@@ -10,6 +10,7 @@ C If nalgorithm=0 use Fowler-Manopoulus algorithm
 C If nalgorithm=1 use Tutte algorithm
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
+      REAL*8 layout2d
       Integer D,S,RT,Spiral
       DIMENSION layout2d(2,NMAX)
       DIMENSION D(MMAX,MMAX),S(MMAX),Dist(3,NMAX),distP(NMAX)
