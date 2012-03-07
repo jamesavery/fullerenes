@@ -1,0 +1,7 @@
+C120 Using FM algorithm to produce coordinates
+&Coord NA=120, IC=3 , IP=1, R6=1.42 /
+&Opt Iopt=1 /
+&Hamilton /
+&Isomers /
+&Graph IG=1, ISO1=1, ISO2=2, ISO3=3 /
+1   8  12  26  28  30  33  35  37  51  55  62

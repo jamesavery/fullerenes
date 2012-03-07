@@ -1,0 +1,7 @@
+C60  Using subroutine to produce coordinates for C60, ideal capped isosahedron
+&Coord NA=60, IC=0, R5=1.423, R6=1.423 /
+&Opt /
+&Hamilton /
+&Isomers /
+&Graph IG=1 /
+

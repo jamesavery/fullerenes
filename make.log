@@ -1,0 +1,8 @@
+cd libgraph && make 
+g++ -O3 -msse4    -c -o graph.o graph.cc
+g++ -O3 -msse4    -c -o cubicgraph.o cubicgraph.cc
+g++ -O3 -msse4    -c -o layout.o layout.cc
+g++ -O3 -msse4    -c -o hamiltonian.o hamiltonian.cc
+g++ -O3 -msse4    -c -o fullerenegraph.o fullerenegraph.cc
+ar rcs ../libgraph.a graph.o cubicgraph.o layout.o hamiltonian.o graph.o fullerenegraph.o
+gfortran -w -O3 -m64  main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o hueckel.o pentindex.o schlegel.o spiral.o volume.o graph_fortran.o libgraph.a  -o fullerene -lstdc++

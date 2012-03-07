@@ -1,0 +1,7 @@
+C40  Using FM algorithm to produce coordinates
+&Coord NA=40, IC=2, IP=1 /
+&Opt Iopt=1 /
+&Hamilton /
+&Isomers /
+&Graph IG=2 /
+1 2 3 4 5 6 17 18 19 20 21 22

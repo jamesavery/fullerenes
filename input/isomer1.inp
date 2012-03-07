@@ -1,0 +1,6 @@
+C84 Creating isomer list only
+&Coord NA=82, IC=0 /
+&Opt Iopt=1 /
+&Hamilton Iham=1 /
+&Isomers IPR=1 istop=1 /
+&Graph /

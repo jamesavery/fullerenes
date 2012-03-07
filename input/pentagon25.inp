@@ -1,0 +1,7 @@
+C110 Using FM algorithm to produce coordinates
+&Coord NA=110, IC=2, R6=1.42 /
+&Opt Iopt=1 /
+&Hamilton /
+&Isomers /
+&Graph IG=1, ISO1=1, ISO2=2, ISO3=3 /
+1   8  10  12  25  27  29  43  45  47  50  57

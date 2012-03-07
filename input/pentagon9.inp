@@ -1,0 +1,7 @@
+C30  Using FM algorithm to produce coordinates
+&Coord NA=30, IC=2 /
+&Opt Iopt=1 /
+&Hamilton /
+&Isomers /
+&Graph IG=2, ISO1=1, ISO2=2, ISO3=3 /
+1 2 3 4 5 6 12 13 14 15 16 17

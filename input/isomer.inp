@@ -1,0 +1,6 @@
+C62 Creating isomer list only
+&Coord NA=62, IC=0 /
+&Opt /
+&Hamilton /
+&Isomers IPR=2 istop=1 /
+&Graph /

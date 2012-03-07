@@ -1,0 +1,7 @@
+C840 I could not locate eigenvectors for FM, using Tutte instead
+&Coord NA=840, IC=3, R6=1.42 /
+&Opt Iopt=1 /
+&Hamilton /
+&Isomers  /
+&Graph IG=1, ISO1=1, ISO2=2, ISO3=3 /
+1   7   9  11  13  15 408 410 412 414 416 422

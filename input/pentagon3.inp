@@ -1,0 +1,7 @@
+C60  Using FM algorithm to produce coordinates
+&Coord NA=60, IC=2 , IP=1 /
+&Opt Iopt=1 /
+&Hamilton IHam=1 /
+&Isomers /
+&Graph IG=1, ISO1=1, ISO2=2, ISO3=3 /
+1 7 9 11 13 15 18 20 22 24 26 32

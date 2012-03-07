@@ -1,0 +1,5 @@
+&Coord NA=20, IC=3 , IP=1, R6=1.39 /
+&Opt Iopt=1 /
+&Hamilton IHam=1 /
+&Isomers IPR=1 /
+&Graph IG=1, ISO1=1, ISO2=2, ISO3=3 /
