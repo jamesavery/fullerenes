@@ -557,7 +557,7 @@ C
 C---------------------------------------------------------------------- 
 
 C    Set the dimensions for the distance matrix
-      PARAMETER (natom=900)      !  Change natom if RAM is not sufficient
+      PARAMETER (natom=840)      !  Change natom if RAM is not sufficient
       PARAMETER (nat11=natom*11)  
       PARAMETER (msrs=56+1)      !  Size of Schlegel output matrix
       PARAMETER (natom2=natom*natom)
@@ -719,8 +719,9 @@ C adjacent vertices
 C Establish all closed ring systems
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(NAtom,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,N5Ring,
-     1 N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
+      CALL Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,
+     1 N5Ring,N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
+     1 DistMat)
 
 C Produce the dual of the fullerene
 C     if(IOPD.eq.1) then
@@ -753,8 +754,9 @@ C Optimize Geometry through force field method
       endif
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(NAtom,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,N5Ring,
-     1 N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
+      CALL Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,
+     1 N5Ring,N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
+     1 DistMat)
 
 C Calculate the center for each ring system
       routine='RINGC        '
