@@ -1392,7 +1392,7 @@ C     Calculate the volume for C50 using R5
       RETURN
       END
 
-      SUBROUTINE Ring(NAtom,Nfaces,natomL,Natom2,MCon2,MAtom,
+      SUBROUTINE Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,
      1 IOUT,Ncount5,Ncount6,IC3,Icon2,N5MEM,N6MEM,Rmin5,
      1 Rmin6,Rmax5,Rmax6,DistMat)
 C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
@@ -1407,7 +1407,7 @@ C     enough and fast.
       DIMENSION IPa(6,96)
       DIMENSION DistMat(natomL)
       DIMENSION Rd(6)
-      DIMENSION Rmem(100)
+      DIMENSION Rmem(Nedges)
       Data Tol/5.d-4/
       Ndif=0
       NForbid=0
