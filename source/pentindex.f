@@ -108,6 +108,21 @@ C Now produce the Hueckel matrix from the dual matrix
       A(I,J)=dfloat(IDA(I,J))
       enddo
       enddo
+C Analyze the adjaceny matrix if it is correct
+      nsum=0
+      Do I=1,MAtom
+      isum=0
+      Do J=1,MAtom
+      isum=isum+IDA(I,J)
+      enddo
+      If(isum.ne.3) nsum=nsum+1
+      enddo
+      if(nsum.ne.0) then
+      WRITE(Iout,1037) nsum,isum
+      stop
+      else
+      WRITE(Iout,1038)
+      endif
 
 C Now produce the 3D image
 C   Algorithm 1 (Fowler-Manopoulus):
@@ -444,6 +459,9 @@ C     Check distances
      1 'of ',D18.12)
  1035 FORMAT(1X,'Projected on sphere')
  1036 FORMAT(1X,'Fullerene graph deleted')
+ 1037 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
+     1 'not of degree 3, last one is of degree ',I4)
+ 1038 FORMAT(1X,'Graph checked, it is cubic')
       Return 
       END
 

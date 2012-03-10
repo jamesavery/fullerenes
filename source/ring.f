@@ -1,3 +1,279 @@
+      SUBROUTINE Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,
+     1 IOUT,Ncount5,Ncount6,IC3,Icon2,N5MEM,N6MEM,Rmin5,
+     1 Rmin6,Rmax5,Rmax6,DistMat)
+C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
+C     for each atom
+C     I am sure there are better algorithms, but this one is not too bad and fast
+C     enough and fast.
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION IC3(NAtom,3)
+      DIMENSION Icon2(natom2)
+      DIMENSION N5MEM(Nfaces,5),N5MEMS(Nfaces,5)
+      DIMENSION N6MEM(Nfaces,6),N6MEMS(Nfaces,6)
+      DIMENSION IPa(6,96)
+      DIMENSION DistMat(natomL)
+      DIMENSION Rd(6)
+      DIMENSION Rmem(Nedges)
+      Data Tol/5.d-4/
+      Ndif=0
+      NForbid=0
+      Ncount5=1
+      Ncount6=1
+      Do I=1,6
+      Rd(I)=0.d0
+      enddo
+      Do IS=1,MAtom
+      Do 1 I=1,6
+      Do 1 J=1,96
+    1 IPa(I,J)=0
+      Do 2 I=1,3
+    2 IPa(1,I)=IC3(IS,I)     
+      Do I2=1,3
+      IX1=IPa(1,I2)
+      if(IX1.ne.0) CALL Step(NAtom,2,I2,IS,IX1,IPA,IC3)
+      Do I3=1,6
+      IV=I3/2
+      IV1=(I3+1)/2
+      IDIF=IV1-IV
+      IF(IDIF.EQ.1) IV=IV+1
+      IForbid=IPa(1,IV)
+      IX2=IPa(2,I3)
+      if(IX2.ne.0) CALL Step(NAtom,3,I3,IForbid,IX2,IPA,IC3)
+      Do I4=1,12
+      IV=I4/2
+      IV1=(I4+1)/2
+      IDIF=IV1-IV
+      IF(IDIF.EQ.1) IV=IV+1
+      IForbid=IPa(2,IV)
+      IX3=IPa(3,I4)
+      if(IX3.ne.0) CALL Step(NAtom,4,I4,IForbid,IX3,IPA,IC3)
+      Do I5=1,24
+      IV=I5/2
+      IV1=(I5+1)/2
+      IDIF=IV1-IV
+      IF(IDIF.EQ.1) IV=IV+1
+      IForbid=IPa(3,IV)
+      IX4=IPa(4,I5)
+      if(IX4.ne.0) CALL Step(NAtom,5,I5,IForbid,IX4,IPA,IC3)
+      Do I6=1,48
+      IV=I6/2
+      IV1=(I6+1)/2
+      IDIF=IV1-IV
+      IF(IDIF.EQ.1) IV=IV+1
+      IForbid=IPa(4,IV)
+      IX5=IPa(5,I6)
+      if(IX5.ne.0) CALL Step(NAtom,6,I6,IForbid,IX5,IPA,IC3)
+      enddo
+      enddo
+      enddo
+      enddo
+      enddo
+C     Print*,' Tree ',IS
+C     Do 3 I=1,6
+C     Write(IOUT,1010) (IPa(I,J),J=1,48)
+C   3 Write(IOUT,1011) (IPa(I,J),J=49,96)
+C     Identify all 5-membered rings
+      Do I=1,48
+      IN5=IPa(5,I)
+      IF(IN5.eq.IS) then
+      CALL Ring5(Ncount5,I,IN5,natom,Nfaces,IPA,N5MEM,N5MEMS)
+      endif
+      enddo
+C     Identify all 6-membered rings
+      Do I=1,96
+      IN6=IPa(6,I)
+      IF(IN6.eq.IS) then
+      CALL Ring6(Ncount6,I,IN6,natom,Nfaces,IPA,N6MEM,N6MEMS)
+      endif
+      enddo
+      enddo
+
+      Ncount5=Ncount5-1
+      Write(IOUT,1000) Ncount5
+C     Check bond distances
+      Do I=1,Ncount5
+      Rsum=0.
+      Rmin5=1000.d0
+      Rmax5=0.d0
+      Do J=1,5
+      IAT1=N5MEM(I,J)
+      J1=J+1
+      IF(J1.eq.6) J1=1
+      IAT2=N5MEM(I,J1)
+      DM=FunDistMat(IAT1,IAT2,natomL,DistMat)
+      Rd(J)=DM
+      if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
+      if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
+      RSum=Rsum+Rd(J)
+      enddo
+      RAv5=RSum*.2d0
+      Rsum=0.
+      Do J=1,5
+      Rsum=Rsum+(RAv5-Rd(J))**2
+      enddo
+      Rrmsd=dsqrt(Rsum*.2d0)
+      Write(IOUT,1001) (N5MEM(I,J),J=1,5),RAv5,Rrmsd,(Rd(J),J=1,5)
+      CALL DifDist(Ndif,5,Tol,Rd,Rmem)
+      enddo
+      Write(IOUT,1007) Rmin5,Rmax5
+C     Check bond angles
+      asmall=1.d10
+      abig=-1.d10
+      Do I=1,Ncount5
+      Do J=1,5
+      IAT1=N5MEM(I,J)
+      J1=J+1
+      IF(J1.eq.6) J1=1
+      IAT2=N5MEM(I,J1)
+      J2=J+2
+      IF(J2.eq.6) J2=1
+      IF(J2.eq.7) J2=2
+      IAT3=N5MEM(I,J2)
+C     Deviation from ideal pentagon angle of 108 deg
+      AngleM=FunAngleMat(IAT1,IAT2,IAT3,natomL,DistMat)
+      if(AngleM.gt.abig) then
+      abig=AngleM
+      endif
+      if(AngleM.lt.asmall) then
+      asmall=AngleM
+      endif
+      enddo
+      enddo
+      asmalldif=asmall-1.08d2
+      abigdif=abig-1.08d2
+      Write(IOUT,1015) asmall,asmalldif,abig,abigdif
+C
+      Ncount6=Ncount6-1
+      Write(IOUT,1002) Ncount6
+      If(Ncount6.ne.0) Write(IOUT,1006)
+C     Check bond distances
+      Rmin6=1000.d0
+      Rmax6=0.d0
+      Do I=1,Ncount6
+      Rsum=0.
+      Do J=1,6
+      IAT1=N6MEM(I,J)
+      J1=J+1
+      IF(J1.eq.7) J1=1
+      IAT2=N6MEM(I,J1)
+      DM=FunDistMat(IAT1,IAT2,natomL,DistMat)
+      Rd(J)=DM
+      if(Rd(J).LT.Rmin6) Rmin6=Rd(J)
+      if(Rd(J).GT.Rmax6) Rmax6=Rd(J)
+      RSum=Rsum+Rd(J)
+      enddo
+      RAv6=RSum/6.d0
+      Rsum=0.
+      Do J=1,6
+      Rsum=Rsum+(RAv6-Rd(J))**2
+      enddo
+      Rrmsd=dsqrt(Rsum*.2d0)
+      Write(IOUT,1003) (N6MEM(I,J),J=1,6),RAv6,Rrmsd,(Rd(J),J=1,6)
+      CALL DifDist(Ndif,6,Tol,Rd,Rmem)
+      enddo
+      If(Ncount6.ne.0) Write(IOUT,1008) Rmin6,Rmax6
+      If(Rmin5.lt.Rmin6) then
+      NMin=5
+      RminT=Rmin5
+      else
+      NMin=6
+      RminT=Rmin6
+      endif
+      If(Rmax5.ge.(Rmax6-1.d-12)) then
+      NMax=5
+      RmaxT=Rmax5
+      else
+      NMax=6
+      RmaxT=Rmax6
+      endif
+C     Check bond angles
+      asmall=1.d10
+      abig=-1.d10
+      Do I=1,Ncount5
+      Do J=1,6
+      IAT1=N6MEM(I,J)
+      J1=J+1
+      IF(J1.eq.7) J1=1
+      IAT2=N6MEM(I,J1)
+      J2=J+2
+      IF(J2.eq.7) J2=1
+      IF(J2.eq.8) J2=2
+      IAT3=N6MEM(I,J2)
+C     Deviation from ideal hexagon angle of 120 deg
+      AngleM=FunAngleMat(IAT1,IAT2,IAT3,natomL,DistMat)
+      if(AngleM.gt.abig) then
+      abig=AngleM
+      endif
+      if(AngleM.lt.asmall) then
+      asmall=AngleM
+      endif
+      enddo
+      enddo
+      asmalldif=asmall-1.2d2
+      abigdif=abig-1.2d2
+      Write(IOUT,1016) asmall,asmalldif,abig,abigdif
+
+C     Check Euler characteristic
+      Ncount56=Ncount5+Ncount6
+      MEuler=MAtom-Mcon2+Ncount56
+      Mv=(5*Ncount5+6*Ncount6)/3
+      Me=(5*Ncount5+6*Ncount6)/2
+      Write(IOUT,1004) MAtom,Mcon2,Ncount56,MEuler,Ncount5,Ncount6,Mv,Me
+      If(MEuler.ne.2) Write(IOUT,1005)
+      If(Ncount5.ne.12) then
+      Write(IOUT,1014)
+      stop
+      endif
+      Write(IOUT,1009) NMin,RminT,NMax,RmaxT
+      ameas=dfloat(Ndif)/dfloat(Mcon2)
+      Write(Iout,1012) Ndif,ameas,Tol
+      Write(Iout,1013) (Rmem(I),I=1,Ndif)
+ 1000 Format(/1X,I3,' five-membered-rings identified',/,
+     1 ' Atom numbers in ring, Ni, mean distance, dm, and root mean',
+     1 ' square deviation for distances, RMSD,'
+     1 ' and distances in the ring:',
+     1 /3X,'N1   N2   N3   N4   N5',9X,'dm',11X,'RMSD',
+     1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5')
+ 1001 Format(1X,5(I4,1X),3X,2(d12.6,2X),5X,5(d12.6,2X))
+ 1002 Format(/1X,I3,' six-membered-rings identified')
+ 1003 Format(1X,6(I4,1X)3X,2(d12.6,2X),5X,6(d12.6,2X))
+ 1004 Format(//1X,'Checking the Euler polyhedron formula:',/1X,
+     1 'Number of vertices Nv: ',I4,/1X,
+     1 'Number of edges Ne:    ',I4,/1X,
+     1 'Number of faces Nf:    ',I4,/1X,
+     1 'Euler number Nv-Ne+Nf: ',I4,
+     1 ' (should be 2 for spherical polyhedra '
+     1 'or planar connected graphs)',/1X,
+     1 'Number of pentagons:   ',I4,/1X,
+     1 'Number of hexagons:    ',I4,/1X,
+     1 'Mv=',I4,1X,' Me=',I4)
+ 1005 Format(1X,' **** Capped Polydron does not fulfill Eulers theorem')
+ 1006 Format(/1X,' Atom numbers in ring,',
+     1 ' Ni, mean distance, dm, and root mean',
+     1 ' square deviation for distances, RMSD,'
+     1 ' and distances in the ring:',
+     1 /3X,'N1   N2   N3   N4   N5   N6',9X,'dm',11X,'RMSD',
+     1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5'12X,'R6')
+ 1007 Format(1X,' 5-ring minimum bond distance: ',d12.6,
+     1 3X,' maximum bond distance: ',d12.6) 
+ 1008 Format(1X,' 6-ring minimum bond distance: ',d12.6,
+     1 3X,' maximum bond distance: ',d12.6) 
+ 1009 Format(1X,' Minimum bond distance in ',I1,'-ring: ',d12.6,
+     1 3X,' maximum bond distance in ',I1,'-ring: ',d12.6) 
+ 1010 Format(1X,96(I3))
+ 1011 Format(3X,96(I3))
+ 1012 Format(/1X,'Number of different bond distances Nr=',I4,
+     1 ' and Nr/Ne= ',d12.6,
+     1 ' (within tolerance ',d6.1,'),  Nonequivalent bond distances:') 
+ 1013 Format(10(1X,D12.6,1X))
+ 1014 Format(1X,'**** Severe error: 12 pentagons expected. STOP ****')
+ 1015 Format(1X,' 5-ring minimum bond angle (deviation from 108 deg): ',
+     1 F6.2,' (',F6.2,'), maximum bond angle: ',F6.2,' (',F6.2,')')
+ 1016 Format(1X,' 6-ring minimum bond angle (deviation from 120 deg): ',
+     1 F6.2,' (',F6.2,'), maximum bond angle: ',F6.2,' (',F6.2,')')
+      RETURN
+      END
+
       SUBROUTINE RingC(NAtom,Nfaces,Nedges,NAtom2,Matom,nat11,Iout,
      1 iprint,N5MEM,N6MEM,N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
      1 NringA,NringB,NringC,NringD,NringE,NringF,DIST,CRing5,CRing6)
@@ -1389,222 +1665,6 @@ C     Calculate the volume for C50 using R5
  1004 Format(1X,' Radius of dodecahedron: ',D15.8,
      1 ' and edge length: ',D15.8,/,
      1 '  Volume of ideal dodecahedron for C20:',D15.8)
-      RETURN
-      END
-
-      SUBROUTINE Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,
-     1 IOUT,Ncount5,Ncount6,IC3,Icon2,N5MEM,N6MEM,Rmin5,
-     1 Rmin6,Rmax5,Rmax6,DistMat)
-C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
-C     for each atom
-C     I am sure there are better algorithms, but this one is not too bad and fast
-C     enough and fast.
-      IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION IC3(NAtom,3)
-      DIMENSION Icon2(natom2)
-      DIMENSION N5MEM(Nfaces,5),N5MEMS(Nfaces,5)
-      DIMENSION N6MEM(Nfaces,6),N6MEMS(Nfaces,6)
-      DIMENSION IPa(6,96)
-      DIMENSION DistMat(natomL)
-      DIMENSION Rd(6)
-      DIMENSION Rmem(Nedges)
-      Data Tol/5.d-4/
-      Ndif=0
-      NForbid=0
-      Ncount5=1
-      Ncount6=1
-      Do I=1,6
-      Rd(I)=0.d0
-      enddo
-      Do IS=1,MAtom
-      Do 1 I=1,6
-      Do 1 J=1,96
-    1 IPa(I,J)=0
-      Do 2 I=1,3
-    2 IPa(1,I)=IC3(IS,I)     
-      Do I2=1,3
-      IX1=IPa(1,I2)
-      if(IX1.ne.0) CALL Step(NAtom,2,I2,IS,IX1,IPA,IC3)
-      Do I3=1,6
-      IV=I3/2
-      IV1=(I3+1)/2
-      IDIF=IV1-IV
-      IF(IDIF.EQ.1) IV=IV+1
-      IForbid=IPa(1,IV)
-      IX2=IPa(2,I3)
-      if(IX2.ne.0) CALL Step(NAtom,3,I3,IForbid,IX2,IPA,IC3)
-      Do I4=1,12
-      IV=I4/2
-      IV1=(I4+1)/2
-      IDIF=IV1-IV
-      IF(IDIF.EQ.1) IV=IV+1
-      IForbid=IPa(2,IV)
-      IX3=IPa(3,I4)
-      if(IX3.ne.0) CALL Step(NAtom,4,I4,IForbid,IX3,IPA,IC3)
-      Do I5=1,24
-      IV=I5/2
-      IV1=(I5+1)/2
-      IDIF=IV1-IV
-      IF(IDIF.EQ.1) IV=IV+1
-      IForbid=IPa(3,IV)
-      IX4=IPa(4,I5)
-      if(IX4.ne.0) CALL Step(NAtom,5,I5,IForbid,IX4,IPA,IC3)
-      Do I6=1,48
-      IV=I6/2
-      IV1=(I6+1)/2
-      IDIF=IV1-IV
-      IF(IDIF.EQ.1) IV=IV+1
-      IForbid=IPa(4,IV)
-      IX5=IPa(5,I6)
-      if(IX5.ne.0) CALL Step(NAtom,6,I6,IForbid,IX5,IPA,IC3)
-      enddo
-      enddo
-      enddo
-      enddo
-      enddo
-C     Print*,' Tree ',IS
-C     Do 3 I=1,6
-C     Write(IOUT,1010) (IPa(I,J),J=1,48)
-C   3 Write(IOUT,1011) (IPa(I,J),J=49,96)
-C     Identify all 5-membered rings
-      Do I=1,48
-      IN5=IPa(5,I)
-      IF(IN5.eq.IS) then
-      CALL Ring5(Ncount5,I,IN5,natom,Nfaces,IPA,N5MEM,N5MEMS)
-      endif
-      enddo
-C     Identify all 6-membered rings
-      Do I=1,96
-      IN6=IPa(6,I)
-      IF(IN6.eq.IS) then
-      CALL Ring6(Ncount6,I,IN6,natom,Nfaces,IPA,N6MEM,N6MEMS)
-      endif
-      enddo
-      enddo
-      Ncount5=Ncount5-1
-      Write(IOUT,1000) Ncount5
-      Do I=1,Ncount5
-      Rsum=0.
-      Rmin5=1000.d0
-      Rmax5=0.d0
-      Do J=1,5
-      IAT1=N5MEM(I,J)
-      J1=J+1
-      IF(J1.eq.6) J1=1
-      IAT2=N5MEM(I,J1)
-      DM=FunDistMat(IAT1,IAT2,natomL,DistMat)
-      Rd(J)=DM
-      if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
-      if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
-      RSum=Rsum+Rd(J)
-      enddo
-      RAv5=RSum*.2d0
-      Rsum=0.
-      Do J=1,5
-      Rsum=Rsum+(RAv5-Rd(J))**2
-      enddo
-      Rrmsd=dsqrt(Rsum*.2d0)
-      Write(IOUT,1001) (N5MEM(I,J),J=1,5),RAv5,Rrmsd,(Rd(J),J=1,5)
-      CALL DifDist(Ndif,5,Tol,Rd,Rmem)
-      enddo
-      Write(IOUT,1007) Rmin5,Rmax5
-C
-      Ncount6=Ncount6-1
-      Write(IOUT,1002) Ncount6
-      If(Ncount6.ne.0) Write(IOUT,1006)
-      Rmin6=1000.d0
-      Rmax6=0.d0
-      Do I=1,Ncount6
-      Rsum=0.
-      Do J=1,6
-      IAT1=N6MEM(I,J)
-      J1=J+1
-      IF(J1.eq.7) J1=1
-      IAT2=N6MEM(I,J1)
-      DM=FunDistMat(IAT1,IAT2,natomL,DistMat)
-      Rd(J)=DM
-      if(Rd(J).LT.Rmin6) Rmin6=Rd(J)
-      if(Rd(J).GT.Rmax6) Rmax6=Rd(J)
-      RSum=Rsum+Rd(J)
-      enddo
-      RAv6=RSum/6.d0
-      Rsum=0.
-      Do J=1,6
-      Rsum=Rsum+(RAv6-Rd(J))**2
-      enddo
-      Rrmsd=dsqrt(Rsum*.2d0)
-      Write(IOUT,1003) (N6MEM(I,J),J=1,6),RAv6,Rrmsd,(Rd(J),J=1,6)
-      CALL DifDist(Ndif,6,Tol,Rd,Rmem)
-      enddo
-      If(Ncount6.ne.0) Write(IOUT,1008) Rmin6,Rmax6
-      If(Rmin5.lt.Rmin6) then
-      NMin=5
-      RminT=Rmin5
-      else
-      NMin=6
-      RminT=Rmin6
-      endif
-      If(Rmax5.ge.(Rmax6-1.d-12)) then
-      NMax=5
-      RmaxT=Rmax5
-      else
-      NMax=6
-      RmaxT=Rmax6
-      endif
-C     Check Euler charecteristic
-      Ncount56=Ncount5+Ncount6
-      MEuler=MAtom-Mcon2+Ncount56
-      Mv=(5*Ncount5+6*Ncount6)/3
-      Me=(5*Ncount5+6*Ncount6)/2
-      Write(IOUT,1004) MAtom,Mcon2,Ncount56,MEuler,Ncount5,Ncount6,Mv,Me
-      If(MEuler.ne.2) Write(IOUT,1005)
-      If(Ncount5.ne.12) then
-      Write(IOUT,1014)
-      stop
-      endif
-      Write(IOUT,1009) NMin,RminT,NMax,RmaxT
-      ameas=dfloat(Ndif)/dfloat(Mcon2)
-      Write(Iout,1012) Ndif,ameas,Tol
-      Write(Iout,1013) (Rmem(I),I=1,Ndif)
- 1000 Format(/1X,I3,' five-membered-rings identified',/,
-     1 ' Atom numbers in ring, Ni, mean distance, dm, and root mean',
-     1 ' square deviation for distances, RMSD,'
-     1 ' and distances in the ring:',
-     1 /3X,'N1   N2   N3   N4   N5',9X,'dm',11X,'RMSD',
-     1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5')
- 1001 Format(1X,5(I4,1X),3X,2(d12.6,2X),5X,5(d12.6,2X))
- 1002 Format(/1X,I3,' six-membered-rings identified')
- 1003 Format(1X,6(I4,1X)3X,2(d12.6,2X),5X,6(d12.6,2X))
- 1004 Format(//1X,'Checking the Euler polyhedron formula:',/1X,
-     1 'Number of vertices Nv: ',I4,/1X,
-     1 'Number of edges Ne:    ',I4,/1X,
-     1 'Number of faces Nf:    ',I4,/1X,
-     1 'Euler number Nv-Ne+Nf: ',I4,
-     1 ' (should be 2 for spherical polyhedra '
-     1 'or planar connected graphs)',/1X,
-     1 'Number of pentagons:   ',I4,/1X,
-     1 'Number of hexagons:    ',I4,/1X,
-     1 'Mv=',I4,1X,' Me=',I4)
- 1005 Format(1X,' **** Capped Polydron does not fulfill Eulers theorem')
- 1006 Format(/1X,' Atom numbers in ring,',
-     1 ' Ni, mean distance, dm, and root mean',
-     1 ' square deviation for distances, RMSD,'
-     1 ' and distances in the ring:',
-     1 /3X,'N1   N2   N3   N4   N5   N6',9X,'dm',11X,'RMSD',
-     1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5'12X,'R6')
- 1007 Format(1X,' 5-ring minimum bond distance: ',d12.6,
-     1 3X,' maximum bond distance: ',d12.6) 
- 1008 Format(1X,' 6-ring minimum bond distance: ',d12.6,
-     1 3X,' maximum bond distance: ',d12.6) 
- 1009 Format(1X,' Minimum bond distance in ',I1,'-ring: ',d12.6,
-     1 3X,' maximum bond distance in ',I1,'-ring: ',d12.6) 
- 1010 Format(1X,96(I3))
- 1011 Format(3X,96(I3))
- 1012 Format(/1X,'Number of different bond distances Nr=',I4,
-     1 ' and Nr/Ne= ',d12.6,
-     1 ' (within tolerance ',d6.1,'),  Nonequivalent bond distances:') 
- 1013 Format(10(1X,D12.6,1X))
- 1014 Format(1X,'**** Severe error: 12 pentagons expected. STOP ****')
       RETURN
       END
 

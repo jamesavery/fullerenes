@@ -442,23 +442,57 @@ C of length (n-1).
       DIMENSION IMF(Natom,Natom),IMF1(Natom,Natom)
       DIMENSION IS1(10),IS2(10),APN(10)
       DIMENSION B(NAtom,NAtom)
-      Data Ihuge/600/
+      Real*8 upperschwerd,lowerschwerd
+      Data Ihuge/180/
 C     Epstein upper limit
-      power=dfloat(MAtom)/3.d0
+      dAtom=dfloat(MAtom)
+      power=dAtom/3.d0
       ulepstein=2.d0**power
       If(power.lt.31.01d0) then
-      ilepstein=dint(ulepstein)
-      write (Iout,1005) ilepstein
+       ilepstein=dint(ulepstein)
+       write (Iout,1005) ilepstein
       else
-      If(power.gt.1.d3) then
-      write (Iout,1008) 
-      RETURN
+       write (Iout,1000) ulepstein
       endif
-      write (Iout,1000) ulepstein
+C     Schwerdtfeger upper and lower limit
+      powerupper=0.169941*datom+1.508012
+      powerlower=0.118820*datom-0.371872
+      upperschwerd=2.d0**powerupper
+      lowerschwerd=2.d0**powerlower
+      If(powerupper.lt.31.01d0) then
+       iupperschwerd=dint(upperschwerd)
+       write (Iout,1010) iupperschwerd
+      else
+       write (Iout,1011) upperschwerd
       endif
+      If(powerlower.lt.31.01d0) then
+       ilowerschwerd=dint(lowerschwerd)
+       If(ilowerschwerd.lt.24) ilowerschwerd=24
+        write (Iout,1012) ilowerschwerd
+      else
+       write (Iout,1013) lowerschwerd
+      endif
+
+C     Approximate number of IPR fullerenes
+      exphigh=1.230625d-1*dAtom
+      explow=1.136977d-1*dAtom
+      fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
+      fullIPRl=1.050204d0*dexp(explow)/1.2d0
+      If(fullIPRh.lt.2.d10) then
+       ifullIPRh=dint(fullIPRh)
+       ifullIPRl=dint(fullIPRl)
+       write (Iout,1014) ifullIPRl,ifullIPRh
+      else
+       write (Iout,1015) fullIPRl,fullIPRh
+       if(fullIPRh.gt.2.d10) then
+        write (Iout,1008)
+        Return
+       endif
+      endif
+C     Limit for number of atoms
       if(Matom.gt.Ihuge) then
-      write (Iout,1008) 
-      RETURN
+       write (Iout,1009) Ihuge 
+       RETURN
       endif
       write (Iout,1001) 
 C     This is only good for C20, C24 already causes integer overflow
@@ -564,7 +598,6 @@ C     NP values
       enddo
       enddo
       if(ic.ne.0) Write(IOUT,1006) (IS1(l),IS2(l),APN(l),l=1,ic)
-
       endif
  1000 Format(/1X,'Epstein upper limit for Hamiltonian cycles in '
      1 'cubic graphs: ',D22.14)
@@ -585,6 +618,20 @@ C     NP values
  1006 Format(1X,5('('I3,',',I3,')',D21.14,','))
  1007 Format(1X,'Only matrix elements of adjacent vertices are printed')
  1008 Format(1X,'Number of paths of length (n-1) exceeds computer'
-     1 ' real number limit -> Return')
+     1 ' real number limit --> Return') 
+ 1009 Format(1X,'Number of atoms exceeds ',I3,', change Ihuge value ',
+     1 ' (if you dare)') 
+ 1010 Format(1X,'Schwerdtfeger upper limit for Hamiltonian cycles in '
+     1 'fullerene graphs: ',I12)
+ 1011 Format(1X,'Schwerdtfeger upper limit for Hamiltonian cycles in '
+     1 'fullerene graphs: ',D22.14)
+ 1012 Format(1X,'Schwerdtfeger lower limit for Hamiltonian cycles in '
+     1 'fullerene graphs: ',I12)
+ 1013 Format(1X,'Schwerdtfeger lower limit for Hamiltonian cycles in '
+     1 'fullerene graphs: ',D22.14)
+ 1014 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
+     1 'fullerene graphs: between appr.',I12,' and ',I12)
+ 1015 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
+     1 'fullerene graphs: between appr.',D22.14,' and ',D22.14)
       RETURN
       END

@@ -278,4 +278,38 @@ C     Unpack distance matrix value from linear vector
       IMat=((I1-1)*(I1-2))/2+J1
       FunDistMat=DistMat(IMat)
       Return
+      END
+ 
+      FUNCTION FunAngleMat(I,J,K,natomL,DistMat)
+C     Unpack distance matrix value from linear vector
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Dimension DistMat(natomL)
+      Data dpi/3.14159265358979d0/
+      I1=I
+      J1=J
+      IF(I.lt.J) then
+      I1=J
+      J1=I
+      endif
+      IMat=((I1-1)*(I1-2))/2+J1
+      R1=DistMat(IMat)
+      I1=J
+      J1=K
+      IF(J.lt.K) then
+      I1=K
+      J1=J
+      endif
+      IMat=((I1-1)*(I1-2))/2+J1
+      R2=DistMat(IMat)
+      I1=I
+      J1=K
+      IF(I.lt.K) then
+      I1=K
+      J1=I
+      endif
+      IMat=((I1-1)*(I1-2))/2+J1
+      RM=DistMat(IMat)
+      Fac=(R1*R1+R2*R2-RM*RM)/(2.d0*R1*R2)
+      FunAngleMat=180.d0*dacos(Fac)/dpi
+      Return
       END 

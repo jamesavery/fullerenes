@@ -1,20 +1,32 @@
       SUBROUTINE MaxInSphere(ndim,M,IOUT,Dist,c,RVdWC)
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,ndim),c(3)
+      DIMENSION Dist(3,ndim),c(3),cmax(3)
       DATA API/3.14159265358979d0/
       DATA itermax/10000000/
-      DATA eps/1.d-8/
+      DATA eps,epsc/1.d-8,2.d0/
       IOP=1
 C     Get the maximum inner sphere
       Write(IOUT,1000) 
 C    Initial step
+      cnorm=dsqrt(c(1)*c(1)+c(2)*c(2)+c(3)*c(3))
+      nchoice=0
+      if(cnorm.gt.epsc) then
+       c(1)=0.d0
+       c(2)=0.d0
+       c(3)=0.d0
+      nchoice=1
+      endif
       Call MAInorm(ndim,3,M,IP,RMIS,c,Dist)
+      if(nchoice.eq.0) then
       Write(IOUT,1001) RMIS,IP,(c(i),i=1,3)
+      else
+      Write(IOUT,1006) RMIS,IP,(c(i),i=1,3)
+      endif
       VMIS=4.d0/3.d0*Api*RMIS**3
       AMIS=4.d0*Api*RMIS**2
       Write(IOUT,1002) RMIS,VMIS,AMIS
 C     Start Iteration
-      CALL powell(ndim,3,iter,Iout,IOP,ier,M,eps,AN,RMIS,c,Dist)
+      CALL powell(ndim,3,iter,Iout,IOP,ier,M,eps,AN,RMIS,c,cmax,Dist)
 C     End Iteration
       if(ier.eq.1) then
        Write(IOUT,1010)
@@ -28,13 +40,13 @@ C     End Iteration
       RealMIS=RMIS-RVdWC
       VVdWC=4.d0/3.d0*Api*RealMIS**3
       Write(IOUT,1005) RVdWC,RealMIS,VVdWC
+ 1000 Format(/1X,'Calculate the maximum inner sphere')
+ 1001 Format(1X,'Initial inner radius: ',d12.6,' to point ',I5,
+     1 ' taken from center of MDS at (X,Y,Z): ',3(D14.8,2X))
  1002 Format(/1x,'Initial values (in units of input):',
      1 /1x,' Radius of maximum inner sphere: ',D14.8,
      1 /1x,' Volume of maximum inner sphere: ',D14.8,
      1 /1x,' Area   of maximum inner sphere: ',D14.8)
- 1001 Format(1X,'Initial inner radius: ',d12.6,' to point ',I5,
-     1 ' taken from center of MDS at (X,Y,Z): ',3(D14.8,2X))
- 1000 Format(/1X,'Calculate the maximum inner sphere')
  1003 Format(1X,'Inner radius: ',d12.6,' to point ',I5,
      1 ' taken from center of MIS at (X,Y,Z): ',3(D14.8,2X))
  1004 Format(/1x,'Final values (in units of input):',
@@ -44,14 +56,15 @@ C     End Iteration
  1005 Format(/1x,'Subtracting Van der Waals radius of carbon ',
      1 F8.4,' gives VdW inner sphere radius of ',D14.8,
      1 ' and volume of ',D14.8)
+ 1006 Format(1X,'Initial inner radius: ',d12.6,' to point ',I5,
+     1 ' taken from barycenter at (X,Y,Z): ',3(D14.8,2X))
  1010 Format(/1x,'**** Error in MaxInSphere, Problem ill-defined')
       RETURN
       END
 
-      SUBROUTINE MinDistSphere(ndim,M,IOUT,Dist,Rmin,Rmax,
-     1 distP,c,radiusi)
+      SUBROUTINE MinDistSphere(ndim,M,IOUT,Dist,distP,c,radiusi)
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,ndim),distP(ndim),c(3)
+      DIMENSION Dist(3,ndim),distP(ndim),c(3),cmax(3),cMCS(3)
 C     Get the minimum distance sphere
       
       DATA API/3.14159265358979d0/
@@ -61,6 +74,20 @@ C     Get the minimum distance sphere
       Write(IOUT,1000) 
 
 C    Initial step
+C    Center of MDS needs to be confined in convex hull
+C    Here weaker test is carried out if it is within a cube
+C    enclosing the fullerine of diameter xmax*2, ymax*2 and zmax*2
+C    contained in the vector cmax
+C    Get maximum values
+      Do J=1,3
+       cmax(J)=0.d0
+       cMCS(i)=c(i)
+      enddo
+      Do I=1,ndim
+      Do J=1,3
+       if(dabs(Dist(J,I)).gt.cmax(J)) cmax(J)=dabs(Dist(J,I))
+      enddo
+      enddo
 C    Calculate the MDS norm
 
       IOP=0
@@ -74,10 +101,16 @@ C    Calculate the MDS norm
       Write(IOUT,1002) RMDSI,VMDS,AMDS
       Write(IOUT,1003) AN
 C     Start Iteration
-      CALL powell(ndim,3,iter,Iout,IOP,ier,M,eps,AN,RMDSI,c,Dist)
+      CALL powell(ndim,3,iter,Iout,IOP,ier,M,eps,AN,RMDSI,c,cmax,Dist)
 C     End Iteration
+      if(ier.eq.2) then
+       Write(IOUT,1006)
+       do I=1,3
+        c(i)=cMCS(i)
+       enddo
+      endif
       if(ier.eq.1) then
-       Write(IOUT,1010)
+       Write(IOUT,1007)
        Return
       endif
       Call MDSnorm(ndim,3,M,AN,RMDSI,c,Dist)
@@ -87,16 +120,16 @@ C     End Iteration
       VMDS=VMDSI
       AMDS=AMDSI
       RMDS=RMDSI
-      rmin=1.d8
+      rminMDS=1.d8
       Do i=1,M
        dx=dist(1,I)-c(1)
        dy=dist(2,I)-c(2)
        dz=dist(3,I)-c(3)
        dp=dsqrt(dx*dx+dy*dy+dz*dz)
-       if(dp.lt.rmin) rmin=dp
+       if(dp.lt.rminMDS) rminMDS=dp
       enddo
-      distortion=100.d0*AN/rmin
-      Write(IOUT,1005) RMDSI,VMDS,AMDS,rmin,distortion
+      distortion=100.d0*AN/rminMDS
+      Write(IOUT,1005) RMDSI,VMDS,AMDS,rminMDS,distortion
  1000 Format(/1X,'Calculate the minimum distance sphere')
  1001 Format(1X,'Initial average radius: ',d12.6,
      1 ' taken from center of MCS at (X,Y,Z): ',3(D14.8,2X))
@@ -115,7 +148,10 @@ C     End Iteration
      1 /1x,' Area of  minimum distance  sphere:   ',D14.8,
      1 /1x,' Smallest point distance from center: ',D14.8,
      1 /1x,' MDS distortion parameter in percent: ',D14.8)
- 1010 Format(/1x,'**** Error in MaxInSphere, Problem ill-defined')
+ 1006 Format(/1x,'Center of MDS tries to move out of convex hull.',
+     1 ' MDS problem ill-defined due to large distortion.',
+     1 /1x,'Taking center of MCS instead:')
+ 1007 Format(/1x,'**** Error in MaxInSphere, Problem ill-defined')
       Return
       End
 

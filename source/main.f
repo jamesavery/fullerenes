@@ -435,7 +435,7 @@ C          directly into the input file
 C      If IC = 2 or 3 Cartesian Coordinates are created from pentagon 
 C             ring spiral list. Extra input required (free format):
 C
-C           IP(I),I=1,12 
+C           IRSP(I),I=1,12 
 C
 C           R6 is taken as the smallest bond distance in the fullerene and IP(I)
 C           identify the locations of the pentagons as described in detail
@@ -457,7 +457,7 @@ C           IC=4: Tutte embedding algorithm. This should alway work, although
 C            the initial fullerene might be too spherical.
 C           Examples are given in the input files starting with 'pentagon'.
 C           Please use Angstroems.
-C      If iprintf>0 larger output produced, i.e. the full distance matrix, all
+C      If IP>0 larger output produced, i.e. the full distance matrix, all
 C          Hamiltonian cycles and all 3-ring connections.
 C      Connectivities are found for atoms with distances between
 C         R6   and   R6*(1+TolR/100)   if cartesian coordinate input is chosen.
@@ -492,7 +492,12 @@ C      In detail:
 C      If IHam>0 Then Subroutine HAMILTON is called.     (Default: 0)
 C         IHam=1 Routine will stop after 1 million Hamiltonian cycles are found
 C         IHam>1 it will run up to 10**IHam Hamiltonian cycles.
-C      If IUPAC=1 IUPAC numbers are produced.     (Default: 0)
+C      If IUPAC=1 IUPAC numbers are produced.   (Default: 0) 
+C         Note only with this option together with IP=1 in &Coord input 
+C         all Hamiltonian cycles are printed out. IP=0 only gives the
+C         best cycle (see Babic, ref.3).
+C         IUPAC=0 goes into a fast subroutine and prints only the total number of
+C         Hamiltonian cycles.
 C
 C 5) Option for producing list of isomers and properties.
 C      &Isomers options /        (e.g.&Isomers IPR=1, IPH=1 /)
@@ -557,7 +562,7 @@ C
 C---------------------------------------------------------------------- 
 
 C    Set the dimensions for the distance matrix
-      PARAMETER (natom=840)      !  Change natom if RAM is not sufficient
+      PARAMETER (natom=960)      !  Change natom if RAM is not sufficient
       PARAMETER (nat11=natom*11)  
       PARAMETER (msrs=56+1)      !  Size of Schlegel output matrix
       PARAMETER (natom2=natom*natom)
@@ -811,8 +816,7 @@ C    1 Rmin,Rmax,VolSphere,ASphere,Atol,VTol,cmcs,rmcs,RVdWC)
 C Calculate the minimum distance sphere
       routine='MINDISTSPHERE'
       Write(Iout,1008) routine
-      CALL MinDistSphere(NAtom,MAtom,IOUT,Dist,
-     1 Rmin,Rmax,distP,cmcs,rmcs)
+      CALL MinDistSphere(NAtom,MAtom,IOUT,Dist,distP,cmcs,rmcs)
 
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE'

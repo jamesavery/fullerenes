@@ -129,7 +129,7 @@ C         dgg=dgg+xi(j)**2
       Write(Iout,1000) fret,fret-fp
  1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
      1 /1X,'energy ',F15.9,', diff= ',D12.3)
- 1001 Format(' Iteration ',I3,', energy ',F15.9,', gradient ',F12.6)
+ 1001 Format(' Iteration ',I3,', energy ',D14.8,', gradient ',D14.8)
  1002 Format(/1X,'Convergence achieved, energy ',F15.9,', diff= ',D12.3)
  1003 Format(' Force field parameters: ',8F12.6,', Tolerance= ',D9.3,/)
  1004 Format('**** Severe error in angle, check input coordiantes:',
@@ -334,11 +334,12 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE powell(ndim,n,iter,Iout,IOP,ier,M,ftol,AN,RMDSI,p,Dist)
+      SUBROUTINE powell(ndim,n,iter,Iout,IOP,ier,M,ftol,AN,RMDSI,
+     1 p,pmax,Dist)
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (NMAX=3,ITMAX=20,TINY=1.D-20)
       REAL*8 p(n),pcom(n),xicom(n),xi(n,n),pt(n),ptt(n),xit(n),step(n)
-      REAL*8 Dist(3,ndim)
+      REAL*8 Dist(3,ndim),pmax(n)
       
 c numerical recipies cluster to do Powell minimization
 c
@@ -388,6 +389,12 @@ c   fret      ... value of f at p
         endif
 13    continue
         WRITE(IOUT,1004) iter,(p(j),j=1,3),fret
+      If(IOP.eq.0) then
+       if(dabs(p(1)).gt.pmax(1)) ier=2
+       if(dabs(p(2)).gt.pmax(2)) ier=2
+       if(dabs(p(3)).gt.pmax(3)) ier=2
+       if(ier.eq.2) return
+      endif
       if(2.*dabs(fp-fret).le.ftol*(dabs(fp)+dabs(fret))+TINY) Return
       if(iter.eq.ITMAX) Go to 2
       do 14 j=1,n
