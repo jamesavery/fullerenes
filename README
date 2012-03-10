@@ -436,7 +436,7 @@
       If IC = 2 or 3 Cartesian Coordinates are created from pentagon 
              ring spiral list. Extra input required (free format):
 
-           IP(I),I=1,12 
+           IRSP(I),I=1,12 
 
            R6 is taken as the smallest bond distance in the fullerene and IP(I)
            identify the locations of the pentagons as described in detail
@@ -458,7 +458,7 @@
             the initial fullerene might be too spherical.
            Examples are given in the input files starting with 'pentagon'.
            Please use Angstroems.
-      If iprintf>0 larger output produced, i.e. the full distance matrix, all
+      If IP>0 larger output produced, i.e. the full distance matrix, all
           Hamiltonian cycles and all 3-ring connections.
       Connectivities are found for atoms with distances between
          R6   and   R6*(1+TolR/100)   if cartesian coordinate input is chosen.
@@ -494,6 +494,11 @@
          IHam=1 Routine will stop after 1 million Hamiltonian cycles are found
          IHam>1 it will run up to 10**IHam Hamiltonian cycles.
       If IUPAC=1 IUPAC numbers are produced.     (Default: 0)
+         Note only with this option together with IP=1 in &Coord input
+         all Hamiltonian cycles are printed out. IP=0 only gives the
+         best cycle (see Babic, ref.3).
+         IUPAC=0 goes into a fast subroutine and prints only the total number of
+         Hamiltonian cycles.
 
  5) Option for producing list of isomers and properties.
       &Isomers options /        (e.g.&Isomers IPR=1, IPH=1 /)
