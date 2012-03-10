@@ -1,28 +1,42 @@
 #
 # Makefile for FULLERENE program
 #
-DIR=./source
-#FCOMP= g77 -w
-#FCOMP= gfortran -w -O3 -m32
-FCOMP=gfortran -g3 -O3 -m64
-OBJECTS= main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-TESTINP=$(wildcard *.inp)
-TESTOUT=$(patsubst %.inp, %.out, $(TESTINP))
+CXX=g++
+F90=gfortran-mp-4.4
+AR=ar
+
+CXXFLAGS=-O3 -msse3 -m32
+FFLAGS= -O3 -msse3 -m32
+
+OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
+GRAPHOBJECTS=graph.o cubicgraph.o layout.o hamiltonian.o graph.o fullerenegraph.o graph_fortran.o
+
+FOBJECTS=$(patsubst %.o,build/%.o,$(OBJECTS))
+COBJECTS=$(patsubst %.o,build/%.o,$(GRAPHOBJECTS))
+TESTINP=$(wildcard input/*.inp)
+TESTOUT=$(patsubst input/%.inp, output/%.out, $(TESTINP))
 #
 #
-fullerene: $(OBJECTS) libgraph.a
-	$(FCOMP) $(OPTIONS) $^ $(LIBRARIES) -o $@ -lstdc++
+fullerene: $(FOBJECTS) libgraph.a
+	$(F90) $(FFLAGS) $(OPTIONS) $^ $(LIBRARIES) -o $@ -lstdc++
 
 #
 # ############    Definition of the subroutines    ###############
 #
 #-----------------------------------------------------
-%.o: $(DIR)/%.f
-	$(FCOMP) $(OPTIONS) -c $<
+build/%.o: source/%.f
+	$(F90) $(FFLAGS) $(OPTIONS) -c $< -o $@
+
+build:
+	mkdir -f build
+
+build/%.o: libgraph/%.cc build
+	$(F90) $(FFLAGS) $(OPTIONS) -c $< -o $@
 #-----------------------------------------------------
 .PHONY: libfullerenegraph.a
-libgraph.a: 
-	cd libgraph && $(MAKE) 
+libgraph.a: $(COBJECTS)
+	$(AR) rcs $@ $(COBJECTS)
+
 #-----------------------------------------------------
 test-%: tests/%.cc libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ 
@@ -36,7 +50,9 @@ tests: fullerene $(TESTOUT)
 
 
 clean:
-	rm -f *~ \#*\# *.o *.a
-	cd libgraph && make clean
+	find . \( -name  "*~" -or  -name "#*#" -or -name "*.o" \) -exec rm {} \;
+
+distclean: clean
+	rm -f fullerene libgraph.a
 
 #-----------------------------------------------------
