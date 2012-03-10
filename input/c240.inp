@@ -1,4 +1,9 @@
-240   0 0 0 0 0    2 12 13 26    60. 0.    6-31G opt. geom. minimum -9144.76260 au not converged out
+C240 6-31G opt. geom. minimum -9144.76260 au not converged out
+&Coord NA=240 /
+&Opt /
+&Hamilton /
+&Isomers /
+&Graph IG=2, IS1=12, IS2=13,IS3=26, PS=30. /
 6             0.289117    6.379537    2.784036
 6             1.706950    6.184846    3.022066
 6             2.677796    6.130266    1.945327
