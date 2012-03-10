@@ -21,6 +21,7 @@ extern "C" {
 
   // Planar and spherical graph layout methods 
   void tutte_layout_(fullerene_graph_ptr* g, double *LAYOUT);
+  void tutte_layout_b_(fullerene_graph_ptr* g, int *s, int *t, int *r, double *LAYOUT);
   void spherical_layout_(const fullerene_graph_ptr* g, double *LAYOUT3D);
 
 
@@ -74,8 +75,12 @@ fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g)
 
 void tutte_layout_(fullerene_graph_ptr *g, double *LAYOUT)
 {
+  tutte_layout_b_(g,0,0,0,LAYOUT);
+}
+void tutte_layout_b_(fullerene_graph_ptr *g, int *s, int *t, int *r, double *LAYOUT)
+{
   FullereneGraph &G(**g);
-  G.layout2d = G.tutte_layout();
+  G.layout2d = G.tutte_layout(*s-1,*t-1,*r-1);
   for(unsigned int i=0;i<G.N;i++){
     LAYOUT[i*2]   = G.layout2d[i].first;
     LAYOUT[i*2+1] = G.layout2d[i].second;
@@ -90,7 +95,7 @@ void spherical_layout_(const fullerene_graph_ptr *g, double *LAYOUT3D)
   
   for(int i=0;i<G.N;i++){
     double theta = angles[i].first, phi = angles[i].second;
-    fprintf(stderr,"%f,%f\n",theta,phi);
+    //    fprintf(stderr,"%f,%f\n",theta,phi);
     double x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
     LAYOUT3D[i*3] = x;
     LAYOUT3D[i*3+1] = y;

@@ -165,7 +165,7 @@ Graph Graph::dual_graph(unsigned int Fmax, const vector<coord2d> layout) const {
 	dual.edge_set.insert(edge_t(*f,*g));
     }
   }
-  fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()),allfaces.size());
+  fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
 
   dual.update_auxiliaries();
 

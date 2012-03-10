@@ -32,7 +32,7 @@ struct Graph {
   Graph(const unsigned int N, const vector<int>& adjacency) : N(N), neighbours(N), edges(N*(N-1)/2) {
     assert(adjacency.size() == N*N);
 
-    printf(" New Graph(%d,adjacency)\n",N);
+  //  printf(" New Graph(%d,adjacency)\n",N);
     for(unsigned int i=0;i<N;i++)
       for(unsigned int j=i+1;j<N;j++){
 	if(adjacency[i*N+j]) edge_set.insert(edge_t(i,j));

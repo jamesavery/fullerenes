@@ -26,10 +26,21 @@ struct CubicGraph : public Graph {
   }
 
   CubicGraph(FILE *file = stdin) {
+    int l = 0;
+    char line[0x300];
     while(!feof(file)){
       node_t n, ns[3];
       double x, y;
-       int count = fscanf(file,"%d %lf %lf %d %d %d",&n,&x,&y,ns,ns+1,ns+2);
+      char *p = fgets(line,0x2ff,file);
+      if(!p){
+	if(feof(file)) continue;
+	else {
+	  fprintf(stderr,"File read error.\n");
+	  abort();
+	}
+      }
+
+      int count = sscanf(line,"%d %lf %lf %d %d %d",&n,&x,&y,ns,ns+1,ns+2);
 
        if(count == 6){
 	 // Change index start from 1 to 0
@@ -41,6 +52,19 @@ struct CubicGraph : public Graph {
 	 }
 	 neighbours[n] = vector<node_t>(ns,ns+3);
 	 layout2d[n] = coord2d(x,y);
+       } else {			// Try
+	 char dummy[0x300];
+	 count = sscanf(line,"%d %s %s %d %d %d",&n,dummy,dummy,ns,ns+1,ns+2);
+	 if(count == 6){
+	   n--;
+	   for(int i=0;i<3;i++) ns[i]--;
+	   if(n>=neighbours.size())
+	     neighbours.resize(n+1);
+	   
+	   neighbours[n] = vector<node_t>(ns,ns+3);
+	 } else {
+	   //	   fprintf(stderr,"Skipped line %d\n",l++);
+	 }
        }
     }
     N = neighbours.size();
@@ -60,7 +84,7 @@ struct CubicGraph : public Graph {
 
 
 
-  vector<coord2d> tutte_layout(const node_t s = 0) const;
+  vector<coord2d> tutte_layout(const node_t s=0, const node_t t=0, const node_t r=0) const;
   vector<coord2d> spherical_projection(const vector< coord2d >& layout2d) const;
 
 

@@ -2,12 +2,26 @@
 #include "cubicgraph.hh"
 #include <sstream>
 
-vector<coord2d> CubicGraph::tutte_layout(const node_t s) const
+struct ToleranceLess {
+  const double tolerance;
+  ToleranceLess(const double tolerance) : tolerance(tolerance) {}
+  bool operator()(const coord2d& x,const coord2d& y) const { return x<y && (y-x).norm() > tolerance; }
+};
+
+vector<coord2d> CubicGraph::tutte_layout(const node_t s, node_t t, node_t r) const
 {
-  node_t t = neighbours[s][0];
-  vector<node_t> outer_face(shortest_cycle(s,t,6));
+  if(!t) t = neighbours[s][0];
+  if(!r) {
+	r = neighbours[t][0];
+	for(int i=1;i<3;i++) if(r==s) r = neighbours[t][i];
+  }
+  vector<node_t> outer_face(shortest_cycle(s,t,r,6));
   vector<coord2d> xys(N), newxys(N);
   vector<bool> fixed(N);
+
+  vector<unsigned int> vertex_depth(multiple_source_shortest_paths(outer_face,vector<bool>(N*(N-1)/2),vector<bool>(N)));
+  unsigned int max_vertex_depth = *max_element(vertex_depth.begin(), vertex_depth.end());
+  // fprintf(stderr,"Maximum vertex depth is %d\n",max_vertex_depth);
 
   unsigned int Nface = outer_face.size();
   for(unsigned int i=0;i<Nface;i++){
@@ -16,8 +30,8 @@ vector<coord2d> CubicGraph::tutte_layout(const node_t s) const
   }
     
   bool converged = false;
-  const unsigned int TUTTE_MAX_ITERATION = 1000;
-  const double TUTTE_CONVERGENCE = 1e-10;
+  const unsigned int TUTTE_MAX_ITERATION = 4000;
+  const double TUTTE_CONVERGENCE = 1e-8;
   for(unsigned int i=0;!converged && i<TUTTE_MAX_ITERATION; i++){
 
     for(node_t u=0;u<N;u++)
@@ -31,11 +45,21 @@ vector<coord2d> CubicGraph::tutte_layout(const node_t s) const
       
     double max_change = 0;
     for(node_t u=0;u<N;u++) {
-      double change = (xys[u]-newxys[u]).norm();
-      if(change > max_change) max_change = change;
+      const vector<node_t>& ns(neighbours[u]);
+      double neighbour_dist = ((xys[u]-xys[ns[0]]).norm()+(xys[u]-xys[ns[1]]).norm()+(xys[u]-xys[ns[2]]).norm())/3.0;
+      double relative_change = (xys[u]-newxys[u]).norm()/neighbour_dist;
+      if(relative_change > max_change) max_change = relative_change;
     }
     if(max_change <= TUTTE_CONVERGENCE) converged = true;
     xys = newxys;
+  }
+
+  // Test that points are distinct
+  ToleranceLess lt(0.0);
+  set<coord2d,ToleranceLess> point_set(xys.begin(),xys.end(),lt);
+  if(point_set.size() != N){
+    fprintf(stderr,"tutte_layout() failed: only %d unique coordinates out of %d vertices (up to tolerance %g).\n",
+	    int(point_set.size()),N,0.0);
   }
   return xys;
 }
