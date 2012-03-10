@@ -2,6 +2,8 @@
 
 ostream& operator<<(ostream& s, const CubicGraph& g)
 {
+  s.precision(30);
+  s << fixed << endl;
   s << "{" << static_cast<Graph>(g); 
   
   if(g.spherical_layout.size() == g.N){
