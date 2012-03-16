@@ -19,6 +19,8 @@ vector<coord2d> CubicGraph::tutte_layout(const node_t s, node_t t, node_t r) con
   vector<coord2d> xys(N), newxys(N);
   vector<bool> fixed(N);
 
+  cout << "tutte_layout: Outer face: " << outer_face << endl;
+
   vector<unsigned int> vertex_depth(multiple_source_shortest_paths(outer_face,vector<bool>(N*(N-1)/2),vector<bool>(N)));
   unsigned int max_vertex_depth = *max_element(vertex_depth.begin(), vertex_depth.end());
   // fprintf(stderr,"Maximum vertex depth is %d\n",max_vertex_depth);
@@ -26,7 +28,7 @@ vector<coord2d> CubicGraph::tutte_layout(const node_t s, node_t t, node_t r) con
   unsigned int Nface = outer_face.size();
   for(unsigned int i=0;i<Nface;i++){
     fixed[outer_face[i]] = true;
-    xys[outer_face[i]] = coord2d(cos(i*2*M_PI/double(Nface)),sin(i*2*M_PI/double(Nface)));
+    xys[outer_face[i]] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
   }
     
   bool converged = false;
