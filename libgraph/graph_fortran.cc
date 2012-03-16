@@ -75,10 +75,13 @@ fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g)
 
 void tutte_layout_(fullerene_graph_ptr *g, double *LAYOUT)
 {
-  tutte_layout_b_(g,0,0,0,LAYOUT);
+  int nul = 1;
+  //  fprintf(stderr,"tutte_layout_a()\n");
+  tutte_layout_b_(g,&nul,&nul,&nul,LAYOUT);
 }
 void tutte_layout_b_(fullerene_graph_ptr *g, int *s, int *t, int *r, double *LAYOUT)
 {
+  //  fprintf(stderr,"tutte_layout_b(%d,%d,%d)\n",*s,*t,*r);
   FullereneGraph &G(**g);
   G.layout2d = G.tutte_layout(*s-1,*t-1,*r-1);
   for(unsigned int i=0;i<G.N;i++){
