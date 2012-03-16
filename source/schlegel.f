@@ -1,11 +1,16 @@
       SUBROUTINE Schlegel(NAtom,Nfaces,Nedges,M,msrs,IOUT,IS1,IS2,IS3,
-     1 N5M,N6M,N5R,N6R,NRing,Iring,ISchlegel,IC3,Dist,angle,Rmin,
+     1 N5M,N6M,N5R,N6R,NRing,Iring,ISchlegel,IC3,IDA,Dist,angle,Rmin,
      1 Tol,CR,CR5,CR6,Symbol)
+      use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
-C projection method and the perspective projection. The fullerene
-C is rotated first such that the desired point, edge or face is at
-C the top. Euler angles are used for rotation.
+C projection method and the perspective projection, or Tutte
+C embedding method and optimization to make it distant transitive. 
+C The fullerene is rotated first such that the desired point, edge 
+C or face is at the top. Euler angles are used for rotation.
       IMPLICIT REAL*8 (A-H,O-Z)
+      REAL*8 layout2d
+      DIMENSION IDA(Natom,Natom)
+      DIMENSION layout2d(2,NAtom)
       DIMENSION Dist(3,NAtom),IAtom(NAtom),NRing(Nfaces),distw(3),c(3)
       DIMENSION CR5(3,Nfaces),CR6(3,Nfaces),vec1(3),Iring(Nfaces)
       DIMENSION N5M(Nfaces,5),N6M(Nfaces,6),Rot(3,3),CR(3,Nfaces)
@@ -13,10 +18,13 @@ C the top. Euler angles are used for rotation.
       DIMENSION IC3(natom,3)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
+      type(c_ptr) :: g, new_fullerene_graph, new_graph
+
       Open(unit=2,file='qmga.dat',form='formatted')
       Data epsf,dpi/.12d0,3.14159265358979d0/
 C     Parameter set for Program QMGA
       Data DPoint,Dedge/0.5d0,0.1d0/
+
 
       satom='o'
       s5ring='^'
@@ -387,11 +395,11 @@ C   Print the sorted ring centers
 C     Prepare for Program QMGA
       Write(2,901) M,DPoint,Dedge
 
-      If(ISchlegel.eq.2) then
+      If(ISchlegel-2) 10,20,30
  
 C     Cone projection using the input angle
 C     Calculate distance of vertices from z-axis for projection
-      app=rmin+Dist(3,1)
+  20  app=rmin+Dist(3,1)
       WRITE(IOUT,1002)
 C     Write out on file unit=2 for qmga
 C     See http://qmga.sourceforge.net/
@@ -466,12 +474,12 @@ C   Print
       WRITE(IOUT,1023) IRing(i),Symbol(i),RingS(1,I),RingS(2,I),
      1 Angle,Fac
       enddo
+      go to 999
 
-      else
 C   Perspective projection using the input distance
 C   Algorithm to produce symmetric Schlegel diagrams
 C   Smallest and largest ring z-coordinate
-      Z=CR(3,1)
+ 10   Z=CR(3,1)
       scale=.45d0
       zmin=CR(3,NR)
 C   Setting point of projection
@@ -511,11 +519,26 @@ C     Extra boost for rings
       RingS(2,I)=CR(2,I)*Fac
       WRITE(IOUT,1027) IRing(i),Symbol(i),RingS(1,I),RingS(2,I)
       enddo
-      endif
+      go to 999
+
+C     Use Tutte method and optimize graph
+C     J. Avery
+C     Implement Tutte method here
+C     Note that fullerene is oriented already according to input for Schlegel projection
+C     Take top ring for outer rim
+
+C     Algorithm 3 (Tutte):
+ 30   write (Iout,1033)
+      g = new_fullerene_graph(NAtom,MAtom,IDA)
+      write (Iout,1034)
+      call tutte_layout_b(g,is1,is2,is3,layout2d)
+      call delete_fullerene_graph(g)
+      write (Iout,1035)
+
 
 C   Produce Schlegel picture
 C   Atoms
-       span=0.d0
+ 999   span=0.d0
        iflaga=0
       do i=1,M
        xabs=dabs(DistS(1,I))
@@ -642,7 +665,12 @@ C   Print Schlegel picture
  1031 Format(/1X,'Reset focal point distance to nearest ring to ',F12.6)
  1032 Format(/1X,'File qmga.dat written out for input into',
      1 ' program QMGA')
-  
+ 1033 FORMAT(/1X,'Using the Tutte-embedding algorithm to construct ',
+     1 'the fullerne',/1X,'Construct the Tutte planar graph and ',
+     1 'make it distant transparant')
+ 1034 Format(1X,'Calculating Tutte-embedding',/1X,
+     1 'Coordinates of Tutte graph:')
+ 1035 FORMAT(1X,'Fullerene graph deleted') 
       Close(unit=2)
       Return
       END
