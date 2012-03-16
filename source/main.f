@@ -836,8 +836,8 @@ C Calculate Schlegel diagram
        ParamS=dabs(ParamS)
       endif
       CALL Schlegel(NAtom,Nfaces,Nedges,MAtom,msrs,IOUT,IS1,IS2,IS3,
-     1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring,Ischlegel,IC3,Dist,ParamS,
-     1 Rmin,TolX,CR,CRing5,CRing6,Symbol)
+     1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring,Ischlegel,IC3,IDA,Dist,
+     1 ParamS,Rmin,TolX,CR,CRing5,CRing6,Symbol)
       endif
 
 C  E N D   O F   P R O G R A M
