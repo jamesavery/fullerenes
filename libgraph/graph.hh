@@ -75,7 +75,7 @@ struct Graph {
 
   friend ostream& operator<<(ostream& s, const Graph& g);
 
-  string to_latex(const vector<coord2d>& layout2d, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
+  string to_latex(const vector<coord2d>& layout2d, double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
   string to_latex(const vector<coord3d>& layout3d, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
 };
 

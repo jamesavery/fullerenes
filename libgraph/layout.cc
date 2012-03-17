@@ -201,10 +201,11 @@ Graph::facemap_t Graph::compute_faces_oriented(const vector<coord2d>& layout) co
 }
 
 
-string Graph::to_latex(const vector<coord2d>& layout2d, bool show_dual, bool number_vertices, bool include_latex_header) const 
+string Graph::to_latex(const vector<coord2d>& layout2d, double w_cm, double h_cm, bool show_dual, bool number_vertices, bool include_latex_header) const 
 {
   ostringstream s;
   s << fixed;
+  // If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
   if(include_latex_header)
     s << "\\documentclass{article}\n"
          "\\usepackage{fullpage,fourier,tikz}\n"
@@ -213,12 +214,26 @@ string Graph::to_latex(const vector<coord2d>& layout2d, bool show_dual, bool num
       "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=red!40, minimum width=2pt]\n"
       "\\tikzstyle{invisible}=[draw=none,inner sep=0,fill=none,minimum width=0pt]\n"
       "\\tikzstyle{dualedge}=[dotted,draw]\n"
+      "\\tikzstyle{edge}=[draw]\n"
       ;
 
-  s << "\\begin{tikzpicture}\n";
+  // Find "internal" width and height of layout and scale to w_cm x h_cm
+  double xmin=INFINITY,xmax=-INFINITY,ymin=INFINITY,ymax=-INFINITY, xscale, yscale;
+  for(node_t u=0;u<N;u++){
+    double x = layout2d[u].first, y = layout2d[u].second;
+    if(x<xmin) xmin = x;
+    if(x>xmax) xmax = x;
+    if(y<ymin) ymin = y;
+    if(y>ymax) ymax = y;
+  }
+  xscale = w_cm/(xmax-xmin);
+  yscale = h_cm/(ymax-ymin);
+
+
+  s << "\\begin{tikzpicture}[xscale="<<xscale<<",yscale="<<yscale<<"]\n";
   s << "\\foreach \\place/\\name/\\lbl in {";
   for(node_t u=0;u<N;u++){
-    const coord2d& xs(layout2d[u]*8.0);
+    const coord2d& xs(layout2d[u]);
     s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<N? ", ":"}\n\t");
   }
   s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
@@ -233,7 +248,7 @@ string Graph::to_latex(const vector<coord2d>& layout2d, bool show_dual, bool num
     Graph dual(dual_graph(6,layout2d));	// TODO: This breaks for everything else than fullerenes
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
-      const coord2d& xs(dual.layout2d[u]*8.0);
+      const coord2d& xs(dual.layout2d[u]);
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<dual.N? ", ":"}\n\t");
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
