@@ -194,7 +194,8 @@ Graph::facemap_t Graph::compute_faces(unsigned int Nmax, const vector<coord2d> l
 {
   facemap_t facemap;
 
-  if(layout.size() == N) return compute_faces_oriented(layout);
+  // TODO: This is a much better and faster method, but needs to be debugged.
+  //  if(layout.size() == N) return compute_faces_oriented(layout);
 
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
