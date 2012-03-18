@@ -2,11 +2,11 @@
 # Makefile for FULLERENE program
 #
 CXX=g++
-F90=gfortran-mp-4.4
+F90=gfortran
 AR=ar
 
-CXXFLAGS=-O3 -msse3 -m32
-FFLAGS= -O3 -msse3 -m32
+CXXFLAGS=-O3 -m64
+FFLAGS=-O3 -m64
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
 GRAPHOBJECTS=graph.o cubicgraph.o layout.o hamiltonian.o graph.o fullerenegraph.o graph_fortran.o
@@ -24,16 +24,14 @@ fullerene: $(FOBJECTS) libgraph.a
 # ############    Definition of the subroutines    ###############
 #
 #-----------------------------------------------------
+
 build/%.o: source/%.f
 	$(F90) $(FFLAGS) $(OPTIONS) -c $< -o $@
 
-build:
-	mkdir -f build
-
-build/%.o: libgraph/%.cc build
-	$(F90) $(FFLAGS) $(OPTIONS) -c $< -o $@
+build/%.o: libgraph/%.cc
+	$(CXX) $(CXXFLAGS) $(OPTIONS) -c $< -o $@
 #-----------------------------------------------------
-.PHONY: libfullerenegraph.a
+.PHONY: libgraph.a
 libgraph.a: $(COBJECTS)
 	$(AR) rcs $@ $(COBJECTS)
 
@@ -53,6 +51,6 @@ clean:
 	find . \( -name  "*~" -or  -name "#*#" -or -name "*.o" \) -exec rm {} \;
 
 distclean: clean
-	rm -f fullerene libgraph.a
+	rm -f fullerene libgraph.a cylview.xyz qmga.dat
 
 #-----------------------------------------------------
