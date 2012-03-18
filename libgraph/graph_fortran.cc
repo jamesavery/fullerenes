@@ -6,6 +6,7 @@ extern "C" {
 
   // Graph construction and destruction
   fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *N, const int *adjacency);
+  fullerene_graph_ptr read_fullerene_graph_(const char *path);
   void delete_fullerene_graph_(fullerene_graph_ptr*);
 
   graph_ptr new_graph_(const int *nmax, const int *N, const int *adjacency);
@@ -31,7 +32,7 @@ extern "C" {
 //------------------ Wrapper functions --------------------------------
 #include <math.h>
 #include <string.h>
-
+#include <stdio.h>
 
 
 graph_ptr new_graph_(const int *nmax, const int *n, const int *adjacency){
@@ -56,6 +57,19 @@ fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *n, const in
       A[i*N+j] = adjacency[i*Nmax+j];
 
   return new FullereneGraph(Graph(N,A));
+}
+
+fullerene_graph_ptr read_fullerene_graph_(const char *path){
+  fullerene_graph_ptr g;
+  FILE *f = fopen(path,"r");
+  if(!f){
+    fprintf(stderr,"Cannot open file %s for reading: ");
+    perror(path);
+    return NULL;
+  }
+  g = new FullereneGraph(f);
+  fclose(f);
+  return g;
 }
 
 void delete_fullerene_graph_(fullerene_graph_ptr *g){  delete (*g); }
