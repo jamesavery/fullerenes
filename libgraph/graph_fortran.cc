@@ -15,9 +15,10 @@ extern "C" {
   // General graph operations -- look in fullerenegraph/graph.hh for others to potentially add
   graph_ptr dual_graph_(const graph_ptr *);
   int hamiltonian_count_(const graph_ptr *);
+  void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, int *D);
   
   // Fullerene graph generation 
-  fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const unsigned int n);
+  fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const unsigned int *n);
   fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const bool);
 
   // Planar and spherical graph layout methods 
@@ -63,7 +64,7 @@ fullerene_graph_ptr read_fullerene_graph_(const char *path){
   fullerene_graph_ptr g;
   FILE *f = fopen(path,"r");
   if(!f){
-    fprintf(stderr,"Cannot open file %s for reading: ");
+    fprintf(stderr,"Cannot open file %s for reading: ",path);
     perror(path);
     return NULL;
   }
@@ -77,9 +78,9 @@ void delete_fullerene_graph_(fullerene_graph_ptr *g){  delete (*g); }
 graph_ptr dual_graph_(const graph_ptr *g){  return new Graph((*g)->dual_graph()); }
 int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 
-fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const unsigned int n)
+fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const unsigned int *n)
 {
-  return new FullereneGraph((*g)->halma_fullerene(n,false));
+  return new FullereneGraph((*g)->halma_fullerene(*n,false));
 }
 
 fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g)
@@ -118,4 +119,11 @@ void spherical_layout_(const fullerene_graph_ptr *g, double *LAYOUT3D)
     LAYOUT3D[i*3+1] = y;
     LAYOUT3D[i*3+2] = z;
   }
+}
+
+void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, int *D)
+{
+  unsigned int N=(*g)->N;
+  vector<unsigned int> distances((*g)->all_pairs_shortest_paths(*max_depth));
+  memcpy(D,&distances[0],N*N*sizeof(int));
 }

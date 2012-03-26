@@ -31,6 +31,19 @@ vector<unsigned int> Graph::shortest_paths(const node_t& source, const unsigned 
   return shortest_paths(source,vector<bool>(N*(N-1)/2),vector<bool>(N),max_depth);
 }
 
+// Returns NxN matrix of shortest distances (or INT_MAX if not connected)
+vector<unsigned int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
+{
+  vector<unsigned int> distances(N*N);
+  vector<bool> dummy_edges(N*(N-1)/2), dummy_nodes(N);
+  for(node_t u=0;u<N;u++){
+    const vector<unsigned int> row(shortest_paths(u,dummy_edges,dummy_nodes,max_depth));
+    memcpy(&distances[u*N],&row[0],N*sizeof(unsigned int));
+  }
+
+  return distances;
+}
+
 
 vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const int max_depth) const 
 { 

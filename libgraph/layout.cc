@@ -15,7 +15,7 @@ vector<coord2d> CubicGraph::tutte_layout(const node_t s, node_t t, node_t r) con
 	r = neighbours[t][0];
 	for(int i=1;i<3;i++) if(r==s) r = neighbours[t][i];
   }
-  vector<node_t> outer_face(shortest_cycle(s,t,r,6));
+  face_t outer_face(shortest_cycle(s,t,r,6));
   vector<coord2d> xys(N), newxys(N);
   vector<bool> fixed(N);
 
@@ -303,7 +303,7 @@ string Graph::to_latex(const vector<coord3d>& layout3d, bool show_dual, bool num
   for(vector<face_t>::const_iterator f(faces.begin());f!=faces.end();f++){
     s << "\\fill[red!"<<50*(-layout3d[(*f)[0]][0]+1)<<"]" ;
     for(size_t i=0;i<f->size();i++){
-      coord3d xs(layout3d[(*f)[i]]*8.0);
+      coord3d xs(layout3d[(*f)[i]]);
       s << "(" << xs[0] << "," << xs[1] << "," << xs[2] << ") -- " << (i+1<f->size()?"":"cycle;\n");
     }
   }

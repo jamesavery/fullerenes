@@ -48,7 +48,8 @@ struct Graph {
   vector<unsigned int> shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 				      const vector<bool>& used_nodes, const unsigned int max_depth = INT_MAX) const;
   vector<unsigned int> shortest_paths(const node_t& source, const unsigned int max_depth = INT_MAX) const;
-
+  vector<unsigned int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
+  
   // Find shortest cycle of the form s->t->...->s
   vector<node_t> shortest_cycle(const node_t& s, const node_t& t, const int max_depth=INT_MAX) const;
   // Find shortest cycle of the form s->t->r->...->s
