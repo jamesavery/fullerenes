@@ -19,7 +19,7 @@ vector<coord2d> CubicGraph::tutte_layout(const node_t s, node_t t, node_t r) con
   vector<coord2d> xys(N), newxys(N);
   vector<bool> fixed(N);
 
-  cout << "tutte_layout: Outer face: " << outer_face << endl;
+//  cout << "tutte_layout: Outer face: " << outer_face << endl;
 
   vector<unsigned int> vertex_depth(multiple_source_shortest_paths(outer_face,vector<bool>(N*(N-1)/2),vector<bool>(N)));
   unsigned int max_vertex_depth = *max_element(vertex_depth.begin(), vertex_depth.end());
@@ -113,16 +113,16 @@ void Graph::orient_neighbours(const vector<coord2d>& layout)
 
 }
 
-coord2d Graph::center2d(const vector<coord2d>& layout) const {
-  coord2d center(0,0);
-  for(node_t u=0;u<N;u++) center += layout[u];
-  return center/N;
+coord2d Graph::centre2d(const vector<coord2d>& layout) const {
+  coord2d centre(0,0);
+  for(node_t u=0;u<N;u++) centre += layout[u];
+  return centre/N;
 }
 
-coord3d Graph::center3d(const vector<coord3d>& layout) const {
-  coord3d center(0,0,0);
-  for(node_t u=0;u<N;u++) center += layout[u];
-  return center/N;
+coord3d Graph::centre3d(const vector<coord3d>& layout) const {
+  coord3d centre(0,0,0);
+  for(node_t u=0;u<N;u++) centre += layout[u];
+  return centre/N;
 }
 // TODO: 
 // * Move layout to member variable
@@ -141,9 +141,9 @@ Graph::facemap_t Graph::compute_faces_oriented(const vector<coord2d>& layout) co
 
   face_t outer_face(shortest_cycle(0,neighbours[0][0]));
   // Orient outer face CW, rest of faces CCW
-  coord2d center(center2d(layout));
+  coord2d centre(centre2d(layout));
 
-  sort_ccw_point CCW(layout,center);
+  sort_ccw_point CCW(layout,centre);
   sort(outer_face.begin(),outer_face.end(),CCW);
   reverse(outer_face.begin(),outer_face.end());
   
@@ -288,7 +288,7 @@ string Graph::to_latex(const vector<coord3d>& layout3d, bool show_dual, bool num
   s << "\\begin{tikzpicture}\n";
   s << "\\foreach \\place/\\name/\\lbl in {";
   for(node_t u=0;u<N;u++){
-    const coord3d& xs(layout3d[u]*8.0);
+    const coord3d& xs(layout3d[u]);
     s << "{(" << xs[0] << "," << xs[1] << "," << xs[2] << ")/v" << u << "/$" << u << "$}" << (u+1<N? ", ":"}\n\t");
   }
   s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
@@ -314,7 +314,7 @@ string Graph::to_latex(const vector<coord3d>& layout3d, bool show_dual, bool num
     Graph dual(dual_graph(6,layout2d));	// TODO: This breaks for everything else than fullerenes
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
-      const coord2d& xs(dual.layout2d[u]*8.0);
+      const coord2d& xs(dual.layout2d[u]);
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<dual.N? ", ":"}\n\t");
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";

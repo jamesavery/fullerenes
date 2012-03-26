@@ -29,6 +29,7 @@ public:
   pair<set< face_t>, set<face_t> > compute_faces56() const;
 
 
+
   static FullereneGraph C20() {
     return CubicGraph(20,vector<node_t>(C20_neighbours,C20_neighbours+3*20));
   }

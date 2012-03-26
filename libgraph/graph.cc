@@ -174,9 +174,9 @@ Graph Graph::dual_graph(unsigned int Fmax, const vector<coord2d> layout) const {
     dual.layout2d = vector<coord2d>(Nfaces);
     for(unsigned int i=0;i<Nfaces;i++){
       face_t face(allfaces[i]);
-      coord2d center = 0;
-      for(unsigned int j=0;j<face.size();j++) center += layout[face[j]];
-      dual.layout2d[i] = center / face.size();
+      coord2d centre = 0;
+      for(unsigned int j=0;j<face.size();j++) centre += layout[face[j]];
+      dual.layout2d[i] = centre / face.size();
     }
   }
 
@@ -255,6 +255,16 @@ void Graph::update_auxiliaries()
     neighbours[u] = vector<node_t>(ns[u].begin(),ns[u].end());
 
 }
+
+void Graph::update_from_neighbours() 
+{
+  edge_set.clear();
+  for(node_t u=0;u<N;u++)
+    for(unsigned int i=0;i<neighbours[u].size();i++)
+      edge_set.insert(edge_t(u,neighbours[u][i]));
+  update_auxiliaries();
+}
+
 
 ostream& operator<<(ostream& s, const Graph& g) 
 {

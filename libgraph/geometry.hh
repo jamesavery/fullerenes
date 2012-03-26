@@ -100,6 +100,7 @@ struct Tri3D {
   typedef pair<coord3d,coord3d> segment_t;
 
   Tri3D(const coord3d *T) : a(T[0]), b(T[1]), c(T[2]), u(b-a), v(c-a), n(u.cross(v)) {}
+  Tri3D(const coord3d& a,const coord3d& b,const coord3d& c) : a(a), b(b), c(c), u(b-a), v(c-a), n(u.cross(v)) {}
   double plane_intersection(const segment_t& segment) const { 
     return n.dot(a-segment.first)/n.dot(segment.second-segment.first);
   }
@@ -118,9 +119,31 @@ struct Tri3D {
     return intersects(x);
   }
 
+  bool back_face(const coord3d& p) const {
+    const coord3d centre((a+b+c)/3.0);
+    const coord3d line(centre-p);
+
+    return line.dot(n) < 0;
+  }
+
+  double area() const {
+    return ((b-a).cross(c-a)).norm()/2.0;
+  }
+
   friend ostream& operator<<(ostream& s, const Tri3D& T){
     s << "{" << T.a << "," << T.b << "," << T.c << "}";
     return s;
+  }
+};
+
+struct Tetra3D {
+  coord3d a,b,c,d;
+
+  Tetra3D(const coord3d *T): a(T[0]),  b(T[1]), c(T[2]), d(T[3]) {}
+  Tetra3D(const coord3d& a, const coord3d& b, const coord3d& c, const coord3d& d): a(a),  b(b), c(c), d(d) {}
+
+  double volume() const {
+    return fabs((a-d).dot((b-d).cross(c-d)))/6.0;
   }
 };
 

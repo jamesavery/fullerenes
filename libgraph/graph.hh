@@ -17,7 +17,8 @@ using namespace std;
 #include "geometry.hh"
 
 
-
+// TODO: Separate planar graph stuff from general graph stuff.
+// TODO: Don't constantly pass layout2d around -- it's a member!
 struct Graph {
   unsigned int N;
   neighbours_t neighbours;
@@ -65,18 +66,37 @@ struct Graph {
   Graph dual_graph(unsigned int Fmax=INT_MAX, const vector<coord2d> layout = vector<coord2d>()) const;
 
   void    orient_neighbours(const vector<coord2d>& layout);
-  coord2d center2d(const vector<coord2d>& layout) const;
-  coord3d center3d(const vector<coord3d>& layout) const;
+  coord2d centre2d(const vector<coord2d>& layout) const; // TODO: Move to static member of geometry.hh::coord2d
+  coord3d centre3d(const vector<coord3d>& layout) const; // TODO: Move to geometry.hh::coord3d
 
   int hamiltonian_count() const;
   int hamiltonian_count(const node_t& current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<unsigned int>& distances) const;
 
   void update_auxiliaries(); 
+  void update_from_neighbours(); 
 
   friend ostream& operator<<(ostream& s, const Graph& g);
 
   string to_latex(const vector<coord2d>& layout2d, double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
   string to_latex(const vector<coord3d>& layout3d, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
+
+Graph triangulation(int face_max = INT_MAX) const
+{
+  assert(layout2d.size() == N);
+  vector<face_t> faces(compute_faces_flat(face_max,layout2d));  
+  return triangulation(faces);
+}
+
+Graph triangulation(const vector<face_t>& faces) const
+{
+  Graph tris(*this);
+  
+  for(size_t i=0;i<faces.size();i++)
+    for(size_t j=2;j<faces[i].size()-1;j++)
+      tris.edge_set.insert(edge_t(faces[i][0],faces[i][j]));
+  tris.update_auxiliaries();
+  return tris;
+}
 };
 
 #endif

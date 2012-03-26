@@ -4,7 +4,7 @@
 coord3d surface(const coord2d& polar_angle)
 {
   double theta = polar_angle.first, phi = polar_angle.second;
-  double r = 1.0 + .2*cos(2*theta)*sin(2*phi);
+  double r = 1.0;// + .2*cos(2*theta)*sin(2*phi);
   return coord3d(cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi))*r;
 }
 
@@ -32,7 +32,8 @@ int main()
   Polyhedron hull(P.convex_hull());
 
   cout << "hull = " << hull << endl;
-
+  cout << "volume = " << P.volume() << endl;
+  cout << "area = " << P.surface_area() << endl;
 
   return 0;
 }

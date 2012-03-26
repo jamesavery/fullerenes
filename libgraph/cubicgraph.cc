@@ -1,5 +1,7 @@
 #include "cubicgraph.hh"
 
+
+
 ostream& operator<<(ostream& s, const CubicGraph& g)
 {
   s.precision(30);
