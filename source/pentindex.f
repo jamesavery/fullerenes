@@ -21,7 +21,7 @@ C If nalgorithm=1 use Tutte algorithm
       Character*10 Symbol
       CHARACTER*3 GROUP
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-      type(c_ptr) :: g, new_fullerene_graph, new_graph
+      type(c_ptr) :: g, new_fullerene_graph, read_fullerene_graph
 
       nalgorithm=ICart-2
       M=Matom/2+2
@@ -326,7 +326,6 @@ C     Calculate P-type dipole moment
        enddo
 
       else
-C   Avery 
 C   Algorithm 2 (Tutte):
 C     Here goes your part, the adjacency matrix is in IDA(i,j)
 C     in integers (0 or 1), I guess this is all you need

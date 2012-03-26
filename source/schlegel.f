@@ -18,7 +18,7 @@ C or face is at the top. Euler angles are used for rotation.
       DIMENSION IC3(natom,3)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
-      type(c_ptr) :: g, new_fullerene_graph, new_graph
+      type(c_ptr) :: g, new_fullerene_graph, read_fullerene_graph
 
       Open(unit=2,file='qmga.dat',form='formatted')
       Data epsf,dpi/.12d0,3.14159265358979d0/
