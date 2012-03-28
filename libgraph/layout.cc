@@ -8,12 +8,12 @@ struct ToleranceLess {
   bool operator()(const coord2d& x,const coord2d& y) const { return x<y && (y-x).norm() > tolerance; }
 };
 
-vector<coord2d> CubicGraph::tutte_layout(const node_t s, node_t t, node_t r) const
+vector<coord2d> Graph::tutte_layout(const node_t s, node_t t, node_t r) const
 {
   if(!t) t = neighbours[s][0];
   if(!r) {
 	r = neighbours[t][0];
-	for(int i=1;i<3;i++) if(r==s) r = neighbours[t][i];
+	for(int i=1;i<neighbours[t].size();i++) if(r==s) r = neighbours[t][i];
   }
   face_t outer_face(shortest_cycle(s,t,r,6));
   vector<coord2d> xys(N), newxys(N);
@@ -40,15 +40,18 @@ vector<coord2d> CubicGraph::tutte_layout(const node_t s, node_t t, node_t r) con
       if(fixed[u]){
 	newxys[u] = xys[u];
       } else {
-	coord2d neighbour_sum;
-	for(int i=0;i<3;i++) neighbour_sum += xys[neighbours[u][i]];
-	newxys[u] = xys[u]*0.2 + (neighbour_sum/3.0)*0.8;
+	const vector<node_t>& ns(neighbours[u]);
+	coord2d neighbour_sum(0.0);
+
+	for(int i=0;i<ns.size();i++) neighbour_sum += xys[ns[i]];
+	newxys[u] = xys[u]*0.2 + (neighbour_sum/ns.size())*0.8;
       }
       
     double max_change = 0;
     for(node_t u=0;u<N;u++) {
       const vector<node_t>& ns(neighbours[u]);
-      double neighbour_dist = ((xys[u]-xys[ns[0]]).norm()+(xys[u]-xys[ns[1]]).norm()+(xys[u]-xys[ns[2]]).norm())/3.0;
+      double neighbour_dist = 0;
+      for(size_t i=0;i<ns.size();i++) neighbour_dist += (xys[u]-xys[ns[0]]).norm()/ns.size();
       double relative_change = (xys[u]-newxys[u]).norm()/neighbour_dist;
       if(relative_change > max_change) max_change = relative_change;
     }

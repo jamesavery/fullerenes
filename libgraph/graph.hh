@@ -81,23 +81,11 @@ struct Graph {
   string to_latex(const vector<coord2d>& layout2d, double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
   string to_latex(const vector<coord3d>& layout3d, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
 
-Graph triangulation(int face_max = INT_MAX) const
-{
-  assert(layout2d.size() == N);
-  vector<face_t> faces(compute_faces_flat(face_max,layout2d));  
-  return triangulation(faces);
-}
+  // TODO: Move.
+  vector<coord2d> tutte_layout(const node_t s=0, const node_t t=0, const node_t r=0) const;
+  vector<face_t> Graph::triangulation(int face_max = INT_MAX) const;
+  vector<face_t> Graph::triangulation(const vector<face_t>& faces) const;
 
-Graph triangulation(const vector<face_t>& faces) const
-{
-  Graph tris(*this);
-  
-  for(size_t i=0;i<faces.size();i++)
-    for(size_t j=2;j<faces[i].size()-1;j++)
-      tris.edge_set.insert(edge_t(faces[i][0],faces[i][j]));
-  tris.update_auxiliaries();
-  return tris;
-}
 };
 
 #endif

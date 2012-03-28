@@ -1,58 +1,89 @@
 #include "graph.hh"
+#include <fstream>
+#include <sstream>
 
 node_t observe_point = 8;
 
 struct Polyhedron : public Graph {
+  int face_max;
   vector<coord3d> points;
   coord3d centre;
   vector<face_t> faces;
 
-
+  Polyhedron(const int face_max=INT_MAX) : face_max(face_max) {}
   Polyhedron(const Graph& G, const vector<coord3d>& points, const int face_max = INT_MAX) : 
-    Graph(G), points(points), centre(centre3d(points)), faces(G.compute_faces_flat(face_max))
+    Graph(G), face_max(face_max), points(points), centre(centre3d(points)), faces(G.compute_faces_flat(face_max))
   {
-    // TODO: Currently assumes layout2d is given -- but it is not!
+    //    if(layout2d.size() != N)
+    //layout2d = polar_angles();
+    layout2d = tutte_layout();
+  }
+  Polyhedron(const string& path) {
+    ifstream file(path.c_str());
+    file >> *this;
+    file.close();
+  }
+
+  vector<coord2d> polar_angles() const {
+    vector<coord2d> angles(N);
+    for(node_t u=0;u<N;u++){
+      const coord3d& x(points[u]);
+      const double r = x.norm();
+      angles[u].first  = acos(x[2]/r);
+      angles[u].second = atan2(x[1],x[0]);
+    }
+    return angles;
   }
 
   double surface_area() const {
     assert(layout2d.size() == N);
-    vector<face_t> tris(triangulation(faces).compute_faces_flat(4,layout2d));
     double A = 0;  
+
+    vector<face_t> tris(triangulation(faces));
+
     for(size_t i=0;i<tris.size();i++){
       const face_t& tri(tris[i]);
       Tri3D T(points[tri[0]],points[tri[1]],points[tri[2]]);
       A += T.area();
-    }    
+    } 
+
     return A;
   }
 
   double volume() const {
-    assert(layout2d.size() == N);
-    vector<face_t> tris(triangulation(faces).compute_faces_flat(4,layout2d));
+
+    vector<face_t> tris(triangulation(faces));
     double V = 0;
 
-    // Sort triangle vertices CCW according to 2D layout (N.B.: may have to reverse triangles generated from face 0! How?
-#if 0
-    for(size_t i=0;i<tris.size();i++){
-      coord2d c((layout2d[tris[i][0]]+layout2d[tris[i][0]]+layout2d[tris[i][0]])/3.0);
-      sort_ccw_point CCW(layout2d,c);
-      sort(tris[i].begin(),tris[i].end(),CCW);
-      //      cout << tris[i] << endl;
-    }
-#endif
-    
     // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
-    coord3d zero;
+    //    cout << "normalcenters = {";
+    coord3d zero(-10,0,0);
     for(size_t i=0;i<tris.size();i++){
-      const face_t& tri(tris[i]);
-      Tri3D T(points[tri[0]],points[tri[1]],points[tri[2]]);
-
-      Tetra3D tet(T.a,T.b,T.c,centre);
-      if(T.back_face(centre)) V += tet.volume();
-      else V += tet.volume();
+      const face_t& t(tris[i]);
+      Tri3D T(points[t[0]],points[t[1]],points[t[2]]);
+      //      cout << "{" << T.n << "," << T.centroid() << "}" << (i+1<tris.size()? ", " : "};\n");
+      double dV = Tetra3D(T.a,T.b,T.c,zero).volume();
+      V += (T.back_face(zero)? 1 : -1)*dV;
     }
-    return V;
+    return fabs(V);
   }
+
+  double volume2() const {
+    vector<face_t> tris(triangulation(faces));
+    double V = 0;
+
+    // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
+    for(size_t i=0;i<tris.size();i++){
+      const face_t& t(tris[i]);
+      Tri3D T(points[t[0]],points[t[1]],points[t[2]]);
+
+      if(T.n.norm() < 1e-10)
+	cerr << "normal " << i << " is zero: " << T << endl;
+      V += ((T.a).dot(T.n))*T.area()/T.n.norm();
+    }
+    return fabs(V/3.0);
+  }
+
 
   // TODO: Handle coplanar triangles.
   bool include_point(const node_t& u, const coord3d& interior_point) const {
@@ -165,6 +196,29 @@ struct Polyhedron : public Graph {
     for(unsigned int i=0;i<P.points.size();i++) s << P.points[i] << (i+1<P.points.size()?", ":"},");
     s << static_cast<Graph>(P) << "}";
     return s;
+  }
+
+  friend istream& operator>>(istream& f, Polyhedron& P){
+    string s;
+    node_t u=0,v;
+    coord3d x;
+
+    while(getline(f,s)){
+      stringstream l(s);
+      l >> x;
+      if(l.fail()) continue; // Invalid line
+      while(!l.fail()){
+	l >> v;
+	P.edge_set.insert(edge_t(u,v-1)); // File format numbers nodes from 1 
+      }
+      P.points.push_back(x);
+      u++;
+    }
+    P.update_auxiliaries();
+    P.layout2d = P.tutte_layout();
+    P.faces = P.compute_faces_flat(P.face_max,P.layout2d);
+    P.centre = P.centre3d(P.points);
+    return f;
   }
 };
 

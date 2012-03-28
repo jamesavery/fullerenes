@@ -2,7 +2,7 @@
 # define GEOMETRY_HH
 
 #include <string.h>
-
+#include <iostream>
 using namespace std;
 
 typedef unsigned int node_t;
@@ -22,22 +22,6 @@ struct edge_t : public pair<node_t,node_t> {
   inline size_t index() const { 
     const node_t v = first, u = second;
     return u*(u-1)/2 + v; 
-  }
-};
-
-struct face_t : public vector<node_t> {
-  face_t() {}
-  face_t(const vector<node_t>& vertices) : vector<node_t>(vertices) {}
-  bool operator==(const face_t& B) const { 
-    // Two faces are the same if they contain the same vertices
-    // (I.e., we disregard the orientation)
-    return set<node_t>(begin(),end()) == set<node_t>(B.begin(),B.end());
-  }
-  bool operator<(const face_t& B) const {
-    return set<node_t>(begin(),end()) < set<node_t>(B.begin(),B.end());
-  }
-  friend ostream& operator<<(ostream &s, const face_t& f){
-    s << "["; for(unsigned int i=0;i<f.size();i++) s << f[i] << (i+1<f.size()?", ":"]"); return s;
   }
 };
 
@@ -65,6 +49,7 @@ struct coord2d : public pair<double,double> {
   double norm() const { return sqrt(first*first+second*second); }
 
   friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << "{" << x.first << "," << x.second << "}"; return s; }
+  friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; }
 };
 
 
@@ -92,7 +77,39 @@ struct coord3d {
   double  operator[](unsigned int i) const { return x[i]; }
 
   friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
+  friend istream& operator>>(istream &s, coord3d& x){ double d; for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };
+
+
+struct face_t : public vector<node_t> {
+  face_t(const size_t size=0) : vector<node_t>(size) {}
+  face_t(const vector<node_t>& vertices) : vector<node_t>(vertices) {}
+    
+  bool operator==(const face_t& B) const { 
+    // Two faces are the same if they contain the same vertices
+    // (I.e., we disregard the orientation)
+    return set<node_t>(begin(),end()) == set<node_t>(B.begin(),B.end());
+  }
+  bool operator<(const face_t& B) const {
+    return set<node_t>(begin(),end()) < set<node_t>(B.begin(),B.end());
+  }
+  
+  coord2d centroid(const vector<coord2d>& layout) const { 
+    coord2d c(0);
+    for(size_t i=0;i<size();i++) c += layout[(*this)[i]];
+    return c/size();
+  }
+  coord3d centroid(const vector<coord3d>& layout) const { 
+    coord3d c(0.0);
+    for(size_t i=0;i<size();i++) c += layout[(*this)[i]];
+    return c/size();
+  }
+  
+  friend ostream& operator<<(ostream &s, const face_t& f){
+    s << "["; for(unsigned int i=0;i<f.size();i++) s << f[i] << (i+1<f.size()?", ":"]"); return s;
+  }
+};
+
 
 
 struct Tri3D {
@@ -123,12 +140,14 @@ struct Tri3D {
     const coord3d centre((a+b+c)/3.0);
     const coord3d line(centre-p);
 
-    return line.dot(n) < 0;
+    return line.dot(n) > 0;
   }
 
   double area() const {
-    return ((b-a).cross(c-a)).norm()/2.0;
+    return (((b-a).cross(c-a)).norm()/2.0);
   }
+
+  coord3d centroid() const { return coord3d((a+b+c)/3.0); }
 
   friend ostream& operator<<(ostream& s, const Tri3D& T){
     s << "{" << T.a << "," << T.b << "," << T.c << "}";

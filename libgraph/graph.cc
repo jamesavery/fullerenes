@@ -301,3 +301,36 @@ ostream& operator<<(ostream& s, const Graph& g)
 
   return s;
 }
+
+
+vector<face_t> Graph::triangulation(int face_max = INT_MAX) const
+{
+  vector<face_t> faces(compute_faces_flat(face_max,layout2d));  
+  return triangulation(faces);
+}
+  
+vector<face_t> Graph::triangulation(const vector<face_t>& faces) const
+{
+  assert(layout2d.size() == N);
+  vector<face_t> tris;
+  
+  
+  for(size_t i=0;i<faces.size();i++){
+    face_t f(faces[i]);
+
+    for(size_t j=1;j<f.size()-1;j++){
+      face_t t(3); 
+      t[0] = f[0]; t[1] = f[j]; t[2] = f[j+1];
+
+      coord2d c(t.centroid(layout2d));
+      sort_ccw_point CCW(layout2d,c);
+      
+      sort(t.begin(),t.end(),CCW);
+      if(i == 0) reverse(t.begin(), t.end()); // TODO: Show normals!
+
+      tris.push_back(t);
+    }
+  }
+
+  return tris;
+}
