@@ -83,8 +83,8 @@ struct Graph {
 
   // TODO: Move.
   vector<coord2d> tutte_layout(const node_t s=0, const node_t t=0, const node_t r=0) const;
-  vector<face_t> Graph::triangulation(int face_max = INT_MAX) const;
-  vector<face_t> Graph::triangulation(const vector<face_t>& faces) const;
+  vector<face_t> triangulation(int face_max = INT_MAX) const;
+  vector<face_t> triangulation(const vector<face_t>& faces) const;
 
 };
 

@@ -51,17 +51,14 @@ struct Polyhedron : public Graph {
   }
 
   double volume() const {
-
     vector<face_t> tris(triangulation(faces));
     double V = 0;
 
     // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
-    //    cout << "normalcenters = {";
     coord3d zero(-10,0,0);
     for(size_t i=0;i<tris.size();i++){
       const face_t& t(tris[i]);
       Tri3D T(points[t[0]],points[t[1]],points[t[2]]);
-      //      cout << "{" << T.n << "," << T.centroid() << "}" << (i+1<tris.size()? ", " : "};\n");
       double dV = Tetra3D(T.a,T.b,T.c,zero).volume();
       V += (T.back_face(zero)? 1 : -1)*dV;
     }
@@ -77,8 +74,6 @@ struct Polyhedron : public Graph {
       const face_t& t(tris[i]);
       Tri3D T(points[t[0]],points[t[1]],points[t[2]]);
 
-      if(T.n.norm() < 1e-10)
-	cerr << "normal " << i << " is zero: " << T << endl;
       V += ((T.a).dot(T.n))*T.area()/T.n.norm();
     }
     return fabs(V/3.0);

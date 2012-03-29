@@ -303,7 +303,7 @@ ostream& operator<<(ostream& s, const Graph& g)
 }
 
 
-vector<face_t> Graph::triangulation(int face_max = INT_MAX) const
+vector<face_t> Graph::triangulation(int face_max) const
 {
   vector<face_t> faces(compute_faces_flat(face_max,layout2d));  
   return triangulation(faces);
