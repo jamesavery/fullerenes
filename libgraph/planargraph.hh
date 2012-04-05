@@ -25,7 +25,11 @@ public:
   }
 
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g) { 
-    layout2d = layout;
+    if(layout.size() != N)
+      layout2d = tutte_layout();
+    else 
+      layout2d = layout;
+
     outer_face = find_outer_face();
   }
 

@@ -132,6 +132,79 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax) const
   return facemap;
 }
 
+facemap_t PlanarGraph::compute_faces_oriented() const 
+{
+  facemap_t facemap;
+  cout << "Computing faces using 2D orientation.\n";
+  set<dedge_t> workset;
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+    const node_t s = e->first, t = e->second;
+    workset.insert(dedge_t(s,t));
+    workset.insert(dedge_t(t,s));
+  }
+
+  // Outer face must exist and be ordered CW, rest of faces CCW
+  assert(outer_face.size() > 0);
+
+  cerr << "Outer face: " << outer_face << endl;
+
+  coord2d centre(centre2d(layout2d));
+
+  // Add outer face to output, remove directed edges from work set
+  facemap[outer_face.size()].insert(outer_face);
+  for(unsigned int i=0;i<outer_face.size();i++){
+    const node_t u = outer_face[i], v = outer_face[(i+1)%outer_face.size()];
+    //    printf("Removing directed edge (%d,%d)\n",u,v);
+    workset.erase(dedge_t(u,v));
+  }
+
+  // Now visit every other edge once in each direction.
+  while(!workset.empty()){
+    dedge_t e = *workset.begin(); workset.erase(workset.begin());
+
+    face_t face;
+    face.push_back(e.first);
+    face.push_back(e.second);
+
+    //    printf("%d->%d\n",e.first,e.second);
+    while(e.second != face[0]){
+      const node_t u = e.first, v = e.second;
+      const vector<node_t>& ns(neighbours[v]);
+
+      coord2d vu(layout2d[u]-layout2d[v]);
+      double angle_min = -M_PI;
+
+      node_t w=0;
+      for(unsigned int i=0;i<ns.size();i++) {
+	//	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
+	if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
+	  set<dedge_t>::iterator ei(workset.find(dedge_t(v,ns[i])));
+
+	  if(ei != workset.end()){ // directed edge is not yet visited
+	    coord2d vw(layout2d[ns[i]]-layout2d[v]);
+	    double angle = vu.line_angle(vw);
+
+	    if(angle>= angle_min){
+	      angle_min = angle;
+	      w = ns[i];
+	    } // else {
+	    //   fprintf(stderr,"\t[%d->%d already used.]\n",v,ns[i]);
+	    // }
+	  }
+	}
+      }
+      e = dedge_t(v,w);
+      workset.erase(e);
+
+      if(e.second != face[0]) face.push_back(e.second);
+    }
+    //    cout << "face = " << face << endl;
+    facemap[face.size()].insert(face);
+  }
+  return facemap;
+}
+
+
 
 vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax) const 
 {
