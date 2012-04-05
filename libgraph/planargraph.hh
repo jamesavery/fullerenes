@@ -43,12 +43,16 @@ public:
 
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX) const;
 
+  vector<double> edge_lengths() const;
 
   vector<face_t>  triangulation(int face_max = INT_MAX) const;
   vector<face_t>  triangulation(const vector<face_t>& faces) const;
 
   vector<coord2d> tutte_layout(const node_t s=0, const node_t t=0, const node_t r=0) const;
   vector<coord2d> spherical_projection(const vector< coord2d >& layout2d) const;
+
+  void scale(const double s);
+  void move (const coord2d s);
 
   string to_latex(double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
 };

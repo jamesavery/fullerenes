@@ -275,6 +275,18 @@ face_t PlanarGraph::find_outer_face() const
   return outer_face;
 }
 
+vector<double> PlanarGraph::edge_lengths() const 
+{
+  assert(layout2d.size() == N);
+
+  vector<double> lengths(edge_set.size());
+  unsigned int i = 0;
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();e++, i++)
+    lengths[i] = (layout2d[e->first]-layout2d[e->second]).norm();
+
+  return lengths;
+}
+
 
 ostream& operator<<(ostream& s, const PlanarGraph& g) 
 {

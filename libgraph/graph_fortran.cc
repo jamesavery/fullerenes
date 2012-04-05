@@ -34,6 +34,8 @@ extern "C" {
   void tutte_layout_b_(graph_ptr* g, int *s, int *t, int *r, double *LAYOUT);
   void spherical_layout_(const graph_ptr* g, double *LAYOUT3D);
 
+  double shortest_planar_distance_(const graph_ptr *g);
+
   // Operations on polyhedra
   double surface_area_(polyhedron_ptr *P);
   double volume2_(polyhedron_ptr *P);
@@ -185,3 +187,12 @@ double surface_area_(polyhedron_ptr *P){ return (*P)->surface_area(); }
 double volume2_(polyhedron_ptr *P){ return (*P)->volume(); }
 
 int graph_is_a_fullerene_(const graph_ptr *g){ return (*g)->this_is_a_fullerene(); }
+
+double shortest_planar_distance_(const graph_ptr *g)
+{
+  const PlanarGraph& G(*(*g));
+
+  const vector<double> lengths(G.edge_lengths());
+  
+  return *min_element(lengths.begin(),lengths.end());
+}
