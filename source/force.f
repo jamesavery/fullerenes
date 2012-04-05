@@ -1,9 +1,8 @@
-      SUBROUTINE func(NMAX,NMAX3,MMAX,n,IERR,A,N5,N6,N5M,N6M,p,fc,c)
+      SUBROUTINE func(IOP,NMAX,NMAX3,MMAX,n,IERR,A,N5,N6,N5M,N6M,
+     1 p,fc,c)
       IMPLICIT REAL*8 (A-H,O-Z)
-C     Calculates the harmonic oscillator potential of power npower
-C     and strength force using the Hueckel adjacency
-C     matrix A and adds a Coulomb repulsion of strength coulomb
-C     for all non-connected atoms
+C     Wu force field in terms of harmonic oscillators for stretching
+C     and bending, energy
       Real*8 p(NMAX3),c(8)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
@@ -20,8 +19,8 @@ C     Stretching
       ehookrp=0.d0
       ehookrh=0.d0
       Do I=1,n,3
-      Do J=I+3,n,3
         I1=(I+2)/3
+      Do J=I+3,n,3
         J1=(J+2)/3
         if(A(I1,J1).ne.0) then
          px=p(I)-p(J)
@@ -128,12 +127,10 @@ C     total energy
       Return
       END
 
-      SUBROUTINE dfunc(NMAX,NMAX3,MMAX,n,A,N5,N6,N5M,N6M,p,x,c)
+      SUBROUTINE dfunc(IOP,NMAX,NMAX3,MMAX,n,A,N5,N6,N5M,N6M,p,x,c)
       IMPLICIT REAL*8 (A-H,O-Z)
-C     Calculates the gradient of the harmonic oscillator potential of 
-C     power npower and strength ehook using the Hueckel adjacency
-C     matrix A and adds a Coulomb repulsion of strength coulomb
-C     for all non-connected atoms. See function func for details.
+C     Wu force field in terms of harmonic oscillators for stretching
+C     and bending, gradient
       Real*8 p(NMAX3),x(NMAX3),c(8)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
@@ -150,8 +147,8 @@ C     Stretching
         ehookx=0.d0
         ehooky=0.d0
         ehookz=0.d0
-      Do J=1,n,3
         I1=(I+2)/3
+      Do J=1,n,3
         J1=(J+2)/3
         if(A(I1,J1).ne.0) then
           px=p(I)-p(J)

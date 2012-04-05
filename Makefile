@@ -5,11 +5,12 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS=-O3 -m64
+CXXFLAGS=-O3 -m64 -fopenmp -Wall -Wno-sign-compare
 FFLAGS=-O3 -m64
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS=graph.o cubicgraph.o layout.o hamiltonian.o graph.o fullerenegraph.o graph_fortran.o
+GRAPHOBJECTS=graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o \
+	     polyhedron.o fullerenegraph.o graph_fortran.o
 
 FOBJECTS=$(patsubst %.o,build/%.o,$(OBJECTS))
 COBJECTS=$(patsubst %.o,build/%.o,$(GRAPHOBJECTS))
@@ -18,7 +19,7 @@ TESTOUT=$(patsubst input/%.inp, output/%.out, $(TESTINP))
 #
 #
 fullerene: $(FOBJECTS) libgraph.a
-	$(F90) $(FFLAGS) $(OPTIONS) $^ $(LIBRARIES) -o $@ -lstdc++
+	$(F90) $(FFLAGS) $(OPTIONS) $^ $(LIBRARIES) -o $@ -lstdc++ -lgomp
 
 #
 # ############    Definition of the subroutines    ###############

@@ -1,612 +1,3 @@
-      SUBROUTINE spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
-      IMPLICIT INTEGER (A-Z)
-      DIMENSION D(MMAX,MMAX),S(MMAX),JP(12),IR(12),JR(12),JS(12)
-C This routine tries to find the spiral from a preset of
-C three connected rings stored in S(1), S(2) and S(3) using
-C information on ring fusions from the dual matrix
-
-      IER=0
-      iring=0
-      mloop=3
-C   Big loop from ring 4 to the end
-      Do 10 i=4,M
-       if(i.gt.5) mloop=5
-       ifound=0
-       IP=S(i-1)
-       if(IP.eq.0) go to 10
-C    Find new ring connection to ring IP, but keep previous ones out
-C    and store in IR
-         IC=0
-         Do j=1,M
-           if(D(j,IP).eq.1) then
-           iflag=0
-            do k=1,i-2
-            if(j.eq.s(k)) iflag=1
-            enddo
-            if(iflag.eq.0) then
-              IC=IC+1
-              IR(IC)=J
-            endif
-           endif
-         enddo
-       if(IC.gt.6.or.IC.eq.0) Go to 10
-C    Find the ring adjacent to IP and to a previous ring
-C    in the spiral and store
-           iring=0
-          do j=1,IC
-           do k=1,i-mloop
-            IX=S(k)
-            if(D(IR(j),IX).eq.1) then
-            iring=iring+1
-            JR(iring)=IR(j)
-            JS(iring)=k
-            endif
-           enddo
-          enddo
-C    Check if spiral is at dead end
-      if(iring.eq.0) then
-        IER=1
-      Return
-      endif
-C    Now determine neighboring ring
-         k=100000
-         do j=1,iring
-          if(JS(j).lt.k) then
-          s(i)=JR(j)
-          k=JS(j)
-          endif
-         enddo
-C    Now check if it is a pentagon
-            if(s(i).le.12) then
-            MP=MP+1
-            JP(MP)=i
-            endif
-  10  Continue
-C    Spiral found if loop went through
-C     Print*,M,IER,'/',(S(I),I=1,M)
-C     Print*,iring,'/',JP
-      Return
-      END
-
-      SUBROUTINE SpiralSearch(NMAX,MMAX,LMAX,NSP,N,Iout,IRG55,IRG66,
-     1 IRG56,NrA,NrB,NrC,NrD,NrE,NrF)
-      IMPLICIT INTEGER (A-Z)
-      DIMENSION NrA(LMAX),NrB(LMAX),NrC(LMAX),NrD(LMAX)
-      DIMENSION NrE(LMAX),NrF(LMAX),NMR(6),JP(12)
-      DIMENSION Spiral(12,NMAX),SpiralT(12,NSP),SpiralF(MMAX,NSP)
-      DIMENSION D(MMAX,MMAX),S(MMAX)
-      CHARACTER*3 GROUP
-
-C     This subroutine has been modified from the original one of Fowler and 
-C     Manopoulus "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
-C     It is used if dual matrix is already known. See subroutine Spiral for details.
-C     N is the nuclearity of the fullerene.
-      M=N/2+2
-      ispiral=0
-      WRITE (Iout,600)
-         IF(N.lt.100) WRITE(Iout,601) N,M
-         IF(N.ge.100) WRITE(Iout,602) N,M
-      do I=1,MMAX
-      do J=1,MMAX
-       D(I,J)=0
-      enddo
-      enddo
-      do I=1,12
-      do J=1,NMAX
-       Spiral(I,J)=0
-      enddo
-      enddo
-C     Set up dual matrix
-      do I=1,IRG55
-       I1=NrA(I)
-       I2=NrB(I)
-       D(I1,I2)=1
-       D(I2,I1)=1
-      enddo
-      do I=1,IRG56
-       I1=NrC(I)
-       I2=NrD(I)
-       D(I1,I2)=1
-       D(I2,I1)=1
-      enddo
-      do I=1,IRG66
-       I1=NrE(I)
-       I2=NrF(I)
-       D(I1,I2)=1
-       D(I2,I1)=1
-      enddo
-
-C     Search for all spirals 
-C     Set up first three rings then wind
-C     Start ring spiral algorithm. Quit after first successful spiral
-C     JP contains the pentagon indices, S the ring numbers
-      nspiral=0
-      
-C     Loop over all (5,5) fusions
-      if(IRG55.eq.0) then
-       write(Iout,610)
-      else
-       write(Iout,611) 2*IRG55
-       do I=1,2*IRG55
-       do j=4,M
-        s(j)=0
-       enddo
-       if(I.le.IRG55) then
-        I1=NrA(I)
-        I2=NrB(I)
-       else
-        IR=I-IRG55
-        I1=NrB(IR)
-        I2=NrA(IR)
-       endif
-        S(1)=I1
-        S(2)=I2
-        JP(1)=1
-        JP(2)=2
-       do J=1,M
-        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
-         S(3)=J
-         MP=2
-         if(J.le.12) then
-          JP(3)=3
-          MP=3
-         endif
-          CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
-         if(IER.eq.0) then
-         nspiral=nspiral+1
-         If(nspiral.gt.NSP) then
-         Write(Iout,626) nspiral,nsp
-         nspiral=nspiral-1
-         Go to 199
-         endif
-         do k=1,12
-          SpiralT(k,nspiral)=JP(k)
-         enddo 
-         do k=1,M
-          SpiralF(k,nspiral)=S(k)
-         enddo 
-         endif
-        endif
-       enddo 
-       enddo 
-      endif
-
-C     Loop over all (5,6) fusions
-      if(IRG56.le.0) then
-      write(Iout,615)
-      else
-      write(Iout,612) 2*IRG56
-      do I=1,2*IRG56
-      do j=4,M
-      s(j)=0
-      enddo
-      if(I.le.IRG56) then
-      I1=NrC(I)
-      I2=NrD(I)
-      else
-      IR=I-IRG56
-      I1=NrD(IR)
-      I2=NrC(IR)
-      endif
-      S(1)=I1
-      S(2)=I2
-      if(I1.le.12) then
-      JP(1)=1
-      else
-      JP(2)=1
-      endif
-      do J=1,M
-      if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
-      S(3)=J
-      MP=1
-      if(J.le.12) then
-      JP(2)=3
-      MP=2
-      endif
-      CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
-      if(IER.eq.0) then
-      nspiral=nspiral+1
-         If(nspiral.gt.NSP) then
-         Write(Iout,627) nspiral,nsp
-         nspiral=nspiral-1
-         Go to 199
-         endif
-      do k=1,12
-      SpiralT(k,nspiral)=JP(k)
-      enddo 
-      do k=1,M
-      SpiralF(k,nspiral)=S(k)
-      enddo 
-      endif
-      endif
-      enddo 
-      enddo 
-      endif
-      
-C     Loop over all (6,6) fusions
-      if(IRG66.eq.0) then
-      write(Iout,616)
-      else
-      write(Iout,613) 2*IRG66
-      do I=1,2*IRG66
-       do j=4,M
-        s(j)=0
-       enddo
-       if(I.le.IRG66) then
-        I1=NrE(I)
-        I2=NrF(I)
-       else
-        IR=I-IRG66
-        I1=NrF(IR)
-        I2=NrE(IR)
-       endif
-       S(1)=I1
-       S(2)=I2
-       do J=1,M
-        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
-          S(3)=J
-          MP=0
-         if(J.le.12) then
-          JP(1)=3
-          MP=1
-         endif
-       CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
-       if(IER.eq.0) then
-        nspiral=nspiral+1
-         If(nspiral.gt.NSP) then
-         Write(Iout,628) nspiral,nsp
-         nspiral=nspiral-1
-         Go to 199
-         endif
-       do k=1,12
-        SpiralT(k,nspiral)=JP(k)
-       enddo 
-       do k=1,M
-        SpiralF(k,nspiral)=S(k)
-       enddo 
-       endif
-      endif
-      enddo 
-      enddo 
-      endif
-      
-C     Now loop over with found spiral until success with
-C     Fowler algorithm
-  199 write(Iout,614) nspiral
-      IT=1
-      IPR=0
-      Do 13 msp=1,nspiral
-       Do I=1,M
-        S(I)=6
-       enddo
-       Do I=1,12
-        S(SpiralT(I,msp))=5
-        JP(I)=SpiralT(I,msp)
-       enddo
-       IER=0
-       CALL Windup(MMAX,M,IPR,IER,S,D)      !      Wind up spiral into dual 
-       IF(IER.ne.0) GO TO 13                !      and check for closure 
-       Do I=1,12 
-        Spiral(I,1)=JP(I)
-       enddo
-       CALL Unwind(NMAX,MMAX,LMAX,M,IER,IT,ispiral,
-     1  Spiral,S,D,NMR,Group)             ! Unwind dual into spirals 
-       K=0
-       DO J=1,6
-         IF(NMR(J).EQ.0) GO TO 16
-         K=J
-       enddo
- 16    If(K.le.0) then
-        WRITE(Iout,603) GROUP,(JP(I),I=1,12)
-       else
-        WRITE(Iout,605) GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
-       endif
-       WRITE(Iout,604) 
-       WRITE(Iout,618) (SpiralF(I,msp),I=1,M)
-       if(ispiral.ge.2) then
-        if(ispiral.eq.2) then
-         WRITE(Iout,623)
-         Do II=1,12
-          JP(II)=spiral(II,2)
-         enddo 
-        else
-         WRITE(Iout,619) ispiral-1
-        endif
-       Do JJ=2,ispiral 
-        WRITE(Iout,607) (spiral(II,JJ),II=1,12)
-       enddo
-       else
-        WRITE(Iout,608)
-       endif
-       if(ispiral.gt.2) then
-        CALL CanSpiral(NMAX,ispiral,spiral,JP)
-        WRITE(Iout,623)
-        WRITE(Iout,621) (JP(I),I=1,12)
-       endif
-       Do I=1,M
-        S(I)=6
-       enddo
-       Do I=1,12
-        S(JP(I))=5
-       enddo
-       WRITE(Iout,624)
-       WRITE(Iout,625) (S(I),I=1,M)
-       go to 99
- 13   CONTINUE 
- 99   if(IER.eq.0) then
-       if(ispiral.ge.2) then
-C     Print ring numbers
-        WRITE(Iout,620) nspiral 
-       Do msp=1,nspiral
-         jpc=0
-       Do ipent=1,12
-         jpc=jpc+iabs(JP(ipent)-SpiralT(ipent,msp))
-       enddo
-        if(jpc.eq.0) then
-        WRITE(Iout,618) (SpiralF(I,msp),I=1,M)
-        return
-        endif
-       enddo
-       endif
-      else 
-      WRITE(Iout,617)
-      endif
- 600  FORMAT(/1X,'Modified spiral algorithm Fowler and Manopoulus',
-     1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)')
- 601  FORMAT(1X,'Spiral for fullerene isomers of C',I2,':',
-     1 ' (',I3,' faces)')
- 602  FORMAT(1X,'Spiral for fullerene isomers of C',I3,':',
-     1 ' (',I3,' faces)')
- 603  FORMAT(1X,A3,9X,12I4)
- 604  FORMAT(1X,90('-'),/1X,'Corresponding ring numbers:') 
- 605  FORMAT(1X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
- 606  Format(/1X,'Spiral list of pentagon positions with ',
-     1 'higher priority: (',I3,' spirals found)') 
- 607  Format(12(1X,I3))
- 608  Format(1X,'Input spiral is canonical')
- 609  Format(/1X,'Canonical spiral list of pentagon positions')
- 610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
-     1 'loop over')
- 611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
- 612  Format(1X,'Loop over (5,6) fusions, ',I5,' max in total')
- 613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
- 614  Format(1X,I4,' Spirals found',/1X,
-     1 'Point group   Ring spiral pentagon positions',
-     2 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
- 615  Format(1X,'This is C20, no (5,6) fusions to loop over')
- 616  Format(1X,'No (6,6) fusions to loop over')
- 617  Format(1X,'Failed to find ring spiral')
- 618  Format(20(1X,32(I3,'-'),/))
- 619  Format(1X,'Spiral list of pentagon positions with ',
-     1 'higher priority: (',I3,' spirals found)') 
- 620  Format(1X,'Search ',I3,' spirals to produce canonical'
-     1 ' list of atoms:')
- 621  Format(12(1X,I3))
- 622  Format(1X,'Input spiral is canonical')
- 623  Format(1X,'Canonical spiral list of pentagon positions:')
- 624  Format(1X,'Canonical spiral list of hexagons and pentagons:')
- 625  Format(1X,100I1)
- 626  Format(1X,'**** Severe Warning: Number of detected spirals is ',
-     1 I5,' greater than dimension in field ',I5,' detected in (5,5)',
-     1 'list',/1X,'Routine will stop here and tries to work with ',
-     1 'existing spirals (otherwise increase NSpScale parameter ',
-     1 'in main program')
- 627  Format(1X,'**** Severe Warning: Number of detected spirals is ',
-     1 I5,' greater than dimension in field ',I5,' detected in (5,6)',
-     1 'list',/1X,'Routine will stop here and tries to work with ',
-     1 'existing spirals (otherwise increase NSpScale parameter ',
-     1 'in main program')
- 628  Format(1X,'**** Severe Warning: Number of detected spirals is ',
-     1 I5,' greater than dimension in field ',I5,' detected in (6,6)',
-     1 'list',/1X,'Routine will stop here and tries to work with ',
-     1 'existing spirals (otherwise increase NSpScale parameter ',
-     1 'in main program')
-      Return
-      END
-      
-      SUBROUTINE CanSpiral(NMAX,MS0,S,P)
-      IMPLICIT Integer (A-Z)
-      DIMENSION S(12,NMAX),P(12),PI(12),SM(12,NMAX)
-C     Find canonical spiral by sorting
-      IS=1
-      MS=MS0
-         Do I=1,12
-         PI(I)=0
-         enddo
-C     Find lowest value
-  1   Smax=100000
-          Do I=1,MS
-          IF(S(IS,I).le.Smax) Smax=S(IS,I)
-          enddo
-      IZ=0
-          Do I=1,MS
-           if(S(IS,I).eq.Smax) then
-           IZ=IZ+1
-            do j=1,12
-            SM(j,IZ)=S(j,I)
-            enddo
-           endif
-           enddo
-      MS=IZ
-       if(MS.eq.1) then
-          Do I=1,12
-          P(I)=SM(I,1)
-          enddo
-          return
-       else
-         Do I=1,MS
-         Do J=1,12
-          S(J,I)=SM(J,I)
-         enddo
-         enddo
-       IS=IS+1
-       go to 1
-      endif
-      return
-      END
-
-      SUBROUTINE DualAnalyze(NMAX,MMAX,N,M,Iout,D,IRhag5,IRhag6,
-     1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
-      IMPLICIT REAL*8 (A-H,O-Z)
-      Integer D(MMAX,MMAX),Ddiag(MMAX),NR5(12),IDA(NMAX,NMAX)
-      Integer IRhag5(0:5),IRhag6(0:6),IDG(NMAX)
-      Dimension A(NMAX,NMAX),evec(NMAX),df(NMAX)
-C     Analyze dual matrix and get pentagon and hexagon indices
-C     and determine if molecule is open shell
-      Data Tol/1.d-5/
-      NV5=0
-      NV6=0
-      IER=0
-      Do I=1,M
-       Ddiag(I)=0
-       Do J=1,M
-        Ddiag(I)=Ddiag(I)+D(J,I)
-       enddo
-       Itest=Ddiag(I)
-       If(Itest.eq.5) then
-        NV5=NV5+1
-        NR5(NV5)=I
-       endif
-       If(Itest.eq.6) NV6=NV6+1
-      enddo
-C     NV=NV5+NV6
-C     If(NV.ne.M) Write(Iout,1000)
-C     Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
-C     First pentagon indices
-      Do I=0,5
-       IRhag5(I)=0
-      enddo
-      do I=1,12
-       IRcount=0
-       IRing5=NR5(I)
-       do J=1,12
-        JRing5=NR5(J)
-        If(D(JRing5,IRing5).eq.1) then
-         IRcount=IRcount+1
-        endif
-       enddo
-       IRhag5(IRcount)=IRhag5(IRcount)+1
-      enddo
-      Ifus5=0
-      Do I=1,5
-       IFus5=IFus5+I*IRhag5(I)
-      enddo
-      IFus5G=IFus5/2
-
-C     Now hexagon indices
-      Do I=0,6
-       IRhag6(I)=0
-      enddo
-      do 10 I=1,M
-       IRcount=0
-       IR5=Ddiag(I)
-       if(IR5.eq.5) go to 10
-       do J=1,M
-        JR5=Ddiag(J)
-        If(JR5.ne.5.and.D(I,J).eq.1) then
-         IRcount=IRcount+1
-        endif
-       enddo
-       IRhag6(IRcount)=IRhag6(IRcount)+1
-   10 Continue
-C     Strain Parameter
-      khk=0
-      k2hk=0
-      Do I=3,6
-      ihk=ihk+IRhag6(I)
-      IIR=I*IRhag6(I)
-      khk=khk+IIR
-      k2hk=k2hk+I*IIR
-      enddo
-      if(ihk.eq.0) go to 112
-      aihk=dfloat(ihk)
-      akhk2=(dfloat(khk)/aihk)**2
-      ak2hk=dfloat(k2hk)/aihk
-      sigmah=dsqrt(dabs(ak2hk-akhk2))
-
-C     Now produce adjacency matrix
- 112  CALL DUAL(NMAX,D,MMAX,IDA,N,IER)
-      Do I=1,N
-       df(I)=0.d0
-      Do J=I,N
-        A(I,J)=0.d0
-        if(IDA(I,J).eq.1) A(I,J)=1.d0
-        A(J,I)=A(I,J)
-      enddo
-      enddo
-C Diagonalize without producing eigenvectors
-      call tred2l(A,N,NMAX,evec,df)
-      call tqlil(evec,df,N,NMAX)
-C Sort eigenvalues
-      Do I=1,N
-       e0=evec(I)
-       jmax=I
-        Do J=I+1,N
-         e1=evec(J)
-          if(e1.gt.e0) then 
-           jmax=j
-           e0=e1
-          endif
-        enddo
-        if(i.ne.jmax) then
-         ex=evec(jmax)
-         evec(jmax)=evec(I)
-         evec(I)=ex
-        endif
-      enddo
-
-C Now sort degeneracies
-      df(1)=evec(1)
-      ieigv=1
-      ideg=1
-      IDG(1)=ideg
-      Do I=2,N
-       diff=dabs(evec(I-1)-evec(I))
-       if(diff.lt.Tol) then
-        ideg=ideg+1
-        IDG(ieigv)=ideg
-       else
-        ieigv=ieigv+1
-        ideg=1
-        IDG(ieigv)=ideg
-        df(ieigv)=evec(I)
-       endif
-      enddo
-       
-C Produce number of electrons in HOMO, degeneracy and gap
-      Noc=N/2
-      Norb=0
-      Do I=1,ieigv
-      Iorb=I
-      Norb=Norb+IDG(I)
-      if(Norb.eq.Noc) then 
-      gap=df(Iorb)-df(Iorb+1)
-      ndeg=IDG(Iorb)
-      nelec=ndeg*2
-      go to 111
-      endif
-      if(Norb.gt.Noc) then 
-      gap=df(Iorb)-df(Iorb+1)
-      ndeg=IDG(Iorb)
-      nelec=(ndeg-Norb+Noc)*2
-      go to 111
-      endif
-      enddo
-  111 Continue
-      
-C1000 Format(1X,'Error: NV5+NN6 does not match total number of '
-C    1 'vertices')
-C     Write(Iout,1001) NV5,NV6
-C     Do I=1,M
-C     Write(Iout,1002) (D(I,J),J=1,M)
-C     enddo
-C     Write(Iout,1002) M,(Ddiag(J),J=1,M)
- 1001 Format(1X,'Number of vertices of order five in dual matrix: ',I4,
-     1 /1X,'Number of vertices of order six in dual matrix: ',I4)
- 1002 Format(1X,60I3)
-      Return
-      End
-
       SUBROUTINE Spiral(NMAX,MMAX,LMAX,N,IPR,Iout,
      1 Isonum,IsoIPR,iham,IDA,A)
       IMPLICIT INTEGER (A-Z)
@@ -902,6 +293,614 @@ C     Analyze dual matrix
      5 /1X,170('-')) 
       Return
       END
+
+      SUBROUTINE spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION D(MMAX,MMAX),S(MMAX),JP(12),IR(12),JR(12),JS(12)
+C This routine tries to find the spiral from a preset of
+C three connected rings stored in S(1), S(2) and S(3) using
+C information on ring fusions from the dual matrix
+
+      IER=0
+      iring=0
+      mloop=3
+C   Big loop from ring 4 to the end
+      Do 10 i=4,M
+       if(i.gt.5) mloop=5
+       ifound=0
+       IP=S(i-1)
+       if(IP.eq.0) go to 10
+C    Find new ring connection to ring IP, but keep previous ones out
+C    and store in IR
+         IC=0
+         Do j=1,M
+           if(D(j,IP).eq.1) then
+           iflag=0
+            do k=1,i-2
+            if(j.eq.s(k)) iflag=1
+            enddo
+            if(iflag.eq.0) then
+              IC=IC+1
+              IR(IC)=J
+            endif
+           endif
+         enddo
+       if(IC.gt.6.or.IC.eq.0) Go to 10
+C    Find the ring adjacent to IP and to a previous ring
+C    in the spiral and store
+           iring=0
+          do j=1,IC
+           do k=1,i-mloop
+            IX=S(k)
+            if(D(IR(j),IX).eq.1) then
+            iring=iring+1
+            JR(iring)=IR(j)
+            JS(iring)=k
+            endif
+           enddo
+          enddo
+C    Check if spiral is at dead end
+      if(iring.eq.0) then
+        IER=1
+      Return
+      endif
+C    Now determine neighboring ring
+         k=100000
+         do j=1,iring
+          if(JS(j).lt.k) then
+          s(i)=JR(j)
+          k=JS(j)
+          endif
+         enddo
+C    Now check if it is a pentagon
+            if(s(i).le.12) then
+            MP=MP+1
+            JP(MP)=i
+            endif
+  10  Continue
+C    Spiral found if loop went through
+C     Print*,M,IER,'/',(S(I),I=1,M)
+C     Print*,iring,'/',JP
+      Return
+      END
+
+      SUBROUTINE SpiralSearch(NMAX,MMAX,LMAX,NSP,N,Iout,IRG55,IRG66,
+     1 IRG56,NrA,NrB,NrC,NrD,NrE,NrF,GROUP)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION NrA(LMAX),NrB(LMAX),NrC(LMAX),NrD(LMAX)
+      DIMENSION NrE(LMAX),NrF(LMAX),NMR(6),JP(12)
+      DIMENSION Spiral(12,NMAX),SpiralT(12,NSP),SpiralF(MMAX,NSP)
+      DIMENSION D(MMAX,MMAX),S(MMAX)
+      CHARACTER*3 GROUP
+
+C     This subroutine has been modified from the original one of Fowler and 
+C     Manopoulus "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
+C     It is used if dual matrix is already known. See subroutine Spiral for details.
+C     N is the nuclearity of the fullerene.
+      M=N/2+2
+      ispiral=0
+      WRITE (Iout,600)
+         IF(N.lt.100) WRITE(Iout,601) N,M
+         IF(N.ge.100) WRITE(Iout,602) N,M
+      do I=1,MMAX
+      do J=1,MMAX
+       D(I,J)=0
+      enddo
+      enddo
+      do I=1,12
+      do J=1,NMAX
+       Spiral(I,J)=0
+      enddo
+      enddo
+C     Set up dual matrix
+      do I=1,IRG55
+       I1=NrA(I)
+       I2=NrB(I)
+       D(I1,I2)=1
+       D(I2,I1)=1
+      enddo
+      do I=1,IRG56
+       I1=NrC(I)
+       I2=NrD(I)
+       D(I1,I2)=1
+       D(I2,I1)=1
+      enddo
+      do I=1,IRG66
+       I1=NrE(I)
+       I2=NrF(I)
+       D(I1,I2)=1
+       D(I2,I1)=1
+      enddo
+
+C     Search for all spirals 
+C     Set up first three rings then wind
+C     Start ring spiral algorithm. Quit after first successful spiral
+C     JP contains the pentagon indices, S the ring numbers
+      nspiral=0
+      
+C     Loop over all (5,5) fusions
+      if(IRG55.eq.0) then
+       write(Iout,610)
+      else
+       write(Iout,611) 2*IRG55
+       do I=1,2*IRG55
+       do j=4,M
+        s(j)=0
+       enddo
+       if(I.le.IRG55) then
+        I1=NrA(I)
+        I2=NrB(I)
+       else
+        IR=I-IRG55
+        I1=NrB(IR)
+        I2=NrA(IR)
+       endif
+        S(1)=I1
+        S(2)=I2
+        JP(1)=1
+        JP(2)=2
+       do J=1,M
+        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
+         S(3)=J
+         MP=2
+         if(J.le.12) then
+          JP(3)=3
+          MP=3
+         endif
+          CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+         if(IER.eq.0) then
+         nspiral=nspiral+1
+         If(nspiral.gt.NSP) then
+         Write(Iout,626) nspiral,nsp
+         nspiral=nspiral-1
+         Go to 199
+         endif
+         do k=1,12
+          SpiralT(k,nspiral)=JP(k)
+         enddo 
+         do k=1,M
+          SpiralF(k,nspiral)=S(k)
+         enddo 
+         endif
+        endif
+       enddo 
+       enddo 
+      endif
+
+C     Loop over all (5,6) fusions
+      if(IRG56.le.0) then
+      write(Iout,615)
+      else
+      write(Iout,612) 2*IRG56
+      do I=1,2*IRG56
+      do j=4,M
+      s(j)=0
+      enddo
+      if(I.le.IRG56) then
+      I1=NrC(I)
+      I2=NrD(I)
+      else
+      IR=I-IRG56
+      I1=NrD(IR)
+      I2=NrC(IR)
+      endif
+      S(1)=I1
+      S(2)=I2
+      if(I1.le.12) then
+      JP(1)=1
+      else
+      JP(2)=1
+      endif
+      do J=1,M
+      if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
+      S(3)=J
+      MP=1
+      if(J.le.12) then
+      JP(2)=3
+      MP=2
+      endif
+      CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+      if(IER.eq.0) then
+      nspiral=nspiral+1
+         If(nspiral.gt.NSP) then
+         Write(Iout,627) nspiral,nsp
+         nspiral=nspiral-1
+         Go to 199
+         endif
+      do k=1,12
+      SpiralT(k,nspiral)=JP(k)
+      enddo 
+      do k=1,M
+      SpiralF(k,nspiral)=S(k)
+      enddo 
+      endif
+      endif
+      enddo 
+      enddo 
+      endif
+      
+C     Loop over all (6,6) fusions
+      if(IRG66.eq.0) then
+      write(Iout,616)
+      else
+      write(Iout,613) 2*IRG66
+      do I=1,2*IRG66
+       do j=4,M
+        s(j)=0
+       enddo
+       if(I.le.IRG66) then
+        I1=NrE(I)
+        I2=NrF(I)
+       else
+        IR=I-IRG66
+        I1=NrF(IR)
+        I2=NrE(IR)
+       endif
+       S(1)=I1
+       S(2)=I2
+       do J=1,M
+        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
+          S(3)=J
+          MP=0
+         if(J.le.12) then
+          JP(1)=3
+          MP=1
+         endif
+       CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+       if(IER.eq.0) then
+        nspiral=nspiral+1
+         If(nspiral.gt.NSP) then
+         Write(Iout,628) nspiral,nsp
+         nspiral=nspiral-1
+         Go to 199
+         endif
+       do k=1,12
+        SpiralT(k,nspiral)=JP(k)
+       enddo 
+       do k=1,M
+        SpiralF(k,nspiral)=S(k)
+       enddo 
+       endif
+      endif
+      enddo 
+      enddo 
+      endif
+      
+C     Now loop over with found spiral until success with
+C     Fowler algorithm
+  199 write(Iout,614) nspiral
+      IT=1
+      IPR=0
+      Do 13 msp=1,nspiral
+       Do I=1,M
+        S(I)=6
+       enddo
+       Do I=1,12
+        S(SpiralT(I,msp))=5
+        JP(I)=SpiralT(I,msp)
+       enddo
+       IER=0
+       CALL Windup(MMAX,M,IPR,IER,S,D)      !      Wind up spiral into dual 
+       IF(IER.ne.0) GO TO 13                !      and check for closure 
+       Do I=1,12 
+        Spiral(I,1)=JP(I)
+       enddo
+       CALL Unwind(NMAX,MMAX,LMAX,M,IER,IT,ispiral,
+     1  Spiral,S,D,NMR,Group)             ! Unwind dual into spirals 
+       K=0
+       DO J=1,6
+         IF(NMR(J).EQ.0) GO TO 16
+         K=J
+       enddo
+ 16    If(K.le.0) then
+        WRITE(Iout,603) GROUP,(JP(I),I=1,12)
+       else
+        WRITE(Iout,605) GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
+       endif
+       WRITE(Iout,604) 
+       WRITE(Iout,618) (SpiralF(I,msp),I=1,M)
+       if(ispiral.ge.2) then
+        if(ispiral.eq.2) then
+         WRITE(Iout,623)
+         Do II=1,12
+          JP(II)=spiral(II,2)
+         enddo 
+        else
+         WRITE(Iout,619) ispiral-1
+        endif
+       Do JJ=2,ispiral 
+        WRITE(Iout,607) (spiral(II,JJ),II=1,12)
+       enddo
+       else
+        WRITE(Iout,608)
+       endif
+       if(ispiral.gt.2) then
+        CALL CanSpiral(NMAX,ispiral,spiral,JP)
+        WRITE(Iout,623)
+        WRITE(Iout,621) (JP(I),I=1,12)
+       endif
+       Do I=1,M
+        S(I)=6
+       enddo
+       Do I=1,12
+        S(JP(I))=5
+       enddo
+       WRITE(Iout,624)
+       WRITE(Iout,625) (S(I),I=1,M)
+       go to 99
+ 13   CONTINUE 
+ 99   if(IER.eq.0) then
+       if(ispiral.ge.2) then
+C     Print ring numbers
+        WRITE(Iout,620) nspiral 
+       Do msp=1,nspiral
+         jpc=0
+       Do ipent=1,12
+         jpc=jpc+iabs(JP(ipent)-SpiralT(ipent,msp))
+       enddo
+        if(jpc.eq.0) then
+        WRITE(Iout,618) (SpiralF(I,msp),I=1,M)
+        return
+        endif
+       enddo
+       endif
+      else 
+      WRITE(Iout,617)
+      endif
+ 600  FORMAT(/1X,'Modified spiral algorithm Fowler and Manopoulus',
+     1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)')
+ 601  FORMAT(1X,'Spiral for fullerene isomers of C',I2,':',
+     1 ' (',I3,' faces)')
+ 602  FORMAT(1X,'Spiral for fullerene isomers of C',I3,':',
+     1 ' (',I3,' faces)')
+ 603  FORMAT(1X,A3,9X,12I4)
+ 604  FORMAT(1X,90('-'),/1X,'Corresponding ring numbers:') 
+ 605  FORMAT(1X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
+ 606  Format(/1X,'Spiral list of pentagon positions with ',
+     1 'higher priority: (',I3,' spirals found)') 
+ 607  Format(12(1X,I3))
+ 608  Format(1X,'Input spiral is canonical')
+ 610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
+     1 'loop over')
+ 611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
+ 612  Format(1X,'Loop over (5,6) fusions, ',I5,' max in total')
+ 613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
+ 614  Format(1X,I4,' Spirals found',/1X,
+     1 'Point group   Ring spiral pentagon positions',
+     2 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
+ 615  Format(1X,'This is C20, no (5,6) fusions to loop over')
+ 616  Format(1X,'No (6,6) fusions to loop over')
+ 617  Format(1X,'Failed to find ring spiral')
+ 618  Format(20(1X,32(I3,'-'),/))
+ 619  Format(1X,'Spiral list of pentagon positions with ',
+     1 'higher priority: (',I3,' spirals found)') 
+ 620  Format(1X,'Search ',I3,' spirals to produce canonical'
+     1 ' list of atoms:')
+ 621  Format(12(1X,I3))
+ 622  Format(1X,'Input spiral is canonical')
+ 623  Format(1X,'Canonical spiral list of pentagon positions:')
+ 624  Format(1X,'Canonical spiral list of hexagons and pentagons:')
+ 625  Format(1X,100I1)
+ 626  Format(1X,'**** Severe Warning: Number of detected spirals is ',
+     1 I5,' greater than dimension in field ',I5,' detected in (5,5)',
+     1 'list',/1X,'Routine will stop here and tries to work with ',
+     1 'existing spirals (otherwise increase NSpScale parameter ',
+     1 'in main program')
+ 627  Format(1X,'**** Severe Warning: Number of detected spirals is ',
+     1 I5,' greater than dimension in field ',I5,' detected in (5,6)',
+     1 'list',/1X,'Routine will stop here and tries to work with ',
+     1 'existing spirals (otherwise increase NSpScale parameter ',
+     1 'in main program')
+ 628  Format(1X,'**** Severe Warning: Number of detected spirals is ',
+     1 I5,' greater than dimension in field ',I5,' detected in (6,6)',
+     1 'list',/1X,'Routine will stop here and tries to work with ',
+     1 'existing spirals (otherwise increase NSpScale parameter ',
+     1 'in main program')
+      Return
+      END
+      
+      SUBROUTINE CanSpiral(NMAX,MS0,S,P)
+      IMPLICIT Integer (A-Z)
+      DIMENSION S(12,NMAX),P(12),PI(12),SM(12,NMAX)
+C     Find canonical spiral by sorting
+      IS=1
+      MS=MS0
+         Do I=1,12
+         PI(I)=0
+         enddo
+C     Find lowest value
+  1   Smax=100000
+          Do I=1,MS
+          IF(S(IS,I).le.Smax) Smax=S(IS,I)
+          enddo
+      IZ=0
+          Do I=1,MS
+           if(S(IS,I).eq.Smax) then
+           IZ=IZ+1
+            do j=1,12
+            SM(j,IZ)=S(j,I)
+            enddo
+           endif
+           enddo
+      MS=IZ
+       if(MS.eq.1) then
+          Do I=1,12
+          P(I)=SM(I,1)
+          enddo
+          return
+       else
+         Do I=1,MS
+         Do J=1,12
+          S(J,I)=SM(J,I)
+         enddo
+         enddo
+       IS=IS+1
+       go to 1
+      endif
+      return
+      END
+
+      SUBROUTINE DualAnalyze(NMAX,MMAX,N,M,Iout,D,IRhag5,IRhag6,
+     1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Integer D(MMAX,MMAX),Ddiag(MMAX),NR5(12),IDA(NMAX,NMAX)
+      Integer IRhag5(0:5),IRhag6(0:6),IDG(NMAX)
+      Dimension A(NMAX,NMAX),evec(NMAX),df(NMAX)
+C     Analyze dual matrix and get pentagon and hexagon indices
+C     and determine if molecule is open shell
+      Data Tol/1.d-5/
+      NV5=0
+      NV6=0
+      IER=0
+      Do I=1,M
+       Ddiag(I)=0
+       Do J=1,M
+        Ddiag(I)=Ddiag(I)+D(J,I)
+       enddo
+       Itest=Ddiag(I)
+       If(Itest.eq.5) then
+        NV5=NV5+1
+        NR5(NV5)=I
+       endif
+       If(Itest.eq.6) NV6=NV6+1
+      enddo
+C     NV=NV5+NV6
+C     If(NV.ne.M) Write(Iout,1000)
+C     Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
+C     First pentagon indices
+      Do I=0,5
+       IRhag5(I)=0
+      enddo
+      do I=1,12
+       IRcount=0
+       IRing5=NR5(I)
+       do J=1,12
+        JRing5=NR5(J)
+        If(D(JRing5,IRing5).eq.1) then
+         IRcount=IRcount+1
+        endif
+       enddo
+       IRhag5(IRcount)=IRhag5(IRcount)+1
+      enddo
+      Ifus5=0
+      Do I=1,5
+       IFus5=IFus5+I*IRhag5(I)
+      enddo
+      IFus5G=IFus5/2
+
+C     Now hexagon indices
+      Do I=0,6
+       IRhag6(I)=0
+      enddo
+      do 10 I=1,M
+       IRcount=0
+       IR5=Ddiag(I)
+       if(IR5.eq.5) go to 10
+       do J=1,M
+        JR5=Ddiag(J)
+        If(JR5.ne.5.and.D(I,J).eq.1) then
+         IRcount=IRcount+1
+        endif
+       enddo
+       IRhag6(IRcount)=IRhag6(IRcount)+1
+   10 Continue
+C     Strain Parameter
+      khk=0
+      k2hk=0
+      Do I=3,6
+      ihk=ihk+IRhag6(I)
+      IIR=I*IRhag6(I)
+      khk=khk+IIR
+      k2hk=k2hk+I*IIR
+      enddo
+      if(ihk.eq.0) go to 112
+      aihk=dfloat(ihk)
+      akhk2=(dfloat(khk)/aihk)**2
+      ak2hk=dfloat(k2hk)/aihk
+      sigmah=dsqrt(dabs(ak2hk-akhk2))
+
+C     Now produce adjacency matrix
+ 112  CALL DUAL(NMAX,D,MMAX,IDA,N,IER)
+      Do I=1,N
+       df(I)=0.d0
+      Do J=I,N
+        A(I,J)=0.d0
+        if(IDA(I,J).eq.1) A(I,J)=1.d0
+        A(J,I)=A(I,J)
+      enddo
+      enddo
+C Diagonalize without producing eigenvectors
+      call tred2l(A,N,NMAX,evec,df)
+      call tqlil(evec,df,N,NMAX)
+C Sort eigenvalues
+      Do I=1,N
+       e0=evec(I)
+       jmax=I
+        Do J=I+1,N
+         e1=evec(J)
+          if(e1.gt.e0) then 
+           jmax=j
+           e0=e1
+          endif
+        enddo
+        if(i.ne.jmax) then
+         ex=evec(jmax)
+         evec(jmax)=evec(I)
+         evec(I)=ex
+        endif
+      enddo
+
+C Now sort degeneracies
+      df(1)=evec(1)
+      ieigv=1
+      ideg=1
+      IDG(1)=ideg
+      Do I=2,N
+       diff=dabs(evec(I-1)-evec(I))
+       if(diff.lt.Tol) then
+        ideg=ideg+1
+        IDG(ieigv)=ideg
+       else
+        ieigv=ieigv+1
+        ideg=1
+        IDG(ieigv)=ideg
+        df(ieigv)=evec(I)
+       endif
+      enddo
+       
+C Produce number of electrons in HOMO, degeneracy and gap
+      Noc=N/2
+      Norb=0
+      Do I=1,ieigv
+      Iorb=I
+      Norb=Norb+IDG(I)
+      if(Norb.eq.Noc) then 
+      gap=df(Iorb)-df(Iorb+1)
+      ndeg=IDG(Iorb)
+      nelec=ndeg*2
+      go to 111
+      endif
+      if(Norb.gt.Noc) then 
+      gap=df(Iorb)-df(Iorb+1)
+      ndeg=IDG(Iorb)
+      nelec=(ndeg-Norb+Noc)*2
+      go to 111
+      endif
+      enddo
+  111 Continue
+      
+C1000 Format(1X,'Error: NV5+NN6 does not match total number of '
+C    1 'vertices')
+C     Write(Iout,1001) NV5,NV6
+C     Do I=1,M
+C     Write(Iout,1002) (D(I,J),J=1,M)
+C     enddo
+C     Write(Iout,1002) M,(Ddiag(J),J=1,M)
+ 1001 Format(1X,'Number of vertices of order five in dual matrix: ',I4,
+     1 /1X,'Number of vertices of order six in dual matrix: ',I4)
+ 1002 Format(1X,60I3)
+      Return
+      End
 
       SUBROUTINE Windup(MMAX,M,IPR,IER,S,D)
       IMPLICIT INTEGER (A-Z)

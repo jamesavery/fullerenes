@@ -1,22 +1,24 @@
-#include "graph.hh"
+#include "planargraph.hh"
 #include <fstream>
 #include <sstream>
 
 node_t observe_point = 8;
 
-struct Polyhedron : public Graph {
+struct Polyhedron : public PlanarGraph {
   int face_max;
   vector<coord3d> points;
   coord3d centre;
   vector<face_t> faces;
 
-  Polyhedron(const int face_max=INT_MAX) : face_max(face_max) {}
-  Polyhedron(const Graph& G, const vector<coord3d>& points, const int face_max = INT_MAX) : 
-    Graph(G), face_max(face_max), points(points), centre(centre3d(points)), faces(G.compute_faces_flat(face_max))
+  Polyhedron(const int face_max = INT_MAX) : face_max(face_max) {  }
+
+  Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX) : 
+    PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points)), faces(G.compute_faces_flat(face_max))
   {
-    //    if(layout2d.size() != N)
-    //layout2d = polar_angles();
     layout2d = tutte_layout();
+
+    if(points.size() != N) 
+      points = polar_mapping(spherical_projection(layout2d));
   }
   Polyhedron(const string& path) {
     ifstream file(path.c_str());
@@ -26,13 +28,19 @@ struct Polyhedron : public Graph {
 
   vector<coord2d> polar_angles() const {
     vector<coord2d> angles(N);
-    for(node_t u=0;u<N;u++){
-      const coord3d& x(points[u]);
-      const double r = x.norm();
-      angles[u].first  = acos(x[2]/r);
-      angles[u].second = atan2(x[1],x[0]);
-    }
+    for(node_t u=0;u<N;u++)
+      angles[u]      = points[u].polar_angle();
+
     return angles;
+  }
+  
+  static vector<coord3d> polar_mapping(const vector<coord2d>& angles) {
+    vector<coord3d> surface(angles.size());
+    for(node_t u=0;u<surface.size();u++){
+      const double &theta = angles[u].first, &phi = angles[u].second;
+      surface[u] = coord3d(cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi));
+    }
+    return surface;
   }
 
   double surface_area() const {
@@ -146,6 +154,53 @@ struct Polyhedron : public Graph {
     }
   }
 
+  // Polyhedron convex_hull() const {
+  //   const size_t Nt=tris.size();
+  //   vector<face_t> tris(triangulation(faces));
+  //   map<dedge_t, int> tri_by_dedge;
+  //   vector<bool> adjacent(Nt*Nt);
+  //   vector<bool> dead(Nt);
+
+  //   for(int i=0;i<Nt;i++)
+  //     for(size_t j=0;j<3;j++)
+  // 	tri_by_dedge[dedge_t(j,(j+1)%3)] = i;
+
+  //   // Build an adjacency matrix for the triangles (unnecessary N^2-space)
+  //   for(int i=0;i<Nt;i++){
+  //     const face_t &t(tris[i])
+  //     for(int k=0;k<3;k++){
+  // 	const dedge_t e(t[(k+1)%3],t[k]);
+  // 	adjacent[i*Nt+tri_by_dedge[e]] = true;
+  //     }
+  //   }
+
+    
+  //   for(size_t i=0;i<tris.size();i++){
+  //     const face_t& t(tris[i]);
+      
+  //     //Consider every pair of triangles r,s adjacent to t such that r and s are also adjacent
+  //     for(size_t j=0;j<3;i++){
+  //     	const int ri(tri_by_dedge[dedge_t(t[(j+1)%3],t[j])]);
+  // 	const int si(tri_by_dedge[dedge_t(t[(j+2)%3],t[(j+1)%3])]);
+
+  // 	if(adjacent[ri*Nt+si]){// We have a patch -- test it!
+  // 	  vector<node_t> shared;
+  // 	  const node_t u = t[(j+1)%3];
+  // 	  intersection(tris[ri].begin(),tris[ri].end(), tris[si].begin(), tris[si].end(), inserter(shared,shared.begin()));
+
+  // 	  assert(shared.size() == 1);
+  // 	  node_t vertices[4] = {t[j],t[(j+1)%3],t[(j+2)%3],shared[0]};
+  // 	  node_t outer_tri[3] = {t[j],t[(j+2)%3], shared[0] }; // Remember to sort CCW
+
+  // 	  // Test whether Tetra(u,v,w,q) is innie or outie
+  // 	}
+      	
+	
+  //     }
+  //   }
+  // }
+
+  /* 
   Polyhedron& convex_hull_inplace() {
     set<node_t> workset;
     for(node_t u=0;u<N;u++) workset.insert(u); // n log n, can be made linear
@@ -177,11 +232,13 @@ struct Polyhedron : public Graph {
 
     return *this;
   }
-
+  */
+  /*
   Polyhedron convex_hull() const {
     Polyhedron hull(*this);
     return hull.convex_hull_inplace();
   }
+  */
 
   friend ostream& operator<<(ostream& s, const Polyhedron& P){
     vector<node_t> reachable_points;
@@ -211,9 +268,11 @@ struct Polyhedron : public Graph {
     }
     P.update_auxiliaries();
     P.layout2d = P.tutte_layout();
-    P.faces = P.compute_faces_flat(P.face_max,P.layout2d);
+    P.faces = P.compute_faces_flat(P.face_max);
     P.centre = P.centre3d(P.points);
     return f;
   }
+
+  string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
 };
 

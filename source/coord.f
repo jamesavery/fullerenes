@@ -1,7 +1,7 @@
       SUBROUTINE MoveCM(Natom,Matom,Iout,Iprint,IAtom,Dist,DistCM,El)
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,natom),DistCM(3),Ainert(3,3),evec(3),df(3)
-      DIMENSION IATOM(natom)
+      DIMENSION IATOM(natom),layout2d(2,NAtom)
       CHARACTER*2 El(99)
       Data FNorm,STol/4.97369255d2,1.d-2/
       if(Iprint.ne.0) WRITE(IOUT,1000) 
@@ -312,4 +312,225 @@ C     Unpack distance matrix value from linear vector
       Fac=(R1*R1+R2*R2-RM*RM)/(2.d0*R1*R2)
       FunAngleMat=180.d0*dacos(Fac)/dpi
       Return
-      END 
+      END
+
+      Subroutine Leapfrog(NAtom,MAtom,Iout,leap,LeapErr,IDA,
+     1 A,evec,df,Dist,layout2D,distp,CDist) 
+C     Construct Leapfrog fullerene through adjacency matrix
+      use iso_c_binding
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Real*8 layout2D
+      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom),IDA(NAtom,NAtom)
+      DIMENSION IDG(NAtom),Dist(3,NAtom),distP(NAtom),layout2D(2,NAtom)
+      Character*10 Symbol
+      Data Tol1/.15d0/
+      integer graph_is_a_fullerene
+      type(c_ptr) :: g, frog, new_fullerene_graph, leapfrog_fullerene,
+     1 new_graph
+C     Print and test 
+      LeapErr=0 
+
+      MLeap=(3**leap)*MAtom
+
+      if(Mleap.gt.NAtom) then
+         Write(Iout,1002) MLeap,NAtom
+         LeapErr=1
+         return
+      endif
+
+      if(leap.eq.1) then
+       Write(Iout,1000) MAtom,MLeap
+      else
+       Write(Iout,1001) leap,MAtom,MLeap
+      endif 
+
+      g = new_fullerene_graph(NAtom,MAtom,IDA)
+      frog = leapfrog_fullerene(g,leap)
+
+C Test that the created leapfrog graph is a fullerene graph
+C (cubic, satisfies Eulers formula, has 12 pentagons, remaining 
+C  faces are hexagons)
+      isafullerene = graph_is_a_fullerene(frog)
+
+      if(isafullerene .eq. 1) then
+         write (Iout,*) 
+     &   "Leapfrog graph satisfies all fullerene conditions."
+      else
+         write (Iout,*) 
+     &   "Leapfrog graph does not satisfy all fullerene conditions."
+      endif
+
+C   Tutte algorithm for the 3D structure (see pentindex.f):
+      write (Iout,1012)
+      call tutte_layout(frog,layout2d)
+      call spherical_layout(frog,Dist)
+      write (Iout,1013)
+
+      call adjacency_matrix(frog,NAtom,IDA)
+
+C Produce Hueckel matrix and diagonalize
+C     Diagonalize
+      Do I=1,MLeap
+         Do J=1,MLeap
+            A(I,J)=dfloat(IDA(I,J))
+         enddo
+      enddo
+      write (Iout,*) "Calling tred2"
+      call tred2(A,MLeap,NAtom,evec,df)
+      write (Iout,*) "Calling tqili"
+      call tqli(evec,df,MLeap,NAtom,A)
+
+      Write(Iout,1005) MLeap,MLeap
+C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
+      Do I=1,MLeap
+         e0=evec(I)
+         jmax=I
+      Do J=I+1,MLeap
+         e1=evec(J)
+         if(e1.gt.e0) then
+            jmax=j
+            e0=e1
+         endif
+      enddo
+      if(i.ne.jmax) then
+      ex=evec(jmax)
+      evec(jmax)=evec(I)
+      evec(I)=ex
+      Do k=1,MLeap
+      df(k)=A(k,jmax)
+      A(k,jmax)=A(k,I)
+      A(k,I)=df(k)
+      enddo
+      endif
+      enddo
+C     Now sort degeneracies
+      df(1)=evec(1)
+      ieigv=1
+      ideg=1
+      IDG(1)=ideg
+      Do I=2,MLeap
+      diff=dabs(evec(I-1)-evec(I))
+      if(diff.lt.Tol) then
+      ideg=ideg+1
+      IDG(ieigv)=ideg
+      else
+      ieigv=ieigv+1
+      ideg=1
+      IDG(ieigv)=ideg
+      df(ieigv)=evec(I)
+      endif
+      enddo
+
+C     Now Print
+      ntot=0
+      nopen=0
+      nflag=0
+      iocc=0
+      Write(Iout,1006)
+      Do I=1,ieigv
+      NE=2*idg(i)
+      NE1=NE
+      ntot=ntot+NE
+      Symbol='(occupied)'
+      if(ntot.gt.MLeap) then
+      if(nflag.eq.0) then
+      nflag=1
+      bandgap=df(i-1)-df(i)
+      endif
+      NE=0
+      Symbol='(empty)   '
+      endif
+      if(ntot.gt.MLeap.and.(ntot-NE1).lt.MLeap) then
+      NE=MLeap-ntot+NE1
+      Symbol='(fractocc)'
+      nopen=1
+      endif
+      if(NE.ne.0.and.NE.eq.idg(i)*2) iocc=iocc+idg(i)
+      Write(Iout,1007) df(I),idg(i),NE,Symbol
+      enddo
+      Write(Iout,1008)
+      if(nopen.eq.1) then
+      Write(Iout,1009)
+      else
+      Write(Iout,1010) bandgap
+      if(bandgap.lt.Tol1) Write(Iout,1009)
+      endif
+
+C     Obtain smallest distance for further scaling
+C     Now this contracts or expands the whole fullerene to set the
+C     smallest bond distance to Cdist
+      R0=1.d10
+      Do I=1,MLEAP
+      Do J=I+1,MLEAP
+      X=Dist(1,I)-Dist(1,J)
+      Y=Dist(2,I)-Dist(2,J)
+      Z=Dist(3,I)-Dist(3,J)
+      R=dsqrt(X*X+Y*Y+Z*Z)
+      if(R.lt.R0) R0=R
+      enddo
+      enddo
+      fac=CDist/R0
+      Do I=1,MLEAP
+      Dist(1,I)=Dist(1,I)*fac
+      Dist(2,I)=Dist(2,I)*fac
+      Dist(3,I)=Dist(3,I)*fac
+      enddo
+C     Check distances
+      Write(IOUT,1015) fac
+      Do J=1,MLeap
+      Write(IOUT,1016) J,(Dist(I,J),I=1,3)
+      enddo
+      CALL Distan(NAtom,MLeap,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      Write(IOUT,1017) Rmin,Rmax,rms
+      ratio=(Rmax/Rmin-1.d0)*1.d2
+      iratio=dint(ratio)
+      CALL Diameter(NAtom,MLeap,IOUT,Dist,distp)
+      if(iratio.lt.33) then
+      Write(IOUT,1018) iratio
+      else
+      Write(IOUT,1019) iratio
+      endif
+
+      MAtom = MLeap
+      call adjacency_matrix(frog,NAtom,IDA)
+
+      call delete_fullerene_graph(frog)
+      call delete_fullerene_graph(g)
+
+ 1000 Format(/1X,'Creating the adjacency matrix of the next leap-frog',
+     1 ' fullerene: ',I4,' --> ',I4)
+ 1001 Format(/1X,'Creating the adjacency matrix of the ',I2,
+     1 'th leap-frog fullerene: ',I4,' --> ',I4)
+ 1002 Format(1X,'Error: Dimension of leapfrof fullerene is ',I4,
+     1 ' greater than dimension of NAtom (',I4,') set in program')
+ 1003 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
+     1 'are not of degree 3, last one is of degree ',I4)
+ 1004 FORMAT(1X,'Graph checked, it is cubic')
+ 1005 FORMAT(/1X,'Using the Tutte embedding algorithm to construct ',
+     1 'the fullerene',/1X,'Construct the (',I3,','I3,') Hueckel ',
+     1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
+     1 /1X,'Eigenvalues are between [-3,+3]')
+ 1006 FORMAT(1X,'       x     deg NE   type    ',/1X,32('-'))
+ 1007 FORMAT(1X,F12.6,I3,1X,I3,3X,A10)
+ 1008 FORMAT(1X,32('-'))
+ 1009 FORMAT(1X,'Fullerene has open-shell character (zero band gap)!')
+ 1010 FORMAT(1X,'Bandgap delta x = ',F12.6,' (in units of |beta|)')
+ 1011 FORMAT(/1X,'Using the Tutte-embedding algorithm to construct ',
+     1 'the fullerene',/1X,'Construct the Tutte planar graph and ',
+     1 'project on sphere')
+ 1012 Format(1X,'Calculating Tutte-embedding')
+ 1013 FORMAT(1X,'Projected on sphere')
+ 1014 FORMAT(1X,'Fullerene graph deleted')
+ 1015 FORMAT(1X,'Coordinates from Tutte embedding scaled by a factor'
+     1 ' of ',D18.12)
+ 1016 FORMAT(1X,I3,5X,3(D18.12,2X))
+ 1017 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
+     1 ', RMS distance: ',F12.6)
+ 1018 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
+     1 'distance')
+ 1019 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
+     1 'distance. Fullerene strongly distorted!',/1X,
+     1 'Optimization of geometry recommended')
+
+      Return
+      END

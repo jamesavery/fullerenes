@@ -5,14 +5,14 @@
 #include <iostream>
 using namespace std;
 
-typedef unsigned int node_t;
+typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
 
-
+// Undirected edge is an unordered pair of nodes
 struct edge_t : public pair<node_t,node_t> {
   edge_t(const node_t& u, const node_t& v): pair<node_t,node_t>(min(u,v),max(u,v)) {}
-  edge_t(const unsigned int index) {
+  edge_t(const int index) {
     node_t u=0;
     for(;u*(u-1)/2<=index;u++) ;
     u--;
@@ -25,6 +25,8 @@ struct edge_t : public pair<node_t,node_t> {
   }
 };
 
+// Directed edge is an ordered pair of nodes
+typedef pair<node_t,node_t> dedge_t;
 
 struct coord2d : public pair<double,double> {
   coord2d(const double x=0, const double y=0) : pair<double,double>(x,y) {}
@@ -49,7 +51,7 @@ struct coord2d : public pair<double,double> {
   double norm() const { return sqrt(first*first+second*second); }
 
   friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << "{" << x.first << "," << x.second << "}"; return s; }
-  friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; }
+  friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; return s; }
 };
 
 
@@ -72,12 +74,20 @@ struct coord3d {
   }
   double dot(const coord3d& y) const { return x[0]*y[0]+x[1]*y[1]+x[2]*y[2]; }
   double norm() const { return sqrt(dot(*this)); }
+  coord2d polar_angle(const coord3d& centre = coord3d()) const
+  { 
+    const coord3d& x(*this - centre);
+    const double r = norm();
+    return coord2d(acos(x[2]/r),atan2(x[1],x[0]));
+  }
 
   double& operator[](unsigned int i){ return x[i]; }
   double  operator[](unsigned int i) const { return x[i]; }
 
+
+
   friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
-  friend istream& operator>>(istream &s, coord3d& x){ double d; for(int i=0;i<3;i++){ s >> x[i]; } return s; }
+  friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };
 
 
@@ -111,6 +121,7 @@ struct face_t : public vector<node_t> {
 };
 
 
+typedef map<unsigned int,set<face_t> > facemap_t;
 
 struct Tri3D {
   const coord3d a,b,c,u,v,n;

@@ -41,6 +41,21 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
+      SUBROUTINE Chiral(Iout,Group)
+      Character*3 Group
+      Character*3 CPG(12)
+      Data CPG/' C1',' C2',' C3',' C5',' C6',
+     1 ' D2',' D3',' D5',' D5',' D6','  T','  I'/
+      do I=1,12
+       if(Group.eq.CPG(I)) then
+        Write(Iout,1000) Group
+       endif
+      enddo
+ 1000 Format(1X,'Chiral fullerene detected belonging to',
+     1 ' point group ',A3)
+      RETURN
+      END
+
       SUBROUTINE Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,NMAX)

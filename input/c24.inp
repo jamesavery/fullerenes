@@ -1,9 +1,9 @@
 C24 aug-cc-pvdz B3LYP opt. geom. minimum D2-sym E=-913.9314011 au
-&Coord NA=24, IC=1, ip=1, icyl=1/
+&Coord NA=24, IC=1 /
 &Opt /
 &Hamilton Iham=1 /
 &Isomers IPR=1, IPH=1 /
-&Graph ig=1 /
+&Graph /
 6                   1.609134   -1.650841    0.381110
 6                   2.234048    0.567939    0.380957
 6                   0.625138    2.218278    0.380856

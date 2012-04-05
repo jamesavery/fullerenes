@@ -1,5 +1,5 @@
       SUBROUTINE CoordPent(NMAX,MMAX,LMAX,MAtom,IN,Iout,IDA,D,ICart,
-     1 IV1,IV2,IV3,A,evec,df,Dist,distp,Cdist)
+     1 IV1,IV2,IV3,A,evec,df,Dist,layout2d,distp,Cdist,GROUP)
 C Cartesian coordinates produced from ring spiral pentagon list
 C using either the Fowler-Manopoulus or the Tutte embedding
 C algorithm 
@@ -7,7 +7,8 @@ C Fowler-Manopoulus algorithm: identify P-type eigenvectors and
 C construct the 3D fullerene
 C Tutte embedding algorithm: Tutte embedding and sphere projection
 C If nalgorithm=0 use Fowler-Manopoulus algorithm
-C If nalgorithm=1 use Tutte algorithm
+C If nalgorithm=1 use Fowler-Manopoulus algorithm but Laplacian instead
+C If nalgorithm=2 use Tutte algorithm
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 layout2d
@@ -21,7 +22,7 @@ C If nalgorithm=1 use Tutte algorithm
       Character*10 Symbol
       CHARACTER*3 GROUP
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-      type(c_ptr) :: g, new_fullerene_graph, read_fullerene_graph
+      type(c_ptr) :: g, new_fullerene_graph, new_graph
 
       nalgorithm=ICart-2
       M=Matom/2+2
@@ -108,7 +109,7 @@ C Now produce the Hueckel matrix from the dual matrix
       A(I,J)=dfloat(IDA(I,J))
       enddo
       enddo
-C Analyze the adjaceny matrix if it is correct
+C Analyze the adjacency matrix if it is correct
       nsum=0
       Do I=1,MAtom
       isum=0
@@ -124,9 +125,7 @@ C Analyze the adjaceny matrix if it is correct
       WRITE(Iout,1038)
       endif
 
-C Now produce the 3D image
-C   Algorithm 1 (Fowler-Manopoulus):
-      if(nalgorithm.le.0) then
+C Produce Hueckel matrix and diagonalize
 C     Diagonalize
       call tred2(A,Matom,NMax,evec,df)
       call tqli(evec,df,Matom,NMax,A)
@@ -204,8 +203,51 @@ C     Now Print
       Write(Iout,1008) bandgap
       if(bandgap.lt.Tol1) Write(Iout,1009)
       endif
+C     Laplacian matrix is used instead of the adjaceny matrix
+C     Add degree of vertex to diagonal
+      if(nalgorithm.eq.1) then
+      Write(Iout,1039)
+      Do I=1,MAtom
+      Do J=1,MAtom
+      A(I,J)=-dfloat(IDA(I,J))
+      enddo
+       A(I,I)=3.d0
+      enddo
+C     Diagonalize
+      call tred2(A,Matom,NMax,evec,df)
+      call tqli(evec,df,Matom,NMax,A)
+      Write(Iout,1004) Matom,Matom
+C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
+C     Sorting is different to adjacency matrix
+C      Here from the lowest to highest eigenvalue
+      Do I=1,MAtom
+      e0=evec(I)
+      jmax=I
+      Do J=I+1,MAtom
+      e1=evec(J)
+      if(e1.lt.e0) then 
+      jmax=j
+      e0=e1
+      endif
+      enddo
+      if(i.ne.jmax) then
+      ex=evec(jmax)
+      evec(jmax)=evec(I)
+      evec(I)=ex
+      Do k=1,MAtom
+      df(k)=A(k,jmax)
+      A(k,jmax)=A(k,I)
+      A(k,I)=df(k)
+      enddo
+      endif
+      enddo
+      endif
+
+C Now produce the 3D image
+C   Algorithm 1 or 2 (Fowler-Manopoulus):
 C     Now search for lowest energy P-type vectors
 C     This needs to be changed
+      if(nalgorithm.le.1) then
       icand=0
       Do I=1,iocc
       mneg=0
@@ -327,8 +369,6 @@ C     Calculate P-type dipole moment
 
       else
 C   Algorithm 2 (Tutte):
-C     Here goes your part, the adjacency matrix is in IDA(i,j)
-C     in integers (0 or 1), I guess this is all you need
 C     Input: Integer Adjacency Matrix IDA(NMax,NMax)
 C     Output: Real*8 Cartesian Coordinates  Dist(3,NMax)
 C     NMax: Max Dimension of Matrix
@@ -345,7 +385,7 @@ C     Algorithm 2 (Tutte):
          write (Iout,1036)
 
 C     Obtain smallest distance for further scaling
-C     Now this contracts or expandes the whole fullerene to set the
+C     Now this contracts or expands the whole fullerene to set the
 C     smallest bond distance to Cdist
       R0=1.d10
       Do I=1,MATOM
@@ -394,8 +434,8 @@ C     Check distances
      1 'therefore NOT a fullerene dual')
  1003 FORMAT(1X,'       x     deg NE   type    ',/1X,32('-'))
  1004 FORMAT(/1X,'Using the Fowler-Manopoulus algorithm to construct ',
-     1 'the fullerne',/1X,'Construct the (',I3,','I3,') Hueckel matrix,'
-     1 ' diagonalize (E=alpha+x*beta) and get eigenvectors',
+     1 'the fullerene',/1X,'Construct the (',I3,','I3,') Hueckel ',
+     1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
  1005 FORMAT(1X,F12.6,I3,1X,I3,3X,A10)
  1006 FORMAT(1X,32('-'))
@@ -421,10 +461,9 @@ C     Check distances
  1016 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
      1 'distance')
  1017 FORMAT(/1X,'Using the Tutte-embedding algorithm to construct ',
-     1 'the fullerne',/1X,'Construct the Tutte planar graph and ',
+     1 'the fullerene',/1X,'Construct the Tutte planar graph and ',
      1 'project on sphere')
- 1018 Format(1X,'Calculating Tutte-embedding',/1X,
-     1 'Coordinates of Tutte graph:') 
+ 1018 Format(1X,'Calculating Tutte-embedding') 
  1019 Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I3,' spirals found)')
  1020 FORMAT(/1X,'Program to create cartesian coordinates through ',
@@ -455,12 +494,13 @@ C     Check distances
  1033 Format(1X,'Rmin/Rmax ratio too small: ',D18.12,
      1 /1X,'Program will stop (choose other set of eigenvectors)')
  1034 FORMAT(1X,'Coordinates from Tutte embedding scaled by a factor'
-     1 'of ',D18.12)
+     1 ' of ',D18.12)
  1035 FORMAT(1X,'Projected on sphere')
  1036 FORMAT(1X,'Fullerene graph deleted')
  1037 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
-     1 'not of degree 3, last one is of degree ',I4)
+     1 'are not of degree 3, last one is of degree ',I4)
  1038 FORMAT(1X,'Graph checked, it is cubic')
+ 1039 FORMAT(1X,'Laplacian Matrix taken instead of adjacency matrix')
       Return 
       END
 

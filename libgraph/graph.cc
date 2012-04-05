@@ -1,10 +1,9 @@
 #include "graph.hh"
 
+
 vector<unsigned int> Graph::shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 					   const vector<bool>& used_nodes, const unsigned int max_depth) const
 {
-    //    if(used_nodes.size() == 0) used_nodes = vector<bool>(N,false);
-    //    if(used_edges.size() == 0) used_edges = vector<bool>(N*(N-1)/2,false);
     vector<unsigned int> distances(N,INT_MAX);
     list<node_t> queue;    
 
@@ -36,6 +35,8 @@ vector<unsigned int> Graph::all_pairs_shortest_paths(const unsigned int max_dept
 {
   vector<unsigned int> distances(N*N);
   vector<bool> dummy_edges(N*(N-1)/2), dummy_nodes(N);
+
+#pragma omp parallel for
   for(node_t u=0;u<N;u++){
     const vector<unsigned int> row(shortest_paths(u,dummy_edges,dummy_nodes,max_depth));
     memcpy(&distances[u*N],&row[0],N*sizeof(unsigned int));
@@ -139,108 +140,8 @@ vector<unsigned int> Graph::multiple_source_shortest_paths(const vector<node_t>&
   return multiple_source_shortest_paths(sources,vector<bool>(N*(N-1)/2),vector<bool>(N),max_depth);
 }
 
-Graph Graph::dual_graph(unsigned int Fmax, const vector<coord2d> layout) const {
-  Graph dual;
-  unsigned int Nfaces = edge_set.size()-N+2;
-  dual.N = Nfaces;
-  dual.neighbours.resize(Nfaces);
-  dual.edges.resize(Nfaces*(Nfaces-1)/2);
-
-  const vector<face_t> allfaces(compute_faces_flat(Fmax,layout));
-
-  if(Nfaces != allfaces.size()){
-    fprintf(stderr,"%d != %d faces: Graph is not polyhedral.\n",Nfaces,int(allfaces.size()));
-    cout << "errgraph = " << *this << endl;
-  }
-
-  // Construct mapping e -> faces containing e (these are mutually adjacent)
-  map< edge_t, set<int> > facenodes;
-  for(unsigned int i=0;i<allfaces.size(); i++){
-    const face_t& face(allfaces[i]);
-    //  cerr << "Face "<<i<<": " << face << endl;
-    for(unsigned int j=0;j<face.size();j++)
-      facenodes[edge_t(face[j],face[(j+1)%face.size()])].insert(i);
-  }
-
-  for(map<edge_t,set<int> >::const_iterator fs(facenodes.begin());fs!=facenodes.end();fs++){
-    const edge_t&   e(fs->first);
-    const set<int>& connects(fs->second);
-    if(connects.size() != 2)
-      fprintf(stderr,"Edge (%d,%d) connects %d faces: Graph is not planar.\n",e.first,e.second,int(connects.size()));
-  }
-  
-  // Insert edge between each pair of faces that share an edge
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    const set<int>& adjacent_faces(facenodes[*e]);
-    for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
-      set<int>::const_iterator g(f);
-      for(++g; g!= adjacent_faces.end(); g++)
-	dual.edge_set.insert(edge_t(*f,*g));
-    }
-  }
-  fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
-
-  dual.update_auxiliaries();
-
-  // If original graph was planar with 2D layout, there's a corresponding layout for the dual grap
-  if(layout.size() == N){
-    dual.layout2d = vector<coord2d>(Nfaces);
-    for(unsigned int i=0;i<Nfaces;i++){
-      face_t face(allfaces[i]);
-      coord2d centre = 0;
-      for(unsigned int j=0;j<face.size();j++) centre += layout[face[j]];
-      dual.layout2d[i] = centre / face.size();
-    }
-  }
-
-  // for(unsigned int u=0;u<Nfaces;u++){
-  //   printf("%d: ",u);
-  //   for(int i=0;i<dual.neighbours[u].size();i++)
-  //     printf("%d ",dual.neighbours[u][i]);
-  //   printf("\n");
-  // }  
-  return dual;
-}
 
 
-Graph::facemap_t Graph::compute_faces(unsigned int Nmax, const vector<coord2d> layout) const 
-{
-  facemap_t facemap;
-
-  // TODO: This is a much better and faster method, but needs to be debugged.
-  //  if(layout.size() == N) return compute_faces_oriented(layout);
-
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    const node_t s = e->first, t = e->second;
-
-    const vector<node_t>& ns(neighbours[t]);
-    for(unsigned int i=0;i<ns.size();i++)
-      if(ns[i] != s) {
-	const node_t u = ns[i];
-
-	face_t face(shortest_cycle(s,t,u,Nmax));  
-	if(face.size() <= Nmax){
-	  facemap[face.size()].insert(face);
-	} //else {
-	  //	  fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u); 
-	  //	  cerr << face << endl;
-	  
-	//	}
-      }
-  }
-  return facemap;
-}
-
-
-vector<face_t> Graph::compute_faces_flat(unsigned int Nmax, const vector<coord2d> layout) const 
-{
-  vector<face_t> result;
-  facemap_t facemap(compute_faces(Nmax,layout));
-  for(facemap_t::const_iterator fs(facemap.begin()); fs != facemap.end(); fs++)
-    copy(fs->second.begin(),fs->second.end(),inserter(result,result.end()));
-
-  return result;
-}
 
 
 void Graph::update_auxiliaries() 
@@ -250,13 +151,14 @@ void Graph::update_auxiliaries()
   //  fprintf(stderr,"Initializing edge map.\n");
 
   // Update node count
+  N = 0;
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     N = max(N,max(e->first,e->second)+1);
   }
 
   edges.resize(N*(N-1)/2);
   neighbours.resize(N);
-  node_t nmax = 0;
+
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     edges[e->index()] = true;
     ns[e->first].insert(e->second);
@@ -264,7 +166,7 @@ void Graph::update_auxiliaries()
   }
 
   //  fprintf(stderr,"Initializing adjacencies\n");
-  for(unsigned int u=0;u<N;u++)
+  for(int u=0;u<N;u++)
     neighbours[u] = vector<node_t>(ns[u].begin(),ns[u].end());
 
 }
@@ -290,47 +192,6 @@ ostream& operator<<(ostream& s, const Graph& g)
       s << "}";
   }
 
-  if(g.layout2d.size() == g.N){
-    s << g.name << ",\n\tVertexCoordinates->{";
-    for(unsigned int i=0;i<g.N;i++){
-      coord2d xy(g.layout2d[i]);
-      s << xy << (i+1<g.N?", ":"}");
-    }
-  }
-  s << "\n]";
-
   return s;
 }
 
-
-vector<face_t> Graph::triangulation(int face_max) const
-{
-  vector<face_t> faces(compute_faces_flat(face_max,layout2d));  
-  return triangulation(faces);
-}
-  
-vector<face_t> Graph::triangulation(const vector<face_t>& faces) const
-{
-  assert(layout2d.size() == N);
-  vector<face_t> tris;
-  
-  
-  for(size_t i=0;i<faces.size();i++){
-    face_t f(faces[i]);
-
-    for(size_t j=1;j<f.size()-1;j++){
-      face_t t(3); 
-      t[0] = f[0]; t[1] = f[j]; t[2] = f[j+1];
-
-      coord2d c(t.centroid(layout2d));
-      sort_ccw_point CCW(layout2d,c);
-      
-      sort(t.begin(),t.end(),CCW);
-      if(i == 0) reverse(t.begin(), t.end()); // TODO: Show normals!
-
-      tris.push_back(t);
-    }
-  }
-
-  return tris;
-}

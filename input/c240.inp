@@ -3,7 +3,7 @@ C240 6-31G opt. geom. minimum -9144.76260 au not converged out
 &Opt /
 &Hamilton /
 &Isomers /
-&Graph IG=2, IS1=12, IS2=13,IS3=26, PS=30. /
+&Graph IG=2, ISO1=12, ISO2=13,ISO3=26, PS=30. /
 6             0.289117    6.379537    2.784036
 6             1.706950    6.184846    3.022066
 6             2.677796    6.130266    1.945327

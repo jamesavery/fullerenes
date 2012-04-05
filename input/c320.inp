@@ -1,5 +1,5 @@
 C320 6-31G opt. geom. minimum -12193.20655 au not converged out
-&Coord NA=320, IC=1, ICYL=1 /
+&Coord NA=320, IC=1, ixyz=1 /
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /

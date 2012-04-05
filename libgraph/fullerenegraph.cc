@@ -1,42 +1,5 @@
 #include "fullerenegraph.hh"
 
-bool FullereneGraph::this_is_a_fullerene() const {
-  for(node_t u=0;u<N;u++)
-    if(neighbours[u].size() != 3){ 
-      fprintf(stderr,"Graph is not cubic: vertex %d has %d neighbours.\n",u,int(neighbours[u].size())); 
-      return false;
-    }
-    
-  Graph::facemap_t faces(compute_faces(7));
-  int n_faces = 0;
-  for(facemap_t::const_iterator f(faces.begin()); f!=faces.end();f++)
-    n_faces += f->second.size();
-
-  const int E = 3*N/2;
-  const int F = 2+E-N;
-    
-  if(E != edge_set.size()){
-    fprintf(stderr,"Graph is not planar: wrong number of edges: %d != %d\n",int(edge_set.size()),E);
-    return false;
-  }
-
-  if(F != n_faces){
-    fprintf(stderr,"Graph is not planar: wrong number of faces: %d != %d\n",n_faces,F);
-    return false;
-  }
-
-  if(faces[5].size() != 12){
-    fprintf(stderr,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",int(faces[5].size()));
-    return false;
-  }
-
-  if(faces[6].size() != (F-12)){
-    fprintf(stderr,"Graph is not fullerene: wrong number of hexagons: %d != %d\n",int(faces[6].size()),F-12);
-    return false;
-  }
-
-  return true;
-}
 
 
 pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const 
@@ -67,7 +30,7 @@ pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool do_layout) const {
-  Graph dual(dual_graph(6));
+  PlanarGraph dual(dual_graph(6));
   vector<face_t> triangles(dual.compute_faces_flat(3));
   map<edge_t,vector<node_t> > edge_nodes;
     
@@ -115,7 +78,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool 
       }
   }
 
-  Graph new_dual(v_new, edgeset_new);
+  FullereneGraph new_dual(edgeset_new);
 
   FullereneGraph G(new_dual.dual_graph(3));
 
@@ -130,7 +93,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool 
 
 // Creates the next leapfrog fullerene C_{3n} from the current fullerene C_n
 FullereneGraph FullereneGraph::leapfrog_fullerene(bool do_layout) const {
-  Graph dualfrog(*this);
+  PlanarGraph dualfrog(*this);
   vector<face_t> faces(dualfrog.compute_faces_flat(6)); 
 
   node_t v_new = N;

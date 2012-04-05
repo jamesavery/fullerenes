@@ -1,5 +1,5 @@
 C50 Using FM algorithm to produce coordinates
-&Coord NA=50, IC=2, R6=1.42 /
+&Coord NA=50, IC=4, R6=1.42 /
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /

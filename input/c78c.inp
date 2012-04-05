@@ -2,7 +2,7 @@ C78   cc-pvdz B3LYP opt. geom. minimum E=-2972.34944163 au
 &Coord NA=78, IC=1 /
 &Opt Iopt=1 /
 &Hamilton Iham=1 /
-&Isomers IPR=1 IPH=1 /
+&Isomers IPR=1, IPH=1 /
 &Graph IG=2, ISO1=7, ISO2=8, ISO3=9 /
 6     1.3906898385     -2.0546060304      3.0816255215
 6     0.8188582668     -0.8439679344      3.5763435203

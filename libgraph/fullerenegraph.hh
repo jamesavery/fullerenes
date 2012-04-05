@@ -5,11 +5,11 @@
 
 class FullereneGraph : public CubicGraph {
 public:
-  FullereneGraph(const Graph& g) : CubicGraph(g) { fullerene_check();  }
-  FullereneGraph(const unsigned int N, const vector<node_t>& neighbours) : CubicGraph(N,neighbours) { fullerene_check(); }
+  FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { fullerene_check();  }
+  FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
+    : CubicGraph(Graph(edges),layout) { fullerene_check(); }
   FullereneGraph(FILE *file = stdin) : CubicGraph(file) { fullerene_check(); }
 
-  bool this_is_a_fullerene() const;
   void fullerene_check() const
   {
     if(!this_is_a_fullerene()){
@@ -30,9 +30,12 @@ public:
 
 
 
-  static FullereneGraph C20() {
-    return CubicGraph(20,vector<node_t>(C20_neighbours,C20_neighbours+3*20));
-  }
+  // static FullereneGraph C20() {
+  //   Graph g;
+  //   g.neighbours = vector<node_t>(C20_neighbours,C20_neighbours+3*20);
+  //   g.update_from_neighbours();
+  //   return FullereneGraph(g);
+  // }
 private:
   static node_t C20_neighbours[20*3];
 };

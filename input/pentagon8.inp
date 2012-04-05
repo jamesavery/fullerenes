@@ -1,5 +1,5 @@
 C60  Using FM algorithm to produce coordinates
-&Coord NA=60, IC=2, IV1=2, IV2=4, IV3=5 /
+&Coord NA=60, IC=4, IV1=2, IV2=4, IV3=5, ixyz=1 /
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /

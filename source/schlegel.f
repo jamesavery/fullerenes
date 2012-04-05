@@ -1,6 +1,6 @@
       SUBROUTINE Schlegel(NAtom,Nfaces,Nedges,M,msrs,IOUT,IS1,IS2,IS3,
      1 N5M,N6M,N5R,N6R,NRing,Iring,ISchlegel,IC3,IDA,Dist,angle,Rmin,
-     1 Tol,CR,CR5,CR6,Symbol)
+     1 Tol,fscale,scalePPG,CR,CR5,CR6,Symbol)
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
 C projection method and the perspective projection, or Tutte
@@ -14,18 +14,26 @@ C or face is at the top. Euler angles are used for rotation.
       DIMENSION Dist(3,NAtom),IAtom(NAtom),NRing(Nfaces),distw(3),c(3)
       DIMENSION CR5(3,Nfaces),CR6(3,Nfaces),vec1(3),Iring(Nfaces)
       DIMENSION N5M(Nfaces,5),N6M(Nfaces,6),Rot(3,3),CR(3,Nfaces)
-      DIMENSION Rotz(3,3),Symbol(Nfaces),DistS(2,NAtom),RingS(2,Nfaces)
-      DIMENSION IC3(natom,3)
+      DIMENSION Rotz(3,3),Symbol(Nfaces),RingS(2,Nfaces)
+      DIMENSION IC3(natom,3),ICM(6,3),IS(6)
+      Integer MDist(Natom,Natom)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
-      type(c_ptr) :: g, new_fullerene_graph, read_fullerene_graph
+      type(c_ptr) :: g, frog, new_fullerene_graph, read_fullerene_graph
 
-      Open(unit=2,file='qmga.dat',form='formatted')
       Data epsf,dpi/.12d0,3.14159265358979d0/
 C     Parameter set for Program QMGA
       Data DPoint,Dedge/0.5d0,0.1d0/
 
-
+C     Prepare for Program QMGA
+      Open(unit=2,file='qmga.dat',form='formatted')
+      Write(2,901) M,DPoint,Dedge
+      
+      Do I=1,NAtom
+      Do J=1,NAtom
+      MDist(I,J)=0
+      enddo
+      enddo
       satom='o'
       s5ring='^'
       s6ring='*'
@@ -36,6 +44,7 @@ C     Parameter set for Program QMGA
       enddo
       eps=Rmin*epsf
       iorig=0
+      If(ISchlegel.gt.2) Go to 30
       Do I=1,3
       Do J=1,3
       Rot(I,J)=0.d0
@@ -137,6 +146,7 @@ C   Search in 6-ring
        Return
        endif
       endif
+
 
 C  Now define the vector of the projection axis and rotate molecule
 C  such that it coincides with the z-axis
@@ -392,13 +402,12 @@ C   Print the sorted ring centers
       WRITE(IOUT,1005)
       endif
 
-C     Prepare for Program QMGA
-      Write(2,901) M,DPoint,Dedge
-
+C   Choise between Schlegel projection or Tutte embedding
       If(ISchlegel-2) 10,20,30
- 
-C     Cone projection using the input angle
-C     Calculate distance of vertices from z-axis for projection
+
+C   Algorithm 1: 
+C   Cone projection using the input angle
+C   Calculate distance of vertices from z-axis for projection
   20  app=rmin+Dist(3,1)
       WRITE(IOUT,1002)
 C     Write out on file unit=2 for qmga
@@ -420,14 +429,14 @@ C   Extra boost for the last ring points
       If(I.gt.IVert) then
       Fac=Fac*1.2d0
       endif
-      DistS(1,I)=Dist(1,I)*Fac
-      DistS(2,I)=Dist(2,I)*Fac
+      layout2d(1,I)=Dist(1,I)*Fac
+      layout2d(2,I)=Dist(2,I)*Fac
 
 C   Print
       IAT=IAtom(i)
-      WRITE(IOUT,1004) IAT,DistS(1,I),DistS(2,I),
+      WRITE(IOUT,1004) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3),Fac
-      Write(2,902) IAT,DistS(1,I),DistS(2,I),
+      Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
       WRITE(IOUT,1032)
@@ -476,6 +485,7 @@ C   Print
       enddo
       go to 999
 
+C   Algorithm 2: 
 C   Perspective projection using the input distance
 C   Algorithm to produce symmetric Schlegel diagrams
 C   Smallest and largest ring z-coordinate
@@ -498,12 +508,12 @@ C   Atoms
       Y=Dist(2,I)
       Z=Dist(3,I)
       Fac=Zproj/(app-Z)
-      DistS(1,I)=Dist(1,I)*Fac
-      DistS(2,I)=Dist(2,I)*Fac
+      layout2d(1,I)=Dist(1,I)*Fac
+      layout2d(2,I)=Dist(2,I)*Fac
       IAT=IAtom(i)
-      WRITE(IOUT,1028) IAT,DistS(1,I),DistS(2,I),
+      WRITE(IOUT,1028) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
-      Write(2,902) IAT,DistS(1,I),DistS(2,I),
+      Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
       WRITE(IOUT,1032)
@@ -519,30 +529,14 @@ C     Extra boost for rings
       RingS(2,I)=CR(2,I)*Fac
       WRITE(IOUT,1027) IRing(i),Symbol(i),RingS(1,I),RingS(2,I)
       enddo
-      go to 999
-
-C     Use Tutte method and optimize graph
-C     J. Avery
-C     Implement Tutte method here
-C     Note that fullerene is oriented already according to input for Schlegel projection
-C     Take top ring for outer rim
-
-C     Algorithm 3 (Tutte):
- 30   write (Iout,1033)
-      g = new_fullerene_graph(NAtom,MAtom,IDA)
-      write (Iout,1034)
-      call tutte_layout_b(g,is1,is2,is3,layout2d)
-      call delete_fullerene_graph(g)
-      write (Iout,1035)
-
 
 C   Produce Schlegel picture
 C   Atoms
  999   span=0.d0
        iflaga=0
       do i=1,M
-       xabs=dabs(DistS(1,I))
-       yabs=dabs(DistS(2,I))
+       xabs=dabs(layout2d(1,I))
+       yabs=dabs(layout2d(2,I))
        if(yabs.gt.xabs) xabs=yabs
        if(xabs.gt.span) span=xabs
       enddo
@@ -550,9 +544,9 @@ C   Atoms
        grid=dfloat(msrs2-1)
        grids=grid/span
       do i=1,M
-      ix=int(DistS(1,I)*grids)
+      ix=int(layout2d(1,I)*grids)
       ixpos=ix+msrs2
-      iy=int(DistS(2,I)*grids)
+      iy=int(layout2d(2,I)*grids)
       iypos=iy+msrs2
       if(ixpos.le.0) ixpos=1
       if(iypos.le.0) iypos=1 
@@ -590,6 +584,141 @@ C   Print Schlegel picture
         WRITE(IOUT,1025) (SRS(I,J),J=1,2*msrs)
       enddo
 
+      Close(unit=2)
+      Return
+
+C   Algorithm 3 (Tutte):
+C   Use Tutte method and optimize graph
+C   Take top ring for outer rim
+ 30   write (Iout,1033)
+      if(is1.le.0.or.is2.le.0.or.is3.le.0) then
+       Do I=1,5
+        IS(I)=N5M(1,I)
+       enddo
+       IS(6)=0
+       write (Iout,1034) (IS(I),I=1,5)
+       lring=5
+      else
+C   Find ring
+C   Search in 5-ring
+      n6hit=0
+      Do I=1,N5R
+       n5hit=0
+        Do J=1,5
+         if(is1.eq.N5M(I,J)) n5hit=n5hit+1
+         if(is2.eq.N5M(I,J)) n5hit=n5hit+1
+         if(is3.eq.N5M(I,J)) n5hit=n5hit+1
+          if(n5hit.eq.3) then
+           c(1)=cr5(1,I) 
+           c(2)=cr5(2,I) 
+           c(3)=cr5(3,I) 
+           IR=I
+           go to 250
+          endif
+        enddo
+      enddo
+C   Search in 6-ring
+      Do I=1,N6R
+      n6hit=0
+       Do J=1,6
+        if(is1.eq.N6M(I,J)) n6hit=n6hit+1
+        if(is2.eq.N6M(I,J)) n6hit=n6hit+1
+        if(is3.eq.N6M(I,J)) n6hit=n6hit+1
+        if(n6hit.eq.3) then 
+         c(1)=cr6(1,I) 
+         c(2)=cr6(2,I) 
+         c(3)=cr6(3,I)
+         IR=N5R+I 
+         go to 250
+        endif
+       enddo
+      enddo
+ 250  if(n5hit.eq.3) then
+       Do I=1,5
+        IS(I)=N5M(IR,I)
+       enddo
+       lring=5
+       IS(6)=0
+       WRITE(IOUT,1038) IR,(IS(I),I=1,5),(c(i),i=1,3)
+      endif
+      if(n6hit.eq.3) then
+       Do I=1,6
+        IS(I)=N5M(IR,I)
+       enddo
+       lring=6
+       WRITE(IOUT,1039) IR,(IS(I),I=1,6),(c(i),i=1,3)
+      endif
+      nhit=n5hit+n6hit
+      if(nhit.lt.3) then
+       WRITE(IOUT,1017) nhit
+       Return
+       endif
+C  End of search
+      endif
+      g = new_fullerene_graph(NAtom,M,IDA)
+      if(ISchlegel.ge.7) then
+       call all_pairs_shortest_path(g,M,NAtom,MDist)
+       WRITE(IOUT,1041) 
+       maxl=0
+      Do I=1,M
+      Do J=I+1,M
+       if(MDist(I,J).gt.maxl) maxl=MDist(I,J)
+      enddo
+      enddo
+      endif
+      write (Iout,1036)
+      call tutte_layout_b(g,is(1),is(2),is(3),layout2d)
+      call delete_fullerene_graph(g)
+C     Get Barycenter of outer ring and use as origin
+      write (Iout,1040)
+      xc=0.d0
+      yc=0.d0
+      do I=1,lring
+       II=IS(I)
+       xc=xc+layout2d(1,II)
+       yc=yc+layout2d(2,II)
+      enddo
+      denom=dfloat(lring)
+      xc=xc/denom
+      yc=yc/denom
+      Do I=1,M
+       layout2d(1,I)=layout2d(1,I)-xc
+       layout2d(2,I)=layout2d(2,I)-yc
+      enddo
+      if(ISchlegel.le.4) then
+C  Radially scale Tutte graph
+       if(ISchlegel.eq.4) then
+        CALL ScaleTutte(Natom,M,Iout,IS,lring,fscale,layout2d)
+       endif
+C     Write to unit 2
+      write (Iout,1037)
+       Do I=1,M
+       WRITE(IOUT,1028) I,layout2d(1,I),layout2d(2,I),
+     1  IC3(I,1),IC3(I,2),IC3(I,3)
+       Write(2,902) I,layout2d(1,I),layout2d(2,I),
+     1  IC3(I,1),IC3(I,2),IC3(I,3)
+       enddo
+       Close(unit=2)
+C  Optimize Tutte graph, spring embedding
+      else
+C  IOP=1: Spring embedding
+C  IOP=2: Spring embedding + Coulomb repulsion from barycenter
+C  IOP=3: Pisanski-Plestenjak-Graovac embedding using the distance matrix MDist
+C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
+       IOP=ISchlegel-4
+       CALL OptGraph(IOP,Natom,M,Iout,IDA,IS,IC3,MDist,maxl,
+     1  scalePPG,layout2d)
+       write (Iout,1037)
+       Do I=1,M
+       WRITE(IOUT,1028) I,layout2d(1,I),layout2d(2,I),
+     1  IC3(I,1),IC3(I,2),IC3(I,3)
+       Write(2,902) I,layout2d(1,I),layout2d(2,I),
+     1  IC3(I,1),IC3(I,2),IC3(I,3)
+       enddo
+       Close(unit=2)
+      endif
+
+       Return
   901 Format(I6,2F12.6)
   902 Format(I6,2(1X,F12.6),1X,3(1X,I6))
  1000 Format(/1X,'Schlegel diagram for selected projection point',
@@ -608,7 +737,7 @@ C   Print Schlegel picture
      2 ' pentagon or hexagon with ring center in the middle)')
  1006 Format(1X,'Aligning Fullerene, Input: ',3I4)
  1007 Format(1X,'ERROR in input')
- 1008 Format(1X,'Vertex of atom ',I4,' chosen for Schlegel alignment.',
+ 1008 Format(1X,'Vertex of atom ',I4,' chosen for alignment.',
      1 ' Coordinates of vertex: X= ',F12.6,', Y= ',F12.6,', Z= ',F12.6)
  1009 Format(1X,'Edge between atoms ',I4,' and ',I4,
      1 ' chosen for Schlegel alignment.',
@@ -665,13 +794,25 @@ C   Print Schlegel picture
  1031 Format(/1X,'Reset focal point distance to nearest ring to ',F12.6)
  1032 Format(/1X,'File qmga.dat written out for input into',
      1 ' program QMGA')
- 1033 FORMAT(/1X,'Using the Tutte-embedding algorithm to construct ',
-     1 'the fullerne',/1X,'Construct the Tutte planar graph and ',
-     1 'make it distant transparant')
- 1034 Format(1X,'Calculating Tutte-embedding',/1X,
-     1 'Coordinates of Tutte graph:')
- 1035 FORMAT(1X,'Fullerene graph deleted') 
-      Close(unit=2)
+ 1033 FORMAT(/1X,'Using the Tutte-embedding algorithm for fullerene ',
+     1 'graph as a starting point for embedding algorithms')
+ 1034 Format(1X,'No input for specifying circumfencing ring chosen, ',
+     1 'first pentagon taken instead including atoms ',5I4)
+ 1035 Format(1X,'Circumfencing ring chosen from input, including ',
+     1 'atoms ',3I4)
+ 1036 Format(1X,'Calculating Tutte-embedding and shift to barycenter')
+ 1037 FORMAT(1X,'Fullerene graph deleted',/,' Tutte graph coordinates:',
+     1 /,'  Atom       X            Y        N1   N2   N3') 
+ 1038 Format(1X,'5-Ring center 'I4,' defined by atoms ',3(I4,' , '),
+     1 I4,' and ',I4,' chosen for Schlegel alignment.',
+     2 /1X,' Coordinates of ring center: X= ',
+     3 F12.6,', Y= ',F12.6,', Z= ',F12.6)
+ 1039 Format(1X,'6-Ring center ',I4,' defined by atoms ',4(I4,' , '),
+     1 I4,' and ',I4,' chosen for Schlegel alignment.',
+     2 /1X,' Coordinates of ring center: X= ',
+     3 F12.6,', Y= ',F12.6,', Z= ',F12.6)
+ 1040 Format(1X,'Set Tutte graph to barycenter of outer ring')
+ 1041 Format(1X,'Distance matrix produced')
       Return
       END
 
@@ -758,4 +899,245 @@ C     Now checking on the original vector
       vec1(2)=Rot(2,1)*vec(1)+Rot(2,2)*vec(2)+Rot(2,3)*vec(3)
       vec1(3)=Rot(3,1)*vec(1)+Rot(3,2)*vec(2)+Rot(3,3)*vec(3)
       Return
+      END
+
+      SUBROUTINE funcg(IOP,NMAX,NMAX2,MMAX,n,A,IS,MDist,maxd,
+     1 p,fc,RAA)
+      IMPLICIT REAL*8 (A-H,O-Z)
+C     Embedding algorithms for fullerene graph, energy
+      Real*8 p(NMAX2)
+      Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
+      Data r,f,coulomb/2.0d0,1.d-1,1.0d0/
+      fc=0.d0
+C     simple spring embedding
+      if(IOP.le.2) then
+      ehook=0.d0
+      Do I=1,n,2
+        I1=(I+1)/2
+      Do J=I+2,n,2
+        J1=(J+1)/2
+        if(A(I1,J1).ne.0) then
+         px=p(I)-p(J)
+         py=p(I+1)-p(J+1)
+         ratom=dsqrt(px*px+py*py)
+          ehook=ehook+(ratom-r)**2
+         endif
+      enddo
+      enddo
+C     total energy  
+      fc=f*ehook
+      endif
+
+C     Add Repulsive Coulomb
+      if(IOP.eq.2) then
+      fcoul=0.d0
+      Do I=1,n,2
+        rv=dsqrt(p(I)**2+p(I+1)**2)
+        fcoul=fcoul+1.d0/rv
+      enddo
+        fc=fc+coulomb*fcoul
+      endif
+
+C     Pisanski-Plestenjak-Graovac algorithm
+      if(IOP.eq.3) then
+      rpermax=dfloat(maxd)
+      af=RAA*(1.4d0+rpermax/24.d0)
+        iloop=6
+        if(IS(6).eq.0) iloop=5
+      ehook=0.d0
+      Do I=1,n,2
+        I1=(I+1)/2
+        maxu=1000000
+        do K=1,iloop
+         K1=IS(K)
+         if(Mdist(K1,I1).lt.maxu) maxu=Mdist(K1,I1)
+        enddo
+      Do J=I+2,n,2
+        J1=(J+1)/2
+        maxp=1000000
+        do K=1,iloop
+         K2=IS(K)
+         if(Mdist(K2,J1).lt.maxp) maxp=Mdist(K2,J1)
+        enddo
+        if(A(I1,J1).ne.0) then
+         px=p(I)-p(J)
+         py=p(I+1)-p(J+1)
+         ratom2=px*px+py*py
+         dup=dfloat(2*maxd-maxu-maxp)
+         weight=dexp(af*dup/rpermax)
+         ehook=ehook+ratom2*weight
+        endif
+      enddo
+      enddo
+C     total energy  
+      fc=ehook
+      endif
+
+C     Kamada-Kawai embedding
+      if(IOP.eq.4) then
+      ehook=0.d0
+      Do I=1,n,2
+        I1=(I+1)/2
+      Do J=I+2,n,2
+        J1=(J+1)/2
+        if(MDist(I1,J1).le.0) then
+         Print*,I1,J1,MDist(I1,J1)
+         stop
+        endif
+        DD=dfloat(MDist(I1,J1))
+         px=p(I)-p(J)
+         py=p(I+1)-p(J+1)
+         ratom=dsqrt(px*px+py*py)
+          ehook=ehook+((ratom-RAA*DD)/DD)**2
+      enddo
+      enddo
+C     total energy  
+      fc=f*ehook
+      endif
+
+      Return
+      END
+
+      SUBROUTINE dfuncg(IOP,NMAX,NMAX2,MMAX,n,A,IS,MDist,maxd,
+     1 p,x,RAA)
+      IMPLICIT REAL*8 (A-H,O-Z)
+C     Embedding algorithms for fullerene graph, gradient
+      Real*8 p(NMAX2),x(NMAX2)
+      Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
+      Data r,f,coulomb/2.0d0,1.d-1,1.0d0/
+C     simple spring embedding
+      if(IOP.le.2) then
+      Do I=1,n,2
+        ehookx=0.d0
+        ehooky=0.d0
+        I1=(I+1)/2
+      Do J=1,n,2
+        J1=(J+1)/2
+        if(A(I1,J1).ne.0) then
+          px=p(I)-p(J)
+          py=p(I+1)-p(J+1)
+          ratom=dsqrt(px*px+py*py)
+            fac=f*(ratom-r)/ratom
+            ehookx=ehookx+fac*px
+            ehooky=ehooky+fac*py
+        endif
+      enddo
+C     Fix outer vertices
+        if(I1.eq.IS(1).or.I1.eq.IS(2).or.I1.eq.IS(3).
+     1   or.I1.eq.IS(4).or.I1.eq.IS(5).or.I1.eq.IS(6)) then
+         x(I)=0.d0
+         x(I+1)=0.d0
+        else
+         x(I)  =2.d0*ehookx
+         x(I+1)=2.d0*ehooky
+        endif
+      enddo
+      endif
+  
+C     Repulsive Coulomb
+      if(IOP.eq.2) then
+      Do I=1,n,2
+        I1=(I+1)/2
+        if(I1.ne.IS(1).and.I1.ne.IS(2).and.I1.ne.IS(3).
+     1   and.I1.ne.IS(4).and.I1.ne.IS(5).and.I1.ne.IS(6)) then
+        xyf=(p(i)**2+p(i+1)**2)**(-1.5d0)
+          x(I)=x(I)-p(I)*xyf*coulomb
+          x(I+1)=x(I+1)-p(I+1)*xyf*coulomb
+        endif
+      enddo
+      endif
+
+C     Pisanski-Plestenjak-Graovac algorithm
+      if(IOP.eq.3) then
+C     simple spring embedding + exponential weighting
+      rpermax=dfloat(maxd)
+      af=RAA*(1.4d0+rpermax/24.d0)
+        iloop=6
+        if(IS(6).eq.0) iloop=5
+      Do I=1,n,2
+        I1=(I+1)/2
+        maxu=1000000
+        do K=1,iloop
+         K1=IS(K)
+         if(Mdist(K1,I1).lt.maxu) maxu=Mdist(K1,I1)
+        enddo
+C     Fix outer vertices
+       if(I1.eq.IS(1).or.I1.eq.IS(2).or.I1.eq.IS(3).
+     1  or.I1.eq.IS(4).or.I1.eq.IS(5).or.I1.eq.IS(6)) then
+        x(I)=0.d0
+        x(I+1)=0.d0
+       else
+        ehookx=0.d0
+        ehooky=0.d0
+       Do J=1,n,2
+        J1=(J+1)/2
+        if(A(I1,J1).ne.0) then
+        maxp=1000000
+        do K=1,iloop
+         K2=IS(K)
+         if(Mdist(K2,J1).lt.maxp) maxp=Mdist(K2,J1)
+        enddo
+          px=p(I)-p(J)
+          py=p(I+1)-p(J+1)
+          dup=dfloat(2*maxd-maxu-maxp)
+          weight=dexp(af*dup/rpermax)
+            ehookx=ehookx+px*weight
+            ehooky=ehooky+py*weight
+        endif
+       enddo
+        x(I)  =ehookx
+        x(I+1)=ehooky
+       endif
+      enddo
+      endif
+
+C     Kamada-Kawai embedding
+      if(IOP.eq.4) then
+      Do I=1,n,2
+        ehookx=0.d0
+        ehooky=0.d0
+        I1=(I+1)/2
+      Do J=1,n,2
+        if(I.ne.J) then
+        J1=(J+1)/2
+        DD=dfloat(MDist(I1,J1))
+          px=p(I)-p(J)
+          py=p(I+1)-p(J+1)
+          ratom=dsqrt(px*px+py*py)
+            fac=(ratom-RAA*DD)/(ratom*DD*DD)
+            ehookx=ehookx+fac*px
+            ehooky=ehooky+fac*py
+        endif
+      enddo
+         x(I)  =f*ehookx
+         x(I+1)=f*ehooky
+      enddo
+      endif
+
+      return
+      END
+
+      SUBROUTINE ScaleTutte(Natom,M,Iout,IS,lring,fs,Dist)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION Dist(2,NAtom),IS(6)
+C Routine to move inner vertices of a Tutte graph outwards
+C through a linear relation
+C   Determine min distance of outer ring
+      Write(Iout,1000) fs
+      rmin=1.d10
+      do i=1,lring
+       II=IS(I)
+       r=dsqrt(Dist(1,II)**2+Dist(2,II)**2)
+       if(r.lt.rmin) rmin=r
+      enddo
+C   Scale
+      do i=1,M
+       r=dsqrt(Dist(1,I)**2+Dist(2,I)**2)
+       scale=1.d0+.5d0*fs*(rmin-r)/rmin      
+       Dist(1,I)=Dist(1,I)*scale
+       Dist(2,I)=Dist(2,I)*scale
+      enddo
+ 1000 Format(1X,'Linear scaling of Tutte graph to move inner ',
+     1 'vertices out (Pre-factor for scaling: ',F12.2,')')
+      return
       END

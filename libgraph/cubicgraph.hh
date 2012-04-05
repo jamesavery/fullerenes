@@ -1,32 +1,21 @@
 #ifndef GRAPH3_HH
 # define GRAPH3_HH
 
-#include "graph.hh"
+#include "planargraph.hh"
 #include <iostream>
 // TODO: Assumes planarity. Should perhaps split into cubic class and planar class?
-struct CubicGraph : public Graph {
+struct CubicGraph : public PlanarGraph {
 
-  vector<coord2d> spherical_layout;
-
-  CubicGraph(const Graph& g) : Graph(g) {
+  CubicGraph(const PlanarGraph& g) : PlanarGraph(g) {
     for(node_t u=0;u<N;u++)
       if(neighbours[u].size() != 3){
 	fprintf(stderr,"Graph not cubic: deg(%d) = %d\n",u,int(neighbours[u].size()));
 	abort();
       }
   }
-
-  CubicGraph(const unsigned int N, const vector<node_t>& neighbours) : Graph(N) {
-    assert(neighbours.size() == 3*N);
-    for(int i=0;i<N;i++)
-      for(int j=0;j<3;j++)
-	edge_set.insert(edge_t(i,neighbours[3*i+j]));
-
-    update_auxiliaries();
-  }
+  CubicGraph(const Graph& g, const vector<coord2d>& layout) : PlanarGraph(g,layout) {}
 
   CubicGraph(FILE *file = stdin) {
-    int l = 0;
     char line[0x300];
     while(!feof(file)){
       node_t n, ns[3];
@@ -83,8 +72,6 @@ struct CubicGraph : public Graph {
   }
 
 
-
-  vector<coord2d> spherical_projection(const vector< coord2d >& layout2d) const;
 
   friend ostream& operator<<(ostream& s, const CubicGraph& g);
 };

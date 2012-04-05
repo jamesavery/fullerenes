@@ -1,5 +1,5 @@
 C60  aug-cc-pvdz B3LYP opt. geom. minimum Ih-sym E=-2286.3878361 au
-&Coord NA=60, IC=1, IP=1, ICYL=1 /
+&Coord NA=60, IC=1, IP=1, ixyz=1 /
 &Opt /
 &Hamilton IHam=1, IUPAC=1 /
 &Isomers IPR=2, IPH=1 /

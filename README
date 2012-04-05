@@ -1,16 +1,26 @@
-  P R O G R A M     F U L L E R E N E
-
+            P R O G R A M     F U L L E R E N E
 
 ---------------------------------------------------------------------- 
 
   PROGRAM FULLERENE FOR TOPOLOGICAL ANALYSIS OF FULLERENES
-    A program to create cartesian coordinates for fullerenes
-    isomers and to perform a topological analysis.
+    A program to create cartesian coordinates for fullerenes isomers
+     and to perform a topological/graph theoretical analysis.
     The results can be used for plotting fullerene graphs
-    (Schlegel diagrams)i and structures, and as a starting point
-    for further quantum theoretical treatment. 
+     (Schlegel diagrams) and structures, and as a starting point
+     for further quantum theoretical treatment. 
     Version 4 now incorporates C++ routines linked to the
     original Fortran program using improved algorithms.
+
+----------------------------------------------------------------------------
+| Important Copyright Message: Hey there is none! If you like to know why  |
+| read Darrel C. Ince1, Leslie Hatton, John Graham-Cumming, Nature 482,    |
+| p.485 (2012). So: You may do whatever you like with this program, but if |
+| you use it and publish data please cite at least the references given    |
+| below. The book of Fowler and Manopoulus is highly recommended. It helps |
+| understanding how this program functions (the book is fun to read as     |
+| well. Many of the concepts used in this program can be found in this     | 
+| book. A standard book on graph theory helps as well.                     |
+----------------------------------------------------------------------------
 
 ---------------------------------------------------------------------- 
   R U N N I N G    T H E    P R O G R A M:
@@ -30,8 +40,9 @@
 ----------------------------------------------------------------------
   G E N E R A L   D E S C R I P T I O N:
 ---------------------------------------------------------------------- 
-    The program is written in standard Fortran and C++ (~10,000 lines)
-    Some standard routines from Mathematical Recepies were modified and
+    The program is written in standard Fortran and C++ (>10,000 lines)
+    Reason: I am good in old-fashioned Fortran and James is good in C++.
+    Some standard routines from Mathematical Recipies were modified and
     are used here for matrix diagonalization and geometry optimization.
 
 * Function: To perform a topological analysis of a regular fullerene 
@@ -39,19 +50,20 @@
     The program calculates the volume and surface area of a fullerene 
     (irregular or not). It further constructs the structure obtaining 
     cartesian coordinates from the canonical ring spiral pentagon indices
-    through either Tutte embedding or Hueckel eigenvector method. Note that 
+    through either Tutte embedding or matrix eigenvector methods. Note that 
     there is no unique definition for the volume of a fullerene for
-    nonplanar 5- or 6-rings on the fullerene surface, but there is no 
-    reason why any other definition than the tesselation algorithm or
-    convex hull chosen should be preferred. The Wu force-field and 
+    nonplanar 5- or 6-rings on the fullerene surface except for the convex
+    hull, but there is no reason why any other definition than the fast
+    tesselation algorithm should be preferred. The Wu force-field and 
     geometry optimization using a Fletcher-Reeves-Polak-Ribiere
     minimization with analytical gradients is also implemented, providing 
-    good a initial guess for cartesian coordinates.
+    good a initial guess for cartesian coordinates. Also Schlegel diagrams
+    can be produced using various methods.
 
     Note: This program works for any (distorted or not) regular fullerene
      (i.e. a fullerene of genus 0 consisting of pentagons and hexagons only).
      The spiral algorithm of Fowler and Manolopoulus is not
-     restricted to starting from a pentagon.
+     restricted to starting from a pentagon or to canonical indices.
      For a general list of fullerenes see "The House of graphs" at 
      https://hog.grinvin.org/Fullerenes. 
 
@@ -75,15 +87,18 @@
           8) D. Babic, D. J. Klein and C. H. Sah, "Symmetry of fullerenes",
              Chem. Phys. Lett. 211 (1993) 235-241.
           9) R. Tonner, G. Frenking, M. Lein, and P. Schwerdtfeger, 
-             "Packed to the Rafters – Filling up C60 with Rare Gas Atoms", 
+             "Packed to the Rafters - Filling up C60 with Rare Gas Atoms", 
              Chem. Phys. Chem. 12, 2081-2084 (2011).
-         10) G. Brinkmann, J. Goedgebeur, B. D. McKay, "The smallest fullerene 
-             without a spiral", Chem. Phys. Lett. 522, 54–55 (2012).
+         10) T. Pisanski, B. Plestenjak, A. Graovac, "NiceGraph Program and its 
+             applications in chemistry", Croatica Chemica Acta 68, 283-292 (1995).
+         11) B. Plestenjak, "An algorithm for drawing Schlegel diagrams",
+             unpublished.
 
       There is a paper in preparation which explains most of the features
         in this program. You may ask for a preliminary copy.
 
-      If you use the CYLview program, the input file is written into cylview.dat.
+      If you use the CYLview program, the input file is written into cylview.dat
+        if specified (xyz format). It also works with Avogadro.
         CYLview plots molecules, is written by C. Y. Legault and is available
         under http://www.cylview.org/Home.html
 
@@ -91,16 +106,8 @@
         in qmga.dat. The program is available at http://qmga.sourceforge.net/
         In this case you need to cite A. T. Gabriel, T. Meyer, G. Germano, 
         "Molecular graphics of convex body fluids", J. Chem. Theory Comput. 
-        4, 468-476 (2008). There will be soon another algorith availble to
+        4, 468-476 (2008). There will be soon another algorithm availble to
         plot fullerene graphs.
-
-   -----------------------------------------------------------------------------
-   |  NOTE: You may do whatever you like with this program, but if you use it  |
-   |  and publish data please cite at least references 1-4 given above.        |
-   |  The book by Fowler and Manopoulus is highly recommended.                 |
-   |  It helps understanding how this program works (the book is fun to read!).|
-   |  Many of the concepts used in this program can be found in this book.     |
-   -----------------------------------------------------------------------------
 
    -> Many definitions depend on the use of Angstroems, so please use this unit.
 
@@ -175,7 +182,7 @@
     the volume and surface.  This routine also analyzes all 2- and 3-ring fusions
     It further gives the Rhagavachari-Fowler-Manoupoulos neighboring pentagon 
     and hexagon indices as described in the Fowler and Manolopoulos book
-    (ref.2). From the hexagon indices one derives if the fullerne fulfills the
+    (ref.2). From the hexagon indices one derives if the fullerene fulfills the
     IPR or not.
 
  - Fletcher-Reeves-Polak-Ribiere geometry optimization using analytical 
@@ -234,7 +241,7 @@
 
     min(c) max(i) || p(I) - Cmcs ||
 
-    where ||..|| is the Eucledian norm in m dimensions and Cmcs is the center 
+    where ||..|| is the Euclidian norm in m dimensions and Cmcs is the center 
     of the MCS.
 
     Note: The spherical central cover SCC is not the minimum covering sphere MCS
@@ -298,12 +305,13 @@
     radius of carbon taken off Rmds. 
 
  - Produce the (X,Y) coordinates of a fullerene graph (Subroutine SCHLEGEL).
+    Schlegel projection:
     Here the points are rotated (if in input I1,I2, and I3 are given) so to
     put the selected vertex, edge or ring center on top of the z-axis as the
     point of projection (otherwise the point (0,0,zmax) is chosen with zmax
     being the point with maximum z-value from the original input coordinates).
     Points are then sorted in descending order according to their z-values.
-    The circumfences for atoms and rings down the z-axis are determined.
+    The circumference for atoms and rings down the z-axis are determined.
     The Schlegel projection is created giving as output the projected (X,Y)
     coordinates. The connections between the points are already written out
     earlier in the output such that the fullerene graph can be drawn.
@@ -327,7 +335,13 @@
     Nevertheless, it serves for a first rough picture. 
     Furthermore, for large fullerenes it becomes critical to correctly set the
     projection point or point of the cone. If for example the projection
-    point is too far away from the fullerene, edges may cross. 
+    point is too far away from the fullerene, edges may cross.
+    Other algorithms for producing Schlegel diagrams:
+     - Tutte graph with linear scaling 
+     - Spring embedding with barycentric Coulomb repulsion
+     - Pisanski-Plestenjak-Graovac embedding 
+     - Kamada-Kawai embedding (This gives a 2D picture of a 3D structure
+        and has edge crossings).
     
 -----------------------------------------------------------------------------------
   G E N E R A L    I N F O R M A T I O N
@@ -366,20 +380,25 @@
       It is however quite fast even for fullerenes such as C840.
 
   Not implemented yet and on the to do list (in progress) is:
-      1) A subroutine to fit the minimum outer ellipsoidal cover 
-          useful for rugby ball like fullerenes.
-      2) Volume of the convex hull to compare to the tesselation method.
-      3) Produce symmetric fullerene graphs by optimizing the coordinates.
-         to avoid Schlegel projection which can result in edge crossings.
+      1) A subroutine to fit the minimum outer ellipsoidal cover useful for  
+          rugby ball like fullerenes and close packing of ellipsoids.
+      2) Volume of the convex hull (coming soon).
+      3) Use the Coxeter construction for fullerenes.
       4) Geometry optimization using the extended Wu-Fowler force field.
       5) Frequency calculations from the force field optimized geometry.
-      6) Construction of leap-frog fullerenes from adjacency matrix.
+      6) Construction of leap-frog fullerenes (coming soon).
       7) Construction of non-ring-spiral isomers using the genus algorithm.
       8) Symmetry labels for Hueckel orbital energies.
       9) Extend to non-regular fullerenes of genus 0 (heptagons and squares).
      10) Extend to non-regular fullerenes of genus 1.
-     11) Convex Hull.
-     12) Symmetrize coordinates to point group symmetry.
+     11) Symmetrize coordinates to point group symmetry.
+     12) Implement Cioslowski's scheme for enthalpy of formation.
+     13) Restart option for subroutine isomer and for Hamiltonian cycle
+          (coming soon).
+     14) Use of databank for all non-IPR fullerenes uo to C120 and IPR up to
+          C150 (coming soon).
+     15) Produce pictures of Schlegel diagrams and corresponding duals (coming soon).
+     16) Produce fullerene name from Schlegel diagram.
 
  For any questions concerning this program please contact P. Schwerdtfeger
    Centre for Theoretical Chemistry and Physics (CTCP)
@@ -393,7 +412,7 @@
 -----------------------------------------------------------------------------------
   A C K N O W L E D G M E N T
 -----------------------------------------------------------------------------------
- I am indebted to the Alexander von Humboldt Foundation (Bonn) for financial support 
+ PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support 
  in terms of a Humboldt Research Award, and to both Prof. Gernot Frenking and 
  Dr. Ralf Tonner (Marburg) for support during my extended stay in Marburg where I
  started to write this program. I acknowledge also the help of Darko Babich, Patrick 
@@ -409,14 +428,16 @@
 
  2) Input to create cartesian coordinates and main flags for the program
     &Coord options /       (e.g. &Coord IC=20, IOPT=1, R6=1.42 /)
-    list of options: NA,IC,IP,IV1,IV2,IV3,icyl,TolR,R5,R6
+    list of options: NA,IC,IP,IV1,IV2,IV3,ixyz,TolR,R5,R6,xyzname
     NA= Number of Atoms (Default: 60)
     IC= Flag for construction of cartesian coordinates (Default: 0)
     IP= Print option (Default: 0)
     IV1= Number for Hueckel P-type eigenvector for Fowler-Manopoulus algorithm (Default: 2)
     IV2= Number for Hueckel P-type eigenvector for Fowler-Manopoulus algorithm (Default: 3)
     IV3= Number for Hueckel P-type eigenvector for Fowler-Manopoulus algorithm (Default: 4)
-    icyl= Flag for producing input file for CYLview (Default: 0)
+    ixyz= Flag for producing input file for CYLview, Avogadro or others in standard
+      xyz format (Default: 0)
+    xyzname (max 20 characters) file name if ixyz.ne.0 (default: cylview.xyz)
     TolR= Tolerance in % (Default: 33)
     R5= pentagon bond distance (Default: 1.455)
     R6= hexagon  bond distance (Default: 1.391)
@@ -445,7 +466,8 @@
            detail by P. W. Fowler and D. E. Manopoulus. Use the canonical
            pentagon ring indices if possible (transformation to the canonical
            from should work as well).
-           IC=3: Fowler-Manopoulus algorithm using P-type eigenvectors:
+           IC=2: Fowler-Manopoulus algorithm using P-type eigenvectors
+            produced from the adjacency matrix:
             If problem with eigenvectors are found to construct the
             cartesian coordinates, i.e. the identification of P-type
             eigenvectors, three integer values IV1, IV2, IV3 can be specified
@@ -454,7 +476,9 @@
             check the eigenvectors used and cartesian coordinates produced.
             Otherwise coordinates are obtained which are useless. This is more
             often the case as you might expect. 
-           IC=4: Tutte embedding algorithm. This should alway work, although
+          IC=3: Same as IC=2 but the Laplacian matrix is used instead of the
+            adjacency matrix. 
+          IC=4: Tutte embedding algorithm. This should always work, although
             the initial fullerene might be too spherical.
            Examples are given in the input files starting with 'pentagon'.
            Please use Angstroems.
@@ -493,8 +517,8 @@
       If IHam>0 Then Subroutine HAMILTON is called.     (Default: 0)
          IHam=1 Routine will stop after 1 million Hamiltonian cycles are found
          IHam>1 it will run up to 10**IHam Hamiltonian cycles.
-      If IUPAC=1 IUPAC numbers are produced.     (Default: 0)
-         Note only with this option together with IP=1 in &Coord input
+      If IUPAC=1 IUPAC numbers are produced.   (Default: 0) 
+         Note only with this option together with IP=1 in &Coord input 
          all Hamiltonian cycles are printed out. IP=0 only gives the
          best cycle (see Babic, ref.3).
          IUPAC=0 goes into a fast subroutine and prints only the total number of
@@ -520,11 +544,28 @@
 
  6) Option for producing coordinates for fullerene graphs (Schlegel diagrams).
       &Graph options /      (e.g. &Graph IG=1, ISO1=1, ISO2=3, ISO3=7 /)
-      list of options: IG,ISO1,ISO2,ISO3,PS
+      list of options: IG,ISO1,ISO2,ISO3,PS,SCALE,SCALEPPG
+      We recommend IG= 1, 2, 4 or 7
       In detail:
-      If IG>0 Use Program Schlegel for generating the Schlegel projection.
+      If IG>0 Use Program Schlegel for generating fullerene graphs
          IG=1 Use the perspective projection method.
-         IR=2 Use the cone projection method.
+         IG=2 Use the cone projection method.
+         IG=3 Produce the Tutte graph
+         IG=4 Produce the Tutte graph and perform linear scaling (scale factor
+               can be read in)
+         IG=5 Produce the Tutte graph and perform spring embedding optimization
+              (rij-r0)**2 with r0 set to 2.0.
+         IG=6 Starting from the Tutte graph perform spring + repulsive Coulomb
+              force embedding optimization. The repulsive force is taken from
+              the barycenter to the vertex. r0 is set to 2.0. The force constants
+              are set such that the graph looks nice.
+         IG=7 Starting from the Tutte graph perform a Pisanski-Plestenjak-Graovac 
+              embedding optimization (called Sclegel by the authors)
+              Note: This is much faster than their algorithm
+         IG=8 Starting from the Tutte graph perform a Kamada-Kawai embedding 
+              optimization using the distance matrix.
+              Note: This gives a 2D picture of a 3D structure, thus
+               it is not related to a Schlegel diagram and has edge crossings.
       If ISO1=0 Use the input coordinates for the construction of 
                the Schlegel diagram.
       If ISO1.ne.0 Specifying the ring center, edge or
@@ -546,17 +587,26 @@
               NB2: For IG=1 the input (if chosen) requires to be a ring, i.e.
                   IO1, IO2 and IO3 are required, otherwise they are chosen by the
                   program using the largest z-coordinate.
-      If PS.eq.0. Projection angle of 45 degrees is chosen (default value)
-              otherwise to be used as an input parameter in the cone projection
+      If Scale.ne.0. Scaling factor for linear scaling of Tutte graph (default  2.5)
+              2D coordinated are scaled by 1.+.5*Scale*(rmin-r)/rmin
+              r is the distance of the vertex from the barycenter
+              rmin is the smallest distance of the vertex from the barycenter 
+               belonging to the outer circumferencing 5- or 6-ring
+      If ScalePPG.ne.0. Scaling factor for exponential in Pisanski-Plestenjak-Graovac
+              algorithm     (default 1.0)
+      If PS.ne.0. 
+              - Projection angle in degrees is chosen (default 45 degrees)
+              to be used as an input parameter in the cone projection
               method. The angle is the cone angle from the point of projection 
               to the projection plane, which touches the point with the smallest 
               z-value (opposite the projection point). Note that angle is reset 
               to 45 deg if chosen larger than 89.
-              In the case of the perspective projection PS is the distance
+              - In the case of the perspective projection PS is the distance
               between the focal point and the ring center underneath, Note this
               is chosen by the program, but if nonzero this parameter has to be
               carefully chosen. The picture produced gives a good idea if the
               ParamS is correctly chosen or not. Note that the ring centers get
               an extra boost of 10% in the scaling factors such that they appear
               more in the center of the rings produced by the Schlegel projection.
------------------------------------------------------------------------------------ 
+              
+------------------------------------------------------------------------------------ 

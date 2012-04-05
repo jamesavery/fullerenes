@@ -1837,9 +1837,9 @@ C     Get the connectivities between 2 and 3 atoms
       Do J=I+1,MAtom
       DM=FunDistMat(I,J,natomL,DistMat)
       If (DM.lt.Rtol) then
-      Mcon2=Mcon2+1
-      Ncount=I*MAtom+J
-      Icon2(Mcon2)=Ncount
+       Mcon2=Mcon2+1
+       Ncount=I*MAtom+J
+       Icon2(Mcon2)=Ncount
       endif
       enddo
       enddo

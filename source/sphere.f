@@ -81,7 +81,7 @@ C    contained in the vector cmax
 C    Get maximum values
       Do J=1,3
        cmax(J)=0.d0
-       cMCS(i)=c(i)
+       cMCS(J)=c(J)
       enddo
       Do I=1,ndim
       Do J=1,3

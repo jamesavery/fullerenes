@@ -1,5 +1,5 @@
 C60 Using FM algorithm for coordinates, eigenvectors are not in order 2 3 4
-&Coord NA=60, IC=2, IP=1, IV2=4, IV3=5 /
+&Coord NA=60, IC=2, IP=1, IV2=4, IV3=5, ixyz=1 /
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /

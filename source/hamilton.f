@@ -2,12 +2,11 @@
 C     Subroutine from Darko Babic to create Hamitonian cycles
 C      oprimized for program Isomer
       integer list(natom,3,3),path(0:natom+1),stack(3*natom),pos(natom)
-      integer bridge(natom),x(0:natom),y(0:natom),saved(natom)
+      integer x(0:natom),y(0:natom),saved(natom)
       integer i,j,k,l,n,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
       integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
       logical occ(natom),pass(natom),end(natom),flag,better
       integer ic3(natom,3),A(natom,natom)
-      
       ifirst=0 
       nhamilton=0
       nmax=30
@@ -27,7 +26,7 @@ C      oprimized for program Isomer
             list(i,j,1)=ic3(i,j)
          end do
       end do
-
+      
       do i=1,n
          do j=1,3
             k=list(i,j,1) 
@@ -45,6 +44,9 @@ C      oprimized for program Isomer
          pass(i)=.false.
          occ(i)=.false.
          end(i)=.false.
+      end do
+      do i=0,natom+1
+         path(i)=0
       end do
       x(0)=n
 
@@ -138,6 +140,8 @@ C      oprimized for program Isomer
       end do
       ptr=oldptr
       oldptr=stack(ptr)
+C     put this one in to avoid segmentation fault
+      if(oldptr.le.0) return
       pass(path(l1+1))=.true.
       stack(ptr)=path(l1+1)
       ptr=ptr+1
@@ -147,7 +151,8 @@ C      oprimized for program Isomer
       pass(next)=.false.
 
       l=l1
-      if (oldptr.gt.0) go to 5
+      go to 5
+C     if (oldptr.gt.0) go to 5
 
       return
       end
@@ -190,6 +195,9 @@ C     and the IUPAC name of a fullerene
          pass(i)=.false.
          occ(i)=.false.
          end(i)=.false.
+      end do
+      do i=0,natom+1
+         path(i)=0
       end do
       x(0)=n
 
@@ -391,6 +399,8 @@ C     and the IUPAC name of a fullerene
       end do
       ptr=oldptr
       oldptr=stack(ptr)
+C     put this one in to avoid segmentation fault
+      if (oldptr.le.0) return
       pass(path(l1+1))=.true.
       stack(ptr)=path(l1+1)
       ptr=ptr+1
@@ -400,7 +410,8 @@ C     and the IUPAC name of a fullerene
       pass(next)=.false.
 
       l=l1
-      if (oldptr.gt.0) go to 5
+C     if (oldptr.gt.0) go to 5
+      go to 5
 
       if (x(0).eq.0) then
          write (Iout,1002) 
@@ -455,8 +466,8 @@ C     Epstein upper limit
        write (Iout,1000) ulepstein
       endif
 C     Schwerdtfeger upper and lower limit
-      powerupper=0.169941*datom+1.508012
-      powerlower=0.118820*datom-0.371872
+      powerupper=0.169941*datom+1.50808d0
+      powerlower=0.118820*datom-0.37188d0
       upperschwerd=2.d0**powerupper
       lowerschwerd=2.d0**powerlower
       If(powerupper.lt.31.01d0) then
@@ -467,27 +478,29 @@ C     Schwerdtfeger upper and lower limit
       endif
       If(powerlower.lt.31.01d0) then
        ilowerschwerd=dint(lowerschwerd)
-       If(ilowerschwerd.lt.24) ilowerschwerd=24
+       If(ilowerschwerd.lt.18) ilowerschwerd=18
         write (Iout,1012) ilowerschwerd
       else
        write (Iout,1013) lowerschwerd
       endif
 
 C     Approximate number of IPR fullerenes
+      if(MAtom.eq.60.or.MAtom.ge.70) then
       exphigh=1.230625d-1*dAtom
       explow=1.136977d-1*dAtom
       fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
       fullIPRl=1.050204d0*dexp(explow)/1.2d0
-      If(fullIPRh.lt.2.d10) then
+      If(fullIPRh.lt.2.d9) then
        ifullIPRh=dint(fullIPRh)
        ifullIPRl=dint(fullIPRl)
        write (Iout,1014) ifullIPRl,ifullIPRh
       else
        write (Iout,1015) fullIPRl,fullIPRh
-       if(fullIPRh.gt.2.d10) then
+       if(fullIPRh.gt.1.d10) then
         write (Iout,1008)
         Return
        endif
+      endif
       endif
 C     Limit for number of atoms
       if(Matom.gt.Ihuge) then

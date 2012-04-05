@@ -1,5 +1,5 @@
 C50 Using Tutte embedding to produce coordinates
-&Coord NA=50, IC=3, R6=1.42 /
+&Coord NA=50, IC=4, R6=1.42 /
 &Opt Iopt=1 /
 &Hamilton IHam=1 /
 &Isomers /
