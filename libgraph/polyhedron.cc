@@ -1,5 +1,136 @@
 #include "polyhedron.hh"
 
+double Polyhedron::surface_area() const {
+  assert(layout2d.size() == N);
+  double A = 0;  
+  
+  vector<face_t> tris(triangulation(faces));
+  
+  for(size_t i=0;i<tris.size();i++){
+    const face_t& tri(tris[i]);
+    Tri3D T(points[tri[0]],points[tri[1]],points[tri[2]]);
+    A += T.area();
+  } 
+  return A;
+}
+
+double Polyhedron::volume_tetra() const {
+  vector<face_t> tris(triangulation(faces));
+  double V = 0;
+
+  // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
+  coord3d zero(-10,0,0);
+  for(size_t i=0;i<tris.size();i++){
+    const face_t& t(tris[i]);
+    Tri3D T(points[t[0]],points[t[1]],points[t[2]]);
+    double dV = Tetra3D(T.a,T.b,T.c,zero).volume();
+    V += (T.back_face(zero)? 1 : -1)*dV;
+  }
+  return fabs(V);
+}
+
+double Polyhedron::volume_divergence() const {
+  vector<face_t> tris(triangulation(faces));
+  double V = 0;
+
+  // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
+  for(size_t i=0;i<tris.size();i++){
+    const face_t& t(tris[i]);
+    Tri3D T(points[t[0]],points[t[1]],points[t[2]]);
+
+    V += ((T.a).dot(T.n))*T.area()/T.n.norm();
+  }
+  return fabs(V/3.0);
+}
+
+
+Polyhedron Polyhedron::incremental_convex_hull() const {
+  list<tri_t> output;
+  typedef list<tri_t>::iterator triit;
+  map< dedge_t, triit > edgetri;
+  // 1. Create initial tetrahedron. 
+  output.push_back(tri_t(0,1,2));
+  output.push_back(tri_t(0,1,3));
+  output.push_back(tri_t(0,2,3));
+  output.push_back(tri_t(1,2,3));
+
+  coord3d c((points[0]+points[1]+points[2]+points[3])/4.0);
+  for(triit t(output.begin());t!=output.end();t++){
+    // Make sure all faces point away from the centroid. 
+    if(!Tri3D(points,*t).back_face(c)) t->flip(); 
+
+    // Traverse edges in oriented order and register the triangle for each directed edge.
+    for(int j=0;j<3;j++)
+      edgetri[dedge_t((*t)[j],(*t)[(j+1)%3])] = t;
+  }
+    
+  // 2. For each remaining vertex u
+  for(node_t u=4;u<N;u++){
+    const coord3d& p(points[u]);
+    // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 )    
+    list<triit> visible;
+    map<dedge_t,bool> is_visible;
+    coord3d centre;		// Centre of visible faces
+    for(triit t(output.begin());t!=output.end();t++){
+      if(!Tri3D(points,*t).back_face(p)) { 
+	visible.push_back(t); 
+	for(int i=0;i<3;i++) 
+	  is_visible[dedge_t(t->u(i),t->u((i+1)%3))] = true; 
+	centre += t->centroid(points);
+      }
+    }
+    centre /= visible.size();
+
+    // 2.2 Build set of horizon edges: each edge e in visible faces that has f_a visible, f_b invisible
+    list<edge_t> horizon;
+    for(list<triit>::const_iterator tvi(visible.begin()); tvi!=visible.end(); tvi++){
+      const tri_t& tv(**tvi);
+
+      for(int j=0;j<3;j++){
+	const dedge_t e(tv[j],tv[(j+1)%3]);
+
+	if( (is_visible[e] && !is_visible[dedge_t(e.second,e.first)]) || (!is_visible[e] && is_visible[dedge_t(e.second,e.first)]) )
+	  horizon.push_back(edge_t(e));
+      }
+      // 2.3 Delete visible faces from output set. 
+      output.erase(*tvi);
+    }
+
+    // 2.4 For each e in horizon, add tri_t(u,e[0],e[1]) to output set. 
+    for(list<edge_t>::const_iterator e(horizon.begin()); e!=horizon.end(); e++){
+      tri_t t(u,e->first,e->second);
+
+      //	Make sure new faces point outwards. 
+      if(!Tri3D(points,t).back_face(centre)) t.flip();
+
+      triit ti = output.insert(output.end(),t);
+      for(int j=0;j<3;j++)
+	edgetri[dedge_t(t[j],t[(j+1)%3])] = ti;
+    }
+  }
+    
+  // Finally, construct the graph and the output polyhedron object
+  set<node_t> used_nodes;
+  for(triit t(output.begin()); t!=output.end(); t++)
+    for(int i=0;i<3;i++)
+      used_nodes.insert(t->u(i));
+  map<node_t,node_t> nodemap;
+  vector<coord3d> remaining_points(used_nodes.size());
+  node_t i=0;
+  for(set<node_t>::const_iterator u(used_nodes.begin()); u!=used_nodes.end(); u++,i++){
+    nodemap[*u] = i;
+    remaining_points[i] = points[*u];
+  }
+
+  set<edge_t> edges;
+  for(triit t(output.begin()); t!=output.end(); t++)
+    for(int i=0;i<3;i++)
+      edges.insert(edge_t(nodemap[t->u(i)],nodemap[t->u((i+1)%3)]));
+    
+  Graph g(edges);
+  return Polyhedron(g,remaining_points,3);
+}
+
 string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_latex_header) const 
 {
   ostringstream s;
