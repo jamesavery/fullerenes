@@ -19,7 +19,7 @@ struct Polyhedron : public PlanarGraph {
   Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX) : 
     PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points)), faces(G.compute_faces_flat(face_max))
   {
-    layout2d = tutte_layout();
+    //    layout2d = tutte_layout();
 
     if(points.size() != N) 
       points = polar_mapping(spherical_projection());

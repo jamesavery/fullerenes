@@ -138,9 +138,9 @@ fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int 
 
 void tutte_layout_(graph_ptr *g, double *LAYOUT)
 {
-  int nul = 1;
+  int null = 0, one = 1;
   //  fprintf(stderr,"tutte_layout_a()\n");
-  tutte_layout_b_(g,&nul,&nul,&nul,LAYOUT);
+  tutte_layout_b_(g,&one,&null,&null,LAYOUT);
 }
 #include <fstream>
 void tutte_layout_b_(graph_ptr *g, int *s, int *t, int *r, double *LAYOUT)
@@ -159,9 +159,8 @@ void tutte_layout_b_(graph_ptr *g, int *s, int *t, int *r, double *LAYOUT)
 
 void spherical_layout_(const graph_ptr *g, double *LAYOUT3D)
 {
-  const PlanarGraph &G(**g);
-  vector<coord2d> layout2d(G.tutte_layout());
-  vector<coord2d> angles(G.spherical_projection(layout2d));
+  PlanarGraph G(**g,(*g)->tutte_layout()); // TODO: Reducer antallet af gange, tl kaldes.
+  vector<coord2d> angles(G.spherical_projection());
   
   for(int i=0;i<G.N;i++){
     double theta = angles[i].first, phi = angles[i].second;

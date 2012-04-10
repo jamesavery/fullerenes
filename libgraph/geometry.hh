@@ -11,6 +11,7 @@ typedef vector< bool > edges_t;
 
 // Undirected edge is an unordered pair of nodes
 struct edge_t : public pair<node_t,node_t> {
+  edge_t(const pair<node_t,node_t>& p) : pair<node_t,node_t>(min(p.first,p.second),max(p.first,p.second)) {}
   edge_t(const node_t& u, const node_t& v): pair<node_t,node_t>(min(u,v),max(u,v)) {}
   edge_t(const int index) {
     node_t u=0;
@@ -32,9 +33,12 @@ struct coord2d : public pair<double,double> {
   coord2d(const double x=0, const double y=0) : pair<double,double>(x,y) {}
   coord2d operator/(const double s)   const { return coord2d(first/s,second/s); }
   coord2d operator*(const double s)   const { return coord2d(first*s,second*s); }
+  coord2d operator*(const coord2d& y)   const { return coord2d(first*y.first,second*y.second); }
   coord2d operator+(const coord2d& y) const { return coord2d(first+y.first,second+y.second); }
   coord2d operator-(const coord2d& y) const { return coord2d(first-y.first,second-y.second); }
   coord2d& operator+=(const coord2d& y){ first += y.first; second += y.second; return *this; }
+  coord2d& operator*=(const coord2d& y){ first *= y.first; second *= y.second; return *this; }
+  coord2d& operator*=(const double s)  { first*=s;second*=s; return *this;}
   double dot(const coord2d& y) const { return first*y.first+second*y.second; }
 
   double line_angle(const coord2d& v) const { // CCW between two lines ([-pi;pi] where -*this is +/-pi and *this is 0 -- i.e. pi is "leftmost", -pi is "rightmost")
@@ -94,7 +98,7 @@ struct coord3d {
 struct face_t : public vector<node_t> {
   face_t(const size_t size=0) : vector<node_t>(size) {}
   face_t(const vector<node_t>& vertices) : vector<node_t>(vertices) {}
-    
+  
   bool operator==(const face_t& B) const { 
     // Two faces are the same if they contain the same vertices
     // (I.e., we disregard the orientation)
@@ -120,11 +124,20 @@ struct face_t : public vector<node_t> {
   }
 };
 
+struct tri_t : public face_t {
+  tri_t(const node_t a,const node_t b,const node_t c) : face_t(3) { u(0) = a; u(1) = b; u(2) = c; }
+  node_t& u(const unsigned int i)  { return (*this)[i]; }
+  const node_t& u(const unsigned int i) const  { return (*this)[i]; }
+
+  coord3d centroid(const vector<coord3d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
+  coord2d centroid(const vector<coord2d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
+  void flip(){ node_t t = u(1); u(1) = u(2); u(2) = t; }
+};
 
 typedef map<unsigned int,set<face_t> > facemap_t;
 
 struct Tri3D {
-  const coord3d a,b,c,u,v,n;
+  coord3d a,b,c,u,v,n;
   typedef pair<coord3d,coord3d> segment_t;
 
   Tri3D(const coord3d *T) : a(T[0]), b(T[1]), c(T[2]), u(b-a), v(c-a), n(u.cross(v)) {}
@@ -132,7 +145,12 @@ struct Tri3D {
   double plane_intersection(const segment_t& segment) const { 
     return n.dot(a-segment.first)/n.dot(segment.second-segment.first);
   }
-  bool   intersects(const coord3d& x) const {
+  Tri3D(const vector<coord3d>& points, const tri_t& t) : a(points[t[0]]),b(points[t[1]]),c(points[t[2]]), u(b-a), v(c-a), n(u.cross(v)) {}
+
+  double distance(const coord3d& x) const {
+    return fabs((x-a).dot(n))/n.norm();
+  }
+  bool intersects(const coord3d& x) const {
     const coord3d w(x-a);
     double d = u.dot(v)*u.dot(v) - u.dot(u)*v.dot(v);
     double s = (u.dot(v)*w.dot(v)-v.dot(v)*w.dot(u))/d;
@@ -146,6 +164,9 @@ struct Tri3D {
     const coord3d x(segment.first + (segment.second-segment.first)*r);
     return intersects(x);
   }
+
+  void flip(){ coord3d t = b; b = c; c = t; t = u; u = v; v = u; n = n*-1; }
+  void flip_normal(){ n = n*-1.0; }
 
   bool back_face(const coord3d& p) const {
     const coord3d centre((a+b+c)/3.0);
@@ -171,6 +192,8 @@ struct Tetra3D {
 
   Tetra3D(const coord3d *T): a(T[0]),  b(T[1]), c(T[2]), d(T[3]) {}
   Tetra3D(const coord3d& a, const coord3d& b, const coord3d& c, const coord3d& d): a(a),  b(b), c(c), d(d) {}
+
+  coord3d centroid() const { return (a+b+c+d)/4.0; }
 
   double volume() const {
     return fabs((a-d).dot((b-d).cross(c-d)))/6.0;

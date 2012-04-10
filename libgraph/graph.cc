@@ -4,30 +4,48 @@
 vector<unsigned int> Graph::shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 					   const vector<bool>& used_nodes, const unsigned int max_depth) const
 {
-    vector<unsigned int> distances(N,INT_MAX);
-    list<node_t> queue;    
+  vector<unsigned int> distances(N,INT_MAX);
+  list<node_t> queue;    
 
-    distances[source] = 0;
-    queue.push_back(source);
+  distances[source] = 0;
+  queue.push_back(source);
 
-    while(!queue.empty()){
-      node_t v = queue.front(); queue.pop_front();
+  while(!queue.empty()){
+    node_t v = queue.front(); queue.pop_front();
       
-      const vector<node_t> &ns(neighbours[v]);
-      for(unsigned int i=0;i<ns.size();i++){
-	const edge_t edge(v,ns[i]);
-	if(!used_nodes[ns[i]] && !used_edges[edge.index()] && distances[ns[i]] == INT_MAX){
-	  distances[ns[i]] = distances[v] + 1;
-	  if(distances[ns[i]] < max_depth) queue.push_back(ns[i]);
-	}
+    const vector<node_t> &ns(neighbours[v]);
+    for(unsigned int i=0;i<ns.size();i++){
+      const edge_t edge(v,ns[i]);
+      if(!used_nodes[ns[i]] && !used_edges[edge.index()] && distances[ns[i]] == INT_MAX){
+	distances[ns[i]] = distances[v] + 1;
+	if(distances[ns[i]] < max_depth) queue.push_back(ns[i]);
       }
     }
-    return distances;
   }
+  return distances;
+}
 
 vector<unsigned int> Graph::shortest_paths(const node_t& source, const unsigned int max_depth) const
 {
-  return shortest_paths(source,vector<bool>(N*(N-1)/2),vector<bool>(N),max_depth);
+  vector<unsigned int> distances(N,INT_MAX);
+  list<node_t> queue;    
+
+  distances[source] = 0;
+  queue.push_back(source);
+
+  while(!queue.empty()){
+    node_t v = queue.front(); queue.pop_front();
+      
+    const vector<node_t> &ns(neighbours[v]);
+    for(unsigned int i=0;i<ns.size();i++){
+      const edge_t edge(v,ns[i]);
+      if(distances[ns[i]] == INT_MAX){
+	distances[ns[i]] = distances[v] + 1;
+	if(distances[ns[i]] < max_depth) queue.push_back(ns[i]);
+      }
+    }
+  }
+  return distances;
 }
 
 // Returns NxN matrix of shortest distances (or INT_MAX if not connected)
@@ -76,14 +94,28 @@ vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const int
   return cycle;
 }
 
+vector<node_t> remove_node(const vector<node_t>& ns, const node_t& v)
+{
+  vector<node_t> r(ns.size()-1);
+  for(int i=0,j=0;i<ns.size();i++)
+    if(ns[i] != v) r[j++] = ns[i];
+  return r;
+}
+
 vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const node_t& r, const int max_depth) const 
 { 
   vector<bool> used_edges(N*(N-1)/2);
   vector<bool> used_nodes(N);
-
+  //  fprintf(stderr,"shortest_cycle(%d,%d,%d), depth = %d\n",s,t,r,max_depth);
   // Find shortest path r->s in G excluding edge (s,t), (t,r)
   used_edges[edge_t(s,t).index()] = true;
   used_edges[edge_t(t,r).index()] = true;
+  // Graph g(*this);
+  // g.neighbours[s] = remove_node(g.neighbours[s],t);
+  // g.neighbours[t] = remove_node(g.neighbours[t],s);
+  // g.neighbours[r] = remove_node(g.neighbours[r],t);
+  // g.neighbours[t] = remove_node(g.neighbours[t],r);
+  
   vector<unsigned int> distances(shortest_paths(r,used_edges,used_nodes,max_depth));
 
   // If distances[s] is uninitialized, we have failed to reach s and there is no cycle <= max_depth.
@@ -190,7 +222,8 @@ ostream& operator<<(ostream& s, const Graph& g)
       s << ", ";
     else
       s << "}";
-  }
+  } 
+  s << "]";
 
   return s;
 }

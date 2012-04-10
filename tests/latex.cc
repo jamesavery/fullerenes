@@ -17,13 +17,16 @@ int main(int ac, char **av)
     }
   }
 
-  FullereneGraph g(stdin);
+  CubicGraph g(stdin);
 
   if(g.layout2d.size() != g.N){
     g.layout2d = g.tutte_layout();
   }
 
-  cout << g.to_latex(g.layout2d,width_cm, height_cm,
+  coord2d wh(g.width_height());
+  g.scale(coord2d(1.0/wh.first,1.0/wh.second));
+
+  cout << g.to_latex(width_cm, height_cm,
 		     show_dual,number_vertices,include_latex_header) << endl;
   
   return 0;

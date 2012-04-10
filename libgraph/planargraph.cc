@@ -45,7 +45,8 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   dual.N = Nfaces;
   dual.neighbours.resize(Nfaces);
   dual.edges.resize(Nfaces*(Nfaces-1)/2);
-
+  
+  cerr << "dual_graph(" << Fmax << ")\n";
   const vector<face_t> allfaces(compute_faces_flat(Fmax));
 
   if(Nfaces != allfaces.size()){
@@ -54,6 +55,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   }
 
   // Construct mapping e -> faces containing e (these are mutually adjacent)
+  cerr << "dual_graph::construct facenodes\n";
   map< edge_t, set<int> > facenodes;
   for(unsigned int i=0;i<allfaces.size(); i++){
     const face_t& face(allfaces[i]);
@@ -61,7 +63,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
     for(unsigned int j=0;j<face.size();j++)
       facenodes[edge_t(face[j],face[(j+1)%face.size()])].insert(i);
   }
-
+  cerr << "dual_graph::test planarity\n";
   for(map<edge_t,set<int> >::const_iterator fs(facenodes.begin());fs!=facenodes.end();fs++){
     const edge_t&   e(fs->first);
     const set<int>& connects(fs->second);
@@ -70,6 +72,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   }
   
   // Insert edge between each pair of faces that share an edge
+  cerr << "dual_graph::construct graph\n";
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const set<int>& adjacent_faces(facenodes[*e]);
     for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
@@ -78,43 +81,35 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
 	dual.edge_set.insert(edge_t(*f,*g));
     }
   }
-  //  fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
+  //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
 
   dual.update_auxiliaries();
 
-  // If original graph was planar with 2D layout, there's a corresponding layout for the dual grap
+  // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
   if(layout2d.size() == N){
+    cerr << "dual_graph::compute layout.\n";
     dual.layout2d = vector<coord2d>(Nfaces);
-    for(unsigned int i=0;i<Nfaces;i++){
-      face_t face(allfaces[i]);
-      coord2d centre = 0;
-      for(unsigned int j=0;j<face.size();j++) centre += layout2d[face[j]];
-      dual.layout2d[i] = centre / face.size();
-    }
+#pragma omp parallel for
+    for(int i=0;i<Nfaces;i++)
+      dual.layout2d[i] = allfaces[i].centroid(layout2d);
   }
-
-  // for(unsigned int u=0;u<Nfaces;u++){
-  //   printf("%d: ",u);
-  //   for(int i=0;i<dual.neighbours[u].size();i++)
-  //     printf("%d ",dual.neighbours[u][i]);
-  //   printf("\n");
-  // }  
   return dual;
 }
 
 // NB: TODO: What happens, for example, if a triangle is comprised of three smaller triangles?
 // This produces "phantom" faces! Fix and use the oriented version instead.
-facemap_t PlanarGraph::compute_faces(unsigned int Nmax) const 
+facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const 
 {
   facemap_t facemap;
 
   // TODO: This is a much better and faster method, but needs to be debugged.
-  if(layout2d.size() == N) return compute_faces_oriented();
+  if(planar_layout) return compute_faces_oriented();
 
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
 
     const vector<node_t>& ns(neighbours[t]);
+
     for(unsigned int i=0;i<ns.size();i++)
       if(ns[i] != s) {
 	const node_t u = ns[i];
@@ -135,7 +130,7 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax) const
 facemap_t PlanarGraph::compute_faces_oriented() const 
 {
   facemap_t facemap;
-  cout << "Computing faces using 2D orientation.\n";
+  cerr << "Computing faces using 2D orientation.\n";
   set<dedge_t> workset;
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
@@ -144,7 +139,14 @@ facemap_t PlanarGraph::compute_faces_oriented() const
   }
 
   // Outer face must exist and be ordered CW, rest of faces CCW
-  assert(outer_face.size() > 0);
+  // assert(outer_face.size() > 0);
+  if(outer_face.size() < 5)
+    outer_face = find_outer_face();
+
+  if(outer_face.size() < 5){
+    cerr << "Invaid outer face: " << outer_face << endl;
+    outer_face.clear();
+  }
 
   cerr << "Outer face: " << outer_face << endl;
 
@@ -206,10 +208,10 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 
 
 
-vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax) const 
+vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const 
 {
   vector<face_t> result;
-  facemap_t facemap(compute_faces(Nmax));
+  facemap_t facemap(compute_faces(Nmax,planar_layout));
   for(facemap_t::const_iterator fs(facemap.begin()); fs != facemap.end(); fs++)
     copy(fs->second.begin(),fs->second.end(),inserter(result,result.end()));
 
@@ -265,12 +267,24 @@ face_t PlanarGraph::find_outer_face() const
 
   face_t outer_face;
   for(node_t u=0;u<N;u++)
-    if(fabs(radii[u]-rmax) < 1e-10)
+    if(fabs(radii[u]-rmax)/rmax < 1e-2)
       outer_face.push_back(u);
 
   sort_ccw_point CCW(layout2d,centre2d(layout2d));
   sort(outer_face.begin(),outer_face.end(),CCW);
   reverse(outer_face.begin(),outer_face.end());  
+
+  // TODO: Assert that outer face forms a loop.
+  for(int i=0;i<outer_face.size();i++){
+    const node_t &u(outer_face[i]), &v(outer_face[(i+1)%outer_face.size()]);
+    const vector<node_t> &ns(neighbours[u]);
+    bool found = false;
+    for(int j=0;j<ns.size();j++) found |= (ns[j] == v);
+    if(!found){ 
+      cerr << "Outer vertices " << outer_face << " do not form a loop.\n";
+      return face_t(0);
+    }
+  }
 
   return outer_face;
 }
@@ -285,6 +299,22 @@ vector<double> PlanarGraph::edge_lengths() const
     lengths[i] = (layout2d[e->first]-layout2d[e->second]).norm();
 
   return lengths;
+}
+
+coord2d PlanarGraph::width_height() const {
+  double xmin=INFINITY,xmax=-INFINITY,ymin=INFINITY,ymax=-INFINITY;
+  for(node_t u=0;u<N;u++){
+    double x = layout2d[u].first, y = layout2d[u].second;
+    if(x<xmin) xmin = x;
+    if(x>xmax) xmax = x;
+    if(y<ymin) ymin = y;
+    if(y>ymax) ymax = y;
+  }
+  return coord2d(xmax-xmin,ymax-ymin);
+}
+
+void PlanarGraph::scale(const coord2d& s) {
+  for(node_t u=0;u<N;u++) layout2d[u] *= s;
 }
 
 
@@ -305,7 +335,7 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
       coord2d xy(g.layout2d[i]);
       s << xy << (i+1<g.N?", ":"}");
     }
-  }
+  } else { fprintf(stderr,"No layout, man!\n"); }
   s << "\n]";
 
   return s;

@@ -47,27 +47,57 @@ double Polyhedron::volume_divergence() const {
 Polyhedron Polyhedron::incremental_convex_hull() const {
   list<tri_t> output;
   typedef list<tri_t>::iterator triit;
-  map< dedge_t, triit > edgetri;
+  list<node_t> work_queue;
+  //  map< dedge_t, triit > edgetri;
   // 1. Create initial tetrahedron. 
-  output.push_back(tri_t(0,1,2));
-  output.push_back(tri_t(0,1,3));
-  output.push_back(tri_t(0,2,3));
-  output.push_back(tri_t(1,2,3));
+  // 1.1 Find 4 non-coplanar points
+  Tri3D T(points,tri_t(0,1,2));
+  
+  for(node_t u=3;u<N;u++) work_queue.push_front(u);
 
-  coord3d c((points[0]+points[1]+points[2]+points[3])/4.0);
+  // Get the point furthest from the (0,1,2)-plane
+  double distmax = 0;
+  list<node_t>::iterator v(work_queue.begin());
+  for(list<node_t>::iterator u(work_queue.begin());u!=work_queue.end();u++){
+    double dist = T.distance(points[*u]);
+    if(dist > distmax){
+      distmax = dist;
+      v = u;
+    }
+  }
+
+  // 1.2 Add faces to output
+  // cerr << "// 1. Create initial tetrahedron: [0, 1, 2, " << *v << "], volume = "<<Tetra3D(points[0],points[1],points[2],points[*v]).volume() << ". \n";
+  output.push_back(tri_t(0,1,2));
+  output.push_back(tri_t(0,1,*v));
+  output.push_back(tri_t(0,2,*v));
+  output.push_back(tri_t(1,2,*v));
+
+  work_queue.erase(v);
+
+  coord3d c((points[0]+points[1]+points[2]+points[*v])/4.0);
   for(triit t(output.begin());t!=output.end();t++){
     // Make sure all faces point away from the centroid. 
     if(!Tri3D(points,*t).back_face(c)) t->flip(); 
 
     // Traverse edges in oriented order and register the triangle for each directed edge.
-    for(int j=0;j<3;j++)
-      edgetri[dedge_t((*t)[j],(*t)[(j+1)%3])] = t;
+    //    for(int j=0;j<3;j++)
+      //      edgetri[dedge_t((*t)[j],(*t)[(j+1)%3])] = t;
   }
     
   // 2. For each remaining vertex u
-  for(node_t u=4;u<N;u++){
-    const coord3d& p(points[u]);
-    // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 )    
+  // cerr << "// 2. For each remaining vertex u\n";
+  for(list<node_t>::const_iterator u(work_queue.begin());u!=work_queue.end();u++){
+    const coord3d& p(points[*u]);
+    // set<edge_t> edges;
+    // for(list<tri_t>::const_iterator t(output.begin()); t!=output.end(); t++)
+    //   for(int j=0;j<3;j++)
+    // 	edges.insert(edge_t((*t)[j],(*t)[(j+1)%3]));
+    // Graph G(edges);
+    // cout << "g" << *u << " = " << G << ";\n";
+
+    // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) 
+    // cerr << *u << "\n// 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) \n";
     list<triit> visible;
     map<dedge_t,bool> is_visible;
     coord3d centre;		// Centre of visible faces
@@ -82,6 +112,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     centre /= visible.size();
 
     // 2.2 Build set of horizon edges: each edge e in visible faces that has f_a visible, f_b invisible
+    // cerr << "// 2.2 Build set of horizon edges: each edge e in visible faces that has f_a visible, f_b invisible\n";
     list<edge_t> horizon;
     for(list<triit>::const_iterator tvi(visible.begin()); tvi!=visible.end(); tvi++){
       const tri_t& tv(**tvi);
@@ -96,20 +127,29 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
       output.erase(*tvi);
     }
 
+
+
     // 2.4 For each e in horizon, add tri_t(u,e[0],e[1]) to output set. 
+    // cerr << "// 2.4 For each e in horizon, add tri_t(u,e[0],e[1]) to output set. \n";
     for(list<edge_t>::const_iterator e(horizon.begin()); e!=horizon.end(); e++){
-      tri_t t(u,e->first,e->second);
+      tri_t t(*u,e->first,e->second);
 
       //	Make sure new faces point outwards. 
       if(!Tri3D(points,t).back_face(centre)) t.flip();
 
       triit ti = output.insert(output.end(),t);
-      for(int j=0;j<3;j++)
-	edgetri[dedge_t(t[j],t[(j+1)%3])] = ti;
+      //      for(int j=0;j<3;j++)
+	//	edgetri[dedge_t(t[j],t[(j+1)%3])] = ti;
+    }
+    if(output.size() > N*N*10){
+      fprintf(stderr,"Something went horribly wrong in computation of convex hull:\n");
+      fprintf(stderr,"Data sizes: output(%ld), visible(%ld), is_visible(%ld), horizon(%ld), horizon-visible: %ld\n",
+	      output.size(),visible.size(),is_visible.size(),horizon.size(),horizon.size()-visible.size());
     }
   }
     
   // Finally, construct the graph and the output polyhedron object
+  // cerr << "// Finally, construct the graph and the output polyhedron object\n";
   set<node_t> used_nodes;
   for(triit t(output.begin()); t!=output.end(); t++)
     for(int i=0;i<3;i++)

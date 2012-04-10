@@ -40,7 +40,6 @@ struct Graph {
     update_auxiliaries();
   }
 
-
   vector<unsigned int> shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 				      const vector<bool>& used_nodes, const unsigned int max_depth = INT_MAX) const;
   vector<unsigned int> shortest_paths(const node_t& source, const unsigned int max_depth = INT_MAX) const;

@@ -4,7 +4,7 @@
 coord3d surface(const coord2d& polar_angle)
 {
   double theta = polar_angle.first, phi = polar_angle.second;
-  double r = 1.0;// + .5*cos(2*theta)*sin(2*phi);
+  double r = 1.0 + .5*cos(2*theta)*sin(2*phi);
   return coord3d(cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi))*r;
 }
 
@@ -19,16 +19,18 @@ int main(int ac, char **av)
 {
   int name(ac<=1? 1 : atoi(av[1]));
   
+  FullereneGraph g(stdin);
   fprintf(stderr,"Constructing high order Halma fullerene.\n");
-  FullereneGraph g(FullereneGraph::C20().halma_fullerene(name));
+  g.layout2d.clear();
+  //  g = g.halma_fullerene(1);
   fprintf(stderr,"Constructing Tutte layout\n");
   g.layout2d = g.tutte_layout();
 
   fprintf(stderr,"Computing faces\n");
-  vector<face_t> faces(g.compute_faces_flat(6, g.layout2d));
+  vector<face_t> faces(g.compute_faces_flat(6));
   
   fprintf(stderr,"Spherical projection\n");
-  vector<coord2d> angles(g.spherical_projection(g.layout2d));
+  vector<coord2d> angles(g.spherical_projection());
   vector<coord3d> points(map_surface(angles)); // Convex hull is {0,...,59} \ {0,2,14,20,50}
 
   Polyhedron P(g,points,6);

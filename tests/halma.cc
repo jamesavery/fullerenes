@@ -16,21 +16,20 @@ vector<coord3d> map_surface(const vector<coord2d>& angles)
 
 int main()
 {
-  FullereneGraph c20(FullereneGraph::C20());
-  c20.layout2d = c20.tutte_layout();
+  FullereneGraph g(stdin);
+  g.layout2d = g.tutte_layout();
   
-#if 0
-  cout << "c20 = " << c20 << endl;
+  cout << "g = " << g << endl;
 
   FullereneGraph 
-    halma1(c20.halma_fullerene(1)),     // C80
+    halma1(g.halma_fullerene(1)),     // C80
     halma11(halma1.halma_fullerene(1)), // C320
-    halma2(c20.halma_fullerene(2)),	// C180
-    halma3(c20.halma_fullerene(3)),	// C320
-    halma4(c20.halma_fullerene(4)),	// C500
-    halma5(c20.halma_fullerene(5)),	// C720
-    halma6(c20.halma_fullerene(6)),	// C980
-    halma7(c20.halma_fullerene(7)),	// C1280
+    halma2(g.halma_fullerene(2)),	// C180
+    halma3(g.halma_fullerene(3)),	// C320
+    halma4(g.halma_fullerene(4)),	// C500
+    halma5(g.halma_fullerene(5)),	// C720
+    halma6(g.halma_fullerene(6)),	// C980
+    halma7(g.halma_fullerene(7)),	// C1280
     halma111(halma11.halma_fullerene(1)); // C1280
 
 
@@ -44,15 +43,7 @@ int main()
   cout << "halma5 = " << halma5 << endl; 
   cout << "halma6 = " << halma6 << endl; 
   cout << "halma7 = " << halma7 << endl; 
-#endif
 
-  FullereneGraph frog1(c20.leapfrog_fullerene());
-  FullereneGraph frog2(frog1.leapfrog_fullerene());
-  vector<coord3d> surface(map_surface(frog1.spherical_projection(frog1.layout2d)));
 
-  
-  cout << frog1.to_latex(frog1.layout2d,true) << endl;
-  //  cout << frog1.to_latex(surface,false,false,true) << endl;
-  // cout << "frog1 = " << frog1 << endl;
   return 0;
 }

@@ -10,16 +10,18 @@ struct ToleranceLess {
 
 vector<coord2d> PlanarGraph::tutte_layout(const node_t s, node_t t, node_t r) const
 {
-  if(!t) t = neighbours[s][0];
-  if(!r) {
-	r = neighbours[t][0];
-	for(int i=1;i<neighbours[t].size();i++) if(r==s) r = neighbours[t][i];
+  if(t<0) t = neighbours[s][0];
+  if(r<0) {
+  	r = neighbours[t][0];
+  	for(int i=1;i<neighbours[t].size();i++) if(r==s) r = neighbours[t][i];
   }
-  face_t outer_face(shortest_cycle(s,t,r,6));
+  fprintf(stderr,"tutte_layout(%d,%d,%d)\n",s,t,r);
+  outer_face = shortest_cycle(s,t,r,6);
+
   vector<coord2d> xys(N), newxys(N);
   vector<bool> fixed(N);
 
-  cout << "tutte_layout: Outer face: " << outer_face << endl;
+  cerr << "tutte_layout: Outer face: " << outer_face << endl;
 
   unsigned int Nface = outer_face.size();
   for(unsigned int i=0;i<Nface;i++){
@@ -29,7 +31,7 @@ vector<coord2d> PlanarGraph::tutte_layout(const node_t s, node_t t, node_t r) co
     
   bool converged = false;
   const unsigned int TUTTE_MAX_ITERATION = 50000;
-  const double TUTTE_CONVERGENCE = 5e-6;
+  const double TUTTE_CONVERGENCE = 5e-7;
   unsigned int i;
   double max_change;
   for(i=0;!converged && i<TUTTE_MAX_ITERATION; i++){
@@ -56,7 +58,7 @@ vector<coord2d> PlanarGraph::tutte_layout(const node_t s, node_t t, node_t r) co
     if(max_change <= TUTTE_CONVERGENCE) converged = true;
     xys = newxys;
   }
-  cout << "Tutte layout of "<<N<<" vertices converged after " << i << " iterations, with maximal relative change " << max_change << endl;
+  cerr << "Tutte layout of "<<N<<" vertices converged after " << i << " iterations, with maximal relative change " << max_change << endl;
   // Test that points are distinct
   ToleranceLess lt(0.0);
   set<coord2d,ToleranceLess> point_set(xys.begin(),xys.end(),lt);
@@ -67,9 +69,9 @@ vector<coord2d> PlanarGraph::tutte_layout(const node_t s, node_t t, node_t r) co
   return xys;
 }
 
-vector<coord2d> PlanarGraph::spherical_projection(const vector< coord2d >& layout2d) const
+vector<coord2d> PlanarGraph::spherical_projection() const
 {
-  vector<node_t> outer_face(shortest_cycle(0,neighbours[0][0],6));
+  vector<node_t> outer_face(find_outer_face());
   vector<unsigned int> vertex_depth(multiple_source_shortest_paths(outer_face,vector<bool>(N*(N-1)/2),vector<bool>(N)));
 
   // Step 1. Sort nodes wrt. vertex depth; partition into dmax sets V[d]. 
@@ -161,16 +163,9 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       ;
 
   // Find "internal" width and height of layout and scale to w_cm x h_cm
-  double xmin=INFINITY,xmax=-INFINITY,ymin=INFINITY,ymax=-INFINITY, xscale, yscale;
-  for(node_t u=0;u<N;u++){
-    double x = layout2d[u].first, y = layout2d[u].second;
-    if(x<xmin) xmin = x;
-    if(x>xmax) xmax = x;
-    if(y<ymin) ymin = y;
-    if(y>ymax) ymax = y;
-  }
-  xscale = w_cm/(xmax-xmin);
-  yscale = h_cm/(ymax-ymin);
+  coord2d wh(width_height());
+  double xscale = w_cm/wh.first;
+  double yscale = h_cm/wh.second;
 
 
   s << "\\begin{tikzpicture}[xscale="<<xscale<<",yscale="<<yscale<<"]\n";
@@ -188,7 +183,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
   s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
 
   if(show_dual){
-    PlanarGraph dual(dual_graph(6));	// TODO: This breaks for everything else than fullerenes
+    PlanarGraph dual(dual_graph());	
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
       const coord2d& xs(dual.layout2d[u]);

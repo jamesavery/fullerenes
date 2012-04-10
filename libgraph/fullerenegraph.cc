@@ -29,11 +29,11 @@ pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const
 }
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
-FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool do_layout) const {
+FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool planar_layout) const {
   PlanarGraph dual(dual_graph(6));
-  vector<face_t> triangles(dual.compute_faces_flat(3));
+  vector<face_t> triangles(dual.compute_faces_flat(3,planar_layout));
   map<edge_t,vector<node_t> > edge_nodes;
-    
+  
   set<edge_t> edgeset_new;
   node_t v_new = dual.N;
 
@@ -82,35 +82,76 @@ FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool 
 
   FullereneGraph G(new_dual.dual_graph(3));
 
-  if(do_layout){
-    G.layout2d = G.tutte_layout();
-    G.spherical_layout = G.spherical_projection(G.layout2d);
-  }
+  // if(do_layout){
+  //   G.layout2d = G.tutte_layout();
+  //   G.spherical_layout = G.spherical_projection();
+  // }
 
   return G;
 }
 
+unsigned int gcd(unsigned int a, unsigned int b)
+{
+  unsigned int r = a % b;
+  if(r == 0) return b; else return gcd(b,r);
+}
+
+
+// Actually works for all cubic graphs -- perhaps stick it there instead
+FullereneGraph FullereneGraph::coxeter_fullerene(const unsigned int i, const unsigned int j, const bool do_layout) const
+{
+  FullereneGraph CG;
+  return CG;
+}
 
 // Creates the next leapfrog fullerene C_{3n} from the current fullerene C_n
-FullereneGraph FullereneGraph::leapfrog_fullerene(bool do_layout) const {
+FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   PlanarGraph dualfrog(*this);
-  vector<face_t> faces(dualfrog.compute_faces_flat(6)); 
+
+  cerr << "leapfrog()\n";
+  vector<face_t> faces(dualfrog.compute_faces_flat(6,planar_layout)); 
+  cerr << "leapfrog::got "<< faces.size() << " faces.\n";
 
   node_t v_new = N;
+
+  if(planar_layout)
+    dualfrog.layout2d.resize(N+faces.size());
+
   for(size_t i=0;i<faces.size();i++){
     const face_t& f(faces[i]);
+    //    cerr << "Face " << i << ": " << f << endl;
     for(size_t j=0;j<f.size();j++)
       dualfrog.edge_set.insert(edge_t(v_new,f[j]));
+    
+    if(planar_layout)
+      dualfrog.layout2d[v_new] = f.centroid(layout2d);
+
     v_new++;
   }
   dualfrog.update_auxiliaries();
 
-  FullereneGraph frog(dualfrog.dual_graph(3));
-  
-  if(do_layout){
-    frog.layout2d = frog.tutte_layout();
-    frog.spherical_layout = frog.spherical_projection(frog.layout2d);
-  }
+  // Note that dualfrog is no longer planar, but is a triangulation of the sphere.
+  // The dual of dualfrog becomes planar again.
+  vector<coord2d> new_layout;
+
+  if(planar_layout){
+    cerr << "leapfrog::find_outer_face and compute faces\n";
+    if(outer_face.size() < 5) outer_face = find_outer_face();
+
+    vector<face_t> triangles(dualfrog.compute_faces_flat(3,false));
+
+    cerr << "leapfrog::planar layout of " << triangles.size() << " triangles\n";
+    new_layout.resize(triangles.size());
+
+    for(int i=0;i<triangles.size();i++){
+      const face_t& t(triangles[i]);
+      new_layout[i] = t.centroid(dualfrog.layout2d)*coord2d(1,-1);
+      if(t[0] == N || t[1] == N || t[2] == N) // triangle belongs to old outer face
+	new_layout[i] *= 2.0;		      // TODO: Ensure that loop encompasses remaining graph
+    }
+  } 
+  cerr << "leapfrog::dual()\n";
+  FullereneGraph frog(dualfrog.dual_graph(3), new_layout);
 
   return frog;
 }
