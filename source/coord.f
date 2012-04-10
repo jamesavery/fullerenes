@@ -360,12 +360,6 @@ C  faces are hexagons)
      &   "Leapfrog graph does not satisfy all fullerene conditions."
       endif
 
-C   Tutte algorithm for the 3D structure (see pentindex.f):
-      write (Iout,1012)
-      call tutte_layout(frog,layout2d)
-      call spherical_layout(frog,Dist)
-      write (Iout,1013)
-
       call adjacency_matrix(frog,NAtom,IDA)
 
 C Produce Hueckel matrix and diagonalize
@@ -375,11 +369,8 @@ C     Diagonalize
             A(I,J)=dfloat(IDA(I,J))
          enddo
       enddo
-      write (Iout,*) "Calling tred2"
       call tred2(A,MLeap,NAtom,evec,df)
-      write (Iout,*) "Calling tqili"
       call tqli(evec,df,MLeap,NAtom,A)
-
       Write(Iout,1005) MLeap,MLeap
 C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       Do I=1,MLeap
@@ -455,6 +446,12 @@ C     Now Print
       Write(Iout,1010) bandgap
       if(bandgap.lt.Tol1) Write(Iout,1009)
       endif
+
+C   Tutte algorithm for the 3D structure (see pentindex.f):
+         write (Iout,1012)
+         call tutte_layout(frog,layout2d)
+         call spherical_layout(frog,Dist)
+         write (Iout,1013)
 
 C     Obtain smallest distance for further scaling
 C     Now this contracts or expands the whole fullerene to set the

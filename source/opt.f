@@ -88,7 +88,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       SUBROUTINE frprmng(IOP,NMAX,NMAX2,N,MMAX,AH,Iout,IS,MDist,
      1 maxd,p,ftol,iter,fret,E0,RAA)
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=500,EPS=1.d-10)
+      PARAMETER (ITMAX=1500,EPS=1.d-10)
       Real*8 p(NMAX2),g(NMAX2),h(NMAX2),xi(NMAX2)
       Real*8 pcom(NMAX2),xicom(NMAX2)
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
@@ -289,7 +289,7 @@ C     USES funcg
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
+      PARAMETER (ITMAX=1500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(NMAX2),xicom(NMAX2)
       Integer AH(NMAX,NMAX),IS(6)
       Integer DD(NMAX,NMAX)
@@ -434,7 +434,7 @@ C     Optimize
       SUBROUTINE frprmn(IOP,NMAX,NMAX3,N,MMAX,AH,Iout,N5,N6,N5M,N6M,
      1 p,force,ftol,iter,fret)
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=500,EPS=1.d-10)
+      PARAMETER (ITMAX=1500,EPS=1.d-10)
       Real*8 p(NMAX3),g(NMAX3),h(NMAX3),xi(NMAX3)
       Real*8 pcom(NMAX3),xicom(NMAX3),force(8)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
@@ -637,7 +637,7 @@ C     USES func
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
+      PARAMETER (ITMAX=1500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(NMAX3),xicom(NMAX3),c(8)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
