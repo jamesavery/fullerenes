@@ -137,7 +137,7 @@ int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 
 fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const unsigned int *n)
 {
-  return new FullereneGraph((*g)->halma_fullerene(*n,false));
+  return new FullereneGraph((*g)->halma_fullerene(*n,true));
 }
 
 fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps)

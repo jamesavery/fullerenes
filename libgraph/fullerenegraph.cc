@@ -1,6 +1,6 @@
 #include "fullerenegraph.hh"
 
-
+#include <fstream>
 
 pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const 
 {
@@ -31,26 +31,40 @@ pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool planar_layout) const {
   PlanarGraph dual(dual_graph(6));
-  vector<face_t> triangles(dual.compute_faces_flat(3,planar_layout));
+  vector<face_t> triangles(dual.compute_faces_flat(3,false));
   map<edge_t,vector<node_t> > edge_nodes;
   
   set<edge_t> edgeset_new;
   node_t v_new = dual.N;
 
+  vector<coord2d> new_layout;
+  if(planar_layout){
+    new_layout.resize(dual.N);
+    for(int i=0;i<dual.N;i++) new_layout[i] = dual.layout2d[i];
+  }
+    
   // Create n new vertices for each edge
   for(set<edge_t>::const_iterator e(dual.edge_set.begin()); e!=dual.edge_set.end(); e++){
     vector<node_t>& nodes(edge_nodes[*e]);
     for(unsigned int i=0;i<m;i++) nodes.push_back(v_new++);
+    
+    if(planar_layout) 
+      for(unsigned int i=0;i<m;i++){
+	double lambda = (1.0+i)*(1.0/(m+1));
+	cerr << "lambda = " << lambda << endl;
+	const coord2d &a(dual.layout2d[e->first]), &b(dual.layout2d[e->second]);
+	new_layout.push_back(a*(1.0-lambda) + b*lambda);
+      }
   }
 
   // For every triangle in the dual, we create and connect a halma-type grid
   for(size_t i=0;i<triangles.size();i++){
     map<edge_t,node_t> grid;
-    const face_t T(triangles[i]);
+    const face_t& T(triangles[i]);
     edge_t e0(T[0],T[1]),e1(T[1],T[2]),e2(T[2],T[0]);
     const vector<node_t>& ns0(edge_nodes[e0]), ns1(edge_nodes[e1]), ns2(edge_nodes[e2]);
 
-    // Insert pentagon vertices
+    // Insert original vertices
     grid[edge_t(0,0)]     = T[0];
     grid[edge_t(m+1,0)]   = T[1];
     grid[edge_t(m+1,m+1)] = T[2];
@@ -65,7 +79,17 @@ FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool 
       for(int k=j+1;k<=m;k++)
 	grid[edge_t(j,k)] = v_new++;
 
-
+    if(planar_layout){
+      double sqrt2inv = 1.0/sqrt(2.0);
+      const coord2d &a(dual.layout2d[T[0]]), &b(dual.layout2d[T[1]]), &c(dual.layout2d[T[2]]);      
+      for(int j=1;j<m;j++)
+	for(int k=j+1;k<=m;k++){
+	  double s = (1+j)*(1.0/(m+2)), t = k*(1.0/(m+2));
+	  fprintf(stderr,"(s,t) = (%g,%g)\n",s,t);
+	  new_layout.push_back(a+((b-a)*s + (c-a)*t)*sqrt2inv);
+	}
+    }
+      
     // Connect the vertices in the grid
     for(int j=0;j<=m;j++)
       for(int k=j+1;k<=m+1;k++){
@@ -78,14 +102,21 @@ FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool 
       }
   }
 
-  PlanarGraph new_dual(edgeset_new);
+  cerr << "new_layout.size() = " << new_layout.size() << endl;
 
-  FullereneGraph G(new_dual.dual_graph(3));
+  PlanarGraph new_dual(Graph(edgeset_new), new_layout);
+  cerr << "newdual.N = " << new_dual.N << endl;
 
-  // if(do_layout){
-  // G.layout2d = G.tutte_layout();
-  //   G.spherical_layout = G.spherical_projection();
-  // }
+  ofstream h("output/halma2.m");
+
+  h << "graph = " << *this << endl;
+  h << "dual = " << dual << endl;
+  h << "newdual = " << new_dual << endl;
+
+  PlanarGraph G(new_dual.dual_graph(3));
+  h << "halma = " << G << endl;
+
+  h.close();
 
   return G;
 }
