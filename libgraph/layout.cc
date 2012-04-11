@@ -8,14 +8,15 @@ struct ToleranceLess {
   bool operator()(const coord2d& x,const coord2d& y) const { return x<y && (y-x).norm() > tolerance; }
 };
 
-vector<coord2d> PlanarGraph::tutte_layout(const node_t s, node_t t, node_t r) const
+vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r) const
 {
+  if(s<0) s = 0;
   if(t<0) t = neighbours[s][0];
   if(r<0) {
   	r = neighbours[t][0];
   	for(int i=1;i<neighbours[t].size();i++) if(r==s) r = neighbours[t][i];
   }
-  fprintf(stderr,"tutte_layout(%d,%d,%d)\n",s,t,r);
+  //  fprintf(stderr,"tutte_layout(%d,%d,%d)\n",s,t,r);
   outer_face = shortest_cycle(s,t,r,6);
 
   vector<coord2d> xys(N), newxys(N);
