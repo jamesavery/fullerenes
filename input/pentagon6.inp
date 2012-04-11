@@ -1,6 +1,12 @@
-C50 Using FM algorithm to produce coordinates
-&Coord NA=50, IC=4, R6=1.42 /
-&Opt Iopt=1 /
+C1350 Leap frog from C50
+For this case the molecule is preoptimized after the
+Tutte embedding with the Wu FF plus an additional
+repulsive potentialvspecified by fcoulomb and then
+optimized with the normal force field. If pre-
+optimization is not done, the structure is not
+good and heavily distorted
+&Coord NA=50, IC=4, R6=1.42 leap=3 ixyz=1 /
+&Opt Iopt=2 fcoulomb=1.d2 /
 &Hamilton /
 &Isomers /
 &Graph IG=1 /
