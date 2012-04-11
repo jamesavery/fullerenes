@@ -88,7 +88,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       SUBROUTINE frprmng(IOP,NMAX,NMAX2,N,MMAX,AH,Iout,IS,MDist,
      1 maxd,p,ftol,iter,fret,E0,RAA)
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=1500,EPS=1.d-10)
+      PARAMETER (ITMAX=500,EPS=1.d-10)
       Real*8 p(NMAX2),g(NMAX2),h(NMAX2),xi(NMAX2)
       Real*8 pcom(NMAX2),xicom(NMAX2)
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
@@ -160,7 +160,7 @@ C         dgg=dgg+xi(j)**2
       Write(Iout,1000) fret,fret-fp
  1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
      1 /1X,'energy ',F15.9,', diff= ',D12.3)
- 1001 Format(' Iteration ',I3,', energy ',D14.8,', gradient ',D14.8)
+ 1001 Format(' Iteration ',I4,', energy ',D14.8,', gradient ',D14.8)
  1002 Format(/1X,'Convergence achieved, energy ',F18.7,', diff= ',D12.3)
  1003 Format(/1X,'E0= ',D12.3)
       return
@@ -289,7 +289,7 @@ C     USES funcg
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=1500,CGOLD=.3819660,ZEPS=1.d-10)
+      PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(NMAX2),xicom(NMAX2)
       Integer AH(NMAX,NMAX),IS(6)
       Integer DD(NMAX,NMAX)
@@ -373,7 +373,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       END
 
       SUBROUTINE OptFF(NMAX,MMAX,MAtom,Iout,IDA,N5,N6,
-     1 N5MEM,N6MEM,Dist,Rdist)
+     1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
       IMPLICIT REAL*8 (A-H,O-Z)
 C  This subroutine optimizes the fullerene 3D structure using the Wu force field:
 C   Z. C. Wu, D. A. Jelski, T. F. George, "Vibrational Motions of
@@ -383,9 +383,8 @@ C   Angstroem and rad is used for bond distances and bond length
 C   Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION Dist(3,NMAX)
       DIMENSION IDA(NMAX,NMAX)
-      DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6),force(8),forceWu(8)
-      Data forceWu/1.455d0,1.391d0,108.d0,120.d0,1.d6,1.1d6,1.d5,1.d5/
-      Data ftol,dpi,conv/.5d-7,3.14159265358979d0,6.0221367d-3/
+      DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6),force(9),forceWu(9)
+      Data dpi,conv/3.14159265358979d0,6.0221367d-3/
       IOP=1
       force(1)=forceWu(1)
       force(2)=forceWu(2)
@@ -398,12 +397,14 @@ C     Conversion of dyn/cm in a.u. / Angstroem**2
       force(6)=.5d0*forceWu(6)*conv*3.80879844d-4
       force(7)=.5d0*forceWu(7)*conv*3.80879844d-4
       force(8)=.5d0*forceWu(8)*conv*3.80879844d-4
+      force(9)=forceWu(9)
       M=Matom/2+2
 C     Optimize
       Write(IOUT,1000) Rdist
       NMAX3=3*NMAX
       MATOM3=3*MATOM
-      Write(Iout,1003) (force(i),i=1,8),ftol
+      Write(Iout,1003) (force(i),i=1,9),ftol
+      if(forceWu(9).gt.0.d0) Write(Iout,1004) forceWu(9)
       CALL frprmn(IOP,NMAX,NMAX3,MATOM3,MMAX,IDA,Iout,N5,N6,N5MEM,N6MEM,
      1 Dist,force,ftol,iter,fret)
       if(fret.gt.1.d-2) then
@@ -427,16 +428,19 @@ C     Optimize
      1 ', RMS distance: ',F12.6)
  1002 FORMAT(1X,'Distances and angles defined in the force field can',
      1 ' not be reached',/1X,'Energy per atom in atomic units: ',F12.6)
- 1003 Format(' Force field parameters: ',8F12.6,', Tolerance= ',D9.3,/)
+ 1003 Format(' Force field parameters: ',9F12.6,', Tolerance= ',D9.3,/)
+ 1004 Format(' Coulomb repulsion from center of origin with force ',
+     1 F12.6,/)
+     
       Return 
       END
 
       SUBROUTINE frprmn(IOP,NMAX,NMAX3,N,MMAX,AH,Iout,N5,N6,N5M,N6M,
      1 p,force,ftol,iter,fret)
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=1500,EPS=1.d-10)
+      PARAMETER (ITMAX=9999,EPS=1.d-9)
       Real*8 p(NMAX3),g(NMAX3),h(NMAX3),xi(NMAX3)
-      Real*8 pcom(NMAX3),xicom(NMAX3),force(8)
+      Real*8 pcom(NMAX3),xicom(NMAX3),force(9)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func, using its gradient as calculated by a routine dfunc.
@@ -505,7 +509,7 @@ C         dgg=dgg+xi(j)**2
       Write(Iout,1000) fret,fret-fp
  1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
      1 /1X,'energy ',F15.9,', diff= ',D12.3)
- 1001 Format(' Iteration ',I3,', energy ',D14.8,', gradient ',D14.8)
+ 1001 Format(' Iteration ',I4,', energy ',D14.8,', gradient ',D14.8)
  1002 Format(/1X,'Convergence achieved, energy ',F15.9,', diff= ',D12.3)
  1004 Format('**** Severe error in angle, check input coordiantes:',
      1 ' One angle either 0 or 180 degrees, ill-alligned structure',
@@ -516,10 +520,10 @@ C         dgg=dgg+xi(j)**2
       SUBROUTINE linmin(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,its,
      1 p,pcom,xi,xicom,fret,c)
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 p(NMAX3),pcom(NMAX3),xicom(NMAX3),xi(NMAX3),c(8)
+      REAL*8 p(NMAX3),pcom(NMAX3),xicom(NMAX3),xi(NMAX3),c(9)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
-      PARAMETER (TOL=1.d-4)
+      PARAMETER (TOL=1.d-5)
 C     USES brent,f1dim,mnbrak
       do j=1,n
         pcom(j)=p(j)
@@ -541,7 +545,7 @@ C     USES brent,f1dim,mnbrak
       SUBROUTINE f1dim(IOP,NMAX,NMAX3,MMAX,n,A,N5,N6,N5M,N6M,
      1 f1dimf,x,xicom,pcom,c)
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 pcom(NMAX3),xt(NMAX3),xicom(NMAX3),c(8)
+      REAL*8 pcom(NMAX3),xt(NMAX3),xicom(NMAX3),c(9)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
 C     USES func
@@ -558,7 +562,7 @@ C     USES func
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
-      REAL*8 pcom(NMAX3),xicom(NMAX3),c(8)
+      REAL*8 pcom(NMAX3),xicom(NMAX3),c(9)
       CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
      1 fa,ax,xicom,pcom,c)
       CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
@@ -637,8 +641,8 @@ C     USES func
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=1500,CGOLD=.3819660,ZEPS=1.d-10)
-      REAL*8 pcom(NMAX3),xicom(NMAX3),c(8)
+      PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
+      REAL*8 pcom(NMAX3),xicom(NMAX3),c(9)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       a=min(ax,cx)
@@ -913,7 +917,7 @@ CU    USES brentx,f1dimx,mnbrakx
       REAL*8 Dist(3,ndim)
       REAL*8 pcom(ncom),xicom(ncom),xt(ncom)
       INTEGER ITMAX
-      PARAMETER (ITMAX=100,CGOLD=.3819660,ZEPS=1.D-10)
+      PARAMETER (ITMAX=1000,CGOLD=.3819660,ZEPS=1.D-10)
       a=min(ax,cx)
       b=max(ax,cx)
       v=bx

@@ -132,7 +132,7 @@ C Asymmetric
      1  /1X,'  I      Z  Element Cartesian Coordinates')
  1001 FORMAT(/1x,'Moment of inertia with setting the masses to unity:',
      1 /1x,'Eigenvalues (principal axis system): ',3F16.6)
- 1002 FORMAT(1X,I3,1X,I6,1X,A2,6X,3(D18.12,2X))
+ 1002 FORMAT(1X,I4,1X,I6,1X,A2,6X,3(D18.12,2X))
  1003 FORMAT(/1X,'Shift Molecule to the centre of points:',
      1 /1X,'Original Centre: ',3(D15.9,1X),
      1 /1X,'New Coordinates:',
@@ -353,11 +353,9 @@ C  faces are hexagons)
       isafullerene = graph_is_a_fullerene(frog)
 
       if(isafullerene .eq. 1) then
-         write (Iout,*) 
-     &   "Leapfrog graph satisfies all fullerene conditions."
+         write (Iout,1020) 
       else
-         write (Iout,*) 
-     &   "Leapfrog graph does not satisfy all fullerene conditions."
+         write (Iout,1021) 
       endif
 
       call adjacency_matrix(frog,NAtom,IDA)
@@ -504,11 +502,11 @@ C     Check distances
      1 'are not of degree 3, last one is of degree ',I4)
  1004 FORMAT(1X,'Graph checked, it is cubic')
  1005 FORMAT(/1X,'Using the Tutte embedding algorithm to construct ',
-     1 'the fullerene',/1X,'Construct the (',I3,','I3,') Hueckel ',
+     1 'the fullerene',/1X,'Construct the (',I4,','I4,') Hueckel ',
      1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
  1006 FORMAT(1X,'       x     deg NE   type    ',/1X,32('-'))
- 1007 FORMAT(1X,F12.6,I3,1X,I3,3X,A10)
+ 1007 FORMAT(1X,F12.6,I4,1X,I4,3X,A10)
  1008 FORMAT(1X,32('-'))
  1009 FORMAT(1X,'Fullerene has open-shell character (zero band gap)!')
  1010 FORMAT(1X,'Bandgap delta x = ',F12.6,' (in units of |beta|)')
@@ -520,7 +518,7 @@ C     Check distances
  1014 FORMAT(1X,'Fullerene graph deleted')
  1015 FORMAT(1X,'Coordinates from Tutte embedding scaled by a factor'
      1 ' of ',D18.12)
- 1016 FORMAT(1X,I3,5X,3(D18.12,2X))
+ 1016 FORMAT(1X,I4,5X,3(D18.12,2X))
  1017 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
  1018 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
@@ -528,6 +526,51 @@ C     Check distances
  1019 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
      1 'distance. Fullerene strongly distorted!',/1X,
      1 'Optimization of geometry recommended')
+ 1020 Format(1X,'Leapfrog graph satisfies all fullerene conditions')
+ 1021 Format(1X,'Leapfrog graph does not satisfy all fullerene ',
+     1 'conditions')
 
       Return
+      END
+
+      SUBROUTINE GoldbergCoxeter(NMAX,MMAX,LMAX,MAtom,kGC,lGC,IN,Iout,
+     1 IDA,A,evec,df,Dist,layout2d,distp,Cdist)
+C 
+      use iso_c_binding
+      IMPLICIT REAL*8 (A-H,O-Z)
+      REAL*8 layout2d
+      DIMENSION layout2d(2,NMAX)
+      DIMENSION Dist(3,NMAX),distP(NMAX)
+      DIMENSION A(NMAX,NMAX),IDA(NMAX,NMAX)
+      DIMENSION evec(NMAX),df(NMAX),dipol(3,3)
+      type(c_ptr) :: g, halma, halma_fullerene, new_fullerene_graph, 
+     1               new_graph
+C Construct Goldberg Coxeter fullerene using the two indices (kGC,lGC)
+
+      Write(Iout,1000) kGC,lGC
+
+      if(lGC .ne. 0) then
+        write(Iout,1010)
+        stop
+      endif
+
+      g = new_graph(NMAX,MAtom,IDA)
+      call print_graph("g",g)
+      stop
+
+      g = new_fullerene_graph(NMAX,MAtom,IDA)
+
+      call print_graph("g",g)
+      halma = halma_fullerene(g,kGC-1)
+      call print_graph("halma",halma)
+
+C      call adjacency_matrix(halma,NMAX,IDA)
+      Print*,IDA
+      stop
+
+ 1000 Format(/1x,'Halma fullerene with Coxeter indices (k,l) = (',I2,','
+     1 ,I2,')')
+ 1010 Format(/1x,'Goldberg-Coxeter construction not implemented',
+     1 ' for l > 0.')
+      Return 
       END

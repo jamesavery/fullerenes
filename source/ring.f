@@ -235,7 +235,7 @@ C     Check Euler characteristic
      1 /3X,'N1   N2   N3   N4   N5',9X,'dm',11X,'RMSD',
      1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5')
  1001 Format(1X,5(I4,1X),3X,2(d12.6,2X),5X,5(d12.6,2X))
- 1002 Format(/1X,I3,' six-membered-rings identified')
+ 1002 Format(/1X,I4,' six-membered-rings identified')
  1003 Format(1X,6(I4,1X)3X,2(d12.6,2X),5X,6(d12.6,2X))
  1004 Format(//1X,'Checking the Euler polyhedron formula:',/1X,
      1 'Number of vertices Nv: ',I4,/1X,
@@ -590,8 +590,11 @@ C     (c6-6-6) 3-ring fusions
 C     (b6-6-6) 3-ring fusions
       Label='bent  '
       Write(Iout,1008) Label,IR1,IR2,IR3,LRing3b
-      if(Lring3b.ne.0.and.iprint.eq.1) 
+      if(Lring3b.ne.0.and.iprint.eq.1.and.Matom.lt.1000) 
      1 write(Iout,1011) ((n3r(J,I),J=1,3),i=1,Lring3b)
+      N3Ring=N3Ring+LRing3b
+      if(Lring3b.ne.0.and.iprint.eq.1.and.Matom.ge.1000) 
+     1 write(Iout,1021) ((n3r(J,I),J=1,3),i=1,Lring3b)
       N3Ring=N3Ring+LRing3b
 
 C     (l6-6-6) 3-ring fusions
@@ -626,8 +629,8 @@ C     Similar for hexagon indices a la Fowler and Manolopoulus
      1 'distances di from ring center to atoms',/2X,
      1 'RN     N1  N2  N3  N4  N5  N6',9X,'X',12X,'Y',12X,'Z',
      1 12X,'d1',11X,'d2',11X,'d3',11X,'d4',11X,'d5',11X,'d6')
- 1002 Format(1X,I3,3X,5I4,3X,3(D12.6,1X),2X,5(D12.6,1X))
- 1003 Format(1X,I3,3X,6I4,3X,3(D12.6,1X),2X,6(D12.6,1X))
+ 1002 Format(I4,3X,5I4,3X,3(D12.6,1X),2X,5(D12.6,1X))
+ 1003 Format(I4,3X,6I4,3X,3(D12.6,1X),2X,6(D12.6,1X))
  1004 Format(/1X,'Analyzing basic two- and three-ring fusions',
      1 //1X,'2-ring fusions between rings (RNI,RNJ):') 
  1005 Format(2X,'(',I1,'-',I1,') fusions: ',I5,' in total')
@@ -662,6 +665,7 @@ C     Similar for hexagon indices a la Fowler and Manolopoulus
      1 'neighboring hexagon indices ---> Fullerene is not IPR')
  1020 Format(1X,'Rhagavachari/Fowler neighboring hexagon indices: (',
      1 6(I3,','),I3,')  and strain parameter sigma = ',F12.6)
+ 1021 Format(10(1X,'(',I3,',',I3,','I3,')'))
       Return
       END
  
@@ -1647,9 +1651,9 @@ C     Calculate the volume for C50 using R5
  1000 Format(/1X,'Distance Matrix:')
  1001 Format(5(1X,'('I3,',',I3,')',1X,D15.8))
  1002 Format(/1X,'Minimum distance ',D15.8,
-     1 ' between atoms ',I3,' and ',I3,
+     1 ' between atoms ',I4,' and ',I4,
      1      /1X,'Maximum distance ',D15.8,
-     1 ' between atoms ',I3,' and ',I3,
+     1 ' between atoms ',I4,' and ',I4,
      1 /1X,' Radius of covering central sphere ',D15.8,
      1 /1X,' Volume of covering central sphere (upper limit)',
      1 D15.8,' in units cube of distances'
@@ -1873,7 +1877,11 @@ C     Get the connectivities between 2 and 3 atoms
       Go to 11
       endif
       enddo
-   11 Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
+   11 if(MAtom.lt.100) Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
+      if(MAtom.ge.100.and.MAtom.lt.1000) 
+     1 Write(IOUT,1006) (NCI(J),NCJ(J),J=1,M12)
+      if(MAtom.ge.1000.and.MAtom.lt.10000) 
+     1 Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
       enddo
       Write(IOUT,1002)
 C     Get all vertices
@@ -1902,14 +1910,16 @@ C     Check if structure is alright at this point
       endif
  1000 Format(/1X,' Number of connected surface atoms (edges, bonds):',
      1 I4,/1X,' Connectivities (edge set):')
- 1001 Format(1X,12('{',I3,',',I3,'} '))
+ 1001 Format(1X,12('{',I2,',',I2,'} '))
  1002 Format(1X,' Calculate all vertices N and corresponding ',
      1 'adjacencies Ni of 3-connected graph:',
-     1 /1X,'   N       N1  N2  N3')
- 1003 Format(1X,I4,'    (',3I4,')')
+     1 /1X,'   N        N1   N2   N3')
+ 1003 Format(1X,I4,'    (',3I5,')')
  1004 Format(1X,'**** Error, not enough connected atoms',
      1 ' check coordinates')
  1005 Format(1X,'**** Severe error, number of edges (bonds) not as ',
      1 'expected from number of atoms: ',I4,' (expected: ',I4,')')
+ 1006 Format(1X,12('{',I3,',',I3,'} '))
+ 1007 Format(1X,12('{',I4,',',I4,'} '))
       RETURN
       END

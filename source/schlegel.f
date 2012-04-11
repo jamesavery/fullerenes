@@ -592,12 +592,12 @@ C   Use Tutte method and optimize graph
 C   Take top ring for outer rim
  30   write (Iout,1033)
       if(is1.le.0.or.is2.le.0.or.is3.le.0) then
-       Do I=1,5
-        IS(I)=N5M(1,I)
-       enddo
-       IS(6)=0
-       write (Iout,1034) (IS(I),I=1,5)
-       lring=5
+         Do I=1,5
+            IS(I)=N5M(1,I)
+         enddo
+         IS(6)=0
+         write (Iout,1034) (IS(I),I=1,5)
+         lring=5
       else
 C   Find ring
 C   Search in 5-ring
@@ -724,8 +724,8 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
  1000 Format(/1X,'Schlegel diagram for selected projection point',
      1 /1X,' First sort z-distances and produce NC circles'
      2  ' with NA atoms on it: Tolerance= ',F12.6,/1X,
-     3  '  Atom       X            Y            Z     NC  NA')
- 1001 Format(1X,I4,3(1X,F12.6),2(1X,I3))
+     3  '  Atom       X            Y            Z      NC   NA')
+ 1001 Format(1X,I4,3(1X,F12.6),2(1X,I4))
  1002 Format(/1X,'Now project the vertices and print adjacent '
      1 'vertices:',/1X,'  Atom       X            Y     '
      1 '  N1   N2   N3   Scale factor')
@@ -758,17 +758,17 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
      1 F8.4,',',F8.4,',',F8.4,') into (0,0,1)')
  1015 Format(/1X,'Same for ring centers producing NC circles'
      2  ' with NA centers on it: Tolerance= ',F12.6,/1X,
-     3  '  Ring       X            Y            Z     NC  NA  PG',
+     3  '  Ring       X            Y            Z      NC   NA  PG',
      4  ' (P: pentagon, H: hexagon)')
  1016 Format(1X,'6-Ring center ',I4,' defined by atoms ',I4,' , ',
      1 I4,' and ',I4,' chosen for Schlegel alignment.',
      2 /1X,' Coordinates of ring center: X= ',
      3 F12.6,', Y= ',F12.6,', Z= ',F12.6)
  1017 Format(1X,'ERROR: No ring found with given atom numbers',
-     1 ' (indices found: ',I3,')')
+     1 ' (indices found: ',I4,')')
  1018 Format(/1X,'Finally project the ring centers:',/1X,
      2  '  Ring         X            Y      Spiral Angle  Scale factor')
- 1019 Format(1X,I4,3(1X,F12.6),2(1X,I3),3X,A1)
+ 1019 Format(1X,I4,3(1X,F12.6),2(1X,I4),3X,A1)
  1020 Format(1X,'Last ring is a ',A12,/1X,
      1 'Rotate around the z-axis by ',F12.4,' degrees',/1X,
      2 ' This moves the edge of the last ring between atoms ',
@@ -779,12 +779,12 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
      1 d10.4,' on z-axis')
  1023 Format(1X,I4,1X,A1,2(1X,F12.6),4X,F7.2,' / ',F12.6)
  1024 Format(/1X,'Schlegel diagram of points (o) and rings ',
-     1 '(^ for 5 and * for 6) on a (',I3,','I3,') matrix:')
+     1 '(^ for 5 and * for 6) on a (',I4,','I4,') matrix:')
  1025 Format(2X,200A1)
  1026 Format(1X,'Fullerene too large for Schlegel picture, ',
-     1 'could not print ',I3,' atom symbols and ',I3,' ring symbols: ',
+     1 'could not print ',I4,' atom symbols and ',I4,' ring symbols: ',
      1 /2X,'Either increase parameter  msrs  or use proper ',
-     1 'plotting ptogram')
+     1 'plotting program')
  1027 Format(1X,I4,1X,A1,2(1X,F12.6))
  1028 Format(1X,I4,2(1X,F12.6),1X,3(1X,I4))
  1029 Format(/1X,'Finally project the ring centers:',/1X,

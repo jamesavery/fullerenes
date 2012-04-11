@@ -17,7 +17,9 @@
 !| read Darrel C. Ince1, Leslie Hatton, John Graham-Cumming, Nature 482,    |
 !| p.485 (2012). So: You may do whatever you like with this program, but if |
 !| you use it and publish data please cite at least the references given    |
-!| below. The book of Fowler and Manopoulus is highly recommended. It helps |
+!| below. Before you use the program for commercial purposes you nedd to    |
+!| contact the authors.                                                     |
+!| The book of Fowler and Manopoulus is highly recommended. It helps        |
 !| understanding how this program functions (the book is fun to read as     |
 !| well. Many of the concepts used in this program can be found in this     | 
 !| book. A standard book on graph theory helps as well.                     |
@@ -38,11 +40,13 @@
 !      32 bits in the Makefile if necessary
 !    All fortran files are in the directory    source
 !    All C-files are in the directory          libgraph
+!    If you use the database, the file needs to be in the directory
+!      where the source and libgraph directories are.
 !
 !----------------------------------------------------------------------
 !  G E N E R A L   D E S C R I P T I O N:
 !---------------------------------------------------------------------- 
-!    The program is written in standard Fortran and C++ (>10,000 lines)
+!    The program is written in standard Fortran and C++ (~12,000 lines)
 !    and is LINUX/UNIX based with links to plotting programs.
 !    Reason: I am good in old-fashioned Fortran and James is good in C++.
 !    Some standard routines from Mathematical Recipies were modified and
@@ -102,15 +106,15 @@
 !        in this program. You may ask for a preliminary copy.
 !
 !      If you use the CYLview program, the input file is written into cylview.xyz
-!        if specified (xyz format). This file also works with Avogadro, Jmol or
-!        any other plot program accepting standard xyz format files.
+!        if specified (xyz format). This file also works with Avogadro, Jmol, Pymol
+!        or any other plot program accepting standard xyz format files.
 !        CYLview plots molecules, is written by C. Y. Legault and is freely
 !        available from http://www.cylview.org/Home.html. Note for using these
 !        programs it is important to force-field optimize them, otherwise
 !        bonds cannot be idendified if structures are used directly from
 !        AME, LME or 3D-TE algorithms (see below). We recommend CYLview, it
-!        is more robust and works for the largest fullerenes, where Avogadro
-!        has some difficulties.
+!        is more robust and works for the largest fullerenes up to 1000 atoms,
+!        where Avogadro has already some difficulties.
 !
 !      If you use QMGA for plotting fullerene graphs the input file is written
 !        in qmga.dat. The program is available at http://qmga.sourceforge.net/
@@ -405,12 +409,12 @@
 !      9) Extend to non-regular fullerenes of genus 1.
 !     10) Symmetrize coordinates to point group symmetry.
 !     11) Implement Cioslowski's scheme for enthalpy of formation.
-!     12) Restart option for subroutine isomer and for Hamiltonian cycle
-!          (coming soon).
+!     12) Restart option for subroutine for Hamiltonian cycle.
 !     13) Use of databank for all non-IPR fullerenes uo to C120 and IPR up to
 !          C150 (coming soon).
 !     14) Produce pictures of Schlegel diagrams and corresponding duals (coming soon).
 !     15) Produce fullerene name from Schlegel diagram.
+!     16) Use of a databases (coming soon).
 !
 ! For any questions concerning this program please contact P. Schwerdtfeger
 !   Centre for Theoretical Chemistry and Physics (CTCP)
@@ -437,10 +441,12 @@
 ! Input (Either Namelist or in Free Format):   (use Angstroem for distances)
 !
 ! 1) Text card of 80 characters (A80 format)
+!    (you can put as many text cards in as you want, the main title (first card)
+!     is printed out extra
 !
 ! 2) Input to create cartesian coordinates and main flags for the program
 !    &Coord options /       (e.g. &Coord IC=20, IOPT=1, R6=1.42 /)
-!    list of options: NA,IC,IP,IV1,IV2,IV3,ixyz,leap,TolR,R5,R6,xyzname
+!    list of options: NA,IC,IP,IV1,IV2,IV3,ixyz,ichk,leap,isonum,IPRC,TolR,R5,R6,xyzname
 !    NA= Number of Atoms (Default: 60)
 !    IC= Flag for construction of cartesian coordinates (Default: 0)
 !    IP= Print option (Default: 0)
@@ -449,6 +455,11 @@
 !    IV3= Number for Hueckel P-type eigenvector for AME algorithm (Default: 4)
 !    ixyz= Flag for producing input file for CYLview, Avogadro or others in standard
 !      xyz format (Default: 0)
+!    isonum= Isomer number according to the scheme of Fowler and Manopoulus (Default: 0)
+!      If IC=2, 3 or 4 and isonum not zero, than pentagon indices are taken from the
+!      isomer list contained in a database (see below). There are two databases, one
+!      for the general isomers (IPRC=2) and one for the IPR isomers (IPRC=1), the
+!      definition is similar to the IPR parameter below (Default: 2).
 !    xyzname (max 20 characters) file name if ixyz.ne.0 (default: cylview.xyz)
 !    TolR= Tolerance in % (Default: 33)
 !    R5= pentagon bond distance (Default: 1.455)
@@ -495,6 +506,7 @@
 !            algorithm is easier, and (in theory) should never fail.
 !           Examples are given in the input files starting with 'pentagon'.
 !           Please use Angstroems.
+!          IC=5: Goldberg-Coxeter construction of fullerene
 !      If IP>0 larger output produced, i.e. the full distance matrix, all
 !          Hamiltonian cycles and all 3-ring connections.
 !      if leap=n than the n-th leapfrog fullerene is generated.
@@ -508,7 +520,7 @@
 !
 ! 3) Option for force-field optimization:
 !      &Opt options /        (e.g. &Opt Iopt=1 /)
-!      list of options: Iopt
+!      list of options: Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
 !      Iopt= Flag for force-field optimization (Default: 0)
 !      In detail:
 !       If Iopt=1  then fullerene is optimized using the force field method
@@ -523,7 +535,22 @@
 !         reached for all atoms and rings. For further reading see: 
 !         A.Ceulemans, B.C.Titeca, L.F.Chibotaru, I.Vos, P.W.Fowler, 
 !         J. Phys. Chem. A 105, 8284-8295 (2001).
+!       If Iopt=2  Preoptimize with input force field, then optimize with Wu
+!         force field. This is especially usefull for fcoulomb input (see below).  
 !         NB: Avogadro has a more sophisticated force-field which you can try out.
+!       ftol: The convergence tolerance on the function value is input as ftol
+!         (Default: 5.0E-8)
+!       WuR5,WuR6,WuA5,WuA6,WufR,WufA: Force field parameters for Wu force field for
+!         distances R5, R6, angles A5, A6, force constants for distance WufR and
+!         angles WufA (see paper by Wu et al. for details).
+!         Defaults: WuR5=1.455, WuR6=1.391, WuA5=1.08d2, WuA6=1.2d2, WufR=1.d6,
+!                   WufA=1.d5
+!       If fCoulomb>0. then add an additional repulsive Coulomb forct from the 
+!         barycenter to the atoms      (Default:  fCoulomb=0.d0)
+!         This is extremely useful for an initial geometry optimization to keep
+!         the cage convex if for example the Tutte construction leads to not
+!         a good guess of the initial structure. In such cases fCoulomb=1.d2
+!         is a good choice.
 !
 ! 4) Option for calculating Hamiltonian cycles and IUPAC numbers 
 !      &Hamilton options /        (e.g. &Hamilton IHam=1 IUPAC=1 /)
@@ -531,7 +558,7 @@
 !      In detail:
 !      If IHam>0 Then Subroutine HAMILTON is called.     (Default: 0)
 !         IHam=1 Routine will stop after 1 million Hamiltonian cycles are found
-!         IHam>1 it will run up to 10**IHam Hamiltonian cycles.
+!         IHam=1000000000 Program runs forever and prints if IHam is reached
 !      If IUPAC=1 IUPAC numbers are produced.   (Default: 0) 
 !         Note only with this option together with IP=1 in &Coord input 
 !         all Hamiltonian cycles are printed out. IP=0 only gives the
@@ -541,7 +568,8 @@
 !
 ! 5) Option for producing list of isomers and properties.
 !      &Isomers options /        (e.g.&Isomers IPR=1, IPH=1 /)
-!      list of options: IPR,IPH,istop     (Default 0 for all options)
+!      list of options: IPR,IPH,IStop,IChk,chkname (Default 0 for all options
+!                                                   and 'checkpoint' for chkname)
 !      In detail:
 !      If IPR>0 then the ring spiral subroutine of Fowler and Manopoulus is used.
 !         This sub-program catalogues fullerenes with a given number of
@@ -553,6 +581,10 @@
 !      If IPH=1 then number of distinct Hamiltonian cycles is calculated for
 !          every isomer (note this is computer time extensive).
 !      If istop=1 program stops after calling this routine.
+!      If IChk=1  Restart: Isomer list is continued from previous output file 
+!          called 'checkpoint' as default if not otherwise give in chkname.
+!          This is a restart option from a previous run which terminated. Note
+!          that the new output file does not contain the previous one.
 !      The resulting output is a catalogue of the isomers found containing
 !         their idealized point groups, canonical spirals, and NMR patterns
 !         (see ref.2).
@@ -623,12 +655,29 @@
 !              ParamS is correctly chosen or not. Note that the ring centers get
 !              an extra boost of 10% in the scaling factors such that they appear
 !              more in the center of the rings produced by the Schlegel projection.
-!---------------------------------------------------------------------------------- 
+!-----------------------------------------------------------------------------------
+!  F U L L E R E N E     I S O M E R     D A T A B A S E
+!-----------------------------------------------------------------------------------
+! A database is provided for general isomers up tp C100 and for IPR isomers up to
+! C120 including the number of Hamiltonian cycles. The database can be copied into
+! the main program folder and can be used to read the ring spiral pentagon indices.
+! The numbering scheme is exactly that chosen in the book by Fowler and Manopoulus
+! (ref.2), that is each isomer in the books appendix can be constructed easily
+! from the database. An example is given in the input file   pentagon13.inp.
+! The datafiles are formatted and can easily be read. It is our intension to
+! extend the isomer list beyond C100/C12 (without Hamiltonian cycles). New lists
+! will be available on our website. Note the determination of the number of
+! distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
+! computationally too demanding. The longest file for our database ran for 3
+! months on a single processor.
+! Note: the directory database needs to be in the same directories as source or 
+! libgraph.
+!-----------------------------------------------------------------------------------
 
       PROGRAM Fullerene
       IMPLICIT REAL*8 (A-H,O-Z)
 C    Set the dimensions for the distance matrix
-      PARAMETER (natom=6000)      !  Change natom if RAM is not sufficient
+      PARAMETER (natom=5000)      !  Change natom if RAM is not sufficient
       PARAMETER (nat11=natom*11)  
       PARAMETER (msrs=56+1)      !  Size of Schlegel output matrix
       PARAMETER (natom2=natom*natom)
@@ -641,6 +690,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION CRing5(3,Nfaces),CRing6(3,Nfaces),cmcs(3),CR(3,Nfaces)
       DIMENSION DistMat(natomL),Dist(3,natom),DistCM(3),Dist2D(2,natom)
       DIMENSION A(NAtom,NAtom),evec(Natom),df(Natom)
+      DIMENSION forceWu(9),forceWuP(9)
       DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6),Iring(Nfaces)
       DIMENSION Icon2(natom2),distP(natom),IDA(Natom,Natom)
       DIMENSION IATOM(natom),IC3(natom,3),Nring(Nfaces)
@@ -656,6 +706,7 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*2 El(99)
       CHARACTER*13 routine
       CHARACTER*20 xyzname
+      CHARACTER*20 chkname
       Character TEXTINPUT*80
       CHARACTER*3 GROUP
       Integer Values(8)
@@ -691,9 +742,10 @@ C  INPUT and setting parameters for running the subroutines
       leapspiral=0
       Write(Iout,1008) routine
         CALL Datain(IN,IOUT,NAtom,MAtom,Icart,Iopt,iprintf,IHam,IPR,
-     1   ISchlegel,IS1,IS2,IS3,IER,istop,leap,iupac,Ipent,iprintham,
-     1   IV1,IV2,IV3,icyl,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,
-     1   xyzname,TEXTINPUT)
+     1  IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,leap,iupac,Ipent,iprintham,
+     1  IGC1,IGC2,IV1,IV2,IV3,icyl,ichk,isonum,ParamS,TolX,R5,R6,Rdist,
+     1  scales,scalePPG,ftolP,forceWu,forceWuP,xyzname,chkname,
+     1  TEXTINPUT)
 
 C  Stop if error in input
       If(IER.ne.0) go to 99
@@ -701,7 +753,7 @@ C  Only do isomer statistics
       if(istop.ne.0) go to 98
 
 C Options for Input coordinates
-      If(Icart-1) 10,20,30 
+      go to (10,20,30,30,30,31) Icart+1
 C  Cartesian coordinates produced for Ih C60
    10 routine='COORDC60     '
       Write(Iout,1008) routine
@@ -726,8 +778,14 @@ C identify P-type eigenvectors and construct the 3D fullerene
        IAtom(I)=6
       enddo
       CALL CoordPent(Natom,NFaces,Nedges,MAtom,IN,Iout,IDA,IDual,
-     1 Icart,IV1,IV2,IV3,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP)
+     1 Icart,IV1,IV2,IV3,isonum,IPR,IPRC,A,evec,df,Dist,Dist2D,distp,
+     1 Rdist,GROUP)
       CALL Chiral(Iout,GROUP)
+      Go to 40
+
+C Goldberg-Coxeter construction of fullerens
+   31 CALL GoldbergCoxeter(Natom,NFaces,Nedges,MAtom,IGC1,IGC2,
+     1 IN,Iout,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
 
    40 WRITE(Iout,1001) MAtom,TolX*100.d0
 
@@ -738,7 +796,7 @@ C intensive
   98  routine='ISOMERS      '
       Write(Iout,1008) routine
       CALL Isomers(NAtom,NFaces,Nedges,MAtom,IPR,IOUT,
-     1 maxit,iprintham,IDA,A)
+     1 maxit,iprintham,ichk,IDA,A,chkname)
       if(istop.ne.0) go to 99
 
 C Move carbon cage to Atomic Center
@@ -797,15 +855,16 @@ C adjacent vertices
       routine='HAMILTON     '
       Write(Iout,1008) routine
        maxiter=maxit
-      if(IHam.gt.1.and.IHam.le.10) then
+      if(IHam.gt.1.and.IHam.le.9) then
        maxiter=10**IHam
       endif
       if(IHam.ne.0) then
        if(iupac.ne.0) then
          CALL Hamilton(NAtom,MAtom,Iout,iprintf,maxiter,IC3)
        else
-         CALL HamiltonCyc(NAtom,MAtom,maxiter,IDA,Nhamilton)
+         CALL HamiltonCyc(NAtom,MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
          WRITE(Iout,1010) Nhamilton
+         if(nbatch.ne.0) WRITE(Iout,1014)
        endif
       endif
       CALL Paths(NAtom,Nedges,MAtom,IOUT,IDA,A,evec,df)
@@ -821,8 +880,22 @@ C Optimize Geometry through force field method
       If(Iopt.ne.0) then
       routine='OPTFF        '
       Write(Iout,1008) routine
-      CALL OptFF(Natom,NFaces,MAtom,Iout,IDA,N5Ring,N6Ring,
-     1 N5MEM,N6MEM,Dist,Rdist)
+      if(Iopt.eq.2) then
+       ftol=1.d-4
+      else
+       ftol=ftolP
+      endif
+ 333  CALL OptFF(Natom,NFaces,MAtom,Iout,IDA,N5Ring,N6Ring,
+     1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
+      if(Iopt.eq.2) then
+       ftol=ftolP
+      Write(Iout,1003)
+       Do I=1,9
+        forceWu(I)=forceWuP(I)
+       enddo
+       Iopt=1
+       go to 333
+      endif
       Iprint=0
       Call MoveCM(Natom,Matom,Iout,Iprint,IAtom,Dist,DistCM,El)
       routine='DISTMATRIX   '
@@ -832,8 +905,9 @@ C Optimize Geometry through force field method
       routine='DIAMETER     '
       Write(Iout,1008) routine
       CALL Diameter(NAtom,MAtom,IOUT,Dist,distp)
-
       endif
+
+C Rings
       routine='RING         '
       Write(Iout,1008) routine
       CALL Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,
@@ -942,7 +1016,7 @@ C Formats
      1 /1X,'|      with routines from Fowler, Manopoulus and Babic   |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.0, last revision from 30/03/12     |',
+     1 /1X,'|    This  version: 4.0, last revision from 08/04/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
@@ -962,6 +1036,7 @@ CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
  1002 FORMAT(/1X,'Input coordinates to be used for program CYLview ',
      1 'by C.Y.Legault:',/1X,'Output written into ',A20)
 CG77 1004 FORMAT(1X,124(1H-),/1X,6HTIME: ,A8)
+ 1003 FORMAT(/1X,'Reoptimization using the original Wu force field')
  1004 FORMAT(132(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
      1 'TIME: ',I2,'h',I2,'m',I2,'s')
  1006 FORMAT(/1X,'Angle for Schlegel diagram reset to ',
@@ -973,6 +1048,7 @@ CG77 1004 FORMAT(1X,124(1H-),/1X,6HTIME: ,A8)
  1011 FORMAT(I5,/,'C',I2,'/  ',A80)
  1012 FORMAT(I5,/,'C',I3,'/  ',A80)
  1013 FORMAT(I5,/,'C',I4,'/  ',A80)
+ 1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
       STOP 
       END
 

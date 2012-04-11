@@ -1,5 +1,5 @@
       SUBROUTINE Isomers(NAtom,Nfaces,Nedges,N,IPR,IOUT,
-     1 maxAiso,iham,IDA,A)
+     1 maxAiso,iham,ichk,IDA,A,chkname)
 C Information on number of isomers with or without fulfilling the
 C the IPR rule. The routine also calls SPIRAL using the subroutines
 C written by P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes"
@@ -8,6 +8,7 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer Isonum(119),IsonumIPR(123),IDA(NAtom,NAtom)
       Character*11 Isoc(52),IsocIPR(28)
+      CHARACTER*20 chkname
       Dimension A(NAtom,NAtom)
       Data Isonum/1,0,1,1,2,3,6,6,15,17,40,45,89,116,199,
      * 271,437,580,924,1205,1812,2385,3465,4478,6332,8149,
@@ -118,6 +119,12 @@ C      fitted to asymptodic
       endif
 
 C SPIRAL uses the subroutines written by Fowler and Manopoulus
+      If(ichk.gt.0) then
+       Write(Iout,1006)
+       CALL SpiralRestart(Natom,Nfaces,Nedges,N,IPR,Iout,Isonum,
+     1 IsonumIPR,iham,IDA,A,chkname)
+       return
+      endif
       If(IPR.ge.0) then
        Write(Iout,1005)
        CALL Spiral(Natom,Nfaces,Nedges,N,IPR,Iout,Isonum,
@@ -137,5 +144,6 @@ C SPIRAL uses the subroutines written by Fowler and Manopoulus
  1004 Format(/1X,'Number of Isomers larger than max value of ',I8)
  1005 Format(/1X,'Enter Spiral code for a general list of all ',
      1 'possible isomers (IPR or not depending on input)')
+ 1006 Format(/1X,'RESTART isomer file from previous run')
       Return
       END 

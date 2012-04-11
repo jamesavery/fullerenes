@@ -1,9 +1,10 @@
       SUBROUTINE func(IOP,NMAX,NMAX3,MMAX,n,IERR,A,N5,N6,N5M,N6M,
      1 p,fc,c)
       IMPLICIT REAL*8 (A-H,O-Z)
+
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
-      Real*8 p(NMAX3),c(8)
+      Real*8 p(NMAX3),c(9)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       IERR=0
@@ -15,6 +16,8 @@ C     and bending, energy
       frh=c(6)
       fap=c(7)
       fah=c(8)
+      fco=c(9)
+
 C     Stretching
       ehookrp=0.d0
       ehookrh=0.d0
@@ -122,8 +125,17 @@ C     Loop over 6-rings
       enddo
       enddo
 
+C     Coulomb repulsion from origin
+      coulomb=0.d0
+      if (fco.ne.0.d0)  then
+      Do I=1,n,3
+       rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
+       coulomb=coulomb+rinv
+      enddo
+      endif
+
 C     total energy  
-  2   fc=frp*ehookrp+frh*ehookrh+fap*ehookap+fah*ehookah
+  2   fc=frp*ehookrp+frh*ehookrh+fap*ehookap+fah*ehookah+fco*coulomb
       Return
       END
 
@@ -131,7 +143,7 @@ C     total energy
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
-      Real*8 p(NMAX3),x(NMAX3),c(8)
+      Real*8 p(NMAX3),x(NMAX3),c(9)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       rp=c(1)
@@ -142,6 +154,7 @@ C     and bending, gradient
       frh=c(6)
       fap=c(7)
       fah=c(8)
+      fco=c(9)
 C     Stretching
       Do I=1,n,3
         ehookx=0.d0
@@ -303,6 +316,16 @@ C     Derivative of right atom
         x(JR+2)=x(JR+2)+fac7*(pzR*fac2+2.d0*pzM*r2R)
       enddo
       enddo
+
+C     Coulomb repulsion from origin
+      if (fco.ne.0.d0)  then
+       Do I=1,n,3
+       rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
+       x(I)=x(I)-fco*rinv*p(I)
+       x(I+1)=x(I+1)-fco*rinv*p(I+1)
+       x(I+2)=x(I+2)-fco*rinv*p(I+2)
+       enddo
+      endif
 
       return
       END

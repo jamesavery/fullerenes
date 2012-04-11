@@ -1,6 +1,7 @@
-      SUBROUTINE HamiltonCyc(NAtom,N,maxiter,A,Nhamilton)
+      SUBROUTINE HamiltonCyc(NAtom,N,maxiter,Iout,nbatch,
+     1 A,Nhamilton)
 C     Subroutine from Darko Babic to create Hamitonian cycles
-C      oprimized for program Isomer
+C      optimized for program Isomer
       integer list(natom,3,3),path(0:natom+1),stack(3*natom),pos(natom)
       integer x(0:natom),y(0:natom),saved(natom)
       integer i,j,k,l,n,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
@@ -10,6 +11,7 @@ C      oprimized for program Isomer
       ifirst=0 
       nhamilton=0
       nmax=30
+      nbatch=0
 
       do i=1,n
         k=0
@@ -113,7 +115,15 @@ C      oprimized for program Isomer
     5 path(l+1)=next
       if (l.eq.n-1) then
       nhamilton=nhamilton+1
-      if(nhamilton.gt.maxiter) Return
+      if(nhamilton.gt.maxiter) then
+       if(maxiter.lt.1000000000) then
+        nbatch=nbatch+1
+        Write(Iout,1000) nbatch,nhamilton
+        nhamilton=0
+       else 
+        Return
+       endif
+      endif
       endif
 
       if (end(next)) then
@@ -154,6 +164,7 @@ C     put this one in to avoid segmentation fault
       go to 5
 C     if (oldptr.gt.0) go to 5
 
+1000  Format(1X,'Batch ',I3,' of Hamiltonian cycles: ',I10)
       return
       end
 
@@ -458,12 +469,13 @@ C of length (n-1).
 C     Epstein upper limit
       dAtom=dfloat(MAtom)
       power=dAtom/3.d0
-      ulepstein=2.d0**power
+      if(power.lt.1.d3) ulepstein=2.d0**power
       If(power.lt.31.01d0) then
        ilepstein=dint(ulepstein)
        write (Iout,1005) ilepstein
       else
-       write (Iout,1000) ulepstein
+      if(power.lt.1.d3) write (Iout,1000) ulepstein
+      if(power.gt.1.d3) write (Iout,1016) power
       endif
 C     Schwerdtfeger upper and lower limit
       powerupper=0.169941*datom+1.50808d0
@@ -646,5 +658,7 @@ C     NP values
      1 'fullerene graphs: between appr.',I12,' and ',I12)
  1015 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr.',D22.14,' and ',D22.14)
+ 1016 Format(/1X,'Epstein upper limit for Hamiltonian cycles in '
+     1 'cubic graphs (only power to base 2 given): ',D22.14)
       RETURN
       END

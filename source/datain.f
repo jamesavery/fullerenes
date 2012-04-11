@@ -1,18 +1,20 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,
-     1 IPR,IG,ISO1,ISO2,ISO3,IER,istop,leap,iupac,Ipent,IPH,
-     1 IV1,IV2,IV3,ixyz,PS,TolX,R5,R6,Rdist,scale,
-     1 scalePPG,xyzname,DATEN)
+     1 IPR,IPRC,IG,ISO1,ISO2,ISO3,IER,istop,leap,iupac,Ipent,IPH,
+     1 kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,PS,TolX,R5,R6,Rdist,
+     1 scale,scalePPG,ftol,forceWu,forceWuP,xyzname,chkname,DATEN)
       IMPLICIT REAL*8 (A-H,O-Z)
+      Dimension forceWu(9),forceWuP(9)
       Character DATEN*80
       Character xyzname*20
+      Character chkname*20
       Character blank*1
       Character xyz*4
       Character xyz1*7
-      Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,xyzname,
-     1 leap
-      Namelist /Opt/ Iopt
+      Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
+     1 ichk,isonum,IPRC,kGC,lGC,xyzname
+      Namelist /Opt/ Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
       Namelist /Hamilton/ IHam,iupac
-      Namelist /Isomers/ IPR,IPH,IStop
+      Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
       Namelist /Graph/ IG,ISO1,ISO2,ISO3,PS,scale,scalePPG
 C Input send to output   
       WRITE(IOUT,100)
@@ -21,10 +23,30 @@ C Input send to output
    10 WRITE(IOUT,60) DATEN
    11 WRITE(IOUT,101)
       REWIND IN
-
+C     Defining the Wu force field
+      forceWuP(1)=1.455d0
+      WuR5=1.455d0
+      forceWuP(2)=1.391d0
+      WuR6=1.391d0
+      forceWuP(3)=1.08d2
+      WuA5=1.08d2
+      forceWuP(4)=1.2d2
+      WuA6=1.2d2
+      forceWuP(5)=1.d6
+      WufR=1.d6
+      forceWuP(6)=1.d6
+      forceWuP(7)=1.d5
+      WufA=1.d5
+      forceWuP(8)=1.d5
+      forceWuP(9)=0.d0
+      fCoulomb=0.d0
+      ftol=.5d-7
+C     More Parameters
       blank=' '
       xyz='.xyz'
       xyzname='cylview'
+      chkname='checkpoint'
+      ichk=0    !  Option for restarting the isomer list
       iupac=1   !  Switch for producing the Iupac nomenclature
                 !  iupac=0 just count Hamiltonian Cycles
       Ipent=0   !  Initial flag for Spriral pentagon input
@@ -32,10 +54,14 @@ C Input send to output
       IER=0     !  Error flag
       Tol=0.33d0 ! Tolerance
       IP=0      !  Print option
-      IPR=0     !  Print Isomers
+      kGC=1    !  First Goldberg-Coxeter index
+      lGC=0    !  second Goldberg-Coxeter index
+      IPR=-1    !  Print Isomers
+      IPRC=0    !  Option for isomer list
       IPH=0     !  Printin Hamiltonian cycles for each isomer
       NA=60     !  Number of Atoms
       IC=1      !  Input for fullerene structure
+      isonum=0  !  Isomer number in database
       iupac=0   !  Print IUPAC numbers
       IV1=2     !  Eigenvector option for fullerene construction
       IV2=3     !  Eigenvector option for fullerene construction
@@ -68,6 +94,19 @@ C     New input
       Read(IN,nml=Graph)
 
 C Set Parameters
+      if(IC.lt.0) IC=0
+      if(IC.gt.5) IC=5
+      if(ichk.ne.0) istop=1
+C  Wu force field
+      forceWu(1)=WuR5
+      forceWu(2)=WuR6
+      forceWu(3)=WuA5
+      forceWu(4)=WuA6
+      forceWu(5)=WufR
+      forceWu(6)=WufR
+      forceWu(7)=WufA
+      forceWu(8)=WufA
+      forceWu(9)=fCoulomb
 C  Filename for CYLVIEW
       do I=2,20
        if(xyzname(I:I).eq.blank) then
@@ -122,6 +161,9 @@ C  Tolerance for finding 5- and 6-ring connections
       TolX=TolR*0.01d0
       endif
 
+      if(IPRC.lt.0) IPRC=0
+      if(IPRC.eq.1) IPRC=1
+      if(IPRC.gt.1) IPRC=0
       if(IPR.le.0) then
         IPR=-1
       endif

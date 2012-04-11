@@ -102,7 +102,7 @@ C     Now Print
       endif
  
  1000 FORMAT(8X,'x',13X,'E',4X,'deg NE   type    ',/1X,45('-'))
- 1001 FORMAT(/1X,'Construct the (',I3,','I3,') Hueckel matrix '
+ 1001 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix '
      1 'and diagonalize (E=alpha+x*beta; E in au)',
      1 /1X,'Eigenvalues are between [-3,+3] (in units of |beta|)',
      1 /1X,'deg: degeneracy; NE: number of electrons')

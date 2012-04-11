@@ -457,7 +457,7 @@ C     to calculate the root mean square as a measure for distortion
  1002 Format(1x,' End of iteration',
      1 /1X,' Center of minimum covering sphere (x,y,z):',3(D14.8,2X),
      2 ' at distance ',D14.8,2X,'from origin')
- 1003 Format(1x,' P',I3,'= ',3(D14.8,2X),'  RMCS = ',D14.8)
+ 1003 Format(1x,' P',I4,'= ',3(D14.8,2X),'  RMCS = ',D14.8)
  1004 Format(/1x,' Final result and comparison (in units of input):',
      1 /1x,' Volume of minimum covering sphere: ',D14.8,
      1 /1x,' Volume of central covering sphere: ',D14.8,

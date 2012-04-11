@@ -1,3 +1,492 @@
+      SUBROUTINE SpiralRestart(NMAX,MMAX,LMAX,N,IPR,Iout,
+     1 Isonum,IsoIPR,iham,IDA,A,chkname)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
+      Real*8 A(NMAX,NMAX),gap
+      Integer Isonum(119),IsoIPR(123)
+      DIMENSION NMR(6),IRhag5(0:5),IRhag6(0:6)
+      DIMENSION Spiralx(12,NMAX)
+      CHARACTER*1 DUMMY
+      CHARACTER*3 GROUP
+      CHARACTER*6 Occup
+      CHARACTER*20 chkname
+      CHARACTER*18 Start,Char,Last
+      Real*8 sigmah,sigmahlow,sigmahhigh
+
+C Set parameters
+      Start=' Isomer List Start'
+      Last=' Isomer List Compl'
+      Nloop=1000000000
+      skip=4
+      nhamcycle=0
+      IPRdect=0
+      maxiter=10000000
+      islow=1
+      islowIPR=1
+      ishigh=1
+      ishighIPR=1
+      IFusL=1
+      IFusH=1
+      ISigmaL=1
+      ISigmaH=1
+
+C Test if file is the right one
+      Write(Iout,1000) chkname
+      Open(UNIT=1,FILE=chkname,ERR=500,STATUS='old',FORM='FORMATTED')
+      do I=1,Nloop
+      Read(1,2002,end=100) Char
+       if(Char.eq.Start) go to 200
+      enddo
+  100  Write(Iout,1001) I,Start
+       Close(unit=1)
+       stop
+  200 Write(Iout,1002)
+
+C Test if atom number is right
+      Read(1,*) IN,IP,IH
+      if(IN.ne.N) then
+       Write(Iout,1003) N,IN
+       Close(unit=1)
+       stop
+      endif
+      if(IH.ne.0) then
+       Write(Iout,1004)
+        iham=1
+       else
+        iham=0
+      endif
+      if(IP.eq.0) then
+       Write(Iout,1005)
+       IPR=0
+      else
+       Write(Iout,1006)
+       IPR=1
+      endif
+
+C Now loop over all data to find the last one
+C Check parameters as well
+      do I=1,skip
+       Read(1,*,end=300) Dummy
+      enddo
+C Without Hamiltonian cycles
+      if(iham.eq.0) then
+       Read(1,2000,Err=300) L,GROUP,K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,
+     1 K11,K12,IFus5G,sigmah
+      IFus5Ghigh=IFus5G
+      IFus5Glow=IFus5G
+      sigmahhigh=sigmah
+      sigmahlow=sigmah
+      if(L.ne.1) Go to 300
+      do I=2,Nloop
+       Read(1,2000,Err=400,end=400) L,GROUP,K1,K2,K3,K4,K5,K6,K7,K8,
+     1 K9,K10,K11,K12,IFus5G,sigmah
+       if(IFus5G.le.IFus5Glow) then
+        IFus5Glow=IFus5G
+        IFusL=L
+       endif
+       if(IFus5G.ge.IFus5Ghigh) then
+        IFus5Ghigh=IFus5G
+        IFusH=L
+       endif
+       if(sigmah.le.sigmahlow) then
+        sigmahlow=sigmah
+        ISigmaL=L
+       endif
+       if(sigmah.ge.sigmahhigh) then
+        sigmahhigh=sigmah
+        ISigmaH=L
+       endif
+      enddo
+      endif
+C With Hamiltonian cycles
+      if(iham.ne.0) then
+       Read(1,2001,Err=300) L,GROUP,K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,
+     1 K11,K12,IFus5G,sigmah,nhamcycle
+      IFus5Ghigh=IFus5G
+      IFus5Glow=IFus5G
+      sigmahhigh=sigmah
+      sigmahlow=sigmah
+      IPRhamlow=nhamcycle
+      IPRhamhigh=nhamcycle
+      hamlow=nhamcycle
+      hamhigh=nhamcycle
+      if(L.ne.1) Go to 300
+      do I=2,Nloop
+       Read(1,2001,Err=400,end=400) L,GROUP,K1,K2,K3,K4,K5,K6,K7,K8,
+     1 K9,K10,K11,K12,IFus5G,sigmah,nhamcycle
+       if(IFus5G.le.IFus5Glow) then
+        IFus5Glow=IFus5G
+        IFusL=L
+       endif
+       if(IFus5G.ge.IFus5Ghigh) then
+        IFus5Ghigh=IFus5G
+        IFusH=L
+       endif
+       if(sigmah.le.sigmahlow) then
+        sigmahlow=sigmah
+        ISigmaL=L
+       endif
+       if(sigmah.ge.sigmahhigh) then
+        sigmahhigh=sigmah
+        ISigmaH=L
+       endif
+        if(nhamcycle.le.hamlow) then
+         hamlow=nhamcycle
+         islow=L
+        endif
+        if(nhamcycle.ge.hamhigh) then
+         hamhigh=nhamcycle
+         ishigh=L
+        endif
+        if(IPR.eq.0.and.IFus5G.eq.0) then
+         IPRdect=1
+         if(nhamcycle.lt.IPRhamlow) then
+          IPRhamlow=nhamcycle
+          islowIPR=L
+         endif
+         if(nhamcycle.gt.IPRhamhigh) then
+          IPRhamhigh=nhamcycle
+          ishighIPR=L
+         endif
+        endif
+      enddo
+      endif
+  400  Write(Iout,1008) L,GROUP,K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,K11,K12
+       Close(unit=1)
+      if(iham.ne.0) then
+       WRITE (Iout,1010) hamlow,islow,hamhigh,ishigh
+       if(IPR.eq.0.and.IPRdect.eq.1) then
+        WRITE (Iout,1011) IPRhamlow,islowIPR,IPRhamhigh,ishighIPR
+       endif
+      endif
+      WRITE (Iout,1012) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
+     1  sigmahlow,ISigmaL,sigmahhigh,ISigmaH
+
+C Now check if list is complete or not
+       M1=N/2-9
+       M2=N/2-29
+       if(IPR.eq.0) then
+        if(M1.le.119.and.L.eq.Isonum(M1)) then
+         Write(Iout,1009) Isonum(M1)
+         return
+        endif
+       else
+        if(M2.le.123.and.M2.gt.0.and.L.eq.IsoIPR(M2)) then
+         Write(Iout,1009) IsoIPR(M2)
+         return
+        endif
+       endif
+
+C Now do the calculation for the remainder
+      Write(Iout,1013) 
+      if(iham.eq.0) then
+      if(IPR.EQ.0) then 
+         IF(N.lt.100) WRITE(Iout,601) N
+         IF(N.ge.100) WRITE(Iout,602) N
+      else
+         IPR=1 
+         IF(N.lt.100) WRITE(Iout,603) N
+         IF(N.ge.100) WRITE(Iout,604) N
+      endif
+      else
+      if(IPR.EQ.0) then 
+         IF(N.lt.100) WRITE(Iout,701) N
+         IF(N.ge.100) WRITE(Iout,702) N
+      else
+         IPR=1 
+         IF(N.lt.100) WRITE(Iout,703) N
+         IF(N.ge.100) WRITE(Iout,704) N
+      endif
+      endif
+
+      do I=1,MMAX
+      do J=1,MMAX
+      D(I,J)=0
+      enddo
+      enddo
+      IER=0
+      IT=0
+      JPR=IPR+1
+      M=N/2+2
+      itest=1
+      DO 1  J1= 1    ,M-11*JPR !   Open loop over spiral
+       if(J1.lt.K1.and.itest.eq.1) go to 1
+      DO 2  J2=J1+JPR,M-10*JPR !   combinations
+       if(J2.lt.K2.and.itest.eq.1) go to 2
+      DO 3  J3=J2+JPR,M-9*JPR
+       if(J3.lt.K3.and.itest.eq.1) go to 3
+      DO 4  J4=J3+JPR,M-8*JPR
+       if(J4.lt.K4.and.itest.eq.1) go to 4
+      DO 5  J5=J4+JPR,M-7*JPR
+       if(J5.lt.K5.and.itest.eq.1) go to 5
+      DO 6  J6=J5+JPR,M-6*JPR
+       if(J6.lt.K6.and.itest.eq.1) go to 6
+      DO 7  J7=J6+JPR,M-5*JPR
+       if(J7.lt.K7.and.itest.eq.1) go to 7
+      DO 8  J8=J7+JPR,M-4*JPR
+       if(J8.lt.K8.and.itest.eq.1) go to 8
+      DO 9  J9=J8+JPR,M-3*JPR
+       if(J9.lt.K9.and.itest.eq.1) go to 9
+      DO 10 J10=J9+JPR,M-2*JPR
+       if(J10.lt.K10.and.itest.eq.1) go to 10
+      DO 11 J11=J10+JPR,M-JPR
+       if(J11.lt.K11.and.itest.eq.1) go to 11
+      DO 12 J12=J11+JPR,M
+       if(J12.lt.K12.and.itest.eq.1) go to 12
+       if(J12.eq.K12.and.itest.eq.1) then
+        itest=0
+        go to 12
+       endif
+        DO J=1,M               ! Form spiral code in S
+         S(J)=6
+        enddo
+      S(J1)=5
+      S(J2)=5
+      S(J3)=5
+      S(J4)=5
+      S(J5)=5
+      S(J6)=5
+      S(J7)=5
+      S(J8)=5
+      S(J9)=5
+      S(J10)=5
+      S(J11)=5
+      S(J12)=5
+      CALL Windup(MMAX,M,IPR,IER,S,D)      !      Wind up spiral into dual 
+      IF(IER.EQ.12) GO TO 12               !      and check for closure 
+      IF(IER.EQ.11) GO TO 11
+      IF(IER.EQ.10) GO TO 10
+      IF(IER.EQ.9)  GO TO 9
+      IF(IER.EQ.8)  GO TO 8
+      IF(IER.EQ.7)  GO TO 7
+      IF(IER.EQ.6)  GO TO 6
+      IF(IER.EQ.5)  GO TO 5
+      IF(IER.EQ.4)  GO TO 4
+      IF(IER.EQ.3)  GO TO 3
+      IF(IER.EQ.2)  GO TO 2
+      IF(IER.EQ.1)  GO TO 1
+      CALL Unwind(NMAX,MMAX,LMAX,M,IER,IT,ispiral,
+     1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals 
+      IF(IER.EQ.13) GO TO 13                             ! and check for uniqueness
+      K=0
+      L=L+1                                              ! Spiral S is canonical      
+      DO J=1,6
+         IF(NMR(J).EQ.0) GO TO 16
+         K=J
+      enddo
+C     Analyze dual matrix
+   16  CALL DualAnalyze(NMAX,MMAX,N,M,Iout,D,IRhag5,IRhag6,
+     1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
+       if(2*ndeg.eq.nelec) then 
+        Occup='closed'
+       else
+        Occup='open  '
+        gap=0.d0
+       endif
+       if(IFus5G.le.IFus5Glow) then
+        IFus5Glow=IFus5G
+        IFusL=L
+       endif
+       if(IFus5G.ge.IFus5Ghigh) then
+        IFus5Ghigh=IFus5G
+        IFusH=L
+       endif
+       if(sigmah.le.sigmahlow) then
+        sigmahlow=sigmah
+        ISigmaL=L
+       endif
+       if(sigmah.ge.sigmahhigh) then
+        sigmahhigh=sigmah
+        ISigmaH=L
+       endif
+       if(iham.eq.0) then
+       WRITE(Iout,607) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
+     1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
+     2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
+       else
+        Call HamiltonCyc(NMax,N,maxiter,Iout,nbatch,IDA,nhamcycle)
+        WRITE(Iout,608) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
+     1   (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
+     2   nelec,ndeg,gap,Occup,nhamcycle,(NMR(J),J=1,K)
+        if(nhamcycle.le.hamlow) then
+         hamlow=nhamcycle
+         islow=L
+        endif
+        if(nhamcycle.ge.hamhigh) then
+         hamhigh=nhamcycle
+         ishigh=L
+        endif
+        if(IPR.eq.0.and.IFus5G.eq.0) then
+         IPRdect=1
+         if(nhamcycle.lt.IPRhamlow) then
+          IPRhamlow=nhamcycle
+          islowIPR=L
+         endif
+         if(nhamcycle.gt.IPRhamhigh) then
+          IPRhamhigh=nhamcycle
+          ishighIPR=L
+         endif
+        endif
+       endif
+       if(IPR.eq.0) then
+        if(M1.le.119.and.L.eq.Isonum(M1)) go to 99
+       else
+        if(M2.le.123.and.M2.gt.0.and.L.eq.IsoIPR(M2)) go to 99
+      endif
+ 13     CONTINUE 
+ 12     CONTINUE        ! Close loop over spiral 
+ 11     CONTINUE        ! combinations      
+ 10     CONTINUE
+ 9      CONTINUE
+ 8      CONTINUE
+ 7      CONTINUE
+ 6      CONTINUE
+ 5      CONTINUE
+ 4      CONTINUE
+ 3      CONTINUE
+ 2      CONTINUE
+ 1      CONTINUE
+ 99   WRITE (Iout,612)
+      if(iham.ne.0) then
+       WRITE (Iout,609) hamlow,islow,hamhigh,ishigh
+       if(IPR.eq.0.and.IPRdect.eq.1) then
+        WRITE (Iout,610) IPRhamlow,islowIPR,IPRhamhigh,ishighIPR
+       endif
+      endif
+      WRITE (Iout,611) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
+     1  sigmahlow,ISigmaL,sigmahhigh,ISigmaH
+      WRITE (Iout,606)
+      Return
+
+  300 Write(Iout,1007)
+      Close(unit=1)
+      Return
+
+  500 Write(Iout,1014) chkname
+      stop
+
+ 601  FORMAT(1X,'General fullerene isomers of C',I2,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-')) 
+ 602  FORMAT(1X,'General fullerene isomers of C',I3,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-')) 
+ 603  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     1 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-')) 
+ 604  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     1 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-')) 
+ 606  FORMAT(/1X,170('-'),/1X,'End of subroutine Spiral')
+ 607  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
+     1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
+     1 1X,A6,2X,3(I3,' x',I3,:,','))
+ 608  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
+     1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
+     1 1X,A6,2X,I9,2X,3(I3,' x',I3,:,','))
+ 609  FORMAT(1X,'Lowest number of Hamiltonian cycles     ',I10,
+     1 ' for isomer ',I10,
+     1      /1X,'Highest number of Hamiltonian cycles    ',I10,
+     1 ' for isomer ',I10)
+ 610  FORMAT(1X,'Lowest number of IPR Hamiltonian cycles ',I10,
+     1 ' for isomer ',I10,
+     1      /1X,'Highest number of IPR Hamiltonian cycles',I10,
+     1 ' for isomer ',I10)
+ 611  FORMAT(1X,'Lowest  Np= ',I3,' for isomer ',I10,
+     1      /1X,'Highest Np= ',I3,' for isomer ',I10,
+     1      /1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
+     1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
+ 612  FORMAT(1X,'Isomer List Complete')
+ 701  FORMAT(1X,'General fullerene isomers of C',I2,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
+     1 ' number of Hamiltonian cycles)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
+     5 /1X,170('-')) 
+ 702  FORMAT(1X,'General fullerene isomers of C',I3,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
+     1 ' number of Hamiltonian cycles)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
+     5 /1X,170('-')) 
+ 703  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
+     1 ' number of Hamiltonian cycles)',
+     1 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
+     5 /1X,170('-')) 
+ 704  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
+     1 ' number of Hamiltonian cycles)',
+     1 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
+     5 /1X,170('-')) 
+ 1000 Format(1X,'Opening file: ',A20)
+ 1001 Format(1X,'Lopped over ',I9,' lines. Characterestic card ',
+     1 'for isomer list not found: ',A18,' ==> ABORT')
+ 1002 Format(1X,'Reading input')
+ 1003 Format(1X,'Atom number ',I5,' requested not identical to ',
+     1 I5,' in the data file  ==> ABORT')
+ 1004 Format(1X,'File contains number of distinct Hamiltonian ',
+     1 'cycles')
+ 1005 Format(1X,'All isomers considered')
+ 1006 Format(1X,'Only IPR isomers considered')
+ 1007 Format(1X,'First Data card not found ==> ABORT')
+ 1008 Format(1X,'Last isomer in list: ',1X,I8,2X,A3,1X,12I4,
+     1 /1X,'General statistics from external file data:')
+ 1009 Format(1X,'List has ',I9,' isomers and is therefore complete',
+     1 /1X,'Nothing else to do --> Return')
+ 1010 FORMAT(1X,'Lowest number of Hamiltonian cycles     ',I10,
+     1 ' for isomer ',I10,
+     1      /1X,'Highest number of Hamiltonian cycles    ',I10,
+     1 ' for isomer ',I10)
+ 1011 FORMAT(1X,'Lowest number of IPR Hamiltonian cycles ',I10,
+     1 ' for isomer ',I10,
+     1      /1X,'Highest number of IPR Hamiltonian cycles',I10,
+     1 ' for isomer ',I10)
+ 1012 FORMAT(1X,'Lowest  Np= ',I3,' for isomer ',I10,
+     1      /1X,'Highest Np= ',I3,' for isomer ',I10,
+     1      /1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
+     1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
+ 1013 FORMAT(/1X,'Starting with new list:')
+ 1014 Format(1X,'File: ',A20,' does not exist ==> ABORT')
+ 2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
+ 2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
+ 2002 Format(A18)
+      end
+
       SUBROUTINE Spiral(NMAX,MMAX,LMAX,N,IPR,Iout,
      1 Isonum,IsoIPR,iham,IDA,A)
       IMPLICIT INTEGER (A-Z)
@@ -40,7 +529,7 @@ C     N is the nuclearity of the fullerene.
       sigmahlow=1.d10
       IFus5Ghigh=0
       sigmahhigh=-1.d0
-      WRITE (Iout,600)
+      WRITE (Iout,600) N,IPR,iham
       if(iham.eq.0) then
       if(IPR.EQ.0) then 
          IF(N.lt.100) WRITE(Iout,601) N
@@ -149,7 +638,7 @@ C     Analyze dual matrix
      1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
        else
-        Call HamiltonCyc(NMax,N,maxiter,IDA,nhamcycle)
+        Call HamiltonCyc(NMax,N,maxiter,Iout,nbatch,IDA,nhamcycle)
         WRITE(Iout,608) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
      1   (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2   nelec,ndeg,gap,Occup,nhamcycle,(NMR(J),J=1,K)
@@ -190,8 +679,9 @@ C     Analyze dual matrix
  4      CONTINUE
  3      CONTINUE
  2      CONTINUE
- 1      CONTINUE 
- 99   if(iham.ne.0) then
+ 1      CONTINUE
+ 99   WRITE (Iout,612)
+      if(iham.ne.0) then
        WRITE (Iout,609) hamlow,islow,hamhigh,ishigh
        if(IPR.eq.0.and.IPRdect.eq.1) then
         WRITE (Iout,610) IPRhamlow,islowIPR,IPRhamhigh,ishighIPR
@@ -202,9 +692,10 @@ C     Analyze dual matrix
       WRITE (Iout,606)
  600  FORMAT(/1X,'Subroutine Spiral from Fowler and Manopoulus',
      1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)',
-     2 /1X,'(Symmetries are given for undistorted fullerenes)')
+     2 /1X,'(Symmetries are given for undistorted fullerenes)',
+     3 /1X,'Isomer List Start ',/,I5,2I2)
  601  FORMAT(1X,'General fullerene isomers of C',I2,':',
-     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
      2 /8X,'N  PG   Ring spiral pentagon positions',
@@ -212,7 +703,7 @@ C     Analyze dual matrix
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
  602  FORMAT(1X,'General fullerene isomers of C',I3,':',
-     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
      2 /8X,'N  PG   Ring spiral pentagon positions',
@@ -220,7 +711,7 @@ C     Analyze dual matrix
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
  603  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
-     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
      1 /8X,'N  PG   Ring spiral pentagon positions',
@@ -228,7 +719,7 @@ C     Analyze dual matrix
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
  604  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
-     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
      1 /8X,'N  PG   Ring spiral pentagon positions',
@@ -236,7 +727,7 @@ C     Analyze dual matrix
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
  605  FORMAT(1X,I8,2X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
- 606  FORMAT(1X,170('-'),/1X,'End of subroutine Spiral')
+ 606  FORMAT(/1X,170('-'),/1X,'End of subroutine Spiral')
  607  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
      1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
      1 1X,A6,2X,3(I3,' x',I3,:,','))
@@ -255,6 +746,7 @@ C     Analyze dual matrix
      1      /1X,'Highest Np= ',I3,' for isomer ',I10,
      1      /1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
      1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
+ 612  FORMAT(1X,'Isomer List Complete')
  701  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -381,7 +873,8 @@ C     N is the nuclearity of the fullerene.
       ispiral=0
       WRITE (Iout,600)
          IF(N.lt.100) WRITE(Iout,601) N,M
-         IF(N.ge.100) WRITE(Iout,602) N,M
+         IF(N.ge.100.and.N.lt.1000) WRITE(Iout,602) N,M
+         IF(N.ge.1000) WRITE(Iout,632) N,M
       do I=1,MMAX
       do J=1,MMAX
        D(I,J)=0
@@ -598,7 +1091,8 @@ C     Fowler algorithm
         WRITE(Iout,605) GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
        endif
        WRITE(Iout,604) 
-       WRITE(Iout,618) (SpiralF(I,msp),I=1,M)
+       if(M.lt.1000) WRITE(Iout,618) (SpiralF(I,msp),I=1,M)
+       if(M.ge.1000) WRITE(Iout,629) (SpiralF(I,msp),I=1,M)
        if(ispiral.ge.2) then
         if(ispiral.eq.2) then
          WRITE(Iout,623)
@@ -650,14 +1144,14 @@ C     Print ring numbers
  600  FORMAT(/1X,'Modified spiral algorithm Fowler and Manopoulus',
      1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)')
  601  FORMAT(1X,'Spiral for fullerene isomers of C',I2,':',
-     1 ' (',I3,' faces)')
+     1 ' (',I2,' faces)')
  602  FORMAT(1X,'Spiral for fullerene isomers of C',I3,':',
      1 ' (',I3,' faces)')
  603  FORMAT(1X,A3,9X,12I4)
  604  FORMAT(1X,90('-'),/1X,'Corresponding ring numbers:') 
  605  FORMAT(1X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
  606  Format(/1X,'Spiral list of pentagon positions with ',
-     1 'higher priority: (',I3,' spirals found)') 
+     1 'higher priority: (',I4,' spirals found)') 
  607  Format(12(1X,I3))
  608  Format(1X,'Input spiral is canonical')
  610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
@@ -673,8 +1167,8 @@ C     Print ring numbers
  617  Format(1X,'Failed to find ring spiral')
  618  Format(20(1X,32(I3,'-'),/))
  619  Format(1X,'Spiral list of pentagon positions with ',
-     1 'higher priority: (',I3,' spirals found)') 
- 620  Format(1X,'Search ',I3,' spirals to produce canonical'
+     1 'higher priority: (',I4,' spirals found)') 
+ 620  Format(1X,'Search ',I4,' spirals to produce canonical'
      1 ' list of atoms:')
  621  Format(12(1X,I3))
  622  Format(1X,'Input spiral is canonical')
@@ -696,6 +1190,9 @@ C     Print ring numbers
      1 'list',/1X,'Routine will stop here and tries to work with ',
      1 'existing spirals (otherwise increase NSpScale parameter ',
      1 'in main program')
+ 629  Format(20(1X,32(I4,'-'),/))
+ 632  FORMAT(1X,'Spiral for fullerene isomers of C',I4,':',
+     1 ' (',I4,' faces)')
       Return
       END
       
