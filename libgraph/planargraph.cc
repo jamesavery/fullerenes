@@ -46,7 +46,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   dual.neighbours.resize(Nfaces);
   dual.edges.resize(Nfaces*(Nfaces-1)/2);
   
-  cerr << "dual_graph(" << Fmax << ")\n";
+  //  cerr << "dual_graph(" << Fmax << ")\n";
   const vector<face_t> allfaces(compute_faces_flat(Fmax));
 
   if(Nfaces != allfaces.size()){
@@ -55,7 +55,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   }
 
   // Construct mapping e -> faces containing e (these are mutually adjacent)
-  cerr << "dual_graph::construct facenodes\n";
+  //  cerr << "dual_graph::construct facenodes\n";
   map< edge_t, set<int> > facenodes;
   for(unsigned int i=0;i<allfaces.size(); i++){
     const face_t& face(allfaces[i]);
@@ -63,7 +63,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
     for(unsigned int j=0;j<face.size();j++)
       facenodes[edge_t(face[j],face[(j+1)%face.size()])].insert(i);
   }
-  cerr << "dual_graph::test planarity\n";
+  //  cerr << "dual_graph::test planarity\n";
   for(map<edge_t,set<int> >::const_iterator fs(facenodes.begin());fs!=facenodes.end();fs++){
     const edge_t&   e(fs->first);
     const set<int>& connects(fs->second);
@@ -72,7 +72,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   }
   
   // Insert edge between each pair of faces that share an edge
-  cerr << "dual_graph::construct graph\n";
+  //  cerr << "dual_graph::construct graph\n";
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const set<int>& adjacent_faces(facenodes[*e]);
     for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
@@ -87,7 +87,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
 
   // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
   if(layout2d.size() == N){
-    cerr << "dual_graph::compute layout.\n";
+    //    cerr << "dual_graph::compute layout.\n";
     dual.layout2d = vector<coord2d>(Nfaces);
 #pragma omp parallel for
     for(int i=0;i<Nfaces;i++)
@@ -313,8 +313,12 @@ coord2d PlanarGraph::width_height() const {
   return coord2d(xmax-xmin,ymax-ymin);
 }
 
-void PlanarGraph::scale(const coord2d& s) {
-  for(node_t u=0;u<N;u++) layout2d[u] *= s;
+void PlanarGraph::scale(const coord2d& x) {
+  for(node_t u=0;u<N;u++) layout2d[u] *= x;
+}
+
+void PlanarGraph::move(const coord2d& x) {
+  for(node_t u=0;u<N;u++) layout2d[u] += x;
 }
 
 

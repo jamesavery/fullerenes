@@ -32,15 +32,21 @@ public:
   pair<set< face_t>, set<face_t> > compute_faces56() const;
 
 
+  static FullereneGraph C20() {
+    PlanarGraph g;
+    g.layout2d.resize(20);
+    for(node_t u=0;u<20;u++)
+      g.layout2d[u] = coord2d(C20_layout2d[u][0],C20_layout2d[u][1]);
 
-  // static FullereneGraph C20() {
-  //   Graph g;
-  //   g.neighbours = vector<node_t>(C20_neighbours,C20_neighbours+3*20);
-  //   g.update_from_neighbours();
-  //   return FullereneGraph(g);
-  // }
+    for(int i=0;i<30;i++)
+      g.edge_set.insert(edge_t(C20_edges[i][0],C20_edges[i][1]));
+    
+    g.update_auxiliaries();
+    return FullereneGraph(g,g.layout2d);
+  }
 private:
-  static node_t C20_neighbours[20*3];
+  static node_t C20_edges[30][2];
+  static double C20_layout2d[20][2];
 };
 
 #endif

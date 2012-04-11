@@ -13,12 +13,16 @@ extern "C" {
 
   polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points);
   polyhedron_ptr read_polyhedron_(const char *path);
+  polyhedron_ptr new_c20_();	
   void delete_polyhedron_(polyhedron_ptr*);
 
   graph_ptr new_graph_(const int *nmax, const int *N, const int *adjacency);
   void delete_graph_(graph_ptr*);
 
   // General graph operations -- look in fullerenegraph/graph.hh for others to potentially add
+  int nvertices_(const graph_ptr *);
+  int nedges_(const graph_ptr *);
+
   graph_ptr dual_graph_(const graph_ptr *);
   int hamiltonian_count_(const graph_ptr *);
   void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const int *outer_dim, int *D);
@@ -36,6 +40,7 @@ extern "C" {
   void tutte_layout_(graph_ptr* g, double *LAYOUT);
   void tutte_layout_b_(graph_ptr* g, int *s, int *t, int *r, double *LAYOUT);
   void spherical_layout_(const graph_ptr* g, double *LAYOUT3D);
+  void get_layout2d_(const graph_ptr *p, double *layout2d);
 
   //  double *get_layout2d(const graph_ptr *g);
   //  void    set_layout2d(const graph_ptr *g, double *layout2d);
@@ -48,6 +53,7 @@ extern "C" {
   // graph_ptr triangulation_(polyhedron_ptr *P)
   polyhedron_ptr convex_hull_(const polyhedron_ptr *P);
 
+  void get_layout3d_(const polyhedron_ptr *p, double *layout3d);
 };
 
 
@@ -209,8 +215,33 @@ polyhedron_ptr convex_hull_(const polyhedron_ptr *p)
 }
 
 
-void print_graph_(const char *name, const graph_ptr *g)
+void print_graph_(const graph_ptr *g)
 {
   const PlanarGraph& G(*(*g));
-  cout << name << " = " << G << ";\n";
+  cout << G << ";\n";
 }
+
+void get_layout3d_(const polyhedron_ptr *p, double *points)
+{
+  const Polyhedron& P(*(*p));
+  for(node_t u=0;u<P.N;u++){
+    const coord3d &x(P.points[u]);
+    for(int i=0;i<3;i++)
+      points[u*3+i] = x[i];
+  }
+}
+
+void get_layout3d_(const graph_ptr *g, double *points)
+{
+  const PlanarGraph& G(*(*g));
+  for(node_t u=0;u<G.N;u++){
+    const coord2d &x(G.layout2d[u]);
+      points[u*2+0] = x.first;
+      points[u*2+1] = x.second;
+  }
+}
+
+polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }
+
+int nvertices_(const graph_ptr *g){ return (*g)->N; }
+int nedges_(const graph_ptr *g){ return (*g)->edge_set.size(); }

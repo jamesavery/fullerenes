@@ -1,4 +1,5 @@
 #include "planargraph.hh"
+#include "fullerenegraph.hh"
 #include <fstream>
 #include <sstream>
 #include <list>
@@ -40,6 +41,21 @@ struct Polyhedron : public PlanarGraph {
 
   Polyhedron convex_hull() const { return incremental_convex_hull(); }
   Polyhedron incremental_convex_hull() const;
+
+  void scale(const coord3d& x) {
+    for(node_t u=0;u<N;u++) points[u] *= x;
+  }
+
+  void move(const coord3d& x) {
+    for(node_t u=0;u<N;u++) points[u] += x;
+  }
+
+  static Polyhedron C20() {
+    vector<coord3d> points(20);
+    for(node_t u=0;u<20;u++) points[u] = coord3d(C20_points[u][0],C20_points[u][1],C20_points[u][2]);
+      
+    return Polyhedron(FullereneGraph::C20(),points);
+  }
 
 
   static vector<coord3d> polar_mapping(const vector<coord2d>& angles) {
@@ -91,5 +107,8 @@ struct Polyhedron : public PlanarGraph {
   }
 
   string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
+
+private:
+  static double C20_points[20][3];
 };
 

@@ -543,8 +543,9 @@ C
       DIMENSION Dist(3,NMAX),distP(NMAX)
       DIMENSION A(NMAX,NMAX),IDA(NMAX,NMAX)
       DIMENSION evec(NMAX),df(NMAX),dipol(3,3)
+      integer :: graph_is_a_fullerene
       type(c_ptr) :: g, halma, halma_fullerene, new_fullerene_graph, 
-     1               new_graph
+     1               new_C20
 C Construct Goldberg Coxeter fullerene using the two indices (kGC,lGC)
 
       Write(Iout,1000) kGC,lGC
@@ -554,19 +555,22 @@ C Construct Goldberg Coxeter fullerene using the two indices (kGC,lGC)
         stop
       endif
 
-      g = new_graph(NMAX,MAtom,IDA)
-      call print_graph("g",g)
-      stop
-
-      g = new_fullerene_graph(NMAX,MAtom,IDA)
-
-      call print_graph("g",g)
+      g = new_C20();
       halma = halma_fullerene(g,kGC-1)
-      call print_graph("halma",halma)
 
-C      call adjacency_matrix(halma,NMAX,IDA)
-      Print*,IDA
-      stop
+      isafullerene = graph_is_a_fullerene(halma)
+
+      IF (isafullerene .eq. 1) then
+        write (iout,*) "Halma fullerene is a fullerene."
+      else
+        write (iout,*) "Halma fullerene is not a fullerene."
+        stop
+      endif
+
+C Update fortran structures
+      MAtom  = NVertices(halma)
+      Medges = NEdges(halma)
+      call adjacency_matrix(halma,NMax,IDA)
 
  1000 Format(/1x,'Halma fullerene with Coxeter indices (k,l) = (',I2,','
      1 ,I2,')')

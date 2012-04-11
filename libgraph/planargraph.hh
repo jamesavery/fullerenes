@@ -47,8 +47,8 @@ public:
 
   vector<double> edge_lengths() const;
   coord2d width_height() const;
-  void scale(const coord2d& s);
-  void move (const coord2d& s);
+  void scale(const coord2d& x);
+  void move (const coord2d& x);
 
   string to_latex(double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
 

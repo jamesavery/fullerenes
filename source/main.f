@@ -933,7 +933,9 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manopoulus
 C Calculate the volume
       routine='VOLUME       '
       Write(Iout,1008) routine
-      CALL Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
+C      call VolumeAndArea(g,Dist,NAtom)
+
+      CALL OldVolume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
      1 N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
      2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
 
