@@ -1,4 +1,25 @@
-      SUBROUTINE Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
+      SUBROUTINE VolumeAndArea(g,points,nmax)
+      use iso_c_binding
+      dimension points(3,nmax)
+      type(c_ptr)::g,p,hull,new_polyhedron, convex_hull
+
+      p = new_polyhedron(g,points)
+
+ 1    surfacearea = get_surface_area(p)
+      volume      = get_volume(p)
+
+      hull = convex_hull(p)
+
+      hullarea   = get_surface_area(hull)
+      hullvolume = get_volume(hull)
+
+
+      call delete_polyhedron(p)
+      call delete_polyhedron(hull)
+
+      end subroutine
+
+      SUBROUTINE OldVolume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
      1 N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,Asphere,
      2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -20,6 +41,7 @@ C
       DIMENSION Dist(3,natom),Distac(6)
       DIMENSION CRing5(3,Nfaces),CRing6(3,Nfaces)
       DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
+
 C     Sum over all 5-rings
       Vol5=0.d0
       Area5=0.d0
