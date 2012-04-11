@@ -43,10 +43,11 @@ extern "C" {
   double shortest_planar_distance_(const graph_ptr *g);
 
   // Operations on polyhedra
-  double surface_area_(polyhedron_ptr *P);
-  double volume2_(polyhedron_ptr *P);
+  double get_surface_area_(const polyhedron_ptr *P);
+  double get_volume_(const polyhedron_ptr *P);
   // graph_ptr triangulation_(polyhedron_ptr *P)
-  // polyhedron_ptr convex_hull_(polyhedron_ptr *P)
+  polyhedron_ptr convex_hull_(const polyhedron_ptr *P);
+
 };
 
 
@@ -188,8 +189,8 @@ void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const in
       D[i*N+j] = distances[i*M+j];
 }
 
-double surface_area_(polyhedron_ptr *P){ return (*P)->surface_area(); }
-double volume2_(polyhedron_ptr *P){ return (*P)->volume(); }
+double get_surface_area_(const polyhedron_ptr *P){ return (*P)->surface_area(); }
+double get_volume_(const polyhedron_ptr *P){ return (*P)->volume(); }
 
 int graph_is_a_fullerene_(const graph_ptr *g){ return (*g)->this_is_a_fullerene(); }
 
@@ -201,6 +202,12 @@ double shortest_planar_distance_(const graph_ptr *g)
   
   return *min_element(lengths.begin(),lengths.end());
 }
+
+polyhedron_ptr convex_hull_(const polyhedron_ptr *p)
+{
+  return new Polyhedron((*p)->convex_hull());
+}
+
 
 void print_graph_(const char *name, const graph_ptr *g)
 {
