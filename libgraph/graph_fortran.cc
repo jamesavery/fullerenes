@@ -25,14 +25,20 @@ extern "C" {
   void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
   int graph_is_a_fullerene_(const graph_ptr *);
 
+  void print_graph_(const char *name, const graph_ptr *);
+
   // Fullerene graph generation 
   fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const unsigned int *n);
   fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps);
+
 
   // Planar and spherical graph layout methods 
   void tutte_layout_(graph_ptr* g, double *LAYOUT);
   void tutte_layout_b_(graph_ptr* g, int *s, int *t, int *r, double *LAYOUT);
   void spherical_layout_(const graph_ptr* g, double *LAYOUT3D);
+
+  //  double *get_layout2d(const graph_ptr *g);
+  //  void    set_layout2d(const graph_ptr *g, double *layout2d);
 
   double shortest_planar_distance_(const graph_ptr *g);
 
@@ -194,4 +200,10 @@ double shortest_planar_distance_(const graph_ptr *g)
   const vector<double> lengths(G.edge_lengths());
   
   return *min_element(lengths.begin(),lengths.end());
+}
+
+void print_graph_(const char *name, const graph_ptr *g)
+{
+  const PlanarGraph& G(*(*g));
+  cout << name << " = " << G << ";\n";
 }

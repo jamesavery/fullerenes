@@ -78,12 +78,12 @@ FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool 
       }
   }
 
-  FullereneGraph new_dual(edgeset_new);
+  PlanarGraph new_dual(edgeset_new);
 
   FullereneGraph G(new_dual.dual_graph(3));
 
   // if(do_layout){
-  //   G.layout2d = G.tutte_layout();
+  // G.layout2d = G.tutte_layout();
   //   G.spherical_layout = G.spherical_projection();
   // }
 

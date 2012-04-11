@@ -335,7 +335,7 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
       coord2d xy(g.layout2d[i]);
       s << xy << (i+1<g.N?", ":"}");
     }
-  } else { fprintf(stderr,"No layout, man!\n"); }
+  } // else { fprintf(stderr,"No layout, man!\n"); }
   s << "\n]";
 
   return s;
