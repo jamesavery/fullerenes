@@ -499,7 +499,7 @@ C     Analyze dual matrix
       CHARACTER*6 Occup
       Real*8 sigmah,sigmahlow,sigmahhigh
 C     This subroutine comes directly from the book of Fowler and 
-C     Manopoulus "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
+C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
 C     This sub-program catalogues fullerenes with a given number of      
 C     vertices using the spiral algorithm and a uniqueness test 
 C     based on equivalent spirals. The required input is IPR, 
@@ -551,7 +551,7 @@ C     N is the nuclearity of the fullerene.
       endif
       do I=1,MMAX
       do J=1,MMAX
-      D(I,J)=0
+       D(I,J)=0
       enddo
       enddo
       L=0
@@ -690,7 +690,7 @@ C     Analyze dual matrix
       WRITE (Iout,611) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
      1  sigmahlow,ISigmaL,sigmahhigh,ISigmaH
       WRITE (Iout,606)
- 600  FORMAT(/1X,'Subroutine Spiral from Fowler and Manopoulus',
+ 600  FORMAT(/1X,'Subroutine Spiral from Fowler and Manolopoulos',
      1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)',
      2 /1X,'(Symmetries are given for undistorted fullerenes)',
      3 /1X,'Isomer List Start ',/,I5,2I2)
@@ -857,7 +857,7 @@ C     Print*,iring,'/',JP
       END
 
       SUBROUTINE SpiralSearch(NMAX,MMAX,LMAX,NSP,N,Iout,IRG55,IRG66,
-     1 IRG56,NrA,NrB,NrC,NrD,NrE,NrF,GROUP)
+     1 IRG56,NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP)
       IMPLICIT INTEGER (A-Z)
       DIMENSION NrA(LMAX),NrB(LMAX),NrC(LMAX),NrD(LMAX)
       DIMENSION NrE(LMAX),NrF(LMAX),NMR(6),JP(12)
@@ -866,7 +866,7 @@ C     Print*,iring,'/',JP
       CHARACTER*3 GROUP
 
 C     This subroutine has been modified from the original one of Fowler and 
-C     Manopoulus "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
+C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
 C     It is used if dual matrix is already known. See subroutine Spiral for details.
 C     N is the nuclearity of the fullerene.
       M=N/2+2
@@ -876,6 +876,7 @@ C     N is the nuclearity of the fullerene.
          IF(N.ge.100.and.N.lt.1000) WRITE(Iout,602) N,M
          IF(N.ge.1000) WRITE(Iout,632) N,M
       do I=1,MMAX
+       S(I)=0
       do J=1,MMAX
        D(I,J)=0
       enddo
@@ -883,6 +884,9 @@ C     N is the nuclearity of the fullerene.
       do I=1,12
       do J=1,NMAX
        Spiral(I,J)=0
+      enddo
+      do J=1,NSP
+       SpiralT(I,J)=0
       enddo
       enddo
 C     Set up dual matrix
@@ -917,9 +921,9 @@ C     Loop over all (5,5) fusions
       else
        write(Iout,611) 2*IRG55
        do I=1,2*IRG55
-       do j=4,M
-        s(j)=0
-       enddo
+        do j=4,M
+         s(j)=0
+        enddo
        if(I.le.IRG55) then
         I1=NrA(I)
         I2=NrB(I)
@@ -941,19 +945,22 @@ C     Loop over all (5,5) fusions
           MP=3
          endif
           CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+         do K=1,12
+          if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+         enddo
          if(IER.eq.0) then
-         nspiral=nspiral+1
-         If(nspiral.gt.NSP) then
-         Write(Iout,626) nspiral,nsp
-         nspiral=nspiral-1
-         Go to 199
-         endif
-         do k=1,12
-          SpiralT(k,nspiral)=JP(k)
-         enddo 
-         do k=1,M
-          SpiralF(k,nspiral)=S(k)
-         enddo 
+          nspiral=nspiral+1
+          If(nspiral.gt.NSP) then
+           Write(Iout,626) nspiral,nsp
+           nspiral=nspiral-1
+           Go to 199
+          endif
+          do k=1,12
+           SpiralT(k,nspiral)=JP(k)
+          enddo 
+          do k=1,M
+           SpiralF(k,nspiral)=S(k)
+          enddo 
          endif
         endif
        enddo 
@@ -993,6 +1000,9 @@ C     Loop over all (5,6) fusions
       MP=2
       endif
       CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+         do K=1,12
+          if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+         enddo
       if(IER.eq.0) then
       nspiral=nspiral+1
          If(nspiral.gt.NSP) then
@@ -1040,6 +1050,9 @@ C     Loop over all (6,6) fusions
           MP=1
          endif
        CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+         do K=1,12
+          if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+         enddo
        if(IER.eq.0) then
         nspiral=nspiral+1
          If(nspiral.gt.NSP) then
@@ -1049,7 +1062,7 @@ C     Loop over all (6,6) fusions
          endif
        do k=1,12
         SpiralT(k,nspiral)=JP(k)
-       enddo 
+       enddo
        do k=1,M
         SpiralF(k,nspiral)=S(k)
        enddo 
@@ -1058,12 +1071,12 @@ C     Loop over all (6,6) fusions
       enddo 
       enddo 
       endif
-      
+     
 C     Now loop over with found spiral until success with
 C     Fowler algorithm
-  199 write(Iout,614) nspiral
-      IT=1
+  199 IT=1
       IPR=0
+      nspfound=0
       Do 13 msp=1,nspiral
        Do I=1,M
         S(I)=6
@@ -1085,7 +1098,9 @@ C     Fowler algorithm
          IF(NMR(J).EQ.0) GO TO 16
          K=J
        enddo
- 16    If(K.le.0) then
+ 16    nspfound=nspfound+1
+       if(nspfound.eq.1) write(Iout,614) nspiral
+       If(K.le.0) then
         WRITE(Iout,603) GROUP,(JP(I),I=1,12)
        else
         WRITE(Iout,605) GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
@@ -1141,7 +1156,7 @@ C     Print ring numbers
       else 
       WRITE(Iout,617)
       endif
- 600  FORMAT(/1X,'Modified spiral algorithm Fowler and Manopoulus',
+ 600  FORMAT(/1X,'Modified spiral algorithm Fowler and Manolopoulos',
      1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)')
  601  FORMAT(1X,'Spiral for fullerene isomers of C',I2,':',
      1 ' (',I2,' faces)')
@@ -1152,25 +1167,26 @@ C     Print ring numbers
  605  FORMAT(1X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
  606  Format(/1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I4,' spirals found)') 
- 607  Format(12(1X,I3))
+ 607  Format(12(1X,I4))
  608  Format(1X,'Input spiral is canonical')
  610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
      1 'loop over')
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
  612  Format(1X,'Loop over (5,6) fusions, ',I5,' max in total')
  613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
- 614  Format(1X,I4,' Spirals found',/1X,
+ 614  Format(1X,I6,' potential spirals found',/1X,
      1 'Point group   Ring spiral pentagon positions',
      2 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
  616  Format(1X,'No (6,6) fusions to loop over')
- 617  Format(1X,'Failed to find ring spiral')
- 618  Format(20(1X,32(I3,'-'),/))
+ 617  Format(1X,'Failed to find ring spiral: Fullerene most likely a ',
+     1 'non-spiral one')
+ 618  Format(20(1X,32(I4,'-'),/))
  619  Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I4,' spirals found)') 
- 620  Format(1X,'Search ',I4,' spirals to produce canonical'
+ 620  Format(1X,'Search ',I6,' spirals to produce canonical'
      1 ' list of atoms:')
- 621  Format(12(1X,I3))
+ 621  Format(12(1X,I4))
  622  Format(1X,'Input spiral is canonical')
  623  Format(1X,'Canonical spiral list of pentagon positions:')
  624  Format(1X,'Canonical spiral list of hexagons and pentagons:')

@@ -7,8 +7,15 @@ C (Dover Publ., New York, 2006), which gives information on the
 C isomers point group, pentagon ring spiral indices and NMR pattern. 
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer Isonum(119),IsonumIPR(123),IDA(NAtom,NAtom)
+      Character*1 fstart,fnum1,Dummy
+      Character*2 fnum2
+      Character*3 fnum,fnum3,GROUP,ident
+      Character*9 fend
       Character*11 Isoc(52),IsocIPR(28)
-      CHARACTER*20 chkname
+      Character*20 chkname
+      Character*13 dbdir
+      Character*31 databasefile
+      Logical lexist
       Dimension A(NAtom,NAtom)
       Data Isonum/1,0,1,1,2,3,6,6,15,17,40,45,89,116,199,
      * 271,437,580,924,1205,1812,2385,3465,4478,6332,8149,
@@ -64,6 +71,7 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
      *       '8636262789','9196920285','9768511147','10396040696',
      *       '11037658075','11730538496','12446446419','13221751502'/
 
+      IPRERR=0
 C     Number of Isomers
       ISOMAX=256
       If(N.le.256) then
@@ -118,6 +126,13 @@ C      fitted to asymptodic
        endif
       endif
 
+      if(IPR.eq.1.and.N.lt.60) IPRERR=1
+      if(IPR.eq.1.and.(N.gt.60.and.N.lt.70)) IPRERR=1
+      if(IPRERR.eq.1) then
+       Write(Iout,1007)
+       return
+      endif
+
 C SPIRAL uses the subroutines written by Fowler and Manopoulus
       If(ichk.gt.0) then
        Write(Iout,1006)
@@ -125,7 +140,41 @@ C SPIRAL uses the subroutines written by Fowler and Manopoulus
      1 IsonumIPR,iham,IDA,A,chkname)
        return
       endif
-      If(IPR.ge.0) then
+
+C Check if database can be taken instead
+      If((IPR.eq.0.and.N.le.100).or.(IPR.eq.1.and.N.le.120)) then
+      dbdir='database/All/'
+      if(IPR.eq.1) dbdir='database/IPR/'
+      fend='.database'
+      fstart='c'
+      if(N.lt.100) then
+      fnum1='0'
+       write(fnum2,'(I2)') N
+       fnum=fnum1//fnum2
+      else
+       write(fnum,'(I3)') N
+      endif
+      fnum3='all'
+      if(IPR.eq.1) fnum3='IPR'
+      databasefile=dbdir//fstart//fnum//fnum3//fend
+      if(IPR.eq.0) then
+       Write(Iout,1008) databasefile
+      else
+       Write(Iout,1009) databasefile
+      endif
+      inquire(file=databasefile,exist=lexist)
+      if(lexist.neqv..True.) then
+       Write(Iout,1010) databasefile
+       Go to 99
+      else
+       Write(Iout,1011) databasefile
+       call Printdatabase(N,Iout,databasefile)
+      endif
+      return
+      endif
+
+C Produce list from ring spiral algorithm
+  99  If(IPR.ge.0) then
        Write(Iout,1005)
        CALL Spiral(Natom,Nfaces,Nedges,N,IPR,Iout,Isonum,
      1 IsonumIPR,iham,IDA,A)
@@ -145,5 +194,129 @@ C SPIRAL uses the subroutines written by Fowler and Manopoulus
  1005 Format(/1X,'Enter Spiral code for a general list of all ',
      1 'possible isomers (IPR or not depending on input)')
  1006 Format(/1X,'RESTART isomer file from previous run')
+ 1007 Format(/1X,'Zero IPR isomers -> Return')
+ 1008 Format(1X,'Search for file: ',A29,' in general isomer list')
+ 1009 Format(1X,'Search for file: ',A29,' in IPR isomer list')
+ 1010 Format(1X,'Filename ',A29,' in database not found: ',
+     1 'Do it the hard way')
+ 1011 Format(1X,'Print from file ',A29,' in database')
+      Return
+      END
+ 
+      SUBROUTINE Printdatabase(N,Iout,databasefile)
+      Character*31 databasefile
+      Character*1 Text(200),Textind
+      Open(UNIT=4,FILE=databasefile,STATUS='old',FORM='FORMATTED')
+       Textind=' '
+       Nlimit=1000000000
+       Read(4,*) IN,IP,IH
+       if(IN.ne.N) then
+        Write(Iout,1002) IN,N
+        return
+       endif
+       Write(Iout,1000) IN,IP,IH
+      if(IH.eq.0) then
+      if(IP.EQ.0) then
+         IF(N.lt.100) WRITE(Iout,601) N
+         IF(N.ge.100) WRITE(Iout,602) N
+      else
+         IF(N.lt.100) WRITE(Iout,603) N
+         IF(N.ge.100) WRITE(Iout,604) N
+      endif
+      else
+      if(IP.EQ.0) then
+         IF(N.lt.100) WRITE(Iout,701) N
+         IF(N.ge.100) WRITE(Iout,702) N
+      else
+         IF(N.lt.100) WRITE(Iout,703) N
+         IF(N.ge.100) WRITE(Iout,704) N
+      endif
+      endif
+
+       do I =1,Nlimit
+        Read(4,1001,Err=99,end=99) (Text(J),J=1,200)
+        do k=1,200
+         l=200-k+1
+         if(Text(l).ne.Textind) then
+          NChar=l
+          go to 10
+         endif
+        enddo
+  10    Write(Iout,1001) (Text(J),J=1,NChar)
+       enddo
+  99  Close(unit=4)
+ 1000 Format(/1X,I10,2I2)
+ 1001 Format(200A1)
+ 1002 Format(/1X,'Atom number ',I5,' not identical to that on file: ',
+     1 I5)
+ 601  FORMAT(1X,'General fullerene isomers of C',I2,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-'))
+ 602  FORMAT(1X,'General fullerene isomers of C',I3,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-'))
+ 603  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     1 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-'))
+ 604  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     1 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-'))
+  701  FORMAT(1X,'General fullerene isomers of C',I2,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
+     1 ' number of Hamiltonian cycles)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
+     5 /1X,170('-'))
+ 702  FORMAT(1X,'General fullerene isomers of C',I3,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
+     1 ' number of Hamiltonian cycles)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
+     5 /1X,170('-'))
+ 703  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
+     1 ' number of Hamiltonian cycles)',
+     1 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
+     5 /1X,170('-'))
+ 704  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
+     1 ' number of Hamiltonian cycles)',
+     1 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
+     5 /1X,170('-'))
+
       Return
       END 

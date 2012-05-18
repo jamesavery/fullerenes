@@ -1,4 +1,4 @@
-      SUBROUTINE Hueckel(NAtom,MAtom,IOUT,IC3,IDA,A,evec,df)
+      SUBROUTINE Hueckel(NAtom,MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
       IMPLICIT REAL*8 (A-H,O-Z)
 C Perform Hueckel matrix diagonalization to obtain eigenvalues
 C This gives a good hint if the fullerene is closed-shell
@@ -26,6 +26,11 @@ C Produce adjacency matrix
       enddo
       enddo
 
+      if(ihueckel.eq.0) then
+       WRITE(IOUT,1008) 
+       return
+      endif
+      WRITE(IOUT,1007) 
 C Diagonalize without producing eigenvectors
       call tred2l(A,Matom,Natom,evec,df)
       call tqlil(evec,df,Matom,Natom)
@@ -102,10 +107,7 @@ C     Now Print
       endif
  
  1000 FORMAT(8X,'x',13X,'E',4X,'deg NE   type    ',/1X,45('-'))
- 1001 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix '
-     1 'and diagonalize (E=alpha+x*beta; E in au)',
-     1 /1X,'Eigenvalues are between [-3,+3] (in units of |beta|)',
-     1 /1X,'deg: degeneracy; NE: number of electrons')
+ 1001 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix')
  1002 FORMAT(2(1X,F12.6),I3,1X,I3,3X,A10)
  1003 FORMAT(1X,45('-'))
  1004 FORMAT(1X,'Hueckel theory indicates that fullerene has',
@@ -114,5 +116,9 @@ C     Now Print
      1 F12.6,' eV')
  1006 FORMAT(1X,'Caution: Bandgap small, possibility '
      1 'for open-shell character')
+ 1007 FORMAT(/1X,'Diagonalize Hueckel matrix (E=alpha+x*beta; E in au)',
+     1 /1X,'Eigenvalues are between [-3,+3] (in units of |beta|)',
+     1 /1X,'deg: degeneracy; NE: number of electrons')
+ 1008 FORMAT(/1X,'Skip diagonalization of Hueckel matrix')
       Return
       End 

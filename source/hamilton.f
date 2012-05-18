@@ -478,8 +478,12 @@ C     Epstein upper limit
       if(power.gt.1.d3) write (Iout,1016) power
       endif
 C     Schwerdtfeger upper and lower limit
-      powerupper=0.169941*datom+1.50808d0
-      powerlower=0.118820*datom-0.37188d0
+      aupper=1.7205d-1
+      bupper=1.466d0
+      alower=1.188d-1
+      blower=-3.720d-1
+      powerupper=aupper*datom+bupper
+      powerlower=alower*datom-blower
       upperschwerd=2.d0**powerupper
       lowerschwerd=2.d0**powerlower
       If(powerupper.lt.31.01d0) then

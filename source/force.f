@@ -17,6 +17,7 @@ C     and bending, energy
       fap=c(7)
       fah=c(8)
       fco=c(9)
+      coulomb=0.d0
 
 C     Stretching
       ehookrp=0.d0
@@ -126,12 +127,11 @@ C     Loop over 6-rings
       enddo
 
 C     Coulomb repulsion from origin
-      coulomb=0.d0
       if (fco.ne.0.d0)  then
-      Do I=1,n,3
-       rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
-       coulomb=coulomb+rinv
-      enddo
+       Do I=1,n,3
+        rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
+        coulomb=coulomb+rinv
+       enddo
       endif
 
 C     total energy  
@@ -320,10 +320,10 @@ C     Derivative of right atom
 C     Coulomb repulsion from origin
       if (fco.ne.0.d0)  then
        Do I=1,n,3
-       rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
-       x(I)=x(I)-fco*rinv*p(I)
-       x(I+1)=x(I+1)-fco*rinv*p(I+1)
-       x(I+2)=x(I+2)-fco*rinv*p(I+2)
+        rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
+        x(I)=x(I)-fco*rinv*p(I)
+        x(I+1)=x(I+1)-fco*rinv*p(I+1)
+        x(I+2)=x(I+2)-fco*rinv*p(I+2)
        enddo
       endif
 

@@ -161,7 +161,7 @@ C         dgg=dgg+xi(j)**2
  1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
      1 /1X,'energy ',F15.9,', diff= ',D12.3)
  1001 Format(' Iteration ',I4,', energy ',D14.8,', gradient ',D14.8)
- 1002 Format(/1X,'Convergence achieved, energy ',F18.7,', diff= ',D12.3)
+ 1002 Format(/1X,'Convergence achieved, energy ',F20.7,', diff= ',D12.3)
  1003 Format(/1X,'E0= ',D12.3)
       return
       END
@@ -397,6 +397,7 @@ C     Conversion of dyn/cm in a.u. / Angstroem**2
       force(6)=.5d0*forceWu(6)*conv*3.80879844d-4
       force(7)=.5d0*forceWu(7)*conv*3.80879844d-4
       force(8)=.5d0*forceWu(8)*conv*3.80879844d-4
+C     Leave parameter for Coulomb force as it is
       force(9)=forceWu(9)
       M=Matom/2+2
 C     Optimize
@@ -438,7 +439,7 @@ C     Optimize
       SUBROUTINE frprmn(IOP,NMAX,NMAX3,N,MMAX,AH,Iout,N5,N6,N5M,N6M,
      1 p,force,ftol,iter,fret)
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=9999,EPS=1.d-9)
+      PARAMETER (ITMAX=99999,EPS=1.d-9)
       Real*8 p(NMAX3),g(NMAX3),h(NMAX3),xi(NMAX3)
       Real*8 pcom(NMAX3),xicom(NMAX3),force(9)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
@@ -509,8 +510,8 @@ C         dgg=dgg+xi(j)**2
       Write(Iout,1000) fret,fret-fp
  1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
      1 /1X,'energy ',F15.9,', diff= ',D12.3)
- 1001 Format(' Iteration ',I4,', energy ',D14.8,', gradient ',D14.8)
- 1002 Format(/1X,'Convergence achieved, energy ',F15.9,', diff= ',D12.3)
+ 1001 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8)
+ 1002 Format(/1X,'Convergence achieved, energy ',D14.8,', diff= ',D12.3)
  1004 Format('**** Severe error in angle, check input coordiantes:',
      1 ' One angle either 0 or 180 degrees, ill-alligned structure',
      1 /1X,'Cannot optimize structure, check eigenvector input')

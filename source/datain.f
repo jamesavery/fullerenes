@@ -1,28 +1,35 @@
-      SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,
-     1 IPR,IPRC,IG,ISO1,ISO2,ISO3,IER,istop,leap,iupac,Ipent,IPH,
-     1 kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,PS,TolX,R5,R6,Rdist,
-     1 scale,scalePPG,ftol,forceWu,forceWuP,xyzname,chkname,DATEN)
+      SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
+     1 IPR,IPRC,IG,ISO1,ISO2,ISO3,IER,istop,leap,leapGC,iupac,Ipent,IPH,
+     1 ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,ilp,IYF,
+     1 PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,forceWu,forceWuP,
+     1 xyzname,chkname,DATEN)
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension forceWu(9),forceWuP(9)
-      Character DATEN*80
+      Character DATEN*132
       Character xyzname*20
       Character chkname*20
       Character blank*1
       Character xyz*4
       Character xyz1*7
       Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
-     1 ichk,isonum,IPRC,kGC,lGC,xyzname
+     1 ichk,isonum,IPRC,kGC,lGC,leapGC,ihueckel,ISW,KE,loop,mirror,
+     1 IYF,xyzname
       Namelist /Opt/ Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
       Namelist /Graph/ IG,ISO1,ISO2,ISO3,PS,scale,scalePPG
-C Input send to output   
-      WRITE(IOUT,100)
-      DO 10 I=1,200
-      READ(IN,'(A80)',END=11) DATEN
-   10 WRITE(IOUT,60) DATEN
-   11 WRITE(IOUT,101)
-      REWIND IN
+C Input send to output
+      if(ilp.eq.0) then   
+       WRITE(IOUT,100)
+       DO 10 I=1,200
+       READ(IN,'(A132)',END=11) DATEN
+   10  WRITE(IOUT,60) DATEN
+   11  WRITE(IOUT,101)
+       REWIND IN
+       ilp=1
+      else
+       WRITE(IOUT,108)
+      endif
 C     Defining the Wu force field
       forceWuP(1)=1.455d0
       WuR5=1.455d0
@@ -33,32 +40,40 @@ C     Defining the Wu force field
       forceWuP(4)=1.2d2
       WuA6=1.2d2
       forceWuP(5)=1.d6
-      WufR=1.d6
       forceWuP(6)=1.d6
+      WufR=1.d6
       forceWuP(7)=1.d5
-      WufA=1.d5
       forceWuP(8)=1.d5
+      WufA=1.d5
       forceWuP(9)=0.d0
       fCoulomb=0.d0
-      ftol=.5d-7
+      ftol=1.d-8
 C     More Parameters
       blank=' '
       xyz='.xyz'
       xyzname='cylview'
       chkname='checkpoint'
+      IHam=0    !  Number of Hamiltonian cycles
+      mirror=0  !  Invert coordinates
+      loop=0    !  Option for compound job
+      KE=0      !  Endo-Kroto C2 insertion
       ichk=0    !  Option for restarting the isomer list
+      ISW=0     !  Option for Stone-Wales transformation
+      IYF=0     !  Option for Yoshido-Fowler transformation
       iupac=1   !  Switch for producing the Iupac nomenclature
                 !  iupac=0 just count Hamiltonian Cycles
       Ipent=0   !  Initial flag for Spriral pentagon input
       leap=0    !  Initial flag for leapfrog fullerene
+      leapGC=0  !  Initial flag for Goldberg-Coxeter leapfrog fullerene
       IER=0     !  Error flag
       Tol=0.33d0 ! Tolerance
       IP=0      !  Print option
-      kGC=1    !  First Goldberg-Coxeter index
-      lGC=0    !  second Goldberg-Coxeter index
+      Ihueckel=1 !  Option for diagonalizing the Hueckel matrix
+      kGC=0     !  First Goldberg-Coxeter index
+      lGC=0     !  second Goldberg-Coxeter index
       IPR=-1    !  Print Isomers
       IPRC=0    !  Option for isomer list
-      IPH=0     !  Printin Hamiltonian cycles for each isomer
+      IPH=0     !  Print Hamiltonian cycles for each isomer
       NA=60     !  Number of Atoms
       IC=1      !  Input for fullerene structure
       isonum=0  !  Isomer number in database
@@ -84,17 +99,17 @@ C Now process namelist input
 C     Old input    
 C     Read(IN,*) NA,IC,Iopt,IP,IHam,IPR,IS,ISO2,ISO2,ISO3,PS,TolR
 C     New input    
-      Read(IN,'(A80)') DATEN
+      Read(IN,'(A132)') DATEN
       WRITE(IOUT,60) DATEN
       WRITE(IOUT,101)
-      Read(IN,nml=Coord)
-      Read(IN,nml=Opt)
-      Read(IN,nml=Hamilton)
-      Read(IN,nml=Isomers)
-      Read(IN,nml=Graph)
+      Read(IN,nml=Coord,Err=99,end=99)
+      Read(IN,nml=Opt,Err=99,end=99)
+      Read(IN,nml=Hamilton,Err=99,end=99)
+      Read(IN,nml=Isomers,Err=99,end=99)
+      Read(IN,nml=Graph,Err=99,end=99)
 
 C Set Parameters
-      if(IC.lt.0) IC=0
+   99 if(IC.lt.0) IC=0
       if(IC.gt.5) IC=5
       if(ichk.ne.0) istop=1
 C  Wu force field
@@ -174,12 +189,12 @@ C  Tolerance for finding 5- and 6-ring connections
         IPR=0
       endif
       
-   60 FORMAT(1X,A80)
-  100 FORMAT(1X,80(1H-),/1X,'I N P U T ',/1X,5H0....,
+   60 FORMAT(1X,A132)
+  100 FORMAT(1X,80('-'),/1X,'I N P U T ',/1X,5H0....,
      161H....1.........2.........3.........4.........5.........6......,
      214H...7.........8,/1X,39H123456789012345678901234567890123456789,
      341H01234567890123456789012345678901234567890,/)
-  101 FORMAT(1X,80(1H-))
+  101 FORMAT(1X,132('-'))
   102 FORMAT(1X,' Number of Atoms exceed allowed limit of ',I4,
      1 ' Increase Parameter natom')
   103 FORMAT(1x,'Fullerene with requested number of carbon atoms ',
@@ -190,5 +205,6 @@ C  Tolerance for finding 5- and 6-ring connections
   106 Format(1X,'Minimum bond distance set to input value: ',F12.6)
   107 Format(1X,'Minimum bond distance set to default value ',
      1 'taken from C60 bond distance: ',F12.6)
+  108 Format(1X,'Start new job',F12.6)
       RETURN
       END

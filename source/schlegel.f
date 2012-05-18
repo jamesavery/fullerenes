@@ -1,4 +1,4 @@
-      SUBROUTINE Schlegel(NAtom,Nfaces,Nedges,M,msrs,IOUT,IS1,IS2,IS3,
+      SUBROUTINE Graph2D(NAtom,Nfaces,Nedges,M,msrs,IOUT,IS1,IS2,IS3,
      1 N5M,N6M,N5R,N6R,NRing,Iring,ISchlegel,IC3,IDA,Dist,angle,Rmin,
      1 Tol,fscale,scalePPG,CR,CR5,CR6,Symbol)
       use iso_c_binding
@@ -801,7 +801,7 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
  1035 Format(1X,'Circumfencing ring chosen from input, including ',
      1 'atoms ',3I4)
  1036 Format(1X,'Calculating Tutte-embedding and shift to barycenter')
- 1037 FORMAT(1X,'Fullerene graph deleted',/,' Tutte graph coordinates:',
+ 1037 FORMAT(1X,'Fullerene graph deleted',/,' Graph coordinates:',
      1 /,'  Atom       X            Y        N1   N2   N3') 
  1038 Format(1X,'5-Ring center 'I4,' defined by atoms ',3(I4,' , '),
      1 I4,' and ',I4,' chosen for Schlegel alignment.',

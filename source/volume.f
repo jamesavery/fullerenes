@@ -1,4 +1,4 @@
-      SUBROUTINE VolumeAndArea(g,points,nmax)
+      SUBROUTINE VolumeAndArea(points,nmax,hullarea,hullvolume)
       use iso_c_binding
       dimension points(3,nmax)
       type(c_ptr)::g,p,hull,new_polyhedron, convex_hull
@@ -17,9 +17,10 @@
       call delete_polyhedron(p)
       call delete_polyhedron(hull)
 
-      end subroutine
+      return
+      end 
 
-      SUBROUTINE OldVolume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
+      SUBROUTINE Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
      1 N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,Asphere,
      2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -95,6 +96,9 @@ C     Now do the total volume calculation
       VPC=DVSphere/VolSphere*1.d2
       DVArea=ATol-Asphere
       APC=DVArea/Asphere*1.d2
+C     Convex Hull Volume and Area
+      Call VolumeAndArea(Dist,natom,hullarea,hullvolume)
+      print*,hullarea,hullvolume
 C     Calculate the volume and area for C60 using R5 and R6
       If(Matom.eq.60) then
       R5=(Rmin5+Rmax5)*.5d0

@@ -1,25 +1,24 @@
 !
 !           P R O G R A M     F U L L E R E N E
 !
-!----------------------------------------------------------------------
+!--------------------------------------------------------------------------
 !
-!          A PROGRAM FOR TOPOLOGICAL ANALYSIS OF FULLERENES
+! A PROGRAM FOR STRUCTURE GENERATION AND TOPOLOGICAL ANALYSIS OF FULLERENES
 !    The program creates cartesian coordinates for fullerenes isomers
 !        and performs a topological/graph theoretical analysis.
-!        The results can be used for plotting fullerene graphs
-!     (Schlegel diagrams) and structures, and as a starting point
+!      The results can be used for plotting 2D/3D fullerene graphs
+!    (e.g. Schlegel diagrams) and structures, and as a starting point
 !            for further quantum theoretical treatment. 
 !        Version 4 now incorporates C++ routines linked to the
-!         original Fortran program using improved algorithms.
+!       original Fortran program using much improved algorithms.
 !
 !----------------------------------------------------------------------------
 !| Important Copyright Message: Hey there is none! If you like to know why  |
 !| read Darrel C. Ince1, Leslie Hatton, John Graham-Cumming, Nature 482,    |
 !| p.485 (2012). So: You may do whatever you like with this program, but if |
 !| you use it and publish data please cite at least the references given    |
-!| below. Before you use the program for commercial purposes you nedd to    |
-!| contact the authors.                                                     |
-!| The book of Fowler and Manopoulus is highly recommended. It helps        |
+!| below. The program is however not available for commercial purposes.     |
+!| The book of Fowler and Manolopoulos is highly recommended. It helps      |
 !| understanding how this program functions (the book is fun to read as     |
 !| well. Many of the concepts used in this program can be found in this     | 
 !| book. A standard book on graph theory helps as well.                     |
@@ -40,45 +39,48 @@
 !      32 bits in the Makefile if necessary
 !    All fortran files are in the directory    source
 !    All C-files are in the directory          libgraph
-!    If you use the database, the file needs to be in the directory
-!      where the source and libgraph directories are.
+!    If you use the fullerene database, the file needs to be in the
+!      directory where the source and libgraph directories are.
 !
 !----------------------------------------------------------------------
 !  G E N E R A L   D E S C R I P T I O N:
 !---------------------------------------------------------------------- 
-!    The program is written in standard Fortran and C++ (~12,000 lines)
+!    The program is written in standard Fortran and C++ (~13,000 lines)
 !    and is LINUX/UNIX based with links to plotting programs.
 !    Reason: I am good in old-fashioned Fortran and James is good in C++.
-!    Some standard routines from Mathematical Recipies were modified and
+!    Some standard routines from Mathematical Recipes were modified and
 !    are used here for matrix diagonalization and geometry optimization.
 !
-!* Function: To perform a topological analysis of a regular fullerene 
-!    (i.e. consisting of pentagons and hexagons) fulfilling Euler's theorem. 
+!* Function: To create the structure of a regular fullerene and to 
+!    perform a topological analysis. A regular fullerene consists of 
+!    pentagons and hexagons) fulfilling Euler's theorem. The program
+!    constructs the fullerne obtaining cartesian coordinates from 
+!    canonical ring spiral pentagon indices through either Tutte embedding 
+!    or adjacency matrix eigenvector methods. It can also construct the 
+!    n-th leapfrog fullerene or the Goldberg-Coxter transform G(k,l)[G0]
+!    with (k,l) restricted to (1,1) and (k,0) at the moment. The Stone-
+!    Wales transformation is also implemented. 
 !    The program calculates the volume and surface area of a fullerene 
-!    (irregular or not). It further constructs the structure obtaining 
-!    cartesian coordinates from the canonical ring spiral pentagon indices
-!    through either Tutte embedding or matrix eigenvector methods. 
-!    It can also construct the n-th leapfrog fullerne. Note that 
-!    there is no unique definition for the volume of a fullerene for
-!    nonplanar 5- or 6-rings on the fullerene surface except for the convex
-!    hull, but there is no reason why any other definition than the fast
-!    tesselation algorithm should be preferred. The Wu force-field and 
-!    geometry optimization using a Fletcher-Reeves-Polak-Ribiere
-!    minimization with analytical gradients is also implemented, providing 
-!    good a initial guess for cartesian coordinates. Also Schlegel diagrams
-!    can be produced using various algorithms.
+!    (irregular or not). Note that there is no unique definition for the 
+!    volume of a fullerene for nonplanar 5- or 6-rings on the fullerene 
+!    surface except for the convex hull. The tesselation algorithm is fast
+!    but good only for convex fullerenes. The Wu force-field and geometry 
+!    optimization using a Fletcher-Reeves-Polak-Ribiere minimization with 
+!    analytical gradients is also implemented, providing good a initial 
+!    guess for cartesian coordinates. Also 2D graphs can be produced using 
+!    various algorithms. Also a database of fullerenes is maintained.
 !
 !    Note: This program works for any (distorted or not) regular fullerene
 !     (i.e. a fullerene of genus 0 consisting of pentagons and hexagons only).
-!     The spiral algorithm of Fowler and Manolopoulus is not
-!     restricted to starting from a pentagon or to canonical indices.
+!     The spiral algorithm of Fowler and Manolopoulos is not restricted to 
+!     canonical ring-spiral indices.
 !     For a general list of fullerenes see "The House of graphs" at 
 !     https://hog.grinvin.org/Fullerenes. 
 !
 !    Lit.: 1) P. Schwerdtfeger, J. Avery, "Topological Analysis of Fullerenes - 
 !             A Fortran and C++ Program (Version 4.0)", Massey University Albany, 
 !             Auckland, New Zealand (2012).
-!          2) P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes" 
+!          2) P. W. Fowler and D. E. Manolopoulos, "An Atlas of Fullerenes" 
 !             (Dover Publ., New York, 2006).
 !          3) D. Babic, "Nomenclature and Coding of Fullerenes",
 !             J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).
@@ -86,7 +88,7 @@
 !             Buckminsterfullerene", Chem. Phys. Lett. 137, 291-295 (1987).
 !
 !      Further reading:
-!          5) D. E. Manopoulus and P. W. Fowler, "Molecular graphs, point groups, 
+!          5) D. E. Manolopoulos and P. W. Fowler, "Molecular graphs, point groups, 
 !             and fullerenes", J. Chem. Phys. 96, 7603-7614 (1992).
 !          6) G. B. Adams, M. O'Keefe, and R. S. Ruoff, "Van der Waals Surface Areas
 !             and Volumes of Fullerenes", J. Phys. Chem. 98, 9465-9469 (1994).
@@ -100,45 +102,51 @@
 !         10) T. Pisanski, B. Plestenjak, A. Graovac, "NiceGraph Program and its 
 !             applications in chemistry", Croatica Chemica Acta 68, 283-292 (1995).
 !         11) B. Plestenjak, "An algorithm for drawing Schlegel diagrams",
-!             unpublished.
-!
+!             unpublished, but can be found on the internet.
+!         12) J. Cioslowski, N. Rao, D. Moncrieff, J. Am. Chem. Soc. 122, 
+!             8265-8270 (2000).
+!         13) M. Yoshida, P.W. Fowler, Chem. Phys. Lett. 278, 256-261 (1997).
+!         14) E. A. Yildirim, SIAM Journal on Optimization 19(3),1368-1391 (2008).
+!         15) T. H. Hopp and C. P. Reeve, NIST, US Department of Commerce (1996).
 !      There is a paper in preparation which explains most of the features
 !        in this program. You may ask for a preliminary copy.
 !
 !      If you use the CYLview program, the input file is written into cylview.xyz
 !        if specified (xyz format). This file also works with Avogadro, Jmol, Pymol
-!        or any other plot program accepting standard xyz format files.
-!        CYLview plots molecules, is written by C. Y. Legault and is freely
+!        or any other plotting program accepting standard xyz format files.
+!        CYLview plots molecules, is written by C. Y. Legault, and is freely
 !        available from http://www.cylview.org/Home.html. Note for using these
 !        programs it is important to force-field optimize them, otherwise
-!        bonds cannot be idendified if structures are used directly from
-!        AME, LME or 3D-TE algorithms (see below). We recommend CYLview, it
-!        is more robust and works for the largest fullerenes up to 1000 atoms,
-!        where Avogadro has already some difficulties.
+!        bonds cannot be identified if structures are used directly from
+!        AME or 3D-TE algorithms (see below). We recommend CYLview, it
+!        is more robust and works for the largest fullerenes up to a few 100 atoms,
+!        where Avogadro has already some difficulties. Pymol always works.
 !
 !      If you use QMGA for plotting fullerene graphs the input file is written
 !        in qmga.dat. The program is available at http://qmga.sourceforge.net/
 !        In this case you need to cite A. T. Gabriel, T. Meyer, G. Germano, 
 !        "Molecular graphics of convex body fluids", J. Chem. Theory Comput. 
-!        4, 468-476 (2008). There will be soon another program availble to
+!        4, 468-476 (2008). There will be soon another program available to
 !        plot fullerene graphs (Schlegel diagrams).
 !
 !   -> Many definitions depend on the use of Angstroems, so please use this unit.
 !
 !   Important steps in the program are:
 !--------------------------------------
-! - Create the structure of a fullerene:
+! - Create the structure of a fullerene (program COORDBUILD):
 !    Read in Cartesian coordinates for a fullerene (see files c20.inp to c540.inp), 
-!    or construct them for the Ih isomer (files ico.inp, icoExp.inp, icoideal.inp)
-!    of C60, or get cartesian coordinates from ring spiral pentagon indices
-!    by the Fowler-Manopoulus algorithm also known as the AME algorithm
+!    or construct them for the Ih isomer (files ico.inp, dodeca.inp, icoideal.inp)
+!    of C20 or C60, or get cartesian coordinates from ring spiral pentagon indices
+!    by the Fowler-Manolopoulos algorithm also known as the AME algorithm
 !    (adjacency matrix eigenvector algorithm) as defined in refs.2 and 5, or Tutte
 !    embedding algorithm, 3D-TEA (used by files pentagon1.inp to pentagon25.inp). 
 !    Barycenter of the fullerene is set to the origin. See ref.2 for the 
-!    construction of cartesian coordinates from ring spiral pentagon indices and 
-!    the use of Hueckel P-type eigenvectors. Note it is critical to get the right
-!    vectors for the construction of the cartesian coordinates. The 3 P-type
-!    vectors may need to be read in (see file pentagon8.inp for such an example).
+!    construction of cartesian coordinates from ring spiral pentagon indices 
+!    or from the Goldberg-Coxeter 2-index tringulation algorithm (coxeter1.inp
+!    to coxeter5.inp), and the use of Hueckel P-type eigenvectors. Note it is 
+!    critical to get the right vectors for the construction of the cartesian 
+!    coordinates. The 3 P-type vectors may need to be read in (see file 
+!    pentagon8.inp for such an example).
 !    It is important that the end-product is viewed by molecular visualization.
 !    program. We recommend CYLview by Claude Legault (see http://www.cylview.org),
 !    Avogadro (see http://avogadro.openmolecules.net) or JMol (see 
@@ -152,12 +160,12 @@
 !    to high (Subroutine DISTMATRIX). The diameters already indicate if the
 !    fullerene is heavily distorted from spherical symmetry.
 !
-! - Use program SPIRAL of Fowler and Manopoulus for creating a ring spiral.
+! - Use program SPIRAL of Fowler and Manolopoulos for creating a ring spiral.
 !    It also produces canonical ring spiral pentagon indices 
 !    (Subroutine SPIRALSEARCH) if cartesian coordinate input is chosen.
 !
 !-  Print all isomers and perform analysis introduced mostly in the book 
-!    written by Fowler and Manopoulus (ref.2), e.g. pentagon indices and 
+!    written by Fowler and Manolopoulos (ref.2), e.g. pentagon indices and 
 !    pentagon number, hexagon indices and strain parameter, NMR information
 !    and number of distinct Hamiltonian cycles if required.
 !
@@ -197,10 +205,12 @@
 ! - Determine the center for each 5- and 6-ring (Subroutine RINGC)
 !    This is required for the trigonal pyramidal tessellation to obtain
 !    the volume and surface.  This routine also analyzes all 2- and 3-ring fusions
-!    It further gives the Rhagavachari-Fowler-Manoupoulos neighboring pentagon 
-!    and hexagon indices as described in the Fowler and Manolopoulos book
+!    It further gives the Rhagavachari-Fowler-Manolopoulos neighboring pentagon 
+!    and hexagon indices as described in the Fowler and Manolopoulos' book
 !    (ref.2). From the hexagon indices one derives if the fullerene fulfills the
-!    IPR or not.
+!    IPR or not. For IPR fullerenes the heat of formation according to
+!    Cioslowski (ref.12) is calculated. Important ring patterns for further
+!    vertex extensions are printed.
 !
 ! - Fletcher-Reeves-Polak-Ribiere geometry optimization using analytical 
 !    gradients for the Wu force field (Subroutine OPTFF).
@@ -208,7 +218,7 @@
 !    might distort the fullerene from the ideal point group symmetry.
 !    On the other hand, the construction of the fullerene by using
 !    pentagon indices leads to a more spherical arrangement in both
-!    algorithms (Fowler-Manoupoulos or Tutte), e.g. barrels instead of
+!    algorithms (Fowler-Manolopoulos or Tutte), e.g. barrels instead of
 !    nanotubes.
 !
 ! - Calculate the volume of the fullerene by summing over all
@@ -400,21 +410,17 @@
 !      1) A subroutine to fit the minimum outer ellipsoidal cover useful for  
 !          rugby ball like fullerenes and close packing of ellipsoids.
 !      2) Volume of the convex hull (coming soon).
-!      3) Use the Coxeter construction for fullerenes.
+!      3) Use the general Coxeter construction for fullerenes.
 !      4) Geometry optimization using the extended Wu-Fowler force field.
 !      5) Frequency calculations from the force field optimized geometry.
-!      6) Construction of non-ring-spiral isomers using the genus algorithm.
+!      6) Construction of non-ring-spiral isomers using vertex extensions.
 !      7) Symmetry labels for Hueckel orbital energies.
 !      8) Extend to non-regular fullerenes of genus 0 (heptagons and squares).
 !      9) Extend to non-regular fullerenes of genus 1.
 !     10) Symmetrize coordinates to point group symmetry.
-!     11) Implement Cioslowski's scheme for enthalpy of formation.
-!     12) Restart option for subroutine for Hamiltonian cycle.
-!     13) Use of databank for all non-IPR fullerenes uo to C120 and IPR up to
-!          C150 (coming soon).
-!     14) Produce pictures of Schlegel diagrams and corresponding duals (coming soon).
-!     15) Produce fullerene name from Schlegel diagram.
-!     16) Use of a databases (coming soon).
+!     11) Restart option for subroutine for Hamiltonian cycle.
+!     12) Produce pictures of Schlegel diagrams and corresponding duals (coming soon).
+!     13) Produce fullerene name from Schlegel diagram.
 !
 ! For any questions concerning this program please contact P. Schwerdtfeger
 !   Centre for Theoretical Chemistry and Physics (CTCP)
@@ -432,7 +438,7 @@
 ! in terms of a Humboldt Research Award, and to both Prof. Gernot Frenking and 
 ! Dr. Ralf Tonner (Marburg) for support during my extended stay in Marburg where I
 ! started to write this program. I acknowledge also the help of Darko Babich, Patrick 
-! W. Fowler and David E. Manopoulus to allow the free distribution of their Fortran 
+! W. Fowler and David E. Manolopoulos to allow the free distribution of their Fortran 
 ! subroutines.
 !
 !-----------------------------------------------------------------------------------
@@ -445,39 +451,54 @@
 !     is printed out extra
 !
 ! 2) Input to create cartesian coordinates and main flags for the program
-!    &Coord options /       (e.g. &Coord IC=20, IOPT=1, R6=1.42 /)
-!    list of options: NA,IC,IP,IV1,IV2,IV3,ixyz,ichk,leap,isonum,IPRC,TolR,R5,R6,xyzname
+!    &Coord options /       (e.g. &Coord IC=2, IOPT=1, R6=1.42 /)
+!    list of options: 
+!       NA,IC,IP,IV1,IV2,IV3,ixyz,ichk,ihueckel,leap,leapGC,
+!       isonum,IPRC,kGC,lGC,ISW,KE,IYF,TolR,R5,R6,xyzname
 !    NA= Number of Atoms (Default: 60)
 !    IC= Flag for construction of cartesian coordinates (Default: 0)
 !    IP= Print option (Default: 0)
+!    loop=1 New input required (compound job), program starts again (Default: 0)
+!       You might use this option to read from a xyz file created in the
+!       previous run.
+!    loop=2 if IC specified correctly, it takes pentagon indices from a previous run.
 !    IV1= Number for Hueckel P-type eigenvector for AME algorithm (Default: 2)
 !    IV2= Number for Hueckel P-type eigenvector for AME algorithm (Default: 3)
 !    IV3= Number for Hueckel P-type eigenvector for AME algorithm (Default: 4)
-!    ixyz= Flag for producing input file for CYLview, Avogadro or others in standard
-!      xyz format (Default: 0)
-!    isonum= Isomer number according to the scheme of Fowler and Manopoulus (Default: 0)
-!      If IC=2, 3 or 4 and isonum not zero, than pentagon indices are taken from the
-!      isomer list contained in a database (see below). There are two databases, one
-!      for the general isomers (IPRC=2) and one for the IPR isomers (IPRC=1), the
-!      definition is similar to the IPR parameter below (Default: 2).
+!    mirror=1 Coordinates are inverted to get mirror image (Default: 0)
+!    ixyz= Flag for producing or reading xyz file for CYLview, Pymol, Avogadro or others 
+!      in standard  xyz format        (Default: 0)
+!      ixyz=1  Produce xyz file for further input
+!      ixyz=2  Read xyz from file specified in xyzname. IC=0 needs to be specified
+!         xyz file is also produces and named   cylviewnew.xyz
+!      ixyz=3  Read xyz from file specified in xyzname. IC=0 needs to be specified
 !    xyzname (max 20 characters) file name if ixyz.ne.0 (default: cylview.xyz)
+!    ihueckel=0 Skip Hueckel diagonalization (recommended for large matrices 
+!      over size 5000)       (Default: 1)
+!    isonum= Isomer number according to the scheme of Fowler and Manolopoulos (Default: 0)
+!      If IC=2, 3 or 4 and isonum not zero, then pentagon indices are taken from the
+!      isomer list contained in a database (see below). There are two databases, one
+!      for the general isomers (IPRC=0) and one for the IPR isomers (IPRC=1), the
+!      definition is similar to the IPR parameter below (Default: 0).
 !    TolR= Tolerance in % (Default: 33)
 !    R5= pentagon bond distance (Default: 1.455)
 !    R6= hexagon  bond distance (Default: 1.391)
 !    In detail:
-!      If IC = 0 No coordinate input required, cordinates are constructed 
-!              for the IPR isomer of C60
+!      If IC = 0 No coordinate input required, coordinates are constructed 
+!              for C20 or the IPR isomer of C60 (if NA is not set to 20 or 60
+!              then 60 is taken by default)
 !           In this case only one card is read in:
 !              R5,R6        (arbitrary units, e.g. Angstroms)
-!              R5: Bond lengths in the pentagons 
+!              R5: Bond lengths in the pentagons (the only parameter required for C20)
 !              R6: Bond length of the bonds connecting hexagons
 !              If R5=R6 chosen then the ideal capped icosahedron is obtained
+!              (Default: R5=1.455, R6=1.391)
 !      If IC = 1 Cartesian Coordinates expected as input
 !         In this case N lines with    Z, X, Y, Z  in free format are expected.
 !         (Z= Nuclear Charge, X,Y,C Cartesian Coordinates for Atom).
 !         NB: Z is not really needed, but you can copy Gaussian output
 !          directly into the input file
-!      If IC = 2 or 3 Cartesian Coordinates are created from pentagon 
+!      If IC = 2 or 3 Adjacency matrix is created from pentagon 
 !             ring spiral list. Extra input required (free format):
 !
 !           IRSP(I),I=1,12 
@@ -486,32 +507,60 @@
 !           identify the locations of the pentagons as described in detail
 !           in ref.2, i.e. IP is the pentagon ring spiral numbering scheme. 
 !           Note this only works for ring spiral fullerenes as described in 
-!           detail by P. W. Fowler and D. E. Manopoulus. Use the canonical
+!           detail by P. W. Fowler and D. E. Manolopoulos. Use the canonical
 !           pentagon ring indices if possible (transformation to the canonical
 !           from should work as well).
-!           IC=2: AME algorithm using P-type eigenvectors produced from the 
-!            adjacency matrix:
-!            If problem with eigenvectors are found to construct the
-!            cartesian coordinates, i.e. the identification of P-type
-!            eigenvectors, three integer values IV1, IV2, IV3 can be specified
-!            identifying the eigenvectors to be chosen. pentagon8.inp is such an example.
-!            In this case a severe warning occurs which means you should carefully
-!            check the eigenvectors used and cartesian coordinates produced.
-!            Otherwise coordinates are obtained which are useless. This is more
-!            often the case as you might expect. 
-!          IC=3: Same as IC=2 but the Laplacian matrix is used instead of the
-!            adjacency matrix (LME algorithm). 
-!          IC=4: Tutte embedding (3D-TE) algorithm. This should always work,
+!         Examples are given in the input files starting with 'pentagon'.
+!      If IC = 4 or 5: Goldberg-Coxeter construction of adjacency matrix. In this
+!            case the two Goldberg-Coxeter indices (kGC,lGC) need to be specified 
+!            in the Coord input. The input fullerene is C20, i.e. GC(k,l)[C20].
+!      If IC = 2 or 4: AME algorithm using P-type eigenvectors produced from the 
+!            adjacency matrix used to construct coordinates.
+!           If problem with eigenvectors are found to construct the
+!           cartesian coordinates, i.e. the identification of P-type
+!           eigenvectors, three integer values IV1, IV2, IV3 can be specified
+!           identifying the eigenvectors to be chosen. pentagon8.inp is such an example.
+!           In this case a severe warning occurs which means you should carefully
+!           check the eigenvectors used and cartesian coordinates produced.
+!           Otherwise coordinates are obtained which are useless. This is more
+!           often the case than you might expect. 
+!      If IC = 3 or 5: Tutte embedding (3D-TE) algorithm used. This should always work,
 !            although the initial fullerene might be too spherical. But this
 !            algorithm is easier, and (in theory) should never fail.
-!           Examples are given in the input files starting with 'pentagon'.
-!           Please use Angstroems.
-!          IC=5: Goldberg-Coxeter construction of fullerene
+!         Examples are given in the input files starting with 'coxeter'.
 !      If IP>0 larger output produced, i.e. the full distance matrix, all
 !          Hamiltonian cycles and all 3-ring connections.
-!      if leap=n than the n-th leapfrog fullerene is generated.
-!      Connectivities are found for atoms with distances between
-!         R6   and   R6*(1+TolR/100)   if cartesian coordinate input is chosen.
+!      if leap=n then the n-th leapfrog fullerene is generated. (Default: 0)
+!      if leapGC=1 then the Goldberg-Coxeter trasform with the input fullerene is
+!         performed. For this the indices (kGC,lGC) are required. (Default: 0)
+!      if ISW=1 then a Stone-Wales transformation is performed. In this case an
+!         input is required (after all the other input, last card) with pairs of
+!         pentagon ring number. Numbers are between 1 and 12. These can be obtained
+!         from a previous output in the section where ring connections are analyzed
+!         and Stone-Wales patterns are printed. In the output for Stone-Wales 
+!         numbers the first and last ring numbers are the ones required as these
+!         are the pentagons. Alternatively you can set the second number to zero,
+!         the first number now determines that the Nth found in the list is taken.
+!         For example, an input     2 3 5 0   means pentagon 2 and 3 is taken and
+!         the 5th in the printed list of Stone-Wales patterns (see output).
+!         (Default: 0)
+!      if KE=1 then a Endo-Kroto 2-vertex insertion is performed. In this case an
+!         input is required (after all the other input, last card) with pairs of
+!         pentagon ring number. Numbers are between 1 and 12. These can be obtained
+!         from a previous output in the section where ring connections are analyzed
+!         and Endo-Kroto patterns are printed. Input is equivalent to the Stone-
+!         Wales transformation described above. (Default: 0) 
+!      if IYF=1 or 2 then a Yashida-Fowler 4-vertex insertion is performed 
+!         (see ref.13). In this case an input is required (after all the other 
+!         input, last card) with either hexagon numbers (IYF=1) or the position in
+!         the list of Yashida-Fowler patterns given in the output (IYF=2).
+!      if IYF=3 or 4 then a Yashida-Fowler 6-vertex insertion is performed 
+!         (see ref.13). In this case an input is required (after all the other 
+!         input, last card) with the three hexagon numbers (IYF=3) or the position in
+!         the list of Yashida-Fowler patterns given in the output (IYF=4).
+!         (Default: 0)
+!      TolR: Tolerance parameter. Connectivities are found for atoms with distances 
+!         between  R6   and   R6*(1+TolR/100)  if cartesian coordinate input is chosen.
 !      If TolR=0. default value of 33% is used. 
 !         NB: If this parameter is set at a value too large, unwanted connectivities
 !          are produced resulting in smaller polygons. This parameter
@@ -536,7 +585,7 @@
 !         A.Ceulemans, B.C.Titeca, L.F.Chibotaru, I.Vos, P.W.Fowler, 
 !         J. Phys. Chem. A 105, 8284-8295 (2001).
 !       If Iopt=2  Preoptimize with input force field, then optimize with Wu
-!         force field. This is especially usefull for fcoulomb input (see below).  
+!         force field. This is especially useful for fcoulomb input (see below).  
 !         NB: Avogadro has a more sophisticated force-field which you can try out.
 !       ftol: The convergence tolerance on the function value is input as ftol
 !         (Default: 5.0E-8)
@@ -571,7 +620,7 @@
 !      list of options: IPR,IPH,IStop,IChk,chkname (Default 0 for all options
 !                                                   and 'checkpoint' for chkname)
 !      In detail:
-!      If IPR>0 then the ring spiral subroutine of Fowler and Manopoulus is used.
+!      If IPR>0 then the ring spiral subroutine of Fowler and Manolopoulos is used.
 !         This sub-program catalogues fullerenes with a given number of
 !         vertices using the spiral algorithm and a uniqueness test
 !         based on equivalent spirals. The required input is IPR.
@@ -588,6 +637,10 @@
 !      The resulting output is a catalogue of the isomers found containing
 !         their idealized point groups, canonical spirals, and NMR patterns
 !         (see ref.2).
+!      IMPORTANT: This routine can become quite computer time extensive for
+!         larger fullerenes especially if the Hamiltonian cycles are wanted as well.
+!         The subroutine therefore uses the database is possible, so please download
+!         the database and move the directory called 'database' into the main folder.
 !
 ! 6) Option for producing coordinates for fullerene graphs (Schlegel diagrams).
 !      &Graph options /      (e.g. &Graph IG=1, ISO1=1, ISO2=3, ISO3=7 /)
@@ -658,19 +711,19 @@
 !-----------------------------------------------------------------------------------
 !  F U L L E R E N E     I S O M E R     D A T A B A S E
 !-----------------------------------------------------------------------------------
-! A database is provided for general isomers up tp C100 and for IPR isomers up to
+! A database is provided for general isomers up to C100 and for IPR isomers up to
 ! C120 including the number of Hamiltonian cycles. The database can be copied into
 ! the main program folder and can be used to read the ring spiral pentagon indices.
-! The numbering scheme is exactly that chosen in the book by Fowler and Manopoulus
-! (ref.2), that is each isomer in the books appendix can be constructed easily
+! The numbering scheme is exactly that chosen in the book by Fowler and Manolopoulos
+! (ref.2), that is each isomer in the book's appendix can be constructed easily
 ! from the database. An example is given in the input file   pentagon13.inp.
 ! The datafiles are formatted and can easily be read. It is our intension to
-! extend the isomer list beyond C100/C12 (without Hamiltonian cycles). New lists
+! extend the isomer list beyond C100/C120 (without Hamiltonian cycles). New lists
 ! will be available on our website. Note the determination of the number of
 ! distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 ! computationally too demanding. The longest file for our database ran for 3
 ! months on a single processor.
-! Note: the directory database needs to be in the same directories as source or 
+! Note: the directory database needs to be in the same main directory as source or 
 ! libgraph.
 !-----------------------------------------------------------------------------------
 
@@ -697,7 +750,8 @@ C    Set the dimensions for the distance matrix
       DIMENSION NringA(Nedges),NringB(Nedges)
       DIMENSION NringC(Nedges),NringD(Nedges)
       DIMENSION NringE(Nedges),NringF(Nedges)
-      DIMENSION IDual(Nfaces,Nfaces)
+      DIMENSION IDual(Nfaces,Nfaces),nSW(4,66),nFM(4,66),nYF(6,66)
+      DIMENSION NEK(3,natom),JP(12)
       DIMENSION Symbol(Nfaces)
       Real*4 TimeX
 CG77  CHARACTER CDAT*9,CTIM*8
@@ -707,7 +761,8 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*13 routine
       CHARACTER*20 xyzname
       CHARACTER*20 chkname
-      Character TEXTINPUT*80
+      CHARACTER*20 element
+      Character TEXTINPUT*132
       CHARACTER*3 GROUP
       Integer Values(8)
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
@@ -725,6 +780,14 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       DATA RVdWC/1.415d0/
       IN=5
       IOUT=6
+      ilp=0
+      iprev=0
+      Do I=1,NAtom
+       IAtom(I)=6
+      Do J=1,NAtom
+       IDA(I,J)=0
+      enddo
+      enddo
 
 C  You might like to comment these 2 lines out 
 C  (and same at the end of this routine) or substitute them with your
@@ -738,59 +801,70 @@ C       WRITE(IOUT,1000) CDAT,CTIM,natom
         WRITE(IOUT,1000) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7),natom
 C  INPUT and setting parameters for running the subroutines
-      routine='DATAIN       '
+ 9    routine='DATAIN       '
       leapspiral=0
+      SWspiral=0
       Write(Iout,1008) routine
-        CALL Datain(IN,IOUT,NAtom,MAtom,Icart,Iopt,iprintf,IHam,IPR,
-     1  IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,leap,iupac,Ipent,iprintham,
-     1  IGC1,IGC2,IV1,IV2,IV3,icyl,ichk,isonum,ParamS,TolX,R5,R6,Rdist,
-     1  scales,scalePPG,ftolP,forceWu,forceWuP,xyzname,chkname,
-     1  TEXTINPUT)
-
+        CALL Datain(IN,IOUT,NAtom,MAtom,Icart,Iopt,iprintf,IHam,
+     1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
+     1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
+     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,
+     1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,forceWu,
+     1  forceWuP,xyzname,chkname,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
       if(istop.ne.0) go to 98
 
 C Options for Input coordinates
-      go to (10,20,30,30,30,31) Icart+1
+      go to (10,20,30,30,30,30) Icart+1
 C  Cartesian coordinates produced for Ih C60
-   10 routine='COORDC60     '
+   10 routine='COORDC20/60  '
       Write(Iout,1008) routine
-      CALL CoordC60(Natom,IN,Iout,IAtom,R5,R6,Dist)
-      Matom=60
+      CALL CoordC60(Natom,IN,Iout,MAtom,R5,R6,Dist)
       Do I=1,60
-      IAtom(I)=6
+       IAtom(I)=6
       enddo
       Go to 40
 C Input Cartesian coordinates for fullerenes
-   20 Do J=1,MAtom
-      Read(IN,*) IAtom(J),(Dist(I,J),I=1,3)
-      enddo
+   20 if(icyl.ge.2) then
+       Open(unit=7,file=xyzname,form='formatted')
+       WRITE(Iout,1015) xyzname 
+       Read(7,*) MAtom
+       Read(7,1018) TEXTINPUT 
+       WRITE(Iout,1017) MAtom,TEXTINPUT
+       Do J=1,MAtom
+        Read(7,*,end=21) element,(Dist(I,J),I=1,3)
+        Iatom(j)=6
+       enddo
+       close(unit=7)
+       xyzname='cylviewnew.xyz'
+      else
+       Do J=1,MAtom
+        Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
+       enddo
+      endif
       Go to 40
+   21 WRITE(Iout,1016)
+      Go to 99
 C Cartesian coordinates produced ring from spiral pentagon list
-C currently using the Fowler-Manopoulus algorithm to
+C currently using the Fowler-Manolopoulos algorithm to
 C identify P-type eigenvectors and construct the 3D fullerene
    30 Ipent=1
-      routine='COORDPENT    '
+      routine='COORDBUILD   '
       Write(Iout,1008) routine
+      CALL CoordBuild(Natom,NFaces,Nedges,MAtom,IN,Iout,IDA,IDual,
+     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPR,IPRC,ihueckel,JP,
+     1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP)
       Do I=1,Matom
        IAtom(I)=6
       enddo
-      CALL CoordPent(Natom,NFaces,Nedges,MAtom,IN,Iout,IDA,IDual,
-     1 Icart,IV1,IV2,IV3,isonum,IPR,IPRC,A,evec,df,Dist,Dist2D,distp,
-     1 Rdist,GROUP)
       CALL Chiral(Iout,GROUP)
-      Go to 40
-
-C Goldberg-Coxeter construction of fullerens
-   31 CALL GoldbergCoxeter(Natom,NFaces,Nedges,MAtom,IGC1,IGC2,
-     1 IN,Iout,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
 
    40 WRITE(Iout,1001) MAtom,TolX*100.d0
 
 C Some general infos on isomers and spiral routine
-C of Fowler and Manopoulus. Set parameter IPR for independent
+C of Fowler and Manolopoulos. Set parameter IPR for independent
 C pentagon rule as full list beyond C60 is computer time 
 C intensive
   98  routine='ISOMERS      '
@@ -800,10 +874,12 @@ C intensive
       if(istop.ne.0) go to 99
 
 C Move carbon cage to Atomic Center
-  999 routine='MOVECM       '
+  999 Group='   '
+      routine='MOVECM       '
       Write(Iout,1008) routine
       Iprint=1
-      Call MoveCM(Natom,Matom,Iout,Iprint,IAtom,Dist,DistCM,El)
+      Call MoveCM(Natom,Matom,Iout,Iprint,IAtom,mirror,
+     1 Dist,DistCM,El)
 
 C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia (to be implemented)
@@ -827,19 +903,17 @@ C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
       routine='HUECKEL      '
       Write(Iout,1008) routine
-      CALL Hueckel(NAtom,MAtom,IOUT,IC3,IDA,A,evec,df)
+      CALL Hueckel(NAtom,MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
       endif
 
 C Produce the nth leapfrog of the fullerene
-      if(leap.gt.0) then
+      if(leap.gt.0.or.leapGC.gt.0) then
       routine='Leapfrog'
       Write(Iout,1008) routine
-      CALL Leapfrog(NAtom,MAtom,Iout,leap,LeapErr,IDA,
-     1 A,evec,df,Dist,Dist2D,distp,Rdist)
-      Do I=1,Matom
-       IAtom(I)=6
-      enddo
+      CALL Leapfrog(NAtom,MAtom,Iout,leap,leapGC,IGC1,IGC2,
+     1 ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
       leap=0
+      leapGC=0
       ipent=1
       leapspiral=1
       if(MAtom.gt.100) IHam=0
@@ -858,7 +932,7 @@ C adjacent vertices
       if(IHam.gt.1.and.IHam.le.9) then
        maxiter=10**IHam
       endif
-      if(IHam.ne.0) then
+      if(IHam.ne.0.and.ISW.eq.0) then
        if(iupac.ne.0) then
          CALL Hamilton(NAtom,MAtom,Iout,iprintf,maxiter,IC3)
        else
@@ -877,27 +951,27 @@ C Establish all closed ring systems
      1 DistMat)
 
 C Optimize Geometry through force field method
-      If(Iopt.ne.0) then
+      If(Iopt.ne.0.and.ISW.eq.0) then
       routine='OPTFF        '
+      ftol=ftolP
       Write(Iout,1008) routine
       if(Iopt.eq.2) then
-       ftol=1.d-4
-      else
+        ftol=ftolP*1.d3
+        Write(Iout,1003)
+        fcoulomb=forceWu(9)
+        CALL OptFF(Natom,NFaces,MAtom,Iout,IDA,N5Ring,N6Ring,
+     1   N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
        ftol=ftolP
-      endif
- 333  CALL OptFF(Natom,NFaces,MAtom,Iout,IDA,N5Ring,N6Ring,
-     1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
-      if(Iopt.eq.2) then
-       ftol=ftolP
-      Write(Iout,1003)
        Do I=1,9
         forceWu(I)=forceWuP(I)
        enddo
-       Iopt=1
-       go to 333
       endif
+      CALL OptFF(Natom,NFaces,MAtom,Iout,IDA,N5Ring,N6Ring,
+     1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
       Iprint=0
-      Call MoveCM(Natom,Matom,Iout,Iprint,IAtom,Dist,DistCM,El)
+      forceWu(9)=fcoulomb
+      Call MoveCM(Natom,Matom,Iout,Iprint,IAtom,mirror,
+     1 Dist,DistCM,El)
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
       CALL Distmatrix(NAtom,natomL,MAtom,IOUT,Iprintf,0,
@@ -907,40 +981,8 @@ C Optimize Geometry through force field method
       CALL Diameter(NAtom,MAtom,IOUT,Dist,distp)
       endif
 
-C Rings
-      routine='RING         '
-      Write(Iout,1008) routine
-      CALL Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,
-     1 N5Ring,N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
-     1 DistMat)
-
-C Calculate the center for each ring system
-      routine='RINGC        '
-      Write(Iout,1008) routine
-      CALL RingC(NAtom,Nfaces,Nedges,NAtom2,Matom,nat11,Iout,iprintf,
-     1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
-     1 NringB,NringC,NringD,NringE,NringF,DIST,CRing5,CRing6)
-
-C Now produce clockwise spiral ring pentagon count a la Fowler and Manopoulus
-      if(ipent.eq.0.or.leapspiral.ne.0) then
-      routine='SPIRALSEARCH '
-      Write(Iout,1008) routine
-      CALL SpiralSearch(NAtom,Nfaces,Nedges,Nspirals,MAtom,Iout,Iring5,
-     1 Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,GROUP)
-      CALL Chiral(Iout,GROUP)
-      endif
-
-C Calculate the volume
-      routine='VOLUME       '
-      Write(Iout,1008) routine
-C      call VolumeAndArea(g,Dist,NAtom)
-
-      CALL OldVolume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
-     1 N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
-     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
-
 C Print out Coordinates used as input for CYLview
-      if(icyl.ne.0) then
+      if(icyl.le.2.and.ISW.eq.0) then
       Open(unit=3,file=xyzname,form='formatted')
       routine='PRINTCOORD   '
       Write(Iout,1008) routine
@@ -954,7 +996,84 @@ C Print out Coordinates used as input for CYLview
       IM=IAtom(J)      
       Write(3,1007) El(IM),(Dist(I,J),I=1,3)
       enddo
+      Close(unit=3)
       endif
+
+C Rings
+      routine='RING         '
+      Write(Iout,1008) routine
+      CALL Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,
+     1 N5Ring,N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
+     1 DistMat)
+
+C Analyze ring connections
+      routine='RINGC        '
+      Write(Iout,1008) routine
+      CALL RingC(NAtom,Nfaces,Nedges,NAtom2,Matom,nat11,Iout,iprintf,
+     1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
+     1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
+     1 numberFM,nFM,numberYF,nYF,DIST,CRing5,CRing6)
+C Perform Stone-Wales transformation
+      if(ISW.ne.0) then
+      routine='STONE-WALES  '
+      Write(Iout,1008) routine
+      CALL StoneWalesTrans(NAtom,Nfaces,Matom,IN,Iout,numbersw,nSW,
+     1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+      ISW=0
+      ipent=1
+      SWspiral=1
+      go to 999
+      endif
+
+C Perform Endo-Kroto 2-vertex insertion
+      if(KE.ne.0) then
+      routine='ENDO-KROTO   '
+      Write(Iout,1008) routine
+      CALL EndoKrotoTrans(NAtom,Nfaces,Matom,IN,Iout,n565,NEK,ihueckel,
+     1 IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+      KE=0
+      ipent=1
+      SWspiral=1
+      go to 999
+      endif
+
+C Perform Yoshida-Fowler 4-or 6-vertex insertion
+      if(IYF.ne.0) then
+      routine='YOSHIDAFOWLER'
+      Write(Iout,1008) routine
+      if(IYF.le.2) then
+      CALL YoshidaFowler3(NAtom,Nfaces,Matom,IN,Iout,JERR,numberFM,IYF,
+     1 nFM,ihueckel,IDA,N5MEM,N6MEM,IC3,
+     1 A,evec,df,Dist,Dist2D,distp,Rdist)
+      else
+      IYF=IYF-2
+      CALL YoshidaFowler6(NAtom,Nfaces,Matom,IN,Iout,JERR,numberYF,IYF,
+     1 nYF,ihueckel,IDA,N5MEM,N6MEM,IC3,
+     1 A,evec,df,Dist,Dist2D,distp,Rdist)
+      endif
+      IYF=0
+      ipent=1
+      SWspiral=1
+      if(JERR.eq.0) go to 999
+      endif
+
+C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
+      if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0) then
+      routine='SPIRALSEARCH '
+      Write(Iout,1008) routine
+      CALL SpiralSearch(NAtom,Nfaces,Nedges,Nspirals,MAtom,Iout,Iring5,
+     1 Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
+     1 GROUP)
+      CALL Chiral(Iout,GROUP)
+      endif
+
+C Calculate the volume
+      routine='VOLUME       '
+      Write(Iout,1008) routine
+
+      CALL Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
+     1 N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
+     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
 
 C Calculate the minimum distance sphere
 C     routine='CONVEXHULL'
@@ -983,7 +1102,7 @@ C Calculate the maximum inner sphere
 
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
-      routine='SCHLEGEL     '
+      routine='GRAPH2D      '
       Write(Iout,1008) routine
       if(ISchlegel.eq.2) then
        if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
@@ -993,20 +1112,28 @@ C Calculate Schlegel diagram
       else
        ParamS=dabs(ParamS)
       endif
-      CALL Schlegel(NAtom,Nfaces,Nedges,MAtom,msrs,IOUT,IS1,IS2,IS3,
+      CALL Graph2D(NAtom,Nfaces,Nedges,MAtom,msrs,IOUT,IS1,IS2,IS3,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring,Ischlegel,IC3,IDA,Dist,
      1 ParamS,Rmin,TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol)
       endif
 
 C  E N D   O F   P R O G R A M
+  99  if(loop-1) 100,101,102
+ 100  Return
+ 101  iprev=0
+      WRITE(IOUT,1019)
+      go to 9 
+ 102  iprev=1
+      WRITE(IOUT,1019)
+      go to 9 
 CG77 99  CALL TIME(CTIM)
-  99  call date_and_time(CDAT,CTIM,zone,values)
+CG77 99  CALL TIME(CTIM)
+      call date_and_time(CDAT,CTIM,zone,values)
         WRITE(IOUT,1004) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7)
       CALL Timer(TIMEX)
       Hours=TIMEX/3.6d3
       WRITE(IOUT,1009) TIMEX,Hours
-      Close(unit=3)
 C Formats 
  1000 FORMAT(
      1  1X,' ________________________________________________________ ',
@@ -1015,10 +1142,10 @@ C Formats
      1 /1X,'|    Fortran/C++ Program for the topological analysis    |',
      1 /1X,'|      of regular fullerenes (pentagons and hexagons)    |',
      1 /1X,'|    Written by Peter Schwerdtfeger and James Avery      |',
-     1 /1X,'|      with routines from Fowler, Manopoulus and Babic   |',
+     1 /1X,'|      with routines from Fowler, Manolopoulos and Babic |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.0, last revision from 08/04/12     |',
+     1 /1X,'|    This  version: 4.0, last revision from 10/05/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
@@ -1027,7 +1154,7 @@ CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 '1) P. Schwerdtfeger, J. Avery, Topological Aspects of ',
      1 'Fullerenes - A Fortran Program',/9X,'(Version 4.0, Massey ',
      1 'University Albany, Auckland, New Zealand, 2012).',/1X,
-     1 '2) P. W. Fowler, D. E. Manopoulus, An Atlas of Fullerenes',
+     1 '2) P. W. Fowler, D. E. Manolopoulos, An Atlas of Fullerenes',
      1 ' (Dover Publ., New York, 2006).',/1X,
      1 '3) D. Babic, Nomenclature and Coding of Fullerenes,',
      1 ' J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).',/1X,
@@ -1035,22 +1162,28 @@ CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 'concerning this program')
  1001 FORMAT(/1X,'Number of Atoms: ',I4,', and distance tolerance: ',
      1 F12.2,'%')
- 1002 FORMAT(/1X,'Input coordinates to be used for program CYLview ',
-     1 'by C.Y.Legault:',/1X,'Output written into ',A20)
-CG77 1004 FORMAT(1X,124(1H-),/1X,6HTIME: ,A8)
- 1003 FORMAT(/1X,'Reoptimization using the original Wu force field')
- 1004 FORMAT(132(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
+ 1002 FORMAT(/1X,'Input coordinates to be used for plotting program',
+     1 ' CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written into ',A20)
+CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
+ 1003 FORMAT(1X,'Pre-optimization using the Wu force field with ',
+     1 'input parameter')
+ 1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
      1 'TIME: ',I2,'h',I2,'m',I2,'s')
  1006 FORMAT(/1X,'Angle for Schlegel diagram reset to ',
      1 F10.4,' degrees')
  1007 FORMAT(A2,6X,3(F15.6,2X))
- 1008 FORMAT(132('-'),/1x,'--> Enter Subroutine ',A13)
+ 1008 FORMAT(140('-'),/1x,'--> Enter Subroutine ',A13)
  1009 FORMAT(1x,'CPU Seconds: ',F15.2,', CPU Hours: ',F13.5)
  1010 FORMAT(1X,'Number of Hamiltonian cycles: ',I10)
- 1011 FORMAT(I5,/,'C',I2,'/  ',A80)
- 1012 FORMAT(I5,/,'C',I3,'/  ',A80)
- 1013 FORMAT(I5,/,'C',I4,'/  ',A80)
+ 1011 FORMAT(I5,/,'C',I2,'/  ',A132)
+ 1012 FORMAT(I5,/,'C',I3,'/  ',A132)
+ 1013 FORMAT(I5,/,'C',I4,'/  ',A132)
  1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
+ 1015 FORMAT(/1X,'Read coordinates from xyz file: ',A20)
+ 1016 FORMAT(/1X,'End of file reached ==> Stop')
+ 1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,A132)
+ 1018 FORMAT(A132)
+ 1019 FORMAT(140('='))
       STOP 
       END
 

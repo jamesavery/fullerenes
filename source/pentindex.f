@@ -1,19 +1,19 @@
-      SUBROUTINE CoordPent(NMAX,MMAX,LMAX,MAtom,IN,Iout,IDA,D,ICart,
-     1 IV1,IV2,IV3,isonum,IPR,IPRC,A,evec,df,Dist,layout2d,distp,
-     1 Cdist,GROUP)
+      SUBROUTINE CoordBuild(NMAX,MMAX,LMAX,MAtom,IN,Iout,IDA,D,ICart,
+     1 IV1,IV2,IV3,kGC,lGC,isonum,IPR,IPRC,ihueckel,JP,iprev,
+     1 A,evec,df,Dist,layout2d,distp,Cdist,GROUP)
 C Cartesian coordinates produced from ring spiral pentagon list
-C using either the Fowler-Manopoulus or the Tutte embedding
-C algorithm 
-C Fowler-Manopoulus algorithm: identify P-type eigenvectors and 
-C construct the 3D fullerene
-C Tutte embedding algorithm: Tutte embedding and sphere projection
-C If nalgorithm=0 use Fowler-Manopoulus algorithm
-C If nalgorithm=1 use Fowler-Manopoulus algorithm but Laplacian instead
-C If nalgorithm=2 use Tutte algorithm
+C or Coxeter-Goldberg construction to get the adjacency matrix
+C This is followed by using either the Fowler-Manolopoulos matrix
+C eigenvector or the Tutte 3D embedding algorithm 
+C Fowler-Manolopoulos matrix eigenvector algorithm: identify P-type 
+C eigenvectors and construct the 3D fullerene
+C Tutte embedding algorithm: Tutte barycentric embedding and sphere
+C mapping 
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 layout2d
       Integer D,S,RT,Spiral
+      integer :: graph_is_a_fullerene
       DIMENSION layout2d(2,NMAX)
       DIMENSION D(MMAX,MMAX),S(MMAX),Dist(3,NMAX),distP(NMAX)
       DIMENSION NMR(6),JP(12),A(NMAX,NMAX),IDA(NMAX,NMAX)
@@ -23,16 +23,27 @@ C If nalgorithm=2 use Tutte algorithm
       Character*10 Symbol
       CHARACTER*3 GROUP
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-      type(c_ptr) :: g, new_fullerene_graph, new_graph
-
+      type(c_ptr) :: g, halma, new_fullerene_graph, new_graph,
+     1               new_C20, halma_fullerene
+C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
+C If nalgorithm=1 use ring-spiral and Tutte algorithm
+C If nalgorithm=2 use Coxeter Goldberg and matrix eigenvector 
+C                 algorithm
+C If nalgorithm=3 use Coxeter Goldberg and Tutte algorithm
       nalgorithm=ICart-2
+
       M=Matom/2+2
       istop=0
       Group='NA '
+
+
+C Ring spiral first:
 C Read pentagon list and produce adjacency matrix
+      if(nalgorithm.le.1) then
       if(isonum.eq.0) then
-        Read(IN,*) (JP(I),I=1,12)
+        if(iprev.eq.0) Read(IN,*) (JP(I),I=1,12)
       else
+C Read from database
         Call Isomerget(Matom,Iout,Isonum,IPRC,JP)
       endif
 C     Produce the Spiral S using the program WINDUP and UNWIND
@@ -103,18 +114,49 @@ C     Search where the 5-rings are in the spiral
       WRITE(Iout,1025) (S(I),I=1,M)
 C End of Spiral Program, dual matrix in D(i,j)
 
-C Now produce the Hueckel matrix from the dual matrix
+C Now produce the adjaceny matrix from the dual matrix
       CALL DUAL(NMAX,D,MMAX,IDA,Matom,IER)
       IF(IER.ne.0) then
       WRITE(Iout,1002) IER
       stop
       endif
+
+C End ring spiral
+      endif
+
+
+C Start Goldberg-Coxeter
+      if(nalgorithm.gt.1) then
+      Write(Iout,1040) kGC,lGC,kGC,lGC
+      if(lGC .ne. 0) then
+        write(Iout,1041)
+        stop
+      endif
+      g = new_C20();
+      halma = halma_fullerene(g,kGC-1)
+      isafullerene = graph_is_a_fullerene(halma)
+      IF (isafullerene .eq. 1) then
+        write (iout,1043) 
+      else
+        write (iout,1044)
+        stop
+      endif
+C Update fortran structures
+      MAtom  = NVertices(halma)
+      Medges = NEdges(halma)
+        write(Iout,1042)  MAtom,Medges
+      call adjacency_matrix(halma,NMax,IDA)
+C End Goldberg-Coxeter
+      endif
+
+
+C Adjacency matrix constructed
+C Now analyze the adjacency matrix if it is correct
       Do I=1,MAtom
       Do J=1,MAtom
-      A(I,J)=dfloat(IDA(I,J))
+       A(I,J)=dfloat(IDA(I,J))
       enddo
       enddo
-C Analyze the adjacency matrix if it is correct
       nsum=0
       Do I=1,MAtom
       isum=0
@@ -131,6 +173,7 @@ C Analyze the adjacency matrix if it is correct
       endif
 
 C Produce Hueckel matrix and diagonalize
+      if(ihueckel.eq.0.or.nalgorithm.eq.0.or.nalgorithm.eq.2) then
 C     Diagonalize
       call tred2(A,Matom,NMax,evec,df)
       call tqli(evec,df,Matom,NMax,A)
@@ -208,51 +251,17 @@ C     Now Print
       Write(Iout,1008) bandgap
       if(bandgap.lt.Tol1) Write(Iout,1009)
       endif
-C     Laplacian matrix is used instead of the adjaceny matrix
-C     Add degree of vertex to diagonal
-      if(nalgorithm.eq.1) then
-      Write(Iout,1039)
-      Do I=1,MAtom
-      Do J=1,MAtom
-      A(I,J)=-dfloat(IDA(I,J))
-      enddo
-       A(I,I)=3.d0
-      enddo
-C     Diagonalize
-      call tred2(A,Matom,NMax,evec,df)
-      call tqli(evec,df,Matom,NMax,A)
-      Write(Iout,1004) Matom,Matom
-C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
-C     Sorting is different to adjacency matrix
-C      Here from the lowest to highest eigenvalue
-      Do I=1,MAtom
-      e0=evec(I)
-      jmax=I
-      Do J=I+1,MAtom
-      e1=evec(J)
-      if(e1.lt.e0) then 
-      jmax=j
-      e0=e1
-      endif
-      enddo
-      if(i.ne.jmax) then
-      ex=evec(jmax)
-      evec(jmax)=evec(I)
-      evec(I)=ex
-      Do k=1,MAtom
-      df(k)=A(k,jmax)
-      A(k,jmax)=A(k,I)
-      A(k,I)=df(k)
-      enddo
-      endif
-      enddo
+C     End of Hueckel
       endif
 
+
 C Now produce the 3D image
-C   Algorithm 1 or 2 (Fowler-Manopoulus):
+
+C   Fowler-Manolopoulos matrix eigenvector algorithm
 C     Now search for lowest energy P-type vectors
 C     This needs to be changed
-      if(nalgorithm.le.1) then
+      if(nalgorithm.eq.0.or.nalgorithm.eq.2) then
+      Write(Iout,1045)
       icand=0
       Do I=1,iocc
       mneg=0
@@ -371,9 +380,10 @@ C     Calculate P-type dipole moment
        Do I=1,3
         Write(IOUT,1031) I,(dipol(I,J),J=1,3)
        enddo
+      endif
 
-      else
-C   Algorithm 2 (Tutte):
+      if(nalgorithm.eq.1.or.nalgorithm.eq.3) then
+C   Tutte 3D embedding Algorithm:
 C     Input: Integer Adjacency Matrix IDA(NMax,NMax)
 C     Output: Real*8 Cartesian Coordinates  Dist(3,NMax)
 C     NMax: Max Dimension of Matrix
@@ -438,8 +448,7 @@ C     Check distances
  1002 FORMAT(/1X,'D contains IER = ',I6,' separating triangles and is ',
      1 'therefore NOT a fullerene dual')
  1003 FORMAT(1X,'       x     deg NE   type    ',/1X,32('-'))
- 1004 FORMAT(/1X,'Using the Fowler-Manopoulus algorithm to construct ',
-     1 'the fullerene',/1X,'Construct the (',I4,','I4,') Hueckel ',
+ 1004 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel ',
      1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
  1005 FORMAT(1X,F12.6,I3,1X,I3,3X,A10)
@@ -459,7 +468,7 @@ C     Check distances
  1011 FORMAT(1X,'eigenvalue',I4,': ',F12.6,', eigenvector: (',I4,
      1 ' negative and ',I4,' positive values)')
  1012 FORMAT(10(1X,F12.6))
- 1013 FORMAT(1X,'Fowler-Manopoulus Coordinates')
+ 1013 FORMAT(1X,'Fowler-Manolopoulos Coordinates')
  1014 FORMAT(1X,I4,5X,3(D18.12,2X))
  1015 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
@@ -506,6 +515,17 @@ C     Check distances
      1 'are not of degree 3, last one is of degree ',I4)
  1038 FORMAT(1X,'Graph checked, it is cubic')
  1039 FORMAT(1X,'Laplacian Matrix taken instead of adjacency matrix')
+ 1040 Format(/1x,'Goldberg-Coxeter fullerene with indices (k,l) = (',
+     1 I2,',',I2,') taking C20 as the input graph: GC(',I2,',',I2,
+     1 ')[G0] with G0=C20')
+ 1041 Format(/1x,'Goldberg-Coxeter construction not implemented',
+     1 ' for l > 0.')
+ 1042 Format(1x,'Updating number of vertices (',I5,') and edges (',
+     1 I5,')')
+ 1043 Format(1x,'Halma fullerene is a fullerene')
+ 1044 Format(1x,'Halma fullerene is not a fullerene')
+ 1045 FORMAT(/1X,'Using the Fowler-Manolopoulos adjacency matrix '
+     1 'eigenvector algorithm to construct the fullerene')
       Return 
       END
 
@@ -579,7 +599,7 @@ C Routine to get Isomer number from database
      * 659140287,716217922,776165188,842498881,912274540,987874095,
      * 1068507788,1156161307,1247686189,1348832364,1454359806,
      * 1568768524,1690214836,1821766896,1958581588,2109271290/
-      LimitAll=98
+      LimitAll=100
       LimitIPR=118
       nhamcycle=0
 
@@ -634,7 +654,6 @@ C     Now produce filename in database
        fnum=fnum1//fnum2
       else
        write(fnum,'(I3)') MAtom
-       fnum=char(Matom)
       endif
       fnum3='all'
       if(IPR.eq.1) fnum3='IPR'

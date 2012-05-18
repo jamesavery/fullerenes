@@ -222,7 +222,7 @@ C     Check Euler characteristic
       If(MEuler.ne.2) Write(IOUT,1005)
       If(Ncount5.ne.12) then
       Write(IOUT,1014)
-      stop
+      stop 20
       endif
       Write(IOUT,1009) NMin,RminT,NMax,RmaxT
       ameas=dfloat(Ndif)/dfloat(Mcon2)
@@ -268,15 +268,16 @@ C     Check Euler characteristic
  1013 Format(10(1X,D12.6,1X))
  1014 Format(1X,'**** Severe error: 12 pentagons expected. STOP ****')
  1015 Format(1X,' 5-ring minimum bond angle (deviation from 108 deg): ',
-     1 F6.2,' (',F6.2,'), maximum bond angle: ',F6.2,' (',F6.2,')')
+     1 F6.2,' (',F8.2,'), maximum bond angle: ',F6.2,' (',F8.2,')')
  1016 Format(1X,' 6-ring minimum bond angle (deviation from 120 deg): ',
-     1 F6.2,' (',F6.2,'), maximum bond angle: ',F6.2,' (',F6.2,')')
+     1 F6.2,' (',F8.2,'), maximum bond angle: ',F6.2,' (',F8.2,')')
       RETURN
       END
 
       SUBROUTINE RingC(NAtom,Nfaces,Nedges,NAtom2,Matom,nat11,Iout,
      1 iprint,N5MEM,N6MEM,N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
-     1 NringA,NringB,NringC,NringD,NringE,NringF,DIST,CRing5,CRing6)
+     1 NringA,NringB,NringC,NringD,NringE,NringF,numbersw,nSW,nl565,
+     1 n3rc,numberFM,nFM,numberYF,nYF,DIST,CRing5,CRing6)
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Determine the center of each 5-and 6-ring system
       DIMENSION Dist(3,natom),Distac(6)
@@ -288,10 +289,13 @@ C     Determine the center of each 5-and 6-ring system
       DIMENSION NringA(Nedges),NringB(Nedges)
       DIMENSION NringC(Nedges),NringD(Nedges)
       DIMENSION NringE(Nedges),NringF(Nedges)
-      Integer n3r(3,nat11),n3ra(3,natom),n3rb(3,natom)
-      Integer IRhag5(0:5),IRhag6(0:6)
+      Integer n3r(3,nat11),n3ra(3,natom),n3rb(3,natom),nSW(4,66),
+     1 nFM(4,66),n3rc(3,natom),n3rd(3,natom),nYF(6,66)
+      Integer IRhag5(0:5),IRhag6(0:6),MPatt(30)
       Character*6,Label
 C     Center for 5-rings
+      numbersw=0
+      numberFM=0
       Write(Iout,1000)
       Do I=1,N5Ring
       Nring(I)=I
@@ -452,9 +456,16 @@ C     Strain Parameter
       enddo
       IFus6G=IFus6*2+20
       If(IFus6G.eq.Matom) then
-      Write(Iout,1018) IFus6G
+       Write(Iout,1018) IFus6G
       else
-      Write(Iout,1019) IFus6G
+       Write(Iout,1019) IFus6G
+      endif
+      If(IRing5.eq.0) then
+       IPR=1
+       Write(Iout,1022) 
+      else
+       IPR=0
+       Write(Iout,1023)
       endif
 
 C     All 3-ring fusions
@@ -480,9 +491,9 @@ C     (o5-5-5) 3-ring fusions
       if(Kring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
       N3Ring=N3Ring+KRing3
-      If(N6Ring.eq.0) Go to 4000
 
 C     (c5-5-6) 3-ring fusions with (5-5)
+      If(N6Ring.eq.0) Go to 4000
       KRing3=0
       LRing3=0
       if(IRing5.gt.0.and.IRing56.gt.0) then
@@ -503,7 +514,7 @@ C     (o5-5-6) 3-ring fusions
      1 write(Iout,1011) ((n3rb(J,I),J=1,3),i=1,Lring3)
       N3Ring=N3Ring+LRing3
 
-C     (l5-6-5) 3-ring fusions
+C     (b5-6-5) 3-ring fusions
       KRing3=0
       LRing3=0
       if(IRing56.gt.0) then
@@ -518,13 +529,24 @@ C     (l5-6-5) 3-ring fusions
       if(Kring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
       N3Ring=N3Ring+KRing3
-
-C     (b5-6-5) 3-ring fusions
+C     Search for Stone-Wales pattern
+      Call StoneWales(Natom,Kring3,n3ra,numbersw,nSW)
+C     Search for Yoshida-Fowler D3h 6555 patterns - C60-like corner patch
+      Call Threevertexinsert(Natom,Nedges,Kring3,n3ra,NringA,NringB,
+     1 IRing5,numberFM,nFM)
+C     (l5-6-5) 3-ring fusions
       Label='linear'
       Write(Iout,1009) Label,IR1,IR2,IR3,LRing3
       if(Lring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3rb(J,I),J=1,3),i=1,Lring3)
       N3Ring=N3Ring+LRing3
+C     Store linear 5-6-5 for Cioslowski's scheme and Endo-Kroto insertion
+       Do J1=1,3
+       Do J2=1,Lring3
+        n3rc(J1,J2)=n3rb(J1,J2)
+       enddo
+       enddo
+       nl565=Lring3
 
 C     (c6-5-6) 3-ring fusions
       KRing3=0
@@ -541,6 +563,13 @@ C     (c6-5-6) 3-ring fusions
       if(Kring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
       N3Ring=N3Ring+KRing3
+C     Store closed 6-5-6 for Yashido-Fowler 9-vertex insertion
+       Do J1=1,3
+       Do J2=1,Kring3
+        n3rd(J1,J2)=n3ra(J1,J2)
+       enddo
+       enddo
+       nc656=Lring3
 
 C     (o6-5-6) 3-ring fusions
       Label='open  '
@@ -549,6 +578,10 @@ C     (o6-5-6) 3-ring fusions
      1 write(Iout,1011) ((n3rb(J,I),J=1,3),i=1,Lring3)
       N3Ring=N3Ring+LRing3
 
+C Cioslowski's increment scheme for IPR fullerenes
+      if(IPR.eq.1) Call Cioslowski(natom,Nfaces,Nedges,Kring3,
+     1 nl565,IRing5,IRing56,IRing6,MAtom,N5Ring,N6Ring,NRing,NringA,
+     1 NringB,NringC,NringD,NringE,NringF,n3ra,n3rc,Mpatt,E1,E2)
 C     (l5-6-6) 3-ring fusions
       KRing3=0
       LRing3=0
@@ -586,13 +619,15 @@ C     (c6-6-6) 3-ring fusions
       if(Kring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
       N3Ring=N3Ring+KRing3
+C     Search for Yoshida-Fowler D3h 666555 patterns - C80-like corner patch
+      Call Ninevertexinsert(Natom,Nedges,Kring3,n3ra,nc656,n3rd,NringA,
+     1 NringB,IRing5,numberYF,nYF)
 
 C     (b6-6-6) 3-ring fusions
       Label='bent  '
       Write(Iout,1008) Label,IR1,IR2,IR3,LRing3b
       if(Lring3b.ne.0.and.iprint.eq.1.and.Matom.lt.1000) 
      1 write(Iout,1011) ((n3r(J,I),J=1,3),i=1,Lring3b)
-      N3Ring=N3Ring+LRing3b
       if(Lring3b.ne.0.and.iprint.eq.1.and.Matom.ge.1000) 
      1 write(Iout,1021) ((n3r(J,I),J=1,3),i=1,Lring3b)
       N3Ring=N3Ring+LRing3b
@@ -614,34 +649,68 @@ C     Final 3-ring count
       if(Ndif.ne.0) then
       Write(Iout,1012)
       endif
-C     Check all connected 4-and 5-ring pentagons to create
-C     pentagon indices a la Fowler and Manolopoulus
 
-C     Similar for hexagon indices a la Fowler and Manolopoulus
+C Print Stone-Wales patterns
+      if(numbersw.eq.0.and.N6Ring.ne.0) then 
+       Write(Iout,1030)
+      else
+       Write(Iout,1031) numbersw
+       Write(Iout,1032) ((nsw(I,J),I=1,4),J=1,numbersw)
+      endif
+
+C Print Yoshida-Fowler D3h 6555 patterns
+      if(numberFM.eq.0) then 
+       Write(Iout,1040)
+      else
+       Write(Iout,1041) numberFM
+       Write(Iout,1042) ((nFM(I,J),I=1,4),J=1,numberFM)
+      endif
+
+C Print Yoshida-Fowler D3h 6555 patterns
+      if(numberYF.eq.0) then 
+       Write(Iout,1043)
+      else
+       Write(Iout,1044) numberYF
+       Write(Iout,1045) ((nYF(I,J),I=1,6),J=1,numberYF)
+      endif
+
+C Print Cioslowsky analysis and check of correctness
+      if(IPR.eq.1) then 
+       Write(Iout,1033) N6Ring
+       Write(Iout,1034) (Mpatt(I),I=1,30)
+       Call CheckCioslowski(Iout,MAtom,Mpatt)
+        Esum=E1+E2
+        EC60=Esum/dfloat(MAtom)-6.1681359415162888d2/6.d1
+       Write(Iout,1035) E1,E2,Esum
+       if(Matom.lt.100) Write(Iout,1036) MAtom,MAtom,EC60
+       if(Matom.ge.100.and.Matom.lt.1000) 
+     1   Write(Iout,1037) MAtom,MAtom,EC60
+       if(Matom.ge.1000) Write(Iout,1038) MAtom,MAtom,EC60
+      endif
 
  1000 Format(/1X,'Center for 5-rings',/1X,
      1 ' Ring Number RN, Atom Numbers Ni, Ring centers X,Y,Z and '
      1 'distances di from ring center to atoms',/2X,
-     1 'RN     N1  N2  N3  N4  N5',9X,'X',12X,'Y',12X,'Z',
+     1 'RN      N1   N2   N3   N4   N5',9X,'X',12X,'Y',12X,'Z',
      1 12X,'d1',11X,'d2',11X,'d3',11X,'d4',11X,'d5')
  1001 Format(/1X,'Center for 6-rings',/1X,
      1 ' Ring Number RN, Atom Numbers Ni, Ring centers X,Y,Z and '
      1 'distances di from ring center to atoms',/2X,
-     1 'RN     N1  N2  N3  N4  N5  N6',9X,'X',12X,'Y',12X,'Z',
+     1 'RN      N1   N2   N3   N4   N5   N6',9X,'X',12X,'Y',12X,'Z',
      1 12X,'d1',11X,'d2',11X,'d3',11X,'d4',11X,'d5',11X,'d6')
- 1002 Format(I4,3X,5I4,3X,3(D12.6,1X),2X,5(D12.6,1X))
- 1003 Format(I4,3X,6I4,3X,3(D12.6,1X),2X,6(D12.6,1X))
+ 1002 Format(I4,3X,5I5,3X,3(D12.6,1X),2X,5(D12.6,1X))
+ 1003 Format(I4,3X,6I5,3X,3(D12.6,1X),2X,6(D12.6,1X))
  1004 Format(/1X,'Analyzing basic two- and three-ring fusions',
      1 //1X,'2-ring fusions between rings (RNI,RNJ):') 
  1005 Format(2X,'(',I1,'-',I1,') fusions: ',I5,' in total')
- 1006 Format(15(1X,'(',I3,',',I3,')'))
- 1007 Format(1X,'Total number of distinct two-ring fusions:',I4,
+ 1006 Format(12(1X,'(',I4,',',I4,')'))
+ 1007 Format(1X,'Total number of distinct two-ring fusions:',I5,
      1 ' (should be identical to the number of edges Ne)',/)
- 1008 Format(2X,A6,1X,'(',I1,'-',I1,'-',I1,') fusions: ',I4)
- 1009 Format(2X,A6,1X,'(',I1,'-',I1,'-',I1,') fusions: ',I4,
-     1 ' (natural constraint of the second kind)')
- 1010 Format(1X,'Total number of distinct three-ring fusions:',I5,
-     1 ' (expected: ',I5,')')
+ 1008 Format(2X,A6,1X,'(',I1,'-',I1,'-',I1,') fusions: ',I5)
+ 1009 Format(2X,A6,1X,'(',I1,'-',I1,'-',I1,') fusions: ',I5,
+     1 ' (natural constraint of the second kind, Endo-Kroto pattern)')
+ 1010 Format(1X,'Total number of distinct three-ring fusions:',I6,
+     1 ' (expected: ',I6,')')
  1011 Format(10(1X,'(',I3,',',I3,','I3,')'))
  1012 Format(' WARNING: expected 3-ring count does not match ',
      1 'number found')
@@ -656,16 +725,779 @@ C     Similar for hexagon indices a la Fowler and Manolopoulus
      1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
      1 'neighboring pentagon indices')
  1017 Format(1X,'Rhagavachari/Fowler neighboring hexagon indices: (',
-     1 6(I3,','),I3,')')
+     1 6(I3,','),I4,')')
  1018 Format(1X,'Number vertices matches the ',I5,
      1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
-     1 'neighboring hexagon indices ---> Fullerene is IPR')
+     1 'neighboring hexagon indices h3+h4+h5+h6')
  1019 Format(1X,'Number vertices does not match the ',I5,
      1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
-     1 'neighboring hexagon indices ---> Fullerene is not IPR')
+     1 'neighboring hexagon indices h3+h4+h5+h6')
  1020 Format(1X,'Rhagavachari/Fowler neighboring hexagon indices: (',
-     1 6(I3,','),I3,')  and strain parameter sigma = ',F12.6)
+     1 6(I3,','),I4,')  and strain parameter sigma = ',F12.6)
  1021 Format(10(1X,'(',I3,',',I3,','I3,')'))
+ 1022 Format(1X,'--> Fullerene is IPR')
+ 1023 Format(1X,'--> Fullerene is not IPR')
+ 1030 Format(/1X,'No Stone-Wales patterns found')
+ 1031 Format(/1X,I2,' Stone-Wales patterns found:')
+ 1032 Format(7(' (',I2,',',I5,',',I5,',',I2,')'))
+ 1033 Format(/1X,'Calculate Standard Enthalpy for IPR fullerene ',
+     1 'from structural motifs (M)',/2X,'J.Cioslowski, ',
+     1 'N.Rao, D.Moncrieff, J. Am. Chem. Soc. 122, 8265 (2000)',
+     1 /1X,'Loop through all ',I5,' hexagons. Ring patterns:')
+ 1034 Format  (' M666666: ',I4,', M666665: ',I4,', M666655: ',I4,
+     1        ', M666565: ',I4,', M665665: ',I4,', M666555: ',I4,
+     1       /,' M665655: ',I4,', M656565: ',I4,', M665555: ',I4,
+     1        ', M656555: ',I4,', M655655: ',I4,', M655555: ',I4,
+     1       /,' M555555: ',I4,', M6666  : ',I4,', M6665  : ',I4,
+     1        ', M6656  : ',I4,', M6655  : ',I4,', M6565  : ',I4,
+     1       /,' M6556  : ',I4,', M5665  : ',I4,', M6555  : ',I4,
+     1        ', M5655  : ',I4,', M5555  : ',I4,', M13/66 : ',I4,
+     1       /,' M13/56 : ',I4,', M13/55 : ',I4,', M14/66 : ',I4,
+     1        ', M14/56 : ',I4,', M14/55 : ',I4,', M135   : ',I4)
+ 1035 Format(1X,'Enthalpy H of formation:',/1X,
+     1 'Motif term:              ',F12.3,' kcal/mol',/1X,
+     1 'Curvature term:          ',F12.3,' kcal/mol',/1X,
+     1 'Total enthalpy:          ',F12.3,' kcal/mol')
+ 1036 Format(' H(C60)/60 - H(C',I2,')/',I2,4X,F12.3,' kcal/mol')
+ 1037 Format(' H(C60)/60 - H(C',I3,')/',I3,2X,F12.3,' kcal/mol')
+ 1038 Format(' H(C60)/60 - H(C',I5,')/',I5,F12.3,' kcal/mol')
+ 1040 Format(/1X,'No Yoshida-Fowler D3h 6555 pattern (C60-like corner',
+     1 ' patch) found')
+ 1041 Format(/1X,I2,' Yoshida-Fowler D3h 6555 patterns (C60-like ', 
+     1 'corner  patch) found:')
+ 1042 Format(8(' (',I5,',',I2,',',I2,',',I2,')'))
+ 1043 Format(/1X,'No Yoshida-Fowler D3h 666555 pattern (C80-like ',
+     1 'corner patch) found')
+ 1044 Format(/1X,I2,' Yoshida-Fowler D3h 666555 patterns (C80-like ', 
+     1 'corner  patch) found:')
+ 1045 Format(4(' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,') '))
+      Return
+      END
+
+      SUBROUTINE Ninevertexinsert(Natom,Nedges,Kring3,n3ra,nc656,n3rd,
+     1 NringA,NringB,IRing5,numberYF,nYF)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION NringA(Nedges),NringB(Nedges),n3ra(3,natom),nFM(4,66)
+      DIMENSION n3rd(3,natom),nYF(6,66),mem(3)
+C Find Yoshida-Fowler D3h 666555 pattern for 9-vertex insertion
+      numberYF=0
+      if(Kring3.eq.0.or.nc656.eq.0) Return
+      do I=1,6
+      do J=1,66
+       nfm(I,J)=0
+      enddo
+      enddo
+      do I=1,Kring3
+       I1=n3ra(1,I)
+       I2=n3ra(2,I)
+       I3=n3ra(3,I)
+       icount=0
+       do J=1,nc656
+        J1=n3rd(1,J)
+        J2=n3rd(3,J)
+        if(I1.eq.J1.and.I2.eq.J2) then
+         icount=icount+1
+         mem(icount)=n3rd(2,J)
+        endif
+        if(I2.eq.J1.and.I3.eq.J2) then
+         icount=icount+1
+         mem(icount)=n3rd(2,J)
+        endif
+        if(I1.eq.J1.and.I3.eq.J2) then
+         icount=icount+1
+         mem(icount)=n3rd(2,J)
+        endif
+       enddo
+      if(icount.eq.3) then
+       numberYF=numberYF+1
+       nYF(1,numberYF)=I1
+       nYF(2,numberYF)=I2
+       nYF(3,numberYF)=I3
+       nYF(4,numberYF)=mem(1)
+       nYF(5,numberYF)=mem(2)
+       nYF(6,numberYF)=mem(3)
+      endif
+      enddo
+      Return
+      END
+
+      SUBROUTINE Threevertexinsert(Natom,Nedges,Kring3,n3ra,
+     1 NringA,NringB,IRing5,numberFM,nFM)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION NringA(Nedges),NringB(Nedges),n3ra(3,natom),nFM(4,66)
+      DIMENSION IC(4)
+C Find Yoshida-Fowler D3h 6555 pattern for 3-vertex insertion
+      numberfm=0
+      if(Kring3.eq.0) Return
+      icount=0
+      mring=0
+      do I=1,4
+      do J=1,66
+       nfm(I,J)=0
+      enddo
+      enddo
+      do I=1,Kring3
+      do J=I+1,Kring3
+       if(n3ra(2,I).eq.n3ra(2,J).and.n3ra(2,I).ne.mring) then
+        icount=icount+1
+        nfm(1,icount)=n3ra(2,I)
+        mring=n3ra(2,I)
+        IC(1)=n3ra(1,I)
+        IC(2)=n3ra(3,I)
+        IC(3)=n3ra(1,J)
+        IC(4)=n3ra(3,J)
+        Do K1=1,4
+        Do K2=K1+1,4
+         if(IC(K2).lt.IC(K1)) then
+          II=IC(K1)
+          IC(K1)=IC(K2)
+          IC(K2)=II
+         endif
+        enddo
+        enddo
+        Do K=2,4
+         if(IC(K).eq.IC(K-1)) then
+          Do K1=K+1,4
+           IC(K1-1)=IC(K1)
+          enddo
+         endif
+        enddo
+        nfm(2,icount)=IC(1)
+        nfm(3,icount)=IC(2)
+        nfm(4,icount)=IC(3)
+        go to 9
+       endif
+      enddo
+   9  continue
+      enddo
+
+C Sort and check if any duplicates
+      do I=1,icount
+      do J=I+1,icount
+       if(nfm(1,J).lt.nfm(1,I)) then
+        I1=nfm(1,I)
+        I2=nfm(2,I)
+        I3=nfm(3,I)
+        I4=nfm(4,I)
+        nfm(1,I)=nfm(1,J)
+        nfm(2,I)=nfm(2,J)
+        nfm(3,I)=nfm(3,J)
+        nfm(4,I)=nfm(4,J)
+        nfm(1,J)=I1
+        nfm(2,J)=I2
+        nfm(3,J)=I3
+        nfm(4,J)=I4
+       endif
+      enddo
+      enddo
+
+      numberfm=icount
+      do I=2,icount
+       if(nfm(1,I).eq.nfm(1,I-1)) then
+        do J=I+1,icount
+         do k=1,4
+          nfm(k,J-1)=nfm(k,J)
+         enddo
+        enddo
+        numberfm=numberfm-1
+       endif
+      enddo
+ 
+      Return
+      END
+
+      SUBROUTINE CheckCioslowski(Iout,Matom,p)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION p(30)
+      nhex=MAtom/2-10
+      sum=0
+C Check if number of patches is correct
+      do I=1,30
+       sum=sum+p(I)
+      enddo
+      if(sum.ne.nhex) Write(Iout,1000) sum,nhex
+C Check if eqs.(2a-e) from Cioslowski's paper are fulfilled
+
+      c2a=2*(p(2)+p(3)+p(6)+p(9)+p(12)-p(14))+
+     1 4*(p(4)+p(5)+p(7)+p(10)+p(11))+6*p(8)-p(15)+p(18)+p(22)
+
+C There is a typo in Cioslowski's paper concerning N655555. 
+C Equation (2b) should be
+C    N666655 + 2 N666555 +   N665655 + 3 N665555 + 2 N656555 + 
+C  2 N655655 + 4 N655555 + 6 N555555 +   N6556    +  N6555   + 
+C    N5555   -   N13/66  = 0
+
+      c2b=2*(p(6)+p(10)+p(11))+3*p(9)+6*p(13)+p(3)+p(7)+4*p(12)
+     1 +p(19)+p(21)+p(23)-p(24)
+
+C In Cioslowski's paper 13/65 should be 13/56, same with 14/65
+      c2c=2*p(23)+p(17)+p(21)+p(22)-p(25)
+
+C There is a typo in Cioslowski's paper concerning N14/66. 
+C Equation (2d) should be
+C    N6665 + N6565 + 2 N5665 + N5655 + 2 N13/55 + 2 N13/56 -
+C  4 N14/66 - 2 N14/56 = 0
+      c2d=p(15)+p(18)+p(22)-4*p(27)+2*(p(20)+p(25)+p(26)-p(28))
+
+      c2e=p(14)+p(15)+p(16)+p(17)+p(18)+p(19)+p(20)+p(21)+p(22)+
+     1 p(23)+2*(p(24)+p(25)+p(26)+p(27)+p(28)+p(29))+3*p(30)
+
+      Write(Iout,1001) c2a,c2b,c2c,c2d,c2e
+      if(c2a.ne.0.or.c2b.ne.0.or.c2c.ne.0.or.c2d.ne.0.or.c2e.ne.60) 
+     1 Write(Iout,1002) 
+ 1000 Format(' Severe Error: Sum of patches ',I5,' not equal to'
+     1 ' number of hexagons ',I5)
+ 1001 Format(1X,'Check equations (2a)-(2e): Solutions ',5I3) 
+ 1002 Format(' Severe Error: Cioslowski equations not fulfilled')
+      Return
+      END
+
+      SUBROUTINE Cioslowski(natom,Nfaces,Nedges,K656,nl565,IRing5,
+     1 IRing56,IRing6,MAtom,N5Ring,N6Ring,NRing,NringA,NringB,
+     1 NringC,NringD,NringE,NringF,n3ra,n3rc,Mpatt,E1,E2)
+      IMPLICIT INTEGER (A-Z)
+      Real*8 EMC(30),E1,E2
+      DIMENSION Nring(Nfaces),MPatt(30),n3ra(3,natom),n3rc(3,natom)
+      DIMENSION NringA(Nedges),NringB(Nedges)
+      DIMENSION NringC(Nedges),NringD(Nedges)
+      DIMENSION NringE(Nedges),NringF(Nedges)
+      DIMENSION nhex(6),ihex(6),ipent(6)
+      data EMC/30.336,18.636,13.560,6.351,-0.145,4.162,-2.468,
+     1 -5.563,1.559,-0.807,-6.576,-0.133,-0.313,18.498,16.476,
+     1 14.792,12.519,14.779,14.255,13.427,8.007,11.087,1.245,
+     1 30.422,34.103,26.377,31.455,32.167,29.980,44.281/
+      do I=1,30
+       Mpatt(I)=0
+      enddo
+
+C Loop through all 6-rings and find 4 basic patterns
+C depending the number of 5-rings connected to the 6-ring
+      Do I=13,N6ring+12
+C  Search for 5-rings
+       n5count=0
+       N135=0
+       do J=1,6
+        ipent(J)=0
+        nhex(J)=0
+       enddo
+       Do J=1,IRing56
+        if(NringD(J).eq.I) then
+         n5count=n5count+1
+         ipent(n5count)=NringC(J)
+       endif
+       enddo
+       if(n5count.gt.3) stop 1
+       go to (10,20,30,40),n5count+1
+
+C  zero pentagons on main hexagon, all hexagons
+C  Get hexagon ring numbers
+   10  i6=0
+       Do J=1,IRing6
+        if(NringE(J).eq.I) then
+         i6=i6+1
+         if(i6.gt.6) stop 2
+         nhex(i6)=NringF(J)
+        endif
+        if(NringF(J).eq.I) then
+         i6=i6+1
+         if(i6.gt.6) stop 3
+         nhex(i6)=NringE(J)
+        endif
+       enddo
+       if(i6.lt.6) stop 4
+C Now sort hexagon numbers in ring of hexagons
+C according to their adjacencies
+       Call sorthex(Nedges,IRing6,nhex,NringE,NringF)
+C Now get the right structure motif. Search through c-6-5-6
+       do K=1,6
+        I1=K
+        I2=K+1
+        if(I2.eq.7) I2=1
+        IH1=nhex(I1)
+        IH2=nhex(I2)
+        if(IH2.lt.IH1) then
+         imem=IH1
+         IH1=IH2
+         IH2=imem
+        endif
+         ihex(K)=0
+        do J=1,K656
+         if(IH1.eq.n3ra(1,J).and.IH2.eq.n3ra(3,J)) then
+          ihex(K)=1
+          go to 19
+         endif 
+        enddo
+   19   continue
+       enddo
+C Now analyze ihex and get M values for patterns 1-13
+       Call HexPattern(ihex,M)
+       go to 100
+
+C---  One pentagon on main hexagon
+   20  i6=0
+       nhex(6)=0
+       Do J=1,IRing6
+        if(NringE(J).eq.I) then
+         i6=i6+1
+         if(i6.gt.5) stop 5
+         nhex(i6)=NringF(J)
+        endif
+        if(NringF(J).eq.I) then
+         i6=i6+1
+         if(i6.gt.5) stop 6
+         nhex(i6)=NringE(J)
+        endif
+       enddo
+       if(i6.ne.5) stop 7
+C Now sort hexagon numbers in ring of adjacent hexagons
+       Call sorthex1(Nedges,IRing6,IRing56,nhex,
+     1  NRingC,NRingD,NringE,NringF,ipent)
+C Now get the right structure motif. Search throgh c-6-5-6
+       do K=1,4
+        I1=K
+        I2=K+1
+        IH1=nhex(I1)
+        IH2=nhex(I2)
+        if(IH2.lt.IH1) then
+         imem=IH1
+         IH1=IH2
+         IH2=imem
+        endif
+         ihex(K)=0
+        do J=1,K656
+          if(IH1.eq.n3ra(1,J).and.IH2.eq.n3ra(3,J)) then
+          ihex(K)=1
+          go to 29
+         endif 
+        enddo
+   29   continue
+       enddo
+C Now analyze ihex and get M
+       Call HexPattern5(ihex,M)
+       go to 100
+
+C---  Two pentagons on main hexagon
+   30  i6=0
+       nhex(5)=0
+       nhex(6)=0
+       Do J=1,IRing6
+        if(NringE(J).eq.I) then
+         i6=i6+1
+         nhex(i6)=NringF(J)
+        endif
+        if(NringF(J).eq.I) then
+         i6=i6+1
+         nhex(i6)=NringE(J)
+        endif
+       enddo
+       if(i6.ne.4) stop 10
+C Now sort hexagon numbers in ascending order
+      Do J1=1,4
+      Do J2=J1+1,4
+       if(nhex(J2).lt.nhex(J1)) then
+        imem=nhex(J1)
+        nhex(J1)=nhex(J2)
+        nhex(J2)=imem
+       endif
+      enddo
+      enddo
+C  Sort if main 5-6-5 is linear or bent
+       do J=1,nl565
+        if(I.eq.n3rc(2,J)) go to 35
+       enddo
+C  bent 5-6-5 main pattern 
+C   Get 3 adjacent hexagons
+       Call sorthex3(Nedges,IRing6,nhex,NringE,NringF)
+C   Count 656 rings
+       I1=nhex(1)
+       I2=nhex(2)
+       if(I1.gt.I2) then
+        imem=I1
+        I1=I2
+        I2=imem
+       endif
+       I3=nhex(2)
+       I4=nhex(3)
+       if(I3.gt.I4) then
+        imem=I3
+        I3=I4
+        I4=imem
+       endif
+       icount=0
+C    Loop through closed 656
+       do J=1,K656
+        if(I1.eq.n3ra(1,J).and.I2.eq.n3ra(3,J)) icount=icount+1
+        if(I3.eq.n3ra(1,J).and.I4.eq.n3ra(3,J)) icount=icount+1
+       enddo
+       if(icount.gt.2) stop 11
+C 13/66
+       if(icount.eq.0) M=24
+C 13/65
+       if(icount.eq.1) M=25
+C 13/55
+       if(icount.eq.2) M=26
+       go to 100
+C  linear 5-6-5 main pattern
+C  Find adjacent hexagons
+   35  Call sorthex4(Nedges,IRing6,nhex,NringE,NringF)
+C    Loop through closed 656
+       I1=nhex(1)
+       I2=nhex(2)
+       I3=nhex(3)
+       I4=nhex(4)
+       icount=0
+C    Loop through closed 656
+       do J=1,K656
+        if(I1.eq.n3ra(1,J).and.I2.eq.n3ra(3,J)) icount=icount+1
+        if(I3.eq.n3ra(1,J).and.I4.eq.n3ra(3,J)) icount=icount+1
+       enddo
+       if(icount.gt.2) stop 12
+C 14/66
+       if(icount.eq.0) M=27
+C 14/65
+       if(icount.eq.1) M=28
+C 14/55
+       if(icount.eq.2) M=29
+       go to 100
+
+C---  Three pentagons on main hexagon
+   40  M=30
+       
+  100  Mpatt(M)=Mpatt(M)+1
+      enddo
+
+C Get energy
+      E1=0.d0
+      E2=-8.050751d3/(dfloat(Matom)-30.050)
+      Do I=1,30
+       E1=E1+dfloat(Mpatt(I))*EMC(I)
+      enddo
+
+      Return
+      END
+
+      SUBROUTINE sorthex(Nedges,IRing6,nhex,NringE,NringF)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION NringE(Nedges),NringF(Nedges)
+      DIMENSION nhex(6)
+C     Sort hexagon numbers according to their adjacencies
+      do I=1,6
+       IS=nhex(I)
+      do J=I+1,6
+       JS=nhex(J)
+       do K=1,IRing6
+        if(IS.eq.NringE(K).and.JS.eq.NringF(K)) then
+         nhex(J)=nhex(I+1)
+         nhex(I+1)=JS
+         go to 10
+        endif
+        if(IS.eq.NringF(K).and.JS.eq.NringE(K)) then
+         nhex(J)=nhex(I+1)
+         nhex(I+1)=JS
+         go to 10
+        endif
+       enddo
+      enddo
+  10  continue
+      enddo
+      Return
+      END
+
+      SUBROUTINE sorthex1(Nedges,IRing6,Iring56,nhex,
+     1 NRingC,NRingD,NringE,NringF,ipent)
+      IMPLICIT INTEGER (A-Z)
+C Sort hexagon numbers in ring of adjacent hexagons
+C after the pentagon
+      DIMENSION NringC(Nedges),NringD(Nedges)
+      DIMENSION NringE(Nedges),NringF(Nedges)
+      DIMENSION nhex(6),ipent(6)
+C     Get hexagon adjacent to pentagon
+      ifound=0
+      do I=1,5
+       IH=nhex(I)
+       Do J=1,IRing56
+        if(IH.eq.NringD(J).and.NRingC(J).eq.ipent(1)) then
+         imem=nhex(1)
+         nhex(1)=IH
+         nhex(I)=imem
+         ifound=1
+         go to 1
+        endif
+       enddo
+      enddo
+   1  if(ifound.eq.0) stop 14
+ 
+C     Now sort in spiral
+      do I=1,5
+       IS=nhex(I)
+      do J=I+1,5
+       JS=nhex(J)
+       do K=1,IRing6
+        if(IS.eq.NringE(K).and.JS.eq.NringF(K)) then
+         nhex(J)=nhex(I+1)
+         nhex(I+1)=JS
+         go to 10
+        endif
+        if(IS.eq.NringF(K).and.JS.eq.NringE(K)) then
+         nhex(J)=nhex(I+1)
+         nhex(I+1)=JS
+         go to 10
+        endif
+       enddo
+      enddo
+  10  continue
+      enddo
+      Return
+      END
+
+      SUBROUTINE sorthex3(Nedges,IRing6,nhex,NringE,NringF)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION NringE(Nedges),NringF(Nedges),icount(4),nhex(6)
+C     Find ring connected to two others
+      do I=1,4
+       icount(i)=0
+      enddo
+      do I=1,4
+      do J=I+1,4
+       do K=1,IRing6
+        if(NringE(K).eq.nhex(I).and.NringF(K).eq.nhex(J)) then
+         icount(I)=icount(I)+1
+         icount(J)=icount(J)+1
+        endif
+       enddo
+      enddo
+      enddo
+      idis=0
+C     Eliminate disconnected one 
+      do I=1,4
+       if(icount(I).eq.0) then
+        nhex(i)=nhex(4)
+        nhex(4)=0
+        icount(i)=icount(4)
+        icount(4)=0
+        idis=1
+       endif
+      enddo
+      if(idis.eq.0) stop 19
+C put middle ring at position 2
+      do I=1,3
+       if(icount(I).eq.2) ipos=I
+      enddo
+C Now swap
+      imem=nhex(2)
+      nhex(2)=nhex(ipos)
+      nhex(ipos)=imem
+      Return
+      END
+
+      SUBROUTINE sorthex4(Nedges,IRing6,nhex,NringE,NringF)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION NringE(Nedges),NringF(Nedges),nhex(6)
+      ifound=0
+      do I=2,4
+       do K=1,IRing6
+        if(NringE(K).eq.nhex(1).and.NringF(K).eq.nhex(I)) then
+         ifound=I
+         go to 10
+        endif
+       enddo
+      enddo
+  10  if(ifound.eq.0) stop 13
+       imem=nhex(2)
+       nhex(2)=nhex(ifound)
+       nhex(ifound)=imem
+      if(nhex(3).gt.nhex(4)) then
+       imem=nhex(3)
+       nhex(3)=nhex(4)
+       nhex(4)=imem
+      endif
+      Return
+      END
+      
+      SUBROUTINE HexPattern(ihex,M)
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION ihex(6)
+       isum=0
+       do I=1,6
+        isum=isum+ihex(i)
+       enddo
+       go to (1,2,3,4,5,6,7) isum+1
+C 666666
+    1  M=1
+       Return
+C 666665
+    2  M=2
+       Return
+C 666655 or 666565 or 665665
+C 665665
+    3  M=5
+       do I=1,6
+        I1=I+1
+        if(I.eq.6) I1=1
+        if(ihex(I).eq.1.and.ihex(I1).eq.1) then
+C 666655
+         M=3
+         Return
+        endif
+        I2=I+2
+        if(I.eq.5) I2=1
+        if(I.eq.6) I2=2
+        if(ihex(I).eq.1.and.ihex(I2).eq.1) then
+C 666565
+         M=4
+         Return
+        endif
+       enddo
+       Return
+C 666555 or 665655 or 656565
+C Care needs to be taken as 665655 is chiral
+C so this is taken as the first one
+C 665655
+    4  M=7
+       do I=1,6
+        I1=I+1
+        I2=I+2
+        if(I.eq.5) I2=1
+        if(I.eq.6) then
+         I1=1
+         I2=2
+        endif
+        if(ihex(I).eq.1.and.ihex(I1).eq.1.and.ihex(I2).eq.1) then
+C 666555
+         M=6
+         Return
+        endif
+        I4=I2+2
+        if(I.eq.3) I4=1
+        if(I.eq.4) I4=2
+        if(ihex(I).eq.1.and.ihex(I2).eq.1.and.ihex(I4).eq.1) then
+C 656565
+         M=8
+         Return
+        endif
+       enddo
+       Return
+C 665555 or 656555 or 655655
+C 656555
+    5  M=10
+       do I=1,6
+        I1=I+1
+        I2=I+2
+        I3=I+3
+        if(I.eq.6) then
+         I1=1
+         I2=2
+         I3=3
+        endif
+        if(I.eq.5) then
+         I2=1
+         I3=2
+        endif
+        if(I.eq.4) then
+         I3=1
+        endif
+        if(ihex(I).eq.1.and.ihex(I1).eq.1.and.ihex(I2).eq.1.
+     1   and.ihex(I3).eq.1) then
+C 665555
+         M=9
+         Return
+        endif
+        I4=I2+2
+        if(I.eq.3) I4=1
+        if(I.eq.4) I4=2
+        if(ihex(I).eq.1.and.ihex(I1).eq.1.and.ihex(I3).eq.1.
+     1   and.ihex(I4).eq.1) then
+C 655655
+         M=11
+         Return
+        endif
+       enddo
+       Return
+C 655555
+    6  M=12
+       Return
+C 555555
+    7  M=13
+      Return
+      END
+
+      SUBROUTINE HexPattern5(ihex,M)
+      IMPLICIT INTEGER (A-Z)
+C Analyze ihex and get M
+      DIMENSION ihex(6)
+       isum=0
+       do I=1,4
+        isum=isum+ihex(i)
+       enddo
+       go to (1,2,3,4,5) isum+1
+C 6666
+    1  M=14
+       Return
+C 6665 or 6656
+C 6656
+    2  M=16
+C 6665 
+        if(ihex(1).eq.1.or.ihex(4).eq.1) M=15
+       Return
+C 6655 or 6565 or 6556 or 5665
+C 6655
+    3  M=17
+       if(ihex(2).eq.1.and.ihex(4).eq.1.or.
+     1  ihex(1).eq.1.and.ihex(3).eq.1) then
+C 6565 
+        M=18
+        Return
+       endif
+       if(ihex(2).eq.1.and.ihex(3).eq.1) then
+C 6556
+        M=19
+        Return
+       endif
+       if(ihex(1).eq.1.and.ihex(4).eq.1) then
+C 5665
+        M=20
+        Return
+       endif
+       Return
+C 6555 or 5655 
+C 5655 
+    4  M=22
+       if(ihex(2).eq.1.and.ihex(3).eq.1.and.ihex(4).eq.1) then
+C 6555
+        M=21
+        Return
+       endif
+       if(ihex(1).eq.1.and.ihex(2).eq.1.and.ihex(3).eq.1) then
+C 6555
+        M=21
+        Return
+       endif
+       Return
+C 5555
+    5  M=23
+      Return
+      END
+
+      SUBROUTINE StoneWales(Natom,Kring3,n3ra,numbersw,nSW)
+      IMPLICIT INTEGER (A-Z)
+      Integer n3ra(3,natom),nSW(4,66)
+       numbersw=0 
+      if(Kring3.eq.0) Return
+      do I=1,Kring3
+      do J=I+1,Kring3
+       nI1=n3ra(1,I)
+       nI3=n3ra(3,I)
+       nJ1=n3ra(1,J)
+       nJ3=n3ra(3,J)
+       if(NI1.eq.NJ1.and.NI3.eq.NJ3) then
+        numbersw=numbersw+1
+        nsw(1,numbersw)=nI1
+        nsw(4,numbersw)=nI3
+        nsw(2,numbersw)=n3ra(2,I)
+        nsw(3,numbersw)=n3ra(2,J)
+       endif
+      enddo
+      enddo
       Return
       END
  
@@ -1908,8 +2740,8 @@ C     Check if structure is alright at this point
       Write(IOUT,1005) Mcon2,nexpedge
       stop
       endif
- 1000 Format(/1X,' Number of connected surface atoms (edges, bonds):',
-     1 I4,/1X,' Connectivities (edge set):')
+ 1000 Format(/1X,' Number of connected surface atoms (edges, bonds): ',
+     1 I5,/1X,' Connectivities (edge set):')
  1001 Format(1X,12('{',I2,',',I2,'} '))
  1002 Format(1X,' Calculate all vertices N and corresponding ',
      1 'adjacencies Ni of 3-connected graph:',
