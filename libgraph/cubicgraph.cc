@@ -65,11 +65,8 @@ CubicGraph::CubicGraph(unsigned int index, istream& file){
   file.read(reinterpret_cast<char*>(&N), 1);
   if(N == 0){
     file.read(reinterpret_cast<char*>(&N),2);
-    //    fprintf(stderr, "N: %x -> %x\n",N,((N&0xff)>>8) | (N>>8));
-    //    N = ((N&0xff)>>8) | (N>>8); // Swap byte order
   }
   neighbours.resize(N);
-  //cerr << N << " vertices per graph\n";
 
   //only for files with graphs of the equal size
   unsigned int step;
@@ -78,34 +75,33 @@ CubicGraph::CubicGraph(unsigned int index, istream& file){
   else
     {step = N * 8 + 3;}
   size_t address = header_size + step * index;
-  //cerr << "Index " << index << " ~> address " << address << endl;
+
+  //check if selected graph is valid
+  unsigned int graphs_per_file = (file_size - header_size ) /step;
+  if(graphs_per_file -1 < index)
+    cerr << "There are only " << graphs_per_file << " stored in this file.\n";
 
   //the actual parsing of the selected graph
   file.seekg(address+1, ifstream::beg);//because the size is known
 
   if(N<=255){
-    //cerr << "Byte sized vertex numbers\n";
     for(node_t u=0; u<N; ++u){
       for(int neighbour=0; neighbour<3; ++neighbour){
 	unsigned char v;
 
-	fprintf(stderr, "Adding edge (%d,%d)\n",u,v);
+	//fprintf(stderr, "Adding edge (%d,%d)\n",u,v);
 	file.read(reinterpret_cast<char*>(&v), 1);
 	neighbours[u].push_back(v-1);
       }
       file.seekg(1,ifstream::cur);
     }
   } else{
-    //cerr << "Short sized vertex numbers\n";
     file.seekg(2, std::ifstream::cur);//because three bytes are not read
     for(node_t u=0; u<N; ++u){
-      //      cerr << u << ": ";
       for(int neighbour=0; neighbour<3; ++neighbour){
 	unsigned short v;
 	file.read(reinterpret_cast<char*>(&v),2);
-	//	v = ((v&0xff)>>8) | (v>>8); // Swap byte order
 	neighbours[u].push_back(v-1);
-	//	cerr << v << endl;
       }
       file.seekg(2,ifstream::cur);
     }
