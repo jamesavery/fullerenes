@@ -152,6 +152,10 @@ C With Hamiltonian cycles
       enddo
       endif
   400  Write(Iout,1008) L,GROUP,K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,K11,K12
+      if(L.eq.0) then
+       WRITE (Iout,1015)
+       return
+      endif
        Close(unit=1)
       if(iham.ne.0) then
        WRITE (Iout,1010) hamlow,islow,hamhigh,ishigh
@@ -166,12 +170,12 @@ C Now check if list is complete or not
        M1=N/2-9
        M2=N/2-29
        if(IPR.eq.0) then
-        if(M1.le.119.and.L.eq.Isonum(M1)) then
+        if(M1.le.119.and.L.ge.Isonum(M1)) then
          Write(Iout,1009) Isonum(M1)
          return
         endif
        else
-        if(M2.le.123.and.M2.gt.0.and.L.eq.IsoIPR(M2)) then
+        if(M2.le.123.and.M2.gt.0.and.L.ge.IsoIPR(M2)) then
          Write(Iout,1009) IsoIPR(M2)
          return
         endif
@@ -329,9 +333,9 @@ C     Analyze dual matrix
         endif
        endif
        if(IPR.eq.0) then
-        if(M1.le.119.and.L.eq.Isonum(M1)) go to 99
+        if(M1.le.119.and.L.ge.Isonum(M1)) go to 99
        else
-        if(M2.le.123.and.M2.gt.0.and.L.eq.IsoIPR(M2)) go to 99
+        if(M2.le.123.and.M2.gt.0.and.L.ge.IsoIPR(M2)) go to 99
       endif
  13     CONTINUE 
  12     CONTINUE        ! Close loop over spiral 
@@ -482,6 +486,8 @@ C     Analyze dual matrix
      1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
  1013 FORMAT(/1X,'Starting with new list:')
  1014 Format(1X,'File: ',A20,' does not exist ==> ABORT')
+ 1015 Format(1X,'Last entry is zero, so check that you do not have ',
+     1 'an empty line at the end of the input')
  2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
  2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
  2002 Format(A18)
