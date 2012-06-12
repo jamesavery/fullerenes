@@ -129,7 +129,7 @@ C   Search in 6-ring
         if(is1.eq.N6M(I,J)) n6hit=n6hit+1
         if(is2.eq.N6M(I,J)) n6hit=n6hit+1
         if(is3.eq.N6M(I,J)) n6hit=n6hit+1
-        if(n6hit.eq.3) then 
+        if(n6hit.eq.3) then
          c(1)=cr6(1,I) 
          c(2)=cr6(2,I) 
          c(3)=cr6(3,I)
@@ -585,7 +585,7 @@ C   Print Schlegel picture
       enddo
 
       Close(unit=2)
-      Return
+      go to 9999
 
 C   Algorithm 3 (Tutte):
 C   Use Tutte method and optimize graph
@@ -624,7 +624,7 @@ C   Search in 6-ring
         if(is1.eq.N6M(I,J)) n6hit=n6hit+1
         if(is2.eq.N6M(I,J)) n6hit=n6hit+1
         if(is3.eq.N6M(I,J)) n6hit=n6hit+1
-        if(n6hit.eq.3) then 
+        if(n6hit.eq.3) then
          c(1)=cr6(1,I) 
          c(2)=cr6(2,I) 
          c(3)=cr6(3,I)
@@ -643,7 +643,7 @@ C   Search in 6-ring
       endif
       if(n6hit.eq.3) then
        Do I=1,6
-        IS(I)=N5M(IR,I)
+        IS(I)=N6M(IR,I)
        enddo
        lring=6
        WRITE(IOUT,1039) IR,(IS(I),I=1,6),(c(i),i=1,3)
@@ -718,7 +718,10 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
        Close(unit=2)
       endif
 
-       Return
+ 9999 Continue
+C James, here goes your latex program creation for Schlegel diagram
+C     call write_layout2d(g,filename,"latex")
+      Return
   901 Format(I6,2F12.6)
   902 Format(I6,2(1X,F12.6),1X,3(1X,I6))
  1000 Format(/1X,'Schlegel diagram for selected projection point',
