@@ -55,7 +55,7 @@ CubicGraph::CubicGraph(unsigned int index, istream& file){
 	
   // Get file size
   file.seekg(0,ios::end);
-  ifstream::pos_type file_size = file.tellg();
+  size_t file_size = file.tellg();
 
   //find number of vertices per graph
   //only for files with graphs of the equal size
