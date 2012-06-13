@@ -340,7 +340,7 @@ C     smallest bond distance to Cdist
       enddo
       fac=CDist/R0
       Write(Iout,1010) icand,I1,I2,I3,fac1,fac2,fac3,fac,Cdist
-      Do k=1,2*IL3
+      Do k=1,2*I3
       ICN=0
       ICP=0
       do kk=1,Matom
