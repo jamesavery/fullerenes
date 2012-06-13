@@ -396,9 +396,9 @@
 !    (except of course for the ones where the pentagon indices input is
 !    chosen). Note that for some of the fullerene coordinates the singlet
 !    state chosen may not be the electronic ground state.
-! Number of atoms is set in NATOMS currently at 900, so change this parameter
+! Number of atoms is set in NMAX currently at 5000, so change this parameter
 !   if you do not have enough RAM, alternatively the distances need to be
-!   calculated directly and the DistMat(natomL) Matrix removed 
+!   calculated directly and the DistMat(NmaxL) Matrix removed 
 !   (which I can do if somebody insists). Also, maxit=2000000, which sets the
 !   number of isomers or the number of Hamiltonian cycles to this value in order
 !   for the program to not run forever.
@@ -738,32 +738,24 @@
 !-----------------------------------------------------------------------------------
 
       PROGRAM Fullerene
+      use config
+
       IMPLICIT REAL*8 (A-H,O-Z)
 C    Set the dimensions for the distance matrix
-      PARAMETER (natom=5000)      !  Change natom if RAM is not sufficient
-      PARAMETER (nat11=natom*11)  
-      PARAMETER (msrs=56+1)      !  Size of Schlegel output matrix
-      PARAMETER (natom2=natom*natom)
-      PARAMETER (natomL=(natom*(natom-1))/2)
-      PARAMETER (Nfaces=natom/2+2)
-      PARAMETER (NSpScale=12)
-      PARAMETER (NSpirals=Nfaces*NSpScale)
-      PARAMETER (Nedges=3*natom/2)
-      PARAMETER (maxit=2000000) 
-      DIMENSION CRing5(3,Nfaces),CRing6(3,Nfaces),cmcs(3),CR(3,Nfaces)
-      DIMENSION DistMat(natomL),Dist(3,natom),DistCM(3),Dist2D(2,natom)
-      DIMENSION A(NAtom,NAtom),evec(Natom),df(Natom)
+      DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
+      DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
+      DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
       DIMENSION forceWu(9),forceWuP(9)
-      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6),Iring(Nfaces)
-      DIMENSION Icon2(natom2),distP(natom),IDA(Natom,Natom)
-      DIMENSION IATOM(natom),IC3(natom,3),Nring(Nfaces)
-      DIMENSION NringA(Nedges),NringB(Nedges)
-      DIMENSION NringC(Nedges),NringD(Nedges)
-      DIMENSION NringE(Nedges),NringF(Nedges)
-      DIMENSION IDual(Nfaces,Nfaces),nSW(4,66),nFM(4,66),nYF(6,66),
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
+      DIMENSION Icon2(Nmax*Nmax),distP(Nmax),IDA(Nmax,Nmax)
+      DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax)
+      DIMENSION NringA(Emax),NringB(Emax)
+      DIMENSION NringC(Emax),NringD(Emax)
+      DIMENSION NringE(Emax),NringF(Emax)
+      DIMENSION IDual(Mmax,Mmax),nSW(4,66),nFM(4,66),nYF(6,66),
      1 nWS(5,8)
-      DIMENSION NEK(3,natom),JP(12)
-      DIMENSION Symbol(Nfaces)
+      DIMENSION NEK(3,Nmax),JP(12)
+      DIMENSION Symbol(Mmax)
       Real*4 TimeX
 CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER CDAT*8,CTIM*10,Zone*5
@@ -793,9 +785,9 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       IOUT=6
       ilp=0
       iprev=0
-      Do I=1,NAtom
+      Do I=1,Nmax
        IAtom(I)=6
-      Do J=1,NAtom
+      Do J=1,Nmax
        IDA(I,J)=0
       enddo
       enddo
@@ -808,15 +800,15 @@ CG77    CALL Time(CTIM)
         call date_and_time(CDAT,CTIM,zone,values)
         TIMEX=0.d0
         CALL Timer(TIMEX)
-C       WRITE(IOUT,1000) CDAT,CTIM,natom
+C       WRITE(IOUT,1000) CDAT,CTIM,Nmax
         WRITE(IOUT,1000) Values(3),Values(2),Values(1),Values(5),
-     1    Values(6),Values(7),natom
+     1    Values(6),Values(7),Nmax
 C  INPUT and setting parameters for running the subroutines
  9    routine='DATAIN       '
       leapspiral=0
       SWspiral=0
       Write(Iout,1008) routine
-        CALL Datain(IN,IOUT,NAtom,MAtom,Icart,Iopt,iprintf,IHam,
+        CALL Datain(IN,IOUT,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,
@@ -832,7 +824,7 @@ C Options for Input coordinates
 C  Cartesian coordinates produced for Ih C60
    10 routine='COORDC20/60  '
       Write(Iout,1008) routine
-      CALL CoordC60(Natom,IN,Iout,MAtom,R5,R6,Dist)
+      CALL CoordC60(Nmax,IN,Iout,MAtom,R5,R6,Dist)
       Do I=1,60
        IAtom(I)=6
       enddo
@@ -864,7 +856,7 @@ C identify P-type eigenvectors and construct the 3D fullerene
    30 Ipent=1
       routine='COORDBUILD   '
       Write(Iout,1008) routine
-      CALL CoordBuild(Natom,NFaces,Nedges,MAtom,IN,Iout,IDA,IDual,
+      CALL CoordBuild(Nmax,Mmax,Emax,MAtom,IN,Iout,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPR,IPRC,ihueckel,JP,
      1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP)
       Do I=1,Matom
@@ -880,7 +872,7 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS      '
       Write(Iout,1008) routine
-      CALL Isomers(NAtom,NFaces,Nedges,MAtom,IPR,IOUT,
+      CALL Isomers(Nmax,Mmax,Emax,MAtom,IPR,IOUT,
      1 maxit,iprintham,ichk,IDA,A,chkname)
       if(istop.ne.0) go to 99
 
@@ -889,39 +881,39 @@ C Move carbon cage to Atomic Center
       routine='MOVECM       '
       Write(Iout,1008) routine
       Iprint=1
-      Call MoveCM(Natom,Matom,Iout,Iprint,IAtom,mirror,
+      Call MoveCM(Nmax,Matom,Iout,Iprint,IAtom,mirror,
      1 Dist,DistCM,El)
 
 C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia (to be implemented)
       routine='DIAMETER     '
       Write(Iout,1008) routine
-      CALL Diameter(NAtom,MAtom,IOUT,Dist,distp)
+      CALL Diameter(Nmax,MAtom,IOUT,Dist,distp)
 
 C Calculate the distance Matrix and print out distance Matrix
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
-      CALL Distmatrix(NAtom,natomL,MAtom,IOUT,iprintf,Iopt,
+      CALL Distmatrix(Nmax,NmaxL,MAtom,IOUT,iprintf,Iopt,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
 
 C Establish Connectivities
       routine='CONNECT      '
       Write(Iout,1008) routine
-      CALL Connect(NAtom,natomL,Natom2,MCon2,MAtom,Ipent,IOUT,
+      CALL Connect(Nmax,NmaxL,Nmax*Nmax,MCon2,MAtom,Ipent,IOUT,
      1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
 
 C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
       routine='HUECKEL      '
       Write(Iout,1008) routine
-      CALL Hueckel(NAtom,MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
+      CALL Hueckel(Nmax,MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
       endif
 
 C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
       routine='Leapfrog'
       Write(Iout,1008) routine
-      CALL Leapfrog(NAtom,MAtom,Iout,leap,leapGC,IGC1,IGC2,
+      CALL Leapfrog(Nmax,MAtom,Iout,leap,leapGC,IGC1,IGC2,
      1 ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
       leap=0
       leapGC=0
@@ -945,19 +937,19 @@ C adjacent vertices
       endif
       if(IHam.ne.0.and.ISW.eq.0) then
        if(iupac.ne.0) then
-         CALL Hamilton(NAtom,MAtom,Iout,iprintf,maxiter,IC3)
+         CALL Hamilton(Nmax,MAtom,Iout,iprintf,maxiter,IC3)
        else
-         CALL HamiltonCyc(NAtom,MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
+         CALL HamiltonCyc(Nmax,MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
          WRITE(Iout,1010) Nhamilton
          if(nbatch.ne.0) WRITE(Iout,1014)
        endif
       endif
-      CALL Paths(NAtom,Nedges,MAtom,IOUT,IDA,A,evec,df)
+      CALL Paths(Nmax,Emax,MAtom,IOUT,IDA,A,evec,df)
 
 C Establish all closed ring systems
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,
+      CALL Ring(Nmax,Emax,Mmax,NmaxL,Nmax*Nmax,MCon2,MAtom,IOUT,
      1 N5Ring,N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
      1 DistMat)
 
@@ -970,26 +962,26 @@ C Optimize Geometry through force field method
         ftol=ftolP*1.d3
         Write(Iout,1003)
         fcoulomb=forceWu(9)
-        CALL OptFF(Natom,NFaces,MAtom,Iout,IDA,N5Ring,N6Ring,
+        CALL OptFF(Nmax,Mmax,MAtom,Iout,IDA,N5Ring,N6Ring,
      1   N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
        ftol=ftolP
        Do I=1,9
         forceWu(I)=forceWuP(I)
        enddo
       endif
-      CALL OptFF(Natom,NFaces,MAtom,Iout,IDA,N5Ring,N6Ring,
+      CALL OptFF(Nmax,Mmax,MAtom,Iout,IDA,N5Ring,N6Ring,
      1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
       Iprint=0
       forceWu(9)=fcoulomb
-      Call MoveCM(Natom,Matom,Iout,Iprint,IAtom,mirror,
+      Call MoveCM(Nmax,Matom,Iout,Iprint,IAtom,mirror,
      1 Dist,DistCM,El)
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
-      CALL Distmatrix(NAtom,natomL,MAtom,IOUT,Iprintf,0,
+      CALL Distmatrix(Nmax,NmaxL,MAtom,IOUT,Iprintf,0,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
       routine='DIAMETER     '
       Write(Iout,1008) routine
-      CALL Diameter(NAtom,MAtom,IOUT,Dist,distp)
+      CALL Diameter(Nmax,MAtom,IOUT,Dist,distp)
       endif
 
 C Print out Coordinates used as input for CYLview
@@ -1013,14 +1005,14 @@ C Print out Coordinates used as input for CYLview
 C Rings
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,IOUT,
+      CALL Ring(Nmax,Emax,Mmax,NmaxL,Nmax*Nmax,MCon2,MAtom,IOUT,
      1 N5Ring,N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
      1 DistMat)
 
 C Analyze ring connections
       routine='RINGC        '
       Write(Iout,1008) routine
-      CALL RingC(NAtom,Nfaces,Nedges,NAtom2,Matom,nat11,Iout,iprintf,
+      CALL RingC(Nmax,Mmax,Emax,Nmax*Nmax,Matom,Nmax*11,Iout,iprintf,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
      1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
      1 numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
@@ -1028,7 +1020,7 @@ C Perform Stone-Wales transformation
       if(ISW.ne.0) then
       routine='STONE-WALES  '
       Write(Iout,1008) routine
-      CALL StoneWalesTrans(NAtom,Nfaces,Matom,IN,Iout,numbersw,nSW,
+      CALL StoneWalesTrans(Nmax,Mmax,Matom,IN,Iout,numbersw,nSW,
      1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       ISW=0
       ipent=1
@@ -1040,7 +1032,7 @@ C Perform Endo-Kroto 2-vertex insertion
       if(KE.ne.0) then
       routine='ENDO-KROTO   '
       Write(Iout,1008) routine
-      CALL EndoKrotoTrans(NAtom,Nfaces,Matom,IN,Iout,n565,NEK,ihueckel,
+      CALL EndoKrotoTrans(Nmax,Mmax,Matom,IN,Iout,n565,NEK,ihueckel,
      1 IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       KE=0
       ipent=1
@@ -1053,12 +1045,12 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
       routine='YOSHIDAFOWLER'
       Write(Iout,1008) routine
       if(IYF.le.2) then
-      CALL YoshidaFowler3(NAtom,Nfaces,Matom,IN,Iout,JERR,numberFM,IYF,
+      CALL YoshidaFowler3(Nmax,Mmax,Matom,IN,Iout,JERR,numberFM,IYF,
      1 nFM,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,Dist2D,distp,Rdist)
       else
       IYF=IYF-2
-      CALL YoshidaFowler6(NAtom,Nfaces,Matom,IN,Iout,JERR,numberYF,IYF,
+      CALL YoshidaFowler6(Nmax,Mmax,Matom,IN,Iout,JERR,numberYF,IYF,
      1 nYF,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,Dist2D,distp,Rdist)
       endif
@@ -1072,7 +1064,7 @@ C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
       if(IWS.ne.0) then
       routine='WIRZSCHWERD  '
       Write(Iout,1008) routine
-      CALL WirzSchwerd(NAtom,Nfaces,Matom,IN,Iout,JERR,numberWS,IWS,
+      CALL WirzSchwerd(Nmax,Mmax,Matom,IN,Iout,JERR,numberWS,IWS,
      1 nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,Dist2D,distp,Rdist)
       IWS=0
@@ -1085,7 +1077,7 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0) then
       routine='SPIRALSEARCH '
       Write(Iout,1008) routine
-      CALL SpiralSearch(NAtom,Nfaces,Nedges,Nspirals,MAtom,Iout,Iring5,
+      CALL SpiralSearch(Nmax,Mmax,Emax,Nspirals,MAtom,Iout,Iring5,
      1 Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
      1 GROUP)
       CALL Chiral(Iout,GROUP)
@@ -1095,34 +1087,34 @@ C Calculate the volume
       routine='VOLUME       '
       Write(Iout,1008) routine
 
-c$$$      CALL Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
+c$$$      CALL Volume(Nmax,Mmax,Nmax*Nmax,Matom,Iout,N5MEM,N6MEM,
 c$$$     1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
 c$$$     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
 
 C Calculate the minimum distance sphere
 C     routine='CONVEXHULL'
 C     Write(Iout,1008) routine
-C     CALL ConvexHull(NAtom,MAtom,Dist,VolumeCH,AreaCH)
+C     CALL ConvexHull(Nmax,MAtom,Dist,VolumeCH,AreaCH)
 
 C Calculate the minimum covering sphere and volumes
 C     MinCovSphere1 contains algorithm 1 and MinCovSphere2 algorithm2
 C     MinCovSphere2 is more efficient and contains more useful information
-C     CALL MinCovSphere1(NAtom,MAtom,IOUT,Dist,
+C     CALL MinCovSphere1(Nmax,MAtom,IOUT,Dist,
 C    1 Rmin,Rmax,VolSphere,ASphere,Atol,VTol,cmcs,rmcs,RVdWC)
       routine='MINCOVSPHERE2'
       Write(Iout,1008) routine
-      CALL MinCovSphere2(NAtom,MAtom,IOUT,Dist,Rmin,Rmax,
+      CALL MinCovSphere2(Nmax,MAtom,IOUT,Dist,Rmin,Rmax,
      1 VolSphere,ASphere,Atol,VTol,distP,cmcs,rmcs,RVdWC)
 
 C Calculate the minimum distance sphere
       routine='MINDISTSPHERE'
       Write(Iout,1008) routine
-      CALL MinDistSphere(NAtom,MAtom,IOUT,Dist,distP,cmcs,rmcs)
+      CALL MinDistSphere(Nmax,MAtom,IOUT,Dist,distP,cmcs,rmcs)
 
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE'
       Write(Iout,1008) routine
-      CALL MaxInSphere(NAtom,MAtom,IOUT,Dist,cmcs,RVdWC)
+      CALL MaxInSphere(Nmax,MAtom,IOUT,Dist,cmcs,RVdWC)
 
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
@@ -1136,7 +1128,7 @@ C Calculate Schlegel diagram
       else
        ParamS=dabs(ParamS)
       endif
-      CALL Graph2D(NAtom,Nfaces,Nedges,MAtom,msrs,IOUT,IS1,IS2,IS3,
+      CALL Graph2D(Nmax,Mmax,Emax,MAtom,msrs,IOUT,IS1,IS2,IS3,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring,Ischlegel,IC3,IDA,Dist,
      1 ParamS,Rmin,TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol)
       endif
