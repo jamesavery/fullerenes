@@ -903,11 +903,12 @@ C     Now checking on the original vector
       Return
       END
 
-      SUBROUTINE funcg(IOP,NMAX,NMAX2,MMAX,n,A,IS,MDist,maxd,
+      SUBROUTINE funcg(IOP,n,A,IS,MDist,maxd,
      1 p,fc,RAA)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Embedding algorithms for fullerene graph, energy
-      Real*8 p(NMAX2)
+      Real*8 p(NMAX*2)
       Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
       Data r,f,coulomb/2.0d0,1.d-1,1.0d0/
       fc=0.d0
@@ -1000,11 +1001,12 @@ C     total energy
       Return
       END
 
-      SUBROUTINE dfuncg(IOP,NMAX,NMAX2,MMAX,n,A,IS,MDist,maxd,
+      SUBROUTINE dfuncg(IOP,n,A,IS,MDist,maxd,
      1 p,x,RAA)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Embedding algorithms for fullerene graph, gradient
-      Real*8 p(NMAX2),x(NMAX2)
+      Real*8 p(NMAX*2),x(NMAX*2)
       Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
       Data r,f,coulomb/2.0d0,1.d-1,1.0d0/
 C     simple spring embedding
