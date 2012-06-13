@@ -75,7 +75,9 @@ C     Now Print
       ntot=0
       nopen=0
       nflag=0
-      Write(Iout,1000) 
+      Etot=0.d0
+      Write(Iout,1000)
+      iproper=0 
       Do I=1,ieigv
        NE=2*idg(i)
        NE1=NE
@@ -85,6 +87,7 @@ C     Now Print
          if(nflag.eq.0) then
           nflag=1
           bandgap=df(i-1)-df(i)
+          if(df(i).gt.-1.d-5) iproper=1
          endif
         NE=0
         Symbol='(empty)   '
@@ -95,9 +98,19 @@ C     Now Print
         nopen=1
        endif
        epsilon=alpha+df(i)*beta
+       Etot=Etot+df(I)*dfloat(NE)
        Write(Iout,1002) df(I),epsilon,idg(i),NE,Symbol
       enddo
-      Write(Iout,1003)
+      TRE=1.024296d0*Etot/dfloat(MAtom)-1.562211d0
+      DTRE=TRE-2.82066353359331501d-2
+      DTREkcal=DTRE*beta*6.27509541D+02
+      Graphene=0.0468d0*beta*6.27509541D+02
+      Write(Iout,1003) Etot,TRE,Graphene,DTRE,DTREkcal
+       if(iproper.eq.0) then
+         Write(Iout,1009)
+        else
+         Write(Iout,1010)
+       endif
       if(nopen.eq.1) then
        Write(Iout,1004)
       else
@@ -109,7 +122,14 @@ C     Now Print
  1000 FORMAT(8X,'x',13X,'E',4X,'deg NE   type    ',/1X,45('-'))
  1001 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix')
  1002 FORMAT(2(1X,F12.6),I3,1X,I3,3X,A10)
- 1003 FORMAT(1X,45('-'))
+ 1003 FORMAT(1X,45('-'),/1X,'Total pi-energy in units of beta: ',F12.6,
+     1 /1X,'Total resonance energy per atom in units of beta ',
+     1     'according to Babic: ',F12.6,' (graphene limit: ',
+     1     F12.6,')',
+     1 /1X,'Difference of total resonance energy per atom ',
+     1     'compared to C60 in units of beta: ',F12.6,
+     1 /1X,'Difference of total resonance energy per atom ',
+     1     'compared to C60 in kcal/mol: ',F12.6)
  1004 FORMAT(1X,'Hueckel theory indicates that fullerene has',
      1 ' open-shell character (zero band gap)!')
  1005 FORMAT(1X,'Bandgap delta x =',F12.6,' in units of |beta| =',
@@ -120,5 +140,7 @@ C     Now Print
      1 /1X,'Eigenvalues are between [-3,+3] (in units of |beta|)',
      1 /1X,'deg: degeneracy; NE: number of electrons')
  1008 FORMAT(/1X,'Skip diagonalization of Hueckel matrix')
+ 1009 FORMAT(/1X,'Fullerene has a properly closed shell')
+ 1010 FORMAT(/1X,'Fullerene has a pseudo closed shell')
       Return
       End 
