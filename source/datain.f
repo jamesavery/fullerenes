@@ -1,7 +1,7 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
      1 IPR,IPRC,IG,ISO1,ISO2,ISO3,IER,istop,leap,leapGC,iupac,Ipent,IPH,
      1 ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,ilp,IYF,
-     1 PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,forceWu,forceWuP,
+     1 IWS,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,forceWu,forceWuP,
      1 xyzname,chkname,DATEN)
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension forceWu(9),forceWuP(9)
@@ -13,7 +13,7 @@
       Character xyz1*7
       Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,leapGC,ihueckel,ISW,KE,loop,mirror,
-     1 IYF,xyzname
+     1 IYF,IWS,xyzname
       Namelist /Opt/ Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
@@ -58,6 +58,7 @@ C     More Parameters
       loop=0    !  Option for compound job
       KE=0      !  Endo-Kroto C2 insertion
       ichk=0    !  Option for restarting the isomer list
+      IWS=0     !  Option for Wirz-Schwerdtfeger transformation
       ISW=0     !  Option for Stone-Wales transformation
       IYF=0     !  Option for Yoshido-Fowler transformation
       iupac=1   !  Switch for producing the Iupac nomenclature
