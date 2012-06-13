@@ -647,6 +647,334 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
+      Subroutine WirzSchwerd(NAtom,Nfaces,Matom,IN,Iout,JERR,numberWS,
+     1 IWS,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
+     1 A,evec,df,Dist,layout2D,distp,Cdist)
+      use iso_c_binding
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Real*8 layout2D(2,NAtom)
+      DIMENSION IDA(NAtom,NAtom),IC3(natom,3)
+      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
+      DIMENSION nWS(5,8),IP(20),KWS(5),IBWS(8,8)
+      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom)
+      DIMENSION Dist(3,NAtom),distP(NAtom)
+      integer graph_is_a_fullerene
+      type(c_ptr) :: g, new_fullerene_graph
+      Write(Iout,1000)
+      JERR=0
+      Do I=1,10
+       IP(I)=0
+      enddo
+C     read single hexagon numbers
+      Read(IN,*,Err=100,end=100) (IP(I),I=1,66)
+
+C     Check if any is a Wirz-Schwerdtfeger D2h 55-6-55 pattern
+  100 ntrans=0
+      Do I=1,10
+       if(IP(I).eq.0) go to 10
+       ntrans=ntrans+1
+      enddo
+      if(ntrans.lt.1) then
+       Write(Iout,1016) 
+       JERR=1
+       return
+      endif
+   10 if(ntrans.gt.numberWS) then
+       Write(Iout,1017) ntrans,numberWS
+       JERR=1
+       return
+      endif
+      Write(Iout,1001) ntrans,(IP(J),J=1,ntrans)
+ 
+      if(IWS.eq.1) then
+       nfound=0
+       Do I=1,ntrans
+        I1=IP(I)
+        Do J=1,numberWS
+         J1=nWS(3,J)
+         if(I1.eq.J1) then
+          nfound=nfound+1
+          IP(nfound)=J
+         endif
+        enddo
+       enddo
+       if(nfound.ne.ntrans) then
+        Write(Iout,1018)
+        JERR=1
+        return
+       endif
+      ntrans=nfound
+      endif
+
+C     Sort array nWS
+      Do I=1,ntrans
+       I1=IP(I)
+       Do J=1,5
+        KWS(J)=nWS(J,I1)
+        nWS(J,I1)=nWS(J,I)
+        nWS(J,I)=KWS(J)
+       enddo
+      enddo
+
+C     Check for shared pentagons or hexagons which is not allowed
+      if(ntrans.gt.1) then
+       KERR1=0
+       KERR2=0
+       Do I=1,ntrans
+       Do J=I+1,ntrans
+        if(nWS(3,I).eq.nWS(3,J)) KERR1=1
+        if(nWS(1,I).eq.nWS(1,J)) KERR1=2
+        if(nWS(1,I).eq.nWS(2,J)) KERR1=2
+        if(nWS(1,I).eq.nWS(4,J)) KERR1=2
+        if(nWS(1,I).eq.nWS(5,J)) KERR1=2
+        if(nWS(2,I).eq.nWS(1,J)) KERR1=2
+        if(nWS(2,I).eq.nWS(2,J)) KERR1=2
+        if(nWS(2,I).eq.nWS(4,J)) KERR1=2
+        if(nWS(2,I).eq.nWS(5,J)) KERR1=2
+        if(nWS(4,I).eq.nWS(1,J)) KERR1=2
+        if(nWS(4,I).eq.nWS(2,J)) KERR1=2
+        if(nWS(4,I).eq.nWS(4,J)) KERR1=2
+        if(nWS(4,I).eq.nWS(5,J)) KERR1=2
+        if(nWS(5,I).eq.nWS(1,J)) KERR1=2
+        if(nWS(5,I).eq.nWS(2,J)) KERR1=2
+        if(nWS(5,I).eq.nWS(4,J)) KERR1=2
+        if(nWS(5,I).eq.nWS(5,J)) KERR1=2
+        if(KERR1.gt.0) Write(Iout,1024) I,J,
+     1   (nWS(J1,I),J1=1,5),(nWS(J1,J),J1=1,5)
+        if(KERR2.gt.0) Write(Iout,1020) I,J,
+     1   (nWS(J1,I),J1=1,5),(nWS(J1,J),J1=1,5)
+       enddo
+       enddo
+       endif
+       if(KERR1.gt.0.or.KERR2.gt.0) return
+   
+        Write(Iout,1007) ntrans
+        Write(Iout,1003) ((nWS(I,J),I=1,5),J=1,ntrans)
+    
+C Perform Wirz-Schwerdtfeger 6-vertex insertion
+C First find common vertices between pentagons and middle hexagon
+       Do I=1,ntrans
+       IH=nWS(3,I)-12
+       icount=0
+C Pentagon 1
+       I1=nWS(1,I)
+        do J=1,5
+         IPN=N5MEM(I1,J)
+        do K=1,6
+         IHN=N6MEM(IH,K)
+         if(IPN.eq.IHN) then
+          icount=icount+1
+          IBWS(I,icount)=IPN
+         endif
+        enddo
+        enddo
+C Pentagon 2
+       I1=nWS(2,I)
+        do J=1,5
+         IPN=N5MEM(I1,J)
+        do K=1,6
+         IHN=N6MEM(IH,K)
+         if(IPN.eq.IHN) then
+          icount=icount+1
+          IBWS(I,icount)=IPN
+         endif
+        enddo
+        enddo
+C Pentagon 3
+       I1=nWS(4,I)
+        do J=1,5
+         IPN=N5MEM(I1,J)
+        do K=1,6
+         IHN=N6MEM(IH,K)
+         if(IPN.eq.IHN) then
+          icount=icount+1
+          IBWS(I,icount)=IPN
+         endif
+        enddo
+        enddo
+C Pentagon 4
+       I1=nWS(5,I)
+        do J=1,5
+         IPN=N5MEM(I1,J)
+        do K=1,6
+         IHN=N6MEM(IH,K)
+         if(IPN.eq.IHN) then
+          icount=icount+1
+          IBWS(I,icount)=IPN
+         endif
+        enddo
+        enddo
+       if(icount.ne.8) stop 50
+       enddo
+C Swap or leave the lest two pentagons
+C See if pentagon 2 is next to 3 or not
+C Find vertex first
+      do I=1,ntrans
+       IVP=IBWS(I,4)
+       IVN=IBWS(I,3)
+       if(IVP.eq.IBWS(I,1).or.IVP.eq.IBWS(I,2)) then
+        IVP=IBWS(I,3)
+        IVN=IBWS(I,4)
+       endif
+C Find opposite vertex IVNN
+       Do J=1,3
+        KWS(J)=IC3(IVP,J)
+       enddo
+       Do J=1,3
+        if(KWS(J).eq.IVN) KWS(J)=KWS(3)
+       enddo
+       ifound=0
+       Do J=1,5
+        IP3=N5MEM(IBWS(I,2),J)
+        if(IP3.eq.KWS(1)) ifound=1
+       enddo
+       IVNN=KWS(1)
+       if(ifound.eq.1) IVNN=KWS(2)
+C Check if IVNN is in pentagon 3
+       ifound=0
+       Do J=1,5
+        IP3=N5MEM(IBWS(I,4),J)
+        if(IP3.eq.IVNN) ifound=1
+       enddo
+C Swap vertices if IVNN not found
+       if(ifound.eq.0) then
+        IVP1=IBWS(I,5)
+        IVP2=IBWS(I,6)
+        IBWS(I,5)=IBWS(I,7)
+        IBWS(I,6)=IBWS(I,8)
+        IBWS(I,7)=IVP1
+        IBWS(I,8)=IVP2
+       endif
+      enddo
+
+C Transform adjacency matrix
+C Delete edges
+      Nlimit=MAtom+6*ntrans
+      if(Nlimit.gt.NAtom) then
+       Write(Iout,1019) NAtom
+      endif
+      Write(Iout,1008)
+      do I=1,ntrans
+       IE1=IBWS(I,1)
+       IE2=IBWS(I,2)
+       IE3=IBWS(I,3)
+       IE4=IBWS(I,4)
+       IE5=IBWS(I,5)
+       IE6=IBWS(I,6)
+       IE7=IBWS(I,7)
+       IE8=IBWS(I,8)
+       Write(Iout,1013) IE1,IE2,IE3,IE4,IE5,IE6,IE7,IE8
+       IDA(IE1,IE2)=0
+       IDA(IE2,IE1)=0
+       IDA(IE3,IE4)=0
+       IDA(IE4,IE3)=0
+       IDA(IE5,IE6)=0
+       IDA(IE6,IE5)=0
+       IDA(IE7,IE8)=0
+       IDA(IE8,IE7)=0
+      enddo
+      Write(Iout,1009)
+C Add edges
+      do I=1,ntrans
+       idim=MAtom+6*(I-1)
+       IE1=IBWS(I,1)
+       IE2=IBWS(I,2)
+       IE3=IBWS(I,3)
+       IE4=IBWS(I,4)
+       IE5=IBWS(I,5)
+       IE6=IBWS(I,6)
+       IE7=IBWS(I,7)
+       IE8=IBWS(I,8)
+       IV1=idim+1
+       IV2=idim+2
+       IV3=idim+3
+       IV4=idim+4
+       IV5=idim+5
+       IV6=idim+6
+       IDA(IE1,IV1)=1
+       IDA(IV1,IE1)=1
+       IDA(IE2,IV1)=1
+       IDA(IV1,IE2)=1
+       IDA(IE3,IV2)=1
+       IDA(IV2,IE3)=1
+       IDA(IE4,IV2)=1
+       IDA(IV2,IE4)=1
+       IDA(IE5,IV3)=1
+       IDA(IV3,IE5)=1
+       IDA(IE6,IV3)=1
+       IDA(IV3,IE6)=1
+       IDA(IE7,IV4)=1
+       IDA(IV4,IE7)=1
+       IDA(IE8,IV4)=1
+       IDA(IV4,IE8)=1
+       IDA(IV1,IV5)=1
+       IDA(IV5,IV1)=1
+       IDA(IV2,IV6)=1
+       IDA(IV6,IV2)=1
+       IDA(IV3,IV6)=1
+       IDA(IV6,IV3)=1
+       IDA(IV4,IV5)=1
+       IDA(IV5,IV4)=1
+       IDA(IV5,IV6)=1
+       IDA(IV6,IV5)=1
+       Write(Iout,1010) IE1,IV1,IE2,IV1,IE3,IV2,IE4,IV2,
+     1  IE5,IV3,IE6,IV3,IE7,IV4,IE8,IV4,IV1,IV5,IV2,IV6,
+     1  IV3,IV6,IV4,IV5,IV5,IV6
+      enddo
+      MAtom=MAtom+6*ntrans
+
+C Adjacency matrix constructed
+C Now analyze the adjacency matrix if it is correct
+      nsum=0
+      Do I=1,MAtom
+      isum=0
+      Do J=1,MAtom
+      isum=isum+IDA(I,J)
+      enddo
+      If(isum.ne.3) nsum=nsum+1
+      enddo
+      if(nsum.ne.0) then
+      WRITE(Iout,1005) nsum,isum
+      stop
+      else
+      WRITE(Iout,1006)
+      endif
+      Call Tutte(NAtom,Matom,Iout,ihueckel,IDA,
+     1 A,evec,df,Dist,layout2D,distp,CDist)
+ 1000 Format(/1X,'Wirz-Schwerdtfeger 6-vertex insertion to D2h 55-6-55',
+     1 ' ring pattern:',/1X,'Read hexagon ring numbers or position',
+     1 ' in list of patterns')
+ 1001 Format(/1X,'Input for Wirz-Schwerdtfeger 6-vertex insertions: ',
+     1 I2,' entries with numbers ',15(' ',I5))
+ 1003 Format(6(' (',I2,',',I2,',',I5,',',I2,',',I2,')'))
+ 1005 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
+     1 'are not of degree 3, last one is of degree ',I4)
+ 1006 FORMAT(1X,'Graph checked, it is cubic')
+ 1007 Format(1X,'Perform ',I2,' Wirz-Schwerdtfeger 6-vertex insertions',
+     1 /1X,'Modifying adjacency matrix for rings (P,P,H,P,P):')
+ 1008 Format(1X,'Transform adjacency matrix',/1X,
+     1 'Bonds to be added and deleted',/1X,
+     1 'Delete edges:')
+ 1009 Format(1X,'Add edges: ')
+ 1010 Format(1X,7(' (',I5,','I5,') '),/1X,6(' (',I5,','I5,') '))
+ 1013 Format(1X,4(' (',I5,','I5,') '))
+ 1016 Format(/1X,'No input found ==> RETURN')
+ 1017 Format(/1X,'Number of insertions ',I2,' exceeds number of ',
+     1 'possible Wirz-Schwerdtfeger insertions ',I2,' ==> RETURN')
+ 1018 Format(/1X,'Hexagon numbers do not match list of ',
+     1 'Wirz-Schwerdtfeger list ==> RETURN')
+ 1019 Format(/1X,'Dimension of new adjacency matrix exceeds the ',
+     1 'NAtom limit set at ',I5,' ==> STOP')
+ 1020 Format(1X,'Shared pentagons found between input pattern ',I2,
+     1 ' and ',I2,: ' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')',
+     1 ' / (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')')
+ 1024 Format(1X,'Shared hexagons found between input pattern ',I2,
+     1 ' and ',I2,: ' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')',
+     1 ' / (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')')
+
+      Return
+      END
+
       Subroutine YoshidaFowler6(NAtom,Nfaces,Matom,IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,layout2D,distp,CDist)
