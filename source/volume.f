@@ -1,31 +1,36 @@
-      SUBROUTINE VolumeAndArea(points,nmax,hullarea,hullvolume)
+      SUBROUTINE VolumeAndArea(points,nmax,M,IDA,exactarea,
+     1 exactvolume,hullarea,hullvolume)
       use iso_c_binding
-      dimension points(3,nmax)
-      type(c_ptr)::g,p,hull,new_polyhedron, convex_hull
+      IMPLICIT REAL*8 (A-H,O-Z)
+      dimension points(3,nmax),IDA(nmax,nmax),layout2d(2,NMAX)
+      type(c_ptr)::g,p,hull,new_polyhedron,convex_hull,
+     1             new_fullerene_graph
 
+      g = new_fullerene_graph(NMax,M,IDA)
       p = new_polyhedron(g,points)
-
- 1    surfacearea = get_surface_area(p)
-      volume      = get_volume(p)
+      exactarea = get_surface_area(p)
+      exactvolume      = get_volume(p)
 
       hull = convex_hull(p)
-
+      return
       hullarea   = get_surface_area(hull)
       hullvolume = get_volume(hull)
 
 
       call delete_polyhedron(p)
       call delete_polyhedron(hull)
-
+      call delete_fullerene_graph(g)
       return
       end 
 
       SUBROUTINE Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
-     1 N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,Asphere,
-     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
+     1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,Asphere,
+     2 exactarea,exactvolume,Rmin5,Rmin6,Rmax5,Rmax6)
       IMPLICIT REAL*8 (A-H,O-Z)
-C     Calculate the volume (and surface) of the cage molecule by summing over
-C     all trigonal pyramids (areas) defined by the vectors
+C     Calculate the volume (and surface) of the cage molecule by
+C     1) Exact polyhedron volume using the normal of faces
+C     2) Convex hull 
+C     3) Summing over all trigonal pyramids (areas) defined by the vectors
 C     CM-CR  (center of cage to the center of ring)
 C     CM-CA1 (center of cage to atom 1 in ring)
 C     CM-CA2 (center of cage to atom 2 in ring)
@@ -41,7 +46,7 @@ C                                 | X3 Y3 Z3 |
 C
       DIMENSION Dist(3,natom),Distac(6)
       DIMENSION CRing5(3,Nfaces),CRing6(3,Nfaces)
-      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
+      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6),IDA(Natom,Natom)
 
 C     Sum over all 5-rings
       Vol5=0.d0
@@ -96,9 +101,9 @@ C     Now do the total volume calculation
       VPC=DVSphere/VolSphere*1.d2
       DVArea=ATol-Asphere
       APC=DVArea/Asphere*1.d2
-C     Convex Hull Volume and Area
-      Call VolumeAndArea(Dist,natom,hullarea,hullvolume)
-      print*,hullarea,hullvolume
+C     Convex Hull and exact polyhedral Volume and Area
+      Call VolumeAndArea(Dist,natom,MAtom,IDA,exactarea,
+     1 exactvolume,hullarea,hullvolume)
 C     Calculate the volume and area for C60 using R5 and R6
       If(Matom.eq.60) then
       R5=(Rmin5+Rmax5)*.5d0
@@ -130,29 +135,47 @@ C     Calculate the volume and area for C60 using R5 and R6
       endif
       Write(Iout,1000) VTol,Vol5,Vol6,ITH,DVSphere,VPC
       If(Matom.eq.60) Write(Iout,1004) DVIcocap
-      Write(Iout,1001) ATol,Area5,Area6,Atol/VTol,DVArea,APC
+      Write(Iout,1006) exactvolume,hullvolume
+      Write(Iout,1001) ATol,Area5,Area6,DVArea,APC
+      Write(Iout,1007) exactarea,hullarea
+      Write(Iout,1008) Atol/VTol,exactarea/exactvolume,
+     1 hullarea/hullvolume
+C    Measure for convexity
+      convex1=1.d2*dsqrt(exactarea/hullarea)
+      convex2=1d2*(exactvolume/hullvolume)**(1./3.)
+      Write(Iout,1009) convex1,convex2
  1000 Format(/1X,'Final result:',/1X,
-     1 'Total calculated volume of cage molecule through tesselation: ',
-     1 D14.8,' (Contributions from 5-ring: ',D14.8,
+     1 'Total calculated volume of fullerene through tesselation ',
+     1 'from barycenter of polyhedron (valid for convex polyhedra): ',
+     1 D14.8,/10X,'(Contributions from 5-ring: ',D14.8,
      1 ' , and from 6-ring: ',D14.8,')'
      1 /3X,' using ',I4,' trigonal pyramidal tessellations',/1X,
      1 ' Deviation from spherical central covering: ',D12.6,1X,
      1 ' in percent: ',D12.6)
- 1001 Format(/1X,'Total calculated area of cage molecule: ',D14.8,
-     1 ' (Contributions from 5-ring: ',D14.8,
+ 1001 Format(/1X,'Total surface area of fullerene taken ',
+     1 ' from triangulation from barycenter of ring: ',D14.8,
+     1 /10X,'(Contributions from 5-ring: ',D14.8,
      1 ' , and from 6-ring: ',D14.8,')',/1X,
-     1 ' Ratio Area/Volume total: ',D12.6,/1X,
      1 ' Deviation from spherical central covering: ',D12.6,1X,
-     1 ' in percent: ',D12.6,/1X)
+     1 ' in percent: ',D12.6)
  1002 Format(/1X,' Volume of the original icosahedron: ',D14.8,
-     1 ' and volume and area of the capped icosahedron: V= ',D14.8,1X,
-     1 ', A= ',D14.8,/1X,' Distances taken: R5= ',D12.6,', R6= ',D12.6)
+     1 ' and volume and surface area of the capped icosahedron: V= ',
+     1 D14.8,1X,', A= ',D14.8,/1X,' Distances taken: R5= ',D12.6,
+     1 ', R6= ',D12.6)
  1003 Format(1X,' Warning: Distances in 5-ring not the same, ',
      1 ' difference is ',D12.6,
      1 ', taking the average distance of ',D12.6)
  1004 Format(1X,' Deviation from capped Ih icosahedron: ',D12.6)
- 1005 Format(/1X,' Volume and area of the dodecahedron: V= ',D14.8,1X,
-     1 ', A= ',D14.8,/1X,' Distance taken: R5= ',D12.6)
+ 1005 Format(/1X,' Volume and surface area of the dodecahedron: V= ',
+     1 D14.8,1X,', A= ',D14.8,/1X,' Distance taken: R5= ',D12.6)
+ 1006 Format(1X,' Exact volume of fullerene: ',D12.6,
+     1      /1X,' Convex hull volume of fullerene: ',D12.6)
+ 1007 Format(1X,' Exact surface area of fullerene: ',D12.6,
+     1      /1X,' Convex hull surface area of fullerene: ',D12.6)
+ 1008 Format(1X,' Ratio Area/Volume: ',D12.6,' (Tesselation), ',
+     1 D12.6,' (exact), ',D12.6,' (convex hull)')
+ 1009 Format(1X,' Percent convexity: ',F12.3,' (area) ',F12.3,
+     1 ' (volume)')
       Return
       END 
 
