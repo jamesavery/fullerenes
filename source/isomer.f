@@ -7,7 +7,7 @@ C (Dover Publ., New York, 2006), which gives information on the
 C isomers point group, pentagon ring spiral indices and NMR pattern. 
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer Isonum(119),IsonumIPR(123),IDA(NAtom,NAtom)
-      Character*1 fstart,fnum1,Dummy
+      Character*1 fstart,fnum1
       Character*2 fnum2
       Character*3 fnum,fnum3,GROUP,ident
       Character*9 fend

@@ -824,7 +824,7 @@ C Options for Input coordinates
 C  Cartesian coordinates produced for Ih C60
    10 routine='COORDC20/60  '
       Write(Iout,1008) routine
-      CALL CoordC60(Nmax,IN,Iout,MAtom,R5,R6,Dist)
+      CALL CoordC60(Iout,MAtom,R5,R6,Dist)
       Do I=1,60
        IAtom(I)=6
       enddo
@@ -856,8 +856,8 @@ C identify P-type eigenvectors and construct the 3D fullerene
    30 Ipent=1
       routine='COORDBUILD   '
       Write(Iout,1008) routine
-      CALL CoordBuild(Nmax,Mmax,Emax,MAtom,IN,Iout,IDA,IDual,
-     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPR,IPRC,ihueckel,JP,
+      CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
+     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
      1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP)
       Do I=1,Matom
        IAtom(I)=6
@@ -881,14 +881,14 @@ C Move carbon cage to Atomic Center
       routine='MOVECM       '
       Write(Iout,1008) routine
       Iprint=1
-      Call MoveCM(Nmax,Matom,Iout,Iprint,IAtom,mirror,
+      Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
      1 Dist,DistCM,El)
 
 C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia (to be implemented)
       routine='DIAMETER     '
       Write(Iout,1008) routine
-      CALL Diameter(Nmax,MAtom,IOUT,Dist,distp)
+      CALL Diameter(MAtom,IOUT,Dist,distp)
 
 C Calculate the distance Matrix and print out distance Matrix
       routine='DISTMATRIX   '
@@ -973,7 +973,7 @@ C Optimize Geometry through force field method
      1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
       Iprint=0
       forceWu(9)=fcoulomb
-      Call MoveCM(Nmax,Matom,Iout,Iprint,IAtom,mirror,
+      Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
      1 Dist,DistCM,El)
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
@@ -981,7 +981,7 @@ C Optimize Geometry through force field method
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
       routine='DIAMETER     '
       Write(Iout,1008) routine
-      CALL Diameter(Nmax,MAtom,IOUT,Dist,distp)
+      CALL Diameter(MAtom,IOUT,Dist,distp)
       endif
 
 C Print out Coordinates used as input for CYLview
@@ -1103,18 +1103,18 @@ C     CALL MinCovSphere1(Nmax,MAtom,IOUT,Dist,
 C    1 Rmin,Rmax,VolSphere,ASphere,Atol,VTol,cmcs,rmcs,RVdWC)
       routine='MINCOVSPHERE2'
       Write(Iout,1008) routine
-      CALL MinCovSphere2(Nmax,MAtom,IOUT,Dist,Rmin,Rmax,
+      CALL MinCovSphere2(MAtom,IOUT,Dist,Rmin,Rmax,
      1 VolSphere,ASphere,Atol,VTol,distP,cmcs,rmcs,RVdWC)
 
 C Calculate the minimum distance sphere
       routine='MINDISTSPHERE'
       Write(Iout,1008) routine
-      CALL MinDistSphere(Nmax,MAtom,IOUT,Dist,distP,cmcs,rmcs)
+      CALL MinDistSphere(MAtom,IOUT,Dist,distP,cmcs,rmcs)
 
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE'
       Write(Iout,1008) routine
-      CALL MaxInSphere(Nmax,MAtom,IOUT,Dist,cmcs,RVdWC)
+      CALL MaxInSphere(MAtom,IOUT,Dist,cmcs,RVdWC)
 
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then

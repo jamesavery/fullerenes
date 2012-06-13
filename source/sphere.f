@@ -1,6 +1,7 @@
-      SUBROUTINE MaxInSphere(ndim,M,IOUT,Dist,c,RVdWC)
+      SUBROUTINE MaxInSphere(M,IOUT,Dist,c,RVdWC)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,ndim),c(3),cmax(3)
+      DIMENSION Dist(3,Nmax),c(3),cmax(3)
       DATA API/3.14159265358979d0/
       DATA itermax/10000000/
       DATA eps,epsc/1.d-8,2.d0/
@@ -16,7 +17,7 @@ C    Initial step
        c(3)=0.d0
       nchoice=1
       endif
-      Call MAInorm(ndim,3,M,IP,RMIS,c,Dist)
+      Call MAInorm(3,M,IP,RMIS,c,Dist)
       if(nchoice.eq.0) then
       Write(IOUT,1001) RMIS,IP,(c(i),i=1,3)
       else
@@ -26,13 +27,13 @@ C    Initial step
       AMIS=4.d0*Api*RMIS**2
       Write(IOUT,1002) RMIS,VMIS,AMIS
 C     Start Iteration
-      CALL powell(ndim,3,iter,Iout,IOP,ier,M,eps,AN,RMIS,c,cmax,Dist)
+      CALL powell(Nmax,3,iter,Iout,IOP,ier,M,eps,AN,RMIS,c,cmax,Dist)
 C     End Iteration
       if(ier.eq.1) then
        Write(IOUT,1010)
        Return
       endif
-      Call MAInorm(ndim,3,M,IP,RMIS,c,Dist)
+      Call MAInorm(3,M,IP,RMIS,c,Dist)
       Write(IOUT,1003) RMIS,IP,(c(i),i=1,3)
       VMIS=4.d0/3.d0*Api*RMIS**3
       AMIS=4.d0*Api*RMIS**2
@@ -62,9 +63,10 @@ C     End Iteration
       RETURN
       END
 
-      SUBROUTINE MinDistSphere(ndim,M,IOUT,Dist,distP,c,radiusi)
+      SUBROUTINE MinDistSphere(M,IOUT,Dist,distP,c,radiusi)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,ndim),distP(ndim),c(3),cmax(3),cMCS(3)
+      DIMENSION Dist(3,Nmax),distP(Nmax),c(3),cmax(3),cMCS(3)
 C     Get the minimum distance sphere
       
       DATA API/3.14159265358979d0/
@@ -83,7 +85,7 @@ C    Get maximum values
        cmax(J)=0.d0
        cMCS(J)=c(J)
       enddo
-      Do I=1,ndim
+      Do I=1,Nmax
       Do J=1,3
        if(dabs(Dist(J,I)).gt.cmax(J)) cmax(J)=dabs(Dist(J,I))
       enddo
@@ -91,7 +93,7 @@ C    Get maximum values
 C    Calculate the MDS norm
 
       IOP=0
-      Call MDSnorm(ndim,3,M,AN,RMDSI,c,Dist)
+      Call MDSnorm(3,M,AN,RMDSI,c,Dist)
       Write(IOUT,1001) RMDSI,(c(i),i=1,3)
       VMDSI=4.d0/3.d0*Api*RMDSI**3
       AMDSI=4.d0*Api*RMDSI**2
@@ -101,7 +103,7 @@ C    Calculate the MDS norm
       Write(IOUT,1002) RMDSI,VMDS,AMDS
       Write(IOUT,1003) AN
 C     Start Iteration
-      CALL powell(ndim,3,iter,Iout,IOP,ier,M,eps,AN,RMDSI,c,cmax,Dist)
+      CALL powell(Nmax,3,iter,Iout,IOP,ier,M,eps,AN,RMDSI,c,cmax,Dist)
 C     End Iteration
       if(ier.eq.2) then
        Write(IOUT,1006)
@@ -113,7 +115,7 @@ C     End Iteration
        Write(IOUT,1007)
        Return
       endif
-      Call MDSnorm(ndim,3,M,AN,RMDSI,c,Dist)
+      Call MDSnorm(3,M,AN,RMDSI,c,Dist)
       Write(IOUT,1004) iter,(c(i),i=1,3),AN
       VMDSI=4.d0/3.d0*Api*RMDSI**3
       AMDSI=4.d0*Api*RMDSI**2
@@ -155,9 +157,10 @@ C     End Iteration
       Return
       End
 
-      SUBROUTINE MAInorm(ndim,ncom,M,IP,dm,c,d)
+      SUBROUTINE MAInorm(ncom,M,IP,dm,c,d)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION d(3,ndim),c(ncom)
+      DIMENSION d(3,Nmax),c(ncom)
 C     Calculate minimum distance to center c
       dm=1.d8
       Do i=1,M
@@ -173,9 +176,10 @@ C     Calculate minimum distance to center c
       Return
       End
 
-      SUBROUTINE MDSnorm(ndim,ncom,M,A,davd,c,d)
+      SUBROUTINE MDSnorm(ncom,M,A,davd,c,d)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION d(3,ndim),c(ncom),dp(ndim)
+      DIMENSION d(3,Nmax),c(ncom),dp(Nmax)
 C     Calculate norm for minimum distance sphere
       XM=dfloat(M)
       dav=0.d0
@@ -195,11 +199,12 @@ C     Calculate norm for minimum distance sphere
       Return
       End
 
-      SUBROUTINE MinCovSphere2(ndim,M,IOUT,Dist,Rmin,Rmax,
+      SUBROUTINE MinCovSphere2(M,IOUT,Dist,Rmin,Rmax,
      1 VCS,ACS,Atol,VTol,u,c,radius,RVdWC)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,ndim)
-      DIMENSION u(ndim),c(3),Kappa(ndim)
+      DIMENSION Dist(3,Nmax)
+      DIMENSION u(Nmax),c(3),Kappa(Nmax)
 C     Get the minimum covering sphere using algorithm 2 by E.A.Yildirim
       DATA API/3.14159265358979d0/
       DATA itermax/10000000/
@@ -257,7 +262,7 @@ C     Size of set Kappa (number of vectors)
       do j=1,3
         c(j)=.5d0*(Dist(j,ialpha)+Dist(j,ibeta))
       enddo 
-      gammak=fpsi(ndim,M,u,dist)
+      gammak=fpsi(M,u,dist)
       xmax=0.d0
       ikappa=0
       do i=1,M
@@ -347,7 +352,7 @@ C     ----------------
           enddo
       endif
 C     New parameters
-      gammak=fpsi(ndim,M,u,dist)
+      gammak=fpsi(M,u,dist)
       xmax=0.d0
       ikappa=0
       do i=1,M
@@ -501,20 +506,20 @@ C     to calculate the root mean square as a measure for distortion
       return
       END
 
-      DOUBLE PRECISION FUNCTION f1dimx(ncom,ndim,Mdim,IOP,
+      DOUBLE PRECISION FUNCTION f1dimx(ncom,Nmax,Mdim,IOP,
      1 x,pcom,xicom,Dist)
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION pcom(ncom),xicom(ncom),xt(ncom)
-      REAL*8 Dist(3,ndim)
+      REAL*8 Dist(3,Nmax)
       HUGE=dfloat(Mdim)*1.d2
       do 11 j=1,ncom
         xt(j)=pcom(j)+x*xicom(j)
 11    continue
       If(IOP.eq.0) then
-      Call MDSnorm(ndim,ncom,Mdim,AN,R,xt,Dist)
+      Call MDSnorm(ncom,Mdim,AN,R,xt,Dist)
       f1dimx=AN
       else
-      Call MAInorm(ndim,ncom,Mdim,IP,AN,xt,Dist)
+      Call MAInorm(ncom,Mdim,IP,AN,xt,Dist)
       f1dimx=-AN
       endif
       if(AN.gt.Huge) then
@@ -524,10 +529,11 @@ C     to calculate the root mean square as a measure for distortion
       return
       END
 
-      FUNCTION fpsi(ndim,M,u,dist)
+      FUNCTION fpsi(M,u,dist)
+      use config
 C     Calculate the Lagrangian dual for the minimum sphere problem
       IMPLICIT REAL*8 (A-H,O-Z)
-      Dimension u(ndim),dist(3,ndim),x(3)
+      Dimension u(Nmax),dist(3,Nmax),x(3)
       sum1=0.d0
       x(1)=0.d0
       x(2)=0.d0

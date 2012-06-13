@@ -1,5 +1,5 @@
-      SUBROUTINE CoordBuild(NMAX,MMAX,LMAX,MAtom,IN,Iout,IDA,D,ICart,
-     1 IV1,IV2,IV3,kGC,lGC,isonum,IPR,IPRC,ihueckel,JP,iprev,
+      SUBROUTINE CoordBuild(MAtom,IN,Iout,IDA,D,ICart,
+     1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
      1 A,evec,df,Dist,layout2d,distp,Cdist,GROUP)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
@@ -9,10 +9,11 @@ C Fowler-Manolopoulos matrix eigenvector algorithm: identify P-type
 C eigenvectors and construct the 3D fullerene
 C Tutte embedding algorithm: Tutte barycentric embedding and sphere
 C mapping 
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 layout2d
-      Integer D,S,RT,Spiral
+      Integer D,S,Spiral
       integer :: graph_is_a_fullerene
       DIMENSION layout2d(2,NMAX)
       DIMENSION D(MMAX,MMAX),S(MMAX),Dist(3,NMAX),distP(NMAX)
@@ -23,7 +24,7 @@ C mapping
       Character*10 Symbol
       CHARACTER*3 GROUP
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-      type(c_ptr) :: g, halma, new_fullerene_graph, new_graph,
+      type(c_ptr) :: g, halma, new_fullerene_graph,
      1               new_C20, halma_fullerene
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
@@ -72,7 +73,7 @@ C     Search where the 5-rings are in the spiral
       Do I=1,12
       Spiral(I,1)=JP(I)
       enddo
-      CALL Unwind(NMAX,MMAX,LMAX,M,IER,IT,ispiral,
+      CALL Unwind(NMAX,MMAX,EMAX,M,IER,IT,ispiral,
      1 Spiral,S,D,NMR,Group)                       ! Unwind dual into spirals
       K=0
       DO J=1,6
@@ -368,14 +369,14 @@ C     Check distances
       Write(IOUT,1015) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
-      CALL Diameter(NMax,MAtom,IOUT,Dist,distp)
+      CALL Diameter(MAtom,IOUT,Dist,distp)
       if(iratio.lt.33) then
       Write(IOUT,1016) iratio
       else
       Write(IOUT,1029) iratio
       endif
 C     Calculate P-type dipole moment
-       Call Dipole(NMax,MAtom,I1,I2,I3,IOUT,dipol,Dist,A)
+       Call Dipole(MAtom,I1,I2,I3,IOUT,dipol,Dist,A)
        Write(IOUT,1030)
        Do I=1,3
         Write(IOUT,1031) I,(dipol(I,J),J=1,3)
@@ -427,7 +428,7 @@ C     Check distances
       Write(IOUT,1015) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
-      CALL Diameter(NMax,MAtom,IOUT,Dist,distp)
+      CALL Diameter(MAtom,IOUT,Dist,distp)
       if(iratio.lt.33) then
       Write(IOUT,1016) iratio
       else
@@ -529,7 +530,8 @@ C     Check distances
       Return 
       END
 
-      SUBROUTINE Dipole(NMax,MAtom,I1,I2,I3,IOUT,dipol,Dist,A)
+      SUBROUTINE Dipole(MAtom,I1,I2,I3,IOUT,dipol,Dist,A)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,NMAX),A(NMAX,NMAX),dipol(3,3)
       tol=1.d-7

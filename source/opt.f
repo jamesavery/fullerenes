@@ -1,5 +1,6 @@
-      SUBROUTINE OptGraph(IOP,NMAX,MAtom,Iout,IDA,IS,IC3,MDist,maxl,
+      SUBROUTINE OptGraph(IOP,MAtom,Iout,IDA,IS,IC3,MDist,maxl,
      1 scalePPG,Dist)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C  This subroutine optimizes the fullerene graph using spring embedding
       DIMENSION Dist(2,NMAX),IC3(NMAX,3)
@@ -46,9 +47,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
        Dist(2,i)=Dist(2,i)*scale 
        WRITE(IOUT,1001) I,Dist(1,I),Dist(2,I),(IC3(I,J),J=1,3)
       enddo
-      NMAX2=2*NMAX
-      MATOM2=2*MATOM
-      CALL frprmng(IOP,NMAX,NMAX2,MATOM2,MAtom,IDA,Iout,IS,MDist,
+      CALL frprmng(IOP,NMAX,NMAX*2,MATOM*22,MAtom,IDA,Iout,IS,MDist,
      1 maxd,Dist,ftol,iter,fret,E0,RAA)
       if(fret-E0.gt.1.d-2) then
        fretn=(fret-E0)/dfloat(MATOM)
@@ -744,9 +743,9 @@ c   fret      ... value of f at p
       ier=0
       TOL=ftol
       If(IOP.eq.0) then
-       Call MDSnorm(ndim,n,M,fret,RMDSI,p,Dist)
+       Call MDSnorm(n,M,fret,RMDSI,p,Dist)
       else
-       Call MAInorm(ndim,n,M,IP,AN,p,Dist)
+       Call MAInorm(n,M,IP,AN,p,Dist)
        fret=-AN
       endif
       WRITE(IOUT,1002)
@@ -794,9 +793,9 @@ c   fret      ... value of f at p
         pt(j)=p(j)
 14    continue
       If(IOP.eq.0) then
-       Call MDSnorm(ndim,n,M,fptt,RMDSI,ptt,Dist)
+       Call MDSnorm(n,M,fptt,RMDSI,ptt,Dist)
       else
-       Call MAInorm(ndim,n,M,IP,AN,ptt,Dist)
+       Call MAInorm(n,M,IP,AN,ptt,Dist)
        fptt=-AN
       endif
       if(fptt.ge.fp)goto 1

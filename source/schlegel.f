@@ -706,7 +706,7 @@ C  IOP=2: Spring embedding + Coulomb repulsion from barycenter
 C  IOP=3: Pisanski-Plestenjak-Graovac embedding using the distance matrix MDist
 C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
        IOP=ISchlegel-4
-       CALL OptGraph(IOP,Natom,M,Iout,IDA,IS,IC3,MDist,maxl,
+       CALL OptGraph(IOP,M,Iout,IDA,IS,IC3,MDist,maxl,
      1  scalePPG,layout2d)
        write (Iout,1037)
        Do I=1,M

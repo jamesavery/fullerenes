@@ -1,8 +1,9 @@
-      SUBROUTINE MoveCM(Natom,Matom,Iout,Iprint,IAtom,mirror,
+      SUBROUTINE MoveCM(Matom,Iout,Iprint,IAtom,mirror,
      1 Dist,DistCM,El)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,natom),DistCM(3),Ainert(3,3),evec(3),df(3)
-      DIMENSION IATOM(natom),layout2d(2,NAtom)
+      DIMENSION Dist(3,Nmax),DistCM(3),Ainert(3,3),evec(3),df(3)
+      DIMENSION IATOM(Nmax)
       CHARACTER*2 El(99)
       Data FNorm,STol/4.97369255d2,1.d-2/
       if(Iprint.ne.0) WRITE(IOUT,1000) 
@@ -160,10 +161,11 @@ C Asymmetric
       return
       END
 
-      SUBROUTINE Diameter(Natom,M,IOUT,Dist,diam)
+      SUBROUTINE Diameter(M,IOUT,Dist,diam)
+      use config
 C Calculate largest and smallest atom-to-atom diameters
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,Natom),diam(Natom),imirror(Natom),jmirror(Natom)
+      DIMENSION Dist(3,Nmax),diam(Nmax),imirror(Nmax),jmirror(Nmax)
       Data difeps/1.d-6/
       Do i=1,M
 C     Search for the closest carbon atom to dmirror
@@ -188,7 +190,7 @@ C     Search for the closest carbon atom to dmirror
       enddo
 C     Sort from the largest to the smallest diameter
 C     and delete duplicates
-      CALL SortR(Natom,M,Mnew,imirror,jmirror,diam)
+      CALL SortR(Nmax,M,Mnew,imirror,jmirror,diam)
       Write(IOUT,1000) Mnew
       If(Mnew.ne.M/2) Write(IOUT,1002) Mnew,M/2
       Write(IOUT,1001) (imirror(i),jmirror(i),diam(i),i=1,MNew)
@@ -207,13 +209,14 @@ C     Calculate the moment of inertia tensor and diagonalize (no mass)
       Return
       END
  
-      SUBROUTINE CoordC60(natom,IN,Iout,MAtom,R5,R6,Dist)
+      SUBROUTINE CoordC60(Iout,MAtom,R5,R6,Dist)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     This routine constructs coordinates for the ideal capped icosahedron
 C     as described by P. Senn, J. Chem. Ed. 72, 302 (1995)
 C     or for a dodecahedron
       DIMENSION NUM(30),NUN(30)
-      DIMENSION Dist(3,natom)
+      DIMENSION Dist(3,Nmax)
       DIMENSION DIco(3,12)
       Data NUM/1,1,1,1,1,2,2,2,2,3,3,3,4,4,4,5,5,5,
      1   6,6,6,7,7,7,8,8,8,9,9,10/
@@ -384,10 +387,10 @@ C     Scale to get R5 distance
       Return
       END 
 
-      FUNCTION FunDistMat(I,J,natomL,DistMat)
+      FUNCTION FunDistMat(I,J,NmaxL,DistMat)
 C     Unpack distance matrix value from linear vector
       IMPLICIT REAL*8 (A-H,O-Z)
-      Dimension DistMat(natomL)
+      Dimension DistMat(NmaxL)
       I1=I
       J1=J
       IF(I.lt.J) then
@@ -399,10 +402,10 @@ C     Unpack distance matrix value from linear vector
       Return
       END
  
-      FUNCTION FunAngleMat(I,J,K,natomL,DistMat)
+      FUNCTION FunAngleMat(I,J,K,NmaxL,DistMat)
 C     Unpack distance matrix value from linear vector
       IMPLICIT REAL*8 (A-H,O-Z)
-      Dimension DistMat(natomL)
+      Dimension DistMat(NmaxL)
       Data dpi/3.14159265358979d0/
       I1=I
       J1=J
@@ -433,18 +436,17 @@ C     Unpack distance matrix value from linear vector
       Return
       END
 
-      Subroutine EndoKrotoTrans(NAtom,Nfaces,Matom,IN,Iout,n565,NEK,
+      Subroutine EndoKrotoTrans(Nmax,Nfaces,Matom,IN,Iout,n565,NEK,
      1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
      1 CDist)
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 layout2D(2,NAtom)
-      DIMENSION IDA(NAtom,NAtom),IC3(natom,3)
+      Real*8 layout2D(2,Nmax)
+      DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
       DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
-      DIMENSION NEK(3,Natom),IP(2,66),KD(4,66),KSW(3)
-      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom)
-      DIMENSION Dist(3,NAtom),distP(NAtom)
-      integer graph_is_a_fullerene
+      DIMENSION NEK(3,Nmax),IP(2,66),KD(4,66),KSW(3)
+      DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
+      DIMENSION Dist(3,Nmax),distP(Nmax)
       type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
       if(n565.eq.0) then
@@ -569,8 +571,8 @@ C Add edges
        II=2*I 
        IAD1=MAtom+II-1
        IAD2=MAtom+II
-       if(IAD2.gt.NAtom) then
-        Write(Iout,1023) NAtom
+       if(IAD2.gt.Nmax) then
+        Write(Iout,1023) Nmax
         stop
        endif
        I1=KD(1,I)
@@ -608,7 +610,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(NAtom,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Endo-Kroto insertion of 2 vertices:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
@@ -643,21 +645,21 @@ C Now analyze the adjacency matrix if it is correct
  1022 Format(/1X,'Number of vertices in Endo-Kroto transformed ',
      1 'fullerene: ',I5)
  1023 Format(/1X,'Number of vertices in fullerene over the current',
-     1 'limit set by NAtoms=',I5,' ==> STOP')
+     1 'limit set by Nmaxs=',I5,' ==> STOP')
       Return
       END
 
-      Subroutine WirzSchwerd(NAtom,Nfaces,Matom,IN,Iout,JERR,numberWS,
+      Subroutine WirzSchwerd(Nmax,Nfaces,Matom,IN,Iout,JERR,numberWS,
      1 IWS,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
      1 A,evec,df,Dist,layout2D,distp,Cdist)
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 layout2D(2,NAtom)
-      DIMENSION IDA(NAtom,NAtom),IC3(natom,3)
+      Real*8 layout2D(2,Nmax)
+      DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
       DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
       DIMENSION nWS(5,8),IP(20),KWS(5),IBWS(8,8)
-      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom)
-      DIMENSION Dist(3,NAtom),distP(NAtom)
+      DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
+      DIMENSION Dist(3,Nmax),distP(Nmax)
       integer graph_is_a_fullerene
       type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
@@ -850,8 +852,8 @@ C Swap vertices if IVNN not found
 C Transform adjacency matrix
 C Delete edges
       Nlimit=MAtom+6*ntrans
-      if(Nlimit.gt.NAtom) then
-       Write(Iout,1019) NAtom
+      if(Nlimit.gt.Nmax) then
+       Write(Iout,1019) Nmax
       endif
       Write(Iout,1008)
       do I=1,ntrans
@@ -939,7 +941,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(NAtom,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Wirz-Schwerdtfeger 6-vertex insertion to D2h 55-6-55',
      1 ' ring pattern:',/1X,'Read hexagon ring numbers or position',
@@ -964,7 +966,7 @@ C Now analyze the adjacency matrix if it is correct
  1018 Format(/1X,'Hexagon numbers do not match list of ',
      1 'Wirz-Schwerdtfeger list ==> RETURN')
  1019 Format(/1X,'Dimension of new adjacency matrix exceeds the ',
-     1 'NAtom limit set at ',I5,' ==> STOP')
+     1 'Nmax limit set at ',I5,' ==> STOP')
  1020 Format(1X,'Shared pentagons found between input pattern ',I2,
      1 ' and ',I2,: ' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')',
      1 ' / (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')')
@@ -975,17 +977,17 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      Subroutine YoshidaFowler6(NAtom,Nfaces,Matom,IN,Iout,JERR,
+      Subroutine YoshidaFowler6(Nmax,Nfaces,Matom,IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 layout2D(2,NAtom)
-      DIMENSION IDA(NAtom,NAtom),IC3(natom,3)
+      Real*8 layout2D(2,Nmax)
+      DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
       DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
       DIMENSION nFM(6,66),IP(66),KFM(6),IBFM(66,10)
-      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom)
-      DIMENSION Dist(3,NAtom),distP(NAtom)
+      DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
+      DIMENSION Dist(3,Nmax),distP(Nmax)
       integer graph_is_a_fullerene
       type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
@@ -1143,8 +1145,8 @@ C Now find outer 6 vertices between 5- and 6-rings
 C Transform adjacency matrix
 C Delete edges
       Nlimit=MAtom+6*ntrans
-      if(Nlimit.gt.NAtom) then
-       Write(Iout,1019) NAtom
+      if(Nlimit.gt.Nmax) then
+       Write(Iout,1019) Nmax
       endif
       Write(Iout,1008)
       do I=1,ntrans
@@ -1346,7 +1348,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(NAtom,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Yoshida-Fowler 6-vertex insertion to D3h 666555 ',
      1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
@@ -1379,7 +1381,7 @@ C Now analyze the adjacency matrix if it is correct
  1018 Format(/1X,'Hexagon numbers do not match list of ',
      1 'Yoshida-Fowler list ==> RETURN')
  1019 Format(/1X,'Dimension of new adjacency matrix exceeds the ',
-     1 'NAtom limit set at ',I5,' ==> STOP')
+     1 'Nmax limit set at ',I5,' ==> STOP')
  1020 Format(1X,'Shared pentagons found between input pattern ',I2,
      1 ' and ',I2,: ' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')',
      1 ' / (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')')
@@ -1392,17 +1394,17 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      Subroutine YoshidaFowler3(NAtom,Nfaces,Matom,IN,Iout,JERR,
+      Subroutine YoshidaFowler3(Nmax,Nfaces,Matom,IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 layout2D(2,NAtom)
-      DIMENSION IDA(NAtom,NAtom),IC3(natom,3)
+      Real*8 layout2D(2,Nmax)
+      DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
       DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
       DIMENSION nFM(4,66),IP(66),KFM(4),IBFM(66,6)
-      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom)
-      DIMENSION Dist(3,NAtom),distP(NAtom)
+      DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
+      DIMENSION Dist(3,Nmax),distP(Nmax)
       integer graph_is_a_fullerene
       type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
@@ -1575,7 +1577,7 @@ C Transform adjacency matrix
        IV2=idim+2
        IV3=idim+3
        IV4=idim+4
-       if(IV4.gt.Natom) then
+       if(IV4.gt.Nmax) then
         Write(Iout,1019)
         stop
        endif
@@ -1618,7 +1620,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(NAtom,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Yoshida-Fowler 4-vertex insertion to D3h 6555 ',
      1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
@@ -1652,24 +1654,24 @@ C Now analyze the adjacency matrix if it is correct
  1018 Format(/1X,'Hexagon numbers do not match list of ',
      1 'Yoshida-Fowler list ==> RETURN')
  1019 Format(/1X,'Dimension of new adjacency matrix exceeds the ',
-     1 'NAtom limit set at ',I5,' ==> STOP')
+     1 'Nmax limit set at ',I5,' ==> STOP')
  1020 Format(1X,'Shared pentagons found between hexagons ',I5,
      1 ' and ',I5,'. Corresponding pentagon numbers: ',I2)
  1021 Format(1X,'Abort Yoshida-Fowler insertion ==> RETURN')
       Return
       END
 
-      Subroutine StoneWalesTrans(NAtom,Nfaces,Matom,IN,Iout,numbersw,
+      Subroutine StoneWalesTrans(Nmax,Nfaces,Matom,IN,Iout,numbersw,
      1 nSW,ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
      1 CDist)
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 layout2D(2,NAtom)
-      DIMENSION IDA(NAtom,NAtom),IC3(natom,3)
+      Real*8 layout2D(2,Nmax)
+      DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
       DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
       DIMENSION nsw(4,66),IP(2,66),KSW(4),IBSW(66,2),JBSW(66,2),IAtSW(4)
-      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom)
-      DIMENSION Dist(3,NAtom),distP(NAtom)
+      DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
+      DIMENSION Dist(3,Nmax),distP(Nmax)
       integer graph_is_a_fullerene
       type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
@@ -1841,7 +1843,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(NAtom,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Stone-Wales transformation:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
@@ -1872,14 +1874,14 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      Subroutine Leapfrog(NAtom,MAtom,Iout,leap,leapGC,kGC,lGC,
+      Subroutine Leapfrog(Nmax,MAtom,Iout,leap,leapGC,kGC,lGC,
      1 ihueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,CDist) 
 C     Construct Leapfrog fullerene through adjacency matrix
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 layout2D(2,NAtom)
-      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom),IDA(NAtom,NAtom)
-      DIMENSION Dist(3,NAtom),distP(NAtom)
+      Real*8 layout2D(2,Nmax)
+      DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax),IDA(Nmax,Nmax)
+      DIMENSION Dist(3,Nmax),distP(Nmax)
       integer graph_is_a_fullerene
       type(c_ptr) :: g, frog, halma, new_fullerene_graph, new_graph,
      1 leapfrog_fullerene, halma_fullerene
@@ -1889,8 +1891,8 @@ C Leapfrog fullerene
   10  if(leap.gt.0) then
       MLeap=(3**leap)*MAtom
 
-      if(Mleap.gt.NAtom) then
-         Write(Iout,1002) MLeap,NAtom
+      if(Mleap.gt.Nmax) then
+         Write(Iout,1002) MLeap,Nmax
          LeapErr=1
          return
       endif
@@ -1901,7 +1903,7 @@ C Leapfrog fullerene
        Write(Iout,1001) leap,MAtom,MLeap
       endif 
 
-      g = new_fullerene_graph(NAtom,MAtom,IDA)
+      g = new_fullerene_graph(Nmax,MAtom,IDA)
       frog = leapfrog_fullerene(g,leap)
 
 C Test that the created leapfrog graph is a fullerene graph
@@ -1916,7 +1918,7 @@ C  faces are hexagons)
       endif
 C Produce adjacency matrix
       write (Iout,1005) 
-      call adjacency_matrix(frog,NAtom,IDA)
+      call adjacency_matrix(frog,Nmax,IDA)
       endif
 
 C Goldberg-Coxeter transform of initial fullerene
@@ -1937,7 +1939,7 @@ C Input: initial graph, and GC indices (kGC,lGC)
         write(Iout,1011)
         stop
       endif
-      g = new_fullerene_graph(NAtom,MAtom,IDA)
+      g = new_fullerene_graph(Nmax,MAtom,IDA)
       halma = halma_fullerene(g,kGC-1)
       isafullerene = graph_is_a_fullerene(halma)
       IF (isafullerene .eq. 1) then
@@ -1952,12 +1954,12 @@ C Update fortran structures
         write(Iout,1012)  MLeap,Medges
 C Produce adjacency matrix 
       write (Iout,1005) 
-      call adjacency_matrix(halma,NAtom,IDA)
+      call adjacency_matrix(halma,Nmax,IDA)
       write (Iout,1007) 
       endif
       MAtom = MLeap
 
-      Call Tutte(NAtom,MAtom,Iout,ihueckel,IDA,
+      Call Tutte(Nmax,MAtom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       if(leap.ne.0) call delete_fullerene_graph(frog)
       if(leapGC.ne.0) call delete_fullerene_graph(halma)
@@ -1968,7 +1970,7 @@ C Produce adjacency matrix
  1001 Format(/1X,'Creating the adjacency matrix of the ',I2,
      1 'th leap-frog fullerene: ',I4,' --> ',I4)
  1002 Format(1X,'Error: Dimension of leapfrof fullerene is ',I4,
-     1 ' greater than dimension of NAtom (',I4,') set in program')
+     1 ' greater than dimension of Nmax (',I4,') set in program')
  1004 FORMAT(1X,'Fullerene graph deleted')
  1005 Format(1x,'Produce new adjacency matrix')
  1006 Format(/1x,'Goldberg-Coxeter transformation with indices ',
@@ -1990,14 +1992,14 @@ C Produce adjacency matrix
       Return
       END
 
-      Subroutine Tutte(NAtom,Matom,Iout,ihueckel,IDA,
+      Subroutine Tutte(Nmax,Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 layout2D(2,NAtom)
-      DIMENSION IDA(NAtom,NAtom),IDG(NAtom),IC3(natom,3)
-      DIMENSION evec(NAtom),df(NAtom),A(NAtom,NAtom)
-      DIMENSION Dist(3,NAtom),distP(NAtom)
+      Real*8 layout2D(2,Nmax)
+      DIMENSION IDA(Nmax,Nmax),IDG(Nmax),IC3(Nmax,3)
+      DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
+      DIMENSION Dist(3,Nmax),distP(Nmax)
       Character*10 Symbol
       Data Tol1/.15d0/
       integer graph_is_a_fullerene
@@ -2011,8 +2013,8 @@ C     Diagonalize
             A(I,J)=dfloat(IDA(I,J))
          enddo
       enddo
-      call tred2(A,MAtom,NAtom,evec,df)
-      call tqli(evec,df,MAtom,NAtom,A)
+      call tred2(A,MAtom,Nmax,evec,df)
+      call tqli(evec,df,MAtom,Nmax,A)
       Write(Iout,1005) MAtom,MAtom
 C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       Do I=1,MAtom
@@ -2093,7 +2095,7 @@ C     End of Hueckel analysis
 
 C   Tutte algorithm for the 3D structure (see pentindex.f):
          write (Iout,1011)
-         g = new_fullerene_graph(NAtom,MAtom,IDA)
+         g = new_fullerene_graph(Nmax,MAtom,IDA)
          call tutte_layout(g,layout2d)
          call spherical_layout(g,Dist)
          write (Iout,1013)
@@ -2124,11 +2126,11 @@ C     Check distances
       Do J=1,MAtom
       Write(IOUT,1016) J,(Dist(I,J),I=1,3)
       enddo
-      CALL Distan(NAtom,MAtom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(Nmax,MAtom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1017) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
-      CALL Diameter(NAtom,MAtom,IOUT,Dist,distp)
+      CALL Diameter(MAtom,IOUT,Dist,distp)
       if(iratio.lt.33) then
       Write(IOUT,1018) iratio
       else
