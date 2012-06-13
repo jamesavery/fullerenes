@@ -221,8 +221,15 @@
 !    algorithms (Fowler-Manolopoulos or Tutte), e.g. barrels instead of
 !    nanotubes.
 !
-! - Calculate the volume of the fullerene by summing over all
-!    tetrahedrons spanned by the three vectors (Subroutine VOLUME).
+! - Calculate the volume of the fullerene using three different algorithms: 
+!                                                        (Subroutine VOLUME)
+!   1) The convex hull
+!   2) The normal vector algorithm resulting in the exact volume of the polyhedron
+!      (identical to convex hull if polyhedron is convex)
+!   3) The tesselation into trigonal pyramides from the barycenter by summing over all
+!      tetrahedrons spanned by the three vectors (identical to algorithm 1 and 3 if
+!      polyhedron is convex).
+!   Algorithm 3:
 !     CM-CR  (center of cage to the center of ring)
 !     CM-CA1 (center of cage to atom 1 in ring)
 !     CM-CA2 (center of cage to atom 2 in ring)
@@ -236,13 +243,16 @@
 !     V = abs(Vdet)  ,   V =  1/6 | X2 Y2 Z2 |
 !                                 | X3 Y3 Z3 |
 !
-!   Calculate the surface area A and the area/volume ratio (Subroutine VOLUME)
+!   Calculate the surface area A and the area/volume ratio through triangulation
+!     of polygon from the barycenter (Subroutine VOLUME)
 !
 !                                        2              2              2
 !                             | Y1 Z1 1 |    | Z1 X1 1 |    | X1 Y1 1 |   
 !     A = 1/2 d**0.5 ,   d =  | Y2 Z2 1 | +  | Z2 X2 1 | +  | X2 Y2 1 |
 !                             | Y3 Z3 1 |    | Z3 X3 1 |    | X3 Y3 1 |
 !
+!   Also given is the surface area of the convex hull and the one obtained from
+!    algorithm 2.
 !   Note that the ideal C60 coordinates can be constructed from scratch 
 !    (Subroutine COORDC60). This routine was constructed to test the program 
 !    for the case of an ideal capped icosahedron, where the analytical formula 
@@ -257,7 +267,7 @@
 !    i.e.   V=5[(3+sqrt(5))*(2R5+R6)**3]/12-[(5+sqrt(5))*R5**3]/2
 !    For C20 (ideal dodecahedron) we have V=[(15+7sqrt(5))*R5**3]/4
 !    For C20 and C60 the result of these formulae are also printed.
-!   This method gives sensible results for convex fullerenes.
+!   These methods gives identical results for convex fullerenes.
 !
 ! - Calculate the minimum covering sphere (MCS) of the cage molecule 
 !    (Subroutine MINCOVSPHERE): The MCS in m-dimensional space exists, is unique 
@@ -750,7 +760,8 @@ C    Set the dimensions for the distance matrix
       DIMENSION NringA(Nedges),NringB(Nedges)
       DIMENSION NringC(Nedges),NringD(Nedges)
       DIMENSION NringE(Nedges),NringF(Nedges)
-      DIMENSION IDual(Nfaces,Nfaces),nSW(4,66),nFM(4,66),nYF(6,66)
+      DIMENSION IDual(Nfaces,Nfaces),nSW(4,66),nFM(4,66),nYF(6,66),
+     1 nWS(5,8)
       DIMENSION NEK(3,natom),JP(12)
       DIMENSION Symbol(Nfaces)
       Real*4 TimeX
@@ -808,7 +819,7 @@ C  INPUT and setting parameters for running the subroutines
         CALL Datain(IN,IOUT,NAtom,MAtom,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
-     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,
+     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,
      1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,forceWu,
      1  forceWuP,xyzname,chkname,TEXTINPUT)
 C  Stop if error in input
@@ -1012,7 +1023,7 @@ C Analyze ring connections
       CALL RingC(NAtom,Nfaces,Nedges,NAtom2,Matom,nat11,Iout,iprintf,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
      1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
-     1 numberFM,nFM,numberYF,nYF,DIST,CRing5,CRing6)
+     1 numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
 C Perform Stone-Wales transformation
       if(ISW.ne.0) then
       routine='STONE-WALES  '
@@ -1057,6 +1068,19 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
       if(JERR.eq.0) go to 999
       endif
 
+C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
+      if(IWS.ne.0) then
+      routine='WIRZSCHWERD  '
+      Write(Iout,1008) routine
+      CALL WirzSchwerd(NAtom,Nfaces,Matom,IN,Iout,JERR,numberWS,IWS,
+     1 nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
+     1 A,evec,df,Dist,Dist2D,distp,Rdist)
+      IWS=0
+      ipent=1
+      SWspiral=1
+      if(JERR.eq.0) go to 999
+      endif
+
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0) then
       routine='SPIRALSEARCH '
@@ -1071,9 +1095,9 @@ C Calculate the volume
       routine='VOLUME       '
       Write(Iout,1008) routine
 
-      CALL Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
-     1 N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
-     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
+c$$$      CALL Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
+c$$$     1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
+c$$$     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
 
 C Calculate the minimum distance sphere
 C     routine='CONVEXHULL'
@@ -1119,7 +1143,7 @@ C Calculate Schlegel diagram
 
 C  E N D   O F   P R O G R A M
   99  if(loop-1) 100,101,102
- 100  Return
+ 100  go to 9999
  101  iprev=0
       WRITE(IOUT,1019)
       go to 9 
@@ -1128,7 +1152,7 @@ C  E N D   O F   P R O G R A M
       go to 9 
 CG77 99  CALL TIME(CTIM)
 CG77 99  CALL TIME(CTIM)
-      call date_and_time(CDAT,CTIM,zone,values)
+9999  call date_and_time(CDAT,CTIM,zone,values)
         WRITE(IOUT,1004) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7)
       CALL Timer(TIMEX)

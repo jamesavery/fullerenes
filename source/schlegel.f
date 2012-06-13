@@ -129,7 +129,7 @@ C   Search in 6-ring
         if(is1.eq.N6M(I,J)) n6hit=n6hit+1
         if(is2.eq.N6M(I,J)) n6hit=n6hit+1
         if(is3.eq.N6M(I,J)) n6hit=n6hit+1
-        if(n6hit.eq.3) then
+        if(n6hit.eq.3) then 
          c(1)=cr6(1,I) 
          c(2)=cr6(2,I) 
          c(3)=cr6(3,I)
@@ -720,7 +720,6 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
 
  9999 Continue
 C James, here goes your latex program creation for Schlegel diagram
-C     call write_layout2d(g,filename,"latex")
       Return
   901 Format(I6,2F12.6)
   902 Format(I6,2(1X,F12.6),1X,3(1X,I6))
