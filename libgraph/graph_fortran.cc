@@ -32,7 +32,7 @@ extern "C" {
   void print_graph_(const char *name, const graph_ptr *);
 
   // Fullerene graph generation 
-  fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const unsigned int *n);
+  fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n);
   fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps);
 
 
@@ -135,7 +135,7 @@ void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 graph_ptr dual_graph_(const graph_ptr *g){  return new PlanarGraph((*g)->dual_graph()); }
 int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 
-fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const unsigned int *n)
+fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n)
 {
   return new FullereneGraph((*g)->halma_fullerene(*n,true));
 }

@@ -20,7 +20,7 @@ public:
 
   // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. 
   // (I.e. 4,9,16,25,... for n=1,2,3,4,...)
-  FullereneGraph halma_fullerene(const unsigned int n, const bool do_layout=false) const;
+  FullereneGraph halma_fullerene(const int n, const bool do_layout=false) const;
 
   // Creates the next leapfrog fullerene C_{3n} from the current fullerene C_n
   FullereneGraph leapfrog_fullerene(const bool do_layout=false) const;

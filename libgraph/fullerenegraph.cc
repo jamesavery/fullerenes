@@ -29,7 +29,9 @@ pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const
 }
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
-FullereneGraph FullereneGraph::halma_fullerene(const unsigned int m, const bool planar_layout) const {
+FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_layout) const {
+  if(m<0) return FullereneGraph(*this);
+
   PlanarGraph dual(dual_graph(6));
   vector<face_t> triangles(dual.compute_faces_flat(3,false));
   map<edge_t,vector<node_t> > edge_nodes;
