@@ -1128,7 +1128,7 @@ C Calculate Schlegel diagram
       else
        ParamS=dabs(ParamS)
       endif
-      CALL Graph2D(Nmax,Mmax,Emax,MAtom,msrs,IOUT,IS1,IS2,IS3,
+      CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring,Ischlegel,IC3,IDA,Dist,
      1 ParamS,Rmin,TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol)
       endif

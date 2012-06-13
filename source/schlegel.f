@@ -1,6 +1,7 @@
-      SUBROUTINE Graph2D(NAtom,Nfaces,Nedges,M,msrs,IOUT,IS1,IS2,IS3,
+      SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,
      1 N5M,N6M,N5R,N6R,NRing,Iring,ISchlegel,IC3,IDA,Dist,angle,Rmin,
      1 Tol,fscale,scalePPG,CR,CR5,CR6,Symbol)
+      use config
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
 C projection method and the perspective projection, or Tutte
@@ -9,14 +10,14 @@ C The fullerene is rotated first such that the desired point, edge
 C or face is at the top. Euler angles are used for rotation.
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 layout2d
-      DIMENSION IDA(Natom,Natom)
-      DIMENSION layout2d(2,NAtom)
-      DIMENSION Dist(3,NAtom),IAtom(NAtom),NRing(Nfaces),distw(3),c(3)
-      DIMENSION CR5(3,Nfaces),CR6(3,Nfaces),vec1(3),Iring(Nfaces)
-      DIMENSION N5M(Nfaces,5),N6M(Nfaces,6),Rot(3,3),CR(3,Nfaces)
-      DIMENSION Rotz(3,3),Symbol(Nfaces),RingS(2,Nfaces)
-      DIMENSION IC3(natom,3),ICM(6,3),IS(6)
-      Integer MDist(Natom,Natom)
+      DIMENSION IDA(Nmax,Nmax)
+      DIMENSION layout2d(2,Nmax)
+      DIMENSION Dist(3,Nmax),IAtom(Nmax),NRing(Mmax),distw(3),c(3)
+      DIMENSION CR5(3,Mmax),CR6(3,Mmax),vec1(3),Iring(Mmax)
+      DIMENSION N5M(Mmax,5),N6M(Mmax,6),Rot(3,3),CR(3,Mmax)
+      DIMENSION Rotz(3,3),Symbol(Mmax),RingS(2,Mmax)
+      DIMENSION IC3(Nmax,3),ICM(6,3),IS(6)
+      Integer MDist(Nmax,Nmax)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
       type(c_ptr) :: g, frog, new_fullerene_graph, read_fullerene_graph
@@ -29,8 +30,8 @@ C     Prepare for Program QMGA
       Open(unit=2,file='qmga.dat',form='formatted')
       Write(2,901) M,DPoint,Dedge
       
-      Do I=1,NAtom
-      Do J=1,NAtom
+      Do I=1,Nmax
+      Do J=1,Nmax
       MDist(I,J)=0
       enddo
       enddo
@@ -655,9 +656,9 @@ C   Search in 6-ring
        endif
 C  End of search
       endif
-      g = new_fullerene_graph(NAtom,M,IDA)
+      g = new_fullerene_graph(Nmax,M,IDA)
       if(ISchlegel.ge.7) then
-       call all_pairs_shortest_path(g,M,NAtom,MDist)
+       call all_pairs_shortest_path(g,M,Nmax,MDist)
        WRITE(IOUT,1041) 
        maxl=0
       Do I=1,M
@@ -688,7 +689,7 @@ C     Get Barycenter of outer ring and use as origin
       if(ISchlegel.le.4) then
 C  Radially scale Tutte graph
        if(ISchlegel.eq.4) then
-        CALL ScaleTutte(Natom,M,Iout,IS,lring,fscale,layout2d)
+        CALL ScaleTutte(M,Iout,IS,lring,fscale,layout2d)
        endif
 C     Write to unit 2
       write (Iout,1037)
@@ -1121,9 +1122,10 @@ C     Kamada-Kawai embedding
       return
       END
 
-      SUBROUTINE ScaleTutte(Natom,M,Iout,IS,lring,fs,Dist)
+      SUBROUTINE ScaleTutte(M,Iout,IS,lring,fs,Dist)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(2,NAtom),IS(6)
+      DIMENSION Dist(2,Nmax),IS(6)
 C Routine to move inner vertices of a Tutte graph outwards
 C through a linear relation
 C   Determine min distance of outer ring

@@ -180,9 +180,9 @@ C     USES brent,f1dim,mnbrak
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrakg(IOP,NMAX,NMAX*2,MATOM,n,Iout,AH,IS,MDist,maxd,
+      CALL mnbrakg(IOP,n,Iout,AH,IS,MDist,maxd,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,RAA)
-      CALL brentg(IOP,NMAX,NMAX*2,MATOM,n,Iout,AH,IS,MDist,maxd,
+      CALL brentg(IOP,n,Iout,AH,IS,MDist,maxd,
      1 fret,ax,xx,bx,TOL,xmin,xicom,pcom,RAA)
       do j=1,n
         xi(j)=xmin*xi(j)
@@ -191,8 +191,9 @@ C     USES brent,f1dim,mnbrak
       return
       END
 
-      SUBROUTINE f1dimg(IOP,NMAX,NMAX2,MMAX,n,A,IS,MDist,maxd,
+      SUBROUTINE f1dimg(IOP,n,A,IS,MDist,maxd,
      1 f1dimf,x,xicom,pcom,RAA)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*2),xt(NMAX*2),xicom(NMAX*2)
       Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
@@ -204,16 +205,17 @@ C     USES funcg
       return
       END
 
-      SUBROUTINE mnbrakg(IOP,NMAX,NMAX2,MMAX,n,Iout,AH,IS,DD,maxd,
+      SUBROUTINE mnbrakg(IOP,n,Iout,AH,IS,DD,maxd,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,RAA)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       Integer AH(NMAX,NMAX),IS(6)
       Integer DD(NMAX,NMAX)
       REAL*8 pcom(NMAX*2),xicom(NMAX*2)
-      CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fa,ax,xicom,pcom,
+      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fa,ax,xicom,pcom,
      1 RAA)
-      CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fb,bx,xicom,pcom,
+      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fb,bx,xicom,pcom,
      1 RAA)
       if(fb.gt.fa)then
         dum=ax
@@ -224,7 +226,7 @@ C     USES funcg
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fc,cx,xicom,pcom,
+      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fc,cx,xicom,pcom,
      1 RAA)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
@@ -232,7 +234,7 @@ C     USES funcg
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             ax=bx
@@ -246,10 +248,10 @@ C     USES funcg
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             bx=cx
@@ -257,12 +259,12 @@ C     USES funcg
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else
           u=cx+GOLD*(cx-bx)
@@ -270,7 +272,7 @@ C     USES funcg
         Write(Iout,1000)
         return
         endif
-        CALL f1dimg(IOP,NMAX,NMAX*2,MMAX,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         endif
         ax=bx
@@ -285,13 +287,14 @@ C     USES funcg
  1000 Format('**** Error in Subroutine mnbrakg')
       END
 
-      SUBROUTINE brentg(IOP,NMAX,NMAX2,MMAX,n,Iout,AH,IS,DD,maxd,
+      SUBROUTINE brentg(IOP,n,Iout,AH,IS,DD,maxd,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,RAA)
+      use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
-      REAL*8 pcom(NMAX2),xicom(NMAX2)
+      REAL*8 pcom(NMAX*2),xicom(NMAX*2)
       Integer AH(NMAX,NMAX),IS(6)
       Integer DD(NMAX,NMAX)
       a=min(ax,cx)
@@ -300,7 +303,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dimg(IOP,NMAX,NMAX2,MMAX,n,AH,IS,DD,maxd,fx,x,xicom,pcom,
+      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fx,x,xicom,pcom,
      1 RAA)
       fv=fx
       fw=fx
@@ -336,7 +339,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dimg(IOP,NMAX,NMAX2,MMAX,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1    RAA)
         if(fu.le.fx) then
           if(u.ge.x) then
