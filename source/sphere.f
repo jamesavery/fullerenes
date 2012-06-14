@@ -27,7 +27,7 @@ C    Initial step
       AMIS=4.d0*Api*RMIS**2
       Write(IOUT,1002) RMIS,VMIS,AMIS
 C     Start Iteration
-      CALL powell(Nmax,3,iter,Iout,IOP,ier,M,eps,AN,RMIS,c,cmax,Dist)
+      CALL powell(3,iter,Iout,IOP,ier,M,eps,AN,RMIS,c,cmax,Dist)
 C     End Iteration
       if(ier.eq.1) then
        Write(IOUT,1010)
@@ -103,7 +103,7 @@ C    Calculate the MDS norm
       Write(IOUT,1002) RMDSI,VMDS,AMDS
       Write(IOUT,1003) AN
 C     Start Iteration
-      CALL powell(Nmax,3,iter,Iout,IOP,ier,M,eps,AN,RMDSI,c,cmax,Dist)
+      CALL powell(3,iter,Iout,IOP,ier,M,eps,AN,RMDSI,c,cmax,Dist)
 C     End Iteration
       if(ier.eq.2) then
        Write(IOUT,1006)
@@ -506,20 +506,21 @@ C     to calculate the root mean square as a measure for distortion
       return
       END
 
-      DOUBLE PRECISION FUNCTION f1dimx(ncom,Nmax,Mdim,IOP,
+      DOUBLE PRECISION FUNCTION f1dimx(ncom,Matom,IOP,
      1 x,pcom,xicom,Dist)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION pcom(ncom),xicom(ncom),xt(ncom)
       REAL*8 Dist(3,Nmax)
-      HUGE=dfloat(Mdim)*1.d2
+      HUGE=dfloat(Matom)*1.d2
       do 11 j=1,ncom
         xt(j)=pcom(j)+x*xicom(j)
 11    continue
       If(IOP.eq.0) then
-      Call MDSnorm(ncom,Mdim,AN,R,xt,Dist)
+      Call MDSnorm(ncom,Matom,AN,R,xt,Dist)
       f1dimx=AN
       else
-      Call MAInorm(ncom,Mdim,IP,AN,xt,Dist)
+      Call MAInorm(ncom,Matom,IP,AN,xt,Dist)
       f1dimx=-AN
       endif
       if(AN.gt.Huge) then

@@ -129,8 +129,8 @@ C     dfunc input vector p of length N, output gradient of length n user defined
         fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linming(IOP,NMAX,NMAX*2,MATOM,N,Iout,AH,its,IS,MDist,maxd,
-     1  rper,p,pcom,xi,xicom,fret,RAA)
+        call linming(IOP,N,Iout,AH,IS,MDist,maxd,
+     1       p,pcom,xi,xicom,fret,RAA)
          grad2=0.d0
          do I=1,n
           grad2=grad2+xi(i)*xi(i)
@@ -167,8 +167,9 @@ C         dgg=dgg+xi(j)**2
       return
       END
 
-      SUBROUTINE linming(IOP,NMAX,NMAX2,MATOM,n,Iout,AH,its,IS,MDist,
-     1 maxd,rper,p,pcom,xi,xicom,fret,RAA)
+      SUBROUTINE linming(IOP,n,Iout,AH,IS,MDist,
+     1 maxd,p,pcom,xi,xicom,fret,RAA)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(NMAX*2),pcom(NMAX*2),xicom(NMAX*2),xi(NMAX*2)
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
@@ -376,8 +377,9 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE OptFF(NMAX,MMAX,MAtom,Iout,IDA,N5,N6,
+      SUBROUTINE OptFF(MAtom,Iout,IDA,N5,N6,
      1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C  This subroutine optimizes the fullerene 3D structure using the Wu force field:
 C   Z. C. Wu, D. A. Jelski, T. F. George, "Vibrational Motions of
@@ -406,24 +408,22 @@ C     Leave parameter for Coulomb force as it is
       M=Matom/2+2
 C     Optimize
       Write(IOUT,1000) Rdist
-      NMAX3=3*NMAX
-      MATOM3=3*MATOM
       Write(Iout,1003) (force(i),i=1,9),ftol
       if(forceWu(9).gt.0.d0) Write(Iout,1004) forceWu(9)
-      CALL frprmn(IOP,NMAX,NMAX3,MATOM3,MMAX,IDA,Iout,N5,N6,N5MEM,N6MEM,
+      CALL frprmn(IOP,MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
      1 Dist,force,ftol,iter,fret)
       if(fret.gt.1.d-2) then
       fretn=fret/dfloat(MATOM)
       Write(IOUT,1002) fretn
       endif
-      CALL Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       fac=RDist/Rmin
       Do I=1,MATOM
       Dist(1,I)=Dist(1,I)*fac
       Dist(2,I)=Dist(2,I)*fac
       Dist(3,I)=Dist(3,I)*fac
       enddo
-      CALL Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of ',
@@ -440,12 +440,13 @@ C     Optimize
       Return 
       END
 
-      SUBROUTINE frprmn(IOP,NMAX,NMAX3,N,MMAX,AH,Iout,N5,N6,N5M,N6M,
+      SUBROUTINE frprmn(IOP,N,AH,Iout,N5,N6,N5M,N6M,
      1 p,force,ftol,iter,fret)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=99999,EPS=1.d-9)
-      Real*8 p(NMAX3),g(NMAX3),h(NMAX3),xi(NMAX3)
-      Real*8 pcom(NMAX3),xicom(NMAX3),force(9)
+      Real*8 p(NMAX*3),g(NMAX*3),h(NMAX*3),xi(NMAX*3)
+      Real*8 pcom(NMAX*3),xicom(NMAX*3),force(9)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func, using its gradient as calculated by a routine dfunc.
@@ -460,13 +461,13 @@ C     USES dfunc,func,linmin
 C     func input vector p of length n user defined to be optimized
 C     IOP=1: Wu force field optimization
       iter=0
-      CALL func(IOP,NMAX,NMAX3,MMAX,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
+      CALL func(IOP,NMAX,NMAX*3,MMAX,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
       if(IERR.ne.0) then
       Write(Iout,1004)
       return
       endif
 C     dfunc input vector p of length N, output gradient of length n user defined
-      CALL dfunc(IOP,NMAX,NMAX3,MMAX,N,AH,N5,N6,N5M,N6M,p,xi,force)
+      CALL dfunc(IOP,NMAX,NMAX*3,MMAX,N,AH,N5,N6,N5M,N6M,p,xi,force)
       grad2=0.d0
       do I=1,N
        grad2=grad2+xi(i)*xi(i)
@@ -482,7 +483,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
         fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linmin(IOP,NMAX,NMAX3,MMAX,N,AH,N5,N6,N5M,N6M,its,
+        call linmin(IOP,N,AH,N5,N6,N5M,N6M,
      1   p,pcom,xi,xicom,fret,force)
          grad2=0.d0
          do I=1,n
@@ -495,7 +496,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
           return
         endif
         fp=fret
-        CALL dfunc(IOP,NMAX,NMAX3,MMAX,N,AH,N5,N6,N5M,N6M,p,xi,force)
+        CALL dfunc(IOP,NMAX,NMAX*3,MMAX,N,AH,N5,N6,N5M,N6M,p,xi,force)
         gg=0.d0
         dgg=0.d0
         do j=1,n
@@ -522,10 +523,11 @@ C         dgg=dgg+xi(j)**2
       return
       END
 
-      SUBROUTINE linmin(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,its,
+      SUBROUTINE linmin(IOP,n,AH,N5,N6,N5M,N6M,
      1 p,pcom,xi,xicom,fret,c)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 p(NMAX3),pcom(NMAX3),xicom(NMAX3),xi(NMAX3),c(9)
+      REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3),c(9)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       PARAMETER (TOL=1.d-5)
@@ -536,9 +538,9 @@ C     USES brent,f1dim,mnbrak
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+      CALL mnbrak(IOP,n,AH,N5,N6,N5M,N6M,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,c)
-      CALL brent(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,Iout,fret,
+      CALL brent(IOP,n,AH,N5,N6,N5M,N6M,Iout,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,c)
       do j=1,n
         xi(j)=xmin*xi(j)
@@ -547,30 +549,32 @@ C     USES brent,f1dim,mnbrak
       return
       END
 
-      SUBROUTINE f1dim(IOP,NMAX,NMAX3,MMAX,n,A,N5,N6,N5M,N6M,
+      SUBROUTINE f1dim(IOP,n,A,N5,N6,N5M,N6M,
      1 f1dimf,x,xicom,pcom,c)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 pcom(NMAX3),xt(NMAX3),xicom(NMAX3),c(9)
+      REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3),c(9)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
 C     USES func
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func(IOP,NMAX,NMAX3,MMAX,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
+      CALL func(IOP,NMAX,NMAX*3,MMAX,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
       return
       END
 
-      SUBROUTINE mnbrak(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+      SUBROUTINE mnbrak(IOP,n,AH,N5,N6,N5M,N6M,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,c)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
-      REAL*8 pcom(NMAX3),xicom(NMAX3),c(9)
-      CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+      REAL*8 pcom(NMAX*3),xicom(NMAX*3),c(9)
+      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1 fa,ax,xicom,pcom,c)
-      CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1 fb,bx,xicom,pcom,c)
       if(fb.gt.fa)then
         dum=ax
@@ -581,7 +585,7 @@ C     USES func
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1 fc,cx,xicom,pcom,c)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
@@ -589,7 +593,7 @@ C     USES func
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           if(fu.lt.fc)then
             ax=bx
@@ -603,10 +607,10 @@ C     USES func
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           if(fu.lt.fc)then
             bx=cx
@@ -614,12 +618,12 @@ C     USES func
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         else
           u=cx+GOLD*(cx-bx)
@@ -627,7 +631,7 @@ C     USES func
         Print*,'**** Error in Subroutine mnbrak'
         return
         endif
-        CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         endif
         ax=bx
@@ -641,13 +645,14 @@ C     USES func
       return
       END
 
-      SUBROUTINE brent(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,Iout,
+      SUBROUTINE brent(IOP,n,AH,N5,N6,N5M,N6M,Iout,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,c)
+      use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
-      REAL*8 pcom(NMAX3),xicom(NMAX3),c(9)
+      REAL*8 pcom(NMAX*3),xicom(NMAX*3),c(9)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       a=min(ax,cx)
@@ -656,7 +661,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1 fx,x,xicom,pcom,c)
       fv=fx
       fw=fx
@@ -692,7 +697,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim(IOP,NMAX,NMAX3,MMAX,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         if(fu.le.fx) then
           if(u.ge.x) then
@@ -729,12 +734,13 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE powell(ndim,n,iter,Iout,IOP,ier,M,ftol,AN,RMDSI,
-     1 p,pmax,Dist)
+      SUBROUTINE powell(n,iter,Iout,IOP,ier,Matom,ftol,AN,RMDSI,
+     1     p,pmax,Dist)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (NMAX=3,ITMAX=20,TINY=1.D-20)
+      PARAMETER (ITMAX=20,TINY=1.D-20)
       REAL*8 p(n),pcom(n),xicom(n),xi(n,n),pt(n),ptt(n),xit(n),step(n)
-      REAL*8 Dist(3,ndim),pmax(n)
+      REAL*8 Dist(3,Nmax),pmax(n)
       
 c numerical recipies cluster to do Powell minimization
 c
@@ -748,9 +754,9 @@ c   fret      ... value of f at p
       ier=0
       TOL=ftol
       If(IOP.eq.0) then
-       Call MDSnorm(n,M,fret,RMDSI,p,Dist)
+       call MDSnorm(n,Matom,fret,RMDSI,p,Dist)
       else
-       Call MAInorm(n,M,IP,AN,p,Dist)
+       call MAInorm(n,Matom,IP,AN,p,Dist)
        fret=-AN
       endif
       WRITE(IOUT,1002)
@@ -776,7 +782,7 @@ c   fret      ... value of f at p
           xit(j)=xi(j,i)
 12      continue
         fptt=fret
-        call linminx(n,ndim,M,IOP,ier,TOL,p,xit,fret,pcom,xicom,Dist)
+        call linminx(n,Matom,IOP,ier,TOL,p,xit,fret,pcom,xicom,Dist)
           if(ier.eq.1) Return
         if(dabs(fptt-fret).gt.del)then
           del=dabs(fptt-fret)
@@ -798,15 +804,15 @@ c   fret      ... value of f at p
         pt(j)=p(j)
 14    continue
       If(IOP.eq.0) then
-       Call MDSnorm(n,M,fptt,RMDSI,ptt,Dist)
+       Call MDSnorm(n,Matom,fptt,RMDSI,ptt,Dist)
       else
-       Call MAInorm(n,M,IP,AN,ptt,Dist)
+       Call MAInorm(n,Matom,IP,AN,ptt,Dist)
        fptt=-AN
       endif
       if(fptt.ge.fp)goto 1
       t=2.*(fp-2.*fret+fptt)*(fp-fret-del)**2-del*(fp-fptt)**2
       if(t.ge.0.)goto 1
-      call linminx(n,ndim,M,IOP,ier,TOL,p,xit,fret,pcom,xicom,Dist)
+      call linminx(n,Matom,IOP,ier,TOL,p,xit,fret,pcom,xicom,Dist)
       if(ier.eq.1) Return
       do 15 j=1,n
         xi(j,ibig)=xi(j,n)
@@ -823,11 +829,12 @@ c   fret      ... value of f at p
       Return
       END
 
-      SUBROUTINE linminx(n,ndim,Mdim,IOP,ier,
+      SUBROUTINE linminx(n,Matom,IOP,ier,
      1 TOL,p,xi,fret,pcom,xicom,Dist)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(n),xi(n),pcom(n),xicom(n)
-      REAL*8 Dist(3,ndim)
+      REAL*8 Dist(3,Nmax)
 CU    USES brentx,f1dimx,mnbrakx
       do 11 j=1,n
         pcom(j)=p(j)
@@ -835,10 +842,10 @@ CU    USES brentx,f1dimx,mnbrakx
 11    continue
       ax=0.d0
       xx=1.d0
-      call mnbrakx(n,ndim,Mdim,IOP,ier,
+      call mnbrakx(n,Matom,IOP,ier,
      1 pcom,xicom,ax,xx,bx,fa,fx,fb,Dist)
       if(ier.eq.1) Return
-      fret=brentx(n,ndim,Mdim,IOP,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
+      fret=brentx(n,Matom,IOP,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
       do 12 j=1,n
         xi(j)=xmin*xi(j)
         p(j)=p(j)+xi(j)
@@ -846,14 +853,15 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-      SUBROUTINE mnbrakx(ncom,ndim,Mdim,IOP,ier,pcom,xicom,ax,bx,cx,
+      SUBROUTINE mnbrakx(ncom,Matom,IOP,ier,pcom,xicom,ax,bx,cx,
      1 fa,fb,fc,Dist)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20,HUGE=1.d10)
       REAL*8 pcom(ncom),xicom(ncom)
-      REAL*8 Dist(3,ndim)
-      fa=f1dimx(ncom,ndim,Mdim,IOP,ax,pcom,xicom,Dist)
-      fb=f1dimx(ncom,ndim,Mdim,IOP,bx,pcom,xicom,Dist)
+      REAL*8 Dist(3,Nmax)
+      fa=f1dimx(ncom,Matom,IOP,ax,pcom,xicom,Dist)
+      fb=f1dimx(ncom,Matom,IOP,bx,pcom,xicom,Dist)
       if(fb.gt.fa)then
         dum=ax
         ax=bx
@@ -863,7 +871,7 @@ CU    USES brentx,f1dimx,mnbrakx
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      fc=f1dimx(ncom,ndim,Mdim,IOP,cx,pcom,xicom,Dist)
+      fc=f1dimx(ncom,Matom,IOP,cx,pcom,xicom,Dist)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
         q=(bx-cx)*(fb-fa)
@@ -874,7 +882,7 @@ CU    USES brentx,f1dimx,mnbrakx
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-          fu=f1dimx(ncom,ndim,Mdim,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             ax=bx
             fa=fb
@@ -887,23 +895,23 @@ CU    USES brentx,f1dimx,mnbrakx
             return
           endif
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,ndim,Mdim,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
         else if((cx-u)*(u-ulim).gt.0.d0)then
-          fu=f1dimx(ncom,ndim,Mdim,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             bx=cx
             cx=u
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-            fu=f1dimx(ncom,ndim,Mdim,IOP,u,pcom,xicom,Dist)
+            fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.d0)then
           u=ulim
-          fu=f1dimx(ncom,ndim,Mdim,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
         else
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,ndim,Mdim,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
         endif
         ax=bx
         bx=cx
@@ -916,11 +924,12 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-      DOUBLE PRECISION FUNCTION brentx(ncom,ndim,Mdim,IOP,
+      DOUBLE PRECISION FUNCTION brentx(ncom,Matom,IOP,
      1 pcom,xicom,ax,bx,cx,tol,xmin,Dist)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 Dist(3,ndim)
-      REAL*8 pcom(ncom),xicom(ncom),xt(ncom)
+      REAL*8 Dist(3,Nmax)
+      REAL*8 pcom(ncom),xicom(ncom)
       INTEGER ITMAX
       PARAMETER (ITMAX=1000,CGOLD=.3819660,ZEPS=1.D-10)
       a=min(ax,cx)
@@ -929,7 +938,7 @@ CU    USES brentx,f1dimx,mnbrakx
       w=v
       x=v
       e=0.
-      fx=f1dimx(ncom,ndim,Mdim,IOP,x,pcom,xicom,Dist)
+      fx=f1dimx(ncom,Matom,IOP,x,pcom,xicom,Dist)
       fv=fx
       fw=fx
       do 11 iter=1,ITMAX
@@ -964,7 +973,7 @@ CU    USES brentx,f1dimx,mnbrakx
         else
           u=x+sign(tol1,d)
         endif
-        fu=f1dimx(ncom,ndim,Mdim,IOP,u,pcom,xicom,Dist)
+        fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
         if(fu.le.fx) then
           if(u.ge.x) then
             a=x

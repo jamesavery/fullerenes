@@ -962,14 +962,14 @@ C Optimize Geometry through force field method
         ftol=ftolP*1.d3
         Write(Iout,1003)
         fcoulomb=forceWu(9)
-        CALL OptFF(Nmax,Mmax,MAtom,Iout,IDA,N5Ring,N6Ring,
+        CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1   N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
        ftol=ftolP
        Do I=1,9
         forceWu(I)=forceWuP(I)
        enddo
       endif
-      CALL OptFF(Nmax,Mmax,MAtom,Iout,IDA,N5Ring,N6Ring,
+      CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
       Iprint=0
       forceWu(9)=fcoulomb

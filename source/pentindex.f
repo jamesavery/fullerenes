@@ -295,7 +295,7 @@ C     if required
       Dist(2,I)=A(I,I2)
       Dist(3,I)=A(I,I3)
       enddo
-      CALL Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       ratiotest=Rminall/Rmax
 C     Search for better eigenvectors (not implemented yet)
       if(ratiotest.lt.1.d-6) then
@@ -311,7 +311,7 @@ C     Search for better eigenvectors (not implemented yet)
       Dist(2,I)=A(I,I2)*fac2
       Dist(3,I)=A(I,I3)*fac3
       enddo
-      CALL Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       ratio=(Rmax/Rmin-1.d0)*1.d2
       if(ratio1.lt.ratio) then
       Write(Iout,1026)
@@ -323,7 +323,7 @@ C     Search for better eigenvectors (not implemented yet)
       fac1=1.d0
       fac2=1.d0
       fac3=1.d0
-      CALL Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       endif
 
 C     Obtain smallest distance for further scaling
@@ -365,7 +365,7 @@ C     Check distances
       Do J=1,MAtom
       Write(IOUT,1014) J,(Dist(I,J),I=1,3)
       enddo
-      CALL Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1015) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
@@ -424,7 +424,7 @@ C     Check distances
       Do J=1,MAtom
       Write(IOUT,1014) J,(Dist(I,J),I=1,3)
       enddo
-      CALL Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1015) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)

@@ -56,7 +56,8 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
-      SUBROUTINE Distan(NMAX,Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      SUBROUTINE Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,NMAX)
       DIMENSION IDA(NMAX,NMAX)

@@ -2126,7 +2126,7 @@ C     Check distances
       Do J=1,MAtom
       Write(IOUT,1016) J,(Dist(I,J),I=1,3)
       enddo
-      CALL Distan(Nmax,MAtom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(MAtom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1017) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
