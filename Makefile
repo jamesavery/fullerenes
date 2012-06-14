@@ -5,11 +5,11 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS=-O3 -m64 -fopenmp -Wall -Wno-sign-compare
-FFLAGS=-O3 -m64
+CXXFLAGS= -g3 -m64 -Wall -Wno-sign-compare
+FFLAGS= -g3 -m64 -Wall
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS=graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o \
+GRAPHOBJECTS=config.o graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o \
 	     polyhedron.o fullerenegraph.o graph_fortran.o
 
 FOBJECTS=$(patsubst %.o,build/%.o,$(OBJECTS))
@@ -41,11 +41,13 @@ test-%: tests/%.cc libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ 
 #-----------------------------------------------------
 
-
 output/%.out: input/%.inp
 	./fullerene < $< > $@
 
 tests: fullerene $(TESTOUT)
+
+tags:
+	ctags -e --c-kinds=pxd -R
 
 
 clean:
