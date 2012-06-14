@@ -387,7 +387,8 @@ C     Scale to get R5 distance
       Return
       END 
 
-      FUNCTION FunDistMat(I,J,NmaxL,DistMat)
+      FUNCTION FunDistMat(I,J,DistMat)
+      use config
 C     Unpack distance matrix value from linear vector
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension DistMat(NmaxL)
@@ -402,7 +403,8 @@ C     Unpack distance matrix value from linear vector
       Return
       END
  
-      FUNCTION FunAngleMat(I,J,K,NmaxL,DistMat)
+      FUNCTION FunAngleMat(I,J,K,DistMat)
+      use config
 C     Unpack distance matrix value from linear vector
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension DistMat(NmaxL)
@@ -436,14 +438,15 @@ C     Unpack distance matrix value from linear vector
       Return
       END
 
-      Subroutine EndoKrotoTrans(Nmax,Nfaces,Matom,IN,Iout,n565,NEK,
+      SUBROUTINE EndoKrotoTrans(Matom,IN,Iout,n565,NEK,
      1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
      1 CDist)
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
-      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
       DIMENSION NEK(3,Nmax),IP(2,66),KD(4,66),KSW(3)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
@@ -610,7 +613,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Endo-Kroto insertion of 2 vertices:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
@@ -649,14 +652,15 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      Subroutine WirzSchwerd(Nmax,Nfaces,Matom,IN,Iout,JERR,numberWS,
+      SUBROUTINE WirzSchwerd(Matom,IN,Iout,JERR,numberWS,
      1 IWS,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
      1 A,evec,df,Dist,layout2D,distp,Cdist)
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
-      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
       DIMENSION nWS(5,8),IP(20),KWS(5),IBWS(8,8)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
@@ -941,7 +945,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Wirz-Schwerdtfeger 6-vertex insertion to D2h 55-6-55',
      1 ' ring pattern:',/1X,'Read hexagon ring numbers or position',
@@ -977,14 +981,15 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      Subroutine YoshidaFowler6(Nmax,Nfaces,Matom,IN,Iout,JERR,
+      SUBROUTINE YoshidaFowler6(Matom,IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,layout2D,distp,CDist)
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
-      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
       DIMENSION nFM(6,66),IP(66),KFM(6),IBFM(66,10)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
@@ -1348,7 +1353,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Yoshida-Fowler 6-vertex insertion to D3h 666555 ',
      1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
@@ -1394,14 +1399,15 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      Subroutine YoshidaFowler3(Nmax,Nfaces,Matom,IN,Iout,JERR,
+      SUBROUTINE YoshidaFowler3(Matom,IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,layout2D,distp,CDist)
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
-      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
       DIMENSION nFM(4,66),IP(66),KFM(4),IBFM(66,6)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
@@ -1620,7 +1626,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Yoshida-Fowler 4-vertex insertion to D3h 6555 ',
      1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
@@ -1661,14 +1667,15 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      Subroutine StoneWalesTrans(Nmax,Nfaces,Matom,IN,Iout,numbersw,
+      SUBROUTINE StoneWalesTrans(Matom,IN,Iout,numbersw,
      1 nSW,ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
      1 CDist)
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
-      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6)
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
       DIMENSION nsw(4,66),IP(2,66),KSW(4),IBSW(66,2),JBSW(66,2),IAtSW(4)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
@@ -1843,7 +1850,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Nmax,Matom,Iout,ihueckel,IDA,
+      Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Stone-Wales transformation:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
@@ -1874,9 +1881,10 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      Subroutine Leapfrog(Nmax,MAtom,Iout,leap,leapGC,kGC,lGC,
+      SUBROUTINE Leapfrog(Matom,Iout,leap,leapGC,kGC,lGC,
      1 ihueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,CDist) 
 C     Construct Leapfrog fullerene through adjacency matrix
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
@@ -1959,7 +1967,7 @@ C Produce adjacency matrix
       endif
       MAtom = MLeap
 
-      Call Tutte(Nmax,MAtom,Iout,ihueckel,IDA,
+      Call Tutte(MAtom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       if(leap.ne.0) call delete_fullerene_graph(frog)
       if(leapGC.ne.0) call delete_fullerene_graph(halma)
@@ -1992,8 +2000,9 @@ C Produce adjacency matrix
       Return
       END
 
-      Subroutine Tutte(Nmax,Matom,Iout,ihueckel,IDA,
+      SUBROUTINE Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist)
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
