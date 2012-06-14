@@ -1,5 +1,6 @@
-      SUBROUTINE SpiralRestart(NMAX,MMAX,LMAX,N,IPR,Iout,
+      SUBROUTINE SpiralRestart(N,IPR,Iout,
      1 Isonum,IsoIPR,iham,IDA,A,chkname)
+      use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
       Real*8 A(NMAX,NMAX),gap
@@ -256,7 +257,7 @@ C Now do the calculation for the remainder
       S(J10)=5
       S(J11)=5
       S(J12)=5
-      CALL Windup(MMAX,M,IPR,IER,S,D)      !      Wind up spiral into dual 
+      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
       IF(IER.EQ.12) GO TO 12               !      and check for closure 
       IF(IER.EQ.11) GO TO 11
       IF(IER.EQ.10) GO TO 10
@@ -269,7 +270,7 @@ C Now do the calculation for the remainder
       IF(IER.EQ.3)  GO TO 3
       IF(IER.EQ.2)  GO TO 2
       IF(IER.EQ.1)  GO TO 1
-      CALL Unwind(NMAX,MMAX,LMAX,M,IER,IT,ispiral,
+      CALL Unwind(M,IER,IT,ispiral,
      1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals 
       IF(IER.EQ.13) GO TO 13                             ! and check for uniqueness
       K=0
@@ -279,7 +280,7 @@ C Now do the calculation for the remainder
          K=J
       enddo
 C     Analyze dual matrix
-   16  CALL DualAnalyze(NMAX,MMAX,N,M,Iout,D,IRhag5,IRhag6,
+   16  CALL DualAnalyze(nmax,mmax,N,M,Iout,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
        if(2*ndeg.eq.nelec) then 
         Occup='closed'
@@ -308,7 +309,7 @@ C     Analyze dual matrix
      1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
        else
-        Call HamiltonCyc(NMax,N,maxiter,Iout,nbatch,IDA,nhamcycle)
+        Call HamiltonCyc(N,maxiter,Iout,nbatch,IDA,nhamcycle)
         WRITE(Iout,608) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
      1   (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2   nelec,ndeg,gap,Occup,nhamcycle,(NMR(J),J=1,K)
@@ -493,8 +494,9 @@ C     Analyze dual matrix
  2002 Format(A18)
       end
 
-      SUBROUTINE Spiral(NMAX,MMAX,LMAX,N,IPR,Iout,
+      SUBROUTINE Spiral(N,IPR,Iout,
      1 Isonum,IsoIPR,iham,IDA,A)
+      use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
       Real*8 A(NMAX,NMAX),gap
@@ -592,7 +594,7 @@ C     N is the nuclearity of the fullerene.
       S(J10)=5
       S(J11)=5
       S(J12)=5
-      CALL Windup(MMAX,M,IPR,IER,S,D)      !      Wind up spiral into dual 
+      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
       IF(IER.EQ.12) GO TO 12               !      and check for closure 
       IF(IER.EQ.11) GO TO 11
       IF(IER.EQ.10) GO TO 10
@@ -605,7 +607,7 @@ C     N is the nuclearity of the fullerene.
       IF(IER.EQ.3)  GO TO 3
       IF(IER.EQ.2)  GO TO 2
       IF(IER.EQ.1)  GO TO 1
-      CALL Unwind(NMAX,MMAX,LMAX,M,IER,IT,ispiral,
+      CALL Unwind(M,IER,IT,ispiral,
      1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals 
       IF(IER.EQ.13) GO TO 13                             ! and check for uniqueness      
       K=0
@@ -615,7 +617,7 @@ C     N is the nuclearity of the fullerene.
          K=J
       enddo
 C     Analyze dual matrix
-   16  CALL DualAnalyze(NMAX,MMAX,N,M,Iout,D,IRhag5,IRhag6,
+   16  CALL DualAnalyze(nmax,mmax,N,M,Iout,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
        if(2*ndeg.eq.nelec) then 
         Occup='closed'
@@ -644,7 +646,7 @@ C     Analyze dual matrix
      1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
        else
-        Call HamiltonCyc(NMax,N,maxiter,Iout,nbatch,IDA,nhamcycle)
+        Call HamiltonCyc(N,maxiter,Iout,nbatch,IDA,nhamcycle)
         WRITE(Iout,608) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
      1   (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2   nelec,ndeg,gap,Occup,nhamcycle,(NMR(J),J=1,K)
@@ -792,7 +794,8 @@ C     Analyze dual matrix
       Return
       END
 
-      SUBROUTINE spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+      SUBROUTINE spwindup(M,MP,Iout,D,S,JP,IER)
+      use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),JP(12),IR(12),JR(12),JS(12)
 C This routine tries to find the spiral from a preset of
@@ -862,11 +865,12 @@ C     Print*,iring,'/',JP
       Return
       END
 
-      SUBROUTINE SpiralSearch(NMAX,MMAX,LMAX,NSP,N,Iout,IRG55,IRG66,
+      SUBROUTINE SpiralSearch(NSP,N,Iout,IRG55,IRG66,
      1 IRG56,NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP)
+      use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION NrA(LMAX),NrB(LMAX),NrC(LMAX),NrD(LMAX)
-      DIMENSION NrE(LMAX),NrF(LMAX),NMR(6),JP(12)
+      DIMENSION NrA(EMAX),NrB(EMAX),NrC(EMAX),NrD(EMAX)
+      DIMENSION NrE(EMAX),NrF(EMAX),NMR(6),JP(12)
       DIMENSION Spiral(12,NMAX),SpiralT(12,NSP),SpiralF(MMAX,NSP)
       DIMENSION D(MMAX,MMAX),S(MMAX)
       CHARACTER*3 GROUP
@@ -950,7 +954,7 @@ C     Loop over all (5,5) fusions
           JP(3)=3
           MP=3
          endif
-          CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+          CALL spwindup(M,MP,Iout,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
          enddo
@@ -1005,7 +1009,7 @@ C     Loop over all (5,6) fusions
       JP(2)=3
       MP=2
       endif
-      CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+      CALL spwindup(M,MP,Iout,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
          enddo
@@ -1055,7 +1059,7 @@ C     Loop over all (6,6) fusions
           JP(1)=3
           MP=1
          endif
-       CALL spwindup(NMAX,MMAX,M,MP,Iout,D,S,JP,IER)
+       CALL spwindup(M,MP,Iout,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
          enddo
@@ -1092,12 +1096,12 @@ C     Fowler algorithm
         JP(I)=SpiralT(I,msp)
        enddo
        IER=0
-       CALL Windup(MMAX,M,IPR,IER,S,D)      !      Wind up spiral into dual 
+       CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
        IF(IER.ne.0) GO TO 13                !      and check for closure 
        Do I=1,12 
         Spiral(I,1)=JP(I)
        enddo
-       CALL Unwind(NMAX,MMAX,LMAX,M,IER,IT,ispiral,
+       CALL Unwind(M,IER,IT,ispiral,
      1  Spiral,S,D,NMR,Group)             ! Unwind dual into spirals 
        K=0
        DO J=1,6
@@ -1130,7 +1134,7 @@ C     Fowler algorithm
         WRITE(Iout,608)
        endif
        if(ispiral.gt.2) then
-        CALL CanSpiral(NMAX,ispiral,spiral,JP)
+        CALL CanSpiral(ispiral,spiral,JP)
         WRITE(Iout,623)
         WRITE(Iout,621) (JP(I),I=1,12)
        endif
@@ -1218,7 +1222,8 @@ C     Print ring numbers
       Return
       END
       
-      SUBROUTINE CanSpiral(NMAX,MS0,S,P)
+      SUBROUTINE CanSpiral(MS0,S,P)
+      use config
       IMPLICIT Integer (A-Z)
       DIMENSION S(12,NMAX),P(12),PI(12),SM(12,NMAX)
 C     Find canonical spiral by sorting
@@ -1259,8 +1264,9 @@ C     Find lowest value
       return
       END
 
-      SUBROUTINE DualAnalyze(NMAX,MMAX,N,M,Iout,D,IRhag5,IRhag6,
+      SUBROUTINE DualAnalyze(nmax,mmax,N,M,Iout,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
+c      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer D(MMAX,MMAX),Ddiag(MMAX),NR5(12),IDA(NMAX,NMAX)
       Integer IRhag5(0:5),IRhag6(0:6),IDG(NMAX)
@@ -1339,7 +1345,7 @@ C     Strain Parameter
       sigmah=dsqrt(dabs(ak2hk-akhk2))
 
 C     Now produce adjacency matrix
- 112  CALL DUAL(NMAX,D,MMAX,IDA,N,IER)
+ 112  CALL DUAL(D,MMAX,IDA,N,IER)
       Do I=1,N
        df(I)=0.d0
       Do J=I,N
@@ -1421,7 +1427,8 @@ C     Write(Iout,1002) M,(Ddiag(J),J=1,M)
       Return
       End
 
-      SUBROUTINE Windup(MMAX,M,IPR,IER,S,D)
+      SUBROUTINE Windup(M,IPR,IER,S,D)
+      use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION S(MMAX),D(MMAX,MMAX)
       DIMENSION R(MMAX),C(MMAX,6)
@@ -1499,13 +1506,14 @@ C       after P pentagons have been added. Otherwise IER = 0 on return.
       RETURN
       END
 
-      SUBROUTINE Unwind(NMAX,MMAX,LMAX,M,IER,IT,ispiral,
+      SUBROUTINE Unwind(M,IER,IT,ispiral,
      1 Spiral,S,D,NMR,GROUP)
+      use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),NMR(6)
       DIMENSION P(MMAX),R(MMAX)
-      DIMENSION V(3,NMAX),E(2,LMAX)
-      DIMENSION VP(NMAX,MMAX),EP(LMAX,MMAX),FP(MMAX,MMAX)
+      DIMENSION V(3,NMAX),E(2,EMAX)
+      DIMENSION VP(NMAX,MMAX),EP(EMAX,MMAX),FP(MMAX,MMAX)
       DIMENSION MV(12),ME(12),MF(12),MS(12),Spiral(12,NMAX)
       CHARACTER*3 GROUP
 C       This subroutine unwinds a fullerene dual adjacency matrix D 
@@ -1822,45 +1830,46 @@ C            Store all non-identical spirals
         RETURN
         END
 
-      SUBROUTINE DUAL(NMAX,D,M,A,N,IER) 	 
+      SUBROUTINE DUAL(D,M,A,N,IER)
+      use config
       IMPLICIT INTEGER (A-Z)
-	DIMENSION D(M,M),A(NMAX,NMAX)
-	DIMENSION V(3,NMAX)
+        DIMENSION D(M,M),A(NMAX,NMAX)
+        DIMENSION V(3,NMAX)
 c       Given a fullerene dual adjacency matrix D, this subroutine 
 c       constructs the corresponding fullerene adjacency matrix A. 
 c       IER = 0 on return if the construction is successful. 	 
-	I=0 	 
+        I=0
 	DO 3 L = 1,M 
 	   DO 2 K=1,L 
-	      IF (D(K,L).EQ.0) GO TO 2 		 
+	      IF (D(K,L).EQ.0) GO TO 2
 	      DO 1 J = 1,K
-		 IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1 	 
-		 I = I+1 
+		 IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
+		 I = I+1
 		 IF (I.GT.N) GO TO 1
 		 V(1,I) = J ! Associate the three mutually adjacent 
 		 V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
 		 V(3,I) = L ! with fullerene vertex I 	 
- 1	      CONTINUE 	 
- 2	   CONTINUE 	 
- 3	CONTINUE 	 
-	IER = I-N 
+ 1	      CONTINUE
+ 2	   CONTINUE
+ 3	CONTINUE
+	IER = I-N
 	IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
-	DO 7 J = 1,N           ! and is therefore NOT a fullerene dual 	 
+	DO 7 J = 1,N           ! and is therefore NOT a fullerene dual 
 	   DO 6 I = 1,J
-	      K = 0 	 
+	      K = 0
 	      DO 5 JJ = 1,3
 		 DO 4 II = 1,3
-		    IF(V(II,I).EQ.V(JJ,J)) K = K+1	 
- 4		 CONTINUE 	 
- 5	      CONTINUE 
-	      IF (K.EQ.2) THEN 
+		    IF(V(II,I).EQ.V(JJ,J)) K = K+1
+ 4		 CONTINUE
+ 5	      CONTINUE
+	      IF (K.EQ.2) THEN
 		 A(I,J)=1   ! Fullerene vertices I and J are adjacent 
 		 A(J,I)=1   ! if they have 2 dual vertices in common
-	      ELSE 			 
+	      ELSE
 		 A(I,J)=0
 		 A(J,I)=0
 	      ENDIF
- 6	   CONTINUE 			 
- 7	CONTINUE 			 
-	RETURN 			 
-	END
+ 6	   CONTINUE
+ 7      CONTINUE
+        RETURN
+        END

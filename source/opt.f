@@ -461,13 +461,13 @@ C     USES dfunc,func,linmin
 C     func input vector p of length n user defined to be optimized
 C     IOP=1: Wu force field optimization
       iter=0
-      CALL func(IOP,NMAX,NMAX*3,MMAX,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
+      CALL func(IOP,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
       if(IERR.ne.0) then
       Write(Iout,1004)
       return
       endif
 C     dfunc input vector p of length N, output gradient of length n user defined
-      CALL dfunc(IOP,NMAX,NMAX*3,MMAX,N,AH,N5,N6,N5M,N6M,p,xi,force)
+      CALL dfunc(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
       grad2=0.d0
       do I=1,N
        grad2=grad2+xi(i)*xi(i)
@@ -496,7 +496,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
           return
         endif
         fp=fret
-        CALL dfunc(IOP,NMAX,NMAX*3,MMAX,N,AH,N5,N6,N5M,N6M,p,xi,force)
+        CALL dfunc(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
         gg=0.d0
         dgg=0.d0
         do j=1,n
@@ -560,7 +560,7 @@ C     USES func
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func(IOP,NMAX,NMAX*3,MMAX,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
+      CALL func(IOP,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
       return
       END
 

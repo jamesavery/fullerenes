@@ -1,12 +1,13 @@
-      SUBROUTINE Isomers(NAtom,Nfaces,Nedges,N,IPR,IOUT,
+      SUBROUTINE Isomers(N,IPR,IOUT,
      1 maxAiso,iham,ichk,IDA,A,chkname)
 C Information on number of isomers with or without fulfilling the
 C the IPR rule. The routine also calls SPIRAL using the subroutines
 C written by P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes"
 C (Dover Publ., New York, 2006), which gives information on the
 C isomers point group, pentagon ring spiral indices and NMR pattern. 
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer Isonum(119),IsonumIPR(123),IDA(NAtom,NAtom)
+      Integer Isonum(119),IsonumIPR(123),IDA(Nmax,Nmax)
       Character*1 fstart,fnum1
       Character*2 fnum2
       Character*3 fnum,fnum3,GROUP,ident
@@ -16,7 +17,7 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
       Character*13 dbdir
       Character*31 databasefile
       Logical lexist
-      Dimension A(NAtom,NAtom)
+      Dimension A(Nmax,Nmax)
       Data Isonum/1,0,1,1,2,3,6,6,15,17,40,45,89,116,199,
      * 271,437,580,924,1205,1812,2385,3465,4478,6332,8149,
      * 11190,14246,19151,24109,31924,39718,51592,63761,81738,
@@ -136,7 +137,7 @@ C      fitted to asymptodic
 C SPIRAL uses the subroutines written by Fowler and Manopoulus
       If(ichk.gt.0) then
        Write(Iout,1006)
-       CALL SpiralRestart(Natom,Nfaces,Nedges,N,IPR,Iout,Isonum,
+       CALL SpiralRestart(N,IPR,Iout,Isonum,
      1 IsonumIPR,iham,IDA,A,chkname)
        return
       endif
@@ -176,7 +177,7 @@ C Check if database can be taken instead
 C Produce list from ring spiral algorithm
   99  If(IPR.ge.0) then
        Write(Iout,1005)
-       CALL Spiral(Natom,Nfaces,Nedges,N,IPR,Iout,Isonum,
+       CALL Spiral(N,IPR,Iout,Isonum,
      1 IsonumIPR,iham,IDA,A)
       endif
 

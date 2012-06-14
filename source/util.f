@@ -1,7 +1,8 @@
-      SUBROUTINE Sortr(ndim,M,Mnew,imirror,jmirror,diam)
+      SUBROUTINE Sortr(M,Mnew,imirror,jmirror,diam)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION imirror(ndim),jmirror(ndim),diam(ndim)
-      DIMENSION imirrorw(ndim),jmirrorw(ndim),diamw(ndim)
+      DIMENSION imirror(Nmax),jmirror(Nmax),diam(Nmax)
+      DIMENSION imirrorw(Nmax),jmirrorw(Nmax),diamw(Nmax)
       ICOUNT=0
       DO I=1,M
       DO K=I+1,M

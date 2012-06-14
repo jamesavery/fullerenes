@@ -190,7 +190,7 @@ C     Search for the closest carbon atom to dmirror
       enddo
 C     Sort from the largest to the smallest diameter
 C     and delete duplicates
-      CALL SortR(Nmax,M,Mnew,imirror,jmirror,diam)
+      CALL SortR(M,Mnew,imirror,jmirror,diam)
       Write(IOUT,1000) Mnew
       If(Mnew.ne.M/2) Write(IOUT,1002) Mnew,M/2
       Write(IOUT,1001) (imirror(i),jmirror(i),diam(i),i=1,MNew)

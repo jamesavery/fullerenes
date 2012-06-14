@@ -1,16 +1,17 @@
-      SUBROUTINE HamiltonCyc(NAtom,N,maxiter,Iout,nbatch,
+      SUBROUTINE HamiltonCyc(N,maxiter,Iout,nbatch,
      1 A,Nhamilton)
+      use config
 C     Subroutine from Darko Babic to create Hamitonian cycles
 C      optimized for program Isomer
-      integer list(natom,3,3),path(0:natom+1),stack(3*natom),pos(natom)
-      integer x(0:natom),y(0:natom),saved(natom)
+      integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax),pos(Nmax)
+      integer x(0:Nmax),y(0:Nmax),saved(Nmax)
       integer i,j,k,l,n,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
       integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
-      logical occ(natom),pass(natom),end(natom),flag,better
-      integer ic3(natom,3),A(natom,natom)
+      logical occ(Nmax),pass(Nmax),end(Nmax),flag,better
+      integer ic3(Nmax,3),A(Nmax,Nmax)
       ifirst=0 
       nhamilton=0
-      nmax=30
+      maxN=30
       nbatch=0
 
       do i=1,n
@@ -47,7 +48,7 @@ C      optimized for program Isomer
          occ(i)=.false.
          end(i)=.false.
       end do
-      do i=0,natom+1
+      do i=0,Nmax+1
          path(i)=0
       end do
       x(0)=n
@@ -168,20 +169,21 @@ C     if (oldptr.gt.0) go to 5
       return
       end
 
-      SUBROUTINE Hamilton(NAtom,n,Iout,iprint,maxiter,IC3)
+      SUBROUTINE Hamilton(n,Iout,iprint,maxiter,IC3)
 C     Subroutine from Darko Babic to create Hamitonian cycles
 C     and the IUPAC name of a fullerene
-      integer list(natom,3,3),path(0:natom+1),stack(3*natom),pos(natom)
-      integer bridge(natom),x(0:natom),y(0:natom),saved(natom)
+      use config
+      integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax),pos(Nmax)
+      integer bridge(Nmax),x(0:Nmax),y(0:Nmax),saved(Nmax)
       integer i,j,k,l,n,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
       integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
-      logical occ(natom),pass(natom),end(natom),flag,better
-      integer ic3(natom,3)
+      logical occ(Nmax),pass(Nmax),end(Nmax),flag,better
+      integer ic3(Nmax,3)
       
       ifirst=0 
       nhamilton=0
-      nmax=30
-      if(n.lt.nmax) nmax=n
+      maxN=30
+      if(n.lt.maxN) maxN=n
       write (Iout,1009) maxiter
       do i=1,n
          do j=1,3
@@ -207,7 +209,7 @@ C     and the IUPAC name of a fullerene
          occ(i)=.false.
          end(i)=.false.
       end do
-      do i=0,natom+1
+      do i=0,Nmax+1
          path(i)=0
       end do
       x(0)=n
@@ -284,7 +286,7 @@ C     and the IUPAC name of a fullerene
       endif
       if(iprint.ne.0) then
       if(ifirst.eq.0) write (Iout,1005)
-      write (Iout,1004) nhamilton,(path(j),j=1,nmax)
+      write (Iout,1004) nhamilton,(path(j),j=1,maxN)
       if(n.gt.30) then
       do I=31,n,30
       jmax=I+29
@@ -453,17 +455,18 @@ C     if (oldptr.gt.0) go to 5
       return
       end
 
-      SUBROUTINE Paths(NAtom,Nedges,MAtom,IOUT,IA,A,evec,df)
+      SUBROUTINE Paths(MAtom,IOUT,IA,A,evec,df)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C Calculate the number of all possible distinct paths from the
 C adjaceny matric A(i,j) by producing the (n-1)-th power
 C of A. In this case n is Matom. This gives all possible walks
 C of length (n-1).
-      DIMENSION A(NAtom,NAtom),evec(NAtom),df(NAtom)
-      DIMENSION IA(Natom,Natom),IM(Natom,Natom),IM2(Natom,Natom)
-      DIMENSION IMF(Natom,Natom),IMF1(Natom,Natom)
+      DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
+      DIMENSION IA(Nmax,Nmax),IM(Nmax,Nmax),IM2(Nmax,Nmax)
+      DIMENSION IMF(Nmax,Nmax),IMF1(Nmax,Nmax)
       DIMENSION IS1(10),IS2(10),APN(10)
-      DIMENSION B(NAtom,NAtom)
+      DIMENSION B(Nmax,Nmax)
       Real*8 upperschwerd,lowerschwerd
       Data Ihuge/180/
 C     Epstein upper limit
@@ -597,8 +600,8 @@ C     Diagonalize adjacency matrix A
       A(j,i)=A(i,j)
       enddo
       enddo
-      call tred2(A,Matom,NAtom,evec,df)
-      call tqli(evec,df,Matom,NAtom,A)
+      call tred2(A,Matom,Nmax,evec,df)
+      call tqli(evec,df,Matom,Nmax,A)
 C     Calculate A^(n-1) = L D^(n-1) L but only printing the adjacent vertices
 C     NP values
       mpower=Matom-1

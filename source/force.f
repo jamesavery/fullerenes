@@ -1,10 +1,11 @@
-      SUBROUTINE func(IOP,NMAX,NMAX3,MMAX,n,IERR,A,N5,N6,N5M,N6M,
+      SUBROUTINE func(IOP,n,IERR,A,N5,N6,N5M,N6M,
      1 p,fc,c)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
-      Real*8 p(NMAX3),c(9)
+      Real*8 p(NMAX*3),c(9)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       IERR=0
@@ -139,11 +140,12 @@ C     total energy
       Return
       END
 
-      SUBROUTINE dfunc(IOP,NMAX,NMAX3,MMAX,n,A,N5,N6,N5M,N6M,p,x,c)
+      SUBROUTINE dfunc(IOP,n,A,N5,N6,N5M,N6M,p,x,c)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
-      Real*8 p(NMAX3),x(NMAX3),c(9)
+      Real*8 p(NMAX*3),x(NMAX*3),c(9)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       rp=c(1)

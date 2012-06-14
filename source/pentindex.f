@@ -65,7 +65,7 @@ C     Search where the 5-rings are in the spiral
       enddo
       IPRS=0
       IER=0
-      CALL Windup(MMAX,M,IPRS,IER,S,D)              ! Wind up spiral into dual
+      CALL Windup(M,IPRS,IER,S,D)              ! Wind up spiral into dual
       IF(IER.gt.0) then
       WRITE(Iout,1000) IER
       endif
@@ -73,7 +73,7 @@ C     Search where the 5-rings are in the spiral
       Do I=1,12
       Spiral(I,1)=JP(I)
       enddo
-      CALL Unwind(NMAX,MMAX,EMAX,M,IER,IT,ispiral,
+      CALL Unwind(M,IER,IT,ispiral,
      1 Spiral,S,D,NMR,Group)                       ! Unwind dual into spirals
       K=0
       DO J=1,6
@@ -101,7 +101,7 @@ C     Search where the 5-rings are in the spiral
       WRITE(Iout,1022)
       endif
       if(ispiral.gt.2) then
-      CALL CanSpiral(NMAX,ispiral,spiral,JP)
+      CALL CanSpiral(ispiral,spiral,JP)
       WRITE(Iout,1023)
       WRITE(Iout,1021) (JP(I),I=1,12)
       endif
@@ -116,7 +116,7 @@ C     Search where the 5-rings are in the spiral
 C End of Spiral Program, dual matrix in D(i,j)
 
 C Now produce the adjaceny matrix from the dual matrix
-      CALL DUAL(NMAX,D,MMAX,IDA,Matom,IER)
+      CALL DUAL(D,MMAX,IDA,Matom,IER)
       IF(IER.ne.0) then
       WRITE(Iout,1002) IER
       stop

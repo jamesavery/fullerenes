@@ -1,5 +1,5 @@
       SUBROUTINE Ring(NAtom,Nedges,Nfaces,natomL,Natom2,MCon2,MAtom,
-     1 IOUT,Ncount5,Ncount6,IC3,Icon2,N5MEM,N6MEM,Rmin5,
+     1 IOUT,Ncount5,Ncount6,IC3,N5MEM,N6MEM,Rmin5,
      1 Rmin6,Rmax5,Rmax6,DistMat)
 C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
 C     for each atom
@@ -7,7 +7,6 @@ C     I am sure there are better algorithms, but this one is not too bad and fas
 C     enough and fast.
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION IC3(NAtom,3)
-      DIMENSION Icon2(natom2)
       DIMENSION N5MEM(Nfaces,5),N5MEMS(Nfaces,5)
       DIMENSION N6MEM(Nfaces,6),N6MEMS(Nfaces,6)
       DIMENSION IPa(6,96)
@@ -100,7 +99,7 @@ C     Check bond distances
       J1=J+1
       IF(J1.eq.6) J1=1
       IAT2=N5MEM(I,J1)
-      DM=FunDistMat(IAT1,IAT2,natomL,DistMat)
+      DM=FunDistMat(IAT1,IAT2,DistMat)
       Rd(J)=DM
       if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
       if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
@@ -130,7 +129,7 @@ C     Check bond angles
       IF(J2.eq.7) J2=2
       IAT3=N5MEM(I,J2)
 C     Deviation from ideal pentagon angle of 108 deg
-      AngleM=FunAngleMat(IAT1,IAT2,IAT3,natomL,DistMat)
+      AngleM=FunAngleMat(IAT1,IAT2,IAT3,DistMat)
       if(AngleM.gt.abig) then
       abig=AngleM
       endif
@@ -156,7 +155,7 @@ C     Check bond distances
       J1=J+1
       IF(J1.eq.7) J1=1
       IAT2=N6MEM(I,J1)
-      DM=FunDistMat(IAT1,IAT2,natomL,DistMat)
+      DM=FunDistMat(IAT1,IAT2,DistMat)
       Rd(J)=DM
       if(Rd(J).LT.Rmin6) Rmin6=Rd(J)
       if(Rd(J).GT.Rmax6) Rmax6=Rd(J)
@@ -200,7 +199,7 @@ C     Check bond angles
       IF(J2.eq.8) J2=2
       IAT3=N6MEM(I,J2)
 C     Deviation from ideal hexagon angle of 120 deg
-      AngleM=FunAngleMat(IAT1,IAT2,IAT3,natomL,DistMat)
+      AngleM=FunAngleMat(IAT1,IAT2,IAT3,DistMat)
       if(AngleM.gt.abig) then
       abig=AngleM
       endif
@@ -2487,7 +2486,7 @@ C     Determine minimum and maximum distances
       Sumd=dsqrt(Sum)
       If(Sumd.gt.RmaxS) RmaxS=Sumd
       Do J=I+1,MAtom
-      DM=FunDistMat(I,J,natomL,DistMat)
+      DM=FunDistMat(I,J,DistMat)
       If(DM.lt.Rmin) then
       Rmin=DM
       Imin=I
@@ -2717,7 +2716,7 @@ C     Get the connectivities between 2 and 3 atoms
       if(Ipent.eq.0) then
       Do I=1,MAtom
       Do J=I+1,MAtom
-      DM=FunDistMat(I,J,natomL,DistMat)
+      DM=FunDistMat(I,J,DistMat)
       If (DM.lt.Rtol) then
        Mcon2=Mcon2+1
        Ncount=I*MAtom+J

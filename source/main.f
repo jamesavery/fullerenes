@@ -872,7 +872,7 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS      '
       Write(Iout,1008) routine
-      CALL Isomers(Nmax,Mmax,Emax,MAtom,IPR,IOUT,
+      CALL Isomers(MAtom,IPR,IOUT,
      1 maxit,iprintham,ichk,IDA,A,chkname)
       if(istop.ne.0) go to 99
 
@@ -913,7 +913,7 @@ C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
       routine='Leapfrog'
       Write(Iout,1008) routine
-      CALL Leapfrog(Nmax,MAtom,Iout,leap,leapGC,IGC1,IGC2,
+      CALL Leapfrog(MAtom,Iout,leap,leapGC,IGC1,IGC2,
      1 ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
       leap=0
       leapGC=0
@@ -937,20 +937,20 @@ C adjacent vertices
       endif
       if(IHam.ne.0.and.ISW.eq.0) then
        if(iupac.ne.0) then
-         CALL Hamilton(Nmax,MAtom,Iout,iprintf,maxiter,IC3)
+         CALL Hamilton(MAtom,Iout,iprintf,maxiter,IC3)
        else
-         CALL HamiltonCyc(Nmax,MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
+         CALL HamiltonCyc(MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
          WRITE(Iout,1010) Nhamilton
          if(nbatch.ne.0) WRITE(Iout,1014)
        endif
       endif
-      CALL Paths(Nmax,Emax,MAtom,IOUT,IDA,A,evec,df)
+      CALL Paths(MAtom,IOUT,IDA,A,evec,df)
 
 C Establish all closed ring systems
       routine='RING         '
       Write(Iout,1008) routine
       CALL Ring(Nmax,Emax,Mmax,NmaxL,Nmax*Nmax,MCon2,MAtom,IOUT,
-     1 N5Ring,N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
+     1 N5Ring,N6Ring,IC3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
      1 DistMat)
 
 C Optimize Geometry through force field method
@@ -1006,7 +1006,7 @@ C Rings
       routine='RING         '
       Write(Iout,1008) routine
       CALL Ring(Nmax,Emax,Mmax,NmaxL,Nmax*Nmax,MCon2,MAtom,IOUT,
-     1 N5Ring,N6Ring,IC3,Icon2,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
+     1 N5Ring,N6Ring,IC3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
      1 DistMat)
 
 C Analyze ring connections
@@ -1020,7 +1020,7 @@ C Perform Stone-Wales transformation
       if(ISW.ne.0) then
       routine='STONE-WALES  '
       Write(Iout,1008) routine
-      CALL StoneWalesTrans(Nmax,Mmax,Matom,IN,Iout,numbersw,nSW,
+      CALL StoneWalesTrans(Matom,IN,Iout,numbersw,nSW,
      1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       ISW=0
       ipent=1
@@ -1032,7 +1032,7 @@ C Perform Endo-Kroto 2-vertex insertion
       if(KE.ne.0) then
       routine='ENDO-KROTO   '
       Write(Iout,1008) routine
-      CALL EndoKrotoTrans(Nmax,Mmax,Matom,IN,Iout,n565,NEK,ihueckel,
+      CALL EndoKrotoTrans(Matom,IN,Iout,n565,NEK,ihueckel,
      1 IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       KE=0
       ipent=1
@@ -1045,12 +1045,12 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
       routine='YOSHIDAFOWLER'
       Write(Iout,1008) routine
       if(IYF.le.2) then
-      CALL YoshidaFowler3(Nmax,Mmax,Matom,IN,Iout,JERR,numberFM,IYF,
+      CALL YoshidaFowler3(Matom,IN,Iout,JERR,numberFM,IYF,
      1 nFM,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,Dist2D,distp,Rdist)
       else
       IYF=IYF-2
-      CALL YoshidaFowler6(Nmax,Mmax,Matom,IN,Iout,JERR,numberYF,IYF,
+      CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,
      1 nYF,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,Dist2D,distp,Rdist)
       endif
@@ -1064,7 +1064,7 @@ C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
       if(IWS.ne.0) then
       routine='WIRZSCHWERD  '
       Write(Iout,1008) routine
-      CALL WirzSchwerd(Nmax,Mmax,Matom,IN,Iout,JERR,numberWS,IWS,
+      CALL WirzSchwerd(Matom,IN,Iout,JERR,numberWS,IWS,
      1 nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1 A,evec,df,Dist,Dist2D,distp,Rdist)
       IWS=0
@@ -1077,7 +1077,7 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0) then
       routine='SPIRALSEARCH '
       Write(Iout,1008) routine
-      CALL SpiralSearch(Nmax,Mmax,Emax,Nspirals,MAtom,Iout,Iring5,
+      CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
      1 Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
      1 GROUP)
       CALL Chiral(Iout,GROUP)
