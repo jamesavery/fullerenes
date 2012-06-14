@@ -8,21 +8,28 @@ struct ToleranceLess {
   bool operator()(const coord2d& x,const coord2d& y) const { return x<y && (y-x).norm() > tolerance; }
 };
 
-vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r) const
+vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned int face_max) const
 {
   if(s<0) s = 0;
-  if(t<0) t = neighbours[s][0];
-  if(r<0) {
-  	r = neighbours[t][0];
-  	for(int i=1;i<neighbours[t].size();i++) if(r==s) r = neighbours[t][i];
+  if(t<0){
+    //    fprintf(stderr,"t = %d\n",t);
+    face_t c(shortest_cycle(s,face_max));
+    t = c[1];
+    r = c[2];
+    //    fprintf(stderr,"s,t,r ~> %d,%d,%d\n",s,t,r);
+  } else if(r < 0) {
+    //    fprintf(stderr,"r = %d\n",r);
+    face_t c(shortest_cycle(s,t,face_max));
+    r = c[2];
+    //    fprintf(stderr,"s,t,r ~> %d,%d,%d\n",s,t,r);
   }
   //  fprintf(stderr,"tutte_layout(%d,%d,%d)\n",s,t,r);
-  outer_face = shortest_cycle(s,t,r,6);
+  outer_face = shortest_cycle(s,t,r,face_max);
 
   vector<coord2d> xys(N), newxys(N);
   vector<bool> fixed(N);
 
-  cerr << "tutte_layout: Outer face: " << outer_face << endl;
+  //  cerr << "tutte_layout: Outer face: " << outer_face << endl;
 
   unsigned int Nface = outer_face.size();
   for(unsigned int i=0;i<Nface;i++){
@@ -47,7 +54,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r) const
 	coord2d neighbour_sum(0.0);
 
 	for(int i=0;i<ns.size();i++) neighbour_sum += xys[ns[i]];
-	newxys[u] = xys[u]*0.2 + (neighbour_sum/ns.size())*0.8;
+	newxys[u] = xys[u]*0.15 + (neighbour_sum/ns.size())*0.85;
 
 	// Did the solution converge yet?
 	double neighbour_dist = 0;
@@ -59,7 +66,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r) const
     if(max_change <= TUTTE_CONVERGENCE) converged = true;
     xys = newxys;
   }
-  cerr << "Tutte layout of "<<N<<" vertices converged after " << i << " iterations, with maximal relative change " << max_change << endl;
+  //  cerr << "Tutte layout of "<<N<<" vertices converged after " << i << " iterations, with maximal relative change " << max_change << endl;
   // Test that points are distinct
   ToleranceLess lt(0.0);
   set<coord2d,ToleranceLess> point_set(xys.begin(),xys.end(),lt);
@@ -149,12 +156,22 @@ coord3d Graph::centre3d(const vector<coord3d>& layout) const {
 
 string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool number_vertices, bool include_latex_header) const 
 {
+// \documentclass[tikz=true,crop=true]{standalone}
+// \usepackage{tikz}
+// \tikzstyle{vertex}=[circle, draw, inner sep=0, fill=blue!80, minimum width=1.5pt]
+// \tikzstyle{dualvertex}=[circle, draw, inner sep=0, fill=red!40, minimum width=2pt]
+// \tikzstyle{invisible}=[draw=none,inner sep=0,fill=none,minimum width=0pt]
+// \tikzstyle{dualedge}=[dotted,draw]
+// \tikzstyle{edge}=[color=black, draw]
+// \begin{document}
+// \input{c180}
+// \end{document}
   ostringstream s;
   s << fixed;
   // If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
   if(include_latex_header)
-    s << "\\documentclass{article}\n"
-         "\\usepackage{fullpage,fourier,tikz}\n"
+    s << "\\documentclass{tikz=true,crop=true}{standalone}\n"
+      "\\usepackage{fullpage,fourier,tikz}\n"
          "\\begin{document}\n"
       "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=blue!20, minimum width=4pt]\n"
       "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=red!40, minimum width=2pt]\n"

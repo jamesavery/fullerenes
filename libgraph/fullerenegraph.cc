@@ -39,6 +39,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
   set<edge_t> edgeset_new;
   node_t v_new = dual.N;
 
+  // TODO: Everything that's made from the outer face needs to be "reversed".
   vector<coord2d> new_layout;
   if(planar_layout){
     new_layout.resize(dual.N);
@@ -141,9 +142,9 @@ FullereneGraph FullereneGraph::coxeter_fullerene(const unsigned int i, const uns
 FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   PlanarGraph dualfrog(*this);
 
-  cerr << "leapfrog()\n";
+  //  cerr << "leapfrog()\n";
   vector<face_t> faces(dualfrog.compute_faces_flat(6,planar_layout)); 
-  cerr << "leapfrog::got "<< faces.size() << " faces.\n";
+  //  cerr << "leapfrog::got "<< faces.size() << " faces.\n";
 
   node_t v_new = N;
 
@@ -168,12 +169,12 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   vector<coord2d> new_layout;
 
   if(planar_layout){
-    cerr << "leapfrog::find_outer_face and compute faces\n";
+    //    cerr << "leapfrog::find_outer_face and compute faces\n";
     if(outer_face.size() < 5) outer_face = find_outer_face();
 
     vector<face_t> triangles(dualfrog.compute_faces_flat(3,false));
 
-    cerr << "leapfrog::planar layout of " << triangles.size() << " triangles\n";
+    //    cerr << "leapfrog::planar layout of " << triangles.size() << " triangles\n";
     new_layout.resize(triangles.size());
 
     for(int i=0;i<triangles.size();i++){
@@ -183,11 +184,51 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
 	new_layout[i] *= 2.0;		      // TODO: Ensure that loop encompasses remaining graph
     }
   } 
-  cerr << "leapfrog::dual()\n";
+  //  cerr << "leapfrog::dual()\n";
   FullereneGraph frog(dualfrog.dual_graph(3), new_layout);
 
   return frog;
 }
+
+#include "fortran.hh"
+
+FullereneGraph::FullereneGraph(const int n, const vector<int>& spiral_indices, bool IPR) : CubicGraph() {
+
+  int m = n/2+2;
+  int s[m], d[m*m], ipr = IPR, error = 0;
+  cerr << "Spiral constructor: " << n << ", " << face_t(spiral_indices) << endl; 
+  assert(spiral_indices.size() == 12);
+ 
+  // Call Peter's fortran routine for constructing dual from spiral.
+  for(int i=0;i<n/2+2;i++) s[i] = 6;
+  for(int i=0;i<12;i++) s[spiral_indices[i]-1] = 5;
+
+  windup_(&m,&ipr,&error,s,d);
+  if(error != 0){
+    fprintf(stderr,"Spiral windup failed after %d pentagons.\n",error);
+    //    delete d;
+    N = 0;
+  } else {
+    //    cerr << " Spiral windup is successful.\n";
+    PlanarGraph dual;
+    //    printf("Dual should have %d nodes\n",m);
+    for(node_t u=0;u<m;u++)
+      for(node_t v=0;v<m;v++)
+	if(d[u*m+v] == 1)
+	  dual.edge_set.insert(edge_t(u,v)); 
+
+    //    delete d;
+    cerr << "dual = " << dual << endl;
+    dual.update_auxiliaries();
+    dual.layout2d = dual.tutte_layout(-1,-1,-1,3);
+
+    *this = dual.dual_graph(3);
+    //    cerr << "dual = " << dual << endl;
+    //    cerr << "G    = " << G << endl;
+
+  }
+}
+
 
 node_t FullereneGraph::C20_edges[30][2] ={{0,13},{0,14},{0,15},{1,4},{1,5},{1,12},{2,6},{2,13},{2,18},{3,7},{3,14},{3,19},{4,10},{4,18},{5,11},{5,19},{6,10},{6,15},{7,11},{7,15},{8,9},{8,13},{8,16},{9,14},{9,17},{10,11},{12,16},{12,17},{16,18},{17,19}};
 

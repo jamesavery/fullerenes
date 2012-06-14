@@ -15,16 +15,9 @@ struct Polyhedron : public PlanarGraph {
   //---- Constructors ----//
   // Default constructor
   Polyhedron(const int face_max = INT_MAX) : face_max(face_max) {  }
+  Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX);
 
   // Create polyhedron from skeleton graph and 3D vertex coordinates 
-  Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX) : 
-    PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points)), faces(G.compute_faces_flat(face_max))
-  {
-    //    layout2d = tutte_layout();
-
-    if(points.size() != N) 
-      points = polar_mapping(spherical_projection());
-  }
   // Read polyhedron from a .pol file
   Polyhedron(const string& path) {
     ifstream file(path.c_str());
@@ -79,6 +72,13 @@ struct Polyhedron : public PlanarGraph {
     s << "{{";
     for(unsigned int i=0;i<reachable_points.size();i++) s << reachable_points[i] << (i+1<reachable_points.size()?", ":"},{");
     for(unsigned int i=0;i<P.points.size();i++) s << P.points[i] << (i+1<P.points.size()?", ":"},");
+    s << "{";
+    for(int i=0;i<P.faces.size();i++){
+	s << "{";
+	for(int j=0; j < P.faces[i].size();j++) 
+	      s << P.faces[i][j] << (j+1<P.faces[i].size()?", ":"}");
+      s << (i+1<P.faces.size()?", ":"},");
+    }
     s << static_cast<Graph>(P) << "}";
     return s;
   }
@@ -92,9 +92,11 @@ struct Polyhedron : public PlanarGraph {
       stringstream l(s);
       l >> x;
       if(l.fail()) continue; // Invalid line
+      l >> v;
+      if(l.fail()) continue; // Invalid line
       while(!l.fail()){
-	l >> v;
 	P.edge_set.insert(edge_t(u,v-1)); // File format numbers nodes from 1 
+	l >> v;
       }
       P.points.push_back(x);
       u++;

@@ -28,7 +28,6 @@ extern "C" {
   void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const int *outer_dim, int *D);
   void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
   int graph_is_a_fullerene_(const graph_ptr *);
-
   void print_graph_(const char *name, const graph_ptr *);
 
   // Fullerene graph generation 
@@ -41,6 +40,7 @@ extern "C" {
   void tutte_layout_b_(graph_ptr* g, int *s, int *t, int *r, double *LAYOUT);
   void spherical_layout_(const graph_ptr* g, double *LAYOUT3D);
   void get_layout2d_(const graph_ptr *p, double *layout2d);
+  int  iget_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face);
 
   //  double *get_layout2d(const graph_ptr *g);
   //  void    set_layout2d(const graph_ptr *g, double *layout2d);
@@ -239,6 +239,14 @@ void get_layout3d_(const graph_ptr *g, double *points)
       points[u*2+0] = x.first;
       points[u*2+1] = x.second;
   }
+}
+
+int iget_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face)
+{
+  face_t cycle((*g)->shortest_cycle(*s-1,*t-1,*r-1,*fmax));
+  for(int i=0;i<cycle.size();i++) face[i] = cycle[i]+1;
+  cerr << "get_face(" << *s << "," << *t << "," << *r << ") = " << cycle << endl; 
+  return cycle.size();
 }
 
 polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }

@@ -47,7 +47,7 @@ struct coord2d : public pair<double,double> {
     return angle;
   }
   double point_angle(const coord2d& x=0) const { // CCW angle of x around *this ([-pi;pi])
-    const coord2d vx(x-*this);
+    const coord2d vx(*this-x);			 // TODO: Is the sign here correct?
     double angle = atan2(vx.second,vx.first);
     return angle;
   }
@@ -119,14 +119,38 @@ struct face_t : public vector<node_t> {
     for(size_t i=0;i<size();i++) c += layout[(*this)[i]];
     return c/size();
   }
+
+  // http://www.softsurfer.com/Archive/algorithm_0103/algorithm_0103.htm#Winding%20Number
+  double winding_number(const vector<coord2d>& layout, const coord2d& x) const {
+    vector<coord2d> Cp(size());
+    for(int i=0;i<size();i++)
+      Cp[i] = layout[(*this)[i]]-x;
+
+    double wn = 0;
+    for(int i=0;i<size();i++){
+      coord2d segment = Cp[(i+1)%size()] - Cp[i];
+      double theta = atan2(segment.second,segment.first);
+      wn += theta;
+    }
+    wn /= 2*M_PI;
+    return wn;
+  }
+
+  bool point_inside(const vector<coord2d>& layout, const coord2d& x) const {
+    return winding_number(layout,x) != 0;
+  }
+  bool contains(const node_t v) const { for(int i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
   
+  
+
   friend ostream& operator<<(ostream &s, const face_t& f){
-    s << "["; for(unsigned int i=0;i<f.size();i++) s << f[i] << (i+1<f.size()?", ":"]"); return s;
+    s << "{"; for(unsigned int i=0;i<f.size();i++) s << f[i] << (i+1<f.size()?", ":"}"); return s;
   }
 };
 
 struct tri_t : public face_t {
   tri_t(const node_t a,const node_t b,const node_t c) : face_t(3) { u(0) = a; u(1) = b; u(2) = c; }
+  tri_t(const vector<node_t>& f) : face_t(f) {}
   node_t& u(const unsigned int i)  { return (*this)[i]; }
   const node_t& u(const unsigned int i) const  { return (*this)[i]; }
 
@@ -214,7 +238,7 @@ struct sort_ccw_point {
     // printf("compare: %d:{%g,%g}:%g %d:{%g,%g}:%g\n",
     // 	   s,layout[s].first,layout[s].second,angs,
     // 	   t,layout[t].first,layout[t].second,angt);
-    return angs <= angt; 
+    return angs >= angt; 	// TODO: Is the sign here correct?
   }
 };
 

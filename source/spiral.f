@@ -1430,6 +1430,20 @@ C     Write(Iout,1002) M,(Ddiag(J),J=1,M)
       Return
       End
 
+C     Inputs: M, IPR, S(M)
+C     Output: D(M,M)
+      SUBROUTINE Windup2(M,IPR,S,ier,D)
+      use config
+      integer bigD(Mmax,Mmax), D(M,M), i, j, ier
+
+      call Windup(M, IPR, S, ier, bigD)
+      do i=1,M
+         do j=1,M
+            D(i,j) = bigD(i,j)
+         enddo
+      enddo   
+      end subroutine
+
       SUBROUTINE Windup(M,IPR,IER,S,D)
       use config
       IMPLICIT INTEGER (A-Z)

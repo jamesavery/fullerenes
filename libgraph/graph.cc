@@ -1,5 +1,32 @@
 #include "graph.hh"
 
+vector<node_t> Graph::shortest_path(const node_t& source, const node_t& dest, const vector<unsigned int>& dist) const
+{
+  // Fill in shortest paths -- move to own function.
+  node_t vi = source;
+  vector<node_t> path;
+  //  fprintf(stderr,"Shortest path %d -> %d\n",source,dest);
+  for(int i=0;i<N;i++)
+    //    fprintf(stderr,"%d: %d\n",i,dist[i]);
+
+  do {
+    path.push_back(vi);
+    const vector<node_t>& ns(neighbours[vi]);
+    // Find next vertex in shortest path
+    int kmin = 0;
+    for(int k=1, d=dist[ns[0]];k<ns.size();k++) {
+      //      fprintf(stderr,"node %d has distance %d\n",ns[k],dist[ns[k]]);
+      if(dist[ns[k]] < d){ 
+	d = dist[ns[k]];
+	kmin = k;
+      }
+    }
+    //    fprintf(stderr,"Choosing neighbour %d = %d\n",kmin,ns[kmin]);
+    vi = ns[kmin];
+  } while(vi != dest);
+  //  cerr << face_t(path) << endl;
+  return path;
+}
 
 vector<unsigned int> Graph::shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 					   const vector<bool>& used_nodes, const unsigned int max_depth) const
@@ -63,6 +90,19 @@ vector<unsigned int> Graph::all_pairs_shortest_paths(const unsigned int max_dept
   return distances;
 }
 
+vector<node_t> Graph::shortest_cycle(const node_t& s, const int max_depth) const 
+{
+  const vector<node_t> ns(neighbours[s]);
+  assert(ns.size() > 0);
+
+  face_t cycle;
+  int Lmax = 0;
+  for(int i=0;i<ns.size();i++){
+    face_t c(shortest_cycle(s,ns[i],max_depth));
+    if(c.size() >= Lmax){ Lmax = c.size(); cycle = c; }
+  }
+  return cycle;
+}
 
 vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const int max_depth) const 
 { 
@@ -104,18 +144,34 @@ vector<node_t> remove_node(const vector<node_t>& ns, const node_t& v)
 
 vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const node_t& r, const int max_depth) const 
 { 
+  //  fprintf(stderr,"3: shortest_cycle(%d,%d,%d,max_depth=%d)\n",s,t,r,max_depth);
+  assert(s >= 0 && t >= 0 && r >= 0);
+  if(max_depth == 3){		// Triangles need special handling
+    vector<node_t> cycle(3);
+    node_t p=-1,q=-1;
+    cycle[0] = s;
+    for(int i=0;i<neighbours[s].size();i++) {
+      if(neighbours[s][i] == t){ p = t; q = r; break; }
+      if(neighbours[s][i] == r){ p = r; q = t; break; }
+    }
+    bool foundq = false, founds = false;
+    if(p<0) return vector<node_t>();
+    for(int i=0;i<neighbours[p].size();i++) if(neighbours[p][i] == q) foundq = true;
+    for(int i=0;i<neighbours[q].size();i++) if(neighbours[q][i] == s) founds = true;
+    
+    if(!foundq || !founds) return vector<node_t>();
+    cycle[1] = p;
+    cycle[2] = q;
+    return cycle;
+  }
+
   vector<bool> used_edges(N*(N-1)/2);
   vector<bool> used_nodes(N);
   //  fprintf(stderr,"shortest_cycle(%d,%d,%d), depth = %d\n",s,t,r,max_depth);
   // Find shortest path r->s in G excluding edge (s,t), (t,r)
   used_edges[edge_t(s,t).index()] = true;
   used_edges[edge_t(t,r).index()] = true;
-  // Graph g(*this);
-  // g.neighbours[s] = remove_node(g.neighbours[s],t);
-  // g.neighbours[t] = remove_node(g.neighbours[t],s);
-  // g.neighbours[r] = remove_node(g.neighbours[r],t);
-  // g.neighbours[t] = remove_node(g.neighbours[t],r);
-  
+
   vector<unsigned int> distances(shortest_paths(r,used_edges,used_nodes,max_depth));
 
   // If distances[s] is uninitialized, we have failed to reach s and there is no cycle <= max_depth.

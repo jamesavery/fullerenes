@@ -1,42 +1,65 @@
 #include "polyhedron.hh"
 
 double Polyhedron::surface_area() const {
-  assert(layout2d.size() == N);
   double A = 0;  
+
+  // vector<tri_t> tris(triangulation(faces)); 
   
-  vector<face_t> tris(triangulation(faces));
+  // for(size_t i=0;i<tris.size();i++){
+  //   const tri_t& tri(tris[i]);
+  //   Tri3D T(points[tri[0]],points[tri[1]],points[tri[2]]);
+  //   A += T.area();
+  // } 
+  // return A;
+
+  vector<tri_t> tris(centroid_triangulation(faces)); 
+  vector<coord3d> centroid_points(points.begin(),points.end());
+  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));  
   
   for(size_t i=0;i<tris.size();i++){
-    const face_t& tri(tris[i]);
-    Tri3D T(points[tri[0]],points[tri[1]],points[tri[2]]);
+    const tri_t& tri(tris[i]);
+    Tri3D T(centroid_points[tri[0]],centroid_points[tri[1]],centroid_points[tri[2]]);
     A += T.area();
   } 
   return A;
 }
 
 double Polyhedron::volume_tetra() const {
-  vector<face_t> tris(triangulation(faces));
-  double V = 0;
+  vector<tri_t>   tris(centroid_triangulation(faces));
+  vector<coord3d> centroid_points(points.begin(),points.end());
+  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
 
+  double V = 0,Vm=0,Vp=0;
+  
   // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
-  coord3d zero(-10,0,0);
+  coord3d zero(0,0,0);
   for(size_t i=0;i<tris.size();i++){
     const face_t& t(tris[i]);
-    Tri3D T(points[t[0]],points[t[1]],points[t[2]]);
+    Tri3D T(centroid_points[t[0]],centroid_points[t[1]],centroid_points[t[2]]);
     double dV = Tetra3D(T.a,T.b,T.c,zero).volume();
     V += (T.back_face(zero)? 1 : -1)*dV;
+    if(T.back_face(zero)) Vp += dV;
+    else Vm += dV;
+    //    if(!T.back_face(zero))
+      //      cerr << "Tri " << t << " / " << T << " is a front face.\n";
   }
+  fprintf(stderr,"V = %f - %f = %f\n",Vp,Vm,V);
   return fabs(V);
 }
 
 double Polyhedron::volume_divergence() const {
-  vector<face_t> tris(triangulation(faces));
+  vector<tri_t>   tris(centroid_triangulation(faces));
+  vector<coord3d> centroid_points(points.begin(),points.end());
+  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
+
+  //  cerr << "points = {"; for(int i=0;i<centroid_points.size();i++) cerr << centroid_points[i] << (i+1<centroid_points.size()? ", ":"};\n");
+
   double V = 0;
 
   // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
   for(size_t i=0;i<tris.size();i++){
     const face_t& t(tris[i]);
-    Tri3D T(points[t[0]],points[t[1]],points[t[2]]);
+    Tri3D T(centroid_points[t[0]],centroid_points[t[1]],centroid_points[t[2]]);
 
     V += ((T.a).dot(T.n))*T.area()/T.n.norm();
   }
@@ -79,22 +102,12 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   for(triit t(output.begin());t!=output.end();t++){
     // Make sure all faces point away from the centroid. 
     if(!Tri3D(points,*t).back_face(c)) t->flip(); 
-
-    // Traverse edges in oriented order and register the triangle for each directed edge.
-    //    for(int j=0;j<3;j++)
-      //      edgetri[dedge_t((*t)[j],(*t)[(j+1)%3])] = t;
   }
     
   // 2. For each remaining vertex u
   // cerr << "// 2. For each remaining vertex u\n";
   for(list<node_t>::const_iterator u(work_queue.begin());u!=work_queue.end();u++){
     const coord3d& p(points[*u]);
-    // set<edge_t> edges;
-    // for(list<tri_t>::const_iterator t(output.begin()); t!=output.end(); t++)
-    //   for(int j=0;j<3;j++)
-    // 	edges.insert(edge_t((*t)[j],(*t)[(j+1)%3]));
-    // Graph G(edges);
-    // cout << "g" << *u << " = " << G << ";\n";
 
     // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) 
     // cerr << *u << "\n// 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) \n";
@@ -167,7 +180,8 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     for(int i=0;i<3;i++)
       edges.insert(edge_t(nodemap[t->u(i)],nodemap[t->u((i+1)%3)]));
     
-  Graph g(edges);
+  PlanarGraph g(edges);
+  cerr << "Polyhedron is "<< (g.N != N?"not ":"") << "equal to convex hull.\n"; 
   return Polyhedron(g,remaining_points,3);
 }
 
@@ -202,7 +216,7 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
   }
   s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
 #if 0
-  vector<face_t> faces(compute_faces_flat(6));
+  vector<face_t> faces(compute_faces_flat(face_max));
   for(vector<face_t>::const_iterator f(faces.begin());f!=faces.end();f++){
     s << "\\fill[red!"<<50*(-points[(*f)[0]][0]+1)<<"]" ;
     for(size_t i=0;i<f->size();i++){
@@ -214,7 +228,7 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
 
 
   if(show_dual){
-    PlanarGraph dual(dual_graph(6));	// TODO: This breaks for everything else than fullerenes
+    PlanarGraph dual(dual_graph(face_max));	// TODO: This breaks for everything else than fullerenes
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
       const coord2d& xs(dual.layout2d[u]);
@@ -235,5 +249,31 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
 
   return s.str();
 }
+
+Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max) : 
+  PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points))
+{
+  //  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
+
+  if(layout2d.size() != N)
+    layout2d = tutte_layout(-1,-1,-1,face_max);
+  assert(outer_face.size() <= face_max);
+
+  // cerr << "G = " << static_cast<PlanarGraph>(*this) << endl;
+  // cerr << "Layout has " << layout2d.size() << " points.\n";
+
+  //  if(points.size() != N) 
+  //    points = polar_mapping(spherical_projection());
+
+  faces = compute_faces_flat(face_max,true);
+
+  assert(faces[0] == outer_face);
+
+  // cerr << "Found " << faces.size() << " faces.\n";
+  // cerr << "Volume divergence: " << volume_divergence() << "\n";
+  // cerr << "Volume tetra:      " << volume_tetra() << "\n";
+  // cerr << "P = " << *this << endl;
+}
+
 
 double Polyhedron::C20_points[20][3] = {{-1.376381920471174,0,0.2628655560595668},{1.376381920471174,0,-0.2628655560595668},{-0.4253254041760200,-1.309016994374947,0.2628655560595668},{-0.4253254041760200,1.309016994374947,0.2628655560595668},{1.113516364411607,-0.8090169943749474,0.2628655560595668},{1.113516364411607,0.8090169943749474,0.2628655560595668},{-0.2628655560595668,-0.8090169943749474,1.113516364411607},{-0.2628655560595668,0.8090169943749474,1.113516364411607},{-0.6881909602355868,-0.5000000000000000,-1.113516364411607},{-0.6881909602355868,0.5000000000000000,-1.113516364411607},{0.6881909602355868,-0.5000000000000000,1.113516364411607},{0.6881909602355868,0.5000000000000000,1.113516364411607},{0.8506508083520399,0,-1.113516364411607},{-1.113516364411607,-0.8090169943749474,-0.2628655560595668},{-1.113516364411607,0.8090169943749474,-0.2628655560595668},{-0.8506508083520399,0,1.113516364411607},{0.2628655560595668,-0.8090169943749474,-1.113516364411607},{0.2628655560595668,0.8090169943749474,-1.113516364411607},{0.4253254041760200,-1.309016994374947,-0.2628655560595668},{0.4253254041760200,1.309016994374947,-0.2628655560595668}};

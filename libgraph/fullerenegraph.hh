@@ -5,10 +5,11 @@
 
 class FullereneGraph : public CubicGraph {
 public:
-  FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { fullerene_check();  }
+  FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { if(N>0) fullerene_check();  }
   FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
-    : CubicGraph(Graph(edges),layout) { fullerene_check(); }
-  FullereneGraph(FILE *file) : CubicGraph(file) { fullerene_check(); }
+    : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
+  FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
+  FullereneGraph(int N, const vector<int>& spiral_indices, bool IPR); 
 
   void fullerene_check() const
   {

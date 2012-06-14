@@ -96,15 +96,17 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   return dual;
 }
 
+
+
 // NB: TODO: What happens, for example, if a triangle is comprised of three smaller triangles?
 // This produces "phantom" faces! Fix and use the oriented version instead.
 facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const 
 {
   facemap_t facemap;
-
   // TODO: This is a much better and faster method, but needs to be debugged.
-  if(planar_layout) return compute_faces_oriented();
+  if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
 
+  cerr << "Non-oriented face computation (loop search)\n";
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
 
@@ -115,7 +117,8 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
 	const node_t u = ns[i];
 
 	face_t face(shortest_cycle(s,t,u,Nmax));  
-	if(face.size() <= Nmax){
+	//	cerr << face << endl;
+	if(face.size() > 0 && face.size() <= Nmax){
 	  facemap[face.size()].insert(face);
 	} //else {
 	  //	  fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u); 
@@ -129,6 +132,7 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
 
 facemap_t PlanarGraph::compute_faces_oriented() const 
 {
+  assert(layout2d.size() == N);
   facemap_t facemap;
   cerr << "Computing faces using 2D orientation.\n";
   set<dedge_t> workset;
@@ -140,17 +144,25 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 
   // Outer face must exist and be ordered CW, rest of faces CCW
   // assert(outer_face.size() > 0);
-  if(outer_face.size() < 5)
+  if(outer_face.size() < 3)
     outer_face = find_outer_face();
 
-  if(outer_face.size() < 5){
+  if(outer_face.size() < 3){
     cerr << "Invaid outer face: " << outer_face << endl;
-    outer_face.clear();
+    assert(outer_face.size() < 3);
   }
 
-  cerr << "Outer face: " << outer_face << endl;
+  //  cerr << "Outer face: " << outer_face << endl;
 
   coord2d centre(centre2d(layout2d));
+  
+  for(node_t u=0;u<N;u++)
+    if(!outer_face.contains(u) && !outer_face.point_inside(layout2d,u)){
+      cerr << "Point " << u << "/" << layout2d[u] << " is outside outer face " << outer_face << endl;
+      cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
+      abort();
+    }
+  //  cerr << "Outer face is OK: All vertices are inside face.\n";
 
   // Add outer face to output, remove directed edges from work set
   facemap[outer_face.size()].insert(outer_face);
@@ -176,7 +188,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
       coord2d vu(layout2d[u]-layout2d[v]);
       double angle_min = -M_PI;
 
-      node_t w=0;
+      node_t w=-1;
       for(unsigned int i=0;i<ns.size();i++) {
 	//	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
 	if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
@@ -189,16 +201,17 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 	    if(angle>= angle_min){
 	      angle_min = angle;
 	      w = ns[i];
-	    } // else {
-	    //   fprintf(stderr,"\t[%d->%d already used.]\n",v,ns[i]);
-	    // }
-	  }
+	    } 
+	  } 
 	}
       }
+      if(w == -1) abort(); // There is no face!
+
       e = dedge_t(v,w);
       workset.erase(e);
-
+      
       if(e.second != face[0]) face.push_back(e.second);
+
     }
     //    cout << "face = " << face << endl;
     facemap[face.size()].insert(face);
@@ -210,45 +223,127 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 
 vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const 
 {
-  vector<face_t> result;
+  vector<face_t> faces;
   facemap_t facemap(compute_faces(Nmax,planar_layout));
-  for(facemap_t::const_iterator fs(facemap.begin()); fs != facemap.end(); fs++)
-    copy(fs->second.begin(),fs->second.end(),inserter(result,result.end()));
 
-  return result;
+  for(facemap_t::const_iterator fs(facemap.begin()); fs != facemap.end(); fs++)
+    copy(fs->second.begin(),fs->second.end(),inserter(faces,faces.end()));
+
+  // Make sure that outer face is at position 0
+  if(planar_layout){
+    const node_t s(outer_face[0]), t(outer_face[1]), r(outer_face[2]);
+    for(int i=0;i<faces.size();i++){
+      const face_t f(faces[i]);
+      if(f[0] == s && f[1] == t && f[2] == r){ // swap faces[i] with faces[0]
+	faces[i] = faces[0];
+	faces[0] = f;
+      }
+    }
+  } else outer_face = face_t(faces[0]);
+
+  return faces;
 }
 
 
-
-vector<face_t> PlanarGraph::triangulation(int face_max) const
+vector<tri_t> PlanarGraph::triangulation(int face_max) const
 {
   vector<face_t> faces(compute_faces_flat(face_max));  
   return triangulation(faces);
 }
-  
-vector<face_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
+
+vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) const 
 {
-  assert(layout2d.size() == N);
-  vector<face_t> tris;
+  // Test whether faces already form a triangulation
+  bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
+  if(is_tri){
+    //    cerr << "Faces already form a triangulation.\n";
+    vector<tri_t> tris(faces.begin(),faces.end());
+    return orient_triangulation(tris);
+  }
+
+  // Triangulate by inserting extra vertex at face centroid and connecting
+  // each face vertex to this midpoint.
+  vector<tri_t> tris;
+  for(int i=0;i<faces.size();i++){
+    const node_t v_new = N+i;
+    const face_t& f(faces[i]);
+
+    for(int j=0;j<f.size();j++)
+      tris.push_back(tri_t(f[j],v_new,f[(j+1)%f.size()]));
+  }
   
+  return orient_triangulation(tris);
+}
   
+
+vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
+{
+  // Test whether faces already form a triangulation
+  bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
+  if(is_tri){
+    //    cerr << "Faces already form a triangulation.\n";
+    vector<tri_t> tris(faces.begin(),faces.end());
+    return orient_triangulation(tris);
+  } else {
+    for(int i=0;i<faces.size();i++) 
+      if(faces[i].size() != 3){
+	fprintf(stderr,"Face %d has %d sides: ",i,int(faces[i].size())); cerr << faces[i] << endl;
+      }
+  }
+
+  vector<tri_t> tris;
+  // First, break up the faces into a non-consistent triangulation
   for(size_t i=0;i<faces.size();i++){
     face_t f(faces[i]);
+    assert(f.size() >= 3);
+    for(size_t j=1;j<f.size()-1;j++)
+      tris.push_back(tri_t(f[0],f[j],f[j+1]));
+  }
+  
+  return orient_triangulation(tris);
+}
 
-    for(size_t j=1;j<f.size()-1;j++){
-      face_t t(3); 
-      t[0] = f[0]; t[1] = f[j]; t[2] = f[j+1];
 
-      coord2d c(t.centroid(layout2d));
-      sort_ccw_point CCW(layout2d,c);
-      
-      sort(t.begin(),t.end(),CCW);
-      if(i == 0) reverse(t.begin(), t.end()); // TODO: Show normals!
+vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
+{
+  // Now, pick an orientation for triangle 0. We choose the one it
+  // already has. This determines the orientation of the remaining triangles!
+  map<dedge_t,bool> done;
+  for(int i=0;i<3;i++) done[dedge_t(tris[0][i],tris[0][(i+1)%3])] = true;
 
-      tris.push_back(t);
+  for(int i=1;i<tris.size();i++){
+    tri_t& t(tris[i]);
+    if(done[dedge_t(t[0],t[1])] || done[dedge_t(t[1],t[2])] || done[dedge_t(t[2],t[0])]){
+      node_t u = t[2]; t[2] = t[1]; t[1] = u;
+    }
+    
+    // if(done[dedge_t(t[0],t[1])]){ node_t u = t[1]; t[1] = t[0]; t[0] = u; }
+    // if(done[dedge_t(t[1],t[2])]){ node_t u = t[2]; t[2] = t[1]; t[1] = u; }
+    // if(done[dedge_t(t[2],t[0])]){ node_t u = t[0]; t[0] = t[2]; t[2] = u; }
+    done[dedge_t(t[0],t[1])] = true;
+    done[dedge_t(t[1],t[2])] = true;
+    done[dedge_t(t[2],t[0])] = true;
+  }
+  // Check consistency of orientation. It is consistent if and only if
+  // each edge has been used exactly once in each direction.
+  bool consistent = true;
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+    if(!done[dedge_t(e->first,e->second)]){
+      fprintf(stderr,"A: Directed edge %d->%d is missing: triangulation is not consistently oriented.\n",e->first,e->second);
+      consistent = false;
+    }
+    if(!done[dedge_t(e->second,e->first)]){
+      fprintf(stderr,"B: Directed edge %d->%d is missing: triangulation is not consistently oriented.\n",e->second,e->first);
+      consistent = false;
     }
   }
 
+  if(!consistent){
+    cerr << "(*** Inconsistent triangulation: ***)\n";
+    cerr << "tris = {"; for(int i=0;i<tris.size();i++) cerr << tris[i] << (i+1<tris.size()? ", ":"};\n");
+    cerr << "outerface = " << outer_face << ";\n";
+  }
+  assert(consistent == true);
   return tris;
 }
 
@@ -260,32 +355,35 @@ face_t PlanarGraph::find_outer_face() const
 
   vector<double> radii(N);
 
-  for(node_t u=0;u<N;u++)
+  node_t u_farthest = 0;
+  double rmax = 0;
+  for(node_t u=0;u<N;u++){
     radii[u] = layout2d[u].norm();
+    if(radii[u] > rmax){ rmax = radii[u]; u_farthest = u; }
+  }
   
-  double rmax = *max_element(radii.begin(),radii.end());
-
   face_t outer_face;
-  for(node_t u=0;u<N;u++)
-    if(fabs(radii[u]-rmax)/rmax < 1e-2)
-      outer_face.push_back(u);
+  int i = 0;
+  for(node_t t = u_farthest, u = u_farthest, v = -1; v != u_farthest && i <= N; i++){
+    const vector<node_t>& ns(neighbours[u]);
+    double r = 0;
+    for(int i=0;i<ns.size();i++)
+      if(ns[i] != t && ns[i] != u && radii[ns[i]] > r){ r = radii[ns[i]]; v = ns[i]; }
+    outer_face.push_back(u);
+    t = u;
+    u = v;
+  }
+  // fprintf(stderr,"(u_farthest,rmax) = (%d,%f); i = %d\n",u_farthest,rmax,i);
+  // cerr << "Outer face: " << outer_face << endl;
+  // cerr << "Radii: "; for(int i=0;i<outer_face.size();i++) cerr << " " << radii[outer_face[i]]; cerr << "\n";
 
-  sort_ccw_point CCW(layout2d,centre2d(layout2d));
+  assert(i<N);
+
+  sort_ccw_point CCW(layout2d,outer_face.centroid(layout2d));
   sort(outer_face.begin(),outer_face.end(),CCW);
   reverse(outer_face.begin(),outer_face.end());  
 
-  // TODO: Assert that outer face forms a loop.
-  for(int i=0;i<outer_face.size();i++){
-    const node_t &u(outer_face[i]), &v(outer_face[(i+1)%outer_face.size()]);
-    const vector<node_t> &ns(neighbours[u]);
-    bool found = false;
-    for(int j=0;j<ns.size();j++) found |= (ns[j] == v);
-    if(!found){ 
-      cerr << "Outer vertices " << outer_face << " do not form a loop.\n";
-      return face_t(0);
-    }
-  }
-
+  cerr << "Found outer face: " << outer_face << endl;
   return outer_face;
 }
 

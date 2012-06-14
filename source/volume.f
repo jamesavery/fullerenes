@@ -3,7 +3,7 @@
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      dimension points(3,nmax),IDA(nmax,nmax),layout2d(2,NMAX)
+      dimension points(3,nmax),IDA(nmax,nmax)
       type(c_ptr)::g,p,hull,new_polyhedron,convex_hull,
      1             new_fullerene_graph
 
@@ -13,7 +13,6 @@
       exactvolume      = get_volume(p)
 
       hull = convex_hull(p)
-      return
       hullarea   = get_surface_area(hull)
       hullvolume = get_volume(hull)
 
@@ -46,7 +45,7 @@ C                                 | X1 Y1 Z1 |
 C     V = abs(Vdet)  ,   V =  1/6 | X2 Y2 Z2 |
 C                                 | X3 Y3 Z3 |
 C
-      DIMENSION Dist(3,Nmax),Distac(6)
+      DIMENSION Dist(3,Nmax)
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),IDA(Nmax,Nmax)
 

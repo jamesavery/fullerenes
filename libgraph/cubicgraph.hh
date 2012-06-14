@@ -6,6 +6,7 @@
 // TODO: Assumes planarity. Should perhaps split into cubic class and planar class?
 struct CubicGraph : public PlanarGraph {
 
+  CubicGraph() {}
   CubicGraph(const PlanarGraph& g) : PlanarGraph(g) {
     for(node_t u=0;u<N;u++)
       if(neighbours[u].size() != 3){

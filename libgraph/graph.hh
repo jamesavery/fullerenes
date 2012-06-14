@@ -40,13 +40,16 @@ struct Graph {
     update_auxiliaries();
   }
 
+  vector<node_t> shortest_path(const node_t& source, const node_t& dest, const vector<unsigned int>& D0) const;
   vector<unsigned int> shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 				      const vector<bool>& used_nodes, const unsigned int max_depth = INT_MAX) const;
   vector<unsigned int> shortest_paths(const node_t& source, const unsigned int max_depth = INT_MAX) const;
   vector<unsigned int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
   
+  // Find shortest cycle of the form s->...->s
+  vector<node_t> shortest_cycle(const node_t& s, const int max_depth) const;
   // Find shortest cycle of the form s->t->...->s
-  vector<node_t> shortest_cycle(const node_t& s, const node_t& t, const int max_depth=INT_MAX) const;
+  vector<node_t> shortest_cycle(const node_t& s, const node_t& t, const int max_depth) const;
   // Find shortest cycle of the form s->t->r->...->s
   vector<node_t> shortest_cycle(const node_t& s, const node_t& t, const node_t& r, const int max_depth) const;
   vector<unsigned int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
@@ -66,7 +69,6 @@ struct Graph {
   void update_from_neighbours(); 
 
   friend ostream& operator<<(ostream& s, const Graph& g);
-
 };
 
 #endif
