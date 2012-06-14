@@ -5,8 +5,8 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS= -g3 -m64 -Wall -Wno-sign-compare
-FFLAGS= -g3 -m64 -Wall
+CXXFLAGS= -O2 -m64 -Wall -Wno-sign-compare
+FFLAGS= -O2 -m64 -Wall
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
 GRAPHOBJECTS=config.o graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o \
@@ -43,6 +43,8 @@ test-%: tests/%.cc libgraph.a
 
 output/%.out: input/%.inp
 	./fullerene < $< > $@
+	cp -f cylview.xyz $@.xyz
+	cp -f qmga.dat $@.dat
 
 tests: fullerene $(TESTOUT)
 

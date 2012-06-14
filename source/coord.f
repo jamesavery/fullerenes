@@ -2054,7 +2054,7 @@ C     Now sort degeneracies
       IDG(1)=ideg
       Do I=2,MAtom
       diff=dabs(evec(I-1)-evec(I))
-      if(diff.lt.Tol) then
+      if(diff.lt.Tol1) then
       ideg=ideg+1
       IDG(ieigv)=ideg
       else
@@ -2115,8 +2115,9 @@ C     Obtain smallest distance for further scaling
 C     Now this contracts or expands the whole fullerene to set the
 C     smallest bond distance to Cdist
       R0=1.d10
-      Do I=1,MLEAP
-      Do J=I+1,MLEAP
+
+      Do I=1,Matom
+      Do J=I+1,Matom
       X=Dist(1,I)-Dist(1,J)
       Y=Dist(2,I)-Dist(2,J)
       Z=Dist(3,I)-Dist(3,J)
@@ -2125,7 +2126,7 @@ C     smallest bond distance to Cdist
       enddo
       enddo
       fac=CDist/R0
-      Do I=1,MLEAP
+      Do I=1,Matom
       Dist(1,I)=Dist(1,I)*fac
       Dist(2,I)=Dist(2,I)*fac
       Dist(3,I)=Dist(3,I)*fac

@@ -139,7 +139,7 @@ C  Filename for CYLVIEW
       endif
       xyzname=xyzname(1:npos)//xyz  !  Option for naming file for cylview program
 C  Check on number of atoms (vertices)
-      NAtom=IABS(NAtom)
+      NA=IABS(NA)
       if(NA.gt.NAtomax) WRITE(IOUT,102) NA
       if(NA.lt.20.or.NA.eq.22) then
       Write(IOUT,103) NA

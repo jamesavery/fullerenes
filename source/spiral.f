@@ -1266,7 +1266,6 @@ C     Find lowest value
 
       SUBROUTINE DualAnalyze(nmax,mmax,N,M,Iout,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
-c      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer D(MMAX,MMAX),Ddiag(MMAX),NR5(12),IDA(NMAX,NMAX)
       Integer IRhag5(0:5),IRhag6(0:6),IDG(NMAX)
@@ -1274,6 +1273,7 @@ c      use config
 C     Analyze dual matrix and get pentagon and hexagon indices
 C     and determine if molecule is open shell
       Data Tol/1.d-5/
+
       NV5=0
       NV6=0
       IER=0
@@ -1355,6 +1355,9 @@ C     Now produce adjacency matrix
       enddo
       enddo
 C Diagonalize without producing eigenvectors
+      do i=1,nmax
+         evec(i) = 0
+      enddo
       call tred2l(A,N,NMAX,evec,df)
       call tqlil(evec,df,N,NMAX)
 C Sort eigenvalues
