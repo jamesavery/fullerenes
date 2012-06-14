@@ -1,5 +1,6 @@
-      SUBROUTINE VolumeAndArea(points,nmax,M,IDA,exactarea,
+      SUBROUTINE VolumeAndArea(points,M,IDA,exactarea,
      1 exactvolume,hullarea,hullvolume)
+      use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       dimension points(3,nmax),IDA(nmax,nmax),layout2d(2,NMAX)
@@ -23,9 +24,10 @@
       return
       end 
 
-      SUBROUTINE Volume(NAtom,Nfaces,NAtom2,Matom,Iout,N5MEM,N6MEM,
+      SUBROUTINE Volume(Matom,Iout,N5MEM,N6MEM,
      1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,Asphere,
      2 exactarea,exactvolume,Rmin5,Rmin6,Rmax5,Rmax6)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Calculate the volume (and surface) of the cage molecule by
 C     1) Exact polyhedron volume using the normal of faces
@@ -44,9 +46,9 @@ C                                 | X1 Y1 Z1 |
 C     V = abs(Vdet)  ,   V =  1/6 | X2 Y2 Z2 |
 C                                 | X3 Y3 Z3 |
 C
-      DIMENSION Dist(3,natom),Distac(6)
-      DIMENSION CRing5(3,Nfaces),CRing6(3,Nfaces)
-      DIMENSION N5MEM(Nfaces,5),N6MEM(Nfaces,6),IDA(Natom,Natom)
+      DIMENSION Dist(3,Nmax),Distac(6)
+      DIMENSION CRing5(3,Mmax),CRing6(3,Mmax)
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),IDA(Nmax,Nmax)
 
 C     Sum over all 5-rings
       Vol5=0.d0
@@ -102,7 +104,7 @@ C     Now do the total volume calculation
       DVArea=ATol-Asphere
       APC=DVArea/Asphere*1.d2
 C     Convex Hull and exact polyhedral Volume and Area
-      Call VolumeAndArea(Dist,natom,MAtom,IDA,exactarea,
+      Call VolumeAndArea(Dist,MAtom,IDA,exactarea,
      1 exactvolume,hullarea,hullvolume)
 C     Calculate the volume and area for C60 using R5 and R6
       If(Matom.eq.60) then

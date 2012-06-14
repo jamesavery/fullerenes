@@ -1,9 +1,10 @@
-      SUBROUTINE Hueckel(NAtom,MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
+      SUBROUTINE Hueckel(MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C Perform Hueckel matrix diagonalization to obtain eigenvalues
 C This gives a good hint if the fullerene is closed-shell
-      DIMENSION IC3(natom,3),A(NAtom,NAtom),evec(Natom),df(Natom)
-      DIMENSION IDG(natom),IDA(Natom,Natom)
+      DIMENSION IC3(Nmax,3),A(Nmax,Nmax),evec(Nmax),df(Nmax)
+      DIMENSION IDG(Nmax),IDA(Nmax,Nmax)
       Character*10 Symbol
 C Parameters alpha and beta are in atomic units and are adjusted 
 C  to HOMO DFT orbital energies
@@ -32,8 +33,8 @@ C Produce adjacency matrix
       endif
       WRITE(IOUT,1007) 
 C Diagonalize without producing eigenvectors
-      call tred2l(A,Matom,Natom,evec,df)
-      call tqlil(evec,df,Matom,Natom)
+      call tred2l(A,Matom,Nmax,evec,df)
+      call tqlil(evec,df,Matom,Nmax)
 
 C Sort eigenvalues
       Do I=1,MAtom

@@ -906,7 +906,7 @@ C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
       routine='HUECKEL      '
       Write(Iout,1008) routine
-      CALL Hueckel(Nmax,MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
+      CALL Hueckel(MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
       endif
 
 C Produce the nth leapfrog of the fullerene
@@ -1087,9 +1087,9 @@ C Calculate the volume
       routine='VOLUME       '
       Write(Iout,1008) routine
 
-c$$$      CALL Volume(Nmax,Mmax,Nmax*Nmax,Matom,Iout,N5MEM,N6MEM,
-c$$$     1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
-c$$$     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
+      CALL Volume(Matom,Iout,N5MEM,N6MEM,
+     1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
+     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
 
 C Calculate the minimum distance sphere
 C     routine='CONVEXHULL'
