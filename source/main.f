@@ -893,13 +893,13 @@ C Also get moment of inertia (to be implemented)
 C Calculate the distance Matrix and print out distance Matrix
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
-      CALL Distmatrix(Nmax,NmaxL,MAtom,IOUT,iprintf,Iopt,
+      CALL Distmatrix(MAtom,IOUT,iprintf,Iopt,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
 
 C Establish Connectivities
       routine='CONNECT      '
       Write(Iout,1008) routine
-      CALL Connect(Nmax,NmaxL,Nmax*Nmax,MCon2,MAtom,Ipent,IOUT,
+      CALL Connect(MCon2,MAtom,Ipent,IOUT,
      1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
 
 C Hueckel matrix and eigenvalues
@@ -949,7 +949,7 @@ C adjacent vertices
 C Establish all closed ring systems
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(Nmax,Emax,Mmax,NmaxL,Nmax*Nmax,MCon2,MAtom,IOUT,
+      CALL Ring(MCon2,MAtom,IOUT,
      1 N5Ring,N6Ring,IC3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
      1 DistMat)
 
@@ -977,7 +977,7 @@ C Optimize Geometry through force field method
      1 Dist,DistCM,El)
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
-      CALL Distmatrix(Nmax,NmaxL,MAtom,IOUT,Iprintf,0,
+      CALL Distmatrix(MAtom,IOUT,Iprintf,0,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
       routine='DIAMETER     '
       Write(Iout,1008) routine
@@ -1005,14 +1005,14 @@ C Print out Coordinates used as input for CYLview
 C Rings
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(Nmax,Emax,Mmax,NmaxL,Nmax*Nmax,MCon2,MAtom,IOUT,
+      CALL Ring(MCon2,MAtom,IOUT,
      1 N5Ring,N6Ring,IC3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
      1 DistMat)
 
 C Analyze ring connections
       routine='RINGC        '
       Write(Iout,1008) routine
-      CALL RingC(Nmax,Mmax,Emax,Nmax*Nmax,Matom,Nmax*11,Iout,iprintf,
+      CALL RingC(Matom,Iout,iprintf,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
      1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
      1 numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
