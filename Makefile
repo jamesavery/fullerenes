@@ -9,7 +9,7 @@ CXXFLAGS= -O2 -m64 -Wall -Wno-sign-compare
 FFLAGS= -O2 -m64 -Wall
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS=config.o graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o \
+GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o \
 	     polyhedron.o fullerenegraph.o graph_fortran.o
 
 FOBJECTS=$(patsubst %.o,build/%.o,$(OBJECTS))
@@ -18,7 +18,7 @@ TESTINP=$(wildcard input/*.inp)
 TESTOUT=$(patsubst input/%.inp, output/%.out, $(TESTINP))
 #
 #
-fullerene: $(FOBJECTS) libgraph.a
+fullerene: build/config.o $(FOBJECTS) libgraph.a
 	$(F90) $(FFLAGS) $(OPTIONS) $^ $(LIBRARIES) -o $@ -lstdc++ -lgomp
 
 #
