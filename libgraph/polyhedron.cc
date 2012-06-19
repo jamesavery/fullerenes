@@ -182,7 +182,8 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     
   PlanarGraph g(edges);
   cerr << "Polyhedron is "<< (g.N != N?"not ":"") << "equal to convex hull.\n"; 
-  return Polyhedron(g,remaining_points,3);
+  g.outer_face = *output.begin();
+  return Polyhedron(g,remaining_points,3,vector<face_t>(output.begin(),output.end()));
 }
 
 string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_latex_header) const 
@@ -250,24 +251,29 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
   return s.str();
 }
 
-Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max) : 
-  PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points))
+Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max, const vector<face_t> faces_) : 
+  PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points)), faces(faces_)
 {
   //  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
 
-  if(layout2d.size() != N)
-    layout2d = tutte_layout(-1,-1,-1,face_max);
-  assert(outer_face.size() <= face_max);
+  if(faces.size() == 0){
+    if(layout2d.size())
+      layout2d = tutte_layout(-1,-1,-1,face_max);
+    assert(outer_face.size() <= face_max);
+    faces = compute_faces_flat(face_max,true);
 
+    assert(faces[0] == outer_face);
+  }
+
+  //  cerr << "points = {"; for(int i=0;i<points.size();i++) cerr << points[i] << (i+1<points.size()? ", ":"};\n");
   // cerr << "G = " << static_cast<PlanarGraph>(*this) << endl;
   // cerr << "Layout has " << layout2d.size() << " points.\n";
 
   //  if(points.size() != N) 
   //    points = polar_mapping(spherical_projection());
 
-  faces = compute_faces_flat(face_max,true);
 
-  assert(faces[0] == outer_face);
+
 
   // cerr << "Found " << faces.size() << " faces.\n";
   // cerr << "Volume divergence: " << volume_divergence() << "\n";
