@@ -107,14 +107,14 @@ C     Now Print
       DTREkcal=DTRE*beta*6.27509541D+02
       Graphene=0.0468d0*beta*6.27509541D+02
       Write(Iout,1003) Etot,TRE,Graphene,DTRE,DTREkcal
+      if(nopen.eq.1) then
+       Write(Iout,1004)
+      else
        if(iproper.eq.0) then
          Write(Iout,1009)
         else
          Write(Iout,1010)
        endif
-      if(nopen.eq.1) then
-       Write(Iout,1004)
-      else
        excite=-bandgap*beta*27.2117
        Write(Iout,1005) bandgap,excite
        if(bandgap.lt.Tol1) Write(Iout,1006)
