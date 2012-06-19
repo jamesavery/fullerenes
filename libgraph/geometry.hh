@@ -24,6 +24,7 @@ struct edge_t : public pair<node_t,node_t> {
     const node_t v = first, u = second;
     return u*(u-1)/2 + v; 
   }
+  friend ostream& operator<<(ostream& s, const edge_t& e){ s<<"{"<<e.first <<","<<e.second<<"}"; return s; }
 };
 
 // Directed edge is an ordered pair of nodes
