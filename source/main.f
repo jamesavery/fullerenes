@@ -29,6 +29,7 @@
 
       IMPLICIT REAL*8 (A-H,O-Z)
 C    Set the dimensions for the distance matrix
+      parameter (nzeile=132)
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
       DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
@@ -52,9 +53,9 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*20 xyzname
       CHARACTER*20 chkname
       CHARACTER*20 element
-      Character TEXTINPUT*132
+      Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
-      Integer Values(8)
+      Integer endzeile,Values(8)
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
      2 'MN','FE','CO','NI','CU','ZN','GA','GE','AS','SE','BR','KR',    
@@ -98,7 +99,7 @@ C  INPUT and setting parameters for running the subroutines
         CALL Datain(IN,IOUT,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
-     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,
+     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,
      1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,forceWu,
      1  forceWuP,xyzname,chkname,TEXTINPUT)
 C  Stop if error in input
@@ -121,8 +122,12 @@ C Input Cartesian coordinates for fullerenes
        Open(unit=7,file=xyzname,form='formatted')
        WRITE(Iout,1015) xyzname 
        Read(7,*) MAtom
-       Read(7,1018) TEXTINPUT 
-       WRITE(Iout,1017) MAtom,TEXTINPUT
+       Read(7,1018) (TEXTINPUT(I),I=1,nzeile)
+       endzeile=0
+       do j=1,nzeile
+        if(TEXTINPUT(j).ne.' ') endzeile=j
+       enddo 
+       WRITE(Iout,1017) MAtom,(TEXTINPUT(I),I=1,endzeile)
        Do J=1,MAtom
         Read(7,*,end=21) element,(Dist(I,J),I=1,3)
         Iatom(j)=6
@@ -277,11 +282,16 @@ C Print out Coordinates used as input for CYLview
       routine='PRINTCOORD   '
       Write(Iout,1008) routine
       WRITE(Iout,1002) xyzname 
-      if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,TEXTINPUT 
+      endzeile=0
+       do j=1,nzeile
+        if(TEXTINPUT(j).ne.' ') endzeile=j
+       enddo
+      if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,
+     1 (TEXTINPUT(I),I=1,endzeile)
       if(MAtom.ge.100.and.MAtom.lt.1000) 
-     1 WRITE(3,1012) MAtom,MAtom,TEXTINPUT 
+     1 WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
       if(MAtom.ge.1000.and.MAtom.lt.10000) 
-     1 WRITE(3,1013) MAtom,MAtom,TEXTINPUT
+     1 WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
       Do J=1,MAtom
       IM=IAtom(J)      
       Write(3,1007) El(IM),(Dist(I,J),I=1,3)
@@ -478,14 +488,14 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1008 FORMAT(140('-'),/1x,'--> Enter Subroutine ',A13)
  1009 FORMAT(1x,'CPU Seconds: ',F15.2,', CPU Hours: ',F13.5)
  1010 FORMAT(1X,'Number of Hamiltonian cycles: ',I10)
- 1011 FORMAT(I5,/,'C',I2,'/  ',A132)
- 1012 FORMAT(I5,/,'C',I3,'/  ',A132)
- 1013 FORMAT(I5,/,'C',I4,'/  ',A132)
+ 1011 FORMAT(I5,/,'C',I2,'/  ',132A1)
+ 1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
+ 1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
  1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
  1015 FORMAT(/1X,'Read coordinates from xyz file: ',A20)
  1016 FORMAT(/1X,'End of file reached ==> Stop')
- 1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,A132)
- 1018 FORMAT(A132)
+ 1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
+ 1018 FORMAT(132A1)
  1019 FORMAT(140('='))
       STOP 
       END
