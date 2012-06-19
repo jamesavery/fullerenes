@@ -5,12 +5,13 @@
      1 xyzname,chkname,DATEN)
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension forceWu(9),forceWuP(9)
-      Character DATEN*132
+      parameter (nzeile=132)
+      integer endzeile
+      Character*1 DATEN(nzeile)
       Character xyzname*20
       Character chkname*20
       Character blank*1
       Character xyz*4
-      Character xyz1*7
       Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,leapGC,ihueckel,ISW,KE,loop,mirror,
      1 IYF,IWS,xyzname
@@ -21,9 +22,14 @@
 C Input send to output
       if(ilp.eq.0) then   
        WRITE(IOUT,100)
-       DO 10 I=1,200
-       READ(IN,'(A132)',END=11) DATEN
-   10  WRITE(IOUT,60) DATEN
+       Do I=1,200
+       READ(IN,'(132(A1))',END=11) (DATEN(j),j=1,nzeile)
+       endzeile=0
+       do j=1,nzeile
+        if(DATEN(j).ne.' ') endzeile=j
+       enddo
+       WRITE(IOUT,60) (DATEN(j),j=1,endzeile)
+       enddo
    11  WRITE(IOUT,101)
        REWIND IN
        ilp=1
@@ -100,8 +106,12 @@ C Now process namelist input
 C     Old input    
 C     Read(IN,*) NA,IC,Iopt,IP,IHam,IPR,IS,ISO2,ISO2,ISO3,PS,TolR
 C     New input    
-      Read(IN,'(A132)') DATEN
-      WRITE(IOUT,60) DATEN
+      READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
+       endzeile=0
+       do j=1,nzeile
+        if(DATEN(j).ne.' ') endzeile=j
+       enddo
+      WRITE(IOUT,60) (DATEN(j),j=1,endzeile)
       WRITE(IOUT,101)
       Read(IN,nml=Coord,Err=99,end=99)
       Read(IN,nml=Opt,Err=99,end=99)
@@ -190,7 +200,7 @@ C  Tolerance for finding 5- and 6-ring connections
         IPR=0
       endif
       
-   60 FORMAT(1X,A132)
+   60 FORMAT(1X,132A1)
   100 FORMAT(1X,80('-'),/1X,'I N P U T ',/1X,5H0....,
      161H....1.........2.........3.........4.........5.........6......,
      214H...7.........8,/1X,39H123456789012345678901234567890123456789,
