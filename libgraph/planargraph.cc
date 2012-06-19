@@ -1,4 +1,7 @@
 #include "planargraph.hh"
+#include <queue>
+#include <list>
+using namespace std;
 
 bool PlanarGraph::this_is_a_fullerene() const {
   for(node_t u=0;u<N;u++)
@@ -229,8 +232,21 @@ vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_la
   for(facemap_t::const_iterator fs(facemap.begin()); fs != facemap.end(); fs++)
     copy(fs->second.begin(),fs->second.end(),inserter(faces,faces.end()));
 
+  // Check that faces are orientable: Every edge must appear in two faces
+  map<edge_t,int> edgecount;
+  for(int i=0;i<faces.size();i++)
+    for(int j=0;j<faces[i].size();j++)
+      edgecount[edge_t(faces[i][j],faces[i][(j+1)%faces[i].size()])]++;
+
+  for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
+    if(e->second != 2){
+      cerr << "Edge "<< e->first << " appears in " << e->second <<" faces, not two.\n";
+      abort();
+    }
+
+
   // Make sure that outer face is at position 0
-  if(planar_layout){
+  if(planar_layout && outer_face.size() > 0){
     const node_t s(outer_face[0]), t(outer_face[1]), r(outer_face[2]);
     for(int i=0;i<faces.size();i++){
       const face_t f(faces[i]);
@@ -259,6 +275,10 @@ vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) c
     //    cerr << "Faces already form a triangulation.\n";
     vector<tri_t> tris(faces.begin(),faces.end());
     return orient_triangulation(tris);
+  } else {
+    // cerr << "Not a triangulation. Building centroid triangulation!\n";
+    // cerr << "Original faces:\n";
+    // for(int i=0;i<faces.size();i++) cerr << faces[i] << "\n";
   }
 
   // Triangulate by inserting extra vertex at face centroid and connecting
@@ -309,17 +329,30 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   // Now, pick an orientation for triangle 0. We choose the one it
   // already has. This determines the orientation of the remaining triangles!
   map<dedge_t,bool> done;
-  for(int i=0;i<3;i++) done[dedge_t(tris[0][i],tris[0][(i+1)%3])] = true;
+  for(int i=0;i<3;i++){
+    done[dedge_t(tris[0][i],tris[0][(i+1)%3])] = true;
+  }
 
-  for(int i=1;i<tris.size();i++){
+  deque<int> workset; 
+  for(int i=1;i<tris.size();i++) workset.push_back(i);
+
+  while(!workset.empty()){
+    int i = workset.front(); workset.pop_front();
     tri_t& t(tris[i]);
-    if(done[dedge_t(t[0],t[1])] || done[dedge_t(t[1],t[2])] || done[dedge_t(t[2],t[0])]){
+
+
+    // Is this triangle connected to any already processed triangle?
+    bool seen = false, rev_seen = false;
+    for(int j=0;j<3;j++){  seen |= done[dedge_t(t[j],t[(j+1)%3])]; rev_seen |= done[dedge_t(t[(j+1)%3],t[j])]; }
+    if(!seen && !rev_seen) {
+      workset.push_back(i);
+      continue;
+    }
+
+    if(seen){
       node_t u = t[2]; t[2] = t[1]; t[1] = u;
     }
     
-    // if(done[dedge_t(t[0],t[1])]){ node_t u = t[1]; t[1] = t[0]; t[0] = u; }
-    // if(done[dedge_t(t[1],t[2])]){ node_t u = t[2]; t[2] = t[1]; t[1] = u; }
-    // if(done[dedge_t(t[2],t[0])]){ node_t u = t[0]; t[0] = t[2]; t[2] = u; }
     done[dedge_t(t[0],t[1])] = true;
     done[dedge_t(t[1],t[2])] = true;
     done[dedge_t(t[2],t[0])] = true;
