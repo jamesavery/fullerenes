@@ -1,7 +1,7 @@
 This is an example how to create the coordinate for the non-spiral C380
 through a ring-spiral fullerene C364 and 4 Yoshida-Fowler 4-vertex insertions
 &Coord NA=364, IC=3 , R6=1.39, IYF=2, ixyz=1 /
-&Opt Iopt=2 fcoulomb=50. /
+&Opt Iopt=2 fcoulomb=250. /
 &Hamilton /
 &Isomers /
 &Graph /
