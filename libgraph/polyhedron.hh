@@ -15,7 +15,8 @@ struct Polyhedron : public PlanarGraph {
   //---- Constructors ----//
   // Default constructor
   Polyhedron(const int face_max = INT_MAX) : face_max(face_max) {  }
-  Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX);
+  Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_ = vector<coord3d>(), const int face_max = INT_MAX,
+	     const vector<face_t> faces = vector<face_t>());
 
   // Create polyhedron from skeleton graph and 3D vertex coordinates 
   // Read polyhedron from a .pol file
