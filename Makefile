@@ -12,8 +12,8 @@ OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o d
 GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o \
 	     polyhedron.o fullerenegraph.o graph_fortran.o
 
-FOBJECTS=$(patsubst %.o,build/%.o,$(OBJECTS))
-COBJECTS=$(patsubst %.o,build/%.o,$(GRAPHOBJECTS))
+FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))
+COBJECTS=$(patsubst %.o, build/%.o, $(GRAPHOBJECTS))
 TESTINP=$(wildcard input/*.inp)
 TESTOUT=$(patsubst input/%.inp, output/%.out, $(TESTINP))
 #
@@ -26,7 +26,10 @@ fullerene: build/config.o $(FOBJECTS) libgraph.a
 #
 #-----------------------------------------------------
 
-build/%.o: source/%.f
+build/config.o: source/config.f
+	$(F90) $(FFLAGS) $(OPTIONS) -c $< -o $@
+
+build/%.o: source/%.f build/config.o
 	$(F90) $(FFLAGS) $(OPTIONS) -c $< -o $@
 
 build/%.o: libgraph/%.cc
@@ -56,6 +59,6 @@ clean:
 	find . \( -name  "*~" -or  -name "#*#" -or -name "*.o" \) -exec rm {} \;
 
 distclean: clean
-	rm -f fullerene libgraph.a cylview.xyz qmga.dat
+	rm -f fullerene libgraph.a cylview.xyz qmga.dat config.mod
 
 #-----------------------------------------------------
