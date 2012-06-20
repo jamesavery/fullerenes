@@ -3,11 +3,11 @@
       use config
 C     Subroutine from Darko Babic to create Hamitonian cycles
 C      optimized for program Isomer
-      integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax),pos(Nmax)
-      integer x(0:Nmax),y(0:Nmax),saved(Nmax)
+      integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax)
+      integer x(0:Nmax)
       integer i,j,k,l,n,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
-      integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
-      logical occ(Nmax),pass(Nmax),end(Nmax),flag,better
+      integer ptr,prev,oldptr
+      logical occ(Nmax),pass(Nmax),end(Nmax),flag
       integer ic3(Nmax,3),A(Nmax,Nmax)
       ifirst=0 
       nhamilton=0
@@ -463,10 +463,9 @@ C adjaceny matric A(i,j) by producing the (n-1)-th power
 C of A. In this case n is Matom. This gives all possible walks
 C of length (n-1).
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
-      DIMENSION IA(Nmax,Nmax),IM(Nmax,Nmax),IM2(Nmax,Nmax)
+      DIMENSION IA(Nmax,Nmax),IM(Nmax,Nmax)
       DIMENSION IMF(Nmax,Nmax),IMF1(Nmax,Nmax)
       DIMENSION IS1(10),IS2(10),APN(10)
-      DIMENSION B(Nmax,Nmax)
       Real*8 upperschwerd,lowerschwerd
       Data Ihuge/180/
 C     Epstein upper limit

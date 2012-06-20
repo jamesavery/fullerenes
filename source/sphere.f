@@ -63,10 +63,10 @@ C     End Iteration
       RETURN
       END
 
-      SUBROUTINE MinDistSphere(M,IOUT,Dist,distP,c,radiusi)
+      SUBROUTINE MinDistSphere(M,IOUT,Dist,c)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,Nmax),distP(Nmax),c(3),cmax(3),cMCS(3)
+      DIMENSION Dist(3,Nmax),c(3),cmax(3),cMCS(3)
 C     Get the minimum distance sphere
       
       DATA API/3.14159265358979d0/

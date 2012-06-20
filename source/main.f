@@ -406,7 +406,7 @@ C    1 Rmin,Rmax,VolSphere,ASphere,Atol,VTol,cmcs,rmcs,RVdWC)
 C Calculate the minimum distance sphere
       routine='MINDISTSPHERE'
       Write(Iout,1008) routine
-      CALL MinDistSphere(MAtom,IOUT,Dist,distP,cmcs,rmcs)
+      CALL MinDistSphere(MAtom,IOUT,Dist,cmcs)
 
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE'

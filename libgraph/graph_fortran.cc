@@ -198,7 +198,7 @@ void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const in
 double get_surface_area_(const polyhedron_ptr *P){ return (*P)->surface_area(); }
 double get_volume_(const polyhedron_ptr *P){ return (*P)->volume(); }
 
-int graph_is_a_fullerene_(const graph_ptr *g){ return (*g)->this_is_a_fullerene(); }
+int graph_is_a_fullerene_(const graph_ptr *g){ return (*g)->is_a_fullerene(); }
 
 double shortest_planar_distance_(const graph_ptr *g)
 {

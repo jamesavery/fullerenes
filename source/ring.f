@@ -285,8 +285,6 @@ C     Determine the center of each 5-and 6-ring system
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Nring(Mmax)
       DIMENSION IedgeA(Emax),IedgeB(Emax)
-      DIMENSION IedgeC(Emax),IedgeD(Emax)
-      DIMENSION IedgeE(Emax),IedgeF(Emax)
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)

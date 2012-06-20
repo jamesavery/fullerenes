@@ -88,7 +88,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
       for(int j=1;j<m;j++)
 	for(int k=j+1;k<=m;k++){
 	  double s = (1+j)*(1.0/(m+2)), t = k*(1.0/(m+2));
-	  fprintf(stderr,"(s,t) = (%g,%g)\n",s,t);
+	  //fprintf(stderr,"(s,t) = (%g,%g)\n",s,t);
 	  new_layout.push_back(a+((b-a)*s + (c-a)*t)*sqrt2inv);
 	}
     }
@@ -105,10 +105,10 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
       }
   }
 
-  cerr << "new_layout.size() = " << new_layout.size() << endl;
+  //cerr << "new_layout.size() = " << new_layout.size() << endl;
 
   PlanarGraph new_dual(Graph(edgeset_new), new_layout);
-  cerr << "newdual.N = " << new_dual.N << endl;
+  //cerr << "newdual.N = " << new_dual.N << endl;
 
   ofstream h("output/halma2.m");
 

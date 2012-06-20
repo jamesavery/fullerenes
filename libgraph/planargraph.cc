@@ -3,12 +3,18 @@
 #include <list>
 using namespace std;
 
-bool PlanarGraph::this_is_a_fullerene() const {
+bool PlanarGraph::is_cubic() const {
   for(node_t u=0;u<N;u++)
-    if(neighbours[u].size() != 3){ 
-      fprintf(stderr,"Graph is not cubic: vertex %d has %d neighbours.\n",u,int(neighbours[u].size())); 
+    if(neighbours[u].size() != 3)
       return false;
-    }
+  return true;
+}
+
+bool PlanarGraph::is_a_fullerene() const {
+  if(!is_cubic()){
+    fprintf(stdout,"Graph is not cubic.\n"); 
+    return false;
+  }
     
   facemap_t faces(PlanarGraph(*this).compute_faces(7));
   int n_faces = 0;
@@ -19,22 +25,22 @@ bool PlanarGraph::this_is_a_fullerene() const {
   const int F = 2+E-N;
     
   if(E != edge_set.size()){
-    fprintf(stderr,"Graph is not planar: wrong number of edges: %d != %d\n",int(edge_set.size()),E);
+    fprintf(stdout,"Graph is not planar: wrong number of edges: %d != %d\n",int(edge_set.size()),E);
     return false;
   }
 
   if(F != n_faces){
-    fprintf(stderr,"Graph is not planar: wrong number of faces: %d != %d\n",n_faces,F);
+    fprintf(stdout,"Graph is not planar: wrong number of faces: %d != %d\n",n_faces,F);
     return false;
   }
 
   if(faces[5].size() != 12){
-    fprintf(stderr,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",int(faces[5].size()));
+    fprintf(stdout,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",int(faces[5].size()));
     return false;
   }
 
   if(faces[6].size() != (F-12)){
-    fprintf(stderr,"Graph is not fullerene: wrong number of hexagons: %d != %d\n",int(faces[6].size()),F-12);
+    fprintf(stdout,"Graph is not fullerene: wrong number of hexagons: %d != %d\n",int(faces[6].size()),F-12);
     return false;
   }
 
@@ -109,7 +115,7 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
   // TODO: This is a much better and faster method, but needs to be debugged.
   if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
 
-  cerr << "Non-oriented face computation (loop search)\n";
+  cout << "Non-oriented face computation (loop search)\n";
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
 
@@ -137,7 +143,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 {
   assert(layout2d.size() == N);
   facemap_t facemap;
-  cerr << "Computing faces using 2D orientation.\n";
+  cout << "Computing faces using 2D orientation.\n";
   set<dedge_t> workset;
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
@@ -145,34 +151,32 @@ facemap_t PlanarGraph::compute_faces_oriented() const
     workset.insert(dedge_t(t,s));
   }
 
-  // Outer face must exist and be ordered CW, rest of faces CCW
-  // assert(outer_face.size() > 0);
-  if(outer_face.size() < 3)
+  // If layout is planar, outer face must exist and be ordered CW,
+  // rest of faces CCW. If layout is spherical / periodic, all faces
+  // should be ordered CCW.
+  if(!layout_is_spherical){
+    if(outer_face.size() < 3)
     outer_face = find_outer_face();
 
-  if(outer_face.size() < 3){
-    cerr << "Invaid outer face: " << outer_face << endl;
-    assert(outer_face.size() < 3);
-  }
-
-  //  cerr << "Outer face: " << outer_face << endl;
-
-  coord2d centre(centre2d(layout2d));
-  
-  for(node_t u=0;u<N;u++)
-    if(!outer_face.contains(u) && !outer_face.point_inside(layout2d,u)){
-      cerr << "Point " << u << "/" << layout2d[u] << " is outside outer face " << outer_face << endl;
-      cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
-      abort();
+    if(outer_face.size() < 3){
+      cerr << "Invaid outer face: " << outer_face << endl;
+      assert(outer_face.size() < 3);
     }
-  //  cerr << "Outer face is OK: All vertices are inside face.\n";
 
-  // Add outer face to output, remove directed edges from work set
-  facemap[outer_face.size()].insert(outer_face);
-  for(unsigned int i=0;i<outer_face.size();i++){
-    const node_t u = outer_face[i], v = outer_face[(i+1)%outer_face.size()];
-    //    printf("Removing directed edge (%d,%d)\n",u,v);
-    workset.erase(dedge_t(u,v));
+    for(node_t u=0;u<N;u++)
+      if(!outer_face.contains(u) && !outer_face.point_inside(layout2d,u)){
+	cerr << "Point " << u << "/" << layout2d[u] << " is outside outer face " << outer_face << endl;
+	cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
+	abort();
+      }
+    cerr << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face.\n";
+    facemap[outer_face.size()].insert(outer_face);
+    // Add outer face to output, remove directed edges from work set
+    for(unsigned int i=0;i<outer_face.size();i++){
+      const node_t u = outer_face[i], v = outer_face[(i+1)%outer_face.size()];
+      //    printf("Removing directed edge (%d,%d)\n",u,v);
+      workset.erase(dedge_t(u,v));
+    }
   }
 
   // Now visit every other edge once in each direction.
@@ -240,7 +244,10 @@ vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_la
 
   for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
     if(e->second != 2){
-      cerr << "Edge "<< e->first << " appears in " << e->second <<" faces, not two.\n";
+      cerr << "compute_faces_flat: Graph not orientable - edge "<< e->first << " appears in " << e->second <<" faces, not two.\n";
+      cerr << "faces = {"; for(int i=0;i<faces.size();i++) cerr << faces[i] << (i+1<faces.size()?", ":"};\n");
+      cerr << "G = " << *this << ";\n";
+	
       abort();
     }
 
@@ -272,13 +279,15 @@ vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) c
   // Test whether faces already form a triangulation
   bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
   if(is_tri){
-    //    cerr << "Faces already form a triangulation.\n";
+    //    cerr << "centroid_triangulation: Faces already form a triangulation.\n";
     vector<tri_t> tris(faces.begin(),faces.end());
     return orient_triangulation(tris);
   } else {
-    // cerr << "Not a triangulation. Building centroid triangulation!\n";
+    //    cerr << "centroid_triangulation: Not a triangulation. Building centroid triangulation!\n";
     // cerr << "Original faces:\n";
-    // for(int i=0;i<faces.size();i++) cerr << faces[i] << "\n";
+    // cerr << "faces = {"; for(int i=0;i<faces.size();i++) cerr << faces[i] << (i+1<faces.size()?", ":"};\n");
+    // cerr << "layout = {"; for(int i=0;i<layout2d.size();i++) cerr << layout2d[i] << (i+1<layout2d.size()?", ":"};\n");
+    // cerr << "G = " << *this << ";\n";
   }
 
   // Triangulate by inserting extra vertex at face centroid and connecting
@@ -301,7 +310,7 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
   // Test whether faces already form a triangulation
   bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
   if(is_tri){
-    //    cerr << "Faces already form a triangulation.\n";
+    //cerr << "PlanarGraph::triangulation: Faces already form a triangulation.\n";
     vector<tri_t> tris(faces.begin(),faces.end());
     return orient_triangulation(tris);
   } else {
@@ -326,6 +335,21 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
 
 vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
 {
+
+  // Check that triangles are orientable: Every edge must appear in two faces
+  map<edge_t,int> edgecount;
+  for(int i=0;i<tris.size();i++)
+    for(int j=0;j<tris[i].size();j++){
+      edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]++;
+      if(edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]>2)
+	cerr << tris[i] << " bad!\n";
+    }
+  for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
+    if(e->second != 2){
+      cerr << "Triangulation not orientable: Edge "<< e->first << " appears in " << e->second <<" tris, not two.\n";
+      abort();
+    }
+
   // Now, pick an orientation for triangle 0. We choose the one it
   // already has. This determines the orientation of the remaining triangles!
   map<dedge_t,bool> done;
@@ -416,7 +440,7 @@ face_t PlanarGraph::find_outer_face() const
   sort(outer_face.begin(),outer_face.end(),CCW);
   reverse(outer_face.begin(),outer_face.end());  
 
-  cerr << "Found outer face: " << outer_face << endl;
+  cout << "Found outer face: " << outer_face << endl;
   return outer_face;
 }
 
