@@ -110,7 +110,6 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     const coord3d& p(points[*u]);
 
     // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) 
-    // cerr << *u << "\n// 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) \n";
     list<triit> visible;
     map<dedge_t,bool> is_visible;
     coord3d centre;		// Centre of visible faces
@@ -125,7 +124,6 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     centre /= visible.size();
 
     // 2.2 Build set of horizon edges: each edge e in visible faces that has f_a visible, f_b invisible
-    // cerr << "// 2.2 Build set of horizon edges: each edge e in visible faces that has f_a visible, f_b invisible\n";
     list<edge_t> horizon;
     for(list<triit>::const_iterator tvi(visible.begin()); tvi!=visible.end(); tvi++){
       const tri_t& tv(**tvi);
@@ -140,10 +138,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
       output.erase(*tvi);
     }
 
-
-
     // 2.4 For each e in horizon, add tri_t(u,e[0],e[1]) to output set. 
-    // cerr << "// 2.4 For each e in horizon, add tri_t(u,e[0],e[1]) to output set. \n";
     for(list<edge_t>::const_iterator e(horizon.begin()); e!=horizon.end(); e++){
       tri_t t(*u,e->first,e->second);
 
@@ -161,8 +156,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     }
   }
     
-  // Finally, construct the graph and the output polyhedron object
-  // cerr << "// Finally, construct the graph and the output polyhedron object\n";
+  // 3. Finally, construct the graph and the output polyhedron object
   set<node_t> used_nodes;
   for(triit t(output.begin()); t!=output.end(); t++)
     for(int i=0;i<3;i++)
@@ -181,9 +175,14 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
       edges.insert(edge_t(nodemap[t->u(i)],nodemap[t->u((i+1)%3)]));
     
   PlanarGraph g(edges);
-  cerr << "Polyhedron is "<< (g.N != N?"not ":"") << "equal to convex hull.\n"; 
-  g.outer_face = *output.begin();
-  return Polyhedron(g,remaining_points,3,vector<face_t>(output.begin(),output.end()));
+  cout << "Polyhedron is "<< (g.N != N?"not ":"") << "equal to convex hull.\n"; 
+  vector<face_t> faces;
+  for(list<tri_t>::const_iterator o(output.begin());o!=output.end();o++){
+    const tri_t& f(*o);
+    faces.push_back(tri_t(nodemap[f[0]],nodemap[f[1]],nodemap[f[2]]));
+  }
+  g.outer_face = faces[0];
+  return Polyhedron(g,remaining_points,3,faces);
 }
 
 string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_latex_header) const 
@@ -257,15 +256,24 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
   //  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
 
   if(faces.size() == 0){
-    if(layout2d.size())
-      layout2d = tutte_layout(-1,-1,-1,face_max);
-    assert(outer_face.size() <= face_max);
-    faces = compute_faces_flat(face_max,true);
-
-    assert(faces[0] == outer_face);
+    if(layout2d.size() != N){
+      if(is_cubic()){
+	layout2d = tutte_layout(-1,-1,-1,face_max);
+	faces = compute_faces_flat(face_max,true);
+	assert(outer_face.size() <= face_max);
+      } else {
+	layout2d = polar_angles();
+	layout_is_spherical = true;
+	faces = compute_faces_flat(face_max,true);
+      }
+    }
   }
+  
+  //  assert(faces[0] == outer_face);
+  //   }
 
-  //  cerr << "points = {"; for(int i=0;i<points.size();i++) cerr << points[i] << (i+1<points.size()? ", ":"};\n");
+  // cerr << "points = {"; for(int i=0;i<points.size();i++) cerr << points[i] << (i+1<points.size()? ", ":"};\n");
+  // cerr << "faces  = {"; for(int i=0;i<faces.size();i++) cerr << faces[i] << (i+1<faces.size()? ", ":"};\n");
   // cerr << "G = " << static_cast<PlanarGraph>(*this) << endl;
   // cerr << "Layout has " << layout2d.size() << " points.\n";
 

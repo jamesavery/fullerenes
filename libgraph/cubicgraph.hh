@@ -20,7 +20,6 @@ struct CubicGraph : public PlanarGraph {
   CubicGraph(FILE *file);
 
   CubicGraph(unsigned int index, istream& file = cin);
-  friend ostream& operator<<(ostream& s, const CubicGraph& g);
 };
 
 #endif

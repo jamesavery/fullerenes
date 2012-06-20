@@ -13,7 +13,7 @@ public:
 
   void fullerene_check() const
   {
-    if(!this_is_a_fullerene()){
+    if(!is_a_fullerene()){
       fprintf(stderr,"Fullerene graph constructor called for non-fullerene graph.\n");
       abort();
     }

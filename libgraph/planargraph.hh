@@ -13,10 +13,10 @@ public:
 
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
-  vector<coord2d> spherical_layout;
+  bool layout_is_spherical;
 
-  PlanarGraph() {}
-  PlanarGraph(const PlanarGraph& g) : Graph(g), layout2d(g.layout2d), spherical_layout(g.spherical_layout) {  }
+  PlanarGraph() : layout_is_spherical(false) {}
+  PlanarGraph(const PlanarGraph& g) : Graph(g), layout2d(g.layout2d), layout_is_spherical(layout_is_spherical) {  }
   PlanarGraph(const Graph& g, const node_t s=-1, const node_t t=0, const node_t r=0) : Graph(g)
   {
     if(s!=-1){ // Compute planar layout
@@ -28,7 +28,8 @@ public:
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g), layout2d(layout) {  }
 
 
-  bool this_is_a_fullerene() const;
+  bool is_a_fullerene() const;
+  bool is_cubic() const;
 
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;

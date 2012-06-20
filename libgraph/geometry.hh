@@ -47,10 +47,34 @@ struct coord2d : public pair<double,double> {
     //    fprintf(stderr,"angle[{%f,%f},{%f,%f}] == %f\n",first,second,v.first,v.second,angle);
     return angle;
   }
-  double point_angle(const coord2d& x=0) const { // CCW angle of x around *this ([-pi;pi])
-    const coord2d vx(*this-x);			 // TODO: Is the sign here correct?
-    double angle = atan2(vx.second,vx.first);
-    return angle;
+
+  double point_angle(const coord2d& y=0, const bool periodic=false) const { 
+    if(periodic) return point_angle_periodic(y);
+    else {
+      const coord2d vx(*this-y);
+      return atan2(vx.second,vx.first);
+    }
+  }
+
+  // CCW angle of y around point on a periodic surface [0;2pi[ x [0;pi[. 
+  double point_angle_periodic(const coord2d& y=0) const {
+    const coord2d dy[4] = {coord2d(0,0), coord2d(2*M_PI,0), coord2d(0,M_PI), coord2d(2*M_PI,M_PI)};
+    const coord2d& x(*this);
+
+    // Step 1: There are four potential "proper" coordinates for y:  y, y+(2pi,0), y+(0,pi), or y+(2pi,pi)
+    //         The appropriate one has the smallest distance to x.
+    double rsqrmin = INFINITY;
+    int imin = 0;
+    for(int i=0;i<4;i++){
+      const coord2d y0(y+dy[i]-x);
+      const double rsqr = y0.dot(y0);
+      if(rsqr < rsqrmin){
+	rsqrmin = rsqr;
+	imin = i;
+      }
+    }
+    // Step 2: Now the angle is calculated as usual.
+    return point_angle(y+dy[imin],false);
   }
   
   double norm() const { return sqrt(first*first+second*second); }
@@ -229,12 +253,14 @@ struct Tetra3D {
 struct sort_ccw_point {
   const vector<coord2d>& layout;
   const coord2d& x;
-  sort_ccw_point(const vector<coord2d>& layout, const coord2d& x) : layout(layout), x(x)
+  const bool periodic;
+  sort_ccw_point(const vector<coord2d>& layout, const coord2d& x, const bool periodic = false)
+    : layout(layout), x(x), periodic(periodic)
   { }
   
   bool operator()(const node_t& s, const node_t& t) const {
-    double angs = x.point_angle(layout[s]), 
-           angt = x.point_angle(layout[t]);
+    double angs = x.point_angle(layout[s],periodic), 
+           angt = x.point_angle(layout[t],periodic);
 
     // printf("compare: %d:{%g,%g}:%g %d:{%g,%g}:%g\n",
     // 	   s,layout[s].first,layout[s].second,angs,
