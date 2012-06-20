@@ -2006,11 +2006,9 @@ C Produce adjacency matrix
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
-      DIMENSION IDA(Nmax,Nmax),IDG(Nmax),IC3(Nmax,3)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
-      Character*10 Symbol
-      Data Tol1/.15d0/
+      DIMENSION IDA(Nmax,Nmax)
       integer graph_is_a_fullerene
       type(c_ptr) :: g, new_fullerene_graph
 
@@ -2047,60 +2045,8 @@ C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       enddo
       endif
       enddo
-
-C     Now sort degeneracies
-      df(1)=evec(1)
-      ieigv=1
-      ideg=1
-      IDG(1)=ideg
-      Do I=2,MAtom
-      diff=dabs(evec(I-1)-evec(I))
-      if(diff.lt.Tol1) then
-      ideg=ideg+1
-      IDG(ieigv)=ideg
-      else
-      ieigv=ieigv+1
-      ideg=1
-      IDG(ieigv)=ideg
-      df(ieigv)=evec(I)
-      endif
-      enddo
-
-C     Now Print
-      ntot=0
-      nopen=0
-      nflag=0
-      iocc=0
-      Write(Iout,1006)
-      Do I=1,ieigv
-      NE=2*idg(i)
-      NE1=NE
-      ntot=ntot+NE
-      Symbol='(occupied)'
-      if(ntot.gt.MAtom) then
-      if(nflag.eq.0) then
-      nflag=1
-      bandgap=df(i-1)-df(i)
-      endif
-      NE=0
-      Symbol='(empty)   '
-      endif
-      if(ntot.gt.MAtom.and.(ntot-NE1).lt.MAtom) then
-      NE=MAtom-ntot+NE1
-      Symbol='(fractocc)'
-      nopen=1
-      endif
-      if(NE.ne.0.and.NE.eq.idg(i)*2) iocc=iocc+idg(i)
-      Write(Iout,1007) df(I),idg(i),NE,Symbol
-      enddo
-      Write(Iout,1008)
-      if(nopen.eq.1) then
-      Write(Iout,1009)
-      else
-      Write(Iout,1010) bandgap
-      if(bandgap.lt.Tol1) Write(Iout,1009)
-      endif
-C     End of Hueckel analysis
+C Analyze eigenenergies
+      Call HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
       endif
 
 C   Tutte algorithm for the 3D structure (see pentindex.f):
@@ -2150,11 +2096,6 @@ C     Check distances
  1005 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel ',
      1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
- 1006 FORMAT(1X,'       x      deg   NE    type    ',/1X,32('-'))
- 1007 FORMAT(1X,F12.6,I4,1X,I4,3X,A10)
- 1008 FORMAT(1X,32('-'))
- 1009 FORMAT(1X,'Fullerene has open-shell character (zero band gap)!')
- 1010 FORMAT(1X,'Bandgap delta x = ',F12.6,' (in units of |beta|)')
  1011 FORMAT(/1X,'Using the Tutte embedding algorithm to construct ',
      1 'the fullerene')
  1013 FORMAT(1X,'Projected on sphere')

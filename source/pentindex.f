@@ -19,9 +19,8 @@ C mapping
       DIMENSION D(MMAX,MMAX),S(MMAX),Dist(3,NMAX),distP(NMAX)
       DIMENSION NMR(6),JP(12),A(NMAX,NMAX),IDA(NMAX,NMAX)
       DIMENSION evec(NMAX),df(NMAX),dipol(3,3)
-      DIMENSION IDG(NMax)
       DIMENSION Spiral(12,NMAX)
-      Character*10 Symbol
+      DIMENSION idg(NMAX)
       CHARACTER*3 GROUP
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
       type(c_ptr) :: g, halma, new_fullerene_graph,
@@ -202,57 +201,8 @@ C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       endif
       enddo
 
-C     Now sort degeneracies
-      df(1)=evec(1)
-      ieigv=1
-      ideg=1
-      IDG(1)=ideg
-      Do I=2,MAtom
-      diff=dabs(evec(I-1)-evec(I))
-      if(diff.lt.Tol) then
-      ideg=ideg+1
-      IDG(ieigv)=ideg
-      else
-      ieigv=ieigv+1
-      ideg=1
-      IDG(ieigv)=ideg
-      df(ieigv)=evec(I)
-      endif
-      enddo
-C     Now Print
-      ntot=0
-      nopen=0
-      nflag=0
-      iocc=0
-      Write(Iout,1003) 
-      Do I=1,ieigv
-      NE=2*idg(i)
-      NE1=NE
-      ntot=ntot+NE
-      Symbol='(occupied)'
-      if(ntot.gt.Matom) then 
-      if(nflag.eq.0) then
-      nflag=1
-      bandgap=df(i-1)-df(i)
-      endif
-      NE=0
-      Symbol='(empty)   '
-      endif
-      if(ntot.gt.Matom.and.(ntot-NE1).lt.Matom) then 
-      NE=Matom-ntot+NE1
-      Symbol='(fractocc)'
-      nopen=1
-      endif
-      if(NE.ne.0.and.NE.eq.idg(i)*2) iocc=iocc+idg(i)
-      Write(Iout,1005) df(I),idg(i),NE,Symbol
-      enddo
-      Write(Iout,1006)
-      if(nopen.eq.1) then
-      Write(Iout,1007)
-      else
-      Write(Iout,1008) bandgap
-      if(bandgap.lt.Tol1) Write(Iout,1009)
-      endif
+C Analyze eigenenergies
+      Call HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
 C     End of Hueckel
       endif
 
@@ -377,7 +327,7 @@ C     Check distances
       Write(IOUT,1029) iratio
       endif
 C     Calculate P-type dipole moment
-       Call Dipole(MAtom,I1,I2,I3,IOUT,dipol,Dist,A)
+       Call Dipole(MAtom,I1,I2,I3,dipol,Dist,A)
        Write(IOUT,1030)
        Do I=1,3
         Write(IOUT,1031) I,(dipol(I,J),J=1,3)
@@ -449,16 +399,9 @@ C     Check distances
      1 /1X,'NMR pattern: ',3(I3,' x',I3,:,','))
  1002 FORMAT(/1X,'D contains IER = ',I6,' separating triangles and is ',
      1 'therefore NOT a fullerene dual')
- 1003 FORMAT(1X,'       x     deg NE   type    ',/1X,32('-'))
  1004 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel ',
      1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
- 1005 FORMAT(1X,F12.6,I3,1X,I3,3X,A10)
- 1006 FORMAT(1X,32('-'))
- 1007 FORMAT(1X,'Fullerene has open-shell character (zero band gap)!')
- 1008 FORMAT(1X,'Bandgap delta x = ',F12.6,' (in units of |beta|)')
- 1009 FORMAT(1X,'Caution: Bandgap small, possibility '
-     1 'for open-shell character')
  1010 FORMAT(1X,I4,' potential candidates in occupied space discovered',
      1 ' for odd symmetry eigenvectors, and ',3I4,' taken',
      1 /1X,'Create cartesian coordinates and scale a la Fowler ',
@@ -516,7 +459,6 @@ C     Check distances
  1037 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
      1 'are not of degree 3, last one is of degree ',I4)
  1038 FORMAT(1X,'Graph checked, it is cubic')
- 1039 FORMAT(1X,'Laplacian Matrix taken instead of adjacency matrix')
  1040 Format(/1x,'Goldberg-Coxeter fullerene with indices (k,l) = (',
      1 I2,',',I2,') taking C20 as the input graph: GC(',I2,',',I2,
      1 ')[G0] with G0=C20')
@@ -531,7 +473,7 @@ C     Check distances
       Return 
       END
 
-      SUBROUTINE Dipole(MAtom,I1,I2,I3,IOUT,dipol,Dist,A)
+      SUBROUTINE Dipole(MAtom,I1,I2,I3,dipol,Dist,A)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,NMAX),A(NMAX,NMAX),dipol(3,3)

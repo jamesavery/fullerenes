@@ -4,7 +4,7 @@
 C Perform Hueckel matrix diagonalization to obtain eigenvalues
 C This gives a good hint if the fullerene is closed-shell
       DIMENSION IC3(Nmax,3),A(Nmax,Nmax),evec(Nmax),df(Nmax)
-      DIMENSION IDG(Nmax),IDA(Nmax,Nmax)
+      DIMENSION IDA(Nmax,Nmax)
 C Produce adjacency matrix
       WRITE(IOUT,1000) Matom,Matom 
       Do I=1,MAtom
@@ -50,14 +50,14 @@ C Sort eigenvalues
       enddo
 
 C Analyze eigenenergies
-      Call HueckelAnalyze(MAtom,NMax,Iout,df,evec)
+      Call HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
       
  1000 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix')
  1001 FORMAT(/1X,'Skip diagonalization of Hueckel matrix')
       return
       end
 
-      Subroutine HueckelAnalyze(MAtom,NMax,Iout,df,evec)
+      Subroutine HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION evec(Nmax),df(Nmax),IDG(Nmax)
       Character*10 Symbol
@@ -89,6 +89,7 @@ C     Now Print
       nopen=0
       nflag=0
       Etot=0.d0
+      iocc=0
       Write(Iout,1000)
       iproper=0 
       Do I=1,ieigv
@@ -110,6 +111,7 @@ C     Now Print
         Symbol='(fractocc)'
         nopen=1
        endif
+       if(NE.ne.0.and.NE.eq.idg(i)*2) iocc=iocc+idg(i)
        epsilon=alpha+df(i)*beta
        Etot=Etot+df(I)*dfloat(NE)
        Write(Iout,1002) df(I),epsilon,idg(i),NE,Symbol
