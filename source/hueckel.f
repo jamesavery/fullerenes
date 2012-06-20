@@ -5,12 +5,8 @@ C Perform Hueckel matrix diagonalization to obtain eigenvalues
 C This gives a good hint if the fullerene is closed-shell
       DIMENSION IC3(Nmax,3),A(Nmax,Nmax),evec(Nmax),df(Nmax)
       DIMENSION IDG(Nmax),IDA(Nmax,Nmax)
-      Character*10 Symbol
-C Parameters alpha and beta are in atomic units and are adjusted 
-C  to HOMO DFT orbital energies
-      Data Tol,Tol1,alpha,beta/1.d-5,.15d0,-.21d0,-0.111/
 C Produce adjacency matrix
-      WRITE(IOUT,1001) Matom,Matom 
+      WRITE(IOUT,1000) Matom,Matom 
       Do I=1,MAtom
       Do K=1,MAtom
         A(I,K)=0.d0
@@ -28,10 +24,9 @@ C Produce adjacency matrix
       enddo
 
       if(ihueckel.eq.0) then
-       WRITE(IOUT,1008) 
+       WRITE(IOUT,1001) 
        return
       endif
-      WRITE(IOUT,1007) 
 C Diagonalize without producing eigenvectors
       call tred2l(A,Matom,Nmax,evec,df)
       call tqlil(evec,df,Matom,Nmax)
@@ -54,7 +49,24 @@ C Sort eigenvalues
         endif
       enddo
 
+C Analyze eigenenergies
+      Call HueckelAnalyze(MAtom,NMax,Iout,df,evec)
+      
+ 1000 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix')
+ 1001 FORMAT(/1X,'Skip diagonalization of Hueckel matrix')
+      return
+      end
+
+      Subroutine HueckelAnalyze(MAtom,NMax,Iout,df,evec)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION evec(Nmax),df(Nmax),IDG(Nmax)
+      Character*10 Symbol
+C Parameters alpha and beta are in atomic units and are adjusted 
+C  to HOMO DFT orbital energies
+      Data Tol,Tol1,alpha,beta/1.d-5,.15d0,-.21d0,-0.111/
+C Perform Hueckel matrix diagonalization to obtain eigenvalues
 C Now sort degeneracies
+      WRITE(IOUT,1007) 
       df(1)=evec(1)
       ieigv=1
       ideg=1
@@ -121,7 +133,6 @@ C     Now Print
       endif
  
  1000 FORMAT(8X,'x',13X,'E',4X,'deg NE   type    ',/1X,45('-'))
- 1001 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix')
  1002 FORMAT(2(1X,F12.6),I3,1X,I3,3X,A10)
  1003 FORMAT(1X,45('-'),/1X,'Total pi-energy in units of beta: ',F12.6,
      1 /1X,'Total resonance energy per atom in units of beta ',
@@ -140,7 +151,6 @@ C     Now Print
  1007 FORMAT(/1X,'Diagonalize Hueckel matrix (E=alpha+x*beta; E in au)',
      1 /1X,'Eigenvalues are between [-3,+3] (in units of |beta|)',
      1 /1X,'deg: degeneracy; NE: number of electrons')
- 1008 FORMAT(/1X,'Skip diagonalization of Hueckel matrix')
  1009 FORMAT(/1X,'Fullerene has a properly closed shell')
  1010 FORMAT(/1X,'Fullerene has a pseudo closed shell')
       Return
