@@ -105,7 +105,7 @@ C     Now Print
       TRE=1.024296d0*Etot/dfloat(MAtom)-1.562211d0
       DTRE=TRE-2.82066353359331501d-2
       DTREkcal=DTRE*beta*6.27509541D+02
-      Graphene=0.0468d0*beta*6.27509541D+02
+      Graphene=0.0468d0
       Write(Iout,1003) Etot,TRE,Graphene,DTRE,DTREkcal
       if(nopen.eq.1) then
        Write(Iout,1004)
