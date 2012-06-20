@@ -201,6 +201,7 @@ C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       enddo
       endif
       enddo
+
 C     Now sort degeneracies
       df(1)=evec(1)
       ieigv=1
