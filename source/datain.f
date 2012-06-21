@@ -104,9 +104,6 @@ C     More Parameters
       R6=R       ! Distance in 6-Ring
 
 C Now process namelist input
-C     Old input    
-C     Read(IN,*) NA,IC,Iopt,IP,IHam,IPR,IS,ISO2,ISO2,ISO3,PS,TolR
-C     New input    
       READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
        endzeile=0
        do j=1,nzeile
