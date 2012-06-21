@@ -3,7 +3,7 @@ C26 aug-cc-pvdz B3LYP opt. geom. minimum C1-sym E=-990.1561223 au
 &Opt /
 &Hamilton IHam=1 /
 &Isomers IPR=1, IPH=1 /
-&Graph IG=1, ISO1=7, ISO2=16, ISO3=20 /
+&Graph ISchlegel=1, ISO1=7, ISO2=16, ISO3=20 /
 6                  -0.022100    2.118933    0.771821
 6                  -0.057276   -1.739689    1.419449
 6                   0.100684   -0.387172   -2.168401

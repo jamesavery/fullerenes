@@ -3,7 +3,7 @@ C320 6-31G opt. geom. minimum -12193.20655 au not converged out
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /
-&Graph IG=2, ISO1=10, ISO2=14, ISO3=22 /
+&Graph ISchlegel=2, ISO1=10, ISO2=14, ISO3=22 /
 6             7.037573   -2.768428    2.447645
 6             7.366907   -0.843998   -2.857384
 6             0.987723   -7.436973   -2.620680

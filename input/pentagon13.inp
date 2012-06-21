@@ -3,4 +3,4 @@ C90  Using FM algorithm to produce coordinates
 &Opt Iopt=1 /
 &Hamilton IHam=1 /
 &Isomers /
-&Graph IG=2, ISO1=1, ISO2=2, ISO3=3 /
+&Graph ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /

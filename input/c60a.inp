@@ -3,7 +3,7 @@ C60  nanotube Lanl2DZ B3LYP optimized
 &Opt /
 &Hamilton /
 &Isomers /
-&Graph IG=1 /
+&Graph ISchlegel=1 /
 6           1.001815    5.820514    0.730707
 6           1.001815    5.820514   -0.730707
 6          -0.390108    5.828248   -1.196887

@@ -3,5 +3,5 @@ C40  Using FM algorithm to produce coordinates
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /
-&Graph IG=2 /
+&Graph ISchlegel=2 /
 1 2 3 4 5 6 17 18 19 20 21 22
