@@ -318,7 +318,7 @@ C Perform Stone-Wales transformation
       routine='STONE-WALES  '
       Write(Iout,1008) routine
       CALL StoneWalesTrans(Matom,IN,Iout,numbersw,nSW,
-     1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+     1 ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       ISW=0
       ipent=1
       SWspiral=1
@@ -342,14 +342,12 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
       routine='YOSHIDAFOWLER'
       Write(Iout,1008) routine
       if(IYF.le.2) then
-      CALL YoshidaFowler3(Matom,IN,Iout,JERR,numberFM,IYF,
-     1 nFM,ihueckel,IDA,N5MEM,N6MEM,IC3,
-     1 A,evec,df,Dist,Dist2D,distp,Rdist)
+      CALL YoshidaFowler3(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
+     1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
       else
       IYF=IYF-2
-      CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,
-     1 nYF,ihueckel,IDA,N5MEM,N6MEM,IC3,
-     1 A,evec,df,Dist,Dist2D,distp,Rdist)
+      CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,nYF,
+     1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       endif
       IYF=0
       ipent=1

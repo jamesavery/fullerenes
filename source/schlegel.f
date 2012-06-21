@@ -16,11 +16,11 @@ C or face is at the top. Euler angles are used for rotation.
       DIMENSION CR5(3,Mmax),CR6(3,Mmax),vec1(3),Iring(Mmax)
       DIMENSION N5M(Mmax,5),N6M(Mmax,6),Rot(3,3),CR(3,Mmax)
       DIMENSION Rotz(3,3),Symbol(Mmax),RingS(2,Mmax)
-      DIMENSION IC3(Nmax,3),ICM(6,3),IS(6)
+      DIMENSION IC3(Nmax,3),IS(6)
       Integer MDist(Nmax,Nmax)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
-      type(c_ptr) :: g, frog, new_fullerene_graph, read_fullerene_graph
+      type(c_ptr) :: g, new_fullerene_graph
 
       Data epsf,dpi/.12d0,3.14159265358979d0/
 C     Parameter set for Program QMGA

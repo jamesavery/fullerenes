@@ -10,7 +10,7 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
       Integer Isonum(119),IsonumIPR(123),IDA(Nmax,Nmax)
       Character*1 fstart,fnum1
       Character*2 fnum2
-      Character*3 fnum,fnum3,GROUP,ident
+      Character*3 fnum,fnum3
       Character*9 fend
       Character*11 Isoc(52),IsocIPR(28)
       Character*20 chkname
