@@ -17,7 +17,7 @@
       Namelist /Opt/ Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
-      Namelist /Graph/ IG,ISO1,ISO2,ISO3,PS,scale,scalePPG
+      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,PS,scale,scalePPG
 C Input send to output
       if(ilp.eq.0) then   
        WRITE(IOUT,100)
@@ -94,7 +94,7 @@ C     More Parameters
       ISO2=0    !  Option for fullerene orientation for Schlegel projection
       ISO3=0    !  Option for fullerene orientation for Schlegel projection
       PS=0.d0   !  For graph production, angle input for Schlegel diagram
-      IG=0      !  For graph production, option for type of graph
+      ISchlegel=0 !  For graph production, option for type of graph
       scale=2.5d0 !  For graph production, scale Tutte graph
       scalePPG=1.d0 !  For graph production exponential factor in Plestenjak alg.
       TolR=0.d0 !  Tolerance for finding ring connections

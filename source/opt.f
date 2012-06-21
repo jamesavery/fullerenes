@@ -93,27 +93,27 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Real*8 pcom(NMAX*2),xicom(NMAX*2)
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX), N
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
-C     is performed on a function func, using its gradient as calculated by a routine dfunc.
+C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
 C     p (the location of the minimum), iter (the number of iterations that were performed),
-C     and fret (the minimum value of the function). The routine linmin is called to perform
+C     and fret (the minimum value of the function). The routine linmin3d is called to perform
 C     line minimizations. AH is the Hueckel adjacency matrix of atoms.
 C     Parameters: NMAX is the maximum anticipated value of n; ITMAX is the maximum allowed
 C     number of iterations; EPS is a small number to rectify special case of converging to exactly
 C     zero function value.
-C     USES dfuncg,funcg,linming
-C     func input vector p of length n user defined to be optimized
+C     USES dfunc2d,func2d,linmin2d
+C     func3d input vector p of length n user defined to be optimized
 C     IOP=1: spring embedding
 C     IOP=2: spring + Coulomb embedding
 C     IOP=3: Pisanski-Plestenjak-Graovac algorithm
 C     IOP=4: Kamada-Kawai embedding
       N = 2*Matom
       iter=0
-      CALL funcg(IOP,N,AH,IS,MDist,maxd,p,fp,RAA)
+      CALL func2d(IOP,N,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
       Write(Iout,1003) E0
-C     dfunc input vector p of length N, output gradient of length n user defined
-      CALL dfuncg(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
+C     dfunc3d input vector p of length N, output gradient of length n user defined
+      CALL dfunc2d(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
       grad2=0.d0
       do I=1,N
        grad2=grad2+xi(i)*xi(i)
@@ -129,7 +129,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
         fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linming(IOP,N,Iout,AH,IS,MDist,maxd,
+        call linmin2d(IOP,N,Iout,AH,IS,MDist,maxd,
      1       p,pcom,xi,xicom,fret,RAA)
          grad2=0.d0
          do I=1,n
@@ -142,7 +142,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
           return
         endif
         fp=fret
-        CALL dfuncg(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
+        CALL dfunc2d(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
         gg=0.d0
         dgg=0.d0
         do j=1,n
@@ -167,7 +167,7 @@ C         dgg=dgg+xi(j)**2
       return
       END
 
-      SUBROUTINE linming(IOP,n,Iout,AH,IS,MDist,
+      SUBROUTINE linmin2d(IOP,n,Iout,AH,IS,MDist,
      1 maxd,p,pcom,xi,xicom,fret,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -198,11 +198,11 @@ C     USES brent,f1dim,mnbrak
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*2),xt(NMAX*2),xicom(NMAX*2)
       Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
-C     USES funcg
+C     USES func2d
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL funcg(IOP,n,A,IS,MDist,maxd,xt,f1dimf,RAA)
+      CALL func2d(IOP,n,A,IS,MDist,maxd,xt,f1dimf,RAA)
       return
       END
 
@@ -449,25 +449,25 @@ C     Optimize
       Real*8 pcom(NMAX*3),xicom(NMAX*3),force(9)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
-C     is performed on a function func, using its gradient as calculated by a routine dfunc.
+C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
 C     p (the location of the minimum), iter (the number of iterations that were performed),
-C     and fret (the minimum value of the function). The routine linmin is called to perform
+C     and fret (the minimum value of the function). The routine linmin3d is called to perform
 C     line minimizations. AH is the Hueckel adjacency matrix of atoms.
 C     Parameters: NMAX is the maximum anticipated value of n; ITMAX is the maximum allowed
 C     number of iterations; EPS is a small number to rectify special case of converging to exactly
 C     zero function value.
-C     USES dfunc,func,linmin
-C     func input vector p of length n user defined to be optimized
+C     USES dfunc3d,func3d,linmin3d
+C     func3d input vector p of length n user defined to be optimized
 C     IOP=1: Wu force field optimization
       iter=0
-      CALL func(IOP,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
+      CALL func3d(IOP,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
       if(IERR.ne.0) then
       Write(Iout,1004)
       return
       endif
-C     dfunc input vector p of length N, output gradient of length n user defined
-      CALL dfunc(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
+C     dfunc3d input vector p of length N, output gradient of length n user defined
+      CALL dfunc3d(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
       grad2=0.d0
       do I=1,N
        grad2=grad2+xi(i)*xi(i)
@@ -483,7 +483,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
         fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linmin(IOP,N,AH,N5,N6,N5M,N6M,
+        call linmin3d(IOP,N,AH,N5,N6,N5M,N6M,
      1   p,pcom,xi,xicom,fret,force)
          grad2=0.d0
          do I=1,n
@@ -496,7 +496,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
           return
         endif
         fp=fret
-        CALL dfunc(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
+        CALL dfunc3d(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
         gg=0.d0
         dgg=0.d0
         do j=1,n
@@ -523,7 +523,7 @@ C         dgg=dgg+xi(j)**2
       return
       END
 
-      SUBROUTINE linmin(IOP,n,AH,N5,N6,N5M,N6M,
+      SUBROUTINE linmin3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 p,pcom,xi,xicom,fret,c)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -556,11 +556,11 @@ C     USES brent,f1dim,mnbrak
       REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3),c(9)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
-C     USES func
+C     USES func3d
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func(IOP,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
+      CALL func3d(IOP,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
       return
       END
 

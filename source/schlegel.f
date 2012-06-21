@@ -904,7 +904,7 @@ C     Now checking on the original vector
       Return
       END
 
-      SUBROUTINE funcg(IOP,n,A,IS,MDist,maxd,
+      SUBROUTINE func2d(IOP,n,A,IS,MDist,maxd,
      1 p,fc,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1002,7 +1002,7 @@ C     total energy
       Return
       END
 
-      SUBROUTINE dfuncg(IOP,n,A,IS,MDist,maxd,
+      SUBROUTINE dfunc2d(IOP,n,A,IS,MDist,maxd,
      1 p,x,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
