@@ -174,16 +174,16 @@ C         dgg=dgg+xi(j)**2
       REAL*8 p(NMAX*2),pcom(NMAX*2),xicom(NMAX*2),xi(NMAX*2)
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
       PARAMETER (TOL=1.d-8)
-C     USES brent,f1dim,mnbrak
+C     USES brent2d,f1dim2d,mnbrak2d
       do j=1,n
         pcom(j)=p(j)
         xicom(j)=xi(j)
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrakg(IOP,n,Iout,AH,IS,MDist,maxd,
+      CALL mnbrak2d(IOP,n,Iout,AH,IS,MDist,maxd,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,RAA)
-      CALL brentg(IOP,n,Iout,AH,IS,MDist,maxd,
+      CALL brent2d(IOP,n,Iout,AH,IS,MDist,maxd,
      1 fret,ax,xx,bx,TOL,xmin,xicom,pcom,RAA)
       do j=1,n
         xi(j)=xmin*xi(j)
@@ -192,7 +192,7 @@ C     USES brent,f1dim,mnbrak
       return
       END
 
-      SUBROUTINE f1dimg(IOP,n,A,IS,MDist,maxd,
+      SUBROUTINE f1dim2d(IOP,n,A,IS,MDist,maxd,
      1 f1dimf,x,xicom,pcom,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -206,7 +206,7 @@ C     USES func2d
       return
       END
 
-      SUBROUTINE mnbrakg(IOP,n,Iout,AH,IS,DD,maxd,
+      SUBROUTINE mnbrak2d(IOP,n,Iout,AH,IS,DD,maxd,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -214,9 +214,9 @@ C     USES func2d
       Integer AH(NMAX,NMAX),IS(6)
       Integer DD(NMAX,NMAX)
       REAL*8 pcom(NMAX*2),xicom(NMAX*2)
-      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fa,ax,xicom,pcom,
+      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fa,ax,xicom,pcom,
      1 RAA)
-      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fb,bx,xicom,pcom,
+      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fb,bx,xicom,pcom,
      1 RAA)
       if(fb.gt.fa)then
         dum=ax
@@ -227,7 +227,7 @@ C     USES func2d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fc,cx,xicom,pcom,
+      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fc,cx,xicom,pcom,
      1 RAA)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
@@ -235,7 +235,7 @@ C     USES func2d
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             ax=bx
@@ -249,10 +249,10 @@ C     USES func2d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             bx=cx
@@ -260,12 +260,12 @@ C     USES func2d
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else
           u=cx+GOLD*(cx-bx)
@@ -273,7 +273,7 @@ C     USES func2d
         Write(Iout,1000)
         return
         endif
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         endif
         ax=bx
@@ -285,10 +285,10 @@ C     USES func2d
         goto 1
       endif
       return
- 1000 Format('**** Error in Subroutine mnbrakg')
+ 1000 Format('**** Error in Subroutine mnbrak2d')
       END
 
-      SUBROUTINE brentg(IOP,n,Iout,AH,IS,DD,maxd,
+      SUBROUTINE brent2d(IOP,n,Iout,AH,IS,DD,maxd,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,RAA)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
@@ -304,7 +304,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fx,x,xicom,pcom,
+      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fx,x,xicom,pcom,
      1 RAA)
       fv=fx
       fw=fx
@@ -340,7 +340,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1    RAA)
         if(fu.le.fx) then
           if(u.ge.x) then
@@ -372,7 +372,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         endif
 11    continue
       Write(Iout,1000)
- 1000 Format(' WARNING: Subroutine brent: maximum iterations exceeded')
+ 1000 Format('WARNING: Subroutine brent2d: maximum iterations exceeded')
 3     xmin=x
       return
       END
@@ -531,16 +531,16 @@ C         dgg=dgg+xi(j)**2
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       PARAMETER (TOL=1.d-5)
-C     USES brent,f1dim,mnbrak
+C     USES brent3d,f1dim3d,mnbrak3d
       do j=1,n
         pcom(j)=p(j)
         xicom(j)=xi(j)
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL mnbrak3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,c)
-      CALL brent(IOP,n,AH,N5,N6,N5M,N6M,Iout,fret,
+      CALL brent3d(IOP,n,AH,N5,N6,N5M,N6M,Iout,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,c)
       do j=1,n
         xi(j)=xmin*xi(j)
@@ -549,7 +549,7 @@ C     USES brent,f1dim,mnbrak
       return
       END
 
-      SUBROUTINE f1dim(IOP,n,A,N5,N6,N5M,N6M,
+      SUBROUTINE f1dim3d(IOP,n,A,N5,N6,N5M,N6M,
      1 f1dimf,x,xicom,pcom,c)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -564,7 +564,7 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE mnbrak(IOP,n,AH,N5,N6,N5M,N6M,
+      SUBROUTINE mnbrak3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,c)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -572,9 +572,9 @@ C     USES func3d
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3),c(9)
-      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 fa,ax,xicom,pcom,c)
-      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 fb,bx,xicom,pcom,c)
       if(fb.gt.fa)then
         dum=ax
@@ -585,7 +585,7 @@ C     USES func3d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 fc,cx,xicom,pcom,c)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
@@ -593,7 +593,7 @@ C     USES func3d
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           if(fu.lt.fc)then
             ax=bx
@@ -607,10 +607,10 @@ C     USES func3d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           if(fu.lt.fc)then
             bx=cx
@@ -618,20 +618,20 @@ C     USES func3d
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         else
           u=cx+GOLD*(cx-bx)
         if(u.gt.1.d10) then
-        Print*,'**** Error in Subroutine mnbrak'
+        Print*,'**** Error in Subroutine mnbrak3d'
         return
         endif
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         endif
         ax=bx
@@ -645,7 +645,7 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE brent(IOP,n,AH,N5,N6,N5M,N6M,Iout,
+      SUBROUTINE brent3d(IOP,n,AH,N5,N6,N5M,N6M,Iout,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,c)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
@@ -661,7 +661,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 fx,x,xicom,pcom,c)
       fv=fx
       fw=fx
@@ -697,7 +697,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         if(fu.le.fx) then
           if(u.ge.x) then
@@ -729,7 +729,8 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         endif
 11    continue
       Write(Iout,1000)
- 1000 Format(' WARNING: Subroutine brent: maximum iterations exceeded')
+ 1000 Format(' WARNING: Subroutine brent3d: maximum iterations
+     1 exceeded')
 3     xmin=x
       return
       END
