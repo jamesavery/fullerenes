@@ -1,7 +1,9 @@
 !
 !           P R O G R A M     F U L L E R E N E
 !
-!--------------------------------------------------------------------------
+!----------------------------------------------------------------------------
+!  This is an open-source code, see copyright message in the User Manual.   |
+!----------------------------------------------------------------------------
 !
 ! A PROGRAM FOR STRUCTURE GENERATION AND TOPOLOGICAL ANALYSIS OF FULLERENES
 !    The program creates cartesian coordinates for fullerenes isomers
@@ -11,14 +13,7 @@
 !            for further quantum theoretical treatment. 
 !        Version 4 now incorporates C++ routines linked to the
 !       original Fortran program using much improved algorithms.
-!
-!----------------------------------------------------------------------------
-!| Important Copyright Message: Hey there is none! If you like to know why  |
-!| read Darrel C. Ince1, Leslie Hatton, John Graham-Cumming, Nature 482,    |
-!| p.485 (2012). So: You may do whatever you like with this program, but if |
-!| you use it and publish data please cite at least the references given    |
-!| below. The program is however not available for commercial purposes.     |
-!----------------------------------------------------------------------------
+!--------------------------------------------------------------------------
 
       PROGRAM Fullerene
       use config

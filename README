@@ -1,54 +1,46 @@
 ---------------------------------------------------------------------------------- 
-!
-!           P R O G R A M     F U L L E R E N E
-!
-!----------------------------------------------------------------------
-!
-!          A PROGRAM FOR TOPOLOGICAL ANALYSIS OF FULLERENES
-!    The program creates cartesian coordinates for fullerenes isomers
-!        and performs a topological/graph theoretical analysis.
-!        The results can be used for plotting fullerene graphs
-!     (Schlegel diagrams) and structures, and as a starting point
-!            for further quantum theoretical treatment. 
-!
-!----------------------------------------------------------------------------
-!| Important Copyright Message: Hey there is none! If you like to know why  |
-!| read Darrel C. Ince1, Leslie Hatton, John Graham-Cumming, Nature 482,    |
-!| p.485 (2012). So: You may do whatever you like with this program, but if |
-!| you use it and publish data please cite at least the references given    |
-!| in the User Manual. Before you use the program for commercial purposes   |
-!| you need to contact the authors.                                         |
-!----------------------------------------------------------------------------
-!
-! -->   See Usermanual.pdf for the input instructions.
-!       Report all problems back to us (see our website at Massey University).
-!
-!---------------------------------------------------------------------- 
-!  R U N N I N G    T H E    P R O G R A M:
-!---------------------------------------------------------------------- 
-!* The program is LINUX/UNIX based and works fine with gfortran and 
-!      gc compilers
-!    You need to use the Makefile included in fullerene.zip. Simply type make. 
-!    The executable "fullerene" runs on a mac intel as:
-!      ./fullerene <inp >out
-!    If you type      make tests      it runs all the input jobs and
-!      puts them into *.out
-!    If you type      make clean      all the object files are deleted
-!    If you type      make distclean  all the object files are deleted + more
-!    It currently compiles in a 64 bit version, but you can change to
-!      32 bits in the Makefile if necessary
-!    All fortran files are in the directory    source
-!    All C-files are in the directory          libgraph
-!
-!-----------------------------------------------------------------------------------
-!  F U L L E R E N E     I S O M E R     D A T A B A S E
-!-----------------------------------------------------------------------------------
-! A database is provided for general isomers up tp C100 and for IPR isomers up to
-! C120 including the number of Hamiltonian cycles. The database can be copied into
-! the main program folder and can be used to read the ring spiral pentagon indices.
-! The numbering scheme is exactly that chosen in the book by Fowler and Manopoulus
-! (ref.2), that is each isomer in the books appendix can be constructed easily
-! from the database. 
-! Note: the directory database needs to be in the main directory where source or 
-! libgraph is.
-!-----------------------------------------------------------------------------------
+
+           P R O G R A M     F U L L E R E N E
+
+----------------------------------------------------------------------------
+
+          A PROGRAM FOR TOPOLOGICAL ANALYSIS OF FULLERENES
+    The program creates cartesian coordinates for fullerenes isomers
+        and performs a topological/graph theoretical analysis.
+        The results can be used for plotting fullerene graphs
+     (Schlegel diagrams) and structures, and as a starting point
+            for further quantum theoretical treatment. 
+----------------------------------------------------------------------------
+
+-->  See UserManual.pdf for input instructions and copyright message.
+     Report all problems back to us (emails are provides in the user manual).
+
+----------------------------------------------------------------------------
+  R U N N I N G    T H E    P R O G R A M:
+----------------------------------------------------------------------------
+  The program is LINUX/UNIX based and works fine with gfortran and 
+      gc compilers
+    You need to use the Makefile included in fullerene.zip. Simply type make. 
+    The executable "fullerene" runs on a mac intel as:
+      ./fullerene <inp >out
+    If you type      make tests      it runs all the input jobs and
+      puts them into *.out
+    If you type      make clean      all the object files are deleted
+    If you type      make distclean  all the object files are deleted + more
+    It currently compiles in a 64 bit version, but you can change to
+      32 bits in the Makefile if necessary
+    All fortran files are in the directory    source
+    All C-files are in the directory          libgraph
+
+-----------------------------------------------------------------------------------
+  F U L L E R E N E     I S O M E R     D A T A B A S E
+-----------------------------------------------------------------------------------
+ A database is provided for general isomers up tp C100 and for IPR isomers up to
+ C120 including the number of Hamiltonian cycles. The database can be copied into
+ the main program folder and can be used to read the ring spiral pentagon indices.
+ The numbering scheme is exactly that chosen in the book by Fowler and Manolopoulus
+ (Atlas of Fullerenes), that is each isomer in the books appendix can be constructed 
+ easily from the database. 
+ Note: the directory database needs to be in the main directory where source or 
+ libgraph is.
+-----------------------------------------------------------------------------------
