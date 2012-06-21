@@ -3,5 +3,5 @@ C50 Using Tutte embedding to produce coordinates
 &Opt Iopt=1 /
 &Hamilton IHam=1 /
 &Isomers /
-&Graph IG=1 /
+&Graph ISchlegel=1 /
 1   2   3   4   5   6  22  23  24  25  26  27

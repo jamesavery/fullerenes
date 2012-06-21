@@ -47,7 +47,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
        Dist(2,i)=Dist(2,i)*scale 
        WRITE(IOUT,1001) I,Dist(1,I),Dist(2,I),(IC3(I,J),J=1,3)
       enddo
-      CALL frprmng(IOP,MAtom,IDA,Iout,IS,MDist,
+      CALL frprmn2d(IOP,MAtom,IDA,Iout,IS,MDist,
      1 maxd,Dist,ftol,iter,fret,E0,RAA)
       if(fret-E0.gt.1.d-2) then
        fretn=(fret-E0)/dfloat(MATOM)
@@ -84,7 +84,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Return 
       END
 
-      SUBROUTINE frprmng(IOP,MATOM,AH,Iout,IS,MDist,
+      SUBROUTINE frprmn2d(IOP,MATOM,AH,Iout,IS,MDist,
      1 maxd,p,ftol,iter,fret,E0,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -159,8 +159,8 @@ C         dgg=dgg+xi(j)**2
         enddo   
       enddo
       Write(Iout,1000) fret,fret-fp
- 1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
-     1 /1X,'energy ',F15.9,', diff= ',D12.3)
+ 1000 Format(' WARNING: Subroutine frprmn2d: maximum iterations
+     1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
  1001 Format(' Iteration ',I4,', energy ',D14.8,', gradient ',D14.8)
  1002 Format(/1X,'Convergence achieved, energy ',F20.7,', diff= ',D12.3)
  1003 Format(/1X,'E0= ',D12.3)
@@ -410,7 +410,7 @@ C     Optimize
       Write(IOUT,1000) Rdist
       Write(Iout,1003) (force(i),i=1,9),ftol
       if(forceWu(9).gt.0.d0) Write(Iout,1004) forceWu(9)
-      CALL frprmn(IOP,MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
+      CALL frprmn3d(IOP,MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
      1 Dist,force,ftol,iter,fret)
       if(fret.gt.1.d-2) then
       fretn=fret/dfloat(MATOM)
@@ -440,7 +440,7 @@ C     Optimize
       Return 
       END
 
-      SUBROUTINE frprmn(IOP,N,AH,Iout,N5,N6,N5M,N6M,
+      SUBROUTINE frprmn3d(IOP,N,AH,Iout,N5,N6,N5M,N6M,
      1 p,force,ftol,iter,fret)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -513,8 +513,8 @@ C         dgg=dgg+xi(j)**2
         enddo   
       enddo
       Write(Iout,1000) fret,fret-fp
- 1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
-     1 /1X,'energy ',F15.9,', diff= ',D12.3)
+ 1000 Format(' WARNING: Subroutine frprmn3d: maximum iterations
+     1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
  1001 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8)
  1002 Format(/1X,'Convergence achieved, energy ',D14.8,', diff= ',D12.3)
  1004 Format('**** Severe error in angle, check input coordiantes:',

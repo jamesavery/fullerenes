@@ -3,7 +3,7 @@ C20 aug-cc-pvdz B3LYP opt. geom. minimum E=-761.5231573 au
 &Opt Iopt=1 /
 &Hamilton IHam=1 IUPAC=1/
 &Isomers IPR=1, IPH=1 /
-&Graph IG=1, ISO1=1, ISO2=3, ISO3=7 /
+&Graph ISchlegel=1, ISO1=1, ISO2=3, ISO3=7 /
 6                  -1.153700   -1.621816    0.618052
 6                   1.153589    1.621838   -0.618065
 6                   0.329515   -1.956189    0.629256

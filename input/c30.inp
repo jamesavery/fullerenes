@@ -3,7 +3,7 @@ C30 aug-cc-pvdz B3LYP opt. geom. minimum C2-sym E=-1142.5804894 au
 &Opt /
 &Hamilton IHam=1 /
 &Isomers IPR=2, IPH=1 /
-&Graph IG=2, ISO1=22, ISO2=23, ISO3=24 /
+&Graph ISchlegel=2, ISO1=22, ISO2=23, ISO3=24 /
 6                   0.000000    0.717308    2.050465
 6                   2.028982    0.723511    0.642343
 6                   1.252671    0.716009   -1.656730

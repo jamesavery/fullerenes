@@ -3,7 +3,7 @@ C92   cc-pvdz B3LYP opt. geom. minimum -3505.9228870 au
 &Opt Iopt=1 /
 &Hamilton  /
 &Isomers  /
-&Graph IG=7 /
+&Graph ISchlegel=7 /
 6            -3.252788   -2.537538    1.606819
 6            -2.437281   -3.465649    0.928030
 6            -2.659081   -3.598539   -0.481927

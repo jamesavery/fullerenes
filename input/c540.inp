@@ -3,7 +3,7 @@ C540  6-31G opt. geom. minimum -20577.06531 au not converged out
 &Opt /
 &Hamilton /
 &Isomers /
-&Graph IG=2, ISO1=8, ISO2=9, ISO3=174 /
+&Graph ISchlegel=2, ISO1=8, ISO2=9, ISO3=174 /
 6             7.175539   -4.820412   -5.755363
 6             7.124712   -5.722012   -4.650658
 6             7.931736   -5.482188   -3.487037

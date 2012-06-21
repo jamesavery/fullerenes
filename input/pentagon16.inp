@@ -3,5 +3,5 @@ C540 Using FM algorithm to produce coordinates
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /
-&Graph IG=1, ISO1=1, ISO2=2, ISO3=3 /
+&Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /
 1 79 85 91 97 103 172 178 184 190 196 272

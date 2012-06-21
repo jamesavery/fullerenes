@@ -4,7 +4,7 @@ This input takes the coordinates for C20 and leapfrogs to C1620
 &Opt Iopt=1  /
 &Hamilton IHam=1 IUPAC=1 /
 &Isomers IPR=1, IPH=1 /
-&Graph IG=1 /
+&Graph ISchlegel=1 /
 6                  -1.153700   -1.621816    0.618052
 6                   1.153589    1.621838   -0.618065
 6                   0.329515   -1.956189    0.629256
