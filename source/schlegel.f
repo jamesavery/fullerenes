@@ -801,8 +801,8 @@ C James, here goes your latex program creation for Schlegel diagram
      1 'graph as a starting point for embedding algorithms')
  1034 Format(1X,'No input for specifying circumfencing ring chosen, ',
      1 'first pentagon taken instead including atoms ',5I4)
- 1035 Format(1X,'Circumfencing ring chosen from input, including ',
-     1 'atoms ',3I4)
+C1035 Format(1X,'Circumfencing ring chosen from input, including ',
+C    1 'atoms ',3I4)
  1036 Format(1X,'Calculating Tutte-embedding and shift to barycenter')
  1037 FORMAT(1X,'Fullerene graph deleted',/,' Graph coordinates:',
      1 /,'  Atom       X            Y        N1   N2   N3') 

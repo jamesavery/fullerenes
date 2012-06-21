@@ -1,8 +1,9 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
-     1 IPR,IPRC,IG,ISO1,ISO2,ISO3,IER,istop,leap,leapGC,iupac,Ipent,IPH,
-     1 ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,ilp,IYF,
-     1 IWS,nzeile,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,forceWu,
-     1 forceWuP,xyzname,chkname,DATEN)
+     1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,leapGC,iupac,
+     1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
+     1 ilp,IYF,IWS,nzeile,
+     1 PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,forceWu,forceWuP,
+     1 xyzname,chkname,DATEN)
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension forceWu(9),forceWuP(9)
       integer endzeile

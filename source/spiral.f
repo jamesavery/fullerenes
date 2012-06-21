@@ -734,7 +734,6 @@ C     Analyze dual matrix
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
- 605  FORMAT(1X,I8,2X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
  606  FORMAT(/1X,170('-'),/1X,'End of subroutine Spiral')
  607  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
      1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
@@ -794,7 +793,7 @@ C     Analyze dual matrix
       Return
       END
 
-      SUBROUTINE spwindup(M,MP,Iout,D,S,JP,IER)
+      SUBROUTINE spwindup(M,MP,D,S,JP,IER)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),JP(12),IR(12),JR(12),JS(12)
@@ -954,7 +953,7 @@ C     Loop over all (5,5) fusions
           JP(3)=3
           MP=3
          endif
-          CALL spwindup(M,MP,Iout,D,S,JP,IER)
+          CALL spwindup(M,MP,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
          enddo
@@ -1009,7 +1008,7 @@ C     Loop over all (5,6) fusions
       JP(2)=3
       MP=2
       endif
-      CALL spwindup(M,MP,Iout,D,S,JP,IER)
+      CALL spwindup(M,MP,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
          enddo
@@ -1059,7 +1058,7 @@ C     Loop over all (6,6) fusions
           JP(1)=3
           MP=1
          endif
-       CALL spwindup(M,MP,Iout,D,S,JP,IER)
+       CALL spwindup(M,MP,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
          enddo
@@ -1175,8 +1174,6 @@ C     Print ring numbers
  603  FORMAT(1X,A3,9X,12I4)
  604  FORMAT(1X,90('-'),/1X,'Corresponding ring numbers:') 
  605  FORMAT(1X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
- 606  Format(/1X,'Spiral list of pentagon positions with ',
-     1 'higher priority: (',I4,' spirals found)') 
  607  Format(12(1X,I4))
  608  Format(1X,'Input spiral is canonical')
  610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
@@ -1197,7 +1194,6 @@ C     Print ring numbers
  620  Format(1X,'Search ',I6,' spirals to produce canonical'
      1 ' list of atoms:')
  621  Format(12(1X,I4))
- 622  Format(1X,'Input spiral is canonical')
  623  Format(1X,'Canonical spiral list of pentagon positions:')
  624  Format(1X,'Canonical spiral list of hexagons and pentagons:')
  625  Format(1X,100I1)
@@ -1424,9 +1420,9 @@ C     Do I=1,M
 C     Write(Iout,1002) (D(I,J),J=1,M)
 C     enddo
 C     Write(Iout,1002) M,(Ddiag(J),J=1,M)
- 1001 Format(1X,'Number of vertices of order five in dual matrix: ',I4,
-     1 /1X,'Number of vertices of order six in dual matrix: ',I4)
- 1002 Format(1X,60I3)
+C1001 Format(1X,'Number of vertices of order five in dual matrix: ',I4,
+C    1 /1X,'Number of vertices of order six in dual matrix: ',I4)
+C1002 Format(1X,60I3)
       Return
       End
 
@@ -1856,37 +1852,37 @@ c       Given a fullerene dual adjacency matrix D, this subroutine
 c       constructs the corresponding fullerene adjacency matrix A. 
 c       IER = 0 on return if the construction is successful. 	 
         I=0
-	DO 3 L = 1,M 
-	   DO 2 K=1,L 
-	      IF (D(K,L).EQ.0) GO TO 2
-	      DO 1 J = 1,K
-		 IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
-		 I = I+1
-		 IF (I.GT.N) GO TO 1
-		 V(1,I) = J ! Associate the three mutually adjacent 
-		 V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
-		 V(3,I) = L ! with fullerene vertex I 	 
- 1	      CONTINUE
- 2	   CONTINUE
- 3	CONTINUE
-	IER = I-N
-	IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
-	DO 7 J = 1,N           ! and is therefore NOT a fullerene dual 
-	   DO 6 I = 1,J
-	      K = 0
-	      DO 5 JJ = 1,3
-		 DO 4 II = 1,3
-		    IF(V(II,I).EQ.V(JJ,J)) K = K+1
- 4		 CONTINUE
- 5	      CONTINUE
-	      IF (K.EQ.2) THEN
-		 A(I,J)=1   ! Fullerene vertices I and J are adjacent 
-		 A(J,I)=1   ! if they have 2 dual vertices in common
-	      ELSE
-		 A(I,J)=0
-		 A(J,I)=0
-	      ENDIF
- 6	   CONTINUE
+        DO 3 L = 1,M 
+           DO 2 K=1,L 
+              IF (D(K,L).EQ.0) GO TO 2
+              DO 1 J = 1,K
+                 IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
+                  I = I+1
+                 IF (I.GT.N) GO TO 1
+                 V(1,I) = J ! Associate the three mutually adjacent 
+                 V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
+                 V(3,I) = L ! with fullerene vertex I 	 
+ 1            CONTINUE
+ 2        CONTINUE
+ 3      CONTINUE
+        IER = I-N
+        IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
+        DO 7 J = 1,N           ! and is therefore NOT a fullerene dual 
+           DO 6 I = 1,J
+              K = 0
+              DO 5 JJ = 1,3
+                 DO 4 II = 1,3
+                  IF(V(II,I).EQ.V(JJ,J)) K = K+1
+ 4               CONTINUE
+ 5             CONTINUE
+              IF (K.EQ.2) THEN
+                 A(I,J)=1   ! Fullerene vertices I and J are adjacent 
+                 A(J,I)=1   ! if they have 2 dual vertices in common
+               ELSE
+                 A(I,J)=0
+                 A(J,I)=0
+              ENDIF
+ 6         CONTINUE
  7      CONTINUE
         RETURN
         END
