@@ -18,10 +18,6 @@
 !| p.485 (2012). So: You may do whatever you like with this program, but if |
 !| you use it and publish data please cite at least the references given    |
 !| below. The program is however not available for commercial purposes.     |
-!| The book of Fowler and Manolopoulos is highly recommended. It helps      |
-!| understanding how this program functions (the book is fun to read as     |
-!| well. Many of the concepts used in this program can be found in this     | 
-!| book. A standard book on graph theory helps as well.                     |
 !----------------------------------------------------------------------------
 
       PROGRAM Fullerene
@@ -456,7 +452,7 @@ C Formats
      1 /1X,'|      with routines from Fowler, Manolopoulos and Babic |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.0, last revision from 10/05/12     |',
+     1 /1X,'|    This  version: 4.0, last revision from 21/06/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
