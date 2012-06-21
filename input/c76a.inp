@@ -3,7 +3,7 @@ C76  cc-pvdz B3LYP opt. geom. minimum -2895.2183887204 au
 &Opt /
 &Hamilton IHam=1 /
 &Isomers IPR=1, IPH=1 /
-&Graph IG=2, ISO1=3, ISO2=4, ISO3=5 /
+&Graph ISchlegel=2, ISO1=3, ISO2=4, ISO3=5 /
 6    3.1989190172   -1.2678289283   -2.3673352375
 6    3.9894845556   -1.4564155745   -1.1569068753
 6    4.3949148533   -0.1439637813   -0.6858979881

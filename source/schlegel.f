@@ -16,11 +16,11 @@ C or face is at the top. Euler angles are used for rotation.
       DIMENSION CR5(3,Mmax),CR6(3,Mmax),vec1(3),Iring(Mmax)
       DIMENSION N5M(Mmax,5),N6M(Mmax,6),Rot(3,3),CR(3,Mmax)
       DIMENSION Rotz(3,3),Symbol(Mmax),RingS(2,Mmax)
-      DIMENSION IC3(Nmax,3),ICM(6,3),IS(6)
+      DIMENSION IC3(Nmax,3),IS(6)
       Integer MDist(Nmax,Nmax)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
-      type(c_ptr) :: g, frog, new_fullerene_graph, read_fullerene_graph
+      type(c_ptr) :: g, new_fullerene_graph
 
       Data epsf,dpi/.12d0,3.14159265358979d0/
 C     Parameter set for Program QMGA
@@ -801,8 +801,8 @@ C James, here goes your latex program creation for Schlegel diagram
      1 'graph as a starting point for embedding algorithms')
  1034 Format(1X,'No input for specifying circumfencing ring chosen, ',
      1 'first pentagon taken instead including atoms ',5I4)
- 1035 Format(1X,'Circumfencing ring chosen from input, including ',
-     1 'atoms ',3I4)
+C1035 Format(1X,'Circumfencing ring chosen from input, including ',
+C    1 'atoms ',3I4)
  1036 Format(1X,'Calculating Tutte-embedding and shift to barycenter')
  1037 FORMAT(1X,'Fullerene graph deleted',/,' Graph coordinates:',
      1 /,'  Atom       X            Y        N1   N2   N3') 
@@ -904,7 +904,7 @@ C     Now checking on the original vector
       Return
       END
 
-      SUBROUTINE funcg(IOP,n,A,IS,MDist,maxd,
+      SUBROUTINE func2d(IOP,n,A,IS,MDist,maxd,
      1 p,fc,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1002,7 +1002,7 @@ C     total energy
       Return
       END
 
-      SUBROUTINE dfuncg(IOP,n,A,IS,MDist,maxd,
+      SUBROUTINE dfunc2d(IOP,n,A,IS,MDist,maxd,
      1 p,x,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)

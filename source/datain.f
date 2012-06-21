@@ -1,8 +1,9 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
-     1 IPR,IPRC,IG,ISO1,ISO2,ISO3,IER,istop,leap,leapGC,iupac,Ipent,IPH,
-     1 ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,ilp,IYF,
-     1 IWS,nzeile,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,forceWu,
-     1 forceWuP,xyzname,chkname,DATEN)
+     1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,leapGC,iupac,
+     1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
+     1 ilp,IYF,IWS,nzeile,
+     1 PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,forceWu,forceWuP,
+     1 xyzname,chkname,DATEN)
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension forceWu(9),forceWuP(9)
       integer endzeile
@@ -17,7 +18,7 @@
       Namelist /Opt/ Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
-      Namelist /Graph/ IG,ISO1,ISO2,ISO3,PS,scale,scalePPG
+      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,PS,scale,scalePPG
 C Input send to output
       if(ilp.eq.0) then   
        WRITE(IOUT,100)
@@ -94,7 +95,7 @@ C     More Parameters
       ISO2=0    !  Option for fullerene orientation for Schlegel projection
       ISO3=0    !  Option for fullerene orientation for Schlegel projection
       PS=0.d0   !  For graph production, angle input for Schlegel diagram
-      IG=0      !  For graph production, option for type of graph
+      ISchlegel=0 !  For graph production, option for type of graph
       scale=2.5d0 !  For graph production, scale Tutte graph
       scalePPG=1.d0 !  For graph production exponential factor in Plestenjak alg.
       TolR=0.d0 !  Tolerance for finding ring connections
@@ -103,9 +104,6 @@ C     More Parameters
       R6=R       ! Distance in 6-Ring
 
 C Now process namelist input
-C     Old input    
-C     Read(IN,*) NA,IC,Iopt,IP,IHam,IPR,IS,ISO2,ISO2,ISO3,PS,TolR
-C     New input    
       READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
        endzeile=0
        do j=1,nzeile

@@ -3,5 +3,5 @@ C60 Using Tutte algorithm for coordinates
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /
-&Graph IG=7 ISO1=1 ISO2=2 ISO3=3 /
+&Graph ISchlegel=7 ISO1=1 ISO2=2 ISO3=3 /
 1 2 3 4 5 8 25 28 29 30 31 32

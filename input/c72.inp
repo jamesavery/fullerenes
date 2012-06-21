@@ -3,7 +3,7 @@ C72   0 0 1 1 1   1 0 0 0     0. 0. cc-pvdz B3LYP opt. geom. minimum E=-2743.634
 &Opt /
 &Hamilton IHam=1 /
 &Isomers IPR=1 /
-&Graph IG=1 /
+&Graph ISchlegel=1 /
 6                  -0.689925    3.512251    1.785444
 6                   0.689925    3.512251    1.785444
 6                   1.405953    2.435221    2.431308

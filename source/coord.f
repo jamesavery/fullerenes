@@ -629,16 +629,7 @@ C Now analyze the adjacency matrix if it is correct
  1006 FORMAT(1X,'Graph checked, it is cubic')
  1007 Format(1X,'Perform ',I2,' Endo-Kroto transformations ',
      1 /1X,'Modifying adjacency matrix for rings (P,H,P):')
- 1008 Format(1X,'Transform adjacency matrix:',/1X,
-     1 'Delete edges:')
- 1009 Format(1X,' (',I5,'-',I5,') (',I5,'-',I5,')')
- 1010 Format(1X,'Endo-Kroto graph satisfies all fullerene conditions')
- 1011 Format(1X,'Endo-Kroto graph does not satisfy all fullerene ',
-     1 'conditions')
  1012 Format(1X,6(' (',I5,'-',I5,') (',I5,'-',I5,')'))
- 1013 Format(1X,'Vertices affected in Endo-Kroto transformation:')
- 1014 Format(1X,' (',I5,',',I5,',',I5,',',I5,')')
- 1015 Format(1X,'Add edges:')
  1016 Format(/1X,'No input found ==> RETURN')
  1017 Format(/1X,'No Endo-Kroto pattern in this fullerene ==> RETURN')
  1018 Format(/1X,'Found less vertices then anticipated ==> STOP')
@@ -1360,10 +1351,7 @@ C Now analyze the adjacency matrix if it is correct
      1 ' in list of patterns')
  1001 Format(/1X,'Input for Yoshida-Fowler 6-vertex insertions: ',I2,
      1 ' entries with numbers ',15(' ',I5))
- 1002 Format(/1X,I2,' Number of hexagon rings for Yoshida-Fowler ',
-     1 'insertion does not match list, only ',I2,' found:')
  1003 Format(6(' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')'))
- 1004 Format(/1X,'==> RETURN')
  1005 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
      1 'are not of degree 3, last one is of degree ',I4)
  1006 FORMAT(1X,'Graph checked, it is cubic')
@@ -1373,13 +1361,7 @@ C Now analyze the adjacency matrix if it is correct
      1 'Yoshida-Fowler bonds to be added and deleted')
  1009 Format(1X,'Add edges: ',8(' (',I5,'-',I5,') '),
      1 /1X,7(' (',I5,'-',I5,') '))
- 1010 Format(1X,'Yoshida-Fowler graph satisfies all fullerene ',
-     1 'conditions')
- 1011 Format(1X,'Yoshida-Fowler graph does not satisfy all fullerene ',
-     1 'conditions')
- 1012 Format(1X,'Error: did not find the 3 edges in ring connections ')
  1013 Format(1X,'Delete edges: '6(' (',I5,','I5,') '))
- 1014 Format(1X,' (',I5,',',I5,',',I5,',',I5,')')
  1016 Format(/1X,'No input found ==> RETURN')
  1017 Format(/1X,'Number of insertions ',I2,' exceeds number of ',
      1 'possible Yoshida-Fowler insertions ',I2,' ==> RETURN')
@@ -1390,7 +1372,6 @@ C Now analyze the adjacency matrix if it is correct
  1020 Format(1X,'Shared pentagons found between input pattern ',I2,
      1 ' and ',I2,: ' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')',
      1 ' / (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,')')
- 1021 Format(1X,'Abort Yoshida-Fowler insertion ==> RETURN')
  1022 Format(1X,'Error: Need 3 hexagon numbers per pattern ==> RETURN')
  1023 Format(1X,'Central vertices: ',20I6)
  1024 Format(1X,'Shared hexagons found between input pattern ',I2,
@@ -1400,13 +1381,13 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE YoshidaFowler3(Matom,IN,Iout,JERR,
-     1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,IC3,
+     1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
-      DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
+      DIMENSION IDA(Nmax,Nmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
       DIMENSION nFM(4,66),IP(66),KFM(4),IBFM(66,6)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
@@ -1645,14 +1626,9 @@ C Now analyze the adjacency matrix if it is correct
  1008 Format(1X,'Transform adjacency matrix:',/1X,
      1 'Delete edges:')
  1009 Format(1X,9(' (',I5,'-',I5,') '))
- 1010 Format(1X,'Yoshida-Fowler graph satisfies all fullerene ',
-     1 'conditions')
- 1011 Format(1X,'Yoshida-Fowler graph does not satisfy all fullerene ',
-     1 'conditions')
  1012 Format(1X,'Error: did not find the 3 edges in ring connections ')
  1013 Format(1X,'Yoshida-Fowler bonds to be deleted. ',
      1 'Delete edges:',/,6(' (',I5,','I5,') '))
- 1014 Format(1X,' (',I5,',',I5,',',I5,',',I5,')')
  1015 Format(1X,'Add edges:')
  1016 Format(/1X,'No input found ==> RETURN')
  1017 Format(/1X,'Number of insertions ',I2,' exceeds number of ',
@@ -1668,14 +1644,14 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE StoneWalesTrans(Matom,IN,Iout,numbersw,
-     1 nSW,ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
+     1 nSW,ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
      1 CDist)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
-      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
+      DIMENSION N6MEM(Mmax,6)
       DIMENSION nsw(4,66),IP(2,66),KSW(4),IBSW(66,2),JBSW(66,2),IAtSW(4)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
@@ -1869,9 +1845,6 @@ C Now analyze the adjacency matrix if it is correct
  1008 Format(1X,'Transform adjacency matrix:',/1X,
      1 'Delete edges:')
  1009 Format(1X,' (',I5,'-',I5,') (',I5,'-',I5,')')
- 1010 Format(1X,'Stone-Wales graph satisfies all fullerene conditions')
- 1011 Format(1X,'Stone-Wales graph does not satisfy all fullerene ',
-     1 'conditions')
  1012 Format(1X,'Stone-Wales bonds to be rotated by 90 degrees. ',
      1 'Edge numbers:',/,10(' (',I5,','I5,') '))
  1013 Format(1X,'Vertices affected in Stone-Wales transformation:')

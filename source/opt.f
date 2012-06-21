@@ -47,7 +47,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
        Dist(2,i)=Dist(2,i)*scale 
        WRITE(IOUT,1001) I,Dist(1,I),Dist(2,I),(IC3(I,J),J=1,3)
       enddo
-      CALL frprmng(IOP,MAtom,IDA,Iout,IS,MDist,
+      CALL frprmn2d(IOP,MAtom,IDA,Iout,IS,MDist,
      1 maxd,Dist,ftol,iter,fret,E0,RAA)
       if(fret-E0.gt.1.d-2) then
        fretn=(fret-E0)/dfloat(MATOM)
@@ -84,7 +84,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Return 
       END
 
-      SUBROUTINE frprmng(IOP,MATOM,AH,Iout,IS,MDist,
+      SUBROUTINE frprmn2d(IOP,MATOM,AH,Iout,IS,MDist,
      1 maxd,p,ftol,iter,fret,E0,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -93,27 +93,27 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Real*8 pcom(NMAX*2),xicom(NMAX*2)
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX), N
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
-C     is performed on a function func, using its gradient as calculated by a routine dfunc.
+C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
 C     p (the location of the minimum), iter (the number of iterations that were performed),
-C     and fret (the minimum value of the function). The routine linmin is called to perform
+C     and fret (the minimum value of the function). The routine linmin3d is called to perform
 C     line minimizations. AH is the Hueckel adjacency matrix of atoms.
 C     Parameters: NMAX is the maximum anticipated value of n; ITMAX is the maximum allowed
 C     number of iterations; EPS is a small number to rectify special case of converging to exactly
 C     zero function value.
-C     USES dfuncg,funcg,linming
-C     func input vector p of length n user defined to be optimized
+C     USES dfunc2d,func2d,linmin2d
+C     func3d input vector p of length n user defined to be optimized
 C     IOP=1: spring embedding
 C     IOP=2: spring + Coulomb embedding
 C     IOP=3: Pisanski-Plestenjak-Graovac algorithm
 C     IOP=4: Kamada-Kawai embedding
       N = 2*Matom
       iter=0
-      CALL funcg(IOP,N,AH,IS,MDist,maxd,p,fp,RAA)
+      CALL func2d(IOP,N,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
       Write(Iout,1003) E0
-C     dfunc input vector p of length N, output gradient of length n user defined
-      CALL dfuncg(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
+C     dfunc3d input vector p of length N, output gradient of length n user defined
+      CALL dfunc2d(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
       grad2=0.d0
       do I=1,N
        grad2=grad2+xi(i)*xi(i)
@@ -129,7 +129,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
         fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linming(IOP,N,Iout,AH,IS,MDist,maxd,
+        call linmin2d(IOP,N,Iout,AH,IS,MDist,maxd,
      1       p,pcom,xi,xicom,fret,RAA)
          grad2=0.d0
          do I=1,n
@@ -142,7 +142,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
           return
         endif
         fp=fret
-        CALL dfuncg(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
+        CALL dfunc2d(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
         gg=0.d0
         dgg=0.d0
         do j=1,n
@@ -159,31 +159,31 @@ C         dgg=dgg+xi(j)**2
         enddo   
       enddo
       Write(Iout,1000) fret,fret-fp
- 1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
-     1 /1X,'energy ',F15.9,', diff= ',D12.3)
+ 1000 Format(' WARNING: Subroutine frprmn2d: maximum iterations
+     1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
  1001 Format(' Iteration ',I4,', energy ',D14.8,', gradient ',D14.8)
  1002 Format(/1X,'Convergence achieved, energy ',F20.7,', diff= ',D12.3)
  1003 Format(/1X,'E0= ',D12.3)
       return
       END
 
-      SUBROUTINE linming(IOP,n,Iout,AH,IS,MDist,
+      SUBROUTINE linmin2d(IOP,n,Iout,AH,IS,MDist,
      1 maxd,p,pcom,xi,xicom,fret,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(NMAX*2),pcom(NMAX*2),xicom(NMAX*2),xi(NMAX*2)
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
       PARAMETER (TOL=1.d-8)
-C     USES brent,f1dim,mnbrak
+C     USES brent2d,f1dim2d,mnbrak2d
       do j=1,n
         pcom(j)=p(j)
         xicom(j)=xi(j)
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrakg(IOP,n,Iout,AH,IS,MDist,maxd,
+      CALL mnbrak2d(IOP,n,Iout,AH,IS,MDist,maxd,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,RAA)
-      CALL brentg(IOP,n,Iout,AH,IS,MDist,maxd,
+      CALL brent2d(IOP,n,Iout,AH,IS,MDist,maxd,
      1 fret,ax,xx,bx,TOL,xmin,xicom,pcom,RAA)
       do j=1,n
         xi(j)=xmin*xi(j)
@@ -192,21 +192,21 @@ C     USES brent,f1dim,mnbrak
       return
       END
 
-      SUBROUTINE f1dimg(IOP,n,A,IS,MDist,maxd,
+      SUBROUTINE f1dim2d(IOP,n,A,IS,MDist,maxd,
      1 f1dimf,x,xicom,pcom,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*2),xt(NMAX*2),xicom(NMAX*2)
       Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
-C     USES funcg
+C     USES func2d
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL funcg(IOP,n,A,IS,MDist,maxd,xt,f1dimf,RAA)
+      CALL func2d(IOP,n,A,IS,MDist,maxd,xt,f1dimf,RAA)
       return
       END
 
-      SUBROUTINE mnbrakg(IOP,n,Iout,AH,IS,DD,maxd,
+      SUBROUTINE mnbrak2d(IOP,n,Iout,AH,IS,DD,maxd,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -214,9 +214,9 @@ C     USES funcg
       Integer AH(NMAX,NMAX),IS(6)
       Integer DD(NMAX,NMAX)
       REAL*8 pcom(NMAX*2),xicom(NMAX*2)
-      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fa,ax,xicom,pcom,
+      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fa,ax,xicom,pcom,
      1 RAA)
-      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fb,bx,xicom,pcom,
+      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fb,bx,xicom,pcom,
      1 RAA)
       if(fb.gt.fa)then
         dum=ax
@@ -227,7 +227,7 @@ C     USES funcg
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fc,cx,xicom,pcom,
+      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fc,cx,xicom,pcom,
      1 RAA)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
@@ -235,7 +235,7 @@ C     USES funcg
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             ax=bx
@@ -249,10 +249,10 @@ C     USES funcg
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             bx=cx
@@ -260,12 +260,12 @@ C     USES funcg
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else
           u=cx+GOLD*(cx-bx)
@@ -273,7 +273,7 @@ C     USES funcg
         Write(Iout,1000)
         return
         endif
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         endif
         ax=bx
@@ -285,10 +285,10 @@ C     USES funcg
         goto 1
       endif
       return
- 1000 Format('**** Error in Subroutine mnbrakg')
+ 1000 Format('**** Error in Subroutine mnbrak2d')
       END
 
-      SUBROUTINE brentg(IOP,n,Iout,AH,IS,DD,maxd,
+      SUBROUTINE brent2d(IOP,n,Iout,AH,IS,DD,maxd,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,RAA)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
@@ -304,7 +304,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dimg(IOP,n,AH,IS,DD,maxd,fx,x,xicom,pcom,
+      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fx,x,xicom,pcom,
      1 RAA)
       fv=fx
       fw=fx
@@ -340,7 +340,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dimg(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1    RAA)
         if(fu.le.fx) then
           if(u.ge.x) then
@@ -372,7 +372,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         endif
 11    continue
       Write(Iout,1000)
- 1000 Format(' WARNING: Subroutine brent: maximum iterations exceeded')
+ 1000 Format('WARNING: Subroutine brent2d: maximum iterations exceeded')
 3     xmin=x
       return
       END
@@ -410,7 +410,7 @@ C     Optimize
       Write(IOUT,1000) Rdist
       Write(Iout,1003) (force(i),i=1,9),ftol
       if(forceWu(9).gt.0.d0) Write(Iout,1004) forceWu(9)
-      CALL frprmn(IOP,MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
+      CALL frprmn3d(IOP,MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
      1 Dist,force,ftol,iter,fret)
       if(fret.gt.1.d-2) then
       fretn=fret/dfloat(MATOM)
@@ -440,7 +440,7 @@ C     Optimize
       Return 
       END
 
-      SUBROUTINE frprmn(IOP,N,AH,Iout,N5,N6,N5M,N6M,
+      SUBROUTINE frprmn3d(IOP,N,AH,Iout,N5,N6,N5M,N6M,
      1 p,force,ftol,iter,fret)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -449,25 +449,25 @@ C     Optimize
       Real*8 pcom(NMAX*3),xicom(NMAX*3),force(9)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
-C     is performed on a function func, using its gradient as calculated by a routine dfunc.
+C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
 C     p (the location of the minimum), iter (the number of iterations that were performed),
-C     and fret (the minimum value of the function). The routine linmin is called to perform
+C     and fret (the minimum value of the function). The routine linmin3d is called to perform
 C     line minimizations. AH is the Hueckel adjacency matrix of atoms.
 C     Parameters: NMAX is the maximum anticipated value of n; ITMAX is the maximum allowed
 C     number of iterations; EPS is a small number to rectify special case of converging to exactly
 C     zero function value.
-C     USES dfunc,func,linmin
-C     func input vector p of length n user defined to be optimized
+C     USES dfunc3d,func3d,linmin3d
+C     func3d input vector p of length n user defined to be optimized
 C     IOP=1: Wu force field optimization
       iter=0
-      CALL func(IOP,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
+      CALL func3d(IOP,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
       if(IERR.ne.0) then
       Write(Iout,1004)
       return
       endif
-C     dfunc input vector p of length N, output gradient of length n user defined
-      CALL dfunc(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
+C     dfunc3d input vector p of length N, output gradient of length n user defined
+      CALL dfunc3d(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
       grad2=0.d0
       do I=1,N
        grad2=grad2+xi(i)*xi(i)
@@ -483,7 +483,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
         fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linmin(IOP,N,AH,N5,N6,N5M,N6M,
+        call linmin3d(IOP,N,AH,N5,N6,N5M,N6M,
      1   p,pcom,xi,xicom,fret,force)
          grad2=0.d0
          do I=1,n
@@ -496,7 +496,7 @@ C     dfunc input vector p of length N, output gradient of length n user defined
           return
         endif
         fp=fret
-        CALL dfunc(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
+        CALL dfunc3d(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
         gg=0.d0
         dgg=0.d0
         do j=1,n
@@ -513,8 +513,8 @@ C         dgg=dgg+xi(j)**2
         enddo   
       enddo
       Write(Iout,1000) fret,fret-fp
- 1000 Format(' WARNING: Subroutine frprmn: maximum iterations exceeded',
-     1 /1X,'energy ',F15.9,', diff= ',D12.3)
+ 1000 Format(' WARNING: Subroutine frprmn3d: maximum iterations
+     1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
  1001 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8)
  1002 Format(/1X,'Convergence achieved, energy ',D14.8,', diff= ',D12.3)
  1004 Format('**** Severe error in angle, check input coordiantes:',
@@ -523,7 +523,7 @@ C         dgg=dgg+xi(j)**2
       return
       END
 
-      SUBROUTINE linmin(IOP,n,AH,N5,N6,N5M,N6M,
+      SUBROUTINE linmin3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 p,pcom,xi,xicom,fret,c)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -531,16 +531,16 @@ C         dgg=dgg+xi(j)**2
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       PARAMETER (TOL=1.d-5)
-C     USES brent,f1dim,mnbrak
+C     USES brent3d,f1dim3d,mnbrak3d
       do j=1,n
         pcom(j)=p(j)
         xicom(j)=xi(j)
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL mnbrak3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,c)
-      CALL brent(IOP,n,AH,N5,N6,N5M,N6M,Iout,fret,
+      CALL brent3d(IOP,n,AH,N5,N6,N5M,N6M,Iout,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,c)
       do j=1,n
         xi(j)=xmin*xi(j)
@@ -549,22 +549,22 @@ C     USES brent,f1dim,mnbrak
       return
       END
 
-      SUBROUTINE f1dim(IOP,n,A,N5,N6,N5M,N6M,
+      SUBROUTINE f1dim3d(IOP,n,A,N5,N6,N5M,N6M,
      1 f1dimf,x,xicom,pcom,c)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3),c(9)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
-C     USES func
+C     USES func3d
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func(IOP,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
+      CALL func3d(IOP,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
       return
       END
 
-      SUBROUTINE mnbrak(IOP,n,AH,N5,N6,N5M,N6M,
+      SUBROUTINE mnbrak3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,c)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -572,9 +572,9 @@ C     USES func
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3),c(9)
-      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 fa,ax,xicom,pcom,c)
-      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 fb,bx,xicom,pcom,c)
       if(fb.gt.fa)then
         dum=ax
@@ -585,7 +585,7 @@ C     USES func
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 fc,cx,xicom,pcom,c)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
@@ -593,7 +593,7 @@ C     USES func
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           if(fu.lt.fc)then
             ax=bx
@@ -607,10 +607,10 @@ C     USES func
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           if(fu.lt.fc)then
             bx=cx
@@ -618,20 +618,20 @@ C     USES func
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         else
           u=cx+GOLD*(cx-bx)
         if(u.gt.1.d10) then
-        Print*,'**** Error in Subroutine mnbrak'
+        Print*,'**** Error in Subroutine mnbrak3d'
         return
         endif
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         endif
         ax=bx
@@ -645,7 +645,7 @@ C     USES func
       return
       END
 
-      SUBROUTINE brent(IOP,n,AH,N5,N6,N5M,N6M,Iout,
+      SUBROUTINE brent3d(IOP,n,AH,N5,N6,N5M,N6M,Iout,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,c)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
@@ -661,7 +661,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1 fx,x,xicom,pcom,c)
       fv=fx
       fw=fx
@@ -697,7 +697,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim(IOP,n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
      1   fu,u,xicom,pcom,c)
         if(fu.le.fx) then
           if(u.ge.x) then
@@ -729,7 +729,8 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         endif
 11    continue
       Write(Iout,1000)
- 1000 Format(' WARNING: Subroutine brent: maximum iterations exceeded')
+ 1000 Format(' WARNING: Subroutine brent3d: maximum iterations
+     1 exceeded')
 3     xmin=x
       return
       END

@@ -3,5 +3,5 @@ C60  Using FM algorithm to produce coordinates
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /
-&Graph IG=1 /
+&Graph ISchlegel=1 /
 1 2 3 4 5 6 27 28 29 30 31 32

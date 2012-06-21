@@ -3,5 +3,5 @@ C96 Using Tutte embedding to produce coordinates
 &Opt Iopt=1 /
 &Hamilton /
 &Isomers /
-&Graph IG=2, ISO1=1, ISO2=2, ISO3=3 /
+&Graph ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /
 1 7 9 11 13 18 36 41 43 45 47 49
