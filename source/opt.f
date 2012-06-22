@@ -6,7 +6,6 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       DIMENSION Dist(2,NMAX),IC3(NMAX,3)
       DIMENSION IDA(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
       Data Rdist,ftol,conv/1.d0,.5d-10,1 6.0221367d-3/
-c      Data dpi/3.14159265358979d0/
       rmin=1.d10
       rmax=0.d0
       rper=0.d0
@@ -389,8 +388,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION Dist(3,NMAX)
       DIMENSION IDA(NMAX,NMAX)
       DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6)
-      dimension force(ffmaxdim)
-c      Data dpi,conv/3.14159265358979d0,6.0221367d-3/ ! moven to conf.mod
+      real(8) force(ffmaxdim)
 c      IOP=1
       deg2rad=dpi/180.d0
       dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
