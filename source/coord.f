@@ -1853,7 +1853,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE Leapfrog(Matom,Iout,leap,leapGC,kGC,lGC,
+      SUBROUTINE GoldbergCoxeter(Matom,Iout,leap,leapGC,kGC,lGC,
      1 ihueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,CDist) 
 C     Construct Leapfrog fullerene through adjacency matrix
       use config

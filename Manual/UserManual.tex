@@ -195,10 +195,10 @@ explained in detain in the following.\\
  \end{figure}
  
 \subsection{Create a 3D structure for a specific fullerene}
-The easiest way to create a 3D structure is to read in cartesian coordinates (Subroutine {\bf CoordBuild}) for a specific fullerene 
+The easiest way to create a 3D structure is to read in cartesian coordinates for a specific fullerene 
 (see files {\it c20.inp} to {\it c540.inp}), or to construct them internally for the high symmetry 
-$Ih-$\C{20} or $Ih-$\C{60} isomers (files {\it ico.inp}, {\it icoExp.inp}, {\it icoideal.inp}), or to 
-get the cartesian coordinates from input ring spiral pentagon indices by using either the Fowler-Manopoulus 
+$Ih-$\C{20} or $Ih-$\C{60} isomers (Subroutine {\bf CoordC20C60}, see input files {\it ico.inp}, {\it icoExp.inp}, {\it icoideal.inp}), or to 
+get the cartesian coordinates from input ring spiral pentagon indices (Subroutine {\bf CoordBuild}) by using either the Fowler-Manopoulus 
 AME algorithm (the adjacency matrix eigenvector algorithm) \cite{Atlas}, or the more reliable Tutte embedding algorithm (3D-TEA) 
 (used by files {\it pentagon1.inp} to {\it pentagon25.inp}). The program sets barycenter of the fullerene 
 to the origin. The book ``Atlas of Fullerenes" Fowler and Manopoulus \cite{Atlas} is recommended for the 
@@ -211,8 +211,23 @@ viewed by a molecular visualization program. We recommend CYLview by Claude Lega
 Avogadro \cite{Avogadro}, JMol \cite{JMol} or Pymol \cite{Pymol}. These codes are all freely downloadable.
 For this purpose a file is written out to cylview.xyz to be used as an input file for these programs. 
 Using these coordinates the program calculates the smallest and largest cage diameters which gives already a measure 
-for distortion from spherical symmetry (Subroutine {\bf DIAMETER}). It produces the distance matrix if print level 
-is set to high (Subroutine {\bf DISTMATRIX}).
+for distortion from spherical symmetry (Subroutine {\bf Diameter}). It produces the distance matrix if print level 
+is set to high (Subroutine {\bf DistMatrix}), and once the point group is obtained the program determines if the
+fullerene is chiral or not (Subroutine {\bf Chiral}).
+
+In a next step all edges are determined by analyzing connectivities between vertices from either given cartesian
+coordinates or from adjacency matrix if ring spiral as input is used (Subroutine {\bf Connect}). In any case
+one has the adjacency matrix $A_{ij}$ for all vertices and edges at this stage.
+From $A_{ij}$ a H\"uckel analysis is performed (Subroutine {\bf Hueckel}). This gives you a good hint if the 
+fullerene is open or closed shell. Note that for fullerenes the H\"uckel analysis may not be very reliable 
+as hybridization with the C(2s) orbitals occur due to nonplanarity. Hence the $\sigma-\pi$ separation breaks down
+especially for the small fullerenes. Nevertheless, we adopt $\alpha$=-0.21 au  and  $\beta$=-0.111 au obtained
+from the exp. ionization potential (7.58 eV) and excitation energy (3.02 eV) of \C{60} (note the electron goes 
+into the second LUMO of $t_{1g}$ symmetry). This gives also orbital energies for \C{60} in reasonable 
+agreement with DFT Kohn-Sham orbital energies. The fullerene might also Jahn-Teller distort adopting a singlet 
+ground state instead of one of a higher multiplicity as this is the case for \C{20}. Such electronic effects are not
+captured in this program, and one needs to perform a proper quantum theoretical calculation.
+
 
  - Use program SPIRAL of Fowler and Manopoulus for creating a ring spiral.
     It also produces canonical ring spiral pentagon indices 
@@ -223,20 +238,6 @@ is set to high (Subroutine {\bf DISTMATRIX}).
     pentagon number, hexagon indices and strain parameter, NMR information
     and number of distinct Hamiltonian cycles if required.
 
- - Perform Hueckel analysis (Subroutine HUECKEL). 
-    This gives you a good hint if the fullerene is open or closed shell.
-    Note: It is known that for fullerenes the Hueckel analysis is not
-      very reliable as hybridization with the C(2s) orbitals occur due
-      to nonplanarity. Hence the sigma-pi separation breaks down.
-      Nevertheless, we adopt  alpha=-0.21 au  and  beta=-0.111 au obtained
-      from the exp. ionization potential (7.58 eV) and excitation energy
-      (3.02 eV) of C60 (note the electron goes into the second LUMO of 
-      t1g symmetry). This gives also orbital energies for C60 in reasonable 
-      agreement with DFT Kohn-Sham orbital energies. The fullerene might
-      also Jahn-Teller distort adopting a singlet ground state instead
-      of one of a higher multiplicity. Such electronic effects are not
-      captured in this program, and one needs to perform a proper quantum
-      theoretical calculation.
 
  - Use program HAMILTON of Babic (ref.3) for Hamiltonian cycles and IUPAC 
     Nomenclature. The number of Hamiltonian cycles given has been checked 
@@ -250,9 +251,6 @@ is set to high (Subroutine {\bf DISTMATRIX}).
     nanotubes) it has been proven to exist, our calculations show that
     they exist for all fullerene isomers up to C100.
 
- - Establish connectivities between atoms either from given cartesian
-    coordinates or from adjacency matrix if ring spiral as input is used:
-    1) Bond between atoms, 2) Vertices (Subroutine CONNECT).
     Identify all closed 5- and 6-ring systems (Subroutine RING).
     This routine also determines if Euler's theorem is fulfilled.
 

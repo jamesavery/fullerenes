@@ -197,7 +197,7 @@ C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
       routine='Leapfrog'
       Write(Iout,1008) routine
-      CALL Leapfrog(MAtom,Iout,leap,leapGC,IGC1,IGC2,
+      CALL GoldbergCoxeter(MAtom,Iout,leap,leapGC,IGC1,IGC2,
      1 ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
       leap=0
       leapGC=0
