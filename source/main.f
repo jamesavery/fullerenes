@@ -2,6 +2,8 @@
 !           P R O G R A M     F U L L E R E N E                             !
 !                                                                           !
 !---------------------------------------------------------------------------!
+!  This is an open-source code, see copyright message in the User Manual.   !
+!---------------------------------------------------------------------------!
 !                                                                           !
 ! A PROGRAM FOR STRUCTURE GENERATION AND TOPOLOGICAL ANALYSIS OF FULLERENES !
 !    The program creates cartesian coordinates for fullerenes isomers       !
@@ -11,17 +13,6 @@
 !            for further quantum theoretical treatment.                     !
 !        Version 4 now incorporates C++ routines linked to the              !
 !       original Fortran program using much improved algorithms.            !
-!                                                                           !
-!---------------------------------------------------------------------------!
-!  Important Copyright Message: Hey there is none! If you like to know why  !
-!  read Darrel C. Ince1, Leslie Hatton, John Graham-Cumming, Nature 482,    !
-!  p.485 (2012). So: You may do whatever you like with this program, but if !
-!  you use it and publish data please cite at least the references given    !
-!  below. The program is however not available for commercial purposes.     !
-!  The book of Fowler and Manolopoulos is highly recommended. It helps      !
-!  understanding how this program functions (the book is fun to read as     !
-!  well. Many of the concepts used in this program can be found in this     ! 
-!  book. A standard book on graph theory helps as well.                     !
 !---------------------------------------------------------------------------!
 
       PROGRAM Fullerene
@@ -273,16 +264,15 @@ c          force(9)=fcoulomb ! not used anywhere?
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
         endif
-
-      Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
-     1 Dist,DistCM,El)
-      routine='DISTMATRIX   '
-      Write(Iout,1008) routine
-      CALL Distmatrix(MAtom,IOUT,Iprintf,0,
-     1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
-      routine='DIAMETER     '
-      Write(Iout,1008) routine
-      CALL Diameter(MAtom,IOUT,Dist,distp)
+        Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
+     1   Dist,DistCM,El)
+        routine='DISTMATRIX   '
+        Write(Iout,1008) routine
+        CALL Distmatrix(MAtom,IOUT,Iprintf,0,
+     1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
+        routine='DIAMETER     '
+        Write(Iout,1008) routine
+        CALL Diameter(MAtom,IOUT,Dist,distp)
       endif
 
 C Print out Coordinates used as input for CYLview
@@ -327,7 +317,7 @@ C Perform Stone-Wales transformation
       routine='STONE-WALES  '
       Write(Iout,1008) routine
       CALL StoneWalesTrans(Matom,IN,Iout,numbersw,nSW,
-     1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+     1 ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       ISW=0
       ipent=1
       SWspiral=1
@@ -351,14 +341,12 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
       routine='YOSHIDAFOWLER'
       Write(Iout,1008) routine
       if(IYF.le.2) then
-      CALL YoshidaFowler3(Matom,IN,Iout,JERR,numberFM,IYF,
-     1 nFM,ihueckel,IDA,N5MEM,N6MEM,IC3,
-     1 A,evec,df,Dist,Dist2D,distp,Rdist)
+      CALL YoshidaFowler3(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
+     1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
       else
       IYF=IYF-2
-      CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,
-     1 nYF,ihueckel,IDA,N5MEM,N6MEM,IC3,
-     1 A,evec,df,Dist,Dist2D,distp,Rdist)
+      CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,nYF,
+     1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       endif
       IYF=0
       ipent=1
@@ -467,7 +455,7 @@ C Formats
      1 /1X,'|      with routines from Fowler, Manolopoulos and Babic |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.0, last revision from 10/05/12     |',
+     1 /1X,'|    This  version: 4.0, last revision from 21/06/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',

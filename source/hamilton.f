@@ -445,7 +445,6 @@ C     if (oldptr.gt.0) go to 5
  1005 format (/1X,'Distinct Hamiltonian cycles:',/6X,'NH    vertices',
      1 /1X,20('-'))
  1006 format (/1X,'The best Hamiltonian cycle:')
- 1007 format (1X,'Next Hamiltonian cycles:')
  1008 format (30(I4,'-'))
  1009 format (/1X,'Calculate Hamiltonian cycles, half-ring sizes'
      1 ' and IUPAC superscripts: (D. Babic, J. Chem. Inf. Comput. Sci.'

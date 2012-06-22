@@ -1,6 +1,5 @@
-      SUBROUTINE Ring(MCon2,MAtom,
-     1 IOUT,Ncount5,Ncount6,IC3,N5MEM,N6MEM,Rmin5,
-     1 Rmin6,Rmax5,Rmax6,DistMat)
+      SUBROUTINE Ring(MCon2,MAtom,IOUT,Ncount5,Ncount6,
+     1 IC3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       use config
 C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
 C     for each atom
@@ -76,14 +75,14 @@ C     Identify all 5-membered rings
       Do I=1,48
       IN5=IPa(5,I)
       IF(IN5.eq.IS) then
-      CALL Ring5(Ncount5,I,IN5,Nmax,Mmax,IPA,N5MEM,N5MEMS)
+      CALL Ring5(Ncount5,I,IN5,Mmax,IPA,N5MEM,N5MEMS)
       endif
       enddo
 C     Identify all 6-membered rings
       Do I=1,96
       IN6=IPa(6,I)
       IF(IN6.eq.IS) then
-      CALL Ring6(Ncount6,I,IN6,Nmax,Mmax,IPA,N6MEM,N6MEMS)
+      CALL Ring6(Ncount6,I,IN6,Mmax,IPA,N6MEM,N6MEMS)
       endif
       enddo
       enddo
@@ -260,8 +259,8 @@ C     Check Euler characteristic
      1 3X,' maximum bond distance: ',d12.6) 
  1009 Format(1X,' Minimum bond distance in ',I1,'-ring: ',d12.6,
      1 3X,' maximum bond distance in ',I1,'-ring: ',d12.6) 
- 1010 Format(1X,96(I3))
- 1011 Format(3X,96(I3))
+C1010 Format(1X,96(I3))
+C1011 Format(3X,96(I3))
  1012 Format(/1X,'Number of different bond distances Nr=',I4,
      1 ' and Nr/Ne= ',d12.6,
      1 ' (within tolerance ',d6.1,'),  Nonequivalent bond distances:') 
@@ -478,8 +477,8 @@ C     (c5-5-5) 3-ring fusions
       N3Ring=0
       KRing3=0
       LRing3=0
-      if(IRing5.gt.0) CALL Ring555(Iout,
-     1 IRing5,NringA,NringB,KRing3,LRing3,n3r,n3ra,n3rb)
+      if(IRing5.gt.0) CALL Ring555(IRing5,NringA,
+     1 NringB,KRing3,LRing3,n3r,n3ra,n3rb)
       Write(Iout,1008) Label,IR1,IR2,IR3,LRing3
       if(Lring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3rb(J,I),J=1,3),i=1,Lring3)
@@ -497,8 +496,8 @@ C     (c5-5-6) 3-ring fusions with (5-5)
       KRing3=0
       LRing3=0
       if(IRing5.gt.0.and.IRing56.gt.0) then
-      CALL Ring556(Iout,IRing5,IRing56,
-     1 NringA,NringB,NringC,NringD,KRing3,LRing3,n3r,n3ra,n3rb)
+      CALL Ring556(IRing5,IRing56,NringA,NringB,NringC,NringD,
+     1 KRing3,LRing3,n3r,n3ra,n3rb)
       endif
       IR3=6
       Label='closed'
@@ -521,9 +520,8 @@ C     (b5-6-5) 3-ring fusions
       KRing3=0
       LRing3=0
       if(IRing56.gt.0) then
-      CALL Ring565(Iout,IRing5,IRing56,
-     1 NringA,NringB,NringC,NringD,KRing3,LRing3,n3r,n3ra,n3rb,
-     1 N5Ring, N6Ring,N5MEM,N6MEM)
+      CALL Ring565(IRing5,IRing56,NringA,NringB,NringC,NringD,
+     1 KRing3,LRing3,n3r,n3ra,n3rb,N5MEM,N6MEM)
       endif
       Label='bent  '
       IR2=6
@@ -535,8 +533,7 @@ C     (b5-6-5) 3-ring fusions
 C     Search for Stone-Wales pattern
       Call StoneWales(Kring3,n3ra,numbersw,nSW)
 C     Search for Yoshida-Fowler D3h 6555 patterns - C60-like corner patch
-      Call Threevertexinsert(Kring3,n3ra,NringA,NringB,
-     1 IRing5,numberFM,nFM)
+      Call Threevertexinsert(Kring3,n3ra,numberFM,nFM)
 C     (l5-6-5) 3-ring fusions
       Label='linear'
       Write(Iout,1009) Label,IR1,IR2,IR3,LRing3
@@ -555,8 +552,8 @@ C     (c6-5-6) 3-ring fusions
       KRing3=0
       LRing3=0
       if(IRing56.gt.0) then
-      CALL Ring656(Iout,IRing5,IRing6,IRing56,
-     1 NringC,NringD,NringE,NringF,KRing3,LRing3,n3r,n3ra,n3rb)
+      CALL Ring656(IRing6,IRing56,NringC,NringD,NringE,NringF,
+     1 KRing3,LRing3,n3r,n3ra,n3rb)
       endif
       Label='closed'
       IR1=6
@@ -582,9 +579,8 @@ C     (o6-5-6) 3-ring fusions
       N3Ring=N3Ring+LRing3
 
 C Cioslowski's increment scheme for IPR fullerenes
-      if(IPR.eq.1) Call Cioslowski(Kring3,
-     1 nl565,IRing5,IRing56,IRing6,MAtom,N5Ring,N6Ring,NRing,NringA,
-     1 NringB,NringC,NringD,NringE,NringF,n3ra,n3rc,Mpatt,E1,E2)
+      if(IPR.eq.1) Call Cioslowski(Kring3,nl565,IRing56,IRing6,
+     1 MAtom,N6Ring,NringC,NringD,NringE,NringF,n3ra,n3rc,Mpatt,E1,E2)
 C     (l5-6-6) 3-ring fusions
       KRing3=0
       LRing3=0
@@ -592,9 +588,8 @@ C     (l5-6-6) 3-ring fusions
       IR1=5
       IR2=6
       if(IRing56.gt.0.and.IRing6.gt.0) then
-      CALL Ring566(Iout,IRing6,IRing56,
-     1 NringC,NringD,NringE,NringF,N5MEM,N6MEM,KRing3,LRing3,
-     1 n3r,n3ra,n3rb)
+      CALL Ring566(IRing6,IRing56,NringC,NringD,NringE,NringF,
+     1 N5MEM,N6MEM,KRing3,LRing3,n3r,n3ra,n3rb)
       endif
       Write(Iout,1008) Label,IR1,IR2,IR3,KRing3
       if(Kring3.ne.0.and.iprint.eq.1) 
@@ -615,16 +610,15 @@ C     (c6-6-6) 3-ring fusions
       IR1=6
       Label='closed'
       if(IRing6.gt.0) then
-      CALL Ring666(Iout,IRing6,
-     1 NringE,NringF,N6MEM,KRing3,LRing3b,LRing3l,n3r,n3ra)
+      CALL Ring666(IRing6,NringE,NringF,
+     1 N6MEM,KRing3,LRing3b,LRing3l,n3r,n3ra)
       endif
       Write(Iout,1008) Label,IR1,IR2,IR3,KRing3
       if(Kring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
       N3Ring=N3Ring+KRing3
 C     Search for Yoshida-Fowler D3h 666555 patterns - C80-like corner patch
-      Call Ninevertexinsert(Kring3,n3ra,nc656,n3rd,NringA,
-     1 NringB,IRing5,numberYF,nYF)
+      Call Ninevertexinsert(Kring3,n3ra,nc656,n3rd,numberYF,nYF)
 
 C     (b6-6-6) 3-ring fusions
       Label='bent  '
@@ -735,8 +729,6 @@ C Print Cioslowsky analysis and check of correctness
  1016 Format(1X,'Error: Number of (5,5) fusions does not match the ',I2,
      1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
      1 'neighboring pentagon indices')
- 1017 Format(1X,'Rhagavachari/Fowler neighboring hexagon indices: (',
-     1 6(I3,','),I4,')')
  1018 Format(1X,'Number vertices matches the ',I5,
      1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
      1 'neighboring hexagon indices h3+h4+h5+h6')
@@ -820,11 +812,10 @@ C Find Wirz-Schwerdtfeger D2h 55-6-55 patterns
       Return
       END
 
-      SUBROUTINE Ninevertexinsert(Kring3,n3ra,nc656,n3rd,
-     1 NringA,NringB,IRing5,numberYF,nYF)
+      SUBROUTINE Ninevertexinsert(Kring3,n3ra,nc656,n3rd,numberYF,nYF)
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION NringA(Emax),NringB(Emax),n3ra(3,Nmax),nFM(4,66)
+      DIMENSION n3ra(3,Nmax),nFM(4,66)
       DIMENSION n3rd(3,Nmax),nYF(6,66),mem(3)
 C Find Yoshida-Fowler D3h 666555 pattern for 9-vertex insertion
       numberYF=0
@@ -868,11 +859,10 @@ C Find Yoshida-Fowler D3h 666555 pattern for 9-vertex insertion
       Return
       END
 
-      SUBROUTINE Threevertexinsert(Kring3,n3ra,
-     1 NringA,NringB,IRing5,numberFM,nFM)
+      SUBROUTINE Threevertexinsert(Kring3,n3ra,numberFM,nFM)
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION NringA(Emax),NringB(Emax),n3ra(3,Nmax),nFM(4,66)
+      DIMENSION n3ra(3,Nmax),nFM(4,66)
       DIMENSION IC(4)
 C Find Yoshida-Fowler D3h 6555 pattern for 3-vertex insertion
       numberfm=0
@@ -1000,14 +990,12 @@ C  4 N14/66 - 2 N14/56 = 0
       Return
       END
 
-      SUBROUTINE Cioslowski(K656,nl565,IRing5,
-     1 IRing56,IRing6,MAtom,N5Ring,N6Ring,NRing,NringA,NringB,
+      SUBROUTINE Cioslowski(K656,nl565,IRing56,IRing6,MAtom,N6Ring,
      1 NringC,NringD,NringE,NringF,n3ra,n3rc,Mpatt,E1,E2)
       use config
       IMPLICIT INTEGER (A-Z)
       Real*8 EMC(30),E1,E2
-      DIMENSION Nring(Mmax),MPatt(30),n3ra(3,Nmax),n3rc(3,Nmax)
-      DIMENSION NringA(Emax),NringB(Emax)
+      DIMENSION MPatt(30),n3ra(3,Nmax),n3rc(3,Nmax)
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
       DIMENSION nhex(6),ihex(6),ipent(6)
@@ -1551,8 +1539,8 @@ C 5555
       Return
       END
  
-      SUBROUTINE Ring666(Iout,I6C,
-     1 NrE,NrF,N6MEM,KRing3,LRing3b,LRing3l,n666,c666)
+      SUBROUTINE Ring666(I6C,NrE,NrF,N6MEM,
+     1 KRing3,LRing3b,LRing3l,n666,c666)
       use config
 C     Search for (o5-5-5) and (c5-5-5) 3-ring fusions
       IMPLICIT INTEGER (A-Z)
@@ -1804,8 +1792,8 @@ C     Next the linear structures
       Return
       END
  
-      SUBROUTINE Ring566(Iout,I6C,I56C,
-     1 NrC,NrD,NrE,NrF,N5MEM,N6MEM,KRing3,LRing3,n566,b566,l566)
+      SUBROUTINE Ring566(I6C,I56C,NrC,NrD,NrE,NrF,
+     1 N5MEM,N6MEM,KRing3,LRing3,n566,b566,l566)
       use config
 C     Search for (o5-5-5) and (c5-5-5) 3-ring fusions
       IMPLICIT INTEGER (A-Z)
@@ -1902,8 +1890,8 @@ C     Now sort out linear and bent 566 structures
       Return
       END
  
-      SUBROUTINE Ring656(Iout,I5C,I6C,
-     1 I56C,NrC,NrD,NrE,NrF,KRing3,LRing3,n656,c656,o656)
+      SUBROUTINE Ring656(I6C,I56C,NrC,NrD,NrE,NrF,
+     1  KRing3,LRing3,n656,c656,o656)
       use config
 C     Search for (o5-5-5) and (c5-5-5) 3-ring fusions
       IMPLICIT INTEGER (A-Z)
@@ -1961,8 +1949,8 @@ C     Now sort out closed and open 656 structures
       Return
       END
  
-      SUBROUTINE Ring565(Iout,I5C,I56C,NrA,NrB,
-     1 NrC,NrD,KRing3,LRing3,n565,b565,l565,N5Ring,N6Ring,N5MEM,N6MEM)
+      SUBROUTINE Ring565(I5C,I56C,NrA,NrB,NrC,NrD,KRing3,LRing3,
+     1 n565,b565,l565,N5MEM,N6MEM)
       use config
 C     Search for (o5-5-5) and (c5-5-5) 3-ring fusions
       IMPLICIT INTEGER (A-Z)
@@ -2059,14 +2047,14 @@ C     Now store the linear fusions
       Return
       END
  
-      SUBROUTINE Ring556(Iout,I5C,I56C,
-     1 NrA,NrB,NrC,NrD,KRing3,LRing3,n556,c556,o556)
+      SUBROUTINE Ring556(I5C,I56C,NrA,NrB,NrC,NrD,
+     1 KRing3,LRing3,n556,c556,o556)
       use config
 C     Search for (o5-5-5) and (c5-5-5) 3-ring fusions
       IMPLICIT INTEGER (A-Z)
       DIMENSION NrA(Emax),NrB(Emax)
       DIMENSION NrC(Emax),NrD(Emax)
-      DIMENSION IS(6),JS(6)
+      DIMENSION IS(6)
       Integer n556(3,Nmax*11),c556(3,Nmax),o556(3,Nmax)
 C     Write out all 3-ring 556 connections first then sort them out
       ndim = Nmax*11
@@ -2137,8 +2125,7 @@ C     Sort out duplicates
       Return
       END
  
-      SUBROUTINE Ring555(Iout,I5C,
-     1 NrA,NrB,KRing3,LRing3,n555,n555f,m555)
+      SUBROUTINE Ring555(I5C,NrA,NrB,KRing3,LRing3,n555,n555f,m555)
       use config
 C     Search for (o5-5-5) and (c5-5-5) 3-ring fusions
       IMPLICIT INTEGER (A-Z)
@@ -2570,7 +2557,7 @@ C     Calculate the volume for C50 using R5
       RETURN
       END
 
-      SUBROUTINE Ring5(Ncount5,IN,I5,Nmax,Mmax,IPA,N5MEM,N5MEMS)
+      SUBROUTINE Ring5(Ncount5,IN,I5,Mmax,IPA,N5MEM,N5MEMS)
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION IPa(6,96),N5MEM(Mmax,5),N5MEMS(Mmax,5)
       DIMENSION ISM(6),JSM(6)
@@ -2627,7 +2614,7 @@ C     Print*,ISM,' Sorted ',JSM
       RETURN
       END
 
-      SUBROUTINE Ring6(Ncount6,IN,I6,Nmax,Mmax,IPA,N6MEM,N6MEMS)
+      SUBROUTINE Ring6(Ncount6,IN,I6,Mmax,IPA,N6MEM,N6MEMS)
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION IPa(6,96),N6MEM(Mmax,6),N6MEMS(Mmax,6)
       DIMENSION ISM(6),JSM(6)
