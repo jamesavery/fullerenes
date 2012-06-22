@@ -1,4 +1,3 @@
-# $Id: $
 
 .PHONY: all
 all: UserManual.pdf
@@ -10,21 +9,14 @@ UserManual.pdf: UserManual.tex
 tree.pdf: tree.tex
 	latex tree.tex
 	latex tree.tex
-	latex tree.tex
 	dvips tree.dvi
 	ps2pdf tree.ps
 
-UserManual.aux: UserManual.tex
-	pdflatex UserManual.tex
-
-UserManual.bbl: UserManual.aux
-	bibtex UserManual.aux
-
 .PHONY: clean
 clean:
-	rm -f UserManual.ps *.dvi UserManual.bbl UserManual.blg UserManual.toc *.aux *.log *~ 
+	rm -f *.log *.aux *.dvi *.ps *.bib
 
 .PHONY: purge
 purge: clean
-	rm -f UserManual.pdf
+	rm -f UserManual.pdf tree.pdf
 

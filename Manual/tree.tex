@@ -7,17 +7,15 @@
 
 \thispagestyle{empty}
 \begin{document}
-
-foo
-\small
+\tiny
 \begin{pspicture}(2,-8)(20,8)
 %\psgrid
-\renewcommand{\psedge}{\ncline[]{<-}}
+\renewcommand{\psedge}{\ncline[linewidth=.5pt]{<-}}
 \pstree[treemode=R,levelsep=3cm,radius=2pt]{\Tr{main}}{%
 	\Tr{date\_and\_time (--)}
-	\pstree{\Tr{timer (main.f)}}{\Tr{dtime}}
+	\pstree{\Tr{timer (main.f)}}{\Tr{dtime (--)}}
     \Tr{datain (datain.f)}
-	\Tr{coordc60 (coord.f)}
+	\Tr{coordc20c60 (coord.f)}
 	\pstree{\Tr{optff (opt.f)}}{
 		\pstree{\Tr{frprmn3d (opt.f)}}{
 			\skiplevels{2}
@@ -33,10 +31,25 @@ foo
 			\pstree{\Tr{mnbrak3d (opt.f)}}{\Tr[name=f1dim3d]{f1dim3d (opt.f)}}
 			\Tr[name=brent3d]{brent3d (opt.f)}
 		}
-		\pstree{\Tr{distan (util.f)}}{\Tr{$X_1$} \Tr{$X_2$}}
-		\pstree{\TC*}{\Tr{$Y_1$} \Tr{$Y_2$}}
+		\Tr{distan (util.f)}
 	}
-	\Tr{coordbuild}
+	\pstree{\Tr{coordbuild (pentindex.f)}}{
+		\Tr{isomerget (pentindex.f)}
+		\Tr{windup}
+		\Tr{unwind}
+		\Tr{canspiral}
+		\Tr{dual}
+		\Tr{adjacency\_matrix}
+		\Tr{tred2}
+		\Tr{tqli}
+		\Tr{HueckelAnalyze}
+		\Tr{Distan}
+		\Tr{diameter}
+		\Tr{dipole (pentindex.f)}
+		\Tr{tutte\_layout}
+		\Tr{spherical\_layout}
+		\Tr{delete\_fullerene\_graph}
+	}
 	\Tr{chiral}
 	\Tr{isomers}
 	\Tr{MoveCM}
