@@ -103,7 +103,7 @@ C Options for Input coordinates
 C  Cartesian coordinates produced for Ih C60
    10 routine='COORDC20/60  '
       Write(Iout,1008) routine
-      CALL CoordC60(Iout,MAtom,R5,R6,Dist)
+      CALL CoordC20C60(Iout,MAtom,R5,R6,Dist)
       Do I=1,60
         IAtom(I)=6
       enddo

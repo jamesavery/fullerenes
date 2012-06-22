@@ -209,7 +209,7 @@ C     Calculate the moment of inertia tensor and diagonalize (no mass)
       Return
       END
  
-      SUBROUTINE CoordC60(Iout,MAtom,R5,R6,Dist)
+      SUBROUTINE CoordC20C60(Iout,MAtom,R5,R6,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     This routine constructs coordinates for the ideal capped icosahedron
