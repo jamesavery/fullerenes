@@ -1,28 +1,28 @@
-!
-!           P R O G R A M     F U L L E R E N E
-!
-!--------------------------------------------------------------------------
-!
-! A PROGRAM FOR STRUCTURE GENERATION AND TOPOLOGICAL ANALYSIS OF FULLERENES
-!    The program creates cartesian coordinates for fullerenes isomers
-!        and performs a topological/graph theoretical analysis.
-!      The results can be used for plotting 2D/3D fullerene graphs
-!    (e.g. Schlegel diagrams) and structures, and as a starting point
-!            for further quantum theoretical treatment. 
-!        Version 4 now incorporates C++ routines linked to the
-!       original Fortran program using much improved algorithms.
-!
-!----------------------------------------------------------------------------
-!| Important Copyright Message: Hey there is none! If you like to know why  |
-!| read Darrel C. Ince1, Leslie Hatton, John Graham-Cumming, Nature 482,    |
-!| p.485 (2012). So: You may do whatever you like with this program, but if |
-!| you use it and publish data please cite at least the references given    |
-!| below. The program is however not available for commercial purposes.     |
-!| The book of Fowler and Manolopoulos is highly recommended. It helps      |
-!| understanding how this program functions (the book is fun to read as     |
-!| well. Many of the concepts used in this program can be found in this     | 
-!| book. A standard book on graph theory helps as well.                     |
-!----------------------------------------------------------------------------
+!                                                                           !
+!           P R O G R A M     F U L L E R E N E                             !
+!                                                                           !
+!---------------------------------------------------------------------------!
+!                                                                           !
+! A PROGRAM FOR STRUCTURE GENERATION AND TOPOLOGICAL ANALYSIS OF FULLERENES !
+!    The program creates cartesian coordinates for fullerenes isomers       !
+!        and performs a topological/graph theoretical analysis.             !
+!      The results can be used for plotting 2D/3D fullerene graphs          !
+!    (e.g. Schlegel diagrams) and structures, and as a starting point       !
+!            for further quantum theoretical treatment.                     !
+!        Version 4 now incorporates C++ routines linked to the              !
+!       original Fortran program using much improved algorithms.            !
+!                                                                           !
+!---------------------------------------------------------------------------!
+!  Important Copyright Message: Hey there is none! If you like to know why  !
+!  read Darrel C. Ince1, Leslie Hatton, John Graham-Cumming, Nature 482,    !
+!  p.485 (2012). So: You may do whatever you like with this program, but if !
+!  you use it and publish data please cite at least the references given    !
+!  below. The program is however not available for commercial purposes.     !
+!  The book of Fowler and Manolopoulos is highly recommended. It helps      !
+!  understanding how this program functions (the book is fun to read as     !
+!  well. Many of the concepts used in this program can be found in this     ! 
+!  book. A standard book on graph theory helps as well.                     !
+!---------------------------------------------------------------------------!
 
       PROGRAM Fullerene
       use config
@@ -33,7 +33,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
       DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
-      DIMENSION forceWu(9),forceWuP(9)
+      real(8) force(ffmaxdim),forceP(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
       DIMENSION Icon2(Nmax*Nmax),distP(Nmax),IDA(Nmax,Nmax)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax)
@@ -47,7 +47,7 @@ C    Set the dimensions for the distance matrix
       Real*4 TimeX
 CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER CDAT*8,CTIM*10,Zone*5
-      CHARACTER*1  Symbol
+      CHARACTER*1 Symbol
       CHARACTER*2 El(99)
       CHARACTER*13 routine
       CHARACTER*20 xyzname
@@ -100,8 +100,8 @@ C  INPUT and setting parameters for running the subroutines
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,
-     1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,forceWu,
-     1  forceWuP,xyzname,chkname,TEXTINPUT)
+     1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,force,forceP,
+     1  xyzname,chkname,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -114,30 +114,31 @@ C  Cartesian coordinates produced for Ih C60
       Write(Iout,1008) routine
       CALL CoordC60(Iout,MAtom,R5,R6,Dist)
       Do I=1,60
-       IAtom(I)=6
+        IAtom(I)=6
       enddo
       Go to 40
 C Input Cartesian coordinates for fullerenes
    20 if(icyl.ge.2) then
-       Open(unit=7,file=xyzname,form='formatted')
-       WRITE(Iout,1015) xyzname 
-       Read(7,*) MAtom
-       Read(7,1018) (TEXTINPUT(I),I=1,nzeile)
-       endzeile=0
-       do j=1,nzeile
-        if(TEXTINPUT(j).ne.' ') endzeile=j
-       enddo 
-       WRITE(Iout,1017) MAtom,(TEXTINPUT(I),I=1,endzeile)
-       Do J=1,MAtom
-        Read(7,*,end=21) element,(Dist(I,J),I=1,3)
-        Iatom(j)=6
-       enddo
-       close(unit=7)
-       xyzname='cylviewnew.xyz'
+        Open(unit=7,file=xyzname,form='formatted')
+        WRITE(Iout,1015) xyzname 
+        Read(7,*) MAtom
+        Read(7,1018) (TEXTINPUT(I),I=1,nzeile)
+        endzeile=0
+        do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo 
+        WRITE(Iout,1017) MAtom,(TEXTINPUT(I),I=1,endzeile)
+        Do J=1,MAtom
+          Read(7,*,end=21) element,(Dist(I,J),I=1,3)
+          Iatom(j)=6
+        enddo
+        close(unit=7)
+        xyzname='cylviewnew.xyz'
       else
-       Do J=1,MAtom
-        Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
-       enddo
+        Do J=1,MAtom
+          write(*,*)j,matom,'t1',icyl
+          Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
+        enddo
       endif
       Go to 40
    21 WRITE(Iout,1016)
@@ -246,25 +247,33 @@ C Establish all closed ring systems
      1 DistMat)
 
 C Optimize Geometry through force field method
+c we check for ISW because the coordinates shouldn't be optimized before
+c a stone wales (or any other transformation) is done
       If(Iopt.ne.0.and.ISW.eq.0) then
-      routine='OPTFF        '
-      ftol=ftolP
-      Write(Iout,1008) routine
-      if(Iopt.eq.2) then
-        ftol=ftolP*1.d3
-        Write(Iout,1003)
-        fcoulomb=forceWu(9)
-        CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
-     1   N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
-       ftol=ftolP
-       Do I=1,9
-        forceWu(I)=forceWuP(I)
-       enddo
-      endif
-      CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
-     1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
-      Iprint=0
-      forceWu(9)=fcoulomb
+        routine='OPTFF        '
+        ftol=ftolP
+        Write(Iout,1008) routine
+        if(Iopt.eq.1 .or. Iopt.eq.2) then ! vanilla Wu or Wu + Coulomb
+          if(Iopt.eq.2) then ! Wu + Coulomb
+            ftol=ftolP*1.d3
+            Write(Iout,1003)
+c            fcoulomb=force(9) ! not used anywhere?
+            CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
+     1        N5MEM,N6MEM,Dist,Rdist,ftol,force,iopt)
+c            ftol=ftolP ! reset tolerance
+c            Do i=1,9 ! reset force field to default
+c              force(i)=forceP(i)
+c            enddo
+          endif
+          CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring, ! vanilla Wu
+     1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
+          Iprint=0
+c          force(9)=fcoulomb ! not used anywhere?
+        else if(Iopt.eq.3) then ! extended Wu, 18 parameters
+          CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
+     1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
+        endif
+
       Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
      1 Dist,DistCM,El)
       routine='DISTMATRIX   '

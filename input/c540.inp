@@ -1,6 +1,7 @@
 C540  6-31G opt. geom. minimum -20577.06531 au not converged out
 &Coord NA=540, IC=1, ixyz=1 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=2, ISO1=8, ISO2=9, ISO3=174 /

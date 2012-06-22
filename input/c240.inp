@@ -1,6 +1,7 @@
 C240 6-31G opt. geom. minimum -9144.76260 au not converged out
 &Coord NA=240 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=2, ISO1=12, ISO2=13,ISO3=26, PS=30. /

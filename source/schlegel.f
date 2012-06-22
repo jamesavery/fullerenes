@@ -22,7 +22,7 @@ C or face is at the top. Euler angles are used for rotation.
       Character*12 Symbol1
       type(c_ptr) :: g, frog, new_fullerene_graph, read_fullerene_graph
 
-      Data epsf,dpi/.12d0,3.14159265358979d0/
+      Data epsf/.12d0/
 C     Parameter set for Program QMGA
       Data DPoint,Dedge/0.5d0,0.1d0/
 
@@ -840,7 +840,7 @@ C    1 'atoms ',3I4)
       SUBROUTINE Rotmat(Iout,Rot,vec)
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Rot(3,3),vec(3),vec1(3)
-      data dpi,eps/3.14159265358979d0,1.d-8/
+      data eps/1.d-8/
 C     Construct rotation matrix for turning vec into (0,0,1)
 C     First rotate around y-axis to produce (0,y1,z1)
       beta=datan(-vec(1)/vec(3))

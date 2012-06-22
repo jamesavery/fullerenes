@@ -1,6 +1,7 @@
 C180  cc-pvdz opt. geom. minimum -6860.35515 au not converged out
 &Coord NA=180, IC=1, ixyz=1 /
-&Opt Iopt=1 /
+&FFChoice Iopt=1 /
+&FFParameters /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=7 scalePPG=1.5 /

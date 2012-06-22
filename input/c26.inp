@@ -1,6 +1,7 @@
 C26 aug-cc-pvdz B3LYP opt. geom. minimum C1-sym E=-990.1561223 au
 &Coord NA=26, IC=1, IP=1, ixyz=1 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton IHam=1 /
 &Isomers IPR=1, IPH=1 /
 &Graph ISchlegel=1, ISO1=7, ISO2=16, ISO3=20 /

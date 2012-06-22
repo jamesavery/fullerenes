@@ -1,6 +1,7 @@
 C20 aug-cc-pvtz B3LYP opt. geom. minimum E=-761.6628130 au
 &Coord NA=20, IC=1 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton /
 &Isomers IPR=2, IPH=1 /
 &Graph ISchlegel=1, ISO1=2, ISO2=4, ISO3=6 /

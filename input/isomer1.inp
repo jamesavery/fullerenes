@@ -1,6 +1,7 @@
 C92 Creating isomer list only
 &Coord NA=92, IC=0 /
-&Opt Iopt=1 /
+&FFChoice Iopt=1 /
+&FFParameters /
 &Hamilton Iham=1 /
 &Isomers IPR=1 IPH=1 istop=1 /
 &Graph /

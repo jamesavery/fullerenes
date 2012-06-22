@@ -1,11 +1,12 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
      1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,leapGC,iupac,
      1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
-     1 ilp,IYF,IWS,nzeile,
-     1 PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,forceWu,forceWuP,
-     1 xyzname,chkname,DATEN)
+     1 ilp,IYF,IWS,nzeile,PS,TolX,R5,R6,Rdist,scale,scalePPG,
+     1 ftol,force,forceP,xyzname,chkname,DATEN)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      Dimension forceWu(9),forceWuP(9)
+      integer iopt
+      real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF and default FF.  force and forceP (=permanent) are equal if there are no input parameters
       integer endzeile
       Character*1 DATEN(nzeile)
       Character xyzname*20
@@ -15,51 +16,69 @@
       Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,leapGC,ihueckel,ISW,KE,loop,mirror,
      1 IYF,IWS,xyzname
-      Namelist /Opt/ Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
+      Namelist /FFChoice/ Iopt
+      Namelist /FFParameters/ ftol,fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
+     1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
+     1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
       Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,PS,scale,scalePPG
 C Input send to output
       if(ilp.eq.0) then   
-       WRITE(IOUT,100)
-       Do I=1,200
-       READ(IN,'(132(A1))',END=11) (DATEN(j),j=1,nzeile)
-       endzeile=0
-       do j=1,nzeile
-        if(DATEN(j).ne.' ') endzeile=j
-       enddo
-       WRITE(IOUT,60) (DATEN(j),j=1,endzeile)
-       enddo
-   11  WRITE(IOUT,101)
-       REWIND IN
-       ilp=1
-      else
-       WRITE(IOUT,108)
+        WRITE(IOUT,100)
+        Do I=1,200
+          READ(IN,'(132(A1))',END=11) (DATEN(j),j=1,nzeile)
+            endzeile=0
+            do j=1,nzeile
+              if(DATEN(j).ne.' ') endzeile=j
+            enddo
+            WRITE(IOUT,60) (DATEN(j),j=1,endzeile)
+          enddo
+   11     WRITE(IOUT,101)
+          REWIND IN
+          ilp=1
+        else
+        WRITE(IOUT,108)
       endif
-C     Defining the Wu force field
-      forceWuP(1)=1.455d0
-      WuR5=1.455d0
-      forceWuP(2)=1.391d0
-      WuR6=1.391d0
-      forceWuP(3)=1.08d2
-      WuA5=1.08d2
-      forceWuP(4)=1.2d2
-      WuA6=1.2d2
-      forceWuP(5)=1.d6
-      forceWuP(6)=1.d6
-      WufR=1.d6
-      forceWuP(7)=1.d5
-      forceWuP(8)=1.d5
-      WufA=1.d5
-      forceWuP(9)=0.d0
-      fCoulomb=0.d0
+
+C tolerance parameter (to be used in all force fields)
       ftol=1.d-8
-C     More Parameters
+
+C Defining the Wu force field (default values)
+      WuR5=1.455d0
+      WuR6=1.391d0
+      WuA5=1.08d2
+      WuA6=1.2d2
+      WufR=1.d6
+      WufA=1.d5
+      fcoulomb=0.d0
+
+C Defining an extension of the Wu force field (default values)
+c     three distances: zero values
+      ExtWuR55=1.5d0 ! guess
+      ExtWuR56=1.455d0
+      ExtWuR66=1.391d0
+c     two angles: zero values
+      ExtWuA5=1.08d2
+      ExtWuA6=1.2d2
+c     four dihedrals: zero values (all guessed)
+      ExtWuDppp=3.0d1
+      ExtWuDhpp=2.0d1
+      ExtWuDhhp=1.0d1
+      ExtWuDhhh=0.0d1
+c     three distances: forces (let's assume they are all the same)
+      ExtWufR=1.0d6
+c     three angles: forces (let's assume they are all the same)
+      ExtWufA=1.0d5
+c     four dihedrals: forces (let's assume they are all the same)
+      ExtWufD=1.d5
+
+C more default parameters
       blank=' '
       xyz='.xyz'
       xyzname='cylview'
       chkname='checkpoint'
-      IOpt=0    !  No optimization
+      IOpt=0    !  No (force field) optimization
       IHam=0    !  Number of Hamiltonian cycles
       mirror=0  !  Invert coordinates
       loop=0    !  Option for compound job
@@ -108,14 +127,48 @@ C     Old input
 C     Read(IN,*) NA,IC,Iopt,IP,IHam,IPR,IS,ISO2,ISO2,ISO3,PS,TolR
 C     New input    
       READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
-       endzeile=0
-       do j=1,nzeile
+      endzeile=0
+      do j=1,nzeile
         if(DATEN(j).ne.' ') endzeile=j
-       enddo
+      enddo
       WRITE(IOUT,60) (DATEN(j),j=1,endzeile)
       WRITE(IOUT,101)
       Read(IN,nml=Coord,Err=99,end=99)
-      Read(IN,nml=Opt,Err=99,end=99)
+      Read(IN,nml=FFChoice,Err=99,end=99)
+c set forceP (default parameters)[needs to be done after iopt and before opt is read]
+      if(iopt.eq.1 .or. iopt.eq.2)then
+C Wu force field
+        forceP(1)=WuR5
+        forceP(2)=WuR6
+        forceP(3)=WuA5
+        forceP(4)=WuA6
+        forceP(5)=WufR
+        forceP(6)=WufR
+        forceP(7)=WufA
+        forceP(8)=WufA
+        forceP(9)=fCoulomb
+      else if(iopt.eq.3)then
+C ExtWu forceP field
+        forceP(1)=ExtWuR55
+        forceP(2)=ExtWuR56
+        forceP(3)=ExtWuR66
+        forceP(4)=ExtWuA5
+        forceP(5)=ExtWuA6
+        forceP(6)=ExtWuDppp
+        forceP(7)=ExtWuDhpp
+        forceP(8)=ExtWuDhhp
+        forceP(9)=ExtWuDhhh
+        forceP(10)=ExtWufR
+        forceP(11)=ExtWufR
+        forceP(12)=ExtWufR
+        forceP(13)=ExtWufA
+        forceP(14)=ExtWufA
+        forceP(15)=ExtWufD
+        forceP(16)=ExtWufD
+        forceP(17)=ExtWufD
+        forceP(18)=ExtWufD
+      endif
+      Read(IN,nml=FFParameters,Err=99,end=99)
       Read(IN,nml=Hamilton,Err=99,end=99)
       Read(IN,nml=Isomers,Err=99,end=99)
       Read(IN,nml=Graph,Err=99,end=99)
@@ -124,16 +177,41 @@ C Set Parameters
    99 if(IC.lt.0) IC=0
       if(IC.gt.5) IC=5
       if(ichk.ne.0) istop=1
-C  Wu force field
-      forceWu(1)=WuR5
-      forceWu(2)=WuR6
-      forceWu(3)=WuA5
-      forceWu(4)=WuA6
-      forceWu(5)=WufR
-      forceWu(6)=WufR
-      forceWu(7)=WufA
-      forceWu(8)=WufA
-      forceWu(9)=fCoulomb
+
+c set force (custom parameters)
+      if(iopt.eq.1 .or. iopt.eq.2)then
+C Wu force field
+        force(1)=WuR5
+        force(2)=WuR6
+        force(3)=WuA5
+        force(4)=WuA6
+        force(5)=WufR
+        force(6)=WufR
+        force(7)=WufA
+        force(8)=WufA
+        force(9)=fCoulomb
+      else if(iopt.eq.3)then
+C ExtWu force field
+        force(1)=ExtWuR55
+        force(2)=ExtWuR56
+        force(3)=ExtWuR66
+        force(4)=ExtWuA5
+        force(5)=ExtWuA6
+        force(6)=ExtWuDppp
+        force(7)=ExtWuDhpp
+        force(8)=ExtWuDhhp
+        force(9)=ExtWuDhhh
+        force(10)=ExtWufR
+        force(11)=ExtWufR
+        force(12)=ExtWufR
+        force(13)=ExtWufA
+        force(14)=ExtWufA
+        force(15)=ExtWufD
+        force(16)=ExtWufD
+        force(17)=ExtWufD
+        force(18)=ExtWufD
+      endif
+
 C  Filename for CYLVIEW
       do I=2,20
        if(xyzname(I:I).eq.blank) then
@@ -149,6 +227,7 @@ C  Filename for CYLVIEW
        endif
       endif
       xyzname=xyzname(1:npos)//xyz  !  Option for naming file for cylview program
+
 C  Check on number of atoms (vertices)
       NA=IABS(NA)
       if(NA.gt.NAtomax) WRITE(IOUT,102) NA

@@ -1,13 +1,13 @@
       module config
-      integer nmax,msrs,nmaxl,mmax,nspscale,
-     1        nspirals,emax,maxit
-      PARAMETER (Nmax=5000)    !  Change NMAX if RAM is not sufficient
-      PARAMETER (msrs=56+1)     !  Size of Schlegel output matrix
-      PARAMETER (NmaxL=(Nmax*(Nmax-1))/2)
-      PARAMETER (Mmax=Nmax/2+2)
-      PARAMETER (NSpScale=12)
-      PARAMETER (NSpirals=Mmax*NSpScale)
-      PARAMETER (Emax=3*Nmax/2)
-      PARAMETER (maxit=2000000)       
+      integer,parameter :: Nmax=5000 !  Change NMAX if RAM is not sufficient
+      integer,parameter :: msrs=56+1 !  Size of Schlegel output matrix
+      integer,parameter :: NmaxL=(Nmax*(Nmax-1))/2
+      integer,parameter :: Mmax=Nmax/2+2
+      integer,parameter :: NSpScale=12
+      integer,parameter :: NSpirals=Mmax*NSpScale
+      integer,parameter :: Emax=3*Nmax/2
+      integer,parameter :: maxit=2000000
+      integer,parameter :: ffmaxdim=18 ! maximum number of parameters per force field
+      real(8),parameter :: DPI=3.14159265358979d0 
       save
       end module config

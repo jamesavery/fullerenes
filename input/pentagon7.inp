@@ -1,6 +1,7 @@
 C96 Using Tutte embedding to produce coordinates
 &Coord NA=96, IC=4 /
-&Opt Iopt=1 /
+&FFChoice Iopt=1 /
+&FFParameters /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /

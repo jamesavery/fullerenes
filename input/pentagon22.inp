@@ -1,6 +1,7 @@
 C840 I could not locate eigenvectors for FM, using Tutte instead
 &Coord NA=840, IC=4, R6=1.42, ixyz=1, xyzname='pent22' /
-&Opt Iopt=1 /
+&FFChoice Iopt=1 /
+&FFParameters /
 &Hamilton /
 &Isomers  /
 &Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /

@@ -408,7 +408,7 @@ C     Unpack distance matrix value from linear vector
 C     Unpack distance matrix value from linear vector
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension DistMat(NmaxL)
-      Data dpi/3.14159265358979d0/
+c      Data dpi/3.14159265358979d0/
       I1=I
       J1=J
       IF(I.lt.J) then

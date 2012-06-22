@@ -1,6 +1,7 @@
 C62 Creating isomer list only
 &Coord NA=100, IC=0 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton /
 &Isomers IPR=1 IPH=1 istop=1 /
 &Graph /

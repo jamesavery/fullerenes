@@ -1,6 +1,7 @@
 C76   0 0 0 1 1   2 1 6 55     0. 0.  cc-pvdz B3LYP opt. geom. minimum -2896.102677199 au
 &Coord NA=76, IC=1 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton Iham=1 /
 &Isomers /
 &Graph ISchlegel=2, ISO1=1, ISO2=6, ISO3=55 /

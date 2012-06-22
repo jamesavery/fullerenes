@@ -1,6 +1,7 @@
 C74    cc-pvdz B3LYP opt. geom. minimum -2819.8928353 au
 &Coord NA=74, IC=1, ixyz=1 /
-&Opt Iopt=1 /
+&FFChoice Iopt=1 /
+&FFParameters /
 &Hamilton IHam=1/
 &Isomers IPR=1 /
 &Graph ISchlegel=2, ISO1=3, ISO2=4, ISO3=13 /

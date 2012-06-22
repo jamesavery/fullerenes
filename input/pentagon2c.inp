@@ -1,6 +1,7 @@
 C60 Using FM algorithm for coordinates, eigenvectors are not in order 2 3 4
 &Coord NA=60, IC=4, IP=1, R6=1.42, ixyz=1 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=2 ISO1=1 ISO2=2 ISO3=3 /

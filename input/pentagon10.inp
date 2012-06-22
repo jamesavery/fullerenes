@@ -1,6 +1,7 @@
 C40  Using FM algorithm to produce coordinates
 &Coord NA=40, IC=2, IP=1 /
-&Opt Iopt=1 /
+&FFChoice Iopt=1 /
+&FFParameters /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=2 /

@@ -1,6 +1,7 @@
 C60  nanotube Lanl2DZ B3LYP optimized
 &Coord NA=60, IC=1, ixyz=1 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=1 /

@@ -1,6 +1,7 @@
 C36 aug-cc-pvdz B3LYP opt. geom. minimum D2h-sym E=-1371.3904747 au
 &Coord NA=36, IC=1 /
-&Opt /
+&FFChoice /
+&FFParameters /
 &Hamilton IHam=1/
 &Isomers IPR=2/
 &Graph ISchlegel=2, ISO1=1, ISO2=7, ISO3=8 /

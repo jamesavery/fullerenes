@@ -5,8 +5,8 @@
 C  This subroutine optimizes the fullerene graph using spring embedding
       DIMENSION Dist(2,NMAX),IC3(NMAX,3)
       DIMENSION IDA(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
-      Data Rdist,ftol,dpi,conv/1.d0,.5d-10,3.14159265358979d0,
-     1 6.0221367d-3/
+      Data Rdist,ftol,conv/1.d0,.5d-10,1 6.0221367d-3/
+c      Data dpi/3.14159265358979d0/
       rmin=1.d10
       rmax=0.d0
       rper=0.d0
@@ -378,40 +378,64 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       END
 
       SUBROUTINE OptFF(MAtom,Iout,IDA,N5,N6,
-     1 N5MEM,N6MEM,Dist,Rdist,ftol,forceWu)
+     1 N5MEM,N6MEM,Dist,Rdist,ftol,force,iopt)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-C  This subroutine optimizes the fullerene 3D structure using the Wu force field:
-C   Z. C. Wu, D. A. Jelski, T. F. George, "Vibrational Motions of
-C   Buckminsterfullerene", Chem. Phys. Lett. 137, 291-295 (1987).
-C   Original force field in forceWu
-C   Angstroem and rad is used for bond distances and bond length
-C   Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
+C  This subroutine optimizes the fullerene 3D structure using a force field
+c  (e.g. the Wu force field):  Z. C. Wu, D. A. Jelski, T. F. George, "Vibrational
+c  Motions of Buckminsterfullerene", Chem. Phys. Lett. 137, 291-295 (1987).
+C  Angstroem and rad is used for bond distances and bond length
+C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION Dist(3,NMAX)
       DIMENSION IDA(NMAX,NMAX)
-      DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6),force(9),forceWu(9)
-      Data dpi,conv/3.14159265358979d0,6.0221367d-3/
-      IOP=1
-      force(1)=forceWu(1)
-      force(2)=forceWu(2)
-C     Conversion of angles in rad
-      conrad=dpi/180.d0
-      force(3)=forceWu(3)*conrad
-      force(4)=forceWu(4)*conrad
-C     Conversion of dyn/cm in a.u. / Angstroem**2
-      force(5)=.5d0*forceWu(5)*conv*3.80879844d-4
-      force(6)=.5d0*forceWu(6)*conv*3.80879844d-4
-      force(7)=.5d0*forceWu(7)*conv*3.80879844d-4
-      force(8)=.5d0*forceWu(8)*conv*3.80879844d-4
-C     Leave parameter for Coulomb force as it is
-      force(9)=forceWu(9)
+      DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6)
+      dimension force(ffmaxdim)
+c      Data dpi,conv/3.14159265358979d0,6.0221367d-3/ ! moven to conf.mod
+c      IOP=1
+      deg2rad=dpi/180.d0
+      dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
+      if(iopt.eq.1 .or. iopt.eq.2) then
+        force(1)=force(1)
+        force(2)=force(2)
+C       Conversion of angles in rad
+        force(3)=force(3)*deg2rad
+        force(4)=force(4)*deg2rad
+C       Conversion of dyn/cm in a.u. / Angstroem**2
+        force(5)=force(5)*dynpercm2auperaa
+        force(6)=force(6)*dynpercm2auperaa
+        force(7)=force(7)*dynpercm2auperaa
+        force(8)=force(8)*dynpercm2auperaa
+C       Leave parameter for Coulomb force as it is
+        force(9)=force(9)
+      else if (iopt.eq.3)then
+        force(1)=force(1)
+        force(2)=force(2)
+        force(3)=force(3)
+C       Conversion of angles and dihedrals in rad
+        force(4)=force(4)*deg2rad
+        force(5)=force(5)*deg2rad
+        force(6)=force(6)*deg2rad
+        force(7)=force(7)*deg2rad
+        force(8)=force(8)*deg2rad
+        force(9)=force(9)*deg2rad
+C       Conversion of dyn/cm in a.u. / Angstroem**2
+        force(10)=force(10)*dynpercm2auperaa
+        force(11)=force(11)*dynpercm2auperaa
+        force(12)=force(12)*dynpercm2auperaa
+        force(13)=force(13)*dynpercm2auperaa
+        force(14)=force(14)*dynpercm2auperaa
+        force(15)=force(15)*dynpercm2auperaa
+        force(16)=force(16)*dynpercm2auperaa
+        force(17)=force(17)*dynpercm2auperaa
+        force(18)=force(18)*dynpercm2auperaa
+      end if
       M=Matom/2+2
 C     Optimize
       Write(IOUT,1000) Rdist
       Write(Iout,1003) (force(i),i=1,9),ftol
-      if(forceWu(9).gt.0.d0) Write(Iout,1004) forceWu(9)
-      CALL frprmn3d(IOP,MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
-     1 Dist,force,ftol,iter,fret)
+      if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
+      CALL frprmn3d(MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
+     1 Dist,force,iopt,ftol,iter,fret)
       if(fret.gt.1.d-2) then
       fretn=fret/dfloat(MATOM)
       Write(IOUT,1002) fretn
@@ -440,13 +464,13 @@ C     Optimize
       Return 
       END
 
-      SUBROUTINE frprmn3d(IOP,N,AH,Iout,N5,N6,N5M,N6M,
-     1 p,force,ftol,iter,fret)
+      SUBROUTINE frprmn3d(N,AH,Iout,N5,N6,N5M,N6M,
+     1 p,force,iopt,ftol,iter,fret)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=99999,EPS=1.d-9)
       Real*8 p(NMAX*3),g(NMAX*3),h(NMAX*3),xi(NMAX*3)
-      Real*8 pcom(NMAX*3),xicom(NMAX*3),force(9)
+      Real*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
@@ -459,18 +483,18 @@ C     number of iterations; EPS is a small number to rectify special case of con
 C     zero function value.
 C     USES dfunc3d,func3d,linmin3d
 C     func3d input vector p of length n user defined to be optimized
-C     IOP=1: Wu force field optimization
+C     IOPT=1: Wu force field optimization
       iter=0
-      CALL func3d(IOP,N,IERR,AH,N5,N6,N5M,N6M,p,fp,force)
+      CALL func3d(N,IERR,AH,N5,N6,N5M,N6M,p,fp,force,iopt)
       if(IERR.ne.0) then
-      Write(Iout,1004)
-      return
+        Write(Iout,1004)
+        return
       endif
 C     dfunc3d input vector p of length N, output gradient of length n user defined
-      CALL dfunc3d(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
+      CALL dfunc3d(N,AH,N5,N6,N5M,N6M,p,xi,force,iopt)
       grad2=0.d0
       do I=1,N
-       grad2=grad2+xi(i)*xi(i)
+        grad2=grad2+xi(i)*xi(i)
       enddo
       grad=dsqrt(grad2)
       Write(Iout,1001) iter,fp,grad
@@ -480,23 +504,23 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
         h(j)=g(j)
         xi(j)=h(j)
       enddo
-        fret=0.d0
+      fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linmin3d(IOP,N,AH,N5,N6,N5M,N6M,
-     1   p,pcom,xi,xicom,fret,force)
-         grad2=0.d0
-         do I=1,n
+        call linmin3d(N,AH,N5,N6,N5M,N6M,p,pcom,xi,xicom,fret,
+     1    force,iopt)
+        grad2=0.d0
+        do I=1,n
           grad2=grad2+xi(i)*xi(i)
-         enddo
-         grad=dsqrt(grad2)
+        enddo
+        grad=dsqrt(grad2)
         Write(Iout,1001) iter,fret,grad
         if(2.d0*dabs(fret-fp).le.ftol*(dabs(fret)+dabs(fp)+EPS))then
           Write(Iout,1002) fret,fret-fp
           return
         endif
         fp=fret
-        CALL dfunc3d(IOP,N,AH,N5,N6,N5M,N6M,p,xi,force)
+        CALL dfunc3d(N,AH,N5,N6,N5M,N6M,p,xi,force,iopt)
         gg=0.d0
         dgg=0.d0
         do j=1,n
@@ -523,11 +547,12 @@ C         dgg=dgg+xi(j)**2
       return
       END
 
-      SUBROUTINE linmin3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1 p,pcom,xi,xicom,fret,c)
+      SUBROUTINE linmin3d(n,AH,N5,N6,N5M,N6M,
+     1 p,pcom,xi,xicom,fret,force,iopt)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3),c(9)
+      REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3),
+     1 force(ffmaxdim)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       PARAMETER (TOL=1.d-5)
@@ -538,10 +563,10 @@ C     USES brent3d,f1dim3d,mnbrak3d
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1 ax,xx,bx,fa,fx,fb,xicom,pcom,c)
-      CALL brent3d(IOP,n,AH,N5,N6,N5M,N6M,Iout,fret,
-     1 ax,xx,bx,TOL,xmin,xicom,pcom,c)
+      CALL mnbrak3d(n,AH,N5,N6,N5M,N6M,
+     1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt)
+      CALL brent3d(n,AH,N5,N6,N5M,N6M,Iout,fret,
+     1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt)
       do j=1,n
         xi(j)=xmin*xi(j)
         p(j)=p(j)+xi(j)
@@ -549,33 +574,33 @@ C     USES brent3d,f1dim3d,mnbrak3d
       return
       END
 
-      SUBROUTINE f1dim3d(IOP,n,A,N5,N6,N5M,N6M,
-     1 f1dimf,x,xicom,pcom,c)
+      SUBROUTINE f1dim3d(n,A,N5,N6,N5M,N6M,
+     1 f1dimf,x,xicom,pcom,force,iopt)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3),c(9)
+      REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3)!,force(ffmaxdim)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
 C     USES func3d
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func3d(IOP,n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,c)
+      CALL func3d(n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,force,iopt)
       return
       END
 
-      SUBROUTINE mnbrak3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1 ax,bx,cx,fa,fb,fc,xicom,pcom,c)
+      SUBROUTINE mnbrak3d(n,AH,N5,N6,N5M,N6M,
+     1 ax,bx,cx,fa,fb,fc,xicom,pcom,force,iopt)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
-      REAL*8 pcom(NMAX*3),xicom(NMAX*3),c(9)
-      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1 fa,ax,xicom,pcom,c)
-      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1 fb,bx,xicom,pcom,c)
+      REAL*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
+      CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1 fa,ax,xicom,pcom,force,iopt)
+      CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1 fb,bx,xicom,pcom,force,iopt)
       if(fb.gt.fa)then
         dum=ax
         ax=bx
@@ -585,16 +610,16 @@ C     USES func3d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1 fc,cx,xicom,pcom,c)
+      CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1 fc,cx,xicom,pcom,force,iopt)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
         q=(bx-cx)*(fb-fa)
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,c)
+        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1   fu,u,xicom,pcom,force,iopt)
           if(fu.lt.fc)then
             ax=bx
             fa=fb
@@ -607,32 +632,32 @@ C     USES func3d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,c)
+        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1   fu,u,xicom,pcom,force,iopt)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,c)
+        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1   fu,u,xicom,pcom,force,iopt)
           if(fu.lt.fc)then
             bx=cx
             cx=u
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,c)
+        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1   fu,u,xicom,pcom,force,iopt)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,c)
+        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1   fu,u,xicom,pcom,force,iopt)
         else
           u=cx+GOLD*(cx-bx)
         if(u.gt.1.d10) then
         Print*,'**** Error in Subroutine mnbrak3d'
         return
         endif
-        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,c)
+        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1   fu,u,xicom,pcom,force,iopt)
         endif
         ax=bx
         bx=cx
@@ -645,14 +670,14 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE brent3d(IOP,n,AH,N5,N6,N5M,N6M,Iout,
-     1 fx,ax,bx,cx,tol,xmin,xicom,pcom,c)
+      SUBROUTINE brent3d(n,AH,N5,N6,N5M,N6M,Iout,
+     1 fx,ax,bx,cx,tol,xmin,xicom,pcom,force,iopt)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
-      REAL*8 pcom(NMAX*3),xicom(NMAX*3),c(9)
+      REAL*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       a=min(ax,cx)
@@ -661,8 +686,8 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1 fx,x,xicom,pcom,c)
+      CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1 fx,x,xicom,pcom,force,iopt)
       fv=fx
       fw=fx
       do 11 iter=1,ITMAX
@@ -697,8 +722,8 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim3d(IOP,n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,c)
+        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+     1   fu,u,xicom,pcom,force,iopt)
         if(fu.le.fx) then
           if(u.ge.x) then
             a=x
