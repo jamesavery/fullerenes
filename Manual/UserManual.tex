@@ -200,23 +200,24 @@ The easiest way to create a 3D structure is to read in cartesian coordinates for
 $Ih-$\C{20} or $Ih-$\C{60} isomers (Subroutine {\bf CoordC20C60}, see input files {\it ico.inp}, {\it icoExp.inp}, {\it icoideal.inp}), or to 
 get the cartesian coordinates from input ring spiral pentagon indices (Subroutine {\bf CoordBuild}) by using either the Fowler-Manopoulus 
 AME algorithm (the adjacency matrix eigenvector algorithm) \cite{Atlas}, or the more reliable Tutte embedding algorithm (3D-TEA) 
-(used by files {\it pentagon1.inp} to {\it pentagon25.inp}). The program sets barycenter of the fullerene 
-to the origin. The book ``Atlas of Fullerenes" Fowler and Manopoulus \cite{Atlas} is recommended for the 
-use of ring spiral pentagon indices and and H\"uckel (adjacency matrix) $P$-type eigenvectors to construct the 3D fullerene
-graph. Note it is critical to get the right H\"uckel eigenvectors for the construction of cartesian coordinates. 
+(used by files {\it pentagon1.inp} to {\it pentagon25.inp}). The pentagon indices can also be read-in from the {\it fullerene
+database} if the canonical fullerene number is used as defined in The book ``Atlas of Fullerenes" Fowler and Manopoulus \cite{Atlas}.
+We recommend reading this book for the use of ring spiral pentagon indices and and H\"uckel (adjacency matrix) $P$-type eigenvectors 
+to construct 3D fullerene graphs. Note it is critical to get the right H\"uckel eigenvectors for the construction of cartesian coordinates. 
 The 3 $P$-type vectors may need to be read in (see file {\it pentagon8.inp} for such an example).
 If the AME algorithm fails you can use our Tutte embedding algorithm (which to our opinion is less troublesome 
 and may be used as the standard method to construct 3D structures). It is important that the end-product is 
 viewed by a molecular visualization program. We recommend CYLview by Claude Legault \cite{CYLview},
 Avogadro \cite{Avogadro}, JMol \cite{JMol} or Pymol \cite{Pymol}. These codes are all freely downloadable.
 For this purpose a file is written out to cylview.xyz to be used as an input file for these programs. 
-Using these coordinates the program calculates the smallest and largest cage diameters which gives already a measure 
+The program sets barycenter of the fullerene 
+to the origin. Using these coordinates the program calculates the smallest and largest cage diameters which gives already a measure 
 for distortion from spherical symmetry (Subroutine {\bf Diameter}). It produces the distance matrix if print level 
 is set to high (Subroutine {\bf DistMatrix}), and once the point group is obtained the program determines if the
-fullerene is chiral or not (Subroutine {\bf Chiral}).
+fullerene is chiral or not (Subroutine {\bf Chiral}).\\
 
-In a next step all edges are determined by analyzing connectivities between vertices from either given cartesian
-coordinates or from adjacency matrix if ring spiral as input is used (Subroutine {\bf Connect}). In any case
+Once the cartesian coordinates are known, all edges are determined by analyzing connectivities between vertices from either given cartesian
+coordinates or from adjacency matrix if a ring spiral input was used (Subroutine {\bf Connect}). In any case
 one has the adjacency matrix $A_{ij}$ for all vertices and edges at this stage.
 From $A_{ij}$ a H\"uckel analysis is performed (Subroutine {\bf Hueckel}). This gives you a good hint if the 
 fullerene is open or closed shell. Note that for fullerenes the H\"uckel analysis may not be very reliable 
@@ -226,7 +227,35 @@ from the exp. ionization potential (7.58 eV) and excitation energy (3.02 eV) of 
 into the second LUMO of $t_{1g}$ symmetry). This gives also orbital energies for \C{60} in reasonable 
 agreement with DFT Kohn-Sham orbital energies. The fullerene might also Jahn-Teller distort adopting a singlet 
 ground state instead of one of a higher multiplicity as this is the case for \C{20}. Such electronic effects are not
-captured in this program, and one needs to perform a proper quantum theoretical calculation.
+captured in this program, and one needs to perform a proper quantum theoretical calculation. The total resonance energy
+is calculated from Babi\'c's fit data \cite{Babic1995,Babic1997}.\\
+
+In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \C{n} can be performed if required from input
+(Subroutine {\bf GoldbergCoxeter}). This leads to a fullerene C$_{k^2+kl+l^2}$. The current implementation allows only for
+{\it leapfrog transformations} ($k=l=1$) and for {\it halma transformations} ($k \neq 0$ and $l=0$). The program allows for multiple leapfrog
+transformations for the construction of very large fullerenes. A general $GC_{k,l}(n)$  for all values of $k$ and $l$ is in
+preparation.\\
+
+Subroutine {\bf Hamilton} uses the back-track algorithm of Babi\'c \cite{Babic1995a} to obtain all 
+Hamiltonian cycles and subsequently the IUPAC name of the fullerene. The number of Hamiltonian cycles given has been checked 
+against a second algorithm. Note, the number gives all distinct Hamiltonian cycles and left-right cycles counted as the 
+same. Although finding all Hamiltonian cycles is a NP-complete problem, it works fine up to about \C{100}. 
+After that it becomes computationally too demanding. The program therefore prints upper and lower limits instead
+for the larger fullerenes. The existence of Hamiltonian cycles for fullerenes is only conjectured, and only for layered fullerenes 
+(e.g. fullerene with onion-shaped 2D graphs such as nanotubes) it has been proven to exist. Our calculations proved that
+they exist for all fullerene isomers up to \C{100} and all IPR isomers up to \C{120}.\\
+
+Subroutine {\bf Ring} identifies all closed 5- and 6-ring systems (faces) and determines if Euler's theorem is fulfilled.
+Subroutine {\bf RingC}) then determines the center for each 5- and 6-ring later used for the trigonal pyramidal tessellation to obtain
+the volume and surface. This routine also analyzes all 2- and 3-ring fusions and many other useful patterns needed for example
+in Stone-Wales transformations or vertex insertions. It further determines the Rhagavachari-Fowler-Manolopoulos neighboring pentagon 
+and hexagon indices as described in detail in Fowler and Manolopoulos' book \cite{Atlas}.
+From the hexagon indices one derives if the fullerene is IPR or not. If it is IPR, Cioslowski's scheme is used to calculate the 
+heat of formation.\\
+
+Information from the subroutine {\bf RingC} is used to perform Stone-Wales transformations (subroutine {\bf StoneWalesTrans}), Endo-Kroto
+2-index insertions (subroutine {\bf EndoKrotoTrans}, Yoshida-Fowler 4-vertex (D3h 6555) and 6-vertex (D3h 666555) insertions 
+(subroutine {\bf StoneWalesTrans})
 
 
  - Use program SPIRAL of Fowler and Manopoulus for creating a ring spiral.
@@ -239,28 +268,8 @@ captured in this program, and one needs to perform a proper quantum theoretical 
     and number of distinct Hamiltonian cycles if required.
 
 
- - Use program HAMILTON of Babic (ref.3) for Hamiltonian cycles and IUPAC 
-    Nomenclature. The number of Hamiltonian cycles given has been checked 
-    against a second algorithm, so it should work. Note, the number gives 
-    all distinct Hamiltonian cycles and left-right cycles counted as the 
-    same. Although finding all Hamiltonian cycles by the back-track algorithm
-    of Babich used here is a NP-complete problem, it works fine up to 
-    about C100. After that it becomes computationally very demanding. 
-    Note also that the existence of Hamiltonian cycles for fullerenes is 
-    only conjectured, and only for layered fullerenes (e.g. fullerene 
-    nanotubes) it has been proven to exist, our calculations show that
-    they exist for all fullerene isomers up to C100.
 
-    Identify all closed 5- and 6-ring systems (Subroutine RING).
-    This routine also determines if Euler's theorem is fulfilled.
 
- - Determine the center for each 5- and 6-ring (Subroutine RINGC)
-    This is required for the trigonal pyramidal tessellation to obtain
-    the volume and surface.  This routine also analyzes all 2- and 3-ring fusions
-    It further gives the Rhagavachari-Fowler-Manoupoulos neighboring pentagon 
-    and hexagon indices as described in the Fowler and Manolopoulos book
-    (ref.2). From the hexagon indices one derives if the fullerene fulfills the
-    IPR or not.
 
  - Fletcher-Reeves-Polak-Ribiere geometry optimization using analytical 
     gradients for the Wu force field (Subroutine OPTFF).
@@ -438,6 +447,8 @@ captured in this program, and one needs to perform a proper quantum theoretical 
    email: peter.schwerdtfeger@gmail.com
    http://ctcp.massey.ac.nz/   and  http://www.nzias.ac.nz/
    --> Always open to improvements and suggestions
+   
+   The time consuming steps in the program are ...
 
 \section{Input description}
 
@@ -715,6 +726,10 @@ Dependence on Structural Motifs", {\it J. Am. Chem. Soc.} {\bf 122}, 8265Ð8270 (
 
 \bibitem{Pymol} see
 
+\bibitem{Babic1995a} D. Babi\'c, ``Nomenclature and Coding of Fullerenes", {\it J. Chem. Inf. Comput. Sci.} {\bf 35}, 515-526 (1995).
+
+J. Cioslowski, N. Rao, D. Moncrieff, {\it Standard Enthalpies of Formation of Fullerenes and Their
+Dependence on Structural Motifs}, J. Am. Chem. Soc. {\bf 122}, 8265Ð8270 (2000).\\\\
 
 \end{thebibliography}
 

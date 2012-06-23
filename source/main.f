@@ -341,7 +341,7 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
       routine='YOSHIDAFOWLER'
       Write(Iout,1008) routine
       if(IYF.le.2) then
-      CALL YoshidaFowler3(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
+      CALL YoshidaFowler4(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
      1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
       else
       IYF=IYF-2

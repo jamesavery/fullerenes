@@ -1379,7 +1379,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE YoshidaFowler3(Matom,IN,Iout,JERR,
+      SUBROUTINE YoshidaFowler4(Matom,IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       use config
