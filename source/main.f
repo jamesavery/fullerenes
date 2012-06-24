@@ -127,7 +127,6 @@ C Input Cartesian coordinates for fullerenes
         xyzname='cylviewnew.xyz'
       else
         Do J=1,MAtom
-          write(*,*)j,matom,'t1',icyl
           Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
         enddo
       endif
@@ -385,16 +384,7 @@ C Calculate the volume
      1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
      2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
 
-C Calculate the minimum distance sphere
-C     routine='CONVEXHULL'
-C     Write(Iout,1008) routine
-C     CALL ConvexHull(Nmax,MAtom,Dist,VolumeCH,AreaCH)
-
 C Calculate the minimum covering sphere and volumes
-C     MinCovSphere1 contains algorithm 1 and MinCovSphere2 algorithm2
-C     MinCovSphere2 is more efficient and contains more useful information
-C     CALL MinCovSphere1(Nmax,MAtom,IOUT,Dist,
-C    1 Rmin,Rmax,VolSphere,ASphere,Atol,VTol,cmcs,rmcs,RVdWC)
       routine='MINCOVSPHERE2'
       Write(Iout,1008) routine
       CALL MinCovSphere2(MAtom,IOUT,Dist,Rmin,Rmax,
