@@ -1,5 +1,5 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
-     1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,leapGC,iupac,
+     1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,GCtrans,iupac,
      1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
      1 ilp,IYF,IWS,nzeile,PS,TolX,R5,R6,Rdist,scale,scalePPG,
      1 ftol,force,forceP,xyzname,chkname,DATEN)
@@ -14,7 +14,7 @@
       Character blank*1
       Character xyz*4
       Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
-     1 ichk,isonum,IPRC,kGC,lGC,leapGC,ihueckel,ISW,KE,loop,mirror,
+     1 ichk,isonum,IPRC,kGC,lGC,GCtrans,ihueckel,ISW,KE,loop,mirror,
      1 IYF,IWS,xyzname
       Namelist /FFChoice/ Iopt
       Namelist /FFParameters/ ftol,fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
@@ -91,7 +91,7 @@ C more default parameters
                 !  iupac=0 just count Hamiltonian Cycles
       Ipent=0   !  Initial flag for Spriral pentagon input
       leap=0    !  Initial flag for leapfrog fullerene
-      leapGC=0  !  Initial flag for Goldberg-Coxeter leapfrog fullerene
+      GCtrans=0 !  Initial flag for Goldberg-Coxeter transformed fullerene
       IER=0     !  Error flag
       Tol=0.33d0 ! Tolerance
       IP=0      !  Print option

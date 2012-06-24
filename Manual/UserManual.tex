@@ -409,7 +409,8 @@ In the following the input in the required sequence is described in detail (eith
 1) Text line of 80 characters (in A132 format) (you can put as many text cards in as you want)\\\\
 
 2) {\bf \&Coord line}: Input to create cartesian coordinates and main flags for the program (e.g. \&Coord IC=20, IOPT=1, R6=1.42 /).\\
-List of options: {\bf NA,IC,IP,IV1,IV2,IV3,ixyz,ichk,leap,isonum,IPRC,TolR,R5,R6,xyzname}\\
+List of options:\\ 
+{\bf NA, IC, IV1, IV2, IV3, ixyz, isonum, kGC, lGC, IP, IPRC, leap, leapGC, ihueckel, ISW, KE, loop, mirror, IYF, IWS, ichk, TolR, R5, R6, xyzname}\\
 NA= Number of Atoms (Default: 60)\\
 IC= Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0)\\
 IP= Print option (Default: 0)\\
@@ -421,11 +422,11 @@ isonum= Isomer number according to the scheme of Fowler and Manopoulus (Default:
 If IC=2, 3 or 4 and isonum not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
 There are two databases, one for the general isomers (IPRC=2) and one for the IPR isomers (IPRC=1), the
 definition is similar to the IPR parameter below (Default: 2).\\
-xyzname=filename (max 20 characters) if ixyz.ne.0 (default: cylview.xyz).\\
 TolR= Tolerance in \% (Default: 33).\\
 R5= pentagon bond distance, i.e. the bond length in the pentagons (Default: 1.455).\\
 R6= hexagon  bond distance, i.e. the bond length of the bonds connecting hexagons (Default: 1.391).  
-If R5=R6 is chosen then the ideal capped icosahedron for \C{60} is obtained if NA=60 is chosen.\\\\
+If R5=R6 is chosen then the ideal capped icosahedron for \C{60} is obtained if NA=60 is chosen.\\
+xyzname=filename (max 20 characters) if ixyz.ne.0 (default: cylview.xyz).\\\\
 
 Details for the {\bf IC}-flag:\\
 If IC = 0 No coordinate input required, coordinates are constructed for the IPR isomer of \C{60} (or \C{20} if NA=20 is chosen).
@@ -434,40 +435,32 @@ If IC = 1 Cartesian Coordinates expected as input. In this case NA extra lines a
 $N_{Z_i}, X_i, Y_i, Z_i$  (in free format)\\\\
 Here $N_{Z_i}$= Nuclear Charge, and X,Y,C are the cartesian coordinates for atom $i$ in \AA. NB: $N_{Z_i}$ is not really needed by the program, 
 but you can copy easily .xyz files or outputs from other quantum theoretical programs into the input.\\
-If IC = 2 or 3 cartesian coordinates are created from the pentagon ring-spiral list. Extra input required (free format):\\\\
+If IC = 2 or 3 the adjacency matrix is created from a ring-spiral pentagon list. Extra input required (free format):\\\\
 $n_{RSPI}(I), I=1,12$ \\\\
 $n_{RSPI}(I)$ are the 12 Fowler-Manolopoulus ring-spiral pentagon indices which uniquely identify the locations of the 
 pentagons if the fullerene is spirable \cite{Atlas}. Use the canonical pentagon ring indices if possible (transformation to the canonical
 from should work as well).\\
-IC=2: AME algorithm using P-type eigenvectors produced from the 
-            adjacency matrix:
-            If problem with eigenvectors are found to construct the
-            cartesian coordinates, i.e. the identification of P-type
-            eigenvectors, three integer values IV1, IV2, IV3 can be specified
-            identifying the eigenvectors to be chosen. pentagon8.inp is such an example.
-            In this case a severe warning occurs which means you should carefully
-            check the eigenvectors used and cartesian coordinates produced.
-            Otherwise coordinates are obtained which are useless. This is more
-            often the case as you might expect. 
-          IC=3: Same as IC=2 but the Laplacian matrix is used instead of the
-            adjacency matrix (LME algorithm). 
-          IC=4: Tutte embedding (3D-TE) algorithm. This should always work,
-            although the initial fullerene might be too spherical. But this
-            algorithm is easier, and (in theory) should never fail.
-           Examples are given in the input files starting with 'pentagon'.
-           Please use Angstroems.
-      If IP>0 larger output produced, i.e. the full distance matrix, all
-          Hamiltonian cycles and all 3-ring connections.
-      if leap=n than the n-th leapfrog fullerene is generated.
-      Connectivities are found for atoms with distances between
-         R6   and   R6*(1+TolR/100)   if cartesian coordinate input is chosen.
-      If TolR=0. default value of 33\% is used. 
-         NB: If this parameter is set at a value too large, unwanted connectivities
-          are produced resulting in smaller polygons. This parameter
-          should reflect the maximum deviation in distance from the
-          smallest distance found.
+If IC = 4 or 5 adjacency matrix is created from a Goldberg-Coxeter transform of \C{20}, i.e. $GC_{k,l}$[\C{20}]. Note at the moment
+the program is restricted to $l=0$. In this case the parameter kGC in the namelist input has to be used.\\
+If IC = 2 or 4 the AME algorithm using $P$-type eigenvectors produced from the adjacency matrix to get cartesian coordinates. 
+If the $P$-type eigenvectors are not in sequence
+(position 2,3 and 4, see ref.\cite{Atlas} for details), three integer values $I_{V_1}, I_{V_2}, I_{V_3}$ can be specified in the \&Coord
+namelist input identifying the position of the eigenvectors (see pentagon8.inp for such an example).
+In this case a warning occurs which means you should carefully check the eigenvectors used and cartesian coordinates produced.
+Otherwise coordinates produced are useless. This is more often the case as you might expect.\\
+IC = 3 or 5 the Tutte embedding (3D-TE) algorithm is chosen for the construction of the 3D fullerene structure from the adjacency matrix. 
+This should always work,
+although the fullerene created might be too spherical compared to the AME algorithm. But this algorithm is easier, and (in theory) 
+should never fail. Examples are given in the input files starting with ``pentagon".\\
+If IP $>$ 0 a larger output produced, i.e. the full distance matrix, all Hamiltonian cycles and all 3-ring connections.\\
+TolR: Only change this parameter if the program cannot produce correctly the adjacency matrix. This is only necessary for the cartesian
+coordinate input (IC=1) and only fails if bond distances are unusually large or small. Connectivities are found for atoms with distances between
+R6   and   R6*(1+TolR/100). If TolR=0.0 the default value of 33\% is used. If this parameter is set at a value too large, unwanted connectivities
+are produced resulting in smaller polygons. This parameter should reflect the maximum deviation in distance from the smallest distance found.\\
+ 
+if leap=n than the n-th leapfrog fullerene is generated.\\\\
 
- 3) Option for force-field optimization:
+3) {\bf \&Opt line}: Option for force-field optimization:
       \&Opt options /        (e.g. \&Opt Iopt=1 /)
       list of options: Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
       Iopt= Flag for force-field optimization (Default: 0)
@@ -485,7 +478,7 @@ IC=2: AME algorithm using P-type eigenvectors produced from the
          A.Ceulemans, B.C.Titeca, L.F.Chibotaru, I.Vos, P.W.Fowler, 
          J. Phys. Chem. A 105, 8284-8295 (2001).
        If Iopt=2  Preoptimize with input force field, then optimize with Wu
-         force field. This is especially usefull for fcoulomb input (see below).  
+         force field. This is especially useful for fcoulomb input (see below).  
          NB: Avogadro has a more sophisticated force-field which you can try out.
        ftol: The convergence tolerance on the function value is input as ftol
          (Default: 5.0E-8)
@@ -499,7 +492,7 @@ IC=2: AME algorithm using P-type eigenvectors produced from the
          This is extremely useful for an initial geometry optimization to keep
          the cage convex if for example the Tutte construction leads to not
          a good guess of the initial structure. In such cases fCoulomb=1.d2
-         is a good choice.
+         is a good choice.\\\\
 
  4) Option for calculating Hamiltonian cycles and IUPAC numbers 
       \&Hamilton options /        (e.g. \&Hamilton IHam=1 IUPAC=1 /)
@@ -513,7 +506,7 @@ IC=2: AME algorithm using P-type eigenvectors produced from the
          all Hamiltonian cycles are printed out. IP=0 only gives the
          best cycle (see Babic, ref.3).
          IUPAC=0 goes into a fast subroutine and prints only the total number of
-         Hamiltonian cycles.
+         Hamiltonian cycles.\\\\
 
  5) Option for producing list of isomers and properties.
       \&Isomers options /        (e.g.\&Isomers IPR=1, IPH=1 /)
@@ -536,7 +529,7 @@ IC=2: AME algorithm using P-type eigenvectors produced from the
           that the new output file does not contain the previous one.
       The resulting output is a catalogue of the isomers found containing
          their idealized point groups, canonical spirals, and NMR patterns
-         (see ref.2).
+         (see ref.2).\\\\
 
  6) Option for producing coordinates for fullerene graphs (Schlegel diagrams).
       \&Graph options /      (e.g. \&Graph IG=1, ISO1=1, ISO2=3, ISO3=7 /)
@@ -618,7 +611,6 @@ New lists will be available on our website. Note the determination of the number
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 computationally too demanding. The longest file for our database ran for 3
 months on a single processor.
-
 Note: the directory database needs to be in the same directory as ``source" or ``libgraph".
 
 
