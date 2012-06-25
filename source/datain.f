@@ -45,9 +45,9 @@ C tolerance parameter (to be used in all force fields)
       ftol=1.d-8
 
 C Defining the Wu force field (default values)
-      WuR5=1.455d0
+      WuR5=1.455d0! in angstoem
       WuR6=1.391d0
-      WuA5=1.08d2
+      WuA5=1.08d2! in deg
       WuA6=1.2d2
       WufR=1.d6
       WufA=1.d5
@@ -62,10 +62,10 @@ c     two angles: zero values
       ExtWuA5=1.08d2
       ExtWuA6=1.2d2
 c     four dihedrals: zero values (all guessed)
-      ExtWuDppp=3.0d1
-      ExtWuDhpp=2.0d1
-      ExtWuDhhp=1.0d1
-      ExtWuDhhh=0.0d1
+      ExtWuDppp=4.0d1
+      ExtWuDhpp=4.0d1
+      ExtWuDhhp=2.4d1
+      ExtWuDhhh=0.0d0
 c     three distances: forces (let's assume they are all the same)
       ExtWufR=1.0d6
 c     three angles: forces (let's assume they are all the same)
