@@ -469,7 +469,7 @@ c and N=MATOM*3
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=99999,EPS=1.d-9)
       Real*8 p(NMAX*3),g(NMAX*3),h(NMAX*3),xi(NMAX*3)
-      Real*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
+      Real*8 pcom(NMAX*3),xicom(NMAX*3)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
@@ -550,8 +550,7 @@ C         dgg=dgg+xi(j)**2
      1 p,pcom,xi,xicom,fret,force,iopt)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3),
-     1 force(ffmaxdim)
+      REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       PARAMETER (TOL=1.d-5)
@@ -577,7 +576,7 @@ C     USES brent3d,f1dim3d,mnbrak3d
      1 f1dimf,x,xicom,pcom,force,iopt)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3)!,force(ffmaxdim)
+      REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
 C     USES func3d
@@ -595,7 +594,7 @@ C     USES func3d
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
-      REAL*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
+      REAL*8 pcom(NMAX*3),xicom(NMAX*3)
       CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
      1 fa,ax,xicom,pcom,force,iopt)
       CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
@@ -676,7 +675,7 @@ C BRENT is a FORTRAN library which contains algorithms for finding zeros
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
-      REAL*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
+      REAL*8 pcom(NMAX*3),xicom(NMAX*3)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       a=min(ax,cx)

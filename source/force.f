@@ -4,14 +4,12 @@ c n=MATOM*3
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
 
-c      write(*,*)"iopt:",iopt," n:",n," NMAX:",nmax
       select case(iopt)
         case(1)
           CALL wu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force,iopt)
         case(2)
           CALL wu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force,iopt)
         case(3)
-c          write(*,*)"iopt:",iopt," n:",n," NMAX:",nmax
           CALL extwu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force)
       end select
 
@@ -25,7 +23,7 @@ c          write(*,*)"iopt:",iopt," n:",n," NMAX:",nmax
 
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
-      Real*8 p(n),force(ffmaxdim)
+      Real*8 p(nmax*3),force(ffmaxdim)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       IERR=0
@@ -165,7 +163,7 @@ C     total energy
       SUBROUTINE extwu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 p(n),force(ffmaxdim),increment
+      Real*8 p(nmax*3),force(ffmaxdim),increment
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6),neighbour_atoms,
      2 neighbour_faces_h, neighbour_faces_p, pentagoncount,
@@ -235,7 +233,6 @@ C             5-ring, 5-ring
           endif ! conncted
         enddo
       enddo
-c      write(*,*)ehookrhh, " ",ehookrhp, " ",ehookrpp
 
 
 C Bending
@@ -312,7 +309,6 @@ C     Loop over 6-rings
           ehookah=ehookah+(angleh-ah)**2
         enddo
       enddo
-c      write(*,*)ehookap," ",ehookah
 
 
 C dihedrals 
@@ -321,8 +317,7 @@ C dihedrals
       ehookdhhp=0.d0
       ehookdhhh=0.d0
       Do I=1,n/3 ! iterate over atoms
-c classify vertex acording to adjacent faces
-c find neighbouring faces (3)
+c count adjacent pentagons (0 to 3)
         pentagoncount=0
         do IB=1,12 ! iterate over pentagons
           do JB=1,5 ! iterate over atoms in pentagon
@@ -332,6 +327,7 @@ c find neighbouring faces (3)
             endif
           enddo
         enddo
+c count adjacent hexagons (0 to 3)
         hexagoncount=0
         do IB=1,n/3-12 ! because n=vertex_count * 3 ()
           do JB=1,6
@@ -352,10 +348,12 @@ c find neighbouring atoms (3)
 c sort neighbours
 c we make use of the fact, that for any dihedral ijkl=ikjl
 c therefore we only need to find the special vertex and dont care about the others which are much harder to distinguish
+      
         if(pentagoncount.eq.1) then
           do k=1,3 ! iterate over neighbour atoms
             arbitrary_index=0
-            do l=1,neighbour_faces_h_index-1 ! iterate over neighbour faces
+            do l=1,hexagoncount ! iterate over neighbour hexagons
+c            do l=1,neighbour_faces_h_index-1 ! iterate over neighbour faces
               do m=1,6 ! iterate over atoms in hexagon
                 if (neighbour_atoms(k).eq.N6M(l,m)) then
                   arbitrary_index=arbitrary_index+1
@@ -372,7 +370,7 @@ c therefore we only need to find the special vertex and dont care about the othe
         if(pentagoncount.eq.2) then
           do k=1,3 ! iterate over neighbour atoms
             arbitrary_index=0
-            do l=1,neighbour_faces_p_index-1 ! iterate over neighbour faces
+            do l=1,pentagoncount! iterate over neighbour pentagons
               do m=1,5 ! iterate over atoms in hexagon
                 if (neighbour_atoms(k).eq.N5M(l,m)) then
                   arbitrary_index=arbitrary_index+1
@@ -437,7 +435,7 @@ c        write(*,*)angle,increment,"dihedral angle (in radians)"
           case(1)
             ehookdhhp=ehookdhhp+increment**2
           case(2)
-            ehookdhp=pehookdhpp+increment**2
+            ehookdhpp=ehookdhpp+increment**2
           case(3)
             ehookdppp=ehookdppp+increment**2
         end select
@@ -458,6 +456,7 @@ c      write(*,*)fc,"energy"
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
+c      write(*,*)"entering dfunc3d"
 
       select case(iopt)
         case(1)
@@ -468,6 +467,7 @@ c      write(*,*)fc,"energy"
           CALL dextwu(n,A,N5,N6,N5M,N6M,p,x,force)
       end select
 
+c      write(*,*)"leaving dfunc3d"
       return
       END
 
@@ -477,7 +477,7 @@ c      write(*,*)fc,"energy"
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
-      Real*8 p(N),x(N),force(ffmaxdim)
+      Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       rp=force(1)
@@ -669,13 +669,13 @@ C     Coulomb repulsion from origin
       SUBROUTINE dextwu(n,A,N5,N6,N5M,N6M,p,x,force)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 p(N),x(N),force(ffmaxdim)
+      Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
+      real*8 J1x,J1y,J1z,J2x,J2y,J2z,J3x,J3y,J3z,J4x,J4y,J4z
       Integer A(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6),neighbour_atoms,
-     2 neighbour_faces_h, neighbour_faces_p, pentagoncount,
-     3 hexagoncount, arbitrary_index
-      dimension neighbour_atoms(3)
-      dimension neighbour_faces_h(3), neighbour_faces_p(3)
+      Integer N5M(MMAX,5),N6M(MMAX,6),pentagoncount,
+     2 hexagoncount,arbitrary_index,neighbour_faces_h_index,
+     3 neighbour_faces_p_index,neighbour_atoms(3),
+     4 neighbour_faces_h(3),neighbour_faces_p(3)
       rpp=force(1)
       rhp=force(2)
       rhh=force(3)
@@ -842,6 +842,7 @@ C     Loop over 6-rings
            if(cosarg.gt.1.d0) cosarg=1.d0
            if(cosarg.lt.-1.d0) cosarg=-1.d0
            angleh=dacos(cosarg)! angle in hexagon
+c          write(*,*)angleh,"hexagon angle"
            anglesin=dabs(dsin(angleh)) ! sine of the angle
            fac=fah*(angleh-ah)/anglesin
 C     Derivative of central atom
@@ -900,13 +901,14 @@ c find neighbouring atoms (3)
             neighbour_atom_count=neighbour_atom_count+1
           endif
         enddo
+c        write(*,*)"p:",pentagoncount, "h:",hexagoncount
 c sort neighbours
 c we make use of the fact, that for any dihedral ijkl=ikjl
 c therefore we only need to find the special vertex and dont care about the others which are much harder to distinguish
         if(pentagoncount.eq.1) then
           do k=1,3 ! iterate over neighbour atoms
             arbitrary_index=0
-            do l=1,neighbour_faces_h_index-1 ! iterate over neighbour faces
+            do l=1,hexagoncount ! iterate over neighbour hexagons
               do m=1,6 ! iterate over atoms in hexagon
                 if (neighbour_atoms(k).eq.N6M(l,m)) then
                   arbitrary_index=arbitrary_index+1
@@ -923,7 +925,7 @@ c therefore we only need to find the special vertex and dont care about the othe
         if(pentagoncount.eq.2) then
           do k=1,3 ! iterate over neighbour atoms
             arbitrary_index=0
-            do l=1,neighbour_faces_p_index-1 ! iterate over neighbour faces
+            do l=1,pentagoncont ! iterate over neighbour pentagons
               do m=1,5 ! iterate over atoms in hexagon
                 if (neighbour_atoms(k).eq.N5M(l,m)) then
                   arbitrary_index=arbitrary_index+1
@@ -942,6 +944,7 @@ c atoms
         J2=neighbour_atoms(2)
         J3=neighbour_atoms(3)
         J4=I
+c        write(*,*)j1,j2,j3,j4
 c coordinates
         J1x=p(J1*3-2)
         J1y=p(J1*3-1)
@@ -955,6 +958,7 @@ c coordinates
         J4x=p(J4*3-2)
         J4y=p(J4*3-1)
         J4z=p(J4*3)
+c        write(*,*)J1x,J1y,J1z,J2x,J2y,J2z,J3x,J3y,J3z,J4x,J4y,J4z
 c some auxiliary factors without any physical meaning
         fac_A=(-J1y*J2x+J1x*J2y+J1y*J3x-J2y*J3x-J1x*J3y+J2x*J3y)
         fac_B=(-J2y*J3x+J2x*J3y+J2y*J4x-J3y*J4x-J2x*J4y+J3x*J4y)
@@ -967,9 +971,11 @@ c some auxiliary factors without any physical meaning
         fac_I=(fac_B**2+fac_D**2+fac_F**2)
         fac_J=1/(fac_H * fac_I)
         fac_K=1/(fac_H * fac_I**2)
-        fac_L=1/(fac_H**2 * I)
+        fac_L=1/(fac_H**2 * fac_I)
         fac_AC=fac_G * fac_J
+c        write(*,*)fac_a, fac_b, fac_c, fac_d, fac_e, fac_f
         if(fac_AC .ge. dpi) fac_AC=fac_AC-2*dpi
+c        write(*,*)fac_ac
         select case(pentagoncount)
           case(0)
           fac_M=2*(fdhhh*(dhhh-dacos(fac_AC)))/
@@ -999,6 +1005,7 @@ c some auxiliary factors without any physical meaning
         fac_Z=(J1z-J2z)
         fac_AA=(J2x-J4x)
         fac_AB=(J1x-J2x)
+c        write(*,*)fac_m, fac_n, fac_o, fac_p, fac_q, fac_r
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(J1*3-2)=x(J1*3-2)+
      2     ((fac_N*fac_B-fac_O*fac_D)*fac_J+
@@ -1051,6 +1058,7 @@ c derivations of the energy with respect the x,y,z of each of the four atoms
      2     fac_M*(-fac_E*fac_J*fac_N+2*fac_F*fac_G*fac_K*fac_N+
      3     fac_C*fac_J*fac_P-2*fac_D*fac_G*fac_K*fac_P)
       enddo
-
+c      write(*,*)"x: ",x
+c      write(*,*)"leaving dextwu"
       return
       END
