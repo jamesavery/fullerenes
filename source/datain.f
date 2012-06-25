@@ -62,9 +62,9 @@ c     two angles: zero values
       ExtWuA5=1.08d2
       ExtWuA6=1.2d2
 c     four dihedrals: zero values (all guessed)
-      ExtWuDppp=4.5d1
-      ExtWuDhpp=3.0d1
-      ExtWuDhhp=1.5d1
+      ExtWuDppp=4.0d1
+      ExtWuDhpp=4.0d1
+      ExtWuDhhp=2.4d1
       ExtWuDhhh=0.0d0
 c     three distances: forces (let's assume they are all the same)
       ExtWufR=1.0d6

@@ -353,7 +353,6 @@ c therefore we only need to find the special vertex and dont care about the othe
           do k=1,3 ! iterate over neighbour atoms
             arbitrary_index=0
             do l=1,hexagoncount ! iterate over neighbour hexagons
-c            do l=1,neighbour_faces_h_index-1 ! iterate over neighbour faces
               do m=1,6 ! iterate over atoms in hexagon
                 if (neighbour_atoms(k).eq.N6M(l,m)) then
                   arbitrary_index=arbitrary_index+1
@@ -673,8 +672,7 @@ C     Coulomb repulsion from origin
       real*8 J1x,J1y,J1z,J2x,J2y,J2z,J3x,J3y,J3z,J4x,J4y,J4z
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6),pentagoncount,
-     2 hexagoncount,arbitrary_index,neighbour_faces_h_index,
-     3 neighbour_faces_p_index,neighbour_atoms(3),
+     2 hexagoncount,arbitrary_index,neighbour_atoms(3),
      4 neighbour_faces_h(3),neighbour_faces_p(3)
       rpp=force(1)
       rhp=force(2)
@@ -925,7 +923,7 @@ c therefore we only need to find the special vertex and dont care about the othe
         if(pentagoncount.eq.2) then
           do k=1,3 ! iterate over neighbour atoms
             arbitrary_index=0
-            do l=1,pentagoncont ! iterate over neighbour pentagons
+            do l=1,pentagoncount ! iterate over neighbour pentagons
               do m=1,5 ! iterate over atoms in hexagon
                 if (neighbour_atoms(k).eq.N5M(l,m)) then
                   arbitrary_index=arbitrary_index+1
