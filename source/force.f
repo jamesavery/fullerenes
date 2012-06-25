@@ -1,14 +1,17 @@
       SUBROUTINE func3d(n,IERR,A,N5,N6,N5M,N6M,p,fc,force,iopt)
       use config
+c n=MATOM*3
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
 
+c      write(*,*)"iopt:",iopt," n:",n," NMAX:",nmax
       select case(iopt)
         case(1)
           CALL wu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force,iopt)
         case(2)
           CALL wu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force,iopt)
         case(3)
+c          write(*,*)"iopt:",iopt," n:",n," NMAX:",nmax
           CALL extwu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force)
       end select
 
@@ -22,7 +25,7 @@
 
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
-      Real*8 p(NMAX*3),force(ffmaxdim)
+      Real*8 p(n),force(ffmaxdim)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       IERR=0
@@ -162,7 +165,7 @@ C     total energy
       SUBROUTINE extwu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 p(NMAX*3),force(ffmaxdim)
+      Real*8 p(n),force(ffmaxdim),increment
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6),neighbour_atoms,
      2 neighbour_faces_h, neighbour_faces_p, pentagoncount,
@@ -191,9 +194,9 @@ C     total energy
 
 C Stretching
 c we distinguish between bonds between two hexagons, two pentagons and hex/pent
-      ehookrpp=0.d0
-      ehookrhp=0.d0
       ehookrhh=0.d0
+      ehookrhp=0.d0
+      ehookrpp=0.d0
       Do I=1,n,3 ! n = number of atoms * 3 !!!
         I1=(I+2)/3 ! I1 = 1, 2, ... (n+2)/3
         Do J=I+3,n,3
@@ -232,6 +235,7 @@ C             5-ring, 5-ring
           endif ! conncted
         enddo
       enddo
+c      write(*,*)ehookrhh, " ",ehookrhp, " ",ehookrpp
 
 
 C Bending
@@ -276,9 +280,8 @@ c law of cosines
       enddo
 C     Loop over 6-rings
       ehookah=0.d0
-      if(N6.eq.0) go to 2 ! if there are no hexagons ...
-        Do I=1,N6
-          Do J=1,6
+      Do I=1,N6
+        Do J=1,6
           JLX=J-1
           JRX=J+1
           if(JLX.eq.0) JLX=6
@@ -309,6 +312,7 @@ C     Loop over 6-rings
           ehookah=ehookah+(angleh-ah)**2
         enddo
       enddo
+c      write(*,*)ehookap," ",ehookah
 
 
 C dihedrals 
@@ -360,7 +364,7 @@ c therefore we only need to find the special vertex and dont care about the othe
             enddo
             if(arbitrary_index.eq.2) then ! we found the atom that lies between the two hexagons
               buffer=neighbour_atoms(k)
-              neighbour_atoms(k)=neighbour_atoms(k)
+              neighbour_atoms(k)=neighbour_atoms(1)
               neighbour_atoms(1)=buffer
             endif
           enddo
@@ -377,7 +381,7 @@ c therefore we only need to find the special vertex and dont care about the othe
             enddo
             if(arbitrary_index.eq.2) then ! we found the atom that lies between the two pentagons
               buffer=neighbour_atoms(k)
-              neighbour_atoms(k)=neighbour_atoms(k)
+              neighbour_atoms(k)=neighbour_atoms(1)
               neighbour_atoms(1)=buffer
             endif
           enddo
@@ -387,6 +391,7 @@ c atoms
         J2=neighbour_atoms(2)
         J3=neighbour_atoms(3)
         J4=I
+c        write(*,*)j1,j2,j3,j4,"atoms of dihedral"
 c coordinates
         px1=p(J1*3-2)-p(J2*3-2) ! x-distance between the first two points
         py1=p(J1*3-1)-p(J2*3-1)
@@ -404,36 +409,46 @@ c distances (first two are nonbonded)
         r1M=dsqrt(r2M)
         r2R=px3*px3 + py3*py3 + pz3*pz3
         r1R=dsqrt(r2R)
-c finally the energies
-        angle=
-     2   dacos(((-py1*px2+px1*py2)*(-py2*px3+px2*py3)+(pz1*px2-px1*pz2)*
-     3   (pz2*px3-px2*pz3)+(-pz1*py2+py1*pz2)*(-pz2*py3+py2*pz3))/
-     4(((py1*px2-px1*py2)**2+(pz1*px2-px1*pz2)**2+(pz1*py2-py1*pz2)**2)*
-     5((py2*px3-px2*py3)**2+(pz2*px3-px2*pz3)**2+(pz2*py3-py2*pz3)**2)))
-        if(pentagons_count.eq.0) then
-           ehookdhhh=ehookdhhh+(angle-dhhh)**2
-        else if(pentagons_count.eq.1) then
-           ehookdhhp=ehookdhhp+(angle-dhhp)**2
-        else if(pentagons_count.eq.2) then
-           ehookdhpp=ehookdhpp+(angle-dhpp)**2
-        else
-           ehookdhppp=ehookdppp+(angle-dppp)**2
-        endif
+c        write(*,*)r1L,r1m,r1r,"distances in dihedral"
+c angle between abc and cbd (between 0 and 2pi)
+        angle=dacos(((-py1*px2+px1*py2)*(-py2*px3+px2*py3)+
+     2   (pz1*px2-px1*pz2)*(pz2*px3-px2*pz3)+(-pz1*py2+py1*pz2)*
+     3   (-pz2*py3+py2*pz3))/(((py1*px2-px1*py2)**2+(pz1*px2-px1*pz2)**2
+     4   +(pz1*py2-py1*pz2)**2)*((py2*px3-px2*py3)**2+(pz2*px3-px2*
+     5   pz3)**2+(pz2*py3-py2*pz3)**2)))
+c        write(*,*)angle,"dihedral angle (in radians)"
+        select case(pentagoncount)
+          case(0)
+            zero_value=dhhh
+          case(1)
+            zero_value=dhhp
+          case(2)
+            zero_value=dhpp
+          case(3)
+            zero_value=dppp
+        end select
+        if(angle .ge. dpi) angle=angle-2*dpi
+        angle=dabs(angle)
+        increment=angle-zero_value ! can be <0 (but will be squared)
+c        write(*,*)angle,increment,"dihedral angle (in radians)"
+        select case(pentagoncount)
+          case(0)
+            ehookdhhh=ehookdhhh+increment**2
+          case(1)
+            ehookdhhp=ehookdhhp+increment**2
+          case(2)
+            ehookdhp=pehookdhpp+increment**2
+          case(3)
+            ehookdppp=ehookdppp+increment**2
+        end select
       enddo
 
-C     Coulomb repulsion from origin
-      if (fco.ne.0.d0)  then
-        Do I=1,n,3
-          rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
-          coulomb=coulomb+rinv
-        enddo
-      endif
 
 C     total energy  
-  2   fc=frpp*ehookrpp+frhp*ehookrhp+frhh*ehookrhh ! stretching
+      fc=frpp*ehookrpp+frhp*ehookrhp+frhh*ehookrhh ! stretching
      2 +fap*ehookap+fah*ehookah ! bending
      3 +fdppp*ehookdppp+fdhpp*ehookdhpp+fdhhp*ehookdhhp+fdhhh*ehookdhhh! dihedral
-     4 +fco*coulomb
+c      write(*,*)fc,"energy"
       Return
       END
 
@@ -462,7 +477,7 @@ C     total energy
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
-      Real*8 p(NMAX*3),x(NMAX*3),force(ffmaxdim)
+      Real*8 p(N),x(N),force(ffmaxdim)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       rp=force(1)
@@ -638,11 +653,11 @@ C     Derivative of right atom
 
 C     Coulomb repulsion from origin
       if (iopt.eq.2 .and. fco.ne.0.d0)  then
-       Do I=1,n,3
+       Do I=1,n/3
         rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
-        x(I)=x(I)-fco*rinv*p(I)
-        x(I+1)=x(I+1)-fco*rinv*p(I+1)
-        x(I+2)=x(I+2)-fco*rinv*p(I+2)
+        x(I*3-2)=x(I*3-2)-fco*rinv*p(I)
+        x(I*3-1)=x(I*3-1)-fco*rinv*p(I+1)
+        x(I*3)=x(I*3)-fco*rinv*p(I+2)
        enddo
       endif
 
@@ -654,7 +669,7 @@ C     Coulomb repulsion from origin
       SUBROUTINE dextwu(n,A,N5,N6,N5M,N6M,p,x,force)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 p(NMAX*3),x(NMAX*3),force(ffmaxdim)
+      Real*8 p(N),x(N),force(ffmaxdim)
       Integer A(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6),neighbour_atoms,
      2 neighbour_faces_h, neighbour_faces_p, pentagoncount,
@@ -728,7 +743,7 @@ C           Check if bond is part of 5-ring
         x(I+1)=2.d0*ehooky
         x(I+2)=2.d0*ehookz
       enddo
-        
+c      write(*,*)x,"displacement after dists"
 
 C     Bending
       Do I=1,N5 ! Loop over 5-rings (and N5 == 12)
@@ -737,7 +752,7 @@ C     Bending
           JRX=J+1
           if(JLX.eq.0) JLX=5
           if(JRX.eq.6) JRX=1
-          JM=3*N5M(I,J)-2
+          JM=3*N5M(I,J)-2! position of x coordinate of middle atom in p
           JL=3*N5M(I,JLX)-2
           JR=3*N5M(I,JRX)-2
 c left bond
@@ -746,7 +761,7 @@ c left bond
            pzL=p(JM+2)-p(JL+2)
           r2L=pxL*pxL+pyL*pyL+pzL*pzL
           r1L=dsqrt(r2L)
-          rL=r1L*r2L
+          r3L=r1L*r2L
 c right bond
            pxR=p(JM)  -p(JR)
            pyR=p(JM+1)-p(JR+1)
@@ -766,6 +781,7 @@ c law of cosines
           if(cosarg.gt.1.d0) cosarg=1.d0
           if(cosarg.lt.-1.d0) cosarg=-1.d0
           anglep=dacos(cosarg)
+c          write(*,*)anglep,"pentagon angle"
           anglesin=dabs(dsin(anglep))
           fac=fap*(anglep-ap)/anglesin
 C     Derivative of central atom
@@ -791,6 +807,7 @@ C Derivative of right atom
           x(JR+2)=x(JR+2)+fac7*(pzR*fac2+2.d0*pzM*r2R)
         enddo
       enddo
+c      write(*,*)x,"displacement after pentagons angles"
       
 C     Loop over 6-rings
       if(N6.eq.0) return
@@ -850,6 +867,7 @@ C       Derivative of right atom
           x(JR+2)=x(JR+2)+fac7*(pzR*fac2+2.d0*pzM*r2R)
         enddo
       enddo
+c      write(*,*)x,"displacement after hexagon angles"
 
 
 C dihedrals 
@@ -897,7 +915,7 @@ c therefore we only need to find the special vertex and dont care about the othe
             enddo
             if(arbitrary_index.eq.2) then ! we found the atom that lies between the two hexagons
               buffer=neighbour_atoms(k)
-              neighbour_atoms(k)=neighbour_atoms(k)
+              neighbour_atoms(k)=neighbour_atoms(1)
               neighbour_atoms(1)=buffer
             endif
           enddo
@@ -914,7 +932,7 @@ c therefore we only need to find the special vertex and dont care about the othe
             enddo
             if(arbitrary_index.eq.2) then ! we found the atom that lies between the two pentagons
               buffer=neighbour_atoms(k)
-              neighbour_atoms(k)=neighbour_atoms(k)
+              neighbour_atoms(k)=neighbour_atoms(1)
               neighbour_atoms(1)=buffer
             endif
           enddo
@@ -947,22 +965,25 @@ c some auxiliary factors without any physical meaning
         fac_G=(fac_A*fac_B+fac_C*fac_D+fac_E*fac_F)
         fac_H=(fac_A**2+fac_C**2+fac_E**2)
         fac_I=(fac_B**2+fac_D**2+fac_F**2)
-        fac_J=1/(fac_H*fac_I)
-        fac_K=1/(fac_H*fac_I**2)
-        fac_L=1/(fac_H**2*I)
-        if(pentagoncount .eq. 0) then
-          fac_M=2*(fdhhh*(dhhh-dacos(fac_G/fac_J)))/
-     2          (dsqrt(1-fac_G**2/fac_J**2))
-        else if(pentagoncount .eq. 1) then
-          fac_M=2*(fdhhp*(dhhp-dacos(fac_G/fac_J)))/
-     2          (dsqrt(1-fac_G**2/fac_J**2))
-        else if(pentagoncount .eq. 2) then
-          fac_M=2*(fdhpp*(dhpp-dacos(fac_G/fac_J)))/
-     2          (dsqrt(1-fac_G**2/fac_J**2))
-        else if(pentagoncount .eq. 3) then
-          fac_M=2*(fdppp*(dppp-dacos(fac_G/fac_J)))/
-     2          (dsqrt(1-fac_G**2/fac_J**2))
-        endif
+        fac_J=1/(fac_H * fac_I)
+        fac_K=1/(fac_H * fac_I**2)
+        fac_L=1/(fac_H**2 * I)
+        fac_AC=fac_G * fac_J
+        if(fac_AC .ge. dpi) fac_AC=fac_AC-2*dpi
+        select case(pentagoncount)
+          case(0)
+          fac_M=2*(fdhhh*(dhhh-dacos(fac_AC)))/
+     2          (dsqrt(1-fac_AC**2))
+          case(1)
+          fac_M=2*(fdhhp*(dhhp-dacos(fac_AC)))/
+     2          (dsqrt(1-fac_AC**2))
+          case(2)
+          fac_M=2*(fdhpp*(dhpp-dacos(fac_AC)))/
+     2          (dsqrt(1-fac_AC**2))
+          case(3)
+          fac_M=2*(fdppp*(dppp-dacos(fac_AC)))/
+     2          (dsqrt(1-fac_AC**2))
+        end select
         fac_N=(J2y-J3y)
         fac_O=(J2z-J3z)
         fac_P=(J2x-J3x)
@@ -978,7 +999,7 @@ c some auxiliary factors without any physical meaning
         fac_Z=(J1z-J2z)
         fac_AA=(J2x-J4x)
         fac_AB=(J1x-J2x)
-c finally
+c derivations of the energy with respect the x,y,z of each of the four atoms
         x(J1*3-2)=x(J1*3-2)+
      2     ((fac_N*fac_B-fac_O*fac_D)*fac_J+
      3     (-2*fac_N*fac_A+2*fac_O*fac_C)*fac_G*fac_L)*fac_M
@@ -1030,17 +1051,6 @@ c finally
      2     fac_M*(-fac_E*fac_J*fac_N+2*fac_F*fac_G*fac_K*fac_N+
      3     fac_C*fac_J*fac_P-2*fac_D*fac_G*fac_K*fac_P)
       enddo
-
-
-C     Coulomb repulsion from origin
-      if (fco.ne.0.d0)  then
-        Do I=1,n,3
-          rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
-          x(I)=x(I)-fco*rinv*p(I)
-          x(I+1)=x(I+1)-fco*rinv*p(I+1)
-          x(I+2)=x(I+2)-fco*rinv*p(I+2)
-        enddo
-      endif
 
       return
       END

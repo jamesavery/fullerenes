@@ -464,6 +464,7 @@ C     Optimize
 
       SUBROUTINE frprmn3d(N,AH,Iout,N5,N6,N5M,N6M,
      1 p,force,iopt,ftol,iter,fret)
+c and N=MATOM*3
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=99999,EPS=1.d-9)
