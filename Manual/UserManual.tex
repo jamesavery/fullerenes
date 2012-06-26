@@ -159,17 +159,17 @@ We are also open to any other suggestions and welcome additions to this program 
 \section{Installation and running the program}
 All fortran files are situated in the directory "source" and all C-files are in "libgraph".
 The program is LINUX/UNIX based and works fine with {\bf gfortran} and {\bf gc} compilers. You need to use the {\bf Makefile} included in 
-the {\bf fullerene.zip} file provided and type\\\\ 
-{\bf make}\\\\
+the {\bf fullerene.zip} file provided and type\\\\
+{\verb|make|}\\\\
 It currently compiles in a 64 bit version, but you can change it in the Makefile to 32 bits if required.
 The executable "fullerene" runs on a LINUX/UNIX as\\\\
-{\bf ./fullerene $<$filename.inp $>$filename.out}\\\\
+{\verb|./fullerene < filename.inp > filename.out|}\\\\
 A number of test input files can be found in the directory "input". If you type\\\\
-{\bf make tests}\\\\
+{\verb|make tests|}\\\\
 it will run all the input jobs and stores them into the output directory as *.out. If you type\\\\
-{\bf make clean}\\\\
+{\verb|make clean|}\\\\
 all the object files are deleted. A bit more is deleted if you type\\\\
-{\bf make distclean}\\\\
+{\verb|make distclean|}\\\\
 If you use the fullerene database (which is recommended for time savings), the file needs to be in the directory
 where the source and libgraph directories are situated.
 

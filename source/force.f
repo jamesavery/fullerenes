@@ -24,8 +24,7 @@ c n=MATOM*3
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
       Real*8 p(nmax*3),force(ffmaxdim)
-      Integer A(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6)
+      Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
       IERR=0
       rp=force(1)
       rh=force(2)
@@ -100,8 +99,8 @@ C     Loop over 5-rings
         r2M=pxM*pxM+pyM*pyM+pzM*pzM
          cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
          if(cosarg.ge.1.d0.or.cosarg.le.-1.d0) then
-         IERR=1
-         return
+           IERR=1
+           return
          endif
          anglep=dacos(cosarg)
          ehookap=ehookap+(anglep-ap)**2
@@ -164,12 +163,9 @@ C     total energy
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 p(nmax*3),force(ffmaxdim),increment
-      Integer A(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6),neighbour_atoms,
-     2 neighbour_faces_h, neighbour_faces_p, pentagoncount,
-     3 hexagoncount, arbitrary_index
-      dimension neighbour_atoms(3)
-      dimension neighbour_faces_h(3), neighbour_faces_p(3)
+      Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6),neighbour_atoms(3),
+     2 neighbour_faces_h(3),neighbour_faces_p(3),pentagoncount,
+     3 hexagoncount,arbitrary_index
       IERR=0
       rpp=force(1)
       rhp=force(2)
@@ -230,7 +226,7 @@ C             5-ring, 6-ring
 C             5-ring, 5-ring
               ehookrpp=ehookrpp+(ratom-rpp)**2
             endif
-          endif ! conncted
+          endif ! connected
         enddo
       enddo
 
@@ -329,7 +325,7 @@ c count adjacent pentagons (0 to 3)
         enddo
 c count adjacent hexagons (0 to 3)
         hexagoncount=0
-        do IB=1,n/3-12 ! because n=vertex_count * 3 ()
+        do IB=1,n/3-12 ! because n=vertex_count * 3
           do JB=1,6
             if(i.eq.N6M(IB,JB)) then
               hexagoncount=hexagoncount+1
@@ -346,9 +342,8 @@ c find neighbouring atoms (3)
           endif
         enddo
 c sort neighbours
-c we make use of the fact, that for any dihedral ijkl=ikjl
+c we make use of the fact, that for any dihedral ijkl=-ikjl (hence: ijkl=abs(ikjl))
 c therefore we only need to find the special vertex and dont care about the others which are much harder to distinguish
-      
         if(pentagoncount.eq.1) then
           do k=1,3 ! iterate over neighbour atoms
             arbitrary_index=0
@@ -406,14 +401,14 @@ c distances (first two are nonbonded)
         r1M=dsqrt(r2M)
         r2R=px3*px3 + py3*py3 + pz3*pz3
         r1R=dsqrt(r2R)
-c        write(*,*)r1L,r1m,r1r,"distances in dihedral"
+        write(*,*)i,r1L,r1m,r1r,"distances in dihedral"
 c angle between abc and cbd (between 0 and 2pi)
         angle=dacos(((-py1*px2+px1*py2)*(-py2*px3+px2*py3)+
      2   (pz1*px2-px1*pz2)*(pz2*px3-px2*pz3)+(-pz1*py2+py1*pz2)*
      3   (-pz2*py3+py2*pz3))/(((py1*px2-px1*py2)**2+(pz1*px2-px1*pz2)**2
      4   +(pz1*py2-py1*pz2)**2)*((py2*px3-px2*py3)**2+(pz2*px3-px2*
      5   pz3)**2+(pz2*py3-py2*pz3)**2)))
-c        write(*,*)angle,"dihedral angle (in radians)"
+        write(*,*)i,angle,"dihedral angle (in radians)"
         select case(pentagoncount)
           case(0)
             zero_value=dhhh
@@ -427,7 +422,7 @@ c        write(*,*)angle,"dihedral angle (in radians)"
         if(angle .ge. dpi) angle=angle-2*dpi
         angle=dabs(angle)
         increment=angle-zero_value ! can be <0 (but will be squared)
-c        write(*,*)angle,increment,"dihedral angle (in radians)"
+        write(*,*)i,angle,increment,"dihedral angle (in radians)"
         select case(pentagoncount)
           case(0)
             ehookdhhh=ehookdhhh+increment**2
@@ -477,8 +472,7 @@ c      write(*,*)"leaving dfunc3d"
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
       Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
-      Integer A(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6)
+      Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
       rp=force(1)
       rh=force(2)
       ap=force(3)
@@ -670,10 +664,9 @@ C     Coulomb repulsion from origin
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
       real*8 J1x,J1y,J1z,J2x,J2y,J2z,J3x,J3y,J3z,J4x,J4y,J4z
-      Integer A(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6),pentagoncount,
+      Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6),pentagoncount,
      2 hexagoncount,arbitrary_index,neighbour_atoms(3),
-     4 neighbour_faces_h(3),neighbour_faces_p(3)
+     3 neighbour_faces_h(3),neighbour_faces_p(3)
       rpp=force(1)
       rhp=force(2)
       rhh=force(3)
@@ -971,9 +964,10 @@ c some auxiliary factors without any physical meaning
         fac_K=1/(fac_H * fac_I**2)
         fac_L=1/(fac_H**2 * fac_I)
         fac_AC=fac_G * fac_J
-c        write(*,*)fac_a, fac_b, fac_c, fac_d, fac_e, fac_f
+        write(*,*)"abcdef",fac_a, fac_b, fac_c, fac_d, fac_e, fac_f
         if(fac_AC .ge. dpi) fac_AC=fac_AC-2*dpi
-c        write(*,*)fac_ac
+        fac_ac=dabs(fac_ac)
+        write(*,*)"ac",fac_ac
         select case(pentagoncount)
           case(0)
           fac_M=2*(fdhhh*(dhhh-dacos(fac_AC)))/
@@ -1003,7 +997,7 @@ c        write(*,*)fac_ac
         fac_Z=(J1z-J2z)
         fac_AA=(J2x-J4x)
         fac_AB=(J1x-J2x)
-c        write(*,*)fac_m, fac_n, fac_o, fac_p, fac_q, fac_r
+        write(*,*)"mnopqr",fac_m, fac_n, fac_o, fac_p, fac_q, fac_r
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(J1*3-2)=x(J1*3-2)+
      2     ((fac_N*fac_B-fac_O*fac_D)*fac_J+
