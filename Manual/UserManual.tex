@@ -30,7 +30,7 @@ North Shore City, 0745 Auckland, New Zealand.}
 
 \author{James Avery}\email[]{j.e.avery@massey.ac.nz}
 
-\affiliation{Copenhagen, Denmark.}
+\affiliation{Niels Bohr Institute, University of Copenhagen, 2100 Copenhagen, Denmark.}
 \date{\today}
 
 \maketitle
@@ -199,7 +199,8 @@ The easiest way to create a 3D structure is of course to read-in cartesian coord
 $I_h-$\C{20} or $I_h-$\C{60} isomers (Subroutine {\bf CoordC20C60}, see input files {\it ico.inp}, {\it icoExp.inp}, {\it icoideal.inp}), or to 
 get the cartesian coordinates from input ring-spiral pentagon-indices PSPI (Subroutine {\bf CoordBuild}) by using either the Fowler-Manopoulus 
 AME algorithm (the adjacency-matrix eigenvector algorithm) \cite{Atlas}, or the more reliable 3D Tutte embedding algorithm (3D-TE) 
-(used by files {\it pentagon1.inp} to {\it pentagon28.inp}). The pentagon indices can also be read-in from the {\it fullerene
+(used by files {\it pentagon1.inp} to {\it pentagon28.inp}), or from the Goldberg-Coxeter 2-index triangulation algorithm (input files {\it coxeter1.inp}
+to {\it coxeter5.inp}). The pentagon indices can also be read-in from the {\it fullerene
 database} if the canonical fullerene number is used as defined in The book ``Atlas of Fullerenes" Fowler and Manopoulus \cite{Atlas,cvetkovic2002} 
 (input file database.inp).
 We recommend reading this book for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
@@ -297,7 +298,7 @@ angles in an harmonic oscillator approximation \cite{Wu87}:
         + \frac{f_h}{2} \sum_{j_h}^{ring} \left(\theta_{j_h} - \theta_h\right)^2 
 \end{equation}
 $i_p$ and $i_h$ are restricted to the case where the adjacency matrix $A_{ij}$ for the atoms has nonzero values. $k_{p}$ and $k_{h}$ are
-the force constant for the two different C---C bonds (set to $\approx 300 $kcal\AA$^{-2}$), $R_p$ and $R_h$ the corresponding pentagon and
+the force constant for the two different C---C bonds (set to $\approx 300 ~$kcal \AA$^{-2}$), $R_p$ and $R_h$ the corresponding pentagon and
 hexagon bond distances ($\approx$ 1.4 \AA), and $\theta _p $and $\theta _h$ are the corresponding bond angles (108$^\circ$ and 120$^\circ$
 respectively).
 
@@ -329,14 +330,18 @@ cartesian coordinates were chosen of the fullerene was modified. It produces can
 A general ring-spiral algorithm is in preparation.
 
 \subsection{Volume and surface area, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
-The volume and surface area of the fullerene is calculated in Subroutine {\bf Volume}. This is done by 
-summing over all tetrahedrons spanned by the three vectors CM-CR (barycenter of fullerene to the ring center),
+The volume and surface area of the fullerene is calculated in Subroutine {\bf Volume}. This is done by\\
+1) The convex hull.\\
+2) The normal vector algorithm resulting in the exact volume of the polyhedron (identical to convex hull if polyhedron is convex).\\
+3) The tesselation into trigonal pyramides from the barycenter by summing over all
+tetrahedrons spanned by the three vectors (identical to algorithm 1 and 3 if
+polyhedron is convex). Here one sums over all tetrahedrons spanned by the three vectors CM-CR (barycenter of fullerene to the ring center),
 CM-CA1 (barycenter of fullerene to atom 1 in ring), and CM-CA2 (barycenter of fullerene  to atom 2 in ring).
-There are 5 such tetrahedrons in a pentagon and 6 in a hexagon. Note that the barycenter CM is already set to the origin.
+There are 5 such tetrahedrons in a pentagon and 6 in a hexagon. Note that the barycenter CM is already set to the origin.\\
 In a similar way the surface area is obtained by summing over all triangles from the ring center to neighboring vertices in the ring.
 $I_h$-\C{20} and $I_h$-\C{60} coordinates can be constructed easily using basic geometry. For these the volume and surface areas are
-known analytically. The routine also calculates the exact volume through a different tesselation method .... Also an algorithm
-has been implemented to get the convex hull (CH). The {\it isoperimetric quotient} defined as
+known analytically.\\
+The {\it isoperimetric quotient} (IPQ) defined as
  \begin{equation}
  \label{IPQ}
    q_{IPQ} =36\pi \frac{V^{2} }{S^{3} } \ \text{  with }\   q_{IPQ} \in [0,1]
@@ -464,12 +469,13 @@ For other 2D graph embedding methods implemented see the input section.
 %Input description
 \section{Input description}
 
-Input and output files are in the directories {\it input}  and   {\it output}  respectively. {\it Program Fullerene} has been tested for the ideal capped 
-for many fullerenes which found in the following input files:
+Input and output files are in the directories {\it input}  and   {\it output}  respectively. {\it Program Fullerene} has been tested 
+for many fullerenes found in the following input files:
 \C{20} (c20.inp), \C{24} (c24.inp), \C{26} (c26.inp), \C{28} (c28.inp), \C{30} (c30.inp),
 \C{36} (c36.inp), \C{50} (c50.inp), \C{60} (c60.inp), \C{70} (c70.inp), \C{72} (c72.inp),
 \C{74} (c74.inp), \C{78} (c78.inp), \C{80} (c80.inp), \C{92} (c92.inp), \C{100} (c100.inp),
-\C{180} (c180.inp), \C{320} (c320.inp), and \C{540} (c540.inp), pentagon1.inp, ..., pentagon25.inp for
+\C{180} (c180.inp), \C{320} (c320.inp), and \C{540}, the nonspirable fullerenes \C{380} (c380.inp) 
+and \C{384} (c384.inp), (c540.inp). RSPI inputs pentagon1.inp to pentagon25.inp for
 RSPI inputs and many more. The cartesian coordinates used in the input files are mostly B3LYP aug-cc-pVDZ optimized up to \C{60}, 
 cc-pVDZ up to \C{180}, and 6-31G for the rest, and all for singlet electronic states. 
 Note that for some of the fullerenes listed the singlet state chosen may not be the electronic ground state.
@@ -490,209 +496,187 @@ line in the input is for the 12 ring-spiral pentagon indices (RSPI).
 
 In the following, the input in the required sequence is described in detail (either Namelist or in Free Format):\\\\
 
-1) Text line of max. 132 characters (in 132A1 format) (you can put as many text cards into the input as you want)\\\\
+1) {\bf Text line} of max. 132 characters (in 132A1 format) (you can put as many text cards into the input as you want).\\\\
 
 2) {\bf \&Coord line}: Input to create cartesian coordinates and main flags for the program (e.g. \&Coord IC=20, IOPT=1, R6=1.42 /).\\
-List of options:\\ 
-{\bf NA, IC, IV1, IV2, IV3, ixyz, xyzname, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, IWS, ihueckel, loop, mirror, IP, IPRC, TolR, R5, R6, }\\
-NA = Number of atoms (vertices) $N_A$ (Default: 60)\\
-IC = Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
-IV1 = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
-IV2 = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 3)\\
-IV3 = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)\\
-ixyz = Flag for producing xyz input file for CYLview, Avogadro or others in standard xyz format (Default: 0). 
-Default name for the external file is cylview.xyz . Otherwise xyzname=filename needs to be specified (max 20 characters).\\
-isonum= Isomer number according to the scheme of Fowler and Manopoulus (Default: 0).\\
-ichk = 1 Restart isomer list.\\
-If IC=2, 3 or 4 and isonum not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
-There are two databases, one for the general isomers (IPRC=2) and one for the IPR isomers (IPRC=1), the
-definition is similar to the IPR parameter below (Default: 2).\\
-If leap = $n_{leap}$ the initial fullerene C$_{N_A}$ is subjected to an $n-th$ leapfrog transformation. 
+{\it List of options:}\\ 
+{\bf NA, IC, IV1, IV2, IV3, ixyz, xyzname, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, loop, mirror, IP, IPRC, TolR, R5, R6}\\
+{\bf NA} = Number of atoms (vertices) $N_A$ (Default: 60)\\
+{\bf IC} = Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
+{\bf IV1} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
+{\bf IV2} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 3)\\
+{\bf IV3} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)\\
+{\bf ixyz} = Flag for producing xyz input file for CYLview, Avogadro or others in standard xyz format (Default: 0). 
+Default name for the external file is {\it cylview.xyz}. Otherwise {\bf xyzname}=filename needs to be specified (max 20 characters).\\
+{\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0). 
+If {\bf IC} = 2, 3 or 4 and {\bf isonum} not zero, then pentagon indices are taken from the
+isomer list contained in a database (see below). There are two databases, one for the general isomers 
+({\bf IPRC} = 0) and one for the IPR isomers ({\bf IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).\\
+{\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting ptograms (Default: 0).\\
+If {\bf ixyz} = 1:  Produce xyz file for further input.\\
+If {\bf ixyz} = 2:  Read xyz from file specified in xyzname. {\bf IC} = 0 needs to be specified for this. Another xyz file is also produces 
+and named   {\it cylviewnew.xyz}.\\
+If {\bf ixyz} = 3  Read xyz from file specified in xyzname. {\bf IC} = 0  needs to be specified.\\
+{\bf xyzname}: A name of up to 16 characters must be chosen, the file is then named name.xyz (Default: cylview.dat).
+If {\bf IC} = 2, 3 or 4 and {\bf isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
+There are two databases, one for the general isomers ({\bf IPRC} = 2) and one for the IPR isomers ({\bf IPRC} = 1), the
+definition is similar to the {\bf IPR} parameter below (Default: 2).\\
+If {\bf leap} = $n_{leap}$ the initial fullerene C$_{N_A}$ is subjected to an $n-th$ leapfrog transformation. 
 This converts the number of atoms $N_A$ to $N^{'}_A = 3^{n_{leap}}N_A$. (Default: 0)\\
-If GCtrans = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}$[C$_{N_A}$] (Default: 0).
+If {\bf GCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}$[C$_{N_A}$] (Default: 0).
 Note that at the moment only $l=0$ is implemented, also the leapfrog transformation $k=1$ and $l=1$ is available in this input.
-In this case kGC in the namelist input has to be specified. \\
-If ISW = 1 the initial fullerene structure is subjected to a Stone-Wales transformation (Default: 0).\\
-If KE = 1 the initial fullerene structure is subjected to a Stone-Wales transformation (Default: 0).\\
-If IYF = 1 the initial fullerene structure is subjected to a Yoshida-Fowler 4- or 6-vertex insertion (Default: 0).\\
-If IWS = 1 the initial fullerene structure is subjected to a 9-vertex insertion (Default: 0).\\
-If ihueckel = 1 diagonalization of H\"uckel matrix is avoided which is of order $O(n^3)$ (efault: 0)\\
-If loop = 1 the program does not stop at the end but loops back to the beginning (Default: 0). This is important if one takes
-an initial structure and subjects it to further transformations, for example in subsequent Stone-Wales or
-Goldberg-Coxeter transformations.\\
-If mirror = 1 invert all coordinates (take the mirror image). This may be important for chiral fullerenes (Default: 0).\\
-If IP = 1 a larger output produced, i.e. the full distance matrix, all Hamiltonian cycles and all 3-ring connections (Default: 0).\\
-TolR = Tolerance in \% (Default: 33). Only change this parameter if the program cannot produce correctly the adjacency matrix. 
+In this case {\bf kGC} in the namelist input has to be specified. \\
+If {\bf ISW} = 1 the initial fullerene structure is subjected to a Stone-Wales transformation (Default: 0). In this case an
+input is required (after all the other input, last card) with pairs of
+pentagon ring number. Numbers are between 1 and 12. These can be obtained
+from a previous output in the section where ring connections are analyzed
+and Stone-Wales patterns are printed. In the output for Stone-Wales
+numbers the first and last ring numbers are the ones required as these
+are the pentagons. Alternatively you can set the second number to zero,
+the first number now determines that the Nth found in the list is taken.
+For example, an input\\     
+2 3 5 0\\
+means pentagon 2 and 3 is taken and the 5th in the printed list of Stone-Wales patterns (see output).\\
+If {\bf KE} = 1 the initial fullerene structure is subjected to a Endo-Kroto 2-vertex insertion (Default: 0).
+In this case an input is required (after all the other input, last card) with pairs of
+pentagon ring number. Numbers are between 1 and 12. These can be obtained
+from a previous output in the section where ring connections are analyzed
+and Endo-Kroto patterns are printed. Input is equivalent to the Stone-Wales transformation described above.\\
+If {\bf IYF} = 1 or 2 then a Yoshida-Fowler 4-vertex insertion \cite{Yoshida97} is performed (Default: 0). 
+In this case an input is required  with either hexagon numbers (IYF=1) or the position in
+the list of Yoshida-Fowler patterns given in the output (IYF=2).\\
+If {\bf IYF} = 3 or 4 then a Yoshida-Fowler 6-vertex insertion \cite{Yoshida97} is performed (Default: 0). 
+In this case an input is required with the three hexagon numbers (IYF=3) or the position in
+the list of Yashida-Fowler patterns given in the output (IYF=4).\\
+If {\bf ISW} = 1 the initial fullerene structure is subjected to a 9-vertex insertion (Default: 0).
+Similar to Yoshia-Fowler, an input is required (see {\it c384.inp} for details).\\
+If {\bf ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $O(n^3)$ (recommended for large matrices
+over size 5000) (Default: 0)\\
+If {\bf loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 
+This is important if one takes an initial structure and subjects it to further transformations, for example in subsequent Stone-Wales or
+Goldberg-Coxeter transformations. You might use this option to read from a xyz file created in the previous run.\\
+If {\bf loop} = 2: Same a above but if IC specified correctly, it takes pentagon indices from a previous run.\\
+If {\bf mirror} = 1 invert all coordinates (take the mirror image). This may be important for chiral fullerenes (Default: 0).\\
+If {\bf IP} = 1 Print option for larger output to be produced, i.e. the full distance matrix, all Hamiltonian cycles 
+and all 3-ring connections (Default: 0).\\
+{\bf IPRC}: see entry for {\bf isonum}.\\
+{\bf TolR} = Tolerance in \% (Default: 33). Only change this parameter if the program cannot produce correctly the adjacency matrix. 
 This is only necessary for the cartesian coordinate input (IC=1) and only fails if bond distances are unusually large or small. 
 Connectivities are found for atoms with distances between R6   and   R6*(1+TolR/100). If TolR=0.0 the default value of 33\% is used. 
 If this parameter is set at a value too large, unwanted connectivities
 are produced resulting in smaller polygons. This parameter should reflect the maximum deviation in distance from the smallest distance found.\\
-R5 = pentagon bond distance, i.e. the bond length in the pentagons (Default: 1.455).\\
-R6 = hexagon  bond distance, i.e. the bond length of the bonds connecting hexagons (Default: 1.391).  
-If R5 = R6 is chosen then the ideal capped icosahedron for \C{60} is obtained if NA=60 is chosen.\\\\
-
+{\bf R5} = pentagon bond distance, i.e. the bond length in the pentagons (Default: 1.455).\\
+{\bf R6} = hexagon  bond distance, i.e. the bond length of the bonds connecting hexagons (Default: 1.391).  
+If {\bf R5} = {\bf R6} is chosen then the ideal capped icosahedron for \C{60} is obtained if NA=60 is chosen.\\\\
 More details for the {\bf IC}-flag:\\
-If IC = 0 No coordinate input required, coordinates are constructed for the IPR isomer of \C{60} (or \C{20} if NA=20 is chosen).
+If {\bf IC} = 0 No coordinate input required, coordinates are constructed for the IPR isomer of \C{60} (or \C{20} if NA=20 is chosen).
 You may like to specify R5 and R6 in the input, otherwise the default values are taken.\\
-If IC = 1 Cartesian Coordinates expected as input. In this case NA extra lines are required with\\\\
+If {\bf IC} = 1 Cartesian Coordinates expected as input. In this case NA extra lines are required with\\\\
 $N_{Z_i}, X_i, Y_i, Z_i$  (in free format)\\\\
-Here $N_{Z_i}$= Nuclear Charge, and X,Y,C are the cartesian coordinates for atom $i$ in \AA. NB: $N_{Z_i}$ is not really needed by the program, 
+Here $N_{Z_i}$= Nuclear Charge, and $X_i, Y_i, Z_i$ are the cartesian coordinates for atom $i$ in \AA. NB: $N_{Z_i}$ is not really needed by the program, 
 but you can copy easily .xyz files or outputs from other quantum theoretical programs into the input.\\
-If IC = 2 or 3 the adjacency matrix is created from a ring-spiral pentagon list. Extra input required (free format):\\\\
+If {\bf IC} = 2 or 3 the adjacency matrix is created from a ring-spiral pentagon list. Extra input required (free format):\\\\
 $n_{RSPI}(I), I=1,12$ \\\\
 $n_{RSPI}(I)$ are the 12 Fowler-Manolopoulus ring-spiral pentagon indices which uniquely identify the locations of the 
 pentagons if the fullerene is spirable \cite{Atlas}. Use the canonical pentagon ring indices if possible (transformation to the canonical
 from should work as well).\\
-If IC = 4 or 5 adjacency matrix is created from a Goldberg-Coxeter transform of \C{20}, i.e. $GC_{k,l}$[\C{20}]. Note at the moment
-the program is restricted to $l=0$. In this case the parameter kGC in the namelist input has to be used.\\
-If IC = 2 or 4 the AME algorithm using $P$-type eigenvectors produced from the adjacency matrix to get cartesian coordinates. 
+If {\bf IC} = 4 or 5 adjacency matrix is created from a Goldberg-Coxeter transform of \C{20}, i.e. $GC_{k,l}$[\C{20}]. Note at the moment
+the program is restricted to $l=0$. In this case the parameter {\bf kGC} in the namelist input has to be used.\\
+If {\bf IC} = 2 or 4 the AME algorithm using $P$-type eigenvectors produced from the adjacency matrix to get cartesian coordinates. 
 If the $P$-type eigenvectors are not in sequence
-(position 2,3 and 4, see ref.\cite{Atlas} for details), three integer values $I_{V_1}, I_{V_2}, I_{V_3}$ can be specified in the \&Coord
+(position 2,3 and 4, see ref.\cite{Atlas} for details), three integer values {\bf IV1, IV2, IV3} can be specified in the \&Coord
 namelist input identifying the position of the eigenvectors (see pentagon8.inp for such an example).
 In this case a warning occurs which means you should carefully check the eigenvectors used and cartesian coordinates produced.
 Otherwise coordinates produced are useless. This is more often the case as you might expect.\\
-IC = 3 or 5 the Tutte embedding (3D-TE) algorithm is chosen for the construction of the 3D fullerene structure from the adjacency matrix. 
+If {\bf IC} = 3 or 5 the Tutte embedding (3D-TE) algorithm is chosen for the construction of the 3D fullerene structure from the adjacency matrix. 
 This should always work, although the fullerene created might be too spherical compared to the AME algorithm. But this algorithm is easier, 
 and (in theory) should never fail. Examples are given in the input files starting with ``pentagon".\\\\
 
+3) {\bf \&FFParameters and \&FFParameters  lines}: Options for force-field optimization.\\
+{\it List of options} for \&FFChoice line: {\bf Iopt, ftol}\\
+{\it List of options} for \&FFParameters line: {\bf fCoulomb, WuR5, WuR6, WuA5, WuA6, WufR, WufA, ExtWuR55, ExtWuR56, 
+ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR, ExtWufA, ExtWufD}\\
+{\bf Iopt} = Flag for force-field optimization (Default: 0)\\
+If {\bf Iopt} = 1  then fullerene is optimized using the force field method of Wu et al. \cite{Wu87} within a 
+Fletcher-Reeves-Polak-Ribiere algorithm. There are more sophisticated force fields available \cite{Ceulemans},
+e.g. {\it Avogadro} has a more sophisticated force-field which you can try out.
+but for these general parameters for fullerenes are not yet available, and the Wu force field does the 
+job to create good initial cartesian coordinates for further refinement using more sophisticated QM methods. 
+Note that a converged energy much greater than zero implies that the set distances and angles in the Wu force field cannot be
+reached for all atoms and rings.\\
+If {\bf Iopt} = 2  Preoptimize with input force field, then optimize with standard Wu force field. This is especially useful for {\bf fcoulomb} 
+input (see below).  \\
+{\bf ftol}: The convergence tolerance on the energy (Default: $5.0 \times 10^{-8}$)
+{\bf WuR5, WuR6, WuA5, WuA6, WufR, WufA} are force-field parameters for Wu force field for
+distances R5, R6, and angles A5, A6. The force constants are: distance WufR and
+angles WufA (see paper by Wu et al. for details \cite{Wu87}). Defaults: {\bf WuR5} =  1.455, {\bf WuR6} = 1.391, {\bf WuA5} = 1.08d2, 
+{\bf WuA6} = 1.2d2, {\bf WufR} = 1.d6, {\bf WufA} = 1.d5
+If {\bf fCoulomb} $>$ 0. then add an additional repulsive Coulomb force from the barycenter to all atoms (Default:  {\bf fCoulomb} = 0.d0)
+This is extremely useful for an initial geometry optimization to keep the fullerene cage convex if for example the Tutte construction leads to not
+a good guess of the initial structure. In such cases {\bf fCoulomb} = 1.d2 is a good choice.\\\\
 
-3) {\bf \&Opt line}: Option for force-field optimization:
-      \&Opt options /        (e.g. \&Opt Iopt=1 /)
-      list of options: Iopt,ftol,WuR5,WuR6,WuA5,WuA6,WufR,WufA,fCoulomb
-      Iopt= Flag for force-field optimization (Default: 0)
-      In detail:
-       If Iopt=1  then fullerene is optimized using the force field method
-         of Wu et al within a Fletcher-Reeves-Polak-Ribiere algorithm:
-         Z.C.Wu, D.A.Jelski, T.F.George, Chem. Phys. Lett. 137, 291-295 (1987).
-         Note that there are more sophisticated force fields available,
-         but for these general parameters for fullerenes are not
-         yet available, and the Wu force field does the job to create good initial
-         cartesian coordinates for further refinement using more sophisticated
-         QM methods. Note that a converged energy much greater than zero implies
-         that the set distances and angles in the Wu force field cannot be
-         reached for all atoms and rings. For further reading see: 
-         A.Ceulemans, B.C.Titeca, L.F.Chibotaru, I.Vos, P.W.Fowler, 
-         J. Phys. Chem. A 105, 8284-8295 (2001).
-       If Iopt=2  Preoptimize with input force field, then optimize with Wu
-         force field. This is especially useful for fcoulomb input (see below).  
-         NB: Avogadro has a more sophisticated force-field which you can try out.
-       ftol: The convergence tolerance on the function value is input as ftol
-         (Default: 5.0E-8)
-       WuR5,WuR6,WuA5,WuA6,WufR,WufA: Force field parameters for Wu force field for
-         distances R5, R6, angles A5, A6, force constants for distance WufR and
-         angles WufA (see paper by Wu et al. for details).
-         Defaults: WuR5=1.455, WuR6=1.391, WuA5=1.08d2, WuA6=1.2d2, WufR=1.d6,
-                   WufA=1.d5
-       If fCoulomb>0. then add an additional repulsive Coulomb forct from the 
-         barycenter to the atoms      (Default:  fCoulomb=0.d0)
-         This is extremely useful for an initial geometry optimization to keep
-         the cage convex if for example the Tutte construction leads to not
-         a good guess of the initial structure. In such cases fCoulomb=1.d2
-         is a good choice.\\\\
+4) {\bf \&Hamilton line}: Option for calculating Hamiltonian cycles and IUPAC numbers.\\
+\&Hamilton options: {\bf IHam}, {\bf IUPAC}\\
+If {\bf IHam} > 0 Then Subroutine HAMILTON is called (Default: 0).\\
+If {\bf IHam} = 1 Routine will stop after 1 million Hamiltonian cycles are found.\\
+If {\bf IHam} = 1000000000 Program runs forever and prints if IHam is reached (dangerous choice).\\
+If {\bf IUPAC} = 1 IUPAC numbers are produced (Default: 0).\\
+Note only with this option together with {\bf IP} = 1 in the \&Coord input all Hamiltonian cycles are printed out. 
+{\bf IP} = 0 only gives the best cycle (see Babi\'c \cite{Babic1995a}).
+If {\bf IUPAC} = 0 the program goes into a fast subroutine and prints only the total number of Hamiltonian cycles.\\\\
 
- 4) Option for calculating Hamiltonian cycles and IUPAC numbers 
-      \&Hamilton options /        (e.g. \&Hamilton IHam=1 IUPAC=1 /)
-      list of options: IHam,IUPAC
-      In detail:
-      If IHam>0 Then Subroutine HAMILTON is called.     (Default: 0)
-         IHam=1 Routine will stop after 1 million Hamiltonian cycles are found
-         IHam=1000000000 Program runs forever and prints if IHam is reached
-      If IUPAC=1 IUPAC numbers are produced.   (Default: 0) 
-         Note only with this option together with IP=1 in \&Coord input 
-         all Hamiltonian cycles are printed out. IP=0 only gives the
-         best cycle (see Babic, ref.3).
-         IUPAC=0 goes into a fast subroutine and prints only the total number of
-         Hamiltonian cycles.\\\\
+5) {\bf \&Isomers line}: Option for producing list of isomers and properties.\\
+\&Isomers options: {\bf IPR}, {\bf IPH}, {\bf IStop}, {\bf IChk}, {\bf chkname} (Default 0 for all options and 'checkpoint' for chkname).\\
+If {\bf IPR} $>$ 0 then the ring-spiral subroutine of Fowler and Manolopoulus is used \cite{Atlas}.
+This sub-program catalogues fullerenes with a given number of vertices using the spiral algorithm and a uniqueness test
+based on equivalent spirals. The required input is IPR.\\
+If {\bf IPR} = 1 for isolated-pentagon isomers from \C{60} onwards.\\
+If {\bf IPR} = 2 for general isomers (note that this generates a large output and takes some computer time for fullerenes larger than \C{80}).
+Also the database has all this information (see below) up to \C{100}.\\
+If {\bf IPH} = 1 then number of distinct Hamiltonian cycles is calculated for every isomer (note this is computer time extensive).\\
+If {\bf istop} = 1 program stops after calling this routine.\\
+If {\bf IChk} = 1  Restart: Isomer list is continued from previous output file called 'checkpoint' as default if not otherwise give in {\bf chkname}.
+This is a restart option from a previous run which terminated. Note that the new output file does not contain the previous one.
+The resulting output is a catalogue of the isomers found containing their idealized point groups, canonical spirals, and NMR patterns
+\cite{Atlas}.\\\\
 
- 5) Option for producing list of isomers and properties.
-      \&Isomers options /        (e.g.\&Isomers IPR=1, IPH=1 /)
-      list of options: IPR,IPH,IStop,IChk,chkname (Default 0 for all options
-                                                   and 'checkpoint' for chkname)
-      In detail:
-      If IPR>0 then the ring spiral subroutine of Fowler and Manolopoulus is used.
-         This sub-program catalogues fullerenes with a given number of
-         vertices using the spiral algorithm and a uniqueness test
-         based on equivalent spirals. The required input is IPR.
-         IPR=1 for isolated-pentagon isomers from C60 onwards.
-         IPR=2 for general isomers (note that this generates a lot of output and
-            takes some computer time for fullerenes larger than C60).
-      If IPH=1 then number of distinct Hamiltonian cycles is calculated for
-          every isomer (note this is computer time extensive).
-      If istop=1 program stops after calling this routine.
-      If IChk=1  Restart: Isomer list is continued from previous output file 
-          called 'checkpoint' as default if not otherwise give in chkname.
-          This is a restart option from a previous run which terminated. Note
-          that the new output file does not contain the previous one.
-      The resulting output is a catalogue of the isomers found containing
-         their idealized point groups, canonical spirals, and NMR patterns
-         (see ref.2).\\\\
-
- 6) Option for producing coordinates for fullerene graphs (Schlegel diagrams).
-      \&Graph options /      (e.g. \&Graph IG=1, ISO1=1, ISO2=3, ISO3=7 /)
-      list of options: ISchlegel,ISO1,ISO2,ISO3,PS,SCALE,SCALEPPG
-      We recommend IG= 1, 2, 4 or 7
-      In detail:
-      If ISchlegel>0 Use Program Schlegel for generating fullerene graphs
-         ISchlegel=1 Use the perspective projection method (PSP).
-         ISchlegel=2 Use the cone projection method (CSP).
-         ISchlegel=3 Produce the Tutte graph (2D-TE)
-         ISchlegel=4 Produce the Tutte graph and perform linear scaling (2D-TE-LS)
-              (scale factor can be read in).
-         ISchlegel=5 Produce the Tutte graph and perform spring embedding optimization
-              (rij-r0)**2 with r0 set to 2.0 (2D-SE).
-         ISchlegel=6 Starting from the Tutte graph perform spring + repulsive Coulomb
-              force embedding optimization (2D-SE+C). The repulsive force is taken
-              from the barycenter to the vertex. r0 is set to 2.0. The force
-              constants are set such that the graph looks nice.
-         ISchlegel=7 Starting from the Tutte graph perform a Pisanski-Plestenjak-Graovac 
-              embedding PPGE) optimization (called Schlegel by the authors)
-              Note: This is much faster than their simulated annealing algorithm.
-         ISchlegel=8 Starting from the Tutte graph perform a Kamada-Kawai embedding 
-              optimization using the distance matrix (2D-KKE).
-              Note: This gives a 2D picture of a 3D structure, thus
-               it is not related to a Schlegel diagram and has edge crossings.
-      If ISO1=0 Use the input coordinates for the construction of 
-               the Schlegel diagram.
-      If ISO1.ne.0 Specifying the ring center, edge or
-              vertex through which the z-axis goes at the top of
-              the projection (under construction). This rotates
-              the fullerene around the origin of points into the
-              right position for the Schlegel diagram. Since 3 atoms
-              uniquely define the ring, two the edge, and one the vertex,
-              the input is three integers with the corresponding
-              atom numbers  IO1, IO2, and IO3, i.e. for these values
-                    1 0 0 is a vertex with atom 1 on the top of the z-axis;
-                    7 8 0 is an edge between atom 7 and 8 and z-axis goes
-                          the middle of the bond;
-                    12 13 50 is a ring (either pentagon or hexagon determined
-                          by the program) and z-axis goes through the center
-                          of the ring;
-              NB: You can run the program first with 0 0 0, check the positions
-                  and run it again with the appropriate values.
-              NB2: For IG=1 the input (if chosen) requires to be a ring, i.e.
-                  IO1, IO2 and IO3 are required, otherwise they are chosen by the
-                  program using the largest z-coordinate.
-      If Scale.ne.0. Scaling factor for linear scaling of Tutte graph (default  2.5)
-              2D coordinated are scaled by 1.+.5*Scale*(rmin-r)/rmin
-              r is the distance of the vertex from the barycenter
-              rmin is the smallest distance of the vertex from the barycenter 
-               belonging to the outer circumferencing 5- or 6-ring
-      If ScalePPG.ne.0. Scaling factor for exponential in Pisanski-Plestenjak-Graovac
-              algorithm     (default 1.0)
-      If PS.ne.0. 
-              - Projection angle in degrees is chosen (default 45 degrees)
-              to be used as an input parameter in the cone projection
-              method. The angle is the cone angle from the point of projection 
-              to the projection plane, which touches the point with the smallest 
-              z-value (opposite the projection point). Note that angle is reset 
-              to 45 deg if chosen larger than 89.
-              - In the case of the perspective projection PS is the distance
-              between the focal point and the ring center underneath, Note this
-              is chosen by the program, but if nonzero this parameter has to be
-              carefully chosen. The picture produced gives a good idea if the
-              ParamS is correctly chosen or not. Note that the ring centers get
-              an extra boost of 10\% in the scaling factors such that they appear
-              more in the center of the rings produced by the Schlegel projection.
+6) {\bf \&Graph line}: Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (Schlegel diagrams).\\
+\&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, PS, Scale, ScalePPG, graphname} (Default: 0 for all values except for {\bf graphname}). We recommend {\bf IG} = 1, 2, 4 or 7.\\
+If {\bf ISchlegel} $>$ 0 Use Program Schlegel for generating fullerene graphs
+If {\bf ISchlegel} = 1: Use the perspective projection method (PSP).\\
+If {\bf ISchlegel} = 2: Use the cone projection method (CSP).\\
+If {\bf ISchlegel} = 3: Produce the Tutte graph (2D-TE).\\
+If {\bf ISchlegel} = 4: Produce the Tutte graph and perform linear scaling (2D-TE-LS) (scale factor can be read in).\\
+If {\bf ISchlegel} = 5: Produce the Tutte graph and perform spring embedding optimization $(r_{ij}-r_0)^2$ with $r_0$ set to 2.0 (2D-SE).\\
+If {\bf ISchlegel} = 6: Starting from the Tutte graph perform spring + repulsive Coulomb.
+force embedding optimization (2D-SE+C). The repulsive force is taken from the barycenter to the vertex. $r_0$ is set to 2.0. The force
+constants are set such that the graph looks nice.\\
+If {\bf ISchlegel} = 7: Starting from the Tutte graph perform a Pisanski-Plestenjak-Graovac embedding PPGE) optimization 
+(called Schlegel by the authors). Note: This is much faster than their simulated annealing algorithm.\\
+If {\bf ISchlegel} = 8: Starting from the Tutte graph perform a Kamada-Kawai embedding 
+optimization using the distance matrix (2D-KKE). Note: This gives a 2D picture of a 3D structure, thus
+it is not related to a Schlegel diagram and has edge crossings.\\
+If {\bf ISO1} = 0: Use the input coordinates for the construction of the Schlegel diagram.\\
+If {\bf ISO1} $\ne$ 0: Specifying the ring center, edge or vertex through which the $z$-axis goes at the top of the projection. This rotates
+the fullerene around the origin of points into the right position for the Schlegel diagram. Since 3 atoms
+uniquely define the ring, two the edge, and one the vertex, the input is three integers with the corresponding
+atom numbers  ({\bf ISO1}, {\bf ISO2}, and {\bf ISO3}(, i.e. for these values (1, 0, 0) is a vertex with atom 1 on the top of the z-axis;
+(7, 8, 0) is an edge between atom 7 and 8 and z-axis goes the middle of the bond; (12, 13, 50) is a ring (either pentagon or hexagon determined
+by the program) and $z$-axis goes through the center of the ring. You can run the program first with (0, 0, 0), check the positions
+and run it again with the appropriate values. For {\bf IG} = 1 the input (if chosen) requires to be a ring, i.e.
+{\bf ISO1}, {\bf ISO2}, and {\bf ISO3} are required, otherwise they are chosen by the program using the largest $z$-coordinate.\\
+If {\bf Scale} $\ne$ 0: Scaling factor $f_{Scale}$ for linear scaling of Tutte graph (default  2.5). 2D coordinates are scaled by 
+$1.+0.5f_{Scale}(r_{min}-r)/r_{min}$. $r$ is the distance of the vertex from the barycenter, $r_{min}$ is the smallest distance of the vertex 
+from the barycenter belonging to the outer circumference 5- or 6-ring.\\
+If {\bf ScalePPG} $\ne$ 0: Scaling factor for exponential in Pisanski-Plestenjak-Graovac algorithm \cite{pisanski95} (default 1.0).\\
+If {\bf PS} $\ne$ 0: Projection angle in degrees is chosen (default 45 degrees)
+to be used as an input parameter in the cone projection method. The angle is the cone angle from the point of projection 
+to the projection plane, which touches the point with the smallest $z$-value (opposite the projection point). Note that angle is reset 
+to 45 degrees if chosen larger than 89 degrees. In the case of the perspective projection PS is the distance
+between the focal point and the ring center underneath, Note this is chosen by the program, but if nonzero this parameter has to be
+carefully chosen. The picture produced gives a good idea if the {\bf PS} is correctly chosen or not. Note that the ring centers get
+an extra boost of 10\% in the scaling factors such that they appear more in the center of the rings produced by the Schlegel projection.
+{\bf graphname} = name. A name of up to 16 characters including at the end must be chosen, the file is then named name.dat (Default: graph2D.dat).
               
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{100} and for IPR isomers up to
@@ -747,9 +731,9 @@ Dependence on Structural Motifs", {\it J. Am. Chem. Soc.} {\bf 122}, 8265Ð8270 (
 
 \bibitem{Avogadro} Program Avogadro, ``an advanced molecule editor and visualizer designed for cross-platform use in computational chemistry, molecular modeling, bioinformatics, materials science, and related areas", see http://avogadro.openmolecules.net.
 
-\bibitem{JMol} JyMOL, ``a Java-based development component", see http://jmol.sourceforge.net/.
+\bibitem{JMol} Program JyMOL, ``a Java-based development component", see http://jmol.sourceforge.net/.
 
-\bibitem{Pymol}. Program Pymol, ``A user-sponsered molecular visualization system on an open-source foundation", see http://www.pymol.org/.
+\bibitem{Pymol} Program Pymol, ``A user-sponsored molecular visualization system on an open-source foundation", see http://www.pymol.org/.
 
 \bibitem{Gabriel2008} A. T. Gabriel, T. Meyer, and G. Germano, 
 ``Molecular graphics of convex body fluids", {\it J. Chem. Theory Comput.}
@@ -757,7 +741,7 @@ Dependence on Structural Motifs", {\it J. Am. Chem. Soc.} {\bf 122}, 8265Ð8270 (
 
 \bibitem{PSJA} P. Schwerdtfeger and J. Avery, ``Topological and Graph Theoretical Properties of Regular Fullerenes", in preparation.
 
-\bibitem{cvetkovic2002} D. Cvetkovi\'c, P. Fowler, P. Rowlinson, and D. Stevanovi«c, {\it Linear Algebra Appl.} 356, 37Ð56 (2002).
+\bibitem{cvetkovic2002} D. Cvetkovi\'c, P. Fowler, P. Rowlinson, and D. Stevanovi«c, {\it Linear Algebra Appl.} {\bf 356}, 37Ð56 (2002).
 
 \bibitem{Babic1995a} D. Babi\'c, ``Nomenclature and Coding of Fullerenes", {\it J. Chem. Inf. Comput. Sci.} {\bf 35}, 515-526 (1995).
 
@@ -771,9 +755,13 @@ Dependence on Structural Motifs", {\it J. Am. Chem. Soc.} {\bf 122}, 8265Ð8270 (
 
 \bibitem{Hopp96} T. H. Hopp and C. P. Reeve, NIST, US Department of Commerce (1996).
 
-\bibitem{Heiney91} P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991).
+\bibitem{Heiney91} P.A.Heiney et al., {\it Phys. Rev. Lett.} {\bf 66}, 2911 (1991).
 
-\bibitem{pisanski95} Pisanski, T.; Plestenjak, B.; Graovac, A. Croat. Chem. Acta 1995, 68, 283Ð292.
+\bibitem{pisanski95} T. Pisanski, B. Plestenjak, and A. Graovac, {\it Croat. Chem. Acta} {\bf 68}, 283Ð292 (1995).
+
+\bibitem{Ceulemans} A. Ceulemans, B. C. Titeca, L. F. Chibotaru, I. Vos, and P. W. Fowler, ``Complete bond force fields for trivalent and deltahedral cages: Group theory and applications to cubane, closo-dodecaborane, and buckminsterfullerene", {\it J. Phys. Chem. A} {\bf 105}, 8284-8295 (2001).
+
+\bibitem{ands} I. D. Hands, J. L. Dunn, and C. A. Bates, {\it J. Chem. Phys.} {\bf 120}, 6912-xxx (2004).
 
 \end{thebibliography}
 

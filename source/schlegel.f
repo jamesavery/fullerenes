@@ -1,6 +1,6 @@
       SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,
      1 N5M,N6M,N5R,N6R,NRing,Iring,ISchlegel,IC3,IDA,Dist,angle,Rmin,
-     1 Tol,fscale,scalePPG,CR,CR5,CR6,Symbol)
+     1 Tol,fscale,scalePPG,CR,CR5,CR6,Symbol,graphname)
       use config
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
@@ -17,6 +17,7 @@ C or face is at the top. Euler angles are used for rotation.
       DIMENSION N5M(Mmax,5),N6M(Mmax,6),Rot(3,3),CR(3,Mmax)
       DIMENSION Rotz(3,3),Symbol(Mmax),RingS(2,Mmax)
       DIMENSION IC3(Nmax,3),IS(6)
+      CHARACTER*20 graphname
       Integer MDist(Nmax,Nmax)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
@@ -27,7 +28,7 @@ C     Parameter set for Program QMGA
       Data DPoint,Dedge/0.5d0,0.1d0/
 
 C     Prepare for Program QMGA
-      Open(unit=2,file='qmga.dat',form='formatted')
+      Open(unit=2,file=graphname,form='formatted')
       Write(2,901) M,DPoint,Dedge
       
       Do I=1,Nmax
@@ -411,8 +412,7 @@ C   Cone projection using the input angle
 C   Calculate distance of vertices from z-axis for projection
   20  app=rmin+Dist(3,1)
       WRITE(IOUT,1002)
-C     Write out on file unit=2 for qmga
-C     See http://qmga.sourceforge.net/
+C     Write out on file unit=2 for schlegel.dat
       sfac=dtan(angle*dpi/180.d0)
       Do I=1,M
       X=Dist(1,I)
@@ -440,7 +440,7 @@ C   Print
       Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
-      WRITE(IOUT,1032)
+      WRITE(IOUT,1032) graphname
 
 C   Calculate distance of ring centers from z-axis for projection
       WRITE(IOUT,1018)
@@ -517,7 +517,7 @@ C   Atoms
       Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
-      WRITE(IOUT,1032)
+      WRITE(IOUT,1032) graphname
       WRITE(IOUT,1029)
 C   Rings
       Do I=1,NR
@@ -795,8 +795,8 @@ C James, here goes your latex program creation for Schlegel diagram
  1030 Format(/1X,'Now project the vertices and print adjacent vertices:'
      2 /1X,'  Atom       X            Y       N1   N2   N3')
  1031 Format(/1X,'Reset focal point distance to nearest ring to ',F12.6)
- 1032 Format(/1X,'File qmga.dat written out for input into',
-     1 ' program QMGA')
+ 1032 Format(/1X,'File ',A20,' written out for input into',
+     1 ' 2D graph program')
  1033 FORMAT(/1X,'Using the Tutte-embedding algorithm for fullerene ',
      1 'graph as a starting point for embedding algorithms')
  1034 Format(1X,'No input for specifying circumfencing ring chosen, ',
@@ -838,6 +838,7 @@ C    1 'atoms ',3I4)
       END
  
       SUBROUTINE Rotmat(Iout,Rot,vec)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Rot(3,3),vec(3),vec1(3)
       data eps/1.d-8/
