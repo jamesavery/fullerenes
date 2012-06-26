@@ -239,7 +239,7 @@ C Establish all closed ring systems
 C Optimize Geometry through force field method
 c we check for ISW because the coordinates shouldn't be optimized before
 c a stone wales (or any other transformation) is done
-      If(Iopt.ne.0.and.ISW.eq.0) then
+      If(Iopt.ne.0.and.ISW.eq.0.and.iyf.eq.0.and.iws.eq.0) then
         routine='OPTFF        '
         ftol=ftolP
         Write(Iout,1008) routine
@@ -247,11 +247,9 @@ c a stone wales (or any other transformation) is done
           if(Iopt.eq.2) then ! Wu + Coulomb
             ftol=ftolP*1.d3
             Write(Iout,1003)
-c            fcoulomb=force(9) ! not used anywhere?
             CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1        N5MEM,N6MEM,Dist,Rdist,ftol,force,iopt)
-c            ftol=ftolP ! reset tolerance
-c            Do i=1,9 ! reset force field to default
+c            Do i=1,ffmaxdim ! reset force field to default
 c              force(i)=forceP(i)
 c            enddo
           endif
@@ -421,10 +419,10 @@ C  E N D   O F   P R O G R A M
   99  if(loop-1) 100,101,102
  100  go to 9999
  101  iprev=0
-      WRITE(IOUT,1019)
-      go to 9 
+      WRITE(IOUT,1019) ! line of dashes
+      go to 9 ! datain
  102  iprev=1
-      WRITE(IOUT,1019)
+      WRITE(IOUT,1019) 
       go to 9 
 CG77 99  CALL TIME(CTIM)
 CG77 99  CALL TIME(CTIM)
