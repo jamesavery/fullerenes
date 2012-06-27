@@ -90,6 +90,8 @@ C     Now Print
       nflag=0
       Etot=0.d0
       iocc=0
+      estrada=0.d0
+      bipartivity=0.d0
       Write(Iout,1000)
       iproper=0 
       Do I=1,ieigv
@@ -114,13 +116,24 @@ C     Now Print
        if(NE.ne.0.and.NE.eq.idg(i)*2) iocc=iocc+idg(i)
        epsilon=alpha+df(i)*beta
        Etot=Etot+df(I)*dfloat(NE)
+       aidg=dfloat(idg(i))
+       bipartivity=bipartivity+aidg*dcosh(df(i))
+       estrada=estrada+aidg*dexp(df(i))
        Write(Iout,1002) df(I),epsilon,idg(i),NE,Symbol
       enddo
+
+C     Other useful properties from Hueckel matrix
+C     Babic's resonance energy
       TRE=1.024296d0*Etot/dfloat(MAtom)-1.562211d0
       DTRE=TRE-2.82066353359331501d-2
       DTREkcal=DTRE*beta*6.27509541D+02
       Graphene=0.0468d0
       Write(Iout,1003) Etot,TRE,Graphene,DTRE,DTREkcal
+
+C     Estrada and bibartivity index
+      Write(Iout,1008) estrada,bipartivity/estrada
+
+C     Bandgap
       if(nopen.eq.1) then
        Write(Iout,1004)
       else
@@ -133,6 +146,7 @@ C     Now Print
        Write(Iout,1005) bandgap,excite
        if(bandgap.lt.Tol1) Write(Iout,1006)
       endif
+
  
  1000 FORMAT(8X,'x',13X,'E',4X,'deg NE   type    ',/1X,45('-'))
  1002 FORMAT(2(1X,F12.6),I3,1X,I3,3X,A10)
@@ -153,6 +167,8 @@ C     Now Print
  1007 FORMAT(/1X,'Diagonalize Hueckel matrix (E=alpha+x*beta; E in au)',
      1 /1X,'Eigenvalues are between [-3,+3] (in units of |beta|)',
      1 /1X,'deg: degeneracy; NE: number of electrons')
+ 1008 FORMAT(1X,'Estrada index: ',F12.6,
+     1 ' and bipartivity index: ',F12.6)
  1009 FORMAT(/1X,'Fullerene has a properly closed shell')
  1010 FORMAT(/1X,'Fullerene has a pseudo closed shell')
       Return
