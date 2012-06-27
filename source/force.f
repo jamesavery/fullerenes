@@ -16,7 +16,75 @@ c n=MATOM*3
       return
       END
 
-  
+
+c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
+      SUBROUTINE DIST(ax,ay,az,bx,by,bz,dist_ab)
+      real*8 ax,ay,az,bx,by,bz,dist_ab
+      dist_ab=dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
+      return
+      END  
+
+
+c subroutine angle takes 9 reals (=3 coordinates) and yields an angel between 0 and +\pi (in radians)
+      SUBROUTINE ANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
+      real*8 ax,ay,az,bx,by,bz,cx,cy,cz,
+     2 r1L,r2L,r2M,r1R,r2R,angle_abc
+      r2L=(ax-bx)**2 + (ay-by)**2 + (az-bz)**2
+      r1L=dsqrt(r2L)
+      r2M=(ax-cx)**2 + (ay-cy)**2 + (az-cz)**2
+      r2R=(bx-cx)**2 + (by-cy)**2 + (bz-cz)**2
+      r1R=dsqrt(r2R)
+      angle_abc=dacos((r2L+r2R-r2M)/(2.0*r1L*r1R))
+      return
+      END  
+
+
+c subroutine dist takes 12 reals (=4 coordinates) and yields an angel between -\pi/2 and +\pi/2 (in radians)
+      SUBROUTINE DIHEDRAL(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     2 dihedral_abcd)
+      use config
+      IMPLICIT REAL*8 (a-z)
+
+c normal vectors on abc and bcd
+      abc_x=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
+      abc_y= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
+      abc_z=-ay*bx+ax*by+ay*cx-by*cx-ax*cy+bx*cy
+      bcd_x=-bz*cy+by*cz+bz*dy-cz*dy-by*dz+cy*dz
+      bcd_y= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
+      bcd_z=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy
+c their respective lengths
+      abc_length=dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
+      bcd_length=dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
+c normal vectors (length 1) on abc and bcd
+      abc_1_x=abc_x/abc_length
+      abc_1_y=abc_y/abc_length
+      abc_1_z=abc_z/abc_length
+      bcd_1_x=bcd_x/bcd_length
+      bcd_1_y=bcd_y/bcd_length
+      bcd_1_z=bcd_z/bcd_length
+c      write(*,*)dsqrt(abc_1_x**2 + abc_1_y**2 + abc_1_z**2)
+c      write(*,*)dsqrt(bcd_1_x**2 + bcd_1_y**2 + bcd_1_z**2)
+c two auxiliary vectors
+      bc_x=bx-cx
+      bc_y=by-cy
+      bc_z=bz-cz
+      bc_length=dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
+      bc_1_x=bc_x/bc_length
+      bc_1_y=bc_y/bc_length
+      bc_1_z=bc_z/bc_length
+      aux_x=abc_1_y*bc_1_z-bc_1_y*abc_1_z
+      aux_y=abc_1_z*bc_1_x-bc_1_z*abc_1_x
+      aux_z=abc_1_x*bc_1_y-bc_1_x*abc_1_y
+c two auxiliary reals
+      aux_1=abc_1_x*bcd_1_x + abc_1_y*bcd_1_y + abc_1_z*bcd_1_z
+      aux_2=aux_x*bcd_1_x + aux_y*bcd_1_y + aux_z*bcd_1_z
+c the result
+      dihedral_abcd=atan2(aux_2, aux_1)
+      write(*,*)abc_length,bcd_length,aux_1,aux_2,dihedral_abcd
+      return
+      END  
+
+
       SUBROUTINE wu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force,iopt)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -41,34 +109,29 @@ C     Stretching
       ehookrh=0.d0
       Do I=1,n,3
         I1=(I+2)/3
-      Do J=I+3,n,3
-        J1=(J+2)/3
-        if(A(I1,J1).ne.0) then
-         px=p(I)-p(J)
-         py=p(I+1)-p(J+1)
-         pz=p(I+2)-p(J+2)
-         ratom=dsqrt(px*px+py*py+pz*pz)
-         ratominv=1.d0/ratom
-C        Check if bond is part of 5-ring
-         ibond=6
-          do IB=1,12
-           ir1=0
-           ir2=0
-           do JB=1,5
-            if(I1.eq.N5M(IB,JB)) ir1=1
-            if(J1.eq.N5M(IB,JB)) ir2=1
-           enddo
-            if(ir1.eq.1.and.ir2.eq.1) then
-C           5-ring
-             ehookrp=ehookrp+(ratom-rp)**2
-             go to 1
-            endif
-           enddo
+        Do J=I+3,n,3
+          J1=(J+2)/3
+          if(A(I1,J1).ne.0) then
+            call dist(p(i),p(i+1),p(i+2),p(j),p(j+1),p(j+2),ratom)
+C           Check if bond is part of 5-ring
+            do IB=1,12
+              ir1=0
+              ir2=0
+              do JB=1,5
+                if(I1.eq.N5M(IB,JB)) ir1=1
+                if(J1.eq.N5M(IB,JB)) ir2=1
+              enddo
+              if(ir1.eq.1.and.ir2.eq.1) then
+C               5-ring
+                ehookrp=ehookrp+(ratom-rp)**2
+                go to 1
+              endif
+            enddo
 C           6-ring
-           ehookrh=ehookrh+(ratom-rh)**2
-        endif
-  1   continue
-      enddo
+            ehookrh=ehookrh+(ratom-rh)**2
+          endif
+  1       continue
+        enddo
       enddo
 
 C     Bending
@@ -83,27 +146,9 @@ C     Loop over 5-rings
         JM=3*N5M(I,J)-2
         JL=3*N5M(I,JLX)-2
         JR=3*N5M(I,JRX)-2
-         pxL=p(JM)  -p(JL)
-         pyL=p(JM+1)-p(JL+1)
-         pzL=p(JM+2)-p(JL+2)
-        r2L=pxL*pxL+pyL*pyL+pzL*pzL
-        r1L=dsqrt(r2L)
-         pxR=p(JM)  -p(JR)
-         pyR=p(JM+1)-p(JR+1)
-         pzR=p(JM+2)-p(JR+2)
-        r2R=pxR*pxR+pyR*pyR+pzR*pzR
-        r1R=dsqrt(r2R)
-         pxM=p(JL)  -p(JR)
-         pyM=p(JL+1)-p(JR+1)
-         pzM=p(JL+2)-p(JR+2)
-        r2M=pxM*pxM+pyM*pyM+pzM*pzM
-         cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
-         if(cosarg.ge.1.d0.or.cosarg.le.-1.d0) then
-           IERR=1
-           return
-         endif
-         anglep=dacos(cosarg)
-         ehookap=ehookap+(anglep-ap)**2
+        call angle(p(JL),p(JL+1),p(JL+2),p(JM),p(JM+1),p(JM+2),
+     2   p(JR),p(JR+1),p(JR+2),angle_p)
+        ehookap=ehookap+(angle_p-ap)**2
       enddo
       enddo
 
@@ -119,27 +164,9 @@ C     Loop over 6-rings
         JM=3*N6M(I,J)  -2
         JL=3*N6M(I,JLX)-2
         JR=3*N6M(I,JRX)-2
-         pxL=p(JM)  -p(JL)
-         pyL=p(JM+1)-p(JL+1)
-         pzL=p(JM+2)-p(JL+2)
-        r2L=pxL*pxL+pyL*pyL+pzL*pzL
-        r1L=dsqrt(r2L)
-         pxR=p(JM)  -p(JR)
-         pyR=p(JM+1)-p(JR+1)
-         pzR=p(JM+2)-p(JR+2)
-        r2R=pxR*pxR+pyR*pyR+pzR*pzR
-        r1R=dsqrt(r2R)
-         pxM=p(JL)  -p(JR)
-         pyM=p(JL+1)-p(JR+1)
-         pzM=p(JL+2)-p(JR+2)
-        r2M=pxM*pxM+pyM*pyM+pzM*pzM
-        cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
-         if(cosarg.ge.1.d0.or.cosarg.le.-1.d0) then
-         IERR=1
-         return
-         endif
-        angleh=dacos(cosarg)
-        ehookah=ehookah+(angleh-ah)**2
+        call angle(p(JL),p(JL+1),p(JL+2),p(JM),p(JM+1),p(JM+2),
+     2   p(JR),p(JR+1),p(JR+2),angle_h)
+        ehookah=ehookah+(angle_h-ah)**2
       enddo
       enddo
 
@@ -197,13 +224,8 @@ c we distinguish between bonds between two hexagons, two pentagons and hex/pent
           J1=(J+2)/3 ! J1 = I1, I1+1 ... (n+2)/3
           if(A(I1,J1).ne.0) then ! if connected
 c get distance
-            px=p(I)-p(J)
-            py=p(I+1)-p(J+1)
-            pz=p(I+2)-p(J+2)
-            ratom=dsqrt(px*px + py*py + pz*pz)
-cnu         ratominv=1.d0/ratom
-C           Check if bond is part of 5-ring
-cnu         ibond=6
+            call dist(p(i),p(i+1),p(i+2),p(j),p(j+1),p(j+2),ratom)
+C Check if bond is part of 5-ring
             pentagoncount=0
             do IB=1,12! number of pentagons
               ir1=0
@@ -244,31 +266,9 @@ C Loop over 5-rings
           JM=3*N5M(I,J)-2 ! middle
           JL=3*N5M(I,JLX)-2 ! left
           JR=3*N5M(I,JRX)-2 ! right
-c left bond
-           pxL=p(JM)  -p(JL)
-           pyL=p(JM+1)-p(JL+1)
-           pzL=p(JM+2)-p(JL+2)
-          r2L=pxL*pxL+pyL*pyL+pzL*pzL
-          r1L=dsqrt(r2L)
-c right bond
-           pxR=p(JM)  -p(JR)
-           pyR=p(JM+1)-p(JR+1)
-           pzR=p(JM+2)-p(JR+2)
-          r2R=pxR*pxR+pyR*pyR+pzR*pzR
-          r1R=dsqrt(r2R)
-c not a bond
-           pxM=p(JL)  -p(JR)
-           pyM=p(JL+1)-p(JR+1)
-           pzM=p(JL+2)-p(JR+2)
-          r2M=pxM*pxM+pyM*pyM+pzM*pzM
-c law of cosines
-          cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
-          if(cosarg.ge.1.d0.or.cosarg.le.-1.d0) then
-            IERR=1
-            return
-          endif
-          anglep=dacos(cosarg)
-          ehookap=ehookap+(anglep-ap)**2
+          call angle(p(JL),p(JL+1),p(JL+2),p(JM),p(JM+1),p(JM+2),
+     2     p(JR),p(JR+1),p(JR+2),angle_p)
+          ehookap=ehookap+(angle_p-ap)**2
         enddo
       enddo
 C     Loop over 6-rings
@@ -282,27 +282,9 @@ C     Loop over 6-rings
           JM=3*N6M(I,J)  -2
           JL=3*N6M(I,JLX)-2
           JR=3*N6M(I,JRX)-2
-           pxL=p(JM)  -p(JL)
-           pyL=p(JM+1)-p(JL+1)
-           pzL=p(JM+2)-p(JL+2)
-          r2L=pxL*pxL+pyL*pyL+pzL*pzL
-          r1L=dsqrt(r2L)
-           pxR=p(JM)  -p(JR)
-           pyR=p(JM+1)-p(JR+1)
-           pzR=p(JM+2)-p(JR+2)
-          r2R=pxR*pxR+pyR*pyR+pzR*pzR
-          r1R=dsqrt(r2R)
-           pxM=p(JL)  -p(JR)
-           pyM=p(JL+1)-p(JR+1)
-           pzM=p(JL+2)-p(JR+2)
-          r2M=pxM*pxM+pyM*pyM+pzM*pzM
-          cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
-          if(cosarg.ge.1.d0.or.cosarg.le.-1.d0) then
-            IERR=1
-            return
-          endif
-          angleh=dacos(cosarg)
-          ehookah=ehookah+(angleh-ah)**2
+          call angle(p(JL),p(JL+1),p(JL+2),p(JM),p(JM+1),p(JM+2),
+     2     p(JR),p(JR+1),p(JR+2),angle_h)
+          ehookah=ehookah+(angle_h-ah)**2
         enddo
       enddo
 
@@ -385,30 +367,10 @@ c atoms
         J4=I
 c        write(*,*)j1,j2,j3,j4,"atoms of dihedral"
 c coordinates
-        px1=p(J1*3-2)-p(J2*3-2) ! x-distance between the first two points
-        py1=p(J1*3-1)-p(J2*3-1)
-        pz1=p(J1*3)  -p(J2*3)
-        px2=p(J2*3-2)-p(J3*3-2)
-        py2=p(J2*3-1)-p(J3*3-1)
-        pz2=p(J2*3)  -p(J3*3)
-        px3=p(J3*3-2)-p(J4*3-2)
-        py3=p(J3*3-1)-p(J4*3-1)
-        pz3=p(J3*3)  -p(J4*3)
-c distances (first two are nonbonded)
-        r2L=px1*px1 + py1*py1 + pz1*pz1
-        r1L=dsqrt(r2L)
-        r2M=px2*px2 + py2*py2 + pz2*pz2
-        r1M=dsqrt(r2M)
-        r2R=px3*px3 + py3*py3 + pz3*pz3
-        r1R=dsqrt(r2R)
-        write(*,*)i,r1L,r1m,r1r,"distances in dihedral"
-c angle between abc and cbd (between 0 and 2pi)
-        angle=dacos(((-py1*px2+px1*py2)*(-py2*px3+px2*py3)+
-     2   (pz1*px2-px1*pz2)*(pz2*px3-px2*pz3)+(-pz1*py2+py1*pz2)*
-     3   (-pz2*py3+py2*pz3))/(((py1*px2-px1*py2)**2+(pz1*px2-px1*pz2)**2
-     4   +(pz1*py2-py1*pz2)**2)*((py2*px3-px2*py3)**2+(pz2*px3-px2*
-     5   pz3)**2+(pz2*py3-py2*pz3)**2)))
-        write(*,*)i,angle,"dihedral angle (in radians)"
+        call dihedral(p(J1*3-2),p(J1*3-1),p(J1*3),p(J2*3-2),p(J2*3-1),
+     2   p(J2*3),p(J3*3-2),p(J3*3-1),p(J3*3),p(J4*3-2),p(J4*3-1),
+     3   p(J4*3),angle_abcd)
+c        write(*,*)i,angle_abcd,"dihedral angle (in radians)"
         select case(pentagoncount)
           case(0)
             zero_value=dhhh
@@ -419,19 +381,18 @@ c angle between abc and cbd (between 0 and 2pi)
           case(3)
             zero_value=dppp
         end select
-        if(angle .ge. dpi) angle=angle-2*dpi
-        angle=dabs(angle)
-        increment=angle-zero_value ! can be <0 (but will be squared)
-        write(*,*)i,angle,increment,"dihedral angle (in radians)"
+        angle_abcd=dabs(angle_abcd)
+        increment=(angle_abcd-zero_value)**2
+        write(*,*)i,angle_abcd*57.29,zero_value*57.29,"dihedral angle"
         select case(pentagoncount)
           case(0)
-            ehookdhhh=ehookdhhh+increment**2
+            ehookdhhh=ehookdhhh+increment
           case(1)
-            ehookdhhp=ehookdhhp+increment**2
+            ehookdhhp=ehookdhhp+increment
           case(2)
-            ehookdhpp=ehookdhpp+increment**2
+            ehookdhpp=ehookdhpp+increment
           case(3)
-            ehookdppp=ehookdppp+increment**2
+            ehookdppp=ehookdppp+increment
         end select
       enddo
 
@@ -488,39 +449,39 @@ C     Stretching
         ehooky=0.d0
         ehookz=0.d0
         I1=(I+2)/3
-      Do J=1,n,3
-        J1=(J+2)/3
-        if(A(I1,J1).ne.0) then
-          px=p(I)-p(J)
-          py=p(I+1)-p(J+1)
-          pz=p(I+2)-p(J+2)
-          ratom=dsqrt(px*px+py*py+pz*pz)
-          ratominv=1.d0/ratom
-C         Check if bond is part of 5-ring
-          do IB=1,12
-           ir1=0
-           ir2=0
-           do JB=1,5
-            if(I1.eq.N5M(IB,JB)) ir1=1
-            if(J1.eq.N5M(IB,JB)) ir2=1
-           enddo
-           if(ir1.eq.1.and.ir2.eq.1) then
-C           5-ring
-            fac=frp*ratominv*(ratom-rp)
-            ehookx=ehookx+fac*px
-            ehooky=ehooky+fac*py
-            ehookz=ehookz+fac*pz
-            go to 1
-           endif
-           enddo
+        Do J=1,n,3
+          J1=(J+2)/3
+          if(A(I1,J1).ne.0) then
+            px=p(i)-p(j)
+            py=p(i+1)-p(j+1)
+            pz=p(i+2)-p(j+2)
+            ratom=dsqrt(px**2 + py**2 + pz**2)
+            ratominv=1.d0/ratom
+C           Check if bond is part of 5-ring
+            do IB=1,12
+              ir1=0
+              ir2=0
+              do JB=1,5
+                if(I1.eq.N5M(IB,JB)) ir1=1
+                if(J1.eq.N5M(IB,JB)) ir2=1
+              enddo
+              if(ir1.eq.1.and.ir2.eq.1) then
+C               5-ring
+                fac=frp*ratominv*(ratom-rp)
+                ehookx=ehookx+fac*px
+                ehooky=ehooky+fac*py
+                ehookz=ehookz+fac*pz
+                go to 1
+              endif
+            enddo
 C           6-ring
             fac=frh*ratominv*(ratom-rh)
             ehookx=ehookx+fac*px
             ehooky=ehooky+fac*py
             ehookz=ehookz+fac*pz
-        endif
-  1   continue
-      enddo
+          endif
+  1       continue
+        enddo
         x(I)  =2.d0*ehookx
         x(I+1)=2.d0*ehooky
         x(I+2)=2.d0*ehookz
