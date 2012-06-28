@@ -66,12 +66,12 @@ double Polyhedron::volume_divergence() const {
   return fabs(V/3.0);
 }
 
-
 Polyhedron Polyhedron::incremental_convex_hull() const {
   list<tri_t> output;
   typedef list<tri_t>::iterator triit;
   list<node_t> work_queue;
-  //  map< dedge_t, triit > edgetri;
+  srandom(42); // Seed random numbers with constant for reproducible behaviour
+
   // 1. Create initial tetrahedron. 
   // 1.1 Find 4 non-coplanar points
   Tri3D T(points,tri_t(0,1,2));
@@ -104,10 +104,17 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     if(!Tri3D(points,*t).back_face(c)) t->flip(); 
   }
     
+
+
   // 2. For each remaining vertex u
   // cerr << "// 2. For each remaining vertex u\n";
   for(list<node_t>::const_iterator u(work_queue.begin());u!=work_queue.end();u++){
-    const coord3d& p(points[*u]);
+    long r = random();
+    const coord3d perturbation(r&0xff,(r>>8)&0xff,(r>>16)&0xff);
+
+    // Perturb p randomly
+    coord3d p(points[*u]);
+    p *= (coord3d(1,1,1)+perturbation*1e-13);
 
     // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) 
     list<triit> visible;
@@ -115,7 +122,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     coord3d centre;		// Centre of visible faces
     for(triit t(output.begin());t!=output.end();t++){
       if(!Tri3D(points,*t).back_face(p)) { 
-	visible.push_back(t); 
+	visible.push_back(t);
 	for(int i=0;i<3;i++) 
 	  is_visible[dedge_t(t->u(i),t->u((i+1)%3))] = true; 
 	centre += t->centroid(points);
@@ -144,6 +151,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
 
       //	Make sure new faces point outwards. 
       if(!Tri3D(points,t).back_face(centre)) t.flip();
+
 
       triit ti = output.insert(output.end(),t);
       //      for(int j=0;j<3;j++)
@@ -254,7 +262,6 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
   PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points)), faces(faces_)
 {
   //  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
-
   if(faces.size() == 0){
     if(layout2d.size() != N){
       if(is_cubic()){
