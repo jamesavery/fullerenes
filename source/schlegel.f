@@ -1,5 +1,5 @@
-      SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,
-     1 N5M,N6M,N5R,N6R,NRing,Iring,ISchlegel,IC3,IDA,Dist,angle,Rmin,
+      SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
+     1 Iring,ISchlegel,IC3,IDA,Mdist,Dist,angle,Rmin,
      1 Tol,fscale,scalePPG,CR,CR5,CR6,Symbol,graphname)
       use config
       use iso_c_binding
@@ -658,7 +658,7 @@ C  End of search
       endif
       g = new_fullerene_graph(Nmax,M,IDA)
       if(ISchlegel.ge.7) then
-       call all_pairs_shortest_path(g,M,Nmax,MDist)
+C      call all_pairs_shortest_path(g,M,Nmax,MDist)
        WRITE(IOUT,1041) 
        maxl=0
       Do I=1,M

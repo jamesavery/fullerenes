@@ -48,6 +48,7 @@ CG77  CHARACTER CDAT*9,CTIM*8
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
       Integer endzeile,Values(8)
+      Integer MDist(Nmax,Nmax)
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
      2 'MN','FE','CO','NI','CU','ZN','GA','GE','AS','SE','BR','KR',    
@@ -375,6 +376,11 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       CALL Chiral(Iout,GROUP)
       endif
 
+C Topological Indicators
+      routine='TOP INDICATOR'
+      Write(Iout,1008) routine
+      Call TopIndicators(Matom,Iout,IDA,Mdist)
+
 C Calculate the volume
       routine='VOLUME       '
       Write(Iout,1008) routine
@@ -411,10 +417,9 @@ C Calculate Schlegel diagram
       else
        ParamS=dabs(ParamS)
       endif
-      CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,
-     1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring,Ischlegel,IC3,IDA,Dist,
-     1 ParamS,Rmin,TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,
-     1 graphname)
+      CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
+     1 NRing,Iring,Ischlegel,IC3,IDA,Mdist,Dist,ParamS,Rmin,TolX,
+     1 scales,scalePPG,CR,CRing5,CRing6,Symbol,graphname)
       endif
 
 C  E N D   O F   P R O G R A M
