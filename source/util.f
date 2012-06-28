@@ -59,15 +59,22 @@ C     Now sort values of diamw, output diam
       call all_pairs_shortest_path(g,Matom,Nmax,MDist)
 
       iwiener=0
+      ihyperwiener=0
       Do I=1,MAtom
       Do J=I+1,MAtom
-       iwiener=iwiener+MDist(I,J)
+       idist=MDist(I,J)
+       iwiener=iwiener+idist
+       ihyperwiener=ihyperwiener+idist*(1+idist)
       enddo
       enddo
+       isize=Matom*(Matom-1)
+      Avdist=2.d0*dfloat(iwiener)/dfloat(isize)
      
-      Write(Iout,1000) iwiener
+      Write(Iout,1000) iwiener,ihyperwiener
+      Write(Iout,1001) Avdist
 
- 1000 Format(' Wiener index: ',I10) 
+ 1000 Format(' Wiener index W: ',I10,' and hyper Wiener index WW: ',I10)
+ 1001 Format(' Average topological distance: ',F12.6)
       RETURN
       END
 

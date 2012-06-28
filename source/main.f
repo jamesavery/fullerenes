@@ -377,7 +377,7 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       endif
 
 C Topological Indicators
-      routine='TOP INDICATOR'
+      routine='TOPINDICATORS'
       Write(Iout,1008) routine
       Call TopIndicators(Matom,Iout,IDA,Mdist)
 
