@@ -42,6 +42,42 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
+      SUBROUTINE TopIndicators(Matom,Iout,IDA,Mdist)
+      use config
+      use iso_c_binding
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Integer MDist(Nmax,Nmax)
+      DIMENSION IDA(Nmax,Nmax)
+      type(c_ptr) :: g, new_fullerene_graph
+      Do I=1,Nmax
+      Do J=1,Nmax
+      MDist(I,J)=0
+      enddo
+      enddo
+
+      g = new_fullerene_graph(Nmax,Matom,IDA)
+      call all_pairs_shortest_path(g,Matom,Nmax,MDist)
+
+      iwiener=0
+      ihyperwiener=0
+      Do I=1,MAtom
+      Do J=I+1,MAtom
+       idist=MDist(I,J)
+       iwiener=iwiener+idist
+       ihyperwiener=ihyperwiener+idist*(1+idist)
+      enddo
+      enddo
+       isize=Matom*(Matom-1)
+      Avdist=2.d0*dfloat(iwiener)/dfloat(isize)
+     
+      Write(Iout,1000) iwiener,ihyperwiener
+      Write(Iout,1001) Avdist
+
+ 1000 Format(' Wiener index W: ',I10,' and hyper Wiener index WW: ',I10)
+ 1001 Format(' Average topological distance: ',F12.6)
+      RETURN
+      END
+
       SUBROUTINE Chiral(Iout,Group)
       Character*3 Group
       Character*3 CPG(12)
