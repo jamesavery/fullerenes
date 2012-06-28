@@ -19,16 +19,34 @@ c n=MATOM*3
 
 c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
       SUBROUTINE DIST(ax,ay,az,bx,by,bz,dist_ab)
-      real*8 ax,ay,az,bx,by,bz,dist_ab
+      implicit real*8 (a-z)
       dist_ab=dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
       return
       END  
 
 
+c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivations of the distance
+      SUBROUTINE DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz)
+      implicit real*8 (a-z)
+      dist_ab_inv=1/dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
+      aux_1=ax-bx
+      aux_2=ay-by
+      aux_3=az-bz
+      dax=aux_1*dist_ab_inv
+      day=-dax
+      daz=aux_2*dist_ab_inv
+      dbx=-day
+      dby=aux_3*dist_ab_inv
+      dbz=-daz
+      return
+      END  
+
+
 c subroutine angle takes 9 reals (=3 coordinates) and yields an angel between 0 and +\pi (in radians)
+c via law of cosines
+c mult: 11, div: 1, root: 2, add/sub: 8, arccos: 1
       SUBROUTINE ANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
-      real*8 ax,ay,az,bx,by,bz,cx,cy,cz,
-     2 r1L,r2L,r2M,r1R,r2R,angle_abc
+      implicit real*8 (a-z)
       r2L=(ax-bx)**2 + (ay-by)**2 + (az-bz)**2
       r1L=dsqrt(r2L)
       r2M=(ax-cx)**2 + (ay-cy)**2 + (az-cz)**2
@@ -36,15 +54,74 @@ c subroutine angle takes 9 reals (=3 coordinates) and yields an angel between 0 
       r1R=dsqrt(r2R)
       angle_abc=dacos((r2L+r2R-r2M)/(2.0*r1L*r1R))
       return
-      END  
+      END
 
 
-c subroutine dist takes 12 reals (=4 coordinates) and yields an angel between -\pi/2 and +\pi/2 (in radians)
+c subroutine angle takes 9 reals (=3 coordinates) and yields an angel between 0 and +\pi (in radians)
+c via vector definition of the cosine
+c mult: 10, div: 1, root: 2, add/sub: 12, arccos: 1
+c      SUBROUTINE ANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
+c      implicit real*8 (a-z)
+c      aux_ax=ax-bx
+c      aux_ay=ay-by
+c      aux_az=az-bz
+c      aux_bx=bx-cx
+c      aux_by=by-cy
+c      aux_bz=bz-cz
+c      r2L=aux_ax**2 + aux_ay**2 + aux_az**2
+c      r1L=dsqrt(r2L)
+c      r2R=aux_bx**2 + aux_by**2 + aux_bz**2
+c      r1R=dsqrt(r2R)
+c      aux=aux_ax*aux_bx + aux_ay*aux_by + aux_az*aux_bz
+c      angle_abc=dacos(aux/(r1l*r1r))
+c      return
+c      END
+
+
+c subroutine dangle takes 9 reals (=3 coordinates) and yields all 9 first derivations of the angle
+      SUBROUTINE DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
+     2 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz)
+      implicit real*8 (a-z)
+c vectors from a to b and b to c
+      aux_lx=ax-bx
+      aux_ly=ay-by
+      aux_lz=az-bz
+      aux_rx=bx-cx
+      aux_ry=by-cy
+      aux_rz=bz-cz
+c length of a-b and b-c
+      r2L=(ax-bx)**2 + (ay-by)**2 + (az-bz)**2
+      r2R=(bx-cx)**2 + (by-cy)**2 + (bz-cz)**2
+      r1l=dsqrt(r2l)
+      r1R=dsqrt(r2R)
+      r3l=r2l*r1l
+      r3R=r2r*r1r
+c auxiliary product
+      l_dot_r=aux_lx*aux_rx + aux_ly*aux_ry + aux_lz*aux_rz
+      aux_1_inv=1/dsqrt(r1L*r1R)
+      aux_2_inv=1/dsqrt(r3L*r1R)
+      aux_3_inv=1/dsqrt(r1L*r3R)
+      den_inv=1/dsqrt(1-(l_dot_r**2)*aux_1_inv**2)
+      aux_4=l_dot_r*aux_2_inv
+      aux_5=l_dot_r*aux_3_inv
+c the derivations
+      dax=(-aux_rx*aux_1_inv + aux_lx*aux_4)*den_inv
+      day=(-aux_ry*aux_1_inv + aux_ly*aux_4)*den_inv
+      daz=(-aux_rz*aux_1_inv + aux_lz*aux_4)*den_inv
+      dbx=(aux_rx*aux_5-(aux_lx-aux_rx)*aux_1_inv-aux_lx*aux_4)*den_inv
+      dby=(aux_ry*aux_5-(aux_ly-aux_ry)*aux_1_inv-aux_ly*aux_4)*den_inv
+      dbz=(aux_rz*aux_5-(aux_lz-aux_rz)*aux_1_inv-aux_lz*aux_4)*den_inv
+      dcx=(aux_lx*aux_1_inv - aux_rx*aux_5)*den_inv
+      dcy=(aux_ly*aux_1_inv - aux_ry*aux_5)*den_inv
+      dcz=(aux_lz*aux_1_inv - aux_rz*aux_5)*den_inv
+      return
+      END
+
+
+c subroutine dist takes 12 reals (=4 coordinates) and yields an angel between -\pi and +\pi (in radians)
       SUBROUTINE DIHEDRAL(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
      2 dihedral_abcd)
-      use config
       IMPLICIT REAL*8 (a-z)
-
 c normal vectors on abc and bcd
       abc_x=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
       abc_y= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
@@ -53,25 +130,23 @@ c normal vectors on abc and bcd
       bcd_y= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
       bcd_z=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy
 c their respective lengths
-      abc_length=dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
-      bcd_length=dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
+      abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
+      bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
 c normal vectors (length 1) on abc and bcd
-      abc_1_x=abc_x/abc_length
-      abc_1_y=abc_y/abc_length
-      abc_1_z=abc_z/abc_length
-      bcd_1_x=bcd_x/bcd_length
-      bcd_1_y=bcd_y/bcd_length
-      bcd_1_z=bcd_z/bcd_length
-c      write(*,*)dsqrt(abc_1_x**2 + abc_1_y**2 + abc_1_z**2)
-c      write(*,*)dsqrt(bcd_1_x**2 + bcd_1_y**2 + bcd_1_z**2)
+      abc_1_x=abc_x*abc_length_inv
+      abc_1_y=abc_y*abc_length_inv
+      abc_1_z=abc_z*abc_length_inv
+      bcd_1_x=bcd_x*bcd_length_inv
+      bcd_1_y=bcd_y*bcd_length_inv
+      bcd_1_z=bcd_z*bcd_length_inv
 c two auxiliary vectors
       bc_x=bx-cx
       bc_y=by-cy
       bc_z=bz-cz
-      bc_length=dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
-      bc_1_x=bc_x/bc_length
-      bc_1_y=bc_y/bc_length
-      bc_1_z=bc_z/bc_length
+      bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
+      bc_1_x=bc_x*bc_length_inv
+      bc_1_y=bc_y*bc_length_inv
+      bc_1_z=bc_z*bc_length_inv
       aux_x=abc_1_y*bc_1_z-bc_1_y*abc_1_z
       aux_y=abc_1_z*bc_1_x-bc_1_z*abc_1_x
       aux_z=abc_1_x*bc_1_y-bc_1_x*abc_1_y
@@ -80,7 +155,6 @@ c two auxiliary reals
       aux_2=aux_x*bcd_1_x + aux_y*bcd_1_y + aux_z*bcd_1_z
 c the result
       dihedral_abcd=atan2(aux_2, aux_1)
-      write(*,*)abc_length,bcd_length,aux_1,aux_2,dihedral_abcd
       return
       END  
 
@@ -381,9 +455,11 @@ c        write(*,*)i,angle_abcd,"dihedral angle (in radians)"
           case(3)
             zero_value=dppp
         end select
+        if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
+        if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
         increment=(angle_abcd-zero_value)**2
-        write(*,*)i,angle_abcd*57.29,zero_value*57.29,"dihedral angle"
+c        write(*,*)i,angle_abcd*57.29,zero_value*57.29,"dihedral angle"
         select case(pentagoncount)
           case(0)
             ehookdhhh=ehookdhhh+increment
@@ -925,10 +1001,10 @@ c some auxiliary factors without any physical meaning
         fac_K=1/(fac_H * fac_I**2)
         fac_L=1/(fac_H**2 * fac_I)
         fac_AC=fac_G * fac_J
-        write(*,*)"abcdef",fac_a, fac_b, fac_c, fac_d, fac_e, fac_f
+c        write(*,*)"abcdef",fac_a, fac_b, fac_c, fac_d, fac_e, fac_f
         if(fac_AC .ge. dpi) fac_AC=fac_AC-2*dpi
         fac_ac=dabs(fac_ac)
-        write(*,*)"ac",fac_ac
+c        write(*,*)"ac",fac_ac
         select case(pentagoncount)
           case(0)
           fac_M=2*(fdhhh*(dhhh-dacos(fac_AC)))/
@@ -958,7 +1034,7 @@ c some auxiliary factors without any physical meaning
         fac_Z=(J1z-J2z)
         fac_AA=(J2x-J4x)
         fac_AB=(J1x-J2x)
-        write(*,*)"mnopqr",fac_m, fac_n, fac_o, fac_p, fac_q, fac_r
+c        write(*,*)"mnopqr",fac_m, fac_n, fac_o, fac_p, fac_q, fac_r
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(J1*3-2)=x(J1*3-2)+
      2     ((fac_N*fac_B-fac_O*fac_D)*fac_J+
