@@ -74,7 +74,7 @@ c     three distances: forces (let's assume they are all the same)
 c     three angles: forces (let's assume they are all the same)
       ExtWufA=1.0d5
 c     four dihedrals: forces (let's assume they are all the same)
-      ExtWufD=1.d5
+      ExtWufD=1.0d3
 
 C more default parameters
       blank=' '
