@@ -49,6 +49,7 @@ C     Now sort values of diamw, output diam
       Integer MDist(Nmax,Nmax)
       DIMENSION IDA(Nmax,Nmax)
       type(c_ptr) :: g, new_fullerene_graph
+      Write(Iout,1000)
       Do I=1,Nmax
       Do J=1,Nmax
       MDist(I,J)=0
@@ -59,10 +60,12 @@ C     Now sort values of diamw, output diam
       call all_pairs_shortest_path(g,Matom,Nmax,MDist)
 
       iwiener=0
+      maxdist=0
       ihyperwiener=0
       Do I=1,MAtom
       Do J=I+1,MAtom
        idist=MDist(I,J)
+       if (idist.gt.maxdist) maxdist=idist
        iwiener=iwiener+idist
        ihyperwiener=ihyperwiener+idist*(1+idist)
       enddo
@@ -70,11 +73,13 @@ C     Now sort values of diamw, output diam
        isize=Matom*(Matom-1)
       Avdist=2.d0*dfloat(iwiener)/dfloat(isize)
      
-      Write(Iout,1000) iwiener,ihyperwiener
-      Write(Iout,1001) Avdist
+      Write(Iout,1001) iwiener,ihyperwiener
+      Write(Iout,1002) maxdist,Avdist
 
- 1000 Format(' Wiener index W: ',I10,' and hyper Wiener index WW: ',I10)
- 1001 Format(' Average topological distance: ',F12.6)
+ 1000 Format(' Topological Indicators and polynomials')
+ 1001 Format(' Wiener index W: ',I10,' and hyper Wiener index WW: ',I10)
+ 1002 Format(' Topological distances between 1 and ',I6,
+     1 ', average topological distance: ',F12.6)
       RETURN
       END
 
