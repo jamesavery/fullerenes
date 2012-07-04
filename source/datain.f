@@ -51,9 +51,9 @@ C Defining the Wu force field (default values)
       WuR5=1.455d0! in angstoem
       WuR6=1.391d0
       WuA5=1.08d2! in deg
-      WuA6=1.2d2
-      WufR=1.d6
-      WufA=1.d5
+      WuA6=1.20d2
+      WufR=1.0d6
+      WufA=1.0d5
       fcoulomb=0.d0
 
 C Defining an extension of the Wu force field (default values)
@@ -63,10 +63,10 @@ c     three distances: zero values
       ExtWuR66=1.391d0
 c     two angles: zero values
       ExtWuA5=1.08d2
-      ExtWuA6=1.2d2
+      ExtWuA6=1.20d2
 c     four dihedrals: zero values (all guessed)
       ExtWuDppp=4.0d1
-      ExtWuDhpp=4.0d1
+      ExtWuDhpp=3.5d1
       ExtWuDhhp=2.4d1
       ExtWuDhhh=0.0d0
 c     three distances: forces (let's assume they are all the same)
@@ -74,7 +74,7 @@ c     three distances: forces (let's assume they are all the same)
 c     three angles: forces (let's assume they are all the same)
       ExtWufA=1.0d5
 c     four dihedrals: forces (let's assume they are all the same)
-      ExtWufD=1.0d3
+      ExtWufD=5.0d4
 
 C more default parameters
       blank=' '
