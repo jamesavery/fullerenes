@@ -85,6 +85,7 @@ C more default parameters
       tex='.tex'
       xyzname='cylview'
       graphname='graph2D'
+      texname='graph2D'
       chkname='checkpoint'
       IOpt=0    !  No (force field) optimization
       IHam=0    !  Number of Hamiltonian cycles
