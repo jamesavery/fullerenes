@@ -1,7 +1,7 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
      1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,GCtrans,iupac,
      1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
-     1 ilp,IYF,IWS,nzeile,PS,TolX,R5,R6,Rdist,scale,scalePPG,
+     1 ilp,IYF,IWS,nzeile,ifs,PS,TolX,R5,R6,Rdist,scale,scalePPG,
      1 ftol,force,forceP,xyzname,chkname,graphname,texname,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -26,7 +26,7 @@
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
-      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,PS,scale,scalePPG,
+      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,IFS,PS,scale,scalePPG,
      1 graphname
 C Input send to output
       if(ilp.eq.0) then   
@@ -119,6 +119,7 @@ C more default parameters
       IV3=4     !  Eigenvector option for fullerene construction
       istop=0   !  Option for stopping after isomer list
       ixyz=0    !  Option for producing input for ploting program CYLVIEW
+      iFS=0     !  Option for producing files for 2D fullerene graphs
       ISO1=0    !  Option for fullerene orientation for Schlegel projection
       ISO2=0    !  Option for fullerene orientation for Schlegel projection
       ISO3=0    !  Option for fullerene orientation for Schlegel projection
@@ -250,9 +251,9 @@ C  Filename for GRAPH2D
        endif
       endif
       if(npos.gt.16) npos=16
-      graphname=graphname(1:npos)//dat  !  Option for naming file for cylview program
+      graphname=graphname(1:npos)//dat  !  Option for naming file for 2D graphs
 
-C  Filename for GRAPH2D
+C  Filename for GRAPH2D latex file
       do I=2,20
        if(texname(I:I).eq.blank) then
         npos=I-1
@@ -263,11 +264,11 @@ C  Filename for GRAPH2D
       if(ia.gt.0) then
        if(texname(ia:npos).eq.dat) then
         npos=npos-4
-        if(npos.le.0) graphname='graph2D'
+        if(npos.le.0) texname='graph2D'
        endif
       endif
       if(npos.gt.16) npos=16
-      graphname=graphname(1:npos)//dat  !  Option for naming file for cylview program
+      texname=texname(1:npos)//tex  !  Option for naming latex file for 2D graphs
 
 C  Check on number of atoms (vertices)
       NA=IABS(NA)

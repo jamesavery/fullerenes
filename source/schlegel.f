@@ -1,5 +1,5 @@
       SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
-     1 Iring,ISchlegel,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,fscale,
+     1 Iring,ISchlegel,ifs,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,fscale,
      1 scalePPG,CR,CR5,CR6,Symbol,graphname,texname)
       use config
       use iso_c_binding
@@ -29,9 +29,12 @@ C     Parameter set for Program QMGA
       Data DPoint,Dedge/0.5d0,0.1d0/
 
 C     Prepare for Program QMGA
-      Open(unit=2,file=graphname,form='formatted')
-      Open(unit=8,file=texname,form='formatted')
-      Write(2,901) M,DPoint,Dedge
+      if(ifs.eq.1.or.ifs.eq.3) 
+     1 Open(unit=8,file=texname,form='formatted')
+      if(ifs.eq.2.or.ifs.eq.3) then 
+       Open(unit=2,file=graphname,form='formatted')
+       Write(2,901) M,DPoint,Dedge
+      endif
       
       Do I=1,Nmax
       Do J=1,Nmax
@@ -439,7 +442,8 @@ C   Print
       IAT=IAtom(i)
       WRITE(IOUT,1004) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3),Fac
-      Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
+      if(ifs.eq.2.or.ifs.eq.3) 
+     1 Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
       WRITE(IOUT,1032) graphname
@@ -516,7 +520,8 @@ C   Atoms
       IAT=IAtom(i)
       WRITE(IOUT,1028) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
-      Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
+      if(ifs.eq.2.or.ifs.eq.3) 
+     1 Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
       WRITE(IOUT,1032) graphname
@@ -698,7 +703,8 @@ C     Write to unit 2
        Do I=1,M
        WRITE(IOUT,1028) I,layout2d(1,I),layout2d(2,I),
      1  IC3(I,1),IC3(I,2),IC3(I,3)
-       Write(2,902) I,layout2d(1,I),layout2d(2,I),
+      if(ifs.eq.2.or.ifs.eq.3) 
+     1  Write(2,902) I,layout2d(1,I),layout2d(2,I),
      1  IC3(I,1),IC3(I,2),IC3(I,3)
        enddo
        Close(unit=2)
@@ -715,13 +721,14 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
        Do I=1,M
        WRITE(IOUT,1028) I,layout2d(1,I),layout2d(2,I),
      1  IC3(I,1),IC3(I,2),IC3(I,3)
-       Write(2,902) I,layout2d(1,I),layout2d(2,I),
+      if(ifs.eq.2.or.ifs.eq.3) 
+     1  Write(2,902) I,layout2d(1,I),layout2d(2,I),
      1  IC3(I,1),IC3(I,2),IC3(I,3)
        enddo
-       Close(unit=2)
       endif
 
  9999 Continue
+       Close(unit=2)
 C James, here goes your latex program creation for Schlegel diagram
 C     The filename for this is in      texname     and the unit is 8
        Close(unit=8)
