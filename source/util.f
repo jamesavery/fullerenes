@@ -52,7 +52,7 @@ C     Now sort values of diamw, output diam
       Write(Iout,1000)
       Do I=1,Nmax
       Do J=1,Nmax
-      MDist(I,J)=0
+       MDist(I,J)=0
       enddo
       enddo
 

@@ -36,11 +36,6 @@ C     Prepare for Program QMGA
        Write(2,901) M,DPoint,Dedge
       endif
       
-      Do I=1,Nmax
-      Do J=1,Nmax
-      MDist(I,J)=0
-      enddo
-      enddo
       satom='o'
       s5ring='^'
       s6ring='*'

@@ -642,7 +642,7 @@ The resulting output is a catalogue of the isomers found containing their ideali
 \cite{Atlas}.\\\\
 
 6) {\bf \&Graph line}: Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (Schlegel diagrams).\\
-\&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, PS, Scale, ScalePPG, graphname} (Default: 0 for all values except for {\bf graphname}). We recommend {\bf IG} = 1, 2, 4 or 7.\\
+\&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, IFS, PS, Scale, ScalePPG, graphname, texname} (Default: 0 for all values except for {\bf graphname}). We recommend {\bf IG} = 1, 2, 4 or 7.\\
 If {\bf ISchlegel} $>$ 0 Use Program Schlegel for generating fullerene graphs
 If {\bf ISchlegel} = 1: Use the perspective projection method (PSP).\\
 If {\bf ISchlegel} = 2: Use the cone projection method (CSP).\\
@@ -676,8 +676,12 @@ to the projection plane, which touches the point with the smallest $z$-value (op
 to 45 degrees if chosen larger than 89 degrees. In the case of the perspective projection PS is the distance
 between the focal point and the ring center underneath, Note this is chosen by the program, but if nonzero this parameter has to be
 carefully chosen. The picture produced gives a good idea if {\bf PS} was correctly chosen or not. Note that the ring centers get
-an extra boost of 10\% in the scaling factors such that they appear more in the center of the rings produced by the Schlegel projection.
-{\bf graphname} = name. A name of up to 16 characters including at the end must be chosen, the file is then named name.dat (Default: graph2D.dat).
+an extra boost of 10\% in the scaling factors such that they appear more in the center of the rings produced by the Schlegel projection.\\
+If {\bf IFS} = 1: A tex file named {\bf texname} is produced which contains the 2D fullerene graph.\\
+If {\bf IFS} = 2: A data file named {\bf graphname} is produced which contains all the information for producing a 2D fullerene graph with a plotting program.\\
+If {\bf IFS} = 3: Both files are produced.\\
+{\bf graphname} = name. A name of up to 16 characters must be chosen, the file is then named name.dat (Default: graph2D.dat).\\
+{\bf texname} = name. A name of up to 16 characters must be chosen, the file is then named name.tex (Default: graph2D.tex).
               
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{100} and for IPR isomers up to
