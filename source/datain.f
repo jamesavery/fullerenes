@@ -2,7 +2,7 @@
      1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,GCtrans,iupac,
      1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
      1 ilp,IYF,IWS,nzeile,PS,TolX,R5,R6,Rdist,scale,scalePPG,
-     1 ftol,force,forceP,xyzname,chkname,graphname,DATEN)
+     1 ftol,force,forceP,xyzname,chkname,graphname,texname,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
@@ -10,14 +10,16 @@
       integer endzeile
       Character*1 DATEN(nzeile)
       Character xyzname*20
+      Character texname*20
       Character graphname*20
       Character chkname*20
       Character blank*1
       Character xyz*4
       Character dat*4
+      Character tex*4
       Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,GCtrans,ihueckel,ISW,KE,loop,mirror,
-     1 IYF,IWS,xyzname
+     1 IYF,IWS,xyzname,texname
       Namelist /FFChoice/ Iopt,ftol
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
      1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
@@ -80,6 +82,7 @@ C more default parameters
       blank=' '
       xyz='.xyz'
       dat='.dat'
+      tex='.tex'
       xyzname='cylview'
       graphname='graph2D'
       chkname='checkpoint'
@@ -241,6 +244,23 @@ C  Filename for GRAPH2D
   13  ia=npos-3
       if(ia.gt.0) then
        if(graphname(ia:npos).eq.dat) then
+        npos=npos-4
+        if(npos.le.0) graphname='graph2D'
+       endif
+      endif
+      if(npos.gt.16) npos=16
+      graphname=graphname(1:npos)//dat  !  Option for naming file for cylview program
+
+C  Filename for GRAPH2D
+      do I=2,20
+       if(texname(I:I).eq.blank) then
+        npos=I-1
+        go to 14
+       endif
+      enddo
+  14  ia=npos-3
+      if(ia.gt.0) then
+       if(texname(ia:npos).eq.dat) then
         npos=npos-4
         if(npos.le.0) graphname='graph2D'
        endif

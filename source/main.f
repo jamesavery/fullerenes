@@ -42,6 +42,7 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*2 El(99)
       CHARACTER*13 routine
       CHARACTER*20 xyzname
+      CHARACTER*20 texname
       CHARACTER*20 graphname
       CHARACTER*20 chkname
       CHARACTER*20 element
@@ -94,7 +95,7 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,
      1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,force,forceP,
-     1  xyzname,chkname,graphname,TEXTINPUT)
+     1  xyzname,chkname,graphname,texname,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -419,7 +420,7 @@ C Calculate Schlegel diagram
       endif
       CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
      1 NRing,Iring,Ischlegel,IC3,IDA,Mdist,Dist,ParamS,Rmin,TolX,
-     1 scales,scalePPG,CR,CRing5,CRing6,Symbol,graphname)
+     1 scales,scalePPG,CR,CRing5,CRing6,Symbol,graphname,texname)
       endif
 
 C  E N D   O F   P R O G R A M

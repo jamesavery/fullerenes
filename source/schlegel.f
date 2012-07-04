@@ -1,6 +1,6 @@
       SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
-     1 Iring,ISchlegel,IC3,IDA,Mdist,Dist,angle,Rmin,
-     1 Tol,fscale,scalePPG,CR,CR5,CR6,Symbol,graphname)
+     1 Iring,ISchlegel,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,fscale,
+     1 scalePPG,CR,CR5,CR6,Symbol,graphname,texname)
       use config
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
@@ -18,6 +18,7 @@ C or face is at the top. Euler angles are used for rotation.
       DIMENSION Rotz(3,3),Symbol(Mmax),RingS(2,Mmax)
       DIMENSION IC3(Nmax,3),IS(6)
       CHARACTER*20 graphname
+      CHARACTER*20 texname
       Integer MDist(Nmax,Nmax)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
@@ -29,6 +30,7 @@ C     Parameter set for Program QMGA
 
 C     Prepare for Program QMGA
       Open(unit=2,file=graphname,form='formatted')
+      Open(unit=8,file=texname,form='formatted')
       Write(2,901) M,DPoint,Dedge
       
       Do I=1,Nmax
@@ -721,6 +723,8 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
 
  9999 Continue
 C James, here goes your latex program creation for Schlegel diagram
+C     The filename for this is in      texname     and the unit is 8
+       Close(unit=8)
       Return
   901 Format(I6,2F12.6)
   902 Format(I6,2(1X,F12.6),1X,3(1X,I6))
