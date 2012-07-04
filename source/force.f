@@ -128,13 +128,12 @@ c the derivations
       dax=((aux_lx-aux_mx)*aux_2-aux_3x)*den_inv
       day=((aux_ly-aux_my)*aux_2-aux_3y)*den_inv
       daz=((aux_lz-aux_mz)*aux_2-aux_3z)*den_inv
-      dbx=((aux_rx-aux_lx)*aux_2-aux_rx*aux_4+aux_3z)*den_inv
+      dbx=((aux_rx-aux_lx)*aux_2-aux_rx*aux_4+aux_3x)*den_inv
       dby=((aux_ry-aux_ly)*aux_2-aux_ry*aux_4+aux_3y)*den_inv
-      dbz=((aux_rz-aux_lz)*aux_2-aux_rz*aux_4+aux_3x)*den_inv
+      dbz=((aux_rz-aux_lz)*aux_2-aux_rz*aux_4+aux_3z)*den_inv
       dcx=((aux_mx-aux_rx)*aux_2-aux_3x)*den_inv
       dcy=((aux_my-aux_ry)*aux_2-aux_3y)*den_inv
       dcz=((aux_mz-aux_rz)*aux_2-aux_3z)*den_inv
-c      write(*,*)"ddddddda",dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc
       return
       END
 
@@ -144,12 +143,18 @@ c subroutine dist takes 12 reals (=4 coordinates) and yields an angel between -\
      2 dihedral_abcd)
       IMPLICIT REAL*8 (a-z)
 c normal vectors on abc and bcd
-      abc_x=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
-      abc_y= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
-      abc_z=-ay*bx+ax*by+ay*cx-by*cx-ax*cy+bx*cy
-      bcd_x=-bz*cy+by*cz+bz*dy-cz*dy-by*dz+cy*dz
-      bcd_y= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
-      bcd_z=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy
+c      abc_x=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
+      abc_x=(cy-by)*az+(ay-cy)*bz+(by-ay)*cz
+c      abc_y= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
+      abc_y=(bx-cx)*az+(cx-ax)*bz+(ax-bx)*cz
+c      abc_z=-ay*bx+ax*by+ay*cx-by*cx-ax*cy+bx*cy
+      abc_z=(cx-bx)*ay+(ax-cx)*by+(bx-ax)*cy
+c      bcd_x=-bz*cy+by*cz+bz*dy-cz*dy-by*dz+cy*dz
+      bcd_x=(dy-cy)*bz+(by-dy)*cz+(cy-by)*dz
+c      bcd_y= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
+      bcd_y=(cx-dx)*bz+(dx-bx)*cz+(bx-cx)*dz
+c      bcd_z=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy
+      bcd_z=(cy-dy)*bx+(dy-by)*cx+(by-cy)*dx
 c their respective lengths
       abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
       bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
