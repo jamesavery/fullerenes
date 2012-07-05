@@ -157,30 +157,25 @@ coord3d Graph::centre3d(const vector<coord3d>& layout) const {
 // * Check if layout is planar before allowing it (this function crashes if it is not).
 
 
-string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool number_vertices, bool include_latex_header) const 
+string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool number_vertices, bool include_latex_header,
+		  int line_colour, int vertex_colour, double line_width, double vertex_diameter) const
 {
-// \documentclass[tikz=true,crop=true]{standalone}
-// \usepackage{tikz}
-// \tikzstyle{vertex}=[circle, draw, inner sep=0, fill=blue!80, minimum width=1.5pt]
-// \tikzstyle{dualvertex}=[circle, draw, inner sep=0, fill=red!40, minimum width=2pt]
-// \tikzstyle{invisible}=[draw=none,inner sep=0,fill=none,minimum width=0pt]
-// \tikzstyle{dualedge}=[dotted,draw]
-// \tikzstyle{edge}=[color=black, draw]
-// \begin{document}
-// \input{c180}
-// \end{document}
   ostringstream s;
   s << fixed;
   // If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
   if(include_latex_header)
-    s << "\\documentclass{tikz=true,crop=true}{standalone}\n"
-      "\\usepackage{fullpage,fourier,tikz}\n"
-         "\\begin{document}\n"
-      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=blue!20, minimum width=4pt]\n"
-      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=red!40, minimum width=2pt]\n"
+    s << "\\documentclass{standalone}\n"
+      "\\usepackage{tikz}\n"
+      "\\begin{document}\n"
+      "\\definecolor{vertexcolour}{RGB}{"<<(vertex_colour>>16)<<","<<((vertex_colour>>8)&0xff)<<","<<(vertex_colour&0xff)<<"}\n"
+      "\\definecolor{edgecolour}{RGB}{"<<(line_colour>>16)<<","<<((line_colour>>8)&0xff)<<","<<(line_colour&0xff)<<"}\n"
+      "\\definecolor{dualvertexcolour}{RGB}{205,79,57}\n"
+      "\\definecolor{dualedgecolour}{RGB}{0,0,0}\n"
+      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
+      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
+      "\\tikzstyle{edge}=[draw,color=edgecolour,line width="<<line_width<<"mm]\n"
+      "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolor,line width="<<line_width<<"mm]\n"
       "\\tikzstyle{invisible}=[draw=none,inner sep=0,fill=none,minimum width=0pt]\n"
-      "\\tikzstyle{dualedge}=[dotted,draw]\n"
-      "\\tikzstyle{edge}=[draw]\n"
       ;
 
   // Find "internal" width and height of layout and scale to w_cm x h_cm
