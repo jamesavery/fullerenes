@@ -29,13 +29,16 @@ C     Parameter set for Program QMGA
       Data DPoint,Dedge/0.5d0,0.1d0/
 
 C     Prepare for Program QMGA
-      if(ifs.eq.1.or.ifs.eq.3) 
-     1 Open(unit=8,file=texname,form='formatted')
       if(ifs.eq.2.or.ifs.eq.3) then 
        Open(unit=2,file=graphname,form='formatted')
        Write(2,901) M,DPoint,Dedge
       endif
-      
+
+C     Construct a graph object from the adjacency matrix
+C     and get the matrix of topological distances.
+      g = new_fullerene_graph(Nmax,M,IDA)
+      call all_pairs_shortest_path(g,M,Nmax,MDist)
+
       satom='o'
       s5ring='^'
       s6ring='*'
@@ -658,9 +661,8 @@ C   Search in 6-ring
        endif
 C  End of search
       endif
-      g = new_fullerene_graph(Nmax,M,IDA)
+
       if(ISchlegel.ge.7) then
-C      call all_pairs_shortest_path(g,M,Nmax,MDist)
        WRITE(IOUT,1041) 
        maxl=0
       Do I=1,M
@@ -671,7 +673,6 @@ C      call all_pairs_shortest_path(g,M,Nmax,MDist)
       endif
       write (Iout,1036)
       call tutte_layout_b(g,is(1),is(2),is(3),layout2d)
-      call delete_fullerene_graph(g)
 C     Get Barycenter of outer ring and use as origin
       write (Iout,1040)
       xc=0.d0
@@ -723,10 +724,14 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
       endif
 
  9999 Continue
-       Close(unit=2)
-C James, here goes your latex program creation for Schlegel diagram
-C     The filename for this is in      texname     and the unit is 8
-       Close(unit=8)
+C     Call format: draw_graph(filename, format (string),show_dual (0|1), dimensions ((w,h) in cm), 
+C     line_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
+C     line_width (in mm), vertex_diameter (in mm) )
+      call set_layout2d(g,layout2d)
+      call draw_graph(g, texname, "tex",0, (/10.d0,10.d0/), x'274070', 
+     1                x'458b00', 0.5d0, 2.5d0)
+
+      call delete_fullerene_graph(g)
       Return
   901 Format(I6,2F12.6)
   902 Format(I6,2(1X,F12.6),1X,3(1X,I6))
