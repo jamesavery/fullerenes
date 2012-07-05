@@ -374,12 +374,10 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
      1 Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
      1 GROUP)
+C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
       endif
-
 C Topological Indicators
-      routine='TOPINDICATORS'
-      Write(Iout,1008) routine
       Call TopIndicators(Matom,Iout,IDA,Mdist)
 
 C Calculate the volume

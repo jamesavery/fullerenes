@@ -76,10 +76,10 @@ C     Now sort values of diamw, output diam
       Write(Iout,1001) iwiener,ihyperwiener
       Write(Iout,1002) maxdist,Avdist
 
- 1000 Format(' Topological Indicators and polynomials')
- 1001 Format(' Wiener index W: ',I10,' and hyper Wiener index WW: ',I10)
- 1002 Format(' Topological distances between 1 and ',I6,
-     1 ', average topological distance: ',F12.6)
+ 1000 Format(/1X,'Topological Indicators:')
+ 1001 Format(' Wiener index W: ',I10,/,' Hyper Wiener index WW: ',I10)
+ 1002 Format(' Topological distances are between 1 and ',I6,/,
+     1 ' Average topological distance: ',F12.6)
       RETURN
       END
 
