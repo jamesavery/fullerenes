@@ -433,15 +433,15 @@ C   Extra boost for the last ring points
       If(I.gt.IVert) then
       Fac=Fac*1.2d0
       endif
-      layout2d(1,I)=Dist(1,I)*Fac
-      layout2d(2,I)=Dist(2,I)*Fac
+      IAT=IAtom(I)
+      layout2d(1,IAT)=Dist(1,I)*Fac
+      layout2d(2,IAT)=Dist(2,I)*Fac
 
 C   Print
-      IAT=IAtom(i)
-      WRITE(IOUT,1004) IAT,layout2d(1,I),layout2d(2,I),
+      WRITE(IOUT,1004) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3),Fac
       if(ifs.eq.2.or.ifs.eq.3) 
-     1 Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
+     1 Write(2,902) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
       WRITE(IOUT,1032) graphname
@@ -513,13 +513,13 @@ C   Atoms
       Y=Dist(2,I)
       Z=Dist(3,I)
       Fac=Zproj/(app-Z)
-      layout2d(1,I)=Dist(1,I)*Fac
-      layout2d(2,I)=Dist(2,I)*Fac
-      IAT=IAtom(i)
-      WRITE(IOUT,1028) IAT,layout2d(1,I),layout2d(2,I),
+      IAT=IAtom(I)
+      layout2d(1,IAT)=Dist(1,I)*Fac
+      layout2d(2,IAT)=Dist(2,I)*Fac
+      WRITE(IOUT,1028) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       if(ifs.eq.2.or.ifs.eq.3) 
-     1 Write(2,902) IAT,layout2d(1,I),layout2d(2,I),
+     1 Write(2,902) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
       WRITE(IOUT,1032) graphname
