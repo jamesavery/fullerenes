@@ -16,6 +16,13 @@
       hullarea   = get_surface_area(hull)
       hullvolume = get_volume(hull)
 
+      call draw_polyhedron(p,"output/fullerene ","pov",
+     1 x'bb9988', x'8899bb',x'99bb88',
+     1 0.4d0, 1.d0, 0.6d0)
+
+      call draw_polyhedron(hull,"output/convexhull ","pov",
+     1 x'bb9988', x'8899bb',x'99bb88',
+     1 0.4d0, 1.d0, 0.6d0)
 
       call delete_polyhedron(p)
       call delete_polyhedron(hull)

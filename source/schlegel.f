@@ -728,8 +728,11 @@ C     Call format: draw_graph(filename, format (string),show_dual (0|1), dimensi
 C     line_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
 C     line_width (in mm), vertex_diameter (in mm) )
       call set_layout2d(g,layout2d)
-      call draw_graph(g, texname, "tex",0, (/10.d0,10.d0/), x'274070', 
-     1                x'458b00', 0.5d0, 2.5d0)
+      call draw_graph(g, texname, "tex",0, (/10.d0,10.d0/), 
+     1                x'113344', x'88bb99', 0.3d0, 1.d0)
+
+      call draw_graph(g, "output/graph2D ", "pov",0, (/10.d0,10.d0/), 
+     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
 
       call delete_fullerene_graph(g)
       Return

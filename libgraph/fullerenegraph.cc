@@ -54,7 +54,6 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
     if(planar_layout) 
       for(unsigned int i=0;i<m;i++){
 	double lambda = (1.0+i)*(1.0/(m+1));
-	cerr << "lambda = " << lambda << endl;
 	const coord2d &a(dual.layout2d[e->first]), &b(dual.layout2d[e->second]);
 	new_layout.push_back(a*(1.0-lambda) + b*lambda);
       }

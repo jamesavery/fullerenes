@@ -59,6 +59,11 @@ public:
 		  double line_width = 0.1, double vertex_diameter = 2.0
 		  ) const;
 
+  string to_povray(double w_cm = 10, double h_cm = 10, 
+		   int line_colour = 0x6a5acd, int vertex_colour = 0x8b2500,
+		   double line_width = 0.1, double vertex_diameter = 2.0
+		   ) const;
+
   friend ostream& operator<<(ostream& s, const PlanarGraph& g);
 };
 

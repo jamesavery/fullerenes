@@ -221,4 +221,33 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
   return s.str();
 }
 
+#define byte0(x) ((x)&0xff)
+#define byte1(x) (((x)>>8)&0xff)
+#define byte2(x) (((x)>>16)&0xff)
+#define byte3(x) (((x)>>24)&0xff)
+
+string PlanarGraph::to_povray(double w_cm, double h_cm, 
+			      int line_colour, int vertex_colour, double line_width, double vertex_diameter) const
+{
+  ostringstream s;
+  s << fixed;
+
+  s << "#declare Nvertices="<<N<<";\n";
+  s << "#declare Nedges="<<edge_set.size()<<";\n";
+  s << "#declare edgecolour=color rgb <" << byte2(line_colour)/256. << "," << byte1(line_colour)/256. << "," << byte0(line_colour)/256. << ">;\n";
+  s << "#declare nodecolour=color rgb <" << byte2(vertex_colour)/256. << "," << byte1(vertex_colour)/256. << "," << byte0(vertex_colour)/256. << ">;\n";
+  s << "#declare edgewidth="<<line_width/10.<<";\n";
+  s << "#declare nodediameter="<<vertex_diameter/10.<<";\n";
+
+  if(layout2d.size() == N){
+    coord2d wh(width_height());
+    double xscale = w_cm/wh.first;
+    double yscale = h_cm/wh.second;
+    s << "#declare layout2D=array[Nvertices][2]{"; for(int i=0;i<N;i++) s<<layout2d[i]*coord2d(xscale,yscale)<<(i+1<N?",":"}\n\n");
+  }
+  s << "#declare edges   =array[Nedges][2]{"; 
+  for(set<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();){ s << *e; s <<(++e != edge_set.end()? ",":"}\n\n"); }
+
+  return s.str();
+}
 

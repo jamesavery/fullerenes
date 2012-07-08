@@ -52,6 +52,10 @@ extern "C" {
   // graph_ptr triangulation_(polyhedron_ptr *P)
   polyhedron_ptr convex_hull_(const polyhedron_ptr *P);
 
+void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char *format, 
+		      const int *edge_colour, const int *node_colour, const int *face_colour,
+		      const double *edge_width, const double *node_diameter, const double *face_opacity);
+
   void get_layout3d_(const polyhedron_ptr *p, double *layout3d);
 };
 
@@ -268,8 +272,10 @@ int nedges_(const graph_ptr *g){ return (*g)->edge_set.size(); }
 void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, const int *show_dual, const double *dimensions,
 		 const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter)
 {
-  char filename[25];
-  for(int i=0;i<20 && filename_[i] != ' ';i++) { filename[i] = filename_[i]; filename[i+1] = char(0); }
+  int i=0;
+  string fmt(format,3), filename;
+  for(i=0;i<20 && filename_[i] != ' ';i++) ;
+  filename = string(filename_,i)+"."+fmt;
   
   // printf("draw_graph({\n"
   // 	 "\tformat:     '%3s',\n"
@@ -286,8 +292,27 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   // 	 *line_width, *vertex_diameter);
 
 
-
-  ofstream graph_file(filename,ios::out | ios::binary);
-  graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],*show_dual,false,true,*line_colour,*vertex_colour,*line_width,*vertex_diameter);
+  ofstream graph_file(filename.c_str(),ios::out | ios::binary);
+  if        (fmt == "tex"){
+    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],*show_dual,false,true,*line_colour,*vertex_colour,*line_width,*vertex_diameter);
+  } else if (fmt == "pov"){
+    graph_file << (*g)->to_povray(dimensions[0],dimensions[1],*line_colour,*vertex_colour,*line_width,*vertex_diameter);
+  }
   graph_file.close();
+}
+
+void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char *format, 
+		      const int *edge_colour, const int *node_colour, const int *face_colour,
+		      const double *edge_width, const double *node_diameter, const double *face_opacity)
+{
+  int i=0;
+  string fmt(format,3), filename;
+  for(i=0;i<20 && filename_[i] != ' ';i++) ;
+  filename = string(filename_,i)+"."+fmt;
+
+  ofstream polyhedron_file(filename.c_str(),ios::out|ios::binary);
+
+  if     (fmt == "pov"){
+    polyhedron_file << (*P)->to_povray(10.0,10.0,*edge_colour,*node_colour,*face_colour,*edge_width,*node_diameter,*face_opacity);
+  }
 }
