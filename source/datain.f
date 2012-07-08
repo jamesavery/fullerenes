@@ -1,7 +1,7 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
      1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,GCtrans,iupac,
      1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
-     1 ilp,IYF,IWS,nzeile,ifs,PS,TolX,R5,R6,Rdist,scale,scalePPG,
+     1 ilp,IYF,IWS,nzeile,ifs,ndual,PS,TolX,R5,R6,Rdist,scale,scalePPG,
      1 ftol,force,forceP,xyzname,chkname,graphname,texname,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -26,8 +26,8 @@
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
-      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,IFS,PS,scale,scalePPG,
-     1 graphname
+      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,ifs,ndual,PS,scale,
+     1 scalePPG,graphname
 C Input send to output
       if(ilp.eq.0) then   
         WRITE(IOUT,100)
@@ -87,8 +87,10 @@ C more default parameters
       graphname='graph2D'
       texname='graph2D'
       chkname='checkpoint'
-      IOpt=0    !  No (force field) optimization
-      IHam=0    !  Number of Hamiltonian cycles
+      Ifs=0     !  Option for .dat and .tex files
+      ndual=0   !  Option for plotting dual graph as well
+      Iopt=0    !  No (force field) optimization
+      Iham=0    !  Number of Hamiltonian cycles
       mirror=0  !  Invert coordinates
       loop=0    !  Option for compound job
       KE=0      !  Endo-Kroto C2 insertion

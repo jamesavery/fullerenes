@@ -1,6 +1,6 @@
       SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
-     1 Iring,ISchlegel,ifs,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,fscale,
-     1 scalePPG,CR,CR5,CR6,Symbol,graphname,texname)
+     1 Iring,ISchlegel,ifs,ndual,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,
+     1 fscale,scalePPG,CR,CR5,CR6,Symbol,graphname,texname)
       use config
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
@@ -29,15 +29,15 @@ C     Parameter set for Program QMGA
       Data DPoint,Dedge/0.5d0,0.1d0/
 
 C     Prepare for Program QMGA
-      if(ifs.eq.2.or.ifs.eq.3) then 
+      if(ifs.ge.2) then 
        Open(unit=2,file=graphname,form='formatted')
        Write(2,901) M,DPoint,Dedge
       endif
 
 C     Construct a graph object from the adjacency matrix
-C     and get the matrix of topological distances.
-      g = new_fullerene_graph(Nmax,M,IDA)
-      call all_pairs_shortest_path(g,M,Nmax,MDist)
+      if(ifs.gt.0.or.ISchlegel.gt.2) then
+       g = new_fullerene_graph(Nmax,M,IDA)
+      endif
 
       satom='o'
       s5ring='^'
@@ -158,7 +158,7 @@ C  such that it coincides with the z-axis
 C  **** This still needs some work for better alignement
       R=1.d0/dsqrt(c(1)**2+c(2)**2+c(3)**2)
       Do I=1,3
-      distw(i)=c(i)*R
+       distw(i)=c(i)*R
       enddo
       WRITE(IOUT,1014) (distw(i),i=1,3)
 C   Construct rotation matrix
@@ -166,62 +166,65 @@ C   Construct rotation matrix
 
 C   Now rotate all vertices
       DO I=1,M
-      distw(1)=Dist(1,I)
-      distw(2)=Dist(2,I)
-      distw(3)=Dist(3,I)
-      CALL Rotate(Rot,distw,vec1)
-      Dist(1,I)=vec1(1)
-      Dist(2,I)=vec1(2)
-      Dist(3,I)=vec1(3)
+       distw(1)=Dist(1,I)
+       distw(2)=Dist(2,I)
+       distw(3)=Dist(3,I)
+       CALL Rotate(Rot,distw,vec1)
+       Dist(1,I)=vec1(1)
+       Dist(2,I)=vec1(2)
+       Dist(3,I)=vec1(3)
       enddo
 
 C   Rotate all ring centers
+C   Pentagons
       Do I=1,N5R
-      distw(1)=CR5(1,I)
-      distw(2)=CR5(2,I)
-      distw(3)=CR5(3,I)
-      CALL Rotate(Rot,distw,vec1)
-      CR5(1,I)=vec1(1)
-      CR5(2,I)=vec1(2)
-      CR5(3,I)=vec1(3)
+       distw(1)=CR5(1,I)
+       distw(2)=CR5(2,I)
+       distw(3)=CR5(3,I)
+       CALL Rotate(Rot,distw,vec1)
+       CR5(1,I)=vec1(1)
+       CR5(2,I)=vec1(2)
+       CR5(3,I)=vec1(3)
       enddo
+C   Hexagons
       Do I=1,N6R
-      distw(1)=CR6(1,I)
-      distw(2)=CR6(2,I)
-      distw(3)=CR6(3,I)
-      CALL Rotate(Rot,distw,vec1)
-      CR6(1,I)=vec1(1)
-      CR6(2,I)=vec1(2)
-      CR6(3,I)=vec1(3)
+       distw(1)=CR6(1,I)
+       distw(2)=CR6(2,I)
+       distw(3)=CR6(3,I)
+       CALL Rotate(Rot,distw,vec1)
+       CR6(1,I)=vec1(1)
+       CR6(2,I)=vec1(2)
+       CR6(3,I)=vec1(3)
       enddo
 
       else
+C   Original input chosen
        WRITE(IOUT,1011)
        iorig=1
       endif
 
 C   Sort distances according to z-values
       DO I=1,M
-      IAtom(I)=I
+       IAtom(I)=I
       enddo
       DO I=1,M
-      dMaxx=Dist(3,I)
-      iMax=I
+       dMaxx=Dist(3,I)
+       iMax=I
       DO K=I+1,M
-      IF (dMaxx.lt.Dist(3,K)) then
-      iMax=K
-      dMaxx=Dist(3,K)
-      endif
+       IF (dMaxx.lt.Dist(3,K)) then
+        iMax=K
+        dMaxx=Dist(3,K)
+       endif
       enddo
 
 C   Swap
       Do ii=1,3
-      iw=IAtom(iMax)
-      IAtom(iMax)=IAtom(I)
-      IAtom(I)=iw
-      distw(ii)=Dist(ii,imax)
-      Dist(ii,imax)=Dist(ii,i)
-      Dist(ii,i)=distw(ii)
+       iw=IAtom(iMax)
+       IAtom(iMax)=IAtom(I)
+       IAtom(I)=iw
+       distw(ii)=Dist(ii,imax)
+       Dist(ii,imax)=Dist(ii,i)
+       Dist(ii,i)=distw(ii)
       enddo
       enddo
 
@@ -230,23 +233,23 @@ C   Now do the same with ring centers
       DO I=1,NR
       IRing(I)=NRing(I)
       if(I.LE.N5R) then
-      CR(1,I)=CR5(1,I)
-      CR(2,I)=CR5(2,I)
-      CR(3,I)=CR5(3,I)
+       CR(1,I)=CR5(1,I)
+       CR(2,I)=CR5(2,I)
+       CR(3,I)=CR5(3,I)
       else
-      CR(1,I)=CR6(1,I-N5R)
-      CR(2,I)=CR6(2,I-N5R)
-      CR(3,I)=CR6(3,I-N5R)
+       CR(1,I)=CR6(1,I-N5R)
+       CR(2,I)=CR6(2,I-N5R)
+       CR(3,I)=CR6(3,I-N5R)
       endif
       enddo
       DO I=1,NR
-      dMaxx=CR(3,I)
-      iMax=I
+       dMaxx=CR(3,I)
+       iMax=I
       DO K=I+1,NR
-      dMax1=CR(3,K)
-      IF (dMaxx.lt.dmax1) then
-      iMax=K
-      dMaxx=dMax1
+       dMax1=CR(3,K)
+      IF(dMaxx.lt.dmax1) then
+       iMax=K
+       dMaxx=dMax1
       endif
       enddo
 
@@ -255,9 +258,9 @@ C   Swap
       IRing(imax)=IRing(I)
       IRing(I)=ival
       Do ii=1,3
-      dval=CR(ii,imax)
-      CR(ii,imax)=CR(ii,I)
-      CR(ii,I)=dval
+       dval=CR(ii,imax)
+       CR(ii,imax)=CR(ii,I)
+       CR(ii,I)=dval
       enddo
       enddo
 
@@ -407,7 +410,7 @@ C   Print the sorted ring centers
       WRITE(IOUT,1005)
       endif
 
-C   Choise between Schlegel projection or Tutte embedding
+C   Choice between Schlegel projection or Tutte embedding
       If(ISchlegel-2) 10,20,30
 
 C   Algorithm 1: 
@@ -440,11 +443,11 @@ C   Extra boost for the last ring points
 C   Print
       WRITE(IOUT,1004) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3),Fac
-      if(ifs.eq.2.or.ifs.eq.3) 
+      if(ifs.ge.2) 
      1 Write(2,902) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
-      WRITE(IOUT,1032) graphname
+      if(ifs.ge.2) WRITE(IOUT,1032) graphname
 
 C   Calculate distance of ring centers from z-axis for projection
       WRITE(IOUT,1018)
@@ -518,12 +521,13 @@ C   Atoms
       layout2d(2,IAT)=Dist(2,I)*Fac
       WRITE(IOUT,1028) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
-      if(ifs.eq.2.or.ifs.eq.3) 
+      if(ifs.ge.2) 
      1 Write(2,902) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
-      WRITE(IOUT,1032) graphname
+      if(ifs.ge.2) WRITE(IOUT,1032) graphname
       WRITE(IOUT,1029)
+
 C   Rings
       Do I=1,NR
       X=CR(1,I)
@@ -589,8 +593,6 @@ C   Print Schlegel picture
       do I=1,msrs
         WRITE(IOUT,1025) (SRS(I,J),J=1,2*msrs)
       enddo
-
-      Close(unit=2)
       go to 9999
 
 C   Algorithm 3 (Tutte):
@@ -717,21 +719,23 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
        Do I=1,M
        WRITE(IOUT,1028) I,layout2d(1,I),layout2d(2,I),
      1  IC3(I,1),IC3(I,2),IC3(I,3)
-      if(ifs.eq.2.or.ifs.eq.3) 
-     1  Write(2,902) I,layout2d(1,I),layout2d(2,I),
+      if(ifs.ge.2) Write(2,902) I,layout2d(1,I),layout2d(2,I),
      1  IC3(I,1),IC3(I,2),IC3(I,3)
        enddo
       endif
 
- 9999 Continue
-C     Call format: draw_graph(filename, format (string),show_dual (0|1), dimensions ((w,h) in cm), 
+ 9999 if(ifs.eq.1.or.ifs.eq.3) then
+C     Call format: draw_graph(filename, format (string),ndual: show_dual (0|1), dimensions ((w,h) in cm), 
 C     line_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
 C     line_width (in mm), vertex_diameter (in mm) )
       call set_layout2d(g,layout2d)
-      call draw_graph(g, texname, "tex",0, (/10.d0,10.d0/), x'274070', 
+      call draw_graph(g,texname,"tex",ndual, (/10.d0,10.d0/), x'274070', 
      1                x'458b00', 0.5d0, 2.5d0)
 
       call delete_fullerene_graph(g)
+      endif
+
+      if(ifs.ge.2) Close(unit=2)
       Return
   901 Format(I6,2F12.6)
   902 Format(I6,2(1X,F12.6),1X,3(1X,I6))
@@ -923,7 +927,7 @@ C     Now checking on the original vector
 C     Embedding algorithms for fullerene graph, energy
       Real*8 p(NMAX*2)
       Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
-      Data r,f,coulomb/2.0d0,1.d-1,1.0d0/
+      Data r,f,coulomb/2.0d0,1.d-1,.3d0/
       fc=0.d0
 C     simple spring embedding
       if(IOP.le.2) then
@@ -1021,7 +1025,7 @@ C     total energy
 C     Embedding algorithms for fullerene graph, gradient
       Real*8 p(NMAX*2),x(NMAX*2)
       Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
-      Data r,f,coulomb/2.0d0,1.d-1,1.0d0/
+      Data r,f,coulomb/2.0d0,1.d-1,.3d0/
 C     simple spring embedding
       if(IOP.le.2) then
       Do I=1,n,2

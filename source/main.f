@@ -93,7 +93,7 @@ C  INPUT and setting parameters for running the subroutines
         CALL Datain(IN,IOUT,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
-     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,
+     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ndual,
      1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,force,forceP,
      1  xyzname,chkname,graphname,texname,TEXTINPUT)
 C  Stop if error in input
@@ -417,8 +417,8 @@ C Calculate Schlegel diagram
        ParamS=dabs(ParamS)
       endif
       CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
-     1 NRing,Iring,Ischlegel,ifs,IC3,IDA,Mdist,Dist,ParamS,Rmin,TolX,
-     1 scales,scalePPG,CR,CRing5,CRing6,Symbol,graphname,texname)
+     1 NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
+     1 TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,graphname,texname)
       endif
 
 C  E N D   O F   P R O G R A M
