@@ -181,6 +181,7 @@ The input is in {\it Namelist format} if not otherwise stated.
 Important steps in the program are given in the flow diagram below and are
 explained in some detail in this section. More information can be obtained in an up-coming review article \cite{PSJA}.\\
 
+%Figure 1
  \begin{figure}[htbp]
    	\begin{center}
 %  		\includegraphics[width=1.0\textwidth]{flowdiagram.png} \\
@@ -240,7 +241,7 @@ obtained from the natural sequence of canonical RSPIs to distinguish between the
 general isomer number can be taken and the RSPIs for a specific isomer up to \C{100} can be read-in from the database provided. 
 The numbering scheme for IPR isomers only ($N_{isomers}^{IPR}= 1, ..., n_{max}$) can also be used up to \C{120}, see input file {\it database.inp}.
 
-\subsection{H\"uckel analysis}
+\subsection{H\"uckel analysis and topological indicators}
 From the adjacency matrix $A_{ij}$ a H\"uckel analysis is performed (Subroutine {\bf Hueckel}). This gives you a good hint if the 
 fullerene is open or closed shell \cite{Atlas}. Note that for fullerenes the H\"uckel analysis may not be very reliable 
 as hybridization with the C(2s) orbitals occurs due to non-planarity. Hence the $\sigma-\pi$ separation breaks down
@@ -256,6 +257,8 @@ agreement with DFT Kohn-Sham orbital energies. The fullerene might also Jahn-Tel
 ground state instead of one of a higher multiplicity as this is the case for \C{20}. Such electronic effects are not
 captured in this program, and one needs to perform a proper quantum theoretical calculation. The program gives information
 on the HOMO-LUMO gap and calculates the topological resonance energy from Babi\'c's matching polynomial calculations \cite{Babic1995,Babic1997}.
+There are several other topological indicators of which the Estrada index and mean topological distance, and the Wiener index and hyper Wiener
+index are pronted out. For details see a book on graph theory.
 
 \subsection{The Goldberg-Coxeter transformation}
 In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \C{n} can be performed if required from input
@@ -323,18 +326,28 @@ Endo-Kroto 2-vertex insertions (subroutine {\bf EndoKrotoTrans} \cite{Endo92}, Y
 and 6-vertex ($D_{3h}$ 666555) insertions (subroutine {\bf YoshidaFowler6}) \cite{Yoshida97}, or the a WS 6-vertex (6-55-55) insertion 
 we developed, see input files {\it c50EK.inp, c60SW.inp, c80YF.inp}. 
 The non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with these vertex insertion methods, see input files {\it c380.inp} 
-and {\it c384.inp}.
+and {\it c384.inp}. The two structures obtained with the program PYMOL are shown in Figure \ref{pic:C380andC384}.
+
+%Figure 2
+ \begin{figure}[htbp]
+   	\begin{center}
+  		\includegraphics[width=0.3\textwidth]{C380.png}
+		\includegraphics[width=0.4\textwidth]{C384.png}
+         \label{pic:C380andC384}
+        \caption{Optimized force-field structures of \C{380} (left) and \C{384} (right).}
+   	\end{center}
+ \end{figure}
 
 Subroutine {\bf SpiralSearch}) uses ring-spiral algorithm of Fowler and Manolopoulus for the search of a ring spiral if, for the input,
 cartesian coordinates were chosen or the initial fullerene structure was modified. 
-It produces the canonical ring spiral pentagon indices if the fullerene is spiral.
-A general ring-spiral algorithm is currently in preparation.
+It produces the canonical ring spiral pentagon indices if the fullerene is spiral and fails if it is non-spiral (as for the two examples shown in 
+Figure \ref{pic:C380andC384}. A general ring-spiral algorithm is currently in preparation.
 
 \subsection{Volume and surface area, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
 The volume and surface area of the fullerene is calculated in Subroutine {\bf Volume}. This is done by\\
 1) The convex hull.\\
 2) The normal vector algorithm resulting in the exact volume of the polyhedron (identical to convex hull if polyhedron is convex).\\
-3) The tesselation into trigonal pyramides from the barycenter by summing over all
+3) The tesselation into trigonal pyramids from the barycenter by summing over all
 tetrahedrons spanned by the three vectors (identical to algorithm 1 and 2 if
 polyhedron is convex). Here one sums over all tetrahedrons spanned by the three vectors CM-CR (barycenter of fullerene to the ring center),
 CM-CA1 (barycenter of fullerene to atom 1 in ring), and CM-CA2 (barycenter of fullerene  to atom 2 in ring).
@@ -643,13 +656,13 @@ The resulting output is a catalogue of the isomers found containing their ideali
 
 6) {\bf \&Graph line}: Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (Schlegel diagrams).\\
 \&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, IFS, PS, Scale, ScalePPG, graphname, texname} (Default: 0 for all values except for {\bf graphname}). We recommend {\bf IG} = 1, 2, 4 or 7.\\
-If {\bf ISchlegel} $>$ 0 Use Program Schlegel for generating fullerene graphs
-If {\bf ISchlegel} = 1: Use the perspective projection method (PSP).\\
+If {\bf ISchlegel} $>$ 0 Use Program Graph2D for generating fullerene graphs.\\
+If {\bf ISchlegel} = 1: Use the perspective projection method (PSP) also called Schlegel projection.\\
 If {\bf ISchlegel} = 2: Use the cone projection method (CSP).\\
 If {\bf ISchlegel} = 3: Produce the Tutte graph (2D-TE).\\
 If {\bf ISchlegel} = 4: Produce the Tutte graph and perform linear scaling (2D-TE-LS) (scale factor can be read in).\\
 If {\bf ISchlegel} = 5: Produce the Tutte graph and perform spring embedding optimization $(r_{ij}-r_0)^2$ with $r_0$ set to 2.0 (2D-SE).\\
-If {\bf ISchlegel} = 6: Starting from the Tutte graph perform spring + repulsive Coulomb.
+If {\bf ISchlegel} = 6: Starting from the Tutte graph perform spring + repulsive Coulomb with prefactor of 0.3.\\
 force embedding optimization (2D-SE+C). The repulsive force is taken from the barycenter to the vertex. $r_0$ is set to 2.0. The force
 constants are set such that the graph looks nice.\\
 If {\bf ISchlegel} = 7: Starting from the Tutte graph perform a Pisanski-Plestenjak-Graovac embedding PPGE) optimization 
@@ -677,11 +690,30 @@ to 45 degrees if chosen larger than 89 degrees. In the case of the perspective p
 between the focal point and the ring center underneath, Note this is chosen by the program, but if nonzero this parameter has to be
 carefully chosen. The picture produced gives a good idea if {\bf PS} was correctly chosen or not. Note that the ring centers get
 an extra boost of 10\% in the scaling factors such that they appear more in the center of the rings produced by the Schlegel projection.\\
-If {\bf IFS} = 1: A tex file named {\bf texname} is produced which contains the 2D fullerene graph.\\
-If {\bf IFS} = 2: A data file named {\bf graphname} is produced which contains all the information for producing a 2D fullerene graph with a plotting program.\\
+If {\bf IFS} = 1: A tex file named {\bf texname} is produced which contains the 2D fullerene graph (Default: 0).\\
+If {\bf IFS} = 2: A data file named {\bf graphname} is produced which contains all the information 
+for producing a 2D fullerene graph with a plotting program.\\
 If {\bf IFS} = 3: Both files are produced.\\
+If {\bf ndual} = 1: The dual graph is drawn as well in texfile{\bf texname}. (Default: 0).\\
 {\bf graphname} = name. A name of up to 16 characters must be chosen, the file is then named name.dat (Default: graph2D.dat).\\
-{\bf texname} = name. A name of up to 16 characters must be chosen, the file is then named name.tex (Default: graph2D.tex).
+{\bf texname} = name. A name of up to 16 characters must be chosen, the file is then named name.tex (Default: graph2D.tex).\\
+The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{pic:Graph2D}.
+
+%Figure 3
+ \begin{figure}[htbp]
+   	\begin{center}
+  		\includegraphics[width=0.2\textwidth]{Graph1.png}
+		\includegraphics[width=0.2\textwidth]{Graph2.png}
+		\includegraphics[width=0.2\textwidth]{Graph3.png}
+		\includegraphics[width=0.2\textwidth]{Graph4.png}
+		\includegraphics[width=0.2\textwidth]{Graph5.png}
+		\includegraphics[width=0.2\textwidth]{Graph6.png}
+		\includegraphics[width=0.2\textwidth]{Graph7.png}
+		\includegraphics[width=0.2\textwidth]{Graph8.png}
+         \label{pic:Graph2D}
+        \caption{From the left to right: 2D fullerene structures created using {\bf ISchlegel}=1 to 8.}
+   	\end{center}
+ \end{figure}
               
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{100} and for IPR isomers up to
@@ -698,9 +730,9 @@ computationally too demanding. The longest file for our database ran for 3
 months on a single processor.
 Note: the directory database needs to be in the same directory as "source" or "libgraph".
 
-\clearpage
-%References
 
+%References
+\section{References}
 \begin{thebibliography}{35}
 
 \bibitem{Brinkman} G. Brinkmann, ``Program Fullgen - a program for generating nonisomorphic fullerenes", see http://cs.anu.edu.au/~bdm/plantri/.
