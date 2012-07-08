@@ -735,7 +735,6 @@ C     line_width (in mm), vertex_diameter (in mm) )
 c Output to POVRay raytracer. Commented out currently.
 c      call draw_graph(g, "output/graph2D ", "pov",0, (/10.d0,10.d0/), 
 c     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
-
       call delete_fullerene_graph(g)
       endif
 
