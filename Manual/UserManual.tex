@@ -522,7 +522,7 @@ In the following, the input in the required sequence is described in detail (eit
 {\bf IV3} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)\\
 {\bf filename} = 'name'. Filename for all external files created or used in the program.\\
 {\bf ixyz} = Flag for producing xyz input file for CYLview, Avogadro or others in standard xyz format (Default: 0). 
-Default name for the external file is {\it fullerene-3D.xyz}. Otherwise {\bf filename}='filename' needs to be specified (max 13 characters).\\
+Default name for the external file is {\it Fullerene-3D.xyz}. Otherwise {\bf filename}='filename' needs to be specified (max 13 characters).\\
 {\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0).\\ 
 If {\bf IC} = 2, 3 or 4 and {\bf isonum} not zero, then pentagon indices are taken from the
 isomer list contained in a database (see below). There are two databases, one for the general isomers.\\
@@ -532,7 +532,7 @@ If {\bf ixyz} = 1:  Produce xyz file named {\bf filename-3D.xyz} for further inp
 If {\bf ixyz} = 2:  Read xyz from file specified in {\bf filename}. {\bf IC} = 0 needs to be specified for this. Another xyz file is also produced 
 and named   {\it cylviewnew.xyz}.\\
 If {\bf ixyz} = 3  Read xyz from file specified in {\bf filename}. {\bf IC} = 0  needs to be specified.\\
-{\bf filename}: A name of up to 13 characters must be chosen, the file is then named filename-3D.xyz (Default: fullerene-3D.xyz).
+{\bf filename}: A name of up to 13 characters must be chosen, the file is then named filename-3D.xyz (Default: Fullerene-3D.xyz).
 If {\bf IC} = 2, 3 or 4 and {\bf isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
 There are two databases, one for the general isomers ({\bf IPRC} = 2) and one for the IPR isomers ({\bf IPRC} = 1), the
 definition is similar to the {\bf IPR} parameter below (Default: 2).\\
@@ -692,7 +692,7 @@ between the focal point and the ring center underneath, Note this is chosen by t
 carefully chosen. The picture produced gives a good idea if {\bf PS} was correctly chosen or not. Note that the ring centers get
 an extra boost of 10\% in the scaling factors such that they appear more in the center of the rings produced by the Schlegel projection.\\
 If {\bf IFS} = 1: A tex file named {\bf filename-2D.tex} is produced which contains the 2D fullerene graph (Default: 0).\\
-If {\bf IFS} = 2: A data file named {\bf graphname-2D.dat} is produced which contains all the information 
+If {\bf IFS} = 2: A data file named {\bf filename-2D.dat} is produced which contains all the information 
 for producing a 2D fullerene graph with a plotting program.\\
 If {\bf IFS} = 3: Both files are produced.\\
 If {\bf ndual} = 1: The dual graph is drawn as well in texfile {\bf filename-2D.tex}. (Default: 0).\\
