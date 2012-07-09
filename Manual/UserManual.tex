@@ -76,7 +76,7 @@ applications in chemistry}, Croatica Chemica Acta {\bf 68}, 283-292 (1995).\\
 11) J. Bondy and U. Murty, {\it Graph Theory} (Springer, Berlin, 2008).\\
 12) A. J. M. Wilson, {\it Graphs and Applications. An Introductory Approach} (Springer, Berlin, 2000).\\
 13) J. Cioslowski, N. Rao, and D. Moncrieff, {\it Standard Enthalpies of Formation of Fullerenes and Their
-Dependence on Structural Motifs}, J. Am. Chem. Soc. {\bf 122}, 8265Ð8270 (2000).\\\\
+Dependence on Structural Motifs}, J. Am. Chem. Soc. {\bf 122}, 8265-8270 (2000).\\\\
      
 {\bf Acknowledgement}\\\\
 PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support 
@@ -184,7 +184,7 @@ explained in some detail in this section. More information can be obtained in an
 %Figure 1
  \begin{figure}[htbp]
    	\begin{center}
-%  		\includegraphics[width=1.0\textwidth]{flowdiagram.png} \\
+%  		\includegraphics[width=1.0\textwidth]{tree.pdf} \\
                  \label{pic:flowdiagram}
         \caption{Flow diagram for main program tasks}
    	\end{center}
@@ -514,24 +514,25 @@ In the following, the input in the required sequence is described in detail (eit
 
 2) {\bf \&Coord line}: Input to create cartesian coordinates and main flags for the program (e.g. \&Coord IC=20, IOPT=1, R6=1.42 /).\\
 {\it List of options:}\\ 
-{\bf NA, IC, IV1, IV2, IV3, ixyz, xyzname, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, loop, mirror, IP, IPRC, TolR, R5, R6}\\
+{\bf NA, IC, IV1, IV2, IV3, ixyz, filename, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, loop, mirror, IP, IPRC, TolR, R5, R6}\\
 {\bf NA} = Number of atoms (vertices) $N_A$ (Default: 60)\\
 {\bf IC} = Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 {\bf IV1} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
 {\bf IV2} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 3)\\
 {\bf IV3} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)\\
+{\bf filename} = 'name'. Filename for all external files created or used in the program.\\
 {\bf ixyz} = Flag for producing xyz input file for CYLview, Avogadro or others in standard xyz format (Default: 0). 
-Default name for the external file is {\it cylview.xyz}. Otherwise {\bf xyzname}=filename needs to be specified (max 20 characters).\\
-{\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0). 
+Default name for the external file is {\it fullerene-3D.xyz}. Otherwise {\bf filename}='filename' needs to be specified (max 13 characters).\\
+{\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0).\\ 
 If {\bf IC} = 2, 3 or 4 and {\bf isonum} not zero, then pentagon indices are taken from the
-isomer list contained in a database (see below). There are two databases, one for the general isomers 
+isomer list contained in a database (see below). There are two databases, one for the general isomers.\\
 ({\bf IPRC} = 0) and one for the IPR isomers ({\bf IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).\\
-{\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting ptograms (Default: 0).\\
-If {\bf ixyz} = 1:  Produce xyz file for further input.\\
-If {\bf ixyz} = 2:  Read xyz from file specified in xyzname. {\bf IC} = 0 needs to be specified for this. Another xyz file is also produces 
+{\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting programs (Default: 0).\\
+If {\bf ixyz} = 1:  Produce xyz file named {\bf filename-3D.xyz} for further input.\\
+If {\bf ixyz} = 2:  Read xyz from file specified in {\bf filename}. {\bf IC} = 0 needs to be specified for this. Another xyz file is also produced 
 and named   {\it cylviewnew.xyz}.\\
-If {\bf ixyz} = 3  Read xyz from file specified in xyzname. {\bf IC} = 0  needs to be specified.\\
-{\bf xyzname}: A name of up to 16 characters must be chosen, the file is then named name.xyz (Default: cylview.dat).
+If {\bf ixyz} = 3  Read xyz from file specified in {\bf filename}. {\bf IC} = 0  needs to be specified.\\
+{\bf filename}: A name of up to 13 characters must be chosen, the file is then named filename-3D.xyz (Default: fullerene-3D.xyz).
 If {\bf IC} = 2, 3 or 4 and {\bf isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
 There are two databases, one for the general isomers ({\bf IPRC} = 2) and one for the IPR isomers ({\bf IPRC} = 1), the
 definition is similar to the {\bf IPR} parameter below (Default: 2).\\
@@ -640,7 +641,7 @@ Note only with this option together with {\bf IP} = 1 in the \&Coord input all H
 If {\bf IUPAC} = 0 the program goes into a fast subroutine and prints only the total number of Hamiltonian cycles.\\\\
 
 5) {\bf \&Isomers line}: Option for producing list of isomers and properties.\\
-\&Isomers options: {\bf IPR}, {\bf IPH}, {\bf IStop}, {\bf IChk}, {\bf chkname} (Default 0 for all options and 'checkpoint' for chkname).\\
+\&Isomers options: {\bf IPR}, {\bf IPH}, {\bf IStop}, {\bf IChk} (Default 0 for all options).\\
 If {\bf IPR} $>$ 0 then the ring-spiral subroutine of Fowler and Manolopoulus is used \cite{Atlas}.
 This sub-program catalogues fullerenes with a given number of vertices using the spiral algorithm and a uniqueness test
 based on equivalent spirals. The required input is IPR.\\
@@ -649,13 +650,13 @@ If {\bf IPR} = 2 for general isomers (note that this generates a large output an
 Also the database has all this information (see below) up to \C{100}.\\
 If {\bf IPH} = 1 then number of distinct Hamiltonian cycles is calculated for every isomer (note this is computer time extensive).\\
 If {\bf istop} = 1 program stops after calling this routine.\\
-If {\bf IChk} = 1  Restart: Isomer list is continued from previous output file called 'checkpoint' as default if not otherwise give in {\bf chkname}.
+If {\bf IChk} = 1  Restart: Isomer list is continued from previous output file called 'checkpoint' as default if not otherwise give in {\bf filename.chkpnt}.
 This is a restart option from a previous run which terminated. Note that the new output file does not contain the previous one.
 The resulting output is a catalogue of the isomers found containing their idealized point groups, canonical spirals, and NMR patterns
 \cite{Atlas}.\\\\
 
 6) {\bf \&Graph line}: Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (Schlegel diagrams).\\
-\&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, IFS, PS, Scale, ScalePPG, graphname, texname} (Default: 0 for all values except for {\bf graphname}). We recommend {\bf IG} = 1, 2, 4 or 7.\\
+\&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, IFS, PS, Scale, ScalePPG} (Default: 0 for all values). We recommend {\bf IG} = 1, 2, 4 or 7.\\
 If {\bf ISchlegel} $>$ 0 Use Program Graph2D for generating fullerene graphs.\\
 If {\bf ISchlegel} = 1: Use the perspective projection method (PSP) also called Schlegel projection.\\
 If {\bf ISchlegel} = 2: Use the cone projection method (CSP).\\
@@ -690,13 +691,11 @@ to 45 degrees if chosen larger than 89 degrees. In the case of the perspective p
 between the focal point and the ring center underneath, Note this is chosen by the program, but if nonzero this parameter has to be
 carefully chosen. The picture produced gives a good idea if {\bf PS} was correctly chosen or not. Note that the ring centers get
 an extra boost of 10\% in the scaling factors such that they appear more in the center of the rings produced by the Schlegel projection.\\
-If {\bf IFS} = 1: A tex file named {\bf texname} is produced which contains the 2D fullerene graph (Default: 0).\\
-If {\bf IFS} = 2: A data file named {\bf graphname} is produced which contains all the information 
+If {\bf IFS} = 1: A tex file named {\bf filename-2D.tex} is produced which contains the 2D fullerene graph (Default: 0).\\
+If {\bf IFS} = 2: A data file named {\bf graphname-2D.dat} is produced which contains all the information 
 for producing a 2D fullerene graph with a plotting program.\\
 If {\bf IFS} = 3: Both files are produced.\\
-If {\bf ndual} = 1: The dual graph is drawn as well in texfile{\bf texname}. (Default: 0).\\
-{\bf graphname} = name. A name of up to 16 characters must be chosen, the file is then named name.dat (Default: graph2D.dat).\\
-{\bf texname} = name. A name of up to 16 characters must be chosen, the file is then named name.tex (Default: graph2D.tex).\\
+If {\bf ndual} = 1: The dual graph is drawn as well in texfile {\bf filename-2D.tex}. (Default: 0).\\
 The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{pic:Graph2D}.
 
 %Figure 3
