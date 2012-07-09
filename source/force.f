@@ -124,16 +124,19 @@ c more auxiliary products
       aux_3y=aux_ly*aux_3
       aux_3z=aux_lz*aux_3
       aux_4=aux_1*aux_13_inv
+      aux_4x=aux_rx*aux_4
+      aux_4y=aux_ry*aux_4
+      aux_4z=aux_rz*aux_4
 c the derivations
       dax=((aux_lx-aux_mx)*aux_2-aux_3x)*den_inv
       day=((aux_ly-aux_my)*aux_2-aux_3y)*den_inv
       daz=((aux_lz-aux_mz)*aux_2-aux_3z)*den_inv
-      dbx=((aux_rx-aux_lx)*aux_2-aux_rx*aux_4+aux_3x)*den_inv
-      dby=((aux_ry-aux_ly)*aux_2-aux_ry*aux_4+aux_3y)*den_inv
-      dbz=((aux_rz-aux_lz)*aux_2-aux_rz*aux_4+aux_3z)*den_inv
-      dcx=((aux_mx-aux_rx)*aux_2-aux_3x)*den_inv
-      dcy=((aux_my-aux_ry)*aux_2-aux_3y)*den_inv
-      dcz=((aux_mz-aux_rz)*aux_2-aux_3z)*den_inv
+      dbx=((aux_rx-aux_lx)*aux_2-aux_4x+aux_3x)*den_inv
+      dby=((aux_ry-aux_ly)*aux_2-aux_4y+aux_3y)*den_inv
+      dbz=((aux_rz-aux_lz)*aux_2-aux_4z+aux_3z)*den_inv
+      dcx=((aux_mx-aux_rx)*aux_2+aux_4x)*den_inv
+      dcy=((aux_my-aux_ry)*aux_2+aux_4y)*den_inv
+      dcz=((aux_mz-aux_rz)*aux_2+aux_4z)*den_inv
       return
       END
 
@@ -1554,7 +1557,7 @@ c      write(*,*)den_inv,dax
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
       Real*8 p(nmax*3),force(ffmaxdim)
-      Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
+      Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6),iopt
       IERR=0
       rp=force(1)
       rh=force(2)
@@ -1605,11 +1608,11 @@ C     Loop over 5-rings
         JRX=J+1
         if(JLX.eq.0) JLX=5
         if(JRX.eq.6) JRX=1
-        JM=3*N5M(I,J)-2
-        JL=3*N5M(I,JLX)-2
-        JR=3*N5M(I,JRX)-2
-        call angle(p(JL),p(JL+1),p(JL+2),p(JM),p(JM+1),p(JM+2),
-     2   p(JR),p(JR+1),p(JR+2),angle_p)
+        JM=3*N5M(I,J)
+        JL=3*N5M(I,JLX)
+        JR=3*N5M(I,JRX)
+        call angle(p(JL-2),p(JL-1),p(JL),p(JM-2),p(JM-1),p(JM),
+     2   p(JR-2),p(JR-1),p(JR),angle_p)
         ehookap=ehookap+(angle_p-ap)**2
       enddo
       enddo
@@ -1623,11 +1626,11 @@ C     Loop over 6-rings
         JRX=J+1
         if(JLX.eq.0) JLX=6
         if(JRX.eq.7) JRX=1
-        JM=3*N6M(I,J)  -2
-        JL=3*N6M(I,JLX)-2
-        JR=3*N6M(I,JRX)-2
-        call angle(p(JL),p(JL+1),p(JL+2),p(JM),p(JM+1),p(JM+2),
-     2   p(JR),p(JR+1),p(JR+2),angle_h)
+        JM=3*N6M(I,J)
+        JL=3*N6M(I,JLX)
+        JR=3*N6M(I,JRX)
+        call angle(p(JL-2),p(JL-1),p(JL),p(JM-2),p(JM-1),p(JM),
+     2   p(JR-2),p(JR-1),p(JR),angle_h)
         ehookah=ehookah+(angle_h-ah)**2
       enddo
       enddo
@@ -1635,10 +1638,10 @@ C     Loop over 6-rings
 C     Coulomb repulsion from origin
       ecoulomb=0.d0
       if (iopt.eq.2 .and. fco.ne.0.d0)  then
-       Do I=1,n,3
-        rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
-        ecoulomb=ecoulomb+rinv
-       enddo
+        Do I=1,n,3
+          rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
+          ecoulomb=ecoulomb+rinv
+        enddo
       endif
 
 C     total energy  
@@ -1728,8 +1731,8 @@ C Loop over 5-rings
           JM=3*N5M(I,J)-2 ! middle
           JL=3*N5M(I,JLX)-2 ! left
           JR=3*N5M(I,JRX)-2 ! right
-          call angle(p(JL),p(JL+1),p(JL+2),p(JM),p(JM+1),p(JM+2),
-     2     p(JR),p(JR+1),p(JR+2),angle_p)
+          call angle(p(JL-2),p(JL-1),p(JL),p(JM-2),p(JM-1),p(JM),
+     2     p(JR-2),p(JR-1),p(JR),angle_p)
           ehookap=ehookap+(angle_p-ap)**2
         enddo
       enddo
@@ -1741,11 +1744,11 @@ C     Loop over 6-rings
           JRX=J+1
           if(JLX.eq.0) JLX=6
           if(JRX.eq.7) JRX=1
-          JM=3*N6M(I,J)  -2
-          JL=3*N6M(I,JLX)-2
-          JR=3*N6M(I,JRX)-2
-          call angle(p(JL),p(JL+1),p(JL+2),p(JM),p(JM+1),p(JM+2),
-     2     p(JR),p(JR+1),p(JR+2),angle_h)
+          JM=3*N6M(I,J)
+          JL=3*N6M(I,JLX)
+          JR=3*N6M(I,JRX)
+          call angle(p(JL-2),p(JL-1),p(JL),p(JM-2),p(JM-1),p(JM),
+     2     p(JR-2),p(JR-1),p(JR),angle_h)
           ehookah=ehookah+(angle_h-ah)**2
         enddo
       enddo
@@ -1823,14 +1826,14 @@ c therefore we only need to find the special vertex and dont care about the othe
           enddo
         endif
 c atoms
-        J1=neighbour_atoms(1)
-        J2=neighbour_atoms(2)
-        J3=neighbour_atoms(3)
-        J4=I
+        J1=3*neighbour_atoms(1)
+        J2=3*neighbour_atoms(2)
+        J3=3*neighbour_atoms(3)
+        J4=3*I
 c coordinates
-        call dihedral(p(J1*3-2),p(J1*3-1),p(J1*3),p(J2*3-2),p(J2*3-1),
-     2   p(J2*3),p(J3*3-2),p(J3*3-1),p(J3*3),p(J4*3-2),p(J4*3-1),
-     3   p(J4*3),angle_abcd)
+        call dihedral(p(J1-2),p(J1-1),p(J1),p(J2-2),p(J2-1),
+     2   p(J2),p(J3-2),p(J3-1),p(J3),p(J4-2),p(J4-1),
+     3   p(J4),angle_abcd)
 c        write(*,*)i,angle_abcd,"dihedral angle (in radians)"
         select case(pentagoncount)
           case(0)
@@ -1895,7 +1898,7 @@ c      write(*,*)"leaving dfunc3d"
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
       Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
-      Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
+      Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6),iopt
       rp=force(1)
       rh=force(2)
       ap=force(3)
@@ -1944,11 +1947,11 @@ C           6-ring
               zero_value=rp
               force_constant=frp
             end if
-            dE_over_dc=2.0*force_constant*(ratom-zero_value)
-            x(i)=x(i)+dax*dE_over_dc
+            dE_over_dc=force_constant*(ratom-zero_value)
+            x(i  )=x(i  )+dax*dE_over_dc
             x(i+1)=x(i+1)+day*dE_over_dc
             x(i+2)=x(i+2)+daz*dE_over_dc
-            x(j)=x(j)+dbx*dE_over_dc
+            x(j  )=x(j  )+dbx*dE_over_dc
             x(j+1)=x(j+1)+dby*dE_over_dc
             x(j+2)=x(j+2)+dbz*dE_over_dc
           endif
@@ -1957,39 +1960,39 @@ C           6-ring
         
 C     Bending
 C     Loop over 5-rings
-      Do I=1,N5
+      Do I=1,N5 !=12
         Do J=1,5
           JLX=J-1
           JRX=J+1
           if(JLX.eq.0) JLX=5
           if(JRX.eq.6) JRX=1
-          JM=3*N5M(I,J)-2
-          JL=3*N5M(I,JLX)-2
-          JR=3*N5M(I,JRX)-2
-          ax=p(JL)
-          ay=p(JL+1)
-          az=p(JL+2)
-          bx=p(JM)
-          by=p(JM+1)
-          bz=p(JM+2)
-          cx=p(JR)
-          cy=p(JR+1)
-          cz=p(JR+2)
+          JL=3*N5M(I,JLX)
+          JM=3*N5M(I,J)
+          JR=3*N5M(I,JRX)
+          ax=p(JL-2)
+          ay=p(JL-1)
+          az=p(JL)
+          bx=p(JM-2)
+          by=p(JM-1)
+          bz=p(JM)
+          cx=p(JR-2)
+          cy=p(JR-1)
+          cz=p(JR)
           call DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
      2     dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
      3     angle_abc)
           zero_value=ap
           force_constant=fap
-          dE_over_dc=2*force_constant*(angle_abc-zero_value)
-          x(JL)  =x(JL)  +dax*dE_over_dc
-          x(JL+1)=x(JL+1)+day*dE_over_dc
-          x(JL+2)=x(JL+2)+daz*dE_over_dc
-          x(JM)  =x(JM)  +dbx*dE_over_dc
-          x(JM+1)=x(JM+1)+dby*dE_over_dc
-          x(JM+2)=x(JM+2)+dbz*dE_over_dc
-          x(JR)  =x(JR)  +dcx*dE_over_dc
-          x(JR+1)=x(JR+1)+dcy*dE_over_dc
-          x(JR+2)=x(JR+2)+dcz*dE_over_dc
+          dE_over_dc=force_constant*(angle_abc-zero_value)
+          x(JL-2)=x(JL-2)+dax*dE_over_dc
+          x(JL-1)=x(JL-1)+day*dE_over_dc
+          x(JL)  =x(JL)  +daz*dE_over_dc
+          x(JM-2)=x(JM-2)+dbx*dE_over_dc
+          x(JM-1)=x(JM-1)+dby*dE_over_dc
+          x(JM)  =x(JM)  +dbz*dE_over_dc
+          x(JR-2)=x(JR-2)+dcx*dE_over_dc
+          x(JR-1)=x(JR-1)+dcy*dE_over_dc
+          x(JR)  =x(JR)  +dcz*dE_over_dc
         enddo
       enddo
       
@@ -2017,8 +2020,13 @@ C     Loop over 6-rings
      3     angle_abc)
           zero_value=ah
           force_constant=fah
-          dE_over_dc=2*force_constant*(angle_abc-zero_value)
-          x(JL-2)=x(JL-2)  +dax*dE_over_dc
+          dE_over_dc=force_constant*(angle_abc-zero_value)
+c      write(*,*)"a,z,de",angle_abc,zero_value,dE_over_dc
+c      write(*,*)"dd",dax*dE_over_dc,day*dE_over_dc,
+c     2  daz*dE_over_dc,
+c     2  dbx*dE_over_dc,dby*dE_over_dc,dbz*dE_over_dc,
+c     2  dcx*dE_over_dc,dcy*dE_over_dc,dcz*dE_over_dc
+          x(JL-2)=x(JL-2)+dax*dE_over_dc
           x(JL-1)=x(JL-1)+day*dE_over_dc
           x(JL)  =x(JL)  +daz*dE_over_dc
           x(JM-2)=x(JM-2)+dbx*dE_over_dc
@@ -2032,11 +2040,11 @@ C     Loop over 6-rings
 
 C     Coulomb repulsion from origin
       if (iopt.eq.2 .and. fco.ne.0.d0)  then
-        Do I=1,n/3
+        Do I=1,n,3
           rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
-          x(I*3-2)=x(I*3-2)-fco*rinv*p(I)
-          x(I*3-1)=x(I*3-1)-fco*rinv*p(I+1)
-          x(I*3)=x(I*3)-fco*rinv*p(I+2)
+          x(I)  =x(I)  -fco*rinv*p(I)
+          x(I+1)=x(I+1)-fco*rinv*p(I+1)
+          x(I+2)=x(I+2)-fco*rinv*p(I+2)
         enddo
       endif
 
@@ -2075,17 +2083,17 @@ c      real*8 J1x,J1y,J1z,J2x,J2y,J2z,J3x,J3y,J3z,J4x,J4y,J4z
 C     Stretching
 c we distinguish between bonds between two hexagons, two pentagons and hex/pent
 C     Stretching
-      Do I=1,n/3
-        Do J=I+1,n/3
+      Do I=1,n,3
+        Do J=I+3,n,3
 c check if bond exists
           if(A(I,J).ne.0) then
 c get coordinates
-            ax=p(i*3-2)
-            ay=p(i*3-1)
-            az=p(i*3)
-            bx=p(j*3-2)
-            by=p(j*3-1)
-            bz=p(j*3)
+            ax=p(I-2)
+            ay=p(I-1)
+            az=p(I)
+            bx=p(J-2)
+            by=p(J-1)
+            bz=p(J)
             call DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz,ratom)
 C           Check if bond is part of 5-ring
             pentagoncount=0
@@ -2093,8 +2101,8 @@ C           Check if bond is part of 5-ring
               ir1=0
               ir2=0
               do JB=1,5
-                if(I.eq.N5M(IB,JB)) ir1=1
-                if(J.eq.N5M(IB,JB)) ir2=1
+                if((I+2)/3.eq.N5M(IB,JB)) ir1=1
+                if((J+2)/3.eq.N5M(IB,JB)) ir2=1
               enddo
               if(ir1.eq.1.and.ir2.eq.1) then
                 pentagoncount=pentagoncount+1
@@ -2111,15 +2119,13 @@ C           Check if bond is part of 5-ring
               zero_value=rpp
               force_constant=frpp
             end select
-            dE_over_dc=2.0*force_constant*(ratom-zero_value)
-c            write(*,*)"i",i,"dist",dE_over_dc,force_constant,ratom,
-c     2             zero_value,ratom-zero_value
-            x(i*3-2)=x(i*3-2)+dax*dE_over_dc
-            x(i*3-1)=x(i*3-1)+day*dE_over_dc
-            x(i*3)=x(i*3)+daz*dE_over_dc
-            x(j*3-2)=x(j*3-2)+dbx*dE_over_dc
-            x(J*3-1)=x(j*3-1)+dby*dE_over_dc
-            x(j*3)=x(j*3)+dbz*dE_over_dc
+            dE_over_dc=force_constant*(ratom-zero_value)
+            x(I-2)=x(I-2)+dax*dE_over_dc
+            x(I-1)=x(I-1)+day*dE_over_dc
+            x(I)  =x(I)  +daz*dE_over_dc
+            x(J-2)=x(J-2)+dbx*dE_over_dc
+            x(J-1)=x(J-1)+dby*dE_over_dc
+            x(J)  =x(J)  +dbz*dE_over_dc
           endif
         enddo
       enddo
@@ -2133,36 +2139,34 @@ C     Loop over 5-rings
           JRX=J+1
           if(JLX.eq.0) JLX=5
           if(JRX.eq.6) JRX=1
-          JL=3*N5M(I,JLX)-2
-          JM=3*N5M(I,J)-2
-          JR=3*N5M(I,JRX)-2
-          ax=p(JL)
-          ay=p(JL+1)
-          az=p(JL+2)
-          bx=p(JM)
-          by=p(JM+1)
-          bz=p(JM+2)
-          cx=p(JR)
-          cy=p(JR+1)
-          cz=p(JR+2)
+          JL=3*N5M(I,JLX)
+          JM=3*N5M(I,J)
+          JR=3*N5M(I,JRX)
+          ax=p(JL-2)
+          ay=p(JL-1)
+          az=p(JL)
+          bx=p(JM-2)
+          by=p(JM-1)
+          bz=p(JM)
+          cx=p(JR-2)
+          cy=p(JR-1)
+          cz=p(JR)
           call DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
      2     dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
      3     angle_abc)
-          call angle(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
+c          call angle(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
           zero_value=ap
           force_constant=fap
-          dE_over_dc=2*force_constant*(angle_abc-zero_value)
-c          write(*,*)"i",i,"5a",dE_over_dc,force_constant,angle_abc,
-c     2              zero_value,angle_abc-zero_value
-          x(JL)  =x(JL)  +dax*dE_over_dc
-          x(JL+1)=x(JL+1)+day*dE_over_dc
-          x(JL+2)=x(JL+2)+daz*dE_over_dc
-          x(JM)  =x(JM)  +dbx*dE_over_dc
-          x(JM+1)=x(JM+1)+dby*dE_over_dc
-          x(JM+2)=x(JM+2)+dbz*dE_over_dc
-          x(JR)  =x(JR)  +dcx*dE_over_dc
-          x(JR+1)=x(JR+1)+dcy*dE_over_dc
-          x(JR+2)=x(JR+2)+dcz*dE_over_dc
+          dE_over_dc=force_constant*(angle_abc-zero_value)
+          x(JL-2)=x(JL-2)+dax*dE_over_dc
+          x(JL-1)=x(JL-1)+day*dE_over_dc
+          x(JL)  =x(JL)  +daz*dE_over_dc
+          x(JM-2)=x(JM-2)+dbx*dE_over_dc
+          x(JM-1)=x(JM+1)+dby*dE_over_dc
+          x(JM)  =x(JM)  +dbz*dE_over_dc
+          x(JR-2)=x(JR-2)+dcx*dE_over_dc
+          x(JR-1)=x(JR-1)+dcy*dE_over_dc
+          x(JR)  =x(JR)  +dcz*dE_over_dc
         enddo
       enddo
       
@@ -2173,35 +2177,33 @@ C     Loop over 6-rings
           JRX=J+1
           if(JLX.eq.0) JLX=6
           if(JRX.eq.7) JRX=1
-          JM=3*N6M(I,J)-2
-          JL=3*N6M(I,JLX)-2
-          JR=3*N6M(I,JRX)-2
-          ax=p(JL)
-          ay=p(JL+1)
-          az=p(JL+2)
-          bx=p(JM)
-          by=p(JM+1)
-          bz=p(JM+2)
-          cx=p(JR)
-          cy=p(JR+1)
-          cz=p(JR+2)
+          JL=3*N6M(I,JLX)
+          JM=3*N6M(I,J)
+          JR=3*N6M(I,JRX)
+          ax=p(JL-2)
+          ay=p(JL-1)
+          az=p(JL)
+          bx=p(JM-2)
+          by=p(JM-1)
+          bz=p(JM)
+          cx=p(JR-2)
+          cy=p(JR-1)
+          cz=p(JR)
           call DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
      2     dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
      3     angle_abc)
           zero_value=ah
           force_constant=fah
-          dE_over_dc=2*force_constant*(angle_abc-zero_value)
-c          write(*,*)"i",i,"6a",dE_over_dc,force_constant,angle_abc,
-c     2            zero_value,angle_abc-zero_value
-          x(JL)  =x(JL)  +dax*dE_over_dc
-          x(JL+1)=x(JL+1)+day*dE_over_dc
-          x(JL+2)=x(JL+2)+daz*dE_over_dc
-          x(JM)  =x(JM)  +dbx*dE_over_dc
-          x(JM+1)=x(JM+1)+dby*dE_over_dc
-          x(JM+2)=x(JM+2)+dbz*dE_over_dc
-          x(JR)  =x(JR)  +dcx*dE_over_dc
-          x(JR+1)=x(JR+1)+dcy*dE_over_dc
-          x(JR+2)=x(JR+2)+dcz*dE_over_dc
+          dE_over_dc=force_constant*(angle_abc-zero_value)
+          x(JL-2)=x(JL-2)+dax*dE_over_dc
+          x(JL-1)=x(JL-1)+day*dE_over_dc
+          x(JL)  =x(JL)  +daz*dE_over_dc
+          x(JM-2)=x(JM-2)+dbx*dE_over_dc
+          x(JM-1)=x(JM-1)+dby*dE_over_dc
+          x(JM)  =x(JM)  +dbz*dE_over_dc
+          x(JR-2)=x(JR-2)+dcx*dE_over_dc
+          x(JR-1)=x(JR-1)+dcy*dE_over_dc
+          x(JR)  =x(JR)  +dcz*dE_over_dc
         enddo
       enddo
 
@@ -2273,24 +2275,24 @@ c therefore we only need to find the special vertex and dont care about the othe
           enddo
         endif
 c atoms
-        J1=neighbour_atoms(1)
-        J2=neighbour_atoms(2)
-        J3=neighbour_atoms(3)
-        J4=I
+        J1=3*neighbour_atoms(1)
+        J2=3*neighbour_atoms(2)
+        J3=3*neighbour_atoms(3)
+        J4=3*I
 c        write(*,*)j1,j2,j3,j4
 c coordinates
-        ax=p(J1*3-2)
-        ay=p(J1*3-1)
-        az=p(J1*3)
-        bx=p(J2*3-2)
-        by=p(J2*3-1)
-        bz=p(J2*3)
-        cx=p(J3*3-2)
-        cy=p(J3*3-1)
-        cz=p(J3*3)
-        dx=p(J4*3-2)
-        dy=p(J4*3-1)
-        dz=p(J4*3)
+        ax=p(J1-2)
+        ay=p(J1-1)
+        az=p(J1)
+        bx=p(J2-2)
+        by=p(J2-1)
+        bz=p(J2)
+        cx=p(J3-2)
+        cy=p(J3-1)
+        cz=p(J3)
+        dx=p(J4-2)
+        dy=p(J4-1)
+        dz=p(J4)
         call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
      2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
         call dihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,angle_abcd)
@@ -2311,23 +2313,22 @@ c coordinates
             zero_value=dppp
             force_constant=fdppp
         end select
-        dE_over_dc=2*force_constant*(angle_abcd-zero_value)
-c        write(*,*)"i",i,"dh",dE_over_dc,force_constant,
-c     2      angle_abcd,zero_value,angle_abcd-zero_value
+        dE_over_dc=force_constant*(angle_abcd-zero_value)
 c derivations of the energy with respect the x,y,z of each of the four atoms
-        x(J1*3-2)=x(J1*3-2)+dax*dE_over_dc
-        x(J1*3-1)=x(J1*3-1)+day*dE_over_dc
-        x(J1*3  )=x(J1*3  )+daz*dE_over_dc
-        x(J2*3-2)=x(J2*3-2)+dbx*dE_over_dc
-        x(J2*3-1)=x(J2*3-1)+dby*dE_over_dc
-        x(J2*3  )=x(J2*3  )+dbz*dE_over_dc
-        x(J3*3-2)=x(J3*3-2)+dcx*dE_over_dc
-        x(J3*3-1)=x(J3*3-1)+dcy*dE_over_dc
-        x(J3*3  )=x(J3*3  )+dcz*dE_over_dc
-        x(J4*3-2)=x(J4*3-2)+ddx*dE_over_dc
-        x(J4*3-1)=x(J4*3-1)+ddy*dE_over_dc
-        x(J4*3  )=x(J4*3  )+ddz*dE_over_dc
+        x(J1-2)=x(J1-2)+dax*dE_over_dc
+        x(J1-1)=x(J1-1)+day*dE_over_dc
+        x(J1  )=x(J1  )+daz*dE_over_dc
+        x(J2-2)=x(J2-2)+dbx*dE_over_dc
+        x(J2-1)=x(J2-1)+dby*dE_over_dc
+        x(J2  )=x(J2  )+dbz*dE_over_dc
+        x(J3-2)=x(J3-2)+dcx*dE_over_dc
+        x(J3-1)=x(J3-1)+dcy*dE_over_dc
+        x(J3  )=x(J3  )+dcz*dE_over_dc
+        x(J4-2)=x(J4-2)+ddx*dE_over_dc
+        x(J4-1)=x(J4-1)+ddy*dE_over_dc
+        x(J4  )=x(J4  )+ddz*dE_over_dc
       enddo
 c      write(*,*)"d,0: ",angle_abcd,zero_value," (should be similar)"
       return
       END
+c      write(*,*)"da: ",dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc

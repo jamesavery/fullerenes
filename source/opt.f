@@ -433,7 +433,7 @@ C     Optimize
       Write(IOUT,1000) Rdist
       select case(iopt)
       case(1)
-        Write(Iout,1003) (force(i),i=1,9),ftol
+        Write(Iout,1006) (force(i),i=1,8),ftol
       case(2)
         Write(Iout,1003) (force(i),i=1,9),ftol
       case(3)
@@ -467,6 +467,7 @@ C     Optimize
  1004 Format(' Coulomb repulsion from center of origin with force ',
      1 F12.6,/)
  1005 Format(' Force field parameters: ',18F12.6,', Tolerance= ',D9.3,/)
+ 1006 Format(' Force field parameters: ',8F12.6,', Tolerance= ',D9.3,/)
      
       Return 
       END

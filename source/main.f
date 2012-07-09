@@ -252,14 +252,11 @@ c a stone wales (or any other transformation) is done
             Write(Iout,1003)
             CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1        N5MEM,N6MEM,Dist,Rdist,ftol,force,iopt)
-c            Do i=1,ffmaxdim ! reset force field to default
-c              force(i)=forceP(i)
-c            enddo
           endif
+          iopt=1
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring, ! vanilla Wu
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
           Iprint=0
-c          force(9)=fcoulomb ! not used anywhere?
         else if(Iopt.eq.3) then ! extended Wu, 18 parameters
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
