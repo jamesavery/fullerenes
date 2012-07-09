@@ -46,8 +46,6 @@ test-%: tests/%.cc build/libgraph.a
 
 output/%.out: input/%.inp
 	./fullerene < $< > $@
-	cp -f cylview.xyz $@.xyz
-	cp -f qmga.dat $@.dat
 
 tests: fullerene $(TESTOUT)
 

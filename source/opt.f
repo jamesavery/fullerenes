@@ -389,12 +389,13 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION IDA(NMAX,NMAX)
       DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6)
       real(8) force(ffmaxdim)
+      integer iopt
 c      IOP=1
       deg2rad=dpi/180.d0
       dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
-      if(iopt.eq.1 .or. iopt.eq.2) then
-        force(1)=force(1)
-        force(2)=force(2)
+      if(iopt.eq.1 .or. iopt.eq.2)then
+c        force(1)=force(1)
+c        force(2)=force(2)
 C       Conversion of angles in rad
         force(3)=force(3)*deg2rad
         force(4)=force(4)*deg2rad
@@ -404,11 +405,11 @@ C       Conversion of dyn/cm in a.u. / Angstroem**2
         force(7)=force(7)*dynpercm2auperaa
         force(8)=force(8)*dynpercm2auperaa
 C       Leave parameter for Coulomb force as it is
-        force(9)=force(9)
-      else if (iopt.eq.3)then
-        force(1)=force(1)
-        force(2)=force(2)
-        force(3)=force(3)
+c        force(9)=force(9)
+      else if (iopt.eq.3) then
+c        force(1)=force(1)
+c        force(2)=force(2)
+c        force(3)=force(3)
 C       Conversion of angles and dihedrals in rad
         force(4)=force(4)*deg2rad
         force(5)=force(5)*deg2rad
@@ -430,7 +431,14 @@ C       Conversion of dyn/cm in a.u. / Angstroem**2
       M=Matom/2+2
 C     Optimize
       Write(IOUT,1000) Rdist
-      Write(Iout,1003) (force(i),i=1,9),ftol
+      select case(iopt)
+      case(1)
+        Write(Iout,1003) (force(i),i=1,9),ftol
+      case(2)
+        Write(Iout,1003) (force(i),i=1,9),ftol
+      case(3)
+        Write(Iout,1005) (force(i),i=1,18),ftol
+      end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
       CALL frprmn3d(MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
      1 Dist,force,iopt,ftol,iter,fret)
@@ -458,6 +466,7 @@ C     Optimize
  1003 Format(' Force field parameters: ',9F12.6,', Tolerance= ',D9.3,/)
  1004 Format(' Coulomb repulsion from center of origin with force ',
      1 F12.6,/)
+ 1005 Format(' Force field parameters: ',18F12.6,', Tolerance= ',D9.3,/)
      
       Return 
       END

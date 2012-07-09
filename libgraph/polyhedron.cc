@@ -296,5 +296,56 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
   // cerr << "P = " << *this << endl;
 }
 
+coord3d Polyhedron::width_height_depth() const {
+  double xmin=INFINITY,xmax=-INFINITY,ymin=INFINITY,ymax=-INFINITY,zmin=INFINITY,zmax=-INFINITY;
+  for(node_t u=0;u<N;u++){
+    const coord3d& x(points[u]);
+    if(x[0]<xmin) xmin = x[0];
+    if(x[0]>xmax) xmax = x[0];
+    if(x[1]<ymin) ymin = x[1];
+    if(x[1]>ymax) ymax = x[1];
+    if(x[2]<zmin) zmin = x[2];
+    if(x[2]>zmax) zmax = x[2];
+  }
+  return coord3d(xmax-xmin,ymax-ymin,zmax-zmin);
+}
+
+
+string Polyhedron::to_povray(double w_cm, double h_cm, 
+		   int line_colour, int vertex_colour, int face_colour,
+		   double line_width, double vertex_diameter, double face_opacity) const 
+{
+  coord3d whd(width_height_depth());
+  double xscale = w_cm/whd[0];
+
+  ostringstream s;
+  s << "#declare facecolour=color rgb <"<<((face_colour>>16)&0xff)/256.<<","<<((face_colour>>8)&0xff)/256.<<","<<(face_colour&0xff)/256.<<">;\n";
+  s << "#declare faceopacity="<<face_opacity<<";\n";
+
+  s << PlanarGraph(*this).to_povray(w_cm,h_cm,line_colour,vertex_colour,line_width,vertex_diameter);
+  s << "#declare layout3D=array["<<N<<"][3]{"; for(int i=0;i<N;i++) s<<(points[i]*xscale)<<(i+1<N?",":"}\n\n"); 
+  s << "#declare faces   =array["<<faces.size()<<"]["<<(face_max+1)<<"]{"; 
+  for(int i=0;i<faces.size();i++) {
+    const face_t& f(faces[i]);
+    s << "{";
+    for(int j=0;j<f.size();j++) s << f[j] << ",";
+    for(int j=f.size();j<face_max;j++) s << "-1,";
+    s << "-1}" << (i+1<faces.size()? ",":"}\n\n");
+  }
+  s << "#declare facelength=array["<<faces.size()<<"]{";for(int i=0;i<faces.size();i++) s<< faces[i].size() << (i+1<faces.size()?",":"}\n\n");
+
+  vector<tri_t>   tris(centroid_triangulation(faces));
+  vector<coord3d> centroid_points(points.begin(),points.end());
+  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
+
+  s << "#declare tris = array["<<tris.size()<<"][3]{";
+  for(int i=0;i<tris.size();i++) s <<  "{" << tris[i][0] << "," << tris[i][1] << "," << tris[i][2] << "}" << (i+1<tris.size()?",":"}\n\n");
+
+  s << "#declare cpoints=array["<<centroid_points.size()<<"][3]{"; 
+  for(int i=0;i<centroid_points.size();i++) s<<(centroid_points[i]*xscale)<<(i+1<centroid_points.size()?",\n":"}\n\n"); 
+
+  return s.str();
+}
+
 
 double Polyhedron::C20_points[20][3] = {{-1.376381920471174,0,0.2628655560595668},{1.376381920471174,0,-0.2628655560595668},{-0.4253254041760200,-1.309016994374947,0.2628655560595668},{-0.4253254041760200,1.309016994374947,0.2628655560595668},{1.113516364411607,-0.8090169943749474,0.2628655560595668},{1.113516364411607,0.8090169943749474,0.2628655560595668},{-0.2628655560595668,-0.8090169943749474,1.113516364411607},{-0.2628655560595668,0.8090169943749474,1.113516364411607},{-0.6881909602355868,-0.5000000000000000,-1.113516364411607},{-0.6881909602355868,0.5000000000000000,-1.113516364411607},{0.6881909602355868,-0.5000000000000000,1.113516364411607},{0.6881909602355868,0.5000000000000000,1.113516364411607},{0.8506508083520399,0,-1.113516364411607},{-1.113516364411607,-0.8090169943749474,-0.2628655560595668},{-1.113516364411607,0.8090169943749474,-0.2628655560595668},{-0.8506508083520399,0,1.113516364411607},{0.2628655560595668,-0.8090169943749474,-1.113516364411607},{0.2628655560595668,0.8090169943749474,-1.113516364411607},{0.4253254041760200,-1.309016994374947,-0.2628655560595668},{0.4253254041760200,1.309016994374947,-0.2628655560595668}};

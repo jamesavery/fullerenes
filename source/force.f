@@ -1,6 +1,6 @@
       SUBROUTINE func3d(n,IERR,A,N5,N6,N5M,N6M,p,fc,force,iopt)
-      use config
 c n=MATOM*3
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
 
@@ -10,7 +10,6 @@ c n=MATOM*3
         case(2)
           CALL wu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force,iopt)
         case(3)
-          write(*,*)"entering extwu"
           CALL extwu(n,IERR,A,N5,N6,N5M,N6M,p,fc,force)
       end select
 
@@ -27,17 +26,19 @@ c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
 
 
 c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivations of the distance
-      SUBROUTINE DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz)
+      SUBROUTINE DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz,
+     2  dist_ab)
       implicit real*8 (a-z)
-      dist_ab_inv=1/dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
+      dist_ab=dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
+      dist_ab_inv=1/dist_ab
       aux_1=ax-bx
       aux_2=ay-by
       aux_3=az-bz
       dax=aux_1*dist_ab_inv
-      day=-dax
-      daz=aux_2*dist_ab_inv
-      dbx=-day
-      dby=aux_3*dist_ab_inv
+      dbx=-dax
+      day=aux_2*dist_ab_inv
+      dby=-day
+      daz=aux_3*dist_ab_inv
       dbz=-daz
       return
       END  
@@ -73,48 +74,66 @@ c      r2L=aux_ax**2 + aux_ay**2 + aux_az**2
 c      r1L=dsqrt(r2L)
 c      r2R=aux_bx**2 + aux_by**2 + aux_bz**2
 c      r1R=dsqrt(r2R)
-c      aux=aux_ax*aux_bx + aux_ay*aux_by + aux_az*aux_bz
+c      aux=dabs(aux_ax*aux_bx + aux_ay*aux_by + aux_az*aux_bz)
 c      angle_abc=dacos(aux/(r1l*r1r))
 c      return
 c      END
 
 
 c subroutine dangle takes 9 reals (=3 coordinates) and yields all 9 first derivations of the angle
+c via law of cosines (calculating the derivative of Abs[foo] is rather troublesome)
       SUBROUTINE DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
-     2 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz)
+     2 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
+     3 angle_abc)
       implicit real*8 (a-z)
-c vectors from a to b and b to c
+c vectors from a to b and b to c and a to c
       aux_lx=ax-bx
       aux_ly=ay-by
       aux_lz=az-bz
       aux_rx=bx-cx
       aux_ry=by-cy
       aux_rz=bz-cz
+      aux_mx=ax-cx
+      aux_my=ay-cy
+      aux_mz=az-cz
 c length of a-b and b-c
       r2L=aux_lx**2 + aux_ly**2 + aux_lz**2
       r2R=aux_rx**2 + aux_ry**2 + aux_rz**2
-      r1L=dsqrt(r2l)
+      r2M=aux_mx**2 + aux_my**2 + aux_mz**2
+      r1L=dsqrt(r2L)
       r1R=dsqrt(r2R)
-      r3L=r2l*r1l
-      r3R=r2r*r1r
+      r1M=dsqrt(r2M)
+      r3L=r2L*r1L
+      r3R=r2R*r1R
+      r3M=r2M*r1M
 c some auxiliary products
-      l_dot_r=aux_lx*aux_rx + aux_ly*aux_ry + aux_lz*aux_rz
-      aux_1_inv=1/dsqrt(r1L*r1R)
-      aux_2_inv=1/dsqrt(r3L*r1R)
-      aux_3_inv=1/dsqrt(r1L*r3R)
-      den_inv=1/dsqrt(1-(l_dot_r**2)*aux_1_inv**2)
-      aux_4=l_dot_r*aux_2_inv
-      aux_5=l_dot_r*aux_3_inv
+      aux_11_inv=1/(2*r1L*r1R)
+      aux_31_inv=1/(2*r3L*r1R)
+      aux_13_inv=1/(2*r1L*r3R)
+      aux_1=r2L + r2R - r2M
+      arccos_arg=aux_1*aux_11_inv
+c the actual angle, because it will always be required
+      angle_abc=dacos(arccos_arg)
+c not sure which is faster
+      den_inv=-1/dsqrt(1-arccos_arg**2)
+c      den_inv=-1/dabs(dsin(angle_abc))              
+c more auxiliary products
+      aux_2=2*aux_11_inv
+      aux_3=aux_1*aux_31_inv
+      aux_3x=aux_lx*aux_3
+      aux_3y=aux_ly*aux_3
+      aux_3z=aux_lz*aux_3
+      aux_4=aux_1*aux_13_inv
 c the derivations
-      dax=(-aux_rx*aux_1_inv + aux_lx*aux_4)*den_inv
-      day=(-aux_ry*aux_1_inv + aux_ly*aux_4)*den_inv
-      daz=(-aux_rz*aux_1_inv + aux_lz*aux_4)*den_inv
-      dbx=(aux_rx*aux_5-(aux_lx-aux_rx)*aux_1_inv-aux_lx*aux_4)*den_inv
-      dby=(aux_ry*aux_5-(aux_ly-aux_ry)*aux_1_inv-aux_ly*aux_4)*den_inv
-      dbz=(aux_rz*aux_5-(aux_lz-aux_rz)*aux_1_inv-aux_lz*aux_4)*den_inv
-      dcx=(aux_lx*aux_1_inv - aux_rx*aux_5)*den_inv
-      dcy=(aux_ly*aux_1_inv - aux_ry*aux_5)*den_inv
-      dcz=(aux_lz*aux_1_inv - aux_rz*aux_5)*den_inv
+      dax=((aux_lx-aux_mx)*aux_2-aux_3x)*den_inv
+      day=((aux_ly-aux_my)*aux_2-aux_3y)*den_inv
+      daz=((aux_lz-aux_mz)*aux_2-aux_3z)*den_inv
+      dbx=((aux_rx-aux_lx)*aux_2-aux_rx*aux_4+aux_3x)*den_inv
+      dby=((aux_ry-aux_ly)*aux_2-aux_ry*aux_4+aux_3y)*den_inv
+      dbz=((aux_rz-aux_lz)*aux_2-aux_rz*aux_4+aux_3z)*den_inv
+      dcx=((aux_mx-aux_rx)*aux_2-aux_3x)*den_inv
+      dcy=((aux_my-aux_ry)*aux_2-aux_3y)*den_inv
+      dcz=((aux_mz-aux_rz)*aux_2-aux_3z)*den_inv
       return
       END
 
@@ -124,12 +143,18 @@ c subroutine dist takes 12 reals (=4 coordinates) and yields an angel between -\
      2 dihedral_abcd)
       IMPLICIT REAL*8 (a-z)
 c normal vectors on abc and bcd
-      abc_x=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
-      abc_y= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
-      abc_z=-ay*bx+ax*by+ay*cx-by*cx-ax*cy+bx*cy
-      bcd_x=-bz*cy+by*cz+bz*dy-cz*dy-by*dz+cy*dz
-      bcd_y= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
-      bcd_z=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy
+c      abc_x=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
+      abc_x=(cy-by)*az+(ay-cy)*bz+(by-ay)*cz
+c      abc_y= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
+      abc_y=(bx-cx)*az+(cx-ax)*bz+(ax-bx)*cz
+c      abc_z=-ay*bx+ax*by+ay*cx-by*cx-ax*cy+bx*cy
+      abc_z=(cx-bx)*ay+(ax-cx)*by+(bx-ax)*cy
+c      bcd_x=-bz*cy+by*cz+bz*dy-cz*dy-by*dz+cy*dz
+      bcd_x=(dy-cy)*bz+(by-dy)*cz+(cy-by)*dz
+c      bcd_y= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
+      bcd_y=(cx-dx)*bz+(dx-bx)*cz+(bx-cx)*dz
+c      bcd_z=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy
+      bcd_z=(cy-dy)*bx+(dy-by)*cx+(by-cy)*dx
 c their respective lengths
       abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
       bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
@@ -1544,7 +1569,7 @@ C     and bending, energy
 C     Stretching
       ehookrp=0.d0
       ehookrh=0.d0
-      Do I=1,n,3
+      Do I=1,n,3! iterate over half the adjacency mtx
         I1=(I+2)/3
         Do J=I+3,n,3
           J1=(J+2)/3
@@ -1802,7 +1827,6 @@ c atoms
         J2=neighbour_atoms(2)
         J3=neighbour_atoms(3)
         J4=I
-c        write(*,*)j1,j2,j3,j4,"atoms of dihedral"
 c coordinates
         call dihedral(p(J1*3-2),p(J1*3-1),p(J1*3),p(J2*3-2),p(J2*3-1),
      2   p(J2*3),p(J3*3-2),p(J3*3-1),p(J3*3),p(J4*3-2),p(J4*3-1),
@@ -1822,7 +1846,6 @@ c        write(*,*)i,angle_abcd,"dihedral angle (in radians)"
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
         increment=(angle_abcd-zero_value)**2
-c        write(*,*)i,angle_abcd*57.29,zero_value*57.29,"dihedral angle"
         select case(pentagoncount)
           case(0)
             ehookdhhh=ehookdhhh+increment
@@ -1851,14 +1874,13 @@ c      write(*,*)fc,"energy"
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
 c      write(*,*)"entering dfunc3d"
-
+      
       select case(iopt)
         case(1)
           CALL dwu(n,A,N5,N6,N5M,N6M,p,x,force,iopt)
         case(2)
           CALL dwu(n,A,N5,N6,N5M,N6M,p,x,force,iopt)
         case(3)
-          write(*,*)"entering dextwu"
           CALL dextwu(n,A,N5,N6,N5M,N6M,p,x,force)
       end select
 
@@ -1889,15 +1911,18 @@ C     Stretching
         ehooky=0.d0
         ehookz=0.d0
         I1=(I+2)/3
-        Do J=1,n,3
+        Do J=I+3,n,3
           J1=(J+2)/3
           if(A(I1,J1).ne.0) then
-            px=p(i)-p(j)
-            py=p(i+1)-p(j+1)
-            pz=p(i+2)-p(j+2)
-            ratom=dsqrt(px**2 + py**2 + pz**2)
-            ratominv=1.d0/ratom
+            ax=p(i)
+            ay=p(i+1)
+            az=p(i+2)
+            bx=p(j)
+            by=p(j+1)
+            bz=p(j+2)
+            call DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz,ratom)
 C           Check if bond is part of 5-ring
+            pentagoncount=0
             do IB=1,12
               ir1=0
               ir2=0
@@ -1907,152 +1932,112 @@ C           Check if bond is part of 5-ring
               enddo
               if(ir1.eq.1.and.ir2.eq.1) then
 C               5-ring
-                fac=frp*ratominv*(ratom-rp)
-                ehookx=ehookx+fac*px
-                ehooky=ehooky+fac*py
-                ehookz=ehookz+fac*pz
+                pentagoncount=pentagoncount+1
                 go to 1
               endif
             enddo
 C           6-ring
-            fac=frh*ratominv*(ratom-rh)
-            ehookx=ehookx+fac*px
-            ehooky=ehooky+fac*py
-            ehookz=ehookz+fac*pz
+ 1          if (pentagoncount.eq.0)then
+              zero_value=rh
+              force_constant=frh
+            else
+              zero_value=rp
+              force_constant=frp
+            end if
+            dE_over_dc=2.0*force_constant*(ratom-zero_value)
+            x(i)=x(i)+dax*dE_over_dc
+            x(i+1)=x(i+1)+day*dE_over_dc
+            x(i+2)=x(i+2)+daz*dE_over_dc
+            x(j)=x(j)+dbx*dE_over_dc
+            x(j+1)=x(j+1)+dby*dE_over_dc
+            x(j+2)=x(j+2)+dbz*dE_over_dc
           endif
-  1       continue
         enddo
-        x(I)  =2.d0*ehookx
-        x(I+1)=2.d0*ehooky
-        x(I+2)=2.d0*ehookz
       enddo
         
 C     Bending
 C     Loop over 5-rings
       Do I=1,N5
-      Do J=1,5
-        JLX=J-1
-        JRX=J+1
-        if(JLX.eq.0) JLX=5
-        if(JRX.eq.6) JRX=1
-        JM=3*N5M(I,J)-2
-        JL=3*N5M(I,JLX)-2
-        JR=3*N5M(I,JRX)-2
-         pxL=p(JM)  -p(JL)
-         pyL=p(JM+1)-p(JL+1)
-         pzL=p(JM+2)-p(JL+2)
-        r2L=pxL*pxL+pyL*pyL+pzL*pzL
-        r1L=dsqrt(r2L)
-        r3L=r1L*r2L
-         pxR=p(JM)  -p(JR)
-         pyR=p(JM+1)-p(JR+1)
-         pzR=p(JM+2)-p(JR+2)
-        r2R=pxR*pxR+pyR*pyR+pzR*pzR
-        r1R=dsqrt(r2R)
-        r3R=r1R*r2R
-         pxM=p(JL)  -p(JR)
-         pyM=p(JL+1)-p(JR+1)
-         pzM=p(JL+2)-p(JR+2)
-        r2M=pxM*pxM+pyM*pyM+pzM*pzM
-        r1M=dsqrt(r2M)
-        r3M=r1M*r2M
-         cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
-         if(cosarg.gt.1.d0) cosarg=1.d0
-         if(cosarg.lt.-1.d0) cosarg=-1.d0
-         anglep=dacos(cosarg)
-         anglesin=dabs(dsin(anglep))
-         fac=fap*(anglep-ap)/anglesin
-C     Derivative of central atom
-         fac1=fac/(r3R*r3L)
-         r2RL=r2R-r2L
-         r2LR=-r2RL
-         fac2=r2RL-r2M
-         fac3=r2LR-r2M
-         fac4=r2R*fac2
-         fac5=r2L*fac3
-        x(JM)  =x(JM)  +fac1*(pxL*fac4+pxR*fac5)
-        x(JM+1)=x(JM+1)+fac1*(pyL*fac4+pyR*fac5)
-        x(JM+2)=x(JM+2)+fac1*(pzL*fac4+pzR*fac5)
-C     Derivative of left atom
-         fac6=-fac/(r3L*r1R)
-        x(JL)  =x(JL)  +fac6*(pxL*fac3-2.d0*pxM*r2L)
-        x(JL+1)=x(JL+1)+fac6*(pyL*fac3-2.d0*pyM*r2L)
-        x(JL+2)=x(JL+2)+fac6*(pzL*fac3-2.d0*pzM*r2L)
-C     Derivative of right atom
-         fac7=-fac/(r3R*r1L)
-        x(JR)  =x(JR)  +fac7*(pxR*fac2+2.d0*pxM*r2R)
-        x(JR+1)=x(JR+1)+fac7*(pyR*fac2+2.d0*pyM*r2R)
-        x(JR+2)=x(JR+2)+fac7*(pzR*fac2+2.d0*pzM*r2R)
-      enddo
+        Do J=1,5
+          JLX=J-1
+          JRX=J+1
+          if(JLX.eq.0) JLX=5
+          if(JRX.eq.6) JRX=1
+          JM=3*N5M(I,J)-2
+          JL=3*N5M(I,JLX)-2
+          JR=3*N5M(I,JRX)-2
+          ax=p(JL)
+          ay=p(JL+1)
+          az=p(JL+2)
+          bx=p(JM)
+          by=p(JM+1)
+          bz=p(JM+2)
+          cx=p(JR)
+          cy=p(JR+1)
+          cz=p(JR+2)
+          call DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
+     2     dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
+     3     angle_abc)
+          zero_value=ap
+          force_constant=fap
+          dE_over_dc=2*force_constant*(angle_abc-zero_value)
+          x(JL)  =x(JL)  +dax*dE_over_dc
+          x(JL+1)=x(JL+1)+day*dE_over_dc
+          x(JL+2)=x(JL+2)+daz*dE_over_dc
+          x(JM)  =x(JM)  +dbx*dE_over_dc
+          x(JM+1)=x(JM+1)+dby*dE_over_dc
+          x(JM+2)=x(JM+2)+dbz*dE_over_dc
+          x(JR)  =x(JR)  +dcx*dE_over_dc
+          x(JR+1)=x(JR+1)+dcy*dE_over_dc
+          x(JR+2)=x(JR+2)+dcz*dE_over_dc
+        enddo
       enddo
       
 C     Loop over 6-rings
-      if(N6.eq.0) return
       Do I=1,N6
-      Do J=1,6
-        JLX=J-1
-        JRX=J+1
-        if(JLX.eq.0) JLX=6
-        if(JRX.eq.7) JRX=1
-        JM=3*N6M(I,J)-2
-        JL=3*N6M(I,JLX)-2
-        JR=3*N6M(I,JRX)-2
-         pxL=p(JM)  -p(JL)
-         pyL=p(JM+1)-p(JL+1)
-         pzL=p(JM+2)-p(JL+2)
-        r2L=pxL*pxL+pyL*pyL+pzL*pzL
-        r1L=dsqrt(r2L)
-        r3L=r1L*r2L
-         pxR=p(JM)  -p(JR)
-         pyR=p(JM+1)-p(JR+1)
-         pzR=p(JM+2)-p(JR+2)
-        r2R=pxR*pxR+pyR*pyR+pzR*pzR
-        r1R=dsqrt(r2R)
-        r3R=r1R*r2R
-         pxM=p(JL)  -p(JR)
-         pyM=p(JL+1)-p(JR+1)
-         pzM=p(JL+2)-p(JR+2)
-        r2M=pxM*pxM+pyM*pyM+pzM*pzM
-        r1M=dsqrt(r2M)
-        r3M=r1M*r2M
-         cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
-         if(cosarg.gt.1.d0) cosarg=1.d0
-         if(cosarg.lt.-1.d0) cosarg=-1.d0
-         angleh=dacos(cosarg)
-         anglesin=dabs(dsin(angleh))
-         fac=fah*(angleh-ah)/anglesin
-C     Derivative of central atom
-         fac1=fac/(r3R*r3L)
-         r2RL=r2R-r2L
-         r2LR=-r2RL
-        fac2=r2RL-r2M
-        fac3=r2LR-r2M
-        fac4=r2R*fac2
-        fac5=r2L*fac3
-        x(JM)  =x(JM)  +fac1*(pxL*fac4+pxR*fac5)
-        x(JM+1)=x(JM+1)+fac1*(pyL*fac4+pyR*fac5)
-        x(JM+2)=x(JM+2)+fac1*(pzL*fac4+pzR*fac5)
-C     Derivative of left atom
-         fac6=-fac/(r3L*r1R)
-        x(JL)  =x(JL)  +fac6*(pxL*fac3-2.d0*pxM*r2L)
-        x(JL+1)=x(JL+1)+fac6*(pyL*fac3-2.d0*pyM*r2L)
-        x(JL+2)=x(JL+2)+fac6*(pzL*fac3-2.d0*pzM*r2L)
-C     Derivative of right atom
-         fac7=-fac/(r3R*r1L)
-        x(JR)  =x(JR)  +fac7*(pxR*fac2+2.d0*pxM*r2R)
-        x(JR+1)=x(JR+1)+fac7*(pyR*fac2+2.d0*pyM*r2R)
-        x(JR+2)=x(JR+2)+fac7*(pzR*fac2+2.d0*pzM*r2R)
-      enddo
+        Do J=1,6
+          JLX=J-1
+          JRX=J+1
+          if(JLX.eq.0) JLX=6
+          if(JRX.eq.7) JRX=1
+          JL=3*N6M(I,JLX)
+          JM=3*N6M(I,J)
+          JR=3*N6M(I,JRX)
+          ax=p(JL-2)
+          ay=p(JL-1)
+          az=p(JL)
+          bx=p(JM-2)
+          by=p(JM-1)
+          bz=p(JM)
+          cx=p(JR-2)
+          cy=p(JR-1)
+          cz=p(JR)
+          call DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
+     2     dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
+     3     angle_abc)
+          zero_value=ah
+          force_constant=fah
+          dE_over_dc=2*force_constant*(angle_abc-zero_value)
+          x(JL-2)=x(JL-2)  +dax*dE_over_dc
+          x(JL-1)=x(JL-1)+day*dE_over_dc
+          x(JL)  =x(JL)  +daz*dE_over_dc
+          x(JM-2)=x(JM-2)+dbx*dE_over_dc
+          x(JM-1)=x(JM-1)+dby*dE_over_dc
+          x(JM)  =x(JM)  +dbz*dE_over_dc
+          x(JR-2)=x(JR-2)+dcx*dE_over_dc
+          x(JR-1)=x(JR-1)+dcy*dE_over_dc
+          x(JR)  =x(JR)  +dcz*dE_over_dc
+        enddo
       enddo
 
 C     Coulomb repulsion from origin
       if (iopt.eq.2 .and. fco.ne.0.d0)  then
-       Do I=1,n/3
-        rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
-        x(I*3-2)=x(I*3-2)-fco*rinv*p(I)
-        x(I*3-1)=x(I*3-1)-fco*rinv*p(I+1)
-        x(I*3)=x(I*3)-fco*rinv*p(I+2)
-       enddo
+        Do I=1,n/3
+          rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
+          x(I*3-2)=x(I*3-2)-fco*rinv*p(I)
+          x(I*3-1)=x(I*3-1)-fco*rinv*p(I+1)
+          x(I*3)=x(I*3)-fco*rinv*p(I+2)
+        enddo
       endif
 
       return
@@ -2067,7 +2052,7 @@ C     Coulomb repulsion from origin
 c      real*8 J1x,J1y,J1z,J2x,J2y,J2z,J3x,J3y,J3z,J4x,J4y,J4z
       Integer A(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6),pentagoncount,
      2 hexagoncount,arbitrary_index,neighbour_atoms(3),
-     3 neighbour_faces_h(3),neighbour_faces_p(3)
+     3 neighbour_faces_h(3),neighbour_faces_p(3),buffer
       rpp=force(1)
       rhp=force(2)
       rhh=force(3)
@@ -2089,117 +2074,97 @@ c      real*8 J1x,J1y,J1z,J2x,J2y,J2z,J3x,J3y,J3z,J4x,J4y,J4z
 
 C     Stretching
 c we distinguish between bonds between two hexagons, two pentagons and hex/pent
-      Do I=1,n,3
-        ehookx=0.d0
-        ehooky=0.d0
-        ehookz=0.d0
-        I1=(I+2)/3
-        Do J=1,n,3
-          J1=(J+2)/3
-          if(A(I1,J1).ne.0) then
-            px=p(I)-p(J)
-            py=p(I+1)-p(J+1)
-            pz=p(I+2)-p(J+2)
-            ratom=dsqrt(px*px+py*py+pz*pz)
-            ratominv=1.d0/ratom
+C     Stretching
+      Do I=1,n/3
+        Do J=I+1,n/3
+c check if bond exists
+          if(A(I,J).ne.0) then
+c get coordinates
+            ax=p(i*3-2)
+            ay=p(i*3-1)
+            az=p(i*3)
+            bx=p(j*3-2)
+            by=p(j*3-1)
+            bz=p(j*3)
+            call DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz,ratom)
 C           Check if bond is part of 5-ring
             pentagoncount=0
-            do IB=1,12! number of pentagons
+            do IB=1,12
               ir1=0
               ir2=0
-              do JB=1,5!number of atoms per pentagons
-                if(I1.eq.N5M(IB,JB)) ir1=1 !
-                if(J1.eq.N5M(IB,JB)) ir2=1 ! if I1 and J2 happen to be in the same pentagon
+              do JB=1,5
+                if(I.eq.N5M(IB,JB)) ir1=1
+                if(J.eq.N5M(IB,JB)) ir2=1
               enddo
-              if(ir1.eq.1 .and. ir2.eq.1) then
+              if(ir1.eq.1.and.ir2.eq.1) then
                 pentagoncount=pentagoncount+1
               endif
             enddo
-            if(pentagoncount.eq.0) then
-C             6-ring, 6-ring
-              fac=frhh*ratominv*(ratom-rhh)
-            else if(pentagoncount.eq.1) then
-C             5-ring, 6-ring
-              fac=frhp*ratominv*(ratom-rhp)
-            else
-C             5-ring, 5-ring
-              fac=frpp*ratominv*(ratom-rpp)
-            endif
-            ehookx=ehookx+fac*px! add up forces on a single atom, in x, y, z
-            ehooky=ehooky+fac*py
-            ehookz=ehookz+fac*pz
-C           Check if bond is part of 5-ring
+            select case(pentagoncount)
+            case(0)
+              zero_value=rhh
+              force_constant=frhh
+            case(1)
+              zero_value=rhp
+              force_constant=frhp
+            case(2)
+              zero_value=rpp
+              force_constant=frpp
+            end select
+            dE_over_dc=2.0*force_constant*(ratom-zero_value)
+c            write(*,*)"i",i,"dist",dE_over_dc,force_constant,ratom,
+c     2             zero_value,ratom-zero_value
+            x(i*3-2)=x(i*3-2)+dax*dE_over_dc
+            x(i*3-1)=x(i*3-1)+day*dE_over_dc
+            x(i*3)=x(i*3)+daz*dE_over_dc
+            x(j*3-2)=x(j*3-2)+dbx*dE_over_dc
+            x(J*3-1)=x(j*3-1)+dby*dE_over_dc
+            x(j*3)=x(j*3)+dbz*dE_over_dc
           endif
         enddo
-        x(I)  =2.d0*ehookx
-        x(I+1)=2.d0*ehooky
-        x(I+2)=2.d0*ehookz
       enddo
-c      write(*,*)x,"displacement after dists"
 
-C     Bending
-      Do I=1,N5 ! Loop over 5-rings (and N5 == 12)
-        Do J=1,5 ! loop over atoms in pentagon
+
+C     Bending        
+C     Loop over 5-rings
+      Do I=1,N5 !and n5==12
+        Do J=1,5
           JLX=J-1
           JRX=J+1
           if(JLX.eq.0) JLX=5
           if(JRX.eq.6) JRX=1
-          JM=3*N5M(I,J)-2! position of x coordinate of middle atom in p
           JL=3*N5M(I,JLX)-2
+          JM=3*N5M(I,J)-2
           JR=3*N5M(I,JRX)-2
-c left bond
-           pxL=p(JM)  -p(JL)
-           pyL=p(JM+1)-p(JL+1)
-           pzL=p(JM+2)-p(JL+2)
-          r2L=pxL*pxL+pyL*pyL+pzL*pzL
-          r1L=dsqrt(r2L)
-          r3L=r1L*r2L
-c right bond
-           pxR=p(JM)  -p(JR)
-           pyR=p(JM+1)-p(JR+1)
-           pzR=p(JM+2)-p(JR+2)
-          r2R=pxR*pxR+pyR*pyR+pzR*pzR
-          r1R=dsqrt(r2R)
-          r3R=r1R*r2R
-c no bond
-           pxM=p(JL)  -p(JR)
-           pyM=p(JL+1)-p(JR+1)
-           pzM=p(JL+2)-p(JR+2)
-          r2M=pxM*pxM+pyM*pyM+pzM*pzM
-          r1M=dsqrt(r2M)
-          r3M=r1M*r2M
-c law of cosines
-          cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
-          if(cosarg.gt.1.d0) cosarg=1.d0
-          if(cosarg.lt.-1.d0) cosarg=-1.d0
-          anglep=dacos(cosarg)
-c          write(*,*)anglep,"pentagon angle"
-          anglesin=dabs(dsin(anglep))
-          fac=fap*(anglep-ap)/anglesin
-C     Derivative of central atom
-           fac1=fac/(r3R*r3L)
-           r2RL=r2R-r2L
-           r2LR=-r2RL
-           fac2=r2RL-r2M
-           fac3=r2LR-r2M
-           fac4=r2R*fac2
-           fac5=r2L*fac3
-          x(JM)  =x(JM)  +fac1*(pxL*fac4+pxR*fac5)
-          x(JM+1)=x(JM+1)+fac1*(pyL*fac4+pyR*fac5)
-          x(JM+2)=x(JM+2)+fac1*(pzL*fac4+pzR*fac5)
-C Derivative of left atom
-           fac6=-fac/(r3L*r1R)
-          x(JL)  =x(JL)  +fac6*(pxL*fac3-2.d0*pxM*r2L)
-          x(JL+1)=x(JL+1)+fac6*(pyL*fac3-2.d0*pyM*r2L)
-          x(JL+2)=x(JL+2)+fac6*(pzL*fac3-2.d0*pzM*r2L)
-C Derivative of right atom
-           fac7=-fac/(r3R*r1L)
-          x(JR)  =x(JR)  +fac7*(pxR*fac2+2.d0*pxM*r2R)
-          x(JR+1)=x(JR+1)+fac7*(pyR*fac2+2.d0*pyM*r2R)
-          x(JR+2)=x(JR+2)+fac7*(pzR*fac2+2.d0*pzM*r2R)
+          ax=p(JL)
+          ay=p(JL+1)
+          az=p(JL+2)
+          bx=p(JM)
+          by=p(JM+1)
+          bz=p(JM+2)
+          cx=p(JR)
+          cy=p(JR+1)
+          cz=p(JR+2)
+          call DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
+     2     dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
+     3     angle_abc)
+          call angle(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
+          zero_value=ap
+          force_constant=fap
+          dE_over_dc=2*force_constant*(angle_abc-zero_value)
+c          write(*,*)"i",i,"5a",dE_over_dc,force_constant,angle_abc,
+c     2              zero_value,angle_abc-zero_value
+          x(JL)  =x(JL)  +dax*dE_over_dc
+          x(JL+1)=x(JL+1)+day*dE_over_dc
+          x(JL+2)=x(JL+2)+daz*dE_over_dc
+          x(JM)  =x(JM)  +dbx*dE_over_dc
+          x(JM+1)=x(JM+1)+dby*dE_over_dc
+          x(JM+2)=x(JM+2)+dbz*dE_over_dc
+          x(JR)  =x(JR)  +dcx*dE_over_dc
+          x(JR+1)=x(JR+1)+dcy*dE_over_dc
+          x(JR+2)=x(JR+2)+dcz*dE_over_dc
         enddo
       enddo
-      write(*,*)"stretches done"
       
 C     Loop over 6-rings
       Do I=1,N6
@@ -2211,55 +2176,34 @@ C     Loop over 6-rings
           JM=3*N6M(I,J)-2
           JL=3*N6M(I,JLX)-2
           JR=3*N6M(I,JRX)-2
-           pxL=p(JM)  -p(JL)
-           pyL=p(JM+1)-p(JL+1)
-           pzL=p(JM+2)-p(JL+2)
-          r2L=pxL*pxL+pyL*pyL+pzL*pzL
-          r1L=dsqrt(r2L)
-          r3L=r1L*r2L
-           pxR=p(JM)  -p(JR)
-           pyR=p(JM+1)-p(JR+1)
-           pzR=p(JM+2)-p(JR+2)
-          r2R=pxR*pxR+pyR*pyR+pzR*pzR
-          r1R=dsqrt(r2R)
-          r3R=r1R*r2R
-           pxM=p(JL)  -p(JR)
-           pyM=p(JL+1)-p(JR+1)
-           pzM=p(JL+2)-p(JR+2)
-          r2M=pxM*pxM+pyM*pyM+pzM*pzM
-          r1M=dsqrt(r2M)
-          r3M=r1M*r2M
-           cosarg=.5d0*(r2L+r2R-r2M)/(r1L*r1R)
-           if(cosarg.gt.1.d0) cosarg=1.d0
-           if(cosarg.lt.-1.d0) cosarg=-1.d0
-           angleh=dacos(cosarg)! angle in hexagon
-c          write(*,*)angleh,"hexagon angle"
-           anglesin=dabs(dsin(angleh)) ! sine of the angle
-           fac=fah*(angleh-ah)/anglesin
-C     Derivative of central atom
-           fac1=fac/(r3R*r3L)
-           r2RL=r2R-r2L
-           r2LR=-r2RL
-           fac2=r2RL-r2M
-           fac3=r2LR-r2M
-           fac4=r2R*fac2
-           fac5=r2L*fac3
-          x(JM)  =x(JM)  +fac1*(pxL*fac4+pxR*fac5)
-          x(JM+1)=x(JM+1)+fac1*(pyL*fac4+pyR*fac5)
-          x(JM+2)=x(JM+2)+fac1*(pzL*fac4+pzR*fac5)
-C       Derivative of left atom
-           fac6=-fac/(r3L*r1R)
-          x(JL)  =x(JL)  +fac6*(pxL*fac3-2.d0*pxM*r2L)
-          x(JL+1)=x(JL+1)+fac6*(pyL*fac3-2.d0*pyM*r2L)
-          x(JL+2)=x(JL+2)+fac6*(pzL*fac3-2.d0*pzM*r2L)
-C       Derivative of right atom
-           fac7=-fac/(r3R*r1L)
-          x(JR)  =x(JR)  +fac7*(pxR*fac2+2.d0*pxM*r2R)
-          x(JR+1)=x(JR+1)+fac7*(pyR*fac2+2.d0*pyM*r2R)
-          x(JR+2)=x(JR+2)+fac7*(pzR*fac2+2.d0*pzM*r2R)
+          ax=p(JL)
+          ay=p(JL+1)
+          az=p(JL+2)
+          bx=p(JM)
+          by=p(JM+1)
+          bz=p(JM+2)
+          cx=p(JR)
+          cy=p(JR+1)
+          cz=p(JR+2)
+          call DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
+     2     dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
+     3     angle_abc)
+          zero_value=ah
+          force_constant=fah
+          dE_over_dc=2*force_constant*(angle_abc-zero_value)
+c          write(*,*)"i",i,"6a",dE_over_dc,force_constant,angle_abc,
+c     2            zero_value,angle_abc-zero_value
+          x(JL)  =x(JL)  +dax*dE_over_dc
+          x(JL+1)=x(JL+1)+day*dE_over_dc
+          x(JL+2)=x(JL+2)+daz*dE_over_dc
+          x(JM)  =x(JM)  +dbx*dE_over_dc
+          x(JM+1)=x(JM+1)+dby*dE_over_dc
+          x(JM+2)=x(JM+2)+dbz*dE_over_dc
+          x(JR)  =x(JR)  +dcx*dE_over_dc
+          x(JR+1)=x(JR+1)+dcy*dE_over_dc
+          x(JR+2)=x(JR+2)+dcz*dE_over_dc
         enddo
       enddo
-      write(*,*)"angles done"
 
 C dihedrals 
       Do I=1,n/3 ! iterate over atoms
@@ -2311,8 +2255,7 @@ c therefore we only need to find the special vertex and dont care about the othe
               neighbour_atoms(1)=buffer
             endif
           enddo
-        endif
-        if(pentagoncount.eq.2) then
+        else if(pentagoncount.eq.2) then
           do k=1,3 ! iterate over neighbour atoms
             arbitrary_index=0
             do l=1,pentagoncount ! iterate over neighbour pentagons
@@ -2348,45 +2291,43 @@ c coordinates
         dx=p(J4*3-2)
         dy=p(J4*3-1)
         dz=p(J4*3)
-      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
-     2  dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
-      call dihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,angle_abcd)
-c        if(fac_AC .ge. dpi) fac_AC=fac_AC-2*dpi
-c        fac_ac=dabs(fac_ac)
-c        write(*,*)"ac",fac_ac
-        select case(pentagoncount)
-          case(0)
-          zero_value=dhhh
-          force_constant=fdhhh
-          case(1)
-          zero_value=dhhp
-          force_constant=fdhhp
-          case(2)
-          zero_value=dhpp
-          force_constant=fdhpp
-          case(3)
-          zero_value=dppp
-          force_constant=fdppp
-        end select
+        call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
+        call dihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+        select case(pentagoncount)
+          case(0)
+            zero_value=dhhh
+            force_constant=fdhhh
+          case(1)
+            zero_value=dhhp
+            force_constant=fdhhp
+          case(2)
+            zero_value=dhpp
+            force_constant=fdhpp
+          case(3)
+            zero_value=dppp
+            force_constant=fdppp
+        end select
         dE_over_dc=2*force_constant*(angle_abcd-zero_value)
+c        write(*,*)"i",i,"dh",dE_over_dc,force_constant,
+c     2      angle_abcd,zero_value,angle_abcd-zero_value
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(J1*3-2)=x(J1*3-2)+dax*dE_over_dc
         x(J1*3-1)=x(J1*3-1)+day*dE_over_dc
-        x(J1*3)=x(J1*3)+daz*dE_over_dc
+        x(J1*3  )=x(J1*3  )+daz*dE_over_dc
         x(J2*3-2)=x(J2*3-2)+dbx*dE_over_dc
         x(J2*3-1)=x(J2*3-1)+dby*dE_over_dc
-        x(J2*3)=x(J2*3)+dbz*dE_over_dc
+        x(J2*3  )=x(J2*3  )+dbz*dE_over_dc
         x(J3*3-2)=x(J3*3-2)+dcx*dE_over_dc
         x(J3*3-1)=x(J3*3-1)+dcy*dE_over_dc
-        x(J3*3)=x(J3*3)+dcz*dE_over_dc
+        x(J3*3  )=x(J3*3  )+dcz*dE_over_dc
         x(J4*3-2)=x(J4*3-2)+ddx*dE_over_dc
         x(J4*3-1)=x(J4*3-1)+ddy*dE_over_dc
-        x(J4*3)=x(J4*3)+ddz*dE_over_dc
+        x(J4*3  )=x(J4*3  )+ddz*dE_over_dc
       enddo
-      write(*,*)"d,0: ",angle_abcd,zero_value," (should be similar)"
-      write(*,*)"dihedrals done"
+c      write(*,*)"d,0: ",angle_abcd,zero_value," (should be similar)"
       return
       END

@@ -43,7 +43,7 @@ CubicGraph::CubicGraph(FILE *file = stdin){
 	   
 	   neighbours[n] = vector<node_t>(ns,ns+3);
 	 } else {
-	   //	   fprintf(stderr,"Skipped line %d\n",l++);
+	   //	   fprintf(stderr,"Skipped line: %s\n",line);
 	 }
        }
     }

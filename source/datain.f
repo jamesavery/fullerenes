@@ -1,7 +1,7 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
      1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,GCtrans,iupac,
      1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
-     1 ilp,IYF,IWS,nzeile,PS,TolX,R5,R6,Rdist,scale,scalePPG,
+     1 ilp,IYF,IWS,nzeile,ifs,ndual,PS,TolX,R5,R6,Rdist,scale,scalePPG,
      1 ftol,force,forceP,xyzname,chkname,graphname,texname,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -9,25 +9,27 @@
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF and default FF.  force and forceP (=permanent) are equal if there are no input parameters
       integer endzeile
       Character*1 DATEN(nzeile)
+      Character filename*13
       Character xyzname*20
       Character texname*20
       Character graphname*20
       Character chkname*20
       Character blank*1
-      Character xyz*4
-      Character dat*4
-      Character tex*4
+      Character xyz*7
+      Character dat*7
+      Character tex*7
+      Character chk*7
       Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,GCtrans,ihueckel,ISW,KE,loop,mirror,
-     1 IYF,IWS,xyzname,texname
+     1 IYF,IWS,filename
       Namelist /FFChoice/ Iopt,ftol
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
      1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
       Namelist /Hamilton/ IHam,iupac
-      Namelist /Isomers/ IPR,IPH,IStop,IChk,chkname
-      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,PS,scale,scalePPG,
-     1 graphname
+      Namelist /Isomers/ IPR,IPH,IStop,IChk
+      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,ifs,ndual,PS,scale,
+     1 scalePPG
 C Input send to output
       if(ilp.eq.0) then   
         WRITE(IOUT,100)
@@ -53,9 +55,9 @@ C Defining the Wu force field (default values)
       WuR5=1.455d0! in angstoem
       WuR6=1.391d0
       WuA5=1.08d2! in deg
-      WuA6=1.2d2
-      WufR=1.d6
-      WufA=1.d5
+      WuA6=1.20d2
+      WufR=1.0d6
+      WufA=1.0d5
       fcoulomb=0.d0
 
 C Defining an extension of the Wu force field (default values)
@@ -65,10 +67,10 @@ c     three distances: zero values
       ExtWuR66=1.391d0
 c     two angles: zero values
       ExtWuA5=1.08d2
-      ExtWuA6=1.2d2
+      ExtWuA6=1.20d2
 c     four dihedrals: zero values (all guessed)
       ExtWuDppp=4.0d1
-      ExtWuDhpp=4.0d1
+      ExtWuDhpp=3.5d1
       ExtWuDhhp=2.4d1
       ExtWuDhhh=0.0d0
 c     three distances: forces (let's assume they are all the same)
@@ -76,59 +78,68 @@ c     three distances: forces (let's assume they are all the same)
 c     three angles: forces (let's assume they are all the same)
       ExtWufA=1.0d5
 c     four dihedrals: forces (let's assume they are all the same)
-      ExtWufD=1.0d3
+      ExtWufD=5.0d4
 
 C more default parameters
       blank=' '
-      xyz='.xyz'
-      dat='.dat'
-      tex='.tex'
-      xyzname='cylview'
-      graphname='graph2D'
-      chkname='checkpoint'
-      IOpt=0    !  No (force field) optimization
-      IHam=0    !  Number of Hamiltonian cycles
-      mirror=0  !  Invert coordinates
-      loop=0    !  Option for compound job
-      KE=0      !  Endo-Kroto C2 insertion
-      ichk=0    !  Option for restarting the isomer list
-      IWS=0     !  Option for Wirz-Schwerdtfeger transformation
-      ISW=0     !  Option for Stone-Wales transformation
-      IYF=0     !  Option for Yoshido-Fowler transformation
-      iupac=1   !  Switch for producing the Iupac nomenclature
-                !  iupac=0 just count Hamiltonian Cycles
-      Ipent=0   !  Initial flag for Spriral pentagon input
-      leap=0    !  Initial flag for leapfrog fullerene
+      chk='.chkpnt'
+      dat='-2D.dat'
+      tex='-2D.tex'
+      xyz='-3D.xyz'
+      filename= 'Fullerene'
+      chkname=  'Fullerene.chkpnt'
+      graphname='Fullerene-2D.dat'
+      texname=  'Fullerene-2D.tex'
+      xyzname=  'Fullerene-3D.xyz'
+
+C Integers
       GCtrans=0 !  Initial flag for Goldberg-Coxeter transformed fullerene
+      IC=1      !  Input for fullerene structure
+      ichk=0    !  Option for restarting the isomer list
       IER=0     !  Error flag
-      Tol=0.33d0 ! Tolerance
-      IP=0      !  Print option
+      ifs=0     !  Option for .dat and .tex files
+      iham=0    !  Number of Hamiltonian cycles
+      iFS=0     !  Option for producing files for 2D fullerene graphs
       Ihueckel=1 !  Option for diagonalizing the Hueckel matrix
-      kGC=0     !  First Goldberg-Coxeter index
-      lGC=0     !  second Goldberg-Coxeter index
+      iopt=0    !  No (force field) optimization
+      Ipent=0   !  Initial flag for Spriral pentagon input
+      IP=0      !  Print option
+      IPH=0     !  Print Hamiltonian cycles for each isomer
       IPR=-1    !  Print Isomers
       IPRC=0    !  Option for isomer list
-      IPH=0     !  Print Hamiltonian cycles for each isomer
-      NA=60     !  Number of Atoms
-      IC=1      !  Input for fullerene structure
       isonum=0  !  Isomer number in database
-      iupac=0   !  Print IUPAC numbers
-      IV1=2     !  Eigenvector option for fullerene construction
-      IV2=3     !  Eigenvector option for fullerene construction
-      IV3=4     !  Eigenvector option for fullerene construction
-      istop=0   !  Option for stopping after isomer list
-      ixyz=0    !  Option for producing input for ploting program CYLVIEW
+      ISchlegel=0 !  For graph production, option for type of graph
       ISO1=0    !  Option for fullerene orientation for Schlegel projection
       ISO2=0    !  Option for fullerene orientation for Schlegel projection
       ISO3=0    !  Option for fullerene orientation for Schlegel projection
-      PS=0.d0   !  For graph production, angle input for Schlegel diagram
-      ISchlegel=0 !  For graph production, option for type of graph
-      scale=2.5d0 !  For graph production, scale Tutte graph
-      scalePPG=1.d0 !  For graph production exponential factor in Plestenjak alg.
-      TolR=0.d0 !  Tolerance for finding ring connections
-      R=1.391d0 !  
-      R5=1.455d0 ! Distance in 5-Ring
-      R6=R       ! Distance in 6-Ring
+      istop=0   !  Option for stopping after isomer list
+      iupac=0   !  Switch for producing the Iupac nomenclature
+      ISW=0     !  Option for Stone-Wales transformation
+      IWS=0     !  Option for Wirz-Schwerdtfeger transformation
+      IYF=0     !  Option for Yoshido-Fowler transformation
+      IV1=2     !  Eigenvector option for fullerene construction
+      IV2=3     !  Eigenvector option for fullerene construction
+      IV3=4     !  Eigenvector option for fullerene construction
+      ixyz=0    !  Option for producing input for ploting program CYLVIEW
+      KE=0      !  Endo-Kroto C2 insertion
+      kGC=0     !  First Goldberg-Coxeter index
+      lGC=0     !  second Goldberg-Coxeter index
+      leap=0    !  Initial flag for leapfrog fullerene
+      loop=0    !  Option for compound job
+      mirror=0  !  Invert coordinates
+      ndual=0   !  Option for plotting dual graph as well
+                !  iupac=0 just count Hamiltonian Cycles
+      NA=60     !  Number of Atoms
+
+C Reals
+      Tol=0.33d0    ! Tolerance
+      PS=0.d0       ! For graph production, angle input for Schlegel diagram
+      scale=2.5d0   ! For graph production, scale Tutte graph
+      scalePPG=1.d0 ! For graph production exponential factor in Plestenjak alg.
+      TolR=0.d0     ! Tolerance for finding ring connections
+      R=1.391d0     ! C-C distance 
+      R5=1.455d0    ! Distance in 5-Ring
+      R6=R          ! Distance in 6-Ring
 
 C Now process namelist input
       READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
@@ -138,8 +149,17 @@ C Now process namelist input
       enddo
       WRITE(IOUT,60) (DATEN(j),j=1,endzeile)
       WRITE(IOUT,101)
+C Read Namelist
       Read(IN,nml=Coord,Err=99,end=99)
       Read(IN,nml=FFChoice,Err=99,end=99)
+      Read(IN,nml=FFParameters,Err=99,end=99)
+      Read(IN,nml=Hamilton,Err=99,end=99)
+      Read(IN,nml=Isomers,Err=99,end=99)
+      Read(IN,nml=Graph,Err=99,end=99)
+
+C Set more parameters
+
+C Set Parameters for force field
 c set forceP (default parameters)[needs to be done after iopt and before opt is read]
       if(iopt.eq.1 .or. iopt.eq.2)then
 C Wu force field
@@ -173,18 +193,9 @@ C ExtWu forceP field
         forceP(17)=ExtWufD
         forceP(18)=ExtWufD
       endif
-      Read(IN,nml=FFParameters,Err=99,end=99)
-      Read(IN,nml=Hamilton,Err=99,end=99)
-      Read(IN,nml=Isomers,Err=99,end=99)
-      Read(IN,nml=Graph,Err=99,end=99)
-
-C Set Parameters
-   99 if(IC.lt.0) IC=0
-      if(IC.gt.5) IC=5
-      if(ichk.ne.0) istop=1
 
 c set force (custom parameters)
-      if(iopt.eq.1 .or. iopt.eq.2)then
+   99 if(iopt.eq.1 .or. iopt.eq.2)then
 C Wu force field
         force(1)=WuR5
         force(2)=WuR6
@@ -217,56 +228,26 @@ C ExtWu force field
         force(18)=ExtWufD
       endif
 
-C  Filename for CYLVIEW
+C Set IC and ichk parameters
+      if(IC.lt.0) IC=0
+      if(IC.gt.5) IC=5
+      if(ichk.ne.0) istop=1
+
+C  Filenames for external files
       do I=2,20
-       if(xyzname(I:I).eq.blank) then
+       if(filename(I:I).eq.blank) then
         npos=I-1
         go to 12
        endif
       enddo
-  12  ia=npos-3
+  12  ia=npos-7
       if(ia.gt.0) then
-       if(xyzname(ia:npos).eq.xyz) then
-        npos=npos-4
-        if(npos.le.0) xyzname='cylview'
-       endif
+       if(npos.gt.13) npos=13
+       xyzname=filename(1:npos)//xyz    !  Option for naming file for 3D plotting program
+       chkname=filename(1:npos)//chk    !  Option for naming checkpoint file
+       texname=filename(1:npos)//tex    !  Option for naming checkpoint file
+       graphname=filename(1:npos)//dat  !  Option for naming checkpoint file
       endif
-      if(npos.gt.16) npos=16
-      xyzname=xyzname(1:npos)//xyz  !  Option for naming file for cylview program
-
-C  Filename for GRAPH2D
-      do I=2,20
-       if(graphname(I:I).eq.blank) then
-        npos=I-1
-        go to 13
-       endif
-      enddo
-  13  ia=npos-3
-      if(ia.gt.0) then
-       if(graphname(ia:npos).eq.dat) then
-        npos=npos-4
-        if(npos.le.0) graphname='graph2D'
-       endif
-      endif
-      if(npos.gt.16) npos=16
-      graphname=graphname(1:npos)//dat  !  Option for naming file for cylview program
-
-C  Filename for GRAPH2D
-      do I=2,20
-       if(texname(I:I).eq.blank) then
-        npos=I-1
-        go to 14
-       endif
-      enddo
-  14  ia=npos-3
-      if(ia.gt.0) then
-       if(texname(ia:npos).eq.dat) then
-        npos=npos-4
-        if(npos.le.0) graphname='graph2D'
-       endif
-      endif
-      if(npos.gt.16) npos=16
-      graphname=graphname(1:npos)//dat  !  Option for naming file for cylview program
 
 C  Check on number of atoms (vertices)
       NA=IABS(NA)

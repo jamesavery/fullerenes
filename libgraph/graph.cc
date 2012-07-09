@@ -262,7 +262,7 @@ void Graph::update_auxiliaries()
 void Graph::update_from_neighbours() 
 {
   edge_set.clear();
-  for(node_t u=0;u<N;u++)
+  for(node_t u=0;u<neighbours.size();u++)
     for(unsigned int i=0;i<neighbours[u].size();i++)
       edge_set.insert(edge_t(u,neighbours[u][i]));
   update_auxiliaries();

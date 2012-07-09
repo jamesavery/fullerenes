@@ -76,7 +76,7 @@ applications in chemistry}, Croatica Chemica Acta {\bf 68}, 283-292 (1995).\\
 11) J. Bondy and U. Murty, {\it Graph Theory} (Springer, Berlin, 2008).\\
 12) A. J. M. Wilson, {\it Graphs and Applications. An Introductory Approach} (Springer, Berlin, 2000).\\
 13) J. Cioslowski, N. Rao, and D. Moncrieff, {\it Standard Enthalpies of Formation of Fullerenes and Their
-Dependence on Structural Motifs}, J. Am. Chem. Soc. {\bf 122}, 8265Ð8270 (2000).\\\\
+Dependence on Structural Motifs}, J. Am. Chem. Soc. {\bf 122}, 8265-8270 (2000).\\\\
      
 {\bf Acknowledgement}\\\\
 PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support 
@@ -181,9 +181,10 @@ The input is in {\it Namelist format} if not otherwise stated.
 Important steps in the program are given in the flow diagram below and are
 explained in some detail in this section. More information can be obtained in an up-coming review article \cite{PSJA}.\\
 
+%Figure 1
  \begin{figure}[htbp]
    	\begin{center}
-%  		\includegraphics[width=1.0\textwidth]{flowdiagram.png} \\
+%  		\includegraphics[width=1.0\textwidth]{tree.pdf} \\
                  \label{pic:flowdiagram}
         \caption{Flow diagram for main program tasks}
    	\end{center}
@@ -240,7 +241,7 @@ obtained from the natural sequence of canonical RSPIs to distinguish between the
 general isomer number can be taken and the RSPIs for a specific isomer up to \C{100} can be read-in from the database provided. 
 The numbering scheme for IPR isomers only ($N_{isomers}^{IPR}= 1, ..., n_{max}$) can also be used up to \C{120}, see input file {\it database.inp}.
 
-\subsection{H\"uckel analysis}
+\subsection{H\"uckel analysis and topological indicators}
 From the adjacency matrix $A_{ij}$ a H\"uckel analysis is performed (Subroutine {\bf Hueckel}). This gives you a good hint if the 
 fullerene is open or closed shell \cite{Atlas}. Note that for fullerenes the H\"uckel analysis may not be very reliable 
 as hybridization with the C(2s) orbitals occurs due to non-planarity. Hence the $\sigma-\pi$ separation breaks down
@@ -256,6 +257,8 @@ agreement with DFT Kohn-Sham orbital energies. The fullerene might also Jahn-Tel
 ground state instead of one of a higher multiplicity as this is the case for \C{20}. Such electronic effects are not
 captured in this program, and one needs to perform a proper quantum theoretical calculation. The program gives information
 on the HOMO-LUMO gap and calculates the topological resonance energy from Babi\'c's matching polynomial calculations \cite{Babic1995,Babic1997}.
+There are several other topological indicators of which the Estrada index and mean topological distance, and the Wiener index and hyper Wiener
+index are pronted out. For details see a book on graph theory.
 
 \subsection{The Goldberg-Coxeter transformation}
 In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \C{n} can be performed if required from input
@@ -323,18 +326,28 @@ Endo-Kroto 2-vertex insertions (subroutine {\bf EndoKrotoTrans} \cite{Endo92}, Y
 and 6-vertex ($D_{3h}$ 666555) insertions (subroutine {\bf YoshidaFowler6}) \cite{Yoshida97}, or the a WS 6-vertex (6-55-55) insertion 
 we developed, see input files {\it c50EK.inp, c60SW.inp, c80YF.inp}. 
 The non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with these vertex insertion methods, see input files {\it c380.inp} 
-and {\it c384.inp}.
+and {\it c384.inp}. The two structures obtained with the program PYMOL are shown in Figure \ref{pic:C380andC384}.
+
+%Figure 2
+ \begin{figure}[htbp]
+   	\begin{center}
+  		\includegraphics[width=0.3\textwidth]{C380.png}
+		\includegraphics[width=0.4\textwidth]{C384.png}
+         \label{pic:C380andC384}
+        \caption{Optimized force-field structures of \C{380} (left) and \C{384} (right).}
+   	\end{center}
+ \end{figure}
 
 Subroutine {\bf SpiralSearch}) uses ring-spiral algorithm of Fowler and Manolopoulus for the search of a ring spiral if, for the input,
 cartesian coordinates were chosen or the initial fullerene structure was modified. 
-It produces the canonical ring spiral pentagon indices if the fullerene is spiral.
-A general ring-spiral algorithm is currently in preparation.
+It produces the canonical ring spiral pentagon indices if the fullerene is spiral and fails if it is non-spiral (as for the two examples shown in 
+Figure \ref{pic:C380andC384}. A general ring-spiral algorithm is currently in preparation.
 
 \subsection{Volume and surface area, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
 The volume and surface area of the fullerene is calculated in Subroutine {\bf Volume}. This is done by\\
 1) The convex hull.\\
 2) The normal vector algorithm resulting in the exact volume of the polyhedron (identical to convex hull if polyhedron is convex).\\
-3) The tesselation into trigonal pyramides from the barycenter by summing over all
+3) The tesselation into trigonal pyramids from the barycenter by summing over all
 tetrahedrons spanned by the three vectors (identical to algorithm 1 and 2 if
 polyhedron is convex). Here one sums over all tetrahedrons spanned by the three vectors CM-CR (barycenter of fullerene to the ring center),
 CM-CA1 (barycenter of fullerene to atom 1 in ring), and CM-CA2 (barycenter of fullerene  to atom 2 in ring).
@@ -501,24 +514,25 @@ In the following, the input in the required sequence is described in detail (eit
 
 2) {\bf \&Coord line}: Input to create cartesian coordinates and main flags for the program (e.g. \&Coord IC=20, IOPT=1, R6=1.42 /).\\
 {\it List of options:}\\ 
-{\bf NA, IC, IV1, IV2, IV3, ixyz, xyzname, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, loop, mirror, IP, IPRC, TolR, R5, R6}\\
+{\bf NA, IC, IV1, IV2, IV3, ixyz, filename, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, loop, mirror, IP, IPRC, TolR, R5, R6}\\
 {\bf NA} = Number of atoms (vertices) $N_A$ (Default: 60)\\
 {\bf IC} = Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 {\bf IV1} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
 {\bf IV2} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 3)\\
 {\bf IV3} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)\\
+{\bf filename} = 'name'. Filename for all external files created or used in the program.\\
 {\bf ixyz} = Flag for producing xyz input file for CYLview, Avogadro or others in standard xyz format (Default: 0). 
-Default name for the external file is {\it cylview.xyz}. Otherwise {\bf xyzname}=filename needs to be specified (max 20 characters).\\
-{\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0). 
+Default name for the external file is {\it Fullerene-3D.xyz}. Otherwise {\bf filename}='filename' needs to be specified (max 13 characters).\\
+{\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0).\\ 
 If {\bf IC} = 2, 3 or 4 and {\bf isonum} not zero, then pentagon indices are taken from the
-isomer list contained in a database (see below). There are two databases, one for the general isomers 
+isomer list contained in a database (see below). There are two databases, one for the general isomers.\\
 ({\bf IPRC} = 0) and one for the IPR isomers ({\bf IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).\\
-{\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting ptograms (Default: 0).\\
-If {\bf ixyz} = 1:  Produce xyz file for further input.\\
-If {\bf ixyz} = 2:  Read xyz from file specified in xyzname. {\bf IC} = 0 needs to be specified for this. Another xyz file is also produces 
+{\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting programs (Default: 0).\\
+If {\bf ixyz} = 1:  Produce xyz file named {\bf filename-3D.xyz} for further input.\\
+If {\bf ixyz} = 2:  Read xyz from file specified in {\bf filename}. {\bf IC} = 0 needs to be specified for this. Another xyz file is also produced 
 and named   {\it cylviewnew.xyz}.\\
-If {\bf ixyz} = 3  Read xyz from file specified in xyzname. {\bf IC} = 0  needs to be specified.\\
-{\bf xyzname}: A name of up to 16 characters must be chosen, the file is then named name.xyz (Default: cylview.dat).
+If {\bf ixyz} = 3  Read xyz from file specified in {\bf filename}. {\bf IC} = 0  needs to be specified.\\
+{\bf filename}: A name of up to 13 characters must be chosen, the file is then named filename-3D.xyz (Default: Fullerene-3D.xyz).
 If {\bf IC} = 2, 3 or 4 and {\bf isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
 There are two databases, one for the general isomers ({\bf IPRC} = 2) and one for the IPR isomers ({\bf IPRC} = 1), the
 definition is similar to the {\bf IPR} parameter below (Default: 2).\\
@@ -527,7 +541,7 @@ This converts the number of atoms $N_A$ to $N^{'}_A = 3^{n_{leap}}N_A$. (Default
 If {\bf GCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}$[C$_{N_A}$] (Default: 0).
 Note that at the moment only $l=0$ is implemented, also the leapfrog transformation $k=1$ and $l=1$ is available in this input.
 In this case {\bf kGC} in the namelist input has to be specified. \\
-If {\bf ISW} = 1 the initial fullerene structure is subjected to a Stone-Wales transformation (Default: 0). In this case an
+If {\bf IWS} = 1 the initial fullerene structure is subjected to a Stone-Wales transformation (Default: 0). In this case an
 input is required (after all the other input, last card) with pairs of
 pentagon ring number. Numbers are between 1 and 12. These can be obtained
 from a previous output in the section where ring connections are analyzed
@@ -627,7 +641,7 @@ Note only with this option together with {\bf IP} = 1 in the \&Coord input all H
 If {\bf IUPAC} = 0 the program goes into a fast subroutine and prints only the total number of Hamiltonian cycles.\\\\
 
 5) {\bf \&Isomers line}: Option for producing list of isomers and properties.\\
-\&Isomers options: {\bf IPR}, {\bf IPH}, {\bf IStop}, {\bf IChk}, {\bf chkname} (Default 0 for all options and 'checkpoint' for chkname).\\
+\&Isomers options: {\bf IPR}, {\bf IPH}, {\bf IStop}, {\bf IChk} (Default 0 for all options).\\
 If {\bf IPR} $>$ 0 then the ring-spiral subroutine of Fowler and Manolopoulus is used \cite{Atlas}.
 This sub-program catalogues fullerenes with a given number of vertices using the spiral algorithm and a uniqueness test
 based on equivalent spirals. The required input is IPR.\\
@@ -636,20 +650,20 @@ If {\bf IPR} = 2 for general isomers (note that this generates a large output an
 Also the database has all this information (see below) up to \C{100}.\\
 If {\bf IPH} = 1 then number of distinct Hamiltonian cycles is calculated for every isomer (note this is computer time extensive).\\
 If {\bf istop} = 1 program stops after calling this routine.\\
-If {\bf IChk} = 1  Restart: Isomer list is continued from previous output file called 'checkpoint' as default if not otherwise give in {\bf chkname}.
+If {\bf IChk} = 1  Restart: Isomer list is continued from previous output file called 'checkpoint' as default if not otherwise give in {\bf filename.chkpnt}.
 This is a restart option from a previous run which terminated. Note that the new output file does not contain the previous one.
 The resulting output is a catalogue of the isomers found containing their idealized point groups, canonical spirals, and NMR patterns
 \cite{Atlas}.\\\\
 
 6) {\bf \&Graph line}: Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (Schlegel diagrams).\\
-\&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, PS, Scale, ScalePPG, graphname} (Default: 0 for all values except for {\bf graphname}). We recommend {\bf IG} = 1, 2, 4 or 7.\\
-If {\bf ISchlegel} $>$ 0 Use Program Schlegel for generating fullerene graphs
-If {\bf ISchlegel} = 1: Use the perspective projection method (PSP).\\
+\&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, IFS, PS, Scale, ScalePPG} (Default: 0 for all values). We recommend {\bf IG} = 1, 2, 4 or 7.\\
+If {\bf ISchlegel} $>$ 0 Use Program Graph2D for generating fullerene graphs.\\
+If {\bf ISchlegel} = 1: Use the perspective projection method (PSP) also called Schlegel projection.\\
 If {\bf ISchlegel} = 2: Use the cone projection method (CSP).\\
 If {\bf ISchlegel} = 3: Produce the Tutte graph (2D-TE).\\
 If {\bf ISchlegel} = 4: Produce the Tutte graph and perform linear scaling (2D-TE-LS) (scale factor can be read in).\\
 If {\bf ISchlegel} = 5: Produce the Tutte graph and perform spring embedding optimization $(r_{ij}-r_0)^2$ with $r_0$ set to 2.0 (2D-SE).\\
-If {\bf ISchlegel} = 6: Starting from the Tutte graph perform spring + repulsive Coulomb.
+If {\bf ISchlegel} = 6: Starting from the Tutte graph perform spring + repulsive Coulomb with prefactor of 0.3.\\
 force embedding optimization (2D-SE+C). The repulsive force is taken from the barycenter to the vertex. $r_0$ is set to 2.0. The force
 constants are set such that the graph looks nice.\\
 If {\bf ISchlegel} = 7: Starting from the Tutte graph perform a Pisanski-Plestenjak-Graovac embedding PPGE) optimization 
@@ -676,8 +690,29 @@ to the projection plane, which touches the point with the smallest $z$-value (op
 to 45 degrees if chosen larger than 89 degrees. In the case of the perspective projection PS is the distance
 between the focal point and the ring center underneath, Note this is chosen by the program, but if nonzero this parameter has to be
 carefully chosen. The picture produced gives a good idea if {\bf PS} was correctly chosen or not. Note that the ring centers get
-an extra boost of 10\% in the scaling factors such that they appear more in the center of the rings produced by the Schlegel projection.
-{\bf graphname} = name. A name of up to 16 characters including at the end must be chosen, the file is then named name.dat (Default: graph2D.dat).
+an extra boost of 10\% in the scaling factors such that they appear more in the center of the rings produced by the Schlegel projection.\\
+If {\bf IFS} = 1: A tex file named {\bf filename-2D.tex} is produced which contains the 2D fullerene graph (Default: 0).\\
+If {\bf IFS} = 2: A data file named {\bf filename-2D.dat} is produced which contains all the information 
+for producing a 2D fullerene graph with a plotting program.\\
+If {\bf IFS} = 3: Both files are produced.\\
+If {\bf ndual} = 1: The dual graph is drawn as well in texfile {\bf filename-2D.tex}. (Default: 0).\\
+The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{pic:Graph2D}.
+
+%Figure 3
+ \begin{figure}[htbp]
+   	\begin{center}
+  		\includegraphics[width=0.2\textwidth]{Graph1.png}
+		\includegraphics[width=0.2\textwidth]{Graph2.png}
+		\includegraphics[width=0.2\textwidth]{Graph3.png}
+		\includegraphics[width=0.2\textwidth]{Graph4.png}
+		\includegraphics[width=0.2\textwidth]{Graph5.png}
+		\includegraphics[width=0.2\textwidth]{Graph6.png}
+		\includegraphics[width=0.2\textwidth]{Graph7.png}
+		\includegraphics[width=0.2\textwidth]{Graph8.png}
+         \label{pic:Graph2D}
+        \caption{From the left to right: 2D fullerene structures created using {\bf ISchlegel}=1 to 8.}
+   	\end{center}
+ \end{figure}
               
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{100} and for IPR isomers up to
@@ -694,9 +729,9 @@ computationally too demanding. The longest file for our database ran for 3
 months on a single processor.
 Note: the directory database needs to be in the same directory as "source" or "libgraph".
 
-\clearpage
-%References
 
+%References
+\section{References}
 \begin{thebibliography}{35}
 
 \bibitem{Brinkman} G. Brinkmann, ``Program Fullgen - a program for generating nonisomorphic fullerenes", see http://cs.anu.edu.au/~bdm/plantri/.
