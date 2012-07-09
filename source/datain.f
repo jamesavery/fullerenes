@@ -2,23 +2,14 @@
      1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,GCtrans,iupac,
      1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
      1 ilp,IYF,IWS,nzeile,ifs,ndual,PS,TolX,R5,R6,Rdist,scale,scalePPG,
-     1 ftol,force,forceP,xyzname,chkname,graphname,texname,DATEN)
+     1 ftol,force,forceP,filename,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF and default FF.  force and forceP (=permanent) are equal if there are no input parameters
       integer endzeile
       Character*1 DATEN(nzeile)
-      Character filename*13
-      Character xyzname*20
-      Character texname*20
-      Character graphname*20
-      Character chkname*20
-      Character blank*1
-      Character xyz*7
-      Character dat*7
-      Character tex*7
-      Character chk*7
+      Character filename*20
       Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,GCtrans,ihueckel,ISW,KE,loop,mirror,
      1 IYF,IWS,filename
@@ -81,16 +72,17 @@ c     four dihedrals: forces (let's assume they are all the same)
       ExtWufD=5.0d4
 
 C more default parameters
-      blank=' '
-      chk='.chkpnt'
-      dat='-2D.dat'
-      tex='-2D.tex'
-      xyz='-3D.xyz'
       filename= 'Fullerene'
-      chkname=  'Fullerene.chkpnt'
-      graphname='Fullerene-2D.dat'
-      texname=  'Fullerene-2D.tex'
-      xyzname=  'Fullerene-3D.xyz'
+c$$$  This yields:
+c$$$      chkname=  'Fullerene.chkpnt'
+c$$$      graphname='Fullerene-2D.dat'
+c$$$      texname=  'Fullerene-2D.tex'
+c$$$      xyzname=  'Fullerene-3D.xyz'
+c$$$      povname2d='Fullerene-2D.pov'
+c$$$      povname3d='Fullerene-3D.pov'
+c$$$      povnamehull='Fullerene-hull.pov'
+c$$$ instead of passing all these variables around.
+c      ...etc.
 
 C Integers
       GCtrans=0 !  Initial flag for Goldberg-Coxeter transformed fullerene
@@ -234,20 +226,6 @@ C Set IC and ichk parameters
       if(ichk.ne.0) istop=1
 
 C  Filenames for external files
-      do I=2,20
-       if(filename(I:I).eq.blank) then
-        npos=I-1
-        go to 12
-       endif
-      enddo
-  12  ia=npos-7
-      if(ia.gt.0) then
-       if(npos.gt.13) npos=13
-       xyzname=filename(1:npos)//xyz    !  Option for naming file for 3D plotting program
-       chkname=filename(1:npos)//chk    !  Option for naming checkpoint file
-       texname=filename(1:npos)//tex    !  Option for naming checkpoint file
-       graphname=filename(1:npos)//dat  !  Option for naming checkpoint file
-      endif
 
 C  Check on number of atoms (vertices)
       NA=IABS(NA)

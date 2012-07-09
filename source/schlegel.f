@@ -1,6 +1,6 @@
       SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
      1 Iring,ISchlegel,ifs,ndual,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,
-     1 fscale,scalePPG,CR,CR5,CR6,Symbol,graphname,texname)
+     1 fscale,scalePPG,CR,CR5,CR6,Symbol,filename)
       use config
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
@@ -17,11 +17,10 @@ C or face is at the top. Euler angles are used for rotation.
       DIMENSION N5M(Mmax,5),N6M(Mmax,6),Rot(3,3),CR(3,Mmax)
       DIMENSION Rotz(3,3),Symbol(Mmax),RingS(2,Mmax)
       DIMENSION IC3(Nmax,3),IS(6)
-      CHARACTER*20 graphname
-      CHARACTER*20 texname
       Integer MDist(Nmax,Nmax)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
+      Character*20 filename
       type(c_ptr) :: g, new_fullerene_graph
 
       Data epsf/.12d0/
@@ -30,15 +29,16 @@ C     Parameter set for Program QMGA
 
 C     Prepare for Program QMGA
       if(ifs.ge.2) then 
-       Open(unit=2,file=graphname,form='formatted')
+       Open(unit=2,file=trim(filename)//"-2D.dat",form='formatted')
        Write(2,901) M,DPoint,Dedge
       endif
 
 C     Construct a graph object from the adjacency matrix
       if(ifs.gt.0.or.ISchlegel.gt.2) then
        g = new_fullerene_graph(Nmax,M,IDA)
+c       call print_graph(g)
       endif
-
+     
       satom='o'
       s5ring='^'
       s6ring='*'
@@ -447,7 +447,7 @@ C   Print
      1 Write(2,902) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
-      if(ifs.ge.2) WRITE(IOUT,1032) graphname
+      if(ifs.ge.2) WRITE(IOUT,1032) trim(filename)//"-2D.dat"
 
 C   Calculate distance of ring centers from z-axis for projection
       WRITE(IOUT,1018)
@@ -525,7 +525,7 @@ C   Atoms
      1 Write(2,902) IAT,layout2d(1,IAT),layout2d(2,IAT),
      1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
       enddo
-      if(ifs.ge.2) WRITE(IOUT,1032) graphname
+      if(ifs.ge.2) WRITE(IOUT,1032) trim(filename)//"-2D.dat"
       WRITE(IOUT,1029)
 
 C   Rings
@@ -729,14 +729,16 @@ C     Call format: draw_graph(filename, format (string),ndual (0|1), dimensions 
 C     line_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
 C     line_width (in mm), vertex_diameter (in mm) )
       call set_layout2d(g,layout2d)
-      call draw_graph(g,texname,"tex",ndual, (/10.d0,10.d0/), x'274070', 
-     1                x'458b00', 0.3d0, 1.d0)
+      call draw_graph(g,filename,"tex",ndual, 
+     1                (/10.d0,10.d0/), x'274070',
+     2                x'458b00', 0.3d0, 1.d0)
 
 c Output to POVRay raytracer. Commented out currently.
-c      call draw_graph(g, "output/graph2D ", "pov",0, (/10.d0,10.d0/), 
-c     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
-      call delete_fullerene_graph(g)
+c$$$      call draw_graph(g,filename, "pov",0, (/10.d0,10.d0/), 
+c$$$     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
       endif
+      call delete_fullerene_graph(g)
+
 
       if(ifs.ge.2) Close(unit=2)
       Return
