@@ -1,5 +1,5 @@
 C840 I could not locate eigenvectors for FM, using Tutte instead
-&Coord NA=840, IC=4, R6=1.42, ixyz=1, xyzname='pent22' /
+&Coord NA=840, IC=4, R6=1.42, ixyz=1, filename='pent22' /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /
