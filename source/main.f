@@ -253,6 +253,7 @@ c a stone wales (or any other transformation) is done
             CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1        N5MEM,N6MEM,Dist,Rdist,ftol,force,iopt)
           endif
+          iopt=1
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring, ! vanilla Wu
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
           Iprint=0
