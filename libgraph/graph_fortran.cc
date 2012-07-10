@@ -28,7 +28,7 @@ extern "C" {
   void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const int *outer_dim, int *D);
   void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
   int graph_is_a_fullerene_(const graph_ptr *);
-  void print_graph_(const char *name, const graph_ptr *);
+  void print_graph_(const graph_ptr *);
   void draw_graph_(const graph_ptr *g, const char *filename, const char *format, const int *show_dual, const double *dimensions,
 		   const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter);
   // Fullerene graph generation 
@@ -275,8 +275,8 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   int i=0;
   string fmt(format,3), filename;
   for(i=0;i<20 && filename_[i] != ' ';i++) ;
-  filename = string(filename_,i)+"."+fmt;
-  
+  filename = string(filename_,i)+"-2D."+fmt;
+
   // printf("draw_graph({\n"
   // 	 "\tformat:     '%3s',\n"
   // 	 "\tfilename:   '%s',\n"
@@ -284,10 +284,10 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   // 	 "\tdimensions: %gcm x %gcm,\n"
   // 	 "\tline_colour: #%.6x,\n"
   // 	 "\tnode_colour: #%.6x,\n"
-  // 	 "\tline_width: %.2gcm,\n"
-  // 	 "\tnode_diameter: %.2gcm,\n"
+  // 	 "\tline_width: %.2gmm,\n"
+  // 	 "\tnode_diameter: %.2gmm,\n"
   // 	 "})\n\n",
-  // 	 format, filename, *show_dual, dimensions[0], dimensions[1],
+  // 	 format, filename.c_str(), *show_dual, dimensions[0], dimensions[1],
   // 	 *line_colour, *vertex_colour,
   // 	 *line_width, *vertex_diameter);
 
