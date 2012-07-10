@@ -174,7 +174,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
       "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
       "\\tikzstyle{edge}=[draw,color=edgecolour,line width="<<line_width<<"mm]\n"
-      "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolor,line width="<<line_width<<"mm]\n"
+      "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolour,line width="<<line_width<<"mm]\n"
       "\\tikzstyle{invisible}=[draw=none,inner sep=0,fill=none,minimum width=0pt]\n"
       ;
 
@@ -184,25 +184,34 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
   double yscale = h_cm/wh.second;
 
 
-  s << "\\begin{tikzpicture}[xscale="<<xscale<<",yscale="<<yscale<<"]\n";
-  s << "\\foreach \\place/\\name/\\lbl in {";
-  for(node_t u=0;u<N;u++){
-    const coord2d& xs(layout2d[u]);
-    s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<N? ", ":"}\n\t");
+  s << "\\begin{tikzpicture}\n";
+  for(node_t u=0;u<N;){
+    s << "\\foreach \\place/\\name/\\lbl in {";
+    for(node_t u_=0;u_<100 && u<N;u++,u_++){
+      const coord2d xs(layout2d[u]*coord2d(xscale,yscale));
+    s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << ((u+1<N && u_+1<100)
+? ", ":"}\n\t");
+    }
+    s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
   }
-  s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
-  s << "\\foreach \\u/\\v in {";
+
+  
+  
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();){
-    s << "{v"<<e->first<<"/v"<<e->second<<"}";
-    if(++e != edge_set.end()) s << ", ";
+    s << "\\foreach \\u/\\v in {";
+    for(int i=0;i<100 && e!=edge_set.end();){
+      s << "{v"<<e->first<<"/v"<<e->second<<"}";
+      if(++e != edge_set.end() && i+1<100) s << ", ";
+    }
+    s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
   }
-  s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
+
 
   if(show_dual){
     PlanarGraph dual(dual_graph());	
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
-      const coord2d& xs(dual.layout2d[u]);
+      const coord2d xs(dual.layout2d[u]*coord2d(xscale,yscale));
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<dual.N? ", ":"}\n\t");
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
