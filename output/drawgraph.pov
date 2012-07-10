@@ -1,5 +1,3 @@
-#include "graph2D.pov"
-
 #version 3.6;
 #include "textures.inc"
 #include "colors.inc"

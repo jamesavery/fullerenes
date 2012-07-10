@@ -22,13 +22,16 @@ extern "C" {
   // General graph operations -- look in fullerenegraph/graph.hh for others to potentially add
   int nvertices_(const graph_ptr *);
   int nedges_(const graph_ptr *);
+  void edge_list(const graph_ptr *, int *edges /* 2x|E| */, int *length);
+  void adjacency_list(const fullerene_graph_ptr *, int *neighbours /* 3xN */);
+  void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
 
   graph_ptr dual_graph_(const graph_ptr *);
   int hamiltonian_count_(const graph_ptr *);
   void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const int *outer_dim, int *D);
-  void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
+
   int graph_is_a_fullerene_(const graph_ptr *);
-  void print_graph_(const char *name, const graph_ptr *);
+  void print_graph_(const graph_ptr *);
   void draw_graph_(const graph_ptr *g, const char *filename, const char *format, const int *show_dual, const double *dimensions,
 		   const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter);
   // Fullerene graph generation 
@@ -42,6 +45,7 @@ extern "C" {
   void spherical_layout_(const graph_ptr* g, double *LAYOUT3D);
   void get_layout2d_(const graph_ptr *p, double *layout2d);
   int  iget_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face);
+
   void set_layout2d_(graph_ptr *g, const double *layout2d);
 
   double shortest_planar_distance_(const graph_ptr *g);
@@ -260,7 +264,7 @@ int iget_face_(const graph_ptr *g, const int *s, const int *t, const int *r, con
 {
   face_t cycle((*g)->shortest_cycle(*s-1,*t-1,*r-1,*fmax));
   for(int i=0;i<cycle.size();i++) face[i] = cycle[i]+1;
-  cerr << "get_face(" << *s << "," << *t << "," << *r << ") = " << cycle << endl; 
+  //  cerr << "get_face(" << *s << "," << *t << "," << *r << ") = " << cycle << endl; 
   return cycle.size();
 }
 
@@ -275,8 +279,8 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   int i=0;
   string fmt(format,3), filename;
   for(i=0;i<20 && filename_[i] != ' ';i++) ;
-  filename = string(filename_,i)+"."+fmt;
-  
+  filename = string(filename_,i)+"-2D."+fmt;
+
   // printf("draw_graph({\n"
   // 	 "\tformat:     '%3s',\n"
   // 	 "\tfilename:   '%s',\n"
@@ -284,10 +288,10 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   // 	 "\tdimensions: %gcm x %gcm,\n"
   // 	 "\tline_colour: #%.6x,\n"
   // 	 "\tnode_colour: #%.6x,\n"
-  // 	 "\tline_width: %.2gcm,\n"
-  // 	 "\tnode_diameter: %.2gcm,\n"
+  // 	 "\tline_width: %.2gmm,\n"
+  // 	 "\tnode_diameter: %.2gmm,\n"
   // 	 "})\n\n",
-  // 	 format, filename, *show_dual, dimensions[0], dimensions[1],
+  // 	 format, filename.c_str(), *show_dual, dimensions[0], dimensions[1],
   // 	 *line_colour, *vertex_colour,
   // 	 *line_width, *vertex_diameter);
 
@@ -316,3 +320,27 @@ void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char
     polyhedron_file << (*P)->to_povray(10.0,10.0,*edge_colour,*node_colour,*face_colour,*edge_width,*node_diameter,*face_opacity);
   }
 }
+
+void edge_list(const graph_ptr *g, int *edges, int *length)
+{
+  const set<edge_t>& edge_set((*g)->edge_set);
+  *length = edge_set.size();
+  int i=0;
+  for(set<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();e++,i++){
+    edges[2*i+0] = e->first;
+    edges[2*i+1] = e->second;
+  }
+}
+
+void adjacency_list(const fullerene_graph_ptr *g, int *neighbours)
+{
+  const neighbours_t& ns((*g)->neighbours);
+
+  for(int i=0;i<ns.size();i++){	// Assumes trivalent graph, since fortran handles non-flat data structures poorly.
+    neighbours[3*i+0] = ns[0];
+    neighbours[3*i+1] = ns[1];
+    neighbours[3*i+2] = ns[2];
+  }
+}
+
+

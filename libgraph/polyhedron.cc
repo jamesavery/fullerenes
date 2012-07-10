@@ -344,6 +344,7 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   s << "#declare cpoints=array["<<centroid_points.size()<<"][3]{"; 
   for(int i=0;i<centroid_points.size();i++) s<<(centroid_points[i]*xscale)<<(i+1<centroid_points.size()?",\n":"}\n\n"); 
 
+  s << "#include \"drawpolyhedron.pov\"\n\n";
   return s.str();
 }
 

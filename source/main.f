@@ -41,10 +41,8 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
       CHARACTER*13 routine
+      CHARACTER*20 filename
       CHARACTER*20 xyzname
-      CHARACTER*20 texname
-      CHARACTER*20 graphname
-      CHARACTER*20 chkname
       CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
@@ -95,7 +93,10 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ndual,
      1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,force,forceP,
-     1  xyzname,chkname,graphname,texname,TEXTINPUT)
+     1  filename,TEXTINPUT)
+
+      xyzname=trim(filename)//"-3D.xyz"
+
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -112,6 +113,7 @@ C  Cartesian coordinates produced for Ih C60
       enddo
       Go to 40
 C Input Cartesian coordinates for fullerenes
+
    20 if(icyl.ge.2) then
         Open(unit=7,file=xyzname,form='formatted')
         WRITE(Iout,1015) xyzname 
@@ -127,7 +129,7 @@ C Input Cartesian coordinates for fullerenes
           Iatom(j)=6
         enddo
         close(unit=7)
-        xyzname='cylviewnew.xyz'
+        xyzname=trim(filename)//'-3D.new.xyz'
       else
         Do J=1,MAtom
           Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
@@ -159,7 +161,7 @@ C intensive
   98  routine='ISOMERS      '
       Write(Iout,1008) routine
       CALL Isomers(MAtom,IPR,IOUT,
-     1 maxit,iprintham,ichk,IDA,A,chkname)
+     1 maxit,iprintham,ichk,IDA,A,trim(filename)//".chkpnt")
       if(istop.ne.0) go to 99
 
 C Move carbon cage to Atomic Center
@@ -252,14 +254,11 @@ c a stone wales (or any other transformation) is done
             Write(Iout,1003)
             CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1        N5MEM,N6MEM,Dist,Rdist,ftol,force,iopt)
-c            Do i=1,ffmaxdim ! reset force field to default
-c              force(i)=forceP(i)
-c            enddo
           endif
+          iopt=1
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring, ! vanilla Wu
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
           Iprint=0
-c          force(9)=fcoulomb ! not used anywhere?
         else if(Iopt.eq.3) then ! extended Wu, 18 parameters
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
@@ -387,7 +386,7 @@ C Calculate the volume
 
       CALL Volume(Matom,Iout,N5MEM,N6MEM,
      1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
-     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)
+     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6,filename)
 
 C Calculate the minimum covering sphere and volumes
       routine='MINCOVSPHERE2'
@@ -419,7 +418,7 @@ C Calculate Schlegel diagram
       endif
       CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
      1 NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
-     1 TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,graphname,texname)
+     1 TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,filename)
       endif
 
 C  E N D   O F   P R O G R A M
