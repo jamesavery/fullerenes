@@ -506,7 +506,7 @@ C     to calculate the root mean square as a measure for distortion
       return
       END
 
-      DOUBLE PRECISION FUNCTION f1dimx(ncom,Matom,IOP,
+      DOUBLE PRECISION FUNCTION f1dimx(ncom,Matom,IOP,ier,
      1 x,pcom,xicom,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -524,8 +524,8 @@ C     to calculate the root mean square as a measure for distortion
       f1dimx=-AN
       endif
       if(AN.gt.Huge) then
-      Print*,'**** Severe Error, check coordinates'
-      stop
+       Print*,'**** Severe Error, check coordinates'
+       ier=1
       endif
       return
       END

@@ -280,7 +280,7 @@ C Now do the calculation for the remainder
          K=J
       enddo
 C     Analyze dual matrix
-   16  CALL DualAnalyze(nmax,mmax,N,M,Iout,D,IRhag5,IRhag6,
+   16  CALL DualAnalyze(nmax,mmax,N,M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
        if(2*ndeg.eq.nelec) then 
         Occup='closed'
@@ -617,7 +617,7 @@ C     N is the nuclearity of the fullerene.
          K=J
       enddo
 C     Analyze dual matrix
-   16  CALL DualAnalyze(nmax,mmax,N,M,Iout,D,IRhag5,IRhag6,
+   16  CALL DualAnalyze(nmax,mmax,N,M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
        if(2*ndeg.eq.nelec) then 
         Occup='closed'
@@ -1260,7 +1260,7 @@ C     Find lowest value
       return
       END
 
-      SUBROUTINE DualAnalyze(nmax,mmax,N,M,Iout,D,IRhag5,IRhag6,
+      SUBROUTINE DualAnalyze(nmax,mmax,N,M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer D(MMAX,MMAX),Ddiag(MMAX),NR5(12),IDA(NMAX,NMAX)
@@ -1413,16 +1413,6 @@ C Produce number of electrons in HOMO, degeneracy and gap
       enddo
   111 Continue
       
-C1000 Format(1X,'Error: NV5+NN6 does not match total number of '
-C    1 'vertices')
-C     Write(Iout,1001) NV5,NV6
-C     Do I=1,M
-C     Write(Iout,1002) (D(I,J),J=1,M)
-C     enddo
-C     Write(Iout,1002) M,(Ddiag(J),J=1,M)
-C1001 Format(1X,'Number of vertices of order five in dual matrix: ',I4,
-C    1 /1X,'Number of vertices of order six in dual matrix: ',I4)
-C1002 Format(1X,60I3)
       Return
       End
 
