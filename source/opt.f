@@ -879,7 +879,7 @@ CU    USES brentx,f1dimx,mnbrakx
       call mnbrakx(n,Matom,IOP,ier,
      1 pcom,xicom,ax,xx,bx,fa,fx,fb,Dist)
       if(ier.eq.1) Return
-      fret=brentx(n,Matom,IOP,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
+      fret=brentx(n,Matom,IOP,ier,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
       do 12 j=1,n
         xi(j)=xmin*xi(j)
         p(j)=p(j)+xi(j)
@@ -894,8 +894,8 @@ CU    USES brentx,f1dimx,mnbrakx
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20,HUGE=1.d10)
       REAL*8 pcom(ncom),xicom(ncom)
       REAL*8 Dist(3,Nmax)
-      fa=f1dimx(ncom,Matom,IOP,ax,pcom,xicom,Dist)
-      fb=f1dimx(ncom,Matom,IOP,bx,pcom,xicom,Dist)
+      fa=f1dimx(ncom,Matom,IOP,ier,ax,pcom,xicom,Dist)
+      fb=f1dimx(ncom,Matom,IOP,ier,bx,pcom,xicom,Dist)
       if(fb.gt.fa)then
         dum=ax
         ax=bx
@@ -905,7 +905,7 @@ CU    USES brentx,f1dimx,mnbrakx
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      fc=f1dimx(ncom,Matom,IOP,cx,pcom,xicom,Dist)
+      fc=f1dimx(ncom,Matom,IOP,ier,cx,pcom,xicom,Dist)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
         q=(bx-cx)*(fb-fa)
@@ -916,7 +916,7 @@ CU    USES brentx,f1dimx,mnbrakx
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             ax=bx
             fa=fb
@@ -929,23 +929,23 @@ CU    USES brentx,f1dimx,mnbrakx
             return
           endif
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
         else if((cx-u)*(u-ulim).gt.0.d0)then
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             bx=cx
             cx=u
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-            fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+            fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.d0)then
           u=ulim
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
         else
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
         endif
         ax=bx
         bx=cx
@@ -958,7 +958,7 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-      DOUBLE PRECISION FUNCTION brentx(ncom,Matom,IOP,
+      DOUBLE PRECISION FUNCTION brentx(ncom,Matom,IOP,ier,
      1 pcom,xicom,ax,bx,cx,tol,xmin,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -972,7 +972,7 @@ CU    USES brentx,f1dimx,mnbrakx
       w=v
       x=v
       e=0.
-      fx=f1dimx(ncom,Matom,IOP,x,pcom,xicom,Dist)
+      fx=f1dimx(ncom,Matom,IOP,ier,x,pcom,xicom,Dist)
       fv=fx
       fw=fx
       do 11 iter=1,ITMAX
@@ -1007,7 +1007,7 @@ CU    USES brentx,f1dimx,mnbrakx
         else
           u=x+sign(tol1,d)
         endif
-        fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+        fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
         if(fu.le.fx) then
           if(u.ge.x) then
             a=x
@@ -1042,3 +1042,118 @@ CU    USES brentx,f1dimx,mnbrakx
       brentx=fx
       return
       END
+
+C     Lukas: The following subroutine iterates over
+C      1. edges
+C      2. corners
+C      3. dihedrals
+C     in linear time (i.e. O(1) time per element), while providing the information you asked for.
+C
+C     Assumptions: 
+C     - g is a fullerene graph and has had a call to set_layout2d(g,layout2d) with its Tutte embedding as layout.
+C       (or another strictly planar layout)
+C     - N = Nvertices(g)
+      SUBROUTINE lukas_template(g,N)
+      use config
+      use iso_c_binding
+      integer edges(2,3*N/2), NE, i,j, r,s,t,u,v,w
+      integer neighbours(3,N), face(6), l, lA,lB,lC, np
+      integer pentagons(5,12), hexagons(6,N/2-10), NH
+      type(c_ptr) :: g
+
+      NH = N/2-10      
+      call edge_list(g,edges,NE)
+      call adjacency_list(g,3,neighbours)
+      call compute_fullerene_faces(g,pentagons,hexagons) ! Yields faces with vertices ordered CCW. O(N)
+
+C     ------------------------------------------------------------
+C                              EDGES
+C     ------------------------------------------------------------
+      do i=1,NE
+C        Edge u--v
+         u = edges(1,i)
+         v = edges(2,i)
+
+C     Edge is part of how many pentagons?
+         np = 0
+         call get_arc_face(g,u,v,face,l) ! O(1) operation
+         if(l.eq.5) then np = np+1
+         call get_arc_face(g,v,u,face,l) ! O(1) operation
+         if(l.eq.5) then np = np+1
+
+C     Do what needs to be done to u--v here
+      end do
+      
+C     ------------------------------------------------------------
+C                              ANGLES
+C     ------------------------------------------------------------
+C     Every directed edge u->v is part of two "angles", corresponding to the neighbours to v that aren't u,
+C     corresponding to both a CW and a CCW traversal starting in the edge. (Likewise, every edge is part of four)
+C     The angles are each counted exactly once if we trace the outline of each face in e.g. CCW order.
+      do i=1,12
+C     iterate over angles u--v--w
+         do j=1,5
+            u = pentagons(i,j)
+            v = pentagons(i,MOD(j,5)+1)
+            w = pentagons(i,MOD(j+1,5)+1)
+C     Do what needs to be done to u--v--w here. Each of these are part of a pentagon, obviously.
+         end do
+      end do
+
+      do i=1,NH
+C     iterate over angles u--v--w
+         do j=1,6
+            u = hexagons(i,j)
+            v = hexagons(i,MOD(j,6)+1)
+            w = hexagons(i,MOD(j+1,6)+1)
+C     Do what needs to be done to u--v--w here. Each of these are part of a hexagon, obviously.
+         end do
+      end do
+
+C     ------------------------------------------------------------
+C                              DIHEDRALS
+C     ------------------------------------------------------------
+      do u=1,N
+C      s   B   t      
+C        \   /
+C       A  u   C
+C          |
+C          r
+         r = neighbours(1,u)
+         s = neighbours(2,u)
+         t = neighbours(3,u)
+         
+         call get_face(g,s,u,r,6,face,lA)
+         call get_face(g,s,u,t,6,face,lB)
+         call get_face(g,r,u,t,6,face,lC)
+
+         select case ( lA+lB+lC )
+         case ( 15 )            ! (5,5,5) - all pentagons
+C     Do stuff here
+         case ( 16 )            ! Two pentagons, one hexagon
+C     Do stuff common to all three (2,1)-cases here
+            
+C     Do case specific stuff here
+            select case ( lA*100+lB*10+lC )
+            case ( 655 )  ! BC are pentagons, u--t common edge
+            case ( 565 )  ! AC are pentagons, u--r common edge
+            case ( 556 )  ! AB are pentagons, u--s common edge
+            end select
+
+         case ( 17 )            ! One pentagon, two hexagons
+C     Do stuff common to all three (1,2)-cases here
+            
+C     Do case specific stuff here
+            select case ( lA*100+lB*10+lC )
+            case ( 566 )  ! BC are hexagons, u--t common edge
+            case ( 656 )  ! AC are hexagons, u--r common edge
+            case ( 665 )  ! AB are hexagons, u--s common edge
+            end select
+
+         case ( 18 )            ! (6,6,6) - all hexagons
+C     Do stuff here
+         end select
+
+      end do
+
+      END SUBROUTINE

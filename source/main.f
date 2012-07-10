@@ -42,7 +42,7 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*2 El(99)
       CHARACTER*13 routine
       CHARACTER*20 filename
-      CHARACTER*20 xyzname
+      CHARACTER*31 xyzname
       CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
@@ -329,7 +329,7 @@ C Perform Endo-Kroto 2-vertex insertion
       routine='ENDO-KROTO   '
       Write(Iout,1008) routine
       CALL EndoKrotoTrans(Matom,IN,Iout,n565,NEK,ihueckel,
-     1 IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+     1 IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
       KE=0
       ipent=1
       SWspiral=1
@@ -346,7 +346,7 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
       else
       IYF=IYF-2
       CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,nYF,
-     1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+     1 ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
       endif
       IYF=0
       ipent=1

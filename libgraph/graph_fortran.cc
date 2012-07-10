@@ -22,15 +22,24 @@ extern "C" {
   // General graph operations -- look in fullerenegraph/graph.hh for others to potentially add
   int nvertices_(const graph_ptr *);
   int nedges_(const graph_ptr *);
+  void edge_list_(const graph_ptr *, int *edges /* 2x|E| */, int *length);
+  void adjacency_list_(const fullerene_graph_ptr *, const int *k, int *neighbours /* kxN */);
+  void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
+  void compute_fullerene_faces_(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
+  void get_arc_face_(const graph_ptr *g, const int *u, const int *v, int *face, int *l);
 
-  graph_ptr dual_graph_(const graph_ptr *);
   int hamiltonian_count_(const graph_ptr *);
   void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const int *outer_dim, int *D);
-  void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
+
   int graph_is_a_fullerene_(const graph_ptr *);
   void print_graph_(const graph_ptr *);
   void draw_graph_(const graph_ptr *g, const char *filename, const char *format, const int *show_dual, const double *dimensions,
 		   const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter);
+  graph_ptr dual_graph_(const graph_ptr *);
+
+  void compute_fullerene_faces(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
+
+
   // Fullerene graph generation 
   fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n);
   fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps);
@@ -41,7 +50,8 @@ extern "C" {
   void tutte_layout_b_(graph_ptr* g, int *s, int *t, int *r, double *LAYOUT);
   void spherical_layout_(const graph_ptr* g, double *LAYOUT3D);
   void get_layout2d_(const graph_ptr *p, double *layout2d);
-  int  iget_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face);
+  void get_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face, int *l);
+
   void set_layout2d_(graph_ptr *g, const double *layout2d);
 
   double shortest_planar_distance_(const graph_ptr *g);
@@ -256,13 +266,7 @@ void set_layout2d_(graph_ptr *g, const double *layout2d)
 
 
 
-int iget_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face)
-{
-  face_t cycle((*g)->shortest_cycle(*s-1,*t-1,*r-1,*fmax));
-  for(int i=0;i<cycle.size();i++) face[i] = cycle[i]+1;
-  cerr << "get_face(" << *s << "," << *t << "," << *r << ") = " << cycle << endl; 
-  return cycle.size();
-}
+
 
 polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }
 
@@ -315,4 +319,67 @@ void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char
   if     (fmt == "pov"){
     polyhedron_file << (*P)->to_povray(10.0,10.0,*edge_colour,*node_colour,*face_colour,*edge_width,*node_diameter,*face_opacity);
   }
+}
+
+void edge_list_(const graph_ptr *g, int *edges, int *length)
+{
+  const set<edge_t>& edge_set((*g)->edge_set);
+  *length = edge_set.size();
+  int i=0;
+  for(set<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();e++,i++){
+    edges[2*i+0] = e->first;
+    edges[2*i+1] = e->second;
+  }
+}
+
+
+// Assumes k-regular graph, since fortran handles non-flat data structures poorly.
+void adjacency_list_(const fullerene_graph_ptr *g, const int *k, int *neighbours)
+{
+  const neighbours_t& ns((*g)->neighbours);
+
+  for(node_t u=0;u<ns.size();u++)
+    for(int i=0;i<*k;i++)
+      neighbours[(*k)*u+i] = ns[u][i];
+}
+
+void compute_fullerene_faces_(const fullerene_graph_ptr *g, int *pentagons, int *hexagons)
+{
+  assert((*g)->layout2d.size() == (*g)->N);
+
+  facemap_t faces((*g)->compute_faces_oriented());
+  int NH = (*g)->N/2-10;
+  
+  assert(faces[5].size() == 12);
+  assert(faces[6].size() == NH);
+
+  const vector<face_t> p(faces[5].begin(),faces[5].end()), 
+                       h(faces[6].begin(),faces[6].end());
+
+  for(int i=0;i<12;i++)
+    for(int j=0;j<5;j++)
+      pentagons[i*5+j] = p[i][j];
+
+  for(int i=0;i<NH;i++)
+    for(int j=0;j<6;j++)
+      pentagons[i*6+j] = h[i][j];
+}
+
+// Only works for trivalent graphs. 
+void get_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face, int *l)
+{
+  face_t cycle((*g)->shortest_cycle(*s-1,*t-1,*r-1,*fmax));
+  for(int i=0;i<cycle.size();i++) face[i] = cycle[i]+1;
+  //  cerr << "get_face(" << *s << "," << *t << "," << *r << ") = " << cycle << endl; 
+  *l = cycle.size();
+}
+
+// This version works for all planar graphs.
+void get_arc_face_(const graph_ptr *g, const int *u, const int *v, int *face, int *l)
+{
+  assert((*g)->layout2d.size() == (*g)->N);
+  face_t f((*g)->get_face_oriented(*u,*v));
+  
+  for(int i=0;i<f.size();i++) face[i] = f[i];
+  *l = f.size();
 }
