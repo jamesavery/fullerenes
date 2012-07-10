@@ -34,10 +34,7 @@ C     Prepare for Program QMGA
       endif
 
 C     Construct a graph object from the adjacency matrix
-      if(ifs.gt.0.or.ISchlegel.gt.2) then
-       g = new_fullerene_graph(Nmax,M,IDA)
-c       call print_graph(g)
-      endif
+      g = new_fullerene_graph(Nmax,M,IDA)
      
       satom='o'
       s5ring='^'
