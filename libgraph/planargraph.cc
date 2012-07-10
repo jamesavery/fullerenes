@@ -139,6 +139,42 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
   return facemap;
 }
 
+face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const 
+{
+  face_t face;
+  face.push_back(s);
+  face.push_back(t);
+  
+  node_t u = s, v = t;
+  //    printf("%d->%d\n",e.first,e.second);
+  while(v != s){
+    const vector<node_t>& ns(neighbours[v]);
+
+    coord2d vu(layout2d[u]-layout2d[v]);
+    double angle_max = -M_PI;
+
+    node_t w=-1;
+    for(unsigned int i=0;i<ns.size();i++) {
+      //	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
+      if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
+	  coord2d vw(layout2d[ns[i]]-layout2d[v]);
+	  double angle = vu.line_angle(vw);
+
+	  if(angle>= angle_max){
+	    angle_max = angle;
+	    w = ns[i];
+	  } 
+	} 
+    }
+    if(w == -1) abort(); // There is no face!
+
+    u = v; v = w;
+      
+    if(w != s) face.push_back(w);
+  }
+  return face;
+}
+
 facemap_t PlanarGraph::compute_faces_oriented() const 
 {
   assert(layout2d.size() == N);
@@ -181,47 +217,13 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 
   // Now visit every other edge once in each direction.
   while(!workset.empty()){
-    dedge_t e = *workset.begin(); workset.erase(workset.begin());
-
-    face_t face;
-    face.push_back(e.first);
-    face.push_back(e.second);
-
-    //    printf("%d->%d\n",e.first,e.second);
-    while(e.second != face[0]){
-      const node_t u = e.first, v = e.second;
-      const vector<node_t>& ns(neighbours[v]);
-
-      coord2d vu(layout2d[u]-layout2d[v]);
-      double angle_min = -M_PI;
-
-      node_t w=-1;
-      for(unsigned int i=0;i<ns.size();i++) {
-	//	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
-	if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
-	  set<dedge_t>::iterator ei(workset.find(dedge_t(v,ns[i])));
-
-	  if(ei != workset.end()){ // directed edge is not yet visited
-	    coord2d vw(layout2d[ns[i]]-layout2d[v]);
-	    double angle = vu.line_angle(vw);
-
-	    if(angle>= angle_min){
-	      angle_min = angle;
-	      w = ns[i];
-	    } 
-	  } 
-	}
-      }
-      if(w == -1) abort(); // There is no face!
-
-      e = dedge_t(v,w);
-      workset.erase(e);
-      
-      if(e.second != face[0]) face.push_back(e.second);
-
-    }
-    //    cout << "face = " << face << endl;
+    dedge_t e = *workset.begin(); 
+    face_t face(get_face_oriented(e.first,e.second));
     facemap[face.size()].insert(face);
+
+    //    cout << "face = " << face << endl;
+    for(int i=0;i<face.size();i++)
+      workset.erase(dedge_t(face[i],face[(i+1)%face.size()]));
   }
   return facemap;
 }

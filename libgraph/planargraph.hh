@@ -33,6 +33,8 @@ public:
 
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;
+  face_t get_face_oriented(int u, int v) const;
+
   vector<face_t> compute_faces_flat(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   face_t find_outer_face() const; 
 
