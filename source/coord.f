@@ -438,18 +438,18 @@ C     Unpack distance matrix value from linear vector
       END
 
       SUBROUTINE EndoKrotoTrans(Matom,IN,Iout,n565,NEK,
-     1 ihueckel,IDA,N5MEM,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
+     1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,layout2D,distp,
      1 CDist)
       use config
-      use iso_c_binding
+C     use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
-      DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
+      DIMENSION IDA(Nmax,Nmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
       DIMENSION NEK(3,Nmax),IP(2,66),KD(4,66),KSW(3)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
-      type(c_ptr) :: g, new_fullerene_graph
+C     type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
       if(n565.eq.0) then
        Write(Iout,1017)
@@ -646,7 +646,6 @@ C Now analyze the adjacency matrix if it is correct
      1 IWS,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
      1 A,evec,df,Dist,layout2D,distp,Cdist)
       use config
-      use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
@@ -654,8 +653,6 @@ C Now analyze the adjacency matrix if it is correct
       DIMENSION nWS(5,8),IP(20),KWS(5),IBWS(8,8)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
-      integer graph_is_a_fullerene
-      type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
       JERR=0
       Do I=1,10
@@ -972,19 +969,16 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE YoshidaFowler6(Matom,IN,Iout,JERR,
-     1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,IC3,
+     1 numberfm,IYF,nfm,ihueckel,IDA,N6MEM,IC3,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       use config
-      use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
-      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
+      DIMENSION N6MEM(Mmax,6)
       DIMENSION nFM(6,66),IP(66),KFM(6),IBFM(66,10)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
-      integer graph_is_a_fullerene
-      type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
       JERR=0
       Do I=1,66
@@ -1383,7 +1377,6 @@ C Now analyze the adjacency matrix if it is correct
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,
      1 A,evec,df,Dist,layout2D,distp,CDist)
       use config
-      use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax)
@@ -1391,8 +1384,6 @@ C Now analyze the adjacency matrix if it is correct
       DIMENSION nFM(4,66),IP(66),KFM(4),IBFM(66,6)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
-      integer graph_is_a_fullerene
-      type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
       JERR=0
       Do I=1,66
@@ -1646,7 +1637,6 @@ C Now analyze the adjacency matrix if it is correct
      1 nSW,ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
      1 CDist)
       use config
-      use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
@@ -1654,8 +1644,6 @@ C Now analyze the adjacency matrix if it is correct
       DIMENSION nsw(4,66),IP(2,66),KSW(4),IBSW(66,2),JBSW(66,2),IAtSW(4)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
-      integer graph_is_a_fullerene
-      type(c_ptr) :: g, new_fullerene_graph
       Write(Iout,1000)
       Do J=1,66
       Do I=1,2
@@ -1863,7 +1851,7 @@ C     Construct Leapfrog fullerene through adjacency matrix
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax),IDA(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
       integer graph_is_a_fullerene
-      type(c_ptr) :: g, frog, halma, new_fullerene_graph, new_graph,
+      type(c_ptr) :: g, frog, halma, new_fullerene_graph,
      1 leapfrog_fullerene, halma_fullerene
       LeapErr=0 
 
@@ -1981,7 +1969,6 @@ C Produce adjacency matrix
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
       DIMENSION IDA(Nmax,Nmax)
-      integer graph_is_a_fullerene
       type(c_ptr) :: g, new_fullerene_graph
 
 C Produce Hueckel matrix and diagonalize

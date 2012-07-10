@@ -71,18 +71,8 @@ c     three angles: forces (let's assume they are all the same)
 c     four dihedrals: forces (let's assume they are all the same)
       ExtWufD=5.0d4
 
-C more default parameters
+C Default parameters for external files
       filename= 'Fullerene'
-c$$$  This yields:
-c$$$      chkname=  'Fullerene.chkpnt'
-c$$$      graphname='Fullerene-2D.dat'
-c$$$      texname=  'Fullerene-2D.tex'
-c$$$      xyzname=  'Fullerene-3D.xyz'
-c$$$      povname2d='Fullerene-2D.pov'
-c$$$      povname3d='Fullerene-3D.pov'
-c$$$      povnamehull='Fullerene-hull.pov'
-c$$$ instead of passing all these variables around.
-c      ...etc.
 
 C Integers
       GCtrans=0 !  Initial flag for Goldberg-Coxeter transformed fullerene
@@ -224,8 +214,6 @@ C Set IC and ichk parameters
       if(IC.lt.0) IC=0
       if(IC.gt.5) IC=5
       if(ichk.ne.0) istop=1
-
-C  Filenames for external files
 
 C  Check on number of atoms (vertices)
       NA=IABS(NA)
