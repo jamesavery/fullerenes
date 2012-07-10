@@ -145,19 +145,40 @@ c subroutine dist takes 12 reals (=4 coordinates) and yields an angel between -\
       SUBROUTINE DIHEDRAL(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
      2 dihedral_abcd)
       IMPLICIT REAL*8 (a-z)
+      ab_x=ax-bx
+      ab_y=ay-by
+      ab_z=az-bz
+      ac_x=ax-cx
+      ac_y=ay-cy
+      ac_z=az-cz
+      bc_x=bx-cx
+      bc_y=by-cy
+      bc_z=bz-cz
+      bd_x=bx-dx
+      bd_y=by-dy
+      bd_z=bz-dz
+      cd_x=cx-dx
+      cd_y=cy-dy
+      cd_z=cz-dz
 c normal vectors on abc and bcd
 c      abc_x=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
-      abc_x=(cy-by)*az+(ay-cy)*bz+(by-ay)*cz
+c      abc_x=(cy-by)*az+(ay-cy)*bz+(by-ay)*cz
+      abc_x=-bc_y*az + ac_y*bz - ab_y*cz
 c      abc_y= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
-      abc_y=(bx-cx)*az+(cx-ax)*bz+(ax-bx)*cz
+c      abc_y=(bx-cx)*az+(cx-ax)*bz+(ax-bx)*cz
+      abc_y=bc_x*az - ac_x*bz + ab_x*cz
 c      abc_z=-ay*bx+ax*by+ay*cx-by*cx-ax*cy+bx*cy
-      abc_z=(cx-bx)*ay+(ax-cx)*by+(bx-ax)*cy
+c      abc_z=(cx-bx)*ay+(ax-cx)*by+(bx-ax)*cy
+      abc_z=-bc_x*ay + ac_x*by - ab_x*cy
 c      bcd_x=-bz*cy+by*cz+bz*dy-cz*dy-by*dz+cy*dz
-      bcd_x=(dy-cy)*bz+(by-dy)*cz+(cy-by)*dz
+c      bcd_x=(dy-cy)*bz+(by-dy)*cz+(cy-by)*dz
+      bcd_x=-cd_y*bz + bd_y*cz - bc_y*dz
 c      bcd_y= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
-      bcd_y=(cx-dx)*bz+(dx-bx)*cz+(bx-cx)*dz
+c      bcd_y=(cx-dx)*bz+(dx-bx)*cz+(bx-cx)*dz
+      bcd_y=cd_x*bz - bd_x*cz + bc_x*dz
 c      bcd_z=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy
-      bcd_z=(cy-dy)*bx+(dy-by)*cx+(by-cy)*dx
+c      bcd_z=(cy-dy)*bx+(dy-by)*cx+(by-cy)*dx
+      bcd_z=cd_y*bx - bd_y*cx + bc_y*dx
 c their respective lengths
       abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
       bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
@@ -169,9 +190,6 @@ c normal vectors (length 1) on abc and bcd
       bcd_1_y=bcd_y*bcd_length_inv
       bcd_1_z=bcd_z*bcd_length_inv
 c two auxiliary vectors
-      bc_x=bx-cx
-      bc_y=by-cy
-      bc_z=bz-cz
       bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc_1_x=bc_x*bc_length_inv
       bc_1_y=bc_y*bc_length_inv
@@ -1728,9 +1746,9 @@ C Loop over 5-rings
           JRX=J+1
           if(JLX.eq.0) JLX=5 ! pseudo cyclic sequence
           if(JRX.eq.6) JRX=1
-          JM=3*N5M(I,J)-2 ! middle
-          JL=3*N5M(I,JLX)-2 ! left
-          JR=3*N5M(I,JRX)-2 ! right
+          JM=3*N5M(I,J) ! middle
+          JL=3*N5M(I,JLX) ! left
+          JR=3*N5M(I,JRX) ! right
           call angle(p(JL-2),p(JL-1),p(JL),p(JM-2),p(JM-1),p(JM),
      2     p(JR-2),p(JR-1),p(JR),angle_p)
           ehookap=ehookap+(angle_p-ap)**2
@@ -2084,16 +2102,18 @@ C     Stretching
 c we distinguish between bonds between two hexagons, two pentagons and hex/pent
 C     Stretching
       Do I=1,n,3
+        i1=(i+2)/3
         Do J=I+3,n,3
+          j1=(j+2)/3
 c check if bond exists
-          if(A(I,J).ne.0) then
+          if(A(i1,j1).ne.0) then
 c get coordinates
-            ax=p(I-2)
-            ay=p(I-1)
-            az=p(I)
-            bx=p(J-2)
-            by=p(J-1)
-            bz=p(J)
+            ax=p(I)
+            ay=p(I+1)
+            az=p(I+2)
+            bx=p(J)
+            by=p(J+1)
+            bz=p(J+2)
             call DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz,ratom)
 C           Check if bond is part of 5-ring
             pentagoncount=0
@@ -2101,8 +2121,8 @@ C           Check if bond is part of 5-ring
               ir1=0
               ir2=0
               do JB=1,5
-                if((I+2)/3.eq.N5M(IB,JB)) ir1=1
-                if((J+2)/3.eq.N5M(IB,JB)) ir2=1
+                if(i1.eq.N5M(IB,JB)) ir1=1
+                if(j1.eq.N5M(IB,JB)) ir2=1
               enddo
               if(ir1.eq.1.and.ir2.eq.1) then
                 pentagoncount=pentagoncount+1
@@ -2120,12 +2140,12 @@ C           Check if bond is part of 5-ring
               force_constant=frpp
             end select
             dE_over_dc=force_constant*(ratom-zero_value)
-            x(I-2)=x(I-2)+dax*dE_over_dc
-            x(I-1)=x(I-1)+day*dE_over_dc
-            x(I)  =x(I)  +daz*dE_over_dc
-            x(J-2)=x(J-2)+dbx*dE_over_dc
-            x(J-1)=x(J-1)+dby*dE_over_dc
-            x(J)  =x(J)  +dbz*dE_over_dc
+            x(I)  =x(I)  +dax*dE_over_dc
+            x(I+1)=x(I+1)+day*dE_over_dc
+            x(I+2)=x(I+2)+daz*dE_over_dc
+            x(J)  =x(J)  +dbx*dE_over_dc
+            x(J+1)=x(J+1)+dby*dE_over_dc
+            x(J+2)=x(J+2)+dbz*dE_over_dc
           endif
         enddo
       enddo
@@ -2162,7 +2182,7 @@ c          call angle(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
           x(JL-1)=x(JL-1)+day*dE_over_dc
           x(JL)  =x(JL)  +daz*dE_over_dc
           x(JM-2)=x(JM-2)+dbx*dE_over_dc
-          x(JM-1)=x(JM+1)+dby*dE_over_dc
+          x(JM-1)=x(JM-1)+dby*dE_over_dc
           x(JM)  =x(JM)  +dbz*dE_over_dc
           x(JR-2)=x(JR-2)+dcx*dE_over_dc
           x(JR-1)=x(JR-1)+dcy*dE_over_dc
@@ -2317,18 +2337,17 @@ c coordinates
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(J1-2)=x(J1-2)+dax*dE_over_dc
         x(J1-1)=x(J1-1)+day*dE_over_dc
-        x(J1  )=x(J1  )+daz*dE_over_dc
+        x(J1)  =x(J1)  +daz*dE_over_dc
         x(J2-2)=x(J2-2)+dbx*dE_over_dc
         x(J2-1)=x(J2-1)+dby*dE_over_dc
-        x(J2  )=x(J2  )+dbz*dE_over_dc
+        x(J2)  =x(J2)  +dbz*dE_over_dc
         x(J3-2)=x(J3-2)+dcx*dE_over_dc
         x(J3-1)=x(J3-1)+dcy*dE_over_dc
-        x(J3  )=x(J3  )+dcz*dE_over_dc
+        x(J3)  =x(J3)  +dcz*dE_over_dc
         x(J4-2)=x(J4-2)+ddx*dE_over_dc
         x(J4-1)=x(J4-1)+ddy*dE_over_dc
-        x(J4  )=x(J4  )+ddz*dE_over_dc
+        x(J4)  =x(J4)  +ddz*dE_over_dc
       enddo
 c      write(*,*)"d,0: ",angle_abcd,zero_value," (should be similar)"
       return
       END
-c      write(*,*)"da: ",dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc
