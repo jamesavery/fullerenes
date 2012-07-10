@@ -42,7 +42,7 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*2 El(99)
       CHARACTER*13 routine
       CHARACTER*20 filename
-      CHARACTER*20 xyzname
+      CHARACTER*31 xyzname
       CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
