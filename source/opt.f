@@ -878,7 +878,7 @@ CU    USES brentx,f1dimx,mnbrakx
       call mnbrakx(n,Matom,IOP,ier,
      1 pcom,xicom,ax,xx,bx,fa,fx,fb,Dist)
       if(ier.eq.1) Return
-      fret=brentx(n,Matom,IOP,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
+      fret=brentx(n,Matom,IOP,ier,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
       do 12 j=1,n
         xi(j)=xmin*xi(j)
         p(j)=p(j)+xi(j)
@@ -893,8 +893,8 @@ CU    USES brentx,f1dimx,mnbrakx
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20,HUGE=1.d10)
       REAL*8 pcom(ncom),xicom(ncom)
       REAL*8 Dist(3,Nmax)
-      fa=f1dimx(ncom,Matom,IOP,ax,pcom,xicom,Dist)
-      fb=f1dimx(ncom,Matom,IOP,bx,pcom,xicom,Dist)
+      fa=f1dimx(ncom,Matom,IOP,ier,ax,pcom,xicom,Dist)
+      fb=f1dimx(ncom,Matom,IOP,ier,bx,pcom,xicom,Dist)
       if(fb.gt.fa)then
         dum=ax
         ax=bx
@@ -904,7 +904,7 @@ CU    USES brentx,f1dimx,mnbrakx
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      fc=f1dimx(ncom,Matom,IOP,cx,pcom,xicom,Dist)
+      fc=f1dimx(ncom,Matom,IOP,ier,cx,pcom,xicom,Dist)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
         q=(bx-cx)*(fb-fa)
@@ -915,7 +915,7 @@ CU    USES brentx,f1dimx,mnbrakx
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             ax=bx
             fa=fb
@@ -928,23 +928,23 @@ CU    USES brentx,f1dimx,mnbrakx
             return
           endif
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
         else if((cx-u)*(u-ulim).gt.0.d0)then
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             bx=cx
             cx=u
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-            fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+            fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.d0)then
           u=ulim
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
         else
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
         endif
         ax=bx
         bx=cx
@@ -957,7 +957,7 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-      DOUBLE PRECISION FUNCTION brentx(ncom,Matom,IOP,
+      DOUBLE PRECISION FUNCTION brentx(ncom,Matom,IOP,ier,
      1 pcom,xicom,ax,bx,cx,tol,xmin,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -971,7 +971,7 @@ CU    USES brentx,f1dimx,mnbrakx
       w=v
       x=v
       e=0.
-      fx=f1dimx(ncom,Matom,IOP,x,pcom,xicom,Dist)
+      fx=f1dimx(ncom,Matom,IOP,ier,x,pcom,xicom,Dist)
       fv=fx
       fw=fx
       do 11 iter=1,ITMAX
@@ -1006,7 +1006,7 @@ CU    USES brentx,f1dimx,mnbrakx
         else
           u=x+sign(tol1,d)
         endif
-        fu=f1dimx(ncom,Matom,IOP,u,pcom,xicom,Dist)
+        fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
         if(fu.le.fx) then
           if(u.ge.x) then
             a=x
