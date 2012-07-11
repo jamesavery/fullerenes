@@ -1180,7 +1180,7 @@ c     evenly.
 
       call vertex_depth(g,IS,lring,depths,d_max)
 
-C     Calculate barycentre of *innermost* face
+C     Calculate barycentre 
       c = (/0,0/)
       do i=1,M
          c(1) = c(1) + Dist(1,i)*(1.d0/M)
