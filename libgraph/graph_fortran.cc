@@ -30,7 +30,8 @@ extern "C" {
 
   int hamiltonian_count_(const graph_ptr *);
   void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const int *outer_dim, int *D);
-
+  void vertex_depth_(const graph_ptr *g, const int *outer_face, const int *of_length, 
+		     int *depths, int *max_depth);
   int graph_is_a_fullerene_(const graph_ptr *);
   void print_graph_(const graph_ptr *);
   void draw_graph_(const graph_ptr *g, const char *filename, const char *format, const int *show_dual, const double *dimensions,
@@ -382,4 +383,21 @@ void get_arc_face_(const graph_ptr *g, const int *u, const int *v, int *face, in
   
   for(int i=0;i<f.size();i++) face[i] = f[i];
   *l = f.size();
+}
+
+void vertex_depth_(const graph_ptr *g, const int *outer_face, const int *of_length, int *depths, int *max_depth)
+{
+  const int N = (*g)->N;
+
+  
+  vector<node_t> outer(*of_length);
+  for(int i=0;i<outer.size();i++) outer[i] = outer_face[i]-1;
+
+  vector<unsigned int> D((*g)->multiple_source_shortest_paths(outer,vector<bool>(N*(N-1)/2),vector<bool>(N)));
+  
+  *max_depth = -1;
+  for(node_t u=0;u<N;u++){
+    depths[u] = D[u];
+    if(depths[u] > *max_depth) *max_depth = depths[u];
+  }
 }

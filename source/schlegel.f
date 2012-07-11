@@ -691,7 +691,8 @@ C     Get Barycenter of outer ring and use as origin
       if(ISchlegel.le.4) then
 C  Radially scale Tutte graph
        if(ISchlegel.eq.4) then
-        CALL ScaleTutte(M,Iout,IS,lring,fscale,layout2d)
+c        CALL ScaleTutteB(g,M,Iout,IS,lring,layout2d)
+         CALL ScaleTutte(M,Iout,IS,lring,fscale,layout2d)
        endif
 C     Write to unit 2
       write (Iout,1037)
@@ -1163,5 +1164,47 @@ C   Scale
       enddo
  1000 Format(1X,'Linear scaling of Tutte graph to move inner ',
      1 'vertices out (Pre-factor for scaling: ',F12.2,')')
+      return
+      END
+
+c     Layout based on Tutte embedding: Keep angles
+c     to barycentrum, throw away radii and distribute
+c     evenly.
+      SUBROUTINE ScaleTutteB(g,M,Iout,IS,lring,Dist)
+      use config
+      use iso_c_binding
+      integer is(6), depths(M), d_max,i
+      real*8 Dist(2,Nmax), c(2), radius, dr
+      type(c_ptr)::g
+      Write(Iout,1000) 
+
+      call vertex_depth(g,IS,lring,depths,d_max)
+
+C     Calculate barycentre 
+      c = (/0,0/)
+      do i=1,M
+         c(1) = c(1) + Dist(1,i)*(1.d0/M)
+         c(2) = c(2) + Dist(2,i)*(1.d0/M)
+      end do
+
+C   Scale
+      do i=1,M
+         d = sqrt((Dist(1,i)-c(1))**2 + (Dist(2,i)-c(2))**2)
+         dr = .8/REAL(d_max-.5d0) ! Slightly less than radius 0.809 of circle inscribed in pentagon
+
+         if(d.gt.0.d0) then
+            if(depths(i).eq.0) then
+               radius = 1.0
+            else
+               radius = dr*(d_max-depths(i)+.5d0)
+            endif
+            write (*,*) "Scaling vertex", i, "at depth",depths(i),
+     1           "by",radius
+            Dist(1,I)=(Dist(1,I)-c(1))*radius/d+c(1)
+            Dist(2,I)=(Dist(2,I)-c(2))*radius/d+c(2)
+         endif
+      enddo
+ 1000 Format(1X,'Graph layout from Tutte-embedding angles, linearly 
+     1           distributed raii.')
       return
       END
