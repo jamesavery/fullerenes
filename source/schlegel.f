@@ -1176,15 +1176,8 @@ c     evenly.
       integer is(6), depths(M), d_max,i
       real*8 Dist(2,Nmax), c(2), radius, dr
       type(c_ptr)::g
-C Routine to move inner vertices of a Tutte graph outwards
-C through a linear relation.
-C Scheme: 
-C  Let C be barycentrum. Position x(v) of vertex v
-C  is (1+s(v))*x(v), where s(v) \propto d(v)/d_max
-C   Determine min distance of outer ring
-      Write(Iout,1000) fs
+      Write(Iout,1000) 
 
-      write (*,*) "Outer ring is", IS
       call vertex_depth(g,IS,lring,depths,d_max)
 
 C     Calculate barycentre of *innermost* face
