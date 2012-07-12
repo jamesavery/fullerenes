@@ -43,7 +43,7 @@ C     End Iteration
       Write(IOUT,1005) RVdWC,RealMIS,VVdWC
  1000 Format(/1X,'Calculate the maximum inner sphere')
  1001 Format(1X,'Initial inner radius: ',d12.6,' to point ',I5,
-     1 ' taken from center of MDS at (X,Y,Z): ',3(D14.8,2X))
+     1 ' taken from center of MCS at (X,Y,Z): ',3(D14.8,2X))
  1002 Format(/1x,'Initial values (in units of input):',
      1 /1x,' Radius of maximum inner sphere: ',D14.8,
      1 /1x,' Volume of maximum inner sphere: ',D14.8,
@@ -63,7 +63,7 @@ C     End Iteration
       RETURN
       END
 
-      SUBROUTINE MinDistSphere(M,IOUT,Dist,c)
+      SUBROUTINE MinDistSphere(M,IOUT,Dist,cMCS)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),c(3),cmax(3),cMCS(3)
@@ -83,7 +83,7 @@ C    contained in the vector cmax
 C    Get maximum values
       Do J=1,3
        cmax(J)=0.d0
-       cMCS(J)=c(J)
+       c(J)=0.d0
       enddo
       Do I=1,Nmax
       Do J=1,3
@@ -134,7 +134,7 @@ C     End Iteration
       Write(IOUT,1005) RMDSI,VMDS,AMDS,rminMDS,distortion
  1000 Format(/1X,'Calculate the minimum distance sphere')
  1001 Format(1X,'Initial average radius: ',d12.6,
-     1 ' taken from center of MCS at (X,Y,Z): ',3(D14.8,2X))
+     1 ' taken from barycenter at (X,Y,Z): ',3(D14.8,2X))
  1002 Format(/1x,'Initial values (in units of input):',
      1 /1x,' Radius of minimum distance sphere: ',D14.8,
      1 /1x,' Volume of minimum distance sphere: ',D14.8,
