@@ -1,0 +1,67 @@
+\documentclass[]{scrartcl}
+
+\usepackage{pstricks}
+\usepackage{pst-all}
+\usepackage[landscape]{geometry}
+
+
+\thispagestyle{empty}
+\begin{document}
+\tiny
+\begin{pspicture}(2,-8)(20,8)
+%\psgrid
+\renewcommand{\psedge}{\ncline[linewidth=.5pt]{<-}}
+\pstree[treemode=R,levelsep=3cm,radius=2pt]{\Tr{main}}{%
+	\Tr{date\_and\_time (--)}
+	\pstree{\Tr{timer (main.f)}}{\Tr{dtime (--)}}
+    \Tr{datain (datain.f)}
+	\Tr{coordc20c60 (coord.f)}
+	\pstree{\Tr{optff (opt.f)}}{
+		\pstree{\Tr{frprmn3d (opt.f)}}{
+			\skiplevels{2}
+			\pstree{\Tr[name=func3d]{func3d (force.f)}}{
+				\Tr{wu (force.f)} \Tr{extwu (force.f)}
+			} 
+			\pstree{\Tr[name=dfunc3d]{dfunc3d (force.f)}}{
+				\Tr{dwu (force.f)} \Tr{dextwu (force.f)}
+			}
+			\endskiplevels
+		}
+		\pstree{\Tr{linmin3d (opt.f)}}{
+			\pstree{\Tr{mnbrak3d (opt.f)}}{\Tr[name=f1dim3d]{f1dim3d (opt.f)}}
+			\Tr[name=brent3d]{brent3d (opt.f)}
+		}
+		\Tr{distan (util.f)}
+	}
+	\pstree{\Tr{coordbuild (pentindex.f)}}{
+		\Tr{isomerget (pentindex.f)}
+		\Tr{windup}
+		\Tr{unwind}
+		\Tr{canspiral}
+		\Tr{dual}
+		\Tr{adjacency\_matrix}
+		\Tr{tred2}
+		\Tr{tqli}
+		\Tr{HueckelAnalyze}
+		\Tr{Distan}
+		\Tr{diameter}
+		\Tr{dipole (pentindex.f)}
+		\Tr{tutte\_layout}
+		\Tr{spherical\_layout}
+		\Tr{delete\_fullerene\_graph}
+	}
+	\Tr{chiral}
+	\Tr{isomers}
+	\Tr{MoveCM}
+    \Tr{Diameter}
+	\Tr{Distmatrix}
+    \Tr{Connect}
+    \Tr{Hueckel}
+    \Tr{Leapfrog}
+}
+\ncline[]{<-}{f1dim3d}{func3d}
+\ncline[]{<-}{brent3d}{f1dim3d}
+\end{pspicture}
+
+
+\end{document}
