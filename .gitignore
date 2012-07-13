@@ -1,0 +1,6 @@
+# thing we never want to commit
+
+
+*.log
+*.aux
+*.o
