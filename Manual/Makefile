@@ -16,7 +16,7 @@ tree.pdf: tree.tex
 clean:
 	rm -f *.log *.aux *.dvi *.ps *.bib
 
-.PHONY: purge
-purge: clean
+.PHONY: distclean
+distclean: clean
 	rm -f UserManual.pdf tree.pdf
 
