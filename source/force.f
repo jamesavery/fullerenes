@@ -210,1359 +210,2443 @@ c the result
      2  dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
       implicit real*8 (a-z)
 
-      AA=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
-      AB= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
-      AC=-ay*bx+ax*by+ay*cx-by*cx-ax*cy+bx*cy
-      AD=-bz*cy+by*cz+bz*dy-cz*dy-by*dz+cy*dz
-      AE= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
-      AF=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy 
-c      write(*,*)"abcdef",aa,ab,ac,ad,ae,af
-    
-      AG=ax-bx
-      AH=ay-by
-      AI=az-bz
-      AJ=bx-cx
-      AK=by-cy
-      AL=bz-cz
-      AM=cx-dx
-      AN=cy-dy
-      AO=cz-dz
-c      write(*,*)"g-o",AG,AH,AI,AJ,AK,AL,AM,AN,AO
-      BB=ax-cx
-      BC=ay-cy
-      BD=az-cz
-      BE=bx-dx
-      BF=by-dy
-      BG=bz-dz
+      abx=ax-bx
+      aby=ay-by
+      abz=az-bz
+      acx=ax-cx
+      acy=ay-cy
+      acz=az-cz
+      bcx=bx-cx
+      bcy=by-cy
+      bcz=bz-cz
+      bdx=bx-dx
+      bdy=by-dy
+      bdz=bz-dz
+      cdx=cx-dx
+      cdy=cy-dy
+      cdz=cz-dz
+c      write(*,*)"a-b",abx,aby,abz
+c      write(*,*)"a-c",acx,acy,acz
+c      write(*,*)"b-c",bcx,bcy,bcz
+c      write(*,*)"b-d",bdx,bdy,bdz
+c      write(*,*)"c-d",cdx,cdy,cdz
 
-      BH= 2*AC*BB - 2*AA*BD
-      BI=-2*AF*AM + 2*AD*AO
-c      write(*,*)"hi",bh,bi
+c normal vectors on abc and bcd
+c      abc_x=-az*by+ay*bz+az*cy-bz*cy-ay*cz+by*cz
+c      abc_x=(cy-by)*az+(ay-cy)*bz+(by-ay)*cz
+      abcx=-bcy*az + acy*bz - aby*cz
+c      abc_y= az*bx-ax*bz-az*cx+bz*cx+ax*cz-bx*cz
+c      abc_y=(bx-cx)*az+(cx-ax)*bz+(ax-bx)*cz
+      abcy= bcx*az - acx*bz + abx*cz
+c      abc_z=-ay*bx+ax*by+ay*cx-by*cx-ax*cy+bx*cy
+c      abc_z=(cx-bx)*ay+(ax-cx)*by+(bx-ax)*cy
+      abcz=-bcx*ay + acx*by - abx*cy
+c      bcd_x=-bz*cy+by*cz+bz*dy-cz*dy-by*dz+cy*dz
+c      bcd_x=(dy-cy)*bz+(by-dy)*cz+(cy-by)*dz
+      bcdx=-cdy*bz + bdy*cz - bcy*dz
+c      bcd_y= bz*cx-bx*cz-bz*dx+cz*dx+bx*dz-cx*dz
+c      bcd_y=(cx-dx)*bz+(dx-bx)*cz+(bx-cx)*dz
+      bcdy= cdx*bz - bdx*cz + bcx*dz
+c      bcd_z=-by*cx+bx*cy+by*dx-cy*dx-bx*dy+cx*dy
+c      bcd_z=(cy-dy)*bx+(dy-by)*cx+(by-cy)*dx
+      bcdz= cdy*bx - bdy*cx + bcy*dx
+c      write(*,*)"abc",abcx,abcy,abcz
+c      write(*,*)"bcd",bcdx,bcdy,bcdz
 
-      AP=AA**2 + AB**2 + AC**2
-      AQ=AJ**2 + AK**2 + AL**2
-      AR=AD**2 + AE**2 + AF**2
+      BH= 2*abcz*acx - 2*abcx*acz
+      BI=-2*bcdz*cdx + 2*bcdx*cdz
+c      write(*,*)"b-hi",bh,bi
 
-      AS=AI**2+AL**2
-      AT=AJ**2+AK**2
-      AU=AJ**2+AL**2
-c      write(*,*)"p-u",ap,aq,ar,as,at,au
+      abc2n=abcx**2 + abcy**2 + abcz**2
+      bcd2n=bcdx**2 + bcdy**2 + bcdz**2
+      bc2=bcx**2 + bcy**2 + bcz**2
+c      write(*,*)"abc2n,bcd2n,bc2n",abc2n,bcd2n,bc2n
 
-      AV=-(AJ*AK*ax) + AU*ay - az*by*bz + bx*by*cx - by*cx**2 -
-     2    bx**2*cy + az*bz*cy - bz**2*cy + bx*cx*cy + az*by*cz +
-     3    by*bz*cz - az*cy*cz + bz*cy*cz - by*cz**2
-      AW=-(AJ*AL*ax) + AT*az - ay*by*bz + bx*bz*cx - bz*cx**2 +
-     2    ay*bz*cy + by*bz*cy - bz*cy**2 - bx**2*cz + ay*by*cz -
-     3    by**2*cz + bx*cx*cz - ay*cy*cz + by*cy*cz
-      BA=AS*ax - AJ*AK*ay - az*bx*bz - by**2*cx + az*bz*cx -
-     2    bz**2*cx + bx*by*cy + by*cx*cy - bx*cy**2 + az*bx*cz +
-     3    bx*bz*cz - az*cx*cz + bz*cx*cz - bx*cz**2
-c      write(*,*)"v-ba",av,aw,ba
-      BM=-(AJ*AL*ax) + AJ**2*az + AK**2*az - ay*by*bz + bx*bz*cx -
-     2    bz*cx**2 + ay*bz*cy + by*bz*cy - bz*cy**2 - bx**2*cz +
-     3    ay*by*cz - by**2*cz + bx*cx*cz - ay*cy*cz + by*cy*cz
-      BN=AI**2*ax + AL**2*ax - AJ*AK*ay - az*bx*bz - by**2*cx +
-     2    az*bz*cx - bz**2*cx + bx*by*cy + by*cx*cy - bx*cy**2 +
-     3    az*bx*cz + bx*bz*cz - az*cx*cz + bz*cx*cz - bx*cz**2
-      BO=-(AJ*AK*ax) + AJ**2*ay + AL**2*ay - az*by*bz + bx*by*cx -
-     2    by*cx**2 - bx**2*cy + az*bz*cy - bz**2*cy + bx*cx*cy +
-     3    az*by*cz + by*bz*cz - az*cy*cz + bz*cy*cz - by*cz**2
-
-      den_inv=1/(Sqrt(AQ)*((AA*AD + AB*AE + AC*AF)**2 +
-     6 (AE*AV + AF*AW + AD*BA)**2/AQ))
-
-      dax=(AA*AD**2*AS + AE**2*(-(AB*AJ*AK) + AL*AV) - AF**2*(AC*AJ*AL +
-     2 AK*AW) + AD*AF*(-(AA*AJ*AL) + AC*AS - AK*BA) + 
-     3 AE*(AF*(-(AJ*(AC*AK + AB*AL)) - AK*AV + AL*AW) + AD*(-(AA*AJ*AK)+
-     4 AB*AS + AL*BA)))*den_inv
-c      write(*,*)den_inv,dax
-
-      day=(AC*AE*AF*bx**2 + AE*AF*AJ*ay*bx**2 - AD*AE*AL*ay*bx**2 + 
-     -    AF**2*AJ*az*bx**2 - AD*AF*AL*az*bx**2 - AC*AD*AF*bx*by - 
-     -    AE*AF*AJ*ax*bx*by + AD*AE*AL*ax*bx*by - AD*AF*AJ*ay*bx*by + 
-     -    AD**2*AL*ay*bx*by + AD*AF*AJ*ax*by**2 - AD**2*AL*ax*by**2 + 
-     -    AF**2*AJ*az*by**2 - AD*AF*AL*az*by**2 - AF**2*AJ*ax*bx*bz + 
-     -    AD*AF*AL*ax*bx*bz - AD*AF*AJ*az*bx*bz + AD**2*AL*az*bx*bz - 
-     -    AC*AF**2*by*bz - AF**2*AJ*ay*by*bz + AD*AF*AL*ay*by*bz - 
-     -    AE*AF*AJ*az*by*bz + AD*AE*AL*az*by*bz + AC*AE*AF*bz**2 + 
-     -    AD*AF*AJ*ax*bz**2 - AD**2*AL*ax*bz**2 + AE*AF*AJ*ay*bz**2 - 
-     -    AD*AE*AL*ay*bz**2 - 2*AC*AE*AF*bx*cx - 2*AE*AF*AJ*ay*bx*cx + 
-     -    2*AD*AE*AL*ay*bx*cx - 2*AF**2*AJ*az*bx*cx + 
-     -    2*AD*AF*AL*az*bx*cx + AC*AD*AF*by*cx + AE*AF*AJ*ax*by*cx - 
-     -    AD*AE*AL*ax*by*cx + AD*AF*AJ*ay*by*cx - AD**2*AL*ay*by*cx + 
-     -    AE*AF*AJ*bx*by*cx - AD*AE*AL*bx*by*cx - AD*AF*AJ*by**2*cx + 
-     -    AD**2*AL*by**2*cx + AF**2*AJ*ax*bz*cx - AD*AF*AL*ax*bz*cx + 
-     -    AD*AF*AJ*az*bz*cx - AD**2*AL*az*bz*cx + AF**2*AJ*bx*bz*cx - 
-     -    AD*AF*AL*bx*bz*cx - AD*AF*AJ*bz**2*cx + AD**2*AL*bz**2*cx + 
-     -    AC*AE*AF*cx**2 + AE*AF*AJ*ay*cx**2 - AD*AE*AL*ay*cx**2 + 
-     -    AF**2*AJ*az*cx**2 - AD*AF*AL*az*cx**2 - AE*AF*AJ*by*cx**2 + 
-     -    AD*AE*AL*by*cx**2 - AF**2*AJ*bz*cx**2 + AD*AF*AL*bz*cx**2 + 
-     -    AC*AD*AF*bx*cy + AE*AF*AJ*ax*bx*cy - AD*AE*AL*ax*bx*cy + 
-     -    AD*AF*AJ*ay*bx*cy - AD**2*AL*ay*bx*cy - AE*AF*AJ*bx**2*cy + 
-     -    AD*AE*AL*bx**2*cy - 2*AD*AF*AJ*ax*by*cy + 2*AD**2*AL*ax*by*cy-
-     -    2*AF**2*AJ*az*by*cy + 2*AD*AF*AL*az*by*cy + AD*AF*AJ*bx*by*cy-
-     -    AD**2*AL*bx*by*cy + AC*AF**2*bz*cy + AF**2*AJ*ay*bz*cy - 
-     -    AD*AF*AL*ay*bz*cy + AE*AF*AJ*az*bz*cy - AD*AE*AL*az*bz*cy + 
-     -    AF**2*AJ*by*bz*cy - AD*AF*AL*by*bz*cy - AE*AF*AJ*bz**2*cy + 
-     -    AD*AE*AL*bz**2*cy - AC*AD*AF*cx*cy - AE*AF*AJ*ax*cx*cy + 
-     -    AD*AE*AL*ax*cx*cy - AD*AF*AJ*ay*cx*cy + AD**2*AL*ay*cx*cy + 
-     -    AE*AF*AJ*bx*cx*cy - AD*AE*AL*bx*cx*cy + AD*AF*AJ*by*cx*cy - 
-     -    AD**2*AL*by*cx*cy + AD*AF*AJ*ax*cy**2 - AD**2*AL*ax*cy**2 + 
-     -    AF**2*AJ*az*cy**2 - AD*AF*AL*az*cy**2 - AD*AF*AJ*bx*cy**2 + 
-     -    AD**2*AL*bx*cy**2 - AF**2*AJ*bz*cy**2 + AD*AF*AL*bz*cy**2 + 
-     -    AF**2*AJ*ax*bx*cz - AD*AF*AL*ax*bx*cz + AD*AF*AJ*az*bx*cz - 
-     -    AD**2*AL*az*bx*cz - AF**2*AJ*bx**2*cz + AD*AF*AL*bx**2*cz + 
-     -    AC*AF**2*by*cz + AF**2*AJ*ay*by*cz - AD*AF*AL*ay*by*cz + 
-     -    AE*AF*AJ*az*by*cz - AD*AE*AL*az*by*cz - AF**2*AJ*by**2*cz + 
-     -    AD*AF*AL*by**2*cz - 2*AC*AE*AF*bz*cz - 2*AD*AF*AJ*ax*bz*cz + 
-     -    2*AD**2*AL*ax*bz*cz - 2*AE*AF*AJ*ay*bz*cz + 
-     -    2*AD*AE*AL*ay*bz*cz + AD*AF*AJ*bx*bz*cz - AD**2*AL*bx*bz*cz + 
-     -    AE*AF*AJ*by*bz*cz - AD*AE*AL*by*bz*cz - AF**2*AJ*ax*cx*cz + 
-     -    AD*AF*AL*ax*cx*cz - AD*AF*AJ*az*cx*cz + AD**2*AL*az*cx*cz + 
-     -    AF**2*AJ*bx*cx*cz - AD*AF*AL*bx*cx*cz + AD*AF*AJ*bz*cx*cz - 
-     -    AD**2*AL*bz*cx*cz - AC*AF**2*cy*cz - AF**2*AJ*ay*cy*cz + 
-     -    AD*AF*AL*ay*cy*cz - AE*AF*AJ*az*cy*cz + AD*AE*AL*az*cy*cz + 
-     -    AF**2*AJ*by*cy*cz - AD*AF*AL*by*cy*cz + AE*AF*AJ*bz*cy*cz - 
-     -    AD*AE*AL*bz*cy*cz + AC*AE*AF*cz**2 + AD*AF*AJ*ax*cz**2 - 
-     -    AD**2*AL*ax*cz**2 + AE*AF*AJ*ay*cz**2 - AD*AE*AL*ay*cz**2 - 
-     -    AD*AF*AJ*bx*cz**2 + AD**2*AL*bx*cz**2 - AE*AF*AJ*by*cz**2 + 
-     -    AD*AE*AL*by*cz**2 + 
-     -    AA*AD*(AE*AU + AK*(-(AD*bx) - AF*bz + AD*cx + AF*cz)) + 
-     -    AB*AE*(AE*AU + AK*(-(AD*bx) - AF*bz + AD*cx + AF*cz)))/
-     -  (Sqrt(AQ)*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
-
-
-      daz=(AC*AF**2*bx**2 - AE**2*AJ*ay*bx**2 + AD*AE*AK*ay*bx**2 - 
-     -    AE*AF*AJ*az*bx**2 + AD*AF*AK*az*bx**2 + AE**2*AJ*ax*bx*by - 
-     -    AD*AE*AK*ax*bx*by + AD*AE*AJ*ay*bx*by - AD**2*AK*ay*bx*by + 
-     -    AC*AF**2*by**2 - AD*AE*AJ*ax*by**2 + AD**2*AK*ax*by**2 - 
-     -    AE*AF*AJ*az*by**2 + AD*AF*AK*az*by**2 - AC*AD*AF*bx*bz + 
-     -    AE*AF*AJ*ax*bx*bz - AD*AF*AK*ax*bx*bz + AD*AE*AJ*az*bx*bz - 
-     -    AD**2*AK*az*bx*bz - AC*AE*AF*by*bz + AE*AF*AJ*ay*by*bz - 
-     -    AD*AF*AK*ay*by*bz + AE**2*AJ*az*by*bz - AD*AE*AK*az*by*bz - 
-     -    AD*AE*AJ*ax*bz**2 + AD**2*AK*ax*bz**2 - AE**2*AJ*ay*bz**2 + 
-     -    AD*AE*AK*ay*bz**2 - 2*AC*AF**2*bx*cx + 2*AE**2*AJ*ay*bx*cx - 
-     -    2*AD*AE*AK*ay*bx*cx +2*AE*AF*AJ*az*bx*cx -2*AD*AF*AK*az*bx*cx-
-     -    AE**2*AJ*ax*by*cx + AD*AE*AK*ax*by*cx - AD*AE*AJ*ay*by*cx + 
-     -    AD**2*AK*ay*by*cx - AE**2*AJ*bx*by*cx + AD*AE*AK*bx*by*cx + 
-     -    AD*AE*AJ*by**2*cx - AD**2*AK*by**2*cx + AC*AD*AF*bz*cx - 
-     -    AE*AF*AJ*ax*bz*cx + AD*AF*AK*ax*bz*cx - AD*AE*AJ*az*bz*cx + 
-     -    AD**2*AK*az*bz*cx - AE*AF*AJ*bx*bz*cx + AD*AF*AK*bx*bz*cx + 
-     -    AD*AE*AJ*bz**2*cx - AD**2*AK*bz**2*cx + AC*AF**2*cx**2 - 
-     -    AE**2*AJ*ay*cx**2 + AD*AE*AK*ay*cx**2 - AE*AF*AJ*az*cx**2 + 
-     -    AD*AF*AK*az*cx**2 + AE**2*AJ*by*cx**2 - AD*AE*AK*by*cx**2 + 
-     -    AE*AF*AJ*bz*cx**2 - AD*AF*AK*bz*cx**2 - AE**2*AJ*ax*bx*cy + 
-     -    AD*AE*AK*ax*bx*cy - AD*AE*AJ*ay*bx*cy + AD**2*AK*ay*bx*cy + 
-     -    AE**2*AJ*bx**2*cy - AD*AE*AK*bx**2*cy - 2*AC*AF**2*by*cy + 
-     -    2*AD*AE*AJ*ax*by*cy -2*AD**2*AK*ax*by*cy +2*AE*AF*AJ*az*by*cy-
-     -    2*AD*AF*AK*az*by*cy - AD*AE*AJ*bx*by*cy + AD**2*AK*bx*by*cy + 
-     -    AC*AE*AF*bz*cy - AE*AF*AJ*ay*bz*cy + AD*AF*AK*ay*bz*cy - 
-     -    AE**2*AJ*az*bz*cy + AD*AE*AK*az*bz*cy - AE*AF*AJ*by*bz*cy + 
-     -    AD*AF*AK*by*bz*cy + AE**2*AJ*bz**2*cy - AD*AE*AK*bz**2*cy + 
-     -    AE**2*AJ*ax*cx*cy - AD*AE*AK*ax*cx*cy + AD*AE*AJ*ay*cx*cy - 
-     -    AD**2*AK*ay*cx*cy - AE**2*AJ*bx*cx*cy + AD*AE*AK*bx*cx*cy - 
-     -    AD*AE*AJ*by*cx*cy + AD**2*AK*by*cx*cy + AC*AF**2*cy**2 - 
-     -    AD*AE*AJ*ax*cy**2 + AD**2*AK*ax*cy**2 - AE*AF*AJ*az*cy**2 + 
-     -    AD*AF*AK*az*cy**2 + AD*AE*AJ*bx*cy**2 - AD**2*AK*bx*cy**2 + 
-     -    AE*AF*AJ*bz*cy**2 - AD*AF*AK*bz*cy**2 + 
-     -    AA*AD*(AF*AT + AL*(-(AD*bx) - AE*by + AD*cx + AE*cy)) + 
-     -    AB*AE*(AF*AT + AL*(-(AD*bx) - AE*by + AD*cx + AE*cy)) + 
-     -    AC*AD*AF*bx*cz - AE*AF*AJ*ax*bx*cz + AD*AF*AK*ax*bx*cz - 
-     -    AD*AE*AJ*az*bx*cz + AD**2*AK*az*bx*cz + AE*AF*AJ*bx**2*cz - 
-     -    AD*AF*AK*bx**2*cz + AC*AE*AF*by*cz - AE*AF*AJ*ay*by*cz + 
-     -    AD*AF*AK*ay*by*cz - AE**2*AJ*az*by*cz + AD*AE*AK*az*by*cz + 
-     -    AE*AF*AJ*by**2*cz - AD*AF*AK*by**2*cz + 2*AD*AE*AJ*ax*bz*cz - 
-     -    2*AD**2*AK*ax*bz*cz +2*AE**2*AJ*ay*bz*cz -2*AD*AE*AK*ay*bz*cz-
-     -    AD*AE*AJ*bx*bz*cz + AD**2*AK*bx*bz*cz - AE**2*AJ*by*bz*cz + 
-     -    AD*AE*AK*by*bz*cz - AC*AD*AF*cx*cz + AE*AF*AJ*ax*cx*cz - 
-     -    AD*AF*AK*ax*cx*cz + AD*AE*AJ*az*cx*cz - AD**2*AK*az*cx*cz - 
-     -    AE*AF*AJ*bx*cx*cz + AD*AF*AK*bx*cx*cz - AD*AE*AJ*bz*cx*cz + 
-     -    AD**2*AK*bz*cx*cz - AC*AE*AF*cy*cz + AE*AF*AJ*ay*cy*cz - 
-     -    AD*AF*AK*ay*cy*cz + AE**2*AJ*az*cy*cz - AD*AE*AK*az*cy*cz - 
-     -    AE*AF*AJ*by*cy*cz + AD*AF*AK*by*cy*cz - AE**2*AJ*bz*cy*cz + 
-     -    AD*AE*AK*bz*cy*cz - AD*AE*AJ*ax*cz**2 + AD**2*AK*ax*cz**2 - 
-     -    AE**2*AJ*ay*cz**2 + AD*AE*AK*ay*cz**2 + AD*AE*AJ*bx*cz**2 - 
-     -    AD**2*AK*bx*cz**2 + AE**2*AJ*by*cz**2 - AD*AE*AK*by*cz**2)/
-     -  (Sqrt(AQ)*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
-
-      dbx=(2*AC*AE*AF*AQ*ay*bx + 2*AC*AF**2*AQ*az*bx - 
-     -    AC*AE*AF*AJ*ay*bx**2 - AC*AE*AN*AQ*ay*bx**2 - 
-     -    AC*AF*AO*AQ*ay*bx**2 - AC*AF**2*AJ*az*bx**2 + 
-     -    AE*AF*AQ*ay*BC*bx**2 + AF**2*AQ*az*BC*bx**2 - 
-     -    AE**2*AQ*ay*BD*bx**2 - AE*AF*AQ*az*BD*bx**2 - 
-     -    AC*AE*AF*AQ*ax*by - AC*AD*AF*AQ*ay*by + 
-     -    AC*AE*AF*AJ*ax*bx*by + AC*AE*AN*AQ*ax*bx*by + 
-     -    AC*AF*AO*AQ*ax*bx*by + AC*AD*AF*AJ*ay*bx*by + 
-     -    AC*AD*AN*AQ*ay*bx*by - AE*AF*AQ*ax*BC*bx*by - 
-     -    AD*AF*AQ*ay*BC*bx*by + AE**2*AQ*ax*BD*bx*by + 
-     -    AD*AE*AQ*ay*BD*bx*by - AC*AD*AF*AJ*ax*by**2 - 
-     -    AC*AD*AN*AQ*ax*by**2 - AC*AF**2*AJ*az*by**2 + 
-     -    AD*AF*AQ*ax*BC*by**2 + AF**2*AQ*az*BC*by**2 - 
-     -    AD*AE*AQ*ax*BD*by**2 - AE*AF*AQ*az*BD*by**2 - 
-     -    AC*AF**2*AQ*ax*bz - AC*AD*AF*AQ*az*bz + 
-     -    AC*AF**2*AJ*ax*bx*bz + AC*AD*AF*AJ*az*bx*bz + 
-     -    AC*AD*AN*AQ*az*bx*bz - AF**2*AQ*ax*BC*bx*bz - 
-     -    AD*AF*AQ*az*BC*bx*bz + AE*AF*AQ*ax*BD*bx*bz + 
-     -    AD*AE*AQ*az*BD*bx*bz + AC*AF**2*AJ*ay*by*bz + 
-     -    AC*AE*AF*AJ*az*by*bz + AC*AE*AN*AQ*az*by*bz + 
-     -    AC*AF*AO*AQ*az*by*bz - AF**2*AQ*ay*BC*by*bz - 
-     -    AE*AF*AQ*az*BC*by*bz + AE*AF*AQ*ay*BD*by*bz + 
-     -    AE**2*AQ*az*BD*by*bz - AC*AD*AF*AJ*ax*bz**2 - 
-     -    AC*AD*AN*AQ*ax*bz**2 - AC*AE*AF*AJ*ay*bz**2 - 
-     -    AC*AE*AN*AQ*ay*bz**2 - AC*AF*AO*AQ*ay*bz**2 + 
-     -    AD*AF*AQ*ax*BC*bz**2 + AE*AF*AQ*ay*BC*bz**2 - 
-     -    AD*AE*AQ*ax*BD*bz**2 - AE**2*AQ*ay*BD*bz**2 - 
-     -    2*AC*AE*AF*AQ*ay*cx - 2*AC*AF**2*AQ*az*cx + 
-     -    2*AC*AE*AF*AJ*ay*bx*cx + 2*AC*AE*AN*AQ*ay*bx*cx + 
-     -    2*AC*AF*AO*AQ*ay*bx*cx + 2*AC*AF**2*AJ*az*bx*cx - 
-     -    2*AE*AF*AQ*ay*BC*bx*cx - 2*AF**2*AQ*az*BC*bx*cx + 
-     -    2*AE**2*AQ*ay*BD*bx*cx + 2*AE*AF*AQ*az*BD*bx*cx + 
-     -    AC*AE*AF*AQ*by*cx - AC*AE*AF*AJ*ax*by*cx - 
-     -    AC*AE*AN*AQ*ax*by*cx - AC*AF*AO*AQ*ax*by*cx - 
-     -    AC*AD*AF*AJ*ay*by*cx - AC*AD*AN*AQ*ay*by*cx + 
-     -    AE*AF*AQ*ax*BC*by*cx + AD*AF*AQ*ay*BC*by*cx - 
-     -    AE**2*AQ*ax*BD*by*cx - AD*AE*AQ*ay*BD*by*cx - 
-     -    AC*AE*AF*AJ*bx*by*cx - AC*AE*AN*AQ*bx*by*cx - 
-     -    AC*AF*AO*AQ*bx*by*cx + AE*AF*AQ*BC*bx*by*cx - 
-     -    AE**2*AQ*BD*bx*by*cx + AC*AD*AF*AJ*by**2*cx + 
-     -    AC*AD*AN*AQ*by**2*cx - AD*AF*AQ*BC*by**2*cx + 
-     -    AD*AE*AQ*BD*by**2*cx + AC*AF**2*AQ*bz*cx - 
-     -    AC*AF**2*AJ*ax*bz*cx - AC*AD*AF*AJ*az*bz*cx - 
-     -    AC*AD*AN*AQ*az*bz*cx + AF**2*AQ*ax*BC*bz*cx + 
-     -    AD*AF*AQ*az*BC*bz*cx - AE*AF*AQ*ax*BD*bz*cx - 
-     -    AD*AE*AQ*az*BD*bz*cx - AC*AF**2*AJ*bx*bz*cx + 
-     -    AF**2*AQ*BC*bx*bz*cx - AE*AF*AQ*BD*bx*bz*cx + 
-     -    AC*AD*AF*AJ*bz**2*cx + AC*AD*AN*AQ*bz**2*cx - 
-     -    AD*AF*AQ*BC*bz**2*cx + AD*AE*AQ*BD*bz**2*cx - 
-     -    AC*AE*AF*AJ*ay*cx**2 - AC*AE*AN*AQ*ay*cx**2 - 
-     -    AC*AF*AO*AQ*ay*cx**2 - AC*AF**2*AJ*az*cx**2 + 
-     -    AE*AF*AQ*ay*BC*cx**2 + AF**2*AQ*az*BC*cx**2 - 
-     -    AE**2*AQ*ay*BD*cx**2 - AE*AF*AQ*az*BD*cx**2 + 
-     -    AC*AE*AF*AJ*by*cx**2 + AC*AE*AN*AQ*by*cx**2 + 
-     -    AC*AF*AO*AQ*by*cx**2 - AE*AF*AQ*BC*by*cx**2 + 
-     -    AE**2*AQ*BD*by*cx**2 + AC*AF**2*AJ*bz*cx**2 - 
-     -    AF**2*AQ*BC*bz*cx**2 + AE*AF*AQ*BD*bz*cx**2 + 
-     -    AC*AE*AF*AQ*ax*cy + AC*AD*AF*AQ*ay*cy - 2*AC*AE*AF*AQ*bx*cy - 
-     -    AC*AE*AF*AJ*ax*bx*cy - AC*AE*AN*AQ*ax*bx*cy - 
-     -    AC*AF*AO*AQ*ax*bx*cy - AC*AD*AF*AJ*ay*bx*cy - 
-     -    AC*AD*AN*AQ*ay*bx*cy + AE*AF*AQ*ax*BC*bx*cy + 
-     -    AD*AF*AQ*ay*BC*bx*cy - AE**2*AQ*ax*BD*bx*cy - 
-     -    AD*AE*AQ*ay*BD*bx*cy + AC*AE*AF*AJ*bx**2*cy + 
-     -    AC*AE*AN*AQ*bx**2*cy + AC*AF*AO*AQ*bx**2*cy - 
-     -    AE*AF*AQ*BC*bx**2*cy + AE**2*AQ*BD*bx**2*cy + 
-     -    AC*AD*AF*AQ*by*cy + 2*AC*AD*AF*AJ*ax*by*cy + 
-     -    2*AC*AD*AN*AQ*ax*by*cy + 2*AC*AF**2*AJ*az*by*cy - 
-     -    2*AD*AF*AQ*ax*BC*by*cy - 2*AF**2*AQ*az*BC*by*cy + 
-     -    2*AD*AE*AQ*ax*BD*by*cy + 2*AE*AF*AQ*az*BD*by*cy - 
-     -    AC*AD*AF*AJ*bx*by*cy - AC*AD*AN*AQ*bx*by*cy + 
-     -    AD*AF*AQ*BC*bx*by*cy - AD*AE*AQ*BD*bx*by*cy - 
-     -    AC*AF**2*AJ*ay*bz*cy - AC*AE*AF*AJ*az*bz*cy - 
-     -    AC*AE*AN*AQ*az*bz*cy - AC*AF*AO*AQ*az*bz*cy + 
-     -    AF**2*AQ*ay*BC*bz*cy + AE*AF*AQ*az*BC*bz*cy - 
-     -    AE*AF*AQ*ay*BD*bz*cy - AE**2*AQ*az*BD*bz*cy - 
-     -    AC*AF**2*AJ*by*bz*cy + AF**2*AQ*BC*by*bz*cy - 
-     -    AE*AF*AQ*BD*by*bz*cy + AC*AE*AF*AJ*bz**2*cy + 
-     -    AC*AE*AN*AQ*bz**2*cy + AC*AF*AO*AQ*bz**2*cy - 
-     -    AE*AF*AQ*BC*bz**2*cy + AE**2*AQ*BD*bz**2*cy + 
-     -    AC*AE*AF*AQ*cx*cy + AC*AE*AF*AJ*ax*cx*cy + 
-     -    AC*AE*AN*AQ*ax*cx*cy + AC*AF*AO*AQ*ax*cx*cy + 
-     -    AC*AD*AF*AJ*ay*cx*cy + AC*AD*AN*AQ*ay*cx*cy - 
-     -    AE*AF*AQ*ax*BC*cx*cy - AD*AF*AQ*ay*BC*cx*cy + 
-     -    AE**2*AQ*ax*BD*cx*cy + AD*AE*AQ*ay*BD*cx*cy - 
-     -    AC*AE*AF*AJ*bx*cx*cy - AC*AE*AN*AQ*bx*cx*cy - 
-     -    AC*AF*AO*AQ*bx*cx*cy + AE*AF*AQ*BC*bx*cx*cy - 
-     -    AE**2*AQ*BD*bx*cx*cy - AC*AD*AF*AJ*by*cx*cy - 
-     -    AC*AD*AN*AQ*by*cx*cy + AD*AF*AQ*BC*by*cx*cy - 
-     -    AD*AE*AQ*BD*by*cx*cy - AC*AD*AF*AQ*cy**2 - 
-     -    AC*AD*AF*AJ*ax*cy**2 - AC*AD*AN*AQ*ax*cy**2 - 
-     -    AC*AF**2*AJ*az*cy**2 + AD*AF*AQ*ax*BC*cy**2 + 
-     -    AF**2*AQ*az*BC*cy**2 - AD*AE*AQ*ax*BD*cy**2 - 
-     -    AE*AF*AQ*az*BD*cy**2 + AC*AD*AF*AJ*bx*cy**2 + 
-     -    AC*AD*AN*AQ*bx*cy**2 - AD*AF*AQ*BC*bx*cy**2 + 
-     -    AD*AE*AQ*BD*bx*cy**2 + AC*AF**2*AJ*bz*cy**2 - 
-     -    AF**2*AQ*BC*bz*cy**2 + AE*AF*AQ*BD*bz*cy**2 + 
-     -    AC*AF**2*AQ*ax*cz + AC*AD*AF*AQ*az*cz - 2*AC*AF**2*AQ*bx*cz - 
-     -    AC*AF**2*AJ*ax*bx*cz - AC*AD*AF*AJ*az*bx*cz - 
-     -    AC*AD*AN*AQ*az*bx*cz + AF**2*AQ*ax*BC*bx*cz + 
-     -    AD*AF*AQ*az*BC*bx*cz - AE*AF*AQ*ax*BD*bx*cz - 
-     -    AD*AE*AQ*az*BD*bx*cz + AC*AF**2*AJ*bx**2*cz - 
-     -    AF**2*AQ*BC*bx**2*cz + AE*AF*AQ*BD*bx**2*cz - 
-     -    AC*AF**2*AJ*ay*by*cz - AC*AE*AF*AJ*az*by*cz - 
-     -    AC*AE*AN*AQ*az*by*cz - AC*AF*AO*AQ*az*by*cz + 
-     -    AF**2*AQ*ay*BC*by*cz + AE*AF*AQ*az*BC*by*cz - 
-     -    AE*AF*AQ*ay*BD*by*cz - AE**2*AQ*az*BD*by*cz + 
-     -    AC*AF**2*AJ*by**2*cz - AF**2*AQ*BC*by**2*cz + 
-     -    AE*AF*AQ*BD*by**2*cz + AC*AD*AF*AQ*bz*cz + 
-     -    2*AC*AD*AF*AJ*ax*bz*cz + 2*AC*AD*AN*AQ*ax*bz*cz + 
-     -    2*AC*AE*AF*AJ*ay*bz*cz + 2*AC*AE*AN*AQ*ay*bz*cz + 
-     -    2*AC*AF*AO*AQ*ay*bz*cz - 2*AD*AF*AQ*ax*BC*bz*cz - 
-     -    2*AE*AF*AQ*ay*BC*bz*cz + 2*AD*AE*AQ*ax*BD*bz*cz + 
-     -    2*AE**2*AQ*ay*BD*bz*cz - AC*AD*AF*AJ*bx*bz*cz - 
-     -    AC*AD*AN*AQ*bx*bz*cz + AD*AF*AQ*BC*bx*bz*cz - 
-     -    AD*AE*AQ*BD*bx*bz*cz - AC*AE*AF*AJ*by*bz*cz - 
-     -    AC*AE*AN*AQ*by*bz*cz - AC*AF*AO*AQ*by*bz*cz + 
-     -    AE*AF*AQ*BC*by*bz*cz - AE**2*AQ*BD*by*bz*cz + 
-     -    AC*AF**2*AQ*cx*cz + AC*AF**2*AJ*ax*cx*cz + 
-     -    AC*AD*AF*AJ*az*cx*cz + AC*AD*AN*AQ*az*cx*cz - 
-     -    AF**2*AQ*ax*BC*cx*cz - AD*AF*AQ*az*BC*cx*cz + 
-     -    AE*AF*AQ*ax*BD*cx*cz + AD*AE*AQ*az*BD*cx*cz - 
-     -    AC*AF**2*AJ*bx*cx*cz + AF**2*AQ*BC*bx*cx*cz - 
-     -    AE*AF*AQ*BD*bx*cx*cz - AC*AD*AF*AJ*bz*cx*cz - 
-     -    AC*AD*AN*AQ*bz*cx*cz + AD*AF*AQ*BC*bz*cx*cz - 
-     -    AD*AE*AQ*BD*bz*cx*cz + AC*AF**2*AJ*ay*cy*cz + 
-     -    AC*AE*AF*AJ*az*cy*cz + AC*AE*AN*AQ*az*cy*cz + 
-     -    AC*AF*AO*AQ*az*cy*cz - AF**2*AQ*ay*BC*cy*cz - 
-     -    AE*AF*AQ*az*BC*cy*cz + AE*AF*AQ*ay*BD*cy*cz + 
-     -    AE**2*AQ*az*BD*cy*cz - AC*AF**2*AJ*by*cy*cz + 
-     -    AF**2*AQ*BC*by*cy*cz - AE*AF*AQ*BD*by*cy*cz - 
-     -    AC*AE*AF*AJ*bz*cy*cz - AC*AE*AN*AQ*bz*cy*cz - 
-     -    AC*AF*AO*AQ*bz*cy*cz + AE*AF*AQ*BC*bz*cy*cz - 
-     -    AE**2*AQ*BD*bz*cy*cz - AC*AD*AF*AQ*cz**2 - 
-     -    AC*AD*AF*AJ*ax*cz**2 - AC*AD*AN*AQ*ax*cz**2 - 
-     -    AC*AE*AF*AJ*ay*cz**2 - AC*AE*AN*AQ*ay*cz**2 - 
-     -    AC*AF*AO*AQ*ay*cz**2 + AD*AF*AQ*ax*BC*cz**2 + 
-     -    AE*AF*AQ*ay*BC*cz**2 - AD*AE*AQ*ax*BD*cz**2 - 
-     -    AE**2*AQ*ay*BD*cz**2 + AC*AD*AF*AJ*bx*cz**2 + 
-     -    AC*AD*AN*AQ*bx*cz**2 - AD*AF*AQ*BC*bx*cz**2 + 
-     -    AD*AE*AQ*BD*bx*cz**2 + AC*AE*AF*AJ*by*cz**2 + 
-     -    AC*AE*AN*AQ*by*cz**2 + AC*AF*AO*AQ*by*cz**2 - 
-     -    AE*AF*AQ*BC*by*cz**2 + AE**2*AQ*BD*by*cz**2 - 
-     -    AA*AD*(AO*AQ*ay*bx**2 - AN*AQ*az*bx**2 + AD*AQ*ay*by - 
-     -       AO*AQ*ax*bx*by - AD*AJ*ay*bx*by + AD*AJ*ax*by**2 - 
-     -       AN*AQ*az*by**2 + AD*AQ*az*bz + AN*AQ*ax*bx*bz - 
-     -       AD*AJ*az*bx*bz + AN*AQ*ay*by*bz - AO*AQ*az*by*bz + 
-     -       AD*AJ*ax*bz**2 + AO*AQ*ay*bz**2 - 2*AO*AQ*ay*bx*cx + 
-     -       2*AN*AQ*az*bx*cx + AO*AQ*ax*by*cx + AD*AJ*ay*by*cx + 
-     -       AO*AQ*bx*by*cx - AD*AJ*by**2*cx - AN*AQ*ax*bz*cx + 
-     -       AD*AJ*az*bz*cx - AN*AQ*bx*bz*cx - AD*AJ*bz**2*cx + 
-     -       AO*AQ*ay*cx**2 - AN*AQ*az*cx**2 - AO*AQ*by*cx**2 + 
-     -       AN*AQ*bz*cx**2 - AD*AQ*ay*cy + AO*AQ*ax*bx*cy + 
-     -       AD*AJ*ay*bx*cy - AO*AQ*bx**2*cy - AD*AQ*by*cy - 
-     -       2*AD*AJ*ax*by*cy + 2*AN*AQ*az*by*cy + AD*AJ*bx*by*cy - 
-     -       AN*AQ*ay*bz*cy + AO*AQ*az*bz*cy - AN*AQ*by*bz*cy - 
-     -       AO*AQ*bz**2*cy - AO*AQ*ax*cx*cy - AD*AJ*ay*cx*cy + 
-     -       AO*AQ*bx*cx*cy + AD*AJ*by*cx*cy + AD*AQ*cy**2 + 
-     -       AD*AJ*ax*cy**2 - AN*AQ*az*cy**2 - AD*AJ*bx*cy**2 + 
-     -       AN*AQ*bz*cy**2 + 
-     -       AE*(AJ*AV + AQ*(AK*ax - 2*AJ*ay - by*cx + 2*bx*cy - 
-     -             cx*cy)) - AD*AQ*az*cz - AN*AQ*ax*bx*cz + 
-     -       AD*AJ*az*bx*cz + AN*AQ*bx**2*cz - AN*AQ*ay*by*cz + 
-     -       AO*AQ*az*by*cz + AN*AQ*by**2*cz - AD*AQ*bz*cz - 
-     -       2*AD*AJ*ax*bz*cz - 2*AO*AQ*ay*bz*cz + AD*AJ*bx*bz*cz + 
-     -       AO*AQ*by*bz*cz + AN*AQ*ax*cx*cz - AD*AJ*az*cx*cz - 
-     -       AN*AQ*bx*cx*cz + AD*AJ*bz*cx*cz + AN*AQ*ay*cy*cz - 
-     -       AO*AQ*az*cy*cz - AN*AQ*by*cy*cz + AO*AQ*bz*cy*cz + 
-     -       AD*AQ*cz**2 + AD*AJ*ax*cz**2 + AO*AQ*ay*cz**2 - 
-     -       AD*AJ*bx*cz**2 - AO*AQ*by*cz**2 + 
-     -       AF*(AJ*AW + AQ*(AL*ax - 2*AJ*az - bz*cx + 2*bx*cz - cx*cz))
-     -       ) + AB*(AO*AQ*(AF*AW + AD*BA) + 
-     -       AE**2*(-(AJ*AV) + 
-     -          AQ*(-(AK*ax) + 2*AJ*ay + by*cx - 2*bx*cy + cx*cy)) + 
-     -       AE*(AN*AQ*AW + AF*
-     -           (-(AJ*AW) + 
-     -             AQ*(-(AL*ax) + 2*AJ*az + bz*cx - 2*bx*cz + cx*cz)) - 
-     -          AD*(AJ*BA + AQ*
-     -           (AK*ay + AL*az - by*cy + cy**2 - bz*cz + cz**2)))))/
-     -  (AQ**1.5*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
+   
+       dax= (abcx*bcdx*bcdy*bx*by + abcy*bcdy**2*bx*by + 
+     -    abcz*bcdy*bcdz*bx*by - ax*bcdy*bcdz*bcy*bx*by + 
+     -    ax*bcdy**2*bcz*bx*by - abcx*bcdx**2*by**2 - 
+     -    abcy*bcdx*bcdy*by**2 - abcz*bcdx*bcdz*by**2 + 
+     -    ax*bcdx*bcdz*bcy*by**2 - ax*bcdx*bcdy*bcz*by**2 + 
+     -    abcx*bcdx*bcdz*bx*bz + abcy*bcdy*bcdz*bx*bz + 
+     -    abcz*bcdz**2*bx*bz - ax*bcdz**2*bcy*bx*bz + 
+     -    ax*bcdy*bcdz*bcz*bx*bz - abcx*bcdx**2*bz**2 - 
+     -    abcy*bcdx*bcdy*bz**2 - abcz*bcdx*bcdz*bz**2 + 
+     -    ax*bcdx*bcdz*bcy*bz**2 - ax*bcdx*bcdy*bcz*bz**2 - 
+     -    abcx*bcdx*bcdy*by*cx - abcy*bcdy**2*by*cx - 
+     -    abcz*bcdy*bcdz*by*cx + ax*bcdy*bcdz*bcy*by*cx - 
+     -    ax*bcdy**2*bcz*by*cx + bcdy*bcdz*bcy*bx*by*cx - 
+     -    bcdy**2*bcz*bx*by*cx - bcdx*bcdz*bcy*by**2*cx + 
+     -    bcdx*bcdy*bcz*by**2*cx - abcx*bcdx*bcdz*bz*cx - 
+     -    abcy*bcdy*bcdz*bz*cx - abcz*bcdz**2*bz*cx + 
+     -    ax*bcdz**2*bcy*bz*cx - ax*bcdy*bcdz*bcz*bz*cx + 
+     -    bcdz**2*bcy*bx*bz*cx - bcdy*bcdz*bcz*bx*bz*cx - 
+     -    bcdx*bcdz*bcy*bz**2*cx + bcdx*bcdy*bcz*bz**2*cx - 
+     -    bcdy*bcdz*bcy*by*cx**2 + bcdy**2*bcz*by*cx**2 - 
+     -    bcdz**2*bcy*bz*cx**2 + bcdy*bcdz*bcz*bz*cx**2 - 
+     -    abcx*bcdx*bcdy*bx*cy - abcy*bcdy**2*bx*cy - 
+     -    abcz*bcdy*bcdz*bx*cy + ax*bcdy*bcdz*bcy*bx*cy - 
+     -    ax*bcdy**2*bcz*bx*cy - bcdy*bcdz*bcy*bx**2*cy + 
+     -    bcdy**2*bcz*bx**2*cy + 2*abcx*bcdx**2*by*cy + 
+     -    2*abcy*bcdx*bcdy*by*cy + 2*abcz*bcdx*bcdz*by*cy - 
+     -    2*ax*bcdx*bcdz*bcy*by*cy + 2*ax*bcdx*bcdy*bcz*by*cy + 
+     -    bcdx*bcdz*bcy*bx*by*cy - bcdx*bcdy*bcz*bx*by*cy + 
+     -    bcdz**2*bcy*by*bz*cy - bcdy*bcdz*bcz*by*bz*cy - 
+     -    bcdy*bcdz*bcy*bz**2*cy + bcdy**2*bcz*bz**2*cy + 
+     -    abcx*bcdx*bcdy*cx*cy + abcy*bcdy**2*cx*cy + 
+     -    abcz*bcdy*bcdz*cx*cy - ax*bcdy*bcdz*bcy*cx*cy + 
+     -    ax*bcdy**2*bcz*cx*cy + bcdy*bcdz*bcy*bx*cx*cy - 
+     -    bcdy**2*bcz*bx*cx*cy + bcdx*bcdz*bcy*by*cx*cy - 
+     -    bcdx*bcdy*bcz*by*cx*cy - abcx*bcdx**2*cy**2 - 
+     -    abcy*bcdx*bcdy*cy**2 - abcz*bcdx*bcdz*cy**2 + 
+     -    ax*bcdx*bcdz*bcy*cy**2 - ax*bcdx*bcdy*bcz*cy**2 - 
+     -    bcdx*bcdz*bcy*bx*cy**2 + bcdx*bcdy*bcz*bx*cy**2 - 
+     -    bcdz**2*bcy*bz*cy**2 + bcdy*bcdz*bcz*bz*cy**2 + 
+     -    az*(bcdz*bcy - bcdy*bcz)*
+     -     (bcdz*(bcx**2 + bcy**2) + 
+     -       bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) - 
+     -    abcx*bcdx*bcdz*bx*cz - abcy*bcdy*bcdz*bx*cz - 
+     -    abcz*bcdz**2*bx*cz + ax*bcdz**2*bcy*bx*cz - 
+     -    ax*bcdy*bcdz*bcz*bx*cz - bcdz**2*bcy*bx**2*cz + 
+     -    bcdy*bcdz*bcz*bx**2*cz - bcdz**2*bcy*by**2*cz + 
+     -    bcdy*bcdz*bcz*by**2*cz + 2*abcx*bcdx**2*bz*cz + 
+     -    2*abcy*bcdx*bcdy*bz*cz + 2*abcz*bcdx*bcdz*bz*cz - 
+     -    2*ax*bcdx*bcdz*bcy*bz*cz + 2*ax*bcdx*bcdy*bcz*bz*cz + 
+     -    bcdx*bcdz*bcy*bx*bz*cz - bcdx*bcdy*bcz*bx*bz*cz + 
+     -    bcdy*bcdz*bcy*by*bz*cz - bcdy**2*bcz*by*bz*cz + 
+     -    abcx*bcdx*bcdz*cx*cz + abcy*bcdy*bcdz*cx*cz + 
+     -    abcz*bcdz**2*cx*cz - ax*bcdz**2*bcy*cx*cz + 
+     -    ax*bcdy*bcdz*bcz*cx*cz + bcdz**2*bcy*bx*cx*cz - 
+     -    bcdy*bcdz*bcz*bx*cx*cz + bcdx*bcdz*bcy*bz*cx*cz - 
+     -    bcdx*bcdy*bcz*bz*cx*cz + bcdz**2*bcy*by*cy*cz - 
+     -    bcdy*bcdz*bcz*by*cy*cz + bcdy*bcdz*bcy*bz*cy*cz - 
+     -    bcdy**2*bcz*bz*cy*cz - abcx*bcdx**2*cz**2 - 
+     -    abcy*bcdx*bcdy*cz**2 - abcz*bcdx*bcdz*cz**2 + 
+     -    ax*bcdx*bcdz*bcy*cz**2 - ax*bcdx*bcdy*bcz*cz**2 - 
+     -    bcdx*bcdz*bcy*bx*cz**2 + bcdx*bcdy*bcz*bx*cz**2 - 
+     -    bcdy*bcdz*bcy*by*cz**2 + bcdy**2*bcz*by*cz**2 - 
+     -    ay*(-(bcdz*bcy) + bcdy*bcz)*
+     -     (bcdy*(bcx**2 + bcz**2) + 
+     -       bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))/
+     -  (Sqrt(bc2)*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy))
+     -           + ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))
+     -         **2/bc2))
 
 
-      dby=(-(AC*AE*AF*AQ*ax*bx) - AC*AD*AF*AQ*ay*bx - 
-     -    AC*AE*AF*AK*ay*bx**2 + AC*AE*AM*AQ*ay*bx**2 - 
-     -    AC*AF**2*AK*az*bx**2 - AE*AF*AQ*ay*BB*bx**2 - 
-     -    AF**2*AQ*az*BB*bx**2 + AD*AE*AQ*ay*BD*bx**2 + 
-     -    AD*AF*AQ*az*BD*bx**2 + 2*AC*AD*AF*AQ*ax*by + 
-     -    2*AC*AF**2*AQ*az*by + AC*AE*AF*AK*ax*bx*by - 
-     -    AC*AE*AM*AQ*ax*bx*by + AC*AD*AF*AK*ay*bx*by - 
-     -    AC*AD*AM*AQ*ay*bx*by - AC*AF*AO*AQ*ay*bx*by + 
-     -    AE*AF*AQ*ax*BB*bx*by + AD*AF*AQ*ay*BB*bx*by - 
-     -    AD*AE*AQ*ax*BD*bx*by - AD**2*AQ*ay*BD*bx*by - 
-     -    AC*AD*AF*AK*ax*by**2 + AC*AD*AM*AQ*ax*by**2 + 
-     -    AC*AF*AO*AQ*ax*by**2 - AC*AF**2*AK*az*by**2 - 
-     -    AD*AF*AQ*ax*BB*by**2 - AF**2*AQ*az*BB*by**2 + 
-     -    AD**2*AQ*ax*BD*by**2 + AD*AF*AQ*az*BD*by**2 - 
-     -    AC*AF**2*AQ*ay*bz - AC*AE*AF*AQ*az*bz + 
-     -    AC*AF**2*AK*ax*bx*bz + AC*AD*AF*AK*az*bx*bz - 
-     -    AC*AD*AM*AQ*az*bx*bz - AC*AF*AO*AQ*az*bx*bz + 
-     -    AF**2*AQ*ax*BB*bx*bz + AD*AF*AQ*az*BB*bx*bz - 
-     -    AD*AF*AQ*ax*BD*bx*bz - AD**2*AQ*az*BD*bx*bz + 
-     -    AC*AF**2*AK*ay*by*bz + AC*AE*AF*AK*az*by*bz - 
-     -    AC*AE*AM*AQ*az*by*bz + AF**2*AQ*ay*BB*by*bz + 
-     -    AE*AF*AQ*az*BB*by*bz - AD*AF*AQ*ay*BD*by*bz - 
-     -    AD*AE*AQ*az*BD*by*bz - AC*AD*AF*AK*ax*bz**2 + 
-     -    AC*AD*AM*AQ*ax*bz**2 + AC*AF*AO*AQ*ax*bz**2 - 
-     -    AC*AE*AF*AK*ay*bz**2 + AC*AE*AM*AQ*ay*bz**2 - 
-     -    AD*AF*AQ*ax*BB*bz**2 - AE*AF*AQ*ay*BB*bz**2 + 
-     -    AD**2*AQ*ax*BD*bz**2 + AD*AE*AQ*ay*BD*bz**2 + 
-     -    AC*AE*AF*AQ*ax*cx + AC*AD*AF*AQ*ay*cx + 
-     -    AC*AE*AF*AQ*bx*cx + 2*AC*AE*AF*AK*ay*bx*cx - 
-     -    2*AC*AE*AM*AQ*ay*bx*cx + 2*AC*AF**2*AK*az*bx*cx + 
-     -    2*AE*AF*AQ*ay*BB*bx*cx + 2*AF**2*AQ*az*BB*bx*cx - 
-     -    2*AD*AE*AQ*ay*BD*bx*cx - 2*AD*AF*AQ*az*BD*bx*cx - 
-     -    2*AC*AD*AF*AQ*by*cx - AC*AE*AF*AK*ax*by*cx + 
-     -    AC*AE*AM*AQ*ax*by*cx - AC*AD*AF*AK*ay*by*cx + 
-     -    AC*AD*AM*AQ*ay*by*cx + AC*AF*AO*AQ*ay*by*cx - 
-     -    AE*AF*AQ*ax*BB*by*cx - AD*AF*AQ*ay*BB*by*cx + 
-     -    AD*AE*AQ*ax*BD*by*cx + AD**2*AQ*ay*BD*by*cx - 
-     -    AC*AE*AF*AK*bx*by*cx + AC*AE*AM*AQ*bx*by*cx - 
-     -    AE*AF*AQ*BB*bx*by*cx + AD*AE*AQ*BD*bx*by*cx + 
-     -    AC*AD*AF*AK*by**2*cx - AC*AD*AM*AQ*by**2*cx - 
-     -    AC*AF*AO*AQ*by**2*cx + AD*AF*AQ*BB*by**2*cx - 
-     -    AD**2*AQ*BD*by**2*cx - AC*AF**2*AK*ax*bz*cx - 
-     -    AC*AD*AF*AK*az*bz*cx + AC*AD*AM*AQ*az*bz*cx + 
-     -    AC*AF*AO*AQ*az*bz*cx - AF**2*AQ*ax*BB*bz*cx - 
-     -    AD*AF*AQ*az*BB*bz*cx + AD*AF*AQ*ax*BD*bz*cx + 
-     -    AD**2*AQ*az*BD*bz*cx - AC*AF**2*AK*bx*bz*cx - 
-     -    AF**2*AQ*BB*bx*bz*cx + AD*AF*AQ*BD*bx*bz*cx + 
-     -    AC*AD*AF*AK*bz**2*cx - AC*AD*AM*AQ*bz**2*cx - 
-     -    AC*AF*AO*AQ*bz**2*cx + AD*AF*AQ*BB*bz**2*cx - 
-     -    AD**2*AQ*BD*bz**2*cx - AC*AE*AF*AQ*cx**2 - 
-     -    AC*AE*AF*AK*ay*cx**2 + AC*AE*AM*AQ*ay*cx**2 - 
-     -    AC*AF**2*AK*az*cx**2 - AE*AF*AQ*ay*BB*cx**2 - 
-     -    AF**2*AQ*az*BB*cx**2 + AD*AE*AQ*ay*BD*cx**2 + 
-     -    AD*AF*AQ*az*BD*cx**2 + AC*AE*AF*AK*by*cx**2 - 
-     -    AC*AE*AM*AQ*by*cx**2 + AE*AF*AQ*BB*by*cx**2 - 
-     -    AD*AE*AQ*BD*by*cx**2 + AC*AF**2*AK*bz*cx**2 + 
-     -    AF**2*AQ*BB*bz*cx**2 - AD*AF*AQ*BD*bz*cx**2 - 
-     -    2*AC*AD*AF*AQ*ax*cy - 2*AC*AF**2*AQ*az*cy + 
-     -    AC*AD*AF*AQ*bx*cy - AC*AE*AF*AK*ax*bx*cy + 
-     -    AC*AE*AM*AQ*ax*bx*cy - AC*AD*AF*AK*ay*bx*cy + 
-     -    AC*AD*AM*AQ*ay*bx*cy + AC*AF*AO*AQ*ay*bx*cy - 
-     -    AE*AF*AQ*ax*BB*bx*cy - AD*AF*AQ*ay*BB*bx*cy + 
-     -    AD*AE*AQ*ax*BD*bx*cy + AD**2*AQ*ay*BD*bx*cy + 
-     -    AC*AE*AF*AK*bx**2*cy - AC*AE*AM*AQ*bx**2*cy + 
-     -    AE*AF*AQ*BB*bx**2*cy - AD*AE*AQ*BD*bx**2*cy + 
-     -    2*AC*AD*AF*AK*ax*by*cy - 2*AC*AD*AM*AQ*ax*by*cy - 
-     -    2*AC*AF*AO*AQ*ax*by*cy + 2*AC*AF**2*AK*az*by*cy + 
-     -    2*AD*AF*AQ*ax*BB*by*cy + 2*AF**2*AQ*az*BB*by*cy - 
-     -    2*AD**2*AQ*ax*BD*by*cy - 2*AD*AF*AQ*az*BD*by*cy - 
-     -    AC*AD*AF*AK*bx*by*cy + AC*AD*AM*AQ*bx*by*cy + 
-     -    AC*AF*AO*AQ*bx*by*cy - AD*AF*AQ*BB*bx*by*cy + 
-     -    AD**2*AQ*BD*bx*by*cy + AC*AF**2*AQ*bz*cy - 
-     -    AC*AF**2*AK*ay*bz*cy - AC*AE*AF*AK*az*bz*cy + 
-     -    AC*AE*AM*AQ*az*bz*cy - AF**2*AQ*ay*BB*bz*cy - 
-     -    AE*AF*AQ*az*BB*bz*cy + AD*AF*AQ*ay*BD*bz*cy + 
-     -    AD*AE*AQ*az*BD*bz*cy - AC*AF**2*AK*by*bz*cy - 
-     -    AF**2*AQ*BB*by*bz*cy + AD*AF*AQ*BD*by*bz*cy + 
-     -    AC*AE*AF*AK*bz**2*cy - AC*AE*AM*AQ*bz**2*cy + 
-     -    AE*AF*AQ*BB*bz**2*cy - AD*AE*AQ*BD*bz**2*cy + 
-     -    AC*AD*AF*AQ*cx*cy + AC*AE*AF*AK*ax*cx*cy - 
-     -    AC*AE*AM*AQ*ax*cx*cy + AC*AD*AF*AK*ay*cx*cy - 
-     -    AC*AD*AM*AQ*ay*cx*cy - AC*AF*AO*AQ*ay*cx*cy + 
-     -    AE*AF*AQ*ax*BB*cx*cy + AD*AF*AQ*ay*BB*cx*cy - 
-     -    AD*AE*AQ*ax*BD*cx*cy - AD**2*AQ*ay*BD*cx*cy - 
-     -    AC*AE*AF*AK*bx*cx*cy + AC*AE*AM*AQ*bx*cx*cy - 
-     -    AE*AF*AQ*BB*bx*cx*cy + AD*AE*AQ*BD*bx*cx*cy - 
-     -    AC*AD*AF*AK*by*cx*cy + AC*AD*AM*AQ*by*cx*cy + 
-     -    AC*AF*AO*AQ*by*cx*cy - AD*AF*AQ*BB*by*cx*cy + 
-     -    AD**2*AQ*BD*by*cx*cy - AC*AD*AF*AK*ax*cy**2 + 
-     -    AC*AD*AM*AQ*ax*cy**2 + AC*AF*AO*AQ*ax*cy**2 - 
-     -    AC*AF**2*AK*az*cy**2 - AD*AF*AQ*ax*BB*cy**2 - 
-     -    AF**2*AQ*az*BB*cy**2 + AD**2*AQ*ax*BD*cy**2 + 
-     -    AD*AF*AQ*az*BD*cy**2 + AC*AD*AF*AK*bx*cy**2 - 
-     -    AC*AD*AM*AQ*bx*cy**2 - AC*AF*AO*AQ*bx*cy**2 + 
-     -    AD*AF*AQ*BB*bx*cy**2 - AD**2*AQ*BD*bx*cy**2 + 
-     -    AC*AF**2*AK*bz*cy**2 + AF**2*AQ*BB*bz*cy**2 - 
-     -    AD*AF*AQ*BD*bz*cy**2 + AC*AF**2*AQ*ay*cz + 
-     -    AC*AE*AF*AQ*az*cz - AC*AF**2*AK*ax*bx*cz - 
-     -    AC*AD*AF*AK*az*bx*cz + AC*AD*AM*AQ*az*bx*cz + 
-     -    AC*AF*AO*AQ*az*bx*cz - AF**2*AQ*ax*BB*bx*cz - 
-     -    AD*AF*AQ*az*BB*bx*cz + AD*AF*AQ*ax*BD*bx*cz + 
-     -    AD**2*AQ*az*BD*bx*cz + AC*AF**2*AK*bx**2*cz + 
-     -    AF**2*AQ*BB*bx**2*cz - AD*AF*AQ*BD*bx**2*cz - 
-     -    2*AC*AF**2*AQ*by*cz - AC*AF**2*AK*ay*by*cz - 
-     -    AC*AE*AF*AK*az*by*cz + AC*AE*AM*AQ*az*by*cz - 
-     -    AF**2*AQ*ay*BB*by*cz - AE*AF*AQ*az*BB*by*cz + 
-     -    AD*AF*AQ*ay*BD*by*cz + AD*AE*AQ*az*BD*by*cz + 
-     -    AC*AF**2*AK*by**2*cz + AF**2*AQ*BB*by**2*cz - 
-     -    AD*AF*AQ*BD*by**2*cz + AC*AE*AF*AQ*bz*cz + 
-     -    2*AC*AD*AF*AK*ax*bz*cz - 2*AC*AD*AM*AQ*ax*bz*cz - 
-     -    2*AC*AF*AO*AQ*ax*bz*cz + 2*AC*AE*AF*AK*ay*bz*cz - 
-     -    2*AC*AE*AM*AQ*ay*bz*cz + 2*AD*AF*AQ*ax*BB*bz*cz + 
-     -    2*AE*AF*AQ*ay*BB*bz*cz - 2*AD**2*AQ*ax*BD*bz*cz - 
-     -    2*AD*AE*AQ*ay*BD*bz*cz - AC*AD*AF*AK*bx*bz*cz + 
-     -    AC*AD*AM*AQ*bx*bz*cz + AC*AF*AO*AQ*bx*bz*cz - 
-     -    AD*AF*AQ*BB*bx*bz*cz + AD**2*AQ*BD*bx*bz*cz - 
-     -    AC*AE*AF*AK*by*bz*cz + AC*AE*AM*AQ*by*bz*cz - 
-     -    AE*AF*AQ*BB*by*bz*cz + AD*AE*AQ*BD*by*bz*cz + 
-     -    AC*AF**2*AK*ax*cx*cz + AC*AD*AF*AK*az*cx*cz - 
-     -    AC*AD*AM*AQ*az*cx*cz - AC*AF*AO*AQ*az*cx*cz + 
-     -    AF**2*AQ*ax*BB*cx*cz + AD*AF*AQ*az*BB*cx*cz - 
-     -    AD*AF*AQ*ax*BD*cx*cz - AD**2*AQ*az*BD*cx*cz - 
-     -    AC*AF**2*AK*bx*cx*cz - AF**2*AQ*BB*bx*cx*cz + 
-     -    AD*AF*AQ*BD*bx*cx*cz - AC*AD*AF*AK*bz*cx*cz + 
-     -    AC*AD*AM*AQ*bz*cx*cz + AC*AF*AO*AQ*bz*cx*cz - 
-     -    AD*AF*AQ*BB*bz*cx*cz + AD**2*AQ*BD*bz*cx*cz + 
-     -    AC*AF**2*AQ*cy*cz + AC*AF**2*AK*ay*cy*cz + 
-     -    AC*AE*AF*AK*az*cy*cz - AC*AE*AM*AQ*az*cy*cz + 
-     -    AF**2*AQ*ay*BB*cy*cz + AE*AF*AQ*az*BB*cy*cz - 
-     -    AD*AF*AQ*ay*BD*cy*cz - AD*AE*AQ*az*BD*cy*cz - 
-     -    AC*AF**2*AK*by*cy*cz - AF**2*AQ*BB*by*cy*cz + 
-     -    AD*AF*AQ*BD*by*cy*cz - AC*AE*AF*AK*bz*cy*cz + 
-     -    AC*AE*AM*AQ*bz*cy*cz - AE*AF*AQ*BB*bz*cy*cz + 
-     -    AD*AE*AQ*BD*bz*cy*cz - AC*AE*AF*AQ*cz**2 - 
-     -    AC*AD*AF*AK*ax*cz**2 + AC*AD*AM*AQ*ax*cz**2 + 
-     -    AC*AF*AO*AQ*ax*cz**2 - AC*AE*AF*AK*ay*cz**2 + 
-     -    AC*AE*AM*AQ*ay*cz**2 - AD*AF*AQ*ax*BB*cz**2 - 
-     -    AE*AF*AQ*ay*BB*cz**2 + AD**2*AQ*ax*BD*cz**2 + 
-     -    AD*AE*AQ*ay*BD*cz**2 + AC*AD*AF*AK*bx*cz**2 - 
-     -    AC*AD*AM*AQ*bx*cz**2 - AC*AF*AO*AQ*bx*cz**2 + 
-     -    AD*AF*AQ*BB*bx*cz**2 - AD**2*AQ*BD*bx*cz**2 + 
-     -    AC*AE*AF*AK*by*cz**2 - AC*AE*AM*AQ*by*cz**2 + 
-     -    AE*AF*AQ*BB*by*cz**2 - AD*AE*AQ*BD*by*cz**2 - 
-     -    AB*AE*(AF*AK*az*bx**2 + AM*AQ*az*bx**2 - 2*AF*AQ*az*by + 
-     -       AO*AQ*ay*bx*by - AO*AQ*ax*by**2 + AF*AK*az*by**2 + 
-     -       AM*AQ*az*by**2 + AF*AQ*ay*bz - AF*AK*ax*bx*bz - 
-     -       AM*AQ*ax*bx*bz + AO*AQ*az*bx*bz - AF*AK*ay*by*bz - 
-     -       AM*AQ*ay*by*bz - AO*AQ*ax*bz**2 - 2*AF*AK*az*bx*cx - 
-     -       2*AM*AQ*az*bx*cx - AO*AQ*ay*by*cx + AO*AQ*by**2*cx + 
-     -       AF*AK*ax*bz*cx + AM*AQ*ax*bz*cx - AO*AQ*az*bz*cx + 
-     -       AF*AK*bx*bz*cx + AM*AQ*bx*bz*cx + AO*AQ*bz**2*cx + 
-     -       AF*AK*az*cx**2 + AM*AQ*az*cx**2 - AF*AK*bz*cx**2 - 
-     -       AM*AQ*bz*cx**2 + 2*AF*AQ*az*cy - AO*AQ*ay*bx*cy + 
-     -       2*AO*AQ*ax*by*cy - 2*AF*AK*az*by*cy - 
-     -       2*AM*AQ*az*by*cy - AO*AQ*bx*by*cy - AF*AQ*bz*cy + 
-     -       AF*AK*ay*bz*cy + AM*AQ*ay*bz*cy + AF*AK*by*bz*cy + 
-     -       AM*AQ*by*bz*cy + AO*AQ*ay*cx*cy - AO*AQ*by*cx*cy - 
-     -       AO*AQ*ax*cy**2 + AF*AK*az*cy**2 + AM*AQ*az*cy**2 + 
-     -       AO*AQ*bx*cy**2 - AF*AK*bz*cy**2 - AM*AQ*bz*cy**2 + 
-     -       AD*(AK*BA - AQ*
-     -           (2*AK*ax - AJ*ay - 2*by*cx + bx*cy + cx*cy)) - 
-     -       AF*AQ*ay*cz + AF*AK*ax*bx*cz + AM*AQ*ax*bx*cz - 
-     -       AO*AQ*az*bx*cz - AF*AK*bx**2*cz - AM*AQ*bx**2*cz + 
-     -       2*AF*AQ*by*cz + AF*AK*ay*by*cz + AM*AQ*ay*by*cz - 
-     -       AF*AK*by**2*cz - AM*AQ*by**2*cz + 2*AO*AQ*ax*bz*cz - 
-     -       AO*AQ*bx*bz*cz - AF*AK*ax*cx*cz - AM*AQ*ax*cx*cz + 
-     -       AO*AQ*az*cx*cz + AF*AK*bx*cx*cz + AM*AQ*bx*cx*cz - 
-     -       AO*AQ*bz*cx*cz - AF*AQ*cy*cz - AF*AK*ay*cy*cz - 
-     -       AM*AQ*ay*cy*cz + AF*AK*by*cy*cz + AM*AQ*by*cy*cz - 
-     -       AO*AQ*ax*cz**2 + AO*AQ*bx*cz**2 + 
-     -       AE*(AK*AV + AQ*
-     -           (AJ*ax + AL*az - bx*cx + cx**2 - bz*cz + cz**2))) + 
-     -    AA*(-(AO*AQ*(AE*AV + AF*AW)) - 
-     -       AD**2*(AK*BA - 
-     -          AQ*(2*AK*ax - AJ*ay - 2*by*cx + bx*cy + cx*cy)) - 
-     -       AD*(AM*AQ*AW + 
-     -          AF*(AK*AW + 
-     -             AQ*(AL*ay - 2*AK*az - bz*cy + 2*by*cz - cy*cz)) + 
-     -          AE*(AK*AV + 
-     -             AQ*(AJ*ax + AL*az - bx*cx + cx**2 - bz*cz + cz**2)
-     -             ))))/
-     -  (AQ**1.5*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
-
-      dbz= (-(AC*AF**2*AQ*ax*bx) - AC*AD*AF*AQ*az*bx - 
-     -    AC*AE*AF*AL*ay*bx**2 + AC*AF*AM*AQ*ay*bx**2 - 
-     -    AC*AF**2*AL*az*bx**2 + AE**2*AQ*ay*BB*bx**2 + 
-     -    AE*AF*AQ*az*BB*bx**2 - AD*AE*AQ*ay*BC*bx**2 - 
-     -    AD*AF*AQ*az*BC*bx**2 - AC*AF**2*AQ*ay*by - 
-     -    AC*AE*AF*AQ*az*by + AC*AE*AF*AL*ax*bx*by - 
-     -    AC*AF*AM*AQ*ax*bx*by + AC*AD*AF*AL*ay*bx*by + 
-     -    AC*AF*AN*AQ*ay*bx*by - AE**2*AQ*ax*BB*bx*by - 
-     -    AD*AE*AQ*ay*BB*bx*by + AD*AE*AQ*ax*BC*bx*by + 
-     -    AD**2*AQ*ay*BC*bx*by - AC*AD*AF*AL*ax*by**2 - 
-     -    AC*AF*AN*AQ*ax*by**2 - AC*AF**2*AL*az*by**2 + 
-     -    AD*AE*AQ*ax*BB*by**2 + AE*AF*AQ*az*BB*by**2 - 
-     -    AD**2*AQ*ax*BC*by**2 - AD*AF*AQ*az*BC*by**2 + 
-     -    2*AC*AD*AF*AQ*ax*bz + 2*AC*AE*AF*AQ*ay*bz + 
-     -    AC*AF**2*AL*ax*bx*bz + AC*AD*AF*AL*az*bx*bz + 
-     -    AC*AF*AN*AQ*az*bx*bz - AE*AF*AQ*ax*BB*bx*bz - 
-     -    AD*AE*AQ*az*BB*bx*bz + AD*AF*AQ*ax*BC*bx*bz + 
-     -    AD**2*AQ*az*BC*bx*bz + AC*AF**2*AL*ay*by*bz + 
-     -    AC*AE*AF*AL*az*by*bz - AC*AF*AM*AQ*az*by*bz - 
-     -    AE*AF*AQ*ay*BB*by*bz - AE**2*AQ*az*BB*by*bz + 
-     -    AD*AF*AQ*ay*BC*by*bz + AD*AE*AQ*az*BC*by*bz - 
-     -    AC*AD*AF*AL*ax*bz**2 - AC*AF*AN*AQ*ax*bz**2 - 
-     -    AC*AE*AF*AL*ay*bz**2 + AC*AF*AM*AQ*ay*bz**2 + 
-     -    AD*AE*AQ*ax*BB*bz**2 + AE**2*AQ*ay*BB*bz**2 - 
-     -    AD**2*AQ*ax*BC*bz**2 - AD*AE*AQ*ay*BC*bz**2 + 
-     -    AC*AF**2*AQ*ax*cx + AC*AD*AF*AQ*az*cx + 
-     -    AC*AF**2*AQ*bx*cx + 2*AC*AE*AF*AL*ay*bx*cx - 
-     -    2*AC*AF*AM*AQ*ay*bx*cx + 2*AC*AF**2*AL*az*bx*cx - 
-     -    2*AE**2*AQ*ay*BB*bx*cx - 2*AE*AF*AQ*az*BB*bx*cx + 
-     -    2*AD*AE*AQ*ay*BC*bx*cx + 2*AD*AF*AQ*az*BC*bx*cx - 
-     -    AC*AE*AF*AL*ax*by*cx + AC*AF*AM*AQ*ax*by*cx - 
-     -    AC*AD*AF*AL*ay*by*cx - AC*AF*AN*AQ*ay*by*cx + 
-     -    AE**2*AQ*ax*BB*by*cx + AD*AE*AQ*ay*BB*by*cx - 
-     -    AD*AE*AQ*ax*BC*by*cx - AD**2*AQ*ay*BC*by*cx - 
-     -    AC*AE*AF*AL*bx*by*cx + AC*AF*AM*AQ*bx*by*cx + 
-     -    AE**2*AQ*BB*bx*by*cx - AD*AE*AQ*BC*bx*by*cx + 
-     -    AC*AD*AF*AL*by**2*cx + AC*AF*AN*AQ*by**2*cx - 
-     -    AD*AE*AQ*BB*by**2*cx + AD**2*AQ*BC*by**2*cx - 
-     -    2*AC*AD*AF*AQ*bz*cx - AC*AF**2*AL*ax*bz*cx - 
-     -    AC*AD*AF*AL*az*bz*cx - AC*AF*AN*AQ*az*bz*cx + 
-     -    AE*AF*AQ*ax*BB*bz*cx + AD*AE*AQ*az*BB*bz*cx - 
-     -    AD*AF*AQ*ax*BC*bz*cx - AD**2*AQ*az*BC*bz*cx - 
-     -    AC*AF**2*AL*bx*bz*cx + AE*AF*AQ*BB*bx*bz*cx - 
-     -    AD*AF*AQ*BC*bx*bz*cx + AC*AD*AF*AL*bz**2*cx + 
-     -    AC*AF*AN*AQ*bz**2*cx - AD*AE*AQ*BB*bz**2*cx + 
-     -    AD**2*AQ*BC*bz**2*cx - AC*AF**2*AQ*cx**2 - 
-     -    AC*AE*AF*AL*ay*cx**2 + AC*AF*AM*AQ*ay*cx**2 - 
-     -    AC*AF**2*AL*az*cx**2 + AE**2*AQ*ay*BB*cx**2 + 
-     -    AE*AF*AQ*az*BB*cx**2 - AD*AE*AQ*ay*BC*cx**2 - 
-     -    AD*AF*AQ*az*BC*cx**2 + AC*AE*AF*AL*by*cx**2 - 
-     -    AC*AF*AM*AQ*by*cx**2 - AE**2*AQ*BB*by*cx**2 + 
-     -    AD*AE*AQ*BC*by*cx**2 + AC*AF**2*AL*bz*cx**2 - 
-     -    AE*AF*AQ*BB*bz*cx**2 + AD*AF*AQ*BC*bz*cx**2 + 
-     -    AC*AF**2*AQ*ay*cy + AC*AE*AF*AQ*az*cy - 
-     -    AC*AE*AF*AL*ax*bx*cy + AC*AF*AM*AQ*ax*bx*cy - 
-     -    AC*AD*AF*AL*ay*bx*cy - AC*AF*AN*AQ*ay*bx*cy + 
-     -    AE**2*AQ*ax*BB*bx*cy + AD*AE*AQ*ay*BB*bx*cy - 
-     -    AD*AE*AQ*ax*BC*bx*cy - AD**2*AQ*ay*BC*bx*cy + 
-     -    AC*AE*AF*AL*bx**2*cy - AC*AF*AM*AQ*bx**2*cy - 
-     -    AE**2*AQ*BB*bx**2*cy + AD*AE*AQ*BC*bx**2*cy + 
-     -    AC*AF**2*AQ*by*cy + 2*AC*AD*AF*AL*ax*by*cy + 
-     -    2*AC*AF*AN*AQ*ax*by*cy + 2*AC*AF**2*AL*az*by*cy - 
-     -    2*AD*AE*AQ*ax*BB*by*cy - 2*AE*AF*AQ*az*BB*by*cy + 
-     -    2*AD**2*AQ*ax*BC*by*cy + 2*AD*AF*AQ*az*BC*by*cy - 
-     -    AC*AD*AF*AL*bx*by*cy - AC*AF*AN*AQ*bx*by*cy + 
-     -    AD*AE*AQ*BB*bx*by*cy - AD**2*AQ*BC*bx*by*cy - 
-     -    2*AC*AE*AF*AQ*bz*cy - AC*AF**2*AL*ay*bz*cy - 
-     -    AC*AE*AF*AL*az*bz*cy + AC*AF*AM*AQ*az*bz*cy + 
-     -    AE*AF*AQ*ay*BB*bz*cy + AE**2*AQ*az*BB*bz*cy - 
-     -    AD*AF*AQ*ay*BC*bz*cy - AD*AE*AQ*az*BC*bz*cy - 
-     -    AC*AF**2*AL*by*bz*cy + AE*AF*AQ*BB*by*bz*cy - 
-     -    AD*AF*AQ*BC*by*bz*cy + AC*AE*AF*AL*bz**2*cy - 
-     -    AC*AF*AM*AQ*bz**2*cy - AE**2*AQ*BB*bz**2*cy + 
-     -    AD*AE*AQ*BC*bz**2*cy + AC*AE*AF*AL*ax*cx*cy - 
-     -    AC*AF*AM*AQ*ax*cx*cy + AC*AD*AF*AL*ay*cx*cy + 
-     -    AC*AF*AN*AQ*ay*cx*cy - AE**2*AQ*ax*BB*cx*cy - 
-     -    AD*AE*AQ*ay*BB*cx*cy + AD*AE*AQ*ax*BC*cx*cy + 
-     -    AD**2*AQ*ay*BC*cx*cy - AC*AE*AF*AL*bx*cx*cy + 
-     -    AC*AF*AM*AQ*bx*cx*cy + AE**2*AQ*BB*bx*cx*cy - 
-     -    AD*AE*AQ*BC*bx*cx*cy - AC*AD*AF*AL*by*cx*cy - 
-     -    AC*AF*AN*AQ*by*cx*cy + AD*AE*AQ*BB*by*cx*cy - 
-     -    AD**2*AQ*BC*by*cx*cy - AC*AF**2*AQ*cy**2 - 
-     -    AC*AD*AF*AL*ax*cy**2 - AC*AF*AN*AQ*ax*cy**2 - 
-     -    AC*AF**2*AL*az*cy**2 + AD*AE*AQ*ax*BB*cy**2 + 
-     -    AE*AF*AQ*az*BB*cy**2 - AD**2*AQ*ax*BC*cy**2 - 
-     -    AD*AF*AQ*az*BC*cy**2 + AC*AD*AF*AL*bx*cy**2 + 
-     -    AC*AF*AN*AQ*bx*cy**2 - AD*AE*AQ*BB*bx*cy**2 + 
-     -    AD**2*AQ*BC*bx*cy**2 + AC*AF**2*AL*bz*cy**2 - 
-     -    AE*AF*AQ*BB*bz*cy**2 + AD*AF*AQ*BC*bz*cy**2 - 
-     -    2*AC*AD*AF*AQ*ax*cz - 2*AC*AE*AF*AQ*ay*cz + 
-     -    AC*AD*AF*AQ*bx*cz - AC*AF**2*AL*ax*bx*cz - 
-     -    AC*AD*AF*AL*az*bx*cz - AC*AF*AN*AQ*az*bx*cz + 
-     -    AE*AF*AQ*ax*BB*bx*cz + AD*AE*AQ*az*BB*bx*cz - 
-     -    AD*AF*AQ*ax*BC*bx*cz - AD**2*AQ*az*BC*bx*cz + 
-     -    AC*AF**2*AL*bx**2*cz - AE*AF*AQ*BB*bx**2*cz + 
-     -    AD*AF*AQ*BC*bx**2*cz + AC*AE*AF*AQ*by*cz - 
-     -    AC*AF**2*AL*ay*by*cz - AC*AE*AF*AL*az*by*cz + 
-     -    AC*AF*AM*AQ*az*by*cz + AE*AF*AQ*ay*BB*by*cz + 
-     -    AE**2*AQ*az*BB*by*cz - AD*AF*AQ*ay*BC*by*cz - 
-     -    AD*AE*AQ*az*BC*by*cz + AC*AF**2*AL*by**2*cz - 
-     -    AE*AF*AQ*BB*by**2*cz + AD*AF*AQ*BC*by**2*cz + 
-     -    2*AC*AD*AF*AL*ax*bz*cz + 2*AC*AF*AN*AQ*ax*bz*cz + 
-     -    2*AC*AE*AF*AL*ay*bz*cz - 2*AC*AF*AM*AQ*ay*bz*cz - 
-     -    2*AD*AE*AQ*ax*BB*bz*cz - 2*AE**2*AQ*ay*BB*bz*cz + 
-     -    2*AD**2*AQ*ax*BC*bz*cz + 2*AD*AE*AQ*ay*BC*bz*cz - 
-     -    AC*AD*AF*AL*bx*bz*cz - AC*AF*AN*AQ*bx*bz*cz + 
-     -    AD*AE*AQ*BB*bx*bz*cz - AD**2*AQ*BC*bx*bz*cz - 
-     -    AC*AE*AF*AL*by*bz*cz + AC*AF*AM*AQ*by*bz*cz + 
-     -    AE**2*AQ*BB*by*bz*cz - AD*AE*AQ*BC*by*bz*cz + 
-     -    AC*AD*AF*AQ*cx*cz + AC*AF**2*AL*ax*cx*cz + 
-     -    AC*AD*AF*AL*az*cx*cz + AC*AF*AN*AQ*az*cx*cz - 
-     -    AE*AF*AQ*ax*BB*cx*cz - AD*AE*AQ*az*BB*cx*cz + 
-     -    AD*AF*AQ*ax*BC*cx*cz + AD**2*AQ*az*BC*cx*cz - 
-     -    AC*AF**2*AL*bx*cx*cz + AE*AF*AQ*BB*bx*cx*cz - 
-     -    AD*AF*AQ*BC*bx*cx*cz - AC*AD*AF*AL*bz*cx*cz - 
-     -    AC*AF*AN*AQ*bz*cx*cz + AD*AE*AQ*BB*bz*cx*cz - 
-     -    AD**2*AQ*BC*bz*cx*cz + AC*AE*AF*AQ*cy*cz + 
-     -    AC*AF**2*AL*ay*cy*cz + AC*AE*AF*AL*az*cy*cz - 
-     -    AC*AF*AM*AQ*az*cy*cz - AE*AF*AQ*ay*BB*cy*cz - 
-     -    AE**2*AQ*az*BB*cy*cz + AD*AF*AQ*ay*BC*cy*cz + 
-     -    AD*AE*AQ*az*BC*cy*cz - AC*AF**2*AL*by*cy*cz + 
-     -    AE*AF*AQ*BB*by*cy*cz - AD*AF*AQ*BC*by*cy*cz - 
-     -    AC*AE*AF*AL*bz*cy*cz + AC*AF*AM*AQ*bz*cy*cz + 
-     -    AE**2*AQ*BB*bz*cy*cz - AD*AE*AQ*BC*bz*cy*cz - 
-     -    AC*AD*AF*AL*ax*cz**2 - AC*AF*AN*AQ*ax*cz**2 - 
-     -    AC*AE*AF*AL*ay*cz**2 + AC*AF*AM*AQ*ay*cz**2 + 
-     -    AD*AE*AQ*ax*BB*cz**2 + AE**2*AQ*ay*BB*cz**2 - 
-     -    AD**2*AQ*ax*BC*cz**2 - AD*AE*AQ*ay*BC*cz**2 + 
-     -    AC*AD*AF*AL*bx*cz**2 + AC*AF*AN*AQ*bx*cz**2 - 
-     -    AD*AE*AQ*BB*bx*cz**2 + AD**2*AQ*BC*bx*cz**2 + 
-     -    AC*AE*AF*AL*by*cz**2 - AC*AF*AM*AQ*by*cz**2 - 
-     -    AE**2*AQ*BB*by*cz**2 + AD*AE*AQ*BC*by*cz**2 - 
-     -    AB*(AM*AQ*(AF*AW + AD*BA) + 
-     -       AE**2*(AL*AV - 
-     -          AQ*(2*AL*ay - AK*az - 2*bz*cy + by*cz + cy*cz))
-     -        + AE*(AN*AQ*BA + 
-     -          AF*(AL*AW + 
-     -             AQ*(AJ*ax + AK*ay - bx*cx + cx**2 - by*cy + 
-     -                cy**2)) + 
-     -          AD*(AL*BA - 
-     -             AQ*(2*AL*ax - AJ*az - 2*bz*cx + bx*cz + cx*cz)
-     -             ))) + AA*
-     -     (AN*AQ*(AE*AV + AF*AW) - 
-     -       AD**2*(AL*BA - 
-     -          AQ*(2*AL*ax - AJ*az - 2*bz*cx + bx*cz + cx*cz))
-     -        - AD*(-(AM*AQ*AV) + 
-     -          AF*(AL*AW + 
-     -             AQ*(AJ*ax + AK*ay - bx*cx + cx**2 - by*cy + 
-     -                cy**2)) + 
-     -          AE*(AL*AV - 
-     -             AQ*(2*AL*ay - AK*az - 2*bz*cy + by*cz + cy*cz)))))/
-     -  (AQ**1.5*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
+       day=(-(abcz*bcdy*bcdz*bx**2) - ay*bcdy*bcdz*bcx*bx**2 - 
+     -    az*bcdz**2*bcx*bx**2 + ay*bcdx*bcdy*bcz*bx**2 + 
+     -    az*bcdx*bcdz*bcz*bx**2 + abcz*bcdx*bcdz*bx*by + 
+     -    ay*bcdx*bcdz*bcx*bx*by + ax*bcdy*bcdz*bcx*bx*by - 
+     -    ay*bcdx**2*bcz*bx*by - ax*bcdx*bcdy*bcz*bx*by - 
+     -    ax*bcdx*bcdz*bcx*by**2 - az*bcdz**2*bcx*by**2 + 
+     -    ax*bcdx**2*bcz*by**2 + az*bcdx*bcdz*bcz*by**2 + 
+     -    az*bcdx*bcdz*bcx*bx*bz + ax*bcdz**2*bcx*bx*bz - 
+     -    az*bcdx**2*bcz*bx*bz - ax*bcdx*bcdz*bcz*bx*bz + 
+     -    abcz*bcdz**2*by*bz + az*bcdy*bcdz*bcx*by*bz + 
+     -    ay*bcdz**2*bcx*by*bz - az*bcdx*bcdy*bcz*by*bz - 
+     -    ay*bcdx*bcdz*bcz*by*bz - abcz*bcdy*bcdz*bz**2 - 
+     -    ax*bcdx*bcdz*bcx*bz**2 - ay*bcdy*bcdz*bcx*bz**2 + 
+     -    ax*bcdx**2*bcz*bz**2 + ay*bcdx*bcdy*bcz*bz**2 + 
+     -    2*abcz*bcdy*bcdz*bx*cx + 2*ay*bcdy*bcdz*bcx*bx*cx + 
+     -    2*az*bcdz**2*bcx*bx*cx - 2*ay*bcdx*bcdy*bcz*bx*cx - 
+     -    2*az*bcdx*bcdz*bcz*bx*cx - abcz*bcdx*bcdz*by*cx - 
+     -    ay*bcdx*bcdz*bcx*by*cx - ax*bcdy*bcdz*bcx*by*cx + 
+     -    ay*bcdx**2*bcz*by*cx + ax*bcdx*bcdy*bcz*by*cx - 
+     -    bcdy*bcdz*bcx*bx*by*cx + bcdx*bcdy*bcz*bx*by*cx + 
+     -    bcdx*bcdz*bcx*by**2*cx - bcdx**2*bcz*by**2*cx - 
+     -    az*bcdx*bcdz*bcx*bz*cx - ax*bcdz**2*bcx*bz*cx + 
+     -    az*bcdx**2*bcz*bz*cx + ax*bcdx*bcdz*bcz*bz*cx - 
+     -    bcdz**2*bcx*bx*bz*cx + bcdx*bcdz*bcz*bx*bz*cx + 
+     -    bcdx*bcdz*bcx*bz**2*cx - bcdx**2*bcz*bz**2*cx - 
+     -    abcz*bcdy*bcdz*cx**2 - ay*bcdy*bcdz*bcx*cx**2 - 
+     -    az*bcdz**2*bcx*cx**2 + ay*bcdx*bcdy*bcz*cx**2 + 
+     -    az*bcdx*bcdz*bcz*cx**2 + bcdy*bcdz*bcx*by*cx**2 - 
+     -    bcdx*bcdy*bcz*by*cx**2 + bcdz**2*bcx*bz*cx**2 - 
+     -    bcdx*bcdz*bcz*bz*cx**2 - abcz*bcdx*bcdz*bx*cy - 
+     -    ay*bcdx*bcdz*bcx*bx*cy - ax*bcdy*bcdz*bcx*bx*cy + 
+     -    ay*bcdx**2*bcz*bx*cy + ax*bcdx*bcdy*bcz*bx*cy + 
+     -    bcdy*bcdz*bcx*bx**2*cy - bcdx*bcdy*bcz*bx**2*cy + 
+     -    2*ax*bcdx*bcdz*bcx*by*cy + 2*az*bcdz**2*bcx*by*cy - 
+     -    2*ax*bcdx**2*bcz*by*cy - 2*az*bcdx*bcdz*bcz*by*cy - 
+     -    bcdx*bcdz*bcx*bx*by*cy + bcdx**2*bcz*bx*by*cy - 
+     -    abcz*bcdz**2*bz*cy - az*bcdy*bcdz*bcx*bz*cy - 
+     -    ay*bcdz**2*bcx*bz*cy + az*bcdx*bcdy*bcz*bz*cy + 
+     -    ay*bcdx*bcdz*bcz*bz*cy - bcdz**2*bcx*by*bz*cy + 
+     -    bcdx*bcdz*bcz*by*bz*cy + bcdy*bcdz*bcx*bz**2*cy - 
+     -    bcdx*bcdy*bcz*bz**2*cy + abcz*bcdx*bcdz*cx*cy + 
+     -    ay*bcdx*bcdz*bcx*cx*cy + ax*bcdy*bcdz*bcx*cx*cy - 
+     -    ay*bcdx**2*bcz*cx*cy - ax*bcdx*bcdy*bcz*cx*cy - 
+     -    bcdy*bcdz*bcx*bx*cx*cy + bcdx*bcdy*bcz*bx*cx*cy - 
+     -    bcdx*bcdz*bcx*by*cx*cy + bcdx**2*bcz*by*cx*cy - 
+     -    ax*bcdx*bcdz*bcx*cy**2 - az*bcdz**2*bcx*cy**2 + 
+     -    ax*bcdx**2*bcz*cy**2 + az*bcdx*bcdz*bcz*cy**2 + 
+     -    bcdx*bcdz*bcx*bx*cy**2 - bcdx**2*bcz*bx*cy**2 + 
+     -    bcdz**2*bcx*bz*cy**2 - bcdx*bcdz*bcz*bz*cy**2 - 
+     -    az*bcdx*bcdz*bcx*bx*cz - ax*bcdz**2*bcx*bx*cz + 
+     -    az*bcdx**2*bcz*bx*cz + ax*bcdx*bcdz*bcz*bx*cz + 
+     -    bcdz**2*bcx*bx**2*cz - bcdx*bcdz*bcz*bx**2*cz - 
+     -    abcz*bcdz**2*by*cz - az*bcdy*bcdz*bcx*by*cz - 
+     -    ay*bcdz**2*bcx*by*cz + az*bcdx*bcdy*bcz*by*cz + 
+     -    ay*bcdx*bcdz*bcz*by*cz + bcdz**2*bcx*by**2*cz - 
+     -    bcdx*bcdz*bcz*by**2*cz + 2*abcz*bcdy*bcdz*bz*cz + 
+     -    2*ax*bcdx*bcdz*bcx*bz*cz + 2*ay*bcdy*bcdz*bcx*bz*cz - 
+     -    2*ax*bcdx**2*bcz*bz*cz - 2*ay*bcdx*bcdy*bcz*bz*cz - 
+     -    bcdx*bcdz*bcx*bx*bz*cz + bcdx**2*bcz*bx*bz*cz - 
+     -    bcdy*bcdz*bcx*by*bz*cz + bcdx*bcdy*bcz*by*bz*cz + 
+     -    az*bcdx*bcdz*bcx*cx*cz + ax*bcdz**2*bcx*cx*cz - 
+     -    az*bcdx**2*bcz*cx*cz - ax*bcdx*bcdz*bcz*cx*cz - 
+     -    bcdz**2*bcx*bx*cx*cz + bcdx*bcdz*bcz*bx*cx*cz - 
+     -    bcdx*bcdz*bcx*bz*cx*cz + bcdx**2*bcz*bz*cx*cz + 
+     -    abcz*bcdz**2*cy*cz + az*bcdy*bcdz*bcx*cy*cz + 
+     -    ay*bcdz**2*bcx*cy*cz - az*bcdx*bcdy*bcz*cy*cz - 
+     -    ay*bcdx*bcdz*bcz*cy*cz - bcdz**2*bcx*by*cy*cz + 
+     -    bcdx*bcdz*bcz*by*cy*cz - bcdy*bcdz*bcx*bz*cy*cz + 
+     -    bcdx*bcdy*bcz*bz*cy*cz - abcz*bcdy*bcdz*cz**2 - 
+     -    ax*bcdx*bcdz*bcx*cz**2 - ay*bcdy*bcdz*bcx*cz**2 + 
+     -    ax*bcdx**2*bcz*cz**2 + ay*bcdx*bcdy*bcz*cz**2 + 
+     -    bcdx*bcdz*bcx*bx*cz**2 - bcdx**2*bcz*bx*cz**2 + 
+     -    bcdy*bcdz*bcx*by*cz**2 - bcdx*bcdy*bcz*by*cz**2 + 
+     -    abcx*bcdx*(-(bcdy*(bcx**2 + bcz**2)) + 
+     -       bcy*(bcdx*bx + bcdz*bz - bcdx*cx - bcdz*cz)) - 
+     -    abcy*bcdy*(bcdy*(bcx**2 + bcz**2) + 
+     -       bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))/
+     -  (Sqrt(bc2)*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy))
+     -           + ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))
+     -         **2/bc2))
 
 
-      dcx=(-2*AC*AE*AF*AQ*ay*bx - 2*AC*AF**2*AQ*az*bx + 
-     -    AC*AE*AF*AJ*ay*bx**2 - AE*AF*AH*AQ*ay*bx**2 + 
-     -    AE**2*AI*AQ*ay*bx**2 + AC*AF**2*AJ*az*bx**2 - 
-     -    AF**2*AH*AQ*az*bx**2 + AE*AF*AI*AQ*az*bx**2 + 
-     -    AC*AE*AF*AQ*ax*by + AC*AD*AF*AQ*ay*by + 
-     -    AC*AE*AF*AQ*bx*by - AC*AE*AF*AJ*ax*bx*by + 
-     -    AE*AF*AH*AQ*ax*bx*by - AE**2*AI*AQ*ax*bx*by - 
-     -    AC*AD*AF*AJ*ay*bx*by + AD*AF*AH*AQ*ay*bx*by - 
-     -    AD*AE*AI*AQ*ay*bx*by + AC*AE*AQ*ay*bx**2*by - 
-     -    AC*AD*AF*AQ*by**2 + AC*AD*AF*AJ*ax*by**2 - 
-     -    AD*AF*AH*AQ*ax*by**2 + AD*AE*AI*AQ*ax*by**2 + 
-     -    AC*AF**2*AJ*az*by**2 - AF**2*AH*AQ*az*by**2 + 
-     -    AE*AF*AI*AQ*az*by**2 - AC*AE*AQ*ax*bx*by**2 - 
-     -    AC*AD*AQ*ay*bx*by**2 + AC*AD*AQ*ax*by**3 + 
-     -    AC*AF**2*AQ*ax*bz + AC*AD*AF*AQ*az*bz + 
-     -    AC*AF**2*AQ*bx*bz - AC*AF**2*AJ*ax*bx*bz + 
-     -    AF**2*AH*AQ*ax*bx*bz - AE*AF*AI*AQ*ax*bx*bz - 
-     -    AC*AD*AF*AJ*az*bx*bz + AD*AF*AH*AQ*az*bx*bz - 
-     -    AD*AE*AI*AQ*az*bx*bz + AC*AF*AQ*ay*bx**2*bz - 
-     -    AC*AF**2*AJ*ay*by*bz + AF**2*AH*AQ*ay*by*bz - 
-     -    AE*AF*AI*AQ*ay*by*bz - AC*AE*AF*AJ*az*by*bz + 
-     -    AE*AF*AH*AQ*az*by*bz - AE**2*AI*AQ*az*by*bz - 
-     -    AC*AF*AQ*ax*bx*by*bz - AC*AD*AQ*az*bx*by*bz - 
-     -    AC*AE*AQ*az*by**2*bz - AC*AD*AF*AQ*bz**2 + 
-     -    AC*AD*AF*AJ*ax*bz**2 - AD*AF*AH*AQ*ax*bz**2 + 
-     -    AD*AE*AI*AQ*ax*bz**2 + AC*AE*AF*AJ*ay*bz**2 - 
-     -    AE*AF*AH*AQ*ay*bz**2 + AE**2*AI*AQ*ay*bz**2 + 
-     -    AC*AD*AQ*ax*by*bz**2 + AC*AE*AQ*ay*by*bz**2 - 
-     -    AC*AF*AQ*az*by*bz**2 + AC*AF*AQ*ay*bz**3 + 
-     -    2*AC*AE*AF*AQ*ay*cx + 2*AC*AF**2*AQ*az*cx - 
-     -    2*AC*AE*AF*AJ*ay*bx*cx + 2*AE*AF*AH*AQ*ay*bx*cx - 
-     -    2*AE**2*AI*AQ*ay*bx*cx - 2*AC*AF**2*AJ*az*bx*cx + 
-     -    2*AF**2*AH*AQ*az*bx*cx - 2*AE*AF*AI*AQ*az*bx*cx - 
-     -    2*AC*AE*AF*AQ*by*cx + AC*AE*AF*AJ*ax*by*cx - 
-     -    AE*AF*AH*AQ*ax*by*cx + AE**2*AI*AQ*ax*by*cx + 
-     -    AC*AD*AF*AJ*ay*by*cx - AD*AF*AH*AQ*ay*by*cx + 
-     -    AD*AE*AI*AQ*ay*by*cx + AC*AE*AF*AJ*bx*by*cx - 
-     -    AE*AF*AH*AQ*bx*by*cx + AE**2*AI*AQ*bx*by*cx - 
-     -    2*AC*AE*AQ*ay*bx*by*cx - AC*AD*AF*AJ*by**2*cx + 
-     -    AD*AF*AH*AQ*by**2*cx - AD*AE*AI*AQ*by**2*cx + 
-     -    AC*AE*AQ*ax*by**2*cx + AC*AD*AQ*ay*by**2*cx + 
-     -    AC*AE*AQ*bx*by**2*cx - AC*AD*AQ*by**3*cx - 
-     -    2*AC*AF**2*AQ*bz*cx + AC*AF**2*AJ*ax*bz*cx - 
-     -    AF**2*AH*AQ*ax*bz*cx + AE*AF*AI*AQ*ax*bz*cx + 
-     -    AC*AD*AF*AJ*az*bz*cx - AD*AF*AH*AQ*az*bz*cx + 
-     -    AD*AE*AI*AQ*az*bz*cx + AC*AF**2*AJ*bx*bz*cx - 
-     -    AF**2*AH*AQ*bx*bz*cx + AE*AF*AI*AQ*bx*bz*cx - 
-     -    2*AC*AF*AQ*ay*bx*bz*cx + AC*AF*AQ*ax*by*bz*cx + 
-     -    AC*AD*AQ*az*by*bz*cx + AC*AF*AQ*bx*by*bz*cx - 
-     -    AC*AD*AF*AJ*bz**2*cx + AD*AF*AH*AQ*bz**2*cx - 
-     -    AD*AE*AI*AQ*bz**2*cx - AC*AD*AQ*by*bz**2*cx + 
-     -    AC*AE*AF*AJ*ay*cx**2 - AE*AF*AH*AQ*ay*cx**2 + 
-     -    AE**2*AI*AQ*ay*cx**2 + AC*AF**2*AJ*az*cx**2 - 
-     -    AF**2*AH*AQ*az*cx**2 + AE*AF*AI*AQ*az*cx**2 - 
-     -    AC*AE*AF*AJ*by*cx**2 + AE*AF*AH*AQ*by*cx**2 - 
-     -    AE**2*AI*AQ*by*cx**2 + AC*AE*AQ*ay*by*cx**2 - 
-     -    AC*AE*AQ*by**2*cx**2 - AC*AF**2*AJ*bz*cx**2 + 
-     -    AF**2*AH*AQ*bz*cx**2 - AE*AF*AI*AQ*bz*cx**2 + 
-     -    AC*AF*AQ*ay*bz*cx**2 - AC*AF*AQ*by*bz*cx**2 - 
-     -    AC*AE*AF*AQ*ax*cy - AC*AD*AF*AQ*ay*cy + 
-     -    AC*AE*AF*AQ*bx*cy + AC*AE*AF*AJ*ax*bx*cy - 
-     -    AE*AF*AH*AQ*ax*bx*cy + AE**2*AI*AQ*ax*bx*cy + 
-     -    AC*AD*AF*AJ*ay*bx*cy - AD*AF*AH*AQ*ay*bx*cy + 
-     -    AD*AE*AI*AQ*ay*bx*cy - AC*AE*AF*AJ*bx**2*cy + 
-     -    AE*AF*AH*AQ*bx**2*cy - AE**2*AI*AQ*bx**2*cy + 
-     -    AC*AD*AF*AQ*by*cy - 2*AC*AD*AF*AJ*ax*by*cy + 
-     -    2*AD*AF*AH*AQ*ax*by*cy - 2*AD*AE*AI*AQ*ax*by*cy - 
-     -    2*AC*AF**2*AJ*az*by*cy + 2*AF**2*AH*AQ*az*by*cy - 
-     -    2*AE*AF*AI*AQ*az*by*cy + AC*AD*AF*AJ*bx*by*cy - 
-     -    AD*AF*AH*AQ*bx*by*cy + AD*AE*AI*AQ*bx*by*cy + 
-     -    AC*AE*AQ*ax*bx*by*cy + AC*AD*AQ*ay*bx*by*cy - 
-     -    AC*AE*AQ*bx**2*by*cy - 2*AC*AD*AQ*ax*by**2*cy + 
-     -    AC*AD*AQ*bx*by**2*cy + AC*AF**2*AJ*ay*bz*cy - 
-     -    AF**2*AH*AQ*ay*bz*cy + AE*AF*AI*AQ*ay*bz*cy + 
-     -    AC*AE*AF*AJ*az*bz*cy - AE*AF*AH*AQ*az*bz*cy + 
-     -    AE**2*AI*AQ*az*bz*cy + AC*AF*AQ*ax*bx*bz*cy - 
-     -    AC*AF*AQ*bx**2*bz*cy + AC*AF**2*AJ*by*bz*cy - 
-     -    AF**2*AH*AQ*by*bz*cy + AE*AF*AI*AQ*by*bz*cy + 
-     -    AC*AE*AQ*az*by*bz*cy - AC*AE*AF*AJ*bz**2*cy + 
-     -    AE*AF*AH*AQ*bz**2*cy - AE**2*AI*AQ*bz**2*cy + 
-     -    AC*AF*AQ*az*bz**2*cy - AC*AE*AQ*by*bz**2*cy - 
-     -    AC*AF*AQ*bz**3*cy - AC*AE*AF*AJ*ax*cx*cy + 
-     -    AE*AF*AH*AQ*ax*cx*cy - AE**2*AI*AQ*ax*cx*cy - 
-     -    AC*AD*AF*AJ*ay*cx*cy + AD*AF*AH*AQ*ay*cx*cy - 
-     -    AD*AE*AI*AQ*ay*cx*cy + AC*AE*AF*AJ*bx*cx*cy - 
-     -    AE*AF*AH*AQ*bx*cx*cy + AE**2*AI*AQ*bx*cx*cy + 
-     -    AC*AD*AF*AJ*by*cx*cy - AD*AF*AH*AQ*by*cx*cy + 
-     -    AD*AE*AI*AQ*by*cx*cy - AC*AE*AQ*ax*by*cx*cy - 
-     -    AC*AD*AQ*ay*by*cx*cy + AC*AE*AQ*bx*by*cx*cy + 
-     -    AC*AD*AQ*by**2*cx*cy - AC*AF*AQ*ax*bz*cx*cy + 
-     -    AC*AF*AQ*bx*bz*cx*cy + AC*AD*AF*AJ*ax*cy**2 - 
-     -    AD*AF*AH*AQ*ax*cy**2 + AD*AE*AI*AQ*ax*cy**2 + 
-     -    AC*AF**2*AJ*az*cy**2 - AF**2*AH*AQ*az*cy**2 + 
-     -    AE*AF*AI*AQ*az*cy**2 - AC*AD*AF*AJ*bx*cy**2 + 
-     -    AD*AF*AH*AQ*bx*cy**2 - AD*AE*AI*AQ*bx*cy**2 + 
-     -    AC*AD*AQ*ax*by*cy**2 - AC*AD*AQ*bx*by*cy**2 - 
-     -    AC*AF**2*AJ*bz*cy**2 + AF**2*AH*AQ*bz*cy**2 - 
-     -    AE*AF*AI*AQ*bz*cy**2 - AC*AF**2*AQ*ax*cz - 
-     -    AC*AD*AF*AQ*az*cz + AC*AF**2*AQ*bx*cz + 
-     -    AC*AF**2*AJ*ax*bx*cz - AF**2*AH*AQ*ax*bx*cz + 
-     -    AE*AF*AI*AQ*ax*bx*cz + AC*AD*AF*AJ*az*bx*cz - 
-     -    AD*AF*AH*AQ*az*bx*cz + AD*AE*AI*AQ*az*bx*cz - 
-     -    AC*AF**2*AJ*bx**2*cz + AF**2*AH*AQ*bx**2*cz - 
-     -    AE*AF*AI*AQ*bx**2*cz + AC*AF**2*AJ*ay*by*cz - 
-     -    AF**2*AH*AQ*ay*by*cz + AE*AF*AI*AQ*ay*by*cz + 
-     -    AC*AE*AF*AJ*az*by*cz - AE*AF*AH*AQ*az*by*cz + 
-     -    AE**2*AI*AQ*az*by*cz + AC*AD*AQ*az*bx*by*cz - 
-     -    AC*AF**2*AJ*by**2*cz + AF**2*AH*AQ*by**2*cz - 
-     -    AE*AF*AI*AQ*by**2*cz + AC*AE*AQ*az*by**2*cz + 
-     -    AC*AD*AF*AQ*bz*cz - 2*AC*AD*AF*AJ*ax*bz*cz + 
-     -    2*AD*AF*AH*AQ*ax*bz*cz - 2*AD*AE*AI*AQ*ax*bz*cz - 
-     -    2*AC*AE*AF*AJ*ay*bz*cz + 2*AE*AF*AH*AQ*ay*bz*cz - 
-     -    2*AE**2*AI*AQ*ay*bz*cz + AC*AD*AF*AJ*bx*bz*cz - 
-     -    AD*AF*AH*AQ*bx*bz*cz + AD*AE*AI*AQ*bx*bz*cz + 
-     -    AC*AE*AF*AJ*by*bz*cz - AE*AF*AH*AQ*by*bz*cz + 
-     -    AE**2*AI*AQ*by*bz*cz - 2*AC*AD*AQ*ax*by*bz*cz - 
-     -    2*AC*AE*AQ*ay*by*bz*cz + AC*AF*AQ*az*by*bz*cz + 
-     -    AC*AD*AQ*bx*by*bz*cz + AC*AE*AQ*by**2*bz*cz - 
-     -    2*AC*AF*AQ*ay*bz**2*cz + AC*AF*AQ*by*bz**2*cz - 
-     -    AC*AF**2*AJ*ax*cx*cz + AF**2*AH*AQ*ax*cx*cz - 
-     -    AE*AF*AI*AQ*ax*cx*cz - AC*AD*AF*AJ*az*cx*cz + 
-     -    AD*AF*AH*AQ*az*cx*cz - AD*AE*AI*AQ*az*cx*cz + 
-     -    AC*AF**2*AJ*bx*cx*cz - AF**2*AH*AQ*bx*cx*cz + 
-     -    AE*AF*AI*AQ*bx*cx*cz - AC*AD*AQ*az*by*cx*cz + 
-     -    AC*AD*AF*AJ*bz*cx*cz - AD*AF*AH*AQ*bz*cx*cz + 
-     -    AD*AE*AI*AQ*bz*cx*cz + AC*AD*AQ*by*bz*cx*cz - 
-     -    AC*AF**2*AJ*ay*cy*cz + AF**2*AH*AQ*ay*cy*cz - 
-     -    AE*AF*AI*AQ*ay*cy*cz - AC*AE*AF*AJ*az*cy*cz + 
-     -    AE*AF*AH*AQ*az*cy*cz - AE**2*AI*AQ*az*cy*cz + 
-     -    AC*AF**2*AJ*by*cy*cz - AF**2*AH*AQ*by*cy*cz + 
-     -    AE*AF*AI*AQ*by*cy*cz - AC*AE*AQ*az*by*cy*cz + 
-     -    AC*AE*AF*AJ*bz*cy*cz - AE*AF*AH*AQ*bz*cy*cz + 
-     -    AE**2*AI*AQ*bz*cy*cz - AC*AF*AQ*az*bz*cy*cz + 
-     -    AC*AE*AQ*by*bz*cy*cz + AC*AF*AQ*bz**2*cy*cz + 
-     -    AC*AD*AF*AJ*ax*cz**2 - AD*AF*AH*AQ*ax*cz**2 + 
-     -    AD*AE*AI*AQ*ax*cz**2 + AC*AE*AF*AJ*ay*cz**2 - 
-     -    AE*AF*AH*AQ*ay*cz**2 + AE**2*AI*AQ*ay*cz**2 - 
-     -    AC*AD*AF*AJ*bx*cz**2 + AD*AF*AH*AQ*bx*cz**2 - 
-     -    AD*AE*AI*AQ*bx*cz**2 - AC*AE*AF*AJ*by*cz**2 + 
-     -    AE*AF*AH*AQ*by*cz**2 - AE**2*AI*AQ*by*cz**2 + 
-     -    AC*AD*AQ*ax*by*cz**2 + AC*AE*AQ*ay*by*cz**2 - 
-     -    AC*AD*AQ*bx*by*cz**2 - AC*AE*AQ*by**2*cz**2 + 
-     -    AC*AF*AQ*ay*bz*cz**2 - AC*AF*AQ*by*bz*cz**2 - 
-     -    AC*AE*AQ*ay*bx**2*dy + AC*AE*AQ*ax*bx*by*dy + 
-     -    AC*AD*AQ*ay*bx*by*dy - AC*AD*AQ*ax*by**2*dy + 
-     -    AC*AD*AQ*az*bx*bz*dy + AC*AE*AQ*az*by*bz*dy - 
-     -    AC*AD*AQ*ax*bz**2*dy - AC*AE*AQ*ay*bz**2*dy + 
-     -    2*AC*AE*AQ*ay*bx*cx*dy - AC*AE*AQ*ax*by*cx*dy - 
-     -    AC*AD*AQ*ay*by*cx*dy - AC*AE*AQ*bx*by*cx*dy + 
-     -    AC*AD*AQ*by**2*cx*dy - AC*AD*AQ*az*bz*cx*dy + 
-     -    AC*AD*AQ*bz**2*cx*dy - AC*AE*AQ*ay*cx**2*dy + 
-     -    AC*AE*AQ*by*cx**2*dy - AC*AE*AQ*ax*bx*cy*dy - 
-     -    AC*AD*AQ*ay*bx*cy*dy + AC*AE*AQ*bx**2*cy*dy + 
-     -    2*AC*AD*AQ*ax*by*cy*dy - AC*AD*AQ*bx*by*cy*dy - 
-     -    AC*AE*AQ*az*bz*cy*dy + AC*AE*AQ*bz**2*cy*dy + 
-     -    AC*AE*AQ*ax*cx*cy*dy + AC*AD*AQ*ay*cx*cy*dy - 
-     -    AC*AE*AQ*bx*cx*cy*dy - AC*AD*AQ*by*cx*cy*dy - 
-     -    AC*AD*AQ*ax*cy**2*dy + AC*AD*AQ*bx*cy**2*dy - 
-     -    AC*AD*AQ*az*bx*cz*dy - AC*AE*AQ*az*by*cz*dy + 
-     -    2*AC*AD*AQ*ax*bz*cz*dy + 2*AC*AE*AQ*ay*bz*cz*dy - 
-     -    AC*AD*AQ*bx*bz*cz*dy - AC*AE*AQ*by*bz*cz*dy + 
-     -    AC*AD*AQ*az*cx*cz*dy - AC*AD*AQ*bz*cx*cz*dy + 
-     -    AC*AE*AQ*az*cy*cz*dy - AC*AE*AQ*bz*cy*cz*dy - 
-     -    AC*AD*AQ*ax*cz**2*dy - AC*AE*AQ*ay*cz**2*dy + 
-     -    AC*AD*AQ*bx*cz**2*dy + AC*AE*AQ*by*cz**2*dy + 
-     -    AB*(AE**2*(AJ*AV + 
-     -          AQ*(-2*ay*bx + ax*by + bx*by + 2*ay*cx - 
-     -             2*by*cx - ax*cy + bx*cy)) + 
-     -       AE*(AD*(AJ*BA + 
-     -             AQ*(AI*AL + AK*ay + by*(-by + cy))) + 
-     -          AF*(AJ*AW + 
-     -             AQ*(-2*az*bx + ax*bz + bx*bz + 2*az*cx - 
-     -                2*bz*cx - ax*cz + bx*cz)) - 
-     -          AQ*AW*(by - dy)) - AQ*(AF*AW + AD*BA)*(bz - dz))
-     -      - AC*AF*AQ*ay*bx**2*dz + AC*AF*AQ*ax*bx*by*dz + 
-     -    AC*AF*AQ*az*by*bz*dz - AC*AF*AQ*ay*bz**2*dz + 
-     -    2*AC*AF*AQ*ay*bx*cx*dz - AC*AF*AQ*ax*by*cx*dz - 
-     -    AC*AF*AQ*bx*by*cx*dz - AC*AF*AQ*ay*cx**2*dz + 
-     -    AC*AF*AQ*by*cx**2*dz - AC*AF*AQ*ax*bx*cy*dz + 
-     -    AC*AF*AQ*bx**2*cy*dz - AC*AF*AQ*az*bz*cy*dz + 
-     -    AC*AF*AQ*bz**2*cy*dz + AC*AF*AQ*ax*cx*cy*dz - 
-     -    AC*AF*AQ*bx*cx*cy*dz - AC*AF*AQ*az*by*cz*dz + 
-     -    2*AC*AF*AQ*ay*bz*cz*dz - AC*AF*AQ*by*bz*cz*dz + 
-     -    AC*AF*AQ*az*cy*cz*dz - AC*AF*AQ*bz*cy*cz*dz - 
-     -    AC*AF*AQ*ay*cz**2*dz + AC*AF*AQ*by*cz**2*dz + 
-     -    AA*AD*(AD*AQ*ay*by - AD*AJ*ay*bx*by - 
-     -       AQ*az*bx**2*by - AD*AQ*by**2 + AD*AJ*ax*by**2 - 
-     -       AQ*az*by**3 + AD*AQ*az*bz - AD*AJ*az*bx*bz + 
-     -       AQ*ay*bx**2*bz + AQ*ay*by**2*bz - AD*AQ*bz**2 + 
-     -       AD*AJ*ax*bz**2 - AQ*az*by*bz**2 + AQ*ay*bz**3 + 
-     -       AD*AJ*ay*by*cx + 2*AQ*az*bx*by*cx - 
-     -       AD*AJ*by**2*cx + AD*AJ*az*bz*cx - 
-     -       2*AQ*ay*bx*bz*cx - AD*AJ*bz**2*cx - 
-     -       AQ*az*by*cx**2 + AQ*ay*bz*cx**2 - AD*AQ*ay*cy + 
-     -       AD*AJ*ay*bx*cy + AD*AQ*by*cy - 2*AD*AJ*ax*by*cy + 
-     -       AD*AJ*bx*by*cy + 2*AQ*az*by**2*cy + 
-     -       AQ*ax*bx*bz*cy - AQ*bx**2*bz*cy - AQ*ay*by*bz*cy - 
-     -       AQ*by**2*bz*cy + AQ*az*bz**2*cy - AQ*bz**3*cy - 
-     -       AD*AJ*ay*cx*cy + AD*AJ*by*cx*cy - AQ*ax*bz*cx*cy + 
-     -       AQ*bx*bz*cx*cy + AD*AJ*ax*cy**2 - AD*AJ*bx*cy**2 - 
-     -       AQ*az*by*cy**2 + AQ*by*bz*cy**2 + 
-     -       AE*(AJ*AV + AQ*
-     -           (-2*ay*bx + ax*by + bx*by + 2*ay*cx - 
-     -             2*by*cx - ax*cy + bx*cy)) - AD*AQ*az*cz + 
-     -       AD*AJ*az*bx*cz - AQ*ax*bx*by*cz + AQ*bx**2*by*cz - 
-     -       AQ*ay*by**2*cz + AQ*by**3*cz + AD*AQ*bz*cz - 
-     -       2*AD*AJ*ax*bz*cz + AD*AJ*bx*bz*cz + 
-     -       AQ*az*by*bz*cz - 2*AQ*ay*bz**2*cz + 
-     -       AQ*by*bz**2*cz - AD*AJ*az*cx*cz + AQ*ax*by*cx*cz - 
-     -       AQ*bx*by*cx*cz + AD*AJ*bz*cx*cz + AQ*ay*by*cy*cz - 
-     -       AQ*by**2*cy*cz - AQ*az*bz*cy*cz + AQ*bz**2*cy*cz + 
-     -       AD*AJ*ax*cz**2 - AD*AJ*bx*cz**2 + AQ*ay*bz*cz**2 - 
-     -       AQ*by*bz*cz**2 + 
-     -       AF*(AJ*AW + AQ*
-     -           (-2*az*bx + ax*bz + bx*bz + 2*az*cx - 
-     -             2*bz*cx - ax*cz + bx*cz)) + AQ*az*bx**2*dy + 
-     -       AQ*az*by**2*dy - AQ*ax*bx*bz*dy - AQ*ay*by*bz*dy - 
-     -       2*AQ*az*bx*cx*dy + AQ*ax*bz*cx*dy + 
-     -       AQ*bx*bz*cx*dy + AQ*az*cx**2*dy - AQ*bz*cx**2*dy - 
-     -       2*AQ*az*by*cy*dy + AQ*ay*bz*cy*dy + 
-     -       AQ*by*bz*cy*dy + AQ*az*cy**2*dy - AQ*bz*cy**2*dy + 
-     -       AQ*ax*bx*cz*dy - AQ*bx**2*cz*dy + AQ*ay*by*cz*dy - 
-     -       AQ*by**2*cz*dy - AQ*ax*cx*cz*dy + AQ*bx*cx*cz*dy - 
-     -       AQ*ay*cy*cz*dy + AQ*by*cy*cz*dy - AQ*ay*bx**2*dz + 
-     -       AQ*ax*bx*by*dz + AQ*az*by*bz*dz - AQ*ay*bz**2*dz + 
-     -       2*AQ*ay*bx*cx*dz - AQ*ax*by*cx*dz - 
-     -       AQ*bx*by*cx*dz - AQ*ay*cx**2*dz + AQ*by*cx**2*dz - 
-     -       AQ*ax*bx*cy*dz + AQ*bx**2*cy*dz - AQ*az*bz*cy*dz + 
-     -       AQ*bz**2*cy*dz + AQ*ax*cx*cy*dz - AQ*bx*cx*cy*dz - 
-     -       AQ*az*by*cz*dz + 2*AQ*ay*bz*cz*dz - 
-     -       AQ*by*bz*cz*dz + AQ*az*cy*cz*dz - AQ*bz*cy*cz*dz - 
-     -       AQ*ay*cz**2*dz + AQ*by*cz**2*dz))/
-     -  (AQ**1.5*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
+       daz= (-(abcz*bcdz**2*bx**2) + ay*bcdy**2*bcx*bx**2 + 
+     -    az*bcdy*bcdz*bcx*bx**2 - ay*bcdx*bcdy*bcy*bx**2 - 
+     -    az*bcdx*bcdz*bcy*bx**2 - ay*bcdx*bcdy*bcx*bx*by - 
+     -    ax*bcdy**2*bcx*bx*by + ay*bcdx**2*bcy*bx*by + 
+     -    ax*bcdx*bcdy*bcy*bx*by - abcz*bcdz**2*by**2 + 
+     -    ax*bcdx*bcdy*bcx*by**2 + az*bcdy*bcdz*bcx*by**2 - 
+     -    ax*bcdx**2*bcy*by**2 - az*bcdx*bcdz*bcy*by**2 + 
+     -    abcz*bcdx*bcdz*bx*bz - az*bcdx*bcdy*bcx*bx*bz - 
+     -    ax*bcdy*bcdz*bcx*bx*bz + az*bcdx**2*bcy*bx*bz + 
+     -    ax*bcdx*bcdz*bcy*bx*bz + abcz*bcdy*bcdz*by*bz - 
+     -    az*bcdy**2*bcx*by*bz - ay*bcdy*bcdz*bcx*by*bz + 
+     -    az*bcdx*bcdy*bcy*by*bz + ay*bcdx*bcdz*bcy*by*bz + 
+     -    ax*bcdx*bcdy*bcx*bz**2 + ay*bcdy**2*bcx*bz**2 - 
+     -    ax*bcdx**2*bcy*bz**2 - ay*bcdx*bcdy*bcy*bz**2 + 
+     -    2*abcz*bcdz**2*bx*cx - 2*ay*bcdy**2*bcx*bx*cx - 
+     -    2*az*bcdy*bcdz*bcx*bx*cx + 2*ay*bcdx*bcdy*bcy*bx*cx + 
+     -    2*az*bcdx*bcdz*bcy*bx*cx + ay*bcdx*bcdy*bcx*by*cx + 
+     -    ax*bcdy**2*bcx*by*cx - ay*bcdx**2*bcy*by*cx - 
+     -    ax*bcdx*bcdy*bcy*by*cx + bcdy**2*bcx*bx*by*cx - 
+     -    bcdx*bcdy*bcy*bx*by*cx - bcdx*bcdy*bcx*by**2*cx + 
+     -    bcdx**2*bcy*by**2*cx - abcz*bcdx*bcdz*bz*cx + 
+     -    az*bcdx*bcdy*bcx*bz*cx + ax*bcdy*bcdz*bcx*bz*cx - 
+     -    az*bcdx**2*bcy*bz*cx - ax*bcdx*bcdz*bcy*bz*cx + 
+     -    bcdy*bcdz*bcx*bx*bz*cx - bcdx*bcdz*bcy*bx*bz*cx - 
+     -    bcdx*bcdy*bcx*bz**2*cx + bcdx**2*bcy*bz**2*cx - 
+     -    abcz*bcdz**2*cx**2 + ay*bcdy**2*bcx*cx**2 + 
+     -    az*bcdy*bcdz*bcx*cx**2 - ay*bcdx*bcdy*bcy*cx**2 - 
+     -    az*bcdx*bcdz*bcy*cx**2 - bcdy**2*bcx*by*cx**2 + 
+     -    bcdx*bcdy*bcy*by*cx**2 - bcdy*bcdz*bcx*bz*cx**2 + 
+     -    bcdx*bcdz*bcy*bz*cx**2 + ay*bcdx*bcdy*bcx*bx*cy + 
+     -    ax*bcdy**2*bcx*bx*cy - ay*bcdx**2*bcy*bx*cy - 
+     -    ax*bcdx*bcdy*bcy*bx*cy - bcdy**2*bcx*bx**2*cy + 
+     -    bcdx*bcdy*bcy*bx**2*cy + 2*abcz*bcdz**2*by*cy - 
+     -    2*ax*bcdx*bcdy*bcx*by*cy - 2*az*bcdy*bcdz*bcx*by*cy + 
+     -    2*ax*bcdx**2*bcy*by*cy + 2*az*bcdx*bcdz*bcy*by*cy + 
+     -    bcdx*bcdy*bcx*bx*by*cy - bcdx**2*bcy*bx*by*cy - 
+     -    abcz*bcdy*bcdz*bz*cy + az*bcdy**2*bcx*bz*cy + 
+     -    ay*bcdy*bcdz*bcx*bz*cy - az*bcdx*bcdy*bcy*bz*cy - 
+     -    ay*bcdx*bcdz*bcy*bz*cy + bcdy*bcdz*bcx*by*bz*cy - 
+     -    bcdx*bcdz*bcy*by*bz*cy - bcdy**2*bcx*bz**2*cy + 
+     -    bcdx*bcdy*bcy*bz**2*cy - ay*bcdx*bcdy*bcx*cx*cy - 
+     -    ax*bcdy**2*bcx*cx*cy + ay*bcdx**2*bcy*cx*cy + 
+     -    ax*bcdx*bcdy*bcy*cx*cy + bcdy**2*bcx*bx*cx*cy - 
+     -    bcdx*bcdy*bcy*bx*cx*cy + bcdx*bcdy*bcx*by*cx*cy - 
+     -    bcdx**2*bcy*by*cx*cy - abcz*bcdz**2*cy**2 + 
+     -    ax*bcdx*bcdy*bcx*cy**2 + az*bcdy*bcdz*bcx*cy**2 - 
+     -    ax*bcdx**2*bcy*cy**2 - az*bcdx*bcdz*bcy*cy**2 - 
+     -    bcdx*bcdy*bcx*bx*cy**2 + bcdx**2*bcy*bx*cy**2 - 
+     -    bcdy*bcdz*bcx*bz*cy**2 + bcdx*bcdz*bcy*bz*cy**2 + 
+     -    abcx*bcdx*(-(bcdz*(bcx**2 + bcy**2)) + 
+     -       bcz*(bcdx*bx + bcdy*by - bcdx*cx - bcdy*cy)) + 
+     -    abcy*bcdy*(-(bcdz*(bcx**2 + bcy**2)) + 
+     -       bcz*(bcdx*bx + bcdy*by - bcdx*cx - bcdy*cy)) - 
+     -    abcz*bcdx*bcdz*bx*cz + az*bcdx*bcdy*bcx*bx*cz + 
+     -    ax*bcdy*bcdz*bcx*bx*cz - az*bcdx**2*bcy*bx*cz - 
+     -    ax*bcdx*bcdz*bcy*bx*cz - bcdy*bcdz*bcx*bx**2*cz + 
+     -    bcdx*bcdz*bcy*bx**2*cz - abcz*bcdy*bcdz*by*cz + 
+     -    az*bcdy**2*bcx*by*cz + ay*bcdy*bcdz*bcx*by*cz - 
+     -    az*bcdx*bcdy*bcy*by*cz - ay*bcdx*bcdz*bcy*by*cz - 
+     -    bcdy*bcdz*bcx*by**2*cz + bcdx*bcdz*bcy*by**2*cz - 
+     -    2*ax*bcdx*bcdy*bcx*bz*cz - 2*ay*bcdy**2*bcx*bz*cz + 
+     -    2*ax*bcdx**2*bcy*bz*cz + 2*ay*bcdx*bcdy*bcy*bz*cz + 
+     -    bcdx*bcdy*bcx*bx*bz*cz - bcdx**2*bcy*bx*bz*cz + 
+     -    bcdy**2*bcx*by*bz*cz - bcdx*bcdy*bcy*by*bz*cz + 
+     -    abcz*bcdx*bcdz*cx*cz - az*bcdx*bcdy*bcx*cx*cz - 
+     -    ax*bcdy*bcdz*bcx*cx*cz + az*bcdx**2*bcy*cx*cz + 
+     -    ax*bcdx*bcdz*bcy*cx*cz + bcdy*bcdz*bcx*bx*cx*cz - 
+     -    bcdx*bcdz*bcy*bx*cx*cz + bcdx*bcdy*bcx*bz*cx*cz - 
+     -    bcdx**2*bcy*bz*cx*cz + abcz*bcdy*bcdz*cy*cz - 
+     -    az*bcdy**2*bcx*cy*cz - ay*bcdy*bcdz*bcx*cy*cz + 
+     -    az*bcdx*bcdy*bcy*cy*cz + ay*bcdx*bcdz*bcy*cy*cz + 
+     -    bcdy*bcdz*bcx*by*cy*cz - bcdx*bcdz*bcy*by*cy*cz + 
+     -    bcdy**2*bcx*bz*cy*cz - bcdx*bcdy*bcy*bz*cy*cz + 
+     -    ax*bcdx*bcdy*bcx*cz**2 + ay*bcdy**2*bcx*cz**2 - 
+     -    ax*bcdx**2*bcy*cz**2 - ay*bcdx*bcdy*bcy*cz**2 - 
+     -    bcdx*bcdy*bcx*bx*cz**2 + bcdx**2*bcy*bx*cz**2 - 
+     -    bcdy**2*bcx*by*cz**2 + bcdx*bcdy*bcy*by*cz**2)/
+     -  (Sqrt(bc2)*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy))
+     -           + ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))
+     -         **2/bc2))
 
-      dcy= (AC*AE*AF*AQ*ax*bx + AC*AD*AF*AQ*ay*bx - 
-     -    AC*AE*AF*AQ*bx**2 + AC*AE*AF*AK*ay*bx**2 + 
-     -    AE*AF*AG*AQ*ay*bx**2 - AD*AE*AI*AQ*ay*bx**2 + 
-     -    AC*AF**2*AK*az*bx**2 + AF**2*AG*AQ*az*bx**2 - 
-     -    AD*AF*AI*AQ*az*bx**2 - AC*AE*AQ*ay*bx**3 - 
-     -    2*AC*AD*AF*AQ*ax*by - 2*AC*AF**2*AQ*az*by + 
-     -    AC*AD*AF*AQ*bx*by - AC*AE*AF*AK*ax*bx*by - 
-     -    AE*AF*AG*AQ*ax*bx*by + AD*AE*AI*AQ*ax*bx*by - 
-     -    AC*AD*AF*AK*ay*bx*by - AD*AF*AG*AQ*ay*bx*by + 
-     -    AD**2*AI*AQ*ay*bx*by + AC*AE*AQ*ax*bx**2*by + 
-     -    AC*AD*AQ*ay*bx**2*by + AC*AD*AF*AK*ax*by**2 + 
-     -    AD*AF*AG*AQ*ax*by**2 - AD**2*AI*AQ*ax*by**2 + 
-     -    AC*AF**2*AK*az*by**2 + AF**2*AG*AQ*az*by**2 - 
-     -    AD*AF*AI*AQ*az*by**2 - AC*AD*AQ*ax*bx*by**2 + 
-     -    AC*AF**2*AQ*ay*bz + AC*AE*AF*AQ*az*bz - 
-     -    AC*AF**2*AK*ax*bx*bz - AF**2*AG*AQ*ax*bx*bz + 
-     -    AD*AF*AI*AQ*ax*bx*bz - AC*AD*AF*AK*az*bx*bz - 
-     -    AD*AF*AG*AQ*az*bx*bz + AD**2*AI*AQ*az*bx*bz + 
-     -    AC*AD*AQ*az*bx**2*bz + AC*AF**2*AQ*by*bz - 
-     -    AC*AF**2*AK*ay*by*bz - AF**2*AG*AQ*ay*by*bz + 
-     -    AD*AF*AI*AQ*ay*by*bz - AC*AE*AF*AK*az*by*bz - 
-     -    AE*AF*AG*AQ*az*by*bz + AD*AE*AI*AQ*az*by*bz + 
-     -    AC*AF*AQ*ay*bx*by*bz + AC*AE*AQ*az*bx*by*bz - 
-     -    AC*AF*AQ*ax*by**2*bz - AC*AE*AF*AQ*bz**2 + 
-     -    AC*AD*AF*AK*ax*bz**2 + AD*AF*AG*AQ*ax*bz**2 - 
-     -    AD**2*AI*AQ*ax*bz**2 + AC*AE*AF*AK*ay*bz**2 + 
-     -    AE*AF*AG*AQ*ay*bz**2 - AD*AE*AI*AQ*ay*bz**2 - 
-     -    AC*AD*AQ*ax*bx*bz**2 - AC*AE*AQ*ay*bx*bz**2 + 
-     -    AC*AF*AQ*az*bx*bz**2 - AC*AF*AQ*ax*bz**3 - 
-     -    AC*AE*AF*AQ*ax*cx - AC*AD*AF*AQ*ay*cx + 
-     -    AC*AE*AF*AQ*bx*cx - 2*AC*AE*AF*AK*ay*bx*cx - 
-     -    2*AE*AF*AG*AQ*ay*bx*cx + 2*AD*AE*AI*AQ*ay*bx*cx - 
-     -    2*AC*AF**2*AK*az*bx*cx - 2*AF**2*AG*AQ*az*bx*cx + 
-     -    2*AD*AF*AI*AQ*az*bx*cx + 2*AC*AE*AQ*ay*bx**2*cx + 
-     -    AC*AD*AF*AQ*by*cx + AC*AE*AF*AK*ax*by*cx + 
-     -    AE*AF*AG*AQ*ax*by*cx - AD*AE*AI*AQ*ax*by*cx + 
-     -    AC*AD*AF*AK*ay*by*cx + AD*AF*AG*AQ*ay*by*cx - 
-     -    AD**2*AI*AQ*ay*by*cx + AC*AE*AF*AK*bx*by*cx + 
-     -    AE*AF*AG*AQ*bx*by*cx - AD*AE*AI*AQ*bx*by*cx - 
-     -    AC*AE*AQ*ax*bx*by*cx - AC*AD*AQ*ay*bx*by*cx - 
-     -    AC*AE*AQ*bx**2*by*cx - AC*AD*AF*AK*by**2*cx - 
-     -    AD*AF*AG*AQ*by**2*cx + AD**2*AI*AQ*by**2*cx + 
-     -    AC*AD*AQ*bx*by**2*cx + AC*AF**2*AK*ax*bz*cx + 
-     -    AF**2*AG*AQ*ax*bz*cx - AD*AF*AI*AQ*ax*bz*cx + 
-     -    AC*AD*AF*AK*az*bz*cx + AD*AF*AG*AQ*az*bz*cx - 
-     -    AD**2*AI*AQ*az*bz*cx + AC*AF**2*AK*bx*bz*cx + 
-     -    AF**2*AG*AQ*bx*bz*cx - AD*AF*AI*AQ*bx*bz*cx - 
-     -    AC*AD*AQ*az*bx*bz*cx - AC*AF*AQ*ay*by*bz*cx + 
-     -    AC*AF*AQ*by**2*bz*cx - AC*AD*AF*AK*bz**2*cx - 
-     -    AD*AF*AG*AQ*bz**2*cx + AD**2*AI*AQ*bz**2*cx - 
-     -    AC*AF*AQ*az*bz**2*cx + AC*AD*AQ*bx*bz**2*cx + 
-     -    AC*AF*AQ*bz**3*cx + AC*AE*AF*AK*ay*cx**2 + 
-     -    AE*AF*AG*AQ*ay*cx**2 - AD*AE*AI*AQ*ay*cx**2 + 
-     -    AC*AF**2*AK*az*cx**2 + AF**2*AG*AQ*az*cx**2 - 
-     -    AD*AF*AI*AQ*az*cx**2 - AC*AE*AQ*ay*bx*cx**2 - 
-     -    AC*AE*AF*AK*by*cx**2 - AE*AF*AG*AQ*by*cx**2 + 
-     -    AD*AE*AI*AQ*by*cx**2 + AC*AE*AQ*bx*by*cx**2 - 
-     -    AC*AF**2*AK*bz*cx**2 - AF**2*AG*AQ*bz*cx**2 + 
-     -    AD*AF*AI*AQ*bz*cx**2 + 2*AC*AD*AF*AQ*ax*cy + 
-     -    2*AC*AF**2*AQ*az*cy - 2*AC*AD*AF*AQ*bx*cy + 
-     -    AC*AE*AF*AK*ax*bx*cy + AE*AF*AG*AQ*ax*bx*cy - 
-     -    AD*AE*AI*AQ*ax*bx*cy + AC*AD*AF*AK*ay*bx*cy + 
-     -    AD*AF*AG*AQ*ay*bx*cy - AD**2*AI*AQ*ay*bx*cy - 
-     -    AC*AE*AF*AK*bx**2*cy - AE*AF*AG*AQ*bx**2*cy + 
-     -    AD*AE*AI*AQ*bx**2*cy - AC*AE*AQ*ax*bx**2*cy - 
-     -    AC*AD*AQ*ay*bx**2*cy + AC*AE*AQ*bx**3*cy - 
-     -    2*AC*AD*AF*AK*ax*by*cy - 2*AD*AF*AG*AQ*ax*by*cy + 
-     -    2*AD**2*AI*AQ*ax*by*cy - 2*AC*AF**2*AK*az*by*cy - 
-     -    2*AF**2*AG*AQ*az*by*cy + 2*AD*AF*AI*AQ*az*by*cy + 
-     -    AC*AD*AF*AK*bx*by*cy + AD*AF*AG*AQ*bx*by*cy - 
-     -    AD**2*AI*AQ*bx*by*cy + 2*AC*AD*AQ*ax*bx*by*cy - 
-     -    AC*AD*AQ*bx**2*by*cy - 2*AC*AF**2*AQ*bz*cy + 
-     -    AC*AF**2*AK*ay*bz*cy + AF**2*AG*AQ*ay*bz*cy - 
-     -    AD*AF*AI*AQ*ay*bz*cy + AC*AE*AF*AK*az*bz*cy + 
-     -    AE*AF*AG*AQ*az*bz*cy - AD*AE*AI*AQ*az*bz*cy - 
-     -    AC*AF*AQ*ay*bx*bz*cy - AC*AE*AQ*az*bx*bz*cy + 
-     -    AC*AF**2*AK*by*bz*cy + AF**2*AG*AQ*by*bz*cy - 
-     -    AD*AF*AI*AQ*by*bz*cy + 2*AC*AF*AQ*ax*by*bz*cy - 
-     -    AC*AF*AQ*bx*by*bz*cy - AC*AE*AF*AK*bz**2*cy - 
-     -    AE*AF*AG*AQ*bz**2*cy + AD*AE*AI*AQ*bz**2*cy + 
-     -    AC*AE*AQ*bx*bz**2*cy - AC*AE*AF*AK*ax*cx*cy - 
-     -    AE*AF*AG*AQ*ax*cx*cy + AD*AE*AI*AQ*ax*cx*cy - 
-     -    AC*AD*AF*AK*ay*cx*cy - AD*AF*AG*AQ*ay*cx*cy + 
-     -    AD**2*AI*AQ*ay*cx*cy + AC*AE*AF*AK*bx*cx*cy + 
-     -    AE*AF*AG*AQ*bx*cx*cy - AD*AE*AI*AQ*bx*cx*cy + 
-     -    AC*AE*AQ*ax*bx*cx*cy + AC*AD*AQ*ay*bx*cx*cy - 
-     -    AC*AE*AQ*bx**2*cx*cy + AC*AD*AF*AK*by*cx*cy + 
-     -    AD*AF*AG*AQ*by*cx*cy - AD**2*AI*AQ*by*cx*cy - 
-     -    AC*AD*AQ*bx*by*cx*cy + AC*AF*AQ*ay*bz*cx*cy - 
-     -    AC*AF*AQ*by*bz*cx*cy + AC*AD*AF*AK*ax*cy**2 + 
-     -    AD*AF*AG*AQ*ax*cy**2 - AD**2*AI*AQ*ax*cy**2 + 
-     -    AC*AF**2*AK*az*cy**2 + AF**2*AG*AQ*az*cy**2 - 
-     -    AD*AF*AI*AQ*az*cy**2 - AC*AD*AF*AK*bx*cy**2 - 
-     -    AD*AF*AG*AQ*bx*cy**2 + AD**2*AI*AQ*bx*cy**2 - 
-     -    AC*AD*AQ*ax*bx*cy**2 + AC*AD*AQ*bx**2*cy**2 - 
-     -    AC*AF**2*AK*bz*cy**2 - AF**2*AG*AQ*bz*cy**2 + 
-     -    AD*AF*AI*AQ*bz*cy**2 - AC*AF*AQ*ax*bz*cy**2 + 
-     -    AC*AF*AQ*bx*bz*cy**2 - AC*AF**2*AQ*ay*cz - 
-     -    AC*AE*AF*AQ*az*cz + AC*AF**2*AK*ax*bx*cz + 
-     -    AF**2*AG*AQ*ax*bx*cz - AD*AF*AI*AQ*ax*bx*cz + 
-     -    AC*AD*AF*AK*az*bx*cz + AD*AF*AG*AQ*az*bx*cz - 
-     -    AD**2*AI*AQ*az*bx*cz - AC*AF**2*AK*bx**2*cz - 
-     -    AF**2*AG*AQ*bx**2*cz + AD*AF*AI*AQ*bx**2*cz - 
-     -    AC*AD*AQ*az*bx**2*cz + AC*AF**2*AQ*by*cz + 
-     -    AC*AF**2*AK*ay*by*cz + AF**2*AG*AQ*ay*by*cz - 
-     -    AD*AF*AI*AQ*ay*by*cz + AC*AE*AF*AK*az*by*cz + 
-     -    AE*AF*AG*AQ*az*by*cz - AD*AE*AI*AQ*az*by*cz - 
-     -    AC*AE*AQ*az*bx*by*cz - AC*AF**2*AK*by**2*cz - 
-     -    AF**2*AG*AQ*by**2*cz + AD*AF*AI*AQ*by**2*cz + 
-     -    AC*AE*AF*AQ*bz*cz - 2*AC*AD*AF*AK*ax*bz*cz - 
-     -    2*AD*AF*AG*AQ*ax*bz*cz + 2*AD**2*AI*AQ*ax*bz*cz - 
-     -    2*AC*AE*AF*AK*ay*bz*cz - 2*AE*AF*AG*AQ*ay*bz*cz + 
-     -    2*AD*AE*AI*AQ*ay*bz*cz + AC*AD*AF*AK*bx*bz*cz + 
-     -    AD*AF*AG*AQ*bx*bz*cz - AD**2*AI*AQ*bx*bz*cz + 
-     -    2*AC*AD*AQ*ax*bx*bz*cz + 2*AC*AE*AQ*ay*bx*bz*cz - 
-     -    AC*AF*AQ*az*bx*bz*cz - AC*AD*AQ*bx**2*bz*cz + 
-     -    AC*AE*AF*AK*by*bz*cz + AE*AF*AG*AQ*by*bz*cz - 
-     -    AD*AE*AI*AQ*by*bz*cz - AC*AE*AQ*bx*by*bz*cz + 
-     -    2*AC*AF*AQ*ax*bz**2*cz - AC*AF*AQ*bx*bz**2*cz - 
-     -    AC*AF**2*AK*ax*cx*cz - AF**2*AG*AQ*ax*cx*cz + 
-     -    AD*AF*AI*AQ*ax*cx*cz - AC*AD*AF*AK*az*cx*cz - 
-     -    AD*AF*AG*AQ*az*cx*cz + AD**2*AI*AQ*az*cx*cz + 
-     -    AC*AF**2*AK*bx*cx*cz + AF**2*AG*AQ*bx*cx*cz - 
-     -    AD*AF*AI*AQ*bx*cx*cz + AC*AD*AQ*az*bx*cx*cz + 
-     -    AC*AD*AF*AK*bz*cx*cz + AD*AF*AG*AQ*bz*cx*cz - 
-     -    AD**2*AI*AQ*bz*cx*cz + AC*AF*AQ*az*bz*cx*cz - 
-     -    AC*AD*AQ*bx*bz*cx*cz - AC*AF*AQ*bz**2*cx*cz - 
-     -    AC*AF**2*AK*ay*cy*cz - AF**2*AG*AQ*ay*cy*cz + 
-     -    AD*AF*AI*AQ*ay*cy*cz - AC*AE*AF*AK*az*cy*cz - 
-     -    AE*AF*AG*AQ*az*cy*cz + AD*AE*AI*AQ*az*cy*cz + 
-     -    AC*AE*AQ*az*bx*cy*cz + AC*AF**2*AK*by*cy*cz + 
-     -    AF**2*AG*AQ*by*cy*cz - AD*AF*AI*AQ*by*cy*cz + 
-     -    AC*AE*AF*AK*bz*cy*cz + AE*AF*AG*AQ*bz*cy*cz - 
-     -    AD*AE*AI*AQ*bz*cy*cz - AC*AE*AQ*bx*bz*cy*cz + 
-     -    AC*AD*AF*AK*ax*cz**2 + AD*AF*AG*AQ*ax*cz**2 - 
-     -    AD**2*AI*AQ*ax*cz**2 + AC*AE*AF*AK*ay*cz**2 + 
-     -    AE*AF*AG*AQ*ay*cz**2 - AD*AE*AI*AQ*ay*cz**2 - 
-     -    AC*AD*AF*AK*bx*cz**2 - AD*AF*AG*AQ*bx*cz**2 + 
-     -    AD**2*AI*AQ*bx*cz**2 - AC*AD*AQ*ax*bx*cz**2 - 
-     -    AC*AE*AQ*ay*bx*cz**2 + AC*AD*AQ*bx**2*cz**2 - 
-     -    AC*AE*AF*AK*by*cz**2 - AE*AF*AG*AQ*by*cz**2 + 
-     -    AD*AE*AI*AQ*by*cz**2 + AC*AE*AQ*bx*by*cz**2 - 
-     -    AC*AF*AQ*ax*bz*cz**2 + AC*AF*AQ*bx*bz*cz**2 + 
-     -    AC*AE*AQ*ay*bx**2*dx - AC*AE*AQ*ax*bx*by*dx - 
-     -    AC*AD*AQ*ay*bx*by*dx + AC*AD*AQ*ax*by**2*dx - 
-     -    AC*AD*AQ*az*bx*bz*dx - AC*AE*AQ*az*by*bz*dx + 
-     -    AC*AD*AQ*ax*bz**2*dx + AC*AE*AQ*ay*bz**2*dx - 
-     -    2*AC*AE*AQ*ay*bx*cx*dx + AC*AE*AQ*ax*by*cx*dx + 
-     -    AC*AD*AQ*ay*by*cx*dx + AC*AE*AQ*bx*by*cx*dx - 
-     -    AC*AD*AQ*by**2*cx*dx + AC*AD*AQ*az*bz*cx*dx - 
-     -    AC*AD*AQ*bz**2*cx*dx + AC*AE*AQ*ay*cx**2*dx - 
-     -    AC*AE*AQ*by*cx**2*dx + AC*AE*AQ*ax*bx*cy*dx + 
-     -    AC*AD*AQ*ay*bx*cy*dx - AC*AE*AQ*bx**2*cy*dx - 
-     -    2*AC*AD*AQ*ax*by*cy*dx + AC*AD*AQ*bx*by*cy*dx + 
-     -    AC*AE*AQ*az*bz*cy*dx - AC*AE*AQ*bz**2*cy*dx - 
-     -    AC*AE*AQ*ax*cx*cy*dx - AC*AD*AQ*ay*cx*cy*dx + 
-     -    AC*AE*AQ*bx*cx*cy*dx + AC*AD*AQ*by*cx*cy*dx + 
-     -    AC*AD*AQ*ax*cy**2*dx - AC*AD*AQ*bx*cy**2*dx + 
-     -    AC*AD*AQ*az*bx*cz*dx + AC*AE*AQ*az*by*cz*dx - 
-     -    2*AC*AD*AQ*ax*bz*cz*dx - 2*AC*AE*AQ*ay*bz*cz*dx + 
-     -    AC*AD*AQ*bx*bz*cz*dx + AC*AE*AQ*by*bz*cz*dx - 
-     -    AC*AD*AQ*az*cx*cz*dx + AC*AD*AQ*bz*cx*cz*dx - 
-     -    AC*AE*AQ*az*cy*cz*dx + AC*AE*AQ*bz*cy*cz*dx + 
-     -    AC*AD*AQ*ax*cz**2*dx + AC*AE*AQ*ay*cz**2*dx - 
-     -    AC*AD*AQ*bx*cz**2*dx - AC*AE*AQ*by*cz**2*dx + 
-     -    AA*(AD**2*(AK*BA + 
-     -          AQ*(AJ*ay - 2*ax*by + bx*by + by*cx + 2*ax*cy - 
-     -             2*bx*cy)) + 
-     -       AD*(AE*(AK*AV + 
-     -             AQ*(AI*AL + AJ*ax + bx*(-bx + cx))) + 
-     -          AF*(-(AJ*AK*AL*ax) + AJ**2*AK*az + AK**3*az + 
-     -             AQ*(-2*az*by + ay*bz + by*bz + 2*az*cy - 
-     -                2*bz*cy - ay*cz + by*cz) + 
-     -             AK*(-(bz*cx**2) + by*bz*cy - bz*cy**2 - 
-     -                ay*(by - cy)*(bz - cz) - bx**2*cz - 
-     -                by**2*cz + by*cy*cz + bx*cx*(bz + cz))) + 
-     -          AQ*AW*(bx - dx)) + AQ*(AE*AV + AF*AW)*(bz - dz))
-     -     - AC*AF*AQ*ay*bx*by*dz + AC*AF*AQ*ax*by**2*dz - 
-     -    AC*AF*AQ*az*bx*bz*dz + AC*AF*AQ*ax*bz**2*dz + 
-     -    AC*AF*AQ*ay*by*cx*dz - AC*AF*AQ*by**2*cx*dz + 
-     -    AC*AF*AQ*az*bz*cx*dz - AC*AF*AQ*bz**2*cx*dz + 
-     -    AC*AF*AQ*ay*bx*cy*dz - 2*AC*AF*AQ*ax*by*cy*dz + 
-     -    AC*AF*AQ*bx*by*cy*dz - AC*AF*AQ*ay*cx*cy*dz + 
-     -    AC*AF*AQ*by*cx*cy*dz + AC*AF*AQ*ax*cy**2*dz - 
-     -    AC*AF*AQ*bx*cy**2*dz + AC*AF*AQ*az*bx*cz*dz - 
-     -    2*AC*AF*AQ*ax*bz*cz*dz + AC*AF*AQ*bx*bz*cz*dz - 
-     -    AC*AF*AQ*az*cx*cz*dz + AC*AF*AQ*bz*cx*cz*dz + 
-     -    AC*AF*AQ*ax*cz**2*dz - AC*AF*AQ*bx*cz**2*dz + 
-     -    AB*AE*(AF*AK*az*bx**2 + AQ*az*bx**3 - 2*AF*AQ*az*by + 
-     -       AF*AK*az*by**2 + AQ*az*bx*by**2 + AF*AQ*ay*bz - 
-     -       AF*AK*ax*bx*bz - AQ*ax*bx**2*bz + AF*AQ*by*bz - 
-     -       AF*AK*ay*by*bz - AQ*ax*by**2*bz + AQ*az*bx*bz**2 - 
-     -       AQ*ax*bz**3 - 2*AF*AK*az*bx*cx - 2*AQ*az*bx**2*cx + 
-     -       AF*AK*ax*bz*cx + AF*AK*bx*bz*cx + AQ*ax*bx*bz*cx + 
-     -       AQ*bx**2*bz*cx - AQ*ay*by*bz*cx + AQ*by**2*bz*cx - 
-     -       AQ*az*bz**2*cx + AQ*bz**3*cx + AF*AK*az*cx**2 + 
-     -       AQ*az*bx*cx**2 - AF*AK*bz*cx**2 - AQ*bx*bz*cx**2 + 
-     -       AE*(AK*AV + AQ*(AI*AL + AJ*ax + bx*(-bx + cx))) + 
-     -       2*AF*AQ*az*cy - 2*AF*AK*az*by*cy - 
-     -       2*AQ*az*bx*by*cy - 2*AF*AQ*bz*cy + AF*AK*ay*bz*cy + 
-     -       AF*AK*by*bz*cy + 2*AQ*ax*by*bz*cy + 
-     -       AQ*ay*bz*cx*cy - AQ*by*bz*cx*cy + AF*AK*az*cy**2 + 
-     -       AQ*az*bx*cy**2 - AF*AK*bz*cy**2 - AQ*ax*bz*cy**2 + 
-     -       AD*(AK*BA + AQ*
-     -           (AJ*ay - 2*ax*by + bx*by + by*cx + 2*ax*cy - 
-     -             2*bx*cy)) - AF*AQ*ay*cz + AF*AK*ax*bx*cz - 
-     -       AF*AK*bx**2*cz + AQ*ax*bx**2*cz - AQ*bx**3*cz + 
-     -       AF*AQ*by*cz + AF*AK*ay*by*cz + AQ*ay*bx*by*cz - 
-     -       AF*AK*by**2*cz - AQ*bx*by**2*cz - AQ*az*bx*bz*cz + 
-     -       2*AQ*ax*bz**2*cz - AQ*bx*bz**2*cz - 
-     -       AF*AK*ax*cx*cz + AF*AK*bx*cx*cz - AQ*ax*bx*cx*cz + 
-     -       AQ*bx**2*cx*cz + AQ*az*bz*cx*cz - AQ*bz**2*cx*cz - 
-     -       AF*AK*ay*cy*cz - AQ*ay*bx*cy*cz + AF*AK*by*cy*cz + 
-     -       AQ*bx*by*cy*cz - AQ*ax*bz*cz**2 + AQ*bx*bz*cz**2 - 
-     -       AQ*az*bx**2*dx - AQ*az*by**2*dx + AQ*ax*bx*bz*dx + 
-     -       AQ*ay*by*bz*dx + 2*AQ*az*bx*cx*dx - 
-     -       AQ*ax*bz*cx*dx - AQ*bx*bz*cx*dx - AQ*az*cx**2*dx + 
-     -       AQ*bz*cx**2*dx + 2*AQ*az*by*cy*dx - 
-     -       AQ*ay*bz*cy*dx - AQ*by*bz*cy*dx - AQ*az*cy**2*dx + 
-     -       AQ*bz*cy**2*dx - AQ*ax*bx*cz*dx + AQ*bx**2*cz*dx - 
-     -       AQ*ay*by*cz*dx + AQ*by**2*cz*dx + AQ*ax*cx*cz*dx - 
-     -       AQ*bx*cx*cz*dx + AQ*ay*cy*cz*dx - AQ*by*cy*cz*dx - 
-     -       AQ*ay*bx*by*dz + AQ*ax*by**2*dz - AQ*az*bx*bz*dz + 
-     -       AQ*ax*bz**2*dz + AQ*ay*by*cx*dz - AQ*by**2*cx*dz + 
-     -       AQ*az*bz*cx*dz - AQ*bz**2*cx*dz + AQ*ay*bx*cy*dz - 
-     -       2*AQ*ax*by*cy*dz + AQ*bx*by*cy*dz - 
-     -       AQ*ay*cx*cy*dz + AQ*by*cx*cy*dz + AQ*ax*cy**2*dz - 
-     -       AQ*bx*cy**2*dz + AQ*az*bx*cz*dz - 
-     -       2*AQ*ax*bz*cz*dz + AQ*bx*bz*cz*dz - 
-     -       AQ*az*cx*cz*dz + AQ*bz*cx*cz*dz + AQ*ax*cz**2*dz - 
-     -       AQ*bx*cz**2*dz))/
-     -  (AQ**1.5*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
 
-      dcz=        (AC*AF**2*AQ*ax*bx + AC*AD*AF*AQ*az*bx - 
-     -    AC*AF**2*AQ*bx**2 + AC*AE*AF*AL*ay*bx**2 - 
-     -    AE**2*AG*AQ*ay*bx**2 + AD*AE*AH*AQ*ay*bx**2 + 
-     -    AC*AF**2*AL*az*bx**2 - AE*AF*AG*AQ*az*bx**2 + 
-     -    AD*AF*AH*AQ*az*bx**2 - AC*AF*AQ*ay*BE*bx**2 + 
-     -    AC*AF**2*AQ*ay*by + AC*AE*AF*AQ*az*by - 
-     -    AC*AE*AF*AL*ax*bx*by + AE**2*AG*AQ*ax*bx*by - 
-     -    AD*AE*AH*AQ*ax*bx*by - AC*AD*AF*AL*ay*bx*by + 
-     -    AD*AE*AG*AQ*ay*bx*by - AD**2*AH*AQ*ay*bx*by + 
-     -    AC*AF*AQ*ax*BE*bx*by - AC*AF*AQ*ay*BF*bx*by - 
-     -    AC*AF**2*AQ*by**2 + AC*AD*AF*AL*ax*by**2 - 
-     -    AD*AE*AG*AQ*ax*by**2 + AD**2*AH*AQ*ax*by**2 + 
-     -    AC*AF**2*AL*az*by**2 - AE*AF*AG*AQ*az*by**2 + 
-     -    AD*AF*AH*AQ*az*by**2 + AC*AF*AQ*ax*BF*by**2 - 
-     -    2*AC*AD*AF*AQ*ax*bz - 2*AC*AE*AF*AQ*ay*bz + 
-     -    AC*AD*AF*AQ*bx*bz - AC*AF**2*AL*ax*bx*bz + 
-     -    AE*AF*AG*AQ*ax*bx*bz - AD*AF*AH*AQ*ax*bx*bz - 
-     -    AC*AD*AF*AL*az*bx*bz + AD*AE*AG*AQ*az*bx*bz - 
-     -    AD**2*AH*AQ*az*bx*bz - AC*AF*AQ*az*BF*bx*bz + 
-     -    AC*AE*AF*AQ*by*bz - AC*AF**2*AL*ay*by*bz + 
-     -    AE*AF*AG*AQ*ay*by*bz - AD*AF*AH*AQ*ay*by*bz - 
-     -    AC*AE*AF*AL*az*by*bz + AE**2*AG*AQ*az*by*bz - 
-     -    AD*AE*AH*AQ*az*by*bz + AC*AF*AQ*az*BE*by*bz + 
-     -    AC*AD*AF*AL*ax*bz**2 - AD*AE*AG*AQ*ax*bz**2 + 
-     -    AD**2*AH*AQ*ax*bz**2 + AC*AE*AF*AL*ay*bz**2 - 
-     -    AE**2*AG*AQ*ay*bz**2 + AD*AE*AH*AQ*ay*bz**2 - 
-     -    AC*AF*AQ*ay*BE*bz**2 + AC*AF*AQ*ax*BF*bz**2 - 
-     -    AC*AF**2*AQ*ax*cx - AC*AD*AF*AQ*az*cx + 
-     -    AC*AF**2*AQ*bx*cx - 2*AC*AE*AF*AL*ay*bx*cx + 
-     -    2*AE**2*AG*AQ*ay*bx*cx - 2*AD*AE*AH*AQ*ay*bx*cx - 
-     -    2*AC*AF**2*AL*az*bx*cx + 2*AE*AF*AG*AQ*az*bx*cx - 
-     -    2*AD*AF*AH*AQ*az*bx*cx + 2*AC*AF*AQ*ay*BE*bx*cx + 
-     -    AC*AE*AF*AL*ax*by*cx - AE**2*AG*AQ*ax*by*cx + 
-     -    AD*AE*AH*AQ*ax*by*cx + AC*AD*AF*AL*ay*by*cx - 
-     -    AD*AE*AG*AQ*ay*by*cx + AD**2*AH*AQ*ay*by*cx - 
-     -    AC*AF*AQ*ax*BE*by*cx + AC*AF*AQ*ay*BF*by*cx + 
-     -    AC*AE*AF*AL*bx*by*cx - AE**2*AG*AQ*bx*by*cx + 
-     -    AD*AE*AH*AQ*bx*by*cx - AC*AF*AQ*BE*bx*by*cx - 
-     -    AC*AD*AF*AL*by**2*cx + AD*AE*AG*AQ*by**2*cx - 
-     -    AD**2*AH*AQ*by**2*cx - AC*AF*AQ*BF*by**2*cx + 
-     -    AC*AD*AF*AQ*bz*cx + AC*AF**2*AL*ax*bz*cx - 
-     -    AE*AF*AG*AQ*ax*bz*cx + AD*AF*AH*AQ*ax*bz*cx + 
-     -    AC*AD*AF*AL*az*bz*cx - AD*AE*AG*AQ*az*bz*cx + 
-     -    AD**2*AH*AQ*az*bz*cx + AC*AF*AQ*az*BF*bz*cx + 
-     -    AC*AF**2*AL*bx*bz*cx - AE*AF*AG*AQ*bx*bz*cx + 
-     -    AD*AF*AH*AQ*bx*bz*cx - AC*AD*AF*AL*bz**2*cx + 
-     -    AD*AE*AG*AQ*bz**2*cx - AD**2*AH*AQ*bz**2*cx - 
-     -    AC*AF*AQ*BF*bz**2*cx + AC*AE*AF*AL*ay*cx**2 - 
-     -    AE**2*AG*AQ*ay*cx**2 + AD*AE*AH*AQ*ay*cx**2 + 
-     -    AC*AF**2*AL*az*cx**2 - AE*AF*AG*AQ*az*cx**2 + 
-     -    AD*AF*AH*AQ*az*cx**2 - AC*AF*AQ*ay*BE*cx**2 - 
-     -    AC*AE*AF*AL*by*cx**2 + AE**2*AG*AQ*by*cx**2 - 
-     -    AD*AE*AH*AQ*by*cx**2 + AC*AF*AQ*BE*by*cx**2 - 
-     -    AC*AF**2*AL*bz*cx**2 + AE*AF*AG*AQ*bz*cx**2 - 
-     -    AD*AF*AH*AQ*bz*cx**2 - AC*AF**2*AQ*ay*cy - 
-     -    AC*AE*AF*AQ*az*cy + AC*AE*AF*AL*ax*bx*cy - 
-     -    AE**2*AG*AQ*ax*bx*cy + AD*AE*AH*AQ*ax*bx*cy + 
-     -    AC*AD*AF*AL*ay*bx*cy - AD*AE*AG*AQ*ay*bx*cy + 
-     -    AD**2*AH*AQ*ay*bx*cy - AC*AF*AQ*ax*BE*bx*cy + 
-     -    AC*AF*AQ*ay*BF*bx*cy - AC*AE*AF*AL*bx**2*cy + 
-     -    AE**2*AG*AQ*bx**2*cy - AD*AE*AH*AQ*bx**2*cy + 
-     -    AC*AF*AQ*BE*bx**2*cy + AC*AF**2*AQ*by*cy - 
-     -    2*AC*AD*AF*AL*ax*by*cy + 2*AD*AE*AG*AQ*ax*by*cy - 
-     -    2*AD**2*AH*AQ*ax*by*cy - 2*AC*AF**2*AL*az*by*cy + 
-     -    2*AE*AF*AG*AQ*az*by*cy - 2*AD*AF*AH*AQ*az*by*cy - 
-     -    2*AC*AF*AQ*ax*BF*by*cy + AC*AD*AF*AL*bx*by*cy - 
-     -    AD*AE*AG*AQ*bx*by*cy + AD**2*AH*AQ*bx*by*cy + 
-     -    AC*AF*AQ*BF*bx*by*cy + AC*AE*AF*AQ*bz*cy + 
-     -    AC*AF**2*AL*ay*bz*cy - AE*AF*AG*AQ*ay*bz*cy + 
-     -    AD*AF*AH*AQ*ay*bz*cy + AC*AE*AF*AL*az*bz*cy - 
-     -    AE**2*AG*AQ*az*bz*cy + AD*AE*AH*AQ*az*bz*cy - 
-     -    AC*AF*AQ*az*BE*bz*cy + AC*AF**2*AL*by*bz*cy - 
-     -    AE*AF*AG*AQ*by*bz*cy + AD*AF*AH*AQ*by*bz*cy - 
-     -    AC*AE*AF*AL*bz**2*cy + AE**2*AG*AQ*bz**2*cy - 
-     -    AD*AE*AH*AQ*bz**2*cy + AC*AF*AQ*BE*bz**2*cy - 
-     -    AC*AE*AF*AL*ax*cx*cy + AE**2*AG*AQ*ax*cx*cy - 
-     -    AD*AE*AH*AQ*ax*cx*cy - AC*AD*AF*AL*ay*cx*cy + 
-     -    AD*AE*AG*AQ*ay*cx*cy - AD**2*AH*AQ*ay*cx*cy + 
-     -    AC*AF*AQ*ax*BE*cx*cy - AC*AF*AQ*ay*BF*cx*cy + 
-     -    AC*AE*AF*AL*bx*cx*cy - AE**2*AG*AQ*bx*cx*cy + 
-     -    AD*AE*AH*AQ*bx*cx*cy - AC*AF*AQ*BE*bx*cx*cy + 
-     -    AC*AD*AF*AL*by*cx*cy - AD*AE*AG*AQ*by*cx*cy + 
-     -    AD**2*AH*AQ*by*cx*cy + AC*AF*AQ*BF*by*cx*cy + 
-     -    AC*AD*AF*AL*ax*cy**2 - AD*AE*AG*AQ*ax*cy**2 + 
-     -    AD**2*AH*AQ*ax*cy**2 + AC*AF**2*AL*az*cy**2 - 
-     -    AE*AF*AG*AQ*az*cy**2 + AD*AF*AH*AQ*az*cy**2 + 
-     -    AC*AF*AQ*ax*BF*cy**2 - AC*AD*AF*AL*bx*cy**2 + 
-     -    AD*AE*AG*AQ*bx*cy**2 - AD**2*AH*AQ*bx*cy**2 - 
-     -    AC*AF*AQ*BF*bx*cy**2 - AC*AF**2*AL*bz*cy**2 + 
-     -    AE*AF*AG*AQ*bz*cy**2 - AD*AF*AH*AQ*bz*cy**2 + 
-     -    2*AC*AD*AF*AQ*ax*cz + 2*AC*AE*AF*AQ*ay*cz - 
-     -    2*AC*AD*AF*AQ*bx*cz + AC*AF**2*AL*ax*bx*cz - 
-     -    AE*AF*AG*AQ*ax*bx*cz + AD*AF*AH*AQ*ax*bx*cz + 
-     -    AC*AD*AF*AL*az*bx*cz - AD*AE*AG*AQ*az*bx*cz + 
-     -    AD**2*AH*AQ*az*bx*cz + AC*AF*AQ*az*BF*bx*cz - 
-     -    AC*AF**2*AL*bx**2*cz + AE*AF*AG*AQ*bx**2*cz - 
-     -    AD*AF*AH*AQ*bx**2*cz - 2*AC*AE*AF*AQ*by*cz + 
-     -    AC*AF**2*AL*ay*by*cz - AE*AF*AG*AQ*ay*by*cz + 
-     -    AD*AF*AH*AQ*ay*by*cz + AC*AE*AF*AL*az*by*cz - 
-     -    AE**2*AG*AQ*az*by*cz + AD*AE*AH*AQ*az*by*cz - 
-     -    AC*AF*AQ*az*BE*by*cz - AC*AF**2*AL*by**2*cz + 
-     -    AE*AF*AG*AQ*by**2*cz - AD*AF*AH*AQ*by**2*cz - 
-     -    2*AC*AD*AF*AL*ax*bz*cz + 2*AD*AE*AG*AQ*ax*bz*cz - 
-     -    2*AD**2*AH*AQ*ax*bz*cz - 2*AC*AE*AF*AL*ay*bz*cz + 
-     -    2*AE**2*AG*AQ*ay*bz*cz - 2*AD*AE*AH*AQ*ay*bz*cz + 
-     -    2*AC*AF*AQ*ay*BE*bz*cz - 2*AC*AF*AQ*ax*BF*bz*cz + 
-     -    AC*AD*AF*AL*bx*bz*cz - AD*AE*AG*AQ*bx*bz*cz + 
-     -    AD**2*AH*AQ*bx*bz*cz + AC*AF*AQ*BF*bx*bz*cz + 
-     -    AC*AE*AF*AL*by*bz*cz - AE**2*AG*AQ*by*bz*cz + 
-     -    AD*AE*AH*AQ*by*bz*cz - AC*AF*AQ*BE*by*bz*cz - 
-     -    AC*AF**2*AL*ax*cx*cz + AE*AF*AG*AQ*ax*cx*cz - 
-     -    AD*AF*AH*AQ*ax*cx*cz - AC*AD*AF*AL*az*cx*cz + 
-     -    AD*AE*AG*AQ*az*cx*cz - AD**2*AH*AQ*az*cx*cz - 
-     -    AC*AF*AQ*az*BF*cx*cz + AC*AF**2*AL*bx*cx*cz - 
-     -    AE*AF*AG*AQ*bx*cx*cz + AD*AF*AH*AQ*bx*cx*cz + 
-     -    AC*AD*AF*AL*bz*cx*cz - AD*AE*AG*AQ*bz*cx*cz + 
-     -    AD**2*AH*AQ*bz*cx*cz + AC*AF*AQ*BF*bz*cx*cz - 
-     -    AC*AF**2*AL*ay*cy*cz + AE*AF*AG*AQ*ay*cy*cz - 
-     -    AD*AF*AH*AQ*ay*cy*cz - AC*AE*AF*AL*az*cy*cz + 
-     -    AE**2*AG*AQ*az*cy*cz - AD*AE*AH*AQ*az*cy*cz + 
-     -    AC*AF*AQ*az*BE*cy*cz + AC*AF**2*AL*by*cy*cz - 
-     -    AE*AF*AG*AQ*by*cy*cz + AD*AF*AH*AQ*by*cy*cz + 
-     -    AC*AE*AF*AL*bz*cy*cz - AE**2*AG*AQ*bz*cy*cz + 
-     -    AD*AE*AH*AQ*bz*cy*cz - AC*AF*AQ*BE*bz*cy*cz + 
-     -    AC*AD*AF*AL*ax*cz**2 - AD*AE*AG*AQ*ax*cz**2 + 
-     -    AD**2*AH*AQ*ax*cz**2 + AC*AE*AF*AL*ay*cz**2 - 
-     -    AE**2*AG*AQ*ay*cz**2 + AD*AE*AH*AQ*ay*cz**2 - 
-     -    AC*AF*AQ*ay*BE*cz**2 + AC*AF*AQ*ax*BF*cz**2 - 
-     -    AC*AD*AF*AL*bx*cz**2 + AD*AE*AG*AQ*bx*cz**2 - 
-     -    AD**2*AH*AQ*bx*cz**2 - AC*AF*AQ*BF*bx*cz**2 - 
-     -    AC*AE*AF*AL*by*cz**2 + AE**2*AG*AQ*by*cz**2 - 
-     -    AD*AE*AH*AQ*by*cz**2 + AC*AF*AQ*BE*by*cz**2 + 
-     -    AB*(AQ*(AF*AW + AD*BA)*BE + 
-     -       AE**2*(-(AJ*AK*AL*ax) + AJ**2*AL*ay + AL**3*ay + 
-     -          AQ*(AK*az - 2*ay*bz + by*bz + bz*cy + 
-     -             2*ay*cz - 2*by*cz) + 
-     -          AL*(-(by*cx**2) - bx**2*cy - bz**2*cy + 
-     -             bx*cx*(by + cy) - az*(by - cy)*(bz - cz) + 
-     -             by*bz*cz + bz*cy*cz - by*cz**2)) + 
-     -       AE*(AQ*BA*BF + 
-     -          AF*(AL*AW + 
-     -             AQ*(AH*AK + AJ*ax + bx*(-bx + cx))) + 
-     -          AD*(AL*BA + 
-     -             AQ*(AJ*az - 2*ax*bz + bx*bz + bz*cx + 
-     -                2*ax*cz - 2*bx*cz)))) + 
-     -    AA*(-(AQ*(AE*AV + AF*AW)*BF) + 
-     -       AD**2*(AL*BA + 
-     -          AQ*(AJ*az - 2*ax*bz + bx*bz + bz*cx + 
-     -             2*ax*cz - 2*bx*cz)) + 
-     -       AD*(-(AQ*AV*BE) + 
-     -          AF*(AL*AW + 
-     -             AQ*(AH*AK + AJ*ax + bx*(-bx + cx))) + 
-     -          AE*(-(AJ*AK*AL*ax) + AJ**2*AL*ay + AL**3*ay + 
-     -             AQ*(AK*az - 2*ay*bz + by*bz + bz*cy + 
-     -                2*ay*cz - 2*by*cz) + 
-     -             AL*(-(by*cx**2) - bx**2*cy - bz**2*cy + 
-     -                bx*cx*(by + cy) - 
-     -                az*(by - cy)*(bz - cz) + by*bz*cz + 
-     -                bz*cy*cz - by*cz**2)))))/
-     -  (AQ**1.5*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
-    
+       dbx=(-2*abcz*ay*bc2*bcdy*bcdz*bx - 2*abcz*az*bc2*bcdz**2*bx + 
+     -    ay*az*bc2*bcdy**2*bx**2 - ay**2*bc2*bcdy*bcdz*bx**2 + 
+     -    az**2*bc2*bcdy*bcdz*bx**2 - ay*az*bc2*bcdz**2*bx**2 + 
+     -    abcz*ay*bcdy*bcdz*bcx*bx**2 + abcz*az*bcdz**2*bcx*bx**2 + 
+     -    abcz*ay*bc2*bcdx*bcdz*by + abcz*ax*bc2*bcdy*bcdz*by - 
+     -    ay*az*bc2*bcdx*bcdy*bx*by - ax*az*bc2*bcdy**2*bx*by + 
+     -    ay**2*bc2*bcdx*bcdz*bx*by + ax*ay*bc2*bcdy*bcdz*bx*by - 
+     -    abcz*ay*bcdx*bcdz*bcx*bx*by - abcz*ax*bcdy*bcdz*bcx*bx*by + 
+     -    ax*az*bc2*bcdx*bcdy*by**2 - ax*ay*bc2*bcdx*bcdz*by**2 + 
+     -    az**2*bc2*bcdy*bcdz*by**2 - ay*az*bc2*bcdz**2*by**2 + 
+     -    abcz*ax*bcdx*bcdz*bcx*by**2 + abcz*az*bcdz**2*bcx*by**2 + 
+     -    abcz*az*bc2*bcdx*bcdz*bz + abcz*ax*bc2*bcdz**2*bz - 
+     -    az**2*bc2*bcdx*bcdy*bx*bz + ay*az*bc2*bcdx*bcdz*bx*bz - 
+     -    ax*az*bc2*bcdy*bcdz*bx*bz + ax*ay*bc2*bcdz**2*bx*bz - 
+     -    abcz*az*bcdx*bcdz*bcx*bx*bz - abcz*ax*bcdz**2*bcx*bx*bz - 
+     -    az**2*bc2*bcdy**2*by*bz + ay**2*bc2*bcdz**2*by*bz - 
+     -    abcz*az*bcdy*bcdz*bcx*by*bz - abcz*ay*bcdz**2*bcx*by*bz + 
+     -    ax*az*bc2*bcdx*bcdy*bz**2 + ay*az*bc2*bcdy**2*bz**2 - 
+     -    ax*ay*bc2*bcdx*bcdz*bz**2 - ay**2*bc2*bcdy*bcdz*bz**2 + 
+     -    abcz*ax*bcdx*bcdz*bcx*bz**2 + abcz*ay*bcdy*bcdz*bcx*bz**2 + 
+     -    abcz*ay*bc2*bcdy*bx**2*cdy - abcz*ay*bc2*bcdx*bx*by*cdy - 
+     -    abcz*ax*bc2*bcdy*bx*by*cdy + abcz*ax*bc2*bcdx*by**2*cdy - 
+     -    abcz*az*bc2*bcdx*bx*bz*cdy - abcz*az*bc2*bcdy*by*bz*cdy + 
+     -    abcz*ax*bc2*bcdx*bz**2*cdy + abcz*ay*bc2*bcdy*bz**2*cdy + 
+     -    abcz*ay*bc2*bcdz*bx**2*cdz - abcz*ax*bc2*bcdz*bx*by*cdz - 
+     -    abcz*az*bc2*bcdz*by*bz*cdz + abcz*ay*bc2*bcdz*bz**2*cdz + 
+     -    2*abcz*ay*bc2*bcdy*bcdz*cx + 2*abcz*az*bc2*bcdz**2*cx - 
+     -    2*ay*az*bc2*bcdy**2*bx*cx + 2*ay**2*bc2*bcdy*bcdz*bx*cx - 
+     -    2*az**2*bc2*bcdy*bcdz*bx*cx + 2*ay*az*bc2*bcdz**2*bx*cx - 
+     -    2*abcz*ay*bcdy*bcdz*bcx*bx*cx - 2*abcz*az*bcdz**2*bcx*bx*cx + 
+     -    ay*az*bc2*bcdx*bcdy*by*cx + ax*az*bc2*bcdy**2*by*cx - 
+     -    ay**2*bc2*bcdx*bcdz*by*cx - abcz*bc2*bcdy*bcdz*by*cx - 
+     -    ax*ay*bc2*bcdy*bcdz*by*cx + abcz*ay*bcdx*bcdz*bcx*by*cx + 
+     -    abcz*ax*bcdy*bcdz*bcx*by*cx + az*bc2*bcdy**2*bx*by*cx - 
+     -    ay*bc2*bcdy*bcdz*bx*by*cx + abcz*bcdy*bcdz*bcx*bx*by*cx - 
+     -    az*bc2*bcdx*bcdy*by**2*cx + ay*bc2*bcdx*bcdz*by**2*cx - 
+     -    abcz*bcdx*bcdz*bcx*by**2*cx + az**2*bc2*bcdx*bcdy*bz*cx - 
+     -    ay*az*bc2*bcdx*bcdz*bz*cx + ax*az*bc2*bcdy*bcdz*bz*cx - 
+     -    abcz*bc2*bcdz**2*bz*cx - ax*ay*bc2*bcdz**2*bz*cx + 
+     -    abcz*az*bcdx*bcdz*bcx*bz*cx + abcz*ax*bcdz**2*bcx*bz*cx + 
+     -    az*bc2*bcdy*bcdz*bx*bz*cx - ay*bc2*bcdz**2*bx*bz*cx + 
+     -    abcz*bcdz**2*bcx*bx*bz*cx - az*bc2*bcdx*bcdy*bz**2*cx + 
+     -    ay*bc2*bcdx*bcdz*bz**2*cx - abcz*bcdx*bcdz*bcx*bz**2*cx - 
+     -    2*abcz*ay*bc2*bcdy*bx*cdy*cx + abcz*ay*bc2*bcdx*by*cdy*cx + 
+     -    abcz*ax*bc2*bcdy*by*cdy*cx + abcz*bc2*bcdy*bx*by*cdy*cx - 
+     -    abcz*bc2*bcdx*by**2*cdy*cx + abcz*az*bc2*bcdx*bz*cdy*cx - 
+     -    abcz*bc2*bcdx*bz**2*cdy*cx - 2*abcz*ay*bc2*bcdz*bx*cdz*cx + 
+     -    abcz*ax*bc2*bcdz*by*cdz*cx + abcz*bc2*bcdz*bx*by*cdz*cx + 
+     -    ay*az*bc2*bcdy**2*cx**2 - ay**2*bc2*bcdy*bcdz*cx**2 + 
+     -    az**2*bc2*bcdy*bcdz*cx**2 - ay*az*bc2*bcdz**2*cx**2 + 
+     -    abcz*ay*bcdy*bcdz*bcx*cx**2 + abcz*az*bcdz**2*bcx*cx**2 - 
+     -    az*bc2*bcdy**2*by*cx**2 + ay*bc2*bcdy*bcdz*by*cx**2 - 
+     -    abcz*bcdy*bcdz*bcx*by*cx**2 - az*bc2*bcdy*bcdz*bz*cx**2 + 
+     -    ay*bc2*bcdz**2*bz*cx**2 - abcz*bcdz**2*bcx*bz*cx**2 + 
+     -    abcz*ay*bc2*bcdy*cdy*cx**2 - abcz*bc2*bcdy*by*cdy*cx**2 + 
+     -    abcz*ay*bc2*bcdz*cdz*cx**2 - abcz*bc2*bcdz*by*cdz*cx**2 - 
+     -    abcz*ay*bc2*bcdx*bcdz*cy - abcz*ax*bc2*bcdy*bcdz*cy + 
+     -    ay*az*bc2*bcdx*bcdy*bx*cy + ax*az*bc2*bcdy**2*bx*cy - 
+     -    ay**2*bc2*bcdx*bcdz*bx*cy + 2*abcz*bc2*bcdy*bcdz*bx*cy - 
+     -    ax*ay*bc2*bcdy*bcdz*bx*cy + abcz*ay*bcdx*bcdz*bcx*bx*cy + 
+     -    abcz*ax*bcdy*bcdz*bcx*bx*cy - az*bc2*bcdy**2*bx**2*cy + 
+     -    2*ay*bc2*bcdy*bcdz*bx**2*cy + az*bc2*bcdz**2*bx**2*cy - 
+     -    abcz*bcdy*bcdz*bcx*bx**2*cy - 2*ax*az*bc2*bcdx*bcdy*by*cy - 
+     -    abcz*bc2*bcdx*bcdz*by*cy + 2*ax*ay*bc2*bcdx*bcdz*by*cy - 
+     -    2*az**2*bc2*bcdy*bcdz*by*cy + 2*ay*az*bc2*bcdz**2*by*cy - 
+     -    2*abcz*ax*bcdx*bcdz*bcx*by*cy - 2*abcz*az*bcdz**2*bcx*by*cy + 
+     -    az*bc2*bcdx*bcdy*bx*by*cy - 2*ay*bc2*bcdx*bcdz*bx*by*cy - 
+     -    ax*bc2*bcdy*bcdz*bx*by*cy + abcz*bcdx*bcdz*bcx*bx*by*cy + 
+     -    ax*bc2*bcdx*bcdz*by**2*cy + az*bc2*bcdz**2*by**2*cy + 
+     -    az**2*bc2*bcdy**2*bz*cy - ay**2*bc2*bcdz**2*bz*cy + 
+     -    abcz*az*bcdy*bcdz*bcx*bz*cy + abcz*ay*bcdz**2*bcx*bz*cy - 
+     -    az*bc2*bcdx*bcdz*bx*bz*cy - ax*bc2*bcdz**2*bx*bz*cy - 
+     -    2*ay*bc2*bcdz**2*by*bz*cy + abcz*bcdz**2*bcx*by*bz*cy - 
+     -    az*bc2*bcdy**2*bz**2*cy + ax*bc2*bcdx*bcdz*bz**2*cy + 
+     -    2*ay*bc2*bcdy*bcdz*bz**2*cy - abcz*bcdy*bcdz*bcx*bz**2*cy + 
+     -    abcz*ay*bc2*bcdx*bx*cdy*cy + abcz*ax*bc2*bcdy*bx*cdy*cy - 
+     -    abcz*bc2*bcdy*bx**2*cdy*cy - 2*abcz*ax*bc2*bcdx*by*cdy*cy + 
+     -    abcz*bc2*bcdx*bx*by*cdy*cy + abcz*az*bc2*bcdy*bz*cdy*cy - 
+     -    abcz*bc2*bcdy*bz**2*cdy*cy + abcz*ax*bc2*bcdz*bx*cdz*cy - 
+     -    abcz*bc2*bcdz*bx**2*cdz*cy + abcz*az*bc2*bcdz*bz*cdz*cy - 
+     -    abcz*bc2*bcdz*bz**2*cdz*cy - ay*az*bc2*bcdx*bcdy*cx*cy - 
+     -    ax*az*bc2*bcdy**2*cx*cy + ay**2*bc2*bcdx*bcdz*cx*cy - 
+     -    abcz*bc2*bcdy*bcdz*cx*cy + ax*ay*bc2*bcdy*bcdz*cx*cy - 
+     -    abcz*ay*bcdx*bcdz*bcx*cx*cy - abcz*ax*bcdy*bcdz*bcx*cx*cy + 
+     -    az*bc2*bcdy**2*bx*cx*cy - 3*ay*bc2*bcdy*bcdz*bx*cx*cy - 
+     -    2*az*bc2*bcdz**2*bx*cx*cy + abcz*bcdy*bcdz*bcx*bx*cx*cy + 
+     -    az*bc2*bcdx*bcdy*by*cx*cy + ax*bc2*bcdy*bcdz*by*cx*cy + 
+     -    abcz*bcdx*bcdz*bcx*by*cx*cy + bc2*bcdy*bcdz*bx*by*cx*cy - 
+     -    bc2*bcdx*bcdz*by**2*cx*cy + az*bc2*bcdx*bcdz*bz*cx*cy + 
+     -    ax*bc2*bcdz**2*bz*cx*cy + bc2*bcdz**2*bx*bz*cx*cy - 
+     -    bc2*bcdx*bcdz*bz**2*cx*cy - abcz*ay*bc2*bcdx*cdy*cx*cy - 
+     -    abcz*ax*bc2*bcdy*cdy*cx*cy + abcz*bc2*bcdy*bx*cdy*cx*cy + 
+     -    abcz*bc2*bcdx*by*cdy*cx*cy - abcz*ax*bc2*bcdz*cdz*cx*cy + 
+     -    abcz*bc2*bcdz*bx*cdz*cx*cy + ay*bc2*bcdy*bcdz*cx**2*cy + 
+     -    az*bc2*bcdz**2*cx**2*cy - bc2*bcdy*bcdz*by*cx**2*cy - 
+     -    bc2*bcdz**2*bz*cx**2*cy + ax*az*bc2*bcdx*bcdy*cy**2 + 
+     -    abcz*bc2*bcdx*bcdz*cy**2 - ax*ay*bc2*bcdx*bcdz*cy**2 + 
+     -    az**2*bc2*bcdy*bcdz*cy**2 - ay*az*bc2*bcdz**2*cy**2 + 
+     -    abcz*ax*bcdx*bcdz*bcx*cy**2 + abcz*az*bcdz**2*bcx*cy**2 - 
+     -    az*bc2*bcdx*bcdy*bx*cy**2 + 2*ay*bc2*bcdx*bcdz*bx*cy**2 + 
+     -    ax*bc2*bcdy*bcdz*bx*cy**2 - abcz*bcdx*bcdz*bcx*bx*cy**2 - 
+     -    bc2*bcdy*bcdz*bx**2*cy**2 - 2*ax*bc2*bcdx*bcdz*by*cy**2 - 
+     -    2*az*bc2*bcdz**2*by*cy**2 + bc2*bcdx*bcdz*bx*by*cy**2 + 
+     -    2*ay*bc2*bcdz**2*bz*cy**2 - abcz*bcdz**2*bcx*bz*cy**2 + 
+     -    bc2*bcdz**2*by*bz*cy**2 - bc2*bcdy*bcdz*bz**2*cy**2 + 
+     -    abcz*ax*bc2*bcdx*cdy*cy**2 - abcz*bc2*bcdx*bx*cdy*cy**2 - 
+     -    ay*bc2*bcdx*bcdz*cx*cy**2 - ax*bc2*bcdy*bcdz*cx*cy**2 + 
+     -    bc2*bcdy*bcdz*bx*cx*cy**2 + bc2*bcdx*bcdz*by*cx*cy**2 + 
+     -    ax*bc2*bcdx*bcdz*cy**3 + az*bc2*bcdz**2*cy**3 - 
+     -    bc2*bcdx*bcdz*bx*cy**3 - bc2*bcdz**2*bz*cy**3 - 
+     -    abcz*az*bc2*bcdx*bcdz*cz - abcz*ax*bc2*bcdz**2*cz + 
+     -    az**2*bc2*bcdx*bcdy*bx*cz - ay*az*bc2*bcdx*bcdz*bx*cz + 
+     -    ax*az*bc2*bcdy*bcdz*bx*cz + 2*abcz*bc2*bcdz**2*bx*cz - 
+     -    ax*ay*bc2*bcdz**2*bx*cz + abcz*az*bcdx*bcdz*bcx*bx*cz + 
+     -    abcz*ax*bcdz**2*bcx*bx*cz - ay*bc2*bcdy**2*bx**2*cz - 
+     -    2*az*bc2*bcdy*bcdz*bx**2*cz + ay*bc2*bcdz**2*bx**2*cz - 
+     -    abcz*bcdz**2*bcx*bx**2*cz + az**2*bc2*bcdy**2*by*cz - 
+     -    ay**2*bc2*bcdz**2*by*cz + abcz*az*bcdy*bcdz*bcx*by*cz + 
+     -    abcz*ay*bcdz**2*bcx*by*cz + ay*bc2*bcdx*bcdy*bx*by*cz + 
+     -    ax*bc2*bcdy**2*bx*by*cz - ax*bc2*bcdx*bcdy*by**2*cz - 
+     -    2*az*bc2*bcdy*bcdz*by**2*cz + ay*bc2*bcdz**2*by**2*cz - 
+     -    abcz*bcdz**2*bcx*by**2*cz - 2*ax*az*bc2*bcdx*bcdy*bz*cz - 
+     -    2*ay*az*bc2*bcdy**2*bz*cz - abcz*bc2*bcdx*bcdz*bz*cz + 
+     -    2*ax*ay*bc2*bcdx*bcdz*bz*cz + 2*ay**2*bc2*bcdy*bcdz*bz*cz - 
+     -    2*abcz*ax*bcdx*bcdz*bcx*bz*cz - 
+     -    2*abcz*ay*bcdy*bcdz*bcx*bz*cz + 2*az*bc2*bcdx*bcdy*bx*bz*cz - 
+     -    ay*bc2*bcdx*bcdz*bx*bz*cz + ax*bc2*bcdy*bcdz*bx*bz*cz + 
+     -    abcz*bcdx*bcdz*bcx*bx*bz*cz + 2*az*bc2*bcdy**2*by*bz*cz + 
+     -    abcz*bcdy*bcdz*bcx*by*bz*cz - ax*bc2*bcdx*bcdy*bz**2*cz - 
+     -    ay*bc2*bcdy**2*bz**2*cz + abcz*az*bc2*bcdx*bx*cdy*cz + 
+     -    abcz*az*bc2*bcdy*by*cdy*cz - 2*abcz*ax*bc2*bcdx*bz*cdy*cz - 
+     -    2*abcz*ay*bc2*bcdy*bz*cdy*cz + abcz*bc2*bcdx*bx*bz*cdy*cz + 
+     -    abcz*bc2*bcdy*by*bz*cdy*cz + abcz*az*bc2*bcdz*by*cdz*cz - 
+     -    2*abcz*ay*bc2*bcdz*bz*cdz*cz + abcz*bc2*bcdz*by*bz*cdz*cz - 
+     -    az**2*bc2*bcdx*bcdy*cx*cz + ay*az*bc2*bcdx*bcdz*cx*cz - 
+     -    ax*az*bc2*bcdy*bcdz*cx*cz - abcz*bc2*bcdz**2*cx*cz + 
+     -    ax*ay*bc2*bcdz**2*cx*cz - abcz*az*bcdx*bcdz*bcx*cx*cz - 
+     -    abcz*ax*bcdz**2*bcx*cx*cz + 2*ay*bc2*bcdy**2*bx*cx*cz + 
+     -    3*az*bc2*bcdy*bcdz*bx*cx*cz - ay*bc2*bcdz**2*bx*cx*cz + 
+     -    abcz*bcdz**2*bcx*bx*cx*cz - ay*bc2*bcdx*bcdy*by*cx*cz - 
+     -    ax*bc2*bcdy**2*by*cx*cz - bc2*bcdy**2*bx*by*cx*cz + 
+     -    bc2*bcdx*bcdy*by**2*cx*cz - ay*bc2*bcdx*bcdz*bz*cx*cz - 
+     -    ax*bc2*bcdy*bcdz*bz*cx*cz + abcz*bcdx*bcdz*bcx*bz*cx*cz - 
+     -    bc2*bcdy*bcdz*bx*bz*cx*cz + bc2*bcdx*bcdy*bz**2*cx*cz - 
+     -    abcz*az*bc2*bcdx*cdy*cx*cz + abcz*bc2*bcdx*bz*cdy*cx*cz - 
+     -    ay*bc2*bcdy**2*cx**2*cz - az*bc2*bcdy*bcdz*cx**2*cz + 
+     -    bc2*bcdy**2*by*cx**2*cz + bc2*bcdy*bcdz*bz*cx**2*cz - 
+     -    az**2*bc2*bcdy**2*cy*cz + ay**2*bc2*bcdz**2*cy*cz - 
+     -    abcz*az*bcdy*bcdz*bcx*cy*cz - abcz*ay*bcdz**2*bcx*cy*cz - 
+     -    ay*bc2*bcdx*bcdy*bx*cy*cz - ax*bc2*bcdy**2*bx*cy*cz + 
+     -    az*bc2*bcdx*bcdz*bx*cy*cz + ax*bc2*bcdz**2*bx*cy*cz + 
+     -    bc2*bcdy**2*bx**2*cy*cz - bc2*bcdz**2*bx**2*cy*cz + 
+     -    2*ax*bc2*bcdx*bcdy*by*cy*cz + 4*az*bc2*bcdy*bcdz*by*cy*cz + 
+     -    abcz*bcdz**2*bcx*by*cy*cz - bc2*bcdx*bcdy*bx*by*cy*cz - 
+     -    bc2*bcdz**2*by**2*cy*cz - 2*ax*bc2*bcdx*bcdz*bz*cy*cz - 
+     -    4*ay*bc2*bcdy*bcdz*bz*cy*cz + abcz*bcdy*bcdz*bcx*bz*cy*cz + 
+     -    bc2*bcdx*bcdz*bx*bz*cy*cz + bc2*bcdy**2*bz**2*cy*cz - 
+     -    abcz*az*bc2*bcdy*cdy*cy*cz + abcz*bc2*bcdy*bz*cdy*cy*cz - 
+     -    abcz*az*bc2*bcdz*cdz*cy*cz + abcz*bc2*bcdz*bz*cdz*cy*cz + 
+     -    ay*bc2*bcdx*bcdy*cx*cy*cz + ax*bc2*bcdy**2*cx*cy*cz - 
+     -    az*bc2*bcdx*bcdz*cx*cy*cz - ax*bc2*bcdz**2*cx*cy*cz - 
+     -    bc2*bcdy**2*bx*cx*cy*cz + bc2*bcdz**2*bx*cx*cy*cz - 
+     -    bc2*bcdx*bcdy*by*cx*cy*cz + bc2*bcdx*bcdz*bz*cx*cy*cz - 
+     -    ax*bc2*bcdx*bcdy*cy**2*cz - 2*az*bc2*bcdy*bcdz*cy**2*cz - 
+     -    ay*bc2*bcdz**2*cy**2*cz + bc2*bcdx*bcdy*bx*cy**2*cz + 
+     -    bc2*bcdz**2*by*cy**2*cz + 2*bc2*bcdy*bcdz*bz*cy**2*cz + 
+     -    ax*az*bc2*bcdx*bcdy*cz**2 + ay*az*bc2*bcdy**2*cz**2 + 
+     -    abcz*bc2*bcdx*bcdz*cz**2 - ax*ay*bc2*bcdx*bcdz*cz**2 - 
+     -    ay**2*bc2*bcdy*bcdz*cz**2 + abcz*ax*bcdx*bcdz*bcx*cz**2 + 
+     -    abcz*ay*bcdy*bcdz*bcx*cz**2 - 2*az*bc2*bcdx*bcdy*bx*cz**2 + 
+     -    ay*bc2*bcdx*bcdz*bx*cz**2 - ax*bc2*bcdy*bcdz*bx*cz**2 - 
+     -    abcz*bcdx*bcdz*bcx*bx*cz**2 + bc2*bcdy*bcdz*bx**2*cz**2 - 
+     -    2*az*bc2*bcdy**2*by*cz**2 - abcz*bcdy*bcdz*bcx*by*cz**2 + 
+     -    bc2*bcdy*bcdz*by**2*cz**2 + 2*ax*bc2*bcdx*bcdy*bz*cz**2 + 
+     -    2*ay*bc2*bcdy**2*bz*cz**2 - bc2*bcdx*bcdy*bx*bz*cz**2 - 
+     -    bc2*bcdy**2*by*bz*cz**2 + abcz*ax*bc2*bcdx*cdy*cz**2 + 
+     -    abcz*ay*bc2*bcdy*cdy*cz**2 - abcz*bc2*bcdx*bx*cdy*cz**2 - 
+     -    abcz*bc2*bcdy*by*cdy*cz**2 + abcz*ay*bc2*bcdz*cdz*cz**2 - 
+     -    abcz*bc2*bcdz*by*cdz*cz**2 + az*bc2*bcdx*bcdy*cx*cz**2 + 
+     -    ax*bc2*bcdy*bcdz*cx*cz**2 - bc2*bcdy*bcdz*bx*cx*cz**2 - 
+     -    bc2*bcdx*bcdy*bz*cx*cz**2 + az*bc2*bcdy**2*cy*cz**2 + 
+     -    ax*bc2*bcdx*bcdz*cy*cz**2 + 2*ay*bc2*bcdy*bcdz*cy*cz**2 - 
+     -    bc2*bcdx*bcdz*bx*cy*cz**2 - 2*bc2*bcdy*bcdz*by*cy*cz**2 - 
+     -    bc2*bcdy**2*bz*cy*cz**2 - ax*bc2*bcdx*bcdy*cz**3 - 
+     -    ay*bc2*bcdy**2*cz**3 + bc2*bcdx*bcdy*bx*cz**3 + 
+     -    bc2*bcdy**2*by*cz**3 + 
+     -    abcx*bcdx*(ax*bc2*bcdy*by - ax*bcdy*bcx*bx*by + 
+     -       ax*bcdx*bcx*by**2 + ax*bc2*bcdz*bz - ax*bcdz*bcx*bx*bz + 
+     -       ax*bcdx*bcx*bz**2 + ax*bc2*bx*bz*cdy - ax*bc2*bx*by*cdz - 
+     -       bc2*bcdy*by*cx + ax*bcdy*bcx*by*cx + bcdy*bcx*bx*by*cx - 
+     -       bcdx*bcx*by**2*cx - bc2*bcdz*bz*cx + ax*bcdz*bcx*bz*cx + 
+     -       bcdz*bcx*bx*bz*cx - bcdx*bcx*bz**2*cx - ax*bc2*bz*cdy*cx - 
+     -       bc2*bx*bz*cdy*cx + ax*bc2*by*cdz*cx + bc2*bx*by*cdz*cx - 
+     -       bcdy*bcx*by*cx**2 - bcdz*bcx*bz*cx**2 + bc2*bz*cdy*cx**2 - 
+     -       bc2*by*cdz*cx**2 - ax*bc2*bcdy*cy + 2*bc2*bcdy*bx*cy + 
+     -       ax*bcdy*bcx*bx*cy - bcdy*bcx*bx**2*cy - bc2*bcdx*by*cy - 
+     -       2*ax*bcdx*bcx*by*cy + bcdx*bcx*bx*by*cy + 
+     -       bcdz*bcx*by*bz*cy - bcdy*bcx*bz**2*cy - bc2*by*bz*cdy*cy + 
+     -       ax*bc2*bx*cdz*cy - bc2*bx**2*cdz*cy - bc2*bz**2*cdz*cy - 
+     -       bc2*bcdy*cx*cy - ax*bcdy*bcx*cx*cy + bcdy*bcx*bx*cx*cy + 
+     -       bcdx*bcx*by*cx*cy - ax*bc2*cdz*cx*cy + bc2*bx*cdz*cx*cy + 
+     -       bc2*bcdx*cy**2 + ax*bcdx*bcx*cy**2 - bcdx*bcx*bx*cy**2 - 
+     -       bcdz*bcx*bz*cy**2 + bc2*bz*cdy*cy**2 - ax*bc2*bcdz*cz + 
+     -       2*bc2*bcdz*bx*cz + ax*bcdz*bcx*bx*cz - bcdz*bcx*bx**2*cz - 
+     -       bcdz*bcx*by**2*cz - bc2*bcdx*bz*cz - 2*ax*bcdx*bcx*bz*cz + 
+     -       bcdx*bcx*bx*bz*cz + bcdy*bcx*by*bz*cz - ax*bc2*bx*cdy*cz + 
+     -       bc2*bx**2*cdy*cz + bc2*by**2*cdy*cz + bc2*by*bz*cdz*cz - 
+     -       bc2*bcdz*cx*cz - ax*bcdz*bcx*cx*cz + bcdz*bcx*bx*cx*cz + 
+     -       bcdx*bcx*bz*cx*cz + ax*bc2*cdy*cx*cz - bc2*bx*cdy*cx*cz + 
+     -       bcdz*bcx*by*cy*cz + bcdy*bcx*bz*cy*cz - bc2*by*cdy*cy*cz + 
+     -       bc2*bz*cdz*cy*cz + bc2*bcdx*cz**2 + ax*bcdx*bcx*cz**2 - 
+     -       bcdx*bcx*bx*cz**2 - bcdy*bcx*by*cz**2 - bc2*by*cdz*cz**2 + 
+     -       az*(bcx*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(bcdx*(-bx + cx) + bcdy*(-by + cy))) - 
+     -          bc2*(2*abx*bcdz + bx**2*cdy + by**2*cdy + by*bz*cdz - 
+     -             2*bx*cdy*cx + cdy*cx**2 - 2*by*cdy*cy - bz*cdz*cy + 
+     -             cdy*cy**2 - by*cdz*cz + cdz*cy*cz + bcdx*(-bz + cz)))
+     -        + ay*(bc2*(-2*bcdy*bx + bcdx*by + by*bz*cdy + bx**2*cdz + 
+     -             bz**2*cdz + 2*bcdy*cx - 2*bx*cdz*cx + cdz*cx**2 - 
+     -             bcdx*cy - bz*cdy*cy - by*cdy*cz - 2*bz*cdz*cz + 
+     -             cdy*cy*cz + cdz*cz**2) + 
+     -          bcx*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(bcdx*(-bx + cx) + bcdz*(-bz + cz))))) - 
+     -    abcy*(-(ax*bc2*bcdy**2*by) + ax*bcdy**2*bcx*bx*by - 
+     -       ax*bcdx*bcdy*bcx*by**2 - ax*bc2*bcdy*bcdz*bz + 
+     -       ax*bcdy*bcdz*bcx*bx*bz - ax*bcdx*bcdy*bcx*bz**2 - 
+     -       ax*bc2*bcdy*bx*bz*cdy + ax*bc2*bcdx*by**2*cdz - 
+     -       ax*bc2*bcdz*bx*bz*cdz + ax*bc2*bcdx*bz**2*cdz + 
+     -       az*(bcdy*bcx*(-(bcdz*(bcx**2 + bcy**2)) + 
+     -             (abx*bcdx + bcdy*bcy)*bcz) + 
+     -          bc2*(-(bcdx*bcdy*bcz) + 
+     -             (bcx**2 + bcy**2)*(bcdy*cdy + bcdz*cdz) + 
+     -             abx*(2*bcdy*bcdz - bcdx*bcz*cdz))) + 
+     -       bc2*bcdy**2*by*cx - ax*bcdy**2*bcx*by*cx - 
+     -       bcdy**2*bcx*bx*by*cx + bcdx*bcdy*bcx*by**2*cx + 
+     -       bc2*bcdy*bcdz*bz*cx - ax*bcdy*bcdz*bcx*bz*cx - 
+     -       bcdy*bcdz*bcx*bx*bz*cx + bcdx*bcdy*bcx*bz**2*cx + 
+     -       ax*bc2*bcdy*bz*cdy*cx + bc2*bcdy*bx*bz*cdy*cx - 
+     -       bc2*bcdx*by**2*cdz*cx + ax*bc2*bcdz*bz*cdz*cx + 
+     -       bc2*bcdz*bx*bz*cdz*cx - bc2*bcdx*bz**2*cdz*cx + 
+     -       bcdy**2*bcx*by*cx**2 + bcdy*bcdz*bcx*bz*cx**2 - 
+     -       bc2*bcdy*bz*cdy*cx**2 - bc2*bcdz*bz*cdz*cx**2 + 
+     -       ax*bc2*bcdy**2*cy - 2*bc2*bcdy**2*bx*cy - 
+     -       ax*bcdy**2*bcx*bx*cy + bcdy**2*bcx*bx**2*cy + 
+     -       bc2*bcdx*bcdy*by*cy + 2*ax*bcdx*bcdy*bcx*by*cy - 
+     -       bcdx*bcdy*bcx*bx*by*cy - bcdy*bcdz*bcx*by*bz*cy + 
+     -       bcdy**2*bcx*bz**2*cy + bc2*bcdy*by*bz*cdy*cy - 
+     -       2*ax*bc2*bcdx*by*cdz*cy + bc2*bcdx*bx*by*cdz*cy + 
+     -       bc2*bcdz*by*bz*cdz*cy + bc2*bcdy**2*cx*cy + 
+     -       ax*bcdy**2*bcx*cx*cy - bcdy**2*bcx*bx*cx*cy - 
+     -       bcdx*bcdy*bcx*by*cx*cy + bc2*bcdx*by*cdz*cx*cy - 
+     -       bc2*bcdx*bcdy*cy**2 - ax*bcdx*bcdy*bcx*cy**2 + 
+     -       bcdx*bcdy*bcx*bx*cy**2 + bcdy*bcdz*bcx*bz*cy**2 - 
+     -       bc2*bcdy*bz*cdy*cy**2 + ax*bc2*bcdx*cdz*cy**2 - 
+     -       bc2*bcdx*bx*cdz*cy**2 - bc2*bcdz*bz*cdz*cy**2 + 
+     -       ax*bc2*bcdy*bcdz*cz - 2*bc2*bcdy*bcdz*bx*cz - 
+     -       ax*bcdy*bcdz*bcx*bx*cz + bcdy*bcdz*bcx*bx**2*cz + 
+     -       bcdy*bcdz*bcx*by**2*cz + bc2*bcdx*bcdy*bz*cz + 
+     -       2*ax*bcdx*bcdy*bcx*bz*cz - bcdx*bcdy*bcx*bx*bz*cz - 
+     -       bcdy**2*bcx*by*bz*cz + ax*bc2*bcdy*bx*cdy*cz - 
+     -       bc2*bcdy*bx**2*cdy*cz - bc2*bcdy*by**2*cdy*cz + 
+     -       ax*bc2*bcdz*bx*cdz*cz - bc2*bcdz*bx**2*cdz*cz - 
+     -       bc2*bcdz*by**2*cdz*cz - 2*ax*bc2*bcdx*bz*cdz*cz + 
+     -       bc2*bcdx*bx*bz*cdz*cz + bc2*bcdy*bcdz*cx*cz + 
+     -       ax*bcdy*bcdz*bcx*cx*cz - bcdy*bcdz*bcx*bx*cx*cz - 
+     -       bcdx*bcdy*bcx*bz*cx*cz - ax*bc2*bcdy*cdy*cx*cz + 
+     -       bc2*bcdy*bx*cdy*cx*cz - ax*bc2*bcdz*cdz*cx*cz + 
+     -       bc2*bcdz*bx*cdz*cx*cz + bc2*bcdx*bz*cdz*cx*cz - 
+     -       bcdy*bcdz*bcx*by*cy*cz - bcdy**2*bcx*bz*cy*cz + 
+     -       bc2*bcdy*by*cdy*cy*cz + bc2*bcdz*by*cdz*cy*cz - 
+     -       bc2*bcdx*bcdy*cz**2 - ax*bcdx*bcdy*bcx*cz**2 + 
+     -       bcdx*bcdy*bcx*bx*cz**2 + bcdy**2*bcx*by*cz**2 + 
+     -       ax*bc2*bcdx*cdz*cz**2 - bc2*bcdx*bx*cdz*cz**2 + 
+     -       ay*(bc2*(2*abx*bcdy**2 - 
+     -             bcy*(bcdx*(bcdy + bx*cdz - cdz*cx) + 
+     -                (bcdy*cdy + bcdz*cdz)*(bz - cz))) - 
+     -          bcdy*bcx*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(bcdx*(-bx + cx) + bcdz*(-bz + cz))))))/
+     -  (bc2**1.5*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**2/
+     -       bc2))
 
-      ddx=   (AB*((AE*AK + AF*AL)*BM + AD*AL*BN) - 
-     -    AC*(AD*AK*BN + (AE*AK + AF*AL)*BO) + 
-     -    AA*AD*(-(AL**3*ay) + AJ**2*(-(AL*ay) + AK*az) + 
-     -       AK*(AK**2*az + bx*bz*cx - bz*cx**2 + by*bz*cy - 
-     -          bz*cy**2 - ay*(by - cy)*(bz - cz) - bx**2*cz - 
-     -          by**2*cz + bx*cx*cz + by*cy*cz) + 
-     -       AL*(by*cx**2 + bx**2*cy + bz**2*cy - 
-     -          bx*cx*(by + cy) + az*(by - cy)*(bz - cz) - 
-     -          by*bz*cz - bz*cy*cz + by*cz**2)))/
-     -  (Sqrt(AQ)*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
 
-      ddy=        (-(AA*(AE*AL*AV + (AD*AJ + AF*AL)*AW)) - 
-     -    AB*AE*(AJ*AW - AL*BA) + 
-     -    AC*(AE*AJ*AV + (AD*AJ + AF*AL)*BA))/
-     -  (Sqrt(AQ)*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
+       dby= (abcz*ay*bc2*bcdx*bcdz*bx + abcz*ax*bc2*bcdy*bcdz*bx - 
+     -    ay*az*bc2*bcdx*bcdy*bx**2 - az**2*bc2*bcdx*bcdz*bx**2 + 
+     -    ax*ay*bc2*bcdy*bcdz*bx**2 + ax*az*bc2*bcdz**2*bx**2 + 
+     -    abcz*ay*bcdy*bcdz*bcy*bx**2 + abcz*az*bcdz**2*bcy*bx**2 - 
+     -    2*abcz*ax*bc2*bcdx*bcdz*by - 2*abcz*az*bc2*bcdz**2*by + 
+     -    ay*az*bc2*bcdx**2*bx*by + ax*az*bc2*bcdx*bcdy*bx*by - 
+     -    ax*ay*bc2*bcdx*bcdz*bx*by - ax**2*bc2*bcdy*bcdz*bx*by - 
+     -    abcz*ay*bcdx*bcdz*bcy*bx*by - abcz*ax*bcdy*bcdz*bcy*bx*by - 
+     -    ax*az*bc2*bcdx**2*by**2 + ax**2*bc2*bcdx*bcdz*by**2 - 
+     -    az**2*bc2*bcdx*bcdz*by**2 + ax*az*bc2*bcdz**2*by**2 + 
+     -    abcz*ax*bcdx*bcdz*bcy*by**2 + abcz*az*bcdz**2*bcy*by**2 + 
+     -    abcz*az*bc2*bcdy*bcdz*bz + abcz*ay*bc2*bcdz**2*bz + 
+     -    az**2*bc2*bcdx**2*bx*bz - ax**2*bc2*bcdz**2*bx*bz - 
+     -    abcz*az*bcdx*bcdz*bcy*bx*bz - abcz*ax*bcdz**2*bcy*bx*bz + 
+     -    az**2*bc2*bcdx*bcdy*by*bz + ay*az*bc2*bcdx*bcdz*by*bz - 
+     -    ax*az*bc2*bcdy*bcdz*by*bz - ax*ay*bc2*bcdz**2*by*bz - 
+     -    abcz*az*bcdy*bcdz*bcy*by*bz - abcz*ay*bcdz**2*bcy*by*bz - 
+     -    ax*az*bc2*bcdx**2*bz**2 - ay*az*bc2*bcdx*bcdy*bz**2 + 
+     -    ax**2*bc2*bcdx*bcdz*bz**2 + ax*ay*bc2*bcdy*bcdz*bz**2 + 
+     -    abcz*ax*bcdx*bcdz*bcy*bz**2 + abcz*ay*bcdy*bcdz*bcy*bz**2 - 
+     -    abcz*ay*bc2*bcdy*bx**2*cdx + abcz*ay*bc2*bcdx*bx*by*cdx + 
+     -    abcz*ax*bc2*bcdy*bx*by*cdx - abcz*ax*bc2*bcdx*by**2*cdx + 
+     -    abcz*az*bc2*bcdx*bx*bz*cdx + abcz*az*bc2*bcdy*by*bz*cdx - 
+     -    abcz*ax*bc2*bcdx*bz**2*cdx - abcz*ay*bc2*bcdy*bz**2*cdx + 
+     -    abcz*ay*bc2*bcdz*bx*by*cdz - abcz*ax*bc2*bcdz*by**2*cdz + 
+     -    abcz*az*bc2*bcdz*bx*bz*cdz - abcz*ax*bc2*bcdz*bz**2*cdz - 
+     -    abcz*ay*bc2*bcdx*bcdz*cx - abcz*ax*bc2*bcdy*bcdz*cx + 
+     -    2*ay*az*bc2*bcdx*bcdy*bx*cx + 2*az**2*bc2*bcdx*bcdz*bx*cx - 
+     -    abcz*bc2*bcdy*bcdz*bx*cx - 2*ax*ay*bc2*bcdy*bcdz*bx*cx - 
+     -    2*ax*az*bc2*bcdz**2*bx*cx - 2*abcz*ay*bcdy*bcdz*bcy*bx*cx - 
+     -    2*abcz*az*bcdz**2*bcy*bx*cx - ay*bc2*bcdy*bcdz*bx**2*cx - 
+     -    az*bc2*bcdz**2*bx**2*cx - ay*az*bc2*bcdx**2*by*cx - 
+     -    ax*az*bc2*bcdx*bcdy*by*cx + 2*abcz*bc2*bcdx*bcdz*by*cx + 
+     -    ax*ay*bc2*bcdx*bcdz*by*cx + ax**2*bc2*bcdy*bcdz*by*cx + 
+     -    abcz*ay*bcdx*bcdz*bcy*by*cx + abcz*ax*bcdy*bcdz*bcy*by*cx - 
+     -    az*bc2*bcdx*bcdy*bx*by*cx + ay*bc2*bcdx*bcdz*bx*by*cx + 
+     -    2*ax*bc2*bcdy*bcdz*bx*by*cx + abcz*bcdy*bcdz*bcy*bx*by*cx + 
+     -    az*bc2*bcdx**2*by**2*cx - 2*ax*bc2*bcdx*bcdz*by**2*cx - 
+     -    az*bc2*bcdz**2*by**2*cx - abcz*bcdx*bcdz*bcy*by**2*cx - 
+     -    az**2*bc2*bcdx**2*bz*cx + ax**2*bc2*bcdz**2*bz*cx + 
+     -    abcz*az*bcdx*bcdz*bcy*bz*cx + abcz*ax*bcdz**2*bcy*bz*cx + 
+     -    2*ax*bc2*bcdz**2*bx*bz*cx + abcz*bcdz**2*bcy*bx*bz*cx + 
+     -    az*bc2*bcdy*bcdz*by*bz*cx + ay*bc2*bcdz**2*by*bz*cx + 
+     -    az*bc2*bcdx**2*bz**2*cx - 2*ax*bc2*bcdx*bcdz*bz**2*cx - 
+     -    ay*bc2*bcdy*bcdz*bz**2*cx - abcz*bcdx*bcdz*bcy*bz**2*cx + 
+     -    2*abcz*ay*bc2*bcdy*bx*cdx*cx - abcz*ay*bc2*bcdx*by*cdx*cx - 
+     -    abcz*ax*bc2*bcdy*by*cdx*cx - abcz*bc2*bcdy*bx*by*cdx*cx + 
+     -    abcz*bc2*bcdx*by**2*cdx*cx - abcz*az*bc2*bcdx*bz*cdx*cx + 
+     -    abcz*bc2*bcdx*bz**2*cdx*cx - abcz*ay*bc2*bcdz*by*cdz*cx + 
+     -    abcz*bc2*bcdz*by**2*cdz*cx - abcz*az*bc2*bcdz*bz*cdz*cx + 
+     -    abcz*bc2*bcdz*bz**2*cdz*cx - ay*az*bc2*bcdx*bcdy*cx**2 - 
+     -    az**2*bc2*bcdx*bcdz*cx**2 + abcz*bc2*bcdy*bcdz*cx**2 + 
+     -    ax*ay*bc2*bcdy*bcdz*cx**2 + ax*az*bc2*bcdz**2*cx**2 + 
+     -    abcz*ay*bcdy*bcdz*bcy*cx**2 + abcz*az*bcdz**2*bcy*cx**2 + 
+     -    2*ay*bc2*bcdy*bcdz*bx*cx**2 + 2*az*bc2*bcdz**2*bx*cx**2 + 
+     -    az*bc2*bcdx*bcdy*by*cx**2 - ay*bc2*bcdx*bcdz*by*cx**2 - 
+     -    2*ax*bc2*bcdy*bcdz*by*cx**2 - abcz*bcdy*bcdz*bcy*by*cx**2 - 
+     -    bc2*bcdy*bcdz*bx*by*cx**2 + bc2*bcdx*bcdz*by**2*cx**2 - 
+     -    2*ax*bc2*bcdz**2*bz*cx**2 - abcz*bcdz**2*bcy*bz*cx**2 - 
+     -    bc2*bcdz**2*bx*bz*cx**2 + bc2*bcdx*bcdz*bz**2*cx**2 - 
+     -    abcz*ay*bc2*bcdy*cdx*cx**2 + abcz*bc2*bcdy*by*cdx*cx**2 - 
+     -    ay*bc2*bcdy*bcdz*cx**3 - az*bc2*bcdz**2*cx**3 + 
+     -    bc2*bcdy*bcdz*by*cx**3 + bc2*bcdz**2*bz*cx**3 + 
+     -    2*abcz*ax*bc2*bcdx*bcdz*cy + 2*abcz*az*bc2*bcdz**2*cy - 
+     -    ay*az*bc2*bcdx**2*bx*cy - ax*az*bc2*bcdx*bcdy*bx*cy - 
+     -    abcz*bc2*bcdx*bcdz*bx*cy + ax*ay*bc2*bcdx*bcdz*bx*cy + 
+     -    ax**2*bc2*bcdy*bcdz*bx*cy + abcz*ay*bcdx*bcdz*bcy*bx*cy + 
+     -    abcz*ax*bcdy*bcdz*bcy*bx*cy + az*bc2*bcdx*bcdy*bx**2*cy - 
+     -    ax*bc2*bcdy*bcdz*bx**2*cy - abcz*bcdy*bcdz*bcy*bx**2*cy + 
+     -    2*ax*az*bc2*bcdx**2*by*cy - 2*ax**2*bc2*bcdx*bcdz*by*cy + 
+     -    2*az**2*bc2*bcdx*bcdz*by*cy - 2*ax*az*bc2*bcdz**2*by*cy - 
+     -    2*abcz*ax*bcdx*bcdz*bcy*by*cy - 2*abcz*az*bcdz**2*bcy*by*cy - 
+     -    az*bc2*bcdx**2*bx*by*cy + ax*bc2*bcdx*bcdz*bx*by*cy + 
+     -    abcz*bcdx*bcdz*bcy*bx*by*cy - az**2*bc2*bcdx*bcdy*bz*cy - 
+     -    ay*az*bc2*bcdx*bcdz*bz*cy + ax*az*bc2*bcdy*bcdz*bz*cy - 
+     -    abcz*bc2*bcdz**2*bz*cy + ax*ay*bc2*bcdz**2*bz*cy + 
+     -    abcz*az*bcdy*bcdz*bcy*bz*cy + abcz*ay*bcdz**2*bcy*bz*cy - 
+     -    az*bc2*bcdx*bcdz*by*bz*cy + ax*bc2*bcdz**2*by*bz*cy + 
+     -    abcz*bcdz**2*bcy*by*bz*cy + az*bc2*bcdx*bcdy*bz**2*cy - 
+     -    ax*bc2*bcdy*bcdz*bz**2*cy - abcz*bcdy*bcdz*bcy*bz**2*cy - 
+     -    abcz*ay*bc2*bcdx*bx*cdx*cy - abcz*ax*bc2*bcdy*bx*cdx*cy + 
+     -    abcz*bc2*bcdy*bx**2*cdx*cy + 2*abcz*ax*bc2*bcdx*by*cdx*cy - 
+     -    abcz*bc2*bcdx*bx*by*cdx*cy - abcz*az*bc2*bcdy*bz*cdx*cy + 
+     -    abcz*bc2*bcdy*bz**2*cdx*cy - abcz*ay*bc2*bcdz*bx*cdz*cy + 
+     -    2*abcz*ax*bc2*bcdz*by*cdz*cy - abcz*bc2*bcdz*bx*by*cdz*cy + 
+     -    ay*az*bc2*bcdx**2*cx*cy + ax*az*bc2*bcdx*bcdy*cx*cy - 
+     -    abcz*bc2*bcdx*bcdz*cx*cy - ax*ay*bc2*bcdx*bcdz*cx*cy - 
+     -    ax**2*bc2*bcdy*bcdz*cx*cy - abcz*ay*bcdx*bcdz*bcy*cx*cy - 
+     -    abcz*ax*bcdy*bcdz*bcy*cx*cy - az*bc2*bcdx*bcdy*bx*cx*cy - 
+     -    ay*bc2*bcdx*bcdz*bx*cx*cy + abcz*bcdy*bcdz*bcy*bx*cx*cy + 
+     -    bc2*bcdy*bcdz*bx**2*cx*cy - az*bc2*bcdx**2*by*cx*cy + 
+     -    3*ax*bc2*bcdx*bcdz*by*cx*cy + 2*az*bc2*bcdz**2*by*cx*cy + 
+     -    abcz*bcdx*bcdz*bcy*by*cx*cy - bc2*bcdx*bcdz*bx*by*cx*cy - 
+     -    az*bc2*bcdy*bcdz*bz*cx*cy - ay*bc2*bcdz**2*bz*cx*cy - 
+     -    bc2*bcdz**2*by*bz*cx*cy + bc2*bcdy*bcdz*bz**2*cx*cy + 
+     -    abcz*ay*bc2*bcdx*cdx*cx*cy + abcz*ax*bc2*bcdy*cdx*cx*cy - 
+     -    abcz*bc2*bcdy*bx*cdx*cx*cy - abcz*bc2*bcdx*by*cdx*cx*cy + 
+     -    abcz*ay*bc2*bcdz*cdz*cx*cy - abcz*bc2*bcdz*by*cdz*cx*cy + 
+     -    ay*bc2*bcdx*bcdz*cx**2*cy + ax*bc2*bcdy*bcdz*cx**2*cy - 
+     -    bc2*bcdy*bcdz*bx*cx**2*cy - bc2*bcdx*bcdz*by*cx**2*cy - 
+     -    ax*az*bc2*bcdx**2*cy**2 + ax**2*bc2*bcdx*bcdz*cy**2 - 
+     -    az**2*bc2*bcdx*bcdz*cy**2 + ax*az*bc2*bcdz**2*cy**2 + 
+     -    abcz*ax*bcdx*bcdz*bcy*cy**2 + abcz*az*bcdz**2*bcy*cy**2 + 
+     -    az*bc2*bcdx**2*bx*cy**2 - ax*bc2*bcdx*bcdz*bx*cy**2 - 
+     -    abcz*bcdx*bcdz*bcy*bx*cy**2 + az*bc2*bcdx*bcdz*bz*cy**2 - 
+     -    ax*bc2*bcdz**2*bz*cy**2 - abcz*bcdz**2*bcy*bz*cy**2 - 
+     -    abcz*ax*bc2*bcdx*cdx*cy**2 + abcz*bc2*bcdx*bx*cdx*cy**2 - 
+     -    abcz*ax*bc2*bcdz*cdz*cy**2 + abcz*bc2*bcdz*bx*cdz*cy**2 - 
+     -    ax*bc2*bcdx*bcdz*cx*cy**2 - az*bc2*bcdz**2*cx*cy**2 + 
+     -    bc2*bcdx*bcdz*bx*cx*cy**2 + bc2*bcdz**2*bz*cx*cy**2 - 
+     -    abcz*az*bc2*bcdy*bcdz*cz - abcz*ay*bc2*bcdz**2*cz - 
+     -    az**2*bc2*bcdx**2*bx*cz + ax**2*bc2*bcdz**2*bx*cz + 
+     -    abcz*az*bcdx*bcdz*bcy*bx*cz + abcz*ax*bcdz**2*bcy*bx*cz + 
+     -    ay*bc2*bcdx*bcdy*bx**2*cz + 2*az*bc2*bcdx*bcdz*bx**2*cz - 
+     -    ax*bc2*bcdz**2*bx**2*cz - abcz*bcdz**2*bcy*bx**2*cz - 
+     -    az**2*bc2*bcdx*bcdy*by*cz - ay*az*bc2*bcdx*bcdz*by*cz + 
+     -    ax*az*bc2*bcdy*bcdz*by*cz + 2*abcz*bc2*bcdz**2*by*cz + 
+     -    ax*ay*bc2*bcdz**2*by*cz + abcz*az*bcdy*bcdz*bcy*by*cz + 
+     -    abcz*ay*bcdz**2*bcy*by*cz - ay*bc2*bcdx**2*bx*by*cz - 
+     -    ax*bc2*bcdx*bcdy*bx*by*cz + ax*bc2*bcdx**2*by**2*cz + 
+     -    2*az*bc2*bcdx*bcdz*by**2*cz - ax*bc2*bcdz**2*by**2*cz - 
+     -    abcz*bcdz**2*bcy*by**2*cz + 2*ax*az*bc2*bcdx**2*bz*cz + 
+     -    2*ay*az*bc2*bcdx*bcdy*bz*cz - 2*ax**2*bc2*bcdx*bcdz*bz*cz - 
+     -    abcz*bc2*bcdy*bcdz*bz*cz - 2*ax*ay*bc2*bcdy*bcdz*bz*cz - 
+     -    2*abcz*ax*bcdx*bcdz*bcy*bz*cz - 
+     -    2*abcz*ay*bcdy*bcdz*bcy*bz*cz - 2*az*bc2*bcdx**2*bx*bz*cz + 
+     -    abcz*bcdx*bcdz*bcy*bx*bz*cz - 2*az*bc2*bcdx*bcdy*by*bz*cz - 
+     -    ay*bc2*bcdx*bcdz*by*bz*cz + ax*bc2*bcdy*bcdz*by*bz*cz + 
+     -    abcz*bcdy*bcdz*bcy*by*bz*cz + ax*bc2*bcdx**2*bz**2*cz + 
+     -    ay*bc2*bcdx*bcdy*bz**2*cz - abcz*az*bc2*bcdx*bx*cdx*cz - 
+     -    abcz*az*bc2*bcdy*by*cdx*cz + 2*abcz*ax*bc2*bcdx*bz*cdx*cz + 
+     -    2*abcz*ay*bc2*bcdy*bz*cdx*cz - abcz*bc2*bcdx*bx*bz*cdx*cz - 
+     -    abcz*bc2*bcdy*by*bz*cdx*cz - abcz*az*bc2*bcdz*bx*cdz*cz + 
+     -    2*abcz*ax*bc2*bcdz*bz*cdz*cz - abcz*bc2*bcdz*bx*bz*cdz*cz + 
+     -    az**2*bc2*bcdx**2*cx*cz - ax**2*bc2*bcdz**2*cx*cz - 
+     -    abcz*az*bcdx*bcdz*bcy*cx*cz - abcz*ax*bcdz**2*bcy*cx*cz - 
+     -    2*ay*bc2*bcdx*bcdy*bx*cx*cz - 4*az*bc2*bcdx*bcdz*bx*cx*cz + 
+     -    abcz*bcdz**2*bcy*bx*cx*cz + bc2*bcdz**2*bx**2*cx*cz + 
+     -    ay*bc2*bcdx**2*by*cx*cz + ax*bc2*bcdx*bcdy*by*cx*cz - 
+     -    az*bc2*bcdy*bcdz*by*cx*cz - ay*bc2*bcdz**2*by*cx*cz + 
+     -    bc2*bcdx*bcdy*bx*by*cx*cz - bc2*bcdx**2*by**2*cx*cz + 
+     -    bc2*bcdz**2*by**2*cx*cz + 4*ax*bc2*bcdx*bcdz*bz*cx*cz + 
+     -    2*ay*bc2*bcdy*bcdz*bz*cx*cz + abcz*bcdx*bcdz*bcy*bz*cx*cz - 
+     -    bc2*bcdy*bcdz*by*bz*cx*cz - bc2*bcdx**2*bz**2*cx*cz + 
+     -    abcz*az*bc2*bcdx*cdx*cx*cz - abcz*bc2*bcdx*bz*cdx*cx*cz + 
+     -    abcz*az*bc2*bcdz*cdz*cx*cz - abcz*bc2*bcdz*bz*cdz*cx*cz + 
+     -    ay*bc2*bcdx*bcdy*cx**2*cz + 2*az*bc2*bcdx*bcdz*cx**2*cz + 
+     -    ax*bc2*bcdz**2*cx**2*cz - bc2*bcdz**2*bx*cx**2*cz - 
+     -    bc2*bcdx*bcdy*by*cx**2*cz - 2*bc2*bcdx*bcdz*bz*cx**2*cz + 
+     -    az**2*bc2*bcdx*bcdy*cy*cz + ay*az*bc2*bcdx*bcdz*cy*cz - 
+     -    ax*az*bc2*bcdy*bcdz*cy*cz - abcz*bc2*bcdz**2*cy*cz - 
+     -    ax*ay*bc2*bcdz**2*cy*cz - abcz*az*bcdy*bcdz*bcy*cy*cz - 
+     -    abcz*ay*bcdz**2*bcy*cy*cz + ay*bc2*bcdx**2*bx*cy*cz + 
+     -    ax*bc2*bcdx*bcdy*bx*cy*cz - bc2*bcdx*bcdy*bx**2*cy*cz - 
+     -    2*ax*bc2*bcdx**2*by*cy*cz - 3*az*bc2*bcdx*bcdz*by*cy*cz + 
+     -    ax*bc2*bcdz**2*by*cy*cz + abcz*bcdz**2*bcy*by*cy*cz + 
+     -    bc2*bcdx**2*bx*by*cy*cz + ay*bc2*bcdx*bcdz*bz*cy*cz + 
+     -    ax*bc2*bcdy*bcdz*bz*cy*cz + abcz*bcdy*bcdz*bcy*bz*cy*cz + 
+     -    bc2*bcdx*bcdz*by*bz*cy*cz - bc2*bcdx*bcdy*bz**2*cy*cz + 
+     -    abcz*az*bc2*bcdy*cdx*cy*cz - abcz*bc2*bcdy*bz*cdx*cy*cz - 
+     -    ay*bc2*bcdx**2*cx*cy*cz - ax*bc2*bcdx*bcdy*cx*cy*cz + 
+     -    az*bc2*bcdy*bcdz*cx*cy*cz + ay*bc2*bcdz**2*cx*cy*cz + 
+     -    bc2*bcdx*bcdy*bx*cx*cy*cz + bc2*bcdx**2*by*cx*cy*cz - 
+     -    bc2*bcdz**2*by*cx*cy*cz - bc2*bcdy*bcdz*bz*cx*cy*cz + 
+     -    ax*bc2*bcdx**2*cy**2*cz + az*bc2*bcdx*bcdz*cy**2*cz - 
+     -    bc2*bcdx**2*bx*cy**2*cz - bc2*bcdx*bcdz*bz*cy**2*cz - 
+     -    ax*az*bc2*bcdx**2*cz**2 - ay*az*bc2*bcdx*bcdy*cz**2 + 
+     -    ax**2*bc2*bcdx*bcdz*cz**2 + abcz*bc2*bcdy*bcdz*cz**2 + 
+     -    ax*ay*bc2*bcdy*bcdz*cz**2 + abcz*ax*bcdx*bcdz*bcy*cz**2 + 
+     -    abcz*ay*bcdy*bcdz*bcy*cz**2 + 2*az*bc2*bcdx**2*bx*cz**2 - 
+     -    abcz*bcdx*bcdz*bcy*bx*cz**2 - bc2*bcdx*bcdz*bx**2*cz**2 + 
+     -    2*az*bc2*bcdx*bcdy*by*cz**2 + ay*bc2*bcdx*bcdz*by*cz**2 - 
+     -    ax*bc2*bcdy*bcdz*by*cz**2 - abcz*bcdy*bcdz*bcy*by*cz**2 - 
+     -    bc2*bcdx*bcdz*by**2*cz**2 - 2*ax*bc2*bcdx**2*bz*cz**2 - 
+     -    2*ay*bc2*bcdx*bcdy*bz*cz**2 + bc2*bcdx**2*bx*bz*cz**2 + 
+     -    bc2*bcdx*bcdy*by*bz*cz**2 - abcz*ax*bc2*bcdx*cdx*cz**2 - 
+     -    abcz*ay*bc2*bcdy*cdx*cz**2 + abcz*bc2*bcdx*bx*cdx*cz**2 + 
+     -    abcz*bc2*bcdy*by*cdx*cz**2 - abcz*ax*bc2*bcdz*cdz*cz**2 + 
+     -    abcz*bc2*bcdz*bx*cdz*cz**2 - az*bc2*bcdx**2*cx*cz**2 - 
+     -    2*ax*bc2*bcdx*bcdz*cx*cz**2 - ay*bc2*bcdy*bcdz*cx*cz**2 + 
+     -    2*bc2*bcdx*bcdz*bx*cx*cz**2 + bc2*bcdy*bcdz*by*cx*cz**2 + 
+     -    bc2*bcdx**2*bz*cx*cz**2 - az*bc2*bcdx*bcdy*cy*cz**2 - 
+     -    ay*bc2*bcdx*bcdz*cy*cz**2 + bc2*bcdx*bcdz*by*cy*cz**2 + 
+     -    bc2*bcdx*bcdy*bz*cy*cz**2 + ax*bc2*bcdx**2*cz**3 + 
+     -    ay*bc2*bcdx*bcdy*cz**3 - bc2*bcdx**2*bx*cz**3 - 
+     -    bc2*bcdx*bcdy*by*cz**3 + 
+     -    abcy*bcdy*(az*bcdz*bcy*bx**2 - 2*az*bc2*bcdz*by + 
+     -       az*bcdz*bcy*by**2 + az*bc2*bcdy*bz - az*bcdx*bcy*bx*bz - 
+     -       az*bcdy*bcy*by*bz + az*bc2*bx**2*cdx + az*bc2*by**2*cdx + 
+     -       az*bc2*bx*bz*cdz - bc2*bcdy*bx*cx - 2*az*bcdz*bcy*bx*cx + 
+     -       2*bc2*bcdx*by*cx + bcdy*bcy*bx*by*cx - bcdx*bcy*by**2*cx + 
+     -       az*bcdx*bcy*bz*cx + bcdz*bcy*bx*bz*cx - 
+     -       bcdx*bcy*bz**2*cx - 2*az*bc2*bx*cdx*cx + 
+     -       bc2*bx*bz*cdx*cx + bc2*by**2*cdz*cx - az*bc2*bz*cdz*cx + 
+     -       bc2*bz**2*cdz*cx + bc2*bcdy*cx**2 + az*bcdz*bcy*cx**2 - 
+     -       bcdy*bcy*by*cx**2 - bcdz*bcy*bz*cx**2 + az*bc2*cdx*cx**2 - 
+     -       bc2*bz*cdx*cx**2 + 2*az*bc2*bcdz*cy - bc2*bcdx*bx*cy - 
+     -       bcdy*bcy*bx**2*cy - 2*az*bcdz*bcy*by*cy + 
+     -       bcdx*bcy*bx*by*cy - bc2*bcdz*bz*cy + az*bcdy*bcy*bz*cy + 
+     -       bcdz*bcy*by*bz*cy - bcdy*bcy*bz**2*cy - 
+     -       2*az*bc2*by*cdx*cy + bc2*by*bz*cdx*cy - bc2*bx*by*cdz*cy - 
+     -       bc2*bcdx*cx*cy + bcdy*bcy*bx*cx*cy + bcdx*bcy*by*cx*cy - 
+     -       bc2*by*cdz*cx*cy + az*bcdz*bcy*cy**2 - bcdx*bcy*bx*cy**2 - 
+     -       bcdz*bcy*bz*cy**2 + az*bc2*cdx*cy**2 - bc2*bz*cdx*cy**2 + 
+     -       bc2*bx*cdz*cy**2 - az*bc2*bcdy*cz + az*bcdx*bcy*bx*cz - 
+     -       bcdz*bcy*bx**2*cz + 2*bc2*bcdz*by*cz + az*bcdy*bcy*by*cz - 
+     -       bcdz*bcy*by**2*cz - bc2*bcdy*bz*cz + bcdx*bcy*bx*bz*cz + 
+     -       bcdy*bcy*by*bz*cz - bc2*bx**2*cdx*cz - bc2*by**2*cdx*cz - 
+     -       az*bc2*bx*cdz*cz - bc2*bx*bz*cdz*cz - az*bcdx*bcy*cx*cz + 
+     -       bcdz*bcy*bx*cx*cz + bcdx*bcy*bz*cx*cz + bc2*bx*cdx*cx*cz + 
+     -       az*bc2*cdz*cx*cz - bc2*bz*cdz*cx*cz - bc2*bcdz*cy*cz - 
+     -       az*bcdy*bcy*cy*cz + bcdz*bcy*by*cy*cz + 
+     -       bcdy*bcy*bz*cy*cz + bc2*by*cdx*cy*cz + bc2*bcdy*cz**2 - 
+     -       bcdx*bcy*bx*cz**2 - bcdy*bcy*by*cz**2 + bc2*bx*cdz*cz**2 + 
+     -       ax*(-(abx*bcy*(bcdy*bcy + bcdz*bcz)) + 
+     -          bcdx*(bcy**3 + bcy*bcz**2 - 2*bc2*by + 2*bc2*cy) + 
+     -          bc2*(bcdy*bx - bx*bz*cdx - by**2*cdz - bz**2*cdz - 
+     -             bcdy*cx + bz*cdx*cx + 2*by*cdz*cy - cdz*cy**2 + 
+     -             bx*cdx*cz + 2*bz*cdz*cz - cdx*cx*cz - cdz*cz**2)) + 
+     -       ay*(bcy*(-(bcy*(abx*bcdx + bcdz*bcz)) + 
+     -             bcdy*(bcx**2 + bcz**2)) + 
+     -          bc2*(abx*bcdx + bcdz*bcz + 
+     -             bcy*(-(bz*cdx) + bx*cdz - cdz*cx + cdx*cz)))) + 
+     -    abcx*(az*bcdx*bcdz*bcy*bx**2 - 2*az*bc2*bcdx*bcdz*by + 
+     -       az*bcdx*bcdz*bcy*by**2 + az*bc2*bcdx*bcdy*bz - 
+     -       az*bcdx**2*bcy*bx*bz - az*bcdx*bcdy*bcy*by*bz + 
+     -       az*bc2*bcdx*bx**2*cdx + az*bc2*bcdx*by**2*cdx + 
+     -       az*bc2*bcdz*bx**2*cdz + az*bc2*bcdz*by**2*cdz - 
+     -       az*bc2*bcdy*by*bz*cdz + 
+     -       ax*(bcdx**2*bcy*(-2*bc2 + bcy**2 + bcz**2) - 
+     -          abx*(bcdx*bcy*(bcdy*bcy + bcdz*bcz) + 
+     -             bc2*(-(bcdx*bcdy) + bcdx*bcz*cdx + bcdy*bcy*cdz + 
+     -                bcdz*bcz*cdz))) - bc2*bcdx*bcdy*bx*cx - 
+     -       2*az*bcdx*bcdz*bcy*bx*cx + 2*bc2*bcdx**2*by*cx + 
+     -       bcdx*bcdy*bcy*bx*by*cx - bcdx**2*bcy*by**2*cx + 
+     -       az*bcdx**2*bcy*bz*cx + bcdx*bcdz*bcy*bx*bz*cx - 
+     -       bcdx**2*bcy*bz**2*cx - 2*az*bc2*bcdx*bx*cdx*cx + 
+     -       bc2*bcdx*bx*bz*cdx*cx - 2*az*bc2*bcdz*bx*cdz*cx + 
+     -       bc2*bcdy*bx*by*cdz*cx + bc2*bcdz*bx*bz*cdz*cx + 
+     -       bc2*bcdx*bcdy*cx**2 + az*bcdx*bcdz*bcy*cx**2 - 
+     -       bcdx*bcdy*bcy*by*cx**2 - bcdx*bcdz*bcy*bz*cx**2 + 
+     -       az*bc2*bcdx*cdx*cx**2 - bc2*bcdx*bz*cdx*cx**2 + 
+     -       az*bc2*bcdz*cdz*cx**2 - bc2*bcdy*by*cdz*cx**2 - 
+     -       bc2*bcdz*bz*cdz*cx**2 + 2*az*bc2*bcdx*bcdz*cy - 
+     -       bc2*bcdx**2*bx*cy - bcdx*bcdy*bcy*bx**2*cy - 
+     -       2*az*bcdx*bcdz*bcy*by*cy + bcdx**2*bcy*bx*by*cy - 
+     -       bc2*bcdx*bcdz*bz*cy + az*bcdx*bcdy*bcy*bz*cy + 
+     -       bcdx*bcdz*bcy*by*bz*cy - bcdx*bcdy*bcy*bz**2*cy - 
+     -       2*az*bc2*bcdx*by*cdx*cy + bc2*bcdx*by*bz*cdx*cy - 
+     -       bc2*bcdy*bx**2*cdz*cy - 2*az*bc2*bcdz*by*cdz*cy + 
+     -       az*bc2*bcdy*bz*cdz*cy + bc2*bcdz*by*bz*cdz*cy - 
+     -       bc2*bcdy*bz**2*cdz*cy - bc2*bcdx**2*cx*cy + 
+     -       bcdx*bcdy*bcy*bx*cx*cy + bcdx**2*bcy*by*cx*cy + 
+     -       bc2*bcdy*bx*cdz*cx*cy + az*bcdx*bcdz*bcy*cy**2 - 
+     -       bcdx**2*bcy*bx*cy**2 - bcdx*bcdz*bcy*bz*cy**2 + 
+     -       az*bc2*bcdx*cdx*cy**2 - bc2*bcdx*bz*cdx*cy**2 + 
+     -       az*bc2*bcdz*cdz*cy**2 - bc2*bcdz*bz*cdz*cy**2 - 
+     -       az*bc2*bcdx*bcdy*cz + az*bcdx**2*bcy*bx*cz - 
+     -       bcdx*bcdz*bcy*bx**2*cz + 2*bc2*bcdx*bcdz*by*cz + 
+     -       az*bcdx*bcdy*bcy*by*cz - bcdx*bcdz*bcy*by**2*cz - 
+     -       bc2*bcdx*bcdy*bz*cz + bcdx**2*bcy*bx*bz*cz + 
+     -       bcdx*bcdy*bcy*by*bz*cz - bc2*bcdx*bx**2*cdx*cz - 
+     -       bc2*bcdx*by**2*cdx*cz - bc2*bcdz*bx**2*cdz*cz + 
+     -       az*bc2*bcdy*by*cdz*cz - bc2*bcdz*by**2*cdz*cz + 
+     -       bc2*bcdy*by*bz*cdz*cz - az*bcdx**2*bcy*cx*cz + 
+     -       bcdx*bcdz*bcy*bx*cx*cz + bcdx**2*bcy*bz*cx*cz + 
+     -       bc2*bcdx*bx*cdx*cx*cz + bc2*bcdz*bx*cdz*cx*cz - 
+     -       bc2*bcdx*bcdz*cy*cz - az*bcdx*bcdy*bcy*cy*cz + 
+     -       bcdx*bcdz*bcy*by*cy*cz + bcdx*bcdy*bcy*bz*cy*cz + 
+     -       bc2*bcdx*by*cdx*cy*cz - az*bc2*bcdy*cdz*cy*cz + 
+     -       bc2*bcdz*by*cdz*cy*cz + bc2*bcdy*bz*cdz*cy*cz + 
+     -       bc2*bcdx*bcdy*cz**2 - bcdx**2*bcy*bx*cz**2 - 
+     -       bcdx*bcdy*bcy*by*cz**2 - bc2*bcdy*by*cdz*cz**2 + 
+     -       ay*(bc2*(abx*bcdx**2 + bcdx*bcz*(bcdz - bcy*cdx) + 
+     -             (-(bcdz*bcy*bcz) + bcdy*(bcx**2 + bcz**2))*cdz) + 
+     -          bcdx*bcy*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(bcdx*(-bx + cx) + bcdz*(-bz + cz))))))/
+     -  (bc2**1.5*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**2/
+     -       bc2))
 
-      ddz=        (AA*(AD*AJ*AV + AK*(AE*AV + AF*AW)) + 
-     -    AC*AF*(AJ*AV - AK*BA) - 
-     -    AB*(AF*AJ*AW + (AD*AJ + AE*AK)*BA))/
-     -  (Sqrt(AQ)*((AA*AD + AB*AE + AC*AF)**2 + 
-     -      (AE*AV + AF*AW + AD*BA)**2/AQ))
+       dbz= (abcz*az*bc2*bcdx*bcdz*bx + abcz*ax*bc2*bcdz**2*bx + 
+     -    ay**2*bc2*bcdx*bcdy*bx**2 - ax*ay*bc2*bcdy**2*bx**2 + 
+     -    ay*az*bc2*bcdx*bcdz*bx**2 - ax*az*bc2*bcdy*bcdz*bx**2 + 
+     -    abcz*ay*bcdy*bcdz*bcz*bx**2 + abcz*az*bcdz**2*bcz*bx**2 + 
+     -    abcz*az*bc2*bcdy*bcdz*by + abcz*ay*bc2*bcdz**2*by - 
+     -    ay**2*bc2*bcdx**2*bx*by + ax**2*bc2*bcdy**2*bx*by - 
+     -    abcz*ay*bcdx*bcdz*bcz*bx*by - abcz*ax*bcdy*bcdz*bcz*bx*by + 
+     -    ax*ay*bc2*bcdx**2*by**2 - ax**2*bc2*bcdx*bcdy*by**2 + 
+     -    ay*az*bc2*bcdx*bcdz*by**2 - ax*az*bc2*bcdy*bcdz*by**2 + 
+     -    abcz*ax*bcdx*bcdz*bcz*by**2 + abcz*az*bcdz**2*bcz*by**2 - 
+     -    2*abcz*ax*bc2*bcdx*bcdz*bz - 2*abcz*ay*bc2*bcdy*bcdz*bz - 
+     -    ay*az*bc2*bcdx**2*bx*bz + ax*az*bc2*bcdx*bcdy*bx*bz - 
+     -    ax*ay*bc2*bcdx*bcdz*bx*bz + ax**2*bc2*bcdy*bcdz*bx*bz - 
+     -    abcz*az*bcdx*bcdz*bcz*bx*bz - abcz*ax*bcdz**2*bcz*bx*bz - 
+     -    ay*az*bc2*bcdx*bcdy*by*bz + ax*az*bc2*bcdy**2*by*bz - 
+     -    ay**2*bc2*bcdx*bcdz*by*bz + ax*ay*bc2*bcdy*bcdz*by*bz - 
+     -    abcz*az*bcdy*bcdz*bcz*by*bz - abcz*ay*bcdz**2*bcz*by*bz + 
+     -    ax*ay*bc2*bcdx**2*bz**2 - ax**2*bc2*bcdx*bcdy*bz**2 + 
+     -    ay**2*bc2*bcdx*bcdy*bz**2 - ax*ay*bc2*bcdy**2*bz**2 + 
+     -    abcz*ax*bcdx*bcdz*bcz*bz**2 + abcz*ay*bcdy*bcdz*bcz*bz**2 - 
+     -    abcz*ay*bc2*bcdz*bx**2*cdx + abcz*ax*bc2*bcdz*bx*by*cdx + 
+     -    abcz*az*bc2*bcdz*by*bz*cdx - abcz*ay*bc2*bcdz*bz**2*cdx - 
+     -    abcz*ay*bc2*bcdz*bx*by*cdy + abcz*ax*bc2*bcdz*by**2*cdy - 
+     -    abcz*az*bc2*bcdz*bx*bz*cdy + abcz*ax*bc2*bcdz*bz**2*cdy - 
+     -    abcz*az*bc2*bcdx*bcdz*cx - abcz*ax*bc2*bcdz**2*cx - 
+     -    2*ay**2*bc2*bcdx*bcdy*bx*cx + 2*ax*ay*bc2*bcdy**2*bx*cx - 
+     -    2*ay*az*bc2*bcdx*bcdz*bx*cx + 2*ax*az*bc2*bcdy*bcdz*bx*cx - 
+     -    abcz*bc2*bcdz**2*bx*cx - 2*abcz*ay*bcdy*bcdz*bcz*bx*cx - 
+     -    2*abcz*az*bcdz**2*bcz*bx*cx + ay*bc2*bcdy**2*bx**2*cx + 
+     -    az*bc2*bcdy*bcdz*bx**2*cx + ay**2*bc2*bcdx**2*by*cx - 
+     -    ax**2*bc2*bcdy**2*by*cx + abcz*ay*bcdx*bcdz*bcz*by*cx + 
+     -    abcz*ax*bcdy*bcdz*bcz*by*cx - 2*ax*bc2*bcdy**2*bx*by*cx + 
+     -    abcz*bcdy*bcdz*bcz*bx*by*cx - ay*bc2*bcdx**2*by**2*cx + 
+     -    2*ax*bc2*bcdx*bcdy*by**2*cx + az*bc2*bcdy*bcdz*by**2*cx - 
+     -    abcz*bcdx*bcdz*bcz*by**2*cx + ay*az*bc2*bcdx**2*bz*cx - 
+     -    ax*az*bc2*bcdx*bcdy*bz*cx + 2*abcz*bc2*bcdx*bcdz*bz*cx + 
+     -    ax*ay*bc2*bcdx*bcdz*bz*cx - ax**2*bc2*bcdy*bcdz*bz*cx + 
+     -    abcz*az*bcdx*bcdz*bcz*bz*cx + abcz*ax*bcdz**2*bcz*bz*cx - 
+     -    az*bc2*bcdx*bcdy*bx*bz*cx + ay*bc2*bcdx*bcdz*bx*bz*cx - 
+     -    2*ax*bc2*bcdy*bcdz*bx*bz*cx + abcz*bcdz**2*bcz*bx*bz*cx - 
+     -    az*bc2*bcdy**2*by*bz*cx - ay*bc2*bcdy*bcdz*by*bz*cx - 
+     -    ay*bc2*bcdx**2*bz**2*cx + 2*ax*bc2*bcdx*bcdy*bz**2*cx + 
+     -    ay*bc2*bcdy**2*bz**2*cx - abcz*bcdx*bcdz*bcz*bz**2*cx + 
+     -    2*abcz*ay*bc2*bcdz*bx*cdx*cx - abcz*ax*bc2*bcdz*by*cdx*cx - 
+     -    abcz*bc2*bcdz*bx*by*cdx*cx + abcz*ay*bc2*bcdz*by*cdy*cx - 
+     -    abcz*bc2*bcdz*by**2*cdy*cx + abcz*az*bc2*bcdz*bz*cdy*cx - 
+     -    abcz*bc2*bcdz*bz**2*cdy*cx + ay**2*bc2*bcdx*bcdy*cx**2 - 
+     -    ax*ay*bc2*bcdy**2*cx**2 + ay*az*bc2*bcdx*bcdz*cx**2 - 
+     -    ax*az*bc2*bcdy*bcdz*cx**2 + abcz*bc2*bcdz**2*cx**2 + 
+     -    abcz*ay*bcdy*bcdz*bcz*cx**2 + abcz*az*bcdz**2*bcz*cx**2 - 
+     -    2*ay*bc2*bcdy**2*bx*cx**2 - 2*az*bc2*bcdy*bcdz*bx*cx**2 + 
+     -    2*ax*bc2*bcdy**2*by*cx**2 - abcz*bcdy*bcdz*bcz*by*cx**2 + 
+     -    bc2*bcdy**2*bx*by*cx**2 - bc2*bcdx*bcdy*by**2*cx**2 + 
+     -    az*bc2*bcdx*bcdy*bz*cx**2 - ay*bc2*bcdx*bcdz*bz*cx**2 + 
+     -    2*ax*bc2*bcdy*bcdz*bz*cx**2 - abcz*bcdz**2*bcz*bz*cx**2 + 
+     -    bc2*bcdy*bcdz*bx*bz*cx**2 - bc2*bcdx*bcdy*bz**2*cx**2 - 
+     -    abcz*ay*bc2*bcdz*cdx*cx**2 + abcz*bc2*bcdz*by*cdx*cx**2 + 
+     -    ay*bc2*bcdy**2*cx**3 + az*bc2*bcdy*bcdz*cx**3 - 
+     -    bc2*bcdy**2*by*cx**3 - bc2*bcdy*bcdz*bz*cx**3 - 
+     -    abcz*az*bc2*bcdy*bcdz*cy - abcz*ay*bc2*bcdz**2*cy + 
+     -    ay**2*bc2*bcdx**2*bx*cy - ax**2*bc2*bcdy**2*bx*cy + 
+     -    abcz*ay*bcdx*bcdz*bcz*bx*cy + abcz*ax*bcdy*bcdz*bcz*bx*cy - 
+     -    2*ay*bc2*bcdx*bcdy*bx**2*cy + ax*bc2*bcdy**2*bx**2*cy - 
+     -    az*bc2*bcdx*bcdz*bx**2*cy - abcz*bcdy*bcdz*bcz*bx**2*cy - 
+     -    2*ax*ay*bc2*bcdx**2*by*cy + 2*ax**2*bc2*bcdx*bcdy*by*cy - 
+     -    2*ay*az*bc2*bcdx*bcdz*by*cy + 2*ax*az*bc2*bcdy*bcdz*by*cy - 
+     -    abcz*bc2*bcdz**2*by*cy - 2*abcz*ax*bcdx*bcdz*bcz*by*cy - 
+     -    2*abcz*az*bcdz**2*bcz*by*cy + 2*ay*bc2*bcdx**2*bx*by*cy + 
+     -    abcz*bcdx*bcdz*bcz*bx*by*cy - ax*bc2*bcdx**2*by**2*cy - 
+     -    az*bc2*bcdx*bcdz*by**2*cy + ay*az*bc2*bcdx*bcdy*bz*cy - 
+     -    ax*az*bc2*bcdy**2*bz*cy + ay**2*bc2*bcdx*bcdz*bz*cy + 
+     -    2*abcz*bc2*bcdy*bcdz*bz*cy - ax*ay*bc2*bcdy*bcdz*bz*cy + 
+     -    abcz*az*bcdy*bcdz*bcz*bz*cy + abcz*ay*bcdz**2*bcz*bz*cy + 
+     -    az*bc2*bcdx**2*bx*bz*cy + ax*bc2*bcdx*bcdz*bx*bz*cy + 
+     -    az*bc2*bcdx*bcdy*by*bz*cy + 2*ay*bc2*bcdx*bcdz*by*bz*cy - 
+     -    ax*bc2*bcdy*bcdz*by*bz*cy + abcz*bcdz**2*bcz*by*bz*cy - 
+     -    ax*bc2*bcdx**2*bz**2*cy - 2*ay*bc2*bcdx*bcdy*bz**2*cy + 
+     -    ax*bc2*bcdy**2*bz**2*cy - abcz*bcdy*bcdz*bcz*bz**2*cy - 
+     -    abcz*ax*bc2*bcdz*bx*cdx*cy + abcz*bc2*bcdz*bx**2*cdx*cy - 
+     -    abcz*az*bc2*bcdz*bz*cdx*cy + abcz*bc2*bcdz*bz**2*cdx*cy + 
+     -    abcz*ay*bc2*bcdz*bx*cdy*cy - 2*abcz*ax*bc2*bcdz*by*cdy*cy + 
+     -    abcz*bc2*bcdz*bx*by*cdy*cy - ay**2*bc2*bcdx**2*cx*cy + 
+     -    ax**2*bc2*bcdy**2*cx*cy - abcz*ay*bcdx*bcdz*bcz*cx*cy - 
+     -    abcz*ax*bcdy*bcdz*bcz*cx*cy + 4*ay*bc2*bcdx*bcdy*bx*cx*cy + 
+     -    2*az*bc2*bcdx*bcdz*bx*cx*cy + abcz*bcdy*bcdz*bcz*bx*cx*cy - 
+     -    bc2*bcdy**2*bx**2*cx*cy - 4*ax*bc2*bcdx*bcdy*by*cx*cy - 
+     -    2*az*bc2*bcdy*bcdz*by*cx*cy + abcz*bcdx*bcdz*bcz*by*cx*cy + 
+     -    bc2*bcdx**2*by**2*cx*cy - az*bc2*bcdx**2*bz*cx*cy + 
+     -    az*bc2*bcdy**2*bz*cx*cy - ax*bc2*bcdx*bcdz*bz*cx*cy + 
+     -    ay*bc2*bcdy*bcdz*bz*cx*cy - bc2*bcdx*bcdz*bx*bz*cx*cy + 
+     -    bc2*bcdy*bcdz*by*bz*cx*cy + bc2*bcdx**2*bz**2*cx*cy - 
+     -    bc2*bcdy**2*bz**2*cx*cy + abcz*ax*bc2*bcdz*cdx*cx*cy - 
+     -    abcz*bc2*bcdz*bx*cdx*cx*cy - abcz*ay*bc2*bcdz*cdy*cx*cy + 
+     -    abcz*bc2*bcdz*by*cdy*cx*cy - 2*ay*bc2*bcdx*bcdy*cx**2*cy - 
+     -    ax*bc2*bcdy**2*cx**2*cy - az*bc2*bcdx*bcdz*cx**2*cy + 
+     -    bc2*bcdy**2*bx*cx**2*cy + 2*bc2*bcdx*bcdy*by*cx**2*cy + 
+     -    bc2*bcdx*bcdz*bz*cx**2*cy + ax*ay*bc2*bcdx**2*cy**2 - 
+     -    ax**2*bc2*bcdx*bcdy*cy**2 + ay*az*bc2*bcdx*bcdz*cy**2 - 
+     -    ax*az*bc2*bcdy*bcdz*cy**2 + abcz*bc2*bcdz**2*cy**2 + 
+     -    abcz*ax*bcdx*bcdz*bcz*cy**2 + abcz*az*bcdz**2*bcz*cy**2 - 
+     -    2*ay*bc2*bcdx**2*bx*cy**2 - abcz*bcdx*bcdz*bcz*bx*cy**2 + 
+     -    bc2*bcdx*bcdy*bx**2*cy**2 + 2*ax*bc2*bcdx**2*by*cy**2 + 
+     -    2*az*bc2*bcdx*bcdz*by*cy**2 - bc2*bcdx**2*bx*by*cy**2 - 
+     -    az*bc2*bcdx*bcdy*bz*cy**2 - 2*ay*bc2*bcdx*bcdz*bz*cy**2 + 
+     -    ax*bc2*bcdy*bcdz*bz*cy**2 - abcz*bcdz**2*bcz*bz*cy**2 - 
+     -    bc2*bcdx*bcdz*by*bz*cy**2 + bc2*bcdx*bcdy*bz**2*cy**2 + 
+     -    abcz*ax*bc2*bcdz*cdy*cy**2 - abcz*bc2*bcdz*bx*cdy*cy**2 + 
+     -    ay*bc2*bcdx**2*cx*cy**2 + 2*ax*bc2*bcdx*bcdy*cx*cy**2 + 
+     -    az*bc2*bcdy*bcdz*cx*cy**2 - 2*bc2*bcdx*bcdy*bx*cx*cy**2 - 
+     -    bc2*bcdx**2*by*cx*cy**2 - bc2*bcdy*bcdz*bz*cx*cy**2 - 
+     -    ax*bc2*bcdx**2*cy**3 - az*bc2*bcdx*bcdz*cy**3 + 
+     -    bc2*bcdx**2*bx*cy**3 + bc2*bcdx*bcdz*bz*cy**3 + 
+     -    2*abcz*ax*bc2*bcdx*bcdz*cz + 2*abcz*ay*bc2*bcdy*bcdz*cz + 
+     -    ay*az*bc2*bcdx**2*bx*cz - ax*az*bc2*bcdx*bcdy*bx*cz - 
+     -    abcz*bc2*bcdx*bcdz*bx*cz + ax*ay*bc2*bcdx*bcdz*bx*cz - 
+     -    ax**2*bc2*bcdy*bcdz*bx*cz + abcz*az*bcdx*bcdz*bcz*bx*cz + 
+     -    abcz*ax*bcdz**2*bcz*bx*cz - ay*bc2*bcdx*bcdz*bx**2*cz + 
+     -    ax*bc2*bcdy*bcdz*bx**2*cz - abcz*bcdz**2*bcz*bx**2*cz + 
+     -    ay*az*bc2*bcdx*bcdy*by*cz - ax*az*bc2*bcdy**2*by*cz + 
+     -    ay**2*bc2*bcdx*bcdz*by*cz - abcz*bc2*bcdy*bcdz*by*cz - 
+     -    ax*ay*bc2*bcdy*bcdz*by*cz + abcz*az*bcdy*bcdz*bcz*by*cz + 
+     -    abcz*ay*bcdz**2*bcz*by*cz - ay*bc2*bcdx*bcdz*by**2*cz + 
+     -    ax*bc2*bcdy*bcdz*by**2*cz - abcz*bcdz**2*bcz*by**2*cz - 
+     -    2*ax*ay*bc2*bcdx**2*bz*cz + 2*ax**2*bc2*bcdx*bcdy*bz*cz - 
+     -    2*ay**2*bc2*bcdx*bcdy*bz*cz + 2*ax*ay*bc2*bcdy**2*bz*cz - 
+     -    2*abcz*ax*bcdx*bcdz*bcz*bz*cz - 
+     -    2*abcz*ay*bcdy*bcdz*bcz*bz*cz + ay*bc2*bcdx**2*bx*bz*cz - 
+     -    ax*bc2*bcdx*bcdy*bx*bz*cz + abcz*bcdx*bcdz*bcz*bx*bz*cz + 
+     -    ay*bc2*bcdx*bcdy*by*bz*cz - ax*bc2*bcdy**2*by*bz*cz + 
+     -    abcz*bcdy*bcdz*bcz*by*bz*cz - abcz*az*bc2*bcdz*by*cdx*cz + 
+     -    2*abcz*ay*bc2*bcdz*bz*cdx*cz - abcz*bc2*bcdz*by*bz*cdx*cz + 
+     -    abcz*az*bc2*bcdz*bx*cdy*cz - 2*abcz*ax*bc2*bcdz*bz*cdy*cz + 
+     -    abcz*bc2*bcdz*bx*bz*cdy*cz - ay*az*bc2*bcdx**2*cx*cz + 
+     -    ax*az*bc2*bcdx*bcdy*cx*cz - abcz*bc2*bcdx*bcdz*cx*cz - 
+     -    ax*ay*bc2*bcdx*bcdz*cx*cz + ax**2*bc2*bcdy*bcdz*cx*cz - 
+     -    abcz*az*bcdx*bcdz*bcz*cx*cz - abcz*ax*bcdz**2*bcz*cx*cz + 
+     -    az*bc2*bcdx*bcdy*bx*cx*cz + ay*bc2*bcdx*bcdz*bx*cx*cz + 
+     -    abcz*bcdz**2*bcz*bx*cx*cz - bc2*bcdy*bcdz*bx**2*cx*cz + 
+     -    az*bc2*bcdy**2*by*cx*cz + ay*bc2*bcdy*bcdz*by*cx*cz - 
+     -    bc2*bcdy*bcdz*by**2*cx*cz + ay*bc2*bcdx**2*bz*cx*cz - 
+     -    3*ax*bc2*bcdx*bcdy*bz*cx*cz - 2*ay*bc2*bcdy**2*bz*cx*cz + 
+     -    abcz*bcdx*bcdz*bcz*bz*cx*cz + bc2*bcdx*bcdy*bx*bz*cx*cz + 
+     -    bc2*bcdy**2*by*bz*cx*cz - abcz*az*bc2*bcdz*cdy*cx*cz + 
+     -    abcz*bc2*bcdz*bz*cdy*cx*cz - az*bc2*bcdx*bcdy*cx**2*cz - 
+     -    ax*bc2*bcdy*bcdz*cx**2*cz + bc2*bcdy*bcdz*bx*cx**2*cz + 
+     -    bc2*bcdx*bcdy*bz*cx**2*cz - ay*az*bc2*bcdx*bcdy*cy*cz + 
+     -    ax*az*bc2*bcdy**2*cy*cz - ay**2*bc2*bcdx*bcdz*cy*cz - 
+     -    abcz*bc2*bcdy*bcdz*cy*cz + ax*ay*bc2*bcdy*bcdz*cy*cz - 
+     -    abcz*az*bcdy*bcdz*bcz*cy*cz - abcz*ay*bcdz**2*bcz*cy*cz - 
+     -    az*bc2*bcdx**2*bx*cy*cz - ax*bc2*bcdx*bcdz*bx*cy*cz + 
+     -    bc2*bcdx*bcdz*bx**2*cy*cz - az*bc2*bcdx*bcdy*by*cy*cz - 
+     -    ax*bc2*bcdy*bcdz*by*cy*cz + abcz*bcdz**2*bcz*by*cy*cz + 
+     -    bc2*bcdx*bcdz*by**2*cy*cz + 2*ax*bc2*bcdx**2*bz*cy*cz + 
+     -    3*ay*bc2*bcdx*bcdy*bz*cy*cz - ax*bc2*bcdy**2*bz*cy*cz + 
+     -    abcz*bcdy*bcdz*bcz*bz*cy*cz - bc2*bcdx**2*bx*bz*cy*cz - 
+     -    bc2*bcdx*bcdy*by*bz*cy*cz + abcz*az*bc2*bcdz*cdx*cy*cz - 
+     -    abcz*bc2*bcdz*bz*cdx*cy*cz + az*bc2*bcdx**2*cx*cy*cz - 
+     -    az*bc2*bcdy**2*cx*cy*cz + ax*bc2*bcdx*bcdz*cx*cy*cz - 
+     -    ay*bc2*bcdy*bcdz*cx*cy*cz - bc2*bcdx*bcdz*bx*cx*cy*cz + 
+     -    bc2*bcdy*bcdz*by*cx*cy*cz - bc2*bcdx**2*bz*cx*cy*cz + 
+     -    bc2*bcdy**2*bz*cx*cy*cz + az*bc2*bcdx*bcdy*cy**2*cz + 
+     -    ay*bc2*bcdx*bcdz*cy**2*cz - bc2*bcdx*bcdz*by*cy**2*cz - 
+     -    bc2*bcdx*bcdy*bz*cy**2*cz + ax*ay*bc2*bcdx**2*cz**2 - 
+     -    ax**2*bc2*bcdx*bcdy*cz**2 + ay**2*bc2*bcdx*bcdy*cz**2 - 
+     -    ax*ay*bc2*bcdy**2*cz**2 + abcz*ax*bcdx*bcdz*bcz*cz**2 + 
+     -    abcz*ay*bcdy*bcdz*bcz*cz**2 - ay*bc2*bcdx**2*bx*cz**2 + 
+     -    ax*bc2*bcdx*bcdy*bx*cz**2 - abcz*bcdx*bcdz*bcz*bx*cz**2 - 
+     -    ay*bc2*bcdx*bcdy*by*cz**2 + ax*bc2*bcdy**2*by*cz**2 - 
+     -    abcz*bcdy*bcdz*bcz*by*cz**2 - abcz*ay*bc2*bcdz*cdx*cz**2 + 
+     -    abcz*bc2*bcdz*by*cdx*cz**2 + abcz*ax*bc2*bcdz*cdy*cz**2 - 
+     -    abcz*bc2*bcdz*bx*cdy*cz**2 + ax*bc2*bcdx*bcdy*cx*cz**2 + 
+     -    ay*bc2*bcdy**2*cx*cz**2 - bc2*bcdx*bcdy*bx*cx*cz**2 - 
+     -    bc2*bcdy**2*by*cx*cz**2 - ax*bc2*bcdx**2*cy*cz**2 - 
+     -    ay*bc2*bcdx*bcdy*cy*cz**2 + bc2*bcdx**2*bx*cy*cz**2 + 
+     -    bc2*bcdx*bcdy*by*cy*cz**2 + 
+     -    abcy*(ay*bcdy**2*bcz*bx**2 + ay*bc2*bcdy*bcdz*by - 
+     -       ay*bcdx*bcdy*bcz*bx*by - 2*ay*bc2*bcdy**2*bz - 
+     -       ay*bcdy*bcdz*bcz*by*bz + ay*bcdy**2*bcz*bz**2 - 
+     -       ay*bc2*bcdx*bx*by*cdx - ay*bc2*bcdz*by*bz*cdx - 
+     -       ay*bc2*bcdy*bx*by*cdy + 
+     -       az*(bcdy*bcz*(bcdz*(bcx**2 + bcy**2) - 
+     -             (abx*bcdx + bcdy*bcy)*bcz) + 
+     -          bc2*(bcdy**2*bcy + bcdz*(bcx**2 + bcy**2)*cdx + 
+     -             abx*bcdx*(bcdy - bcz*cdx) - abx*bcdy*bcz*cdy)) + 
+     -       ax*(bcdy*bcz*(-(abx*(bcdy*bcy + bcdz*bcz)) + 
+     -             bcdx*(bcy**2 + bcz**2)) + 
+     -          bc2*(abx*bcdz*(bcdy - bcz*cdx) + 
+     -             bcdx*(-2*bcdy*bcz + (bcy**2 + bcz**2)*cdx) + 
+     -             bcdy*(bcy**2 + bcz**2)*cdy)) - bc2*bcdy*bcdz*bx*cx - 
+     -       2*ay*bcdy**2*bcz*bx*cx + ay*bcdx*bcdy*bcz*by*cx + 
+     -       bcdy**2*bcz*bx*by*cx - bcdx*bcdy*bcz*by**2*cx + 
+     -       2*bc2*bcdx*bcdy*bz*cx + bcdy*bcdz*bcz*bx*bz*cx - 
+     -       bcdx*bcdy*bcz*bz**2*cx + ay*bc2*bcdx*by*cdx*cx - 
+     -       bc2*bcdx*by**2*cdx*cx + bc2*bcdz*bx*bz*cdx*cx - 
+     -       bc2*bcdx*bz**2*cdx*cx + ay*bc2*bcdy*by*cdy*cx - 
+     -       bc2*bcdy*by**2*cdy*cx - bc2*bcdy*bz**2*cdy*cx + 
+     -       bc2*bcdy*bcdz*cx**2 + ay*bcdy**2*bcz*cx**2 - 
+     -       bcdy**2*bcz*by*cx**2 - bcdy*bcdz*bcz*bz*cx**2 - 
+     -       bc2*bcdz*bz*cdx*cx**2 - ay*bc2*bcdy*bcdz*cy + 
+     -       ay*bcdx*bcdy*bcz*bx*cy - bcdy**2*bcz*bx**2*cy - 
+     -       bc2*bcdy*bcdz*by*cy + bcdx*bcdy*bcz*bx*by*cy + 
+     -       2*bc2*bcdy**2*bz*cy + ay*bcdy*bcdz*bcz*bz*cy + 
+     -       bcdy*bcdz*bcz*by*bz*cy - bcdy**2*bcz*bz**2*cy + 
+     -       ay*bc2*bcdx*bx*cdx*cy + bc2*bcdx*bx*by*cdx*cy + 
+     -       ay*bc2*bcdz*bz*cdx*cy + bc2*bcdz*by*bz*cdx*cy + 
+     -       ay*bc2*bcdy*bx*cdy*cy + bc2*bcdy*bx*by*cdy*cy - 
+     -       ay*bcdx*bcdy*bcz*cx*cy + bcdy**2*bcz*bx*cx*cy + 
+     -       bcdx*bcdy*bcz*by*cx*cy - ay*bc2*bcdx*cdx*cx*cy + 
+     -       bc2*bcdx*by*cdx*cx*cy - ay*bc2*bcdy*cdy*cx*cy + 
+     -       bc2*bcdy*by*cdy*cx*cy + bc2*bcdy*bcdz*cy**2 - 
+     -       bcdx*bcdy*bcz*bx*cy**2 - bcdy*bcdz*bcz*bz*cy**2 - 
+     -       bc2*bcdx*bx*cdx*cy**2 - bc2*bcdz*bz*cdx*cy**2 - 
+     -       bc2*bcdy*bx*cdy*cy**2 + 2*ay*bc2*bcdy**2*cz - 
+     -       bc2*bcdx*bcdy*bx*cz - bcdy*bcdz*bcz*bx**2*cz - 
+     -       bc2*bcdy**2*by*cz + ay*bcdy*bcdz*bcz*by*cz - 
+     -       bcdy*bcdz*bcz*by**2*cz - 2*ay*bcdy**2*bcz*bz*cz + 
+     -       bcdx*bcdy*bcz*bx*bz*cz + bcdy**2*bcz*by*bz*cz - 
+     -       bc2*bcdz*bx**2*cdx*cz + ay*bc2*bcdz*by*cdx*cz - 
+     -       bc2*bcdz*by**2*cdx*cz + bc2*bcdx*bx*bz*cdx*cz + 
+     -       bc2*bcdy*bx*bz*cdy*cz - bc2*bcdx*bcdy*cx*cz + 
+     -       bcdy*bcdz*bcz*bx*cx*cz + bcdx*bcdy*bcz*bz*cx*cz + 
+     -       bc2*bcdz*bx*cdx*cx*cz + bc2*bcdx*bz*cdx*cx*cz + 
+     -       bc2*bcdy*bz*cdy*cx*cz - bc2*bcdy**2*cy*cz - 
+     -       ay*bcdy*bcdz*bcz*cy*cz + bcdy*bcdz*bcz*by*cy*cz + 
+     -       bcdy**2*bcz*bz*cy*cz - ay*bc2*bcdz*cdx*cy*cz + 
+     -       bc2*bcdz*by*cdx*cy*cz + ay*bcdy**2*bcz*cz**2 - 
+     -       bcdx*bcdy*bcz*bx*cz**2 - bcdy**2*bcz*by*cz**2 - 
+     -       bc2*bcdx*bx*cdx*cz**2 - bc2*bcdy*bx*cdy*cz**2) + 
+     -    abcx*(ay*bcdx*bcdy*bcz*bx**2 + ay*bc2*bcdx*bcdz*by - 
+     -       ay*bcdx**2*bcz*bx*by - 2*ay*bc2*bcdx*bcdy*bz - 
+     -       ay*bcdx*bcdz*bcz*by*bz + ay*bcdx*bcdy*bcz*bz**2 - 
+     -       ay*bc2*bcdx*bx**2*cdx - ay*bc2*bcdx*bz**2*cdx - 
+     -       ay*bc2*bcdy*bx**2*cdy + ay*bc2*bcdz*by*bz*cdy - 
+     -       ay*bc2*bcdy*bz**2*cdy - 
+     -       ax*(-(bcdx**2*bcz*(-2*bc2 + bcy**2 + bcz**2)) - 
+     -          abx*(-(bcdx*bcz*(bcdy*bcy + bcdz*bcz)) + 
+     -             bc2*(bcdx*bcdz + bcdx*bcy*cdx + bcdy*bcy*cdy + 
+     -                bcdz*bcz*cdy))) - bc2*bcdx*bcdz*bx*cx - 
+     -       2*ay*bcdx*bcdy*bcz*bx*cx + ay*bcdx**2*bcz*by*cx + 
+     -       bcdx*bcdy*bcz*bx*by*cx - bcdx**2*bcz*by**2*cx + 
+     -       2*bc2*bcdx**2*bz*cx + bcdx*bcdz*bcz*bx*bz*cx - 
+     -       bcdx**2*bcz*bz**2*cx + 2*ay*bc2*bcdx*bx*cdx*cx - 
+     -       bc2*bcdx*bx*by*cdx*cx + 2*ay*bc2*bcdy*bx*cdy*cx - 
+     -       bc2*bcdy*bx*by*cdy*cx - bc2*bcdz*bx*bz*cdy*cx + 
+     -       bc2*bcdx*bcdz*cx**2 + ay*bcdx*bcdy*bcz*cx**2 - 
+     -       bcdx*bcdy*bcz*by*cx**2 - bcdx*bcdz*bcz*bz*cx**2 - 
+     -       ay*bc2*bcdx*cdx*cx**2 + bc2*bcdx*by*cdx*cx**2 - 
+     -       ay*bc2*bcdy*cdy*cx**2 + bc2*bcdy*by*cdy*cx**2 + 
+     -       bc2*bcdz*bz*cdy*cx**2 - ay*bc2*bcdx*bcdz*cy + 
+     -       ay*bcdx**2*bcz*bx*cy - bcdx*bcdy*bcz*bx**2*cy - 
+     -       bc2*bcdx*bcdz*by*cy + bcdx**2*bcz*bx*by*cy + 
+     -       2*bc2*bcdx*bcdy*bz*cy + ay*bcdx*bcdz*bcz*bz*cy + 
+     -       bcdx*bcdz*bcz*by*bz*cy - bcdx*bcdy*bcz*bz**2*cy + 
+     -       bc2*bcdx*bx**2*cdx*cy + bc2*bcdx*bz**2*cdx*cy + 
+     -       bc2*bcdy*bx**2*cdy*cy - ay*bc2*bcdz*bz*cdy*cy - 
+     -       bc2*bcdz*by*bz*cdy*cy + bc2*bcdy*bz**2*cdy*cy - 
+     -       ay*bcdx**2*bcz*cx*cy + bcdx*bcdy*bcz*bx*cx*cy + 
+     -       bcdx**2*bcz*by*cx*cy - bc2*bcdx*bx*cdx*cx*cy - 
+     -       bc2*bcdy*bx*cdy*cx*cy + bc2*bcdx*bcdz*cy**2 - 
+     -       bcdx**2*bcz*bx*cy**2 - bcdx*bcdz*bcz*bz*cy**2 + 
+     -       bc2*bcdz*bz*cdy*cy**2 + 
+     -       az*(bc2*(abx*bcdx**2 + bcdx*bcy*(bcdy + bcz*cdx) - 
+     -             (bcdz*(bcx**2 + bcy**2) - bcdy*bcy*bcz)*cdy) + 
+     -          bcdx*bcz*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(bcdx*(-bx + cx) + bcdy*(-by + cy)))) + 
+     -       2*ay*bc2*bcdx*bcdy*cz - bc2*bcdx**2*bx*cz - 
+     -       bcdx*bcdz*bcz*bx**2*cz - bc2*bcdx*bcdy*by*cz + 
+     -       ay*bcdx*bcdz*bcz*by*cz - bcdx*bcdz*bcz*by**2*cz - 
+     -       2*ay*bcdx*bcdy*bcz*bz*cz + bcdx**2*bcz*bx*bz*cz + 
+     -       bcdx*bcdy*bcz*by*bz*cz + 2*ay*bc2*bcdx*bz*cdx*cz - 
+     -       bc2*bcdx*by*bz*cdx*cz + bc2*bcdz*bx**2*cdy*cz - 
+     -       ay*bc2*bcdz*by*cdy*cz + bc2*bcdz*by**2*cdy*cz + 
+     -       2*ay*bc2*bcdy*bz*cdy*cz - bc2*bcdy*by*bz*cdy*cz - 
+     -       bc2*bcdx**2*cx*cz + bcdx*bcdz*bcz*bx*cx*cz + 
+     -       bcdx**2*bcz*bz*cx*cz - bc2*bcdz*bx*cdy*cx*cz - 
+     -       bc2*bcdx*bcdy*cy*cz - ay*bcdx*bcdz*bcz*cy*cz + 
+     -       bcdx*bcdz*bcz*by*cy*cz + bcdx*bcdy*bcz*bz*cy*cz - 
+     -       bc2*bcdx*bz*cdx*cy*cz + ay*bc2*bcdz*cdy*cy*cz - 
+     -       bc2*bcdz*by*cdy*cy*cz - bc2*bcdy*bz*cdy*cy*cz + 
+     -       ay*bcdx*bcdy*bcz*cz**2 - bcdx**2*bcz*bx*cz**2 - 
+     -       bcdx*bcdy*bcz*by*cz**2 - ay*bc2*bcdx*cdx*cz**2 + 
+     -       bc2*bcdx*by*cdx*cz**2 - ay*bc2*bcdy*cdy*cz**2 + 
+     -       bc2*bcdy*by*cdy*cz**2))/
+     -  (bc2**1.5*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**2/
+     -       bc2))
+
+       dcx= (2*abcz*ay*bc2*bcdy*bcdz*bx + 2*abcz*az*bc2*bcdz**2*bx - 
+     -    abz*ay*bc2*bcdy**2*bx**2 + aby*ay*bc2*bcdy*bcdz*bx**2 - 
+     -    abz*az*bc2*bcdy*bcdz*bx**2 + aby*az*bc2*bcdz**2*bx**2 - 
+     -    abcz*ay*bcdy*bcdz*bcx*bx**2 - abcz*az*bcdz**2*bcx*bx**2 - 
+     -    abcz*ay*bc2*bcdx*bcdz*by - abcz*ax*bc2*bcdy*bcdz*by + 
+     -    abz*ay*bc2*bcdx*bcdy*bx*by + abz*ax*bc2*bcdy**2*bx*by - 
+     -    aby*ay*bc2*bcdx*bcdz*bx*by - abcz*bc2*bcdy*bcdz*bx*by - 
+     -    aby*ax*bc2*bcdy*bcdz*bx*by + abcz*ay*bcdx*bcdz*bcx*bx*by + 
+     -    abcz*ax*bcdy*bcdz*bcx*bx*by - abcz*ay*bc2*bcdy*bx**2*by - 
+     -    abz*ax*bc2*bcdx*bcdy*by**2 + abcz*bc2*bcdx*bcdz*by**2 + 
+     -    aby*ax*bc2*bcdx*bcdz*by**2 - abz*az*bc2*bcdy*bcdz*by**2 + 
+     -    aby*az*bc2*bcdz**2*by**2 - abcz*ax*bcdx*bcdz*bcx*by**2 - 
+     -    abcz*az*bcdz**2*bcx*by**2 + abcz*ay*bc2*bcdx*bx*by**2 + 
+     -    abcz*ax*bc2*bcdy*bx*by**2 - abcz*ax*bc2*bcdx*by**3 - 
+     -    abcz*az*bc2*bcdx*bcdz*bz - abcz*ax*bc2*bcdz**2*bz + 
+     -    abz*az*bc2*bcdx*bcdy*bx*bz - aby*az*bc2*bcdx*bcdz*bx*bz + 
+     -    abz*ax*bc2*bcdy*bcdz*bx*bz - abcz*bc2*bcdz**2*bx*bz - 
+     -    aby*ax*bc2*bcdz**2*bx*bz + abcz*az*bcdx*bcdz*bcx*bx*bz + 
+     -    abcz*ax*bcdz**2*bcx*bx*bz - abcz*ay*bc2*bcdz*bx**2*bz + 
+     -    abz*az*bc2*bcdy**2*by*bz + abz*ay*bc2*bcdy*bcdz*by*bz - 
+     -    aby*az*bc2*bcdy*bcdz*by*bz - aby*ay*bc2*bcdz**2*by*bz + 
+     -    abcz*az*bcdy*bcdz*bcx*by*bz + abcz*ay*bcdz**2*bcx*by*bz + 
+     -    abcz*az*bc2*bcdx*bx*by*bz + abcz*ax*bc2*bcdz*bx*by*bz + 
+     -    abcz*az*bc2*bcdy*by**2*bz - abz*ax*bc2*bcdx*bcdy*bz**2 - 
+     -    abz*ay*bc2*bcdy**2*bz**2 + abcz*bc2*bcdx*bcdz*bz**2 + 
+     -    aby*ax*bc2*bcdx*bcdz*bz**2 + aby*ay*bc2*bcdy*bcdz*bz**2 - 
+     -    abcz*ax*bcdx*bcdz*bcx*bz**2 - abcz*ay*bcdy*bcdz*bcx*bz**2 - 
+     -    abcz*ax*bc2*bcdx*by*bz**2 - abcz*ay*bc2*bcdy*by*bz**2 + 
+     -    abcz*az*bc2*bcdz*by*bz**2 - abcz*ay*bc2*bcdz*bz**3 - 
+     -    2*abcz*ay*bc2*bcdy*bcdz*cx - 2*abcz*az*bc2*bcdz**2*cx + 
+     -    2*abz*ay*bc2*bcdy**2*bx*cx - 2*aby*ay*bc2*bcdy*bcdz*bx*cx + 
+     -    2*abz*az*bc2*bcdy*bcdz*bx*cx - 2*aby*az*bc2*bcdz**2*bx*cx + 
+     -    2*abcz*ay*bcdy*bcdz*bcx*bx*cx + 2*abcz*az*bcdz**2*bcx*bx*cx - 
+     -    abz*ay*bc2*bcdx*bcdy*by*cx - abz*ax*bc2*bcdy**2*by*cx + 
+     -    aby*ay*bc2*bcdx*bcdz*by*cx + 2*abcz*bc2*bcdy*bcdz*by*cx + 
+     -    aby*ax*bc2*bcdy*bcdz*by*cx - abcz*ay*bcdx*bcdz*bcx*by*cx - 
+     -    abcz*ax*bcdy*bcdz*bcx*by*cx + 2*abcz*ay*bc2*bcdy*bx*by*cx - 
+     -    abz*bc2*bcdy**2*bx*by*cx + aby*bc2*bcdy*bcdz*bx*by*cx - 
+     -    abcz*bcdy*bcdz*bcx*bx*by*cx - abcz*ay*bc2*bcdx*by**2*cx - 
+     -    abcz*ax*bc2*bcdy*by**2*cx + abz*bc2*bcdx*bcdy*by**2*cx - 
+     -    aby*bc2*bcdx*bcdz*by**2*cx + abcz*bcdx*bcdz*bcx*by**2*cx - 
+     -    abcz*bc2*bcdy*bx*by**2*cx + abcz*bc2*bcdx*by**3*cx - 
+     -    abz*az*bc2*bcdx*bcdy*bz*cx + aby*az*bc2*bcdx*bcdz*bz*cx - 
+     -    abz*ax*bc2*bcdy*bcdz*bz*cx + 2*abcz*bc2*bcdz**2*bz*cx + 
+     -    aby*ax*bc2*bcdz**2*bz*cx - abcz*az*bcdx*bcdz*bcx*bz*cx - 
+     -    abcz*ax*bcdz**2*bcx*bz*cx + 2*abcz*ay*bc2*bcdz*bx*bz*cx - 
+     -    abz*bc2*bcdy*bcdz*bx*bz*cx + aby*bc2*bcdz**2*bx*bz*cx - 
+     -    abcz*bcdz**2*bcx*bx*bz*cx - abcz*az*bc2*bcdx*by*bz*cx - 
+     -    abcz*ax*bc2*bcdz*by*bz*cx - abcz*bc2*bcdz*bx*by*bz*cx + 
+     -    abz*bc2*bcdx*bcdy*bz**2*cx - aby*bc2*bcdx*bcdz*bz**2*cx + 
+     -    abcz*bcdx*bcdz*bcx*bz**2*cx + abcz*bc2*bcdx*by*bz**2*cx - 
+     -    abz*ay*bc2*bcdy**2*cx**2 + aby*ay*bc2*bcdy*bcdz*cx**2 - 
+     -    abz*az*bc2*bcdy*bcdz*cx**2 + aby*az*bc2*bcdz**2*cx**2 - 
+     -    abcz*ay*bcdy*bcdz*bcx*cx**2 - abcz*az*bcdz**2*bcx*cx**2 - 
+     -    abcz*ay*bc2*bcdy*by*cx**2 + abz*bc2*bcdy**2*by*cx**2 - 
+     -    aby*bc2*bcdy*bcdz*by*cx**2 + abcz*bcdy*bcdz*bcx*by*cx**2 + 
+     -    abcz*bc2*bcdy*by**2*cx**2 - abcz*ay*bc2*bcdz*bz*cx**2 + 
+     -    abz*bc2*bcdy*bcdz*bz*cx**2 - aby*bc2*bcdz**2*bz*cx**2 + 
+     -    abcz*bcdz**2*bcx*bz*cx**2 + abcz*bc2*bcdz*by*bz*cx**2 + 
+     -    abcz*ay*bc2*bcdx*bcdz*cy + abcz*ax*bc2*bcdy*bcdz*cy - 
+     -    abz*ay*bc2*bcdx*bcdy*bx*cy - abz*ax*bc2*bcdy**2*bx*cy + 
+     -    aby*ay*bc2*bcdx*bcdz*bx*cy - abcz*bc2*bcdy*bcdz*bx*cy + 
+     -    aby*ax*bc2*bcdy*bcdz*bx*cy - abcz*ay*bcdx*bcdz*bcx*bx*cy - 
+     -    abcz*ax*bcdy*bcdz*bcx*bx*cy + abz*bc2*bcdy**2*bx**2*cy - 
+     -    aby*bc2*bcdy*bcdz*bx**2*cy + abcz*bcdy*bcdz*bcx*bx**2*cy + 
+     -    2*abz*ax*bc2*bcdx*bcdy*by*cy - abcz*bc2*bcdx*bcdz*by*cy - 
+     -    2*aby*ax*bc2*bcdx*bcdz*by*cy + 2*abz*az*bc2*bcdy*bcdz*by*cy - 
+     -    2*aby*az*bc2*bcdz**2*by*cy + 2*abcz*ax*bcdx*bcdz*bcx*by*cy + 
+     -    2*abcz*az*bcdz**2*bcx*by*cy - abcz*ay*bc2*bcdx*bx*by*cy - 
+     -    abcz*ax*bc2*bcdy*bx*by*cy - abz*bc2*bcdx*bcdy*bx*by*cy + 
+     -    aby*bc2*bcdx*bcdz*bx*by*cy - abcz*bcdx*bcdz*bcx*bx*by*cy + 
+     -    abcz*bc2*bcdy*bx**2*by*cy + 2*abcz*ax*bc2*bcdx*by**2*cy - 
+     -    abcz*bc2*bcdx*bx*by**2*cy - abz*az*bc2*bcdy**2*bz*cy - 
+     -    abz*ay*bc2*bcdy*bcdz*bz*cy + aby*az*bc2*bcdy*bcdz*bz*cy + 
+     -    aby*ay*bc2*bcdz**2*bz*cy - abcz*az*bcdy*bcdz*bcx*bz*cy - 
+     -    abcz*ay*bcdz**2*bcx*bz*cy - abcz*ax*bc2*bcdz*bx*bz*cy + 
+     -    abcz*bc2*bcdz*bx**2*bz*cy - abcz*az*bc2*bcdy*by*bz*cy - 
+     -    abz*bc2*bcdy*bcdz*by*bz*cy + aby*bc2*bcdz**2*by*bz*cy - 
+     -    abcz*bcdz**2*bcx*by*bz*cy + abz*bc2*bcdy**2*bz**2*cy - 
+     -    abcz*az*bc2*bcdz*bz**2*cy - aby*bc2*bcdy*bcdz*bz**2*cy + 
+     -    abcz*bcdy*bcdz*bcx*bz**2*cy + abcz*bc2*bcdy*by*bz**2*cy + 
+     -    abcz*bc2*bcdz*bz**3*cy + abz*ay*bc2*bcdx*bcdy*cx*cy + 
+     -    abz*ax*bc2*bcdy**2*cx*cy - aby*ay*bc2*bcdx*bcdz*cx*cy - 
+     -    aby*ax*bc2*bcdy*bcdz*cx*cy + abcz*ay*bcdx*bcdz*bcx*cx*cy + 
+     -    abcz*ax*bcdy*bcdz*bcx*cx*cy - abz*bc2*bcdy**2*bx*cx*cy + 
+     -    aby*bc2*bcdy*bcdz*bx*cx*cy - abcz*bcdy*bcdz*bcx*bx*cx*cy + 
+     -    abcz*ay*bc2*bcdx*by*cx*cy + abcz*ax*bc2*bcdy*by*cx*cy - 
+     -    abz*bc2*bcdx*bcdy*by*cx*cy + aby*bc2*bcdx*bcdz*by*cx*cy - 
+     -    abcz*bcdx*bcdz*bcx*by*cx*cy - abcz*bc2*bcdy*bx*by*cx*cy - 
+     -    abcz*bc2*bcdx*by**2*cx*cy + abcz*ax*bc2*bcdz*bz*cx*cy - 
+     -    abcz*bc2*bcdz*bx*bz*cx*cy - abz*ax*bc2*bcdx*bcdy*cy**2 + 
+     -    aby*ax*bc2*bcdx*bcdz*cy**2 - abz*az*bc2*bcdy*bcdz*cy**2 + 
+     -    aby*az*bc2*bcdz**2*cy**2 - abcz*ax*bcdx*bcdz*bcx*cy**2 - 
+     -    abcz*az*bcdz**2*bcx*cy**2 + abz*bc2*bcdx*bcdy*bx*cy**2 - 
+     -    aby*bc2*bcdx*bcdz*bx*cy**2 + abcz*bcdx*bcdz*bcx*bx*cy**2 - 
+     -    abcz*ax*bc2*bcdx*by*cy**2 + abcz*bc2*bcdx*bx*by*cy**2 + 
+     -    abz*bc2*bcdy*bcdz*bz*cy**2 - aby*bc2*bcdz**2*bz*cy**2 + 
+     -    abcz*bcdz**2*bcx*bz*cy**2 + abcz*az*bc2*bcdx*bcdz*cz + 
+     -    abcz*ax*bc2*bcdz**2*cz - abz*az*bc2*bcdx*bcdy*bx*cz + 
+     -    aby*az*bc2*bcdx*bcdz*bx*cz - abz*ax*bc2*bcdy*bcdz*bx*cz - 
+     -    abcz*bc2*bcdz**2*bx*cz + aby*ax*bc2*bcdz**2*bx*cz - 
+     -    abcz*az*bcdx*bcdz*bcx*bx*cz - abcz*ax*bcdz**2*bcx*bx*cz + 
+     -    abz*bc2*bcdy*bcdz*bx**2*cz - aby*bc2*bcdz**2*bx**2*cz + 
+     -    abcz*bcdz**2*bcx*bx**2*cz - abz*az*bc2*bcdy**2*by*cz - 
+     -    abz*ay*bc2*bcdy*bcdz*by*cz + aby*az*bc2*bcdy*bcdz*by*cz + 
+     -    aby*ay*bc2*bcdz**2*by*cz - abcz*az*bcdy*bcdz*bcx*by*cz - 
+     -    abcz*ay*bcdz**2*bcx*by*cz - abcz*az*bc2*bcdx*bx*by*cz - 
+     -    abcz*az*bc2*bcdy*by**2*cz + abz*bc2*bcdy*bcdz*by**2*cz - 
+     -    aby*bc2*bcdz**2*by**2*cz + abcz*bcdz**2*bcx*by**2*cz + 
+     -    2*abz*ax*bc2*bcdx*bcdy*bz*cz + 2*abz*ay*bc2*bcdy**2*bz*cz - 
+     -    abcz*bc2*bcdx*bcdz*bz*cz - 2*aby*ax*bc2*bcdx*bcdz*bz*cz - 
+     -    2*aby*ay*bc2*bcdy*bcdz*bz*cz + 
+     -    2*abcz*ax*bcdx*bcdz*bcx*bz*cz + 
+     -    2*abcz*ay*bcdy*bcdz*bcx*bz*cz - abz*bc2*bcdx*bcdy*bx*bz*cz + 
+     -    aby*bc2*bcdx*bcdz*bx*bz*cz - abcz*bcdx*bcdz*bcx*bx*bz*cz + 
+     -    2*abcz*ax*bc2*bcdx*by*bz*cz + 2*abcz*ay*bc2*bcdy*by*bz*cz - 
+     -    abz*bc2*bcdy**2*by*bz*cz - abcz*az*bc2*bcdz*by*bz*cz + 
+     -    aby*bc2*bcdy*bcdz*by*bz*cz - abcz*bcdy*bcdz*bcx*by*bz*cz - 
+     -    abcz*bc2*bcdx*bx*by*bz*cz - abcz*bc2*bcdy*by**2*bz*cz + 
+     -    2*abcz*ay*bc2*bcdz*bz**2*cz - abcz*bc2*bcdz*by*bz**2*cz + 
+     -    abz*az*bc2*bcdx*bcdy*cx*cz - aby*az*bc2*bcdx*bcdz*cx*cz + 
+     -    abz*ax*bc2*bcdy*bcdz*cx*cz - aby*ax*bc2*bcdz**2*cx*cz + 
+     -    abcz*az*bcdx*bcdz*bcx*cx*cz + abcz*ax*bcdz**2*bcx*cx*cz - 
+     -    abz*bc2*bcdy*bcdz*bx*cx*cz + aby*bc2*bcdz**2*bx*cx*cz - 
+     -    abcz*bcdz**2*bcx*bx*cx*cz + abcz*az*bc2*bcdx*by*cx*cz - 
+     -    abz*bc2*bcdx*bcdy*bz*cx*cz + aby*bc2*bcdx*bcdz*bz*cx*cz - 
+     -    abcz*bcdx*bcdz*bcx*bz*cx*cz - abcz*bc2*bcdx*by*bz*cx*cz + 
+     -    abz*az*bc2*bcdy**2*cy*cz + abz*ay*bc2*bcdy*bcdz*cy*cz - 
+     -    aby*az*bc2*bcdy*bcdz*cy*cz - aby*ay*bc2*bcdz**2*cy*cz + 
+     -    abcz*az*bcdy*bcdz*bcx*cy*cz + abcz*ay*bcdz**2*bcx*cy*cz + 
+     -    abcz*az*bc2*bcdy*by*cy*cz - abz*bc2*bcdy*bcdz*by*cy*cz + 
+     -    aby*bc2*bcdz**2*by*cy*cz - abcz*bcdz**2*bcx*by*cy*cz - 
+     -    abz*bc2*bcdy**2*bz*cy*cz + abcz*az*bc2*bcdz*bz*cy*cz + 
+     -    aby*bc2*bcdy*bcdz*bz*cy*cz - abcz*bcdy*bcdz*bcx*bz*cy*cz - 
+     -    abcz*bc2*bcdy*by*bz*cy*cz - abcz*bc2*bcdz*bz**2*cy*cz - 
+     -    abz*ax*bc2*bcdx*bcdy*cz**2 - abz*ay*bc2*bcdy**2*cz**2 + 
+     -    aby*ax*bc2*bcdx*bcdz*cz**2 + aby*ay*bc2*bcdy*bcdz*cz**2 - 
+     -    abcz*ax*bcdx*bcdz*bcx*cz**2 - abcz*ay*bcdy*bcdz*bcx*cz**2 + 
+     -    abz*bc2*bcdx*bcdy*bx*cz**2 - aby*bc2*bcdx*bcdz*bx*cz**2 + 
+     -    abcz*bcdx*bcdz*bcx*bx*cz**2 - abcz*ax*bc2*bcdx*by*cz**2 - 
+     -    abcz*ay*bc2*bcdy*by*cz**2 + abz*bc2*bcdy**2*by*cz**2 - 
+     -    aby*bc2*bcdy*bcdz*by*cz**2 + abcz*bcdy*bcdz*bcx*by*cz**2 + 
+     -    abcz*bc2*bcdx*bx*by*cz**2 + abcz*bc2*bcdy*by**2*cz**2 - 
+     -    abcz*ay*bc2*bcdz*bz*cz**2 + abcz*bc2*bcdz*by*bz*cz**2 + 
+     -    abcz*ay*bc2*bcdy*bx**2*dy - abcz*ay*bc2*bcdx*bx*by*dy - 
+     -    abcz*ax*bc2*bcdy*bx*by*dy + abcz*ax*bc2*bcdx*by**2*dy - 
+     -    abcz*az*bc2*bcdx*bx*bz*dy - abcz*az*bc2*bcdy*by*bz*dy + 
+     -    abcz*ax*bc2*bcdx*bz**2*dy + abcz*ay*bc2*bcdy*bz**2*dy - 
+     -    2*abcz*ay*bc2*bcdy*bx*cx*dy + abcz*ay*bc2*bcdx*by*cx*dy + 
+     -    abcz*ax*bc2*bcdy*by*cx*dy + abcz*bc2*bcdy*bx*by*cx*dy - 
+     -    abcz*bc2*bcdx*by**2*cx*dy + abcz*az*bc2*bcdx*bz*cx*dy - 
+     -    abcz*bc2*bcdx*bz**2*cx*dy + abcz*ay*bc2*bcdy*cx**2*dy - 
+     -    abcz*bc2*bcdy*by*cx**2*dy + abcz*ay*bc2*bcdx*bx*cy*dy + 
+     -    abcz*ax*bc2*bcdy*bx*cy*dy - abcz*bc2*bcdy*bx**2*cy*dy - 
+     -    2*abcz*ax*bc2*bcdx*by*cy*dy + abcz*bc2*bcdx*bx*by*cy*dy + 
+     -    abcz*az*bc2*bcdy*bz*cy*dy - abcz*bc2*bcdy*bz**2*cy*dy - 
+     -    abcz*ay*bc2*bcdx*cx*cy*dy - abcz*ax*bc2*bcdy*cx*cy*dy + 
+     -    abcz*bc2*bcdy*bx*cx*cy*dy + abcz*bc2*bcdx*by*cx*cy*dy + 
+     -    abcz*ax*bc2*bcdx*cy**2*dy - abcz*bc2*bcdx*bx*cy**2*dy + 
+     -    abcz*az*bc2*bcdx*bx*cz*dy + abcz*az*bc2*bcdy*by*cz*dy - 
+     -    2*abcz*ax*bc2*bcdx*bz*cz*dy - 2*abcz*ay*bc2*bcdy*bz*cz*dy + 
+     -    abcz*bc2*bcdx*bx*bz*cz*dy + abcz*bc2*bcdy*by*bz*cz*dy - 
+     -    abcz*az*bc2*bcdx*cx*cz*dy + abcz*bc2*bcdx*bz*cx*cz*dy - 
+     -    abcz*az*bc2*bcdy*cy*cz*dy + abcz*bc2*bcdy*bz*cy*cz*dy + 
+     -    abcz*ax*bc2*bcdx*cz**2*dy + abcz*ay*bc2*bcdy*cz**2*dy - 
+     -    abcz*bc2*bcdx*bx*cz**2*dy - abcz*bc2*bcdy*by*cz**2*dy + 
+     -    abcz*ay*bc2*bcdz*bx**2*dz - abcz*ax*bc2*bcdz*bx*by*dz - 
+     -    abcz*az*bc2*bcdz*by*bz*dz + abcz*ay*bc2*bcdz*bz**2*dz - 
+     -    2*abcz*ay*bc2*bcdz*bx*cx*dz + abcz*ax*bc2*bcdz*by*cx*dz + 
+     -    abcz*bc2*bcdz*bx*by*cx*dz + abcz*ay*bc2*bcdz*cx**2*dz - 
+     -    abcz*bc2*bcdz*by*cx**2*dz + abcz*ax*bc2*bcdz*bx*cy*dz - 
+     -    abcz*bc2*bcdz*bx**2*cy*dz + abcz*az*bc2*bcdz*bz*cy*dz - 
+     -    abcz*bc2*bcdz*bz**2*cy*dz - abcz*ax*bc2*bcdz*cx*cy*dz + 
+     -    abcz*bc2*bcdz*bx*cx*cy*dz + abcz*az*bc2*bcdz*by*cz*dz - 
+     -    2*abcz*ay*bc2*bcdz*bz*cz*dz + abcz*bc2*bcdz*by*bz*cz*dz - 
+     -    abcz*az*bc2*bcdz*cy*cz*dz + abcz*bc2*bcdz*bz*cy*cz*dz + 
+     -    abcz*ay*bc2*bcdz*cz**2*dz - abcz*bc2*bcdz*by*cz**2*dz - 
+     -    abcy*(ax*bc2*bcdy**2*by + bc2*bcdy**2*bx*by - 
+     -       ax*bcdy**2*bcx*bx*by - bc2*bcdx*bcdy*by**2 + 
+     -       ax*bcdx*bcdy*bcx*by**2 + ax*bc2*bcdy*bcdz*bz + 
+     -       bc2*bcdy*bcdz*bx*bz - ax*bcdy*bcdz*bcx*bx*bz + 
+     -       ax*bc2*bcdy*bx*by*bz - ax*bc2*bcdx*by**2*bz - 
+     -       bc2*bcdx*bcdy*bz**2 + ax*bcdx*bcdy*bcx*bz**2 + 
+     -       ax*bc2*bcdz*bx*bz**2 - ax*bc2*bcdx*bz**3 - 
+     -       2*bc2*bcdy**2*by*cx + ax*bcdy**2*bcx*by*cx + 
+     -       bcdy**2*bcx*bx*by*cx - bcdx*bcdy*bcx*by**2*cx - 
+     -       2*bc2*bcdy*bcdz*bz*cx + ax*bcdy*bcdz*bcx*bz*cx + 
+     -       bcdy*bcdz*bcx*bx*bz*cx - ax*bc2*bcdy*by*bz*cx - 
+     -       bc2*bcdy*bx*by*bz*cx + bc2*bcdx*by**2*bz*cx - 
+     -       ax*bc2*bcdz*bz**2*cx - bcdx*bcdy*bcx*bz**2*cx - 
+     -       bc2*bcdz*bx*bz**2*cx + bc2*bcdx*bz**3*cx - 
+     -       bcdy**2*bcx*by*cx**2 - bcdy*bcdz*bcx*bz*cx**2 + 
+     -       bc2*bcdy*by*bz*cx**2 + bc2*bcdz*bz**2*cx**2 - 
+     -       ax*bc2*bcdy**2*cy + bc2*bcdy**2*bx*cy + 
+     -       ax*bcdy**2*bcx*bx*cy - bcdy**2*bcx*bx**2*cy + 
+     -       bc2*bcdx*bcdy*by*cy - 2*ax*bcdx*bcdy*bcx*by*cy + 
+     -       bcdx*bcdy*bcx*bx*by*cy + 2*ax*bc2*bcdx*by*bz*cy + 
+     -       bcdy*bcdz*bcx*by*bz*cy - bc2*bcdx*bx*by*bz*cy - 
+     -       bc2*bcdy*by**2*bz*cy - bcdy**2*bcx*bz**2*cy - 
+     -       bc2*bcdz*by*bz**2*cy - ax*bcdy**2*bcx*cx*cy + 
+     -       bcdy**2*bcx*bx*cx*cy + bcdx*bcdy*bcx*by*cx*cy - 
+     -       bc2*bcdx*by*bz*cx*cy + ax*bcdx*bcdy*bcx*cy**2 - 
+     -       bcdx*bcdy*bcx*bx*cy**2 - ax*bc2*bcdx*bz*cy**2 - 
+     -       bcdy*bcdz*bcx*bz*cy**2 + bc2*bcdx*bx*bz*cy**2 + 
+     -       bc2*bcdy*by*bz*cy**2 + bc2*bcdz*bz**2*cy**2 - 
+     -       ax*bc2*bcdy*bcdz*cz + bc2*bcdy*bcdz*bx*cz + 
+     -       ax*bcdy*bcdz*bcx*bx*cz - bcdy*bcdz*bcx*bx**2*cz - 
+     -       ax*bc2*bcdy*bx*by*cz + bc2*bcdy*bx**2*by*cz - 
+     -       bcdy*bcdz*bcx*by**2*cz + bc2*bcdy*by**3*cz + 
+     -       bc2*bcdx*bcdy*bz*cz - 2*ax*bcdx*bcdy*bcx*bz*cz - 
+     -       ax*bc2*bcdz*bx*bz*cz + bcdx*bcdy*bcx*bx*bz*cz + 
+     -       bc2*bcdz*bx**2*bz*cz + bcdy**2*bcx*by*bz*cz + 
+     -       bc2*bcdz*by**2*bz*cz + 2*ax*bc2*bcdx*bz**2*cz - 
+     -       bc2*bcdx*bx*bz**2*cz - ax*bcdy*bcdz*bcx*cx*cz + 
+     -       bcdy*bcdz*bcx*bx*cx*cz + ax*bc2*bcdy*by*cx*cz - 
+     -       bc2*bcdy*bx*by*cx*cz + ax*bc2*bcdz*bz*cx*cz + 
+     -       bcdx*bcdy*bcx*bz*cx*cz - bc2*bcdz*bx*bz*cx*cz - 
+     -       bc2*bcdx*bz**2*cx*cz + bcdy*bcdz*bcx*by*cy*cz - 
+     -       bc2*bcdy*by**2*cy*cz + bcdy**2*bcx*bz*cy*cz - 
+     -       bc2*bcdz*by*bz*cy*cz + ax*bcdx*bcdy*bcx*cz**2 - 
+     -       bcdx*bcdy*bcx*bx*cz**2 - bcdy**2*bcx*by*cz**2 - 
+     -       ax*bc2*bcdx*bz*cz**2 + bc2*bcdx*bx*bz*cz**2 - 
+     -       ax*bc2*bcdy*bx*bz*dy + ax*bc2*bcdy*bz*cx*dy + 
+     -       bc2*bcdy*bx*bz*cx*dy - bc2*bcdy*bz*cx**2*dy + 
+     -       bc2*bcdy*by*bz*cy*dy - bc2*bcdy*bz*cy**2*dy + 
+     -       ax*bc2*bcdy*bx*cz*dy - bc2*bcdy*bx**2*cz*dy - 
+     -       bc2*bcdy*by**2*cz*dy - ax*bc2*bcdy*cx*cz*dy + 
+     -       bc2*bcdy*bx*cx*cz*dy + bc2*bcdy*by*cy*cz*dy + 
+     -       az*(bcdy*bcx*(bcdz*(bcx**2 + bcy**2) - 
+     -             (abx*bcdx + bcdy*bcy)*bcz) + 
+     -          bc2*(bcdy*(-2*abx*bcdz - by**3 + bcdx*bz - by*cx**2 + 
+     -                2*by**2*cy - by*cy**2 - bcdx*cz + 
+     -                2*bx*cx*(by - dy) + by**2*dy + cx**2*dy - 
+     -                2*by*cy*dy + cy**2*dy + bx**2*(-by + dy)) - 
+     -             (bcdz*(bcx**2 + bcy**2) - abx*bcdx*bcz)*(bz - dz)))
+     -        + ay*(bcdy*bcx*
+     -           (-(bcy*(abx*bcdx + bcdz*bcz)) + bcdy*(bcx**2 + bcz**2))
+     -            + bc2*(-2*abx*bcdy**2 + 
+     -             bcdy*bcy*(bcdx + bcz*(by - dy)) + 
+     -             bcy*(abx*bcdx + bcdz*bcz)*(bz - dz))) + 
+     -       ax*bc2*bcdx*by**2*dz - ax*bc2*bcdz*bx*bz*dz + 
+     -       ax*bc2*bcdx*bz**2*dz - bc2*bcdx*by**2*cx*dz + 
+     -       ax*bc2*bcdz*bz*cx*dz + bc2*bcdz*bx*bz*cx*dz - 
+     -       bc2*bcdx*bz**2*cx*dz - bc2*bcdz*bz*cx**2*dz - 
+     -       2*ax*bc2*bcdx*by*cy*dz + bc2*bcdx*bx*by*cy*dz + 
+     -       bc2*bcdz*by*bz*cy*dz + bc2*bcdx*by*cx*cy*dz + 
+     -       ax*bc2*bcdx*cy**2*dz - bc2*bcdx*bx*cy**2*dz - 
+     -       bc2*bcdz*bz*cy**2*dz + ax*bc2*bcdz*bx*cz*dz - 
+     -       bc2*bcdz*bx**2*cz*dz - bc2*bcdz*by**2*cz*dz - 
+     -       2*ax*bc2*bcdx*bz*cz*dz + bc2*bcdx*bx*bz*cz*dz - 
+     -       ax*bc2*bcdz*cx*cz*dz + bc2*bcdz*bx*cx*cz*dz + 
+     -       bc2*bcdx*bz*cx*cz*dz + bc2*bcdz*by*cy*cz*dz + 
+     -       ax*bc2*bcdx*cz**2*dz - bc2*bcdx*bx*cz**2*dz) - 
+     -    abcx*bcdx*(ax*bc2*bcdy*by + bc2*bcdy*bx*by - 
+     -       ax*bcdy*bcx*bx*by - bc2*bcdx*by**2 + ax*bcdx*bcx*by**2 + 
+     -       ax*bc2*bcdz*bz + bc2*bcdz*bx*bz - ax*bcdz*bcx*bx*bz - 
+     -       bc2*bcdx*bz**2 + ax*bcdx*bcx*bz**2 - 2*bc2*bcdy*by*cx + 
+     -       ax*bcdy*bcx*by*cx + bcdy*bcx*bx*by*cx - 
+     -       bcdx*bcx*by**2*cx - 2*bc2*bcdz*bz*cx + ax*bcdz*bcx*bz*cx + 
+     -       bcdz*bcx*bx*bz*cx - bcdx*bcx*bz**2*cx - 
+     -       bcdy*bcx*by*cx**2 - bcdz*bcx*bz*cx**2 - ax*bc2*bcdy*cy + 
+     -       bc2*bcdy*bx*cy + ax*bcdy*bcx*bx*cy - bcdy*bcx*bx**2*cy + 
+     -       bc2*bcdx*by*cy - 2*ax*bcdx*bcx*by*cy + bcdx*bcx*bx*by*cy + 
+     -       ax*bc2*bx*bz*cy - bc2*bx**2*bz*cy + bcdz*bcx*by*bz*cy - 
+     -       bc2*by**2*bz*cy - bcdy*bcx*bz**2*cy - bc2*bz**3*cy - 
+     -       ax*bcdy*bcx*cx*cy + bcdy*bcx*bx*cx*cy + 
+     -       bcdx*bcx*by*cx*cy - ax*bc2*bz*cx*cy + bc2*bx*bz*cx*cy + 
+     -       ax*bcdx*bcx*cy**2 - bcdx*bcx*bx*cy**2 - 
+     -       bcdz*bcx*bz*cy**2 + bc2*by*bz*cy**2 - ax*bc2*bcdz*cz + 
+     -       bc2*bcdz*bx*cz + ax*bcdz*bcx*bx*cz - bcdz*bcx*bx**2*cz - 
+     -       ax*bc2*bx*by*cz + bc2*bx**2*by*cz - bcdz*bcx*by**2*cz + 
+     -       bc2*by**3*cz + bc2*bcdx*bz*cz - 2*ax*bcdx*bcx*bz*cz + 
+     -       bcdx*bcx*bx*bz*cz + bcdy*bcx*by*bz*cz + bc2*by*bz**2*cz - 
+     -       ax*bcdz*bcx*cx*cz + bcdz*bcx*bx*cx*cz + ax*bc2*by*cx*cz - 
+     -       bc2*bx*by*cx*cz + bcdx*bcx*bz*cx*cz + bcdz*bcx*by*cy*cz - 
+     -       bc2*by**2*cy*cz + bcdy*bcx*bz*cy*cz + bc2*bz**2*cy*cz + 
+     -       ax*bcdx*bcx*cz**2 - bcdx*bcx*bx*cz**2 - 
+     -       bcdy*bcx*by*cz**2 - bc2*by*bz*cz**2 - ax*bc2*bx*bz*dy + 
+     -       ax*bc2*bz*cx*dy + bc2*bx*bz*cx*dy - bc2*bz*cx**2*dy + 
+     -       bc2*by*bz*cy*dy - bc2*bz*cy**2*dy + ax*bc2*bx*cz*dy - 
+     -       bc2*bx**2*cz*dy - bc2*by**2*cz*dy - ax*bc2*cx*cz*dy + 
+     -       bc2*bx*cx*cz*dy + bc2*by*cy*cz*dy + ax*bc2*bx*by*dz - 
+     -       ax*bc2*by*cx*dz - bc2*bx*by*cx*dz + bc2*by*cx**2*dz - 
+     -       ax*bc2*bx*cy*dz + bc2*bx**2*cy*dz + bc2*bz**2*cy*dz + 
+     -       ax*bc2*cx*cy*dz - bc2*bx*cx*cy*dz - bc2*by*bz*cz*dz - 
+     -       bc2*bz*cy*cz*dz + bc2*by*cz**2*dz + 
+     -       az*(bcx*(bcdz*(bcx**2 + bcy**2) - 
+     -             (abx*bcdx + bcdy*bcy)*bcz) + 
+     -          bc2*(-2*abx*bcdz - by**3 + bcdx*bz - by*bz**2 - 
+     -             by*cx**2 + 2*by**2*cy + bz**2*cy - by*cy**2 - 
+     -             bcdx*cz + by*bz*cz - bz*cy*cz + 2*bx*cx*(by - dy) + 
+     -             by**2*dy + cx**2*dy - 2*by*cy*dy + cy**2*dy + 
+     -             bx**2*(-by + dy) + by*bz*dz - bz*cy*dz - by*cz*dz + 
+     -             cy*cz*dz)) + 
+     -       ay*(bcx*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(bcdx*(-bx + cx) + bcdz*(-bz + cz))) + 
+     -          bc2*(-2*bcdy*bx + bcdx*by + bx**2*bz + by**2*bz + 
+     -             bz**3 + 2*bcdy*cx - 2*bx*bz*cx + bz*cx**2 - 
+     -             bcdx*cy - by*bz*cy - by**2*cz - 2*bz**2*cz + 
+     -             by*cy*cz + bz*cz**2 - by*bz*dy + bz*cy*dy + 
+     -             by*cz*dy - cy*cz*dy - bx**2*dz - bz**2*dz + 
+     -             2*bx*cx*dz - cx**2*dz + 2*bz*cz*dz - cz**2*dz))))/
+     -  (bc2**1.5*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**2/
+     -       bc2))
+
+
+       dcy= (-(abcz*ay*bc2*bcdx*bcdz*bx) - abcz*ax*bc2*bcdy*bcdz*bx + 
+     -    abz*ay*bc2*bcdx*bcdy*bx**2 + abz*az*bc2*bcdx*bcdz*bx**2 + 
+     -    abcz*bc2*bcdy*bcdz*bx**2 - abx*ay*bc2*bcdy*bcdz*bx**2 - 
+     -    abx*az*bc2*bcdz**2*bx**2 - abcz*ay*bcdy*bcdz*bcy*bx**2 - 
+     -    abcz*az*bcdz**2*bcy*bx**2 + abcz*ay*bc2*bcdy*bx**3 + 
+     -    2*abcz*ax*bc2*bcdx*bcdz*by + 2*abcz*az*bc2*bcdz**2*by - 
+     -    abz*ay*bc2*bcdx**2*bx*by - abz*ax*bc2*bcdx*bcdy*bx*by - 
+     -    abcz*bc2*bcdx*bcdz*bx*by + abx*ay*bc2*bcdx*bcdz*bx*by + 
+     -    abx*ax*bc2*bcdy*bcdz*bx*by + abcz*ay*bcdx*bcdz*bcy*bx*by + 
+     -    abcz*ax*bcdy*bcdz*bcy*bx*by - abcz*ay*bc2*bcdx*bx**2*by - 
+     -    abcz*ax*bc2*bcdy*bx**2*by + abz*ax*bc2*bcdx**2*by**2 - 
+     -    abx*ax*bc2*bcdx*bcdz*by**2 + abz*az*bc2*bcdx*bcdz*by**2 - 
+     -    abx*az*bc2*bcdz**2*by**2 - abcz*ax*bcdx*bcdz*bcy*by**2 - 
+     -    abcz*az*bcdz**2*bcy*by**2 + abcz*ax*bc2*bcdx*bx*by**2 - 
+     -    abcz*az*bc2*bcdy*bcdz*bz - abcz*ay*bc2*bcdz**2*bz - 
+     -    abz*az*bc2*bcdx**2*bx*bz - abz*ax*bc2*bcdx*bcdz*bx*bz + 
+     -    abx*az*bc2*bcdx*bcdz*bx*bz + abx*ax*bc2*bcdz**2*bx*bz + 
+     -    abcz*az*bcdx*bcdz*bcy*bx*bz + abcz*ax*bcdz**2*bcy*bx*bz - 
+     -    abcz*az*bc2*bcdx*bx**2*bz - abz*az*bc2*bcdx*bcdy*by*bz - 
+     -    abz*ay*bc2*bcdx*bcdz*by*bz + abx*az*bc2*bcdy*bcdz*by*bz - 
+     -    abcz*bc2*bcdz**2*by*bz + abx*ay*bc2*bcdz**2*by*bz + 
+     -    abcz*az*bcdy*bcdz*bcy*by*bz + abcz*ay*bcdz**2*bcy*by*bz - 
+     -    abcz*az*bc2*bcdy*bx*by*bz - abcz*ay*bc2*bcdz*bx*by*bz + 
+     -    abcz*ax*bc2*bcdz*by**2*bz + abz*ax*bc2*bcdx**2*bz**2 + 
+     -    abz*ay*bc2*bcdx*bcdy*bz**2 - abx*ax*bc2*bcdx*bcdz*bz**2 + 
+     -    abcz*bc2*bcdy*bcdz*bz**2 - abx*ay*bc2*bcdy*bcdz*bz**2 - 
+     -    abcz*ax*bcdx*bcdz*bcy*bz**2 - abcz*ay*bcdy*bcdz*bcy*bz**2 + 
+     -    abcz*ax*bc2*bcdx*bx*bz**2 + abcz*ay*bc2*bcdy*bx*bz**2 - 
+     -    abcz*az*bc2*bcdz*bx*bz**2 + abcz*ax*bc2*bcdz*bz**3 + 
+     -    abcz*ay*bc2*bcdx*bcdz*cx + abcz*ax*bc2*bcdy*bcdz*cx - 
+     -    2*abz*ay*bc2*bcdx*bcdy*bx*cx - 
+     -    2*abz*az*bc2*bcdx*bcdz*bx*cx - abcz*bc2*bcdy*bcdz*bx*cx + 
+     -    2*abx*ay*bc2*bcdy*bcdz*bx*cx + 2*abx*az*bc2*bcdz**2*bx*cx + 
+     -    2*abcz*ay*bcdy*bcdz*bcy*bx*cx + 
+     -    2*abcz*az*bcdz**2*bcy*bx*cx - 2*abcz*ay*bc2*bcdy*bx**2*cx + 
+     -    abz*ay*bc2*bcdx**2*by*cx + abz*ax*bc2*bcdx*bcdy*by*cx - 
+     -    abcz*bc2*bcdx*bcdz*by*cx - abx*ay*bc2*bcdx*bcdz*by*cx - 
+     -    abx*ax*bc2*bcdy*bcdz*by*cx - abcz*ay*bcdx*bcdz*bcy*by*cx - 
+     -    abcz*ax*bcdy*bcdz*bcy*by*cx + abcz*ay*bc2*bcdx*bx*by*cx + 
+     -    abcz*ax*bc2*bcdy*bx*by*cx + abz*bc2*bcdx*bcdy*bx*by*cx - 
+     -    abx*bc2*bcdy*bcdz*bx*by*cx - abcz*bcdy*bcdz*bcy*bx*by*cx + 
+     -    abcz*bc2*bcdy*bx**2*by*cx - abz*bc2*bcdx**2*by**2*cx + 
+     -    abx*bc2*bcdx*bcdz*by**2*cx + abcz*bcdx*bcdz*bcy*by**2*cx - 
+     -    abcz*bc2*bcdx*bx*by**2*cx + abz*az*bc2*bcdx**2*bz*cx + 
+     -    abz*ax*bc2*bcdx*bcdz*bz*cx - abx*az*bc2*bcdx*bcdz*bz*cx - 
+     -    abx*ax*bc2*bcdz**2*bz*cx - abcz*az*bcdx*bcdz*bcy*bz*cx - 
+     -    abcz*ax*bcdz**2*bcy*bz*cx + abcz*az*bc2*bcdx*bx*bz*cx + 
+     -    abz*bc2*bcdx*bcdz*bx*bz*cx - abx*bc2*bcdz**2*bx*bz*cx - 
+     -    abcz*bcdz**2*bcy*bx*bz*cx + abcz*ay*bc2*bcdz*by*bz*cx - 
+     -    abcz*bc2*bcdz*by**2*bz*cx - abz*bc2*bcdx**2*bz**2*cx + 
+     -    abcz*az*bc2*bcdz*bz**2*cx + abx*bc2*bcdx*bcdz*bz**2*cx + 
+     -    abcz*bcdx*bcdz*bcy*bz**2*cx - abcz*bc2*bcdx*bx*bz**2*cx - 
+     -    abcz*bc2*bcdz*bz**3*cx + abz*ay*bc2*bcdx*bcdy*cx**2 + 
+     -    abz*az*bc2*bcdx*bcdz*cx**2 - abx*ay*bc2*bcdy*bcdz*cx**2 - 
+     -    abx*az*bc2*bcdz**2*cx**2 - abcz*ay*bcdy*bcdz*bcy*cx**2 - 
+     -    abcz*az*bcdz**2*bcy*cx**2 + abcz*ay*bc2*bcdy*bx*cx**2 - 
+     -    abz*bc2*bcdx*bcdy*by*cx**2 + abx*bc2*bcdy*bcdz*by*cx**2 + 
+     -    abcz*bcdy*bcdz*bcy*by*cx**2 - abcz*bc2*bcdy*bx*by*cx**2 - 
+     -    abz*bc2*bcdx*bcdz*bz*cx**2 + abx*bc2*bcdz**2*bz*cx**2 + 
+     -    abcz*bcdz**2*bcy*bz*cx**2 - 2*abcz*ax*bc2*bcdx*bcdz*cy - 
+     -    2*abcz*az*bc2*bcdz**2*cy + abz*ay*bc2*bcdx**2*bx*cy + 
+     -    abz*ax*bc2*bcdx*bcdy*bx*cy + 2*abcz*bc2*bcdx*bcdz*bx*cy - 
+     -    abx*ay*bc2*bcdx*bcdz*bx*cy - abx*ax*bc2*bcdy*bcdz*bx*cy - 
+     -    abcz*ay*bcdx*bcdz*bcy*bx*cy - abcz*ax*bcdy*bcdz*bcy*bx*cy + 
+     -    abcz*ay*bc2*bcdx*bx**2*cy + abcz*ax*bc2*bcdy*bx**2*cy - 
+     -    abz*bc2*bcdx*bcdy*bx**2*cy + abx*bc2*bcdy*bcdz*bx**2*cy + 
+     -    abcz*bcdy*bcdz*bcy*bx**2*cy - abcz*bc2*bcdy*bx**3*cy - 
+     -    2*abz*ax*bc2*bcdx**2*by*cy + 2*abx*ax*bc2*bcdx*bcdz*by*cy - 
+     -    2*abz*az*bc2*bcdx*bcdz*by*cy + 2*abx*az*bc2*bcdz**2*by*cy + 
+     -    2*abcz*ax*bcdx*bcdz*bcy*by*cy + 
+     -    2*abcz*az*bcdz**2*bcy*by*cy - 2*abcz*ax*bc2*bcdx*bx*by*cy + 
+     -    abz*bc2*bcdx**2*bx*by*cy - abx*bc2*bcdx*bcdz*bx*by*cy - 
+     -    abcz*bcdx*bcdz*bcy*bx*by*cy + abcz*bc2*bcdx*bx**2*by*cy + 
+     -    abz*az*bc2*bcdx*bcdy*bz*cy + abz*ay*bc2*bcdx*bcdz*bz*cy - 
+     -    abx*az*bc2*bcdy*bcdz*bz*cy + 2*abcz*bc2*bcdz**2*bz*cy - 
+     -    abx*ay*bc2*bcdz**2*bz*cy - abcz*az*bcdy*bcdz*bcy*bz*cy - 
+     -    abcz*ay*bcdz**2*bcy*bz*cy + abcz*az*bc2*bcdy*bx*bz*cy + 
+     -    abcz*ay*bc2*bcdz*bx*bz*cy - 2*abcz*ax*bc2*bcdz*by*bz*cy + 
+     -    abz*bc2*bcdx*bcdz*by*bz*cy - abx*bc2*bcdz**2*by*bz*cy - 
+     -    abcz*bcdz**2*bcy*by*bz*cy + abcz*bc2*bcdz*bx*by*bz*cy - 
+     -    abz*bc2*bcdx*bcdy*bz**2*cy + abx*bc2*bcdy*bcdz*bz**2*cy + 
+     -    abcz*bcdy*bcdz*bcy*bz**2*cy - abcz*bc2*bcdy*bx*bz**2*cy - 
+     -    abz*ay*bc2*bcdx**2*cx*cy - abz*ax*bc2*bcdx*bcdy*cx*cy + 
+     -    abx*ay*bc2*bcdx*bcdz*cx*cy + abx*ax*bc2*bcdy*bcdz*cx*cy + 
+     -    abcz*ay*bcdx*bcdz*bcy*cx*cy + abcz*ax*bcdy*bcdz*bcy*cx*cy - 
+     -    abcz*ay*bc2*bcdx*bx*cx*cy - abcz*ax*bc2*bcdy*bx*cx*cy + 
+     -    abz*bc2*bcdx*bcdy*bx*cx*cy - abx*bc2*bcdy*bcdz*bx*cx*cy - 
+     -    abcz*bcdy*bcdz*bcy*bx*cx*cy + abcz*bc2*bcdy*bx**2*cx*cy + 
+     -    abz*bc2*bcdx**2*by*cx*cy - abx*bc2*bcdx*bcdz*by*cx*cy - 
+     -    abcz*bcdx*bcdz*bcy*by*cx*cy + abcz*bc2*bcdx*bx*by*cx*cy - 
+     -    abcz*ay*bc2*bcdz*bz*cx*cy + abcz*bc2*bcdz*by*bz*cx*cy + 
+     -    abz*ax*bc2*bcdx**2*cy**2 - abx*ax*bc2*bcdx*bcdz*cy**2 + 
+     -    abz*az*bc2*bcdx*bcdz*cy**2 - abx*az*bc2*bcdz**2*cy**2 - 
+     -    abcz*ax*bcdx*bcdz*bcy*cy**2 - abcz*az*bcdz**2*bcy*cy**2 + 
+     -    abcz*ax*bc2*bcdx*bx*cy**2 - abz*bc2*bcdx**2*bx*cy**2 + 
+     -    abx*bc2*bcdx*bcdz*bx*cy**2 + abcz*bcdx*bcdz*bcy*bx*cy**2 - 
+     -    abcz*bc2*bcdx*bx**2*cy**2 + abcz*ax*bc2*bcdz*bz*cy**2 - 
+     -    abz*bc2*bcdx*bcdz*bz*cy**2 + abx*bc2*bcdz**2*bz*cy**2 + 
+     -    abcz*bcdz**2*bcy*bz*cy**2 - abcz*bc2*bcdz*bx*bz*cy**2 + 
+     -    abcz*az*bc2*bcdy*bcdz*cz + abcz*ay*bc2*bcdz**2*cz + 
+     -    abz*az*bc2*bcdx**2*bx*cz + abz*ax*bc2*bcdx*bcdz*bx*cz - 
+     -    abx*az*bc2*bcdx*bcdz*bx*cz - abx*ax*bc2*bcdz**2*bx*cz - 
+     -    abcz*az*bcdx*bcdz*bcy*bx*cz - abcz*ax*bcdz**2*bcy*bx*cz + 
+     -    abcz*az*bc2*bcdx*bx**2*cz - abz*bc2*bcdx*bcdz*bx**2*cz + 
+     -    abx*bc2*bcdz**2*bx**2*cz + abcz*bcdz**2*bcy*bx**2*cz + 
+     -    abz*az*bc2*bcdx*bcdy*by*cz + abz*ay*bc2*bcdx*bcdz*by*cz - 
+     -    abx*az*bc2*bcdy*bcdz*by*cz - abcz*bc2*bcdz**2*by*cz - 
+     -    abx*ay*bc2*bcdz**2*by*cz - abcz*az*bcdy*bcdz*bcy*by*cz - 
+     -    abcz*ay*bcdz**2*bcy*by*cz + abcz*az*bc2*bcdy*bx*by*cz - 
+     -    abz*bc2*bcdx*bcdz*by**2*cz + abx*bc2*bcdz**2*by**2*cz + 
+     -    abcz*bcdz**2*bcy*by**2*cz - 2*abz*ax*bc2*bcdx**2*bz*cz - 
+     -    2*abz*ay*bc2*bcdx*bcdy*bz*cz + 
+     -    2*abx*ax*bc2*bcdx*bcdz*bz*cz - abcz*bc2*bcdy*bcdz*bz*cz + 
+     -    2*abx*ay*bc2*bcdy*bcdz*bz*cz + 
+     -    2*abcz*ax*bcdx*bcdz*bcy*bz*cz + 
+     -    2*abcz*ay*bcdy*bcdz*bcy*bz*cz - 
+     -    2*abcz*ax*bc2*bcdx*bx*bz*cz + abz*bc2*bcdx**2*bx*bz*cz - 
+     -    2*abcz*ay*bc2*bcdy*bx*bz*cz + abcz*az*bc2*bcdz*bx*bz*cz - 
+     -    abx*bc2*bcdx*bcdz*bx*bz*cz - abcz*bcdx*bcdz*bcy*bx*bz*cz + 
+     -    abcz*bc2*bcdx*bx**2*bz*cz + abz*bc2*bcdx*bcdy*by*bz*cz - 
+     -    abx*bc2*bcdy*bcdz*by*bz*cz - abcz*bcdy*bcdz*bcy*by*bz*cz + 
+     -    abcz*bc2*bcdy*bx*by*bz*cz - 2*abcz*ax*bc2*bcdz*bz**2*cz + 
+     -    abcz*bc2*bcdz*bx*bz**2*cz - abz*az*bc2*bcdx**2*cx*cz - 
+     -    abz*ax*bc2*bcdx*bcdz*cx*cz + abx*az*bc2*bcdx*bcdz*cx*cz + 
+     -    abx*ax*bc2*bcdz**2*cx*cz + abcz*az*bcdx*bcdz*bcy*cx*cz + 
+     -    abcz*ax*bcdz**2*bcy*cx*cz - abcz*az*bc2*bcdx*bx*cx*cz + 
+     -    abz*bc2*bcdx*bcdz*bx*cx*cz - abx*bc2*bcdz**2*bx*cx*cz - 
+     -    abcz*bcdz**2*bcy*bx*cx*cz + abz*bc2*bcdx**2*bz*cx*cz - 
+     -    abcz*az*bc2*bcdz*bz*cx*cz - abx*bc2*bcdx*bcdz*bz*cx*cz - 
+     -    abcz*bcdx*bcdz*bcy*bz*cx*cz + abcz*bc2*bcdx*bx*bz*cx*cz + 
+     -    abcz*bc2*bcdz*bz**2*cx*cz - abz*az*bc2*bcdx*bcdy*cy*cz - 
+     -    abz*ay*bc2*bcdx*bcdz*cy*cz + abx*az*bc2*bcdy*bcdz*cy*cz + 
+     -    abx*ay*bc2*bcdz**2*cy*cz + abcz*az*bcdy*bcdz*bcy*cy*cz + 
+     -    abcz*ay*bcdz**2*bcy*cy*cz - abcz*az*bc2*bcdy*bx*cy*cz + 
+     -    abz*bc2*bcdx*bcdz*by*cy*cz - abx*bc2*bcdz**2*by*cy*cz - 
+     -    abcz*bcdz**2*bcy*by*cy*cz + abz*bc2*bcdx*bcdy*bz*cy*cz - 
+     -    abx*bc2*bcdy*bcdz*bz*cy*cz - abcz*bcdy*bcdz*bcy*bz*cy*cz + 
+     -    abcz*bc2*bcdy*bx*bz*cy*cz + abz*ax*bc2*bcdx**2*cz**2 + 
+     -    abz*ay*bc2*bcdx*bcdy*cz**2 - abx*ax*bc2*bcdx*bcdz*cz**2 - 
+     -    abx*ay*bc2*bcdy*bcdz*cz**2 - abcz*ax*bcdx*bcdz*bcy*cz**2 - 
+     -    abcz*ay*bcdy*bcdz*bcy*cz**2 + abcz*ax*bc2*bcdx*bx*cz**2 - 
+     -    abz*bc2*bcdx**2*bx*cz**2 + abcz*ay*bc2*bcdy*bx*cz**2 + 
+     -    abx*bc2*bcdx*bcdz*bx*cz**2 + abcz*bcdx*bcdz*bcy*bx*cz**2 - 
+     -    abcz*bc2*bcdx*bx**2*cz**2 - abz*bc2*bcdx*bcdy*by*cz**2 + 
+     -    abx*bc2*bcdy*bcdz*by*cz**2 + abcz*bcdy*bcdz*bcy*by*cz**2 - 
+     -    abcz*bc2*bcdy*bx*by*cz**2 + abcz*ax*bc2*bcdz*bz*cz**2 - 
+     -    abcz*bc2*bcdz*bx*bz*cz**2 - abcz*ay*bc2*bcdy*bx**2*dx + 
+     -    abcz*ay*bc2*bcdx*bx*by*dx + abcz*ax*bc2*bcdy*bx*by*dx - 
+     -    abcz*ax*bc2*bcdx*by**2*dx + abcz*az*bc2*bcdx*bx*bz*dx + 
+     -    abcz*az*bc2*bcdy*by*bz*dx - abcz*ax*bc2*bcdx*bz**2*dx - 
+     -    abcz*ay*bc2*bcdy*bz**2*dx + 2*abcz*ay*bc2*bcdy*bx*cx*dx - 
+     -    abcz*ay*bc2*bcdx*by*cx*dx - abcz*ax*bc2*bcdy*by*cx*dx - 
+     -    abcz*bc2*bcdy*bx*by*cx*dx + abcz*bc2*bcdx*by**2*cx*dx - 
+     -    abcz*az*bc2*bcdx*bz*cx*dx + abcz*bc2*bcdx*bz**2*cx*dx - 
+     -    abcz*ay*bc2*bcdy*cx**2*dx + abcz*bc2*bcdy*by*cx**2*dx - 
+     -    abcz*ay*bc2*bcdx*bx*cy*dx - abcz*ax*bc2*bcdy*bx*cy*dx + 
+     -    abcz*bc2*bcdy*bx**2*cy*dx + 2*abcz*ax*bc2*bcdx*by*cy*dx - 
+     -    abcz*bc2*bcdx*bx*by*cy*dx - abcz*az*bc2*bcdy*bz*cy*dx + 
+     -    abcz*bc2*bcdy*bz**2*cy*dx + abcz*ay*bc2*bcdx*cx*cy*dx + 
+     -    abcz*ax*bc2*bcdy*cx*cy*dx - abcz*bc2*bcdy*bx*cx*cy*dx - 
+     -    abcz*bc2*bcdx*by*cx*cy*dx - abcz*ax*bc2*bcdx*cy**2*dx + 
+     -    abcz*bc2*bcdx*bx*cy**2*dx - abcz*az*bc2*bcdx*bx*cz*dx - 
+     -    abcz*az*bc2*bcdy*by*cz*dx + 2*abcz*ax*bc2*bcdx*bz*cz*dx + 
+     -    2*abcz*ay*bc2*bcdy*bz*cz*dx - abcz*bc2*bcdx*bx*bz*cz*dx - 
+     -    abcz*bc2*bcdy*by*bz*cz*dx + abcz*az*bc2*bcdx*cx*cz*dx - 
+     -    abcz*bc2*bcdx*bz*cx*cz*dx + abcz*az*bc2*bcdy*cy*cz*dx - 
+     -    abcz*bc2*bcdy*bz*cy*cz*dx - abcz*ax*bc2*bcdx*cz**2*dx - 
+     -    abcz*ay*bc2*bcdy*cz**2*dx + abcz*bc2*bcdx*bx*cz**2*dx + 
+     -    abcz*bc2*bcdy*by*cz**2*dx + abcz*ay*bc2*bcdz*bx*by*dz - 
+     -    abcz*ax*bc2*bcdz*by**2*dz + abcz*az*bc2*bcdz*bx*bz*dz - 
+     -    abcz*ax*bc2*bcdz*bz**2*dz - abcz*ay*bc2*bcdz*by*cx*dz + 
+     -    abcz*bc2*bcdz*by**2*cx*dz - abcz*az*bc2*bcdz*bz*cx*dz + 
+     -    abcz*bc2*bcdz*bz**2*cx*dz - abcz*ay*bc2*bcdz*bx*cy*dz + 
+     -    2*abcz*ax*bc2*bcdz*by*cy*dz - abcz*bc2*bcdz*bx*by*cy*dz + 
+     -    abcz*ay*bc2*bcdz*cx*cy*dz - abcz*bc2*bcdz*by*cx*cy*dz - 
+     -    abcz*ax*bc2*bcdz*cy**2*dz + abcz*bc2*bcdz*bx*cy**2*dz - 
+     -    abcz*az*bc2*bcdz*bx*cz*dz + 2*abcz*ax*bc2*bcdz*bz*cz*dz - 
+     -    abcz*bc2*bcdz*bx*bz*cz*dz + abcz*az*bc2*bcdz*cx*cz*dz - 
+     -    abcz*bc2*bcdz*bz*cx*cz*dz - abcz*ax*bc2*bcdz*cz**2*dz + 
+     -    abcz*bc2*bcdz*bx*cz**2*dz - 
+     -    abcx*(-(bc2*bcdx*bcdy*bx**2) + az*bcdx*bcdz*bcy*bx**2 + 
+     -       az*bc2*bcdx*bx**3 - 2*az*bc2*bcdx*bcdz*by + 
+     -       bc2*bcdx**2*bx*by + az*bcdx*bcdz*bcy*by**2 + 
+     -       az*bc2*bcdx*bx*by**2 + az*bc2*bcdx*bcdy*bz - 
+     -       az*bcdx**2*bcy*bx*bz + az*bc2*bcdz*bx**2*bz + 
+     -       bc2*bcdx*bcdz*by*bz - az*bcdx*bcdy*bcy*by*bz + 
+     -       az*bc2*bcdz*by**2*bz - bc2*bcdx*bcdy*bz**2 - 
+     -       az*bc2*bcdy*by*bz**2 + bc2*bcdx*bcdy*bx*cx - 
+     -       2*az*bcdx*bcdz*bcy*bx*cx - 2*az*bc2*bcdx*bx**2*cx + 
+     -       bc2*bcdx**2*by*cx + bcdx*bcdy*bcy*bx*by*cx - 
+     -       bcdx**2*bcy*by**2*cx + az*bcdx**2*bcy*bz*cx - 
+     -       2*az*bc2*bcdz*bx*bz*cx + bcdx*bcdz*bcy*bx*bz*cx + 
+     -       bc2*bcdx*bx**2*bz*cx + bc2*bcdy*bx*by*bz*cx - 
+     -       bcdx**2*bcy*bz**2*cx + bc2*bcdz*bx*bz**2*cx + 
+     -       az*bcdx*bcdz*bcy*cx**2 + az*bc2*bcdx*bx*cx**2 - 
+     -       bcdx*bcdy*bcy*by*cx**2 + az*bc2*bcdz*bz*cx**2 - 
+     -       bcdx*bcdz*bcy*bz*cx**2 - bc2*bcdx*bx*bz*cx**2 - 
+     -       bc2*bcdy*by*bz*cx**2 - bc2*bcdz*bz**2*cx**2 + 
+     -       2*az*bc2*bcdx*bcdz*cy - 2*bc2*bcdx**2*bx*cy - 
+     -       bcdx*bcdy*bcy*bx**2*cy - 2*az*bcdx*bcdz*bcy*by*cy - 
+     -       2*az*bc2*bcdx*bx*by*cy + bcdx**2*bcy*bx*by*cy - 
+     -       2*bc2*bcdx*bcdz*bz*cy + az*bcdx*bcdy*bcy*bz*cy - 
+     -       bc2*bcdy*bx**2*bz*cy - 2*az*bc2*bcdz*by*bz*cy + 
+     -       bcdx*bcdz*bcy*by*bz*cy + bc2*bcdx*bx*by*bz*cy + 
+     -       az*bc2*bcdy*bz**2*cy - bcdx*bcdy*bcy*bz**2*cy + 
+     -       bc2*bcdz*by*bz**2*cy - bc2*bcdy*bz**3*cy + 
+     -       bcdx*bcdy*bcy*bx*cx*cy + bcdx**2*bcy*by*cx*cy + 
+     -       bc2*bcdy*bx*bz*cx*cy + az*bcdx*bcdz*bcy*cy**2 + 
+     -       az*bc2*bcdx*bx*cy**2 - bcdx**2*bcy*bx*cy**2 + 
+     -       az*bc2*bcdz*bz*cy**2 - bcdx*bcdz*bcy*bz*cy**2 - 
+     -       bc2*bcdx*bx*bz*cy**2 - bc2*bcdz*bz**2*cy**2 - 
+     -       az*bc2*bcdx*bcdy*cz + az*bcdx**2*bcy*bx*cz - 
+     -       bcdx*bcdz*bcy*bx**2*cz - bc2*bcdx*bx**3*cz + 
+     -       bc2*bcdx*bcdz*by*cz + az*bcdx*bcdy*bcy*by*cz - 
+     -       bcdx*bcdz*bcy*by**2*cz - bc2*bcdx*bx*by**2*cz + 
+     -       bc2*bcdx*bcdy*bz*cz + bcdx**2*bcy*bx*bz*cz - 
+     -       bc2*bcdz*bx**2*bz*cz + az*bc2*bcdy*by*bz*cz + 
+     -       bcdx*bcdy*bcy*by*bz*cz - bc2*bcdz*by**2*bz*cz + 
+     -       bc2*bcdy*by*bz**2*cz - az*bcdx**2*bcy*cx*cz + 
+     -       bcdx*bcdz*bcy*bx*cx*cz + bc2*bcdx*bx**2*cx*cz + 
+     -       bcdx**2*bcy*bz*cx*cz + bc2*bcdz*bx*bz*cx*cz - 
+     -       az*bcdx*bcdy*bcy*cy*cz + bcdx*bcdz*bcy*by*cy*cz + 
+     -       bc2*bcdx*bx*by*cy*cz - az*bc2*bcdy*bz*cy*cz + 
+     -       bcdx*bcdy*bcy*bz*cy*cz + bc2*bcdz*by*bz*cy*cz + 
+     -       bc2*bcdy*bz**2*cy*cz - bcdx**2*bcy*bx*cz**2 - 
+     -       bcdx*bcdy*bcy*by*cz**2 - bc2*bcdy*by*bz*cz**2 - 
+     -       az*bc2*bcdx*bx**2*dx - az*bc2*bcdx*by**2*dx + 
+     -       2*az*bc2*bcdx*bx*cx*dx - bc2*bcdx*bx*bz*cx*dx - 
+     -       az*bc2*bcdx*cx**2*dx + bc2*bcdx*bz*cx**2*dx + 
+     -       2*az*bc2*bcdx*by*cy*dx - bc2*bcdx*by*bz*cy*dx - 
+     -       az*bc2*bcdx*cy**2*dx + bc2*bcdx*bz*cy**2*dx + 
+     -       bc2*bcdx*bx**2*cz*dx + bc2*bcdx*by**2*cz*dx - 
+     -       bc2*bcdx*bx*cx*cz*dx - bc2*bcdx*by*cy*cz*dx + 
+     -       ax*(bcdx**2*bcy*(-2*bc2 + bcy**2 + bcz**2) + 
+     -          abx*(-(bcdx*bcy*(bcdy*bcy + bcdz*bcz)) + 
+     -             bc2*(bcdx*(bcdy - bcz*bx + bcz*dx) - 
+     -                (bcdy*bcy + bcdz*bcz)*(bz - dz)))) + 
+     -       ay*(bcdx*bcy*(-(bcy*(abx*bcdx + bcdz*bcz)) + 
+     -             bcdy*(bcx**2 + bcz**2)) + 
+     -          bc2*(abx*bcdx**2 + bcdx*bcz*(bcdz + bcy*(-bx + dx)) + 
+     -             (-(bcdz*bcy*bcz) + bcdy*(bcx**2 + bcz**2))*
+     -              (bz - dz))) - az*bc2*bcdz*bx**2*dz - 
+     -       az*bc2*bcdz*by**2*dz + az*bc2*bcdy*by*bz*dz + 
+     -       2*az*bc2*bcdz*bx*cx*dz - bc2*bcdy*bx*by*cx*dz - 
+     -       bc2*bcdz*bx*bz*cx*dz - az*bc2*bcdz*cx**2*dz + 
+     -       bc2*bcdy*by*cx**2*dz + bc2*bcdz*bz*cx**2*dz + 
+     -       bc2*bcdy*bx**2*cy*dz + 2*az*bc2*bcdz*by*cy*dz - 
+     -       az*bc2*bcdy*bz*cy*dz - bc2*bcdz*by*bz*cy*dz + 
+     -       bc2*bcdy*bz**2*cy*dz - bc2*bcdy*bx*cx*cy*dz - 
+     -       az*bc2*bcdz*cy**2*dz + bc2*bcdz*bz*cy**2*dz + 
+     -       bc2*bcdz*bx**2*cz*dz - az*bc2*bcdy*by*cz*dz + 
+     -       bc2*bcdz*by**2*cz*dz - bc2*bcdy*by*bz*cz*dz - 
+     -       bc2*bcdz*bx*cx*cz*dz + az*bc2*bcdy*cy*cz*dz - 
+     -       bc2*bcdz*by*cy*cz*dz - bc2*bcdy*bz*cy*cz*dz + 
+     -       bc2*bcdy*by*cz**2*dz) - 
+     -    abcy*bcdy*(-(bc2*bcdy*bx**2) + az*bcdz*bcy*bx**2 + 
+     -       az*bc2*bx**3 - 2*az*bc2*bcdz*by + bc2*bcdx*bx*by + 
+     -       az*bcdz*bcy*by**2 + az*bc2*bx*by**2 + az*bc2*bcdy*bz - 
+     -       az*bcdx*bcy*bx*bz + bc2*bcdz*by*bz - az*bcdy*bcy*by*bz - 
+     -       bc2*bcdy*bz**2 + az*bc2*bx*bz**2 + bc2*bcdy*bx*cx - 
+     -       2*az*bcdz*bcy*bx*cx - 2*az*bc2*bx**2*cx + 
+     -       bc2*bcdx*by*cx + bcdy*bcy*bx*by*cx - bcdx*bcy*by**2*cx + 
+     -       az*bcdx*bcy*bz*cx + bcdz*bcy*bx*bz*cx + 
+     -       bc2*bx**2*bz*cx + bc2*by**2*bz*cx - az*bc2*bz**2*cx - 
+     -       bcdx*bcy*bz**2*cx + bc2*bz**3*cx + az*bcdz*bcy*cx**2 + 
+     -       az*bc2*bx*cx**2 - bcdy*bcy*by*cx**2 - 
+     -       bcdz*bcy*bz*cx**2 - bc2*bx*bz*cx**2 + 2*az*bc2*bcdz*cy - 
+     -       2*bc2*bcdx*bx*cy - bcdy*bcy*bx**2*cy - 
+     -       2*az*bcdz*bcy*by*cy - 2*az*bc2*bx*by*cy + 
+     -       bcdx*bcy*bx*by*cy - 2*bc2*bcdz*bz*cy + 
+     -       az*bcdy*bcy*bz*cy + bcdz*bcy*by*bz*cy - 
+     -       bcdy*bcy*bz**2*cy + bcdy*bcy*bx*cx*cy + 
+     -       bcdx*bcy*by*cx*cy - bc2*by*bz*cx*cy + 
+     -       az*bcdz*bcy*cy**2 + az*bc2*bx*cy**2 - 
+     -       bcdx*bcy*bx*cy**2 - bcdz*bcy*bz*cy**2 - az*bc2*bcdy*cz + 
+     -       az*bcdx*bcy*bx*cz - bcdz*bcy*bx**2*cz - bc2*bx**3*cz + 
+     -       bc2*bcdz*by*cz + az*bcdy*bcy*by*cz - bcdz*bcy*by**2*cz - 
+     -       bc2*bx*by**2*cz + bc2*bcdy*bz*cz - az*bc2*bx*bz*cz + 
+     -       bcdx*bcy*bx*bz*cz + bcdy*bcy*by*bz*cz - 
+     -       bc2*bx*bz**2*cz - az*bcdx*bcy*cx*cz + 
+     -       bcdz*bcy*bx*cx*cz + bc2*bx**2*cx*cz + az*bc2*bz*cx*cz + 
+     -       bcdx*bcy*bz*cx*cz - bc2*bz**2*cx*cz - 
+     -       az*bcdy*bcy*cy*cz + bcdz*bcy*by*cy*cz + 
+     -       bc2*bx*by*cy*cz + bcdy*bcy*bz*cy*cz - 
+     -       bcdx*bcy*bx*cz**2 - bcdy*bcy*by*cz**2 + 
+     -       bc2*bx*bz*cz**2 - az*bc2*bx**2*dx - az*bc2*by**2*dx + 
+     -       2*az*bc2*bx*cx*dx - bc2*bx*bz*cx*dx - az*bc2*cx**2*dx + 
+     -       bc2*bz*cx**2*dx + 2*az*bc2*by*cy*dx - bc2*by*bz*cy*dx - 
+     -       az*bc2*cy**2*dx + bc2*bz*cy**2*dx + bc2*bx**2*cz*dx + 
+     -       bc2*by**2*cz*dx - bc2*bx*cx*cz*dx - bc2*by*cy*cz*dx - 
+     -       az*bc2*bx*bz*dz - bc2*by**2*cx*dz + az*bc2*bz*cx*dz - 
+     -       bc2*bz**2*cx*dz + bc2*bx*by*cy*dz + bc2*by*cx*cy*dz - 
+     -       bc2*bx*cy**2*dz + az*bc2*bx*cz*dz + bc2*bx*bz*cz*dz - 
+     -       az*bc2*cx*cz*dz + bc2*bz*cx*cz*dz - bc2*bx*cz**2*dz + 
+     -       ax*(abx*(bc2*bcdy - bcy*(bcdy*bcy + bcdz*bcz)) + 
+     -          bcdx*(bcy**3 + bcy*bcz**2 + 2*bc2*(-by + cy)) + 
+     -          bc2*(-bz**3 - bz*cy**2 + 2*bz**2*cz - bz*cz**2 + 
+     -             bx**2*(-bz + cz) - bz*cx*dx + cx*cz*dx + 
+     -             bx*(bz - cz)*(cx + dx) + 2*by*cy*(bz - dz) + 
+     -             bz**2*dz + cy**2*dz - 2*bz*cz*dz + cz**2*dz + 
+     -             by**2*(-bz + dz))) + 
+     -       ay*(bcy*(-(bcy*(abx*bcdx + bcdz*bcz)) + 
+     -             bcdy*(bcx**2 + bcz**2)) + 
+     -          bc2*(abx*bcdx + bcdz*bcz - 
+     -             bcy*(bz*cdx - bx*cz + cz*dx + bx*dz - cx*dz)))))/
+     -  (bc2**1.5*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**2
+     -        /bc2))
+
+
+
+       dcz= (-(abcz*az*bc2*bcdx*bcdz*bx) - abcz*ax*bc2*bcdz**2*bx - 
+     -    aby*ay*bc2*bcdx*bcdy*bx**2 + abx*ay*bc2*bcdy**2*bx**2 - 
+     -    aby*az*bc2*bcdx*bcdz*bx**2 + abx*az*bc2*bcdy*bcdz*bx**2 + 
+     -    abcz*bc2*bcdz**2*bx**2 - abcz*ay*bcdy*bcdz*bcz*bx**2 - 
+     -    abcz*az*bcdz**2*bcz*bx**2 + abcz*ay*bc2*bcdz*bx**3 - 
+     -    abcz*az*bc2*bcdy*bcdz*by - abcz*ay*bc2*bcdz**2*by + 
+     -    aby*ay*bc2*bcdx**2*bx*by + aby*ax*bc2*bcdx*bcdy*bx*by - 
+     -    abx*ay*bc2*bcdx*bcdy*bx*by - abx*ax*bc2*bcdy**2*bx*by + 
+     -    abcz*ay*bcdx*bcdz*bcz*bx*by + abcz*ax*bcdy*bcdz*bcz*bx*by - 
+     -    abcz*ax*bc2*bcdz*bx**2*by - aby*ax*bc2*bcdx**2*by**2 + 
+     -    abx*ax*bc2*bcdx*bcdy*by**2 - aby*az*bc2*bcdx*bcdz*by**2 + 
+     -    abx*az*bc2*bcdy*bcdz*by**2 + abcz*bc2*bcdz**2*by**2 - 
+     -    abcz*ax*bcdx*bcdz*bcz*by**2 - abcz*az*bcdz**2*bcz*by**2 + 
+     -    abcz*ay*bc2*bcdz*bx*by**2 - abcz*ax*bc2*bcdz*by**3 + 
+     -    2*abcz*ax*bc2*bcdx*bcdz*bz + 2*abcz*ay*bc2*bcdy*bcdz*bz + 
+     -    aby*az*bc2*bcdx**2*bx*bz - abx*az*bc2*bcdx*bcdy*bx*bz - 
+     -    abcz*bc2*bcdx*bcdz*bx*bz + aby*ax*bc2*bcdx*bcdz*bx*bz - 
+     -    abx*ax*bc2*bcdy*bcdz*bx*bz + abcz*az*bcdx*bcdz*bcz*bx*bz + 
+     -    abcz*ax*bcdz**2*bcz*bx*bz + aby*az*bc2*bcdx*bcdy*by*bz - 
+     -    abx*az*bc2*bcdy**2*by*bz + aby*ay*bc2*bcdx*bcdz*by*bz - 
+     -    abcz*bc2*bcdy*bcdz*by*bz - abx*ay*bc2*bcdy*bcdz*by*bz + 
+     -    abcz*az*bcdy*bcdz*bcz*by*bz + abcz*ay*bcdz**2*bcz*by*bz - 
+     -    aby*ax*bc2*bcdx**2*bz**2 + abx*ax*bc2*bcdx*bcdy*bz**2 - 
+     -    aby*ay*bc2*bcdx*bcdy*bz**2 + abx*ay*bc2*bcdy**2*bz**2 - 
+     -    abcz*ax*bcdx*bcdz*bcz*bz**2 - abcz*ay*bcdy*bcdz*bcz*bz**2 + 
+     -    abcz*ay*bc2*bcdz*bx*bz**2 - abcz*ax*bc2*bcdz*by*bz**2 + 
+     -    abcz*az*bc2*bcdx*bcdz*cx + abcz*ax*bc2*bcdz**2*cx + 
+     -    2*aby*ay*bc2*bcdx*bcdy*bx*cx - 2*abx*ay*bc2*bcdy**2*bx*cx + 
+     -    2*aby*az*bc2*bcdx*bcdz*bx*cx - 
+     -    2*abx*az*bc2*bcdy*bcdz*bx*cx - abcz*bc2*bcdz**2*bx*cx + 
+     -    2*abcz*ay*bcdy*bcdz*bcz*bx*cx + 
+     -    2*abcz*az*bcdz**2*bcz*bx*cx - 2*abcz*ay*bc2*bcdz*bx**2*cx - 
+     -    aby*ay*bc2*bcdx**2*by*cx - aby*ax*bc2*bcdx*bcdy*by*cx + 
+     -    abx*ay*bc2*bcdx*bcdy*by*cx + abx*ax*bc2*bcdy**2*by*cx - 
+     -    abcz*ay*bcdx*bcdz*bcz*by*cx - abcz*ax*bcdy*bcdz*bcz*by*cx - 
+     -    aby*bc2*bcdx*bcdy*bx*by*cx + abx*bc2*bcdy**2*bx*by*cx + 
+     -    abcz*ax*bc2*bcdz*bx*by*cx - abcz*bcdy*bcdz*bcz*bx*by*cx + 
+     -    abcz*bc2*bcdz*bx**2*by*cx + aby*bc2*bcdx**2*by**2*cx - 
+     -    abx*bc2*bcdx*bcdy*by**2*cx - abcz*ay*bc2*bcdz*by**2*cx + 
+     -    abcz*bcdx*bcdz*bcz*by**2*cx + abcz*bc2*bcdz*by**3*cx - 
+     -    aby*az*bc2*bcdx**2*bz*cx + abx*az*bc2*bcdx*bcdy*bz*cx - 
+     -    abcz*bc2*bcdx*bcdz*bz*cx - aby*ax*bc2*bcdx*bcdz*bz*cx + 
+     -    abx*ax*bc2*bcdy*bcdz*bz*cx - abcz*az*bcdx*bcdz*bcz*bz*cx - 
+     -    abcz*ax*bcdz**2*bcz*bz*cx - aby*bc2*bcdx*bcdz*bx*bz*cx + 
+     -    abx*bc2*bcdy*bcdz*bx*bz*cx - abcz*bcdz**2*bcz*bx*bz*cx - 
+     -    abcz*az*bc2*bcdz*by*bz*cx + aby*bc2*bcdx**2*bz**2*cx - 
+     -    abx*bc2*bcdx*bcdy*bz**2*cx + abcz*bcdx*bcdz*bcz*bz**2*cx + 
+     -    abcz*bc2*bcdz*by*bz**2*cx - aby*ay*bc2*bcdx*bcdy*cx**2 + 
+     -    abx*ay*bc2*bcdy**2*cx**2 - aby*az*bc2*bcdx*bcdz*cx**2 + 
+     -    abx*az*bc2*bcdy*bcdz*cx**2 - abcz*ay*bcdy*bcdz*bcz*cx**2 - 
+     -    abcz*az*bcdz**2*bcz*cx**2 + abcz*ay*bc2*bcdz*bx*cx**2 + 
+     -    aby*bc2*bcdx*bcdy*by*cx**2 - abx*bc2*bcdy**2*by*cx**2 + 
+     -    abcz*bcdy*bcdz*bcz*by*cx**2 - abcz*bc2*bcdz*bx*by*cx**2 + 
+     -    aby*bc2*bcdx*bcdz*bz*cx**2 - abx*bc2*bcdy*bcdz*bz*cx**2 + 
+     -    abcz*bcdz**2*bcz*bz*cx**2 + abcz*az*bc2*bcdy*bcdz*cy + 
+     -    abcz*ay*bc2*bcdz**2*cy - aby*ay*bc2*bcdx**2*bx*cy - 
+     -    aby*ax*bc2*bcdx*bcdy*bx*cy + abx*ay*bc2*bcdx*bcdy*bx*cy + 
+     -    abx*ax*bc2*bcdy**2*bx*cy - abcz*ay*bcdx*bcdz*bcz*bx*cy - 
+     -    abcz*ax*bcdy*bcdz*bcz*bx*cy + aby*bc2*bcdx*bcdy*bx**2*cy - 
+     -    abx*bc2*bcdy**2*bx**2*cy + abcz*ax*bc2*bcdz*bx**2*cy + 
+     -    abcz*bcdy*bcdz*bcz*bx**2*cy - abcz*bc2*bcdz*bx**3*cy + 
+     -    2*aby*ax*bc2*bcdx**2*by*cy - 2*abx*ax*bc2*bcdx*bcdy*by*cy + 
+     -    2*aby*az*bc2*bcdx*bcdz*by*cy - 
+     -    2*abx*az*bc2*bcdy*bcdz*by*cy - abcz*bc2*bcdz**2*by*cy + 
+     -    2*abcz*ax*bcdx*bcdz*bcz*by*cy + 
+     -    2*abcz*az*bcdz**2*bcz*by*cy - aby*bc2*bcdx**2*bx*by*cy + 
+     -    abx*bc2*bcdx*bcdy*bx*by*cy - abcz*ay*bc2*bcdz*bx*by*cy - 
+     -    abcz*bcdx*bcdz*bcz*bx*by*cy + 2*abcz*ax*bc2*bcdz*by**2*cy - 
+     -    abcz*bc2*bcdz*bx*by**2*cy - aby*az*bc2*bcdx*bcdy*bz*cy + 
+     -    abx*az*bc2*bcdy**2*bz*cy - aby*ay*bc2*bcdx*bcdz*bz*cy - 
+     -    abcz*bc2*bcdy*bcdz*bz*cy + abx*ay*bc2*bcdy*bcdz*bz*cy - 
+     -    abcz*az*bcdy*bcdz*bcz*bz*cy - abcz*ay*bcdz**2*bcz*bz*cy + 
+     -    abcz*az*bc2*bcdz*bx*bz*cy - aby*bc2*bcdx*bcdz*by*bz*cy + 
+     -    abx*bc2*bcdy*bcdz*by*bz*cy - abcz*bcdz**2*bcz*by*bz*cy + 
+     -    aby*bc2*bcdx*bcdy*bz**2*cy - abx*bc2*bcdy**2*bz**2*cy + 
+     -    abcz*bcdy*bcdz*bcz*bz**2*cy - abcz*bc2*bcdz*bx*bz**2*cy + 
+     -    aby*ay*bc2*bcdx**2*cx*cy + aby*ax*bc2*bcdx*bcdy*cx*cy - 
+     -    abx*ay*bc2*bcdx*bcdy*cx*cy - abx*ax*bc2*bcdy**2*cx*cy + 
+     -    abcz*ay*bcdx*bcdz*bcz*cx*cy + abcz*ax*bcdy*bcdz*bcz*cx*cy - 
+     -    aby*bc2*bcdx*bcdy*bx*cx*cy + abx*bc2*bcdy**2*bx*cx*cy - 
+     -    abcz*ax*bc2*bcdz*bx*cx*cy - abcz*bcdy*bcdz*bcz*bx*cx*cy + 
+     -    abcz*bc2*bcdz*bx**2*cx*cy - aby*bc2*bcdx**2*by*cx*cy + 
+     -    abx*bc2*bcdx*bcdy*by*cx*cy + abcz*ay*bc2*bcdz*by*cx*cy - 
+     -    abcz*bcdx*bcdz*bcz*by*cx*cy - abcz*bc2*bcdz*by**2*cx*cy - 
+     -    aby*ax*bc2*bcdx**2*cy**2 + abx*ax*bc2*bcdx*bcdy*cy**2 - 
+     -    aby*az*bc2*bcdx*bcdz*cy**2 + abx*az*bc2*bcdy*bcdz*cy**2 - 
+     -    abcz*ax*bcdx*bcdz*bcz*cy**2 - abcz*az*bcdz**2*bcz*cy**2 + 
+     -    aby*bc2*bcdx**2*bx*cy**2 - abx*bc2*bcdx*bcdy*bx*cy**2 + 
+     -    abcz*bcdx*bcdz*bcz*bx*cy**2 - abcz*ax*bc2*bcdz*by*cy**2 + 
+     -    abcz*bc2*bcdz*bx*by*cy**2 + aby*bc2*bcdx*bcdz*bz*cy**2 - 
+     -    abx*bc2*bcdy*bcdz*bz*cy**2 + abcz*bcdz**2*bcz*bz*cy**2 - 
+     -    2*abcz*ax*bc2*bcdx*bcdz*cz - 2*abcz*ay*bc2*bcdy*bcdz*cz - 
+     -    aby*az*bc2*bcdx**2*bx*cz + abx*az*bc2*bcdx*bcdy*bx*cz + 
+     -    2*abcz*bc2*bcdx*bcdz*bx*cz - aby*ax*bc2*bcdx*bcdz*bx*cz + 
+     -    abx*ax*bc2*bcdy*bcdz*bx*cz - abcz*az*bcdx*bcdz*bcz*bx*cz - 
+     -    abcz*ax*bcdz**2*bcz*bx*cz + aby*bc2*bcdx*bcdz*bx**2*cz - 
+     -    abx*bc2*bcdy*bcdz*bx**2*cz + abcz*bcdz**2*bcz*bx**2*cz - 
+     -    aby*az*bc2*bcdx*bcdy*by*cz + abx*az*bc2*bcdy**2*by*cz - 
+     -    aby*ay*bc2*bcdx*bcdz*by*cz + 2*abcz*bc2*bcdy*bcdz*by*cz + 
+     -    abx*ay*bc2*bcdy*bcdz*by*cz - abcz*az*bcdy*bcdz*bcz*by*cz - 
+     -    abcz*ay*bcdz**2*bcz*by*cz + aby*bc2*bcdx*bcdz*by**2*cz - 
+     -    abx*bc2*bcdy*bcdz*by**2*cz + abcz*bcdz**2*bcz*by**2*cz + 
+     -    2*aby*ax*bc2*bcdx**2*bz*cz - 2*abx*ax*bc2*bcdx*bcdy*bz*cz + 
+     -    2*aby*ay*bc2*bcdx*bcdy*bz*cz - 2*abx*ay*bc2*bcdy**2*bz*cz + 
+     -    2*abcz*ax*bcdx*bcdz*bcz*bz*cz + 
+     -    2*abcz*ay*bcdy*bcdz*bcz*bz*cz - aby*bc2*bcdx**2*bx*bz*cz + 
+     -    abx*bc2*bcdx*bcdy*bx*bz*cz - 2*abcz*ay*bc2*bcdz*bx*bz*cz - 
+     -    abcz*bcdx*bcdz*bcz*bx*bz*cz - aby*bc2*bcdx*bcdy*by*bz*cz + 
+     -    abx*bc2*bcdy**2*by*bz*cz + 2*abcz*ax*bc2*bcdz*by*bz*cz - 
+     -    abcz*bcdy*bcdz*bcz*by*bz*cz + aby*az*bc2*bcdx**2*cx*cz - 
+     -    abx*az*bc2*bcdx*bcdy*cx*cz + aby*ax*bc2*bcdx*bcdz*cx*cz - 
+     -    abx*ax*bc2*bcdy*bcdz*cx*cz + abcz*az*bcdx*bcdz*bcz*cx*cz + 
+     -    abcz*ax*bcdz**2*bcz*cx*cz - aby*bc2*bcdx*bcdz*bx*cx*cz + 
+     -    abx*bc2*bcdy*bcdz*bx*cx*cz - abcz*bcdz**2*bcz*bx*cx*cz + 
+     -    abcz*az*bc2*bcdz*by*cx*cz - aby*bc2*bcdx**2*bz*cx*cz + 
+     -    abx*bc2*bcdx*bcdy*bz*cx*cz - abcz*bcdx*bcdz*bcz*bz*cx*cz - 
+     -    abcz*bc2*bcdz*by*bz*cx*cz + aby*az*bc2*bcdx*bcdy*cy*cz - 
+     -    abx*az*bc2*bcdy**2*cy*cz + aby*ay*bc2*bcdx*bcdz*cy*cz - 
+     -    abx*ay*bc2*bcdy*bcdz*cy*cz + abcz*az*bcdy*bcdz*bcz*cy*cz + 
+     -    abcz*ay*bcdz**2*bcz*cy*cz - abcz*az*bc2*bcdz*bx*cy*cz - 
+     -    aby*bc2*bcdx*bcdz*by*cy*cz + abx*bc2*bcdy*bcdz*by*cy*cz - 
+     -    abcz*bcdz**2*bcz*by*cy*cz - aby*bc2*bcdx*bcdy*bz*cy*cz + 
+     -    abx*bc2*bcdy**2*bz*cy*cz - abcz*bcdy*bcdz*bcz*bz*cy*cz + 
+     -    abcz*bc2*bcdz*bx*bz*cy*cz - aby*ax*bc2*bcdx**2*cz**2 + 
+     -    abx*ax*bc2*bcdx*bcdy*cz**2 - aby*ay*bc2*bcdx*bcdy*cz**2 + 
+     -    abx*ay*bc2*bcdy**2*cz**2 - abcz*ax*bcdx*bcdz*bcz*cz**2 - 
+     -    abcz*ay*bcdy*bcdz*bcz*cz**2 + aby*bc2*bcdx**2*bx*cz**2 - 
+     -    abx*bc2*bcdx*bcdy*bx*cz**2 + abcz*ay*bc2*bcdz*bx*cz**2 + 
+     -    abcz*bcdx*bcdz*bcz*bx*cz**2 + aby*bc2*bcdx*bcdy*by*cz**2 - 
+     -    abx*bc2*bcdy**2*by*cz**2 - abcz*ax*bc2*bcdz*by*cz**2 + 
+     -    abcz*bcdy*bcdz*bcz*by*cz**2 - abcz*ay*bc2*bcdz*bx**2*dx + 
+     -    abcz*ax*bc2*bcdz*bx*by*dx + abcz*az*bc2*bcdz*by*bz*dx - 
+     -    abcz*ay*bc2*bcdz*bz**2*dx + 2*abcz*ay*bc2*bcdz*bx*cx*dx - 
+     -    abcz*ax*bc2*bcdz*by*cx*dx - abcz*bc2*bcdz*bx*by*cx*dx - 
+     -    abcz*ay*bc2*bcdz*cx**2*dx + abcz*bc2*bcdz*by*cx**2*dx - 
+     -    abcz*ax*bc2*bcdz*bx*cy*dx + abcz*bc2*bcdz*bx**2*cy*dx - 
+     -    abcz*az*bc2*bcdz*bz*cy*dx + abcz*bc2*bcdz*bz**2*cy*dx + 
+     -    abcz*ax*bc2*bcdz*cx*cy*dx - abcz*bc2*bcdz*bx*cx*cy*dx - 
+     -    abcz*az*bc2*bcdz*by*cz*dx + 2*abcz*ay*bc2*bcdz*bz*cz*dx - 
+     -    abcz*bc2*bcdz*by*bz*cz*dx + abcz*az*bc2*bcdz*cy*cz*dx - 
+     -    abcz*bc2*bcdz*bz*cy*cz*dx - abcz*ay*bc2*bcdz*cz**2*dx + 
+     -    abcz*bc2*bcdz*by*cz**2*dx - abcz*ay*bc2*bcdz*bx*by*dy + 
+     -    abcz*ax*bc2*bcdz*by**2*dy - abcz*az*bc2*bcdz*bx*bz*dy + 
+     -    abcz*ax*bc2*bcdz*bz**2*dy + abcz*ay*bc2*bcdz*by*cx*dy - 
+     -    abcz*bc2*bcdz*by**2*cx*dy + abcz*az*bc2*bcdz*bz*cx*dy - 
+     -    abcz*bc2*bcdz*bz**2*cx*dy + abcz*ay*bc2*bcdz*bx*cy*dy - 
+     -    2*abcz*ax*bc2*bcdz*by*cy*dy + abcz*bc2*bcdz*bx*by*cy*dy - 
+     -    abcz*ay*bc2*bcdz*cx*cy*dy + abcz*bc2*bcdz*by*cx*cy*dy + 
+     -    abcz*ax*bc2*bcdz*cy**2*dy - abcz*bc2*bcdz*bx*cy**2*dy + 
+     -    abcz*az*bc2*bcdz*bx*cz*dy - 2*abcz*ax*bc2*bcdz*bz*cz*dy + 
+     -    abcz*bc2*bcdz*bx*bz*cz*dy - abcz*az*bc2*bcdz*cx*cz*dy + 
+     -    abcz*bc2*bcdz*bz*cx*cz*dy + abcz*ax*bc2*bcdz*cz**2*dy - 
+     -    abcz*bc2*bcdz*bx*cz**2*dy - 
+     -    abcx*(-(bc2*bcdx*bcdz*bx**2) + ay*bcdx*bcdy*bcz*bx**2 - 
+     -       ay*bc2*bcdx*bx**3 + ay*bc2*bcdx*bcdz*by - 
+     -       ay*bcdx**2*bcz*bx*by - ay*bc2*bcdy*bx**2*by - 
+     -       bc2*bcdx*bcdz*by**2 - 2*ay*bc2*bcdx*bcdy*bz + 
+     -       bc2*bcdx**2*bx*bz + bc2*bcdx*bcdy*by*bz - 
+     -       ay*bcdx*bcdz*bcz*by*bz + ay*bc2*bcdz*by**2*bz + 
+     -       ay*bcdx*bcdy*bcz*bz**2 - ay*bc2*bcdx*bx*bz**2 - 
+     -       ay*bc2*bcdy*by*bz**2 + bc2*bcdx*bcdz*bx*cx - 
+     -       2*ay*bcdx*bcdy*bcz*bx*cx + 2*ay*bc2*bcdx*bx**2*cx + 
+     -       ay*bcdx**2*bcz*by*cx + 2*ay*bc2*bcdy*bx*by*cx + 
+     -       bcdx*bcdy*bcz*bx*by*cx - bc2*bcdx*bx**2*by*cx - 
+     -       bcdx**2*bcz*by**2*cx - bc2*bcdy*bx*by**2*cx + 
+     -       bc2*bcdx**2*bz*cx + bcdx*bcdz*bcz*bx*bz*cx - 
+     -       bc2*bcdz*bx*by*bz*cx - bcdx**2*bcz*bz**2*cx + 
+     -       ay*bcdx*bcdy*bcz*cx**2 - ay*bc2*bcdx*bx*cx**2 - 
+     -       ay*bc2*bcdy*by*cx**2 - bcdx*bcdy*bcz*by*cx**2 + 
+     -       bc2*bcdx*bx*by*cx**2 + bc2*bcdy*by**2*cx**2 - 
+     -       bcdx*bcdz*bcz*bz*cx**2 + bc2*bcdz*by*bz*cx**2 - 
+     -       ay*bc2*bcdx*bcdz*cy + ay*bcdx**2*bcz*bx*cy - 
+     -       bcdx*bcdy*bcz*bx**2*cy + bc2*bcdx*bx**3*cy + 
+     -       bc2*bcdx*bcdz*by*cy + bcdx**2*bcz*bx*by*cy + 
+     -       bc2*bcdy*bx**2*by*cy + bc2*bcdx*bcdy*bz*cy + 
+     -       ay*bcdx*bcdz*bcz*bz*cy - ay*bc2*bcdz*by*bz*cy + 
+     -       bcdx*bcdz*bcz*by*bz*cy - bc2*bcdz*by**2*bz*cy - 
+     -       bcdx*bcdy*bcz*bz**2*cy + bc2*bcdx*bx*bz**2*cy + 
+     -       bc2*bcdy*by*bz**2*cy - ay*bcdx**2*bcz*cx*cy + 
+     -       bcdx*bcdy*bcz*bx*cx*cy - bc2*bcdx*bx**2*cx*cy + 
+     -       bcdx**2*bcz*by*cx*cy - bc2*bcdy*bx*by*cx*cy - 
+     -       bcdx**2*bcz*bx*cy**2 - bcdx*bcdz*bcz*bz*cy**2 + 
+     -       bc2*bcdz*by*bz*cy**2 + 2*ay*bc2*bcdx*bcdy*cz - 
+     -       2*bc2*bcdx**2*bx*cz - bcdx*bcdz*bcz*bx**2*cz - 
+     -       2*bc2*bcdx*bcdy*by*cz + ay*bcdx*bcdz*bcz*by*cz + 
+     -       bc2*bcdz*bx**2*by*cz - ay*bc2*bcdz*by**2*cz - 
+     -       bcdx*bcdz*bcz*by**2*cz + bc2*bcdz*by**3*cz - 
+     -       2*ay*bcdx*bcdy*bcz*bz*cz + 2*ay*bc2*bcdx*bx*bz*cz + 
+     -       bcdx**2*bcz*bx*bz*cz + 2*ay*bc2*bcdy*by*bz*cz + 
+     -       bcdx*bcdy*bcz*by*bz*cz - bc2*bcdx*bx*by*bz*cz - 
+     -       bc2*bcdy*by**2*bz*cz + bcdx*bcdz*bcz*bx*cx*cz - 
+     -       bc2*bcdz*bx*by*cx*cz + bcdx**2*bcz*bz*cx*cz - 
+     -       ay*bcdx*bcdz*bcz*cy*cz + ay*bc2*bcdz*by*cy*cz + 
+     -       bcdx*bcdz*bcz*by*cy*cz - bc2*bcdz*by**2*cy*cz + 
+     -       bcdx*bcdy*bcz*bz*cy*cz - bc2*bcdx*bx*bz*cy*cz - 
+     -       bc2*bcdy*by*bz*cy*cz + ay*bcdx*bcdy*bcz*cz**2 - 
+     -       ay*bc2*bcdx*bx*cz**2 - bcdx**2*bcz*bx*cz**2 - 
+     -       ay*bc2*bcdy*by*cz**2 - bcdx*bcdy*bcz*by*cz**2 + 
+     -       bc2*bcdx*bx*by*cz**2 + bc2*bcdy*by**2*cz**2 + 
+     -       ay*bc2*bcdx*bx**2*dx + ay*bc2*bcdx*bz**2*dx - 
+     -       2*ay*bc2*bcdx*bx*cx*dx + bc2*bcdx*bx*by*cx*dx + 
+     -       ay*bc2*bcdx*cx**2*dx - bc2*bcdx*by*cx**2*dx - 
+     -       bc2*bcdx*bx**2*cy*dx - bc2*bcdx*bz**2*cy*dx + 
+     -       bc2*bcdx*bx*cx*cy*dx - 2*ay*bc2*bcdx*bz*cz*dx + 
+     -       bc2*bcdx*by*bz*cz*dx + bc2*bcdx*bz*cy*cz*dx + 
+     -       ay*bc2*bcdx*cz**2*dx - bc2*bcdx*by*cz**2*dx + 
+     -       ax*(bcdx**2*bcz*(-2*bc2 + bcy**2 + bcz**2) + 
+     -          abx*(-(bcdx*bcz*(bcdy*bcy + bcdz*bcz)) + 
+     -             bc2*(bcdx*(bcdz + bcy*bx - bcy*dx) + 
+     -                (bcdy*bcy + bcdz*bcz)*(by - dy)))) + 
+     -       az*(bcdx*bcz*(bcdz*(bcx**2 + bcy**2) - 
+     -             (abx*bcdx + bcdy*bcy)*bcz) + 
+     -          bc2*(abx*bcdx**2 + bcdx*bcy*(bcdy + bcz*(bx - dx)) - 
+     -             (bcdz*(bcx**2 + bcy**2) - bcdy*bcy*bcz)*(by - dy)))
+     -        + ay*bc2*bcdy*bx**2*dy - ay*bc2*bcdz*by*bz*dy + 
+     -       ay*bc2*bcdy*bz**2*dy - 2*ay*bc2*bcdy*bx*cx*dy + 
+     -       bc2*bcdy*bx*by*cx*dy + bc2*bcdz*bx*bz*cx*dy + 
+     -       ay*bc2*bcdy*cx**2*dy - bc2*bcdy*by*cx**2*dy - 
+     -       bc2*bcdz*bz*cx**2*dy - bc2*bcdy*bx**2*cy*dy + 
+     -       ay*bc2*bcdz*bz*cy*dy + bc2*bcdz*by*bz*cy*dy - 
+     -       bc2*bcdy*bz**2*cy*dy + bc2*bcdy*bx*cx*cy*dy - 
+     -       bc2*bcdz*bz*cy**2*dy - bc2*bcdz*bx**2*cz*dy + 
+     -       ay*bc2*bcdz*by*cz*dy - bc2*bcdz*by**2*cz*dy - 
+     -       2*ay*bc2*bcdy*bz*cz*dy + bc2*bcdy*by*bz*cz*dy + 
+     -       bc2*bcdz*bx*cx*cz*dy - ay*bc2*bcdz*cy*cz*dy + 
+     -       bc2*bcdz*by*cy*cz*dy + bc2*bcdy*bz*cy*cz*dy + 
+     -       ay*bc2*bcdy*cz**2*dy - bc2*bcdy*by*cz**2*dy) - 
+     -    abcy*(-(bc2*bcdy*bcdz*bx**2) + ay*bcdy**2*bcz*bx**2 + 
+     -       ay*bc2*bcdy*bcdz*by - ay*bcdx*bcdy*bcz*bx*by - 
+     -       ay*bc2*bcdx*bx**2*by - bc2*bcdy*bcdz*by**2 - 
+     -       ay*bc2*bcdy*bx*by**2 - 2*ay*bc2*bcdy**2*bz + 
+     -       bc2*bcdx*bcdy*bx*bz + bc2*bcdy**2*by*bz - 
+     -       ay*bcdy*bcdz*bcz*by*bz - ay*bc2*bcdz*bx*by*bz + 
+     -       ay*bcdy**2*bcz*bz**2 + bc2*bcdy*bcdz*bx*cx - 
+     -       2*ay*bcdy**2*bcz*bx*cx + ay*bcdx*bcdy*bcz*by*cx + 
+     -       ay*bc2*bcdx*bx*by*cx + bcdy**2*bcz*bx*by*cx + 
+     -       ay*bc2*bcdy*by**2*cx - bcdx*bcdy*bcz*by**2*cx - 
+     -       bc2*bcdx*bx*by**2*cx - bc2*bcdy*by**3*cx + 
+     -       bc2*bcdx*bcdy*bz*cx + bcdy*bcdz*bcz*bx*bz*cx + 
+     -       bc2*bcdz*bx**2*bz*cx - bcdx*bcdy*bcz*bz**2*cx - 
+     -       bc2*bcdx*bx*bz**2*cx - bc2*bcdy*by*bz**2*cx + 
+     -       ay*bcdy**2*bcz*cx**2 - bcdy**2*bcz*by*cx**2 - 
+     -       bcdy*bcdz*bcz*bz*cx**2 - bc2*bcdz*bx*bz*cx**2 - 
+     -       ay*bc2*bcdy*bcdz*cy + ay*bcdx*bcdy*bcz*bx*cy + 
+     -       ay*bc2*bcdx*bx**2*cy - bcdy**2*bcz*bx**2*cy + 
+     -       bc2*bcdy*bcdz*by*cy + ay*bc2*bcdy*bx*by*cy + 
+     -       bcdx*bcdy*bcz*bx*by*cy + bc2*bcdx*bx**2*by*cy + 
+     -       bc2*bcdy*bx*by**2*cy + bc2*bcdy**2*bz*cy + 
+     -       ay*bcdy*bcdz*bcz*bz*cy + ay*bc2*bcdz*bx*bz*cy + 
+     -       bcdy*bcdz*bcz*by*bz*cy + bc2*bcdz*bx*by*bz*cy - 
+     -       bcdy**2*bcz*bz**2*cy - ay*bcdx*bcdy*bcz*cx*cy - 
+     -       ay*bc2*bcdx*bx*cx*cy + bcdy**2*bcz*bx*cx*cy - 
+     -       ay*bc2*bcdy*by*cx*cy + bcdx*bcdy*bcz*by*cx*cy + 
+     -       bc2*bcdx*bx*by*cx*cy + bc2*bcdy*by**2*cx*cy - 
+     -       bcdx*bcdy*bcz*bx*cy**2 - bc2*bcdx*bx**2*cy**2 - 
+     -       bc2*bcdy*bx*by*cy**2 - bcdy*bcdz*bcz*bz*cy**2 - 
+     -       bc2*bcdz*bx*bz*cy**2 + 2*ay*bc2*bcdy**2*cz - 
+     -       2*bc2*bcdx*bcdy*bx*cz - bcdy*bcdz*bcz*bx**2*cz - 
+     -       bc2*bcdz*bx**3*cz - 2*bc2*bcdy**2*by*cz + 
+     -       ay*bcdy*bcdz*bcz*by*cz + ay*bc2*bcdz*bx*by*cz - 
+     -       bcdy*bcdz*bcz*by**2*cz - bc2*bcdz*bx*by**2*cz - 
+     -       2*ay*bcdy**2*bcz*bz*cz + bcdx*bcdy*bcz*bx*bz*cz + 
+     -       bc2*bcdx*bx**2*bz*cz + bcdy**2*bcz*by*bz*cz + 
+     -       bc2*bcdy*bx*by*bz*cz + bcdy*bcdz*bcz*bx*cx*cz + 
+     -       bc2*bcdz*bx**2*cx*cz + bcdx*bcdy*bcz*bz*cx*cz + 
+     -       bc2*bcdx*bx*bz*cx*cz + bc2*bcdy*by*bz*cx*cz - 
+     -       ay*bcdy*bcdz*bcz*cy*cz - ay*bc2*bcdz*bx*cy*cz + 
+     -       bcdy*bcdz*bcz*by*cy*cz + bc2*bcdz*bx*by*cy*cz + 
+     -       bcdy**2*bcz*bz*cy*cz + ay*bcdy**2*bcz*cz**2 - 
+     -       bcdx*bcdy*bcz*bx*cz**2 - bc2*bcdx*bx**2*cz**2 - 
+     -       bcdy**2*bcz*by*cz**2 - bc2*bcdy*bx*by*cz**2 + 
+     -       ay*bc2*bcdx*bx*by*dx + ay*bc2*bcdz*by*bz*dx - 
+     -       ay*bc2*bcdx*by*cx*dx + bc2*bcdx*by**2*cx*dx - 
+     -       bc2*bcdz*bx*bz*cx*dx + bc2*bcdx*bz**2*cx*dx + 
+     -       bc2*bcdz*bz*cx**2*dx - ay*bc2*bcdx*bx*cy*dx - 
+     -       bc2*bcdx*bx*by*cy*dx - ay*bc2*bcdz*bz*cy*dx - 
+     -       bc2*bcdz*by*bz*cy*dx + ay*bc2*bcdx*cx*cy*dx - 
+     -       bc2*bcdx*by*cx*cy*dx + bc2*bcdx*bx*cy**2*dx + 
+     -       bc2*bcdz*bz*cy**2*dx + bc2*bcdz*bx**2*cz*dx - 
+     -       ay*bc2*bcdz*by*cz*dx + bc2*bcdz*by**2*cz*dx - 
+     -       bc2*bcdx*bx*bz*cz*dx - bc2*bcdz*bx*cx*cz*dx - 
+     -       bc2*bcdx*bz*cx*cz*dx + ay*bc2*bcdz*cy*cz*dx - 
+     -       bc2*bcdz*by*cy*cz*dx + bc2*bcdx*bx*cz**2*dx + 
+     -       ax*(bcdx*(bcdy*(bcy**2*bcz + bcz**3 - 2*bc2*bz + 
+     -                2*bc2*cz) + bc2*(bcy**2 + bcz**2)*(bx - dx)) + 
+     -          abx*(-(bcdy*bcz*(bcdy*bcy + bcdz*bcz)) + 
+     -             bc2*bcdz*(bcdy - bcz*bx + bcz*dx)) + 
+     -          bc2*bcdy*(by**2 + bz**2 - 2*by*cy + cy**2 - 2*bz*cz + 
+     -             cz**2)*(by - dy)) + ay*bc2*bcdy*bx*by*dy - 
+     -       ay*bc2*bcdy*by*cx*dy + bc2*bcdy*by**2*cx*dy + 
+     -       bc2*bcdy*bz**2*cx*dy - ay*bc2*bcdy*bx*cy*dy - 
+     -       bc2*bcdy*bx*by*cy*dy + ay*bc2*bcdy*cx*cy*dy - 
+     -       bc2*bcdy*by*cx*cy*dy + bc2*bcdy*bx*cy**2*dy - 
+     -       bc2*bcdy*bx*bz*cz*dy - bc2*bcdy*bz*cx*cz*dy + 
+     -       bc2*bcdy*bx*cz**2*dy + 
+     -       az*(bcdy*bcz*(bcdz*(bcx**2 + bcy**2) - 
+     -             (abx*bcdx + bcdy*bcy)*bcz) + 
+     -          bc2*(bcdz*(bcx**2 + bcy**2)*(bx - dx) + 
+     -             abx*bcdx*(bcdy + bcz*(-bx + dx)) + 
+     -             bcdy*(bcdy*bcy + abx*bcz*(-by + dy))))))/
+     -  (bc2**1.5*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**2/
+     -       bc2))
+
+
+       ddx=(-(abcy*(-(ay*bcy*bcz*(abx*bcdx + bcdy*bcy + bcdz*bcz)) + 
+     -         az*(bcdy*bcy*(bcx**2 + bcy**2) + 
+     -            bcz*(bcdz*(bcx**2 + bcy**2) - abx*bcdx*bcz)) + 
+     -         ax*bcdx*bcz*by**2 - ax*bcdy*bcy*bx*bz - 
+     -         ax*bcdz*bcz*bx*bz + ax*bcdx*bcz*bz**2 - 
+     -         bcdx*bcz*by**2*cx + ax*bcdy*bcy*bz*cx + 
+     -         ax*bcdz*bcz*bz*cx + bcdy*bcy*bx*bz*cx + 
+     -         bcdz*bcz*bx*bz*cx - bcdx*bcz*bz**2*cx - 
+     -         bcdy*bcy*bz*cx**2 - bcdz*bcz*bz*cx**2 - 
+     -         2*ax*bcdx*bcz*by*cy + bcdx*bcz*bx*by*cy + 
+     -         bcdy*bcy*by*bz*cy + bcdz*bcz*by*bz*cy + 
+     -         bcdx*bcz*by*cx*cy + ax*bcdx*bcz*cy**2 - 
+     -         bcdx*bcz*bx*cy**2 - bcdy*bcy*bz*cy**2 - 
+     -         bcdz*bcz*bz*cy**2 + ax*bcdy*bcy*bx*cz + 
+     -         ax*bcdz*bcz*bx*cz - bcdy*bcy*bx**2*cz - 
+     -         bcdz*bcz*bx**2*cz - bcdy*bcy*by**2*cz - 
+     -         bcdz*bcz*by**2*cz - 2*ax*bcdx*bcz*bz*cz + 
+     -         bcdx*bcz*bx*bz*cz - ax*bcdy*bcy*cx*cz - 
+     -         ax*bcdz*bcz*cx*cz + bcdy*bcy*bx*cx*cz + 
+     -         bcdz*bcz*bx*cx*cz + bcdx*bcz*bz*cx*cz + 
+     -         bcdy*bcy*by*cy*cz + bcdz*bcz*by*cy*cz + 
+     -         ax*bcdx*bcz*cz**2 - bcdx*bcz*bx*cz**2)) + 
+     -    abcx*bcdx*(-(az*bcy*(bcx**2 + bcy**2 + bcz**2)) + 
+     -       ay*bcz*(bcx**2 + bcy**2 + bcz**2) - ax*bcz*bx*by + 
+     -       ax*bcy*bx*bz + ax*bcz*by*cx + bcz*bx*by*cx - 
+     -       ax*bcy*bz*cx - bcy*bx*bz*cx - bcz*by*cx**2 + 
+     -       bcy*bz*cx**2 + ax*bcz*bx*cy - bcz*bx**2*cy - 
+     -       bcy*by*bz*cy - bcz*bz**2*cy - ax*bcz*cx*cy + 
+     -       bcz*bx*cx*cy + bcy*bz*cy**2 - ax*bcy*bx*cz + 
+     -       bcy*bx**2*cz + bcy*by**2*cz + bcz*by*bz*cz + 
+     -       ax*bcy*cx*cz - bcy*bx*cx*cz - bcy*by*cy*cz + 
+     -       bcz*bz*cy*cz - bcz*by*cz**2) + 
+     -    abcz*(ay*(-(abx*bcdx*bcy**2) + 
+     -          bcdy*bcy*(bcx**2 + bcz**2) + 
+     -          bcdz*bcz*(bcx**2 + bcz**2)) - az*bcdx*bcy*bx*bz - 
+     -       az*bcdy*bcy*by*bz - az*bcdz*bcz*by*bz + 
+     -       bcdy*bcy*bx*by*cx + bcdz*bcz*bx*by*cx - 
+     -       bcdx*bcy*by**2*cx + az*bcdx*bcy*bz*cx - 
+     -       bcdx*bcy*bz**2*cx - bcdy*bcy*by*cx**2 - 
+     -       bcdz*bcz*by*cx**2 - bcdy*bcy*bx**2*cy - 
+     -       bcdz*bcz*bx**2*cy + bcdx*bcy*bx*by*cy + 
+     -       az*bcdy*bcy*bz*cy + az*bcdz*bcz*bz*cy - 
+     -       bcdy*bcy*bz**2*cy - bcdz*bcz*bz**2*cy + 
+     -       bcdy*bcy*bx*cx*cy + bcdz*bcz*bx*cx*cy + 
+     -       bcdx*bcy*by*cx*cy - bcdx*bcy*bx*cy**2 + 
+     -       az*bcdx*bcy*bx*cz + az*bcdy*bcy*by*cz + 
+     -       az*bcdz*bcz*by*cz + bcdx*bcy*bx*bz*cz + 
+     -       bcdy*bcy*by*bz*cz + bcdz*bcz*by*bz*cz - 
+     -       az*bcdx*bcy*cx*cz + bcdx*bcy*bz*cx*cz - 
+     -       az*bcdy*bcy*cy*cz - az*bcdz*bcz*cy*cz + 
+     -       bcdy*bcy*bz*cy*cz + bcdz*bcz*bz*cy*cz - 
+     -       bcdx*bcy*bx*cz**2 - bcdy*bcy*by*cz**2 - 
+     -       bcdz*bcz*by*cz**2 + 
+     -       ax*(-(bcdy*bcy*(bx - cx)*(by - cy)) - 
+     -          bcdz*bcz*(bx - cx)*(by - cy) + 
+     -          bcdx*bcy*(by**2 + bz**2 - 2*by*cy + cy**2 - 
+     -             2*bz*cz + cz**2))))/
+     -  (Sqrt(bc2)*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**
+     -        2/bc2))
+
+
+       ddy=(-(abcz*(ay*(-(abx*bcy*(bcdx*bcx + bcdz*bcz)) + 
+     -            bcdy*bcx*(bcx**2 + bcz**2)) + 
+     -         ax*(-(abx*bcdy*bcx*bcy) + 
+     -            (bcdx*bcx + bcdz*bcz)*(bcy**2 + bcz**2)) - 
+     -         az*bcdx*bcx*bx*bz - az*bcdz*bcz*bx*bz - 
+     -         az*bcdy*bcx*by*bz + bcdy*bcx*bx*by*cx - 
+     -         bcdx*bcx*by**2*cx - bcdz*bcz*by**2*cx + 
+     -         az*bcdx*bcx*bz*cx + az*bcdz*bcz*bz*cx - 
+     -         bcdx*bcx*bz**2*cx - bcdz*bcz*bz**2*cx - 
+     -         bcdy*bcx*by*cx**2 - bcdy*bcx*bx**2*cy + 
+     -         bcdx*bcx*bx*by*cy + bcdz*bcz*bx*by*cy + 
+     -         az*bcdy*bcx*bz*cy - bcdy*bcx*bz**2*cy + 
+     -         bcdy*bcx*bx*cx*cy + bcdx*bcx*by*cx*cy + 
+     -         bcdz*bcz*by*cx*cy - bcdx*bcx*bx*cy**2 - 
+     -         bcdz*bcz*bx*cy**2 + az*bcdx*bcx*bx*cz + 
+     -         az*bcdz*bcz*bx*cz + az*bcdy*bcx*by*cz + 
+     -         bcdx*bcx*bx*bz*cz + bcdz*bcz*bx*bz*cz + 
+     -         bcdy*bcx*by*bz*cz - az*bcdx*bcx*cx*cz - 
+     -         az*bcdz*bcz*cx*cz + bcdx*bcx*bz*cx*cz + 
+     -         bcdz*bcz*bz*cx*cz - az*bcdy*bcx*cy*cz + 
+     -         bcdy*bcx*bz*cy*cz - bcdx*bcx*bx*cz**2 - 
+     -         bcdz*bcz*bx*cz**2 - bcdy*bcx*by*cz**2)) + 
+     -    abcx*(az*(bcdx*bcx*(bcx**2 + bcy**2) + 
+     -          bcz*(bcdz*(bcx**2 + bcy**2) - bcdy*bcy*bcz)) + 
+     -       ay*bcz*(-(bcy*(bcdx*bcx + bcdz*bcz)) + 
+     -          bcdy*(bcx**2 + bcz**2)) - ax*bcdy*bcz*bx*by - 
+     -       ax*bcdx*bcx*bx*bz - ax*bcdz*bcz*bx*bz + 
+     -       ax*bcdy*bcz*by*cx + bcdy*bcz*bx*by*cx + 
+     -       ax*bcdx*bcx*bz*cx + ax*bcdz*bcz*bz*cx + 
+     -       bcdx*bcx*bx*bz*cx + bcdz*bcz*bx*bz*cx - 
+     -       bcdy*bcz*by*cx**2 - bcdx*bcx*bz*cx**2 - 
+     -       bcdz*bcz*bz*cx**2 + ax*bcdy*bcz*bx*cy - 
+     -       bcdy*bcz*bx**2*cy + bcdx*bcx*by*bz*cy + 
+     -       bcdz*bcz*by*bz*cy - bcdy*bcz*bz**2*cy - 
+     -       ax*bcdy*bcz*cx*cy + bcdy*bcz*bx*cx*cy - 
+     -       bcdx*bcx*bz*cy**2 - bcdz*bcz*bz*cy**2 + 
+     -       ax*bcdx*bcx*bx*cz + ax*bcdz*bcz*bx*cz - 
+     -       bcdx*bcx*bx**2*cz - bcdz*bcz*bx**2*cz - 
+     -       bcdx*bcx*by**2*cz - bcdz*bcz*by**2*cz + 
+     -       bcdy*bcz*by*bz*cz - ax*bcdx*bcx*cx*cz - 
+     -       ax*bcdz*bcz*cx*cz + bcdx*bcx*bx*cx*cz + 
+     -       bcdz*bcz*bx*cx*cz + bcdx*bcx*by*cy*cz + 
+     -       bcdz*bcz*by*cy*cz + bcdy*bcz*bz*cy*cz - 
+     -       bcdy*bcz*by*cz**2) - 
+     -    abcy*bcdy*(-(az*(bcx**3 + bcx*bcy**2 + abx*bcz**2)) + 
+     -       ax*bcz*by**2 + ax*bcx*bx*bz + ax*bcz*bz**2 - 
+     -       bcz*by**2*cx - ax*bcx*bz*cx - bcx*bx*bz*cx - 
+     -       bcz*bz**2*cx + bcx*bz*cx**2 - 2*ax*bcz*by*cy + 
+     -       bcz*bx*by*cy - bcx*by*bz*cy + bcz*by*cx*cy + 
+     -       ax*bcz*cy**2 - bcz*bx*cy**2 + bcx*bz*cy**2 - 
+     -       ax*bcx*bx*cz + bcx*bx**2*cz + bcx*by**2*cz - 
+     -       2*ax*bcz*bz*cz + bcz*bx*bz*cz + ax*bcx*cx*cz - 
+     -       bcx*bx*cx*cz + bcz*bz*cx*cz - bcx*by*cy*cz + 
+     -       ax*bcz*cz**2 - bcz*bx*cz**2 + 
+     -       ay*bcy*(-(bcz*bx) + bcx*bz + bcz*cx - bcx*cz)))/
+     -  (Sqrt(bc2)*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**
+     -        2/bc2))
+
+
+       ddz= (abcy*(-(ay*bcy*(abx*bcdx*bcx + abx*bcdy*bcy + 
+     -            bcdz*bcx*bcz)) + 
+     -       az*(bcdz*bcx*(bcx**2 + bcy**2) - 
+     -          abx*(bcdx*bcx + bcdy*bcy)*bcz) + ax*bcdx*bcx*by**2 + 
+     -       ax*bcdy*bcy*by**2 - ax*bcdz*bcx*bx*bz + 
+     -       ax*bcdx*bcx*bz**2 + ax*bcdy*bcy*bz**2 - 
+     -       bcdx*bcx*by**2*cx - bcdy*bcy*by**2*cx + 
+     -       ax*bcdz*bcx*bz*cx + bcdz*bcx*bx*bz*cx - 
+     -       bcdx*bcx*bz**2*cx - bcdy*bcy*bz**2*cx - 
+     -       bcdz*bcx*bz*cx**2 - 2*ax*bcdx*bcx*by*cy - 
+     -       2*ax*bcdy*bcy*by*cy + bcdx*bcx*bx*by*cy + 
+     -       bcdy*bcy*bx*by*cy + bcdz*bcx*by*bz*cy + 
+     -       bcdx*bcx*by*cx*cy + bcdy*bcy*by*cx*cy + 
+     -       ax*bcdx*bcx*cy**2 + ax*bcdy*bcy*cy**2 - 
+     -       bcdx*bcx*bx*cy**2 - bcdy*bcy*bx*cy**2 - 
+     -       bcdz*bcx*bz*cy**2 + ax*bcdz*bcx*bx*cz - 
+     -       bcdz*bcx*bx**2*cz - bcdz*bcx*by**2*cz - 
+     -       2*ax*bcdx*bcx*bz*cz - 2*ax*bcdy*bcy*bz*cz + 
+     -       bcdx*bcx*bx*bz*cz + bcdy*bcy*bx*bz*cz - 
+     -       ax*bcdz*bcx*cx*cz + bcdz*bcx*bx*cx*cz + 
+     -       bcdx*bcx*bz*cx*cz + bcdy*bcy*bz*cx*cz + 
+     -       bcdz*bcx*by*cy*cz + ax*bcdx*bcx*cz**2 + 
+     -       ax*bcdy*bcy*cz**2 - bcdx*bcx*bx*cz**2 - 
+     -       bcdy*bcy*bx*cz**2) + 
+     -    abcz*bcdz*(ax*bcy*(abx*bcx + bcy**2 + bcz**2) - 
+     -       ay*(bcx**3 + abx*bcy**2 + bcx*bcz**2) - az*bcy*bx*bz + 
+     -       az*bcx*by*bz - bcx*bx*by*cx - bcy*by**2*cx + 
+     -       az*bcy*bz*cx - bcy*bz**2*cx + bcx*by*cx**2 + 
+     -       bcx*bx**2*cy + bcy*bx*by*cy - az*bcx*bz*cy + 
+     -       bcx*bz**2*cy - bcx*bx*cx*cy + bcy*by*cx*cy - 
+     -       bcy*bx*cy**2 + az*bcy*bx*cz - az*bcx*by*cz + 
+     -       bcy*bx*bz*cz - bcx*by*bz*cz - az*bcy*cx*cz + 
+     -       bcy*bz*cx*cz + az*bcx*cy*cz - bcx*bz*cy*cz - 
+     -       bcy*bx*cz**2 + bcx*by*cz**2) - 
+     -    abcx*(az*bcy*(bcdz*(bcx**2 + bcy**2) - 
+     -          (bcdx*bcx + bcdy*bcy)*bcz) + 
+     -       ay*(bcdx*bcx*(bcx**2 + bcz**2) + 
+     -          bcy*(-(bcdz*bcy*bcz) + bcdy*(bcx**2 + bcz**2))) - 
+     -       ax*bcdx*bcx*bx*by - ax*bcdy*bcy*bx*by - 
+     -       ax*bcdz*bcy*bx*bz + ax*bcdx*bcx*by*cx + 
+     -       ax*bcdy*bcy*by*cx + bcdx*bcx*bx*by*cx + 
+     -       bcdy*bcy*bx*by*cx + ax*bcdz*bcy*bz*cx + 
+     -       bcdz*bcy*bx*bz*cx - bcdx*bcx*by*cx**2 - 
+     -       bcdy*bcy*by*cx**2 - bcdz*bcy*bz*cx**2 + 
+     -       ax*bcdx*bcx*bx*cy + ax*bcdy*bcy*bx*cy - 
+     -       bcdx*bcx*bx**2*cy - bcdy*bcy*bx**2*cy + 
+     -       bcdz*bcy*by*bz*cy - bcdx*bcx*bz**2*cy - 
+     -       bcdy*bcy*bz**2*cy - ax*bcdx*bcx*cx*cy - 
+     -       ax*bcdy*bcy*cx*cy + bcdx*bcx*bx*cx*cy + 
+     -       bcdy*bcy*bx*cx*cy - bcdz*bcy*bz*cy**2 + 
+     -       ax*bcdz*bcy*bx*cz - bcdz*bcy*bx**2*cz - 
+     -       bcdz*bcy*by**2*cz + bcdx*bcx*by*bz*cz + 
+     -       bcdy*bcy*by*bz*cz - ax*bcdz*bcy*cx*cz + 
+     -       bcdz*bcy*bx*cx*cz + bcdz*bcy*by*cy*cz + 
+     -       bcdx*bcx*bz*cy*cz + bcdy*bcy*bz*cy*cz - 
+     -       bcdx*bcx*by*cz**2 - bcdy*bcy*by*cz**2))/
+     -  (Sqrt(bc2)*((abcx*bcdx + abcy*bcdy + abcz*bcdz)**2 + 
+     -      (-(ax*bcdy*bx*by) + ax*bcdx*by**2 - ax*bcdz*bx*bz + 
+     -          ax*bcdx*bz**2 + ax*bcdy*by*cx + bcdy*bx*by*cx - 
+     -          bcdx*by**2*cx + ax*bcdz*bz*cx + bcdz*bx*bz*cx - 
+     -          bcdx*bz**2*cx - bcdy*by*cx**2 - bcdz*bz*cx**2 + 
+     -          ax*bcdy*bx*cy - bcdy*bx**2*cy - 2*ax*bcdx*by*cy + 
+     -          bcdx*bx*by*cy + bcdz*by*bz*cy - bcdy*bz**2*cy - 
+     -          ax*bcdy*cx*cy + bcdy*bx*cx*cy + bcdx*by*cx*cy + 
+     -          ax*bcdx*cy**2 - bcdx*bx*cy**2 - bcdz*bz*cy**2 + 
+     -          az*(bcdz*(bcx**2 + bcy**2) + 
+     -             bcz*(-(bcdx*bx) - bcdy*by + bcdx*cx + bcdy*cy)) + 
+     -          ax*bcdz*bx*cz - bcdz*bx**2*cz - bcdz*by**2*cz - 
+     -          2*ax*bcdx*bz*cz + bcdx*bx*bz*cz + bcdy*by*bz*cz - 
+     -          ax*bcdz*cx*cz + bcdz*bx*cx*cz + bcdx*bz*cx*cz + 
+     -          bcdz*by*cy*cz + bcdy*bz*cy*cz + ax*bcdx*cz**2 - 
+     -          bcdx*bx*cz**2 - bcdy*by*cz**2 + 
+     -          ay*(bcdy*(bcx**2 + bcz**2) + 
+     -             bcy*(-(bcdx*bx) - bcdz*bz + bcdx*cx + bcdz*cz)))**
+     -        2/bc2))
+
+
+
       return
       END
 
@@ -2060,9 +3144,9 @@ C     Coulomb repulsion from origin
       if (iopt.eq.2 .and. fco.ne.0.d0)  then
         Do I=1,n,3
           rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
-          x(I)  =x(I)  -fco*rinv*p(I)
-          x(I+1)=x(I+1)-fco*rinv*p(I+1)
-          x(I+2)=x(I+2)-fco*rinv*p(I+2)
+          x(I)  =x(I)  +fco*rinv*p(I)
+          x(I+1)=x(I+1)+fco*rinv*p(I+1)
+          x(I+2)=x(I+2)+fco*rinv*p(I+2)
         enddo
       endif
 

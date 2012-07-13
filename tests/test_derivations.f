@@ -1,4 +1,3 @@
-
       PROGRAM testderivations
       use config
       IMPLICIT REAL*8 (a-z)
@@ -6,9 +5,9 @@
       iout=6
       e=1.d-6
  
-      write(iout,1003)
+      write(iout,1000)
       write(*,*)"checking dist and ddist"
-      write(iout,1003)
+      write(iout,1000)
 
       testno=1
       minor=1
@@ -178,9 +177,9 @@
 
 
        
-      write(iout,1003)
+      write(iout,1000)
       write(*,*)"checking angle and dangle"
-      write(iout,1003)
+      write(iout,1000)
 
 
       testno=6
@@ -266,9 +265,9 @@
 
 
        
-      write(iout,1003)
+      write(iout,1000)
       write(*,*)"checking dihedral and ddihedral"
-      write(iout,1003)
+      write(iout,1000)
 
 
       testno=8
@@ -291,9 +290,10 @@
       else
         write(iout,2)testno,minor
       end if
-      call dangle(ax,ay,az,bx,by,bz,cx,cy,cz,
-     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc)
+      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
       minor=2
+c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       if(dabs(dax-(0.)).lt.e.and.
      2   dabs(day-(0)).lt.e.and.
      2   dabs(daz-(1)).lt.e.and.
@@ -311,11 +311,10 @@
         write(iout,2)testno,minor
       end if
 
-
       testno=9
       minor=1
       ax=1
-      ay=0
+      ay=1
       az=0
       bx=0
       by=0
@@ -323,30 +322,73 @@
       cx=-1
       cy=1
       cz=0
-      call angle(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
-      if(dabs(angle_abc - 3*dpi/4).lt.e) then
+      dx=-1
+      dy=1
+      dz=1
+      call dihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,angle_abcd)
+      if(dabs(angle_abcd - (-dpi/2)).lt.e) then
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
       end if
-      call dangle(ax,ay,az,bx,by,bz,cx,cy,cz,
-     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc)
+      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
       minor=2
-      if(dabs(dax-(0)).lt.e.and.
-     2   dabs(day-(-1)).lt.e.and.
-     2   dabs(daz-(0)).lt.e.and.
-     2   dabs(dbx-(.5)).lt.e.and.
-     2   dabs(dby-(1.5)).lt.e.and.
-     2   dabs(dbz-(0)).lt.e.and.
-     2   dabs(dcx-(-.5)).lt.e.and.
-     2   dabs(dcy-(-.5)).lt.e.and.
-     2   dabs(dcz-(0)).lt.e) then
+c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+      if(dabs(dax-(0.)).lt.e.and.
+     2   dabs(day-(0)).lt.e.and.
+     2   dabs(daz-(1/sqrt(2.))).lt.e.and.
+     2   dabs(dbx-(0)).lt.e.and.
+     2   dabs(dby-(0)).lt.e.and.
+     2   dabs(dbz-(-1/sqrt(2.))).lt.e.and.
+     2   dabs(dcx-(-1/sqrt(2.))).lt.e.and.
+     2   dabs(dcy-(-1/sqrt(2.))).lt.e.and.
+     2   dabs(dcz-(0)).lt.e.and.
+     2   dabs(ddx-(1/sqrt(2.))).lt.e.and.
+     2   dabs(ddy-(1/sqrt(2.))).lt.e.and.
+     2   dabs(ddz-(0.)).lt.e) then
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
       end if
-      minor=3
-      if(dabs(angle_abc - 3*dpi/4).lt.e) then
+
+
+      testno=10
+      minor=1
+      ax=1
+      ay=0
+      az=0
+      bx=0
+      by=1
+      bz=0
+      cx=-1
+      cy=-1
+      cz=0
+      dx=0
+      dy=0
+      dz=.2
+      call dihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,angle_abcd)
+      if(dabs(angle_abcd - (0.4205343353)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
+      minor=2
+c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+      if(dabs(dax-(0.)).lt.e.and.
+     2   dabs(day-(0)).lt.e.and.
+     2   dabs(daz-(-0.7453559925)).lt.e.and.
+     2   dabs(dbx-(0.4472135955)).lt.e.and.
+     2   dabs(dby-(-0.2236067977)).lt.e.and.
+     2   dabs(dbz-(-0.5217491947)).lt.e.and.
+     2   dabs(dcx-(0.298142397)).lt.e.and.
+     2   dabs(dcy-(-0.1490711985)).lt.e.and.
+     2   dabs(dcz-(-0.596284794)).lt.e.and.
+     2   dabs(ddx-(-0.7453559925)).lt.e.and.
+     2   dabs(ddy-(0.3726779962)).lt.e.and.
+     2   dabs(ddz-(1.863389981)).lt.e) then
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
@@ -355,6 +397,6 @@
 
  1    FORMAT('passed test ',I2,'.',I2,' ...')
  2    FORMAT('FAILED test ',I2,'.',I2,' ...')
- 1003 FORMAT(70('-'))
+ 1000 FORMAT(70('-'))
       stop
       END
