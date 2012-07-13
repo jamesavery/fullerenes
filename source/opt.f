@@ -1043,76 +1043,95 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-C     Lukas: The following subroutine iterates over
+C     Lukas: The following three subroutines iterate over
 C      1. edges
 C      2. corners
 C      3. dihedrals
-C     in linear time (i.e. O(1) time per element), while providing the information you asked for.
+C     in linear time (i.e. constant time per element), while providing the information you asked for.
 C
 C     Assumptions: 
 C     - g is a fullerene graph and has had a call to set_layout2d(g,layout2d) with its Tutte embedding as layout.
 C       (or another strictly planar layout)
 C     - N = Nvertices(g)
-      SUBROUTINE lukas_template(g,N)
-      use config
-      use iso_c_binding
-      integer edges(2,3*N/2), NE, i,j, r,s,t,u,v,w
-      integer neighbours(3,N), face(6), l, lA,lB,lC, np
-      integer pentagons(5,12), hexagons(6,N/2-10), NH
-      type(c_ptr) :: g
-
-      NH = N/2-10      
-      call edge_list(g,edges,NE)
-      call adjacency_list(g,3,neighbours)
-      call compute_fullerene_faces(g,pentagons,hexagons) ! Yields faces with vertices ordered CCW. O(N)
-
 C     ------------------------------------------------------------
 C                              EDGES
 C     ------------------------------------------------------------
+      SUBROUTINE lukas_edges(g,N)
+      use iso_c_binding
+      type(c_ptr) :: g
+      integer edges(2,3*N/2), faceA(6), faceB(6), NE, np, i, u, v, lA,lB
+
+      call edge_list(g,edges,NE)
+
       do i=1,NE
 C        Edge u--v
          u = edges(1,i)
          v = edges(2,i)
 
 C     Edge is part of how many pentagons?
-         np = 0
-         call get_arc_face(g,u,v,face,l) ! O(1) operation
-         if(l.eq.5) then np = np+1
-         call get_arc_face(g,v,u,face,l) ! O(1) operation
-         if(l.eq.5) then np = np+1
-
+         call get_arc_face(g,u,v,faceA,lA) ! O(1) operation
+         call get_arc_face(g,v,u,faceB,lB) ! O(1) operation
+         np = 12-lA-lB
+         
 C     Do what needs to be done to u--v here
+         write (*,*) "Edge ",(/u,v/)," connects ",np,"pentagons.",lA,lB
       end do
-      
+
+      END SUBROUTINE
+
 C     ------------------------------------------------------------
-C                              ANGLES
+C                              CORNERS
 C     ------------------------------------------------------------
+      SUBROUTINE lukas_corners(g,N)
+      use iso_c_binding
+      type(c_ptr) :: g
+      integer pentagons(5,12), hexagons(6,N/2-10), u,v,w,i,j
+      integer NH
+
+      NH = N/2-10
+
+      call compute_fullerene_faces(g,pentagons,hexagons) ! Yields faces with vertices ordered CCW. O(N)
 C     Every directed edge u->v is part of two "angles", corresponding to the neighbours to v that aren't u,
 C     corresponding to both a CW and a CCW traversal starting in the edge. (Likewise, every edge is part of four)
 C     The angles are each counted exactly once if we trace the outline of each face in e.g. CCW order.
       do i=1,12
 C     iterate over angles u--v--w
+         write (*,*) "Pentagon number",i,"has corners:"
          do j=1,5
-            u = pentagons(i,j)
-            v = pentagons(i,MOD(j,5)+1)
-            w = pentagons(i,MOD(j+1,5)+1)
+            u = pentagons(j,i)
+            v = pentagons(MOD(j,5)+1,i)
+            w = pentagons(MOD(j+1,5)+1,i)
 C     Do what needs to be done to u--v--w here. Each of these are part of a pentagon, obviously.
+
+            write (*,*) j,":",(/u,v,w/)
          end do
       end do
 
       do i=1,NH
+         write (*,*) "Hexagon number",i,"has corners:"
 C     iterate over angles u--v--w
          do j=1,6
-            u = hexagons(i,j)
-            v = hexagons(i,MOD(j,6)+1)
-            w = hexagons(i,MOD(j+1,6)+1)
+            u = hexagons(j,i)
+            v = hexagons(MOD(j,6)+1,i)
+            w = hexagons(MOD(j+1,6)+1,i)
 C     Do what needs to be done to u--v--w here. Each of these are part of a hexagon, obviously.
+
+            write (*,*) j,":",(/u,v,w/)
          end do
       end do
+      END SUBROUTINE
+
 
 C     ------------------------------------------------------------
 C                              DIHEDRALS
 C     ------------------------------------------------------------
+      SUBROUTINE lukas_dihedrals(g,N)
+      use iso_c_binding
+      integer neighbours(3,N), face(6), lA,lB,lC, u,s,r,t
+      type(c_ptr) :: g
+
+      call adjacency_list(g,3,neighbours)
+
       do u=1,N
 C      s   B   t      
 C        \   /
@@ -1122,13 +1141,15 @@ C          r
          r = neighbours(1,u)
          s = neighbours(2,u)
          t = neighbours(3,u)
-         
+
+         write (*,*) "Dihedral ",u-1,s-1,r-1,t-1
          call get_face(g,s,u,r,6,face,lA)
          call get_face(g,s,u,t,6,face,lB)
          call get_face(g,r,u,t,6,face,lC)
 
          select case ( lA+lB+lC )
          case ( 15 )            ! (5,5,5) - all pentagons
+            write (*,*) "555"
 C     Do stuff here
          case ( 16 )            ! Two pentagons, one hexagon
 C     Do stuff common to all three (2,1)-cases here
@@ -1136,8 +1157,11 @@ C     Do stuff common to all three (2,1)-cases here
 C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 655 )  ! BC are pentagons, u--t common edge
+               write (*,*) "655"
             case ( 565 )  ! AC are pentagons, u--r common edge
+               write (*,*) "565"
             case ( 556 )  ! AB are pentagons, u--s common edge
+               write (*,*) "556"
             end select
 
          case ( 17 )            ! One pentagon, two hexagons
@@ -1146,14 +1170,20 @@ C     Do stuff common to all three (1,2)-cases here
 C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 566 )  ! BC are hexagons, u--t common edge
+               write (*,*) "566"
             case ( 656 )  ! AC are hexagons, u--r common edge
+               write (*,*) "656"
             case ( 665 )  ! AB are hexagons, u--s common edge
+               write (*,*) "665"
             end select
 
          case ( 18 )            ! (6,6,6) - all hexagons
 C     Do stuff here
+            write (*,*) "666"
+         case DEFAULT
+            write (*,*) "INVALID: ",(/lA,lB,lC/)
          end select
 
       end do
-
       END SUBROUTINE
+

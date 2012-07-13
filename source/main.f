@@ -16,6 +16,7 @@
 !---------------------------------------------------------------------------!
 
       PROGRAM Fullerene
+      use iso_c_binding
       use config
 
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -48,6 +49,7 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*3 GROUP
       Integer endzeile,Values(8)
       Integer MDist(Nmax,Nmax)
+      type(c_ptr) :: graph, new_fullerene_graph
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
      2 'MN','FE','CO','NI','CU','ZN','GA','GE','AS','SE','BR','KR',    
@@ -210,6 +212,14 @@ C Produce the nth leapfrog of the fullerene
       if(MAtom.gt.100) IHam=0
       if(LeapErr.eq.0) go to 999
       endif
+
+c$$$      graph = new_fullerene_graph(Nmax,MAtom,IDA)
+c$$$      call tutte_layout(graph,Dist2D)
+c$$$      call set_layout2d(graph,Dist2D)
+c$$$
+c$$$      call lukas_edges(graph,MAtom)
+c$$$      call lukas_corners(graph,MAtom)
+c$$$      call lukas_dihedrals(graph,MAtom)
 
 C Generate IUPAC name and locate Hamiltonian cycles. 
 C Routine written by D. Babic. Note routine
