@@ -341,7 +341,7 @@ void adjacency_list_(const fullerene_graph_ptr *g, const int *k, int *neighbours
 
   for(node_t u=0;u<ns.size();u++)
     for(int i=0;i<*k;i++)
-      neighbours[(*k)*u+i] = ns[u][i];
+      neighbours[(*k)*u+i] = ns[u][i]+1;
 }
 
 void compute_fullerene_faces_(const fullerene_graph_ptr *g, int *pentagons, int *hexagons)
@@ -363,7 +363,7 @@ void compute_fullerene_faces_(const fullerene_graph_ptr *g, int *pentagons, int 
 
   for(int i=0;i<NH;i++)
     for(int j=0;j<6;j++)
-      pentagons[i*6+j] = h[i][j];
+      hexagons[i*6+j] = h[i][j];
 }
 
 // Only works for trivalent graphs. 
