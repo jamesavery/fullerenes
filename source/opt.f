@@ -430,13 +430,15 @@ C       Conversion of dyn/cm in a.u. / Angstroem**2
       end if
       M=Matom/2+2
 C     Optimize
-      Write(IOUT,1000) Rdist
       select case(iopt)
       case(1)
+        Write(IOUT,1000) Rdist
         Write(Iout,1006) (force(i),i=1,8),ftol
       case(2)
+        Write(IOUT,1000) Rdist
         Write(Iout,1003) (force(i),i=1,9),ftol
       case(3)
+        Write(IOUT,1007) Rdist
         Write(Iout,1005) (force(i),i=1,18),ftol
       end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
@@ -456,9 +458,13 @@ C     Optimize
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
-     1 ' for stretching and bending modes using the force-field of ',
+     1 ' for stretching and bending modes using the force-field of',
      1 ' Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere algorithm used',
      1 /1X,'Smallest bond distance set to ',F12.6)
+ 1007 Format(1X,'Optimization of geometry using harmonic oscillators',
+     1 ' for stretching and bending modes using an extension of the',
+     1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
+     1 ' algorithm used',/1X,'Smallest bond distance set to ',F12.6)
  1001 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
  1002 FORMAT(1X,'Distances and angles defined in the force field can',
