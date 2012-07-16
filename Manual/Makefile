@@ -2,7 +2,7 @@
 .PHONY: all
 all: UserManual.pdf
 
-UserManual.pdf: UserManual.tex 
+UserManual.pdf: UserManual.tex Makefile 
 	pdflatex UserManual.tex
 	pdflatex UserManual.tex
 
