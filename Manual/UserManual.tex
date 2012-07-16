@@ -123,8 +123,8 @@ In the current version only regular fullerenes are considered (i.e. of genus 0 c
 fulfilling Euler's theorem, $n_v - n_e + n_f = 2$, where $n_v$ is the number of vertices (atoms), $n_e$ the number of edges (bonds), and 
 $n_f$ the number of faces (5- or 6-rings). The program constructs an accurate 3D structure (cartesian coordinates) of any fullerene isomer 
 from the canonical ring spiral pentagon indices (RSPI) through either the 3D Tutte embedding (3D-TE) \cite{Tutte} or the adjacency matrix
-eigenvector (AME) method \cite{Atlas}. One can also construct the $n$-th leapfrog $GC_{1,1}^n$[C$_{n_v}$] fullerene or a halma fullerene 
-$GC_{k,0}$[C$_{n_v}$] as a special case of a Goldberg-Coxeter transformation $GC_{k,l}$. Starting from a given fullerene structure one can 
+eigenvector (AME) method \cite{Atlas}. One can also construct the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene or a halma fullerene 
+$GC_{k,0}[C_{n_v}]$ as a special case of a Goldberg-Coxeter transformation $GC_{k,l}$. Starting from a given fullerene structure one can 
 perform vertex insertions (such as Endo-Kroto \cite{Endo92} or Yoshida-Fowler \cite{Yoshida97}) or Stone-Wales transformations \cite{Stone86}. 
 Vertex insertions allow for the construction of non-spiral fullerenes such as \C{380} or \C{384}. 
 Geometry optimization using a Fletcher-Reeves-Polak-Ribiere
@@ -141,7 +141,7 @@ total resonance energy of a general fullerene \cite{Babic1995,Babic1997}.
 This program works for any (distorted or not) regular fullerene. The spiral algorithm of Fowler and Manolopoulus used here \cite{Atlas}
 is not restricted to a pentagon start or to canonical indices. For a general list of fullerenes see ``The House of Graphs'' \cite{HouseofGraphs}. 
 The program produces an external file with default name {\bf Fullerene-3D.xyz} to be used for standard molecular plotting programs
-like CYLview \cite{CYLview}, Avogadro \cite{Avogadro}, Jmol \cite{JMol}, or Pymol \cite{Pymol}.  For using these programs 
+like CYLview \cite{CYLview}, Avogadro \cite{Avogadro}, Jmol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}.  For using these programs 
 it is important that the fullerene has a reasonable structure, obtained for example by a force-field 
 optimization, otherwise bonds cannot be correctly identified. It may therefore not be advisable to use structures that come out directly from
 the AME or 3D-TE algorithm. We recommend CYLview, it is more robust and works for large fullerenes up to about 1000 atoms. 
@@ -237,7 +237,7 @@ database} if the canonical fullerene number is used as defined in the book ``Atl
 We recommend reading this book for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
 to construct 3D fullerene graphs.  For the AME algorithm it is critical to get the right 
 H\"uckel eigenvectors for the construction of cartesian coordinates \cite{Atlas}. 
-The position of the 3 $P$-type eigenvectors can be specified (see file {\it pentagon8.inp} for such an example).
+The position of the 3~$P$-type eigenvectors can be specified (see file {\it pentagon8.inp} for such an example).
 If the AME algorithm fails or you cannot find the $P$-type eigenvectors, you should use our Tutte embedding algorithm,
 which to our opinion is less troublesome and may be used as the standard method to construct 3D structures.
 The structure can also be obtained from a Goldberg-Coxeter transformation of \C{20}.
@@ -273,7 +273,7 @@ too demanding when calculating fullerenes beyond \C{100}. Moreover, the database
 \C{100}, and up to \C{120} for all IPR isomers. Fowler and Manolopoulus use a numbering scheme ($N_{isomers}= 1,\dots, n_{max}$) 
 obtained from the natural sequence of canonical RSPIs to distinguish between the different isomers \cite{Atlas}. From their book \cite{Atlas} the
 general isomer number can be taken and the RSPIs for a specific isomer up to \C{100} can be read-in from the database provided. 
-The numbering scheme for IPR isomers only ($N_{isomers}^{IPR}= 1,\dots, n_{max}$) can also be used up to \C{120}, see input file {\it database.inp}.
+The numbering scheme for IPR isomers only ($N_{\mathrm{isomers}}^{IPR}= 1,\dots, n_{max}$) can also be used up to \C{120}, see input file {\it database.inp}.
 
 \subsection{H\"uckel analysis and topological indicators}
 From the adjacency matrix $A_{ij}$ a H\"uckel analysis is performed (Subroutine {\bf Hueckel}). This gives you a good hint if the 
@@ -303,8 +303,10 @@ In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \
 for multiple leapfrog transformations for the construction of very large fullerenes. A general $GC_{k,l}(n)$  for all values of $k$ and $l$ 
 is currently in preparation. 
 
-The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ works in the following way:
-($i$) consider a cubic planar graph $G_{0}$ and take its dual (faces become vertices and
+The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ works in the following way: ($i$) consider
+a cubic planar 
+\marc{redundant?}
+graph $G_{0}$ and take its dual (faces become vertices and
 vertices become faces), $D_{t}(G_{0})$. This transforms the graph $G_{0}$
 with $n_v$ vertices into a triangulation, i.e. a geodesic sphere with $n_v$ triangles. (\textit{ii})
 each triangle $T_{k}$ ($k=1, \dots, n_{v}$) of the geodesic sphere is
@@ -315,12 +317,14 @@ together with other non-triangle faces, new triangles are formed and we end up w
 i.e. a larger geodesic sphere $GC_{k,l}D_{t}(G_{0})$.
 (\textit{iii}) Finally we take the dual which yields a new fullerene,
 \begin{equation}
-\label{eq:GC}
-  G_1 = GC_{k,l}[G_0] = D_t GC_{k,l} D_t(G_0)
+ 	G_1 = GC_{k,l}[G_0] = D_t GC_{k,l} D_t(G_0)
+	\label{eq:GC}
 \end{equation}
+
 If the initial graph $G_0$ has $n_v$ vertices, the number of vertices of $GC_{k,l}[G_0]$ is
-\begin{equation}\label{eq:GCvertexcount} 
-  n_v^{GC} = t(k,l)n_v = (k^2 + kl + l^2)n_v
+\begin{equation}
+	n_v^{GC} = t(k,l)n_v = (k^2 + kl + l^2)n_v
+	\label{eq:GCvertexcount} 
 \end{equation}
 $t(k,l)$ is called the {\em triangulation number}. We work with the dual triangulation instead of a hexagonal mesh as it is easier to implement.
 
@@ -352,7 +356,7 @@ hexagon bond distances ($\approx$ 1.4 \AA), and $\theta _p $ and $\theta _h$ are
 respectively).
 
 The force-field optimization is very fast even for fullerenes such as \C{840}. 
-The Wu force-field optimization may in some cases distort the fullerene from the ideal point group symmetry. Moreover, as no
+The Wu force-field optimization may in some cases distort the fullerene to a structure of lower symmetry. Moreover, as no
 dihedral angles are fixed, the molecule might distort away from convexity. In such cases an additional Coulomb repulsive potential can
 be added (see input instructions) in a preoptimization step.  That the construction of the fullerene by using the AME or Tutte algorithm may
 lead to a more spherical arrangement, e.g. barrels instead of nanotubes, the latter come out from a force-field optimization. 
@@ -374,7 +378,7 @@ insertions (subroutine {\bf YoshidaFowler6}) \cite{Yoshida97}, or the a WS 6-ver
 we developed, see input files {\it c50EK.inp, c60SW.inp, c80YF.inp}. 
 Non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with these vertex insertion methods, see input files {\it c380.inp} 
 and {\it c384.inp}. The two structures obtained with the program PYMOL are shown in Figure \ref{pic:C380andC384}.
-\marc{actually, the structures were not obtained by pymol ...}
+\marc{actually, the structures were not obtained by pymol ... (the picture are, though)}
 
 %Figure 2
  \begin{figure}[htbp]
@@ -398,8 +402,8 @@ The volume and surface area of the fullerene are calculated in Subroutine {\bf V
 3) The tesselation into trigonal pyramids from the barycenter by summing over all tetrahedrons spanned
 by the three vectors (identical to algorithm 1 and 2 if the polyhedron is convex).  A sum over all
 tetrahedrons spanned by the three vectors CM-CR (center(mass)-center(ring): barycenter of fullerene to the ring center),
-CM-CA1 (barycenter of fullerene to atom 1 in ring), and CM-CA2 (barycenter of fullerene  to atom 2 in ring) is calculated.
-There are 5 such tetrahedrons in a pentagon and 6 in a hexagon.  The barycenter CM has been set to the orign in a previous step.
+CM-CA1 (barycenter of fullerene to atom~1 in ring), and CM-CA2 (barycenter of fullerene  to atom~2 in ring) is calculated.
+There are 5 such tetrahedrons in a pentagon and 6 in a hexagon.  The barycenter CM has been set to the origin in a previous step.
 
 In a similar way the surface area is obtained by summing over all triangles from the ring center to
 neighbouring vertices in the ring. $I_h$-\C{20} and $I_h$-\C{60} coordinates can be constructed easily
@@ -407,7 +411,7 @@ using basic geometry. For these, the volume and surface areas are known analytic
 
 The {\it isoperimetric quotient} (IPQ) is defined as
 \begin{equation}
- q_{\textrm IPQ} =36\pi \frac{V^{2} }{S^{3}}\quad\text{with}q_{\textrm IPQ}\quad\in [0,1]
+ q_{\textrm IPQ} =36\pi \frac{V^{2} }{S^{3}}\quad\text{with}\quad q_{\textrm IPQ}\in [0,1]
  \label{IPQ}
  \end{equation}
 which for an ideal sphere is trivially $q_{\textrm IPQ}=1$, and for zero volume $q_{\textrm IPQ}=0$. For \C{20} 
@@ -444,7 +448,7 @@ The MCS problem can be expressed as follows,
 \end{equation} 
 where $\|\cdot\| $ denotes the Eucledian norm and $\vec{c}_{MCS}$ is the center of the MCS. The MCS
 is uniquely defined and can be expressed as a convex combination of at most 
-($m+1$) points, hence our algorithm stops when 4 points are left over in the iteration process of the algorithm.
+($m+1$) points, hence our algorithm stops when 4~points are left over in the iteration process of the algorithm.
 The spherical central cover SCC is not the minimum covering sphere MCS
 (except if all distances from the center of points CM are the same as in the
 ideal capped icosahedron). The spherical central cover is taken from the
@@ -460,37 +464,40 @@ At the end, the Van der Waals radius of carbon (1.415\,\AA) is added to the radi
 (Input coordinates for this need to be in \AA{} otherwise you are required to change the program),
 and the volume of an ideal fcc solid is calculated. The Van der Waals radius is chosen such that
 for \C{60} the solid-state results of Heiney et al. \cite{Heiney91} are reproduced.
-In the case of nonplanar 5- or 6-rings there is no unique definition for the 
-volume of a fullerene, except for the convex hull. There is no reason, however, why any other definition should be preferred over the 
-fast tesselation algorithm employed in this program.
+In the case of nonplanar 5- or 6-rings there is no unique definition for the volume of a fullerene,
+except for the convex hull. There is no reason, however, why any other definition should be preferred
+over the fast tesselation algorithm employed in this program.
 
 The minimum distance sphere (MDS) of a fullerene is biased for the case that few atoms stick 
-out on a sphere and the MDS may be more appropriate for a measure from spherical distortion. The MDS radius is defined as
+out on a sphere and the MDS may be more appropriate for a measure from spherical distortion. The MDS 
+radius is defined as
 \begin{equation} 
-\label{eq:RMDS}
-R_{MDS} =\frac{1}{N} \sum _{i}^{}\left\| \vec{p}_{i} -\vec{c}_{MDS} \right\|   
+	R_{MDS} =\frac{1}{N} \sum _{i}^{}\left\| \vec{p}_{i} -\vec{c}_{MDS} \right\|   
+	\label{eq:RMDS}
 \end{equation} 
 
 The restriction of $\vec{c}_{MDS}$ to be inside the convex hull is necessary as the center may move
 out of the fullerene structure in the optimization.  One can now easily verify this definition is
 different from the MCS and generally $\vec{c}_{MDS}\ne\vec{c}_{MCP}$. This is a much better distortion
 parameter compared to $D_{MCS}$, as it is not biased to a few points lying outside or inside the sphere.
-The MDS may not be uniquely defined, as there can be many (even degenerate) local minima, but for most spherical fullerenes it should 
-just be fine.  Analogous to the MCS there we define a measure for distortion from spherical symmetry through the MDS,
+The MDS may not be uniquely defined, as there can be many (even degenerate) local minima, but for most
+spherical fullerenes it should just be fine.  Analogous to the MCS there we define a measure for distortion
+from spherical symmetry through the MDS,
 \begin{equation}
   \label{eq:DMDS}
-  D_{MDS} = \frac{100}{N r_{\min}} \sum_{i=1}^N \left|R_{MDS} - \|\vec{p}_i - \vec{c}_{MDS}\| \right|
+  D_{MDS} = \frac{100}{N r_{\mathrm{min}}} \sum_{i=1}^N \left|R_{\mathrm{MDS}} - \|\vec{p}_i - \vec{c}_{\mathrm{MDS}}\| \right|
 \end{equation}
 
 The maximum inner sphere (MIS) of a fullerene is important to estimate if there is space inside the cage for endohedral atoms or molecules. It is
 defined as
-\begin{equation} \label{MES} 
+\begin{equation}
 	\max\limits_{c_{\mathrm{MES}} \in \mathrm{CH}(S)} \min\limits_{i} \left\| \vec{p}_{i} -\vec{c}_{\mathrm{MES}} \right\|  
+	\label{MES} 
 \end{equation}
 
 For ideal \C{60} ($I_h$ symmetry) MCS and MES are identical. 
 For this the radius and volume is printed  with the Van der Waals
-radius of carbon taken off $R_{MDS}$. 
+radius of carbon taken off $R_{\mathrm{MDS}}$. 
 
 \advance\leftskip -1.5cm
 }
@@ -543,7 +550,7 @@ parameter to be determined. The distances in eq.\eqref{eq:Eppg} are defined thro
 distance matrix $D$,
 \begin{equation}
 	\label{GrindEQ__20_}
-  	d_{\mathrm{max}} = \max_{j,j_P}\left\{ D_{ij_P} \right\}\quad\text{and}d_{ip} = \min_{j_P}\left\{ D_{ij_P} \right\}
+  	d_{\mathrm{max}} = \max_{j,j_P}\left\{ D_{ij_P} \right\}\quad\text{and}\quad d_{ip} = \min_{j_P}\left\{ D_{ij_P} \right\}
 \end{equation}
 where  $j_P$ is the vertex number belonging to the (5 or 6) peripheral vertices.  Instead of a
 simulated annealing algorithm we start with a Tutte 2D graph and perform a minimization procedure for $E_{PPG}$.
@@ -772,7 +779,7 @@ The different algorithms for drawing 2D fullerene graphs are shown in Figure \re
 
 %Figure 3
  \begin{figure}[htbp]
-   	\begin{center}
+	\centering
   		\includegraphics[width=0.2\textwidth]{Graph1.png}
 		\includegraphics[width=0.2\textwidth]{Graph2.png}
 		\includegraphics[width=0.2\textwidth]{Graph3.png}
@@ -781,9 +788,8 @@ The different algorithms for drawing 2D fullerene graphs are shown in Figure \re
 		\includegraphics[width=0.2\textwidth]{Graph6.png}
 		\includegraphics[width=0.2\textwidth]{Graph7.png}
 		\includegraphics[width=0.2\textwidth]{Graph8.png}
-         \label{pic:Graph2D}
+        \label{pic:Graph2D}
         \caption{From the left to right: 2D fullerene structures created using {\bf ISchlegel}=1 to 8.}
-   	\end{center}
  \end{figure}
               
 \section{Fullerene Isomer Database}
