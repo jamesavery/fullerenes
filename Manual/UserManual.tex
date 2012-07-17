@@ -303,19 +303,17 @@ In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \
 for multiple leapfrog transformations for the construction of very large fullerenes. A general $GC_{k,l}(n)$  for all values of $k$ and $l$ 
 is currently in preparation. 
 
-The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ works in the following way: ($i$) consider
-a cubic planar 
-\marc{redundant?}
-graph $G_{0}$ and take its dual (faces become vertices and
+The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ used here works in the following way: ($i$) consider
+a cubic planar graph $G_{0}$ and take its dual (faces become vertices and
 vertices become faces), $D_{t}(G_{0})$. This transforms the graph $G_{0}$
-with $n_v$ vertices into a triangulation, i.e. a geodesic sphere with $n_v$ triangles. (\textit{ii})
+with $n_v$ vertices into a triangulation, i.e. a geodesic sphere with $n_v$ triangles; (\textit{ii})
 each triangle $T_{k}$ ($k=1, \dots, n_{v}$) of the geodesic sphere is
 subdivided into another set of faces $t_i$ using the Coxeter indices ($k,l$).
 If the obtained new smaller faces $t_i$ are not
 triangles themselves within one $T_k$, when neighboring $T_k$s are glued
 together with other non-triangle faces, new triangles are formed and we end up with a new triangulation,
-i.e. a larger geodesic sphere $GC_{k,l}D_{t}(G_{0})$.
-(\textit{iii}) Finally we take the dual which yields a new fullerene,
+i.e. a larger geodesic sphere $GC_{k,l}D_{t}(G_{0})$;
+(\textit{iii}) finally we take the dual which yields a new fullerene,
 \begin{equation}
  	G_1 = GC_{k,l}[G_0] = D_t GC_{k,l} D_t(G_0)
 	\label{eq:GC}
@@ -377,8 +375,7 @@ Yoshida-Fowler 4-vertex ($D_{3h}$ 6555) (subroutine {\bf YoshidaFowler4}) and 6-
 insertions (subroutine {\bf YoshidaFowler6}) \cite{Yoshida97}, or the a WS 6-vertex (6-55-55) insertion 
 we developed, see input files {\it c50EK.inp, c60SW.inp, c80YF.inp}. 
 Non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with these vertex insertion methods, see input files {\it c380.inp} 
-and {\it c384.inp}. The two structures obtained with the program PYMOL are shown in Figure \ref{pic:C380andC384}.
-\marc{actually, the structures were not obtained by pymol ... (the picture are, though)}
+and {\it c384.inp}. The two structures obtained from a force-field optimization are shown in Figure \ref{pic:C380andC384} using program PYMOL \ref{Pymol}.
 
 %Figure 2
  \begin{figure}[htbp]
@@ -695,9 +692,8 @@ Fletcher-Reeves-Polak-Ribiere algorithm. There are more sophisticated force fiel
 e.g. {\it Avogadro} has a more sophisticated force-field which you can try out.
 but for these general parameters for fullerenes are not yet available, and the Wu force field does the 
 job to create good initial cartesian coordinates for further refinement using more sophisticated QM methods. 
-A converged energy much greater than zero implies that the set distances and angles in the Wu force field cannot be
+A converged energy $E$ much greater than zero (i.e. $E$>0.5) implies that the set distances and angles in the Wu force field cannot be
 reached for all atoms and rings.\\
-\marc{we need a number because any number is much greater than zero}
 If {\bf Iopt} = 2  Preoptimize with input force field, then optimize with standard Wu force field. This is especially useful for {\bf fcoulomb} 
 input (see below).  \\
 {\bf ftol}: The convergence tolerance on the energy (Default: $5.0 \times 10^{-8}$)
@@ -705,7 +701,7 @@ input (see below).  \\
 distances R5, R6, and angles A5, A6. The force constants are: distance WufR and
 angles WufA (see paper by Wu et al. for details \cite{Wu87}). Defaults: {\bf WuR5} =  1.455, {\bf WuR6} = 1.391, {\bf WuA5} = 1.08d2, 
 {\bf WuA6} = 1.2d2, {\bf WufR} = 1.d6, {\bf WufA} = 1.d5
-If {\bf fCoulomb} $>$ 0. then add an additional repulsive Coulomb force from the barycenter to all atoms (Default:  {\bf fCoulomb} = 0.d0)
+If {\bf fCoulomb} $>$ 0.0 then add an additional repulsive Coulomb force from the barycenter to all atoms (Default:  {\bf fCoulomb} = 0.d0)
 This is extremely useful for an initial geometry optimization to keep the fullerene cage convex if for example the Tutte construction leads to not
 a good guess of the initial structure. In such cases {\bf fCoulomb} = 1.d2 is a good choice.\\\\
 
@@ -775,7 +771,9 @@ If {\bf IFS} = 2: A data file named {\bf filename-2D.dat} is produced which cont
 for producing a 2D fullerene graph with a plotting program.\\
 If {\bf IFS} = 3: Both files are produced.\\
 If {\bf ndual} = 1: The dual graph is drawn as well in texfile {\bf filename-2D.tex}. (Default: 0).\\
-The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{pic:Graph2D}.
+The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{pic:Graph2D}. Note that for very large
+fullerenes which are far from spherical symmetry the algorithms here may not produce the best 2D graph representation.
+We are working on this problem at the moment.
 
 %Figure 3
  \begin{figure}[htbp]
@@ -803,9 +801,8 @@ constructed easily from the database. An example is given in the input file
 intention to extend the isomer list beyond \C{100}/\C{120} (without Hamiltonian cycles). 
 New lists will be available on our website.  The determination of the number of
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
-computationally too demanding. The longest file for our database ran for 3~months on a single processor.
+computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
 The directory database needs to be in the same directory as ``source'' or ``libgraph''.
-\marc{we need to either specify the processor or not mention it at all}
 
 
 %References
