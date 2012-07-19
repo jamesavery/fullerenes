@@ -1,8 +1,9 @@
-      SUBROUTINE Datain(IN,IOUT,NAtomax,NA,IC,Iopt,IP,IHam,ihueckel,KE,
-     1 IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,leap,GCtrans,iupac,
-     1 Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,ixyz,ichk,isonum,loop,mirror,
-     1 ilp,IYF,IWS,nzeile,ifs,ndual,PS,TolX,R5,R6,Rdist,scale,scalePPG,
-     1 ftol,force,forceP,filename,DATEN)
+      SUBROUTINE Datain(IN,IOUT,NAtomax,NA,ICart,Iopt,IP,IHam,
+     1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
+     1 leap,GCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
+     1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,
+     1 ndual,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,force,
+     1 forceP,filename,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
@@ -10,7 +11,7 @@
       integer endzeile
       Character*1 DATEN(nzeile)
       Character filename*20
-      Namelist /Coord/ IC,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
+      Namelist /Coord/ ICart,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,GCtrans,ihueckel,ISW,KE,loop,mirror,
      1 IYF,IWS,filename
       Namelist /FFChoice/ Iopt,ftol
@@ -76,7 +77,7 @@ C Default parameters for external files
 
 C Integers
       GCtrans=0 !  Initial flag for Goldberg-Coxeter transformed fullerene
-      IC=1      !  Input for fullerene structure
+      ICart=1   !  Input for fullerene structure
       ichk=0    !  Option for restarting the isomer list
       IER=0     !  Error flag
       ifs=0     !  Option for .dat and .tex files
@@ -211,8 +212,8 @@ C ExtWu force field
       endif
 
 C Set IC and ichk parameters
-      if(IC.lt.0) IC=0
-      if(IC.gt.5) IC=5
+      if(ICart.lt.0) ICart=0
+      if(ICart.gt.5) ICart=5
       if(ichk.ne.0) istop=1
 
 C  Check on number of atoms (vertices)
