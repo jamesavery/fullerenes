@@ -492,7 +492,7 @@ C     Analyze dual matrix
  2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
  2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
  2002 Format(A18)
-      end
+      END
 
       SUBROUTINE Spiral(N,IPR,Iout,
      1 Isonum,IsoIPR,iham,IDA,A)
@@ -1414,7 +1414,7 @@ C Produce number of electrons in HOMO, degeneracy and gap
   111 Continue
       
       Return
-      End
+      END
 
 C     Inputs: M, IPR, S(M)
 C     Output: D(M,M)
@@ -1428,7 +1428,7 @@ C     Output: D(M,M)
             D(i,j) = bigD(i,j)
          enddo
       enddo   
-      end subroutine
+      END
 
       SUBROUTINE Windup(M,IPR,IER,S,D)
       use config

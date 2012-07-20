@@ -55,7 +55,7 @@ C Analyze eigenenergies
  1000 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix')
  1001 FORMAT(/1X,'Skip diagonalization of Hueckel matrix')
       return
-      end
+      END
 
       Subroutine HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -172,4 +172,4 @@ C     Bandgap
  1009 FORMAT(/1X,'Fullerene has a properly closed shell')
  1010 FORMAT(/1X,'Fullerene has a pseudo closed shell')
       Return
-      End 
+      END 

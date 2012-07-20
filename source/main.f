@@ -79,7 +79,7 @@ C  (and same at the end of this routine) or substitute them with your
 C  compiler specific option. Next two are g77 options
 CG77    CALL Date(CDAT)
 CG77    CALL Time(CTIM)
-        call date_and_time(CDAT,CTIM,zone,values)
+        CALL date_and_time(CDAT,CTIM,zone,values)
         TIMEX=0.d0
         CALL Timer(TIMEX)
 C       WRITE(IOUT,1000) CDAT,CTIM,Nmax
@@ -150,7 +150,7 @@ C identify P-type eigenvectors and construct the 3D fullerene
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
      1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP)
       Do I=1,Matom
-       IAtom(I)=6
+        IAtom(I)=6
       enddo
       CALL Chiral(Iout,GROUP)
 
@@ -194,23 +194,23 @@ C Establish Connectivities
 
 C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
-      routine='HUECKEL      '
-      Write(Iout,1008) routine
-      CALL Hueckel(MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
+        routine='HUECKEL      '
+        Write(Iout,1008) routine
+        CALL Hueckel(MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
       endif
 
 C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
-      routine='Leapfrog'
-      Write(Iout,1008) routine
-      CALL GoldbergCoxeter(MAtom,Iout,leap,leapGC,IGC1,IGC2,
-     1 ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
-      leap=0
-      leapGC=0
-      ipent=1
-      leapspiral=1
-      if(MAtom.gt.100) IHam=0
-      if(LeapErr.eq.0) go to 999
+        routine='Leapfrog'
+        Write(Iout,1008) routine
+        CALL GoldbergCoxeter(MAtom,Iout,leap,leapGC,IGC1,IGC2,
+     1   ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
+        leap=0
+        leapGC=0
+        ipent=1
+        leapspiral=1
+        if(MAtom.gt.100) IHam=0
+        if(LeapErr.eq.0) go to 999 ! moveCM
       endif
 
 c$$$      graph = new_fullerene_graph(Nmax,MAtom,IDA)
@@ -229,18 +229,18 @@ C to calculate the number of all distinct paths between
 C adjacent vertices
       routine='HAMILTON     '
       Write(Iout,1008) routine
-       maxiter=maxit
+      maxiter=maxit
       if(IHam.gt.1.and.IHam.le.9) then
-       maxiter=10**IHam
+        maxiter=10**IHam
       endif
-      if(IHam.ne.0.and.ISW.eq.0) then
-       if(iupac.ne.0) then
-         CALL Hamilton(MAtom,Iout,iprintf,maxiter,IC3)
-       else
-         CALL HamiltonCyc(MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
-         WRITE(Iout,1010) Nhamilton
-         if(nbatch.ne.0) WRITE(Iout,1014)
-       endif
+      if(IHam.ne.0.and.ISW.eq.0.and.iyf.eq.0.and.iws.eq.0) then
+        if(iupac.ne.0) then
+          CALL Hamilton(MAtom,Iout,iprintf,maxiter,IC3)
+        else
+          CALL HamiltonCyc(MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
+          WRITE(Iout,1010) Nhamilton
+          if(nbatch.ne.0) WRITE(Iout,1014)
+        endif
       endif
       CALL Paths(MAtom,IOUT,IDA,A,evec,df)
 
@@ -285,25 +285,25 @@ c a stone wales (or any other transformation) is done
 
 C Print out Coordinates used as input for CYLview
       if(icyl.le.2.and.ISW.eq.0) then
-      Open(unit=3,file=xyzname,form='formatted')
-      routine='PRINTCOORD   '
-      Write(Iout,1008) routine
-      WRITE(Iout,1002) xyzname 
-      endzeile=0
-       do j=1,nzeile
-        if(TEXTINPUT(j).ne.' ') endzeile=j
-       enddo
-      if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,
-     1 (TEXTINPUT(I),I=1,endzeile)
-      if(MAtom.ge.100.and.MAtom.lt.1000) 
-     1 WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-      if(MAtom.ge.1000.and.MAtom.lt.10000) 
-     1 WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-      Do J=1,MAtom
-      IM=IAtom(J)      
-      Write(3,1007) El(IM),(Dist(I,J),I=1,3)
-      enddo
-      Close(unit=3)
+        Open(unit=3,file=xyzname,form='formatted')
+        routine='PRINTCOORD   '
+        Write(Iout,1008) routine
+        WRITE(Iout,1002) xyzname 
+        endzeile=0
+        do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo
+        if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,
+     1    (TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.100.and.MAtom.lt.1000) 
+     1    WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.1000.and.MAtom.lt.10000) 
+     1    WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        Do J=1,MAtom
+          IM=IAtom(J)      
+          Write(3,1007) El(IM),(Dist(I,J),I=1,3)
+        enddo
+        Close(unit=3)
       endif
 
 C Rings
@@ -322,68 +322,68 @@ C Analyze ring connections
 
 C Perform Stone-Wales transformation
       if(ISW.ne.0) then
-      routine='STONE-WALES  '
-      Write(Iout,1008) routine
-      CALL StoneWalesTrans(Matom,IN,Iout,numbersw,nSW,
-     1 ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
-      ISW=0
-      ipent=1
-      SWspiral=1
-      go to 999
+        routine='STONE-WALES  '
+        Write(Iout,1008) routine
+        CALL StoneWalesTrans(Matom,IN,Iout,numbersw,nSW,
+     1   ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+        ISW=0
+        ipent=1
+        SWspiral=1
+        go to 999 ! moveCM
       endif
 
 C Perform Endo-Kroto 2-vertex insertion
       if(KE.ne.0) then
-      routine='ENDO-KROTO   '
-      Write(Iout,1008) routine
-      CALL EndoKrotoTrans(Matom,IN,Iout,n565,NEK,ihueckel,
-     1 IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
-      KE=0
-      ipent=1
-      SWspiral=1
-      go to 999
+        routine='ENDO-KROTO   '
+        Write(Iout,1008) routine
+        CALL EndoKrotoTrans(Matom,IN,Iout,n565,NEK,ihueckel,
+     1   IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
+        KE=0
+        ipent=1
+        SWspiral=1
+        go to 999 ! moveCM
       endif
 
 C Perform Yoshida-Fowler 4-or 6-vertex insertion
       if(IYF.ne.0) then
-      routine='YOSHIDAFOWLER'
-      Write(Iout,1008) routine
-      if(IYF.le.2) then
-      CALL YoshidaFowler4(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
-     1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
-      else
-      IYF=IYF-2
-      CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,nYF,
-     1 ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
-      endif
-      IYF=0
-      ipent=1
-      SWspiral=1
-      if(JERR.eq.0) go to 999
+        routine='YOSHIDAFOWLER'
+        Write(Iout,1008) routine
+        if(IYF.le.2) then
+         CALL YoshidaFowler4(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
+     1    ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
+        else
+          IYF=IYF-2
+          CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,nYF,
+     1     ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+        endif
+        IYF=0
+        ipent=1
+        SWspiral=1
+        if(JERR.eq.0) go to 999 ! moveCM
       endif
 
 C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
       if(IWS.ne.0) then
-      routine='WIRZSCHWERD  '
-      Write(Iout,1008) routine
-      CALL WirzSchwerd(Matom,IN,Iout,JERR,numberWS,IWS,
-     1 nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
-     1 A,evec,df,Dist,Dist2D,distp,Rdist)
-      IWS=0
-      ipent=1
-      SWspiral=1
-      if(JERR.eq.0) go to 999
+        routine='WIRZSCHWERD  '
+        Write(Iout,1008) routine
+        CALL WirzSchwerd(Matom,IN,Iout,JERR,numberWS,IWS,
+     1   nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
+     1   A,evec,df,Dist,Dist2D,distp,Rdist)
+        IWS=0
+        ipent=1
+        SWspiral=1
+        if(JERR.eq.0) go to 999 ! moveCM
       endif
 
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0) then
-      routine='SPIRALSEARCH '
-      Write(Iout,1008) routine
-      CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
-     1 Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
-     1 GROUP)
+        routine='SPIRALSEARCH '
+        Write(Iout,1008) routine
+        CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
+     1   Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
+     1   GROUP)
 C Determine if fullerene is chiral
-      CALL Chiral(Iout,GROUP)
+        CALL Chiral(Iout,GROUP)
       endif
 C Topological Indicators
       Call TopIndicators(Matom,Iout,IDA,Mdist)
@@ -414,19 +414,19 @@ C Calculate the maximum inner sphere
 
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
-      routine='GRAPH2D      '
-      Write(Iout,1008) routine
-      if(ISchlegel.eq.2) then
-       if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
-       ParamS=anglew
-       WRITE(IOUT,1006) ParamS
-       endif
-      else
-       ParamS=dabs(ParamS)
-      endif
-      CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
-     1 NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
-     1 TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,filename)
+        routine='GRAPH2D      '
+        Write(Iout,1008) routine
+        if(ISchlegel.eq.2) then
+          if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
+            ParamS=anglew
+            WRITE(IOUT,1006) ParamS
+          endif
+        else
+          ParamS=dabs(ParamS)
+        endif
+        CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
+     1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
+     1   TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,filename)
       endif
 
 C  E N D   O F   P R O G R A M
@@ -437,7 +437,7 @@ C  E N D   O F   P R O G R A M
       go to 9 ! datain
  102  iprev=1
       WRITE(IOUT,1019) 
-      go to 9 
+      go to 9 ! datain
 CG77 99  CALL TIME(CTIM)
 CG77 99  CALL TIME(CTIM)
 9999  call date_and_time(CDAT,CTIM,zone,values)
