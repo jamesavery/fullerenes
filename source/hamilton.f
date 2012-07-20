@@ -167,7 +167,7 @@ C     if (oldptr.gt.0) go to 5
 
 1000  Format(1X,'Batch ',I3,' of Hamiltonian cycles: ',I10)
       return
-      end
+      END
 
       SUBROUTINE Hamilton(n,Iout,iprint,maxiter,IC3)
 C     Subroutine from Darko Babic to create Hamitonian cycles
@@ -452,7 +452,7 @@ C     if (oldptr.gt.0) go to 5
  1010 format (I10,' Maximum Hamiltonian cycles reached: Return')
  1011 format (1X,' Hamiltonian cycle detected')
       return
-      end
+      END
 
       SUBROUTINE Paths(MAtom,IOUT,IA,A,evec,df)
       use config

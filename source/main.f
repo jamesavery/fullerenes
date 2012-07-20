@@ -79,7 +79,7 @@ C  (and same at the end of this routine) or substitute them with your
 C  compiler specific option. Next two are g77 options
 CG77    CALL Date(CDAT)
 CG77    CALL Time(CTIM)
-        call date_and_time(CDAT,CTIM,zone,values)
+        CALL date_and_time(CDAT,CTIM,zone,values)
         TIMEX=0.d0
         CALL Timer(TIMEX)
 C       WRITE(IOUT,1000) CDAT,CTIM,Nmax
@@ -210,7 +210,7 @@ C Produce the nth leapfrog of the fullerene
       ipent=1
       leapspiral=1
       if(MAtom.gt.100) IHam=0
-      if(LeapErr.eq.0) go to 999
+      if(LeapErr.eq.0) go to 999 ! moveCM
       endif
 
 c$$$      graph = new_fullerene_graph(Nmax,MAtom,IDA)
@@ -324,68 +324,68 @@ C Analyze ring connections
 
 C Perform Stone-Wales transformation
       if(ISW.ne.0) then
-      routine='STONE-WALES  '
-      Write(Iout,1008) routine
-      CALL StoneWalesTrans(Matom,IN,Iout,numbersw,nSW,
-     1 ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
-      ISW=0
-      ipent=1
-      SWspiral=1
-      go to 999
+        routine='STONE-WALES  '
+        Write(Iout,1008) routine
+        CALL StoneWalesTrans(Matom,IN,Iout,numbersw,nSW,
+     1   ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+        ISW=0
+        ipent=1
+        SWspiral=1
+        go to 999 ! moveCM
       endif
 
 C Perform Endo-Kroto 2-vertex insertion
       if(KE.ne.0) then
-      routine='ENDO-KROTO   '
-      Write(Iout,1008) routine
-      CALL EndoKrotoTrans(Matom,IN,Iout,n565,NEK,ihueckel,
-     1 IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
-      KE=0
-      ipent=1
-      SWspiral=1
-      go to 999
+        routine='ENDO-KROTO   '
+        Write(Iout,1008) routine
+        CALL EndoKrotoTrans(Matom,IN,Iout,n565,NEK,ihueckel,
+     1   IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
+        KE=0
+        ipent=1
+        SWspiral=1
+        go to 999 ! moveCM
       endif
 
 C Perform Yoshida-Fowler 4-or 6-vertex insertion
       if(IYF.ne.0) then
-      routine='YOSHIDAFOWLER'
-      Write(Iout,1008) routine
-      if(IYF.le.2) then
-      CALL YoshidaFowler4(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
-     1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
-      else
-      IYF=IYF-2
-      CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,nYF,
-     1 ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
-      endif
-      IYF=0
-      ipent=1
-      SWspiral=1
-      if(JERR.eq.0) go to 999
+        routine='YOSHIDAFOWLER'
+        Write(Iout,1008) routine
+        if(IYF.le.2) then
+         CALL YoshidaFowler4(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
+     1    ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist)
+        else
+          IYF=IYF-2
+          CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,nYF,
+     1     ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist)
+        endif
+        IYF=0
+        ipent=1
+        SWspiral=1
+        if(JERR.eq.0) go to 999 ! moveCM
       endif
 
 C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
       if(IWS.ne.0) then
-      routine='WIRZSCHWERD  '
-      Write(Iout,1008) routine
-      CALL WirzSchwerd(Matom,IN,Iout,JERR,numberWS,IWS,
-     1 nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
-     1 A,evec,df,Dist,Dist2D,distp,Rdist)
-      IWS=0
-      ipent=1
-      SWspiral=1
-      if(JERR.eq.0) go to 999
+        routine='WIRZSCHWERD  '
+        Write(Iout,1008) routine
+        CALL WirzSchwerd(Matom,IN,Iout,JERR,numberWS,IWS,
+     1   nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
+     1   A,evec,df,Dist,Dist2D,distp,Rdist)
+        IWS=0
+        ipent=1
+        SWspiral=1
+        if(JERR.eq.0) go to 999 ! moveCM
       endif
 
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0) then
-      routine='SPIRALSEARCH '
-      Write(Iout,1008) routine
-      CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
-     1 Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
-     1 GROUP)
+        routine='SPIRALSEARCH '
+        Write(Iout,1008) routine
+        CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
+     1   Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
+     1   GROUP)
 C Determine if fullerene is chiral
-      CALL Chiral(Iout,GROUP)
+        CALL Chiral(Iout,GROUP)
       endif
 C Topological Indicators
       Call TopIndicators(Matom,Iout,IDA,Mdist)
@@ -439,7 +439,7 @@ C  E N D   O F   P R O G R A M
       go to 9 ! datain
  102  iprev=1
       WRITE(IOUT,1019) 
-      go to 9 
+      go to 9 ! datain
 CG77 99  CALL TIME(CTIM)
 CG77 99  CALL TIME(CTIM)
 9999  call date_and_time(CDAT,CTIM,zone,values)
