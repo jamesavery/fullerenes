@@ -1,12 +1,13 @@
-      SUBROUTINE Ring(MCon2,MAtom,IOUT,Ncount5,Ncount6,
-     1 IC3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
+      SUBROUTINE Ring(Me,MCon2,MAtom,IOUT,Ncount5,Ncount6,
+     1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       use config
 C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
 C     for each atom
 C     I am sure there are better algorithms, but this one is not too bad and fast
 C     enough and fast.
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION IC3(Nmax,3)
+C     IC3 contains vertex adjacencies and IVR3 ring numbers for a vertex
+      DIMENSION IC3(Nmax,3),IVR3(Nmax,3)
       DIMENSION N5MEM(Mmax,5),N5MEMS(Mmax,5)
       DIMENSION N6MEM(Mmax,6),N6MEMS(Mmax,6)
       DIMENSION IPa(6,96)
@@ -71,6 +72,7 @@ C     Print*,' Tree ',IS
 C     Do 3 I=1,6
 C     Write(IOUT,1010) (IPa(I,J),J=1,48)
 C   3 Write(IOUT,1011) (IPa(I,J),J=49,96)
+
 C     Identify all 5-membered rings
       Do I=1,48
       IN5=IPa(5,I)
@@ -115,6 +117,7 @@ C     Check bond distances
       CALL DifDist(Ndif,5,Tol,Rd,Rmem)
       enddo
       Write(IOUT,1007) Rmin5,Rmax5
+
 C     Check bond angles
       asmall=1.d10
       abig=-1.d10
@@ -128,6 +131,7 @@ C     Check bond angles
       IF(J2.eq.6) J2=1
       IF(J2.eq.7) J2=2
       IAT3=N5MEM(I,J2)
+
 C     Deviation from ideal pentagon angle of 108 deg
       AngleM=FunAngleMat(IAT1,IAT2,IAT3,DistMat)
       if(AngleM.gt.abig) then
@@ -145,6 +149,7 @@ C
       Ncount6=Ncount6-1
       Write(IOUT,1002) Ncount6
       If(Ncount6.ne.0) Write(IOUT,1006)
+
 C     Check bond distances
       Rmin6=1000.d0
       Rmax6=0.d0
@@ -185,10 +190,11 @@ C     Check bond distances
       MaxN=6
       RmaxT=Rmax6
       endif
+
 C     Check bond angles
       asmall=1.d10
       abig=-1.d10
-      Do I=1,Ncount5
+      Do I=1,Ncount6
       Do J=1,6
       IAT1=N6MEM(I,J)
       J1=J+1
@@ -198,6 +204,7 @@ C     Check bond angles
       IF(J2.eq.7) J2=1
       IF(J2.eq.8) J2=2
       IAT3=N6MEM(I,J2)
+
 C     Deviation from ideal hexagon angle of 120 deg
       AngleM=FunAngleMat(IAT1,IAT2,IAT3,DistMat)
       if(AngleM.gt.abig) then
@@ -212,6 +219,50 @@ C     Deviation from ideal hexagon angle of 120 deg
       abigdif=abig-1.2d2
       Write(IOUT,1016) asmall,asmalldif,abig,abigdif
 
+C     Establish ring numbers for specific vertex
+      do I=1,Matom
+      Do J=1,3
+       IVR3(I,J)=0
+      enddo
+      enddo
+C     First pentagons
+      Do I=1,Ncount5
+      Do J=1,5
+       IAT=N5MEM(I,J)
+       if(IVR3(IAT,1).eq.0) then
+        IVR3(IAT,1)=I
+       else
+        if(IVR3(IAT,2).eq.0) then
+         IVR3(IAT,2)=I
+        else
+         IVR3(IAT,3)=I
+        endif
+       endif
+      enddo
+      enddo
+C     Next hexagons
+      Do I=1,Ncount6
+       II=I+12
+      Do J=1,6
+       IAT=N6MEM(I,J)
+       if(IVR3(IAT,1).eq.0) then
+        IVR3(IAT,1)=II
+       else
+        if(IVR3(IAT,2).eq.0) then
+         IVR3(IAT,2)=II
+        else
+         IVR3(IAT,3)=II
+        endif
+       endif
+      enddo
+      enddo
+      Write(IOUT,1017)
+      Do I=1,Matom,5
+      Write(IOUT,1018) I,(IVR3(I,J),J=1,3),
+     1 I+1,(IVR3(I+1,J),J=1,3),I+2,(IVR3(I+2,J),J=1,3),
+     1 I+3,(IVR3(I+3,J),J=1,3),I+4,(IVR3(I+4,J),J=1,3)
+      enddo
+      
 C     Check Euler characteristic
       Ncount56=Ncount5+Ncount6
       MEuler=MAtom-Mcon2+Ncount56
@@ -270,11 +321,14 @@ C1011 Format(3X,96(I3))
      1 F6.2,' (',F8.2,'), maximum bond angle: ',F6.2,' (',F8.2,')')
  1016 Format(1X,' 6-ring minimum bond angle (deviation from 120 deg): ',
      1 F6.2,' (',F8.2,'), maximum bond angle: ',F6.2,' (',F8.2,')')
+ 1017 Format(/1X,'List of ring numbers RNj containing vertex Ni  ',
+     1 '(Ni: RNj, RNk, RNl)',/1X,135('-'))
+ 1018 Format(5(1X,'(',I5,':',I5,',',I5,',',I5,') '))
       RETURN
       END
 
-      SUBROUTINE RingC(Matom,Iout,
-     1 iprint,N5MEM,N6MEM,N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
+      SUBROUTINE RingC(Matom,Medges,Iout,iprint,IC3,IVR3,
+     1 N5MEM,N6MEM,N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
      1 NringA,NringB,NringC,NringD,NringE,NringF,numbersw,nSW,nl565,
      1 n3rc,numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
       use config
@@ -283,6 +337,7 @@ C     Determine the center of each 5-and 6-ring system
       DIMENSION Dist(3,Nmax),Distac(6)
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Nring(Mmax)
+      DIMENSION IC3(Nmax,3),IVR3(Nmax,3)
       DIMENSION IedgeA(Emax),IedgeB(Emax)
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
@@ -679,6 +734,10 @@ C Print Wirz-Schwerdtfeger D2h 55-6-55 patterns
        Write(Iout,1048) ((nWS(I,J),I=1,5),J=1,numberWS)
       endif
 
+C Print Alcami's heat of formation from structural patterns
+       Write(Iout,1024) Medges
+       Call Alcami(Iout,MAtom,Medges,IC3,IVR3)
+
 C Print Cioslowsky analysis and check of correctness
       if(IPR.eq.1) then 
        Write(Iout,1033) N6Ring
@@ -740,6 +799,11 @@ C Print Cioslowsky analysis and check of correctness
  1021 Format(10(1X,'(',I3,',',I3,','I3,')'))
  1022 Format(1X,'--> Fullerene is IPR')
  1023 Format(1X,'--> Fullerene is not IPR')
+ 1024 Format(/1X,'Calculate Standard Enthalpy for fullerene ',
+     1 'from structural motifs (M)',/2X,'M.Alcami, G.Sanchez',
+     1 'S.Diaz-Tendero, Y.Wang, F.Martin, J. Nanosci. Nanotech. ',
+     1 '7, 1329 (2007)',
+     1 /1X,'Loop through all ',I5,' edges.')
  1030 Format(/1X,'No Stone-Wales patterns found')
  1031 Format(/1X,I2,' Stone-Wales patterns found:')
  1032 Format(7(' (',I2,',',I5,',',I5,',',I2,')'))
@@ -774,9 +838,140 @@ C Print Cioslowsky analysis and check of correctness
  1044 Format(/1X,I2,' Yoshida-Fowler D3h 666555 patterns (C80-like ', 
      1 'corner  patch) found:')
  1045 Format(4(' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,') '))
- 1046 Format(/1X,'No Wirz-Schwerdtfeger D2h 55-6-55 pattern found')
- 1047 Format(/1X,I2,' Wirz-Schwerdtfeger D2h 55-6-55 patterns found:')
+ 1046 Format(/1X,'No W-S D2h 55-6-55 pattern found')
+ 1047 Format(/1X,I2,' W-S D2h 55-6-55 patterns found:')
  1048 Format(5(' (',I2,',',I2,',',I5,',',I2,',',I2,') '))
+      Return
+      END
+
+      SUBROUTINE Alcami(Iout,MAtom,Medges,IC3,IVR3)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Dimension IC3(Nmax,3),IVR3(Nmax,3),nring(4),npattern(9),eps(9)
+C     Finds different ring patterns of 4 rings connected
+C     see M.Alcami, G.Sanchez, S.Diaz-Tendero, Y.Wang, F.Martin, 
+C      J. Nanosci. Nanotech. 7, 1329 (2007)
+C     Parameter from Table IV in the paper
+      Data eps/19.8d0,17.6d0,10.3d0,15.7d0,12.4d0,7.8d0,
+     1 6.2d0,4.7d0,1.7d0/
+
+      do I=1,9
+       npattern(i)=0
+      enddo
+
+C     Go through all edges (IV1,IV2)
+      Do IV1=1,MAtom
+      Do J=1,3
+       IV2=IC3(IV1,J)
+       if(IV1.lt.IV2) then
+C     Analyze the rings
+C     Find rings left-right to edge
+        do nr=1,4
+         nring(nr)=0
+        enddo
+         nrfind=0
+        do k1=1,3
+        do k2=1,3
+         If(IVR3(IV1,k1).eq.IVR3(IV2,k2)) then
+          nrfind=nrfind+1
+          nring(nrfind)=IVR3(IV1,k1)
+         endif
+        enddo
+        enddo
+        do k1=1,3
+         if(nring(1).ne.IVR3(IV1,k1).and.nring(2).ne.IVR3(IV1,k1)) 
+     1   nring(3)=IVR3(IV1,k1)
+        enddo
+        do k2=1,3
+         if(nring(1).ne.IVR3(IV2,k2).and.nring(2).ne.IVR3(IV2,k2)) 
+     1   nring(4)=IVR3(IV2,k2)
+        enddo
+
+C      Distinguish between 9 cases of patterns
+       if(nring(1).le.12.and.nring(2).le.12) then
+
+C      55 case        
+C       55-55
+        if(nring(3).le.12.and.nring(4).le.12) then
+         npattern(1)=npattern(1)+1
+        else
+C       55-66
+         if(nring(3).gt.12.and.nring(4).gt.12) then
+          npattern(3)=npattern(3)+1
+         else
+C       55-56
+          npattern(2)=npattern(2)+1
+         endif
+        endif
+
+       else
+
+        if(nring(1).gt.12.and.nring(2).gt.12) then
+
+C      66 case
+C       66-55
+        if(nring(3).le.12.and.nring(4).le.12) then
+         npattern(7)=npattern(7)+1
+        else
+C       66-66
+         if(nring(3).gt.12.and.nring(4).gt.12) then
+          npattern(9)=npattern(9)+1
+         else
+C       66-56
+          npattern(8)=npattern(8)+1
+         endif
+        endif
+
+        else
+
+C      56 or 65 case
+C       56-55
+        if(nring(3).le.12.and.nring(4).le.12) then
+         npattern(4)=npattern(4)+1
+        else
+C       56-66
+         if(nring(3).gt.12.and.nring(4).gt.12) then
+          npattern(6)=npattern(6)+1
+         else
+C       56-56
+          npattern(5)=npattern(5)+1
+         endif
+        endif
+
+       endif        
+       endif        
+
+      endif
+      enddo
+      enddo
+
+      Write(Iout,1000) (npattern(i),i=1,9)
+
+C     Calculate the enthalpy of formation per bond
+      energy=0.d0
+      Do I=1,9
+       energy=energy+eps(i)*dfloat(npattern(i))
+      enddo
+      Ebond=energy/dfloat(Medges)
+      Write(Iout,1001) energy,Ebond
+       EC60=energy/dfloat(MAtom)-6.54d2/6.d1
+       if(Matom.lt.100) Write(Iout,1002) MAtom,MAtom,EC60
+       if(Matom.ge.100.and.Matom.lt.1000)
+     1   Write(Iout,1003) MAtom,MAtom,EC60
+       if(Matom.ge.1000) Write(Iout,1004) MAtom,MAtom,EC60
+
+
+
+ 1000 Format(1x,'Structural motifs for four connected compact rings:',
+     1 /1x,' pp-pp: ',I5,', pp-hp: ',I5,', pp-hh: ',I5,
+     1 /1x,' ph-pp: ',I5,', ph-hp: ',I5,', ph-hh: ',I5,
+     1 /1x,' hh-pp: ',I5,', hh-hp: ',I5,', hh-hh: ',I5)
+ 1001 Format(1x,'Enthalpy of formation: ',F12.3,' kcal/mol',
+     1 ' (per bond: ',F12.3,' kcal/mol)')
+ 1002 Format(' H(C60)/60 - H(C',I2,')/',I2,4X,F12.3,' kcal/mol')
+ 1003 Format(' H(C60)/60 - H(C',I3,')/',I3,2X,F12.3,' kcal/mol')
+ 1004 Format(' H(C60)/60 - H(C',I5,')/',I5,F12.3,' kcal/mol')
+
       Return
       END
 
@@ -2720,7 +2915,7 @@ C     Get the connectivities between 2 and 3 atoms
       Mcon2=0
       Do I=1,Nmax
       Do J=1,3
-      IC3(I,J)=0
+       IC3(I,J)=0
       enddo
       enddo
       if(Ipent.eq.0) then
@@ -2737,11 +2932,11 @@ C     Get the connectivities between 2 and 3 atoms
       else
       Do I=1,MAtom
       Do J=I+1,MAtom
-      If (IDA(I,J).eq.1) then
-      Mcon2=Mcon2+1
-      Ncount=I*MAtom+J
-      Icon2(Mcon2)=Ncount
-      endif
+       If (IDA(I,J).eq.1) then
+        Mcon2=Mcon2+1
+        Ncount=I*MAtom+J
+        Icon2(Mcon2)=Ncount
+       endif
       enddo
       enddo
       endif
@@ -2752,8 +2947,8 @@ C     Get the connectivities between 2 and 3 atoms
       endif
       Do I=1,Mcon2,12
       Do J=1,12
-      NCI(J)=0
-      NCJ(J)=0
+       NCI(J)=0
+       NCJ(J)=0
       enddo
       M12=12
       Do J=1,12

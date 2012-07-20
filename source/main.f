@@ -28,7 +28,7 @@ C    Set the dimensions for the distance matrix
       real(8) force(ffmaxdim),forceP(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
       DIMENSION Icon2(Nmax*Nmax),distP(Nmax),IDA(Nmax,Nmax)
-      DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax)
+      DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
@@ -247,9 +247,8 @@ C adjacent vertices
 C Establish all closed ring systems
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(MCon2,MAtom,IOUT,
-     1 N5Ring,N6Ring,IC3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
-     1 DistMat)
+      CALL Ring(Medges,MCon2,MAtom,IOUT,N5Ring,N6Ring,
+     1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
 C Optimize Geometry through force field method
 c we check for ISW because the coordinates shouldn't be optimized before
@@ -310,14 +309,13 @@ C Print out Coordinates used as input for CYLview
 C Rings
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(MCon2,MAtom,IOUT,
-     1 N5Ring,N6Ring,IC3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,
-     1 DistMat)
+      CALL Ring(Medges,MCon2,MAtom,IOUT,N5Ring,N6Ring,
+     1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
 C Analyze ring connections
       routine='RINGC        '
       Write(Iout,1008) routine
-      CALL RingC(Matom,Iout,iprintf,
+      CALL RingC(Matom,Medges,Iout,iprintf,IC3,IVR3,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
      1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
      1 numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
