@@ -14,7 +14,7 @@
 %\psgrid
 
 \newdimen\hdist\hdist=12mm
-\newdimen\vdist\vdist=12mm
+\newdimen\vdist\vdist=15mm
 
 \rput[c](.5\hdist,0){\rnode[c]{0}{}}
 \rput[c](\hdist,0){\rnode[c]{1}{}}
@@ -29,9 +29,10 @@
 \rput[c](10\hdist,0){\rnode[c]{10}{}}
 \rput[c](11\hdist,0){\rnode[c]{11}{}}
 \rput[c](12\hdist,0){\rnode[c]{12}{}}
-\rput[c](12.5\hdist,0){\rnode[c]{13}{}}
+\rput[c](13\hdist,0){\rnode[c]{13}{}}
+\rput[c](13.5\hdist,0){\rnode[c]{14}{}}
 
-\rput[c](5.5\hdist,-3\hdist){\rnode[c]{i}{}}
+\rput[c](6.5\hdist,-3\hdist){\rnode[c]{i}{}}
 
 \ncline[]{->}{0}{1}
 \ncline[]{->}{1}{2}
@@ -46,42 +47,50 @@
 \ncline[]{->}{10}{11}
 \ncline[]{->}{11}{12}
 \ncline[]{->}{12}{13}
+\ncline[]{->}{13}{14}
 
 \ncangle[angleA=-90,offsetA=.2\hdist,angleB=180,offsetB=0]{->}{2}{i}
-\ncput*{if `istop' $\ne$ 0}
-\ncangle[angleA=0,offsetB=.5\hdist,angleB=-90,offsetB=-.6\hdist]{->}{i}{11}
+\ncput*{if `istop' $\ne 0$}
+\ncangle[angleA=0,offsetB=.5\hdist,angleB=-90,offsetB=-.6\hdist]{->}{i}{12}
 
 \rput[t](\hdist,-\vdist){\rnode[c]{datetime}{\begin{minipage}[c]{2cm}\centering date\_and\_time\\timer\end{minipage}}}
 \rput[b](2\hdist,\vdist){\rnode[c]{datain}{\begin{minipage}[c]{2cm}\centering datain\end{minipage}}}
 \rput[t](3\hdist,-\vdist){\rnode[c]{coordbuild}{\begin{minipage}[c]{2cm}\centering CoordC20C60\\CoordBuild\\chiral\end{minipage}}}
 \rput[b](4\hdist,\vdist){\rnode[c]{postprocess}{\begin{minipage}[c]{2cm}\centering MoveCM\\Diameter\\Distmatrix\\Connect\\Hueckel\end{minipage}}}
 \rput[t](5\hdist,-\vdist){\rnode[c]{gc}{\begin{minipage}[c]{2cm}\centering GoldbergCoxeter\end{minipage}}}
-\rput[b](6\hdist,\vdist){\rnode[c]{desc}{\begin{minipage}[c]{2cm}\centering Hamilton\\HamiltonCyc\\Paths\\Ring\end{minipage}}}
-\rput[t](7\hdist,-\vdist){\rnode[c]{opt}{\begin{minipage}[c]{2cm}\centering OptFF\\MoveCM\\Distmatrix\\Diameter\end{minipage}}}
-\rput[b](8\hdist,\vdist){\rnode[c]{ring}{\begin{minipage}[c]{2cm}\centering Ring\\RingC\end{minipage}}}
-\rput[t](9\hdist,-\vdist){\rnode[c]{insert}{\begin{minipage}[c]{2.5cm}\centering StoneWalesTrans\\EndoKrotoTrans\\YoshidaFowler4\\YoshidaFowler6\\WirzSchwerd\end{minipage}}}
-\rput[b](10\hdist,\vdist){\rnode[c]{prop}{\begin{minipage}[c]{2.5cm}\centering SpiralSearch\\Chiral\\TopIndicators\\Volume\\MinCovSphere2\\MinDistSphere\\MaxInSphere\end{minipage}}}
-\rput[t](11\hdist,-\vdist){\rnode[c]{write}{\begin{minipage}[c]{2cm}\centering graph2D\end{minipage}}}
-\rput[b](12\hdist,\vdist){\rnode[c]{time2}{\begin{minipage}[c]{2cm}\centering timer\end{minipage}}}
+\rput[b](6\hdist,\vdist){\rnode[c]{ham}{\begin{minipage}[c]{2cm}\centering Hamilton\\HamiltonCyc\end{minipage}}}
+\rput[t](7\hdist,-\vdist){\rnode[c]{desc}{\begin{minipage}[c]{2cm}\centering Paths\\Ring\end{minipage}}}
+\rput[b](8\hdist,\vdist){\rnode[c]{opt}{\begin{minipage}[c]{2cm}\centering OptFF\\MoveCM\\Distmatrix\\Diameter\end{minipage}}}
+\rput[t](9\hdist,-\vdist){\rnode[c]{ring}{\begin{minipage}[c]{2cm}\centering Ring\\RingC\end{minipage}}}
+\rput[b](10\hdist,\vdist){\rnode[c]{insert}{\begin{minipage}[c]{2.5cm}\centering StoneWalesTrans\\EndoKrotoTrans\\YoshidaFowler4\\YoshidaFowler6\\WirzSchwerd\end{minipage}}}
+\rput[t](11\hdist,-\vdist){\rnode[c]{prop}{\begin{minipage}[c]{2.5cm}\centering SpiralSearch\\Chiral\\TopIndicators\\Volume\\MinCovSphere2\\MinDistSphere\\MaxInSphere\end{minipage}}}
+\rput[b](12\hdist,\vdist){\rnode[c]{write}{\begin{minipage}[c]{2cm}\centering graph2D\end{minipage}}}
+\rput[t](13\hdist,-\vdist){\rnode[c]{time2}{\begin{minipage}[c]{2cm}\centering timer\end{minipage}}}
 
-\rput[b](5.5\hdist,-4\vdist){\rnode[c]{iso}{\begin{minipage}[c]{2cm}\centering isomers\end{minipage}}}
+\rput[b](6.5\hdist,-4\vdist){\rnode[c]{iso}{\begin{minipage}[c]{2cm}\centering isomers\end{minipage}}}
 
 \ncline[]{->}{datetime}{1}
 \ncline[]{->}{datain}{2}
 \ncline[]{->}{coordbuild}{3}
 \ncline[]{->}{postprocess}{4}
 \ncline[]{->}{gc}{5}
-\ncline[]{->}{desc}{6}
-\ncline[]{->}{opt}{7}
-\ncline[]{->}{ring}{8}
-\ncline[]{->}{insert}{9}
-\ncline[]{->}{prop}{10}
-\ncline[]{->}{write}{11}
-\ncline[]{->}{time2}{12}
+\ncput*{\begin{minipage}[c]{2.5cm}\centering if `leap' $> 0$ \\ or if `leapGC' $> 0$\end{minipage}}
+\ncline[]{->}{ham}{6}
+\ncput*{\begin{minipage}[c]{2cm}\centering if `iHam' $\ne 0$\end{minipage}}
+\ncline[]{->}{desc}{7}
+\ncline[]{->}{opt}{8}
+\ncput*{\begin{minipage}[c]{2cm}\centering if `iOpt' $\ne 0$\end{minipage}}
+\ncline[]{->}{ring}{9}
+\ncline[]{->}{insert}{10}
+\ncput*{\begin{minipage}[c]{2cm}\centering if $\langle\dots\rangle \ne 0$\end{minipage}}
+\ncline[]{->}{prop}{11}
+\ncline[]{->}{write}{12}
+\ncput*{\begin{minipage}[c]{2cm}\centering if `iSchlegel' $\ne 0$\end{minipage}}
+\ncline[]{->}{time2}{13}
 
 \ncline[]{->}{iso}{i}
 
-\ncbar[offset=-.6\hdist,armA=40mm,angleA=90]{->}{11}{2}
+\ncbar[offset=-.6\hdist,armA=40mm,angleA=90]{->}{12}{2}
 \ncput*{if `loop' $\ge$ 2}
 
 \end{pspicture}

@@ -150,7 +150,7 @@ C identify P-type eigenvectors and construct the 3D fullerene
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
      1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP)
       Do I=1,Matom
-       IAtom(I)=6
+        IAtom(I)=6
       enddo
       CALL Chiral(Iout,GROUP)
 
@@ -194,23 +194,23 @@ C Establish Connectivities
 
 C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
-      routine='HUECKEL      '
-      Write(Iout,1008) routine
-      CALL Hueckel(MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
+        routine='HUECKEL      '
+        Write(Iout,1008) routine
+        CALL Hueckel(MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
       endif
 
 C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
-      routine='Leapfrog'
-      Write(Iout,1008) routine
-      CALL GoldbergCoxeter(MAtom,Iout,leap,leapGC,IGC1,IGC2,
-     1 ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
-      leap=0
-      leapGC=0
-      ipent=1
-      leapspiral=1
-      if(MAtom.gt.100) IHam=0
-      if(LeapErr.eq.0) go to 999 ! moveCM
+        routine='Leapfrog'
+        Write(Iout,1008) routine
+        CALL GoldbergCoxeter(MAtom,Iout,leap,leapGC,IGC1,IGC2,
+     1   ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist)
+        leap=0
+        leapGC=0
+        ipent=1
+        leapspiral=1
+        if(MAtom.gt.100) IHam=0
+        if(LeapErr.eq.0) go to 999 ! moveCM
       endif
 
 c$$$      graph = new_fullerene_graph(Nmax,MAtom,IDA)
@@ -229,18 +229,18 @@ C to calculate the number of all distinct paths between
 C adjacent vertices
       routine='HAMILTON     '
       Write(Iout,1008) routine
-       maxiter=maxit
+      maxiter=maxit
       if(IHam.gt.1.and.IHam.le.9) then
-       maxiter=10**IHam
+        maxiter=10**IHam
       endif
-      if(IHam.ne.0.and.ISW.eq.0) then
-       if(iupac.ne.0) then
-         CALL Hamilton(MAtom,Iout,iprintf,maxiter,IC3)
-       else
-         CALL HamiltonCyc(MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
-         WRITE(Iout,1010) Nhamilton
-         if(nbatch.ne.0) WRITE(Iout,1014)
-       endif
+      if(IHam.ne.0.and.ISW.eq.0.and.iyf.eq.0.and.iws.eq.0) then
+        if(iupac.ne.0) then
+          CALL Hamilton(MAtom,Iout,iprintf,maxiter,IC3)
+        else
+          CALL HamiltonCyc(MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
+          WRITE(Iout,1010) Nhamilton
+          if(nbatch.ne.0) WRITE(Iout,1014)
+        endif
       endif
       CALL Paths(MAtom,IOUT,IDA,A,evec,df)
 
@@ -286,25 +286,25 @@ c a stone wales (or any other transformation) is done
 
 C Print out Coordinates used as input for CYLview
       if(icyl.le.2.and.ISW.eq.0) then
-      Open(unit=3,file=xyzname,form='formatted')
-      routine='PRINTCOORD   '
-      Write(Iout,1008) routine
-      WRITE(Iout,1002) xyzname 
-      endzeile=0
-       do j=1,nzeile
-        if(TEXTINPUT(j).ne.' ') endzeile=j
-       enddo
-      if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,
-     1 (TEXTINPUT(I),I=1,endzeile)
-      if(MAtom.ge.100.and.MAtom.lt.1000) 
-     1 WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-      if(MAtom.ge.1000.and.MAtom.lt.10000) 
-     1 WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-      Do J=1,MAtom
-      IM=IAtom(J)      
-      Write(3,1007) El(IM),(Dist(I,J),I=1,3)
-      enddo
-      Close(unit=3)
+        Open(unit=3,file=xyzname,form='formatted')
+        routine='PRINTCOORD   '
+        Write(Iout,1008) routine
+        WRITE(Iout,1002) xyzname 
+        endzeile=0
+        do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo
+        if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,
+     1    (TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.100.and.MAtom.lt.1000) 
+     1    WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.1000.and.MAtom.lt.10000) 
+     1    WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        Do J=1,MAtom
+          IM=IAtom(J)      
+          Write(3,1007) El(IM),(Dist(I,J),I=1,3)
+        enddo
+        Close(unit=3)
       endif
 
 C Rings
@@ -416,19 +416,19 @@ C Calculate the maximum inner sphere
 
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
-      routine='GRAPH2D      '
-      Write(Iout,1008) routine
-      if(ISchlegel.eq.2) then
-       if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
-       ParamS=anglew
-       WRITE(IOUT,1006) ParamS
-       endif
-      else
-       ParamS=dabs(ParamS)
-      endif
-      CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
-     1 NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
-     1 TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,filename)
+        routine='GRAPH2D      '
+        Write(Iout,1008) routine
+        if(ISchlegel.eq.2) then
+          if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
+            ParamS=anglew
+            WRITE(IOUT,1006) ParamS
+          endif
+        else
+          ParamS=dabs(ParamS)
+        endif
+        CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
+     1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
+     1   TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,filename)
       endif
 
 C  E N D   O F   P R O G R A M
