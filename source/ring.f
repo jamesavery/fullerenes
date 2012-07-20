@@ -750,6 +750,8 @@ C Print Cioslowsky analysis and check of correctness
        if(Matom.ge.100.and.Matom.lt.1000) 
      1   Write(Iout,1037) MAtom,MAtom,EC60
        if(Matom.ge.1000) Write(Iout,1038) MAtom,MAtom,EC60
+       graphenel=30.336d0*.5d0-6.1681359415162888d2/6.d1
+       Write(Iout,1039) graphenel
       endif
 
  1000 Format(/1X,'Center for 5-rings',/1X,
@@ -828,6 +830,7 @@ C Print Cioslowsky analysis and check of correctness
  1036 Format(' H(C60)/60 - H(C',I2,')/',I2,4X,F12.3,' kcal/mol')
  1037 Format(' H(C60)/60 - H(C',I3,')/',I3,2X,F12.3,' kcal/mol')
  1038 Format(' H(C60)/60 - H(C',I5,')/',I5,F12.3,' kcal/mol')
+ 1039 Format(' Graphene limit: ',F12.3,' kcal/mol')
  1040 Format(/1X,'No Yoshida-Fowler D3h 6555 pattern (C60-like corner',
      1 ' patch) found')
  1041 Format(/1X,I2,' Yoshida-Fowler D3h 6555 patterns (C60-like ', 
@@ -959,8 +962,8 @@ C     Calculate the enthalpy of formation per bond
        if(Matom.ge.100.and.Matom.lt.1000)
      1   Write(Iout,1003) MAtom,MAtom,EC60
        if(Matom.ge.1000) Write(Iout,1004) MAtom,MAtom,EC60
-
-
+       graphenel=1.7d0*.5d0-6.1681359415162888d2/6.d1
+       Write(Iout,1005) graphenel
 
  1000 Format(1x,'Structural motifs for four connected compact rings:',
      1 /1x,' pp-pp: ',I5,', pp-hp: ',I5,', pp-hh: ',I5,
@@ -971,7 +974,7 @@ C     Calculate the enthalpy of formation per bond
  1002 Format(' H(C60)/60 - H(C',I2,')/',I2,4X,F12.3,' kcal/mol')
  1003 Format(' H(C60)/60 - H(C',I3,')/',I3,2X,F12.3,' kcal/mol')
  1004 Format(' H(C60)/60 - H(C',I5,')/',I5,F12.3,' kcal/mol')
-
+ 1005 Format(' Graphene limit: ',F12.3,' kcal/mol')
       Return
       END
 
