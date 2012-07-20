@@ -15,9 +15,9 @@ tree.pdf: tree.tex
 
 .PHONY: clean
 clean:
-	rm -f *.log *.aux *.dvi *.ps *.bib
+	rm -f *.log *.aux *.dvi *.ps *.bib tree_tmp.pdf
 
 .PHONY: distclean
 distclean: clean
-	rm -f UserManual.pdf tree.pdf
+	rm -f UserManual.pdf tree.pdf 
 
