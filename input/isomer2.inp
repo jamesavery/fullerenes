@@ -1,5 +1,5 @@
 C92 Creating isomer list only
-&Coord NA=92, IC=0, ichk=1 /
+&Coord NA=92, ICart=0, ichk=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton /

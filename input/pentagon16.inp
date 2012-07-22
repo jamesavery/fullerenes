@@ -1,5 +1,5 @@
 C540 Using FM algorithm to produce coordinates
-&Coord NA=540, IC=2, R6=1.42 /
+&Coord NA=540, ICart=2, R6=1.42 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

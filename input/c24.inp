@@ -1,5 +1,5 @@
 C24 aug-cc-pvdz B3LYP opt. geom. minimum D2-sym E=-913.9314011 au
-&Coord NA=24, IC=1 /
+&Coord NA=24, ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton Iham=1 /

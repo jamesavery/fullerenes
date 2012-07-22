@@ -1,5 +1,5 @@
 C96 Using Tutte embedding to produce coordinates
-&Coord NA=96, IC=4 /
+&Coord NA=96, ICart=4 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

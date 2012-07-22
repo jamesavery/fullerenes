@@ -1,5 +1,5 @@
 C60  Using subroutine to produce coordinates for C60, Exp. bond distance from solid state
-&Coord NA=60, IC=0, R5=1.455, R6=1.391 /
+&Coord NA=60, ICart=0, R5=1.455, R6=1.391 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

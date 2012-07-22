@@ -1,5 +1,5 @@
 C62 Creating isomer list only
-&Coord NA=100, IC=0 /
+&Coord NA=100, ICart=0 /
 &FFChoice /
 &FFParameters /
 &Hamilton /

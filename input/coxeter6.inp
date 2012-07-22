@@ -1,6 +1,6 @@
 C20 aug-cc-pvdz B3LYP opt. geom. minimum E=-761.5231573 au
 Cartesian coordinate input
-&Coord NA=20, IC=0, ixyz=1, ihueckel=0, GCtrans=1, kGC=5 /
+&Coord NA=20, ICart=0, ixyz=1, ihueckel=0, GCtrans=1, kGC=5 /
 &FFChoice Iopt=1 /
 &FFParameters /
 

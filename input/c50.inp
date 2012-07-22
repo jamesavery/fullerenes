@@ -1,5 +1,5 @@
 C50 aug-cc-pvdz B3LYP opt. geom. minimum C2v-sym E=-1905.1079932 au 
-&Coord NA=50, IC=1, IP=1 /
+&Coord NA=50, ICart=1, IP=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1, IUpac=1 /

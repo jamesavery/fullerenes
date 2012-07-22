@@ -92,6 +92,8 @@ applications in chemistry}, Croatica Chemica Acta {\bf 68}, 283-292 (1995).\\
 12) A. J. M. Wilson, {\it Graphs and Applications. An Introductory Approach} (Springer, Berlin, 2000).\\
 13) J. Cioslowski, N. Rao, and D. Moncrieff, {\it Standard Enthalpies of Formation of Fullerenes and Their
 Dependence on Structural Motifs}, J. Am. Chem. Soc. {\bf 122}, 8265-8270 (2000).\\
+14) M. Alcam\'i, G. Sanchez, S. Diaz-Tendero, Y. Wang, F. Martin, ``Structural Patterns in Fullerenes Showing
+Adjacent Pentagons: \C{20} to \C{72}'', {\it J. Nanosci. Nanotech.} {\bf 7}, 1329-1338 (2007).\\
      
 {\noindent\bf Acknowledgement}\\
 PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support 
@@ -125,7 +127,8 @@ $n_f$ the number of faces (5- or 6-rings). The program constructs an accurate 3D
 from the canonical ring spiral pentagon indices (RSPI) through either the 3D Tutte embedding (3D-TE) \cite{Tutte} or the adjacency matrix
 eigenvector (AME) method \cite{Atlas}. One can also construct the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene or a halma fullerene 
 $GC_{k,0}[C_{n_v}]$ as a special case of a Goldberg-Coxeter transformation $GC_{k,l}$. Starting from a given fullerene structure one can 
-perform vertex insertions (such as Endo-Kroto \cite{Endo92} or Yoshida-Fowler \cite{Yoshida97}) or Stone-Wales transformations \cite{Stone86}. 
+perform vertex insertions (such as Endo-Kroto \cite{Endo92} or Yoshida-Fowler \cite{Yoshida97}), W-S \cite{WS}
+or Stone-Wales transformations \cite{Stone86}. 
 Vertex insertions allow for the construction of non-spiral fullerenes such as \C{380} or \C{384}. 
 Geometry optimization using a Fletcher-Reeves-Polak-Ribiere
 minimization with analytical gradients for the Wu force-field \cite{Wu87} is implemented in the current version, providing 
@@ -161,7 +164,7 @@ Not implemented yet is: 1) The minimum covering ellipsoid useful for  rugby-ball
 and crazy about rugby), and close packing of ellipsoids; 2) The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes;
 3) Geometry optimization using improved force fields; 4) Frequency calculations from the force-field 
 optimized geometry; 5) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 6) Symmetry labels for 
-H\"uckel orbital energies; 7) Extension to non-regular fullerenes of genus 0 (heptagons and squares); 8) Extension to non-regular fullerenes 
+H\"uckel orbital energies; 7) Extension to non-classical fullerenes of genus 0 (heptagons and squares); 8) Extension to non-regular fullerenes 
 of genus 1 (hmmm, donuts!); 9) To symmetrize optimized coordinates to point group symmetry; 
 10) A restart option for subroutine Hamilton; 11) Use of ``House of Graphs'' 
 fullerene database; 12) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
@@ -197,7 +200,6 @@ where the source and libgraph directories are located.
 
 To use the latex program for the 2D fullerene graphs you need to use the files standalone.cfg and standalone.cls.
 
-
 %Program Structure
 \section{Program Structure}
 The main program ({\bf main.f}) calls a number of subroutines for certain tasks and in a certain sequence.
@@ -209,52 +211,54 @@ explained in some detail in this section. More information can be obtained in an
 %Figure 1
 \begin{figure}[htbp]
    	\centering
-	\includegraphics[width=1.0\textwidth]{tree.pdf} 
+	\includegraphics[width=0.9\textwidth]{tree.pdf} 
     \label{pic:flowdiagram}
-    \caption{Flow diagram for main program tasks}
+    \caption{Flow diagram for main program tasks.}
 \end{figure}
 
-The most time consuming steps in the program are the diagonalization of the adjacency matrix (${\cal O}(n^3)$) 
+The most time-consuming steps in the program are the diagonalization of the adjacency matrix (${\cal O}(n^3)$) 
 needed for the AME algorithm and the H\"uckel analysis, the force-field optimization for
 very large fullerenes ($>$ 2000 atoms), the determination of the number of Hamiltonian cycles
 ($>$ 80 atoms) (this is an NP-complete problem), the creation of a list of ring-spiral pentagon
 indices for all possible isomers with a given vertex count $n_v$ ($>$ 80 atoms), 
-and the Tutte embedding algorithm ($>$ 2000 atoms).
+and the Tutte embedding algorithm ($>$ 2000 atoms). We try to improve the performance of these algorithms
+in our next version.
 
+%Create a 3D structure for a specific fullerene
 \subsection{Create a 3D structure for a specific fullerene}
 
 The easiest way to create a 3D structure is of course to read-in cartesian coordinates for a specific
 fullerene (see files {\it c20.inp} to {\it c540.inp}), or to construct them internally for the high
 symmetry $I_h-$\C{20} or $I_h-$\C{60} isomers (Subroutine {\bf CoordC20C60}, see input files {\it ico.inp},
 {\it icoExp.inp}, {\it icoideal.inp}), or to get the cartesian coordinates from input ring-spiral
-pentagon-indices PSPI (Subroutine {\bf CoordBuild}) by using either the Fowler-Manopoulus AME algorithm \cite{Atlas},
-or the more reliable 3D-TE algorithm (used by files {\it pentagon1.inp} to {\it pentagon28.inp}),
-or from the Goldberg-Coxeter 2-index triangulation algorithm (input files {\it coxeter1.inp}
-to {\it coxeter5.inp}). The pentagon indices can also be read-in from the {\it fullerene
-database} if the canonical fullerene number is used as defined in the book ``Atlas of Fullerenes'' by Fowler and Manopoulus \cite{Atlas,cvetkovic2002} 
+pentagon-indices PSPI (Subroutine {\bf CoordBuild}) by using either the Fowler-Manolopoulus AME algorithm \cite{Atlas},
+or the more reliable 3D-TE algorithm (used by files {\it pentagon1.inp} to {\it pentagon27.inp}),
+or from the Goldberg-Coxeter 2-index transformation (triangulation algorithm, input files {\it coxeter1.inp}
+to {\it coxeter6.inp}). The 12 pentagon indices can also be obtained from the {\it fullerene
+database} if the canonical fullerene number is used as defined in the book ``Atlas of Fullerenes'' by Fowler and Manolopoulus \cite{Atlas,cvetkovic2002} 
 (input file {\it database.inp}).
 
-We recommend reading this book for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
+We recommend reading Fowler and Manolopoulus' book \cite{Atlas,cvetkovic2002} for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
 to construct 3D fullerene graphs.  For the AME algorithm it is critical to get the right 
 H\"uckel eigenvectors for the construction of cartesian coordinates \cite{Atlas}. 
-The position of the 3~$P$-type eigenvectors can be specified (see file {\it pentagon8.inp} for such an example).
-If the AME algorithm fails or you cannot find the $P$-type eigenvectors, you should use our Tutte embedding algorithm,
-which to our opinion is less troublesome and may be used as the standard method to construct 3D structures.
-The structure can also be obtained from a Goldberg-Coxeter transformation of \C{20}.
+The position of the three~$P$-type eigenvectors can be specified (see file {\it pentagon8.inp} for such an example).
+If the AME algorithm fails or you cannot find the required $P$-type eigenvectors, you should use our Tutte embedding algorithm,
+which (to our opinion) is less troublesome and may be used as the standard method to construct 3D structures.
+3D structures can also be obtained from a Goldberg-Coxeter transformation of \C{20}.
 
 It is important that the end-product is viewed by a molecular visualization program. 
 We recommend CYLview by Claude Legault \cite{CYLview}, Avogadro \cite{Avogadro}, JMol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}. 
-Most of these programs are freely available.  For this purpose a file is written to Fullerene-3d.xyz to be used as an input file 
+Most of these programs are freely available.  For this purpose a file is written to Fullerene-3D.xyz to be used as an input file 
 for these molecular visualization programs.
 
 The program sets the barycenter of the fullerene 
 to the origin. Using the obtained cartesian coordinates the program calculates the smallest and largest cage diameters and the
 moment of inertia, which already gives a measure for distortion from spherical symmetry (Subroutine {\bf Diameter}). 
-It produces the distance matrix if print level is set to high (Subroutine {\bf DistMatrix}), and once the 
+It produces the distance matrix~ $d_{ij}$ if the print level is set to high (Subroutine {\bf DistMatrix}), and once the 
 molecular point group is obtained, the program determines if the fullerene is chiral or not (Subroutine {\bf Chiral}).
 Once the cartesian coordinates $(X_i, Y_i, Z_i)$ for each vertex $i=1,\dots, n_v$ is known, all edges are determined by 
 analyzing connectivities between the vertices from either given cartesian coordinates or directly from the adjacency matrix 
-if a ring spiral input was chosen (Subroutine {\bf Connect}). In any case, one has the adjacency matrix $A_{ij}$ for all edges at this stage:
+if a ring spiral input was chosen (Subroutine {\bf Connect}). In any case, one has the adjacency matrix $A_{ij}$ for all vertices at this stage:
 \begin{equation}
   \label{eq:adjacencymatrix}
   A_{ij} =
@@ -264,56 +268,57 @@ if a ring spiral input was chosen (Subroutine {\bf Connect}). In any case, one h
   \end{cases}
 \end{equation}
 
+%List of Isomers
 \subsection{List of Isomers}
-The program can print all general and IPR isomers for a specific fullerene and perform an analysis introduced 
+The program can print all general and IPR isomers for a specific fullerene and perform an analysis as introduced 
 in the book by Fowler and Manolopoulus \cite{Atlas}, e.g. pentagon indices and 
 pentagon number, hexagon indices and strain parameter, NMR information and number of distinct Hamiltonian cycles if 
 required. The number of isomers scales polynomially as $n_v^9$, thus it becomes computationally
-too demanding when calculating fullerenes beyond \C{100}. Moreover, the database provided, can be used to print all isomers up to 
+too demanding for a full isomer list beyond \C{100}. Moreover, the database provided, can be used to print all isomers up to 
 \C{100}, and up to \C{120} for all IPR isomers. Fowler and Manolopoulus use a numbering scheme ($N_{isomers}= 1,\dots, n_{max}$) 
 obtained from the natural sequence of canonical RSPIs to distinguish between the different isomers \cite{Atlas}. From their book \cite{Atlas} the
 general isomer number can be taken and the RSPIs for a specific isomer up to \C{100} can be read-in from the database provided. 
 The numbering scheme for IPR isomers only ($N_{\mathrm{isomers}}^{IPR}= 1,\dots, n_{max}$) can also be used up to \C{120}, see input file {\it database.inp}.
 
+%H\"uckel analysis and topological indicators
 \subsection{H\"uckel analysis and topological indicators}
 From the adjacency matrix $A_{ij}$ a H\"uckel analysis is performed (Subroutine {\bf Hueckel}). This gives you a good hint if the 
-fullerene is open or closed shell \cite{Atlas}.  For fullerenes the H\"uckel analysis may not be very reliable 
-as hybridization with the C(2s) orbitals occurs due to non-planarity. Hence the $\sigma-\pi$ separation breaks down
-especially for the smaller fullerenes. The orbital energies are defined as
+fullerene is open or closed shell \cite{Atlas}. For smaller fullerenes or non-IPR fullerenes the H\"uckel analysis may not be very reliable 
+as hybridization with the C(2s) orbitals occurs due to non-planarity. Hence the $\sigma-\pi$ separation breaks down. The orbital energies are defined as
 \begin{equation}
   \label{Hueckel}
   \epsilon_i=\alpha+x_i\beta
 \end{equation}
 and we adopt $\alpha = -0.21$ au  and  $\beta = -0.111$ au obtained
-from the exp. ionization potential (7.58 eV) and excitation energy (3.02 eV) of \C{60} (the electron goes 
+from the experimental ionization potential (7.58 eV) and excitation energy (3.02 eV) of \C{60} (the electron goes 
 into the second LUMO of $t_{1g}$ symmetry). This gives also orbital energies for \C{60} in reasonable 
-agreement with DFT Kohn-Sham orbital energies. The fullerene might also Jahn-Teller distort adopting a singlet 
-ground state instead of one of a higher multiplicity as this is the case for \C{20}. Such electronic effects are not
+agreement with DFT Kohn-Sham orbital energies. The fullerene structure might also undergo a Jahn-Teller distortion adopting a singlet 
+ground state instead of one of a higher multiplicity, as this is the case for \C{20}. Such electronic effects are not
 captured in this program, and one needs to perform a proper quantum theoretical calculation. The program gives information
 on the HOMO-LUMO gap and calculates the topological resonance energy from Babi\'c's matching polynomial calculations \cite{Babic1995,Babic1997}.
-There are several other topological indicators of which the Estrada index and mean topological distance, and the Wiener index and hyper Wiener
-index are printed. For details see a book on graph theory.
+There are several other topological indicators of which the Estrada index and mean topological distance, the Wiener index and the hyper-Wiener
+index are printed. For details consult a book on graph theory.
 
-
+%The Goldberg-Coxeter transformation
 \subsection{The Goldberg-Coxeter transformation}
 
-In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \C{n} can be performed if required from input
+In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \C{n} can be performed if required from the input
 (Subroutine {\bf GoldbergCoxeter}). This leads to a fullerene C$_{k^2+kl+l^2}$. The current implementation allows only for
 {\it leapfrog transformations} ($k=l=1$) and for {\it halma transformations} ($k \neq 0$ and $l=0$). However, the program allows 
 for multiple leapfrog transformations for the construction of very large fullerenes. A general $GC_{k,l}(n)$  for all values of $k$ and $l$ 
 is currently in preparation. 
 
-The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ used here works in the following way: ($i$) consider
+The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ used here works in the following way: ($i$) Consider
 a cubic planar graph $G_{0}$ and take its dual (faces become vertices and
 vertices become faces), $D_{t}(G_{0})$. This transforms the graph $G_{0}$
 with $n_v$ vertices into a triangulation, i.e. a geodesic sphere with $n_v$ triangles; (\textit{ii})
-each triangle $T_{k}$ ($k=1, \dots, n_{v}$) of the geodesic sphere is
+Each triangle $T_{k}$ ($k=1, \dots, n_{v}$) of the geodesic sphere is
 subdivided into another set of faces $t_i$ using the Coxeter indices ($k,l$).
 If the obtained new smaller faces $t_i$ are not
 triangles themselves within one $T_k$, when neighboring $T_k$s are glued
 together with other non-triangle faces, new triangles are formed and we end up with a new triangulation,
 i.e. a larger geodesic sphere $GC_{k,l}D_{t}(G_{0})$;
-(\textit{iii}) finally we take the dual which yields a new fullerene,
+(\textit{iii}) Finally we take the dual which yields a new fullerene,
 \begin{equation}
  	G_1 = GC_{k,l}[G_0] = D_t GC_{k,l} D_t(G_0)
 	\label{eq:GC}
@@ -326,21 +331,22 @@ If the initial graph $G_0$ has $n_v$ vertices, the number of vertices of $GC_{k,
 \end{equation}
 $t(k,l)$ is called the {\em triangulation number}. We work with the dual triangulation instead of a hexagonal mesh as it is easier to implement.
 
+%Hamiltonian cycles
 \subsection{Hamiltonian cycles}
 Subroutine {\bf Hamilton} uses the back-track algorithm of Babi\'c \cite{Babic1995a} to obtain all 
-Hamiltonian cycles and subsequently the IUPAC name of the fullerene. Hamiltonian cycles go through all vertices exactly once returning 
-to the starting point. The number of Hamiltonian cycles given has carefully been checked 
-against a second algorithm for various fullerenes.  The number gives all distinct Hamiltonian cycles and left-right cycles counted as the 
-same. Although finding all Hamiltonian cycles is an NP-complete problem, it works fine up to about \C{100}. 
-After that it becomes computationally very demanding. The program therefore prints upper and lower limits instead
-for the larger fullerenes. The existence of Hamiltonian cycles for fullerenes is only conjectured at this stage, and only for layered fullerenes 
+Hamiltonian cycles and subsequently (if required) the IUPAC name of the fullerene. Hamiltonian cycles go through all vertices exactly once returning 
+to the starting point. The number of distinct Hamiltonian cycles has carefully been checked 
+against a second algorithm for various fullerenes, and left-right cycles and cyclic vertex permutations counted as the 
+same. Although finding all Hamiltonian cycles is an NP-complete problem, the algorithm works fine up to about \C{100}. 
+After that it becomes computationally very demanding. Therefore, for the larger fullerenes the program prints upper and lower limits instead. The existence of Hamiltonian cycles for fullerenes is only conjectured at this stage, and only for layered fullerenes 
 (e.g. fullerene with onion-shaped 2D graphs such as nanotubes) existence has been proven. Our recent calculations verified that
 Hamiltonian cycles exist for all fullerene isomers up to \C{100} and for all IPR isomers up to \C{120} \cite{PSAJDB}.
 
+%Force-field optimization
 \subsection{Force-field optimization}
-The geometry can be optimized by force fields using a Fletcher-Reeves-Polak-Ribiere geometry optimization
-with analytical gradients (Subroutine {\bf OptFF} \cite{NumericalRecipes}). At the moment, only the Wu
-force field is implemented, which considers bond lengths and angles in an harmonic oscillator approximation \cite{Wu87}: 
+The geometry can be optimized by force fields using a Fletcher-Reeves-Polak-Ribiere geometry optimization \cite{NumRec}
+with analytical gradients (Subroutine {\bf OptFF} \cite{NumericalRecipes}). In the currently version the Wu
+force field is implemented, which considers bond lengths and angles only in an harmonic oscillator approximation \cite{Wu87}: 
 \begin{equation}
   \label{eq:Ewu}
   E_{\mathrm{Wu}} = \frac{k_p}{2} \sum_{i_p}^{\mathrm{edges}} \left(R_{i_p} - R_p\right)^2 
@@ -354,20 +360,28 @@ hexagon bond distances ($\approx$ 1.4 \AA), and $\theta _p $ and $\theta _h$ are
 respectively).
 
 The force-field optimization is very fast even for fullerenes such as \C{840}. 
-The Wu force-field optimization may in some cases distort the fullerene to a structure of lower symmetry. Moreover, as no
+The Wu force-field optimization may lead to distortions of the fullerene to a structure of lower symmetry compared to the original point-group. 
+Moreover, as no
 dihedral angles are fixed, the molecule might distort away from convexity. In such cases an additional Coulomb repulsive potential can
-be added (see input instructions) in a preoptimization step.  That the construction of the fullerene by using the AME or Tutte algorithm may
-lead to a more spherical arrangement, e.g. barrels instead of nanotubes, the latter come out from a force-field optimization. 
-A more sophisticated force field using dihedral angles is currently being developed.
+be added (see input instructions) in a preoptimization step,
+\begin{equation}
+  \label{eq:Ewu}
+  E = E_{\mathrm{Wu}} + E_{\mathrm{Coulomb}} = E_{\mathrm{Wu}} + \sum_{i=1}^{\mathrm{vertices}} \frac{f_{\mathrm{Coulomb}}}{|r_i - r_0|}
+\end{equation}
+with $r_i - r_0$ being the distance between vertex $i$ and the barycenter.
+Note that the construction of the fullerene by using the AME or Tutte algorithm may
+lead to a more spherical arrangement prior to a force-field optimization with rather large bond distances, 
+e.g. barrels instead of nanotubes. A more sophisticated force field using dihedral angles is currently being developed.
 
+%Ring connectivities, patterns, vertex insertions and spiral detection
 \subsection{Ring connectivities, patterns, vertex insertions and spiral detection}
-Subroutine {\bf Ring} identifies all closed 5- and 6-ring systems (faces) and determines if Euler's theorem is fulfilled.
-Subroutine {\bf RingC} then determines the center for each 5- and 6-ring later used for the trigonal pyramidal tessellation to obtain
+Subroutine {\bf Ring} identifies all pentagons and hexagons (faces) and checks if Euler's theorem is fulfilled.
+Subroutine {\bf RingC} then determines the center for each pentagon and hexagon later used for the trigonal pyramidal tessellation to obtain
 the fullerene volume and surface. This routine also analyzes all 2- and 3-ring fusions and many other useful patterns needed for example
 in Stone-Wales transformations or vertex insertions. It further determines the Rhagavachari-Fowler-Manolopoulos neighboring pentagon 
 and hexagon indices as described in detail in Fowler and Manolopoulos' book \cite{Atlas}.
 From the hexagon indices one derives if the fullerene is IPR or not. If it is IPR, Cioslowski's scheme is used to calculate the 
-heat of formation \cite{Cioslowski2000}.
+heat of formation \cite{Cioslowski2000}. For all fullerenes, Martin's scheme is used to calculate the heat of formation \cite{Alcami}.
 
 Information from subroutine {\bf RingC} can be used to perform Stone-Wales transformations \cite{Stone86}
 (subroutine {\bf StoneWalesTrans}), Endo-Kroto 2-vertex insertions \cite{Endo92} (subroutine {\bf EndoKrotoTrans}),
@@ -375,7 +389,7 @@ Yoshida-Fowler 4-vertex ($D_{3h}$ 6555) (subroutine {\bf YoshidaFowler4}) and 6-
 insertions (subroutine {\bf YoshidaFowler6}) \cite{Yoshida97}, or the a WS 6-vertex (6-55-55) insertion 
 we developed, see input files {\it c50EK.inp, c60SW.inp, c80YF.inp}. 
 Non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with these vertex insertion methods, see input files {\it c380.inp} 
-and {\it c384.inp}. The two structures obtained from a force-field optimization are shown in Figure \ref{pic:C380andC384} using program PYMOL \ref{Pymol}.
+and {\it c384.inp}. The two structures obtained from a force-field optimization are shown in Figure \ref{pic:C380andC384} using program PYMOL \cite{Pymol}.
 
 %Figure 2
  \begin{figure}[htbp]
@@ -389,9 +403,10 @@ and {\it c384.inp}. The two structures obtained from a force-field optimization 
 Subroutine {\bf SpiralSearch} uses the ring-spiral algorithm of Fowler and Manolopoulus \cite{Atlas}
 for the search of a ring spiral if, for the input, cartesian coordinates were chosen, or if the
 initial fullerene structure was modified. It produces the canonical ring spiral pentagon indices
-if the fullerene is spirallible and fails if it is non-spirallible (as for the two examples shown in 
-Figure \ref{pic:C380andC384}.  A general ring-spiral algorithm is currently in preparation.
+if the fullerene is spirable and fails if it is non-spirable (as for the two examples shown in 
+Figure \ref{pic:C380andC384}.  A more general ring-spiral algorithm is currently in preparation.
 
+%Volume and surface area, minimum covering sphere
 \subsection{Volume and surface area, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
 The volume and surface area of the fullerene are calculated in Subroutine {\bf Volume}. This is done by\\
 1) The convex hull.\\
@@ -408,101 +423,97 @@ using basic geometry. For these, the volume and surface areas are known analytic
 
 The {\it isoperimetric quotient} (IPQ) is defined as
 \begin{equation}
- q_{\textrm IPQ} =36\pi \frac{V^{2} }{S^{3}}\quad\text{with}\quad q_{\textrm IPQ}\in [0,1]
+ q_{\textrm{IPQ}} =36\pi \frac{V^{2} }{S^{3}}\quad\text{with}\quad q_{\textrm{IPQ}}\in [0,1]
  \label{IPQ}
  \end{equation}
-which for an ideal sphere is trivially $q_{\textrm IPQ}=1$, and for zero volume $q_{\textrm IPQ}=0$. For \C{20} 
+which for an ideal sphere is trivially $q_{\textrm{IPQ}}=1$, and for zero volume $q_{\textrm{IPQ}}=0$. For \C{20} 
 and \C{60} with equal bond lengths we get
 \begin{equation}
 \label{IPQC20}
-q_{IPQ} (\C{20}) =0.75470 
+q_{\textrm{IPQ}} (\C{20}) =0.75470 
 \end{equation} 
 \begin{equation}
 \label{IPQC60}
-q_{IPQ} (\C{60}) =0.90317 
+q_{\textrm{IPQ}} (\C{60}) =0.90317 
 \end{equation} 
 
  We can now define the deviation from a sphere (in \%) by
 \begin{equation} 
-D_{IPQ} =100\left(1-q_{IPQ} \right) 
+D_{\textrm{IPQ}} =100\left(1-q_{\textrm{IPQ}} \right) 
 \end{equation}
 
-Three routines follow to calculate the minimum covering sphere (MCS) of a fullerene (Subroutine
-{\bf MinCovSphere2}) using the second algorithm of Yildirim \cite{Yildirim08}, minimum distance
-sphere (MDS) (Subroutine {\bf MinDistSphere}), and the maximum inner sphere (MIS) (Subroutine {\bf MaxInSphere}).
-
-{
-\advance\leftskip 1.5cm
-\textsmaller
-
+Three routines follow to calculate the {\it minimum covering sphere} (MCS) of a fullerene (Subroutine
+{\bf MinCovSphere2}) using algorithm 2 of Yildirim \cite{Yildirim08}, {\it minimum distance
+sphere} (MDS) (Subroutine {\bf MinDistSphere}), and the {\it maximum inner sphere} (MIS) (Subroutine {\bf MaxInSphere}).
+The MCS is defined as follows:
 Let $S = \vec{p}_i$ be the set of $n$ points ($i=1,\ldots ,n$) in $m$-dimensional Euclidean space, 
-$R^m$. The MCS of this set, MCS($S$), is a sphere of smallest radius $R_{MCS}$ that encloses the set of points $S$. 
-
-The MCS problem can be expressed as follows,
+$R^m$. The MCS of this set, MCS($S$), is a sphere of smallest radius $R_{MCS}$ that encloses the set of points $S$,
+and can be expressed as follows,
 \begin{equation}
 	\label{eq:MCS}
-	\min\limits_{\vec{c}_{MCS} } \max\limits_i \left\| \vec{p}_i -\vec{c}_{MCS} \right\|  
+	\min\limits_{\vec{c}_{\mathrm{MCS}} } \max\limits_i \left\| \vec{p}_i -\vec{c}_{\mathrm{MCS}} \right\|  
 \end{equation} 
-where $\|\cdot\| $ denotes the Eucledian norm and $\vec{c}_{MCS}$ is the center of the MCS. The MCS
+where $\|\cdot\| $ denotes the Eucledian norm and $\vec{c}_{\mathrm{MCS}}$ is the center of the MCS. The MCS
 is uniquely defined and can be expressed as a convex combination of at most 
 ($m+1$) points, hence our algorithm stops when 4~points are left over in the iteration process of the algorithm.
 The spherical central cover SCC is not the minimum covering sphere MCS
-(except if all distances from the center of points CM are the same as in the
+(except for example if all distances from the barycenter CM are the same as in the
 ideal capped icosahedron). The spherical central cover is taken from the
 CM point with radius $R_{\mathrm{max}}$ (longest distance to one vertex).  We changed the first
 condition in this Yildirim's algorithm by choosing the furthest point from CM.
 In the final statistics there should be 0 points outside the sphere and at least 1 point on the sphere.
 We can now introduce the definition for the MCS distortion parameter $D_{MCS}$ (in \% of $r_{\mathrm{min}}$),
 \begin{equation} \label{eq:DMCS}
-D_{MCS} =\frac{100}{n_vr_{\min}} \sum_{i=1}^{n_v} \left(R_{MCS} - \|\vec{p}_i - \vec{c}_{MCS}\|\right)
+D_{\mathrm{MCS}} =\frac{100}{n_vr_{\min}} \sum_{i=1}^{n_v} \left(R_{\mathrm{MCS}} - \|\vec{p}_i - \vec{c}_{\mathrm{MCS}}\|\right)
 \end{equation} 
 
 At the end, the Van der Waals radius of carbon (1.415\,\AA) is added to the radius of the MCS
 (Input coordinates for this need to be in \AA{} otherwise you are required to change the program),
 and the volume of an ideal fcc solid is calculated. The Van der Waals radius is chosen such that
 for \C{60} the solid-state results of Heiney et al. \cite{Heiney91} are reproduced.
-In the case of nonplanar 5- or 6-rings there is no unique definition for the volume of a fullerene,
+In the case of nonplanar pentagons or hexagons there is no unique definition for the volume of a fullerene,
 except for the convex hull. There is no reason, however, why any other definition should be preferred
-over the fast tesselation algorithm employed in this program.
+over the exact volume algorithm employed in this program.
 
-The minimum distance sphere (MDS) of a fullerene is biased for the case that few atoms stick 
-out on a sphere and the MDS may be more appropriate for a measure from spherical distortion. The MDS 
-radius is defined as
+The MCS is biased for the case that few atoms stick out on the surface of a fullerene,
+and the minimum distance sphere (MDS) may be more appropriate for a measure from spherical distortion,
 \begin{equation} 
-	R_{MDS} =\frac{1}{N} \sum _{i}^{}\left\| \vec{p}_{i} -\vec{c}_{MDS} \right\|   
+\mathop{\min }\limits_{c_{MDS} \in CH(S)} \frac{1}{n_v} \sum _{i}^{}\left|R_{MDS} -\left\| \vec{p}_{i}-\vec{c}_{MDS} \right\| \right|  
+\end{equation}
+
+with the MDS radius
+\begin{equation} 
+	R_{\mathrm{MDS}} =\frac{1}{n_v} \sum _{i}^{}\left\| \vec{p}_{i} -\vec{c}_{\mathrm{MDS}} \right\|   
 	\label{eq:RMDS}
 \end{equation} 
 
-The restriction of $\vec{c}_{MDS}$ to be inside the convex hull is necessary as the center may move
-out of the fullerene structure in the optimization.  One can now easily verify this definition is
-different from the MCS and generally $\vec{c}_{MDS}\ne\vec{c}_{MCP}$. This is a much better distortion
-parameter compared to $D_{MCS}$, as it is not biased to a few points lying outside or inside the sphere.
-The MDS may not be uniquely defined, as there can be many (even degenerate) local minima, but for most
-spherical fullerenes it should just be fine.  Analogous to the MCS there we define a measure for distortion
-from spherical symmetry through the MDS,
+The restriction of $\vec{c}_{\mathrm{MDS}}$ to be inside the convex hull is necessary as $\vec{c}_{\mathrm{MDS}}$ may move
+out of the fullerene structure in the optimization procedure.  In general we have $\vec{c}_{\mathrm{MDS}}\ne\vec{c}_{\mathrm{MCP}}$
+except for the case that all points lie on the MCS. The MDS may however not be uniquely defined, as there could be many 
+(even degenerate) local minima, but for most case (i.e. ``spherical'' fullerenes) it works just fine.  
+This gives a better definition for the distortion
+parameter compared to $D_{\mathrm{MCS}}$, as it is not biased to a few points lying outside or inside the fullerene surface.
+Hence, analogous to the MCS we define a measure for distortion from spherical symmetry through the MDS,
 \begin{equation}
   \label{eq:DMDS}
-  D_{MDS} = \frac{100}{N r_{\mathrm{min}}} \sum_{i=1}^N \left|R_{\mathrm{MDS}} - \|\vec{p}_i - \vec{c}_{\mathrm{MDS}}\| \right|
+  D_{\mathrm{MDS}} = \frac{100}{n_v r_{\mathrm{min}}} \sum_{i=1}^N \left|R_{\mathrm{MDS}} - \|\vec{p}_i - \vec{c}_{\mathrm{MDS}}\| \right|
 \end{equation}
 
-The maximum inner sphere (MIS) of a fullerene is important to estimate if there is space inside the cage for endohedral atoms or molecules. It is
+The maximum inner sphere (MIS) is important to estimate if there is enough space inside the fullerene cage for endohedral atoms or molecules. It is
 defined as
 \begin{equation}
 	\max\limits_{c_{\mathrm{MES}} \in \mathrm{CH}(S)} \min\limits_{i} \left\| \vec{p}_{i} -\vec{c}_{\mathrm{MES}} \right\|  
 	\label{MES} 
 \end{equation}
 
-For ideal \C{60} ($I_h$ symmetry) MCS and MES are identical. 
-For this the radius and volume is printed  with the Van der Waals
-radius of carbon taken off $R_{\mathrm{MDS}}$. 
+For ideal \C{60} ($I_h$ symmetry) MCS, MDS and MES are all identical. 
+For the MIS the radius and volume is printed  with the Van der Waals radius of carbon taken off $R_{\mathrm{MIS}}$. 
 
-\advance\leftskip -1.5cm
-}
-
+%2D fullerene graphs and Schlegel diagrams
 \subsection{2D fullerene graphs and Schlegel diagrams}
-Finally, fullerenes can be nicely visualized in 2D fullerene graphs. They should be distance-transitive, distance-regular and 
-symmetric. In Subroutine {\bf Graph2D} $(X_i,Y_i) (i=1,\dots, n_v)$ coordinates 
-of a fullerene graph are created. There are a number of different algorithms available to achieve this. We list here the ones we recommend to use,
+Fullerenes can be nicely visualized by 2D fullerene graphs. They should be distance-transitive, distance-regular and 
+symmetric. There are a number of different algorithms available to achieve this, and in subroutine {\bf Graph2D} $(X_i,Y_i) (i=1,\dots, n_v)$ 
+coordinates for a 2D fullerene graph are created. Here we briefly describe the algorithms we recommend to use,
 others are of perhaps of more historical interest.
 
 1) The perspective Schlegel projection (SP): Here the points are rotated so to put a selected vertex, edge or ring center 
@@ -778,14 +789,14 @@ We are working on this problem at the moment.
 %Figure 3
  \begin{figure}[htbp]
 	\centering
-  		\includegraphics[width=0.2\textwidth]{Graph1.png}
-		\includegraphics[width=0.2\textwidth]{Graph2.png}
-		\includegraphics[width=0.2\textwidth]{Graph3.png}
-		\includegraphics[width=0.2\textwidth]{Graph4.png}
-		\includegraphics[width=0.2\textwidth]{Graph5.png}
-		\includegraphics[width=0.2\textwidth]{Graph6.png}
-		\includegraphics[width=0.2\textwidth]{Graph7.png}
-		\includegraphics[width=0.2\textwidth]{Graph8.png}
+  		\includegraphics[width=0.22\textwidth]{Graph1.png}
+		\includegraphics[width=0.22\textwidth]{Graph2.png}
+		\includegraphics[width=0.22\textwidth]{Graph3.png}
+		\includegraphics[width=0.22\textwidth]{Graph4.png}
+		\includegraphics[width=0.22\textwidth]{Graph5.png}
+		\includegraphics[width=0.22\textwidth]{Graph6.png}
+		\includegraphics[width=0.22\textwidth]{Graph7.png}
+		\includegraphics[width=0.22\textwidth]{Graph8.png}
         \label{pic:Graph2D}
         \caption{From the left to right: 2D fullerene structures created using {\bf ISchlegel}=1 to 8.}
  \end{figure}
@@ -828,7 +839,11 @@ see http://caagt.ugent.be/buckygen/.
 
 \bibitem{Yoshida97} M. Yoshida, P. Fowler, {\it Chem. Phys. Lett.} {\bf 278}, 256Ð261(1997).
 
+\bibitem{WS} L. Wirz, J. Avery, P. Schwerdtfeger, to be published.
+
 \bibitem{Stone86} A. J. Stone and D. J. Wales, ``Formation of carbon nanofibers'', {\it Chem. Phys. Lett.} {\bf 128}, 501-503 (1986).
+
+\bibitem{NumRec} W. T. Vetterling, B. P. Flannery, in ``Numerical Recipes in C - The Art of Scientific Computing'', chapter 10, section 6: Conjugate Gradient Methods in Multidimensions; W. H. Press, S. A. Teukolsky (Editors), , Cambridge University Press; 2nd edition (1992).
 
 \bibitem{Wu87} Z. C. Wu, D. A. Jelski, and T. F. George, ``Vibrational Motions of
 Buckminsterfullerene'', {\it Chem. Phys. Lett.} {\bf 137}, 291-295 (1987).
