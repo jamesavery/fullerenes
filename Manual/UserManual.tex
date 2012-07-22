@@ -275,10 +275,10 @@ in the book by Fowler and Manolopoulus \cite{Atlas}, e.g. pentagon indices and
 pentagon number, hexagon indices and strain parameter, NMR information and number of distinct Hamiltonian cycles if 
 required. The number of isomers scales polynomially as $n_v^9$, thus it becomes computationally
 too demanding for a full isomer list beyond \C{100}. Moreover, the database provided, can be used to print all isomers up to 
-\C{100}, and up to \C{120} for all IPR isomers. Fowler and Manolopoulus use a numbering scheme ($N_{isomers}= 1,\dots, n_{max}$) 
+\C{100}, and up to \C{120} for all IPR isomers. Fowler and Manolopoulus use a numbering scheme ($N_\mathrm{isomers}= 1,\dots, n_\mathrm{max}$) 
 obtained from the natural sequence of canonical RSPIs to distinguish between the different isomers \cite{Atlas}. From their book \cite{Atlas} the
 general isomer number can be taken and the RSPIs for a specific isomer up to \C{100} can be read-in from the database provided. 
-The numbering scheme for IPR isomers only ($N_{\mathrm{isomers}}^{IPR}= 1,\dots, n_{max}$) can also be used up to \C{120}, see input file {\it database.inp}.
+The numbering scheme for IPR isomers only ($N_\mathrm{isomers}^\mathrm{IPR}= 1,\dots, n_\mathrm{max}$) can also be used up to \C{120}, see input file {\it database.inp}.
 
 %H\"uckel analysis and topological indicators
 \subsection{H\"uckel analysis and topological indicators}
@@ -464,7 +464,7 @@ condition in this Yildirim's algorithm by choosing the furthest point from CM.
 In the final statistics there should be 0 points outside the sphere and at least 1 point on the sphere.
 We can now introduce the definition for the MCS distortion parameter $D_{MCS}$ (in \% of $r_{\mathrm{min}}$),
 \begin{equation} \label{eq:DMCS}
-D_{\mathrm{MCS}} =\frac{100}{n_vr_{\min}} \sum_{i=1}^{n_v} \left(R_{\mathrm{MCS}} - \|\vec{p}_i - \vec{c}_{\mathrm{MCS}}\|\right)
+D_{\mathrm{MCS}} =\frac{100}{n_vr_\mathrm{min}} \sum_{i=1}^{n_v} \left(R_{\mathrm{MCS}} - \|\vec{p}_i - \vec{c}_{\mathrm{MCS}}\|\right)
 \end{equation} 
 
 At the end, the Van der Waals radius of carbon (1.415\,\AA) is added to the radius of the MCS
@@ -478,12 +478,12 @@ over the exact volume algorithm employed in this program.
 The MCS is biased for the case that few atoms stick out on the surface of a fullerene,
 and the minimum distance sphere (MDS) may be more appropriate for a measure from spherical distortion,
 \begin{equation} 
-\mathop{\min }\limits_{c_{MDS} \in CH(S)} \frac{1}{n_v} \sum _{i}^{}\left|R_{MDS} -\left\| \vec{p}_{i}-\vec{c}_{MDS} \right\| \right|  
+\min\limits_{c_\mathrm{MDS} \in CH(S)} \frac{1}{n_v} \sum _{i} \left|R_\mathrm{MDS} -\left\| \vec{p}_{i}-\vec{c}_{MDS} \right\| \right|  
 \end{equation}
 
 with the MDS radius
 \begin{equation} 
-	R_{\mathrm{MDS}} =\frac{1}{n_v} \sum _{i}^{}\left\| \vec{p}_{i} -\vec{c}_{\mathrm{MDS}} \right\|   
+	R_{\mathrm{MDS}} =\frac{1}{n_v} \sum _{i}\left\| \vec{p}_{i} -\vec{c}_{\mathrm{MDS}} \right\|   
 	\label{eq:RMDS}
 \end{equation} 
 
@@ -540,7 +540,7 @@ but the resulting overcrowding of small polygons near the center of the graph is
 by a linear scaling procedure
 \begin{equation}
 	\label{GrindEQ__16_} 
-	\lambda_i = 1+\frac{f(r_{min} - r_i)}{r_{min}}
+	\lambda_i = 1+\frac{f(r_\mathrm{min} - r_i)}{r_\mathrm{min}}
 \end{equation}
 applying a linear scaling factor $\lambda_i$ to all vertices $v_i$ ($i=5(6),\dots , n_v$), where $f$
 is a parameter to be determined, $r_{\mathrm{min}}$ is the smallest distance to the vertices of the peripheral
@@ -552,7 +552,7 @@ Pisanski, Plestenjak and Graovac in conjunction with a simulated annealing proce
 which is an improvement over usual spring embedders. Here the potential between adjacent vertices is modeled by
 \begin{equation} 
 \label{eq:Eppg} 
-E_{\mathrm{PPG}} =\sum _{i<j}^{ord(G)} A_{ij}  r_{ij}^{2} \exp \left(\alpha \frac{2d_{\mathrm{max}} -d_{iP} -d_{jP} }{d_{\mathrm{max}} } \right) 
+E_{\mathrm{PPG}} =\sum_{i<j}^{\mathrm{ord}(G)} A_{ij}  r_{ij}^{2} \exp \left(\alpha \frac{2d_{\mathrm{max}} -d_{iP} -d_{jP} }{d_{\mathrm{max}} } \right) 
 \end{equation} 
 where $A_{ij}$ is the adjacency matrix, $r_{ij}$ the distance between vertex $i$ and $j$, and $a$ a
 parameter to be determined. The distances in eq.\eqref{eq:Eppg} are defined through the topological
