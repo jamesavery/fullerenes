@@ -1,5 +1,5 @@
       SUBROUTINE MoveCM(Matom,Iout,Iprint,IAtom,mirror,
-     1 Dist,DistCM,El)
+     1 SP,Dist,DistCM,El)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),DistCM(3),Ainert(3,3),evec(3),df(3)
@@ -43,7 +43,7 @@
 C     Calculate distance part of moment of inertia
       Do I=1,3
       Do J=1,3
-      Ainert(I,J)=0.d0
+       Ainert(I,J)=0.d0
       enddo
       enddo
       Do J=1,MAtom
@@ -72,14 +72,14 @@ C     Calculate distance part of moment of inertia
       enddo
       Do I=1,3
       Do J=1,3
-      Ainert(I,J)=Ainert(I,J)/xmin
+       Ainert(I,J)=Ainert(I,J)/xmin
       enddo
       enddo
 C Diagonalize without producing eigenvectors
       call tred2l(Ainert,3,3,evec,df)
       call tqlil(evec,df,3,3)
       Do I=1,3
-      evec(i)=evec(i)*xmin
+       evec(i)=evec(i)*xmin
       enddo
 C Sort eigenvalues
       Do I=1,3
@@ -100,9 +100,14 @@ C Sort eigenvalues
       enddo
       Write(Iout,1001) (evec(i),I=1,3)
       do i=1,3
-      evec(i)=evec(i)/FNorm
+       evec(i)=evec(i)/FNorm
       enddo
-      Write(Iout,1004) FNorm,(evec(i),I=1,3)
+C Calculate distortion parameter
+      a2=(evec(1)-evec(2))**2
+      b2=(evec(2)-evec(3))**2
+      c2=(evec(3)-evec(1))**2
+      SP=dsqrt(a2+b2+c2)/evec(1)
+      Write(Iout,1004) FNorm,(evec(i),I=1,3),SP
 C Determine shape
       S1=dabs(evec(1)-evec(2))/evec(1)
       S2=dabs(evec(1)-evec(3))/evec(1)
@@ -149,7 +154,8 @@ C Asymmetric
      1  /1X,'  I      Z  Element Cartesian Coordinates')
  1004 FORMAT(1x,'Using C60 ideal icosahedron to normalize eigenvalues',
      1 ' (',F6.2,' Angstroem^2)',/,' Eigenvalues (normalized): ',
-     1 3(' ',D15.9))
+     1 3(' ',D15.9),/1X,'Sphericity parameter normed to largest ',
+     1 'rotational constant: ',D15.9)
  1005 FORMAT(1x,'Fullerene is symmetric top')
  1006 FORMAT(1x,'Fullerene is distorted symmetric top')
  1007 FORMAT(1x,'Fullerene is prolate')

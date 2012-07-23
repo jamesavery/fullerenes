@@ -442,6 +442,19 @@ q_{\textrm{IPQ}} (\C{60}) =0.90317
 D_{\textrm{IPQ}} =100\left(1-q_{\textrm{IPQ}} \right) 
 \end{equation}
 
+The program also calculates the {\it sphericity parameter} of Diaz-Tendero \cite{Diaz},
+\begin{equation}
+\label{Diaz}
+q_{\textrm{SP}} = \sqrt{(A-B)^2+(A-C)^2+(B-C)^2}/A 
+\end{equation}
+where $A \ge B \ge C$ are the rotational constants. Note that we deviate from the original definition by dividing 
+the square-root by the rotational constant $A$. Further, the {\it asymmetry parameter} of Fowler is printed,
+\begin{equation}
+\label{Diaz}
+q_{\textrm{AP}} = \sum_{i=1}^{n_v}  \frac{(r_i-r_0)^2}{r_0^2}
+\end{equation}
+where $r_i$ is the radial distance of atom $i$ from the barycenter and $r_0$ is the average distance \cite{Fowler2000}.
+
 Three routines follow to calculate the {\it minimum covering sphere} (MCS) of a fullerene (Subroutine
 {\bf MinCovSphere2}) using algorithm 2 of Yildirim \cite{Yildirim08}, {\it minimum distance
 sphere} (MDS) (Subroutine {\bf MinDistSphere}), and the {\it maximum inner sphere} (MIS) (Subroutine {\bf MaxInSphere}).
@@ -554,7 +567,7 @@ which is an improvement over usual spring embedders. Here the potential between 
 \label{eq:Eppg} 
 E_{\mathrm{PPG}} =\sum_{i<j}^{\mathrm{ord}(G)} A_{ij}  r_{ij}^{2} \exp \left(\alpha \frac{2d_{\mathrm{max}} -d_{iP} -d_{jP} }{d_{\mathrm{max}} } \right) 
 \end{equation} 
-where $A_{ij}$ is the adjacency matrix, $r_{ij}$ the distance between vertex $i$ and $j$, and $a$ a
+where $A_{ij}$ is the adjacency matrix, $r_{ij}$ the distance between vertex $i$ and $j$, and $\alpha$ a
 parameter to be determined. The distances in eq.\eqref{eq:Eppg} are defined through the topological
 distance matrix $D$,
 \begin{equation}
@@ -889,6 +902,10 @@ Adjacent Pentagons: \C{20} to \C{72}'', {\it J. Nanosci. Nanotech.} {\bf 7}, 132
 \bibitem{PSAJDB} P. Schwerdtfeger, D. Babi\'c, and J. Avery, ``Hamiltonian cycles in regular fullerenes'', in preparation.
 
 \bibitem{NumericalRecipes} ``Numerical Recipes in Fortran 77. The Art of Scientific Computing'' (2nd Edition, 1992); see http://www.nr.com/.
+
+\bibitem{Diaz} S. D\'iaz-Tendero, F. Mart\'in, and M. Alcam\'i, {\it ChemPhysChem} {\bf 6}, 92-100 (2005).
+
+\bibitem{Fowler2000} P. W. Fowler, T. Heine, F. Zerbetto, {\it J. Phys. Chem.} {\bf 104}, 9625-9629 (2000).
 
 \bibitem{Yildirim08} E. A. Yildirim, ``Two Algorithms for the Minimum Enclosing Ball Problem'', 
 {\it SIAM Journal on Optimization}, {\bf 19}, 1368-1391 (2008) 

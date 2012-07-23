@@ -172,10 +172,10 @@ C Move carbon cage to Atomic Center
       Write(Iout,1008) routine
       Iprint=1
       Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
-     1 Dist,DistCM,El)
+     1 SP,Dist,DistCM,El)
 
 C Calculate largest and smallest atom-to-atom diameters
-C Also get moment of inertia (to be implemented)
+C Also get moment of inertia
       routine='DIAMETER     '
       Write(Iout,1008) routine
       CALL Diameter(MAtom,IOUT,Dist,distp)
@@ -273,7 +273,7 @@ c a stone wales (or any other transformation) is done
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
         endif
         Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
-     1   Dist,DistCM,El)
+     1   SP,Dist,DistCM,El)
         routine='DISTMATRIX   '
         Write(Iout,1008) routine
         CALL Distmatrix(MAtom,IOUT,Iprintf,0,
@@ -399,7 +399,7 @@ C Calculate the volume
 C Calculate the minimum covering sphere and volumes
       routine='MINCOVSPHERE2'
       Write(Iout,1008) routine
-      CALL MinCovSphere2(MAtom,IOUT,Dist,Rmin,Rmax,
+      CALL MinCovSphere2(MAtom,IOUT,SP,Dist,Rmin,Rmax,
      1 VolSphere,ASphere,Atol,VTol,distP,cmcs,rmcs,RVdWC)
 
 C Calculate the minimum distance sphere
@@ -457,7 +457,7 @@ C Formats
      1 /1X,'|      with routines from Fowler, Manolopoulos and Babic |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.0, last revision from 16/07/12     |',
+     1 /1X,'|    This  version: 4.0, last revision from 23/07/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',

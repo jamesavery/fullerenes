@@ -199,7 +199,7 @@ C     Calculate norm for minimum distance sphere
       Return
       End
 
-      SUBROUTINE MinCovSphere2(M,IOUT,Dist,Rmin,Rmax,
+      SUBROUTINE MinCovSphere2(M,IOUT,SP,Dist,Rmin,Rmax,
      1 VCS,ACS,Atol,VTol,u,c,radius,RVdWC)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -221,26 +221,36 @@ C     Get the minimum covering sphere using algorithm 2 by E.A.Yildirim
 C   
 C    Initial step
 C 
+      xmax=0.d0
+      ialpha=0
       do i=1,M
         u(i)=0.d0
       enddo
-      xmax=0.d0
-      ialpha=0
 C    Algorithm changed here by taking the furthest 
 C    point from the center of points
+      rav=0.d0
       do i=1,M
         dx=Dist(1,i)
         dy=Dist(2,i)
         dz=Dist(3,i)
-C       dx=Dist(1,1)-Dist(1,i)
-C       dy=Dist(2,1)-Dist(2,i)
-C       dz=Dist(3,1)-Dist(3,i)
         Xnorm=dx*dx+dy*dy+dz*dz
+        rav=rav+dsqrt(Xnorm)
           if(Xnorm.gt.xmax) then
             ialpha=i
             xmax=Xnorm
           endif
       enddo
+      meandist=rav/dfloat(M)
+      asym=0.d0
+C     Fowler asymmetry parameter
+      do i=1,M
+        dx=Dist(1,i)
+        dy=Dist(2,i)
+        dz=Dist(3,i)
+        ri=dsqrt(dx*dx+dy*dy+dz*dz)
+        asym=asym+(ri-meandist)**2
+      enddo
+        asym=asym/meandist**2
       xmax=0.d0
       ibeta=0
       do i=1,M
@@ -410,7 +420,8 @@ C     Finally calculate the surface and volume and compare to previous results
       AIPQ=36.d0*API*Vtol**2/Atol**3
       DIPQ=(1.d0-AIPQ)*100.d0
       Write(IOUT,1004) VMCS,VCS,Vtol,AMCS,ACS,Atol,
-     1 RatioMCS,RatioCS,RatioT,RatioV,AIPQ,DIPQ
+     1 RatioMCS,RatioCS,RatioT,RatioV,AIPQ,DIPQ,
+     1 SP,SP*1.d2,asym
 C     Do statistics
       Write(IOUT,1011)
       keq=0
@@ -475,7 +486,10 @@ C     to calculate the root mean square as a measure for distortion
      1 /1x,' Ratio area/volume of fullerene              : ',D14.8,
      1 /1x,' Ratio V(MCS)/V(cage)                        : ',D14.8,
      1 /1x,' Isoperimetric quotient (q_IP=36*PI*V^2/A^3) : ',D14.8,
-     1 /1x,' Deformation parameter from q_IP (in %)      : ',D14.8)
+     1 /1x,' Deformation parameter from q_IP (in %)      : ',D14.8,
+     1 /1x,' Diaz-Tendero sphericity parameter divided by ',
+     1     'rotational constant A: ',D14.8,' (',D14.8,'%)',
+     1 /1x,' Fowler asymmetry parameter       : ',D14.8)
  1005 Format(1x,' Number of cycles ',I8,', nr. points: ',I4,
      1 ', convergence: ',F14.8,', Center of Sphere (X,Y,Z): ',
      2 3(D12.6,2X))
