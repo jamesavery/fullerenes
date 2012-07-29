@@ -1,7 +1,7 @@
-      SUBROUTINE MaxInSphere(M,IOUT,Dist,c,RVdWC)
+      SUBROUTINE MaxInSphere(M,IOUT,Dist,cmcs,RVdWC)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION Dist(3,Nmax),c(3),cmax(3)
+      DIMENSION Dist(3,Nmax),c(3),cmax(3),cmcs(3)
       DATA API/3.14159265358979d0/
       DATA itermax/10000000/
       DATA eps,epsc/1.d-8,2.d0/
@@ -9,6 +9,9 @@
 C     Get the maximum inner sphere
       Write(IOUT,1000) 
 C    Initial step
+      do i=1,3
+       c(i)=cmcs(i)
+      enddo
       cnorm=dsqrt(c(1)*c(1)+c(2)*c(2)+c(3)*c(3))
       nchoice=0
       if(cnorm.gt.epsc) then
