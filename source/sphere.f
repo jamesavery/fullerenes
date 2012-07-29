@@ -199,6 +199,74 @@ C     Calculate norm for minimum distance sphere
       Return
       End
 
+      SUBROUTINE ProjectSphere(MAtom,ipsphere,Iout,IAtom,nzeile,
+     1 Dist,c,rmcs,filename,El,TEXTINPUT)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+C     This routine projects vertices on the minimum covering sphere
+C      producing a spherical fullerene
+      DIMENSION Dist(3,Nmax),c(3),IATOM(Nmax)
+      CHARACTER*2 El(99)
+      Character*1 TEXTINPUT(nzeile)
+      Character*20 filename
+      CHARACTER*34 xyzname
+      Integer endzeile
+
+      Write(Iout,1000)
+      Do I=1,MAtom
+       r2=0.d0
+      Do J=1,3
+       Dist(J,I)=Dist(J,I)-c(J)
+       r2=r2+Dist(J,I)**2
+      enddo
+       rdist=dsqrt(r2)
+       rscale=rmcs/rdist
+      Do J=1,3
+       Dist(J,I)=Dist(J,I)*rscale
+      enddo
+      enddo
+
+      Do J=1,MAtom
+       IM=IAtom(J)
+       Write(IOUT,1001),J,IM,El(IM),(Dist(I,J),I=1,3)
+      enddo
+
+      if(ipsphere.ge.2) then
+       xyzname=trim(filename)//"-3DMCS.xyz"
+       Open(unit=9,file=xyzname,form='formatted')
+        WRITE(Iout,1002) xyzname
+        endzeile=0
+        do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo
+        if(MAtom.lt.100) WRITE(9,1011) MAtom,MAtom,
+     1    (TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.100.and.MAtom.lt.1000)
+     1    WRITE(9,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.1000.and.MAtom.lt.10000)
+     1    WRITE(9,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        Do J=1,MAtom
+          IM=IAtom(J)
+          Write(9,1007) El(IM),(Dist(I,J),I=1,3)
+        enddo
+        Close(unit=9)
+
+      endif
+
+ 1000 Format(/1X,'Projecting vertices on minimum covering sphere',
+     1 /1x,'Cartesian Input',
+     1  /1X,'  I      Z  Element Cartesian Coordinates')
+ 1001 FORMAT(1X,I4,1X,I6,1X,A2,6X,3(D18.12,2X))
+ 1002 FORMAT(/1X,'Input coordinates for spherical fullerene to be ',
+     1 'used for plotting program CYLVIEW, PYMOL or AVOGADRO',
+     1 /1X,'Output written into ',A34)
+ 1007 FORMAT(A2,6X,3(F15.6,2X))
+ 1011 FORMAT(I5,/,'C',I2,'/  ',132A1)
+ 1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
+ 1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
+      Return
+      End
+
       SUBROUTINE MinCovSphere2(M,IOUT,SP,Dist,Rmin,Rmax,
      1 VCS,ACS,Atol,VTol,u,c,radius,RVdWC)
       use config

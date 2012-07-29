@@ -93,9 +93,9 @@ C  INPUT and setting parameters for running the subroutines
         CALL Datain(IN,IOUT,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
-     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ndual,
-     1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,force,forceP,
-     1  filename,TEXTINPUT)
+     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
+     1  ndual,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
+     1  force,forceP,filename,TEXTINPUT)
 
       xyzname=trim(filename)//"-3D.xyz"
 
@@ -412,6 +412,13 @@ C Calculate the maximum inner sphere
       Write(Iout,1008) routine
       CALL MaxInSphere(MAtom,IOUT,Dist,cmcs,RVdWC)
 
+C Projecting vertices on minimum covering sphere
+C  producing a spherical fullerene
+      if(ipsphere.ne.0) then
+       call ProjectSphere(MAtom,ipsphere,Iout,IAtom,nzeile,
+     1 Dist,cmcs,rmcs,filename,El,TEXTINPUT)
+      endif
+
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
         routine='GRAPH2D      '
@@ -457,7 +464,7 @@ C Formats
      1 /1X,'|      with routines from Fowler, Manolopoulos and Babic |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.0, last revision from 23/07/12     |',
+     1 /1X,'|    This  version: 4.0, last revision from 29/07/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
@@ -475,7 +482,7 @@ CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
  1001 FORMAT(/1X,'Number of Atoms: ',I4,', and distance tolerance: ',
      1 F12.2,'%')
  1002 FORMAT(/1X,'Input coordinates to be used for plotting program',
-     1 ' CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written into ',A20)
+     1 ' CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written into ',A31)
 CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1003 FORMAT(1X,'Pre-optimization using the Wu force field with ',
      1 'input parameter')

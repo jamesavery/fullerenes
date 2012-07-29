@@ -525,9 +525,11 @@ For the MIS the radius and volume is printed  with the Van der Waals radius of c
 %2D fullerene graphs and Schlegel diagrams
 \subsection{2D fullerene graphs and Schlegel diagrams}
 Fullerenes can be nicely visualized by 2D fullerene graphs. They should be distance-transitive, distance-regular and 
-symmetric. There are a number of different algorithms available to achieve this, and in subroutine {\bf Graph2D} $(X_i,Y_i) (i=1,\dots, n_v)$ 
+symmetric. There are a number of different algorithms available trying to achieve this, and in subroutine {\bf Graph2D} $(X_i,Y_i) (i=1,\dots, n_v)$ 
 coordinates for a 2D fullerene graph are created. Here we briefly describe the algorithms we recommend to use,
-others are of perhaps of more historical interest. The subroutine produces latex file with the fullerene graph included.
+others are of perhaps of more historical interest. Note that for non-spherical fullerenes (like the famous non-spirable \C{380} (Figure  \ref{pic:C380andC384})
+tetrahedron) it becomes very difficult to create a good Schlegel projection, and in such cases the projection of vertices to the minimum
+covering sphere is recommended before these algorithms are used (see input). The subroutine produces latex file with the fullerene graph included.
 
 1) The perspective Schlegel projection (SP): Here the points are rotated such to put a selected vertex, edge or ring center 
 on top of the $z$-axis just below the projection point (otherwise the point $(0,0,z_{\mathrm{max}})$ is chosen with $z_{\mathrm{max}}$
@@ -614,7 +616,7 @@ In the following, the input in the required sequence is described in detail (eit
 
 2) {\bf \&Coord line}: Input to create cartesian coordinates and main flags for the program (e.g. \&Coord ICart=20, R6=1.42 /).\\
 {\it List of options:}\\ 
-{\bf NA, ICart, IV1, IV2, IV3, ixyz, filename, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, loop, mirror, IP, IPRC, TolR, R5, R6}\\
+{\bf NA, ICart, IV1, IV2, IV3, ixyz, filename, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, ipsphere, loop, mirror, IP, IPRC, TolR, R5, R6}\\
 {\bf NA} = Number of atoms (vertices) $N_A$ (Default: 60)\\
 {\bf ICart} = Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 {\bf IV1} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
@@ -644,7 +646,7 @@ At the moment only $l=0$ is implemented, also the leapfrog transformation $k=1$ 
 In this case {\bf kGC} in the namelist input has to be specified. \\
 If {\bf IWS} = 1 the initial fullerene structure is subjected to a Stone-Wales transformation (Default: 0). In this case an
 input is required (after all the other input, last card) with pairs of
-pentagon ring number. Numbers are between 1 and 12. These can be obtained
+pentagon ring numbers. Numbers are between 1 and 12. These can be obtained
 from a previous output in the section where ring connections are analyzed
 and Stone-Wales patterns are printed. In the output for Stone-Wales
 numbers the first and last ring numbers are the ones required as these
@@ -667,7 +669,9 @@ the list of Yoshida-Fowler patterns given in the output (IYF=4).\\
 If {\bf ISW} = 1 the initial fullerene structure is subjected to a 9-vertex insertion (Default: 0).
 Similar to Yoshida-Fowler, an input is required (see {\it c384.inp} for details).\\
 If {\bf ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $O(n^3)$ (recommended for large matrices
-over size 5000) (Default: 0)\\
+over size 5000) (Default: 0).\\
+If {\bf ipsphere} = 1 all vertices are projected onto the minimum covering sphere useful for drawing 2D fullerene graphs (Default: 0).\\
+If {\bf ipsphere} = 2 In addition an xyz file is written out named filename-3DMCS.xyz (Default: Fullerene-3DMCS.xyz).\\
 If {\bf loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 
 This is important if one takes an initial structure and subjects it to further transformations, for example in subsequent Stone-Wales or
 Goldberg-Coxeter transformations. You might use this option to read from a xyz file created in the previous run.\\

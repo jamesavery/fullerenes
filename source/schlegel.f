@@ -729,7 +729,7 @@ C     line_width (in mm), vertex_diameter (in mm) )
       call set_layout2d(g,layout2d)
       call draw_graph(g,filename,"tex",ndual, 
      1                (/10.d0,10.d0/), x'274070',
-     2                x'458b00', 0.3d0, 1.d0)
+     2                x'458b00', 0.3d0, .5d0)
 
 c Output to POVRay raytracer. Commented out currently.
 c$$$      call draw_graph(g,filename, "pov",0, (/10.d0,10.d0/), 

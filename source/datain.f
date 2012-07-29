@@ -1,7 +1,7 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,ICart,Iopt,IP,IHam,
      1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,GCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
-     1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,
+     1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
      1 ndual,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,force,
      1 forceP,filename,DATEN)
       use config
@@ -13,7 +13,7 @@
       Character filename*20
       Namelist /Coord/ ICart,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,GCtrans,ihueckel,ISW,KE,loop,mirror,
-     1 IYF,IWS,filename
+     1 IYF,IWS,filename,ipsphere
       Namelist /FFChoice/ Iopt,ftol
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
      1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
@@ -90,6 +90,7 @@ C Integers
       IPH=0     !  Print Hamiltonian cycles for each isomer
       IPR=-1    !  Print Isomers
       IPRC=0    !  Option for isomer list
+      IPSphere=0 ! Option for projecting vertices on minimum covering sphere
       isonum=0  !  Isomer number in database
       ISchlegel=0 !  For graph production, option for type of graph
       ISO1=0    !  Option for fullerene orientation for Schlegel projection
