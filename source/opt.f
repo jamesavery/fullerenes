@@ -390,7 +390,6 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6)
       real(8) force(ffmaxdim)
       integer iopt
-c      IOP=1
       deg2rad=dpi/180.d0
       dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
       if(iopt.eq.1 .or. iopt.eq.2)then
