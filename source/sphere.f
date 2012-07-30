@@ -276,6 +276,7 @@ C      producing a spherical fullerene
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax)
       DIMENSION u(Nmax),c(3),Kappa(Nmax)
+      Real*8 meandist
 C     Get the minimum covering sphere using algorithm 2 by E.A.Yildirim
       DATA API/3.14159265358979d0/
       DATA itermax/10000000/
