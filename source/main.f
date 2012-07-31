@@ -99,6 +99,7 @@ C  INPUT and setting parameters for running the subroutines
      1  force,forceP,filename,TEXTINPUT)
 
       xyzname=trim(filename)//"-3D.xyz"
+      cc1name=trim(filename)//"-3D.cc1"
 
 C  Stop if error in input
       If(IER.ne.0) go to 99
@@ -117,22 +118,34 @@ C  Cartesian coordinates produced for Ih C60
       Go to 40
 C Input Cartesian coordinates for fullerenes
 
-   20 if(icyl.eq.2.or.icyl.eq.3) then
-        Open(unit=7,file=xyzname,form='formatted')
-        WRITE(Iout,1015) xyzname 
-        Read(7,*) MAtom
-        Read(7,1018) (TEXTINPUT(I),I=1,nzeile)
-        endzeile=0
-        do j=1,nzeile
-          if(TEXTINPUT(j).ne.' ') endzeile=j
-        enddo 
-        WRITE(Iout,1017) MAtom,(TEXTINPUT(I),I=1,endzeile)
-        Do J=1,MAtom
-          Read(7,*,end=21) element,(Dist(I,J),I=1,3)
-          Iatom(j)=6
-        enddo
-        close(unit=7)
-        xyzname=trim(filename)//'-3D.new.xyz'
+   20 if(icyl.eq.2.or.icyl.eq.3.or.icyl.eq.5) then
+        if(icyl.eq.5) then
+         Open(unit=7,file=cc1name,form='formatted')
+         WRITE(Iout,1021) cc1name 
+         Read(7,*) MAtom
+         Do J=1,MAtom
+           Read(7,*,end=23) element,JJ,(Dist(I,J),I=1,3)
+           Iatom(j)=6
+         enddo
+   23    close(unit=7)
+         cc1name=trim(filename)//'-3D.new.xyz'
+        else
+         Open(unit=7,file=xyzname,form='formatted')
+         WRITE(Iout,1015) xyzname 
+         Read(7,*) MAtom
+         Read(7,1018) (TEXTINPUT(I),I=1,nzeile)
+         endzeile=0
+         do j=1,nzeile
+           if(TEXTINPUT(j).ne.' ') endzeile=j
+         enddo 
+         WRITE(Iout,1017) MAtom,(TEXTINPUT(I),I=1,endzeile)
+         Do J=1,MAtom
+           Read(7,*,end=22) element,(Dist(I,J),I=1,3)
+           Iatom(j)=6
+         enddo
+   22    close(unit=7)
+         xyzname=trim(filename)//'-3D.new.xyz'
+        endif
       else
         Do J=1,MAtom
           Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
@@ -310,7 +323,7 @@ C xyz format
         Close(unit=3)
       endif
 C cc1 format
-      if(icyl.eq.4.and.ISW.eq.0) then
+      if(icyl.ge.4.and.ISW.eq.0) then
        cc1name=trim(filename)//"-3DMCS.cc1"
        Open(unit=3,file=cc1name,form='formatted')
         WRITE(Iout,1002) cc1name
@@ -524,6 +537,7 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
  1018 FORMAT(132A1)
  1019 FORMAT(140('='))
+ 1021 FORMAT(/1X,'Read coordinates from cc1 file: ',A20)
  1025 FORMAT(I2)
  1026 FORMAT(I3)
  1027 FORMAT(I4)

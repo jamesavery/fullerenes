@@ -632,11 +632,14 @@ There are two databases, one for the general isomers
 ({\bf IPRC} = 0), and one for the IPR isomers ({\bf IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).\\
 {\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting programs (Default: 0).\\
 If {\bf ixyz} = 1: Produce xyz file named {\bf filename-3D.xyz} for further input.\\
-If {\bf ixyz} = 2: Read xyz from file specified in {\bf filename}. {\bf ICart} = 0 needs to be specified for this. Another xyz file is also produced 
-and named   {\it filename-3Dnew.xyz}.\\
-If {\bf ixyz} = 3: Read xyz from file specified in {\bf filename}. {\bf ICart} = 0  needs to be specified.\\
+If {\bf ixyz} = 2: Read xyz from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.xyz}. 
+{\bf ICart} = 0 needs to be specified for this. Another xyz file is also produced and named   {\it filename-3Dnew.xyz}.\\
+If {\bf ixyz} = 3: Read xyz from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.xyz}. 
+{\bf ICart} = 0  needs to be specified.\\
 If {\bf ixyz} = 4: Produce cc1 file (Chem3D cartesian coordinate format 1 file) for further input. Note that in contrast to xyz files,
 cc1 files contain information about vertex connections. Programs like PYMOL can read such files.\\
+If {\bf ixyz} = 5: Read cc1 from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.cc1}. 
+{\bf ICart} = 0  needs to be specified. This is useful for reading for example cc1 files produces by M. Yoshida \cite{Yoshida}.\\
 {\bf filename}: A name of up to 13 characters must be chosen, the file is then named filename-3D.xyz (Default: Fullerene-3D.xyz).
 If {\bf ICart} = 2, 3 or 4 and {\bf isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
 There are two databases, one for the general isomers ({\bf IPRC} = 2) and one for the IPR isomers ({\bf IPRC} = 1), the
@@ -924,6 +927,8 @@ NIST, US Department of Commerce (1996).
 ``Orientational ordering transition in solid \C{60}'', {\it Phys. Rev. Lett.} {\bf 66}, 2911-2914 (1991).
 
 \bibitem{pisanski95} T. Pisanski, B. Plestenjak, and A. Graovac, ``Nice Program and its Application, {\it Croat. Chem. Acta} {\bf 68}, 283Ð292 (1995).
+
+\bibitem{Yoshida} M. Yoshida, ``VRML gallery of Fullerenes'' (1991). The database is available at http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html.
 
 \bibitem{Ceulemans} A. Ceulemans, B. C. Titeca, L. F. Chibotaru, I. Vos, and P. W. Fowler, ``Complete bond force fields for trivalent and deltahedral cages: Group theory and applications to cubane, closo-dodecaborane, and buckminsterfullerene'', {\it J. Phys. Chem. A} {\bf 105}, 8284-8295 (2001).
 
