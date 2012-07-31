@@ -44,6 +44,7 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*13 routine
       CHARACTER*20 filename
       CHARACTER*31 xyzname
+      CHARACTER*31 cc1name
       CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
@@ -116,7 +117,7 @@ C  Cartesian coordinates produced for Ih C60
       Go to 40
 C Input Cartesian coordinates for fullerenes
 
-   20 if(icyl.ge.2) then
+   20 if(icyl.eq.2.or.icyl.eq.3) then
         Open(unit=7,file=xyzname,form='formatted')
         WRITE(Iout,1015) xyzname 
         Read(7,*) MAtom
@@ -284,6 +285,7 @@ c a stone wales (or any other transformation) is done
       endif
 
 C Print out Coordinates used as input for CYLview
+C xyz format
       if(icyl.le.2.and.ISW.eq.0) then
         Open(unit=3,file=xyzname,form='formatted')
         routine='PRINTCOORD   '
@@ -299,12 +301,30 @@ C Print out Coordinates used as input for CYLview
      1    WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
         if(MAtom.ge.1000.and.MAtom.lt.10000) 
      1    WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.10000) 
+     1    WRITE(3,1020) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
         Do J=1,MAtom
           IM=IAtom(J)      
           Write(3,1007) El(IM),(Dist(I,J),I=1,3)
         enddo
         Close(unit=3)
       endif
+C cc1 format
+      if(icyl.eq.4.and.ISW.eq.0) then
+       cc1name=trim(filename)//"-3DMCS.cc1"
+       Open(unit=3,file=cc1name,form='formatted')
+        WRITE(Iout,1002) cc1name
+        if(MAtom.lt.100) WRITE(3,1025) MAtom
+        if(MAtom.ge.100.and.MAtom.lt.1000) WRITE(3,1026) MAtom
+        if(MAtom.ge.1000.and.MAtom.lt.10000) WRITE(3,1027) MAtom
+        if(MAtom.ge.10000) WRITE(3,1028) MAtom
+        Do J=1,MAtom
+          IM=IAtom(J)
+          Write(3,1004) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
+        enddo
+        Close(unit=3)
+      endif
+
 
 C Rings
       routine='RING         '
@@ -416,7 +436,7 @@ C Projecting vertices on minimum covering sphere
 C  producing a spherical fullerene
       if(ipsphere.ne.0) then
        call ProjectSphere(MAtom,ipsphere,Iout,IAtom,nzeile,
-     1 Dist,cmcs,rmcs,filename,El,TEXTINPUT)
+     1 IC3,Dist,cmcs,rmcs,filename,El,TEXTINPUT)
       endif
 
 C Calculate Schlegel diagram
@@ -497,12 +517,17 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1011 FORMAT(I5,/,'C',I2,'/  ',132A1)
  1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
  1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
+ 1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
  1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
  1015 FORMAT(/1X,'Read coordinates from xyz file: ',A20)
  1016 FORMAT(/1X,'End of file reached ==> Stop')
  1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
  1018 FORMAT(132A1)
  1019 FORMAT(140('='))
+ 1025 FORMAT(I2)
+ 1026 FORMAT(I3)
+ 1027 FORMAT(I4)
+ 1028 FORMAT(I8)
       STOP 
       END
 

@@ -1,6 +1,6 @@
 C70 
 &Coord NA=70, ICart=1, IP=1, ixyz=1 /
-&FFChoice Iopt=1 /
+&FFChoice  /
 &FFParameters /
 &Hamilton IHam=1/
 &Isomers IPR=1 /

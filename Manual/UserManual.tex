@@ -143,7 +143,7 @@ total resonance energy of a general fullerene \cite{Babic1995,Babic1997}, and Ma
 
 This program works for any (distorted or not) regular fullerene. The spiral algorithm of Fowler and Manolopoulus used here \cite{Atlas}
 is not restricted to a pentagon start or to canonical indices. For a general list of fullerenes see ``The House of Graphs'' \cite{HouseofGraphs}. 
-The program produces an external file with default name {\bf Fullerene-3D.xyz} to be used for standard molecular plotting programs
+The program produces an external file with default name {\bf Fullerene-3D.xyz} or {\bf Fullerene-3D.cc1} to be used for standard molecular plotting programs
 like CYLview \cite{CYLview}, Avogadro \cite{Avogadro}, Jmol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}.  For using these programs 
 it is important that the fullerene has a reasonable structure, obtained for example by a force-field 
 optimization, otherwise bonds cannot be correctly identified. It may therefore not be advisable to use structures that come out directly from
@@ -248,7 +248,7 @@ which (to our opinion) is less troublesome and may be used as the standard metho
 
 It is important that the end-product is viewed by a molecular visualization program. 
 We recommend CYLview by Claude Legault \cite{CYLview}, Avogadro \cite{Avogadro}, JMol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}. 
-Most of these programs are freely available.  For this purpose a file is written to Fullerene-3D.xyz to be used as an input file 
+Most of these programs are freely available.  For this purpose a file is written to Fullerene-3D.xyz or Fullerene-3D.cc1 to be used as an input file 
 for these molecular visualization programs.
 
 The program sets the barycenter of the fullerene 
@@ -631,10 +631,12 @@ isomer list contained in a database (see below).\\
 There are two databases, one for the general isomers
 ({\bf IPRC} = 0), and one for the IPR isomers ({\bf IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).\\
 {\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting programs (Default: 0).\\
-If {\bf ixyz} = 1:  Produce xyz file named {\bf filename-3D.xyz} for further input.\\
-If {\bf ixyz} = 2:  Read xyz from file specified in {\bf filename}. {\bf ICart} = 0 needs to be specified for this. Another xyz file is also produced 
+If {\bf ixyz} = 1: Produce xyz file named {\bf filename-3D.xyz} for further input.\\
+If {\bf ixyz} = 2: Read xyz from file specified in {\bf filename}. {\bf ICart} = 0 needs to be specified for this. Another xyz file is also produced 
 and named   {\it filename-3Dnew.xyz}.\\
-If {\bf ixyz} = 3  Read xyz from file specified in {\bf filename}. {\bf ICart} = 0  needs to be specified.\\
+If {\bf ixyz} = 3: Read xyz from file specified in {\bf filename}. {\bf ICart} = 0  needs to be specified.\\
+If {\bf ixyz} = 4: Produce cc1 file (Chem3D cartesian coordinate format 1 file) for further input. Note that in contrast to xyz files,
+cc1 files contain information about vertex connections. Programs like PYMOL can read such files.\\
 {\bf filename}: A name of up to 13 characters must be chosen, the file is then named filename-3D.xyz (Default: Fullerene-3D.xyz).
 If {\bf ICart} = 2, 3 or 4 and {\bf isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
 There are two databases, one for the general isomers ({\bf IPRC} = 2) and one for the IPR isomers ({\bf IPRC} = 1), the
@@ -672,6 +674,7 @@ If {\bf ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of 
 over size 5000) (Default: 0).\\
 If {\bf ipsphere} = 1 all vertices are projected onto the minimum covering sphere useful for drawing 2D fullerene graphs (Default: 0).\\
 If {\bf ipsphere} = 2 In addition an xyz file is written out named filename-3DMCS.xyz (Default: Fullerene-3DMCS.xyz).\\
+If {\bf ipsphere} = 3 In addition an cc1 file is written out named filename-3DMCS.cc1 (Default: Fullerene-3DMCS.cc1).\\
 If {\bf loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 
 This is important if one takes an initial structure and subjects it to further transformations, for example in subsequent Stone-Wales or
 Goldberg-Coxeter transformations. You might use this option to read from a xyz file created in the previous run.\\

@@ -1,6 +1,6 @@
 C100  
 &Coord NA=100, ICart=1 /
-&FFChoice Iopt=1 /
+&FFChoice /
 &FFParameters /
 &Hamilton IHam=1 /
 &Isomers IPR=1 /

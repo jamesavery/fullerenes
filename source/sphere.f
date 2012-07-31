@@ -203,12 +203,12 @@ C     Calculate norm for minimum distance sphere
       End
 
       SUBROUTINE ProjectSphere(MAtom,ipsphere,Iout,IAtom,nzeile,
-     1 Dist,c,rmcs,filename,El,TEXTINPUT)
+     1 IC3,Dist,c,rmcs,filename,El,TEXTINPUT)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     This routine projects vertices on the minimum covering sphere
 C      producing a spherical fullerene
-      DIMENSION Dist(3,Nmax),c(3),IATOM(Nmax)
+      DIMENSION Dist(3,Nmax),c(3),IATOM(Nmax),IC3(Nmax,3)
       CHARACTER*2 El(99)
       Character*1 TEXTINPUT(nzeile)
       Character*20 filename
@@ -234,7 +234,8 @@ C      producing a spherical fullerene
        Write(IOUT,1001),J,IM,El(IM),(Dist(I,J),I=1,3)
       enddo
 
-      if(ipsphere.ge.2) then
+C Write out xyz file
+      if(ipsphere.eq.2) then
        xyzname=trim(filename)//"-3DMCS.xyz"
        Open(unit=9,file=xyzname,form='formatted')
         WRITE(Iout,1002) xyzname
@@ -248,12 +249,29 @@ C      producing a spherical fullerene
      1    WRITE(9,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
         if(MAtom.ge.1000.and.MAtom.lt.10000)
      1    WRITE(9,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.10000)
+     1    WRITE(9,1014) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
         Do J=1,MAtom
           IM=IAtom(J)
-          Write(9,1007) El(IM),(Dist(I,J),I=1,3)
+          Write(9,1003) El(IM),(Dist(I,J),I=1,3)
         enddo
         Close(unit=9)
+      endif
 
+C Write out cc1 file
+      if(ipsphere.ge.3) then
+       xyzname=trim(filename)//"-3DMCS.cc1"
+       Open(unit=9,file=xyzname,form='formatted')
+        WRITE(Iout,1002) xyzname
+        if(MAtom.lt.100) WRITE(9,1005) MAtom
+        if(MAtom.ge.100.and.MAtom.lt.1000) WRITE(9,1006) MAtom
+        if(MAtom.ge.1000.and.MAtom.lt.10000) WRITE(9,1007) MAtom
+        if(MAtom.ge.10000) WRITE(9,1008) MAtom
+        Do J=1,MAtom
+          IM=IAtom(J)
+          Write(9,1004) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
+        enddo
+        Close(unit=9)
       endif
 
  1000 Format(/1X,'Projecting vertices on minimum covering sphere',
@@ -263,10 +281,16 @@ C      producing a spherical fullerene
  1002 FORMAT(/1X,'Input coordinates for spherical fullerene to be ',
      1 'used for plotting program CYLVIEW, PYMOL or AVOGADRO',
      1 /1X,'Output written into ',A34)
- 1007 FORMAT(A2,6X,3(F15.6,2X))
+ 1003 FORMAT(A2,6X,3(F15.6,2X))
+ 1004 FORMAT(A2,I5,3F12.6,'    2',3I5)
+ 1005 FORMAT(I2)
+ 1006 FORMAT(I3)
+ 1007 FORMAT(I4)
+ 1008 FORMAT(I8)
  1011 FORMAT(I5,/,'C',I2,'/  ',132A1)
  1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
  1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
+ 1014 FORMAT(I8,/,'C',I8,'/  ',132A1)
       Return
       End
 
