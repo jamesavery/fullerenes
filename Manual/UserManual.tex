@@ -622,9 +622,9 @@ In the following, the input in the required sequence is described in detail (eit
 {\bf IV1} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
 {\bf IV2} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 3)\\
 {\bf IV3} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)\\
-{\bf filename} = 'name'. Filename for all external files created or used by the program.\\
+{\bf filename} = 'name'. Filename for all external files created or used by the program. Limited to 50 characters.\\
 {\bf ixyz} = Flag for producing .xyz input file for CYLview, Avogadro or other plotting programs in standard xyz format (Default: 0). 
-Default name for the external file is {\it Fullerene-3D.xyz}. Otherwise {\bf filename}='filename' needs to be specified (max 20 characters).\\
+Default name for the external file is {\it Fullerene-3D.xyz}. Otherwise {\bf filename}='filename' needs to be specified (max. 50 characters).\\
 {\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0).\\ 
 If {\bf ICart} = 2, 3 or 4 and {\bf isonum} not zero, then pentagon indices are taken from the
 isomer list contained in a database (see below).\\
@@ -632,15 +632,14 @@ There are two databases, one for the general isomers
 ({\bf IPRC} = 0), and one for the IPR isomers ({\bf IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).\\
 {\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting programs (Default: 0).\\
 If {\bf ixyz} = 1: Produce xyz file named {\bf filename-3D.xyz} for further input.\\
-If {\bf ixyz} = 2: Read xyz from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.xyz}. 
-{\bf ICart} = 0 needs to be specified for this. Another xyz file is also produced and named   {\it filename-3Dnew.xyz}.\\
-If {\bf ixyz} = 3: Read xyz from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.xyz}. 
+If {\bf ixyz} = 2: Read xyz from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.xyz} (Default: Fullerene-3D.xyz). 
+{\bf ICart} = 0 needs to be specified for this. Another xyz file is also produced and named   {\it filename-3Dnew.xyz}. (Default: Fullerene-3Dnew.xyz)\\
+If {\bf ixyz} = 3: Read xyz from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.xyz} (Default: Fullerene-3D.xyz). 
 {\bf ICart} = 0  needs to be specified.\\
 If {\bf ixyz} = 4: Produce cc1 file (Chem3D cartesian coordinate format 1 file) for further input. Note that in contrast to xyz files,
 cc1 files contain information about vertex connections. Programs like PYMOL can read such files.\\
 If {\bf ixyz} = 5: Read cc1 from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.cc1}. 
-{\bf ICart} = 0  needs to be specified. This is useful for reading for example cc1 files produces by M. Yoshida \cite{Yoshida}.\\
-{\bf filename}: A name of up to 13 characters must be chosen, the file is then named filename-3D.xyz (Default: Fullerene-3D.xyz).
+{\bf ICart} = 0  needs to be specified. This is useful for reading for example cc1 files produced by M. Yoshida \cite{Yoshida}.\\
 If {\bf ICart} = 2, 3 or 4 and {\bf isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
 There are two databases, one for the general isomers ({\bf IPRC} = 2) and one for the IPR isomers ({\bf IPRC} = 1), the
 definition is similar to the {\bf IPR} parameter below (Default: 2).\\
@@ -839,7 +838,9 @@ intention to extend the isomer list beyond \C{100}/\C{120} (without Hamiltonian 
 New lists will be available on our website in time.  The determination of the number of
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
-The directory database needs to be in the same directory as ``source'' or ``libgraph''.
+The Yoshida database often used has also been added into our database and is placed in the
+folder {\it database/Yoshida} \cite{Yoshida}. The input file {\it read1.inp} shows an example for reading from
+this database. The directory database needs to be in the same directory as ``source'' or ``libgraph''.
 
 %\clearpage
 
@@ -857,7 +858,7 @@ see http://caagt.ugent.be/buckygen/.
 
 \bibitem{Pisanski} T. Pisanski, ``Program VEGA - A Mathematica based system for manipulating graphs'', see http://www.ijp.si/.
 
-\bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', {\it Proc. London Math. Soc.} {\bf 13}, 743Ð767 (1963).
+\bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', {\it Proc. London Math. Soc.} {\bf 13}, 743-767 (1963).
 
 \bibitem{Atlas} P. W. Fowler and D. E. Manolopoulus, ``An Atlas of Fullerenes'' (Dover Publ., New York, 2006).
  

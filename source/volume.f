@@ -3,7 +3,7 @@
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      character*20 filename
+      character*50 filename
       dimension points(3,nmax),IDA(nmax,nmax)
       type(c_ptr)::g,p,hull,new_polyhedron,convex_hull,
      1             new_fullerene_graph

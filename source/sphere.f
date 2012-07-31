@@ -211,8 +211,8 @@ C      producing a spherical fullerene
       DIMENSION Dist(3,Nmax),c(3),IATOM(Nmax),IC3(Nmax,3)
       CHARACTER*2 El(99)
       Character*1 TEXTINPUT(nzeile)
-      Character*20 filename
-      CHARACTER*34 xyzname
+      Character*50 filename
+      CHARACTER*50 xyzname
       Integer endzeile
 
       Write(Iout,1000)
@@ -280,7 +280,7 @@ C Write out cc1 file
  1001 FORMAT(1X,I4,1X,I6,1X,A2,6X,3(D18.12,2X))
  1002 FORMAT(/1X,'Input coordinates for spherical fullerene to be ',
      1 'used for plotting program CYLVIEW, PYMOL or AVOGADRO',
-     1 /1X,'Output written into ',A34)
+     1 /1X,'Output written into ',A60)
  1003 FORMAT(A2,6X,3(F15.6,2X))
  1004 FORMAT(A2,I5,3F12.6,'    2',3I5)
  1005 FORMAT(I2)

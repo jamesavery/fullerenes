@@ -1,2 +1,2 @@
 This is an input where the geometry comes from an xyz file
-&Coord ICart=1, ixyz=3 /
+&Coord ICart=1, ixyz=3, filename='Fullerene-3D' /

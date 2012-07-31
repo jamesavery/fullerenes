@@ -42,9 +42,9 @@ CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
       CHARACTER*13 routine
-      CHARACTER*20 filename
-      CHARACTER*31 xyzname
-      CHARACTER*31 cc1name
+      CHARACTER*50 filename
+      CHARACTER*50 xyzname
+      CHARACTER*50 cc1name
       CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
@@ -98,9 +98,6 @@ C  INPUT and setting parameters for running the subroutines
      1  ndual,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
      1  force,forceP,filename,TEXTINPUT)
 
-      xyzname=trim(filename)//"-3D.xyz"
-      cc1name=trim(filename)//"-3D.cc1"
-
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -120,6 +117,7 @@ C Input Cartesian coordinates for fullerenes
 
    20 if(icyl.eq.2.or.icyl.eq.3.or.icyl.eq.5) then
         if(icyl.eq.5) then
+         cc1name=trim(filename)//".cc1"
          Open(unit=7,file=cc1name,form='formatted')
          WRITE(Iout,1021) cc1name 
          Read(7,*) MAtom
@@ -130,6 +128,7 @@ C Input Cartesian coordinates for fullerenes
    23    close(unit=7)
          cc1name=trim(filename)//'-3D.new.xyz'
         else
+         xyzname=trim(filename)//".xyz"
          Open(unit=7,file=xyzname,form='formatted')
          WRITE(Iout,1015) xyzname 
          Read(7,*) MAtom
@@ -300,6 +299,7 @@ c a stone wales (or any other transformation) is done
 C Print out Coordinates used as input for CYLview
 C xyz format
       if(icyl.le.2.and.ISW.eq.0) then
+        xyzname=trim(filename)//"-3D.xyz"
         Open(unit=3,file=xyzname,form='formatted')
         routine='PRINTCOORD   '
         Write(Iout,1008) routine
@@ -333,7 +333,7 @@ C cc1 format
         if(MAtom.ge.10000) WRITE(3,1028) MAtom
         Do J=1,MAtom
           IM=IAtom(J)
-          Write(3,1004) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
+          Write(3,1005) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
         enddo
         Close(unit=3)
       endif
@@ -521,6 +521,7 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
      1 'TIME: ',I2,'h',I2,'m',I2,'s')
+ 1005 FORMAT(A2,I5,3F12.6,'    2',3I5)
  1006 FORMAT(/1X,'Angle for Schlegel diagram reset to ',
      1 F10.4,' degrees')
  1007 FORMAT(A2,6X,3(F15.6,2X))
@@ -532,12 +533,12 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
  1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
  1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
- 1015 FORMAT(/1X,'Read coordinates from xyz file: ',A20)
+ 1015 FORMAT(/1X,'Read coordinates from xyz file: ',A60)
  1016 FORMAT(/1X,'End of file reached ==> Stop')
  1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
  1018 FORMAT(132A1)
  1019 FORMAT(140('='))
- 1021 FORMAT(/1X,'Read coordinates from cc1 file: ',A20)
+ 1021 FORMAT(/1X,'Read coordinates from cc1 file: ',A60)
  1025 FORMAT(I2)
  1026 FORMAT(I3)
  1027 FORMAT(I4)

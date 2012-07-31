@@ -20,7 +20,7 @@ C or face is at the top. Euler angles are used for rotation.
       Integer MDist(Nmax,Nmax)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
       Character*12 Symbol1
-      Character*20 filename
+      Character*50 filename
       type(c_ptr) :: g, new_fullerene_graph
 
       Data epsf/.12d0/

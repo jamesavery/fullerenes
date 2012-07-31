@@ -10,7 +10,7 @@
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF and default FF.  force and forceP (=permanent) are equal if there are no input parameters
       integer endzeile
       Character*1 DATEN(nzeile)
-      Character filename*20
+      Character filename*50
       Namelist /Coord/ ICart,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
      1 ichk,isonum,IPRC,kGC,lGC,GCtrans,ihueckel,ISW,KE,loop,mirror,
      1 IYF,IWS,filename,ipsphere
