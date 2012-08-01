@@ -41,7 +41,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
 
   // TODO: Everything that's made from the outer face needs to be "reversed".
   vector<coord2d> new_layout;
-  if(planar_layout){
+  if(planar_layout && layout2d.size() == N){
     new_layout.resize(dual.N);
     for(int i=0;i<dual.N;i++) new_layout[i] = dual.layout2d[i];
   }
@@ -51,7 +51,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
     vector<node_t>& nodes(edge_nodes[*e]);
     for(unsigned int i=0;i<m;i++) nodes.push_back(v_new++);
     
-    if(planar_layout) 
+    if(planar_layout && layout2d.size() == N) 
       for(unsigned int i=0;i<m;i++){
 	double lambda = (1.0+i)*(1.0/(m+1));
 	const coord2d &a(dual.layout2d[e->first]), &b(dual.layout2d[e->second]);
@@ -81,7 +81,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
       for(int k=j+1;k<=m;k++)
 	grid[edge_t(j,k)] = v_new++;
 
-    if(planar_layout){
+    if(planar_layout && layout2d.size() == N){
       double sqrt2inv = 1.0/sqrt(2.0);
       const coord2d &a(dual.layout2d[T[0]]), &b(dual.layout2d[T[1]]), &c(dual.layout2d[T[2]]);      
       for(int j=1;j<m;j++)
@@ -109,17 +109,21 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
   PlanarGraph new_dual(Graph(edgeset_new), new_layout);
   //cerr << "newdual.N = " << new_dual.N << endl;
 
+  /*
   ofstream h("output/halma2.m");
 
   h << "graph = " << *this << endl;
   h << "dual = " << dual << endl;
   h << "newdual = " << new_dual << endl;
+  */
 
   PlanarGraph G(new_dual.dual_graph(3));
+
+  /*
   h << "halma = " << G << endl;
 
   h.close();
-
+  */
   return G;
 }
 

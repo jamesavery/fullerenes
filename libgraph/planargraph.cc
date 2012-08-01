@@ -115,7 +115,7 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
   // TODO: This is a much better and faster method, but needs to be debugged.
   if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
 
-  cout << "Non-oriented face computation (loop search)\n";
+  //  cout << " Non-oriented face computation (loop search)\n";
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
 
