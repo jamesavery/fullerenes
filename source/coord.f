@@ -1,5 +1,5 @@
-      SUBROUTINE MoveCM(Matom,Iout,Iprint,IAtom,mirror,
-     1 SP,Dist,DistCM,El)
+      SUBROUTINE MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+     1 nosort,SP,Dist,DistCM,El)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),DistCM(3),Ainert(3,3),evec(3),df(3)
@@ -25,6 +25,11 @@
         AnumY=AnumY+Dist(2,J)
         AnumZ=AnumZ+Dist(3,J)
       enddo
+
+C     Convert to internal coordinates
+      Call CartInt(Dist,Matom,Iout,isort)
+      if(isort.ne.0.and.nosort.eq.0) return
+
       Adenom=dfloat(MAtom)
       DistCM(1)=AnumX/Adenom
       If(dabs(DistCM(1)).lt.1.d-13) DistCM(1)=0.d0
@@ -40,9 +45,6 @@
          enddo
        Write(IOUT,1002),J,IM,El(IM),(Dist(I,J),I=1,3)
       enddo
-
-C     Convert to internal coordinates
-      Call CartInt(Dist,Matom,Iout)
 
 C     Calculate distance part of moment of inertia
       Do I=1,3
@@ -148,7 +150,7 @@ C Oblate
 C Asymmetric
       Write(Iout,1011)
  1000 FORMAT(/1x,'Cartesian Input',
-     1  /1X,'  I      Z  Element Cartesian Coordinates')
+     1  /1X,'  I       Z Element Cartesian Coordinates')
  1001 FORMAT(/1x,'Moment of inertia with setting the masses to unity:',
      1 /1x,'Eigenvalues (principal axis system): ',3(' ',D18.12))
  1002 FORMAT(1X,I4,1X,I6,1X,A2,6X,3(D18.12,2X))
@@ -1918,9 +1920,10 @@ C Input: initial graph, and GC indices (kGC,lGC)
         stop
       endif
       g = new_fullerene_graph(Nmax,MAtom,IDA)
+C  James, we have a problem here
       halma = halma_fullerene(g,kGC-1)
       isafullerene = graph_is_a_fullerene(halma)
-      IF (isafullerene .eq. 1) then
+      IF (isafullerene.eq.1) then
         write (iout,1013)
       else
         write (iout,1009)
@@ -2082,7 +2085,72 @@ C     Check distances
       Return
       END
 
-      Subroutine CartInt(Dist,Natoms,Iout)
+      Subroutine Permute(Matom,Iout,Dist,IC3)
+      use config
+      implicit double precision (a-h,o-z)
+      dimension Dist(3,Nmax),IC3(Nmax,3),Iperm(Nmax,2)
+C Sort Cartesian coordinated so atom number i is connected to
+C  atoms 1,...,I-1
+
+      nperm=0
+      do 10 i=2,MAtom
+      do j=i,MAtom-1
+       do k=1,3
+        if(IC3(j,k).le.i-1) then
+         if(i.ne.j) then
+C    change distances
+          x=Dist(1,i)
+          y=Dist(2,i)
+          z=Dist(3,i)
+          Dist(1,i)=Dist(1,j)
+          Dist(2,i)=Dist(2,j)
+          Dist(3,i)=Dist(3,j)
+          Dist(1,j)=x
+          Dist(2,j)=y
+          Dist(3,j)=z
+C    change IC3
+         iz1=IC3(i,1)
+         iz2=IC3(i,2)
+         iz3=IC3(i,3)
+         IC3(i,1)=IC3(j,1)
+         IC3(i,2)=IC3(j,2)
+         IC3(i,3)=IC3(j,3)
+         IC3(j,1)=iz1
+         IC3(j,2)=iz2
+         IC3(j,3)=iz3
+         do k1=1,MAtom
+         do 11 k2=1,3
+          if(IC3(k1,k2).eq.i) then
+           IC3(k1,k2)=j
+           go to 11
+          endif
+          if(IC3(k1,k2).eq.j) then
+           IC3(k1,k2)=i
+          endif
+   11    continue
+         enddo
+
+C    record change
+          nperm=nperm+1
+          Iperm(nperm,1)=i
+          Iperm(nperm,2)=j
+         endif
+        go to 10
+        endif
+       enddo
+
+      enddo
+  10  continue
+      Write(Iout,1000) nperm
+      Write(Iout,1001) (Iperm(i,1),Iperm(i,2),i=1,nperm)
+
+ 1000 Format(1X,'Number of permutations for cartesian coordinates ',
+     1  'performed: ',I5,', Permutations:')
+ 1001 Format(10(1X,'(',I4,',',I4,')'))
+      Return
+      END
+
+      Subroutine CartInt(Dist,MAtom,Iout,isort)
       use config
       implicit double precision (a-h,o-z)
       dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),geo(3,Nmax)
@@ -2096,15 +2164,15 @@ C        atom i makes a dihedral angle with atoms j, k, and l. l having
 C        been defined and is the nearest atom to k, and j, k and l
 C        have a contained angle in the range 15 to 165 degrees,
 C        if possible.
-C   on input Dist = cartesian array of Natoms atoms
-C        Natoms: number of atoms
+C   on input Dist = cartesian array of MAtom atoms
+C        MAtom: number of atoms
 C        degree = 360/2Pi = 57.29578..., angles are in degrees
 C
       DATA API/3.14159265358979d0/
       degree=1.8d2/API
  
       Write(Iout,1000) 
-       do i=1,Natoms
+       do i=1,MAtom
         geo(1,i)=0.d0
         geo(2,i)=0.d0
         geo(3,i)=0.d0
@@ -2113,7 +2181,7 @@ C
         nc(i)=0
        enddo
 
-       do 30 i=1,Natoms
+       do 30 i=1,MAtom
         na(i)=2
         nb(i)=3
         nc(i)=4
@@ -2144,27 +2212,48 @@ c   find any atom to relate to na(i)
       nc(3)=0
 
 c   na, nb, nc are determined, now get geo
-      call xyzgeo(Dist,Natoms,na,nb,nc,degree,geo)
+      call xyzgeo(Dist,MAtom,na,nb,nc,degree,geo)
 
 c     print
-       do i=1,Natoms
+       do i=1,MAtom
         Write(Iout,1001) i,(geo(J,I),J=1,3),na(i),nb(i),nc(i)
        enddo
+
+c   Check if distances are within certain range
+       rmindist=geo(1,2)
+       rmaxdist=geo(1,2)
+       do i=3,MAtom
+        if(geo(1,i).lt.rmindist) rmindist=geo(1,i)
+        if(geo(1,i).gt.rmaxdist) rmaxdist=geo(1,i)
+       enddo
+      ratio=rmaxdist/rmindist
+      if(ratio.lt.1.5d0) then
+       Write(Iout,1002) rmindist,rmaxdist
+       isort=0
+      else
+       Write(Iout,1003) rmindist,rmaxdist
+       isort=1
+      endif
       
  1000 Format(/1X,'Convert cartesian into internal coordinates:',
      1 /5X,'I',9X,'R',10X,'Angle',6X,'Dihedral',5X,'N1',4X,
      1 'N2',4X,'N3',/1X,64('-'))
  1001 Format(1X,I5,3(1X,F12.6),3(1X,I5))
+ 1002 Format(1X,'Analysis of distances: All are bond distances',
+     1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
+ 1003 Format(1X,'Analysis of distances: Requires sorting of cartesian',
+     1 ' coordinates after getting connectivities',
+     1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
       return
       end
 
-      subroutine xyzgeo(Dist,Natoms,na,nb,nc,degree,geo)
+      subroutine xyzgeo(Dist,MAtom,na,nb,nc,degree,geo)
       use config
       implicit double precision (a-h,o-z)
       dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),geo(3,Nmax)
 C Distgeo converts coordinates from cartesian to internal.
 C  input Dist  = array of cartesian coordinates
-C   Natoms= number of atoms
+C   MAtom= number of atoms
 C   na   = numbers of atom to which atoms are related by distance
 C   nb   = numbers of atom to which atoms are related by angle
 C   nc   = numbers of atom to which atoms are related by dihedral
@@ -2173,7 +2262,7 @@ C  output geo  = internal coordinates in angstroms, radians, and radians
       Data tol/0.2617994d0/
       DATA API/3.14159265358979d0/
 
-      do 30 i=2,Natoms
+      do 30 i=2,MAtom
          j=na(i)
          k=nb(i)
          l=nc(i)

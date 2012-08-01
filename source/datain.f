@@ -1,8 +1,8 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,ICart,Iopt,IP,IHam,
      1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
-     1 leap,GCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
+     1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
-     1 ndual,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,force,
+     1 ndual,nosort,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,force,
      1 forceP,filename,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -12,8 +12,8 @@
       Character*1 DATEN(nzeile)
       Character filename*50
       Namelist /Coord/ ICart,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
-     1 ichk,isonum,IPRC,kGC,lGC,GCtrans,ihueckel,ISW,KE,loop,mirror,
-     1 IYF,IWS,filename,ipsphere
+     1 ichk,isonum,IPRC,kGC,lGC,IGCtrans,ihueckel,ISW,KE,loop,mirror,
+     1 IYF,IWS,filename,ipsphere,nosort
       Namelist /FFChoice/ Iopt,ftol
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
      1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
@@ -76,7 +76,8 @@ C Default parameters for external files
       filename= 'Fullerene'
 
 C Integers
-      GCtrans=0 !  Initial flag for Goldberg-Coxeter transformed fullerene
+      nosort=0  !  Flag for sorting cartesian coordinates
+      IGCtrans=0 ! Initial flag for Goldberg-Coxeter transformed fullerene
       ICart=1   !  Input for fullerene structure
       ichk=0    !  Option for restarting the isomer list
       IER=0     !  Error flag

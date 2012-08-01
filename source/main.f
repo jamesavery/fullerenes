@@ -65,9 +65,12 @@ C     Van der Waals radius of carbon, adjusted approximately to the
 C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       DATA RVdWC/1.415d0/
       IN=5
-      IOUT=6
+      Iout=6
       ilp=0
       iprev=0
+      isort=0
+      icall=0
+      Group='   '
       Do I=1,Nmax
        IAtom(I)=6
       Do J=1,Nmax
@@ -83,19 +86,19 @@ CG77    CALL Time(CTIM)
         CALL date_and_time(CDAT,CTIM,zone,values)
         TIMEX=0.d0
         CALL Timer(TIMEX)
-C       WRITE(IOUT,1000) CDAT,CTIM,Nmax
-        WRITE(IOUT,1000) Values(3),Values(2),Values(1),Values(5),
+C       WRITE(Iout,1000) CDAT,CTIM,Nmax
+        WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7),Nmax
 C  INPUT and setting parameters for running the subroutines
  9    routine='DATAIN       '
       leapspiral=0
       SWspiral=0
       Write(Iout,1008) routine
-        CALL Datain(IN,IOUT,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
+        CALL Datain(IN,Iout,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
-     1  ndual,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
+     1  ndual,nosort,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
      1  force,forceP,filename,TEXTINPUT)
 
 C  Stop if error in input
@@ -175,43 +178,51 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS      '
       Write(Iout,1008) routine
-      CALL Isomers(MAtom,IPR,IOUT,
+      CALL Isomers(MAtom,IPR,Iout,
      1 maxit,iprintham,ichk,IDA,A,trim(filename)//".chkpnt")
       if(istop.ne.0) go to 99
 
 C Move carbon cage to Atomic Center
-  999 Group='   '
-      routine='MOVECM       '
+  999 routine='MOVECM_1     '
       Write(Iout,1008) routine
       Iprint=1
-      Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
-     1 SP,Dist,DistCM,El)
+      Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+     1 nosort,SP,Dist,DistCM,El)
+      mirror=0
 
 C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia
+      if(isort.eq.0.or.nosort.ne.0) then
       routine='DIAMETER     '
       Write(Iout,1008) routine
-      CALL Diameter(MAtom,IOUT,Dist,distp)
+      CALL Diameter(MAtom,Iout,Dist,distp)
+      endif
 
 C Calculate the distance Matrix and print out distance Matrix
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
-      CALL Distmatrix(MAtom,IOUT,iprintf,Iopt,
+      CALL Distmatrix(MAtom,Iout,isort,nosort,iprintf,Iopt,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
 
 C Establish Connectivities
       routine='CONNECT      '
       Write(Iout,1008) routine
-      CALL Connect(MCon2,MAtom,Ipent,IOUT,
+      CALL Connect(MCon2,MAtom,Ipent,Iout,isort,nosort,
      1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
+      if(isort.ne.0.and.nosort.eq.0) then
+       CALL Permute(Matom,Iout,Dist,IC3)
+       icall=icall+1
+       if(icall.lt.10) Go to 999
+      endif
 
 C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
         routine='HUECKEL      '
         Write(Iout,1008) routine
-        CALL Hueckel(MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
+        CALL Hueckel(MAtom,Iout,IC3,ihueckel,IDA,A,evec,df)
       endif
 
+      nosort=1
 C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
         routine='Leapfrog'
@@ -255,12 +266,12 @@ C adjacent vertices
           if(nbatch.ne.0) WRITE(Iout,1014)
         endif
       endif
-      CALL Paths(MAtom,IOUT,IDA,A,evec,df)
+      CALL Paths(MAtom,Iout,IDA,A,evec,df)
 
 C Establish all closed ring systems
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(Medges,MCon2,MAtom,IOUT,N5Ring,N6Ring,
+      CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
 C Optimize Geometry through force field method
@@ -285,15 +296,17 @@ c a stone wales (or any other transformation) is done
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
         endif
-        Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,
-     1   SP,Dist,DistCM,El)
+        routine='MOVECM_2     '
+        Write(Iout,1008) routine
+        Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+     1   nosort,SP,Dist,DistCM,El)
         routine='DISTMATRIX   '
         Write(Iout,1008) routine
-        CALL Distmatrix(MAtom,IOUT,Iprintf,0,
+        CALL Distmatrix(MAtom,Iout,isort,nosort,Iprintf,0,
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
         routine='DIAMETER     '
         Write(Iout,1008) routine
-        CALL Diameter(MAtom,IOUT,Dist,distp)
+        CALL Diameter(MAtom,Iout,Dist,distp)
       endif
 
 C Print out Coordinates used as input for CYLview
@@ -342,7 +355,7 @@ C cc1 format
 C Rings
       routine='RING         '
       Write(Iout,1008) routine
-      CALL Ring(Medges,MCon2,MAtom,IOUT,N5Ring,N6Ring,
+      CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
 C Analyze ring connections
@@ -432,18 +445,18 @@ C Calculate the volume
 C Calculate the minimum covering sphere and volumes
       routine='MINCOVSPHERE2'
       Write(Iout,1008) routine
-      CALL MinCovSphere2(MAtom,IOUT,SP,Dist,Rmin,Rmax,
+      CALL MinCovSphere2(MAtom,Iout,SP,Dist,Rmin,Rmax,
      1 VolSphere,ASphere,Atol,VTol,distP,cmcs,rmcs,RVdWC)
 
 C Calculate the minimum distance sphere
       routine='MINDISTSPHERE'
       Write(Iout,1008) routine
-      CALL MinDistSphere(MAtom,IOUT,Dist,cmcs)
+      CALL MinDistSphere(MAtom,Iout,Dist,cmcs)
 
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE'
       Write(Iout,1008) routine
-      CALL MaxInSphere(MAtom,IOUT,Dist,cmcs,RVdWC)
+      CALL MaxInSphere(MAtom,Iout,Dist,cmcs,RVdWC)
 
 C Projecting vertices on minimum covering sphere
 C  producing a spherical fullerene
@@ -459,12 +472,12 @@ C Calculate Schlegel diagram
         if(ISchlegel.eq.2) then
           if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
             ParamS=anglew
-            WRITE(IOUT,1006) ParamS
+            WRITE(Iout,1006) ParamS
           endif
         else
           ParamS=dabs(ParamS)
         endif
-        CALL Graph2D(MAtom,IOUT,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
+        CALL Graph2D(MAtom,Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
      1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
      1   TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,filename)
       endif
@@ -473,19 +486,19 @@ C  E N D   O F   P R O G R A M
   99  if(loop-1) 100,101,102
  100  go to 9999
  101  iprev=0
-      WRITE(IOUT,1019) ! line of dashes
+      WRITE(Iout,1019) ! line of dashes
       go to 9 ! datain
  102  iprev=1
-      WRITE(IOUT,1019) 
+      WRITE(Iout,1019) 
       go to 9 ! datain
 CG77 99  CALL TIME(CTIM)
 CG77 99  CALL TIME(CTIM)
 9999  call date_and_time(CDAT,CTIM,zone,values)
-        WRITE(IOUT,1004) Values(3),Values(2),Values(1),Values(5),
+        WRITE(Iout,1004) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7)
       CALL Timer(TIMEX)
       Hours=TIMEX/3.6d3
-      WRITE(IOUT,1009) TIMEX,Hours
+      WRITE(Iout,1009) TIMEX,Hours
 C Formats 
  1000 FORMAT(
      1  1X,' ________________________________________________________ ',

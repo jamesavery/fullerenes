@@ -616,7 +616,7 @@ In the following, the input in the required sequence is described in detail (eit
 
 2) {\bf \&Coord line}: Input to create cartesian coordinates and main flags for the program (e.g. \&Coord ICart=20, R6=1.42 /).\\
 {\it List of options:}\\ 
-{\bf NA, ICart, IV1, IV2, IV3, ixyz, filename, isonum, ichk, leap, GCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, ipsphere, loop, mirror, IP, IPRC, TolR, R5, R6}\\
+{\bf NA, ICart, IV1, IV2, IV3, ixyz, filename, isonum, ichk, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, ipsphere, loop, mirror, IP, IPRC, TolR, R5, R6}\\
 {\bf NA} = Number of atoms (vertices) $N_A$ (Default: 60)\\
 {\bf ICart} = Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 {\bf IV1} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
@@ -645,7 +645,7 @@ There are two databases, one for the general isomers ({\bf IPRC} = 2) and one fo
 definition is similar to the {\bf IPR} parameter below (Default: 2).\\
 If {\bf leap} = $n_{leap}$ the initial fullerene C$_{N_A}$ is subjected to an $n-th$ leapfrog transformation. 
 This converts the number of atoms $N_A$ to $N^{'}_A = 3^{n_{leap}}N_A$. (Default: 0)\\
-If {\bf GCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}$[C$_{N_A}$] (Default: 0).
+If {\bf IGCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}$[C$_{N_A}$] (Default: 0).
 At the moment only $l=0$ is implemented, also the leapfrog transformation $k=1$ and $l=1$ is available in this input.
 In this case {\bf kGC} in the namelist input has to be specified. \\
 If {\bf IWS} = 1 the initial fullerene structure is subjected to a Stone-Wales transformation (Default: 0). In this case an

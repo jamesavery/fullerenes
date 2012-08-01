@@ -140,12 +140,18 @@ C   Search in 6-ring
         endif
        enddo
       enddo
- 150  if(n5hit.eq.3) WRITE(IOUT,1010) IR,is1,is2,is3,(c(i),i=1,3)
-      if(n6hit.eq.3) WRITE(IOUT,1016) IR,is1,is2,is3,(c(i),i=1,3)
-      nhit=n5hit+n6hit
-      if(nhit.lt.3) then
-       WRITE(IOUT,1017) nhit
-       Return
+ 150  nhit=0
+      if(n5hit.eq.3) then
+       WRITE(IOUT,1010) IR,is1,is2,is3,(c(i),i=1,3)
+       nhit=1
+      endif
+      if(n6hit.eq.3) then
+       WRITE(IOUT,1016) IR,is1,is2,is3,(c(i),i=1,3)
+       nhit=1
+      endif
+       if(nhit.eq.0) then
+        WRITE(IOUT,1017)
+        Return
        endif
       endif
 
@@ -638,7 +644,9 @@ C   Search in 6-ring
         endif
        enddo
       enddo
- 250  if(n5hit.eq.3) then
+ 250  nhit=0
+      if(n5hit.eq.3) then
+      nhit=1
        Do I=1,5
         IS(I)=N5M(IR,I)
        enddo
@@ -647,15 +655,15 @@ C   Search in 6-ring
        WRITE(IOUT,1038) IR,(IS(I),I=1,5),(c(i),i=1,3)
       endif
       if(n6hit.eq.3) then
+      nhit=1
        Do I=1,6
         IS(I)=N6M(IR,I)
        enddo
        lring=6
        WRITE(IOUT,1039) IR,(IS(I),I=1,6),(c(i),i=1,3)
       endif
-      nhit=n5hit+n6hit
-      if(nhit.lt.3) then
-       WRITE(IOUT,1017) nhit
+      if(nhit.eq.0) then
+       WRITE(IOUT,1017)
        Return
        endif
 C  End of search
@@ -785,8 +793,7 @@ c$$$     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
      1 I4,' and ',I4,' chosen for Schlegel alignment.',
      2 /1X,' Coordinates of ring center: X= ',
      3 F12.6,', Y= ',F12.6,', Z= ',F12.6)
- 1017 Format(1X,'ERROR: No ring found with given atom numbers',
-     1 ' (indices found: ',I4,')')
+ 1017 Format(1X,'ERROR: No ring found with given atom numbers')
  1018 Format(/1X,'Finally project the ring centers:',/1X,
      2  '  Ring         X            Y      Spiral Angle  Scale factor')
  1019 Format(1X,I4,3(1X,F12.6),2(1X,I4),3X,A1)

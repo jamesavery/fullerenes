@@ -2656,7 +2656,7 @@ C     (6-6) 2-ring fusions
       Return
       END
  
-      SUBROUTINE Distmatrix(MAtom,IOUT,Iprint,Iopt,
+      SUBROUTINE Distmatrix(MAtom,IOUT,isort,nosort,Iprint,Iopt,
      1 Dist,DistMat,Rmin,Rmax,Vol,ASphere)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2667,12 +2667,12 @@ C     Calculate distance matrix between atoms from cartesian coordinates
       if(Iopt.eq.0.and.Iprint.eq.1) Write(IOUT,1000) 
       Do I=2,MAtom
       Do J=1,I-1
-      Sum=0.d0
+       Sum=0.d0
       Do K=1,3
-      Sum=Sum+(Dist(K,I)-Dist(K,J))**2
+       Sum=Sum+(Dist(K,I)-Dist(K,J))**2
       enddo
-      IMat=IMat+1
-      DistMat(IMat)=dsqrt(Sum)
+       IMat=IMat+1
+       DistMat(IMat)=dsqrt(Sum)
       enddo
       enddo
       Do I=2,MAtom
@@ -2680,31 +2680,33 @@ C     Calculate distance matrix between atoms from cartesian coordinates
       if(Iopt.eq.0.and.Iprint.eq.1) 
      1   Write(IOUT,1001) (I,J,DistMat(IZ+J),J=1,I-1)
       enddo
+
 C     Determine minimum and maximum distances
       Rmin=1.d20
       Rmax=1.d0
       RmaxS=1.d0
       Do I=1,MAtom
-      Sum=0.d0
+       Sum=0.d0
       Do K=1,3
-      Sum=Sum+Dist(K,I)**2
+       Sum=Sum+Dist(K,I)**2
       enddo
-      Sumd=dsqrt(Sum)
-      If(Sumd.gt.RmaxS) RmaxS=Sumd
+       Sumd=dsqrt(Sum)
+       If(Sumd.gt.RmaxS) RmaxS=Sumd
       Do J=I+1,MAtom
-      DM=FunDistMat(I,J,DistMat)
-      If(DM.lt.Rmin) then
-      Rmin=DM
-      Imin=I
-      Jmin=J
-      endif
-      If(DM.gt.Rmax) then
-      Rmax=DM
-      Imax=I
-      Jmax=J
-      endif
+       DM=FunDistMat(I,J,DistMat)
+       If(DM.lt.Rmin) then
+        Rmin=DM
+        Imin=I
+        Jmin=J
+       endif
+       If(DM.gt.Rmax) then
+        Rmax=DM
+        Imax=I
+        Jmax=J
+       endif
       enddo
       enddo
+      if(isort.eq.1.and.nosort.eq.0) return
       Vol=4.d0/3.d0*API*RmaxS**3
       ASphere=4.d0*API*RmaxS**2
       Write(IOUT,1002) Rmin,Imin,Jmin,Rmax,Imax,Jmax,RmaxS,Vol,
@@ -2905,8 +2907,8 @@ C     Filling in Tree structure at level Istep
       RETURN
       END
 
-      SUBROUTINE Connect(MCon2,MAtom,
-     1 Ipent,IOUT,Icon2,IC3,IDA,Tol,DistMat,Rmin)
+      SUBROUTINE Connect(MCon2,MAtom,Ipent,IOUT,isort,nosort,
+     1  Icon2,IC3,IDA,Tol,DistMat,Rmin)
       use config
 C     Get the connectivities between 2 and 3 atoms
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2968,7 +2970,7 @@ C     Get the connectivities between 2 and 3 atoms
       if(MAtom.ge.1000.and.MAtom.lt.10000) 
      1 Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
       enddo
-      Write(IOUT,1002)
+      if(isort.eq.0.or.nosort.eq.1) Write(IOUT,1002)
 C     Get all vertices
       Do I=1,MAtom
       IZ=0
@@ -2985,7 +2987,8 @@ C     Get all vertices
       IF(IZ.EQ.3) Go to 10
       enddo
    10 Continue
-      Write(IOUT,1003) I,(IC3(I,J),J=1,3)
+      if(isort.eq.0.or.nosort.eq.1)
+     1 Write(IOUT,1003) I,(IC3(I,J),J=1,3)
       enddo
 C     Check if structure is alright at this point
       nexpedge=MAtom*3/2
