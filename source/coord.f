@@ -40,6 +40,10 @@
          enddo
        Write(IOUT,1002),J,IM,El(IM),(Dist(I,J),I=1,3)
       enddo
+
+C     Convert to internal coordinates
+      Call CartInt(Dist,Matom,Iout)
+
 C     Calculate distance part of moment of inertia
       Do I=1,3
       Do J=1,3
@@ -2078,3 +2082,249 @@ C     Check distances
       Return
       END
 
+      Subroutine CartInt(Dist,Natoms,Iout)
+      use config
+      implicit double precision (a-h,o-z)
+      dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),geo(3,Nmax)
+C Modified routine xyzint taken from www.koders.com
+C Distint works out the internal coordinates of a molecule.
+C        atom i is defined as being at a distance from the nearest
+C        atom j, atom j already having been defined.
+C        atom i makes an angle with atom j and the atom k, which has
+C        already been defined, and is the nearest atom to j
+C        atom i makes a dihedral angle with atoms j, k, and l. l having
+C        been defined and is the nearest atom to k, and j, k and l
+C        have a contained angle in the range 15 to 165 degrees,
+C        if possible.
+C   on input Dist = cartesian array of Natoms atoms
+C        Natoms: number of atoms
+C        degree = 360/2Pi = 57.29578..., angles are in degrees
+C
+      DATA API/3.14159265358979d0/
+      degree=1.8d2/API
+ 
+      Write(Iout,1000) 
+       do i=1,Natoms
+        geo(1,i)=0.d0
+        geo(2,i)=0.d0
+        geo(3,i)=0.d0
+        na(i)=0
+        nb(i)=0
+        nc(i)=0
+       enddo
+
+       do 30 i=1,Natoms
+        na(i)=2
+        nb(i)=3
+        nc(i)=4
+        im1=i-1
+        if(im1.eq.0) go to 30
+        sum=1.d30
+        do j=1,im1
+          r=(Dist(1,i)-Dist(1,j))**2+
+     1     (Dist(2,i)-Dist(2,j))**2+
+     2     (Dist(3,i)-Dist(3,j))**2
+          if(r.lt.sum.and.na(j).ne.j.and.nb(j).ne.j) then
+            sum=r
+            k=j
+          endif
+        enddo
+c   atom i is nearest to atom k
+      na(i)=k
+      if(i.gt.2)nb(i)=na(k)
+      if(i.gt.3)nc(i)=nb(k)
+c   find any atom to relate to na(i)
+   30    continue
+
+      na(1)=0
+      nb(1)=0
+      nc(1)=0
+      nb(2)=0
+      nc(2)=0
+      nc(3)=0
+
+c   na, nb, nc are determined, now get geo
+      call xyzgeo(Dist,Natoms,na,nb,nc,degree,geo)
+
+c     print
+       do i=1,Natoms
+        Write(Iout,1001) i,(geo(J,I),J=1,3),na(i),nb(i),nc(i)
+       enddo
+      
+ 1000 Format(/1X,'Convert cartesian into internal coordinates:',
+     1 /5X,'I',9X,'R',10X,'Angle',6X,'Dihedral',5X,'N1',4X,
+     1 'N2',4X,'N3',/1X,64('-'))
+ 1001 Format(1X,I5,3(1X,F12.6),3(1X,I5))
+      return
+      end
+
+      subroutine xyzgeo(Dist,Natoms,na,nb,nc,degree,geo)
+      use config
+      implicit double precision (a-h,o-z)
+      dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),geo(3,Nmax)
+C Distgeo converts coordinates from cartesian to internal.
+C  input Dist  = array of cartesian coordinates
+C   Natoms= number of atoms
+C   na   = numbers of atom to which atoms are related by distance
+C   nb   = numbers of atom to which atoms are related by angle
+C   nc   = numbers of atom to which atoms are related by dihedral
+C  output geo  = internal coordinates in angstroms, radians, and radians
+
+      Data tol/0.2617994d0/
+      DATA API/3.14159265358979d0/
+
+      do 30 i=2,Natoms
+         j=na(i)
+         k=nb(i)
+         l=nc(i)
+         if(i.lt.3) go to 30
+         ii=i
+         call bangle(Dist,ii,j,k,geo(2,i))
+         geo(2,i)=geo(2,i)*degree
+         if(i.lt.4) go to 30
+c   make sure dihedral is meaningful
+         call bangle(Dist,j,k,l,angl)
+         if(angl.gt.API-tol.or.angl.lt.tol)then
+c  angle is unsatisfactory, let's search for another atom for
+c  defining the dihedral.
+   10       sum=1.d2
+            do i1=1,ii-1
+               r=(Dist(1,i1)-Dist(1,k))**2+
+     1          (Dist(2,i1)-Dist(2,k))**2+
+     2          (Dist(3,i1)-Dist(3,k))**2
+               if(r.lt.sum.and.i1.ne.j.and.i1.ne.k) then
+                  call bangle(Dist,j,k,i1,angl)
+                  if(angl.lt.API-tol.and.angl.gt.tol)then
+                     sum=r
+                     l=i1
+                     nc(ii)=l
+                  endif
+               endif
+            enddo
+            if(sum.gt.99.d0.and.tol.gt.0.1d0)then
+c
+c anything within 5 degrees?
+c
+               tol=0.087266d0
+               go to 10
+            endif
+         endif
+         call dihed(Dist,ii,j,k,l,geo(3,i))
+         geo(3,i)=geo(3,i)*degree
+   30 geo(1,i)=dsqrt((Dist(1,i)-Dist(1,j))**2+
+     1           (Dist(2,i)-Dist(2,j))**2+
+     2           (Dist(3,i)-Dist(3,j))**2)
+      geo(1,1)=0.d0
+      geo(2,1)=0.d0
+      geo(3,1)=0.d0
+      geo(2,2)=0.d0
+      geo(3,2)=0.d0
+      geo(3,3)=0.d0
+      return
+      end
+
+      subroutine bangle(Dist,i,j,k,angle)
+      use config
+      implicit double precision (a-h,o-z)
+      dimension Dist(3,Nmax)
+C bangle calculates the angle between atoms i,j, and k. the
+C        cartesian coordinates are in Dist.
+
+      d2ij = (Dist(1,i)-Dist(1,j))**2+
+     1       (Dist(2,i)-Dist(2,j))**2+
+     2       (Dist(3,i)-Dist(3,j))**2
+      d2jk = (Dist(1,j)-Dist(1,k))**2+
+     1       (Dist(2,j)-Dist(2,k))**2+
+     2       (Dist(3,j)-Dist(3,k))**2
+      d2ik = (Dist(1,i)-Dist(1,k))**2+
+     1       (Dist(2,i)-Dist(2,k))**2+
+     2       (Dist(3,i)-Dist(3,k))**2
+      xy =dsqrt(d2ij*d2jk)
+      temp = 0.5d0*(d2ij+d2jk-d2ik)/xy
+      if (temp.gt.1.0d0) temp=1.0d0
+      if (temp.lt.-1.0d0) temp=-1.0d0
+      angle =dacos(temp)
+      return
+      end
+
+      subroutine dihed(Dist,i,j,k,l,angle)
+      use config
+      implicit double precision (a-h,o-z)
+      dimension Dist(3,Nmax)
+C      dihed calculates the dihedral angle between atoms i, j, k,
+C            and l.  the cartesian coordinates of these atoms
+C            are in array Dist.
+C     dihed is a modified version of a subroutine of the same name
+C           which was written by dr. w. theil in 1973.
+
+      xi1=Dist(1,i)-Dist(1,k)
+      xj1=Dist(1,j)-Dist(1,k)
+      xl1=Dist(1,l)-Dist(1,k)
+      yi1=Dist(2,i)-Dist(2,k)
+      yj1=Dist(2,j)-Dist(2,k)
+      yl1=Dist(2,l)-Dist(2,k)
+      zi1=Dist(3,i)-Dist(3,k)
+      zj1=Dist(3,j)-Dist(3,k)
+      zl1=Dist(3,l)-Dist(3,k)
+c      rotate around z axis to put kj along y axis
+      rdist=dsqrt(xj1**2+yj1**2+zj1**2)
+      cosa=zj1/rdist
+      if(cosa.gt.1.0d0) cosa=1.0d0
+      if(cosa.lt.-1.0d0) cosa=-1.0d0
+      ddd=1.0d0-cosa**2
+      if(ddd.le.0.0) go to 10
+      yxdist=rdist*dsqrt(ddd)
+      if(yxdist.gt.1.0d-6) go to 20
+   10 continue
+      xi2=xi1
+      xl2=xl1
+      yi2=yi1
+      yl2=yl1
+      costh=cosa
+      sinth=0.d0
+      go to 30
+   20 cosph=yj1/yxdist
+      sinph=xj1/yxdist
+      xi2=xi1*cosph-yi1*sinph
+      xl2=xl1*cosph-yl1*sinph
+      yi2=xi1*sinph+yi1*cosph
+      yj2=xj1*sinph+yj1*cosph
+      yl2=xl1*sinph+yl1*cosph
+c      rotate kj around the x axis so kj lies along the z axis
+      costh=cosa
+      sinth=yj2/rdist
+   30 continue
+      yi3=yi2*costh-zi1*sinth
+      yl3=yl2*costh-zl1*sinth
+      call dang(xl2,yl3,xi2,yi3,angle)
+      if (angle.lt.0.d0) angle=4.d0*dasin(1.d0)+angle
+      if (angle.ge.6.2831853d0 ) angle=0.d0
+      return
+      end
+
+      subroutine dang(a1,a2,b1,b2,rcos)
+      implicit double precision (a-h,o-z)
+C    dang  determines the angle between the points (a1,a2), (0,0),
+C       and (b1,b2). The result is put in rcos.
+      Data zero/1.0d-6/
+
+      if(dabs(a1).lt.zero.and.dabs(a2).lt.zero) go to 10
+      if(dabs(b1).lt.zero.and.dabs(b2).lt.zero) go to 10
+      anorm=1.0d0/dsqrt(a1**2+a2**2)
+      bnorm=1.0d0/dsqrt(b1**2+b2**2)
+      a1=a1*anorm
+      a2=a2*anorm
+      b1=b1*bnorm
+      b2=b2*bnorm
+      sinth=(a1*b2)-(a2*b1)
+      costh=a1*b1+a2*b2
+      if(costh.gt.1.0d0) costh=1.0d0
+      if(costh.lt.-1.0d0) costh=-1.0d0
+      rcos= acos(costh)
+      if(dabs(rcos).lt.4.d-4) go to 10
+      if(sinth.gt.0.d0) rcos=4.d0*dasin(1.d0)-rcos
+      rcos=-rcos
+      return
+   10 rcos=0.d0
+      return
+      end
