@@ -1,6 +1,7 @@
-C78   0 0 1 1 1   1 2 18 19    0. 0.  cc-pvdz B3LYP opt. geom. minimum -2972.358202246 au
+C78   cc-pvdz B3LYP opt. geom. minimum -2972.358202246 au
 C20 aug-cc-pvdz B3LYP opt. geom. minimum E=-761.5231573 au
-&Coord NA=78, ICart=1 /
+&General NA=78 /
+&Coord ICart=1 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton Iham=1 /
@@ -84,6 +85,4 @@ C20 aug-cc-pvdz B3LYP opt. geom. minimum E=-761.5231573 au
  6     -0.0000017512      3.9241899764     -0.252670633
  6      0.0000100612     -0.5935445818      3.919438152
  6      0.0000099182     -1.9012218987      3.5127014139
-
-
 

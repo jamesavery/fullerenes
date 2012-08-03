@@ -1,5 +1,6 @@
 C60 Stone-Wales transformation
-&Coord NA=60, ICart=0, ISW=1 /
+&General NA=60 /
+&Coord ICart=0, ISW=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton /

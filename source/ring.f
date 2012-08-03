@@ -217,7 +217,8 @@ C     Deviation from ideal hexagon angle of 120 deg
       enddo
       asmalldif=asmall-1.2d2
       abigdif=abig-1.2d2
-      Write(IOUT,1016) asmall,asmalldif,abig,abigdif
+      if(Ncount6.ne.0)
+     1  Write(IOUT,1016) asmall,asmalldif,abig,abigdif
 
 C     Establish ring numbers for specific vertex
       do I=1,Matom
@@ -802,7 +803,7 @@ C Print Cioslowsky analysis and check of correctness
  1022 Format(1X,'--> Fullerene is IPR')
  1023 Format(1X,'--> Fullerene is not IPR')
  1024 Format(/1X,'Calculate Standard Enthalpy for fullerene ',
-     1 'from structural motifs (M)',/2X,'M.Alcami, G.Sanchez',
+     1 'from structural motifs (M)',/2X,'M.Alcami, G.Sanchez, ',
      1 'S.Diaz-Tendero, Y.Wang, F.Martin, J. Nanosci. Nanotech. ',
      1 '7, 1329 (2007)',
      1 /1X,'Loop through all ',I5,' edges.')
@@ -830,7 +831,7 @@ C Print Cioslowsky analysis and check of correctness
  1036 Format(' H(C60)/60 - H(C',I2,')/',I2,4X,F12.3,' kcal/mol')
  1037 Format(' H(C60)/60 - H(C',I3,')/',I3,2X,F12.3,' kcal/mol')
  1038 Format(' H(C60)/60 - H(C',I5,')/',I5,F12.3,' kcal/mol')
- 1039 Format(' Graphene limit: ',F12.3,' kcal/mol')
+ 1039 Format('       (graphene limit: ',F12.3,' kcal/mol)')
  1040 Format(/1X,'No Yoshida-Fowler D3h 6555 pattern (C60-like corner',
      1 ' patch) found')
  1041 Format(/1X,I2,' Yoshida-Fowler D3h 6555 patterns (C60-like ', 
@@ -974,7 +975,7 @@ C     Calculate the enthalpy of formation per bond
  1002 Format(' H(C60)/60 - H(C',I2,')/',I2,4X,F12.3,' kcal/mol')
  1003 Format(' H(C60)/60 - H(C',I3,')/',I3,2X,F12.3,' kcal/mol')
  1004 Format(' H(C60)/60 - H(C',I5,')/',I5,F12.3,' kcal/mol')
- 1005 Format(' Graphene limit: ',F12.3,' kcal/mol')
+ 1005 Format('       (graphene limit: ',F12.3,' kcal/mol)')
       Return
       END
 

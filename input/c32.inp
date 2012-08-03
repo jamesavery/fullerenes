@@ -1,5 +1,6 @@
 C32  aug-cc-pvdz B3LYP opt. geom. minimum C2-sym E=-1218.9516264 au
-&Coord NA=32, ICart=1, IP=1 /
+&General NA=32, IP=1 /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1 /
@@ -37,6 +38,4 @@ C32  aug-cc-pvdz B3LYP opt. geom. minimum C2-sym E=-1218.9516264 au
 6                  -0.644098   -0.337622   -2.327462
 6                  -1.675583   -0.374260    1.731469
 6                   2.352804   -0.231539    0.595545
-
-
 

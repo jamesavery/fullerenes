@@ -1,5 +1,6 @@
 C28  aug-cc-pvdz B3LYP opt. geom. minimum C1-sym E=-1066.4090397 au
-&Coord NA=28, ICart=1, IP=1, ixyz=1 /
+&General NA=28, IP=1, ixyz=1 /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1 /
@@ -33,5 +34,4 @@ C28  aug-cc-pvdz B3LYP opt. geom. minimum C1-sym E=-1066.4090397 au
 6                  -1.043491   -1.721721    1.387724
 6                   1.065760    1.731396   -1.347929
 6                  -1.065987    1.731362    1.347800
-
 

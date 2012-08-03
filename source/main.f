@@ -37,7 +37,6 @@ C    Set the dimensions for the distance matrix
       DIMENSION NEK(3,Nmax),JP(12)
       DIMENSION Symbol(Mmax)
       Real*4 TimeX
-CG77  CHARACTER CDAT*9,CTIM*8
       CHARACTER CDAT*8,CTIM*10,Zone*5
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
@@ -64,6 +63,7 @@ CG77  CHARACTER CDAT*9,CTIM*8
 C     Van der Waals radius of carbon, adjusted approximately to the
 C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       DATA RVdWC/1.415d0/
+
       IN=5
       Iout=6
       ilp=0
@@ -78,17 +78,14 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       enddo
       enddo
 
-C  You might like to comment these 2 lines out 
-C  (and same at the end of this routine) or substitute them with your
-C  compiler specific option. Next two are g77 options
-CG77    CALL Date(CDAT)
-CG77    CALL Time(CTIM)
-        CALL date_and_time(CDAT,CTIM,zone,values)
-        TIMEX=0.d0
-        CALL Timer(TIMEX)
-C       WRITE(Iout,1000) CDAT,CTIM,Nmax
-        WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
+      CALL date_and_time(CDAT,CTIM,zone,values)
+       TIMEX=0.d0
+      CALL Timer(TIMEX)
+C      WRITE(Iout,1000) CDAT,CTIM,Nmax
+       WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7),Nmax
+
+C------------------DATAIN------------------------------------------
 C  INPUT and setting parameters for running the subroutines
  9    routine='DATAIN       '
       leapspiral=0
@@ -100,12 +97,12 @@ C  INPUT and setting parameters for running the subroutines
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
      1  ndual,nosort,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
      1  force,forceP,filename,TEXTINPUT)
-
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
       if(istop.ne.0) go to 98
 
+C------------------Coordinates-------------------------------------
 C Options for Input coordinates
       go to (10,20,30,30,30,30) Icart+1
 C  Cartesian coordinates produced for Ih C60
@@ -172,6 +169,7 @@ C identify P-type eigenvectors and construct the 3D fullerene
 
    40 WRITE(Iout,1001) MAtom,TolX*100.d0
 
+C------------------ISOMERS-----------------------------------------
 C Some general infos on isomers and spiral routine
 C of Fowler and Manolopoulos. Set parameter IPR for independent
 C pentagon rule as full list beyond C60 is computer time 
@@ -179,17 +177,19 @@ C intensive
   98  routine='ISOMERS      '
       Write(Iout,1008) routine
       CALL Isomers(MAtom,IPR,Iout,
-     1 maxit,iprintham,ichk,IDA,A,trim(filename)//".chkpnt")
+     1 maxit,iprintham,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
 
+C------------------MOVECM------------------------------------------
 C Move carbon cage to Atomic Center
   999 routine='MOVECM_1     '
       Write(Iout,1008) routine
-      Iprint=1
+      Iprint=iprintf
       Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
      1 nosort,SP,Dist,DistCM,El)
       mirror=0
 
+C------------------DIAMETER----------------------------------------
 C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia
       if(isort.eq.0.or.nosort.ne.0) then
@@ -198,12 +198,14 @@ C Also get moment of inertia
       CALL Diameter(MAtom,Iout,Dist,distp)
       endif
 
+C------------------DISTMATRIX--------------------------------------
 C Calculate the distance Matrix and print out distance Matrix
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
       CALL Distmatrix(MAtom,Iout,isort,nosort,iprintf,Iopt,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
 
+C------------------CONNECT-----------------------------------------
 C Establish Connectivities
       routine='CONNECT      '
       Write(Iout,1008) routine
@@ -212,9 +214,11 @@ C Establish Connectivities
       if(isort.ne.0.and.nosort.eq.0) then
        CALL Permute(Matom,Iout,Dist,IC3)
        icall=icall+1
-       if(icall.lt.10) Go to 999
+       if(icall.lt.2) Go to 999
       endif
+      icall=0
 
+C------------------HUECKEL-----------------------------------------
 C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
         routine='HUECKEL      '
@@ -222,7 +226,7 @@ C Hueckel matrix and eigenvalues
         CALL Hueckel(MAtom,Iout,IC3,ihueckel,IDA,A,evec,df)
       endif
 
-      nosort=1
+C------------------GOLDBERG-COXETER-------------------------------
 C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
         routine='Leapfrog'
@@ -245,6 +249,7 @@ c$$$      call lukas_edges(graph,MAtom)
 c$$$      call lukas_corners(graph,MAtom)
 c$$$      call lukas_dihedrals(graph,MAtom)
 
+C------------------HAMILTON---------------------------------------
 C Generate IUPAC name and locate Hamiltonian cycles. 
 C Routine written by D. Babic. Note routine
 C is called only if IPR>0 as computer time is extensive beyond
@@ -268,15 +273,18 @@ C adjacent vertices
       endif
       CALL Paths(MAtom,Iout,IDA,A,evec,df)
 
+C------------------RING-------------------------------------------
 C Establish all closed ring systems
       routine='RING         '
       Write(Iout,1008) routine
       CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
+C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
 c we check for ISW because the coordinates shouldn't be optimized before
 c a stone wales (or any other transformation) is done
+      icall=0
       If(Iopt.ne.0.and.ISW.eq.0.and.iyf.eq.0.and.iws.eq.0) then
         routine='OPTFF        '
         ftol=ftolP
@@ -297,18 +305,24 @@ c a stone wales (or any other transformation) is done
      1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
         endif
         routine='MOVECM_2     '
-        Write(Iout,1008) routine
+  991   Write(Iout,1008) routine
         Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
      1   nosort,SP,Dist,DistCM,El)
         routine='DISTMATRIX   '
         Write(Iout,1008) routine
         CALL Distmatrix(MAtom,Iout,isort,nosort,Iprintf,0,
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
+      if(isort.ne.0.and.nosort.eq.0) then
+       CALL Permute(Matom,Iout,Dist,IC3)
+       icall=icall+1
+       if(icall.lt.2) Go to 991
+       endif
         routine='DIAMETER     '
         Write(Iout,1008) routine
         CALL Diameter(MAtom,Iout,Dist,distp)
       endif
 
+C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview
 C xyz format
       if(icyl.le.2.and.ISW.eq.0) then
@@ -351,13 +365,14 @@ C cc1 format
         Close(unit=3)
       endif
 
-
+C------------------RING-------------------------------------------
 C Rings
       routine='RING         '
       Write(Iout,1008) routine
       CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
+C------------------RINGC------------------------------------------
 C Analyze ring connections
       routine='RINGC        '
       Write(Iout,1008) routine
@@ -366,6 +381,7 @@ C Analyze ring connections
      1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
      1 numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
 
+C------------------STONE-WALES------------------------------------
 C Perform Stone-Wales transformation
       if(ISW.ne.0) then
         routine='STONE-WALES  '
@@ -378,6 +394,7 @@ C Perform Stone-Wales transformation
         go to 999 ! moveCM
       endif
 
+C------------------ENDO-KROTO-------------------------------------
 C Perform Endo-Kroto 2-vertex insertion
       if(KE.ne.0) then
         routine='ENDO-KROTO   '
@@ -390,6 +407,7 @@ C Perform Endo-Kroto 2-vertex insertion
         go to 999 ! moveCM
       endif
 
+C------------------YOSHIDA-FOWLER---------------------------------
 C Perform Yoshida-Fowler 4-or 6-vertex insertion
       if(IYF.ne.0) then
         routine='YOSHIDAFOWLER'
@@ -408,6 +426,7 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
         if(JERR.eq.0) go to 999 ! moveCM
       endif
 
+C------------------WIRZSCHWERD------------------------------------
 C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
       if(IWS.ne.0) then
         routine='WIRZSCHWERD  '
@@ -421,6 +440,7 @@ C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
         if(JERR.eq.0) go to 999 ! moveCM
       endif
 
+C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0) then
         routine='SPIRALSEARCH '
@@ -434,30 +454,34 @@ C Determine if fullerene is chiral
 C Topological Indicators
       Call TopIndicators(Matom,Iout,IDA,Mdist)
 
+C------------------VOLUME-----------------------------------------
 C Calculate the volume
       routine='VOLUME       '
       Write(Iout,1008) routine
-
       CALL Volume(Matom,Iout,N5MEM,N6MEM,
      1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
      2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6,filename)
 
+C------------------MINCOVSPHERE-----------------------------------
 C Calculate the minimum covering sphere and volumes
       routine='MINCOVSPHERE2'
       Write(Iout,1008) routine
       CALL MinCovSphere2(MAtom,Iout,SP,Dist,Rmin,Rmax,
      1 VolSphere,ASphere,Atol,VTol,distP,cmcs,rmcs,RVdWC)
 
+C------------------MINDISTSPHERE----------------------------------
 C Calculate the minimum distance sphere
       routine='MINDISTSPHERE'
       Write(Iout,1008) routine
       CALL MinDistSphere(MAtom,Iout,Dist,cmcs)
 
+C------------------MAXINSPHERE------------------------------------
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE'
       Write(Iout,1008) routine
       CALL MaxInSphere(MAtom,Iout,Dist,cmcs,RVdWC)
 
+C------------------PROJECTSPHERE----------------------------------
 C Projecting vertices on minimum covering sphere
 C  producing a spherical fullerene
       if(ipsphere.ne.0) then
@@ -465,6 +489,7 @@ C  producing a spherical fullerene
      1 IC3,Dist,cmcs,rmcs,filename,El,TEXTINPUT)
       endif
 
+C------------------GRAPH2D----------------------------------------
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
         routine='GRAPH2D      '
@@ -482,6 +507,7 @@ C Calculate Schlegel diagram
      1   TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,filename)
       endif
 
+C------------------END--------------------------------------------
 C  E N D   O F   P R O G R A M
   99  if(loop-1) 100,101,102
  100  go to 9999
@@ -491,8 +517,6 @@ C  E N D   O F   P R O G R A M
  102  iprev=1
       WRITE(Iout,1019) 
       go to 9 ! datain
-CG77 99  CALL TIME(CTIM)
-CG77 99  CALL TIME(CTIM)
 9999  call date_and_time(CDAT,CTIM,zone,values)
         WRITE(Iout,1004) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7)
@@ -510,7 +534,7 @@ C Formats
      1 /1X,'|      with routines from Fowler, Manolopoulos and Babic |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.0, last revision from 29/07/12     |',
+     1 /1X,'|    This  version: 4.1, last revision from 03/08/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',

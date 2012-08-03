@@ -1,5 +1,6 @@
 C80  Using FM algorithm to produce coordinates
-&Coord NA=80, ICart=2, IV2=4, IV3=5 /
+&General  NA=80 /
+&Coord ICart=2, IV2=4, IV3=5 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton IHam=1 /

@@ -1,10 +1,11 @@
 C70 
-&Coord NA=70, ICart=1, IP=1, ixyz=1 /
+&General NA=70, IP=1, ixyz=1 /
+&Coord ICart=1 /
 &FFChoice  /
 &FFParameters /
 &Hamilton IHam=1/
 &Isomers IPR=1 /
-&Graph ISchlegel=8, ISO1=3, ISO2=10, ISO3=20, ifs=1 /
+&Graph ISchlegel=8, ISO1=3, ISO2=8, ISO3=18, ifs=1 /
 6            -3.226450    2.093857    1.210583
 6            -2.445960    1.829719    2.403966
 6            -3.975081    1.070632    0.618963

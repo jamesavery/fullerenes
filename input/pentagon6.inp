@@ -5,9 +5,10 @@ repulsive potentialvspecified by fcoulomb and then
 optimized with the normal force field. If pre-
 optimization is not done, the structure is not
 good and heavily distorted
-&Coord NA=50, ICart=4, R6=1.42 leap=3 ixyz=1 /
-&FFChoice Iopt=2 /
-&FFParameters fcoulomb=1.d2 /
+&General NA=50, ixyz=1 /
+&Coord ICart=4, R6=1.42, leap=3 /
+&FFChoice Iopt=2 ftol=1.d-9 /
+&FFParameters fcoulomb=105. /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=1 /

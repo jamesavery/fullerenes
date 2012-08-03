@@ -1,5 +1,6 @@
 C90  Using FM algorithm to produce coordinates
-&Coord NA=90, ICart=4, IP=1, IV2=5, IV3=6, IPRC=2, isonum=134 /
+&General  NA=90, IP=1, IPRC=2 /
+&Coord ICart=4, IV2=5, IV3=6, isonum=134 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton IHam=1 /

@@ -1,5 +1,6 @@
 C30  Using FM algorithm to produce coordinates
-&Coord NA=30, ICart=2 /
+&General  NA=30 /
+&Coord ICart=2 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

@@ -1,4 +1,5 @@
 Coxeter fullerene with indices (k,l)=(6,0) G0=C20
-&Coord ICart=4 , kGC=5, ixyz=1 /
+&General ixyz=1 /
+&Coord ICart=4 , kGC=5 /
 &FFChoice Iopt=1 /
 &FFParameters /

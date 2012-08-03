@@ -1,5 +1,6 @@
-C60 iYoshida-Fowler transformation
-&Coord NA=60, ICart=0, IYF=1 /
+C60 Yoshida-Fowler transformation
+&General NA=60 /
+&Coord ICart=0, IYF=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton /

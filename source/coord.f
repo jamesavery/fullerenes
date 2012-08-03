@@ -1920,7 +1920,6 @@ C Input: initial graph, and GC indices (kGC,lGC)
         stop
       endif
       g = new_fullerene_graph(Nmax,MAtom,IDA)
-C  James, we have a problem here
       halma = halma_fullerene(g,kGC-1)
       isafullerene = graph_is_a_fullerene(halma)
       IF (isafullerene.eq.1) then
@@ -2153,18 +2152,13 @@ C    record change
       Subroutine CartInt(Dist,MAtom,Iout,isort)
       use config
       implicit double precision (a-h,o-z)
-      dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),geo(3,Nmax)
-C Modified routine xyzint taken from www.koders.com
-C Distint works out the internal coordinates of a molecule.
-C        atom i is defined as being at a distance from the nearest
-C        atom j, atom j already having been defined.
-C        atom i makes an angle with atom j and the atom k, which has
-C        already been defined, and is the nearest atom to j
-C        atom i makes a dihedral angle with atoms j, k, and l. l having
-C        been defined and is the nearest atom to k, and j, k and l
-C        have a contained angle in the range 15 to 165 degrees,
-C        if possible.
-C   on input Dist = cartesian array of MAtom atoms
+      dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),zmatrix(3,Nmax)
+C Modified routine xyzint
+C Cartint works out the internal coordinates (z-matrix) of a molecule
+C        atoms N1,N2,N3,N4 defined with distances, bond angles and dihedrals
+C        angles in the range 15 to 165 degrees if possible.
+C   on input  Dist    = cartesian array of MAtom atoms
+C   on output ZMatrix = Z-Matrix
 C        MAtom: number of atoms
 C        degree = 360/2Pi = 57.29578..., angles are in degrees
 C
@@ -2173,9 +2167,9 @@ C
  
       Write(Iout,1000) 
        do i=1,MAtom
-        geo(1,i)=0.d0
-        geo(2,i)=0.d0
-        geo(3,i)=0.d0
+        zmatrix(1,i)=0.d0
+        zmatrix(2,i)=0.d0
+        zmatrix(3,i)=0.d0
         na(i)=0
         nb(i)=0
         nc(i)=0
@@ -2211,20 +2205,20 @@ c   find any atom to relate to na(i)
       nc(2)=0
       nc(3)=0
 
-c   na, nb, nc are determined, now get geo
-      call xyzgeo(Dist,MAtom,na,nb,nc,degree,geo)
+c   na, nb, nc are determined, now get zmatrix
+      call Distgeo(Dist,MAtom,na,nb,nc,degree,zmatrix)
 
 c     print
        do i=1,MAtom
-        Write(Iout,1001) i,(geo(J,I),J=1,3),na(i),nb(i),nc(i)
+        Write(Iout,1001) i,(zmatrix(J,I),J=1,3),na(i),nb(i),nc(i)
        enddo
 
 c   Check if distances are within certain range
-       rmindist=geo(1,2)
-       rmaxdist=geo(1,2)
+       rmindist=zmatrix(1,2)
+       rmaxdist=zmatrix(1,2)
        do i=3,MAtom
-        if(geo(1,i).lt.rmindist) rmindist=geo(1,i)
-        if(geo(1,i).gt.rmaxdist) rmaxdist=geo(1,i)
+        if(zmatrix(1,i).lt.rmindist) rmindist=zmatrix(1,i)
+        if(zmatrix(1,i).gt.rmaxdist) rmaxdist=zmatrix(1,i)
        enddo
       ratio=rmaxdist/rmindist
       if(ratio.lt.1.5d0) then
@@ -2234,30 +2228,35 @@ c   Check if distances are within certain range
        Write(Iout,1003) rmindist,rmaxdist
        isort=1
       endif
+      if(rmindist.lt.1.d0) then
+       Write(Iout,1004)
+      endif
       
  1000 Format(/1X,'Convert cartesian into internal coordinates:',
-     1 /5X,'I',9X,'R',10X,'Angle',6X,'Dihedral',5X,'N1',4X,
-     1 'N2',4X,'N3',/1X,64('-'))
+     1 /4X,'N1',9X,'R',10X,'Angle',6X,'Dihedral',5X,'N2',4X,
+     1 'N3',4X,'N4',/1X,64('-'))
  1001 Format(1X,I5,3(1X,F12.6),3(1X,I5))
  1002 Format(1X,'Analysis of distances: All are bond distances',
      1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
  1003 Format(1X,'Analysis of distances: Requires sorting of cartesian',
      1 ' coordinates after getting connectivities',
      1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
+ 1004 Format(1X,'WARNING: Problem with smallest bond distance detected!',
+     1 /1X,' Geometry of fullerene may be wrong')
       return
       end
 
-      subroutine xyzgeo(Dist,MAtom,na,nb,nc,degree,geo)
+      subroutine Distgeo(Dist,MAtom,na,nb,nc,degree,zmatrix)
       use config
       implicit double precision (a-h,o-z)
-      dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),geo(3,Nmax)
+      dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),zmatrix(3,Nmax)
 C Distgeo converts coordinates from cartesian to internal.
 C  input Dist  = array of cartesian coordinates
 C   MAtom= number of atoms
 C   na   = numbers of atom to which atoms are related by distance
 C   nb   = numbers of atom to which atoms are related by angle
 C   nc   = numbers of atom to which atoms are related by dihedral
-C  output geo  = internal coordinates in angstroms, radians, and radians
+C  output zmatrix  = internal coordinates in angstroms, radians, and radians
 
       Data tol/0.2617994d0/
       DATA API/3.14159265358979d0/
@@ -2268,8 +2267,8 @@ C  output geo  = internal coordinates in angstroms, radians, and radians
          l=nc(i)
          if(i.lt.3) go to 30
          ii=i
-         call bangle(Dist,ii,j,k,geo(2,i))
-         geo(2,i)=geo(2,i)*degree
+         call bangle(Dist,ii,j,k,zmatrix(2,i))
+         zmatrix(2,i)=zmatrix(2,i)*degree
          if(i.lt.4) go to 30
 c   make sure dihedral is meaningful
          call bangle(Dist,j,k,l,angl)
@@ -2298,17 +2297,17 @@ c
                go to 10
             endif
          endif
-         call dihed(Dist,ii,j,k,l,geo(3,i))
-         geo(3,i)=geo(3,i)*degree
-   30 geo(1,i)=dsqrt((Dist(1,i)-Dist(1,j))**2+
+         call dihed(Dist,ii,j,k,l,zmatrix(3,i))
+         zmatrix(3,i)=zmatrix(3,i)*degree
+   30 zmatrix(1,i)=dsqrt((Dist(1,i)-Dist(1,j))**2+
      1           (Dist(2,i)-Dist(2,j))**2+
      2           (Dist(3,i)-Dist(3,j))**2)
-      geo(1,1)=0.d0
-      geo(2,1)=0.d0
-      geo(3,1)=0.d0
-      geo(2,2)=0.d0
-      geo(3,2)=0.d0
-      geo(3,3)=0.d0
+      zmatrix(1,1)=0.d0
+      zmatrix(2,1)=0.d0
+      zmatrix(3,1)=0.d0
+      zmatrix(2,2)=0.d0
+      zmatrix(3,2)=0.d0
+      zmatrix(3,3)=0.d0
       return
       end
 

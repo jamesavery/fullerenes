@@ -1,5 +1,6 @@
-C72   0 0 1 1 1   1 0 0 0     0. 0. cc-pvdz B3LYP opt. geom. minimum E=-2743.634187956 au
-&Coord NA=72, ICart=1, IP=1 /
+C72   cc-pvdz B3LYP opt. geom. minimum E=-2743.634187956 au
+&General NA=72, IP=1 /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1 /
@@ -77,6 +78,4 @@ C72   0 0 1 1 1   1 0 0 0     0. 0. cc-pvdz B3LYP opt. geom. minimum E=-2743.634
 6                   0.689925   -3.512251    1.785444
 6                  -1.428030   -3.916295    0.596731
 6                  -0.689925   -3.512251    1.785444
-
-
 

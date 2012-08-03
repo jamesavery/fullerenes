@@ -2,8 +2,8 @@
      1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
-     1 ndual,nosort,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,force,
-     1 forceP,filename,DATEN)
+     1 ndual,nosort,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,
+     1 force,forceP,filename,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
@@ -11,9 +11,10 @@
       integer endzeile
       Character*1 DATEN(nzeile)
       Character filename*50
-      Namelist /Coord/ ICart,NA,IP,IV1,IV2,IV3,TolR,R5,R6,ixyz,leap,
-     1 ichk,isonum,IPRC,kGC,lGC,IGCtrans,ihueckel,ISW,KE,loop,mirror,
-     1 IYF,IWS,filename,ipsphere,nosort
+      Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,ihueckel,loop,
+     1 filename,ipsphere,nosort
+      Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
+     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IWS
       Namelist /FFChoice/ Iopt,ftol
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
      1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
@@ -22,6 +23,7 @@
       Namelist /Isomers/ IPR,IPH,IStop,IChk
       Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,ifs,ndual,PS,scale,
      1 scalePPG
+
 C Input send to output
       if(ilp.eq.0) then   
         WRITE(IOUT,100)
@@ -43,8 +45,13 @@ C Input send to output
 C tolerance parameter (to be used in all force fields)
       ftol=1.d-8
 
+      do i=1,ffmaxdim
+       force(i)=0.d0
+       forceP(i)=0.d0
+      enddo
+
 C Defining the Wu force field (default values)
-      WuR5=1.455d0! in angstoem
+      WuR5=1.455d0! in angstroem
       WuR6=1.391d0
       WuA5=1.08d2! in deg
       WuA6=1.20d2
@@ -99,6 +106,7 @@ C Integers
       ISO3=0    !  Option for fullerene orientation for Schlegel projection
       istop=0   !  Option for stopping after isomer list
       iupac=0   !  Switch for producing the Iupac nomenclature
+                !  iupac=0 just counts Hamiltonian Cycles
       ISW=0     !  Option for Stone-Wales transformation
       IWS=0     !  Option for Wirz-Schwerdtfeger transformation
       IYF=0     !  Option for Yoshido-Fowler transformation
@@ -112,19 +120,18 @@ C Integers
       leap=0    !  Initial flag for leapfrog fullerene
       loop=0    !  Option for compound job
       mirror=0  !  Invert coordinates
-      ndual=0   !  Option for plotting dual graph as well
-                !  iupac=0 just count Hamiltonian Cycles
       NA=60     !  Number of Atoms
+      ndual=0   !  Option for plotting dual graph as well
 
 C Reals
-      Tol=0.33d0    ! Tolerance
       PS=0.d0       ! For graph production, angle input for Schlegel diagram
       scale=2.5d0   ! For graph production, scale Tutte graph
       scalePPG=1.d0 ! For graph production exponential factor in Plestenjak alg.
-      TolR=0.d0     ! Tolerance for finding ring connections
       R=1.391d0     ! C-C distance 
       R5=1.455d0    ! Distance in 5-Ring
       R6=R          ! Distance in 6-Ring
+      Tol=0.33d0    ! Tolerance
+      TolR=0.d0     ! Tolerance for finding ring connections
 
 C Now process namelist input
       READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
@@ -135,6 +142,7 @@ C Now process namelist input
       WRITE(IOUT,60) (DATEN(j),j=1,endzeile)
       WRITE(IOUT,101)
 C Read Namelist
+      Read(IN,nml=General,Err=99,end=99)
       Read(IN,nml=Coord,Err=99,end=99)
       Read(IN,nml=FFChoice,Err=99,end=99)
       Read(IN,nml=FFParameters,Err=99,end=99)
@@ -146,7 +154,7 @@ C Set more parameters
 
 C Set Parameters for force field
 c set forceP (default parameters)[needs to be done after iopt and before opt is read]
-      if(iopt.eq.1 .or. iopt.eq.2)then
+  99  if(iopt.eq.1 .or. iopt.eq.2)then
 C Wu force field
         forceP(1)=WuR5
         forceP(2)=WuR6
@@ -180,7 +188,7 @@ C ExtWu forceP field
       endif
 
 c set force (custom parameters)
-   99 if(iopt.eq.1 .or. iopt.eq.2)then
+      if(iopt.eq.1 .or. iopt.eq.2)then
 C Wu force field
         force(1)=WuR5
         force(2)=WuR6

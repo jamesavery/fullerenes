@@ -1,6 +1,7 @@
 This is an example how to create the coordinate for the non-spiral C384
 through a ring-spiral fullerene C364 and 4 Yoshida-Fowler 4-vertex insertions
-&Coord NA=366, ICart=2, ixyz=1, IWS=2, ipsphere=2, filename="output/c384" /
+&General NA=366, ixyz=1, nosort=1, ipsphere=2, filename="output/c384" /
+&Coord ICart=2, IWS=2 /
 &FFChoice Iopt=2 ftol=.1d-9/
 &FFParameters fcoulomb=127. /
 &Hamilton /

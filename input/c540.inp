@@ -1,5 +1,6 @@
 C540  6-31G opt. geom. minimum -20577.06531 au not converged out
-&Coord NA=540, ICart=1, ixyz=1 /
+&General NA=540, ixyz=1 /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton /
@@ -545,7 +546,4 @@ C540  6-31G opt. geom. minimum -20577.06531 au not converged out
 6            -7.783887   -6.293084    2.222804
 6            -7.772334   -5.684422    3.523674
 6            -6.952027   -6.223646    4.559148
-
-                                                                              
-
 

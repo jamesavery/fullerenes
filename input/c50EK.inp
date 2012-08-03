@@ -1,6 +1,7 @@
 C50 aug-cc-pvdz B3LYP opt. geom. minimum C2v-sym E=-1905.1079932 au 
 Cartesian coordinate input
-&Coord NA=50, ICart=1, IP=1, KE=1 /
+&General NA=50, IP=1, nosort=1 /
+&Coord ICart=1, KE=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1, IUpac=1 /

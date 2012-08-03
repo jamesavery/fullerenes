@@ -1,5 +1,6 @@
 C60  aug-cc-pvdz B3LYP opt. geom. minimum Ih-sym E=-2286.3878361 au
-&Coord NA=60, ICart=1, IP=1, ixyz=1, filename='C60extfile' /
+&General NA=60, IP=1, ixyz=1, filename='C60extfile' /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1, IUPAC=1 /

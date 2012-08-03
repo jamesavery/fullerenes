@@ -1,6 +1,7 @@
 C80  cc-pvdz B3LYP opt. geom. minimum -3048.53107840 au
 Cartesian coordinate input
-&Coord NA=80, ICart=1, IP=1, IYF=3 /
+&General NA=80, IP=1 /
+&Coord ICart=1, IYF=3 /
 &FFChoice Iopt=2 /
 &FFParameters fcoulomb=20 /
 &Hamilton /
@@ -88,3 +89,4 @@ Cartesian coordinate input
 6     0.2404509792    -1.7542784846    -3.6998201567
 14 15 13 
 31 34 36
+

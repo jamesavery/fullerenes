@@ -1,5 +1,6 @@
 C80  cc-pvdz B3LYP opt. geom. minimum -3048.53107840 au
-&Coord NA=80, ICart=1 /
+&General NA=80 /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1 /
@@ -85,5 +86,4 @@ C80  cc-pvdz B3LYP opt. geom. minimum -3048.53107840 au
 6     2.5353495419    -1.5332515233    -2.8554277546
 6     1.3666829542    -2.338871022     -3.0285844873
 6     0.2404509792    -1.7542784846    -3.6998201567
-
 

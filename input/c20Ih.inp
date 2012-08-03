@@ -1,5 +1,6 @@
 C20   aug-cc-pvdz B3LYP opt. geom. high sym. Ih local min. E=-761.4899671 au 
-&Coord NA=20, ICart=1 /
+&General NA=20 /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton /

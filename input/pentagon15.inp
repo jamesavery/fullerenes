@@ -1,5 +1,6 @@
 C60 Using FM algorithm to produce coordinates
-&Coord NA=60, ICart=2 , IP=1, R6=1.42 /
+&General  NA=60, IP=1 /
+&Coord ICart=2, R6=1.42 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

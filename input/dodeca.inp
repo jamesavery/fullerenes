@@ -1,7 +1,8 @@
 C20  Using subroutine to produce coordinates for C20
-&Coord NA=20, ICart=0, R5=0.14548E+1 /
+&General NA=20 /
+&Coord ICart=0, R5=0.14548E+1 /
 &FFChoice /
 &FFParameters /
 &Hamilton /
 &Isomers /
-&Graph ISchlegel=1 ISO1=1, ISO2=2, ISO3=9 /
+&Graph ISchlegel=1 ISO1=1, ISO2=2, ISO3=3 /

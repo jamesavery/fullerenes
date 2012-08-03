@@ -236,7 +236,9 @@ or the more reliable 3D-TE algorithm (used by files {\it pentagon1.inp} to {\it 
 or from the Goldberg-Coxeter 2-index transformation (triangulation algorithm, input files {\it coxeter1.inp}
 to {\it coxeter6.inp}). The 12 pentagon indices can also be obtained from the {\it fullerene
 database} if the canonical fullerene number is used as defined in the book ``Atlas of Fullerenes'' by Fowler and Manolopoulus \cite{Atlas,cvetkovic2002} 
-(input file {\it database.inp}).
+(input file {\it database.inp}). The program also print internal coordinates in form of a Z-Matrix (distances, angles and dihedrals).
+For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
+coordinates.
 
 We recommend reading Fowler and Manolopoulus' book \cite{Atlas,cvetkovic2002} for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
 to construct 3D fullerene graphs.  For the AME algorithm it is critical to get the right 
@@ -598,39 +600,32 @@ For some of the fullerenes listed, the singlet state chosen may not be the elect
 Many definitions depend on the use of {\AA}ngstr{\o}ms for distances, so please use this unit throughout. 
 A typical input is in {\it Namelist format}, or if additional data are required in {\it free format}, and reads like this:\\\\
 C80  Using FM algorithm to produce coordinates, input file: pentagon12.inp \\
-\&Coord NA=80, ICart=2, IV2=4, IV3=5 / \\
+\&General NA=80 / \\
+\&Coord ICart=2, IV2=4, IV3=5 / \\
 \&FFChoice Iopt=1 / \\
 \&FFParameters / \\
 \&Hamilton IHam=1 / \\
 \&Isomers IPR=1 / \\
 \&Graph ISchlegel=2, ISO1=2, ISO2=4, ISO3=5 / \\
 1 2 3 4 5 6 37 38 39 40 41 42 \\\\
-The first line is a text line, the second \&Coord line in {\it namelist format} tells the program how the coordinates are created (and many more), the
-next two lines \&FFChoice and \&FFParameters are specifications for the force field to be used (none in this case), line 4 (\&Hamilton) concerns the
-Hamiltonian cycles, line 5 (\&Isomers) is an isomer list is created, and line 6 (\&Graph) for the 2D fullerene graph (Schlegel diagram). The last
-line in the input is for the 12 ring-spiral pentagon indices (RSPI).
+The first line is a text line, the second \&General is a general command line containing many useful flags, 
+the third \&Coord line in {\it namelist format} tells the program how the coordinates are created, the
+next two lines \&FFChoice and \&FFParameters are specifications for the force field to be used (none in this case), line 5 (\&Hamilton) concerns the
+Hamiltonian cycles, line 6 (\&Isomers) is an isomer list is created, and line 7 (\&Graph) for the 2D fullerene graph (Schlegel diagram). The last
+line in the input is for the 12 ring-spiral pentagon indices (RSPI) of indices for vertex insertions.
 
 In the following, the input in the required sequence is described in detail (either Namelist or in Free Format):\\\\
 
 1) {\bf Text line} of max. 132 characters (in 132A1 format) (you can put as many text cards into the input as you want).\\\\
 
-2) {\bf \&Coord line}: Input to create cartesian coordinates and main flags for the program (e.g. \&Coord ICart=20, R6=1.42 /).\\
+2) {\bf \&General line}: General command line containing main flags for the program (e.g. \&General NA=60 /).\\
 {\it List of options:}\\ 
-{\bf NA, ICart, IV1, IV2, IV3, ixyz, filename, isonum, ichk, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, ihueckel, ipsphere, loop, mirror, IP, IPRC, TolR, R5, R6}\\
+{\bf NA, IP, ixyz, ichk, ihueckel, loop, ipsphere, nosort, TolR, R5, R6, filename,}\\
 {\bf NA} = Number of atoms (vertices) $N_A$ (Default: 60)\\
-{\bf ICart} = Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
-{\bf IV1} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
-{\bf IV2} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 3)\\
-{\bf IV3} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)\\
-{\bf filename} = 'name'. Filename for all external files created or used by the program. Limited to 50 characters.\\
+If {\bf IP} = 1 Print option for larger output to be produced, i.e. the full distance matrix, all Hamiltonian cycles 
+and all 3-ring connections (Default: 0).\\
 {\bf ixyz} = Flag for producing .xyz input file for CYLview, Avogadro or other plotting programs in standard xyz format (Default: 0). 
 Default name for the external file is {\it Fullerene-3D.xyz}. Otherwise {\bf filename}='filename' needs to be specified (max. 50 characters).\\
-{\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0).\\ 
-If {\bf ICart} = 2, 3 or 4 and {\bf isonum} not zero, then pentagon indices are taken from the
-isomer list contained in a database (see below).\\
-There are two databases, one for the general isomers
-({\bf IPRC} = 0), and one for the IPR isomers ({\bf IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).\\
-{\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting programs (Default: 0).\\
 If {\bf ixyz} = 1: Produce xyz file named {\bf filename-3D.xyz} for further input.\\
 If {\bf ixyz} = 2: Read xyz from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.xyz} (Default: Fullerene-3D.xyz). 
 {\bf ICart} = 0 needs to be specified for this. Another xyz file is also produced and named   {\it filename-3Dnew.xyz}. (Default: Fullerene-3Dnew.xyz)\\
@@ -639,10 +634,40 @@ If {\bf ixyz} = 3: Read xyz from file specified in {\bf filename}. The final nam
 If {\bf ixyz} = 4: Produce cc1 file (Chem3D cartesian coordinate format 1 file) for further input. Note that in contrast to xyz files,
 cc1 files contain information about vertex connections. Programs like PYMOL can read such files.\\
 If {\bf ixyz} = 5: Read cc1 from file specified in {\bf filename}. The final name is chosen as {\it filename-3D.cc1}. 
-{\bf ICart} = 0  needs to be specified. This is useful for reading for example cc1 files produced by M. Yoshida \cite{Yoshida}.\\
+In this case {\bf ICart} = 0  needs to be specified (see \&Coord input). This is useful for reading for example cc1 files produced by M. Yoshida \cite{Yoshida}.\\
+{\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting programs (Default: 0).\\
+If {\bf ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $O(n^3)$ (recommended for large matrices
+over size 5000) (Default: 0).\\
+If {\bf loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 
+This is important if one takes an initial structure and subjects it to further transformations, for example in subsequent Stone-Wales or
+Goldberg-Coxeter transformations. You might use this option to read from a xyz file created in the previous run.\\
+If {\bf loop} = 2: Same as above but if ICart specified correctly, it takes pentagon indices from a previous run.\\
+If {\bf ipsphere} = 1 all vertices are projected onto the minimum covering sphere useful for drawing 2D fullerene graphs (Default: 0).\\
+If {\bf ipsphere} = 2 In addition an xyz file is written out named filename-3DMCS.xyz (Default: Fullerene-3DMCS.xyz).\\
+If {\bf ipsphere} = 3 In addition an cc1 file is written out named filename-3DMCS.cc1 (Default: Fullerene-3DMCS.cc1).\\
+If {\bf nosort} = 1 permutation of vertices for better Z-Matrix is suppressed (Default: 0).\\
+{\bf TolR} = Tolerance in \% (Default: 33). Only change this parameter if the program cannot produce correctly the adjacency matrix. 
+This is only necessary for the cartesian coordinate input ({\bf ICart}=1) and only fails if bond distances are unusually large or small. 
+Connectivities are found for atoms with distances between R6   and   R6*(1+TolR/100). If TolR=0.0 the default value of 33\% is used. 
+If this parameter is set at a value too large, unwanted connectivities
+are produced resulting in smaller polygons. This parameter should reflect the maximum deviation in distance from the smallest distance found.\\
+{\bf filename} = 'name'. Filename for all external files created or used by the program. Limited to 50 characters.\\\\
+
+3) {\bf \&Coord line}: Input to create cartesian coordinates for the program (e.g. \&Coord ICart=20, R6=1.42 /).\\
+{\it List of options:}\\ 
+{\bf ICart, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6}\\
+{\bf ICart} = Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
+{\bf IV1} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)\\
+{\bf IV2} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 3)\\
+{\bf IV3} = Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)\\
+{\bf isonum} = Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0).\\ 
+If {\bf ICart} = 2, 3 or 4 and {\bf isonum} not zero, then pentagon indices are taken from the
+isomer list contained in a database (see below).\\
 If {\bf ICart} = 2, 3 or 4 and {\bf isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below). 
 There are two databases, one for the general isomers ({\bf IPRC} = 2) and one for the IPR isomers ({\bf IPRC} = 1), the
-definition is similar to the {\bf IPR} parameter below (Default: 2).\\
+definition is similar to the {\bf IPR} parameter below (Default: 2).\\There are two databases, one for the general isomers
+({\bf IPRC} = 0), and one for the IPR isomers ({\bf IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).\\
+{\bf ichk} = Flag for producing or reading a .xyz file for CYLview, Pymol, Avogadro or other plotting programs (Default: 0).\\
 If {\bf leap} = $n_{leap}$ the initial fullerene C$_{N_A}$ is subjected to an $n-th$ leapfrog transformation. 
 This converts the number of atoms $N_A$ to $N^{'}_A = 3^{n_{leap}}N_A$. (Default: 0)\\
 If {\bf IGCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}$[C$_{N_A}$] (Default: 0).
@@ -672,25 +697,8 @@ In this case an input is required with the three hexagon numbers (IYF=3) or the 
 the list of Yoshida-Fowler patterns given in the output (IYF=4).\\
 If {\bf ISW} = 1 the initial fullerene structure is subjected to a 9-vertex insertion (Default: 0).
 Similar to Yoshida-Fowler, an input is required (see {\it c384.inp} for details).\\
-If {\bf ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $O(n^3)$ (recommended for large matrices
-over size 5000) (Default: 0).\\
-If {\bf ipsphere} = 1 all vertices are projected onto the minimum covering sphere useful for drawing 2D fullerene graphs (Default: 0).\\
-If {\bf ipsphere} = 2 In addition an xyz file is written out named filename-3DMCS.xyz (Default: Fullerene-3DMCS.xyz).\\
-If {\bf ipsphere} = 3 In addition an cc1 file is written out named filename-3DMCS.cc1 (Default: Fullerene-3DMCS.cc1).\\
-If {\bf loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 
-This is important if one takes an initial structure and subjects it to further transformations, for example in subsequent Stone-Wales or
-Goldberg-Coxeter transformations. You might use this option to read from a xyz file created in the previous run.\\
-If {\bf loop} = 2: Same as above but if ICart specified correctly, it takes pentagon indices from a previous run.\\
 If {\bf mirror} = 1 invert all coordinates (take the mirror image). This may be important for chiral fullerenes (Default: 0).\\
-If {\bf IP} = 1 Print option for larger output to be produced, i.e. the full distance matrix, all Hamiltonian cycles 
-and all 3-ring connections (Default: 0).\\
 {\bf IPRC}: see entry for {\bf isonum}.\\
-{\bf TolR} = Tolerance in \% (Default: 33). Only change this parameter if the program cannot produce correctly the adjacency matrix. 
-This is only necessary for the cartesian coordinate input ({\bf ICart}=1) and only fails if bond distances are unusually large or small. 
-Connectivities are found for atoms with distances between R6   and   R6*(1+TolR/100). If TolR=0.0 the default value of 33\% is used. 
-If this parameter is set at a value too large, unwanted connectivities
-are produced resulting in smaller polygons. This parameter should reflect the maximum deviation in distance from the smallest distance found.\\
-{\bf R5} = pentagon bond distance, i.e. the bond length in the pentagons (Default: 1.455).\\
 {\bf R6} = hexagon  bond distance, i.e. the bond length of the bonds connecting hexagons (Default: 1.391).  
 If {\bf R5} = {\bf R6} is chosen then the ideal capped icosahedron for \C{60} is obtained if NA=60 is chosen.\\\\
 More details for the {\bf ICart}-flag:\\
@@ -717,7 +725,7 @@ If {\bf ICart} = 3 or 5 the Tutte embedding (3D-TE) algorithm is chosen for the 
 This should always work, although the fullerene created might be too spherical compared to the AME algorithm. But this algorithm is easier, 
 and (in theory) should never fail. Examples are given in the input files starting with ``pentagon''.\\\\
 
-3) {\bf \&FFParameters and \&FFParameters  lines}: Options for force-field optimization.\\
+4) {\bf \&FFParameters and \&FFParameters  lines}: Options for force-field optimization.\\
 {\it List of options} for \&FFChoice line: {\bf Iopt, ftol}\\
 {\it List of options} for \&FFParameters line: {\bf fCoulomb, WuR5, WuR6, WuA5, WuA6, WufR, WufA, ExtWuR55, ExtWuR56, 
 ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR, ExtWufA, ExtWufD}\\
@@ -740,7 +748,7 @@ If {\bf fCoulomb} $>$ 0.0 then add an additional repulsive Coulomb force from th
 This is extremely useful for an initial geometry optimization to keep the fullerene cage convex if for example the Tutte construction leads to not
 a good guess of the initial structure. In such cases {\bf fCoulomb} = 100.0 is a good choice.\\\\
 
-4) {\bf \&Hamilton line}: Option for calculating Hamiltonian cycles and IUPAC numbers.\\
+5) {\bf \&Hamilton line}: Option for calculating Hamiltonian cycles and IUPAC numbers.\\
 \&Hamilton options: {\bf IHam}, {\bf IUPAC}\\
 If {\bf IHam} > 0 Then Subroutine HAMILTON is called (Default: 0).\\
 If {\bf IHam} = 1 Routine will stop after 1 million Hamiltonian cycles are found.\\
@@ -750,7 +758,7 @@ Only with this option together with {\bf IP} = 1 in the \&Coord input all Hamilt
 {\bf IP} = 0 only gives the best cycle (see Babi\'c \cite{Babic1995a}).
 If {\bf IUPAC} = 0 the program goes into a fast subroutine and prints only the total number of Hamiltonian cycles.\\\\
 
-5) {\bf \&Isomers line}: Option for producing list of isomers and properties.\\
+6) {\bf \&Isomers line}: Option for producing list of isomers and properties.\\
 \&Isomers options: {\bf IPR}, {\bf IPH}, {\bf IStop}, {\bf IChk} (Default 0 for all options).\\
 If {\bf IPR} $>$ 0 then the ring-spiral subroutine of Fowler and Manolopoulus is used \cite{Atlas}.
 This sub-program catalogues fullerenes with a given number of vertices using the spiral algorithm and a uniqueness test
@@ -765,7 +773,22 @@ This is a restart option from a previous run which terminated. The new output fi
 The resulting output is a catalogue of the isomers found containing their idealized point groups, canonical spirals, and NMR patterns
 \cite{Atlas}.\\\\
 
-6) {\bf \&Graph line}: Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (Schlegel diagrams).\\
+%Figure 3
+ \begin{figure}[htbp]
+	\centering
+  		\includegraphics[width=0.22\textwidth]{Graph1.png}
+		\includegraphics[width=0.22\textwidth]{Graph2.png}
+		\includegraphics[width=0.22\textwidth]{Graph3.png}
+		\includegraphics[width=0.22\textwidth]{Graph4.png}
+		\includegraphics[width=0.22\textwidth]{Graph5.png}
+		\includegraphics[width=0.22\textwidth]{Graph6.png}
+		\includegraphics[width=0.22\textwidth]{Graph7.png}
+		\includegraphics[width=0.22\textwidth]{Graph8.png}
+        \label{pic:Graph2D}
+        \caption{From the left to right: 2D fullerene structures created using {\bf ISchlegel}=1 to 8.}
+ \end{figure}
+
+7) {\bf \&Graph line}: Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (Schlegel diagrams).\\
 \&Graph options: {\bf ISchlegel, ISO1, ISO2, ISO3, IFS, PS, Scale, ScalePPG} (Default: 0 for all values). We recommend {\bf ISchlegel} = 1, 2, 4 or 7.\\
 If {\bf ISchlegel} $>$ 0 Use Program Graph2D for generating fullerene graphs.\\
 If {\bf ISchlegel} = 1: Use the perspective projection method (PSP) also called Schlegel projection.\\
@@ -809,21 +832,6 @@ If {\bf ndual} = 1: The dual graph is drawn as well in tex-file {\bf filename-2D
 The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{pic:Graph2D}. Note that for very large
 fullerenes which are far from spherical symmetry the algorithms here may not produce the best 2D graph representation.
 We are working on this problem at the moment.
-
-%Figure 3
- \begin{figure}[htbp]
-	\centering
-  		\includegraphics[width=0.22\textwidth]{Graph1.png}
-		\includegraphics[width=0.22\textwidth]{Graph2.png}
-		\includegraphics[width=0.22\textwidth]{Graph3.png}
-		\includegraphics[width=0.22\textwidth]{Graph4.png}
-		\includegraphics[width=0.22\textwidth]{Graph5.png}
-		\includegraphics[width=0.22\textwidth]{Graph6.png}
-		\includegraphics[width=0.22\textwidth]{Graph7.png}
-		\includegraphics[width=0.22\textwidth]{Graph8.png}
-        \label{pic:Graph2D}
-        \caption{From the left to right: 2D fullerene structures created using {\bf ISchlegel}=1 to 8.}
- \end{figure}
               
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}

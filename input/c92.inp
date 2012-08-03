@@ -1,5 +1,6 @@
 C92   cc-pvdz B3LYP opt. geom. minimum -3505.9228870 au  
-&Coord NA=92, ICart=1 /
+&General NA=92 /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1 /
@@ -97,5 +98,4 @@ C92   cc-pvdz B3LYP opt. geom. minimum -3505.9228870 au
 6             1.144494    2.607097    3.506890
 6             0.484302    1.568333    4.212438
 6             1.168082    0.333098    4.350746
-
 

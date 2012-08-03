@@ -1,5 +1,5 @@
       SUBROUTINE Isomers(N,IPR,IOUT,
-     1 maxAiso,iham,ichk,IDA,A,chkname)
+     1 maxAiso,iham,ichk,IDA,A,filename)
 C Information on number of isomers with or without fulfilling the
 C the IPR rule. The routine also calls SPIRAL using the subroutines
 C written by P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes"
@@ -13,7 +13,8 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
       Character*3 fnum,fnum3
       Character*9 fend
       Character*11 Isoc(52),IsocIPR(28)
-      Character*20 chkname
+      Character*50 filename
+      Character*50 chkname
       Character*13 dbdir
       Character*31 databasefile
       Logical lexist
@@ -72,6 +73,7 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
      *       '8636262789','9196920285','9768511147','10396040696',
      *       '11037658075','11730538496','12446446419','13221751502'/
 
+      chkname=trim(filename)//".chkpnt"
       IPRERR=0
 C     Number of Isomers
       ISOMAX=256
@@ -198,9 +200,9 @@ C Produce list from ring spiral algorithm
  1007 Format(/1X,'Zero IPR isomers -> Return')
  1008 Format(1X,'Search for file: ',A29,' in general isomer list')
  1009 Format(1X,'Search for file: ',A29,' in IPR isomer list')
- 1010 Format(1X,'Filename ',A29,' in database not found: ',
+ 1010 Format(1X,'Filename ',A50,' in database not found: ',
      1 'Do it the hard way')
- 1011 Format(1X,'Print from file ',A29,' in database')
+ 1011 Format(1X,'Print from file ',A50,' in database')
       Return
       END
  

@@ -1,5 +1,6 @@
 C120 Using FM algorithm to produce coordinates
-&Coord NA=120, ICart=2, R6=1.42 /
+&General  NA=120 /
+&Coord ICart=2, R6=1.42 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

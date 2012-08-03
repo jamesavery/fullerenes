@@ -1,7 +1,8 @@
 C50 Using Tutte embedding to produce coordinates
-&Coord NA=50, ICart=4, R6=1.42 /
-&FFChoice Iopt=1 /
-&FFParameters /
+&General NA=50 /
+&Coord ICart=4, R6=1.42 /
+&FFChoice Iopt=2 /
+&FFParameters fcoulomb=60. /
 &Hamilton IHam=1 /
 &Isomers /
 &Graph ISchlegel=1 /

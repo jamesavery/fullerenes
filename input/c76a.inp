@@ -1,5 +1,6 @@
 C76  cc-pvdz B3LYP opt. geom. minimum -2895.2183887204 au
-&Coord NA=76, ICart=1 /
+&General NA=76 /
+&Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1 /
@@ -81,5 +82,4 @@ C76  cc-pvdz B3LYP opt. geom. minimum -2895.2183887204 au
 6   -1.739492468    -3.5615555069   -0.6830229407
 6   -2.5006803312   -3.3345977268    0.5417542189
 6   -0.347687933    -3.8351295895   -0.6502842809
-
 

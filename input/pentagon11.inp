@@ -1,5 +1,6 @@
 C70  Using FM algorithm to produce coordinates
-&Coord NA=70, ICart=2 , IP=1 IV2=4, IV3=5 /
+&General  NA=70, IP=1 /
+&Coord ICart=2, IV2=4, IV3=5 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton IHam=1 /
