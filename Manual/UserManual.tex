@@ -1,12 +1,15 @@
-\documentclass[article,a4paper,showtrims]{memoir}
-\usepackage{xcolor}
-\usepackage{graphicx,textcomp}
+\documentclass[article,a4paper]{memoir}
+\usepackage{graphicx,textcomp,authblk,wallpaper,xcolor}
 \usepackage{amsmath,amssymb,amsfonts,hyperref,tikz}
 \usepackage[T1]{fontenc}
-
-
+% JA: Is this used?
 %\usepackage{mathrsfs}`
 %\usepackage{relsize}
+% \newcount\marcnumber
+% \marcnumber=1\relax
+% \newcommand{\marc}[1]{
+% \marginpar{\color{red}{\bf\the\marcnumber}---#1 }
+% \global\advance\marcnumber by 1}
 
 \newcommand{\C}[1]{\ensuremath{\mathrm{C}_{#1}}}
 
@@ -26,34 +29,35 @@
 \newcommand{\funname}[1]{{\color{blue}\textbf{#1}}}
 \newcommand{\paramname}[1]{{\color{green}\textbf{#1}}}
 
-% \newcount\marcnumber
-% \marcnumber=1\relax
-% \newcommand{\marc}[1]{
-% \marginpar{\color{red}{\bf\the\marcnumber}---#1 }
-% \global\advance\marcnumber by 1}
 
 
-\begin{document}
+
 
 \title{PROGRAM FULLERENE (Version 4.1)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
 
-% \begin{figure}[htbp!]
-% 	\centering 
-% 	\includegraphics[width=0.6\textwidth]{Toc.png}
-%     \label{pic:toc}
-% \end{figure}
+\author{Peter Schwerdtfeger%
+  \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
+}
+\author{Lukas Wirz%
+  \thanks{Email: \texttt{l.wirz@massey.ac.nz}}
+}
+\affil{Centre of Theoretical Chemistry and Physics, The New Zealand Institute
+ for Advanced Study, Massey University Auckland, Private Bag 102904,
+ North Shore City, 0745 Auckland, New Zealand.}
 
-% \author{Peter Schwerdtfeger}\email[]{p.a.schwerdtfeger@massey.ac.nz}
-% \author{Lukas Wirz}\email[]{l.wirz@massey.ac.nz}
+\author{James Avery%
+  \thanks{Email: \texttt{avery@nbi.ku.dk}}
+}
+\affil{Niels Bohr Institute, University of Copenhagen, 2100 Copenhagen, Denmark.}
 
-% \affiliation{Center of Theoretical Chemistry and Physics, The New Zealand Institute
-% for Advanced Study, Massey University Auckland, Private Bag 102904,
-% North Shore City, 0745 Auckland, New Zealand.}
+\preauthor{
+  \begin{center}
+    \includegraphics[width=0.6\textwidth]{Toc.png}
+    \large \lineskip 0.5em%
+    \begin{tabular}[t]{c}
+}
 
-% \author{James Avery}\email[]{avery@nbi.ku.dk}
-
-% \affiliation{Niels Bohr Institute, University of Copenhagen, 2100 Copenhagen, Denmark.}
-% \date{\today}
+\begin{document}
 
 \maketitle
 
