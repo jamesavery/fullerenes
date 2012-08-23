@@ -138,7 +138,14 @@ and 3D structures, and as a good starting point for further quantum theoretical 
 written in standard FORTRAN and C++ and is easily implemented within a LINUX/UNIX environment.
 Although there are several other computer programs already available to deal with fullerene graphs 
 like \program{CAGE} \cite{Brinkmanx}, \program{FULLGEN} \cite{Brinkman}, \program{BUCKYGEN} \cite{Goedgebeur} or VEGA \cite{Pisanski},
-we felt that there is a need to write a general purpose program which does what other programs do and (of course) a lot more. 
+we felt that there is a need to write a general purpose program which does what other programs do and (of course) a lot more.
+The first version (1.0) was written in Fortran for calculating the surface area and volume of a fullerene and corresponding changes due to endohedral 
+incorporation of rare gas atoms \cite{Tonner}. A much improved version 2.0 allowed for the creation of fullerene structures using
+the ring-spiral algorithm introduced in the book by Fowler and Manolopoulus \cite{Atlas}, and version 3.0 was already dealing with
+topological and graph theoretical properties. It became soon clear that many open problems remain in fullerene structure generations
+which needed to be addressed, and it was therefore decided extend version 3 to a general purpose program package wand make it available
+to the community.
+
 In the current version only regular fullerenes are considered (i.e. of genus 0 consisting of pentagons and hexagons only) 
 fulfilling Euler's theorem, $n_v - n_e + n_f = 2$, where $n_v$ is the number of vertices (atoms), $n_e$ the number of edges (bonds), and 
 $n_f$ the number of faces (5- or 6-rings). The program constructs an accurate 3D structure (cartesian coordinates) of any fullerene isomer 
@@ -171,7 +178,7 @@ For larger fullerenes Pymol is recommended. The program produces fullerene 2D gr
 be used by any other program which is capable of producing 2D graphs, for example QMGA \cite{Gabriel2008}. 
 For this an external file is written out called \filename{Fullerene-2D.dat} containing all the information required for plotting a 2D graph.
 
-From version 4.0 onwards (released July 2012) C++ routines embedded into the original FORTRAN program are incorporates using 
+From version 4.0 onwards (released July 2012) C++ routines embedded into the original FORTRAN program incorporate
 much improved algorithms compared to the older versions. The reason for using two different program languages is
 that PS is good in old-fashioned Fortran and JA is good in C++.  Furthermore, some of the original routines used were available 
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
@@ -968,7 +975,6 @@ this database. The directory database needs to be in the same directory as ``sou
 
 
 %References
-\section{References}
 \begin{thebibliography}{99}
 
 \bibitem{Brinkmanx} G. Brinkmann, O. D. Friedrichs, A. Dress, and T. Harmuth, ``CaGe -- a virtual environment for studying some special classes of large molecules'', \textit{Match-Commun. Math. Comput. Chem.} 233 (1997).
@@ -1020,6 +1026,9 @@ Adjacent Pentagons: \C{20} to \C{72}'', \textit{J. Nanosci. Nanotech.} \textbf{7
 \bibitem{Pymol} Program Pymol, ``A user-sponsored molecular visualization system on an open-source foundation'', see http://www.pymol.org/.
 
 \bibitem{vmd} Program VMD, ``Visual Molecular Dynamics'', http://www.ks.uiuc.edu/Research/vmd/.
+
+\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, P. Schwerdtfeger, ``Packed to the Rafters Ð Filling up C60 with Rare Gas Atoms'', 
+\textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
 
 \bibitem{Gabriel2008} A. T. Gabriel, T. Meyer, and G. Germano, 
 ``Molecular graphics of convex body fluids'', \textit{J. Chem. Theory Comput.}
