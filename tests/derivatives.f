@@ -181,9 +181,10 @@
       write(*,*)"checking angle and dangle"
       write(iout,1000)
 
-
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       testno=6
       minor=1
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       ax=2
       ay=0
       az=0
@@ -222,9 +223,10 @@
         write(iout,2)testno,minor
       end if
 
-
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       testno=7
       minor=1
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       ax=1
       ay=0
       az=0
@@ -263,35 +265,38 @@
         write(iout,2)testno,minor
       end if
 
-
-       
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
       write(iout,1000)
       write(*,*)"checking dihedral and ddihedral"
       write(iout,1000)
 
-
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       testno=8
       minor=1
-      ax=1
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+      ax=1.1
       ay=0
-      az=0
-      bx=0
+      az=0.2
+      bx=0.1
       by=0
-      bz=0
-      cx=0
+      bz=0.2
+      cx=0.1
       cy=1
-      cz=0
-      dx=0
+      cz=0.2
+      dx=0.1
       dy=1
-      dz=1
+      dz=1.2
       call dihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,angle_abcd)
       if(dabs(angle_abcd - (-dpi/2)).lt.e) then
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
+        write(iout,3)angle_abcd,(-dpi/2)
       end if
-      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
-     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
+      call xddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
+     3   dihedral_abcd)
       minor=2
 c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       if(dabs(dax-(0.)).lt.e.and.
@@ -310,9 +315,18 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       else
         write(iout,2)testno,minor
       end if
+      minor=3
+      if(dabs(angle_abcd - (-dpi/2)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+        write(iout,3)angle_abcd,(-dpi/2)
+      end if
 
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       testno=9
       minor=1
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       ax=1
       ay=1
       az=0
@@ -330,8 +344,9 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
+        write(iout,3)angle_abcd,(-dpi/2)
       end if
-      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+      call xddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
      2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
       minor=2
 c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
@@ -351,10 +366,18 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       else
         write(iout,2)testno,minor
       end if
+      minor=3
+      if(dabs(angle_abcd - (-dpi/2)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+        write(iout,3)angle_abcd,(-dpi/2)
+      end if
 
-
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       testno=10
       minor=1
+ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       ax=1
       ay=0
       az=0
@@ -372,11 +395,24 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
+        write(iout,3)angle_abcd, (0.4205343353)
       end if
-      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+      call xddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
      2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
       minor=2
-c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+      write(*,*)dax,' dax ','0'
+      write(*,*)day,' day ','0'
+      write(*,*)daz,' daz ','-0.7453559925'
+      write(*,*)dbx,' dbx ','0.4472135955'
+      write(*,*)dby,' dby ','-0.2236067977'
+      write(*,*)dbz,' dbz ','-0.5217491947'
+      write(*,*)dcx,' dcx ','0.298142397'
+      write(*,*)dcy,' dcy ','-0.1490711985'
+      write(*,*)dcz,' dcz ','-0.596284794'
+      write(*,*)ddx,' ddx ','-0.7453559925'
+      write(*,*)ddy,' ddy ','0.3726779962'
+      write(*,*)ddz,' ddz ','1.863389981'
       if(dabs(dax-(0.)).lt.e.and.
      2   dabs(day-(0)).lt.e.and.
      2   dabs(daz-(-0.7453559925)).lt.e.and.
@@ -393,10 +429,19 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       else
         write(iout,2)testno,minor
       end if
+      minor=3
+      if(dabs(angle_abcd - (0.4205343353)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+        write(iout,3)angle_abcd,(0.4205343353)
+      end if
 
 
- 1    FORMAT('passed test ',I2,'.',I2,' ...')
- 2    FORMAT('FAILED test ',I2,'.',I2,' ...')
+ 1    FORMAT('passed test ',I2,'.',I1)
+ 2    FORMAT('FAILED test ',I2,'.',I1,' ...')
+ 3    FORMAT('result is ',D10.8,' but should be ',D10.8)
  1000 FORMAT(70('-'))
+
       stop
       END
