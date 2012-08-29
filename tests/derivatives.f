@@ -294,9 +294,9 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
         write(iout,2)testno,minor
         write(iout,3)angle_abcd,(-dpi/2)
       end if
-      call xddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
      2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
-     3   dihedral_abcd)
+     3   angle_abcd)
       minor=2
 c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       if(dabs(dax-(0.)).lt.e.and.
@@ -346,8 +346,9 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
         write(iout,2)testno,minor
         write(iout,3)angle_abcd,(-dpi/2)
       end if
-      call xddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
-     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
+      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
+     3   angle_abcd)
       minor=2
 c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       if(dabs(dax-(0.)).lt.e.and.
@@ -397,22 +398,23 @@ ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
         write(iout,2)testno,minor
         write(iout,3)angle_abcd, (0.4205343353)
       end if
-      call xddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
-     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
+      call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
+     3   angle_abcd)
       minor=2
-      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
-      write(*,*)dax,' dax ','0'
-      write(*,*)day,' day ','0'
-      write(*,*)daz,' daz ','-0.7453559925'
-      write(*,*)dbx,' dbx ','0.4472135955'
-      write(*,*)dby,' dby ','-0.2236067977'
-      write(*,*)dbz,' dbz ','-0.5217491947'
-      write(*,*)dcx,' dcx ','0.298142397'
-      write(*,*)dcy,' dcy ','-0.1490711985'
-      write(*,*)dcz,' dcz ','-0.596284794'
-      write(*,*)ddx,' ddx ','-0.7453559925'
-      write(*,*)ddy,' ddy ','0.3726779962'
-      write(*,*)ddz,' ddz ','1.863389981'
+c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+c      write(*,*)dax,' dax ','0'
+c      write(*,*)day,' day ','0'
+c      write(*,*)daz,' daz ','-0.7453559925'
+c      write(*,*)dbx,' dbx ','0.4472135955'
+c      write(*,*)dby,' dby ','-0.2236067977'
+c      write(*,*)dbz,' dbz ','-0.5217491947'
+c      write(*,*)dcx,' dcx ','0.298142397'
+c      write(*,*)dcy,' dcy ','-0.1490711985'
+c      write(*,*)dcz,' dcz ','-0.596284794'
+c      write(*,*)ddx,' ddx ','-0.7453559925'
+c      write(*,*)ddy,' ddy ','0.3726779962'
+c      write(*,*)ddz,' ddz ','1.863389981'
       if(dabs(dax-(0.)).lt.e.and.
      2   dabs(day-(0)).lt.e.and.
      2   dabs(daz-(-0.7453559925)).lt.e.and.
