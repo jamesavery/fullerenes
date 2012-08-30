@@ -763,8 +763,8 @@ c coordinates
         dy=p(J4-1)
         dz=p(J4)
         call ddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
-     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz)
-        call dihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,angle_abcd)
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
+     3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
