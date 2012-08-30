@@ -9,6 +9,7 @@
       write(*,*)"checking dist and ddist"
       write(iout,1000)
 
+C######################################################################
       testno=1
       minor=1
       ax=0
@@ -41,7 +42,62 @@
       else
         write(iout,2)testno,minor
       end if
+      call dddist(ax,ay,az,bx,by,bz,
+     2 dax,day,daz,dbx,dby,dbz,
+     3 daxax,daxay,daxaz,daxbx,daxby,daxbz,dayay,dayaz,daybx,dayby,
+     4 daybz,dazaz,dazbx,dazby,dazbz,dbxbx,dbxby,dbxbz,dbyby,dbybz,
+     5 dbzbz,
+     6 dist_ab)
+      minor=4
+      if(dabs(daxax-(0)).lt.e.and.
+     2   dabs(daxay-(0)).lt.e.and.
+     2   dabs(daxaz-(0)).lt.e.and.
+     2   dabs(daxbx-(0)).lt.e.and.
+     2   dabs(daxby-(0)).lt.e.and.
+     2   dabs(daxbz-(0)).lt.e.and.
 
+     2   dabs(dayay-(1)).lt.e.and.
+     2   dabs(dayaz-(0)).lt.e.and.
+     2   dabs(daybx-(0)).lt.e.and.
+     2   dabs(dayby-(-1)).lt.e.and.
+     2   dabs(daybz-(0)).lt.e.and.
+
+     2   dabs(dazaz-(1)).lt.e.and.
+     2   dabs(dazbx-(0)).lt.e.and.
+     2   dabs(dazby-(0)).lt.e.and.
+     2   dabs(dazbz-(-1)).lt.e.and.
+
+     2   dabs(dbxbx-(0)).lt.e.and.
+     2   dabs(dbxby-(0)).lt.e.and.
+     2   dabs(dbxbz-(0)).lt.e.and.
+
+     2   dabs(dbyby-(1)).lt.e.and.
+     2   dabs(dbybz-(0)).lt.e.and.
+
+     2   dabs(dbzbz-(1)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      minor=5
+      if(dabs(dax-(-1)).lt.e.and.
+     2   dabs(day-(0)).lt.e.and.
+     2   dabs(daz-(0)).lt.e.and.
+     2   dabs(dbx-(1)).lt.e.and.
+     2   dabs(dby-(0)).lt.e.and.
+     2   dabs(dbz-(0)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      minor=6
+      if(dabs(dist_ab - (1)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+
+C######################################################################
       testno=2
       minor=1
       ax=0
@@ -74,7 +130,68 @@
       else
         write(iout,2)testno,minor
       end if
+      call dddist(ax,ay,az,bx,by,bz,
+     2 dax,day,daz,dbx,dby,dbz,
+     3 daxax,daxay,daxaz,daxbx,daxby,daxbz,dayay,dayaz,daybx,dayby,
+     4 daybz,dazaz,dazbx,dazby,dazbz,dbxbx,dbxby,dbxbz,dbyby,dbybz,
+     5 dbzbz,
+     6 dist_ab)
+      minor=4
+      if(dabs(daxax-(1)).lt.e.and.
+     2   dabs(daxay-(0)).lt.e.and.
+     2   dabs(daxaz-(0)).lt.e.and.
+     2   dabs(daxbx-(-1)).lt.e.and.
+     2   dabs(daxby-(0)).lt.e.and.
+     2   dabs(daxbz-(0)).lt.e.and.
 
+     2   dabs(dayay-(0)).lt.e.and.
+     2   dabs(dayaz-(0)).lt.e.and.
+     2   dabs(daybx-(0)).lt.e.and.
+     2   dabs(dayby-(0)).lt.e.and.
+     2   dabs(daybz-(0)).lt.e.and.
+
+     2   dabs(dazaz-(1)).lt.e.and.
+     2   dabs(dazbx-(0)).lt.e.and.
+     2   dabs(dazby-(0)).lt.e.and.
+     2   dabs(dazbz-(-1)).lt.e.and.
+
+     2   dabs(dbxbx-(1)).lt.e.and.
+     2   dabs(dbxby-(0)).lt.e.and.
+     2   dabs(dbxbz-(0)).lt.e.and.
+
+     2   dabs(dbyby-(0)).lt.e.and.
+     2   dabs(dbybz-(0)).lt.e.and.
+
+     2   dabs(dbzbz-(1)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+        write(*,*)daxax, daxay, daxaz, daxbx, daxby, daxbz
+        write(*,*)dayay, dayaz, daybx, dayby, daybz
+        write(*,*)dazaz, dazbx, dazby, dazbz
+        write(*,*)dbxbx, dbxby, dbxbz
+        write(*,*)dbyby, dbybz
+        write(*,*)dbzbz
+      end if
+      minor=5
+      if(dabs(dax-(0)).lt.e.and.
+     2   dabs(day-(-1)).lt.e.and.
+     2   dabs(daz-(0)).lt.e.and.
+     2   dabs(dbx-(0)).lt.e.and.
+     2   dabs(dby-(1)).lt.e.and.
+     2   dabs(dbz-(0)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      minor=6
+      if(dabs(dist_ab - (1)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+
+C######################################################################
       testno=3
       minor=1
       ax=0
@@ -108,6 +225,7 @@
         write(iout,2)testno,minor
       end if
 
+C######################################################################
       testno=4
       minor=1
       ax=0

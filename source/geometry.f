@@ -6,21 +6,91 @@ c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
       END  
 
 
-c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivations of the distance
+c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivatives of the distance
       SUBROUTINE DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz,
      2  dist_ab)
       implicit real*8 (a-z)
-      dist_ab=dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
+      ab_x=ax-bx
+      ab_y=ay-by
+      ab_z=az-bz
+      dist_ab=dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
       dist_ab_inv=1/dist_ab
-      aux_1=ax-bx
-      aux_2=ay-by
-      aux_3=az-bz
-      dax=aux_1*dist_ab_inv
+      dax=ab_x*dist_ab_inv
       dbx=-dax
-      day=aux_2*dist_ab_inv
+      day=ab_y*dist_ab_inv
       dby=-day
-      daz=aux_3*dist_ab_inv
+      daz=ab_z*dist_ab_inv
       dbz=-daz
+      return
+      END  
+
+
+c subroutine dddist takes 6 reals (=2 coordinates) and yields all 6 first derivatives,
+c all 21 second derivatives of the distance and the the distance itself
+      SUBROUTINE DDDIST(ax,ay,az,bx,by,bz,
+     2 dax,day,daz,dbx,dby,dbz,
+     3 daxax,daxay,daxaz,daxbx,daxby,daxbz,dayay,dayaz,daybx,dayby,
+     4 daybz,dazaz,dazbx,dazby,dazbz,dbxbx,dbxby,dbxbz,dbyby,dbybz,
+     5 dbzbz,
+     6 dist_ab)
+      implicit real*8 (a-z)
+      ab_x=ax-bx
+      ab_y=ay-by
+      ab_z=az-bz
+      dist_ab_inv=dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
+      dist_ab=1/dist_ab_inv
+      dist_ab_inv_cub = dist_ab_inv**3
+
+      dax=ab_x*dist_ab_inv
+      dbx=-dax
+      day=ab_y*dist_ab_inv
+      dby=-day
+      daz=ab_z*dist_ab_inv
+      dbz=-daz
+
+c second derivs      
+      dab_x__dax=1
+      dab_x__dbx=-1
+      dab_y__day=1
+      dab_y__dby=-1
+      dab_z__daz=1
+      dab_z__dbz=-1
+
+c dist_ab_inv=1/dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
+      ddist_ab_inv__dax=-ab_x*dist_ab_inv_cub
+      ddist_ab_inv__day=-ab_y*dist_ab_inv_cub
+      ddist_ab_inv__daz=-ab_z*dist_ab_inv_cub
+      ddist_ab_inv__dbx=ab_x*dist_ab_inv_cub
+      ddist_ab_inv__dby=ab_y*dist_ab_inv_cub
+      ddist_ab_inv__dbz=ab_z*dist_ab_inv_cub
+
+      daxax=dab_x__dax*dist_ab_inv + ab_x*ddist_ab_inv__dax
+      daxay=                         ab_x*ddist_ab_inv__day
+      daxaz=                         ab_x*ddist_ab_inv__daz
+      daxbx=dab_x__dbx*dist_ab_inv + ab_x*ddist_ab_inv__dbx
+      daxby=                         ab_x*ddist_ab_inv__dby
+      daxbz=                         ab_x*ddist_ab_inv__dbz
+
+      dayay=dab_y__day*dist_ab_inv + ab_y*ddist_ab_inv__day
+      dayaz=ab_y*ddist_ab_inv__daz
+      daybx=ab_y*ddist_ab_inv__dbx
+      dayby=dab_y__dby*dist_ab_inv + ab_y*ddist_ab_inv__dby
+      daybz=ab_y*ddist_ab_inv__dbz
+
+      dazaz=dab_z__daz*dist_ab_inv + ab_z*ddist_ab_inv__daz
+      dazbx=ab_z*ddist_ab_inv__dbx
+      dazby=ab_z*ddist_ab_inv__dby
+      dazbz=dab_z__dbz*dist_ab_inv + ab_z*ddist_ab_inv__dbz
+
+      dbxbx=-dab_x__dbx*dist_ab_inv - ab_x*ddist_ab_inv__dbx
+      dbxby=- ab_x*ddist_ab_inv__dby
+      dbxbz=- ab_x*ddist_ab_inv__dbz
+
+      dbyby=-dab_y__dby*dist_ab_inv - ab_y*ddist_ab_inv__dby
+      dbybz=-ab_y*ddist_ab_inv__dbz
+
+      dbzbz=-dab_z__dbz*dist_ab_inv - ab_z*ddist_ab_inv__dbz
+
       return
       END  
 
@@ -61,7 +131,7 @@ c      return
 c      END
 
 
-c subroutine dangle takes 9 reals (=3 coordinates) and yields all 9 first derivations of the angle
+c subroutine dangle takes 9 reals (=3 coordinates) and yields all 9 first derivatives of the angle
 c via law of cosines (calculating the derivative of Abs[foo] is rather troublesome)
       SUBROUTINE DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
      2 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
