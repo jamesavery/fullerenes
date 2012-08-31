@@ -37,8 +37,8 @@ c all 21 second derivatives of the distance and the the distance itself
       ab_x=ax-bx
       ab_y=ay-by
       ab_z=az-bz
-      dist_ab_inv=dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
-      dist_ab=1/dist_ab_inv
+      dist_ab=dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
+      dist_ab_inv=1/dist_ab
       dist_ab_inv_cub = dist_ab_inv**3
 
       dax=ab_x*dist_ab_inv
