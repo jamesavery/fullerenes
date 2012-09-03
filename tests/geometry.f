@@ -6,7 +6,7 @@
       e=1.d-6
  
       write(iout,1000)
-      write(*,*)"checking dist and ddist"
+      write(*,*)"checking dist, ddist and dddist"
       write(iout,1000)
 
 C######################################################################
@@ -621,7 +621,7 @@ c      write(*,*)ddz,' ddz ','1.863389981'
  1    FORMAT('passed test ',I2,'.',I1)
  2    FORMAT('FAILED test ',I2,'.',I1,' ...')
  3    FORMAT('result is ',D10.8,' but should be ',D10.8)
- 1000 FORMAT(70('-'))
+ 1000 FORMAT(72('-'))
 
       stop
       END
