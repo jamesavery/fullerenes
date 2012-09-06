@@ -180,7 +180,10 @@ c mult: 11, div: 1, root: 2, add/sub: 8, arccos: 1
       r2M=(ax-cx)**2 + (ay-cy)**2 + (az-cz)**2
       r2R=(bx-cx)**2 + (by-cy)**2 + (bz-cz)**2
       r1R=dsqrt(r2R)
-      angle_abc=dacos((r2L+r2R-r2M)/(2.0*r1L*r1R))
+      arg=(r2L+r2R-r2M)/(2.0*r1L*r1R)
+      if(arg .ge. 1.d0) arg=1.d0
+      if(arg .le. -1.d0) arg=-1.d0
+      angle_abc=dacos(arg)
       return
       END
 
@@ -302,6 +305,10 @@ c length of a-b and b-c
       r2ab=ab_x**2 + ab_y**2 + ab_z**2
       r2bc=bc_x**2 + bc_y**2 + bc_z**2
       r2ac=ac_x**2 + ac_y**2 + ac_z**2
+c prevent NaN due to rounding errors
+      if(r2ab.le.0.d0) r2ab=0.d0
+      if(r2bc.le.0.d0) r2bc=0.d0
+      if(r2ac.le.0.d0) r2ac=0.d0
       r1ab=dsqrt(r2ab)
       r1bc=dsqrt(r2bc)
       r1ac=dsqrt(r2ac)
@@ -314,6 +321,9 @@ c some auxiliary products
       aux_13_inv=1/(2*r1ab*r3bc)
       aux_1=r2ab + r2bc - r2ac
       arccos_arg=aux_1*aux_11_inv
+c prevent NaN due to rounding errors
+      if(arccos_arg.ge.1.d0) arccos_arg=1.d0
+      if(arccos_arg.le.-1.d0) arccos_arg=-1.d0
 c the actual angle, because it will always be required
 c also referred to as 'f'
       angle_abc=dacos(arccos_arg)
@@ -599,7 +609,6 @@ c arccos_arg=aux_1*aux_11_inv
 
 c den_inv=-1/dsqrt(1-arccos_arg**2)
       dden_inv__darccos_arg=-arccos_arg*((1-arccos_arg**2)**(-3./2.))
-c for reasons I seriously don't understand (1-arccos_arg**2)**(3/2) is not understood
 
 c den_inv=-1/dsqrt(1-arccos_arg**2)
       dden_inv__dax=dden_inv__darccos_arg*darccos_arg__dax

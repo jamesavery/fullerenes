@@ -930,6 +930,146 @@ C######################################################################
         write(iout,2)testno,minor
       end if
 
+C######################################################################
+      testno=10
+      minor=1
+      ax=2
+      ay=0
+      az=0
+      bx=0
+      by=0
+      bz=0
+      cx=-1
+      cy=0
+      cz=0
+      call angle(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
+      if(dabs(angle_abc - dpi).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      call dangle(ax,ay,az,bx,by,bz,cx,cy,cz,
+     2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc)
+      minor=2
+      if(dabs(dax-(0)).lt.e.and.
+     2   dabs(day-(-1)).lt.e.and.
+     2   dabs(daz-(0)).lt.e.and.
+     2   dabs(dbx-(.5)).lt.e.and.
+     2   dabs(dby-(.5)).lt.e.and.
+     2   dabs(dbz-(0)).lt.e.and.
+     2   dabs(dcx-(-.5)).lt.e.and.
+     2   dabs(dcy-(.5)).lt.e.and.
+     2   dabs(dcz-(0)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      minor=3
+      if(dabs(angle_abc - dpi).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      call ddangle(ax,ay,az,bx,by,bz,cx,cy,cz,
+     2 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
+     2 daxax,daxay,daxaz,daxbx,daxby,daxbz,daxcx,daxcy,daxcz,
+     2 dayay,dayaz,daybx,dayby,daybz,daycx,daycy,daycz,
+     2 dazaz,dazbx,dazby,dazbz,dazcx,dazcy,dazcz,
+     2 dbxbx,dbxby,dbxbz,dbxcx,dbxcy,dbxcz,
+     2 dbyby,dbybz,dbycx,dbycy,dbycz,
+     2 dbzbz,dbzcx,dbzcy,dbzcz,
+     2 dcxcx,dcxcy,dcxcz,
+     2 dcycy,dcycz,
+     2 dczcz,
+     3 angle_abc)
+      minor=4
+      if(dabs(daxax-(0.)).lt.e.and.
+     2   dabs(daxay-(1.)).lt.e.and.
+     2   dabs(daxaz-(0.)).lt.e.and.
+     2   dabs(daxbx-(0.)).lt.e.and.
+     2   dabs(daxby-(-1.)).lt.e.and.
+     2   dabs(daxbz-(0.)).lt.e.and.
+     2   dabs(daxcx-(0.)).lt.e.and.
+     2   dabs(daxcy-(0.)).lt.e.and.
+     2   dabs(daxcz-(0.)).lt.e.and.
+
+     2   dabs(dayay-(0.)).lt.e.and.
+     2   dabs(dayaz-(0.)).lt.e.and.
+     2   dabs(daybx-(-1.)).lt.e.and.
+     2   dabs(dayby-(0.)).lt.e.and.
+     2   dabs(daybz-(0.)).lt.e.and.
+     2   dabs(daycx-(0.)).lt.e.and.
+     2   dabs(daycy-(0.)).lt.e.and.
+     2   dabs(daycz-(0.)).lt.e.and.
+
+     2   dabs(dazaz-(1.)).lt.e.and.
+     2   dabs(dazbx-(0.)).lt.e.and.
+     2   dabs(dazby-(0.)).lt.e.and.
+     2   dabs(dazbz-(0.)).lt.e.and.
+     2   dabs(dazcx-(0.)).lt.e.and.
+     2   dabs(dazcy-(0.)).lt.e.and.
+     2   dabs(dazcz-(-1)).lt.e.and.
+
+     2   dabs(dbxbx-(0.5)).lt.e.and.
+     2   dabs(dbxby-(1.)).lt.e.and.
+     2   dabs(dbxbz-(0.)).lt.e.and.
+     2   dabs(dbxcx-(-.5)).lt.e.and.
+     2   dabs(dbxcy-(0.)).lt.e.and.
+     2   dabs(dbxcz-(0.)).lt.e.and.
+
+     2   dabs(dbyby-(-.5)).lt.e.and.
+     2   dabs(dbybz-(0.)).lt.e.and.
+     2   dabs(dbycx-(0.)).lt.e.and.
+     2   dabs(dbycy-(.5)).lt.e.and.
+     2   dabs(dbycz-(0.)).lt.e.and.
+
+     2   dabs(dbzbz-(-.5)).lt.e.and.
+     2   dabs(dbzcx-(0.)).lt.e.and.
+     2   dabs(dbzcy-(0.)).lt.e.and.
+     2   dabs(dbzcz-(.5)).lt.e.and.
+
+     2   dabs(dcxcx-(.5)).lt.e.and.
+     2   dabs(dcxcy-(0.)).lt.e.and.
+     2   dabs(dcxcz-(0.)).lt.e.and.
+
+     2   dabs(dcycy-(-0.5)).lt.e.and.
+     2   dabs(dcycz-(0.)).lt.e.and.
+
+     2   dabs(dczcz-(.5)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+        write(*,*)daxax,daxay,daxaz,daxbx,daxby,daxbz,daxcx,daxcy,daxcz
+        write(*,*)dayay,dayaz,daybx,dayby,daybz,daycx,daycy,daycz
+        write(*,*)dazaz,dazbx,dazby,dazbz,dazcx,dazcy,dazcz
+        write(*,*)dbxbx,dbxby,dbxbz,dbxcx,dbxcy,dbxcz
+        write(*,*)dbyby,dbybz,dbycx,dbycy,dbycz
+        write(*,*)dbzbz,dbzcx,dbzcy,dbzcz
+        write(*,*)dcxcx,dcxcy,dcxcz
+        write(*,*)dcycy,dcycz
+        write(*,*)dczcz
+      end if
+      minor=5
+      if(dabs(dax-(0)).lt.e.and.
+     2   dabs(day-(-1)).lt.e.and.
+     2   dabs(daz-(0)).lt.e.and.
+     2   dabs(dbx-(.5)).lt.e.and.
+     2   dabs(dby-(.5)).lt.e.and.
+     2   dabs(dbz-(0)).lt.e.and.
+     2   dabs(dcx-(-.5)).lt.e.and.
+     2   dabs(dcy-(.5)).lt.e.and.
+     2   dabs(dcz-(0)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      minor=6
+      if(dabs(angle_abc - dpi).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+
 
 C######################################################################
 C---DIHEDRAL---
@@ -939,7 +1079,7 @@ C######################################################################
       write(iout,1000)
 
 C######################################################################
-      testno=10
+      testno=11
       minor=1
       ax=1.1
       ay=0
@@ -990,7 +1130,7 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       end if
 
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      testno=11
+      testno=12
       minor=1
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       ax=1
@@ -1042,7 +1182,7 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       end if
 
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      testno=11
+      testno=13
       minor=1
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       ax=1
