@@ -181,8 +181,9 @@ c mult: 11, div: 1, root: 2, add/sub: 8, arccos: 1
       r2R=(bx-cx)**2 + (by-cy)**2 + (bz-cz)**2
       r1R=dsqrt(r2R)
       arg=(r2L+r2R-r2M)/(2.0*r1L*r1R)
-      if(arg .ge. 1.d0) arg=1.d0
-      if(arg .le. -1.d0) arg=-1.d0
+c the following two exceptions may be called in case of rounding errors
+      if(arg .gt. 1.d0) arg=1.d0
+      if(arg .lt. -1.d0) arg=-1.d0
       angle_abc=dacos(arg)
       return
       END
@@ -241,11 +242,40 @@ c some auxiliary products
       aux_13_inv=1/(2*r1L*r3R)
       aux_1=r2L + r2R - r2M
       arccos_arg=aux_1*aux_11_inv
+c if the angle is defined as the smallest angle (which it should be) there is a singularity
+c at 180 degrees.  Depending on the coordinate system the derivative is between 1 and -1
+c (in case of sides of length 1) 
+      if(arccos_arg .ge. 1.d0) then
+        angle_abc=dacos(1.d0)
+        dax=0
+        day=0
+        daz=0
+        dbx=0
+        dby=0
+        dbz=0
+        dcx=0
+        dcy=0
+        dcz=0
+        return
+      elseif(arccos_arg .le. -1.d0) then
+        angle_abc=dacos(-1.d0)
+        dax=0
+        day=0
+        daz=0
+        dbx=0
+        dby=0
+        dbz=0
+        dcx=0
+        dcy=0
+        dcz=0
+        return
+      endif
+      arccos_arg=aux_1*aux_11_inv
 c the actual angle, because it will always be required
       angle_abc=dacos(arccos_arg)
 c not sure which is faster
       den_inv=-1/dsqrt(1-arccos_arg**2)
-c      den_inv=-1/dabs(dsin(angle_abc))              
+c      den_inv=-1/dabs(dsin(angle_abc))            
 c more auxiliary products
       aux_2=2*aux_11_inv
       aux_3=aux_1*aux_31_inv
@@ -305,10 +335,6 @@ c length of a-b and b-c
       r2ab=ab_x**2 + ab_y**2 + ab_z**2
       r2bc=bc_x**2 + bc_y**2 + bc_z**2
       r2ac=ac_x**2 + ac_y**2 + ac_z**2
-c prevent NaN due to rounding errors
-      if(r2ab.le.0.d0) r2ab=0.d0
-      if(r2bc.le.0.d0) r2bc=0.d0
-      if(r2ac.le.0.d0) r2ac=0.d0
       r1ab=dsqrt(r2ab)
       r1bc=dsqrt(r2bc)
       r1ac=dsqrt(r2ac)
@@ -321,11 +347,77 @@ c some auxiliary products
       aux_13_inv=1/(2*r1ab*r3bc)
       aux_1=r2ab + r2bc - r2ac
       arccos_arg=aux_1*aux_11_inv
-c prevent NaN due to rounding errors
-      if(arccos_arg.ge.1.d0) arccos_arg=1.d0
-      if(arccos_arg.le.-1.d0) arccos_arg=-1.d0
-c the actual angle, because it will always be required
-c also referred to as 'f'
+cc the actual angle, because it will always be required
+cc also referred to as 'f'
+c if the angle is defined as the smallest angle (which it should be) the derivatives
+c feature a singularity at 180 degrees.  Depending on the coordinate system the
+c derivative is between 1 and -1 (in case of sides of length 1).  The first derivatives
+c are artificially set to zero.  The second redivatives are artificially set to zero
+c as well which is far less justified.  Some second derivatives are in fact infinite ...
+c we could also gracefully terminate ...
+      if(arccos_arg .le. -1.d0 .or. arccos_arg .ge. 1.d0) then
+        dax=0
+        day=0
+        daz=0
+        dbx=0
+        dby=0
+        dbz=0
+        dcx=0
+        dcy=0
+        dcz=0
+        ddf11dax__dax=0
+        ddf11dax__day=0
+        ddf11dax__daz=0
+        ddf11dax__dbx=0
+        ddf11dax__dby=0
+        ddf11dax__dbz=0
+        ddf11dax__dcx=0
+        ddf11dax__dcy=0
+        ddf11dax__dcz=0
+        ddf11day__day=0
+        ddf11day__daz=0
+        ddf11day__dbx=0
+        ddf11day__dby=0
+        ddf11day__dbz=0
+        ddf11day__dcx=0
+        ddf11day__dcy=0
+        ddf11day__dcz=0
+        ddf11daz__daz=0
+        ddf11daz__dbx=0
+        ddf11daz__dby=0
+        ddf11daz__dbz=0
+        ddf11daz__dcx=0
+        ddf11daz__dcy=0
+        ddf11daz__dcz=0
+        ddf11dbx__dbx=0
+        ddf11dbx__dby=0
+        ddf11dbx__dbz=0
+        ddf11dbx__dcx=0
+        ddf11dbx__dcy=0
+        ddf11dbx__dcz=0
+        ddf11dby__dby=0
+        ddf11dby__dbz=0
+        ddf11dby__dcx=0
+        ddf11dby__dcy=0
+        ddf11dby__dcz=0
+        ddf11dbz__dbz=0
+        ddf11dbz__dcx=0
+        ddf11dbz__dcy=0
+        ddf11dbz__dcz=0
+        ddf11dcx__dcx=0
+        ddf11dcx__dcy=0
+        ddf11dcx__dcz=0
+        ddf11dcy__dcy=0
+        ddf11dcy__dcz=0
+        ddf11dcz__dcz=0
+        if(arccos_arg .le. -1.d0) then
+          angle_abc=dacos(-1.d0)
+          return
+        elseif(arccos_arg .ge. 1.d0) then
+          angle_abc=dacos(1.d0)
+          return
+        endif
+      endif
       angle_abc=dacos(arccos_arg)
       den_inv=-1/dsqrt(1-arccos_arg**2)
 c more auxiliary products
@@ -1747,4 +1839,3 @@ c fortran (and most other sources) use 'atan2(y,x)' while mathematica uses 'atan
 
       return
       END
-

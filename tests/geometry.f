@@ -364,7 +364,7 @@ C######################################################################
 C---ANGLE---
 C######################################################################
       write(iout,1000)
-      write(*,*)"checking angle and dangle"
+      write(*,*)"checking angle, dangle and ddangle"
       write(iout,1000)
 
 c######################################################################
@@ -952,13 +952,13 @@ C######################################################################
      2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc)
       minor=2
       if(dabs(dax-(0)).lt.e.and.
-     2   dabs(day-(-1)).lt.e.and.
+     2   dabs(day-(0)).lt.e.and.
      2   dabs(daz-(0)).lt.e.and.
-     2   dabs(dbx-(.5)).lt.e.and.
-     2   dabs(dby-(.5)).lt.e.and.
+     2   dabs(dbx-(0)).lt.e.and.
+     2   dabs(dby-(0)).lt.e.and.
      2   dabs(dbz-(0)).lt.e.and.
-     2   dabs(dcx-(-.5)).lt.e.and.
-     2   dabs(dcy-(.5)).lt.e.and.
+     2   dabs(dcx-(0)).lt.e.and.
+     2   dabs(dcy-(0)).lt.e.and.
      2   dabs(dcz-(0)).lt.e) then
         write(iout,1)testno,minor
       else
@@ -984,10 +984,10 @@ C######################################################################
      3 angle_abc)
       minor=4
       if(dabs(daxax-(0.)).lt.e.and.
-     2   dabs(daxay-(1.)).lt.e.and.
+     2   dabs(daxay-(0.)).lt.e.and.
      2   dabs(daxaz-(0.)).lt.e.and.
      2   dabs(daxbx-(0.)).lt.e.and.
-     2   dabs(daxby-(-1.)).lt.e.and.
+     2   dabs(daxby-(0.)).lt.e.and.
      2   dabs(daxbz-(0.)).lt.e.and.
      2   dabs(daxcx-(0.)).lt.e.and.
      2   dabs(daxcy-(0.)).lt.e.and.
@@ -995,47 +995,47 @@ C######################################################################
 
      2   dabs(dayay-(0.)).lt.e.and.
      2   dabs(dayaz-(0.)).lt.e.and.
-     2   dabs(daybx-(-1.)).lt.e.and.
+     2   dabs(daybx-(0.)).lt.e.and.
      2   dabs(dayby-(0.)).lt.e.and.
      2   dabs(daybz-(0.)).lt.e.and.
      2   dabs(daycx-(0.)).lt.e.and.
      2   dabs(daycy-(0.)).lt.e.and.
      2   dabs(daycz-(0.)).lt.e.and.
 
-     2   dabs(dazaz-(1.)).lt.e.and.
+     2   dabs(dazaz-(0.)).lt.e.and.
      2   dabs(dazbx-(0.)).lt.e.and.
      2   dabs(dazby-(0.)).lt.e.and.
      2   dabs(dazbz-(0.)).lt.e.and.
      2   dabs(dazcx-(0.)).lt.e.and.
      2   dabs(dazcy-(0.)).lt.e.and.
-     2   dabs(dazcz-(-1)).lt.e.and.
+     2   dabs(dazcz-(0)).lt.e.and.
 
-     2   dabs(dbxbx-(0.5)).lt.e.and.
-     2   dabs(dbxby-(1.)).lt.e.and.
+     2   dabs(dbxbx-(0.)).lt.e.and.
+     2   dabs(dbxby-(0.)).lt.e.and.
      2   dabs(dbxbz-(0.)).lt.e.and.
-     2   dabs(dbxcx-(-.5)).lt.e.and.
+     2   dabs(dbxcx-(0.)).lt.e.and.
      2   dabs(dbxcy-(0.)).lt.e.and.
      2   dabs(dbxcz-(0.)).lt.e.and.
 
-     2   dabs(dbyby-(-.5)).lt.e.and.
+     2   dabs(dbyby-(0.)).lt.e.and.
      2   dabs(dbybz-(0.)).lt.e.and.
      2   dabs(dbycx-(0.)).lt.e.and.
-     2   dabs(dbycy-(.5)).lt.e.and.
+     2   dabs(dbycy-(0.)).lt.e.and.
      2   dabs(dbycz-(0.)).lt.e.and.
 
-     2   dabs(dbzbz-(-.5)).lt.e.and.
+     2   dabs(dbzbz-(0.)).lt.e.and.
      2   dabs(dbzcx-(0.)).lt.e.and.
      2   dabs(dbzcy-(0.)).lt.e.and.
-     2   dabs(dbzcz-(.5)).lt.e.and.
+     2   dabs(dbzcz-(0.)).lt.e.and.
 
-     2   dabs(dcxcx-(.5)).lt.e.and.
+     2   dabs(dcxcx-(0.)).lt.e.and.
      2   dabs(dcxcy-(0.)).lt.e.and.
      2   dabs(dcxcz-(0.)).lt.e.and.
 
-     2   dabs(dcycy-(-0.5)).lt.e.and.
+     2   dabs(dcycy-(0.)).lt.e.and.
      2   dabs(dcycz-(0.)).lt.e.and.
 
-     2   dabs(dczcz-(.5)).lt.e) then
+     2   dabs(dczcz-(0.)).lt.e) then
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
@@ -1051,13 +1051,13 @@ C######################################################################
       end if
       minor=5
       if(dabs(dax-(0)).lt.e.and.
-     2   dabs(day-(-1)).lt.e.and.
+     2   dabs(day-(0)).lt.e.and.
      2   dabs(daz-(0)).lt.e.and.
-     2   dabs(dbx-(.5)).lt.e.and.
-     2   dabs(dby-(.5)).lt.e.and.
+     2   dabs(dbx-(0)).lt.e.and.
+     2   dabs(dby-(0)).lt.e.and.
      2   dabs(dbz-(0)).lt.e.and.
-     2   dabs(dcx-(-.5)).lt.e.and.
-     2   dabs(dcy-(.5)).lt.e.and.
+     2   dabs(dcx-(0)).lt.e.and.
+     2   dabs(dcy-(0)).lt.e.and.
      2   dabs(dcz-(0)).lt.e) then
         write(iout,1)testno,minor
       else
@@ -1068,6 +1068,7 @@ C######################################################################
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
+        write(*,*)angle_abc
       end if
 
 
@@ -1075,7 +1076,7 @@ C######################################################################
 C---DIHEDRAL---
 C######################################################################
       write(iout,1000)
-      write(*,*)"checking dihedral and ddihedral"
+      write(*,*)"checking dihedral, ddihedral and dddihedral"
       write(iout,1000)
 
 C######################################################################
@@ -1128,6 +1129,111 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
         write(iout,2)testno,minor
         write(iout,3)angle_abcd,(-dpi/2)
       end if
+      call dddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
+     1 daxdcz, daxddx, daxddy, daxddz, dayday, daydaz, daydbx, daydby,
+     1 daydbz, daydcx, daydcy, daydcz, dayddx, dayddy, dayddz, dazdaz,
+     1 dazdbx, dazdby, dazdbz, dazdcx, dazdcy, dazdcz, dazddx, dazddy,
+     1 dazddz, dbxdbx, dbxdby, dbxdbz, dbxdcx, dbxdcy, dbxdcz, dbxddx,
+     1 dbxddy, dbxddz, dbydby, dbydbz, dbydcx, dbydcy, dbydcz, dbyddx,
+     1 dbyddy, dbyddz, dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy,
+     1 dbzddz, dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz, dcydcy,
+     1 dcydcz, dcyddx, dcyddy, dcyddz, dczdcz, dczddx, dczddy, dczddz,
+     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz)
+      minor=4
+      if(dabs(daxdax-(0.)).lt.e.and.
+     2   dabs(daxday-(0.)).lt.e.and.
+     2   dabs(daxdaz-(-1.)).lt.e.and.
+     2   dabs(daxdbx-(0.)).lt.e.and.
+     2   dabs(daxdby-(0.)).lt.e.and.
+     2   dabs(daxdbz-(1.)).lt.e.and.
+     2   dabs(daxdcx-(0.)).lt.e.and.
+     2   dabs(daxdcy-(0.)).lt.e.and.
+     2   dabs(daxdcz-(0.)).lt.e.and.
+     2   dabs(daxddx-(0.)).lt.e.and.
+     2   dabs(daxddy-(0.)).lt.e.and.
+     2   dabs(daxddz-(0.)).lt.e.and.
+
+     2   dabs(dayday-(0.)).lt.e.and.
+     2   dabs(daydaz-(0.)).lt.e.and.
+     2   dabs(daydbx-(0.)).lt.e.and.
+     2   dabs(daydby-(0.)).lt.e.and.
+     2   dabs(daydbz-(1.)).lt.e.and.
+     2   dabs(daydcx-(0.)).lt.e.and.
+     2   dabs(daydcy-(0.)).lt.e.and.
+     2   dabs(daydcz-(-1.)).lt.e.and.
+     2   dabs(dayddx-(0.)).lt.e.and.
+     2   dabs(dayddy-(0.)).lt.e.and.
+     2   dabs(dayddz-(0.)).lt.e.and.
+
+     2   dabs(dazdaz-(0.)).lt.e.and.
+     2   dabs(dazdbx-(1.)).lt.e.and.
+     2   dabs(dazdby-(0.)).lt.e.and.
+     2   dabs(dazdbz-(0.)).lt.e.and.
+     2   dabs(dazdcx-(0.)).lt.e.and.
+     2   dabs(dazdcy-(0.)).lt.e.and.
+     2   dabs(dazdcz-(0.)).lt.e.and.
+     2   dabs(dazddx-(0.)).lt.e.and.
+     2   dabs(dazddy-(0.)).lt.e.and.
+     2   dabs(dazddz-(0.)).lt.e.and.
+
+     2   dabs(dbxdbx-(0.)).lt.e.and.
+     2   dabs(dbxdby-(0.)).lt.e.and.
+     2   dabs(dbxdbz-(-2.)).lt.e.and.
+     2   dabs(dbxdcx-(0.)).lt.e.and.
+     2   dabs(dbxdcy-(-1.)).lt.e.and.
+     2   dabs(dbxdcz-(1.)).lt.e.and.
+     2   dabs(dbxddx-(0.)).lt.e.and.
+     2   dabs(dbxddy-(1.)).lt.e.and.
+     2   dabs(dbxddz-(0.)).lt.e.and.
+
+     2   dabs(dbydby-(0.)).lt.e.and.
+     2   dabs(dbydbz-(-1.)).lt.e.and.
+     2   dabs(dbydcx-(0.)).lt.e.and.
+     2   dabs(dbydcy-(0.)).lt.e.and.
+     2   dabs(dbydcz-(1.)).lt.e.and.
+     2   dabs(dbyddx-(0.)).lt.e.and.
+     2   dabs(dbyddy-(0.)).lt.e.and.
+     2   dabs(dbyddz-(0.)).lt.e.and.
+
+     2   dabs(dbzdbz-(0.)).lt.e.and.
+     2   dabs(dbzdcx-(1.)).lt.e.and.
+     2   dabs(dbzdcy-(0.)).lt.e.and.
+     2   dabs(dbzdcz-(0.)).lt.e.and.
+     2   dabs(dbzddx-(0.)).lt.e.and.
+     2   dabs(dbzddy-(0.)).lt.e.and.
+     2   dabs(dbzddz-(0.)).lt.e.and.
+
+     2   dabs(dcxdcx-(0.)).lt.e.and.
+     2   dabs(dcxdcy-(1.)).lt.e.and.
+     2   dabs(dcxdcz-(-2.)).lt.e.and.
+     2   dabs(dcxddx-(0.)).lt.e.and.
+     2   dabs(dcxddy-(-1.)).lt.e.and.
+     2   dabs(dcxddz-(1.)).lt.e.and.
+
+     2   dabs(dcydcy-(0.)).lt.e.and.
+     2   dabs(dcydcz-(0.)).lt.e.and.
+     2   dabs(dcyddx-(0.)).lt.e.and.
+     2   dabs(dcyddy-(0.)).lt.e.and.
+     2   dabs(dcyddz-(0.)).lt.e.and.
+
+     2   dabs(dczdcz-(0.)).lt.e.and.
+     2   dabs(dczddx-(1.)).lt.e.and.
+     2   dabs(dczddy-(0.)).lt.e.and.
+     2   dabs(dczddz-(0.)).lt.e.and.
+
+     2   dabs(ddxddx-(0.)).lt.e.and.
+     2   dabs(ddxddy-(0.)).lt.e.and.
+     2   dabs(ddxddz-(-1.)).lt.e.and.
+
+     2   dabs(ddyddy-(0.)).lt.e.and.
+     2   dabs(ddyddz-(0.)).lt.e.and.
+
+     2   dabs(ddzddz-(0.)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
 
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       testno=12
@@ -1179,6 +1285,112 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       else
         write(iout,2)testno,minor
         write(iout,3)angle_abcd,(-dpi/2)
+      end if
+      call dddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
+     1 daxdcz, daxddx, daxddy, daxddz, dayday, daydaz, daydbx, daydby,
+     1 daydbz, daydcx, daydcy, daydcz, dayddx, dayddy, dayddz, dazdaz,
+     1 dazdbx, dazdby, dazdbz, dazdcx, dazdcy, dazdcz, dazddx, dazddy,
+     1 dazddz, dbxdbx, dbxdby, dbxdbz, dbxdcx, dbxdcy, dbxdcz, dbxddx,
+     1 dbxddy, dbxddz, dbydby, dbydbz, dbydcx, dbydcy, dbydcz, dbyddx,
+     1 dbyddy, dbyddz, dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy,
+     1 dbzddz, dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz, dcydcy,
+     1 dcydcz, dcyddx, dcyddy, dcyddz, dczdcz, dczddx, dczddy, dczddz,
+     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz)
+      minor=4
+      sqrteight=2*sqrt(2.)
+      if(dabs(daxdax-(0.)).lt.e.and.
+     2   dabs(daxday-(0.)).lt.e.and.
+     2   dabs(daxdaz-(-1/sqrt(8.))).lt.e.and.
+     2   dabs(daxdbx-(0.)).lt.e.and.
+     2   dabs(daxdby-(0.)).lt.e.and.
+     2   dabs(daxdbz-(0.)).lt.e.and.
+     2   dabs(daxdcx-(0.)).lt.e.and.
+     2   dabs(daxdcy-(0.)).lt.e.and.
+     2   dabs(daxdcz-(1/sqrt(8.))).lt.e.and.
+     2   dabs(daxddx-(0.)).lt.e.and.
+     2   dabs(daxddy-(0.)).lt.e.and.
+     2   dabs(daxddz-(0.)).lt.e.and.
+
+     2   dabs(dayday-(0.)).lt.e.and.
+     2   dabs(daydaz-(-1/sqrt(8.))).lt.e.and.
+     2   dabs(daydbx-(0.)).lt.e.and.
+     2   dabs(daydby-(0.)).lt.e.and.
+     2   dabs(daydbz-(1/sqrt(2.))).lt.e.and.
+     2   dabs(daydcx-(0.)).lt.e.and.
+     2   dabs(daydcy-(0.)).lt.e.and.
+     2   dabs(daydcz-(-1/sqrt(8.))).lt.e.and.
+     2   dabs(dayddx-(0.)).lt.e.and.
+     2   dabs(dayddy-(0.)).lt.e.and.
+     2   dabs(dayddz-(0.)).lt.e.and.
+
+     2   dabs(dazdaz-(0.)).lt.e.and.
+     2   dabs(dazdbx-(1/sqrt(8.))).lt.e.and.
+     2   dabs(dazdby-(1/sqrt(8.))).lt.e.and.
+     2   dabs(dazdbz-(0.)).lt.e.and.
+     2   dabs(dazdcx-(0.)).lt.e.and.
+     2   dabs(dazdcy-(0.)).lt.e.and.
+     2   dabs(dazdcz-(0.)).lt.e.and.
+     2   dabs(dazddx-(0.)).lt.e.and.
+     2   dabs(dazddy-(0.)).lt.e.and.
+     2   dabs(dazddz-(0.)).lt.e.and.
+
+     2   dabs(dbxdbx-(0.)).lt.e.and.
+     2   dabs(dbxdby-(0.)).lt.e.and.
+     2   dabs(dbxdbz-(-1/sqrteight)).lt.e.and.
+     2   dabs(dbxdcx-(1/sqrteight)).lt.e.and.
+     2   dabs(dbxdcy-(-1/sqrteight)).lt.e.and.
+     2   dabs(dbxdcz-(0.)).lt.e.and.
+     2   dabs(dbxddx-(-1/sqrteight)).lt.e.and.
+     2   dabs(dbxddy-(1/sqrteight)).lt.e.and.
+     2   dabs(dbxddz-(0.)).lt.e.and.
+
+     2   dabs(dbydby-(0.)).lt.e.and.
+     2   dabs(dbydbz-(-3/sqrteight)).lt.e.and.
+     2   dabs(dbydcx-(1/sqrteight)).lt.e.and.
+     2   dabs(dbydcy-(-1/sqrteight)).lt.e.and.
+     2   dabs(dbydcz-(1/sqrt(2.))).lt.e.and.
+     2   dabs(dbyddx-(-1/sqrteight)).lt.e.and.
+     2   dabs(dbyddy-(1/sqrteight)).lt.e.and.
+     2   dabs(dbyddz-(0.)).lt.e.and.
+
+     2   dabs(dbzdbz-(0.)).lt.e.and.
+     2   dabs(dbzdcx-(1/sqrteight)).lt.e.and.
+     2   dabs(dbzdcy-(1/sqrteight)).lt.e.and.
+     2   dabs(dbzdcz-(0.)).lt.e.and.
+     2   dabs(dbzddx-(0.)).lt.e.and.
+     2   dabs(dbzddy-(0.)).lt.e.and.
+     2   dabs(dbzddz-(0.)).lt.e.and.
+
+     2   dabs(dcxdcx-(-1/sqrt(2.))).lt.e.and.
+     2   dabs(dcxdcy-(0.)).lt.e.and.
+     2   dabs(dcxdcz-(-3/sqrteight)).lt.e.and.
+     2   dabs(dcxddx-(1/sqrteight)).lt.e.and.
+     2   dabs(dcxddy-(-1/sqrteight)).lt.e.and.
+     2   dabs(dcxddz-(1/sqrt(2.))).lt.e.and.
+
+     2   dabs(dcydcy-(1/sqrt(2.))).lt.e.and.
+     2   dabs(dcydcz-(-3/sqrteight)).lt.e.and.
+     2   dabs(dcyddx-(1/sqrteight)).lt.e.and.
+     2   dabs(dcyddy-(-1/sqrteight)).lt.e.and.
+     2   dabs(dcyddz-(1/sqrt(2.))).lt.e.and.
+
+     2   dabs(dczdcz-(0.)).lt.e.and.
+     2   dabs(dczddx-(1/sqrt(2.))).lt.e.and.
+     2   dabs(dczddy-(1/sqrt(2.))).lt.e.and.
+     2   dabs(dczddz-(0.)).lt.e.and.
+
+     2   dabs(ddxddx-(0.)).lt.e.and.
+     2   dabs(ddxddy-(0.)).lt.e.and.
+     2   dabs(ddxddz-(-1/sqrt(2.))).lt.e.and.
+
+     2   dabs(ddyddy-(0.)).lt.e.and.
+     2   dabs(ddyddz-(-1/sqrt(2.))).lt.e.and.
+
+     2   dabs(ddzddz-(0.)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
       end if
 
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -1244,12 +1456,118 @@ c      write(*,*)ddz,' ddz ','1.863389981'
         write(iout,2)testno,minor
         write(iout,3)angle_abcd,(0.4205343353)
       end if
+      call dddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
+     1 daxdcz, daxddx, daxddy, daxddz, dayday, daydaz, daydbx, daydby,
+     1 daydbz, daydcx, daydcy, daydcz, dayddx, dayddy, dayddz, dazdaz,
+     1 dazdbx, dazdby, dazdbz, dazdcx, dazdcy, dazdcz, dazddx, dazddy,
+     1 dazddz, dbxdbx, dbxdby, dbxdbz, dbxdcx, dbxdcy, dbxdcz, dbxddx,
+     1 dbxddy, dbxddz, dbydby, dbydbz, dbydcx, dbydcy, dbydcz, dbyddx,
+     1 dbyddy, dbyddz, dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy,
+     1 dbzddz, dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz, dcydcy,
+     1 dcydcz, dcyddx, dcyddy, dcyddz, dczdcz, dczddx, dczddy, dczddz,
+     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz)
+      minor=4
+      if(dabs(daxdax-(0.)).lt.e.and.
+     2   dabs(daxday-(0.)).lt.e.and.
+     2   dabs(daxdaz-(0.496903995)).lt.e.and.
+     2   dabs(daxdbx-(0.)).lt.e.and.
+     2   dabs(daxdby-(0.)).lt.e.and.
+     2   dabs(daxdbz-(-0.2484519975)).lt.e.and.
+     2   dabs(daxdcx-(0.)).lt.e.and.
+     2   dabs(daxdcy-(0.)).lt.e.and.
+     2   dabs(daxdcz-(-0.2484519975)).lt.e.and.
+     2   dabs(daxddx-(0.)).lt.e.and.
+     2   dabs(daxddy-(0.)).lt.e.and.
+     2   dabs(daxddz-(0.)).lt.e.and.
+
+     2   dabs(dayday-(0.)).lt.e.and.
+     2   dabs(daydaz-(0.)).lt.e.and.
+     2   dabs(daydbx-(0.)).lt.e.and.
+     2   dabs(daydby-(0.)).lt.e.and.
+     2   dabs(daydbz-(0.)).lt.e.and.
+     2   dabs(daydcx-(0.)).lt.e.and.
+     2   dabs(daydcy-(0.)).lt.e.and.
+     2   dabs(daydcz-(0.)).lt.e.and.
+     2   dabs(dayddx-(0.)).lt.e.and.
+     2   dabs(dayddy-(0.)).lt.e.and.
+     2   dabs(dayddz-(0.)).lt.e.and.
+
+     2   dabs(dazdaz-(0.)).lt.e.and.
+     2   dabs(dazdbx-(0.)).lt.e.and.
+     2   dabs(dazdby-(0.)).lt.e.and.
+     2   dabs(dazdbz-(0.)).lt.e.and.
+     2   dabs(dazdcx-(0.)).lt.e.and.
+     2   dabs(dazdcy-(0.)).lt.e.and.
+     2   dabs(dazdcz-(0.)).lt.e.and.
+     2   dabs(dazddx-(0.)).lt.e.and.
+     2   dabs(dazddy-(0.)).lt.e.and.
+     2   dabs(dazddz-(0.)).lt.e.and.
+
+     2   dabs(dbxdbx-(0.)).lt.e.and.
+     2   dabs(dbxdby-(0.)).lt.e.and.
+     2   dabs(dbxdbz-(0.)).lt.e.and.
+     2   dabs(dbxdcx-(0.)).lt.e.and.
+     2   dabs(dbxdcy-(0.)).lt.e.and.
+     2   dabs(dbxdcz-(0.)).lt.e.and.
+     2   dabs(dbxddx-(0.)).lt.e.and.
+     2   dabs(dbxddy-(2.)).lt.e.and.
+     2   dabs(dbxddz-(0.)).lt.e.and.
+
+     2   dabs(dbydby-(0.)).lt.e.and.
+     2   dabs(dbydbz-(0.)).lt.e.and.
+     2   dabs(dbydcx-(0.)).lt.e.and.
+     2   dabs(dbydcy-(0.)).lt.e.and.
+     2   dabs(dbydcz-(0.)).lt.e.and.
+     2   dabs(dbyddx-(0.)).lt.e.and.
+     2   dabs(dbyddy-(0.)).lt.e.and.
+     2   dabs(dbyddz-(0.)).lt.e.and.
+
+     2   dabs(dbzdbz-(0.)).lt.e.and.
+     2   dabs(dbzdcx-(0.)).lt.e.and.
+     2   dabs(dbzdcy-(0.)).lt.e.and.
+     2   dabs(dbzdcz-(0.)).lt.e.and.
+     2   dabs(dbzddx-(0.)).lt.e.and.
+     2   dabs(dbzddy-(0.)).lt.e.and.
+     2   dabs(dbzddz-(0.)).lt.e.and.
+
+     2   dabs(dcxdcx-(0.)).lt.e.and.
+     2   dabs(dcxdcy-(0.)).lt.e.and.
+     2   dabs(dcxdcz-(0.)).lt.e.and.
+     2   dabs(dcxddx-(0.)).lt.e.and.
+     2   dabs(dcxddy-(0.)).lt.e.and.
+     2   dabs(dcxddz-(0.)).lt.e.and.
+
+     2   dabs(dcydcy-(0.)).lt.e.and.
+     2   dabs(dcydcz-(0.)).lt.e.and.
+     2   dabs(dcyddx-(0.)).lt.e.and.
+     2   dabs(dcyddy-(0.)).lt.e.and.
+     2   dabs(dcyddz-(0.)).lt.e.and.
+
+     2   dabs(dczdcz-(0.)).lt.e.and.
+     2   dabs(dczddx-(0.)).lt.e.and.
+     2   dabs(dczddy-(0.)).lt.e.and.
+     2   dabs(dczddz-(0.)).lt.e.and.
+
+     2   dabs(ddxddx-(0.)).lt.e.and.
+     2   dabs(ddxddy-(0.)).lt.e.and.
+     2   dabs(ddxddz-(0.)).lt.e.and.
+
+     2   dabs(ddyddy-(0.)).lt.e.and.
+     2   dabs(ddyddz-(0.)).lt.e.and.
+
+     2   dabs(ddzddz-(0.)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
 
 
  1    FORMAT('passed test ',I2,'.',I1)
  2    FORMAT('FAILED test ',I2,'.',I1,' ...')
  3    FORMAT('result is ',D10.8,' but should be ',D10.8)
  1000 FORMAT(72('-'))
+
 
       stop
       END
