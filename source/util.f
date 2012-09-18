@@ -7,37 +7,37 @@
       DO I=1,M
       DO K=I+1,M
 C     Delete duplicates
-      IF(I.eq.imirror(k).and.K.eq.imirror(i)) then
-      ICOUNT=ICOUNT+1
-      imirrorw(ICOUNT)=I
-      jmirrorw(ICOUNT)=imirror(I)
-      diamw(ICOUNT)=diam(I)
-      endif
+       IF(I.eq.imirror(k).and.K.eq.imirror(i)) then
+        ICOUNT=ICOUNT+1
+        imirrorw(ICOUNT)=I
+        jmirrorw(ICOUNT)=imirror(I)
+        diamw(ICOUNT)=diam(I)
+       endif
       enddo
       enddo
       Mnew=Icount
 C     Now sort values of diamw, output diam
       DO I=1,MNew
-      dMax=diamw(I)
-      im=imirrorw(i)
-      jm=jmirrorw(i)
-      ivec=i
+       dMax=diamw(I)
+       im=imirrorw(i)
+       jm=jmirrorw(i)
+       ivec=i
       DO K=I+1,MNew
-      IF (dMax.LT.diamw(K)) then
-      im=imirrorw(K)
-      jm=jmirrorw(K)
-      dMax=diamw(K)
-      Ivec=K
-      endif
+       IF (dMax.LT.diamw(K)) then
+        im=imirrorw(K)
+        jm=jmirrorw(K)
+        dMax=diamw(K)
+        Ivec=K
+       endif
       enddo
-      imirror(i)=im
-      jmirror(i)=jm
-      diam(I)=dMax
-      if(ivec.ne.i) then
-      imirrorw(ivec)=imirrorw(i)
-      jmirrorw(ivec)=jmirrorw(i)
-      diamw(ivec)=diamw(i)
-      endif
+       imirror(i)=im
+       jmirror(i)=jm
+       diam(I)=dMax
+       if(ivec.ne.i) then
+        imirrorw(ivec)=imirrorw(i)
+        jmirrorw(ivec)=jmirrorw(i)
+        diamw(ivec)=diamw(i)
+       endif
       enddo
       RETURN
       END
@@ -46,9 +46,14 @@ C     Now sort values of diamw, output diam
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer MDist(Nmax,Nmax)
+      Integer MDist(Nmax,Nmax),wi(nmax),wienermin,wienermax
       DIMENSION IDA(Nmax,Nmax)
       type(c_ptr) :: g, new_fullerene_graph
+C     This routine calculates the Wiener index, Hyperwiener index,
+C     minimal and maximal vertex contribution, rho and rhoE
+C     For details see D. Vukicevic,F. Cataldo, O. Ori, A. Graovac,
+C     Chem. Phys. Lett. 501, 442–445 (2011).
+
       Write(Iout,1000)
       Do I=1,Nmax
       Do J=1,Nmax
@@ -56,28 +61,54 @@ C     Now sort values of diamw, output diam
       enddo
       enddo
 
+C     Get topological distance matrix
       g = new_fullerene_graph(Nmax,Matom,IDA)
       call all_pairs_shortest_path(g,Matom,Nmax,MDist)
 
+      iwiener1=0
       iwiener=0
-      maxdist=0
       ihyperwiener=0
+      maxdist=0
       Do I=1,MAtom
-      Do J=I+1,MAtom
-       idist=MDist(I,J)
-       if (idist.gt.maxdist) maxdist=idist
-       iwiener=iwiener+idist
-       ihyperwiener=ihyperwiener+idist*(1+idist)
+        wi(I)=0
+       Do J=1,MAtom
+        idist=MDist(I,J)
+        wi(I)=wi(i)+idist
+        if(J.gt.I) then
+         if(idist.gt.maxdist) maxdist=idist
+         ihyperwiener=ihyperwiener+idist*(1+idist)
+        endif
+       enddo
+      iwiener1=iwiener1+wi(i)
+        if(I.ne.1) then
+         if(wi(i).lt.wienermin) then
+          wienermin=wi(i)
+         endif
+         if(wi(i).gt.wienermax) then
+          wienermax=wi(i)
+         endif
+        else
+         wienermin=wi(1)
+         wienermax=wi(1)
+        endif
       enddo
-      enddo
-       isize=Matom*(Matom-1)
+
+      iwiener=iwiener1/2
+      wav=dfloat(iwiener1)/dfloat(MAtom)
+      rho=wav/dfloat(wienermin)
+      rhoE=dfloat(wienermax)/dfloat(wienermin)
+      isize=Matom*(Matom-1)
       Avdist=2.d0*dfloat(iwiener)/dfloat(isize)
      
-      Write(Iout,1001) iwiener,ihyperwiener
+      Write(Iout,1001) iwiener,ihyperwiener,wienermin,wienermax,
+     1 wav,rho,rhoE
       Write(Iout,1002) maxdist,Avdist
 
  1000 Format(/1X,'Topological Indicators:')
- 1001 Format(' Wiener index W: ',I10,/,' Hyper Wiener index WW: ',I10)
+ 1001 Format(' Wiener index W: ',I12,/,' Hyper Wiener index WW: ',I12,
+     1 /,' minimal and maximal vertex contribution to W: ',I12,' and ',
+     1 I12,', average vertex contribution wav: ',D15.9,/,
+     1 ' rho: ',D15.9,', rhoE: ',D15.9)
  1002 Format(' Topological distances are between 1 and ',I6,/,
      1 ' Average topological distance: ',F12.6)
       RETURN

@@ -3,7 +3,7 @@ Cartesian coordinate input
 &General NA=80, IP=1 /
 &Coord ICart=1, IYF=3 /
 &FFChoice Iopt=2 /
-&FFParameters fcoulomb=20 /
+&FFParameters fcoulomb=20. /
 &Hamilton /
 &Isomers /
 &Graph  /
