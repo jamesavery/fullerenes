@@ -76,7 +76,7 @@ C     Get topological distance matrix
         wi(I)=wi(i)+idist
         if(J.gt.I) then
          if(idist.gt.maxdist) maxdist=idist
-         ihyperwiener=ihyperwiener+idist*(1+idist)
+         ihyperwiener=ihyperwiener+(idist*(1+idist))/2
         endif
        enddo
       iwiener1=iwiener1+wi(i)
@@ -99,17 +99,21 @@ C     Get topological distance matrix
       rhoE=dfloat(wienermax)/dfloat(wienermin)
       isize=Matom*(Matom-1)
       Avdist=2.d0*dfloat(iwiener)/dfloat(isize)
+      izagreb=MAtom*9
      
       Write(Iout,1001) iwiener,ihyperwiener,wienermin,wienermax,
-     1 wav,rho,rhoE
+     1 wav,rho,rhoE,izagreb
       Write(Iout,1002) maxdist,Avdist
 
- 1000 Format(1X,'Topological Indicators: (Vukicevic et al. ',
-     1 'Chem. Phys. Lett. 501, 442 (2011).)')
+ 1000 Format(1X,'Topological Indicators:',/1X,
+     1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
+     1 '501, 442 (2011), and Behtoei et al., Appl. Math. Lett. ',
+     1 '22, 1571 (2009)')
  1001 Format(' Wiener index W: ',I12,/,' Hyper Wiener index WW: ',I12,
      1 /,' Minimal and maximal vertex contribution to W: ',I12,' and ',
      1 I12,', average vertex contribution (wav): ',D15.9,/,
-     1 ' rho: ',D15.9,', rhoE: ',D15.9)
+     1 ' rho: ',D15.9,', rhoE: ',D15.9,/,' Zagreb index = nv*3^2 = ',
+     1 I12,' (trivial for regular fullerenes)')
  1002 Format(' Topological distances are between 1 and ',I6,/,
      1 ' Average topological distance: ',F12.6)
       RETURN
