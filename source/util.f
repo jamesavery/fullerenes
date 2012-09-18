@@ -104,10 +104,11 @@ C     Get topological distance matrix
      1 wav,rho,rhoE
       Write(Iout,1002) maxdist,Avdist
 
- 1000 Format(/1X,'Topological Indicators:')
+ 1000 Format(1X,'Topological Indicators: (Vukicevic et al. ',
+     1 'Chem. Phys. Lett. 501, 442 (2011).)')
  1001 Format(' Wiener index W: ',I12,/,' Hyper Wiener index WW: ',I12,
-     1 /,' minimal and maximal vertex contribution to W: ',I12,' and ',
-     1 I12,', average vertex contribution wav: ',D15.9,/,
+     1 /,' Minimal and maximal vertex contribution to W: ',I12,' and ',
+     1 I12,', average vertex contribution (wav): ',D15.9,/,
      1 ' rho: ',D15.9,', rhoE: ',D15.9)
  1002 Format(' Topological distances are between 1 and ',I6,/,
      1 ' Average topological distance: ',F12.6)

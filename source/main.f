@@ -70,6 +70,8 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       iprev=0
       isort=0
       icall=0
+      VolSphere=0.d0
+      ASphere=0.d0
       Group='   '
       Do I=1,Nmax
        IAtom(I)=6
@@ -202,7 +204,7 @@ C------------------DISTMATRIX--------------------------------------
 C Calculate the distance Matrix and print out distance Matrix
       routine='DISTMATRIX   '
       Write(Iout,1008) routine
-      CALL Distmatrix(MAtom,Iout,isort,nosort,iprintf,Iopt,
+      CALL Distmatrix(MAtom,Iout,iprintf,Iopt,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
 
 C------------------CONNECT-----------------------------------------
@@ -310,7 +312,7 @@ c a stone wales (or any other transformation) is done
      1   nosort,SP,Dist,DistCM,El)
         routine='DISTMATRIX   '
         Write(Iout,1008) routine
-        CALL Distmatrix(MAtom,Iout,isort,nosort,Iprintf,0,
+        CALL Distmatrix(MAtom,Iout,Iprintf,0,
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
       if(isort.ne.0.and.nosort.eq.0) then
        CALL Permute(Matom,Iout,Dist,IC3)
@@ -451,6 +453,10 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
 C Determine if fullerene is chiral
         CALL Chiral(Iout,GROUP)
       endif
+
+C--------------TOPOLOGICAL INDICATORS-----------------------------
+        routine='TOPOINDICATOR'
+        Write(Iout,1008) routine
 C Topological Indicators
       Call TopIndicators(Matom,Iout,IDA,Mdist)
 

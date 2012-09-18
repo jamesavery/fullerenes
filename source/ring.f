@@ -2657,7 +2657,7 @@ C     (6-6) 2-ring fusions
       Return
       END
  
-      SUBROUTINE Distmatrix(MAtom,IOUT,isort,nosort,Iprint,Iopt,
+      SUBROUTINE Distmatrix(MAtom,IOUT,Iprint,Iopt,
      1 Dist,DistMat,Rmin,Rmax,Vol,ASphere)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2707,7 +2707,6 @@ C     Determine minimum and maximum distances
        endif
       enddo
       enddo
-      if(isort.eq.1.and.nosort.eq.0) return
       Vol=4.d0/3.d0*API*RmaxS**3
       ASphere=4.d0*API*RmaxS**2
       Write(IOUT,1002) Rmin,Imin,Jmin,Rmax,Imax,Jmax,RmaxS,Vol,
