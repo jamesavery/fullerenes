@@ -205,7 +205,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 	cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
 	abort();
       }
-    cerr << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face.\n";
+    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face.\n";
     facemap[outer_face.size()].insert(outer_face);
     // Add outer face to output, remove directed edges from work set
     for(unsigned int i=0;i<outer_face.size();i++){
