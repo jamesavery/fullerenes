@@ -729,8 +729,8 @@ This converts the number of atoms $N_A$ to $N^{'}_A = 3^{n_{leap}}N_A$. (Default
 If \paramname{IGCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}[\C{N_A}]$ (Default: 0).
 At the moment only $l=0$ is implemented, also the leapfrog transformation $k=1$ and $l=1$ is available in this input.
 In this case \paramname{kGC} in the namelist input has to be specified. 
-\item[IWS] 
-  If \paramname{IWS} = 1 the initial fullerene structure is subjected
+\item[ISW] 
+  If \paramname{ISW} = 1 the initial fullerene structure is subjected
   to a Stone-Wales transformation (Default: 0). In this case an input
   is required (after all the other input, last card) with pairs of
   pentagon ring numbers. Numbers are between 1 and 12. These can be
@@ -759,8 +759,8 @@ the list of Yoshida-Fowler patterns given in the output (\paramname{IYF}=2).
 If \paramname{IYF} = 3 or 4 then a Yoshida-Fowler 6-vertex insertion \cite{Yoshida97} is performed (Default: 0). 
 In this case an input is required with the three hexagon numbers (\paramname{IYF}=3) or the position in
 the list of Yoshida-Fowler patterns given in the output (IYF=4).
-\item[ISW] 
-If \paramname{ISW} = 1 the initial fullerene structure is subjected to a 9-vertex insertion (Default: 0).
+\item[IWS] 
+If \paramname{IWS} = 1 the initial fullerene structure is subjected to a 9-vertex insertion (Default: 0).
 Similar to Yoshida-Fowler, an input is required (see \filename{c384.inp} for details).
 \item[mirror] 
 If \paramname{mirror} = 1 invert all coordinates (take the mirror image). This may be important for chiral fullerenes (Default: 0).
