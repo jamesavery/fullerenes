@@ -569,6 +569,9 @@ C         dgg=dgg+xi(j)**2
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       PARAMETER (TOL=1.d-5)
+      real length, cutoff, xi_tmp(nmax*3)
+c larger cutoffs result in faster convergence and are less safe ...
+      cutoff=3.0d0
 C     USES brent3d,f1dim3d,mnbrak3d
       do j=1,n
         pcom(j)=p(j)
@@ -580,9 +583,24 @@ C     USES brent3d,f1dim3d,mnbrak3d
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt)
       CALL brent3d(n,AH,N5,N6,N5M,N6M,Iout,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt)
+c lets scale all displacements that are longer than a chosen cutoff to that cutoff
+c the direction of that vector is maintained
       do j=1,n
         xi(j)=xmin*xi(j)
-        p(j)=p(j)+xi(j)
+c save xi, because it will be used later
+        xi_tmp(j)=xi(j)
+      enddo
+      do j=1,n,3
+c we could also use xi_tmp
+        length=dsqrt(xi(j)*xi(j) + xi(j+1)*xi(j+1) + xi(j+2)*xi(j+2))
+        if (length .gt. cutoff) then
+          xi_tmp(j)  =xi(j)  /length*cutoff
+          xi_tmp(j+1)=xi(j+1)/length*cutoff
+          xi_tmp(j+2)=xi(j+2)/length*cutoff
+        endif
+        p(j)  =p(j)  +xi_tmp(j)
+        p(j+1)=p(j+1)+xi_tmp(j+1)
+        p(j+2)=p(j+2)+xi_tmp(j+2)
       enddo
       return
       END
