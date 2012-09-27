@@ -486,6 +486,7 @@ c and N=MATOM*3
       Real*8 p(NMAX*3),g(NMAX*3),h(NMAX*3),xi(NMAX*3)
       Real*8 pcom(NMAX*3),xicom(NMAX*3)
       Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
+c      integer damping
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
@@ -522,15 +523,19 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
       do its=1,ITMAX
         iter=its
         call linmin3d(N,AH,N5,N6,N5M,N6M,p,pcom,xi,xicom,fret,
-     1    force,iopt)
+     1    force,iopt)!,damping)
         grad2=0.d0
         do I=1,n
           grad2=grad2+xi(i)*xi(i)
         enddo
         grad=dsqrt(grad2)
-        Write(Iout,1001) iter,fret,grad
+c        if(damping.eq.0) then 
+          write(Iout,1001) iter,fret,grad
+c        else
+c          write(Iout,1002) iter,fret,grad,damping
+c        endif
         if(2.d0*dabs(fret-fp).le.ftol*(dabs(fret)+dabs(fp)+EPS))then
-          Write(Iout,1002) fret,fret-fp
+          Write(Iout,1003) fret,fret-fp
           return
         endif
         fp=fret
@@ -554,7 +559,9 @@ C         dgg=dgg+xi(j)**2
  1000 Format(' WARNING: Subroutine frprmn3d: maximum iterations
      1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
  1001 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8)
- 1002 Format(/1X,'Convergence achieved, energy ',D14.8,', diff= ',D12.3)
+c 1002 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8,
+c     1 ' The displacements of ',I4,' atoms were damped.')
+ 1003 Format(/1X,'Convergence achieved, energy ',D14.8,', diff= ',D12.3)
  1004 Format('**** Severe error in angle, check input coordiantes:',
      1 ' One angle either 0 or 180 degrees, ill-alligned structure',
      1 /1X,'Cannot optimize structure, check eigenvector input')
@@ -562,16 +569,15 @@ C         dgg=dgg+xi(j)**2
       END
 
       SUBROUTINE linmin3d(n,AH,N5,N6,N5M,N6M,
-     1 p,pcom,xi,xicom,fret,force,iopt)
+     1 p,pcom,xi,xicom,fret,force,iopt)!,damping)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3)
       Integer AH(NMAX,NMAX)
       Integer N5M(MMAX,5),N6M(MMAX,6)
       PARAMETER (TOL=1.d-5)
-      real length, cutoff, xi_tmp(nmax*3)
-c larger cutoffs result in faster convergence and are less safe ...
-      cutoff=3.0d0
+c      real*8 length, cutoff, xi_tmp(nmax*3)
+c      integer damping
 C     USES brent3d,f1dim3d,mnbrak3d
       do j=1,n
         pcom(j)=p(j)
@@ -583,24 +589,28 @@ C     USES brent3d,f1dim3d,mnbrak3d
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt)
       CALL brent3d(n,AH,N5,N6,N5M,N6M,Iout,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt)
-c lets scale all displacements that are longer than a chosen cutoff to that cutoff
-c the direction of that vector is maintained
+c lets scale all displacements that are longer than a chosen cutoff to that cutoff.
+c the direction of the displacement vector is maintained
       do j=1,n
         xi(j)=xmin*xi(j)
-c save xi, because it will be used later
-        xi_tmp(j)=xi(j)
+c        xi_tmp(j)=xi(j)
       enddo
-      do j=1,n,3
-c we could also use xi_tmp
-        length=dsqrt(xi(j)*xi(j) + xi(j+1)*xi(j+1) + xi(j+2)*xi(j+2))
-        if (length .gt. cutoff) then
-          xi_tmp(j)  =xi(j)  /length*cutoff
-          xi_tmp(j+1)=xi(j+1)/length*cutoff
-          xi_tmp(j+2)=xi(j+2)/length*cutoff
-        endif
-        p(j)  =p(j)  +xi_tmp(j)
-        p(j+1)=p(j+1)+xi_tmp(j+1)
-        p(j+2)=p(j+2)+xi_tmp(j+2)
+c larger cutoffs result in faster convergence and are less safe ...
+c      cutoff=3.0d1
+c     count the number of atoms/displacements that were damped
+c      damping=0
+c      do j=1,n,3
+c        length=dsqrt(xi(j)*xi(j) + xi(j+1)*xi(j+1) + xi(j+2)*xi(j+2))
+c        if (length .gt. cutoff) then
+c          xi_tmp(j)  =xi_tmp(j)  *(cutoff/length)
+c          xi_tmp(j+1)=xi_tmp(j+1)*(cutoff/length)
+c          xi_tmp(j+2)=xi_tmp(j+2)*(cutoff/length)
+c          damping=damping + 1
+c        endif
+c      enddo
+      do j=1,n
+c        p(j)=p(j)+xi_tmp(j)
+        p(j)=p(j)+xi(j)
       enddo
       return
       END
