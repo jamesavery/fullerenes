@@ -23,6 +23,8 @@ c      write(*,*)'entering func3d'
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      2      a_h,a_p,
      1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        case default
+          IERR=1
       end select
 
 c      write(*,*)'leaving func3d'
@@ -109,13 +111,11 @@ C     Loop over 5-rings
       if(n/3 .gt. 20) then
 C     Loop over 6-rings
       do i=1,n-60
-c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
         call angle(p(3*a_h(1,i)-2),p(3*a_h(1,i)-1),p(3*a_h(1,i)),
      1             p(3*a_h(2,i)-2),p(3*a_h(2,i)-1),p(3*a_h(2,i)),
      1             p(3*a_h(3,i)-2),p(3*a_h(3,i)-1),p(3*a_h(3,i)),
      1             angle_h)
         ehookah=ehookah+(angle_h-ah)**2
-c        write(*,*)'diff',angle_p,ap
       enddo
       endif
 
@@ -213,26 +213,22 @@ c     we distinguish between angles of pentagons and hexagons
 C     Loop over 5-rings
       ehookap=0.d0
       do i=1,60
-c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
         call angle(p(3*a_p(1,i)-2),p(3*a_p(1,i)-1),p(3*a_p(1,i)),
      1             p(3*a_p(2,i)-2),p(3*a_p(2,i)-1),p(3*a_p(2,i)),
      1             p(3*a_p(3,i)-2),p(3*a_p(3,i)-1),p(3*a_p(3,i)),
      1             angle_abc)
         ehookap=ehookap+(angle_abc-ap)**2
-c        write(*,*)'diff',angle_p,ap
       enddo
 
       if(n/3 .gt. 20) then
 C     Loop over 6-rings
       ehookah=0.d0
       do i=1,n-60
-c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
         call angle(p(3*a_h(1,i)-2),p(3*a_h(1,i)-1),p(3*a_h(1,i)),
      1             p(3*a_h(2,i)-2),p(3*a_h(2,i)-1),p(3*a_h(2,i)),
      1             p(3*a_h(3,i)-2),p(3*a_h(3,i)-1),p(3*a_h(3,i)),
      1             angle_abc)
         ehookah=ehookah+(angle_abc-ah)**2
-c        write(*,*)'diff',angle_p,ap
       enddo
       endif
 
@@ -242,16 +238,15 @@ C dihedrals
       ehookdhpp=0.d0
       ehookdhhp=0.d0
       ehookdhhh=0.d0
-c      write(*,*)nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
       if(nd_hhh .ne. 0) then
 C     3 hexagons
       do i=1,nd_hhh
       call dihedral(p(3*d_hhh(1,i)-2),p(3*d_hhh(1,i)-1),p(3*d_hhh(1,i)),
-     1             p(3*d_hhh(2,i)-2),p(3*d_hhh(2,i)-1),p(3*d_hhh(2,i)),
-     1             p(3*d_hhh(3,i)-2),p(3*d_hhh(3,i)-1),p(3*d_hhh(3,i)),
-     1             p(3*d_hhh(4,i)-2),p(3*d_hhh(4,i)-1),p(4*d_hhh(3,i)),
-     1             angle_abcd)
+     1              p(3*d_hhh(2,i)-2),p(3*d_hhh(2,i)-1),p(3*d_hhh(2,i)),
+     1              p(3*d_hhh(3,i)-2),p(3*d_hhh(3,i)-1),p(3*d_hhh(3,i)),
+     1              p(3*d_hhh(4,i)-2),p(3*d_hhh(4,i)-1),p(3*d_hhh(4,i)),
+     1              angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
@@ -259,34 +254,29 @@ C     3 hexagons
       enddo
       endif
 
-
       if(nd_hhp .ne. 0) then
 C     2 hexagons, 1 pentagon
       do i=1,nd_hhp
-c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
       call dihedral(p(3*d_hhp(1,i)-2),p(3*d_hhp(1,i)-1),p(3*d_hhp(1,i)),
-     1             p(3*d_hhp(2,i)-2),p(3*d_hhp(2,i)-1),p(3*d_hhp(2,i)),
-     1             p(3*d_hhp(3,i)-2),p(3*d_hhp(3,i)-1),p(3*d_hhp(3,i)),
-     1             p(3*d_hhp(4,i)-2),p(3*d_hhp(4,i)-1),p(4*d_hhp(3,i)),
-     1             angle_abcd)
+     1              p(3*d_hhp(2,i)-2),p(3*d_hhp(2,i)-1),p(3*d_hhp(2,i)),
+     1              p(3*d_hhp(3,i)-2),p(3*d_hhp(3,i)-1),p(3*d_hhp(3,i)),
+     1              p(3*d_hhp(4,i)-2),p(3*d_hhp(4,i)-1),p(3*d_hhp(4,i)),
+     1              angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
         ehookdhhp=ehookdhhp+(angle_abcd-dhhp)**2
-c        write(*,*)'diff',angle_p,ap
       enddo
       endif
-
 
       if(nd_hpp .ne. 0) then
 C     1 hexagon, 2 pentagons
       do i=1,nd_hpp
-c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
       call dihedral(p(3*d_hpp(1,i)-2),p(3*d_hpp(1,i)-1),p(3*d_hpp(1,i)),
-     1             p(3*d_hpp(2,i)-2),p(3*d_hpp(2,i)-1),p(3*d_hpp(2,i)),
-     1             p(3*d_hpp(3,i)-2),p(3*d_hpp(3,i)-1),p(3*d_hpp(3,i)),
-     1             p(3*d_hpp(4,i)-2),p(3*d_hpp(4,i)-1),p(4*d_hpp(3,i)),
-     1             angle_abcd)
+     1              p(3*d_hpp(2,i)-2),p(3*d_hpp(2,i)-1),p(3*d_hpp(2,i)),
+     1              p(3*d_hpp(3,i)-2),p(3*d_hpp(3,i)-1),p(3*d_hpp(3,i)),
+     1              p(3*d_hpp(4,i)-2),p(3*d_hpp(4,i)-1),p(3*d_hpp(4,i)),
+     1              angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
@@ -301,10 +291,10 @@ C     3 pentagons
       do i=1,nd_ppp
 c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
       call dihedral(p(3*d_ppp(1,i)-2),p(3*d_ppp(1,i)-1),p(3*d_ppp(1,i)),
-     1             p(3*d_ppp(2,i)-2),p(3*d_ppp(2,i)-1),p(3*d_ppp(2,i)),
-     1             p(3*d_ppp(3,i)-2),p(3*d_ppp(3,i)-1),p(3*d_ppp(3,i)),
-     1             p(3*d_ppp(4,i)-2),p(3*d_ppp(4,i)-1),p(4*d_ppp(3,i)),
-     1             angle_abcd)
+     1              p(3*d_ppp(2,i)-2),p(3*d_ppp(2,i)-1),p(3*d_ppp(2,i)),
+     1              p(3*d_ppp(3,i)-2),p(3*d_ppp(3,i)-1),p(3*d_ppp(3,i)),
+     1              p(3*d_ppp(4,i)-2),p(3*d_ppp(4,i)-1),p(3*d_ppp(4,i)),
+     1              angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
@@ -328,7 +318,7 @@ c      write(*,*)fc,"energy"
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
-      IMPLICIT REAL*8 (A-H,O-Z)
+c      IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
 c      write(*,*)"entering dfunc3d"
       
@@ -346,6 +336,7 @@ c      write(*,*)"entering dfunc3d"
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        case default
       end select
 
 c      write(*,*)"leaving dfunc3d"
@@ -362,7 +353,7 @@ c n=MATOM*3
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
       Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
-      Integer iopt
+      Integer n,iopt
 
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
@@ -385,8 +376,8 @@ c      write(*,*)'entering dwu'
       if(ne_hh .ne. 0) then
         do i=1,ne_hh
           call ddist(p(3*e_hh(1,i)-2),p(3*e_hh(1,i)-1),p(3*e_hh(1,i)),
-     1      p(3*e_hh(2,i)-2),p(3*e_hh(2,i)-1),p(3*e_hh(2,i)),
-     1      dax,day,daz,dbx,dby,dbz,ratom)
+     1               p(3*e_hh(2,i)-2),p(3*e_hh(2,i)-1),p(3*e_hh(2,i)),
+     1               dax,day,daz,dbx,dby,dbz,ratom)
           zero_value=rh
           force_constant=frh
           dE_over_dc=force_constant*(ratom-zero_value)
@@ -399,13 +390,12 @@ c      write(*,*)'entering dwu'
         enddo
       endif
 
-
 c     in the wu ff there is no difference between 1 and 2 pentagons
       if(ne_hp .ne. 0) then
         do i=1,ne_hp
           call ddist(p(3*e_hp(1,i)-2),p(3*e_hp(1,i)-1),p(3*e_hp(1,i)),
-     1      p(3*e_hp(2,i)-2),p(3*e_hp(2,i)-1),p(3*e_hp(2,i)),
-     1      dax,day,daz,dbx,dby,dbz,ratom)
+     1               p(3*e_hp(2,i)-2),p(3*e_hp(2,i)-1),p(3*e_hp(2,i)),
+     1               dax,day,daz,dbx,dby,dbz,ratom)
           zero_value=rp
           force_constant=frp
           dE_over_dc=force_constant*(ratom-zero_value)
@@ -421,8 +411,8 @@ c     in the wu ff there is no difference between 1 and 2 pentagons
       if(ne_pp .ne. 0) then
         do i=1,ne_pp
           call ddist(p(3*e_pp(1,i)-2),p(3*e_pp(1,i)-1),p(3*e_pp(1,i)),
-     1      p(3*e_pp(2,i)-2),p(3*e_pp(2,i)-1),p(3*e_pp(2,i)),
-     1      dax,day,daz,dbx,dby,dbz,ratom)
+     1               p(3*e_pp(2,i)-2),p(3*e_pp(2,i)-1),p(3*e_pp(2,i)),
+     1               dax,day,daz,dbx,dby,dbz,ratom)
           zero_value=rp
           force_constant=frp
           dE_over_dc=force_constant*(ratom-zero_value)
@@ -516,7 +506,6 @@ c      write(*,*)'leaving dwu'
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
-c      real*8 J1x,J1y,J1z,J2x,J2y,J2z,J3x,J3y,J3z,J4x,J4y,J4z
 
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)

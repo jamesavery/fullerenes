@@ -376,8 +376,8 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE OptFF(MAtom,Iout,IDA,N5,N6,
-     1 N5MEM,N6MEM,Dist,dist2D,Rdist,ftol,force,iopt)
+      SUBROUTINE OptFF(MAtom,Iout,IDA,
+     1 Dist,dist2D,Rdist,ftol,force,iopt)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -388,7 +388,6 @@ C  Angstroem and rad is used for bond distances and bond length
 C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION Dist(3,NMAX)
       DIMENSION IDA(NMAX,NMAX)
-      DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6)
       real(8) force(ffmaxdim)
       integer iopt
       type(c_ptr) :: graph, new_fullerene_graph
@@ -471,7 +470,7 @@ C     Optimize
       end select
 c      write(*,*)'frprmn3d will be entered soon'
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
-      CALL frprmn3d(MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
+      CALL frprmn3d(MATOM*3,Iout,
      1 Dist,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -510,7 +509,7 @@ c      write(*,*)'frprmn3d will be entered soon'
       Return 
       END
 
-      SUBROUTINE frprmn3d(N,AH,Iout,N5,N6,N5M,N6M,
+      SUBROUTINE frprmn3d(N,Iout,
      1 p,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -521,7 +520,6 @@ c and N=MATOM*3
       PARAMETER (ITMAX=99999,EPS=1.d-9)
       Real*8 p(NMAX*3),g(NMAX*3),h(NMAX*3),xi(NMAX*3)
       Real*8 pcom(NMAX*3),xicom(NMAX*3)
-      Integer AH(NMAX,NMAX),N5M(MMAX,5),N6M(MMAX,6)
 c      integer damping
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
@@ -564,7 +562,7 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
       fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linmin3d(N,AH,N5,N6,N5M,N6M,p,pcom,xi,xicom,fret,
+        call linmin3d(N,p,pcom,xi,xicom,fret,
      1    force,iopt,e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
      1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
@@ -615,15 +613,13 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       return
       END
 
-      SUBROUTINE linmin3d(n,AH,N5,N6,N5M,N6M,
+      SUBROUTINE linmin3d(n,
      1 p,pcom,xi,xicom,fret,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3)
-      Integer AH(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6)
       PARAMETER (TOL=1.d-5)
 c      real*8 length, cutoff, xi_tmp(nmax*3)
 c      integer damping
@@ -634,11 +630,11 @@ C     USES brent3d,f1dim3d,mnbrak3d
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak3d(n,AH,N5,N6,N5M,N6M,
+      CALL mnbrak3d(n,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      CALL brent3d(n,AH,N5,N6,N5M,N6M,Iout,fret,
+      CALL brent3d(n,Iout,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -668,7 +664,7 @@ c        p(j)=p(j)+xi_tmp(j)
       return
       END
 
-      SUBROUTINE f1dim3d(n,A,N5,N6,N5M,N6M,
+      SUBROUTINE f1dim3d(n,
      1 f1dimf,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -676,8 +672,6 @@ c        p(j)=p(j)+xi_tmp(j)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3)
-      Integer A(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6)
 C     USES func3d
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
@@ -689,7 +683,7 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE mnbrak3d(n,AH,N5,N6,N5M,N6M,
+      SUBROUTINE mnbrak3d(n,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -697,15 +691,13 @@ C     USES func3d
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
-      Integer AH(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3)
-      CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(n,
      1 fa,ax,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(n,
      1 fb,bx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -719,7 +711,7 @@ C     USES func3d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(n,
      1 fc,cx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -730,7 +722,7 @@ C     USES func3d
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(n,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -747,13 +739,13 @@ C     USES func3d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(n,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(n,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -764,7 +756,7 @@ C     USES func3d
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(n,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -772,7 +764,7 @@ C     USES func3d
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(n,
      1   fu,u,xicom,pcom,force,iopt,
      2   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -783,7 +775,7 @@ C     USES func3d
         Print*,'**** Error in Subroutine mnbrak3d'
         return
         endif
-        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(n,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -800,7 +792,7 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE brent3d(n,AH,N5,N6,N5M,N6M,Iout,
+      SUBROUTINE brent3d(n,Iout,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -811,15 +803,13 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3)
-      Integer AH(NMAX,NMAX)
-      Integer N5M(MMAX,5),N6M(MMAX,6)
       a=min(ax,cx)
       b=max(ax,cx)
       v=bx
       w=v
       x=v
       e=0.d0
-      CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+      CALL f1dim3d(n,
      1 fx,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -858,7 +848,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
+        CALL f1dim3d(n,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,

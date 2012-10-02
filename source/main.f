@@ -287,16 +287,16 @@ c a stone wales (or any other transformation) is done
           if(Iopt.eq.2) then ! Wu + Coulomb
             ftol=ftolP*1.d3
             Write(Iout,1003)
-            CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
-     1        N5MEM,N6MEM,Dist,dist2D,Rdist,ftol,force,iopt)
+            CALL OptFF(MAtom,Iout,IDA,
+     1        Dist,dist2D,Rdist,ftol,force,iopt)
           endif
           iopt=1
-          CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring, ! vanilla Wu
-     1      N5MEM,N6MEM,Dist,dist2D,Rdist,ftolP,forceP,iopt)
+          CALL OptFF(MAtom,Iout,IDA, ! vanilla Wu
+     1      Dist,dist2D,Rdist,ftolP,forceP,iopt)
           Iprint=0
         else if(Iopt.eq.3) then ! extended Wu, 18 parameters
-          CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
-     1      N5MEM,N6MEM,Dist,dist2D,Rdist,ftolP,forceP,iopt)
+          CALL OptFF(MAtom,Iout,IDA,
+     1      Dist,dist2D,Rdist,ftolP,forceP,iopt)
         endif
         routine='MOVECM_2     '
   991   Write(Iout,1008) routine
