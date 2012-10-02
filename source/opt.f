@@ -536,7 +536,7 @@ C     USES dfunc3d,func3d,linmin3d
 C     func3d input vector p of length n user defined to be optimized
 C     IOPT=1: Wu force field optimization
       iter=0
-      CALL func3d(N,IERR,AH,N5,N6,N5M,N6M,p,fp,force,iopt,
+      CALL func3d(N,IERR,p,fp,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -545,7 +545,7 @@ C     IOPT=1: Wu force field optimization
         return
       endif
 C     dfunc3d input vector p of length N, output gradient of length n user defined
-      CALL dfunc3d(N,AH,N5,N6,N5M,N6M,p,xi,force,iopt,
+      CALL dfunc3d(N,p,xi,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -583,7 +583,7 @@ c        endif
           return
         endif
         fp=fret
-        CALL dfunc3d(N,AH,N5,N6,N5M,N6M,p,xi,force,iopt,
+        CALL dfunc3d(N,p,xi,force,iopt,
      1    e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
      1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -682,7 +682,7 @@ C     USES func3d
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func3d(n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,force,iopt,
+      CALL func3d(n,IERR,xt,f1dimf,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
