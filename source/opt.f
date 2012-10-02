@@ -409,19 +409,15 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       graph = new_fullerene_graph(Nmax,MAtom,IDA)
       call tutte_layout(graph,Dist2D)
       call set_layout2d(graph,Dist2D)
-      write(*,*)'iopt',iopt
 
-      call lukas_edges(graph,matom,
+      call get_edges(graph,matom,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
-      write(*,*)'iopt',iopt
-      call lukas_corners(graph,MAtom,
+      call get_corners(graph,MAtom,
      1 a_h,a_p)
-      write(*,*)'iopt',iopt
       if(iopt .eq. 3) then
-      call lukas_dihedrals(graph,MAtom,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        call get_dihedrals(graph,MAtom,
+     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
-      write(*,*)'iopt',iopt
 
       deg2rad=dpi/180.d0
       dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
@@ -1192,7 +1188,7 @@ C     - N = Nvertices(g)
 C     ------------------------------------------------------------
 C                              EDGES
 C     ------------------------------------------------------------
-      SUBROUTINE lukas_edges(graph,N,
+      SUBROUTINE get_edges(graph,N,
      1 edges_hh,edges_hp,edges_pp,na_hh,na_hp,na_pp)
       use iso_c_binding
       type(c_ptr) :: graph
@@ -1200,11 +1196,10 @@ C     ------------------------------------------------------------
       integer edges_hh(2,3*N/2), edges_hp(2,3*N/2),edges_pp(2,3*N/2)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer na_hh,na_hp,na_pp
-      write(*,*)'entering lukas_edges'
       na_hh=0
       na_hp=0
       na_pp=0
-c      write(*,*)'n'
+
       do j=1,2
       do i=1,3*N/2
         edges_pp(j,i)=0
@@ -1212,10 +1207,7 @@ c      write(*,*)'n'
         edges_hh(j,i)=0
       enddo
       enddo
-c      write(*,*)'edges',edges
-c      write(*,*)'ne',NE
       call edge_list(graph,edges,NE)
-c      write(*,*)'check 2'
 
       do i=1,NE
 C       Edge u--v
@@ -1246,16 +1238,15 @@ C       Do what needs to be done to u--v here
           exit
         end select
 
-        write (*,*) "Edge ",(/u,v/)," connects ",np,"pentagons.",lA,lB 
+c        write (*,*) "Edge ",(/u,v/)," connects ",np,"pentagons.",lA,lB 
       end do
 
-      write(*,*)'leaving lukas_edges'
       END SUBROUTINE
 
 C     ------------------------------------------------------------
 C                              CORNERS
 C     ------------------------------------------------------------
-      SUBROUTINE lukas_corners(graph,N,a_h,a_p)
+      SUBROUTINE get_corners(graph,N,a_h,a_p)
 c     here, n is the number of atoms
       use iso_c_binding
       type(c_ptr) :: graph
@@ -1264,7 +1255,6 @@ c     arrays for atoms that are part of angles ...
       integer a_p(3,60), a_h(3,3*n-60)
 c     counter for angles around hexagons and pentagons
       integer NH
-      write(*,*)'entering lukas_corners'
 
       NH = N/2-10
 
@@ -1274,7 +1264,7 @@ C     corresponding to both a CW and a CCW traversal starting in the edge. (Like
 C     The angles are each counted exactly once if we trace the outline of each face in e.g. CCW order.
       do i=1,12
 C     iterate over angles u--v--w
-         write (*,*) "Pentagon number",i,"has corners:"
+c         write (*,*) "Pentagon number",i,"has corners:"
          do j=1,5
             u = pentagons(j,i)
             v = pentagons(MOD(j,5)+1,i)
@@ -1285,12 +1275,12 @@ C     Do what needs to be done to u--v--w here. Each of these are part of a pent
             a_p(2,5*(i-1)+j)=v+1
             a_p(3,5*(i-1)+j)=w+1
 
-            write (*,*) j,":",(/u,v,w/)
+c            write (*,*) j,":",(/u,v,w/)
          end do
       end do
 
       do i=1,NH
-         write (*,*) "Hexagon number",i,"has corners:"
+c         write (*,*) "Hexagon number",i,"has corners:"
 C     iterate over angles u--v--w
          do j=1,6
             u = hexagons(j,i)
@@ -1302,17 +1292,16 @@ C     Do what needs to be done to u--v--w here. Each of these are part of a hexa
             a_h(2,6*(i-1)+j)=v+1
             a_h(3,6*(i-1)+j)=w+1
 
-            write (*,*) j,":",(/u,v,w/)
+c            write (*,*) j,":",(/u,v,w/)
          end do
       end do
-      write(*,*)'leaving lukas_corners'
       END SUBROUTINE
 
 
 C     ------------------------------------------------------------
 C                              DIHEDRALS
 C     ------------------------------------------------------------
-      SUBROUTINE lukas_dihedrals(graph,N,
+      SUBROUTINE get_dihedrals(graph,N,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use iso_c_binding
       integer neighbours(3,N), face(6), lA,lB,lC, u,s,r,t
@@ -1321,12 +1310,11 @@ c     arrays for dihedrals. one per atom, starting in the middle
       integer d_hhh(4,n),d_hpp(4,n),d_hhp(4,n),d_ppp(4,n)
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
-      write(*,*)'entering lukas_dihedrals'
       nd_hhh=0
       nd_hhp=0
       nd_hpp=0
       nd_ppp=0
-c      write(*,*)'n'
+
       do j=1,4
       do i=1,n
         d_hhh(j,i)=0
@@ -1348,14 +1336,14 @@ C          r
          s = neighbours(2,u)
          t = neighbours(3,u)
 
-         write (*,*) "Dihedral ",u-1,r-1,s-1,t-1
+c         write (*,*) "Dihedral ",u-1,r-1,s-1,t-1
          call get_face(graph,s,u,r,6,face,lA)
          call get_face(graph,s,u,t,6,face,lB)
          call get_face(graph,r,u,t,6,face,lC)
 
          select case ( lA+lB+lC )
          case ( 15 )            ! (5,5,5) - all pentagons
-            write (*,*) "555"
+c            write (*,*) "555"
 C     Do stuff here
 
           nd_ppp=nd_ppp+1
@@ -1370,7 +1358,7 @@ C     Do stuff common to all three (2,1)-cases here
 C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 655 )  ! BC are pentagons, u--t common edge
-               write (*,*) "655"
+c               write (*,*) "655"
 
           nd_hpp=nd_hpp+1
           d_hpp(1,nd_hpp)=u
@@ -1379,9 +1367,9 @@ C     Do case specific stuff here
           d_hpp(4,nd_hpp)=t
 
             case ( 565 )  ! AC are pentagons, u--r common edge
-               write (*,*) "565"
+c               write (*,*) "565"
             case ( 556 )  ! AB are pentagons, u--s common edge
-               write (*,*) "556"
+c               write (*,*) "556"
             end select
 
          case ( 17 )            ! One pentagon, two hexagons
@@ -1390,7 +1378,7 @@ C     Do stuff common to all three (1,2)-cases here
 C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 566 )  ! BC are hexagons, u--t common edge
-               write (*,*) "566"
+c               write (*,*) "566"
 
           nd_hhp=nd_hhp+1
           d_hhp(1,nd_hhp)=u
@@ -1399,14 +1387,14 @@ C     Do case specific stuff here
           d_hhp(4,nd_hhp)=t
 
             case ( 656 )  ! AC are hexagons, u--r common edge
-               write (*,*) "656"
+c               write (*,*) "656"
             case ( 665 )  ! AB are hexagons, u--s common edge
-               write (*,*) "665"
+c               write (*,*) "665"
             end select
 
          case ( 18 )            ! (6,6,6) - all hexagons
 C     Do stuff here
-            write (*,*) "666"
+c            write (*,*) "666"
 
           nd_hhh=nd_hhh+1
           d_hhh(1,nd_hhh)=u
@@ -1419,11 +1407,7 @@ C     Do stuff here
          end select
 
       end do
-      write(*,*)'d_ppp',d_ppp
-      write(*,*)'d_hpp',d_hpp
-      write(*,*)'d_hhp',d_hhp
-      write(*,*)'d_hhh',d_hhh
-      write(*,*)'leaving lukas_dihedrals'
+c      write(*,*)'leaving lukas_dihedrals'
       END SUBROUTINE
 
 

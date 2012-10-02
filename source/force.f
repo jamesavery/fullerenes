@@ -7,7 +7,7 @@ c n=MATOM*3
 c      IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
 
-      write(*,*)'entering func3d'
+c      write(*,*)'entering func3d'
 
       select case(iopt)
         case(1)
@@ -25,7 +25,7 @@ c      IMPLICIT REAL*8 (A-H,O-Z)
      1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       end select
 
-      write(*,*)'leaving func3d'
+c      write(*,*)'leaving func3d'
       
       return
       END SUBROUTINE
@@ -49,7 +49,7 @@ c     edges with 0, 1, 2 pentagons
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 
-      write(*,*)'entering wu'
+c      write(*,*)'entering wu'
 
       IERR=0
       rp=force(1)
@@ -205,7 +205,7 @@ C     Coulomb repulsion from origin
 C     total energy  
       fc=frp*ehookrp+frh*ehookrh+fap*ehookap+fah*ehookah+fco*ecoulomb
 c  2   fc=frp*ehookrp+frh*ehookrh+fap*ehookap+fah*ehookah+fco*ecoulomb
-      write(*,*)'leaving wu'
+c      write(*,*)'leaving wu'
       Return
       END SUBROUTINE
 
@@ -354,7 +354,7 @@ C dihedrals
       ehookdhpp=0.d0
       ehookdhhp=0.d0
       ehookdhhh=0.d0
-      write(*,*)nd_hhh,nd_hhp,nd_hpp,nd_ppp
+c      write(*,*)nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
       if(nd_hhh .ne. 0) then
 C     3 hexagons
@@ -547,7 +547,7 @@ c      write(*,*)fc,"energy"
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
-      write(*,*)"entering dfunc3d"
+c      write(*,*)"entering dfunc3d"
       
       select case(iopt)
         case(1)
@@ -565,7 +565,7 @@ c      write(*,*)fc,"energy"
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       end select
 
-      write(*,*)"leaving dfunc3d"
+c      write(*,*)"leaving dfunc3d"
       return
       END SUBROUTINE
 
@@ -587,7 +587,7 @@ c     edges with 0, 1, 2 pentagons
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 
-      write(*,*)'entering dwu'
+c      write(*,*)'entering dwu'
 
       rp=force(1)
       rh=force(2)
@@ -838,7 +838,7 @@ c          x(JR-1)=x(JR-1)+dcy*dE_over_dc
 c          x(JR)  =x(JR)  +dcz*dE_over_dc
 c        enddo
 c      enddo
-      write(*,*)x
+c      write(*,*)x
 
 C     Coulomb repulsion from origin
       if (iopt.eq.2 .and. fco.ne.0.d0)  then
@@ -850,7 +850,7 @@ C     Coulomb repulsion from origin
         enddo
       endif
 
-      write(*,*)'leaving dwu'
+c      write(*,*)'leaving dwu'
       return
       END
 
@@ -876,8 +876,8 @@ c     counter for edges with 0, 1, 2 pentagons neighbours
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
-      write(*,*)'entering dextwu'
-      write(*,*)'n',n
+c      write(*,*)'entering dextwu'
+c      write(*,*)'n',n
 
       rpp=force(1)
       rhp=force(2)
@@ -901,7 +901,7 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
 C     Stretching
 c     we distinguish between bonds between two hexagons, two pentagons and hex/pent
       
-      write(*,*)'before stretch'
+c      write(*,*)'before stretch'
       if(ne_hh .ne. 0) then
         do i=1,ne_hh
           call ddist(p(3*e_hh(1,i)-2),p(3*e_hh(1,i)-1),p(3*e_hh(1,i)),
@@ -1006,7 +1006,7 @@ c        enddo
 c      enddo
 
 c      enddo
-      write(*,*)'before bend-p'
+c      write(*,*)'before bend-p'
         
 C     Bending
 C     Loop over 5-rings
@@ -1037,7 +1037,7 @@ C     Loop over 5-rings
         x(3*a_p(3,i))  =x(3*a_p(3,i))  +dcz*dE_over_dc
       enddo
 
-      write(*,*)'before bend-h'
+c      write(*,*)'before bend-h'
 C     Loop over 6-rings
       if(n/3 .gt. 20) then
         do i=1,n-60
@@ -1143,7 +1143,6 @@ c          x(JR-1)=x(JR-1)+dcy*dE_over_dc
 c          x(JR)  =x(JR)  +dcz*dE_over_dc
 c        enddo
 c      enddo
-      write(*,*)'before dihed'
 
 C     dihedrals 
 c     3 hexagons
@@ -1429,6 +1428,6 @@ c        x(J4-1)=x(J4-1)+ddy*dE_over_dc
 c        x(J4)  =x(J4)  +ddz*dE_over_dc
 c      enddo
 c      write(*,*)"d,0: ",angle_abcd,zero_value," (should be similar)"
-      write(*,*)'leaving dextwu'
+c      write(*,*)'leaving dextwu'
       return
       END
