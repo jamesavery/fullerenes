@@ -49,7 +49,6 @@ C    Set the dimensions for the distance matrix
       CHARACTER*3 GROUP
       Integer endzeile,Values(8)
       Integer MDist(Nmax,Nmax)
-      type(c_ptr) :: graph, new_fullerene_graph
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
      2 'MN','FE','CO','NI','CU','ZN','GA','GE','AS','SE','BR','KR',    
@@ -74,10 +73,10 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       ASphere=0.d0
       Group='   '
       Do I=1,Nmax
-       IAtom(I)=6
-      Do J=1,Nmax
-       IDA(I,J)=0
-      enddo
+        IAtom(I)=6
+        Do J=1,Nmax
+          IDA(I,J)=0
+        enddo
       enddo
 
       CALL date_and_time(CDAT,CTIM,zone,values)
@@ -243,13 +242,6 @@ C Produce the nth leapfrog of the fullerene
         if(LeapErr.eq.0) go to 999 ! moveCM
       endif
 
-c$$$      graph = new_fullerene_graph(Nmax,MAtom,IDA)
-c$$$      call tutte_layout(graph,Dist2D)
-c$$$      call set_layout2d(graph,Dist2D)
-c$$$
-c$$$      call lukas_edges(graph,MAtom)
-c$$$      call lukas_corners(graph,MAtom)
-c$$$      call lukas_dihedrals(graph,MAtom)
 
 C------------------HAMILTON---------------------------------------
 C Generate IUPAC name and locate Hamiltonian cycles. 
@@ -296,15 +288,15 @@ c a stone wales (or any other transformation) is done
             ftol=ftolP*1.d3
             Write(Iout,1003)
             CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
-     1        N5MEM,N6MEM,Dist,Rdist,ftol,force,iopt)
+     1        N5MEM,N6MEM,Dist,dist2D,Rdist,ftol,force,iopt)
           endif
           iopt=1
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring, ! vanilla Wu
-     1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
+     1      N5MEM,N6MEM,Dist,dist2D,Rdist,ftolP,forceP,iopt)
           Iprint=0
         else if(Iopt.eq.3) then ! extended Wu, 18 parameters
           CALL OptFF(MAtom,Iout,IDA,N5Ring,N6Ring,
-     1      N5MEM,N6MEM,Dist,Rdist,ftolP,forceP,iopt)
+     1      N5MEM,N6MEM,Dist,dist2D,Rdist,ftolP,forceP,iopt)
         endif
         routine='MOVECM_2     '
   991   Write(Iout,1008) routine

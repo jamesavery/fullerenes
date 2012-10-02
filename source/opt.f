@@ -377,8 +377,9 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       END
 
       SUBROUTINE OptFF(MAtom,Iout,IDA,N5,N6,
-     1 N5MEM,N6MEM,Dist,Rdist,ftol,force,iopt)
+     1 N5MEM,N6MEM,Dist,dist2D,Rdist,ftol,force,iopt)
       use config
+      use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
 C  This subroutine optimizes the fullerene 3D structure using a force field
 c  (e.g. the Wu force field):  Z. C. Wu, D. A. Jelski, T. F. George, "Vibrational
@@ -390,6 +391,38 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION N5MEM(MMAX,5),N6MEM(MMAX,6)
       real(8) force(ffmaxdim)
       integer iopt
+      type(c_ptr) :: graph, new_fullerene_graph
+
+c      write(*,*)'entering optff'
+c      write(*,*)'iopt',iopt
+
+c edges with 0, 1, 2 pentagons
+      integer e_hh(2,3*MAtom/2), e_hp(2,3*MAtom/2),
+     1      e_pp(2,3*MAtom/2)
+      integer a_h(3,3*MAtom-60), a_p(3,60)
+      integer d_hhh(4,matom),d_hpp(4,matom),d_hhp(4,matom),
+     1      d_ppp(4,matom)
+c counter for edges with 0, 1, 2 pentagons neighbours
+      integer ne_hh,ne_hp,ne_pp
+      integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
+
+      graph = new_fullerene_graph(Nmax,MAtom,IDA)
+      call tutte_layout(graph,Dist2D)
+      call set_layout2d(graph,Dist2D)
+      write(*,*)'iopt',iopt
+
+      call lukas_edges(graph,matom,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
+      write(*,*)'iopt',iopt
+      call lukas_corners(graph,MAtom,
+     1 a_h,a_p)
+      write(*,*)'iopt',iopt
+      if(iopt .eq. 3) then
+      call lukas_dihedrals(graph,MAtom,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+      endif
+      write(*,*)'iopt',iopt
+
       deg2rad=dpi/180.d0
       dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
       if(iopt.eq.1 .or. iopt.eq.2)then
@@ -440,9 +473,13 @@ C     Optimize
         Write(IOUT,1007) Rdist
         Write(Iout,1005) (force(i),i=1,18),ftol
       end select
+c      write(*,*)'frprmn3d will be entered soon'
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
       CALL frprmn3d(MATOM*3,IDA,Iout,N5,N6,N5MEM,N6MEM,
-     1 Dist,force,iopt,ftol,iter,fret)
+     1 Dist,force,iopt,ftol,iter,fret,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(fret.gt.1.d-2) then
       fretn=fret/dfloat(MATOM)
       Write(IOUT,1002) fretn
@@ -478,7 +515,10 @@ C     Optimize
       END
 
       SUBROUTINE frprmn3d(N,AH,Iout,N5,N6,N5M,N6M,
-     1 p,force,iopt,ftol,iter,fret)
+     1 p,force,iopt,ftol,iter,fret,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c and N=MATOM*3
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -500,13 +540,19 @@ C     USES dfunc3d,func3d,linmin3d
 C     func3d input vector p of length n user defined to be optimized
 C     IOPT=1: Wu force field optimization
       iter=0
-      CALL func3d(N,IERR,AH,N5,N6,N5M,N6M,p,fp,force,iopt)
+      CALL func3d(N,IERR,AH,N5,N6,N5M,N6M,p,fp,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(IERR.ne.0) then
         Write(Iout,1004)
         return
       endif
 C     dfunc3d input vector p of length N, output gradient of length n user defined
-      CALL dfunc3d(N,AH,N5,N6,N5M,N6M,p,xi,force,iopt)
+      CALL dfunc3d(N,AH,N5,N6,N5M,N6M,p,xi,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       grad2=0.d0
       do I=1,N
         grad2=grad2+xi(i)*xi(i)
@@ -523,7 +569,9 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
       do its=1,ITMAX
         iter=its
         call linmin3d(N,AH,N5,N6,N5M,N6M,p,pcom,xi,xicom,fret,
-     1    force,iopt)!,damping)
+     1    force,iopt,e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1    a_h,a_p,
+     1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
         grad2=0.d0
         do I=1,n
           grad2=grad2+xi(i)*xi(i)
@@ -539,7 +587,10 @@ c        endif
           return
         endif
         fp=fret
-        CALL dfunc3d(N,AH,N5,N6,N5M,N6M,p,xi,force,iopt)
+        CALL dfunc3d(N,AH,N5,N6,N5M,N6M,p,xi,force,iopt,
+     1    e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1    a_h,a_p,
+     1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         gg=0.d0
         dgg=0.d0
         do j=1,n
@@ -569,7 +620,9 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       END
 
       SUBROUTINE linmin3d(n,AH,N5,N6,N5M,N6M,
-     1 p,pcom,xi,xicom,fret,force,iopt)!,damping)
+     1 p,pcom,xi,xicom,fret,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3)
@@ -586,9 +639,13 @@ C     USES brent3d,f1dim3d,mnbrak3d
       ax=0.d0
       xx=1.d0
       CALL mnbrak3d(n,AH,N5,N6,N5M,N6M,
-     1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt)
+     1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       CALL brent3d(n,AH,N5,N6,N5M,N6M,Iout,fret,
-     1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt)
+     1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c lets scale all displacements that are longer than a chosen cutoff to that cutoff.
 c the direction of the displacement vector is maintained
       do j=1,n
@@ -616,7 +673,10 @@ c        p(j)=p(j)+xi_tmp(j)
       END
 
       SUBROUTINE f1dim3d(n,A,N5,N6,N5M,N6M,
-     1 f1dimf,x,xicom,pcom,force,iopt)
+     1 f1dimf,x,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3)
@@ -626,12 +686,18 @@ C     USES func3d
       do j=1,n
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func3d(n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,force,iopt)
+      CALL func3d(n,IERR,A,N5,N6,N5M,N6M,xt,f1dimf,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       return
       END
 
       SUBROUTINE mnbrak3d(n,AH,N5,N6,N5M,N6M,
-     1 ax,bx,cx,fa,fb,fc,xicom,pcom,force,iopt)
+     1 ax,bx,cx,fa,fb,fc,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
@@ -639,9 +705,15 @@ C     USES func3d
       Integer N5M(MMAX,5),N6M(MMAX,6)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3)
       CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1 fa,ax,xicom,pcom,force,iopt)
+     1 fa,ax,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1 fb,bx,xicom,pcom,force,iopt)
+     1 fb,bx,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(fb.gt.fa)then
         dum=ax
         ax=bx
@@ -652,7 +724,10 @@ C     USES func3d
       endif
       cx=bx+GOLD*(bx-ax)
       CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1 fc,cx,xicom,pcom,force,iopt)
+     1 fc,cx,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
         q=(bx-cx)*(fb-fa)
@@ -660,7 +735,10 @@ C     USES func3d
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
         CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,force,iopt)
+     1   fu,u,xicom,pcom,force,iopt,
+     1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1   a_h,a_p,
+     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
           if(fu.lt.fc)then
             ax=bx
             fa=fb
@@ -674,10 +752,16 @@ C     USES func3d
           endif
           u=cx+GOLD*(cx-bx)
         CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,force,iopt)
+     1   fu,u,xicom,pcom,force,iopt,
+     1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1   a_h,a_p,
+     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         else if((cx-u)*(u-ulim).gt.0.)then
         CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,force,iopt)
+     1   fu,u,xicom,pcom,force,iopt,
+     1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1   a_h,a_p,
+     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
           if(fu.lt.fc)then
             bx=cx
             cx=u
@@ -685,12 +769,18 @@ C     USES func3d
             fb=fc
             fc=fu
         CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,force,iopt)
+     1   fu,u,xicom,pcom,force,iopt,
+     1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1   a_h,a_p,
+     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
         CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,force,iopt)
+     1   fu,u,xicom,pcom,force,iopt,
+     2   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1   a_h,a_p,
+     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         else
           u=cx+GOLD*(cx-bx)
         if(u.gt.1.d10) then
@@ -698,7 +788,10 @@ C     USES func3d
         return
         endif
         CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,force,iopt)
+     1   fu,u,xicom,pcom,force,iopt,
+     1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1   a_h,a_p,
+     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         endif
         ax=bx
         bx=cx
@@ -712,7 +805,10 @@ C     USES func3d
       END
 
       SUBROUTINE brent3d(n,AH,N5,N6,N5M,N6M,Iout,
-     1 fx,ax,bx,cx,tol,xmin,xicom,pcom,force,iopt)
+     1 fx,ax,bx,cx,tol,xmin,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
@@ -728,7 +824,10 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       x=v
       e=0.d0
       CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1 fx,x,xicom,pcom,force,iopt)
+     1 fx,x,xicom,pcom,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       fv=fx
       fw=fx
       do 11 iter=1,ITMAX
@@ -764,7 +863,10 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
           u=x+sign(tol1,d)
         endif
         CALL f1dim3d(n,AH,N5,N6,N5M,N6M,
-     1   fu,u,xicom,pcom,force,iopt)
+     1   fu,u,xicom,pcom,force,iopt,
+     1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1   a_h,a_p,
+     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         if(fu.le.fx) then
           if(u.ge.x) then
             a=x
@@ -1076,6 +1178,7 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
+
 C     Lukas: The following three subroutines iterate over
 C      1. edges
 C      2. corners
@@ -1089,41 +1192,83 @@ C     - N = Nvertices(g)
 C     ------------------------------------------------------------
 C                              EDGES
 C     ------------------------------------------------------------
-      SUBROUTINE lukas_edges(g,N)
+      SUBROUTINE lukas_edges(graph,N,
+     1 edges_hh,edges_hp,edges_pp,na_hh,na_hp,na_pp)
       use iso_c_binding
-      type(c_ptr) :: g
+      type(c_ptr) :: graph
       integer edges(2,3*N/2), faceA(6), faceB(6), NE, np, i, u, v, lA,lB
-
-      call edge_list(g,edges,NE)
+      integer edges_hh(2,3*N/2), edges_hp(2,3*N/2),edges_pp(2,3*N/2)
+c     counter for edges with 0, 1, 2 pentagons neighbours
+      integer na_hh,na_hp,na_pp
+      write(*,*)'entering lukas_edges'
+      na_hh=0
+      na_hp=0
+      na_pp=0
+c      write(*,*)'n'
+      do j=1,2
+      do i=1,3*N/2
+        edges_pp(j,i)=0
+        edges_hp(j,i)=0
+        edges_hh(j,i)=0
+      enddo
+      enddo
+c      write(*,*)'edges',edges
+c      write(*,*)'ne',NE
+      call edge_list(graph,edges,NE)
+c      write(*,*)'check 2'
 
       do i=1,NE
-C        Edge u--v
-         u = edges(1,i)
-         v = edges(2,i)
+C       Edge u--v
+        u = edges(1,i)
+        v = edges(2,i)
 
-C     Edge is part of how many pentagons?
-         call get_arc_face(g,u,v,faceA,lA) ! O(1) operation
-         call get_arc_face(g,v,u,faceB,lB) ! O(1) operation
-         np = 12-lA-lB
+C       Edge is part of how many pentagons?
+        call get_arc_face(graph,u,v,faceA,lA) ! O(1) operation
+        call get_arc_face(graph,v,u,faceB,lB) ! O(1) operation
+        np = 12-lA-lB
          
-C     Do what needs to be done to u--v here
-         write (*,*) "Edge ",(/u,v/)," connects ",np,"pentagons.",lA,lB
+C       Do what needs to be done to u--v here 
+        select case(np)
+        case(0)
+          na_hh=na_hh+1
+          edges_hh(1,na_hh)=u+1
+          edges_hh(2,na_hh)=v+1
+        case(1)
+          na_hp=na_hp+1
+          edges_hp(1,na_hp)=u+1
+          edges_hp(2,na_hp)=v+1
+        case(2)
+          na_pp=na_pp+1
+          edges_pp(1,na_pp)=u+1
+          edges_pp(2,na_pp)=v+1
+        case default
+          write(*,*)'Something went horribly wrong'
+          exit
+        end select
+
+        write (*,*) "Edge ",(/u,v/)," connects ",np,"pentagons.",lA,lB 
       end do
 
+      write(*,*)'leaving lukas_edges'
       END SUBROUTINE
 
 C     ------------------------------------------------------------
 C                              CORNERS
 C     ------------------------------------------------------------
-      SUBROUTINE lukas_corners(g,N)
+      SUBROUTINE lukas_corners(graph,N,a_h,a_p)
+c     here, n is the number of atoms
       use iso_c_binding
-      type(c_ptr) :: g
+      type(c_ptr) :: graph
       integer pentagons(5,12), hexagons(6,N/2-10), u,v,w,i,j
+c     arrays for atoms that are part of angles ... 
+      integer a_p(3,60), a_h(3,3*n-60)
+c     counter for angles around hexagons and pentagons
       integer NH
+      write(*,*)'entering lukas_corners'
 
       NH = N/2-10
 
-      call compute_fullerene_faces(g,pentagons,hexagons) ! Yields faces with vertices ordered CCW. O(N)
+      call compute_fullerene_faces(graph,pentagons,hexagons) ! Yields faces with vertices ordered CCW. O(N)
 C     Every directed edge u->v is part of two "angles", corresponding to the neighbours to v that aren't u,
 C     corresponding to both a CW and a CCW traversal starting in the edge. (Likewise, every edge is part of four)
 C     The angles are each counted exactly once if we trace the outline of each face in e.g. CCW order.
@@ -1135,6 +1280,10 @@ C     iterate over angles u--v--w
             v = pentagons(MOD(j,5)+1,i)
             w = pentagons(MOD(j+1,5)+1,i)
 C     Do what needs to be done to u--v--w here. Each of these are part of a pentagon, obviously.
+
+            a_p(1,5*(i-1)+j)=u+1
+            a_p(2,5*(i-1)+j)=v+1
+            a_p(3,5*(i-1)+j)=w+1
 
             write (*,*) j,":",(/u,v,w/)
          end do
@@ -1149,21 +1298,45 @@ C     iterate over angles u--v--w
             w = hexagons(MOD(j+1,6)+1,i)
 C     Do what needs to be done to u--v--w here. Each of these are part of a hexagon, obviously.
 
+            a_h(1,6*(i-1)+j)=u+1
+            a_h(2,6*(i-1)+j)=v+1
+            a_h(3,6*(i-1)+j)=w+1
+
             write (*,*) j,":",(/u,v,w/)
          end do
       end do
+      write(*,*)'leaving lukas_corners'
       END SUBROUTINE
 
 
 C     ------------------------------------------------------------
 C                              DIHEDRALS
 C     ------------------------------------------------------------
-      SUBROUTINE lukas_dihedrals(g,N)
+      SUBROUTINE lukas_dihedrals(graph,N,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use iso_c_binding
       integer neighbours(3,N), face(6), lA,lB,lC, u,s,r,t
-      type(c_ptr) :: g
+      type(c_ptr) :: graph
+c     arrays for dihedrals. one per atom, starting in the middle
+      integer d_hhh(4,n),d_hpp(4,n),d_hhp(4,n),d_ppp(4,n)
+c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
+      integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
+      write(*,*)'entering lukas_dihedrals'
+      nd_hhh=0
+      nd_hhp=0
+      nd_hpp=0
+      nd_ppp=0
+c      write(*,*)'n'
+      do j=1,4
+      do i=1,n
+        d_hhh(j,i)=0
+        d_hhp(j,i)=0
+        d_hpp(j,i)=0
+        d_ppp(j,i)=0
+      enddo
+      enddo
 
-      call adjacency_list(g,3,neighbours)
+      call adjacency_list(graph,3,neighbours)
 
       do u=1,N
 C      s   B   t      
@@ -1175,15 +1348,22 @@ C          r
          s = neighbours(2,u)
          t = neighbours(3,u)
 
-         write (*,*) "Dihedral ",u-1,s-1,r-1,t-1
-         call get_face(g,s,u,r,6,face,lA)
-         call get_face(g,s,u,t,6,face,lB)
-         call get_face(g,r,u,t,6,face,lC)
+         write (*,*) "Dihedral ",u-1,r-1,s-1,t-1
+         call get_face(graph,s,u,r,6,face,lA)
+         call get_face(graph,s,u,t,6,face,lB)
+         call get_face(graph,r,u,t,6,face,lC)
 
          select case ( lA+lB+lC )
          case ( 15 )            ! (5,5,5) - all pentagons
             write (*,*) "555"
 C     Do stuff here
+
+          nd_ppp=nd_ppp+1
+          d_ppp(1,nd_ppp)=u
+          d_ppp(2,nd_ppp)=r
+          d_ppp(3,nd_ppp)=s
+          d_ppp(4,nd_ppp)=t
+
          case ( 16 )            ! Two pentagons, one hexagon
 C     Do stuff common to all three (2,1)-cases here
             
@@ -1191,6 +1371,13 @@ C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 655 )  ! BC are pentagons, u--t common edge
                write (*,*) "655"
+
+          nd_hpp=nd_hpp+1
+          d_hpp(1,nd_hpp)=u
+          d_hpp(2,nd_hpp)=r
+          d_hpp(3,nd_hpp)=s
+          d_hpp(4,nd_hpp)=t
+
             case ( 565 )  ! AC are pentagons, u--r common edge
                write (*,*) "565"
             case ( 556 )  ! AB are pentagons, u--s common edge
@@ -1204,6 +1391,13 @@ C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 566 )  ! BC are hexagons, u--t common edge
                write (*,*) "566"
+
+          nd_hhp=nd_hhp+1
+          d_hhp(1,nd_hhp)=u
+          d_hhp(2,nd_hhp)=r
+          d_hhp(3,nd_hhp)=s
+          d_hhp(4,nd_hhp)=t
+
             case ( 656 )  ! AC are hexagons, u--r common edge
                write (*,*) "656"
             case ( 665 )  ! AB are hexagons, u--s common edge
@@ -1213,10 +1407,23 @@ C     Do case specific stuff here
          case ( 18 )            ! (6,6,6) - all hexagons
 C     Do stuff here
             write (*,*) "666"
+
+          nd_hhh=nd_hhh+1
+          d_hhh(1,nd_hhh)=u
+          d_hhh(2,nd_hhh)=r
+          d_hhh(3,nd_hhh)=s
+          d_hhh(4,nd_hhh)=t
+
          case DEFAULT
             write (*,*) "INVALID: ",(/lA,lB,lC/)
          end select
 
       end do
+      write(*,*)'d_ppp',d_ppp
+      write(*,*)'d_hpp',d_hpp
+      write(*,*)'d_hhp',d_hhp
+      write(*,*)'d_hhh',d_hhh
+      write(*,*)'leaving lukas_dihedrals'
       END SUBROUTINE
+
 
