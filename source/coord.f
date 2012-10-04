@@ -234,7 +234,6 @@ C     or for a dodecahedron
      1   6,6,6,7,7,7,8,8,8,9,9,10/
       Data NUN/2,3,9,10,11,3,4,10,12,4,5,11,5,6,12,
      1   6,7,11,7,8,12,8,9,11,9,10,12,10,11,12/
-      DATA API/3.14159265358979d0/
 
       dsqrt5=dsqrt(5.d0)
 C   Capped Isosahedron
@@ -252,7 +251,7 @@ C     Calculate the 12 coordinates of icosahedron
       Fac1=Rmax/dsqrt5
       Do I=1,10
 C     Angle multiple of 36 deg, or Pi/10., multiplied by 2
-      ang=.2d0*dfloat(I)*API
+      ang=.2d0*dfloat(I)*dpi
       fcos=dcos(ang)
       fsin=dsin(ang)
       DIco(1,I)=2.d0*Fac1*fcos
@@ -2171,8 +2170,7 @@ C   on output ZMatrix = Z-Matrix
 C        MAtom: number of atoms
 C        degree = 360/2Pi = 57.29578..., angles are in degrees
 C
-      DATA API/3.14159265358979d0/
-      degree=1.8d2/API
+      degree=1.8d2/dpi
  
       Write(Iout,1000) 
        do i=1,MAtom
@@ -2268,7 +2266,6 @@ C   nc   = numbers of atom to which atoms are related by dihedral
 C  output zmatrix  = internal coordinates in angstroms, radians, and radians
 
       Data tol/0.2617994d0/
-      DATA API/3.14159265358979d0/
 
       do 30 i=2,MAtom
          j=na(i)
@@ -2281,7 +2278,7 @@ C  output zmatrix  = internal coordinates in angstroms, radians, and radians
          if(i.lt.4) go to 30
 c   make sure dihedral is meaningful
          call bangle(Dist,j,k,l,angl)
-         if(angl.gt.API-tol.or.angl.lt.tol)then
+         if(angl.gt.dpi-tol.or.angl.lt.tol)then
 c  angle is unsatisfactory, let's search for another atom for
 c  defining the dihedral.
    10       sum=1.d2
@@ -2291,7 +2288,7 @@ c  defining the dihedral.
      2          (Dist(3,i1)-Dist(3,k))**2
                if(r.lt.sum.and.i1.ne.j.and.i1.ne.k) then
                   call bangle(Dist,j,k,i1,angl)
-                  if(angl.lt.API-tol.and.angl.gt.tol)then
+                  if(angl.lt.dpi-tol.and.angl.gt.tol)then
                      sum=r
                      l=i1
                      nc(ii)=l

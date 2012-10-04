@@ -2663,7 +2663,6 @@ C     (6-6) 2-ring fusions
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),DistMat(NmaxL)
 C     Calculate distance matrix between atoms from cartesian coordinates
-      DATA API/3.14159265358979d0/
       IMat=0
       if(Iopt.eq.0.and.Iprint.eq.1) Write(IOUT,1000) 
       Do I=2,MAtom
@@ -2707,8 +2706,8 @@ C     Determine minimum and maximum distances
        endif
       enddo
       enddo
-      Vol=4.d0/3.d0*API*RmaxS**3
-      ASphere=4.d0*API*RmaxS**2
+      Vol=4.d0/3.d0*dpi*RmaxS**3
+      ASphere=4.d0*dpi*RmaxS**2
       Write(IOUT,1002) Rmin,Imin,Jmin,Rmax,Imax,Jmax,RmaxS,Vol,
      1 ASphere,ASphere/Vol
 C     Volume of ideal capped icosahedron

@@ -2,7 +2,6 @@
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),c(3),cmax(3),cmcs(3)
-      DATA API/3.14159265358979d0/
       DATA itermax/10000000/
       DATA eps,epsc/1.d-8,2.d0/
       IOP=1
@@ -26,8 +25,8 @@ C    Initial step
       else
       Write(IOUT,1006) RMIS,IP,(c(i),i=1,3)
       endif
-      VMIS=4.d0/3.d0*Api*RMIS**3
-      AMIS=4.d0*Api*RMIS**2
+      VMIS=4.d0/3.d0*dpi*RMIS**3
+      AMIS=4.d0*dpi*RMIS**2
       Write(IOUT,1002) RMIS,VMIS,AMIS
 C     Start Iteration
       CALL powell(3,iter,Iout,IOP,ier,M,eps,AN,RMIS,c,cmax,Dist)
@@ -38,11 +37,11 @@ C     End Iteration
       endif
       Call MAInorm(3,M,IP,RMIS,c,Dist)
       Write(IOUT,1003) RMIS,IP,(c(i),i=1,3)
-      VMIS=4.d0/3.d0*Api*RMIS**3
-      AMIS=4.d0*Api*RMIS**2
+      VMIS=4.d0/3.d0*dpi*RMIS**3
+      AMIS=4.d0*dpi*RMIS**2
       Write(IOUT,1004) RMIS,VMIS,AMIS
       RealMIS=RMIS-RVdWC
-      VVdWC=4.d0/3.d0*Api*RealMIS**3
+      VVdWC=4.d0/3.d0*dpi*RealMIS**3
       Write(IOUT,1005) RVdWC,RealMIS,VVdWC
  1000 Format(/1X,'Calculate the maximum inner sphere')
  1001 Format(1X,'Initial inner radius: ',d12.6,' to point ',I5,
@@ -72,7 +71,6 @@ C     End Iteration
       DIMENSION Dist(3,Nmax),c(3),cmax(3),cMCS(3)
 C     Get the minimum distance sphere
       
-      DATA API/3.14159265358979d0/
       DATA itermax/10000000/
       DATA eps/1.d-8/
 
@@ -98,8 +96,8 @@ C    Calculate the MDS norm
       IOP=0
       Call MDSnorm(3,M,AN,RMDSI,c,Dist)
       Write(IOUT,1001) RMDSI,(c(i),i=1,3)
-      VMDSI=4.d0/3.d0*Api*RMDSI**3
-      AMDSI=4.d0*Api*RMDSI**2
+      VMDSI=4.d0/3.d0*dpi*RMDSI**3
+      AMDSI=4.d0*dpi*RMDSI**2
       VMDS=VMDSI
       AMDS=AMDSI
       RMDS=RMDSI
@@ -120,8 +118,8 @@ C     End Iteration
       endif
       Call MDSnorm(3,M,AN,RMDSI,c,Dist)
       Write(IOUT,1004) iter,(c(i),i=1,3),AN
-      VMDSI=4.d0/3.d0*Api*RMDSI**3
-      AMDSI=4.d0*Api*RMDSI**2
+      VMDSI=4.d0/3.d0*dpi*RMDSI**3
+      AMDSI=4.d0*dpi*RMDSI**2
       VMDS=VMDSI
       AMDS=AMDSI
       RMDS=RMDSI
@@ -302,7 +300,6 @@ C Write out cc1 file
       DIMENSION u(Nmax),c(3),Kappa(Nmax)
       Real*8 meandist
 C     Get the minimum covering sphere using algorithm 2 by E.A.Yildirim
-      DATA API/3.14159265358979d0/
       DATA itermax/10000000/
       DATA eps,disteps/1.d-12,1.d-5/
       epsilon=(1.d0+eps)**2-1.d0
@@ -507,13 +504,13 @@ C     ----------------
       Write(IOUT,1002) (c(i),i=1,3),dist0
 C     Check if there is no point outside the sphere
 C     Finally calculate the surface and volume and compare to previous results
-      VMCS=4.d0/3.d0*Api*RMCS**3
-      AMCS=4.d0*Api*RMCS**2
+      VMCS=4.d0/3.d0*dpi*RMCS**3
+      AMCS=4.d0*dpi*RMCS**2
       RatioMCS=AMCS/VMCS
       RatioCS=ACS/VCS
       RatioT=Atol/Vtol
       RatioV=VMCS/Vtol
-      AIPQ=36.d0*API*Vtol**2/Atol**3
+      AIPQ=36.d0*dpi*Vtol**2/Atol**3
       DIPQ=(1.d0-AIPQ)*100.d0
       Write(IOUT,1004) VMCS,VCS,Vtol,AMCS,ACS,Atol,
      1 RatioMCS,RatioCS,RatioT,RatioV,AIPQ,DIPQ,
@@ -542,8 +539,8 @@ C     Do statistics
       Write(IOUT,1008) radius
 C     Add the carbon Van der Waals radius
       RVdWF=radius+RVdWC
-      VVdWF=4.d0/3.d0*Api*RVdWF**3
-      VFCC=VVdWF*3.d0*dsqrt(2.d0)/Api
+      VVdWF=4.d0/3.d0*dpi*RVdWF**3
+      VFCC=VVdWF*3.d0*dsqrt(2.d0)/dpi
       Write(IOUT,1009) RVdWC,RVdWF,VVdWF
       ALC=2.d0*RVdWF*dsqrt(2.d0)
       Write(IOUT,1010) ALC,VFCC,VFCC*0.60221367d0
