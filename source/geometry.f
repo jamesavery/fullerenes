@@ -176,11 +176,10 @@ c mult: 11, div: 1, root: 2, add/sub: 8, arccos: 1
       SUBROUTINE ANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
       implicit real*8 (a-z)
       r2L=(ax-bx)**2 + (ay-by)**2 + (az-bz)**2
-      r1L=dsqrt(r2L)
       r2M=(ax-cx)**2 + (ay-cy)**2 + (az-cz)**2
       r2R=(bx-cx)**2 + (by-cy)**2 + (bz-cz)**2
-      r1R=dsqrt(r2R)
-      arg=(r2L+r2R-r2M)/(2.0*r1L*r1R)
+      den=2.0 * dsqrt(r2L * r2R)
+      arg=(r2L+r2R-r2M)/den
 c the following two exceptions may be called in case of rounding errors
       if(arg .gt. 1.d0) arg=1.d0
       if(arg .lt. -1.d0) arg=-1.d0
