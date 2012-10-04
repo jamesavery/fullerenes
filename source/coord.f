@@ -2032,22 +2032,31 @@ C   Tutte algorithm for the 3D structure (see pentindex.f):
 C     Obtain smallest distance for further scaling
 C     Now this contracts or expands the whole fullerene to set the
 C     smallest bond distance to Cdist
+c the same functionality is in pentindex.f, twice.
+c     corraction: setting the shortest bond to to cdist is not a good idea.  It is beneficial to set the avarage bond length to some value, like e.g. 3*cdist
       R0=1.d10
-
+      Rsum=0.d0
       Do I=1,Matom
-      Do J=I+1,Matom
-      X=Dist(1,I)-Dist(1,J)
-      Y=Dist(2,I)-Dist(2,J)
-      Z=Dist(3,I)-Dist(3,J)
-      R=dsqrt(X*X+Y*Y+Z*Z)
-      if(R.lt.R0) R0=R
+        Do J=I+1,Matom
+          if (IDA(i,j) .ne. 0) then
+            X=Dist(1,I)-Dist(1,J)
+            Y=Dist(2,I)-Dist(2,J)
+            Z=Dist(3,I)-Dist(3,J)
+            R=dsqrt(X*X+Y*Y+Z*Z)
+            rsum=rsum+r
+c            if(R.lt.R0) R0=R
+          endif
+        enddo
       enddo
-      enddo
-      fac=CDist/R0
+      rsum=rsum/(3*matom/2)
+c      fac=CDist/R0
+      fac=4.0*CDist/Rsum
       Do I=1,Matom
       Dist(1,I)=Dist(1,I)*fac
       Dist(2,I)=Dist(2,I)*fac
       Dist(3,I)=Dist(3,I)*fac
+c      write(*,*)dist(1,i),dist(2,i),dist(3,i),
+c     1  dsqrt(dist(1,i)**2+dist(2,i)**2+dist(3,i)**2)
       enddo
 C     Check distances
       Write(IOUT,1015) fac
@@ -2241,7 +2250,7 @@ c   Check if distances are within certain range
  1003 Format(1X,'Analysis of distances: Requires sorting of cartesian',
      1 ' coordinates after getting connectivities',
      1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
- 1004 Format(1X,'WARNING: Problem with smallest bond distance detected!',
+ 1004 Format('WARNING: Problem with smallest bond distance detected!',
      1 /1X,' Geometry of fullerene may be wrong')
       return
       end
