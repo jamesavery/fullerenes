@@ -2168,10 +2168,7 @@ C        angles in the range 15 to 165 degrees if possible.
 C   on input  Dist    = cartesian array of MAtom atoms
 C   on output ZMatrix = Z-Matrix
 C        MAtom: number of atoms
-C        degree = 360/2Pi = 57.29578..., angles are in degrees
 C
-      degree=1.8d2/dpi
- 
       Write(Iout,1000) 
        do i=1,MAtom
         zmatrix(1,i)=0.d0
@@ -2213,7 +2210,7 @@ c   find any atom to relate to na(i)
       nc(3)=0
 
 c   na, nb, nc are determined, now get zmatrix
-      call Distgeo(Dist,MAtom,na,nb,nc,degree,zmatrix)
+      call Distgeo(Dist,MAtom,na,nb,nc,zmatrix)
 
 c     print
        do i=1,MAtom
@@ -2253,7 +2250,7 @@ c   Check if distances are within certain range
       return
       end
 
-      subroutine Distgeo(Dist,MAtom,na,nb,nc,degree,zmatrix)
+      subroutine Distgeo(Dist,MAtom,na,nb,nc,zmatrix)
       use config
       implicit double precision (a-h,o-z)
       dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),zmatrix(3,Nmax)
@@ -2276,7 +2273,7 @@ C  output zmatrix  = internal coordinates in angstroms, radians, and radians
          call angle(Dist(1,ii),Dist(2,ii),Dist(3,ii),Dist(1,j),
      1           Dist(2,j),Dist(3,j),Dist(1,k),Dist(2,k),Dist(3,k),
      1           zmatrix(2,i))
-         zmatrix(2,i)=zmatrix(2,i)*degree
+         zmatrix(2,i)=zmatrix(2,i)*1.8d2/dpi
          if(i.lt.4) go to 30
 c   make sure dihedral is meaningful
          call angle(Dist(1,j),Dist(2,j),Dist(3,j),Dist(1,k),
@@ -2311,7 +2308,7 @@ c
          call dihedral(Dist(1,ii),Dist(2,ii),Dist(3,ii),Dist(1,j),
      1           Dist(2,j),Dist(3,j),Dist(1,k),Dist(2,k),Dist(3,k),
      1           Dist(1,l),Dist(2,l),Dist(3,l),zmatrix(3,i))
-         zmatrix(3,i)=zmatrix(3,i)*degree
+         zmatrix(3,i)=zmatrix(3,i)*1.8d2/dpi
    30 zmatrix(1,i)=dsqrt((Dist(1,i)-Dist(1,j))**2+
      1           (Dist(2,i)-Dist(2,j))**2+
      2           (Dist(3,i)-Dist(3,j))**2)
