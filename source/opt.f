@@ -392,12 +392,8 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       integer iopt
       type(c_ptr) :: graph, new_fullerene_graph
 
-c      write(*,*)'entering optff'
-c      write(*,*)'iopt',iopt
-
 c edges with 0, 1, 2 pentagons
-      integer e_hh(2,3*MAtom/2), e_hp(2,3*MAtom/2),
-     1      e_pp(2,3*MAtom/2)
+      integer e_hh(2,3*MAtom/2), e_hp(2,3*MAtom/2), e_pp(2,3*MAtom/2)
       integer a_h(3,3*MAtom-60), a_p(3,60)
       integer d_hhh(4,matom),d_hpp(4,matom),d_hhp(4,matom),
      1      d_ppp(4,matom)
