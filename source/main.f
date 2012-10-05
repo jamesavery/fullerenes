@@ -162,7 +162,7 @@ C identify P-type eigenvectors and construct the 3D fullerene
       Write(Iout,1008) routine
       CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
-     1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP)
+     1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP,isw,iyf,iws)
       Do I=1,Matom
         IAtom(I)=6
       enddo

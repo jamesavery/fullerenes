@@ -1,6 +1,6 @@
       SUBROUTINE CoordBuild(MAtom,IN,Iout,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
-     1 A,evec,df,Dist,layout2d,distp,Cdist,GROUP)
+     1 A,evec,df,Dist,layout2d,distp,Cdist,GROUP,isw,iyf,iws)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
 C This is followed by using either the Fowler-Manolopoulos matrix
@@ -18,13 +18,12 @@ C mapping
       DIMENSION layout2d(2,NMAX)
       DIMENSION D(MMAX,MMAX),S(MMAX),Dist(3,NMAX),distP(NMAX)
       DIMENSION NMR(6),JP(12),A(NMAX,NMAX),IDA(NMAX,NMAX)
-      DIMENSION evec(NMAX),df(NMAX),dipol(3,3)
+      DIMENSION evec(NMAX),df(NMAX)
       DIMENSION Spiral(12,NMAX)
-      DIMENSION idg(NMAX)
       CHARACTER*3 GROUP
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-      type(c_ptr) :: g, halma, new_fullerene_graph,
-     1               new_C20, halma_fullerene
+      integer isw, iyf, iws
+      type(c_ptr) :: g, halma, new_C20, halma_fullerene
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
 C If nalgorithm=2 use Coxeter Goldberg and matrix eigenvector 
@@ -207,186 +206,17 @@ C     End of Hueckel
       endif
 
 
-C Now produce the 3D image
-
-C   Fowler-Manolopoulos matrix eigenvector algorithm
-C     Now search for lowest energy P-type vectors
-C     This needs to be changed
+C Now produce the 3D image (unless the graph is going to changes later)
       if(nalgorithm.eq.0.or.nalgorithm.eq.2) then
-      Write(Iout,1045)
-      icand=0
-      Do I=1,iocc
-      mneg=0
-      mpos=0
-      z=0.d0
-      Do J=1,MATOM
-      if(A(J,I).lt.-1.d-9) mneg=mneg+1
-      if(A(J,I).gt.1.d-9) mpos=mpos+1
-      enddo
-      if(mneg.eq.mpos) then
-      icand=icand+1
-      idg(icand)=I
-      endif
-      enddo
-C     Analyzing remaining occupied eigenvectors
-C     Create cartesian coordinates (in Angstroems) and scale them
-C     if required
-      Ix1=idg(1)
-      Ix2=idg(2)
-      Ix3=idg(3)
-      if(Ix1.ne.2.or.Ix2.ne.3.or.Ix3.ne.4) then
-      Write(Iout,1027) Ix1,Ix2,Ix3
-      endif
-      I1=IV1
-      I2=IV2
-      I3=IV3
-      Write(Iout,1028) I1,I2,I3
-      Do I=1,MATOM
-      Dist(1,I)=A(I,I1)
-      Dist(2,I)=A(I,I2)
-      Dist(3,I)=A(I,I3)
-      enddo
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
-      ratiotest=Rminall/Rmax
-C     Search for better eigenvectors (not implemented yet)
-      if(ratiotest.lt.1.d-6) then
-      Write(Iout,1033) ratiotest
-      istop=1
-      endif
-      fac1=1.d0/dsqrt(3.d0-evec(I1))
-      fac2=1.d0/dsqrt(3.d0-evec(I2))
-      fac3=1.d0/dsqrt(3.d0-evec(I3))
-      ratio1=(Rmax/Rmin-1.d0)*1.d2
-      Do I=1,MATOM
-      Dist(1,I)=A(I,I1)*fac1
-      Dist(2,I)=A(I,I2)*fac2
-      Dist(3,I)=A(I,I3)*fac3
-      enddo
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
-      ratio=(Rmax/Rmin-1.d0)*1.d2
-      if(ratio1.lt.ratio) then
-      Write(Iout,1026)
-      Do I=1,MATOM
-      Dist(1,I)=A(I,I1)/fac1
-      Dist(2,I)=A(I,I2)/fac2
-      Dist(3,I)=A(I,I3)/fac3
-      enddo
-      fac1=1.d0
-      fac2=1.d0
-      fac3=1.d0
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
-      endif
-
-C     Obtain smallest distance for further scaling
-C     Now this contracts or expandes the whole fullerene to set the
-C     smallest bond distance to Cdist
-      R0=1.d10
-      Do I=1,MATOM
-      Do J=I+1,MATOM
-      X=Dist(1,I)-Dist(1,J)
-      Y=Dist(2,I)-Dist(2,J)
-      Z=Dist(3,I)-Dist(3,J)
-      R=dsqrt(X*X+Y*Y+Z*Z)
-      if(R.lt.R0) R0=R
-      enddo
-      enddo
-      fac=CDist/R0
-      Write(Iout,1010) icand,I1,I2,I3,fac1,fac2,fac3,fac,Cdist
-      Do k=1,2*I3
-      ICN=0
-      ICP=0
-      do kk=1,Matom
-      if(A(kk,k).gt.0.d0) ICP=ICP+1
-      if(A(kk,k).lt.0.d0) ICN=ICN+1
-      enddo
-      Write(Iout,1011) k,evec(k),ICN,ICP
-      Write(Iout,1012) (A(J,k),J=1,Matom)
-      enddo
-      if(R0.lt.1.d-5.or.istop.eq.1) then
-      Write(IOUT,1032) R0,fac
-      stop
-      endif
-      Do I=1,MATOM
-      Dist(1,I)=Dist(1,I)*fac
-      Dist(2,I)=Dist(2,I)*fac
-      Dist(3,I)=Dist(3,I)*fac
-      enddo
-C     Check distances
-      Write(IOUT,1013)     
-      Do J=1,MAtom
-      Write(IOUT,1014) J,(Dist(I,J),I=1,3)
-      enddo
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
-      Write(IOUT,1015) Rmin,Rmax,rms
-      ratio=(Rmax/Rmin-1.d0)*1.d2
-      iratio=dint(ratio)
-      CALL Diameter(MAtom,IOUT,Dist,distp)
-      if(iratio.lt.33) then
-      Write(IOUT,1016) iratio
-      else
-      Write(IOUT,1029) iratio
-      endif
-C     Calculate P-type dipole moment
-       Call Dipole(MAtom,I1,I2,I3,dipol,Dist,A)
-       Write(IOUT,1030)
-       Do I=1,3
-        Write(IOUT,1031) I,(dipol(I,J),J=1,3)
-       enddo
+        call AME(Matom,Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
+     1   CDist,isw,iyf,iws)
       endif
 
       if(nalgorithm.eq.1.or.nalgorithm.eq.3) then
-C   Tutte 3D embedding Algorithm:
-C     Input: Integer Adjacency Matrix IDA(NMax,NMax)
-C     Output: Real*8 Cartesian Coordinates  Dist(3,NMax)
-C     NMax: Max Dimension of Matrix
-C     MAtom: Working Dimension of Matrix
-
-C     Algorithm 2 (Tutte):
-         write (Iout,1017) 
-         g = new_fullerene_graph(NMax,MAtom,IDA)
-         write (Iout,1018)
-         call tutte_layout(g,layout2d)
-         call spherical_layout(g,Dist)
-         write (Iout,1035)
-         call delete_fullerene_graph(g)
-         write (Iout,1036)
-
-C     Obtain smallest distance for further scaling
-C     Now this contracts or expands the whole fullerene to set the
-C     smallest bond distance to Cdist
-      R0=1.d10
-      Do I=1,MATOM
-      Do J=I+1,MATOM
-      X=Dist(1,I)-Dist(1,J)
-      Y=Dist(2,I)-Dist(2,J)
-      Z=Dist(3,I)-Dist(3,J)
-      R=dsqrt(X*X+Y*Y+Z*Z)
-      if(R.lt.R0) R0=R
-      enddo
-      enddo
-      fac=CDist/R0
-      Do I=1,MATOM
-      Dist(1,I)=Dist(1,I)*fac
-      Dist(2,I)=Dist(2,I)*fac
-      Dist(3,I)=Dist(3,I)*fac
-      enddo
-C     Check distances
-      Write(IOUT,1034) fac     
-      Do J=1,MAtom
-      Write(IOUT,1014) J,(Dist(I,J),I=1,3)
-      enddo
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
-      Write(IOUT,1015) Rmin,Rmax,rms
-      ratio=(Rmax/Rmin-1.d0)*1.d2
-      iratio=dint(ratio)
-      CALL Diameter(MAtom,IOUT,Dist,distp)
-      if(iratio.lt.33) then
-      Write(IOUT,1016) iratio
-      else
-      Write(IOUT,1029) iratio
+        call Tutte(Matom,Iout,ihueckel,IDA,
+     1   A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
       endif
-
-      endif
+      
 
  1000 FORMAT(/1X,'Cannot produce dual matrix, error IER= ',I2,
      1 ' Check your input for pentagon locations')
@@ -402,27 +232,6 @@ C     Check distances
  1004 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel ',
      1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
- 1010 FORMAT(1X,I4,' potential candidates in occupied space discovered',
-     1 ' for odd symmetry eigenvectors, and ',3I4,' taken',
-     1 /1X,'Create cartesian coordinates and scale a la Fowler ',
-     1 /1X,'Scaling factors sx =',D12.6,', sy =',D12.6,', sz =',D12.6,
-     1 ', and final scaling factor of ',D16.8,' setting Rmin= ',F12.6,
-     1 /1X,'P-type eigenvalues and eigenvectors (path search not yet ',
-     1 'implemented and cartesian coordinates may not be correct)',/1X,
-     1 'Note: Procedure may give bond lengths which may vary strongly')
- 1011 FORMAT(1X,'eigenvalue',I4,': ',F12.6,', eigenvector: (',I4,
-     1 ' negative and ',I4,' positive values)')
- 1012 FORMAT(10(1X,F12.6))
- 1013 FORMAT(1X,'Fowler-Manolopoulos Coordinates')
- 1014 FORMAT(1X,I4,5X,3(D18.12,2X))
- 1015 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
-     1 ', RMS distance: ',F12.6)
- 1016 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
-     1 'distance')
- 1017 FORMAT(/1X,'Using the Tutte-embedding algorithm to construct ',
-     1 'the fullerene',/1X,'Construct the Tutte planar graph and ',
-     1 'project on sphere')
- 1018 Format(1X,'Calculating Tutte-embedding') 
  1019 Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I5,' spirals found)')
  1020 FORMAT(/1X,'Program to create cartesian coordinates through ',
@@ -436,26 +245,6 @@ C     Check distances
  1023 Format(1X,'Canonical spiral list of pentagon positions:')
  1024 Format(1X,'Canonical spiral list of hexagons and pentagons:')
  1025 Format(1X,100I1)
- 1026 Format(1X,'No Fowler scaling')
- 1027 Format(1X,'Analysis of ',3I3,' eigenvectors finds P-type ',
-     1 'eigenvectors not in sequence 2 3 4',
-     1 /,' You might analyze eigenvectors and read in numbers for '
-     1 'eigenvectors to be used to construct coordinates instead')
- 1028 Format(1X,'Take ',3I3,' eigenvectors as required by input')
- 1029 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
-     1 'distance. Fullerene strongly distorted!',/1X,
-     1 'Optimization of geometry recommended')
- 1030 Format(1X,'P-type dipole moments as indicators:')
- 1031 Format(1X,I1,2X,'(',F9.2,',',F9.2,',',F9.2,')')
- 1032 Format(1X,'Very small bond distance of ',D18.12,' found',
-     1 ' leading to a unreasonable scaling factor of ',D18.12,
-     1 /1X,'**** Program stops (choose other set of eigenvectors)')
- 1033 Format(1X,'Rmin/Rmax ratio too small: ',D18.12,
-     1 /1X,'Program will stop (choose other set of eigenvectors)')
- 1034 FORMAT(1X,'Coordinates from Tutte embedding scaled by a factor'
-     1 ' of ',D18.12)
- 1035 FORMAT(1X,'Projected on sphere')
- 1036 FORMAT(1X,'Fullerene graph deleted')
  1037 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
      1 'are not of degree 3, last one is of degree ',I4)
  1038 FORMAT(1X,'Graph checked, it is cubic')
@@ -468,8 +257,6 @@ C     Check distances
      1 I5,')')
  1043 Format(1x,'Halma fullerene is a fullerene')
  1044 Format(1x,'Halma fullerene is not a fullerene')
- 1045 FORMAT(/1X,'Using the Fowler-Manolopoulos adjacency matrix '
-     1 'eigenvector algorithm to construct the fullerene')
       Return 
       END
 
@@ -479,21 +266,21 @@ C     Check distances
       DIMENSION Dist(3,NMAX),A(NMAX,NMAX),dipol(3,3)
       tol=1.d-7
       do I=1,3
-      do j=1,3
-      dipol(I,J)=0.d0
-      enddo
+        do j=1,3
+          dipol(I,J)=0.d0
+        enddo
       enddo
       do I=1,MAtom
-      do j=1,3
-      dipol(1,j)=dipol(1,j)+Dist(j,I)*A(I,I1)
-      dipol(2,j)=dipol(2,j)+Dist(j,I)*A(I,I2)
-      dipol(3,j)=dipol(3,j)+Dist(j,I)*A(I,I3)
-      enddo
+        do j=1,3
+          dipol(1,j)=dipol(1,j)+Dist(j,I)*A(I,I1)
+          dipol(2,j)=dipol(2,j)+Dist(j,I)*A(I,I2)
+          dipol(3,j)=dipol(3,j)+Dist(j,I)*A(I,I3)
+        enddo
       enddo
       do i=1,3
-      do j=1,3
-      if(dabs(dipol(i,j)).lt.tol) dipol(i,j)=0.d0
-      enddo
+        do j=1,3
+          if(dabs(dipol(i,j)).lt.tol) dipol(i,j)=0.d0
+        enddo
       enddo
       Return 
       END
