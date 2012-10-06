@@ -1,6 +1,6 @@
       SUBROUTINE CoordBuild(MAtom,IN,Iout,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
-     1 A,evec,df,Dist,layout2d,distp,Cdist,GROUP,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2d,distp,Cdist,GROUP,ke,isw,iyf,iws)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
 C This is followed by using either the Fowler-Manolopoulos matrix
@@ -22,7 +22,7 @@ C mapping
       DIMENSION Spiral(12,NMAX)
       CHARACTER*3 GROUP
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-      integer isw, iyf, iws
+      integer ke, isw, iyf, iws
       type(c_ptr) :: g, halma, new_C20, halma_fullerene
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
@@ -206,17 +206,19 @@ C     End of Hueckel
       endif
 
 
-C Now produce the 3D image (unless the graph is going to changes later)
-      if(nalgorithm.eq.0.or.nalgorithm.eq.2) then
-        call AME(Matom,Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
-     1   CDist,isw,iyf,iws)
-      endif
+c      if(ke + isw + iyf + iws .eq. 0) then
+C Now produce the 3D image (unless the graph is going to change later)
+        if(nalgorithm.eq.0.or.nalgorithm.eq.2) then
+          call AME(Matom,Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
+     1     CDist)
+        endif
+  
+        if(nalgorithm.eq.1.or.nalgorithm.eq.3) then
+          call Tutte(Matom,Iout,ihueckel,IDA,
+     1     A,evec,df,Dist,layout2D,distp,CDist)
+        endif
+c      endif
 
-      if(nalgorithm.eq.1.or.nalgorithm.eq.3) then
-        call Tutte(Matom,Iout,ihueckel,IDA,
-     1   A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
-      endif
-      
 
  1000 FORMAT(/1X,'Cannot produce dual matrix, error IER= ',I2,
      1 ' Check your input for pentagon locations')
