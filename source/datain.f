@@ -145,12 +145,7 @@ C Read Namelist
       Read(IN,nml=General,Err=99,end=99)
       Read(IN,nml=Coord,Err=99,end=99)
       Read(IN,nml=FFChoice,Err=99,end=99)
-      Read(IN,nml=FFParameters,Err=99,end=99)
-      Read(IN,nml=Hamilton,Err=99,end=99)
-      Read(IN,nml=Isomers,Err=99,end=99)
-      Read(IN,nml=Graph,Err=99,end=99)
 
-C Set more parameters
 
 C Set Parameters for force field
 c set forceP (default parameters)[needs to be done after iopt and before opt is read]
@@ -186,6 +181,11 @@ C ExtWu forceP field
         forceP(17)=ExtWufD
         forceP(18)=ExtWufD
       endif
+
+      Read(IN,nml=FFParameters,Err=99,end=99)
+      Read(IN,nml=Hamilton,Err=99,end=99)
+      Read(IN,nml=Isomers,Err=99,end=99)
+      Read(IN,nml=Graph,Err=99,end=99)
 
 c set force (custom parameters)
       if(iopt.eq.1 .or. iopt.eq.2)then
