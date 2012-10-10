@@ -457,16 +457,16 @@ c        force(19)=force(19)
 C     Optimize
       select case(iopt)
       case(1)
-        Write(IOUT,1000) Rdist
+        Write(IOUT,1000)
         Write(Iout,1006) (force(i),i=1,8),ftol
       case(2)
-        Write(IOUT,1000) Rdist
+        Write(IOUT,1000)
         Write(Iout,1003) (force(i),i=1,9),ftol
       case(3)
-        Write(IOUT,1007) Rdist
+        Write(IOUT,1007)
         Write(Iout,1005) (force(i),i=1,18),ftol
       case(4)
-        Write(IOUT,1007) Rdist
+        Write(IOUT,1007)
         Write(Iout,1008) (force(i),i=1,19),ftol
       end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
@@ -494,7 +494,7 @@ C     Optimize
  1007 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using an extension of the',
      1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
-     1 ' algorithm used',/1X,'Smallest bond distance set to ',F12.6)
+     1 ' algorithm used')
  1001 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
  1002 FORMAT(1X,'Distances and angles defined in the force field can',

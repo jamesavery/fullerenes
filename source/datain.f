@@ -3,11 +3,11 @@
      1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
      1 ndual,nosort,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,
-     1 force,filename,DATEN)
+     1 force,forceP,filename,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
-      real(8) force(ffmaxdim) ! user chosen FF.
+      real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF (and a backup)
       integer endzeile
       Character*1 DATEN(nzeile)
       Character filename*50
@@ -44,6 +44,11 @@ C Input send to output
 
 C tolerance parameter (to be used in all force fields)
       ftol=1.d-8
+
+      do i=1,ffmaxdim
+        force(i)=0.d0
+        forceP(i)=0.d0
+      enddo
 
 C Defining the Wu force field (default values)
       WuR5=1.455d0! in angstroem
@@ -217,6 +222,10 @@ C ExtWu force field
         force(18)=ExtWufD
         force(19)=fCoulomb
       endif
+
+      do i=1,ffmaxdim
+        forceP(i)=force(i)
+      enddo
 
 C Set IC and ichk parameters
       if(ICart.lt.0) ICart=0
