@@ -3,11 +3,11 @@
      1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
      1 ndual,nosort,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,
-     1 force,forceP,filename,DATEN)
+     1 force,filename,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
-      real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF and default FF.  force and forceP (=permanent) are equal if there are no input parameters
+      real(8) force(ffmaxdim) ! user chosen FF.
       integer endzeile
       Character*1 DATEN(nzeile)
       Character filename*50
@@ -44,11 +44,6 @@ C Input send to output
 
 C tolerance parameter (to be used in all force fields)
       ftol=1.d-8
-
-      do i=1,ffmaxdim
-       force(i)=0.d0
-       forceP(i)=0.d0
-      enddo
 
 C Defining the Wu force field (default values)
       WuR5=1.455d0! in angstroem
@@ -151,45 +146,6 @@ C Set Parameters for force field
 c set forceP (default parameters)[needs to be done after iopt and before opt is read]
   99  if(iopt.eq.1 .or. iopt.eq.2)then
 C Wu force field
-        forceP(1)=WuR5
-        forceP(2)=WuR6
-        forceP(3)=WuA5
-        forceP(4)=WuA6
-        forceP(5)=WufR
-        forceP(6)=WufR
-        forceP(7)=WufA
-        forceP(8)=WufA
-        forceP(9)=fCoulomb
-      else if(iopt.eq.3)then
-C ExtWu forceP field
-        forceP(1)=ExtWuR55
-        forceP(2)=ExtWuR56
-        forceP(3)=ExtWuR66
-        forceP(4)=ExtWuA5
-        forceP(5)=ExtWuA6
-        forceP(6)=ExtWuDppp
-        forceP(7)=ExtWuDhpp
-        forceP(8)=ExtWuDhhp
-        forceP(9)=ExtWuDhhh
-        forceP(10)=ExtWufR
-        forceP(11)=ExtWufR
-        forceP(12)=ExtWufR
-        forceP(13)=ExtWufA
-        forceP(14)=ExtWufA
-        forceP(15)=ExtWufD
-        forceP(16)=ExtWufD
-        forceP(17)=ExtWufD
-        forceP(18)=ExtWufD
-      endif
-
-      Read(IN,nml=FFParameters,Err=99,end=99)
-      Read(IN,nml=Hamilton,Err=99,end=99)
-      Read(IN,nml=Isomers,Err=99,end=99)
-      Read(IN,nml=Graph,Err=99,end=99)
-
-c set force (custom parameters)
-      if(iopt.eq.1 .or. iopt.eq.2)then
-C Wu force field
         force(1)=WuR5
         force(2)=WuR6
         force(3)=WuA5
@@ -199,7 +155,7 @@ C Wu force field
         force(7)=WufA
         force(8)=WufA
         force(9)=fCoulomb
-      else if(iopt.eq.3)then
+      else if(iopt.eq.3 .or. iopt.eq.4)then
 C ExtWu force field
         force(1)=ExtWuR55
         force(2)=ExtWuR56
@@ -219,6 +175,47 @@ C ExtWu force field
         force(16)=ExtWufD
         force(17)=ExtWufD
         force(18)=ExtWufD
+        force(19)=fCoulomb
+      endif
+
+      Read(IN,nml=FFParameters,Err=99,end=99)
+      Read(IN,nml=Hamilton,Err=99,end=99)
+      Read(IN,nml=Isomers,Err=99,end=99)
+      Read(IN,nml=Graph,Err=99,end=99)
+
+c set force (custom parameters)
+      if(iopt.eq.1 .or. iopt.eq.2)then
+C Wu force field
+        force(1)=WuR5
+        force(2)=WuR6
+        force(3)=WuA5
+        force(4)=WuA6
+        force(5)=WufR
+        force(6)=WufR
+        force(7)=WufA
+        force(8)=WufA
+        force(9)=fCoulomb
+      else if(iopt.eq.3 .or. iopt.eq.4)then
+C ExtWu force field
+        force(1)=ExtWuR55
+        force(2)=ExtWuR56
+        force(3)=ExtWuR66
+        force(4)=ExtWuA5
+        force(5)=ExtWuA6
+        force(6)=ExtWuDppp
+        force(7)=ExtWuDhpp
+        force(8)=ExtWuDhhp
+        force(9)=ExtWuDhhh
+        force(10)=ExtWufR
+        force(11)=ExtWufR
+        force(12)=ExtWufR
+        force(13)=ExtWufA
+        force(14)=ExtWufA
+        force(15)=ExtWufD
+        force(16)=ExtWufD
+        force(17)=ExtWufD
+        force(18)=ExtWufD
+        force(19)=fCoulomb
       endif
 
 C Set IC and ichk parameters

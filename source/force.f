@@ -19,7 +19,12 @@ c      write(*,*)'entering func3d'
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1      a_h,a_p)
         case(3)
-          CALL extwu(n,IERR,p,fc,force,
+          CALL extwu(n,IERR,p,fc,force,iopt,
+     1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     2      a_h,a_p,
+     1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        case(4)
+          CALL extwu(n,IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      2      a_h,a_p,
      1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -137,7 +142,7 @@ c      write(*,*)'leaving wu'
 
 
 
-      SUBROUTINE extwu(n,IERR,p,fc,force,
+      SUBROUTINE extwu(n,IERR,p,fc,force,iopt,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -174,6 +179,7 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       fdhpp=force(16)
       fdhhp=force(17)
       fdhhh=force(18)
+      fco=force(19)
 
 C Stretching
 c we distinguish between bonds between two hexagons, two pentagons and hex/pent
@@ -303,10 +309,20 @@ c        write(*,*)'diff',angle_p,ap
       enddo
       endif
 
+C     Coulomb repulsion from origin
+      ecoulomb=0.d0
+      if (iopt.eq.4 .and. fco.ne.0.d0)  then
+        Do I=1,n,3
+          rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
+          ecoulomb=ecoulomb+rinv
+        enddo
+      endif
+
 C     total energy  
       fc=frpp*ehookrpp+frhp*ehookrhp+frhh*ehookrhh ! stretching
      2 +fap*ehookap+fah*ehookah ! bending
      3 +fdppp*ehookdppp+fdhpp*ehookdhpp+fdhhp*ehookdhhp+fdhhh*ehookdhhh! dihedral
+     4 +fco*ecoulomb
 c      write(*,*)fc,"energy"
       Return
       END SUBROUTINE
@@ -332,7 +348,12 @@ c      write(*,*)"entering dfunc3d"
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p)
         case(3)
-          CALL dextwu(n,p,x,force,
+          CALL dextwu(n,p,x,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        case(4)
+          CALL dextwu(n,p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -499,7 +520,7 @@ c      write(*,*)'leaving dwu'
       END
 
 
-      SUBROUTINE dextwu(n,p,x,force,
+      SUBROUTINE dextwu(n,p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -534,6 +555,7 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       fdhpp=force(16)
       fdhhp=force(17)
       fdhhh=force(18)
+      fco=force(19)
 
 C     Stretching
 c     we distinguish between bonds between two hexagons, two pentagons and hex/pent
@@ -675,6 +697,7 @@ c     3 hexagons
         zero_value=dhhh
         force_constant=fdhhh
         dE_over_dc=force_constant*(angle_abcd-zero_value)
+c        write(*,*)"dhhh,fdhhh, dE_over_dc",dhhh,fdhhh,dE_over_dc
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(3*d_hhh(1,i)-2)=x(3*d_hhh(1,i)-2)+dax*dE_over_dc
         x(3*d_hhh(1,i)-1)=x(3*d_hhh(1,i)-1)+day*dE_over_dc
@@ -809,6 +832,16 @@ c derivations of the energy with respect the x,y,z of each of the four atoms
         x(3*d_ppp(4,i)-1)=x(3*d_ppp(4,i)-1)+ddy*dE_over_dc
         x(3*d_ppp(4,i))  =x(3*d_ppp(4,i))  +ddz*dE_over_dc
       enddo
+      endif
+
+C     Coulomb repulsion from origin
+      if (iopt.eq.4 .and. fco.ne.0.d0)  then
+        Do I=1,n,3
+          rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
+          x(I)  =x(I)  +fco*rinv*p(I)
+          x(I+1)=x(I+1)+fco*rinv*p(I+1)
+          x(I+2)=x(I+2)+fco*rinv*p(I+2)
+        enddo
       endif
 
       return

@@ -25,7 +25,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
       DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
-      real(8) force(ffmaxdim),forceP(ffmaxdim)
+      real(8) force(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
       DIMENSION Icon2(Nmax*Nmax),distP(Nmax),IDA(Nmax,Nmax)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
@@ -97,7 +97,7 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
      1  ndual,nosort,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
-     1  force,forceP,filename,TEXTINPUT)
+     1  force,filename,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -291,14 +291,14 @@ c a stone wales (or any other transformation) is done
             Write(Iout,1003)
             CALL OptFF(MAtom,Iout,IDA,
      1        Dist,dist2D,Rdist,ftol,force,iopt)
+            iopt=1
           endif
-          iopt=1
           CALL OptFF(MAtom,Iout,IDA, ! vanilla Wu
-     1      Dist,dist2D,Rdist,ftolP,forceP,iopt)
+     1      Dist,dist2D,Rdist,ftolP,force,iopt)
           Iprint=0
-        else if(Iopt.eq.3) then ! extended Wu, 18 parameters
+        else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
           CALL OptFF(MAtom,Iout,IDA,
-     1      Dist,dist2D,Rdist,ftolP,forceP,iopt)
+     1      Dist,dist2D,Rdist,ftolP,force,iopt)
         endif
         routine='MOVECM_2     '
   991   Write(Iout,1008) routine
