@@ -218,6 +218,7 @@ C     Bending
 c     we distinguish between angles of pentagons and hexagons
 C     Loop over 5-rings
       ehookap=0.d0
+      ehookah=0.d0
       do i=1,60
         call angle(p(3*a_p(1,i)-2),p(3*a_p(1,i)-1),p(3*a_p(1,i)),
      1             p(3*a_p(2,i)-2),p(3*a_p(2,i)-1),p(3*a_p(2,i)),
@@ -228,7 +229,6 @@ C     Loop over 5-rings
 
       if(n/3 .gt. 20) then
 C     Loop over 6-rings
-      ehookah=0.d0
       do i=1,n-60
         call angle(p(3*a_h(1,i)-2),p(3*a_h(1,i)-1),p(3*a_h(1,i)),
      1             p(3*a_h(2,i)-2),p(3*a_h(2,i)-1),p(3*a_h(2,i)),
@@ -256,6 +256,7 @@ C     3 hexagons
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+c        write(*,*)angle_abcd
         ehookdhhh=ehookdhhh+(angle_abcd-dhhh)**2
       enddo
       endif
@@ -271,6 +272,7 @@ C     2 hexagons, 1 pentagon
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+c        write(*,*)angle_abcd
         ehookdhhp=ehookdhhp+(angle_abcd-dhhp)**2
       enddo
       endif
@@ -286,6 +288,7 @@ C     1 hexagon, 2 pentagons
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+c        write(*,*)angle_abcd
         ehookdhpp=ehookdhpp+(angle_abcd-dhpp)**2
 c        write(*,*)'diff',angle_p,ap
       enddo
@@ -304,6 +307,7 @@ c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+c        write(*,*)angle_abcd
         ehookdppp=ehookdppp+(angle_abcd-dppp)**2
 c        write(*,*)'diff',angle_p,ap
       enddo
@@ -641,7 +645,6 @@ C     Loop over 5-rings
         x(3*a_p(3,i))  =x(3*a_p(3,i))  +dcz*dE_over_dc
       enddo
 
-c      write(*,*)'before bend-h'
 C     Loop over 6-rings
       if(n/3 .gt. 20) then
         do i=1,n-60
@@ -693,11 +696,10 @@ c     3 hexagons
      3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
-        zero_value=dhhh
+c        angle_abcd=dabs(angle_abcd)
+        zero_value=sign(dhhh,angle_abcd)
         force_constant=fdhhh
         dE_over_dc=force_constant*(angle_abcd-zero_value)
-c        write(*,*)"dhhh,fdhhh, dE_over_dc",dhhh,fdhhh,dE_over_dc
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(3*d_hhh(1,i)-2)=x(3*d_hhh(1,i)-2)+dax*dE_over_dc
         x(3*d_hhh(1,i)-1)=x(3*d_hhh(1,i)-1)+day*dE_over_dc
@@ -734,8 +736,8 @@ c     2 hexagon, 1 pentagon
      3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
-        zero_value=dhhp
+c        angle_abcd=dabs(angle_abcd)
+        zero_value=sign(dhhp,angle_abcd)
         force_constant=fdhhp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
 c derivations of the energy with respect the x,y,z of each of the four atoms
@@ -774,8 +776,8 @@ c     1 hexagon, 2 pentagons
      3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
-        zero_value=dhpp
+c        angle_abcd=dabs(angle_abcd)
+        zero_value=sign(dhpp,angle_abcd)
         force_constant=fdhpp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
 c derivations of the energy with respect the x,y,z of each of the four atoms
@@ -814,8 +816,8 @@ c     3 pentagons
      3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
-        zero_value=dppp
+c        angle_abcd=dabs(angle_abcd)
+        zero_value=dsign(dppp, angle_abcd)
         force_constant=fdppp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
 c derivations of the energy with respect the x,y,z of each of the four atoms
