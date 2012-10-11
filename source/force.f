@@ -10,20 +10,11 @@ c      IMPLICIT REAL*8 (A-H,O-Z)
 c      write(*,*)'entering func3d'
 
       select case(iopt)
-        case(1)
+        case(1, 2)
           CALL wu(n,IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1      a_h,a_p)
-        case(2)
-          CALL wu(n,IERR,p,fc,force,iopt,
-     1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
-     1      a_h,a_p)
-        case(3)
-          CALL extwu(n,IERR,p,fc,force,iopt,
-     1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
-     2      a_h,a_p,
-     1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-        case(4)
+        case(3, 4)
           CALL extwu(n,IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      2      a_h,a_p,
@@ -343,20 +334,11 @@ c      IMPLICIT REAL*8 (A-H,O-Z)
 c      write(*,*)"entering dfunc3d"
       
       select case(iopt)
-        case(1)
+        case(1, 2)
           CALL dwu(n,p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p)
-        case(2)
-          CALL dwu(n,p,x,force,iopt,
-     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
-     1 a_h,a_p)
-        case(3)
-          CALL dextwu(n,p,x,force,iopt,
-     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
-     1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-        case(4)
+        case(3, 4)
           CALL dextwu(n,p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
