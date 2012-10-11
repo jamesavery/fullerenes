@@ -807,7 +807,7 @@ algorithm is easier, and (in theory) should never fail. Examples are given in th
 \subsection{\&FFParameters and \&FFParameters  lines}
 Options for force-field optimization.
 
-\paragraph{List of options:}\ 
+\paragraph{List of options:} 
 
 \textbf{\&FFChoice} has parameters \paramname{Iopt, ftol}.\\
 \textbf{\&FFParameters} has parameters \paramname{fCoulomb, WuR5, WuR6, WuA5, WuA6, WufR, WufA, ExtWuR55, ExtWuR56, 
@@ -825,6 +825,14 @@ ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR,
   reached for all atoms and rings.
 
   If \paramname{Iopt} = 2  Preoptimize with input force field, then optimize with standard Wu force field. This is especially useful for the \paramname{fcoulomb} input (see below).
+
+  \paramname{Iopt} = 3 triggers an extension of the Wu force field.  In addition to Wu (two different bond types
+  and two angle types) there is a third bond type and four types of dihedral angles.  If \paramname{Iopt} = 3 is
+  chosen the structure typically converges in less cycles.
+
+  \paramname{Iopt} = 4 behaves like \paramname{Iopt} = 3, but there is an additional repulsive coulomb force applied.  It is switched off
+  as soon as the gradient falls below a value of 10.
+  
 \item[ftol] The convergence tolerance on the energy (Default: $5.0 \times 10^{-8}$)
 \item[{WuR5, WuR6, WuA5, WuA6, WufR, WufA}] These are force-field parameters for the Wu force field, i.e. for
 distances R5, R6, and angles A5, A6. The force constants are: distance WufR and
