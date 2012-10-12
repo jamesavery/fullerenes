@@ -409,7 +409,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
       call get_corners(graph,MAtom,
      1 a_h,a_p)
-      if(iopt .eq. 3) then
+      if(iopt .eq. 3 .or. iopt.eq.4) then
         call get_dihedrals(graph,MAtom,
      1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
@@ -429,7 +429,7 @@ C       Conversion of dyn/cm in a.u. / Angstroem**2
         force(8)=force(8)*dynpercm2auperaa
 C       Leave parameter for Coulomb force as it is
 c        force(9)=force(9)
-      else if (iopt.eq.3) then
+      else if (iopt.eq.3 .or. iopt.eq.4) then
 c        force(1)=force(1)
 c        force(2)=force(2)
 c        force(3)=force(3)
@@ -450,21 +450,25 @@ C       Conversion of dyn/cm in a.u. / Angstroem**2
         force(16)=force(16)*dynpercm2auperaa
         force(17)=force(17)*dynpercm2auperaa
         force(18)=force(18)*dynpercm2auperaa
+C       Leave parameter for Coulomb force as it is
+c        force(19)=force(19)
       end if
       M=Matom/2+2
 C     Optimize
       select case(iopt)
       case(1)
-        Write(IOUT,1000) Rdist
+        Write(IOUT,1000)
         Write(Iout,1006) (force(i),i=1,8),ftol
       case(2)
-        Write(IOUT,1000) Rdist
+        Write(IOUT,1000)
         Write(Iout,1003) (force(i),i=1,9),ftol
       case(3)
-        Write(IOUT,1007) Rdist
+        Write(IOUT,1007)
         Write(Iout,1005) (force(i),i=1,18),ftol
+      case(4)
+        Write(IOUT,1007)
+        Write(Iout,1008) (force(i),i=1,19),ftol
       end select
-c      write(*,*)'frprmn3d will be entered soon'
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
       CALL frprmn3d(MATOM*3,Iout,
      1 Dist,force,iopt,ftol,iter,fret,
@@ -486,12 +490,11 @@ c      write(*,*)'frprmn3d will be entered soon'
       Write(IOUT,1001) Rmin,Rmax,rms
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
-     1 ' Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere algorithm used',
-     1 /1X,'Smallest bond distance set to ',F12.6)
+     1 ' Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere algorithm used')
  1007 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using an extension of the',
      1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
-     1 ' algorithm used',/1X,'Smallest bond distance set to ',F12.6)
+     1 ' algorithm used')
  1001 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
  1002 FORMAT(1X,'Distances and angles defined in the force field can',
@@ -500,6 +503,7 @@ c      write(*,*)'frprmn3d will be entered soon'
  1004 Format(' Coulomb repulsion from center of origin with force ',
      1 F12.6,/)
  1005 Format(' Force field parameters: ',18F12.6,', Tolerance= ',D9.3,/)
+ 1008 Format(' Force field parameters: ',19F12.6,', Tolerance= ',D9.3,/)
  1006 Format(' Force field parameters: ',8F12.6,', Tolerance= ',D9.3,/)
      
       Return 
@@ -516,6 +520,7 @@ c and N=MATOM*3
       PARAMETER (ITMAX=99999,EPS=1.d-9)
       Real*8 p(NMAX*3),g(NMAX*3),h(NMAX*3),xi(NMAX*3)
       Real*8 pcom(NMAX*3),xicom(NMAX*3)
+      real*8 force(ffmaxdim)
 c      integer damping
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
@@ -557,6 +562,11 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
       enddo
       fret=0.d0
       do its=1,ITMAX
+c       turn off coulomb pot towards the end
+        if(iopt.eq.4 .and. force(19).gt.0.d0 .and. grad.le.1.d1) then
+          force(19)=0.0d0
+          write(*,*)'Switching off coulomb repulsive potential.'
+        endif
         iter=its
         call linmin3d(N,p,pcom,xi,xicom,fret,
      1    force,iopt,e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,

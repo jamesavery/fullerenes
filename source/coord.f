@@ -624,7 +624,7 @@ C Now analyze the adjacency matrix if it is correct
         WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Endo-Kroto insertion of 2 vertices:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
  1001 Format(/1X,'Number of Endo-Kroto insertions: ',I2,
@@ -944,7 +944,7 @@ C Now analyze the adjacency matrix if it is correct
       WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'W-S 6-vertex insertion to D2h 55-6-55',
      1 ' ring pattern:',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
@@ -1349,7 +1349,7 @@ C Now analyze the adjacency matrix if it is correct
       WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Yoshida-Fowler 6-vertex insertion to D3h 666555 ',
      1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
@@ -1609,7 +1609,7 @@ C Now analyze the adjacency matrix if it is correct
       WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Yoshida-Fowler 4-vertex insertion to D3h 6555 ',
      1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
@@ -1825,7 +1825,7 @@ C Now analyze the adjacency matrix if it is correct
       WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2D,distp,CDist)
  1000 Format(/1X,'Stone-Wales transformation:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
  1001 Format(/1X,'Number of Stone-Wales transformations: ',I2,
@@ -1939,7 +1939,7 @@ C Produce adjacency matrix
       MAtom = MLeap
 
       Call Tutte(MAtom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2D,distp,CDist)
       if(leap.ne.0) call delete_fullerene_graph(frog)
       if(leapGC.ne.0) call delete_fullerene_graph(halma)
       call delete_fullerene_graph(g)
@@ -1972,7 +1972,7 @@ C Produce adjacency matrix
       END
 
       SUBROUTINE Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2D,distp,CDist)
 C   Tutte 3D embedding Algorithm:
 C     Input: Integer Adjacency Matrix IDA(NMax,NMax)
 C     Output: Real*8 Cartesian Coordinates  Dist(3,NMax)
@@ -1986,7 +1986,6 @@ C     MAtom: Working Dimension of Matrix
       DIMENSION Dist(3,Nmax),distP(Nmax)
       DIMENSION IDA(Nmax,Nmax)
       type(c_ptr) :: g, new_fullerene_graph
-      integer isw, iyf, iws
 
 C Produce Hueckel matrix and diagonalize
 C     Diagonalize
@@ -2037,7 +2036,6 @@ C   Tutte algorithm for the 3D structure (see pentindex.f):
 C     Obtain smallest distance for further scaling
 C     Now this contracts or expands the whole fullerene to set the
 C     smallest bond distance to Cdist
-c the same functionality is in pentindex.f, twice.
 c     corraction: setting the shortest bond to to cdist is not a good idea.  It is beneficial to set the avarage bond length to some value, like e.g. 4*cdist
       R0=1.d10
       Rsum=0.d0
@@ -2101,7 +2099,7 @@ C     Check distances
 
 
       SUBROUTINE AME(Matom,Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
-     1 CDist,isw,iyf,iws)
+     1 CDist)
 C   Fowler-Manolopoulos matrix eigenvector algorithm
 C     Now search for lowest energy P-type vectors
 C     This needs to be changed
@@ -2113,11 +2111,9 @@ C     This needs to be changed
       DIMENSION evec(NMAX),dipol(3,3)
       DIMENSION idg(NMAX)
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-      integer isw, iyf, iws
 
       Write(Iout,1045)
 
-c      if(ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
 
       icand=0
       Do I=1,iocc

@@ -25,7 +25,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
       DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
-      real(8) force(ffmaxdim),forceP(ffmaxdim)
+      real(8) force(ffmaxdim), forceP(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
       DIMENSION Icon2(Nmax*Nmax),distP(Nmax),IDA(Nmax,Nmax)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
@@ -162,7 +162,7 @@ C identify P-type eigenvectors and construct the 3D fullerene
       Write(Iout,1008) routine
       CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
-     1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP,isw,iyf,iws)
+     1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,GROUP,ke,isw,iyf,iws)
       Do I=1,Matom
         IAtom(I)=6
       enddo
@@ -256,7 +256,8 @@ C adjacent vertices
       if(IHam.gt.1.and.IHam.le.9) then
         maxiter=10**IHam
       endif
-      if(IHam.ne.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+      if(IHam.ne.0 .and. 
+     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
         if(iupac.ne.0) then
           CALL Hamilton(MAtom,Iout,iprintf,maxiter,IC3)
         else
@@ -279,7 +280,8 @@ C Optimize Geometry through force field method
 c we check for ISW because the coordinates shouldn't be optimized before
 c a stone wales (or any other transformation) is done
       icall=0
-      If(Iopt.ne.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+      If(Iopt.ne.0 .and. 
+     1     ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
         routine='OPTFF        '
         ftol=ftolP
         Write(Iout,1008) routine
@@ -289,14 +291,17 @@ c a stone wales (or any other transformation) is done
             Write(Iout,1003)
             CALL OptFF(MAtom,Iout,IDA,
      1        Dist,dist2D,Rdist,ftol,force,iopt)
+            do i=1,9
+              force(i)=forcep(i)
+            enddo
+            iopt=1
           endif
-          iopt=1
           CALL OptFF(MAtom,Iout,IDA, ! vanilla Wu
-     1      Dist,dist2D,Rdist,ftolP,forceP,iopt)
+     1      Dist,dist2D,Rdist,ftolP,force,iopt)
           Iprint=0
-        else if(Iopt.eq.3) then ! extended Wu, 18 parameters
+        else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
           CALL OptFF(MAtom,Iout,IDA,
-     1      Dist,dist2D,Rdist,ftolP,forceP,iopt)
+     1      Dist,dist2D,Rdist,ftolP,force,iopt)
         endif
         routine='MOVECM_2     '
   991   Write(Iout,1008) routine
@@ -319,7 +324,8 @@ c a stone wales (or any other transformation) is done
 C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview
 C xyz format
-      if(icyl.le.2 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+      if(icyl.le.2 .and. 
+     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
         xyzname=trim(filename)//"-3D.xyz"
         Open(unit=3,file=xyzname,form='formatted')
         routine='PRINTCOORD   '
@@ -344,7 +350,8 @@ C xyz format
         Close(unit=3)
       endif
 C cc1 format
-      if(icyl.ge.4 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+      if(icyl.ge.4 .and. 
+     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
        cc1name=trim(filename)//"-3DMCS.cc1"
        Open(unit=3,file=cc1name,form='formatted')
         WRITE(Iout,1002) cc1name

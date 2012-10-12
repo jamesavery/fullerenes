@@ -19,7 +19,12 @@ c      write(*,*)'entering func3d'
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1      a_h,a_p)
         case(3)
-          CALL extwu(n,IERR,p,fc,force,
+          CALL extwu(n,IERR,p,fc,force,iopt,
+     1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     2      a_h,a_p,
+     1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        case(4)
+          CALL extwu(n,IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      2      a_h,a_p,
      1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -137,7 +142,7 @@ c      write(*,*)'leaving wu'
 
 
 
-      SUBROUTINE extwu(n,IERR,p,fc,force,
+      SUBROUTINE extwu(n,IERR,p,fc,force,iopt,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -174,6 +179,7 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       fdhpp=force(16)
       fdhhp=force(17)
       fdhhh=force(18)
+      fco=force(19)
 
 C Stretching
 c we distinguish between bonds between two hexagons, two pentagons and hex/pent
@@ -212,6 +218,7 @@ C     Bending
 c     we distinguish between angles of pentagons and hexagons
 C     Loop over 5-rings
       ehookap=0.d0
+      ehookah=0.d0
       do i=1,60
         call angle(p(3*a_p(1,i)-2),p(3*a_p(1,i)-1),p(3*a_p(1,i)),
      1             p(3*a_p(2,i)-2),p(3*a_p(2,i)-1),p(3*a_p(2,i)),
@@ -222,7 +229,6 @@ C     Loop over 5-rings
 
       if(n/3 .gt. 20) then
 C     Loop over 6-rings
-      ehookah=0.d0
       do i=1,n-60
         call angle(p(3*a_h(1,i)-2),p(3*a_h(1,i)-1),p(3*a_h(1,i)),
      1             p(3*a_h(2,i)-2),p(3*a_h(2,i)-1),p(3*a_h(2,i)),
@@ -250,6 +256,7 @@ C     3 hexagons
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+c        write(*,*)angle_abcd
         ehookdhhh=ehookdhhh+(angle_abcd-dhhh)**2
       enddo
       endif
@@ -265,6 +272,7 @@ C     2 hexagons, 1 pentagon
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+c        write(*,*)angle_abcd
         ehookdhhp=ehookdhhp+(angle_abcd-dhhp)**2
       enddo
       endif
@@ -280,6 +288,7 @@ C     1 hexagon, 2 pentagons
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+c        write(*,*)angle_abcd
         ehookdhpp=ehookdhpp+(angle_abcd-dhpp)**2
 c        write(*,*)'diff',angle_p,ap
       enddo
@@ -298,15 +307,26 @@ c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
+c        write(*,*)angle_abcd
         ehookdppp=ehookdppp+(angle_abcd-dppp)**2
 c        write(*,*)'diff',angle_p,ap
       enddo
+      endif
+
+C     Coulomb repulsion from origin
+      ecoulomb=0.d0
+      if (iopt.eq.4 .and. fco.ne.0.d0)  then
+        Do I=1,n,3
+          rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
+          ecoulomb=ecoulomb+rinv
+        enddo
       endif
 
 C     total energy  
       fc=frpp*ehookrpp+frhp*ehookrhp+frhh*ehookrhh ! stretching
      2 +fap*ehookap+fah*ehookah ! bending
      3 +fdppp*ehookdppp+fdhpp*ehookdhpp+fdhhp*ehookdhhp+fdhhh*ehookdhhh! dihedral
+     4 +fco*ecoulomb
 c      write(*,*)fc,"energy"
       Return
       END SUBROUTINE
@@ -332,7 +352,12 @@ c      write(*,*)"entering dfunc3d"
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p)
         case(3)
-          CALL dextwu(n,p,x,force,
+          CALL dextwu(n,p,x,force,iopt,
+     1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1 a_h,a_p,
+     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        case(4)
+          CALL dextwu(n,p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -499,7 +524,7 @@ c      write(*,*)'leaving dwu'
       END
 
 
-      SUBROUTINE dextwu(n,p,x,force,
+      SUBROUTINE dextwu(n,p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -534,6 +559,7 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       fdhpp=force(16)
       fdhhp=force(17)
       fdhhh=force(18)
+      fco=force(19)
 
 C     Stretching
 c     we distinguish between bonds between two hexagons, two pentagons and hex/pent
@@ -619,7 +645,6 @@ C     Loop over 5-rings
         x(3*a_p(3,i))  =x(3*a_p(3,i))  +dcz*dE_over_dc
       enddo
 
-c      write(*,*)'before bend-h'
 C     Loop over 6-rings
       if(n/3 .gt. 20) then
         do i=1,n-60
@@ -671,8 +696,8 @@ c     3 hexagons
      3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
-        zero_value=dhhh
+c        angle_abcd=dabs(angle_abcd)
+        zero_value=sign(dhhh,angle_abcd)
         force_constant=fdhhh
         dE_over_dc=force_constant*(angle_abcd-zero_value)
 c derivations of the energy with respect the x,y,z of each of the four atoms
@@ -711,8 +736,8 @@ c     2 hexagon, 1 pentagon
      3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
-        zero_value=dhhp
+c        angle_abcd=dabs(angle_abcd)
+        zero_value=sign(dhhp,angle_abcd)
         force_constant=fdhhp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
 c derivations of the energy with respect the x,y,z of each of the four atoms
@@ -751,8 +776,8 @@ c     1 hexagon, 2 pentagons
      3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
-        zero_value=dhpp
+c        angle_abcd=dabs(angle_abcd)
+        zero_value=sign(dhpp,angle_abcd)
         force_constant=fdhpp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
 c derivations of the energy with respect the x,y,z of each of the four atoms
@@ -791,8 +816,8 @@ c     3 pentagons
      3   angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
-        zero_value=dppp
+c        angle_abcd=dabs(angle_abcd)
+        zero_value=dsign(dppp, angle_abcd)
         force_constant=fdppp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
 c derivations of the energy with respect the x,y,z of each of the four atoms
@@ -809,6 +834,16 @@ c derivations of the energy with respect the x,y,z of each of the four atoms
         x(3*d_ppp(4,i)-1)=x(3*d_ppp(4,i)-1)+ddy*dE_over_dc
         x(3*d_ppp(4,i))  =x(3*d_ppp(4,i))  +ddz*dE_over_dc
       enddo
+      endif
+
+C     Coulomb repulsion from origin
+      if (iopt.eq.4 .and. fco.ne.0.d0)  then
+        Do I=1,n,3
+          rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
+          x(I)  =x(I)  +fco*rinv*p(I)
+          x(I+1)=x(I+1)+fco*rinv*p(I+1)
+          x(I+2)=x(I+2)+fco*rinv*p(I+2)
+        enddo
       endif
 
       return
