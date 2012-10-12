@@ -130,7 +130,8 @@ C     Balaban index
      1 ' rho: ',D15.9,', rhoE: ',D15.9,/,' Zagreb index = nv*3^2 = ',
      1 I12,' (trivial for regular fullerenes)',/,
      1 ' Schultz index = 6*W = ',I12,' (related to Wiener index for ',
-     1 'regular fullerenes)',/,' Balaban index = ',D15.9)
+     1 'regular fullerenes)',/,' Balaban index = ',D15.9,
+     1 /,' For the Estrada index see Subroutine Hueckel output')
  1002 Format(' Topological distances are between 1 and ',I6,/,
      1 ' Average topological distance: ',F12.6)
       RETURN
