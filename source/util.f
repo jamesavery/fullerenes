@@ -50,7 +50,8 @@ C     Now sort values of diamw, output diam
       DIMENSION IDA(Nmax,Nmax)
       type(c_ptr) :: g, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
-C     minimal and maximal vertex contribution, rho and rhoE
+C     minimal and maximal vertex contribution, rho and rhoE,
+C     Schultz index and Balaban index
 C     For details see D. Vukicevic,F. Cataldo, O. Ori, A. Graovac,
 C     Chem. Phys. Lett. 501, 442–445 (2011).
 
@@ -74,10 +75,10 @@ C     Get topological distance matrix
        Do J=1,MAtom
         idist=MDist(I,J)
         wi(I)=wi(i)+idist
-        if(J.gt.I) then
-         if(idist.gt.maxdist) maxdist=idist
-         ihyperwiener=ihyperwiener+(idist*(1+idist))/2
-        endif
+         if(J.gt.I) then
+          if(idist.gt.maxdist) maxdist=idist
+          ihyperwiener=ihyperwiener+(idist*(1+idist))/2
+         endif
        enddo
       iwiener1=iwiener1+wi(i)
         if(I.ne.1) then
@@ -93,6 +94,19 @@ C     Get topological distance matrix
         endif
       enddo
 
+C     Balaban index
+      balaban=0.d0
+      Do I=1,MAtom
+      Do J=I+1,MAtom
+       if(IDA(I,J).eq.1) then
+        balaban=balaban+1.d0/dsqrt(dfloat(wi(I)*wi(J)))
+       endif
+      enddo
+      enddo
+      vertnum=dfloat(MAtom)
+      fac=3.d0*vertnum/(vertnum+2.d0)
+      balabanindex=balaban*fac
+
       iwiener=iwiener1/2
       wav=dfloat(iwiener1)/dfloat(MAtom)
       rho=wav/dfloat(wienermin)
@@ -100,9 +114,10 @@ C     Get topological distance matrix
       isize=Matom*(Matom-1)
       Avdist=2.d0*dfloat(iwiener)/dfloat(isize)
       izagreb=MAtom*9
+      ischultz=iwiener*6
      
       Write(Iout,1001) iwiener,ihyperwiener,wienermin,wienermax,
-     1 wav,rho,rhoE,izagreb
+     1 wav,rho,rhoE,izagreb,ischultz,balabanindex
       Write(Iout,1002) maxdist,Avdist
 
  1000 Format(1X,'Topological Indicators:',/1X,
@@ -113,7 +128,9 @@ C     Get topological distance matrix
      1 /,' Minimal and maximal vertex contribution to W: ',I12,' and ',
      1 I12,', average vertex contribution (wav): ',D15.9,/,
      1 ' rho: ',D15.9,', rhoE: ',D15.9,/,' Zagreb index = nv*3^2 = ',
-     1 I12,' (trivial for regular fullerenes)')
+     1 I12,' (trivial for regular fullerenes)',/,
+     1 ' Schultz index = 6*W = ',I12,' (related to Wiener index for ',
+     1 'regular fullerenes)',/,' Balaban index = ',D15.9)
  1002 Format(' Topological distances are between 1 and ',I6,/,
      1 ' Average topological distance: ',F12.6)
       RETURN
