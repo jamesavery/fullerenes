@@ -7,6 +7,7 @@
       integer,parameter :: NSpirals=Mmax*NSpScale
       integer,parameter :: Emax=3*Nmax/2
       integer,parameter :: maxit=2000000
+      integer,parameter :: maxRS=20000000
       integer,parameter :: ffmaxdim=19 ! maximum number of parameters per force field
       real(8),parameter :: dpi=3.14159265358979d0 
 c      real(8),parameter :: deg2rad=dpi/1.8d2

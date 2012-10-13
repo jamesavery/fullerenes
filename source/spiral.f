@@ -358,8 +358,12 @@ C     Analyze dual matrix
         WRITE (Iout,610) IPRhamlow,islowIPR,IPRhamhigh,ishighIPR
        endif
       endif
-      WRITE (Iout,611) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
+      if(IPR.eq.0) then
+       WRITE (Iout,611) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
      1  sigmahlow,ISigmaL,sigmahhigh,ISigmaH
+      else
+       WRITE (Iout,613) sigmahlow,ISigmaL,sigmahhigh,ISigmaH
+      endif
       WRITE (Iout,606)
       Return
 
@@ -422,6 +426,8 @@ C     Analyze dual matrix
      1      /1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
      1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
  612  FORMAT(1X,'Isomer List Complete')
+ 613  FORMAT(1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
+     1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
  701  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',

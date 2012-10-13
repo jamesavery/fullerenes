@@ -333,8 +333,11 @@ C Routine to get Isomer number from database
      * 659140287,716217922,776165188,842498881,912274540,987874095,
      * 1068507788,1156161307,1247686189,1348832364,1454359806,
      * 1568768524,1690214836,1821766896,1958581588,2109271290/
+C     Current status of Database file
+C     Max Vertex number for general database
       LimitAll=100
-      LimitIPR=120
+C     Max Vertex number for IPR database
+      LimitIPR=158
       nhamcycle=0
 
 C     Check if parameters are set correctly

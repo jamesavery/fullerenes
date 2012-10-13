@@ -116,15 +116,18 @@ C      fitted to asymptodic
            AisoIPR=fac2*(dfloat(N)/6.d1)**11.08800d0
            If(N.gt.360) Write(Iout,1003) AisoNIPR,AisoIPR
           endif
- 
+
+C     Limit number of cycles
+      maxRSI=maxRS
+      if(iham.ne.0) maxRSI=maxRS/10
       if(IPR.eq.0) then
-       if(AisoNIPR.gt.dfloat(maxAiso)) then
-        Write(Iout,1004) maxAiso
+       if(AisoNIPR.gt.dfloat(maxRSI)) then
+        Write(Iout,1004) maxRSI
         Return
        endif
       else
-       if(AisoIPR.gt.dfloat(maxAiso)) then
-        Write(Iout,1004) maxAiso
+       if(AisoIPR.gt.dfloat(maxRSI)) then
+        Write(Iout,1004) maxRSI
         Return
        endif
       endif
