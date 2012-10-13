@@ -1,5 +1,5 @@
-C62 Creating isomer list only
-&General NA=100 /
+C80 Creating isomer list only
+&General NA=80 /
 &Coord ICart=0 /
 &FFChoice /
 &FFParameters /

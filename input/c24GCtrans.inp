@@ -1,6 +1,7 @@
 C24 aug-cc-pvdz B3LYP opt. geom. minimum D2-sym E=-913.9314011 au
 Cartesian coordinate input and subsequent
-&Coord NA=24, ICart=1, IGCtrans=1, kGC=2, nosort=1 /
+&General NA=24, nosort=1 / 
+&Coord ICart=1, IGCtrans=1, kGC=2 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton Iham=1 /

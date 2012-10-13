@@ -4,4 +4,7 @@ Cartesian coordinate input
 &Coord ICart=0, IGCtrans=1, kGC=5 /
 &FFChoice Iopt=1 /
 &FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
 
