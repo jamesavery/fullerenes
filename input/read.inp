@@ -1,3 +1,8 @@
 This is an input where the geometry comes from an xyz file
 &General ixyz=3, filename='Fullerene-3D' /
 &Coord ICart=1 /
+&FFChoice /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /

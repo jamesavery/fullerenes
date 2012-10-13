@@ -1,7 +1,7 @@
 C1350 Leap frog from C50
 For this case the molecule is preoptimized after the
 Tutte embedding with the Wu FF plus an additional
-repulsive potentialvspecified by fcoulomb and then
+repulsive potential specified by fcoulomb and then
 optimized with the normal force field. If pre-
 optimization is not done, the structure is not
 good and heavily distorted
