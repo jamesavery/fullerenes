@@ -1,7 +1,7 @@
-C50 Using Tutte embedding to produce coordinates
+C50 Using Tutte embedding to produce coordinates through ring spiral indices
 &General NA=50 /
-&Coord ICart=4, R6=1.42 /
-&FFChoice Iopt=2 /
+&Coord ICart=3, R6=1.42 /
+&FFChoice Iopt=4 /
 &FFParameters fcoulomb=60. /
 &Hamilton IHam=1 /
 &Isomers /

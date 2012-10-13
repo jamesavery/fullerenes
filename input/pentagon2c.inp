@@ -1,6 +1,7 @@
-C60 Using FM algorithm for coordinates, eigenvectors are not in order 2 3 4
-&General  NA=60, IP=1, ixyz=1 /
-&Coord ICart=4, R6=1.42 /
+C180 Using FM algorithm for coordinates, eigenvectors are not in order 2 3 4
+Goldberg-Coxeter to construct C180
+&General  IP=1, ixyz=1 /
+&Coord ICart=4, kGC=3, R6=1.42 /
 &FFChoice /
 &FFParameters /
 &Hamilton /

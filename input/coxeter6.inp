@@ -1,5 +1,4 @@
-C20 aug-cc-pvdz B3LYP opt. geom. minimum E=-761.5231573 au
-Cartesian coordinate input
+Coxeter fullerene with indices (k,l)=(6,0) G0=C20
 &General NA=20, ixyz=1, ihueckel=0 /
 &Coord ICart=0, IGCtrans=1, kGC=5 /
 &FFChoice Iopt=1 /

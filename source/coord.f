@@ -1879,7 +1879,9 @@ C Leapfrog fullerene
       if(leap.eq.1) then
        Write(Iout,1000) MAtom,MLeap
       else
-       Write(Iout,1001) leap,MAtom,MLeap
+       if(leap.gt.3) Write(Iout,1001) leap,MAtom,MLeap
+       if(leap.eq.2) Write(Iout,1021) leap,MAtom,MLeap
+       if(leap.eq.3) Write(Iout,1022) leap,MAtom,MLeap
       endif 
 
       g = new_fullerene_graph(Nmax,MAtom,IDA)
@@ -1968,6 +1970,10 @@ C Produce adjacency matrix
  1014 Format(1X,'Leapfrog graph satisfies all fullerene conditions')
  1015 Format(1X,'Leapfrog graph does not satisfy all fullerene ',
      1 'conditions')
+ 1021 Format(/1X,'Creating the adjacency matrix of the ',I2,
+     1 'nd leap-frog fullerene: ',I4,' --> ',I4)
+ 1022 Format(/1X,'Creating the adjacency matrix of the ',I2,
+     1 'rd leap-frog fullerene: ',I4,' --> ',I4)
       Return
       END
 

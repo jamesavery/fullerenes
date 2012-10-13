@@ -1,4 +1,5 @@
 C80  cc-pvdz B3LYP opt. geom. minimum -3048.53107840 au
+2 Yoshida-Fowler 6-vertex insertions to C92
 Cartesian coordinate input
 &General NA=80, IP=1 /
 &Coord ICart=1, IYF=3 /

@@ -1,4 +1,4 @@
-C70  Using FM algorithm to produce coordinates
+C70 nanotube. Using FM algorithm to produce coordinates from ring spiral indices
 &General  NA=70, IP=1 /
 &Coord ICart=2, IV2=4, IV3=5 /
 &FFChoice Iopt=1 /

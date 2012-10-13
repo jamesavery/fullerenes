@@ -1,4 +1,4 @@
-C840 I could not locate eigenvectors for FM, using Tutte instead
+C840 I could not locate eigenvectors for FM, using Tutte instead from ring spiral indices
 &General NA=840, ixyz=1, filename='pent22' /
 &Coord ICart=3, R6=1.42 /
 &FFChoice Iopt=1 /

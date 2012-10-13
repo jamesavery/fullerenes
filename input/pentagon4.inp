@@ -1,4 +1,4 @@
-C60  Using FM algorithm to produce coordinates
+C60  Using FM algorithm to produce coordinates through ring spiral indices
 &General NA=60, IP=1 /
 &Coord ICart=2 /
 &FFChoice Iopt=1 /
