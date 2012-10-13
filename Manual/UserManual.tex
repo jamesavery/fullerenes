@@ -711,11 +711,10 @@ Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2
 \paragraph{Option description:} 
 \begin{description}
 \item[{ICart}] Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
-If \paramname{ICart} = 2, 3 then pentagon indices are used.\\
+If \paramname{ICart} = 2, 3 then 12 pentagon indices are used for input.\\
+If \paramname{ICart} = 4, 5 then Goldberg-Coxeter transformation of \C{20} is used.\\
 If \paramname{ICart} = 2 or 3 and \paramname{isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below).
-\item[{IPRC}] 
-There are two databases, one for the general isomers (\paramname{IPRC} = 2) and one for the IPR isomers (\paramname{IPRC} = 1), the
-definition is similar to the \paramname{IPR} parameter below (Default: 2).\\ %TODO: Which of these two is correct?
+\item[{IPRC}]
 There are two databases, one for the general isomers
 (\paramname{IPRC} = 0), and one for the IPR isomers (\paramname{IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).
 \item[{IV1}] Number for H\"uckel P-type eigenvector for AME algorithm (Default: 2)
