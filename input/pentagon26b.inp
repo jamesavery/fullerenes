@@ -1,8 +1,8 @@
 C20 Coordinates produced by Tutte embedding
 &General NA=20, IP=1 /
-&Coord ICart=4, R6=1.39 /
-&FFChoice Iopt=1 /
-&FFParameters /
+&Coord ICart=3, R6=1.39 /
+&FFChoice Iopt=4 /
+&FFParameters fcoulomb=120. /
 &Hamilton IHam=1 /
 &Isomers IPR=1 /
 &Graph ISchlegel=4, ISO1=1, ISO2=2, ISO3=3 /

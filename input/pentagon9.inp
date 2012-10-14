@@ -1,4 +1,4 @@
-C30  Using FM algorithm to produce coordinates
+C30 nanotube. Using FM algorithm to produce coordinates through ring spiral indices
 &General  NA=30 /
 &Coord ICart=2 /
 &FFChoice Iopt=1 /

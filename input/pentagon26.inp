@@ -1,6 +1,6 @@
-C20 Coordinates produced by Tutte embedding
+C20 Coordinates produced by Tutte embedding from ring spiral indices
 &General NA=20, IP=1 /
-&Coord ICart=4, R6=1.39 /
+&Coord ICart=3, R6=1.39 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton IHam=1 /

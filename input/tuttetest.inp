@@ -1,8 +1,9 @@
-C60 Using Tutte algorithm for coordinates
+C60 Using Tutte algorithm for coordinates for C60 nanotube
+Difficult case to get the structure right through force field
 &General NA=60, IP=1, ixyz=1 /
 &Coord ICart=4, R6=1.42 /
-&FFChoice Iopt=1 /
-&FFParameters /
+&FFChoice Iopt=4 /
+&FFParameters fcoulomb=41./
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=7 ISO1=1 ISO2=2 ISO3=3 /

@@ -1,6 +1,7 @@
-C90  Using FM algorithm to produce coordinates
-&General  NA=90, IP=1 /
-&Coord ICart=4, IV2=5, IV3=6, isonum=134, IPRC=2 /
+C80  Using Tutte algorithm to produce coordinates from Goldberg-Coxeter construction of C20
+FM algorith has difficulties finding eigenvectors
+&General  IP=1 /
+&Coord ICart=5, kGC=2, IPRC=2 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton IHam=1 /

@@ -1,5 +1,4 @@
 C78   cc-pvdz B3LYP opt. geom. minimum -2972.358202246 au
-C20 aug-cc-pvdz B3LYP opt. geom. minimum E=-761.5231573 au
 &General NA=78 /
 &Coord ICart=1 /
 &FFChoice Iopt=1 /

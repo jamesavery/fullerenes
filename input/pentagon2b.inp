@@ -1,6 +1,7 @@
 C60 Using FM algorithm for coordinates, eigenvectors are not in order 2 3 4
+Using ring pentagon indices
 &General NA=60, IP=1, ixyz=1 /
-&Coord ICart=3, IV2=4, IV3=5 /
+&Coord ICart=3 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

@@ -1,6 +1,6 @@
-C120 Using FM algorithm to produce coordinates
+C120 Using FM algorithm to produce coordinates from ring spiral indices
 &General NA=120, IP=1 /
-&Coord ICart=4 , R6=1.42 /
+&Coord ICart=3 , R6=1.42 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

@@ -1,11 +1,11 @@
-C100  
+C100 data from B3LYP calculations  
 &General NA=100 /
 &Coord ICart=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton IHam=1 /
 &Isomers IPR=1 /
-&Graph ISchlegel=2, ISO1=22, ISO2=25, ISO3=44 /
+&Graph ISchlegel=2, ISO1=24, ISO2=25, ISO3=44 /
 6   -3.4526368749   -1.1630906343    2.6886737648
 6   -2.8037743744   -2.4022379552    2.6169584218
 6   -3.2531184436   -3.270623811     1.5788413302
