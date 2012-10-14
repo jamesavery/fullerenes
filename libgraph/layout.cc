@@ -41,7 +41,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
   }
     
   bool converged = false;
-  const unsigned int TUTTE_MAX_ITERATION = 50000;
+  const unsigned int TUTTE_MAX_ITERATION = 500000;
   const double TUTTE_CONVERGENCE = 5e-7;
   unsigned int i;
   double max_change;
@@ -68,6 +68,10 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
       
     if(max_change <= TUTTE_CONVERGENCE) converged = true;
     xys = newxys;
+  }
+  if(i>=TUTTE_MAX_ITERATION){
+    printf("Planar Tutte embedding failed to converge. Increase TUTTE_MAX_ITERATION. ");
+    abort();
   }
   //  cerr << "Tutte layout of "<<N<<" vertices converged after " << i << " iterations, with maximal relative change " << max_change << endl;
   // Test that points are distinct
