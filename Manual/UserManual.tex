@@ -33,7 +33,7 @@
 
 
 
-\title{PROGRAM FULLERENE (Version 4.1)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
+\title{PROGRAM FULLERENE (Version 4.2)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
 
 \author{Peter Schwerdtfeger%
   \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
@@ -70,8 +70,8 @@ If you like to know why, read the article by \textrm{Darrel C. Ince, Leslie Hatt
 John Graham-Cumming, Nature \textbf{482}, p.485 (2012)}. However, we kindly ask that if 
 our program is used, and data are subsequently published, to cite the three references given below.
 Before you distribute the program to other agencies or users outside your
-group/department we ask you to pass the information on, that new users should be
-added into our user's database. For details go to our website at Massey University:}
+group/department please make them aware that their name should be
+added into our user's database. For more details go to our website at Massey University:}
 {
 
  \centering
@@ -119,7 +119,7 @@ in terms of a Humboldt Research Award, and to both Prof. Gernot Frenking and
 Dr. Ralf Tonner (Marburg) for support during his extended stay in Marburg where 
 writing of this program began. We acknowledge the help of Darko Babi\'c, Patrick 
 W. Fowler and David E. Manolopoulus for permission to freely distribute 
-their Fortran subroutines which were modified and implemented in this program.
+their Fortran subroutines which were modified and implemented within this program.
 
  \begin{figure}[htbp]
    	\centering
@@ -143,8 +143,8 @@ The first version (1.0) was written in Fortran for calculating the surface area 
 incorporation of rare gas atoms \cite{Tonner}. A much improved version 2.0 allowed for the creation of fullerene structures using
 the ring-spiral algorithm introduced in the book by Fowler and Manolopoulus \cite{Atlas}, and version 3.0 was already dealing with
 topological and graph theoretical properties. It became soon clear that many open problems remain in fullerene structure generations
-which needed to be addressed, and it was therefore decided extend version 3 to a general purpose program package wand make it available
-to the community.
+which needed to be addressed, and it was therefore decided extend version 3 to a general purpose program package and make it available
+to the scientific community.
 
 In the current version only regular fullerenes are considered (i.e. of genus 0 consisting of pentagons and hexagons only) 
 fulfilling Euler's theorem, $n_v - n_e + n_f = 2$, where $n_v$ is the number of vertices (atoms), $n_e$ the number of edges (bonds), and 
@@ -156,7 +156,7 @@ perform vertex insertions (such as Endo-Kroto \cite{Endo92} or Yoshida-Fowler \c
 or Stone-Wales transformations \cite{Stone86}. 
 Vertex insertions allow for the construction of non-spiral fullerenes such as \C{380} or \C{384}. 
 Geometry optimization using a Fletcher-Reeves-Polak-Ribiere
-minimization with analytical gradients for the Wu force-field \cite{Wu87} is implemented in the current version, providing 
+minimization with analytical gradients for the Wu (and extended Wu) force-field \cite{Wu87} is implemented in the current version, providing 
 a good initial guess for 3D cartesian coordinates. 2D fullerene graphs (Schlegel diagrams)
 can be produced using a variety of different algorithms \cite{Plestenjak}. The program determines the volume and surface area 
 of a fullerene (irregular or not) through tesselation in trigonal pyramids or from the convex hull, and gives measures for
@@ -174,7 +174,7 @@ it is important that the fullerene has a reasonable structure, obtained for exam
 optimization, otherwise bonds cannot be correctly identified using .xyz files. It may therefore not be advisable to use structures that come out directly from
 the AME or 3D-TE algorithm, or the .cc1 file should be used which contains information on vertex adjancencies. 
 We recommend CYLview, it is more robust and works for large fullerenes up to about 1000 atoms. 
-For larger fullerenes Pymol is recommended. The program produces fullerene 2D graphs in latex format, but can
+For larger fullerenes VMD or Pymol is recommended. The program produces fullerene 2D graphs in latex format, but can
 be used by any other program which is capable of producing 2D graphs, for example QMGA \cite{Gabriel2008}. 
 For this an external file is written out called \filename{Fullerene-2D.dat} containing all the information required for plotting a 2D graph.
 
@@ -192,8 +192,8 @@ and crazy about rugby), and close packing of ellipsoids; 2) The general Goldberg
 optimized geometry; 5) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 6) Symmetry labels for 
 H\"uckel orbital energies; 7) Extension to non-classical fullerenes of genus 0 (heptagons and squares); 8) Extension to non-regular fullerenes 
 of genus 1 (hmmm, donuts!); 9) To symmetrize optimized coordinates to point group symmetry; 
-10) A restart option for subroutine Hamilton; 11) Use of ``House of Graphs'' 
-fullerene database; 12) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
+10) A restart option for subroutine Hamilton; 11) Use of ``House of Graphs'' fullerene database; 
+12) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
 with a good graphical interface similar to the \program{CAGE} program \cite{Brinkmanx}.
 
 We are also open to any other suggestions and welcome additions to this program suite.
@@ -247,7 +247,7 @@ very large fullerenes ($>$ 2000 atoms), the determination of the number of Hamil
 ($>$ 80 atoms) (this is an NP-complete problem), the creation of a list of ring-spiral pentagon
 indices for all possible isomers with a given vertex count $n_v$ ($>$ 80 atoms), 
 and the Tutte embedding algorithm ($>$ 2000 atoms). We try to improve the performance of these algorithms
-in our next version.
+in our next major version.
 
 %Create a 3D structure for a specific fullerene
 \subsection{Create a 3D structure for a specific fullerene}
@@ -270,8 +270,10 @@ to construct 3D fullerene graphs.  For the AME algorithm it is critical to get t
 H\"uckel eigenvectors for the construction of cartesian coordinates \cite{Atlas}. 
 The position of the three~$P$-type eigenvectors can be specified (see file \filename{pentagon8.inp} for such an example).
 If the AME algorithm fails or you cannot find the required $P$-type eigenvectors, you should use our Tutte embedding algorithm,
-which (to our opinion) is less troublesome and may be used as the standard method to construct 3D structures.
-3D structures can also be obtained from a Goldberg-Coxeter transformation of \C{20}.
+which (to our opinion) is less troublesome and may be used as the standard method to construct 3D structures. The disadvantage
+of this algorithm is that the structure could be far off from a force-field optimized global minimum for a fullerene and the
+force-field optimization might end up in a heavily distorted unreasonable 3D local minimum (for strategies to avoid this
+see the input section). 3D structures can also be obtained from a Goldberg-Coxeter transformation of \C{20}.
 
 It is important that the end-product is viewed by a molecular visualization program. 
 We recommend CYLview by Claude Legault \cite{CYLview}, Avogadro \cite{Avogadro}, JMol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}. 
@@ -305,7 +307,7 @@ too demanding for a full isomer list beyond \C{100}. Moreover, the database prov
 \C{100}, and up to \C{120} for all IPR isomers. Fowler and Manolopoulus use a numbering scheme ($N_\mathrm{isomers}= 1,\dots, n_\mathrm{max}$) 
 obtained from the natural sequence of canonical RSPIs to distinguish between the different isomers \cite{Atlas}. From their book \cite{Atlas} the
 general isomer number can be taken and the RSPIs for a specific isomer up to \C{100} can be read-in from the database provided. 
-The numbering scheme for IPR isomers only ($N_\mathrm{isomers}^\mathrm{IPR}= 1,\dots, n_\mathrm{max}$) can also be used up to \C{120}, see input file \filename{database.inp}.
+The numbering scheme for IPR isomers only ($N_\mathrm{isomers}^\mathrm{IPR}= 1,\dots, n_\mathrm{max}$) can also be used up to \C{160}, see input file \filename{database.inp}.
 
 %H\"uckel analysis and topological indicators
 \subsection{H\"uckel analysis and topological indicators}
@@ -372,7 +374,7 @@ Hamiltonian cycles exist for all fullerene isomers up to \C{100} and for all IPR
 %Force-field optimization
 \subsection{Force-field optimization}
 The geometry can be optimized by force fields using a Fletcher-Reeves-Polak-Ribiere geometry optimization \cite{NumRec}
-with analytical gradients (Subroutine \funname{OptFF} \cite{NumericalRecipes}). In the currently version only the Wu
+with analytical gradients (Subroutine \funname{OptFF} \cite{NumericalRecipes}). In the current version the Wu
 force field is implemented, which considers bond lengths and angles only in an harmonic oscillator approximation \cite{Wu87}: 
 \begin{equation}
   \label{eq:Ewu}
@@ -388,17 +390,18 @@ respectively).
 
 The force-field optimization is very fast even for fullerenes such as \C{840}. 
 The Wu force-field optimization may lead to distortions of the fullerene to a structure of lower symmetry compared to the original point-group. 
-Moreover, as no
-dihedral angles are fixed, the molecule might distort away from convexity. In such cases an additional Coulomb repulsive potential can
+Moreover, as no dihedral angles are fixed, the molecule might distort away from convexity. In such cases an additional Coulomb repulsive potential can
 be added (see input instructions) in a preoptimization step to avoid large "dents" or collapse of the fullerene,
 \begin{equation}
   \label{eq:Ewu}
   E = E_{\mathrm{Wu}} + E_{\mathrm{Coulomb}} = E_{\mathrm{Wu}} + \sum_{i=1}^{\mathrm{vertices}} \frac{f_{\mathrm{Coulomb}}}{|r_i - r_0|}
 \end{equation}
-with $r_i - r_0$ being the distance between vertex $i$ and the barycenter.
+with $r_i - r_0$ being the distance between vertex $i$ and the barycenter. Another method to influence convergence into the global
+minimum is to adjust the sphere radius in the Tutte embedding algorithm (see input section).
 Note that the construction of the fullerene by using the AME or Tutte algorithm may
 lead to a more spherical arrangement prior to a force-field optimization with rather large bond distances, 
-e.g. barrels instead of nanotubes. A more sophisticated force field using dihedral angles is currently being implemented.
+e.g. barrels instead of nanotubes. A more sophisticated force field using dihedral angles is also implemented (extended Wu force field),
+which enhances planarity for areas of connected hexagons.
 
 %Ring connectivities, patterns, vertex insertions and spiral detection
 \subsection{Ring connectivities, patterns, vertex insertions and spiral detection}
@@ -706,7 +709,7 @@ Namelist line that contains the main flags for the program.
 Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=20, R6=1.42 /|).
 \paragraph{List of options:}\ 
 
-\paramname{ICart, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6}
+\paramname{ICart, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6, ScaleRad}
 
 \paragraph{Option description:} 
 \begin{description}
@@ -767,6 +770,7 @@ If \paramname{mirror} = 1 invert all coordinates (take the mirror image). This m
 \item[R6] Hexagon  bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.391)
 If \paramname{R5} = \paramname{R6} is chosen then the ideal capped icosahedron for \C{60} is obtained if \paramname{NA}=60 is chosen.
 \end{description}
+\item[ScaleRad] Scaling paramater for Tutte sphere.
 
 \paragraph{More details for the \paramname{ICart}-flag:} 
 If \paramname{ICart} = 0 No coordinate input required, coordinates are constructed for the ideal IPR isomer.
@@ -963,7 +967,8 @@ We are working on this problem at the moment.
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{100} and for IPR isomers up to
-\C{120} including the number of Hamiltonian cycles. The database can be copied into
+\C{160} including the number of Hamiltonian cycles up to \C{100} for general and up to
+\C{120} for IPR isomers. The database should be copied into
 the main program folder and can be used to read the ring-spiral pentagon indices.
 The numbering scheme is identical to that the one chosen in the book by Fowler 
 and Manolopoulus \cite{Atlas}, that is each isomer in the book's appendix can be 
@@ -974,7 +979,7 @@ New lists will be available on our website in time.  The determination of the nu
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
 The Yoshida database often used has also been added into our database and is placed in the
-folder \filename{database/Yoshida} \cite{Yoshida}. The input file \filename{read1.inp} shows an example for reading from
+folder \filename{database/Yoshida} \cite{Yoshida}. The input file \filename{database3.inp} shows an example for reading from
 this database. The directory database needs to be in the same directory as ``source'' or ``libgraph''.
 
 %\clearpage
