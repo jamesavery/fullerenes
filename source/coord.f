@@ -2122,23 +2122,24 @@ C     This needs to be changed
       DIMENSION evec(NMAX),dipol(3,3)
       DIMENSION idg(NMAX)
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
+      integer istop  
+      istop=0
 
       Write(Iout,1045)
 
-
       icand=0
       Do I=1,iocc
-      mneg=0
-      mpos=0
-      z=0.d0
-      Do J=1,MATOM
-      if(A(J,I).lt.-1.d-9) mneg=mneg+1
-      if(A(J,I).gt.1.d-9) mpos=mpos+1
-      enddo
-      if(mneg.eq.mpos) then
-      icand=icand+1
-      idg(icand)=I
-      endif
+        mneg=0
+        mpos=0
+        z=0.d0
+        Do J=1,MATOM
+          if(A(J,I).lt.-1.d-9) mneg=mneg+1
+          if(A(J,I).gt.1.d-9) mpos=mpos+1
+        enddo
+        if(mneg.eq.mpos) then
+          icand=icand+1
+          idg(icand)=I
+        endif
       enddo
 C     Analyzing remaining occupied eigenvectors
 C     Create cartesian coordinates (in Angstroems) and scale them
@@ -2147,46 +2148,46 @@ C     if required
       Ix2=idg(2)
       Ix3=idg(3)
       if(Ix1.ne.2.or.Ix2.ne.3.or.Ix3.ne.4) then
-      Write(Iout,1027) Ix1,Ix2,Ix3
+        Write(Iout,1027) Ix1,Ix2,Ix3
       endif
       I1=IV1
       I2=IV2
       I3=IV3
       Write(Iout,1028) I1,I2,I3
       Do I=1,MATOM
-      Dist(1,I)=A(I,I1)
-      Dist(2,I)=A(I,I2)
-      Dist(3,I)=A(I,I3)
+        Dist(1,I)=A(I,I1)
+        Dist(2,I)=A(I,I2)
+        Dist(3,I)=A(I,I3)
       enddo
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       ratiotest=Rminall/Rmax
 C     Search for better eigenvectors (not implemented yet)
       if(ratiotest.lt.1.d-6) then
-      Write(Iout,1033) ratiotest
-      istop=1
+        Write(Iout,1033) ratiotest
+        istop=1
       endif
       fac1=1.d0/dsqrt(3.d0-evec(I1))
       fac2=1.d0/dsqrt(3.d0-evec(I2))
       fac3=1.d0/dsqrt(3.d0-evec(I3))
       ratio1=(Rmax/Rmin-1.d0)*1.d2
       Do I=1,MATOM
-      Dist(1,I)=A(I,I1)*fac1
-      Dist(2,I)=A(I,I2)*fac2
-      Dist(3,I)=A(I,I3)*fac3
+        Dist(1,I)=A(I,I1)*fac1
+        Dist(2,I)=A(I,I2)*fac2
+        Dist(3,I)=A(I,I3)*fac3
       enddo
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       ratio=(Rmax/Rmin-1.d0)*1.d2
       if(ratio1.lt.ratio) then
-      Write(Iout,1026)
-      Do I=1,MATOM
-      Dist(1,I)=A(I,I1)/fac1
-      Dist(2,I)=A(I,I2)/fac2
-      Dist(3,I)=A(I,I3)/fac3
-      enddo
-      fac1=1.d0
-      fac2=1.d0
-      fac3=1.d0
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+        Write(Iout,1026)
+        Do I=1,MATOM
+          Dist(1,I)=A(I,I1)/fac1
+          Dist(2,I)=A(I,I2)/fac2
+          Dist(3,I)=A(I,I3)/fac3
+        enddo
+        fac1=1.d0
+        fac2=1.d0
+        fac3=1.d0
+        CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       endif
 
 C     Obtain smallest distance for further scaling
@@ -2194,29 +2195,29 @@ C     Now this contracts or expandes the whole fullerene to set the
 C     smallest bond distance to Cdist
       R0=1.d10
       Do I=1,MATOM
-      Do J=I+1,MATOM
-      X=Dist(1,I)-Dist(1,J)
-      Y=Dist(2,I)-Dist(2,J)
-      Z=Dist(3,I)-Dist(3,J)
-      R=dsqrt(X*X+Y*Y+Z*Z)
-      if(R.lt.R0) R0=R
-      enddo
+        Do J=I+1,MATOM
+          X=Dist(1,I)-Dist(1,J)
+          Y=Dist(2,I)-Dist(2,J)
+          Z=Dist(3,I)-Dist(3,J)
+          R=dsqrt(X*X+Y*Y+Z*Z)
+          if(R.lt.R0) R0=R
+        enddo
       enddo
       fac=CDist/R0
       Write(Iout,1010) icand,I1,I2,I3,fac1,fac2,fac3,fac,Cdist
       Do k=1,2*I3
-      ICN=0
-      ICP=0
-      do kk=1,Matom
-      if(A(kk,k).gt.0.d0) ICP=ICP+1
-      if(A(kk,k).lt.0.d0) ICN=ICN+1
-      enddo
-      Write(Iout,1011) k,evec(k),ICN,ICP
-      Write(Iout,1012) (A(J,k),J=1,Matom)
+        ICN=0
+        ICP=0
+        do kk=1,Matom
+          if(A(kk,k).gt.0.d0) ICP=ICP+1
+          if(A(kk,k).lt.0.d0) ICN=ICN+1
+        enddo
+        Write(Iout,1011) k,evec(k),ICN,ICP
+        Write(Iout,1012) (A(J,k),J=1,Matom)
       enddo
       if(R0.lt.1.d-5.or.istop.eq.1) then
-      Write(IOUT,1032) R0,fac
-      stop
+        Write(IOUT,1032) R0,fac
+        stop
       endif
       Do I=1,MATOM
       Dist(1,I)=Dist(1,I)*fac

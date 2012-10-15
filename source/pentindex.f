@@ -33,7 +33,6 @@ C If nalgorithm=3 use Coxeter Goldberg and Tutte algorithm
       nalgorithm=ICart-2
 
       M=Matom/2+2
-      istop=0
       Group='NA '
 
 

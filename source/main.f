@@ -49,6 +49,8 @@ C    Set the dimensions for the distance matrix
       CHARACTER*3 GROUP
       Integer endzeile,Values(8)
       Integer MDist(Nmax,Nmax)
+      integer istop
+
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
      2 'MN','FE','CO','NI','CU','ZN','GA','GE','AS','SE','BR','KR',    
