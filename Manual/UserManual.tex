@@ -655,6 +655,7 @@ In the following, the input in the required sequence is described in detail (eit
 A comment line of of max. 132 characters. You can have as many comment lines as you want, so long as they are 132 characters or less: 
 every line until the first namelist-line is interpreted as a comment.
 
+%---General---
 \subsection{\&General line}
 Namelist line that contains the main flags for the program. 
 
@@ -703,7 +704,7 @@ Namelist line that contains the main flags for the program.
 \end{description}
 
 
-
+%---Coord---
 \subsection{\&Coord line}
 
 Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=20, R6=1.42 /|).
@@ -766,11 +767,12 @@ Similar to Yoshida-Fowler, an input is required (see \filename{c384.inp} for det
 \item[mirror] 
 If \paramname{mirror} = 1 invert all coordinates (take the mirror image). This may be important for chiral fullerenes (Default: 0).
 \item[IPRC] See entry for \paramname{isonum}.
-\item[R5] Pentagon bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.455)
-\item[R6] Hexagon  bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.391)
+\item[R5] Pentagon bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.455).
+\item[R6] Hexagon  bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.391).
 If \paramname{R5} = \paramname{R6} is chosen then the ideal capped icosahedron for \C{60} is obtained if \paramname{NA}=60 is chosen.
+\item[ScaleRad] Scaling paramater for Tutte sphere (Default: 4.0).
 \end{description}
-\item[ScaleRad] Scaling paramater for Tutte sphere.
+
 
 \paragraph{More details for the \paramname{ICart}-flag:} 
 If \paramname{ICart} = 0 No coordinate input required, coordinates are constructed for the ideal IPR isomer.
@@ -805,15 +807,16 @@ If \paramname{ICart} = 3 or 5 the Tutte embedding (3D-TE) algorithm is chosen fo
 adjacency matrix.  This should always work, although the fullerene created might be too spherical compared to the AME algorithm. But this
 algorithm is easier, and (in theory) should never fail. Examples are given in the input files starting with ``pentagon''.
 
-\clearpage
-\subsection{\&FFParameters and \&FFParameters  lines}
+
+%---FFChoice and FFParameters---
+\subsection{\&FFChoice and \&FFParameters lines}
 Options for force-field optimization.
 
 \paragraph{List of options:} 
 
 \textbf{\&FFChoice} has parameters \paramname{Iopt, ftol}.\\
 \textbf{\&FFParameters} has parameters \paramname{fCoulomb, WuR5, WuR6, WuA5, WuA6, WufR, WufA, ExtWuR55, ExtWuR56, 
-ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR, ExtWufA, ExtWufD}.
+ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR, ExtWufA, ExtWufD}.\\
 
 \paragraph{Option description:}
 \begin{description}
@@ -846,6 +849,8 @@ a good guess of the initial structure. In such cases, $\paramname{fCoulomb} = 10
 are difficult to optimize if the start is bad, and one needs to play with the \paramname{fCoulomb} parameter (see for example {c380.inp}).
 \end{description}
 
+
+%---Hamilton---
 \subsection{\&Hamilton line}
 Option for calculating Hamiltonian cycles and IUPAC numbers.
 \paragraph{List of options:}\  \paramname{IHam}, \paramname{IUPAC}
@@ -865,6 +870,7 @@ Option for calculating Hamiltonian cycles and IUPAC numbers.
 \end{description}
 
 
+%---Isomers---
 \subsection{\&Isomers line}
  Option for producing list of isomers and properties.
 \paragraph{List of options:}\ \paramname{IPR}, \paramname{IPH}, \paramname{IStop}, \paramname{IChk} (Default 0 for all options).\\
@@ -885,6 +891,8 @@ The resulting output is a catalogue of the isomers found containing their ideali
 \cite{Atlas}.
 \end{description}
 
+
+%---Graph---
 \subsection{\&Graph line}
  Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (called Schlegel diagrams by some authors).
 \paragraph{List of options:}\ 
@@ -967,15 +975,15 @@ We are working on this problem at the moment.
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{100} and for IPR isomers up to
-\C{160} including the number of Hamiltonian cycles up to \C{100} for general and up to
-\C{120} for IPR isomers. The database should be copied into
+\C{120} including the number of Hamiltonian cycles, and without Hamiltonian cycles
+up to \C{120} for general and up to \C{170} for IPR isomers. The database should be copied into
 the main program folder and can be used to read the ring-spiral pentagon indices.
-The numbering scheme is identical to that the one chosen in the book by Fowler 
+The numbering scheme is in canonical order and identical to the one introduced in the book by Fowler 
 and Manolopoulus \cite{Atlas}, that is each isomer in the book's appendix can be 
-constructed easily from our database. An example is given in the input file   
-\filename{database.inp}.  The datafiles are formatted and can easily be read. It is our 
-intention to extend the isomer list beyond \C{100}/\C{120} (without Hamiltonian cycles) using the ``House of Graphs'' database . 
-New lists will be available on our website in time.  The determination of the number of
+constructed easily from our database. Example is given in input files  \filename{database.inp},
+\filename{database1.inp} and \filename{database2.inp}.  The data files are formatted and can easily be read. It is our 
+intention to extend the isomer list beyond \C{120}/\C{170} (without Hamiltonian cycles) using the ``House of Graphs'' database . 
+New lists will be available on our website in due time.  The determination of the number of
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
 The Yoshida database often used has also been added into our database and is placed in the
