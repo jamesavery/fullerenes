@@ -450,7 +450,7 @@ C     Unpack distance matrix value from linear vector
 
       SUBROUTINE EndoKrotoTrans(Matom,IN,Iout,n565,NEK,
      1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,layout2D,distp,
-     1 CDist)
+     1 CDist,scalerad)
       use config
 C     use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -624,7 +624,7 @@ C Now analyze the adjacency matrix if it is correct
         WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Endo-Kroto insertion of 2 vertices:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
  1001 Format(/1X,'Number of Endo-Kroto insertions: ',I2,
@@ -655,7 +655,7 @@ C Now analyze the adjacency matrix if it is correct
 
       SUBROUTINE WirzSchwerd(Matom,IN,Iout,JERR,numberWS,
      1 IWS,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
-     1 A,evec,df,Dist,layout2D,distp,Cdist)
+     1 A,evec,df,Dist,layout2D,distp,Cdist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
@@ -944,7 +944,7 @@ C Now analyze the adjacency matrix if it is correct
       WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'W-S 6-vertex insertion to D2h 55-6-55',
      1 ' ring pattern:',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
@@ -981,7 +981,7 @@ C Now analyze the adjacency matrix if it is correct
 
       SUBROUTINE YoshidaFowler6(Matom,IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N6MEM,IC3,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
@@ -1349,7 +1349,7 @@ C Now analyze the adjacency matrix if it is correct
       WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 6-vertex insertion to D3h 666555 ',
      1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
@@ -1386,7 +1386,7 @@ C Now analyze the adjacency matrix if it is correct
 
       SUBROUTINE YoshidaFowler4(Matom,IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
@@ -1609,7 +1609,7 @@ C Now analyze the adjacency matrix if it is correct
       WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 4-vertex insertion to D3h 6555 ',
      1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
@@ -1646,7 +1646,7 @@ C Now analyze the adjacency matrix if it is correct
 
       SUBROUTINE StoneWalesTrans(Matom,IN,Iout,numbersw,
      1 nSW,ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
-     1 CDist)
+     1 CDist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
@@ -1825,7 +1825,7 @@ C Now analyze the adjacency matrix if it is correct
       WRITE(Iout,1006)
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Stone-Wales transformation:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
  1001 Format(/1X,'Number of Stone-Wales transformations: ',I2,
@@ -1853,7 +1853,8 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE GoldbergCoxeter(Matom,Iout,leap,leapGC,kGC,lGC,
-     1 ihueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,CDist) 
+     1 ihueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
+     1 CDist,scalerad) 
 C     Construct Leapfrog fullerene through adjacency matrix
       use config
       use iso_c_binding
@@ -1941,7 +1942,7 @@ C Produce adjacency matrix
       MAtom = MLeap
 
       Call Tutte(MAtom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
       if(leap.ne.0) call delete_fullerene_graph(frog)
       if(leapGC.ne.0) call delete_fullerene_graph(halma)
       call delete_fullerene_graph(g)
@@ -1978,7 +1979,7 @@ C Produce adjacency matrix
       END
 
       SUBROUTINE Tutte(Matom,Iout,ihueckel,IDA,
-     1 A,evec,df,Dist,layout2D,distp,CDist)
+     1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
 C   Tutte 3D embedding Algorithm:
 C     Input: Integer Adjacency Matrix IDA(NMax,NMax)
 C     Output: Real*8 Cartesian Coordinates  Dist(3,NMax)
@@ -2042,7 +2043,7 @@ C   Tutte algorithm for the 3D structure (see pentindex.f):
 C     Obtain smallest distance for further scaling
 C     Now this contracts or expands the whole fullerene to set the
 C     smallest bond distance to Cdist
-c     corraction: setting the shortest bond to to cdist is not a good idea.  It is beneficial to set the avarage bond length to some value, like e.g. 4*cdist
+c     correction: setting the shortest bond to to cdist is not a good idea.  It is beneficial to set the avarage bond length to some value, like e.g. 4*cdist
       R0=1.d10
       Rsum=0.d0
       Do I=1,Matom
@@ -2052,20 +2053,24 @@ c     corraction: setting the shortest bond to to cdist is not a good idea.  It 
             Y=Dist(2,I)-Dist(2,J)
             Z=Dist(3,I)-Dist(3,J)
             R=dsqrt(X*X+Y*Y+Z*Z)
+c           get the sum of all distances (of adjacent atoms)
             rsum=rsum+r
-c            if(R.lt.R0) R0=R
+c			get the minimal distance
+            if(R.lt.R0) R0=R
           endif
         enddo
       enddo
       rsum=rsum/(3*matom/2)
-c      fac=CDist/R0
-      fac=4.0*CDist/Rsum
+c     make sure the default value of scaleRad is not much too large (but don't correct custom values)
+      if(scaleRad .eq. 4.0 .and. scaleRad*R0 .ge. cdist) then
+        scaleRad=2.d0
+        if(scaleRad*R0 .ge. cdist) scaleRad=1.d0
+      endif
+      fac=scaleRad*CDist/Rsum
       Do I=1,Matom
         Dist(1,I)=Dist(1,I)*fac
         Dist(2,I)=Dist(2,I)*fac
         Dist(3,I)=Dist(3,I)*fac
-c        write(*,*)dist(1,i),dist(2,i),dist(3,i),
-c       1  dsqrt(dist(1,i)**2+dist(2,i)**2+dist(3,i)**2)
       enddo
 C     Check distances
       Write(IOUT,1015) fac

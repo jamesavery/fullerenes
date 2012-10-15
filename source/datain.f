@@ -2,7 +2,7 @@
      1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
-     1 ndual,nosort,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,
+     1 ndual,nosort,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,scaleRad,
      1 force,forceP,filename,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -14,7 +14,7 @@
       Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,ihueckel,loop,
      1 filename,ipsphere,nosort
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
-     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IWS
+     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IWS,scaleRad
       Namelist /FFChoice/ Iopt,ftol
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
      1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
@@ -132,6 +132,8 @@ C Reals
       R6=R          ! Distance in 6-Ring
       Tol=0.33d0    ! Tolerance
       TolR=0.d0     ! Tolerance for finding ring connections
+
+      scaleRad=4    ! scale size of initial tutte sphere by factor.  The more non-spherical the structure is, the larger this factor should be
 
 C Now process namelist input
       READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)

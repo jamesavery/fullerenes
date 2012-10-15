@@ -1,6 +1,7 @@
       SUBROUTINE CoordBuild(MAtom,IN,Iout,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
-     1 A,evec,df,Dist,layout2d,distp,Cdist,GROUP,ke,isw,iyf,iws)
+     1 A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
+     1 GROUP,ke,isw,iyf,iws)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
 C This is followed by using either the Fowler-Manolopoulos matrix
@@ -215,7 +216,7 @@ C Now produce the 3D image (unless the graph is going to change later)
   
         if(nalgorithm.eq.1.or.nalgorithm.eq.3) then
           call Tutte(Matom,Iout,ihueckel,IDA,
-     1     A,evec,df,Dist,layout2D,distp,CDist)
+     1     A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
         endif
 c      endif
 
