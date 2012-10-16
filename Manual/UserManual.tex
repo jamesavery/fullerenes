@@ -703,7 +703,7 @@ Namelist line that contains the main flags for the program.
   .cc1 files contain information about vertex connections. Programs like PYMOL can read such files.\\
   If \paramname{ixyz} = 5: Read .cc1 from file specified in \paramname{filename}. The final name is chosen as \filename{filename-3D.cc1}. 
   In this case ICart = 0  needs to be specified (see \paramname{\&Coord} input). This is useful for reading for example \filename{.cc1} files produced 
-  by M. Yoshida \cite{Yoshida}, which has beed added to our database.
+  by M. Yoshida \cite{Yoshida}, which has been added to our database.
 \item[{ichk}] Flag for producing or reading a \filename{.xyz} file for \program{CYLview}, \program{Pymol}, 
   \program{Avogadro} or other plotting programs (Default: 0).\\
   If \paramname{ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $O(n^3)$ (recommended for large matrices
@@ -734,7 +734,7 @@ Namelist line that contains the main flags for the program.
 %---Coord---
 \subsection{\&Coord line}
 
-Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=20, R6=1.42 /|).
+Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2, R6=1.42 /|).
 \paragraph{List of options:}\ 
 
 \paramname{ICart, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6, ScaleRad}
@@ -744,7 +744,7 @@ Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2
 \item[{ICart}] Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 If \paramname{ICart} = 2, 3 then 12 pentagon indices are used for input.\\
 If \paramname{ICart} = 4, 5 then Goldberg-Coxeter transformation of \C{20} is used.\\
-If \paramname{ICart} = 2 or 3 and \paramname{isonum} not zero, than pentagon indices are taken from the isomer list contained in a database (see below).
+If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$, than pentagon indices are taken from the isomer list contained in a database (see below).
 \item[{IPRC}]
 There are two databases, one for the general isomers
 (\paramname{IPRC} = 0), and one for the IPR isomers (\paramname{IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).
