@@ -11,7 +11,7 @@
 !      The results can be used for plotting 2D/3D fullerene graphs          !
 !    (e.g. Schlegel diagrams) and structures, and as a starting point       !
 !            for further quantum theoretical treatment.                     !
-!        Version 4 now incorporates C++ routines linked to the              !
+!        Version 4.2 now incorporates C++ routines linked to the            !
 !       original Fortran program using much improved algorithms.            !
 !---------------------------------------------------------------------------!
 
@@ -543,11 +543,12 @@ C Formats
      1 /1X,'|          P R O G R A M   F U L L E R E N E             |',
      1 /1X,'|    Fortran/C++ Program for the topological analysis    |',
      1 /1X,'|      of regular fullerenes (pentagons and hexagons)    |',
-     1 /1X,'|    Written by Peter Schwerdtfeger and James Avery      |',
+     1 /1X,'|    Written by Peter Schwerdtfeger, James Avery         |',
+     1 /1X,'|                     and Lukas Wirz                     |',
      1 /1X,'|      with routines from Fowler, Manolopoulos and Babic |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.1, last revision from 03/08/12     |',
+     1 /1X,'|    This  version: 4.2, last revision from 03/08/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
