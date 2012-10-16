@@ -376,22 +376,23 @@ Hamiltonian cycles exist for all fullerene isomers up to \C{100} and for all IPR
 The geometry can be optimized by force fields using a Fletcher-Reeves-Polak-Ribiere geometry optimization \cite{NumRec}
 with analytical gradients (Subroutine \funname{OptFF} \cite{NumericalRecipes}). In the current version the Wu
 force field is implemented, which considers bond lengths and angles only in an harmonic oscillator approximation \cite{Wu87}: 
-\begin{equation}
+\begin{multline}
   \label{eq:Ewu}
-  E_{\mathrm{Wu}} = \frac{k_p}{2} \sum_{i_p}^{\mathrm{edges}} \left(R_{i_p} - R_p\right)^2 
-        + \frac{k_h}{2} \sum_{i_h}^{\mathrm{edges}} \left(R_{i_h} - R_h\right)^2 
-        + \frac{f_p}{2} \sum_{j_p}^{\mathrm{ring}} \left(\theta_{j_p} - \theta_p\right)^2 
-        + \frac{f_h}{2} \sum_{j_h}^{\mathrm{ring}} \left(\theta_{j_h} - \theta_h\right)^2 
-\end{equation}
+  E_{\mathrm{Wu}} = 
+          \frac{k_p}{2} \sum_{i_p}^{\mathrm{p-edges}} \left(R_{i_p} - R_p\right)^2 
+        + \frac{k_h}{2} \sum_{i_h}^{\mathrm{h-edges}} \left(R_{i_h} - R_h\right)^2 \\
+        + \frac{f_p}{2} \sum_{j_p}^{\mathrm{60}} \left(\theta_{j_p} - \theta_p\right)^2 
+        + \frac{f_h}{2} \sum_{j_h}^{\mathrm{3\times vertices-60}} \left(\theta_{j_h} - \theta_h\right)^2 
+\end{multline}
 Only bonded pairs of vertices are taken into account. $k_{p}$ and $k_{h}$ are
 the force constant for the two different C--C bonds (set to $\approx 300 \text{\,kcal\,\AA}^{-2}$), $R_p$ and $R_h$ the corresponding pentagon and
-hexagon bond distances ($\approx$ 1.4 \AA), and $\theta _p $ and $\theta _h$ are the corresponding bond angles (108$^\circ$ and 120$^\circ$
+hexagon bond distances ($\approx$ 1.4 \AA), and $\theta_p $ and $\theta_h$ are the corresponding bond angles (108$^\circ$ and 120$^\circ$
 respectively).
 
 The force-field optimization is very fast even for fullerenes such as \C{840}. 
 The Wu force-field optimization may lead to distortions of the fullerene to a structure of lower symmetry compared to the original point-group. 
 Moreover, as no dihedral angles are fixed, the molecule might distort away from convexity. In such cases an additional Coulomb repulsive potential can
-be added (see input instructions) in a preoptimization step to avoid large "dents" or collapse of the fullerene,
+be added (see input instructions) in a preoptimization step to avoid large ``dents'' or collapse of the fullerene,
 \begin{equation}
   \label{eq:Ewu}
   E = E_{\mathrm{Wu}} + E_{\mathrm{Coulomb}} = E_{\mathrm{Wu}} + \sum_{i=1}^{\mathrm{vertices}} \frac{f_{\mathrm{Coulomb}}}{|r_i - r_0|}
@@ -400,8 +401,34 @@ with $r_i - r_0$ being the distance between vertex $i$ and the barycenter. Anoth
 minimum is to adjust the sphere radius in the Tutte embedding algorithm (see input section).
 Note that the construction of the fullerene by using the AME or Tutte algorithm may
 lead to a more spherical arrangement prior to a force-field optimization with rather large bond distances, 
-e.g. barrels instead of nanotubes. A more sophisticated force field using dihedral angles is also implemented (extended Wu force field),
+e.g. barrels instead of nanotubes. A more sophisticated force field using dihedral angles is implemented as well (extended Wu force field),
 which enhances planarity for areas of connected hexagons.
+
+There is an extension of the Wu force field which takes three types of bonds (adjacent to 0, 1 or 2 pentagons),
+two types of angles, and four types of dihedral angles into account. There is one dihedral per atom.  Dihedrals~$\theta_{abcd}$ 
+are defined between one atom~$a$ and its three neighbours~$b$, $c$ and $d$.  As one atom is part of three faces
+(0, 1, 2, or 3 pentagons) there are four different types of dihedrals which differ in their respective
+zero value and force constant.
+
+The energy is given by
+\begin{multline}
+  \label{eq:extEwu}
+  E_{\mathrm{extWu}} =
+          \frac{f_{pp}}{2}  \sum_{i_{pp}}^{\mathrm{pp-e}} \left(R_{i_{pp}} - R_{pp}\right)^2 
+        + \frac{f_{hp}}{2}  \sum_{i_{hp}}^{\mathrm{hp-e}} \left(R_{i_{hp}} - R_{hp}\right)^2 
+        + \frac{f_{hh}}{2}  \sum_{i_{hh}}^{\mathrm{hh-e}} \left(R_{i_{hh}} - R_{hh}\right)^2\\
+        + \frac{f_p}{2}     \sum_{j_p}^{\mathrm{60}} \left(\theta_{j_p} - \theta_p\right)^2 
+        + \frac{f_h}{2}     \sum_{j_h}^{\mathrm{3\times v-60}} \left(\theta_{j_h} - \theta_h\right)^2\\ 
+        + \frac{f_{ppp}}{2} \sum_{k_{ppp}}^{\mathrm{ppp-v}} \left(\theta_{k_{ppp}} - \theta_{ppp}\right)^2 
+        + \frac{f_{hpp}}{2} \sum_{k_{hpp}}^{\mathrm{hpp-v}} \left(\theta_{k_{hpp}} - \theta_{hpp}\right)^2 
+        + \frac{f_{hhp}}{2} \sum_{k_{hhp}}^{\mathrm{hhp-v}} \left(\theta_{k_{hhp}} - \theta_{hhp}\right)^2 
+        + \frac{f_{hhh}}{2} \sum_{k_{hhh}}^{\mathrm{hhh-v}} \left(\theta_{k_{hhh}} - \theta_{hhh}\right)^2,
+\end{multline}
+where pp-e (hp-e, hh-e) denotes the number of edges adjacent to 2 (1, 0) pentagons, v is the 
+number of vertices and ppp-v (hpp-v, hhp-v, hhh-v) is the number of vertices between 3 (2, 1, 0) pentagons.
+
+The additional coulomb force, that can be added to the extended Wu field, is equal to the aforementioned
+optional coulomb force of the vanilla Wu field.
 
 %Ring connectivities, patterns, vertex insertions and spiral detection
 \subsection{Ring connectivities, patterns, vertex insertions and spiral detection}
@@ -770,7 +797,9 @@ If \paramname{mirror} = 1 invert all coordinates (take the mirror image). This m
 \item[R5] Pentagon bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.455).
 \item[R6] Hexagon  bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.391).
 If \paramname{R5} = \paramname{R6} is chosen then the ideal capped icosahedron for \C{60} is obtained if \paramname{NA}=60 is chosen.
-\item[ScaleRad] Scaling paramater for Tutte sphere (Default: 4.0).
+\item[ScaleRad] Scaling paramater for Tutte sphere (Default: 4.0).  After mapping the fullerene graph
+on a unit sphere, the radius of the sphere is scaled up by \paramname{ScaleRad}$/\langle\text{average bond length}\rangle$.
+More non-spherical structures require the choice of a larger \paramname{ScaleRad}.
 \end{description}
 
 
@@ -833,7 +862,7 @@ ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR,
 
   \paramname{Iopt} = 3 triggers an extension of the Wu force field.  In addition to Wu (two different bond types
   and two angle types) there is a third bond type and four types of dihedral angles.  If \paramname{Iopt} = 3 is
-  chosen the structure typically converges in less cycles.
+  chosen, the structure typically converges in less cycles.
 
   \paramname{Iopt} = 4 behaves like \paramname{Iopt} = 3, but there is an additional repulsive coulomb force applied.  It is switched off
   as soon as the gradient falls below a value of 10.
