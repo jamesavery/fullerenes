@@ -148,7 +148,8 @@ C SPIRAL uses the subroutines written by Fowler and Manopoulus
       endif
 
 C Check if database can be taken instead
-      If((IPR.eq.0.and.N.le.100).or.(IPR.eq.1.and.N.le.120)) then
+      If((IPR.eq.0.and.N.le.LimitAll).or.
+     1 (IPR.eq.1.and.N.le.LimitIPR)) then
       dbdir='database/All/'
       if(IPR.eq.1) dbdir='database/IPR/'
       fend='.database'

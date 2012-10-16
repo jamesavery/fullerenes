@@ -288,6 +288,7 @@ c      endif
       END
 
       SUBROUTINE Isomerget(Matom,Iout,Isonum,IPR,JP)
+      use config
       IMPLICIT Integer (A-Z)
 C Routine to get Isomer number from database
       Real*8 sigmah
@@ -334,10 +335,8 @@ C Routine to get Isomer number from database
      * 1068507788,1156161307,1247686189,1348832364,1454359806,
      * 1568768524,1690214836,1821766896,1958581588,2109271290/
 C     Current status of Database file
-C     Max Vertex number for general database
-      LimitAll=100
-C     Max Vertex number for IPR database
-      LimitIPR=158
+C     Max Vertex number for general database and for IPR database
+C     see config.f file
       nhamcycle=0
 
 C     Check if parameters are set correctly
