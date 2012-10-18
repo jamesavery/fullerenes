@@ -241,8 +241,9 @@ explained in some detail in this section. More information can be obtained in an
     \caption{Flow diagram for main program tasks.}
 \end{figure}
 
-The most time-consuming steps in the program are the diagonalization of the adjacency matrix ($\mathcal{O}(n^3)$) 
-needed for the AME algorithm and the H\"uckel analysis, the force-field optimization for
+The most time-consuming steps in the program are the diagonalization of the adjacency matrix 
+of the fullerene graph $F$, $A(F)$,  
+needed for the AME algorithm and the H\"uckel analysis ($\mathcal{O}(n^3)$), the force-field optimization for
 very large fullerenes ($>$ 2000 atoms), the determination of the number of Hamiltonian cycles
 ($>$ 80 atoms) (this is an NP-complete problem), the creation of a list of ring-spiral pentagon
 indices for all possible isomers with a given vertex count $n_v$ ($>$ 80 atoms), 
@@ -325,15 +326,46 @@ agreement with DFT Kohn-Sham orbital energies. The fullerene structure might als
 ground state instead of one of a higher multiplicity, as this is the case for \C{20}. Such electronic effects are not
 captured in this program, and one needs to perform a proper quantum theoretical calculation. The program gives information
 on the HOMO-LUMO gap and calculates the topological resonance energy from Babi\'c's matching polynomial calculations \cite{Babic1995,Babic1997}.
-There are several other topological indicators of which the Estrada index and mean topological distance, the Wiener index and the hyper-Wiener
-index are printed. For details consult a book on graph theory.
+There are several other topological indicators of which the Estrada index and mean topological distance, the Wiener index, the hyper-Wiener
+index and the Balaban index are printed. The Estrada $E(G)$ and bipartivity $\beta(G)$ indices are obtained from the eigenvalues of the adjacency
+matrix $A(G)$, $\{ x_i, i=1,...,n_v \} \in [-3,3]$ of a graph $G$ (in our case a regular fullerene graph) \cite{Estrada,Doslic2005},
+\begin{equation}
+  \label{Estrada}
+  E(G)=\sum_{i=1}^{n_v}e^{x_i} \quad \text{ and } \quad \beta(G)=\sum_{i=1}^{n_v}\text{cosh}(x_i)/E(G)
+\end{equation}
+The Estrada index for $I_h$-\C{60} is $E$= 197.450228 and the corresponding bipartite index $\beta$= 0.992966. The Wiener $W(G)$ and hyper-Wiener $WW(G)$ 
+indices are defined as \cite{Wiener1947},
+\begin{equation}
+  \label{Wiener}
+  W(G)=\frac{1}{2} \sum_{\{ u,v \} \subseteq V(G)} d(u,v) \quad \text{ and } \quad WW(G)=\frac{1}{2} \sum_{\{ u,v \} \subseteq V(G)} \left( d(u,v) + d(u,v)^2 \right)
+\end{equation}
+Here $V(G)$ is the vertex set and $d(u,v)$ is the topological (chemical) distance between the two vertices $u$ and $v$, i.e. the number 
+of edges in the shortest path connecting them. For $I_h$-\C{60} we have $W(G)$= 8340 and $WW(G)$= 27180. The Balaban index is defined as \cite{Balaban},
+\begin{equation}
+  \label{Balaban}
+  B(G)=\frac{n_e}{n_e-n_v+1} \sum_{i<j \in E(G)} \left( d(i)d(j) \right)^{-1/2}
+\end{equation}
+$n_e$ are the number of edges and $d(i)$ is the sum of topological distances between vertex $i$ and all other vertices in the graph.
+For $I_h$-\C{60} we have $B(G)$= 0.939893247. The Schultz and Zagreb indices are also listed, although they are related to
+the indices already defined here. Further listed are two topological efficiency parameters $\rho$ and $\rho E$ defined by Vukicevic, Ori and co-workers \cite{Vukicevic,Ori},
+\begin{equation}
+  \label{rho}
+  \rho=\frac{W(G)}{n_v W_{min}} \quad \text{ with } \quad W_{min}= \text{min} \{ W_i \}  \quad \text{ and } \quad W_i=\sum_{j \in V(G)} d(i,j)
+\end{equation}
+and
+\begin{equation}
+  \label{rhoE}
+  \rho_E=\frac{W_{max}}{W_{min}} \quad \text{ with } \quad W_{max}= \text{max} \{ W_i \}
+\end{equation}
+For $I_h$-\C{60} both $\rho$ and $\rho_E$ are exactly 1.0.
+
 
 %The Goldberg-Coxeter transformation
 \subsection{The Goldberg-Coxeter transformation}
 
 In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \C{n} can be performed if required from the input
 (Subroutine \funname{GoldbergCoxeter}). This leads to a fullerene C$_{k^2+kl+l^2}$. The current implementation allows only for
-\textit{leapfrog transformations} ($k=l=1$) and for \textit{halma transformations} ($k \neq 0$ and $l=0$). However, the program allows 
+\textit{leapfrog transformations} ($k=l=1$) and for \textit{halma transformations} ($k \neq 0$ and $l=0$). However, the program allows
 for multiple leapfrog transformations for the construction of very large fullerenes. A general $GC_{k,l}(n)$  for all values of $k$ and $l$ 
 is currently in preparation. 
 
@@ -428,7 +460,7 @@ where pp-e (hp-e, hh-e) denotes the number of edges adjacent to 2 (1, 0) pentago
 number of vertices and ppp-v (hpp-v, hhp-v, hhh-v) is the number of vertices between 3 (2, 1, 0) pentagons.
 
 The additional coulomb force, that can be added to the extended Wu field, is equal to the aforementioned
-optional coulomb force of the vanilla Wu field.
+optional coulomb force defined in eq.(\ref{eq:Ewu}).
 
 %Ring connectivities, patterns, vertex insertions and spiral detection
 \subsection{Ring connectivities, patterns, vertex insertions and spiral detection}
@@ -1087,6 +1119,18 @@ Adjacent Pentagons: \C{20} to \C{72}'', \textit{J. Nanosci. Nanotech.} \textbf{7
 
 \bibitem{cvetkovic2002} D. Cvetkovi\'c, P. Fowler, P. Rowlinson, and D. Stevanovi«c, ``Constructing fullerene graphs from eigenvalues and angles'',
 \textit{Linear Algebra Appl.} \textbf{356}, 37-56 (2002).
+
+\bibitem{Estrada} E. Estrada, ``Characterization of 3D molecular structure'', \textit{Chem. Phys. Lett.}, \textbf{319}, 713-718 (2000).
+
+\bibitem{Doslic2005} T. Dosli\'c, ``Bipartivity of fullerene graphs and stability'', \textit{Chem. Phys. Lett.}, \textbf{412}, 336-340 (2005).
+
+\bibitem{Wiener1947} H. Wiener, ``Structural Determination of Paraffin Boiling Points'', \textit{J. Am. Chem. Soc.}, \textbf{69}, 17-20 (1947).
+
+\bibitem{Balaban} A. T. Balaban, ``Topological indices based on topological distances in molecular graphs'', \textit{Pure Appl. Chem.}, \textbf{55}, 199-206 (1983).
+
+\bibitem{Vukicevic} D. Vukicevic, F. Cataldo, O. Ori, A. Graovac, ``Topological efficiency of \C{66} fullerene'', \textit{Chem. Phys. Lett.} \textbf{501}, 442-445 (2011),
+
+\bibitem{Ori} O. Ori, private communication (2012).
 
 \bibitem{Babic1995a} D. Babi\'c, ``Nomenclature and Coding of Fullerenes'', \textit{J. Chem. Inf. Comput. Sci.} \textbf{35}, 515-526 (1995).
 
