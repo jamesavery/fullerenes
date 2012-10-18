@@ -1,7 +1,9 @@
 # thing we never want to commit
 
-
+*.out
 *.log
 *.aux
 *.o
 Manual/*pdf
+config.mod
+libgraph.a

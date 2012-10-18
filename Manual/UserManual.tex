@@ -350,12 +350,12 @@ For $I_h$-\C{60} we have $B(G)$= 0.939893247. The Schultz and Zagreb indices are
 the indices already defined here. Further listed are two topological efficiency parameters $\rho$ and $\rho E$ defined by Vukicevic, Ori and co-workers \cite{Vukicevic,Ori},
 \begin{equation}
   \label{rho}
-  \rho=\frac{W(G)}{n_v W_{min}} \quad \text{ with } \quad W_{min}= \text{min} \{ W_i \}  \quad \text{ and } \quad W_i=\sum_{j \in V(G)} d(i,j)
+  \rho=\frac{W(G)}{n_v W_{\mathrm{min}}} \quad \text{ with } \quad W_{\mathrm{min}}= \min \{ W_i \}  \quad \text{ and } \quad W_i=\sum_{j \in V(G)} d(i,j)
 \end{equation}
 and
 \begin{equation}
   \label{rhoE}
-  \rho_E=\frac{W_{max}}{W_{min}} \quad \text{ with } \quad W_{max}= \text{max} \{ W_i \}
+  \rho_E=\frac{W_{\mathrm{max}}}{W_{\mathrm{min}}} \quad \text{ with } \quad W_{\mathrm{max}}= \max \{ W_i \}
 \end{equation}
 For $I_h$-\C{60} both $\rho$ and $\rho_E$ are exactly 1.0.
 
@@ -738,13 +738,13 @@ Namelist line that contains the main flags for the program.
   by M. Yoshida \cite{Yoshida}, which has been added to our database.
 \item[{ichk}] Flag for producing or reading a \filename{.xyz} file for \program{CYLview}, \program{Pymol}, 
   \program{Avogadro} or other plotting programs (Default: 0).\\
-  If \paramname{ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $O(n^3)$ (recommended for large matrices
+  If \paramname{ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $\mathcal{O}(n^3)$ (recommended for large matrices
   over size 5000) (Default: 0).
 \item[{loop}] 
   If \paramname{loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 
   This is important if one takes an initial structure and subjects it to further transformations, for example in subsequent Stone-Wales or
   Goldberg-Coxeter transformations. You might use this option to read from a .xyz file created in the previous run.\\
-  If \paramname{loop} = 2: Same as above but if ICart specified correctly, it takes pentagon indices from a previous run.
+  If \paramname{loop} = 2: Same as above but if \paramname{ICart} specified correctly, it takes pentagon indices from a previous run.
 \item[{ipsphere}] 
   Project all vertices onto the minimum covering sphere (MCS), useful for drawing 2D fullerene graphs (Default: 0).
   \begin{enumerate}
@@ -759,7 +759,7 @@ Namelist line that contains the main flags for the program.
   If this parameter is set at a value too large, unwanted connectivities are produced resulting in smaller polygons. 
   This parameter should reflect the maximum deviation in distance from the smallest distance found.
 \item[{filename}] 
-    Prefix for for all external filenames created by the program. Limited to 50 characters. Default: \filename{Fullerene}.
+    Prefix for for all external filenames created by the program. Limited to 50~characters. Default: \filename{Fullerene}.
 \end{description}
 
 
