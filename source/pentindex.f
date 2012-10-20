@@ -151,7 +151,7 @@ C End Goldberg-Coxeter
 
 C Input connectivities and construct adjacency matrix
       if(nalgorithm.eq.4) then
-       Call ConnectivityInput(Matom,Iout,Isonum,IDA)
+       Call ConnectivityInput(Matom,Iout,In,Isonum,IDA)
       endif
 
 C Adjacency matrix constructed
@@ -486,19 +486,71 @@ C     Open file
       Return 
       END
 
-      Subroutine ConnectivityInput(Matom,Iout,Isonum,IDA)
+      Subroutine ConnectivityInput(Matom,Iout,In,Isonum,A)
 C This routine either takes input from connectivities (edges)
 C if Isonum=0, or it reads it from the House of Graphs if
 C Isonum.ne.0. Isonum is the number of the isomer in the database
       use config
       IMPLICIT Integer (A-Z)
-      DIMENSION IDA(NMAX,NMAX)
+      DIMENSION A(NMAX,NMAX)
+
+      Do I=1,NMAX
+       A(I,I)=0
+      Do J=I+1,NMAX
+       A(I,J)=0
+       A(J,I)=0
+      enddo
+      enddo
+
       if(isonum.eq.0) then
 C     Read in connectivities
+       Do I=1,100000
+        IV=0 
+        IC1=0
+        IC2=0
+        IC3=0
+        Read(In,*,Iostat=k) IV,IC1,IC2,IC3
+        if(k.eq.-1.or.IV.eq.0) go to 1
+        if(IC1.eq.0) then
+         Write(Iout,1003) IV,IC1,IC2,IC3
+        stop
+        endif
+        if(IC2.eq.0) then
+         Write(Iout,1000) IV,IC1 
+         A(IV,IC1)=1
+         A(IC1,IV)=1
+        endif
+        if(IC3.eq.0) then
+         Write(Iout,1001) IV,IC1,IC2 
+         A(IV,IC1)=1
+         A(IC1,IV)=1
+         A(IV,IC2)=1
+         A(IC2,IV)=1
+        endif
+        if(IC3.ne.0.and.IC2.ne.0) then
+         Write(Iout,1002) IV,IC1,IC2,IC3 
+         A(IV,IC1)=1
+         A(IC1,IV)=1
+         A(IV,IC2)=1
+         A(IC2,IV)=1
+         A(IV,IC3)=1
+         A(IC3,IV)=1
+        endif
+       enddo
+    1  Continue
+
       else
-C     Read isomer from House of Graphs database
-      endif
-C     Build adjacency matrix IDA
+C      Read isomer from House of Graphs database
+
+C      Lukas, here goes your stuff
+
+
+       endif
+
       Stop 'Not implemented yet'
+ 1000 Format(1X,2(I6,1X))
+ 1001 Format(1X,3(I6,1X))
+ 1002 Format(1X,4(I6,1X))
+ 1003 Format(1X,4(I6,1X))
       Return 
       END
