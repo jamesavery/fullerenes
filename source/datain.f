@@ -231,7 +231,7 @@ C ExtWu force field
 
 C Set IC and ichk parameters
       if(ICart.lt.0) ICart=0
-      if(ICart.gt.5) ICart=5
+      if(ICart.gt.7) ICart=7
       if(ichk.ne.0) istop=1
 
 C  Check on number of atoms (vertices)

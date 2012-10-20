@@ -108,7 +108,7 @@ C  Only do isomer statistics
 
 C------------------Coordinates-------------------------------------
 C Options for Input coordinates
-      go to (10,20,30,30,30,30,30) Icart+1
+      go to (10,20,30,30,30,30,30,30) Icart+1
 C  Cartesian coordinates produced for Ih C60
    10 routine='COORDC20/60  '
       Write(Iout,1008) routine
@@ -167,7 +167,7 @@ C the 3D fullerene
       CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
      1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
-     1 GROUP,ke,isw,iyf,iws)
+     1 GROUP,ke,isw,iyf,iws,filename)
       Do I=1,Matom
         IAtom(I)=6
       enddo

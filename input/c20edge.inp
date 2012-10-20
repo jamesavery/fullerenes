@@ -1,0 +1,29 @@
+C20 build from input connectivities
+&General NA=20 /
+&Coord ICart=7 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+ 1   2    3    4
+ 2   13   17   0
+ 3   1    5   19
+ 4   1    6   15
+ 5   3   12   15
+ 6   4    7   17
+ 7   6    8   16
+ 8   7    9   20
+ 9   8   10   11
+10   9   14   18
+11   9   12   16
+12   5   11   18
+13   2   14   19   
+14  10   13   20
+15   4    5   16
+16   7   11   15
+17   2    6   20
+18  10   12   19
+19   3   13   18
+20   8   14   17
+ 0

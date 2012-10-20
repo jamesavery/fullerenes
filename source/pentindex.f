@@ -1,7 +1,7 @@
       SUBROUTINE CoordBuild(MAtom,IN,Iout,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
      1 A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
-     1 GROUP,ke,isw,iyf,iws)
+     1 GROUP,ke,isw,iyf,iws,filename)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
 C This is followed by using either the Fowler-Manolopoulos matrix
@@ -22,6 +22,7 @@ C mapping
       DIMENSION evec(NMAX),df(NMAX)
       DIMENSION Spiral(12,NMAX)
       CHARACTER*3 GROUP
+      CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
       integer ke, isw, iyf, iws
       type(c_ptr) :: g, halma, new_C20, halma_fullerene
@@ -124,7 +125,6 @@ C Now produce the adjaceny matrix from the dual matrix
 C End ring spiral
       endif
 
-
 C Start Goldberg-Coxeter
       if(nalgorithm.gt.1.and.nalgorithm.lt.4) then
       Write(Iout,1040) kGC,lGC,kGC,lGC
@@ -150,10 +150,11 @@ C End Goldberg-Coxeter
       endif
 
 C Input connectivities and construct adjacency matrix
-      if(nalgorithm.eq.4) then
-       Call ConnectivityInput(Matom,Iout,In,Isonum,IDA)
+      if(nalgorithm.ge.4) then
+       Call ConnectivityInput(Matom,Iout,In,Isonum,IDA,
+     1  filename)
       endif
-
+      
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
       Do I=1,MAtom
@@ -177,7 +178,8 @@ C Now analyze the adjacency matrix if it is correct
       endif
 
 C Produce Hueckel matrix and diagonalize
-      if(ihueckel.eq.0.or.nalgorithm.eq.0.or.nalgorithm.eq.2) then
+      if(ihueckel.eq.0.or.nalgorithm.eq.0.
+     1 or.nalgorithm.eq.2.or.nalgorithm.eq.4) then
 C     Diagonalize
       call tred2(A,Matom,NMax,evec,df)
       call tqli(evec,df,Matom,NMax,A)
@@ -213,12 +215,14 @@ C     End of Hueckel
 
 c      if(ke + isw + iyf + iws .eq. 0) then
 C Now produce the 3D image (unless the graph is going to change later)
-        if(nalgorithm.eq.0.or.nalgorithm.eq.2) then
+        if(nalgorithm.eq.0.or.nalgorithm.eq.2.
+     1   or.nalgorithm.eq.4) then
           call AME(Matom,Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
      1     CDist)
         endif
   
-        if(nalgorithm.eq.1.or.nalgorithm.eq.3) then
+        if(nalgorithm.eq.1.or.nalgorithm.eq.3.
+     1   or.nalgorithm.eq.5) then
           call Tutte(Matom,Iout,ihueckel,IDA,
      1     A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
         endif
@@ -486,13 +490,15 @@ C     Open file
       Return 
       END
 
-      Subroutine ConnectivityInput(Matom,Iout,In,Isonum,A)
+      Subroutine ConnectivityInput(Matom,Iout,In,Isonum,A,
+     1 filename)
 C This routine either takes input from connectivities (edges)
 C if Isonum=0, or it reads it from the House of Graphs if
 C Isonum.ne.0. Isonum is the number of the isomer in the database
       use config
       IMPLICIT Integer (A-Z)
       DIMENSION A(NMAX,NMAX)
+      CHARACTER*50 filename
 
       Do I=1,NMAX
        A(I,I)=0
@@ -504,12 +510,13 @@ C Isonum.ne.0. Isonum is the number of the isomer in the database
 
       if(isonum.eq.0) then
 C     Read in connectivities
+       Write(Iout,1004) 
        Do I=1,100000
         IV=0 
         IC1=0
         IC2=0
         IC3=0
-        Read(In,*,Iostat=k) IV,IC1,IC2,IC3
+        Read(In,*,Iostat=k,ERR=1,END=1) IV,IC1,IC2,IC3
         if(k.eq.-1.or.IV.eq.0) go to 1
         if(IC1.eq.0) then
          Write(Iout,1003) IV,IC1,IC2,IC3
@@ -540,17 +547,22 @@ C     Read in connectivities
     1  Continue
 
       else
-C      Read isomer from House of Graphs database
 
+C      Read isomer from House of Graphs database
+       Open(unit=7,file=filename,form='formatted')
+         WRITE(Iout,1010) filename
 C      Lukas, here goes your stuff
 
 
-       endif
+       close(unit=7)
+      endif
 
-      Stop 'Not implemented yet'
  1000 Format(1X,2(I6,1X))
  1001 Format(1X,3(I6,1X))
  1002 Format(1X,4(I6,1X))
  1003 Format(1X,4(I6,1X))
+ 1004 Format(1X,'Read in connectivities:',/4X,
+     1 'IV1    IC1    IC2    IC3',/1X,32('-'))
+ 1010 Format(1X,'Read input from House of Graph file :',A50)
       Return 
       END
