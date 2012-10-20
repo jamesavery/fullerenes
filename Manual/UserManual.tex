@@ -43,7 +43,8 @@
 }
 \affil{Centre of Theoretical Chemistry and Physics, The New Zealand Institute
  for Advanced Study, Massey University Auckland, Private Bag 102904,
- North Shore City, 0745 Auckland, New Zealand.}
+ North Shore City, \\
+ 0745 Auckland, New Zealand.}
 
 \author{James Avery%
   \thanks{Email: \texttt{avery@nbi.ku.dk}}
@@ -119,7 +120,7 @@ in terms of a Humboldt Research Award, and to both Prof. Gernot Frenking and
 Dr. Ralf Tonner (Marburg) for support during his extended stay in Marburg where 
 writing of this program began. We acknowledge the help of Darko Babi\'c, Patrick 
 W. Fowler and David E. Manolopoulus for permission to freely distribute 
-their Fortran subroutines which were modified and implemented within this program.
+their Fortran subroutines which we modified and implemented in this program.
 
  \begin{figure}[htbp]
    	\centering
@@ -134,7 +135,7 @@ their Fortran subroutines which were modified and implemented within this progra
 \textit{Program Fullerene} is a general purpose program that creates a reasonably accurate 3D structure
 (cartesian coordinates) for any fullerene isomer through various different methods and algorithms, and subsequently performs a topological/graph 
 theoretical analysis. The results can be used for plotting 2D fullerene graphs (Schlegel diagrams) 
-and 3D structures, and as a good starting point for further quantum theoretical treatment. The program is 
+and 3D structures, and serves as a good starting point for further quantum theoretical treatment. The program is 
 written in standard FORTRAN and C++ and is easily implemented within a LINUX/UNIX environment.
 Although there are several other computer programs already available to deal with fullerene graphs 
 like \program{CAGE} \cite{Brinkmanx}, \program{FULLGEN} \cite{Brinkman}, \program{BUCKYGEN} \cite{Goedgebeur} or VEGA \cite{Pisanski},
@@ -148,7 +149,7 @@ to the scientific community.
 
 In the current version only regular fullerenes are considered (i.e. of genus 0 consisting of pentagons and hexagons only) 
 fulfilling Euler's theorem, $n_v - n_e + n_f = 2$, where $n_v$ is the number of vertices (atoms), $n_e$ the number of edges (bonds), and 
-$n_f$ the number of faces (5- or 6-rings). The program constructs an accurate 3D structure (cartesian coordinates) of any fullerene isomer 
+$n_f$ the number of faces (5- or 6-rings). The program constructs an accurate 3D structure (in cartesian coordinates) of any fullerene isomer 
 from the canonical ring spiral pentagon indices (RSPI) through either a 3D Tutte embedding (3D-TE) \cite{Tutte} or the adjacency matrix
 eigenvector (AME) method \cite{Atlas}. One can also construct the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene or a halma fullerene 
 $GC_{k,0}[C_{n_v}]$ as a special case of a Goldberg-Coxeter transformation $GC_{k,l}$. Starting from a given fullerene structure one can 
@@ -156,7 +157,7 @@ perform vertex insertions (such as Endo-Kroto \cite{Endo92} or Yoshida-Fowler \c
 or Stone-Wales transformations \cite{Stone86}. 
 Vertex insertions allow for the construction of non-spiral fullerenes such as \C{380} or \C{384}. 
 Geometry optimization using a Fletcher-Reeves-Polak-Ribiere
-minimization with analytical gradients for the Wu (and extended Wu) force-field \cite{Wu87} is implemented in the current version, providing 
+minimization \cite{NumRec} with analytical gradients for the Wu (and extended Wu) force-field \cite{Wu87} is implemented in the current version, providing 
 a good initial guess for 3D cartesian coordinates. 2D fullerene graphs (Schlegel diagrams)
 can be produced using a variety of different algorithms \cite{Plestenjak}. The program determines the volume and surface area 
 of a fullerene (irregular or not) through tesselation in trigonal pyramids or from the convex hull, and gives measures for
@@ -172,7 +173,7 @@ The program produces an external file with default name \filename{Fullerene-3D.x
 like CYLview \cite{CYLview}, Avogadro \cite{Avogadro}, Jmol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}.  For using these programs 
 it is important that the fullerene has a reasonable structure, obtained for example by a force-field 
 optimization, otherwise bonds cannot be correctly identified using .xyz files. It may therefore not be advisable to use structures that come out directly from
-the AME or 3D-TE algorithm, or the .cc1 file should be used which contains information on vertex adjancencies. 
+the AME or 3D-TE algorithm, or the .cc1 file should be used which contains information on vertex adjacencies. 
 We recommend CYLview, it is more robust and works for large fullerenes up to about 1000 atoms. 
 For larger fullerenes VMD or Pymol is recommended. The program produces fullerene 2D graphs in latex format, but can
 be used by any other program which is capable of producing 2D graphs, for example QMGA \cite{Gabriel2008}. 
@@ -343,14 +344,18 @@ Here $V(G)$ is the vertex set and $d(u,v)$ is the topological (chemical) distanc
 of edges in the shortest path connecting them. For $I_h$-\C{60} we have $W(G)$= 8340 and $WW(G)$= 27180. The Balaban index is defined as \cite{Balaban},
 \begin{equation}
   \label{Balaban}
-  B(G)=\frac{n_e}{n_e-n_v+1} \sum_{i<j \in E(G)} \left( d(i)d(j) \right)^{-1/2}
+  B(G)=\frac{n_e}{n_e-n_v+1} \sum_{i<j \in E(G)} \left( W(i)W(j) \right)^{-1/2}
 \end{equation}
-$n_e$ are the number of edges and $d(i)$ is the sum of topological distances between vertex $i$ and all other vertices in the graph.
+$n_e$ are the number of edges and $W(i)$ is the sum of topological distances between vertex $i$ and all other vertices in the graph,
+\begin{equation}
+  \label{sum}
+  W_i=\sum_{j \in V(G)} d(i,j)
+\end{equation}
 For $I_h$-\C{60} we have $B(G)$= 0.939893247. The Schultz and Zagreb indices are also listed, although they are related to
 the indices already defined here. Further listed are two topological efficiency parameters $\rho$ and $\rho E$ defined by Vukicevic, Ori and co-workers \cite{Vukicevic,Ori},
 \begin{equation}
   \label{rho}
-  \rho=\frac{W(G)}{n_v W_{\mathrm{min}}} \quad \text{ with } \quad W_{\mathrm{min}}= \min \{ W_i \}  \quad \text{ and } \quad W_i=\sum_{j \in V(G)} d(i,j)
+  \rho=\frac{W(G)}{n_v W_{\mathrm{min}}} \quad \text{ with } \quad W_{\mathrm{min}}= \min \{ W_i \}
 \end{equation}
 and
 \begin{equation}
@@ -712,7 +717,7 @@ In the following, the input in the required sequence is described in detail (eit
 
 \subsection{Comment line} 
 A comment line of of max. 132 characters. You can have as many comment lines as you want, so long as they are 132 characters or less: 
-every line until the first namelist-line is interpreted as a comment.
+every line until the first namelist line is interpreted as a comment.
 
 %---General---
 \subsection{\&General line}
@@ -1067,10 +1072,13 @@ see http://caagt.ugent.be/buckygen/.
 
 \bibitem{Pisanski} T. Pisanski, ``Program VEGA - A Mathematica based system for manipulating graphs'', see http://www.ijp.si/.
 
-\bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', \textit{Proc. London Math. Soc.} \textbf{13}, 743-767 (1963).
+\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, P. Schwerdtfeger, ``Packed to the Rafters Ð Filling up C60 with Rare Gas Atoms'', 
+\textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
 
 \bibitem{Atlas} P. W. Fowler and D. E. Manolopoulus, ``An Atlas of Fullerenes'' (Dover Publ., New York, 2006).
  
+\bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', \textit{Proc. London Math. Soc.} \textbf{13}, 743-767 (1963).
+
 \bibitem{Endo92} M. Endo and H.W. Kroto, ``Formation of carbon nanofibers'', \textit{J. Phys. Chem.} \textbf{96}, 6941-6944 (1992).
 
 \bibitem{Yoshida97} M. Yoshida, P. Fowler, \textit{Chem. Phys. Lett.} \textbf{278}, 256-261(1997).
@@ -1107,9 +1115,6 @@ Adjacent Pentagons: \C{20} to \C{72}'', \textit{J. Nanosci. Nanotech.} \textbf{7
 \bibitem{Pymol} Program Pymol, ``A user-sponsored molecular visualization system on an open-source foundation'', see http://www.pymol.org/.
 
 \bibitem{vmd} Program VMD, ``Visual Molecular Dynamics'', http://www.ks.uiuc.edu/Research/vmd/.
-
-\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, P. Schwerdtfeger, ``Packed to the Rafters Ð Filling up C60 with Rare Gas Atoms'', 
-\textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
 
 \bibitem{Gabriel2008} A. T. Gabriel, T. Meyer, and G. Germano, 
 ``Molecular graphics of convex body fluids'', \textit{J. Chem. Theory Comput.}
