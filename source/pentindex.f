@@ -30,6 +30,7 @@ C If nalgorithm=1 use ring-spiral and Tutte algorithm
 C If nalgorithm=2 use Coxeter Goldberg and matrix eigenvector 
 C                 algorithm
 C If nalgorithm=3 use Coxeter Goldberg and Tutte algorithm
+C If nalgorithm=4 use connectivity input
       nalgorithm=ICart-2
 
       M=Matom/2+2
@@ -125,7 +126,7 @@ C End ring spiral
 
 
 C Start Goldberg-Coxeter
-      if(nalgorithm.gt.1) then
+      if(nalgorithm.gt.1.and.nalgorithm.lt.4) then
       Write(Iout,1040) kGC,lGC,kGC,lGC
       if(lGC .ne. 0) then
         write(Iout,1041)
@@ -148,6 +149,10 @@ C Update fortran structures
 C End Goldberg-Coxeter
       endif
 
+C Input connectivities and construct adjacency matrix
+      if(nalgorithm.eq.4) then
+       Call ConnectivityInput(Matom,Iout,Isonum,IDA)
+      endif
 
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
@@ -478,5 +483,22 @@ C     Open file
  2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
  2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
 
+      Return 
+      END
+
+      Subroutine ConnectivityInput(Matom,Iout,Isonum,IDA)
+C This routine either takes input from connectivities (edges)
+C if Isonum=0, or it reads it from the House of Graphs if
+C Isonum.ne.0. Isonum is the number of the isomer in the database
+      use config
+      IMPLICIT Integer (A-Z)
+      DIMENSION IDA(NMAX,NMAX)
+      if(isonum.eq.0) then
+C     Read in connectivities
+      else
+C     Read isomer from House of Graphs database
+      endif
+C     Build adjacency matrix IDA
+      Stop 'Not implemented yet'
       Return 
       END

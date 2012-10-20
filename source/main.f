@@ -108,7 +108,7 @@ C  Only do isomer statistics
 
 C------------------Coordinates-------------------------------------
 C Options for Input coordinates
-      go to (10,20,30,30,30,30) Icart+1
+      go to (10,20,30,30,30,30,30) Icart+1
 C  Cartesian coordinates produced for Ih C60
    10 routine='COORDC20/60  '
       Write(Iout,1008) routine
@@ -158,8 +158,9 @@ C Input Cartesian coordinates for fullerenes
    21 WRITE(Iout,1016)
       Go to 99
 C Cartesian coordinates produced ring from spiral pentagon list
-C currently using the Fowler-Manolopoulos algorithm to
-C identify P-type eigenvectors and construct the 3D fullerene
+C or from adjacency matrix. Uses the Fowler-Manolopoulos algorithm 
+C with P-type eigenvectors or the Tutte algorithm to construct 
+C the 3D fullerene
    30 Ipent=1
       routine='COORDBUILD   '
       Write(Iout,1008) routine
