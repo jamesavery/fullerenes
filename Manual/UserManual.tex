@@ -263,7 +263,8 @@ or the more reliable 3D-TE algorithm (used by files \filename{pentagon1.inp} to 
 or from the Goldberg-Coxeter 2-index transformation (triangulation algorithm, input files \filename{coxeter1.inp}
 to \filename{coxeter6.inp}). The 12 pentagon indices can also be obtained from the \textit{fullerene database} if 
 the canonical fullerene number is used as defined in the book ``Atlas of Fullerenes'' by Fowler and Manolopoulus \cite{Atlas,cvetkovic2002} 
-(input file \filename{database.inp}). The program also prints internal coordinates in form of a Z-Matrix (distances, angles and dihedrals).
+(input file \filename{database.inp}). The vertex connections (edges) can also be used as an input, for an example see input file \filename{c20edge.inp}.
+The program also prints internal coordinates in form of a Z-Matrix (distances, angles and dihedrals).
 For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
 coordinates.
 
@@ -782,7 +783,7 @@ Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2
 If \paramname{ICart} = 2, 3 then 12 pentagon indices are used for input.\\
 If \paramname{ICart} = 4, 5 then Goldberg-Coxeter transformation of \C{20} is used.\\
 If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$, then pentagon indices are taken from the isomer list contained in a database (see below).\\
-If \paramname{ICart} = 6 input vertex connectivities directly. If \paramname{isonum} $\neq 0$, then the isomer number from the isomer list contained in the
+If \paramname{ICart} = 6 or 7 input vertex connectivities directly. If \paramname{isonum} $\neq 0$, then the isomer number from the isomer list contained in the
 ``House of Graphs'' database is taken.
 \item[{IPRC}]
 There are two databases, one for the general isomers
@@ -865,13 +866,13 @@ pentagon ring indices if possible (transformation to the canonical from should w
 If \paramname{ICart} = 4 or 5 adjacency matrix is created from a Goldberg-Coxeter transform of \C{20}, i.e. $GC_{k,l}$[\C{20}].  At the
 moment, the program is restricted to $l=0$. In this case the parameter \paramname{kGC} in the namelist input has to be used.
 
-If \paramname{ICart} = 2 or 4 the AME algorithm using $P$-type eigenvectors produced from the adjacency matrix to get cartesian
+If \paramname{ICart} = 2, 4 or 6 the AME algorithm using $P$-type eigenvectors produced from the adjacency matrix to get cartesian
 coordinates.  If the $P$-type eigenvectors are not in sequence (position 2,3 and 4, see ref.\cite{Atlas} for details), three integer
 values \paramname{IV1, IV2, IV3} can be specified in the \paramname{\&Coord} namelist input identifying the position of the eigenvectors (see
 pentagon8.inp for such an example).  In this case a warning occurs which means you should carefully check the eigenvectors used and
 cartesian coordinates produced. Otherwise coordinates produced are useless. This is more often the case as you might expect.
 
-If \paramname{ICart} = 3 or 5 the Tutte embedding (3D-TE) algorithm is chosen for the construction of the 3D fullerene structure from the
+If \paramname{ICart} = 3, 5 or 7 the Tutte embedding (3D-TE) algorithm is chosen for the construction of the 3D fullerene structure from the
 adjacency matrix.  This should always work, although the fullerene created might be too spherical compared to the AME algorithm. But this
 algorithm is easier, and (in theory) should never fail. Examples are given in the input files starting with ``pentagon''.
 
