@@ -526,6 +526,7 @@ C     Read in connectivities
          Write(Iout,1000) IV,IC1 
          A(IV,IC1)=1
          A(IC1,IV)=1
+         go to 5
         endif
         if(IC3.eq.0) then
          Write(Iout,1001) IV,IC1,IC2 
@@ -533,8 +534,8 @@ C     Read in connectivities
          A(IC1,IV)=1
          A(IV,IC2)=1
          A(IC2,IV)=1
+         go to 5
         endif
-        if(IC3.ne.0.and.IC2.ne.0) then
          Write(Iout,1002) IV,IC1,IC2,IC3 
          A(IV,IC1)=1
          A(IC1,IV)=1
@@ -542,7 +543,7 @@ C     Read in connectivities
          A(IC2,IV)=1
          A(IV,IC3)=1
          A(IC3,IV)=1
-        endif
+    5  Continue
        enddo
     1  Continue
 
