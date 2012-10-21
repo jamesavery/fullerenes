@@ -28,10 +28,12 @@
 \newcommand{\filename}[1]{\texttt{#1}}
 \newcommand{\funname}[1]{{\color{blue}\textbf{#1}}}
 \newcommand{\paramname}[1]{{\color{green}\textbf{#1}}}
-
-
-
-
+\newcommand{\blankpage}{
+\newpage
+\thispagestyle{empty}
+\mbox{}
+\newpage
+}
 
 \title{PROGRAM FULLERENE (Version 4.2)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
 
@@ -53,7 +55,7 @@
 
 \preauthor{
   \begin{center}
-    \includegraphics[width=0.6\textwidth]{Toc.png}
+    \includegraphics[width=0.9\textwidth]{Toc.png}
     \large \lineskip 0.5em%
     \begin{tabular}[t]{c}
 }
@@ -62,7 +64,7 @@
 
 \maketitle
 
-\clearpage
+\blankpage
 
 
 \section*{Important Copyright Message:}
@@ -221,10 +223,13 @@ it will run all the input jobs and stores them into the output directory as *.ou
 all the object files are deleted. Additionally, the linked binaries are deleted if you type\\\\
 \verb|make distclean|
 
-If you use the fullerene database (which is recommended for time savings), the file needs to be in the directory
-where the source and libgraph directories are located.
+If you use the fullerene database (which is recommended for time savings), the directory \filename{database} needs 
+to be created and put into the main directory where the \filename{source} and \filename{libgraph} directories are located. \filename{database} contains
+the folders \filename{ALL} with our database for general fullerenes, \filename{IPR} with our database 
+for IPR fullerenes, \filename{Yoshida} with Yoshida's database of selected fullerenes (directories containing .cc1 files),
+and \filename{HOG} with (if downloaded from http://hog.grinvin.org/Fullerenes ) the House of Graph datafiles.
 
-To use the latex program for the 2D fullerene graphs you need to use the files standalone.cfg and standalone.cls.
+To use the latex program for the 2D fullerene graphs you need to use the files \filename{standalone.cfg} and \filename{standalone.cls}.
 
 %Program Structure
 \section{Program Structure}
@@ -249,7 +254,7 @@ very large fullerenes ($>$ 2000 atoms), the determination of the number of Hamil
 ($>$ 80 atoms) (this is an NP-complete problem), the creation of a list of ring-spiral pentagon
 indices for all possible isomers with a given vertex count $n_v$ ($>$ 80 atoms), 
 and the Tutte embedding algorithm ($>$ 2000 atoms). We try to improve the performance of these algorithms
-in our next major version.
+in our next major version to be released.
 
 %Create a 3D structure for a specific fullerene
 \subsection{Create a 3D structure for a specific fullerene}
@@ -489,9 +494,9 @@ and \filename{c384.inp}. The two structures obtained from a force-field optimiza
 %Figure 2
  \begin{figure}[htbp]
    	\centering
-  	\includegraphics[width=0.3\textwidth]{C380.png}
-	\includegraphics[width=0.4\textwidth]{C384.png}
-    \caption{Optimized Wu force-field structures of \C{380} (left) and \C{384} (right).}
+  	\includegraphics[width=0.35\textwidth]{C380.png}
+	\includegraphics[width=0.45\textwidth]{C384.png}
+    \caption{Optimized Wu force-field structures of \C{380} (left) and \C{384} (right), the first fullerenes with no ring spiral.}
 	\label{pic:C380andC384}
  \end{figure}
 
@@ -878,7 +883,7 @@ If \paramname{ICart} = 3, 5 or 7 the Tutte embedding (3D-TE) algorithm is chosen
 adjacency matrix.  This should always work, although the fullerene created might be too spherical compared to the AME algorithm. But this
 algorithm is easier, and (in theory) should never fail. Examples are given in the input files starting with ``pentagon''.
 
-
+\clearpage
 %---FFChoice and FFParameters---
 \subsection{\&FFChoice and \&FFParameters lines}
 Options for force-field optimization.
@@ -1024,10 +1029,11 @@ If \paramname{IFS} = 3: Both files are produced.
 If \paramname{ndual} = 1, The dual graph is drawn as well in tex-file \filename{filename-2D.tex}. (Default: 0).\\
 \end{description}
 
-The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{pic:Graph2D}. Note that for very large
+The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{Schlegel}. Note that for very large
 fullerenes which are far from spherical symmetry, the algorithms here may not produce the best 2D graph representation.
 We are working on this problem at the moment.
-              
+
+\clearpage          
 %Figure 3
  \begin{figure}[htbp]
 	\centering
@@ -1039,9 +1045,11 @@ We are working on this problem at the moment.
 		 \includegraphics[width=0.225\textwidth]{Graph6.png}
 		 \includegraphics[width=0.225\textwidth]{Graph7.png}
 		 \includegraphics[width=0.225\textwidth]{Graph8.png}
-        \label{pic:Graph2D}
+        \label{Schlegel}
         \caption{From the left to right: 2D fullerene structures created using \paramname{ISchlegel}=1 to 8.}
  \end{figure}
+
+
 
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
@@ -1062,7 +1070,7 @@ folder \filename{database/Yoshida} \cite{Yoshida}. The input file \filename{data
 this database. The directory database needs to be in the same directory as ``source'' or ``libgraph''.
 Note that the maximum number of vertices in the database is et in the config.f file (LimitALL and LimitIPR).
 
-%\clearpage
+\clearpage
 
 
 %References
