@@ -791,7 +791,7 @@ If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$, then pentagon ind
 If \paramname{ICart} = 6 or 7 input vertex connectivities (edges) directly. If \paramname{isonum} $\neq 0$, then the isomer number from the isomer list contained in the
 ``House of Graphs'' database is taken. For the vertex connectivities input as series of cards is required each with 4 integers: IV1, IC1, IC2 IC3, i.e. 1 3 6 4 gives
 the following edges: 1-3, 1-6, and 1-4. Zeros for IC2 and IC3 can be used, i.e. 1 3 6 0 gives 1-3 and 1-6, and 1 3 0 0 just gives 1-3 as an edge. For the last card
-in the input stream, IV1 needs to be set to zero. For an example see input file \filename{c20edge.inp}.
+in the input stream, IV1 needs to be set to zero. For an example see input file \filename{c20edge.inp}.  It is legal but not necassary to define edges twice.
 \item[{IPRC}]
 There are two databases, one for the general isomers
 (\paramname{IPRC} = 0), and one for the IPR isomers (\paramname{IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).
@@ -799,8 +799,8 @@ There are two databases, one for the general isomers
 \item[{IV2}] Number for H\"uckel P-type eigenvector for AME algorithm (Default: 3)
 \item[{IV3}] Number for H\"uckel P-type eigenvector for AME algorithm (Default: 4)
 \item[{isonum}] Isomer number according to the scheme introduced in Fowler and Manolopoulus' book \cite{Atlas} (Default: 0).
-\item[{leap}] If \paramname{leap} = $n_{leap}$ the initial fullerene C$_{N_A}$ is subjected to an $n-th$ leapfrog transformation. 
-This converts the number of atoms $N_A$ to $N^{'}_A = 3^{n_{leap}}N_A$. (Default: 0)
+\item[{leap}] If \paramname{leap} = $n_\mathrm{leap}$ the initial fullerene C$_{N_A}$ is subjected to an $n^\mathrm{th}$ leapfrog transformation. 
+This converts the number of atoms $N_A$ to $N'_A = 3^{n_\mathrm{leap}}N_A$. (Default: 0)
 \item[{ICGtrans}] 
 If \paramname{IGCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}[\C{N_A}]$ (Default: 0).
 At the moment only $l=0$ is implemented, also the leapfrog transformation $k=1$ and $l=1$ is available in this input.
@@ -841,8 +841,8 @@ Similar to Yoshida-Fowler, an input is required (see \filename{c384.inp} for det
 \item[mirror] 
 If \paramname{mirror} = 1 invert all coordinates (take the mirror image). This may be important for chiral fullerenes (Default: 0).
 \item[IPRC] See entry for \paramname{isonum}.
-\item[R5] Pentagon bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.455).
-\item[R6] Hexagon  bond distance in \AA ngstr\"om, i.e. the bond length of the bonds connecting hexagons (Default: 1.391).
+\item[R5] Pentagon bond distance in \AA ngstr{\o}m, i.e. the bond length of the bonds connecting hexagons (Default: 1.455).
+\item[R6] Hexagon  bond distance in \AA ngstr{\o}m, i.e. the bond length of the bonds connecting hexagons (Default: 1.391).
 If \paramname{R5} = \paramname{R6} is chosen then the ideal capped icosahedron for \C{60} is obtained if \paramname{NA}=60 is chosen.
 \item[ScaleRad] Scaling paramater for Tutte sphere (Default: 4.0).  After mapping the fullerene graph
 on a unit sphere, the radius of the sphere is scaled up by \paramname{ScaleRad}$/\langle\text{average bond length}\rangle$.
