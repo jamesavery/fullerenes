@@ -195,8 +195,8 @@ and crazy about rugby), and close packing of ellipsoids; 2) The general Goldberg
 optimized geometry; 5) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 6) Symmetry labels for 
 H\"uckel orbital energies; 7) Extension to non-classical fullerenes of genus 0 (heptagons and squares); 8) Extension to non-regular fullerenes 
 of genus 1 (hmmm, donuts!); 9) To symmetrize optimized coordinates to point group symmetry; 
-10) A restart option for subroutine Hamilton; 11) Use of ``House of Graphs'' fullerene database; 
-12) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
+10) A restart option for subroutine Hamilton;  
+11) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
 with a good graphical interface similar to the \program{CAGE} program \cite{Brinkmanx}.
 
 We are also open to any other suggestions and welcome additions to this program suite.
@@ -792,6 +792,8 @@ If \paramname{ICart} = 6 or 7 input vertex connectivities (edges) directly. If \
 ``House of Graphs'' database is taken. For the vertex connectivities input as series of cards is required each with 4 integers: IV1, IC1, IC2 IC3, i.e. 1 3 6 4 gives
 the following edges: 1-3, 1-6, and 1-4. Zeros for IC2 and IC3 can be used, i.e. 1 3 6 0 gives 1-3 and 1-6, and 1 3 0 0 just gives 1-3 as an edge. For the last card
 in the input stream, IV1 needs to be set to zero. For an example see input file \filename{c20edge.inp}.  It is legal but not necassary to define edges twice.
+
+When importing graphs from ``House of Graphs'' the isomers are numbered starting at 1 (Although, internally we start counting at 0.).
 \item[{IPRC}]
 There are two databases, one for the general isomers
 (\paramname{IPRC} = 0), and one for the IPR isomers (\paramname{IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).
