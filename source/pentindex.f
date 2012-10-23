@@ -151,8 +151,7 @@ C End Goldberg-Coxeter
 
 C Input connectivities and construct adjacency matrix
       if(nalgorithm.eq.4 .or. nalgorithm.eq.5) then
-       Call ConnectivityInput(Matom,Iout,In,Isonum,IDA,
-     1  filename)
+       Call ConnectivityInput(Iout,In,Isonum,IDA,filename)
       endif
       
 C Adjacency matrix constructed
@@ -490,8 +489,7 @@ C     Open file
       Return 
       END
 
-      Subroutine ConnectivityInput(Matom,Iout,In,Isonum,A,
-     1 filename)
+      Subroutine ConnectivityInput(Iout,In,Isonum,A,filename)
 C This routine either takes input from connectivities (edges)
 C if Isonum=0, or it reads it from the House of Graphs if
 C Isonum.ne.0. Isonum is the number of the isomer in the database
@@ -512,70 +510,64 @@ C Isonum.ne.0. Isonum is the number of the isomer in the database
         enddo
       enddo
 
-c      do i=1,3*nmax/2
-c        edges(1,i)=0
-c        edges(2,i)=0
-c      enddo 
-
-
       if(isonum.eq.0) then
 C     Read in connectivities
-       Write(Iout,1004) 
-       Do I=1,nmax
-        IV=0 
-        IC1=0
-        IC2=0
-        IC3=0
-        Read(In,*,Iostat=k,ERR=1,END=1) IV,IC1,IC2,IC3
-        if(k.eq.-1.or.IV.eq.0) go to 1
-        if(IC1.eq.0) then
-         Write(Iout,1003) IV,IC1,IC2,IC3
-        stop
-        endif
-        if(IC2.eq.0) then
-         Write(Iout,1000) IV,IC1 
-         A(IV,IC1)=1
-         A(IC1,IV)=1
-         go to 5
-        endif
-        if(IC3.eq.0) then
-         Write(Iout,1001) IV,IC1,IC2 
-         A(IV,IC1)=1
-         A(IC1,IV)=1
-         A(IV,IC2)=1
-         A(IC2,IV)=1
-         go to 5
-        endif
-         Write(Iout,1002) IV,IC1,IC2,IC3 
-         A(IV,IC1)=1
-         A(IC1,IV)=1
-         A(IV,IC2)=1
-         A(IC2,IV)=1
-         A(IV,IC3)=1
-         A(IC3,IV)=1
-    5  Continue
-       enddo
-    1  Continue
+        Write(Iout,1004) 
+        Do I=1,nmax
+          IV=0 
+          IC1=0
+          IC2=0
+          IC3=0
+          Read(In,*,Iostat=k,ERR=1,END=1) IV,IC1,IC2,IC3
+          if(k.eq.-1.or.IV.eq.0) go to 1
+          if(IC1.eq.0) then
+            Write(Iout,1003) IV,IC1,IC2,IC3
+            stop
+          endif
+          if(IC2.eq.0) then
+            Write(Iout,1000) IV,IC1 
+            A(IV,IC1)=1
+            A(IC1,IV)=1
+            go to 5
+          endif
+          if(IC3.eq.0) then
+            Write(Iout,1001) IV,IC1,IC2 
+            A(IV,IC1)=1
+            A(IC1,IV)=1
+            A(IV,IC2)=1
+            A(IC2,IV)=1
+            go to 5
+          endif
+          Write(Iout,1002) IV,IC1,IC2,IC3 
+          A(IV,IC1)=1
+          A(IC1,IV)=1
+          A(IV,IC2)=1
+          A(IC2,IV)=1
+          A(IV,IC3)=1
+          A(IC3,IV)=1
+    5     Continue
+        enddo
+    1   Continue
 
       else
 
-C      Read isomer from House of Graphs database
-       WRITE(Iout,1010) filename
-       inquire(file=filename,exist=lexist)
-       if(lexist.neqv..True.) then
-        Write(Iout,1007) filename
-        stop
-       endif
+C       Read isomer from House of Graphs database
+        WRITE(Iout,1010) filename
+        inquire(file=filename,exist=lexist)
+        if(lexist.neqv..True.) then
+          Write(Iout,1007) filename
+          stop
+        endif
 
-c       write(*,*)'1, filename ', filename
-       graph = read_fullerene_graph_hog(isonum-1, filename)
-c       write(*,*)'2, filename ', filename
-       call edge_list(graph, edges, NE)
+c       create graph object
+        graph = read_fullerene_graph_hog(isonum-1, filename)
+c       get edge list and write it to 'edges'
+        call edge_list(graph, edges, NE)
  
-       do i=1,ne
+        do i=1,ne
           A(edges(1,i)+1,edges(2,i)+1)=1
           A(edges(2,i)+1,edges(1,i)+1)=1
-       enddo 
+        enddo 
       endif
 
  1000 Format(1X,2(I6,1X))
@@ -584,7 +576,7 @@ c       write(*,*)'2, filename ', filename
  1003 Format(1X,4(I6,1X))
  1004 Format(1X,'Read in connectivities: ',/4X,
      1 'IV1    IC1    IC2    IC3',/1X,32('-'))
- 1007 Format(1X,'Filename ',A29,' in database not found ==> ABORT')
+ 1007 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  1010 Format(1X,'Read input from House of Graph file : ',A50)
       Return 
       END

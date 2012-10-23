@@ -53,23 +53,15 @@ CubicGraph::CubicGraph(FILE *file = stdin){
 CubicGraph::CubicGraph(unsigned int *index, FILE* file){
   const int header_size = 15;	
 	
-  //std::cout<< "entering constuctor" << std::endl;
   // Get file size
-  //file->seekg(0,ios::end);
   fseek(file, 0, SEEK_END);
-  //size_t file_size = file->tellg();
   size_t file_size = ftell(file);
-  //std::cout<< "size has been read" << std::endl;
 
   //find number of vertices per graph
-  //only for files with graphs of the equal size
-  //file->seekg(header_size, ifstream::beg);
+  //this only works for files with graphs of the equal size
   fseek(file, header_size, SEEK_SET);
+
   // Read the number N of vertices per graph.
-  //file->read(reinterpret_cast<char*>(&N), 1);
-  //if(N == 0){
-  //  file->read(reinterpret_cast<char*>(&N),2);
-  //}
   fread(reinterpret_cast<char*>(&N), 1, 1, file);
   if(N == 0){
     fread(reinterpret_cast<char*>(&N), 2, 1, file);
@@ -85,46 +77,39 @@ CubicGraph::CubicGraph(unsigned int *index, FILE* file){
     {step = N * 8 + 3;}
   size_t address = header_size + step * *index;
 
-  //check if selected graph is valid
+  //check if selected graphnumber is valid
   unsigned int graphs_per_file = (file_size - header_size ) /step;
-  //std::cout << graphs_per_file << std::endl;
   if(graphs_per_file -1 < *index){
-    cerr << "You asked for the " << *index+1 << "th fullerene, but there are only " << graphs_per_file << " stored in this file.\n";
-    abort();}
+    cerr << "You asked for the " << *index+1 << "th fullerene, but there are only " << graphs_per_file << " stored in this file." << std::endl;
+    abort();
+  }
 
-  //the actual parsing of the selected graph
-  //file->seekg(address+1, ifstream::beg);//because the size is known
+  //the actual parsing of the selected graph:
+  //go to the beginning of the selected graph
   fseek(file, address+1, SEEK_SET);
 
   if(N<=255){
     for(node_t u=0; u<N; ++u){
       for(int neighbour=0; neighbour<3; ++neighbour){
-	unsigned char v;
-
-	//fprintf(stderr, "Adding edge (%d,%d)\n",u,v);
-	//file->read(reinterpret_cast<char*>(&v), 1);
-    fread(reinterpret_cast<char*>(&v), 1, 1, file);
-	neighbours[u].push_back(v-1);
+	    unsigned char v;
+        fread(reinterpret_cast<char*>(&v), 1, 1, file);
+	    neighbours[u].push_back(v-1);
       }
-      //file->seekg(1,ifstream::cur);
+      //skip one byte because there is no interesting content
       fseek(file, 1, SEEK_CUR);
     }
   } else{
-    //file->seekg(2, std::ifstream::cur);//because three bytes are not read
-    fseek(file, 2, SEEK_CUR);
+    fseek(file, 2, SEEK_CUR);//because three bytes are not read
     for(node_t u=0; u<N; ++u){
       for(int neighbour=0; neighbour<3; ++neighbour){
-	unsigned short v;
-	//file->read(reinterpret_cast<char*>(&v),2);
-    fread(reinterpret_cast<char*>(&v), 2, 1, file);
-	neighbours[u].push_back(v-1);
+	    unsigned short v;
+        fread(reinterpret_cast<char*>(&v), 2, 1, file);
+	    neighbours[u].push_back(v-1);
       }
-      //file->seekg(2,ifstream::cur);
       fseek(file, 2, SEEK_CUR);
     }
   }
 
   update_from_neighbours();
 }
-
 

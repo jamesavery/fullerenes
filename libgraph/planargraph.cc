@@ -179,7 +179,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 {
   assert(layout2d.size() == N);
   facemap_t facemap;
-  cout << "Computing faces using 2D orientation.\n";
+  cout << "Computing faces using 2D orientation." << endl;
   set<dedge_t> workset;
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
@@ -205,7 +205,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 	cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
 	abort();
       }
-    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face.\n";
+    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face." << endl;
     facemap[outer_face.size()].insert(outer_face);
     // Add outer face to output, remove directed edges from work set
     for(unsigned int i=0;i<outer_face.size();i++){
