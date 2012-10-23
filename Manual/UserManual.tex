@@ -591,7 +591,7 @@ over the exact volume algorithm employed in this program.
 The MCS is biased for the case that few atoms stick out on the surface of a fullerene,
 and the minimum distance sphere (MDS) may be more appropriate for a measure from spherical distortion,
 \begin{equation} 
-\min\limits_{c_\mathrm{MDS} \in CH(S)} \frac{1}{n_v} \sum _{i} \left|R_\mathrm{MDS} -\left\| \vec{p}_{i}-\vec{c}_{MDS} \right\| \right|  
+\min\limits_{c_\mathrm{MDS} \in CH(S)} \frac{1}{n_v} \sum _{i} \left|R_\mathrm{MDS} -\left\| \vec{p}_{i}-\vec{c}_\mathrm{MDS} \right\| \right|  
 \end{equation}
 
 with the MDS radius
@@ -787,13 +787,18 @@ Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2
 \item[{ICart}] Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 If \paramname{ICart} = 2, 3 then 12 pentagon indices are used for input.\\
 If \paramname{ICart} = 4, 5 then Goldberg-Coxeter transformation of \C{20} is used.\\
-If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$, then pentagon indices are taken from the isomer list contained in a database (see below).\\
-If \paramname{ICart} = 6 or 7 input vertex connectivities (edges) directly. If \paramname{isonum} $\neq 0$, then the isomer number from the isomer list contained in the
-``House of Graphs'' database is taken. For the vertex connectivities input as series of cards is required each with 4 integers: IV1, IC1, IC2 IC3, i.e. 1 3 6 4 gives
-the following edges: 1-3, 1-6, and 1-4. Zeros for IC2 and IC3 can be used, i.e. 1 3 6 0 gives 1-3 and 1-6, and 1 3 0 0 just gives 1-3 as an edge. For the last card
-in the input stream, IV1 needs to be set to zero. For an example see input file \filename{c20edge.inp}.  It is legal but not necassary to define edges twice.
+If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$, then pentagon indices are taken from the
+isomer list contained in a database (see below).\\
+If \paramname{ICart} = 6 or 7 input vertex connectivities (edges) directly. If \paramname{isonum} $\neq 0$,
+then the isomer number from the isomer list contained in the ``House of Graphs'' database is taken. For the
+vertex connectivities input as series of cards is required each with 4~integers: IV1, IC1, IC2 IC3,
+i.e. 1~3~6~4 gives the following edges: 1-3, 1-6, and 1-4.  Zeros for IC2 and IC3 can be used, i.e. 1~3~6~0
+gives 1-3 and 1-6, and 1~3~0~0 just gives 1-3 as an edge.  For the last card in the input stream, IV1 needs
+to be set to zero. For an example see input file \filename{c20edge.inp}.  It is legal but not necassary to define edges twice.
 
-When importing graphs from ``House of Graphs'' the isomers are numbered starting at 1 (Although, internally we start counting at 0.).
+When importing graphs from the ``House of Graphs'' database, the isomers are numbered starting at~1 (Although,
+internally we start counting at~0.).  There are two example files called \filename{c50hog.inp} and \filename{c384hog.inp}.
+
 \item[{IPRC}]
 There are two databases, one for the general isomers
 (\paramname{IPRC} = 0), and one for the IPR isomers (\paramname{IPRC} = 1), the definition is similar to the IPR parameter below (Default: 0).
