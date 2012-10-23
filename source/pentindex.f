@@ -500,6 +500,7 @@ C Isonum.ne.0. Isonum is the number of the isomer in the database
       IMPLICIT Integer (A-Z)
       DIMENSION A(NMAX,NMAX)
       CHARACTER*50 filename
+      Logical lexist
       type(c_ptr) :: graph, read_fullerene_graph_hog
       integer edges(2,3*NMAX/2), NE
 
@@ -560,6 +561,11 @@ C     Read in connectivities
 
 C      Read isomer from House of Graphs database
        WRITE(Iout,1010) filename
+       inquire(file=filename,exist=lexist)
+       if(lexist.neqv..True.) then
+        Write(Iout,1007) filename
+        stop
+       endif
 
 c       write(*,*)'1, filename ', filename
        graph = read_fullerene_graph_hog(isonum-1, filename)
@@ -578,6 +584,7 @@ c       write(*,*)'2, filename ', filename
  1003 Format(1X,4(I6,1X))
  1004 Format(1X,'Read in connectivities: ',/4X,
      1 'IV1    IC1    IC2    IC3',/1X,32('-'))
+ 1007 Format(1X,'Filename ',A29,' in database not found ==> ABORT')
  1010 Format(1X,'Read input from House of Graph file : ',A50)
       Return 
       END

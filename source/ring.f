@@ -351,6 +351,7 @@ C     Center for 5-rings
       numbersw=0
       numberFM=0
       numberWS=0
+      numberYF=0
       Write(Iout,1000)
       Do I=1,N5Ring
       Nring(I)=I
