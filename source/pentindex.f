@@ -511,6 +511,12 @@ C Isonum.ne.0. Isonum is the number of the isomer in the database
         enddo
       enddo
 
+c      do i=1,3*nmax/2
+c        edges(1,i)=0
+c        edges(2,i)=0
+c      enddo 
+
+
       if(isonum.eq.0) then
 C     Read in connectivities
        Write(Iout,1004) 
@@ -553,23 +559,17 @@ C     Read in connectivities
       else
 
 C      Read isomer from House of Graphs database
-c       Open(unit=7,file=filename,form='formatted')
-c       Open(unit=7,file=filename)
-         WRITE(Iout,1010) filename
-C      Lukas, here goes your stuff
-c      we need to create A
-       write(*,*)'1, filename ', filename
+       WRITE(Iout,1010) filename
+
+c       write(*,*)'1, filename ', filename
        graph = read_fullerene_graph_hog(isonum-1, filename)
-       write(*,*)'2, filename ', filename
+c       write(*,*)'2, filename ', filename
        call edge_list(graph, edges, NE)
-       write(*,*)'3'
  
        do i=1,ne
-          A(edges(i,1),edges(i,2))=1
-          A(edges(i,2),edges(i,1))=1
+          A(edges(1,i)+1,edges(2,i)+1)=1
+          A(edges(2,i)+1,edges(1,i)+1)=1
        enddo 
-
-c       close(unit=7)
       endif
 
  1000 Format(1X,2(I6,1X))

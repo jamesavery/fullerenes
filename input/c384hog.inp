@@ -1,0 +1,8 @@
+Read the first and only C384 without a spiral from the house of graphs database
+&General NA=384, filename='No_spiral_384'/
+&Coord ICart=7 ,isonum=1/
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /

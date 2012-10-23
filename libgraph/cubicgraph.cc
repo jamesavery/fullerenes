@@ -50,32 +50,30 @@ CubicGraph::CubicGraph(FILE *file = stdin){
     update_from_neighbours();
   }
 
-CubicGraph::CubicGraph(unsigned int *index, FILE* file=stdin){
+CubicGraph::CubicGraph(unsigned int *index, FILE* file){
   const int header_size = 15;	
 	
-  std::cout<< "entering constuctor" << std::endl;
+  //std::cout<< "entering constuctor" << std::endl;
   // Get file size
   //file->seekg(0,ios::end);
   fseek(file, 0, SEEK_END);
   //size_t file_size = file->tellg();
   size_t file_size = ftell(file);
-  std::cout<< "size has been read" << std::endl;
+  //std::cout<< "size has been read" << std::endl;
 
   //find number of vertices per graph
   //only for files with graphs of the equal size
   //file->seekg(header_size, ifstream::beg);
   fseek(file, header_size, SEEK_SET);
-  std::cout<< "gone to start" << std::endl;
   // Read the number N of vertices per graph.
   //file->read(reinterpret_cast<char*>(&N), 1);
   //if(N == 0){
   //  file->read(reinterpret_cast<char*>(&N),2);
   //}
-  fgets(reinterpret_cast<char*>(&N), 1, file);
+  fread(reinterpret_cast<char*>(&N), 1, 1, file);
   if(N == 0){
-    fgets(reinterpret_cast<char*>(&N),2, file);
+    fread(reinterpret_cast<char*>(&N), 2, 1, file);
   }
-  std::cout<<"N "<<N<<std::endl;
 
   neighbours.resize(N);
 
@@ -86,7 +84,6 @@ CubicGraph::CubicGraph(unsigned int *index, FILE* file=stdin){
   else
     {step = N * 8 + 3;}
   size_t address = header_size + step * *index;
-  std::cout<<"step, address"<< step<<address<<std::endl;
 
   //check if selected graph is valid
   unsigned int graphs_per_file = (file_size - header_size ) /step;
@@ -97,7 +94,6 @@ CubicGraph::CubicGraph(unsigned int *index, FILE* file=stdin){
   //the actual parsing of the selected graph
   //file->seekg(address+1, ifstream::beg);//because the size is known
   fseek(file, address+1, SEEK_SET);
-  std::cout << "right pos" << std::endl;
 
   if(N<=255){
     for(node_t u=0; u<N; ++u){
@@ -106,7 +102,7 @@ CubicGraph::CubicGraph(unsigned int *index, FILE* file=stdin){
 
 	//fprintf(stderr, "Adding edge (%d,%d)\n",u,v);
 	//file->read(reinterpret_cast<char*>(&v), 1);
-    fgets(reinterpret_cast<char*>(&v), 1, file);
+    fread(reinterpret_cast<char*>(&v), 1, 1, file);
 	neighbours[u].push_back(v-1);
       }
       //file->seekg(1,ifstream::cur);
@@ -119,17 +115,15 @@ CubicGraph::CubicGraph(unsigned int *index, FILE* file=stdin){
       for(int neighbour=0; neighbour<3; ++neighbour){
 	unsigned short v;
 	//file->read(reinterpret_cast<char*>(&v),2);
-    fgets(reinterpret_cast<char*>(&v), 2, file);
+    fread(reinterpret_cast<char*>(&v), 2, 1, file);
 	neighbours[u].push_back(v-1);
       }
       //file->seekg(2,ifstream::cur);
       fseek(file, 2, SEEK_CUR);
     }
   }
-  std::cout<<"everything done"<<std::endl;
 
   update_from_neighbours();
-  std::cout<<"everything done"<<std::endl;
 }
 
 
