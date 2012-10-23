@@ -87,7 +87,7 @@ CubicGraph::CubicGraph(unsigned int *index, FILE* file){
 
   //check if selected graph is valid
   unsigned int graphs_per_file = (file_size - header_size ) /step;
-  std::cout << graphs_per_file << std::endl;
+  //std::cout << graphs_per_file << std::endl;
   if(graphs_per_file -1 < *index)
     cerr << "There are only " << graphs_per_file << " stored in this file.\n";
 

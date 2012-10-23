@@ -130,7 +130,8 @@ fullerene_graph_ptr read_fullerene_graph_(const char *path){
 
 fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *path){
   fullerene_graph_ptr g;
-  std::cout << "path " << *path << "." << std::endl;
+
+// strip the whitespace (fortran passes an array of 50 characters)
   std::string s(path);
   s.erase( remove( s.begin(), s.end(), ' ' ), s.end() );
   char* stripped_path = new char[s.length() + 1];
@@ -142,12 +143,9 @@ fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *p
     perror(stripped_path);
     return NULL;
   }
-  std::cout<< *index << std::endl;
-//  std::cout<< file << std::endl;
-  std::cout<< "before" <<std::endl;
   g = new FullereneGraph(index,f);
-  std::cout<< "after" <<std::endl;
-//  fclose(f);
+
+  fclose(f);
   return g;
 }
 
