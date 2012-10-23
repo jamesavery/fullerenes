@@ -150,7 +150,7 @@ C End Goldberg-Coxeter
       endif
 
 C Input connectivities and construct adjacency matrix
-      if(nalgorithm.ge.4) then
+      if(nalgorithm.eq.4 .or. nalgorithm.eq.5) then
        Call ConnectivityInput(Matom,Iout,In,Isonum,IDA,
      1  filename)
       endif
@@ -496,22 +496,25 @@ C This routine either takes input from connectivities (edges)
 C if Isonum=0, or it reads it from the House of Graphs if
 C Isonum.ne.0. Isonum is the number of the isomer in the database
       use config
+      use iso_c_binding
       IMPLICIT Integer (A-Z)
       DIMENSION A(NMAX,NMAX)
       CHARACTER*50 filename
+      type(c_ptr) :: graph, read_fullerene_graph_hog
+      integer edges(2,3*NMAX/2), NE
 
       Do I=1,NMAX
-       A(I,I)=0
-      Do J=I+1,NMAX
-       A(I,J)=0
-       A(J,I)=0
-      enddo
+        A(I,I)=0
+        Do J=I+1,NMAX
+          A(I,J)=0
+          A(J,I)=0
+        enddo
       enddo
 
       if(isonum.eq.0) then
 C     Read in connectivities
        Write(Iout,1004) 
-       Do I=1,100000
+       Do I=1,nmax
         IV=0 
         IC1=0
         IC2=0
@@ -550,20 +553,31 @@ C     Read in connectivities
       else
 
 C      Read isomer from House of Graphs database
-       Open(unit=7,file=filename,form='formatted')
+c       Open(unit=7,file=filename,form='formatted')
+c       Open(unit=7,file=filename)
          WRITE(Iout,1010) filename
 C      Lukas, here goes your stuff
+c      we need to create A
+       write(*,*)'1, filename ', filename
+       graph = read_fullerene_graph_hog(isonum-1, filename)
+       write(*,*)'2, filename ', filename
+       call edge_list(graph, edges, NE)
+       write(*,*)'3'
+ 
+       do i=1,ne
+          A(edges(i,1),edges(i,2))=1
+          A(edges(i,2),edges(i,1))=1
+       enddo 
 
-
-       close(unit=7)
+c       close(unit=7)
       endif
 
  1000 Format(1X,2(I6,1X))
  1001 Format(1X,3(I6,1X))
  1002 Format(1X,4(I6,1X))
  1003 Format(1X,4(I6,1X))
- 1004 Format(1X,'Read in connectivities:',/4X,
+ 1004 Format(1X,'Read in connectivities: ',/4X,
      1 'IV1    IC1    IC2    IC3',/1X,32('-'))
- 1010 Format(1X,'Read input from House of Graph file :',A50)
+ 1010 Format(1X,'Read input from House of Graph file : ',A50)
       Return 
       END

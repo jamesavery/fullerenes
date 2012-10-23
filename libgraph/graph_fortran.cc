@@ -9,6 +9,7 @@ extern "C" {
   // Graph construction and destruction
   fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *N, const int *adjacency);
   fullerene_graph_ptr read_fullerene_graph_(const char *path);
+  fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *path);
   void delete_fullerene_graph_(fullerene_graph_ptr*);
 
   polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points);
@@ -124,6 +125,29 @@ fullerene_graph_ptr read_fullerene_graph_(const char *path){
   }
   g = new FullereneGraph(f);
   fclose(f);
+  return g;
+}
+
+fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *path){
+  fullerene_graph_ptr g;
+  std::cout << "path " << *path << "." << std::endl;
+  std::string s(path);
+  s.erase( remove( s.begin(), s.end(), ' ' ), s.end() );
+  char* stripped_path = new char[s.length() + 1];
+  strcpy(stripped_path, s.c_str());
+
+  FILE *f = fopen(stripped_path,"r");
+  if(!f){
+    fprintf(stderr,"Cannot open file %s for reading: ",stripped_path);
+    perror(stripped_path);
+    return NULL;
+  }
+  std::cout<< *index << std::endl;
+//  std::cout<< file << std::endl;
+  std::cout<< "before" <<std::endl;
+  g = new FullereneGraph(index,f);
+  std::cout<< "after" <<std::endl;
+//  fclose(f);
   return g;
 }
 

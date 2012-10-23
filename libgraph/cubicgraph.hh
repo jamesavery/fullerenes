@@ -19,7 +19,7 @@ struct CubicGraph : public PlanarGraph {
 
   CubicGraph(FILE *file);
 
-  CubicGraph(unsigned int index, istream& file = cin);
+  CubicGraph(unsigned int *index, FILE *file);
 };
 
 #endif
