@@ -115,38 +115,38 @@ fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *n, const in
   return new FullereneGraph(Graph(edge_set));
 }
 
-fullerene_graph_ptr read_fullerene_graph_(const char *path){
-  fullerene_graph_ptr g;
-  FILE *f = fopen(path,"r");
-  if(!f){
-    fprintf(stderr,"Cannot open file %s for reading: ",path);
-    perror(path);
-    return NULL;
-  }
-  g = new FullereneGraph(f);
-  fclose(f);
-  return g;
+string fortran_string(const char *s, int max)
+{
+  int i;
+  for(i=0;i<max && s[i] != ' '; i++) ;
+  return string(s,i);
 }
 
-fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *path){
-  fullerene_graph_ptr g;
+fullerene_graph_ptr read_fullerene_graph_(const char *f_path){
+  string path(fortran_string(f_path,50));
 
-// strip the whitespace (fortran passes an array of 50 characters)
-  std::string s(path);
-  s.erase( remove( s.begin(), s.end(), ' ' ), s.end() );
-  char* stripped_path = new char[s.length() + 1];
-  strcpy(stripped_path, s.c_str());
-
-  FILE *f = fopen(stripped_path,"r");
+  FILE *f = fopen(path.c_str(),"r");
   if(!f){
-    fprintf(stderr,"Cannot open file %s for reading: ",stripped_path);
-    perror(stripped_path);
+    fprintf(stderr,"Cannot open file %s for reading: ",path.c_str());
+    perror(path.c_str());
     return NULL;
   }
-  g = new FullereneGraph(index,f);
-
   fclose(f);
-  return g;
+  return new FullereneGraph(f);
+}
+
+fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *f_path){
+// strip the whitespace (fortran passes an array of 50 characters)
+  string path(fortran_string(f_path,50));
+
+  FILE *f = fopen(path.c_str(),"r");
+  if(!f){
+    fprintf(stderr,"Cannot open file %s for reading: ",path.c_str());
+    perror(path.c_str());
+    return NULL;
+  }
+  fclose(f);
+  return new FullereneGraph(index,f);
 }
 
 void delete_fullerene_graph_(fullerene_graph_ptr *g){  delete (*g); }
@@ -299,10 +299,8 @@ int nedges_(const graph_ptr *g){ return (*g)->edge_set.size(); }
 void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, const int *show_dual, const double *dimensions,
 		 const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter)
 {
-  int i=0;
   string fmt(format,3), filename;
-  for(i=0;i<20 && filename_[i] != ' ';i++) ;
-  filename = string(filename_,i)+"-2D."+fmt;
+  filename = fortran_string(filename_,50)+"-2D"+fmt;
 
   // printf("draw_graph({\n"
   // 	 "\tformat:     '%3s',\n"
@@ -332,10 +330,8 @@ void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char
 		      const int *edge_colour, const int *node_colour, const int *face_colour,
 		      const double *edge_width, const double *node_diameter, const double *face_opacity)
 {
-  int i=0;
   string fmt(format,3), filename;
-  for(i=0;i<20 && filename_[i] != ' ';i++) ;
-  filename = string(filename_,i)+"."+fmt;
+  filename = fortran_string(filename_,50)+"."+fmt;
 
   ofstream polyhedron_file(filename.c_str(),ios::out|ios::binary);
 
