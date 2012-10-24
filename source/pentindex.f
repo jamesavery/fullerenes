@@ -500,7 +500,6 @@ C Isonum.ne.0. Isonum is the number of the isomer in the database
       CHARACTER*50 filename
       Logical lexist
       type(c_ptr) :: graph, read_fullerene_graph_hog
-      integer edges(2,3*NMAX/2), NE
 
       Do I=1,NMAX
         A(I,I)=0
@@ -561,13 +560,10 @@ C       Read isomer from House of Graphs database
 
 c       create graph object
         graph = read_fullerene_graph_hog(isonum-1, filename)
-c       get edge list and write it to 'edges'
-        call edge_list(graph, edges, NE)
+
+c       get the adjcaency matrix
+        call adjacency_matrix(graph,Nmax,A)
  
-        do i=1,ne
-          A(edges(1,i)+1,edges(2,i)+1)=1
-          A(edges(2,i)+1,edges(1,i)+1)=1
-        enddo 
       endif
 
  1000 Format(1X,2(I6,1X))
