@@ -161,7 +161,7 @@ C Cartesian coordinates produced ring from spiral pentagon list
 C or from adjacency matrix. Uses the Fowler-Manolopoulos algorithm 
 C with P-type eigenvectors or the Tutte algorithm to construct 
 C the 3D fullerene
-   30 Ipent=1
+   30 if(Icart.lt.6) Ipent=1
       routine='COORDBUILD   '
       Write(Iout,1008) routine
       CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
