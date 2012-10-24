@@ -406,6 +406,18 @@ If the initial graph $G_0$ has $n_v$ vertices, the number of vertices of $GC_{k,
 	\label{eq:GCvertexcount} 
 \end{equation}
 $t(k,l)$ is called the {\em triangulation number}. We work with the dual triangulation instead of a hexagonal mesh as it is easier to be implemented in a computer code.
+This is shown in Figure \ref{pic:GoldbergCoxeter}
+
+
+%Figure 2
+ \begin{figure}[htbp]
+   	\centering
+  	\includegraphics[width=0.35\textwidth]{GoldbergCoxeter.png}
+    \caption{Goldberg-Coxeter construction: $GC_{1,1}$ (green triangle), leapfrog transformation; $GC_{3,0}$ (blue triangle), halma transformation; $GC_{6,2}$ (red triangle), general.}
+	\label{pic:GoldbergCoxeter}
+ \end{figure}
+
+
 
 %Hamiltonian cycles
 \subsection{Hamiltonian cycles}
@@ -495,7 +507,7 @@ we developed (subroutine \funname{WirzSchwerd}), see for example input files \te
 Non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with such vertex insertion methods, see input files \filename{c380.inp} 
 and \filename{c384.inp}. The two structures obtained from a force-field optimization are shown in Figure \ref{pic:C380andC384} using program PYMOL \cite{Pymol}.
 
-%Figure 2
+%Figure 3
  \begin{figure}[htbp]
    	\centering
   	\includegraphics[width=0.35\textwidth]{C380.png}
@@ -642,7 +654,7 @@ The circumference for atoms and rings down the $z$-axis are determined. The Schl
 coordinates, i.e. points are projected down a plane from a set projection point. 
 The connections between the points are already written out earlier in the output such that the fullerene graph can be drawn. This is shown in Figure \ref{pic:Schlegel}.
 
-%Figure 3
+%Figure 4
  \begin{figure}[htbp]
    	\centering
   	\includegraphics[width=0.5\textwidth]{Schlegel.png}
@@ -1051,8 +1063,12 @@ If \paramname{ndual} = 1, The dual graph is drawn as well in tex-file \filename{
 The different algorithms for drawing 2D fullerene graphs are shown in Figure \ref{pic:ManySchlegel}. Note that for very large
 fullerenes which are far from spherical symmetry, the algorithms here may not produce the best 2D graph representation.
 We are currently working on this problem.
-         
-%Figure 4
+
+
+\clearpage
+
+        
+%Figure 5
  \begin{figure}[htbp]
 	\centering
   		 \includegraphics[width=0.225\textwidth]{Graph1.png}
@@ -1069,7 +1085,7 @@ We are currently working on this problem.
 
 
  
- 
+
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{100} and for IPR isomers up to
