@@ -162,7 +162,7 @@ C Cartesian coordinates produced ring from spiral pentagon list
 C or from adjacency matrix. Uses the Fowler-Manolopoulos algorithm 
 C with P-type eigenvectors or the Tutte algorithm to construct 
 C the 3D fullerene
-   30 if(Icart.lt.6) Ipent=1
+   30 Ipent=1
       routine='COORDBUILD   '
       Write(Iout,1008) routine
       CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
@@ -461,7 +461,8 @@ C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
-      if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0) then
+      if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
+     1   or.Icart.eq.6.or.Icart.eq.7) then
         routine='SPIRALSEARCH '
         Write(Iout,1008) routine
         CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
