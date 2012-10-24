@@ -8,8 +8,8 @@ extern "C" {
 
   // Graph construction and destruction
   fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *N, const int *adjacency);
-  fullerene_graph_ptr read_fullerene_graph_(const char *path);
-  fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *path);
+  fullerene_graph_ptr read_fullerene_graph_(const char *f_path);
+  fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *f_path);
   void delete_fullerene_graph_(fullerene_graph_ptr*);
 
   polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points);
@@ -123,6 +123,8 @@ string fortran_string(const char *s, int max)
 }
 
 fullerene_graph_ptr read_fullerene_graph_(const char *f_path){
+  fullerene_graph_ptr g;
+
   string path(fortran_string(f_path,50));
 
   FILE *f = fopen(path.c_str(),"r");
@@ -131,11 +133,15 @@ fullerene_graph_ptr read_fullerene_graph_(const char *f_path){
     perror(path.c_str());
     return NULL;
   }
+
+  g = new FullereneGraph(f);
   fclose(f);
-  return new FullereneGraph(f);
+  return g;
 }
 
 fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *f_path){
+  fullerene_graph_ptr g;
+
 // strip the whitespace (fortran passes an array of 50 characters)
   string path(fortran_string(f_path,50));
 
@@ -145,8 +151,10 @@ fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *f
     perror(path.c_str());
     return NULL;
   }
+
+  g = new FullereneGraph(index,f);
   fclose(f);
-  return new FullereneGraph(index,f);
+  return g;
 }
 
 void delete_fullerene_graph_(fullerene_graph_ptr *g){  delete (*g); }
