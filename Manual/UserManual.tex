@@ -1,4 +1,4 @@
-\documentclass[article,a4paper]{memoir}
+\documentclass[article,a4paper,twoside]{memoir}
 \usepackage{graphicx,textcomp,authblk,wallpaper,xcolor}
 \usepackage{amsmath,amssymb,amsfonts,hyperref,tikz}
 \usepackage[T1]{fontenc}
@@ -28,12 +28,8 @@
 \newcommand{\filename}[1]{\texttt{#1}}
 \newcommand{\funname}[1]{{\color{blue}\textbf{#1}}}
 \newcommand{\paramname}[1]{{\color{green}\textbf{#1}}}
-\newcommand{\blankpage}{
-\newpage
-\thispagestyle{empty}
-\mbox{}
-\newpage
-}
+
+\aliaspagestyle{title}{empty}
 
 \title{PROGRAM FULLERENE (Version 4.2)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
 
@@ -58,14 +54,15 @@
     \includegraphics[width=0.9\textwidth]{Toc.png}
     \large \lineskip 0.5em%
     \begin{tabular}[t]{c}
+%\thispagestyle{empty}
 }
 
+%\let\maketitle={\thispagestyle{empty}\maketitle}
 \begin{document}
 
 \maketitle
 
-\blankpage
-
+\cleardoublepage
 
 \section*{Important Copyright Message:}
 \textit{This is an \textbf{open-source code} and you may use and modify the program at your own will.
@@ -127,7 +124,7 @@ their Fortran subroutines which we modified and implemented in this program pack
  \begin{figure}[htbp]
    	\centering
   	\includegraphics[width=\textwidth]{C840.png}
-    \label{pic:toc}
+%    \label{pic:toc}
  \end{figure} 
 
 \clearpage
@@ -248,8 +245,8 @@ explained in some detail in this section. More information can be obtained in an
 \begin{figure}[htbp]
    	\centering
 	\includegraphics[width=0.9\textwidth]{tree.pdf} 
-    \label{pic:flowdiagram}
     \caption{Flow diagram for main program tasks.}
+    \label{pic:flowdiagram}
 \end{figure}
 
 The most time-consuming steps in the program are the diagonalization of the adjacency matrix 
@@ -1066,8 +1063,8 @@ We are currently working on this problem.
 		 \includegraphics[width=0.225\textwidth]{Graph6.png}
 		 \includegraphics[width=0.225\textwidth]{Graph7.png}
 		 \includegraphics[width=0.225\textwidth]{Graph8.png}
-     \label{pic:ManySchlegel}
      \caption{From the left to right: 2D fullerene structures created using \paramname{ISchlegel}=1 to 8.}
+     \label{pic:ManySchlegel}
  \end{figure}
 
 
