@@ -173,6 +173,38 @@ C Asymmetric
       return
       END
 
+      SUBROUTINE CompareStruct(M,Iout,IDA,Dist,DistS)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION Dist(3,Nmax),DistS(3,Nmax)
+      DIMENSION IDA(Nmax,Nmax)
+C     This routine calculates the RMSD between two structures
+C     by comparing bond distances
+      diff=0.d0
+      ncount=0
+      Do I=1,M
+      Do J=I+1,M
+       if(IDA(I,J).eq.1) then
+        ncount=ncount+1
+        X=Dist(1,I)-Dist(1,J)
+        Y=Dist(2,I)-Dist(2,J)
+        Z=Dist(3,I)-Dist(3,J)
+        RD=dsqrt(X*X+Y*Y+Z*Z)
+        Xs=DistS(1,I)-DistS(1,J)
+        Ys=DistS(2,I)-DistS(2,J)
+        Zs=DistS(3,I)-DistS(3,J)
+        RS=dsqrt(Xs*Xs+Ys*Ys+Zs*Zs)
+       endif
+       diff=diff+(RD-RS)**2
+      enddo
+      enddo
+      RMSD=dsqrt(diff/dfloat(ncount))
+      Write(Iout,1000) RMSD
+ 1000 Format(1X,'Root mean square deviation between intitial and ',
+     1 'final structure: ',D15.9)
+      return
+      END
+
       SUBROUTINE Diameter(M,IOUT,Dist,diam)
       use config
 C Calculate largest and smallest atom-to-atom diameters

@@ -24,6 +24,7 @@ C    Set the dimensions for the distance matrix
       parameter (nzeile=132)
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
       DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
+      DIMENSION DistStore(3,Nmax)
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
       real(8) force(ffmaxdim), forceP(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
@@ -283,11 +284,17 @@ C Establish all closed ring systems
 
 C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
-c we check for ISW because the coordinates shouldn't be optimized before
+c We check for ISW because the coordinates shouldn't be optimized before
 c a stone wales (or any other transformation) is done
       icall=0
       If(Iopt.ne.0 .and. 
      1     ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+c       Store distances
+        Do I=1,3
+        Do J=1,MAtom 
+         DistStore(I,J)=Dist(I,J)
+        enddo
+        enddo
         routine='OPTFF        '
         ftol=ftolP
         Write(Iout,1008) routine
@@ -309,6 +316,8 @@ c a stone wales (or any other transformation) is done
           CALL OptFF(MAtom,Iout,IDA,
      1      Dist,dist2D,Rdist,ftolP,force,iopt)
         endif
+c       Compare structures
+        Call CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
         routine='MOVECM_2     '
   991   Write(Iout,1008) routine
         Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
