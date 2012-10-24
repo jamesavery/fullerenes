@@ -181,11 +181,14 @@ C Asymmetric
 C     This routine calculates the RMSD between two structures
 C     by comparing bond distances
       diff=0.d0
+      dif=0.d0
       ncount=0
+      difmin=1.d10
+      difmax=-1.d10
+      RSmax=-1.d10
+      RDmax=-1.d10
       Do I=1,M
       Do J=I+1,M
-       if(IDA(I,J).eq.1) then
-        ncount=ncount+1
         X=Dist(1,I)-Dist(1,J)
         Y=Dist(2,I)-Dist(2,J)
         Z=Dist(3,I)-Dist(3,J)
@@ -194,14 +197,35 @@ C     by comparing bond distances
         Ys=DistS(2,I)-DistS(2,J)
         Zs=DistS(3,I)-DistS(3,J)
         RS=dsqrt(Xs*Xs+Ys*Ys+Zs*Zs)
+       if(RS.gt.RSmax) RSmax=RS
+       if(RD.gt.RDmax) RDmax=RD
+       if(IDA(I,J).eq.1) then
+        ncount=ncount+1
+       dif=RS-RD
+       if(dif.gt.difmax) then
+        difmax=dif
+        iv1=I
+        iv2=J
        endif
-       diff=diff+(RD-RS)**2
+       if(dif.lt.difmin) then
+        difmin=dif
+        iv3=I
+        iv4=J
+       endif
+       diff=diff+dif*dif
+       endif
       enddo
       enddo
       RMSD=dsqrt(diff/dfloat(ncount))
-      Write(Iout,1000) RMSD
- 1000 Format(1X,'Root mean square deviation between intitial and ',
-     1 'final structure: ',D15.9)
+      difRSRD=RSmax-RDmax
+      Write(Iout,1000) RMSD,ncount,difmin,iv1,iv2,difmax,iv3,iv4,difRSRD
+ 1000 Format(1X,'Root mean square deviation between intitial (i) and ',
+     1 'final (f) structure (counting edges only): ',D15.9,
+     1 ' (N= ',I7,')',/1X,'Smallest deviation (Ri-Rf)= ',D15.9,
+     1 ' (between vertices ',I7,' and ',I7,')',
+     1 /1X,'Largest  deviation (Ri-Rf)= ',D15.9,
+     1 ' (between vertices ',I7,' and ',I7,')',
+     1 /1X,'Largest deciation in diameter: ',D15.9)
       return
       END
 
