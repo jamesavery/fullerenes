@@ -116,37 +116,30 @@ fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *n, const in
 }
 
 fullerene_graph_ptr read_fullerene_graph_(const char *path){
-  fullerene_graph_ptr g;
   FILE *f = fopen(path,"r");
   if(!f){
     fprintf(stderr,"Cannot open file %s for reading: ",path);
     perror(path);
     return NULL;
   }
-  g = new FullereneGraph(f);
   fclose(f);
-  return g;
+  return new FullereneGraph(f);
 }
 
-fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *path){
-  fullerene_graph_ptr g;
-
+fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *f_path){
 // strip the whitespace (fortran passes an array of 50 characters)
-  std::string s(path);
-  s.erase( remove( s.begin(), s.end(), ' ' ), s.end() );
-  char* stripped_path = new char[s.length() + 1];
-  strcpy(stripped_path, s.c_str());
+  int i;
+  for(i=0;i<50 && f_path[i] != ' ';i++) ;
+  string path(f_path,i);
 
-  FILE *f = fopen(stripped_path,"r");
+  FILE *f = fopen(path.c_str(),"r");
   if(!f){
-    fprintf(stderr,"Cannot open file %s for reading: ",stripped_path);
-    perror(stripped_path);
+    fprintf(stderr,"Cannot open file %s for reading: ",path.c_str());
+    perror(path.c_str());
     return NULL;
   }
-  g = new FullereneGraph(index,f);
-
   fclose(f);
-  return g;
+  return new FullereneGraph(index,f);
 }
 
 void delete_fullerene_graph_(fullerene_graph_ptr *g){  delete (*g); }
@@ -301,7 +294,7 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
 {
   int i=0;
   string fmt(format,3), filename;
-  for(i=0;i<20 && filename_[i] != ' ';i++) ;
+  for(i=0;i<50 && filename_[i] != ' ';i++) ;
   filename = string(filename_,i)+"-2D."+fmt;
 
   // printf("draw_graph({\n"
@@ -334,7 +327,7 @@ void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char
 {
   int i=0;
   string fmt(format,3), filename;
-  for(i=0;i<20 && filename_[i] != ' ';i++) ;
+  for(i=0;i<50 && filename_[i] != ' ';i++) ;
   filename = string(filename_,i)+"."+fmt;
 
   ofstream polyhedron_file(filename.c_str(),ios::out|ios::binary);
