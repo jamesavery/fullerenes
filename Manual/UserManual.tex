@@ -228,6 +228,7 @@ to be created and moved into the main directory where the \filename{source} and 
 the folders \filename{ALL} with our database for general fullerenes, \filename{IPR} with our database 
 for IPR fullerenes, \filename{Yoshida} with Yoshida's database of selected fullerenes (directories containing .cc1 files),
 and \filename{HOG} with (if downloaded from http://hog.grinvin.org/Fullerenes ) the House of Graph datafiles.
+Important: Please make all filenames in the database read-only.
 
 To use the latex program for the 2D fullerene graphs you need to use the files \filename{standalone.cfg} and \filename{standalone.cls}.
 
@@ -753,7 +754,7 @@ every line until the first namelist line is interpreted as a comment.
 \subsection{\&General line}
 Namelist line that contains the main flags for the program. 
 
-\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, ihueckel, loop, ipsphere, nosort, TolR, R5, R6, filename}.
+\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, ihueckel, loop, ipsphere, nosort, TolR, R5, R6, filenamedb, filename}.
 \paragraph{Option description:}
 \begin{description}
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
@@ -795,6 +796,10 @@ Namelist line that contains the main flags for the program.
   This parameter should reflect the maximum deviation in distance from the smallest distance found.
 \item[{filename}] 
     Prefix for for all external filenames created by the program. Limited to 50~characters. Default: \filename{Fullerene}.
+\item[{filenameout}] 
+    Prefix for for a database filename to be used as output for .xyz and .cc1 files if different from \filename{filename}. Limited to 50~characters, 
+    Used for example to read from the Yoshida or House of Graph files with \filename{filename} in the directory \filename{database/Yoshida} or \filename{database/HOG}.
+    and write .xyz-file out to another filename called \filename{filenameout}.
 \end{description}
 
 
@@ -1065,7 +1070,6 @@ fullerenes which are far from spherical symmetry, the algorithms here may not pr
 We are currently working on this problem.
 
 
-\clearpage
 
         
 %Figure 5

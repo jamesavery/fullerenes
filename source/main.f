@@ -43,6 +43,7 @@ C    Set the dimensions for the distance matrix
       CHARACTER*2 El(99)
       CHARACTER*13 routine
       CHARACTER*50 filename
+      CHARACTER*50 filenameout
       CHARACTER*50 xyzname
       CHARACTER*50 cc1name
       CHARACTER*20 element
@@ -100,7 +101,7 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
      1  ndual,nosort,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
-     1  scaleRad,force,forceP,filename,TEXTINPUT)
+     1  scaleRad,force,forceP,filename,filenameout,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -341,7 +342,16 @@ C Print out Coordinates used as input for CYLview
 C xyz format
       if(icyl.le.2 .and. 
      1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
-        xyzname=trim(filename)//"-3D.xyz"
+        xyzname=trim(filenameout)//"-3D.xyz"
+        ichar1=index(xyzname,'database/ALL')
+        ichar2=index(xyzname,'database/IPR')
+        ichar3=index(xyzname,'database/Yoshida')
+        ichar4=index(xyzname,'database/HOG')
+        ifind=ichar1+ichar2+ichar3+ichar4
+        if(ifind.ne.0) then
+         Write(Iout,1022)
+         go to 9999
+        endif
         Open(unit=3,file=xyzname,form='formatted')
         routine='PRINTCOORD   '
         Write(Iout,1008) routine
@@ -367,7 +377,18 @@ C xyz format
 C cc1 format
       if(icyl.ge.4 .and. 
      1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
-       cc1name=trim(filename)//"-3DMCS.cc1"
+       cc1name=trim(filenameout)//"-3DMCS.cc1"
+        ichar1=index(cc1name,'database/ALL')
+        ichar2=index(cc1name,'database/IPR')
+        ichar3=index(cc1name,'database/Yoshida')
+        ichar4=index(cc1name,'database/HOG')
+        ifind=ichar1+ichar2+ichar3+ichar4
+        if(ifind.ne.0) then
+         Write(Iout,1022)
+         go to 9999
+        endif
+        icharfind=index(cc1name,'database/')
+        print*,icharfind
        Open(unit=3,file=cc1name,form='formatted')
         WRITE(Iout,1002) cc1name
         if(MAtom.lt.100) WRITE(3,1025) MAtom
@@ -593,14 +614,16 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1011 FORMAT(I5,/,'C',I2,'/  ',132A1)
  1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
  1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
- 1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
  1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
  1015 FORMAT(/1X,'Read coordinates from xyz file: ',A60)
  1016 FORMAT(/1X,'End of file reached ==> Stop')
  1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
  1018 FORMAT(132A1)
  1019 FORMAT(140('='))
+ 1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
  1021 FORMAT(/1X,'Read coordinates from cc1 file: ',A60)
+ 1022 FORMAT(/1X,'You try to write into the database filesystem',
+     1 ' which is not allowed  ===>  ABORT')
  1025 FORMAT(I2)
  1026 FORMAT(I3)
  1027 FORMAT(I4)

@@ -3,7 +3,7 @@
      1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
      1 ndual,nosort,PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,scaleRad,
-     1 force,forceP,filename,DATEN)
+     1 force,forceP,filename,filenameout,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
@@ -11,8 +11,9 @@
       integer endzeile
       Character*1 DATEN(nzeile)
       Character filename*50
+      Character filenameout*50
       Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,ihueckel,loop,
-     1 filename,ipsphere,nosort
+     1 filename,filenameout,ipsphere,nosort
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IWS,scaleRad
       Namelist /FFChoice/ Iopt,ftol
@@ -81,6 +82,7 @@ c     four dihedrals: forces (let's assume they are all the same)
 
 C Default parameters for external files
       filename= 'Fullerene'
+      filenameout= 'Fullerene'
 
 C Integers
       nosort=0  !  Flag for sorting cartesian coordinates
@@ -148,7 +150,8 @@ C Read Namelist
       Read(IN,nml=Coord,Err=99,end=99)
       Read(IN,nml=FFChoice,Err=99,end=99)
 
-
+C Filenames
+      if(filenameout.eq.'Fullerene') filenameout=filename
 C Set Parameters for force field
 c set forceP (default parameters)[needs to be done after iopt and before opt is read]
   99  if(iopt.eq.1 .or. iopt.eq.2)then
