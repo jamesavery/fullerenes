@@ -147,6 +147,7 @@ C     Bandgap
        if(bandgap.lt.Tol1) Write(Iout,1006)
       endif
 
+      call flush(iout)
  
  1000 FORMAT(8X,'x',13X,'E',4X,'deg NE   type    ',/1X,45('-'))
  1002 FORMAT(2(1X,F12.6),I3,1X,I3,3X,A10)

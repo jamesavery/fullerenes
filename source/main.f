@@ -299,6 +299,7 @@ c       Store distances
         routine='OPTFF        '
         ftol=ftolP
         Write(Iout,1008) routine
+        call flush(iout)
         if(Iopt.eq.1 .or. Iopt.eq.2) then ! vanilla Wu or Wu + Coulomb
           if(Iopt.eq.2) then ! Wu + Coulomb
             ftol=ftolP*1.d3

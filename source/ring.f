@@ -279,6 +279,9 @@ C     Check Euler characteristic
       ameas=dfloat(Ndif)/dfloat(Mcon2)
       Write(Iout,1012) Ndif,ameas,Tol
       Write(Iout,1013) (Rmem(I),I=1,Ndif)
+
+      call flush(iout)
+
  1000 Format(/1X,I3,' five-membered-rings identified',/,
      1 ' Atom numbers in ring, Ni, mean distance, dm, and root mean',
      1 ' square deviation for distances, RMSD,'
