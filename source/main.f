@@ -73,6 +73,7 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       iprev=0
       isort=0
       icall=0
+      scaledist=1.d0
       VolSphere=0.d0
       ASphere=0.d0
       Group='   '
