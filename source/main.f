@@ -378,7 +378,7 @@ C xyz format
 C cc1 format
       if(icyl.ge.4 .and. 
      1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
-       cc1name=trim(filenameout)//"-3DMCS.cc1"
+       cc1name=trim(filenameout)//"-3D.cc1"
         ichar1=index(cc1name,'database/ALL')
         ichar2=index(cc1name,'database/IPR')
         ichar3=index(cc1name,'database/Yoshida')
@@ -581,15 +581,15 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.2, last revision from 21/08/12     |',
+     1 /1X,'|    This  version: 4.2, last revision from 25/08/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
      1 /1X,'For citation when running this program use:',/1X,
-     1 '1) P. Schwerdtfeger, L. Wirz, J. Avery, Topological Aspects of',
-     1 ' Fullerenes - A Fortran Program',/9X,'(Version 4.0, Massey ',
-     1 'University Albany, Auckland, New Zealand, 2012).',/1X,
+     1 '1) P. Schwerdtfeger, L. Wirz, J. Avery, Topological Analysis ',
+     1 'of Fullerenes - A Fortran and C++ Program (Version 4.2), ',
+     1 'Massey University Albany, Auckland, New Zealand (2012).',/1X,
      1 '2) P. W. Fowler, D. E. Manolopoulos, An Atlas of Fullerenes',
      1 ' (Dover Publ., New York, 2006).',/1X,
      1 '3) D. Babic, Nomenclature and Coding of Fullerenes,',
