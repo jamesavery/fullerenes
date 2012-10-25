@@ -414,6 +414,9 @@ c counter for edges with 0, 1, 2 pentagons neighbours
      1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
 
+c     and finally delete the graph to free the mem
+      call delete_fullerene_graph(graph)     
+
       deg2rad=dpi/180.d0
       dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
       if(iopt.eq.1 .or. iopt.eq.2)then

@@ -563,6 +563,8 @@ c       create graph object
 
 c       get the adjcaency matrix
         call adjacency_matrix(graph,Nmax,A)
+
+        call delete_fullerene_graph(graph)
  
       endif
 
