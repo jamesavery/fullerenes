@@ -73,7 +73,6 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       iprev=0
       isort=0
       icall=0
-      scaledist=1.d0
       VolSphere=0.d0
       ASphere=0.d0
       Group='   '
@@ -242,7 +241,7 @@ C Produce the nth leapfrog of the fullerene
         Write(Iout,1008) routine
         CALL GoldbergCoxeter(MAtom,Iout,leap,leapGC,IGC1,IGC2,
      1   ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
-     1   scaledist)
+     1   scaleRad)
         leap=0
         leapGC=0
         ipent=1
