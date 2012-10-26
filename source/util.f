@@ -1,3 +1,10 @@
+C     SUBROUTINE PerfectMatching(MAtom,Iout,IDA)
+C     use config
+C     IMPLICIT REAL*8 (A-H,O-Z)
+C     DIMENSION IDA(Nmax,Nmax)
+C     RETURN
+C     END
+
       SUBROUTINE Sortr(M,Mnew,imirror,jmirror,diam)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
