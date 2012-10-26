@@ -506,7 +506,7 @@ C Calculate the volume
       Write(Iout,1008) routine
       CALL Volume(Matom,Iout,N5MEM,N6MEM,
      1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
-     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6,filename)
+     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)!,filename)
 
 C------------------MINCOVSPHERE-----------------------------------
 C Calculate the minimum covering sphere and volumes
