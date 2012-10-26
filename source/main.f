@@ -169,7 +169,7 @@ C the 3D fullerene
       CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
      1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
-     1 GROUP,ke,isw,iyf,iws,filename)
+     1 GROUP,filename)
       Do I=1,Matom
         IAtom(I)=6
       enddo
@@ -184,8 +184,7 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS      '
       Write(Iout,1008) routine
-      CALL Isomers(MAtom,IPR,Iout,
-     1 maxit,iprintham,ichk,IDA,A,filename)
+      CALL Isomers(MAtom,IPR,Iout,iprintham,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
 
 C------------------MOVECM------------------------------------------

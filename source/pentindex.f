@@ -1,7 +1,7 @@
       SUBROUTINE CoordBuild(MAtom,IN,Iout,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
      1 A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
-     1 GROUP,ke,isw,iyf,iws,filename)
+     1 GROUP,filename)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
 C This is followed by using either the Fowler-Manolopoulos matrix
@@ -24,7 +24,7 @@ C mapping
       CHARACTER*3 GROUP
       CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-      integer ke, isw, iyf, iws
+c      integer ke, isw, iyf, iws
       type(c_ptr) :: g, halma, new_C20, halma_fullerene
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
