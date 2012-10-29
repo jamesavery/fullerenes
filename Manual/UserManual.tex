@@ -152,7 +152,7 @@ $n_f$ the number of faces (5- or 6-rings). The program constructs an accurate 3D
 from the canonical ring spiral pentagon indices (RSPI) through either a 3D Tutte embedding (3D-TE) \cite{Tutte} or the adjacency matrix
 eigenvector (AME) method \cite{Atlas}. One can also construct the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene or a halma fullerene 
 $GC_{k,0}[C_{n_v}]$ as a special case of a Goldberg-Coxeter transformation $GC_{k,l}$. Starting from a given fullerene structure one can 
-perform vertex insertions (such as Endo-Kroto \cite{Endo92} or Yoshida-Fowler \cite{Yoshida97}), W-S \cite{WS}
+perform vertex insertions (such as Endo-Kroto \cite{Endo92} or Yoshida-Fowler \cite{Yoshida97}), Brinkmann-Fowler \cite{BrinkmannFowler03}
 or Stone-Wales transformations \cite{Stone86}. 
 Vertex insertions allow for the construction of non-spiral fullerenes such as \C{380} or \C{384}. 
 Geometry optimization using a Fletcher-Reeves-Polak-Ribiere
@@ -503,8 +503,8 @@ heat of formation \cite{Cioslowski2000}. For all fullerenes, Martin's scheme is 
 Information from subroutine \funname{RingC} can be used to perform Stone-Wales transformations \cite{Stone86}
 (subroutine \funname{StoneWalesTrans}), Endo-Kroto 2-vertex insertions \cite{Endo92} (subroutine \funname{EndoKrotoTrans}),
 Yoshida-Fowler 4-vertex ($D_{3h}$ 6555) (subroutine \funname{YoshidaFowler4}) and 6-vertex ($D_{3h}$ 666555)
-insertions (subroutine \funname{YoshidaFowler6}) \cite{Yoshida97}, or a WS 6-vertex (6-55-55) insertion 
-we developed (subroutine \funname{WirzSchwerd}), see for example input files \textit{c50EK.inp, c60SW.inp, c80YF.inp}. 
+insertions (subroutine \funname{YoshidaFowler6}) \cite{Yoshida97}, or a Brinkmann-Fowler 6-vertex (6-55-55) insertion 
+(subroutine \funname{BrinkmannFowler}) \cite{BrinkmannFowler03}, see for example input files \textit{c50EK.inp, c60SW.inp, c80YF.inp}. 
 Non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with such vertex insertion methods, see input files \filename{c380.inp} 
 and \filename{c384.inp}. The two structures obtained from a force-field optimization are shown in Figure \ref{pic:C380andC384} using program PYMOL \cite{Pymol}.
 
@@ -1137,7 +1137,7 @@ see http://caagt.ugent.be/buckygen/.
 
 \bibitem{Yoshida97} M. Yoshida, P. Fowler, \textit{Chem. Phys. Lett.} \textbf{278}, 256-261(1997).
 
-\bibitem{WS} L. Wirz, J. Avery, P. Schwerdtfeger, ``Topological and graph theoretical properties of regular fullerenes'', to be published.
+\bibitem{BrinkmannFowler03} G. Brinkmann, P. W. Fowler, \textit{J. Chem. Inf. Comput. Sci.} \textbf{43}, 1837-1843 (2003).
 
 \bibitem{Stone86} A. J. Stone and D. J. Wales, ``Formation of carbon nanofibers'', \textit{Chem. Phys. Lett.} \textbf{128}, 501-503 (1986).
 
