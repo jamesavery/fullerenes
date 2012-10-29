@@ -99,7 +99,7 @@ C  INPUT and setting parameters for running the subroutines
         CALL Datain(IN,Iout,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
-     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IWS,nzeile,ifs,ipsphere,
+     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
      1  ndual,nosort,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
      1  scaleRad,force,forceP,filename,filenameout,TEXTINPUT)
 C  Stop if error in input
@@ -472,13 +472,13 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
 
 C------------------WIRZSCHWERD------------------------------------
 C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
-      if(IWS.ne.0) then
+      if(IBF.ne.0) then
         routine='WIRZSCHWERD  '
         Write(Iout,1008) routine
-        CALL BrinkmannFowler(Matom,IN,Iout,JERR,numberWS,IWS,
+        CALL BrinkmannFowler(Matom,IN,Iout,JERR,numberWS,IBF,
      1   nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1   A,evec,df,Dist,Dist2D,distp,Rdist,scalerad)
-        IWS=0
+        IBF=0
         ipent=1
         SWspiral=1
         if(JERR.eq.0) go to 999 ! moveCM

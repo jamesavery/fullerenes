@@ -710,7 +710,7 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE BrinkmannFowler(Matom,IN,Iout,JERR,numberWS,
-     1 IWS,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
+     1 IBF,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
      1 A,evec,df,Dist,layout2D,distp,Cdist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -746,7 +746,7 @@ C     Check if any is a Brinkmann-Fowler D2h 55-6-55 pattern
       endif
       Write(Iout,1001) ntrans,(IP(J),J=1,ntrans)
  
-      if(IWS.eq.1) then
+      if(IBF.eq.1) then
        nfound=0
        Do I=1,ntrans
         I1=IP(I)
