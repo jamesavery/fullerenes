@@ -564,7 +564,7 @@ C     (c5-5-6) 3-ring fusions with (5-5)
       Write(Iout,1008) Label,IR1,IR2,IR3,KRing3
       if(Kring3.ne.0) then
        if(iprint.eq.1) write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
-C       Search for Wirz-Schwerdtfeger D2h 55-6-55 patterns
+C       Search for Brinkmann-Fowler D2h 55-6-55 patterns
         Call SixvertexinsertWS(Kring3,n3ra,numberWS,nWS)
         N3Ring=N3Ring+KRing3
        endif
@@ -731,7 +731,7 @@ C Print Yoshida-Fowler D3h 6555 patterns
        Write(Iout,1045) ((nYF(I,J),I=1,6),J=1,numberYF)
       endif
 
-C Print Wirz-Schwerdtfeger D2h 55-6-55 patterns
+C Print Brinkmann-Fowler D2h 55-6-55 patterns
       if(numberWS.eq.0) then 
        Write(Iout,1046)
       else
@@ -987,7 +987,7 @@ C     Calculate the enthalpy of formation per bond
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION n3ra(3,Nmax),nWS(5,8)
-C Find Wirz-Schwerdtfeger D2h 55-6-55 patterns
+C Find Brinkmann-Fowler D2h 55-6-55 patterns
       numberWS=0
       do I=1,5
       do J=1,8

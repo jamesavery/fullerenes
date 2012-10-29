@@ -709,7 +709,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE WirzSchwerd(Matom,IN,Iout,JERR,numberWS,
+      SUBROUTINE BrinkmannFowler(Matom,IN,Iout,JERR,numberWS,
      1 IWS,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
      1 A,evec,df,Dist,layout2D,distp,Cdist,scalerad)
       use config
@@ -728,7 +728,7 @@ C Now analyze the adjacency matrix if it is correct
 C     read single hexagon numbers
       Read(IN,*,Err=100,end=100) (IP(I),I=1,66)
 
-C     Check if any is a Wirz-Schwerdtfeger D2h 55-6-55 pattern
+C     Check if any is a Brinkmann-Fowler D2h 55-6-55 pattern
   100 ntrans=0
       Do I=1,10
        if(IP(I).eq.0) go to 10
@@ -811,7 +811,7 @@ C     Check for shared pentagons or hexagons which is not allowed
         Write(Iout,1007) ntrans
         Write(Iout,1003) ((nWS(I,J),I=1,5),J=1,ntrans)
     
-C Perform Wirz-Schwerdtfeger 6-vertex insertion
+C Perform Brinkmann-Fowler 6-vertex insertion
 C First find common vertices between pentagons and middle hexagon
        Do I=1,ntrans
        IH=nWS(3,I)-12
@@ -1001,16 +1001,16 @@ C Now analyze the adjacency matrix if it is correct
       endif
       Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
- 1000 Format(/1X,'W-S 6-vertex insertion to D2h 55-6-55',
+ 1000 Format(/1X,'Brinkmann-Fowler 6-vertex insertion to D2h 55-6-55',
      1 ' ring pattern:',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
- 1001 Format(/1X,'Input for W-S 6-vertex insertions: ',
+ 1001 Format(/1X,'Input for Brinkmann-Fowler 6-vertex insertions: ',
      1 I2,' entries with numbers ',15(' ',I5))
  1003 Format(6(' (',I2,',',I2,',',I5,',',I2,',',I2,')'))
  1005 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
      1 'are not of degree 3, last one is of degree ',I4)
  1006 FORMAT(1X,'Graph checked, it is cubic')
- 1007 Format(1X,'Perform ',I2,' W-S 6-vertex insertions',
+ 1007 Format(1X,'Perform ',I2,' Brinkmann-Fowler 6-vertex insertions',
      1 /1X,'Modifying adjacency matrix for rings (P,P,H,P,P):')
  1008 Format(1X,'Transform adjacency matrix',/1X,
      1 'Bonds to be added and deleted',/1X,
@@ -1020,7 +1020,7 @@ C Now analyze the adjacency matrix if it is correct
  1013 Format(1X,4(' (',I5,','I5,') '))
  1016 Format(/1X,'No input found ==> RETURN')
  1017 Format(/1X,'Number of insertions ',I2,' exceeds number of ',
-     1 'possible W-S insertions ',I2,' ==> RETURN')
+     1 'possible Brinkmann-Fowler insertions ',I2,' ==> RETURN')
  1018 Format(/1X,'Hexagon numbers do not match list of ',
      1 'W-S list ==> RETURN')
  1019 Format(/1X,'Dimension of new adjacency matrix exceeds the ',

@@ -471,11 +471,11 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
       endif
 
 C------------------WIRZSCHWERD------------------------------------
-C Perform Wirz-Schwerdtfeger 6-vertex 6-55-55 insertion
+C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
       if(IWS.ne.0) then
         routine='WIRZSCHWERD  '
         Write(Iout,1008) routine
-        CALL WirzSchwerd(Matom,IN,Iout,JERR,numberWS,IWS,
+        CALL BrinkmannFowler(Matom,IN,Iout,JERR,numberWS,IWS,
      1   nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1   A,evec,df,Dist,Dist2D,distp,Rdist,scalerad)
         IWS=0
