@@ -682,6 +682,7 @@ C Now analyze the adjacency matrix if it is correct
       Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Endo-Kroto insertion of 2 vertices:',
+     1 ' 2 pentagon G2.12.1.1 (nv=12)-> G2.12.1.2 (nv=14)',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
  1001 Format(/1X,'Number of Endo-Kroto insertions: ',I2,
      1 /1X,'Endo-Kroto pentagon ring numbers:',/,
@@ -1002,7 +1003,8 @@ C Now analyze the adjacency matrix if it is correct
       Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Brinkmann-Fowler 6-vertex insertion to D2h 55-6-55',
-     1 ' ring pattern:',/1X,'Read hexagon ring numbers or position',
+     1 ' ring pattern: 4 pentagon G4.14.2.1 (nv=16) -> G4.14.2.2 ',
+     1 '(nv=22)',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
  1001 Format(/1X,'Input for Brinkmann-Fowler 6-vertex insertions: ',
      1 I2,' entries with numbers ',15(' ',I5))
@@ -1407,7 +1409,9 @@ C Now analyze the adjacency matrix if it is correct
       Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 6-vertex insertion to D3h 666555 ',
-     1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
+     1 'ring pattern: 3 pentagon G3.15.4.1 (nv=19) -> G3.15.4.2 ',
+     1 '(nv=21) and G3.15.3.1 (nv=15) -> G3.15.3.2 (nv=19)',
+     1 /1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
  1001 Format(/1X,'Input for Yoshida-Fowler 6-vertex insertions: ',I2,
      1 ' entries with numbers ',15(' ',I5))
@@ -1667,7 +1671,8 @@ C Now analyze the adjacency matrix if it is correct
       Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 4-vertex insertion to D3h 6555 ',
-     1 'ring pattern:',/1X,'Read hexagon ring numbers or position',
+     1 'ring pattern: 3 pentagon G3.15.31.1 (nv=15) -> G3.17.3.2',
+     1 ' (nv=19)',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
  1001 Format(/1X,'Number of Yoshida-Fowler 4-vertex insertions: ',I2,
      1 /1X,'Yoshida-Fowler hexagon ring numbers:',20(' ',I5))

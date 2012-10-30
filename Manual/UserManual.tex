@@ -98,7 +98,8 @@ and fullerenes}, J. Chem. Phys. \textbf{96}, 7603-7614 (1992).\\
 Buckminsterfullerene}, Chem. Phys. Lett. \textbf{137}, 291-295 (1987).\\
 6) G. B. Adams, M. O'Keefe, and R. S. Ruoff, \textit{Van der Waals Surface Areas
 and Volumes of Fullerenes}, J. Phys. Chem. \textbf{98}, 9465-9469 (1994).\\
-7) W. O. J. Boo, \textit{An Introduction to Fullerene Structures}, J. Chem. Ed. \textbf{69}, 605-609 (1992).\\
+7) G. Brinkmann, P. W. Fowler, \textit{A Catalogue of Growth Transformations of Fullerene Polyhedra}, 
+J. Chem. Inf. Comput. Sci. \textbf{43}, 1837-1843 (2003).\\
 8) D. Babi\'c, D. J. Klein and C. H. Sah, \textit{Symmetry of fullerenes},
 Chem. Phys. Lett. \textbf{211}, 235-241 (1993).\\
 9) T. Pisanski, B. Plestenjak, and A. Graovac, \textit{NiceGraph Program and its 
@@ -110,7 +111,7 @@ applications in chemistry}, Croatica Chemica Acta \textbf{68}, 283-292 (1995).\\
 Dependence on Structural Motifs}, J. Am. Chem. Soc. \textbf{122}, 8265-8270 (2000).\\
 14) M. Alcam\'i, G. Sanchez, S. Diaz-Tendero, Y. Wang, F. Martin, \textit{Structural Patterns in Fullerenes Showing
 Adjacent Pentagons: \C{20} to \C{72}}, J. Nanosci. Nanotech. \textbf{7}, 1329-1338 (2007).\\
-15) F. Cataldo, A. Graovac, and O. Ori \textit{The Mathematics and Topology of Fullernes} (Springer, Berlin, 2011).\\
+15) F. Cataldo, A. Graovac, and O. Ori \textit{The Mathematics and Topology of Fullerenes} (Springer, Berlin, 2011).\\
 
 
      
@@ -504,7 +505,13 @@ Information from subroutine \funname{RingC} can be used to perform Stone-Wales t
 (subroutine \funname{StoneWalesTrans}), Endo-Kroto 2-vertex insertions \cite{Endo92} (subroutine \funname{EndoKrotoTrans}),
 Yoshida-Fowler 4-vertex ($D_{3h}$ 6555) (subroutine \funname{YoshidaFowler4}) and 6-vertex ($D_{3h}$ 666555)
 insertions (subroutine \funname{YoshidaFowler6}) \cite{Yoshida97}, or a Brinkmann-Fowler 6-vertex (6-55-55) insertion 
-(subroutine \funname{BrinkmannFowler}) \cite{BrinkmannFowler03}, see for example input files \textit{c50EK.inp, c60SW.inp, c80YF.inp}. 
+(subroutine \funname{BrinkmannFowler}) \cite{BrinkmannFowler03}, see for example input files \textit{c50EK.inp, c60SW.inp, c80YF.inp}.
+The vertex-insertion nomenclature introduced by Brinkmann and Fowler \cite{BrinkmannFowler03} defines these insertions uniquely:\\
+Endo-Kroto: 2 pentagon G2.12.1.1 ($n_v$=12) $\rightarrow$ G2.12.1.2 ($n_v$=14);\\ 
+Yoshida-Fowler 4 vertex insertion: 3 pentagon G3.15.31.1 ($n_v$=15) $\rightarrow$ G3.17.3.2 ($n_v$=19);\\
+Yoshida-Fowler 6 vertex insertion: 3 pentagon G3.15.4.1 ($n_v$=19) $\rightarrow$ G3.15.4.2 ($n_v$=21) 
+followed by G3.15.3.1 ($n_v$=15) $\rightarrow$ G3.15.3.2 ($n_v$=19);\\
+Brinkmann-Fowler 6-vertex insertion: 4 pentagon G4.14.2.1 ($n_v$=16) $\rightarrow$ G4.14.2.2 ($n_v$=22).\\
 Non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with such vertex insertion methods, see input files \filename{c380.inp} 
 and \filename{c384.inp}. The two structures obtained from a force-field optimization are shown in Figure \ref{pic:C380andC384} using program PYMOL \cite{Pymol}.
 
@@ -872,7 +879,7 @@ If \paramname{IYF} = 3 or 4 then a Yoshida-Fowler 6-vertex insertion \cite{Yoshi
 In this case an input is required with the three hexagon numbers (\paramname{IYF}=3) or the position in
 the list of Yoshida-Fowler patterns given in the output (IYF=4).
 \item[IBF] 
-If \paramname{IBF} = 1 the initial fullerene structure is subjected to a 9-vertex insertion (3 are deleted) (Default: 0).
+If \paramname{IBF} = 1 the initial fullerene structure is subjected to a 6-vertex insertion (Default: 0).
 Similar to Yoshida-Fowler, an input is required (see \filename{c384.inp} for details).
 \item[mirror] 
 If \paramname{mirror} = 1 invert all coordinates (take the mirror image). This may be important for chiral fullerenes (Default: 0).
