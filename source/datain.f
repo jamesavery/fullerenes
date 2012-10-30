@@ -110,7 +110,7 @@ C Integers
       iupac=0   !  Switch for producing the Iupac nomenclature
                 !  iupac=0 just counts Hamiltonian Cycles
       ISW=0     !  Option for Stone-Wales transformation
-      IBF=0     !  Option for Wirz-Schwerdtfeger transformation
+      IBF=0     !  Option for Brinkmann-Fowler transformation
       IYF=0     !  Option for Yoshido-Fowler transformation
       IV1=2     !  Eigenvector option for fullerene construction
       IV2=3     !  Eigenvector option for fullerene construction
