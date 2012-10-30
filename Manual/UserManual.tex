@@ -1111,12 +1111,22 @@ intention to extend the isomer list beyond \C{122}/\C{170} (without Hamiltonian 
 New lists will be available on our website in due time.  The determination of the number of
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
-The Yoshida database often used has also been added into our database and is placed in the
+The Yoshida database (from http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html) 
+often used has also been added into our database and is placed in the
 folder \filename{database/Yoshida} \cite{Yoshida}. The input file \filename{database3.inp} shows an example for reading from
 this database. Finally, files from the ``House of Graphs'' database can be added into the database/HOG directory (they
-need to be downloaded from the House of Graphs website) and read-in. 
+need to be downloaded from the House of Graphs website http://hog.grinvin.org/Fullerenes) and read-in. 
 The directory database needs to be in the same directory as ``source'' or ``libgraph''.
 Note that the maximum number of vertices in the database is defined in the config.f file (LimitALL and LimitIPR).
+
+
+%Figure 6
+ \begin{figure}[htbp]
+	\centering
+  		 \includegraphics[width=0.35\textwidth]{C2160.png}
+     \caption{Force-field optimized structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
+     \label{pic:Finalgraph}
+ \end{figure}
 
 \clearpage
 

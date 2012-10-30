@@ -2161,9 +2161,9 @@ C     Check distances
  1016 FORMAT(1X,I4,5X,3(D18.12,2X))
  1017 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
- 1018 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
+ 1018 Format(1X,'Maximum bond distance ',I4,'% larger than minimum ',
      1 'distance')
- 1019 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
+ 1019 Format(1X,'Maximum bond distance ',I10,'% larger than minimum ',
      1 'distance. Fullerene strongly distorted!',/1X,
      1 'Optimization of geometry recommended')
       Return
