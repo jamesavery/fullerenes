@@ -264,7 +264,7 @@ C adjacent vertices
         maxiter=10**IHam
       endif
       if(IHam.ne.0 .and. 
-     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+     1    ke.eq.0 .and. isw.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
         if(iupac.ne.0) then
           CALL Hamilton(MAtom,Iout,iprintf,maxiter,IC3)
         else
@@ -292,7 +292,7 @@ c We check for ISW because the coordinates shouldn't be optimized before
 c a stone wales (or any other transformation) is done
       icall=0
       If(Iopt.ne.0 .and. 
-     1     ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+     1     ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
 c       Store distances
         Do I=1,3
         Do J=1,MAtom 
@@ -345,7 +345,7 @@ C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview
 C xyz format
       if(icyl.le.2 .and. 
-     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
         xyzname=trim(filenameout)//"-3D.xyz"
         ichar1=index(xyzname,'database/ALL')
         ichar2=index(xyzname,'database/IPR')
@@ -380,7 +380,7 @@ C xyz format
       endif
 C cc1 format
       if(icyl.ge.4 .and. 
-     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. iws.eq.0) then
+     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
        cc1name=trim(filenameout)//"-3D.cc1"
         ichar1=index(cc1name,'database/ALL')
         ichar2=index(cc1name,'database/IPR')

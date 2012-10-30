@@ -24,7 +24,7 @@ C mapping
       CHARACTER*3 GROUP
       CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
-c      integer ke, isw, iyf, iws
+c      integer ke, isw, iyf, ibf
       type(c_ptr) :: g, halma, new_C20, halma_fullerene
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
@@ -212,7 +212,7 @@ C     End of Hueckel
       endif
 
 
-c      if(ke + isw + iyf + iws .eq. 0) then
+c      if(ke + isw + iyf + ibf .eq. 0) then
 C Now produce the 3D image (unless the graph is going to change later)
         if(nalgorithm.eq.0.or.nalgorithm.eq.2.
      1   or.nalgorithm.eq.4) then
