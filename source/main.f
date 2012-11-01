@@ -52,6 +52,7 @@ C    Set the dimensions for the distance matrix
       Integer endzeile,Values(8)
       Integer MDist(Nmax,Nmax)
       integer istop
+      Logical lexist
 
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
@@ -124,6 +125,11 @@ C Input Cartesian coordinates for fullerenes
    20 if(icyl.eq.2.or.icyl.eq.3.or.icyl.eq.5) then
         if(icyl.eq.5) then
          cc1name=trim(filename)//".cc1"
+         inquire(file=cc1name,exist=lexist)
+          if(lexist.neqv..True.) then
+            Write(Iout,1023) cc1name
+            stop
+          endif
          Open(unit=7,file=cc1name,form='formatted')
          WRITE(Iout,1021) cc1name 
          Read(7,*) MAtom
@@ -628,6 +634,7 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1021 FORMAT(/1X,'Read coordinates from cc1 file: ',A60)
  1022 FORMAT(/1X,'You try to write into the database filesystem',
      1 ' which is not allowed  ===>  ABORT')
+ 1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  1025 FORMAT(I2)
  1026 FORMAT(I3)
  1027 FORMAT(I4)

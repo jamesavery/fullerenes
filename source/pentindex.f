@@ -459,7 +459,7 @@ C     Open file
      1 ' in general isomer list',/1X,'Search in file: ',A29)
  1006 Format(1X,'Number of atoms ',I5,' and isomer number ',I9,
      1 ' in IPR isomer list',/1X,'Search in file: ',A29)
- 1007 Format(1X,'Filename ',A29,' in database not found ==> ABORT')
+ 1007 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  1008 Format(1X,'IPR parameter not set ==> ABORT')
  1009 Format(1X,'File contains ',I9,' isomers')
  1010 Format(1X,'Read isomer ',A3,I2,' from database (point group: ',
