@@ -3,7 +3,7 @@ c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
       implicit real*8 (a-z)
       dist_ab=dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
       return
-      END  
+      END SUBROUTINE
 
 
 c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivatives of the distance
@@ -22,7 +22,7 @@ c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivat
       daz=ab_z*dist_ab_inv
       dbz=-daz
       return
-      END  
+      END SUBROUTINE  
 
 
 c subroutine dddist takes 6 reals (=2 coordinates) and yields all 6 first derivatives,
@@ -302,22 +302,22 @@ c the derivations
 
 c subroutine dangle takes 9 reals (=3 coordinates) and yields all 9 first derivatives of the angle
 c via law of cosines (calculating the derivative of Abs[foo] is rather troublesome)
-      SUBROUTINE DDANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
-     2 df__dax,df__day,df__daz,df__dbx,df__dby,df__dbz,df__dcx,df__dcy,
-     3 df__dcz,
-     4 ddf11dax__dax,ddf11dax__day,ddf11dax__daz,ddf11dax__dbx,
-     1 ddf11dax__dby,ddf11dax__dbz,ddf11dax__dcx,ddf11dax__dcy,
-     1 ddf11dax__dcz,ddf11day__day,ddf11day__daz,ddf11day__dbx,
-     1 ddf11day__dby,ddf11day__dbz,ddf11day__dcx,ddf11day__dcy,
-     1 ddf11day__dcz,ddf11daz__daz,ddf11daz__dbx,ddf11daz__dby,
-     1 ddf11daz__dbz,ddf11daz__dcx,ddf11daz__dcy,ddf11daz__dcz,
-     1 ddf11dbx__dbx,ddf11dbx__dby,ddf11dbx__dbz,ddf11dbx__dcx,
-     1 ddf11dbx__dcy,ddf11dbx__dcz,ddf11dby__dby,ddf11dby__dbz,
-     1 ddf11dby__dcx,ddf11dby__dcy,ddf11dby__dcz,ddf11dbz__dbz,
-     1 ddf11dbz__dcx,ddf11dbz__dcy,ddf11dbz__dcz,ddf11dcx__dcx,
-     1 ddf11dcx__dcy,ddf11dcx__dcz,ddf11dcy__dcy,ddf11dcy__dcz,
+      SUBROUTINE DDANGLE(ax, ay, az, bx, by, bz, cx, cy, cz,
+     1 df__dax, df__day, df__daz, df__dbx, df__dby, df__dbz,
+     1 df__dcx, df__dcy, df__dcz,
+     1 ddf11dax__dax, ddf11dax__day, ddf11dax__daz, ddf11dax__dbx,
+     1 ddf11dax__dby, ddf11dax__dbz, ddf11dax__dcx, ddf11dax__dcy,
+     1 ddf11dax__dcz, ddf11day__day, ddf11day__daz, ddf11day__dbx,
+     1 ddf11day__dby, ddf11day__dbz, ddf11day__dcx, ddf11day__dcy,
+     1 ddf11day__dcz, ddf11daz__daz, ddf11daz__dbx, ddf11daz__dby,
+     1 ddf11daz__dbz, ddf11daz__dcx, ddf11daz__dcy, ddf11daz__dcz,
+     1 ddf11dbx__dbx, ddf11dbx__dby, ddf11dbx__dbz, ddf11dbx__dcx,
+     1 ddf11dbx__dcy, ddf11dbx__dcz, ddf11dby__dby, ddf11dby__dbz,
+     1 ddf11dby__dcx, ddf11dby__dcy, ddf11dby__dcz, ddf11dbz__dbz,
+     1 ddf11dbz__dcx, ddf11dbz__dcy, ddf11dbz__dcz, ddf11dcx__dcx,
+     1 ddf11dcx__dcy, ddf11dcx__dcz, ddf11dcy__dcy, ddf11dcy__dcz,
      1 ddf11dcz__dcz,
-     3 angle_abc)
+     1 angle_abc)
       implicit real*8 (a-z)
 
 c vectors from a to b and b to c and a to c
@@ -355,15 +355,15 @@ c are artificially set to zero.  The second redivatives are artificially set to 
 c as well which is far less justified.  Some second derivatives are in fact infinite ...
 c we could also gracefully terminate ...
       if(arccos_arg .le. -1.d0 .or. arccos_arg .ge. 1.d0) then
-        dax=0
-        day=0
-        daz=0
-        dbx=0
-        dby=0
-        dbz=0
-        dcx=0
-        dcy=0
-        dcz=0
+        df__dax=0
+        df__day=0
+        df__daz=0
+        df__dbx=0
+        df__dby=0
+        df__dbz=0
+        df__dcx=0
+        df__dcy=0
+        df__dcz=0
         ddf11dax__dax=0
         ddf11dax__day=0
         ddf11dax__daz=0
