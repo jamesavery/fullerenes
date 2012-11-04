@@ -355,6 +355,7 @@ C     Center for 5-rings
       numberFM=0
       numberWS=0
       numberYF=0
+      IPR=0
       Write(Iout,1000)
       Do I=1,N5Ring
       Nring(I)=I
@@ -410,9 +411,52 @@ C     Calculate distance of atoms from the center
      1 (CRing6(JT1,I),JT1=1,3),(Distac(JT),JT=1,6)
       enddo
 
+C     Get the largest ring to ring distance
+ 2000 Rmin5=1.d10
+      Rmin6=1.d10
+      Rmin56=1.d10
+      Rmax5=0.d0
+      Rmax6=0.d0
+      Rmax56=0.d0
+      Do I=1,N5Ring
+      Do J=I+1,N5Ring
+       X=CRing5(1,I)-CRing5(1,J)
+       Y=CRing5(2,I)-CRing5(2,J)
+       Z=CRing5(3,I)-CRing5(3,J)
+       R=X*X+Y*Y+Z*Z
+       if(R.gt.Rmax5) Rmax5=R
+       if(R.lt.Rmin5) Rmin5=R
+      enddo
+      enddo
+      if(N6Ring.eq.0) then
+       Write(Iout,1025) RMin5,Rmax5
+       go to 2001
+      endif
+      Do I=1,N6Ring
+      Do J=I+1,N6Ring
+       X=CRing6(1,I)-CRing6(1,J)
+       Y=CRing6(2,I)-CRing6(2,J)
+       Z=CRing6(3,I)-CRing6(3,J)
+       R=X*X+Y*Y+Z*Z
+       if(R.gt.Rmax6) Rmax6=R
+       if(R.lt.Rmin6) Rmin6=R
+      enddo
+      enddo
+      Do I=1,N5Ring
+      Do J=1,N6Ring
+       X=CRing5(1,I)-CRing6(1,J)
+       Y=CRing5(2,I)-CRing6(2,J)
+       Z=CRing5(3,I)-CRing6(3,J)
+       R=X*X+Y*Y+Z*Z
+       if(R.gt.Rmax56) Rmax56=R
+       if(R.lt.Rmin56) Rmin56=R
+      enddo
+      enddo
+      Write(Iout,1026) Rmin5,Rmin6,Rmin56,Rmax5,Rmax6,Rmax56
+
 C     Analyzing the ring fusions
 C     All 2-ring fusions
- 2000 Write(Iout,1004)
+ 2001 Write(Iout,1004)
       IR1=5
       IR2=5
       N2ring=0
@@ -523,7 +567,6 @@ C     Strain Parameter
        IPR=1
        Write(Iout,1022) 
       else
-       IPR=0
        Write(Iout,1023)
       endif
 
@@ -811,6 +854,12 @@ C Print Cioslowsky analysis and check of correctness
      1 'S.Diaz-Tendero, Y.Wang, F.Martin, J. Nanosci. Nanotech. ',
      1 '7, 1329 (2007)',
      1 /1X,'Loop through all ',I5,' edges.')
+ 1025 Format(/1X,'Pentagon to pentagon distance: smallest ',D12.6,
+     1 ', largest ',D12.6)
+ 1026 Format(/1X,'Smallest distances between faces: ',
+     1 D12.6,' (5-5), ',D12.6,' (6-6), 'D12.6,' (5-6)',
+     1 /1X,'Largest  distances between faces: ',
+     1 D12.6,' (5-5), ',D12.6,' (6-6), 'D12.6,' (5-6)')
  1030 Format(/1X,'No Stone-Wales patterns found')
  1031 Format(/1X,I2,' Stone-Wales patterns found:')
  1032 Format(7(' (',I2,',',I5,',',I5,',',I2,')'))
