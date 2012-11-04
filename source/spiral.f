@@ -10,9 +10,10 @@
       CHARACTER*1 DUMMY
       CHARACTER*3 GROUP
       CHARACTER*6 Occup
-      CHARACTER*20 chkname
+      CHARACTER*50 chkname
       CHARACTER*18 Start,Char,Last
       Real*8 sigmah,sigmahlow,sigmahhigh
+      Logical lexist
 
 C Set parameters
       Start=' Isomer List Start'
@@ -33,6 +34,11 @@ C Set parameters
 
 C Test if file is the right one
       Write(Iout,1000) chkname
+         inquire(file=chkname,exist=lexist)
+          if(lexist.neqv..True.) then
+            Write(Iout,1023) chkname
+            stop
+          endif
       Open(UNIT=1,FILE=chkname,ERR=500,STATUS='old',FORM='FORMATTED')
       do I=1,Nloop
       Read(1,2002,end=100) Char
@@ -495,6 +501,7 @@ C     Analyze dual matrix
  1014 Format(1X,'File: ',A20,' does not exist ==> ABORT')
  1015 Format(1X,'Last entry is zero, so check that you do not have ',
      1 'an empty line at the end of the input')
+ 1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
  2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
  2002 Format(A18)

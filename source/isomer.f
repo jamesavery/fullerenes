@@ -15,7 +15,7 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
       Character*50 filename
       Character*50 chkname
       Character*13 dbdir
-      Character*31 databasefile
+      Character*50 databasefile
       Logical lexist
       Dimension A(Nmax,Nmax)
       Data Isonum/1,0,1,1,2,3,6,6,15,17,40,45,89,116,199,
@@ -201,16 +201,17 @@ C Produce list from ring spiral algorithm
      1 'possible isomers (IPR or not depending on input)')
  1006 Format(/1X,'RESTART isomer file from previous run')
  1007 Format(/1X,'Zero IPR isomers -> Return')
- 1008 Format(1X,'Search for file: ',A29,' in general isomer list')
- 1009 Format(1X,'Search for file: ',A29,' in IPR isomer list')
+ 1008 Format(1X,'Search for file: ',A50,' in general isomer list')
+ 1009 Format(1X,'Search for file: ',A50,' in IPR isomer list')
  1010 Format(1X,'Filename ',A50,' in database not found: ',
      1 'Do it the hard way')
- 1011 Format(1X,'Print from file ',A50,' in database')
+ 1011 Format(1X,'Print from file: ',A50,' in database')
       Return
       END
  
       SUBROUTINE Printdatabase(N,Iout,databasefile)
-      Character*31 databasefile
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Character*50 databasefile
       Character*1 Text(200),Textind
       Open(UNIT=4,FILE=databasefile,STATUS='old',FORM='FORMATTED')
        Textind=' '
