@@ -2518,7 +2518,7 @@ c   Check if distances are within certain range
  1002 Format(1X,'Analysis of distances: All are bond distances',
      1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
  1003 Format(1X,'Analysis of distances: May require sorting of ',
-     1 'cartesian coordinates after getting connectivities',
+     1 'cartesian coordinates or optimization of structure',
      1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
  1004 Format('WARNING: Problem with smallest bond distance detected!',
      1 /1X,' Geometry of fullerene may be wrong')

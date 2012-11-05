@@ -226,7 +226,7 @@ C Establish Connectivities
       CALL Connect(MCon2,MAtom,Ipent,Iout,isort,nosort,
      1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
        icall=icall+1
-      if(isort.ne.0.and.nosort.eq.0) then
+      if(isort.ne.0.and.nosort.eq.0.and.Icart.le.2) then
        CALL Permute(Matom,Iout,nperm,IC3,IDA,Dist)
        if(nperm.eq.0) then
         isort=0
