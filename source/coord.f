@@ -2345,10 +2345,7 @@ C     Calculate P-type dipole moment
      1 'eigenvector algorithm to construct the fullerene')
       END SUBROUTINE 
 
-
-
-
-      Subroutine Permute(Matom,Iout,Dist,IC3)
+      Subroutine Permute(Matom,Iout,nperm,IC3,Dist)
       use config
       implicit double precision (a-h,o-z)
       dimension Dist(3,Nmax),IC3(Nmax,3),Iperm(Nmax,2)
@@ -2405,11 +2402,15 @@ C    record change
       enddo
   10  continue
       Write(Iout,1000) nperm
-      Write(Iout,1001) (Iperm(i,1),Iperm(i,2),i=1,nperm)
+      if(nperm.ne.0) then 
+       Write(Iout,1001) 
+       Write(Iout,1002) (Iperm(i,1),Iperm(i,2),i=1,nperm)
+      endif
 
  1000 Format(1X,'Number of permutations for cartesian coordinates ',
-     1  'performed: ',I5,', Permutations:')
- 1001 Format(10(1X,'(',I4,',',I4,')'))
+     1  'performed: ',I5)
+ 1001 Format(1X,'Permutations:')
+ 1002 Format(10(1X,'(',I4,',',I4,')'))
       Return
       END
 

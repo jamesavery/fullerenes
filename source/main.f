@@ -224,10 +224,10 @@ C Establish Connectivities
       Write(Iout,1008) routine
       CALL Connect(MCon2,MAtom,Ipent,Iout,isort,nosort,
      1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
-      if(isort.ne.0.and.nosort.eq.0) then
-       CALL Permute(Matom,Iout,Dist,IC3)
        icall=icall+1
-       if(icall.lt.2) Go to 999
+      if(isort.ne.0.and.nosort.eq.0) then
+       CALL Permute(Matom,Iout,nperm,IC3,Dist)
+       if(icall.lt.2.and.nperm.gt.0) Go to 999
       endif
       icall=0
 
