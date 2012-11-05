@@ -2345,11 +2345,11 @@ C     Calculate P-type dipole moment
      1 'eigenvector algorithm to construct the fullerene')
       END SUBROUTINE 
 
-      Subroutine Permute(Matom,Iout,nperm,IC3,Dist)
+      Subroutine Permute(Matom,Iout,nperm,IC3,IDA,Dist)
       use config
       implicit double precision (a-h,o-z)
-      dimension Dist(3,Nmax),IC3(Nmax,3),Iperm(Nmax,2)
-C Sort Cartesian coordinated so atom number i is connected to
+      dimension Dist(3,Nmax),IC3(Nmax,3),Iperm(Nmax,2),IDA(Nmax,Nmax)
+C Sort Cartesian coordinates so atom number i is connected to
 C  atoms 1,...,I-1
 
       nperm=0
@@ -2405,7 +2405,25 @@ C    record change
       if(nperm.ne.0) then 
        Write(Iout,1001) 
        Write(Iout,1002) (Iperm(i,1),Iperm(i,2),i=1,nperm)
+C     Reset IDA
+       Do I=1,NAtom
+       Do J=1,NAtom
+        IDA(I,J)=0
+       enddo
+       enddo
+C     Reconstruct IDA
+       Do I=1,NAtom
+       Do K=1,3
+        J=IC3(I,K)
+        IDA(I,J)=1
+        IDA(J,I)=1
+       enddo
+       enddo
+
       endif
+
+
+
 
  1000 Format(1X,'Number of permutations for cartesian coordinates ',
      1  'performed: ',I5)
@@ -2499,8 +2517,8 @@ c   Check if distances are within certain range
  1001 Format(1X,I5,3(1X,F12.6),3(1X,I5))
  1002 Format(1X,'Analysis of distances: All are bond distances',
      1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
- 1003 Format(1X,'Analysis of distances: Requires sorting of cartesian',
-     1 ' coordinates after getting connectivities',
+ 1003 Format(1X,'Analysis of distances: May require sorting of ',
+     1 'cartesian coordinates or optimization of structure',
      1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
  1004 Format('WARNING: Problem with smallest bond distance detected!',
      1 /1X,' Geometry of fullerene may be wrong')

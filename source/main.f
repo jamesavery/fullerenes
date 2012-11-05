@@ -200,12 +200,13 @@ C Move carbon cage to Atomic Center
       Iprint=iprintf
       Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
      1 nosort,SP,Dist,DistCM,El)
+      if(icall.eq.1) isort=0
       mirror=0
 
 C------------------DIAMETER----------------------------------------
 C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia
-      if(isort.eq.0.or.nosort.ne.0) then
+  888 if(isort.eq.0.or.nosort.ne.0) then
       routine='DIAMETER       '
       Write(Iout,1008) routine
       CALL Diameter(MAtom,Iout,Dist,distp)
@@ -225,9 +226,13 @@ C Establish Connectivities
       CALL Connect(MCon2,MAtom,Ipent,Iout,isort,nosort,
      1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
        icall=icall+1
-      if(isort.ne.0.and.nosort.eq.0) then
-       CALL Permute(Matom,Iout,nperm,IC3,Dist)
-       if(icall.lt.2.and.nperm.gt.0) Go to 999
+      if(isort.ne.0.and.nosort.eq.0.and.Icart.le.2) then
+       CALL Permute(Matom,Iout,nperm,IC3,IDA,Dist)
+       if(nperm.eq.0) then
+        isort=0
+        go to 888 
+       endif
+       if(icall.lt.2) Go to 999
       endif
       icall=0
 
@@ -337,10 +342,10 @@ c       Compare structures
         Write(Iout,1008) routine
         CALL Distmatrix(MAtom,Iout,Iprintf,0,
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
-      if(isort.ne.0.and.nosort.eq.0) then
-       CALL Permute(Matom,Iout,Dist,IC3)
        icall=icall+1
-       if(icall.lt.2) Go to 991
+      if(isort.ne.0.and.nosort.eq.0) then
+       CALL Permute(Matom,Iout,IC3,IDA,Dist,nperm)
+       if(icall.lt.2.and.nperm.gt.0) Go to 991
        endif
         routine='DIAMETER       '
         Write(Iout,1008) routine
