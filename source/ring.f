@@ -2976,26 +2976,26 @@ C     Get the connectivities between 2 and 3 atoms
       enddo
       enddo
       if(Ipent.eq.0) then
-      Do I=1,MAtom
-      Do J=I+1,MAtom
-      DM=FunDistMat(I,J,DistMat)
-      If (DM.lt.Rtol) then
-       Mcon2=Mcon2+1
-       Ncount=I*MAtom+J
-       Icon2(Mcon2)=Ncount
-      endif
-      enddo
-      enddo
+       Do I=1,MAtom
+       Do J=I+1,MAtom
+        DM=FunDistMat(I,J,DistMat)
+         If (DM.lt.Rtol) then
+          Mcon2=Mcon2+1
+          Ncount=I*MAtom+J
+          Icon2(Mcon2)=Ncount
+         endif
+       enddo
+       enddo
       else
-      Do I=1,MAtom
-      Do J=I+1,MAtom
-       If (IDA(I,J).eq.1) then
-        Mcon2=Mcon2+1
-        Ncount=I*MAtom+J
-        Icon2(Mcon2)=Ncount
-       endif
-      enddo
-      enddo
+       Do I=1,MAtom
+       Do J=I+1,MAtom
+        If (IDA(I,J).eq.1) then
+         Mcon2=Mcon2+1
+         Ncount=I*MAtom+J
+         Icon2(Mcon2)=Ncount
+        endif
+       enddo
+       enddo
       endif
       Write(IOUT,1000) Mcon2
       If(Mcon2.lt.MAtom) then
