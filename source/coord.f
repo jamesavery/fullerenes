@@ -10,6 +10,7 @@
       AnumX=0.d0
       AnumY=0.d0
       AnumZ=0.d0
+C     Take the mirror image
       if(mirror.ne.0) then
        Write(IOUT,1012)
        Do J=1,MAtom
@@ -18,6 +19,7 @@
        enddo
        enddo
       endif
+
       Do J=1,MAtom
         IM=IAtom(J)
         if(Iprint.ne.0) Write(IOUT,1002),J,IM,El(IM),(Dist(I,J),I=1,3)
@@ -2351,7 +2353,8 @@ C     Calculate P-type dipole moment
       dimension Dist(3,Nmax),IC3(Nmax,3),Iperm(Nmax,2),IDA(Nmax,Nmax)
 C Sort Cartesian coordinates so atom number i is connected to
 C  atoms 1,...,I-1
-
+ 
+      Write(Iout,1003)
       nperm=0
       do 10 i=2,MAtom
       do j=i,MAtom-1
@@ -2429,6 +2432,7 @@ C     Reconstruct IDA
      1  'performed: ',I5)
  1001 Format(1X,'Permutations:')
  1002 Format(10(1X,'(',I4,',',I4,')'))
+ 1003 Format(1X,'Enter Subroutine Permute')
       Return
       END
 

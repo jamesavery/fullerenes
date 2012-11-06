@@ -207,9 +207,9 @@ C------------------DIAMETER----------------------------------------
 C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia
   888 if(isort.eq.0.or.nosort.ne.0) then
-      routine='DIAMETER       '
-      Write(Iout,1008) routine
-      CALL Diameter(MAtom,Iout,Dist,distp)
+       routine='DIAMETER       '
+       Write(Iout,1008) routine
+       CALL Diameter(MAtom,Iout,Dist,distp)
       endif
 
 C------------------DISTMATRIX--------------------------------------
@@ -228,8 +228,9 @@ C Establish Connectivities
        icall=icall+1
       if(isort.ne.0.and.nosort.eq.0.and.Icart.le.2) then
        CALL Permute(Matom,Iout,nperm,IC3,IDA,Dist)
-       if(nperm.eq.0) then
+       if(nperm.ne.0) then
         isort=0
+          Write(Iout,1024)
         go to 888 
        endif
        if(icall.lt.2) Go to 999
@@ -284,7 +285,7 @@ C adjacent vertices
           if(nbatch.ne.0) WRITE(Iout,1014)
         endif
       endif
-      CALL Paths(MAtom,Iout,IDA,A,evec,df)
+      CALL Paths(MAtom,Iout,iprintf,IDA,A,evec,df)
 
 C------------------PERFECT MATCHING-------------------------------
 C Produce perfect matchings (Kekule structures) and analyze
@@ -343,10 +344,13 @@ c       Compare structures
         CALL Distmatrix(MAtom,Iout,Iprintf,0,
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
        icall=icall+1
-      if(isort.ne.0.and.nosort.eq.0) then
-       CALL Permute(Matom,Iout,IC3,IDA,Dist,nperm)
-       if(icall.lt.2.and.nperm.gt.0) Go to 991
-       endif
+        if(isort.ne.0.and.nosort.eq.0.and.icall.lt.2) then
+         CALL Permute(Matom,Iout,IC3,IDA,Dist,nperm)
+         if(nperm.gt.0) then
+          Write(Iout,1024)
+          Go to 991
+         endif
+        endif
         routine='DIAMETER       '
         Write(Iout,1008) routine
         CALL Diameter(MAtom,Iout,Dist,distp)
@@ -595,7 +599,7 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.2, last revision from 01/11/12     |',
+     1 /1X,'|    This  version: 4.2.1, last revision from 06/11/12   |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
@@ -640,6 +644,8 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1022 FORMAT(/1X,'You try to write into the database filesystem',
      1 ' which is not allowed  ===>  ABORT')
  1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
+ 1024 Format(1X,'Note that there are now permutations in the ',
+     1 'connectivities and the adjacency matrix has been altered')
  1025 FORMAT(I2)
  1026 FORMAT(I3)
  1027 FORMAT(I4)

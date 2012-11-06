@@ -454,7 +454,7 @@ C     if (oldptr.gt.0) go to 5
       return
       END
 
-      SUBROUTINE Paths(MAtom,IOUT,IA,A,evec,df)
+      SUBROUTINE Paths(MAtom,IOUT,iprintf,IA,A,evec,df)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C Calculate the number of all possible distinct paths from the
@@ -524,6 +524,7 @@ C     Limit for number of atoms
        write (Iout,1009) Ihuge 
        RETURN
       endif
+      if(iprintf.eq.0) RETURN
       write (Iout,1001) 
 C     This is only good for C20, C24 already causes integer overflow
       if(MAtom.eq.20) then
