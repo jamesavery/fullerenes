@@ -79,6 +79,127 @@ c// to be read from bottom to top
 c//////////////////////////////////////////////////////////////
 c//////////////////////////////////////////////////////////////
 
+c derivatives of single vectors
+c all other combinations are zero
+
+      dab_x__dax=1
+      dab_x__day=0
+      dab_x__daz=0
+      dab_x__dbx=-1
+      dab_x__dby=0
+      dab_x__dbz=0
+      dab_x__dcx=0
+      dab_x__dcy=0
+      dab_x__dcz=0
+      dab_x__ddx=0
+      dab_x__ddy=0
+      dab_x__ddz=0
+
+      dab_y__dax=0
+      dab_y__day=1
+      dab_y__daz=0
+      dab_y__dbx=0
+      dab_y__dby=-1
+      dab_y__dbz=0
+      dab_y__dcx=0
+      dab_y__dcy=0
+      dab_y__dcz=0
+      dab_y__ddx=0
+      dab_y__ddy=0
+      dab_y__ddz=0
+      dab_y__ddz=0
+
+      dab_z__dax=0
+      dab_z__day=0
+      dab_z__daz=1
+      dab_z__dbx=0
+      dab_z__dby=0
+      dab_z__dbz=-1
+      dab_z__dcx=0
+      dab_z__dcy=0
+      dab_z__dcz=0
+      dab_z__ddx=0
+      dab_z__ddy=0
+      dab_z__ddz=0
+
+      dbc_x__dax=0
+      dbc_x__day=0
+      dbc_x__daz=0
+      dbc_x__dbx=1
+      dbc_x__dby=0
+      dbc_x__dbz=0
+      dbc_x__dcx=-1
+      dbc_x__dcy=0
+      dbc_x__dcz=0
+      dbc_x__ddx=0
+      dbc_x__ddy=0
+      dbc_x__ddz=0
+
+      dbc_y__dax=0
+      dbc_y__day=0
+      dbc_y__daz=0
+      dbc_y__dbx=0
+      dbc_y__dby=1
+      dbc_y__dbz=0
+      dbc_y__dcx=0
+      dbc_y__dcy=-1
+      dbc_y__dcz=0
+      dbc_y__ddx=0
+      dbc_y__ddy=0
+      dbc_y__ddz=0
+
+      dbc_z__dax=0
+      dbc_z__day=0
+      dbc_z__daz=0
+      dbc_z__dbx=0
+      dbc_z__dby=0
+      dbc_z__dbz=1
+      dbc_z__dcx=0
+      dbc_z__dcy=0
+      dbc_z__dcz=-1
+      dbc_z__ddx=0
+      dbc_z__ddy=0
+      dbc_z__ddz=0
+
+      dcd_x__dax=0
+      dcd_x__day=0
+      dcd_x__daz=0
+      dcd_x__dbx=0
+      dcd_x__dby=0
+      dcd_x__dbz=0
+      dcd_x__dcx=1
+      dcd_x__dcy=0
+      dcd_x__dcz=0
+      dcd_x__ddx=-1
+      dcd_x__ddy=0
+      dcd_x__ddz=0
+
+      dcd_y__dax=0
+      dcd_y__day=0
+      dcd_y__daz=0
+      dcd_y__dbx=0
+      dcd_y__dby=0
+      dcd_y__dbz=0
+      dcd_y__dcx=0
+      dcd_y__dcy=1
+      dcd_y__dcz=0
+      dcd_y__ddx=0
+      dcd_y__ddy=-1
+      dcd_y__ddz=0
+
+      dcd_z__dax=0
+      dcd_z__day=0
+      dcd_z__daz=0
+      dcd_z__dbx=0
+      dcd_z__dby=0
+      dcd_z__dbz=0
+      dcd_z__dcx=0
+      dcd_z__dcy=0
+      dcd_z__dcz=1
+      dcd_z__ddx=0
+      dcd_z__ddy=0
+      dcd_z__ddz=-1
+
 c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc_length_inv_cub=bc_length_inv**3
       dbc_length_inv__dbc_x=-bc_x*bc_length_inv_cub
@@ -567,364 +688,1156 @@ c////////////////////////////////////////////////////////////////////////
 c////////////////////////////////////////////////////////////////////////
 
 
+      ddbcd_length_inv11dbx__dbx
+      ddbcd_length_inv11dbx__dby
+      ddbcd_length_inv11dbx__dbz
+      ddbcd_length_inv11dbx__dcx
+      ddbcd_length_inv11dbx__dcy
+      ddbcd_length_inv11dbx__dcz
+      ddbcd_length_inv11dbx__ddx
+      ddbcd_length_inv11dbx__ddy
+      ddbcd_length_inv11dbx__ddz
+      ddbcd_length_inv11dby__dby
+      ddbcd_length_inv11dby__dbz
+      ddbcd_length_inv11dby__dcx
+      ddbcd_length_inv11dby__dcy
+      ddbcd_length_inv11dby__dcz
+      ddbcd_length_inv11dby__ddx
+      ddbcd_length_inv11dby__ddy
+      ddbcd_length_inv11dby__ddz
+      ddbcd_length_inv11dbz__dbz
+      ddbcd_length_inv11dbz__dcx
+      ddbcd_length_inv11dbz__dcy
+      ddbcd_length_inv11dbz__dcz
+      ddbcd_length_inv11dbz__ddx
+      ddbcd_length_inv11dbz__ddy
+      ddbcd_length_inv11dbz__ddz
+      ddbcd_length_inv11dcx__dcx
+      ddbcd_length_inv11dcx__dcy
+      ddbcd_length_inv11dcx__dcz
+      ddbcd_length_inv11dcx__ddx
+      ddbcd_length_inv11dcx__ddy
+      ddbcd_length_inv11dcx__ddz
+      ddbcd_length_inv11dcy__dcy
+      ddbcd_length_inv11dcy__dcz
+      ddbcd_length_inv11dcy__ddx
+      ddbcd_length_inv11dcy__ddy
+      ddbcd_length_inv11dcy__ddz
+      ddbcd_length_inv11dcz__dcz
+      ddbcd_length_inv11dcz__ddx
+      ddbcd_length_inv11dcz__ddy
+      ddbcd_length_inv11dcz__ddz
+      ddbcd_length_inv11ddx__ddx
+      ddbcd_length_inv11ddx__ddy
+      ddbcd_length_inv11ddx__ddz
+      ddbcd_length_inv11ddy__ddy
+      ddbcd_length_inv11ddy__ddz
+      ddbcd_length_inv11ddz__ddz
+
+      ddbcd_x11dcy__dcy
+      ddbcd_x11dcy__dcz
+      ddbcd_x11dcy__ddx
+      ddbcd_x11dcy__ddy
+      ddbcd_x11dcy__ddz
+      ddbcd_x11dcz__dcz
+      ddbcd_x11dcz__ddx
+      ddbcd_x11dcz__ddy
+      ddbcd_x11dcz__ddz
+      ddbcd_y11dcx__dcx
+      ddbcd_y11dcx__dcy
+      ddbcd_y11dcx__dcz
+      ddbcd_y11dcx__ddx
+      ddbcd_y11dcx__ddy
+      ddbcd_y11dcx__ddz
+      ddbcd_y11dcz__dcz
+      ddbcd_y11dcz__ddx
+      ddbcd_y11dcz__ddy
+      ddbcd_y11dcz__ddz
+      ddbcd_z11dcx__dcx
+      ddbcd_z11dcx__dcy
+      ddbcd_z11dcx__dcz
+      ddbcd_z11dcx__ddx
+      ddbcd_z11dcx__ddy
+      ddbcd_z11dcx__ddz
+      ddbcd_z11dcy__dcy
+      ddbcd_z11dcy__dcz
+      ddbcd_z11dcy__ddx
+      ddbcd_z11dcy__ddy
+      ddbcd_z11dcy__ddz
+
+
+      ddbcd1_x11dbx__dbcd_x
+      ddbcd1_x11dbx__ddbcd_length_inv11dbx
+      ddbcd1_x11dby__dbcd_length_inv
+      ddbcd1_x11dby__dbcd_x
+      ddbcd1_x11dby__dcd_z
+      ddbcd1_x11dby__ddbcd_length_inv11dby
+      ddbcd1_x11dbz__dbcd_length_inv
+      ddbcd1_x11dbz__dbcd_x
+      ddbcd1_x11dbz__dcd_y
+      ddbcd1_x11dbz__ddbcd_length_inv11dbz
+      ddbcd1_x11dcx__dbcd_x
+      ddbcd1_x11dcx__ddbcd_length_inv11dcx
+      ddbcd1_x11dcy__dbcd_length_inv
+      ddbcd1_x11dcy__dbcd_x
+      ddbcd1_x11dcy__ddbcd_length_inv11dcy
+      ddbcd1_x11dcy__ddbcd_x11dcy
+      ddbcd1_x11dcz__dbcd_length_inv
+      ddbcd1_x11dcz__dbcd_x
+      ddbcd1_x11dcz__ddbcd_length_inv11dcz
+      ddbcd1_x11dcz__ddbcd_x11dcz
+      ddbcd1_x11ddx__dbcd_x
+      ddbcd1_x11ddx__ddbcd_length_inv11ddx
+      ddbcd1_x11ddy__dbc_z
+      ddbcd1_x11ddy__dbcd_length_inv
+      ddbcd1_x11ddy__dbcd_x
+      ddbcd1_x11ddy__ddbcd_length_inv11ddy
+      ddbcd1_x11ddz__dbc_y
+      ddbcd1_x11ddz__dbcd_length_inv
+      ddbcd1_x11ddz__dbcd_x
+      ddbcd1_x11ddz__ddbcd_length_inv11ddz
+
+      ddbcd1_y11dbx__dbcd_length_inv
+      ddbcd1_y11dbx__dbcd_y
+      ddbcd1_y11dbx__dcd_z
+      ddbcd1_y11dbx__ddbcd_length_inv11dbx
+      ddbcd1_y11dby__dbcd_y
+      ddbcd1_y11dby__ddbcd_length_inv11dby
+      ddbcd1_y11dbz__dbcd_length_inv
+      ddbcd1_y11dbz__dbcd_y
+      ddbcd1_y11dbz__dcd_x
+      ddbcd1_y11dbz__ddbcd_length_inv11dbz
+      ddbcd1_y11dcx__dbcd_length_inv
+      ddbcd1_y11dcx__dbcd_y
+      ddbcd1_y11dcx__ddbcd_length_inv11dcx
+      ddbcd1_y11dcx__ddbcd_y11dcx
+      ddbcd1_y11dcy__dbcd_y
+      ddbcd1_y11dcy__ddbcd_length_inv11dcy
+      ddbcd1_y11dcz__dbcd_length_inv
+      ddbcd1_y11dcz__dbcd_y
+      ddbcd1_y11dcz__ddbcd_length_inv11dcz
+      ddbcd1_y11dcz__ddbcd_y11dcz
+      ddbcd1_y11ddx__dbc_z
+      ddbcd1_y11ddx__dbcd_length_inv
+      ddbcd1_y11ddx__dbcd_y
+      ddbcd1_y11ddx__ddbcd_length_inv11ddx
+      ddbcd1_y11ddy__dbcd_y
+      ddbcd1_y11ddy__ddbcd_length_inv11ddy
+      ddbcd1_y11ddz__dbc_x
+      ddbcd1_y11ddz__dbcd_length_inv
+      ddbcd1_y11ddz__dbcd_y
+      ddbcd1_y11ddz__ddbcd_length_inv11ddz
+
+      ddbcd1_z11dbx__dbcd_length_inv
+      ddbcd1_z11dbx__dbcd_z
+      ddbcd1_z11dbx__dcd_y
+      ddbcd1_z11dbx__ddbcd_length_inv11dbx
+      ddbcd1_z11dby__dbcd_length_inv
+      ddbcd1_z11dby__dbcd_z
+      ddbcd1_z11dby__dcd_x
+      ddbcd1_z11dby__ddbcd_length_inv11dby
+      ddbcd1_z11dbz__dbcd_z
+      ddbcd1_z11dbz__ddbcd_length_inv11dbz
+      ddbcd1_z11dcx__dbcd_length_inv
+      ddbcd1_z11dcx__dbcd_z
+      ddbcd1_z11dcx__ddbcd_length_inv11dcx
+      ddbcd1_z11dcx__ddbcd_z11dcx
+      ddbcd1_z11dcy__dbcd_length_inv
+      ddbcd1_z11dcy__dbcd_z
+      ddbcd1_z11dcy__ddbcd_length_inv11dcy
+      ddbcd1_z11dcy__ddbcd_z11dcy
+      ddbcd1_z11dcz__dbcd_z
+      ddbcd1_z11dcz__ddbcd_length_inv11dcz
+      ddbcd1_z11ddx__dbc_y
+      ddbcd1_z11ddx__dbcd_length_inv
+      ddbcd1_z11ddx__dbcd_z
+      ddbcd1_z11ddx__ddbcd_length_inv11ddx
+      ddbcd1_z11ddy__dbc_x
+      ddbcd1_z11ddy__dbcd_length_inv
+      ddbcd1_z11ddy__dbcd_z
+      ddbcd1_z11ddy__ddbcd_length_inv11ddy
+      ddbcd1_z11ddz__dbcd_z
+      ddbcd1_z11ddz__ddbcd_length_inv11ddz
+
+
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c block 3a
+
+c df__dx=-y/(x**2 + y**2)
+      ddf11dx__dx= (2*x*y)/((x**2 + y**2)**2)
+      ddf11dx__dy= (2*y**2)/((x**2 + y**2)**2) - 1/(x**2 + y**2)
+c df__dy=x/(x**2 + y**2)
+      ddf11dy__dx= (-2*x**2)/((x**2 + y**2)**2) + 1/(x**2 + y**2)
+      ddf11dy__dy= (-2*x*y)/((x**2 + y**2)**2)
+
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 3b
 
+c dabc1_x__dax= abc_x*dabc_length_inv__dax
       ddabc1_x11dax__dax=
+     1   ddabc1_x11dax__dabc_x*dabc_x__dax
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dax
       ddabc1_x11dax__day=
+     1   ddabc1_x11dax__dabc_x*dabc_x__day
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__day
       ddabc1_x11dax__daz=
+     1   ddabc1_x11dax__dabc_x*dabc_x__daz
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__daz
       ddabc1_x11dax__dbx=
+     1   ddabc1_x11dax__dabc_x*dabc_x__dbx
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dbx
       ddabc1_x11dax__dby=
+     1   ddabc1_x11dax__dabc_x*dabc_x__dby
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dby
       ddabc1_x11dax__dbz=
+     1   ddabc1_x11dax__dabc_x*dabc_x__dbz
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dbz
       ddabc1_x11dax__dcx=
+     1   ddabc1_x11dax__dabc_x*dabc_x__dcx
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcx
       ddabc1_x11dax__dcy=
+     1   ddabc1_x11dax__dabc_x*dabc_x__dcy
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcy
       ddabc1_x11dax__dcz=
+     1   ddabc1_x11dax__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcz
       ddabc1_x11dax__ddx=
+     1   ddabc1_x11dax__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddx
       ddabc1_x11dax__ddy=
+     1   ddabc1_x11dax__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddy
       ddabc1_x11dax__ddz=
+     1   ddabc1_x11dax__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddz
+c dabc1_x__day=- abc_length_inv*bc_z + abc_x*dabc_length_inv__day
       ddabc1_x11day__day=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__day
+     1 + ddabc1_x11day__dbc_z*dbc_z__day
+     1 + ddabc1_x11day__dabc_x*dabc_x__day
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__day
       ddabc1_x11day__daz=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__daz
+     1 + ddabc1_x11day__dbc_z*dbc_z__daz
+     1 + ddabc1_x11day__dabc_x*dabc_x__daz
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__daz
       ddabc1_x11day__dbx=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__dbx
+     1 + ddabc1_x11day__dbc_z*dbc_z__dbx
+     1 + ddabc1_x11day__dabc_x*dabc_x__dbx
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__dbx
       ddabc1_x11day__dby=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_x11day__dbc_z*dbc_z__dby
+     1 + ddabc1_x11day__dabc_x*dabc_x__dby
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__dby
       ddabc1_x11day__dbz=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_x11day__dbc_z*dbc_z__dbz
+     1 + ddabc1_x11day__dabc_x*dabc_x__dbz
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__dbz
       ddabc1_x11day__dcx=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_x11day__dbc_z*dbc_z__dcx
+     1 + ddabc1_x11day__dabc_x*dabc_x__dcx
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__dcx
       ddabc1_x11day__dcy=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_x11day__dbc_z*dbc_z__dcy
+     1 + ddabc1_x11day__dabc_x*dabc_x__dcy
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__dcy
       ddabc1_x11day__dcz=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_x11day__dbc_z*dbc_z__dcz
+     1 + ddabc1_x11day__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__dcz
       ddabc1_x11day__ddx=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_x11day__dbc_z*dbc_z__ddx
+     1 + ddabc1_x11day__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__ddx
       ddabc1_x11day__ddy=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_x11day__dbc_z*dbc_z__ddy
+     1 + ddabc1_x11day__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__ddy
       ddabc1_x11day__ddz=
+     1   ddabc1_x11day__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_x11day__dbc_z*dbc_z__ddz
+     1 + ddabc1_x11day__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11day__ddabc_length_inv11day*ddabc_length_inv11day__ddz
+c dabc1_x__daz=abc_length_inv*bc_y + abc_x*dabc_length_inv__daz
       ddabc1_x11daz__daz=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__daz
+     1 + ddabc1_x11daz__dbc_y*dbc_y__daz
+     1 + ddabc1_x11daz__dabc_x*dabc_x__daz
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__daz
       ddabc1_x11daz__dbx=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__dbx
+     1 + ddabc1_x11daz__dbc_y*dbc_y__dbx
+     1 + ddabc1_x11daz__dabc_x*dabc_x__dbx
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dbx
       ddabc1_x11daz__dby=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_x11daz__dbc_y*dbc_y__dby
+     1 + ddabc1_x11daz__dabc_x*dabc_x__dby
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dby
       ddabc1_x11daz__dbz=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_x11daz__dbc_y*dbc_y__dbz
+     1 + ddabc1_x11daz__dabc_x*dabc_x__dbz
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dbz
       ddabc1_x11daz__dcx=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_x11daz__dbc_y*dbc_y__dcx
+     1 + ddabc1_x11daz__dabc_x*dabc_x__dcx
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcx
       ddabc1_x11daz__dcy=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_x11daz__dbc_y*dbc_y__dcy
+     1 + ddabc1_x11daz__dabc_x*dabc_x__dcy
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcy
       ddabc1_x11daz__dcz=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_x11daz__dbc_y*dbc_y__dcz
+     1 + ddabc1_x11daz__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcz
       ddabc1_x11daz__ddx=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_x11daz__dbc_y*dbc_y__ddx
+     1 + ddabc1_x11daz__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddx
       ddabc1_x11daz__ddy=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_x11daz__dbc_y*dbc_y__ddy
+     1 + ddabc1_x11daz__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddy
       ddabc1_x11daz__ddz=
+     1   ddabc1_x11daz__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_x11daz__dbc_y*dbc_y__ddz
+     1 + ddabc1_x11daz__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddz
+c dabc1_x__dbx= abc_x*dabc_length_inv__dbx
       ddabc1_x11dbx__dbx=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__dbx
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dbx
       ddabc1_x11dbx__dby=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__dby
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dby
       ddabc1_x11dbx__dbz=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__dbz
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dbz
       ddabc1_x11dbx__dcx=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__dcx
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcx
       ddabc1_x11dbx__dcy=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__dcy
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcy
       ddabc1_x11dbx__dcz=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcz
       ddabc1_x11dbx__ddx=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddx
       ddabc1_x11dbx__ddy=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddy
       ddabc1_x11dbx__ddz=
+     1   ddabc1_x11dbx__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddz
+c dabc1_x__dby=abc_length_inv*dabc_x__dby + abc_x*dabc_length_inv__dby
       ddabc1_x11dby__dby=
+     1   ddabc1_x11dby__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_x11dby__ddabc_x11dby*ddabc_x11dby__dby
+     1 + ddabc1_x11dby__dabc_x*dabc_x__dby
+     1 + ddabc1_x11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dby
       ddabc1_x11dby__dbz=
+     1   ddabc1_x11dby__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_x11dby__ddabc_x11dby*ddabc_x11dby__dbz
+     1 + ddabc1_x11dby__dabc_x*dabc_x__dbz
+     1 + ddabc1_x11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dbz
       ddabc1_x11dby__dcx=
+     1   ddabc1_x11dby__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_x11dby__ddabc_x11dby*ddabc_x11dby__dcx
+     1 + ddabc1_x11dby__dabc_x*dabc_x__dcx
+     1 + ddabc1_x11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dcx
       ddabc1_x11dby__dcy=
+     1   ddabc1_x11dby__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_x11dby__ddabc_x11dby*ddabc_x11dby__dcy
+     1 + ddabc1_x11dby__dabc_x*dabc_x__dcy
+     1 + ddabc1_x11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dcy
       ddabc1_x11dby__dcz=
+     1   ddabc1_x11dby__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_x11dby__ddabc_x11dby*ddabc_x11dby__dcz
+     1 + ddabc1_x11dby__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dcz
       ddabc1_x11dby__ddx=
+     1   ddabc1_x11dby__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_x11dby__ddabc_x11dby*ddabc_x11dby__ddx
+     1 + ddabc1_x11dby__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__ddx
       ddabc1_x11dby__ddy=
+     1   ddabc1_x11dby__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_x11dby__ddabc_x11dby*ddabc_x11dby__ddy
+     1 + ddabc1_x11dby__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__ddy
       ddabc1_x11dby__ddz=
+     1   ddabc1_x11dby__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_x11dby__ddabc_x11dby*ddabc_x11dby__ddz
+     1 + ddabc1_x11dby__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__ddz
+c dabc1_x__dbz=abc_length_inv*dabc_x__dbz + abc_x*dabc_length_inv__dbz
       ddabc1_x11dbz__dbz=
+     1   ddabc1_x11dbz__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_x11dbz__ddabc_x11dbz*ddabc_x11dbz__dbz
+     1 + ddabc1_x11dbz__dabc_x*dabc_x__dbz
+     1 + ddabc1_x11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dbz
       ddabc1_x11dbz__dcx=
+     1   ddabc1_x11dbz__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_x11dbz__ddabc_x11dbz*ddabc_x11dbz__dcx
+     1 + ddabc1_x11dbz__dabc_x*dabc_x__dcx
+     1 + ddabc1_x11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcx
       ddabc1_x11dbz__dcy=
+     1   ddabc1_x11dbz__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_x11dbz__ddabc_x11dbz*ddabc_x11dbz__dcy
+     1 + ddabc1_x11dbz__dabc_x*dabc_x__dcy
+     1 + ddabc1_x11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcy
       ddabc1_x11dbz__dcz=
+     1   ddabc1_x11dbz__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_x11dbz__ddabc_x11dbz*ddabc_x11dbz__dcz
+     1 + ddabc1_x11dbz__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcz
       ddabc1_x11dbz__ddx=
+     1   ddabc1_x11dbz__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_x11dbz__ddabc_x11dbz*ddabc_x11dbz__ddx
+     1 + ddabc1_x11dbz__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddx
       ddabc1_x11dbz__ddy=
+     1   ddabc1_x11dbz__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_x11dbz__ddabc_x11dbz*ddabc_x11dbz__ddy
+     1 + ddabc1_x11dbz__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddy
       ddabc1_x11dbz__ddz=
+     1   ddabc1_x11dbz__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_x11dbz__ddabc_x11dbz*ddabc_x11dbz__ddz
+     1 + ddabc1_x11dbz__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddz
+c dabc1_x__dcx= abc_x*dabc_length_inv__dcx
       ddabc1_x11dcx__dcx=
+     1   ddabc1_x11dcx__dabc_x*dabc_x__dcx
+     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__dcx
       ddabc1_x11dcx__dcy=
+     1   ddabc1_x11dcx__dabc_x*dabc_x__dcy
+     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__dcy
       ddabc1_x11dcx__dcz=
+     1   ddabc1_x11dcx__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__dcz
       ddabc1_x11dcx__ddx=
+     1   ddabc1_x11dcx__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__ddx
       ddabc1_x11dcx__ddy=
+     1   ddabc1_x11dcx__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__ddy
       ddabc1_x11dcx__ddz=
+     1   ddabc1_x11dcx__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__ddz
+c dabc1_x__dcy=-abc_length_inv*ab_z + abc_x*dabc_length_inv__dcy
       ddabc1_x11dcy__dcy=
+     1   ddabc1_x11dcy__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_x11dcy__dab_z*dab_z__dcy
+     1 + ddabc1_x11dcy__dabc_x*dabc_x__dcy
+     1 + ddabc1_x11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__dcy
       ddabc1_x11dcy__dcz=
+     1   ddabc1_x11dcy__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_x11dcy__dab_z*dab_z__dcz
+     1 + ddabc1_x11dcy__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__dcz
       ddabc1_x11dcy__ddx=
+     1   ddabc1_x11dcy__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_x11dcy__dab_z*dab_z__ddx
+     1 + ddabc1_x11dcy__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddx
       ddabc1_x11dcy__ddy=
+     1   ddabc1_x11dcy__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_x11dcy__dab_z*dab_z__ddy
+     1 + ddabc1_x11dcy__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddy
       ddabc1_x11dcy__ddz=
+     1   ddabc1_x11dcy__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_x11dcy__dab_z*dab_z__ddz
+     1 + ddabc1_x11dcy__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddz
+c dabc1_x__dcz=abc_length_inv*ab_y + abc_x*dabc_length_inv__dcz
       ddabc1_x11dcz__dcz=
+     1   ddabc1_x11dcz__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_x11dcz__dab_y*dab_y__dcz
+     1 + ddabc1_x11dcz__dabc_x*dabc_x__dcz
+     1 + ddabc1_x11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__dcz
       ddabc1_x11dcz__ddx=
+     1   ddabc1_x11dcz__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_x11dcz__dab_y*dab_y__ddx
+     1 + ddabc1_x11dcz__dabc_x*dabc_x__ddx
+     1 + ddabc1_x11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddx
       ddabc1_x11dcz__ddy=
+     1   ddabc1_x11dcz__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_x11dcz__dab_y*dab_y__ddy
+     1 + ddabc1_x11dcz__dabc_x*dabc_x__ddy
+     1 + ddabc1_x11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddy
       ddabc1_x11dcz__ddz=
+     1   ddabc1_x11dcz__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_x11dcz__dab_y*dab_y__ddz
+     1 + ddabc1_x11dcz__dabc_x*dabc_x__ddz
+     1 + ddabc1_x11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddz
 
+c dabc1_y__dax=abc_length_inv*bc_z + abc_y*dabc_length_inv__dax
       ddabc1_y11dax__dax=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__dax
+     1 + ddabc1_y11dax__dbc_z*dbc_z__dax
+     1 + ddabc1_y11dax__dabc_y*dabc_y__dax
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dax
       ddabc1_y11dax__day=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__day
+     1 + ddabc1_y11dax__dbc_z*dbc_z__day
+     1 + ddabc1_y11dax__dabc_y*dabc_y__day
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__day
       ddabc1_y11dax__daz=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__daz
+     1 + ddabc1_y11dax__dbc_z*dbc_z__daz
+     1 + ddabc1_y11dax__dabc_y*dabc_y__daz
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__daz
       ddabc1_y11dax__dbx=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__dbx
+     1 + ddabc1_y11dax__dbc_z*dbc_z__dbx
+     1 + ddabc1_y11dax__dabc_y*dabc_y__dbx
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dbx
       ddabc1_y11dax__dby=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_y11dax__dbc_z*dbc_z__dby
+     1 + ddabc1_y11dax__dabc_y*dabc_y__dby
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dby
       ddabc1_y11dax__dbz=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_y11dax__dbc_z*dbc_z__dbz
+     1 + ddabc1_y11dax__dabc_y*dabc_y__dbz
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dbz
       ddabc1_y11dax__dcx=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_y11dax__dbc_z*dbc_z__dcx
+     1 + ddabc1_y11dax__dabc_y*dabc_y__dcx
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcx
       ddabc1_y11dax__dcy=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_y11dax__dbc_z*dbc_z__dcy
+     1 + ddabc1_y11dax__dabc_y*dabc_y__dcy
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcy
       ddabc1_y11dax__dcz=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_y11dax__dbc_z*dbc_z__dcz
+     1 + ddabc1_y11dax__dabc_y*dabc_y__dcz
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcz
       ddabc1_y11dax__ddx=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_y11dax__dbc_z*dbc_z__ddx
+     1 + ddabc1_y11dax__dabc_y*dabc_y__ddx
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddx
       ddabc1_y11dax__ddy=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_y11dax__dbc_z*dbc_z__ddy
+     1 + ddabc1_y11dax__dabc_y*dabc_y__ddy
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddy
       ddabc1_y11dax__ddz=
+     1   ddabc1_y11dax__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_y11dax__dbc_z*dbc_z__ddz
+     1 + ddabc1_y11dax__dabc_y*dabc_y__ddz
+     1 + ddabc1_y11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddz
+c dabc1_y__day= abc_y*dabc_length_inv__day
       ddabc1_y11day__day=
+     1   ddabc1_y11day__dabc_y*dabc_y__day
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__day
       ddabc1_y11day__daz=
+     1   ddabc1_y11day__dabc_y*dabc_y__daz
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__daz
       ddabc1_y11day__dbx=
+     1   ddabc1_y11day__dabc_y*dabc_y__dbx
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__dbx
       ddabc1_y11day__dby=
+     1   ddabc1_y11day__dabc_y*dabc_y__dby
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__dby
       ddabc1_y11day__dbz=
+     1   ddabc1_y11day__dabc_y*dabc_y__dbz
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__dbz
       ddabc1_y11day__dcx=
+     1   ddabc1_y11day__dabc_y*dabc_y__dcx
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__dcx
       ddabc1_y11day__dcy=
+     1   ddabc1_y11day__dabc_y*dabc_y__dcy
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__dcy
       ddabc1_y11day__dcz=
+     1   ddabc1_y11day__dabc_y*dabc_y__dcz
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__dcz
       ddabc1_y11day__ddx=
+     1   ddabc1_y11day__dabc_y*dabc_y__ddx
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__ddx
       ddabc1_y11day__ddy=
+     1   ddabc1_y11day__dabc_y*dabc_y__ddy
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__ddy
       ddabc1_y11day__ddz=
+     1   ddabc1_y11day__dabc_y*dabc_y__ddz
+     1 + ddabc1_y11day__ddabc_length_inv11day*ddabc_length_inv11day__ddz
+c dabc1_y__daz=-abc_length_inv*bc_x + abc_y*dabc_length_inv__daz
       ddabc1_y11daz__daz=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__daz
+     1 + ddabc1_y11daz__dbc_x*dbc_x__daz
+     1 + ddabc1_y11daz__dabc_y*dabc_y__daz
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__daz
       ddabc1_y11daz__dbx=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__dbx
+     1 + ddabc1_y11daz__dbc_x*dbc_x__dbx
+     1 + ddabc1_y11daz__dabc_y*dabc_y__dbx
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dbx
       ddabc1_y11daz__dby=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_y11daz__dbc_x*dbc_x__dby
+     1 + ddabc1_y11daz__dabc_y*dabc_y__dby
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dby
       ddabc1_y11daz__dbz=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_y11daz__dbc_x*dbc_x__dbz
+     1 + ddabc1_y11daz__dabc_y*dabc_y__dbz
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dbz
       ddabc1_y11daz__dcx=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_y11daz__dbc_x*dbc_x__dcx
+     1 + ddabc1_y11daz__dabc_y*dabc_y__dcx
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcx
       ddabc1_y11daz__dcy=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_y11daz__dbc_x*dbc_x__dcy
+     1 + ddabc1_y11daz__dabc_y*dabc_y__dcy
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcy
       ddabc1_y11daz__dcz=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_y11daz__dbc_x*dbc_x__dcz
+     1 + ddabc1_y11daz__dabc_y*dabc_y__dcz
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcz
       ddabc1_y11daz__ddx=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_y11daz__dbc_x*dbc_x__ddx
+     1 + ddabc1_y11daz__dabc_y*dabc_y__ddx
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddx
       ddabc1_y11daz__ddy=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_y11daz__dbc_x*dbc_x__ddy
+     1 + ddabc1_y11daz__dabc_y*dabc_y__ddy
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddy
       ddabc1_y11daz__ddz=
+     1   ddabc1_y11daz__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_y11daz__dbc_x*dbc_x__ddz
+     1 + ddabc1_y11daz__dabc_y*dabc_y__ddz
+     1 + ddabc1_y11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddz
+c dabc1_y__dbx=abc_length_inv*dabc_y__dbx + abc_y*dabc_length_inv__dbx
       ddabc1_y11dbx__dbx=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__dbx
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__dbx
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__dbx
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dbx
       ddabc1_y11dbx__dby=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__dby
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__dby
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dby
       ddabc1_y11dbx__dbz=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__dbz
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__dbz
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dbz
       ddabc1_y11dbx__dcx=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__dcx
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__dcx
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcx
       ddabc1_y11dbx__dcy=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__dcy
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__dcy
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcy
       ddabc1_y11dbx__dcz=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__dcz
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__dcz
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcz
       ddabc1_y11dbx__ddx=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__ddx
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__ddx
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddx
       ddabc1_y11dbx__ddy=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__ddy
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__ddy
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddy
       ddabc1_y11dbx__ddz=
+     1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__ddz
+     1 + ddabc1_y11dbx__dabc_y*dabc_y__ddz
+     1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddz
+c dabc1_y__dby= abc_y*dabc_length_inv__dby
       ddabc1_y11dby__dby=
+     1   ddabc1_y11dby__dabc_y*dabc_y__dby
+     1 + ddabc1_y11dby__ddabc_length_inv__dby*ddabc_length_inv11dby__dby
       ddabc1_y11dby__dbz=
+     1   ddabc1_y11dby__dabc_y*dabc_y__dbz
+     1 + ddabc1_y11dby__ddabc_length_inv__dby*ddabc_length_inv11dby__dbz
       ddabc1_y11dby__dcx=
+     1   ddabc1_y11dby__dabc_y*dabc_y__dcx
+     1 + ddabc1_y11dby__ddabc_length_inv__dby*ddabc_length_inv11dby__dcx
       ddabc1_y11dby__dcy=
+     1   ddabc1_y11dby__dabc_y*dabc_y__dcy
+     1 + ddabc1_y11dby__ddabc_length_inv__dby*ddabc_length_inv11dby__dcy
       ddabc1_y11dby__dcz=
+     1   ddabc1_y11dby__dabc_y*dabc_y__dcz
+     1 + ddabc1_y11dby__ddabc_length_inv__dby*ddabc_length_inv11dby__dcz
       ddabc1_y11dby__ddx=
+     1   ddabc1_y11dby__dabc_y*dabc_y__ddx
+     1 + ddabc1_y11dby__ddabc_length_inv__dby*ddabc_length_inv11dby__ddx
       ddabc1_y11dby__ddy=
+     1   ddabc1_y11dby__dabc_y*dabc_y__ddy
+     1 + ddabc1_y11dby__ddabc_length_inv__dby*ddabc_length_inv11dby__ddy
       ddabc1_y11dby__ddz=
+     1   ddabc1_y11dby__dabc_y*dabc_y__ddz
+     1 + ddabc1_y11dby__ddabc_length_inv__dby*ddabc_length_inv11dby__ddz
+c dabc1_y__dbz=abc_length_inv*dabc_y__dbz + abc_y*dabc_length_inv__dbz
       ddabc1_y11dbz__dbz=
+     1   ddabc1_y11dbz__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_y11dbz__ddabc_y11dbz*ddabc_y11dbz__dbz
+     1 + ddabc1_y11dbz__dabc_y*dabc_y__dbz
+     1 + ddabc1_y11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dbz
       ddabc1_y11dbz__dcx=
+     1   ddabc1_y11dbz__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_y11dbz__ddabc_y11dbz*ddabc_y11dbz__dcx
+     1 + ddabc1_y11dbz__dabc_y*dabc_y__dcx
+     1 + ddabc1_y11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcx
       ddabc1_y11dbz__dcy=
+     1   ddabc1_y11dbz__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_y11dbz__ddabc_y11dbz*ddabc_y11dbz__dcy
+     1 + ddabc1_y11dbz__dabc_y*dabc_y__dcy
+     1 + ddabc1_y11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcy
       ddabc1_y11dbz__dcz=
+     1   ddabc1_y11dbz__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_y11dbz__ddabc_y11dbz*ddabc_y11dbz__dcz
+     1 + ddabc1_y11dbz__dabc_y*dabc_y__dcz
+     1 + ddabc1_y11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcz
       ddabc1_y11dbz__ddx=
+     1   ddabc1_y11dbz__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_y11dbz__ddabc_y11dbz*ddabc_y11dbz__ddx
+     1 + ddabc1_y11dbz__dabc_y*dabc_y__ddx
+     1 + ddabc1_y11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddx
       ddabc1_y11dbz__ddy=
+     1   ddabc1_y11dbz__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_y11dbz__ddabc_y11dbz*ddabc_y11dbz__ddy
+     1 + ddabc1_y11dbz__dabc_y*dabc_y__ddy
+     1 + ddabc1_y11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddy
       ddabc1_y11dbz__ddz=
+     1   ddabc1_y11dbz__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_y11dbz__ddabc_y11dbz*ddabc_y11dbz__ddz
+     1 + ddabc1_y11dbz__dabc_y*dabc_y__ddz
+     1 + ddabc1_y11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddz
+c dabc1_y__dcx=abc_length_inv*ab_z + abc_y*dabc_length_inv__dcx
       ddabc1_y11dcx__dcx=
+     1   ddabc1_y11dcx__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_y11dcx__dab_z*dab_z__dcx
+     1 + ddabc1_y11dcx__dabc_y*dbc_y__dcx
+     1 + ddabc1_y11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcx
       ddabc1_y11dcx__dcy=
+     1   ddabc1_y11dcx__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_y11dcx__dab_z*dab_z__dcy
+     1 + ddabc1_y11dcx__dabc_y*dbc_y__dcy
+     1 + ddabc1_y11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcy
       ddabc1_y11dcx__dcz=
+     1   ddabc1_y11dcx__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_y11dcx__dab_z*dab_z__dcz
+     1 + ddabc1_y11dcx__dabc_y*dbc_y__dcz
+     1 + ddabc1_y11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcz
       ddabc1_y11dcx__ddx=
+     1   ddabc1_y11dcx__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_y11dcx__dab_z*dab_z__ddx
+     1 + ddabc1_y11dcx__dabc_y*dbc_y__ddx
+     1 + ddabc1_y11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddx
       ddabc1_y11dcx__ddy=
+     1   ddabc1_y11dcx__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_y11dcx__dab_z*dab_z__ddy
+     1 + ddabc1_y11dcx__dabc_y*dbc_y__ddy
+     1 + ddabc1_y11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddy
       ddabc1_y11dcx__ddz=
+     1   ddabc1_y11dcx__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_y11dcx__dab_z*dab_z__ddz
+     1 + ddabc1_y11dcx__dabc_y*dbc_y__ddz
+     1 + ddabc1_y11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddz
+c dabc1_y__dcy= abc_y*dabc_length_inv__dcy
       ddabc1_y11dcy__dcy=
+     1   ddabc1_y11dcy__dabc_y*dabc_y__dcy
+     1 + ddabc1_y11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__dcy
       ddabc1_y11dcy__dcz=
+     1   ddabc1_y11dcy__dabc_y*dabc_y__dcz
+     1 + ddabc1_y11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__dcz
       ddabc1_y11dcy__ddx=
+     1   ddabc1_y11dcy__dabc_y*dabc_y__ddx
+     1 + ddabc1_y11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddx
       ddabc1_y11dcy__ddy=
+     1   ddabc1_y11dcy__dabc_y*dabc_y__ddy
+     1 + ddabc1_y11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddy
       ddabc1_y11dcy__ddz=
+     1   ddabc1_y11dcy__dabc_y*dabc_y__ddz
+     1 + ddabc1_y11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddz
+c dabc1_y__dcz=-abc_length_inv*ab_x + abc_y*dabc_length_inv__dcz
       ddabc1_y11dcz__dcz=
+     1   ddabc1_y11dcz__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_y11dcz__dab_x*dab_x__dcz
+     1 + ddabc1_y11dcz__dabc_y*dbc_y__dcz
+     1 + ddabc1_y11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__dcz
       ddabc1_y11dcz__ddx=
+     1   ddabc1_y11dcz__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_y11dcz__dab_x*dab_x__ddx
+     1 + ddabc1_y11dcz__dabc_y*dbc_y__ddx
+     1 + ddabc1_y11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddx
       ddabc1_y11dcz__ddy=
+     1   ddabc1_y11dcz__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_y11dcz__dab_x*dab_x__ddy
+     1 + ddabc1_y11dcz__dabc_y*dbc_y__ddy
+     1 + ddabc1_y11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddy
       ddabc1_y11dcz__ddz=
+     1   ddabc1_y11dcz__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_y11dcz__dab_x*dab_x__ddz
+     1 + ddabc1_y11dcz__dabc_y*dbc_y__ddz
+     1 + ddabc1_y11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddz
 
+c dabc1_z__dax=-abc_length_inv*bc_y + abc_z*dabc_length_inv__dax
       ddabc1_z11dax__dax=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__dax
+     1 + ddabc1_z11dax__dbc_y*dbc_y__dax
+     1 + ddabc1_z11dax__dabc_z*dabc_z__dax
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dax
       ddabc1_z11dax__day=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__day
+     1 + ddabc1_z11dax__dbc_y*dbc_y__day
+     1 + ddabc1_z11dax__dabc_z*dabc_z__day
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__day
       ddabc1_z11dax__daz=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__daz
+     1 + ddabc1_z11dax__dbc_y*dbc_y__daz
+     1 + ddabc1_z11dax__dabc_z*dabc_z__daz
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__daz
       ddabc1_z11dax__dbx=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__dbx
+     1 + ddabc1_z11dax__dbc_y*dbc_y__dbx
+     1 + ddabc1_z11dax__dabc_z*dabc_z__dbx
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dbx
       ddabc1_z11dax__dby=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_z11dax__dbc_y*dbc_y__dby
+     1 + ddabc1_z11dax__dabc_z*dabc_z__dby
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dby
       ddabc1_z11dax__dbz=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_z11dax__dbc_y*dbc_y__dbz
+     1 + ddabc1_z11dax__dabc_z*dabc_z__dbz
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dbz
       ddabc1_z11dax__dcx=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_z11dax__dbc_y*dbc_y__dcx
+     1 + ddabc1_z11dax__dabc_z*dabc_z__dcx
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcx
       ddabc1_z11dax__dcy=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_z11dax__dbc_y*dbc_y__dcy
+     1 + ddabc1_z11dax__dabc_z*dabc_z__dcy
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcy
       ddabc1_z11dax__dcz=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_z11dax__dbc_y*dbc_y__dcz
+     1 + ddabc1_z11dax__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__dcz
       ddabc1_z11dax__ddx=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_z11dax__dbc_y*dbc_y__ddx
+     1 + ddabc1_z11dax__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddx
       ddabc1_z11dax__ddy=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_z11dax__dbc_y*dbc_y__ddy
+     1 + ddabc1_z11dax__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddy
       ddabc1_z11dax__ddz=
+     1   ddabc1_z11dax__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_z11dax__dbc_y*dbc_y__ddz
+     1 + ddabc1_z11dax__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11dax__ddabc_length_inv11dax*ddabc_length_inv11dax__ddz
+c dabc1_z__day=abc_length_inv*bc_x + abc_z*dabc_length_inv__day
       ddabc1_z11day__day=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__day
+     1 + ddabc1_z11day__dbc_x*dbc_x__day
+     1 + ddabc1_z11day__dabc_z*dabc_z__day
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__day
       ddabc1_z11day__daz=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__daz
+     1 + ddabc1_z11day__dbc_x*dbc_x__daz
+     1 + ddabc1_z11day__dabc_z*dabc_z__daz
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__daz
       ddabc1_z11day__dbx=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__dbx
+     1 + ddabc1_z11day__dbc_x*dbc_x__dbx
+     1 + ddabc1_z11day__dabc_z*dabc_z__dbx
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__dbx
       ddabc1_z11day__dby=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_z11day__dbc_x*dbc_x__dby
+     1 + ddabc1_z11day__dabc_z*dabc_z__dby
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__dby
       ddabc1_z11day__dbz=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_z11day__dbc_x*dbc_x__dbz
+     1 + ddabc1_z11day__dabc_z*dabc_z__dbz
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__dbz
       ddabc1_z11day__dcx=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_z11day__dbc_x*dbc_x__dcx
+     1 + ddabc1_z11day__dabc_z*dabc_z__dcx
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__dcx
       ddabc1_z11day__dcy=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_z11day__dbc_x*dbc_x__dcy
+     1 + ddabc1_z11day__dabc_z*dabc_z__dcy
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__dcy
       ddabc1_z11day__dcz=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_z11day__dbc_x*dbc_x__dcz
+     1 + ddabc1_z11day__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__dcz
       ddabc1_z11day__ddx=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_z11day__dbc_x*dbc_x__ddx
+     1 + ddabc1_z11day__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__ddx
       ddabc1_z11day__ddy=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_z11day__dbc_x*dbc_x__ddy
+     1 + ddabc1_z11day__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__ddy
       ddabc1_z11day__ddz=
+     1   ddabc1_z11day__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_z11day__dbc_x*dbc_x__ddz
+     1 + ddabc1_z11day__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11day__ddabc_length_inv11day*ddabc_length_inv11day__ddz
+c dabc1_z__daz= abc_z*dabc_length_inv__daz
       ddabc1_z11daz__daz=
+     1   ddabc1_z11daz__dabc_z*dabc_z__daz
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__daz
       ddabc1_z11daz__dbx=
+     1   ddabc1_z11daz__dabc_z*dabc_z__dbx
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dbx
       ddabc1_z11daz__dby=
+     1   ddabc1_z11daz__dabc_z*dabc_z__dby
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dby
       ddabc1_z11daz__dbz=
+     1   ddabc1_z11daz__dabc_z*dabc_z__dbz
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dbz
       ddabc1_z11daz__dcx=
+     1   ddabc1_z11daz__dabc_z*dabc_z__dcx
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcx
       ddabc1_z11daz__dcy=
+     1   ddabc1_z11daz__dabc_z*dabc_z__dcy
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcy
       ddabc1_z11daz__dcz=
+     1   ddabc1_z11daz__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__dcz
       ddabc1_z11daz__ddx=
+     1   ddabc1_z11daz__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddx
       ddabc1_z11daz__ddy=
+     1   ddabc1_z11daz__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddy
       ddabc1_z11daz__ddz=
+     1   ddabc1_z11daz__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11daz__ddabc_length_inv11daz*ddabc_length_inv11daz__ddz
+c dabc1_z__dbx=abc_length_inv*dabc_z__dbx + abc_z*dabc_length_inv__dbx
       ddabc1_z11dbx__dbx=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__dbx
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__dbx
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__dbx
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dbx
       ddabc1_z11dbx__dby=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__dby
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__dby
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dby
       ddabc1_z11dbx__dbz=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__dbz
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__dbz
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dbz
       ddabc1_z11dbx__dcx=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__dcx
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__dcx
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcx
       ddabc1_z11dbx__dcy=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__dcy
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__dcy
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcy
       ddabc1_z11dbx__dcz=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__dcz
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcz
       ddabc1_z11dbx__ddx=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__ddx
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddx
       ddabc1_z11dbx__ddy=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__ddy
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddy
       ddabc1_z11dbx__ddz=
+     1   ddabc1_z11dbx__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_z11dbx__ddabc_z11dbx*ddabc_z11dbx__ddz
+     1 + ddabc1_z11dbx__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__ddz
+c dabc1_z__dby=abc_length_inv*dabc_z__dby + abc_z*dabc_length_inv__dby
       ddabc1_z11dby__dby=
+     1   ddabc1_z11dby__dabc_length_inv*dabc_length_inv__dby
+     1 + ddabc1_z11dby__ddabc_z11dby*ddabc_z11dby__dby
+     1 + ddabc1_z11dby__dabc_z*dabc_z__dby
+     1 + ddabc1_z11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dby
       ddabc1_z11dby__dbz=
+     1   ddabc1_z11dby__dabc_length_inv*dabc_length_inv__dbz
+     1 + ddabc1_z11dby__ddabc_z11dby*ddabc_z11dby__dbz
+     1 + ddabc1_z11dby__dabc_z*dabc_z__dbz
+     1 + ddabc1_z11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dbz
       ddabc1_z11dby__dcx=
+     1   ddabc1_z11dby__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_z11dby__ddabc_z11dby*ddabc_z11dby__dcx
+     1 + ddabc1_z11dby__dabc_z*dabc_z__dcx
+     1 + ddabc1_z11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dcx
       ddabc1_z11dby__dcy=
+     1   ddabc1_z11dby__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_z11dby__ddabc_z11dby*ddabc_z11dby__dcy
+     1 + ddabc1_z11dby__dabc_z*dabc_z__dcy
+     1 + ddabc1_z11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dcy
       ddabc1_z11dby__dcz=
+     1   ddabc1_z11dby__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_z11dby__ddabc_z11dby*ddabc_z11dby__dcz
+     1 + ddabc1_z11dby__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__dcz
       ddabc1_z11dby__ddx=
+     1   ddabc1_z11dby__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_z11dby__ddabc_z11dby*ddabc_z11dby__ddx
+     1 + ddabc1_z11dby__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__ddx
       ddabc1_z11dby__ddy=
+     1   ddabc1_z11dby__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_z11dby__ddabc_z11dby*ddabc_z11dby__ddy
+     1 + ddabc1_z11dby__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__ddy
       ddabc1_z11dby__ddz=
+     1   ddabc1_z11dby__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_z11dby__ddabc_z11dby*ddabc_z11dby__ddz
+     1 + ddabc1_z11dby__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11dby__ddabc_length_inv11dby*ddabc_length_inv11dby__ddz
+c dabc1_z__dbz= abc_z*dabc_length_inv__dbz
       ddabc1_z11dbz__dbz=
+     1   ddabc1_z11dbz__dabc_z*dabc_z__dbz
+     1 + ddabc1_z11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dbz
       ddabc1_z11dbz__dcx=
+     1   ddabc1_z11dbz__dabc_z*dabc_z__dcx
+     1 + ddabc1_z11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcx
       ddabc1_z11dbz__dcy=
+     1   ddabc1_z11dbz__dabc_z*dabc_z__dcy
+     1 + ddabc1_z11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcy
       ddabc1_z11dbz__dcz=
+     1   ddabc1_z11dbz__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__dcz
       ddabc1_z11dbz__ddx=
+     1   ddabc1_z11dbz__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddx
       ddabc1_z11dbz__ddy=
+     1   ddabc1_z11dbz__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddy
       ddabc1_z11dbz__ddz=
+     1   ddabc1_z11dbz__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11dbz__ddabc_length_inv11dbz*ddabc_length_inv11dbz__ddz
+c dabc1_z__dcx=-abc_length_inv*ab_y + abc_z*dabc_length_inv__dcx
       ddabc1_z11dcx__dcx=
+     1   ddabc1_z11dcx__dabc_length_inv*dabc_length_inv__dcx
+     1 + ddabc1_z11dcx__dab_y*dab_y__dcx
+     1 + ddabc1_z11dcx__dabc_z*dabc_z__dcx
+     1 + ddabc1_z11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcx
       ddabc1_z11dcx__dcy=
+     1   ddabc1_z11dcx__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_z11dcx__dab_y*dab_y__dcy
+     1 + ddabc1_z11dcx__dabc_z*dabc_z__dcy
+     1 + ddabc1_z11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcy
       ddabc1_z11dcx__dcz=
+     1   ddabc1_z11dcx__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_z11dcx__dab_y*dab_y__dcz
+     1 + ddabc1_z11dcx__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcz
       ddabc1_z11dcx__ddx=
+     1   ddabc1_z11dcx__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_z11dcx__dab_y*dab_y__ddx
+     1 + ddabc1_z11dcx__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddx
       ddabc1_z11dcx__ddy=
+     1   ddabc1_z11dcx__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_z11dcx__dab_y*dab_y__ddy
+     1 + ddabc1_z11dcx__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddy
       ddabc1_z11dcx__ddz=
+     1   ddabc1_z11dcx__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_z11dcx__dab_y*dab_y__ddz
+     1 + ddabc1_z11dcx__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddz
+c dabc1_z__dcy=abc_length_inv*ab_x + abc_z*dabc_length_inv__dcy
       ddabc1_z11dcy__dcy=
+     1   ddabc1_z11dcy__dabc_length_inv*dabc_length_inv__dcy
+     1 + ddabc1_z11dcy__dab_y*dab_y__dcy
+     1 + ddabc1_z11dcy__dabc_z*dabc_z__dcy
+     1 + ddabc1_z11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__dcy
       ddabc1_z11dcy__dcz=
+     1   ddabc1_z11dcy__dabc_length_inv*dabc_length_inv__dcz
+     1 + ddabc1_z11dcy__dab_y*dab_y__dcz
+     1 + ddabc1_z11dcy__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__dcz
       ddabc1_z11dcy__ddx=
+     1   ddabc1_z11dcy__dabc_length_inv*dabc_length_inv__ddx
+     1 + ddabc1_z11dcy__dab_y*dab_y__ddx
+     1 + ddabc1_z11dcy__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddx
       ddabc1_z11dcy__ddy=
+     1   ddabc1_z11dcy__dabc_length_inv*dabc_length_inv__ddy
+     1 + ddabc1_z11dcy__dab_y*dab_y__ddy
+     1 + ddabc1_z11dcy__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddy
       ddabc1_z11dcy__ddz=
+     1   ddabc1_z11dcy__dabc_length_inv*dabc_length_inv__ddz
+     1 + ddabc1_z11dcy__dab_y*dab_y__ddz
+     1 + ddabc1_z11dcy__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11dcy__ddabc_length_inv11dcy*ddabc_length_inv11dcy__ddz
+c dabc1_z__dcz= abc_z*dabc_length_inv__dcz
       ddabc1_z11dcz__dcz=
+     1   ddabc1_z11dcz__dabc_z*dabc_z__dcz
+     1 + ddabc1_z11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__dcz
       ddabc1_z11dcz__ddx=
+     1   ddabc1_z11dcz__dabc_z*dabc_z__ddx
+     1 + ddabc1_z11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddx
       ddabc1_z11dcz__ddy=
+     1   ddabc1_z11dcz__dabc_z*dabc_z__ddy
+     1 + ddabc1_z11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddy
       ddabc1_z11dcz__ddz=
-
-      ddbcd1_x11dbx__dbx=
-      ddbcd1_x11dbx__dby=
-      ddbcd1_x11dbx__dbz=
-      ddbcd1_x11dbx__dcx=
-      ddbcd1_x11dbx__dcy=
-      ddbcd1_x11dbx__dcz=
-      ddbcd1_x11dbx__ddx=
-      ddbcd1_x11dbx__ddy=
-      ddbcd1_x11dbx__ddz=
-      ddbcd1_x11dby__dby=
-      ddbcd1_x11dby__dbz=
-      ddbcd1_x11dby__dcx=
-      ddbcd1_x11dby__dcy=
-      ddbcd1_x11dby__dcz=
-      ddbcd1_x11dby__ddx=
-      ddbcd1_x11dby__ddy=
-      ddbcd1_x11dby__ddz=
-      ddbcd1_x11dbz__dbz=
-      ddbcd1_x11dbz__dcx=
-      ddbcd1_x11dbz__dcy=
-      ddbcd1_x11dbz__dcz=
-      ddbcd1_x11dbz__ddx=
-      ddbcd1_x11dbz__ddy=
-      ddbcd1_x11dbz__ddz=
-      ddbcd1_x11dcx__dcx=
-      ddbcd1_x11dcx__dcy=
-      ddbcd1_x11dcx__dcz=
-      ddbcd1_x11dcx__ddx=
-      ddbcd1_x11dcx__ddy=
-      ddbcd1_x11dcx__ddz=
-      ddbcd1_x11dcy__dcy=
-      ddbcd1_x11dcy__dcz=
-      ddbcd1_x11dcy__ddx=
-      ddbcd1_x11dcy__ddy=
-      ddbcd1_x11dcy__ddz=
-      ddbcd1_x11dcz__dcz=
-      ddbcd1_x11dcz__ddx=
-      ddbcd1_x11dcz__ddy=
-      ddbcd1_x11dcz__ddz=
-      ddbcd1_x11ddx__ddx=
-      ddbcd1_x11ddx__ddy=
-      ddbcd1_x11ddx__ddz=
-      ddbcd1_x11ddy__ddy=
-      ddbcd1_x11ddy__ddz=
-      ddbcd1_x11ddz__ddz=
-
-      ddbcd1_y11dbx__dbx=
-      ddbcd1_y11dbx__dby=
-      ddbcd1_y11dbx__dbz=
-      ddbcd1_y11dbx__dcx=
-      ddbcd1_y11dbx__dcy=
-      ddbcd1_y11dbx__dcz=
-      ddbcd1_y11dbx__ddx=
-      ddbcd1_y11dbx__ddy=
-      ddbcd1_y11dbx__ddz=
-      ddbcd1_y11dby__dby=
-      ddbcd1_y11dby__dbz=
-      ddbcd1_y11dby__dcx=
-      ddbcd1_y11dby__dcy=
-      ddbcd1_y11dby__dcz=
-      ddbcd1_y11dby__ddx=
-      ddbcd1_y11dby__ddy=
-      ddbcd1_y11dby__ddz=
-      ddbcd1_y11dbz__dbz=
-      ddbcd1_y11dbz__dcx=
-      ddbcd1_y11dbz__dcy=
-      ddbcd1_y11dbz__dcz=
-      ddbcd1_y11dbz__ddx=
-      ddbcd1_y11dbz__ddy=
-      ddbcd1_y11dbz__ddz=
-      ddbcd1_y11dcx__dcx=
-      ddbcd1_y11dcx__dcy=
-      ddbcd1_y11dcx__dcz=
-      ddbcd1_y11dcx__ddx=
-      ddbcd1_y11dcx__ddy=
-      ddbcd1_y11dcx__ddz=
-      ddbcd1_y11dcy__dcy=
-      ddbcd1_y11dcy__dcz=
-      ddbcd1_y11dcy__ddx=
-      ddbcd1_y11dcy__ddy=
-      ddbcd1_y11dcy__ddz=
-      ddbcd1_y11dcz__dcz=
-      ddbcd1_y11dcz__ddx=
-      ddbcd1_y11dcz__ddy=
-      ddbcd1_y11dcz__ddz=
-      ddbcd1_y11ddx__ddx=
-      ddbcd1_y11ddx__ddy=
-      ddbcd1_y11ddx__ddz=
-      ddbcd1_y11ddy__ddy=
-      ddbcd1_y11ddy__ddz=
-      ddbcd1_y11ddz__ddz=
-
-      ddbcd1_z11dbx__dby=
-      ddbcd1_z11dbx__dbz=
-      ddbcd1_z11dbx__dcx=
-      ddbcd1_z11dbx__dcy=
-      ddbcd1_z11dbx__dcz=
-      ddbcd1_z11dbx__ddx=
-      ddbcd1_z11dbx__ddy=
-      ddbcd1_z11dbx__ddz=
-      ddbcd1_z11dby__dby=
-      ddbcd1_z11dby__dbz=
-      ddbcd1_z11dby__dcx=
-      ddbcd1_z11dby__dcy=
-      ddbcd1_z11dby__dcz=
-      ddbcd1_z11dby__ddx=
-      ddbcd1_z11dby__ddy=
-      ddbcd1_z11dby__ddz=
-      ddbcd1_z11dbz__dbz=
-      ddbcd1_z11dbz__dcx=
-      ddbcd1_z11dbz__dcy=
-      ddbcd1_z11dbz__dcz=
-      ddbcd1_z11dbz__ddx=
-      ddbcd1_z11dbz__ddy=
-      ddbcd1_z11dbz__ddz=
-      ddbcd1_z11dcx__dcx=
-      ddbcd1_z11dcx__dcy=
-      ddbcd1_z11dcx__dcz=
-      ddbcd1_z11dcx__ddx=
-      ddbcd1_z11dcx__ddy=
-      ddbcd1_z11dcx__ddz=
-      ddbcd1_z11dcy__dcy=
-      ddbcd1_z11dcy__dcz=
-      ddbcd1_z11dcy__ddx=
-      ddbcd1_z11dcy__ddy=
-      ddbcd1_z11dcy__ddz=
-      ddbcd1_z11dcz__dcz=
-      ddbcd1_z11dcz__ddx=
-      ddbcd1_z11dcz__ddy=
-      ddbcd1_z11dcz__ddz=
-      ddbcd1_z11ddx__ddx=
-      ddbcd1_z11ddx__ddy=
-      ddbcd1_z11ddx__ddz=
-      ddbcd1_z11ddy__ddy=
-      ddbcd1_z11ddy__ddz=
-      ddbcd1_z11ddz__ddz=
+     1   ddabc1_z11dcz__dabc_z*dabc_z__ddz
+     1 + ddabc1_z11dcz__ddabc_length_inv11dcz*ddabc_length_inv11dcz__ddz
 
 
 c dx__dax= bcd1_x*dabc1_x__dax + bcd1_y*dabc1_y__dax + bcd1_z*dabc1_z__dax  
