@@ -2351,17 +2351,19 @@ C     Calculate P-type dipole moment
       use config
       implicit double precision (a-h,o-z)
       dimension Dist(3,Nmax),IC3(Nmax,3),Iperm(Nmax,2),IDA(Nmax,Nmax)
-C Sort Cartesian coordinates so atom number i is connected to
-C  atoms 1,...,I-1
+C Sort Cartesian coordinates so atom number i is always connected to
+C  the previous atoms 1,...,I-1
+C Note this reorders IC3 and IDA
  
-      Write(Iout,1003)
       nperm=0
+      Write(Iout,1003)
+
       do 10 i=2,MAtom
       do j=i,MAtom-1
        do k=1,3
         if(IC3(j,k).le.i-1) then
          if(i.ne.j) then
-C    change distances
+C    change distances, permute (i,j)
           x=Dist(1,i)
           y=Dist(2,i)
           z=Dist(3,i)
@@ -2382,47 +2384,50 @@ C    change IC3
          IC3(j,2)=iz2
          IC3(j,3)=iz3
          do k1=1,MAtom
-         do 11 k2=1,3
+         do k2=1,3
           if(IC3(k1,k2).eq.i) then
            IC3(k1,k2)=j
-           go to 11
+          else
+           if(IC3(k1,k2).eq.j) then
+            IC3(k1,k2)=i
+           endif
           endif
-          if(IC3(k1,k2).eq.j) then
-           IC3(k1,k2)=i
-          endif
-   11    continue
          enddo
-
+         enddo
 C    record change
           nperm=nperm+1
           Iperm(nperm,1)=i
           Iperm(nperm,2)=j
          endif
-        go to 10
+          go to 10
         endif
        enddo
 
       enddo
   10  continue
       Write(Iout,1000) nperm
+
       if(nperm.ne.0) then 
        Write(Iout,1001) 
        Write(Iout,1002) (Iperm(i,1),Iperm(i,2),i=1,nperm)
 C     Reset IDA
-       Do I=1,NAtom
-       Do J=1,NAtom
+       Do I=1,MAtom
+       Do J=1,MAtom
         IDA(I,J)=0
        enddo
        enddo
+      Write(IOUT,1004) 
+      Do I=1,MAtom
+       Write(IOUT,1005) I,(IC3(I,J),J=1,3)
+      enddo
 C     Reconstruct IDA
-       Do I=1,NAtom
+       Do I=1,MAtom
        Do K=1,3
-        J=IC3(I,K)
-        IDA(I,J)=1
-        IDA(J,I)=1
+        IV=IC3(I,K)
+        IDA(I,IV)=1
+        IDA(IV,I)=1
        enddo
        enddo
-
       endif
 
 
@@ -2433,6 +2438,11 @@ C     Reconstruct IDA
  1001 Format(1X,'Permutations:')
  1002 Format(10(1X,'(',I4,',',I4,')'))
  1003 Format(1X,'Enter Subroutine Permute')
+ 1004 Format(1X,' Vertices permuted and connectivities and ',
+     1 'adjacency matrix altered. Vertices N and corresponding ',
+     1 'adjacencies Ni of 3-connected graph:',
+     1 /1X,'   N        N1   N2   N3')
+ 1005 Format(1X,I4,'    (',3I5,')')
       Return
       END
 

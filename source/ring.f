@@ -2959,7 +2959,7 @@ C     Filling in Tree structure at level Istep
       RETURN
       END
 
-      SUBROUTINE Connect(MCon2,MAtom,Ipent,IOUT,isort,nosort,
+      SUBROUTINE Connect(MCon2,MAtom,Ipent,IOUT,
      1  Icon2,IC3,IDA,Tol,DistMat,Rmin)
       use config
 C     Get the connectivities between 2 and 3 atoms
@@ -3022,7 +3022,7 @@ C     Get the connectivities between 2 and 3 atoms
       if(MAtom.ge.1000.and.MAtom.lt.10000) 
      1 Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
       enddo
-      if(isort.eq.0.or.nosort.eq.1) Write(IOUT,1002)
+      Write(IOUT,1002)
 C     Get all vertices
       Do I=1,MAtom
       IZ=0
@@ -3039,8 +3039,7 @@ C     Get all vertices
       IF(IZ.EQ.3) Go to 10
       enddo
    10 Continue
-      if(isort.eq.0.or.nosort.eq.1)
-     1 Write(IOUT,1003) I,(IC3(I,J),J=1,3)
+      Write(IOUT,1003) I,(IC3(I,J),J=1,3)
       enddo
 C     Check if structure is alright at this point
       nexpedge=MAtom*3/2

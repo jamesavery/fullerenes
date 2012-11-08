@@ -73,7 +73,6 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       ilp=0
       iprev=0
       isort=0
-      icall=0
       VolSphere=0.d0
       ASphere=0.d0
       Group='   '
@@ -198,19 +197,16 @@ C Move carbon cage to Atomic Center
   999 routine='MOVECM_1       '
       Write(Iout,1008) routine
       Iprint=iprintf
-      Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+      CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
      1 nosort,SP,Dist,DistCM,El)
-      if(icall.eq.1) isort=0
       mirror=0
 
 C------------------DIAMETER----------------------------------------
 C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia
-  888 if(isort.eq.0.or.nosort.ne.0) then
        routine='DIAMETER       '
        Write(Iout,1008) routine
        CALL Diameter(MAtom,Iout,Dist,distp)
-      endif
 
 C------------------DISTMATRIX--------------------------------------
 C Calculate the distance Matrix and print out distance Matrix
@@ -223,19 +219,18 @@ C------------------CONNECT-----------------------------------------
 C Establish Connectivities
       routine='CONNECT        '
       Write(Iout,1008) routine
-      CALL Connect(MCon2,MAtom,Ipent,Iout,isort,nosort,
+      CALL Connect(MCon2,MAtom,Ipent,Iout,
      1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
-       icall=icall+1
-      if(isort.ne.0.and.nosort.eq.0.and.Icart.le.2) then
+
+C------------------REORDER-----------------------------------------
+C Reorder atoms such that distances in internal coordinates are bonds
+      if(nosort.eq.0) then
+       routine='REORDER        '
+       Write(Iout,1008) routine
        CALL Permute(Matom,Iout,nperm,IC3,IDA,Dist)
-       if(nperm.ne.0) then
-        isort=0
-          Write(Iout,1024)
-        go to 888 
-       endif
-       if(icall.lt.2) Go to 999
+        if(nperm.ne.0) CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+     1   nosort,SP,Dist,DistCM,El)
       endif
-      icall=0
 
 C------------------HUECKEL-----------------------------------------
 C Hueckel matrix and eigenvalues
@@ -334,23 +329,15 @@ c       Store distances
      1      Dist,dist2D,Rdist,ftolP,force,iopt)
         endif
 c       Compare structures
-        Call CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
+        CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
         routine='MOVECM_2       '
-  991   Write(Iout,1008) routine
-        Call MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+        Write(Iout,1008) routine
+        CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
      1   nosort,SP,Dist,DistCM,El)
         routine='DISTANCEMATRIX '
         Write(Iout,1008) routine
         CALL Distmatrix(MAtom,Iout,Iprintf,0,
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
-       icall=icall+1
-        if(isort.ne.0.and.nosort.eq.0.and.icall.lt.2) then
-         CALL Permute(Matom,Iout,IC3,IDA,Dist,nperm)
-         if(nperm.gt.0) then
-          Write(Iout,1024)
-          Go to 991
-         endif
-        endif
         routine='DIAMETER       '
         Write(Iout,1008) routine
         CALL Diameter(MAtom,Iout,Dist,distp)
@@ -516,7 +503,7 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         routine='TOPOLOINDICATOR'
         Write(Iout,1008) routine
 C Topological Indicators
-      Call TopIndicators(Matom,Iout,IDA,Mdist)
+      CALL TopIndicators(Matom,Iout,IDA,Mdist)
 
 C------------------VOLUME-----------------------------------------
 C Calculate the volume
@@ -644,8 +631,6 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1022 FORMAT(/1X,'You try to write into the database filesystem',
      1 ' which is not allowed  ===>  ABORT')
  1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
- 1024 Format(1X,'Note that there are now permutations in the ',
-     1 'connectivities and the adjacency matrix has been altered')
  1025 FORMAT(I2)
  1026 FORMAT(I3)
  1027 FORMAT(I4)
@@ -655,7 +640,7 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
 
       SUBROUTINE TIMER(TIMEX)
       Real TA(2)
-      Call DTIME(TA,time)
+      CALL DTIME(TA,time)
       TIMEX=TIME
       RETURN
       END
