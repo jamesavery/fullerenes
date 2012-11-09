@@ -2710,7 +2710,7 @@ C     (6-6) 2-ring fusions
       Return
       END
  
-      SUBROUTINE Distmatrix(MAtom,IOUT,Iprint,Iopt,
+      SUBROUTINE DistMatrix(MAtom,IOUT,Iprint,ireturn,Iopt,
      1 Dist,DistMat,Rmin,Rmax,Vol,ASphere)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2733,6 +2733,7 @@ C     Calculate distance matrix between atoms from cartesian coordinates
       if(Iopt.eq.0.and.Iprint.eq.1) 
      1   Write(IOUT,1001) (I,J,DistMat(IZ+J),J=1,I-1)
       enddo
+      if(ireturn.eq.1) return
 
 C     Determine minimum and maximum distances
       Rmin=1.d20
