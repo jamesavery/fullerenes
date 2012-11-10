@@ -725,332 +725,530 @@ c////////////////////////////////////////////////////////////////////////
 c////////////////////////////////////////////////////////////////////////
 
 
-      ddabc1_x11dax__dax=1
-      ddabc1_x11dax__day=1
-      ddabc1_x11dax__daz=1
-      ddabc1_x11dax__dbx=1
-      ddabc1_x11dax__dby=1
-      ddabc1_x11dax__dbz=1
-      ddabc1_x11dax__dcx=1
-      ddabc1_x11dax__dcy=1
-      ddabc1_x11dax__dcz=1
-      ddabc1_x11dax__ddx=1
-      ddabc1_x11dax__ddy=1
-      ddabc1_x11dax__ddz=1
-
-      ddabc1_x11day__day=1
-      ddabc1_x11day__daz=1
-      ddabc1_x11day__dbx=1
-      ddabc1_x11day__dby=1
-      ddabc1_x11day__dbz=1
-      ddabc1_x11day__dcx=1
-      ddabc1_x11day__dcy=1
-      ddabc1_x11day__dcz=1
-      ddabc1_x11day__ddx=1
-      ddabc1_x11day__ddy=1
-      ddabc1_x11day__ddz=1
-
-      ddabc1_x11daz__daz=1
-      ddabc1_x11daz__dbx=1
-      ddabc1_x11daz__dby=1
-      ddabc1_x11daz__dbz=1
-      ddabc1_x11daz__dcx=1
-      ddabc1_x11daz__dcy=1
-      ddabc1_x11daz__dcz=1
-      ddabc1_x11daz__ddx=1
-      ddabc1_x11daz__ddy=1
-      ddabc1_x11daz__ddz=1
-
-      ddabc1_x11dbx__dbx=1
-      ddabc1_x11dbx__dby=1
-      ddabc1_x11dbx__dbz=1
-      ddabc1_x11dbx__dcx=1
-      ddabc1_x11dbx__dcy=1
-      ddabc1_x11dbx__dcz=1
-      ddabc1_x11dbx__ddx=1
-      ddabc1_x11dbx__ddy=1
-      ddabc1_x11dbx__ddz=1
-
-      ddabc1_x11dby__dby=1
-      ddabc1_x11dby__dbz=1
-      ddabc1_x11dby__dcx=1
-      ddabc1_x11dby__dcy=1
-      ddabc1_x11dby__dcz=1
-      ddabc1_x11dby__ddx=1
-      ddabc1_x11dby__ddy=1
-      ddabc1_x11dby__ddz=1
-
-      ddabc1_x11dbz__dbz=1
-      ddabc1_x11dbz__dcx=1
-      ddabc1_x11dbz__dcy=1
-      ddabc1_x11dbz__dcz=1
-      ddabc1_x11dbz__ddx=1
-      ddabc1_x11dbz__ddy=1
-      ddabc1_x11dbz__ddz=1
-
-      ddabc1_x11dcx__dcx=1
-      ddabc1_x11dcx__dcy=1
-      ddabc1_x11dcx__dcz=1
-      ddabc1_x11dcx__ddx=1
-      ddabc1_x11dcx__ddy=1
-      ddabc1_x11dcx__ddz=1
-
-      ddabc1_x11dcy__dcy=1
-      ddabc1_x11dcy__dcz=1
-      ddabc1_x11dcy__ddx=1
-      ddabc1_x11dcy__ddy=1
-      ddabc1_x11dcy__ddz=1
-
-      ddabc1_x11dcz__dcz=1
-      ddabc1_x11dcz__ddx=1
-      ddabc1_x11dcz__ddy=1
-      ddabc1_x11dcz__ddz=1
+      ddabc_length_inv11dax__dax=1
+      ddabc_length_inv11dax__day=1
+      ddabc_length_inv11dax__daz=1
+      ddabc_length_inv11dax__dbx=1
+      ddabc_length_inv11dax__dby=1
+      ddabc_length_inv11dax__dbz=1
+      ddabc_length_inv11dax__dcx=1
+      ddabc_length_inv11dax__dcy=1
+      ddabc_length_inv11dax__dcz=1
+      ddabc_length_inv11dax__ddx=1
+      ddabc_length_inv11dax__ddy=1
+      ddabc_length_inv11dax__ddz=1
+      ddabc_length_inv11day__day=1
+      ddabc_length_inv11day__daz=1
+      ddabc_length_inv11day__dbx=1
+      ddabc_length_inv11day__dby=1
+      ddabc_length_inv11day__dbz=1
+      ddabc_length_inv11day__dcx=1
+      ddabc_length_inv11day__dcy=1
+      ddabc_length_inv11day__dcz=1
+      ddabc_length_inv11day__ddx=1
+      ddabc_length_inv11day__ddy=1
+      ddabc_length_inv11day__ddz=1
+      ddabc_length_inv11daz__daz=1
+      ddabc_length_inv11daz__dbx=1
+      ddabc_length_inv11daz__dby=1
+      ddabc_length_inv11daz__dbz=1
+      ddabc_length_inv11daz__dcx=1
+      ddabc_length_inv11daz__dcy=1
+      ddabc_length_inv11daz__dcz=1
+      ddabc_length_inv11daz__ddx=1
+      ddabc_length_inv11daz__ddy=1
+      ddabc_length_inv11daz__ddz=1
+      ddabc_length_inv11dbx__dbx=1
+      ddabc_length_inv11dbx__dby=1
+      ddabc_length_inv11dbx__dbz=1
+      ddabc_length_inv11dbx__dcx=1
+      ddabc_length_inv11dbx__dcy=1
+      ddabc_length_inv11dbx__dcz=1
+      ddabc_length_inv11dbx__ddx=1
+      ddabc_length_inv11dbx__ddy=1
+      ddabc_length_inv11dbx__ddz=1
+      ddabc_length_inv11dby__dby=1
+      ddabc_length_inv11dby__dbz=1
+      ddabc_length_inv11dby__dcx=1
+      ddabc_length_inv11dby__dcy=1
+      ddabc_length_inv11dby__dcz=1
+      ddabc_length_inv11dby__ddx=1
+      ddabc_length_inv11dby__ddy=1
+      ddabc_length_inv11dby__ddz=1
+      ddabc_length_inv11dbz__dbz=1
+      ddabc_length_inv11dbz__dcx=1
+      ddabc_length_inv11dbz__dcy=1
+      ddabc_length_inv11dbz__dcz=1
+      ddabc_length_inv11dbz__ddx=1
+      ddabc_length_inv11dbz__ddy=1
+      ddabc_length_inv11dbz__ddz=1
+      ddabc_length_inv11dcx__dcx=1
+      ddabc_length_inv11dcx__dcy=1
+      ddabc_length_inv11dcx__dcz=1
+      ddabc_length_inv11dcx__ddx=1
+      ddabc_length_inv11dcx__ddy=1
+      ddabc_length_inv11dcx__ddz=1
+      ddabc_length_inv11dcy__dcy=1
+      ddabc_length_inv11dcy__dcz=1
+      ddabc_length_inv11dcy__ddx=1
+      ddabc_length_inv11dcy__ddy=1
+      ddabc_length_inv11dcy__ddz=1
+      ddabc_length_inv11dcz__dcz=1
+      ddabc_length_inv11dcz__ddx=1
+      ddabc_length_inv11dcz__ddy=1
+      ddabc_length_inv11dcz__ddz=1
 
 
-      ddabc1_y11dax__dax=1
-      ddabc1_y11dax__day=1
-      ddabc1_y11dax__daz=1
-      ddabc1_y11dax__dbx=1
-      ddabc1_y11dax__dby=1
-      ddabc1_y11dax__dbz=1
-      ddabc1_y11dax__dcx=1
-      ddabc1_y11dax__dcy=1
-      ddabc1_y11dax__dcz=1
-      ddabc1_y11dax__ddx=1
-      ddabc1_y11dax__ddy=1
-      ddabc1_y11dax__ddz=1
-
-      ddabc1_y11day__day=1
-      ddabc1_y11day__daz=1
-      ddabc1_y11day__dbx=1
-      ddabc1_y11day__dby=1
-      ddabc1_y11day__dbz=1
-      ddabc1_y11day__dcx=1
-      ddabc1_y11day__dcy=1
-      ddabc1_y11day__dcz=1
-      ddabc1_y11day__ddx=1
-      ddabc1_y11day__ddy=1
-      ddabc1_y11day__ddz=1
-
-      ddabc1_y11daz__daz=1
-      ddabc1_y11daz__dbx=1
-      ddabc1_y11daz__dby=1
-      ddabc1_y11daz__dbz=1
-      ddabc1_y11daz__dcx=1
-      ddabc1_y11daz__dcy=1
-      ddabc1_y11daz__dcz=1
-      ddabc1_y11daz__ddx=1
-      ddabc1_y11daz__ddy=1
-      ddabc1_y11daz__ddz=1
-
-      ddabc1_y11dbx__dbx=1
-      ddabc1_y11dbx__dby=1
-      ddabc1_y11dbx__dbz=1
-      ddabc1_y11dbx__dcx=1
-      ddabc1_y11dbx__dcy=1
-      ddabc1_y11dbx__dcz=1
-      ddabc1_y11dbx__ddx=1
-      ddabc1_y11dbx__ddy=1
-      ddabc1_y11dbx__ddz=1
-
-      ddabc1_y11dby__dby=1
-      ddabc1_y11dby__dbz=1
-      ddabc1_y11dby__dcx=1
-      ddabc1_y11dby__dcy=1
-      ddabc1_y11dby__dcz=1
-      ddabc1_y11dby__ddx=1
-      ddabc1_y11dby__ddy=1
-      ddabc1_y11dby__ddz=1
-
-      ddabc1_y11dbz__dbz=1
-      ddabc1_y11dbz__dcx=1
-      ddabc1_y11dbz__dcy=1
-      ddabc1_y11dbz__dcz=1
-      ddabc1_y11dbz__ddx=1
-      ddabc1_y11dbz__ddy=1
-      ddabc1_y11dbz__ddz=1
-
-      ddabc1_y11dcx__dcx=1
-      ddabc1_y11dcx__dcy=1
-      ddabc1_y11dcx__dcz=1
-      ddabc1_y11dcx__ddx=1
-      ddabc1_y11dcx__ddy=1
-      ddabc1_y11dcx__ddz=1
-
-      ddabc1_y11dcy__dcy=1
-      ddabc1_y11dcy__dcz=1
-      ddabc1_y11dcy__ddx=1
-      ddabc1_y11dcy__ddy=1
-      ddabc1_y11dcy__ddz=1
-
-      ddabc1_y11dcz__dcz=1
-      ddabc1_y11dcz__ddx=1
-      ddabc1_y11dcz__ddy=1
-      ddabc1_y11dcz__ddz=1
-
-
-      ddabc1_z11dax__dax=1
-      ddabc1_z11dax__day=1
-      ddabc1_z11dax__daz=1
-      ddabc1_z11dax__dbx=1
-      ddabc1_z11dax__dby=1
-      ddabc1_z11dax__dbz=1
-      ddabc1_z11dax__dcx=1
-      ddabc1_z11dax__dcy=1
-      ddabc1_z11dax__dcz=1
-      ddabc1_z11dax__ddx=1
-      ddabc1_z11dax__ddy=1
-      ddabc1_z11dax__ddz=1
-
-      ddabc1_z11day__day=1
-      ddabc1_z11day__daz=1
-      ddabc1_z11day__dbx=1
-      ddabc1_z11day__dby=1
-      ddabc1_z11day__dbz=1
-      ddabc1_z11day__dcx=1
-      ddabc1_z11day__dcy=1
-      ddabc1_z11day__dcz=1
-      ddabc1_z11day__ddx=1
-      ddabc1_z11day__ddy=1
-      ddabc1_z11day__ddz=1
-
-      ddabc1_z11daz__daz=1
-      ddabc1_z11daz__dbx=1
-      ddabc1_z11daz__dby=1
-      ddabc1_z11daz__dbz=1
-      ddabc1_z11daz__dcx=1
-      ddabc1_z11daz__dcy=1
-      ddabc1_z11daz__dcz=1
-      ddabc1_z11daz__ddx=1
-      ddabc1_z11daz__ddy=1
-      ddabc1_z11daz__ddz=1
-
-      ddabc1_z11dbx__dbx=1
-      ddabc1_z11dbx__dby=1
-      ddabc1_z11dbx__dbz=1
-      ddabc1_z11dbx__dcx=1
-      ddabc1_z11dbx__dcy=1
-      ddabc1_z11dbx__dcz=1
-      ddabc1_z11dbx__ddx=1
-      ddabc1_z11dbx__ddy=1
-      ddabc1_z11dbx__ddz=1
-
-      ddabc1_z11dby__dby=1
-      ddabc1_z11dby__dbz=1
-      ddabc1_z11dby__dcx=1
-      ddabc1_z11dby__dcy=1
-      ddabc1_z11dby__dcz=1
-      ddabc1_z11dby__ddx=1
-      ddabc1_z11dby__ddy=1
-      ddabc1_z11dby__ddz=1
-
-      ddabc1_z11dbz__dbz=1
-      ddabc1_z11dbz__dcx=1
-      ddabc1_z11dbz__dcy=1
-      ddabc1_z11dbz__dcz=1
-      ddabc1_z11dbz__ddx=1
-      ddabc1_z11dbz__ddy=1
-      ddabc1_z11dbz__ddz=1
-
-      ddabc1_z11dcx__dcx=1
-      ddabc1_z11dcx__dcy=1
-      ddabc1_z11dcx__dcz=1
-      ddabc1_z11dcx__ddx=1
-      ddabc1_z11dcx__ddy=1
-      ddabc1_z11dcx__ddz=1
-
-      ddabc1_z11dcy__dcy=1
-      ddabc1_z11dcy__dcz=1
-      ddabc1_z11dcy__ddx=1
-      ddabc1_z11dcy__ddy=1
-      ddabc1_z11dcy__ddz=1
-
-      ddabc1_z11dcz__dcz=1
-      ddabc1_z11dcz__ddx=1
-      ddabc1_z11dcz__ddy=1
-      ddabc1_z11dcz__ddz=1
+      ddabc_x11dby__dby=1
+      ddabc_x11dby__dbz=1
+      ddabc_x11dby__dcx=1
+      ddabc_x11dby__dcy=1
+      ddabc_x11dby__dcz=1
+      ddabc_x11dby__ddx=1
+      ddabc_x11dby__ddy=1
+      ddabc_x11dby__ddz=1
+      ddabc_x11dbz__dbz=1
+      ddabc_x11dbz__dcx=1
+      ddabc_x11dbz__dcy=1
+      ddabc_x11dbz__dcz=1
+      ddabc_x11dbz__ddx=1
+      ddabc_x11dbz__ddy=1
+      ddabc_x11dbz__ddz=1
+      ddabc_y11dbx__dbx=1
+      ddabc_y11dbx__dby=1
+      ddabc_y11dbx__dbz=1
+      ddabc_y11dbx__dcx=1
+      ddabc_y11dbx__dcy=1
+      ddabc_y11dbx__dcz=1
+      ddabc_y11dbx__ddx=1
+      ddabc_y11dbx__ddy=1
+      ddabc_y11dbx__ddz=1
+      ddabc_y11dbz__dbz=1
+      ddabc_y11dbz__dcx=1
+      ddabc_y11dbz__dcy=1
+      ddabc_y11dbz__dcz=1
+      ddabc_y11dbz__ddx=1
+      ddabc_y11dbz__ddy=1
+      ddabc_y11dbz__ddz=1
+      ddabc_z11dbx__dbx=1
+      ddabc_z11dbx__dby=1
+      ddabc_z11dbx__dbz=1
+      ddabc_z11dbx__dcx=1
+      ddabc_z11dbx__dcy=1
+      ddabc_z11dbx__dcz=1
+      ddabc_z11dbx__ddx=1
+      ddabc_z11dbx__ddy=1
+      ddabc_z11dbx__ddz=1
+      ddabc_z11dby__dby=1
+      ddabc_z11dby__dbz=1
+      ddabc_z11dby__dcx=1
+      ddabc_z11dby__dcy=1
+      ddabc_z11dby__dcz=1
+      ddabc_z11dby__ddx=1
+      ddabc_z11dby__ddy=1
+      ddabc_z11dby__ddz=1
 
 
 
-      ddbc1_x11dbx__dbx=1
-      ddbc1_x11dbx__dby=1
-      ddbc1_x11dbx__dbz=1
-      ddbc1_x11dbx__dcx=1
-      ddbc1_x11dbx__dcy=1
-      ddbc1_x11dbx__dcz=1
-      ddbc1_x11dbx__ddx=1
-      ddbc1_x11dbx__ddy=1
-      ddbc1_x11dbx__ddz=1
-      ddbc1_x11dby__dby=1
-      ddbc1_x11dby__dbz=1
-      ddbc1_x11dby__dcx=1
-      ddbc1_x11dby__dcy=1
-      ddbc1_x11dby__dcz=1
-      ddbc1_x11dby__ddx=1
-      ddbc1_x11dby__ddy=1
-      ddbc1_x11dby__ddz=1
-      ddbc1_x11dbz__dbz=1
-      ddbc1_x11dbz__dcx=1
-      ddbc1_x11dbz__dcy=1
-      ddbc1_x11dbz__dcz=1
-      ddbc1_x11dbz__ddx=1
-      ddbc1_x11dbz__ddy=1
-      ddbc1_x11dbz__ddz=1
-      ddbc1_x11dcx__dcx=1
-      ddbc1_x11dcx__dcy=1
-      ddbc1_x11dcx__dcz=1
-      ddbc1_x11dcx__ddx=1
-      ddbc1_x11dcx__ddy=1
-      ddbc1_x11dcx__ddz=1
-      ddbc1_x11dcy__dcy=1
-      ddbc1_x11dcy__dcz=1
-      ddbc1_x11dcy__ddx=1
-      ddbc1_x11dcy__ddy=1
-      ddbc1_x11dcy__ddz=1
-      ddbc1_x11dcz__dcz=1
-      ddbc1_x11dcz__ddx=1
-      ddbc1_x11dcz__ddy=1
 
-      ddbc1_x11dcz__ddz=1
-      ddbc1_y11dbx__dbx=1
-      ddbc1_y11dbx__dby=1
-      ddbc1_y11dbx__dbz=1
-      ddbc1_y11dbx__dcx=1
-      ddbc1_y11dbx__dcy=1
-      ddbc1_y11dbx__dcz=1
-      ddbc1_y11dbx__ddx=1
-      ddbc1_y11dbx__ddy=1
-      ddbc1_y11dbx__ddz=1
-      ddbc1_y11dby__dby=1
-      ddbc1_y11dby__dbz=1
-      ddbc1_y11dby__dcx=1
-      ddbc1_y11dby__dcy=1
-      ddbc1_y11dby__dcz=1
-      ddbc1_y11dby__ddx=1
-      ddbc1_y11dby__ddy=1
-      ddbc1_y11dby__ddz=1
-      ddbc1_y11dbz__dbz=1
-      ddbc1_y11dbz__dcx=1
-      ddbc1_y11dbz__dcy=1
-      ddbc1_y11dbz__dcz=1
-      ddbc1_y11dbz__ddx=1
-      ddbc1_y11dbz__ddy=1
-      ddbc1_y11dbz__ddz=1
-      ddbc1_y11dcx__dcx=1
-      ddbc1_y11dcx__dcy=1
-      ddbc1_y11dcx__dcz=1
-      ddbc1_y11dcx__ddx=1
-      ddbc1_y11dcx__ddy=1
-      ddbc1_y11dcx__ddz=1
-      ddbc1_y11dcy__dcy=1
-      ddbc1_y11dcy__dcz=1
-      ddbc1_y11dcy__ddx=1
-      ddbc1_y11dcy__ddy=1
-      ddbc1_y11dcy__ddz=1
-      ddbc1_y11dcz__dcz=1
-      ddbc1_y11dcz__ddx=1
-      ddbc1_y11dcz__ddy=1
-      ddbc1_y11dcz__ddz=1
+
+c dabc1_x__dax= abc_x*dabc_length_inv__dax
+      ddabc1_x11dax__dabc_x
+      ddabc1_x11dax__ddabc_length_inv11dax
+c dabc1_x__day=- abc_length_inv*bc_z + abc_x*dabc_length_inv__day
+      ddabc1_x11day__dabc_length_inv
+      ddabc1_x11day__dabc_x
+      ddabc1_x11day__dbc_z
+      ddabc1_x11day__ddabc_length_inv11day
+c dabc1_x__daz=abc_length_inv*bc_y + abc_x*dabc_length_inv__daz
+      ddabc1_x11daz__dabc_length_inv
+      ddabc1_x11daz__dabc_x
+      ddabc1_x11daz__dbc_y
+      ddabc1_x11daz__ddabc_length_inv11daz
+c dabc1_x__dbx= abc_x*dabc_length_inv__dbx
+      ddabc1_x11dbx__dabc_x
+      ddabc1_x11dbx__ddabc_length_inv11dbx
+c dabc1_x__dby=abc_length_inv*dabc_x__dby + abc_x*dabc_length_inv__dby
+      ddabc1_x11dby__dabc_length_inv
+      ddabc1_x11dby__dabc_x
+      ddabc1_x11dby__ddabc_length_inv11dby
+      ddabc1_x11dby__ddabc_x11dby
+c dabc1_x__dbz=abc_length_inv*dabc_x__dbz + abc_x*dabc_length_inv__dbz
+      ddabc1_x11dbz__dabc_length_inv
+      ddabc1_x11dbz__dabc_x
+      ddabc1_x11dbz__ddabc_length_inv11dbz
+      ddabc1_x11dbz__ddabc_x11dbz
+c dabc1_x__dcx= abc_x*dabc_length_inv__dcx
+      ddabc1_x11dcx__dabc_x
+      ddabc1_x11dcx__ddabc_length_inv11dcx
+c dabc1_x__dcy=-abc_length_inv*ab_z + abc_x*dabc_length_inv__dcy
+      ddabc1_x11dcy__dab_z
+      ddabc1_x11dcy__dabc_length_inv
+      ddabc1_x11dcy__dabc_x
+      ddabc1_x11dcy__ddabc_length_inv11dcy
+c dabc1_x__dcz=abc_length_inv*ab_y + abc_x*dabc_length_inv__dcz
+      ddabc1_x11dcz__dab_y
+      ddabc1_x11dcz__dabc_length_inv
+      ddabc1_x11dcz__dabc_x
+      ddabc1_x11dcz__ddabc_length_inv11dcz
+
+c dabc1_y__dax=abc_length_inv*bc_z + abc_y*dabc_length_inv__dax
+      ddabc1_y11dax__dabc_length_inv
+      ddabc1_y11dax__dabc_y
+      ddabc1_y11dax__dbc_z
+      ddabc1_y11dax__ddabc_length_inv11dax
+c dabc1_y__day= abc_y*dabc_length_inv__day
+      ddabc1_y11day__dabc_y
+      ddabc1_y11day__ddabc_length_inv11day
+c dabc1_y__daz=-abc_length_inv*bc_x + abc_y*dabc_length_inv__daz
+      ddabc1_y11daz__dabc_length_inv
+      ddabc1_y11daz__dabc_y
+      ddabc1_y11daz__dbc_x
+      ddabc1_y11daz__ddabc_length_inv11daz
+c dabc1_y__dbx=abc_length_inv*dabc_y__dbx + abc_y*dabc_length_inv__dbx
+      ddabc1_y11dbx__dabc_length_inv
+      ddabc1_y11dbx__dabc_y
+      ddabc1_y11dbx__ddabc_length_inv11dbx
+      ddabc1_y11dbx__ddabc_y11dbx
+c dabc1_y__dby= abc_y*dabc_length_inv__dby
+      ddabc1_y11dby__dabc_y
+      ddabc1_y11dby__ddabc_length_inv11dby
+c dabc1_y__dbz=abc_length_inv*dabc_y__dbz + abc_y*dabc_length_inv__dbz
+      ddabc1_y11dbz__dabc_length_inv
+      ddabc1_y11dbz__dabc_y
+      ddabc1_y11dbz__ddabc_length_inv11dbz
+      ddabc1_y11dbz__ddabc_y11dbz
+c dabc1_y__dcx=abc_length_inv*ab_z + abc_y*dabc_length_inv__dcx
+      ddabc1_y11dcx__dab_z
+      ddabc1_y11dcx__dabc_length_inv
+      ddabc1_y11dcx__dabc_y
+      ddabc1_y11dcx__ddabc_length_inv11dcx
+c dabc1_y__dcy= abc_y*dabc_length_inv__dcy
+      ddabc1_y11dcy__dabc_y
+      ddabc1_y11dcy__ddabc_length_inv11dcy
+c dabc1_y__dcz=-abc_length_inv*ab_x + abc_y*dabc_length_inv__dcz
+      ddabc1_y11dcz__dab_x
+      ddabc1_y11dcz__dabc_length_inv
+      ddabc1_y11dcz__dabc_y
+      ddabc1_y11dcz__ddabc_length_inv11dcz
+
+c dabc1_z__dax=-abc_length_inv*bc_y + abc_z*dabc_length_inv__dax
+      ddabc1_z11dax__dabc_length_inv
+      ddabc1_z11dax__dabc_z
+      ddabc1_z11dax__dbc_y
+      ddabc1_z11dax__ddabc_length_inv11dax
+c dabc1_z__day=abc_length_inv*bc_x + abc_z*dabc_length_inv__day
+      ddabc1_z11day__dabc_length_inv
+      ddabc1_z11day__dabc_z
+      ddabc1_z11day__dbc_x
+      ddabc1_z11day__ddabc_length_inv11day
+c dabc1_z__daz= abc_z*dabc_length_inv__daz
+      ddabc1_z11daz__dabc_z
+      ddabc1_z11daz__ddabc_length_inv11daz
+c dabc1_z__dbx=abc_length_inv*dabc_z__dbx + abc_z*dabc_length_inv__dbx
+      ddabc1_z11dbx__dabc_length_inv
+      ddabc1_z11dbx__dabc_z
+      ddabc1_z11dbx__ddabc_length_inv11dbx
+      ddabc1_z11dbx__ddabc_z11dbx
+c dabc1_z__dby=abc_length_inv*dabc_z__dby + abc_z*dabc_length_inv__dby
+      ddabc1_z11dby__dabc_length_inv
+      ddabc1_z11dby__dabc_z
+      ddabc1_z11dby__ddabc_length_inv11dby
+      ddabc1_z11dby__ddabc_z11dby
+c dabc1_z__dbz= abc_z*dabc_length_inv__dbz
+      ddabc1_z11dbz__dabc_z
+      ddabc1_z11dbz__ddabc_length_inv11dbz
+c dabc1_z__dcx=-abc_length_inv*ab_y + abc_z*dabc_length_inv__dcx
+      ddabc1_z11dcx__dab_y
+      ddabc1_z11dcx__dabc_length_inv
+      ddabc1_z11dcx__dabc_z
+      ddabc1_z11dcx__ddabc_length_inv11dcx
+c dabc1_z__dcy=abc_length_inv*ab_x + abc_z*dabc_length_inv__dcy
+      ddabc1_z11dcy__dab_y
+      ddabc1_z11dcy__dabc_length_inv
+      ddabc1_z11dcy__dabc_z
+      ddabc1_z11dcy__ddabc_length_inv11dcy
+c dabc1_z__dcz= abc_z*dabc_length_inv__dcz
+      ddabc1_z11dcz__dabc_z
+      ddabc1_z11dcz__ddabc_length_inv11dcz
+
+
+
+c dbc1_x__dbx= bc_length_inv + bc_x*dbc_length_inv__dbc_x
+      ddbc1_x11dbx__dbx=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dbx
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__dbx
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbx
+      ddbc1_x11dbx__dby=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dby
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__dby
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dby
+      ddbc1_x11dbx__dbz=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dbz
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__dbz
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbz
+      ddbc1_x11dbx__dcx=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dcx
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__dcx
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
+      ddbc1_x11dbx__dcy=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dcy
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__dcy
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
+      ddbc1_x11dbx__dcz=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dcz
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__dcz
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
+      ddbc1_x11dbx__ddx=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__ddx
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__ddx
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddx
+      ddbc1_x11dbx__ddy=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__ddy
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__ddy
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddy
+      ddbc1_x11dbx__ddz=
+     1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__ddz
+     1 +ddbc1_x11dbx__dbc_x*dbc_x__ddz
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddz
+c dbc1_x__dby= bc_x*dbc_length_inv__dbc_y
+      ddbc1_x11dby__dby=
+     1  ddbc1_x11dby__dbc_x*dbc_x__dby
+     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dby
+      ddbc1_x11dby__dbz=
+     1  ddbc1_x11dby__dbc_x*dbc_x__dbz
+     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dbz
+      ddbc1_x11dby__dcx=
+     1  ddbc1_x11dby__dbc_x*dbc_x__dcx
+     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcx
+      ddbc1_x11dby__dcy=
+     1  ddbc1_x11dby__dbc_x*dbc_x__dcy
+     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcy
+      ddbc1_x11dby__dcz=
+     1  ddbc1_x11dby__dbc_x*dbc_x__dcz
+     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
+      ddbc1_x11dby__ddx=
+     1  ddbc1_x11dby__dbc_x*dbc_x__ddx
+     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddx
+      ddbc1_x11dby__ddy=
+     1  ddbc1_x11dby__dbc_x*dbc_x__ddy
+     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddy
+      ddbc1_x11dby__ddz=
+     1  ddbc1_x11dby__dbc_x*dbc_x__ddz
+     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddz
+c dbc1_x__dbz= bc_x*dbc_length_inv__dbc_z
+      ddbc1_x11dbz__dbz=
+     1  ddbc1_x11dbz__dbc_x*dbc_x__dbz
+     1 +ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dbz
+      ddbc1_x11dbz__dcx=
+     1  ddbc1_x11dbz__dbc_x*dbc_x__dcx
+     1 +ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcx
+      ddbc1_x11dbz__dcy=
+     1  ddbc1_x11dbz__dbc_x*dbc_x__dcy
+     1 +ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcy
+      ddbc1_x11dbz__dcz=
+     1  ddbc1_x11dbz__dbc_x*dbc_x__dcz
+     1 +ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
+      ddbc1_x11dbz__ddx=
+     1  ddbc1_x11dbz__dbc_x*dbc_x__ddx
+     1 +ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddx
+      ddbc1_x11dbz__ddy=
+     1  ddbc1_x11dbz__dbc_x*dbc_x__ddy
+     1 +ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddy
+      ddbc1_x11dbz__ddz=
+     1  ddbc1_x11dbz__dbc_x*dbc_x__ddz
+     1 +ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddz
+c dbc1_x__dcx= -bc_length_inv - bc_x*dbc_length_inv__dbc_x
+      ddbc1_x11dcx__dcx=
+     1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__dcx
+     1 +ddbc1_x11dcx__dbc_x*dbc_x__dcx
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
+      ddbc1_x11dcx__dcy=
+     1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__dcy
+     1 +ddbc1_x11dcx__dbc_x*dbc_x__dcy
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
+      ddbc1_x11dcx__dcz=
+     1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__dcz
+     1 +ddbc1_x11dcx__dbc_x*dbc_x__dcz
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
+      ddbc1_x11dcx__ddx=
+     1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__ddx
+     1 +ddbc1_x11dcx__dbc_x*dbc_x__ddx
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddx
+      ddbc1_x11dcx__ddy=
+     1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__ddy
+     1 +ddbc1_x11dcx__dbc_x*dbc_x__ddy
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddy
+      ddbc1_x11dcx__ddz=
+     1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__ddz
+     1 +ddbc1_x11dcx__dbc_x*dbc_x__ddz
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddz
+c dbc1_x__dcy= -bc_x*dbc_length_inv__dbc_y
+      ddbc1_x11dcy__dcy=
+     1  ddbc1_x11dcy__dbc_x*dbc_x__dcy
+     1 +ddbc1_x11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcy
+      ddbc1_x11dcy__dcz=
+     1  ddbc1_x11dcy__dbc_x*dbc_x__dcz
+     1 +ddbc1_x11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
+      ddbc1_x11dcy__ddx=
+     1  ddbc1_x11dcy__dbc_x*dbc_x__ddx
+     1 +ddbc1_x11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddx
+      ddbc1_x11dcy__ddy=
+     1  ddbc1_x11dcy__dbc_x*dbc_x__ddy
+     1 +ddbc1_x11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddy
+      ddbc1_x11dcy__ddz=
+     1  ddbc1_x11dcy__dbc_x*dbc_x__ddz
+     1 +ddbc1_x11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddz
+c dbc1_x__dcz= -bc_x*dbc_length_inv__dbc_z
+      ddbc1_x11dcz__dcz=
+     1  ddbc1_x11dcz__dbc_x*dbc_x__dcz
+     1 +ddbc1_x11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
+      ddbc1_x11dcz__ddx=
+     1  ddbc1_x11dcz__dbc_x*dbc_x__ddx
+     1 +ddbc1_x11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddx
+      ddbc1_x11dcz__ddy=
+     1  ddbc1_x11dcz__dbc_x*dbc_x__ddy
+     1 +ddbc1_x11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddy
+      ddbc1_x11dcz__ddz=
+     1  ddbc1_x11dcz__dbc_x*dbc_x__ddz
+     1 +ddbc1_x11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddz
+
+c dbc1_y__dbx= bc_y*dbc_length_inv__dbc_x
+      ddbc1_y11dbx__dbx=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__dbx
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbx
+      ddbc1_y11dbx__dby=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__dby
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dby
+      ddbc1_y11dbx__dbz=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__dbz
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbz
+      ddbc1_y11dbx__dcx=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__dcx
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
+      ddbc1_y11dbx__dcy=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__dcy
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
+      ddbc1_y11dbx__dcz=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__dcz
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
+      ddbc1_y11dbx__ddx=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__ddx
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddx
+      ddbc1_y11dbx__ddy=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__ddy
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddy
+      ddbc1_y11dbx__ddz=
+     1  ddbc1_y11dbx__dbc_y*dbc_y__ddz
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddz
+c dbc1_y__dby= bc_length_inv + bc_y*dbc_length_inv__dbc_y
+      ddbc1_y11dby__dby=
+     1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__dby
+     1 +ddbc1_y11dby__dbc_y*dbc_y__dby
+     1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dby
+      ddbc1_y11dby__dbz=
+     1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__dbz
+     1 +ddbc1_y11dby__dbc_y*dbc_y__dbz
+     1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dbz
+      ddbc1_y11dby__dcx=
+     1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__dcx
+     1 +ddbc1_y11dby__dbc_y*dbc_y__dcx
+     1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcx
+      ddbc1_y11dby__dcy=
+     1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__dcy
+     1 +ddbc1_y11dby__dbc_y*dbc_y__dcy
+     1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcy
+      ddbc1_y11dby__dcz=
+     1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__dcz
+     1 +ddbc1_y11dby__dbc_y*dbc_y__dcz
+     1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
+      ddbc1_y11dby__ddx=
+     1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__ddx
+     1 +ddbc1_y11dby__dbc_y*dbc_y__ddx
+     1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddx
+      ddbc1_y11dby__ddy=
+     1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__ddy
+     1 +ddbc1_y11dby__dbc_y*dbc_y__ddy
+     1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddy
+      ddbc1_y11dby__ddz=
+     1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__ddz
+     1 +ddbc1_y11dby__dbc_y*dbc_y__ddz
+     1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddz
+c dbc1_y__dbz= bc_y*dbc_length_inv__dbc_z
+      ddbc1_y11dbz__dbz=
+     1  ddbc1_y11dbz__dbc_y*dbc_y__dbz
+     1 +ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dbz
+      ddbc1_y11dbz__dcx=
+     1  ddbc1_y11dbz__dbc_y*dbc_y__dcx
+     1 +ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcx
+      ddbc1_y11dbz__dcy=
+     1  ddbc1_y11dbz__dbc_y*dbc_y__dcy
+     1 +ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcy
+      ddbc1_y11dbz__dcz=
+     1  ddbc1_y11dbz__dbc_y*dbc_y__dcz
+     1 +ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
+      ddbc1_y11dbz__ddx=
+     1  ddbc1_y11dbz__dbc_y*dbc_y__ddx
+     1 +ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddx
+      ddbc1_y11dbz__ddy=
+     1  ddbc1_y11dbz__dbc_y*dbc_y__ddy
+     1 +ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddy
+      ddbc1_y11dbz__ddz=
+     1  ddbc1_y11dbz__dbc_y*dbc_y__ddz
+     1 +ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddz
+c dbc1_y__dcx= -bc_y*dbc_length_inv__dbc_x
+      ddbc1_y11dcx__dcx=
+     1  ddbc1_y11dcx__dbc_y*dbc_y__dcx
+     1 +ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
+      ddbc1_y11dcx__dcy=
+     1  ddbc1_y11dcx__dbc_y*dbc_y__dcy
+     1 +ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
+      ddbc1_y11dcx__dcz=
+     1  ddbc1_y11dcx__dbc_y*dbc_y__dcz
+     1 +ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
+      ddbc1_y11dcx__ddx=
+     1  ddbc1_y11dcx__dbc_y*dbc_y__ddx
+     1 +ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddx
+      ddbc1_y11dcx__ddy=
+     1  ddbc1_y11dcx__dbc_y*dbc_y__ddy
+     1 +ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddy
+      ddbc1_y11dcx__ddz=
+     1  ddbc1_y11dcx__dbc_y*dbc_y__ddz
+     1 +ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__ddz
+c dbc1_y__dcy= -bc_length_inv - bc_y*dbc_length_inv__dbc_y
+      ddbc1_y11dcy__dcy=
+     1  ddbc1_y11dcy__dbc_length_inv*dbc_length_inv__dcy
+     1 +ddbc1_y11dcy__dbc_y*dbc_y__dcy
+     1 +ddbc1_y11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcy
+      ddbc1_y11dcy__dcz=
+     1  ddbc1_y11dcy__dbc_length_inv*dbc_length_inv__dcz
+     1 +ddbc1_y11dcy__dbc_y*dbc_y__dcz
+     1 +ddbc1_y11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
+      ddbc1_y11dcy__ddx=
+     1  ddbc1_y11dcy__dbc_length_inv*dbc_length_inv__ddx
+     1 +ddbc1_y11dcy__dbc_y*dbc_y__ddx
+     1 +ddbc1_y11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddx
+      ddbc1_y11dcy__ddy=
+     1  ddbc1_y11dcy__dbc_length_inv*dbc_length_inv__ddy
+     1 +ddbc1_y11dcy__dbc_y*dbc_y__ddy
+     1 +ddbc1_y11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddy
+      ddbc1_y11dcy__ddz=
+     1  ddbc1_y11dcy__dbc_length_inv*dbc_length_inv__ddz
+     1 +ddbc1_y11dcy__dbc_y*dbc_y__ddz
+     1 +ddbc1_y11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__ddz
+c dbc1_y__dcz= -bc_y*dbc_length_inv__dbc_z
+      ddbc1_y11dcz__dcz=
+     1  ddbc1_y11dcz__dbc_y*dbc_y__dcz
+     1 +ddbc1_y11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
+      ddbc1_y11dcz__ddx=
+     1  ddbc1_y11dcz__dbc_y*dbc_y__ddx
+     1 +ddbc1_y11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddx
+      ddbc1_y11dcz__ddy=
+     1  ddbc1_y11dcz__dbc_y*dbc_y__ddy
+     1 +ddbc1_y11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddy
+      ddbc1_y11dcz__ddz=
+     1  ddbc1_y11dcz__dbc_y*dbc_y__ddz
+     1 +ddbc1_y11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__ddz
 
 c dbc1_z__dbx= bc_z*dbc_length_inv__dbc_x
       ddbc1_z11dbx__dbx=
@@ -2200,22 +2398,22 @@ c dabc1_x__dbz=abc_length_inv*dabc_x__dbz + abc_x*dabc_length_inv__dbz
 c dabc1_x__dcx= abc_x*dabc_length_inv__dcx
       ddabc1_x11dcx__dcx=
      1   ddabc1_x11dcx__dabc_x*dabc_x__dcx
-     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__dcx
+     1 + ddabc1_x11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcx
       ddabc1_x11dcx__dcy=
      1   ddabc1_x11dcx__dabc_x*dabc_x__dcy
-     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__dcy
+     1 + ddabc1_x11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcy
       ddabc1_x11dcx__dcz=
      1   ddabc1_x11dcx__dabc_x*dabc_x__dcz
-     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__dcz
+     1 + ddabc1_x11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__dcz
       ddabc1_x11dcx__ddx=
      1   ddabc1_x11dcx__dabc_x*dabc_x__ddx
-     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__ddx
+     1 + ddabc1_x11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddx
       ddabc1_x11dcx__ddy=
      1   ddabc1_x11dcx__dabc_x*dabc_x__ddy
-     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__ddy
+     1 + ddabc1_x11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddy
       ddabc1_x11dcx__ddz=
      1   ddabc1_x11dcx__dabc_x*dabc_x__ddz
-     1 + ddabc1_x11dcx__ddabc_length_inv__dcx*ddabc_length_inv__dcx__ddz
+     1 + ddabc1_x11dcx__ddabc_length_inv11dcx*ddabc_length_inv11dcx__ddz
 c dabc1_x__dcy=-abc_length_inv*ab_z + abc_x*dabc_length_inv__dcy
       ddabc1_x11dcy__dcy=
      1   ddabc1_x11dcy__dabc_length_inv*dabc_length_inv__dcy
