@@ -100,8 +100,9 @@ C  INPUT and setting parameters for running the subroutines
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1  ndual,nosort,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
-     1  scaleRad,force,forceP,filename,filenameout,TEXTINPUT)
+     1  ndual,nosort,nospiralsearch,ParamS,TolX,R5,R6,Rdist,scales,
+     1  scalePPG,ftolP,scaleRad,force,forceP,
+     1  filename,filenameout,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -212,7 +213,7 @@ C------------------DISTMATRIX--------------------------------------
 C Calculate the distance Matrix and print out distance Matrix
       routine='DISTANCEMATRIX '
       Write(Iout,1008) routine
-      CALL Distmatrix(MAtom,Iout,iprintf,Iopt,
+      CALL DistMatrix(MAtom,Iout,iprintf,0,Iopt,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
 
 C------------------CONNECT-----------------------------------------
@@ -228,8 +229,12 @@ C Reorder atoms such that distances in internal coordinates are bonds
        routine='REORDER        '
        Write(Iout,1008) routine
        CALL Permute(Matom,Iout,nperm,IC3,IDA,Dist)
-        if(nperm.ne.0) CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
-     1   nosort,SP,Dist,DistCM,El)
+        if(nperm.ne.0) then
+         CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+     1    nosort,SP,Dist,DistCM,El)
+         CALL DistMatrix(MAtom,Iout,0,1,Iopt,
+     1    Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
+        endif
       endif
 
 C------------------HUECKEL-----------------------------------------
@@ -336,7 +341,7 @@ c       Compare structures
      1   nosort,SP,Dist,DistCM,El)
         routine='DISTANCEMATRIX '
         Write(Iout,1008) routine
-        CALL Distmatrix(MAtom,Iout,Iprintf,0,
+        CALL DistMatrix(MAtom,Iout,Iprintf,0,0,
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
         routine='DIAMETER       '
         Write(Iout,1008) routine
@@ -488,8 +493,8 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
-      if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
-     1   or.Icart.eq.6.or.Icart.eq.7) then
+      if((ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
+     1   or.Icart.eq.6.or.Icart.eq.7).and.nospiralsearch.eq.0) then
         routine='SPIRALSEARCH   '
         Write(Iout,1008) routine
         CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
@@ -586,14 +591,14 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.2.1, last revision from 06/11/12   |',
+     1 /1X,'|    This  version: 4.2.1, last revision from 09/11/12   |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
      1 /1X,'For citation when running this program use:',/1X,
      1 '1) P. Schwerdtfeger, L. Wirz, J. Avery, Topological Analysis ',
-     1 'of Fullerenes - A Fortran and C++ Program (Version 4.2), ',
+     1 'of Fullerenes - A Fortran and C++ Program (Version 4.2.1), ',
      1 'Massey University Albany, Auckland, New Zealand (2012).',/1X,
      1 '2) P. W. Fowler, D. E. Manolopoulos, An Atlas of Fullerenes',
      1 ' (Dover Publ., New York, 2006).',/1X,

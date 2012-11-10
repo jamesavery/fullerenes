@@ -11,6 +11,7 @@
       integer,parameter :: LimitAll=122
       integer,parameter :: LimitIPR=170
       integer,parameter :: ffmaxdim=19 ! maximum number of parameters per force field
+      integer,parameter :: intmax8=2147483647 ! maximum integer before overflow
       real(8),parameter :: dpi=3.14159265358979d0 
 c      real(8),parameter :: deg2rad=dpi/1.8d2
 c      real(8),parameter :: rad2deg=1.8d2/dpi
