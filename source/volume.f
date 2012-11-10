@@ -160,7 +160,7 @@ C    Measure for convexity
      1 'from barycenter of polyhedron (valid for convex polyhedra): ',
      1 D14.8,/10X,'(Contributions from 5-ring: ',D14.8,
      1 ' , and from 6-ring: ',D14.8,')'
-     1 /3X,' using ',I4,' trigonal pyramidal tessellations',/1X,
+     1 /3X,' using ',I6,' trigonal pyramidal tesselations',/1X,
      1 ' Deviation from spherical central covering: ',D12.6,1X,
      1 ' in percent: ',D12.6)
  1001 Format(/1X,'Total surface area of fullerene taken ',

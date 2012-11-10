@@ -100,8 +100,9 @@ C  INPUT and setting parameters for running the subroutines
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1  ndual,nosort,ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,
-     1  scaleRad,force,forceP,filename,filenameout,TEXTINPUT)
+     1  ndual,nosort,nospiralsearch,ParamS,TolX,R5,R6,Rdist,scales,
+     1  scalePPG,ftolP,scaleRad,force,forceP,
+     1  filename,filenameout,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -492,8 +493,8 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
-      if(ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
-     1   or.Icart.eq.6.or.Icart.eq.7) then
+      if((ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
+     1   or.Icart.eq.6.or.Icart.eq.7).and.nospiralsearch.eq.0) then
         routine='SPIRALSEARCH   '
         Write(Iout,1008) routine
         CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
