@@ -1,7 +1,7 @@
 C20 aug-cc-pvdz B3LYP opt. geom. minimum E=-761.5231573 au
 This input takes the coordinates for C20 and leapfrogs to C1620
-&General NA=20 ixyz=1 /
-&Coord ICart=1, leap=5 /
+&General NA=20 ixyz=1 nospiral=1 /
+&Coord ICart=1, leap=3 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /

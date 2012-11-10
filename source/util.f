@@ -53,7 +53,7 @@ C     Now sort values of diamw, output diam
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer MDist(Nmax,Nmax),wi(nmax),wienermin,wienermax
+      Integer MDist(Nmax,Nmax),wi(Nmax),wienermin,wienermax
       DIMENSION IDA(Nmax,Nmax)
       type(c_ptr) :: g, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
@@ -73,9 +73,13 @@ C     Get topological distance matrix
       g = new_fullerene_graph(Nmax,Matom,IDA)
       call all_pairs_shortest_path(g,Matom,Nmax,MDist)
 
+      nlimit=dint(dfloat(intmax8)/1.2d0)
       iwiener1=0
       iwiener=0
       ihyperwiener=0
+      ierrorhw=0
+      ierrorw=0
+      ierrors=0
       maxdist=0
       Do I=1,MAtom
         wi(I)=0
@@ -84,10 +88,22 @@ C     Get topological distance matrix
         wi(I)=wi(i)+idist
          if(J.gt.I) then
           if(idist.gt.maxdist) maxdist=idist
-          ihyperwiener=ihyperwiener+(idist*(1+idist))/2
+          if(ierrorhw.eq.0) then 
+           ihyperwiener=ihyperwiener+(idist*(1+idist))/2
+           if(ihyperwiener.gt.nlimit) then 
+            ierrorhw=1
+            ihyperwiener=0
+           endif
+          endif
          endif
        enddo
-      iwiener1=iwiener1+wi(i)
+      if(ierrorw.eq.0) then
+       iwiener1=iwiener1+wi(i)
+       if(iwiener1.gt.nlimit) then
+        ierrorw=1
+        iwiener1=0
+       endif
+      endif
         if(I.ne.1) then
          if(wi(i).lt.wienermin) then
           wienermin=wi(i)
@@ -106,7 +122,13 @@ C     Balaban index
       Do I=1,MAtom
       Do J=I+1,MAtom
        if(IDA(I,J).eq.1) then
-        balaban=balaban+1.d0/dsqrt(dfloat(wi(I)*wi(J)))
+        wii=dfloat(wi(I))
+        wij=dfloat(wi(J))
+        if(wii.lt.1.d-15.or.wij.lt.1.d-15) then
+         Write(Iout,1006)
+         Return
+        endif
+        balaban=balaban+1.d0/(dsqrt(wii)*dsqrt(wij))
        endif
       enddo
       enddo
@@ -121,8 +143,16 @@ C     Balaban index
       isize=Matom*(Matom-1)
       Avdist=2.d0*dfloat(iwiener)/dfloat(isize)
       izagreb=MAtom*9
-      ischultz=iwiener*6
-     
+      if(iwiener.lt.intmax8/10) then
+       ischultz=iwiener*6
+      else
+       ierrors=1
+       ischultz=0
+      endif
+
+      if(ierrorw.eq.1)  Write(Iout,1003)     
+      if(ierrorhw.eq.1) Write(Iout,1004)     
+      if(ierrors.eq.1)  Write(Iout,1005)     
       Write(Iout,1001) iwiener,ihyperwiener,wienermin,wienermax,
      1 wav,rho,rhoE,izagreb,ischultz,balabanindex
       Write(Iout,1002) maxdist,Avdist
@@ -141,6 +171,11 @@ C     Balaban index
      1 /,' For the Estrada index see Subroutine Hueckel output')
  1002 Format(' Topological distances are between 1 and ',I6,/,
      1 ' Average topological distance: ',F12.6)
+ 1003 Format(' Integer overflow for Wiener index, W set to zero')
+ 1004 Format(' Integer overflow for Hyper Wiener index, WW set to zero')
+ 1005 Format(' Integer overflow for Schultz index,6*W set to zero')
+ 1006 Format(' Something wrong with Wiener sum')
+
       RETURN
       END
 
