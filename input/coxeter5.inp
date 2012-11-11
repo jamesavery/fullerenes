@@ -1,6 +1,6 @@
 Coxeter fullerene with indices (k,l)=(5,0) G0=C20
 &General ixyz=1 /
-&Coord ICart=4 , kGC=5 /
+&Coord ICart=4 , kGC=8 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /
