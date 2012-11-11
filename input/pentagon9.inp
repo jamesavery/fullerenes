@@ -1,5 +1,5 @@
 C30 nanotube. Using FM algorithm to produce coordinates through ring spiral indices
-&General  NA=30 ixyz=1 /
+&General  NA=30 ixyz=1 ip=1/
 &Coord ICart=2 /
 &FFChoice Iopt=3 /
 &FFParameters /
