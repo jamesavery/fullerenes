@@ -1,6 +1,6 @@
       SUBROUTINE CoordBuild(MAtom,IN,Iout,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
-     1 A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
+     1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
      1 GROUP,filename)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
@@ -135,6 +135,7 @@ C Start Goldberg-Coxeter
       g = new_C20();
       halma = halma_fullerene(g,kGC-1)
       isafullerene = graph_is_a_fullerene(halma)
+      ihalma=1
       IF (isafullerene .eq. 1) then
         write (iout,1043) 
       else

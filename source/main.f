@@ -73,6 +73,7 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       ilp=0
       iprev=0
       isort=0
+      ihalma=0
       VolSphere=0.d0
       ASphere=0.d0
       Group='   '
@@ -174,7 +175,7 @@ C the 3D fullerene
       Write(Iout,1008) routine
       CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
-     1 iprev,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
+     1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
      1 GROUP,filename)
       Do I=1,Matom
         IAtom(I)=6
@@ -248,7 +249,7 @@ C Hueckel matrix and eigenvalues
 C------------------GOLDBERG-COXETER-------------------------------
 C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
-        routine='LEAPFROG       '
+        routine='GOLDBERGCOXETER'
         Write(Iout,1008) routine
         CALL GoldbergCoxeter(MAtom,Iout,leap,leapGC,IGC1,IGC2,
      1   ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
@@ -494,7 +495,8 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       if((ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
-     1   or.Icart.eq.6.or.Icart.eq.7).and.nospiralsearch.eq.0) then
+     1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).and.
+     1   nospiralsearch.eq.0) then
         routine='SPIRALSEARCH   '
         Write(Iout,1008) routine
         CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
