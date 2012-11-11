@@ -356,6 +356,7 @@ C     Center for 5-rings
       numberWS=0
       numberYF=0
       IPR=0
+      sigmah=0.d0
       Write(Iout,1000)
       Do I=1,N5Ring
       Nring(I)=I
@@ -548,6 +549,10 @@ C     Strain Parameter
       khk=khk+IIR
       k2hk=k2hk+I*IIR
       enddo
+      if(ihk.eq.0) then
+       Write(Iout,1027) 
+       Go to 112
+      endif
       aihk=dfloat(ihk)
       akhk2=(dfloat(khk)/aihk)**2
       ak2hk=dfloat(k2hk)/aihk
@@ -860,6 +865,7 @@ C Print Cioslowsky analysis and check of correctness
      1 D12.6,' (5-5), ',D12.6,' (6-6), 'D12.6,' (5-6)',
      1 /1X,'Largest  distances between faces: ',
      1 D12.6,' (5-5), ',D12.6,' (6-6), 'D12.6,' (5-6)')
+ 1027 Format(1X,'sum hk is zero -> sigmah set to zero')
  1030 Format(/1X,'No Stone-Wales patterns found')
  1031 Format(/1X,I2,' Stone-Wales patterns found:')
  1032 Format(7(' (',I2,',',I5,',',I5,',',I2,')'))
