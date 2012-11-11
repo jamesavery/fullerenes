@@ -424,7 +424,7 @@ C     Get the largest ring to ring distance
        X=CRing5(1,I)-CRing5(1,J)
        Y=CRing5(2,I)-CRing5(2,J)
        Z=CRing5(3,I)-CRing5(3,J)
-       R=X*X+Y*Y+Z*Z
+       R=dsqrt(X*X+Y*Y+Z*Z)
        if(R.gt.Rmax5) Rmax5=R
        if(R.lt.Rmin5) Rmin5=R
       enddo
@@ -438,7 +438,7 @@ C     Get the largest ring to ring distance
        X=CRing6(1,I)-CRing6(1,J)
        Y=CRing6(2,I)-CRing6(2,J)
        Z=CRing6(3,I)-CRing6(3,J)
-       R=X*X+Y*Y+Z*Z
+       R=dsqrt(X*X+Y*Y+Z*Z)
        if(R.gt.Rmax6) Rmax6=R
        if(R.lt.Rmin6) Rmin6=R
       enddo
@@ -448,7 +448,7 @@ C     Get the largest ring to ring distance
        X=CRing5(1,I)-CRing6(1,J)
        Y=CRing5(2,I)-CRing6(2,J)
        Z=CRing5(3,I)-CRing6(3,J)
-       R=X*X+Y*Y+Z*Z
+       R=dsqrt(X*X+Y*Y+Z*Z)
        if(R.gt.Rmax56) Rmax56=R
        if(R.lt.Rmin56) Rmin56=R
       enddo
