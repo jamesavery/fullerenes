@@ -356,6 +356,7 @@ C     Center for 5-rings
       numberWS=0
       numberYF=0
       IPR=0
+      sigmah=0.d0
       Write(Iout,1000)
       Do I=1,N5Ring
       Nring(I)=I
@@ -423,7 +424,7 @@ C     Get the largest ring to ring distance
        X=CRing5(1,I)-CRing5(1,J)
        Y=CRing5(2,I)-CRing5(2,J)
        Z=CRing5(3,I)-CRing5(3,J)
-       R=X*X+Y*Y+Z*Z
+       R=dsqrt(X*X+Y*Y+Z*Z)
        if(R.gt.Rmax5) Rmax5=R
        if(R.lt.Rmin5) Rmin5=R
       enddo
@@ -437,7 +438,7 @@ C     Get the largest ring to ring distance
        X=CRing6(1,I)-CRing6(1,J)
        Y=CRing6(2,I)-CRing6(2,J)
        Z=CRing6(3,I)-CRing6(3,J)
-       R=X*X+Y*Y+Z*Z
+       R=dsqrt(X*X+Y*Y+Z*Z)
        if(R.gt.Rmax6) Rmax6=R
        if(R.lt.Rmin6) Rmin6=R
       enddo
@@ -447,7 +448,7 @@ C     Get the largest ring to ring distance
        X=CRing5(1,I)-CRing6(1,J)
        Y=CRing5(2,I)-CRing6(2,J)
        Z=CRing5(3,I)-CRing6(3,J)
-       R=X*X+Y*Y+Z*Z
+       R=dsqrt(X*X+Y*Y+Z*Z)
        if(R.gt.Rmax56) Rmax56=R
        if(R.lt.Rmin56) Rmin56=R
       enddo
@@ -548,6 +549,10 @@ C     Strain Parameter
       khk=khk+IIR
       k2hk=k2hk+I*IIR
       enddo
+      if(ihk.eq.0) then
+       Write(Iout,1027) 
+       Go to 112
+      endif
       aihk=dfloat(ihk)
       akhk2=(dfloat(khk)/aihk)**2
       ak2hk=dfloat(k2hk)/aihk
@@ -860,6 +865,7 @@ C Print Cioslowsky analysis and check of correctness
      1 D12.6,' (5-5), ',D12.6,' (6-6), 'D12.6,' (5-6)',
      1 /1X,'Largest  distances between faces: ',
      1 D12.6,' (5-5), ',D12.6,' (6-6), 'D12.6,' (5-6)')
+ 1027 Format(1X,'sum hk is zero -> sigmah set to zero')
  1030 Format(/1X,'No Stone-Wales patterns found')
  1031 Format(/1X,I2,' Stone-Wales patterns found:')
  1032 Format(7(' (',I2,',',I5,',',I5,',',I2,')'))
