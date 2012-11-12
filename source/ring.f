@@ -850,7 +850,8 @@ C Print Cioslowsky analysis and check of correctness
      1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
      1 'neighboring hexagon indices h3+h4+h5+h6')
  1020 Format(1X,'Rhagavachari/Fowler neighboring hexagon indices: (',
-     1 6(I3,','),I4,')  and strain parameter sigma = ',F12.6)
+     1 6(I3,','),I4,')  and strain parameter sigma = ',F12.6,
+     1 ' (NB: strictly valid only for IPR fullerenes)')
  1021 Format(10(1X,'(',I3,',',I3,','I3,')'))
  1022 Format(1X,'--> Fullerene is IPR')
  1023 Format(1X,'--> Fullerene is not IPR')
