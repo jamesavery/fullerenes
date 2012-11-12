@@ -25,6 +25,8 @@
      1 dihedral_abcd)
       IMPLICIT REAL*8 (a-z)
 
+      write(*,*)'entering dddihedral'
+
 C at first the dihedral (copied from above)
 c vectors ab, bc and cd
       ab_x=ax-bx
@@ -68,10 +70,10 @@ c     x=\vec abc1 \cdot \vec bcd_1
       x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
 c     y=\vec aux  \cdot \vec bcd_1
       y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
+      write(*,*)'x,y: ',x,y
 c the result
-      dihedral_abcd=atan2(y, x)
-
-
+      dihedral_abcd=atan2(y,x)
+      write(*,*)'dihedral angle: ', dihedral_abcd
 c//////////////////////////////////////////////////////////////
 C//////////////////////////////////////////////////////////////
 C// THE FISRT DERIVATIVES
@@ -641,8 +643,21 @@ c a couple of variables that turn out to be zero. -- should be deleted after deb
       dabc1_z__ddz=0
 
 
-
-
+c abc_x=-ab_y*bc_z + ab_z*bc_y
+      dabc_x__dab_y=-bc_z
+      dabc_x__dab_z=bc_y
+      dabc_x__dbc_y=ab_z
+      dabc_x__dbc_z=-ab_y
+c abc_y=-ab_z*bc_x + ab_x*bc_z
+      dabc_y__dab_x=bc_z
+      dabc_y__dab_z=-bc_x
+      dabc_y__dbc_x=-ab_z
+      dabc_y__dbc_z=ab_x
+c abc_z=-ab_x*bc_y + ab_y*bc_x
+      dabc_z__dab_x=-bc_y
+      dabc_z__dab_y=bc_x
+      dabc_z__dbc_x=ab_y
+      dabc_z__dbc_y=-ab_x
 
 
 c abc_x=-ab_y*bc_z + ab_z*bc_y
