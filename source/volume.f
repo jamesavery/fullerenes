@@ -144,11 +144,13 @@ C     Calculate the volume and area for C60 using R5 and R6
       Write(Iout,1005) Voldode,Areadode,R5
       If(R5div.gt.1.d-5) Write(Iout,1003) R5div,R5
       endif
+      ratioVhullexact=hullvolume/exactvolume
+      ratioAhullexact=hullarea/exactarea
       Write(Iout,1000) VTol,Vol5,Vol6,ITH,DVSphere,VPC
       If(Matom.eq.60) Write(Iout,1004) DVIcocap
-      Write(Iout,1006) exactvolume,hullvolume
+      Write(Iout,1006) exactvolume,hullvolume,ratioVhullexact
       Write(Iout,1001) ATol,Area5,Area6,DVArea,APC
-      Write(Iout,1007) exactarea,hullarea
+      Write(Iout,1007) exactarea,hullarea,ratioAhullexact
       Write(Iout,1008) Atol/VTol,exactarea/exactvolume,
      1 hullarea/hullvolume
 C    Measure for convexity
@@ -180,9 +182,11 @@ C    Measure for convexity
  1005 Format(/1X,' Volume and surface area of the dodecahedron: V= ',
      1 D14.8,1X,', A= ',D14.8,/1X,' Distance taken: R5= ',D12.6)
  1006 Format(1X,' Exact volume of fullerene: ',D12.6,
-     1      /1X,' Convex hull volume of fullerene: ',D12.6)
+     1      /1X,' Convex hull volume of fullerene: ',D12.6,
+     1      /1X,' Ratio V(hull)/V(exact): ',D12.6)
  1007 Format(1X,' Exact surface area of fullerene: ',D12.6,
-     1      /1X,' Convex hull surface area of fullerene: ',D12.6)
+     1      /1X,' Convex hull surface area of fullerene: ',D12.6,
+     1      /1X,' Ratio A(hull)/A(exact): ',D12.6)
  1008 Format(1X,' Ratio Area/Volume: ',D12.6,' (Tesselation), ',
      1 D12.6,' (exact), ',D12.6,' (convex hull)')
  1009 Format(1X,' Percent convexity: ',F12.3,' (area) ',F12.3,

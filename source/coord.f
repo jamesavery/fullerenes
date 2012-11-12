@@ -152,14 +152,14 @@ C Oblate
 C Asymmetric
       Write(Iout,1011)
  1000 FORMAT(/1x,'Cartesian Input',
-     1  /1X,'  I       Z Element Cartesian Coordinates')
+     1  /1X,'   I      Z Element Cartesian Coordinates')
  1001 FORMAT(/1x,'Moment of inertia with setting the masses to unity:',
      1 /1x,'Eigenvalues (principal axis system): ',3(' ',D18.12))
  1002 FORMAT(1X,I4,1X,I6,1X,A2,6X,3(D18.12,2X))
  1003 FORMAT(/1X,'Shift Molecule to the centre of points:',
      1 /1X,'Original Centre: ',3(D15.9,1X),
      1 /1X,'New Coordinates:',
-     1  /1X,'  I      Z  Element Cartesian Coordinates')
+     1  /1X,'   I      Z Element Cartesian Coordinates')
  1004 FORMAT(1x,'Using C60 ideal icosahedron to normalize eigenvalues',
      1 ' (',F6.2,' Angstroem^2)',/,' Eigenvalues (normalized): ',
      1 3(' ',D15.9),/1X,'Sphericity parameter normed to largest ',

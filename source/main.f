@@ -429,6 +429,8 @@ C Analyze ring connections
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
      1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
      1 numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
+C     Print edge coordinates (barycenter)
+      if(iprintf.ne.0) Call EdgeCoord(Matom,Iout,DIST,IC3)
 
 C------------------STONE-WALES------------------------------------
 C Perform Stone-Wales transformation
