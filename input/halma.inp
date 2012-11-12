@@ -1,7 +1,7 @@
-Halma fullerne with Coxeter indices (k,l)=(1,0)
+Halma fullerne with Coxeter indices (k,l)=(6,0)
 &General /
-&Coord ICart=5 , kGC=5 /
-&FFChoice  /
+&Coord ICart=5 , kGC=6 /
+&FFChoice iopt=1 /
 &FFParameters /
 &Hamilton  /
 &Isomers  /
