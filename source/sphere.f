@@ -633,6 +633,7 @@ C     to calculate the root mean square as a measure for distortion
       if(AN.gt.Huge) then
        Print*,'**** Severe Error, check coordinates'
        ier=1
+       stop
       endif
       return
       END

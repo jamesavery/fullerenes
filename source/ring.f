@@ -360,9 +360,9 @@ C     Center for 5-rings
       Write(Iout,1000)
       Do I=1,N5Ring
       Nring(I)=I
-      Sum5x=0.
-      Sum5y=0.
-      Sum5z=0.
+      Sum5x=0.d0
+      Sum5y=0.d0
+      Sum5z=0.d0
       Do J=1,5
       IAt=N5MEM(I,J)
       Sum5x=Sum5x+Dist(1,IAt)
@@ -388,9 +388,9 @@ C     Center for 6-rings
       Write(Iout,1001)
       Do I=1,N6Ring
       NRing(N5Ring+I)=N5Ring+I
-      Sum6x=0.
-      Sum6y=0.
-      Sum6z=0.
+      Sum6x=0.d0
+      Sum6y=0.d0
+      Sum6z=0.d0
       Do J=1,6
       IAt=N6MEM(I,J)
       Sum6x=Sum6x+Dist(1,IAt)
@@ -906,6 +906,32 @@ C Print Cioslowsky analysis and check of correctness
  1048 Format(5(' (',I2,',',I2,',',I5,',',I2,',',I2,') '))
       Return
       END
+
+      SUBROUTINE EdgeCoord(Matom,Iout,Dist,IC3)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION Dist(3,Nmax)
+      DIMENSION IC3(Nmax,3)
+C     Print center of edges
+      Write(Iout,1000)
+      Do I=1,Matom
+      Do J=1,3
+       IAtom=IC3(I,J)
+       if(IAtom.gt.I) then
+        X=(Dist(1,I)+Dist(1,IAtom))*.5d0
+        Y=(Dist(2,I)+Dist(2,IAtom))*.5d0
+        Z=(Dist(3,I)+Dist(3,IAtom))*.5d0
+        Write(Iout,1001) I,IAtom,X,Y,Z
+       endif
+      enddo
+      enddo
+ 1000 Format(/1X,'Print center coordinates of edges:',
+     1 /1X,'    I    J       X            Y            Z',
+     1 /1X,49('-')) 
+ 1001 Format(1X,2I5,3(1X,F12.8))
+      Return
+      END
+
 
       SUBROUTINE Alcami(Iout,MAtom,Medges,IC3,IVR3)
       use config

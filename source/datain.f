@@ -62,7 +62,7 @@ C Defining the Wu force field (default values)
 
 C Defining an extension of the Wu force field (default values)
 c     three distances: zero values
-      ExtWuR55=1.440d0 ! Taken from B3lyp calc of C20
+      ExtWuR55=1.455d0 ! capprox. that of C20
       ExtWuR56=1.455d0
       ExtWuR66=1.391d0
 c     two angles: zero values
