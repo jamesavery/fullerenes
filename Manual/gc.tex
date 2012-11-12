@@ -13,9 +13,9 @@
 \begin{pspicture*}(-.5,-2)(6.5,7.5)
 %\psgrid
 
-\def\up{\psline[linewidth=0.5pt, linestyle=dashed, linecolor=gray]{-}(0,0)(15.0,30.0)}
-\def\down{\psline[linewidth=0.5pt, linestyle=dashed, linecolor=gray]{-}(0,0)(-15.0,30.)}
-\def\straight{\psline[linewidth=0.5pt, linestyle=dashed, linecolor=gray]{-}(0,0)(20,0)}
+\def\up{\psline[linewidth=0.4pt, linestyle=dashed, linecolor=lightgray]{-}(0,0)(15.0,30.0)}
+\def\down{\psline[linewidth=0.4pt, linestyle=dashed, linecolor=lightgray]{-}(0,0)(-15.0,30.)}
+\def\straight{\psline[linewidth=0.4pt, linestyle=dashed, linecolor=lightgray]{-}(0,0)(20,0)}
 \multido{\i=-15+1}{35}{\rput[bl](\i,-4){\up}}
 \multido{\i=-5+1}{35}{\rput[bl](\i,-4){\down}}
 \multido{\n=-4+1.0}{30}{\rput[bl](-5,\n){\straight}}
