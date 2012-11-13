@@ -1673,7 +1673,7 @@ C Now analyze the adjacency matrix if it is correct
       Call Tutte(Matom,Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 4-vertex insertion to D3h 6555 ',
-     1 'ring pattern: 3 pentagon G3.15.31.1 (nv=15) -> G3.17.3.2',
+     1 'ring pattern: 3 pentagon G3.15.3.1 (nv=15) -> G3.17.3.2',
      1 ' (nv=19)',/1X,'Read hexagon ring numbers or position',
      1 ' in list of patterns')
  1001 Format(/1X,'Number of Yoshida-Fowler 4-vertex insertions: ',I2,
