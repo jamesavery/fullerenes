@@ -308,7 +308,7 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
 		 const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter)
 {
   string fmt(format,3), filename;
-  filename = fortran_string(filename_,50)+"-2D"+fmt;
+  filename = fortran_string(filename_,50)+"-2D."+fmt;
 
   // printf("draw_graph({\n"
   // 	 "\tformat:     '%3s',\n"
