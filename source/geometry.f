@@ -1116,7 +1116,7 @@ c two auxiliary reals
       aux_1=abc_1_x*bcd_1_x + abc_1_y*bcd_1_y + abc_1_z*bcd_1_z
       aux_2=aux_x*bcd_1_x + aux_y*bcd_1_y + aux_z*bcd_1_z
 c the result
-      dihedral_abcd=atan2(aux_2, aux_1)
+      dihedral_abcd=datan2(aux_2, aux_1)
       return
       END  
 
@@ -1169,7 +1169,7 @@ c     x=\vec abc1 \cdot \vec bcd_1
 c     y=\vec aux  \cdot \vec bcd_1
       y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
 c the result
-      dihedral_abcd=atan2(y, x)
+      dihedral_abcd=datan2(y, x)
 
 C THE DERIVATIVES
 c to be read from bottom to top
