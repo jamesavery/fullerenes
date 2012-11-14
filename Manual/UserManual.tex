@@ -137,7 +137,7 @@ theoretical analysis. The results can be used for plotting 2D fullerene graphs (
 and 3D structures, and serves as a good starting point for further quantum theoretical treatment. The program is 
 written in standard FORTRAN and C++ and is easily implemented within a LINUX/UNIX environment.
 Although there are several other computer programs already available to deal with fullerene graphs 
-like \program{CAGE} \cite{Brinkmanx}, \program{FULLGEN} \cite{Brinkman}, \program{BUCKYGEN} \cite{Goedgebeur} or VEGA \cite{Pisanski},
+like \program{CAGE} \cite{Brinkmanx}, \program{FULLGEN} \cite{Brinkman}, \program{BUCKYGEN} \cite{Goedgebeur,Goedgebeur1} or VEGA \cite{Pisanski},
 we felt that there is a need to write a general purpose program which does what other programs do and (of course) a lot more.
 The first version (1.0) was written in Fortran for calculating the surface area and volume of a fullerene and corresponding changes due to endohedral 
 incorporation of rare gas atoms \cite{Tonner}. A much improved version 2.0 allowed for the creation of fullerene structures using
@@ -638,11 +638,12 @@ Hence, analogous to the MCS we define a measure for distortion from spherical sy
 The maximum inner sphere (MIS) is important to estimate if there is enough space inside the fullerene cage for endohedral atoms or molecules. It is
 defined as
 \begin{equation}
-	\max\limits_{c_{\mathrm{MES}} \in \mathrm{CH}(S)} \min\limits_{i} \left\| \vec{p}_{i} -\vec{c}_{\mathrm{MES}} \right\|  
+	R_{\mathrm{MIS}} = \max\limits_{c_{\mathrm{MIS}} \in \mathrm{CH}(S)} \min\limits_{i} \left\| \vec{p}_{i} -\vec{c}_{\mathrm{MIS}} \right\|  
 	\label{MES} 
 \end{equation}
 
-For ideal \C{60} ($I_h$ symmetry) MCS, MDS and MIS are all identical. 
+For ideal \C{60} ($I_h$ symmetry) MCS, MDS and MIS are all identical. Note that the MIS may not be uniquely defined. For example, for nanotubes
+there may be degenerate solution with different $\vec{c}_{\mathrm{MDS}}$ along the main axis of the nanotube.
 For the MIS the radius and volume is printed  with the Van der Waals radius of carbon taken off $R_{\mathrm{MIS}}$. 
 
 %2D fullerene graphs and Schlegel diagrams
@@ -654,12 +655,14 @@ others are of perhaps of more historical interest. Note that for non-spherical f
 tetrahedron) it becomes very difficult to create a good Schlegel projection, and in such cases the projection of vertices to the minimum
 covering sphere is recommended before these algorithms are used (see input). The subroutine produces a latex file with the fullerene graph included.
 
-1) The perspective Schlegel projection (SP): Here the points are rotated such to put a selected vertex, edge or ring center 
-on top of the $z$-axis just below the projection point (otherwise the point $(0,0,z_{\mathrm{max}})$ is chosen with $z_{\mathrm{max}}$
-being the point with maximum $z$-value from the original input coordinates). Points are then sorted in descending order according to their $z$-values.
-The circumference for atoms and rings down the $z$-axis are determined. The Schlegel projection is created giving as output the projected $(X_i,Y_i)$
-coordinates, i.e. points are projected down a plane from a set projection point. 
-The connections between the points are already written out earlier in the output such that the fullerene graph can be drawn. This is shown in Figure \ref{pic:Schlegel}.
+1) In the perspective Schlegel projection (PSP), the 3D graph is rotated such that a selected vertex, edge of ring 
+(commonly the barycenter of a polygon is chosen) is located at top of the $z$-axis at some distance below the projection point $P$, 
+with the $z$-axis going (not necessarily) through the barycenter of the fullerene. If no choice is given in the input, the point $(0,0,z_{\mathrm{max}})$ 
+is chosen with $z_{\mathrm{max}}$ being the point with maximum $z$-value from the original input coordinates of the vertices. 
+Vertices and ring barycenters are then sorted in descending order according to their $z$-values.
+The Schlegel projection then yields the projected $(X_i,Y_i)$ coordinates by projecting vertices and ring centers 
+down on a plane below the fullerene.  The edges between the vertices are already known such that the fullerene graph can be drawn. 
+This is shown in Figure \ref{pic:Schlegel}.
 
 %Figure 4
  \begin{figure}[htbp]
@@ -669,11 +672,10 @@ The connections between the points are already written out earlier in the output
 	\label{pic:Schlegel}
  \end{figure}
 
-2) The cone projection (CSP), i.e. points are projected out to an enveloping cone and then down to a plane below the fullerene. 
-The last ring center should be at the bottom of the fullerene and if detected, will not be projected 
-out, or if not, will have a large scale factor (this center may be ignored in the drawing). Also, the 
-last points on the outer ring in the fullerene graph are scaled in distance by 1.2 in order to make the outer rings 
-more visible. This also moves the outer centers within the ring.
+2) In the cone Schlegel projection (CSP) the vertices are projected out on an enveloping cone and then down on a plane below the fullerene. 
+The barycenter of the last ring closest to the projection plane should be at the bottom of the fullerene. The barycenter of the circumfencing
+ring will not be projected out (this center may be ignored in the drawing). A scaling factor could be applied (1.2 used in the program)
+for the outer points in the 2D graph in order to avoid edge crossings.
        
 At the end a rough plot of the fullerene graph is produced. This is suitable for fullerenes up to about \C{100}, beyond that
 it becomes too crowded and the latex file produced contains a better graph. Nevertheless, it serves for a first rough picture. 
@@ -1141,6 +1143,8 @@ Note that the maximum number of vertices in the database is defined in the confi
 \bibitem{Goedgebeur} G. Brinkmann, J. Goedgebeur, B. McKay, ``Program Buckygen - a program for the efficient generation of all nonisomorphic fullerenes'',
 see http://caagt.ugent.be/buckygen/.
 
+\bibitem{Goedgebeur1} G. Brinkmann, J. Goedgebeur, B. McKay, \textit{J. Chem. Inf. Sci.}, in press. DOI: 10.1021/ci3003107.
+
 \bibitem{Pisanski} T. Pisanski, ``Program VEGA - A Mathematica based system for manipulating graphs'', see http://www.ijp.si/.
 
 \bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, P. Schwerdtfeger, ``Packed to the Rafters Ð Filling up C60 with Rare Gas Atoms'', 
@@ -1175,7 +1179,8 @@ Dependence on Structural Motifs'', \textit{J. Am. Chem. Soc.} \textbf{122}, 8265
 \bibitem{Alcami} M. Alcam\'i, G. Sanchez, S. Diaz-Tendero, Y. Wang, F. Martin, ``Structural Patterns in Fullerenes Showing
 Adjacent Pentagons: \C{20} to \C{72}'', \textit{J. Nanosci. Nanotech.} \textbf{7}, 1329-1338 (2007).
 
-\bibitem{HouseofGraphs} The House of Graphs website is at https://hog.grinvin.org/Fullerenes.
+\bibitem{HouseofGraphs} Brinkmann, G., Goedgebeur, J., M\'elot, H., Coolsaet, K., \textit{Discrete Applied Mathematics}, \textbf{161}, 311-314 (2013). 
+House of Graphs: a database of interesting graphs, available for fullerenes at https://hog.grinvin.org/Fullerenes.
 
 \bibitem{CYLview} C. Y. Legault, ``Program CYLview'', Universit\'e de Sherbrook, Canada. See http://www.cylview.org.
 

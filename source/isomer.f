@@ -11,7 +11,7 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
       Character*2 fnum2
       Character*3 fnum,fnum3
       Character*9 fend
-      Character*11 Isoc(52),IsocIPR(28)
+      Character*12 Isoc(72),IsocIPR(48)
       Character*50 filename
       Character*50 chkname
       Character*13 dbdir
@@ -63,15 +63,27 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
      *       '22426253115','23796620378','25063227406','26577912084',
      *       '27970034826','29642262229','31177474996','33014225318',
      *       '34705254287','36728266430','38580626759','40806395661',
-     *       '42842199753','45278616586','47513679057','50189039868'/
+     *       '42842199753','45278616586','47513679057','50189039868',
+     *       '52628839448','55562506886','58236270451','61437700788',
+     *       '64363670678','67868149215','71052718441','74884539987',
+     *       '78364039771','82532990559','86329680991','90881152117',
+     *      '95001297565','99963147805','104453597992','109837310021',
+     *    '114722988623','120585261143','125873325588','132247999328'/
+
       Data IsocIPR/'2266138871','2435848971','2614544391','2808510141',
      *       '3009120113','3229731630','3458148016','3704939275',
      *       '3964153268','4244706701','4533465777','4850870260',
      *       '5178120469','5531727283','5900369830','6299880577',
      *       '6709574675','7158963073','7620446934','8118481242',
      *       '8636262789','9196920285','9768511147','10396040696',
-     *       '11037658075','11730538496','12446446419','13221751502'/
+     *       '11037658075','11730538496','12446446419','13221751502',
+     *       '14010515381','14874753568','15754940959','16705334454',
+     *       '17683643273','18744292915','19816289281','20992425825',
+     *       '22186413139','23475079272','24795898388','26227197453',
+     *       '27670862550','29254036711','30852950986','32581366295',
+     *       '34345173894','36259212641','38179777473','40286153024'/
 
+      Write(Iout,1012)
       chkname=trim(filename)//".chkpnt"
       IPRERR=0
 C     Number of Isomers
@@ -100,7 +112,7 @@ C     IPR value only fits 32bit signed integer
 
 C     Both values do not fit 32bit signed integer
 C      Output in characters
-          If(N.le.360.and.N.gt.304) then
+          If(N.le.400.and.N.gt.304) then
            M1=N/2-128
            M2=N/2-152
          Write(Iout,1002) isoc(M1),IsocIPR(M2)
@@ -113,7 +125,7 @@ C      fitted to asymptodic
            fac2=10.d0**1.503692
            AisoNIPR=fac1*(dfloat(N)/6.d1)**9.250947d0
            AisoIPR=fac2*(dfloat(N)/6.d1)**11.08800d0
-           If(N.gt.360) Write(Iout,1003) AisoNIPR,AisoIPR
+           If(N.gt.400) Write(Iout,1003) AisoNIPR,AisoIPR
           endif
 
 C     Limit number of cycles
@@ -186,26 +198,29 @@ C Produce list from ring spiral algorithm
      1 IsonumIPR,iham,IDA,A)
       endif
 
- 1000 Format(/1X,'Number of possible fullerene isomers: ',I10,
+ 1000 Format(1X,'Number of possible fullerene isomers: ',I10,
      1 ' (IPR isomers: ',I10,')')
- 1001 Format(/1X,'Number of possible fullerene isomers: ',A11,
+ 1001 Format(1X,'Number of possible fullerene isomers: ',A12,
      1 ' (IPR isomers: ',I10,')')
- 1002 Format(/1X,'Number of possible fullerene isomers: ',A11,
+ 1002 Format(1X,'Number of possible fullerene isomers: ',A12,
      1 ' (IPR isomers: ',A11,')')
- 1003 Format(/1X,'Exact number of isomers not known for such a'
+ 1003 Format(1X,'Exact number of isomers not known for such a'
      1 ' large fullerene, projected polynomial value:',D12.4,
      1 ' (general), ',D12.4,' (IPR)',
      1 /2X,'obtained from fit of points between Nc=250 and 360)')
- 1004 Format(/1X,'Number of Isomers larger than max value of ',I8)
- 1005 Format(/1X,'Enter Spiral code for a general list of all ',
+ 1004 Format(1X,'Number of Isomers larger than max value of ',I8,
+     1 ' to produce isomer list')
+ 1005 Format(1X,'Enter Spiral code for a general list of all ',
      1 'possible isomers (IPR or not depending on input)')
- 1006 Format(/1X,'RESTART isomer file from previous run')
- 1007 Format(/1X,'Zero IPR isomers -> Return')
+ 1006 Format(1X,'RESTART isomer file from previous run')
+ 1007 Format(1X,'Zero IPR isomers -> Return')
  1008 Format(1X,'Search for file: ',A50,' in general isomer list')
  1009 Format(1X,'Search for file: ',A50,' in IPR isomer list')
  1010 Format(1X,'Filename ',A50,' in database not found: ',
      1 'Do it the hard way')
  1011 Format(1X,'Print from file: ',A50,' in database')
+ 1012 Format(/1X,'Data for isomer numbers from House of Graphs website:',
+     1' http://hog.grinvin.org/')
       Return
       END
  
