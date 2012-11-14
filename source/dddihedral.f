@@ -5,23 +5,38 @@
      1 ddf11dax__dax, ddf11dax__day, ddf11dax__daz, ddf11dax__dbx,
      1 ddf11dax__dby, ddf11dax__dbz, ddf11dax__dcx, ddf11dax__dcy,
      1 ddf11dax__dcz, ddf11dax__ddx, ddf11dax__ddy, ddf11dax__ddz,
+
      1 ddf11day__day, ddf11day__daz, ddf11day__dbx, ddf11day__dby,
      1 ddf11day__dbz, ddf11day__dcx, ddf11day__dcy, ddf11day__dcz,
-     1 ddf11day__ddx, ddf11day__ddy, ddf11day__ddz, ddf11daz__daz,
-     1 ddf11daz__dbx, ddf11daz__dby, ddf11daz__dbz, ddf11daz__dcx,
-     1 ddf11daz__dcy, ddf11daz__dcz, ddf11daz__ddx, ddf11daz__ddy,
-     1 ddf11daz__ddz, ddf11dbx__dbx, ddf11dbx__dby, ddf11dbx__dbz,
-     1 ddf11dbx__dcx, ddf11dbx__dcy, ddf11dbx__dcz, ddf11dbx__ddx,
-     1 ddf11dbx__ddy, ddf11dbx__ddz, ddf11dby__dby, ddf11dby__dbz,
-     1 ddf11dby__dcx, ddf11dby__dcy, ddf11dby__dcz, ddf11dby__ddx,
-     1 ddf11dby__ddy, ddf11dby__ddz, ddf11dbz__dbz, ddf11dbz__dcx,
-     1 ddf11dbz__dcy, ddf11dbz__dcz, ddf11dbz__ddx, ddf11dbz__ddy,
-     1 ddf11dbz__ddz, ddf11dcx__dcx, ddf11dcx__dcy, ddf11dcx__dcz,
-     1 ddf11dcx__ddx, ddf11dcx__ddy, ddf11dcx__ddz, ddf11dcy__dcy,
-     1 ddf11dcy__dcz, ddf11dcy__ddx, ddf11dcy__ddy, ddf11dcy__ddz,
+     1 ddf11day__ddx, ddf11day__ddy, ddf11day__ddz,
+
+     1 ddf11daz__daz, ddf11daz__dbx, ddf11daz__dby, ddf11daz__dbz,
+     1 ddf11daz__dcx, ddf11daz__dcy, ddf11daz__dcz, ddf11daz__ddx,
+     1 ddf11daz__ddy, ddf11daz__ddz,
+
+     1 ddf11dbx__dbx, ddf11dbx__dby, ddf11dbx__dbz, ddf11dbx__dcx,
+     1 ddf11dbx__dcy, ddf11dbx__dcz, ddf11dbx__ddx, ddf11dbx__ddy,
+     1 ddf11dbx__ddz,
+
+     1 ddf11dby__dby, ddf11dby__dbz, ddf11dby__dcx, ddf11dby__dcy,
+     1 ddf11dby__dcz, ddf11dby__ddx, ddf11dby__ddy, ddf11dby__ddz,
+
+     1 ddf11dbz__dbz, ddf11dbz__dcx, ddf11dbz__dcy, ddf11dbz__dcz,
+     1 ddf11dbz__ddx, ddf11dbz__ddy, ddf11dbz__ddz,
+
+     1 ddf11dcx__dcx, ddf11dcx__dcy, ddf11dcx__dcz, ddf11dcx__ddx,
+     1 ddf11dcx__ddy, ddf11dcx__ddz,
+
+     1 ddf11dcy__dcy, ddf11dcy__dcz, ddf11dcy__ddx, ddf11dcy__ddy,
+     1 ddf11dcy__ddz,
+
      1 ddf11dcz__dcz, ddf11dcz__ddx, ddf11dcz__ddy, ddf11dcz__ddz,
-     1 ddf11ddx__ddx, ddf11ddx__ddy, ddf11ddx__ddz, ddf11ddy__ddy,
-     1 ddf11ddy__ddz, ddf11ddz__ddz,
+
+     1 ddf11ddx__ddx, ddf11ddx__ddy, ddf11ddx__ddz,
+
+     1 ddf11ddy__ddy, ddf11ddy__ddz,
+
+     1 ddf11ddz__ddz,
      1 dihedral_abcd)
       IMPLICIT REAL*8 (a-z)
 
@@ -59,7 +74,7 @@ c normal vectors (length 1) on abc and bcd
       bcd1_x=bcd_x*bcd_length_inv
       bcd1_y=bcd_y*bcd_length_inv
       bcd1_z=bcd_z*bcd_length_inv
-c abc \times bcd
+c abc \times bc
       aux_x=abc1_y*bc1_z-bc1_y*abc1_z
       aux_y=abc1_z*bc1_x-bc1_z*abc1_x
       aux_z=abc1_x*bc1_y-bc1_x*abc1_y
@@ -70,6 +85,7 @@ c     y=\vec aux  \cdot \vec bcd_1
       y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
 c the result
       dihedral_abcd=datan2(y,x)
+
 c//////////////////////////////////////////////////////////////
 C//////////////////////////////////////////////////////////////
 C// THE FISRT DERIVATIVES
@@ -368,18 +384,6 @@ c abc_z=-ab_x*bc_y + ab_y*bc_x
 
 
 
-
-c bcd_x=-bc_y*cd_z + bc_z*cd_y
-      dbcd_x__dcy=cd_z + bc_z
-      dbcd_x__dcz=-bc_y - cd_y 
-c bcd_y=-bc_z*cd_x + bc_x*cd_z
-      dbcd_y__dcx=-bc_z - cd_z 
-      dbcd_y__dcz=cd_x + bc_x
-c bcd_z=-bc_x*cd_y + bc_y*cd_x
-      dbcd_z__dcx=cd_y + bc_y
-      dbcd_z__dcy=-bc_x - cd_x
-
-
 c bcd_x=-bc_y*cd_z + bc_z*cd_y
       dbcd_x__dbc_y=-cd_z
       dbcd_x__dbc_z=cd_y
@@ -398,20 +402,35 @@ c bcd_z=-bc_x*cd_y + bc_y*cd_x
 
 
 c bcd_x=-bc_y*cd_z + bc_z*cd_y
+      dbcd_x__dbx=0
       dbcd_x__dby= dbcd_x__dbc_y*dbc_y__dby 
       dbcd_x__dbz= dbcd_x__dbc_z*dbc_z__dbz
+      dbcd_x__dcx=0
+      dbcd_x__dcy= dbcd_x__dbc_y*dbc_y__dcy + dbcd_x__dcd_y*dcd_y__dcy
+      dbcd_x__dcz= dbcd_x__dcd_z*dcd_z__dcz + dbcd_x__dbc_z*dbc_z__dcz 
+      dbcd_x__ddx=0
       dbcd_x__ddy= dbcd_x__dcd_y*dcd_y__ddy
       dbcd_x__ddz= dbcd_x__dcd_z*dcd_z__ddz
 c bcd_y=-bc_z*cd_x + bc_x*cd_z
       dbcd_y__dbx= dbcd_y__dbc_x*dbc_x__dbx
+      dbcd_y__dby=0
       dbcd_y__dbz= dbcd_y__dbc_z*dbc_z__dbz
+      dbcd_y__dcx= dbcd_y__dcd_x*dcd_x__dcx + dbcd_y__dbc_x*dbc_x__dcx
+      dbcd_y__dcy=0
+      dbcd_y__dcz= dbcd_y__dbc_z*dbc_z__dcz + dbcd_y__dcd_z*dcd_z__dcz
       dbcd_y__ddx= dbcd_y__dcd_x*dcd_x__ddx
+      dbcd_y__ddy=0
       dbcd_y__ddz= dbcd_y__dcd_z*dcd_z__ddz
 c bcd_z=-bc_x*cd_y + bc_y*cd_x
       dbcd_z__dbx= dbcd_z__dbc_x*dbc_x__dbx
       dbcd_z__dby= dbcd_z__dbc_y*dbc_y__dby
+      dbcd_z__dbz=0
+      dbcd_z__dcx= dbcd_z__dbc_x*dbc_x__dcx + dbcd_z__dcd_x*dcd_x__dcx
+      dbcd_z__dcy= dbcd_z__dcd_y*dcd_y__dcy + dbcd_z__dbc_y*dbc_y__dcy
+      dbcd_z__dcz=0
       dbcd_z__ddx= dbcd_z__dcd_x*dcd_x__ddx
       dbcd_z__ddy= dbcd_z__dcd_y*dcd_y__ddy
+      dbcd_z__ddz=0
 
 
 c abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
@@ -605,7 +624,7 @@ c      dbcd1_z__daz=0
       dbcd1_z__dcz=
      2 dbcd1_z__dbcd_length_inv*dbcd_length_inv__dcz
 
-      dbcd1_x__ddx=
+      dbcd1_x__ddx=dbcd1_x__dbcd_x*dbcd_x__ddx +
      2 dbcd1_x__dbcd_length_inv*dbcd_length_inv__ddx
       dbcd1_y__ddx=dbcd1_y__dbcd_y*dbcd_y__ddx +
      2 dbcd1_y__dbcd_length_inv*dbcd_length_inv__ddx
@@ -668,9 +687,9 @@ c aux_x=abc1_y*bc1_z-bc1_y*abc1_z
       daux_x__dcz=
      2 daux_x__dabc1_y*dabc1_y__dcz + daux_x__dbc1_z*dbc1_z__dcz
      4 + daux_x__dbc1_y*dbc1_y__dcz + daux_x__dabc1_z*dabc1_z__dcz
-c      daux_x__ddx=0
-c      daux_x__ddy=0
-c      daux_x__ddz=0
+      daux_x__ddx=0
+      daux_x__ddy=0
+      daux_x__ddz=0
 c aux_y=abc1_z*bc1_x-bc1_z*abc1_x
       daux_y__dax=
      2 daux_y__dabc1_z*dabc1_z__dax + daux_y__dabc1_x*dabc1_x__dax
@@ -696,9 +715,9 @@ c aux_y=abc1_z*bc1_x-bc1_z*abc1_x
       daux_y__dcz=
      2 daux_y__dabc1_z*dabc1_z__dcz + daux_y__dbc1_x*dbc1_x__dcz
      4 + daux_y__dbc1_z*dbc1_z__dcz + daux_y__dabc1_x*dabc1_x__dcz
-c      daux_y__ddx=0
-c      daux_y__ddy=0
-c      daux_y__ddz=0
+      daux_y__ddx=0
+      daux_y__ddy=0
+      daux_y__ddz=0
 c aux_z=abc1_x*bc1_y-bc1_x*abc1_y
       daux_z__dax=
      2 daux_z__dabc1_x*dabc1_x__dax + daux_z__dabc1_y*dabc1_y__dax
@@ -724,10 +743,9 @@ c aux_z=abc1_x*bc1_y-bc1_x*abc1_y
       daux_z__dcz=
      2 daux_z__dabc1_x*dabc1_x__dcz + daux_z__dbc1_y*dbc1_y__dcz
      4 + daux_z__dbc1_x*dbc1_x__dcz + daux_z__dabc1_y*dabc1_y__dcz
-c      daux_z__ddx=0
-c      daux_z__ddy=0
-c      daux_z__ddz=0
-
+      daux_z__ddx=0
+      daux_z__ddy=0
+      daux_z__ddz=0
 
 
 c derivation of y
@@ -868,15 +886,6 @@ c a couple of variables that turn out to be zero. -- should be deleted after deb
       dabc1_z__ddy=0
       dabc1_z__ddz=0
 
-      daux_x__ddx=0
-      daux_x__ddy=0
-      daux_x__ddz=0
-      daux_y__ddx=0
-      daux_y__ddy=0
-      daux_y__ddz=0
-      daux_z__ddx=0
-      daux_z__ddy=0
-      daux_z__ddz=0
 
       dbcd1_x__dax=0
       dbcd1_x__day=0
@@ -888,15 +897,6 @@ c a couple of variables that turn out to be zero. -- should be deleted after deb
       dbcd1_z__day=0
       dbcd1_z__daz=0
 
-      dbcd_x__dbx=0
-      dbcd_x__dcx=0
-      dbcd_x__ddx=0
-      dbcd_y__dby=0
-      dbcd_y__dcy=0
-      dbcd_y__ddy=0
-      dbcd_z__dbz=0
-      dbcd_z__dcz=0
-      dbcd_z__ddz=0
 
       dbc1_x__dax=0
       dbc1_x__day=0
@@ -3294,6 +3294,7 @@ c dbcd_length_inv__dcy=dbcd_length_inv__dbcd_x*dbcd_x__dcy + dbcd_length_inv__db
      1                                   ddbcd_length_inv11dbcd_z__ddx
      1 + ddbcd_length_inv11dcy__ddbcd_z11dcy*
      1                                   ddbcd_z11dcy__ddx
+c     1 ddbcd_length_inv11dcy__ddx
       ddbcd_length_inv11dcy__ddy=
      1   ddbcd_length_inv11dcy__ddbcd_length_inv11dbcd_x*
      1                                   ddbcd_length_inv11dbcd_x__ddy
@@ -3520,11 +3521,11 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 3a
 
 c df__dx=-y/(x**2 + y**2)
-      ddf11dx__dx= (2*x*y)/((x**2 + y**2)**2)
-      ddf11dx__dy= (2*y**2)/((x**2 + y**2)**2) - 1/(x**2 + y**2)
+      ddf11dx__dx= (2.*x*y)/((x**2. + y**2.)**2.)
+      ddf11dx__dy= (2.*y**2.)/((x**2. + y**2.)**2.) - 1/(x**2. + y**2.)
 c df__dy=x/(x**2 + y**2)
-      ddf11dy__dx= (-2*x**2)/((x**2 + y**2)**2) + 1/(x**2 + y**2)
-      ddf11dy__dy= (-2*x*y)/((x**2 + y**2)**2)
+      ddf11dy__dx= (-2.*x**2.)/((x**2. + y**2.)**2.) + 1/(x**2. + y**2.)
+      ddf11dy__dy= (-2.*x*y)/((x**2. + y**2.)**2.)
 
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 3b
@@ -4022,11 +4023,6 @@ c dabc1_y__dbx=abc_length_inv*dabc_y__dbx + abc_y*dabc_length_inv__dbx
      1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__dcz
      1 + ddabc1_y11dbx__dabc_y*dabc_y__dcz
      1 + ddabc1_y11dbx__ddabc_length_inv11dbx*ddabc_length_inv11dbx__dcz
-c      write(*,*)'ddabc1_y11dbx__dcz (12)',ddabc1_y11dbx__dcz,
-c     1  ddabc1_y11dbx__dabc_length_inv,dabc_length_inv__dcz,
-c     1  ddabc1_y11dbx__ddabc_y11dbx,ddabc_y11dbx__dcz,
-c     1  ddabc1_y11dbx__dabc_y,dabc_y__dcz,
-c     1  ddabc1_y11dbx__ddabc_length_inv11dbx,ddabc_length_inv11dbx__dcz
       ddabc1_y11dbx__ddx=
      1   ddabc1_y11dbx__dabc_length_inv*dabc_length_inv__ddx
      1 + ddabc1_y11dbx__ddabc_y11dbx*ddabc_y11dbx__ddx
@@ -6240,9 +6236,6 @@ c dbcd1_x__dbx= bcd_x*dbcd_length_inv__dbx
       ddbcd1_x11dbx__dcz=
      1   ddbcd1_x11dbx__dbcd_x*dbcd_x__dcz
      1 + ddbcd1_x11dbx__ddbcd_length_inv11dbx*ddbcd_length_inv11dbx__dcz
-c      write(*,*)'ddbcd1_x11dbx__dcz (8)',ddbcd1_x11dbx__dcz,
-c     1 ddbcd1_x11dbx__dbcd_x,dbcd_x__dcz,
-c     1 ddbcd1_x11dbx__ddbcd_length_inv11dbx,ddbcd_length_inv11dbx__dcz
       ddbcd1_x11dbx__ddx=
      1   ddbcd1_x11dbx__dbcd_x*dbcd_x__ddx
      1 + ddbcd1_x11dbx__ddbcd_length_inv11dbx*ddbcd_length_inv11dbx__ddx
@@ -7245,7 +7238,7 @@ c      dx__dbx= bcd1_x*dabc1_x__dbx + abc1_x*dbcd1_x__dbx + bcd1_y*dabc1_y__dbx 
      1            + ddx11dbx__dbcd1_z*dbcd1_z__dbx
      1            + ddx11dbx__ddabc1_z11dbx*ddabc1_z11dbx__dbx
      1            + ddx11dbx__dabc1_z*dabc1_z__dbx
-     1            + ddx11dbx__ddbcd1_z11dbx*ddbcd1_z11dbx__dby
+     1            + ddx11dbx__ddbcd1_z11dbx*ddbcd1_z11dbx__dbx
       ddx11dbx__dby=
      1              ddx11dbx__dbcd1_x*dbcd1_x__dby
      1            + ddx11dbx__ddabc1_x11dbx*ddabc1_x11dbx__dby
@@ -7311,20 +7304,6 @@ c      dx__dbx= bcd1_x*dabc1_x__dbx + abc1_x*dbcd1_x__dbx + bcd1_y*dabc1_y__dbx 
      1            + ddx11dbx__ddabc1_z11dbx*ddabc1_z11dbx__dcz
      1            + ddx11dbx__dabc1_z*dabc1_z__dcz
      1            + ddx11dbx__ddbcd1_z11dbx*ddbcd1_z11dbx__dcz
-c      write(*,*)'ddx11dbx__dcz (should be 0 (i guess))',
-c     1             ddx11dbx__dcz,
-c     1             ddx11dbx__dbcd1_x, dbcd1_x__dcz,
-c     1             ddx11dbx__ddabc1_x11dbx, ddabc1_x11dbx__dcz,
-c     1             ddx11dbx__dabc1_x, dabc1_x__dcz,
-c     1             ddx11dbx__ddbcd1_x11dbx, ddbcd1_x11dbx__dcz,
-c     1             ddx11dbx__dbcd1_y, dbcd1_y__dcz,
-c     1             ddx11dbx__ddabc1_y11dbx, ddabc1_y11dbx__dcz,
-c     1             ddx11dbx__dabc1_y, dabc1_y__dcz,
-c     1             ddx11dbx__ddbcd1_y11dbx, ddbcd1_y11dbx__dcz,
-c     1             ddx11dbx__dbcd1_z, dbcd1_z__dcz,
-c     1             ddx11dbx__ddabc1_z11dbx, ddabc1_z11dbx__dcz,
-c     1             ddx11dbx__dabc1_z, dabc1_z__dcz,
-c     1             ddx11dbx__ddbcd1_z11dbx, ddbcd1_z11dbx__dcz
       ddx11dbx__ddx=
      1              ddx11dbx__dbcd1_x*dbcd1_x__ddx
      1            + ddx11dbx__ddabc1_x11dbx*ddabc1_x11dbx__ddx
@@ -7588,20 +7567,6 @@ c      dx__dcx= bcd1_x*dabc1_x__dcx + abc1_x*dbcd1_x__dcx + bcd1_y*dabc1_y__dcx 
      1            + ddx11dcx__ddabc1_z11dcx*ddabc1_z11dcx__dcy
      1            + ddx11dcx__dabc1_z*dabc1_z__dcy
      1            + ddx11dcx__ddbcd1_z11dcx*ddbcd1_z11dcx__dcy
-c      write(*,*)'ddx11dcx__dcy',ddx11dcx__dcy,
-c     1             ddx11dcx__dbcd1_x,dbcd1_x__dcy,
-c     1             ddx11dcx__ddabc1_x11dcx,ddabc1_x11dcx__dcy,
-c     1             ddx11dcx__dabc1_x,dabc1_x__dcy,
-c     1             ddx11dcx__ddbcd1_x11dcx,ddbcd1_x11dcx__dcy,
-c     1             ddx11dcx__dbcd1_y,dbcd1_y__dcy,
-c     1             ddx11dcx__ddabc1_y11dcx,ddabc1_y11dcx__dcy,
-c     1             ddx11dcx__dabc1_y,dabc1_y__dcy,
-c     1             ddx11dcx__ddbcd1_y11dcx,ddbcd1_y11dcx__dcy,
-c     1             ddx11dcx__dbcd1_z,dbcd1_z__dcy,
-c     1             ddx11dcx__ddabc1_z11dcx,ddabc1_z11dcx__dcy,
-c     1             ddx11dcx__dabc1_z,dabc1_z__dcy,
-c     1             ddx11dcx__ddbcd1_z11dcx,ddbcd1_z11dcx__dcy
-
       ddx11dcx__dcz=
      1              ddx11dcx__dbcd1_x*dbcd1_x__dcz
      1            + ddx11dcx__ddabc1_x11dcx*ddabc1_x11dcx__dcz
@@ -7615,21 +7580,6 @@ c     1             ddx11dcx__ddbcd1_z11dcx,ddbcd1_z11dcx__dcy
      1            + ddx11dcx__ddabc1_z11dcx*ddabc1_z11dcx__dcz
      1            + ddx11dcx__dabc1_z*dabc1_z__dcz
      1            + ddx11dcx__ddbcd1_z11dcx*ddbcd1_z11dcx__dcz
-c      write(*,*)'ddx11dcx__dcz',
-c     1             ddx11dcx__dcz,
-c     1             ddx11dcx__dbcd1_x,dbcd1_x__dcz,
-c     1             ddx11dcx__ddabc1_x11dcx,ddabc1_x11dcx__dcz,
-c     1             ddx11dcx__dabc1_x,dabc1_x__dcz,
-c     1             ddx11dcx__ddbcd1_x11dcx,ddbcd1_x11dcx__dcz,
-c     1             ddx11dcx__dbcd1_y,dbcd1_y__dcz,
-c     1             ddx11dcx__ddabc1_y11dcx,ddabc1_y11dcx__dcz,
-c     1             ddx11dcx__dabc1_y,dabc1_y__dcz,
-c     1             ddx11dcx__ddbcd1_y11dcx,ddbcd1_y11dcx__dcz,
-c     1             ddx11dcx__dbcd1_z,dbcd1_z__dcz,
-c     1             ddx11dcx__ddabc1_z11dcx,ddabc1_z11dcx__dcz,
-c     1             ddx11dcx__dabc1_z,dabc1_z__dcz,
-c     1             ddx11dcx__ddbcd1_z11dcx,ddbcd1_z11dcx__dcz
-
       ddx11dcx__ddx=
      1              ddx11dcx__dbcd1_x*dbcd1_x__ddx
      1            + ddx11dcx__ddabc1_x11dcx*ddabc1_x11dcx__ddx
@@ -8424,21 +8374,6 @@ c dy__dcx= bcd1_x*daux_x__dcx + aux_x*dbcd1_x__dcx + bcd1_y*daux_y__dcx + aux_y*
      1            + ddy11dcx__ddaux_z11dcx*ddaux_z11dcx__dcz
      1            + ddy11dcx__daux_z*daux_z__dcz
      1            + ddy11dcx__ddbcd1_z11dcx*ddbcd1_z11dcx__dcz
-c      write(*,*)'ddy11dcx__dcz',
-c     1             ddy11dcx__dcz,
-c     1             ddy11dcx__dbcd1_x, dbcd1_x__dcz,
-c     1             ddy11dcx__ddaux_x11dcx, ddaux_x11dcx__dcz,
-c     1             ddy11dcx__daux_x, daux_x__dcz,
-c     1             ddy11dcx__ddbcd1_x11dcx, ddbcd1_x11dcx__dcz,
-c     1             ddy11dcx__dbcd1_y, dbcd1_y__dcz,
-c     1             ddy11dcx__ddaux_y11dcx, ddaux_y11dcx__dcz,
-c     1             ddy11dcx__daux_y, daux_y__dcz,
-c     1             ddy11dcx__ddbcd1_y11dcx, ddbcd1_y11dcx__dcz,
-c     1             ddy11dcx__dbcd1_z, dbcd1_z__dcz,
-c     1             ddy11dcx__ddaux_z11dcx, ddaux_z11dcx__dcz,
-c     1             ddy11dcx__daux_z, daux_z__dcz,
-c     1             ddy11dcx__ddbcd1_z11dcx, ddbcd1_z11dcx__dcz
-
       ddy11dcx__ddx=
      1              ddy11dcx__dbcd1_x*dbcd1_x__ddx
      1            + ddy11dcx__ddaux_x11dcx*ddaux_x11dcx__ddx
@@ -8903,21 +8838,11 @@ c df__dbx=df__dx*dx__dbx + df__dy*dy__dbx
      1 + ddf11dbx__ddx11dbx*ddx11dbx__dcy
      1 + ddf11dbx__ddf11dy*ddf11dy__dcy
      1 + ddf11dbx__ddy11dbx*ddy11dbx__dcy
-c      write(*,*)'ddf11dbx__dcy',ddf11dbx__dcy,
-c     1  ddf11dbx__ddf11dx,ddf11dx__dcy,
-c     1  ddf11dbx__ddx11dbx,ddx11dbx__dcy,
-c     1  ddf11dbx__ddf11dy,ddf11dy__dcy,
-c     1  ddf11dbx__ddy11dbx,ddy11dbx__dcy
       ddf11dbx__dcz=
      1   ddf11dbx__ddf11dx*ddf11dx__dcz
      1 + ddf11dbx__ddx11dbx*ddx11dbx__dcz
      1 + ddf11dbx__ddf11dy*ddf11dy__dcz
      1 + ddf11dbx__ddy11dbx*ddy11dbx__dcz
-c      write(*,*)'ddf11dbx__dcz',ddf11dbx__dcz,
-c     1 ddf11dbx__ddf11dx, ddf11dx__dcz,
-c     1 ddf11dbx__ddx11dbx, ddx11dbx__dcz,
-c     1 ddf11dbx__ddf11dy, ddf11dy__dcz,
-c     1 ddf11dbx__ddy11dbx, ddy11dbx__dcz
       ddf11dbx__ddx=
      1   ddf11dbx__ddf11dx*ddf11dx__ddx
      1 + ddf11dbx__ddx11dbx*ddx11dbx__ddx
@@ -9021,21 +8946,11 @@ c df__dcx=df__dx*dx__dcx + df__dy*dy__dcx
      1 + ddf11dcx__ddx11dcx*ddx11dcx__dcy
      1 + ddf11dcx__ddf11dy*ddf11dy__dcy
      1 + ddf11dcx__ddy11dcx*ddy11dcx__dcy
-c      write(*,*)'ddf11dcx__dcy',ddf11dcx__dcy,
-c     1  ddf11dcx__ddf11dx, ddf11dx__dcy,
-c     1  ddf11dcx__ddx11dcx, ddx11dcx__dcy,
-c     1  ddf11dcx__ddf11dy, ddf11dy__dcy,
-c     1  ddf11dcx__ddy11dcx, ddy11dcx__dcy
       ddf11dcx__dcz=
      1   ddf11dcx__ddf11dx*ddf11dx__dcz
      1 + ddf11dcx__ddx11dcx*ddx11dcx__dcz
      1 + ddf11dcx__ddf11dy*ddf11dy__dcz
      1 + ddf11dcx__ddy11dcx*ddy11dcx__dcz
-c      write(*,*)'ddf11dcx__dcz', ddf11dcx__dcz,
-c     1  ddf11dcx__ddf11dx, ddf11dx__dcz,
-c     1  ddf11dcx__ddx11dcx, ddx11dcx__dcz,
-c     1  ddf11dcx__ddf11dy, ddf11dy__dcz,
-c     1  ddf11dcx__ddy11dcx, ddy11dcx__dcz
       ddf11dcx__ddx=
      1   ddf11dcx__ddf11dx*ddf11dx__ddx
      1 + ddf11dcx__ddx11dcx*ddx11dcx__ddx

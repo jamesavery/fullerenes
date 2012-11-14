@@ -1105,7 +1105,8 @@ C######################################################################
      2   dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
      3   angle_abcd)
       minor=2
-c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+c      write(*,*)'first derivatives',
+c     1        dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       if(dabs(dax-(0.)).lt.e.and.
      2   dabs(day-(0)).lt.e.and.
      2   dabs(daz-(1)).lt.e.and.
@@ -1130,6 +1131,7 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
         write(iout,3)angle_abcd,(-dpi/2)
       end if
       call dddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     1 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
      1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
      1 daxdcz, daxddx, daxddy, daxddz, dayday, daydaz, daydbx, daydby,
      1 daydbz, daydcx, daydcy, daydcz, dayddx, dayddy, dayddz, dazdaz,
@@ -1139,8 +1141,52 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
      1 dbyddy, dbyddz, dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy,
      1 dbzddz, dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz, dcydcy,
      1 dcydcz, dcyddx, dcyddy, dcyddz, dczdcz, dczddx, dczddy, dczddz,
-     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz)
+     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz,
+     1 angle_abcd)
       minor=4
+c      write(*,*)'first derivatives',
+c     1    dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+c      write(*,*)'2nd, batch 1',
+c     1 '(should be 0, 0, -1 -- 0, 0, 1 -- 0, 0, 0 -- 0, 0, 0)',
+c     1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
+c     1 daxdcz, daxddx, daxddy, daxddz
+c      write(*,*)'2nd, batch 2',
+c     1 '(should be 0, 0 -- 0, 0, 1 -- 0, 0, -1 -- 0, 0, 0)',
+c     1 dayday, daydaz, daydbx, daydby, daydbz, daydcx, daydcy,
+c     1 daydcz, dayddx, dayddy, dayddz
+c      write(*,*)'2nd, batch 3',
+c     1 '(should be 0 -- 1, 0, 0 -- 0, 0, 0 -- 0, 0, 0)',
+c     1 dazdaz, dazdbx, dazdby, dazdbz, dazdcx, dazdcy,
+c     1 dazdcz, dazddx, dazddy, dazddz
+c      write(*,*)'2nd, batch 4',
+c     1 '(should be 0, 0, -2 -- 0, -1, 1 -- 0, 1, 0)',
+c     1 dbxdbx, dbxdby, dbxdbz, dbxdcx, dbxdcy,
+c     1 dbxdcz, dbxddx, dbxddy, dbxddz
+c      write(*,*)'2nd, batch 5',
+c     1 '(should be  0, -1 -- 0, 0, 0 -- 0, 0, 0)',
+c     1 dbydby, dbydbz, dbydcx, dbydcy,
+c     1 dbydcz, dbyddx, dbyddy, dbyddz
+c      write(*,*)'2nd, batch 6',
+c     1 '(should be 0 -- 1, 0, 0 -- 0, 0, 0)',
+c     1 dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy, dbzddz
+c      write(*,*)'2nd, batch 7',
+c     1 '(should be 0, 0, -2 -- 0, -1, 1)',
+c     1 dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz
+c      write(*,*)'2nd, batch 8',
+c     1 '(should be 0, 0 -- 0, 0, 0)',
+c     1 dcydcy, dcydcz, dcyddx, dcyddy, dcyddz
+c      write(*,*)'2nd, batch 9',
+c     1 '(should be 0 -- 1, 0, 0)',
+c     1 dczdcz, dczddx, dczddy, dczddz
+c      write(*,*)'2nd, batch 10',
+c     1 '(should be 0, 0, -1)',
+c     1 ddxddx, ddxddy, ddxddz
+c      write(*,*)'2nd, batch 11',
+c     1 '(should be 0, 0)',
+c     1 ddyddy, ddyddz
+c      write(*,*)'2nd, batch 12',
+c     1 '(should be 0)',
+c     1 ddzddz
       if(dabs(daxdax-(0.)).lt.e.and.
      2   dabs(daxday-(0.)).lt.e.and.
      2   dabs(daxdaz-(-1.)).lt.e.and.
@@ -1234,6 +1280,31 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       else
         write(iout,2)testno,minor
       end if
+      minor=5
+c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+      if(dabs(dax-(0.)).lt.e.and.
+     2   dabs(day-(0)).lt.e.and.
+     2   dabs(daz-(1)).lt.e.and.
+     2   dabs(dbx-(0)).lt.e.and.
+     2   dabs(dby-(0)).lt.e.and.
+     2   dabs(dbz-(-1)).lt.e.and.
+     2   dabs(dcx-(-1)).lt.e.and.
+     2   dabs(dcy-(0)).lt.e.and.
+     2   dabs(dcz-(0)).lt.e.and.
+     2   dabs(ddx-(1)).lt.e.and.
+     2   dabs(ddy-(0.)).lt.e.and.
+     2   dabs(ddz-(0.)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      minor=6
+      if(dabs(angle_abcd - (-dpi/2)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+        write(iout,3)angle_abcd,(-dpi/2)
+      end if
 
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       testno=12
@@ -1287,6 +1358,7 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
         write(iout,3)angle_abcd,(-dpi/2)
       end if
       call dddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     1 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
      1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
      1 daxdcz, daxddx, daxddy, daxddz, dayday, daydaz, daydbx, daydby,
      1 daydbz, daydcx, daydcy, daydcz, dayddx, dayddy, dayddz, dazdaz,
@@ -1296,8 +1368,52 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
      1 dbyddy, dbyddz, dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy,
      1 dbzddz, dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz, dcydcy,
      1 dcydcz, dcyddx, dcyddy, dcyddz, dczdcz, dczddx, dczddy, dczddz,
-     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz)
+     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz,
+     1 angle_abcd)
       minor=4
+c      write(*,*)'first derivatives',
+c     1    dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+c      write(*,*)'2nd, batch 1',
+c     1 '(should be 0, 0, -.35 -- 0, 0, 0 -- 0, 0, 0.35 -- 0, 0, 0)',
+c     1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
+c     1 daxdcz, daxddx, daxddy, daxddz
+c      write(*,*)'2nd, batch 2',
+c     1 '(should be 0, -.35 -- 0, 0, .707 -- 0, 0, -.35 -- 0, 0, 0)',
+c     1 dayday, daydaz, daydbx, daydby, daydbz, daydcx, daydcy,
+c     1 daydcz, dayddx, dayddy, dayddz
+c      write(*,*)'2nd, batch 3',
+c     1 '(should be 0 -- .35, .35, 0 -- 0, 0, 0 -- 0, 0, 0)',
+c     1 dazdaz, dazdbx, dazdby, dazdbz, dazdcx, dazdcy,
+c     1 dazdcz, dazddx, dazddy, dazddz
+c      write(*,*)'2nd, batch 4',
+c     1 '(should be 0, 0, -.35 -- .35, -.35, 0 -- -.35, .35, 0)',
+c     1 dbxdbx, dbxdby, dbxdbz, dbxdcx, dbxdcy,
+c     1 dbxdcz, dbxddx, dbxddy, dbxddz
+c      write(*,*)'2nd, batch 5',
+c     1 '(should be  0, -1.06 -- .35, -.35, .707 -- -.35, .35, 0)',
+c     1 dbydby, dbydbz, dbydcx, dbydcy,
+c     1 dbydcz, dbyddx, dbyddy, dbyddz
+c      write(*,*)'2nd, batch 6',
+c     1 '(should be 0 -- .35, .35, 0 -- 0, 0, 0)',
+c     1 dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy, dbzddz
+c      write(*,*)'2nd, batch 7',
+c     1 '(should be -.707, 0, -1.06 -- .35, -.35, .707)',
+c     1 dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz
+c      write(*,*)'2nd, batch 8',
+c     1 '(should be .707, -1.06 -- .35, -.35, .707)',
+c     1 dcydcy, dcydcz, dcyddx, dcyddy, dcyddz
+c      write(*,*)'2nd, batch 9',
+c     1 '(should be 0 -- .707, .707, 0)',
+c     1 dczdcz, dczddx, dczddy, dczddz
+c      write(*,*)'2nd, batch 10',
+c     1 '(should be 0, 0, -.707)',
+c     1 ddxddx, ddxddy, ddxddz
+c      write(*,*)'2nd, batch 11',
+c     1 '(should be 0, -0.707)',
+c     1 ddyddy, ddyddz
+c      write(*,*)'2nd, batch 12',
+c     1 '(should be 0)',
+c     1 ddzddz
       sqrteight=2*sqrt(2.)
       if(dabs(daxdax-(0.)).lt.e.and.
      2   dabs(daxday-(0.)).lt.e.and.
@@ -1392,11 +1508,36 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
       else
         write(iout,2)testno,minor
       end if
+      minor=5
+c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+      if(dabs(dax-(0.)).lt.e.and.
+     2   dabs(day-(0)).lt.e.and.
+     2   dabs(daz-(1/sqrt(2.))).lt.e.and.
+     2   dabs(dbx-(0)).lt.e.and.
+     2   dabs(dby-(0)).lt.e.and.
+     2   dabs(dbz-(-1/sqrt(2.))).lt.e.and.
+     2   dabs(dcx-(-1/sqrt(2.))).lt.e.and.
+     2   dabs(dcy-(-1/sqrt(2.))).lt.e.and.
+     2   dabs(dcz-(0)).lt.e.and.
+     2   dabs(ddx-(1/sqrt(2.))).lt.e.and.
+     2   dabs(ddy-(1/sqrt(2.))).lt.e.and.
+     2   dabs(ddz-(0.)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      minor=6
+      if(dabs(angle_abcd - (-dpi/2)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+        write(iout,3)angle_abcd,(-dpi/2)
+      end if
 
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      testno=13
-      minor=1
-ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+c      testno=13
+c      minor=1
+cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
       ax=1
       ay=0
       az=0
@@ -1457,6 +1598,7 @@ c      write(*,*)ddz,' ddz ','1.863389981'
         write(iout,3)angle_abcd,(0.4205343353)
       end if
       call dddihedral(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
+     1 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
      1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
      1 daxdcz, daxddx, daxddy, daxddz, dayday, daydaz, daydbx, daydby,
      1 daydbz, daydcx, daydcy, daydcz, dayddx, dayddy, dayddz, dazdaz,
@@ -1466,8 +1608,54 @@ c      write(*,*)ddz,' ddz ','1.863389981'
      1 dbyddy, dbyddz, dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy,
      1 dbzddz, dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz, dcydcy,
      1 dcydcz, dcyddx, dcyddy, dcyddz, dczdcz, dczddx, dczddy, dczddz,
-     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz)
+     1 ddxddx, ddxddy, ddxddz, ddyddy, ddyddz, ddzddz,
+     1 angle_abcd)
       minor=4
+c      write(*,*)'first derivatives',
+c     1    dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+c      write(*,*)'2nd, batch 1',
+c     1 '(should be 0, 0, 0.496903995 -- 0, 0, -0.2484519975',
+c     1 ' -- 0, 0, -0.2484519975 -- 0, 0, 0)',
+c     1 daxdax, daxday, daxdaz, daxdbx, daxdby, daxdbz, daxdcx, daxdcy,
+c     1 daxdcz, daxddx, daxddy, daxddz
+c      write(*,*)'2nd, batch 2',
+c     1 '(should be 0, -.35 -- 0, 0, .707 -- 0, 0, -.35 -- 0, 0, 0)',
+c     1 dayday, daydaz, daydbx, daydby, daydbz, daydcx, daydcy,
+c     1 daydcz, dayddx, dayddy, dayddz
+c      write(*,*)'2nd, batch 3',
+c     1 '(should be 0 -- .35, .35, 0 -- 0, 0, 0 -- 0, 0, 0)',
+c     1 dazdaz, dazdbx, dazdby, dazdbz, dazdcx, dazdcy,
+c     1 dazdcz, dazddx, dazddy, dazddz
+c      write(*,*)'2nd, batch 4',
+c     1 '(should be .77, 0, -.35 -- .35, -.35, 0 -- -.35, .35, 0)',
+c     1 dbxdbx, dbxdby, dbxdbz, dbxdcx, dbxdcy,
+c     1 dbxdcz, dbxddx, dbxddy, dbxddz
+c      write(*,*)'2nd, batch 5',
+c     1 '(should be  ,  -- ,   -- , , )',
+c     1 dbydby, dbydbz, dbydcx, dbydcy,
+c     1 dbydcz, dbyddx, dbyddy, dbyddz
+c      write(*,*)'2nd, batch 6',
+c     1 '(should be -1.1925 -- -0.4273, 0.5118, -0.6708 --',
+c     1 '1.118033989, -1.4907, 1.8633)',
+c     1 dbzdbz, dbzdcx, dbzdcy, dbzdcz, dbzddx, dbzddy, dbzddz
+c      write(*,*)'2nd, batch 7',
+c     1 '(should be 0.5764, -0.1391, -0.4670 -- -1.1428, 0.1987,0.9938)',
+c     1 dcxdcx, dcxdcy, dcxdcz, dcxddx, dcxddy, dcxddz
+c      write(*,*)'2nd, batch 8',
+c     1 '(should be -0.00496, -0.06459 -- 0.571439, -0.09938, -0.49690)',
+c     1 dcydcy, dcydcz, dcyddx, dcyddy, dcyddz
+c      write(*,*)'2nd, batch 9',
+c     1 '(should be -0.57143959 -- 1.3664859, 0.24845199, 1.2422599)',
+c     1 dczdcz, dczddx, dczddy, dczddz
+c      write(*,*)'2nd, batch 10',
+c     1 '(should be 2.484519975, -1.242259987, -2.484519975)',
+c     1 ddxddx, ddxddy, ddxddz
+c      write(*,*)'2nd, batch 11',
+c     1 '(should be 0.6211299937, 1.242259987)',
+c     1 ddyddy, ddyddz
+c      write(*,*)'2nd, batch 12',
+c     1 '(should be -3.105649969)',
+c     1 ddzddz
       if(dabs(daxdax-(0.)).lt.e.and.
      2   dabs(daxday-(0.)).lt.e.and.
      2   dabs(daxdaz-(0.496903995)).lt.e.and.
@@ -1482,84 +1670,109 @@ c      write(*,*)ddz,' ddz ','1.863389981'
      2   dabs(daxddz-(0.)).lt.e.and.
 
      2   dabs(dayday-(0.)).lt.e.and.
-     2   dabs(daydaz-(0.)).lt.e.and.
+     2   dabs(daydaz-(-0.2484519975)).lt.e.and.
      2   dabs(daydbx-(0.)).lt.e.and.
      2   dabs(daydby-(0.)).lt.e.and.
-     2   dabs(daydbz-(0.)).lt.e.and.
+     2   dabs(daydbz-(0.496903995)).lt.e.and.
      2   dabs(daydcx-(0.)).lt.e.and.
      2   dabs(daydcy-(0.)).lt.e.and.
-     2   dabs(daydcz-(0.)).lt.e.and.
+     2   dabs(daydcz-(-0.2484519975)).lt.e.and.
      2   dabs(dayddx-(0.)).lt.e.and.
      2   dabs(dayddy-(0.)).lt.e.and.
      2   dabs(dayddz-(0.)).lt.e.and.
 
      2   dabs(dazdaz-(0.)).lt.e.and.
-     2   dabs(dazdbx-(0.)).lt.e.and.
-     2   dabs(dazdby-(0.)).lt.e.and.
+     2   dabs(dazdbx-(-0.397523196)).lt.e.and.
+     2   dabs(dazdby-(0.198761598)).lt.e.and.
      2   dabs(dazdbz-(0.)).lt.e.and.
-     2   dabs(dazdcx-(0.)).lt.e.and.
-     2   dabs(dazdcy-(0.)).lt.e.and.
+     2   dabs(dazdcx-(-0.099380799)).lt.e.and.
+     2   dabs(dazdcy-(0.0496903995)).lt.e.and.
      2   dabs(dazdcz-(0.)).lt.e.and.
      2   dabs(dazddx-(0.)).lt.e.and.
      2   dabs(dazddy-(0.)).lt.e.and.
      2   dabs(dazddz-(0.)).lt.e.and.
 
-     2   dabs(dbxdbx-(0.)).lt.e.and.
-     2   dabs(dbxdby-(0.)).lt.e.and.
-     2   dabs(dbxdbz-(0.)).lt.e.and.
-     2   dabs(dbxdcx-(0.)).lt.e.and.
-     2   dabs(dbxdcy-(0.)).lt.e.and.
-     2   dabs(dbxdcz-(0.)).lt.e.and.
-     2   dabs(dbxddx-(0.)).lt.e.and.
-     2   dabs(dbxddy-(2.)).lt.e.and.
-     2   dabs(dbxddz-(0.)).lt.e.and.
+     2   dabs(dbxdbx-(0.7751702322)).lt.e.and.
+     2   dabs(dbxdby-(-0.6111919138)).lt.e.and.
+     2   dabs(dbxdbz-(-0.4422445555)).lt.e.and.
+     2   dabs(dbxdcx-(0.5664705543)).lt.e.and.
+     2   dabs(dbxdcy-(-0.4323064756)).lt.e.and.
+     2   dabs(dbxdcz-(-0.6509442334)).lt.e.and.
+     2   dabs(dbxddx-(-1.341640786)).lt.e.and.
+     2   dabs(dbxddy-(1.043498389)).lt.e.and.
+     2   dabs(dbxddz-(1.490711985)).lt.e.and.
 
-     2   dabs(dbydby-(0.)).lt.e.and.
-     2   dabs(dbydbz-(0.)).lt.e.and.
-     2   dabs(dbydcx-(0.)).lt.e.and.
-     2   dabs(dbydcy-(0.)).lt.e.and.
-     2   dabs(dbydcz-(0.)).lt.e.and.
-     2   dabs(dbyddx-(0.)).lt.e.and.
-     2   dabs(dbyddy-(0.)).lt.e.and.
-     2   dabs(dbyddz-(0.)).lt.e.and.
+     2   dabs(dbydby-(0.4173993558)).lt.e.and.
+     2   dabs(dbydbz-(0.4819968751)).lt.e.and.
+     2   dabs(dbydcx-(-0.0596284794)).lt.e.and.
+     2   dabs(dbydcy-(0.1043498389)).lt.e.and.
+     2   dabs(dbydcz-(0.06459751935)).lt.e.and.
+     2   dabs(dbyddx-(0.6708203932)).lt.e.and.
+     2   dabs(dbyddy-(-0.5217491947)).lt.e.and.
+     2   dabs(dbyddz-(-0.7453559925)).lt.e.and.
 
-     2   dabs(dbzdbz-(0.)).lt.e.and.
-     2   dabs(dbzdcx-(0.)).lt.e.and.
-     2   dabs(dbzdcy-(0.)).lt.e.and.
-     2   dabs(dbzdcz-(0.)).lt.e.and.
-     2   dabs(dbzddx-(0.)).lt.e.and.
-     2   dabs(dbzddy-(0.)).lt.e.and.
-     2   dabs(dbzddz-(0.)).lt.e.and.
+     2   dabs(dbzdbz-(-1.192569588)).lt.e.and.
+     2   dabs(dbzdcx-(-0.4273374357)).lt.e.and.
+     2   dabs(dbzdcy-(0.5118111148)).lt.e.and.
+     2   dabs(dbzdcz-(-0.6708203932)).lt.e.and.
+     2   dabs(dbzddx-(1.118033989)).lt.e.and.
+     2   dabs(dbzddy-(-1.490711985)).lt.e.and.
+     2   dabs(dbzddz-(1.863389981)).lt.e.and.
 
-     2   dabs(dcxdcx-(0.)).lt.e.and.
-     2   dabs(dcxdcy-(0.)).lt.e.and.
-     2   dabs(dcxdcz-(0.)).lt.e.and.
-     2   dabs(dcxddx-(0.)).lt.e.and.
-     2   dabs(dcxddy-(0.)).lt.e.and.
-     2   dabs(dcxddz-(0.)).lt.e.and.
+     2   dabs(dcxdcx-(0.5764086342)).lt.e.and.
+     2   dabs(dcxdcy-(-0.1391331186)).lt.e.and.
+     2   dabs(dcxdcz-(-0.4670897553)).lt.e.and.
+     2   dabs(dcxddx-(-1.142879188)).lt.e.and.
+     2   dabs(dcxddy-(0.198761598)).lt.e.and.
+     2   dabs(dcxddz-(0.99380799)).lt.e.and.
 
-     2   dabs(dcydcy-(0.)).lt.e.and.
-     2   dabs(dcydcz-(0.)).lt.e.and.
-     2   dabs(dcyddx-(0.)).lt.e.and.
-     2   dabs(dcyddy-(0.)).lt.e.and.
-     2   dabs(dcyddz-(0.)).lt.e.and.
+     2   dabs(dcydcy-(-0.00496903995)).lt.e.and.
+     2   dabs(dcydcz-(-0.06459751935)).lt.e.and.
+     2   dabs(dcyddx-(0.5714395942)).lt.e.and.
+     2   dabs(dcyddy-(-0.099380799)).lt.e.and.
+     2   dabs(dcyddz-(-0.496903995)).lt.e.and.
 
-     2   dabs(dczdcz-(0.)).lt.e.and.
-     2   dabs(dczddx-(0.)).lt.e.and.
-     2   dabs(dczddy-(0.)).lt.e.and.
-     2   dabs(dczddz-(0.)).lt.e.and.
+     2   dabs(dczdcz-(-0.5714395942)).lt.e.and.
+     2   dabs(dczddx-(1.366485986)).lt.e.and.
+     2   dabs(dczddy-(0.2484519975)).lt.e.and.
+     2   dabs(dczddz-(1.242259987)).lt.e.and.
 
-     2   dabs(ddxddx-(0.)).lt.e.and.
-     2   dabs(ddxddy-(0.)).lt.e.and.
-     2   dabs(ddxddz-(0.)).lt.e.and.
+     2   dabs(ddxddx-(2.484519975)).lt.e.and.
+     2   dabs(ddxddy-(-1.242259987)).lt.e.and.
+     2   dabs(ddxddz-(-2.484519975)).lt.e.and.
 
-     2   dabs(ddyddy-(0.)).lt.e.and.
-     2   dabs(ddyddz-(0.)).lt.e.and.
+     2   dabs(ddyddy-(0.6211299937)).lt.e.and.
+     2   dabs(ddyddz-(1.242259987)).lt.e.and.
 
-     2   dabs(ddzddz-(0.)).lt.e) then
+     2   dabs(ddzddz-(-3.105649969)).lt.e) then
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
+      end if
+      minor=5
+c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+      if(dabs(dax-(0.)).lt.e.and.
+     2   dabs(day-(0)).lt.e.and.
+     2   dabs(daz-(-0.7453559925)).lt.e.and.
+     2   dabs(dbx-(0.4472135955)).lt.e.and.
+     2   dabs(dby-(-0.2236067977)).lt.e.and.
+     2   dabs(dbz-(-0.5217491947)).lt.e.and.
+     2   dabs(dcx-(0.298142397)).lt.e.and.
+     2   dabs(dcy-(-0.1490711985)).lt.e.and.
+     2   dabs(dcz-(-0.596284794)).lt.e.and.
+     2   dabs(ddx-(-0.7453559925)).lt.e.and.
+     2   dabs(ddy-(0.3726779962)).lt.e.and.
+     2   dabs(ddz-(1.863389981)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+      end if
+      minor=6
+      if(dabs(angle_abcd - (0.4205343353)).lt.e) then
+        write(iout,1)testno,minor
+      else
+        write(iout,2)testno,minor
+        write(iout,3)angle_abcd,(0.4205343353)
       end if
 
 
