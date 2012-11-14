@@ -655,12 +655,14 @@ others are of perhaps of more historical interest. Note that for non-spherical f
 tetrahedron) it becomes very difficult to create a good Schlegel projection, and in such cases the projection of vertices to the minimum
 covering sphere is recommended before these algorithms are used (see input). The subroutine produces a latex file with the fullerene graph included.
 
-1) The perspective Schlegel projection (SP): Here the points are rotated such to put a selected vertex, edge or ring center 
-on top of the $z$-axis just below the projection point (otherwise the point $(0,0,z_{\mathrm{max}})$ is chosen with $z_{\mathrm{max}}$
-being the point with maximum $z$-value from the original input coordinates). Points are then sorted in descending order according to their $z$-values.
-The circumference for atoms and rings down the $z$-axis are determined. The Schlegel projection is created giving as output the projected $(X_i,Y_i)$
-coordinates, i.e. points are projected down a plane from a set projection point. 
-The connections between the points are already written out earlier in the output such that the fullerene graph can be drawn. This is shown in Figure \ref{pic:Schlegel}.
+1) In the perspective Schlegel projection (PSP), the 3D graph is rotated such that a selected vertex, edge of ring 
+(commonly the barycenter of a polygon is chosen) is located at top of the $z$-axis at some distance below the projection point $P$, 
+with the $z$-axis going (not necessarily) through the barycenter of the fullerene. If no choice is given in the input, the point $(0,0,z_{\mathrm{max}})$ 
+is chosen with $z_{\mathrm{max}}$ being the point with maximum $z$-value from the original input coordinates of the vertices. 
+Vertices and ring barycenters are then sorted in descending order according to their $z$-values.
+The Schlegel projection then yields the projected $(X_i,Y_i)$ coordinates by projecting vertices and ring centers 
+down on a plane below the fullerene.  The edges between the vertices are already known such that the fullerene graph can be drawn. 
+This is shown in Figure \ref{pic:Schlegel}.
 
 %Figure 4
  \begin{figure}[htbp]
@@ -670,11 +672,10 @@ The connections between the points are already written out earlier in the output
 	\label{pic:Schlegel}
  \end{figure}
 
-2) The cone projection (CSP), i.e. points are projected out to an enveloping cone and then down to a plane below the fullerene. 
-The last ring center should be at the bottom of the fullerene and if detected, will not be projected 
-out, or if not, will have a large scale factor (this center may be ignored in the drawing). Also, the 
-last points on the outer ring in the fullerene graph are scaled in distance by 1.2 in order to make the outer rings 
-more visible. This also moves the outer centers within the ring.
+2) In the cone Schlegel projection (CSP) the vertices are projected out on an enveloping cone and then down on a plane below the fullerene. 
+The barycenter of the last ring closest to the projection plane should be at the bottom of the fullerene. The barycenter of the circumfencing
+ring will not be projected out (this center may be ignored in the drawing). A scaling factor could be applied (1.2 used in the program)
+for the outer points in the 2D graph in order to avoid edge crossings.
        
 At the end a rough plot of the fullerene graph is produced. This is suitable for fullerenes up to about \C{100}, beyond that
 it becomes too crowded and the latex file produced contains a better graph. Nevertheless, it serves for a first rough picture. 
