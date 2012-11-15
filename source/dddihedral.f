@@ -106,11 +106,13 @@ c all other combinations are zero
       dcd_z__dcz=1
       dcd_z__ddz=-1
 
+
 c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc_length_inv_cub=bc_length_inv**3
       dbc_length_inv__dbc_x=-bc_x*bc_length_inv_cub
       dbc_length_inv__dbc_y=-bc_y*bc_length_inv_cub
       dbc_length_inv__dbc_z=-bc_z*bc_length_inv_cub
+
 
 c bc1_x=bc_x*bc_length_inv
       dbc1_x__dbx= bc_length_inv + bc_x*dbc_length_inv__dbc_x
@@ -133,6 +135,7 @@ c bc1_z=bc_z*bc_length_inv
       dbc1_z__dcx= -bc_z*dbc_length_inv__dbc_x
       dbc1_z__dcy= -bc_z*dbc_length_inv__dbc_y
       dbc1_z__dcz= -bc_length_inv - bc_z*dbc_length_inv__dbc_z
+
 
 c abc_x=-ab_y*bc_z + ab_z*bc_y
       dabc_x__dby=bc_z + ab_z
@@ -209,7 +212,6 @@ c abc_z=-ab_x*bc_y + ab_y*bc_x
      1  dabc_z__dbc_y*dbc_y__dcy
 
 
-
 c bcd_x=-bc_y*cd_z + bc_z*cd_y
       dbcd_x__dbc_y=-cd_z
       dbcd_x__dbc_z=cd_y
@@ -256,11 +258,13 @@ c abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
       dabc_length_inv__dabc_y=-abc_y*abc_length_inv_cub
       dabc_length_inv__dabc_z=-abc_z*abc_length_inv_cub
 
+
 c bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
       bcd_length_inv_cub=bcd_length_inv**3
       dbcd_length_inv__dbcd_x=-bcd_x*bcd_length_inv_cub
       dbcd_length_inv__dbcd_y=-bcd_y*bcd_length_inv_cub
       dbcd_length_inv__dbcd_z=-bcd_z*bcd_length_inv_cub
+
 
 c abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
       dabc_length_inv__dax=dabc_length_inv__dabc_y*bc_z
@@ -283,7 +287,6 @@ c abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
      3 - dabc_length_inv__dabc_y*ab_x
 
 c bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
-c derivatives according to dax, day, daz
       dbcd_length_inv__dbx=dbcd_length_inv__dbcd_y*cd_z
      4 - dbcd_length_inv__dbcd_z*cd_y
       dbcd_length_inv__dby=-dbcd_length_inv__dbcd_x*cd_z
@@ -314,6 +317,7 @@ c abc1_z=abc_z*abc_length_inv
       dabc1_x__dabc_length_inv=abc_x
       dabc1_y__dabc_length_inv=abc_y
       dabc1_z__dabc_length_inv=abc_z
+
 
 c derivation of the components of the normals
 c abc1_x=abc_x*abc_length_inv
@@ -596,6 +600,7 @@ c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
      3 aux_y*dbcd1_y__ddz +
      4 aux_z*dbcd1_z__ddz
 
+
 c derivation of x
 c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
       dx__dax=
@@ -647,9 +652,11 @@ c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
      3 abc1_y*dbcd1_y__ddz +
      4 abc1_z*dbcd1_z__ddz
 
+
 c derivation atan2(y,x) according to x and y
       df__dx=-y/(x**2 + y**2)
       df__dy=x/(x**2 + y**2)
+
 
 c derive f according to all 12 cartesion components of the four points
 c f=atan2(y,x)
@@ -725,6 +732,7 @@ c abc_length_inv_cub=abc_length_inv**3
      1   dabc_length_inv_cub__dabc_length_inv*dabc_length_inv__dcy
       dabc_length_inv_cub__dcz=
      1   dabc_length_inv_cub__dabc_length_inv*dabc_length_inv__dcz
+
 
 c dabc_length_inv__dabc_x=-abc_x*abc_length_inv_cub
       ddabc_length_inv11dabc_x__dabc_length_inv_cub=-abc_x
@@ -1137,6 +1145,7 @@ c dbcd_z__dcx=cd_y + bc_y
 c dbcd_z__dcy=-bc_x - cd_x
       ddbcd_z11dcy__ddx=
      1  ddbcd_z11dcy__dcd_x*dcd_x__ddx
+
 
 c dbcd_length_inv__dbcd_x=-bcd_x*bcd_length_inv_cub
       ddbcd_length_inv11dbcd_x__dby=
@@ -2096,7 +2105,6 @@ c daux_z__dcz= bc1_y*dabc1_x__dcz + abc1_x*dbc1_y__dcz - abc1_y*dbc1_x__dcz - bc
       ddaux_z11dcz__ddbc1_y11dcz=abc1_x
 
 
-
 c dbcd_length_inv__dbx=dbcd_length_inv__dbcd_y*cd_z - dbcd_length_inv__dbcd_z*cd_y
       ddbcd_length_inv11dbx__dbx=
      1   ddbcd_length_inv11dbx__ddbcd_length_inv11dbcd_y*
@@ -2363,6 +2371,7 @@ c dbcd_length_inv__ddz=dbcd_length_inv__dbcd_x*bc_y - dbcd_length_inv__dbcd_y*bc
      1 + ddbcd_length_inv11ddz__ddbcd_length_inv11dbcd_y*
      1                                   ddbcd_length_inv11dbcd_y__ddz
 
+
 c dbcd1_x__dbx= bcd_x*dbcd_length_inv__dbx
       ddbcd1_x11dbx__dbcd_x=dbcd_length_inv__dbx
       ddbcd1_x11dbx__ddbcd_length_inv11dbx=bcd_x
@@ -2488,11 +2497,12 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 3a
 
 c df__dx=-y/(x**2 + y**2)
-      ddf11dx__dx= (2.*x*y)/((x**2. + y**2.)**2.)
-      ddf11dx__dy= (2.*y**2.)/((x**2. + y**2.)**2.) - 1/(x**2. + y**2.)
+      ddf11dx__dx= -2*x/(x**2 + y**2) * df__dx
+      ddf11dx__dy= (-2*y/(x**2 + y**2) + 1/y ) * df__dx
 c df__dy=x/(x**2 + y**2)
-      ddf11dy__dx= (-2.*x**2.)/((x**2. + y**2.)**2.) + 1/(x**2. + y**2.)
-      ddf11dy__dy= (-2.*x*y)/((x**2. + y**2.)**2.)
+      ddf11dy__dx= ddf11dx__dy
+      ddf11dy__dy= -ddf11dx__dx
+
 
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 3b
@@ -3134,7 +3144,6 @@ c dx__ddz= abc1_x*dbcd1_x__ddz + abc1_y*dbcd1_y__ddz + abc1_z*dbcd1_z__ddz
 
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 3c
-
 
 c daux_x__dax= bc1_z*dabc1_y__dax - bc1_y*dabc1_z__dax
       ddaux_x11dax__dax=
@@ -4689,7 +4698,6 @@ c dy__ddz= aux_x*dbcd1_x__ddz + aux_y*dbcd1_y__ddz + aux_z*dbcd1_z__ddz
 ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 2
 
-
 c df__dx=-y/(x**2 + y**2)
       ddf11dx__dax=ddf11dx__dx*dx__dax + ddf11dx__dy*dy__dax
       ddf11dx__day=ddf11dx__dx*dx__day + ddf11dx__dy*dy__day
@@ -5965,9 +5973,9 @@ c dy__ddz= aux_x*dbcd1_x__ddz + aux_y*dbcd1_y__ddz + aux_z*dbcd1_z__ddz
      1            + ddy11ddz__ddbcd1_y11ddz*ddbcd1_y11ddz__ddz
      1            + ddy11ddz__ddbcd1_z11ddz*ddbcd1_z11ddz__ddz
 
+
 cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 1
-
 
 c df__dax=df__dx*dx__dax + df__dy*dy__dax
       ddf11dax__ddf11dx =dx__dax
