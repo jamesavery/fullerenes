@@ -1369,7 +1369,7 @@ c dbc_length_inv__dbc_z=-bc_z*bc_length_inv_cub
       ddbc_length_inv11dbc_z__ddz=
      1   ddbc_length_inv11dbc_z__dbc_z*dbc_z__ddz
      1 + ddbc_length_inv11dbc_z__dbc_length_inv_cub*
-     1                                     dbc_length_inv_cub__dbz
+     1                                     dbc_length_inv_cub__ddz
 
 
 
