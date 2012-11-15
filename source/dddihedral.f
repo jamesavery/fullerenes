@@ -949,7 +949,7 @@ c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       dbc_length_inv__dcy=
      1   dbc_length_inv__dbc_y*dbc_y__dcy
       dbc_length_inv__dcz=
-     1   dbc_length_inv__dbc_z*dbc_z__dcy
+     1   dbc_length_inv__dbc_z*dbc_z__dcz
 
 
 c bcd_length_inv_cub=bcd_length_inv**3
