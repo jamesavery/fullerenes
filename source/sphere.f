@@ -601,8 +601,8 @@ C     to calculate the root mean square as a measure for distortion
  1010 Format(1x,' FCC Lattice constant: ',D14.8,' Angstroem,'
      1 ' FCC volume: ',D14.8,' Angstroem cube,'
      2 ' FCC volume: ',D14.8,' cm3/mol')
- 1011 Format(/1x,' Points on sphere (minimum 2, at most 4 points)'
-     1 ,' coordinates and distance:')
+ 1011 Format(/1x,' Points on sphere (minimum 2, at most 4 points for
+     1 the algorithm) coordinates and distance:')
  1012 Format(/3x,' Largest vertex distance from sphere: ',D12.6,
      1 /3x,' Mean distance from sphere: ',D12.6, 
      1 /3x,' Distortion (in percent) from the MCS relative to the'
