@@ -1,8 +1,8 @@
-C80 Creating isomer list only
+C80 Creating general isomer list only
 &General NA=80 /
 &Coord ICart=0 /
 &FFChoice /
 &FFParameters /
 &Hamilton /
-&Isomers IPR=1 IPH=1 istop=1 /
+&Isomers IPR=1 istop=1 /
 &Graph /
