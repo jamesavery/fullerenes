@@ -1,9 +1,9 @@
-C150 nanotube. Using Tutte algorithm to produce coordinates from ring spiral indices
-&General  NA=150, IP=1 ixyz=1 /
+C250 nanotube. Using Tutte algorithm to produce coordinates from ring spiral indices
+&General  NA=250, IP=1 ixyz=1 /
 &Coord ICart=3 /
 &FFChoice Iopt=3 ftol=1.d-13/
 &FFParameters /
 &Hamilton /
 &Isomers /
-&Graph ifs=1 ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /
-1 2 3 4 5 6 72 73 74 75 76 77
+&Graph ifs=1 boost=1.25 ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /
+1 2 3 4 5 6 122 123 124 125 126 127
