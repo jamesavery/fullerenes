@@ -1,6 +1,6 @@
       SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
      1 Iring,ISchlegel,ifs,ndual,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,
-     1 fscale,scalePPG,CR,CR5,CR6,Symbol,filename)
+     1 fscale,scalePPG,boost,CR,CR5,CR6,Symbol,filename)
       use config
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
@@ -416,7 +416,7 @@ C   Print the sorted ring centers
 C   Choice between Schlegel projection or Tutte embedding
       If(ISchlegel-2) 10,20,30
 
-C   Algorithm 1: 
+C   Algorithm 2: 
 C   Cone projection using the input angle
 C   Calculate distance of vertices from z-axis for projection
   20  app=rmin+Dist(3,1)
@@ -437,7 +437,7 @@ C     Write out on file unit=2 for schlegel.dat
 C   Extra boost for the last ring points
       IVert=M-Iboost
       If(I.gt.IVert) then
-      Fac=Fac*1.2d0
+      Fac=Fac*boost
       endif
       IAT=IAtom(I)
       layout2d(1,IAT)=Dist(1,I)*Fac
@@ -496,7 +496,7 @@ C   Print
       enddo
       go to 999
 
-C   Algorithm 2: 
+C   Algorithm 1: 
 C   Perspective projection using the input distance
 C   Algorithm to produce symmetric Schlegel diagrams
 C   Smallest and largest ring z-coordinate

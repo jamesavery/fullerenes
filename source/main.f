@@ -102,7 +102,7 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
      1  ndual,nosort,nospiralsearch,ParamS,TolX,R5,R6,Rdist,scales,
-     1  scalePPG,ftolP,scaleRad,force,forceP,
+     1  scalePPG,ftolP,scaleRad,force,forceP,boost,
      1  filename,filenameout,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
@@ -564,7 +564,7 @@ C Calculate Schlegel diagram
         endif
         CALL Graph2D(MAtom,Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
      1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
-     1   TolX,scales,scalePPG,CR,CRing5,CRing6,Symbol,filename)
+     1   TolX,scales,scalePPG,boost,CR,CRing5,CRing6,Symbol,filename)
       endif
 
 C------------------END--------------------------------------------

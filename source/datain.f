@@ -3,7 +3,7 @@
      1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
      1 ndual,nosort,nospiral,PS,TolX,R5,R6,Rdist,scale,scalePPG,
-     1 ftol,scaleRad,force,forceP,filename,filenameout,DATEN)
+     1 ftol,scaleRad,force,forceP,boost,filename,filenameout,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
@@ -23,7 +23,7 @@
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk
       Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,ifs,ndual,PS,scale,
-     1 scalePPG
+     1 scalePPG,boost
 
 C Input send to output
       if(ilp.eq.0) then   
@@ -130,6 +130,7 @@ C Reals
       PS=0.d0       ! For graph production, angle input for Schlegel diagram
       scale=2.5d0   ! For graph production, scale Tutte graph
       scalePPG=1.d0 ! For graph production exponential factor in Plestenjak alg.
+      boost=1.2d0   ! Extra boost in cone Schlegel projection
       R=1.391d0     ! C-C distance 
       R5=1.455d0    ! Distance in 5-Ring
       R6=R          ! Distance in 6-Ring
