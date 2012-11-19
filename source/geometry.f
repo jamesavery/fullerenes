@@ -1838,3 +1838,47 @@ c fortran (and most other sources) use 'atan2(y,x)' while mathematica uses 'atan
 
       return
       END
+
+
+c probably not helpful
+c      SUBROUTINE COULOMB(ax,ay,az,c)
+c      implicit real*8 (a-z)
+c      c=1/dsqrt(ax**2 + ay**2 + az**2)
+c      return
+c      END SUBROUTINE
+
+
+      SUBROUTINE DCOULOMB(ax,ay,az,dax,day,daz,c)
+      implicit real*8 (a-z)
+      dist_2=ax**2 + ay**2 + az**2
+      c=1/dsqrt(dist_2)
+      dist_3_2_inv=c/dist_2
+      dax=-ax*dist_3_2_inv
+      day=-ay*dist_3_2_inv
+      daz=-az*dist_3_2_inv
+      return
+      END SUBROUTINE
+
+
+      SUBROUTINE DDCOULOMB(ax,ay,az,dax,day,daz,
+     1 daxax,daxay,daxaz,dayay,dayaz,dazaz,c)
+      implicit real*8 (a-z)
+      dist_2=ax**2 + ay**2 + az**2
+      c=1/dsqrt(dist_2)
+      dist_3_2_inv=c/dist_2
+      dist_5_2_inv=dist_3_2/dist_2
+
+      dax=-ax*dist_3_2
+      day=-ay*dist_3_2
+      daz=-az*dist_3_2
+
+      daxax=3*ax**2.0*dist_5_2_inv - dist_3_2_inv
+      daxay=3*ax*ay**dist_5_2_inv
+      daxaz=3*ax*az**dist_5_2_inv
+      dayay=3*ay**2.0*dist_5_2_inv - dist_3_2_inv
+      dayaz=3*ay*az**dist_5_2_inv
+      dazaz=3*az**2.0*dist_5_2_inv - dist_3_2_inv
+      return
+      END SUBROUTINE
+
+
