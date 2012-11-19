@@ -390,7 +390,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION IDA(NMAX,NMAX)
       real(8) force(ffmaxdim)
       integer iopt
-c      real(8) hessian(matom*3,matom*3)
+      real(8) hessian(matom*3,matom*3)
       type(c_ptr) :: graph, new_fullerene_graph
 
 c edges with 0, 1, 2 pentagons
@@ -493,11 +493,11 @@ C     Optimize
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
 
-c      call get_hessian(matom, dist, force, iopt, hessian,
-c     1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
-c     1  a_h,a_p,
-c     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-c      write(*,*)'hessian',hessian
+      call get_hessian(matom, dist, force, iopt, hessian,
+     1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1  a_h,a_p,
+     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+      write(*,*)'hessian',hessian
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
@@ -1418,7 +1418,7 @@ c            write (*,*) "666"
       END SUBROUTINE
 
       
-      SUBROUTINE get_hessian(N, p, force, iopt, hessian,
+      SUBROUTINE get_hessian(N, coord, force, iopt, hessian,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -1433,15 +1433,15 @@ c      type(c_ptr) :: graph
       integer d_hhh(4,n), d_hpp(4,n), d_hhp(4,n), d_ppp(4,n)
       integer nd_hhh, nd_hhp, nd_hpp, nd_ppp
       integer a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12
-      real*8 p(n*3), force(ffmaxdim)
+      real*8 coord(n*3), force(ffmaxdim)
       real*8 hessian(3*n,3*n)
 
 c init
-      do i=1,200!nmax*3
-        do j=1,200!nmax*3
+      do i=1,3*n
+        do j=1,3*n
           hessian(i,j)=0.0
         enddo
-      enddo      
+      enddo
 
 c get force constants
       select case(iopt)
@@ -1476,7 +1476,7 @@ c get force constants
           fdhhh=force(18)
           fco=force(19)
       end select
-      
+
 c edges
       edge_types: do i=1,3
         select case(10*iopt + i)
@@ -1505,184 +1505,181 @@ c edges
             r_naught=rpp
             m=ne_pp
         end select
-      if(m.gt.0) then
-      do j=1,m
-        select case(i)
-          case(1)
-            a1=3*e_hh(1,j)-2
-            a2=3*e_hh(1,j)-1
-            a3=3*e_hh(1,j)
-            a4=3*e_hh(2,j)-2
-            a5=3*e_hh(2,j)-1
-            a6=3*e_hh(2,j)
-          case(2)
-            a1=3*e_hp(1,j)-2
-            a2=3*e_hp(1,j)-1
-            a3=3*e_hp(1,j)
-            a4=3*e_hp(2,j)-2
-            a5=3*e_hp(2,j)-1
-            a6=3*e_hp(2,j)
-          case(3)
-            a1=3*e_pp(1,j)-2
-            a2=3*e_pp(1,j)-1
-            a3=3*e_pp(1,j)
-            a4=3*e_pp(2,j)-2
-            a5=3*e_pp(2,j)-1
-            a6=3*e_pp(2,j)
-        end select
-        ax=p(a1)
-        ay=p(a2)
-        az=p(a3)
-        bx=p(a4)
-        by=p(a5)
-        bz=p(a6)
-        call dddist(ax, ay, az, bx, by, bz,
-     2    dax, day, daz, dbx, dby, dbz,
-     3    daxax, daxay, daxaz, daxbx, daxby, daxbz, dayay, dayaz, daybx,
-     1    dayby, daybz, dazaz, dazbx, dazby, dazbz, dbxbx, dbxby, dbxbz,
-     1    dbyby, dbybz, dbzbz,
-     6    dist)
-
-c partial^2 E/partial x_i partial x_j
-c    = (partial ^2 E/partial r^2) * (partial^2 r/partial x_i partial x_j) + (partial^2 r/partial x_i partial x_j) * (partial E/partial r)
-c    = (partial^2 r/partial x_i partial x_j) * k * (1 + r - r_0)
-        aux = k* (1 + dist - r_naught)
-
-        hessian(a1,a1)=hessian(a1,a1)+daxax*aux
-        hessian(a1,a2)=hessian(a1,a2)+daxay*aux
-        hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
-        hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
-        hessian(a1,a5)=hessian(a1,a5)+daxby*aux
-        hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
-        hessian(a2,a2)=hessian(a2,a2)+dayay*aux
-        hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
-        hessian(a2,a4)=hessian(a2,a4)+daybx*aux
-        hessian(a2,a5)=hessian(a2,a5)+dayby*aux
-        hessian(a2,a6)=hessian(a2,a6)+daybz*aux
-        hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
-        hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
-        hessian(a3,a5)=hessian(a3,a5)+dazby*aux
-        hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
-        hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
-        hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
-        hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
-        hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
-        hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
-        hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
-      end do !edges
-      endif
+        if(m.gt.0) then
+          edges: do j=1,m
+            select case(i)
+              case(1)
+                a1=3*e_hh(1,j)-2
+                a2=3*e_hh(1,j)-1
+                a3=3*e_hh(1,j)
+                a4=3*e_hh(2,j)-2
+                a5=3*e_hh(2,j)-1
+                a6=3*e_hh(2,j)
+              case(2)
+                a1=3*e_hp(1,j)-2
+                a2=3*e_hp(1,j)-1
+                a3=3*e_hp(1,j)
+                a4=3*e_hp(2,j)-2
+                a5=3*e_hp(2,j)-1
+                a6=3*e_hp(2,j)
+              case(3)
+                a1=3*e_pp(1,j)-2
+                a2=3*e_pp(1,j)-1
+                a3=3*e_pp(1,j)
+                a4=3*e_pp(2,j)-2
+                a5=3*e_pp(2,j)-1
+                a6=3*e_pp(2,j)
+            end select
+            ax=coord(a1)
+            ay=coord(a2)
+            az=coord(a3)
+            bx=coord(a4)
+            by=coord(a5)
+            bz=coord(a6)
+            call dddist(ax, ay, az, bx, by, bz,
+     2       dax, day, daz, dbx, dby, dbz,
+     3       daxax, daxay, daxaz, daxbx, daxby, daxbz, dayay, dayaz,
+     1       daybx, dayby, daybz, dazaz, dazbx, dazby, dazbz, dbxbx,
+     1       dbxby, dbxbz, dbyby, dbybz, dbzbz, dist)
+c           partial^2 E/partial x_i partial x_j
+c              = (partial ^2 E/partial r^2) * (partial^2 r/partial x_i partial x_j) + (partial^2 r/partial x_i partial x_j) * (partial E/partial r)
+c              = (partial^2 r/partial x_i partial x_j) * k * (1 + r - r_0)
+            aux = k * (1 + dist - r_naught)
+            hessian(a1,a1)=hessian(a1,a1)+daxax*aux
+            hessian(a1,a2)=hessian(a1,a2)+daxay*aux
+            hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
+            hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
+            hessian(a1,a5)=hessian(a1,a5)+daxby*aux
+            hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
+            hessian(a2,a2)=hessian(a2,a2)+dayay*aux
+            hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
+            hessian(a2,a4)=hessian(a2,a4)+daybx*aux
+            hessian(a2,a5)=hessian(a2,a5)+dayby*aux
+            hessian(a2,a6)=hessian(a2,a6)+daybz*aux
+            hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
+            hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
+            hessian(a3,a5)=hessian(a3,a5)+dazby*aux
+            hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
+            hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
+            hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
+            hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
+            hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
+            hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
+            hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
+          end do edges
+        endif
       end do edge_types
-
+      
 c angles
       angle_types: do i=1,2
-c iopt doesn't matter in this case
+c       iopt doesn't matter in this case
         select case(i)
-        case(1)
-          k=fah
-          a_naught=ah
-          m=3*n-60
-        case(2)
-          k=fap
-          a_naught=ap
-          m=60
+          case(1)
+            k=fah
+            a_naught=ah
+            m=3*n-60
+          case(2)
+            k=fap
+            a_naught=ap
+            m=60
         end select
         if(m.gt.0)then
-        do j=1,m
-          select case(i)
-            case(1)
-              a1=3*a_h(1,j)-2
-              a2=3*a_h(1,j)-1
-              a3=3*a_h(1,j)
-              a4=3*a_h(2,j)-2
-              a5=3*a_h(2,j)-1
-              a6=3*a_h(2,j)
-              a7=3*a_h(3,j)-2
-              a8=3*a_h(3,j)-1
-              a9=3*a_h(3,j)
-            case(2)
-              a1=3*a_p(1,j)-2
-              a2=3*a_p(1,j)-1
-              a3=3*a_p(1,j)
-              a4=3*a_p(2,j)-2
-              a5=3*a_p(2,j)-1
-              a6=3*a_p(2,j)
-              a7=3*a_p(3,j)-2
-              a8=3*a_p(3,j)-1
-              a9=3*a_p(3,j)
-          end select
-          ax=p(a1)
-          ay=p(a2)
-          az=p(a3)
-          bx=p(a4)
-          by=p(a5)
-          bz=p(a6)
-          cx=p(a7)
-          cy=p(a8)
-          cz=p(a9)
-          call ddangle(ax, ay, az, bx, by, bz, cx, cy, cz,
-     1     dax, day, daz, dbx, dby, dbz, dcx, dcy, dcz,
-     1     daxax, daxay, daxaz, daxbx, daxby, daxbz, daxcx, daxcy,
-     1     daxcz, dayay, dayaz, daybx, dayby, daybz, daycx, daycy,
-     1     daycz, dazaz, dazbx, dazby, dazbz, dazcx, dazcy, dazcz,
-     1     dbxbx, dbxby, dbxbz, dbxcx, dbxcy, dbxcz, dbyby, dbybz,
-     1     dbycx, dbycy, dbycz, dbzbz, dbzcx, dbzcy, dbzcz, dcxcx,
-     1     dcxcy, dcxcz, dcycy, dcycz, dczcz,
-     1     angle_abc)
-          aux = k* (1 + dist - a_naught)
-          hessian(a1,a1)=hessian(a1,a1)+daxax*aux
-          hessian(a1,a2)=hessian(a1,a2)+daxay*aux
-          hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
-          hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
-          hessian(a1,a5)=hessian(a1,a5)+daxby*aux
-          hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
-          hessian(a1,a7)=hessian(a1,a7)+daxcx*aux
-          hessian(a1,a8)=hessian(a1,a8)+daxcy*aux
-          hessian(a1,a9)=hessian(a1,a9)+daxcz*aux
-          hessian(a2,a2)=hessian(a2,a2)+dayay*aux
-          hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
-          hessian(a2,a4)=hessian(a2,a4)+daybx*aux
-          hessian(a2,a5)=hessian(a2,a5)+dayby*aux
-          hessian(a2,a6)=hessian(a2,a6)+daybz*aux
-          hessian(a2,a7)=hessian(a2,a7)+daycx*aux
-          hessian(a2,a8)=hessian(a2,a8)+daycy*aux
-          hessian(a2,a9)=hessian(a2,a9)+daycz*aux
-          hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
-          hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
-          hessian(a3,a5)=hessian(a3,a5)+dazby*aux
-          hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
-          hessian(a3,a7)=hessian(a3,a7)+dazcx*aux
-          hessian(a3,a8)=hessian(a3,a8)+dazcy*aux
-          hessian(a3,a9)=hessian(a3,a9)+dazcz*aux
-          hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
-          hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
-          hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
-          hessian(a4,a7)=hessian(a4,a7)+dbxcx*aux
-          hessian(a4,a8)=hessian(a4,a8)+dbxcy*aux
-          hessian(a4,a9)=hessian(a4,a9)+dbxcz*aux
-          hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
-          hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
-          hessian(a5,a7)=hessian(a5,a7)+dbycx*aux
-          hessian(a5,a8)=hessian(a5,a8)+dbycy*aux
-          hessian(a5,a9)=hessian(a5,a9)+dbycz*aux
-          hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
-          hessian(a6,a7)=hessian(a6,a7)+dbzcx*aux
-          hessian(a6,a8)=hessian(a6,a8)+dbzcy*aux
-          hessian(a6,a9)=hessian(a6,a9)+dbzcz*aux
-          hessian(a7,a7)=hessian(a7,a7)+dcxcx*aux
-          hessian(a7,a8)=hessian(a7,a8)+dcxcy*aux
-          hessian(a7,a9)=hessian(a7,a9)+dcxcz*aux
-          hessian(a8,a8)=hessian(a8,a8)+dcycy*aux
-          hessian(a8,a9)=hessian(a8,a9)+dcycz*aux
-          hessian(a9,a9)=hessian(a9,a9)+dczcz*aux
-        end do ! angles
-      endif
+          angles: do j=1,m
+            select case(i)
+              case(1)
+                a1=3*a_h(1,j)-2
+                a2=3*a_h(1,j)-1
+                a3=3*a_h(1,j)
+                a4=3*a_h(2,j)-2
+                a5=3*a_h(2,j)-1
+                a6=3*a_h(2,j)
+                a7=3*a_h(3,j)-2
+                a8=3*a_h(3,j)-1
+                a9=3*a_h(3,j)
+              case(2)
+                a1=3*a_p(1,j)-2
+                a2=3*a_p(1,j)-1
+                a3=3*a_p(1,j)
+                a4=3*a_p(2,j)-2
+                a5=3*a_p(2,j)-1
+                a6=3*a_p(2,j)
+                a7=3*a_p(3,j)-2
+                a8=3*a_p(3,j)-1
+                a9=3*a_p(3,j)
+            end select
+            ax=coord(a1)
+            ay=coord(a2)
+            az=coord(a3)
+            bx=coord(a4)
+            by=coord(a5)
+            bz=coord(a6)
+            cx=coord(a7)
+            cy=coord(a8)
+            cz=coord(a9)
+            call ddangle(ax, ay, az, bx, by, bz, cx, cy, cz,
+     1       dax, day, daz, dbx, dby, dbz, dcx, dcy, dcz,
+     1       daxax, daxay, daxaz, daxbx, daxby, daxbz, daxcx, daxcy,
+     1       daxcz, dayay, dayaz, daybx, dayby, daybz, daycx, daycy,
+     1       daycz, dazaz, dazbx, dazby, dazbz, dazcx, dazcy, dazcz,
+     1       dbxbx, dbxby, dbxbz, dbxcx, dbxcy, dbxcz, dbyby, dbybz,
+     1       dbycx, dbycy, dbycz, dbzbz, dbzcx, dbzcy, dbzcz, dcxcx,
+     1       dcxcy, dcxcz, dcycy, dcycz, dczcz,
+     1       angle_abc)
+            aux = k * (1 + angle_abc - a_naught)
+            hessian(a1,a1)=hessian(a1,a1)+daxax*aux
+            hessian(a1,a2)=hessian(a1,a2)+daxay*aux
+            hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
+            hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
+            hessian(a1,a5)=hessian(a1,a5)+daxby*aux
+            hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
+            hessian(a1,a7)=hessian(a1,a7)+daxcx*aux
+            hessian(a1,a8)=hessian(a1,a8)+daxcy*aux
+            hessian(a1,a9)=hessian(a1,a9)+daxcz*aux
+            hessian(a2,a2)=hessian(a2,a2)+dayay*aux
+            hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
+            hessian(a2,a4)=hessian(a2,a4)+daybx*aux
+            hessian(a2,a5)=hessian(a2,a5)+dayby*aux
+            hessian(a2,a6)=hessian(a2,a6)+daybz*aux
+            hessian(a2,a7)=hessian(a2,a7)+daycx*aux
+            hessian(a2,a8)=hessian(a2,a8)+daycy*aux
+            hessian(a2,a9)=hessian(a2,a9)+daycz*aux
+            hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
+            hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
+            hessian(a3,a5)=hessian(a3,a5)+dazby*aux
+            hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
+            hessian(a3,a7)=hessian(a3,a7)+dazcx*aux
+            hessian(a3,a8)=hessian(a3,a8)+dazcy*aux
+            hessian(a3,a9)=hessian(a3,a9)+dazcz*aux
+            hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
+            hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
+            hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
+            hessian(a4,a7)=hessian(a4,a7)+dbxcx*aux
+            hessian(a4,a8)=hessian(a4,a8)+dbxcy*aux
+            hessian(a4,a9)=hessian(a4,a9)+dbxcz*aux
+            hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
+            hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
+            hessian(a5,a7)=hessian(a5,a7)+dbycx*aux
+            hessian(a5,a8)=hessian(a5,a8)+dbycy*aux
+            hessian(a5,a9)=hessian(a5,a9)+dbycz*aux
+            hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
+            hessian(a6,a7)=hessian(a6,a7)+dbzcx*aux
+            hessian(a6,a8)=hessian(a6,a8)+dbzcy*aux
+            hessian(a6,a9)=hessian(a6,a9)+dbzcz*aux
+            hessian(a7,a7)=hessian(a7,a7)+dcxcx*aux
+            hessian(a7,a8)=hessian(a7,a8)+dcxcy*aux
+            hessian(a7,a9)=hessian(a7,a9)+dcxcz*aux
+            hessian(a8,a8)=hessian(a8,a8)+dcycy*aux
+            hessian(a8,a9)=hessian(a8,a9)+dcycz*aux
+            hessian(a9,a9)=hessian(a9,a9)+dczcz*aux
+          end do angles
+        endif
       end do angle_types
 
 c dihedrals
       dihedral_types: do i=1,4
         select case(iopt)
           case(1,2)
-c no dihedrals in case of iopt=1,2
+c           no dihedrals in case of iopt=1,2
             exit dihedral_types
           case(3,4)
         end select
@@ -1705,192 +1702,192 @@ c no dihedrals in case of iopt=1,2
             m=nd_ppp
         end select
         if(m.gt.0)then
-        do j=1,m
-          select case(i)
-            case(1)
-              a1=3*d_hhh(1,j)-2
-              a2=3*d_hhh(1,j)-1
-              a3=3*d_hhh(1,j)
-              a4=3*d_hhh(2,j)-2
-              a5=3*d_hhh(2,j)-1
-              a6=3*d_hhh(2,j)
-              a7=3*d_hhh(3,j)-2
-              a8=3*d_hhh(3,j)-1
-              a9=3*d_hhh(3,j)
-              a10=3*d_hhh(4,j)-2
-              a11=3*d_hhh(4,j)-1
-              a12=3*d_hhh(4,j)
-            case(2)
-              a1=3*d_hhp(1,j)-2
-              a2=3*d_hhp(1,j)-1
-              a3=3*d_hhp(1,j)
-              a4=3*d_hhp(2,j)-2
-              a5=3*d_hhp(2,j)-1
-              a6=3*d_hhp(2,j)
-              a7=3*d_hhp(3,j)-2
-              a8=3*d_hhp(3,j)-1
-              a9=3*d_hhp(3,j)
-              a10=3*d_hhp(4,j)-2
-              a11=3*d_hhp(4,j)-1
-              a12=3*d_hhp(4,j)
-            case(3)
-              a1=3*d_hpp(1,j)-2
-              a2=3*d_hpp(1,j)-1
-              a3=3*d_hpp(1,j)
-              a4=3*d_hpp(2,j)-2
-              a5=3*d_hpp(2,j)-1
-              a6=3*d_hpp(2,j)
-              a7=3*d_hpp(3,j)-2
-              a8=3*d_hpp(3,j)-1
-              a9=3*d_hpp(3,j)
-              a10=3*d_hpp(4,j)-2
-              a11=3*d_hpp(4,j)-1
-              a12=3*d_hpp(4,j)
-            case(4)
-              a1=3*d_ppp(1,j)-2
-              a2=3*d_ppp(1,j)-1
-              a3=3*d_ppp(1,j)
-              a4=3*d_ppp(2,j)-2
-              a5=3*d_ppp(2,j)-1
-              a6=3*d_ppp(2,j)
-              a7=3*d_ppp(3,j)-2
-              a8=3*d_ppp(3,j)-1
-              a9=3*d_ppp(3,j)
-              a10=3*d_ppp(4,j)-2
-              a11=3*d_ppp(4,j)-1
-              a12=3*d_ppp(4,j)
-          end select
-          ax=p(a1)
-          ay=p(a2)
-          az=p(a3)
-          bx=p(a4)
-          by=p(a5)
-          bz=p(a6)
-          cx=p(a7)
-          cy=p(a8)
-          cz=p(a9)
-          dx=p(a10)
-          dy=p(a11)
-          dz=p(a12)
-          call DDDIHEDRAL(
-     1     ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz,
-     1     dax, day, daz, dbx, dby, dbz, dcx, dcy, dcz, ddx, ddy, ddz,
-     1     daxax, daxay, daxaz, daxbx, daxby, daxbz, daxcx, daxcy,
-     1     daxcz, daxdx, daxdy, daxdz, dayay, dayaz, daybx, dayby,
-     1     daybz, daycx, daycy, daycz, daydx, daydy, daydz,
-     1     dazaz, dazbx, dazby, dazbz, dazcx, dazcy, dazcz, dazdx,
-     1     dazdy, dazdz, dbxbx, dbxby, dbxbz, dbxcx,
-     1     dbxcy, dbxcz, dbxdx, dbxdy, dbxdz,
-     1     dbyby, dbybz, dbycx, dbycy, dbycz, dbydx, dbydy, dbydz,
-     1     dbzbz, dbzcx, dbzcy, dbzcz, dbzdx, dbzdy, dbzdz,
-     1     dcxcx, dcxcy, dcxcz, dcxdx, dcxdy, dcxdz,
-     1     dcycy, dcycz, dcydx, dcydy, dcydz,
-     1     dczcz, dczdx, dczdy, dczdz, ddxdx, ddxdy, ddxdz,
-     1     ddydy, ddydz, ddzdz,
-     1     dihedral_abcd)
-          aux = k* (1 + dist - a_naught)
-          hessian(a1,a1)=hessian(a1,a1)+daxax*aux
-          hessian(a1,a2)=hessian(a1,a2)+daxay*aux
-          hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
-          hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
-          hessian(a1,a5)=hessian(a1,a5)+daxby*aux
-          hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
-          hessian(a1,a7)=hessian(a1,a7)+daxcx*aux
-          hessian(a1,a8)=hessian(a1,a8)+daxcy*aux
-          hessian(a1,a9)=hessian(a1,a9)+daxcz*aux
-          hessian(a1,a10)=hessian(a1,a10)+daxdx*aux
-          hessian(a1,a11)=hessian(a1,a11)+daxdy*aux
-          hessian(a1,a12)=hessian(a1,a12)+daxdz*aux
-          hessian(a2,a2)=hessian(a2,a2)+dayay*aux
-          hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
-          hessian(a2,a4)=hessian(a2,a4)+daybx*aux
-          hessian(a2,a5)=hessian(a2,a5)+dayby*aux
-          hessian(a2,a6)=hessian(a2,a6)+daybz*aux
-          hessian(a2,a7)=hessian(a2,a7)+daycx*aux
-          hessian(a2,a8)=hessian(a2,a8)+daycy*aux
-          hessian(a2,a9)=hessian(a2,a9)+daycz*aux
-          hessian(a2,a10)=hessian(a2,a10)+daydx*aux
-          hessian(a2,a11)=hessian(a2,a11)+daydy*aux
-          hessian(a2,a12)=hessian(a2,a12)+daydz*aux
-          hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
-          hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
-          hessian(a3,a5)=hessian(a3,a5)+dazby*aux
-          hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
-          hessian(a3,a7)=hessian(a3,a7)+dazcx*aux
-          hessian(a3,a8)=hessian(a3,a8)+dazcy*aux
-          hessian(a3,a9)=hessian(a3,a9)+dazcz*aux
-          hessian(a3,a10)=hessian(a3,a10)+dazdx*aux
-          hessian(a3,a11)=hessian(a3,a11)+dazdy*aux
-          hessian(a3,a12)=hessian(a3,a12)+dazdz*aux
-          hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
-          hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
-          hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
-          hessian(a4,a7)=hessian(a4,a7)+dbxcx*aux
-          hessian(a4,a8)=hessian(a4,a8)+dbxcy*aux
-          hessian(a4,a9)=hessian(a4,a9)+dbxcz*aux
-          hessian(a4,a10)=hessian(a4,a10)+dbxdx*aux
-          hessian(a4,a11)=hessian(a4,a11)+dbxdy*aux
-          hessian(a4,a12)=hessian(a4,a12)+dbxdz*aux
-          hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
-          hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
-          hessian(a5,a7)=hessian(a5,a7)+dbycx*aux
-          hessian(a5,a8)=hessian(a5,a8)+dbycy*aux
-          hessian(a5,a9)=hessian(a5,a9)+dbycz*aux
-          hessian(a5,a10)=hessian(a5,a10)+dbydx*aux
-          hessian(a5,a11)=hessian(a5,a11)+dbydy*aux
-          hessian(a5,a12)=hessian(a5,a12)+dbydz*aux
-          hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
-          hessian(a6,a7)=hessian(a6,a7)+dbzcx*aux
-          hessian(a6,a8)=hessian(a6,a8)+dbzcy*aux
-          hessian(a6,a9)=hessian(a6,a9)+dbzcz*aux
-          hessian(a6,a10)=hessian(a6,a10)+dbzdx*aux
-          hessian(a6,a11)=hessian(a6,a11)+dbzdy*aux
-          hessian(a6,a12)=hessian(a6,a12)+dbzdz*aux
-          hessian(a7,a7)=hessian(a7,a7)+dcxcx*aux
-          hessian(a7,a8)=hessian(a7,a8)+dcxcy*aux
-          hessian(a7,a9)=hessian(a7,a9)+dcxcz*aux
-          hessian(a7,a10)=hessian(a7,a10)+dcxdx*aux
-          hessian(a7,a11)=hessian(a7,a11)+dcxdy*aux
-          hessian(a7,a12)=hessian(a7,a12)+dcxdz*aux
-          hessian(a8,a8)=hessian(a8,a8)+dcycy*aux
-          hessian(a8,a9)=hessian(a8,a9)+dcycz*aux
-          hessian(a8,a10)=hessian(a8,a10)+dcydx*aux
-          hessian(a8,a11)=hessian(a8,a11)+dcydy*aux
-          hessian(a8,a12)=hessian(a8,a12)+dcydz*aux
-          hessian(a9,a9)=hessian(a9,a9)+dczcz*aux
-          hessian(a9,a10)=hessian(a9,a10)+dczdx*aux
-          hessian(a9,a11)=hessian(a9,a11)+dczdy*aux
-          hessian(a9,a12)=hessian(a9,a12)+dczdz*aux
-          hessian(a10,a10)=hessian(a10,a10)+ddxdx*aux
-          hessian(a10,a11)=hessian(a10,a11)+ddxdy*aux
-          hessian(a10,a12)=hessian(a10,a12)+ddxdz*aux
-          hessian(a11,a11)=hessian(a11,a11)+ddydy*aux
-          hessian(a11,a12)=hessian(a11,a12)+ddydz*aux
-          hessian(a12,a12)=hessian(a12,a12)+ddzdz*aux
-        end do !dihedrals
-      endif
+          dihedrals: do j=1,m
+            select case(i)
+              case(1)
+                a1=3*d_hhh(1,j)-2
+                a2=3*d_hhh(1,j)-1
+                a3=3*d_hhh(1,j)
+                a4=3*d_hhh(2,j)-2
+                a5=3*d_hhh(2,j)-1
+                a6=3*d_hhh(2,j)
+                a7=3*d_hhh(3,j)-2
+                a8=3*d_hhh(3,j)-1
+                a9=3*d_hhh(3,j)
+                a10=3*d_hhh(4,j)-2
+                a11=3*d_hhh(4,j)-1
+                a12=3*d_hhh(4,j)
+              case(2)
+                a1=3*d_hhp(1,j)-2
+                a2=3*d_hhp(1,j)-1
+                a3=3*d_hhp(1,j)
+                a4=3*d_hhp(2,j)-2
+                a5=3*d_hhp(2,j)-1
+                a6=3*d_hhp(2,j)
+                a7=3*d_hhp(3,j)-2
+                a8=3*d_hhp(3,j)-1
+                a9=3*d_hhp(3,j)
+                a10=3*d_hhp(4,j)-2
+                a11=3*d_hhp(4,j)-1
+                a12=3*d_hhp(4,j)
+              case(3)
+                a1=3*d_hpp(1,j)-2
+                a2=3*d_hpp(1,j)-1
+                a3=3*d_hpp(1,j)
+                a4=3*d_hpp(2,j)-2
+                a5=3*d_hpp(2,j)-1
+                a6=3*d_hpp(2,j)
+                a7=3*d_hpp(3,j)-2
+                a8=3*d_hpp(3,j)-1
+                a9=3*d_hpp(3,j)
+                a10=3*d_hpp(4,j)-2
+                a11=3*d_hpp(4,j)-1
+                a12=3*d_hpp(4,j)
+              case(4)
+                a1=3*d_ppp(1,j)-2
+                a2=3*d_ppp(1,j)-1
+                a3=3*d_ppp(1,j)
+                a4=3*d_ppp(2,j)-2
+                a5=3*d_ppp(2,j)-1
+                a6=3*d_ppp(2,j)
+                a7=3*d_ppp(3,j)-2
+                a8=3*d_ppp(3,j)-1
+                a9=3*d_ppp(3,j)
+                a10=3*d_ppp(4,j)-2
+                a11=3*d_ppp(4,j)-1
+                a12=3*d_ppp(4,j)
+            end select
+            ax=coord(a1)
+            ay=coord(a2)
+            az=coord(a3)
+            bx=coord(a4)
+            by=coord(a5)
+            bz=coord(a6)
+            cx=coord(a7)
+            cy=coord(a8)
+            cz=coord(a9)
+            dx=coord(a10)
+            dy=coord(a11)
+            dz=coord(a12)
+            call dddihedral(
+     1       ax, ay, az, bx, by, bz, cx, cy, cz, dx, dy, dz,
+     1       dax, day, daz, dbx, dby, dbz, dcx, dcy, dcz, ddx, ddy, ddz,
+     1       daxax, daxay, daxaz, daxbx, daxby, daxbz, daxcx, daxcy,
+     1       daxcz, daxdx, daxdy, daxdz, dayay, dayaz, daybx, dayby,
+     1       daybz, daycx, daycy, daycz, daydx, daydy, daydz,
+     1       dazaz, dazbx, dazby, dazbz, dazcx, dazcy, dazcz, dazdx,
+     1       dazdy, dazdz, dbxbx, dbxby, dbxbz, dbxcx,
+     1       dbxcy, dbxcz, dbxdx, dbxdy, dbxdz,
+     1       dbyby, dbybz, dbycx, dbycy, dbycz, dbydx, dbydy, dbydz,
+     1       dbzbz, dbzcx, dbzcy, dbzcz, dbzdx, dbzdy, dbzdz,
+     1       dcxcx, dcxcy, dcxcz, dcxdx, dcxdy, dcxdz,
+     1       dcycy, dcycz, dcydx, dcydy, dcydz,
+     1       dczcz, dczdx, dczdy, dczdz, ddxdx, ddxdy, ddxdz,
+     1       ddydy, ddydz, ddzdz,
+     1       dihedral_abcd)
+            aux = k * (1 + dihedral_abcd - d_naught)
+            hessian(a1,a1)=hessian(a1,a1)+daxax*aux
+            hessian(a1,a2)=hessian(a1,a2)+daxay*aux
+            hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
+            hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
+            hessian(a1,a5)=hessian(a1,a5)+daxby*aux
+            hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
+            hessian(a1,a7)=hessian(a1,a7)+daxcx*aux
+            hessian(a1,a8)=hessian(a1,a8)+daxcy*aux
+            hessian(a1,a9)=hessian(a1,a9)+daxcz*aux
+            hessian(a1,a10)=hessian(a1,a10)+daxdx*aux
+            hessian(a1,a11)=hessian(a1,a11)+daxdy*aux
+            hessian(a1,a12)=hessian(a1,a12)+daxdz*aux
+            hessian(a2,a2)=hessian(a2,a2)+dayay*aux
+            hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
+            hessian(a2,a4)=hessian(a2,a4)+daybx*aux
+            hessian(a2,a5)=hessian(a2,a5)+dayby*aux
+            hessian(a2,a6)=hessian(a2,a6)+daybz*aux
+            hessian(a2,a7)=hessian(a2,a7)+daycx*aux
+            hessian(a2,a8)=hessian(a2,a8)+daycy*aux
+            hessian(a2,a9)=hessian(a2,a9)+daycz*aux
+            hessian(a2,a10)=hessian(a2,a10)+daydx*aux
+            hessian(a2,a11)=hessian(a2,a11)+daydy*aux
+            hessian(a2,a12)=hessian(a2,a12)+daydz*aux
+            hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
+            hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
+            hessian(a3,a5)=hessian(a3,a5)+dazby*aux
+            hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
+            hessian(a3,a7)=hessian(a3,a7)+dazcx*aux
+            hessian(a3,a8)=hessian(a3,a8)+dazcy*aux
+            hessian(a3,a9)=hessian(a3,a9)+dazcz*aux
+            hessian(a3,a10)=hessian(a3,a10)+dazdx*aux
+            hessian(a3,a11)=hessian(a3,a11)+dazdy*aux
+            hessian(a3,a12)=hessian(a3,a12)+dazdz*aux
+            hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
+            hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
+            hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
+            hessian(a4,a7)=hessian(a4,a7)+dbxcx*aux
+            hessian(a4,a8)=hessian(a4,a8)+dbxcy*aux
+            hessian(a4,a9)=hessian(a4,a9)+dbxcz*aux
+            hessian(a4,a10)=hessian(a4,a10)+dbxdx*aux
+            hessian(a4,a11)=hessian(a4,a11)+dbxdy*aux
+            hessian(a4,a12)=hessian(a4,a12)+dbxdz*aux
+            hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
+            hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
+            hessian(a5,a7)=hessian(a5,a7)+dbycx*aux
+            hessian(a5,a8)=hessian(a5,a8)+dbycy*aux
+            hessian(a5,a9)=hessian(a5,a9)+dbycz*aux
+            hessian(a5,a10)=hessian(a5,a10)+dbydx*aux
+            hessian(a5,a11)=hessian(a5,a11)+dbydy*aux
+            hessian(a5,a12)=hessian(a5,a12)+dbydz*aux
+            hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
+            hessian(a6,a7)=hessian(a6,a7)+dbzcx*aux
+            hessian(a6,a8)=hessian(a6,a8)+dbzcy*aux
+            hessian(a6,a9)=hessian(a6,a9)+dbzcz*aux
+            hessian(a6,a10)=hessian(a6,a10)+dbzdx*aux
+            hessian(a6,a11)=hessian(a6,a11)+dbzdy*aux
+            hessian(a6,a12)=hessian(a6,a12)+dbzdz*aux
+            hessian(a7,a7)=hessian(a7,a7)+dcxcx*aux
+            hessian(a7,a8)=hessian(a7,a8)+dcxcy*aux
+            hessian(a7,a9)=hessian(a7,a9)+dcxcz*aux
+            hessian(a7,a10)=hessian(a7,a10)+dcxdx*aux
+            hessian(a7,a11)=hessian(a7,a11)+dcxdy*aux
+            hessian(a7,a12)=hessian(a7,a12)+dcxdz*aux
+            hessian(a8,a8)=hessian(a8,a8)+dcycy*aux
+            hessian(a8,a9)=hessian(a8,a9)+dcycz*aux
+            hessian(a8,a10)=hessian(a8,a10)+dcydx*aux
+            hessian(a8,a11)=hessian(a8,a11)+dcydy*aux
+            hessian(a8,a12)=hessian(a8,a12)+dcydz*aux
+            hessian(a9,a9)=hessian(a9,a9)+dczcz*aux
+            hessian(a9,a10)=hessian(a9,a10)+dczdx*aux
+            hessian(a9,a11)=hessian(a9,a11)+dczdy*aux
+            hessian(a9,a12)=hessian(a9,a12)+dczdz*aux
+            hessian(a10,a10)=hessian(a10,a10)+ddxdx*aux
+            hessian(a10,a11)=hessian(a10,a11)+ddxdy*aux
+            hessian(a10,a12)=hessian(a10,a12)+ddxdz*aux
+            hessian(a11,a11)=hessian(a11,a11)+ddydy*aux
+            hessian(a11,a12)=hessian(a11,a12)+ddydz*aux
+            hessian(a12,a12)=hessian(a12,a12)+ddzdz*aux
+          end do dihedrals
+        endif
       end do dihedral_types
 
 c coulomb
       if(iopt.eq.2) then
-      do j=1,n
-        k=fco
-        a1=3*n-2
-        a2=3*n-1
-        a3=3*n
-        ax=p(a1)
-        ay=p(a2)
-        az=p(a3)
-        call ddcoulomb(ax, ay, az, dax, day, daz, 
-     3    daxax, daxay, daxaz, dayay, dayaz, dazaz, c)
-        aux = k * (1 + c - 0)
-        hessian(a1,a1)=hessian(a1,a1)+daxax*aux
-        hessian(a1,a2)=hessian(a1,a2)+daxay*aux
-        hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
-        hessian(a2,a2)=hessian(a2,a2)+dayay*aux
-        hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
-        hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
-      end do !atoms
+        atoms: do j=1,n
+          k=fco
+          a1=3*n-2
+          a2=3*n-1
+          a3=3*n
+          ax=coord(a1)
+          ay=coord(a2)
+          az=coord(a3)
+          call ddcoulomb(ax, ay, az, dax, day, daz, 
+     3      daxax, daxay, daxaz, dayay, dayaz, dazaz, c)
+          aux = k * (1 + c - 0)
+          hessian(a1,a1)=hessian(a1,a1)+daxax*aux
+          hessian(a1,a2)=hessian(a1,a2)+daxay*aux
+          hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
+          hessian(a2,a2)=hessian(a2,a2)+dayay*aux
+          hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
+          hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
+        end do atoms
       endif
 
 c copy hessian to the other half
