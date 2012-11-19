@@ -390,6 +390,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION IDA(NMAX,NMAX)
       real(8) force(ffmaxdim)
       integer iopt
+c      real(8) hessian(matom*3,matom*3)
       type(c_ptr) :: graph, new_fullerene_graph
 
 c edges with 0, 1, 2 pentagons
@@ -479,18 +480,25 @@ C     Optimize
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(fret.gt.1.d-2) then
-      fretn=fret/dfloat(MATOM)
-      Write(IOUT,1002) fretn
+        fretn=fret/dfloat(MATOM)
+        Write(IOUT,1002) fretn
       endif
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       fac=RDist/Rmin
       Do I=1,MATOM
-      Dist(1,I)=Dist(1,I)*fac
-      Dist(2,I)=Dist(2,I)*fac
-      Dist(3,I)=Dist(3,I)*fac
+        Dist(1,I)=Dist(1,I)*fac
+        Dist(2,I)=Dist(2,I)*fac
+        Dist(3,I)=Dist(3,I)*fac
       enddo
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
+
+c      call get_hessian(matom, dist, force, iopt, hessian,
+c     1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+c     1  a_h,a_p,
+c     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+c      write(*,*)'hessian',hessian
+
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
      1 ' Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere algorithm used')
@@ -1416,21 +1424,24 @@ c            write (*,*) "666"
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c      use iso_c_binding
       use config
-      implicit real*8 (a-d)
 c      type(c_ptr) :: graph
-      integer N, iopt
-      integer e_hh, e_hp, e_pp, ne_hh, ne_hp, ne_pp, a_h, a_p,
-     1 d_hhh, d_hpp, d_hhp, d_ppp, nd_hhh, nd_hhp, nd_hpp, nd_ppp
+      implicit real*8 (a-h,k,o-z)
+      integer N, iopt,i,j,m
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
+      integer ne_hh, ne_hp, ne_pp
+      integer a_h(3,3*n-60), a_p(3,60)
+      integer d_hhh(4,n), d_hpp(4,n), d_hhp(4,n), d_ppp(4,n)
+      integer nd_hhh, nd_hhp, nd_hpp, nd_ppp
       integer a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12
-      real*8 p(nmax*3), force(ffmaxdim), hessian(nmax*3,nmax*3)
+      real*8 p(n*3), force(ffmaxdim)
+      real*8 hessian(3*n,3*n)
 
 c init
-      do i=1,nmax*3
-        do j=1,nmax*3
+      do i=1,200!nmax*3
+        do j=1,200!nmax*3
           hessian(i,j)=0.0
         enddo
       enddo      
-
 
 c get force constants
       select case(iopt)
@@ -1468,7 +1479,7 @@ c get force constants
       
 c edges
       edge_types: do i=1,3
-        select case(10*iopt+i)
+        select case(10*iopt + i)
           case(11,21)
             k=frh
             r_naught=rh
@@ -1494,29 +1505,30 @@ c edges
             r_naught=rpp
             m=ne_pp
         end select
+      if(m.gt.0) then
       do j=1,m
         select case(i)
           case(1)
-            a1=3*e_hh(j,1)-2
-            a2=3*e_hh(j,1)-1
-            a3=3*e_hh(j,1)
-            a4=3*e_hh(j,2)-2
-            a5=3*e_hh(j,2)-1
-            a6=3*e_hh(j,2)
+            a1=3*e_hh(1,j)-2
+            a2=3*e_hh(1,j)-1
+            a3=3*e_hh(1,j)
+            a4=3*e_hh(2,j)-2
+            a5=3*e_hh(2,j)-1
+            a6=3*e_hh(2,j)
           case(2)
-            a1=3*e_hp(j,1)-2
-            a2=3*e_hp(j,1)-1
-            a3=3*e_hp(j,1)
-            a4=3*e_hp(j,2)-2
-            a5=3*e_hp(j,2)-1
-            a6=3*e_hp(j,2)
+            a1=3*e_hp(1,j)-2
+            a2=3*e_hp(1,j)-1
+            a3=3*e_hp(1,j)
+            a4=3*e_hp(2,j)-2
+            a5=3*e_hp(2,j)-1
+            a6=3*e_hp(2,j)
           case(3)
-            a1=3*e_pp(j,1)-2
-            a2=3*e_pp(j,1)-1
-            a3=3*e_pp(j,1)
-            a4=3*e_pp(j,2)-2
-            a5=3*e_pp(j,2)-1
-            a6=3*e_pp(j,2)
+            a1=3*e_pp(1,j)-2
+            a2=3*e_pp(1,j)-1
+            a3=3*e_pp(1,j)
+            a4=3*e_pp(2,j)-2
+            a5=3*e_pp(2,j)-1
+            a6=3*e_pp(2,j)
         end select
         ax=p(a1)
         ay=p(a2)
@@ -1558,6 +1570,7 @@ c    = (partial^2 r/partial x_i partial x_j) * k * (1 + r - r_0)
         hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
         hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
       end do !edges
+      endif
       end do edge_types
 
 c angles
@@ -1573,28 +1586,29 @@ c iopt doesn't matter in this case
           a_naught=ap
           m=60
         end select
+        if(m.gt.0)then
         do j=1,m
           select case(i)
             case(1)
-              a1=3*a_h(j,1)-2
-              a2=3*a_h(j,1)-1
-              a3=3*a_h(j,1)
-              a4=3*a_h(j,2)-2
-              a5=3*a_h(j,2)-1
-              a6=3*a_h(j,2)
-              a7=3*a_h(j,3)-2
-              a8=3*a_h(j,3)-1
-              a9=3*a_h(j,3)
+              a1=3*a_h(1,j)-2
+              a2=3*a_h(1,j)-1
+              a3=3*a_h(1,j)
+              a4=3*a_h(2,j)-2
+              a5=3*a_h(2,j)-1
+              a6=3*a_h(2,j)
+              a7=3*a_h(3,j)-2
+              a8=3*a_h(3,j)-1
+              a9=3*a_h(3,j)
             case(2)
-              a1=3*a_p(j,1)-2
-              a2=3*a_p(j,1)-1
-              a3=3*a_p(j,1)
-              a4=3*a_p(j,2)-2
-              a5=3*a_p(j,2)-1
-              a6=3*a_p(j,2)
-              a7=3*a_p(j,3)-2
-              a8=3*a_p(j,3)-1
-              a9=3*a_p(j,3)
+              a1=3*a_p(1,j)-2
+              a2=3*a_p(1,j)-1
+              a3=3*a_p(1,j)
+              a4=3*a_p(2,j)-2
+              a5=3*a_p(2,j)-1
+              a6=3*a_p(2,j)
+              a7=3*a_p(3,j)-2
+              a8=3*a_p(3,j)-1
+              a9=3*a_p(3,j)
           end select
           ax=p(a1)
           ay=p(a2)
@@ -1661,6 +1675,7 @@ c iopt doesn't matter in this case
           hessian(a8,a9)=hessian(a8,a9)+dcycz*aux
           hessian(a9,a9)=hessian(a9,a9)+dczcz*aux
         end do ! angles
+      endif
       end do angle_types
 
 c dihedrals
@@ -1689,60 +1704,61 @@ c no dihedrals in case of iopt=1,2
             d_naught=dppp
             m=nd_ppp
         end select
+        if(m.gt.0)then
         do j=1,m
           select case(i)
             case(1)
-              a1=3*d_hhh(j,1)-2
-              a2=3*d_hhh(j,1)-1
-              a3=3*d_hhh(j,1)
-              a4=3*d_hhh(j,2)-2
-              a5=3*d_hhh(j,2)-1
-              a6=3*d_hhh(j,2)
-              a7=3*d_hhh(j,3)-2
-              a8=3*d_hhh(j,3)-1
-              a9=3*d_hhh(j,3)
-              a10=3*d_hhh(j,4)-2
-              a11=3*d_hhh(j,4)-1
-              a12=3*d_hhh(j,4)
+              a1=3*d_hhh(1,j)-2
+              a2=3*d_hhh(1,j)-1
+              a3=3*d_hhh(1,j)
+              a4=3*d_hhh(2,j)-2
+              a5=3*d_hhh(2,j)-1
+              a6=3*d_hhh(2,j)
+              a7=3*d_hhh(3,j)-2
+              a8=3*d_hhh(3,j)-1
+              a9=3*d_hhh(3,j)
+              a10=3*d_hhh(4,j)-2
+              a11=3*d_hhh(4,j)-1
+              a12=3*d_hhh(4,j)
             case(2)
-              a1=3*d_hhp(j,1)-2
-              a2=3*d_hhp(j,1)-1
-              a3=3*d_hhp(j,1)
-              a4=3*d_hhp(j,2)-2
-              a5=3*d_hhp(j,2)-1
-              a6=3*d_hhp(j,2)
-              a7=3*d_hhp(j,3)-2
-              a8=3*d_hhp(j,3)-1
-              a9=3*d_hhp(j,3)
-              a10=3*d_hhp(j,4)-2
-              a11=3*d_hhp(j,4)-1
-              a12=3*d_hhp(j,4)
+              a1=3*d_hhp(1,j)-2
+              a2=3*d_hhp(1,j)-1
+              a3=3*d_hhp(1,j)
+              a4=3*d_hhp(2,j)-2
+              a5=3*d_hhp(2,j)-1
+              a6=3*d_hhp(2,j)
+              a7=3*d_hhp(3,j)-2
+              a8=3*d_hhp(3,j)-1
+              a9=3*d_hhp(3,j)
+              a10=3*d_hhp(4,j)-2
+              a11=3*d_hhp(4,j)-1
+              a12=3*d_hhp(4,j)
             case(3)
-              a1=3*d_hpp(j,1)-2
-              a2=3*d_hpp(j,1)-1
-              a3=3*d_hpp(j,1)
-              a4=3*d_hpp(j,2)-2
-              a5=3*d_hpp(j,2)-1
-              a6=3*d_hpp(j,2)
-              a7=3*d_hpp(j,3)-2
-              a8=3*d_hpp(j,3)-1
-              a9=3*d_hpp(j,3)
-              a10=3*d_hpp(j,4)-2
-              a11=3*d_hpp(j,4)-1
-              a12=3*d_hpp(j,4)
+              a1=3*d_hpp(1,j)-2
+              a2=3*d_hpp(1,j)-1
+              a3=3*d_hpp(1,j)
+              a4=3*d_hpp(2,j)-2
+              a5=3*d_hpp(2,j)-1
+              a6=3*d_hpp(2,j)
+              a7=3*d_hpp(3,j)-2
+              a8=3*d_hpp(3,j)-1
+              a9=3*d_hpp(3,j)
+              a10=3*d_hpp(4,j)-2
+              a11=3*d_hpp(4,j)-1
+              a12=3*d_hpp(4,j)
             case(4)
-              a1=3*d_ppp(j,1)-2
-              a2=3*d_ppp(j,1)-1
-              a3=3*d_ppp(j,1)
-              a4=3*d_ppp(j,2)-2
-              a5=3*d_ppp(j,2)-1
-              a6=3*d_ppp(j,2)
-              a7=3*d_ppp(j,3)-2
-              a8=3*d_ppp(j,3)-1
-              a9=3*d_ppp(j,3)
-              a10=3*d_ppp(j,4)-2
-              a11=3*d_ppp(j,4)-1
-              a12=3*d_ppp(j,4)
+              a1=3*d_ppp(1,j)-2
+              a2=3*d_ppp(1,j)-1
+              a3=3*d_ppp(1,j)
+              a4=3*d_ppp(2,j)-2
+              a5=3*d_ppp(2,j)-1
+              a6=3*d_ppp(2,j)
+              a7=3*d_ppp(3,j)-2
+              a8=3*d_ppp(3,j)-1
+              a9=3*d_ppp(3,j)
+              a10=3*d_ppp(4,j)-2
+              a11=3*d_ppp(4,j)-1
+              a12=3*d_ppp(4,j)
           end select
           ax=p(a1)
           ay=p(a2)
@@ -1785,7 +1801,6 @@ c no dihedrals in case of iopt=1,2
           hessian(a1,a10)=hessian(a1,a10)+daxdx*aux
           hessian(a1,a11)=hessian(a1,a11)+daxdy*aux
           hessian(a1,a12)=hessian(a1,a12)+daxdz*aux
-        
           hessian(a2,a2)=hessian(a2,a2)+dayay*aux
           hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
           hessian(a2,a4)=hessian(a2,a4)+daybx*aux
@@ -1797,7 +1812,6 @@ c no dihedrals in case of iopt=1,2
           hessian(a2,a10)=hessian(a2,a10)+daydx*aux
           hessian(a2,a11)=hessian(a2,a11)+daydy*aux
           hessian(a2,a12)=hessian(a2,a12)+daydz*aux
-        
           hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
           hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
           hessian(a3,a5)=hessian(a3,a5)+dazby*aux
@@ -1808,7 +1822,6 @@ c no dihedrals in case of iopt=1,2
           hessian(a3,a10)=hessian(a3,a10)+dazdx*aux
           hessian(a3,a11)=hessian(a3,a11)+dazdy*aux
           hessian(a3,a12)=hessian(a3,a12)+dazdz*aux
-        
           hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
           hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
           hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
@@ -1818,7 +1831,6 @@ c no dihedrals in case of iopt=1,2
           hessian(a4,a10)=hessian(a4,a10)+dbxdx*aux
           hessian(a4,a11)=hessian(a4,a11)+dbxdy*aux
           hessian(a4,a12)=hessian(a4,a12)+dbxdz*aux
-        
           hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
           hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
           hessian(a5,a7)=hessian(a5,a7)+dbycx*aux
@@ -1827,7 +1839,6 @@ c no dihedrals in case of iopt=1,2
           hessian(a5,a10)=hessian(a5,a10)+dbydx*aux
           hessian(a5,a11)=hessian(a5,a11)+dbydy*aux
           hessian(a5,a12)=hessian(a5,a12)+dbydz*aux
-        
           hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
           hessian(a6,a7)=hessian(a6,a7)+dbzcx*aux
           hessian(a6,a8)=hessian(a6,a8)+dbzcy*aux
@@ -1835,47 +1846,59 @@ c no dihedrals in case of iopt=1,2
           hessian(a6,a10)=hessian(a6,a10)+dbzdx*aux
           hessian(a6,a11)=hessian(a6,a11)+dbzdy*aux
           hessian(a6,a12)=hessian(a6,a12)+dbzdz*aux
-        
           hessian(a7,a7)=hessian(a7,a7)+dcxcx*aux
           hessian(a7,a8)=hessian(a7,a8)+dcxcy*aux
           hessian(a7,a9)=hessian(a7,a9)+dcxcz*aux
           hessian(a7,a10)=hessian(a7,a10)+dcxdx*aux
           hessian(a7,a11)=hessian(a7,a11)+dcxdy*aux
           hessian(a7,a12)=hessian(a7,a12)+dcxdz*aux
-        
           hessian(a8,a8)=hessian(a8,a8)+dcycy*aux
           hessian(a8,a9)=hessian(a8,a9)+dcycz*aux
           hessian(a8,a10)=hessian(a8,a10)+dcydx*aux
           hessian(a8,a11)=hessian(a8,a11)+dcydy*aux
           hessian(a8,a12)=hessian(a8,a12)+dcydz*aux
-        
           hessian(a9,a9)=hessian(a9,a9)+dczcz*aux
           hessian(a9,a10)=hessian(a9,a10)+dczdx*aux
           hessian(a9,a11)=hessian(a9,a11)+dczdy*aux
           hessian(a9,a12)=hessian(a9,a12)+dczdz*aux
-        
           hessian(a10,a10)=hessian(a10,a10)+ddxdx*aux
-          hessian(a10,a11)=hessian(a10,a11)+ddzdy*aux
+          hessian(a10,a11)=hessian(a10,a11)+ddxdy*aux
           hessian(a10,a12)=hessian(a10,a12)+ddxdz*aux
-        
           hessian(a11,a11)=hessian(a11,a11)+ddydy*aux
           hessian(a11,a12)=hessian(a11,a12)+ddydz*aux
-        
           hessian(a12,a12)=hessian(a12,a12)+ddzdz*aux
         end do !dihedrals
+      endif
       end do dihedral_types
 
-c coulomb goes here
-
+c coulomb
+      if(iopt.eq.2) then
+      do j=1,n
+        k=fco
+        a1=3*n-2
+        a2=3*n-1
+        a3=3*n
+        ax=p(a1)
+        ay=p(a2)
+        az=p(a3)
+        call ddcoulomb(ax, ay, az, dax, day, daz, 
+     3    daxax, daxay, daxaz, dayay, dayaz, dazaz, c)
+        aux = k * (1 + c - 0)
+        hessian(a1,a1)=hessian(a1,a1)+daxax*aux
+        hessian(a1,a2)=hessian(a1,a2)+daxay*aux
+        hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
+        hessian(a2,a2)=hessian(a2,a2)+dayay*aux
+        hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
+        hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
+      end do !atoms
+      endif
 
 c copy hessian to the other half
-
-      do i=1,nmax*3
-        do j=i+1,nmax*3
-          hessian(i,j)=hessian(j,i)
+      do i=1,3*n
+        do j=i+1,3*n
+          hessian(j,i)=hessian(i,j)
         enddo
       enddo      
-
 
       return
       END SUBROUTINE
