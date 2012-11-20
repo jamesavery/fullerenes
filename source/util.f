@@ -133,11 +133,11 @@ C     Balaban index
       enddo
       enddo
       vertnum=dfloat(MAtom)
-      fac=3.d0*vertnum/(vertnum+2.d0)
+      fac=3.d0*vertnum/(vertnum+4.d0)
       balabanindex=balaban*fac
 
       iwiener=iwiener1/2
-      wav=dfloat(iwiener1)/dfloat(MAtom)
+      wav=dfloat(iwiener1)/vertnum
       rho=wav/dfloat(wienermin)
       rhoE=dfloat(wienermax)/dfloat(wienermin)
       isize=Matom*(Matom-1)
@@ -149,12 +149,15 @@ C     Balaban index
        ierrors=1
        ischultz=0
       endif
+      wienerfac=dfloat(iwiener)/(9.d0*vertnum**3)
+      Wienerbalaban=wienerfac*balabanindex*4.d0*(vertnum+4.d0)
 
       if(ierrorw.eq.1)  Write(Iout,1003)     
       if(ierrorhw.eq.1) Write(Iout,1004)     
       if(ierrors.eq.1)  Write(Iout,1005)     
       Write(Iout,1001) iwiener,ihyperwiener,wienermin,wienermax,
      1 wav,rho,rhoE,izagreb,ischultz,balabanindex
+      Write(Iout,1007) Wienerbalaban
       Write(Iout,1002) maxdist,Avdist
 
  1000 Format(1X,'Topological Indicators:',/1X,
@@ -175,6 +178,8 @@ C     Balaban index
  1004 Format(' Integer overflow for Hyper Wiener index, WW set to zero')
  1005 Format(' Integer overflow for Schultz index,6*W set to zero')
  1006 Format(' Something wrong with Wiener sum')
+ 1007 Format(' f*Wiener*Balaban = 4WB(n+4)/(9n^3) = ',D15.9,
+     1 ' (should be exactly 1.0 for cubic graphs)')
 
       RETURN
       END
