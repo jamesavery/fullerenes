@@ -101,9 +101,9 @@ C  INPUT and setting parameters for running the subroutines
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1  ndual,nosort,nospiralsearch,ParamS,TolX,R5,R6,Rdist,scales,
-     1  scalePPG,ftolP,scaleRad,force,forceP,boost,
-     1  filename,filenameout,TEXTINPUT)
+     1  ndual,nosort,nospiralsearch,ihessian,iprinthessian,
+     1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,scaleRad,force,
+     1  forceP,boost,filename,filenameout,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -320,19 +320,19 @@ c       Store distances
           if(Iopt.eq.2) then ! Wu + Coulomb
             ftol=ftolP*1.d3
             Write(Iout,1003)
-            CALL OptFF(MAtom,Iout,IDA,
-     1        Dist,dist2D,Rdist,ftol,force,iopt)
+            CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
+     1        Dist,dist2D,Rdist,ftol,force)
             do i=1,9
               force(i)=forcep(i)
             enddo
             iopt=1
           endif
-          CALL OptFF(MAtom,Iout,IDA, ! vanilla Wu
-     1      Dist,dist2D,Rdist,ftolP,force,iopt)
+          CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA, ! vanilla Wu
+     1      Dist,dist2D,Rdist,ftolP,force)
           Iprint=0
         else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
-          CALL OptFF(MAtom,Iout,IDA,
-     1      Dist,dist2D,Rdist,ftolP,force,iopt)
+          CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
+     1      Dist,dist2D,Rdist,ftolP,force)
         endif
 c       Compare structures
         CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)

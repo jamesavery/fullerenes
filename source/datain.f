@@ -2,8 +2,9 @@
      1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1 ndual,nosort,nospiral,PS,TolX,R5,R6,Rdist,scale,scalePPG,
-     1 ftol,scaleRad,force,forceP,boost,filename,filenameout,DATEN)
+     1 ndual,nosort,nospiral,ihessian,iprinth,
+     1 PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,scaleRad,force,forceP,
+     1 boost,filename,filenameout,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
@@ -16,7 +17,7 @@
      1 filename,filenameout,ipsphere,nosort,nospiral
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad
-      Namelist /FFChoice/ Iopt,ftol
+      Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
      1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
@@ -94,8 +95,10 @@ C Integers
       ifs=0     !  Option for .dat and .tex files
       iham=0    !  Number of Hamiltonian cycles
       iFS=0     !  Option for producing files for 2D fullerene graphs
-      Ihueckel=1 !  Option for diagonalizing the Hueckel matrix
+      Ihueckel=1 ! Option for diagonalizing the Hueckel matrix
       iopt=0    !  No (force field) optimization
+      ihessian=0 ! No Hessian matrix produced
+      iprinth=0 !  No Hessian matrix printed
       Ipent=0   !  Initial flag for Spriral pentagon input
       IP=0      !  Print option
       IPH=0     !  Print Hamiltonian cycles for each isomer
