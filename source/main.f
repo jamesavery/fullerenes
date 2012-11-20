@@ -320,19 +320,19 @@ c       Store distances
           if(Iopt.eq.2) then ! Wu + Coulomb
             ftol=ftolP*1.d3
             Write(Iout,1003)
-            CALL OptFF(MAtom,Iout,IDA,ihessian,
-     1        Dist,dist2D,Rdist,ftol,force,iopt)
+            CALL OptFF(MAtom,Iout,ihessian,iopt,IDA,
+     1        Dist,dist2D,Rdist,ftol,force)
             do i=1,9
               force(i)=forcep(i)
             enddo
             iopt=1
           endif
-          CALL OptFF(MAtom,Iout,IDA, ! vanilla Wu
-     1      Dist,dist2D,Rdist,ftolP,force,iopt)
+          CALL OptFF(MAtom,Iout,ihessian,iopt,IDA, ! vanilla Wu
+     1      Dist,dist2D,Rdist,ftolP,force)
           Iprint=0
         else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
-          CALL OptFF(MAtom,Iout,IDA,
-     1      Dist,dist2D,Rdist,ftolP,force,iopt)
+          CALL OptFF(MAtom,Iout,ihessian,iopt,IDA,
+     1      Dist,dist2D,Rdist,ftolP,force)
         endif
 c       Compare structures
         CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
