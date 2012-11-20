@@ -355,14 +355,14 @@ Here $V(G)$ is the vertex set and $d(u,v)$ is the topological (chemical) distanc
 of edges in the shortest path connecting them. For $I_h$-\C{60} we have $W(G)$= 8340 and $WW(G)$= 27180. The Balaban index is defined as \cite{Balaban},
 \begin{equation}
   \label{Balaban}
-  B(G)=\frac{n_e}{n_e-n_v+1} \sum_{i<j \in E(G)} \left( W(i)W(j) \right)^{-1/2}
+  B(G)=\frac{n_e}{n_e-n_v+2} \sum_{i<j \in E(G)} \left( W(i)W(j) \right)^{-1/2}
 \end{equation}
 $n_e$ are the number of edges and $W(i)$ is the sum of topological distances between vertex $i$ and all other vertices in the graph,
 \begin{equation}
   \label{sum}
   W_i=\sum_{j \in V(G)} d(i,j)
 \end{equation}
-For $I_h$-\C{60} we have $B(G)$= 0.939893247. The Schultz and Zagreb indices are also listed, although they are related to
+For $I_h$-\C{60} we have $B(G)$= 0.910521583. The Schultz and Zagreb indices are also listed, although they are related to
 the indices already defined here. Further listed are two topological efficiency parameters $\rho$ and $\rho_E$ defined by Vukicevic, Ori and co-workers \cite{Vukicevic,Ori},
 \begin{equation}
   \label{rho}
@@ -935,7 +935,7 @@ Options for force-field optimization.
 
 \paragraph{List of options:} 
 
-\textbf{\&FFChoice} has parameters \paramname{Iopt, ftol}.\\
+\textbf{\&FFChoice} has parameters \paramname{Iopt, ftol,ihessian,iprinth}.\\
 \textbf{\&FFParameters} has parameters \paramname{fCoulomb, WuR5, WuR6, WuA5, WuA6, WufR, WufA, ExtWuR55, ExtWuR56, 
 ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR, ExtWufA, ExtWufD}.\\
 
@@ -959,6 +959,9 @@ ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR,
   \paramname{Iopt} = 4 behaves like \paramname{Iopt} = 3, but there is an additional repulsive coulomb force applied.  It is switched off
   as soon as the gradient falls below a value of 10.
   
+   \paramname{ihessian} = 1 then Hessian matrix is calculated and diagonalized. The first $3n_v-6$ eigenvalues should be greater than zero for a minimum.
+   \paramname{iprinth}  = 1 print full Hessian matrix.
+   
 \item[ftol] The convergence tolerance on the energy (Default: $5.0 \times 10^{-8}$)
 \item[{WuR5, WuR6, WuA5, WuA6, WufR, WufA}] These are force-field parameters for the Wu force field, i.e. for
 distances R5, R6, and angles A5, A6. The force constants are: distance WufR and
