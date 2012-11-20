@@ -390,7 +390,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION IDA(NMAX,NMAX)
       real(8) force(ffmaxdim)
       integer iopt
-      real(8) hessian(matom*3,matom*3)
+c      real(8) hessian(matom*3,matom*3)
       type(c_ptr) :: graph, new_fullerene_graph
 
 c edges with 0, 1, 2 pentagons
@@ -405,7 +405,6 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       graph = new_fullerene_graph(Nmax,MAtom,IDA)
       call tutte_layout(graph,Dist2D)
       call set_layout2d(graph,Dist2D)
-
       call get_edges(graph,matom,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
       call get_corners(graph,MAtom,
@@ -414,7 +413,6 @@ c counter for edges with 0, 1, 2 pentagons neighbours
         call get_dihedrals(graph,MAtom,
      1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
-
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)     
 
@@ -493,11 +491,11 @@ C     Optimize
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
 
-      call get_hessian(matom, dist, force, iopt, hessian,
-     1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
-     1  a_h,a_p,
-     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      write(*,*)'hessian',hessian
+c      call get_hessian(matom, dist, force, iopt, hessian,
+c     1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+c     1  a_h,a_p,
+c     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+c      write(*,*)'hessian',hessian
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
@@ -532,6 +530,7 @@ c and N=MATOM*3
       Real*8 p(NMAX*3),g(NMAX*3),h(NMAX*3),xi(NMAX*3)
       Real*8 pcom(NMAX*3),xicom(NMAX*3)
       real*8 force(ffmaxdim)
+      integer iopt
 c      integer damping
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
@@ -573,9 +572,10 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
       enddo
       fret=0.d0
       do its=1,ITMAX
-c       turn off coulomb pot towards the end
+c       turn off coulomb pot towards the end (and go to iopt=3 to indicate that coulomb has been shut of)
         if(iopt.eq.4 .and. force(19).gt.0.d0 .and. grad.le.1.d1) then
           force(19)=0.0d0
+          iopt=3
           write(*,*)'Switching off coulomb repulsive potential.'
         endif
         iter=its
@@ -1426,7 +1426,7 @@ c      use iso_c_binding
       use config
 c      type(c_ptr) :: graph
       implicit real*8 (a-h,k,o-z)
-      integer N, iopt,i,j,m
+      integer N, iopt, i, j, m
       integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer ne_hh, ne_hp, ne_pp
       integer a_h(3,3*n-60), a_p(3,60)
@@ -1869,7 +1869,7 @@ c           no dihedrals in case of iopt=1,2
       end do dihedral_types
 
 c coulomb
-      if(iopt.eq.2) then
+      if(iopt.eq.2 .or. iopt.eq.4) then
         atoms: do j=1,n
           k=fco
           a1=3*n-2
