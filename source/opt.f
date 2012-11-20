@@ -376,7 +376,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE OptFF(MAtom,Iout,ihessian,iopt,IDA,
+      SUBROUTINE OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
      1  Dist,dist2D,Rdist,ftol,force)
       use config
       use iso_c_binding
@@ -390,7 +390,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION IDA(NMAX,NMAX)
       real(8) force(ffmaxdim)
       integer iopt
-      real(8) hessian(matom*3,matom*3)
+      real(8) hessian(matom*3,matom*3),evec(matom*3),df(matom*3)
       type(c_ptr) :: graph, new_fullerene_graph
 
 c edges with 0, 1, 2 pentagons
@@ -492,20 +492,38 @@ C     Optimize
       Write(IOUT,1001) Rmin,Rmax,rms
 
       if(ihessian.ne.0) then
-      call get_hessian(matom, dist, force, iopt, hessian,
+       call get_hessian(matom, dist, force, iopt, hessian,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      write(*,*)'hessian',hessian
+       if(iprinthessian.ne.0) write(*,*)'hessian',hessian
+C Diagonalize without producing eigenvectors
+       call tred2l(hessian,3*Matom,3*Matom,evec,df)
+       call tqlil(evec,df,3*Matom,3*Matom)
+C Sort eigenvalues
+       Do I=1,MAtom*3
+        e0=evec(I)
+        jmax=I
+         Do J=I+1,MAtom*3
+          e1=evec(J)
+           if(e1.gt.e0) then
+            jmax=j
+            e0=e1
+           endif
+         enddo
+         if(i.ne.jmax) then
+          ex=evec(jmax)
+          evec(jmax)=evec(I)
+          evec(I)=ex
+         endif
+       enddo
+       write(Iout,1009)
+       write(Iout,1010) (evec(i),i=1,3*MAtom)
       endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
      1 ' Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere algorithm used')
- 1007 Format(1X,'Optimization of geometry using harmonic oscillators',
-     1 ' for stretching and bending modes using an extension of the',
-     1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
-     1 ' algorithm used')
  1001 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
  1002 FORMAT(1X,'Distances and angles defined in the force field can',
@@ -514,8 +532,14 @@ C     Optimize
  1004 Format(' Coulomb repulsion from center of origin with force ',
      1 F12.6,/)
  1005 Format(' Force field parameters: ',18F12.6,', Tolerance= ',D9.3,/)
- 1008 Format(' Force field parameters: ',19F12.6,', Tolerance= ',D9.3,/)
  1006 Format(' Force field parameters: ',8F12.6,', Tolerance= ',D9.3,/)
+ 1007 Format(1X,'Optimization of geometry using harmonic oscillators',
+     1 ' for stretching and bending modes using an extension of the',
+     1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
+     1 ' algorithm used')
+ 1008 Format(' Force field parameters: ',19F12.6,', Tolerance= ',D9.3,/)
+ 1009 Format(' Eigenvalues of Hessian:')
+ 1010 Format(10(1X,F12.6))
      
       Return 
       END
