@@ -376,8 +376,8 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE OptFF(MAtom,Iout,IDA,
-     1 Dist,dist2D,Rdist,ftol,force,iopt)
+      SUBROUTINE OptFF(MAtom,Iout,IDA,ihessian,
+     1  Dist,dist2D,Rdist,ftol,force,iopt)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -390,7 +390,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION IDA(NMAX,NMAX)
       real(8) force(ffmaxdim)
       integer iopt
-c      real(8) hessian(matom*3,matom*3)
+      real(8) hessian(matom*3,matom*3)
       type(c_ptr) :: graph, new_fullerene_graph
 
 c edges with 0, 1, 2 pentagons
@@ -491,11 +491,13 @@ C     Optimize
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
 
-c      call get_hessian(matom, dist, force, iopt, hessian,
-c     1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
-c     1  a_h,a_p,
-c     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-c      write(*,*)'hessian',hessian
+      if(ihessian.ne.0) then
+      call get_hessian(matom, dist, force, iopt, hessian,
+     1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1  a_h,a_p,
+     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+      write(*,*)'hessian',hessian
+      endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
