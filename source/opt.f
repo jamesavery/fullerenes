@@ -498,13 +498,17 @@ C     Optimize
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
        if(iprinthessian.ne.0) write(*,*)'hessian',hessian
 C Diagonalize without producing eigenvectors
-       call tred2l(hessian,3*Matom,3*Matom,evec,df)
+       amassC=12.0111d0
+       convamu=1836.1528d0
+       convdistau=1./.529177249d0
+       fachess=1./(convamu*amassC*convdistau**2)
+       facfreq=219474.625d0
+C      facfreq=219474.625d0/dsqrt(2.d0*dpi)
+       call tred2l(hessian*fachess,3*Matom,3*Matom,evec,df)
        call tqlil(evec,df,3*Matom,3*Matom)
 C Sort eigenvalues
        negeig=0
        eigneg=1.d-5
-       amassC=12.0111d0
-       facfreq=5.14045d3/dsqrt(1.8361528d3*amassC)
        Do I=1,MAtom*3
         e0=evec(I)
         jmax=I
@@ -524,12 +528,16 @@ C Sort eigenvalues
        write(Iout,1009)
        write(Iout,1010) (evec(i),i=1,3*MAtom)
        Do I=1,MAtom*3
-        if(evec(i).lt.eigneg) negeig=negeig+1
+        if(evec(i).lt.eigneg) then
+         negeig=negeig+1
+        else
+         evec(i)=dsqrt(evec(i))
+        endif
        enddo
        write(Iout,1011) negeig
        write(Iout,1012)
        loop=3*MAtom-negeig
-       write(Iout,1010) (dsqrt(evec(i))*facfreq,i=1,loop)
+       write(Iout,1010) (evec(i)*facfreq,i=1,loop)
       endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
@@ -549,7 +557,7 @@ C Sort eigenvalues
      1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
      1 ' algorithm used')
  1008 Format(' Force field parameters: ',19F12.6,', Tolerance= ',D9.3,/)
- 1009 Format(' Eigenvalues of Hessian:')
+ 1009 Format(' Eigenvalues of mass-weighted Hessian:')
  1010 Format(10(1X,F12.6))
  1011 Format(' Number of zero and negative eigenvalues: ',I6)
  1012 Format(' Frequencies (cm-1):')
