@@ -3,7 +3,7 @@ c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
       implicit real*8 (a-z)
       dist_ab=dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
       return
-      END SUBROUTINE
+      END SUBROUTINE DIST
 
 
 c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivatives of the distance
@@ -22,7 +22,7 @@ c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivat
       daz=ab_z*dist_ab_inv
       dbz=-daz
       return
-      END SUBROUTINE  
+      END SUBROUTINE DDIST
 
 
 c subroutine dddist takes 6 reals (=2 coordinates) and yields all 6 first derivatives,
@@ -167,7 +167,7 @@ c df__dbz=df__dab_z*dab_z__dbz
       ddf11dbz__dbz=ddf11dbz__ddf11dab_z*ddf11dab_z__dbz
 
       return
-      END  
+      END SUBROUTINE DDDIST
 
 
 c subroutine angle takes 9 reals (=3 coordinates) and yields an angel between 0 and +\pi (in radians)
@@ -185,7 +185,7 @@ c the following two exceptions may be called in case of rounding errors
       if(arg .lt. -1.d0) arg=-1.d0
       angle_abc=dacos(arg)
       return
-      END
+      END SUBROUTINE ANGLE
 
 
 c subroutine angle takes 9 reals (=3 coordinates) and yields an angel between 0 and +\pi (in radians)
@@ -297,7 +297,7 @@ c the derivations
       dcz=((ab_z)*aux_2+aux_4z)*den_inv
 
       return
-      END
+      END SUBROUTINE DANGLE
 
 
 c subroutine dangle takes 9 reals (=3 coordinates) and yields all 9 first derivatives of the angle
@@ -1065,8 +1065,7 @@ c df__dcz=((ab_z)*aux_2+aux_4z)*den_inv
      1 + ddf11dcz__dden_inv*dden_inv__dcz
 
       return
-      END
-
+      END SUBROUTINE DDANGLE
 
 
 
@@ -1118,7 +1117,7 @@ c two auxiliary reals
 c the result
       dihedral_abcd=datan2(aux_2, aux_1)
       return
-      END  
+      END SUBROUTINE DIHEDRAL
 
 
       SUBROUTINE DDIHEDRAL(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
@@ -1837,7 +1836,7 @@ c f is the function atan2(y, x)
 c fortran (and most other sources) use 'atan2(y,x)' while mathematica uses 'atan2(x,y)'
 
       return
-      END
+      END SUBROUTINE DDIHEDRAL
 
 
 c probably not helpful
@@ -1857,7 +1856,7 @@ c      END SUBROUTINE
       day=-ay*dist_3_2_inv
       daz=-az*dist_3_2_inv
       return
-      END SUBROUTINE
+      END SUBROUTINE DCOULOMB
 
 
       SUBROUTINE DDCOULOMB(ax,ay,az,dax,day,daz,
@@ -1866,11 +1865,11 @@ c      END SUBROUTINE
       dist_2=ax**2 + ay**2 + az**2
       c=1/dsqrt(dist_2)
       dist_3_2_inv=c/dist_2
-      dist_5_2_inv=dist_3_2/dist_2
+      dist_5_2_inv=dist_3_2_inv/dist_2
 
-      dax=-ax*dist_3_2
-      day=-ay*dist_3_2
-      daz=-az*dist_3_2
+      dax=-ax*dist_3_2_inv
+      day=-ay*dist_3_2_inv
+      daz=-az*dist_3_2_inv
 
       daxax=3*ax**2.0*dist_5_2_inv - dist_3_2_inv
       daxay=3*ax*ay**dist_5_2_inv
@@ -1879,6 +1878,6 @@ c      END SUBROUTINE
       dayaz=3*ay*az**dist_5_2_inv
       dazaz=3*az**2.0*dist_5_2_inv - dist_3_2_inv
       return
-      END SUBROUTINE
+      END SUBROUTINE DDCOULOMB
 
 

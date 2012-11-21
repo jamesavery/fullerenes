@@ -6443,4 +6443,4 @@ c df__ddz=df__dx*dx__ddz + df__dy*dy__ddz
      1 + ddf11ddz__ddy11ddz*ddy11ddz__ddz
 
       return
-      END SUBROUTINE
+      END SUBROUTINE DDDIHEDRAL
