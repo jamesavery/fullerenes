@@ -416,7 +416,6 @@ c counter for edges with 0, 1, 2 pentagons neighbours
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)     
 
-      deg2rad=dpi/180.d0
       dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
       if(iopt.eq.1 .or. iopt.eq.2)then
 c        force(1)=force(1)
@@ -508,7 +507,7 @@ C       facfreq=219474.625d0/dsqrt(2.d0*dpi)
         call tqlil(evec,df,3*Matom,3*Matom)
 C Sort eigenvalues
         negeig=0
-        eigneg=1.d-5
+        eigneg=1.d-7
         Do I=1,MAtom*3
           e0=evec(I)
           jmax=I
@@ -1473,7 +1472,7 @@ c      use iso_c_binding
       use config
 c      type(c_ptr) :: graph
       implicit real*8 (a-h,k,o-z)
-      integer N, iopt, i, j, m
+      integer n, iopt, i, j, m
       integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer ne_hh, ne_hp, ne_pp
       integer a_h(3,3*n-60), a_p(3,60)
@@ -1525,6 +1524,7 @@ c get force constants
       end select
 
 c edges
+c       if(.false.)then
       edge_types: do i=1,3
         select case(10*iopt + i)
           case(11,21)
@@ -1576,6 +1576,9 @@ c edges
                 a4=3*e_pp(2,j)-2
                 a5=3*e_pp(2,j)-1
                 a6=3*e_pp(2,j)
+              case default
+                write(*,*)'Something went horribly wrong'
+                exit
             end select
             ax=coord(a1)
             ay=coord(a2)
@@ -1588,36 +1591,39 @@ c edges
      3       daxax, daxay, daxaz, daxbx, daxby, daxbz, dayay, dayaz,
      1       daybx, dayby, daybz, dazaz, dazbx, dazby, dazbz, dbxbx,
      1       dbxby, dbxbz, dbyby, dbybz, dbzbz, dist)
-c           partial^2 E/partial x_i partial x_j
-c              = (partial ^2 E/partial r^2) * (partial^2 r/partial x_i partial x_j) + (partial^2 r/partial x_i partial x_j) * (partial E/partial r)
-c              = (partial^2 r/partial x_i partial x_j) * k * (1 + r - r_0)
-            aux = k * (1 + dist - r_naught)
-            hessian(a1,a1)=hessian(a1,a1)+daxax*aux
-            hessian(a1,a2)=hessian(a1,a2)+daxay*aux
-            hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
-            hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
-            hessian(a1,a5)=hessian(a1,a5)+daxby*aux
-            hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
-            hessian(a2,a2)=hessian(a2,a2)+dayay*aux
-            hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
-            hessian(a2,a4)=hessian(a2,a4)+daybx*aux
-            hessian(a2,a5)=hessian(a2,a5)+dayby*aux
-            hessian(a2,a6)=hessian(a2,a6)+daybz*aux
-            hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
-            hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
-            hessian(a3,a5)=hessian(a3,a5)+dazby*aux
-            hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
-            hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
-            hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
-            hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
-            hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
-            hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
-            hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
+c           (partial^2 E/partial x_i partial x_j)
+c              = (partial^2 E/partial x_i partial r)(partial r/partial x_j) + (partial^2 r/partial x_i partial x_j)(partial E/partial r)
+c              = (partial (k(r - r_0))/partial x_i)(partial r/partial x_j) + (partial^2 r/partial x_i partial x_j)(k(r - r_0))
+c              = k * ((partial r/partial x_i)(partial r/partial x_j) + (partial^2 r/partial x_i partial x_j)(r - r_0))
+            diff=dist - r_naught
+            hessian(a1,a1)=hessian(a1,a1) + k * (dax*dax + daxax*diff)
+            hessian(a1,a2)=hessian(a1,a2) + k * (dax*day + daxay*diff)
+            hessian(a1,a3)=hessian(a1,a3) + k * (dax*daz + daxaz*diff)
+            hessian(a1,a4)=hessian(a1,a4) + k * (dax*dbx + daxbx*diff)
+            hessian(a1,a5)=hessian(a1,a5) + k * (dax*dby + daxby*diff)
+            hessian(a1,a6)=hessian(a1,a6) + k * (dax*dbz + daxbz*diff)
+            hessian(a2,a2)=hessian(a2,a2) + k * (day*day + dayay*diff)
+            hessian(a2,a3)=hessian(a2,a3) + k * (day*daz + dayaz*diff)
+            hessian(a2,a4)=hessian(a2,a4) + k * (day*dbx + daybx*diff)
+            hessian(a2,a5)=hessian(a2,a5) + k * (day*dby + dayby*diff)
+            hessian(a2,a6)=hessian(a2,a6) + k * (day*dbz + daybz*diff)
+            hessian(a3,a3)=hessian(a3,a3) + k * (daz*daz + dazaz*diff)
+            hessian(a3,a4)=hessian(a3,a4) + k * (daz*dbx + dazbx*diff)
+            hessian(a3,a5)=hessian(a3,a5) + k * (daz*dby + dazby*diff)
+            hessian(a3,a6)=hessian(a3,a6) + k * (daz*dbz + dazbz*diff)
+            hessian(a4,a4)=hessian(a4,a4) + k * (dbx*dbx + dbxbx*diff)
+            hessian(a4,a5)=hessian(a4,a5) + k * (dbx*dby + dbxby*diff)
+            hessian(a4,a6)=hessian(a4,a6) + k * (dbx*dbz + dbxbz*diff)
+            hessian(a5,a5)=hessian(a5,a5) + k * (dby*dby + dbyby*diff)
+            hessian(a5,a6)=hessian(a5,a6) + k * (dby*dbz + dbybz*diff)
+            hessian(a6,a6)=hessian(a6,a6) + k * (dbz*dbz + dbzbz*diff)
           end do edges
         endif
       end do edge_types
+c      endif
       
 c angles
+c      if(.true.)then
       angle_types: do i=1,2
 c       iopt doesn't matter in this case
         select case(i)
@@ -1653,6 +1659,9 @@ c       iopt doesn't matter in this case
                 a7=3*a_p(3,j)-2
                 a8=3*a_p(3,j)-1
                 a9=3*a_p(3,j)
+              case default
+                write(*,*)'Something went horribly wrong'
+                exit
             end select
             ax=coord(a1)
             ay=coord(a2)
@@ -1672,55 +1681,56 @@ c       iopt doesn't matter in this case
      1       dbycx, dbycy, dbycz, dbzbz, dbzcx, dbzcy, dbzcz, dcxcx,
      1       dcxcy, dcxcz, dcycy, dcycz, dczcz,
      1       angle_abc)
-            aux = k * (1 + angle_abc - a_naught)
-            hessian(a1,a1)=hessian(a1,a1)+daxax*aux
-            hessian(a1,a2)=hessian(a1,a2)+daxay*aux
-            hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
-            hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
-            hessian(a1,a5)=hessian(a1,a5)+daxby*aux
-            hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
-            hessian(a1,a7)=hessian(a1,a7)+daxcx*aux
-            hessian(a1,a8)=hessian(a1,a8)+daxcy*aux
-            hessian(a1,a9)=hessian(a1,a9)+daxcz*aux
-            hessian(a2,a2)=hessian(a2,a2)+dayay*aux
-            hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
-            hessian(a2,a4)=hessian(a2,a4)+daybx*aux
-            hessian(a2,a5)=hessian(a2,a5)+dayby*aux
-            hessian(a2,a6)=hessian(a2,a6)+daybz*aux
-            hessian(a2,a7)=hessian(a2,a7)+daycx*aux
-            hessian(a2,a8)=hessian(a2,a8)+daycy*aux
-            hessian(a2,a9)=hessian(a2,a9)+daycz*aux
-            hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
-            hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
-            hessian(a3,a5)=hessian(a3,a5)+dazby*aux
-            hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
-            hessian(a3,a7)=hessian(a3,a7)+dazcx*aux
-            hessian(a3,a8)=hessian(a3,a8)+dazcy*aux
-            hessian(a3,a9)=hessian(a3,a9)+dazcz*aux
-            hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
-            hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
-            hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
-            hessian(a4,a7)=hessian(a4,a7)+dbxcx*aux
-            hessian(a4,a8)=hessian(a4,a8)+dbxcy*aux
-            hessian(a4,a9)=hessian(a4,a9)+dbxcz*aux
-            hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
-            hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
-            hessian(a5,a7)=hessian(a5,a7)+dbycx*aux
-            hessian(a5,a8)=hessian(a5,a8)+dbycy*aux
-            hessian(a5,a9)=hessian(a5,a9)+dbycz*aux
-            hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
-            hessian(a6,a7)=hessian(a6,a7)+dbzcx*aux
-            hessian(a6,a8)=hessian(a6,a8)+dbzcy*aux
-            hessian(a6,a9)=hessian(a6,a9)+dbzcz*aux
-            hessian(a7,a7)=hessian(a7,a7)+dcxcx*aux
-            hessian(a7,a8)=hessian(a7,a8)+dcxcy*aux
-            hessian(a7,a9)=hessian(a7,a9)+dcxcz*aux
-            hessian(a8,a8)=hessian(a8,a8)+dcycy*aux
-            hessian(a8,a9)=hessian(a8,a9)+dcycz*aux
-            hessian(a9,a9)=hessian(a9,a9)+dczcz*aux
+            diff=angle_abc - a_naught
+            hessian(a1,a1)=hessian(a1,a1) + k * (dax+dax * daxax*diff)
+            hessian(a1,a2)=hessian(a1,a2) + k * (dax+day * daxay*diff)
+            hessian(a1,a3)=hessian(a1,a3) + k * (dax+daz * daxaz*diff)
+            hessian(a1,a4)=hessian(a1,a4) + k * (dax+dbx * daxbx*diff)
+            hessian(a1,a5)=hessian(a1,a5) + k * (dax+dby * daxby*diff)
+            hessian(a1,a6)=hessian(a1,a6) + k * (dax+dbz * daxbz*diff)
+            hessian(a1,a7)=hessian(a1,a7) + k * (dax+dcx * daxcx*diff)
+            hessian(a1,a8)=hessian(a1,a8) + k * (dax+dcy * daxcy*diff)
+            hessian(a1,a9)=hessian(a1,a9) + k * (dax+dcz * daxcz*diff)
+            hessian(a2,a2)=hessian(a2,a2) + k * (day+day * dayay*diff)
+            hessian(a2,a3)=hessian(a2,a3) + k * (day+daz * dayaz*diff)
+            hessian(a2,a4)=hessian(a2,a4) + k * (day+dbx * daybx*diff)
+            hessian(a2,a5)=hessian(a2,a5) + k * (day+dby * dayby*diff)
+            hessian(a2,a6)=hessian(a2,a6) + k * (day+dbz * daybz*diff)
+            hessian(a2,a7)=hessian(a2,a7) + k * (day+dcx * daycx*diff)
+            hessian(a2,a8)=hessian(a2,a8) + k * (day+dcy * daycy*diff)
+            hessian(a2,a9)=hessian(a2,a9) + k * (day+dcz * daycz*diff)
+            hessian(a3,a3)=hessian(a3,a3) + k * (daz+daz * dazaz*diff)
+            hessian(a3,a4)=hessian(a3,a4) + k * (daz+dbx * dazbx*diff)
+            hessian(a3,a5)=hessian(a3,a5) + k * (daz+dby * dazby*diff)
+            hessian(a3,a6)=hessian(a3,a6) + k * (daz+dbz * dazbz*diff)
+            hessian(a3,a7)=hessian(a3,a7) + k * (daz+dcx * dazcx*diff)
+            hessian(a3,a8)=hessian(a3,a8) + k * (daz+dcy * dazcy*diff)
+            hessian(a3,a9)=hessian(a3,a9) + k * (daz+dcz * dazcz*diff)
+            hessian(a4,a4)=hessian(a4,a4) + k * (dbx+dbx * dbxbx*diff)
+            hessian(a4,a5)=hessian(a4,a5) + k * (dbx+dby * dbxby*diff)
+            hessian(a4,a6)=hessian(a4,a6) + k * (dbx+dbz * dbxbz*diff)
+            hessian(a4,a7)=hessian(a4,a7) + k * (dbx+dcx * dbxcx*diff)
+            hessian(a4,a8)=hessian(a4,a8) + k * (dbx+dcy * dbxcy*diff)
+            hessian(a4,a9)=hessian(a4,a9) + k * (dbx+dcz * dbxcz*diff)
+            hessian(a5,a5)=hessian(a5,a5) + k * (dby+dby * dbyby*diff)
+            hessian(a5,a6)=hessian(a5,a6) + k * (dby+dbz * dbybz*diff)
+            hessian(a5,a7)=hessian(a5,a7) + k * (dby+dcx * dbycx*diff)
+            hessian(a5,a8)=hessian(a5,a8) + k * (dby+dcy * dbycy*diff)
+            hessian(a5,a9)=hessian(a5,a9) + k * (dby+dcz * dbycz*diff)
+            hessian(a6,a6)=hessian(a6,a6) + k * (dbz+dbz * dbzbz*diff)
+            hessian(a6,a7)=hessian(a6,a7) + k * (dbz+dcx * dbzcx*diff)
+            hessian(a6,a8)=hessian(a6,a8) + k * (dbz+dcy * dbzcy*diff)
+            hessian(a6,a9)=hessian(a6,a9) + k * (dbz+dcz * dbzcz*diff)
+            hessian(a7,a7)=hessian(a7,a7) + k * (dcx+dcx * dcxcx*diff)
+            hessian(a7,a8)=hessian(a7,a8) + k * (dcx+dcy * dcxcy*diff)
+            hessian(a7,a9)=hessian(a7,a9) + k * (dcx+dcz * dcxcz*diff)
+            hessian(a8,a8)=hessian(a8,a8) + k * (dcy+dcy * dcycy*diff)
+            hessian(a8,a9)=hessian(a8,a9) + k * (dcy+dcz * dcycz*diff)
+            hessian(a9,a9)=hessian(a9,a9) + k * (dcz+dcz * dczcz*diff)
           end do angles
         endif
       end do angle_types
+c      endif
 
 c dihedrals
       dihedral_types: do i=1,4
@@ -1803,6 +1813,9 @@ c           no dihedrals in case of iopt=1,2
                 a10=3*d_ppp(4,j)-2
                 a11=3*d_ppp(4,j)-1
                 a12=3*d_ppp(4,j)
+              case default
+                write(*,*)'Something went horribly wrong'
+                exit
             end select
             ax=coord(a1)
             ay=coord(a2)
@@ -1832,85 +1845,85 @@ c           no dihedrals in case of iopt=1,2
      1       dczcz, dczdx, dczdy, dczdz, ddxdx, ddxdy, ddxdz,
      1       ddydy, ddydz, ddzdz,
      1       dihedral_abcd)
-            aux = k * (1 + dihedral_abcd - d_naught)
-            hessian(a1,a1)=hessian(a1,a1)+daxax*aux
-            hessian(a1,a2)=hessian(a1,a2)+daxay*aux
-            hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
-            hessian(a1,a4)=hessian(a1,a4)+daxbx*aux
-            hessian(a1,a5)=hessian(a1,a5)+daxby*aux
-            hessian(a1,a6)=hessian(a1,a6)+daxbz*aux
-            hessian(a1,a7)=hessian(a1,a7)+daxcx*aux
-            hessian(a1,a8)=hessian(a1,a8)+daxcy*aux
-            hessian(a1,a9)=hessian(a1,a9)+daxcz*aux
-            hessian(a1,a10)=hessian(a1,a10)+daxdx*aux
-            hessian(a1,a11)=hessian(a1,a11)+daxdy*aux
-            hessian(a1,a12)=hessian(a1,a12)+daxdz*aux
-            hessian(a2,a2)=hessian(a2,a2)+dayay*aux
-            hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
-            hessian(a2,a4)=hessian(a2,a4)+daybx*aux
-            hessian(a2,a5)=hessian(a2,a5)+dayby*aux
-            hessian(a2,a6)=hessian(a2,a6)+daybz*aux
-            hessian(a2,a7)=hessian(a2,a7)+daycx*aux
-            hessian(a2,a8)=hessian(a2,a8)+daycy*aux
-            hessian(a2,a9)=hessian(a2,a9)+daycz*aux
-            hessian(a2,a10)=hessian(a2,a10)+daydx*aux
-            hessian(a2,a11)=hessian(a2,a11)+daydy*aux
-            hessian(a2,a12)=hessian(a2,a12)+daydz*aux
-            hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
-            hessian(a3,a4)=hessian(a3,a4)+dazbx*aux
-            hessian(a3,a5)=hessian(a3,a5)+dazby*aux
-            hessian(a3,a6)=hessian(a3,a6)+dazbz*aux
-            hessian(a3,a7)=hessian(a3,a7)+dazcx*aux
-            hessian(a3,a8)=hessian(a3,a8)+dazcy*aux
-            hessian(a3,a9)=hessian(a3,a9)+dazcz*aux
-            hessian(a3,a10)=hessian(a3,a10)+dazdx*aux
-            hessian(a3,a11)=hessian(a3,a11)+dazdy*aux
-            hessian(a3,a12)=hessian(a3,a12)+dazdz*aux
-            hessian(a4,a4)=hessian(a4,a4)+dbxbx*aux
-            hessian(a4,a5)=hessian(a4,a5)+dbxby*aux
-            hessian(a4,a6)=hessian(a4,a6)+dbxbz*aux
-            hessian(a4,a7)=hessian(a4,a7)+dbxcx*aux
-            hessian(a4,a8)=hessian(a4,a8)+dbxcy*aux
-            hessian(a4,a9)=hessian(a4,a9)+dbxcz*aux
-            hessian(a4,a10)=hessian(a4,a10)+dbxdx*aux
-            hessian(a4,a11)=hessian(a4,a11)+dbxdy*aux
-            hessian(a4,a12)=hessian(a4,a12)+dbxdz*aux
-            hessian(a5,a5)=hessian(a5,a5)+dbyby*aux
-            hessian(a5,a6)=hessian(a5,a6)+dbybz*aux
-            hessian(a5,a7)=hessian(a5,a7)+dbycx*aux
-            hessian(a5,a8)=hessian(a5,a8)+dbycy*aux
-            hessian(a5,a9)=hessian(a5,a9)+dbycz*aux
-            hessian(a5,a10)=hessian(a5,a10)+dbydx*aux
-            hessian(a5,a11)=hessian(a5,a11)+dbydy*aux
-            hessian(a5,a12)=hessian(a5,a12)+dbydz*aux
-            hessian(a6,a6)=hessian(a6,a6)+dbzbz*aux
-            hessian(a6,a7)=hessian(a6,a7)+dbzcx*aux
-            hessian(a6,a8)=hessian(a6,a8)+dbzcy*aux
-            hessian(a6,a9)=hessian(a6,a9)+dbzcz*aux
-            hessian(a6,a10)=hessian(a6,a10)+dbzdx*aux
-            hessian(a6,a11)=hessian(a6,a11)+dbzdy*aux
-            hessian(a6,a12)=hessian(a6,a12)+dbzdz*aux
-            hessian(a7,a7)=hessian(a7,a7)+dcxcx*aux
-            hessian(a7,a8)=hessian(a7,a8)+dcxcy*aux
-            hessian(a7,a9)=hessian(a7,a9)+dcxcz*aux
-            hessian(a7,a10)=hessian(a7,a10)+dcxdx*aux
-            hessian(a7,a11)=hessian(a7,a11)+dcxdy*aux
-            hessian(a7,a12)=hessian(a7,a12)+dcxdz*aux
-            hessian(a8,a8)=hessian(a8,a8)+dcycy*aux
-            hessian(a8,a9)=hessian(a8,a9)+dcycz*aux
-            hessian(a8,a10)=hessian(a8,a10)+dcydx*aux
-            hessian(a8,a11)=hessian(a8,a11)+dcydy*aux
-            hessian(a8,a12)=hessian(a8,a12)+dcydz*aux
-            hessian(a9,a9)=hessian(a9,a9)+dczcz*aux
-            hessian(a9,a10)=hessian(a9,a10)+dczdx*aux
-            hessian(a9,a11)=hessian(a9,a11)+dczdy*aux
-            hessian(a9,a12)=hessian(a9,a12)+dczdz*aux
-            hessian(a10,a10)=hessian(a10,a10)+ddxdx*aux
-            hessian(a10,a11)=hessian(a10,a11)+ddxdy*aux
-            hessian(a10,a12)=hessian(a10,a12)+ddxdz*aux
-            hessian(a11,a11)=hessian(a11,a11)+ddydy*aux
-            hessian(a11,a12)=hessian(a11,a12)+ddydz*aux
-            hessian(a12,a12)=hessian(a12,a12)+ddzdz*aux
+            diff=dihedral_abcd - d_naught
+            hessian(a1,a1) =hessian(a1,a1)   + k *(dax*dax + daxax*diff)
+            hessian(a1,a2) =hessian(a1,a2)   + k *(dax*day + daxay*diff)
+            hessian(a1,a3) =hessian(a1,a3)   + k *(dax*daz + daxaz*diff)
+            hessian(a1,a4) =hessian(a1,a4)   + k *(dax*dbx + daxbx*diff)
+            hessian(a1,a5) =hessian(a1,a5)   + k *(dax*dby + daxby*diff)
+            hessian(a1,a6) =hessian(a1,a6)   + k *(dax*dbz + daxbz*diff)
+            hessian(a1,a7) =hessian(a1,a7)   + k *(dax*dcx + daxcx*diff)
+            hessian(a1,a8) =hessian(a1,a8)   + k *(dax*dcy + daxcy*diff)
+            hessian(a1,a9) =hessian(a1,a9)   + k *(dax*dcz + daxcz*diff)
+            hessian(a1,a10)=hessian(a1,a10)  + k *(dax*ddx + daxdx*diff)
+            hessian(a1,a11)=hessian(a1,a11)  + k *(dax*ddy + daxdy*diff)
+            hessian(a1,a12)=hessian(a1,a12)  + k *(dax*ddz + daxdz*diff)
+            hessian(a2,a2) =hessian(a2,a2)   + k *(day*day + dayay*diff)
+            hessian(a2,a3) =hessian(a2,a3)   + k *(day*daz + dayaz*diff)
+            hessian(a2,a4) =hessian(a2,a4)   + k *(day*dbx + daybx*diff)
+            hessian(a2,a5) =hessian(a2,a5)   + k *(day*dby + dayby*diff)
+            hessian(a2,a6) =hessian(a2,a6)   + k *(day*dbz + daybz*diff)
+            hessian(a2,a7) =hessian(a2,a7)   + k *(day*dcx + daycx*diff)
+            hessian(a2,a8) =hessian(a2,a8)   + k *(day*dcy + daycy*diff)
+            hessian(a2,a9) =hessian(a2,a9)   + k *(day*dcz + daycz*diff)
+            hessian(a2,a10)=hessian(a2,a10)  + k *(day*ddx + daydx*diff)
+            hessian(a2,a11)=hessian(a2,a11)  + k *(day*ddy + daydy*diff)
+            hessian(a2,a12)=hessian(a2,a12)  + k *(day*ddz + daydz*diff)
+            hessian(a3,a3) =hessian(a3,a3)   + k *(daz*daz + dazaz*diff)
+            hessian(a3,a4) =hessian(a3,a4)   + k *(daz*dbx + dazbx*diff)
+            hessian(a3,a5) =hessian(a3,a5)   + k *(daz*dby + dazby*diff)
+            hessian(a3,a6) =hessian(a3,a6)   + k *(daz*dbz + dazbz*diff)
+            hessian(a3,a7) =hessian(a3,a7)   + k *(daz*dcx + dazcx*diff)
+            hessian(a3,a8) =hessian(a3,a8)   + k *(daz*dcy + dazcy*diff)
+            hessian(a3,a9) =hessian(a3,a9)   + k *(daz*dcz + dazcz*diff)
+            hessian(a3,a10)=hessian(a3,a10)  + k *(daz*ddx + dazdx*diff)
+            hessian(a3,a11)=hessian(a3,a11)  + k *(daz*ddy + dazdy*diff)
+            hessian(a3,a12)=hessian(a3,a12)  + k *(daz*ddz + dazdz*diff)
+            hessian(a4,a4) =hessian(a4,a4)   + k *(dbx*dbx + dbxbx*diff)
+            hessian(a4,a5) =hessian(a4,a5)   + k *(dbx*dby + dbxby*diff)
+            hessian(a4,a6) =hessian(a4,a6)   + k *(dbx*dbz + dbxbz*diff)
+            hessian(a4,a7) =hessian(a4,a7)   + k *(dbx*dcx + dbxcx*diff)
+            hessian(a4,a8) =hessian(a4,a8)   + k *(dbx*dcy + dbxcy*diff)
+            hessian(a4,a9) =hessian(a4,a9)   + k *(dbx*dcz + dbxcz*diff)
+            hessian(a4,a10)=hessian(a4,a10)  + k *(dbx*ddx + dbxdx*diff)
+            hessian(a4,a11)=hessian(a4,a11)  + k *(dbx*ddy + dbxdy*diff)
+            hessian(a4,a12)=hessian(a4,a12)  + k *(dbx*ddz + dbxdz*diff)
+            hessian(a5,a5)=hessian(a5,a5)    + k *(dby*dby + dbyby*diff)
+            hessian(a5,a6)=hessian(a5,a6)    + k *(dby*dbz + dbybz*diff)
+            hessian(a5,a7)=hessian(a5,a7)    + k *(dby*dcx + dbycx*diff)
+            hessian(a5,a8)=hessian(a5,a8)    + k *(dby*dcy + dbycy*diff)
+            hessian(a5,a9)=hessian(a5,a9)    + k *(dby*dcz + dbycz*diff)
+            hessian(a5,a10)=hessian(a5,a10)  + k *(dby*ddx + dbydx*diff)
+            hessian(a5,a11)=hessian(a5,a11)  + k *(dby*ddy + dbydy*diff)
+            hessian(a5,a12)=hessian(a5,a12)  + k *(dby*ddz + dbydz*diff)
+            hessian(a6,a6)=hessian(a6,a6)    + k *(dbz*dbz + dbzbz*diff)
+            hessian(a6,a7)=hessian(a6,a7)    + k *(dbz*dcx + dbzcx*diff)
+            hessian(a6,a8)=hessian(a6,a8)    + k *(dbz*dcy + dbzcy*diff)
+            hessian(a6,a9)=hessian(a6,a9)    + k *(dbz*dcz + dbzcz*diff)
+            hessian(a6,a10)=hessian(a6,a10)  + k *(dbz*ddx + dbzdx*diff)
+            hessian(a6,a11)=hessian(a6,a11)  + k *(dbz*ddy + dbzdy*diff)
+            hessian(a6,a12)=hessian(a6,a12)  + k *(dbz*ddz + dbzdz*diff)
+            hessian(a7,a7)=hessian(a7,a7)    + k *(dcx*dcx + dcxcx*diff)
+            hessian(a7,a8)=hessian(a7,a8)    + k *(dcx*dcy + dcxcy*diff)
+            hessian(a7,a9)=hessian(a7,a9)    + k *(dcx*dcz + dcxcz*diff)
+            hessian(a7,a10)=hessian(a7,a10)  + k *(dcx*ddx + dcxdx*diff)
+            hessian(a7,a11)=hessian(a7,a11)  + k *(dcx*ddy + dcxdy*diff)
+            hessian(a7,a12)=hessian(a7,a12)  + k *(dcx*ddz + dcxdz*diff)
+            hessian(a8,a8)=hessian(a8,a8)    + k *(dcy*dcy + dcycy*diff)
+            hessian(a8,a9)=hessian(a8,a9)    + k *(dcy*dcz + dcycz*diff)
+            hessian(a8,a10)=hessian(a8,a10)  + k *(dcy*ddx + dcydx*diff)
+            hessian(a8,a11)=hessian(a8,a11)  + k *(dcy*ddy + dcydy*diff)
+            hessian(a8,a12)=hessian(a8,a12)  + k *(dcy*ddz + dcydz*diff)
+            hessian(a9,a9)=hessian(a9,a9)    + k *(dcz*dcz + dczcz*diff)
+            hessian(a9,a10)=hessian(a9,a10)  + k *(dcz*ddx + dczdx*diff)
+            hessian(a9,a11)=hessian(a9,a11)  + k *(dcz*ddy + dczdy*diff)
+            hessian(a9,a12)=hessian(a9,a12)  + k *(dcz*ddz + dczdz*diff)
+            hessian(a10,a10)=hessian(a10,a10)+ k *(ddx*ddx + ddxdx*diff)
+            hessian(a10,a11)=hessian(a10,a11)+ k *(ddx*ddy + ddxdy*diff)
+            hessian(a10,a12)=hessian(a10,a12)+ k *(ddx*ddz + ddxdz*diff)
+            hessian(a11,a11)=hessian(a11,a11)+ k *(ddy*ddy + ddydy*diff)
+            hessian(a11,a12)=hessian(a11,a12)+ k *(ddy*ddz + ddydz*diff)
+            hessian(a12,a12)=hessian(a12,a12)+ k *(ddz*ddz + ddzdz*diff)
           end do dihedrals
         endif
       end do dihedral_types
@@ -1926,14 +1939,13 @@ c coulomb
           ay=coord(a2)
           az=coord(a3)
           call ddcoulomb(ax, ay, az, dax, day, daz, 
-     3      daxax, daxay, daxaz, dayay, dayaz, dazaz, c)
-          aux = k * (1 + c - 0)
-          hessian(a1,a1)=hessian(a1,a1)+daxax*aux
-          hessian(a1,a2)=hessian(a1,a2)+daxay*aux
-          hessian(a1,a3)=hessian(a1,a3)+daxaz*aux
-          hessian(a2,a2)=hessian(a2,a2)+dayay*aux
-          hessian(a2,a3)=hessian(a2,a3)+dayaz*aux
-          hessian(a3,a3)=hessian(a3,a3)+dazaz*aux
+     1      daxax, daxay, daxaz, dayay, dayaz, dazaz, c)
+          hessian(a1,a1)=hessian(a1,a1) + k * (dax*dax + daxax*c)
+          hessian(a1,a2)=hessian(a1,a2) + k * (dax*day + daxay*c)
+          hessian(a1,a3)=hessian(a1,a3) + k * (dax*daz + daxaz*c)
+          hessian(a2,a2)=hessian(a2,a2) + k * (day*day + dayay*c)
+          hessian(a2,a3)=hessian(a2,a3) + k * (day*daz + dayaz*c)
+          hessian(a3,a3)=hessian(a3,a3) + k * (daz*daz + dazaz*c)
         end do atoms
       endif
 
