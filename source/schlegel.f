@@ -330,7 +330,7 @@ C   Get atom label
       anglev=.5d0*dpi
       endif
       anglev=anglev+dpi
-      anglevd=anglev*180.d0/dpi
+      anglevd=anglev*deg2rad
       WRITE(IOUT,1020) Symbol1,anglevd,IAL,IBL,RL
 C   Build the rotation matrix
       rw1=dcos(anglev)
@@ -422,7 +422,7 @@ C   Calculate distance of vertices from z-axis for projection
   20  app=rmin+Dist(3,1)
       WRITE(IOUT,1002)
 C     Write out on file unit=2 for schlegel.dat
-      sfac=dtan(angle*dpi/180.d0)
+      sfac=dtan(angle*deg2rad)
       Do I=1,M
       X=Dist(1,I)
       Y=Dist(2,I)
@@ -481,7 +481,7 @@ C   Angle between the two vectors cos^-1(a.b/|a||b|)*(180/pi)
       anglef=R1*R2
       if(dabs(anglef).gt.1.d-3) then
       farg=(dx*dxm+dy*dym)/anglef
-      angle=dacos(farg)*180.d0/dpi
+      angle=dacos(farg)*rad2deg
       else
       angle=0.d0
       endif
@@ -870,8 +870,7 @@ C    1 'atoms ',3I4)
 C     Construct rotation matrix for turning vec into (0,0,1)
 C     First rotate around y-axis to produce (0,y1,z1)
       beta=datan(-vec(1)/vec(3))
-      facw=180.d0/dpi
-      betaw=beta*facw
+      betaw=beta*rad2deg
       cosb=dcos(beta)
       sinb=dsin(beta)
       xi=cosb*vec(1)+sinb*vec(3)
@@ -879,7 +878,7 @@ C     First rotate around y-axis to produce (0,y1,z1)
       zi=cosb*vec(3)-sinb*vec(1)
 C     Then  rotate around x-axis to produce (0, 0,z2)
       alpha=datan(yi/zi)
-      alphaw=alpha*facw
+      alphaw=alpha*rad2deg
       cosa=dcos(alpha)
       sina=dsin(alpha)
 C     Produce matrix

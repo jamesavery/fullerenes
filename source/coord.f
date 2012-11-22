@@ -502,7 +502,7 @@ C     Unpack distance matrix value from linear vector
       IMat=((I1-1)*(I1-2))/2+J1
       RM=DistMat(IMat)
       Fac=(R1*R1+R2*R2-RM*RM)/(2.d0*R1*R2)
-      FunAngleMat=180.d0*dacos(Fac)/dpi
+      FunAngleMat=dacos(Fac)*rad2deg
       Return
       END
 
@@ -2562,7 +2562,7 @@ C  output zmatrix  = internal coordinates in angstroms, radians, and radians
          call angle(Dist(1,ii),Dist(2,ii),Dist(3,ii),Dist(1,j),
      1           Dist(2,j),Dist(3,j),Dist(1,k),Dist(2,k),Dist(3,k),
      1           zmatrix(2,i))
-         zmatrix(2,i)=zmatrix(2,i)*1.8d2/dpi
+         zmatrix(2,i)=zmatrix(2,i)*rad2deg
          if(i.lt.4) go to 30
 c   make sure dihedral is meaningful
          call angle(Dist(1,j),Dist(2,j),Dist(3,j),Dist(1,k),
@@ -2597,7 +2597,7 @@ c
          call dihedral(Dist(1,ii),Dist(2,ii),Dist(3,ii),Dist(1,j),
      1           Dist(2,j),Dist(3,j),Dist(1,k),Dist(2,k),Dist(3,k),
      1           Dist(1,l),Dist(2,l),Dist(3,l),zmatrix(3,i))
-         zmatrix(3,i)=zmatrix(3,i)*1.8d2/dpi
+         zmatrix(3,i)=zmatrix(3,i)*rad2deg
    30 zmatrix(1,i)=dsqrt((Dist(1,i)-Dist(1,j))**2+
      1           (Dist(2,i)-Dist(2,j))**2+
      2           (Dist(3,i)-Dist(3,j))**2)
