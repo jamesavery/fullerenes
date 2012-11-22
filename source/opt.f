@@ -411,7 +411,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
      1 a_h,a_p)
       if(iopt .eq. 3 .or. iopt.eq.4) then
         call get_dihedrals(graph,MAtom,
-     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)     
@@ -492,52 +492,52 @@ C     Optimize
       Write(IOUT,1001) Rmin,Rmax,rms
 
       if(ihessian.ne.0) then
-       call get_hessian(matom, dist, force, iopt, hessian,
-     1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
-     1  a_h,a_p,
-     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-       if(iprinthessian.ne.0) write(*,*)'hessian',hessian
+        call get_hessian(matom, dist, force, iopt, hessian,
+     1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
+     1   a_h,a_p,
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        if(iprinthessian.ne.0) write(*,*)'hessian',hessian
 C Diagonalize without producing eigenvectors
-       amassC=12.0111d0
-       convamu=1836.1528d0
-       convdistau=1./.529177249d0
-       fachess=1./(convamu*amassC*convdistau**2)
-       facfreq=219474.625d0
-C      facfreq=219474.625d0/dsqrt(2.d0*dpi)
-       call tred2l(hessian*fachess,3*Matom,3*Matom,evec,df)
-       call tqlil(evec,df,3*Matom,3*Matom)
+        amassC=12.0111d0
+        convamu=1836.1528d0
+        convdistau=1./.529177249d0
+        fachess=1./(convamu*amassC*convdistau**2)
+        facfreq=219474.625d0
+C       facfreq=219474.625d0/dsqrt(2.d0*dpi)
+        call tred2l(hessian*fachess,3*Matom,3*Matom,evec,df)
+        call tqlil(evec,df,3*Matom,3*Matom)
 C Sort eigenvalues
-       negeig=0
-       eigneg=1.d-5
-       Do I=1,MAtom*3
-        e0=evec(I)
-        jmax=I
-         Do J=I+1,MAtom*3
-          e1=evec(J)
-           if(e1.gt.e0) then
-            jmax=j
-            e0=e1
-           endif
-         enddo
-         if(i.ne.jmax) then
-          ex=evec(jmax)
-          evec(jmax)=evec(I)
-          evec(I)=ex
-         endif
-       enddo
-       write(Iout,1009)
-       write(Iout,1010) (evec(i),i=1,3*MAtom)
-       Do I=1,MAtom*3
-        if(evec(i).lt.eigneg) then
-         negeig=negeig+1
-        else
-         evec(i)=dsqrt(evec(i))
-        endif
-       enddo
-       write(Iout,1011) negeig
-       write(Iout,1012)
-       loop=3*MAtom-negeig
-       write(Iout,1010) (evec(i)*facfreq,i=1,loop)
+        negeig=0
+        eigneg=1.d-5
+        Do I=1,MAtom*3
+          e0=evec(I)
+          jmax=I
+          Do J=I+1,MAtom*3
+            e1=evec(J)
+            if(e1.gt.e0) then
+              jmax=j
+              e0=e1
+            endif
+          enddo
+          if(i.ne.jmax) then
+            ex=evec(jmax)
+            evec(jmax)=evec(I)
+            evec(I)=ex
+          endif
+        enddo
+        write(Iout,1009)
+        write(Iout,1010) (evec(i),i=1,3*MAtom)
+        Do I=1,MAtom*3
+          if(evec(i).lt.eigneg) then
+            negeig=negeig+1
+          else
+            evec(i)=dsqrt(evec(i))
+          endif
+        enddo
+        write(Iout,1011) negeig
+        write(Iout,1012)
+        loop=3*MAtom-negeig
+        write(Iout,1010) (evec(i)*facfreq,i=1,loop)
       endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
@@ -1356,12 +1356,12 @@ C     ------------------------------------------------------------
 C                              DIHEDRALS
 C     ------------------------------------------------------------
       SUBROUTINE get_dihedrals(graph,N,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use iso_c_binding
       integer neighbours(3,N), face(6), lA,lB,lC, u,s,r,t
       type(c_ptr) :: graph
 c     arrays for dihedrals. one per atom, starting in the middle
-      integer d_hhh(4,n),d_hpp(4,n),d_hhp(4,n),d_ppp(4,n)
+      integer d_hhh(4,n),d_hhp(4,n),d_hpp(4,n),d_ppp(4,n)
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
       nd_hhh=0
@@ -1468,7 +1468,7 @@ c            write (*,*) "666"
       SUBROUTINE get_hessian(N, coord, force, iopt, hessian,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
-     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1  d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c      use iso_c_binding
       use config
 c      type(c_ptr) :: graph
@@ -1477,7 +1477,7 @@ c      type(c_ptr) :: graph
       integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer ne_hh, ne_hp, ne_pp
       integer a_h(3,3*n-60), a_p(3,60)
-      integer d_hhh(4,n), d_hpp(4,n), d_hhp(4,n), d_ppp(4,n)
+      integer d_hhh(4,n), d_hhp(4,n), d_hpp(4,n), d_ppp(4,n)
       integer nd_hhh, nd_hhp, nd_hpp, nd_ppp
       integer a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12
       real*8 coord(n*3), force(ffmaxdim)
