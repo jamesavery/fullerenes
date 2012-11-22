@@ -930,8 +930,7 @@ C     Now checking on the original vector
       Return
       END
 
-      SUBROUTINE func2d(IOP,n,A,IS,MDist,maxd,
-     1 p,fc,RAA)
+      SUBROUTINE func2d(IOP,n,A,IS,MDist,maxd,p,fc,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Embedding algorithms for fullerene graph, energy
@@ -1028,8 +1027,7 @@ C     total energy
       Return
       END
 
-      SUBROUTINE dfunc2d(IOP,n,A,IS,MDist,maxd,
-     1 p,x,RAA)
+      SUBROUTINE dfunc2d(IOP,n,A,IS,MDist,maxd,p,x,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Embedding algorithms for fullerene graph, gradient
