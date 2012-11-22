@@ -1,0 +1,41 @@
+Users:
+Version 4.1
+Mr. & Andrew & Punnettt & Massey University & CTCP & Auckland & NZ & andrew.punnett@gmail.com & Hello Peter
+Dr. & Xiang & Ye & Shanghai Normal University & Physics & Shanghai & China & yexiang@shnu.edu.cn & 
+Mrs. & Natalia & Novoselska & Odessa I.I.Mechnikov National University & Faculty of Chemistry & Odessa & Ukraine & natalianochka@rambler.ru & 
+Mr. & Andres Felipe & Grisales & Universidad del Valle & Bionanoelectronics Research Group & Cali & Colombia & anfelipe@ieee.org & 
+fullerene & leidy & bedoya & universidad del valle & valle del cauca & cali & colombia & yetzuko13@hotmail.com & 
+Mrs. & Rebecca & Sure & University Bonn & Theoretical Chemistry & Bonn & Germany & rebecca.sure@thch.uni-bonn.de & 
+Dr. & Matt & Addicoat & Nagoya University & Chemistry & Nagoya & Japan & madd@iar.nagoya-u.ac.jp & 
+Mr. & Nichodemus & Maria Arockiam & Annamalai University & Department of Chemistry & Chidambaram & India & mnichodemus@yahoo.com & 
+Dr. & Eric & Faulques & CNRS & IMN & Nantes & France & eric.faulques@cnrs-imn.fr & 
+Dr. & Pablo & Carbonell & Institute of Systems and Synthetic Biology, University of Evry, Genopole & Biology & Evry & France & pablo.carbonell@issb.genopole.fr & Interested in using it to test our molecular canonizers, thanks
+graduate student & Riddle & Huang & Taiwan University & Physics & Taiwan & Taipei & riddleoreo@yahoo.com.tw & 
+Mr. & Sina & Mostafanejad & Tehran University & Chemistry & Tehran & Iran & Scorpion_blacknight@hotmail.com & 
+Mrs. & Amineh & Aghabali & UC-Davis & Chemistry Department & Davis, CA & United States & aaghabali@ucdavis.edu & 
+Mr. & Alexander & Vorontsov & Moscow State University & Chemistry Department & Moscow & Russia & toluene@yandex.ru & 
+Dr & S&#322;awomir & Ostrowski & ICHP & ICHP & Warsaw & Poland & kistry@o2.pl & 
+Mr. & Otávio & Beruski & University of São Paulo & Institute of Chemistry of São Carlos & São Carlos & Brazil & oberuski@iqsc.usp.br & 
+Dr. & Michio & Yamada & Tokyo Gakugei University & Department of Chemistry & Tokyo & Japan & myamada@u-gakugei.ac.jp & 
+Mr.  & Tim & Zuhlsdorff & Imperial College London & Materials & London & United Kingdom & tjz07@imperial.ac.uk & 
+Mr. & Paul & Dunk & FSU & Chemistry & Tallahassee & Fl & pauldunk.fsu@gmail.com & 
+prof & Mauro & Causa\' & Universita\' di Napoli Federico II & Chemical Engeeniring and Materials Sciences & Napoli & Italy & mauro.causa@unina.it & 
+Mr. & Christopher & Kepics & Drexel University & Physics & Philadelphia & USA & kpaxxxxx@gmail.com & 
+Dr. & SRINIVASA RAO & JAMPANI & Drexel University & Physics & Philadelphia & USA & jampanis@gmail.com & Thanks
+Mr. & George & Anderson & University of Louisville & physics & louisville & USA & gmande05@louisville.edu & 
+Mr. & youssef & tahri & fsm-umi & physics & meknes & morroco & ytahri@gmx.fr & 
+Dr. & Trond & Saue & CNRS & Laboratoire de Chimie et Physique Quantiques & Toulouse & France & trond.saue@irsamc.ups-tlse.fr & good stuff
+Mr.  & solayman & esmaeilzadeh & university & university of kashan & kashan & iran & s.es_chemi@yahoo.com & 
+Mr. & Daniel & Massote & UFMG & Physics & Belo Horizonte & Brazil & dmassote@yahoo.com & 
+Mr.  & Mostafa & Abedi & Isfahan University of Technology & Chemistry & Isfahan & Iran & abedimostafa755@yahoo.com & 
+Mr. & Sriram & Goverapet Srinivasan & The Pennsylvania State University & Mechanical Engineering & State College & USA & sriram.gs.1987@gmail.com & 
+---------------
+Version 4.2
+Ms. & JinHyeok & Cha & The University of Tokyo & Mechanical Engineering & Tokyo & Japan & cha@photon.t.u-tokyo.ac.jp & This is amazing. I am really happy to use this
+Dr. & Raghu & Behera & BITS, Pilani - K K Birla Goa Campus & Chemistry & Zuarinagar & India & rbehera@goa.bits-pilani.ac.in & 
+Prof. Dr. & Zhifeng & Jiao & Nanyang Normal University & Chemistry & Nanyang & China & zhifengjiao@126.com & 
+Prof. Dr. & Peter & Schwerdtfeger & Massey University & NZIAS & Auckland & New Zealand & p.a.schwerdtfeger@massey.ac.nz & dohnuts
+Mr. & Fatemeh & Moftakhar & University of Kashan & Mathematics & Kashan & Iran & f.k.moftakhar@gmail.com & 
+Ms. & Vivekananad & Gobre & Fritz Haber Institute of Max Planck Society  & Theory Department & Berlin & Germany & gobre@fhi-berlin.mpg.de & 
+Ms. & Vivekananad & Gobre & Fritz Haber Institute of Max Planck Society  & Theory Department & Berlin & Germany & gobre@fhi-berlin.mpg.de & 
+Dr. & Jan & Kazimirski &  &  & Warsaw & Poland & jankazim@op.pl & 
