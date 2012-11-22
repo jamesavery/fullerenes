@@ -71,7 +71,7 @@ A Fortran and C++ Program", Version 4.2.2, Massey University Albany, Auckland, N
 3) D. Babic, "Nomenclature and Coding of Fullerenes", J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).<br>
 For further literature see the User's Manual.<br><br>
 
-The program has been tested for the gnu compiler collection (gfortran and gc). 
+The program has been tested for the gnu compiler collection (gfortran and g++). 
 You need to use the Makefile included in fullerene.zip. The executable runs 
 just fine on a PC or Mac running LINUX/UNIX.
 The program is written in standard Fortran and C++ and has been checked
