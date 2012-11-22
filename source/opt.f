@@ -500,10 +500,10 @@ C Diagonalize without producing eigenvectors
         amassC=12.0111d0
         convamu=1836.1528d0
         convdistau=1./.529177249d0
-        fachess=1./(convamu*amassC*convdistau**2)
-        facfreq=219474.625d0
+        fac_hess=1./(convamu*amassC*convdistau**2)
+        fac_freq=219474.625d0
 C       facfreq=219474.625d0/dsqrt(2.d0*dpi)
-        call tred2l(hessian*fachess,3*Matom,3*Matom,evec,df)
+        call tred2l(hessian*fac_hess,3*Matom,3*Matom,evec,df)
         call tqlil(evec,df,3*Matom,3*Matom)
 C Sort eigenvalues
         negeig=0
@@ -536,7 +536,7 @@ C Sort eigenvalues
         write(Iout,1011) negeig
         write(Iout,1012)
         loop=3*MAtom-negeig
-        write(Iout,1010) (evec(i)*facfreq,i=1,loop)
+        write(Iout,1010) (evec(i)*fac_freq,i=1,loop)
       endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
@@ -1524,7 +1524,6 @@ c get force constants
       end select
 
 c edges
-c       if(.false.)then
       edge_types: do i=1,3
         select case(10*iopt + i)
           case(11,21)
@@ -1620,10 +1619,8 @@ c              = k * ((partial r/partial x_i)(partial r/partial x_j) + (partial^
           end do edges
         endif
       end do edge_types
-c      endif
       
 c angles
-c      if(.true.)then
       angle_types: do i=1,2
 c       iopt doesn't matter in this case
         select case(i)
@@ -1635,6 +1632,9 @@ c       iopt doesn't matter in this case
             k=fap
             a_naught=ap
             m=60
+          case default
+            write(*,*)'Something went horribly wrong'
+            exit
         end select
         if(m.gt.0)then
           angles: do j=1,m
@@ -1730,7 +1730,6 @@ c       iopt doesn't matter in this case
           end do angles
         endif
       end do angle_types
-c      endif
 
 c dihedrals
       dihedral_types: do i=1,4
