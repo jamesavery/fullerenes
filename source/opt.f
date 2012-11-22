@@ -499,15 +499,19 @@ C     Optimize
 C Diagonalize without producing eigenvectors
         amassC=12.0111d0
         convamu=1836.1528d0
-        convdistau=1./.529177249d0
-        fac_hess=1./(convamu*amassC*convdistau**2)
-        fac_freq=219474.625d0
+        convdistau=.529177249d0
+        fachess=convdistau**2/(convamu*amassC)
+        facfreq=219474.625d0
 C       facfreq=219474.625d0/dsqrt(2.d0*dpi)
-        call tred2l(hessian*fac_hess,3*Matom,3*Matom,evec,df)
+        do i=1,3*Matom
+        do j=1,3*Matom
+         hessian(i,j)=hessian(i,j)*fachess
+        enddo
+        enddo
+        call tred2l(hessian,3*Matom,3*Matom,evec,df)
         call tqlil(evec,df,3*Matom,3*Matom)
 C Sort eigenvalues
         negeig=0
-        eigneg=1.d-7
         Do I=1,MAtom*3
           e0=evec(I)
           jmax=I
@@ -527,16 +531,16 @@ C Sort eigenvalues
         write(Iout,1009)
         write(Iout,1010) (evec(i),i=1,3*MAtom)
         Do I=1,MAtom*3
-          if(evec(i).lt.eigneg) then
+          if(evec(i).lt.0.d0) then
             negeig=negeig+1
+            evec(i)=-dsqrt(-evec(i))
           else
             evec(i)=dsqrt(evec(i))
           endif
         enddo
         write(Iout,1011) negeig
         write(Iout,1012)
-        loop=3*MAtom-negeig
-        write(Iout,1010) (evec(i)*fac_freq,i=1,loop)
+        write(Iout,1010) (evec(i)*facfreq,i=1,MAtom*3)
       endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
@@ -557,7 +561,7 @@ C Sort eigenvalues
      1 ' algorithm used')
  1008 Format(' Force field parameters: ',19F12.6,', Tolerance= ',D9.3,/)
  1009 Format(' Eigenvalues of mass-weighted Hessian:')
- 1010 Format(10(1X,F12.6))
+ 1010 Format(10(1X,D12.6))
  1011 Format(' Number of zero and negative eigenvalues: ',I6)
  1012 Format(' Frequencies (cm-1):')
      
