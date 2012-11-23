@@ -1525,6 +1525,8 @@ c get force constants
           fdhhp=force(17)
           fdhhh=force(18)
           fco=force(19)
+        case default
+          write(*,*)'Something went horribly wrong'
       end select
 
 c edges
@@ -1554,6 +1556,9 @@ c edges
             k=frpp
             r_naught=rpp
             m=ne_pp
+          case default
+            write(*,*)'Something went horribly wrong'
+            exit
         end select
         if(m.gt.0) then
           edges: do j=1,m
@@ -1760,6 +1765,9 @@ c           no dihedrals in case of iopt=1,2
             k=fdppp
             d_naught=dppp
             m=nd_ppp
+          case default
+            write(*,*)'Something went horribly wrong'
+            exit
         end select
         if(m.gt.0)then
           dihedrals: do j=1,m
@@ -1951,6 +1959,14 @@ c coulomb
           hessian(a3,a3)=hessian(a3,a3) + k * (daz*daz + dazaz*c)
         end do atoms
       endif
+
+
+c copy hessian to the other half
+      do i=1,3*n
+        do j=i+1,3*n
+          hessian(i,j)=hessian(j,i)+hessian(i,j)
+        enddo
+      enddo      
 
 c copy hessian to the other half
       do i=1,3*n
