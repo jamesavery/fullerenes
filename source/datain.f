@@ -169,8 +169,8 @@ C Wu force field
         force(4)=WuA6
         force(5)=WufR5
         force(6)=WufR6
-        force(7)=WufA
-        force(8)=WufA
+        force(7)=WufA5
+        force(8)=WufA6
         force(9)=fCoulomb
       else if(iopt.eq.3 .or. iopt.eq.4)then
 C ExtWu force field
@@ -209,8 +209,8 @@ C Wu force field
         force(4)=WuA6
         force(5)=WufR5
         force(6)=WufR6
-        force(7)=WufA
-        force(8)=WufA
+        force(7)=WufA5
+        force(8)=WufA6
         force(9)=fCoulomb
       else if(iopt.eq.3 .or. iopt.eq.4)then
 C ExtWu force field
