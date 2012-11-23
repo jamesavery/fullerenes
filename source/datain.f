@@ -18,8 +18,8 @@
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
-      Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR,
-     1 WufA,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
+      Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
+     1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
       Namelist /Hamilton/ IHam,iupac
       Namelist /Isomers/ IPR,IPH,IStop,IChk
@@ -57,8 +57,10 @@ C Defining the Wu force field (default values)
       WuR6=1.391d0
       WuA5=1.08d2! in deg
       WuA6=1.20d2
-      WufR=1.0d6
-      WufA=1.0d5
+      WufR5=1.0d6
+      WufR6=1.1d6
+      WufA5=1.0d5
+      WufA6=1.0d5
       fcoulomb=0.d0
 
 C Defining an extension of the Wu force field (default values)
@@ -165,8 +167,8 @@ C Wu force field
         force(2)=WuR6
         force(3)=WuA5
         force(4)=WuA6
-        force(5)=WufR
-        force(6)=WufR
+        force(5)=WufR5
+        force(6)=WufR6
         force(7)=WufA
         force(8)=WufA
         force(9)=fCoulomb
@@ -205,8 +207,8 @@ C Wu force field
         force(2)=WuR6
         force(3)=WuA5
         force(4)=WuA6
-        force(5)=WufR
-        force(6)=WufR
+        force(5)=WufR5
+        force(6)=WufR6
         force(7)=WufA
         force(8)=WufA
         force(9)=fCoulomb

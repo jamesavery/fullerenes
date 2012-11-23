@@ -503,11 +503,26 @@ C Diagonalize without producing eigenvectors
         fachess=convdistau**2/(convamu*amassC)
         facfreq=219474.625d0
 C       facfreq=219474.625d0/dsqrt(2.d0*dpi)
+C       Mass-weight Hessian
+C       Test if Hessian is symmetric
+        symmetric=0.d0
+        test=1.d-10
+        do i=1,3*Matom
+        do j=1,3*Matom
+         symmetric=symmetric+dabs(hessian(i,j)-hessian(j,i))
+        enddo
+        enddo
+        asym=symmetric*.5d0
         do i=1,3*Matom
         do j=1,3*Matom
          hessian(i,j)=hessian(i,j)*fachess
         enddo
         enddo
+        if(asym.gt.test) then
+         Write(Iout,1013) asym
+        else
+         Write(Iout,1015) asym
+        endif
         call tred2l(hessian,3*Matom,3*Matom,evec,df)
         call tqlil(evec,df,3*Matom,3*Matom)
 C Sort eigenvalues
@@ -541,6 +556,13 @@ C Sort eigenvalues
         write(Iout,1011) negeig
         write(Iout,1012)
         write(Iout,1010) (evec(i)*facfreq,i=1,MAtom*3)
+C Zero-point vibrational energy
+        zerop=0.d0
+        Do I=1,MAtom*3-6
+         zerop=zerop+evec(i)
+        enddo
+        zerop=zerop*.5d0
+        write(Iout,1014) zerop,zerop*facfreq
       endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
@@ -564,6 +586,10 @@ C Sort eigenvalues
  1010 Format(10(1X,D12.6))
  1011 Format(' Number of zero and negative eigenvalues: ',I6)
  1012 Format(' Frequencies (cm-1):')
+ 1013 Format(' Severe problem. Hessian is not symmetric: asym= ',d12.6)
+ 1014 Format(' Zero-point vibrational energy: ',d9.3,' a.u. , ',
+     1 d9.3,' cm-1 , ')
+ 1015 Format(' Hessian is symmetric: asym= ',d12.6)
      
       Return 
       END
