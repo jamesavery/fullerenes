@@ -501,8 +501,6 @@ C Diagonalize without producing eigenvectors
         convamu=1836.1528d0
         convdistau=.529177249d0
         fachess=convdistau**2/(convamu*amassC)
-        facfreq=219474.625d0
-C       facfreq=219474.625d0/dsqrt(2.d0*dpi)
 C       Mass-weight Hessian
 C       Test if Hessian is symmetric
         symmetric=0.d0
@@ -555,14 +553,14 @@ C Sort eigenvalues
         enddo
         write(Iout,1011) negeig
         write(Iout,1012)
-        write(Iout,1010) (evec(i)*facfreq,i=1,MAtom*3)
+        write(Iout,1010) (evec(i)*au2wavenumbers,i=1,MAtom*3)
 C Zero-point vibrational energy
         zerop=0.d0
         Do I=1,MAtom*3-6
          zerop=zerop+evec(i)
         enddo
         zerop=zerop*.5d0
-        write(Iout,1014) zerop,zerop*facfreq
+        write(Iout,1014) zerop,zerop*au2eV,zerop*au2wavenumbers
       endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
@@ -587,8 +585,8 @@ C Zero-point vibrational energy
  1011 Format(' Number of zero and negative eigenvalues: ',I6)
  1012 Format(' Frequencies (cm-1):')
  1013 Format(' Severe problem. Hessian is not symmetric: asym= ',d12.6)
- 1014 Format(' Zero-point vibrational energy: ',d9.3,' a.u. , ',
-     1 d9.3,' cm-1 , ')
+ 1014 Format(' Zero-point vibrational energy: ',d12.6,' a.u. , ',
+     1 d12.6,' eV , ',d12.6,' cm-1 , ')
  1015 Format(' Hessian is symmetric: asym= ',d12.6)
      
       Return 
