@@ -416,7 +416,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)     
 
-      dynpercm2auperaa=.5d0 * 6.0221367d-3 * 3.80879844d-4
+c     dynpercm2auperaa=.5d0 * 2.29371049d-6, factor .5 from force field formula
       if(iopt.eq.1 .or. iopt.eq.2)then
 c        force(1)=force(1)
 c        force(2)=force(2)
@@ -424,10 +424,10 @@ C       Conversion of angles in rad
         force(3)=force(3)*deg2rad
         force(4)=force(4)*deg2rad
 C       Conversion of dyn/cm in a.u. / Angstroem**2
-        force(5)=force(5)*dynpercm2auperaa
-        force(6)=force(6)*dynpercm2auperaa
-        force(7)=force(7)*dynpercm2auperaa
-        force(8)=force(8)*dynpercm2auperaa
+        force(5)=force(5)*dynpercm2auperaa*.5d0
+        force(6)=force(6)*dynpercm2auperaa*.5d0
+        force(7)=force(7)*dynpercm2auperaa*.5d0
+        force(8)=force(8)*dynpercm2auperaa*.5d0
 C       Leave parameter for Coulomb force as it is
 c        force(9)=force(9)
       else if (iopt.eq.3 .or. iopt.eq.4) then
@@ -442,15 +442,15 @@ C       Conversion of angles and dihedrals in rad
         force(8)=force(8)*deg2rad
         force(9)=force(9)*deg2rad
 C       Conversion of dyn/cm in a.u. / Angstroem**2
-        force(10)=force(10)*dynpercm2auperaa
-        force(11)=force(11)*dynpercm2auperaa
-        force(12)=force(12)*dynpercm2auperaa
-        force(13)=force(13)*dynpercm2auperaa
-        force(14)=force(14)*dynpercm2auperaa
-        force(15)=force(15)*dynpercm2auperaa
-        force(16)=force(16)*dynpercm2auperaa
-        force(17)=force(17)*dynpercm2auperaa
-        force(18)=force(18)*dynpercm2auperaa
+        force(10)=force(10)*dynpercm2auperaa*.5d0
+        force(11)=force(11)*dynpercm2auperaa*.5d0
+        force(12)=force(12)*dynpercm2auperaa*.5d0
+        force(13)=force(13)*dynpercm2auperaa*.5d0
+        force(14)=force(14)*dynpercm2auperaa*.5d0
+        force(15)=force(15)*dynpercm2auperaa*.5d0
+        force(16)=force(16)*dynpercm2auperaa*.5d0
+        force(17)=force(17)*dynpercm2auperaa*.5d0
+        force(18)=force(18)*dynpercm2auperaa*.5d0
 C       Leave parameter for Coulomb force as it is
 c        force(19)=force(19)
       end if
@@ -459,16 +459,16 @@ C     Optimize
       select case(iopt)
       case(1)
         Write(IOUT,1000)
-        Write(Iout,1006) (force(i),i=1,8),ftol
+        Write(Iout,1006) ftol,(force(i),i=1,8)
       case(2)
         Write(IOUT,1000)
-        Write(Iout,1003) (force(i),i=1,9),ftol
+        Write(Iout,1003) ftol,(force(i),i=1,9)
       case(3)
         Write(IOUT,1007)
-        Write(Iout,1005) (force(i),i=1,18),ftol
+        Write(Iout,1005) ftol,(force(i),i=1,18)
       case(4)
         Write(IOUT,1007)
-        Write(Iout,1008) (force(i),i=1,19),ftol
+        Write(Iout,1008) ftol,(force(i),i=1,19)
       end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
       CALL frprmn3d(MATOM*3,Iout,
@@ -570,16 +570,20 @@ C Zero-point vibrational energy
      1 ', RMS distance: ',F12.6)
  1002 FORMAT(1X,'Distances and angles defined in the force field can',
      1 ' not be reached',/1X,'Energy per atom in atomic units: ',F12.6)
- 1003 Format(' Force field parameters: ',9F12.6,', Tolerance= ',D9.3,/)
+ 1003 Format(' Tolerance= ',D9.3,', Force field parameters: ',
+     1 /1X,9F12.6,/)
  1004 Format(' Coulomb repulsion from center of origin with force ',
      1 F12.6,/)
- 1005 Format(' Force field parameters: ',18F12.6,', Tolerance= ',D9.3,/)
- 1006 Format(' Force field parameters: ',8F12.6,', Tolerance= ',D9.3,/)
+ 1005 Format(' Tolerance= ',D9.3,', Force field parameters: ',
+     1 /1X,18F12.6,/)
+ 1006 Format(' Tolerance= ',D9.3,', Force field parameters: ',
+     1 /1X,8F12.6,/)
  1007 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using an extension of the',
      1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
      1 ' algorithm used')
- 1008 Format(' Force field parameters: ',19F12.6,', Tolerance= ',D9.3,/)
+ 1008 Format(' Tolerance= ',D9.3,', Force field parameters: ',
+     1 /1X,19F12.6,/)
  1009 Format(' Eigenvalues of mass-weighted Hessian:')
  1010 Format(10(1X,D12.6))
  1011 Format(' Number of zero and negative eigenvalues: ',I6)

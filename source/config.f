@@ -17,5 +17,6 @@
       real(8),parameter :: rad2deg=1.8d2/dpi
       real(8),parameter :: au2wavenumbers=2.19474625d5
       real(8),parameter :: au2eV=2.72113957d1
+      real(8),parameter :: dynpercm2auperaa=2.29371049d-6
       save
       end module config
