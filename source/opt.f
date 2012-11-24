@@ -417,6 +417,20 @@ c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)     
 
 c     dynpercm2auperaa=.5d0 * 2.29371049d-6, factor .5 from force field formula
+      select case(iopt)
+      case(1)
+        Write(IOUT,1000)
+        Write(Iout,1016) ftol,(force(i),i=1,8)
+      case(2)
+        Write(IOUT,1000)
+        Write(Iout,1019) ftol,(force(i),i=1,9)
+      case(3)
+        Write(IOUT,1007)
+        Write(Iout,1020) ftol,(force(i),i=1,18)
+      case(4)
+        Write(IOUT,1007)
+        Write(Iout,1018) ftol,(force(i),i=1,19)
+      end select
       if(iopt.eq.1 .or. iopt.eq.2)then
 c        force(1)=force(1)
 c        force(2)=force(2)
@@ -454,23 +468,20 @@ C       Conversion of dyn/cm in a.u. / Angstroem**2
 C       Leave parameter for Coulomb force as it is
 c        force(19)=force(19)
       end if
-      M=Matom/2+2
-C     Optimize
       select case(iopt)
       case(1)
-        Write(IOUT,1000)
-        Write(Iout,1006) ftol,(force(i),i=1,8)
+        Write(Iout,1006) (force(i),i=1,8)
       case(2)
-        Write(IOUT,1000)
-        Write(Iout,1003) ftol,(force(i),i=1,9)
+        Write(Iout,1003) (force(i),i=1,9)
       case(3)
-        Write(IOUT,1007)
-        Write(Iout,1005) ftol,(force(i),i=1,18)
+        Write(Iout,1005) (force(i),i=1,18)
       case(4)
-        Write(IOUT,1007)
-        Write(Iout,1008) ftol,(force(i),i=1,19)
+        Write(Iout,1008) (force(i),i=1,19)
       end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
+
+      M=Matom/2+2
+C     Optimize
       CALL frprmn3d(MATOM*3,Iout,
      1 Dist,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
@@ -499,9 +510,7 @@ C     Optimize
 C Diagonalize without producing eigenvectors
         amassC=12.0111d0
         convamu=1836.1528d0
-        convdistau=.529177249d0
-        fachess=convdistau**2/(convamu*amassC)
-C       Mass-weight Hessian
+        fachess=au2angstroem**2/(convamu*amassC)
 C       Test if Hessian is symmetric
         symmetric=0.d0
         test=1.d-10
@@ -511,16 +520,17 @@ C       Test if Hessian is symmetric
         enddo
         enddo
         asym=symmetric*.5d0
-        do i=1,3*Matom
-        do j=1,3*Matom
-         hessian(i,j)=hessian(i,j)*fachess
-        enddo
-        enddo
         if(asym.gt.test) then
          Write(Iout,1013) asym
         else
          Write(Iout,1015) asym
         endif
+C       Mass-weight Hessian
+        do i=1,3*Matom
+        do j=1,3*Matom
+         hessian(i,j)=hessian(i,j)*fachess
+        enddo
+        enddo
         call tred2l(hessian,3*Matom,3*Matom,evec,df)
         call tqlil(evec,df,3*Matom,3*Matom)
 C Sort eigenvalues
@@ -570,20 +580,16 @@ C Zero-point vibrational energy
      1 ', RMS distance: ',F12.6)
  1002 FORMAT(1X,'Distances and angles defined in the force field can',
      1 ' not be reached',/1X,'Energy per atom in atomic units: ',F12.6)
- 1003 Format(' Tolerance= ',D9.3,', Force field parameters: ',
-     1 /1X,9F12.6,/)
+ 1003 Format(' Force field parameters in A, rad, au/A^2:',/1X,9F12.6,/)
  1004 Format(' Coulomb repulsion from center of origin with force ',
      1 F12.6,/)
- 1005 Format(' Tolerance= ',D9.3,', Force field parameters: ',
-     1 /1X,18F12.6,/)
- 1006 Format(' Tolerance= ',D9.3,', Force field parameters: ',
-     1 /1X,8F12.6,/)
+ 1005 Format(' Force field parameters in A, rad, au/A^2:',/1X,18F12.6,/)
+ 1006 Format(' Force field parameters in A, rad, au/A^2:',/1X,8F12.6,/)
  1007 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using an extension of the',
      1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
      1 ' algorithm used')
- 1008 Format(' Tolerance= ',D9.3,', Force field parameters: ',
-     1 /1X,19F12.6,/)
+ 1008 Format(' Force field parameters in A, rad, au/A^2:',/1X,19F12.6,/)
  1009 Format(' Eigenvalues of mass-weighted Hessian:')
  1010 Format(10(1X,D12.6))
  1011 Format(' Number of zero and negative eigenvalues: ',I6)
@@ -592,6 +598,14 @@ C Zero-point vibrational energy
  1014 Format(' Zero-point vibrational energy: ',d12.6,' a.u. , ',
      1 d12.6,' eV , ',d12.6,' cm-1 , ')
  1015 Format(' Hessian is symmetric: asym= ',d12.6)
+ 1016 Format(' Tolerance= ',D9.3,', Force field parameters in ',
+     1 'A, deg, dyn/cm:',/1X,8F12.2)
+ 1018 Format(' Tolerance= ',D9.3,', Force field parameters in ',
+     1 'A, deg, dyn/cm:'/1X,19F12.2)
+ 1019 Format(' Tolerance= ',D9.3,', Force field parameters in ',
+     1 'A, deg, dyn/cm:'/1X,9F12.2)
+ 1020 Format(' Tolerance= ',D9.3,', Force field parameters in ',
+     1 'A, deg, dyn/cm:'/1X,18F12.2)
      
       Return 
       END
