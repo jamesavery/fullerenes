@@ -334,7 +334,7 @@ C1011 Format(3X,96(I3))
       SUBROUTINE RingC(Matom,Medges,Iout,iprint,IC3,IVR3,
      1 N5MEM,N6MEM,N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
      1 NringA,NringB,NringC,NringD,NringE,NringF,numbersw,nSW,nl565,
-     1 n3rc,numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
+     1 n3rc,numberFM,nFM,numberYF,nYF,numberBF,nBF,DIST,CRing5,CRing6)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Determine the center of each 5-and 6-ring system
@@ -347,13 +347,13 @@ C     Determine the center of each 5-and 6-ring system
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
       Integer n3r(3,Nmax*11),n3ra(3,Nmax),n3rb(3,Nmax),nSW(4,66),
-     1 nFM(4,66),n3rc(3,Nmax),n3rd(3,Nmax),nYF(6,66),nWS(5,8)
+     1 nFM(4,66),n3rc(3,Nmax),n3rd(3,Nmax),nYF(6,66),nBF(5,8)
       Integer IRhag5(0:5),IRhag6(0:6),MPatt(30)
       Character*6,Label
 C     Center for 5-rings
       numbersw=0
       numberFM=0
-      numberWS=0
+      numberBF=0
       numberYF=0
       IPR=0
       sigmah=0.d0
@@ -613,7 +613,7 @@ C     (c5-5-6) 3-ring fusions with (5-5)
       if(Kring3.ne.0) then
        if(iprint.eq.1) write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
 C       Search for Brinkmann-Fowler D2h 55-6-55 patterns
-        Call SixvertexinsertWS(Kring3,n3ra,numberWS,nWS)
+        Call SixvertexinsertWS(Kring3,n3ra,numberBF,nBF)
         N3Ring=N3Ring+KRing3
        endif
 
@@ -780,11 +780,11 @@ C Print Yoshida-Fowler D3h 6555 patterns
       endif
 
 C Print Brinkmann-Fowler D2h 55-6-55 patterns
-      if(numberWS.eq.0) then 
+      if(numberBF.eq.0) then 
        Write(Iout,1046)
       else
-       Write(Iout,1047) numberWS
-       Write(Iout,1048) ((nWS(I,J),I=1,5),J=1,numberWS)
+       Write(Iout,1047) numberBF
+       Write(Iout,1048) ((nBF(I,J),I=1,5),J=1,numberBF)
       endif
 
 C Print Alcami's heat of formation from structural patterns
@@ -1065,15 +1065,15 @@ C     Calculate the enthalpy of formation per bond
       Return
       END
 
-      SUBROUTINE SixvertexinsertWS(Kring3,n3ra,numberWS,nWS)
+      SUBROUTINE SixvertexinsertWS(Kring3,n3ra,numberBF,nBF)
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION n3ra(3,Nmax),nWS(5,8)
+      DIMENSION n3ra(3,Nmax),nBF(5,8)
 C Find Brinkmann-Fowler D2h 55-6-55 patterns
-      numberWS=0
+      numberBF=0
       do I=1,5
       do J=1,8
-       nWS(I,J)=0
+       nBF(I,J)=0
       enddo
       enddo
       ntrans=0
@@ -1083,16 +1083,16 @@ C Find Brinkmann-Fowler D2h 55-6-55 patterns
         if(n3ra(1,I).ne.n3ra(1,J).and.n3ra(2,I).ne.n3ra(1,J).and.
      1   n3ra(1,I).ne.n3ra(2,J).and.n3ra(2,I).ne.n3ra(2,J)) then
          ntrans=ntrans+1 
-         nWS(3,ntrans)=n3ra(3,I)
-         nWS(1,ntrans)=n3ra(1,I)
-         nWS(2,ntrans)=n3ra(2,I)
-         nWS(4,ntrans)=n3ra(1,J)
-         nWS(5,ntrans)=n3ra(2,J)
+         nBF(3,ntrans)=n3ra(3,I)
+         nBF(1,ntrans)=n3ra(1,I)
+         nBF(2,ntrans)=n3ra(2,I)
+         nBF(4,ntrans)=n3ra(1,J)
+         nBF(5,ntrans)=n3ra(2,J)
         endif
        endif
       enddo
       enddo
-      numberWS=ntrans
+      numberBF=ntrans
       
       Return
       END
