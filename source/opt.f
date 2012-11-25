@@ -2002,17 +2002,10 @@ c coulomb
         end do atoms
       endif
 
-
 c copy hessian to the other half
       do i=1,3*n
         do j=i+1,3*n
           hessian(i,j)=hessian(j,i)+hessian(i,j)
-        enddo
-      enddo      
-
-c copy hessian to the other half
-      do i=1,3*n
-        do j=i+1,3*n
           hessian(j,i)=hessian(i,j)
         enddo
       enddo      
