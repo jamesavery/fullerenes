@@ -52,15 +52,17 @@ C tolerance parameter (to be used in all force fields)
         forceP(i)=0.d0
       enddo
 
-C Defining the Wu force field (default values)
-      WuR5=1.455d0! in angstroem
+C Defining the HO force field using Fowler force constants 
+C Distances are taken in Angstroems and angles in rad
+C Force constants in N/m for distances and N/m A^2/deg^2 for angles (default values)
+      WuR5=1.455d0! in angstroem from solid-state
       WuR6=1.391d0
       WuA5=1.08d2! in deg
       WuA6=1.20d2
-      WufR5=1.0d6
-      WufR6=1.1d6
-      WufA5=1.0d5
-      WufA6=1.0d5
+      WufR5=390.7d0! from Fowler
+      WufR6=499.7d0
+      WufA5=100.4d0*1.45d0**2
+      WufA6=160.4d0*1.45d0*1.37d0
       fcoulomb=0.d0
 
 C Defining an extension of the Wu force field (default values)
@@ -77,11 +79,11 @@ c     four dihedrals: zero values (all guessed)
       ExtWuDhhp=2.4d1
       ExtWuDhhh=0.0d0
 c     three distances: forces (let's assume they are all the same)
-      ExtWufR=1.0d6
+      ExtWufR=390.7d0
 c     three angles: forces (let's assume they are all the same)
-      ExtWufA=1.0d5
+      ExtWufA=160.4d0*1.45d0*1.37d0
 c     four dihedrals: forces (let's assume they are all the same)
-      ExtWufD=5.0d4
+      ExtWufD=1.0d2
 
 C Default parameters for external files
       filename= 'Fullerene'
