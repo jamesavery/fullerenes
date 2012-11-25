@@ -39,6 +39,7 @@ c n=MATOM*3
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
       Real*8 p(nmax*3),force(ffmaxdim)
+      real*8 fc
       Integer iopt
 
 c     edges with 0, 1, 2 pentagons
@@ -127,6 +128,7 @@ C     Coulomb repulsion from origin
 
 C     total energy  
       fc=frp*ehookrp+frh*ehookrh+fap*ehookap+fah*ehookah+fco*ecoulomb
+      fc=0.5d0 * fc
 c      write(*,*)'leaving wu'
       Return
       END SUBROUTINE
@@ -285,7 +287,6 @@ c        write(*,*)'diff',angle_p,ap
       enddo
       endif
 
-
       if(nd_ppp .ne. 0) then
 C     3 pentagons
       do i=1,nd_ppp
@@ -318,6 +319,7 @@ C     total energy
      2 +fap*ehookap+fah*ehookah ! bending
      3 +fdppp*ehookdppp+fdhpp*ehookdhpp+fdhhp*ehookdhhp+fdhhh*ehookdhhh! dihedral
      4 +fco*ecoulomb
+      fc=0.5d0 * fc
 c      write(*,*)fc,"energy"
       Return
       END SUBROUTINE
