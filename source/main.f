@@ -34,7 +34,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
       DIMENSION IDual(Mmax,Mmax),nSW(4,66),nFM(4,66),nYF(6,66),
-     1 nWS(5,8)
+     1 nBF(5,8)
       DIMENSION NEK(3,Nmax),JP(12)
       DIMENSION Symbol(Mmax)
       Real*4 TimeX
@@ -428,7 +428,7 @@ C Analyze ring connections
       CALL RingC(Matom,Medges,Iout,iprintf,IC3,IVR3,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
      1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
-     1 numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
+     1 numberFM,nFM,numberYF,nYF,numberBF,nBF,DIST,CRing5,CRing6)
 C     Print edge coordinates (barycenter)
       if(iprintf.ne.0) Call EdgeCoord(Matom,Iout,DIST,IC3)
 
@@ -485,8 +485,8 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
       if(IBF.ne.0) then
         routine='BRINKMANNFOWLER'
         Write(Iout,1008) routine
-        CALL BrinkmannFowler(Matom,IN,Iout,JERR,numberWS,IBF,
-     1   nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
+        CALL BrinkmannFowler(Matom,IN,Iout,JERR,numberBF,IBF,
+     1   nBF,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1   A,evec,df,Dist,Dist2D,distp,Rdist,scalerad)
         IBF=0
         ipent=1
