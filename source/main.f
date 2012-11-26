@@ -64,9 +64,6 @@ C    Set the dimensions for the distance matrix
      7 'AT','RN','FR','RA','AC','TH','PA',' U','NP','PU','AM','CM',   
      8 'BK','CF','ES'/                                               
       DATA Tol,anglew/0.33d0,45.d0/
-C     Van der Waals radius of carbon, adjusted approximately to the
-C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
-      DATA RVdWC/1.415d0/
 
       IN=5
       Iout=6
@@ -102,8 +99,8 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
      1  ndual,nosort,nospiralsearch,ihessian,iprinthessian,
-     1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,scaleRad,force,
-     1  forceP,boost,filename,filenameout,TEXTINPUT)
+     1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
+     1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
