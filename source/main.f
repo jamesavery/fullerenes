@@ -318,7 +318,7 @@ c       Store distances
             ftol=ftolP*1.d3
             Write(Iout,1003)
             CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
-     1        Dist,dist2D,Rdist,ftol,force)
+     1        Dist,dist2D,ftol,force)
             do i=1,9
               force(i)=forcep(i)
             enddo
