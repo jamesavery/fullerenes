@@ -63,7 +63,7 @@ C    Set the dimensions for the distance matrix
      6 'TA',' W','RE','OS','IR','PT','AU','HG','TL','PB','BI','PO',
      7 'AT','RN','FR','RA','AC','TH','PA',' U','NP','PU','AM','CM',   
      8 'BK','CF','ES'/                                               
-      DATA Tol,anglew,Rdist/0.33d0,45.d0,1.391d0/
+      DATA Tol,anglew/0.33d0,45.d0/
 C     Van der Waals radius of carbon, adjusted approximately to the
 C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
       DATA RVdWC/1.415d0/
@@ -308,9 +308,9 @@ c a stone wales (or any other transformation) is done
      1     ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
 c       Store distances
         Do I=1,3
-        Do J=1,MAtom 
-         DistStore(I,J)=Dist(I,J)
-        enddo
+          Do J=1,MAtom 
+            DistStore(I,J)=Dist(I,J)
+          enddo
         enddo
         routine='OPTFORCEFIELD  '
         ftol=ftolP
