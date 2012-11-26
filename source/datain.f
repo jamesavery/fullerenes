@@ -54,7 +54,7 @@ C tolerance parameter (to be used in all force fields)
 
 C Defining the HO force field using Fowler force constants 
 C Distances are taken in Angstroems and angles in rad
-C Force constants in N/m for distances and N/m A^2/deg^2 for angles (default values)
+C Force constants in N/m for distances and N/m A^2/rad^2 for angles (default values)
       WuR5=1.455d0! in angstroem from solid-state
       WuR6=1.391d0
       WuA5=1.08d2! in deg
