@@ -583,9 +583,9 @@ C Zero-point vibrational energy
       endif
 C Sort for degeneracies
       tolfreq=1.d-1
-      write(Iout,1021) 
       icount=0
       idegc=0
+      ndeg=0
       Do I=1,MAtom*3-6
         idegc=idegc+1
         dif=evec(i)-evec(i+1)
@@ -593,9 +593,11 @@ C Sort for degeneracies
           icount=icount+1
           evec(icount)=evec(i)
           ideg(icount)=idegc
+          ndeg=ndeg+idegc
           idegc=0
         endif
       enddo
+      write(Iout,1021) ndeg,MAtom*3-6
       write(Iout,1022) (evec(i),ideg(i),i=1,icount)
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
@@ -635,7 +637,8 @@ C Sort for degeneracies
      1 'A, deg, N/m:'/1X,9F12.2)
  1020 Format(' Tolerance= ',D9.3,', Force field parameters in ',
      1 'A, deg, N/m:'/1X,18F12.2)
- 1021 Format(' Frequencies (in cm-1) and (quasi) degeneracies (n):')
+ 1021 Format(1X,I6,' non-zero frequencies (should be ',I6,').',
+     1 ' Frequencies (in cm-1) and (quasi) degeneracies (n):')
  1022 Format(10(' ',f7.1,'(',I2,')'))
  1023 Format(' Hessian matrix:')
  1024 Format(8(d12.6,' '))
