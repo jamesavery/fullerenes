@@ -34,7 +34,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
       DIMENSION IDual(Mmax,Mmax),nSW(4,66),nFM(4,66),nYF(6,66),
-     1 nWS(5,8)
+     1 nBF(5,8)
       DIMENSION NEK(3,Nmax),JP(12)
       DIMENSION Symbol(Mmax)
       Real*4 TimeX
@@ -63,10 +63,7 @@ C    Set the dimensions for the distance matrix
      6 'TA',' W','RE','OS','IR','PT','AU','HG','TL','PB','BI','PO',
      7 'AT','RN','FR','RA','AC','TH','PA',' U','NP','PU','AM','CM',   
      8 'BK','CF','ES'/                                               
-      DATA Tol,anglew,Rdist/0.33d0,45.d0,1.391d0/
-C     Van der Waals radius of carbon, adjusted approximately to the
-C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
-      DATA RVdWC/1.415d0/
+      DATA Tol,anglew/0.33d0,45.d0/
 
       IN=5
       Iout=6
@@ -102,8 +99,8 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
      1  ndual,nosort,nospiralsearch,ihessian,iprinthessian,
-     1  ParamS,TolX,R5,R6,Rdist,scales,scalePPG,ftolP,scaleRad,force,
-     1  forceP,boost,filename,filenameout,TEXTINPUT)
+     1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
+     1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -308,9 +305,9 @@ c a stone wales (or any other transformation) is done
      1     ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
 c       Store distances
         Do I=1,3
-        Do J=1,MAtom 
-         DistStore(I,J)=Dist(I,J)
-        enddo
+          Do J=1,MAtom 
+            DistStore(I,J)=Dist(I,J)
+          enddo
         enddo
         routine='OPTFORCEFIELD  '
         ftol=ftolP
@@ -321,18 +318,18 @@ c       Store distances
             ftol=ftolP*1.d3
             Write(Iout,1003)
             CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
-     1        Dist,dist2D,Rdist,ftol,force)
+     1        Dist,dist2D,ftol,force)
             do i=1,9
               force(i)=forcep(i)
             enddo
             iopt=1
           endif
           CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA, ! vanilla Wu
-     1      Dist,dist2D,Rdist,ftolP,force)
+     1      Dist,dist2D,ftolP,force)
           Iprint=0
         else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
           CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
-     1      Dist,dist2D,Rdist,ftolP,force)
+     1      Dist,dist2D,ftolP,force)
         endif
 c       Compare structures
         CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
@@ -428,7 +425,7 @@ C Analyze ring connections
       CALL RingC(Matom,Medges,Iout,iprintf,IC3,IVR3,
      1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
      1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
-     1 numberFM,nFM,numberYF,nYF,numberWS,nWS,DIST,CRing5,CRing6)
+     1 numberFM,nFM,numberYF,nYF,numberBF,nBF,DIST,CRing5,CRing6)
 C     Print edge coordinates (barycenter)
       if(iprintf.ne.0) Call EdgeCoord(Matom,Iout,DIST,IC3)
 
@@ -485,8 +482,8 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
       if(IBF.ne.0) then
         routine='BRINKMANNFOWLER'
         Write(Iout,1008) routine
-        CALL BrinkmannFowler(Matom,IN,Iout,JERR,numberWS,IBF,
-     1   nWS,ihueckel,IDA,N5MEM,N6MEM,IC3,
+        CALL BrinkmannFowler(Matom,IN,Iout,JERR,numberBF,IBF,
+     1   nBF,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1   A,evec,df,Dist,Dist2D,distp,Rdist,scalerad)
         IBF=0
         ipent=1

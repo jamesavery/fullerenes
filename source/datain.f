@@ -3,8 +3,8 @@
      1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
      1 ndual,nosort,nospiral,ihessian,iprinth,
-     1 PS,TolX,R5,R6,Rdist,scale,scalePPG,ftol,scaleRad,force,forceP,
-     1 boost,filename,filenameout,DATEN)
+     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
+     1 force,forceP,boost,filename,filenameout,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
@@ -143,6 +143,9 @@ C Reals
       R6=R          ! Distance in 6-Ring
       Tol=0.33d0    ! Tolerance
       TolR=0.d0     ! Tolerance for finding ring connections
+C     Van der Waals radius of carbon, adjusted approximately to the
+C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
+      RVdWC=1.415d0
 
       scaleRad=4    ! scale size of initial tutte sphere by factor.  The more non-spherical the structure is, the larger this factor should be
 

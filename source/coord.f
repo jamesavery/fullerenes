@@ -712,15 +712,15 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE BrinkmannFowler(Matom,IN,Iout,JERR,numberWS,
-     1 IBF,nWS,ihueckel,IDA,N5MEM,N6MEM,IC3, 
+      SUBROUTINE BrinkmannFowler(Matom,IN,Iout,JERR,numberBF,
+     1 IBF,nBF,ihueckel,IDA,N5MEM,N6MEM,IC3, 
      1 A,evec,df,Dist,layout2D,distp,Cdist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
-      DIMENSION nWS(5,8),IP(20),KWS(5),IBWS(8,8)
+      DIMENSION nBF(5,8),IP(20),KWS(5),IBWS(8,8)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
       Write(Iout,1000)
@@ -742,8 +742,8 @@ C     Check if any is a Brinkmann-Fowler D2h 55-6-55 pattern
        JERR=1
        return
       endif
-   10 if(ntrans.gt.numberWS) then
-       Write(Iout,1017) ntrans,numberWS
+   10 if(ntrans.gt.numberBF) then
+       Write(Iout,1017) ntrans,numberBF
        JERR=1
        return
       endif
@@ -753,8 +753,8 @@ C     Check if any is a Brinkmann-Fowler D2h 55-6-55 pattern
        nfound=0
        Do I=1,ntrans
         I1=IP(I)
-        Do J=1,numberWS
-         J1=nWS(3,J)
+        Do J=1,numberBF
+         J1=nBF(3,J)
          if(I1.eq.J1) then
           nfound=nfound+1
           IP(nfound)=J
@@ -769,13 +769,13 @@ C     Check if any is a Brinkmann-Fowler D2h 55-6-55 pattern
       ntrans=nfound
       endif
 
-C     Sort array nWS
+C     Sort array nBF
       Do I=1,ntrans
        I1=IP(I)
        Do J=1,5
-        KWS(J)=nWS(J,I1)
-        nWS(J,I1)=nWS(J,I)
-        nWS(J,I)=KWS(J)
+        KWS(J)=nBF(J,I1)
+        nBF(J,I1)=nBF(J,I)
+        nBF(J,I)=KWS(J)
        enddo
       enddo
 
@@ -785,42 +785,42 @@ C     Check for shared pentagons or hexagons which is not allowed
        KERR2=0
        Do I=1,ntrans
        Do J=I+1,ntrans
-        if(nWS(3,I).eq.nWS(3,J)) KERR1=1
-        if(nWS(1,I).eq.nWS(1,J)) KERR1=2
-        if(nWS(1,I).eq.nWS(2,J)) KERR1=2
-        if(nWS(1,I).eq.nWS(4,J)) KERR1=2
-        if(nWS(1,I).eq.nWS(5,J)) KERR1=2
-        if(nWS(2,I).eq.nWS(1,J)) KERR1=2
-        if(nWS(2,I).eq.nWS(2,J)) KERR1=2
-        if(nWS(2,I).eq.nWS(4,J)) KERR1=2
-        if(nWS(2,I).eq.nWS(5,J)) KERR1=2
-        if(nWS(4,I).eq.nWS(1,J)) KERR1=2
-        if(nWS(4,I).eq.nWS(2,J)) KERR1=2
-        if(nWS(4,I).eq.nWS(4,J)) KERR1=2
-        if(nWS(4,I).eq.nWS(5,J)) KERR1=2
-        if(nWS(5,I).eq.nWS(1,J)) KERR1=2
-        if(nWS(5,I).eq.nWS(2,J)) KERR1=2
-        if(nWS(5,I).eq.nWS(4,J)) KERR1=2
-        if(nWS(5,I).eq.nWS(5,J)) KERR1=2
+        if(nBF(3,I).eq.nBF(3,J)) KERR1=1
+        if(nBF(1,I).eq.nBF(1,J)) KERR1=2
+        if(nBF(1,I).eq.nBF(2,J)) KERR1=2
+        if(nBF(1,I).eq.nBF(4,J)) KERR1=2
+        if(nBF(1,I).eq.nBF(5,J)) KERR1=2
+        if(nBF(2,I).eq.nBF(1,J)) KERR1=2
+        if(nBF(2,I).eq.nBF(2,J)) KERR1=2
+        if(nBF(2,I).eq.nBF(4,J)) KERR1=2
+        if(nBF(2,I).eq.nBF(5,J)) KERR1=2
+        if(nBF(4,I).eq.nBF(1,J)) KERR1=2
+        if(nBF(4,I).eq.nBF(2,J)) KERR1=2
+        if(nBF(4,I).eq.nBF(4,J)) KERR1=2
+        if(nBF(4,I).eq.nBF(5,J)) KERR1=2
+        if(nBF(5,I).eq.nBF(1,J)) KERR1=2
+        if(nBF(5,I).eq.nBF(2,J)) KERR1=2
+        if(nBF(5,I).eq.nBF(4,J)) KERR1=2
+        if(nBF(5,I).eq.nBF(5,J)) KERR1=2
         if(KERR1.gt.0) Write(Iout,1024) I,J,
-     1   (nWS(J1,I),J1=1,5),(nWS(J1,J),J1=1,5)
+     1   (nBF(J1,I),J1=1,5),(nBF(J1,J),J1=1,5)
         if(KERR2.gt.0) Write(Iout,1020) I,J,
-     1   (nWS(J1,I),J1=1,5),(nWS(J1,J),J1=1,5)
+     1   (nBF(J1,I),J1=1,5),(nBF(J1,J),J1=1,5)
        enddo
        enddo
        endif
        if(KERR1.gt.0.or.KERR2.gt.0) return
    
         Write(Iout,1007) ntrans
-        Write(Iout,1003) ((nWS(I,J),I=1,5),J=1,ntrans)
+        Write(Iout,1003) ((nBF(I,J),I=1,5),J=1,ntrans)
     
 C Perform Brinkmann-Fowler 6-vertex insertion
 C First find common vertices between pentagons and middle hexagon
        Do I=1,ntrans
-       IH=nWS(3,I)-12
+       IH=nBF(3,I)-12
        icount=0
 C Pentagon 1
-       I1=nWS(1,I)
+       I1=nBF(1,I)
         do J=1,5
          IPN=N5MEM(I1,J)
         do K=1,6
@@ -832,7 +832,7 @@ C Pentagon 1
         enddo
         enddo
 C Pentagon 2
-       I1=nWS(2,I)
+       I1=nBF(2,I)
         do J=1,5
          IPN=N5MEM(I1,J)
         do K=1,6
@@ -844,7 +844,7 @@ C Pentagon 2
         enddo
         enddo
 C Pentagon 3
-       I1=nWS(4,I)
+       I1=nBF(4,I)
         do J=1,5
          IPN=N5MEM(I1,J)
         do K=1,6
@@ -856,7 +856,7 @@ C Pentagon 3
         enddo
         enddo
 C Pentagon 4
-       I1=nWS(5,I)
+       I1=nBF(5,I)
         do J=1,5
          IPN=N5MEM(I1,J)
         do K=1,6
