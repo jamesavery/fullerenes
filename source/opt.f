@@ -570,7 +570,7 @@ C Zero-point vibrational energy
         Do I=1,MAtom*3-6
          zerop=zerop+evec(i)
         enddo
-        zerop=zerop*.5d0
+        zerop=zerop*.5d0*convw/au2wavenumbers
         write(Iout,1014) zerop,zerop*au2eV,zerop*au2wavenumbers
       endif
 
