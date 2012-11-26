@@ -61,8 +61,8 @@ C Force constants in N/m for distances and N/m A^2/rad^2 for angles (default val
       WuA6=1.20d2
       WufR5=390.7d0! from Fowler
       WufR6=499.7d0
-      WufA5=100.4d0*1.45d0**2
-      WufA6=160.4d0*1.45d0*1.37d0
+      WufA5=47.88d0*1.45d0**2
+      WufA6=80.86d0*1.45d0*1.37d0
       fcoulomb=0.d0
 
 C Defining an extension of the Wu force field (default values)
