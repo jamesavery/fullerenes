@@ -63,7 +63,6 @@ C    Set the dimensions for the distance matrix
      6 'TA',' W','RE','OS','IR','PT','AU','HG','TL','PB','BI','PO',
      7 'AT','RN','FR','RA','AC','TH','PA',' U','NP','PU','AM','CM',   
      8 'BK','CF','ES'/                                               
-      DATA Tol,anglew/0.33d0,45.d0/
 
       IN=5
       Iout=6
@@ -548,6 +547,7 @@ C  producing a spherical fullerene
 
 C------------------GRAPH2D----------------------------------------
 C Calculate Schlegel diagram
+      anglew=45.d0
       if(ISchlegel.ne.0) then
         routine='GRAPH2D        '
         Write(Iout,1008) routine

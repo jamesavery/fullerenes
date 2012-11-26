@@ -482,7 +482,7 @@ c        force(19)=force(19)
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
 
       M=Matom/2+2
-C     Optimize
+C OPTIMIZE
       CALL frprmn3d(MATOM*3,Iout,
      1 Dist,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
@@ -493,23 +493,17 @@ C     Optimize
         Write(IOUT,1002) fretn
       endif
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
-c     fac=RDist/Rmin
-c     Do I=1,MATOM
-c       Dist(1,I)=Dist(1,I)*fac
-c       Dist(2,I)=Dist(2,I)*fac
-c       Dist(3,I)=Dist(3,I)*fac
-c     enddo
-c     CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
 
+C HESSIAN
       if(ihessian.ne.0) then
         call get_hessian(matom, dist, force, iopt, hessian,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         if(iprinthessian.gt.1) then
-         write(iout,1023)
-         write(iout,1024) ((hessian(i,j),i=1,3*Matom),j=1,3*Matom)
+          write(iout,1023)
+          write(iout,1024) ((hessian(i,j),i=1,3*Matom),j=1,3*Matom)
         endif
 C Diagonalize without producing eigenvectors
 C  Mass of 12-C used
@@ -520,21 +514,21 @@ C       Test if Hessian is symmetric
         symmetric=0.d0
         test=1.d-10
         do i=1,3*Matom
-        do j=1,3*Matom
-         symmetric=symmetric+dabs(hessian(i,j)-hessian(j,i))
-        enddo
+          do j=1,3*Matom
+            symmetric=symmetric+dabs(hessian(i,j)-hessian(j,i))
+          enddo
         enddo
         asym=symmetric*.5d0
         if(asym.gt.test) then
-         Write(Iout,1013) asym
+          Write(Iout,1013) asym
         else
-         Write(Iout,1015) asym
+          Write(Iout,1015) asym
         endif
 C       Mass-weight Hessian
         do i=1,3*Matom
-        do j=1,3*Matom
-         hessian(i,j)=hessian(i,j)*fachess
-        enddo
+          do j=1,3*Matom
+            hessian(i,j)=hessian(i,j)*fachess
+          enddo
         enddo
         call tred2l(hessian,3*Matom,3*Matom,evec,df)
         call tqlil(evec,df,3*Matom,3*Matom)
@@ -557,8 +551,8 @@ C Sort eigenvalues
           endif
         enddo
         if(iprinthessian.ne.0) then
-         write(Iout,1009)
-         write(Iout,1010) (evec(i),i=1,3*MAtom)
+          write(Iout,1009)
+          write(Iout,1010) (evec(i),i=1,3*MAtom)
         endif
         Do I=1,MAtom*3
           if(evec(i).lt.0.d0) then
@@ -570,16 +564,16 @@ C Sort eigenvalues
         enddo
         write(Iout,1011) negeig
         Do I=1,MAtom*3
-         evec(i)=evec(i)*convw
+          evec(i)=evec(i)*convw
         enddo
         if(iprinthessian.ne.0) then
-         write(Iout,1012)
-         write(Iout,1010) (evec(i),i=1,MAtom*3)
+          write(Iout,1012)
+          write(Iout,1010) (evec(i),i=1,MAtom*3)
         endif
 C Zero-point vibrational energy
         zerops=0.d0
         Do I=1,MAtom*3-6
-         zerops=zerops+evec(i)
+          zerops=zerops+evec(i)
         enddo
         zerop=zerops*.5d0
         zeropwn=zerop
@@ -588,21 +582,21 @@ C Zero-point vibrational energy
         write(Iout,1014) zeropau,zeropeV,zeropwn
       endif
 C Sort for degeneracies
-        tolfreq=1.d-1
-        write(Iout,1021) 
-        icount=0
-        idegc=0
-        Do I=1,MAtom*3-6
-         idegc=idegc+1
-         dif=evec(i)-evec(i+1)
-         if(dif.gt.tolfreq) then
+      tolfreq=1.d-1
+      write(Iout,1021) 
+      icount=0
+      idegc=0
+      Do I=1,MAtom*3-6
+        idegc=idegc+1
+        dif=evec(i)-evec(i+1)
+        if(dif.gt.tolfreq) then
           icount=icount+1
           evec(icount)=evec(i)
           ideg(icount)=idegc
           idegc=0
-         endif
-        enddo
-        write(Iout,1022) (evec(i),ideg(i),i=1,icount)
+        endif
+      enddo
+      write(Iout,1022) (evec(i),ideg(i),i=1,icount)
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
