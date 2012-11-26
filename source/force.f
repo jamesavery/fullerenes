@@ -4,10 +4,7 @@
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c n=MATOM*3
       use config
-c      IMPLICIT REAL*8 (A-H,O-Z)
       integer iopt
-
-c      write(*,*)'entering func3d'
 
       select case(iopt)
         case(1, 2)
@@ -23,8 +20,6 @@ c      write(*,*)'entering func3d'
           IERR=1
       end select
 
-c      write(*,*)'leaving func3d'
-      
       return
       END SUBROUTINE
 
@@ -34,13 +29,13 @@ c      write(*,*)'leaving func3d'
      1  a_h,a_p)
 c n=MATOM*3
       use config
-      IMPLICIT REAL*8 (A-H,O-Z)
+      implicit real(8) (A-H,O-Z)
 
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
-      Real*8 p(nmax*3),force(ffmaxdim)
-      real*8 fc
-      Integer iopt
+      real(8) p(nmax*3),force(ffmaxdim)
+      real(8) fc
+      integer iopt
 
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
@@ -141,8 +136,9 @@ c      write(*,*)'leaving wu'
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c n=MATOM*3
       use config
-      IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 p(nmax*3),force(ffmaxdim)
+      implicit real(8) (A-H,O-Z)
+      real(8) p(nmax*3),force(ffmaxdim)
+      real(8) fc
 
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
@@ -331,7 +327,7 @@ c      write(*,*)fc,"energy"
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
-c      IMPLICIT REAL*8 (A-H,O-Z)
+c      implicit real(8) (A-H,O-Z)
       integer iopt
 c      write(*,*)"entering dfunc3d"
       
@@ -358,11 +354,11 @@ c      write(*,*)"leaving dfunc3d"
      1 a_h,a_p)
 c n=MATOM*3
       use config
-      IMPLICIT REAL*8 (A-H,O-Z)
+      implicit real(8) (A-H,O-Z)
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
-      Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
-      Integer n,iopt
+      real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
+      integer n,iopt
 
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
@@ -513,8 +509,8 @@ c      write(*,*)'leaving dwu'
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
-      IMPLICIT REAL*8 (A-H,O-Z)
-      Real*8 p(nmax*3),x(nmax*3),force(ffmaxdim)
+      implicit real(8) (A-H,O-Z)
+      real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
 
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
