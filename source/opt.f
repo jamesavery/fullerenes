@@ -493,13 +493,13 @@ C     Optimize
         Write(IOUT,1002) fretn
       endif
       CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
-      fac=RDist/Rmin
-      Do I=1,MATOM
-        Dist(1,I)=Dist(1,I)*fac
-        Dist(2,I)=Dist(2,I)*fac
-        Dist(3,I)=Dist(3,I)*fac
-      enddo
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+c     fac=RDist/Rmin
+c     Do I=1,MATOM
+c       Dist(1,I)=Dist(1,I)*fac
+c       Dist(2,I)=Dist(2,I)*fac
+c       Dist(3,I)=Dist(3,I)*fac
+c     enddo
+c     CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
 
       if(ihessian.ne.0) then
@@ -511,7 +511,7 @@ C     Optimize
 C Diagonalize without producing eigenvectors
         amassC=12.0111d0
         fachess=1./amassC
-        convw=2720.21
+        convw=3.80879844d-4*2720.21
 C       Test if Hessian is symmetric
         symmetric=0.d0
         test=1.d-10
