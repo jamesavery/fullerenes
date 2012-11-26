@@ -377,7 +377,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       END
 
       SUBROUTINE OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
-     1  Dist,dist2D,Rdist,ftol,force)
+     1  Dist,dist2D,ftol,force)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
