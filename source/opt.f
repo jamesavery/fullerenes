@@ -599,6 +599,7 @@ C Sort for degeneracies
       enddo
       write(Iout,1021) ndeg,MAtom*3-6
       write(Iout,1022) (evec(i),ideg(i),i=1,icount)
+      write(Iout,1025) (evec(i),i=MAtom*3-5,3*MAtom)
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
@@ -642,6 +643,8 @@ C Sort for degeneracies
  1022 Format(10(' ',f7.1,'(',I2,')'))
  1023 Format(' Hessian matrix:')
  1024 Format(8(d12.6,' '))
+ 1025 Format(' Zero frequencies for translation and rotation: ',
+     1 6(d12.6,' '))
      
       Return 
       END
