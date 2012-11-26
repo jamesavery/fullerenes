@@ -1,8 +1,9 @@
 C60  aug-cc-pvdz B3LYP opt. geom. minimum Ih-sym E=-2286.3878361 au
-&General NA=60 ixyz=1 /
+Geometry then optimized and frequency analysis for Weeks force field
+&General NA=60 /
 &Coord ICart=1 /
 &FFChoice Iopt=1 ihessian=1 /
-&FFParameters WuR5=1.54  WuR6=1.41 WufR5=1000.  WufR6=1100.  WufA5=237.16 WufA6=217.14 /
+&FFParameters WuR5=1.4  WuR6=1.4 WufR5=760.  WufR6=760.  WufA5=137.2  WufA6=137.2  /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=8, ISO1=1, ISO2=3, ISO3=5, ifs=1, ndual=0 /

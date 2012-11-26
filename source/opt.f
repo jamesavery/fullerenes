@@ -389,7 +389,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION Dist(3,NMAX)
       DIMENSION IDA(NMAX,NMAX)
       real(8) force(ffmaxdim)
-      integer iopt
+      integer iopt,ideg(matom*3)
       real(8) hessian(matom*3,matom*3),evec(matom*3),df(matom*3)
       type(c_ptr) :: graph, new_fullerene_graph
 
@@ -507,7 +507,10 @@ c     CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-        if(iprinthessian.ne.0) write(*,*)'hessian',hessian
+        if(iprinthessian.gt.1) then
+         write(iout,1023)
+         write(iout,1024) ((hessian(i,j),i=1,3*Matom),j=1,3*Matom)
+        endif
 C Diagonalize without producing eigenvectors
         amassC=12.0111d0
         fachess=3.80879844d-4/amassC
@@ -552,8 +555,10 @@ C Sort eigenvalues
             evec(I)=ex
           endif
         enddo
-        write(Iout,1009)
-        write(Iout,1010) (evec(i),i=1,3*MAtom)
+        if(iprinthessian.ne.0) then
+         write(Iout,1009)
+         write(Iout,1010) (evec(i),i=1,3*MAtom)
+        endif
         Do I=1,MAtom*3
           if(evec(i).lt.0.d0) then
             negeig=negeig+1
@@ -563,16 +568,40 @@ C Sort eigenvalues
           endif
         enddo
         write(Iout,1011) negeig
-        write(Iout,1012)
-        write(Iout,1010) (evec(i)*convw,i=1,MAtom*3)
-C Zero-point vibrational energy
-        zerop=0.d0
-        Do I=1,MAtom*3-6
-         zerop=zerop+evec(i)
+        Do I=1,MAtom*3
+         evec(i)=evec(i)*convw
         enddo
-        zerop=zerop*.5d0
-        write(Iout,1014) zerop,zerop*au2eV,zerop*au2wavenumbers
+        if(iprinthessian.ne.0) then
+         write(Iout,1012)
+         write(Iout,1010) (evec(i),i=1,MAtom*3)
+        endif
+C Zero-point vibrational energy
+        zerops=0.d0
+        Do I=1,MAtom*3-6
+         zerops=zerops+evec(i)
+        enddo
+        zerop=zerops*.5d0
+        zeropwn=zerop
+        zeropau=zerop/au2wavenumbers
+        zeropeV=zeropau*au2eV
+        write(Iout,1014) zeropau,zeropeV,zeropwn
       endif
+C Sort for degeneracies
+        tolfreq=1.d-1
+        write(Iout,1021) 
+        icount=0
+        idegc=0
+        Do I=1,MAtom*3-6
+         idegc=idegc+1
+         dif=evec(i)-evec(i+1)
+         if(dif.gt.tolfreq) then
+          icount=icount+1
+          evec(icount)=evec(i)
+          ideg(icount)=idegc
+          idegc=0
+         endif
+        enddo
+        write(Iout,1022) (evec(i),ideg(i),i=1,icount)
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',
@@ -611,6 +640,10 @@ C Zero-point vibrational energy
      1 'A, deg, N/m:'/1X,9F12.2)
  1020 Format(' Tolerance= ',D9.3,', Force field parameters in ',
      1 'A, deg, N/m:'/1X,18F12.2)
+ 1021 Format(' Frequencies (in cm-1) and (quasi) degeneracies (n):')
+ 1022 Format(8(' ',f12.1,'(',I2,')'))
+ 1023 Format(' Hessian matrix:')
+ 1024 Format(8(d12.6,' '))
      
       Return 
       END
