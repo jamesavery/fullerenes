@@ -512,7 +512,8 @@ c     CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
          write(iout,1024) ((hessian(i,j),i=1,3*Matom),j=1,3*Matom)
         endif
 C Diagonalize without producing eigenvectors
-        amassC=12.0111d0
+C  Mass of 12-C used
+        amassC=12.0d0
         fachess=3.80879844d-4/amassC
         convw=2720.21d0
 C       Test if Hessian is symmetric
@@ -641,7 +642,7 @@ C Sort for degeneracies
  1020 Format(' Tolerance= ',D9.3,', Force field parameters in ',
      1 'A, deg, N/m:'/1X,18F12.2)
  1021 Format(' Frequencies (in cm-1) and (quasi) degeneracies (n):')
- 1022 Format(8(' ',f12.1,'(',I2,')'))
+ 1022 Format(10(' ',f7.1,'(',I2,')'))
  1023 Format(' Hessian matrix:')
  1024 Format(8(d12.6,' '))
      
