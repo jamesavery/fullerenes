@@ -31,7 +31,7 @@
 
 \aliaspagestyle{title}{empty}
 
-\title{PROGRAM FULLERENE (Version 4.2.2)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
+\title{PROGRAM FULLERENE (Version 4.3)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
 
 \author{Peter Schwerdtfeger%
   \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
@@ -83,7 +83,7 @@ We are always open to improvements and suggestions.
 
 \subsubsection*{Please cite the following papers if you use this program for publishing data:}
 1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{Topological Analysis of Fullerenes - 
-A Fortran and C++ Program (Version 4.2)}, (Massey University Albany, 
+A Fortran and C++ Program (Version 4.3)}, (Massey University Albany, 
 Auckland, New Zealand, 2012).\\
 2) P. W. Fowler and D. E. Manolopoulus, \textit{An Atlas of Fullerenes}
 (Dover Publ., New York, 2006). This book is highly recommended. 
@@ -117,9 +117,9 @@ Adjacent Pentagons: \C{20} to \C{72}}, J. Nanosci. Nanotech. \textbf{7}, 1329-13
 in terms of a Humboldt Research Award, and to both Prof. Gernot Frenking and 
 Dr. Ralf Tonner (Marburg) for support during his extended stay in Marburg where 
 writing of this program began. We acknowledge the help of Darko Babi\'c, Patrick 
-W. Fowler and David E. Manolopoulus for permission to freely distribute 
+W. Fowler (Sheffield) and David E. Manolopoulus (Oxford) for permission to freely distribute 
 their Fortran subroutines which we modified and implemented in this program package.
-We also thank Prof. Ottorino Ori (Zagreb) for fruitful discussions.}
+We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful discussions.}
 
  \begin{figure}[htbp]
    	\centering
@@ -182,18 +182,24 @@ From version 4.0 onwards (released July 2012) C++ routines embedded into the ori
 much improved algorithms compared to the older versions. The reason for using two different program languages is
 that PS is good in old-fashioned Fortran and JA is good in C++.  Furthermore, some of the original routines used were available 
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
-and geometry optimization. This program is under permanent construction and has been tested extensively for bugs.
+and geometry optimization. Version 4.3 now includes the Hessian of the force field, although for the extended Wu force
+field we have not optimized yet the force constants to match experimental vibrational frequencies.
+This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bug please report it to one of us.
 
 There are many things on our to-do list. We try hard to release more functionality to this program in due time.
-Not implemented yet is: 1) The minimum covering ellipsoid useful for  rugby-ball shaped fullerenes (yes this is New Zealand
-and crazy about rugby), and close packing of ellipsoids; 2) The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes;
-3) Geometry optimization using further improved force fields; 4) Frequency calculations from the force-field 
-optimized geometry; 5) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 6) Symmetry labels for 
-H\"uckel orbital energies; 7) Extension to non-classical fullerenes of genus 0 (heptagons and squares); 8) Extension to non-regular fullerenes 
-of genus 1 (hmmm, donuts!); 9) To symmetrize optimized coordinates to point group symmetry; 
-10) A restart option for subroutine Hamilton;  
-11) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
+Not implemented yet is: 
+1) The minimum covering ellipsoid useful for  rugby-ball shaped fullerenes (yes this is New Zealand
+and crazy about rugby), and close packing of ellipsoids; 
+2) The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes;
+3) Geometry optimization using further improved force fields; 
+4) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 
+5) To symmetrize optimized coordinates to point group symmetry; 
+6) Symmetry labels for H\"uckel orbital energies and vibrational frequencies; 
+7) Extension to non-classical fullerenes of genus 0 (heptagons and squares); 
+8) Extension to non-regular fullerenes of genus 1 (hmmm, donuts!); 
+9) A restart option for subroutine Hamilton;  
+10) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
 with a good graphical interface similar to the \program{CAGE} program \cite{Brinkmanx}.
 
 We are also open to any other suggestions and welcome additions to this program suite. In this case please feel free to contact us per email.
@@ -935,7 +941,7 @@ Options for force-field optimization.
 
 \paragraph{List of options:} 
 
-\textbf{\&FFChoice} has parameters \paramname{Iopt, ftol,ihessian,iprinth}.\\
+\textbf{\&FFChoice} has parameters \paramname{Iopt, ftol, ihessian, iprinth}.\\
 \textbf{\&FFParameters} has parameters \paramname{fCoulomb, WuR5, WuR6, WuA5, WuA6, WufR5, WufR6, WufA5, WufA6, ExtWuR55, ExtWuR56, 
 ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR, ExtWufA, ExtWufD}.\\
 
@@ -959,8 +965,10 @@ ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR,
   \paramname{Iopt} = 4 behaves like \paramname{Iopt} = 3, but there is an additional repulsive coulomb force applied.  It is switched off
   as soon as the gradient falls below a value of 10.
   
-   \paramname{ihessian} = 1 then Hessian matrix is calculated and diagonalized. The first $3n_v-6$ eigenvalues should be greater than zero for a minimum.
-   \paramname{iprinth}  = 1 print full Hessian matrix.
+   \paramname{ihessian} = 1 then Hessian matrix is calculated and diagonalized. The $3n_v-6$ eigenvalues are sorted according to their values
+   and degeneracies and should be greater than zero for a minimum, and the last six should be close to zero representing translation and rotation.
+   \paramname{iprinth}  = 1 print all eigenvalue information.   
+   \paramname{iprinth}  = 2 print all eigenvalue information and full Hessian matrix.
    
 \item[ftol] The convergence tolerance on the energy (Default: $5.0 \times 10^{-8}$)
 \item[{WuR5, WuR6, WuA5, WuA6, WufR5, WufR6, WufA}] These are force-field parameters for the Wu force field, i.e. for
