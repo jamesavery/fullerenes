@@ -1,7 +1,7 @@
 C60  aug-cc-pvdz B3LYP opt. geom. minimum Ih-sym E=-2286.3878361 au
-&General NA=60 ixyz=1 /
+&General NA=60 /
 &Coord ICart=1 /
-&FFChoice Iopt=1 ihessian=1 /
+&FFChoice Iopt=1 ihessian=1 iprinth=1/
 &FFParameters WuR5=1.54  WuR6=1.41 WufR5=1000.  WufR6=1100.  WufA5=237.16 WufA6=217.14 /
 &Hamilton /
 &Isomers /
