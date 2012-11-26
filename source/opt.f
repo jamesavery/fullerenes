@@ -430,8 +430,9 @@ c     and finally delete the graph to free the mem
         Write(IOUT,1007)
         Write(Iout,1018) ftol,(force(i),i=1,19)
       end select
-C       Conversion to atomic units
-        unitconv=2.29371049D+17 * 1.d-20 
+C       Conversion to kJ/mol
+C       energies in KJ/mol, gradients in kJ/mol/A and hessian kJ/mol/A^2
+        unitconv=1.d-20 * 6.02214129d20
       if(iopt.eq.1 .or. iopt.eq.2)then
 c        force(1)=force(1)
 c        force(2)=force(2)
@@ -716,7 +717,8 @@ C         dgg=dgg+xi(j)**2
       Write(Iout,1000) fret,fret-fp
  1000 Format(' WARNING: Subroutine frprmn3d: maximum iterations
      1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
- 1001 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8)
+ 1001 Format(' Iteration ',I6,', energy [kJ/mol] ',D14.8,
+     1 ', gradient [kJ/mol/A] ',D14.8)
 c 1002 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8,
 c     1 ' The displacements of ',I4,' atoms were damped.')
  1003 Format(/1X,'Convergence achieved, energy ',D14.8,', diff= ',D12.3)
