@@ -510,8 +510,8 @@ c     CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
         if(iprinthessian.ne.0) write(*,*)'hessian',hessian
 C Diagonalize without producing eigenvectors
         amassC=12.0111d0
-        fachess=1./amassC
-        convw=3.80879844d-4*2720.21
+        fachess=3.80879844d-4/amassC
+        convw=2720.21d0
 C       Test if Hessian is symmetric
         symmetric=0.d0
         test=1.d-10
