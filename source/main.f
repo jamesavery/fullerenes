@@ -325,11 +325,11 @@ c       Store distances
             iopt=1
           endif
           CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA, ! vanilla Wu
-     1      Dist,dist2D,Rdist,ftolP,force)
+     1      Dist,dist2D,ftolP,force)
           Iprint=0
         else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
           CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
-     1      Dist,dist2D,Rdist,ftolP,force)
+     1      Dist,dist2D,ftolP,force)
         endif
 c       Compare structures
         CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
