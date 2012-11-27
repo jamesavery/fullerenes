@@ -295,121 +295,6 @@ C Establish all closed ring systems
       CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
-C------------------OPTFF------------------------------------------
-C Optimize Geometry through force field method
-c We check for ISW because the coordinates shouldn't be optimized before
-c a stone wales (or any other transformation) is done
-      icall=0
-      If(Iopt.ne.0 .and. 
-     1     ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
-c       Store distances
-        Do I=1,3
-          Do J=1,MAtom 
-            DistStore(I,J)=Dist(I,J)
-          enddo
-        enddo
-        routine='OPTFORCEFIELD  '
-        ftol=ftolP
-        Write(Iout,1008) routine
-        call flush(iout)
-        if(Iopt.eq.1 .or. Iopt.eq.2) then ! vanilla Wu or Wu + Coulomb
-          if(Iopt.eq.2) then ! Wu + Coulomb
-            ftol=ftolP*1.d3
-            Write(Iout,1003)
-            CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
-     1        Dist,dist2D,ftol,force)
-            do i=1,9
-              force(i)=forcep(i)
-            enddo
-            iopt=1
-          endif
-          CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA, ! vanilla Wu
-     1      Dist,dist2D,ftolP,force)
-          Iprint=0
-        else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
-          CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
-     1      Dist,dist2D,ftolP,force)
-        endif
-c       Compare structures
-        CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
-        routine='MOVECM_2       '
-        Write(Iout,1008) routine
-        CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
-     1   nosort,SP,Dist,DistCM,El)
-        routine='DISTANCEMATRIX '
-        Write(Iout,1008) routine
-        CALL DistMatrix(MAtom,Iout,Iprintf,0,0,
-     1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
-        routine='DIAMETER       '
-        Write(Iout,1008) routine
-        CALL Diameter(MAtom,Iout,Dist,distp)
-      endif
-
-C------------------XYZ-and-CC1-FILES------------------------------
-C Print out Coordinates used as input for CYLview
-C xyz format
-      if(icyl.le.2 .and. 
-     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
-        xyzname=trim(filenameout)//"-3D.xyz"
-        ichar1=index(xyzname,'database/ALL')
-        ichar2=index(xyzname,'database/IPR')
-        ichar3=index(xyzname,'database/Yoshida')
-        ichar4=index(xyzname,'database/HOG')
-        ifind=ichar1+ichar2+ichar3+ichar4
-        if(ifind.ne.0) then
-         Write(Iout,1022)
-         go to 9999
-        endif
-        Open(unit=3,file=xyzname,form='formatted')
-        routine='PRINTCOORD     '
-        Write(Iout,1008) routine
-        WRITE(Iout,1002) xyzname 
-        endzeile=0
-        do j=1,nzeile
-          if(TEXTINPUT(j).ne.' ') endzeile=j
-        enddo
-        if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,
-     1    (TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.100.and.MAtom.lt.1000) 
-     1    WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.1000.and.MAtom.lt.10000) 
-     1    WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.10000) 
-     1    WRITE(3,1020) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        Do J=1,MAtom
-          IM=IAtom(J)      
-          Write(3,1007) El(IM),(Dist(I,J),I=1,3)
-        enddo
-        Close(unit=3)
-      endif
-C cc1 format
-      if(icyl.ge.4 .and. 
-     1    ke.eq.0 .and. ISW.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
-       cc1name=trim(filenameout)//"-3D.cc1"
-        ichar1=index(cc1name,'database/ALL')
-        ichar2=index(cc1name,'database/IPR')
-        ichar3=index(cc1name,'database/Yoshida')
-        ichar4=index(cc1name,'database/HOG')
-        ifind=ichar1+ichar2+ichar3+ichar4
-        if(ifind.ne.0) then
-         Write(Iout,1022)
-         go to 9999
-        endif
-        icharfind=index(cc1name,'database/')
-        print*,icharfind
-       Open(unit=3,file=cc1name,form='formatted')
-        WRITE(Iout,1002) cc1name
-        if(MAtom.lt.100) WRITE(3,1025) MAtom
-        if(MAtom.ge.100.and.MAtom.lt.1000) WRITE(3,1026) MAtom
-        if(MAtom.ge.1000.and.MAtom.lt.10000) WRITE(3,1027) MAtom
-        if(MAtom.ge.10000) WRITE(3,1028) MAtom
-        Do J=1,MAtom
-          IM=IAtom(J)
-          Write(3,1005) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
-        enddo
-        Close(unit=3)
-      endif
-
 C------------------RING-------------------------------------------
 C Rings
       routine='RING           '
@@ -509,6 +394,115 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         Write(Iout,1008) routine
 C Topological Indicators
       CALL TopIndicators(Matom,Iout,IDA,Mdist)
+
+C------------------OPTFF------------------------------------------
+C Optimize Geometry through force field method
+      If(Iopt.ne.0) then
+c       Store distances
+        Do I=1,3
+          Do J=1,MAtom 
+            DistStore(I,J)=Dist(I,J)
+          enddo
+        enddo
+        routine='OPTFORCEFIELD  '
+        ftol=ftolP
+        Write(Iout,1008) routine
+        call flush(iout)
+        if(Iopt.eq.1 .or. Iopt.eq.2) then ! vanilla Wu or Wu + Coulomb
+          if(Iopt.eq.2) then ! Wu + Coulomb
+            ftol=ftolP*1.d3
+            Write(Iout,1003)
+            CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
+     1        Dist,dist2D,ftol,force)
+            do i=1,9
+              force(i)=forcep(i)
+            enddo
+            iopt=1
+          endif
+          CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA, ! vanilla Wu
+     1      Dist,dist2D,ftolP,force)
+          Iprint=0
+        else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
+          CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
+     1      Dist,dist2D,ftolP,force)
+        endif
+c       Compare structures
+        CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
+        routine='MOVECM_2       '
+        Write(Iout,1008) routine
+        CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+     1   nosort,SP,Dist,DistCM,El)
+        routine='DISTANCEMATRIX '
+        Write(Iout,1008) routine
+        CALL DistMatrix(MAtom,Iout,Iprintf,0,0,
+     1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
+        routine='DIAMETER       '
+        Write(Iout,1008) routine
+        CALL Diameter(MAtom,Iout,Dist,distp)
+      endif
+
+C------------------XYZ-and-CC1-FILES------------------------------
+C Print out Coordinates used as input for CYLview
+C xyz format
+      if(icyl.le.2) then
+        xyzname=trim(filenameout)//"-3D.xyz"
+        ichar1=index(xyzname,'database/ALL')
+        ichar2=index(xyzname,'database/IPR')
+        ichar3=index(xyzname,'database/Yoshida')
+        ichar4=index(xyzname,'database/HOG')
+        ifind=ichar1+ichar2+ichar3+ichar4
+        if(ifind.ne.0) then
+         Write(Iout,1022)
+         go to 9999
+        endif
+        Open(unit=3,file=xyzname,form='formatted')
+        routine='PRINTCOORD     '
+        Write(Iout,1008) routine
+        WRITE(Iout,1002) xyzname 
+        endzeile=0
+        do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo
+        if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,
+     1    (TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.100.and.MAtom.lt.1000) 
+     1    WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.1000.and.MAtom.lt.10000) 
+     1    WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        if(MAtom.ge.10000) 
+     1    WRITE(3,1020) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
+        Do J=1,MAtom
+          IM=IAtom(J)      
+          Write(3,1007) El(IM),(Dist(I,J),I=1,3)
+        enddo
+        Close(unit=3)
+      endif
+C cc1 format
+      if(icyl.ge.4) then
+       cc1name=trim(filenameout)//"-3D.cc1"
+        ichar1=index(cc1name,'database/ALL')
+        ichar2=index(cc1name,'database/IPR')
+        ichar3=index(cc1name,'database/Yoshida')
+        ichar4=index(cc1name,'database/HOG')
+        ifind=ichar1+ichar2+ichar3+ichar4
+        if(ifind.ne.0) then
+         Write(Iout,1022)
+         go to 9999
+        endif
+        icharfind=index(cc1name,'database/')
+        print*,icharfind
+       Open(unit=3,file=cc1name,form='formatted')
+        WRITE(Iout,1002) cc1name
+        if(MAtom.lt.100) WRITE(3,1025) MAtom
+        if(MAtom.ge.100.and.MAtom.lt.1000) WRITE(3,1026) MAtom
+        if(MAtom.ge.1000.and.MAtom.lt.10000) WRITE(3,1027) MAtom
+        if(MAtom.ge.10000) WRITE(3,1028) MAtom
+        Do J=1,MAtom
+          IM=IAtom(J)
+          Write(3,1005) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
+        enddo
+        Close(unit=3)
+      endif
 
 C------------------VOLUME-----------------------------------------
 C Calculate the volume
