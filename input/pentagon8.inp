@@ -1,9 +1,0 @@
-C60  Using FM algorithm to produce coordinates through ring spiral indices
-&General  NA=60, ixyz=1 /
-&Coord ICart=2, IV1=2, IV2=4, IV3=5 /
-&FFChoice Iopt=1 /
-&FFParameters /
-&Hamilton /
-&Isomers /
-&Graph ISchlegel=1 /
-1 2 3 4 5 6 27 28 29 30 31 32
