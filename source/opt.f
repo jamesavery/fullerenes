@@ -1561,7 +1561,7 @@ c            write (*,*) "666"
 c      use iso_c_binding
       use config
 c      type(c_ptr) :: graph
-      implicit real*8 (a-h,k,o-z)
+      implicit real*8 (a-h,o-z)
       integer n, iopt, i, j, m
       integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer ne_hh, ne_hp, ne_pp
@@ -1569,8 +1569,33 @@ c      type(c_ptr) :: graph
       integer d_hhh(4,n), d_hhp(4,n), d_hpp(4,n), d_ppp(4,n)
       integer nd_hhh, nd_hhp, nd_hpp, nd_ppp
       integer a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12
-      real*8 coord(n*3), force(ffmaxdim)
-      real*8 hessian(3*n,3*n)
+      real(8) coord(n*3), force(ffmaxdim), hessian(3*n,3*n)
+      real(8) k
+
+c initialize variables to *something*
+      ah=0.0
+      ap=0.0
+      dhhh=0.0
+      dhhp=0.0
+      dhpp=0.0
+      dppp=0.0
+      fah=0.0
+      fap=0.0
+      fco=0.0
+      fdhhh=0.0
+      fdhhp=0.0
+      fdhpp=0.0
+      fdppp=0.0
+      frh=0.0
+      frhh=0.0
+      frhp=0.0
+      frp=0.0
+      frpp=0.0
+      rh=0.0
+      rhh=0.0
+      rhp=0.0
+      rp=0.0
+      rpp=0.0
 
 c init
       do i=1,3*n
