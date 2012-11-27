@@ -59,7 +59,7 @@ C Force constants in N/m for distances and N/m A^2/rad^2 for angles (default val
       WuR6=1.391d0
       WuA5=1.08d2! in deg
       WuA6=1.20d2
-      WufR5=390.7d0! from Fowler
+      WufR5=390.7d0! from Ceulemans, Fowler
       WufR6=499.7d0
       WufA5=47.88d0*1.45d0**2
       WufA6=80.86d0*1.45d0*1.37d0
