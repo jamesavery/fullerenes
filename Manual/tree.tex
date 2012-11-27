@@ -10,10 +10,10 @@
 %\small
 \tiny
 \psset{xunit=1cm,yunit=1cm}
-\begin{pspicture}(0,-8)(23,8)
+\begin{pspicture}(0,-8)(25,8)
 %\psgrid
 
-\newdimen\hdist\hdist=12mm
+\newdimen\hdist\hdist=10mm
 \newdimen\vdist\vdist=15mm
 
 \rput[c](.5\hdist,0){\rnode[c]{0}{}}
@@ -31,7 +31,8 @@
 \rput[c](12\hdist,0){\rnode[c]{12}{}}
 \rput[c](13\hdist,0){\rnode[c]{13}{}}
 \rput[c](14\hdist,0){\rnode[c]{14}{}}
-\rput[c](14.5\hdist,0){\rnode[c]{15}{}}
+\rput[c](15\hdist,0){\rnode[c]{15}{}}
+\rput[c](15.5\hdist,0){\rnode[c]{16}{}}
 
 \rput[c](6.5\hdist,-2.5\vdist){\rnode[c]{i}{}}
 
@@ -51,10 +52,11 @@
 \ncline[]{->}{12}{13}
 \ncline[]{->}{13}{14}
 \ncline[]{->}{14}{15}
+\ncline[]{->}{15}{16}
 
-\ncangle[angleA=-90,offsetA=.2\hdist,angleB=180,offsetB=0]{->}{2}{i}
+\ncangle[angleA=-90,offsetA=.1\hdist,angleB=180,offsetB=0]{->}{2}{i}
 \ncput*{if `istop' $\ne 0$}
-\ncangle[angleA=0,offsetB=.5\hdist,angleB=-90,offsetB=-.5\hdist]{->}{i}{13}
+\ncangle[angleA=0,offsetB=.5\hdist,angleB=-90,offsetB=-.5\hdist]{->}{i}{14}
 
 \rput[t](\hdist,-\vdist){\rnode[c]{datetime}{\begin{minipage}[c]{2cm}\centering Date\_and\_time\\Timer\end{minipage}}}
 \rput[b](2\hdist,\vdist){\rnode[c]{datain}{\begin{minipage}[c]{2cm}\centering Datain\end{minipage}}}
@@ -64,12 +66,13 @@
 \rput[b](6\hdist,\vdist){\rnode[c]{gc}{\begin{minipage}[c]{2cm}\centering GoldbergCoxeter\end{minipage}}}
 \rput[t](7\hdist,-\vdist){\rnode[c]{ham}{\begin{minipage}[c]{2cm}\centering Hamilton\\HamiltonCyc\end{minipage}}}
 \rput[b](8\hdist,\vdist){\rnode[c]{desc}{\begin{minipage}[c]{2cm}\centering Paths\\Ring\end{minipage}}}
-\rput[t](9\hdist,-\vdist){\rnode[c]{opt}{\begin{minipage}[c]{2cm}\centering OptFF\\MoveCM\\Distmatrix\\Diameter\end{minipage}}}
-\rput[b](10\hdist,\vdist){\rnode[c]{ring}{\begin{minipage}[c]{2cm}\centering Ring\\RingC\end{minipage}}}
-\rput[t](11\hdist,-\vdist){\rnode[c]{insert}{\begin{minipage}[c]{2.5cm}\centering StoneWalesTrans\\EndoKrotoTrans\\YoshidaFowler4\\YoshidaFowler6\\BrinkmannFowler\end{minipage}}}
-\rput[b](12\hdist,\vdist){\rnode[c]{prop}{\begin{minipage}[c]{2.5cm}\centering SpiralSearch\\Chiral\\TopIndicators\\Volume\\MinCovSphere2\\MinDistSphere\\MaxInSphere\end{minipage}}}
-\rput[t](13\hdist,-\vdist){\rnode[c]{write}{\begin{minipage}[c]{2cm}\centering Graph2D\end{minipage}}}
-\rput[b](14\hdist,\vdist){\rnode[c]{time2}{\begin{minipage}[c]{2cm}\centering Timer\end{minipage}}}
+\rput[t](9\hdist,-\vdist){\rnode[c]{ring}{\begin{minipage}[c]{2cm}\centering Ring\\RingC\end{minipage}}}
+\rput[b](10\hdist,\vdist){\rnode[c]{insert}{\begin{minipage}[c]{2.5cm}\centering StoneWalesTrans\\EndoKrotoTrans\\YoshidaFowler4\\YoshidaFowler6\\BrinkmannFowler\end{minipage}}}
+\rput[t](11\hdist,-\vdist){\rnode[c]{prop2d}{\begin{minipage}[c]{2.5cm}\centering SpiralSearch\\Chiral\\TopIndicators\end{minipage}}}
+\rput[b](12\hdist,\vdist){\rnode[c]{opt}{\begin{minipage}[c]{2cm}\centering OptFF\\MoveCM\\Distmatrix\\Diameter\end{minipage}}}
+\rput[t](13\hdist,-\vdist){\rnode[c]{prop3d}{\begin{minipage}[c]{2.5cm}\centering Volume\\MinCovSphere2\\MinDistSphere\\MaxInSphere\end{minipage}}}
+\rput[b](14\hdist,\vdist){\rnode[c]{write}{\begin{minipage}[c]{2cm}\centering Graph2D\end{minipage}}}
+\rput[t](15\hdist,-\vdist){\rnode[c]{time2}{\begin{minipage}[c]{2cm}\centering Timer\end{minipage}}}
 
 \rput[t](6.5\hdist,-3.5\vdist){\rnode[c]{iso}{\begin{minipage}[c]{2cm}\centering Isomers\end{minipage}}}
 
@@ -86,19 +89,20 @@
 \ncline[]{->}{ham}{7}
 \ncput*{\begin{minipage}[c]{2cm}\centering if `iHam' $\ne 0$\end{minipage}}
 \ncline[]{->}{desc}{8}
-\ncline[]{->}{opt}{9}
-\ncput*{\begin{minipage}[c]{2cm}\centering if `iOpt' $\ne 0$\end{minipage}}
-\ncline[]{->}{ring}{10}
-\ncline[]{->}{insert}{11}
+\ncline[]{->}{ring}{9}
+\ncline[]{->}{insert}{10}
 \ncput*{\begin{minipage}[c]{2cm}\centering if $\langle\dots\rangle \ne 0$\end{minipage}}
-\ncline[]{->}{prop}{12}
-\ncline[]{->}{write}{13}
+\ncline[]{->}{prop2d}{11}
+\ncline[]{->}{opt}{12}
+\ncput*{\begin{minipage}[c]{2cm}\centering if `iOpt' $\ne 0$\end{minipage}}
+\ncline[]{->}{prop3d}{13}
+\ncline[]{->}{write}{14}
 \ncput*{\begin{minipage}[c]{2cm}\centering if `iSchlegel' $\ne 0$\end{minipage}}
-\ncline[]{->}{time2}{14}
+\ncline[]{->}{time2}{15}
 
 \ncline[]{->}{iso}{i}
 
-\ncbar[offset=-.6\hdist,armA=3\hdist,angleA=90]{->}{13}{2}
+\ncbar[offset=-.6\hdist,armA=3\hdist,angleA=90]{->}{14}{2}
 \ncput*{if `loop' $\ge$ 2}
 
 \end{pspicture}
