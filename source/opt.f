@@ -582,26 +582,26 @@ C Zero-point vibrational energy
         peratom=dfloat(MAtom)
         write(Iout,1014) zeropau,zeropeV,zeropwn
         write(Iout,1026) zeropau/peratom,zeropeV/peratom,zeropwn/peratom
-      endif
 C Sort for degeneracies
-      tolfreq=1.d-1
-      icount=0
-      idegc=0
-      ndeg=0
-      Do I=1,MAtom*3-6
-        idegc=idegc+1
-        dif=evec(i)-evec(i+1)
-        if(dif.gt.tolfreq) then
-          icount=icount+1
-          evec(icount)=evec(i)
-          ideg(icount)=idegc
-          ndeg=ndeg+idegc
-          idegc=0
-        endif
-      enddo
-      write(Iout,1021) ndeg,MAtom*3-6
-      write(Iout,1022) (evec(i),ideg(i),i=1,icount)
-      write(Iout,1025) (evec(i),i=MAtom*3-5,3*MAtom)
+        tolfreq=1.d-1
+        icount=0
+        idegc=0
+        ndeg=0
+        Do I=1,MAtom*3-6
+          idegc=idegc+1
+          dif=evec(i)-evec(i+1)
+          if(dif.gt.tolfreq) then
+            icount=icount+1
+            evec(icount)=evec(i)
+            ideg(icount)=idegc
+            ndeg=ndeg+idegc
+            idegc=0
+          endif
+        enddo
+        write(Iout,1021) ndeg,MAtom*3-6
+        write(Iout,1022) (evec(i),ideg(i),i=1,icount)
+        write(Iout,1025) (evec(i),i=MAtom*3-5,3*MAtom)
+      endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
      1 ' for stretching and bending modes using the force-field of',

@@ -1,6 +1,6 @@
-C24 aug-cc-pvdz B3LYP opt. geom. minimum D2-sym E=-913.9314011 au
+D6d-C24 aug-cc-pvdz B3LYP opt. geom. minimum D2-sym E=-913.9314011 au
 Cartesian coordinate input and subsequent Goldberg-Coxeter transformation
-from C24 to C96
+from D6d-C24 to D6d-C96
 &General NA=24, nosort=1 / 
 &Coord ICart=1, IGCtrans=1, kGC=2 /
 &FFChoice Iopt=1 /
