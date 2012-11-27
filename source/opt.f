@@ -579,7 +579,9 @@ C Zero-point vibrational energy
         zeropwn=zerop
         zeropau=zerop/au2wavenumbers
         zeropeV=zeropau*au2eV
+        peratom=dfloat(MAtom)
         write(Iout,1014) zeropau,zeropeV,zeropwn
+        write(Iout,1026) zeropau/peratom,zeropeV/peratom,zeropwn/peratom
       endif
 C Sort for degeneracies
       tolfreq=1.d-1
@@ -631,7 +633,7 @@ C Sort for degeneracies
      1 d12.6,' eV , ',d12.6,' cm-1 , ')
  1015 Format(' Hessian is symmetric: asym= ',d12.6)
  1016 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:',/1X,8F12.2)
+     1 'A, deg, N/m:',/1X,8F12.3)
  1018 Format(' Tolerance= ',D9.3,', Force field parameters in ',
      1 'A, deg, N/m:'/1X,19F12.2)
  1019 Format(' Tolerance= ',D9.3,', Force field parameters in ',
@@ -645,6 +647,8 @@ C Sort for degeneracies
  1024 Format(8(d12.6,' '))
  1025 Format(' Zero frequencies for translation and rotation: ',
      1 6(d12.6,' '))
+ 1026 Format(' Zero-point vibrational energy per atom: ',d12.6,
+     1 ' a.u. , ',d12.6,' eV , ',d12.6,' cm-1 , ')
      
       Return 
       END
