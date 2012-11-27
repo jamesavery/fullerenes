@@ -44,9 +44,6 @@ C Input send to output
         WRITE(IOUT,108)
       endif
 
-C tolerance parameter (to be used in all force fields)
-      ftol=1.d-8
-
       do i=1,ffmaxdim
         force(i)=0.d0
         forceP(i)=0.d0
@@ -64,6 +61,9 @@ C Force constants in N/m for distances and N/m A^2/rad^2 for angles (default val
       WufA5=47.88d0*1.45d0**2
       WufA6=80.86d0*1.45d0*1.37d0
       fcoulomb=0.d0
+C tolerance parameter (to be used in all force fields)
+      ftol=1.d-5
+
 
 C Defining an extension of the Wu force field (default values)
 c     three distances: zero values
