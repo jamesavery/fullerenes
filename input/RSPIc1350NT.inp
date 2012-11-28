@@ -7,8 +7,8 @@ optimization is not done, the structure is not
 good and heavily distorted
 &General NA=50, ixyz=1 /
 &Coord ICart=3, R6=1.42, leap=3 /
-&FFChoice Iopt=2 ftol=1.d-9 /
-&FFParameters fcoulomb=105. /
+&FFChoice Iopt=2 /
+&FFParameters fcoulomb=75. /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=1 /

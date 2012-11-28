@@ -1,8 +1,8 @@
 D5d-C300 nanotube. Using Tutte algorithm to produce coordinates from ring spiral indices
-&General  NA=300, IP=1 ixyz=1 /
+&General  NA=300 ixyz=1 /
 &Coord ICart=3 scalerad=6.d0/
-&FFChoice Iopt=4 ftol=1.d-12/
-&FFParameters /
+&FFChoice Iopt=4 ftol=1.d-9/
+&FFParameters fcoulomb=300. /
 &Hamilton /
 &Isomers /
 &Graph ifs=1 ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /
