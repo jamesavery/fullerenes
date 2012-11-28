@@ -295,13 +295,6 @@ C Establish all closed ring systems
       CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
-C------------------RING-------------------------------------------
-C Rings
-      routine='RING           '
-      Write(Iout,1008) routine
-      CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
-     1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
-
 C------------------RINGC------------------------------------------
 C Analyze ring connections
       routine='RINGC          '
@@ -439,6 +432,11 @@ c       Compare structures
         routine='DIAMETER       '
         Write(Iout,1008) routine
         CALL Diameter(MAtom,Iout,Dist,distp)
+        routine='RING           '
+        Write(Iout,1008) routine
+        CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
+     1   IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
+
       endif
 
 C------------------XYZ-and-CC1-FILES------------------------------
@@ -489,9 +487,9 @@ C cc1 format
          Write(Iout,1022)
          go to 9999
         endif
-        icharfind=index(cc1name,'database/')
-        print*,icharfind
        Open(unit=3,file=cc1name,form='formatted')
+        routine='PRINTCOORD     '
+        Write(Iout,1008) routine
         WRITE(Iout,1002) cc1name
         if(MAtom.lt.100) WRITE(3,1025) MAtom
         if(MAtom.ge.100.and.MAtom.lt.1000) WRITE(3,1026) MAtom
