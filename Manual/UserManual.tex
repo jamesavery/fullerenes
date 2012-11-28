@@ -725,19 +725,25 @@ For other 2D graph embedding methods implemented see the following input section
 
 Input and output files are in the directories \textit{input}  and   \textit{output}  respectively. \textit{Program Fullerene} has been tested 
 for many fullerenes found in the following input files:\\
-1) All files starting with \filename{CC} have cartesian coordinates for input, for example for
+\begin{enumerate}
+\item[1:] All files starting with \filename{CC} have cartesian coordinates for input, for example for
 \C{20} (\filename{CCc20.inp}), \C{24} (\filename{CCc24.inp}), \C{60} (\filename{CCc60.inp}), or \C{540} (\filename{CCc540.inp}).
-2) All files starting with \filename{GEOM} use basic geometry to construct \C{20} or \C{60}, e.g. \filename{GEOMc60.inp} or \filename{GEOMc60exp.inp}.\\
-3) All files starting with \filename{EDGE} have vertex connectivities as input, e.g. \filename{EDGEc20.inp}.\\
-4) All files starting with \filename{RSPI} have the ring-spiral pentagon indices as input, e.g. \filename{RSPIc20.inp} or \filename{RSPIc60NT.inp}
-including and the non-spirable fullerenes \C{380} (\filename{RSPIc380.inp}) and \C{384} (\filename{RSPIc384.inp}).\\ 
+\item[2:] All files starting with \filename{GEOM} use basic geometry to construct \C{20} or \C{60}, e.g. \filename{GEOMc60.inp} or \filename{GEOMc60exp.inp}.
+\item[3:] All files starting with \filename{EDGE} have vertex connectivities as input, e.g. \filename{EDGEc20.inp}.
+\item[4:] All files starting with \filename{RSPI} have the ring-spiral pentagon indices as input, e.g. \filename{RSPIc20.inp} or \filename{RSPIc60NT.inp}
+including and the non-spirable fullerenes \C{380} (\filename{RSPIc380.inp}) and \C{384} (\filename{RSPIc384.inp}).
+\item[5:] All files starting with \filename{ISOMER} produces an isomer list, e.g. \filename{ISOMERc92.inp}.
+\item[6:] All files starting with \filename{GC} uses the Goldberg-Coxeter transform of \C{20}, e.g. \filename{GCc720Halma.inp}.
+\item[7:] All files starting with \filename{READ} uses an external \filename{.xyz} file to read in in cartesian coordinates, e.g. \filename{READxyz.inp}.
+\end{enumerate}
 Many more examples can be found. The cartesian coordinates used in the input files are mostly singlet electronic state 
 B3LYP aug-cc-pVDZ optimized up to \C{60}, cc-pVDZ up to \C{180}, and 6-31G for the rest. 
 For some of the fullerenes listed, the singlet state chosen may not be the electronic ground state.
 Many definitions depend on the use of {\AA}ngstr{\o}ms for distances, so please use this unit throughout. 
 A typical input is in \textit{Namelist format}, or if additional data are required in \textit{free format}, and reads like this:
 \begin{verbatim}
-C80  Using FM algorithm to produce coordinates for C80 nanotube, input file: \filename{RSPIc80NT.inp}
+C80  Using FM algorithm to produce coordinates for C80 nanotube, \\
+input file: \filename{RSPIc80NT.inp}
 &General NA=80 / 
 &Coord ICart=2, IV2=4, IV3=5 / 
 &FFChoice Iopt=1 / 
@@ -1139,7 +1145,7 @@ Note that the maximum number of vertices in the database is defined in the confi
 %Figure 6
  \begin{figure}[htbp]
 	\centering
-  		 \includegraphics[width=0.7\textwidth]{C2160.png}
+  		 \includegraphics[width=0.5\textwidth]{C2160.png}
      \caption{Force-field optimized structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
      \label{pic:Finalgraph}
  \end{figure}
