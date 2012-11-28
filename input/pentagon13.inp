@@ -1,9 +1,0 @@
-C80  Using Tutte algorithm to produce coordinates from Goldberg-Coxeter construction of C20
-FM algorith has difficulties finding eigenvectors
-&General  IP=1 /
-&Coord ICart=5, kGC=2, IPRC=2 /
-&FFChoice Iopt=1 /
-&FFParameters /
-&Hamilton IHam=1 /
-&Isomers /
-&Graph ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /

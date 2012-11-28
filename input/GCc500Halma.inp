@@ -1,0 +1,9 @@
+Coxeter fullerene with indices (k,l)=(5,0) G0=Ih-C20 to give C500
+&General ixyz=1 /
+&Coord ICart=4 , kGC=5 /
+&FFChoice Iopt=1 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+
