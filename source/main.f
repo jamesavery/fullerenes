@@ -1,5 +1,5 @@
 !                                                                           !
-!           P R O G R A M     F U L L E R E N E                             !
+!                  P R O G R A M     F U L L E R E N E                      !
 !                                                                           !
 !---------------------------------------------------------------------------!
 !  This is an open-source code, see copyright message in the User Manual.   !
@@ -11,7 +11,7 @@
 !      The results can be used for plotting 2D/3D fullerene graphs          !
 !    (e.g. Schlegel diagrams) and structures, and as a starting point       !
 !            for further quantum theoretical treatment.                     !
-!        Version 4.3.1 now incorporates C++ routines linked to the          !
+!        Version 4.3 now incorporates C++ routines linked to the            !
 !       original Fortran program using much improved algorithms.            !
 !---------------------------------------------------------------------------!
 
@@ -586,7 +586,7 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.3.1, last revision from 27/11/12   |',
+     1 /1X,'|    This  version: 4.3, last revision from 28/11/12     |',
      1 /1X,'|________________________________________________________|',
 CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
