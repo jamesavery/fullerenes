@@ -62,7 +62,7 @@ C Force constants in N/m for distances and N/m A^2/rad^2 for angles (default val
       WufA6=80.86d0*1.45d0*1.37d0
       fcoulomb=0.d0
 C tolerance parameter (to be used in all force fields)
-      ftol=1.d-5
+      ftol=1.d-7
 
 
 C Defining an extension of the Wu force field (default values)
