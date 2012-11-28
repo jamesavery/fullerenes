@@ -481,7 +481,6 @@ c        force(19)=force(19)
       end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
 
-      M=Matom/2+2
 C OPTIMIZE
       CALL frprmn3d(MATOM*3,Iout,
      1 Dist,force,iopt,ftol,iter,fret,
