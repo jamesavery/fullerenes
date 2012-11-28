@@ -6,10 +6,10 @@ optimized with the normal force field. If pre-
 optimization is not done, the structure is not
 good and heavily distorted
 &General NA=50, ixyz=1 /
-&Coord ICart=2 leap=1 /
-&FFChoice Iopt=2 ftol=1.d-9 /
-&FFParameters fcoulomb=105. /
+&Coord ICart=2 leap=1 scalrad=7. /
+&FFChoice Iopt=3 ftol=1.d-9 /
+&FFParameters /
 &Hamilton /
 &Isomers /
-&Graph ISchlegel=1 /
+&Graph ISchlegel=2 ISO1=1, ISO2=3, ISO3=7 /
 1   2   3   4   5   6  22  23  24  25  26  27
