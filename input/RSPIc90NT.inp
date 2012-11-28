@@ -1,0 +1,9 @@
+D5h-C90 nanotube. Using Tutte algorithm to produce coordinates from ring spiral indices
+&General  NA=90, IP=1 ixyz=1 /
+&Coord ICart=3 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph ifs=1 boost=1.25 ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /
+1 2 3 4 5 6 42 43 44 45 46 47

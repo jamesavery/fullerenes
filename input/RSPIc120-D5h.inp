@@ -1,0 +1,9 @@
+D5h-C120 prolate shaped using FM algorithm to produce coordinates from ring spiral indices
+&General  NA=120 ixyz=1 /
+&Coord ICart=2, R6=1.42 /
+&FFChoice Iopt=1 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /
+1   8  10  12  14  16  48  50  52  54  56  62

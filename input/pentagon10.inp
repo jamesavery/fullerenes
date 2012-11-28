@@ -1,9 +1,0 @@
-C40  Using FM algorithm to produce coordinates from ring spiral indices
-&General NA=40, IP=1 /
-&Coord ICart=2 /
-&FFChoice Iopt=1 /
-&FFParameters /
-&Hamilton /
-&Isomers /
-&Graph ISchlegel=2 /
-1 2 3 4 5 6 17 18 19 20 21 22
