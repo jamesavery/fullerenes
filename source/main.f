@@ -434,6 +434,8 @@ c       Compare structures
         CALL Diameter(MAtom,Iout,Dist,distp)
         routine='RING           '
         Write(Iout,1008) routine
+c  call ring again, this needs some programming as ring duplicates some
+c  stuff previously done, but is ok for now, as it takes not much time
         CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
      1   IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
