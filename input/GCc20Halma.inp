@@ -1,0 +1,10 @@
+Coxeter fullerene with indices (k,l)=(1,0) G0=C20
+Just produces C20 trivially
+&General /
+&Coord ICart=5 , kGC=1 /
+&FFChoice iopt=1 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+

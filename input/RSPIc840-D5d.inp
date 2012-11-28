@@ -1,0 +1,9 @@
+D5d-C840 Using FM algorithm to produce coordinates from ring spiral indices
+&General  NA=840 /
+&Coord ICart=2, R6=1.42 /
+&FFChoice Iopt=1 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /
+1 79 85 91 97 103 322 328 334 340 346 422

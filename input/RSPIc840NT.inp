@@ -1,0 +1,9 @@
+D5d-C840 Nanotube. I could not locate eigenvectors for FM, using Tutte instead from ring spiral indices
+&General NA=840, ixyz=1, filename='pent22' /
+&Coord ICart=3, R6=1.42, scaleRad=7.d0 /
+&FFChoice Iopt=3, ftol=1.d-12/
+&FFParameters /
+&Hamilton /
+&Isomers  /
+&Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /
+1   7   9  11  13  15 408 410 412 414 416 422

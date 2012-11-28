@@ -1,9 +1,0 @@
-C96 Using Tutte embedding to produce coordinates through ring spiral indices
-&General NA=96 /
-&Coord ICart=3 /
-&FFChoice Iopt=1 /
-&FFParameters /
-&Hamilton /
-&Isomers /
-&Graph ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /
-1 7 9 11 13 18 36 41 43 45 47 49
