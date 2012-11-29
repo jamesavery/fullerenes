@@ -728,7 +728,8 @@ c        else
 c          write(Iout,1002) iter,fret,grad,damping
 c        endif
         if(2.d0*dabs(fret-fp).le.ftol*(dabs(fret)+dabs(fp)+EPS))then
-          Write(Iout,1003) fret,fret-fp
+          fretperatom=3.d0*fret/dfloat(N)
+          Write(Iout,1003) fret,fret-fp,fretperatom
           return
         endif
         fp=fret
@@ -758,7 +759,8 @@ C         dgg=dgg+xi(j)**2
      1 ', gradient [kJ/mol/A] ',D14.8)
 c 1002 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8,
 c     1 ' The displacements of ',I4,' atoms were damped.')
- 1003 Format(/1X,'Convergence achieved, energy ',D14.8,', diff= ',D12.3)
+ 1003 Format(/1X,'Convergence achieved, energy [kJ/mol] ',D14.8,
+     1 ', diff= ',D12.3,/1X,'Energy per atom [kJ/mol]: ',D14.8)
  1004 Format('**** Severe error in angle, check input coordiantes:',
      1 ' One angle either 0 or 180 degrees, ill-alligned structure',
      1 /1X,'Cannot optimize structure, check eigenvector input')
