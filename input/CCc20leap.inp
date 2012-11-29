@@ -1,7 +1,7 @@
 Ih-C80 leapfrog to Ih-C2160
-&General NA=80 ixyz=1 /
-&Coord ICart=1 leap=3 /
-&FFChoice Iopt=1 /
+&General NA=80 ixyz=1 nospiral=1 /
+&Coord ICart=1 leap=3 scaleRad=7. /
+&FFChoice Iopt=3 /
 &FFParameters /
 &Hamilton /
 &Isomers /
