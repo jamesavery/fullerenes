@@ -64,6 +64,7 @@ C    Set the dimensions for the distance matrix
      7 'AT','RN','FR','RA','AC','TH','PA',' U','NP','PU','AM','CM',   
      8 'BK','CF','ES'/                                               
 
+C Set parameters
       IN=5
       Iout=6
       ilp=0
@@ -74,16 +75,16 @@ C    Set the dimensions for the distance matrix
       ASphere=0.d0
       Group='   '
       Do I=1,Nmax
-        IAtom(I)=6
+       IAtom(I)=6
         Do J=1,Nmax
           IDA(I,J)=0
         enddo
       enddo
 
+C Get time and date
       CALL date_and_time(CDAT,CTIM,zone,values)
        TIMEX=0.d0
       CALL Timer(TIMEX)
-C      WRITE(Iout,1000) CDAT,CTIM,Nmax
        WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7),Nmax
 
@@ -105,11 +106,11 @@ C  Stop if error in input
 C  Only do isomer statistics
       if(istop.ne.0) go to 98
 
-
 C------------------Coordinates-------------------------------------
 C Options for Input coordinates
       go to (10,20,30,30,30,30,30,30) Icart+1
-C  Cartesian coordinates produced for Ih C60
+
+C  Cartesian coordinates produced for Ih C20 or C60
    10 routine='COORDC20/60    '
       Write(Iout,1008) routine
       CALL CoordC20C60(Iout,MAtom,R5,R6,Dist)
@@ -117,8 +118,8 @@ C  Cartesian coordinates produced for Ih C60
         IAtom(I)=6
       enddo
       Go to 40
-C Input Cartesian coordinates for fullerenes
 
+C Input Cartesian coordinates for fullerenes
    20 if(icyl.eq.2.or.icyl.eq.3.or.icyl.eq.5) then
         if(icyl.eq.5) then
          cc1name=trim(filename)//".cc1"
@@ -162,6 +163,7 @@ C Input Cartesian coordinates for fullerenes
       Go to 40
    21 WRITE(Iout,1016)
       Go to 99
+
 C Cartesian coordinates produced ring from spiral pentagon list
 C or from adjacency matrix. Uses the Fowler-Manolopoulos algorithm 
 C with P-type eigenvectors or the Tutte algorithm to construct 
@@ -257,7 +259,6 @@ C Produce the nth leapfrog of the fullerene
         if(MAtom.gt.100) IHam=0
         if(LeapErr.eq.0) go to 999 ! moveCM
       endif
-
 
 C------------------HAMILTON---------------------------------------
 C Generate IUPAC name and locate Hamiltonian cycles. 
@@ -434,11 +435,10 @@ c       Compare structures
         CALL Diameter(MAtom,Iout,Dist,distp)
         routine='RING           '
         Write(Iout,1008) routine
-c  call ring again, this needs some programming as ring duplicates some
+c  call ring again, this needs some reprogramming as ring duplicates some
 c  stuff previously done, but is ok for now, as it takes not much time
         CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
      1   IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
-
       endif
 
 C------------------XYZ-and-CC1-FILES------------------------------
@@ -574,6 +574,7 @@ C  E N D   O F   P R O G R A M
       CALL Timer(TIMEX)
       Hours=TIMEX/3.6d3
       WRITE(Iout,1009) TIMEX,Hours
+
 C Formats 
  1000 FORMAT(
      1  1X,' ________________________________________________________ ',
@@ -586,26 +587,25 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.3, last revision from 28/11/12     |',
+     1 /1X,'|    This  version: 4.3, last revision from 29/11/12     |',
      1 /1X,'|________________________________________________________|',
-CG77 1 /1X,'DATE: ',A9,10X,'TIME: ',A8,/1X,'Limited to ',I6,' Atoms',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
      1 /1X,'For citation when running this program use:',/1X,
-     1 '1) P. Schwerdtfeger, L. Wirz, J. Avery, Topological Analysis ',
-     1 'of Fullerenes - A Fortran and C++ Program (Version 4.3.1), ',
-     1 'Massey University Albany, Auckland, New Zealand (2012).',/1X,
+     1 '1) P. Schwerdtfeger, L. Wirz, J. Avery, Program Fullerene - ',
+     1 'A Software Package for Constructing and Analyzing Structures ',
+     1 'of Regular Fullerenes (Version 4.3), submitted to J. Comput. ',
+     1 'Chem.',/1X,
      1 '2) P. W. Fowler, D. E. Manolopoulos, An Atlas of Fullerenes',
      1 ' (Dover Publ., New York, 2006).',/1X,
      1 '3) D. Babic, Nomenclature and Coding of Fullerenes,',
      1 ' J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).',/1X,
-     1 'See README file for further literature and input instructions ',
+     1 'See the Manual for further literature and input instructions',
      1 'concerning this program')
  1001 FORMAT(/1X,'Number of Atoms: ',I4,', and distance tolerance: ',
      1 F12.2,'%')
  1002 FORMAT(/1X,'Input coordinates to be used for plotting program',
      1 ' CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written into ',A31)
-CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
  1003 FORMAT(1X,'Pre-optimization using the Wu force field with ',
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
@@ -640,7 +640,7 @@ CG77 1004 FORMAT(1X,140(1H-),/1X,6HTIME: ,A8)
 
       SUBROUTINE TIMER(TIMEX)
       Real TA(2)
-      CALL DTIME(TA,time)
-      TIMEX=TIME
+       CALL DTIME(TA,time)
+       TIMEX=TIME
       RETURN
       END
