@@ -1,9 +1,17 @@
-C     SUBROUTINE PerfectMatching(MAtom,Iout,IDA)
-C     use config
-C     IMPLICIT REAL*8 (A-H,O-Z)
-C     DIMENSION IDA(Nmax,Nmax)
-C     RETURN
-C     END
+      SUBROUTINE PerfectMatching(MAtom,Iout,IDA)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION IDA(Nmax,Nmax)
+       Write(Iout,1000) MAtom
+       Write(Iout,1001) 
+       Write(Iout,1002) 
+ 1000 Format(/1X,'Upper limit for number of perfect matchings',
+     1 ' in cubic graphs: 2**N with N=',I5)
+ 1001 Format(1X,'Counting the number of perfect matchings using',
+     1 ' the Fisher-Kasteleyn-Temperley (FKT) algorithm')
+ 1002 Format(1X,'Not implemented yet')
+      RETURN
+      END
 
       SUBROUTINE Sortr(M,Mnew,imirror,jmirror,diam)
       use config
