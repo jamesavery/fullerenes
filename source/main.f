@@ -287,7 +287,9 @@ C adjacent vertices
 
 C------------------PERFECT MATCHING-------------------------------
 C Produce perfect matchings (Kekule structures) and analyze
-C     CALL PerfectMatching(MAtom,Iout,IDA)
+      routine='PERFECTMATCHING'
+      Write(Iout,1008) routine
+      CALL PerfectMatching(MAtom,Iout,IDA)
 
 C------------------RING-------------------------------------------
 C Establish all closed ring systems
