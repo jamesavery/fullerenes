@@ -783,7 +783,7 @@ every line until the first namelist line is interpreted as a comment.
 \subsection{\&General line}
 Namelist line that contains the main flags for the program. 
 
-\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, ihueckel, loop, ipsphere, nosort, nospiral, TolR, R5, R6, filenamedb, filename}.
+\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, ihueckel, loop, ipsphere, nosort, nospiral, novolume, TolR, R5, R6, filenamedb, filename}.
 \paragraph{Option description:}
 \begin{description}
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
@@ -819,6 +819,7 @@ Namelist line that contains the main flags for the program.
   \end{enumerate}
 \item[{nosort}] If \paramname{nosort} = 1, permutation of vertices for better $Z$-Matrix is suppressed (Default: 0).
 \item[{nospiral}] If \paramname{nospiral} = 1, search for the canonical spiral is avoided  (Default: 0).
+\item[{novolume}] If \paramname{novolume} = 1, all parts for volume determination is avoided  (Default: 0).
 \item[{TolR}] Tolerance in \% (Default: 33). Only change this parameter if the program cannot produce correctly the adjacency matrix. 
   This is only necessary for the cartesian coordinate input (\paramname{ICart}=1) and only fails if bond distances are unusually large or small. 
   Connectivities are found for atoms with distances between \paramname{R6} and $\paramname{R6}*(1+\paramname{TolR}/100)$. 
