@@ -310,7 +310,7 @@ C     Construct the ring spiral
      1 '5(6)^A (5(6)^B)^4 5(6)^C (5(6)^D)^4 5(6)^E 5:',
      1 '  A=',I3,', B=',I3,', C=',I3,', D=',I3,', E=',I3)
  1001 Format(1X,'Last pentagon index: ',I5,', number of faces: ',I5)
- 1002 Format(1X,'Ring spiral pentagon indeces: ',12I5)
+ 1002 Format(1X,'Ring spiral pentagon indices: ',12I5)
       Return 
       END
 
