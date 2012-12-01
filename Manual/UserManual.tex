@@ -191,7 +191,7 @@ There are many things on our to-do list. We try hard to release more functionali
 Not implemented yet is: 
 1) The minimum covering ellipsoid useful for  rugby-ball shaped fullerenes (yes this is New Zealand
 and crazy about rugby), and close packing of ellipsoids; 
-2) The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes;
+2) The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes other than C20;
 3) Geometry optimization using further improved force fields; 
 4) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 
 5) To symmetrize optimized coordinates to point group symmetry; 
@@ -263,7 +263,10 @@ very large fullerenes ($>$ 2000 atoms), the determination of the number of Hamil
 ($>$ 80 atoms) (this is an NP-complete problem), the creation of a list of ring-spiral pentagon
 indices for all possible isomers with a given vertex count $n_v$ ($>$ 80 atoms), 
 and the Tutte embedding algorithm ($>$ 2000 atoms). We try to improve the performance of these algorithms
-in our next major version to be released.
+in our next major version to be released. For version 4.1 the fullerene database was increased and a link to
+the House of Graphs was made possible. Version 4.2 saw the introduction of dihedral angles into the force field,
+and Version 4.3 was extended to calculate frequencies from the Hessian of the force field and introduced
+the the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k$ and $l$.
 
 %Create a 3D structure for a specific fullerene
 \subsection{Create a 3D structure for a specific fullerene}
@@ -274,8 +277,10 @@ symmetry $I_h-$\C{20} or $I_h-$\C{60} isomers (Subroutine \funname{CoordC20C60},
 \filename{GEOMc60exp.inp}, \filename{GEOMc60ideal.inp}), or to get the cartesian coordinates from input ring-spiral
 pentagon-indices RSPI (Subroutine \funname{CoordBuild}) by using either the Fowler-Manolopoulus AME algorithm \cite{Atlas},
 or the more reliable 3D-TE algorithm (used by files \filename{RSPIc20.inp} to for example \filename{RSPIc840.inp}),
-or from a Goldberg-Coxeter 2-index transformation (triangulation algorithm, input files \filename{GEOMc20Halma.inp}
-to \filename{GEOMc500Halma.inp}). The 12 pentagon indices can also be obtained from the \textit{fullerene database} if 
+or from a Goldberg-Coxeter 2-index transformation of \C{20}, i.e. $GC_{k,l}(20)$ with $k \geq l$ and $k > 0$
+(triangulation algorithm described below, input files \filename{GEOMc20Halma.inp}
+to \filename{GEOMc500Halma.inp}) and for example \filename{GGCK6L2.inp}. 
+The 12 pentagon indices can also be obtained from the \textit{fullerene database} if 
 the canonical fullerene number is used as defined in the book ``Atlas of Fullerenes'' by Fowler and Manolopoulus \cite{Atlas,cvetkovic2002} 
 (e.g. input file \filename{DBc66.inp}). Information of vertex connections (edges) can also be used as input (input files \filename{EDGEc20.inp} and \filename{EDGEc60.inp}).
 The program prints internal coordinates in form of a $Z$-Matrix (distances, angles and dihedrals).
@@ -283,14 +288,16 @@ For this the atoms are rearranged (permuted) such that the distances are smalles
 coordinates, e.g. through a force-field optimization.
 
 We recommend reading Fowler and Manolopoulus' book \cite{Atlas,cvetkovic2002} for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
-to construct 3D fullerene graphs.  For the AME algorithm it is critical to get the right 
+to construct 3D fullerene graphs. For the Goldberg-Coxeter transformation of \C{20} we construct the RSPI from the scheme introduced by
+Fowler and Rogers.\cite{Rogers}
+For the AME algorithm it is critical to get the right 
 H\"uckel eigenvectors for the construction of cartesian coordinates \cite{Atlas}. 
 The position of the three~$P$-type eigenvectors can be specified (see file \filename{RSPIc60NT.inp} for such an example).
 If the AME algorithm fails or you cannot find the required $P$-type eigenvectors, you should use our Tutte embedding algorithm,
 which (to our opinion) is less troublesome and may be used as the standard method to construct 3D structures. The disadvantage
 of this algorithm is, however, that the structure could be far off from a force-field optimized global minimum for a fullerene, and the
 force-field optimization might end up in a heavily distorted unreasonable 3D local minimum (for strategies to avoid this
-see the input section). 3D structures can also be obtained from a Goldberg-Coxeter transformation of \C{20}.
+see the input section).
 
 It is important that the end-product is viewed by a molecular visualization program. 
 We recommend CYLview by Claude Legault \cite{CYLview}, Avogadro \cite{Avogadro}, JMol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}. 
@@ -387,8 +394,8 @@ For $I_h$-\C{60} both $\rho$ and $\rho_E$ are exactly 1.0.
 
 In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \C{n} can be performed if required from the input
 (Subroutine \funname{GoldbergCoxeter}). This leads to a fullerene C$_{k^2+kl+l^2}$. The current implementation allows only for
-\textit{leapfrog transformations} ($k=l=1$) and for \textit{halma transformations} ($k \neq 0$ and $l=0$). However, the program allows
-for multiple leapfrog transformations for the construction of very large fullerenes. A general $GC_{k,l}(n)$  for all values of $k$ and $l$ 
+\textit{leapfrog transformations} ($k=l=1$) and for \textit{halma transformations} ($k \neq 0$ and $l=0$) for all fullerenes
+(but all indices are allowed for $GC_{k,l}(20)$). A general $GC_{k,l}(n)$ for all values of $k$, $l$ and $n$ with $k \geq l$ 
 is currently in preparation. 
 
 The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ used here works in the following way: ($i$) Consider
@@ -413,7 +420,8 @@ If the initial graph $G_0$ has $n_v$ vertices, the number of vertices of $GC_{k,
 	\label{eq:GCvertexcount} 
 \end{equation}
 $t(k,l)$ is called the {\em triangulation number}. We work with the dual triangulation instead of a hexagonal mesh as it is easier to be implemented in a computer code.
-This is shown in Figure \ref{pic:GoldbergCoxeter}
+This is shown in Figure \ref{pic:GoldbergCoxeter}. For icosahedral fullerenes ($I_h$ and $I$) with $l = k$ or $l = 0$, Fowler and Rogers 
+showed how to construct the RSPIs,\cite{Rogers} which is implemented in this program as well for $GC_{k,l}(20)$.
 
 
 %Figure 2
@@ -837,7 +845,7 @@ Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2
 \begin{description}
 \item[{ICart}] Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 If \paramname{ICart} = 2, 3 then 12 pentagon indices are used for input.\\
-If \paramname{ICart} = 4, 5 then Goldberg-Coxeter transformation of \C{20} is used.\\
+If \paramname{ICart} = 4, 5 then Goldberg-Coxeter transformation of \C{20} is used, i.e. $GC_{k,l}(20)$ with $k \geq l$ and $k > 0$.\\
 If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$, then pentagon indices are taken from the
 isomer list contained in a database (see below).\\
 If \paramname{ICart} = 6 or 7 input vertex connectivities (edges) directly. If \paramname{isonum} $\neq 0$,
@@ -928,8 +936,8 @@ pentagon indices, which uniquely identify the locations of the
 pentagons if the fullerene is spirable \cite{Atlas}. Use the canonical
 pentagon ring indices if possible (transformation to the canonical from should work as well).
 
-If \paramname{ICart} = 4 or 5 adjacency matrix is created from a Goldberg-Coxeter transform of \C{20}, i.e. $GC_{k,l}$[\C{20}].  At the
-moment, the program is restricted to $l=0$. In this case the parameter \paramname{kGC} in the namelist input has to be used.
+If \paramname{ICart} = 4 or 5 adjacency matrix is created from a Goldberg-Coxeter transform of \C{20}, i.e. $GC_{k,l}$[\C{20}] with $k \geq l$.  
+In this case the parameter \paramname{kGC} in the namelist input has to be used.
 
 If \paramname{ICart} = 2, 4 or 6 the AME algorithm using $P$-type eigenvectors produced from the adjacency matrix to get cartesian
 coordinates.  If the $P$-type eigenvectors are not in sequence (position 2,3 and 4, see ref.\cite{Atlas} for details), three integer
@@ -1222,6 +1230,9 @@ House of Graphs: a database of interesting graphs, available for fullerenes at h
 
 \bibitem{cvetkovic2002} D. Cvetkovi\'c, P. Fowler, P. Rowlinson, and D. Stevanovi\'c, ``Constructing fullerene graphs from eigenvalues and angles'',
 \textit{Linear Algebra Appl.} \textbf{356}, 37-56 (2002).
+
+\bibitem{Rogers} P. Fowler and K. M. Rogers, ``Spiral Codes and Goldberg Representations of Icosahedral Fullerenes and Octahedral
+Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 
 \bibitem{Estrada} E. Estrada, ``Characterization of 3D molecular structure'', \textit{Chem. Phys. Lett.}, \textbf{319}, 713-718 (2000).
 
