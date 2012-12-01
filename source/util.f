@@ -61,8 +61,8 @@ C     Now sort values of diamw, output diam
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer MDist(Nmax,Nmax),wi(Nmax),wienermin,wienermax
-      DIMENSION IDA(Nmax,Nmax)
+      Integer MDist(Nmax,Nmax)
+      DIMENSION IDA(Nmax,Nmax),wi(Nmax)
       type(c_ptr) :: g, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
 C     minimal and maximal vertex contribution, rho and rhoE,
@@ -81,37 +81,22 @@ C     Get topological distance matrix
       g = new_fullerene_graph(Nmax,Matom,IDA)
       call all_pairs_shortest_path(g,Matom,Nmax,MDist)
 
-      nlimit=dint(dfloat(intmax8)/1.2d0)
-      iwiener1=0
-      iwiener=0
-      ihyperwiener=0
-      ierrorhw=0
-      ierrorw=0
-      ierrors=0
+      wiener1=0.d0
+      wiener=0.d0
+      hyperwiener=0.d0
       maxdist=0
       Do I=1,MAtom
-        wi(I)=0
+        wi(I)=0.d0
        Do J=1,MAtom
         idist=MDist(I,J)
-        wi(I)=wi(i)+idist
+        adist=dfloat(idist)
+        wi(I)=wi(i)+adist
          if(J.gt.I) then
           if(idist.gt.maxdist) maxdist=idist
-          if(ierrorhw.eq.0) then 
-           ihyperwiener=ihyperwiener+(idist*(1+idist))/2
-           if(ihyperwiener.gt.nlimit) then 
-            ierrorhw=1
-            ihyperwiener=0
-           endif
-          endif
+           hyperwiener=hyperwiener+adist*(1.d0+adist)/2.d0
          endif
        enddo
-      if(ierrorw.eq.0) then
-       iwiener1=iwiener1+wi(i)
-       if(iwiener1.gt.nlimit) then
-        ierrorw=1
-        iwiener1=0
-       endif
-      endif
+       wiener1=wiener1+wi(i)
         if(I.ne.1) then
          if(wi(i).lt.wienermin) then
           wienermin=wi(i)
@@ -130,13 +115,13 @@ C     Balaban index
       Do I=1,MAtom
       Do J=I+1,MAtom
        if(IDA(I,J).eq.1) then
-        wii=dfloat(wi(I))
-        wij=dfloat(wi(J))
+        wii=wi(I)
+        wij=wi(J)
         if(wii.lt.1.d-15.or.wij.lt.1.d-15) then
          Write(Iout,1006)
          Return
         endif
-        balaban=balaban+1.d0/(dsqrt(wii)*dsqrt(wij))
+        balaban=balaban+1.d0/(dsqrt(wii*wij))
        endif
       enddo
       enddo
@@ -144,27 +129,25 @@ C     Balaban index
       fac=3.d0*vertnum/(vertnum+4.d0)
       balabanindex=balaban*fac
 
-      iwiener=iwiener1/2
-      wav=dfloat(iwiener1)/vertnum
-      rho=wav/dfloat(wienermin)
-      rhoE=dfloat(wienermax)/dfloat(wienermin)
+      over=1.d-10
+      wiener=wiener1/2.d0
+      wav=wiener1/vertnum
+      rho=wav/wienermin
+      rhoE=wienermax/wienermin
       isize=Matom*(Matom-1)
-      Avdist=2.d0*dfloat(iwiener)/dfloat(isize)
+      Avdist=2.d0*wiener/dfloat(isize)
       izagreb=MAtom*9
-      if(iwiener.lt.intmax8/10) then
-       ischultz=iwiener*6
-      else
-       ierrors=1
-       ischultz=0
-      endif
-      wienerfac=dfloat(iwiener)/(9.d0*vertnum**3)
+      schultz=wiener*6.d0
+      wienerfac=wiener/(9.d0*vertnum**3)
       Wienerbalaban=wienerfac*balabanindex*4.d0*(vertnum+4.d0)
 
-      if(ierrorw.eq.1)  Write(Iout,1003)     
-      if(ierrorhw.eq.1) Write(Iout,1004)     
-      if(ierrors.eq.1)  Write(Iout,1005)     
-      Write(Iout,1001) iwiener,ihyperwiener,wienermin,wienermax,
-     1 wav,rho,rhoE,izagreb,ischultz,balabanindex
+      Write(Iout,1001) dint(wiener+over),
+     1 dint(hyperwiener+over),
+     1 dint(wienermin+over),
+     1 dint(wienermax+over),
+     1 wav,rho,rhoE,izagreb,
+     1 dint(schultz+over),
+     1 balabanindex
       Write(Iout,1007) Wienerbalaban
       Write(Iout,1002) maxdist,Avdist
 
@@ -172,19 +155,18 @@ C     Balaban index
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
      1 '501, 442 (2011), and Behtoei et al., Appl. Math. Lett. ',
      1 '22, 1571 (2009)')
- 1001 Format(' Wiener index W: ',I12,/,' Hyper Wiener index WW: ',I12,
-     1 /,' Minimal and maximal vertex contribution to W: ',I12,' and ',
-     1 I12,', average vertex contribution (wav): ',D15.9,/,
-     1 ' rho: ',D15.9,', rhoE: ',D15.9,/,' Zagreb index = nv*3^2 = ',
-     1 I12,' (trivial for regular fullerenes)',/,
-     1 ' Schultz index = 6*W = ',I12,' (related to Wiener index for ',
+ 1001 Format(' Wiener index W: ',F20.0,/,' Hyper Wiener index WW: ',
+     1 F20.0,/,' Minimal vertex contribution to W: ',F20.0,
+     1 ' Maximal vertex contribution to W: ',F20.0,/,
+     1 ' Average vertex contribution (wav): ',D15.9,/,
+     1 ' rho: ',D15.9,', rhoE: ',D15.9,/,
+     1 ' Zagreb index = nv*3^2 = ',I12,
+     1 ' (trivial for regular fullerenes)',/,
+     1 ' Schultz index = 6*W = ',F20.0,' (related to Wiener index for ',
      1 'regular fullerenes)',/,' Balaban index = ',D15.9,
      1 /,' For the Estrada index see Subroutine Hueckel output')
  1002 Format(' Topological distances are between 1 and ',I6,/,
      1 ' Average topological distance: ',F12.6)
- 1003 Format(' Integer overflow for Wiener index, W set to zero')
- 1004 Format(' Integer overflow for Hyper Wiener index, WW set to zero')
- 1005 Format(' Integer overflow for Schultz index,6*W set to zero')
  1006 Format(' Something wrong with Wiener sum')
  1007 Format(' f*Wiener*Balaban = 4WB(n+4)/(9n^3) = ',D15.9,
      1 ' (should be exactly 1.0 for cubic graphs)')
