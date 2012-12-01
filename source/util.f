@@ -140,6 +140,7 @@ C     Balaban index
       schultz=wiener*6.d0
       wienerfac=wiener/(9.d0*vertnum**3)
       Wienerbalaban=wienerfac*balabanindex*4.d0*(vertnum+4.d0)
+      ori=wiener**(0.4d0)/vertnum
 
       Write(Iout,1001) dint(wiener+over),
      1 dint(hyperwiener+over),
@@ -148,16 +149,17 @@ C     Balaban index
      1 wav,rho,rhoE,izagreb,
      1 dint(schultz+over),
      1 balabanindex
-      Write(Iout,1007) Wienerbalaban
-      Write(Iout,1002) maxdist,Avdist
+      Write(Iout,1002) Wienerbalaban
+      Write(Iout,1003) maxdist,Avdist
+      Write(Iout,1004) ori
 
  1000 Format(1X,'Topological Indicators:',/1X,
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
      1 '501, 442 (2011), and Behtoei et al., Appl. Math. Lett. ',
      1 '22, 1571 (2009)')
  1001 Format(' Wiener index W: ',F20.0,/,' Hyper Wiener index WW: ',
-     1 F20.0,/,' Minimal vertex contribution to W: ',F20.0,
-     1 ' Maximal vertex contribution to W: ',F20.0,/,
+     1 F20.0,/,' Minimal vertex contribution to W: Wmin= ',F20.0,
+     1 ' Maximal vertex contribution to W: Wmax= ',F20.0,/,
      1 ' Average vertex contribution (wav): ',D15.9,/,
      1 ' rho: ',D15.9,', rhoE: ',D15.9,/,
      1 ' Zagreb index = nv*3^2 = ',I12,
@@ -165,11 +167,13 @@ C     Balaban index
      1 ' Schultz index = 6*W = ',F20.0,' (related to Wiener index for ',
      1 'regular fullerenes)',/,' Balaban index = ',D15.9,
      1 /,' For the Estrada index see Subroutine Hueckel output')
- 1002 Format(' Topological distances are between 1 and ',I6,/,
+ 1002 Format(' f*Wiener*Balaban = 4WB(n+4)/(9n^3) = ',D15.9,/,'   ',
+     1 ' (should be exactly 1.0 for cubic polyhedra with equal row ',
+     1 'sums in distance matrix, i.e. Wmin=Wmax)')
+ 1003 Format(' Topological distances are between 1 and ',I6,/,
      1 ' Average topological distance: ',F12.6)
+ 1004 Format(' Ori constant for Wiener index: ',D15.9)
  1006 Format(' Something wrong with Wiener sum')
- 1007 Format(' f*Wiener*Balaban = 4WB(n+4)/(9n^3) = ',D15.9,
-     1 ' (should be exactly 1.0 for cubic graphs)')
 
       RETURN
       END
