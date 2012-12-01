@@ -140,7 +140,7 @@ C     Balaban index
       schultz=wiener*6.d0
       wienerfac=wiener/(9.d0*vertnum**3)
       Wienerbalaban=wienerfac*balabanindex*4.d0*(vertnum+4.d0)
-      ori=wiener**(.4d0)/vertnum
+      ori=wiener/vertnum**2.5
 
       Write(Iout,1001) dint(wiener+over),
      1 dint(hyperwiener+over),
