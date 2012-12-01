@@ -193,6 +193,48 @@ C     Balaban index
       RETURN
       END
 
+      SUBROUTINE IcoFullDetect(Iout,MAtom)
+      IMPLICIT Integer (A-Z)
+      N=MAtom/20
+      ntest=20*N
+      ico=0
+      icoh=0
+      if(ntest.eq.Matom) then
+       loopmax=int(sqrt(float(N)))
+       loopmin=int(sqrt(float(N/3)))
+       Do I=loopmin,loopmax
+       Do J=0,I
+        nico=20*(I*I+J*J+I*J)
+        if(nico.eq.MAtom) then
+         if(J.eq.0.or.J.eq.I) then
+          icoh=icoh+1
+         else
+          ico=ico+1
+         endif
+        endif
+       enddo
+       enddo
+      endif
+      icot=ico+icoh
+      if(icot.ne.0) then
+       if(icot.eq.1.and.icoh.eq.1) Write(Iout,1000) 
+       if(icot.eq.1.and.ico.eq.1) Write(Iout,1001) 
+       if(icot.gt.1) Write(Iout,1002) icot,icoh,ico
+      else
+       Write(Iout,1003)
+      endif
+ 1000 Format(1X,'For this vertex number we can have 1 ',
+     1 ' icoshedral fullerene of Ih-symmetry')
+ 1001 Format(1X,'For this vertex number we can have 1 ',
+     1 ' icoshedral fullerene of I-symmetry')
+ 1002 Format(1X,'For this vertex number we can have ',I3,
+     1 ' icoshedral fullerenes. Out of this ',I3,' are of',
+     1 ' Ih-symmetry and ',I3,' of I-symmetry')
+ 1003 Format(1X,'There are no icosahedral fullerenes for ',
+     1 'this vertex number')
+      RETURN
+      END
+
       SUBROUTINE Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)

@@ -178,7 +178,6 @@ C the 3D fullerene
       Do I=1,Matom
         IAtom(I)=6
       enddo
-      CALL Chiral(Iout,GROUP)
 
    40 WRITE(Iout,1001) MAtom,TolX*100.d0
 
@@ -285,12 +284,6 @@ C adjacent vertices
       endif
       CALL Paths(MAtom,Iout,iprintf,IDA,A,evec,df)
 
-C------------------PERFECT MATCHING-------------------------------
-C Produce perfect matchings (Kekule structures) and analyze
-      routine='PERFECTMATCHING'
-      Write(Iout,1008) routine
-      CALL PerfectMatching(MAtom,Iout,IDA)
-
 C------------------RING-------------------------------------------
 C Establish all closed ring systems
       routine='RING           '
@@ -381,8 +374,6 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
         CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
      1   Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
      1   GROUP)
-C Determine if fullerene is chiral
-        CALL Chiral(Iout,GROUP)
       endif
 
 C--------------TOPOLOGICAL INDICATORS-----------------------------
@@ -390,6 +381,12 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         Write(Iout,1008) routine
 C Topological Indicators
       CALL TopIndicators(Matom,Iout,IDA,Mdist)
+C Check if vertex number allows for icosahedral fullerenes
+      Call IcoFullDetect(Iout,MAtom)
+C Determine if fullerene is chiral
+      CALL Chiral(Iout,GROUP)
+C Produce perfect matchings (Kekule structures) and analyze
+      CALL PerfectMatching(MAtom,Iout,IDA)
 
 C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
