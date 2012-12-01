@@ -98,7 +98,7 @@ C  INPUT and setting parameters for running the subroutines
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1  ndual,nosort,nospiralsearch,ihessian,iprinthessian,
+     1  ndual,nosort,nospiralsearch,novolume,ihessian,iprinthessian,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 C  Stop if error in input
@@ -502,7 +502,8 @@ C cc1 format
         enddo
         Close(unit=3)
       endif
-
+      
+      if(novolume.eq.0) then
 C------------------VOLUME-----------------------------------------
 C Calculate the volume
       routine='VOLUME         '
@@ -538,10 +539,12 @@ C  producing a spherical fullerene
      1 IC3,Dist,cmcs,rmcs,filename,El,TEXTINPUT)
       endif
 
+      endif
+
 C------------------GRAPH2D----------------------------------------
 C Calculate Schlegel diagram
-      anglew=45.d0
       if(ISchlegel.ne.0) then
+        anglew=45.d0
         routine='GRAPH2D        '
         Write(Iout,1008) routine
         if(ISchlegel.eq.2) then
