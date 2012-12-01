@@ -1,5 +1,4 @@
-Coxeter fullerene with indices (k,l)=(4,3) G0=C20
-Just produces C740 trivially
+Coxeter fullerene with indices (k,l)=(4,3) G0=C20, produces C740
 &General ixyz=1 /
 &Coord ICart=4  kGC=4 lGC=3 /
 &FFChoice iopt=1 /
