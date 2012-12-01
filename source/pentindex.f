@@ -28,21 +28,21 @@ c      integer ke, isw, iyf, ibf
       type(c_ptr) :: g, halma, new_C20, halma_fullerene
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
-C If nalgorithm=2 use Coxeter Goldberg and matrix eigenvector 
-C                 algorithm
-C If nalgorithm=3 use Coxeter Goldberg and Tutte algorithm
+C If nalgorithm=2 use Goldberg-Coxeter and matrix eigenvector algorithm
+C If nalgorithm=3 use Goldberg-Coxeter and Tutte algorithm
 C If nalgorithm=4 use connectivity input
       nalgorithm=ICart-2
 
       M=Matom/2+2
       Group='NA '
+      jumpGC=0
 
 
 C Ring spiral first:
 C Read pentagon list and produce adjacency matrix
-      if(nalgorithm.le.1) then
+  99  if(nalgorithm.le.1) then
       if(isonum.eq.0) then
-        if(iprev.eq.0) Read(IN,*) (JP(I),I=1,12)
+        if(iprev.eq.0.and.jumpGC.eq.0) Read(IN,*) (JP(I),I=1,12)
       else
 C Read from database
         Call Isomerget(Matom,Iout,Isonum,IPRC,JP)
@@ -50,18 +50,18 @@ C Read from database
 C     Produce the Spiral S using the program WINDUP and UNWIND
       do I=1,MMAX
       do J=1,MMAX
-      D(I,J)=0
+       D(I,J)=0
       enddo
       enddo
       Do I=1,6
-      NMR(I)=0
+       NMR(I)=0
       enddo
       Do I=1,M
-      S(I)=6
+       S(I)=6
       enddo
 C     Search where the 5-rings are in the spiral
       Do I=1,12
-      S(JP(I))=5
+       S(JP(I))=5
       enddo
       IPRS=0
       IER=0
@@ -77,8 +77,8 @@ C     Search where the 5-rings are in the spiral
      1 Spiral,S,D,NMR,Group)                       ! Unwind dual into spirals
       K=0
       DO J=1,6
-         IF(NMR(J).EQ.0) GO TO 3
-         K=J
+       IF(NMR(J).EQ.0) GO TO 3
+       K=J
       enddo
   3   If(K.le.0) then
       WRITE(Iout,1020) M,Matom,GROUP,(JP(I),I=1,12)
@@ -129,8 +129,10 @@ C Start Goldberg-Coxeter
       if(nalgorithm.gt.1.and.nalgorithm.lt.4) then
       Write(Iout,1040) kGC,lGC,kGC,lGC
       if(lGC .ne. 0) then
-        write(Iout,1041)
-        stop
+        Call GetPentIndex(MAtom,M,Iout,kGC,lGC,JP)
+        nalgorithm=nalgorithm-2
+        jumpGC=1
+        Go to 99
       endif
       g = new_C20();
       halma = halma_fullerene(g,kGC-1)
@@ -262,12 +264,53 @@ c      endif
  1040 Format(/1x,'Goldberg-Coxeter fullerene with indices (k,l) = (',
      1 I2,',',I2,') taking C20 as the input graph: GC(',I2,',',I2,
      1 ')[G0] with G0=C20')
- 1041 Format(/1x,'Goldberg-Coxeter construction not implemented',
-     1 ' for l > 0.')
  1042 Format(1x,'Updating number of vertices (',I5,') and edges (',
      1 I5,')')
  1043 Format(1x,'Halma fullerene is a fullerene')
  1044 Format(1x,'Halma fullerene is not a fullerene')
+      Return 
+      END
+
+      SUBROUTINE GetPentIndex(MAtom,Nfaces,Iout,I,J,S)
+      IMPLICIT Integer (A-Z)
+      DIMENSION S(12)
+      if(J.EQ.0) stop
+      I2=I*I
+      J2=J*J
+      MAtom=20*(I2+J2+I*J)
+C     Getting exponents
+      IA=(5*(I+J)**2-5*I-3*J-2)/2
+      IB=I+J-1
+      IC=(5*I+1)*(I-1)+J*(5*I-3)
+      ID=IB
+      IE=(5*I2+15*J2-3*I-7*J)/2
+      WRITE(Iout,1000) MAtom,IA,IB,IC,ID,IE 
+C     Construct the ring spiral
+      NFaces=MAtom/2+2
+      S(1)=1
+      S(2)=IA+2
+      S(3)=S(2)+IB+1
+      S(4)=S(3)+IB+1
+      S(5)=S(4)+IB+1
+      S(6)=S(5)+IB+1
+      S(7)=S(6)+IC+1
+      S(8)=S(7)+ID+1
+      S(9)=S(8)+ID+1
+      S(10)=S(9)+ID+1
+      S(11)=S(10)+ID+1
+      S(12)=S(11)+IE+1
+      if(S(12).ne.Nfaces) Write(Iout,1001) S(12),Nfaces
+      Write(Iout,1002) (S(I),I=1,12)
+      
+ 1000 Format(1X,'General Goldberg-Coxeter transformation of C20 -> Cn',
+     1 ' with n=: ',I5,/1X,'Construction of icosahedral fullerenes ',
+     1 'using the spiral code representation of Fowler and Rogers',/1X,
+     1 ' Lit: P. W. Fowler, K. M. Rogers, J. Chem. Inf. Comput. Sci.',
+     1 ' 41, 108-111 (2001)',/1X,'Exponents of spiral series ',
+     1 '5(6)^A (5(6)^B)^4 5(6)^C (5(6)^D)^4 5(6)^E 5:',
+     1 '  A=',I3,', B=',I3,', C=',I3,', D=',I3,', E=',I3)
+ 1001 Format(1X,'Last pentagon index: ',I5,', number of faces: ',I5)
+ 1002 Format(1X,'Ring spiral pentagon indeces: ',12I5)
       Return 
       END
 
