@@ -809,7 +809,8 @@ C     Analyze dual matrix
       SUBROUTINE spwindup(M,MP,D,S,JP,IER)
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION D(MMAX,MMAX),S(MMAX),JP(12),IR(12),JR(12),JS(12)
+      DIMENSION D(MMAX,MMAX),S(MMAX)
+      DIMENSION JP(12),IR(12),JR(12),JS(12)
 C This routine tries to find the spiral from a preset of
 C three connected rings stored in S(1), S(2) and S(3) using
 C information on ring fusions from the dual matrix
@@ -883,7 +884,8 @@ C     Print*,iring,'/',JP
       IMPLICIT INTEGER (A-Z)
       DIMENSION NrA(EMAX),NrB(EMAX),NrC(EMAX),NrD(EMAX)
       DIMENSION NrE(EMAX),NrF(EMAX),NMR(6),JP(12)
-      DIMENSION Spiral(12,NMAX),SpiralT(12,NSP),SpiralF(MMAX,NSP)
+      DIMENSION Spiral(12,NMAX)
+      DIMENSION SpiralT(12,NSP),SpiralF(MMAX,NSP)
       DIMENSION D(MMAX,MMAX),S(MMAX)
       CHARACTER*3 GROUP
 
@@ -1529,8 +1531,9 @@ C       after P pentagons have been added. Otherwise IER = 0 on return.
       DIMENSION D(MMAX,MMAX),S(MMAX),NMR(6)
       DIMENSION P(MMAX),R(MMAX)
       DIMENSION V(3,NMAX),E(2,EMAX)
-      DIMENSION VP(NMAX,MMAX),EP(EMAX,MMAX),FP(MMAX,MMAX)
-      DIMENSION MV(12),ME(12),MF(12),MS(12),Spiral(12,NMAX)
+      DIMENSION VP(NMAX,MMAX),EP(EMAX,MMAX)
+      DIMENSION FP(MMAX,MMAX),Spiral(12,NMAX)
+      DIMENSION MV(12),ME(12),MF(12),MS(12)
       CHARACTER*3 GROUP
 C       This subroutine unwinds a fullerene dual adjacency matrix D 
 C       into each of its constituent spirals and checks that none has      
