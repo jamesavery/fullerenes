@@ -5,7 +5,7 @@
        Write(Iout,1000) MAtom
        Write(Iout,1001) 
        Write(Iout,1002) 
- 1000 Format(/1X,'Upper limit for number of perfect matchings',
+ 1000 Format(1X,'Upper limit for number of perfect matchings',
      1 ' in cubic graphs: 2**N with N=',I5)
  1001 Format(1X,'Counting the number of perfect matchings using',
      1 ' the Fisher-Kasteleyn-Temperley (FKT) algorithm')
@@ -70,7 +70,7 @@ C     Schultz index and Balaban index
 C     For details see D. Vukicevic,F. Cataldo, O. Ori, A. Graovac,
 C     Chem. Phys. Lett. 501, 442–445 (2011).
 
-      Write(Iout,1000)
+      Write(Iout,1000) MAtom
       Do I=1,Nmax
       Do J=1,Nmax
        MDist(I,J)=0
@@ -156,7 +156,7 @@ C     Balaban index
  1000 Format(1X,'Topological Indicators:',/1X,
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
      1 '501, 442 (2011), and Behtoei et al., Appl. Math. Lett. ',
-     1 '22, 1571 (2009)')
+     1 '22, 1571 (2009)',/1X,'Cn with n=',I5)
  1001 Format(' Wiener index W: ',F20.0,/,' Hyper Wiener index WW: ',
      1 F20.0,/,' Minimal vertex contribution to W: Wmin= ',F20.0,
      1 ' Maximal vertex contribution to W: Wmax= ',F20.0,/,
