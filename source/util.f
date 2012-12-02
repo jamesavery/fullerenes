@@ -81,21 +81,26 @@ C     Get topological distance matrix
       g = new_fullerene_graph(Nmax,Matom,IDA)
       call all_pairs_shortest_path(g,Matom,Nmax,MDist)
 
+      Xatom=dfloat(MAtom)
       wiener1=0.d0
       wiener=0.d0
       hyperwiener=0.d0
       maxdist=0
+      mRadius=100000000
       Do I=1,MAtom
         wi(I)=0.d0
+        maxdistrow=0
        Do J=1,MAtom
         idist=MDist(I,J)
         adist=dfloat(idist)
         wi(I)=wi(i)+adist
+        if(idist.gt.maxdistrow) maxdistrow=idist
          if(J.gt.I) then
-          if(idist.gt.maxdist) maxdist=idist
            hyperwiener=hyperwiener+adist*(1.d0+adist)/2.d0
          endif
        enddo
+       if(maxdistrow.gt.maxdist) maxdist=maxdistrow
+       if(maxdistrow.lt.mRadius) mRadius=maxdistrow
        wiener1=wiener1+wi(i)
         if(I.ne.1) then
          if(wi(i).lt.wienermin) then
@@ -141,16 +146,18 @@ C     Balaban index
       wienerfac=wiener/(9.d0*vertnum**3)
       Wienerbalaban=wienerfac*balabanindex*4.d0*(vertnum+4.d0)
       ori=wiener/vertnum**2.5
+      reversewiener=XATOM*(XATOM-1.d0)*dfloat(maxdist)/2.d0-wiener
 
       Write(Iout,1001) dint(wiener+over),
      1 dint(hyperwiener+over),
      1 dint(wienermin+over),
      1 dint(wienermax+over),
+     1 dint(reversewiener+over),
      1 wav,rho,rhoE,izagreb,
      1 dint(schultz+over),
      1 balabanindex
       Write(Iout,1002) Wienerbalaban
-      Write(Iout,1003) maxdist,Avdist
+      Write(Iout,1003) maxdist,mRadius,Avdist
       Write(Iout,1004) ori
 
  1000 Format(1X,'Topological Indicators:',/1X,
@@ -160,6 +167,7 @@ C     Balaban index
  1001 Format(' Wiener index W: ',F20.0,/,' Hyper Wiener index WW: ',
      1 F20.0,/,' Minimal vertex contribution to W: Wmin= ',F20.0,
      1 ' Maximal vertex contribution to W: Wmax= ',F20.0,/,
+     1 ' Reverse Wiener index n(n-1)D/2-W: ',F20.0,/,
      1 ' Average vertex contribution (wav): ',D15.9,/,
      1 ' rho: ',D15.9,', rhoE: ',D15.9,/,
      1 ' Zagreb index = nv*3^2 = ',I12,
@@ -170,8 +178,10 @@ C     Balaban index
  1002 Format(' f*Wiener*Balaban = 4WB(n+4)/(9n^3) = ',D15.9,/,'   ',
      1 ' (should be exactly 1.0 for cubic polyhedra with equal row ',
      1 'sums in distance matrix, i.e. Wmin=Wmax)')
- 1003 Format(' Topological distances are between 1 and ',I6,/,
-     1 ' Average topological distance: ',F12.6)
+ 1003 Format(' Topological distances are between 1 and ',I6,
+     1 ' (topological diameter D)',/,
+     1 ' Topological radius: ',I6,
+     1 ' and average topological distance: ',F12.6)
  1004 Format(' Ori constant for Wiener index: ',D15.9)
  1006 Format(' Something wrong with Wiener sum')
 
