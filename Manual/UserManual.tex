@@ -315,6 +315,7 @@ molecular point group is obtained, the program determines if the fullerene is ch
 Once the cartesian coordinates $(X_i, Y_i, Z_i)$ for each vertex $i=1,\dots, n_v$ is known, all edges are determined by 
 analyzing connectivities between the vertices from either given cartesian coordinates or directly from the adjacency matrix 
 if a ring spiral input was chosen (Subroutine \funname{Connect}). In any case, one has the adjacency matrix $A_{ij}$ for all vertices at this stage:
+
 \begin{equation}
   \label{eq:adjacencymatrix}
   A_{ij} =
@@ -354,7 +355,7 @@ ground state instead of one of a higher multiplicity, as this is the case for \C
 captured in this program, and one needs to perform a proper quantum theoretical calculation. The program gives information
 on the HOMO-LUMO gap and calculates the topological resonance energy from Babi\'c's matching polynomial calculations \cite{Babic1995,Babic1997}.
 
-There are several other topological indicators \cite{Cataldo} of which the Estrada index and mean topological distance, the Wiener index, the hyper-Wiener
+There are several other topological indicators \cite{Cataldo,Caporossi} of which the Estrada index and mean topological distance, the Wiener index, the hyper-Wiener
 index and the Balaban index are printed. The Estrada $E(G)$ and bipartivity $\beta(G)$ indices are obtained from the eigenvalues of the adjacency
 matrix $A(G)$, $\{ x_i, i=1,...,n_v \} \in [-3,3]$, of a graph $G$ (in our case a regular fullerene graph $G=F$) \cite{Estrada,Doslic2005},
 \begin{equation}
@@ -374,12 +375,12 @@ For $I_h$-\C{60} we have $W(G)$= 8340 and $WW(G)$= 27180. If we define
   \label{TopDist}
   d_i^{\mathrm{max}} = \max\limits_{j} \{ D_{ij} \}
 \end{equation}
-we can define the topological diameters $D$ and radius $R$ as
+we can define the topological diameters $D$ and radius $R$ as\cite{Caporossi}
 \begin{equation}
   \label{TopDist}
   D = \max \{ d_i^{\mathrm{max}} \} \quad \text{ and } \quad  R = \min \{ d_i^{\mathrm{max}} \}
 \end{equation}
-We can now define the reverse Winer index as
+We can now define the reverse Winer index\cite{Balaban2000} as
 \begin{equation}
   \label{RevWiener}
   W_{\mathrm{rev}} = n_v(n_v - 1)D/2 - W
@@ -562,6 +563,7 @@ initial fullerene structure was modified. It produces the canonical ring-spiral 
 if the fullerene contains a face spiral, and fails if it does not (as for the two examples shown in 
 Figure \ref{pic:C380andC384}).  A more general ring-spiral algorithm is currently in preparation.
 
+\clearpage
 %Volume and surface area, minimum covering sphere
 \subsection{Volume and surface area, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
 The volume and surface area of the fullerene are calculated in Subroutine \funname{Volume}. This is done by\\
@@ -1173,12 +1175,10 @@ Note that the maximum number of vertices in the database is defined in the confi
 %Figure 6
  \begin{figure}[htbp]
 	\centering
-  		 \includegraphics[width=0.3\textwidth]{C2160.png}
+  		 \includegraphics[width=0.9\textwidth]{C2160.png}
      \caption{Force-field optimized structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
      \label{pic:Finalgraph}
  \end{figure}
-
-\clearpage
 
 
 %References
@@ -1252,6 +1252,8 @@ House of Graphs: a database of interesting graphs, available for fullerenes at h
 
 \bibitem{Cataldo} F. Cataldo, A. Graovac, and O. Ori ``The Mathematics and Topology of Fullerenes'', Springer, Berlin (2011).
 
+\bibitem{Caporossi} P. W. Fowler, G. Caporossi, and P. Hansen, \textit{J. Phys. Chem. A} \textbf{105}, 6232-6242 (2001).
+
 \bibitem{cvetkovic2002} D. Cvetkovi\'c, P. Fowler, P. Rowlinson, and D. Stevanovi\'c, ``Constructing fullerene graphs from eigenvalues and angles'',
 \textit{Linear Algebra Appl.} \textbf{356}, 37-56 (2002).
 
@@ -1261,6 +1263,8 @@ Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 \bibitem{Estrada} E. Estrada, ``Characterization of 3D molecular structure'', \textit{Chem. Phys. Lett.}, \textbf{319}, 713-718 (2000).
 
 \bibitem{Doslic2005} T. Dosli\'c, ``Bipartivity of fullerene graphs and stability'', \textit{Chem. Phys. Lett.}, \textbf{412}, 336-340 (2005).
+
+\bibitem{Balaban2000} A. T. Balaban, D. Mills, O. Ivanciuc, and S. Basak, ``Reverse Wiener Indices'', \textit{Croat. Chem. Acta} \textbf{73}, 923-941 (2000).
 
 \bibitem{Vukicevic} D. Vukicevic, F. Cataldo, O. Ori, A. Graovac, ``Topological efficiency of \C{66} fullerene'', \textit{Chem. Phys. Lett.} \textbf{501}, 442-445 (2011),
 

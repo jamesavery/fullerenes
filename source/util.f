@@ -180,7 +180,7 @@ C     Balaban index
      1 'sums in distance matrix, i.e. Wmin=Wmax)')
  1003 Format(' Topological distances are between 1 and ',I6,
      1 ' (topological diameter D)',/,
-     1 ' Topological radius: ',I6,
+     1 ' Topological radius R: ',I6,
      1 ', and average topological distance: ',F12.6)
  1004 Format(' Ori constant for Wiener index: ',D15.9)
  1006 Format(' Something wrong with Wiener sum')
