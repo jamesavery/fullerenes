@@ -145,7 +145,7 @@ C     Balaban index
       schultz=wiener*6.d0
       wienerfac=wiener/(9.d0*vertnum**3)
       Wienerbalaban=wienerfac*balabanindex*4.d0*(vertnum+4.d0)
-      ori=wiener/vertnum**2.5
+C     ori=wiener/vertnum**2.5
       reversewiener=XATOM*(XATOM-1.d0)*dfloat(maxdist)/2.d0-wiener
 
       Write(Iout,1001) dint(wiener+over),
@@ -158,7 +158,7 @@ C     Balaban index
      1 balabanindex
       Write(Iout,1002) Wienerbalaban
       Write(Iout,1003) maxdist,mRadius,Avdist
-      Write(Iout,1004) ori
+C     Write(Iout,1004) ori
 
  1000 Format(1X,'Topological Indicators:',/1X,
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
@@ -182,7 +182,7 @@ C     Balaban index
      1 ' (topological diameter D)',/,
      1 ' Topological radius R: ',I6,
      1 ', and average topological distance: ',F12.6)
- 1004 Format(' Ori constant for Wiener index: ',D15.9)
+C1004 Format(' Ori constant for Wiener index: ',D15.9)
  1006 Format(' Something wrong with Wiener sum')
 
       RETURN
