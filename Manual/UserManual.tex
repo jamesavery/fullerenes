@@ -4,12 +4,8 @@
 \usepackage[T1]{fontenc}
 % JA: Is this used?
 %\usepackage{mathrsfs}`
-%\usepackage{relsize}
-% \newcount\marcnumber
-% \marcnumber=1\relax
-% \newcommand{\marc}[1]{
-% \marginpar{\color{red}{\bf\the\marcnumber}---#1 }
-% \global\advance\marcnumber by 1}
+\usepackage{relsize}
+\let\acr=\textsmaller
 
 \newcommand{\C}[1]{\ensuremath{\mathrm{C}_{#1}}}
 
@@ -54,10 +50,8 @@
     \includegraphics[width=0.9\textwidth]{Toc.png}
     \large \lineskip 0.5em%
     \begin{tabular}[t]{c}
-%\thispagestyle{empty}
 }
 
-%\let\maketitle={\thispagestyle{empty}\maketitle}
 \begin{document}
 
 \maketitle
@@ -135,7 +129,7 @@ We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful
 (cartesian coordinates) for any fullerene isomer through various different methods and algorithms, and subsequently performs a topological/graph 
 theoretical analysis. The results can be used for plotting 2D fullerene graphs (Schlegel diagrams) 
 and 3D structures, and serves as a good starting point for further quantum theoretical treatment. The program is 
-written in standard FORTRAN and C++ and is easily implemented within a LINUX/UNIX environment.
+written in standard FORTRAN and C++ and is easily implemented within a Linux/\acr{UNIX} environment.
 Although there are several other computer programs already available to deal with fullerene graphs 
 like \program{CAGE} \cite{Brinkmanx}, \program{FULLGEN} \cite{Brinkman}, \program{BUCKYGEN} \cite{Goedgebeur,Goedgebeur1} or VEGA \cite{Pisanski},
 we felt that there is a need to write a general purpose program which does what other programs do and (of course) a lot more.
@@ -210,14 +204,20 @@ We are also open to any other suggestions and welcome additions to this program 
 
 %Installation and running the program
 \section{Installation and running the program}
-All fortran files are located in the directory ``source'' and all C++ files are in ``libgraph''.
+All fortran source files are located in the directory ``source'' and all C++ files are in ``libgraph''.
 
-The program is LINUX/UNIX based and is tested to compile with the gnu compiler collection (more specifically gfortran and g++).
+The program is Linux/\acr{UNIX} based and is tested to compile with the gnu compiler collection (more specifically gfortran and g++).
 You need to use the \filename{Makefile} included in the \filename{fullerene.zip} file provided and type\\\\
 \verb|make|
 
-It currently compiles in a 64 bit version, but you can change it in the Makefile to 32 bits if required. Note that the \verb|-O3| option
-for compiling will speed up running times considerably. The executable ``fullerene'' runs on a LINUX/UNIX as\\\\
+In the Makefile several compile flags are set.  Per default, the machine dependent compile flag \verb|-m64| is set (if you are
+using a 32-bit environment you will need to change this to \verb|-m32|).  The optimization level is set to \verb|-O3|.  
+If you require an atom number above 6800 (which can be set in \filename{source/config.f}) there will be arrays which are larger
+than 2\,GB.  Per default most compilers don't support this.  If your machine has enough memory, your gfortran is sufficiently new
+(4.4.3, 4.4.4  and 4.6 on 64-bit Linux works, ) you can set the \verb|-mcmodel| and \verb|-mlarge-data-threshold| flags to adequate values
+to enable large memory support.
+
+The executable ``fullerene'' runs on a Linux/\acr{UNIX} as\\\\
 \verb|./fullerene < filename.inp > filename.out|
 
 A number of test input files can be found in the directory ``input''. If you type\\\\
