@@ -61,7 +61,7 @@
 \rput[t](\hdist,-\vdist){\rnode[c]{datetime}{\begin{minipage}[c]{2cm}\centering Date\_and\_time\\Timer\end{minipage}}}
 \rput[b](2\hdist,\vdist){\rnode[c]{datain}{\begin{minipage}[c]{2cm}\centering Datain\end{minipage}}}
 \rput[t](3\hdist,-\vdist){\rnode[c]{c20c60}{\begin{minipage}[c]{2cm}\centering CoordC20C60\end{minipage}}}
-\rput[b](4\hdist,\vdist){\rnode[c]{coordbuild}{\begin{minipage}[c]{2cm}\centering CoordBuild\\Chiral\\Isomers\end{minipage}}}
+\rput[b](4\hdist,\vdist){\rnode[c]{coordbuild}{\begin{minipage}[c]{2cm}\centering CoordBuild\\Isomers\end{minipage}}}
 \rput[t](5\hdist,-\vdist){\rnode[c]{postprocess}{\begin{minipage}[c]{2cm}\centering MoveCM\\Diameter\\Distmatrix\\Connect\\Hueckel\end{minipage}}}
 \rput[b](6\hdist,\vdist){\rnode[c]{gc}{\begin{minipage}[c]{2cm}\centering GoldbergCoxeter\end{minipage}}}
 \rput[t](7\hdist,-\vdist){\rnode[c]{ham}{\begin{minipage}[c]{2cm}\centering Hamilton\\HamiltonCyc\end{minipage}}}
@@ -82,7 +82,7 @@
 \ncline[]{->}{c20c60}{3}
 \ncput*{\begin{minipage}[c]{1.5cm}\centering if `ICart' $= 0$\end{minipage}}
 \ncline[]{->}{coordbuild}{4}
-\ncput*{\begin{minipage}[c]{2.4cm}\centering if `ICart' \\$\in \{2,3,4,5,6,7\}$\end{minipage}}
+\ncput*{\begin{minipage}[c]{2.4cm}\centering if `ICart' \\$\in \{2,3,4,5,$\\   $6,7\}$\end{minipage}}
 \ncline[]{->}{postprocess}{5}
 \ncline[]{->}{gc}{6}
 \ncput*{\begin{minipage}[c]{2.4cm}\centering if `leap' $> 0$ \\ or if `leapGC' $> 0$\end{minipage}}
