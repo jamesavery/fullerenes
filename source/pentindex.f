@@ -127,7 +127,8 @@ C End ring spiral
 
 C Start Goldberg-Coxeter
       if(nalgorithm.gt.1.and.nalgorithm.lt.4) then
-      Write(Iout,1040) kGC,lGC,kGC,lGC
+      itGC=kGC*(kGC+lGC) +lGC*lGC
+      Write(Iout,1040) kGC,lGC,kGC,lGC,itGC
       if(lGC .ne. 0) then
         Call GetPentIndex(MAtom,M,Iout,kGC,lGC,JP)
         nalgorithm=nalgorithm-2
@@ -263,7 +264,7 @@ c      endif
  1038 FORMAT(1X,'Graph checked, it is cubic')
  1040 Format(/1x,'Goldberg-Coxeter fullerene with indices (k,l) = (',
      1 I2,',',I2,') taking C20 as the input graph: GC(',I2,',',I2,
-     1 ')[G0] with G0=C20')
+     1 ')[G0] with G0=C20',/1x,'Triangulation number t(k,l)=',I5)
  1042 Format(1x,'Updating number of vertices (',I5,') and edges (',
      1 I5,')')
  1043 Format(1x,'Halma fullerene is a fullerene')
