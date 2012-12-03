@@ -151,7 +151,7 @@ perform vertex insertions (such as Endo-Kroto \cite{Endo92}, Yoshida-Fowler \cit
 or Stone-Wales transformations \cite{Stone86}. 
 Vertex insertions allow for the construction of non-spiral fullerenes such as \C{380} or \C{384}. 
 Geometry optimization using a Fletcher-Reeves-Polak-Ribiere
-minimization \cite{NumRec} with analytical gradients for the harmonic oscillator force-field \cite{Wu87} is implemented in the current version, providing 
+minimization \cite{NumRec} with analytical gradients for the harmonic oscillator force field \cite{Wu87} is implemented in the current version, providing 
 a good initial guess for 3D cartesian coordinates. 2D fullerene graphs (Schlegel diagrams)
 can be produced using a variety of different algorithms \cite{Plestenjak}. The program determines the volume and surface area 
 of a fullerene (irregular or not) through tesselation in trigonal pyramids or from the convex hull, and gives measures for
@@ -166,7 +166,7 @@ This program works for any (distorted or not) regular fullerene. The spiral algo
 is not restricted to a pentagon start or to canonical indices. For a general list of fullerenes see ``The House of Graphs'' \cite{HouseofGraphs}. 
 The program produces an external file with default name \filename{Fullerene-3D.xyz} or \filename{Fullerene-3D.cc1} to be used for standard molecular plotting programs
 like CYLview \cite{CYLview}, Avogadro \cite{Avogadro}, Jmol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}.  For using these programs 
-it is important that the fullerene has a reasonable structure, obtained for example by a force-field 
+it is important that the fullerene has a reasonable structure, obtained for example by a force field 
 optimization, otherwise bonds cannot be correctly identified using .xyz files. It may therefore not be advisable to use structures that come out directly from
 the AME or 3D-TE algorithm, or the .cc1 file should be used which contains information on vertex adjacencies. 
 We recommend CYLview, it is more robust and works for large fullerenes up to about 1000 atoms. 
@@ -188,15 +188,14 @@ Not implemented yet is:
 1) The minimum covering ellipsoid useful for  rugby-ball shaped fullerenes (yes this is New Zealand
 and crazy about rugby), and close packing of ellipsoids; 
 2) The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes other than \C{20};
-3) Geometry optimization using further improved force fields; 
-4) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 
-5) Symmetrization of optimized coordinates to point group symmetry; 
-6) Symmetry labels for H\"uckel orbital energies and vibrational frequencies; 
-7) Extension to non-classical fullerenes of genus 0 (heptagons and squares); 
-8) Extension to non-regular fullerenes of genus 1 (hmmm, donuts!); 
-9) A restart option for subroutine Hamilton;
-10) Perfect matchings, Kekul\'e structures and Clar sextets;
-11) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
+3) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 
+4) Symmetrization of optimized coordinates to point group symmetry; 
+5) Symmetry labels for H\"uckel orbital energies and vibrational frequencies; 
+6) Extension to non-classical fullerenes of genus 0 (heptagons and squares); 
+7) Extension to non-regular fullerenes of genus 1 (hmmm, donuts!); 
+8) A restart option for subroutine Hamilton;
+9) Perfect matchings, Kekul\'e structures and Clar sextets;
+10) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
 with a good graphical interface similar to the \program{CAGE} program \cite{Brinkmanx}.
 
 We are also open to any other suggestions and welcome additions to this program suite. In this case please feel free to contact us per email.
@@ -210,14 +209,15 @@ The program is Linux/\acr{UNIX} based and is tested to compile with the gnu comp
 You need to use the \filename{Makefile} included in the \filename{fullerene.zip} file provided and type\\\\
 \verb|make|
 
-In the Makefile several compile flags are set.  Per default, the machine dependent compile flag \verb|-m64| is set (if you are
+In the Makefile several compile flags are set.  Per default, the machine dependent flag \verb|-m64| is set (if you are
 using a 32-bit environment you will need to change this to \verb|-m32|).  The optimization level is set to \verb|-O3|.  
-If you require an atom number above 6800 (which can be set in \filename{source/config.f}) there will be arrays which are larger
+If you require an atom count above 6800 (the upper limit can be set in \filename{source/config.f}) there will be arrays which are larger
 than 2\,GB.  Per default most compilers don't support this.  If your machine has enough memory, your gfortran is sufficiently new
-(4.4.3, 4.4.4  and 4.6 on 64-bit Linux works, ) you can set the \verb|-mcmodel| and \verb|-mlarge-data-threshold| flags to adequate values
-to enable large memory support.
+(4.4.3, 4.4.4  and 4.6 on 64-bit Linux work, ) you can set \verb|-mcmodel| to \verb|medium| to switch to the medium code model in
+which objects are permitted to be larger than 2\,GB.  All binary objects must be compiled with the same options; delete all
+binaries before you recompile using a different code model. 
 
-The executable ``fullerene'' runs on a Linux/\acr{UNIX} as\\\\
+The executable ``fullerene'' can be executed on a Linux/\acr{UNIX} as\\\\
 \verb|./fullerene < filename.inp > filename.out|
 
 A number of test input files can be found in the directory ``input''. If you type\\\\
@@ -475,8 +475,8 @@ force field (HOFF) is implemented, which considers both bond lengths and angles 
   E_{\mathrm{Wu}} = 
           \frac{k_p}{2} \sum_{i_p}^{\mathrm{p-edges}} \left(R_{i_p} - R_p\right)^2 
         + \frac{k_h}{2} \sum_{i_h}^{\mathrm{h-edges}} \left(R_{i_h} - R_h\right)^2 \\
-        + \frac{f_p}{2} \sum_{j_p}^{\mathrm{60}} \left(\theta_{j_p} - \theta_p\right)^2 
-        + \frac{f_h}{2} \sum_{j_h}^{\mathrm{3\times vertices-60}} \left(\theta_{j_h} - \theta_h\right)^2 
+        + \frac{f_p}{2} \sum_{j_p}^{60} \left(\theta_{j_p} - \theta_p\right)^2 
+        + \frac{f_h}{2} \sum_{j_h}^{3\times n_v-60} \left(\theta_{j_h} - \theta_h\right)^2 
 \end{multline}
 Only bonded pairs of vertices are taken into account. $k_{p}$ and $k_{h}$ are
 the force constants for the two different C--C bonds (set to $\approx 300 \text{\,kcal\,\AA}^{-2}$), $R_p$ and $R_h$ the corresponding pentagon and
@@ -489,7 +489,7 @@ Moreover, as no dihedral angles are fixed, the molecule might distort away from 
 be added (see input instructions) in a preoptimization step to avoid large ``dents'' or edge crossings of the fullerene,
 \begin{equation}
   \label{eq:Ewu}
-  E = E_{\mathrm{Wu}} + E_{\mathrm{Coulomb}} = E_{\mathrm{Wu}} + \sum_{i=1}^{\mathrm{vertices}} \frac{f_{\mathrm{Coulomb}}}{|\vec{r}_i - \vec{r}_0|}
+  E = E_{\mathrm{Wu}} + E_{\mathrm{Coulomb}} = E_{\mathrm{Wu}} + \sum_{i=1}^{n_v} \frac{f_{\mathrm{Coulomb}}}{|\vec{r}_i - \vec{r}_0|}
 \end{equation}
 with $\vec{r}_i - \vec{r}_0$ being the distance between vertex $i$ and the barycenter at $\vec{r}_0$. Another method to influence convergence into the global
 minimum is to adjust the sphere radius in the Tutte embedding algorithm (see input section).
@@ -511,8 +511,8 @@ The total energy for the extended Wu force field is given by
           \frac{f_{pp}}{2}  \sum_{i_{pp}}^{\mathrm{pp-e}} \left(R_{i_{pp}} - R_{pp}\right)^2 
         + \frac{f_{hp}}{2}  \sum_{i_{hp}}^{\mathrm{hp-e}} \left(R_{i_{hp}} - R_{hp}\right)^2 
         + \frac{f_{hh}}{2}  \sum_{i_{hh}}^{\mathrm{hh-e}} \left(R_{i_{hh}} - R_{hh}\right)^2\\
-        + \frac{f_p}{2}     \sum_{j_p}^{\mathrm{60}} \left(\theta_{j_p} - \theta_p\right)^2 
-        + \frac{f_h}{2}     \sum_{j_h}^{\mathrm{3n_v-60}} \left(\theta_{j_h} - \theta_h\right)^2 
+        + \frac{f_p}{2}     \sum_{j_p}^{60} \left(\theta_{j_p} - \theta_p\right)^2 
+        + \frac{f_h}{2}     \sum_{j_h}^{3n_v-60} \left(\theta_{j_h} - \theta_h\right)^2 
         + \frac{f_{ppp}}{2} \sum_{k_{ppp}}^{\mathrm{ppp-v}} \left(\theta_{k_{ppp}} - \theta_{ppp}\right)^2 \\
         + \frac{f_{hpp}}{2} \sum_{k_{hpp}}^{\mathrm{hpp-v}} \left(\theta_{k_{hpp}} - \theta_{hpp}\right)^2 
         + \frac{f_{hhp}}{2} \sum_{k_{hhp}}^{\mathrm{hhp-v}} \left(\theta_{k_{hhp}} - \theta_{hhp}\right)^2 
