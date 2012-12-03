@@ -151,20 +151,22 @@ fulfilling Euler's theorem, $n_v - n_e + n_f = 2$, where $n_v$ is the number of 
 $n_f$ the number of faces (5- or 6-rings). The program constructs an accurate 3D structure (in cartesian coordinates) of any fullerene isomer 
 from the canonical ring spiral pentagon indices (RSPI) through either a 3D Tutte embedding (3D-TE) \cite{Tutte} or the adjacency matrix
 eigenvector (AME) method \cite{Atlas}. One can also construct the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene or a halma fullerene 
-$GC_{k,0}[C_{n_v}]$ as a special case of a Goldberg-Coxeter transformation $GC_{k,l}$. Starting from a given fullerene structure one can 
-perform vertex insertions (such as Endo-Kroto \cite{Endo92} or Yoshida-Fowler \cite{Yoshida97}), Brinkmann-Fowler \cite{BrinkmannFowler03}
+$GC_{k,0}[C_{n_v}]$ as special cases of the more general Goldberg-Coxeter transformation $GC_{k,l}$ with $k \geq l$, which is implemented
+only for \C{20}, i.e. $GC_{k,l}[C_{20}]$). Starting from a given fullerene structure one can 
+perform vertex insertions (such as Endo-Kroto \cite{Endo92}, Yoshida-Fowler \cite{Yoshida97} or Brinkmann-Fowler \cite{BrinkmannFowler03})
 or Stone-Wales transformations \cite{Stone86}. 
 Vertex insertions allow for the construction of non-spiral fullerenes such as \C{380} or \C{384}. 
 Geometry optimization using a Fletcher-Reeves-Polak-Ribiere
-minimization \cite{NumRec} with analytical gradients for the Wu (and extended Wu) force-field \cite{Wu87} is implemented in the current version, providing 
+minimization \cite{NumRec} with analytical gradients for the harmonic oscillator force-field \cite{Wu87} is implemented in the current version, providing 
 a good initial guess for 3D cartesian coordinates. 2D fullerene graphs (Schlegel diagrams)
 can be produced using a variety of different algorithms \cite{Plestenjak}. The program determines the volume and surface area 
 of a fullerene (irregular or not) through tesselation in trigonal pyramids or from the convex hull, and gives measures for
 spherical distortion and convexity. It determines the minimum covering sphere, the minimum distance sphere
 and the maximum inner sphere. The program further calculates the number of Hamiltonian cycles
-and produces ring spiral indices. Finally, Cioslowski's scheme for the calculation of the heat of formation for IPR
+and produces ring spiral indices. Cioslowski's scheme for the calculation of the heat of formation for IPR
 (isolated pentagon rule) fullerenes is implemented \cite{Cioslowski2000}, as well as Babi{\'c}'s scheme for calculating the 
 total resonance energy of a general fullerene \cite{Babic1995,Babic1997}, and Martin's scheme for the heat of formation \cite{Alcami}.
+A variety of topological indicators, such as the Wiener index or Balaban index, are calculated.\cite{Wiener1947,Balaban}
 
 This program works for any (distorted or not) regular fullerene. The spiral algorithm of Fowler and Manolopoulus used here \cite{Atlas}
 is not restricted to a pentagon start or to canonical indices. For a general list of fullerenes see ``The House of Graphs'' \cite{HouseofGraphs}. 
@@ -182,8 +184,8 @@ From version 4.0 onwards (released July 2012) C++ routines embedded into the ori
 much improved algorithms compared to the older versions. The reason for using two different program languages is
 that PS is good in old-fashioned Fortran and JA is good in C++.  Furthermore, some of the original routines used were available 
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
-and geometry optimization. Version 4.3 now includes the Hessian of the force field, although for the extended Wu force
-field we have not optimized yet the force constants to match experimental vibrational frequencies.
+and geometry optimization. Version 4.3 now includes the Hessian of the force field, although 
+we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
 This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bug please report it to one of us.
 
@@ -191,15 +193,16 @@ There are many things on our to-do list. We try hard to release more functionali
 Not implemented yet is: 
 1) The minimum covering ellipsoid useful for  rugby-ball shaped fullerenes (yes this is New Zealand
 and crazy about rugby), and close packing of ellipsoids; 
-2) The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes other than C20;
+2) The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes other than \C{20};
 3) Geometry optimization using further improved force fields; 
 4) Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 
-5) To symmetrize optimized coordinates to point group symmetry; 
+5) Symmetrization of optimized coordinates to point group symmetry; 
 6) Symmetry labels for H\"uckel orbital energies and vibrational frequencies; 
 7) Extension to non-classical fullerenes of genus 0 (heptagons and squares); 
 8) Extension to non-regular fullerenes of genus 1 (hmmm, donuts!); 
-9) A restart option for subroutine Hamilton;  
-10) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
+9) A restart option for subroutine Hamilton;
+10) Perfect matchings, Kekul\'e structures and Clar sextets;
+11) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
 with a good graphical interface similar to the \program{CAGE} program \cite{Brinkmanx}.
 
 We are also open to any other suggestions and welcome additions to this program suite. In this case please feel free to contact us per email.
@@ -239,7 +242,6 @@ and \filename{HOG} with (if downloaded from http://hog.grinvin.org/Fullerenes ) 
 To use the latex program for the 2D fullerene graphs you need to use the files \filename{standalone.cfg} and \filename{standalone.cls}.
 
 
-\clearpage
 %Program Structure
 \section{Program Structure}
 The main program (\filename{main.f}) calls a number of subroutines for certain tasks and in a certain sequence.
@@ -251,7 +253,7 @@ explained in some detail in this section. More information can be obtained in an
 %Figure 1
 \begin{figure}[htbp]
    	\centering
-	\includegraphics[width=0.9\textwidth]{tree.pdf} 
+	\includegraphics[width=0.95\textwidth]{tree.pdf} 
     \caption{Flow diagram for main program tasks.}
     \label{pic:flowdiagram}
 \end{figure}
@@ -259,39 +261,40 @@ explained in some detail in this section. More information can be obtained in an
 The most time-consuming steps in the program are the diagonalization of the adjacency matrix 
 of the fullerene graph $F$, $A(F)$,  
 needed for the AME algorithm and the H\"uckel analysis ($\mathcal{O}(n^3)$), the force-field optimization for
-very large fullerenes ($>$ 2000 atoms), the determination of the number of Hamiltonian cycles
+very large fullerenes ($>$ 2000 atoms)  and the diagonalization of
+the force-field Hessian, the determination of the number of Hamiltonian cycles
 ($>$ 80 atoms) (this is an NP-complete problem), the creation of a list of ring-spiral pentagon
 indices for all possible isomers with a given vertex count $n_v$ ($>$ 80 atoms), 
 and the Tutte embedding algorithm ($>$ 2000 atoms). We try to improve the performance of these algorithms
 in our next major version to be released. For version 4.1 the fullerene database was increased and a link to
-the House of Graphs was made possible. Version 4.2 saw the introduction of dihedral angles into the force field,
-and Version 4.3 was extended to calculate frequencies from the Hessian of the force field and introduced
-the the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k$ and $l$.
+the House of Graphs was introduced. Version 4.2 saw the introduction of dihedral angles into the force field,
+and Version 4.3 was extended to calculate frequencies from the force-field Hessian, and the implementation of
+the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k \geq l$.
 
 %Create a 3D structure for a specific fullerene
 \subsection{Create a 3D structure for a specific fullerene}
 
 The easiest way to create a 3D structure for program Fullerene is of course to read-in cartesian coordinates for a specific
-fullerene (see files \filename{CCc20.inp} to \filename{CCc540.inp}), or to construct them internally for the high
+fullerene (see input files \filename{CCc20.inp} to \filename{CCc540.inp}), or to construct them internally for the high
 symmetry $I_h-$\C{20} or $I_h-$\C{60} isomers (Subroutine \funname{CoordC20C60}, see input files \filename{GEOMc60.inp},
-\filename{GEOMc60exp.inp}, \filename{GEOMc60ideal.inp}), or to get the cartesian coordinates from input ring-spiral
-pentagon-indices RSPI (Subroutine \funname{CoordBuild}) by using either the Fowler-Manolopoulus AME algorithm \cite{Atlas},
-or the more reliable 3D-TE algorithm (used by files \filename{RSPIc20.inp} to for example \filename{RSPIc840.inp}),
+\filename{GEOMc60exp.inp}, \filename{GEOMc60ideal.inp}), or to construct the cartesian coordinates from the ring-spiral
+pentagon-indices RSPI by using either the Fowler-Manolopoulus AME algorithm \cite{Atlas},
+or the more reliable 3D-TE algorithm (Subroutine \funname{CoordBuild}, see input files \filename{RSPIc20.inp} or \filename{RSPIc840.inp}),
 or from a Goldberg-Coxeter 2-index transformation of \C{20}, i.e. $GC_{k,l}(20)$ with $k \geq l$ and $k > 0$
-(triangulation algorithm described below, input files \filename{GEOMc20Halma.inp}
-to \filename{GEOMc500Halma.inp}) and for example \filename{GGCK6L2.inp}. 
-The 12 pentagon indices can also be obtained from the \textit{fullerene database} if 
-the canonical fullerene number is used as defined in the book ``Atlas of Fullerenes'' by Fowler and Manolopoulus \cite{Atlas,cvetkovic2002} 
-(e.g. input file \filename{DBc66.inp}). Information of vertex connections (edges) can also be used as input (input files \filename{EDGEc20.inp} and \filename{EDGEc60.inp}).
+(triangulation algorithm described below, see input files \filename{GEOMc20Halma.inp}, \filename{GEOMc500Halma.inp}) or \filename{GGCK6L2.inp}). 
+The 12 pentagon indices can also be obtained from the \textit{fullerene database} using 
+the canonical fullerene number as defined in the book ``Atlas of Fullerenes'' by Fowler and Manolopoulus \cite{Atlas,cvetkovic2002} 
+(e.g. input file \filename{DBc66.inp}). Information of vertex connections (edges) can also be used as input 
+(input files \filename{EDGEc20.inp} and \filename{EDGEc60.inp}).
 The program prints internal coordinates in form of a $Z$-Matrix (distances, angles and dihedrals).
 For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
-coordinates, e.g. through a force-field optimization.
+coordinates, e.g. cartesian coordinates obtainded from a force-field optimization.
 
 We recommend reading Fowler and Manolopoulus' book \cite{Atlas,cvetkovic2002} for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
-to construct 3D fullerene graphs. For the Goldberg-Coxeter transformation of \C{20} we construct the RSPI from the scheme introduced by
-Fowler and Rogers.\cite{Rogers}
-For the AME algorithm it is critical to get the right 
-H\"uckel eigenvectors for the construction of cartesian coordinates \cite{Atlas}. 
+to construct 3D fullerene graphs. For the Goldberg-Coxeter transformation of \C{20} we obtain the RSPI from the scheme introduced by
+Fowler and Rogers.\cite{Rogers} For the AME algorithm it is critical to get the right 
+H\"uckel eigenvectors for the construction of cartesian coordinates,\cite{Atlas} which worked well for the icosahedral
+fullerenes, but less well for fullerene nanotubes. 
 The position of the three~$P$-type eigenvectors can be specified (see file \filename{RSPIc60NT.inp} for such an example).
 If the AME algorithm fails or you cannot find the required $P$-type eigenvectors, you should use our Tutte embedding algorithm,
 which (to our opinion) is less troublesome and may be used as the standard method to construct 3D structures. The disadvantage
@@ -362,10 +365,26 @@ The Estrada index for $I_h$-\C{60} is $E$= 197.450228 and the corresponding bipa
 indices are defined as \cite{Wiener1947},
 \begin{equation}
   \label{Wiener}
-  W(G)=\frac{1}{2} \sum_{\{ u,v \} \subseteq V(G)} d(u,v) \quad \text{ and } \quad WW(G)=\frac{1}{2} \sum_{\{ u,v \} \subseteq V(G)} \left( d(u,v) + d(u,v)^2 \right)
+  W(G)=\frac{1}{2} \sum_{\{ i,j \} \subseteq V(G)} D_{ij} \quad \text{ and } \quad WW(G)=\frac{1}{2} \sum_{\{ i,j \} \subseteq V(G)} \left( D_{ij} + D_{ij}^2 \right)
 \end{equation}
-Here $V(G)$ is the vertex set and $d(u,v)$ is the topological (chemical) distance between the two vertices $u$ and $v$, i.e. the number 
-of edges in the shortest path connecting them. For $I_h$-\C{60} we have $W(G)$= 8340 and $WW(G)$= 27180. The Balaban index is defined as \cite{Balaban},
+Here $V(G)$ is the vertex set and $D_{ij}$ is the topological (chemical) distance matrix containing the topological distances 
+between the two vertices $i$ and $j$, i.e. the number of edges in the shortest path connecting them. 
+For $I_h$-\C{60} we have $W(G)$= 8340 and $WW(G)$= 27180. If we define
+\begin{equation}
+  \label{TopDist}
+  d_i^{\mathrm{max}} = \max\limits_{j} \{ D_{ij} \}
+\end{equation}
+we can define the topological diameters $D$ and radius $R$ as
+\begin{equation}
+  \label{TopDist}
+  D = \max \{ d_i^{\mathrm{max}} \} \quad \text{ and } \quad  R = \min \{ d_i^{\mathrm{max}} \}
+\end{equation}
+We can now define the reverse Winer index as
+\begin{equation}
+  \label{RevWiener}
+  W_{\mathrm{rev}} = n_v(n_v - 1)D/2 - W
+\end{equation}
+which for \C{60} is 7590. The Balaban index is defined as \cite{Balaban},
 \begin{equation}
   \label{Balaban}
   B(G)=\frac{n_e}{n_e-n_v+2} \sum_{i<j \in E(G)} \left( W(i)W(j) \right)^{-1/2}
@@ -373,7 +392,7 @@ of edges in the shortest path connecting them. For $I_h$-\C{60} we have $W(G)$= 
 $n_e$ are the number of edges and $W(i)$ is the sum of topological distances between vertex $i$ and all other vertices in the graph,
 \begin{equation}
   \label{sum}
-  W_i=\sum_{j \in V(G)} d(i,j)
+  W_i=\sum_{j \in V(G)} D_{ij}
 \end{equation}
 For $I_h$-\C{60} we have $B(G)$= 0.910521583. The Schultz and Zagreb indices are also listed, although they are related to
 the indices already defined here. Further listed are two topological efficiency parameters $\rho$ and $\rho_E$ defined by Vukicevic, Ori and co-workers \cite{Vukicevic,Ori},
@@ -443,13 +462,13 @@ against a second algorithm developed by us for various fullerenes. Left-right cy
 same cycle as they are isomorphic to each other. Although finding all Hamiltonian cycles is an NP-complete problem, the algorithm works fine up to about \C{100}. 
 After that it becomes computationally very demanding. Therefore, for the larger fullerenes the program prints upper and lower limits instead. The existence of Hamiltonian cycles for fullerenes is only conjectured at this stage, and only for layered fullerenes 
 (e.g. fullerene with onion-shaped 2D graphs such as nanotubes) existence has been proven. Our recent calculations verified that
-Hamiltonian cycles exist for all fullerene isomers up to \C{100} and for all IPR isomers up to \C{120} \cite{PSAJDB}.
+Hamiltonian cycles exist for all fullerene isomers up to \C{122} and for all IPR isomers up to \C{170} \cite{PSAJDB}.
 
 %Force-field optimization
 \subsection{Force-field optimization}
 The fullerene structure can be optimized by force fields using a Fletcher-Reeves-Polak-Ribiere geometry optimization \cite{NumRec}
-with analytical gradients (Subroutine \funname{OptFF} \cite{NumericalRecipes}). In the current version the Wu
-force field is implemented, which considers both bond lengths and angles only in an harmonic oscillator approximation \cite{Wu87}: 
+with analytical gradients (Subroutine \funname{OptFF} \cite{NumericalRecipes}). In the current version the harmonic oscillator
+force field (HOFF) is implemented, which considers both bond lengths and angles only in an harmonic oscillator approximation \cite{Wu87}: 
 \begin{multline}
   \label{eq:Ewu}
   E_{\mathrm{Wu}} = 
@@ -461,10 +480,10 @@ force field is implemented, which considers both bond lengths and angles only in
 Only bonded pairs of vertices are taken into account. $k_{p}$ and $k_{h}$ are
 the force constants for the two different C--C bonds (set to $\approx 300 \text{\,kcal\,\AA}^{-2}$), $R_p$ and $R_h$ the corresponding pentagon and
 hexagon bond distances ($\approx$ 1.4 \AA), and $\theta_p $ and $\theta_h$ are the corresponding bond angles (108$^\circ$ and 120$^\circ$
-respectively). As the Wu force field was developed for $I_h$-\C{60} only adjacent pentagons are treated in the same way as a pentagon adjacent to a hexagon.
+respectively). As the original Wu force field was developed for $I_h$-\C{60} only adjacent pentagons are treated in the same way as a pentagon adjacent to a hexagon.
 
-The force-field optimization is very fast even for fullerenes such as \C{840}. 
-The Wu force-field optimization may lead to distortions of the fullerene to a structure of lower symmetry compared to the original point-group. 
+The HOFF optimization is very fast even for fullerenes such as \C{840}. 
+The HOFF force-field optimization may lead to distortions of the fullerene to a structure of lower symmetry compared to the original point-group. 
 Moreover, as no dihedral angles are fixed, the molecule might distort away from convexity. In such cases an additional Coulomb repulsive potential can
 be added (see input instructions) in a preoptimization step to avoid large ``dents'' or edge crossings of the fullerene,
 \begin{equation}
@@ -477,7 +496,7 @@ Note that the construction of the fullerene by using the AME or Tutte algorithm 
 lead to a more spherical arrangement prior to a force-field optimization with rather large bond distances, 
 e.g. barrels instead of nanotubes. 
 
-A more sophisticated force field using dihedral angles is implemented as well (extended Wu force field),
+A more sophisticated force field using dihedral angles is implemented as well (extended HOFF force field),
 which enhances planarity for areas of connected hexagons. The extended Wu force field takes three types of bonds (adjacent to 0, 1 or 2 pentagons),
 two types of angles, and four types of dihedral angles into account. There is one dihedral per atom.  Dihedrals~$\theta_{abcd}$ 
 are defined between one atom~$a$ and its three neighbours~$b$, $c$ and $d$.  As one atom is part of three faces
@@ -492,16 +511,16 @@ The total energy for the extended Wu force field is given by
         + \frac{f_{hp}}{2}  \sum_{i_{hp}}^{\mathrm{hp-e}} \left(R_{i_{hp}} - R_{hp}\right)^2 
         + \frac{f_{hh}}{2}  \sum_{i_{hh}}^{\mathrm{hh-e}} \left(R_{i_{hh}} - R_{hh}\right)^2\\
         + \frac{f_p}{2}     \sum_{j_p}^{\mathrm{60}} \left(\theta_{j_p} - \theta_p\right)^2 
-        + \frac{f_h}{2}     \sum_{j_h}^{\mathrm{3\times v-60}} \left(\theta_{j_h} - \theta_h\right)^2 
+        + \frac{f_h}{2}     \sum_{j_h}^{\mathrm{3n_v-60}} \left(\theta_{j_h} - \theta_h\right)^2 
         + \frac{f_{ppp}}{2} \sum_{k_{ppp}}^{\mathrm{ppp-v}} \left(\theta_{k_{ppp}} - \theta_{ppp}\right)^2 \\
         + \frac{f_{hpp}}{2} \sum_{k_{hpp}}^{\mathrm{hpp-v}} \left(\theta_{k_{hpp}} - \theta_{hpp}\right)^2 
         + \frac{f_{hhp}}{2} \sum_{k_{hhp}}^{\mathrm{hhp-v}} \left(\theta_{k_{hhp}} - \theta_{hhp}\right)^2 
         + \frac{f_{hhh}}{2} \sum_{k_{hhh}}^{\mathrm{hhh-v}} \left(\theta_{k_{hhh}} - \theta_{hhh}\right)^2
 \end{multline}
-where pp-e (hp-e, hh-e) denotes the number of edges adjacent to 2 (1, 0) pentagons, v is the 
+where pp-e (hp-e, hh-e) denotes the number of edges adjacent to 2 (1, 0) pentagons, $n_v$ is the 
 number of vertices and ppp-v (hpp-v, hhp-v, hhh-v) is the number of vertices between 3 (2, 1, 0) pentagons.
 
-The additional Coulomb force, that can be added to the extended Wu field, is equal to the aforementioned
+The additional Coulomb force, that can be added to the extended HOFF field, is equal to the aforementioned
 optional Coulomb force defined in eq.(\ref{eq:Ewu}).
 
 %Ring connectivities, patterns, vertex insertions and spiral detection
@@ -1154,7 +1173,7 @@ Note that the maximum number of vertices in the database is defined in the confi
 %Figure 6
  \begin{figure}[htbp]
 	\centering
-  		 \includegraphics[width=0.5\textwidth]{C2160.png}
+  		 \includegraphics[width=0.3\textwidth]{C2160.png}
      \caption{Force-field optimized structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
      \label{pic:Finalgraph}
  \end{figure}
@@ -1208,6 +1227,10 @@ Dependence on Structural Motifs'', \textit{J. Am. Chem. Soc.} \textbf{122}, 8265
 \bibitem{Alcami} M. Alcam\'i, G. Sanchez, S. Diaz-Tendero, Y. Wang, F. Martin, ``Structural Patterns in Fullerenes Showing
 Adjacent Pentagons: \C{20} to \C{72}'', \textit{J. Nanosci. Nanotech.} \textbf{7}, 1329-1338 (2007).
 
+\bibitem{Wiener1947} H. Wiener, ``Structural Determination of Paraffin Boiling Points'', \textit{J. Am. Chem. Soc.}, \textbf{69}, 17-20 (1947).
+
+\bibitem{Balaban} A. T. Balaban, ``Topological indices based on topological distances in molecular graphs'', \textit{Pure Appl. Chem.}, \textbf{55}, 199-206 (1983).
+
 \bibitem{HouseofGraphs} Brinkmann, G., Goedgebeur, J., M\'elot, H., Coolsaet, K., \textit{Discrete Applied Mathematics}, \textbf{161}, 311-314 (2013). 
 House of Graphs: a database of interesting graphs, available for fullerenes at https://hog.grinvin.org/Fullerenes.
 
@@ -1238,10 +1261,6 @@ Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 \bibitem{Estrada} E. Estrada, ``Characterization of 3D molecular structure'', \textit{Chem. Phys. Lett.}, \textbf{319}, 713-718 (2000).
 
 \bibitem{Doslic2005} T. Dosli\'c, ``Bipartivity of fullerene graphs and stability'', \textit{Chem. Phys. Lett.}, \textbf{412}, 336-340 (2005).
-
-\bibitem{Wiener1947} H. Wiener, ``Structural Determination of Paraffin Boiling Points'', \textit{J. Am. Chem. Soc.}, \textbf{69}, 17-20 (1947).
-
-\bibitem{Balaban} A. T. Balaban, ``Topological indices based on topological distances in molecular graphs'', \textit{Pure Appl. Chem.}, \textbf{55}, 199-206 (1983).
 
 \bibitem{Vukicevic} D. Vukicevic, F. Cataldo, O. Ori, A. Graovac, ``Topological efficiency of \C{66} fullerene'', \textit{Chem. Phys. Lett.} \textbf{501}, 442-445 (2011),
 
