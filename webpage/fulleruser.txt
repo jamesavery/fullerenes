@@ -39,3 +39,8 @@ Mr. & Fatemeh & Moftakhar & University of Kashan & Mathematics & Kashan & Iran &
 Ms. & Vivekananad & Gobre & Fritz Haber Institute of Max Planck Society  & Theory Department & Berlin & Germany & gobre@fhi-berlin.mpg.de & 
 Ms. & Vivekananad & Gobre & Fritz Haber Institute of Max Planck Society  & Theory Department & Berlin & Germany & gobre@fhi-berlin.mpg.de & 
 Dr. & Jan & Kazimirski &  &  & Warsaw & Poland & jankazim@op.pl & 
+Ms. & Son Tung & Ngo & Institute of Physics, Polish Academy of Sciences & Biophysics & Warsaw & Poland & sontungngo84@gmail.com & 
+Dr. & Al & Chen & IPMech RAS &  & Moscow & Russia & chentsov@ipmnet.ru & 
+Dr. & Alexey & Popov & Leibniz Institute for Solid State and Materials Research (IFW Dresden) & Electronic Structure of Molecular Materials & Dresden & Germany & a.popov@ifw-dresden.de & 
+Dr. & Yang & Gao & lanzhou university & department of mathematics and statistics  & lanzhou & China & gaoy1@163.com & 
+Dr. & Juan & Perilla & University of Illinois Urbana-Champaign & Beckman Institute & Urbana & United States of America & juan@ks.uiuc.edu & 
