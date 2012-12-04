@@ -49,11 +49,10 @@ C    Set the dimensions for the distance matrix
       CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
-      Integer Edges(Emax,2)
       Integer endzeile,Values(8)
-      Integer MDist(Nmax,Nmax)
       integer istop
       Logical lexist
+      integer mdist(nmax,nmax)
 
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
@@ -380,13 +379,13 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         routine='TOPOLOINDICATOR'
         Write(Iout,1008) routine
 C Topological Indicators
-      CALL TopIndicators(Matom,Iout,Edges,IDA,Mdist)
+      CALL TopIndicators(Matom,Iout,IDA)
 C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout,MAtom)
 C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
 C Produce perfect matchings (Kekule structures) and analyze
-      CALL PerfectMatching(MAtom,Iout,IDA)
+c      CALL PerfectMatching(MAtom,Iout,IDA)
 
 C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
@@ -556,7 +555,7 @@ C Calculate Schlegel diagram
           ParamS=dabs(ParamS)
         endif
         CALL Graph2D(MAtom,Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
-     1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
+     1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,mdist,Dist,ParamS,Rmin,
      1   TolX,scales,scalePPG,boost,CR,CRing5,CRing6,Symbol,filename)
       endif
 
