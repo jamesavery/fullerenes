@@ -1,17 +1,17 @@
-      SUBROUTINE PerfectMatching(MAtom,Iout,IDA)
-      use config
-      IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION IDA(Nmax,Nmax)
-       Write(Iout,1000) MAtom
-       Write(Iout,1001) 
-       Write(Iout,1002) 
- 1000 Format(1X,'Upper limit for number of perfect matchings',
-     1 ' in cubic graphs: 2**N with N=',I5)
- 1001 Format(1X,'Counting the number of perfect matchings using',
-     1 ' the Fisher-Kasteleyn-Temperley (FKT) algorithm')
- 1002 Format(1X,'Not implemented yet')
-      RETURN
-      END
+c      SUBROUTINE PerfectMatching(MAtom,Iout,IDA)
+c      use config
+c      IMPLICIT REAL*8 (A-H,O-Z)
+c      DIMENSION IDA(Nmax,Nmax)
+c       Write(Iout,1000) MAtom
+c       Write(Iout,1001) 
+c       Write(Iout,1002) 
+c 1000 Format(1X,'Upper limit for number of perfect matchings',
+c     1 ' in cubic graphs: 2**N with N=',I5)
+c 1001 Format(1X,'Counting the number of perfect matchings using',
+c     1 ' the Fisher-Kasteleyn-Temperley (FKT) algorithm')
+c 1002 Format(1X,'Not implemented yet')
+c      RETURN
+c      END
 
       SUBROUTINE Sortr(M,Mnew,imirror,jmirror,diam)
       use config
@@ -57,13 +57,13 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
-      SUBROUTINE TopIndicators(Matom,Iout,Edges,IDA,Mdist)
+      SUBROUTINE TopIndicators(Matom,Iout,IDA)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer MDist(Nmax,Nmax),Edges(Emax,2)
+      Integer MDist(Nmax,Nmax),Edges(2,3*matom/2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
-      type(c_ptr) :: g, new_fullerene_graph
+      type(c_ptr) :: graph, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
 C     minimal and maximal vertex contribution, rho and rhoE,
 C     Schultz index and Balaban index
@@ -71,23 +71,13 @@ C     For details see D. Vukicevic,F. Cataldo, O. Ori, A. Graovac,
 C     Chem. Phys. Lett. 501, 442–445 (2011).
 
       Write(Iout,1000) MAtom
-      Nedge=0
-      Do I=1,Nmax
-      Do J=I,Nmax
-       MDist(I,J)=0
-       MDist(J,I)=0
-       if(IDA(I,J).eq.1) then
-        Nedge=Nedge+1
-        Edges(Nedge,1)=I
-        Edges(Nedge,2)=J
-       endif
-      enddo
-      enddo
-      if(Nedge.ne.3*MAtom/2) Write(Iout,1005) Nedge
 
 C     Get topological distance matrix
-      g = new_fullerene_graph(Nmax,Matom,IDA)
-      call all_pairs_shortest_path(g,Matom,Nmax,MDist)
+      graph = new_fullerene_graph(Nmax,Matom,IDA)
+      call all_pairs_shortest_path(graph,Matom,Nmax,MDist)
+      call edge_list(graph,edges,NE)
+c     and finally delete the graph to free the mem
+      call delete_fullerene_graph(graph)     
 
 C     Wiener and hyper Wiener index, topological radius and diameter
       Xatom=dfloat(MAtom)
@@ -144,7 +134,7 @@ C     Balaban index
       balabanindex=balaban*fac
 
 C     Szeged index
-      Call Szeged(MAtom,Nedge,Edges,MDist,Sz)
+      Call Szeged(MAtom,Edges,MDist,Sz)
 
 C     Final
       over=1.d-10
@@ -197,29 +187,28 @@ C     Write(Iout,1004) ori
      1 ' Topological radius R: ',I6,
      1 ', and average topological distance: ',F12.6)
 C1004 Format(' Ori constant for Wiener index: ',D15.9)
- 1005 Format(' ERROR: Check number of edges: ',I10)
  1006 Format(' Something wrong with Wiener sum')
 
       RETURN
       END
 
-      SUBROUTINE Szeged(N,Nedge,Edges,Dt,Sz)
+      SUBROUTINE Szeged(N,Edges,mdist,Sz)
       use config
 C     This routine calculates the Szeged index
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer Dt(Nmax,Nmax),Edges(Emax,2)
+      Integer mdist(Nmax,Nmax),Edges(2,3*n/2)
       Sz=0.d0
 C     Sum over all edges
-      Do I=1,Nedge
-       IE1=Edges(I,1)
-       IE2=Edges(I,2)
+      Do I=1,3*n/2
+       IE1=Edges(1,I)+1
+       IE2=Edges(2,I)+1
 C      Get ni and nj for Szeged index
        ni=0
        nj=0
        do J=1,N
 C       if(IE1.ne.J.and.IE2.ne.J) then
-         if(Dt(IE1,J).lt.Dt(IE2,J)) ni=ni+1
-         if(Dt(IE1,J).gt.Dt(IE2,J)) nj=nj+1
+         if(mdist(IE1,J).lt.mdist(IE2,J)) ni=ni+1
+         if(mdist(IE1,J).gt.mdist(IE2,J)) nj=nj+1
 C       endif
        enddo
        Sz=Sz+dfloat(ni*nj)
