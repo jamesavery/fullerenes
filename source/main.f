@@ -28,7 +28,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
       real(8) force(ffmaxdim), forceP(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
-      DIMENSION Icon2(Nmax*Nmax),distP(Nmax),IDA(Nmax,Nmax)
+      DIMENSION distP(Nmax),IDA(Nmax,Nmax)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
@@ -49,6 +49,7 @@ C    Set the dimensions for the distance matrix
       CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
+      Integer Edges(Emax,2)
       Integer endzeile,Values(8)
       Integer MDist(Nmax,Nmax)
       integer istop
@@ -218,8 +219,7 @@ C------------------CONNECT-----------------------------------------
 C Establish Connectivities
       routine='CONNECT        '
       Write(Iout,1008) routine
-      CALL Connect(MCon2,MAtom,Ipent,Iout,
-     1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
+      CALL Connect(MCon2,MAtom,Ipent,Iout,IC3,IDA,TolX,DistMat,Rmin)
 
 C------------------REORDER-----------------------------------------
 C Reorder atoms such that distances in internal coordinates are bonds
@@ -380,7 +380,7 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         routine='TOPOLOINDICATOR'
         Write(Iout,1008) routine
 C Topological Indicators
-      CALL TopIndicators(Matom,Iout,IDA,Mdist)
+      CALL TopIndicators(Matom,Iout,Edges,IDA,Mdist)
 C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout,MAtom)
 C Determine if fullerene is chiral

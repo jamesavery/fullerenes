@@ -57,11 +57,11 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
-      SUBROUTINE TopIndicators(Matom,Iout,IDA,Mdist)
+      SUBROUTINE TopIndicators(Matom,Iout,Edges,IDA,Mdist)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer MDist(Nmax,Nmax)
+      Integer MDist(Nmax,Nmax),Edges(Emax,2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
       type(c_ptr) :: g, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
@@ -71,16 +71,25 @@ C     For details see D. Vukicevic,F. Cataldo, O. Ori, A. Graovac,
 C     Chem. Phys. Lett. 501, 442–445 (2011).
 
       Write(Iout,1000) MAtom
+      Nedge=0
       Do I=1,Nmax
-      Do J=1,Nmax
+      Do J=I,Nmax
        MDist(I,J)=0
+       MDist(J,I)=0
+       if(IDA(I,J).eq.1) then
+        Nedge=Nedge+1
+        Edges(Nedge,1)=I
+        Edges(Nedge,2)=J
+       endif
       enddo
       enddo
+      if(Nedge.ne.3*MAtom/2) Write(Iout,1005) Nedge
 
 C     Get topological distance matrix
       g = new_fullerene_graph(Nmax,Matom,IDA)
       call all_pairs_shortest_path(g,Matom,Nmax,MDist)
 
+C     Wiener and hyper Wiener index, topological radius and diameter
       Xatom=dfloat(MAtom)
       wiener1=0.d0
       wiener=0.d0
@@ -134,6 +143,10 @@ C     Balaban index
       fac=3.d0*vertnum/(vertnum+4.d0)
       balabanindex=balaban*fac
 
+C     Szeged index
+      Call Szeged(MAtom,Nedge,Edges,MDist,Sz)
+
+C     Final
       over=1.d-10
       wiener=wiener1/2.d0
       wav=wiener1/vertnum
@@ -155,7 +168,7 @@ C     ori=wiener/vertnum**2.5
      1 dint(reversewiener+over),
      1 wav,rho,rhoE,izagreb,
      1 dint(schultz+over),
-     1 balabanindex
+     1 balabanindex,dint(Sz+over)
       Write(Iout,1002) Wienerbalaban
       Write(Iout,1003) maxdist,mRadius,Avdist
 C     Write(Iout,1004) ori
@@ -173,7 +186,8 @@ C     Write(Iout,1004) ori
      1 ' Zagreb index = nv*3^2 = ',I12,
      1 ' (trivial for regular fullerenes)',/,
      1 ' Schultz index = 6*W = ',F20.0,' (related to Wiener index for ',
-     1 'regular fullerenes)',/,' Balaban index = ',D15.9,
+     1 'regular fullerenes)',/,' Balaban index = ',D15.9,/,
+     1 ' Szeged index = ',F20.0,
      1 /,' For the Estrada index see Subroutine Hueckel output')
  1002 Format(' f*Wiener*Balaban = 4WB(n+4)/(9n^3) = ',D15.9,/,'   ',
      1 ' (should be exactly 1.0 for cubic polyhedra with equal row ',
@@ -183,8 +197,33 @@ C     Write(Iout,1004) ori
      1 ' Topological radius R: ',I6,
      1 ', and average topological distance: ',F12.6)
 C1004 Format(' Ori constant for Wiener index: ',D15.9)
+ 1005 Format(' ERROR: Check number of edges: ',I10)
  1006 Format(' Something wrong with Wiener sum')
 
+      RETURN
+      END
+
+      SUBROUTINE Szeged(N,Nedge,Edges,Dt,Sz)
+      use config
+C     This routine calculates the Szeged index
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Integer Dt(Nmax,Nmax),Edges(Emax,2)
+      Sz=0.d0
+C     Sum over all edges
+      Do I=1,Nedge
+       IE1=Edges(I,1)
+       IE2=Edges(I,2)
+C      Get ni and nj for Szeged index
+       ni=0
+       nj=0
+       do J=1,N
+C       if(IE1.ne.J.and.IE2.ne.J) then
+         if(Dt(IE1,J).lt.Dt(IE2,J)) ni=ni+1
+         if(Dt(IE1,J).gt.Dt(IE2,J)) nj=nj+1
+C       endif
+       enddo
+       Sz=Sz+dfloat(ni*nj)
+      enddo
       RETURN
       END
 

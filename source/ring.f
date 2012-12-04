@@ -2994,12 +2994,12 @@ C     Filling in Tree structure at level Istep
       END
 
       SUBROUTINE Connect(MCon2,MAtom,Ipent,IOUT,
-     1  Icon2,IC3,IDA,Tol,DistMat,Rmin)
+     1  IC3,IDA,Tol,DistMat,Rmin)
       use config
 C     Get the connectivities between 2 and 3 atoms
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION DistMat(NmaxL)
-      DIMENSION Icon2(Nmax*Nmax),IDA(Nmax,Nmax)
+      DIMENSION Icon2(3*Nmax),IDA(Nmax,Nmax)
       DIMENSION NCI(12),NCJ(12)
       DIMENSION IC3(Nmax,3)
       Rtol=Rmin*(1.d0+Tol)
