@@ -315,7 +315,6 @@ molecular point group is obtained, the program determines if the fullerene is ch
 Once the cartesian coordinates $(X_i, Y_i, Z_i)$ for each vertex $i=1,\dots, n_v$ is known, all edges are determined by 
 analyzing connectivities between the vertices from either given cartesian coordinates or directly from the adjacency matrix 
 if a ring spiral input was chosen (Subroutine \funname{Connect}). In any case, one has the adjacency matrix $A_{ij}$ for all vertices at this stage:
-
 \begin{equation}
   \label{eq:adjacencymatrix}
   A_{ij} =
@@ -355,8 +354,10 @@ ground state instead of one of a higher multiplicity, as this is the case for \C
 captured in this program, and one needs to perform a proper quantum theoretical calculation. The program gives information
 on the HOMO-LUMO gap and calculates the topological resonance energy from Babi\'c's matching polynomial calculations \cite{Babic1995,Babic1997}.
 
-There are several other topological indicators \cite{Cataldo,Caporossi} of which the Estrada index and mean topological distance, the Wiener index, the hyper-Wiener
-index and the Balaban index are printed. The Estrada $E(G)$ and bipartivity $\beta(G)$ indices are obtained from the eigenvalues of the adjacency
+A topological index is a structurally invariant natural or real number related to a molecular graph, which does not depend on the labelling 
+or the 2D representation of a graph $G$. There are several other topological indicators \cite{Cataldo,Caporossi} of which the Estrada 
+index, the Wiener index, the hyper-Wiener index, the Balaban index , the Szeged index, the topological radius, diameter and and mean distance
+are printed. The Estrada $E(G)$ and bipartivity $\beta(G)$ indices are obtained from the eigenvalues of the adjacency
 matrix $A(G)$, $\{ x_i, i=1,...,n_v \} \in [-3,3]$, of a graph $G$ (in our case a regular fullerene graph $G=F$) \cite{Estrada,Doslic2005},
 \begin{equation}
   \label{Estrada}
@@ -396,7 +397,18 @@ $n_e$ are the number of edges and $W(i)$ is the sum of topological distances bet
   W_i=\sum_{j \in V(G)} D_{ij}
 \end{equation}
 For $I_h$-\C{60} we have $B(G)$= 0.910521583. The Schultz and Zagreb indices are also listed, although they are related to
-the indices already defined here. Further listed are two topological efficiency parameters $\rho$ and $\rho_E$ defined by Vukicevic, Ori and co-workers \cite{Vukicevic,Ori},
+the indices already defined here. The Szeged index is defined as\cite{Heydari}
+\begin{equation}
+  \label{Szeged}
+  S_z(G)=\sum_{e \in E(G)} n_{i_j}(e)n_{j_i}(e)
+\end{equation}
+where $n_{i_j}(e) = |B_{i_j}(e)|$ is the number of vertices which are closer to vertex $i$ than vertex $j$ in an edge $e=(ij) \in E(G)$ (with
+$E(G)$ being the edge set) and
+\begin{equation}
+  \label{Szeged1}
+  B_{i_j}(e)= \{ k | k \in V(G), D_{ik} < D_{jk} \}
+\end{equation}
+Further listed are two topological efficiency parameters $\rho$ and $\rho_E$ defined by Vukicevic, Ori and co-workers \cite{Vukicevic,Ori},
 \begin{equation}
   \label{rho}
   \rho=2\frac{W(G)}{n_v W_{\mathrm{min}}} \quad \text{ with } \quad W_{\mathrm{min}}= \min \{ W_i \}
@@ -443,7 +455,6 @@ $t(k,l)$ is called the {\em triangulation number}. We work with the dual triangu
 This is shown in Figure \ref{pic:GoldbergCoxeter}. For icosahedral fullerenes ($I_h$ and $I$) with $l = k$ or $l = 0$, Fowler and Rogers 
 showed how to construct the RSPIs,\cite{Rogers} which is implemented in this program as well for $GC_{k,l}(20)$.
 
-
 %Figure 2
  \begin{figure}[htbp]
    	\centering
@@ -451,7 +462,6 @@ showed how to construct the RSPIs,\cite{Rogers} which is implemented in this pro
     \caption{Goldberg-Coxeter construction: $GC_{1,1}$, leapfrog transformation; $GC_{3,0}$, halma transformation; $GC_{5,2}$, general.}
 	\label{pic:GoldbergCoxeter}
  \end{figure}
-
 
 
 %Hamiltonian cycles
@@ -520,7 +530,6 @@ The total energy for the extended Wu force field is given by
 \end{multline}
 where pp-e (hp-e, hh-e) denotes the number of edges adjacent to 2 (1, 0) pentagons, $n_v$ is the 
 number of vertices and ppp-v (hpp-v, hhp-v, hhh-v) is the number of vertices between 3 (2, 1, 0) pentagons.
-
 The additional Coulomb force, that can be added to the extended HOFF field, is equal to the aforementioned
 optional Coulomb force defined in eq.(\ref{eq:Ewu}).
 
@@ -533,6 +542,15 @@ in Stone-Wales transformations or vertex insertions. It further determines the R
 and hexagon indices as described in detail in Fowler and Manolopoulos' book \cite{Atlas}.
 From the hexagon indices one derives if the fullerene is IPR or not. If it is IPR, Cioslowski's scheme is used to calculate the 
 heat of formation \cite{Cioslowski2000}. For all fullerenes, Martin's scheme is used to calculate the heat of formation \cite{Alcami}.
+
+%Figure 3
+ \begin{figure}[htbp]
+   	\centering
+  	\includegraphics[width=0.4\textwidth]{C380.png}
+	\includegraphics[width=0.5\textwidth]{C384.png}
+    \caption{Optimized Wu force-field structures of \C{380} (left) and \C{384} (right), the first fullerenes with no ring spiral.}
+	\label{pic:C380andC384}
+ \end{figure}
 
 Information from subroutine \funname{RingC} can be used to perform Stone-Wales transformations \cite{Stone86}
 (subroutine \funname{StoneWalesTrans}), Endo-Kroto 2-vertex insertions \cite{Endo92} (subroutine \funname{EndoKrotoTrans}),
@@ -548,22 +566,12 @@ Brinkmann-Fowler 6-vertex insertion: 4 pentagon G4.14.2.1 ($n_v$=16) $\rightarro
 Non-spiral fullerenes such as  \C{380} or  \C{384} can be constructed with such vertex insertion methods, see input files \filename{RSPIc380.inp} 
 and \filename{RSPIc384.inp}. The two structures obtained from a force-field optimization are shown in Figure \ref{pic:C380andC384} using program PYMOL \cite{Pymol}.
 
-%Figure 3
- \begin{figure}[htbp]
-   	\centering
-  	\includegraphics[width=0.35\textwidth]{C380.png}
-	\includegraphics[width=0.45\textwidth]{C384.png}
-    \caption{Optimized Wu force-field structures of \C{380} (left) and \C{384} (right), the first fullerenes with no ring spiral.}
-	\label{pic:C380andC384}
- \end{figure}
-
 Subroutine \funname{SpiralSearch} uses the ring-spiral algorithm of Fowler and Manolopoulus \cite{Atlas}
 for the search of a ring spiral if, for the input, cartesian coordinates or vertex connections (adjacencies) were chosen, or if the
 initial fullerene structure was modified. It produces the canonical ring-spiral pentagon indices
 if the fullerene contains a face spiral, and fails if it does not (as for the two examples shown in 
 Figure \ref{pic:C380andC384}).  A more general ring-spiral algorithm is currently in preparation.
 
-\clearpage
 %Volume and surface area, minimum covering sphere
 \subsection{Volume and surface area, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
 The volume and surface area of the fullerene are calculated in Subroutine \funname{Volume}. This is done by\\
@@ -1175,7 +1183,7 @@ Note that the maximum number of vertices in the database is defined in the confi
 %Figure 6
  \begin{figure}[htbp]
 	\centering
-  		 \includegraphics[width=0.9\textwidth]{C2160.png}
+  		 \includegraphics[width=0.6\textwidth]{C2160.png}
      \caption{Force-field optimized structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
      \label{pic:Finalgraph}
  \end{figure}
@@ -1188,14 +1196,14 @@ Note that the maximum number of vertices in the database is defined in the confi
  
 \bibitem{Brinkman} G. Brinkmann, ``Program Fullgen - a program for generating nonisomorphic fullerenes'', see http://cs.anu.edu.au/~bdm/plantri/.
  
-\bibitem{Goedgebeur} G. Brinkmann, J. Goedgebeur, B. McKay, ``Program Buckygen - a program for the efficient generation of all nonisomorphic fullerenes'',
+\bibitem{Goedgebeur} G. Brinkmann, J. Goedgebeur, and B. McKay, ``Program Buckygen - a program for the efficient generation of all nonisomorphic fullerenes'',
 see http://caagt.ugent.be/buckygen/.
 
-\bibitem{Goedgebeur1} G. Brinkmann, J. Goedgebeur, B. McKay, \textit{J. Chem. Inf. Sci.}, in press. DOI: 10.1021/ci3003107.
+\bibitem{Goedgebeur1} G. Brinkmann, J. Goedgebeur, and B. McKay, ``The Generation of Fullerenes'', \textit{J. Chem. Inf. Sci.} \textbf{52}, 2910-2918 (2012). 
 
 \bibitem{Pisanski} T. Pisanski, ``Program VEGA - A Mathematica based system for manipulating graphs'', see http://www.ijp.si/.
 
-\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, P. Schwerdtfeger, ``Packed to the Rafters - Filling up C60 with Rare Gas Atoms'', 
+\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, and P. Schwerdtfeger, ``Packed to the Rafters - Filling up C60 with Rare Gas Atoms'', 
 \textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
 
 \bibitem{Atlas} P. W. Fowler and D. E. Manolopoulus, ``An Atlas of Fullerenes'' (Dover Publ., New York, 2006).
@@ -1204,34 +1212,34 @@ see http://caagt.ugent.be/buckygen/.
 
 \bibitem{Endo92} M. Endo and H.W. Kroto, ``Formation of carbon nanofibers'', \textit{J. Phys. Chem.} \textbf{96}, 6941-6944 (1992).
 
-\bibitem{Yoshida97} M. Yoshida, P. Fowler, \textit{Chem. Phys. Lett.} \textbf{278}, 256-261(1997).
+\bibitem{Yoshida97} M. Yoshida and P. Fowler, \textit{Chem. Phys. Lett.} \textbf{278}, 256-261(1997).
 
-\bibitem{BrinkmannFowler03} G. Brinkmann, P. W. Fowler, \textit{J. Chem. Inf. Comput. Sci.} \textbf{43}, 1837-1843 (2003).
+\bibitem{BrinkmannFowler03} G. Brinkmann and P. W. Fowler, \textit{J. Chem. Inf. Comput. Sci.} \textbf{43}, 1837-1843 (2003).
 
 \bibitem{Stone86} A. J. Stone and D. J. Wales, ``Formation of carbon nanofibers'', \textit{Chem. Phys. Lett.} \textbf{128}, 501-503 (1986).
 
-\bibitem{NumRec} W. T. Vetterling, B. P. Flannery, in ``Numerical Recipes in C - The Art of Scientific Computing'', chapter 10, section 6: Conjugate Gradient Methods in Multidimensions; W. H. Press, S. A. Teukolsky (Editors), Cambridge University Press; 2nd edition (1992).
+\bibitem{NumRec} W. T. Vetterling, and B. P. Flannery, in ``Numerical Recipes in C - The Art of Scientific Computing'', chapter 10, section 6: Conjugate Gradient Methods in Multidimensions; W. H. Press, S. A. Teukolsky (Editors), Cambridge University Press; 2nd edition (1992).
 
 \bibitem{Wu87} Z. C. Wu, D. A. Jelski, and T. F. George, ``Vibrational Motions of
 Buckminsterfullerene'', \textit{Chem. Phys. Lett.} \textbf{137}, 291-295 (1987).
 
 \bibitem{Plestenjak} B. Plestenjak, ``An algorithm for drawing Schlegel diagrams'', see http://www-lp.fmf.uni-lj.si/plestenjak/Papers/NICEGR.pdf.
 
-\bibitem{Cioslowski2000} J. Cioslowski, N. Rao, D. Moncrieff, ``Standard Enthalpies of Formation of Fullerenes and Their
+\bibitem{Cioslowski2000} J. Cioslowski, N. Rao, and D. Moncrieff, ``Standard Enthalpies of Formation of Fullerenes and Their
 Dependence on Structural Motifs'', \textit{J. Am. Chem. Soc.} \textbf{122}, 8265-8270 (2000).
 
-\bibitem{Babic1995} D. Babi\'c, O. Ori, ``Matching polynomial and topological resonance energy of \C{70}'', \textit{Chem. Phys. Lett.} \textbf{234}, 240-244 (1995).
+\bibitem{Babic1995} D. Babi\'c and O. Ori, ``Matching polynomial and topological resonance energy of \C{70}'', \textit{Chem. Phys. Lett.} \textbf{234}, 240-244 (1995).
 
 \bibitem{Babic1997} D. Babi\'c, ``Topological Resonance Energy of Fullerenes'', \textit{J. Chem. Inf. Comput. Sci.} \textbf{37}, 920-923 (1997).
 
-\bibitem{Alcami} M. Alcam\'i, G. Sanchez, S. Diaz-Tendero, Y. Wang, F. Martin, ``Structural Patterns in Fullerenes Showing
+\bibitem{Alcami} M. Alcam\'i, G. Sanchez, S. Diaz-Tendero, Y. Wang, and F. Martin, ``Structural Patterns in Fullerenes Showing
 Adjacent Pentagons: \C{20} to \C{72}'', \textit{J. Nanosci. Nanotech.} \textbf{7}, 1329-1338 (2007).
 
 \bibitem{Wiener1947} H. Wiener, ``Structural Determination of Paraffin Boiling Points'', \textit{J. Am. Chem. Soc.}, \textbf{69}, 17-20 (1947).
 
 \bibitem{Balaban} A. T. Balaban, ``Topological indices based on topological distances in molecular graphs'', \textit{Pure Appl. Chem.}, \textbf{55}, 199-206 (1983).
 
-\bibitem{HouseofGraphs} Brinkmann, G., Goedgebeur, J., M\'elot, H., Coolsaet, K., \textit{Discrete Applied Mathematics}, \textbf{161}, 311-314 (2013). 
+\bibitem{HouseofGraphs} G. Brinkmann,  J. Goedgebeur, H. M\'elot, and K. Coolsaet, \textit{Discrete Applied Mathematics}, \textbf{161}, 311-314 (2013). 
 House of Graphs: a database of interesting graphs, available for fullerenes at https://hog.grinvin.org/Fullerenes.
 
 \bibitem{CYLview} C. Y. Legault, ``Program CYLview'', Universit\'e de Sherbrook, Canada. See http://www.cylview.org.
@@ -1266,7 +1274,9 @@ Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 
 \bibitem{Balaban2000} A. T. Balaban, D. Mills, O. Ivanciuc, and S. Basak, ``Reverse Wiener Indices'', \textit{Croat. Chem. Acta} \textbf{73}, 923-941 (2000).
 
-\bibitem{Vukicevic} D. Vukicevic, F. Cataldo, O. Ori, A. Graovac, ``Topological efficiency of \C{66} fullerene'', \textit{Chem. Phys. Lett.} \textbf{501}, 442-445 (2011),
+\bibitem{Heydari} A. Heydari and B. Taeri, ``Szeged index of TUC$_4$C$_8$(S) nanotubes'', \textit{Europ. J. Combinatorics} \textbf{30} 1134-1141 (2009). 
+
+\bibitem{Vukicevic} D. Vukicevic, F. Cataldo, O. Ori, and A. Graovac, ``Topological efficiency of \C{66} fullerene'', \textit{Chem. Phys. Lett.} \textbf{501}, 442-445 (2011),
 
 \bibitem{Ori} O. Ori, private communication (2012).
 
@@ -1278,7 +1288,7 @@ Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 
 \bibitem{Diaz} S. D\'iaz-Tendero, F. Mart\'in, and M. Alcam\'i, \textit{ChemPhysChem} \textbf{6}, 92-100 (2005).
 
-\bibitem{Fowler2000} P. W. Fowler, T. Heine, F. Zerbetto, \textit{J. Phys. Chem.} \textbf{104}, 9625-9629 (2000).
+\bibitem{Fowler2000} P. W. Fowler, T. Heine, and F. Zerbetto, \textit{J. Phys. Chem.} \textbf{104}, 9625-9629 (2000).
 
 \bibitem{Yildirim08} E. A. Yildirim, ``Two Algorithms for the Minimum Enclosing Ball Problem'', 
 \textit{SIAM Journal on Optimization}, \textbf{19}, 1368-1391 (2008) 
@@ -1298,7 +1308,7 @@ NIST, US Department of Commerce (1996).
 \bibitem{Hands04} I. D. Hands, J. L. Dunn, and C. A. Bates, ``A complete nearest-neighbor force field model for \C{60}'', 
 \textit{J. Chem. Phys.} \textbf{120}, 6912-6921 (2004).
 
-\bibitem{kamada89} T. Kamada, S. Kawai, ``An Algorithm for Drawing General Undirected Graphs'', \textit{Inform. Process. Lett.} \textbf{31}, 7-15 (1989).
+\bibitem{kamada89} T. Kamada and S. Kawai, ``An Algorithm for Drawing General Undirected Graphs'', \textit{Inform. Process. Lett.} \textbf{31}, 7-15 (1989).
 
 \end{thebibliography}
 
