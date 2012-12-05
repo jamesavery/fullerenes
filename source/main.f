@@ -98,7 +98,8 @@ C  INPUT and setting parameters for running the subroutines
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1  ndual,nosort,nospiralsearch,novolume,ihessian,iprinthessian,
+     1  ndual,nosort,nospiralsearch,novolume,ihessian,isearch,
+     1  iprinthessian,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 C  Stop if error in input
@@ -187,8 +188,9 @@ C of Fowler and Manolopoulos. Set parameter IPR for independent
 C pentagon rule as full list beyond C60 is computer time 
 C intensive
   98  routine='ISOMERS        '
+      if(isearch.ne.0) istop=1
       Write(Iout,1008) routine
-      CALL Isomers(MAtom,IPR,Iout,iprintham,ichk,IDA,A,filename)
+      CALL Isomers(MAtom,IPR,isearch,Iout,iprintham,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
 
 C------------------MOVECM------------------------------------------
@@ -379,7 +381,7 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         routine='TOPOLOINDICATOR'
         Write(Iout,1008) routine
 C Topological Indicators
-      CALL TopIndicators(Matom,Iout,IDA)
+      CALL TopIndicators(Matom,Iout,IDA,mdist)
 C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout,MAtom)
 C Determine if fullerene is chiral
