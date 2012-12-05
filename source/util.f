@@ -57,7 +57,7 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
-      SUBROUTINE TopIndicators(Matom,Iout,IDA)
+      SUBROUTINE TopIndicators(Matom,Iout,IDA,MDist)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)

@@ -41,8 +41,8 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
   }
     
   bool converged = false;
-  const unsigned int TUTTE_MAX_ITERATION = 500000;
-  const double TUTTE_CONVERGENCE = 5e-7;
+  const unsigned int TUTTE_MAX_ITERATION = 1000000;
+  const double TUTTE_CONVERGENCE = 5e-6;
   unsigned int i;
   double max_change;
   for(i=0;!converged && i<TUTTE_MAX_ITERATION; i++){

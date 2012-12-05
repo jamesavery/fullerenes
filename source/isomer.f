@@ -1,4 +1,4 @@
-      SUBROUTINE Isomers(N,IPR,IOUT,iham,ichk,IDA,A,filename)
+      SUBROUTINE Isomers(N,IPR,isearch,IOUT,iham,ichk,IDA,A,filename)
 C Information on number of isomers with or without fulfilling the
 C the IPR rule. The routine also calls SPIRAL using the subroutines
 C written by P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes"
@@ -134,11 +134,19 @@ C     Limit number of cycles
       if(IPR.eq.0) then
        if(AisoNIPR.gt.dfloat(maxRSI)) then
         Write(Iout,1004) maxRSI
+        if(isearch.ne.0) then
+         Write(Iout,1013) isearch
+         go to 99
+        endif
         Return
        endif
       else
        if(AisoIPR.gt.dfloat(maxRSI)) then
         Write(Iout,1004) maxRSI
+        if(isearch.ne.0) then
+         Write(Iout,1013) isearch
+         go to 99
+        endif
         Return
        endif
       endif
@@ -194,8 +202,11 @@ C Check if database can be taken instead
 C Produce list from ring spiral algorithm
   99  If(IPR.ge.0) then
        Write(Iout,1005)
-       CALL Spiral(N,IPR,Iout,Isonum,
-     1 IsonumIPR,iham,IDA,A)
+       if(isearch.eq.0) then
+        CALL Spiral(N,IPR,Iout,Isonum,IsonumIPR,iham,IDA,A)
+       else
+        Call SpiralIco(N,IPR,isearch,Iout,Isonum,IsonumIPR,iham,IDA,A)
+       endif
       endif
 
  1000 Format(1X,'Number of possible fullerene isomers: ',I10,
@@ -221,6 +232,8 @@ C Produce list from ring spiral algorithm
  1011 Format(1X,'Print from file: ',A50,' in database')
  1012 Format(/1X,'Data for isomer numbers from House of Graphs website:',
      1' http://hog.grinvin.org/')
+ 1013 Format(1X,'Search for nearest icosahedral ring spiral indices',
+     1' instead with variation N= ',I2)
       Return
       END
  
