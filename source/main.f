@@ -102,6 +102,11 @@ C  INPUT and setting parameters for running the subroutines
      1  iprinthessian,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
+C  Stop if isomer closest to icosahedral is searched for
+      if(isearch.ne.0) then
+       istop=1
+       go to 98
+      endif
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -109,7 +114,7 @@ C  Only do isomer statistics
 
 C------------------Coordinates-------------------------------------
 C Options for Input coordinates
-      go to (10,20,30,30,30,30,30,30) Icart+1
+      go to (10,20,30,30,30,30,30,98) Icart+1
 
 C  Cartesian coordinates produced for Ih C20 or C60
    10 routine='COORDC20/60    '
@@ -188,7 +193,6 @@ C of Fowler and Manolopoulos. Set parameter IPR for independent
 C pentagon rule as full list beyond C60 is computer time 
 C intensive
   98  routine='ISOMERS        '
-      if(isearch.ne.0) istop=1
       Write(Iout,1008) routine
       CALL Isomers(MAtom,IPR,isearch,Iout,iprintham,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
