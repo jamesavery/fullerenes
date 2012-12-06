@@ -236,31 +236,31 @@ c      endif
      1 ' Check your input for pentagon locations')
  1001 FORMAT(/1X,'Program to create cartesian coordinates through ',
      1 'pentagon index list producing the dual matrix and finally '
-     1 'the Hueckel matrix',/1X,'Number of faces: ',I4,
-     1 ', Number of atoms (vertices): ',I4,
+     1 'the Hueckel matrix',/1X,'Number of faces: ',I5,
+     1 ', Number of atoms (vertices): ',I5,
      1 ', Point group of fullerene (in ideal symmetry): ',A3,/1X,
      1 'Ring spiral pentagon positions: ',12I5,
      1 /1X,'NMR pattern: ',3(I3,' x',I3,:,','))
  1002 FORMAT(/1X,'D contains IER = ',I6,' separating triangles and is ',
      1 'therefore NOT a fullerene dual')
- 1004 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel ',
+ 1004 FORMAT(/1X,'Construct the (',I5,','I5,') Hueckel ',
      1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
  1019 Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I5,' spirals found)')
  1020 FORMAT(/1X,'Program to create cartesian coordinates through ',
      1 'pentagon index list producing the dual matrix and finally '
-     1 'the Hueckel matrix',/1X,'Number of faces: ',I4,
-     1 ', Number of atoms (vertices): ',I4,
+     1 'the Hueckel matrix',/1X,'Number of faces: ',I5,
+     1 ', Number of atoms (vertices): ',I5,
      1 ', Point group of fullerene (in ideal symmetry): ',A3,/1X,
-     1 'Ring spiral pentagon positions: ',12I4)
+     1 'Ring spiral pentagon positions: ',12I5)
  1021 Format(12(1X,I5))
  1022 Format(1X,'Input spiral is canonical')
  1023 Format(1X,'Canonical spiral list of pentagon positions:')
  1024 Format(1X,'Canonical spiral list of hexagons and pentagons:')
  1025 Format(1X,100I1)
- 1037 FORMAT(1X,'Graph is not cubic, ',I4,' vertices detected which ',
-     1 'are not of degree 3, last one is of degree ',I4)
+ 1037 FORMAT(1X,'Graph is not cubic, ',I5,' vertices detected which ',
+     1 'are not of degree 3, last one is of degree ',I5)
  1038 FORMAT(1X,'Graph checked, it is cubic')
  1040 Format(/1x,'Goldberg-Coxeter fullerene with indices (k,l) = (',
      1 I2,',',I2,') taking C20 as the input graph: GC(',I2,',',I2,
@@ -309,7 +309,7 @@ C     Construct the ring spiral
      1 ' Lit: P. W. Fowler, K. M. Rogers, J. Chem. Inf. Comput. Sci.',
      1 ' 41, 108-111 (2001)',/1X,'Exponents of spiral series ',
      1 '5(6)^A (5(6)^B)^4 5(6)^C (5(6)^D)^4 5(6)^E 5:',
-     1 '  A=',I3,', B=',I3,', C=',I3,', D=',I3,', E=',I3)
+     1 '  A=',I5,', B=',I5,', C=',I5,', D=',I5,', E=',I5)
  1001 Format(1X,'Last pentagon index: ',I5,', number of faces: ',I5)
  1002 Format(1X,'Ring spiral pentagon indices: ',12I5)
       Return 
