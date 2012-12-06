@@ -202,13 +202,13 @@ C Check if database can be taken instead
       endif
 
 C Produce list from ring spiral algorithm
-  99  If(IPR.ge.0) then
+  99  If(IPR.ge.0.or.isearch.ne.0) then
        if(isearch.eq.0) then
         Write(Iout,1005)
         CALL Spiral(N,IPR,Iout,Isonum,IsonumIPR,iham,IDA,A)
        else
         Write(Iout,1015)
-        Call SpiralIco(N,IPR,isearch,Iout,IDA,A)
+        Call SpiralIco(N,isearch,Iout,IDA,A)
        endif
       endif
 
