@@ -508,7 +508,7 @@ C     Analyze dual matrix
  2002 Format(A18)
       END
 
-      SUBROUTINE SpiralIco(N,IPR,ivar,Iout,IDA,A)
+      SUBROUTINE SpiralIco(N,ivar,Iout,IDA,A)
 C     This subroutine comes directly from the book of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006),
 C     and has been modified to search for ring spirals around an
@@ -559,7 +559,7 @@ C   Search for icosahedral fullerene Cm closest to Cm with m<n
        endif
        if(icon.eq.N) then
         Write(Iout,801) icon,I,J
-        Return
+C       Return
        else
         Write(Iout,802) icon,N,I,J
        endif
@@ -641,12 +641,10 @@ C  Set parameters
       DO 10 J10=IVL(10),IVH(10)
       DO 11 J11=IVL(11),IVH(11)
       DO 12 J12=IVL(12),IVH(12)
-C Check if J2 exceeds M
 
-
-        DO J=1,M               ! Form spiral code in S
-         S(J)=6
-        enddo
+      DO J=1,M   ! Form spiral code in S
+       S(J)=6
+      enddo
       S(J1)=5
       S(J2)=5
       S(J3)=5
@@ -659,7 +657,6 @@ C Check if J2 exceeds M
       S(J10)=5
       S(J11)=5
       S(J12)=5
-      print*,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12
       CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
       IF(IER.EQ.12) GO TO 12               !      and check for closure 
       IF(IER.EQ.11) GO TO 11
@@ -764,7 +761,7 @@ C     Analyze dual matrix
      1 ' Lit: P. W. Fowler, K. M. Rogers, J. Chem. Inf. Comput. Sci.',
      1 ' 41, 108-111 (2001)',/1X,'Exponents of spiral series ',
      1 '5(6)^A (5(6)^B)^4 5(6)^C (5(6)^D)^4 5(6)^E 5:',
-     1 '  A=',I3,', B=',I3,', C=',I3,', D=',I3,', E=',I3)
+     1 '  A=',I5,', B=',I5,', C=',I5,', D=',I5,', E=',I5)
  804  Format(1X,'Ring spiral pentagon indices RSPI: ',12I5,
      1 /1X,'Variation of each RSPI from RSPI-',I1,' to ','RSPI+',I1)
  805  Format(1X,'Variation too large, too many loops ==> RETURN')

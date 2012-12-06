@@ -286,27 +286,27 @@ C     Check Euler characteristic
      1 ' Atom numbers in ring, Ni, mean distance, dm, and root mean',
      1 ' square deviation for distances, RMSD,'
      1 ' and distances in the ring:',
-     1 /3X,'N1   N2   N3   N4   N5',9X,'dm',11X,'RMSD',
+     1 /4X,'N1    N2    N3    N4    N5',9X,'dm',11X,'RMSD',
      1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5')
- 1001 Format(1X,5(I4,1X),3X,2(d12.6,2X),5X,5(d12.6,2X))
+ 1001 Format(1X,5(I5,1X),3X,2(d12.6,2X),5X,5(d12.6,2X))
  1002 Format(/1X,I4,' six-membered-rings identified')
- 1003 Format(1X,6(I4,1X)3X,2(d12.6,2X),5X,6(d12.6,2X))
+ 1003 Format(1X,6I5,3X,2(d12.6,2X),5X,6(d12.6,2X))
  1004 Format(//1X,'Checking the Euler polyhedron formula:',/1X,
-     1 'Number of vertices Nv: ',I4,/1X,
-     1 'Number of edges Ne:    ',I4,/1X,
-     1 'Number of faces Nf:    ',I4,/1X,
-     1 'Euler number Nv-Ne+Nf: ',I4,
+     1 'Number of vertices Nv: ',I5,/1X,
+     1 'Number of edges Ne:    ',I5,/1X,
+     1 'Number of faces Nf:    ',I5,/1X,
+     1 'Euler number Nv-Ne+Nf: ',I5,
      1 ' (should be 2 for spherical polyhedra '
      1 'or planar connected graphs)',/1X,
-     1 'Number of pentagons:   ',I4,/1X,
-     1 'Number of hexagons:    ',I4,/1X,
+     1 'Number of pentagons:   ',I5,/1X,
+     1 'Number of hexagons:    ',I5,/1X,
      1 'Mv=',I4,1X,' Me=',I4)
  1005 Format(1X,' **** Capped Polydron does not fulfill Eulers theorem')
  1006 Format(/1X,' Atom numbers in ring,',
      1 ' Ni, mean distance, dm, and root mean',
      1 ' square deviation for distances, RMSD,'
      1 ' and distances in the ring:',
-     1 /3X,'N1   N2   N3   N4   N5   N6',9X,'dm',11X,'RMSD',
+     1 /4X,'N1   N2   N3   N4   N5   N6',8X,'dm',11X,'RMSD',
      1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5'12X,'R6')
  1007 Format(1X,' 5-ring minimum bond distance: ',d12.6,
      1 3X,' maximum bond distance: ',d12.6) 
@@ -3055,6 +3055,8 @@ C     Get the connectivities between 2 and 3 atoms
      1 Write(IOUT,1006) (NCI(J),NCJ(J),J=1,M12)
       if(MAtom.ge.1000.and.MAtom.lt.10000) 
      1 Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
+      if(MAtom.ge.10000) 
+     1 Write(IOUT,1008) (NCI(J),NCJ(J),J=1,M12)
       enddo
       Write(IOUT,1002)
 C     Get all vertices
@@ -3086,13 +3088,14 @@ C     Check if structure is alright at this point
  1001 Format(1X,12('{',I2,',',I2,'} '))
  1002 Format(1X,' Calculate all vertices N and corresponding ',
      1 'adjacencies Ni of 3-connected graph:',
-     1 /1X,'   N        N1   N2   N3')
- 1003 Format(1X,I4,'    (',3I5,')')
+     1 /1X,'    N        N1   N2   N3')
+ 1003 Format(1X,I5,'    (',3I5,')')
  1004 Format(1X,'**** Error, not enough connected atoms',
      1 ' check coordinates')
  1005 Format(1X,'**** Severe error, number of edges (bonds) not as ',
      1 'expected from number of atoms: ',I4,' (expected: ',I4,')')
  1006 Format(1X,12('{',I3,',',I3,'} '))
  1007 Format(1X,12('{',I4,',',I4,'} '))
+ 1008 Format(1X,12('{',I5,',',I5,'} '))
       RETURN
       END
