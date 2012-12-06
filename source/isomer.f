@@ -136,6 +136,7 @@ C     Limit number of cycles
         Write(Iout,1004) maxRSI
         if(isearch.ne.0) then
          Write(Iout,1013) isearch
+         IPR=1
          go to 99
         endif
         Return
@@ -145,6 +146,7 @@ C     Limit number of cycles
         Write(Iout,1004) maxRSI
         if(isearch.ne.0) then
          Write(Iout,1013) isearch
+         IPR=1
          go to 99
         endif
         Return
@@ -201,11 +203,12 @@ C Check if database can be taken instead
 
 C Produce list from ring spiral algorithm
   99  If(IPR.ge.0) then
-       Write(Iout,1005)
        if(isearch.eq.0) then
+        Write(Iout,1005)
         CALL Spiral(N,IPR,Iout,Isonum,IsonumIPR,iham,IDA,A)
        else
-        Call SpiralIco(N,IPR,isearch,Iout,Isonum,IsonumIPR,iham,IDA,A)
+        Write(Iout,1015)
+        Call SpiralIco(N,IPR,isearch,Iout,IDA,A)
        endif
       endif
 
@@ -233,7 +236,8 @@ C Produce list from ring spiral algorithm
  1012 Format(/1X,'Data for isomer numbers from House of Graphs website:',
      1' http://hog.grinvin.org/')
  1013 Format(1X,'Search for nearest icosahedral ring spiral indices',
-     1' instead with variation N= ',I2)
+     1' instead with variation V= ',I2)
+ 1015 Format(1X,'Enter Spiral code for search of possible RSPIs')
       Return
       END
  
