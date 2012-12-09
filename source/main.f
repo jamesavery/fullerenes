@@ -194,7 +194,8 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS        '
       Write(Iout,1008) routine
-      CALL Isomers(MAtom,IPR,isearch,Iout,iprintham,ichk,IDA,A,filename)
+      CALL Isomers(MAtom,IPR,isearch,In,Iout,iprintham,ichk,IDA,
+     1  A,filename)
       if(istop.ne.0) go to 99
 
 C------------------MOVECM------------------------------------------

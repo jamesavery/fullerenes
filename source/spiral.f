@@ -508,7 +508,7 @@ C     Analyze dual matrix
  2002 Format(A18)
       END
 
-      SUBROUTINE SpiralIco(N,ivar,Iout,IDA,A)
+      SUBROUTINE SpiralIco(N,ivar,In,Iout,IDA,A)
 C     This subroutine comes directly from the book of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006),
 C     and has been modified to search for ring spirals around an
@@ -564,9 +564,11 @@ C       Return
         Write(Iout,802) icon,N,I,J
        endif
 
-      I2=I*I
+      Read(IN,*,Err=400,end=400) (SS(I),I=1,12)
+      Go to 300
+
+  400 I2=I*I
       J2=J*J
-      MAtom=20*(I2+J2+I*J)
 C     Getting exponents
       IA=(5*(I+J)**2-5*I-3*J-2)/2
       IB=I+J-1
@@ -591,20 +593,11 @@ C     Construct the ring spiral
       Write(Iout,804) (SS(I),I=1,12),ivar,ivar
 
 C  Set loop limits
-      IVL(1)=SS(1)
+  300 IVL(1)=SS(1)
       IVH(1)=SS(1)+1
       do I=2,12
        IVL(I)=SS(I)-ivar
        IVH(I)=SS(I)+ivar
-      enddo
-C  Search for clashes in RSPIs, e.g. SS(j).le.SS(j-1)
-      if(IVH(12).gt.M) IVH(12)=M
-      do I=1,11
-       ndif=IVL(I+1)-IVH(I)
-       if(ndif.le.0) then
-        Write(Iout,806) I,I+1
-        Return
-       endif
       enddo
 
 C  Set parameters
@@ -629,18 +622,83 @@ C  Set parameters
 
       Write(iout,600)
 
+C  Search for clashes in RSPIs, e.g. SS(j).le.SS(j-1)
+C     if(IVH(12).gt.M) IVH(12)=M
+C     do I=1,11
+C      ndif=IVL(I+1)-IVH(I)
+C      if(ndif.le.0) then
+C       Write(Iout,806) I,I+1
+C       Return
+C      endif
+C     enddo
+
       DO 1  J1=IVL(1),IVH(1)
-      DO 2  J2=IVL(2),IVH(2) !   combinations
-      DO 3  J3=IVL(3),IVH(3)
-      DO 4  J4=IVL(4),IVH(4)
-      DO 5  J5=IVL(5),IVH(5)
-      DO 6  J6=IVL(6),IVH(6)
-      DO 7  J7=IVL(7),IVH(7)
-      DO 8  J8=IVL(8),IVH(8)
-      DO 9  J9=IVL(9),IVH(9)
-      DO 10 J10=IVL(10),IVH(10)
-      DO 11 J11=IVL(11),IVH(11)
-      DO 12 J12=IVL(12),IVH(12)
+       IVL2=IVL(2)
+       IVH2=IVH(2)
+       if(J1.ge.IVL2) IVL2=J1+1
+       if(IVL2.gt.IVH2) IVH2=IVL2
+       if(IVH2.gt.M) Return
+      DO 2  J2=IVL2,IVH2         !   combinations
+       IVL3=IVL(3)
+       IVH3=IVH(3)
+       if(J2.ge.IVL3) IVL3=J2+1
+       if(IVL3.gt.IVH3) IVH3=IVL3
+       if(IVH3.gt.M) Return
+      DO 3  J3=IVL3,IVH3
+       IVL4=IVL(4)
+       IVH4=IVH(4)
+       if(J3.ge.IVL4) IVL4=J3+1
+       if(IVL4.gt.IVH4) IVH4=IVL4
+       if(IVH4.gt.M) Return
+      DO 4  J4=IVL4,IVH4
+       IVL5=IVL(5)
+       IVH5=IVH(5)
+       if(J4.ge.IVL5) IVL5=J4+1
+       if(IVL5.gt.IVH5) IVH5=IVL5
+       if(IVH5.gt.M) Return
+      DO 5  J5=IVL5,IVH5
+       IVL6=IVL(6)
+       IVH6=IVH(6)
+       if(J5.ge.IVL6) IVL6=J5+1
+       if(IVL6.gt.IVH6) IVH6=IVL6
+       if(IVH6.gt.M) Return
+      DO 6  J6=IVL6,IVH6
+       IVL7=IVL(7)
+       IVH7=IVH(7)
+       if(J6.ge.IVL7) IVL7=J6+1
+       if(IVL7.gt.IVH7) IVH7=IVL7
+       if(IVH7.gt.M) Return
+      DO 7  J7=IVL7,IVH7
+       IVL8=IVL(8)
+       IVH8=IVH(8)
+       if(J7.ge.IVL8) IVL8=J7+1
+       if(IVL8.gt.IVH8) IVH8=IVL8
+       if(IVH8.gt.M) Return
+      DO 8  J8=IVL8,IVH8
+       IVL9=IVL(9)
+       IVH9=IVH(9)
+       if(J8.ge.IVL9) IVL9=J8+1
+       if(IVL9.gt.IVH9) IVH9=IVL9
+       if(IVH9.gt.M) Return
+      DO 9  J9=IVL9,IVH9
+       IVL10=IVL(10)
+       IVH10=IVH(10)
+       if(J9.ge.IVL10) IVL10=J9+1
+       if(IVL10.gt.IVH10) IVH10=IVL10
+       if(IVH10.gt.M) Return
+      DO 10 J10=IVL10,IVH10
+       IVL11=IVL(11)
+       IVH11=IVH(11)
+       if(J10.ge.IVL11) IVL11=J10+1
+       if(IVL11.gt.IVH11) IVH11=IVL11
+       if(IVH11.gt.M) Return
+      DO 11 J11=IVL11,IVH11
+       IVL12=IVL(12)
+       IVH12=IVH(12)
+       if(J11.ge.IVL12) IVL12=J11+1
+       if(IVL12.gt.IVH12) IVH12=IVL12
+       if(IVH12.gt.M) Return
+      DO 12 J12=IVL12,IVH12
 
       DO J=1,M   ! Form spiral code in S
        S(J)=6
@@ -752,7 +810,7 @@ C     Analyze dual matrix
  613  FORMAT(1X,'No isomers found')
  800  FORMAT(1X,'Nothing found ==> STOP')
  801  FORMAT(1X,'Your vertex number matches icoshedral fullerene ',
-     1 'with N=',I6,' and search is not required,(k,l)=(',I2,',',I2,')')
+     1 'with N=',I6,' ,(k,l)=(',I2,',',I2,')')
  802  FORMAT(1X,'Closest vertex number is ',I6,' for icoshedral ',
      1 'fullerene with N=',I6,'; (k,l)=(',I2,',',I2,')')
  803  Format(1X,'General Goldberg-Coxeter transformation of C20 -> Cn',
@@ -765,7 +823,7 @@ C     Analyze dual matrix
  804  Format(1X,'Ring spiral pentagon indices RSPI: ',12I5,
      1 /1X,'Variation of each RSPI from RSPI-',I1,' to ','RSPI+',I1)
  805  Format(1X,'Variation too large, too many loops ==> RETURN')
- 806  Format(1X,'Overlaping RSPIs between ',I2,' and ',I2,' ==> RETURN')
+C806  Format(1X,'Overlaping RSPIs between ',I2,' and ',I2,' ==> RETURN')
 
 C     RETURN
       END

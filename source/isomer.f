@@ -1,4 +1,5 @@
-      SUBROUTINE Isomers(N,IPR,isearch,IOUT,iham,ichk,IDA,A,filename)
+      SUBROUTINE Isomers(N,IPR,isearch,IN,IOUT,iham,ichk,IDA,
+     1 A,filename)
 C Information on number of isomers with or without fulfilling the
 C the IPR rule. The routine also calls SPIRAL using the subroutines
 C written by P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes"
@@ -208,7 +209,7 @@ C Produce list from ring spiral algorithm
         CALL Spiral(N,IPR,Iout,Isonum,IsonumIPR,iham,IDA,A)
        else
         Write(Iout,1015)
-        Call SpiralIco(N,isearch,Iout,IDA,A)
+        Call SpiralIco(N,isearch,In,Iout,IDA,A)
        endif
       endif
 
