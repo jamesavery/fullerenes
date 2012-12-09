@@ -2318,8 +2318,8 @@ C     Calculate P-type dipole moment
      1 /1X,'P-type eigenvalues and eigenvectors (path search not yet ',
      1 'implemented and cartesian coordinates may not be correct)',/1X,
      1 'Note: Procedure may give bond lengths which may vary strongly')
- 1011 FORMAT(1X,'eigenvalue',I4,': ',F12.6,', eigenvector: (',I4,
-     1 ' negative and ',I4,' positive values)')
+ 1011 FORMAT(1X,'eigenvalue',I4,': ',F12.6,', eigenvector: (',I5,
+     1 ' negative and ',I5,' positive values)')
  1012 FORMAT(10(1X,F12.6))
  1013 FORMAT(1X,'Fowler-Manolopoulos Coordinates')
  1014 FORMAT(1X,I5,5X,3(D18.12,2X))
