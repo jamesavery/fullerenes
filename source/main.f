@@ -28,7 +28,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
       real(8) force(ffmaxdim), forceP(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
-      DIMENSION Icon2(Nmax*Nmax),distP(Nmax),IDA(Nmax,Nmax)
+      DIMENSION distP(Nmax),IDA(Nmax,Nmax)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
@@ -50,9 +50,9 @@ C    Set the dimensions for the distance matrix
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
       Integer endzeile,Values(8)
-      Integer MDist(Nmax,Nmax)
       integer istop
       Logical lexist
+      integer mdist(nmax,nmax)
 
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
@@ -98,9 +98,15 @@ C  INPUT and setting parameters for running the subroutines
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1  ndual,nosort,nospiralsearch,novolume,ihessian,iprinthessian,
+     1  ndual,nosort,nospiralsearch,novolume,ihessian,isearch,
+     1  iprinthessian,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
+C  Stop if isomer closest to icosahedral is searched for
+      if(isearch.ne.0) then
+       istop=1
+       go to 98
+      endif
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
@@ -108,7 +114,7 @@ C  Only do isomer statistics
 
 C------------------Coordinates-------------------------------------
 C Options for Input coordinates
-      go to (10,20,30,30,30,30,30,30) Icart+1
+      go to (10,20,30,30,30,30,30,98) Icart+1
 
 C  Cartesian coordinates produced for Ih C20 or C60
    10 routine='COORDC20/60    '
@@ -188,7 +194,8 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS        '
       Write(Iout,1008) routine
-      CALL Isomers(MAtom,IPR,Iout,iprintham,ichk,IDA,A,filename)
+      CALL Isomers(MAtom,IPR,isearch,In,Iout,iprintham,ichk,IDA,
+     1  A,filename)
       if(istop.ne.0) go to 99
 
 C------------------MOVECM------------------------------------------
@@ -218,8 +225,7 @@ C------------------CONNECT-----------------------------------------
 C Establish Connectivities
       routine='CONNECT        '
       Write(Iout,1008) routine
-      CALL Connect(MCon2,MAtom,Ipent,Iout,
-     1 Icon2,IC3,IDA,TolX,DistMat,Rmin)
+      CALL Connect(MCon2,MAtom,Ipent,Iout,IC3,IDA,TolX,DistMat,Rmin)
 
 C------------------REORDER-----------------------------------------
 C Reorder atoms such that distances in internal coordinates are bonds
@@ -380,13 +386,13 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         routine='TOPOLOINDICATOR'
         Write(Iout,1008) routine
 C Topological Indicators
-      CALL TopIndicators(Matom,Iout,IDA,Mdist)
+      CALL TopIndicators(Matom,Iout,IDA,mdist)
 C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout,MAtom)
 C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
 C Produce perfect matchings (Kekule structures) and analyze
-      CALL PerfectMatching(MAtom,Iout,IDA)
+c      CALL PerfectMatching(MAtom,Iout,IDA)
 
 C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
@@ -556,7 +562,7 @@ C Calculate Schlegel diagram
           ParamS=dabs(ParamS)
         endif
         CALL Graph2D(MAtom,Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
-     1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,Mdist,Dist,ParamS,Rmin,
+     1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,mdist,Dist,ParamS,Rmin,
      1   TolX,scales,scalePPG,boost,CR,CRing5,CRing6,Symbol,filename)
       endif
 
@@ -589,7 +595,7 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.3, last revision from 02/12/12     |',
+     1 /1X,'|    This  version: 4.3.1, last revision from 10/12/12   |',
      1 /1X,'|________________________________________________________|',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
