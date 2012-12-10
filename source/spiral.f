@@ -1,4 +1,5 @@
       SUBROUTINE SpiralRestart(N,IPR,Iout,
+C     Restart version of Subroutine Spiral
      1 Isonum,IsoIPR,iham,IDA,A,chkname)
       use config
       IMPLICIT INTEGER (A-Z)
@@ -507,8 +508,365 @@ C     Analyze dual matrix
  2002 Format(A18)
       END
 
+      SUBROUTINE SpiralFind(N,IPR,ivar,In,Iout,IDA,A)
+C     This subroutine comes directly from the book of Fowler and 
+C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006),
+C     and has been modified to search for ring spirals around an
+C     icosahedral fullerene clostest to the vertex number required.           
+C     This sub-program catalogues fullerenes with a given number of      
+C     vertices using the spiral algorithm and a uniqueness test 
+C     based on equivalent spirals. IPR = 0  for all isomers. 
+C     The resulting output is a catalogue of the isomers found containing 
+C     their idealized point groups, canonical spirals, and NMR patterns.        
+C     N is the nuclearity of the fullerene.
+      use config
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION D(MMAX,MMAX),S(MMAX),SS(MMAX),IDA(NMAX,NMAX)
+      DIMENSION NMR(6),IRhag5(0:5),IRhag6(0:6)
+      DIMENSION Spiralx(12,NMAX),IVL(12),IVH(12)
+      CHARACTER*3 GROUP
+      CHARACTER*6 Occup
+      Real*8 sigmah,sigmahlow,sigmahhigh
+      Real*8 A(NMAX,NMAX),gap,dex
+
+      ivarlimit=4
+      if(ivar.gt.ivarlimit) then
+       Write(Iout,805)
+       Return
+      endif
+      if(N.gt.NMAX) Return     ! Increase NMAX 
+      if(2*(N/2).ne.N) Return  ! N must be even 
+
+C   Search for icosahedral fullerene Cm closest to Cm with m<n
+      dex=dfloat(N)
+      icon=0
+      loopmax=int(dsqrt(dex/2.d1))
+      loopmin=int(dsqrt(dex/6.d1))
+      if(loopmin.lt.1) loopmin=1
+       Do I1=loopmin,loopmax
+       Do J1=0,I1
+        nico=20*(I1*I1+J1*J1+I1*J1)
+        if(nico.le.N.and.nico.gt.icon) then
+         icon=nico
+         I=I1
+         J=J1
+        endif
+       enddo
+       enddo
+       if(icon.eq.0) then
+        Write(Iout,800) 
+        stop
+       endif
+       if(icon.eq.N) then
+        Write(Iout,801) icon,I,J
+       else
+        Write(Iout,802) icon,N,I,J
+       endif
+
+      M=N/2+2
+      Read(IN,*,Err=400,end=400) (SS(I),I=1,12)
+      Write(Iout,807)
+      Go to 300
+
+  400 I2=I*I
+      J2=J*J
+C     Getting exponents
+      IA=(5*(I+J)**2-5*I-3*J-2)/2
+      IB=I+J-1
+      IC=(5*I+1)*(I-1)+J*(5*I-3)
+      ID=IB
+      IE=(5*I2+15*J2-3*I-7*J)/2
+      WRITE(Iout,803) icon,IA,IB,IC,ID,IE
+C     Construct the ring spiral
+      SS(1)=1
+      SS(2)=IA+2
+      SS(3)=SS(2)+IB+1
+      SS(4)=SS(3)+IB+1
+      SS(5)=SS(4)+IB+1
+      SS(6)=SS(5)+IB+1
+      SS(7)=SS(6)+IC+1
+      SS(8)=SS(7)+ID+1
+      SS(9)=SS(8)+ID+1
+      SS(10)=SS(9)+ID+1
+      SS(11)=SS(10)+ID+1
+      SS(12)=SS(11)+IE+1
+
+  300 Write(Iout,804) (SS(I),I=1,12),ivar,ivar
+C  Set loop limits
+      IVL(1)=1
+      IVH(1)=2
+      do I=2,12
+       IVL(I)=SS(I)-ivar
+       IVH(I)=SS(I)+ivar
+      enddo
+      if(SS(12).gt.M) then
+       Write(Iout,*) 'Last RSPI ',SS(12),'>',M,' ==> RETURN'
+       return
+      endif
+      
+
+C  Set parameters
+      IRSPI=0
+      maxiter=10000000
+      islow=0
+      islowIPR=0
+      ishigh=0
+      ishighIPR=0
+      IFus5Glow=1000
+      sigmahlow=1.d10
+      IFus5Ghigh=0
+      sigmahhigh=-1.d0
+      L=0
+      IER=0
+      IT=0
+      do I=1,MMAX
+      do J=1,MMAX
+       D(I,J)=0
+      enddo
+      enddo
+
+      Write(iout,600)
+
+      if(IVH(12).gt.M) IVH(12)=M
+      DO 1  J1=IVL(1),IVH(1)
+       IVL2=IVL(2)
+       IVH2=IVH(2)
+       if(J1.ge.IVL2) IVL2=J1+1
+       if(IVL2.gt.IVH2) IVH2=IVL2
+       if(IVH2.gt.M) then
+        Write(Iout,*) 'Loop1 ',IVH2,'>',M,' ==> RETURN'
+        Return
+       endif 
+      DO 2  J2=IVL2,IVH2         !   combinations
+       IVL3=IVL(3)
+       IVH3=IVH(3)
+       if(J2.ge.IVL3) IVL3=J2+1
+       if(IVL3.gt.IVH3) IVH3=IVL3
+       if(IVH3.gt.M)  then
+        Write(Iout,*) 'Loop2 ',IVH3,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 3  J3=IVL3,IVH3
+       IVL4=IVL(4)
+       IVH4=IVH(4)
+       if(J3.ge.IVL4) IVL4=J3+1
+       if(IVL4.gt.IVH4) IVH4=IVL4
+       if(IVH4.gt.M)  then
+        Write(Iout,*) 'Loop3 ',IVH4,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 4  J4=IVL4,IVH4
+       IVL5=IVL(5)
+       IVH5=IVH(5)
+       if(J4.ge.IVL5) IVL5=J4+1
+       if(IVL5.gt.IVH5) IVH5=IVL5
+       if(IVH5.gt.M)  then
+        Write(Iout,*) 'Loop4 ',IVH5,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 5  J5=IVL5,IVH5
+       IVL6=IVL(6)
+       IVH6=IVH(6)
+       if(J5.ge.IVL6) IVL6=J5+1
+       if(IVL6.gt.IVH6) IVH6=IVL6
+       if(IVH6.gt.M)  then
+        Write(Iout,*) 'Loop5 ',IVH6,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 6  J6=IVL6,IVH6
+       IVL7=IVL(7)
+       IVH7=IVH(7)
+       if(J6.ge.IVL7) IVL7=J6+1
+       if(IVL7.gt.IVH7) IVH7=IVL7
+       if(IVH7.gt.M)  then
+        Write(Iout,*) 'Loop6 ',IVH7,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 7  J7=IVL7,IVH7
+       IVL8=IVL(8)
+       IVH8=IVH(8)
+       if(J7.ge.IVL8) IVL8=J7+1
+       if(IVL8.gt.IVH8) IVH8=IVL8
+       if(IVH8.gt.M)  then
+        Write(Iout,*) 'Loop7 ',IVH8,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 8  J8=IVL8,IVH8
+       IVL9=IVL(9)
+       IVH9=IVH(9)
+       if(J8.ge.IVL9) IVL9=J8+1
+       if(IVL9.gt.IVH9) IVH9=IVL9
+       if(IVH9.gt.M)  then
+        Write(Iout,*) 'Loop8 ',IVH9,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 9  J9=IVL9,IVH9
+       IVL10=IVL(10)
+       IVH10=IVH(10)
+       if(J9.ge.IVL10) IVL10=J9+1
+       if(IVL10.gt.IVH10) IVH10=IVL10
+       if(IVH10.gt.M)  then
+        Write(Iout,*) 'Loop9 ',IVH10,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 10 J10=IVL10,IVH10
+       IVL11=IVL(11)
+       IVH11=IVH(11)
+       if(J10.ge.IVL11) IVL11=J10+1
+       if(IVL11.gt.IVH11) IVH11=IVL11
+       if(IVH11.gt.M)  then
+        Write(Iout,*) 'Loop10 ',IVH11,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 11 J11=IVL11,IVH11
+       IVL12=IVL(12)
+       IVH12=IVH(12)
+       if(J11.ge.IVL12) IVL12=J11+1
+       if(IVL12.gt.IVH12) IVH12=IVL12
+       if(IVH12.gt.M)  then
+        Write(Iout,*) 'Loop11 ',IVH12,'>',M,' ==> RETURN'
+        Return
+       endif
+      DO 12 J12=IVL12,IVH12
+      DO J=1,M   ! Form spiral code in S
+       S(J)=6
+      enddo
+      S(J1)=5
+      S(J2)=5
+      S(J3)=5
+      S(J4)=5
+      S(J5)=5
+      S(J6)=5
+      S(J7)=5
+      S(J8)=5
+      S(J9)=5
+      S(J10)=5
+      S(J11)=5
+      S(J12)=5
+      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
+      IF(IER.EQ.12) GO TO 12          !      and check for closure 
+      IF(IER.EQ.11) GO TO 11
+      IF(IER.EQ.10) GO TO 10
+      IF(IER.EQ.9)  GO TO 9
+      IF(IER.EQ.8)  GO TO 8
+      IF(IER.EQ.7)  GO TO 7
+      IF(IER.EQ.6)  GO TO 6
+      IF(IER.EQ.5)  GO TO 5
+      IF(IER.EQ.4)  GO TO 4
+      IF(IER.EQ.3)  GO TO 3
+      IF(IER.EQ.2)  GO TO 2
+      IF(IER.EQ.1)  GO TO 1
+      CALL Unwind(M,IER,IT,ispiral,
+     1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals 
+      IF(IER.EQ.13) GO TO 13                             ! and check for uniqueness      
+      K=0
+      L=L+1                                              ! Spiral S is canonical      
+      DO J=1,6
+         IF(NMR(J).EQ.0) GO TO 16
+         K=J
+      enddo
+C     Analyze dual matrix
+   16  CALL DualAnalyze(nmax,mmax,N,M,D,IRhag5,IRhag6,
+     1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
+       if(2*ndeg.eq.nelec) then 
+        Occup='closed'
+       else
+        Occup='open  '
+        gap=0.d0
+       endif
+       if(IFus5G.le.IFus5Glow) then
+        IFus5Glow=IFus5G
+        IFusL=L
+       endif
+       if(IFus5G.ge.IFus5Ghigh) then
+        IFus5Ghigh=IFus5G
+        IFusH=L
+       endif
+       if(sigmah.le.sigmahlow) then
+        sigmahlow=sigmah
+        ISigmaL=L
+       endif
+       if(sigmah.ge.sigmahhigh) then
+        sigmahhigh=sigmah
+        ISigmaH=L
+       endif
+       WRITE(Iout,607) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
+     1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
+     2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
+        IRSPI=IRSPI+1
+ 13     CONTINUE 
+ 12     CONTINUE        ! Close loop over spiral 
+ 11     CONTINUE        ! combinations      
+ 10     CONTINUE
+ 9      CONTINUE
+ 8      CONTINUE
+ 7      CONTINUE
+ 6      CONTINUE
+ 5      CONTINUE
+ 4      CONTINUE
+ 3      CONTINUE
+ 2      CONTINUE
+ 1      CONTINUE
+
+      if(IRSPI.ne.0) then
+       WRITE (Iout,611) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
+     1  sigmahlow,ISigmaL,sigmahhigh,ISigmaH
+       WRITE (Iout,612)
+      else
+       WRITE (Iout,613)
+      endif
+      WRITE (Iout,606)
+ 600  FORMAT(/1X,'Subroutine Spiral from Fowler and Manolopoulos',
+     1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)',
+     2 /1X,'(Symmetries are given for undistorted fullerenes)',
+     1 /1X,' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
+     1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
+     2 /8X,'N  PG   Ring spiral pentagon positions',
+     3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
+     4 '   Ne  deg  gap    c/o     NMR pattern',
+     5 /1X,170('-')) 
+ 606  FORMAT(/1X,170('-'),/1X,'End of subroutine Spiral')
+ 607  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
+     1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
+     1 1X,A6,2X,3(I3,' x',I3,:,','))
+ 611  FORMAT(1X,'Lowest  Np= ',I3,' for isomer ',I10,
+     1      /1X,'Highest Np= ',I3,' for isomer ',I10,
+     1      /1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
+     1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
+ 612  FORMAT(1X,'Isomer List Complete')
+ 613  FORMAT(1X,'No isomers found')
+ 800  FORMAT(1X,'Nothing found ==> STOP')
+ 801  FORMAT(1X,'Your vertex number matches icoshedral fullerene ',
+     1 'with N=',I6,' ,(k,l)=(',I2,',',I2,')')
+ 802  FORMAT(1X,'Closest vertex number is ',I6,' for icoshedral ',
+     1 'fullerene with N=',I6,'; (k,l)=(',I2,',',I2,')')
+ 803  Format(1X,'General Goldberg-Coxeter transformation of C20 -> Cn',
+     1 ' with n=: ',I5,/1X,'Construction of icosahedral fullerenes ',
+     1 'using the spiral code representation of Fowler and Rogers',/1X,
+     1 ' Lit: P. W. Fowler, K. M. Rogers, J. Chem. Inf. Comput. Sci.',
+     1 ' 41, 108-111 (2001)',/1X,'Exponents of spiral series ',
+     1 '5(6)^A (5(6)^B)^4 5(6)^C (5(6)^D)^4 5(6)^E 5:',
+     1 '  A=',I5,', B=',I5,', C=',I5,', D=',I5,', E=',I5)
+ 804  Format(1X,'Ring spiral pentagon indices RSPI: ',12I5,
+     1 /1X,'Variation of each RSPI from RSPI-',I1,' to ','RSPI+',I1)
+ 805  Format(1X,'Variation too large, too many loops ==> RETURN')
+ 807  Format(1X,'Pentagon indices taken from input')
+
+C     RETURN
+      END
+
       SUBROUTINE Spiral(N,IPR,Iout,
      1 Isonum,IsoIPR,iham,IDA,A)
+C     This subroutine comes directly from the book of Fowler and 
+C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
+C     This sub-program catalogues fullerenes with a given number of      
+C     vertices using the spiral algorithm and a uniqueness test 
+C     based on equivalent spirals. The required input is IPR, 
+C     where IPR = 0 for general and 1 for isolated-pentagon isomers. 
+C     The resulting output is a catalogue of the isomers found containing 
+C     their idealized point groups, canonical spirals, and NMR patterns.        
+C     N is the nuclearity of the fullerene.
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
@@ -519,15 +877,6 @@ C     Analyze dual matrix
       CHARACTER*3 GROUP
       CHARACTER*6 Occup
       Real*8 sigmah,sigmahlow,sigmahhigh
-C     This subroutine comes directly from the book of Fowler and 
-C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
-C     This sub-program catalogues fullerenes with a given number of      
-C     vertices using the spiral algorithm and a uniqueness test 
-C     based on equivalent spirals. The required input is IPR, 
-C     where IPR = 0 for general and 1 for isolated-pentagon isomers. 
-C     The resulting output is a catalogue of the isomers found containing 
-C     their idealized point groups, canonical spirals, and NMR patterns.        
-C     N is the nuclearity of the fullerene.
 
       if(N.gt.NMAX) Return            ! Increase NMAX 
       if(2*(N/2).ne.N) Return         ! N must be even 

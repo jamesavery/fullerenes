@@ -1,17 +1,17 @@
-      SUBROUTINE PerfectMatching(MAtom,Iout,IDA)
-      use config
-      IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION IDA(Nmax,Nmax)
-       Write(Iout,1000) MAtom
-       Write(Iout,1001) 
-       Write(Iout,1002) 
- 1000 Format(1X,'Upper limit for number of perfect matchings',
-     1 ' in cubic graphs: 2**N with N=',I5)
- 1001 Format(1X,'Counting the number of perfect matchings using',
-     1 ' the Fisher-Kasteleyn-Temperley (FKT) algorithm')
- 1002 Format(1X,'Not implemented yet')
-      RETURN
-      END
+c      SUBROUTINE PerfectMatching(MAtom,Iout,IDA)
+c      use config
+c      IMPLICIT REAL*8 (A-H,O-Z)
+c      DIMENSION IDA(Nmax,Nmax)
+c       Write(Iout,1000) MAtom
+c       Write(Iout,1001) 
+c       Write(Iout,1002) 
+c 1000 Format(1X,'Upper limit for number of perfect matchings',
+c     1 ' in cubic graphs: 2**N with N=',I5)
+c 1001 Format(1X,'Counting the number of perfect matchings using',
+c     1 ' the Fisher-Kasteleyn-Temperley (FKT) algorithm')
+c 1002 Format(1X,'Not implemented yet')
+c      RETURN
+c      END
 
       SUBROUTINE Sortr(M,Mnew,imirror,jmirror,diam)
       use config
@@ -57,13 +57,13 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
-      SUBROUTINE TopIndicators(Matom,Iout,IDA,Mdist)
+      SUBROUTINE TopIndicators(Matom,Iout,IDA,MDist)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer MDist(Nmax,Nmax)
+      Integer MDist(Nmax,Nmax),Edges(2,3*matom/2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
-      type(c_ptr) :: g, new_fullerene_graph
+      type(c_ptr) :: graph, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
 C     minimal and maximal vertex contribution, rho and rhoE,
 C     Schultz index and Balaban index
@@ -71,16 +71,15 @@ C     For details see D. Vukicevic,F. Cataldo, O. Ori, A. Graovac,
 C     Chem. Phys. Lett. 501, 442–445 (2011).
 
       Write(Iout,1000) MAtom
-      Do I=1,Nmax
-      Do J=1,Nmax
-       MDist(I,J)=0
-      enddo
-      enddo
 
 C     Get topological distance matrix
-      g = new_fullerene_graph(Nmax,Matom,IDA)
-      call all_pairs_shortest_path(g,Matom,Nmax,MDist)
+      graph = new_fullerene_graph(Nmax,Matom,IDA)
+      call all_pairs_shortest_path(graph,Matom,Nmax,MDist)
+      call edge_list(graph,edges,NE)
+c     and finally delete the graph to free the mem
+      call delete_fullerene_graph(graph)     
 
+C     Wiener and hyper Wiener index, topological radius and diameter
       Xatom=dfloat(MAtom)
       wiener1=0.d0
       wiener=0.d0
@@ -134,6 +133,10 @@ C     Balaban index
       fac=3.d0*vertnum/(vertnum+4.d0)
       balabanindex=balaban*fac
 
+C     Szeged index
+      Call Szeged(MAtom,Edges,MDist,Sz)
+
+C     Final
       over=1.d-10
       wiener=wiener1/2.d0
       wav=wiener1/vertnum
@@ -155,7 +158,7 @@ C     ori=wiener/vertnum**2.5
      1 dint(reversewiener+over),
      1 wav,rho,rhoE,izagreb,
      1 dint(schultz+over),
-     1 balabanindex
+     1 balabanindex,dint(Sz+over)
       Write(Iout,1002) Wienerbalaban
       Write(Iout,1003) maxdist,mRadius,Avdist
 C     Write(Iout,1004) ori
@@ -173,7 +176,8 @@ C     Write(Iout,1004) ori
      1 ' Zagreb index = nv*3^2 = ',I12,
      1 ' (trivial for regular fullerenes)',/,
      1 ' Schultz index = 6*W = ',F20.0,' (related to Wiener index for ',
-     1 'regular fullerenes)',/,' Balaban index = ',D15.9,
+     1 'regular fullerenes)',/,' Balaban index = ',D15.9,/,
+     1 ' Szeged index = ',F20.0,
      1 /,' For the Estrada index see Subroutine Hueckel output')
  1002 Format(' f*Wiener*Balaban = 4WB(n+4)/(9n^3) = ',D15.9,/,'   ',
      1 ' (should be exactly 1.0 for cubic polyhedra with equal row ',
@@ -185,6 +189,30 @@ C     Write(Iout,1004) ori
 C1004 Format(' Ori constant for Wiener index: ',D15.9)
  1006 Format(' Something wrong with Wiener sum')
 
+      RETURN
+      END
+
+      SUBROUTINE Szeged(N,Edges,mdist,Sz)
+      use config
+C     This routine calculates the Szeged index
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Integer mdist(Nmax,Nmax),Edges(2,3*n/2)
+      Sz=0.d0
+C     Sum over all edges
+      Do I=1,3*n/2
+       IE1=Edges(1,I)+1
+       IE2=Edges(2,I)+1
+C      Get ni and nj for Szeged index
+       ni=0
+       nj=0
+       do J=1,N
+C       if(IE1.ne.J.and.IE2.ne.J) then
+         if(mdist(IE1,J).lt.mdist(IE2,J)) ni=ni+1
+         if(mdist(IE1,J).gt.mdist(IE2,J)) nj=nj+1
+C       endif
+       enddo
+       Sz=Sz+dfloat(ni*nj)
+      enddo
       RETURN
       END
 
