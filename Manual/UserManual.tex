@@ -1052,7 +1052,7 @@ Option for calculating Hamiltonian cycles and IUPAC numbers.
 %---Isomers---
 \subsection{\&Isomers line}
  Option for producing list of isomers and properties.
-\paragraph{List of options:}\ \paramname{IPR}, \paramname{IPH}, \paramname{IStop}, \paramname{IChk} (Default 0 for all options).\\
+\paragraph{List of options:}\ \paramname{IPR}, \paramname{isearch}, \paramname{IPH}, \paramname{IStop}, \paramname{IChk} (Default 0 for all options).\\
 \paragraph{Option description:}
 \begin{description}
 \item[IPR] 
@@ -1062,7 +1062,7 @@ based on equivalent spirals. The required input is IPR.\\
 If \paramname{IPR} = 1 for isolated-pentagon isomers from \C{60} onwards.\\
 If \paramname{IPR} = 2 for general isomers (this generates a large output and takes some computer time for fullerenes larger than \C{100}).
 Also the database has all this information (see below) up to \C{100}.\\
-If \paramname{isearch} = m ($m > 0$) then an input of initial RSPIs is required, otherwise the RSPI of the closest icosahedral fullerene \C{n} with $n \leq n_v$
+If \paramname{isearch} = $m (m > 0)$ then an input of initial RSPIs is required, otherwise the RSPI of the closest icosahedral fullerene \C{n} with $n \leq n_v$
 is taken (Default 0). The input is connected to the IPR input otherwise the default value of  \paramname{IPR} = 1 is chosen. This option searches for all
 possible isomers in the neighbourhood of $ \{ i_p - m, \dot ,i_p, \dot , i_p + m \} $. Note that \paramname{isearch} = 2 is relatively fast, larger values can soon
 become computer time expensive.\\
