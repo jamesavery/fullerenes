@@ -205,6 +205,7 @@ C ExtWu force field
       Read(IN,nml=FFParameters,Err=99,end=99)
       Read(IN,nml=Hamilton,Err=99,end=99)
       Read(IN,nml=Isomers,Err=99,end=99)
+       if(isearch.ne.0.and.IPR.eq.-1) IPR=1
       Read(IN,nml=Graph,Err=99,end=99)
 
 c set force (custom parameters)
