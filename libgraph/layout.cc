@@ -29,15 +29,82 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
   //  fprintf(stderr,"tutte_layout(%d,%d,%d)\n",s,t,r);
   outer_face = shortest_cycle(s,t,r,face_max);
 
+  unsigned int Nface = outer_face.size();
+  vector<coord2d> outer_coords(Nface);
+  for(unsigned int i=0;i<Nface;i++){
+    outer_coords[i] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
+  }
+
+  return tutte_layout_direct(outer_face,outer_coords);
+}
+
+#include "../contrib/mgmres.hpp"
+vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const
+{
+  vector<coord2d> result(N);
+
+  // Construct right hand side: rhs_i = {0,0} everywhere except for outer-face nodes with fixed solutions 
+  double rhs[N*2], x[N*2];
+
+  memset(rhs,0,N*2*sizeof(double));
+  for(int i=0;i<outer_face.size();i++){
+    rhs[    outer_face[i] ] = outer_coords[i].first;
+    rhs[N + outer_face[i] ] = outer_coords[i].second;
+  }
+  memcpy(x,rhs,N*2*sizeof(double));
+
+  // Construct matrix I-1/3*A in triplet form, where A is adjacency, except for rows A_i=\delta_{ij} for i an outer-face node
+  double A[4*N];
+  int IA[N+1], JA[4*N];
+  int nz = 0;
+  {
+    double Afull[N*N];
+    memset(Afull,0,N*N*sizeof(double));
+    for(node_t u=0;u<N;u++){
+      Afull[u*(N+1)] = 1.0;
+      for(int i=0;i<neighbours[u].size();i++){
+	const node_t& v(neighbours[u][i]);
+	Afull[u*N+v] = -1.0L/3.0;
+      }
+    }
+    for(int i=0;i<outer_face.size();i++){
+      const node_t& u(outer_face[i]);
+      for(node_t v=0;v<N;v++) Afull[u*N+v] = (u==v)? 1.0 : 0.0;
+    }
+
+    for(node_t u=0;u<N;u++){
+      IA[u] = nz;
+      for(node_t v=0;v<N;v++)
+	if(Afull[u*N+v]!=0){
+	  A[nz] = Afull[u*N+v];
+	  JA[nz] = v;
+	  nz++;
+	}
+    }
+  }
+  IA[N] = nz;
+  // Solve sparse linear system for x-coordinates and y-coordinates 
+  pmgmres_ilu_cr(N,nz,IA,JA,A,x,  rhs,  50000,N-1,1e-15,1e-15);
+  pmgmres_ilu_cr(N,nz,IA,JA,A,x+N,rhs+N,50000,N-1,1e-15,1e-15);
+  //  mgmres_st(N,nz,IA,JA,A,x,  rhs,  50000,N-1,1e-10,1e-10);
+  //  mgmres_st(N,nz,IA,JA,A,x+N,rhs+N,50000,N-1,1e-10,1e-10);
+
+  for(node_t u=0;u<N;u++) result[u] = coord2d(x[u],x[u+N]);
+
+  return result;
+}
+
+vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const
+{
   vector<coord2d> xys(N), newxys(N);
   vector<bool> fixed(N);
 
-  //  cerr << "tutte_layout: Outer face: " << outer_face << endl;
+  cerr << "tutte_layout: Outer face: " << outer_face << endl;
 
   unsigned int Nface = outer_face.size();
   for(unsigned int i=0;i<Nface;i++){
     fixed[outer_face[i]] = true;
-    xys[outer_face[i]] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
+    xys[outer_face[i]] = outer_coords[i];
   }
     
   bool converged = false;
