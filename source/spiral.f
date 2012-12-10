@@ -521,13 +521,13 @@ C     their idealized point groups, canonical spirals, and NMR patterns.
 C     N is the nuclearity of the fullerene.
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION D(MMAX,MMAX),S(MMAX),SS(MMAX),IDA(NMAX,NMAX)
+      DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
       DIMENSION NMR(6),IRhag5(0:5),IRhag6(0:6)
-      DIMENSION Spiralx(12,NMAX),IVL(12),IVH(12)
-      CHARACTER*3 GROUP
-      CHARACTER*6 Occup
+      DIMENSION Spiralx(12,NMAX),IVL(12),IVH(12),SS(12)
       Real*8 sigmah,sigmahlow,sigmahhigh
       Real*8 A(NMAX,NMAX),gap,dex
+      CHARACTER*3 GROUP
+      CHARACTER*6 Occup
 
       ivarlimit=4
       if(ivar.gt.ivarlimit) then
@@ -856,8 +856,7 @@ C     Analyze dual matrix
 C     RETURN
       END
 
-      SUBROUTINE Spiral(N,IPR,Iout,
-     1 Isonum,IsoIPR,iham,IDA,A)
+      SUBROUTINE Spiral(N,IPR,Iout,Isonum,IsoIPR,iham,IDA,A)
 C     This subroutine comes directly from the book of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
 C     This sub-program catalogues fullerenes with a given number of      

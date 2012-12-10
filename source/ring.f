@@ -3044,7 +3044,7 @@ C     Get the connectivities between 2 and 3 atoms
       M12=12
       Do J=1,12
       IArray=I+J-1
-      CALL Num2(MAtom,Icon2(IArray),NCI(J),NCJ(J))
+      Print*,IArray
       If(NCI(J).Eq.0) then
       M12=J-1
       Go to 11
