@@ -508,14 +508,14 @@ C     Analyze dual matrix
  2002 Format(A18)
       END
 
-      SUBROUTINE SpiralIco(N,ivar,In,Iout,IDA,A)
+      SUBROUTINE SpiralFind(N,IPR,ivar,In,Iout,IDA,A)
 C     This subroutine comes directly from the book of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006),
 C     and has been modified to search for ring spirals around an
 C     icosahedral fullerene clostest to the vertex number required.           
 C     This sub-program catalogues fullerenes with a given number of      
 C     vertices using the spiral algorithm and a uniqueness test 
-C     based on equivalent spirals. IPR = 1  for isolated-pentagon isomers. 
+C     based on equivalent spirals. IPR = 0  for all isomers. 
 C     The resulting output is a catalogue of the isomers found containing 
 C     their idealized point groups, canonical spirals, and NMR patterns.        
 C     N is the nuclearity of the fullerene.
@@ -529,7 +529,6 @@ C     N is the nuclearity of the fullerene.
       Real*8 sigmah,sigmahlow,sigmahhigh
       Real*8 A(NMAX,NMAX),gap,dex
 
-      IPR=1
       ivarlimit=4
       if(ivar.gt.ivarlimit) then
        Write(Iout,805)
@@ -537,6 +536,7 @@ C     N is the nuclearity of the fullerene.
       endif
       if(N.gt.NMAX) Return     ! Increase NMAX 
       if(2*(N/2).ne.N) Return  ! N must be even 
+
 C   Search for icosahedral fullerene Cm closest to Cm with m<n
       dex=dfloat(N)
       icon=0
@@ -559,12 +559,13 @@ C   Search for icosahedral fullerene Cm closest to Cm with m<n
        endif
        if(icon.eq.N) then
         Write(Iout,801) icon,I,J
-C       Return
        else
         Write(Iout,802) icon,N,I,J
        endif
 
+      M=N/2+2
       Read(IN,*,Err=400,end=400) (SS(I),I=1,12)
+      Write(Iout,807)
       Go to 300
 
   400 I2=I*I
@@ -577,7 +578,6 @@ C     Getting exponents
       IE=(5*I2+15*J2-3*I-7*J)/2
       WRITE(Iout,803) icon,IA,IB,IC,ID,IE
 C     Construct the ring spiral
-      M=N/2+2
       SS(1)=1
       SS(2)=IA+2
       SS(3)=SS(2)+IB+1
@@ -590,15 +590,20 @@ C     Construct the ring spiral
       SS(10)=SS(9)+ID+1
       SS(11)=SS(10)+ID+1
       SS(12)=SS(11)+IE+1
-      Write(Iout,804) (SS(I),I=1,12),ivar,ivar
 
+  300 Write(Iout,804) (SS(I),I=1,12),ivar,ivar
 C  Set loop limits
-  300 IVL(1)=SS(1)
-      IVH(1)=SS(1)+1
+      IVL(1)=1
+      IVH(1)=2
       do I=2,12
        IVL(I)=SS(I)-ivar
        IVH(I)=SS(I)+ivar
       enddo
+      if(SS(12).gt.M) then
+       Write(Iout,*) 'Last RSPI ',SS(12),'>',M,' ==> RETURN'
+       return
+      endif
+      
 
 C  Set parameters
       IRSPI=0
@@ -622,84 +627,107 @@ C  Set parameters
 
       Write(iout,600)
 
-C  Search for clashes in RSPIs, e.g. SS(j).le.SS(j-1)
-C     if(IVH(12).gt.M) IVH(12)=M
-C     do I=1,11
-C      ndif=IVL(I+1)-IVH(I)
-C      if(ndif.le.0) then
-C       Write(Iout,806) I,I+1
-C       Return
-C      endif
-C     enddo
-
+      if(IVH(12).gt.M) IVH(12)=M
       DO 1  J1=IVL(1),IVH(1)
        IVL2=IVL(2)
        IVH2=IVH(2)
        if(J1.ge.IVL2) IVL2=J1+1
        if(IVL2.gt.IVH2) IVH2=IVL2
-       if(IVH2.gt.M) Return
+       if(IVH2.gt.M) then
+        Write(Iout,*) 'Loop1 ',IVH2,'>',M,' ==> RETURN'
+        Return
+       endif 
       DO 2  J2=IVL2,IVH2         !   combinations
        IVL3=IVL(3)
        IVH3=IVH(3)
        if(J2.ge.IVL3) IVL3=J2+1
        if(IVL3.gt.IVH3) IVH3=IVL3
-       if(IVH3.gt.M) Return
+       if(IVH3.gt.M)  then
+        Write(Iout,*) 'Loop2 ',IVH3,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 3  J3=IVL3,IVH3
        IVL4=IVL(4)
        IVH4=IVH(4)
        if(J3.ge.IVL4) IVL4=J3+1
        if(IVL4.gt.IVH4) IVH4=IVL4
-       if(IVH4.gt.M) Return
+       if(IVH4.gt.M)  then
+        Write(Iout,*) 'Loop3 ',IVH4,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 4  J4=IVL4,IVH4
        IVL5=IVL(5)
        IVH5=IVH(5)
        if(J4.ge.IVL5) IVL5=J4+1
        if(IVL5.gt.IVH5) IVH5=IVL5
-       if(IVH5.gt.M) Return
+       if(IVH5.gt.M)  then
+        Write(Iout,*) 'Loop4 ',IVH5,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 5  J5=IVL5,IVH5
        IVL6=IVL(6)
        IVH6=IVH(6)
        if(J5.ge.IVL6) IVL6=J5+1
        if(IVL6.gt.IVH6) IVH6=IVL6
-       if(IVH6.gt.M) Return
+       if(IVH6.gt.M)  then
+        Write(Iout,*) 'Loop5 ',IVH6,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 6  J6=IVL6,IVH6
        IVL7=IVL(7)
        IVH7=IVH(7)
        if(J6.ge.IVL7) IVL7=J6+1
        if(IVL7.gt.IVH7) IVH7=IVL7
-       if(IVH7.gt.M) Return
+       if(IVH7.gt.M)  then
+        Write(Iout,*) 'Loop6 ',IVH7,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 7  J7=IVL7,IVH7
        IVL8=IVL(8)
        IVH8=IVH(8)
        if(J7.ge.IVL8) IVL8=J7+1
        if(IVL8.gt.IVH8) IVH8=IVL8
-       if(IVH8.gt.M) Return
+       if(IVH8.gt.M)  then
+        Write(Iout,*) 'Loop7 ',IVH8,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 8  J8=IVL8,IVH8
        IVL9=IVL(9)
        IVH9=IVH(9)
        if(J8.ge.IVL9) IVL9=J8+1
        if(IVL9.gt.IVH9) IVH9=IVL9
-       if(IVH9.gt.M) Return
+       if(IVH9.gt.M)  then
+        Write(Iout,*) 'Loop8 ',IVH9,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 9  J9=IVL9,IVH9
        IVL10=IVL(10)
        IVH10=IVH(10)
        if(J9.ge.IVL10) IVL10=J9+1
        if(IVL10.gt.IVH10) IVH10=IVL10
-       if(IVH10.gt.M) Return
+       if(IVH10.gt.M)  then
+        Write(Iout,*) 'Loop9 ',IVH10,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 10 J10=IVL10,IVH10
        IVL11=IVL(11)
        IVH11=IVH(11)
        if(J10.ge.IVL11) IVL11=J10+1
        if(IVL11.gt.IVH11) IVH11=IVL11
-       if(IVH11.gt.M) Return
+       if(IVH11.gt.M)  then
+        Write(Iout,*) 'Loop10 ',IVH11,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 11 J11=IVL11,IVH11
        IVL12=IVL(12)
        IVH12=IVH(12)
        if(J11.ge.IVL12) IVL12=J11+1
        if(IVL12.gt.IVH12) IVH12=IVL12
-       if(IVH12.gt.M) Return
+       if(IVH12.gt.M)  then
+        Write(Iout,*) 'Loop11 ',IVH12,'>',M,' ==> RETURN'
+        Return
+       endif
       DO 12 J12=IVL12,IVH12
-
       DO J=1,M   ! Form spiral code in S
        S(J)=6
       enddo
@@ -716,7 +744,7 @@ C     enddo
       S(J11)=5
       S(J12)=5
       CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
-      IF(IER.EQ.12) GO TO 12               !      and check for closure 
+      IF(IER.EQ.12) GO TO 12          !      and check for closure 
       IF(IER.EQ.11) GO TO 11
       IF(IER.EQ.10) GO TO 10
       IF(IER.EQ.9)  GO TO 9
@@ -823,7 +851,7 @@ C     Analyze dual matrix
  804  Format(1X,'Ring spiral pentagon indices RSPI: ',12I5,
      1 /1X,'Variation of each RSPI from RSPI-',I1,' to ','RSPI+',I1)
  805  Format(1X,'Variation too large, too many loops ==> RETURN')
-C806  Format(1X,'Overlaping RSPIs between ',I2,' and ',I2,' ==> RETURN')
+ 807  Format(1X,'Pentagon indices taken from input')
 
 C     RETURN
       END
