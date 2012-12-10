@@ -301,7 +301,7 @@ C Write out cc1 file
       Real*8 meandist
 C     Get the minimum covering sphere using algorithm 2 by E.A.Yildirim
       DATA itermax/10000000/
-      DATA eps,disteps/1.d-12,1.d-5/
+      DATA eps,disteps/1.d-8,1.d-5/
       epsilon=(1.d0+eps)**2-1.d0
       Write(IOUT,1000) M,epsilon
  1000 Format(/1X,'Calculate the minimum covering sphere using',

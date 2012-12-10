@@ -52,7 +52,7 @@ C Sort eigenvalues
 C Analyze eigenenergies
       Call HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
       
- 1000 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel matrix')
+ 1000 FORMAT(/1X,'Construct the (',I5,','I5,') Hueckel matrix')
  1001 FORMAT(/1X,'Skip diagonalization of Hueckel matrix')
       return
       END

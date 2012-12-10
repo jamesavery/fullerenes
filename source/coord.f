@@ -152,14 +152,14 @@ C Oblate
 C Asymmetric
       Write(Iout,1011)
  1000 FORMAT(/1x,'Cartesian Input',
-     1  /1X,'   I      Z Element Cartesian Coordinates')
+     1  /1X,'    I      Z Element Cartesian Coordinates')
  1001 FORMAT(/1x,'Moment of inertia with setting the masses to unity:',
      1 /1x,'Eigenvalues (principal axis system): ',3(' ',D18.12))
- 1002 FORMAT(1X,I4,1X,I6,1X,A2,6X,3(D18.12,2X))
+ 1002 FORMAT(1X,I5,1X,I6,1X,A2,6X,3(D18.12,2X))
  1003 FORMAT(/1X,'Shift Molecule to the centre of points:',
      1 /1X,'Original Centre: ',3(D15.9,1X),
      1 /1X,'New Coordinates:',
-     1  /1X,'   I      Z Element Cartesian Coordinates')
+     1  /1X,'    I      Z Element Cartesian Coordinates')
  1004 FORMAT(1x,'Using C60 ideal icosahedron to normalize eigenvalues',
      1 ' (',F6.2,' Angstroem^2)',/,' Eigenvalues (normalized): ',
      1 3(' ',D15.9),/1X,'Sphericity parameter normed to largest ',
@@ -272,9 +272,9 @@ C     Calculate the moment of inertia tensor and diagonalize (no mass)
       endif
  1000 Format(/1X,' Atom-to-atom largest diameters obtained from ',
      1 'inversion through center of points sorted largest to '
-     2 'smallest: (',I4,' values)')
- 1001 Format(5(1X,'(',I4,',',I4,')',2X,D14.8))
- 1002 Format(1X,' Error: Check subroutine diameter',2I4)
+     2 'smallest: (',I5,' values)')
+ 1001 Format(5(1X,'(',I5,',',I5,')',1X,D14.8))
+ 1002 Format(1X,' Error: Check subroutine diameter',2I5)
  1003 Format(1X,' Diameters indicate that points lie on a sphere')
       Return
       END
@@ -2011,11 +2011,11 @@ C Produce adjacency matrix
       call delete_fullerene_graph(g)
       write (Iout,1004) 
  1000 Format(/1X,'Creating the adjacency matrix of the next leap-frog',
-     1 ' fullerene: ',I4,' --> ',I4)
+     1 ' fullerene: ',I5,' --> ',I5)
  1001 Format(/1X,'Creating the adjacency matrix of the ',I2,
      1 'th leap-frog fullerene: ',I4,' --> ',I4)
- 1002 Format(1X,'Error: Dimension of leapfrof fullerene is ',I4,
-     1 ' greater than dimension of Nmax (',I4,') set in program')
+ 1002 Format(1X,'Error: Dimension of leapfrof fullerene is ',I5,
+     1 ' greater than dimension of Nmax (',I5,') set in program')
  1004 FORMAT(1X,'Fullerene graph deleted')
  1005 Format(1x,'Produce new adjacency matrix')
  1006 Format(/1x,'Goldberg-Coxeter transformation with indices ',
@@ -2035,9 +2035,9 @@ C Produce adjacency matrix
  1015 Format(1X,'Leapfrog graph does not satisfy all fullerene ',
      1 'conditions')
  1021 Format(/1X,'Creating the adjacency matrix of the ',I2,
-     1 'nd leap-frog fullerene: ',I4,' --> ',I4)
+     1 'nd leap-frog fullerene: ',I5,' --> ',I5)
  1022 Format(/1X,'Creating the adjacency matrix of the ',I2,
-     1 'rd leap-frog fullerene: ',I4,' --> ',I4)
+     1 'rd leap-frog fullerene: ',I5,' --> ',I5)
       Return
       END
 
@@ -2150,7 +2150,7 @@ C     Check distances
       else
         Write(IOUT,1019) iratio
       endif
- 1005 FORMAT(/1X,'Construct the (',I4,','I4,') Hueckel ',
+ 1005 FORMAT(/1X,'Construct the (',I5,','I5,') Hueckel ',
      1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
  1011 FORMAT(/1X,'Using the Tutte-embedding algorithm to construct ',
@@ -2160,7 +2160,7 @@ C     Check distances
  1014 FORMAT(1X,'Fullerene graph deleted')
  1015 FORMAT(1X,'Coordinates from Tutte embedding scaled by a factor'
      1 ' of ',D18.12)
- 1016 FORMAT(1X,I4,5X,3(D18.12,2X))
+ 1016 FORMAT(1X,I5,5X,3(D18.12,2X))
  1017 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
  1018 Format(1X,'Maximum bond distance ',I4,'% larger than minimum ',
@@ -2318,11 +2318,11 @@ C     Calculate P-type dipole moment
      1 /1X,'P-type eigenvalues and eigenvectors (path search not yet ',
      1 'implemented and cartesian coordinates may not be correct)',/1X,
      1 'Note: Procedure may give bond lengths which may vary strongly')
- 1011 FORMAT(1X,'eigenvalue',I4,': ',F12.6,', eigenvector: (',I4,
-     1 ' negative and ',I4,' positive values)')
+ 1011 FORMAT(1X,'eigenvalue',I4,': ',F12.6,', eigenvector: (',I5,
+     1 ' negative and ',I5,' positive values)')
  1012 FORMAT(10(1X,F12.6))
  1013 FORMAT(1X,'Fowler-Manolopoulos Coordinates')
- 1014 FORMAT(1X,I4,5X,3(D18.12,2X))
+ 1014 FORMAT(1X,I5,5X,3(D18.12,2X))
  1015 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
      1 ', RMS distance: ',F12.6)
  1016 Format(1X,'Maximum bond distance ',I5,'% larger than minimum ',
@@ -2436,13 +2436,13 @@ C     Reconstruct IDA
  1000 Format(1X,'Number of permutations for cartesian coordinates ',
      1  'performed: ',I5)
  1001 Format(1X,'Permutations:')
- 1002 Format(10(1X,'(',I4,',',I4,')'))
+ 1002 Format(10(1X,'(',I5,',',I5,')'))
  1003 Format(1X,'Enter Subroutine Permute')
  1004 Format(1X,' Vertices permuted and connectivities and ',
      1 'adjacency matrix altered. Vertices N and corresponding ',
      1 'adjacencies Ni of 3-connected graph:',
-     1 /1X,'   N        N1   N2   N3')
- 1005 Format(1X,I4,'    (',3I5,')')
+     1 /1X,'   N         N1   N2   N3')
+ 1005 Format(1X,I5,'    (',3I5,')')
       Return
       END
 
@@ -2526,7 +2526,7 @@ c   Check if distances are within certain range
       endif
       
  1000 Format(/1X,'Convert cartesian into internal coordinates:',
-     1 /4X,'N1',9X,'R',10X,'Angle',6X,'Dihedral',5X,'N2',4X,
+     1 /4X,'N1',9X,'R',10X,'Angle',6X,'Dihedral',4X,'N2',4X,
      1 'N3',4X,'N4',/1X,64('-'))
  1001 Format(1X,I5,3(1X,F12.6),3(1X,I5))
  1002 Format(1X,'Analysis of distances: All are bond distances',
