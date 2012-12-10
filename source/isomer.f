@@ -137,7 +137,6 @@ C     Limit number of cycles
         Write(Iout,1004) maxRSI
         if(isearch.ne.0) then
          Write(Iout,1013) isearch
-         IPR=1
          go to 99
         endif
         Return
@@ -147,7 +146,6 @@ C     Limit number of cycles
         Write(Iout,1004) maxRSI
         if(isearch.ne.0) then
          Write(Iout,1013) isearch
-         IPR=1
          go to 99
         endif
         Return
@@ -209,7 +207,7 @@ C Produce list from ring spiral algorithm
         CALL Spiral(N,IPR,Iout,Isonum,IsonumIPR,iham,IDA,A)
        else
         Write(Iout,1015)
-        Call SpiralIco(N,isearch,In,Iout,IDA,A)
+        Call SpiralFind(N,IPR,isearch,In,Iout,IDA,A)
        endif
       endif
 

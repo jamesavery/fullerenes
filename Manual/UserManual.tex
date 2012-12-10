@@ -27,7 +27,7 @@
 
 \aliaspagestyle{title}{empty}
 
-\title{PROGRAM FULLERENE (Version 4.3)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
+\title{PROGRAM FULLERENE (Version 4.3.1)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
 
 \author{Peter Schwerdtfeger%
   \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
@@ -77,7 +77,7 @@ We are always open to improvements and suggestions.
 
 \subsubsection*{Please cite the following papers if you use this program for publishing data:}
 1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{Topological Analysis of Fullerenes - 
-A Fortran and C++ Program (Version 4.3)}, (Massey University Albany, 
+A Fortran and C++ Program (Version 4.3.1)}, (Massey University Albany, 
 Auckland, New Zealand, 2012).\\
 2) P. W. Fowler and D. E. Manolopoulus, \textit{An Atlas of Fullerenes}
 (Dover Publ., New York, 2006). This book is highly recommended. 
@@ -180,6 +180,7 @@ that PS is good in old-fashioned Fortran and JA is good in C++.  Furthermore, so
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
 and geometry optimization. Version 4.3 now includes the Hessian of the force field, although 
 we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
+4.3.1 introduced a search algorithm for neighborhood RSPIs and the Szeged index as a topological index.
 This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bug please report it to one of us.
 
@@ -1061,6 +1062,10 @@ based on equivalent spirals. The required input is IPR.\\
 If \paramname{IPR} = 1 for isolated-pentagon isomers from \C{60} onwards.\\
 If \paramname{IPR} = 2 for general isomers (this generates a large output and takes some computer time for fullerenes larger than \C{100}).
 Also the database has all this information (see below) up to \C{100}.\\
+If \paramname{isearch} = m ($m > 0$) then an input of initial RSPIs is required, otherwise the RSPI of the closest icosahedral fullerene \C{n} with $n \leq n_v$
+is taken (Default 0). The input is connected to the IPR input otherwise the default value of  \paramname{IPR} = 1 is chosen. This option searches for all
+possible isomers in the neighbourhood of $ \{ i_p - m, \dot ,i_p, \dot , i_p + m \} $. Note that \paramname{isearch} = 2 is relatively fast, larger values can soon
+become computer time expensive.\\
 If \paramname{IPH} = 1 then number of distinct Hamiltonian cycles is calculated for every isomer (this is computer time extensive).\\
 If \paramname{istop} = 1 program stops after calling this routine.\\
 If \paramname{IChk} = 1  Restart: Isomer list is continued from previous output file called 'checkpoint' as default if not otherwise give in \paramname{filename.chkpnt}.
@@ -1136,9 +1141,6 @@ The different algorithms for drawing 2D fullerene graphs are shown in Figure \re
 fullerenes which are far from spherical symmetry, the algorithms here may not produce the best 2D graph representation.
 We are currently working on this problem.
 
-
-
-        
 %Figure 5
  \begin{figure}[htbp]
 	\centering
@@ -1153,9 +1155,6 @@ We are currently working on this problem.
      \caption{From the left to right: 2D fullerene structures created using \paramname{ISchlegel}=1 to 8.}
      \label{pic:ManySchlegel}
  \end{figure}
-
-
- 
 
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
