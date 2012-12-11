@@ -50,38 +50,38 @@ C     Convert to internal coordinates
 
 C     Calculate distance part of moment of inertia
       Do I=1,3
-      Do J=1,3
-       Ainert(I,J)=0.d0
-      enddo
+        Do J=1,3
+          Ainert(I,J)=0.d0
+        enddo
       enddo
       Do J=1,MAtom
-      x=Dist(1,J)
-      y=Dist(2,J)
-      z=Dist(3,J)
-      x2=x*x
-      y2=y*y
-      z2=z*z
-      xy=x*y
-      xz=x*z
-      yz=y*z
-      Ainert(1,1)=Ainert(1,1)+y2+z2
-      Ainert(2,2)=Ainert(2,2)+x2+z2
-      Ainert(3,3)=Ainert(3,3)+x2+y2
-      Ainert(1,2)=Ainert(1,2)+xy
-      Ainert(1,3)=Ainert(1,3)+xz
-      Ainert(2,3)=Ainert(2,3)+yz
-      Ainert(2,1)=Ainert(1,2)
-      Ainert(3,1)=Ainert(1,3)
-      Ainert(3,2)=Ainert(2,3)
+        x=Dist(1,J)
+        y=Dist(2,J)
+        z=Dist(3,J)
+        x2=x*x
+        y2=y*y
+        z2=z*z
+        xy=x*y
+        xz=x*z
+        yz=y*z
+        Ainert(1,1)=Ainert(1,1)+y2+z2
+        Ainert(2,2)=Ainert(2,2)+x2+z2
+        Ainert(3,3)=Ainert(3,3)+x2+y2
+        Ainert(1,2)=Ainert(1,2)+xy
+        Ainert(1,3)=Ainert(1,3)+xz
+        Ainert(2,3)=Ainert(2,3)+yz
+        Ainert(2,1)=Ainert(1,2)
+        Ainert(3,1)=Ainert(1,3)
+        Ainert(3,2)=Ainert(2,3)
       enddo
       xmin=0.d0
       Do I=1,3
-      if(Ainert(I,I).gt.xmin) xmin=Ainert(I,I)
+        if(Ainert(I,I).gt.xmin) xmin=Ainert(I,I)
       enddo
       Do I=1,3
-      Do J=1,3
-       Ainert(I,J)=Ainert(I,J)/xmin
-      enddo
+        Do J=1,3
+          Ainert(I,J)=Ainert(I,J)/xmin
+        enddo
       enddo
 C Diagonalize without producing eigenvectors
       call tred2l(Ainert,3,3,evec,df)
