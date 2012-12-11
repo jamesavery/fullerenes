@@ -1,4 +1,4 @@
-      SUBROUTINE func3d(n,IERR,p,fc,force,iopt,
+      SUBROUTINE func3d(IERR,p,fc,force,iopt,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -8,11 +8,11 @@ c n=MATOM*3
 
       select case(iopt)
         case(1, 2)
-          CALL wu(n,IERR,p,fc,force,iopt,
+          CALL wu(IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1      a_h,a_p)
         case(3, 4)
-          CALL extwu(n,IERR,p,fc,force,iopt,
+          CALL extwu(IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      2      a_h,a_p,
      1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -24,7 +24,7 @@ c n=MATOM*3
       END SUBROUTINE
 
 
-      SUBROUTINE wu(n,IERR,p,fc,force,iopt,
+      SUBROUTINE wu(IERR,p,fc,force,iopt,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p)
 c n=MATOM*3
@@ -38,8 +38,9 @@ C     and bending, energy
       integer iopt
 
 c     edges with 0, 1, 2 pentagons
-      integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
-      integer a_p(3,60), a_h(3,N-60)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
+      integer e_pp(2,3*number_vertices/2)
+      integer a_p(3,60), a_h(3,3*number_vertices-60)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 
@@ -100,9 +101,9 @@ C     Loop over 5-rings
         ehookap=ehookap+(angle_p-ap)**2
       enddo
 
-      if(n/3 .gt. 20) then
+      if(number_vertices .gt. 20) then
 C     Loop over 6-rings
-      do i=1,n-60
+      do i=1,3*number_vertices-60
         call angle(p(3*a_h(1,i)-2),p(3*a_h(1,i)-1),p(3*a_h(1,i)),
      1             p(3*a_h(2,i)-2),p(3*a_h(2,i)-1),p(3*a_h(2,i)),
      1             p(3*a_h(3,i)-2),p(3*a_h(3,i)-1),p(3*a_h(3,i)),
@@ -114,8 +115,8 @@ C     Loop over 6-rings
 C     Coulomb repulsion from origin
       ecoulomb=0.d0
       if (iopt.eq.2 .and. fco.ne.0.d0)  then
-        Do I=1,n,3
-          rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
+        Do I=1,number_vertices
+          rinv=1.d0/dsqrt(p(3*I-2)**2+p(3*I-1)**2+p(3*I)**2)
           ecoulomb=ecoulomb+rinv
         enddo
       endif
@@ -130,7 +131,7 @@ c      write(*,*)'leaving wu'
 
 
 
-      SUBROUTINE extwu(n,IERR,p,fc,force,iopt,
+      SUBROUTINE extwu(IERR,p,fc,force,iopt,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -141,9 +142,11 @@ c n=MATOM*3
       real(8) fc
 
 c     edges with 0, 1, 2 pentagons
-      integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
-      integer a_p(3,60), a_h(3,N-60)
-      integer d_hhh(4,n/3),d_hpp(4,n/3),d_hhp(4,n/3),d_ppp(4,n/3)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
+      integer e_pp(2,3*number_vertices/2)
+      integer a_p(3,60), a_h(3,3*number_vertices-60)
+      integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
+      integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
@@ -216,9 +219,9 @@ C     Loop over 5-rings
         ehookap=ehookap+(angle_abc-ap)**2
       enddo
 
-      if(n/3 .gt. 20) then
+      if(number_vertices .gt. 20) then
 C     Loop over 6-rings
-      do i=1,n-60
+      do i=1,3*number_vertices-60
         call angle(p(3*a_h(1,i)-2),p(3*a_h(1,i)-1),p(3*a_h(1,i)),
      1             p(3*a_h(2,i)-2),p(3*a_h(2,i)-1),p(3*a_h(2,i)),
      1             p(3*a_h(3,i)-2),p(3*a_h(3,i)-1),p(3*a_h(3,i)),
@@ -304,8 +307,8 @@ c        write(*,*)'diff',angle_p,ap
 C     Coulomb repulsion from origin
       ecoulomb=0.d0
       if (iopt.eq.4 .and. fco.ne.0.d0)  then
-        Do I=1,n,3
-          rinv=1.d0/dsqrt(p(I)**2+p(I+1)**2+p(I+2)**2)
+        Do I=1,number_vertices
+          rinv=1.d0/dsqrt(p(3*I-2)**2+p(3*I-1)**2+p(3*I)**2)
           ecoulomb=ecoulomb+rinv
         enddo
       endif
@@ -322,7 +325,7 @@ c      write(*,*)fc,"energy"
 
 
 
-      SUBROUTINE dfunc3d(n,p,x,force,iopt,
+      SUBROUTINE dfunc3d(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -333,11 +336,11 @@ c      write(*,*)"entering dfunc3d"
       
       select case(iopt)
         case(1, 2)
-          CALL dwu(n,p,x,force,iopt,
+          CALL dwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p)
         case(3, 4)
-          CALL dextwu(n,p,x,force,iopt,
+          CALL dextwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -349,7 +352,7 @@ c      write(*,*)"leaving dfunc3d"
       END SUBROUTINE
 
 
-      SUBROUTINE dwu(n,p,x,force,iopt,
+      SUBROUTINE dwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p)
 c n=MATOM*3
@@ -358,11 +361,12 @@ c n=MATOM*3
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
       real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
-      integer n,iopt
+      integer iopt
 
 c     edges with 0, 1, 2 pentagons
-      integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
-      integer a_p(3,60), a_h(3,N-60)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
+      integer e_pp(2,3*number_vertices/2)
+      integer a_p(3,60), a_h(3,3*number_vertices-60)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 
@@ -460,8 +464,8 @@ C     Loop over 5-rings
       enddo
 
 C     Loop over 6-rings
-      if(n/3 .gt. 20) then
-        do i=1,n-60
+      if(number_vertices .gt. 20) then
+        do i=1,3*number_vertices-60
           ax=p(3*a_h(1,i)-2)
           ay=p(3*a_h(1,i)-1)
           az=p(3*a_h(1,i))
@@ -491,11 +495,11 @@ C     Loop over 6-rings
 
 C     Coulomb repulsion from origin
       if (iopt.eq.2 .and. fco.ne.0.d0)  then
-        Do I=1,n,3
-          rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
-          x(I)  =x(I)  +fco*rinv*p(I)
-          x(I+1)=x(I+1)+fco*rinv*p(I+1)
-          x(I+2)=x(I+2)+fco*rinv*p(I+2)
+        Do I=1,number_vertices
+          rinv=(p(3*I-2)**2+p(3*I-1)**2+p(3*I)**2)**(-1.5d0)
+          x(3*I-2)=x(3*I-2)+fco*rinv*p(3*I-2)
+          x(3*I-1)=x(3*I-1)+fco*rinv*p(3*I-1)
+          x(3*I)  =x(3*I)  +fco*rinv*p(3*I)
         enddo
       endif
 
@@ -504,7 +508,7 @@ c      write(*,*)'leaving dwu'
       END
 
 
-      SUBROUTINE dextwu(n,p,x,force,iopt,
+      SUBROUTINE dextwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -513,9 +517,11 @@ c      write(*,*)'leaving dwu'
       real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
 
 c     edges with 0, 1, 2 pentagons
-      integer e_hh(2,N/2), e_hp(2,N/2), e_pp(2,N/2)
-      integer a_p(3,60), a_h(3,N-60)
-      integer d_hhh(4,n/3),d_hpp(4,n/3),d_hhp(4,n/3),d_ppp(4,n/3)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
+      integer e_pp(2,3*number_vertices/2)
+      integer a_p(3,60), a_h(3,3*number_vertices-60)
+      integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
+      integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
@@ -626,8 +632,8 @@ C     Loop over 5-rings
       enddo
 
 C     Loop over 6-rings
-      if(n/3 .gt. 20) then
-        do i=1,n-60
+      if(number_vertices .gt. 20) then
+        do i=1,3*number_vertices-60
           ax=p(3*a_h(1,i)-2)
           ay=p(3*a_h(1,i)-1)
           az=p(3*a_h(1,i))
@@ -818,11 +824,11 @@ c derivations of the energy with respect the x,y,z of each of the four atoms
 
 C     Coulomb repulsion from origin
       if (iopt.eq.4 .and. fco.ne.0.d0)  then
-        Do I=1,n,3
-          rinv=(p(I)**2+p(I+1)**2+p(I+2)**2)**(-1.5d0)
-          x(I)  =x(I)  +fco*rinv*p(I)
-          x(I+1)=x(I+1)+fco*rinv*p(I+1)
-          x(I+2)=x(I+2)+fco*rinv*p(I+2)
+        Do I=1,number_vertices
+          rinv=(p(3*I-2)**2+p(3*I-1)**2+p(3*I)**2)**(-1.5d0)
+          x(3*I-2)=x(3*I-2)+fco*rinv*p(3*I-2)
+          x(3*I-1)=x(3*I-1)+fco*rinv*p(3*I-1)
+          x(3*I)  =x(3*I)  +fco*rinv*p(3*I)
         enddo
       endif
 

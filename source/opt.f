@@ -402,6 +402,8 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
+      write(*,*)'number_vertices (entering optff)',number_vertices
+
       graph = new_fullerene_graph(Nmax,MAtom,IDA)
       call tutte_layout(graph,Dist2D)
       call set_layout2d(graph,Dist2D)
@@ -652,7 +654,7 @@ C Sort for degeneracies
       Return 
       END
 
-      SUBROUTINE frprmn3d(N,Iout,
+      SUBROUTINE frprmn3d(n,Iout,
      1 p,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -665,7 +667,9 @@ c and N=MATOM*3
       Real*8 pcom(NMAX*3),xicom(NMAX*3)
       real*8 force(ffmaxdim)
       integer iopt
-c      integer damping
+
+      write(*,*)'number_vertices (entering frprmn3d)', number_vertices
+
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
@@ -679,7 +683,7 @@ C     USES dfunc3d,func3d,linmin3d
 C     func3d input vector p of length n user defined to be optimized
 C     IOPT=1: Wu force field optimization
       iter=0
-      CALL func3d(N,IERR,p,fp,force,iopt,
+      CALL func3d(IERR,p,fp,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -688,18 +692,18 @@ C     IOPT=1: Wu force field optimization
         return
       endif
 C     dfunc3d input vector p of length N, output gradient of length n user defined
-      CALL dfunc3d(N,p,xi,force,iopt,
+      CALL dfunc3d(p,xi,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       grad2=0.d0
-      do I=1,N
+      do I=1,3*number_vertices
         grad2=grad2+xi(i)*xi(i)
       enddo
       grad=dsqrt(grad2)
       Write(Iout,1001) iter,fp,grad
       if(grad.lt.ftol) return
-      do j=1,N
+      do j=1,3*number_vertices
         g(j)=-xi(j)
         h(j)=g(j)
         xi(j)=h(j)
@@ -713,12 +717,12 @@ c       turn off coulomb pot towards the end (and go to iopt=3 to indicate that 
           write(*,*)'Switching off coulomb repulsive potential.'
         endif
         iter=its
-        call linmin3d(N,p,pcom,xi,xicom,fret,
+        call linmin3d(p,pcom,xi,xicom,fret,
      1    force,iopt,e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
-     1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
+     1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         grad2=0.d0
-        do I=1,n
+        do I=1,3*number_vertices
           grad2=grad2+xi(i)*xi(i)
         enddo
         grad=dsqrt(grad2)
@@ -728,25 +732,25 @@ c        else
 c          write(Iout,1002) iter,fret,grad,damping
 c        endif
         if(2.d0*dabs(fret-fp).le.ftol*(dabs(fret)+dabs(fp)+EPS))then
-          fretperatom=3.d0*fret/dfloat(N)
+          fretperatom=3.d0*fret/dfloat(3*number_vertices)
           Write(Iout,1003) fret,fret-fp,fretperatom
           return
         endif
         fp=fret
-        CALL dfunc3d(N,p,xi,force,iopt,
+        CALL dfunc3d(p,xi,force,iopt,
      1    e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
      1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         gg=0.d0
         dgg=0.d0
-        do j=1,n
+        do j=1,3*number_vertices
           gg=gg+g(j)**2
 C         dgg=dgg+xi(j)**2
           dgg=dgg+(xi(j)+g(j))*xi(j)
         enddo
         if(gg.eq.0.d0)return
         gam=dgg/gg
-        do j=1,n
+        do j=1,3*number_vertices
           g(j)=-xi(j)
           h(j)=g(j)+gam*h(j)
           xi(j)=h(j)
@@ -767,8 +771,7 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       return
       END
 
-      SUBROUTINE linmin3d(n,
-     1 p,pcom,xi,xicom,fret,force,iopt,
+      SUBROUTINE linmin3d(p,pcom,xi,xicom,fret,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
       use config
@@ -778,23 +781,23 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
 c      real*8 length, cutoff, xi_tmp(nmax*3)
 c      integer damping
 C     USES brent3d,f1dim3d,mnbrak3d
-      do j=1,n
+      do j=1,3*number_vertices
         pcom(j)=p(j)
         xicom(j)=xi(j)
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak3d(n,
+      CALL mnbrak3d(
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      CALL brent3d(n,Iout,fret,
+      CALL brent3d(Iout,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c lets scale all displacements that are longer than a chosen cutoff to that cutoff.
 c the direction of the displacement vector is maintained
-      do j=1,n
+      do j=1,3*number_vertices
         xi(j)=xmin*xi(j)
 c        xi_tmp(j)=xi(j)
       enddo
@@ -811,14 +814,14 @@ c          xi_tmp(j+2)=xi_tmp(j+2)*(cutoff/length)
 c          damping=damping + 1
 c        endif
 c      enddo
-      do j=1,n
+      do j=1,3*number_vertices
 c        p(j)=p(j)+xi_tmp(j)
         p(j)=p(j)+xi(j)
       enddo
       return
       END
 
-      SUBROUTINE f1dim3d(n,
+      SUBROUTINE f1dim3d(
      1 f1dimf,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -827,17 +830,17 @@ c        p(j)=p(j)+xi_tmp(j)
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3)
 C     USES func3d
-      do j=1,n
+      do j=1,3*number_vertices
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func3d(n,IERR,xt,f1dimf,force,iopt,
+      CALL func3d(IERR,xt,f1dimf,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       return
       END
 
-      SUBROUTINE mnbrak3d(n,
+      SUBROUTINE mnbrak3d(
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -846,12 +849,12 @@ C     USES func3d
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3)
-      CALL f1dim3d(n,
+      CALL f1dim3d(
      1 fa,ax,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      CALL f1dim3d(n,
+      CALL f1dim3d(
      1 fb,bx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -865,7 +868,7 @@ C     USES func3d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim3d(n,
+      CALL f1dim3d(
      1 fc,cx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -876,7 +879,7 @@ C     USES func3d
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -893,13 +896,13 @@ C     USES func3d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -910,7 +913,7 @@ C     USES func3d
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -918,7 +921,7 @@ C     USES func3d
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      2   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -929,7 +932,7 @@ C     USES func3d
         Print*,'**** Error in Subroutine mnbrak3d'
         return
         endif
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -946,7 +949,7 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE brent3d(n,Iout,
+      SUBROUTINE brent3d(Iout,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -963,7 +966,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim3d(n,
+      CALL f1dim3d(
      1 fx,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -1002,7 +1005,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
