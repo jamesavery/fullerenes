@@ -231,16 +231,16 @@ C     by comparing bond distances
       return
       END
 
-      SUBROUTINE Diameter(M,IOUT,Dist,diam)
+      SUBROUTINE Diameter(IOUT,Dist,diam)
       use config
 C Calculate largest and smallest atom-to-atom diameters
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),diam(Nmax),imirror(Nmax),jmirror(Nmax)
       Data difeps/1.d-6/
-      Do i=1,M
+      Do i=1,number_vertices
 C     Search for the closest carbon atom to dmirror
       distmin=1.d10
-      Do k=1,M
+      Do k=1,number_vertices
       if(i.ne.k) then
       x=-Dist(1,i)-Dist(1,k)
       y=-Dist(2,i)-Dist(2,k)
@@ -260,9 +260,11 @@ C     Search for the closest carbon atom to dmirror
       enddo
 C     Sort from the largest to the smallest diameter
 C     and delete duplicates
-      CALL SortR(M,Mnew,imirror,jmirror,diam)
+      CALL SortR(Mnew,imirror,jmirror,diam)
       Write(IOUT,1000) Mnew
-      If(Mnew.ne.M/2) Write(IOUT,1002) Mnew,M/2
+      If(Mnew.ne.number_vertices/2) then
+        Write(IOUT,1002) Mnew,number_vertices/2
+      endif
       Write(IOUT,1001) (imirror(i),jmirror(i),diam(i),i=1,MNew)
       dif=diam(1)-diam(MNew)
       if(dif.lt.difeps) then
@@ -2141,11 +2143,11 @@ C     Check distances
       Do J=1,number_vertices
         Write(IOUT,1016) J,(Dist(I,J),I=1,3)
       enddo
-      CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1017) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
-      CALL Diameter(number_vertices,IOUT,Dist,distp)
+      CALL Diameter(IOUT,Dist,distp)
       if(iratio.lt.33) then
         Write(IOUT,1018) iratio
       else
@@ -2223,7 +2225,7 @@ C     if required
         Dist(2,I)=A(I,I2)
         Dist(3,I)=A(I,I3)
       enddo
-      CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       ratiotest=Rminall/Rmax
 C     Search for better eigenvectors (not implemented yet)
       if(ratiotest.lt.1.d-6) then
@@ -2239,7 +2241,7 @@ C     Search for better eigenvectors (not implemented yet)
         Dist(2,I)=A(I,I2)*fac2
         Dist(3,I)=A(I,I3)*fac3
       enddo
-      CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       ratio=(Rmax/Rmin-1.d0)*1.d2
       if(ratio1.lt.ratio) then
         Write(Iout,1026)
@@ -2251,7 +2253,7 @@ C     Search for better eigenvectors (not implemented yet)
         fac1=1.d0
         fac2=1.d0
         fac3=1.d0
-        CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
+        CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       endif
 
 C     Obtain smallest distance for further scaling
@@ -2293,11 +2295,11 @@ C     Check distances
       Do J=1,number_vertices
       Write(IOUT,1014) J,(Dist(I,J),I=1,3)
       enddo
-      CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1015) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
-      CALL Diameter(number_vertices,IOUT,Dist,distp)
+      CALL Diameter(IOUT,Dist,distp)
       if(iratio.lt.33) then
       Write(IOUT,1016) iratio
       else
