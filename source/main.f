@@ -33,8 +33,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
-      DIMENSION IDual(Mmax,Mmax),nSW(4,66),nFM(4,66),nYF(6,66),
-     1 nBF(5,8)
+      DIMENSION IDual(Mmax,Mmax),nSW(4,66),nFM(4,66),nYF(6,66),nBF(5,66)
       DIMENSION NEK(3,Nmax),JP(12)
       DIMENSION Symbol(Mmax)
       Real*4 TimeX
@@ -96,10 +95,10 @@ C  INPUT and setting parameters for running the subroutines
       Write(Iout,1008) routine
         CALL Datain(IN,Iout,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
-     1  leap,leapGC,iupac,Ipent,iprintham,ISW,IGC1,IGC2,IV1,IV2,IV3,
-     1  icyl,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1  ndual,nosort,nospiralsearch,novolume,ihessian,isearch,
-     1  iprinthessian,
+     1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
+     1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
+     1  ipsphere,ndual,nosort,nospiralsearch,novolume,ihessian,
+     1  isearch,iprinthessian,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 C  Stop if isomer closest to icosahedral is searched for
@@ -301,10 +300,11 @@ C------------------RINGC------------------------------------------
 C Analyze ring connections
       routine='RINGC          '
       Write(Iout,1008) routine
-      CALL RingC(Matom,Medges,Iout,iprintf,IC3,IVR3,
-     1 N5MEM,N6MEM,N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,NringA,
-     1 NringB,NringC,NringD,NringE,NringF,numbersw,nSW,n565,NEK,
-     1 numberFM,nFM,numberYF,nYF,numberBF,nBF,DIST,CRing5,CRing6)
+      CALL RingC(Matom,Medges,Iout,iprintf,
+     1 N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,
+     1 n565,numberSW,numberFM,numberYF,numberBF,
+     1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
+     1 IC3,IVR3,nEK,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
 C     Print edge coordinates (barycenter)
       if(iprintf.ne.0) Call EdgeCoord(Matom,Iout,DIST,IC3)
 
