@@ -720,7 +720,7 @@ C Now analyze the adjacency matrix if it is correct
       Real*8 layout2D(2,Nmax)
       DIMENSION IDA(Nmax,Nmax),IC3(Nmax,3)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
-      DIMENSION nBF(5,8),IP(20),KWS(5),IBWS(8,8)
+      DIMENSION nBF(5,66),IP(20),KWS(5),IBWS(66,66)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
       Write(Iout,1000)
