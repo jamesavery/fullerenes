@@ -331,10 +331,11 @@ C1011 Format(3X,96(I3))
       RETURN
       END
 
-      SUBROUTINE RingC(Matom,Medges,Iout,iprint,IC3,IVR3,
-     1 N5MEM,N6MEM,N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
-     1 NringA,NringB,NringC,NringD,NringE,NringF,numbersw,nSW,nl565,
-     1 n3rc,numberFM,nFM,numberYF,nYF,numberBF,nBF,DIST,CRing5,CRing6)
+      SUBROUTINE RingC(Matom,Medges,Iout,iprint,
+     1 N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
+     1 nl565,numbersw,numberFM,numberYF,numberBF,
+     1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
+     1 IC3,IVR3,n3rc,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Determine the center of each 5-and 6-ring system
@@ -347,7 +348,7 @@ C     Determine the center of each 5-and 6-ring system
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
       Integer n3r(3,Nmax*11),n3ra(3,Nmax),n3rb(3,Nmax),nSW(4,66),
-     1 nFM(4,66),n3rc(3,Nmax),n3rd(3,Nmax),nYF(6,66),nBF(5,8)
+     1 nFM(4,66),n3rc(3,Nmax),n3rd(3,Nmax),nYF(6,66),nBF(5,66)
       Integer IRhag5(0:5),IRhag6(0:6),MPatt(30)
       Character*6,Label
 C     Center for 5-rings
@@ -902,8 +903,8 @@ C Print Cioslowsky analysis and check of correctness
  1044 Format(/1X,I2,' Yoshida-Fowler D3h 666555 patterns (C80-like ', 
      1 'corner  patch) found:')
  1045 Format(4(' (',I5,',',I5,',',I5,',',I2,',',I2,',',I2,') '))
- 1046 Format(/1X,'No W-S D2h 55-6-55 pattern found')
- 1047 Format(/1X,I2,' W-S D2h 55-6-55 patterns found:')
+ 1046 Format(/1X,'No B-F D2h 55-6-55 pattern found')
+ 1047 Format(/1X,I2,' B-F D2h 55-6-55 patterns found:')
  1048 Format(5(' (',I2,',',I2,',',I5,',',I2,',',I2,') '))
       Return
       END
@@ -1068,11 +1069,11 @@ C     Calculate the enthalpy of formation per bond
       SUBROUTINE SixvertexinsertWS(Kring3,n3ra,numberBF,nBF)
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION n3ra(3,Nmax),nBF(5,8)
+      DIMENSION n3ra(3,Nmax),nBF(5,66)
 C Find Brinkmann-Fowler D2h 55-6-55 patterns
       numberBF=0
       do I=1,5
-      do J=1,8
+      do J=1,66
        nBF(I,J)=0
       enddo
       enddo
@@ -3043,12 +3044,12 @@ C     Get the connectivities between 2 and 3 atoms
       enddo
       M12=12
       Do J=1,12
-      IArray=I+J-1
-      Print*,IArray
-      If(NCI(J).Eq.0) then
-      M12=J-1
-      Go to 11
-      endif
+       IArray=I+J-1
+        CALL Num2(MAtom,Icon2(IArray),NCI(J),NCJ(J))
+        If(NCI(J).Eq.0) then
+        M12=J-1
+        Go to 11
+       endif
       enddo
    11 if(MAtom.lt.100) Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
       if(MAtom.ge.100.and.MAtom.lt.1000) 

@@ -1,8 +1,9 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,NA,ICart,Iopt,IP,IHam,
      1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
-     1 leap,IGCtrans,iupac,Ipent,IPH,ISW,kGC,lGC,IV1,IV2,IV3,
-     1 ixyz,ichk,isonum,loop,mirror,ilp,IYF,IBF,nzeile,ifs,ipsphere,
-     1 ndual,nosort,nospiral,novolume,ihessian,isearch,iprinth,
+     1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
+     1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
+     1 ipsphere,ndual,nosort,nospiral,novolume,ihessian,isearch,
+     1 iprinth,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
      1 force,forceP,boost,filename,filenameout,DATEN)
       use config
