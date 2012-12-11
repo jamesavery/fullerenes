@@ -1,4 +1,4 @@
-      SUBROUTINE MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+      SUBROUTINE MoveCM(Iout,Iprint,IAtom,mirror,isort,
      1 nosort,SP,Dist,DistCM,El)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -13,14 +13,14 @@
 C     Take the mirror image
       if(mirror.ne.0) then
        Write(IOUT,1012)
-       Do J=1,MAtom
+       Do J=1,number_vertices
        Do I=1,3
         Dist(I,J)=-Dist(I,J)
        enddo
        enddo
       endif
 
-      Do J=1,MAtom
+      Do J=1,number_vertices
         IM=IAtom(J)
         if(Iprint.ne.0) Write(IOUT,1002),J,IM,El(IM),(Dist(I,J),I=1,3)
         AnumX=AnumX+Dist(1,J)
@@ -29,10 +29,10 @@ C     Take the mirror image
       enddo
 
 C     Convert to internal coordinates
-      Call CartInt(Dist,Matom,Iout,isort)
+      Call CartInt(Dist,Iout,isort)
       if(isort.ne.0.and.nosort.eq.0) return
 
-      Adenom=dfloat(MAtom)
+      Adenom=dfloat(number_vertices)
       DistCM(1)=AnumX/Adenom
       If(dabs(DistCM(1)).lt.1.d-13) DistCM(1)=0.d0
        DistCM(2)=AnumY/Adenom
@@ -40,7 +40,7 @@ C     Convert to internal coordinates
          DistCM(3)=AnumZ/Adenom
          If(dabs(DistCM(3)).lt.1.d-13) DistCM(3)=0.d0
       Write(IOUT,1003) (DistCM(I),I=1,3)
-      Do J=1,MAtom
+      Do J=1,number_vertices
        IM=IAtom(J)
          Do I=1,3
           Dist(I,J)=Dist(I,J)-DistCM(I)
@@ -54,7 +54,7 @@ C     Calculate distance part of moment of inertia
           Ainert(I,J)=0.d0
         enddo
       enddo
-      Do J=1,MAtom
+      Do J=1,number_vertices
         x=Dist(1,J)
         y=Dist(2,J)
         z=Dist(3,J)
@@ -279,7 +279,7 @@ C     Calculate the moment of inertia tensor and diagonalize (no mass)
       Return
       END
  
-      SUBROUTINE CoordC20C60(Iout,MAtom,R5,R6,Dist)
+      SUBROUTINE CoordC20C60(Iout,R5,R6,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     This routine constructs coordinates for the ideal capped icosahedron
@@ -295,8 +295,8 @@ C     or for a dodecahedron
 
       dsqrt5=dsqrt(5.d0)
 C   Capped Isosahedron
-      If(Matom.ne.20) then
-      Matom=60
+      If(number_vertices.ne.20) then
+      number_vertices=60
       Write(Iout,1000) R5,R6
       DIF1=R5-R6
       Dif=Dabs(DIF1)
@@ -345,7 +345,7 @@ C     Now calculated the coordinates
 
 
 C   Dodecahedron
-      If(Matom.eq.20) then
+      If(number_vertices.eq.20) then
       Write(Iout,1005) R5
       phi=(1.d0+dsqrt5)*.5d0
       edge=dsqrt5-1.d0
@@ -433,7 +433,7 @@ C     Atom 20
       Dist(3,20)=0.d0
 
 C     Scale to get R5 distance
-      Do I=1,Matom
+      Do I=1,number_vertices
       Do J=1,3
        Dist(J,I)=Dist(J,I)*fac
       enddo
@@ -506,7 +506,7 @@ C     Unpack distance matrix value from linear vector
       Return
       END
 
-      SUBROUTINE EndoKrotoTrans(Matom,IN,Iout,n565,NEK,
+      SUBROUTINE EndoKrotoTrans(IN,Iout,n565,NEK,
      1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad)
       use config
@@ -640,8 +640,8 @@ C Add edges
       Write(Iout,1020)
       Do I=1,nswt
        II=2*I 
-       IAD1=MAtom+II-1
-       IAD2=MAtom+II
+       IAD1=number_vertices+II-1
+       IAD2=number_vertices+II
        if(IAD2.gt.Nmax) then
         Write(Iout,1023) Nmax
         stop
@@ -662,15 +662,15 @@ C Add edges
        IDA(I4,IAD2)=1
        IDA(IAD2,I4)=1
       enddo
-       MAtom=IAD2
-       Write(Iout,1022) MAtom
+       number_vertices=IAD2
+       Write(Iout,1022) number_vertices
 
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
       nsum=0
-      Do I=1,MAtom
+      Do I=1,number_vertices
         isum=0
-        Do J=1,MAtom
+        Do J=1,number_vertices
           isum=isum+IDA(I,J)
         enddo
         If(isum.ne.3) nsum=nsum+1
@@ -681,7 +681,7 @@ C Now analyze the adjacency matrix if it is correct
       else
         WRITE(Iout,1006)
       endif
-      Call Tutte(Matom,Iout,ihueckel,IDA,
+      Call Tutte(Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Endo-Kroto insertion of 2 vertices:',
      1 ' 2 pentagon G2.12.1.1 (nv=12)-> G2.12.1.2 (nv=14)',
@@ -712,7 +712,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE BrinkmannFowler(Matom,IN,Iout,JERR,numberBF,
+      SUBROUTINE BrinkmannFowler(IN,Iout,JERR,numberBF,
      1 IBF,nBF,ihueckel,IDA,N5MEM,N6MEM,IC3, 
      1 A,evec,df,Dist,layout2D,distp,Cdist,scalerad)
       use config
@@ -912,7 +912,7 @@ C Swap vertices if IVNN not found
 
 C Transform adjacency matrix
 C Delete edges
-      Nlimit=MAtom+6*ntrans
+      Nlimit=number_vertices+6*ntrans
       if(Nlimit.gt.Nmax) then
        Write(Iout,1019) Nmax
       endif
@@ -939,7 +939,7 @@ C Delete edges
       Write(Iout,1009)
 C Add edges
       do I=1,ntrans
-       idim=MAtom+6*(I-1)
+       idim=number_vertices+6*(I-1)
        IE1=IBWS(I,1)
        IE2=IBWS(I,2)
        IE3=IBWS(I,3)
@@ -984,14 +984,14 @@ C Add edges
      1  IE5,IV3,IE6,IV3,IE7,IV4,IE8,IV4,IV1,IV5,IV2,IV6,
      1  IV3,IV6,IV4,IV5,IV5,IV6
       enddo
-      MAtom=MAtom+6*ntrans
+      number_vertices=number_vertices+6*ntrans
 
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
       nsum=0
-      Do I=1,MAtom
+      Do I=1,number_vertices
       isum=0
-      Do J=1,MAtom
+      Do J=1,number_vertices
       isum=isum+IDA(I,J)
       enddo
       If(isum.ne.3) nsum=nsum+1
@@ -1002,7 +1002,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Matom,Iout,ihueckel,IDA,
+      Call Tutte(Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Brinkmann-Fowler 6-vertex insertion to D2h 55-6-55',
      1 ' ring pattern: 4 pentagon G4.14.2.1 (nv=16) -> G4.14.2.2 ',
@@ -1039,7 +1039,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE YoshidaFowler6(Matom,IN,Iout,JERR,
+      SUBROUTINE YoshidaFowler6(IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N6MEM,IC3,
      1 A,evec,df,Dist,layout2D,distp,CDist,scalerad)
       use config
@@ -1204,7 +1204,7 @@ C Now find outer 6 vertices between 5- and 6-rings
 
 C Transform adjacency matrix
 C Delete edges
-      Nlimit=MAtom+6*ntrans
+      Nlimit=number_vertices+6*ntrans
       if(Nlimit.gt.Nmax) then
        Write(Iout,1019) Nmax
       endif
@@ -1234,7 +1234,7 @@ C Delete edges
        IDA(IE4,IE10)=0
        IDA(IE10,IE4)=0
 C Add edges
-       idim=MAtom+6*(I-1)
+       idim=number_vertices+6*(I-1)
        IV1=idim+1
        IV2=idim+2
        IV3=idim+3
@@ -1390,14 +1390,14 @@ C Determine to which hexagon Ivert belongs to
      1 IV6,IV1,IV2,IV3,IV4,IV5,IV6,IE2,IV1,IE3,IV2,IADD1,IADD2,IADD3,
      1 IADD4,IADD5,IADD6,IADD7,IADD8
       enddo
-      MAtom=MAtom+6*ntrans
+      number_vertices=number_vertices+6*ntrans
 
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
       nsum=0
-      Do I=1,MAtom
+      Do I=1,number_vertices
       isum=0
-      Do J=1,MAtom
+      Do J=1,number_vertices
       isum=isum+IDA(I,J)
       enddo
       If(isum.ne.3) nsum=nsum+1
@@ -1408,7 +1408,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Matom,Iout,ihueckel,IDA,
+      Call Tutte(Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 6-vertex insertion to D3h 666555 ',
      1 'ring pattern: 3 pentagon G3.15.4.1 (nv=19) -> G3.15.4.2 ',
@@ -1446,7 +1446,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE YoshidaFowler4(Matom,IN,Iout,JERR,
+      SUBROUTINE YoshidaFowler4(IN,Iout,JERR,
      1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,
      1 A,evec,df,Dist,layout2D,distp,CDist,scalerad)
       use config
@@ -1622,7 +1622,7 @@ C Transform adjacency matrix
        IDA(IE4,IE3)=0
        IDA(IE5,IE6)=0
        IDA(IE6,IE5)=0
-       idim=MAtom+4*(I-1)
+       idim=number_vertices+4*(I-1)
        IV1=idim+1
        IV2=idim+2
        IV3=idim+3
@@ -1652,14 +1652,14 @@ C Transform adjacency matrix
        Write(Iout,1009) IE1,IV1,IE2,IV1,IE3,IV2,IE4,IV2,IE5,IV3,IE6,IV3,
      1 IV1,IV4,IV2,IV4,IV3,IV4
       enddo
-       MAtom=MAtom+4*nFMt 
+       number_vertices=number_vertices+4*nFMt 
 
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
       nsum=0
-      Do I=1,MAtom
+      Do I=1,number_vertices
       isum=0
-      Do J=1,MAtom
+      Do J=1,number_vertices
       isum=isum+IDA(I,J)
       enddo
       If(isum.ne.3) nsum=nsum+1
@@ -1670,7 +1670,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Matom,Iout,ihueckel,IDA,
+      Call Tutte(Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 4-vertex insertion to D3h 6555 ',
      1 'ring pattern: 3 pentagon G3.15.3.1 (nv=15) -> G3.17.3.2',
@@ -1707,7 +1707,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE StoneWalesTrans(Matom,IN,Iout,numbersw,
+      SUBROUTINE StoneWalesTrans(IN,Iout,numbersw,
      1 nSW,ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad)
       use config
@@ -1874,9 +1874,9 @@ C Transform adjacency matrix
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
       nsum=0
-      Do I=1,MAtom
+      Do I=1,number_vertices
       isum=0
-      Do J=1,MAtom
+      Do J=1,number_vertices
       isum=isum+IDA(I,J)
       enddo
       If(isum.ne.3) nsum=nsum+1
@@ -1887,7 +1887,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Matom,Iout,ihueckel,IDA,
+      Call Tutte(Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Stone-Wales transformation:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
@@ -1915,7 +1915,8 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE GoldbergCoxeter(Matom,Iout,leap,leapGC,kGC,lGC,
+      SUBROUTINE GoldbergCoxeter(Iout,
+     1 leap,leapGC,kGC,lGC,
      1 ihueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad) 
 C     Construct Leapfrog fullerene through adjacency matrix
@@ -1932,7 +1933,7 @@ C     Construct Leapfrog fullerene through adjacency matrix
 
 C Leapfrog fullerene
   10  if(leap.gt.0) then
-      MLeap=(3**leap)*MAtom
+      MLeap=(3**leap)*number_vertices
 
       if(MLeap.gt.Nmax) then
          Write(Iout,1002) MLeap,Nmax
@@ -1941,14 +1942,14 @@ C Leapfrog fullerene
       endif
 
       if(leap.eq.1) then
-       Write(Iout,1000) MAtom,MLeap
+       Write(Iout,1000) number_vertices,MLeap
       else
-       if(leap.gt.3) Write(Iout,1001) leap,MAtom,MLeap
-       if(leap.eq.2) Write(Iout,1021) leap,MAtom,MLeap
-       if(leap.eq.3) Write(Iout,1022) leap,MAtom,MLeap
+       if(leap.gt.3) Write(Iout,1001) leap,number_vertices,MLeap
+       if(leap.eq.2) Write(Iout,1021) leap,number_vertices,MLeap
+       if(leap.eq.3) Write(Iout,1022) leap,number_vertices,MLeap
       endif 
 
-      g = new_fullerene_graph(Nmax,MAtom,IDA)
+      g = new_fullerene_graph(Nmax,number_vertices,IDA)
       frog = leapfrog_fullerene(g,leap)
 
 C Test that the created leapfrog graph is a fullerene graph
@@ -1984,7 +1985,7 @@ C Input: initial graph, and GC indices (kGC,lGC)
         write(Iout,1011)
         stop
       endif
-      g = new_fullerene_graph(Nmax,MAtom,IDA)
+      g = new_fullerene_graph(Nmax,number_vertices,IDA)
       halma = halma_fullerene(g,kGC-1)
       isafullerene = graph_is_a_fullerene(halma)
       IF (isafullerene.eq.1) then
@@ -2002,9 +2003,9 @@ C Produce adjacency matrix
       call adjacency_matrix(halma,Nmax,IDA)
       write (Iout,1007) 
       endif
-      MAtom = MLeap
+      number_vertices = MLeap
 
-      Call Tutte(MAtom,Iout,ihueckel,IDA,
+      Call Tutte(Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
       if(leap.ne.0) call delete_fullerene_graph(frog)
       if(leapGC.ne.0) call delete_fullerene_graph(halma)
@@ -2041,13 +2042,13 @@ C Produce adjacency matrix
       Return
       END
 
-      SUBROUTINE Tutte(Matom,Iout,ihueckel,IDA,
+      SUBROUTINE Tutte(Iout,ihueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
 C   Tutte 3D embedding Algorithm:
 C     Input: Integer Adjacency Matrix IDA(NMax,NMax)
 C     Output: Real*8 Cartesian Coordinates  Dist(3,NMax)
 C     NMax: Max Dimension of Matrix
-C     MAtom: Working Dimension of Matrix
+C     number_vertices: Working Dimension of Matrix
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2060,19 +2061,19 @@ C     MAtom: Working Dimension of Matrix
 C Produce Hueckel matrix and diagonalize
 C     Diagonalize
       if(ihueckel.ne.0) then
-      Do I=1,MAtom
-         Do J=1,MAtom
+      Do I=1,number_vertices
+         Do J=1,number_vertices
             A(I,J)=dfloat(IDA(I,J))
          enddo
       enddo
-      call tred2(A,MAtom,Nmax,evec,df)
-      call tqli(evec,df,MAtom,Nmax,A)
-      Write(Iout,1005) MAtom,MAtom
+      call tred2(A,number_vertices,Nmax,evec,df)
+      call tqli(evec,df,number_vertices,Nmax,A)
+      Write(Iout,1005) number_vertices, number_vertices
 C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
-      Do I=1,MAtom
+      Do I=1,number_vertices
          e0=evec(I)
          jmax=I
-      Do J=I+1,MAtom
+      Do J=I+1,number_vertices
          e1=evec(J)
          if(e1.gt.e0) then
             jmax=j
@@ -2083,7 +2084,7 @@ C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       ex=evec(jmax)
       evec(jmax)=evec(I)
       evec(I)=ex
-      Do k=1,MAtom
+      Do k=1,number_vertices
       df(k)=A(k,jmax)
       A(k,jmax)=A(k,I)
       A(k,I)=df(k)
@@ -2091,12 +2092,12 @@ C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       endif
       enddo
 C Analyze eigenenergies
-      Call HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
+      Call HueckelAnalyze(number_vertices,NMax,Iout,iocc,df,evec)
       endif
 
 C   Tutte algorithm for the 3D structure (see pentindex.f):
          write (Iout,1011)
-         g = new_fullerene_graph(Nmax,MAtom,IDA)
+         g = new_fullerene_graph(Nmax,number_vertices,IDA)
          call tutte_layout(g,layout2d)
          call spherical_layout(g,Dist)
          write (Iout,1013)
@@ -2109,8 +2110,8 @@ C     smallest bond distance to Cdist
 c     correction: setting the shortest bond to to cdist is not a good idea.  It is beneficial to set the avarage bond length to some value, like e.g. 4*cdist
       R0=1.d10
       Rsum=0.d0
-      Do I=1,Matom
-        Do J=I+1,Matom
+      Do I=1,number_vertices
+        Do J=I+1,number_vertices
           if (IDA(i,j) .ne. 0) then
             X=Dist(1,I)-Dist(1,J)
             Y=Dist(2,I)-Dist(2,J)
@@ -2123,28 +2124,28 @@ c			get the minimal distance
           endif
         enddo
       enddo
-      rsum=rsum/(3*matom/2)
+      rsum=rsum/(3*number_vertices/2)
 c     make sure the default value of scaleRad is not much too large (but don't correct custom values)
       if(scaleRad .eq. 4.0 .and. scaleRad*R0 .ge. cdist) then
         scaleRad=2.d0
         if(scaleRad*R0 .ge. cdist) scaleRad=1.d0
       endif
       fac=scaleRad*CDist/Rsum
-      Do I=1,Matom
+      Do I=1,number_vertices
         Dist(1,I)=Dist(1,I)*fac
         Dist(2,I)=Dist(2,I)*fac
         Dist(3,I)=Dist(3,I)*fac
       enddo
 C     Check distances
       Write(IOUT,1015) fac
-      Do J=1,MAtom
+      Do J=1,number_vertices
         Write(IOUT,1016) J,(Dist(I,J),I=1,3)
       enddo
-      CALL Distan(MAtom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1017) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
-      CALL Diameter(MAtom,IOUT,Dist,distp)
+      CALL Diameter(number_vertices,IOUT,Dist,distp)
       if(iratio.lt.33) then
         Write(IOUT,1018) iratio
       else
@@ -2172,8 +2173,8 @@ C     Check distances
       END
 
 
-      SUBROUTINE AME(Matom,Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
-     1 CDist)
+      SUBROUTINE AME(Iout,IDA,A,evec,
+     1 Dist,distp,iocc,iv1,iv2,iv3,CDist)
 C   Fowler-Manolopoulos matrix eigenvector algorithm
 C     Now search for lowest energy P-type vectors
 C     This needs to be changed
@@ -2195,7 +2196,7 @@ C     This needs to be changed
         mneg=0
         mpos=0
         z=0.d0
-        Do J=1,MATOM
+        Do J=1,number_vertices
           if(A(J,I).lt.-1.d-9) mneg=mneg+1
           if(A(J,I).gt.1.d-9) mpos=mpos+1
         enddo
@@ -2217,12 +2218,12 @@ C     if required
       I2=IV2
       I3=IV3
       Write(Iout,1028) I1,I2,I3
-      Do I=1,MATOM
+      Do I=1,number_vertices
         Dist(1,I)=A(I,I1)
         Dist(2,I)=A(I,I2)
         Dist(3,I)=A(I,I3)
       enddo
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
       ratiotest=Rminall/Rmax
 C     Search for better eigenvectors (not implemented yet)
       if(ratiotest.lt.1.d-6) then
@@ -2233,16 +2234,16 @@ C     Search for better eigenvectors (not implemented yet)
       fac2=1.d0/dsqrt(3.d0-evec(I2))
       fac3=1.d0/dsqrt(3.d0-evec(I3))
       ratio1=(Rmax/Rmin-1.d0)*1.d2
-      Do I=1,MATOM
+      Do I=1,number_vertices
         Dist(1,I)=A(I,I1)*fac1
         Dist(2,I)=A(I,I2)*fac2
         Dist(3,I)=A(I,I3)*fac3
       enddo
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
       ratio=(Rmax/Rmin-1.d0)*1.d2
       if(ratio1.lt.ratio) then
         Write(Iout,1026)
-        Do I=1,MATOM
+        Do I=1,number_vertices
           Dist(1,I)=A(I,I1)/fac1
           Dist(2,I)=A(I,I2)/fac2
           Dist(3,I)=A(I,I3)/fac3
@@ -2250,15 +2251,15 @@ C     Search for better eigenvectors (not implemented yet)
         fac1=1.d0
         fac2=1.d0
         fac3=1.d0
-        CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+        CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
       endif
 
 C     Obtain smallest distance for further scaling
 C     Now this contracts or expandes the whole fullerene to set the
 C     smallest bond distance to Cdist
       R0=1.d10
-      Do I=1,MATOM
-        Do J=I+1,MATOM
+      Do I=1,number_vertices
+        Do J=I+1,number_vertices
           X=Dist(1,I)-Dist(1,J)
           Y=Dist(2,I)-Dist(2,J)
           Z=Dist(3,I)-Dist(3,J)
@@ -2271,39 +2272,39 @@ C     smallest bond distance to Cdist
       Do k=1,2*I3
         ICN=0
         ICP=0
-        do kk=1,Matom
+        do kk=1,number_vertices
           if(A(kk,k).gt.0.d0) ICP=ICP+1
           if(A(kk,k).lt.0.d0) ICN=ICN+1
         enddo
         Write(Iout,1011) k,evec(k),ICN,ICP
-        Write(Iout,1012) (A(J,k),J=1,Matom)
+        Write(Iout,1012) (A(J,k),J=1,number_vertices)
       enddo
       if(R0.lt.1.d-5.or.istop.eq.1) then
         Write(IOUT,1032) R0,fac
         stop
       endif
-      Do I=1,MATOM
+      Do I=1,number_vertices
       Dist(1,I)=Dist(1,I)*fac
       Dist(2,I)=Dist(2,I)*fac
       Dist(3,I)=Dist(3,I)*fac
       enddo
 C     Check distances
       Write(IOUT,1013)     
-      Do J=1,MAtom
+      Do J=1,number_vertices
       Write(IOUT,1014) J,(Dist(I,J),I=1,3)
       enddo
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(number_vertices,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1015) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
       iratio=dint(ratio)
-      CALL Diameter(MAtom,IOUT,Dist,distp)
+      CALL Diameter(number_vertices,IOUT,Dist,distp)
       if(iratio.lt.33) then
       Write(IOUT,1016) iratio
       else
       Write(IOUT,1029) iratio
       endif
 C     Calculate P-type dipole moment
-       Call Dipole(MAtom,I1,I2,I3,dipol,Dist,A)
+       Call Dipole(number_vertices,I1,I2,I3,dipol,Dist,A)
        Write(IOUT,1030)
        Do I=1,3
         Write(IOUT,1031) I,(dipol(I,J),J=1,3)
@@ -2347,7 +2348,7 @@ C     Calculate P-type dipole moment
      1 'eigenvector algorithm to construct the fullerene')
       END SUBROUTINE 
 
-      Subroutine Permute(Matom,Iout,nperm,IC3,IDA,Dist)
+      Subroutine Permute(Iout,nperm,IC3,IDA,Dist)
       use config
       implicit double precision (a-h,o-z)
       dimension Dist(3,Nmax),IC3(Nmax,3),Iperm(Nmax,2),IDA(Nmax,Nmax)
@@ -2358,8 +2359,8 @@ C Note this reorders IC3 and IDA
       nperm=0
       Write(Iout,1003)
 
-      do 10 i=2,MAtom
-      do j=i,MAtom-1
+      do 10 i=2,number_vertices
+      do j=i,number_vertices-1
        do k=1,3
         if(IC3(j,k).le.i-1) then
          if(i.ne.j) then
@@ -2383,7 +2384,7 @@ C    change IC3
          IC3(j,1)=iz1
          IC3(j,2)=iz2
          IC3(j,3)=iz3
-         do k1=1,MAtom
+         do k1=1,number_vertices
          do k2=1,3
           if(IC3(k1,k2).eq.i) then
            IC3(k1,k2)=j
@@ -2411,17 +2412,17 @@ C    record change
        Write(Iout,1001) 
        Write(Iout,1002) (Iperm(i,1),Iperm(i,2),i=1,nperm)
 C     Reset IDA
-       Do I=1,MAtom
-       Do J=1,MAtom
+       Do I=1,number_vertices
+       Do J=1,number_vertices
         IDA(I,J)=0
        enddo
        enddo
       Write(IOUT,1004) 
-      Do I=1,MAtom
+      Do I=1,number_vertices
        Write(IOUT,1005) I,(IC3(I,J),J=1,3)
       enddo
 C     Reconstruct IDA
-       Do I=1,MAtom
+       Do I=1,number_vertices
        Do K=1,3
         IV=IC3(I,K)
         IDA(I,IV)=1
@@ -2446,7 +2447,7 @@ C     Reconstruct IDA
       Return
       END
 
-      Subroutine CartInt(Dist,MAtom,Iout,isort)
+      Subroutine CartInt(Dist,Iout,isort)
       use config
       implicit double precision (a-h,o-z)
       dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),zmatrix(3,Nmax)
@@ -2454,12 +2455,12 @@ C Modified routine xyzint
 C Cartint works out the internal coordinates (z-matrix) of a molecule
 C        atoms N1,N2,N3,N4 defined with distances, bond angles and dihedrals
 C        angles in the range 15 to 165 degrees if possible.
-C   on input  Dist    = cartesian array of MAtom atoms
+C   on input  Dist    = cartesian array of number_vertices atoms
 C   on output ZMatrix = Z-Matrix
-C        MAtom: number of atoms
+C        number_vertices: number of atoms
 C
       Write(Iout,1000) 
-       do i=1,MAtom
+       do i=1,number_vertices
         zmatrix(1,i)=0.d0
         zmatrix(2,i)=0.d0
         zmatrix(3,i)=0.d0
@@ -2468,7 +2469,7 @@ C
         nc(i)=0
        enddo
 
-       do 30 i=1,MAtom
+       do 30 i=1,number_vertices
         na(i)=2
         nb(i)=3
         nc(i)=4
@@ -2499,17 +2500,17 @@ c   find any atom to relate to na(i)
       nc(3)=0
 
 c   na, nb, nc are determined, now get zmatrix
-      call Distgeo(Dist,MAtom,na,nb,nc,zmatrix)
+      call Distgeo(Dist,na,nb,nc,zmatrix)
 
 c     print
-       do i=1,MAtom
+       do i=1,number_vertices
         Write(Iout,1001) i,(zmatrix(J,I),J=1,3),na(i),nb(i),nc(i)
        enddo
 
 c   Check if distances are within certain range
        rmindist=zmatrix(1,2)
        rmaxdist=zmatrix(1,2)
-       do i=3,MAtom
+       do i=3,number_vertices
         if(zmatrix(1,i).lt.rmindist) rmindist=zmatrix(1,i)
         if(zmatrix(1,i).gt.rmaxdist) rmaxdist=zmatrix(1,i)
        enddo
@@ -2539,13 +2540,13 @@ c   Check if distances are within certain range
       return
       end
 
-      subroutine Distgeo(Dist,MAtom,na,nb,nc,zmatrix)
+      subroutine Distgeo(Dist,na,nb,nc,zmatrix)
       use config
       implicit double precision (a-h,o-z)
       dimension Dist(3,Nmax),na(Nmax),nb(Nmax),nc(Nmax),zmatrix(3,Nmax)
 C Distgeo converts coordinates from cartesian to internal.
 C  input Dist  = array of cartesian coordinates
-C   MAtom= number of atoms
+C   number_vertices= number of atoms
 C   na   = numbers of atom to which atoms are related by distance
 C   nb   = numbers of atom to which atoms are related by angle
 C   nc   = numbers of atom to which atoms are related by dihedral
@@ -2553,7 +2554,7 @@ C  output zmatrix  = internal coordinates in angstroms, radians, and radians
 
       Data tol/0.2617994d0/
 
-      do 30 i=2,MAtom
+      do 30 i=2,number_vertices
          j=na(i)
          k=nb(i)
          l=nc(i)

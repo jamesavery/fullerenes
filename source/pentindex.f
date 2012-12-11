@@ -220,13 +220,13 @@ c      if(ke + isw + iyf + ibf .eq. 0) then
 C Now produce the 3D image (unless the graph is going to change later)
         if(nalgorithm.eq.0.or.nalgorithm.eq.2.
      1   or.nalgorithm.eq.4) then
-          call AME(Matom,Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
+          call AME(Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
      1     CDist)
         endif
   
         if(nalgorithm.eq.1.or.nalgorithm.eq.3.
      1   or.nalgorithm.eq.5) then
-          call Tutte(Matom,Iout,ihueckel,IDA,
+          call Tutte(Iout,ihueckel,IDA,
      1     A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
         endif
 c      endif
