@@ -19,5 +19,8 @@
       real(8),parameter :: au2eV=2.72113957d1
       real(8),parameter :: dynpercm2auperaa=2.29371049d-6
       real(8),parameter :: au2angstroem=.529177249d0
+
+      integer(8) :: nv
+
       save
       end module config
