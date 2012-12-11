@@ -2,7 +2,6 @@
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-c n=MATOM*3
       use config
       integer iopt
 
@@ -27,7 +26,6 @@ c n=MATOM*3
       SUBROUTINE wu(IERR,p,fc,force,iopt,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p)
-c n=MATOM*3
       use config
       implicit real(8) (A-H,O-Z)
 
@@ -135,7 +133,6 @@ c      write(*,*)'leaving wu'
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-c n=MATOM*3
       use config
       implicit real(8) (A-H,O-Z)
       real(8) p(nmax*3),force(ffmaxdim)
@@ -355,7 +352,6 @@ c      write(*,*)"leaving dfunc3d"
       SUBROUTINE dwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p)
-c n=MATOM*3
       use config
       implicit real(8) (A-H,O-Z)
 C     Wu force field in terms of harmonic oscillators for stretching

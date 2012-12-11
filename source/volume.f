@@ -1,4 +1,4 @@
-      SUBROUTINE VolumeAndArea(points,M,IDA,exactarea,
+      SUBROUTINE VolumeAndArea(points,IDA,exactarea,
      1     exactvolume,hullarea,hullvolume)!,filename)
       use config
       use iso_c_binding
@@ -8,7 +8,7 @@ c      character*50 filename
       type(c_ptr)::g,p,hull,new_polyhedron,convex_hull,
      1             new_fullerene_graph
 
-      g = new_fullerene_graph(NMax,M,IDA)
+      g = new_fullerene_graph(NMax,number_vertices,IDA)
       p = new_polyhedron(g,points)
       exactarea = get_surface_area(p)
       exactvolume      = get_volume(p)
@@ -33,9 +33,9 @@ c$$$
       return
       end 
 
-      SUBROUTINE Volume(Matom,Iout,N5MEM,N6MEM,
+      SUBROUTINE Volume(Iout,N5MEM,N6MEM,
      1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,Asphere,
-     2 exactarea,exactvolume,Rmin5,Rmin6,Rmax5,Rmax6)!,filename)
+     2 exactarea,exactvolume,Rmin5,Rmin6,Rmax5,Rmax6)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Calculate the volume (and surface) of the cage molecule by
@@ -113,10 +113,10 @@ C     Now do the total volume calculation
       DVArea=ATol-Asphere
       APC=DVArea/Asphere*1.d2
 C     Convex Hull and exact polyhedral Volume and Area
-      Call VolumeAndArea(Dist,MAtom,IDA,exactarea,
+      Call VolumeAndArea(Dist,IDA,exactarea,
      1 exactvolume,hullarea,hullvolume)!,filename)
 C     Calculate the volume and area for C60 using R5 and R6
-      If(Matom.eq.60) then
+      If(number_vertices.eq.60) then
       R5=(Rmin5+Rmax5)*.5d0
       R5div=dabs(Rmin5-Rmax5)
       R6div1=dabs(R5-Rmin6)
@@ -135,7 +135,7 @@ C     Calculate the volume and area for C60 using R5 and R6
       Write(Iout,1002) VolIco,VolIcocap,AreaIcocap,R5,R6
       If(R5div.gt.1.d-5) Write(Iout,1003) R5div,R5
       endif
-      If(Matom.eq.20) then
+      If(number_vertices.eq.20) then
       R5=(Rmin5+Rmax5)*.5d0
       R5div=dabs(Rmin5-Rmax5)
       sqrt5=dsqrt(5.d0)
@@ -147,7 +147,7 @@ C     Calculate the volume and area for C60 using R5 and R6
       ratioVhullexact=hullvolume/exactvolume
       ratioAhullexact=hullarea/exactarea
       Write(Iout,1000) VTol,Vol5,Vol6,ITH,DVSphere,VPC
-      If(Matom.eq.60) Write(Iout,1004) DVIcocap
+      If(number_vertices.eq.60) Write(Iout,1004) DVIcocap
       Write(Iout,1006) exactvolume,hullvolume,ratioVhullexact
       Write(Iout,1001) ATol,Area5,Area6,DVArea,APC
       Write(Iout,1007) exactarea,hullarea,ratioAhullexact

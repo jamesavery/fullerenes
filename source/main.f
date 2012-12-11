@@ -217,7 +217,7 @@ C Calculate largest and smallest atom-to-atom diameters
 C Also get moment of inertia
        routine='DIAMETER       '
        Write(Iout,1008) routine
-       CALL Diameter(MAtom,Iout,Dist,distp)
+       CALL Diameter(Iout,Dist,distp)
 
 C------------------DISTMATRIX--------------------------------------
 C Calculate the distance Matrix and print out distance Matrix
@@ -392,9 +392,9 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         routine='TOPOLOINDICATOR'
         Write(Iout,1008) routine
 C Topological Indicators
-      CALL TopIndicators(Matom,Iout,IDA,mdist)
+      CALL TopIndicators(Iout,IDA,mdist)
 C Check if vertex number allows for icosahedral fullerenes
-      Call IcoFullDetect(Iout,MAtom)
+      Call IcoFullDetect(Iout)
 C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
 C Produce perfect matchings (Kekule structures) and analyze
@@ -443,7 +443,7 @@ c       Compare structures
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
         routine='DIAMETER       '
         Write(Iout,1008) routine
-        CALL Diameter(MAtom,Iout,Dist,distp)
+        CALL Diameter(Iout,Dist,distp)
         routine='RING           '
         Write(Iout,1008) routine
 c  call ring again, this needs some reprogramming as ring duplicates some
@@ -520,7 +520,7 @@ C------------------VOLUME-----------------------------------------
 C Calculate the volume
       routine='VOLUME         '
       Write(Iout,1008) routine
-      CALL Volume(Matom,Iout,N5MEM,N6MEM,
+      CALL Volume(Iout,N5MEM,N6MEM,
      1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
      2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)!,filename)
 
