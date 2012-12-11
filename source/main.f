@@ -101,6 +101,12 @@ C  INPUT and setting parameters for running the subroutines
      1  isearch,iprinthessian,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
+
+c TEMPORARY LINE
+      number_vertices = matom
+      write(*,*)'number_vertices: ',number_vertices
+
+
 C  Stop if isomer closest to icosahedral is searched for
       if(isearch.ne.0) then
        istop=1
