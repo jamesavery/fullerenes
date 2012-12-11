@@ -124,7 +124,7 @@ C Options for Input coordinates
 C  Cartesian coordinates produced for Ih C20 or C60
    10 routine='COORDC20/60    '
       Write(Iout,1008) routine
-      CALL CoordC20C60(Iout,MAtom,R5,R6,Dist)
+      CALL CoordC20C60(Iout,R5,R6,Dist)
       Do I=1,60
         IAtom(I)=6
       enddo
@@ -208,7 +208,7 @@ C Move carbon cage to Atomic Center
   999 routine='MOVECM_1       '
       Write(Iout,1008) routine
       Iprint=iprintf
-      CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+      CALL MoveCM(Iout,Iprint,IAtom,mirror,isort,
      1 nosort,SP,Dist,DistCM,El)
       mirror=0
 
@@ -237,9 +237,9 @@ C Reorder atoms such that distances in internal coordinates are bonds
       if(nosort.eq.0) then
        routine='REORDER        '
        Write(Iout,1008) routine
-       CALL Permute(Matom,Iout,nperm,IC3,IDA,Dist)
+       CALL Permute(Iout,nperm,IC3,IDA,Dist)
         if(nperm.ne.0) then
-         CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+         CALL MoveCM(Iout,Iprint,IAtom,mirror,isort,
      1    nosort,SP,Dist,DistCM,El)
          CALL DistMatrix(MAtom,Iout,0,1,Iopt,
      1    Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
@@ -259,7 +259,7 @@ C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
         routine='GOLDBERGCOXETER'
         Write(Iout,1008) routine
-        CALL GoldbergCoxeter(MAtom,Iout,leap,leapGC,IGC1,IGC2,
+        CALL GoldbergCoxeter(Iout,leap,leapGC,IGC1,IGC2,
      1   ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
      1   scaleRad)
         leap=0
@@ -319,7 +319,7 @@ C Perform Stone-Wales transformation
       if(ISW.ne.0) then
         routine='STONE-WALES    '
         Write(Iout,1008) routine
-        CALL StoneWalesTrans(Matom,IN,Iout,numbersw,nSW,
+        CALL StoneWalesTrans(IN,Iout,numbersw,nSW,
      1   ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,
      1   Rdist,scalerad)
         ISW=0
@@ -333,7 +333,7 @@ C Perform Endo-Kroto 2-vertex insertion
       if(KE.ne.0) then
         routine='ENDO-KROTO     '
         Write(Iout,1008) routine
-        CALL EndoKrotoTrans(Matom,IN,Iout,n565,NEK,ihueckel,
+        CALL EndoKrotoTrans(IN,Iout,n565,NEK,ihueckel,
      1   IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist,scalerad)
         KE=0
         ipent=1
@@ -347,12 +347,12 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
         routine='YOSHIDAFOWLER  '
         Write(Iout,1008) routine
         if(IYF.le.2) then
-         CALL YoshidaFowler4(Matom,IN,Iout,JERR,numberFM,IYF,nFM,
+         CALL YoshidaFowler4(IN,Iout,JERR,numberFM,IYF,nFM,
      1    ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist,
      1    scalerad)
         else
           IYF=IYF-2
-          CALL YoshidaFowler6(Matom,IN,Iout,JERR,numberYF,IYF,nYF,
+          CALL YoshidaFowler6(IN,Iout,JERR,numberYF,IYF,nYF,
      1     ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist,
      1     scalerad)
         endif
@@ -367,7 +367,7 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
       if(IBF.ne.0) then
         routine='BRINKMANNFOWLER'
         Write(Iout,1008) routine
-        CALL BrinkmannFowler(Matom,IN,Iout,JERR,numberBF,IBF,
+        CALL BrinkmannFowler(IN,Iout,JERR,numberBF,IBF,
      1   nBF,ihueckel,IDA,N5MEM,N6MEM,IC3,
      1   A,evec,df,Dist,Dist2D,distp,Rdist,scalerad)
         IBF=0
@@ -435,7 +435,7 @@ c       Compare structures
         CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
         routine='MOVECM_2       '
         Write(Iout,1008) routine
-        CALL MoveCM(Matom,Iout,Iprint,IAtom,mirror,isort,
+        CALL MoveCM(Iout,Iprint,IAtom,mirror,isort,
      1   nosort,SP,Dist,DistCM,El)
         routine='DISTANCEMATRIX '
         Write(Iout,1008) routine
