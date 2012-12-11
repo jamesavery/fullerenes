@@ -128,6 +128,11 @@ C End ring spiral
 C Start Goldberg-Coxeter
       if(nalgorithm.gt.1.and.nalgorithm.lt.4) then
       itGC=kGC*(kGC+lGC) +lGC*lGC
+       igcfullerne=itGC*20
+       if(igcfullerne.gt.NMax) then
+        Write(Iout,*) ' N =',igcfullerne,' > Nmax =',NMax,' ==> STOP'
+        stop
+       endif
       Write(Iout,1040) kGC,lGC,kGC,lGC,itGC
       if(lGC .ne. 0) then
         Call GetPentIndex(MAtom,M,Iout,kGC,lGC,JP)
