@@ -3045,7 +3045,7 @@ C     Get the connectivities between 2 and 3 atoms
       M12=12
       Do J=1,12
        IArray=I+J-1
-        CALL Num2(MAtom,Icon2(IArray),NCI(J),NCJ(J))
+        CALL Num2(Icon2(IArray),NCI(J),NCJ(J))
         If(NCI(J).Eq.0) then
         M12=J-1
         Go to 11
@@ -3064,7 +3064,7 @@ C     Get all vertices
       Do I=1,MAtom
       IZ=0
       Do J=1,MCon2
-      CALL Num2(MAtom,Icon2(J),IX,IY)
+      CALL Num2(Icon2(J),IX,IY)
       IF(IX.EQ.I) then
       IZ=IZ+1
       IC3(I,IZ)=IY

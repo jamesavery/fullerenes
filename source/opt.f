@@ -493,7 +493,7 @@ C OPTIMIZE
         fretn=fret/dfloat(MATOM)
         Write(IOUT,1002) fretn
       endif
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
 
 C HESSIAN
