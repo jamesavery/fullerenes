@@ -1046,8 +1046,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE powell(n,iter,Iout,IOP,ier,Matom,ftol,AN,RMDSI,
-     1     p,pmax,Dist)
+      SUBROUTINE powell(n,iter,Iout,IOP,ier,ftol,AN,RMDSI,p,pmax,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=20,TINY=1.D-20)
@@ -1066,9 +1065,9 @@ c   fret      ... value of f at p
       ier=0
       TOL=ftol
       If(IOP.eq.0) then
-       call MDSnorm(n,Matom,fret,RMDSI,p,Dist)
+       call MDSnorm(n,fret,RMDSI,p,Dist)
       else
-       call MAInorm(n,Matom,IP,AN,p,Dist)
+       call MAInorm(n,IP,AN,p,Dist)
        fret=-AN
       endif
       WRITE(IOUT,1002)
@@ -1116,9 +1115,9 @@ c   fret      ... value of f at p
         pt(j)=p(j)
 14    continue
       If(IOP.eq.0) then
-       Call MDSnorm(n,Matom,fptt,RMDSI,ptt,Dist)
+       Call MDSnorm(n,fptt,RMDSI,ptt,Dist)
       else
-       Call MAInorm(n,Matom,IP,AN,ptt,Dist)
+       Call MAInorm(n,IP,AN,ptt,Dist)
        fptt=-AN
       endif
       if(fptt.ge.fp)goto 1
@@ -1172,8 +1171,8 @@ CU    USES brentx,f1dimx,mnbrakx
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20,HUGE=1.d10)
       REAL*8 pcom(ncom),xicom(ncom)
       REAL*8 Dist(3,Nmax)
-      fa=f1dimx(ncom,Matom,IOP,ier,ax,pcom,xicom,Dist)
-      fb=f1dimx(ncom,Matom,IOP,ier,bx,pcom,xicom,Dist)
+      fa=f1dimx(ncom,IOP,ier,ax,pcom,xicom,Dist)
+      fb=f1dimx(ncom,IOP,ier,bx,pcom,xicom,Dist)
       if(fb.gt.fa)then
         dum=ax
         ax=bx
@@ -1183,7 +1182,7 @@ CU    USES brentx,f1dimx,mnbrakx
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      fc=f1dimx(ncom,Matom,IOP,ier,cx,pcom,xicom,Dist)
+      fc=f1dimx(ncom,IOP,ier,cx,pcom,xicom,Dist)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
         q=(bx-cx)*(fb-fa)
@@ -1194,7 +1193,7 @@ CU    USES brentx,f1dimx,mnbrakx
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             ax=bx
             fa=fb
@@ -1207,23 +1206,23 @@ CU    USES brentx,f1dimx,mnbrakx
             return
           endif
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
         else if((cx-u)*(u-ulim).gt.0.d0)then
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             bx=cx
             cx=u
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-            fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+            fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.d0)then
           u=ulim
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
         else
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
         endif
         ax=bx
         bx=cx
@@ -1250,7 +1249,7 @@ CU    USES brentx,f1dimx,mnbrakx
       w=v
       x=v
       e=0.
-      fx=f1dimx(ncom,Matom,IOP,ier,x,pcom,xicom,Dist)
+      fx=f1dimx(ncom,IOP,ier,x,pcom,xicom,Dist)
       fv=fx
       fw=fx
       do 11 iter=1,ITMAX
@@ -1285,7 +1284,7 @@ CU    USES brentx,f1dimx,mnbrakx
         else
           u=x+sign(tol1,d)
         endif
-        fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+        fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
         if(fu.le.fx) then
           if(u.ge.x) then
             a=x

@@ -528,26 +528,26 @@ C------------------MINCOVSPHERE-----------------------------------
 C Calculate the minimum covering sphere and volumes
       routine='MINCOVSPHERE2  '
       Write(Iout,1008) routine
-      CALL MinCovSphere2(MAtom,Iout,SP,Dist,Rmin,Rmax,
+      CALL MinCovSphere2(Iout,SP,Dist,Rmin,Rmax,
      1 VolSphere,ASphere,Atol,VTol,distP,cmcs,rmcs,RVdWC)
 
 C------------------MINDISTSPHERE----------------------------------
 C Calculate the minimum distance sphere
       routine='MINDISTSPHERE  '
       Write(Iout,1008) routine
-      CALL MinDistSphere(MAtom,Iout,Dist,cmcs)
+      CALL MinDistSphere(Iout,Dist,cmcs)
 
 C------------------MAXINSPHERE------------------------------------
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE    '
       Write(Iout,1008) routine
-      CALL MaxInSphere(MAtom,Iout,Dist,cmcs,RVdWC)
+      CALL MaxInSphere(Iout,Dist,cmcs,RVdWC)
 
 C------------------PROJECTSPHERE----------------------------------
 C Projecting vertices on minimum covering sphere
 C  producing a spherical fullerene
       if(ipsphere.ne.0) then
-       call ProjectSphere(MAtom,ipsphere,Iout,IAtom,nzeile,
+       call ProjectSphere(ipsphere,Iout,IAtom,nzeile,
      1 IC3,Dist,cmcs,rmcs,filename,El,TEXTINPUT)
       endif
 
