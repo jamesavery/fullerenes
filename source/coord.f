@@ -1934,7 +1934,7 @@ C Leapfrog fullerene
   10  if(leap.gt.0) then
       MLeap=(3**leap)*MAtom
 
-      if(Mleap.gt.Nmax) then
+      if(MLeap.gt.Nmax) then
          Write(Iout,1002) MLeap,Nmax
          LeapErr=1
          return
