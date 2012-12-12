@@ -1,11 +1,10 @@
-      SUBROUTINE HamiltonCyc(N,maxiter,Iout,nbatch,
-     1 A,Nhamilton)
+      SUBROUTINE HamiltonCyc(maxiter,Iout,nbatch,A,Nhamilton)
       use config
 C     Subroutine from Darko Babic to create Hamitonian cycles
 C      optimized for program Isomer
       integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax)
       integer x(0:Nmax)
-      integer i,j,k,l,n,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
+      integer i,j,k,l,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
       integer ptr,prev,oldptr
       logical occ(Nmax),pass(Nmax),end(Nmax),flag
       integer ic3(Nmax,3),A(Nmax,Nmax)
@@ -14,9 +13,9 @@ C      optimized for program Isomer
       maxN=30
       nbatch=0
 
-      do i=1,n
+      do i=1,number_vertices
         k=0
-         do j=1,n
+         do j=1,number_vertices
            if(A(I,J).eq.1) then
             k=k+1
             ic3(i,k)=j
@@ -24,13 +23,13 @@ C      optimized for program Isomer
          end do
       end do
       
-      do i=1,n
+      do i=1,number_vertices
          do j=1,3
             list(i,j,1)=ic3(i,j)
          end do
       end do
       
-      do i=1,n
+      do i=1,number_vertices
          do j=1,3
             k=list(i,j,1) 
             l=1
@@ -43,7 +42,7 @@ C      optimized for program Isomer
          end do
       end do
 
-      do i=1,n
+      do i=1,number_vertices
          pass(i)=.false.
          occ(i)=.false.
          end(i)=.false.
@@ -51,7 +50,7 @@ C      optimized for program Isomer
       do i=0,Nmax+1
          path(i)=0
       end do
-      x(0)=n
+      x(0)=number_vertices
 
       stack(1)=0
       stack(2)=0
@@ -114,7 +113,7 @@ C      optimized for program Isomer
       endif
 
     5 path(l+1)=next
-      if (l.eq.n-1) then
+      if (l.eq.number_vertices-1) then
       nhamilton=nhamilton+1
       if(nhamilton.gt.maxiter) then
        if(maxiter.lt.1000000000) then
@@ -169,13 +168,13 @@ C     if (oldptr.gt.0) go to 5
       return
       END
 
-      SUBROUTINE Hamilton(n,Iout,iprint,maxiter,IC3)
+      SUBROUTINE Hamilton(Iout,iprint,maxiter,IC3)
 C     Subroutine from Darko Babic to create Hamitonian cycles
 C     and the IUPAC name of a fullerene
       use config
       integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax),pos(Nmax)
       integer bridge(Nmax),x(0:Nmax),y(0:Nmax),saved(Nmax)
-      integer i,j,k,l,n,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
+      integer i,j,k,l,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
       integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
       logical occ(Nmax),pass(Nmax),end(Nmax),flag,better
       integer ic3(Nmax,3)
@@ -183,15 +182,15 @@ C     and the IUPAC name of a fullerene
       ifirst=0 
       nhamilton=0
       maxN=30
-      if(n.lt.maxN) maxN=n
+      if(number_vertices.lt.maxN) maxN=number_vertices
       write (Iout,1009) maxiter
-      do i=1,n
+      do i=1,number_vertices
          do j=1,3
             list(i,j,1)=ic3(i,j)
          end do
       end do
 
-      do i=1,n
+      do i=1,number_vertices
          do j=1,3
             k=list(i,j,1) 
             l=1
@@ -204,7 +203,7 @@ C     and the IUPAC name of a fullerene
          end do
       end do
 
-      do i=1,n
+      do i=1,number_vertices
          pass(i)=.false.
          occ(i)=.false.
          end(i)=.false.
@@ -212,7 +211,7 @@ C     and the IUPAC name of a fullerene
       do i=0,Nmax+1
          path(i)=0
       end do
-      x(0)=n
+      x(0)=number_vertices
 
       stack(1)=0
       stack(2)=0
@@ -275,7 +274,7 @@ C     and the IUPAC name of a fullerene
       endif
 
     5 path(l+1)=next
-      if (l.eq.n-1) then
+      if (l.eq.number_vertices-1) then
       nhamilton=nhamilton+1
       if(nhamilton.gt.maxiter) then
       write (Iout,1010) maxiter
@@ -287,23 +286,23 @@ C     and the IUPAC name of a fullerene
       if(iprint.ne.0) then
       if(ifirst.eq.0) write (Iout,1005)
       write (Iout,1004) nhamilton,(path(j),j=1,maxN)
-      if(n.gt.30) then
-      do I=31,n,30
+      if(number_vertices.gt.30) then
+      do I=31,number_vertices,30
       jmax=I+29
-      if(jmax.gt.n) jmax=n
+      if(jmax.gt.number_vertices) jmax=number_vertices
       write (Iout,1001) (path(j),j=I,jmax)
       enddo
       endif
       endif
       ifirst=1
-         do j=1,n           
+         do j=1,number_vertices
             pos(path(j))=j
          end do
-         path(0)=path(n)
-         path(n+1)=path(1)
+         path(0)=path(number_vertices)
+         path(number_vertices+1)=path(1)
 
-         maxdif=n
-         do j=1,n
+         maxdif=number_vertices
+         do j=1,number_vertices
             cur=path(j)
             prv=path(j-1)
             nxt=path(j+1)
@@ -312,7 +311,8 @@ C     and the IUPAC name of a fullerene
                if (ngb.ne.prv.and.ngb.ne.nxt) then
                   bridge(j)=pos(ngb)
                   diff=abs(bridge(j)-j)
-                  if (n-diff.gt.diff) diff=n-diff
+                  if (number_vertices-diff.gt.diff)
+     1              diff=number_vertices-diff
                   if (maxdif.gt.diff) maxdif=diff
                   go to 11
                endif
@@ -323,21 +323,22 @@ C     and the IUPAC name of a fullerene
          maxdif=maxdif-1
          if (maxdif.gt.x(0)) go to 6
 
-         do 13 j=1,n
+         do 13 j=1,number_vertices
             better=.false.
-            diff=mod(n+bridge(j)-j,n)-1
+            diff=mod(number_vertices+bridge(j)-j,number_vertices)-1
             if (diff.eq.maxdif) then
                if (maxdif.lt.x(0)) then
                   x(0)=maxdif
-                  y(0)=n-maxdif-2
+                  y(0)=number_vertices-maxdif-2
                   better=.true.
                endif
                i=0
                k=j
-               do 14 m=1,n-1
-                  k=mod(k,n)+1
-                  relk=mod(n+k-j,n)+1
-                  relbr=mod(n+bridge(k)-j,n)+1
+               do 14 m=1,number_vertices-1
+                  k=mod(k,number_vertices)+1
+                  relk=mod(number_vertices+k-j,number_vertices)+1
+                  relbr=
+     1                mod(number_vertices+bridge(k)-j,number_vertices)+1
                   if (relbr.lt.relk) go to 14
                   i=i+1
                   if (.not.better) then
@@ -351,24 +352,25 @@ C     and the IUPAC name of a fullerene
             endif
 
             if (better) then
-               do m=1,n
+               do m=1,number_vertices
                   saved(m)=path(m)
                end do
             end if
    17       better=.false.
-            diff=n-diff-2
+            diff=number_vertices-diff-2
             if (diff.eq.maxdif) then
                if (maxdif.lt.x(0)) then
                   x(0)=maxdif
-                  y(0)=n-maxdif-2
+                  y(0)=number_vertices-maxdif-2
                   better=.true.
                endif
                i=0
                k=j
-               do 18 m=1,n-1
-                  k=mod(n+k-2,n)+1
-                  relk=mod(n+j-k,n)+1
-                  relbr=mod(n+j-bridge(k),n)+1
+               do 18 m=1,number_vertices-1
+                  k=mod(number_vertices+k-2,number_vertices)+1
+                  relk=mod(number_vertices+j-k,number_vertices)+1
+                  relbr=
+     1               mod(number_vertices+j-bridge(k),number_vertices)+1
                   if (relbr.lt.relk) go to 18
                   i=i+1
                   if (.not.better) then
@@ -381,7 +383,7 @@ C     and the IUPAC name of a fullerene
    18          continue
             endif
             if (better) then
-               do m=1,n
+               do m=1,number_vertices
                   saved(m)=path(m)
                end do
             end if
@@ -432,10 +434,10 @@ C     if (oldptr.gt.0) go to 5
       endif
  
       write (Iout,1003) nhamilton
-      write (Iout,1000) (x(i),i=0,(n-2)/2)
-      write (Iout,1000) (y(i),i=0,(n-2)/2)
+      write (Iout,1000) (x(i),i=0,(number_vertices-2)/2)
+      write (Iout,1000) (y(i),i=0,(number_vertices-2)/2)
       write (Iout,1006)
-      write (Iout,1008) (saved(j),j=1,n)
+      write (Iout,1008) (saved(j),j=1,number_vertices)
  1000 format (1X,i3,i5,98I3)
  1001 format (9X,30(I4,'-'))
  1002 format (/1X,'There is no Hamiltonian cycle in the graph!')
@@ -454,12 +456,12 @@ C     if (oldptr.gt.0) go to 5
       return
       END
 
-      SUBROUTINE Paths(MAtom,IOUT,iprintf,IA,A,evec,df)
+      SUBROUTINE Paths(IOUT,iprintf,IA,A,evec,df)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C Calculate the number of all possible distinct paths from the
 C adjaceny matric A(i,j) by producing the (n-1)-th power
-C of A. In this case n is Matom. This gives all possible walks
+C of A. In this case n is number_vertices. This gives all possible walks
 C of length (n-1).
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
       DIMENSION IA(Nmax,Nmax),IM(Nmax,Nmax)
@@ -468,7 +470,7 @@ C of length (n-1).
       Real*8 upperschwerd,lowerschwerd
       Data Ihuge/180/
 C     Epstein upper limit
-      dAtom=dfloat(MAtom)
+      dAtom=dfloat(number_vertices)
       power=dAtom/3.d0
       if(power.lt.1.d3) ulepstein=2.d0**power
       If(power.lt.31.01d0) then
@@ -502,7 +504,7 @@ C     Schwerdtfeger upper and lower limit
       endif
 
 C     Approximate number of IPR fullerenes
-      if(MAtom.eq.60.or.MAtom.ge.70) then
+      if(number_vertices.eq.60.or.number_vertices.ge.70) then
       exphigh=1.230625d-1*dAtom
       explow=1.136977d-1*dAtom
       fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
@@ -520,26 +522,26 @@ C     Approximate number of IPR fullerenes
       endif
       endif
 C     Limit for number of atoms
-      if(Matom.gt.Ihuge) then
+      if(number_vertices.gt.Ihuge) then
        write (Iout,1009) Ihuge 
        RETURN
       endif
       if(iprintf.eq.0) RETURN
       write (Iout,1001) 
 C     This is only good for C20, C24 already causes integer overflow
-      if(MAtom.eq.20) then
+      if(number_vertices.eq.20) then
 C     Produce symmetric A^2
-      do i=1,MAtom
+      do i=1,number_vertices
       do j=1,i
       IM(i,j)=0
-      do k=1,MAtom
+      do k=1,number_vertices
       IM(i,j)=IM(i,j)+IA(i,k)*IA(k,j)
       IM(j,i)=IM(i,j)
       enddo
       enddo
       enddo
 C     Now loop do (A^2)^8
-      do i=1,MAtom
+      do i=1,number_vertices
       do j=1,i
       IMF(i,j)=IM(i,j)
       IMF(j,i)=IM(j,i)
@@ -548,17 +550,17 @@ C     Now loop do (A^2)^8
       end do
       end do
 
-      nloop=(MAtom-2)/2-1
+      nloop=(number_vertices-2)/2-1
       do loop=1,nloop
-       do i=1,MAtom
-       do j=1,MAtom
-       do k=1,MAtom
+       do i=1,number_vertices
+       do j=1,number_vertices
+       do k=1,number_vertices
        IMF1(i,j)=IMF1(i,j)+IMF(i,k)*IM(k,j)
        enddo
        enddo
        enddo
-       do i=1,MAtom
-       do j=1,MAtom
+       do i=1,number_vertices
+       do j=1,number_vertices
        IMF(i,j)=IMF1(i,j)
        IMF1(i,j)=0
        enddo
@@ -566,20 +568,20 @@ C     Now loop do (A^2)^8
       enddo
 
 C     Now last multiplication with A
-      do i=1,MAtom
-      do j=1,MAtom
-      do k=1,MAtom
+      do i=1,number_vertices
+      do j=1,number_vertices
+      do k=1,number_vertices
       IMF1(i,j)=IMF1(i,j)+IMF(i,k)*IA(k,j)
       enddo
       enddo
       enddo
 C     Now print number of paths for all vertices
       write (Iout,1002)
-      do i=1,MAtom
+      do i=1,number_vertices
       write (Iout,1003) i,(IMF1(i,j),j=1,10)
       enddo
       write (Iout,1004)
-      do i=1,MAtom
+      do i=1,number_vertices
       write (Iout,1003) i,(IMF1(i,j),j=11,20)
       enddo
 
@@ -593,31 +595,31 @@ C     This procedure is much faster and good for large graphs, but real
 C     matrix elements instead of integers are produced.
 C     Diagonalize adjacency matrix A
       write (Iout,1007) 
-      do i=1,MAtom
+      do i=1,number_vertices
       do j=1,i
       A(i,j)=dfloat(IA(i,j))
       A(j,i)=A(i,j)
       enddo
       enddo
-      call tred2(A,Matom,Nmax,evec,df)
-      call tqli(evec,df,Matom,Nmax,A)
+      call tred2(A,number_vertices,Nmax,evec,df)
+      call tqli(evec,df,number_vertices,Nmax,A)
 C     Calculate A^(n-1) = L D^(n-1) L but only printing the adjacent vertices
 C     NP values
-      mpower=Matom-1
-      do i=1,MAtom
+      mpower=number_vertices-1
+      do i=1,number_vertices
       evec(i)=evec(i)**mpower
       enddo
 
       limit=5
       ic=0
-      do i=1,MAtom
+      do i=1,number_vertices
       do j=1,i-1
       if(IA(i,j).eq.1) then
       ic=ic+1
       IS1(ic)=i
       IS2(ic)=j
       amat=0.d0
-      do k=1,Matom
+      do k=1,number_vertices
       amat=amat+A(i,k)*evec(k)*A(j,k)
       enddo
       APN(ic)=amat

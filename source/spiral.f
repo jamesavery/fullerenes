@@ -1,6 +1,6 @@
-      SUBROUTINE SpiralRestart(N,IPR,Iout,
-C     Restart version of Subroutine Spiral
+      SUBROUTINE SpiralRestart(IPR,Iout,
      1 Isonum,IsoIPR,iham,IDA,A,chkname)
+C     Restart version of Subroutine Spiral
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
@@ -52,8 +52,8 @@ C Test if file is the right one
 
 C Test if atom number is right
       Read(1,*) IN,IP,IH
-      if(IN.ne.N) then
-       Write(Iout,1003) N,IN
+      if(IN.ne.number_vertices) then
+       Write(Iout,1003) number_vertices,IN
        Close(unit=1)
        stop
       endif
@@ -175,8 +175,8 @@ C With Hamiltonian cycles
      1  sigmahlow,ISigmaL,sigmahhigh,ISigmaH
 
 C Now check if list is complete or not
-       M1=N/2-9
-       M2=N/2-29
+       M1=number_vertices/2-9
+       M2=number_vertices/2-29
        if(IPR.eq.0) then
         if(M1.le.119.and.L.ge.Isonum(M1)) then
          Write(Iout,1009) Isonum(M1)
@@ -193,21 +193,21 @@ C Now do the calculation for the remainder
       Write(Iout,1013) 
       if(iham.eq.0) then
       if(IPR.EQ.0) then 
-         IF(N.lt.100) WRITE(Iout,601) N
-         IF(N.ge.100) WRITE(Iout,602) N
+         IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices
+         IF(number_vertices.ge.100) WRITE(Iout,602) number_vertices
       else
          IPR=1 
-         IF(N.lt.100) WRITE(Iout,603) N
-         IF(N.ge.100) WRITE(Iout,604) N
+         IF(number_vertices.lt.100) WRITE(Iout,603) number_vertices
+         IF(number_vertices.ge.100) WRITE(Iout,604) number_vertices
       endif
       else
       if(IPR.EQ.0) then 
-         IF(N.lt.100) WRITE(Iout,701) N
-         IF(N.ge.100) WRITE(Iout,702) N
+         IF(number_vertices.lt.100) WRITE(Iout,701) number_vertices
+         IF(number_vertices.ge.100) WRITE(Iout,702) number_vertices
       else
          IPR=1 
-         IF(N.lt.100) WRITE(Iout,703) N
-         IF(N.ge.100) WRITE(Iout,704) N
+         IF(number_vertices.lt.100) WRITE(Iout,703) number_vertices
+         IF(number_vertices.ge.100) WRITE(Iout,704) number_vertices
       endif
       endif
 
@@ -219,7 +219,7 @@ C Now do the calculation for the remainder
       IER=0
       IT=0
       JPR=IPR+1
-      M=N/2+2
+      M=number_vertices/2+2
       itest=1
       DO 1  J1= 1    ,M-11*JPR !   Open loop over spiral
        if(J1.lt.K1.and.itest.eq.1) go to 1
@@ -287,7 +287,7 @@ C Now do the calculation for the remainder
          K=J
       enddo
 C     Analyze dual matrix
-   16  CALL DualAnalyze(nmax,mmax,N,M,D,IRhag5,IRhag6,
+   16  CALL DualAnalyze(M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
        if(2*ndeg.eq.nelec) then 
         Occup='closed'
@@ -316,7 +316,7 @@ C     Analyze dual matrix
      1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
        else
-        Call HamiltonCyc(N,maxiter,Iout,nbatch,IDA,nhamcycle)
+        Call HamiltonCyc(maxiter,Iout,nbatch,IDA,nhamcycle)
         WRITE(Iout,608) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
      1   (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2   nelec,ndeg,gap,Occup,nhamcycle,(NMR(J),J=1,K)
@@ -385,7 +385,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -393,7 +393,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -401,7 +401,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -409,7 +409,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -440,7 +440,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -449,7 +449,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -458,7 +458,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -467,7 +467,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -508,7 +508,7 @@ C     Analyze dual matrix
  2002 Format(A18)
       END
 
-      SUBROUTINE SpiralFind(N,IPR,ivar,In,Iout,IDA,A)
+      SUBROUTINE SpiralFind(IPR,ivar,In,Iout,IDA,A)
 C     This subroutine comes directly from the book of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006),
 C     and has been modified to search for ring spirals around an
@@ -518,7 +518,7 @@ C     vertices using the spiral algorithm and a uniqueness test
 C     based on equivalent spirals. IPR = 0  for all isomers. 
 C     The resulting output is a catalogue of the isomers found containing 
 C     their idealized point groups, canonical spirals, and NMR patterns.        
-C     N is the nuclearity of the fullerene.
+C     number_vertices is the nuclearity of the fullerene.
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
@@ -534,11 +534,11 @@ C     N is the nuclearity of the fullerene.
        Write(Iout,805)
        Return
       endif
-      if(N.gt.NMAX) Return     ! Increase NMAX 
-      if(2*(N/2).ne.N) Return  ! N must be even 
+      if(number_vertices.gt.NMAX) Return     ! Increase NMAX 
+      if(2*(number_vertices/2).ne.number_vertices) Return  ! number_vertices must be even 
 
 C   Search for icosahedral fullerene Cm closest to Cm with m<n
-      dex=dfloat(N)
+      dex=dfloat(number_vertices)
       icon=0
       loopmax=int(dsqrt(dex/2.d1))
       loopmin=int(dsqrt(dex/6.d1))
@@ -546,7 +546,7 @@ C   Search for icosahedral fullerene Cm closest to Cm with m<n
        Do I1=loopmin,loopmax
        Do J1=0,I1
         nico=20*(I1*I1+J1*J1+I1*J1)
-        if(nico.le.N.and.nico.gt.icon) then
+        if(nico.le.number_vertices.and.nico.gt.icon) then
          icon=nico
          I=I1
          J=J1
@@ -557,13 +557,13 @@ C   Search for icosahedral fullerene Cm closest to Cm with m<n
         Write(Iout,800) 
         stop
        endif
-       if(icon.eq.N) then
+       if(icon.eq.number_vertices) then
         Write(Iout,801) icon,I,J
        else
-        Write(Iout,802) icon,N,I,J
+        Write(Iout,802) icon,number_vertices,I,J
        endif
 
-      M=N/2+2
+      M=number_vertices/2+2
       Read(IN,*,Err=400,end=400) (SS(I),I=1,12)
       Write(Iout,807)
       Go to 300
@@ -766,7 +766,7 @@ C  Set parameters
          K=J
       enddo
 C     Analyze dual matrix
-   16  CALL DualAnalyze(nmax,mmax,N,M,D,IRhag5,IRhag6,
+   16  CALL DualAnalyze(M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
        if(2*ndeg.eq.nelec) then 
         Occup='closed'
@@ -822,7 +822,7 @@ C     Analyze dual matrix
      1 /1X,' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -838,9 +838,9 @@ C     Analyze dual matrix
  613  FORMAT(1X,'No isomers found')
  800  FORMAT(1X,'Nothing found ==> STOP')
  801  FORMAT(1X,'Your vertex number matches icoshedral fullerene ',
-     1 'with N=',I6,' ,(k,l)=(',I2,',',I2,')')
+     1 'with number_vertices=',I6,' ,(k,l)=(',I2,',',I2,')')
  802  FORMAT(1X,'Closest vertex number is ',I6,' for icoshedral ',
-     1 'fullerene with N=',I6,'; (k,l)=(',I2,',',I2,')')
+     1 'fullerene with number_vertices=',I6,'; (k,l)=(',I2,',',I2,')')
  803  Format(1X,'General Goldberg-Coxeter transformation of C20 -> Cn',
      1 ' with n=: ',I5,/1X,'Construction of icosahedral fullerenes ',
      1 'using the spiral code representation of Fowler and Rogers',/1X,
@@ -856,7 +856,7 @@ C     Analyze dual matrix
 C     RETURN
       END
 
-      SUBROUTINE Spiral(N,IPR,Iout,Isonum,IsoIPR,iham,IDA,A)
+      SUBROUTINE Spiral(IPR,Iout,Isonum,IsoIPR,iham,IDA,A)
 C     This subroutine comes directly from the book of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
 C     This sub-program catalogues fullerenes with a given number of      
@@ -865,7 +865,7 @@ C     based on equivalent spirals. The required input is IPR,
 C     where IPR = 0 for general and 1 for isolated-pentagon isomers. 
 C     The resulting output is a catalogue of the isomers found containing 
 C     their idealized point groups, canonical spirals, and NMR patterns.        
-C     N is the nuclearity of the fullerene.
+C     number_vertices is the nuclearity of the fullerene.
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
@@ -877,10 +877,10 @@ C     N is the nuclearity of the fullerene.
       CHARACTER*6 Occup
       Real*8 sigmah,sigmahlow,sigmahhigh
 
-      if(N.gt.NMAX) Return            ! Increase NMAX 
-      if(2*(N/2).ne.N) Return         ! N must be even 
-      M1=N/2-9
-      M2=N/2-29
+      if(number_vertices.gt.NMAX) Return            ! Increase NMAX 
+      if(2*(number_vertices/2).ne.number_vertices) Return         ! number_vertices must be even 
+      M1=number_vertices/2-9
+      M2=number_vertices/2-29
       nhamcycle=0
       IPRdect=0
       maxiter=10000000
@@ -898,36 +898,36 @@ C     N is the nuclearity of the fullerene.
       sigmahlow=1.d10
       IFus5Ghigh=0
       sigmahhigh=-1.d0
-      WRITE (Iout,600) N,IPR,iham
+      WRITE (Iout,600) number_vertices,IPR,iham
       if(iham.eq.0) then
-      if(IPR.EQ.0) then 
-         IF(N.lt.100) WRITE(Iout,601) N
-         IF(N.ge.100) WRITE(Iout,602) N
+        if(IPR.EQ.0) then 
+           IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices
+           IF(number_vertices.ge.100) WRITE(Iout,602) number_vertices
+        else
+           IPR=1 
+           IF(number_vertices.lt.100) WRITE(Iout,603) number_vertices
+           IF(number_vertices.ge.100) WRITE(Iout,604) number_vertices
+        endif
       else
-         IPR=1 
-         IF(N.lt.100) WRITE(Iout,603) N
-         IF(N.ge.100) WRITE(Iout,604) N
-      endif
-      else
-      if(IPR.EQ.0) then 
-         IF(N.lt.100) WRITE(Iout,701) N
-         IF(N.ge.100) WRITE(Iout,702) N
-      else
-         IPR=1 
-         IF(N.lt.100) WRITE(Iout,703) N
-         IF(N.ge.100) WRITE(Iout,704) N
-      endif
+        if(IPR.EQ.0) then 
+           IF(number_vertices.lt.100) WRITE(Iout,701) number_vertices
+           IF(number_vertices.ge.100) WRITE(Iout,702) number_vertices
+        else
+           IPR=1 
+           IF(number_vertices.lt.100) WRITE(Iout,703) number_vertices
+           IF(number_vertices.ge.100) WRITE(Iout,704) number_vertices
+        endif
       endif
       do I=1,MMAX
-      do J=1,MMAX
-       D(I,J)=0
-      enddo
+        do J=1,MMAX
+          D(I,J)=0
+        enddo
       enddo
       L=0
       IER=0
       IT=0
       JPR=IPR+1
-      M=N/2+2
+      M=number_vertices/2+2
       DO 1  J1= 1    ,M-11*JPR !   Open loop over spiral
       DO 2  J2=J1+JPR,M-10*JPR !   combinations
       DO 3  J3=J2+JPR,M-9*JPR
@@ -968,17 +968,16 @@ C     N is the nuclearity of the fullerene.
       IF(IER.EQ.3)  GO TO 3
       IF(IER.EQ.2)  GO TO 2
       IF(IER.EQ.1)  GO TO 1
-      CALL Unwind(M,IER,IT,ispiral,
-     1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals 
-      IF(IER.EQ.13) GO TO 13                             ! and check for uniqueness      
+      CALL Unwind(M,IER,IT,ispiral,Spiralx,S,D,NMR,Group)! Unwind dual into spirals and check for uniqueness
+      IF(IER.EQ.13) GO TO 13                
       K=0
       L=L+1                                              ! Spiral S is canonical      
       DO J=1,6
-         IF(NMR(J).EQ.0) GO TO 16
-         K=J
+        IF(NMR(J).EQ.0) GO TO 16
+        K=J
       enddo
 C     Analyze dual matrix
-   16  CALL DualAnalyze(nmax,mmax,N,M,D,IRhag5,IRhag6,
+   16  CALL DualAnalyze(M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
        if(2*ndeg.eq.nelec) then 
         Occup='closed'
@@ -1007,7 +1006,7 @@ C     Analyze dual matrix
      1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
        else
-        Call HamiltonCyc(N,maxiter,Iout,nbatch,IDA,nhamcycle)
+        Call HamiltonCyc(maxiter,Iout,nbatch,IDA,nhamcycle)
         WRITE(Iout,608) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
      1   (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2   nelec,ndeg,gap,Occup,nhamcycle,(NMR(J),J=1,K)
@@ -1067,7 +1066,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1075,7 +1074,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1083,7 +1082,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1091,7 +1090,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1120,7 +1119,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -1129,7 +1128,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -1138,7 +1137,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -1147,7 +1146,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -1226,7 +1225,7 @@ C     Print*,iring,'/',JP
       Return
       END
 
-      SUBROUTINE SpiralSearch(NSP,N,Iout,IRG55,IRG66,
+      SUBROUTINE SpiralSearch(NSP,Iout,IRG55,IRG66,
      1 IRG56,NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP)
       use config
       IMPLICIT INTEGER (A-Z)
@@ -1240,13 +1239,14 @@ C     Print*,iring,'/',JP
 C     This subroutine has been modified from the original one of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
 C     It is used if dual matrix is already known. See subroutine Spiral for details.
-C     N is the nuclearity of the fullerene.
-      M=N/2+2
+C     number_vertices is the nuclearity of the fullerene.
+      M=number_vertices/2+2
       ispiral=0
       WRITE (Iout,600)
-         IF(N.lt.100) WRITE(Iout,601) N,M
-         IF(N.ge.100.and.N.lt.1000) WRITE(Iout,602) N,M
-         IF(N.ge.1000) WRITE(Iout,632) N,M
+         IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices,M
+         IF(number_vertices.ge.100.and.
+     1      number_vertices.lt.1000) WRITE(Iout,602) number_vertices,M
+         IF(number_vertices.ge.1000) WRITE(Iout,632) number_vertices,M
       do I=1,MMAX
        S(I)=0
       do J=1,MMAX
@@ -1463,8 +1463,7 @@ C     Fowler algorithm
        Do I=1,12 
         Spiral(I,1)=JP(I)
        enddo
-       CALL Unwind(M,IER,IT,ispiral,
-     1  Spiral,S,D,NMR,Group)             ! Unwind dual into spirals 
+       CALL Unwind(M,IER,IT,ispiral,Spiral,S,D,NMR,Group)  ! Unwind dual into spirals 
        K=0
        DO J=1,6
          IF(NMR(J).EQ.0) GO TO 16
@@ -1623,8 +1622,9 @@ C     Find lowest value
       return
       END
 
-      SUBROUTINE DualAnalyze(nmax,mmax,N,M,D,IRhag5,IRhag6,
+      SUBROUTINE DualAnalyze(M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer D(MMAX,MMAX),Ddiag(MMAX),NR5(12),IDA(NMAX,NMAX)
       Integer IRhag5(0:5),IRhag6(0:6),IDG(NMAX)
@@ -1704,10 +1704,10 @@ C     Strain Parameter
       sigmah=dsqrt(dabs(ak2hk-akhk2))
 
 C     Now produce adjacency matrix
- 112  CALL DUAL(D,MMAX,IDA,N,IER)
-      Do I=1,N
+ 112  CALL DUAL(D,MMAX,IDA,IER)
+      Do I=1,number_vertices
        df(I)=0.d0
-      Do J=I,N
+      Do J=I,number_vertices
         A(I,J)=0.d0
         if(IDA(I,J).eq.1) A(I,J)=1.d0
         A(J,I)=A(I,J)
@@ -1717,13 +1717,13 @@ C Diagonalize without producing eigenvectors
       do i=1,nmax
          evec(i) = 0
       enddo
-      call tred2l(A,N,NMAX,evec,df)
-      call tqlil(evec,df,N,NMAX)
+      call tred2l(A,number_vertices,NMAX,evec,df)
+      call tqlil(evec,df,number_vertices,NMAX)
 C Sort eigenvalues
-      Do I=1,N
+      Do I=1,number_vertices
        e0=evec(I)
        jmax=I
-        Do J=I+1,N
+        Do J=I+1,number_vertices
          e1=evec(J)
           if(e1.gt.e0) then 
            jmax=j
@@ -1742,7 +1742,7 @@ C Now sort degeneracies
       ieigv=1
       ideg=1
       IDG(1)=ideg
-      Do I=2,N
+      Do I=2,number_vertices
        diff=dabs(evec(I-1)-evec(I))
        if(diff.lt.Tol) then
         ideg=ideg+1
@@ -1756,7 +1756,7 @@ C Now sort degeneracies
       enddo
        
 C Produce number of electrons in HOMO, degeneracy and gap
-      Noc=N/2
+      Noc=number_vertices/2
       Norb=0
       Do I=1,ieigv
       Iorb=I
@@ -1872,8 +1872,7 @@ C       after P pentagons have been added. Otherwise IER = 0 on return.
       RETURN
       END
 
-      SUBROUTINE Unwind(M,IER,IT,ispiral,
-     1 Spiral,S,D,NMR,GROUP)
+      SUBROUTINE Unwind(M,IER,IT,ispiral,Spiral,S,D,NMR,GROUP)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX),NMR(6)
@@ -2197,11 +2196,11 @@ C            Store all non-identical spirals
         RETURN
         END
 
-      SUBROUTINE DUAL(D,M,A,N,IER)
+      SUBROUTINE DUAL(D,M,A,IER)
       use config
       IMPLICIT INTEGER (A-Z)
-        DIMENSION D(M,M),A(NMAX,NMAX)
-        DIMENSION V(3,NMAX)
+      DIMENSION D(M,M),A(NMAX,NMAX)
+      DIMENSION V(3,NMAX)
 c       Given a fullerene dual adjacency matrix D, this subroutine 
 c       constructs the corresponding fullerene adjacency matrix A. 
 c       IER = 0 on return if the construction is successful. 	 
@@ -2212,16 +2211,16 @@ c       IER = 0 on return if the construction is successful.
               DO 1 J = 1,K
                  IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
                   I = I+1
-                 IF (I.GT.N) GO TO 1
+                 IF (I.GT.number_vertices) GO TO 1
                  V(1,I) = J ! Associate the three mutually adjacent 
                  V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
                  V(3,I) = L ! with fullerene vertex I 	 
  1            CONTINUE
  2        CONTINUE
  3      CONTINUE
-        IER = I-N
+        IER = I-number_vertices
         IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
-        DO 7 J = 1,N           ! and is therefore NOT a fullerene dual 
+        DO 7 J = 1,number_vertices           ! and is therefore NOT a fullerene dual 
            DO 6 I = 1,J
               K = 0
               DO 5 JJ = 1,3

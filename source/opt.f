@@ -1,5 +1,4 @@
-      SUBROUTINE OptGraph(IOP,MAtom,Iout,IDA,IS,IC3,MDist,maxl,
-     1 scalePPG,Dist)
+      SUBROUTINE OptGraph(IOP,Iout,IDA,IS,IC3,MDist,maxl,scalePPG,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C  This subroutine optimizes the fullerene graph using spring embedding
@@ -10,8 +9,8 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       rmax=0.d0
       rper=0.d0
       maxd=0
-      do i=1,MAtom
-      do j=i+1,MAtom
+      do i=1,number_vertices
+      do j=i+1,number_vertices
        if(IDA(I,J).eq.1) then
         x=Dist(1,I)-Dist(1,J)
         y=Dist(2,I)-Dist(2,J)
@@ -27,8 +26,8 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       If(IOP.eq.1) Write(IOUT,101)
       If(IOP.eq.2) Write(IOUT,102)
       If(IOP.eq.3) then
-       do i=1,MAtom
-       do j=i+1,MAtom
+       do i=1,number_vertices
+       do j=i+1,number_vertices
         if(Mdist(i,j).gt.maxd) maxd=Mdist(i,j)
        enddo
        enddo
@@ -41,15 +40,15 @@ C  This subroutine optimizes the fullerene graph using spring embedding
        Write(IOUT,104) maxl,RAA
       endif
       Write(IOUT,1000) rmin,Rdist
-      do i=1,MAtom
+      do i=1,number_vertices
        Dist(1,i)=Dist(1,i)*scale 
        Dist(2,i)=Dist(2,i)*scale 
        WRITE(IOUT,1001) I,Dist(1,I),Dist(2,I),(IC3(I,J),J=1,3)
       enddo
-      CALL frprmn2d(IOP,MAtom,IDA,Iout,IS,MDist,
+      CALL frprmn2d(IOP,IDA,Iout,IS,MDist,
      1 maxd,Dist,ftol,iter,fret,E0,RAA)
       if(fret-E0.gt.1.d-2) then
-       fretn=(fret-E0)/dfloat(MATOM)
+       fretn=(fret-E0)/dfloat(number_vertices)
        Write(IOUT,1002) fretn
       endif
 
@@ -83,7 +82,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Return 
       END
 
-      SUBROUTINE frprmn2d(IOP,MATOM,AH,Iout,IS,MDist,
+      SUBROUTINE frprmn2d(IOP,AH,Iout,IS,MDist,
      1 maxd,p,ftol,iter,fret,E0,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -106,7 +105,7 @@ C     IOP=1: spring embedding
 C     IOP=2: spring + Coulomb embedding
 C     IOP=3: Pisanski-Plestenjak-Graovac algorithm
 C     IOP=4: Kamada-Kawai embedding
-      N = 2*Matom
+      N = 2*number_vertices
       iter=0
       CALL func2d(IOP,N,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
@@ -376,7 +375,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
+      SUBROUTINE OptFF(Iout,ihessian,iprinthessian,iopt,IDA,
      1  Dist,dist2D,ftol,force)
       use config
       use iso_c_binding
@@ -389,28 +388,30 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       DIMENSION Dist(3,NMAX)
       DIMENSION IDA(NMAX,NMAX)
       real(8) force(ffmaxdim)
-      integer iopt,ideg(matom*3)
-      real(8) hessian(matom*3,matom*3),evec(matom*3),df(matom*3)
+      integer iopt,ideg(number_vertices*3)
+      real(8) hessian(number_vertices*3,number_vertices*3),
+     1 evec(number_vertices*3),df(number_vertices*3)
       type(c_ptr) :: graph, new_fullerene_graph
 
 c edges with 0, 1, 2 pentagons
-      integer e_hh(2,3*MAtom/2), e_hp(2,3*MAtom/2), e_pp(2,3*MAtom/2)
-      integer a_h(3,3*MAtom-60), a_p(3,60)
-      integer d_hhh(4,matom),d_hpp(4,matom),d_hhp(4,matom),
-     1      d_ppp(4,matom)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1  e_pp(2,3*number_vertices/2)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
+     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
 c counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
-      graph = new_fullerene_graph(Nmax,MAtom,IDA)
+      graph = new_fullerene_graph(Nmax,number_vertices,IDA)
       call tutte_layout(graph,Dist2D)
       call set_layout2d(graph,Dist2D)
-      call get_edges(graph,matom,
+      call get_edges(graph,number_vertices,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
-      call get_corners(graph,MAtom,
+      call get_corners(graph,number_vertices,
      1 a_h,a_p)
       if(iopt .eq. 3 .or. iopt.eq.4) then
-        call get_dihedrals(graph,MAtom,
+        call get_dihedrals(graph,number_vertices,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
 c     and finally delete the graph to free the mem
@@ -482,27 +483,28 @@ c        force(19)=force(19)
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
 
 C OPTIMIZE
-      CALL frprmn3d(MATOM*3,Iout,
+      CALL frprmn3d(Iout,
      1 Dist,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(fret.gt.1.d-2) then
-        fretn=fret/dfloat(MATOM)
+        fretn=fret/dfloat(number_vertices)
         Write(IOUT,1002) fretn
       endif
-      CALL Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1001) Rmin,Rmax,rms
 
 C HESSIAN
       if(ihessian.ne.0) then
-        call get_hessian(matom, dist, force, iopt, hessian,
+        call get_hessian(number_vertices, dist, force, iopt, hessian,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         if(iprinthessian.gt.1) then
           write(iout,1023)
-          write(iout,1024) ((hessian(i,j),i=1,3*Matom),j=1,3*Matom)
+          write(iout,1024)
+     1      ((hessian(i,j),i=1,3*number_vertices),j=1,3*number_vertices)
         endif
 C Diagonalize without producing eigenvectors
 C  Mass of 12-C used
@@ -512,8 +514,8 @@ C  Mass of 12-C used
 C       Test if Hessian is symmetric
         symmetric=0.d0
         test=1.d-10
-        do i=1,3*Matom
-          do j=1,3*Matom
+        do i=1,3*number_vertices
+          do j=1,3*number_vertices
             symmetric=symmetric+dabs(hessian(i,j)-hessian(j,i))
           enddo
         enddo
@@ -524,19 +526,19 @@ C       Test if Hessian is symmetric
           Write(Iout,1015) asym
         endif
 C       Mass-weight Hessian
-        do i=1,3*Matom
-          do j=1,3*Matom
+        do i=1,3*number_vertices
+          do j=1,3*number_vertices
             hessian(i,j)=hessian(i,j)*fachess
           enddo
         enddo
-        call tred2l(hessian,3*Matom,3*Matom,evec,df)
-        call tqlil(evec,df,3*Matom,3*Matom)
+        call tred2l(hessian,3*number_vertices,3*number_vertices,evec,df)
+        call tqlil(evec,df,3*number_vertices,3*number_vertices)
 C Sort eigenvalues
         negeig=0
-        Do I=1,MAtom*3
+        Do I=1,number_vertices*3
           e0=evec(I)
           jmax=I
-          Do J=I+1,MAtom*3
+          Do J=I+1,number_vertices*3
             e1=evec(J)
             if(e1.gt.e0) then
               jmax=j
@@ -551,9 +553,9 @@ C Sort eigenvalues
         enddo
         if(iprinthessian.ne.0) then
           write(Iout,1009)
-          write(Iout,1010) (evec(i),i=1,3*MAtom)
+          write(Iout,1010) (evec(i),i=1,3*number_vertices)
         endif
-        Do I=1,MAtom*3
+        Do I=1,number_vertices*3
           if(evec(i).lt.0.d0) then
             negeig=negeig+1
             evec(i)=-dsqrt(-evec(i))
@@ -562,23 +564,23 @@ C Sort eigenvalues
           endif
         enddo
         write(Iout,1011) negeig
-        Do I=1,MAtom*3
+        Do I=1,number_vertices*3
           evec(i)=evec(i)*convw
         enddo
         if(iprinthessian.ne.0) then
           write(Iout,1012)
-          write(Iout,1010) (evec(i),i=1,MAtom*3)
+          write(Iout,1010) (evec(i),i=1,number_vertices*3)
         endif
 C Zero-point vibrational energy
         zerops=0.d0
-        Do I=1,MAtom*3-6
+        Do I=1,number_vertices*3-6
           zerops=zerops+evec(i)
         enddo
         zerop=zerops*.5d0
         zeropwn=zerop
         zeropau=zerop/au2wavenumbers
         zeropeV=zeropau*au2eV
-        peratom=dfloat(MAtom)
+        peratom=dfloat(number_vertices)
         write(Iout,1014) zeropau,zeropeV,zeropwn
         write(Iout,1026) zeropau/peratom,zeropeV/peratom,zeropwn/peratom
 C Sort for degeneracies
@@ -586,7 +588,7 @@ C Sort for degeneracies
         icount=0
         idegc=0
         ndeg=0
-        Do I=1,MAtom*3-6
+        Do I=1,number_vertices*3-6
           idegc=idegc+1
           dif=evec(i)-evec(i+1)
           if(dif.gt.tolfreq) then
@@ -597,9 +599,10 @@ C Sort for degeneracies
             idegc=0
           endif
         enddo
-        write(Iout,1021) ndeg,MAtom*3-6
+        write(Iout,1021) ndeg,number_vertices*3-6
         write(Iout,1022) (evec(i),ideg(i),i=1,icount)
-        write(Iout,1025) (evec(i),i=MAtom*3-5,3*MAtom)
+        write(Iout,1025)
+     1    (evec(i),i=number_vertices*3-5,3*number_vertices)
       endif
 
  1000 Format(1X,'Optimization of geometry using harmonic oscillators',
@@ -652,12 +655,11 @@ C Sort for degeneracies
       Return 
       END
 
-      SUBROUTINE frprmn3d(N,Iout,
+      SUBROUTINE frprmn3d(Iout,
      1 p,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-c and N=MATOM*3
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=99999,EPS=1.d-9)
@@ -665,7 +667,7 @@ c and N=MATOM*3
       Real*8 pcom(NMAX*3),xicom(NMAX*3)
       real*8 force(ffmaxdim)
       integer iopt
-c      integer damping
+
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
@@ -679,7 +681,7 @@ C     USES dfunc3d,func3d,linmin3d
 C     func3d input vector p of length n user defined to be optimized
 C     IOPT=1: Wu force field optimization
       iter=0
-      CALL func3d(N,IERR,p,fp,force,iopt,
+      CALL func3d(IERR,p,fp,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -688,18 +690,18 @@ C     IOPT=1: Wu force field optimization
         return
       endif
 C     dfunc3d input vector p of length N, output gradient of length n user defined
-      CALL dfunc3d(N,p,xi,force,iopt,
+      CALL dfunc3d(p,xi,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       grad2=0.d0
-      do I=1,N
+      do I=1,3*number_vertices
         grad2=grad2+xi(i)*xi(i)
       enddo
       grad=dsqrt(grad2)
       Write(Iout,1001) iter,fp,grad
       if(grad.lt.ftol) return
-      do j=1,N
+      do j=1,3*number_vertices
         g(j)=-xi(j)
         h(j)=g(j)
         xi(j)=h(j)
@@ -713,12 +715,12 @@ c       turn off coulomb pot towards the end (and go to iopt=3 to indicate that 
           write(*,*)'Switching off coulomb repulsive potential.'
         endif
         iter=its
-        call linmin3d(N,p,pcom,xi,xicom,fret,
+        call linmin3d(p,pcom,xi,xicom,fret,
      1    force,iopt,e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
-     1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
+     1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         grad2=0.d0
-        do I=1,n
+        do I=1,3*number_vertices
           grad2=grad2+xi(i)*xi(i)
         enddo
         grad=dsqrt(grad2)
@@ -728,25 +730,25 @@ c        else
 c          write(Iout,1002) iter,fret,grad,damping
 c        endif
         if(2.d0*dabs(fret-fp).le.ftol*(dabs(fret)+dabs(fp)+EPS))then
-          fretperatom=3.d0*fret/dfloat(N)
+          fretperatom=3.d0*fret/dfloat(3*number_vertices)
           Write(Iout,1003) fret,fret-fp,fretperatom
           return
         endif
         fp=fret
-        CALL dfunc3d(N,p,xi,force,iopt,
+        CALL dfunc3d(p,xi,force,iopt,
      1    e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
      1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         gg=0.d0
         dgg=0.d0
-        do j=1,n
+        do j=1,3*number_vertices
           gg=gg+g(j)**2
 C         dgg=dgg+xi(j)**2
           dgg=dgg+(xi(j)+g(j))*xi(j)
         enddo
         if(gg.eq.0.d0)return
         gam=dgg/gg
-        do j=1,n
+        do j=1,3*number_vertices
           g(j)=-xi(j)
           h(j)=g(j)+gam*h(j)
           xi(j)=h(j)
@@ -767,8 +769,7 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       return
       END
 
-      SUBROUTINE linmin3d(n,
-     1 p,pcom,xi,xicom,fret,force,iopt,
+      SUBROUTINE linmin3d(p,pcom,xi,xicom,fret,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
       use config
@@ -778,23 +779,23 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
 c      real*8 length, cutoff, xi_tmp(nmax*3)
 c      integer damping
 C     USES brent3d,f1dim3d,mnbrak3d
-      do j=1,n
+      do j=1,3*number_vertices
         pcom(j)=p(j)
         xicom(j)=xi(j)
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak3d(n,
+      CALL mnbrak3d(
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      CALL brent3d(n,Iout,fret,
+      CALL brent3d(Iout,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c lets scale all displacements that are longer than a chosen cutoff to that cutoff.
 c the direction of the displacement vector is maintained
-      do j=1,n
+      do j=1,3*number_vertices
         xi(j)=xmin*xi(j)
 c        xi_tmp(j)=xi(j)
       enddo
@@ -811,14 +812,14 @@ c          xi_tmp(j+2)=xi_tmp(j+2)*(cutoff/length)
 c          damping=damping + 1
 c        endif
 c      enddo
-      do j=1,n
+      do j=1,3*number_vertices
 c        p(j)=p(j)+xi_tmp(j)
         p(j)=p(j)+xi(j)
       enddo
       return
       END
 
-      SUBROUTINE f1dim3d(n,
+      SUBROUTINE f1dim3d(
      1 f1dimf,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -827,17 +828,17 @@ c        p(j)=p(j)+xi_tmp(j)
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3)
 C     USES func3d
-      do j=1,n
+      do j=1,3*number_vertices
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func3d(n,IERR,xt,f1dimf,force,iopt,
+      CALL func3d(IERR,xt,f1dimf,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       return
       END
 
-      SUBROUTINE mnbrak3d(n,
+      SUBROUTINE mnbrak3d(
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -846,12 +847,12 @@ C     USES func3d
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3)
-      CALL f1dim3d(n,
+      CALL f1dim3d(
      1 fa,ax,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      CALL f1dim3d(n,
+      CALL f1dim3d(
      1 fb,bx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -865,7 +866,7 @@ C     USES func3d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim3d(n,
+      CALL f1dim3d(
      1 fc,cx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -876,7 +877,7 @@ C     USES func3d
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -893,13 +894,13 @@ C     USES func3d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -910,7 +911,7 @@ C     USES func3d
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -918,7 +919,7 @@ C     USES func3d
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      2   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -929,7 +930,7 @@ C     USES func3d
         Print*,'**** Error in Subroutine mnbrak3d'
         return
         endif
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -946,7 +947,7 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE brent3d(n,Iout,
+      SUBROUTINE brent3d(Iout,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -963,7 +964,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim3d(n,
+      CALL f1dim3d(
      1 fx,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -1002,7 +1003,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim3d(n,
+        CALL f1dim3d(
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -1043,8 +1044,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE powell(n,iter,Iout,IOP,ier,Matom,ftol,AN,RMDSI,
-     1     p,pmax,Dist)
+      SUBROUTINE powell(n,iter,Iout,IOP,ier,ftol,AN,RMDSI,p,pmax,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=20,TINY=1.D-20)
@@ -1063,9 +1063,9 @@ c   fret      ... value of f at p
       ier=0
       TOL=ftol
       If(IOP.eq.0) then
-       call MDSnorm(n,Matom,fret,RMDSI,p,Dist)
+       call MDSnorm(n,fret,RMDSI,p,Dist)
       else
-       call MAInorm(n,Matom,IP,AN,p,Dist)
+       call MAInorm(n,IP,AN,p,Dist)
        fret=-AN
       endif
       WRITE(IOUT,1002)
@@ -1091,7 +1091,7 @@ c   fret      ... value of f at p
           xit(j)=xi(j,i)
 12      continue
         fptt=fret
-        call linminx(n,Matom,IOP,ier,TOL,p,xit,fret,pcom,xicom,Dist)
+        call linminx(n,IOP,ier,TOL,p,xit,fret,pcom,xicom,Dist)
           if(ier.eq.1) Return
         if(dabs(fptt-fret).gt.del)then
           del=dabs(fptt-fret)
@@ -1113,15 +1113,15 @@ c   fret      ... value of f at p
         pt(j)=p(j)
 14    continue
       If(IOP.eq.0) then
-       Call MDSnorm(n,Matom,fptt,RMDSI,ptt,Dist)
+       Call MDSnorm(n,fptt,RMDSI,ptt,Dist)
       else
-       Call MAInorm(n,Matom,IP,AN,ptt,Dist)
+       Call MAInorm(n,IP,AN,ptt,Dist)
        fptt=-AN
       endif
       if(fptt.ge.fp)goto 1
       t=2.*(fp-2.*fret+fptt)*(fp-fret-del)**2-del*(fp-fptt)**2
       if(t.ge.0.)goto 1
-      call linminx(n,Matom,IOP,ier,TOL,p,xit,fret,pcom,xicom,Dist)
+      call linminx(n,IOP,ier,TOL,p,xit,fret,pcom,xicom,Dist)
       if(ier.eq.1) Return
       do 15 j=1,n
         xi(j,ibig)=xi(j,n)
@@ -1138,7 +1138,7 @@ c   fret      ... value of f at p
       Return
       END
 
-      SUBROUTINE linminx(n,Matom,IOP,ier,
+      SUBROUTINE linminx(n,IOP,ier,
      1 TOL,p,xi,fret,pcom,xicom,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1151,10 +1151,10 @@ CU    USES brentx,f1dimx,mnbrakx
 11    continue
       ax=0.d0
       xx=1.d0
-      call mnbrakx(n,Matom,IOP,ier,
+      call mnbrakx(n,IOP,ier,
      1 pcom,xicom,ax,xx,bx,fa,fx,fb,Dist)
       if(ier.eq.1) Return
-      fret=brentx(n,Matom,IOP,ier,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
+      fret=brentx(n,IOP,ier,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
       do 12 j=1,n
         xi(j)=xmin*xi(j)
         p(j)=p(j)+xi(j)
@@ -1162,15 +1162,15 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-      SUBROUTINE mnbrakx(ncom,Matom,IOP,ier,pcom,xicom,ax,bx,cx,
+      SUBROUTINE mnbrakx(ncom,IOP,ier,pcom,xicom,ax,bx,cx,
      1 fa,fb,fc,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20,HUGE=1.d10)
       REAL*8 pcom(ncom),xicom(ncom)
       REAL*8 Dist(3,Nmax)
-      fa=f1dimx(ncom,Matom,IOP,ier,ax,pcom,xicom,Dist)
-      fb=f1dimx(ncom,Matom,IOP,ier,bx,pcom,xicom,Dist)
+      fa=f1dimx(ncom,IOP,ier,ax,pcom,xicom,Dist)
+      fb=f1dimx(ncom,IOP,ier,bx,pcom,xicom,Dist)
       if(fb.gt.fa)then
         dum=ax
         ax=bx
@@ -1180,7 +1180,7 @@ CU    USES brentx,f1dimx,mnbrakx
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      fc=f1dimx(ncom,Matom,IOP,ier,cx,pcom,xicom,Dist)
+      fc=f1dimx(ncom,IOP,ier,cx,pcom,xicom,Dist)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
         q=(bx-cx)*(fb-fa)
@@ -1191,7 +1191,7 @@ CU    USES brentx,f1dimx,mnbrakx
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             ax=bx
             fa=fb
@@ -1204,23 +1204,23 @@ CU    USES brentx,f1dimx,mnbrakx
             return
           endif
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
         else if((cx-u)*(u-ulim).gt.0.d0)then
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
           if(fu.lt.fc)then
             bx=cx
             cx=u
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-            fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+            fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.d0)then
           u=ulim
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
         else
           u=cx+GOLD*(cx-bx)
-          fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+          fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
         endif
         ax=bx
         bx=cx
@@ -1233,7 +1233,7 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-      DOUBLE PRECISION FUNCTION brentx(ncom,Matom,IOP,ier,
+      DOUBLE PRECISION FUNCTION brentx(ncom,IOP,ier,
      1 pcom,xicom,ax,bx,cx,tol,xmin,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1247,7 +1247,7 @@ CU    USES brentx,f1dimx,mnbrakx
       w=v
       x=v
       e=0.
-      fx=f1dimx(ncom,Matom,IOP,ier,x,pcom,xicom,Dist)
+      fx=f1dimx(ncom,IOP,ier,x,pcom,xicom,Dist)
       fv=fx
       fw=fx
       do 11 iter=1,ITMAX
@@ -1282,7 +1282,7 @@ CU    USES brentx,f1dimx,mnbrakx
         else
           u=x+sign(tol1,d)
         endif
-        fu=f1dimx(ncom,Matom,IOP,ier,u,pcom,xicom,Dist)
+        fu=f1dimx(ncom,IOP,ier,u,pcom,xicom,Dist)
         if(fu.le.fx) then
           if(u.ge.x) then
             a=x

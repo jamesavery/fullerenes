@@ -1,4 +1,4 @@
-      SUBROUTINE Ring(Me,MCon2,MAtom,IOUT,Ncount5,Ncount6,
+      SUBROUTINE Ring(Me,MCon2,IOUT,Ncount5,Ncount6,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       use config
 C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
@@ -22,7 +22,7 @@ C     IC3 contains vertex adjacencies and IVR3 ring numbers for a vertex
       Do I=1,6
       Rd(I)=0.d0
       enddo
-      Do IS=1,MAtom
+      Do IS=1,number_vertices
       Do 1 I=1,6
       Do 1 J=1,96
     1 IPa(I,J)=0
@@ -221,7 +221,7 @@ C     Deviation from ideal hexagon angle of 120 deg
      1  Write(IOUT,1016) asmall,asmalldif,abig,abigdif
 
 C     Establish ring numbers for specific vertex
-      do I=1,Matom
+      do I=1,number_vertices
       Do J=1,3
        IVR3(I,J)=0
       enddo
@@ -258,7 +258,7 @@ C     Next hexagons
       enddo
       enddo
       Write(IOUT,1017)
-      Do I=1,Matom,5
+      Do I=1,number_vertices,5
       Write(IOUT,1018) I,(IVR3(I,J),J=1,3),
      1 I+1,(IVR3(I+1,J),J=1,3),I+2,(IVR3(I+2,J),J=1,3),
      1 I+3,(IVR3(I+3,J),J=1,3),I+4,(IVR3(I+4,J),J=1,3)
@@ -266,10 +266,11 @@ C     Next hexagons
       
 C     Check Euler characteristic
       Ncount56=Ncount5+Ncount6
-      MEuler=MAtom-Mcon2+Ncount56
+      MEuler=number_vertices-Mcon2+Ncount56
       Mv=(5*Ncount5+6*Ncount6)/3
       Me=(5*Ncount5+6*Ncount6)/2
-      Write(IOUT,1004) MAtom,Mcon2,Ncount56,MEuler,Ncount5,Ncount6,Mv,Me
+      Write(IOUT,1004) number_vertices,Mcon2,Ncount56,MEuler,Ncount5,
+     1  Ncount6,Mv,Me
       If(MEuler.ne.2) Write(IOUT,1005)
       If(Ncount5.ne.12) then
       Write(IOUT,1014)
@@ -331,7 +332,7 @@ C1011 Format(3X,96(I3))
       RETURN
       END
 
-      SUBROUTINE RingC(Matom,Medges,Iout,iprint,
+      SUBROUTINE RingC(Medges,Iout,iprint,
      1 N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
      1 nl565,numbersw,numberFM,numberYF,numberBF,
      1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
@@ -564,7 +565,7 @@ C     Strain Parameter
       IFus6=IFus6+IRhag6(I)
       enddo
       IFus6G=IFus6*2+20
-      If(IFus6G.eq.Matom) then
+      If(IFus6G.eq.number_vertices) then
        Write(Iout,1018) IFus6G
       else
        Write(Iout,1019) IFus6G
@@ -689,7 +690,8 @@ C     (o6-5-6) 3-ring fusions
 
 C Cioslowski's increment scheme for IPR fullerenes
       if(IPR.eq.1) Call Cioslowski(Kring3,nl565,IRing56,IRing6,
-     1 MAtom,N6Ring,NringC,NringD,NringE,NringF,n3ra,n3rc,Mpatt,E1,E2)
+     1 N6Ring,NringC,NringD,NringE,NringF,
+     1 n3ra,n3rc,Mpatt,E1,E2)
 C     (l5-6-6) 3-ring fusions
       KRing3=0
       LRing3=0
@@ -732,9 +734,9 @@ C     Search for Yoshida-Fowler D3h 666555 patterns - C80-like corner patch
 C     (b6-6-6) 3-ring fusions
       Label='bent  '
       Write(Iout,1008) Label,IR1,IR2,IR3,LRing3b
-      if(Lring3b.ne.0.and.iprint.eq.1.and.Matom.lt.1000) 
+      if(Lring3b.ne.0.and.iprint.eq.1.and.number_vertices.lt.1000) 
      1 write(Iout,1011) ((n3r(J,I),J=1,3),i=1,Lring3b)
-      if(Lring3b.ne.0.and.iprint.eq.1.and.Matom.ge.1000) 
+      if(Lring3b.ne.0.and.iprint.eq.1.and.number_vertices.ge.1000) 
      1 write(Iout,1021) ((n3r(J,I),J=1,3),i=1,Lring3b)
       N3Ring=N3Ring+LRing3b
 
@@ -749,7 +751,7 @@ C     (l6-6-6) 3-ring fusions
       N3Ring=N3Ring+ncount
 
 C     Final 3-ring count
- 4000 N3ringexp=11*(Matom/2)-30
+ 4000 N3ringexp=11*(number_vertices/2)-30
       Write(Iout,1010) N3ring,N3ringexp
       Ndif=N3ringexp-N3ring
       if(Ndif.ne.0) then
@@ -790,20 +792,22 @@ C Print Brinkmann-Fowler D2h 55-6-55 patterns
 
 C Print Alcami's heat of formation from structural patterns
        Write(Iout,1024) Medges
-       Call Alcami(Iout,MAtom,Medges,IC3,IVR3)
+       Call Alcami(Iout,Medges,IC3,IVR3)
 
 C Print Cioslowsky analysis and check of correctness
       if(IPR.eq.1) then 
        Write(Iout,1033) N6Ring
        Write(Iout,1034) (Mpatt(I),I=1,30)
-       Call CheckCioslowski(Iout,MAtom,Mpatt)
+       Call CheckCioslowski(Iout,number_vertices,Mpatt)
         Esum=E1+E2
-        EC60=Esum/dfloat(MAtom)-6.1681359415162888d2/6.d1
+        EC60=Esum/dfloat(number_vertices)-6.1681359415162888d2/6.d1
        Write(Iout,1035) E1,E2,Esum
-       if(Matom.lt.100) Write(Iout,1036) MAtom,MAtom,EC60
-       if(Matom.ge.100.and.Matom.lt.1000) 
-     1   Write(Iout,1037) MAtom,MAtom,EC60
-       if(Matom.ge.1000) Write(Iout,1038) MAtom,MAtom,EC60
+       if(number_vertices.lt.100)
+     1   Write(Iout,1036) number_vertices,number_vertices,EC60
+       if(number_vertices.ge.100.and.number_vertices.lt.1000) 
+     1   Write(Iout,1037) number_vertices,number_vertices,EC60
+       if(number_vertices.ge.1000)
+     1   Write(Iout,1038) number_vertices,number_vertices,EC60
        graphenel=30.336d0*.5d0-6.1681359415162888d2/6.d1
        Write(Iout,1039) graphenel
       endif
@@ -909,14 +913,14 @@ C Print Cioslowsky analysis and check of correctness
       Return
       END
 
-      SUBROUTINE EdgeCoord(Matom,Iout,Dist,IC3)
+      SUBROUTINE EdgeCoord(Iout,Dist,IC3)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax)
       DIMENSION IC3(Nmax,3)
 C     Print center of edges
       Write(Iout,1000)
-      Do I=1,Matom
+      Do I=1,number_vertices
       Do J=1,3
        IAtom=IC3(I,J)
        if(IAtom.gt.I) then
@@ -935,7 +939,7 @@ C     Print center of edges
       END
 
 
-      SUBROUTINE Alcami(Iout,MAtom,Medges,IC3,IVR3)
+      SUBROUTINE Alcami(Iout,Medges,IC3,IVR3)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Dimension IC3(Nmax,3),IVR3(Nmax,3),nring(4),npattern(9),eps(9)
@@ -951,7 +955,7 @@ C     Parameter from Table IV in the paper
       enddo
 
 C     Go through all edges (IV1,IV2)
-      Do IV1=1,MAtom
+      Do IV1=1,number_vertices
       Do J=1,3
        IV2=IC3(IV1,J)
        if(IV1.lt.IV2) then
@@ -1045,11 +1049,13 @@ C     Calculate the enthalpy of formation per bond
       enddo
       Ebond=energy/dfloat(Medges)
       Write(Iout,1001) energy,Ebond
-       EC60=energy/dfloat(MAtom)-6.54d2/6.d1
-       if(Matom.lt.100) Write(Iout,1002) MAtom,MAtom,EC60
-       if(Matom.ge.100.and.Matom.lt.1000)
-     1   Write(Iout,1003) MAtom,MAtom,EC60
-       if(Matom.ge.1000) Write(Iout,1004) MAtom,MAtom,EC60
+       EC60=energy/dfloat(number_vertices)-6.54d2/6.d1
+       if(number_vertices.lt.100)
+     1   Write(Iout,1002) number_vertices,number_vertices,EC60
+       if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1   Write(Iout,1003) number_vertices,number_vertices,EC60
+       if(number_vertices.ge.1000)
+     1   Write(Iout,1004) number_vertices,number_vertices,EC60
        graphenel=1.7d0*.5d0-6.1681359415162888d2/6.d1
        Write(Iout,1005) graphenel
 
@@ -1230,10 +1236,10 @@ C Sort and check if any duplicates
       Return
       END
 
-      SUBROUTINE CheckCioslowski(Iout,Matom,p)
+      SUBROUTINE CheckCioslowski(Iout,number_vertices,p)
       IMPLICIT INTEGER (A-Z)
       DIMENSION p(30)
-      nhex=MAtom/2-10
+      nhex=number_vertices/2-10
       sum=0
 C Check if number of patches is correct
       do I=1,30
@@ -1276,7 +1282,7 @@ C  4 N14/66 - 2 N14/56 = 0
       Return
       END
 
-      SUBROUTINE Cioslowski(K656,nl565,IRing56,IRing6,MAtom,N6Ring,
+      SUBROUTINE Cioslowski(K656,nl565,IRing56,IRing6,N6Ring,
      1 NringC,NringD,NringE,NringF,n3ra,n3rc,Mpatt,E1,E2)
       use config
       IMPLICIT INTEGER (A-Z)
@@ -1330,7 +1336,7 @@ C  Get hexagon ring numbers
        if(i6.lt.6) stop 4
 C Now sort hexagon numbers in ring of hexagons
 C according to their adjacencies
-       Call sorthex(Matom,IRing6,nhex,NringE,NringF)
+       Call sorthex(number_vertices,IRing6,nhex,NringE,NringF)
 C Now get the right structure motif. Search through c-6-5-6
        do K=1,6
         I1=K
@@ -1373,7 +1379,7 @@ C---  One pentagon on main hexagon
        enddo
        if(i6.ne.5) stop 7
 C Now sort hexagon numbers in ring of adjacent hexagons
-       Call sorthex1(Matom,IRing6,IRing56,nhex,
+       Call sorthex1(number_vertices,IRing6,IRing56,nhex,
      1  NRingC,NRingD,NringE,NringF,ipent)
 C Now get the right structure motif. Search throgh c-6-5-6
        do K=1,4
@@ -1430,7 +1436,7 @@ C  Sort if main 5-6-5 is linear or bent
        enddo
 C  bent 5-6-5 main pattern 
 C   Get 3 adjacent hexagons
-       Call sorthex3(Matom,IRing6,nhex,NringE,NringF)
+       Call sorthex3(number_vertices,IRing6,nhex,NringE,NringF)
 C   Count 656 rings
        I1=nhex(1)
        I2=nhex(2)
@@ -1462,7 +1468,7 @@ C 13/55
        go to 100
 C  linear 5-6-5 main pattern
 C  Find adjacent hexagons
-   35  Call sorthex4(Matom,IRing6,nhex,NringE,NringF)
+   35  Call sorthex4(number_vertices,IRing6,nhex,NringE,NringF)
 C    Loop through closed 656
        I1=nhex(1)
        I2=nhex(2)
@@ -1491,7 +1497,7 @@ C---  Three pentagons on main hexagon
 
 C Get energy
       E1=0.d0
-      E2=-8.050751d3/(dfloat(Matom)-30.050)
+      E2=-8.050751d3/(dfloat(number_vertices)-30.050)
       Do I=1,30
        E1=E1+dfloat(Mpatt(I))*EMC(I)
       enddo
@@ -1499,9 +1505,9 @@ C Get energy
       Return
       END
 
-      SUBROUTINE sorthex(Matom,IRing6,nhex,NringE,NringF)
+      SUBROUTINE sorthex(number_vertices,IRing6,nhex,NringE,NringF)
       IMPLICIT INTEGER (A-Z)
-      DIMENSION NringE(3*Matom/2),NringF(3*Matom/2)
+      DIMENSION NringE(3*number_vertices/2),NringF(3*number_vertices/2)
       DIMENSION nhex(6)
 C     Sort hexagon numbers according to their adjacencies
       do I=1,6
@@ -1526,13 +1532,13 @@ C     Sort hexagon numbers according to their adjacencies
       Return
       END
 
-      SUBROUTINE sorthex1(Matom,IRing6,Iring56,nhex,
+      SUBROUTINE sorthex1(number_vertices,IRing6,Iring56,nhex,
      1 NRingC,NRingD,NringE,NringF,ipent)
       IMPLICIT INTEGER (A-Z)
 C Sort hexagon numbers in ring of adjacent hexagons
 C after the pentagon
-      DIMENSION NringC(3*Matom/2),NringD(3*Matom/2)
-      DIMENSION NringE(3*Matom/2),NringF(3*Matom/2)
+      DIMENSION NringC(3*number_vertices/2),NringD(3*number_vertices/2)
+      DIMENSION NringE(3*number_vertices/2),NringF(3*number_vertices/2)
       DIMENSION nhex(6),ipent(6)
 C     Get hexagon adjacent to pentagon
       ifound=0
@@ -1573,9 +1579,10 @@ C     Now sort in spiral
       Return
       END
 
-      SUBROUTINE sorthex3(Matom,IRing6,nhex,NringE,NringF)
+      SUBROUTINE sorthex3(number_vertices,IRing6,nhex,NringE,NringF)
       IMPLICIT INTEGER (A-Z)
-      DIMENSION NringE(3*Matom/2),NringF(3*Matom/2),icount(4),nhex(6)
+      DIMENSION NringE(3*number_vertices/2),NringF(3*number_vertices/2),
+     1 icount(4),nhex(6)
 C     Find ring connected to two others
       do I=1,4
        icount(i)=0
@@ -1613,9 +1620,10 @@ C Now swap
       Return
       END
 
-      SUBROUTINE sorthex4(Matom,IRing6,nhex,NringE,NringF)
+      SUBROUTINE sorthex4(number_vertices,IRing6,nhex,NringE,NringF)
       IMPLICIT INTEGER (A-Z)
-      DIMENSION NringE(3*Matom/2),NringF(3*Matom/2),nhex(6)
+      DIMENSION NringE(3*number_vertices/2),NringF(3*number_vertices/2),
+     1  nhex(6)
       ifound=0
       do I=2,4
        do K=1,IRing6
@@ -2744,7 +2752,7 @@ C     (6-6) 2-ring fusions
       Return
       END
  
-      SUBROUTINE DistMatrix(MAtom,IOUT,Iprint,ireturn,Iopt,
+      SUBROUTINE DistMatrix(IOUT,Iprint,ireturn,Iopt,
      1 Dist,DistMat,Rmin,Rmax,Vol,ASphere)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2752,7 +2760,7 @@ C     (6-6) 2-ring fusions
 C     Calculate distance matrix between atoms from cartesian coordinates
       IMat=0
       if(Iopt.eq.0.and.Iprint.eq.1) Write(IOUT,1000) 
-      Do I=2,MAtom
+      Do I=2,number_vertices
       Do J=1,I-1
        Sum=0.d0
       Do K=1,3
@@ -2762,7 +2770,7 @@ C     Calculate distance matrix between atoms from cartesian coordinates
        DistMat(IMat)=dsqrt(Sum)
       enddo
       enddo
-      Do I=2,MAtom
+      Do I=2,number_vertices
       IZ=((I-1)*(I-2))/2
       if(Iopt.eq.0.and.Iprint.eq.1) 
      1   Write(IOUT,1001) (I,J,DistMat(IZ+J),J=1,I-1)
@@ -2773,14 +2781,14 @@ C     Determine minimum and maximum distances
       Rmin=1.d20
       Rmax=1.d0
       RmaxS=1.d0
-      Do I=1,MAtom
+      Do I=1,number_vertices
        Sum=0.d0
       Do K=1,3
        Sum=Sum+Dist(K,I)**2
       enddo
        Sumd=dsqrt(Sum)
        If(Sumd.gt.RmaxS) RmaxS=Sumd
-      Do J=I+1,MAtom
+      Do J=I+1,number_vertices
        DM=FunDistMat(I,J,DistMat)
        If(DM.lt.Rmin) then
         Rmin=DM
@@ -2799,7 +2807,7 @@ C     Determine minimum and maximum distances
       Write(IOUT,1002) Rmin,Imin,Jmin,Rmax,Imax,Jmax,RmaxS,Vol,
      1 ASphere,ASphere/Vol
 C     Volume of ideal capped icosahedron
-      If(Matom.eq.60) then
+      If(number_vertices.eq.60) then
       Redge=Rmin*3.d0
       dsr5=dsqrt(5.d0)
 C     Calculate square cos36 and sin36
@@ -2812,7 +2820,7 @@ C     Calculate square cos36 and sin36
       Write(IOUT,1003) Rico,Redge,VolIco,VolIcocap 
       endif 
 C     Calculate the volume for C50 using R5
-      If(Matom.eq.20) then
+      If(number_vertices.eq.20) then
       dsr5=dsqrt(5.d0)
       dsr3=dsqrt(3.d0)
       fac1=.25d0*(15.d0+7.d0*dsr5)
@@ -2994,7 +3002,7 @@ C     Filling in Tree structure at level Istep
       RETURN
       END
 
-      SUBROUTINE Connect(MCon2,MAtom,Ipent,IOUT,
+      SUBROUTINE Connect(MCon2,Ipent,IOUT,
      1  IC3,IDA,Tol,DistMat,Rmin)
       use config
 C     Get the connectivities between 2 and 3 atoms
@@ -3011,29 +3019,29 @@ C     Get the connectivities between 2 and 3 atoms
       enddo
       enddo
       if(Ipent.eq.0) then
-       Do I=1,MAtom
-       Do J=I+1,MAtom
+       Do I=1,number_vertices
+       Do J=I+1,number_vertices
         DM=FunDistMat(I,J,DistMat)
          If (DM.lt.Rtol) then
           Mcon2=Mcon2+1
-          Ncount=I*MAtom+J
+          Ncount=I*number_vertices+J
           Icon2(Mcon2)=Ncount
          endif
        enddo
        enddo
       else
-       Do I=1,MAtom
-       Do J=I+1,MAtom
+       Do I=1,number_vertices
+       Do J=I+1,number_vertices
         If (IDA(I,J).eq.1) then
          Mcon2=Mcon2+1
-         Ncount=I*MAtom+J
+         Ncount=I*number_vertices+J
          Icon2(Mcon2)=Ncount
         endif
        enddo
        enddo
       endif
       Write(IOUT,1000) Mcon2
-      If(Mcon2.lt.MAtom) then
+      If(Mcon2.lt.number_vertices) then
       Write(IOUT,1004)
       Stop
       endif
@@ -3045,26 +3053,27 @@ C     Get the connectivities between 2 and 3 atoms
       M12=12
       Do J=1,12
        IArray=I+J-1
-        CALL Num2(MAtom,Icon2(IArray),NCI(J),NCJ(J))
+        CALL Num2(Icon2(IArray),NCI(J),NCJ(J))
         If(NCI(J).Eq.0) then
         M12=J-1
         Go to 11
        endif
       enddo
-   11 if(MAtom.lt.100) Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
-      if(MAtom.ge.100.and.MAtom.lt.1000) 
-     1 Write(IOUT,1006) (NCI(J),NCJ(J),J=1,M12)
-      if(MAtom.ge.1000.and.MAtom.lt.10000) 
-     1 Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
-      if(MAtom.ge.10000) 
-     1 Write(IOUT,1008) (NCI(J),NCJ(J),J=1,M12)
+   11 if(number_vertices.lt.100)
+     1  Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
+      if(number_vertices.ge.100.and.number_vertices.lt.1000) 
+     1  Write(IOUT,1006) (NCI(J),NCJ(J),J=1,M12)
+      if(number_vertices.ge.1000.and.number_vertices.lt.10000) 
+     1  Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
+      if(number_vertices.ge.10000) 
+     1  Write(IOUT,1008) (NCI(J),NCJ(J),J=1,M12)
       enddo
       Write(IOUT,1002)
 C     Get all vertices
-      Do I=1,MAtom
+      Do I=1,number_vertices
       IZ=0
       Do J=1,MCon2
-      CALL Num2(MAtom,Icon2(J),IX,IY)
+      CALL Num2(Icon2(J),IX,IY)
       IF(IX.EQ.I) then
       IZ=IZ+1
       IC3(I,IZ)=IY
@@ -3079,7 +3088,7 @@ C     Get all vertices
       Write(IOUT,1003) I,(IC3(I,J),J=1,3)
       enddo
 C     Check if structure is alright at this point
-      nexpedge=MAtom*3/2
+      nexpedge=number_vertices*3/2
       if(Mcon2.ne.nexpedge) then
       Write(IOUT,1005) Mcon2,nexpedge
       stop
