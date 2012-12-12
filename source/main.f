@@ -79,6 +79,13 @@ C Set parameters
           IDA(I,J)=0
         enddo
       enddo
+      Do I=1,Nmax
+       Dist(1,I)=0.d0
+       Dist(2,I)=0.d0
+       Dist(3,I)=0.d0
+       Dist2D(1,I)=0.d0
+       Dist2D(2,I)=0.d0
+      enddo
 
 C Get time and date
       CALL date_and_time(CDAT,CTIM,zone,values)

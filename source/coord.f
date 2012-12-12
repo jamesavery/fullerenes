@@ -237,6 +237,7 @@ C Calculate largest and smallest atom-to-atom diameters
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),diam(Nmax),imirror(Nmax),jmirror(Nmax)
       Data difeps/1.d-6/
+      kmin=0
       Do i=1,number_vertices
 C     Search for the closest carbon atom to dmirror
       distmin=1.d10
@@ -247,8 +248,8 @@ C     Search for the closest carbon atom to dmirror
       z=-Dist(3,i)-Dist(3,k)
       distm=dsqrt(x*x+y*y+z*z)
       if(distm.lt.distmin) then
-      distmin=distm
-      kmin=k
+       distmin=distm
+       kmin=k
       endif
       endif
       enddo
@@ -727,6 +728,8 @@ C Now analyze the adjacency matrix if it is correct
       DIMENSION Dist(3,Nmax),distP(Nmax)
       Write(Iout,1000)
       JERR=0
+      KERR1=0
+      KERR2=0
       Do I=1,10
        IP(I)=0
       enddo
@@ -1054,6 +1057,7 @@ C Now analyze the adjacency matrix if it is correct
       DIMENSION Dist(3,Nmax),distP(Nmax)
       Write(Iout,1000)
       JERR=0
+      IX=0
       Do I=1,66
        IP(I)=0
       enddo
@@ -2100,6 +2104,7 @@ C Analyze eigenenergies
 C   Tutte algorithm for the 3D structure (see pentindex.f):
          write (Iout,1011)
          g = new_fullerene_graph(Nmax,number_vertices,IDA)
+C   James, program fails after this
          call tutte_layout(g,layout2d)
          call spherical_layout(g,Dist)
          write (Iout,1013)
@@ -2461,6 +2466,7 @@ C   on input  Dist    = cartesian array of number_vertices atoms
 C   on output ZMatrix = Z-Matrix
 C        number_vertices: number of atoms
 C
+      k=0
       Write(Iout,1000) 
        do i=1,number_vertices
         zmatrix(1,i)=0.d0
@@ -2483,8 +2489,8 @@ C
      1     (Dist(2,i)-Dist(2,j))**2+
      2     (Dist(3,i)-Dist(3,j))**2
           if(r.lt.sum.and.na(j).ne.j.and.nb(j).ne.j) then
-            sum=r
-            k=j
+           sum=r
+           k=j
           endif
         enddo
 c   atom i is nearest to atom k
