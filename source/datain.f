@@ -1,4 +1,4 @@
-      SUBROUTINE Datain(IN,IOUT,NAtomax,NA,ICart,Iopt,IP,IHam,
+      SUBROUTINE Datain(IN,IOUT,NAtomax,ICart,Iopt,IP,IHam,
      1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
@@ -8,13 +8,14 @@
      1 force,forceP,boost,filename,filenameout,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      integer iopt
+      integer NA,iopt
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF (and a backup)
       integer endzeile
       Character*1 DATEN(nzeile)
       Character filename*50
       Character filenameout*50
-      Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,ihueckel,loop,
+      Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,
+     1 ihueckel,loop,
      1 filename,filenameout,ipsphere,nosort,nospiral,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad
@@ -254,17 +255,17 @@ C Set IC and ichk parameters
       if(ichk.ne.0) istop=1
 
 C  Check on number of atoms (vertices)
-      NA=IABS(NA)
-      if(NA.gt.NAtomax) WRITE(IOUT,102) NA
-      if(NA.lt.20.or.NA.eq.22) then
-      Write(IOUT,103) NA
-      IER=1
-      return
+      number_vertices=IABS(NA)
+      if(number_vertices.gt.NAtomax) WRITE(IOUT,102) number_vertices
+      if(number_vertices.lt.20.or.number_vertices.eq.22) then
+        Write(IOUT,103) number_vertices
+        IER=1
+        return
       endif
-      IF (NA/2*2.ne.NA) then
-      Write(IOUT,104) NA
-      IER=1
-      return
+      IF (number_vertices/2*2.ne.number_vertices) then
+        Write(IOUT,104) number_vertices
+        IER=1
+        return
       endif
 
 C     Setting minimum distance
@@ -299,7 +300,7 @@ C  Tolerance for finding 5- and 6-ring connections
         IPR=-1
       endif
       if(IPR.eq.1) then
-        if(NA.lt.60) IPR=0
+        if(number_vertices.lt.60) IPR=0
       endif
       if(IPR.ge.2) then
         IPR=0

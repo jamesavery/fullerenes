@@ -1,4 +1,4 @@
-      SUBROUTINE Graph2D(M,IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
+      SUBROUTINE Graph2D(IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
      1 Iring,ISchlegel,ifs,ndual,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,
      1 fscale,scalePPG,boost,CR,CR5,CR6,Symbol,filename)
       use config
@@ -30,11 +30,11 @@ C     Parameter set for Program QMGA
 C     Prepare for Program QMGA
       if(ifs.ge.2) then 
        Open(unit=2,file=trim(filename)//"-2D.dat",form='formatted')
-       Write(2,901) M,DPoint,Dedge
+       Write(2,901) number_vertices,DPoint,Dedge
       endif
 
 C     Construct a graph object from the adjacency matrix
-      g = new_fullerene_graph(Nmax,M,IDA)
+      g = new_fullerene_graph(Nmax,number_vertices,IDA)
      
       satom='o'
       s5ring='^'
@@ -168,7 +168,7 @@ C   Construct rotation matrix
       CALL Rotmat(IOUT,Rot,distw)
 
 C   Now rotate all vertices
-      DO I=1,M
+      DO I=1,number_vertices
        distw(1)=Dist(1,I)
        distw(2)=Dist(2,I)
        distw(3)=Dist(3,I)
@@ -207,13 +207,13 @@ C   Original input chosen
       endif
 
 C   Sort distances according to z-values
-      DO I=1,M
+      DO I=1,number_vertices
        IAtom(I)=I
       enddo
-      DO I=1,M
+      DO I=1,number_vertices
        dMaxx=Dist(3,I)
        iMax=I
-      DO K=I+1,M
+      DO K=I+1,number_vertices
        IF (dMaxx.lt.Dist(3,K)) then
         iMax=K
         dMaxx=Dist(3,K)
@@ -316,7 +316,7 @@ C   Get shortest distance
 C   Determine the rotation angle
 C   Coordinates of vector to rotate
 C   Get atom label
-      Do j=1,M
+      Do j=1,number_vertices
       if(IAL.eq.IATOM(j)) IAN=J
       if(IBL.eq.IATOM(j)) IBN=J
       enddo
@@ -346,7 +346,7 @@ C   Build the rotation matrix
       Rotz(3,3)=1.d0
       WRITE(IOUT,1021)
 C   Rotate the vertices
-      DO I=1,M
+      DO I=1,number_vertices
       distw(1)=Dist(1,I)
       distw(2)=Dist(2,I)
       distw(3)=Dist(3,I)
@@ -372,7 +372,7 @@ C   Print the sorted vertices
       WRITE(IOUT,1000) eps
       Natomcirc=0
       Ncircle=1
-      DO I=1,M
+      DO I=1,number_vertices
       Natomcirc=Natomcirc+1
       If(I.gt.1) then
       dif=dabs(Dist(3,I)-Dist(3,I-1))
@@ -423,7 +423,7 @@ C   Calculate distance of vertices from z-axis for projection
       WRITE(IOUT,1002)
 C     Write out on file unit=2 for schlegel.dat
       sfac=dtan(angle*deg2rad)
-      Do I=1,M
+      Do I=1,number_vertices
       X=Dist(1,I)
       Y=Dist(2,I)
       Z=Dist(3,I)
@@ -435,7 +435,7 @@ C     Write out on file unit=2 for schlegel.dat
       If(I.ne.1) Write(IOUT,1003)
       endif
 C   Extra boost for the last ring points
-      IVert=M-Iboost
+      IVert=number_vertices-Iboost
       If(I.gt.IVert) then
       Fac=Fac*boost
       endif
@@ -514,7 +514,7 @@ C   Setting point of projection
       Zproj=app-zmin
       WRITE(IOUT,1030)
 C   Atoms
-      Do I=1,M
+      Do I=1,number_vertices
       X=Dist(1,I)
       Y=Dist(2,I)
       Z=Dist(3,I)
@@ -547,7 +547,7 @@ C   Produce Schlegel picture
 C   Atoms
  999   span=0.d0
        iflaga=0
-      do i=1,M
+      do i=1,number_vertices
        xabs=dabs(layout2d(1,I))
        yabs=dabs(layout2d(2,I))
        if(yabs.gt.xabs) xabs=yabs
@@ -556,7 +556,7 @@ C   Atoms
        msrs2=msrs/2
        grid=dfloat(msrs2-1)
        grids=grid/span
-      do i=1,M
+      do i=1,number_vertices
       ix=int(layout2d(1,I)*grids)
       ixpos=ix+msrs2
       iy=int(layout2d(2,I)*grids)
@@ -672,8 +672,8 @@ C  End of search
       if(ISchlegel.ge.7) then
        WRITE(IOUT,1041) 
        maxl=0
-      Do I=1,M
-      Do J=I+1,M
+      Do I=1,number_vertices
+      Do J=I+1,number_vertices
        if(MDist(I,J).gt.maxl) maxl=MDist(I,J)
       enddo
       enddo
@@ -692,19 +692,19 @@ C     Get Barycenter of outer ring and use as origin
       denom=dfloat(lring)
       xc=xc/denom
       yc=yc/denom
-      Do I=1,M
+      Do I=1,number_vertices
        layout2d(1,I)=layout2d(1,I)-xc
        layout2d(2,I)=layout2d(2,I)-yc
       enddo
       if(ISchlegel.le.4) then
 C  Radially scale Tutte graph
        if(ISchlegel.eq.4) then
-c        CALL ScaleTutteB(g,M,Iout,IS,lring,layout2d)
-         CALL ScaleTutte(M,Iout,IS,lring,fscale,layout2d)
+c        CALL ScaleTutteB(g,number_vertices,Iout,IS,lring,layout2d)
+         CALL ScaleTutte(number_vertices,Iout,IS,lring,fscale,layout2d)
        endif
 C     Write to unit 2
       write (Iout,1037)
-       Do I=1,M
+       Do I=1,number_vertices
        WRITE(IOUT,1028) I,layout2d(1,I),layout2d(2,I),
      1  IC3(I,1),IC3(I,2),IC3(I,3)
       if(ifs.eq.2.or.ifs.eq.3) 
@@ -719,10 +719,10 @@ C  IOP=2: Spring embedding + Coulomb repulsion from barycenter
 C  IOP=3: Pisanski-Plestenjak-Graovac embedding using the distance matrix MDist
 C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
        IOP=ISchlegel-4
-       CALL OptGraph(IOP,M,Iout,IDA,IS,IC3,MDist,maxl,
+       CALL OptGraph(IOP,Iout,IDA,IS,IC3,MDist,maxl,
      1  scalePPG,layout2d)
        write (Iout,1037)
-       Do I=1,M
+       Do I=1,number_vertices
        WRITE(IOUT,1028) I,layout2d(1,I),layout2d(2,I),
      1  IC3(I,1),IC3(I,2),IC3(I,3)
       if(ifs.ge.2) Write(2,902) I,layout2d(1,I),layout2d(2,I),
