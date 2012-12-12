@@ -2103,13 +2103,8 @@ C Analyze eigenenergies
 
 C   Tutte algorithm for the 3D structure (see pentindex.f):
          write (Iout,1011)
-<<<<<<< HEAD
-         g = new_fullerene_graph(Nmax,MAtom,IDA)
 C   James, program fails after carrying out the next statement
-=======
          g = new_fullerene_graph(Nmax,number_vertices,IDA)
-C   James, program fails after this
->>>>>>> f9250dd138edc524f860ccc97f01c3a947b321ae
          call tutte_layout(g,layout2d)
          call spherical_layout(g,Dist)
          write (Iout,1013)
