@@ -1951,7 +1951,7 @@ C Leapfrog fullerene
        if(leap.eq.2) Write(Iout,1021) leap,MAtom,MLeap
        if(leap.eq.3) Write(Iout,1022) leap,MAtom,MLeap
       endif 
-
+     
       g = new_fullerene_graph(Nmax,MAtom,IDA)
       frog = leapfrog_fullerene(g,leap)
 
@@ -2101,7 +2101,7 @@ C Analyze eigenenergies
 C   Tutte algorithm for the 3D structure (see pentindex.f):
          write (Iout,1011)
          g = new_fullerene_graph(Nmax,MAtom,IDA)
-C   James, program fails after this
+C   James, program fails after carrying out the next statement
          call tutte_layout(g,layout2d)
          call spherical_layout(g,Dist)
          write (Iout,1013)
@@ -2434,9 +2434,6 @@ C     Reconstruct IDA
        enddo
        enddo
       endif
-
-
-
 
  1000 Format(1X,'Number of permutations for cartesian coordinates ',
      1  'performed: ',I5)
