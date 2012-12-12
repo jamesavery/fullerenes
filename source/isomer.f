@@ -1,5 +1,4 @@
-      SUBROUTINE Isomers(N,IPR,isearch,IN,IOUT,iham,ichk,IDA,
-     1 A,filename)
+      SUBROUTINE Isomers(IPR,isearch,IN,IOUT,iham,ichk,IDA,A,filename)
 C Information on number of isomers with or without fulfilling the
 C the IPR rule. The routine also calls SPIRAL using the subroutines
 C written by P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes"
@@ -89,10 +88,10 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
       IPRERR=0
 C     Number of Isomers
       ISOMAX=256
-      If(N.le.256) then
+      If(number_vertices.le.256) then
 C     Both values fit 32bit signed integer
-       M1=N/2-9
-       M2=N/2-29
+       M1=number_vertices/2-9
+       M2=number_vertices/2-29
         if(M2.gt.0) then
          isomIPR=IsonumIPR(M2)
         else
@@ -104,29 +103,29 @@ C     Both values fit 32bit signed integer
       endif
 
 C     IPR value only fits 32bit signed integer
-        If(N.le.304.and.N.gt.256) then
+        If(number_vertices.le.304.and.number_vertices.gt.256) then
            fac1=10.d0**3.502347
-         M1=N/2-128
-         M2=N/2-29
+         M1=number_vertices/2-128
+         M2=number_vertices/2-29
          Write(Iout,1001) isoc(M1),IsonumIPR(M2)
         endif
 
 C     Both values do not fit 32bit signed integer
 C      Output in characters
-          If(N.le.400.and.N.gt.304) then
-           M1=N/2-128
-           M2=N/2-152
+          If(number_vertices.le.400.and.number_vertices.gt.304) then
+           M1=number_vertices/2-128
+           M2=number_vertices/2-152
          Write(Iout,1002) isoc(M1),IsocIPR(M2)
           endif
 
 C     Both values not known, estimate by polynomial
 C      fitted to asymptodic 
-          If(N.gt.256) then
+          If(number_vertices.gt.256) then
            fac1=10.d0**3.502347
            fac2=10.d0**1.503692
-           AisoNIPR=fac1*(dfloat(N)/6.d1)**9.250947d0
-           AisoIPR=fac2*(dfloat(N)/6.d1)**11.08800d0
-           If(N.gt.400) Write(Iout,1003) AisoNIPR,AisoIPR
+           AisoNIPR=fac1*(dfloat(number_vertices)/6.d1)**9.250947d0
+           AisoIPR=fac2*(dfloat(number_vertices)/6.d1)**11.08800d0
+           If(number_vertices.gt.400) Write(Iout,1003) AisoNIPR,AisoIPR
           endif
 
 C     Limit number of cycles
@@ -152,8 +151,9 @@ C     Limit number of cycles
        endif
       endif
 
-      if(IPR.eq.1.and.N.lt.60) IPRERR=1
-      if(IPR.eq.1.and.(N.gt.60.and.N.lt.70)) IPRERR=1
+      if(IPR.eq.1.and.number_vertices.lt.60) IPRERR=1
+      if(IPR.eq.1.and.(number_vertices.gt.60.and.number_vertices.lt.70))
+     1   IPRERR=1
       if(IPRERR.eq.1) then
        Write(Iout,1007)
        return
@@ -162,53 +162,53 @@ C     Limit number of cycles
 C SPIRAL uses the subroutines written by Fowler and Manopoulus
       If(ichk.gt.0) then
        Write(Iout,1006)
-       CALL SpiralRestart(N,IPR,Iout,Isonum,
-     1 IsonumIPR,iham,IDA,A,chkname)
+       CALL SpiralRestart(IPR,Iout,Isonum,IsonumIPR,iham,IDA,A,chkname)
        return
       endif
 
 C Check if database can be taken instead
-      If((IPR.eq.0.and.N.le.LimitAll).or.
-     1 (IPR.eq.1.and.N.le.LimitIPR)) then
+      If((IPR.eq.0.and.number_vertices.le.LimitAll).or.
+     1 (IPR.eq.1.and.number_vertices.le.LimitIPR)) then
       dbdir='database/All/'
       if(IPR.eq.1) dbdir='database/IPR/'
       fend='.database'
       fstart='c'
-      if(N.lt.100) then
-      fnum1='0'
-       write(fnum2,'(I2)') N
-       fnum=fnum1//fnum2
+      if(number_vertices.lt.100) then
+        fnum1='0'
+         write(fnum2,'(I2)') number_vertices
+         fnum=fnum1//fnum2
       else
-       write(fnum,'(I3)') N
+        write(fnum,'(I3)') number_vertices
       endif
       fnum3='all'
       if(IPR.eq.1) fnum3='IPR'
       databasefile=dbdir//fstart//fnum//fnum3//fend
       if(IPR.eq.0) then
-       Write(Iout,1008) databasefile
+        Write(Iout,1008) databasefile
       else
-       Write(Iout,1009) databasefile
+        Write(Iout,1009) databasefile
       endif
       inquire(file=databasefile,exist=lexist)
       if(lexist.neqv..True.) then
-       Write(Iout,1010) databasefile
-       Go to 99
+        Write(Iout,1010) databasefile
+        Go to 99
       else
-       Write(Iout,1011) databasefile
-       call Printdatabase(N,Iout,databasefile)
+        Write(Iout,1011) databasefile
+       call Printdatabase(Iout,databasefile)
       endif
       return
       endif
 
+
 C Produce list from ring spiral algorithm
   99  If(IPR.ge.0.or.isearch.ne.0) then
-       if(isearch.eq.0) then
-        Write(Iout,1005)
-        CALL Spiral(N,IPR,Iout,Isonum,IsonumIPR,iham,IDA,A)
-       else
-        Write(Iout,1015)
-        Call SpiralFind(N,IPR,isearch,In,Iout,IDA,A)
-       endif
+        if(isearch.eq.0) then
+          Write(Iout,1005)
+          CALL Spiral(IPR,Iout,Isonum,IsonumIPR,iham,IDA,A)
+        else
+          Write(Iout,1015)
+          Call SpiralFind(IPR,isearch,In,Iout,IDA,A)
+        endif
       endif
 
  1000 Format(1X,'Number of possible fullerene isomers: ',I10,
@@ -232,15 +232,16 @@ C Produce list from ring spiral algorithm
  1010 Format(1X,'Filename ',A50,' in database not found: ',
      1 'Do it the hard way')
  1011 Format(1X,'Print from file: ',A50,' in database')
- 1012 Format(/1X,'Data for isomer numbers from House of Graphs website:',
-     1' http://hog.grinvin.org/')
+ 1012 Format(/1X,'Data for isomer numbers from House of Graphs website:'
+     1,' http://hog.grinvin.org/')
  1013 Format(1X,'Search for nearest icosahedral ring spiral indices',
      1' instead with variation V= ',I2)
  1015 Format(1X,'Enter Spiral code for search of possible RSPIs')
       Return
       END
  
-      SUBROUTINE Printdatabase(N,Iout,databasefile)
+      SUBROUTINE Printdatabase(Iout,databasefile)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Character*50 databasefile
       Character*1 Text(200),Textind
@@ -248,26 +249,26 @@ C Produce list from ring spiral algorithm
        Textind=' '
        Nlimit=1000000000
        Read(4,*) IN,IP,IH
-       if(IN.ne.N) then
-        Write(Iout,1002) IN,N
+       if(IN.ne.number_vertices) then
+        Write(Iout,1002) IN,number_vertices
         return
        endif
        Write(Iout,1000) IN,IP,IH
       if(IH.eq.0) then
       if(IP.EQ.0) then
-         IF(N.lt.100) WRITE(Iout,601) N
-         IF(N.ge.100) WRITE(Iout,602) N
+         IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices
+         IF(number_vertices.ge.100) WRITE(Iout,602) number_vertices
       else
-         IF(N.lt.100) WRITE(Iout,603) N
-         IF(N.ge.100) WRITE(Iout,604) N
+         IF(number_vertices.lt.100) WRITE(Iout,603) number_vertices
+         IF(number_vertices.ge.100) WRITE(Iout,604) number_vertices
       endif
       else
       if(IP.EQ.0) then
-         IF(N.lt.100) WRITE(Iout,701) N
-         IF(N.ge.100) WRITE(Iout,702) N
+         IF(number_vertices.lt.100) WRITE(Iout,701) number_vertices
+         IF(number_vertices.ge.100) WRITE(Iout,702) number_vertices
       else
-         IF(N.lt.100) WRITE(Iout,703) N
-         IF(N.ge.100) WRITE(Iout,704) N
+         IF(number_vertices.lt.100) WRITE(Iout,703) number_vertices
+         IF(number_vertices.ge.100) WRITE(Iout,704) number_vertices
       endif
       endif
 
@@ -291,7 +292,7 @@ C Produce list from ring spiral algorithm
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-'))
@@ -299,7 +300,7 @@ C Produce list from ring spiral algorithm
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-'))
@@ -307,7 +308,7 @@ C Produce list from ring spiral algorithm
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-'))
@@ -315,7 +316,7 @@ C Produce list from ring spiral algorithm
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-'))
@@ -324,7 +325,7 @@ C Produce list from ring spiral algorithm
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
@@ -333,7 +334,7 @@ C Produce list from ring spiral algorithm
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'N  PG   Ring spiral pentagon positions',
+     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
@@ -342,7 +343,7 @@ C Produce list from ring spiral algorithm
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
@@ -351,7 +352,7 @@ C Produce list from ring spiral algorithm
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'N  PG   Ring spiral pentagon positions',
+     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))

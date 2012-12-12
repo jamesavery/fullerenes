@@ -1,4 +1,4 @@
-      SUBROUTINE Hueckel(MAtom,IOUT,IC3,ihueckel,IDA,A,evec,df)
+      SUBROUTINE Hueckel(IOUT,IC3,ihueckel,IDA,A,evec,df)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C Perform Hueckel matrix diagonalization to obtain eigenvalues
@@ -6,14 +6,14 @@ C This gives a good hint if the fullerene is closed-shell
       DIMENSION IC3(Nmax,3),A(Nmax,Nmax),evec(Nmax),df(Nmax)
       DIMENSION IDA(Nmax,Nmax)
 C Produce adjacency matrix
-      WRITE(IOUT,1000) Matom,Matom 
-      Do I=1,MAtom
-      Do K=1,MAtom
+      WRITE(IOUT,1000) number_vertices,number_vertices 
+      Do I=1,number_vertices
+      Do K=1,number_vertices
         A(I,K)=0.d0
         IDA(I,K)=0
       enddo
       enddo
-      Do I=1,MAtom
+      Do I=1,number_vertices
       Do J=1,3
         IP=IC3(I,J)
         A(I,IP)=1.d0
@@ -28,14 +28,14 @@ C Produce adjacency matrix
        return
       endif
 C Diagonalize without producing eigenvectors
-      call tred2l(A,Matom,Nmax,evec,df)
-      call tqlil(evec,df,Matom,Nmax)
+      call tred2l(A,number_vertices,Nmax,evec,df)
+      call tqlil(evec,df,number_vertices,Nmax)
 
 C Sort eigenvalues
-      Do I=1,MAtom
+      Do I=1,number_vertices
        e0=evec(I)
        jmax=I
-        Do J=I+1,MAtom
+        Do J=I+1,number_vertices
          e1=evec(J)
           if(e1.gt.e0) then 
            jmax=j
@@ -50,14 +50,15 @@ C Sort eigenvalues
       enddo
 
 C Analyze eigenenergies
-      Call HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
+      Call HueckelAnalyze(Iout,iocc,df,evec)
       
  1000 FORMAT(/1X,'Construct the (',I5,','I5,') Hueckel matrix')
  1001 FORMAT(/1X,'Skip diagonalization of Hueckel matrix')
       return
       END
 
-      Subroutine HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
+      Subroutine HueckelAnalyze(Iout,iocc,df,evec)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION evec(Nmax),df(Nmax),IDG(Nmax)
       Character*10 Symbol
@@ -71,7 +72,7 @@ C Now sort degeneracies
       ieigv=1
       ideg=1
       IDG(1)=ideg
-      Do I=2,MAtom
+      Do I=2,number_vertices
        diff=dabs(evec(I-1)-evec(I))
        if(diff.lt.Tol) then
         ideg=ideg+1
@@ -99,7 +100,7 @@ C     Now Print
        NE1=NE
        ntot=ntot+NE
        Symbol='(occupied)'
-       if(ntot.gt.Matom) then 
+       if(ntot.gt.number_vertices) then 
          if(nflag.eq.0) then
           nflag=1
           bandgap=df(i-1)-df(i)
@@ -108,8 +109,9 @@ C     Now Print
         NE=0
         Symbol='(empty)   '
        endif
-       if(ntot.gt.Matom.and.(ntot-NE1).lt.Matom) then 
-        NE=Matom-ntot+NE1
+       if(ntot.gt.number_vertices.and.
+     1       (ntot-NE1).lt.number_vertices) then
+        NE=number_vertices-ntot+NE1
         Symbol='(fractocc)'
         nopen=1
        endif
@@ -124,7 +126,7 @@ C     Now Print
 
 C     Other useful properties from Hueckel matrix
 C     Babic's resonance energy
-      TRE=1.024296d0*Etot/dfloat(MAtom)-1.562211d0
+      TRE=1.024296d0*Etot/dfloat(number_vertices)-1.562211d0
       DTRE=TRE-2.82066353359331501d-2
       DTREkcal=DTRE*beta*6.27509541D+02
       Graphene=0.0468d0

@@ -175,7 +175,7 @@ C Asymmetric
       return
       END
 
-      SUBROUTINE CompareStruct(M,Iout,IDA,Dist,DistS)
+      SUBROUTINE CompareStruct(Iout,IDA,Dist,DistS)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),DistS(3,Nmax)
@@ -189,8 +189,8 @@ C     by comparing bond distances
       difmax=-1.d10
       RSmax=-1.d10
       RDmax=-1.d10
-      Do I=1,M
-      Do J=I+1,M
+      Do I=1,number_vertices
+      Do J=I+1,number_vertices
         X=Dist(1,I)-Dist(1,J)
         Y=Dist(2,I)-Dist(2,J)
         Z=Dist(3,I)-Dist(3,J)
@@ -2094,7 +2094,7 @@ C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       endif
       enddo
 C Analyze eigenenergies
-      Call HueckelAnalyze(number_vertices,NMax,Iout,iocc,df,evec)
+      Call HueckelAnalyze(Iout,iocc,df,evec)
       endif
 
 C   Tutte algorithm for the 3D structure (see pentindex.f):
@@ -2306,7 +2306,7 @@ C     Check distances
       Write(IOUT,1029) iratio
       endif
 C     Calculate P-type dipole moment
-       Call Dipole(number_vertices,I1,I2,I3,dipol,Dist,A)
+       Call Dipole(I1,I2,I3,dipol,Dist,A)
        Write(IOUT,1030)
        Do I=1,3
         Write(IOUT,1031) I,(dipol(I,J),J=1,3)
