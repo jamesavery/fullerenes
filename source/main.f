@@ -82,10 +82,10 @@ C Set parameters
 
 C Get time and date
       CALL date_and_time(CDAT,CTIM,zone,values)
-       TIMEX=0.d0
+      TIMEX=0.d0
       CALL Timer(TIMEX)
-       WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
-     1    Values(6),Values(7),Nmax
+      WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
+     1  Values(6),Values(7),Nmax
 
 C------------------DATAIN------------------------------------------
 C  INPUT and setting parameters for running the subroutines
@@ -93,7 +93,7 @@ C  INPUT and setting parameters for running the subroutines
       leapspiral=0
       SWspiral=0
       Write(Iout,1008) routine
-        CALL Datain(IN,Iout,Nmax,MAtom,Icart,Iopt,iprintf,IHam,
+        CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
      1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
@@ -102,15 +102,10 @@ C  INPUT and setting parameters for running the subroutines
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 
-c TEMPORARY LINE
-      number_vertices = matom
-      write(*,*)'number_vertices: ',number_vertices
-
-
 C  Stop if isomer closest to icosahedral is searched for
       if(isearch.ne.0) then
-       istop=1
-       go to 98
+        istop=1
+        go to 98
       endif
 C  Stop if error in input
       If(IER.ne.0) go to 99
@@ -141,8 +136,8 @@ C Input Cartesian coordinates for fullerenes
           endif
          Open(unit=7,file=cc1name,form='formatted')
          WRITE(Iout,1021) cc1name 
-         Read(7,*) MAtom
-         Do J=1,MAtom
+         Read(7,*) number_vertices
+         Do J=1,number_vertices
            Read(7,*,end=23) element,JJ,(Dist(I,J),I=1,3)
            Iatom(j)=6
          enddo
@@ -152,14 +147,14 @@ C Input Cartesian coordinates for fullerenes
          xyzname=trim(filename)//".xyz"
          Open(unit=7,file=xyzname,form='formatted')
          WRITE(Iout,1015) xyzname 
-         Read(7,*) MAtom
+         Read(7,*) number_vertices
          Read(7,1018) (TEXTINPUT(I),I=1,nzeile)
          endzeile=0
          do j=1,nzeile
            if(TEXTINPUT(j).ne.' ') endzeile=j
          enddo 
-         WRITE(Iout,1017) MAtom,(TEXTINPUT(I),I=1,endzeile)
-         Do J=1,MAtom
+         WRITE(Iout,1017) number_vertices,(TEXTINPUT(I),I=1,endzeile)
+         Do J=1,number_vertices
            Read(7,*,end=22) element,(Dist(I,J),I=1,3)
            Iatom(j)=6
          enddo
@@ -167,7 +162,7 @@ C Input Cartesian coordinates for fullerenes
          xyzname=trim(filename)//'-3D.new.xyz'
         endif
       else
-        Do J=1,MAtom
+        Do J=1,number_vertices
           Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
         enddo
       endif
@@ -182,15 +177,15 @@ C the 3D fullerene
    30 Ipent=1
       routine='COORDBUILD     '
       Write(Iout,1008) routine
-      CALL CoordBuild(MAtom,IN,Iout,IDA,IDual,
+      CALL CoordBuild(IN,Iout,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
      1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
      1 GROUP,filename)
-      Do I=1,Matom
+      Do I=1,number_vertices
         IAtom(I)=6
       enddo
 
-   40 WRITE(Iout,1001) MAtom,TolX*100.d0
+   40 WRITE(Iout,1001) number_vertices,TolX*100.d0
 
 C------------------ISOMERS-----------------------------------------
 C Some general infos on isomers and spiral routine
@@ -199,8 +194,7 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS        '
       Write(Iout,1008) routine
-      CALL Isomers(MAtom,IPR,isearch,In,Iout,iprintham,ichk,IDA,
-     1  A,filename)
+      CALL Isomers(IPR,isearch,In,Iout,iprintham,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
 
 C------------------MOVECM------------------------------------------
@@ -251,7 +245,7 @@ C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
         routine='HUECKEL        '
         Write(Iout,1008) routine
-        CALL Hueckel(MAtom,Iout,IC3,ihueckel,IDA,A,evec,df)
+        CALL Hueckel(Iout,IC3,ihueckel,IDA,A,evec,df)
       endif
 
 C------------------GOLDBERG-COXETER-------------------------------
@@ -266,7 +260,7 @@ C Produce the nth leapfrog of the fullerene
         leapGC=0
         ipent=1
         leapspiral=1
-        if(MAtom.gt.100) IHam=0
+        if(number_vertices.gt.100) IHam=0
         if(LeapErr.eq.0) go to 999 ! moveCM
       endif
 
@@ -286,14 +280,14 @@ C adjacent vertices
       if(IHam.ne.0 .and. 
      1    ke.eq.0 .and. isw.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
         if(iupac.ne.0) then
-          CALL Hamilton(MAtom,Iout,iprintf,maxiter,IC3)
+          CALL Hamilton(Iout,iprintf,maxiter,IC3)
         else
-          CALL HamiltonCyc(MAtom,maxiter,Iout,nbatch,IDA,Nhamilton)
+          CALL HamiltonCyc(maxiter,Iout,nbatch,IDA,Nhamilton)
           WRITE(Iout,1010) Nhamilton
           if(nbatch.ne.0) WRITE(Iout,1014)
         endif
       endif
-      CALL Paths(MAtom,Iout,iprintf,IDA,A,evec,df)
+      CALL Paths(Iout,iprintf,IDA,A,evec,df)
 
 C------------------RING-------------------------------------------
 C Establish all closed ring systems
@@ -383,7 +377,7 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
      1   nospiralsearch.eq.0) then
         routine='SPIRALSEARCH   '
         Write(Iout,1008) routine
-        CALL SpiralSearch(Nspirals,MAtom,Iout,Iring5,
+        CALL SpiralSearch(Nspirals,Iout,Iring5,
      1   Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
      1   GROUP)
       endif
@@ -398,14 +392,14 @@ C Check if vertex number allows for icosahedral fullerenes
 C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
 C Produce perfect matchings (Kekule structures) and analyze
-c      CALL PerfectMatching(MAtom,Iout,IDA)
+c      CALL PerfectMatching(Iout,IDA)
 
 C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
       If(Iopt.ne.0) then
 c       Store distances
         Do I=1,3
-          Do J=1,MAtom 
+          Do J=1,number_vertices 
             DistStore(I,J)=Dist(I,J)
           enddo
         enddo
@@ -417,22 +411,22 @@ c       Store distances
           if(Iopt.eq.2) then ! Wu + Coulomb
             ftol=ftolP*1.d3
             Write(Iout,1003)
-            CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
+            CALL OptFF(Iout,ihessian,iprinthessian,iopt,IDA,
      1        Dist,dist2D,ftol,force)
             do i=1,9
               force(i)=forcep(i)
             enddo
             iopt=1
           endif
-          CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA, ! vanilla Wu
+          CALL OptFF(Iout,ihessian,iprinthessian,iopt,IDA, ! vanilla Wu
      1      Dist,dist2D,ftolP,force)
           Iprint=0
         else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
-          CALL OptFF(MAtom,Iout,ihessian,iprinthessian,iopt,IDA,
+          CALL OptFF(Iout,ihessian,iprinthessian,iopt,IDA,
      1      Dist,dist2D,ftolP,force)
         endif
 c       Compare structures
-        CALL CompareStruct(MAtom,Iout,IDA,Dist,DistStore)
+        CALL CompareStruct(Iout,IDA,Dist,DistStore)
         routine='MOVECM_2       '
         Write(Iout,1008) routine
         CALL MoveCM(Iout,Iprint,IAtom,mirror,isort,
@@ -474,15 +468,18 @@ C xyz format
         do j=1,nzeile
           if(TEXTINPUT(j).ne.' ') endzeile=j
         enddo
-        if(MAtom.lt.100) WRITE(3,1011) MAtom,MAtom,
+        if(number_vertices.lt.100) WRITE(3,1011)
+     1    number_vertices,number_vertices, (TEXTINPUT(I),I=1,endzeile)
+        if(number_vertices.ge.100.and.number_vertices.lt.1000) 
+     1    WRITE(3,1012) number_vertices,number_vertices,
      1    (TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.100.and.MAtom.lt.1000) 
-     1    WRITE(3,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.1000.and.MAtom.lt.10000) 
-     1    WRITE(3,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.10000) 
-     1    WRITE(3,1020) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        Do J=1,MAtom
+        if(number_vertices.ge.1000.and.number_vertices.lt.10000) 
+     1    WRITE(3,1013) number_vertices,number_vertices,
+     1    (TEXTINPUT(I),I=1,endzeile)
+        if(number_vertices.ge.10000) 
+     1    WRITE(3,1020) number_vertices,number_vertices,
+     1    (TEXTINPUT(I),I=1,endzeile)
+        Do J=1,number_vertices
           IM=IAtom(J)      
           Write(3,1007) El(IM),(Dist(I,J),I=1,3)
         enddo
@@ -504,11 +501,13 @@ C cc1 format
         routine='PRINTCOORD     '
         Write(Iout,1008) routine
         WRITE(Iout,1002) cc1name
-        if(MAtom.lt.100) WRITE(3,1025) MAtom
-        if(MAtom.ge.100.and.MAtom.lt.1000) WRITE(3,1026) MAtom
-        if(MAtom.ge.1000.and.MAtom.lt.10000) WRITE(3,1027) MAtom
-        if(MAtom.ge.10000) WRITE(3,1028) MAtom
-        Do J=1,MAtom
+        if(number_vertices.lt.100) WRITE(3,1025) number_vertices
+        if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1    WRITE(3,1026) number_vertices
+        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1    WRITE(3,1027) number_vertices
+        if(number_vertices.ge.10000) WRITE(3,1028) number_vertices
+        Do J=1,number_vertices
           IM=IAtom(J)
           Write(3,1005) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
         enddo
@@ -567,7 +566,7 @@ C Calculate Schlegel diagram
         else
           ParamS=dabs(ParamS)
         endif
-        CALL Graph2D(MAtom,Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
+        CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
      1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,mdist,Dist,ParamS,Rmin,
      1   TolX,scales,scalePPG,boost,CR,CRing5,CRing6,Symbol,filename)
       endif

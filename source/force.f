@@ -42,8 +42,6 @@ c     edges with 0, 1, 2 pentagons
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 
-c      write(*,*)'entering wu'
-
       IERR=0
       rp=force(1)
       rh=force(2)
@@ -119,11 +117,10 @@ C     Coulomb repulsion from origin
         enddo
       endif
  
-
 C     total energy  
       fc=frp*ehookrp+frh*ehookrh+fap*ehookap+fah*ehookah+fco*ecoulomb
       fc=0.5d0 * fc
-c      write(*,*)'leaving wu'
+
       Return
       END SUBROUTINE
 
@@ -327,9 +324,7 @@ c      write(*,*)fc,"energy"
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
-c      implicit real(8) (A-H,O-Z)
       integer iopt
-c      write(*,*)"entering dfunc3d"
       
       select case(iopt)
         case(1, 2)
@@ -344,7 +339,6 @@ c      write(*,*)"entering dfunc3d"
         case default
       end select
 
-c      write(*,*)"leaving dfunc3d"
       return
       END SUBROUTINE
 
@@ -365,8 +359,6 @@ c     edges with 0, 1, 2 pentagons
       integer a_p(3,60), a_h(3,3*number_vertices-60)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
-
-c      write(*,*)'entering dwu'
 
       rp=force(1)
       rh=force(2)
@@ -499,7 +491,6 @@ C     Coulomb repulsion from origin
         enddo
       endif
 
-c      write(*,*)'leaving dwu'
       return
       END
 
