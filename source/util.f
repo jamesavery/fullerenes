@@ -1,8 +1,8 @@
-c      SUBROUTINE PerfectMatching(MAtom,Iout,IDA)
+c      SUBROUTINE PerfectMatching(Iout,IDA)
 c      use config
 c      IMPLICIT REAL*8 (A-H,O-Z)
 c      DIMENSION IDA(Nmax,Nmax)
-c       Write(Iout,1000) MAtom
+c       Write(Iout,1000) number_vertices
 c       Write(Iout,1001) 
 c       Write(Iout,1002) 
 c 1000 Format(1X,'Upper limit for number of perfect matchings',
@@ -13,14 +13,14 @@ c 1002 Format(1X,'Not implemented yet')
 c      RETURN
 c      END
 
-      SUBROUTINE Sortr(M,Mnew,imirror,jmirror,diam)
+      SUBROUTINE Sortr(Mnew,imirror,jmirror,diam)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION imirror(Nmax),jmirror(Nmax),diam(Nmax)
       DIMENSION imirrorw(Nmax),jmirrorw(Nmax),diamw(Nmax)
       ICOUNT=0
-      DO I=1,M
-      DO K=I+1,M
+      DO I=1,number_vertices
+      DO K=I+1,number_vertices
 C     Delete duplicates
        IF(I.eq.imirror(k).and.K.eq.imirror(i)) then
         ICOUNT=ICOUNT+1
@@ -57,11 +57,11 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
-      SUBROUTINE TopIndicators(Matom,Iout,IDA,MDist)
+      SUBROUTINE TopIndicators(Iout,IDA,MDist)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer MDist(Nmax,Nmax),Edges(2,3*matom/2)
+      Integer MDist(Nmax,Nmax),Edges(2,3*number_vertices/2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
       type(c_ptr) :: graph, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
@@ -70,26 +70,26 @@ C     Schultz index and Balaban index
 C     For details see D. Vukicevic,F. Cataldo, O. Ori, A. Graovac,
 C     Chem. Phys. Lett. 501, 442–445 (2011).
 
-      Write(Iout,1000) MAtom
+      Write(Iout,1000) number_vertices
 
 C     Get topological distance matrix
-      graph = new_fullerene_graph(Nmax,Matom,IDA)
-      call all_pairs_shortest_path(graph,Matom,Nmax,MDist)
+      graph = new_fullerene_graph(Nmax,number_vertices,IDA)
+      call all_pairs_shortest_path(graph,number_vertices,Nmax,MDist)
       call edge_list(graph,edges,NE)
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)     
 
 C     Wiener and hyper Wiener index, topological radius and diameter
-      Xatom=dfloat(MAtom)
+      Xatom=dfloat(number_vertices)
       wiener1=0.d0
       wiener=0.d0
       hyperwiener=0.d0
       maxdist=0
       mRadius=100000000
-      Do I=1,MAtom
+      Do I=1,number_vertices
         wi(I)=0.d0
         maxdistrow=0
-       Do J=1,MAtom
+       Do J=1,number_vertices
         idist=MDist(I,J)
         adist=dfloat(idist)
         wi(I)=wi(i)+adist
@@ -116,8 +116,8 @@ C     Wiener and hyper Wiener index, topological radius and diameter
 
 C     Balaban index
       balaban=0.d0
-      Do I=1,MAtom
-      Do J=I+1,MAtom
+      Do I=1,number_vertices
+      Do J=I+1,number_vertices
        if(IDA(I,J).eq.1) then
         wii=wi(I)
         wij=wi(J)
@@ -129,12 +129,12 @@ C     Balaban index
        endif
       enddo
       enddo
-      vertnum=dfloat(MAtom)
+      vertnum=dfloat(number_vertices)
       fac=3.d0*vertnum/(vertnum+4.d0)
       balabanindex=balaban*fac
 
 C     Szeged index
-      Call Szeged(MAtom,Edges,MDist,Sz)
+      Call Szeged(Edges,MDist,Sz)
 
 C     Final
       over=1.d-10
@@ -142,9 +142,9 @@ C     Final
       wav=wiener1/vertnum
       rho=wav/wienermin
       rhoE=wienermax/wienermin
-      isize=Matom*(Matom-1)
+      isize=number_vertices*(number_vertices-1)
       Avdist=2.d0*wiener/dfloat(isize)
-      izagreb=MAtom*9
+      izagreb=number_vertices*9
       schultz=wiener*6.d0
       wienerfac=wiener/(9.d0*vertnum**3)
       Wienerbalaban=wienerfac*balabanindex*4.d0*(vertnum+4.d0)
@@ -192,20 +192,20 @@ C1004 Format(' Ori constant for Wiener index: ',D15.9)
       RETURN
       END
 
-      SUBROUTINE Szeged(N,Edges,mdist,Sz)
+      SUBROUTINE Szeged(Edges,mdist,Sz)
       use config
 C     This routine calculates the Szeged index
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer mdist(Nmax,Nmax),Edges(2,3*n/2)
+      Integer mdist(Nmax,Nmax),Edges(2,3*number_vertices/2)
       Sz=0.d0
 C     Sum over all edges
-      Do I=1,3*n/2
+      Do I=1,3*number_vertices/2
        IE1=Edges(1,I)+1
        IE2=Edges(2,I)+1
 C      Get ni and nj for Szeged index
        ni=0
        nj=0
-       do J=1,N
+       do J=1,number_vertices
 C       if(IE1.ne.J.and.IE2.ne.J) then
          if(mdist(IE1,J).lt.mdist(IE2,J)) ni=ni+1
          if(mdist(IE1,J).gt.mdist(IE2,J)) nj=nj+1
@@ -231,19 +231,20 @@ C       endif
       RETURN
       END
 
-      SUBROUTINE IcoFullDetect(Iout,MAtom)
+      SUBROUTINE IcoFullDetect(Iout)
+      use config
       IMPLICIT Integer (A-Z)
-      N=MAtom/20
+      N=number_vertices/20
       ntest=20*N
       ico=0
       icoh=0
-      if(ntest.eq.Matom) then
+      if(ntest.eq.number_vertices) then
        loopmax=int(sqrt(float(N)))
        loopmin=int(sqrt(float(N/3)))
        Do I=loopmin,loopmax
        Do J=0,I
         nico=20*(I*I+J*J+I*J)
-        if(nico.eq.MAtom) then
+        if(nico.eq.number_vertices) then
          if(J.eq.0.or.J.eq.I) then
           icoh=icoh+1
          else
@@ -273,7 +274,7 @@ C       endif
       RETURN
       END
 
-      SUBROUTINE Distan(Matom,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      SUBROUTINE Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,NMAX)
@@ -285,8 +286,8 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
       Rmax=0.d0
       Rrms=0.d0
       mc=0
-      Do I=1,Matom
-      Do J=I+1,Matom
+      Do I=1,number_vertices
+      Do J=I+1,number_vertices
       X=Dist(1,I)-Dist(1,J)
       Y=Dist(2,I)-Dist(2,J)
       Z=Dist(3,I)-Dist(3,J)
@@ -330,12 +331,13 @@ C     Sort the N integer numbers, input IS, Output JS
       RETURN
       END
 
-      SUBROUTINE Num2(MAtom,IArray,I,J)
+      SUBROUTINE Num2(IArray,I,J)
+      use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      I=IArray/MAtom
-      J=IArray-I*MAtom
+      I=IArray/number_vertices
+      J=IArray-I*number_vertices
       If(J.eq.0) then
-      J=MAtom
+      J=number_vertices
       I=I-1
       endif
       If(I.eq.-1) then

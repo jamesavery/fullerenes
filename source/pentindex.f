@@ -1,4 +1,4 @@
-      SUBROUTINE CoordBuild(MAtom,IN,Iout,IDA,D,ICart,
+      SUBROUTINE CoordBuild(IN,Iout,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
      1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
      1 GROUP,filename)
@@ -33,7 +33,7 @@ C If nalgorithm=3 use Goldberg-Coxeter and Tutte algorithm
 C If nalgorithm=4 use connectivity input
       nalgorithm=ICart-2
 
-      M=Matom/2+2
+      M=number_vertices/2+2
       Group='NA '
       jumpGC=0
 
@@ -45,7 +45,7 @@ C Read pentagon list and produce adjacency matrix
         if(iprev.eq.0.and.jumpGC.eq.0) Read(IN,*) (JP(I),I=1,12)
       else
 C Read from database
-        Call Isomerget(Matom,Iout,Isonum,IPRC,JP)
+        Call Isomerget(Iout,Isonum,IPRC,JP)
       endif
 C     Produce the Spiral S using the program WINDUP and UNWIND
       do I=1,MMAX
@@ -81,9 +81,11 @@ C     Search where the 5-rings are in the spiral
        K=J
       enddo
   3   If(K.le.0) then
-      WRITE(Iout,1020) M,Matom,GROUP,(JP(I),I=1,12)
+        WRITE(Iout,1020)
+     1    M,number_vertices,GROUP,(JP(I),I=1,12)
       else
-      WRITE(Iout,1001) M,Matom,GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
+        WRITE(Iout,1001)
+     1    M,number_vertices,GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
       endif
       if(ispiral.ge.2) then
        if(ispiral.eq.2) then
@@ -116,7 +118,7 @@ C     Search where the 5-rings are in the spiral
 C End of Spiral Program, dual matrix in D(i,j)
 
 C Now produce the adjaceny matrix from the dual matrix
-      CALL DUAL(D,MMAX,IDA,Matom,IER)
+      CALL DUAL(D,MMAX,IDA,IER)
       IF(IER.ne.0) then
       WRITE(Iout,1002) IER
       stop
@@ -135,7 +137,7 @@ C Start Goldberg-Coxeter
        endif
       Write(Iout,1040) kGC,lGC,kGC,lGC,itGC
       if(lGC .ne. 0) then
-        Call GetPentIndex(MAtom,M,Iout,kGC,lGC,JP)
+        Call GetPentIndex(number_vertices,M,Iout,kGC,lGC,JP)
         nalgorithm=nalgorithm-2
         jumpGC=1
         Go to 99
@@ -151,9 +153,9 @@ C Start Goldberg-Coxeter
         stop
       endif
 C Update fortran structures
-      MAtom  = NVertices(halma)
+      number_vertices  = NVertices(halma)
       Medges = NEdges(halma)
-        write(Iout,1042)  MAtom,Medges
+        write(Iout,1042)  number_vertices,Medges
       call adjacency_matrix(halma,NMax,IDA)
 C End Goldberg-Coxeter
       endif
@@ -165,15 +167,15 @@ C Input connectivities and construct adjacency matrix
       
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
-      Do I=1,MAtom
-      Do J=1,MAtom
+      Do I=1,number_vertices
+      Do J=1,number_vertices
        A(I,J)=dfloat(IDA(I,J))
       enddo
       enddo
       nsum=0
-      Do I=1,MAtom
+      Do I=1,number_vertices
       isum=0
-      Do J=1,MAtom
+      Do J=1,number_vertices
       isum=isum+IDA(I,J)
       enddo
       If(isum.ne.3) nsum=nsum+1
@@ -189,14 +191,14 @@ C Produce Hueckel matrix and diagonalize
       if(ihueckel.eq.0.or.nalgorithm.eq.0.
      1 or.nalgorithm.eq.2.or.nalgorithm.eq.4) then
 C     Diagonalize
-      call tred2(A,Matom,NMax,evec,df)
-      call tqli(evec,df,Matom,NMax,A)
-      Write(Iout,1004) Matom,Matom
+      call tred2(A,number_vertices,NMax,evec,df)
+      call tqli(evec,df,number_vertices,NMax,A)
+      Write(Iout,1004) number_vertices,number_vertices
 C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
-      Do I=1,MAtom
+      Do I=1,number_vertices
       e0=evec(I)
       jmax=I
-      Do J=I+1,MAtom
+      Do J=I+1,number_vertices
       e1=evec(J)
       if(e1.gt.e0) then 
       jmax=j
@@ -207,7 +209,7 @@ C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       ex=evec(jmax)
       evec(jmax)=evec(I)
       evec(I)=ex
-      Do k=1,MAtom
+      Do k=1,number_vertices
       df(k)=A(k,jmax)
       A(k,jmax)=A(k,I)
       A(k,I)=df(k)
@@ -216,7 +218,7 @@ C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
       enddo
 
 C Analyze eigenenergies
-      Call HueckelAnalyze(MAtom,NMax,Iout,iocc,df,evec)
+      Call HueckelAnalyze(Iout,iocc,df,evec)
 C     End of Hueckel
       endif
 
@@ -225,13 +227,13 @@ c      if(ke + isw + iyf + ibf .eq. 0) then
 C Now produce the 3D image (unless the graph is going to change later)
         if(nalgorithm.eq.0.or.nalgorithm.eq.2.
      1   or.nalgorithm.eq.4) then
-          call AME(Matom,Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
+          call AME(Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
      1     CDist)
         endif
   
         if(nalgorithm.eq.1.or.nalgorithm.eq.3.
      1   or.nalgorithm.eq.5) then
-          call Tutte(Matom,Iout,ihueckel,IDA,
+          call Tutte(Iout,ihueckel,IDA,
      1     A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
         endif
 c      endif
@@ -277,22 +279,22 @@ c      endif
       Return 
       END
 
-      SUBROUTINE GetPentIndex(MAtom,Nfaces,Iout,I,J,S)
+      SUBROUTINE GetPentIndex(number_vertices,Nfaces,Iout,I,J,S)
       IMPLICIT Integer (A-Z)
       DIMENSION S(12)
       if(J.EQ.0) stop
       I2=I*I
       J2=J*J
-      MAtom=20*(I2+J2+I*J)
+      number_vertices=20*(I2+J2+I*J)
 C     Getting exponents
       IA=(5*(I+J)**2-5*I-3*J-2)/2
       IB=I+J-1
       IC=(5*I+1)*(I-1)+J*(5*I-3)
       ID=IB
       IE=(5*I2+15*J2-3*I-7*J)/2
-      WRITE(Iout,1000) MAtom,IA,IB,IC,ID,IE 
+      WRITE(Iout,1000) number_vertices,IA,IB,IC,ID,IE 
 C     Construct the ring spiral
-      NFaces=MAtom/2+2
+      NFaces=number_vertices/2+2
       S(1)=1
       S(2)=IA+2
       S(3)=S(2)+IB+1
@@ -320,7 +322,7 @@ C     Construct the ring spiral
       Return 
       END
 
-      SUBROUTINE Dipole(MAtom,I1,I2,I3,dipol,Dist,A)
+      SUBROUTINE Dipole(I1,I2,I3,dipol,Dist,A)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,NMAX),A(NMAX,NMAX),dipol(3,3)
@@ -330,7 +332,7 @@ C     Construct the ring spiral
           dipol(I,J)=0.d0
         enddo
       enddo
-      do I=1,MAtom
+      do I=1,number_vertices
         do j=1,3
           dipol(1,j)=dipol(1,j)+Dist(j,I)*A(I,I1)
           dipol(2,j)=dipol(2,j)+Dist(j,I)*A(I,I2)
@@ -345,7 +347,7 @@ C     Construct the ring spiral
       Return 
       END
 
-      SUBROUTINE Isomerget(Matom,Iout,Isonum,IPR,JP)
+      SUBROUTINE Isomerget(Iout,Isonum,IPR,JP)
       use config
       IMPLICIT Integer (A-Z)
 C Routine to get Isomer number from database
@@ -403,11 +405,11 @@ C     Check if parameters are set correctly
         Stop
       endif
       If(IPR.eq.0) then
-       if(MAtom.gt.LimitAll) then
-        Write(Iout,1000) MAtom,LimitAll
+       if(number_vertices.gt.LimitAll) then
+        Write(Iout,1000) number_vertices,LimitAll
         stop
        endif
-       M1=MAtom/2-9
+       M1=number_vertices/2-9
        isoN=Iso(M1)
        if(isonum.gt.isoN) then
         Write(Iout,1003) isonum,isoN
@@ -419,15 +421,16 @@ C     Check if parameters are set correctly
 
       else
 
-       if(MAtom.gt.LimitIPR) then
-        Write(Iout,1001) MAtom,LimitIPR
-        stop
+       if(number_vertices.gt.LimitIPR) then
+         Write(Iout,1001) number_vertices,LimitIPR
+         stop
        endif
-       if(MAtom.lt.60.or.(MAtom.gt.60.and.MAtom.lt.70)) then
-        Write(Iout,1002) MAtom
-        stop
+       if(number_vertices.lt.60.or.
+     1   (number_vertices.gt.60.and.number_vertices.lt.70)) then
+         Write(Iout,1002) number_vertices
+         stop
        endif
-       M2=MAtom/2-29
+       M2=number_vertices/2-29
          isoIPRN=IsoIPR(M2)
        if(isonum.gt.isoIPRN) then
         Write(Iout,1004) isonum,isoIPRN
@@ -442,20 +445,20 @@ C     Check if parameters are set correctly
 C     Now produce filename in database
       fend='.database'
       fstart='c'
-      if(Matom.lt.100) then
+      if(number_vertices.lt.100) then
       fnum1='0'
-       write(fnum2,'(I2)') MAtom
+       write(fnum2,'(I2)') number_vertices
        fnum=fnum1//fnum2
       else
-       write(fnum,'(I3)') MAtom
+       write(fnum,'(I3)') number_vertices
       endif
       fnum3='all'
       if(IPR.eq.1) fnum3='IPR'
       databasefile=dbdir//fstart//fnum//fnum3//fend
       if(IPR.eq.0) then 
-       Write(Iout,1005) MAtom,isonum,databasefile
+       Write(Iout,1005) number_vertices,isonum,databasefile
       else
-       Write(Iout,1006) MAtom,isonum,databasefile
+       Write(Iout,1006) number_vertices,isonum,databasefile
       endif
 
 C     Open file
