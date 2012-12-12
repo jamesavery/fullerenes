@@ -223,14 +223,14 @@ C------------------DISTMATRIX--------------------------------------
 C Calculate the distance Matrix and print out distance Matrix
       routine='DISTANCEMATRIX '
       Write(Iout,1008) routine
-      CALL DistMatrix(MAtom,Iout,iprintf,0,Iopt,
+      CALL DistMatrix(Iout,iprintf,0,Iopt,
      1 Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
 
 C------------------CONNECT-----------------------------------------
 C Establish Connectivities
       routine='CONNECT        '
       Write(Iout,1008) routine
-      CALL Connect(MCon2,MAtom,Ipent,Iout,IC3,IDA,TolX,DistMat,Rmin)
+      CALL Connect(MCon2,Ipent,Iout,IC3,IDA,TolX,DistMat,Rmin)
 
 C------------------REORDER-----------------------------------------
 C Reorder atoms such that distances in internal coordinates are bonds
@@ -241,7 +241,7 @@ C Reorder atoms such that distances in internal coordinates are bonds
         if(nperm.ne.0) then
          CALL MoveCM(Iout,Iprint,IAtom,mirror,isort,
      1    nosort,SP,Dist,DistCM,El)
-         CALL DistMatrix(MAtom,Iout,0,1,Iopt,
+         CALL DistMatrix(Iout,0,1,Iopt,
      1    Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
         endif
       endif
@@ -299,20 +299,20 @@ C------------------RING-------------------------------------------
 C Establish all closed ring systems
       routine='RING           '
       Write(Iout,1008) routine
-      CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
+      CALL Ring(Medges,MCon2,Iout,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
 
 C------------------RINGC------------------------------------------
 C Analyze ring connections
       routine='RINGC          '
       Write(Iout,1008) routine
-      CALL RingC(Matom,Medges,Iout,iprintf,
+      CALL RingC(Medges,Iout,iprintf,
      1 N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,
      1 n565,numberSW,numberFM,numberYF,numberBF,
      1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
      1 IC3,IVR3,nEK,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
 C     Print edge coordinates (barycenter)
-      if(iprintf.ne.0) Call EdgeCoord(Matom,Iout,DIST,IC3)
+      if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
 
 C------------------STONE-WALES------------------------------------
 C Perform Stone-Wales transformation
@@ -439,7 +439,7 @@ c       Compare structures
      1   nosort,SP,Dist,DistCM,El)
         routine='DISTANCEMATRIX '
         Write(Iout,1008) routine
-        CALL DistMatrix(MAtom,Iout,Iprintf,0,0,
+        CALL DistMatrix(Iout,Iprintf,0,0,
      1   Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
         routine='DIAMETER       '
         Write(Iout,1008) routine
@@ -448,7 +448,7 @@ c       Compare structures
         Write(Iout,1008) routine
 c  call ring again, this needs some reprogramming as ring duplicates some
 c  stuff previously done, but is ok for now, as it takes not much time
-        CALL Ring(Medges,MCon2,MAtom,Iout,N5Ring,N6Ring,
+        CALL Ring(Medges,MCon2,Iout,N5Ring,N6Ring,
      1   IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       endif
 
