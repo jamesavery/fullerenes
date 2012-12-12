@@ -833,7 +833,7 @@ Namelist line that contains the main flags for the program.
   by M. Yoshida \cite{Yoshida}, which has been added to our database.
 \item[{ichk}] Flag for producing or reading a \filename{.xyz} file for \program{CYLview}, \program{Pymol}, 
   \program{Avogadro} or other plotting programs (Default: 0).\\
-  If \paramname{ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $\mathcal{O}(n^3)$ (recommended for large matrices
+\item[{ihueckel}]  If \paramname{ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $\mathcal{O}(n^3)$ (recommended for large matrices
   over size 5000) (Default: 0).
 \item[{loop}] 
   If \paramname{loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 
@@ -875,6 +875,7 @@ Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2
 \paragraph{Option description:} 
 \begin{description}
 \item[{ICart}] Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
+If \paramname{ICart} = 1 then Cartesian Coordinate input is expected.\\
 If \paramname{ICart} = 2, 3 then 12 pentagon indices are used for input.\\
 If \paramname{ICart} = 4, 5 then Goldberg-Coxeter transformation of \C{20} is used, i.e. $GC_{k,l}(20)$ with $k \geq l$ and $k > 0$.\\
 If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$, then pentagon indices are taken from the
