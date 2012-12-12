@@ -1,4 +1,4 @@
-      SUBROUTINE MaxInSphere(M,IOUT,Dist,cmcs,RVdWC)
+      SUBROUTINE MaxInSphere(IOUT,Dist,cmcs,RVdWC)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),c(3),cmax(3),cmcs(3)
@@ -19,7 +19,7 @@ C    Initial step
        c(3)=0.d0
       nchoice=1
       endif
-      Call MAInorm(3,M,IP,RMIS,c,Dist)
+      Call MAInorm(3,IP,RMIS,c,Dist)
       if(nchoice.eq.0) then
       Write(IOUT,1001) RMIS,IP,(c(i),i=1,3)
       else
@@ -29,13 +29,13 @@ C    Initial step
       AMIS=4.d0*dpi*RMIS**2
       Write(IOUT,1002) RMIS,VMIS,AMIS
 C     Start Iteration
-      CALL powell(3,iter,Iout,IOP,ier,M,eps,AN,RMIS,c,cmax,Dist)
+      CALL powell(3,iter,Iout,IOP,ier,eps,AN,RMIS,c,cmax,Dist)
 C     End Iteration
       if(ier.eq.1) then
        Write(IOUT,1010)
        Return
       endif
-      Call MAInorm(3,M,IP,RMIS,c,Dist)
+      Call MAInorm(3,IP,RMIS,c,Dist)
       Write(IOUT,1003) RMIS,IP,(c(i),i=1,3)
       VMIS=4.d0/3.d0*dpi*RMIS**3
       AMIS=4.d0*dpi*RMIS**2
@@ -65,7 +65,7 @@ C     End Iteration
       RETURN
       END
 
-      SUBROUTINE MinDistSphere(M,IOUT,Dist,cMCS)
+      SUBROUTINE MinDistSphere(IOUT,Dist,cMCS)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),c(3),cmax(3),cMCS(3)
@@ -94,7 +94,7 @@ C    Get maximum values
 C    Calculate the MDS norm
 
       IOP=0
-      Call MDSnorm(3,M,AN,RMDSI,c,Dist)
+      Call MDSnorm(3,AN,RMDSI,c,Dist)
       Write(IOUT,1001) RMDSI,(c(i),i=1,3)
       VMDSI=4.d0/3.d0*dpi*RMDSI**3
       AMDSI=4.d0*dpi*RMDSI**2
@@ -104,7 +104,7 @@ C    Calculate the MDS norm
       Write(IOUT,1002) RMDSI,VMDS,AMDS
       Write(IOUT,1003) AN
 C     Start Iteration
-      CALL powell(3,iter,Iout,IOP,ier,M,eps,AN,RMDSI,c,cmax,Dist)
+      CALL powell(3,iter,Iout,IOP,ier,eps,AN,RMDSI,c,cmax,Dist)
 C     End Iteration
       if(ier.eq.2) then
        Write(IOUT,1006)
@@ -116,7 +116,7 @@ C     End Iteration
        Write(IOUT,1007)
        Return
       endif
-      Call MDSnorm(3,M,AN,RMDSI,c,Dist)
+      Call MDSnorm(3,AN,RMDSI,c,Dist)
       Write(IOUT,1004) iter,(c(i),i=1,3),AN
       VMDSI=4.d0/3.d0*dpi*RMDSI**3
       AMDSI=4.d0*dpi*RMDSI**2
@@ -124,7 +124,7 @@ C     End Iteration
       AMDS=AMDSI
       RMDS=RMDSI
       rminMDS=1.d8
-      Do i=1,M
+      Do i=1,number_vertices
        dx=dist(1,I)-c(1)
        dy=dist(2,I)-c(2)
        dz=dist(3,I)-c(3)
@@ -158,13 +158,13 @@ C     End Iteration
       Return
       End
 
-      SUBROUTINE MAInorm(ncom,M,IP,dm,c,d)
+      SUBROUTINE MAInorm(ncom,IP,dm,c,d)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION d(3,Nmax),c(ncom)
 C     Calculate minimum distance to center c
       dm=1.d8
-      Do i=1,M
+      Do i=1,number_vertices
        dx=d(1,I)-c(1)
        dy=d(2,I)-c(2)
        dz=d(3,I)-c(3)
@@ -177,14 +177,14 @@ C     Calculate minimum distance to center c
       Return
       End
 
-      SUBROUTINE MDSnorm(ncom,M,A,davd,c,d)
+      SUBROUTINE MDSnorm(ncom,A,davd,c,d)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION d(3,Nmax),c(ncom),dp(Nmax)
 C     Calculate norm for minimum distance sphere
-      XM=dfloat(M)
+      XM=dfloat(number_vertices)
       dav=0.d0
-      Do i=1,M
+      Do i=1,number_vertices
        dx=d(1,I)-c(1)
        dy=d(2,I)-c(2)
        dz=d(3,I)-c(3)
@@ -193,14 +193,14 @@ C     Calculate norm for minimum distance sphere
       enddo
       davd=dav/XM
       ddav=0.d0
-      Do i=1,M
+      Do i=1,number_vertices
        ddav=ddav+dabs(davd-dp(i)) 
       enddo
       A=ddav/XM
       Return
       End
 
-      SUBROUTINE ProjectSphere(MAtom,ipsphere,Iout,IAtom,nzeile,
+      SUBROUTINE ProjectSphere(ipsphere,Iout,IAtom,nzeile,
      1 IC3,Dist,c,rmcs,filename,El,TEXTINPUT)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -214,7 +214,7 @@ C      producing a spherical fullerene
       Integer endzeile
 
       Write(Iout,1000)
-      Do I=1,MAtom
+      Do I=1,number_vertices
        r2=0.d0
       Do J=1,3
        Dist(J,I)=Dist(J,I)-c(J)
@@ -227,7 +227,7 @@ C      producing a spherical fullerene
       enddo
       enddo
 
-      Do J=1,MAtom
+      Do J=1,number_vertices
        IM=IAtom(J)
        Write(IOUT,1001),J,IM,El(IM),(Dist(I,J),I=1,3)
       enddo
@@ -241,15 +241,18 @@ C Write out xyz file
         do j=1,nzeile
           if(TEXTINPUT(j).ne.' ') endzeile=j
         enddo
-        if(MAtom.lt.100) WRITE(9,1011) MAtom,MAtom,
+        if(number_vertices.lt.100) WRITE(9,1011) number_vertices,
+     1    number_vertices,(TEXTINPUT(I),I=1,endzeile)
+        if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1    WRITE(9,1012) number_vertices,number_vertices,
      1    (TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.100.and.MAtom.lt.1000)
-     1    WRITE(9,1012) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.1000.and.MAtom.lt.10000)
-     1    WRITE(9,1013) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        if(MAtom.ge.10000)
-     1    WRITE(9,1014) MAtom,MAtom,(TEXTINPUT(I),I=1,endzeile)
-        Do J=1,MAtom
+        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1    WRITE(9,1013) number_vertices,number_vertices,
+     1    (TEXTINPUT(I),I=1,endzeile)
+        if(number_vertices.ge.10000)
+     1    WRITE(9,1014) number_vertices,number_vertices,
+     1    (TEXTINPUT(I),I=1,endzeile)
+        Do J=1,number_vertices
           IM=IAtom(J)
           Write(9,1003) El(IM),(Dist(I,J),I=1,3)
         enddo
@@ -261,11 +264,13 @@ C Write out cc1 file
        xyzname=trim(filename)//"-3DMCS.cc1"
        Open(unit=9,file=xyzname,form='formatted')
         WRITE(Iout,1002) xyzname
-        if(MAtom.lt.100) WRITE(9,1005) MAtom
-        if(MAtom.ge.100.and.MAtom.lt.1000) WRITE(9,1006) MAtom
-        if(MAtom.ge.1000.and.MAtom.lt.10000) WRITE(9,1007) MAtom
-        if(MAtom.ge.10000) WRITE(9,1008) MAtom
-        Do J=1,MAtom
+        if(number_vertices.lt.100) WRITE(9,1005) number_vertices
+        if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1    WRITE(9,1006) number_vertices
+        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1    WRITE(9,1007) number_vertices
+        if(number_vertices.ge.10000) WRITE(9,1008) number_vertices
+        Do J=1,number_vertices
           IM=IAtom(J)
           Write(9,1004) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
         enddo
@@ -292,7 +297,7 @@ C Write out cc1 file
       Return
       End
 
-      SUBROUTINE MinCovSphere2(M,IOUT,SP,Dist,Rmin,Rmax,
+      SUBROUTINE MinCovSphere2(IOUT,SP,Dist,Rmin,Rmax,
      1 VCS,ACS,Atol,VTol,u,c,radius,RVdWC)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -303,7 +308,7 @@ C     Get the minimum covering sphere using algorithm 2 by E.A.Yildirim
       DATA itermax/10000000/
       DATA eps,disteps/1.d-8,1.d-5/
       epsilon=(1.d0+eps)**2-1.d0
-      Write(IOUT,1000) M,epsilon
+      Write(IOUT,1000) number_vertices,epsilon
  1000 Format(/1X,'Calculate the minimum covering sphere using',
      1 ' the algorithm 2 given by E.A.Yildirim,'
      2 ' SIAM Journal on Optimization 19(3), 1368 (2008):',
@@ -316,13 +321,13 @@ C    Initial step
 C 
       xmax=0.d0
       ialpha=0
-      do i=1,M
+      do i=1,number_vertices
         u(i)=0.d0
       enddo
 C    Algorithm changed here by taking the furthest 
 C    point from the center of points
       rav=0.d0
-      do i=1,M
+      do i=1,number_vertices
         dx=Dist(1,i)
         dy=Dist(2,i)
         dz=Dist(3,i)
@@ -333,10 +338,10 @@ C    point from the center of points
             xmax=Xnorm
           endif
       enddo
-      meandist=rav/dfloat(M)
+      meandist=rav/dfloat(number_vertices)
       asym=0.d0
 C     Fowler asymmetry parameter
-      do i=1,M
+      do i=1,number_vertices
         dx=Dist(1,i)
         dy=Dist(2,i)
         dz=Dist(3,i)
@@ -346,7 +351,7 @@ C     Fowler asymmetry parameter
         asym=asym/meandist**2
       xmax=0.d0
       ibeta=0
-      do i=1,M
+      do i=1,number_vertices
         dx=Dist(1,ialpha)-Dist(1,i)
         dy=Dist(2,ialpha)-Dist(2,i)
         dz=Dist(3,ialpha)-Dist(3,i)
@@ -365,10 +370,10 @@ C     Size of set Kappa (number of vectors)
       do j=1,3
         c(j)=.5d0*(Dist(j,ialpha)+Dist(j,ibeta))
       enddo 
-      gammak=fpsi(M,u,dist)
+      gammak=fpsi(u,dist)
       xmax=0.d0
       ikappa=0
-      do i=1,M
+      do i=1,number_vertices
         dx=c(1)-Dist(1,i)
         dy=c(2)-Dist(2,i)
         dz=c(3)-Dist(3,i)
@@ -410,7 +415,7 @@ C     ----------------
         alamdak=.5d0*deltak/(1.d0+deltak)
         k=k+1
         blambdak=1.d0-alamdak
-          do i=1,M
+          do i=1,number_vertices
             u(i)=blambdak*u(i)
             if(i.eq.ikappa) u(i)=u(i)+alamdak
           enddo
@@ -446,7 +451,7 @@ C     ----------------
             nkappa=nkappa+isetk
           endif
         k=k+1
-          do i=1,M
+          do i=1,number_vertices
             u(i)=(1.d0+alamdak)*u(i)
             if(i.eq.iksi) u(i)=u(i)-alamdak
           enddo
@@ -455,10 +460,10 @@ C     ----------------
           enddo
       endif
 C     New parameters
-      gammak=fpsi(M,u,dist)
+      gammak=fpsi(u,dist)
       xmax=0.d0
       ikappa=0
-      do i=1,M
+      do i=1,number_vertices
         dx=c(1)-Dist(1,i)
         dy=c(2)-Dist(2,i)
         dz=c(3)-Dist(3,i)
@@ -495,7 +500,7 @@ C     ----------------
    10 if(iter.ge.itermax) Write(IOUT,1006) itermax
       Write(IOUT,1005) k,nkappa,deltak,(c(i),i=1,3)
       rmcs=0.d0
-      Do i=1,M
+      Do i=1,number_vertices
       RI=dsqrt((Dist(1,I)-c(1))**2+(Dist(2,I)-c(2))**2
      1 +(Dist(3,I)-c(3))**2)
       if (ri.gt.rmcs) rmcs=ri
@@ -522,7 +527,7 @@ C     Do statistics
       klo=0
       rmcsl=-10.d0*epsilon*rmcs
       rmcsu=10.d0*epsilon*rmcs
-      Do i=1,M
+      Do i=1,number_vertices
       RZ=dsqrt((Dist(1,I)-c(1))**2+(Dist(2,I)-c(2))**2
      1 +(Dist(3,I)-c(3))**2)-rmcs
       u(i)=RZ
@@ -548,16 +553,16 @@ C     For each vertex (atom) use the distance to the sphere
 C     to calculate the root mean square as a measure for distortion
       rsum=0.d0
       rmax=0.d0
-      Do I=1,M
+      Do I=1,number_vertices
       rsum=rsum+u(i)
       if(u(i).lt.rmax) rmax=u(i)
       enddo
-      rmean=rsum/dfloat(M)
+      rmean=rsum/dfloat(number_vertices)
       distortion=-rmean/rmin*100.d0
       Write(IOUT,1014) 
-      Write(IOUT,1013) (i,u(i),i=1,M)
-      Write(IOUT,1007) M,keq,klo,kgt
-      Write(IOUT,1012) rmax,rmean,distortion,M
+      Write(IOUT,1013) (i,u(i),i=1,number_vertices)
+      Write(IOUT,1007) number_vertices,keq,klo,kgt
+      Write(IOUT,1012) rmax,rmean,distortion,number_vertices
       if(distortion.lt.disteps) then
       Write(IOUT,1015)
       endif
@@ -613,21 +618,21 @@ C     to calculate the root mean square as a measure for distortion
       return
       END
 
-      DOUBLE PRECISION FUNCTION f1dimx(ncom,Matom,IOP,ier,
+      DOUBLE PRECISION FUNCTION f1dimx(ncom,IOP,ier,
      1 x,pcom,xicom,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION pcom(ncom),xicom(ncom),xt(ncom)
       REAL*8 Dist(3,Nmax)
-      HUGE=dfloat(Matom)*1.d2
+      HUGE=dfloat(number_vertices)*1.d2
       do 11 j=1,ncom
         xt(j)=pcom(j)+x*xicom(j)
 11    continue
       If(IOP.eq.0) then
-      Call MDSnorm(ncom,Matom,AN,R,xt,Dist)
+      Call MDSnorm(ncom,AN,R,xt,Dist)
       f1dimx=AN
       else
-      Call MAInorm(ncom,Matom,IP,AN,xt,Dist)
+      Call MAInorm(ncom,IP,AN,xt,Dist)
       f1dimx=-AN
       endif
       if(AN.gt.Huge) then
@@ -638,7 +643,7 @@ C     to calculate the root mean square as a measure for distortion
       return
       END
 
-      FUNCTION fpsi(M,u,dist)
+      FUNCTION fpsi(u,dist)
       use config
 C     Calculate the Lagrangian dual for the minimum sphere problem
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -647,7 +652,7 @@ C     Calculate the Lagrangian dual for the minimum sphere problem
       x(1)=0.d0
       x(2)=0.d0
       x(3)=0.d0
-      Do i=1,M
+      Do i=1,number_vertices
       sum1=sum1+u(i)*(dist(1,i)**2+dist(2,i)**2+dist(3,i)**2)
       Do j=1,3
       x(j)=x(j)+u(i)*dist(j,i)
