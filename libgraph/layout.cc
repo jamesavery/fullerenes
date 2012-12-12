@@ -53,12 +53,12 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
   }
   memcpy(x,rhs,N*2*sizeof(double));
 
-  // Construct matrix I-1/3*A in triplet form, where A is adjacency, except for rows A_i=\delta_{ij} for i an outer-face node
+  // Construct matrix I-1/3*A in CSR form, where A is adjacency, except for rows A_i=\delta_{ij} for i an outer-face node
   double A[4*N];
   int IA[N+1], JA[4*N];
   int nz = 0;
   {
-    double Afull[N*N];
+    double *Afull = new double[N*N];
     memset(Afull,0,N*N*sizeof(double));
     for(node_t u=0;u<N;u++){
       Afull[u*(N+1)] = 1.0;
@@ -72,6 +72,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
       for(node_t v=0;v<N;v++) Afull[u*N+v] = (u==v)? 1.0 : 0.0;
     }
 
+    // Write in Compressed Sparse Row format
     for(node_t u=0;u<N;u++){
       IA[u] = nz;
       for(node_t v=0;v<N;v++)
@@ -81,13 +82,12 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
 	  nz++;
 	}
     }
+    delete Afull;
   }
   IA[N] = nz;
   // Solve sparse linear system for x-coordinates and y-coordinates 
-  pmgmres_ilu_cr(N,nz,IA,JA,A,x,  rhs,  50000,N-1,1e-15,1e-15);
-  pmgmres_ilu_cr(N,nz,IA,JA,A,x+N,rhs+N,50000,N-1,1e-15,1e-15);
-  //  mgmres_st(N,nz,IA,JA,A,x,  rhs,  50000,N-1,1e-10,1e-10);
-  //  mgmres_st(N,nz,IA,JA,A,x+N,rhs+N,50000,N-1,1e-10,1e-10);
+  pmgmres_ilu_cr(N,nz,IA,JA,A,x,  rhs,  50000,N-1,1e-13,1e-13);
+  pmgmres_ilu_cr(N,nz,IA,JA,A,x+N,rhs+N,50000,N-1,1e-13,1e-13);
 
   for(node_t u=0;u<N;u++) result[u] = coord2d(x[u],x[u+N]);
 
