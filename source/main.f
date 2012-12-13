@@ -101,7 +101,7 @@ C  INPUT and setting parameters for running the subroutines
       SWspiral=0
       Write(Iout,1008) routine
         CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
-     1  Ihueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
+     1  nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1  ipsphere,ndual,nosort,nospiralsearch,novolume,ihessian,
@@ -185,7 +185,7 @@ C the 3D fullerene
       routine='COORDBUILD     '
       Write(Iout,1008) routine
       CALL CoordBuild(IN,Iout,IDA,IDual,
-     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,ihueckel,JP,
+     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,JP,
      1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
      1 GROUP,filename)
       Do I=1,number_vertices
@@ -252,7 +252,7 @@ C Hueckel matrix and eigenvalues
       if(ipent.eq.0) then
         routine='HUECKEL        '
         Write(Iout,1008) routine
-        CALL Hueckel(Iout,IC3,ihueckel,IDA,A,evec,df)
+        CALL Hueckel(Iout,IC3,nohueckel,IDA,A,evec,df)
       endif
 
 C------------------GOLDBERG-COXETER-------------------------------
@@ -261,7 +261,7 @@ C Produce the nth leapfrog of the fullerene
         routine='GOLDBERGCOXETER'
         Write(Iout,1008) routine
         CALL GoldbergCoxeter(Iout,leap,leapGC,IGC1,IGC2,
-     1   ihueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
+     1   nohueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
      1   scaleRad)
         leap=0
         leapGC=0
@@ -321,7 +321,7 @@ C Perform Stone-Wales transformation
         routine='STONE-WALES    '
         Write(Iout,1008) routine
         CALL StoneWalesTrans(IN,Iout,numbersw,nSW,
-     1   ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,
+     1   nohueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,
      1   Rdist,scalerad)
         ISW=0
         ipent=1
@@ -334,7 +334,7 @@ C Perform Endo-Kroto 2-vertex insertion
       if(KE.ne.0) then
         routine='ENDO-KROTO     '
         Write(Iout,1008) routine
-        CALL EndoKrotoTrans(IN,Iout,n565,NEK,ihueckel,
+        CALL EndoKrotoTrans(IN,Iout,n565,NEK,nohueckel,
      1   IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist,scalerad)
         KE=0
         ipent=1
@@ -349,12 +349,12 @@ C Perform Yoshida-Fowler 4-or 6-vertex insertion
         Write(Iout,1008) routine
         if(IYF.le.2) then
          CALL YoshidaFowler4(IN,Iout,JERR,numberFM,IYF,nFM,
-     1    ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist,
+     1    nohueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,Dist2D,distp,Rdist,
      1    scalerad)
         else
           IYF=IYF-2
           CALL YoshidaFowler6(IN,Iout,JERR,numberYF,IYF,nYF,
-     1     ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist,
+     1     nohueckel,IDA,N6MEM,IC3,A,evec,df,Dist,Dist2D,distp,Rdist,
      1     scalerad)
         endif
         IYF=0
@@ -369,7 +369,7 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
         routine='BRINKMANNFOWLER'
         Write(Iout,1008) routine
         CALL BrinkmannFowler(IN,Iout,JERR,numberBF,IBF,
-     1   nBF,ihueckel,IDA,N5MEM,N6MEM,IC3,
+     1   nBF,nohueckel,IDA,N5MEM,N6MEM,IC3,
      1   A,evec,df,Dist,Dist2D,distp,Rdist,scalerad)
         IBF=0
         ipent=1

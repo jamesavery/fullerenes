@@ -5,8 +5,8 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS= -g3 -O1 -m64 -Wall -Wno-sign-compare
-FFLAGS= -g3 -O1 -m64 -Wall
+CXXFLAGS= -g3 -O3 -m64 -Wall -Wno-sign-compare
+FFLAGS= -g3 -O3 -m64 -Wall
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
 # you might need to change the gfortran compiler options:
 #FFLAGS= -O3 -m64 -mcmodel=medium 
