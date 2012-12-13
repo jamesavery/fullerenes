@@ -1,5 +1,5 @@
       SUBROUTINE CoordBuild(IN,Iout,IDA,D,ICart,
-     1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,ihueckel,JP,iprev,
+     1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,nohueckel,JP,iprev,
      1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
      1 GROUP,filename)
 C Cartesian coordinates produced from ring spiral pentagon list
@@ -188,7 +188,7 @@ C Now analyze the adjacency matrix if it is correct
       endif
 
 C Produce Hueckel matrix and diagonalize
-      if(ihueckel.eq.0.or.nalgorithm.eq.0.
+      if(nohueckel.eq.0.or.nalgorithm.eq.0.
      1 or.nalgorithm.eq.2.or.nalgorithm.eq.4) then
 C     Diagonalize
       call tred2(A,number_vertices,NMax,evec,df)
@@ -233,7 +233,7 @@ C Now produce the 3D image (unless the graph is going to change later)
   
         if(nalgorithm.eq.1.or.nalgorithm.eq.3.
      1   or.nalgorithm.eq.5) then
-          call Tutte(Iout,ihueckel,IDA,
+          call Tutte(Iout,nohueckel,IDA,
      1     A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
         endif
 c      endif

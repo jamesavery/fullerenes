@@ -1,7 +1,7 @@
 This is an example how to create the coordinate for the non-spiral T-C380
 through a ring-spiral fullerene T-C364 and 4 Yoshida-Fowler 4-vertex insertions
 The transformation preserves symmetry
-&General NA=364, ihueckel=1, nosort=1, ixyz=1, ipsphere=3 /
+&General NA=364, nohueckel=1, nosort=1, ixyz=1, ipsphere=3 /
 &Coord ICart=3, IYF=2 /
 &FFChoice Iopt=3 /
 &FFParameters  /

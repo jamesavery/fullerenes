@@ -1,12 +1,12 @@
-      SUBROUTINE Hueckel(IOUT,IC3,ihueckel,IDA,A,evec,df)
+      SUBROUTINE Hueckel(IOUT,IC3,nohueckel,IDA,A,evec,df)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C Perform Hueckel matrix diagonalization to obtain eigenvalues
 C This gives a good hint if the fullerene is closed-shell
       DIMENSION IC3(Nmax,3),A(Nmax,Nmax),evec(Nmax),df(Nmax)
       DIMENSION IDA(Nmax,Nmax)
+
 C Produce adjacency matrix
-      WRITE(IOUT,1000) number_vertices,number_vertices 
       Do I=1,number_vertices
       Do K=1,number_vertices
         A(I,K)=0.d0
@@ -23,11 +23,13 @@ C Produce adjacency matrix
       enddo
       enddo
 
-      if(ihueckel.eq.0) then
+      if(nohueckel.eq.0) then
        WRITE(IOUT,1001) 
        return
       endif
+
 C Diagonalize without producing eigenvectors
+      WRITE(IOUT,1000) number_vertices,number_vertices 
       call tred2l(A,number_vertices,Nmax,evec,df)
       call tqlil(evec,df,number_vertices,Nmax)
 

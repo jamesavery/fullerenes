@@ -510,7 +510,7 @@ C     Unpack distance matrix value from linear vector
       END
 
       SUBROUTINE EndoKrotoTrans(IN,Iout,n565,NEK,
-     1 ihueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,layout2D,distp,
+     1 nohueckel,IDA,N5MEM,N6MEM,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad)
       use config
 C     use iso_c_binding
@@ -684,7 +684,7 @@ C Now analyze the adjacency matrix if it is correct
       else
         WRITE(Iout,1006)
       endif
-      Call Tutte(Iout,ihueckel,IDA,
+      Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Endo-Kroto insertion of 2 vertices:',
      1 ' 2 pentagon G2.12.1.1 (nv=12)-> G2.12.1.2 (nv=14)',
@@ -716,7 +716,7 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE BrinkmannFowler(IN,Iout,JERR,numberBF,
-     1 IBF,nBF,ihueckel,IDA,N5MEM,N6MEM,IC3, 
+     1 IBF,nBF,nohueckel,IDA,N5MEM,N6MEM,IC3, 
      1 A,evec,df,Dist,layout2D,distp,Cdist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1007,7 +1007,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Iout,ihueckel,IDA,
+      Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Brinkmann-Fowler 6-vertex insertion to D2h 55-6-55',
      1 ' ring pattern: 4 pentagon G4.14.2.1 (nv=16) -> G4.14.2.2 ',
@@ -1045,7 +1045,7 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE YoshidaFowler6(IN,Iout,JERR,
-     1 numberfm,IYF,nfm,ihueckel,IDA,N6MEM,IC3,
+     1 numberfm,IYF,nfm,nohueckel,IDA,N6MEM,IC3,
      1 A,evec,df,Dist,layout2D,distp,CDist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1414,7 +1414,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Iout,ihueckel,IDA,
+      Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 6-vertex insertion to D3h 666555 ',
      1 'ring pattern: 3 pentagon G3.15.4.1 (nv=19) -> G3.15.4.2 ',
@@ -1453,7 +1453,7 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE YoshidaFowler4(IN,Iout,JERR,
-     1 numberfm,IYF,nfm,ihueckel,IDA,N5MEM,N6MEM,
+     1 numberfm,IYF,nfm,nohueckel,IDA,N5MEM,N6MEM,
      1 A,evec,df,Dist,layout2D,distp,CDist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1676,7 +1676,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Iout,ihueckel,IDA,
+      Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Yoshida-Fowler 4-vertex insertion to D3h 6555 ',
      1 'ring pattern: 3 pentagon G3.15.3.1 (nv=15) -> G3.17.3.2',
@@ -1714,7 +1714,7 @@ C Now analyze the adjacency matrix if it is correct
       END
 
       SUBROUTINE StoneWalesTrans(IN,Iout,numbersw,
-     1 nSW,ihueckel,IDA,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
+     1 nSW,nohueckel,IDA,N6MEM,IC3,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1893,7 +1893,7 @@ C Now analyze the adjacency matrix if it is correct
       else
       WRITE(Iout,1006)
       endif
-      Call Tutte(Iout,ihueckel,IDA,
+      Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
  1000 Format(/1X,'Stone-Wales transformation:',
      1 /1X,'Read pentagon ring numbers (between 1-12)')
@@ -1923,7 +1923,7 @@ C Now analyze the adjacency matrix if it is correct
 
       SUBROUTINE GoldbergCoxeter(Iout,
      1 leap,leapGC,kGC,lGC,
-     1 ihueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
+     1 nohueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad) 
 C     Construct Leapfrog fullerene through adjacency matrix
       use config
@@ -2011,7 +2011,7 @@ C Produce adjacency matrix
       endif
       number_vertices = MLeap
 
-      Call Tutte(Iout,ihueckel,IDA,
+      Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
       if(leap.ne.0) call delete_fullerene_graph(frog)
       if(leapGC.ne.0) call delete_fullerene_graph(halma)
@@ -2048,7 +2048,7 @@ C Produce adjacency matrix
       Return
       END
 
-      SUBROUTINE Tutte(Iout,ihueckel,IDA,
+      SUBROUTINE Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
 C   Tutte 3D embedding Algorithm:
 C     Input: Integer Adjacency Matrix IDA(NMax,NMax)
@@ -2066,7 +2066,7 @@ C     number_vertices: Working Dimension of Matrix
 
 C Produce Hueckel matrix and diagonalize
 C     Diagonalize
-      if(ihueckel.ne.0) then
+      if(nohueckel.eq.0) then
       Do I=1,number_vertices
          Do J=1,number_vertices
             A(I,J)=dfloat(IDA(I,J))
