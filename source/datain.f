@@ -1,5 +1,5 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,ICart,Iopt,IP,IHam,
-     1 ihueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
+     1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1 ipsphere,ndual,nosort,nospiral,novolume,ihessian,isearch,
@@ -15,7 +15,7 @@
       Character filename*50
       Character filenameout*50
       Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,
-     1 ihueckel,loop,
+     1 nohueckel,loop,
      1 filename,filenameout,ipsphere,nosort,nospiral,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad
@@ -102,7 +102,7 @@ C Integers
       ifs=0     !  Option for .dat and .tex files
       iham=0    !  Number of Hamiltonian cycles
       iFS=0     !  Option for producing files for 2D fullerene graphs
-      Ihueckel=1 ! Option for diagonalizing the Hueckel matrix
+      nohueckel=0 ! Option for diagonalizing the Hueckel matrix
       iopt=0    !  No (force field) optimization
       ihessian=0 ! No Hessian matrix produced
       iprinth=0 !  No Hessian matrix printed

@@ -32,8 +32,7 @@ fullerdl.php receives the password, checks it and if correct
 <tr>
 <td valign="middle" align="center">
 <a href="data/C4860.png"><img src="data/C4860.png" width="270" alt="C4860"></a><br><br>
-<a href="data/C4050.png"><img src="data/C4050.png" width="270" alt="C4050"></a><br>
-<font size="-1"><i>click picture for larger image</i></font>
+<a href="data/C250.png"><img src="data/C250.png" width="270" alt="C250"></a>
 </td>
 <td valign="middle"  align="center">
 <h1> <big> Program FULLERENE <br>
@@ -45,11 +44,12 @@ and Topological Analysis <br><br> </h1>
 The Quantum Chemistry and Physics Group<br>
 The New Zealand Institute for Advanced Study<br>
 Massey University Auckland<br>
-0745 Auckland, New Zealand (Middle Earth)</I></h2>
-</td>
+0745 Auckland, New Zealand (Middle Earth)</I></h2><br>
+<a href="data/C4050.png"><img src="data/C4050.png" width="350" alt="C4050"></a><br>
+<font size="-1"><i>click picture for larger image</i></font></td>
 <td valign="middle" align="center">
-<a href="data/C60.png"><img src="data/C60.png" width="250" alt="C60"></a><br>
-<a href="data/C540.png"><img src="data/C540.png" width="270" alt="C540"></a>
+<a href="data/C60.png"><img src="data/C60.png" width="270" alt="C60"></a><br>
+<a href="data/C540.png"><img src="data/C540.png" width="300" alt="C540"></a>
 </td>
 </tr></table><br>
 
@@ -378,6 +378,9 @@ Once you have a password you can download the program here: (Version 4.3, last u
 Password: <input type="password" name="pwd" size="10" /><br> <input type="submit" value="Download" /> 
 </form>
 
+<table width="95%" align="center">
+<tr>
+<td valign="left" align="left">
 <a href="data/C840.png"><img src="data/C840.png" width="750" alt="C840"></a><br><br>
 <b>Important steps in the program are:</b><br>
 <li>Read in cartesian coordinates for a fullerene.</li>
@@ -405,6 +408,11 @@ harmonic oscillator force field including dihedrals.</li>
 <li>Produce (x,y) coordinates of a fullerene graph (Schlegel diagram) using a variety of different algorithms.</li>
 <li>The output file ending with .xyz or .cc1 can be used as input for CYLVIEW, AVOGADRO, VMD or PYMOL.</li>
 <li>The output file ending with .dat can be used as input for drawing Schlegel diagrams.</li><br>
+</td>
+<td valign="right" align="right">
+<a href="data/Obelix.png"><img src="data/Obelix.png" width="350" alt="Obelix"></a><br><br>
+</td>
+</tr></table><br>
 
 A database is provided for general isomers up to C<SUB>122</SUB> and for IPR isomers up to
 C<SUB>170</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>100</SUB> 

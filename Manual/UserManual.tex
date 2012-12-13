@@ -176,7 +176,7 @@ For this an external file is written out called \filename{Fullerene-2D.dat} cont
 
 From version 4.0 onwards (released July 2012) C++ routines embedded into the original FORTRAN program incorporate
 much improved algorithms compared to the older versions. The reason for using two different program languages is
-that PS is good in old-fashioned Fortran and JA is good in C++.  Furthermore, some of the original routines used were available 
+that PS is good in old-fashioned Fortran, JA is good in C++ (and LW is doing both).  Furthermore, some of the original routines used were available 
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
 and geometry optimization. Version 4.3 now includes the Hessian of the force field, although 
 we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
@@ -813,7 +813,7 @@ every line until the first namelist line is interpreted as a comment.
 \subsection{\&General line}
 Namelist line that contains the main flags for the program. 
 
-\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, ihueckel, loop, ipsphere, nosort, nospiral, novolume, TolR, R5, R6, filenamedb, filename}.
+\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, nohueckel, loop, ipsphere, nosort, nospiral, novolume, TolR, R5, R6, filenamedb, filename}.
 \paragraph{Option description:}
 \begin{description}
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
@@ -833,8 +833,7 @@ Namelist line that contains the main flags for the program.
   by M. Yoshida \cite{Yoshida}, which has been added to our database.
 \item[{ichk}] Flag for producing or reading a \filename{.xyz} file for \program{CYLview}, \program{Pymol}, 
   \program{Avogadro} or other plotting programs (Default: 0).\\
-\item[{ihueckel}]  If \paramname{ihueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $\mathcal{O}(n^3)$ (recommended for large matrices
-  over size 5000) (Default: 0).
+\item[{nohueckel}]  If \paramname{nohueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $\mathcal{O}(n^3)$ (recommended for large matrices over size 5000) (Default: 0).
 \item[{loop}] 
   If \paramname{loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 
   This is important if one takes an initial structure and subjects it to further transformations, for example in subsequent Stone-Wales or
