@@ -89,7 +89,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       PARAMETER (ITMAX=500,EPS=1.d-10)
       Real*8 p(NMAX*2),g(NMAX*2),h(NMAX*2),xi(NMAX*2)
       Real*8 pcom(NMAX*2),xicom(NMAX*2)
-      Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX), N
+      Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
@@ -105,21 +105,21 @@ C     IOP=1: spring embedding
 C     IOP=2: spring + Coulomb embedding
 C     IOP=3: Pisanski-Plestenjak-Graovac algorithm
 C     IOP=4: Kamada-Kawai embedding
-      N = 2*number_vertices
+
       iter=0
-      CALL func2d(IOP,N,AH,IS,MDist,maxd,p,fp,RAA)
+      CALL func2d(IOP,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
       Write(Iout,1003) E0
-C     dfunc3d input vector p of length N, output gradient of length n user defined
-      CALL dfunc2d(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
+C     dfunc3d input vector p of length 2*number_vertices, output gradient of length 2*number_vertices user defined
+      CALL dfunc2d(IOP,AH,IS,MDist,maxd,p,xi,RAA)
       grad2=0.d0
-      do I=1,N
+      do I=1,2*number_vertices
        grad2=grad2+xi(i)*xi(i)
       enddo
       grad=dsqrt(grad2)
       Write(Iout,1001) iter,fp-E0,grad
       if(grad.lt.ftol) return
-      do j=1,N
+      do j=1,2*number_vertices
         g(j)=-xi(j)
         h(j)=g(j)
         xi(j)=h(j)
@@ -127,10 +127,10 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
         fret=0.d0
       do its=1,ITMAX
         iter=its
-        call linmin2d(IOP,N,Iout,AH,IS,MDist,maxd,
+        call linmin2d(IOP,Iout,AH,IS,MDist,maxd,
      1       p,pcom,xi,xicom,fret,RAA)
          grad2=0.d0
-         do I=1,n
+         do I=1,2*number_vertices
           grad2=grad2+xi(i)*xi(i)
          enddo
          grad=dsqrt(grad2)
@@ -140,17 +140,17 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
           return
         endif
         fp=fret
-        CALL dfunc2d(IOP,N,AH,IS,MDist,maxd,p,xi,RAA)
+        CALL dfunc2d(IOP,AH,IS,MDist,maxd,p,xi,RAA)
         gg=0.d0
         dgg=0.d0
-        do j=1,n
+        do j=1,2*number_vertices
           gg=gg+g(j)**2
 C         dgg=dgg+xi(j)**2
           dgg=dgg+(xi(j)+g(j))*xi(j)
         enddo
         if(gg.eq.0.d0)return
         gam=dgg/gg
-        do j=1,n
+        do j=1,2*number_vertices
           g(j)=-xi(j)
           h(j)=g(j)+gam*h(j)
           xi(j)=h(j)
@@ -165,7 +165,7 @@ C         dgg=dgg+xi(j)**2
       return
       END
 
-      SUBROUTINE linmin2d(IOP,n,Iout,AH,IS,MDist,
+      SUBROUTINE linmin2d(IOP,Iout,AH,IS,MDist,
      1 maxd,p,pcom,xi,xicom,fret,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -173,38 +173,38 @@ C         dgg=dgg+xi(j)**2
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
       PARAMETER (TOL=1.d-8)
 C     USES brent2d,f1dim2d,mnbrak2d
-      do j=1,n
+      do j=1,2*number_vertices
         pcom(j)=p(j)
         xicom(j)=xi(j)
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak2d(IOP,n,Iout,AH,IS,MDist,maxd,
+      CALL mnbrak2d(IOP,Iout,AH,IS,MDist,maxd,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,RAA)
-      CALL brent2d(IOP,n,Iout,AH,IS,MDist,maxd,
+      CALL brent2d(IOP,Iout,AH,IS,MDist,maxd,
      1 fret,ax,xx,bx,TOL,xmin,xicom,pcom,RAA)
-      do j=1,n
+      do j=1,2*number_vertices
         xi(j)=xmin*xi(j)
         p(j)=p(j)+xi(j)
       enddo
       return
       END
 
-      SUBROUTINE f1dim2d(IOP,n,A,IS,MDist,maxd,
+      SUBROUTINE f1dim2d(IOP,A,IS,MDist,maxd,
      1 f1dimf,x,xicom,pcom,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*2),xt(NMAX*2),xicom(NMAX*2)
       Integer A(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
 C     USES func2d
-      do j=1,n
+      do j=1,2*number_vertices
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func2d(IOP,n,A,IS,MDist,maxd,xt,f1dimf,RAA)
+      CALL func2d(IOP,A,IS,MDist,maxd,xt,f1dimf,RAA)
       return
       END
 
-      SUBROUTINE mnbrak2d(IOP,n,Iout,AH,IS,DD,maxd,
+      SUBROUTINE mnbrak2d(IOP,Iout,AH,IS,DD,maxd,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -212,9 +212,9 @@ C     USES func2d
       Integer AH(NMAX,NMAX),IS(6)
       Integer DD(NMAX,NMAX)
       REAL*8 pcom(NMAX*2),xicom(NMAX*2)
-      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fa,ax,xicom,pcom,
+      CALL f1dim2d(IOP,AH,IS,DD,maxd,fa,ax,xicom,pcom,
      1 RAA)
-      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fb,bx,xicom,pcom,
+      CALL f1dim2d(IOP,AH,IS,DD,maxd,fb,bx,xicom,pcom,
      1 RAA)
       if(fb.gt.fa)then
         dum=ax
@@ -225,7 +225,7 @@ C     USES func2d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fc,cx,xicom,pcom,
+      CALL f1dim2d(IOP,AH,IS,DD,maxd,fc,cx,xicom,pcom,
      1 RAA)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
@@ -233,7 +233,7 @@ C     USES func2d
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             ax=bx
@@ -247,10 +247,10 @@ C     USES func2d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             bx=cx
@@ -258,12 +258,12 @@ C     USES func2d
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else
           u=cx+GOLD*(cx-bx)
@@ -271,7 +271,7 @@ C     USES func2d
         Write(Iout,1000)
         return
         endif
-        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         endif
         ax=bx
@@ -286,7 +286,7 @@ C     USES func2d
  1000 Format('**** Error in Subroutine mnbrak2d')
       END
 
-      SUBROUTINE brent2d(IOP,n,Iout,AH,IS,DD,maxd,
+      SUBROUTINE brent2d(IOP,Iout,AH,IS,DD,maxd,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,RAA)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
@@ -302,7 +302,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fx,x,xicom,pcom,
+      CALL f1dim2d(IOP,AH,IS,DD,maxd,fx,x,xicom,pcom,
      1 RAA)
       fv=fx
       fw=fx
@@ -338,7 +338,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim2d(IOP,n,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL f1dim2d(IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1    RAA)
         if(fu.le.fx) then
           if(u.ge.x) then
@@ -497,7 +497,7 @@ C OPTIMIZE
 
 C HESSIAN
       if(ihessian.ne.0) then
-        call get_hessian(number_vertices, dist, force, iopt, hessian,
+        call get_hessian(dist, force, iopt, hessian,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -1337,7 +1337,7 @@ C     ------------------------------------------------------------
       use iso_c_binding
       type(c_ptr) :: graph
       integer edges(2,3*N/2), faceA(6), faceB(6), NE, np, i, u, v, lA,lB
-      integer edges_hh(2,3*N/2), edges_hp(2,3*N/2),edges_pp(2,3*N/2)
+      integer edges_hh(2,3*N/2), edges_hp(2,3*N/2), edges_pp(2,3*N/2)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer na_hh,na_hp,na_pp
       na_hh=0
@@ -1378,7 +1378,8 @@ C       Do what needs to be done to u--v here
           edges_pp(1,na_pp)=u+1
           edges_pp(2,na_pp)=v+1
         case default
-          write(*,*)'Something went horribly wrong'
+          write(*,*)'Something went horribly wrong: bond not adjacent ',
+     1 'to 0, 1 or 2 pentagons'
           exit
         end select
 
@@ -1555,7 +1556,7 @@ c            write (*,*) "666"
       END SUBROUTINE
 
       
-      SUBROUTINE get_hessian(N, coord, force, iopt, hessian,
+      SUBROUTINE get_hessian(coord, force, iopt, hessian,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -1563,14 +1564,17 @@ c      use iso_c_binding
       use config
 c      type(c_ptr) :: graph
       implicit real*8 (a-h,o-z)
-      integer n, iopt, i, j, m
-      integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
+      integer iopt, i, j, m
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1 e_pp(2,3*number_vertices/2)
       integer ne_hh, ne_hp, ne_pp
-      integer a_h(3,3*n-60), a_p(3,60)
-      integer d_hhh(4,n), d_hhp(4,n), d_hpp(4,n), d_ppp(4,n)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hhp(4,number_vertices),
+     1 d_hpp(4,number_vertices), d_ppp(4,number_vertices)
       integer nd_hhh, nd_hhp, nd_hpp, nd_ppp
       integer a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12
-      real(8) coord(n*3), force(ffmaxdim), hessian(3*n,3*n)
+      real(8) coord(number_vertices*3), force(ffmaxdim),
+     1 hessian(3*number_vertices,3*number_vertices)
       real(8) k
 
 c initialize variables to *something*
@@ -1599,8 +1603,8 @@ c initialize variables to *something*
       rpp=0.0
 
 c init
-      do i=1,3*n
-        do j=1,3*n
+      do i=1,3*number_vertices
+        do j=1,3*number_vertices
           hessian(i,j)=0.0
         enddo
       enddo
@@ -1638,7 +1642,7 @@ c get force constants
           fdhhh=force(18)
           fco=force(19)
         case default
-          write(*,*)'Something went horribly wrong'
+          write(*,*)'Something went horribly wrong: illegal iopt'
       end select
 
 c edges
@@ -1669,7 +1673,8 @@ c edges
             r_naught=rpp
             m=ne_pp
           case default
-            write(*,*)'Something went horribly wrong'
+            write(*,*)'Something went horribly wrong: illegal iopt',
+     1 ' or edge type'
             exit
         end select
         if(m.gt.0) then
@@ -1748,7 +1753,7 @@ c       iopt doesn't matter in this case
           case(1)
             k=fah
             a_naught=ah
-            m=3*n-60
+            m=3*number_vertices-60
           case(2)
             k=fap
             a_naught=ap
@@ -2053,11 +2058,11 @@ c           no dihedrals in case of iopt=1,2
 
 c coulomb
       if(iopt.eq.2 .or. iopt.eq.4) then
-        atoms: do j=1,n
+        atoms: do j=1,number_vertices
           k=fco
-          a1=3*n-2
-          a2=3*n-1
-          a3=3*n
+          a1=3*number_vertices-2
+          a2=3*number_vertices-1
+          a3=3*number_vertices
           ax=coord(a1)
           ay=coord(a2)
           az=coord(a3)
@@ -2073,8 +2078,8 @@ c coulomb
       endif
 
 c copy hessian to the other half
-      do i=1,3*n
-        do j=i+1,3*n
+      do i=1,3*number_vertices
+        do j=i+1,3*number_vertices
           hessian(i,j)=hessian(j,i)+hessian(i,j)
           hessian(j,i)=hessian(i,j)
         enddo
@@ -2082,3 +2087,4 @@ c copy hessian to the other half
 
       return
       END SUBROUTINE
+
