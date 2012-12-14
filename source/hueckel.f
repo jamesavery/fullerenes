@@ -23,7 +23,7 @@ C Produce adjacency matrix
       enddo
       enddo
 
-      if(nohueckel.eq.0) then
+      if(nohueckel.ne.0) then
        WRITE(IOUT,1001) 
        return
       endif
@@ -62,7 +62,7 @@ C Analyze eigenenergies
       Subroutine HueckelAnalyze(Iout,iocc,df,evec)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION evec(Nmax),df(Nmax),IDG(Nmax)
+      DIMENSION evec(Nmax),df(Nmax),IDG(Nmax),specmom(0:50)
       Character*10 Symbol
 C Parameters alpha and beta are in atomic units and are adjusted 
 C  to HOMO DFT orbital energies
@@ -151,9 +151,27 @@ C     Bandgap
        if(bandgap.lt.Tol1) Write(Iout,1006)
       endif
 
+C     Spectral moments
+      nspec=15
+      vertnum=dfloat(number_vertices)
+      specmom(0)=vertnum
+       do J=1,nspec
+        specmom(J)=0.d0
+       enddo
+      Do I=1,number_vertices
+       do J=1,nspec
+        specmom(J)=specmom(J)+evec(i)**J
+       enddo
+      enddo
+      Write(Iout,1001) 
+       do I=1,nspec
+        Write(Iout,1011) I,dint(specmom(i)+1.d-5)
+       enddo
+
       call flush(iout)
  
  1000 FORMAT(8X,'x',13X,'E',4X,'deg NE   type    ',/1X,45('-'))
+ 1001 FORMAT(/1X,'Spectral moments M(I):',/1X,22('-'))
  1002 FORMAT(2(1X,F12.6),I3,1X,I3,3X,A10)
  1003 FORMAT(1X,45('-'),/1X,'Total pi-energy in units of beta: ',F12.6,
      1 /1X,'Total resonance energy per atom in units of beta ',
@@ -176,5 +194,6 @@ C     Bandgap
      1 ' and bipartivity index: ',F12.6)
  1009 FORMAT(/1X,'Fullerene has a properly closed shell')
  1010 FORMAT(/1X,'Fullerene has a pseudo closed shell')
+ 1011 FORMAT(1X,I2,5X,F20.0)
       Return
       END 
