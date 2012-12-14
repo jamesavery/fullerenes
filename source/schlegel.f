@@ -929,7 +929,7 @@ C     Now checking on the original vector
       Return
       END
 
-      SUBROUTINE func2d(IOP,n,A,IS,MDist,maxd,p,fc,RAA)
+      SUBROUTINE func2d(IOP,A,IS,MDist,maxd,p,fc,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Embedding algorithms for fullerene graph, energy
@@ -940,9 +940,9 @@ C     Embedding algorithms for fullerene graph, energy
 C     simple spring embedding
       if(IOP.le.2) then
       ehook=0.d0
-      Do I=1,n,2
+      Do I=1,2*number_vertices,2
         I1=(I+1)/2
-      Do J=I+2,n,2
+      Do J=I+2,2*number_vertices,2
         J1=(J+1)/2
         if(A(I1,J1).ne.0) then
          px=p(I)-p(J)
@@ -959,7 +959,7 @@ C     total energy
 C     Add Repulsive Coulomb
       if(IOP.eq.2) then
       fcoul=0.d0
-      Do I=1,n,2
+      Do I=1,2*number_vertices,2
         rv=dsqrt(p(I)**2+p(I+1)**2)
         fcoul=fcoul+1.d0/rv
       enddo
@@ -973,14 +973,14 @@ C     Pisanski-Plestenjak-Graovac algorithm
         iloop=6
         if(IS(6).eq.0) iloop=5
       ehook=0.d0
-      Do I=1,n,2
+      Do I=1,2*number_vertices,2
         I1=(I+1)/2
         maxu=1000000
         do K=1,iloop
          K1=IS(K)
          if(Mdist(K1,I1).lt.maxu) maxu=Mdist(K1,I1)
         enddo
-      Do J=I+2,n,2
+      Do J=I+2,2*number_vertices,2
         J1=(J+1)/2
         maxp=1000000
         do K=1,iloop
@@ -1004,9 +1004,9 @@ C     total energy
 C     Kamada-Kawai embedding
       if(IOP.eq.4) then
       ehook=0.d0
-      Do I=1,n,2
+      Do I=1,2*number_vertices,2
         I1=(I+1)/2
-      Do J=I+2,n,2
+      Do J=I+2,2*number_vertices,2
         J1=(J+1)/2
         if(MDist(I1,J1).le.0) then
          Print*,I1,J1,MDist(I1,J1)
@@ -1026,7 +1026,7 @@ C     total energy
       Return
       END
 
-      SUBROUTINE dfunc2d(IOP,n,A,IS,MDist,maxd,p,x,RAA)
+      SUBROUTINE dfunc2d(IOP,A,IS,MDist,maxd,p,x,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Embedding algorithms for fullerene graph, gradient
@@ -1035,11 +1035,11 @@ C     Embedding algorithms for fullerene graph, gradient
       Data r,f,coulomb/2.0d0,1.d-1,.3d0/
 C     simple spring embedding
       if(IOP.le.2) then
-      Do I=1,n,2
+      Do I=1,2*number_vertices,2
         ehookx=0.d0
         ehooky=0.d0
         I1=(I+1)/2
-      Do J=1,n,2
+      Do J=1,2*number_vertices,2
         J1=(J+1)/2
         if(A(I1,J1).ne.0) then
           px=p(I)-p(J)
@@ -1064,7 +1064,7 @@ C     Fix outer vertices
   
 C     Repulsive Coulomb
       if(IOP.eq.2) then
-      Do I=1,n,2
+      Do I=1,2*number_vertices,2
         I1=(I+1)/2
         if(I1.ne.IS(1).and.I1.ne.IS(2).and.I1.ne.IS(3).
      1   and.I1.ne.IS(4).and.I1.ne.IS(5).and.I1.ne.IS(6)) then
@@ -1082,7 +1082,7 @@ C     simple spring embedding + exponential weighting
       af=RAA*(1.4d0+rpermax/24.d0)
         iloop=6
         if(IS(6).eq.0) iloop=5
-      Do I=1,n,2
+      Do I=1,2*number_vertices,2
         I1=(I+1)/2
         maxu=1000000
         do K=1,iloop
@@ -1097,7 +1097,7 @@ C     Fix outer vertices
        else
         ehookx=0.d0
         ehooky=0.d0
-       Do J=1,n,2
+       Do J=1,2*number_vertices,2
         J1=(J+1)/2
         if(A(I1,J1).ne.0) then
         maxp=1000000
@@ -1121,11 +1121,11 @@ C     Fix outer vertices
 
 C     Kamada-Kawai embedding
       if(IOP.eq.4) then
-      Do I=1,n,2
+      Do I=1,2*number_vertices,2
         ehookx=0.d0
         ehooky=0.d0
         I1=(I+1)/2
-      Do J=1,n,2
+      Do J=1,2*number_vertices,2
         if(I.ne.J) then
         J1=(J+1)/2
         DD=dfloat(MDist(I1,J1))
