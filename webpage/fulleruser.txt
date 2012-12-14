@@ -1,4 +1,5 @@
 Users:
+---------------
 Version 4.1
 Mr. & Andrew & Punnettt & Massey University & CTCP & Auckland & NZ & andrew.punnett@gmail.com & Hello Peter
 Dr. & Xiang & Ye & Shanghai Normal University & Physics & Shanghai & China & yexiang@shnu.edu.cn & 
@@ -37,10 +38,15 @@ Prof. Dr. & Zhifeng & Jiao & Nanyang Normal University & Chemistry & Nanyang & C
 Prof. Dr. & Peter & Schwerdtfeger & Massey University & NZIAS & Auckland & New Zealand & p.a.schwerdtfeger@massey.ac.nz & dohnuts
 Mr. & Fatemeh & Moftakhar & University of Kashan & Mathematics & Kashan & Iran & f.k.moftakhar@gmail.com & 
 Ms. & Vivekananad & Gobre & Fritz Haber Institute of Max Planck Society  & Theory Department & Berlin & Germany & gobre@fhi-berlin.mpg.de & 
-Ms. & Vivekananad & Gobre & Fritz Haber Institute of Max Planck Society  & Theory Department & Berlin & Germany & gobre@fhi-berlin.mpg.de & 
 Dr. & Jan & Kazimirski &  &  & Warsaw & Poland & jankazim@op.pl & 
 Ms. & Son Tung & Ngo & Institute of Physics, Polish Academy of Sciences & Biophysics & Warsaw & Poland & sontungngo84@gmail.com & 
 Dr. & Al & Chen & IPMech RAS &  & Moscow & Russia & chentsov@ipmnet.ru & 
 Dr. & Alexey & Popov & Leibniz Institute for Solid State and Materials Research (IFW Dresden) & Electronic Structure of Molecular Materials & Dresden & Germany & a.popov@ifw-dresden.de & 
 Dr. & Yang & Gao & lanzhou university & department of mathematics and statistics  & lanzhou & China & gaoy1@163.com & 
 Dr. & Juan & Perilla & University of Illinois Urbana-Champaign & Beckman Institute & Urbana & United States of America & juan@ks.uiuc.edu & 
+Ms. & Jan & Goedgebeur & Ghent University & Applied Mathematics and Computer Science & Ghent & Belgium & jan.goedgebeur@ugent.be & 
+Ms. & Dominic & Esan & University of Illinois at Chicago & Chemistry & Chicago & United States of America & desan2@uic.edu &
+---------------
+Version 4.3
+Ms. & Xiaojie & Zhang & Fudan University & Chemistry & Shanghai & China & zxjzxj9@gmail.com & Check the structure, great program!
+Dr. & Antti & Kuronen & University of Helsinki & Department of Physics & Helsinki & Finland & antti.kuronen@helsinki.fi &
