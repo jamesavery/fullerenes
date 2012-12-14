@@ -420,8 +420,13 @@ and
   \label{rhoE}
   \rho_E=\frac{W_{\mathrm{max}}}{W_{\mathrm{min}}} \quad \text{ with } \quad W_{\mathrm{max}}= \max \{ W_i \}
 \end{equation}
-For $I_h$-\C{60} both $\rho$ and $\rho_E$ are exactly 1.0.
-
+For $I_h$-\C{60} both $\rho$ and $\rho_E$ are exactly 1.0. The spectral moments $\{ \mu_k, k=0,1,\dots \} $ are calculated from eigenvalues $x_i$ of the adjacency matrix,
+\begin{equation}
+  \label{specmom}
+  \mu_k=\sum_{i=1}^{n_v} x_i^k
+\end{equation}
+and we have $\mu_0 = n_v$, $\mu_1 = 0$, $\mu_2 = 3n_v$, $\mu_3 = 0$, $\mu_4 = 15n_v$, $\mu_5 = 120$, $\mu_4 = 93n_v - 120$, and $\mu_7 = 1680$.
+The higher spectral moments depend on the fullerene structure \cite{Fowler93}.
 
 %The Goldberg-Coxeter transformation
 \subsection{The Goldberg-Coxeter transformation}
@@ -1183,7 +1188,7 @@ Note that the maximum number of vertices in the database is defined in the confi
 %Figure 6
  \begin{figure}[htbp]
 	\centering
-  		 \includegraphics[width=0.6\textwidth]{C2160.png}
+  		 \includegraphics[width=0.4\textwidth]{C2160.png}
      \caption{Force-field optimized structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
      \label{pic:Finalgraph}
  \end{figure}
@@ -1265,7 +1270,7 @@ House of Graphs: a database of interesting graphs, available for fullerenes at h
 \bibitem{cvetkovic2002} D. Cvetkovi\'c, P. Fowler, P. Rowlinson, and D. Stevanovi\'c, ``Constructing fullerene graphs from eigenvalues and angles'',
 \textit{Linear Algebra Appl.} \textbf{356}, 37-56 (2002).
 
-\bibitem{Rogers} P. Fowler and K. M. Rogers, ``Spiral Codes and Goldberg Representations of Icosahedral Fullerenes and Octahedral
+\bibitem{Rogers} P. W. Fowler and K. M. Rogers, ``Spiral Codes and Goldberg Representations of Icosahedral Fullerenes and Octahedral
 Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 
 \bibitem{Estrada} E. Estrada, ``Characterization of 3D molecular structure'', \textit{Chem. Phys. Lett.}, \textbf{319}, 713-718 (2000).
@@ -1276,7 +1281,9 @@ Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 
 \bibitem{Heydari} A. Heydari and B. Taeri, ``Szeged index of TUC$_4$C$_8$(S) nanotubes'', \textit{Europ. J. Combinatorics} \textbf{30} 1134-1141 (2009). 
 
-\bibitem{Vukicevic} D. Vukicevic, F. Cataldo, O. Ori, and A. Graovac, ``Topological efficiency of \C{66} fullerene'', \textit{Chem. Phys. Lett.} \textbf{501}, 442-445 (2011),
+\bibitem{Vukicevic} D. Vukicevic, F. Cataldo, O. Ori, and A. Graovac, ``Topological efficiency of \C{66} fullerene'', \textit{Chem. Phys. Lett.} \textbf{501}, 442-445 (2011).
+
+\bibitem{Fowler93} P. W. Fowler, ``Systematics of fullerenes and related clusters'', \textit{Phil. Trans. R. Soc. Lond. A} \textbf{343}, 39-52 (1993) 
 
 \bibitem{Ori} O. Ori, private communication (2012).
 
