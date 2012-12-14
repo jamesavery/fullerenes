@@ -13,6 +13,39 @@ c 1002 Format(1X,'Not implemented yet')
 c      RETURN
 c      END
 
+      Function IPentInd(IRhag5)
+      Integer IRhag5(0:5)
+      Ifus5=0
+       Do I=1,5
+        IFus5=IFus5+I*IRhag5(I)
+       enddo
+       IPentInd=IFus5/2
+      Return
+      End
+
+      Double Precision Function HexInd(IRhag6,ihk)
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Integer IRhag6(0:6)
+      khk=0
+      k2hk=0
+      ihk=0
+       Do I=3,6
+        ihk=ihk+IRhag6(I)
+        IIR=I*IRhag6(I)
+        khk=khk+IIR
+        k2hk=k2hk+I*IIR
+       enddo
+      if(ihk.eq.0) then
+       Hexind=0.d0
+       Return
+      endif
+      aihk=dfloat(ihk)
+      akhk2=(dfloat(khk)/aihk)**2
+      ak2hk=dfloat(k2hk)/aihk
+      HexInd=dsqrt(dabs(ak2hk-akhk2))
+      Return
+      End
+
       SUBROUTINE Sortr(Mnew,imirror,jmirror,diam)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)

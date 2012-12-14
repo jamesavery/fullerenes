@@ -1246,7 +1246,9 @@ C     number_vertices is the nuclearity of the fullerene.
          IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices,M
          IF(number_vertices.ge.100.and.
      1      number_vertices.lt.1000) WRITE(Iout,602) number_vertices,M
-         IF(number_vertices.ge.1000) WRITE(Iout,632) number_vertices,M
+         IF(number_vertices.ge.1000.and.
+     1      number_vertices.lt.10000) WRITE(Iout,632) number_vertices,M
+         IF(number_vertices.ge.10000) WRITE(Iout,633) number_vertices,M
       do I=1,MMAX
        S(I)=0
       do J=1,MMAX
@@ -1577,6 +1579,8 @@ C     Print ring numbers
  629  Format(20(1X,32(I4,'-'),/))
  632  FORMAT(1X,'Spiral for fullerene isomers of C',I4,':',
      1 ' (',I4,' faces)')
+ 633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
+     1 ' (',I5,' faces)')
       Return
       END
       
@@ -1666,11 +1670,7 @@ C     First pentagon indices
        enddo
        IRhag5(IRcount)=IRhag5(IRcount)+1
       enddo
-      Ifus5=0
-      Do I=1,5
-       IFus5=IFus5+I*IRhag5(I)
-      enddo
-      IFus5G=IFus5/2
+      IFus5G=IPentInd(IRhag5)
 
 C     Now hexagon indices
       Do I=0,6
@@ -1689,22 +1689,10 @@ C     Now hexagon indices
        IRhag6(IRcount)=IRhag6(IRcount)+1
    10 Continue
 C     Strain Parameter
-      khk=0
-      k2hk=0
-      Do I=3,6
-      ihk=ihk+IRhag6(I)
-      IIR=I*IRhag6(I)
-      khk=khk+IIR
-      k2hk=k2hk+I*IIR
-      enddo
-      if(ihk.eq.0) go to 112
-      aihk=dfloat(ihk)
-      akhk2=(dfloat(khk)/aihk)**2
-      ak2hk=dfloat(k2hk)/aihk
-      sigmah=dsqrt(dabs(ak2hk-akhk2))
+      sigmah=HexInd(IRhag6,ihk)
 
 C     Now produce adjacency matrix
- 112  CALL DUAL(D,MMAX,IDA,IER)
+      CALL DUAL(D,MMAX,IDA,IER)
       Do I=1,number_vertices
        df(I)=0.d0
       Do J=I,number_vertices
