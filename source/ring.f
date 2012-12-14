@@ -512,53 +512,34 @@ C     First pentagon indices
        IRhag5(IRcount)=IRhag5(IRcount)+1
       enddo
 C     Pentagon index
-  111 Ifus5=0
-      Do I=1,5
-      IFus5=IFus5+I*IRhag5(I)
-      enddo
-      IFus5G=IFus5/2
+  111 IFus5G=IPentInd(IRhag5)
       Write(Iout,1013) (IRhag5(I),I=0,5),IFus5G
       If(IFus5G.eq.IRing5) then
-      Write(Iout,1015) IFus5G
+       Write(Iout,1015) IFus5G
       else
-      Write(Iout,1016) IFus5G
+       Write(Iout,1016) IFus5G
       endif
 C     Now hexagon indices
       if(N6Ring.eq.0) go to 113
-      Do I=0,6
-      IRhag6(I)=0
-      enddo
-      ihk=0
-      If(IRing6.eq.0) then
-      IRhag6(0)=N6Ring
-      go to 112
-      endif
+       Do I=0,6
+        IRhag6(I)=0
+       enddo
+       If(IRing6.eq.0) then
+        IRhag6(0)=N6Ring
+        go to 112
+       endif
       do I=13,12+N6Ring
       IRcount=0
       do J=1,IRing6
-      If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
-      IRcount=IRcount+1
-      endif
+       If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
+        IRcount=IRcount+1
+       endif
       enddo
       IRhag6(IRcount)=IRhag6(IRcount)+1
       enddo
 C     Strain Parameter
-      khk=0
-      k2hk=0
-      Do I=3,6
-      ihk=ihk+IRhag6(I)
-      IIR=I*IRhag6(I)
-      khk=khk+IIR
-      k2hk=k2hk+I*IIR
-      enddo
-      if(ihk.eq.0) then
-       Write(Iout,1027) 
-       Go to 112
-      endif
-      aihk=dfloat(ihk)
-      akhk2=(dfloat(khk)/aihk)**2
-      ak2hk=dfloat(k2hk)/aihk
-      sigmah=dsqrt(dabs(ak2hk-akhk2))
+      sigmah=HexInd(IRhag6,ihk)
+      if(ihk.eq.0) Write(Iout,1027) 
   112 Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
       Ifus6=0
       Do I=3,6
