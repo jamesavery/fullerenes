@@ -1240,6 +1240,7 @@ C     This subroutine has been modified from the original one of Fowler and
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
 C     It is used if dual matrix is already known. See subroutine Spiral for details.
 C     number_vertices is the nuclearity of the fullerene.
+C     SpiralT contains the pentagon indices, SpiralF the sequence of 6 and 5
       M=number_vertices/2+2
       ispiral=0
       WRITE (Iout,600)
@@ -1263,7 +1264,7 @@ C     number_vertices is the nuclearity of the fullerene.
        SpiralT(I,J)=0
       enddo
       enddo
-C     Set up dual matrix
+C     Set up dual matrix (adjacency matrix for rings)
       do I=1,IRG55
        I1=NrA(I)
        I2=NrB(I)
@@ -1335,6 +1336,7 @@ C     Loop over all (5,5) fusions
           do k=1,M
            SpiralF(k,nspiral)=S(k)
           enddo 
+          if(nspiral.gt.1) Call SpiralCheck(nspiral,NSP,SpiralT)
          endif
         endif
        enddo 
@@ -1378,18 +1380,19 @@ C     Loop over all (5,6) fusions
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
          enddo
       if(IER.eq.0) then
-      nspiral=nspiral+1
+       nspiral=nspiral+1
          If(nspiral.gt.NSP) then
          Write(Iout,627) nspiral,nsp
          nspiral=nspiral-1
          Go to 199
          endif
-      do k=1,12
-      SpiralT(k,nspiral)=JP(k)
-      enddo 
-      do k=1,M
-      SpiralF(k,nspiral)=S(k)
-      enddo 
+       do k=1,12
+        SpiralT(k,nspiral)=JP(k)
+       enddo 
+       do k=1,M
+        SpiralF(k,nspiral)=S(k)
+       enddo 
+        if(nspiral.gt.1) Call SpiralCheck(nspiral,NSP,SpiralT)
       endif
       endif
       enddo 
@@ -1430,16 +1433,17 @@ C     Loop over all (6,6) fusions
        if(IER.eq.0) then
         nspiral=nspiral+1
          If(nspiral.gt.NSP) then
-         Write(Iout,628) nspiral,nsp
-         nspiral=nspiral-1
-         Go to 199
+          Write(Iout,628) nspiral,nsp
+          nspiral=nspiral-1
+          Go to 199
          endif
-       do k=1,12
-        SpiralT(k,nspiral)=JP(k)
-       enddo
-       do k=1,M
-        SpiralF(k,nspiral)=S(k)
-       enddo 
+        do k=1,12
+         SpiralT(k,nspiral)=JP(k)
+        enddo
+        do k=1,M
+         SpiralF(k,nspiral)=S(k)
+        enddo 
+        if(nspiral.gt.1) Call SpiralCheck(nspiral,NSP,SpiralT)
        endif
       endif
       enddo 
@@ -1461,7 +1465,7 @@ C     Fowler algorithm
        enddo
        IER=0
        CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
-       IF(IER.ne.0) GO TO 13                !      and check for closure 
+       IF(IER.ne.0) GO TO 13           !      and check for closure 
        Do I=1,12 
         Spiral(I,1)=JP(I)
        enddo
@@ -1472,7 +1476,7 @@ C     Fowler algorithm
          K=J
        enddo
  16    nspfound=nspfound+1
-       if(nspfound.eq.1) write(Iout,614) nspiral
+       if(nspfound.eq.1) write(Iout,614) nspiral,12*M
        If(K.le.0) then
         WRITE(Iout,603) GROUP,(JP(I),I=1,12)
        else
@@ -1545,9 +1549,10 @@ C     Print ring numbers
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
  612  Format(1X,'Loop over (5,6) fusions, ',I5,' max in total')
  613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
- 614  Format(1X,I6,' potential spirals found',/1X,
-     1 'Point group   Ring spiral pentagon positions',
-     2 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
+ 614  Format(1X,I6,' distinct (clockwise or anti-clockwise) RSPIs ',
+     1 'found, maximum possible: ',I6,/1X,
+     2 'Point group   Ring spiral pentagon positions',
+     3 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
  616  Format(1X,'No (6,6) fusions to loop over')
  617  Format(1X,'Failed to find ring spiral: Fullerene most likely a ',
@@ -1583,7 +1588,24 @@ C     Print ring numbers
      1 ' (',I5,' faces)')
       Return
       END
-      
+     
+      SUBROUTINE SpiralCheck(nspiral,NSP,SpiralT) 
+      IMPLICIT Integer (A-Z)
+      DIMENSION SpiralT(12,NSP),dif(12)
+      Do I=1,nspiral-1
+      sum=0
+      Do J=1,12
+       dif(J)=SpiralT(J,I)-SpiralT(J,nspiral)
+       sum=sum+iabs(dif(J))
+      enddo
+       if(sum.eq.0) then
+        nspiral=nspiral-1
+        return
+       endif
+      enddo
+      Return
+      END
+
       SUBROUTINE CanSpiral(MS0,S,P)
       use config
       IMPLICIT Integer (A-Z)
