@@ -826,7 +826,9 @@ Namelist line that contains the main flags for the program.
 \item[{IP}]  If set to 1, verbose output is be produced, i.e. the full distance matrix, all Hamiltonian cycles 
   and all ring connections up to three rings (Default: 0).
 \item[{ixyz}] Flag for producing \filename{.xyz} input file for \program{CYLview}, \program{Avogadro} or other plotting programs in standard xyz format (Default: 0)
-  Default name for the external file is \filename{Fullerene-3D.xyz}. Otherwise \paramname{filename}='filename' needs to be specified (max. 50 characters).\\
+  Default name for the external file is \filename{Fullerene-3D.xyz}. Otherwise \paramname{filename}='filename' needs to be specified (max. 50 characters).
+  Note that if the routine which writes out \filename{.xyz} or \filename{.cc1} files is used more than onve, for example through the paramname{nloop} parameter,
+  a number is added after the string "-3D" in order to not cause conflict with previous files.\\
   If \paramname{ixyz} = 1: Produce \filename{.xyz} file named \filename{filename-3D.xyz} for further input.\\
   If \paramname{ixyz} = 2: Read \filename{.xyz} from file specified by \paramname{filename}. The final name is chosen as \filename{filename-3D.xyz} (Default: Fullerene-3D.xyz). 
   \paramname{ICart} = 0 needs to be specified for this. Another \filename{.xyz} file is also produced and named   \filename{filename-3Dnew.xyz}. (Default: Fullerene-3Dnew.xyz)\\
@@ -890,7 +892,8 @@ then the isomer number from the isomer list contained in the ``House of Graphs''
 vertex connectivities input as series of cards is required each with 4~integers: IV1, IC1, IC2 IC3,
 i.e. 1~3~6~4 gives the following edges: 1-3, 1-6, and 1-4.  Zeros for IC2 and IC3 can be used, i.e. 1~3~6~0
 gives 1-3 and 1-6, and 1~3~0~0 just gives 1-3 as an edge.  For the last card in the input stream, IV1 needs
-to be set to zero. For an example see input file \filename{EDGEc20.inp}.  It is legal but not necassary to define edges twice.
+to be set to zero. For an example see input file \filename{EDGEc20.inp}.  It is legal but not necessary to define edges twice.\\
+If \paramname{ICart} = 8 A spiral search algorithm is used, see \paramname{isearch} keyword in \paramname{Isomer} section.
 
 When importing graphs from the ``House of Graphs'' database, the isomers are numbered starting at~1 (Although,
 internally we start counting at~0.).  There are two example files called \filename{DBc50HOG.inp} and \filename{DBc384HOG.inp}.
@@ -1054,6 +1057,7 @@ Option for calculating Hamiltonian cycles and IUPAC numbers.
   If $\paramname{IUPAC} = 0$, the program goes into a fast subroutine and prints only the total number of Hamiltonian cycles.
 \end{description}
 
+\clearpage
 
 %---Isomers---
 \subsection{\&Isomers line}
