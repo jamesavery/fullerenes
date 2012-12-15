@@ -41,6 +41,7 @@ C    Set the dimensions for the distance matrix
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
       CHARACTER*7 Namecc1,Namexyz
+      CHARACTER*4 Endcc1,Endxyz
       CHARACTER*15 routine
       CHARACTER*50 filename
       CHARACTER*50 filenameout
@@ -67,9 +68,13 @@ C    Set the dimensions for the distance matrix
 C Set parameters
       Namecc1='-3D.cc1'
       Namexyz='-3D.xyz'
+      Endcc1='.cc1'
+      Endxyz='.xyz'
       IN=5
       Iout=6
       nloop=0
+      nxyz=0
+      ncc1=0
       ilp=0
       iprev=0
       isort=0
@@ -461,7 +466,8 @@ C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs
 C xyz format
       if(icyl.le.2) then
-      Call FileMod(filenameout,xyzname,Namexyz,nloop,ifind)
+      nxyz=nxyz+1
+      Call FileMod(filenameout,xyzname,Namexyz,Endxyz,nxyz,ifind)
         if(ifind.ne.0) then
          Write(Iout,1022)
          go to 9999
@@ -494,7 +500,8 @@ C xyz format
 C cc1 format
       if(icyl.ge.4) then
 C     Name handling
-      Call FileMod(filenameout,cc1name,Namecc1,nloop,ifind)
+      ncc1=ncc1+1
+      Call FileMod(filenameout,cc1name,Namecc1,Endcc1,ncc1,ifind)
         if(ifind.ne.0) then
          Write(Iout,1022)
          go to 9999
@@ -579,11 +586,11 @@ C  E N D   O F   P R O G R A M
  100  go to 9999
  101  iprev=0
       nloop=nloop+1
-      WRITE(Iout,1019) ! line of dashes
+      WRITE(Iout,1019) nloop ! line of dashes
       go to 9 ! datain
  102  iprev=1
       nloop=nloop+1
-      WRITE(Iout,1019) 
+      WRITE(Iout,1019) nloop ! line of dashes
       go to 9 ! datain
 9999  call date_and_time(CDAT,CTIM,zone,values)
         WRITE(Iout,1004) Values(3),Values(2),Values(1),Values(5),
@@ -604,7 +611,7 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.3.1, last revision from 15/12/12   |',
+     1 /1X,'|    This  version: 4.3.1, last revision from 16/12/12   |',
      1 /1X,'|________________________________________________________|',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
@@ -642,7 +649,7 @@ C Formats
  1016 FORMAT(/1X,'End of file reached ==> Stop')
  1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
  1018 FORMAT(132A1)
- 1019 FORMAT(140('='))
+ 1019 FORMAT(140('='),/1X,'Loop ',I2)
  1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
  1021 FORMAT(/1X,'Read coordinates from cc1 file: ',A60)
  1022 FORMAT(/1X,'You try to write into the database filesystem',
@@ -662,11 +669,20 @@ C Formats
       RETURN
       END
  
-      SUBROUTINE FileMod(filenameIn,filenameOut,EndName,nloop,ifind)
+      SUBROUTINE FileMod(filenameIn,filenameOut,EndName,End,Ncyc,ifind)
       Implicit Integer (A-Z)
+      CHARACTER*4  End
+      CHARACTER*20 Number
       CHARACTER*7  EndName
       CHARACTER*50 filenameIn,filenameOut
-        filenameOut=trim(filenameIn)//EndName
+C     Construct filename for xyz or cc1 files
+C     If Ncyc > 1 then add number
+        if(Ncyc.le.1) then
+         filenameOut=trim(filenameIn)//EndName
+        else
+         write(Number,*) Ncyc
+         filenameOut=trim(filenameIn)//trim(adjustl(Number))//End
+        endif
         ichar1=index(filenameOut,'database/ALL')
         ichar2=index(filenameOut,'database/IPR')
         ichar3=index(filenameOut,'database/Yoshida')

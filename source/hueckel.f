@@ -171,7 +171,7 @@ C     Spectral moments
       call flush(iout)
  
  1000 FORMAT(8X,'x',13X,'E',4X,'deg NE   type    ',/1X,45('-'))
- 1001 FORMAT(/1X,'Spectral moments M(I):',/1X,22('-'))
+ 1001 FORMAT(/1X,'Spectral moments M(I):',/1X,26('-'))
  1002 FORMAT(2(1X,F12.6),I3,1X,I3,3X,A10)
  1003 FORMAT(1X,45('-'),/1X,'Total pi-energy in units of beta: ',F12.6,
      1 /1X,'Total resonance energy per atom in units of beta ',
