@@ -40,6 +40,7 @@ C    Set the dimensions for the distance matrix
       CHARACTER CDAT*8,CTIM*10,Zone*5
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
+      CHARACTER*7 Namecc1,Namexyz
       CHARACTER*15 routine
       CHARACTER*50 filename
       CHARACTER*50 filenameout
@@ -64,8 +65,11 @@ C    Set the dimensions for the distance matrix
      8 'BK','CF','ES'/                                               
 
 C Set parameters
+      Namecc1='-3D.cc1'
+      Namexyz='-3D.xyz'
       IN=5
       Iout=6
+      nloop=0
       ilp=0
       iprev=0
       isort=0
@@ -454,15 +458,10 @@ c  stuff previously done, but is ok for now, as it takes not much time
       endif
 
 C------------------XYZ-and-CC1-FILES------------------------------
-C Print out Coordinates used as input for CYLview
+C Print out Coordinates used as input for CYLview, VMD or other programs
 C xyz format
       if(icyl.le.2) then
-        xyzname=trim(filenameout)//"-3D.xyz"
-        ichar1=index(xyzname,'database/ALL')
-        ichar2=index(xyzname,'database/IPR')
-        ichar3=index(xyzname,'database/Yoshida')
-        ichar4=index(xyzname,'database/HOG')
-        ifind=ichar1+ichar2+ichar3+ichar4
+      Call FileMod(filenameout,xyzname,Namexyz,nloop,ifind)
         if(ifind.ne.0) then
          Write(Iout,1022)
          go to 9999
@@ -494,12 +493,8 @@ C xyz format
       endif
 C cc1 format
       if(icyl.ge.4) then
-       cc1name=trim(filenameout)//"-3D.cc1"
-        ichar1=index(cc1name,'database/ALL')
-        ichar2=index(cc1name,'database/IPR')
-        ichar3=index(cc1name,'database/Yoshida')
-        ichar4=index(cc1name,'database/HOG')
-        ifind=ichar1+ichar2+ichar3+ichar4
+C     Name handling
+      Call FileMod(filenameout,cc1name,Namecc1,nloop,ifind)
         if(ifind.ne.0) then
          Write(Iout,1022)
          go to 9999
@@ -583,9 +578,11 @@ C  E N D   O F   P R O G R A M
   99  if(loop-1) 100,101,102
  100  go to 9999
  101  iprev=0
+      nloop=nloop+1
       WRITE(Iout,1019) ! line of dashes
       go to 9 ! datain
  102  iprev=1
+      nloop=nloop+1
       WRITE(Iout,1019) 
       go to 9 ! datain
 9999  call date_and_time(CDAT,CTIM,zone,values)
@@ -662,5 +659,18 @@ C Formats
       Real TA(2)
        CALL DTIME(TA,time)
        TIMEX=TIME
+      RETURN
+      END
+ 
+      SUBROUTINE FileMod(filenameIn,filenameOut,EndName,nloop,ifind)
+      Implicit Integer (A-Z)
+      CHARACTER*7  EndName
+      CHARACTER*50 filenameIn,filenameOut
+        filenameOut=trim(filenameIn)//EndName
+        ichar1=index(filenameOut,'database/ALL')
+        ichar2=index(filenameOut,'database/IPR')
+        ichar3=index(filenameOut,'database/Yoshida')
+        ichar4=index(filenameOut,'database/HOG')
+        ifind=ichar1+ichar2+ichar3+ichar4
       RETURN
       END
