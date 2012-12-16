@@ -661,32 +661,3 @@ C Formats
  1028 FORMAT(I8)
       STOP 
       END
-
-      SUBROUTINE TIMER(TIMEX)
-      Real TA(2)
-       CALL DTIME(TA,time)
-       TIMEX=TIME
-      RETURN
-      END
- 
-      SUBROUTINE FileMod(filenameIn,filenameOut,EndName,End,Ncyc,ifind)
-      Implicit Integer (A-Z)
-      CHARACTER*4  End
-      CHARACTER*20 Number
-      CHARACTER*7  EndName
-      CHARACTER*50 filenameIn,filenameOut
-C     Construct filename for xyz or cc1 files
-C     If Ncyc > 1 then add number
-        if(Ncyc.le.1) then
-         filenameOut=trim(filenameIn)//EndName
-        else
-         write(Number,*) Ncyc
-         filenameOut=trim(filenameIn)//trim(adjustl(Number))//End
-        endif
-        ichar1=index(filenameOut,'database/ALL')
-        ichar2=index(filenameOut,'database/IPR')
-        ichar3=index(filenameOut,'database/Yoshida')
-        ichar4=index(filenameOut,'database/HOG')
-        ifind=ichar1+ichar2+ichar3+ichar4
-      RETURN
-      END
