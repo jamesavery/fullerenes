@@ -1449,6 +1449,9 @@ C     Loop over all (6,6) fusions
       enddo 
       enddo 
       endif
+      if(nspiral.eq.0) then
+       WRITE(Iout,630)      
+      endif
      
 C     Now loop over with found spiral until success with
 C     Fowler algorithm
@@ -1531,7 +1534,7 @@ C     Print ring numbers
        enddo
        endif
       else 
-      WRITE(Iout,617)
+       WRITE(Iout,617) nspiral
       endif
  600  FORMAT(/1X,'Modified spiral algorithm Fowler and Manolopoulos',
      1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)')
@@ -1555,8 +1558,9 @@ C     Print ring numbers
      3 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
  616  Format(1X,'No (6,6) fusions to loop over')
- 617  Format(1X,'Failed to find ring spiral: Fullerene most likely a ',
-     1 'non-spiral one')
+ 617  Format(1X,'Failed to find ring spiral despite ',I6,
+     1 ' initial ring spirals connecting pentagons found: ',
+     1 'Fullerene most likely a non-spiral one')
  618  Format(20(1X,32(I4,'-'),/))
  619  Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I4,' spirals found)') 
@@ -1582,6 +1586,8 @@ C     Print ring numbers
      1 'existing spirals (otherwise increase NSpScale parameter ',
      1 'in main program')
  629  Format(20(1X,32(I4,'-'),/))
+ 630  Format(1X,'Failed to find ring spiral in initial step: ',
+     1 'Fullerene most likely a non-spiral one')
  632  FORMAT(1X,'Spiral for fullerene isomers of C',I4,':',
      1 ' (',I4,' faces)')
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
