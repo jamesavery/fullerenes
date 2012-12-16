@@ -55,6 +55,7 @@ C    Set the dimensions for the distance matrix
       Logical lexist
       integer mdist(nmax,nmax)
 
+C Set parameters
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
      2 'MN','FE','CO','NI','CU','ZN','GA','GE','AS','SE','BR','KR',    
@@ -64,8 +65,6 @@ C    Set the dimensions for the distance matrix
      6 'TA',' W','RE','OS','IR','PT','AU','HG','TL','PB','BI','PO',
      7 'AT','RN','FR','RA','AC','TH','PA',' U','NP','PU','AM','CM',   
      8 'BK','CF','ES'/                                               
-
-C Set parameters
       Namecc1='-3D.cc1'
       Namexyz='-3D.xyz'
       Endcc1='.cc1'
@@ -177,10 +176,12 @@ C Input Cartesian coordinates for fullerenes
    22    close(unit=7)
          xyzname=trim(filename)//'-3D.new.xyz'
         endif
+
       else
-        Do J=1,number_vertices
-          Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
-        enddo
+
+       Do J=1,number_vertices
+        Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
+       enddo
       endif
       Go to 40
    21 WRITE(Iout,1016)
@@ -464,6 +465,7 @@ c  stuff previously done, but is ok for now, as it takes not much time
 
 C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs
+
 C xyz format
       if(icyl.le.2) then
       nxyz=nxyz+1
@@ -497,6 +499,7 @@ C xyz format
         enddo
         Close(unit=3)
       endif
+
 C cc1 format
       if(icyl.ge.4) then
 C     Name handling
@@ -558,7 +561,7 @@ C  producing a spherical fullerene
        call ProjectSphere(ipsphere,Iout,IAtom,nzeile,
      1 IC3,Dist,cmcs,rmcs,filename,El,TEXTINPUT)
       endif
-
+C-----------------------------------------------------------------
       endif
 
 C------------------GRAPH2D----------------------------------------
@@ -579,7 +582,6 @@ C Calculate Schlegel diagram
      1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,mdist,Dist,ParamS,Rmin,
      1   TolX,scales,scalePPG,boost,CR,CRing5,CRing6,Symbol,filename)
       endif
-
 C------------------END--------------------------------------------
 C  E N D   O F   P R O G R A M
   99  if(loop-1) 100,101,102
