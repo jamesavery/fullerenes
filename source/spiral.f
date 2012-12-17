@@ -1490,6 +1490,13 @@ C     Fowler algorithm
         S(SpiralT(I,msp))=5
         JP(I)=SpiralT(I,msp)
        enddo
+C      Check if RSPIs are in order
+       Do I=2,12
+        if(JP(I).le.JP(I-1)) then
+         Write(Iout,631) I,JP(I),JP(I-1)
+         Return
+        endif
+       enddo
        IER=0
        CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
        IF(IER.ne.0) GO TO 13           !      and check for closure 
@@ -1614,6 +1621,8 @@ C     Print ring numbers
  629  Format(20(1X,32(I4,'-'),/))
  630  Format(1X,'Failed to find ring spiral in initial step: ',
      1 'Fullerene most likely a non-spiral one')
+ 631  Format(1X,'Pentagon not in ranking order, discovered at ',
+     1 'position I=',I6,' with JP(I).le.JP(I-1)') 
  632  FORMAT(1X,'Spiral for fullerene isomers of C',I4,':',
      1 ' (',I4,' faces)')
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
