@@ -76,11 +76,9 @@ C Set parameters
       ncc1=0
       ilp=0
       iprev=0
-      isort=0
       ihalma=0
       VolSphere=0.d0
       ASphere=0.d0
-      Group='   '
       Do I=1,Nmax
        IAtom(I)=6
         Do J=1,Nmax
@@ -105,6 +103,8 @@ C Get time and date
 C------------------DATAIN------------------------------------------
 C  INPUT and setting parameters for running the subroutines
  9    routine='DATAIN         '
+      Group='   '
+      isort=0
       leapspiral=0
       SWspiral=0
       Write(Iout,1008) routine
@@ -389,6 +389,10 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
+      if(nospiralsearch.lt.0) then
+       nospiralsearch=0
+       ipent=0
+      endif
       if((ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
      1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).and.
      1   nospiralsearch.eq.0) then

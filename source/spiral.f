@@ -1300,6 +1300,7 @@ C     Check if pentagons are in order
       enddo
 
       nspiral=0
+      nspiralT=0
       
 C     Start searching for spiral from pentagon 1 to 12, then stop
 C      and store the pentagon indices. Note this may still be an
@@ -1313,6 +1314,9 @@ C----  outer loop, ensures both left and right spirals are included
        do I=1,2*IRG55
         do j=4,M
          s(j)=0
+        enddo
+        do j=1,12
+         JP(j)=0
         enddo
 C     Get first two faces
        if(I.le.IRG55) then
@@ -1331,8 +1335,8 @@ C     Get third face, Note that J=I1 or J=I2 is excluded
 C---- Inner loop, ensures that both 3rd faces are included
        do J=1,M
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
-         S(3)=J
          MP=2
+         S(3)=J
 C     See if it is a pentagon, first 12 in D are
          if(J.le.12) then
           JP(3)=3
@@ -1340,22 +1344,29 @@ C     See if it is a pentagon, first 12 in D are
          endif
 C      Now search
           CALL spwindup(M,MP,D,S,JP,IER)
+C      Check if RSPIs are in order
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+          if(K.gt.1) ndifjp=JP(K)-JP(K-1)
+          if(ndifjp.le.0) IER=1
          enddo
          if(IER.eq.0) then
           nspiral=nspiral+1
+          nspiralT=nspiralT+1
+C       Check if enough space
           If(nspiral.gt.NSP) then
            Write(Iout,626) nspiral,nsp
            nspiral=nspiral-1
            Go to 199
           endif
+C       Now everything works fine
           do k=1,12
            SpiralT(k,nspiral)=JP(k)
           enddo 
           do k=1,M
            SpiralF(k,nspiral)=S(k)
           enddo 
+C       Delete identical spirals
           if(nspiral.gt.1) Call SpiralCheck(nspiral,NSP,SpiralT)
          endif
         endif
@@ -1368,42 +1379,48 @@ C---- End outer loop
 C Loop over all (5,6) fusions
 C Dito, see above
       if(IRG56.le.0) then
-      write(Iout,615)
+       write(Iout,615)
       else
-      write(Iout,612) 2*IRG56
+       write(Iout,612) 2*IRG56
       do I=1,2*IRG56
       do j=4,M
-      s(j)=0
+       s(j)=0
       enddo
+       do j=1,12
+        JP(j)=0
+       enddo
       if(I.le.IRG56) then
-      I1=NrC(I)
-      I2=NrD(I)
+       I1=NrC(I)
+       I2=NrD(I)
       else
-      IR=I-IRG56
-      I1=NrD(IR)
-      I2=NrC(IR)
+       IR=I-IRG56
+       I1=NrD(IR)
+       I2=NrC(IR)
       endif
-      S(1)=I1
-      S(2)=I2
+       S(1)=I1
+       S(2)=I2
       if(I1.le.12) then
-      JP(1)=1
+       JP(1)=1
       else
-      JP(2)=1
+       JP(1)=2
       endif
       do J=1,M
-      if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
-      S(3)=J
-      MP=1
-      if(J.le.12) then
-      JP(2)=3
-      MP=2
-      endif
-      CALL spwindup(M,MP,D,S,JP,IER)
+       if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
+        S(3)=J
+        MP=1
+        if(J.le.12) then
+         JP(2)=3
+         MP=2
+         endif
+        CALL spwindup(M,MP,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+          if(K.gt.1) ndifjp=JP(K)-JP(K-1)
+          if(ndifjp.le.0) IER=1
          enddo
       if(IER.eq.0) then
        nspiral=nspiral+1
+       nspiralT=nspiralT+1
          If(nspiral.gt.NSP) then
          Write(Iout,627) nspiral,nsp
          nspiral=nspiral-1
@@ -1432,6 +1449,9 @@ C Dito, see above
        do j=4,M
         s(j)=0
        enddo
+        do j=1,12
+         JP(j)=0
+        enddo
        if(I.le.IRG66) then
         I1=NrE(I)
         I2=NrF(I)
@@ -1453,9 +1473,12 @@ C Dito, see above
        CALL spwindup(M,MP,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+          if(K.gt.1) ndifjp=JP(K)-JP(K-1)
+          if(ndifjp.le.0) IER=1
          enddo
        if(IER.eq.0) then
         nspiral=nspiral+1
+        nspiralT=nspiralT+1
          If(nspiral.gt.NSP) then
           Write(Iout,628) nspiral,nsp
           nspiral=nspiral-1
@@ -1474,7 +1497,10 @@ C Dito, see above
       enddo 
       endif
       if(nspiral.eq.0) then
-       WRITE(Iout,630)      
+       WRITE(Iout,630) nspiralT      
+       Return
+      else
+       WRITE(Iout,634) nspiral,nspiralT
       endif
      
 C     Now loop over with found spiral until success with
@@ -1489,13 +1515,6 @@ C     Fowler algorithm
        Do I=1,12
         S(SpiralT(I,msp))=5
         JP(I)=SpiralT(I,msp)
-       enddo
-C      Check if RSPIs are in order
-       Do I=2,12
-        if(JP(I).le.JP(I-1)) then
-         Write(Iout,631) I,JP(I),JP(I-1)
-         Return
-        endif
        enddo
        IER=0
        CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
@@ -1596,7 +1615,7 @@ C     Print ring numbers
  619  Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I4,' spirals found)') 
  620  Format(1X,'Search ',I6,' spirals to produce canonical'
-     1 ' list of atoms:')
+     1 ' list of faces:')
  621  Format(12(1X,I4))
  622  Format(1X,'Pentagons are not in sequence, stopped at pentagon ',
      1 I6)
@@ -1619,14 +1638,13 @@ C     Print ring numbers
      1 'existing spirals (otherwise increase NSpScale parameter ',
      1 'in main program')
  629  Format(20(1X,32(I4,'-'),/))
- 630  Format(1X,'Failed to find ring spiral in initial step: ',
-     1 'Fullerene most likely a non-spiral one')
- 631  Format(1X,'Pentagon not in ranking order, discovered at ',
-     1 'position I=',I6,' with JP(I).le.JP(I-1)') 
+ 630  Format(1X,'Failed to find ring spiral in initial step: ',I6,
+     1 ' Fullerene most likely a non-spiral one')
  632  FORMAT(1X,'Spiral for fullerene isomers of C',I4,':',
      1 ' (',I4,' faces)')
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
      1 ' (',I5,' faces)')
+ 634  FORMAT(1X,I6,' distinct spirals found out of total',I6)
       Return
       END
      
