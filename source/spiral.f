@@ -1236,11 +1236,15 @@ C     Print*,iring,'/',JP
       DIMENSION D(MMAX,MMAX),S(MMAX)
       CHARACTER*3 GROUP
 
+C     Search for all spirals 
+C     Set up first three rings then wind
+C     Start ring spiral algorithm. Quit after first successful spiral.
 C     This subroutine has been modified from the original one of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
 C     It is used if dual matrix is already known. See subroutine Spiral for details.
 C     number_vertices is the nuclearity of the fullerene.
-C     SpiralT contains the pentagon indices, SpiralF the sequence of 6 and 5
+C     JP contains the pentagon indices, S the ring numbers
+C     SpiralT contains the pentagon indices, SpiralF the face numbers
       M=number_vertices/2+2
       ispiral=0
       WRITE (Iout,600)
@@ -1283,22 +1287,34 @@ C     Set up dual matrix (adjacency matrix for rings)
        D(I1,I2)=1
        D(I2,I1)=1
       enddo
+C     Check if pentagons are in order
+      Do K1=1,12
+       isumpent=0
+      Do K2=1,M
+       isumpent=isumpent+D(K1,K2)
+      enddo
+       if(isumpent.ne.5) then
+        Write(Iout,622) K1
+        return
+       endif
+      enddo
 
-C     Search for all spirals 
-C     Set up first three rings then wind
-C     Start ring spiral algorithm. Quit after first successful spiral
-C     JP contains the pentagon indices, S the ring numbers
       nspiral=0
       
-C     Loop over all (5,5) fusions
+C     Start searching for spiral from pentagon 1 to 12, then stop
+C      and store the pentagon indices. Note this may still be an
+C      unsuccessful ring spiral. Also throw duplicates out.
+C Loop over all (5,5) fusions
       if(IRG55.eq.0) then
        write(Iout,610)
       else
        write(Iout,611) 2*IRG55
+C----  outer loop, ensures both left and right spirals are included
        do I=1,2*IRG55
         do j=4,M
          s(j)=0
         enddo
+C     Get first two faces
        if(I.le.IRG55) then
         I1=NrA(I)
         I2=NrB(I)
@@ -1311,14 +1327,18 @@ C     Loop over all (5,5) fusions
         S(2)=I2
         JP(1)=1
         JP(2)=2
+C     Get third face, Note that J=I1 or J=I2 is excluded
+C---- Inner loop, ensures that both 3rd faces are included
        do J=1,M
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
          S(3)=J
          MP=2
+C     See if it is a pentagon, first 12 in D are
          if(J.le.12) then
           JP(3)=3
           MP=3
          endif
+C      Now search
           CALL spwindup(M,MP,D,S,JP,IER)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.M) IER=1
@@ -1340,10 +1360,13 @@ C     Loop over all (5,5) fusions
          endif
         endif
        enddo 
+C---- End inner loop
        enddo 
+C---- End outer loop
       endif
 
-C     Loop over all (5,6) fusions
+C Loop over all (5,6) fusions
+C Dito, see above
       if(IRG56.le.0) then
       write(Iout,615)
       else
@@ -1399,7 +1422,8 @@ C     Loop over all (5,6) fusions
       enddo 
       endif
       
-C     Loop over all (6,6) fusions
+C Loop over all (6,6) fusions
+C Dito, see above
       if(IRG66.eq.0) then
       write(Iout,616)
       else
@@ -1567,6 +1591,8 @@ C     Print ring numbers
  620  Format(1X,'Search ',I6,' spirals to produce canonical'
      1 ' list of atoms:')
  621  Format(12(1X,I4))
+ 622  Format(1X,'Pentagons are not in sequence, stopped at pentagon ',
+     1 I6)
  623  Format(1X,'Canonical spiral list of pentagon positions:')
  624  Format(1X,'Canonical spiral list of hexagons and pentagons:')
  625  Format(1X,100I1)
