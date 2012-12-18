@@ -1153,7 +1153,7 @@ C     Analyze dual matrix
       Return
       END
 
-      SUBROUTINE spwindup(M,MP,D,S,JP,IER)
+      SUBROUTINE spwindup(IER,M,MP,D,S,JP)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(MMAX,MMAX),S(MMAX)
@@ -1225,14 +1225,14 @@ C     Print*,iring,'/',JP
       Return
       END
 
-      SUBROUTINE SpiralSearch(NSP,Iout,IRG55,IRG66,
+      SUBROUTINE SpiralSearch(Iout,IRG55,IRG66,
      1 IRG56,NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION NrA(EMAX),NrB(EMAX),NrC(EMAX),NrD(EMAX)
       DIMENSION NrE(EMAX),NrF(EMAX),NMR(6),JP(12)
       DIMENSION Spiral(12,NMAX)
-      DIMENSION SpiralT(12,NSP),SpiralF(MMAX,NSP)
+      DIMENSION SpiralT(12,MaxSpirals),SpiralF(MMAX,MaxSpirals)
       DIMENSION D(MMAX,MMAX),S(MMAX)
       CHARACTER*3 GROUP
 
@@ -1245,7 +1245,8 @@ C     It is used if dual matrix is already known. See subroutine Spiral for deta
 C     number_vertices is the nuclearity of the fullerene.
 C     JP contains the pentagon indices, S the ring numbers
 C     SpiralT contains the pentagon indices, SpiralF the face numbers
-      M=number_vertices/2+2
+C     Timing O(6 n_v n_f)
+      number_faces=number_vertices/2+2
       ispiral=0
       WRITE (Iout,600)
          IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices,M
@@ -1264,7 +1265,7 @@ C     SpiralT contains the pentagon indices, SpiralF the face numbers
       do J=1,NMAX
        Spiral(I,J)=0
       enddo
-      do J=1,NSP
+      do J=1,MaxSpirals
        SpiralT(I,J)=0
       enddo
       enddo
@@ -1290,7 +1291,7 @@ C     Set up dual matrix (adjacency matrix for rings)
 C     Check if pentagons are in order
       Do K1=1,12
        isumpent=0
-      Do K2=1,M
+      Do K2=1,number_faces
        isumpent=isumpent+D(K1,K2)
       enddo
        if(isumpent.ne.5) then
@@ -1312,7 +1313,7 @@ C Loop over all (5,5) fusions
        write(Iout,611) 2*IRG55
 C----  outer loop, ensures both left and right spirals are included
        do I=1,2*IRG55
-        do j=4,M
+        do j=4,number_faces
          s(j)=0
         enddo
         do j=1,12
@@ -1333,7 +1334,7 @@ C     Get first two faces
         JP(2)=2
 C     Get third face, Note that J=I1 or J=I2 is excluded
 C---- Inner loop, ensures that both 3rd faces are included
-       do J=1,M
+       do J=1,number_faces
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
          MP=2
          S(3)=J
@@ -1343,10 +1344,10 @@ C     See if it is a pentagon, first 12 in D are
           MP=3
          endif
 C      Now search
-          CALL spwindup(M,MP,D,S,JP,IER)
+          CALL spwindup(IER,number_faces,MP,D,S,JP)
 C      Check if RSPIs are in order
          do K=1,12
-          if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+          if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
           if(K.gt.1) ndifjp=JP(K)-JP(K-1)
           if(ndifjp.le.0) IER=1
          enddo
@@ -1354,7 +1355,7 @@ C      Check if RSPIs are in order
           nspiral=nspiral+1
           nspiralT=nspiralT+1
 C       Check if enough space
-          If(nspiral.gt.NSP) then
+          If(nspiral.gt.MaxSpirals) then
            Write(Iout,626) nspiral,nsp
            nspiral=nspiral-1
            Go to 199
@@ -1363,11 +1364,11 @@ C       Now everything works fine
           do k=1,12
            SpiralT(k,nspiral)=JP(k)
           enddo 
-          do k=1,M
+          do k=1,number_faces
            SpiralF(k,nspiral)=S(k)
           enddo 
 C       Delete identical spirals
-          if(nspiral.gt.1) Call SpiralCheck(nspiral,NSP,SpiralT)
+          if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
          endif
         endif
        enddo 
@@ -1375,6 +1376,8 @@ C---- End inner loop
        enddo 
 C---- End outer loop
       endif
+      nspiral55=nspiral
+      nspiralT55=nspiralT
 
 C Loop over all (5,6) fusions
 C Dito, see above
@@ -1383,7 +1386,7 @@ C Dito, see above
       else
        write(Iout,612) 2*IRG56
       do I=1,2*IRG56
-      do j=4,M
+      do j=4,number_faces
        s(j)=0
       enddo
        do j=1,12
@@ -1404,7 +1407,7 @@ C Dito, see above
       else
        JP(1)=2
       endif
-      do J=1,M
+      do J=1,number_faces
        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
         S(3)=J
         MP=1
@@ -1412,16 +1415,16 @@ C Dito, see above
          JP(2)=3
          MP=2
          endif
-        CALL spwindup(M,MP,D,S,JP,IER)
+        CALL spwindup(IER,number_faces,MP,D,S,JP)
          do K=1,12
-          if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+          if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
           if(K.gt.1) ndifjp=JP(K)-JP(K-1)
           if(ndifjp.le.0) IER=1
          enddo
       if(IER.eq.0) then
        nspiral=nspiral+1
        nspiralT=nspiralT+1
-         If(nspiral.gt.NSP) then
+         If(nspiral.gt.MaxSpirals) then
          Write(Iout,627) nspiral,nsp
          nspiral=nspiral-1
          Go to 199
@@ -1429,15 +1432,17 @@ C Dito, see above
        do k=1,12
         SpiralT(k,nspiral)=JP(k)
        enddo 
-       do k=1,M
+       do k=1,number_faces
         SpiralF(k,nspiral)=S(k)
        enddo 
-        if(nspiral.gt.1) Call SpiralCheck(nspiral,NSP,SpiralT)
+        if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
       endif
       endif
       enddo 
       enddo 
       endif
+      nspiral56=nspiral-nspiral55
+      nspiralT56=nspiralT-nspiralT55
       
 C Loop over all (6,6) fusions
 C Dito, see above
@@ -1446,7 +1451,7 @@ C Dito, see above
       else
       write(Iout,613) 2*IRG66
       do I=1,2*IRG66
-       do j=4,M
+       do j=4,number_faces
         s(j)=0
        enddo
         do j=1,12
@@ -1462,7 +1467,7 @@ C Dito, see above
        endif
        S(1)=I1
        S(2)=I2
-       do J=1,M
+       do J=1,number_faces
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
           S(3)=J
           MP=0
@@ -1470,16 +1475,16 @@ C Dito, see above
           JP(1)=3
           MP=1
          endif
-       CALL spwindup(M,MP,D,S,JP,IER)
+       CALL spwindup(IER,number_faces,MP,D,S,JP)
          do K=1,12
-          if(JP(K).eq.0.or.JP(K).gt.M) IER=1
+          if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
           if(K.gt.1) ndifjp=JP(K)-JP(K-1)
           if(ndifjp.le.0) IER=1
          enddo
        if(IER.eq.0) then
         nspiral=nspiral+1
         nspiralT=nspiralT+1
-         If(nspiral.gt.NSP) then
+         If(nspiral.gt.MaxSpirals) then
           Write(Iout,628) nspiral,nsp
           nspiral=nspiral-1
           Go to 199
@@ -1487,21 +1492,27 @@ C Dito, see above
         do k=1,12
          SpiralT(k,nspiral)=JP(k)
         enddo
-        do k=1,M
+        do k=1,number_faces
          SpiralF(k,nspiral)=S(k)
         enddo 
-        if(nspiral.gt.1) Call SpiralCheck(nspiral,NSP,SpiralT)
+        if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
       endif
       enddo 
       enddo 
       endif
+C---- End of search
       if(nspiral.eq.0) then
-       WRITE(Iout,630) nspiralT      
+       WRITE(Iout,630) nspiralT,6*number_vertices
        Return
       else
-       WRITE(Iout,634) nspiral,nspiralT
+       WRITE(Iout,634) nspiral,nspiralT,6*number_vertices
       endif
+      nspiral66=nspiral-nspiral55-nspiral56
+      nspiralT66=nspiralT-nspiralT55-nspiralT56
+      WRITE(Iout,631) nspiral55,nspiralT55,nspiral56,nspiralT56,
+     1 nspiral66,nspiralT66
+C       print*,nspiral
      
 C     Now loop over with found spiral until success with
 C     Fowler algorithm
@@ -1509,7 +1520,7 @@ C     Fowler algorithm
       IPR=0
       nspfound=0
       Do 13 msp=1,nspiral
-       Do I=1,M
+       Do I=1,number_faces
         S(I)=6
        enddo
        Do I=1,12
@@ -1517,27 +1528,30 @@ C     Fowler algorithm
         JP(I)=SpiralT(I,msp)
        enddo
        IER=0
-       CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
-       IF(IER.ne.0) GO TO 13           !      and check for closure 
+       CALL Windup(number_faces,IPR,IER,S,D)     !      Wind up spiral into dual 
+       IF(IER.ne.0) GO TO 13                     !      and check for closure 
        Do I=1,12 
         Spiral(I,1)=JP(I)
        enddo
-       CALL Unwind(M,IER,IT,ispiral,Spiral,S,D,NMR,Group)  ! Unwind dual into spirals 
+        CALL Unwind(number_faces,IER,IT,ispiral,
+     1   Spiral,S,D,NMR,Group)                    ! Unwind dual into spirals 
        K=0
        DO J=1,6
          IF(NMR(J).EQ.0) GO TO 16
          K=J
        enddo
  16    nspfound=nspfound+1
-       if(nspfound.eq.1) write(Iout,614) nspiral,12*M
+       if(nspfound.eq.1) write(Iout,614) 
        If(K.le.0) then
         WRITE(Iout,603) GROUP,(JP(I),I=1,12)
        else
         WRITE(Iout,605) GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
        endif
        WRITE(Iout,604) 
-       if(M.lt.1000) WRITE(Iout,618) (SpiralF(I,msp),I=1,M)
-       if(M.ge.1000) WRITE(Iout,629) (SpiralF(I,msp),I=1,M)
+       if(number_faces.lt.1000) 
+     1  WRITE(Iout,618) (SpiralF(I,msp),I=1,number_faces)
+       if(number_faces.ge.1000) 
+     1  WRITE(Iout,629) (SpiralF(I,msp),I=1,number_faces)
        if(ispiral.ge.2) then
         if(ispiral.eq.2) then
          WRITE(Iout,623)
@@ -1558,14 +1572,14 @@ C     Fowler algorithm
         WRITE(Iout,623)
         WRITE(Iout,621) (JP(I),I=1,12)
        endif
-       Do I=1,M
+       Do I=1,number_faces
         S(I)=6
        enddo
        Do I=1,12
         S(JP(I))=5
        enddo
        WRITE(Iout,624)
-       WRITE(Iout,625) (S(I),I=1,M)
+       WRITE(Iout,625) (S(I),I=1,number_faces)
        go to 99
  13   CONTINUE 
  99   if(IER.eq.0) then
@@ -1578,7 +1592,7 @@ C     Print ring numbers
          jpc=jpc+iabs(JP(ipent)-SpiralT(ipent,msp))
        enddo
         if(jpc.eq.0) then
-        WRITE(Iout,618) (SpiralF(I,msp),I=1,M)
+        WRITE(Iout,618) (SpiralF(I,msp),I=1,number_faces)
         return
         endif
        enddo
@@ -1602,8 +1616,7 @@ C     Print ring numbers
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
  612  Format(1X,'Loop over (5,6) fusions, ',I5,' max in total')
  613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
- 614  Format(1X,I6,' distinct (clockwise or anti-clockwise) RSPIs ',
-     1 'found, maximum possible: ',I6,/1X,
+ 614  Format(1X,I6,' RSPI  found:',/1X,
      2 'Point group   Ring spiral pentagon positions',
      3 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
@@ -1639,18 +1652,24 @@ C     Print ring numbers
      1 'in main program')
  629  Format(20(1X,32(I4,'-'),/))
  630  Format(1X,'Failed to find ring spiral in initial step: ',I6,
-     1 ' Fullerene most likely a non-spiral one')
+     1 ' (maximum possible: ',I6,')',/1X,
+     1 'Fullerene most likely a non-spiral one')
+ 631  FORMAT(1X,I6,' Distinct (55)      spirals found out of ',I6,
+     1 /1X,I6,' Distinct (56)/(65) spirals found out of ',I6,
+     1 /1X,I6,' Distinct (66)      spirals found out of ',I6)
  632  FORMAT(1X,'Spiral for fullerene isomers of C',I4,':',
      1 ' (',I4,' faces)')
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
      1 ' (',I5,' faces)')
- 634  FORMAT(1X,I6,' distinct spirals found out of total',I6)
+ 634  FORMAT(1X,I6,' distinct spirals found out of total',I6,
+     1 ' (maximum possible: ',I6,')')
       Return
       END
      
-      SUBROUTINE SpiralCheck(nspiral,NSP,SpiralT) 
+      SUBROUTINE SpiralCheck(nspiral,SpiralT) 
+      use config
       IMPLICIT Integer (A-Z)
-      DIMENSION SpiralT(12,NSP),dif(12)
+      DIMENSION SpiralT(12,MaxSpirals),dif(12)
       Do I=1,nspiral-1
       sum=0
       Do J=1,12
