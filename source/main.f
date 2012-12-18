@@ -398,9 +398,8 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
      1   nospiralsearch.eq.0) then
         routine='SPIRALSEARCH   '
         Write(Iout,1008) routine
-        CALL SpiralSearch(Nspirals,Iout,Iring5,
-     1   Iring6,Iring56,NringA,NringB,NringC,NringD,NringE,NringF,JP,
-     1   GROUP)
+        CALL SpiralSearch(Iout,Iring5,Iring6,Iring56,NringA,NringB,
+     1   NringC,NringD,NringE,NringF,JP,GROUP)
       endif
 
 C--------------TOPOLOGICAL INDICATORS-----------------------------
