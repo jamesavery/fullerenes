@@ -529,6 +529,8 @@ C     number_vertices is the nuclearity of the fullerene.
       CHARACTER*3 GROUP
       CHARACTER*6 Occup
 
+      I=0
+      J=0
       ivarlimit=4
       if(ivar.gt.ivarlimit) then
        Write(Iout,805)
@@ -1225,8 +1227,8 @@ C     Print*,iring,'/',JP
       Return
       END
 
-      SUBROUTINE SpiralSearch(Iout,IRG55,IRG66,
-     1 IRG56,NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP)
+      SUBROUTINE SpiralSearch(Iout,IRG55,IRG66,IRG56,
+     1 NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION NrA(EMAX),NrB(EMAX),NrC(EMAX),NrD(EMAX)
@@ -1236,8 +1238,7 @@ C     Print*,iring,'/',JP
       DIMENSION D(MMAX,MMAX),S(MMAX)
       CHARACTER*3 GROUP
 
-C     Search for all spirals 
-C     Set up first three rings then wind
+C     Search for all spirals, set up first three rings then wind.
 C     Start ring spiral algorithm. Quit after first successful spiral.
 C     This subroutine has been modified from the original one of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
@@ -1246,15 +1247,18 @@ C     number_vertices is the nuclearity of the fullerene.
 C     JP contains the pentagon indices, S the ring numbers
 C     SpiralT contains the pentagon indices, SpiralF the face numbers
 C     Timing O(6 n_v n_f)
+
       number_faces=number_vertices/2+2
       ispiral=0
       WRITE (Iout,600)
-         IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices,M
-         IF(number_vertices.ge.100.and.
-     1      number_vertices.lt.1000) WRITE(Iout,602) number_vertices,M
-         IF(number_vertices.ge.1000.and.
-     1      number_vertices.lt.10000) WRITE(Iout,632) number_vertices,M
-         IF(number_vertices.ge.10000) WRITE(Iout,633) number_vertices,M
+       IF(number_vertices.lt.100)   
+     1  WRITE(Iout,601) number_vertices,number_faces
+       IF(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1  WRITE(Iout,602) number_vertices,number_faces
+       IF(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1  WRITE(Iout,632) number_vertices,number_faces
+       IF(number_vertices.ge.10000)
+     1  WRITE(Iout,633) number_vertices,number_faces
       do I=1,MMAX
        S(I)=0
       do J=1,MMAX
@@ -1262,14 +1266,15 @@ C     Timing O(6 n_v n_f)
       enddo
       enddo
       do I=1,12
-      do J=1,NMAX
-       Spiral(I,J)=0
+       do J=1,NMAX
+        Spiral(I,J)=0
+       enddo
+       do J=1,MaxSpirals
+        SpiralT(I,J)=0
+       enddo
       enddo
-      do J=1,MaxSpirals
-       SpiralT(I,J)=0
-      enddo
-      enddo
-C     Set up dual matrix (adjacency matrix for rings)
+
+C     Set up dual matrix (adjacency matrix for faces)
       do I=1,IRG55
        I1=NrA(I)
        I2=NrB(I)
@@ -1288,7 +1293,7 @@ C     Set up dual matrix (adjacency matrix for rings)
        D(I1,I2)=1
        D(I2,I1)=1
       enddo
-C     Check if pentagons are in order
+C     Check if pentagons are in order (dual theorem)
       Do K1=1,12
        isumpent=0
       Do K2=1,number_faces
@@ -1300,12 +1305,12 @@ C     Check if pentagons are in order
        endif
       enddo
 
-      nspiral=0
-      nspiralT=0
-      
 C     Start searching for spiral from pentagon 1 to 12, then stop
 C      and store the pentagon indices. Note this may still be an
 C      unsuccessful ring spiral. Also throw duplicates out.
+      nspiral=0
+      nspiralT=0
+
 C Loop over all (5,5) fusions
       if(IRG55.eq.0) then
        write(Iout,610)
@@ -1333,30 +1338,32 @@ C     Get first two faces
         JP(1)=1
         JP(2)=2
 C     Get third face, Note that J=I1 or J=I2 is excluded
-C---- Inner loop, ensures that both 3rd faces are included
+C---- Inner loop, ensures that both 3rd faces connected to I1 and I2 are included
        do J=1,number_faces
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
-         MP=2
+         MPent=2
          S(3)=J
 C     See if it is a pentagon, first 12 in D are
          if(J.le.12) then
           JP(3)=3
-          MP=3
+          MPent=3
          endif
 C      Now search
-          CALL spwindup(IER,number_faces,MP,D,S,JP)
+          CALL spwindup(IER,number_faces,MPent,D,S,JP)
 C      Check if RSPIs are in order
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
-          if(K.gt.1) ndifjp=JP(K)-JP(K-1)
-          if(ndifjp.le.0) IER=1
+          if(K.gt.1) then
+           ndifjp=JP(K)-JP(K-1)
+           if(ndifjp.le.0) IER=1
+          endif
          enddo
          if(IER.eq.0) then
           nspiral=nspiral+1
           nspiralT=nspiralT+1
 C       Check if enough space
           If(nspiral.gt.MaxSpirals) then
-           Write(Iout,626) nspiral,nsp
+           Write(Iout,626) nspiral,MaxSpirals
            nspiral=nspiral-1
            Go to 199
           endif
@@ -1410,22 +1417,24 @@ C Dito, see above
       do J=1,number_faces
        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
         S(3)=J
-        MP=1
+        MPent=1
         if(J.le.12) then
          JP(2)=3
-         MP=2
+         MPent=2
          endif
-        CALL spwindup(IER,number_faces,MP,D,S,JP)
+        CALL spwindup(IER,number_faces,MPent,D,S,JP)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
-          if(K.gt.1) ndifjp=JP(K)-JP(K-1)
-          if(ndifjp.le.0) IER=1
+          if(K.gt.1) then
+           ndifjp=JP(K)-JP(K-1)
+           if(ndifjp.le.0) IER=1
+          endif
          enddo
       if(IER.eq.0) then
        nspiral=nspiral+1
        nspiralT=nspiralT+1
          If(nspiral.gt.MaxSpirals) then
-         Write(Iout,627) nspiral,nsp
+         Write(Iout,627) nspiral,MaxSpirals
          nspiral=nspiral-1
          Go to 199
          endif
@@ -1470,22 +1479,24 @@ C Dito, see above
        do J=1,number_faces
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
           S(3)=J
-          MP=0
+          MPent=0
          if(J.le.12) then
           JP(1)=3
-          MP=1
+          MPent=1
          endif
-       CALL spwindup(IER,number_faces,MP,D,S,JP)
+       CALL spwindup(IER,number_faces,MPent,D,S,JP)
          do K=1,12
           if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
-          if(K.gt.1) ndifjp=JP(K)-JP(K-1)
-          if(ndifjp.le.0) IER=1
+          if(K.gt.1) then
+           ndifjp=JP(K)-JP(K-1)
+           if(ndifjp.le.0) IER=1
+          endif
          enddo
        if(IER.eq.0) then
         nspiral=nspiral+1
         nspiralT=nspiralT+1
          If(nspiral.gt.MaxSpirals) then
-          Write(Iout,628) nspiral,nsp
+          Write(Iout,628) nspiral,MaxSpirals
           nspiral=nspiral-1
           Go to 199
          endif
@@ -1512,7 +1523,6 @@ C---- End of search
       nspiralT66=nspiralT-nspiralT55-nspiralT56
       WRITE(Iout,631) nspiral55,nspiralT55,nspiral56,nspiralT56,
      1 nspiral66,nspiralT66
-C       print*,nspiral
      
 C     Now loop over with found spiral until success with
 C     Fowler algorithm
@@ -1654,14 +1664,14 @@ C     Print ring numbers
  630  Format(1X,'Failed to find ring spiral in initial step: ',I6,
      1 ' (maximum possible: ',I6,')',/1X,
      1 'Fullerene most likely a non-spiral one')
- 631  FORMAT(1X,I6,' Distinct (55)      spirals found out of ',I6,
-     1 /1X,I6,' Distinct (56)/(65) spirals found out of ',I6,
-     1 /1X,I6,' Distinct (66)      spirals found out of ',I6)
+ 631  FORMAT(1X,I6,' distinct (55)      RSPIs found out of ',I6,
+     1 /1X,I6,' distinct (56)/(65) RSPIs found out of ',I6,
+     1 /1X,I6,' distinct (66)      RSPIs found out of ',I6)
  632  FORMAT(1X,'Spiral for fullerene isomers of C',I4,':',
      1 ' (',I4,' faces)')
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
      1 ' (',I5,' faces)')
- 634  FORMAT(1X,I6,' distinct spirals found out of total',I6,
+ 634  FORMAT(1X,I6,' distinct RSPIs found out of total',I6,
      1 ' (maximum possible: ',I6,')')
       Return
       END
