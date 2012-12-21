@@ -246,7 +246,7 @@ c      endif
      1 'the Hueckel matrix',/1X,'Number of faces: ',I5,
      1 ', Number of atoms (vertices): ',I5,
      1 ', Point group of fullerene (in ideal symmetry): ',A3,/1X,
-     1 'Ring spiral pentagon positions: ',12I5,
+     1 'Ring spiral pentagon positions: ',12I6,
      1 /1X,'NMR pattern: ',3(I3,' x',I3,:,','))
  1002 FORMAT(/1X,'D contains IER = ',I6,' separating triangles and is ',
      1 'therefore NOT a fullerene dual')
@@ -260,7 +260,7 @@ c      endif
      1 'the Hueckel matrix',/1X,'Number of faces: ',I5,
      1 ', Number of atoms (vertices): ',I5,
      1 ', Point group of fullerene (in ideal symmetry): ',A3,/1X,
-     1 'Ring spiral pentagon positions: ',12I5)
+     1 'Ring spiral pentagon positions: ',12I6)
  1021 Format(12(1X,I5))
  1022 Format(1X,'Input spiral is canonical')
  1023 Format(1X,'Canonical spiral list of pentagon positions:')
@@ -318,7 +318,7 @@ C     Construct the ring spiral
      1 '5(6)^A (5(6)^B)^4 5(6)^C (5(6)^D)^4 5(6)^E 5:',
      1 '  A=',I5,', B=',I5,', C=',I5,', D=',I5,', E=',I5)
  1001 Format(1X,'Last pentagon index: ',I5,', number of faces: ',I5)
- 1002 Format(1X,'Ring spiral pentagon indices: ',12I5)
+ 1002 Format(1X,'Ring spiral pentagon indices: ',12I6)
       Return 
       END
 
@@ -531,9 +531,9 @@ C     Open file
      1 A3,')')
  1017 Format(1X,'Read isomer ',A3,I9,' from database (point group: ',
      1 A3,')')
- 1020 Format(/1X,'Ring spiral pentagon indices: ',12I5,
+ 1020 Format(/1X,'Ring spiral pentagon indices: ',12I6,
      1 /1X,'Np= ',I2,', sigmah= ',F12.6)
- 1021 Format(/1X,'Ring spiral pentagon indices: ',12I5,
+ 1021 Format(/1X,'Ring spiral pentagon indices: ',12I6,
      1 /1X,'Np= ',I2,', sigmah= ',F12.6,', Number of distinct ',
      1 'Hamiltonian cycles: ',I10)
  2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)

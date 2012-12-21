@@ -850,7 +850,7 @@ C     Analyze dual matrix
      1 ' 41, 108-111 (2001)',/1X,'Exponents of spiral series ',
      1 '5(6)^A (5(6)^B)^4 5(6)^C (5(6)^D)^4 5(6)^E 5:',
      1 '  A=',I5,', B=',I5,', C=',I5,', D=',I5,', E=',I5)
- 804  Format(1X,'Ring spiral pentagon indices RSPI: ',12I5,
+ 804  Format(1X,'Ring spiral pentagon indices RSPI: ',12I6,
      1 /1X,'Variation of each RSPI from RSPI-',I1,' to ','RSPI+',I1)
  805  Format(1X,'Variation too large, too many loops ==> RETURN')
  807  Format(1X,'Pentagon indices taken from input')
