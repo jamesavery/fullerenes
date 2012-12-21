@@ -1371,7 +1371,7 @@ C       Check if enough space
           If(nspiral.gt.MaxSpirals) then
            Write(Iout,626) nspiral,MaxSpirals
            nspiral=nspiral-1
-           Go to 199
+           Go to 198
           endif
 C       Now everything works fine
           do k=1,12
@@ -1383,7 +1383,7 @@ C       Now everything works fine
 C      Jump count if spcount=0
         if(spcount.eq.0) then
          Write(Iout,635)
-         go to 199
+         go to 198
         endif
 C       Delete identical spirals
           if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
@@ -1441,7 +1441,7 @@ C     Reset arrays
          If(nspiral.gt.MaxSpirals) then
           Write(Iout,627) nspiral,MaxSpirals
           nspiral=nspiral-1
-          Go to 199
+          Go to 198
          endif
          do k=1,12
           SpiralT(k,nspiral)=JP(k)
@@ -1452,7 +1452,7 @@ C     Reset arrays
 C      Jump count if spcount=0
         if(spcount.eq.0) then
          Write(Iout,635)
-         go to 199
+         go to 198
         endif
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
@@ -1501,7 +1501,7 @@ C Dito, see above
          If(nspiral.gt.MaxSpirals) then
           Write(Iout,628) nspiral,MaxSpirals
           nspiral=nspiral-1
-          Go to 199
+          Go to 198
          endif
         do k=1,12
          SpiralT(k,nspiral)=JP(k)
@@ -1512,7 +1512,7 @@ C Dito, see above
 C      Jump count if spcount=0
         if(spcount.eq.0) then
          Write(Iout,635)
-         go to 199
+         go to 198
         endif
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
@@ -1521,20 +1521,22 @@ C      Jump count if spcount=0
       enddo 
       endif
 C---- End of search
-      if(nspiral.eq.0) then
+ 198  if(nspiral.eq.0) then
        WRITE(Iout,630) nspiralT,6*number_vertices
        Return
       else
        WRITE(Iout,634) nspiral,nspiralT,6*number_vertices
       endif
-      nspiral66=nspiral-nspiral55-nspiral56
-      nspiralT66=nspiralT-nspiralT55-nspiralT56
-      WRITE(Iout,631) nspiral55,nspiralT55,nspiral56,nspiralT56,
-     1 nspiral66,nspiralT66
+      if(spcount.ne.0) then
+       nspiral66=nspiral-nspiral55-nspiral56
+       nspiralT66=nspiralT-nspiralT55-nspiralT56
+       WRITE(Iout,631) nspiral55,nspiralT55,nspiral56,nspiralT56,
+     1  nspiral66,nspiralT66
+      endif
      
 C     Now loop over with found spiral until success with
 C     Fowler algorithm
-  199 IT=1
+      IT=1
       IPR=0
       nspfound=0
       Do 13 msp=1,nspiral
@@ -1559,7 +1561,7 @@ C     Fowler algorithm
          K=J
        enddo
  16    nspfound=nspfound+1
-       if(nspfound.eq.1) write(Iout,614) 
+       if(nspfound.eq.1) write(Iout,614) nspiral 
        If(K.le.0) then
         WRITE(Iout,603) GROUP,(JP(I),I=1,12)
        else
@@ -1634,14 +1636,13 @@ C     Print ring numbers
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
  612  Format(1X,'Loop over (5,6) fusions, ',I5,' max in total')
  613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
- 614  Format(1X,I6,' RSPI  found:',/1X,
+ 614  Format(1X,I6,' RSPI  found from spiral ',I6,':',/1X,
      2 'Point group   Ring spiral pentagon positions',
      3 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
  616  Format(1X,'No (6,6) fusions to loop over')
- 617  Format(1X,'Failed to find ring spiral despite ',I6,
-     1 ' initial ring spirals connecting pentagons found: ',
-     1 'Fullerene most likely a non-spiral one')
+ 617  Format(1X,'--->',I6,' ring spirals found ',
+     1 'but RSPIs detected were not valid')
  618  Format(20(1X,32(I4,'-'),/))
  619  Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I4,' spirals found)') 
@@ -1669,9 +1670,9 @@ C     Print ring numbers
      1 'existing spirals (otherwise increase NSpScale parameter ',
      1 'in main program')
  629  Format(20(1X,32(I4,'-'),/))
- 630  Format(1X,'Failed to find ring spiral in initial step: ',I6,
-     1 ' (maximum possible: ',I6,')',/1X,
-     1 'Fullerene most likely a non-spiral one')
+ 630  Format(1X,'Failed to find ring spiral: ',I6,
+     1 ' detected (maximum possible: ',I6,')',/1X,
+     1 'This is a non-spiral fullerene')
  631  FORMAT(1X,I6,' distinct (55)      RSPIs found out of ',I6,
      1 /1X,I6,' distinct (56)/(65) RSPIs found out of ',I6,
      1 /1X,I6,' distinct (66)      RSPIs found out of ',I6)
