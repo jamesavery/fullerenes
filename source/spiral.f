@@ -1155,87 +1155,82 @@ C     Analyze dual matrix
       Return
       END
 
-      SUBROUTINE spwindup(IER,M,MP,D,S,JP)
+      SUBROUTINE spwindup(IER,number_faces,MP,D1,S,JP,FreeRing)
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION D(MMAX,MMAX),S(MMAX)
-      DIMENSION JP(12),IR(12),JR(12),JS(12)
+      DIMENSION D1(6,MMAX),S(MMAX),JP(12),FreeRing(6)
 C This routine tries to find the spiral from a preset of
 C three connected rings stored in S(1), S(2) and S(3) using
-C information on ring fusions from the dual matrix
+C information on ring fusions from the reduced dual matrix D1
+C If pentagon is found MP increases by 1.
+C IER=1 implies that no spiral found
+C This algorithm is much faster than the one in version 4.2
 
       IER=0
-      iring=0
-      mloop=3
-C   Big loop from ring 4 to the end
-      Do 10 i=4,M
-       if(i.gt.5) mloop=5
-       ifound=0
+C   Big loop from ring 4 onwards to the end of the spiral
+C---- Start loop
+      Do 10 i=4,number_faces
+      nsmall=1
+
+C    First collect next possible faces connected to the previous 
+C    5- or 6-ring (nloop=5 or 6) numbered IP=S(i-1) 
+C    and make sure it is not one of the previous rings
+C    in the spiral
        IP=S(i-1)
-       if(IP.eq.0) go to 10
-C    Find new ring connection to ring IP, but keep previous ones out
-C    and store in IR
-         IC=0
-         Do j=1,M
-           if(D(j,IP).eq.1) then
-           iflag=0
-            do k=1,i-2
-            if(j.eq.s(k)) iflag=1
-            enddo
-            if(iflag.eq.0) then
-              IC=IC+1
-              IR(IC)=J
-            endif
-           endif
+       nloop=6
+       nring=0
+       if(D1(6,IP).eq.0) nloop=5
+        do 11 j=1,nloop
+C       Get all adjacent rings to previous one
+         nr=D1(j,IP)
+C       Make sure it is not one in the existing spiral
+         do j1=I-2,1,-1
+          if(nr.eq.S(j1)) go to 11
          enddo
-       if(IC.gt.6.or.IC.eq.0) Go to 10
-C    Find the ring adjacent to IP and to a previous ring
-C    in the spiral and store
-           iring=0
-          do j=1,IC
-           do k=1,i-mloop
-            IX=S(k)
-            if(D(IR(j),IX).eq.1) then
-            iring=iring+1
-            JR(iring)=IR(j)
-            JS(iring)=k
+C       Collect them
+          nring=nring+1
+          FreeRing(nring)=nr
+   11   continue
+         
+C    Now it needs to be connected to a previous ring
+C    Last 2 are not needed
+         do k=nsmall,i-3
+          KP=S(k)
+          do k1=1,6
+           do j2=1,nring
+            nr=FreeRing(j2)
+            if(D1(k1,KP).eq.nr) then
+             nsmall=k
+             S(i)=nr
+             if(D1(6,nr).eq.0) then
+              MP=MP+1
+              JP(MP)=i
+             endif
+            go to 10
             endif
            enddo
           enddo
-C    Check if spiral is at dead end
-      if(iring.eq.0) then
-        IER=1
-      Return
-      endif
-C    Now determine neighboring ring
-         k=100000
-         do j=1,iring
-          if(JS(j).lt.k) then
-          s(i)=JR(j)
-          k=JS(j)
-          endif
          enddo
-C    Now check if it is a pentagon
-            if(s(i).le.12) then
-            MP=MP+1
-            JP(MP)=i
-            endif
-  10  Continue
-C    Spiral found if loop went through
-C     Print*,M,IER,'/',(S(I),I=1,M)
-C     Print*,iring,'/',JP
+
+      if(S(i).eq.0) then
+       IER=1   ! Spiral has dead end
+       Return
+      endif
+
+  10  continue
+C  Finally success, spiral found
       Return
       END
 
       SUBROUTINE SpiralSearch(Iout,IRG55,IRG66,IRG56,
-     1 NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP)
+     1 NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP,spcount)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION NrA(EMAX),NrB(EMAX),NrC(EMAX),NrD(EMAX)
       DIMENSION NrE(EMAX),NrF(EMAX),NMR(6),JP(12)
-      DIMENSION Spiral(12,NMAX)
+      DIMENSION Spiral(12,NMAX),D1(6,MMax)
       DIMENSION SpiralT(12,MaxSpirals),SpiralF(MMAX,MaxSpirals)
-      DIMENSION D(MMAX,MMAX),S(MMAX)
+      DIMENSION D(MMAX,MMAX),S(MMAX),FreeRing(6)
       CHARACTER*3 GROUP
 
 C     Search for all spirals, set up first three rings then wind.
@@ -1260,7 +1255,6 @@ C     Timing O(6 n_v n_f)
        IF(number_vertices.ge.10000)
      1  WRITE(Iout,633) number_vertices,number_faces
       do I=1,MMAX
-       S(I)=0
       do J=1,MMAX
        D(I,J)=0
       enddo
@@ -1272,6 +1266,9 @@ C     Timing O(6 n_v n_f)
        do J=1,MaxSpirals
         SpiralT(I,J)=0
        enddo
+      enddo
+      do I=1,6
+       FreeRing(i)=0
       enddo
 
 C     Set up dual matrix (adjacency matrix for faces)
@@ -1304,6 +1301,21 @@ C     Check if pentagons are in order (dual theorem)
         return
        endif
       enddo
+C     Compress dual matrix
+      Do K1=1,number_faces
+      Do K2=1,6
+       D1(K2,K1)=0
+      enddo
+      enddo
+      Do K1=1,number_faces
+      ncount=0
+      Do K2=1,number_faces
+       if(D(K1,K2).eq.1) then
+        ncount=ncount+1
+        D1(ncount,K1)=K2
+       endif
+      enddo
+      enddo
 
 C     Start searching for spiral from pentagon 1 to 12, then stop
 C      and store the pentagon indices. Note this may still be an
@@ -1318,12 +1330,6 @@ C Loop over all (5,5) fusions
        write(Iout,611) 2*IRG55
 C----  outer loop, ensures both left and right spirals are included
        do I=1,2*IRG55
-        do j=4,number_faces
-         s(j)=0
-        enddo
-        do j=1,12
-         JP(j)=0
-        enddo
 C     Get first two faces
        if(I.le.IRG55) then
         I1=NrA(I)
@@ -1343,21 +1349,21 @@ C---- Inner loop, ensures that both 3rd faces connected to I1 and I2 are include
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
          MPent=2
          S(3)=J
+C       Reset arrays
+        do k=4,number_faces
+         s(k)=0
+        enddo
+        do k=3,12
+         JP(k)=0
+        enddo
 C     See if it is a pentagon, first 12 in D are
          if(J.le.12) then
           JP(3)=3
           MPent=3
          endif
 C      Now search
-          CALL spwindup(IER,number_faces,MPent,D,S,JP)
+          CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
 C      Check if RSPIs are in order
-         do K=1,12
-          if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
-          if(K.gt.1) then
-           ndifjp=JP(K)-JP(K-1)
-           if(ndifjp.le.0) IER=1
-          endif
-         enddo
          if(IER.eq.0) then
           nspiral=nspiral+1
           nspiralT=nspiralT+1
@@ -1393,12 +1399,7 @@ C Dito, see above
       else
        write(Iout,612) 2*IRG56
       do I=1,2*IRG56
-      do j=4,number_faces
-       s(j)=0
-      enddo
-       do j=1,12
-        JP(j)=0
-       enddo
+C     Reset arrays
       if(I.le.IRG56) then
        I1=NrC(I)
        I2=NrD(I)
@@ -1418,35 +1419,34 @@ C Dito, see above
        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
         S(3)=J
         MPent=1
+        do k=4,number_faces
+         s(k)=0
+        enddo
+        do k=2,12
+         JP(k)=0
+        enddo
         if(J.le.12) then
          JP(2)=3
          MPent=2
-         endif
-        CALL spwindup(IER,number_faces,MPent,D,S,JP)
-         do K=1,12
-          if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
-          if(K.gt.1) then
-           ndifjp=JP(K)-JP(K-1)
-           if(ndifjp.le.0) IER=1
-          endif
-         enddo
-      if(IER.eq.0) then
-       nspiral=nspiral+1
-       nspiralT=nspiralT+1
+        endif
+        CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
+        if(IER.eq.0) then
+         nspiral=nspiral+1
+         nspiralT=nspiralT+1
          If(nspiral.gt.MaxSpirals) then
-         Write(Iout,627) nspiral,MaxSpirals
-         nspiral=nspiral-1
-         Go to 199
+          Write(Iout,627) nspiral,MaxSpirals
+          nspiral=nspiral-1
+          Go to 199
          endif
-       do k=1,12
-        SpiralT(k,nspiral)=JP(k)
-       enddo 
-       do k=1,number_faces
-        SpiralF(k,nspiral)=S(k)
-       enddo 
+         do k=1,12
+          SpiralT(k,nspiral)=JP(k)
+         enddo 
+         do k=1,number_faces
+          SpiralF(k,nspiral)=S(k)
+         enddo 
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
-      endif
-      endif
+       endif
+       endif
       enddo 
       enddo 
       endif
@@ -1456,16 +1456,10 @@ C Dito, see above
 C Loop over all (6,6) fusions
 C Dito, see above
       if(IRG66.eq.0) then
-      write(Iout,616)
+       write(Iout,616)
       else
-      write(Iout,613) 2*IRG66
+       write(Iout,613) 2*IRG66
       do I=1,2*IRG66
-       do j=4,number_faces
-        s(j)=0
-       enddo
-        do j=1,12
-         JP(j)=0
-        enddo
        if(I.le.IRG66) then
         I1=NrE(I)
         I2=NrF(I)
@@ -1480,18 +1474,17 @@ C Dito, see above
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
           S(3)=J
           MPent=0
+       do k=4,number_faces
+        s(k)=0
+       enddo
+        do k=1,12
+         JP(k)=0
+        enddo
          if(J.le.12) then
           JP(1)=3
           MPent=1
          endif
-       CALL spwindup(IER,number_faces,MPent,D,S,JP)
-         do K=1,12
-          if(JP(K).eq.0.or.JP(K).gt.number_faces) IER=1
-          if(K.gt.1) then
-           ndifjp=JP(K)-JP(K-1)
-           if(ndifjp.le.0) IER=1
-          endif
-         enddo
+       CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
        if(IER.eq.0) then
         nspiral=nspiral+1
         nspiralT=nspiralT+1

@@ -2,7 +2,7 @@
      1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
-     1 ipsphere,ndual,nosort,nospiral,novolume,ihessian,isearch,
+     1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinth,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
      1 force,forceP,boost,filename,filenameout,DATEN)
@@ -16,7 +16,7 @@
       Character filenameout*50
       Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,
      1 nohueckel,loop,
-     1 filename,filenameout,ipsphere,nosort,nospiral,novolume
+     1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
@@ -93,7 +93,7 @@ C Default parameters for external files
 
 C Integers
       nosort=0  !  Flag for sorting cartesian coordinates
-      nospiral=0 ! Flag for searching for canonical spiral
+      ispsearch=1 ! Flag for searching for canonical spiral
       novolume=0 ! Flag for volume calculation
       IGCtrans=0 ! Initial flag for Goldberg-Coxeter transformed fullerene
       ICart=1   !  Input for fullerene structure

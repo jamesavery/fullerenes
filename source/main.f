@@ -112,8 +112,8 @@ C  INPUT and setting parameters for running the subroutines
      1  nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
-     1  ipsphere,ndual,nosort,nospiralsearch,novolume,ihessian,
-     1  isearch,iprinthessian,
+     1  ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
+     1  iprinthessian,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 
@@ -389,17 +389,15 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
-      if(nospiralsearch.lt.0) then
-       nospiralsearch=0
-       ipent=0
-      endif
+      ispcount=0
+      if(ispsearch.gt.1) ispcount=1
       if((ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
-     1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).and.
-     1   nospiralsearch.eq.0) then
+     1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).or.
+     1   ispsearch.ne.0) then
         routine='SPIRALSEARCH   '
         Write(Iout,1008) routine
         CALL SpiralSearch(Iout,Iring5,Iring6,Iring56,NringA,NringB,
-     1   NringC,NringD,NringE,NringF,JP,GROUP)
+     1   NringC,NringD,NringE,NringF,JP,GROUP,ispcount)
       endif
 
 C--------------TOPOLOGICAL INDICATORS-----------------------------
@@ -616,7 +614,7 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.3.1, last revision from 16/12/12   |',
+     1 /1X,'|    This  version: 4.3.1, last revision from 21/12/12   |',
      1 /1X,'|________________________________________________________|',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
