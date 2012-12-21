@@ -1,6 +1,6 @@
 This is an example how to create the coordinate for the non-spiral D3-C384
 through a ring-spiral fullerene D3-C366 and Brinkmann-Fowler 6-vertex insertions
-&General NA=366, ixyz=1, nosort=1, ipsphere=2 /
+&General NA=366, ixyz=1, nosort=1, ispsearch=2, ipsphere=2 /
 &Coord ICart=2, IBF=2 /
 &FFChoice Iopt=3 ftol=.1d-10/
 &FFParameters  /

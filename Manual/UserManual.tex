@@ -290,7 +290,7 @@ the canonical fullerene number as defined in the book ``Atlas of Fullerenes'' by
 (input files \filename{EDGEc20.inp} and \filename{EDGEc60.inp}).
 The program prints internal coordinates in form of a $Z$-Matrix (distances, angles and dihedrals).
 For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
-coordinates, e.g. cartesian coordinates obtainded from a force-field optimization.
+coordinates, e.g. cartesian coordinates obtained from a force-field optimization.
 
 We recommend reading Fowler and Manolopoulus' book \cite{Atlas,cvetkovic2002} for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
 to construct 3D fullerene graphs. For the Goldberg-Coxeter transformation of \C{20} we obtain the RSPI from the scheme introduced by
@@ -577,7 +577,10 @@ Subroutine \funname{SpiralSearch} uses the ring-spiral algorithm of Fowler and M
 for the search of a ring spiral if, for the input, cartesian coordinates or vertex connections (adjacencies) were chosen, or if the
 initial fullerene structure was modified. It produces the canonical ring-spiral pentagon indices
 if the fullerene contains a face spiral, and fails if it does not (as for the two examples shown in 
-Figure \ref{pic:C380andC384}).  A more general ring-spiral algorithm is currently in preparation.
+Figure \ref{pic:C380andC384}). Note that considerable improvements were made to optimize the ring spiral search algorithm, and if 
+\paramname{ispsearch}=2 is chosen it counts all possible ring spirals (this is computationally more expensive). 
+The number of spirals in the output agree with the examples given by Yoshida and Fowler.\cite{Yoshida97} 
+A more general ring-spiral algorithm is currently in preparation.
 
 %Volume and surface area, minimum covering sphere
 \subsection{Volume and surface area, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
@@ -1297,6 +1300,8 @@ Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 \bibitem{PSAJDB} P. Schwerdtfeger, D. Babi\'c, and J. Avery, ``Hamiltonian cycles in regular fullerenes'', in preparation.
 
 \bibitem{NumericalRecipes} ``Numerical Recipes in Fortran 77. The Art of Scientific Computing'' (2nd Edition, 1992); see http://www.nr.com/.
+
+\bibitem{Yoshida97} M. Yoshida and P. W. Fowler, ``Dihedral fullerenes of threefold symmetry with and withoutface spirals'', \textit{J. Chem. Soc., Faraday Trans.} \textbf{93}, 3289-3294 (1997). 
 
 \bibitem{Diaz} S. D\'iaz-Tendero, F. Mart\'in, and M. Alcam\'i, \textit{ChemPhysChem} \textbf{6}, 92-100 (2005).
 
