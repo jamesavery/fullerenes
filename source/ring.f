@@ -337,6 +337,9 @@ C1011 Format(3X,96(I3))
      1 nl565,numbersw,numberFM,numberYF,numberBF,
      1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
      1 IC3,IVR3,n3rc,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
+C     This routine analyzes the pentagons and hexagons
+C     The first 12 faces are pentagons (many routines need this order)
+C     All other which follow are hexagons
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Determine the center of each 5-and 6-ring system

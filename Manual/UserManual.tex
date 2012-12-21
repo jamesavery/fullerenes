@@ -819,7 +819,7 @@ every line until the first namelist line is interpreted as a comment.
 \subsection{\&General line}
 Namelist line that contains the main flags for the program. 
 
-\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, nohueckel, loop, ipsphere, nosort, nospiral, novolume, TolR, R5, R6, filenamedb, filename}.
+\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, nohueckel, loop, ipsphere, nosort, ispsearch, novolume, TolR, R5, R6, filenamedb, filename}.
 \paragraph{Option description:}
 \begin{description}
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
@@ -855,7 +855,8 @@ Namelist line that contains the main flags for the program.
   \item[3:] In addition, write MCS to the .cc1-file \filename{filename-3DMCS.cc1}.
   \end{enumerate}
 \item[{nosort}] If \paramname{nosort} = 1, permutation of vertices for better $Z$-Matrix is suppressed (Default: 0).
-\item[{nospiral}] If \paramname{nospiral} = 1, search for the canonical spiral is avoided  (Default: 0).
+\item[{ispsearch}] If \paramname{ispsearch} = 0, search for the canonical ring spiral is avoided  (Default: 1). If \paramname{ispsearch} = 1, ring spiral search takes place
+until it is successful. If \paramname{ispsearch} = 2, all spirals are counted (this is computationally expensive for very large fullerenes). 
 \item[{novolume}] If \paramname{novolume} = 1, all parts for volume determination is avoided  (Default: 0).
 \item[{TolR}] Tolerance in \% (Default: 33). Only change this parameter if the program cannot produce correctly the adjacency matrix. 
   This is only necessary for the cartesian coordinate input (\paramname{ICart}=1) and only fails if bond distances are unusually large or small. 
