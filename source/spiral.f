@@ -1371,7 +1371,7 @@ C       Check if enough space
           If(nspiral.gt.MaxSpirals) then
            Write(Iout,626) nspiral,MaxSpirals
            nspiral=nspiral-1
-           Go to 198
+           Go to 199
           endif
 C       Now everything works fine
           do k=1,12
@@ -1383,7 +1383,7 @@ C       Now everything works fine
 C      Jump count if spcount=0
         if(spcount.eq.0) then
          Write(Iout,635)
-         go to 198
+         go to 199
         endif
 C       Delete identical spirals
           if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
@@ -1441,7 +1441,7 @@ C     Reset arrays
          If(nspiral.gt.MaxSpirals) then
           Write(Iout,627) nspiral,MaxSpirals
           nspiral=nspiral-1
-          Go to 198
+          Go to 199
          endif
          do k=1,12
           SpiralT(k,nspiral)=JP(k)
@@ -1452,7 +1452,7 @@ C     Reset arrays
 C      Jump count if spcount=0
         if(spcount.eq.0) then
          Write(Iout,635)
-         go to 198
+         go to 199
         endif
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
@@ -1501,7 +1501,7 @@ C Dito, see above
          If(nspiral.gt.MaxSpirals) then
           Write(Iout,628) nspiral,MaxSpirals
           nspiral=nspiral-1
-          Go to 198
+          Go to 199
          endif
         do k=1,12
          SpiralT(k,nspiral)=JP(k)
@@ -1512,7 +1512,7 @@ C Dito, see above
 C      Jump count if spcount=0
         if(spcount.eq.0) then
          Write(Iout,635)
-         go to 198
+         go to 199
         endif
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
@@ -1520,8 +1520,9 @@ C      Jump count if spcount=0
       enddo 
       enddo 
       endif
+      spcount=1
 C---- End of search
- 198  if(nspiral.eq.0) then
+ 199  if(nspiral.eq.0) then
        WRITE(Iout,630) nspiralT,6*number_vertices
        Return
       else
