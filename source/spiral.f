@@ -1169,8 +1169,8 @@ C This algorithm is much faster than the one in version 4.2
       IER=0
 C   Big loop from ring 4 onwards to the end of the spiral
 C---- Start loop
-      Do 10 i=4,number_faces
       nsmall=1
+      Do 10 i=4,number_faces
 
 C    First collect next possible faces connected to the previous 
 C    5- or 6-ring (nloop=5 or 6) numbered IP=S(i-1) 
@@ -1241,7 +1241,7 @@ C     It is used if dual matrix is already known. See subroutine Spiral for deta
 C     number_vertices is the nuclearity of the fullerene.
 C     JP contains the pentagon indices, S the ring numbers
 C     SpiralT contains the pentagon indices, SpiralF the face numbers
-C     Timing O(6 n_v n_f)
+C     Timing O(6 n_v n_f^2)
 
       number_faces=number_vertices/2+2
       ispiral=0
@@ -1380,6 +1380,11 @@ C       Now everything works fine
           do k=1,number_faces
            SpiralF(k,nspiral)=S(k)
           enddo 
+C      Jump count if spcount=0
+        if(spcount.eq.0) then
+         Write(Iout,635)
+         go to 199
+        endif
 C       Delete identical spirals
           if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
          endif
@@ -1444,6 +1449,11 @@ C     Reset arrays
          do k=1,number_faces
           SpiralF(k,nspiral)=S(k)
          enddo 
+C      Jump count if spcount=0
+        if(spcount.eq.0) then
+         Write(Iout,635)
+         go to 199
+        endif
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
        endif
@@ -1499,6 +1509,11 @@ C Dito, see above
         do k=1,number_faces
          SpiralF(k,nspiral)=S(k)
         enddo 
+C      Jump count if spcount=0
+        if(spcount.eq.0) then
+         Write(Iout,635)
+         go to 199
+        endif
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
       endif
@@ -1666,6 +1681,7 @@ C     Print ring numbers
      1 ' (',I5,' faces)')
  634  FORMAT(1X,I6,' distinct RSPIs found out of total',I6,
      1 ' (maximum possible: ',I6,')')
+ 635  FORMAT(1X,' Spiral found, avoid counting of spirals')
       Return
       END
      
