@@ -389,12 +389,12 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
-      ispcount=0
-      if(ispsearch.gt.1) ispcount=1
       if((ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
      1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).or.
      1   ispsearch.ne.0) then
         routine='SPIRALSEARCH   '
+        ispcount=0
+        if(ispsearch.gt.1) ispcount=1
         Write(Iout,1008) routine
         CALL SpiralSearch(Iout,Iring5,Iring6,Iring56,NringA,NringB,
      1   NringC,NringD,NringE,NringF,JP,GROUP,ispcount)
