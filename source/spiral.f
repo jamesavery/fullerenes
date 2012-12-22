@@ -1321,6 +1321,7 @@ C     Start searching for spiral from pentagon 1 to 12, then stop
 C      and store the pentagon indices. Note this may still be an
 C      unsuccessful ring spiral. Also throw duplicates out.
       nspiral=0
+      nspiral5=0
       nspiralT=0
 
 C Loop over all (5,5) fusions
@@ -1366,6 +1367,7 @@ C      Now search
 C      Check if RSPIs are in order
          if(IER.eq.0) then
           nspiral=nspiral+1
+          nspiral5=nspiral5+1
           nspiralT=nspiralT+1
 C       Check if enough space
           If(nspiral.gt.MaxSpirals) then
@@ -1416,6 +1418,7 @@ C     Reset arrays
        S(1)=I1
        S(2)=I2
       if(I1.le.12) then
+       n5=1
        JP(1)=1
       else
        JP(1)=2
@@ -1436,6 +1439,7 @@ C     Reset arrays
         endif
         CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
         if(IER.eq.0) then
+         if(JP(1).eq.1) nspiral5=nspiral5+1
          nspiral=nspiral+1
          nspiralT=nspiralT+1
          If(nspiral.gt.MaxSpirals) then
@@ -1526,7 +1530,7 @@ C---- End of search
        WRITE(Iout,630) nspiralT,6*number_vertices
        Return
       else
-       WRITE(Iout,634) nspiral,nspiralT,6*number_vertices
+       WRITE(Iout,634) nspiral,nspiralT,6*number_vertices,nspiral5
       endif
       if(spcount.ne.0) then
        nspiral66=nspiral-nspiral55-nspiral56
@@ -1637,7 +1641,7 @@ C     Print ring numbers
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
  612  Format(1X,'Loop over (5,6) fusions, ',I5,' max in total')
  613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
- 614  Format(1X,I6,' RSPI  found from spiral ',I6,':',/1X,
+ 614  Format(1X,I6,' RSPIs taken from spiral list to be analyzed:',/1X,
      2 'Point group   Ring spiral pentagon positions',
      3 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
@@ -1682,7 +1686,8 @@ C     Print ring numbers
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
      1 ' (',I5,' faces)')
  634  FORMAT(1X,I6,' distinct RSPIs found out of total',I6,
-     1 ' (maximum possible: ',I6,')')
+     1 ' (maximum possible: ',I6,')',/1X,
+     1 I6,' spirals staring from a pentagon')
  635  FORMAT(1X,' Spiral found, avoid counting of spirals')
       Return
       END
