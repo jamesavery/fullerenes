@@ -6,7 +6,7 @@
 <!
 --------------------------------------------------------------------------
 This is the main webpage for the Fullerene program 
-Last update: October 23, 2012
+Last update: December 22, 2012
 Two php files are called:
 
 fulleruf.php
@@ -36,7 +36,7 @@ fullerdl.php receives the password, checks it and if correct
 </td>
 <td valign="middle"  align="center">
 <h1> <big> Program FULLERENE <br>
-Version 4.3</big> <br><br>
+Version 4.3.1</big> <br><br>
 A Fortran/C++ Program for Fullerene Structures <br> 
 and Topological Analysis <br><br> </h1>
 <h2>by Peter Schwerdtfeger, Lukas Wirz and James Avery<br>
@@ -57,13 +57,14 @@ Massey University Auckland<br>
 The program creates cartesian coordinates for fullerene isomers and performs a topological/graph theoretical analysis.
 The results can be used for plotting 2D/3D fullerene graphs (e.g. Schlegel diagrams and 3D structures), and serves as a starting 
 point for further quantum theoretical treatment. Version 4 now incorporates C++ routines linked to the
-original Fortran program using much improved algorithms. Version 4.3 is more robust than previous version, and contains
+original Fortran program using much improved algorithms. Version 4.3.1 is more robust than previous version, and contains
 a more extended version of topological indicators, a harmonic oscillator force field using dihedral angles, vibrational
 frequencies (although the force constants have not been adjusted yet), general Goldberg-Coxeter transformation
 of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to both
 the Yoshida and House of Graphs databases, and an improved Tutte embedder. Our own database has been extended up to 
 C<SUB>122</SUB>, and up to C<SUB>170</SUB> for IPR isomers. Version 4.2 was a slightly improved version 
-and contained some bug fixes. Version 4.3 contains major changes and reconstructions.
+and contained some bug fixes. Version 4.3 contains major changes and reconstructions. Version 4.3.1 includes much
+improved algorithms for the Tutte embedding, finding ring spirals and contains a neighborhood ring-spiral search module.
 <br><br>
 
 This is an open-source code and free for distribution (except for commercial purposes). The following references should be used for citation:<br><br>
@@ -82,7 +83,7 @@ for a large number of fullerenes up to 10,000 vertices. A number of input
 and output files are included in the fullerene.zip file and a more detailed description 
 is found in the User's Manual.<br><br>
 
-<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.3.pdf">UserManualv4.3.pdf (04/12/2012)</a> (2.4 MB)
+<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.3.1.pdf">UserManualv4.3.1.pdf (04/12/2012)</a> (2.4 MB)
 <br><br>
 
 <b>Download for Database1: General fullerenes C<SUB>20</SUB>-C<SUB>122</SUB> </b><a href="http://ctcp.massey.ac.nz/data/ALL.zip"> ALL.zip (01/11/2012)</a> (compressed 198.9 MB, uncompressed 1.92 GB)
@@ -373,7 +374,7 @@ This has the advantage that you will receive an email message if a new major upg
 </form>
 </table> <br><br>
 
-Once you have a password you can download the program here: (Version 4.3, last update 04/12/2012)<br>
+Once you have a password you can download the program here: (Version 4.3.1, last update 04/12/2012)<br>
 <form action="fullerdl.php" method="get">
 Password: <input type="password" name="pwd" size="10" /><br> <input type="submit" value="Download" /> 
 </form>
@@ -391,6 +392,7 @@ Password: <input type="password" name="pwd" size="10" /><br> <input type="submit
 <li>Goldberg-Coxeter, leapfrog and halma transformations of fullerenes.</li>
 <li>Endo-Kroto 2-vertex, Yoshida-Fowler 4- and 6-vertex and Brinkmann-Fowler 6-vertex insertions.</li>
 <li>Use of program SPIRAL of Fowler and Manolopoulos for face-spiral fullerenes.</li>
+<li>Find fullerenes in the neighborhood of given ring-spiral pentagon indices.</li>
 <li>Use of program HAMILTON of Babic for Hamiltonian cycles and IUPAC Nomenclature.</li>
 <li>Establish connectivities between vertices to construct the adjacency matrix.</li>
 <li>Perform a Hueckel analysis. This gives you a good hint if the fullerene is open or closed shell.</li>
