@@ -1530,7 +1530,12 @@ C---- End of search
        WRITE(Iout,630) nspiralT,6*number_vertices
        Return
       else
-       WRITE(Iout,634) nspiral,nspiralT,6*number_vertices,nspiral5
+       nspiral5sym=0
+       do i=1,nspiral
+        if(SpiralT(1,i).eq.1) nspiral5sym=nspiral5sym+1
+       enddo
+       WRITE(Iout,634) nspiral,nspiralT,6*number_vertices,
+     1  nspiral5,nspiral5sym
       endif
       if(spcount.ne.0) then
        nspiral66=nspiral-nspiral55-nspiral56
@@ -1686,8 +1691,8 @@ C     Print ring numbers
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
      1 ' (',I5,' faces)')
  634  FORMAT(1X,I6,' distinct RSPIs found out of total',I6,
-     1 ' (maximum possible: ',I6,')',/1X,
-     1 I6,' spirals staring from a pentagon')
+     1 ' (maximum possible: ',I6,')',/1X,I6,' spirals with a ',
+     1 'pentagon start (',I6,' symmetry distinct)')
  635  FORMAT(1X,' Spiral found, avoid counting of spirals')
       Return
       END
