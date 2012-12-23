@@ -353,14 +353,13 @@ C     Determine the center of each 5-and 6-ring system
       DIMENSION NringE(Emax),NringF(Emax)
       Integer n3r(3,Nmax*11),n3ra(3,Nmax),n3rb(3,Nmax),nSW(4,66),
      1 nFM(4,66),n3rc(3,Nmax),n3rd(3,Nmax),nYF(6,66),nBF(5,66)
-      Integer IRhag5(0:5),IRhag6(0:6),MPatt(30)
+      Integer MPatt(30)
       Character*6,Label
 C     Center for 5-rings
       numbersw=0
       numberFM=0
       numberBF=0
       numberYF=0
-      IPR=0
       sigmah=0.d0
       Write(Iout,1000)
       Do I=1,N5Ring
@@ -496,73 +495,12 @@ C     (6-6) 2-ring fusions
 C     Final 2-ring
  3000 Write(Iout,1007) N2ring
 
-C     Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
-C     First pentagon indices
-      Do I=0,5
-       IRhag5(I)=0
-      enddo
-      If(IRing5.eq.0) then
-       IRhag5(0)=12
-       go to 111
-      endif
-      do I=1,12
-       IRcount=0
-       do J=1,IRing5
-        If(NRingA(J).eq.I.or.NRingB(J).eq.I) then
-         IRcount=IRcount+1
-        endif
-       enddo
-       IRhag5(IRcount)=IRhag5(IRcount)+1
-      enddo
-C     Pentagon index
-  111 IFus5G=IPentInd(IRhag5)
-      Write(Iout,1013) (IRhag5(I),I=0,5),IFus5G
-      If(IFus5G.eq.IRing5) then
-       Write(Iout,1015) IFus5G
-      else
-       Write(Iout,1016) IFus5G
-      endif
-C     Now hexagon indices
-      if(N6Ring.eq.0) go to 113
-       Do I=0,6
-        IRhag6(I)=0
-       enddo
-       If(IRing6.eq.0) then
-        IRhag6(0)=N6Ring
-        go to 112
-       endif
-      do I=13,12+N6Ring
-      IRcount=0
-      do J=1,IRing6
-       If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
-        IRcount=IRcount+1
-       endif
-      enddo
-      IRhag6(IRcount)=IRhag6(IRcount)+1
-      enddo
-C     Strain Parameter
-      sigmah=HexInd(IRhag6,ihk)
-      if(ihk.eq.0) Write(Iout,1027) 
-  112 Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
-      Ifus6=0
-      Do I=3,6
-      IFus6=IFus6+IRhag6(I)
-      enddo
-      IFus6G=IFus6*2+20
-      If(IFus6G.eq.number_vertices) then
-       Write(Iout,1018) IFus6G
-      else
-       Write(Iout,1019) IFus6G
-      endif
-      If(IRing5.eq.0) then
-       IPR=1
-       Write(Iout,1022) 
-      else
-       Write(Iout,1023)
-      endif
+C Analysis using pentagon and hexagon indices
+      Call PentHexIndex(Iout,IPR,IRing5,IRing6,N6Ring,
+     1 NRingA,NRingB,NRingE,NRingF)
 
 C     All 3-ring fusions
-  113 Write(Iout,1014) 
+      Write(Iout,1014) 
 C     (c5-5-5) 3-ring fusions
       Label='closed'
       IR1=5
@@ -822,28 +760,8 @@ C Print Cioslowsky analysis and check of correctness
  1011 Format(10(1X,'(',I3,',',I3,','I3,')'))
  1012 Format(' WARNING: expected 3-ring count does not match ',
      1 'number found')
- 1013 Format(1X,'Rhagavachari-Fowler-Manolopoulos neighboring '
-     1 'pentagon indices: (',5(I2,','),I2,')',
-     1 ' and number of pentagon-pentagon fusions: ',I2)
  1014 Format(//1X,'3-ring fusions between rings (RNI,RNJ,RNK):') 
- 1015 Format(1X,'Number of (5,5) fusions matches the ',I2,
-     1 ' value obtained from Rhagavachar-/Fowler-Manolopoulos '
-     1 'neighboring pentagon indices')
- 1016 Format(1X,'Error: Number of (5,5) fusions does not match the ',I2,
-     1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
-     1 'neighboring pentagon indices')
- 1018 Format(1X,'Number vertices matches the ',I5,
-     1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
-     1 'neighboring hexagon indices h3+h4+h5+h6')
- 1019 Format(1X,'Number vertices does not match the ',I5,
-     1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
-     1 'neighboring hexagon indices h3+h4+h5+h6')
- 1020 Format(1X,'Rhagavachari/Fowler neighboring hexagon indices: (',
-     1 6(I3,','),I4,')  and strain parameter sigma = ',F12.6,
-     1 ' (NB: strictly valid only for IPR fullerenes)')
  1021 Format(10(1X,'(',I3,',',I3,','I3,')'))
- 1022 Format(1X,'--> Fullerene is IPR')
- 1023 Format(1X,'--> Fullerene is not IPR')
  1024 Format(/1X,'Calculate Standard Enthalpy for fullerene ',
      1 'from structural motifs (M)',/2X,'M.Alcami, G.Sanchez, ',
      1 'S.Diaz-Tendero, Y.Wang, F.Martin, J. Nanosci. Nanotech. ',
@@ -855,7 +773,6 @@ C Print Cioslowsky analysis and check of correctness
      1 D12.6,' (5-5), ',D12.6,' (6-6), 'D12.6,' (5-6)',
      1 /1X,'Largest  distances between faces: ',
      1 D12.6,' (5-5), ',D12.6,' (6-6), 'D12.6,' (5-6)')
- 1027 Format(1X,'sum hk is zero -> sigmah set to zero')
  1030 Format(/1X,'No Stone-Wales patterns found')
  1031 Format(/1X,I2,' Stone-Wales patterns found:')
  1032 Format(7(' (',I2,',',I5,',',I5,',',I2,')'))
@@ -894,6 +811,126 @@ C Print Cioslowsky analysis and check of correctness
  1046 Format(/1X,'No B-F D2h 55-6-55 pattern found')
  1047 Format(/1X,I2,' B-F D2h 55-6-55 patterns found:')
  1048 Format(5(' (',I2,',',I2,',',I5,',',I2,',',I2,') '))
+      Return
+      END
+
+      Subroutine PentHexIndex(Iout,IPR,IRing5,IRing6,N6Ring,
+     1 NRingA,NRingB,NRingE,NRingF)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION NringA(Emax),NringB(Emax)
+      DIMENSION NringE(Emax),NringF(Emax)
+      Integer IRhag5(0:5),IRhag6(0:6),IArm(0:5)
+C     Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
+C     and Reti-Laszlo analysis
+C     First pentagon indices
+      IPR=0
+      Do I=0,5
+       IRhag5(I)=0
+      enddo
+      If(IRing5.eq.0) then
+       IRhag5(0)=12
+       go to 111
+      endif
+      do I=1,12
+       IRcount=0
+       do J=1,IRing5
+        If(NRingA(J).eq.I.or.NRingB(J).eq.I) then
+         IRcount=IRcount+1
+        endif
+       enddo
+       IRhag5(IRcount)=IRhag5(IRcount)+1
+      enddo
+C     Pentagon index
+  111 IFus5G=IPentInd(IRhag5)
+      Write(Iout,1013) (IRhag5(I),I=0,5),IFus5G
+      If(IFus5G.eq.IRing5) then
+       Write(Iout,1015) IFus5G
+      else
+       Write(Iout,1016) IFus5G
+      endif
+C     Now hexagon indices
+      if(N6Ring.eq.0) Return
+       Do I=0,6
+        IRhag6(I)=0
+       enddo
+       If(IRing6.eq.0) then
+        IRhag6(0)=N6Ring
+        go to 112
+       endif
+      do I=13,12+N6Ring
+      IRcount=0
+      do J=1,IRing6
+       If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
+        IRcount=IRcount+1
+       endif
+      enddo
+      IRhag6(IRcount)=IRhag6(IRcount)+1
+      enddo
+C     Strain Parameter
+      sigmah=HexInd(IRhag6,ihk)
+      if(ihk.eq.0) Write(Iout,1027) 
+  112 Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
+      Ifus6=0
+      Do I=3,6
+      IFus6=IFus6+IRhag6(I)
+      enddo
+      IFus6G=IFus6*2+20
+      If(IFus6G.eq.number_vertices) then
+       Write(Iout,1018) IFus6G
+      else
+       Write(Iout,1019) IFus6G
+      endif
+      If(IRing5.eq.0) then
+       IPR=1
+       Write(Iout,1022) 
+      else
+       Write(Iout,1023)
+      endif
+      return
+
+C Calculate Reti-Laszlo Index
+      M1=0
+      M2=0
+      Do I=0,5
+       IArm(I)=0
+      enddo
+       IArm(0)=8
+       IArm(1)=4
+C Calculate arm indices
+C Still to do
+      Do I=1,5
+       ic=I*IArm(I)
+       M1=M1+ic
+       M2=M2+I*ic
+      enddo
+      AM1=dfloat(M1)/12.d0
+      AM2=dfloat(M2)/12.d0
+      VAR=AM2-AM1*AM1
+      c=dsqrt(1.2d2*AM2/(1+7.d0*AM1))/(1.d0+.9d0*(AM2-AM1**2)**.2d0)
+      psi=(3.d1+6.d0*AM1)/(1.d0+4.5d0*dfloat(IFus5G)+c)
+
+ 1013 Format(1X,'Rhagavachari-Fowler-Manolopoulos neighboring '
+     1 'pentagon indices: (',5(I2,','),I2,')',
+     1 ' and number of pentagon-pentagon fusions: ',I2)
+ 1015 Format(1X,'Number of (5,5) fusions matches the ',I2,
+     1 ' value obtained from Rhagavachar-/Fowler-Manolopoulos '
+     1 'neighboring pentagon indices')
+ 1016 Format(1X,'Error: Number of (5,5) fusions does not match the ',I2,
+     1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
+     1 'neighboring pentagon indices')
+ 1018 Format(1X,'Number vertices matches the ',I5,
+     1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
+     1 'neighboring hexagon indices h3+h4+h5+h6')
+ 1019 Format(1X,'Number vertices does not match the ',I5,
+     1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
+     1 'neighboring hexagon indices h3+h4+h5+h6')
+ 1020 Format(1X,'Rhagavachari/Fowler neighboring hexagon indices: (',
+     1 6(I3,','),I4,')  and strain parameter sigma = ',F12.6,
+     1 ' (NB: strictly valid only for IPR fullerenes)')
+ 1022 Format(1X,'--> Fullerene is IPR')
+ 1023 Format(1X,'--> Fullerene is not IPR')
+ 1027 Format(1X,'sum hk is zero -> sigmah set to zero')
       Return
       END
 
