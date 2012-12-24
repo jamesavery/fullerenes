@@ -965,7 +965,7 @@ C Still to do
       if(NP+NA.eq.0) Write(Iout,1003) 
 
  1000 Format(/1X,'Reti-Laszlo topological analysis using Stone-Wales ',
-     1 'patterns:',/1X,'Pentagon arm signature vector: ',
+     1 'patterns:',/1X,'Pentagon arm indices: ',
      1 '(',5(I2,','),I2,')',' SUM= ',I2)
  1001 Format(1X,'M1= ',F8.2,', M2= ',F8.2,', NA= ',I2,', NP+NA= ',I2)
  1002 Format(1X,'Fullerene is ',I1,'-balanced')
