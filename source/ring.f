@@ -496,7 +496,7 @@ C     Final 2-ring
  3000 Write(Iout,1007) N2ring
 
 C Analysis using pentagon and hexagon indices
-      Call PentHexIndex(Iout,IPR,IRing5,IRing6,N6Ring,
+      Call PentHexIndex(Iout,IPR,IFus5G,IRing5,IRing6,N6Ring,
      1 NRingA,NRingB,NRingE,NRingF)
 
 C     All 3-ring fusions
@@ -687,6 +687,8 @@ C Print Stone-Wales patterns
        Write(Iout,1031) numbersw
        Write(Iout,1032) ((nsw(I,J),I=1,4),J=1,numbersw)
       endif
+C Reti-Laszlo Analysis using Stone-Wales patterns
+      Call ArmsIndices(Iout,IFus5G,numbersw,nsw)
 
 C Print Yoshida-Fowler D3h 6555 patterns
       if(numberFM.eq.0) then 
@@ -814,15 +816,14 @@ C Print Cioslowsky analysis and check of correctness
       Return
       END
 
-      Subroutine PentHexIndex(Iout,IPR,IRing5,IRing6,N6Ring,
+      Subroutine PentHexIndex(Iout,IPR,IFus5G,IRing5,IRing6,N6Ring,
      1 NRingA,NRingB,NRingE,NRingF)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
-      Integer IRhag5(0:5),IRhag6(0:6),IArm(0:5)
-C     Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
-C     and Reti-Laszlo analysis
+      Integer IRhag5(0:5),IRhag6(0:6)
+C Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
 C     First pentagon indices
       IPR=0
       Do I=0,5
@@ -887,28 +888,6 @@ C     Strain Parameter
       else
        Write(Iout,1023)
       endif
-      return
-
-C Calculate Reti-Laszlo Index
-      M1=0
-      M2=0
-      Do I=0,5
-       IArm(I)=0
-      enddo
-       IArm(0)=8
-       IArm(1)=4
-C Calculate arm indices
-C Still to do
-      Do I=1,5
-       ic=I*IArm(I)
-       M1=M1+ic
-       M2=M2+I*ic
-      enddo
-      AM1=dfloat(M1)/12.d0
-      AM2=dfloat(M2)/12.d0
-      VAR=AM2-AM1*AM1
-      c=dsqrt(1.2d2*AM2/(1+7.d0*AM1))/(1.d0+.9d0*(AM2-AM1**2)**.2d0)
-      psi=(3.d1+6.d0*AM1)/(1.d0+4.5d0*dfloat(IFus5G)+c)
 
  1013 Format(1X,'Rhagavachari-Fowler-Manolopoulos neighboring '
      1 'pentagon indices: (',5(I2,','),I2,')',
@@ -934,6 +913,66 @@ C Still to do
       Return
       END
 
+      Subroutine ArmsIndices(Iout,Np,numbersw,nsw)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Integer nSW(4,66),IArm(0:5),IA(12)
+C Calculate Reti-Laszlo Index
+      M1=0
+      M2=0
+      Do I=0,5
+       IArm(I)=0
+      enddo
+      Do I=1,12
+       IA(I)=0
+      enddo
+      if(numbersw.eq.0) then
+       IArm(0)=12
+      else
+       do I=1,numbersw
+        I1=nsw(1,I)
+        I2=nsw(4,I)
+        IA(I1)=IA(I1)+1
+        IA(I2)=IA(I2)+1
+       enddo
+        do I=1,12
+         nf=IA(I)
+         IArm(nf)=IArm(nf)+1
+        enddo
+      endif
+      ibal=0
+      isum=0
+      do I=0,5
+       isum=isum+IArm(I)
+       if(IArm(I).eq.12) ibal=I
+      enddo
+      Write(Iout,1000) (IArm(I),I=0,5),isum
+C Calculate pentagon arm indices
+C Still to do
+      Do I=1,5
+       ic=I*IArm(I)
+       M1=M1+ic
+       M2=M2+I*ic
+      enddo
+      NA=M1/12
+      AM1=dfloat(M1)/12.d0
+      AM2=dfloat(M2)/12.d0
+      VAR=AM2-AM1*AM1
+      c=dsqrt(1.2d2*AM2/(1+7.d0*AM1))/(1.d0+.9d0*(AM2-AM1**2)**.2d0)
+      psi=(3.d1+6.d0*AM1)/(1.d0+4.5d0*dfloat(Np)+c)
+      Write(Iout,1001) AM1,AM2,NA,Np+NA
+      Write(Iout,1002) ibal
+      if(NP+NA.eq.0) Write(Iout,1003) 
+
+ 1000 Format(/1X,'Reti-Laszlo topological analysis using Stone-Wales ',
+     1 'patterns:',/1X,'Pentagon arm signature vector: ',
+     1 '(',5(I2,','),I2,')',' SUM= ',I2)
+ 1001 Format(1X,'M1= ',F8.2,', M2= ',F8.2,', NA= ',I2,', NP+NA= ',I2)
+ 1002 Format(1X,'Fullerene is ',I1,'-balanced')
+ 1003 Format(1X,'This is a strongly isolated fullerene')
+      Return
+      END
+
       SUBROUTINE EdgeCoord(Iout,Dist,IC3)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -952,13 +991,13 @@ C     Print center of edges
        endif
       enddo
       enddo
+
  1000 Format(/1X,'Print center coordinates of edges:',
      1 /1X,'    I    J       X            Y            Z',
      1 /1X,49('-')) 
  1001 Format(1X,2I5,3(1X,F12.8))
       Return
       END
-
 
       SUBROUTINE Alcami(Iout,Medges,IC3,IVR3)
       use config
