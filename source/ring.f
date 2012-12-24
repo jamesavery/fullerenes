@@ -891,9 +891,9 @@ C     Strain Parameter
 
  1013 Format(1X,'Rhagavachari-Fowler-Manolopoulos neighboring '
      1 'pentagon indices: (',5(I2,','),I2,')',
-     1 ' and number of pentagon-pentagon fusions: ',I2)
+     1 ' and number of pentagon-pentagon fusions Np: ',I2)
  1015 Format(1X,'Number of (5,5) fusions matches the ',I2,
-     1 ' value obtained from Rhagavachar-/Fowler-Manolopoulos '
+     1 ' value obtained from Rhagavachari-/Fowler-Manolopoulos '
      1 'neighboring pentagon indices')
  1016 Format(1X,'Error: Number of (5,5) fusions does not match the ',I2,
      1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
@@ -905,8 +905,7 @@ C     Strain Parameter
      1 ' value obtained from Rhagavachari-Fowler-Manolopoulos '
      1 'neighboring hexagon indices h3+h4+h5+h6')
  1020 Format(1X,'Rhagavachari/Fowler neighboring hexagon indices: (',
-     1 6(I3,','),I4,')  and strain parameter sigma = ',F12.6,
-     1 ' (NB: strictly valid only for IPR fullerenes)')
+     1 6(I3,','),I4,')  and strain parameter sigma = ',F12.6)
  1022 Format(1X,'--> Fullerene is IPR')
  1023 Format(1X,'--> Fullerene is not IPR')
  1027 Format(1X,'sum hk is zero -> sigmah set to zero')

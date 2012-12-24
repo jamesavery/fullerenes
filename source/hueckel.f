@@ -190,8 +190,8 @@ C     Spectral moments
  1007 FORMAT(/1X,'Diagonalize Hueckel matrix (E=alpha+x*beta; E in au)',
      1 /1X,'Eigenvalues are between [-3,+3] (in units of |beta|)',
      1 /1X,'deg: degeneracy; NE: number of electrons')
- 1008 FORMAT(1X,'Estrada index: ',F12.6,
-     1 ' and bipartivity index: ',F12.6)
+ 1008 FORMAT(1X,'Estrada index: ',F16.6,
+     1 ' and bipartivity index: ',F14.8)
  1009 FORMAT(/1X,'Fullerene has a properly closed shell')
  1010 FORMAT(/1X,'Fullerene has a pseudo closed shell')
  1011 FORMAT(1X,I2,5X,F20.0)
