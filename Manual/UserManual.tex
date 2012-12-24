@@ -426,7 +426,49 @@ For $I_h$-\C{60} both $\rho$ and $\rho_E$ are exactly 1.0. The spectral moments 
   \mu_k=\sum_{i=1}^{n_v} x_i^k
 \end{equation}
 and we have $\mu_0 = n_v$, $\mu_1 = 0$, $\mu_2 = 3n_v$, $\mu_3 = 0$, $\mu_4 = 15n_v$, $\mu_5 = 120$, $\mu_4 = 93n_v - 120$, and $\mu_7 = 1680$.
-The higher spectral moments depend on the fullerene structure \cite{Fowler93}.
+The higher spectral moments depend on the fullerene structure.\cite{Fowler93}\\
+One of the first topological indicators introduced to discuss the stability of fullerenes are the neighbour indices for pentagons and
+hexagons. The program calculates the pentagon neighbour indices,\cite{Atlas,Albertazzi} hexagon neighbour indices and the pentagon arm indices.\cite{Reti}
+Every fullerene isomer can be characterized by a signature of the form $\{i_k | k=1,n\}$. The pentagon indices $(p_i | i=0, \dots 5)$ define the
+number of pentagons attached to another pentagon, i.e. for IPR fullerenes $p_0 = 12$ and all other pentagon indices are zero. Hexagon indices are similarly
+defined, i.e. $(h_i | i=0, \dots 5)$, where $h_k$ is the number of hexagons with neighbour index $k$. In an IPR fullerene every hexagon is adjacent to aminimum of three others and we can restrict the list to $(h_3, h_4, h_5, h_6)$. The pentagon arm indices $(n_i | i=0, \dots 5)$ counts the number of arms
+of the pentagons. Here an edge $E$ incident to a vertex of a pentagon not belonging to the pentagon is called an arm if i) both end-vertices of edge $E$ 
+are incident to pentagons, and ii) $E$ shares two neighbor hexagons.\cite{Reti} It is clear that this is nothing else than a Stone-Wales pattern.\\
+We can now define some useful topological invariants. The pentagon index $N_p$ is defined as
+\begin{equation}
+  \label{pentindex}
+  N_p = \frac{1}{2}\sum_{k=1}^{5} kp_k
+\end{equation}
+For IPR fullerenes we have no pentagon attached to another and therefore $p_0 = 12$ and all other $p_i = 0$, and it follows that $N_p = 0$. For IPR fullerenes
+a more useful index is defined through the hexagon neighbour indices. The standard deviation $\sigma_h$ of the hexagon neighbour index distribution is defined as
+\begin{equation}
+  \label{standev}
+  \sigma_h = \sqrt{\langle k^2 \rangle - \langle k \rangle^2}
+\end{equation}
+where
+\begin{equation}
+  \label{mean}
+  \langle k^n \rangle = \frac{\sum_{k=1}^{6} k^n h_k}{\sum_{k=0}^{6} h_k}
+\end{equation}
+R\'eti and L\'aszl\'o define the pentagon arm index $N_A$ in a similar way to the pentagon index,\cite{Reti}
+\begin{equation}
+  \label{arms}
+  N_A = \frac{1}{2}\sum_{k=1}^{5} kn_k  \quad \text{ with } \quad  \sum_{k=0}^{5} n_k = 12
+\end{equation}
+The first and second moments $M_1$ and $M_2$ and the variance $V$ are defined as (real numbers),
+\begin{equation}
+  \label{Moments}
+  M_i = \frac{1}{12}\sum_{k=1}^{5} k^i n_k  \quad \text{ and } \quad  V = M_2 - M_1^2
+\end{equation}
+We now define the R\'eti-L\'aszl\'o topological descriptor as $\Psi$,
+\begin{equation}
+  \label{Moments}
+  \Psi = \frac{30+6M_1}{1+4.5N_p+C(M_1,M_2)} \quad \text{ with } \quad  C(M_1,M_2) = \frac{(120M_2)^{1/2}}{(1+7M_1)^{1/2}(1+0.9V^{1.5})}
+\end{equation}
+If there exists a non-negative integer $q$ for which one of the arm indices $n_q = 12$, the fullerene is called $q$-balanced. In this
+case $V = 0$.\cite{Reti} If $N_p + N_A = 0$, the fullerene is called strongly isolated. \C{60} contains Stone-Wales patterns and is therefore not
+strongly isolated. The first leapfrog of \C{60}, \C{180}, is strongly isolated.
+
 
 %The Goldberg-Coxeter transformation
 \subsection{The Goldberg-Coxeter transformation}
@@ -1195,7 +1237,7 @@ Note that the maximum number of vertices in the database is defined in the confi
 %Figure 6
  \begin{figure}[htbp]
 	\centering
-  		 \includegraphics[width=0.4\textwidth]{C2160.png}
+  		 \includegraphics[width=0.6\textwidth]{C2160.png}
      \caption{Force-field optimized structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
      \label{pic:Finalgraph}
  \end{figure}
@@ -1295,6 +1337,11 @@ Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).
 \bibitem{Fowler93} P. W. Fowler, ``Systematics of fullerenes and related clusters'', \textit{Phil. Trans. R. Soc. Lond. A} \textbf{343}, 39-52 (1993) 
 
 \bibitem{Ori} O. Ori, private communication (2012).
+
+\bibitem{Reti} T. R\'eti, I. L\'aszl\'o, ``On the Combinatorial Characterization of Fullerene Graphs'', \textit{Acta Polytechnica Hungarica}, 85-93 (2009).
+
+\bibitem{Albertazzi} E. Albertazzi, C. Domene,  P W. Fowler, T. Heine, G. Seifert, C. Van Alsenoy ,and F Zerbetto, ``Pentagon Adjacency as a Determinant of
+Fullerene Stability,'', \textit{Phys. Chem. Chem. Phys.} \textbf{1}, 2913-2918 (1999). 
 
 \bibitem{Babic1995a} D. Babi\'c, ``Nomenclature and Coding of Fullerenes'', \textit{J. Chem. Inf. Comput. Sci.} \textbf{35}, 515-526 (1995).
 

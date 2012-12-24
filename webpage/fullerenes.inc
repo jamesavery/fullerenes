@@ -64,7 +64,8 @@ of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to
 the Yoshida and House of Graphs databases, and an improved Tutte embedder. Our own database has been extended up to 
 C<SUB>122</SUB>, and up to C<SUB>170</SUB> for IPR isomers. Version 4.2 was a slightly improved version 
 and contained some bug fixes. Version 4.3 contains major changes and reconstructions. Version 4.3.1 includes much
-improved algorithms for the Tutte embedding, finding ring spirals and contains a neighborhood ring-spiral search module.
+improved algorithms for the Tutte embedding, finding ring spirals, general Goldberg-Coxeter transforms of C<SUB>20</SUB>,
+Reti-Laszlo topological analysis, and contains a neighborhood ring-spiral search module.
 <br><br>
 
 This is an open-source code and free for distribution (except for commercial purposes). The following references should be used for citation:<br><br>
@@ -389,7 +390,7 @@ Password: <input type="password" name="pwd" size="10" /><br> <input type="submit
 <li>Construct cartesian coordinates using the face-spiral pentagon indices of Fowler and Manolopoulos.</li>
 <li>Construct cartesian coordinates from a Goldberg-Coxeter transformation of C<SUB>20</SUB>.</li>
 <li>Use matrix-eigenvector or Tutte embedding algorithms to obtain cartesian coordinates.</li>
-<li>Goldberg-Coxeter, leapfrog and halma transformations of fullerenes.</li>
+<li>Goldberg-Coxeter leapfrog and halma transformations of a fullerene.</li>
 <li>Endo-Kroto 2-vertex, Yoshida-Fowler 4- and 6-vertex and Brinkmann-Fowler 6-vertex insertions.</li>
 <li>Use of program SPIRAL of Fowler and Manolopoulos for face-spiral fullerenes.</li>
 <li>Find fullerenes in the neighborhood of given ring-spiral pentagon indices.</li>
