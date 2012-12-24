@@ -29,7 +29,7 @@ c      END
       khk=0
       k2hk=0
       ihk=0
-       Do I=3,6
+       Do I=0,6
         ihk=ihk+IRhag6(I)
         IIR=I*IRhag6(I)
         khk=khk+IIR
