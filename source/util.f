@@ -13,6 +13,100 @@ c 1002 Format(1X,'Not implemented yet')
 c      RETURN
 c      END
 
+      SUBROUTINE CompressDatabase(Iout,filename)
+C This routine turns a database file from the output into a new compreesed one
+      IMPLICIT REAL*8 (A-H,O-Z)
+      Integer RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
+      CHARACTER*50 filename,dbfilename,dbfilenew
+      CHARACTER*26 nmrstring
+      CHARACTER*18 dbstring,readstring
+      CHARACTER*6  shell
+      CHARACTER*3  Group
+      CHARACTER*1  dummy
+      Logical lexist
+
+      dbfilename=trim(filename)
+      Open(UNIT=1,FILE=dbfilename,STATUS='old',Action='Read',
+     1 FORM='FORMATTED')
+      inquire(file=dbfilename,exist=lexist)
+      if(lexist.neqv..True.) then
+        Write(Iout,1000) dbfilename
+        close(unit=1)
+        Return
+      else
+        Write(Iout,1001) dbfilename
+        dbfilenew=trim(filename)//".new"
+        Open(UNIT=2,FILE=dbfilenew,STATUS='unknown',FORM='FORMATTED')
+        Read(1,*,Iostat=ierr) Nvert,IP,IH
+
+C First line not 3 integers, going to search for it
+        if(ierr.ne.0) then
+         dbstring=' Isomer List Start'
+         Write(Iout,1002) dbstring
+         do I=1,10000
+          Read(1,FMT='(A18)',ERR=199) readstring
+          if(readstring.eq.dbstring) go to 10
+         enddo
+ 10      Read(1,*,Iostat=ierr1) Nvert,IP,IH
+         do I=1,5    
+          Read(1,FMT='(A1)') dummy
+         enddo
+        endif
+
+C Now read database
+        Write(Iout,1003) Nvert,IP,IH
+        Do J=1,10000000
+         Read(1,2000,ERR=199) number,Group,(RSPI(i),I=1,12),
+     1    (PNI(I),I=0,5),NP,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,
+     1    HLgap,shell,ncycHam,nmrstring
+        lenstring=LEN_TRIM(nmrstring)
+        if(lenstring.le.9) then
+         read(nmrstring(1:3),'(i3)') INMR(1)
+         read(nmrstring(7:9),'(i3)') INMR(2)
+         INMR(3)=0
+         INMR(4)=0
+         INMR(5)=0
+         INMR(6)=0
+        else
+         if(lenstring.gt.20) then
+          read(nmrstring(1:3),'(i3)') INMR(1)
+          read(nmrstring(6:8),'(i3)') INMR(2)
+          read(nmrstring(10:12),'(i3)') INMR(3)
+          read(nmrstring(15:17),'(i3)') INMR(4)
+          read(nmrstring(19:21),'(i3)') INMR(5)
+          read(nmrstring(24:26),'(i3)') INMR(6)
+         else
+          read(nmrstring(1:3),'(i3)') INMR(1)
+          read(nmrstring(6:8),'(i3)') INMR(2)
+          read(nmrstring(10:12),'(i3)') INMR(3)
+          read(nmrstring(15:17),'(i3)') INMR(4)
+          INMR(5)=0
+          INMR(6)=0
+         endif
+        endif
+         nlines=nlines+1
+         Write(2,1004) Group,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1    (HNI(I),I=0,6),NeHOMO,NedegHOMO,HLgap,ncycHam,(INMR(I),I=1,6)
+        enddo
+      endif
+  199 close(unit=1)
+      close(unit=2)
+      Write(Iout,1006) nlines
+
+ 1000 Format(1X,'Cannot find database file ',A50,' ===> RETURN')
+ 1001 Format(1X,'Open database file ',A50)
+ 1002 Format(1X,'Search for starting point of database',
+     1 /1X,'Searching for string',A18)
+ 1003 Format(1X,'Number of vertices: ',I6,', IPR flag: ',I2,
+     1 ', Hamiltonian cycle flag: ',I2)
+ 1004 Format(A3,12I3,6I2,7I2,2I1,1X,F8.5,1X,I8,6I3)
+ 1006 Format(1X,'Number of isomers written to database: ',I10)
+ 2000 Format(I9,2X,A3,1X,12I4,3X,6(I2,1X),2X,I2,3X,6(I2,1X),
+     1 I3,1X,F10.5,1X,2I3,F9.5,1X,A6,1X,I10,2X,A26)
+      RETURN
+      END
+
+
       Function IPentInd(IRhag5)
       Integer IRhag5(0:5)
       Ifus5=0
@@ -116,6 +210,8 @@ C     Wiener and hyper Wiener index, topological radius and diameter
       Xatom=dfloat(number_vertices)
       wiener1=0.d0
       wiener=0.d0
+      wienermin=0
+      wienermax=0
       hyperwiener=0.d0
       maxdist=0
       mRadius=100000000

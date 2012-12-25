@@ -3,7 +3,7 @@
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1 iprinth,
+     1 iprinth,ndbconvert,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
      1 force,forceP,boost,filename,filenameout,DATEN)
       use config
@@ -15,7 +15,7 @@
       Character filename*50
       Character filenameout*50
       Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,
-     1 nohueckel,loop,
+     1 nohueckel,loop,ndbconvert,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad
@@ -92,6 +92,7 @@ C Default parameters for external files
       filenameout= 'Fullerene'
 
 C Integers
+      ndbconvert=0 ! Flag for conversion of database
       nosort=0  !  Flag for sorting cartesian coordinates
       ispsearch=1 ! Flag for searching for canonical spiral
       novolume=0 ! Flag for volume calculation

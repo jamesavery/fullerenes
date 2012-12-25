@@ -113,7 +113,7 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1  ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1  iprinthessian,
+     1  iprinthessian,ndbconvert,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 
@@ -126,6 +126,11 @@ C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Only do isomer statistics
       if(istop.ne.0) go to 98
+C  Convert printed database into a more compressed file
+      if(ndbconvert.ne.0) then
+       Call CompressDatabase(Iout,filename)
+       go to 99
+      endif
 
 C------------------Coordinates-------------------------------------
 C Options for Input coordinates
