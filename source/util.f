@@ -55,10 +55,18 @@ C First line not 3 integers, going to search for it
 
 C Now read database
         Write(Iout,1003) Nvert,IP,IH
+        Write(2,1005) Nvert,IP,IH
+        nlines=0
         Do J=1,10000000
+         if(IH.eq.1) then
          Read(1,2000,ERR=199) number,Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,5),NP,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,
      1    HLgap,shell,ncycHam,nmrstring
+         else
+         Read(1,2001,ERR=199) number,Group,(RSPI(i),I=1,12),
+     1    (PNI(I),I=0,5),NP,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,
+     1    HLgap,shell,nmrstring
+         endif
         lenstring=LEN_TRIM(nmrstring)
         if(lenstring.le.9) then
          read(nmrstring(1:3),'(i3)') INMR(1)
@@ -85,10 +93,30 @@ C Now read database
          endif
         endif
          nlines=nlines+1
-         Write(2,1004) Group,(RSPI(i),I=1,12),(PNI(I),I=0,5),
-     1    (HNI(I),I=0,6),NeHOMO,NedegHOMO,HLgap,ncycHam,(INMR(I),I=1,6)
+        if(IP.eq.0) then
+         if(IH.eq.1) then
+Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
+          Write(2,1004) Group,(RSPI(i),I=1,12),(PNI(I),I=0,4),
+     1     (HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,ncycHam,(INMR(I),I=1,6)
+         else
+Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
+          Write(2,1007) Group,(RSPI(i),I=1,12),(PNI(I),I=0,4),
+     1     (HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,(INMR(I),I=1,6)
+         endif
+        else
+         if(IH.eq.1) then
+Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
+          Write(2,1008) Group,(RSPI(i),I=1,12),(HNI(I),I=3,5),
+     1     NeHOMO,NedegHOMO,HLgap,ncycHam,(INMR(I),I=1,6)
+         else
+Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
+          Write(2,1009) Group,(RSPI(i),I=1,12),(HNI(I),I=3,5),
+     1     NeHOMO,NedegHOMO,HLgap,ncycHam,(INMR(I),I=1,6)
+         endif
+        endif
         enddo
       endif
+
   199 close(unit=1)
       close(unit=2)
       Write(Iout,1006) nlines
@@ -99,10 +127,16 @@ C Now read database
      1 /1X,'Searching for string',A18)
  1003 Format(1X,'Number of vertices: ',I6,', IPR flag: ',I2,
      1 ', Hamiltonian cycle flag: ',I2)
- 1004 Format(A3,12I3,6I2,7I2,2I1,1X,F8.5,1X,I8,6I3)
- 1006 Format(1X,'Number of isomers written to database: ',I10)
+ 1004 Format(A3,12I3,5I2,6I2,2I1,F7.5,I7,6I3)
+ 1005 Format(I3,2I1)
+ 1006 Format(1X,'Number of isomers written to new database: ',I10)
+ 1007 Format(A3,12I3,5I2,6I2,2I1,F7.5,6I3)
+ 1008 Format(A3,12I3,3I2,2I1,F7.5,I7,6I3)
+ 1009 Format(A3,12I3,3I2,2I1,F7.5,6I3)
  2000 Format(I9,2X,A3,1X,12I4,3X,6(I2,1X),2X,I2,3X,6(I2,1X),
      1 I3,1X,F10.5,1X,2I3,F9.5,1X,A6,1X,I10,2X,A26)
+ 2001 Format(I9,2X,A3,1X,12I4,3X,6(I2,1X),2X,I2,3X,6(I2,1X),
+     1 I3,1X,F10.5,1X,2I3,F9.5,1X,A6,2X,A26)
       RETURN
       END
 
