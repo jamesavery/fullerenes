@@ -27,7 +27,7 @@
 
 \aliaspagestyle{title}{empty}
 
-\title{PROGRAM FULLERENE (Version 4.3.1)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
+\title{PROGRAM FULLERENE (Version 4.4)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
 
 \author{Peter Schwerdtfeger%
   \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
@@ -77,7 +77,7 @@ We are always open to improvements and suggestions.
 
 \subsubsection*{Please cite the following papers if you use this program for publishing data:}
 1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{Topological Analysis of Fullerenes - 
-A Fortran and C++ Program (Version 4.3.1)}, (Massey University Albany, 
+A Fortran and C++ Program (Version 4.4)}, (Massey University Albany, 
 Auckland, New Zealand, 2012).\\
 2) P. W. Fowler and D. E. Manolopoulus, \textit{An Atlas of Fullerenes}
 (Dover Publ., New York, 2006). This book is highly recommended. 
@@ -178,10 +178,10 @@ From version 4.0 onwards (released July 2012) C++ routines embedded into the ori
 much improved algorithms compared to the older versions. The reason for using two different program languages is
 that PS is good in old-fashioned Fortran, JA is good in C++ (and LW is doing both).  Furthermore, some of the original routines used were available 
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
-and geometry optimization. Version 4.3 now includes the Hessian of the force field, although 
+and geometry optimization. Version 4.3 included the Hessian of the force field, although 
 we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
-4.3.1 introduced a search algorithm for neighborhood RSPIs and the Szeged index as a topological index.
-Also the Tutte embedding algorithm has been made much faster.
+4.4 introduced a search algorithm for neighborhood RSPIs, the Szeged index and pentagon arm indices as further topological descriptors.
+Also the Tutte embedding algorithm has been made much faster and the fullerene database has been made more compact.
 This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bug please report it to one of us.
 
@@ -270,8 +270,9 @@ indices for all possible isomers with a given vertex count $n_v$ ($>$ 80 atoms),
 and the Tutte embedding algorithm ($>$ 2000 atoms). We try to improve the performance of these algorithms
 in our next major version to be released. For version 4.1 the fullerene database was increased and a link to
 the House of Graphs was introduced. Version 4.2 saw the introduction of dihedral angles into the force field,
-and Version 4.3 was extended to calculate frequencies from the force-field Hessian, and the implementation of
-the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k \geq l$.
+and Version 4.3 was extended to calculate frequencies from the force-field Hessian, and Version 4.4 saw
+the implementation of the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k \geq l$,
+new topological descriptors and a more compact database.
 
 %Create a 3D structure for a specific fullerene
 \subsection{Create a 3D structure for a specific fullerene}
@@ -431,13 +432,14 @@ One of the first topological indicators introduced to discuss the stability of f
 hexagons. The program calculates the pentagon neighbour indices,\cite{Atlas,Albertazzi} hexagon neighbour indices and the pentagon arm indices.\cite{Reti}
 Every fullerene isomer can be characterized by a signature of the form $\{i_k | k=1,n\}$. The pentagon indices $(p_i | i=0, \dots 5)$ define the
 number of pentagons attached to another pentagon, i.e. for IPR fullerenes $p_0 = 12$ and all other pentagon indices are zero. Hexagon indices are similarly
-defined, i.e. $(h_i | i=0, \dots 5)$, where $h_k$ is the number of hexagons with neighbour index $k$. In an IPR fullerene every hexagon is adjacent to aminimum of three others and we can restrict the list to $(h_3, h_4, h_5, h_6)$. The pentagon arm indices $(n_i | i=0, \dots 5)$ counts the number of arms
+defined, i.e. $(h_i | i=0, \dots 5)$, where $h_k$ is the number of hexagons with neighbour index $k$. In an IPR fullerene every hexagon is adjacent to a
+minimum of three others and we can restrict the list to $(h_3, h_4, h_5, h_6)$. The pentagon arm indices $(n_i | i=0, \dots 5)$ counts the number of arms
 of the pentagons. Here an edge $E$ incident to a vertex of a pentagon not belonging to the pentagon is called an arm if i) both end-vertices of edge $E$ 
 are incident to pentagons, and ii) $E$ shares two neighbor hexagons.\cite{Reti} It is clear that this is nothing else than a Stone-Wales pattern.\\
 We can now define some useful topological invariants. The pentagon index $N_p$ is defined as
 \begin{equation}
   \label{pentindex}
-  N_p = \frac{1}{2}\sum_{k=1}^{5} kp_k
+  N_p = \frac{1}{2}\sum_{k=1}^{5} kp_k \quad \text{ with } \quad  \sum_{k=0}^{5} p_k = 12
 \end{equation}
 For IPR fullerenes we have no pentagon attached to another and therefore $p_0 = 12$ and all other $p_i = 0$, and it follows that $N_p = 0$. For IPR fullerenes
 a more useful index is defined through the hexagon neighbour indices. The standard deviation $\sigma_h$ of the hexagon neighbour index distribution is defined as
@@ -448,7 +450,7 @@ a more useful index is defined through the hexagon neighbour indices. The standa
 where
 \begin{equation}
   \label{mean}
-  \langle k^n \rangle = \frac{\sum_{k=1}^{6} k^n h_k}{\sum_{k=0}^{6} h_k}
+  \langle k^n \rangle = \frac{\sum_{k=1}^{6} k^n h_k}{\sum_{k=0}^{6} h_k}  \quad \text{ with } \quad  \sum_{k=0}^{6} h_k = \frac{n}{2} - 10
 \end{equation}
 R\'eti and L\'aszl\'o define the pentagon arm index $N_A$ in a similar way to the pentagon index,\cite{Reti}
 \begin{equation}
@@ -467,7 +469,7 @@ We now define the R\'eti-L\'aszl\'o topological descriptor as $\Psi$,
 \end{equation}
 If there exists a non-negative integer $q$ for which one of the arm indices $n_q = 12$, the fullerene is called $q$-balanced. In this
 case $V = 0$.\cite{Reti} If $N_p + N_A = 0$, the fullerene is called strongly isolated. \C{60} contains Stone-Wales patterns and is therefore not
-strongly isolated. The first leapfrog of \C{60}, \C{180}, is strongly isolated.
+strongly isolated. The first leapfrog of \C{60}, \C{180}, and the ones to follow are strongly isolated.
 
 
 %The Goldberg-Coxeter transformation
@@ -864,7 +866,7 @@ every line until the first namelist line is interpreted as a comment.
 \subsection{\&General line}
 Namelist line that contains the main flags for the program. 
 
-\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, nohueckel, loop, ipsphere, nosort, ispsearch, novolume, TolR, R5, R6, filenamedb, filename}.
+\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, nohueckel, loop, ipsphere, nosort, ispsearch, novolume, TolR, R5, R6, filenamedb, filename, ndbconvert}.
 \paragraph{Option description:}
 \begin{description}
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
@@ -914,6 +916,7 @@ until it is successful. If \paramname{ispsearch} = 2, all spirals are counted (t
     Prefix for for a database filename to be used as output for .xyz and .cc1 files if different from \filename{filename}. Limited to 50~characters, 
     Used for example to read from the Yoshida or House of Graph files with \filename{filename} in the directory \filename{database/Yoshida} or \filename{database/HOG}.
     and write .xyz-file out to another filename called \filename{filenameout}.
+\item[{ndbconvert}] Programmers option to convert output from isomer routine into a more compact format.
 \end{description}
 
 
