@@ -385,7 +385,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -393,7 +393,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -401,7 +401,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -409,7 +409,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -440,7 +440,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -449,7 +449,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -458,7 +458,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -467,7 +467,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -824,7 +824,7 @@ C     Analyze dual matrix
      1 /1X,' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1068,7 +1068,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1076,7 +1076,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1084,7 +1084,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1092,7 +1092,7 @@ C     Analyze dual matrix
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-')) 
@@ -1121,7 +1121,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -1130,7 +1130,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -1139,7 +1139,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
@@ -1148,7 +1148,7 @@ C     Analyze dual matrix
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
