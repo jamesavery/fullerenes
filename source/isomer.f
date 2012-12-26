@@ -244,11 +244,13 @@ C Produce list from ring spiral algorithm
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Character*50 databasefile
-      Character*1 Text(200),Textind
-      Open(UNIT=4,FILE=databasefile,STATUS='old',FORM='FORMATTED')
-       Textind=' '
-       Nlimit=1000000000
-       Read(4,*) IN,IP,IH
+      CHARACTER*3  Group
+      CHARACTER*6  Occup
+      Integer hamlow,hamhigh,RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
+
+      Open(UNIT=4,FILE=databasefile,STATUS='old',ACTION='Read',
+     1  FORM='FORMATTED')
+       Read(4,1003) IN,IP,IH
        if(IN.ne.number_vertices) then
         Write(Iout,1002) IN,number_vertices
         return
@@ -272,27 +274,199 @@ C Produce list from ring spiral algorithm
       endif
       endif
 
-       do I =1,Nlimit
-        Read(4,1001,Err=99,end=99) (Text(J),J=1,200)
-        do k=1,200
-         l=200-k+1
-         if(Text(l).ne.Textind) then
-          NChar=l
-          go to 10
-         endif
-        enddo
-  10    Write(Iout,1001) (Text(J),J=1,NChar)
+       do I=1,5
+        PNI(I)=0
        enddo
-  99  Close(unit=4)
+       PNI(0)=12
+       do I=0,2
+        HNI(I)=0
+       enddo
+       IFus5G=0
+
+       IFus5Glow=100000
+       IFus5Ghigh=0
+       sigmahlow=1.d10
+       sigmahhigh=0.d0
+       hamlow=1000000000
+       hamhigh=0
+
+       do J =1,Nisoloop
+        if(IP.eq.0) then
+         if(IH.eq.1) then
+Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
+          Read(4,1004,ERR=99,end=99) Group,(RSPI(i),I=1,12),
+     1     (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
+     2     ncycHam,(INMR(I),I=1,6)
+          PNI(5)=12-PNI(0)-PNI(1)-PNI(2)-PNI(3)-PNI(4)
+          IFus5G=IPentInd(PNI)
+          HNI(6)=number_vertices/2-10
+     1           -HNI(0)-HNI(1)-HNI(2)-HNI(3)-HNI(4)-HNI(5)
+          sigmah=HexInd(HNI,ihk)
+          if(2*NedegHOMO.eq.NeHOMO) then
+           Occup='closed'
+          else
+           Occup='open  '
+          endif
+          nmrloop=2
+          if(INMR(3).ne.0) nmrloop=4
+          if(INMR(5).ne.0) nmrloop=6
+          WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1     IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
+     2     Occup,ncycHam,(INMR(I),I=1,nmrloop)
+         if(IFus5G.le.IFus5Glow) then
+          IFus5Glow=IFus5G
+          IFusL=J
+         endif
+         if(IFus5G.ge.IFus5Ghigh) then
+          IFus5Ghigh=IFus5G
+          IFusH=J
+         endif
+         if(sigmah.le.sigmahlow) then
+          sigmahlow=sigmah
+          ISigmaL=J
+         endif
+         if(sigmah.ge.sigmahhigh) then
+          sigmahhigh=sigmah
+          ISigmaH=J
+         endif
+         if(ncycham.le.hamlow) then
+          hamlow=ncycham
+          islow=J
+         endif
+         if(ncycham.ge.hamhigh) then
+          hamhigh=ncycham
+          ishigh=J
+         endif
+
+         else
+Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
+          Read(4,1007,ERR=99,end=99) Group,(RSPI(i),I=1,12),
+     1    (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
+     2    (INMR(I),I=1,6)
+          PNI(5)=12-PNI(0)-PNI(1)-PNI(2)-PNI(3)-PNI(4)
+          IFus5G=IPentInd(PNI)
+          HNI(6)=number_vertices/2-10
+     1           -HNI(0)-HNI(1)-HNI(2)-HNI(3)-HNI(4)-HNI(5)
+          sigmah=HexInd(HNI,ihk)
+          if(2*NedegHOMO.eq.NeHOMO) then
+           Occup='closed'
+          else
+           Occup='open  '
+          endif
+          nmrloop=2
+          if(INMR(3).ne.0) nmrloop=4
+          if(INMR(5).ne.0) nmrloop=6
+          WRITE(Iout,607) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1     IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
+     2     Occup,(INMR(I),I=1,nmrloop)
+          if(IFus5G.le.IFus5Glow) then
+           IFus5Glow=IFus5G
+           IFusL=J
+          endif
+          if(IFus5G.ge.IFus5Ghigh) then
+           IFus5Ghigh=IFus5G
+           IFusH=J
+          endif
+          if(sigmah.le.sigmahlow) then
+           sigmahlow=sigmah
+           ISigmaL=J
+          endif
+          if(sigmah.ge.sigmahhigh) then
+           sigmahhigh=sigmah
+           ISigmaH=J
+          endif
+         endif
+
+        else
+         if(IH.eq.1) then
+Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
+          Read(4,1008,ERR=99,end=99) Group,(RSPI(i),I=1,12),
+     1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,ncycHam,
+     2     (INMR(I),I=1,6)
+          HNI(6)=number_vertices/2-10-HNI(3)-HNI(4)-HNI(5)
+          sigmah=HexInd(HNI,ihk)
+          if(2*NedegHOMO.eq.NeHOMO) then
+           Occup='closed'
+          else
+           Occup='open  '
+          endif
+          nmrloop=2
+          if(INMR(3).ne.0) nmrloop=4
+          if(INMR(5).ne.0) nmrloop=6
+          WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1     IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
+     2     Occup,ncycHam,(INMR(I),I=1,nmrloop)
+          if(sigmah.le.sigmahlow) then
+           sigmahlow=sigmah
+           ISigmaL=J
+          endif
+          if(sigmah.ge.sigmahhigh) then
+           sigmahhigh=sigmah
+           ISigmaH=J
+          endif
+          if(ncycham.le.hamlow) then
+           hamlow=ncycham
+           islow=J
+          endif
+          if(ncycham.ge.hamhigh) then
+           hamhigh=ncycham
+           ishigh=J
+          endif
+
+         else
+Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
+          Read(4,1009,ERR=99,end=99) Group,(RSPI(i),I=1,12),
+     1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,(INMR(I),I=1,6)
+          HNI(6)=number_vertices/2-10-HNI(3)-HNI(4)-HNI(5)
+          sigmah=HexInd(HNI,ihk)
+          if(2*NedegHOMO.eq.NeHOMO) then
+           Occup='closed'
+          else
+           Occup='open  '
+          endif
+          nmrloop=2
+          if(INMR(3).ne.0) nmrloop=4
+          if(INMR(5).ne.0) nmrloop=6
+          WRITE(Iout,607) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1     IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
+     2     Occup,(INMR(I),I=1,nmrloop)
+           if(sigmah.le.sigmahlow) then
+           sigmahlow=sigmah
+           ISigmaL=J
+          endif
+          if(sigmah.ge.sigmahhigh) then
+           sigmahhigh=sigmah
+           ISigmaH=J
+          endif
+         endif
+
+        endif
+       enddo
+C Final statistics
+  99  if(IP.eq.0) then
+        WRITE(Iout,611) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
+     1   sigmahlow,ISigmaL,sigmahhigh,ISigmaH
+        if(IH.eq.1) WRITE(Iout,609) hamlow,islow,hamhigh,ishigh
+      else
+        WRITE(Iout,612) sigmahlow,ISigmaL,sigmahhigh,ISigmaH
+       if(IH.eq.1) WRITE(Iout,610) hamlow,islow,hamhigh,ishigh
+      endif
+      WRITE(Iout,613) 
+
+      Close(unit=4)
  1000 Format(/1X,I10,2I2)
- 1001 Format(200A1)
  1002 Format(/1X,'Atom number ',I5,' not identical to that on file: ',
      1 I5)
+ 1003 Format(I3,2I1)
+ 1004 Format(A3,12I3,5I2,6I2,I2,I1,F7.5,I7,6I3)
+ 1007 Format(A3,12I3,5I2,6I2,I2,I1,F7.5,6I3)
+ 1008 Format(A3,12I3,3I2,I2,I1,F7.5,I7,6I3)
+ 1009 Format(A3,12I3,3I2,I2,I1,F7.5,6I3)
  601  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-'))
@@ -300,7 +474,7 @@ C Produce list from ring spiral algorithm
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-'))
@@ -308,7 +482,7 @@ C Produce list from ring spiral algorithm
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-'))
@@ -316,16 +490,37 @@ C Produce list from ring spiral algorithm
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
      5 /1X,170('-'))
+ 607  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
+     1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
+     1 1X,A6,2X,3(I3,' x',I3,:,','))
+ 608  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
+     1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
+     1 1X,A6,2X,I9,2X,3(I3,' x',I3,:,','))
+ 609  FORMAT(1X,'Lowest number of Hamiltonian cycles     ',I10,
+     1 ' for isomer ',I10,
+     1      /1X,'Highest number of Hamiltonian cycles    ',I10,
+     1 ' for isomer ',I10)
+ 610  FORMAT(1X,'Lowest number of IPR Hamiltonian cycles ',I10,
+     1 ' for isomer ',I10,
+     1      /1X,'Highest number of IPR Hamiltonian cycles',I10,
+     1 ' for isomer ',I10)
+ 611  FORMAT(1X,'Lowest  Np= ',I3,' for isomer ',I10,
+     1      /1X,'Highest Np= ',I3,' for isomer ',I10,
+     1      /1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
+     1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
+ 612  FORMAT(1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
+     1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
+ 613  FORMAT(1X,'Isomer List Complete')
   701  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
@@ -334,7 +529,7 @@ C Produce list from ring spiral algorithm
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     2 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
@@ -343,7 +538,7 @@ C Produce list from ring spiral algorithm
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
@@ -352,7 +547,7 @@ C Produce list from ring spiral algorithm
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
-     1 /8X,'number_vertices  PG   Ring spiral pentagon positions',
+     1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
