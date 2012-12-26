@@ -7,6 +7,7 @@
       integer,parameter :: Emax=3*Nmax/2
       integer,parameter :: maxit=2000000
       integer,parameter :: maxRS=20000000
+      integer,parameter :: Nisoloop=1000000000
       integer,parameter :: LimitAll=122
       integer,parameter :: LimitIPR=170
       integer,parameter :: ffmaxdim=19 ! maximum number of parameters per force field

@@ -1,4 +1,4 @@
-C92 Creating isomer list only
+C92 Creating IPR isomer list only
 &General NA=92 /
 &Coord ICart=0 /
 &FFChoice Iopt=1 /
