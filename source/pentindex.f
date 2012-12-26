@@ -351,13 +351,13 @@ C     Construct the ring spiral
       use config
       IMPLICIT Integer (A-Z)
 C Routine to get Isomer number from database
-      Real*8 sigmah
       Character*31 databasefile
       Character*13 dbdir
       Character*9 fend
       Character*1 fstart,fnum1,Dummy
       Character*2 fnum2
       Character*3 fnum,fnum3,GROUP,ident
+      Real*8 HLgap
       Dimension JP(12)
       Dimension Iso(119),IsoIPR(123)
       Logical lexist
@@ -468,34 +468,47 @@ C     Open file
        stop
       endif
       Open(UNIT=4,FILE=databasefile,STATUS='old',FORM='FORMATTED')
-       Read(4,*) IN,IP,IH
-      Write(Iout,1009) itotal
+       Read(4,2000) IN,IP,IH
+      Write(Iout,1009) itotal,IN,IP,IH
       Do I=1,isonum-1
        Read(4,*) Dummy
       enddo
-      if(IH.eq.0) then
-       Read(4,2000) L,GROUP,(JP(J),J=1,12),IFus5G,sigmah
-      if(L.lt.100) Write(Iout,1010) ident,L,GROUP
-      if(L.ge.100.and.L.lt.1000) Write(Iout,1011) ident,L,GROUP
-      if(L.ge.1000.and.L.lt.10000) Write(Iout,1012) ident,L,GROUP
-      if(L.ge.10000.and.L.lt.100000) Write(Iout,1013) ident,L,GROUP
-      if(L.ge.100000.and.L.lt.1000000) Write(Iout,1014) ident,L,GROUP
-      if(L.ge.1000000.and.L.lt.10000000) Write(Iout,1015) ident,L,GROUP
-      if(L.ge.10000000.and.L.lt.100000000) Write(Iout,1016)ident,L,GROUP
-      if(L.ge.100000000) Write(Iout,1017) ident,L,GROUP
-      Write(Iout,1020) (JP(J),J=1,12),IFus5G,sigmah
+      L=isonum
+
+C read isomer line
+      if(IP.eq.0) then
+       if(IH.eq.0) then
+        Read(4,2001) GROUP,(JP(J),J=1,12),
+     1   NeHOMO,NedegHOMO,HLgap
+       else
+        Read(4,2002) GROUP,(JP(J),J=1,12),
+     1   NeHOMO,NedegHOMO,HLgap,nhamcycle
+       endif
       else
-       Read(4,2001) L,GROUP,(JP(J),J=1,12),IFus5G,sigmah,nhamcycle
-      if(L.lt.100) Write(Iout,1010) ident,L,GROUP
-      if(L.ge.100.and.L.lt.1000) Write(Iout,1011) ident,L,GROUP
-      if(L.ge.1000.and.L.lt.10000) Write(Iout,1012) ident,L,GROUP
-      if(L.ge.10000.and.L.lt.100000) Write(Iout,1013) ident,L,GROUP
-      if(L.ge.100000.and.L.lt.1000000) Write(Iout,1014) ident,L,GROUP
-      if(L.ge.1000000.and.L.lt.10000000) Write(Iout,1015) ident,L,GROUP
-      if(L.ge.10000000.and.L.lt.100000000) Write(Iout,1016)ident,L,GROUP
-      if(L.ge.100000000) Write(Iout,1017) ident,L,GROUP
-      Write(Iout,1021) (JP(J),J=1,12),IFus5G,sigmah,nhamcycle
+       if(IH.eq.0) then
+        Read(4,2003) GROUP,(JP(J),J=1,12),
+     1   NeHOMO,NedegHOMO,HLgap
+       else
+        Read(4,2004) GROUP,(JP(J),J=1,12),
+     1   NeHOMO,NedegHOMO,HLgap,nhamcycle
+       endif
       endif
+C write out information
+      if(L.lt.10) Write(Iout,1010) ident,L,GROUP
+      if(L.ge.10.and.L.lt.100) Write(Iout,1011) ident,L,GROUP
+      if(L.ge.100.and.L.lt.1000) Write(Iout,1012) ident,L,GROUP
+      if(L.ge.1000.and.L.lt.10000) Write(Iout,1013) ident,L,GROUP
+      if(L.ge.10000.and.L.lt.100000) Write(Iout,1014) ident,L,GROUP
+      if(L.ge.100000.and.L.lt.1000000) Write(Iout,1015) ident,L,GROUP
+      if(L.ge.1000000.and.L.lt.10000000) Write(Iout,1016) ident,L,GROUP
+      if(L.ge.10000000.and.L.lt.100000000) Write(Iout,1017)ident,L,GROUP
+      if(L.ge.100000000) Write(Iout,1018) ident,L,GROUP
+      if(IH.eq.0) then
+       Write(Iout,1020) (JP(J),J=1,12),NeHOMO,NedegHOMO,HLgap
+      else
+       Write(Iout,1021) (JP(J),J=1,12),NeHOMO,NedegHOMO,HLgap,nhamcycle
+      endif
+
       Close(unit=4)
 
  1000 Format(1X,'Number of atoms ',I4,' larger than data base limit ',
@@ -514,30 +527,38 @@ C     Open file
      1 ' in IPR isomer list',/1X,'Search in file: ',A29)
  1007 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  1008 Format(1X,'IPR parameter not set ==> ABORT')
- 1009 Format(1X,'File contains ',I9,' isomers')
- 1010 Format(1X,'Read isomer ',A3,I2,' from database (point group: ',
+ 1009 Format(1X,'File contains ',I9,' isomers. IN= ',I4,', IP= ',I2,
+     1 ', IH= ',I2)
+ 1010 Format(1X,'Read isomer ',A3,I1,' from database (point group: ',
      1 A3,')')
- 1011 Format(1X,'Read isomer ',A3,I3,' from database (point group: ',
+ 1011 Format(1X,'Read isomer ',A3,I2,' from database (point group: ',
      1 A3,')')
- 1012 Format(1X,'Read isomer ',A3,I4,' from database (point group: ',
+ 1012 Format(1X,'Read isomer ',A3,I3,' from database (point group: ',
      1 A3,')')
- 1013 Format(1X,'Read isomer ',A3,I5,' from database (point group: ',
+ 1013 Format(1X,'Read isomer ',A3,I4,' from database (point group: ',
      1 A3,')')
- 1014 Format(1X,'Read isomer ',A3,I6,' from database (point group: ',
+ 1014 Format(1X,'Read isomer ',A3,I5,' from database (point group: ',
      1 A3,')')
- 1015 Format(1X,'Read isomer ',A3,I7,' from database (point group: ',
+ 1015 Format(1X,'Read isomer ',A3,I6,' from database (point group: ',
      1 A3,')')
- 1016 Format(1X,'Read isomer ',A3,I8,' from database (point group: ',
+ 1016 Format(1X,'Read isomer ',A3,I7,' from database (point group: ',
      1 A3,')')
- 1017 Format(1X,'Read isomer ',A3,I9,' from database (point group: ',
+ 1017 Format(1X,'Read isomer ',A3,I8,' from database (point group: ',
+     1 A3,')')
+ 1018 Format(1X,'Read isomer ',A3,I9,' from database (point group: ',
      1 A3,')')
  1020 Format(/1X,'Ring spiral pentagon indices: ',12I6,
-     1 /1X,'Np= ',I2,', sigmah= ',F12.6)
+     1 /1X,'Ne(HOMO)= ',I3,', degeneracy(HOMO): ',I1,
+     1 ', HOMO-LUMO gap: ',F7.5)
  1021 Format(/1X,'Ring spiral pentagon indices: ',12I6,
-     1 /1X,'Np= ',I2,', sigmah= ',F12.6,', Number of distinct ',
+     1 /1X,'Ne(HOMO)= ',I3,', degeneracy(HOMO): ',I1,
+     1 ', HOMO-LUMO gap: ',F7.5,', Number of distinct ',
      1 'Hamiltonian cycles: ',I10)
- 2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
- 2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
+ 2000 Format(I3,2I1)
+ 2001 Format(A3,12I3,22X,I2,I1,F7.5)
+ 2002 Format(A3,12I3,22X,I2,I1,F7.5,I7)
+ 2003 Format(A3,12I3,6X,I2,I1,F7.5)
+ 2004 Format(A3,12I3,6X,I2,I1,F7.5,I7)
 
       Return 
       END
