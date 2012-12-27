@@ -1646,17 +1646,17 @@ C     Print ring numbers
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
  612  Format(1X,'Loop over (5,6) fusions, ',I5,' max in total')
  613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
- 614  Format(1X,I6,' RSPIs taken from spiral list to be analyzed:',/1X,
+ 614  Format(1X,I7,' RSPIs taken from spiral list to be analyzed:',/1X,
      2 'Point group   Ring spiral pentagon positions',
      3 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
  616  Format(1X,'No (6,6) fusions to loop over')
- 617  Format(1X,'--->',I6,' ring spirals found ',
+ 617  Format(1X,'--->',I7,' ring spirals found ',
      1 'but RSPIs detected were not valid')
  618  Format(20(1X,32(I4,'-'),/))
  619  Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I4,' spirals found)') 
- 620  Format(1X,'Search ',I6,' spirals to produce canonical'
+ 620  Format(1X,'Search ',I7,' spirals to produce canonical'
      1 ' list of faces:')
  621  Format(12(1X,I4))
  622  Format(1X,'Pentagons are not in sequence, stopped at pentagon ',
@@ -1680,19 +1680,19 @@ C     Print ring numbers
      1 'existing spirals (otherwise increase NSpScale parameter ',
      1 'in main program')
  629  Format(20(1X,32(I4,'-'),/))
- 630  Format(1X,'Failed to find ring spiral: ',I6,
-     1 ' detected (maximum possible: ',I6,')',/1X,
+ 630  Format(1X,'Failed to find ring spiral: ',I7,
+     1 ' detected (maximum possible: ',I7,')',/1X,
      1 'This is a non-spiral fullerene')
- 631  FORMAT(1X,I6,' distinct (55)      RSPIs found out of ',I6,
-     1 /1X,I6,' distinct (56)/(65) RSPIs found out of ',I6,
-     1 /1X,I6,' distinct (66)      RSPIs found out of ',I6)
+ 631  FORMAT(1X,I7,' distinct (55)      RSPIs found out of ',I7,
+     1 /1X,I7,' distinct (56)/(65) RSPIs found out of ',I7,
+     1 /1X,I7,' distinct (66)      RSPIs found out of ',I7)
  632  FORMAT(1X,'Spiral for fullerene isomers of C',I4,':',
      1 ' (',I4,' faces)')
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
      1 ' (',I5,' faces)')
- 634  FORMAT(1X,I6,' distinct RSPIs found out of total',I6,
-     1 ' (maximum possible: ',I6,')',/1X,I6,' spirals with a ',
-     1 'pentagon start (',I6,' symmetry distinct)')
+ 634  FORMAT(1X,I6,' distinct RSPIs found out of total',I7,
+     1 ' (maximum possible: ',I7,')',/1X,I7,' spirals with a ',
+     1 'pentagon start (',I7,' symmetry distinct)')
  635  FORMAT(1X,' Spiral found, avoid counting of spirals')
       Return
       END

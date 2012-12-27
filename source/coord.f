@@ -2447,7 +2447,7 @@ C     Reconstruct IDA
      1 'adjacency matrix altered. Vertices N and corresponding ',
      1 'adjacencies Ni of 3-connected graph:',
      1 /1X,'   N         N1   N2   N3')
- 1005 Format(1X,I5,'    (',3I5,')')
+ 1005 Format(1X,I5,'    (',3I6,')')
       Return
       END
 

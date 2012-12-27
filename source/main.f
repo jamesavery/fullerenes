@@ -573,9 +573,10 @@ C-----------------------------------------------------------------
 C------------------GRAPH2D----------------------------------------
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
-        anglew=45.d0
         routine='GRAPH2D        '
         Write(Iout,1008) routine
+        if(number_vertices.lt.10000) then
+        anglew=45.d0
         if(ISchlegel.eq.2) then
           if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
             ParamS=anglew
@@ -587,6 +588,9 @@ C Calculate Schlegel diagram
         CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
      1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,mdist,Dist,ParamS,Rmin,
      1   TolX,scales,scalePPG,boost,CR,CRing5,CRing6,Symbol,filename)
+      else
+        Write(Iout,1024) number_vertices
+      endif
       endif
 C------------------END--------------------------------------------
 C  E N D   O F   P R O G R A M
@@ -663,6 +667,8 @@ C Formats
  1022 FORMAT(/1X,'You try to write into the database filesystem',
      1 ' which is not allowed  ===>  ABORT')
  1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
+ 1024 Format(1X,'2D Graph for such a large fullerene with ',I6,
+     1 ' vertices is not meaningful ===> RETURN')
  1025 FORMAT(I2)
  1026 FORMAT(I3)
  1027 FORMAT(I4)
