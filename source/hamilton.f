@@ -492,8 +492,12 @@ C     Schwerdtfeger upper and lower limit
        iupperschwerd=dint(upperschwerd)
        write (Iout,1010) iupperschwerd
       else
-       upperschwerd=2.d0**powerupper
-       write (Iout,1011) upperschwerd
+       if(powerupper.lt.9.d2) then
+        upperschwerd=2.d0**powerupper
+        write (Iout,1011) upperschwerd
+       else
+        write (Iout,1021) powerupper
+       endif
       endif
       If(powerlower.lt.31.01d0) then
        lowerschwerd=2.d0**powerlower
@@ -501,22 +505,34 @@ C     Schwerdtfeger upper and lower limit
        If(ilowerschwerd.lt.18) ilowerschwerd=18
         write (Iout,1012) ilowerschwerd
       else
-       lowerschwerd=2.d0**powerlower
-       write (Iout,1013) lowerschwerd
+       if(lowerupper.lt.9.d2) then
+        lowerschwerd=2.d0**powerlower
+        write (Iout,1013) lowerschwerd
+       else
+        write (Iout,1023) powerupper
+       endif
       endif
 
 C     Approximate number of IPR fullerenes
       if(number_vertices.eq.60.or.number_vertices.ge.70) then
       exphigh=1.230625d-1*dAtom
       explow=1.136977d-1*dAtom
-      fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
-      fullIPRl=1.050204d0*dexp(explow)/1.2d0
-      If(fullIPRh.lt.2.d9) then
+      If(exphigh.lt.1.d2) then
+       fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
+       fullIPRl=1.050204d0*dexp(explow)/1.2d0
        ifullIPRh=dint(fullIPRh)
        ifullIPRl=dint(fullIPRl)
        write (Iout,1014) ifullIPRl,ifullIPRh
       else
-       write (Iout,1015) fullIPRl,fullIPRh
+       if(exphigh.lt.6.d2) then
+        fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
+        fullIPRl=1.050204d0*dexp(explow)/1.2d0
+        write (Iout,1015) fullIPRl,fullIPRh
+       else
+        fullexph=dlog(5.698541d-1*1.2d0)*exphigh
+        fullexpl=dlog(1.050204d0/1.2d0)*explow
+        write (Iout,1025) fullexpl,fullexph
+       endif
        if(fullIPRh.gt.1.d10) then
         write (Iout,1008)
         Return
@@ -662,7 +678,7 @@ C     NP values
      1 'fullerene graphs: ',D22.14)
  1012 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
      1 'fullerene graphs: ',I12)
- 1013 Format(1X,'Schwerdtfeger lower limit for Hamiltonian cycles in '
+ 1013 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
      1 'fullerene graphs: ',D22.14)
  1014 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr.',I12,' and ',I12)
@@ -670,5 +686,12 @@ C     NP values
      1 'fullerene graphs: between appr.',D22.14,' and ',D22.14)
  1016 Format(/1X,'Epstein upper limit for Hamiltonian cycles in '
      1 'cubic graphs (only power to base 2 given): ',D22.14)
+ 1021 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
+     1 'fullerene graphs: 10**a with a=',D22.14)
+ 1023 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
+     1 'fullerene graphs: 10**a with a=',D22.14)
+ 1025 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
+     1 'fullerene graphs: between appr. e**a and e**b with a= ',
+     1  D22.14,' and b= ',D22.14)
       RETURN
       END
