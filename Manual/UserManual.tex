@@ -181,7 +181,7 @@ in Fortran only. Some standard routines from Mathematical Recipes were modified 
 and geometry optimization. Version 4.3 included the Hessian of the force field, although 
 we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
 4.4 introduced a search algorithm for neighborhood RSPIs, the Szeged index and pentagon arm indices as further topological descriptors.
-Also the Tutte embedding algorithm has been made much faster and the fullerene database has been made more compact.
+Also the Tutte embedding algorithm has been made much faster and the fullerene database has been transformed into a more compact version.
 This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bug please report it to one of us.
 
@@ -239,7 +239,8 @@ to be created (if not already there) and moved into the main directory where the
 directories are located. Please download our databases and move it into this folder. \filename{database} should contain
 the folders \filename{ALL} with our database for general fullerenes, \filename{IPR} with our database 
 for IPR fullerenes, \filename{Yoshida} with Yoshida's database of selected fullerenes (directories containing .cc1 files),
-and \filename{HOG} with (if downloaded from http://hog.grinvin.org/Fullerenes ) the House of Graph data files. Important: Please make all filenames in the database read-only.
+and \filename{HOG} with (if downloaded from http://hog.grinvin.org/Fullerenes ) the House of Graph data files. Important: 
+Please make all filenames in the database read-only.
 
 To use the latex program for the 2D fullerene graphs you need to use the files \filename{standalone.cfg} and \filename{standalone.cls}.
 
@@ -261,8 +262,8 @@ explained in some detail in this section. More information can be obtained in an
 \end{figure}
 
 The most time-consuming steps in the program are the diagonalization of the adjacency matrix 
-of the fullerene graph $F$, $A(F)$,  
-needed for the AME algorithm and the H\"uckel analysis ($\mathcal{O}(n^3)$), the force-field optimization for
+of the fullerene graph $F$, $A(F)$  
+(needed for the AME algorithm and the H\"uckel analysis ($\mathcal{O}(n^3)$)), the force-field optimization for
 very large fullerenes ($>$ 2000 atoms)  and the diagonalization of
 the force-field Hessian, the determination of the number of Hamiltonian cycles
 ($>$ 80 atoms) (this is an NP-complete problem), the creation of a list of ring-spiral pentagon
@@ -272,7 +273,7 @@ in our next major version to be released. For version 4.1 the fullerene database
 the House of Graphs was introduced. Version 4.2 saw the introduction of dihedral angles into the force field,
 and Version 4.3 was extended to calculate frequencies from the force-field Hessian, and Version 4.4 saw
 the implementation of the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k \geq l$,
-new topological descriptors and a more compact database.
+new topological descriptors and a more compact version of the database.
 
 %Create a 3D structure for a specific fullerene
 \subsection{Create a 3D structure for a specific fullerene}
@@ -481,6 +482,15 @@ In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \
 (but all indices are allowed for $GC_{k,l}(20)$). A general $GC_{k,l}(n)$ for all values of $k$, $l$ and $n$ with $k \geq l$ 
 is currently in preparation. 
 
+
+%Figure 2
+ \begin{figure}[htbp]
+   	\centering
+  	\includegraphics[]{gc}
+    \caption{Goldberg-Coxeter construction: $GC_{1,1}$, leapfrog transformation; $GC_{3,0}$, halma transformation; $GC_{5,2}$, general.}
+	\label{pic:GoldbergCoxeter}
+ \end{figure}
+
 The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ used here works in the following way: ($i$) Consider
 a cubic planar graph $G_{0}$ and take its dual (faces become vertices and
 vertices become faces), $D_{t}(G_{0})$. This transforms the graph $G_{0}$
@@ -505,14 +515,6 @@ If the initial graph $G_0$ has $n_v$ vertices, the number of vertices of $GC_{k,
 $t(k,l)$ is called the {\em triangulation number}. We work with the dual triangulation instead of a hexagonal mesh as it is easier to be implemented in a computer code.
 This is shown in Figure \ref{pic:GoldbergCoxeter}. For icosahedral fullerenes ($I_h$ and $I$) with $l = k$ or $l = 0$, Fowler and Rogers 
 showed how to construct the RSPIs,\cite{Rogers} which is implemented in this program as well for $GC_{k,l}(20)$.
-
-%Figure 2
- \begin{figure}[htbp]
-   	\centering
-  	\includegraphics[]{gc}
-    \caption{Goldberg-Coxeter construction: $GC_{1,1}$, leapfrog transformation; $GC_{3,0}$, halma transformation; $GC_{5,2}$, general.}
-	\label{pic:GoldbergCoxeter}
- \end{figure}
 
 
 %Hamiltonian cycles
@@ -1216,23 +1218,25 @@ We are currently working on this problem.
 
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
-A database is provided for general isomers up to \C{100} and for IPR isomers up to
+A database is provided for general isomers up to \C{102} and for IPR isomers up to
 \C{120} including the number of Hamiltonian cycles, and without Hamiltonian cycles
 up to \C{122} for general and up to \C{170} for IPR isomers. The database should be copied into
 the main program folder and can be used to read the ring-spiral pentagon indices.
 The numbering scheme is in canonical order and identical to the one introduced in the book by Fowler 
 and Manolopoulus \cite{Atlas}, that is each isomer in the book's appendix can be 
-constructed easily from our database. Example is given in input files  \filename{DB4.inp},
-\filename{DB2.inp} and \filename{DB3.inp}.  The data files are formatted and can easily be read. It is our 
+constructed easily from our database. Example is given in input files  \filename{DBc40.inp},
+\filename{DBc66.inp} and \filename{DBc158.inp}.  The data files are formatted and can easily be read
+by the program (\filename{ISOMERc80.inp}). It is our 
 intention to extend the isomer list beyond \C{122}/\C{170} (without Hamiltonian cycles) using the ``House of Graphs'' database. 
 New lists will be available on our website in due time.  The determination of the number of
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
 The Yoshida database (from http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html) 
 often used has also been added into our database and is placed in the
-folder \filename{database/Yoshida} \cite{Yoshida}. The input file \filename{DB3.inp} shows an example for reading from
-this database. Finally, files from the ``House of Graphs'' database can be added into the database/HOG directory (they
-need to be downloaded from the House of Graphs website http://hog.grinvin.org/Fullerenes) and read-in. 
+folder \filename{database/Yoshida} \cite{Yoshida}. The input file \filename{DBc180Yoshida.inp} shows an example for reading from
+this database. Finally, files from the ``House of Graphs'' database can be added into the \filename{database/HOG} directory (they
+need to be downloaded from the House of Graphs website http://hog.grinvin.org/Fullerenes) and read-in. An input example is
+\filename{DBc384HOG.inp}
 The directory database needs to be in the same directory as ``source'' or ``libgraph''.
 Note that the maximum number of vertices in the database is defined in the config.f file (LimitALL and LimitIPR).
 
@@ -1245,7 +1249,7 @@ Note that the maximum number of vertices in the database is defined in the confi
      \label{pic:Finalgraph}
  \end{figure}
 
-
+\clearpage
 %References
 \begin{thebibliography}{99}
 
