@@ -290,24 +290,24 @@ C     Check Euler characteristic
      1 /4X,'N1    N2    N3    N4    N5',9X,'dm',11X,'RMSD',
      1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5')
  1001 Format(1X,5(I5,1X),3X,2(d12.6,2X),5X,5(d12.6,2X))
- 1002 Format(/1X,I4,' six-membered-rings identified')
- 1003 Format(1X,6I5,3X,2(d12.6,2X),5X,6(d12.6,2X))
+ 1002 Format(/1X,I6,' six-membered-rings identified')
+ 1003 Format(1X,6I6,3X,2(d12.6,2X),5X,6(d12.6,2X))
  1004 Format(//1X,'Checking the Euler polyhedron formula:',/1X,
-     1 'Number of vertices Nv: ',I5,/1X,
-     1 'Number of edges Ne:    ',I5,/1X,
-     1 'Number of faces Nf:    ',I5,/1X,
-     1 'Euler number Nv-Ne+Nf: ',I5,
+     1 'Number of vertices Nv: ',I6,/1X,
+     1 'Number of edges Ne:    ',I6,/1X,
+     1 'Number of faces Nf:    ',I6,/1X,
+     1 'Euler number Nv-Ne+Nf: ',I6,
      1 ' (should be 2 for spherical polyhedra '
      1 'or planar connected graphs)',/1X,
-     1 'Number of pentagons:   ',I5,/1X,
-     1 'Number of hexagons:    ',I5,/1X,
-     1 'Mv=',I4,1X,' Me=',I4)
+     1 'Number of pentagons:   ',I6,/1X,
+     1 'Number of hexagons:    ',I6,/1X,
+     1 'Mv=',I6,1X,' Me=',I6)
  1005 Format(1X,' **** Capped Polydron does not fulfill Eulers theorem')
  1006 Format(/1X,' Atom numbers in ring,',
      1 ' Ni, mean distance, dm, and root mean',
      1 ' square deviation for distances, RMSD,'
      1 ' and distances in the ring:',
-     1 /4X,'N1   N2   N3   N4   N5   N6',8X,'dm',11X,'RMSD',
+     1 /5X,'N1    N2    N3    N4    N5    N6',8X,'dm',11X,'RMSD',
      1 15X,'R1',12X,'R2',12X,'R3',12X,'R4',12X,'R5'12X,'R6')
  1007 Format(1X,' 5-ring minimum bond distance: ',d12.6,
      1 3X,' maximum bond distance: ',d12.6) 
@@ -739,19 +739,20 @@ C Print Cioslowsky analysis and check of correctness
  1000 Format(/1X,'Center for 5-rings',/1X,
      1 ' Ring Number RN, Atom Numbers Ni, Ring centers X,Y,Z and '
      1 'distances di from ring center to atoms',/2X,
-     1 'RN      N1   N2   N3   N4   N5',9X,'X',12X,'Y',12X,'Z',
+     1 'RN       N1    N2    N3    N4    N5',9X,'X',12X,'Y',12X,'Z',
      1 12X,'d1',11X,'d2',11X,'d3',11X,'d4',11X,'d5')
  1001 Format(/1X,'Center for 6-rings',/1X,
      1 ' Ring Number RN, Atom Numbers Ni, Ring centers X,Y,Z and '
-     1 'distances di from ring center to atoms',/2X,
-     1 'RN      N1   N2   N3   N4   N5   N6',9X,'X',12X,'Y',12X,'Z',
+     1 'distances di from ring center to atoms',/4X,
+     1 'RN       N1    N2    N3    N4    N5    N6',
+     1  9X,'X',12X,'Y',12X,'Z',
      1 12X,'d1',11X,'d2',11X,'d3',11X,'d4',11X,'d5',11X,'d6')
- 1002 Format(I4,3X,5I5,3X,3(D12.6,1X),2X,5(D12.6,1X))
- 1003 Format(I4,3X,6I5,3X,3(D12.6,1X),2X,6(D12.6,1X))
+ 1002 Format(I4,3X,5I6,3X,3(D12.6,1X),2X,5(D12.6,1X))
+ 1003 Format(I6,3X,6I6,3X,3(D12.6,1X),2X,6(D12.6,1X))
  1004 Format(/1X,'Analyzing basic two- and three-ring fusions',
      1 //1X,'2-ring fusions between rings (RNI,RNJ):') 
  1005 Format(2X,'(',I1,'-',I1,') fusions: ',I5,' in total')
- 1006 Format(12(1X,'(',I4,',',I4,')'))
+ 1006 Format(12(1X,'(',I5,',',I5,')'))
  1007 Format(1X,'Total number of distinct two-ring fusions:',I5,
      1 ' (should be identical to the number of edges Ne)',/)
  1008 Format(2X,A6,1X,'(',I1,'-',I1,'-',I1,') fusions: ',I5)
@@ -782,15 +783,15 @@ C Print Cioslowsky analysis and check of correctness
      1 'from structural motifs (M)',/2X,'J.Cioslowski, ',
      1 'N.Rao, D.Moncrieff, J. Am. Chem. Soc. 122, 8265 (2000)',
      1 /1X,'Loop through all ',I5,' hexagons. Ring patterns:')
- 1034 Format  (' M666666: ',I4,', M666665: ',I4,', M666655: ',I4,
+ 1034 Format  (' M666666: ',I6,', M666665: ',I4,', M666655: ',I4,
      1        ', M666565: ',I4,', M665665: ',I4,', M666555: ',I4,
-     1       /,' M665655: ',I4,', M656565: ',I4,', M665555: ',I4,
+     1       /,' M665655: ',I6,', M656565: ',I4,', M665555: ',I4,
      1        ', M656555: ',I4,', M655655: ',I4,', M655555: ',I4,
-     1       /,' M555555: ',I4,', M6666  : ',I4,', M6665  : ',I4,
+     1       /,' M555555: ',I6,', M6666  : ',I4,', M6665  : ',I4,
      1        ', M6656  : ',I4,', M6655  : ',I4,', M6565  : ',I4,
-     1       /,' M6556  : ',I4,', M5665  : ',I4,', M6555  : ',I4,
+     1       /,' M6556  : ',I6,', M5665  : ',I4,', M6555  : ',I4,
      1        ', M5655  : ',I4,', M5555  : ',I4,', M13/66 : ',I4,
-     1       /,' M13/56 : ',I4,', M13/55 : ',I4,', M14/66 : ',I4,
+     1       /,' M13/56 : ',I6,', M13/55 : ',I4,', M14/66 : ',I4,
      1        ', M14/56 : ',I4,', M14/55 : ',I4,', M135   : ',I4)
  1035 Format(1X,'Enthalpy H of formation:',/1X,
      1 'Motif term:              ',F12.3,' kcal/mol',/1X,
@@ -3158,7 +3159,7 @@ C     Check if structure is alright at this point
  1002 Format(1X,' Calculate all vertices N and corresponding ',
      1 'adjacencies Ni of 3-connected graph:',
      1 /1X,'    N        N1   N2   N3')
- 1003 Format(1X,I5,'    (',3I5,')')
+ 1003 Format(1X,I5,'    (',3I6,')')
  1004 Format(1X,'**** Error, not enough connected atoms',
      1 ' check coordinates')
  1005 Format(1X,'**** Severe error, number of edges (bonds) not as ',

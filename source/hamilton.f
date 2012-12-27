@@ -487,19 +487,21 @@ C     Schwerdtfeger upper and lower limit
       blower=-3.720d-1
       powerupper=aupper*datom+bupper
       powerlower=alower*datom-blower
-      upperschwerd=2.d0**powerupper
-      lowerschwerd=2.d0**powerlower
       If(powerupper.lt.31.01d0) then
+       upperschwerd=2.d0**powerupper
        iupperschwerd=dint(upperschwerd)
        write (Iout,1010) iupperschwerd
       else
+       upperschwerd=2.d0**powerupper
        write (Iout,1011) upperschwerd
       endif
       If(powerlower.lt.31.01d0) then
+       lowerschwerd=2.d0**powerlower
        ilowerschwerd=dint(lowerschwerd)
        If(ilowerschwerd.lt.18) ilowerschwerd=18
         write (Iout,1012) ilowerschwerd
       else
+       lowerschwerd=2.d0**powerlower
        write (Iout,1013) lowerschwerd
       endif
 
@@ -654,11 +656,11 @@ C     NP values
      1 ' real number limit --> Return') 
  1009 Format(1X,'Number of atoms exceeds ',I3,', change Ihuge value ',
      1 ' (if you dare)') 
- 1010 Format(1X,'Schwerdtfeger upper limit for Hamiltonian cycles in '
+ 1010 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
      1 'fullerene graphs: ',I12)
- 1011 Format(1X,'Schwerdtfeger upper limit for Hamiltonian cycles in '
+ 1011 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
      1 'fullerene graphs: ',D22.14)
- 1012 Format(1X,'Schwerdtfeger lower limit for Hamiltonian cycles in '
+ 1012 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
      1 'fullerene graphs: ',I12)
  1013 Format(1X,'Schwerdtfeger lower limit for Hamiltonian cycles in '
      1 'fullerene graphs: ',D22.14)
