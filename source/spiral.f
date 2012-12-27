@@ -472,7 +472,7 @@ C     Analyze dual matrix
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
  1000 Format(1X,'Opening file: ',A20)
- 1001 Format(1X,'Lopped over ',I9,' lines. Characterestic card ',
+ 1001 Format(1X,'Looped over ',I9,' lines. Characterestic card ',
      1 'for isomer list not found: ',A18,' ==> ABORT')
  1002 Format(1X,'Reading input')
  1003 Format(1X,'Atom number ',I5,' requested not identical to ',
