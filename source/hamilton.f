@@ -456,7 +456,7 @@ C     if (oldptr.gt.0) go to 5
       return
       END
 
-      SUBROUTINE Paths(IOUT,iprintf,IA,A,evec,df)
+      SUBROUTINE PathStatistic(IOUT,iprintf,IA,A,evec,df)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C Calculate the number of all possible distinct paths from the
