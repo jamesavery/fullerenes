@@ -468,19 +468,19 @@ C of length (n-1).
       DIMENSION IMF(Nmax,Nmax),IMF1(Nmax,Nmax)
       DIMENSION IS1(10),IS2(10),APN(10)
       Real*8 upperschwerd,lowerschwerd
-      Data Ihuge/180/
+      Data Ihuge,over/180,1.d-10/
+
 C     Epstein upper limit
       dAtom=dfloat(number_vertices)
       power=dAtom/3.d0
-      if(power.lt.1.d3) ulepstein=2.d0**power
-      If(power.lt.31.01d0) then
-       ilepstein=dint(ulepstein)
-       write (Iout,1005) ilepstein
+      if(power.lt.1.d46) then
+       ulepstein=2.d0**power
+       write (Iout,1005) dint(ulepstein+over)
       else
-      if(power.lt.1.d3) write (Iout,1000) ulepstein
-      if(power.gt.1.d3) write (Iout,1016) power
+       write (Iout,1000) power
       endif
-C     Schwerdtfeger upper and lower limit
+
+C     Conjectured upper and lower limit from D5H and D5d nanotubes
       aupper=1.7205d-1
       bupper=1.466d0
       alower=1.188d-1
@@ -651,7 +651,7 @@ C     NP values
       if(ic.ne.0) Write(IOUT,1006) (IS1(l),IS2(l),APN(l),l=1,ic)
       endif
  1000 Format(/1X,'Epstein upper limit for Hamiltonian cycles in '
-     1 'cubic graphs: ',D22.14)
+     1 'cubic graphs (only power to base 2 given): ',D22.14)
  1001 Format(/1X,'Calculate the number of paths (PN) of length (n-1) '
      1 '(n= number of vertices) between vertices i and j'
      1 /1X,'(elements of the (n-1) th power of the adjacency matrix)',
@@ -665,7 +665,7 @@ C     NP values
  1004 Format(/,'   i',5X,'11',8X,'12',8X,'13',8X,'14',8X,'15',8X,'16',
      1 8X,'17',8X,'18',8X,'19',8X,'20')
  1005 Format(/1X,'Epstein upper limit for Hamiltonian cycles in '
-     1 'cubic graphs: ',I12)
+     1 'cubic graphs: ',F20.0)
  1006 Format(1X,5('('I3,',',I3,')',D21.14,','))
  1007 Format(1X,'Only matrix elements of adjacent vertices are printed')
  1008 Format(1X,'Number of paths of length (n-1) exceeds computer'
@@ -684,8 +684,6 @@ C     NP values
      1 'fullerene graphs: between appr.',I12,' and ',I12)
  1015 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr.',D22.14,' and ',D22.14)
- 1016 Format(/1X,'Epstein upper limit for Hamiltonian cycles in '
-     1 'cubic graphs (only power to base 2 given): ',D22.14)
  1021 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
      1 'fullerene graphs: 10**a with a=',D22.14)
  1023 Format(1X,'Estimated lower limit for Hamiltonian cycles in '

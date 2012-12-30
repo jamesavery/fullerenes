@@ -309,7 +309,7 @@ C adjacent vertices
           if(nbatch.ne.0) WRITE(Iout,1014)
         endif
       endif
-      CALL PathStastistic(Iout,iprintf,IDA,A,evec,df)
+      CALL PathStatistic(Iout,iprintf,IDA,A,evec,df)
 
 C------------------RING-------------------------------------------
 C Establish all closed ring systems
