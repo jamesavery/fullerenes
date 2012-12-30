@@ -467,78 +467,105 @@ C of length (n-1).
       DIMENSION IA(Nmax,Nmax),IM(Nmax,Nmax)
       DIMENSION IMF(Nmax,Nmax),IMF1(Nmax,Nmax)
       DIMENSION IS1(10),IS2(10),APN(10)
-      Real*8 upperschwerd,lowerschwerd
-      Data Ihuge,over/180,1.d-10/
+      Integer IHamCycmax(42),IHamCycmin(42)
+      Integer IHAMIPRmin(32),IHAMIPRmax(32)
+      Data Ihuge,over,explimit/180,1.d-10,1.d45/
+      Data IHamCycmin/30,0,34,24,18,20,40,28,42,24,68,44,120,76,152,80,
+     1 262,66,440,173,618,288,1062,197,1750,320,2688,1182,4230,1596,
+     1 7110,2400,10814,1980,17905,1280,29944,7930,46231,13307,72168,
+     1 20754/
+      Data IHamCycmax/30,0,34,24,43,32,76,66,128,96,280,150,327,260,512,
+     1 410,806,642,1746,1068,3040,1802,3340,3096,6018,4818,10428,7832,
+     1 15926,12226,35200,20856,39067,33427,76063,51586,117106,90221,
+     1 209692,156288,417280,249148/
+      Data IHAMIPRmin/ 1090,0,0,0,0,2790,3852,4794,6078,6988,9004,11226,
+     1 14748,17853,22661,29277,36949,44730,60070,71950,93986,35907,
+     1 149920,180243,237580,244254,383218,457235,630059,723505,1038971,
+     1 1368498/
+      Data IHAMIPRmax/1090,0,0,0,0,2790,3852,4794,6643,8244,10970,13614,
+     1 18260,21756,28652,36852,47054,59118,78044,95694,131690,161148,
+     1 207165,257746,351976,426750,571622,699908,1013844,1151918,
+     1 1590875,1888558/
+
+      dAtom=dfloat(number_vertices)
+C General fullerenes
+C     Correct upper and lower limit
+      if(number_vertices.le.102) then
+       ifield=number_vertices/2-9
+       Write(Iout,1016) IHamCycmin(ifield),IHamCycmax(ifield)
+
+      else
+
+C     Conjectured upper and lower limit obtained from D5H and D5d nanotubes
+C     Lower limt
+       alow=1.d-1*dAtom+1.33d0
+       exp1=dAtom/1.d1-1.d0
+       if(alow.le.explimit) then
+        alowerNT=5.d0*2.d0**exp1
+        write (Iout,1012) dint(alowerNT+over)
+       else
+        write (Iout,1013) exp1
+       endif
+
+C     Upper limt
+       ahigh=1.8d-1*dAtom+2.33d0
+       exp1=dAtom/1.d1-1.d0
+       exp2=dAtom/2.d1-1.d0
+       if(ahigh.le.explimit) then
+        ahigherNT=5.d0*(2.d0**exp1)*(2.d0*3.d0**exp2 + 1)
+        write (Iout,1011) dint(ahigherNT+over)
+       else
+        write (Iout,1021) exp1,exp2
+       endif
+
+      endif
+
+C IPR fullerenes
+C     Correct upper and lower limit
+      if(number_vertices.eq.60.or.number_vertices.ge.70) then
+      if(number_vertices.le.122) then
+       ifield=number_vertices/2-29
+       Write(Iout,1010) IHamIPRmin(ifield),IHamIPRmax(ifield)
+
+      else
+
+C     Approximate number of IPR fullerenes
+       explow=1.136977d-1*dAtom
+       exphigh=1.230625d-1*dAtom
+       If(exphigh.lt.1.d2) then
+        fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
+        fullIPRl=1.050204d0*dexp(explow)/1.2d0
+        ifullIPRh=dint(fullIPRh)
+        ifullIPRl=dint(fullIPRl)
+        write (Iout,1014) ifullIPRl,ifullIPRh
+       else
+        if(exphigh.lt.6.d2) then
+         fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
+         fullIPRl=1.050204d0*dexp(explow)/1.2d0
+         write (Iout,1015) fullIPRl,fullIPRh
+        else
+         fullexph=dlog(5.698541d-1*1.2d0)*exphigh
+         fullexpl=dlog(1.050204d0/1.2d0)*explow
+         write (Iout,1025) fullexpl,fullexph
+        endif
+        if(fullIPRh.gt.1.d10) then
+         write (Iout,1008)
+         Return
+        endif
+       endif
+ 
+      endif
+      endif
 
 C     Epstein upper limit
-      dAtom=dfloat(number_vertices)
       power=dAtom/3.d0
-      if(power.lt.1.d46) then
+      if(power.lt.explimit) then
        ulepstein=2.d0**power
        write (Iout,1005) dint(ulepstein+over)
       else
        write (Iout,1000) power
       endif
 
-C     Conjectured upper and lower limit from D5H and D5d nanotubes
-      aupper=1.7205d-1
-      bupper=1.466d0
-      alower=1.188d-1
-      blower=-3.720d-1
-      powerupper=aupper*datom+bupper
-      powerlower=alower*datom-blower
-      If(powerupper.lt.31.01d0) then
-       upperschwerd=2.d0**powerupper
-       iupperschwerd=dint(upperschwerd)
-       write (Iout,1010) iupperschwerd
-      else
-       if(powerupper.lt.9.d2) then
-        upperschwerd=2.d0**powerupper
-        write (Iout,1011) upperschwerd
-       else
-        write (Iout,1021) powerupper
-       endif
-      endif
-      If(powerlower.lt.31.01d0) then
-       lowerschwerd=2.d0**powerlower
-       ilowerschwerd=dint(lowerschwerd)
-       If(ilowerschwerd.lt.18) ilowerschwerd=18
-        write (Iout,1012) ilowerschwerd
-      else
-       if(lowerupper.lt.9.d2) then
-        lowerschwerd=2.d0**powerlower
-        write (Iout,1013) lowerschwerd
-       else
-        write (Iout,1023) powerupper
-       endif
-      endif
-
-C     Approximate number of IPR fullerenes
-      if(number_vertices.eq.60.or.number_vertices.ge.70) then
-      exphigh=1.230625d-1*dAtom
-      explow=1.136977d-1*dAtom
-      If(exphigh.lt.1.d2) then
-       fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
-       fullIPRl=1.050204d0*dexp(explow)/1.2d0
-       ifullIPRh=dint(fullIPRh)
-       ifullIPRl=dint(fullIPRl)
-       write (Iout,1014) ifullIPRl,ifullIPRh
-      else
-       if(exphigh.lt.6.d2) then
-        fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
-        fullIPRl=1.050204d0*dexp(explow)/1.2d0
-        write (Iout,1015) fullIPRl,fullIPRh
-       else
-        fullexph=dlog(5.698541d-1*1.2d0)*exphigh
-        fullexpl=dlog(1.050204d0/1.2d0)*explow
-        write (Iout,1025) fullexpl,fullexph
-       endif
-       if(fullIPRh.gt.1.d10) then
-        write (Iout,1008)
-        Return
-       endif
-      endif
-      endif
 C     Limit for number of atoms
       if(number_vertices.gt.Ihuge) then
        write (Iout,1009) Ihuge 
@@ -650,7 +677,7 @@ C     NP values
       enddo
       if(ic.ne.0) Write(IOUT,1006) (IS1(l),IS2(l),APN(l),l=1,ic)
       endif
- 1000 Format(/1X,'Epstein upper limit for Hamiltonian cycles in '
+ 1000 Format(1X,'Epstein upper limit for Hamiltonian cycles in '
      1 'cubic graphs (only power to base 2 given): ',D22.14)
  1001 Format(/1X,'Calculate the number of paths (PN) of length (n-1) '
      1 '(n= number of vertices) between vertices i and j'
@@ -664,7 +691,7 @@ C     NP values
  1003 Format(1X,I3,10I10)
  1004 Format(/,'   i',5X,'11',8X,'12',8X,'13',8X,'14',8X,'15',8X,'16',
      1 8X,'17',8X,'18',8X,'19',8X,'20')
- 1005 Format(/1X,'Epstein upper limit for Hamiltonian cycles in '
+ 1005 Format(1X,'Epstein upper limit for Hamiltonian cycles in '
      1 'cubic graphs: ',F20.0)
  1006 Format(1X,5('('I3,',',I3,')',D21.14,','))
  1007 Format(1X,'Only matrix elements of adjacent vertices are printed')
@@ -672,22 +699,22 @@ C     NP values
      1 ' real number limit --> Return') 
  1009 Format(1X,'Number of atoms exceeds ',I3,', change Ihuge value ',
      1 ' (if you dare)') 
- 1010 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
-     1 'fullerene graphs: ',I12)
+ 1010 Format(1X,'Exact limits for Hamiltonian cycles for IPR ',
+     1 'fullerenes. Upper limit =',I7,', lower limit= ',I7)
  1011 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
-     1 'fullerene graphs: ',D22.14)
+     1 'fullerene graphs: ',F20.0)
  1012 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
-     1 'fullerene graphs: ',I12)
+     1 'fullerene graphs: ',F20.0)
  1013 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
-     1 'fullerene graphs: ',D22.14)
+     1 'fullerene graphs: 5*2**',D22.14)
  1014 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr.',I12,' and ',I12)
  1015 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr.',D22.14,' and ',D22.14)
+ 1016 Format(1X,'Exact limits for Hamiltonian cycles. Upper ',
+     1 'limit =',I7,', lower limit= ',I7)
  1021 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
-     1 'fullerene graphs: 10**a with a=',D22.14)
- 1023 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
-     1 'fullerene graphs: 10**a with a=',D22.14)
+     1 'fullerene graphs: 5*2**',D22.14,' * (2*3**',D22.14,' + 1)')
  1025 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr. e**a and e**b with a= ',
      1  D22.14,' and b= ',D22.14)
