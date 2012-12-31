@@ -469,7 +469,7 @@ C of length (n-1).
       DIMENSION IS1(10),IS2(10),APN(10)
       Integer IHamCycmax(42),IHamCycmin(42)
       Integer IHAMIPRmin(32),IHAMIPRmax(32)
-      Data Ihuge,over,explimit/180,1.d-10,1.d45/
+      Data Ihuge,over,explimit/180,1.d-10,45.d0/
       Data IHamCycmin/30,0,34,24,18,20,40,28,42,24,68,44,120,76,152,80,
      1 262,66,440,173,618,288,1062,197,1750,320,2688,1182,4230,1596,
      1 7110,2400,10814,1980,17905,1280,29944,7930,46231,13307,72168,
@@ -532,25 +532,19 @@ C     Correct upper and lower limit
 C     Approximate number of IPR fullerenes
        explow=1.136977d-1*dAtom
        exphigh=1.230625d-1*dAtom
-       If(exphigh.lt.1.d2) then
+       If(exphigh.lt.6.d2) then
         fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
         fullIPRl=1.050204d0*dexp(explow)/1.2d0
-        ifullIPRh=dint(fullIPRh)
-        ifullIPRl=dint(fullIPRl)
-        write (Iout,1014) ifullIPRl,ifullIPRh
+       endif
+       If(exphigh.lt.3.2d1) then
+        write (Iout,1014) dint(fullIPRl),dint(fullIPRh)
        else
         if(exphigh.lt.6.d2) then
-         fullIPRh=5.698541d-1*dexp(exphigh)*1.2d0
-         fullIPRl=1.050204d0*dexp(explow)/1.2d0
          write (Iout,1015) fullIPRl,fullIPRh
         else
          fullexph=dlog(5.698541d-1*1.2d0)*exphigh
          fullexpl=dlog(1.050204d0/1.2d0)*explow
          write (Iout,1025) fullexpl,fullexph
-        endif
-        if(fullIPRh.gt.1.d10) then
-         write (Iout,1008)
-         Return
         endif
        endif
  
@@ -567,11 +561,11 @@ C     Epstein upper limit
       endif
 
 C     Limit for number of atoms
+      if(iprintf.eq.0) RETURN
       if(number_vertices.gt.Ihuge) then
        write (Iout,1009) Ihuge 
        RETURN
       endif
-      if(iprintf.eq.0) RETURN
       write (Iout,1001) 
 C     This is only good for C20, C24 already causes integer overflow
       if(number_vertices.eq.20) then
@@ -678,7 +672,7 @@ C     NP values
       if(ic.ne.0) Write(IOUT,1006) (IS1(l),IS2(l),APN(l),l=1,ic)
       endif
  1000 Format(1X,'Epstein upper limit for Hamiltonian cycles in '
-     1 'cubic graphs (only power to base 2 given): ',D22.14)
+     1 'cubic graphs: 2**',F16.4)
  1001 Format(/1X,'Calculate the number of paths (PN) of length (n-1) '
      1 '(n= number of vertices) between vertices i and j'
      1 /1X,'(elements of the (n-1) th power of the adjacency matrix)',
@@ -695,8 +689,6 @@ C     NP values
      1 'cubic graphs: ',F20.0)
  1006 Format(1X,5('('I3,',',I3,')',D21.14,','))
  1007 Format(1X,'Only matrix elements of adjacent vertices are printed')
- 1008 Format(1X,'Number of paths of length (n-1) exceeds computer'
-     1 ' real number limit --> Return') 
  1009 Format(1X,'Number of atoms exceeds ',I3,', change Ihuge value ',
      1 ' (if you dare)') 
  1010 Format(1X,'Exact limits for Hamiltonian cycles for IPR ',
@@ -706,15 +698,15 @@ C     NP values
  1012 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
      1 'fullerene graphs: ',F20.0)
  1013 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
-     1 'fullerene graphs: 5*2**',D22.14)
+     1 'fullerene graphs: 5*2**',F16.4)
  1014 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
-     1 'fullerene graphs: between appr.',I12,' and ',I12)
+     1 'fullerene graphs: between',F20.0,' and',F20.0)
  1015 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
-     1 'fullerene graphs: between appr.',D22.14,' and ',D22.14)
+     1 'fullerene graphs: between ',D20.10,' and ',D20.10)
  1016 Format(1X,'Exact limits for Hamiltonian cycles. Upper ',
      1 'limit =',I7,', lower limit= ',I7)
  1021 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
-     1 'fullerene graphs: 5*2**',D22.14,' * (2*3**',D22.14,' + 1)')
+     1 'fullerene graphs: 5*2**',F16.4,' * (2*3**',F16.4,' + 1)')
  1025 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr. e**a and e**b with a= ',
      1  D22.14,' and b= ',D22.14)
