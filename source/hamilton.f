@@ -1,6 +1,6 @@
       SUBROUTINE HamiltonCyc(maxiter,Iout,nbatch,A,Nhamilton)
       use config
-C     Subroutine from Darko Babic to create Hamitonian cycles
+C     Back-track algorithm from Darko Babic to create Hamitonian cycles
 C      optimized for program Isomer
       integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax)
       integer x(0:Nmax)
@@ -13,6 +13,7 @@ C      optimized for program Isomer
       maxN=30
       nbatch=0
 
+C Prepare field list
       do i=1,number_vertices
         k=0
          do j=1,number_vertices
@@ -42,6 +43,7 @@ C      optimized for program Isomer
          end do
       end do
 
+c Start algorithm
       do i=1,number_vertices
          pass(i)=.false.
          occ(i)=.false.
@@ -169,7 +171,7 @@ C     if (oldptr.gt.0) go to 5
       END
 
       SUBROUTINE Hamilton(Iout,iprint,maxiter,IC3)
-C     Subroutine from Darko Babic to create Hamitonian cycles
+C     Back-track algorithm from Darko Babic to create Hamitonian cycles
 C     and the IUPAC name of a fullerene
       use config
       integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax),pos(Nmax)
@@ -184,6 +186,8 @@ C     and the IUPAC name of a fullerene
       maxN=30
       if(number_vertices.lt.maxN) maxN=number_vertices
       write (Iout,1009) maxiter
+
+C Set field list
       do i=1,number_vertices
          do j=1,3
             list(i,j,1)=ic3(i,j)
@@ -203,6 +207,7 @@ C     and the IUPAC name of a fullerene
          end do
       end do
 
+C Start algorithm
       do i=1,number_vertices
          pass(i)=.false.
          occ(i)=.false.
