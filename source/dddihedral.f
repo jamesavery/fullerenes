@@ -29,7 +29,6 @@
      1 dihedral_abcd)
       IMPLICIT REAL*8 (a-z)
 
-C at first the dihedral (copied from above)
 c vectors ab, bc and cd
       ab_x=ax-bx
       ab_y=ay-by
@@ -74,6 +73,7 @@ c     y=\vec aux  \cdot \vec bcd_1
       y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
 c the result
       dihedral_abcd=datan2(y,x)
+
 
 c//////////////////////////////////////////////////////////////
 C//////////////////////////////////////////////////////////////
@@ -6085,21 +6085,22 @@ c df__dax=df__dx*dx__dax + df__dy*dy__dax
      1 + ddf11dax__ddx11dax*ddx11dax__dcz
      1 + ddf11dax__ddf11dy*ddf11dy__dcz
      1 + ddf11dax__ddy11dax*ddy11dax__dcz
-      ddf11dax__ddx=
-     1   ddf11dax__ddf11dx*ddf11dx__ddx
-     1 + ddf11dax__ddx11dax*ddx11dax__ddx
-     1 + ddf11dax__ddf11dy*ddf11dy__ddx
-     1 + ddf11dax__ddy11dax*ddy11dax__ddx
-      ddf11dax__ddy=
-     1   ddf11dax__ddf11dx*ddf11dx__ddy
-     1 + ddf11dax__ddx11dax*ddx11dax__ddy
-     1 + ddf11dax__ddf11dy*ddf11dy__ddy
-     1 + ddf11dax__ddy11dax*ddy11dax__ddy
-      ddf11dax__ddz=
-     1   ddf11dax__ddf11dx*ddf11dx__ddz
-     1 + ddf11dax__ddx11dax*ddx11dax__ddz
-     1 + ddf11dax__ddf11dy*ddf11dy__ddz
-     1 + ddf11dax__ddy11dax*ddy11dax__ddz
+c the 9 derivations with respect to a{xyz} and d{xyz} are 0
+      ddf11dax__ddx=0
+c     1   ddf11dax__ddf11dx*ddf11dx__ddx
+c     1 + ddf11dax__ddx11dax*ddx11dax__ddx
+c     1 + ddf11dax__ddf11dy*ddf11dy__ddx
+c     1 + ddf11dax__ddy11dax*ddy11dax__ddx
+      ddf11dax__ddy=0
+c     1   ddf11dax__ddf11dx*ddf11dx__ddy
+c     1 + ddf11dax__ddx11dax*ddx11dax__ddy
+c     1 + ddf11dax__ddf11dy*ddf11dy__ddy
+c     1 + ddf11dax__ddy11dax*ddy11dax__ddy
+      ddf11dax__ddz=0
+c     1   ddf11dax__ddf11dx*ddf11dx__ddz
+c     1 + ddf11dax__ddx11dax*ddx11dax__ddz
+c     1 + ddf11dax__ddf11dy*ddf11dy__ddz
+c     1 + ddf11dax__ddy11dax*ddy11dax__ddz
 c df__day=df__dx*dx__day + df__dy*dy__day
       ddf11day__day=
      1   ddf11day__ddf11dx*ddf11dx__day
@@ -6141,21 +6142,21 @@ c df__day=df__dx*dx__day + df__dy*dy__day
      1 + ddf11day__ddx11day*ddx11day__dcz
      1 + ddf11day__ddf11dy*ddf11dy__dcz
      1 + ddf11day__ddy11day*ddy11day__dcz
-      ddf11day__ddx=
-     1   ddf11day__ddf11dx*ddf11dx__ddx
-     1 + ddf11day__ddx11day*ddx11day__ddx
-     1 + ddf11day__ddf11dy*ddf11dy__ddx
-     1 + ddf11day__ddy11day*ddy11day__ddx
-      ddf11day__ddy=
-     1   ddf11day__ddf11dx*ddf11dx__ddy
-     1 + ddf11day__ddx11day*ddx11day__ddy
-     1 + ddf11day__ddf11dy*ddf11dy__ddy
-     1 + ddf11day__ddy11day*ddy11day__ddy
-      ddf11day__ddz=
-     1   ddf11day__ddf11dx*ddf11dx__ddz
-     1 + ddf11day__ddx11day*ddx11day__ddz
-     1 + ddf11day__ddf11dy*ddf11dy__ddz
-     1 + ddf11day__ddy11day*ddy11day__ddz
+      ddf11day__ddx=0
+c     1   ddf11day__ddf11dx*ddf11dx__ddx
+c     1 + ddf11day__ddx11day*ddx11day__ddx
+c     1 + ddf11day__ddf11dy*ddf11dy__ddx
+c     1 + ddf11day__ddy11day*ddy11day__ddx
+      ddf11day__ddy=0
+c     1   ddf11day__ddf11dx*ddf11dx__ddy
+c     1 + ddf11day__ddx11day*ddx11day__ddy
+c     1 + ddf11day__ddf11dy*ddf11dy__ddy
+c     1 + ddf11day__ddy11day*ddy11day__ddy
+      ddf11day__ddz=0
+c     1   ddf11day__ddf11dx*ddf11dx__ddz
+c     1 + ddf11day__ddx11day*ddx11day__ddz
+c     1 + ddf11day__ddf11dy*ddf11dy__ddz
+c     1 + ddf11day__ddy11day*ddy11day__ddz
 c df__daz=df__dx*dx__daz + df__dy*dy__daz
       ddf11daz__daz=
      1   ddf11daz__ddf11dx*ddf11dx__daz
@@ -6192,21 +6193,21 @@ c df__daz=df__dx*dx__daz + df__dy*dy__daz
      1 + ddf11daz__ddx11daz*ddx11daz__dcz
      1 + ddf11daz__ddf11dy*ddf11dy__dcz
      1 + ddf11daz__ddy11daz*ddy11daz__dcz
-      ddf11daz__ddx=
-     1   ddf11daz__ddf11dx*ddf11dx__ddx
-     1 + ddf11daz__ddx11daz*ddx11daz__ddx
-     1 + ddf11daz__ddf11dy*ddf11dy__ddx
-     1 + ddf11daz__ddy11daz*ddy11daz__ddx
-      ddf11daz__ddy=
-     1   ddf11daz__ddf11dx*ddf11dx__ddy
-     1 + ddf11daz__ddx11daz*ddx11daz__ddy
-     1 + ddf11daz__ddf11dy*ddf11dy__ddy
-     1 + ddf11daz__ddy11daz*ddy11daz__ddy
-      ddf11daz__ddz=
-     1   ddf11daz__ddf11dx*ddf11dx__ddz
-     1 + ddf11daz__ddx11daz*ddx11daz__ddz
-     1 + ddf11daz__ddf11dy*ddf11dy__ddz
-     1 + ddf11daz__ddy11daz*ddy11daz__ddz
+      ddf11daz__ddx=0
+c     1   ddf11daz__ddf11dx*ddf11dx__ddx
+c     1 + ddf11daz__ddx11daz*ddx11daz__ddx
+c     1 + ddf11daz__ddf11dy*ddf11dy__ddx
+c     1 + ddf11daz__ddy11daz*ddy11daz__ddx
+      ddf11daz__ddy=0
+c     1   ddf11daz__ddf11dx*ddf11dx__ddy
+c     1 + ddf11daz__ddx11daz*ddx11daz__ddy
+c     1 + ddf11daz__ddf11dy*ddf11dy__ddy
+c     1 + ddf11daz__ddy11daz*ddy11daz__ddy
+      ddf11daz__ddz=0
+c     1   ddf11daz__ddf11dx*ddf11dx__ddz
+c     1 + ddf11daz__ddx11daz*ddx11daz__ddz
+c     1 + ddf11daz__ddf11dy*ddf11dy__ddz
+c     1 + ddf11daz__ddy11daz*ddy11daz__ddz
 c df__dbx=df__dx*dx__dbx + df__dy*dy__dbx
       ddf11dbx__dbx=
      1   ddf11dbx__ddf11dx*ddf11dx__dbx
