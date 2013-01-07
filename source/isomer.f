@@ -246,7 +246,8 @@ C Produce list from ring spiral algorithm
       Character*50 databasefile
       CHARACTER*3  Group
       CHARACTER*6  Occup
-      Integer hamlow,hamhigh,RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
+      Integer hamlow,hamhigh,hamlowIPR,hamhighIPR
+      Integer RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
 
       Open(UNIT=4,FILE=databasefile,STATUS='old',ACTION='Read',
      1  FORM='FORMATTED')
@@ -289,6 +290,8 @@ C Produce list from ring spiral algorithm
        sigmahhigh=0.d0
        hamlow=1000000000
        hamhigh=0
+       hamlowIPR=1000000000
+       hamhighIPR=0
 
        do J =1,Nisoloop
         if(IP.eq.0) then
@@ -336,6 +339,17 @@ Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
          if(ncycham.ge.hamhigh) then
           hamhigh=ncycham
           ishigh=J
+         endif
+         if((number_vertices.eq.60.or.number_vertices.ge.70).
+     1    and.IFus5G.eq.0) then
+          if(ncycham.le.hamlowIPR) then
+           hamlowIPR=ncycham
+           islowIPR=J
+          endif
+          if(ncycham.ge.hamhighIPR) then
+           hamhighIPR=ncycham
+           ishighIPR=J
+          endif
          endif
 
          else
@@ -446,7 +460,12 @@ C Final statistics
   99  if(IP.eq.0) then
         WRITE(Iout,611) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
      1   sigmahlow,ISigmaL,sigmahhigh,ISigmaH
-        if(IH.eq.1) WRITE(Iout,609) hamlow,islow,hamhigh,ishigh
+        if(IH.eq.1) then
+         WRITE(Iout,609) hamlow,islow,hamhigh,ishigh
+          if(number_vertices.eq.60.or.number_vertices.ge.70) then
+           WRITE(Iout,610) hamlowIPR,islowIPR,hamhighIPR,ishighIPR
+          endif
+        endif
       else
         WRITE(Iout,612) sigmahlow,ISigmaL,sigmahhigh,ISigmaH
        if(IH.eq.1) WRITE(Iout,610) hamlow,islow,hamhigh,ishigh
