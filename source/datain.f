@@ -3,7 +3,7 @@
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
      1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1 iprinth,ndbconvert,
+     1 iprinth,ndbconvert,ihamstore,nhamcyc,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
      1 force,forceP,boost,filename,filenameout,DATEN)
       use config
@@ -23,9 +23,9 @@
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
-      Namelist /Hamilton/ IHam,iupac
+      Namelist /Hamilton/ IHam,iupac,ihamstore
       Namelist /Isomers/ IPR,IPH,IStop,IChk,ISearch
-      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,ifs,ndual,PS,scale,
+      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,nhamcyc,ifs,ndual,PS,scale,
      1 scalePPG,boost
 
 C Input send to output
@@ -95,6 +95,8 @@ C Integers
       ndbconvert=0 ! Flag for conversion of database
       nosort=0  !  Flag for sorting cartesian coordinates
       ispsearch=1 ! Flag for searching for canonical spiral
+      ihamstore=0 ! Flag for storing all Hamiltonian cycles
+      nhamcyc=0 ! Flag for reading Hamiltonian cycle for 2D graph
       novolume=0 ! Flag for volume calculation
       IGCtrans=0 ! Initial flag for Goldberg-Coxeter transformed fullerene
       ICart=1   !  Input for fullerene structure
