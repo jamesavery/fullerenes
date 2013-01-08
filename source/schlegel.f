@@ -1,6 +1,6 @@
       SUBROUTINE Graph2D(IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
-     1 Iring,ISchlegel,ifs,ndual,IC3,IDA,Mdist,Dist,angle,Rmin,Tol,
-     1 fscale,scalePPG,boost,CR,CR5,CR6,Symbol,filename)
+     1 Iring,ISchlegel,ifs,ndual,IC3,IDA,Mdist,nhamcyc,Dist,angle,
+     1 Rmin,Tol,fscale,scalePPG,boost,CR,CR5,CR6,Symbol,filename)
       use config
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
@@ -17,10 +17,12 @@ C or face is at the top. Euler angles are used for rotation.
       DIMENSION N5M(Mmax,5),N6M(Mmax,6),Rot(3,3),CR(3,Mmax)
       DIMENSION Rotz(3,3),Symbol(Mmax),RingS(2,Mmax)
       DIMENSION IC3(Nmax,3),IS(6)
-      Integer MDist(Nmax,Nmax)
+      Integer MDist(Nmax,Nmax),mhamfield(Nmax)
       Character*1  Symbol,SRS(msrs,2*msrs),satom,sring,s5ring,s6ring
+      Character*1  Dummy
       Character*12 Symbol1
       Character*50 filename
+      Character*50 hamname
       type(c_ptr) :: g, new_fullerene_graph
 
       Data epsf/.12d0/
@@ -36,6 +38,7 @@ C     Prepare for Program QMGA
 C     Construct a graph object from the adjacency matrix
       g = new_fullerene_graph(Nmax,number_vertices,IDA)
      
+      dummy=' '
       satom='o'
       s5ring='^'
       s6ring='*'
@@ -734,6 +737,19 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
 C     Call format: draw_graph(filename, format (string),ndual (0|1), dimensions ((w,h) in cm), 
 C     line_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
 C     line_width (in mm), vertex_diameter (in mm) )
+      if(nhamcyc.ne.0) then
+       hamname=trim(filename)//".ham"
+       Open(unit=8,file=hamname,form='formatted')
+       Read(8,*) numberham
+       if(numberham.ne.number_vertices) then
+        Write(Iout,1035) numberham,number_vertices
+        Return
+       endif
+        Do I=1,nhamcyc-1
+         Read(8,'(A1)') Dummy
+        enddo
+        Read(8,1040) (mhamfield(i),I=1,numberham)
+      endif
       call set_layout2d(g,layout2d)
       call draw_graph(g,filename,"tex",ndual, 
      1                (/10.d0,10.d0/), x'274070',
@@ -742,6 +758,7 @@ C     line_width (in mm), vertex_diameter (in mm) )
 c Output to POVRay raytracer. Commented out currently.
 c$$$      call draw_graph(g,filename, "pov",0, (/10.d0,10.d0/), 
 c$$$     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
+      close(unit=8)
       endif
       call delete_fullerene_graph(g)
 
@@ -826,8 +843,8 @@ c$$$     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
      1 'graph as a starting point for embedding algorithms')
  1034 Format(1X,'No input for specifying circumfencing ring chosen, ',
      1 'first pentagon taken instead including atoms ',5I4)
-C1035 Format(1X,'Circumfencing ring chosen from input, including ',
-C    1 'atoms ',3I4)
+ 1035 Format(1X,'Number of vertices in Hamiltonian file ',I5,
+     1 ' not identical to number of vertices ',I5,' ===> RETURN')
  1036 Format(1X,'Calculating Tutte-embedding and shift to barycenter')
  1037 FORMAT(1X,'Fullerene graph deleted',/,' Graph coordinates:',
      1 /,'  Atom       X            Y        N1   N2   N3') 
