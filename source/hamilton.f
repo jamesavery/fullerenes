@@ -170,7 +170,7 @@ C     if (oldptr.gt.0) go to 5
       return
       END
 
-      SUBROUTINE Hamilton(Iout,iprint,maxiter,IC3)
+      SUBROUTINE Hamilton(Iout,iprint,ihamstore,maxiter,IC3,filename)
 C     Back-track algorithm from Darko Babic to create Hamitonian cycles
 C     and the IUPAC name of a fullerene
       use config
@@ -180,7 +180,14 @@ C     and the IUPAC name of a fullerene
       integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
       logical occ(Nmax),pass(Nmax),end(Nmax),flag,better
       integer ic3(Nmax,3)
+      CHARACTER*50 filename,hamname
       
+      if(ihamstore.ne.0) then
+       hamname=trim(filename)//".ham"
+       Open(unit=8,file=hamname,form='formatted')
+       Write(8,*) number_vertices
+      endif
+
       ifirst=0 
       nhamilton=0
       maxN=30
@@ -291,6 +298,7 @@ C Start algorithm
       if(iprint.ne.0) then
       if(ifirst.eq.0) write (Iout,1005)
       write (Iout,1004) nhamilton,(path(j),j=1,maxN)
+      if(ihamstore.ne.0) write (8,1020) (path(j),j=1,maxN)
       if(number_vertices.gt.30) then
       do I=31,number_vertices,30
       jmax=I+29
@@ -458,6 +466,7 @@ C     if (oldptr.gt.0) go to 5
      1 ' 35, 515-526 (1995).)',/1X,'Maximum allowed iteration: ',I10)
  1010 format (I10,' Maximum Hamiltonian cycles reached: Return')
  1011 format (1X,' Hamiltonian cycle detected')
+ 1020 format (500I3)
       return
       END
 

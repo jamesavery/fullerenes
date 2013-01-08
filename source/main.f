@@ -113,7 +113,7 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1  ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1  iprinthessian,ndbconvert,
+     1  iprinthessian,ndbconvert,ihamstore,nhamcyc,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 
@@ -302,7 +302,8 @@ C adjacent vertices
       if(IHam.ne.0 .and. 
      1    ke.eq.0 .and. isw.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
         if(iupac.ne.0) then
-          CALL Hamilton(Iout,iprintf,maxiter,IC3)
+          CALL Hamilton(Iout,iprintf,ihamstore,maxiter,IC3,filename)
+          Close(unit=8)
         else
           CALL HamiltonCyc(maxiter,Iout,nbatch,IDA,Nhamilton)
           WRITE(Iout,1010) Nhamilton
@@ -585,9 +586,10 @@ C Calculate Schlegel diagram
         else
           ParamS=dabs(ParamS)
         endif
-        CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,
-     1   NRing,Iring,Ischlegel,ifs,ndual,IC3,IDA,mdist,Dist,ParamS,Rmin,
-     1   TolX,scales,scalePPG,boost,CR,CRing5,CRing6,Symbol,filename)
+        CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,NRing,
+     1   Iring,Ischlegel,ifs,ndual,IC3,IDA,mdist,nhamcyc,Dist,ParamS,
+     1   Rmin,TolX,scales,scalePPG,boost,CR,CRing5,CRing6,
+     1   Symbol,filename)
       else
         Write(Iout,1024) number_vertices
       endif
@@ -636,7 +638,7 @@ C Formats
      1 ' (Dover Publ., New York, 2006).',/1X,
      1 '3) D. Babic, Nomenclature and Coding of Fullerenes,',
      1 ' J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).',/1X,
-     1 'See the Manual for further literature and input instructions',
+     1 'See the Manual for further literature and input instructions ',
      1 'concerning this program')
  1001 FORMAT(/1X,'Number of Atoms: ',I4,', and distance tolerance: ',
      1 F12.2,'%')
