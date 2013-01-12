@@ -256,7 +256,10 @@ C Set IC and ichk parameters
       if(ICart.lt.0) ICart=0
       if(ICart.gt.7) ICart=7
       if(ichk.ne.0) istop=1
-      if(ihamstore.ne.0.or.nhamcyc.ne.0) nosort=1
+      if(ihamstore.ne.0.or.nhamcyc.ne.0) then
+       nosort=1
+       iupac=1
+      endif
 
 C  Check on number of atoms (vertices)
       number_vertices=IABS(NA)

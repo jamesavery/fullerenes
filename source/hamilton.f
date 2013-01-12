@@ -182,10 +182,12 @@ C     and the IUPAC name of a fullerene
       integer ic3(Nmax,3)
       CHARACTER*50 filename,hamname
       
+      if(number_vertices.gt.999) ihamstore=0 
       if(ihamstore.ne.0) then
        hamname=trim(filename)//".ham"
        Open(unit=8,file=hamname,form='formatted')
        Write(8,*) number_vertices
+       Write(Iout,1012) hamname
       endif
 
       ifirst=0 
@@ -295,7 +297,7 @@ C Start algorithm
       if(ifirst.eq.0) then
       write (Iout,1011)
       endif
-      if(ihamstore.ne.0) write (8,1020) (path(j),j=1,maxN)
+      if(ihamstore.ne.0) write (8,*) (path(j),j=1,maxN)
       if(iprint.ne.0) then
        if(ifirst.eq.0) write (Iout,1005)
         write (Iout,1004) nhamilton,(path(j),j=1,maxN)
@@ -466,7 +468,7 @@ C     if (oldptr.gt.0) go to 5
      1 ' 35, 515-526 (1995).)',/1X,'Maximum allowed iteration: ',I10)
  1010 format (I10,' Maximum Hamiltonian cycles reached: Return')
  1011 format (1X,' Hamiltonian cycle detected')
- 1020 format (500I3)
+ 1012 format (1X,' Write Hamiltonian cycles to external file ',A50)
       return
       END
 
