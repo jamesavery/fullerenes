@@ -295,17 +295,17 @@ C Start algorithm
       if(ifirst.eq.0) then
       write (Iout,1011)
       endif
-      if(iprint.ne.0) then
-      if(ifirst.eq.0) write (Iout,1005)
-      write (Iout,1004) nhamilton,(path(j),j=1,maxN)
       if(ihamstore.ne.0) write (8,1020) (path(j),j=1,maxN)
-      if(number_vertices.gt.30) then
-      do I=31,number_vertices,30
-      jmax=I+29
-      if(jmax.gt.number_vertices) jmax=number_vertices
-      write (Iout,1001) (path(j),j=I,jmax)
-      enddo
-      endif
+      if(iprint.ne.0) then
+       if(ifirst.eq.0) write (Iout,1005)
+        write (Iout,1004) nhamilton,(path(j),j=1,maxN)
+        if(number_vertices.gt.30) then
+        do I=31,number_vertices,30
+         jmax=I+29
+         if(jmax.gt.number_vertices) jmax=number_vertices
+         write (Iout,1001) (path(j),j=I,jmax)
+        enddo
+       endif
       endif
       ifirst=1
          do j=1,number_vertices
