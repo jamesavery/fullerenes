@@ -1093,20 +1093,22 @@ are difficult to optimize if the start is bad, and one needs to play with the \p
 %---Hamilton---
 \subsection{\&Hamilton line}
 Option for calculating Hamiltonian cycles and IUPAC numbers.
-\paragraph{List of options:}\  \paramname{IHam}, \paramname{IUPAC}
+\paragraph{List of options:}\  \paramname{IHam}, \paramname{IUPAC}, \paramname{ihamstore}
 \paragraph{Option description:}
 \begin{description}
 \item[IHam] \ \\
   If \paramname{IHam} > 0 Then Subroutine HAMILTON is called (Default: 0).\\
   If \paramname{IHam} = 1 Routine will stop after 1 million Hamiltonian cycles are found.\\
-  If \paramname{IHam} = 1000000000 Program runs forever and prints if IHam is reached (dangerous choice).\\
+  If \paramname{IHam} = $n$ with $n > 1$ and $n < 10$ then the number of Hamiltonian cycles is $10^{IHam}$. \paramname{IHam} = 9 basically means that
+  the program runs forever and prints if IHam is reached (dangerous choice).\\
+  If $\paramname{IP} = 1$ in the \paramname{\&Coord}-input, all Hamiltonian cycles are printed.\\
+  If \paramname{ihamstore} =1 the vertex numbers in the cycles are stored as an external file called \filename{filename.ham} (in I3 Format).
+
 \item[IUPAC]\ \\ 
-  If $\paramname{IUPAC} = 1$, IUPAC numbers are produced (Default: 0).\\
+  If $\paramname{IUPAC} = 0$, the program goes into a fast subroutine and prints only the total number of Hamiltonian cycles.  If $\paramname{IUPAC} = 1$, IUPAC numbers are produced  
+   (Default: 0).\\
   If set, and $\paramname{IP} = 0$ in the \paramname{\&Coord}-input, the best Hamiltonian cycle is printed 
   (See Babi\'c,  \cite{Babic1995a}).\\
-  If set, and $\paramname{IP} = 1$ in the \paramname{\&Coord}-input, all Hamiltonian cycles are printed.
-
-  If $\paramname{IUPAC} = 0$, the program goes into a fast subroutine and prints only the total number of Hamiltonian cycles.
 \end{description}
 
 

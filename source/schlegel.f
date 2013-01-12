@@ -748,7 +748,8 @@ C     line_width (in mm), vertex_diameter (in mm) )
         Do I=1,nhamcyc-1
          Read(8,'(A1)') Dummy
         enddo
-        Read(8,1040) (mhamfield(i),I=1,numberham)
+        Read(8,1042) (mhamfield(i),I=1,numberham)
+        Write(Iout,1043) nhamcyc,(mhamfield(i),I=1,numberham)
       endif
       call set_layout2d(g,layout2d)
       call draw_graph(g,filename,"tex",ndual, 
@@ -858,6 +859,9 @@ c$$$     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
      3 F12.6,', Y= ',F12.6,', Z= ',F12.6)
  1040 Format(1X,'Set Tutte graph to barycenter of outer ring')
  1041 Format(1X,'Distance matrix produced')
+ 1042 Format(500I3)
+ 1043 Format(/1X,' Hamilton cycles read in from external file:',
+     1 /1X,'Cycle number: ',I5,/1X,'Vertex numbers: ',500I3)
       Return
       END
 
