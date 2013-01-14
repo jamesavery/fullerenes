@@ -2,6 +2,15 @@
 #include "cubicgraph.hh"
 #include <sstream>
 
+template <class T> ostream& operator<<(ostream& s, const vector<T>& v)
+{
+  s << "{";
+  for(int i=0;i<v.size();i++)
+    s << v[i] << (i+1<v.size()? ", ":"");
+  s << "}";
+  return s;
+}
+
 struct ToleranceLess {
   const double tolerance;
   ToleranceLess(const double tolerance) : tolerance(tolerance) {}
@@ -30,16 +39,22 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
   outer_face = shortest_cycle(s,t,r,face_max);
 
   unsigned int Nface = outer_face.size();
-  vector<coord2d> outer_coords(Nface);
+  vector<coord2d> initial_coords(N);
   for(unsigned int i=0;i<Nface;i++){
-    outer_coords[i] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
+    initial_coords[outer_face[i]] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
   }
 
-  return tutte_layout_direct(outer_face,outer_coords);
+  return tutte_layout_direct(outer_face,initial_coords);
 }
+#ifdef HAS_MKL
+# include <mkl.h>
+# include <mkl_pardiso.h>
+# include <mkl_types.h>
+#else
+# include "../contrib/mgmres.hpp"
+#endif
 
-#include "../contrib/mgmres.hpp"
-vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const
+vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& initial_coords) const
 {
   vector<coord2d> result(N);
 
@@ -47,9 +62,9 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
   double rhs[N*2], x[N*2];
 
   memset(rhs,0,N*2*sizeof(double));
-  for(int i=0;i<outer_face.size();i++){
-    rhs[    outer_face[i] ] = outer_coords[i].first;
-    rhs[N + outer_face[i] ] = outer_coords[i].second;
+  for(int i=0;i<N;i++){
+    rhs[i]   = initial_coords[i].first;
+    rhs[N+i] = initial_coords[i].second;
   }
   memcpy(x,rhs,N*2*sizeof(double));
 
@@ -85,37 +100,123 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     delete Afull;
   }
   IA[N] = nz;
+
   // Solve sparse linear system for x-coordinates and y-coordinates 
+#ifdef HAS_MKL
+  {
+    /* Matrix data. */
+    MKL_INT n = N;
+    MKL_INT mtype = 11;		/* Real unsymmetric matrix */
+    MKL_INT nrhs = 2;		/* Number of right hand sides. */
+    void *pt[64];        /* Internal solver memory pointer pt, */
+    MKL_INT iparm[64];  /* Pardiso control parameters. */
+    MKL_INT maxfct = 1, mnum = 1, phase, error = 0, msglvl = 1;
+    /* Auxiliary variables. */
+    double ddum;			/* Double dummy */
+    MKL_INT idum;			/* Integer dummy. */
+    /* -------------------------------------------------------------------- */
+    /* .. Setup Pardiso control parameters. */
+    /* -------------------------------------------------------------------- */
+    memset(iparm,0,64*sizeof(MKL_INT));
+    memset(pt,0,64*sizeof(void*));
+
+    iparm[0] = 1;			/* No solver default */
+    iparm[1] = 2;			/* Fill-in reordering from METIS */
+    /* Numbers of processors, value of OMP_NUM_THREADS */
+    iparm[2] = 0;
+    iparm[3] = 1;
+    iparm[7] = 200;		/* Max numbers of iterative refinement steps */
+    iparm[9] = 13;		/* Perturb the pivot elements with 1E-13 */
+    iparm[10] = 1;		/* Use nonsymmetric permutation and scaling MPS */
+    iparm[12] = 1;		/* Maximum weighted matching algorithm is switched-on (default for non-symmetric) */
+    iparm[17] = -1;		/* Output: Number of nonzeros in the factor LU */
+    iparm[18] = -1;		/* Output: Mflops for LU factorization */
+    iparm[19] = 0;		/* Output: Numbers of CG Iterations */
+    iparm[34] = 1;		/* PARDISO use C-style indexing for ia and ja arrays */
+
+    /* -------------------------------------------------------------------- */
+    /* .. Reordering and Symbolic Factorization. This step also allocates */
+    /* all memory that is necessary for the factorization. */
+    /* -------------------------------------------------------------------- */
+    phase = 11;
+    PARDISO (pt, &maxfct, &mnum, &mtype, &phase,
+	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
+    if (error != 0)
+      {
+	printf ("\nERROR during symbolic factorization: %d", error);
+	exit (1);
+      }
+    printf ("\nReordering completed ... ");
+    printf ("\nNumber of nonzeros in factors = %d", iparm[17]);
+    printf ("\nNumber of factorization MFLOPS = %d", iparm[18]);
+    /* -------------------------------------------------------------------- */
+    /* .. Numerical factorization. */
+    /* -------------------------------------------------------------------- */
+    phase = 22;
+    PARDISO (pt, &maxfct, &mnum, &mtype, &phase,
+	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
+    if (error != 0)
+      {
+	printf ("\nERROR during numerical factorization: %d", error);
+	exit (2);
+      }
+    printf ("\nFactorization completed ... ");
+    /* -------------------------------------------------------------------- */
+    /* .. Back substitution and iterative refinement. */
+    /* -------------------------------------------------------------------- */
+    phase = 33;
+
+    printf ("\n\nSolving system...\n");
+    PARDISO (pt, &maxfct, &mnum, &mtype, &phase,
+	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, rhs, x, &error);
+    if (error != 0)
+      {
+	printf ("\nERROR during solution: %d", error);
+	exit (3);
+      }
+
+
+    /* -------------------------------------------------------------------- */
+    /* .. Termination and release of memory. */
+    /* -------------------------------------------------------------------- */
+    phase = -1;			/* Release internal memory. */
+    PARDISO (pt, &maxfct, &mnum, &mtype, &phase,
+	     &n, &ddum, IA, JA, &idum, &nrhs,
+	     iparm, &msglvl, &ddum, &ddum, &error);
+  }
+
+#else
   pmgmres_ilu_cr(N,nz,IA,JA,A,x,  rhs,  50000,N-1,1e-13,1e-13);
   pmgmres_ilu_cr(N,nz,IA,JA,A,x+N,rhs+N,50000,N-1,1e-13,1e-13);
+#endif
 
   for(node_t u=0;u<N;u++) result[u] = coord2d(x[u],x[u+N]);
 
   return result;
 }
 
-vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const
+
+vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& initial_coords) const
 {
-  vector<coord2d> xys(N), newxys(N);
+  vector<coord2d> xys(initial_coords.begin(), initial_coords.end()), newxys(N);
   vector<bool> fixed(N);
 
   cerr << "tutte_layout: Outer face: " << outer_face << endl;
 
   unsigned int Nface = outer_face.size();
-  for(unsigned int i=0;i<Nface;i++){
+  for(unsigned int i=0;i<Nface;i++)
     fixed[outer_face[i]] = true;
-    xys[outer_face[i]] = outer_coords[i];
-  }
-    
+
+  
   bool converged = false;
-  const unsigned int TUTTE_MAX_ITERATION = 1000000;
+  const unsigned int TUTTE_MAX_ITERATION = 100000;
   const double TUTTE_CONVERGENCE = 5e-6;
   unsigned int i;
   double max_change;
   for(i=0;!converged && i<TUTTE_MAX_ITERATION; i++){
 
     max_change = 0;
-#pragma omp parallel for
+
     for(node_t u=0;u<N;u++)
       if(fixed[u]){
 	newxys[u] = xys[u];
@@ -229,7 +330,8 @@ coord3d Graph::centre3d(const vector<coord3d>& layout) const {
 
 
 string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool number_vertices, bool include_latex_header,
-		  int line_colour, int vertex_colour, double line_width, double vertex_diameter) const
+			     int edge_colour, int path_colour, int vertex_colour, double edge_width, double path_width,
+			     double vertex_diameter, int Npath, int *path) const
 {
   ostringstream s;
   s << fixed;
@@ -239,13 +341,15 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       "\\usepackage{tikz}\n"
       "\\begin{document}\n"
       "\\definecolor{vertexcolour}{RGB}{"<<(vertex_colour>>16)<<","<<((vertex_colour>>8)&0xff)<<","<<(vertex_colour&0xff)<<"}\n"
-      "\\definecolor{edgecolour}{RGB}{"<<(line_colour>>16)<<","<<((line_colour>>8)&0xff)<<","<<(line_colour&0xff)<<"}\n"
+      "\\definecolor{edgecolour}{RGB}{"<<(edge_colour>>16)<<","<<((edge_colour>>8)&0xff)<<","<<(edge_colour&0xff)<<"}\n"
+      "\\definecolor{pathcolour}{RGB}{"<<(path_colour>>16)<<","<<((path_colour>>8)&0xff)<<","<<(path_colour&0xff)<<"}\n"
       "\\definecolor{dualvertexcolour}{RGB}{205,79,57}\n"
       "\\definecolor{dualedgecolour}{RGB}{0,0,0}\n"
       "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
       "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
-      "\\tikzstyle{edge}=[draw,color=edgecolour,line width="<<line_width<<"mm]\n"
-      "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolour,line width="<<line_width<<"mm]\n"
+      "\\tikzstyle{edge}=[draw,color=edgecolour,line width="<<edge_width<<"mm]\n"
+      "\\tikzstyle{pth}=[draw,color=pathcolour,line width="<<path_width<<"mm]\n"
+      "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolour,line width="<<edge_width<<"mm]\n"
       "\\tikzstyle{invisible}=[draw=none,inner sep=0,fill=none,minimum width=0pt]\n"
       ;
 
@@ -266,8 +370,6 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
   }
 
-  
-  
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();){
     s << "\\foreach \\u/\\v in {";
     for(int i=0;i<100 && e!=edge_set.end();){
@@ -277,6 +379,14 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
   }
 
+  // Draw path if non-empty
+  if(Npath){
+    s << "\\foreach \\u/\\v in {";  
+    for(int i=0;i+1<Npath;i++)
+      s << "{v"<<path[i]<<"/v"<<path[i+1]<<"}, ";
+    s << "{v"<<path[Npath-1]<<"/v"<<path[0]<<"}";
+    s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
+  }    
 
   if(show_dual){
     PlanarGraph dual(dual_graph());	
@@ -307,16 +417,16 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
 #define byte3(x) (((x)>>24)&0xff)
 
 string PlanarGraph::to_povray(double w_cm, double h_cm, 
-			      int line_colour, int vertex_colour, double line_width, double vertex_diameter) const
+			      int edge_colour, int vertex_colour, double edge_width, double vertex_diameter) const
 {
   ostringstream s;
   s << fixed;
 
   s << "#declare Nvertices="<<N<<";\n";
   s << "#declare Nedges="<<edge_set.size()<<";\n";
-  s << "#declare edgecolour=color rgb <" << byte2(line_colour)/256. << "," << byte1(line_colour)/256. << "," << byte0(line_colour)/256. << ">;\n";
+  s << "#declare edgecolour=color rgb <" << byte2(edge_colour)/256. << "," << byte1(edge_colour)/256. << "," << byte0(edge_colour)/256. << ">;\n";
   s << "#declare nodecolour=color rgb <" << byte2(vertex_colour)/256. << "," << byte1(vertex_colour)/256. << "," << byte0(vertex_colour)/256. << ">;\n";
-  s << "#declare edgewidth="<<line_width/10.<<";\n";
+  s << "#declare edgewidth="<<edge_width/10.<<";\n";
   s << "#declare nodediameter="<<vertex_diameter/10.<<";\n";
 
   if(layout2d.size() == N){

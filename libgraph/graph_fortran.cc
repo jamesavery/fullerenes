@@ -36,7 +36,10 @@ extern "C" {
   int graph_is_a_fullerene_(const graph_ptr *);
   void print_graph_(const graph_ptr *);
   void draw_graph_(const graph_ptr *g, const char *filename, const char *format, const int *show_dual, const double *dimensions,
-		   const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter);
+		   const int *edge_colour, const int *vertex_colour, const double *edge_width, const double *vertex_diameter);
+  void draw_graph_with_path_(const graph_ptr *g, const char *filename, const char *format, const double *dimensions,
+			     const int *edge_colour,const int *path_colour, const int *vertex_colour, const double *edge_width,
+			     const double *path_width, const double *vertex_diameter,const int *Npath, int *path);
   graph_ptr dual_graph_(const graph_ptr *);
 
   void compute_fullerene_faces(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
@@ -64,9 +67,9 @@ extern "C" {
   // graph_ptr triangulation_(polyhedron_ptr *P)
   polyhedron_ptr convex_hull_(const polyhedron_ptr *P);
 
-void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char *format, 
-		      const int *edge_colour, const int *node_colour, const int *face_colour,
-		      const double *edge_width, const double *node_diameter, const double *face_opacity);
+  void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char *format, 
+			const int *edge_colour, const int *node_colour, const int *face_colour,
+			const double *edge_width, const double *node_diameter, const double *face_opacity);
 
   void get_layout3d_(const polyhedron_ptr *p, double *layout3d);
 };
@@ -327,13 +330,27 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
 
   ofstream graph_file(filename.c_str(),ios::out | ios::binary);
   if        (fmt == "tex"){
-    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],*show_dual,false,true,*line_colour,*vertex_colour,*line_width,*vertex_diameter);
+    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],*show_dual,false,true,*line_colour,0,*vertex_colour,*line_width,0,*vertex_diameter,0,0);
   } else if (fmt == "pov"){
     graph_file << (*g)->to_povray(dimensions[0],dimensions[1],*line_colour,*vertex_colour,*line_width,*vertex_diameter);
   }
   graph_file.close();
 }
 
+void draw_graph_with_path_(const graph_ptr *g, const char *filename_, const char *format, const double *dimensions,
+			   const int *edge_colour,const int *path_colour, const int *vertex_colour, const double *edge_width,
+			   const double *path_width, const double *vertex_diameter, const int *Npath, int *path)
+{
+  string fmt(format,3), filename;
+  filename = fortran_string(filename_,50)+"-2D."+fmt;
+
+  ofstream graph_file(filename.c_str(),ios::out | ios::binary);
+  if        (fmt == "tex"){
+    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],false,false,true,*edge_colour,*path_colour,
+				  *vertex_colour,*edge_width,*path_width,*vertex_diameter,*Npath,path);
+  } 
+  graph_file.close();  
+}
 void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char *format, 
 		      const int *edge_colour, const int *node_colour, const int *face_colour,
 		      const double *edge_width, const double *node_diameter, const double *face_opacity)
