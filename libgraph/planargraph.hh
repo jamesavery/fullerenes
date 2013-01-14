@@ -59,8 +59,9 @@ public:
   void move (const coord2d& x);
 
   string to_latex(double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false,
-		  int line_colour = 0x6a5acd, int vertex_colour = 0x8b2500,
-		  double line_width = 0.1, double vertex_diameter = 2.0
+		  int edge_colour = 0x6a5acd, int path_colour = 0x6a5acd, int vertex_colour = 0x8b2500,
+		  double edge_width = 0.1,double path_width = 0.1, double vertex_diameter = 2.0,
+		  int Npath = 0, int *path = 0
 		  ) const;
 
   string to_povray(double w_cm = 10, double h_cm = 10, 

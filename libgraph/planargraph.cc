@@ -98,7 +98,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   if(layout2d.size() == N){
     //    cerr << "dual_graph::compute layout.\n";
     dual.layout2d = vector<coord2d>(Nfaces);
-#pragma omp parallel for
+
     for(int i=0;i<Nfaces;i++)
       dual.layout2d[i] = allfaces[i].centroid(layout2d);
   }
