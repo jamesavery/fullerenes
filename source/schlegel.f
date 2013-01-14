@@ -733,6 +733,8 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
        enddo
       endif
 
+      call set_layout2d(g,layout2d)
+
  9999 if(ifs.eq.1.or.ifs.eq.3) then
 C     Call format: draw_graph(filename, format (string),ndual (0|1), dimensions ((w,h) in cm), 
 C     line_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
@@ -750,12 +752,18 @@ C     line_width (in mm), vertex_diameter (in mm) )
         enddo
         Read(8,*) (mhamfield(i),I=1,numberham)
         Write(Iout,1042) nhamcyc,(mhamfield(i),I=1,numberham)
-      endif
-      call set_layout2d(g,layout2d)
-      call draw_graph(g,filename,"tex",ndual, 
+C     Call format: draw_graph_with_path(filename, format (string), dimensions ((w,h) in cm), 
+C     edge_colour (x'rrggbb'), path_colour (x'rrggbb), vertex_colour (x'rrggbb), 
+C     edge_width (in mm), path_width (in mm), vertex_diameter (in mm) )
+            call draw_graph_with_path(g,filename,"tex",(/10.d0,10.d0/),
+     1           x'270470',x'8b4520',x'458b00', 0.3d0,0.5d0, 5d0, 
+     2           numberham,mhamfield)
+
+      else
+         call draw_graph(g,filename,"tex",ndual, 
      1                (/10.d0,10.d0/), x'274070',
      2                x'458b00', 0.3d0, .5d0)
-
+      endif
 c Output to POVRay raytracer. Commented out currently.
 c$$$      call draw_graph(g,filename, "pov",0, (/10.d0,10.d0/), 
 c$$$     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
