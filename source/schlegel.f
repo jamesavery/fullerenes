@@ -734,7 +734,6 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
       endif
 
       call set_layout2d(g,layout2d)
-
  9999 if(ifs.eq.1.or.ifs.eq.3) then
 C     Call format: draw_graph(filename, format (string),ndual (0|1), dimensions ((w,h) in cm), 
 C     line_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
@@ -757,7 +756,7 @@ C     Call format: draw_graph_with_path(filename, format (string), dimensions ((
 C     edge_colour (x'rrggbb'), path_colour (x'rrggbb), vertex_colour (x'rrggbb), 
 C     edge_width (in mm), path_width (in mm), vertex_diameter (in mm) )
             call draw_graph_with_path(g,filename,"tex",(/10.d0,10.d0/),
-     1           x'270470',x'8b4520',x'458b00', 0.3d0,0.5d0, 5d0, 
+     1           x'270470',x'bb4510',x'458b00', 0.3d0, 1.2d0, 5d0, 
      2           numberham,mhamfield)
 
       else
@@ -1205,7 +1204,7 @@ c     evenly.
       use config
       use iso_c_binding
       integer is(6), depths(M), d_max,i
-      real*8 Dist(2,Nmax), c(2), radius, dr
+      real*8 Dist(2,Nmax), c(2), radius, dr, d
       type(c_ptr)::g
       Write(Iout,1000) 
 
