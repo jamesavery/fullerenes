@@ -364,7 +364,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u_=0;u_<100 && u<N;u++,u_++){
       const coord2d xs(layout2d[u]*coord2d(xscale,yscale));
-    s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << ((u+1<N && u_+1<100)
+      s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << (u+1) << "$}" << ((u+1<N && u_+1<100)
 ? ", ":"}\n\t");
     }
     s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
@@ -385,7 +385,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     for(int i=0;i+1<Npath;i++)
       s << "{v"<<path[i]<<"/v"<<path[i+1]<<"}, ";
     s << "{v"<<path[Npath-1]<<"/v"<<path[0]<<"}";
-    s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
+    s << "}\n\t\\draw[pth] (\\u) -- (\\v);\n";
   }    
 
   if(show_dual){
