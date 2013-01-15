@@ -339,14 +339,17 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
 
 void draw_graph_with_path_(const graph_ptr *g, const char *filename_, const char *format, const double *dimensions,
 			   const int *edge_colour,const int *path_colour, const int *vertex_colour, const double *edge_width,
-			   const double *path_width, const double *vertex_diameter, const int *Npath, int *path)
+			   const double *path_width, const double *vertex_diameter, const int *Npath, int *path_)
 {
   string fmt(format,3), filename;
   filename = fortran_string(filename_,50)+"-2D."+fmt;
 
+  int path[*Npath];// Change from Fortran 1-indexing to C/C++ 0-indexing
+  for(int i=0;i<*Npath;i++) path[i] = path_[i]-1;
+
   ofstream graph_file(filename.c_str(),ios::out | ios::binary);
   if        (fmt == "tex"){
-    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],false,false,true,*edge_colour,*path_colour,
+    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],false,true,true,*edge_colour,*path_colour,
 				  *vertex_colour,*edge_width,*path_width,*vertex_diameter,*Npath,path);
   } 
   graph_file.close();  
