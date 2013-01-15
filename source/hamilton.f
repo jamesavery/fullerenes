@@ -289,27 +289,27 @@ C Start algorithm
 
     5 path(l+1)=next
       if (l.eq.number_vertices-1) then
-      nhamilton=nhamilton+1
-      if(nhamilton.gt.maxiter) then
-      write (Iout,1010) maxiter
-      Return
-      endif
-      if(ifirst.eq.0) then
-      write (Iout,1011)
-      endif
-      if(ihamstore.ne.0) write (8,*) (path(j),j=1,maxN)
-      if(iprint.ne.0) then
-       if(ifirst.eq.0) write (Iout,1005)
-        write (Iout,1004) nhamilton,(path(j),j=1,maxN)
-        if(number_vertices.gt.30) then
-        do I=31,number_vertices,30
-         jmax=I+29
-         if(jmax.gt.number_vertices) jmax=number_vertices
-         write (Iout,1001) (path(j),j=I,jmax)
-        enddo
-       endif
-      endif
-      ifirst=1
+         nhamilton=nhamilton+1
+         if(nhamilton.gt.maxiter) then
+            write (Iout,1010) maxiter
+            Return
+         endif
+         if(ifirst.eq.0) then
+            write (Iout,1011)
+         endif
+         if(ihamstore.ne.0) write (8,*) (path(j),j=1,number_vertices)
+         if(iprint.ne.0) then
+            if(ifirst.eq.0) write (Iout,1005)
+            write (Iout,1004) nhamilton,(path(j),j=1,maxN)
+            if(number_vertices.gt.30) then
+               do I=31,number_vertices,30
+                  jmax=I+29
+                  if(jmax.gt.number_vertices) jmax=number_vertices
+                  write (Iout,1001) (path(j),j=I,jmax)
+               enddo
+            endif
+         endif
+         ifirst=1
          do j=1,number_vertices
             pos(path(j))=j
          end do
