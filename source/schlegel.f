@@ -752,6 +752,7 @@ C     line_width (in mm), vertex_diameter (in mm) )
         enddo
         Read(8,*) (mhamfield(i),I=1,numberham)
         Write(Iout,1042) nhamcyc,(mhamfield(i),I=1,numberham)
+        close(unit=8)
 C     Call format: draw_graph_with_path(filename, format (string), dimensions ((w,h) in cm), 
 C     edge_colour (x'rrggbb'), path_colour (x'rrggbb), vertex_colour (x'rrggbb), 
 C     edge_width (in mm), path_width (in mm), vertex_diameter (in mm) )
@@ -767,10 +768,8 @@ C     edge_width (in mm), path_width (in mm), vertex_diameter (in mm) )
 c Output to POVRay raytracer. Commented out currently.
 c$$$      call draw_graph(g,filename, "pov",0, (/10.d0,10.d0/), 
 c$$$     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
-      close(unit=8)
       endif
       call delete_fullerene_graph(g)
-
 
       if(ifs.ge.2) Close(unit=2)
       Return
@@ -867,7 +866,7 @@ c$$$     1                x'bb7755', x'8899bb', 0.3d0, .8d0)
      3 F12.6,', Y= ',F12.6,', Z= ',F12.6)
  1040 Format(1X,'Set Tutte graph to barycenter of outer ring')
  1041 Format(1X,'Distance matrix produced')
- 1042 Format(/1X,' Hamilton cycles read in from external file:',
+ 1042 Format(/1X,'Hamilton cycles read in from external file:',
      1 /1X,'Cycle number: ',I5,/1X,'Vertex numbers: ',500(I3,'-'))
       Return
       END
