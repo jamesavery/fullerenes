@@ -481,9 +481,9 @@ void PlanarGraph::move(const coord2d& x) {
 
 ostream& operator<<(ostream& s, const PlanarGraph& g) 
 {
-  s << g.name<< "Graph[Range[0,"<<(g.N-1)<<"],\n\tUndirectedEdge@@#&/@{";
+  s << g.name<< "Graph[Range["<<g.N<<"],\n\tUndirectedEdge@@#&/@{";
   for(set<edge_t>::const_iterator e(g.edge_set.begin()); e!=g.edge_set.end(); ){    
-    s << "{" << e->first << "," << e->second << "}";
+    s << "{" << (e->first+1) << "," << (e->second+1) << "}";
     if(++e != g.edge_set.end())
       s << ", ";
     else
