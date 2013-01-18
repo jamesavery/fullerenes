@@ -55,17 +55,15 @@ Massey University Auckland<br>
 
 
 The program creates cartesian coordinates for fullerene isomers and performs a topological/graph theoretical analysis.
-The results can be used for plotting 2D/3D fullerene graphs (e.g. Schlegel diagrams and 3D structures), and serves as a starting 
-point for further quantum theoretical treatment. Version 4 now incorporates C++ routines linked to the
-original Fortran program using much improved algorithms. Version 4.3.1 is more robust than previous version, and contains
-a more extended version of topological indicators, a harmonic oscillator force field using dihedral angles, vibrational
-frequencies (although the force constants have not been adjusted yet), general Goldberg-Coxeter transformation
-of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to both
-the Yoshida and House of Graphs databases, and an improved Tutte embedder. Our own database has been extended up to 
-C<SUB>122</SUB>, and up to C<SUB>170</SUB> for IPR isomers. Version 4.2 was a slightly improved version 
-and contained some bug fixes. Version 4.3 contains major changes and reconstructions. Version 4.3.1 includes much
-improved algorithms for the Tutte embedding, finding ring spirals, general Goldberg-Coxeter transforms of C<SUB>20</SUB>,
-Reti-Laszlo topological analysis, and contains a neighborhood ring-spiral search module.
+The results can be used for plotting 2D/3D fullerene graphs (e.g. Schlegel diagrams and 3D structures), and serves as 
+a starting point for further quantum theoretical treatment. Version 4 incorporated C++ routines for the first time
+linked to the original Fortran program using much improved algorithms. Version 4.4 is more robust than previous versions, 
+and contains a more extended version of topological indicators, a harmonic oscillator force field using dihedral angles, 
+vibrational frequencies (although the force constants have not been adjusted yet), general Goldberg-Coxeter transformation
+of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to both the Yoshida and House of Graphs 
+databases, an improved Tutte embedder, a correct ring spiral count, tight lower and upper bounds for Hamiltonian cycles 
+and a neighborhood spiral ring search algorithm. Our own database has been extended up to C<SUB>140</SUB>, and up to 
+C<SUB>180</SUB> for IPR isomers.  
 <br><br>
 
 This is an open-source code and free for distribution (except for commercial purposes). The following references should be used for citation:<br><br>
@@ -80,11 +78,11 @@ The program has been tested for the gnu compiler collection (gfortran and g++).
 You need to use the Makefile included in fullerene.zip. The executable runs 
 just fine on a PC or Mac running LINUX/UNIX.
 The program is written in standard Fortran and C++ and has been checked
-for a large number of fullerenes up to 10,000 vertices. A number of input 
+for a large number of fullerenes up to 35,000 vertices. A number of input 
 and output files are included in the fullerene.zip file and a more detailed description 
 is found in the User's Manual.<br><br>
 
-<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.3.1.pdf">UserManualv4.3.1.pdf (04/12/2012)</a> (2.4 MB)
+<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.4.pdf">UserManualv4.3.1.pdf (04/12/2012)</a> (2.4 MB)
 <br><br>
 
 <b>Download for Database1: General fullerenes C<SUB>20</SUB>-C<SUB>122</SUB> </b><a href="http://ctcp.massey.ac.nz/data/ALL.zip"> ALL.zip (01/11/2012)</a> (compressed 198.9 MB, uncompressed 1.92 GB)
@@ -386,29 +384,31 @@ Password: <input type="password" name="pwd" size="10" /><br> <input type="submit
 <a href="data/C840.png"><img src="data/C840.png" width="750" alt="C840"></a><br><br>
 <b>Important steps in the program are:</b><br>
 <li>Read in cartesian coordinates for a fullerene.</li>
+<li>Establish connectivities between vertices to construct the adjacency matrix.</li>
 <li>Construct cartesian coordinates for the Ih isomer of C<SUB>60</SUB> or C<SUB>20</SUB>.
-<li>Construct cartesian coordinates using the face-spiral pentagon indices of Fowler and Manolopoulos.</li>
+<li>Construct cartesian coordinates using the ring-spiral pentagon indices of Fowler and Manolopoulos.</li>
 <li>Construct cartesian coordinates from a Goldberg-Coxeter transformation of C<SUB>20</SUB>.</li>
 <li>Use matrix-eigenvector or Tutte embedding algorithms to obtain cartesian coordinates.</li>
 <li>Goldberg-Coxeter leapfrog and halma transformations of a fullerene.</li>
 <li>Endo-Kroto 2-vertex, Yoshida-Fowler 4- and 6-vertex and Brinkmann-Fowler 6-vertex insertions.</li>
 <li>Use of program SPIRAL of Fowler and Manolopoulos for face-spiral fullerenes.</li>
 <li>Find fullerenes in the neighborhood of given ring-spiral pentagon indices.</li>
-<li>Use of program HAMILTON of Babic for Hamiltonian cycles and IUPAC Nomenclature.</li>
-<li>Establish connectivities between vertices to construct the adjacency matrix.</li>
+<li>Use of program HAMILTON of Babic for Hamiltonian cycles and IUPAC Nomenclature.</li> 
+<li>Tight upper and lower bounds for Hamiltonian cycles</li>
 <li>Perform a Hueckel analysis. This gives you a good hint if the fullerene is open or closed shell.</li>
-<li>Topological Indices: Wiener, Estrada, Balaban ...</li>
+<li>Topological Indices: Wiener, Estrada, Balaban, Szeged, ...</li>
 <li>Identify all pentagons and hexagons and perform a topological analysis for ring connectivities.</li>
 <li>Calculate the enthalpy of formation using Martin's or Cioslowski's scheme of motifs.</li>
 <li>Use Fletcher-Reeves-Polak-Ribiere geometry optimization with analytical gradients for the 
 harmonic oscillator force field including dihedrals.</li>
 <li>Get Hessian for the force field and calculate the vibrational frequencies.</li>
 <li>Calculate the volume of the fullerene through the convex hull or trigonal pyramidal tesselation.</li>
-<li>Calculate the surface area.<br>
+<li>Calculate the surface area.</li>
 <li>Calculate the minimum covering sphere (MCS) of the fullerene using the Yildirim algorithm.</li>
 <li>Calculate the minimum distance sphere (MDS) and maximum inner sphere (MIS).</li>
 <li>Measure of distortion from spherical symmetry and convexity.</li>
 <li>Produce (x,y) coordinates of a fullerene graph (Schlegel diagram) using a variety of different algorithms.</li>
+<li>Produce Schlegel diagram with Hamiltonian cycle.</li>
 <li>The output file ending with .xyz or .cc1 can be used as input for CYLVIEW, AVOGADRO, VMD or PYMOL.</li>
 <li>The output file ending with .dat can be used as input for drawing Schlegel diagrams.</li><br>
 </td>
@@ -417,14 +417,14 @@ harmonic oscillator force field including dihedrals.</li>
 </td>
 </tr></table><br>
 
-A database is provided for general isomers up to C<SUB>122</SUB> and for IPR isomers up to
-C<SUB>170</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>100</SUB> 
-and for IPR isomers up to C<SUB>120</SUB>. The database can be copied into
+A database is provided for general isomers up to C<SUB>140</SUB> and for IPR isomers up to
+C<SUB>180</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>102</SUB> 
+and for IPR isomers up to C<SUB>122</SUB>. The database can be copied into
 the main program folder and can be used to read the ring spiral pentagon indices.
 The numbering scheme is identical to that chosen in the "Atlas of Fullerenes" by Fowler and Manolopoulos,
 that is each isomer in the book's appendix can be constructed easily from the database.  
 The data files are formatted and can easily be read on its own. It is our intention to
-extend the isomer list beyond C<SUB>122</SUB>/C<SUB>170</SUB> (without Hamiltonian cycles).
+extend the isomer list beyond C<SUB>140</SUB>/C<SUB>180</SUB> (without Hamiltonian cycles).
 A link to the  "House of Graphs" database by Brinkmann and co-workers is already implemented, 
 and the database can be downloaded from <a href="http://hog.grinvin.org/Fullerenes">House of Graphs Database</a>.<br><br>
 A link to the Yoshida database is also implemented and the database can be downloaded from
@@ -443,7 +443,6 @@ in terms of a Humboldt Research Award. The first version of the program was writ
 his stay at the Philipps University Marburg. We acknowledge the help of Darko Babic (Zagreb), 
 Patrick W. Fowler (Sheffield) and David E. Manolopoulos (Oxford) to kindly allow their Fortran routines to be 
 modified and implemented in our program system. We also thank Prof. Ottorino Ori (Rome) for fruitful discussions.
-
 <br>
 
 <!-- Main content ends here. -->
