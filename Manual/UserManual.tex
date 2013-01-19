@@ -76,9 +76,8 @@ For any questions concerning this program please feel free to contact us.
 We are always open to improvements and suggestions.
 
 \subsubsection*{Please cite the following papers if you use this program for publishing data:}
-1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{Topological Analysis of Fullerenes - 
-A Fortran and C++ Program (Version 4.4)}, (Massey University Albany, 
-Auckland, New Zealand, 2012).\\
+1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{Fullerene -- A Software Package for Constructing and Analyzing 
+Structures of Regular Fullerenes}, submitted to J. Comput. Chem., 2013); Version 4.4.\\
 2) P. W. Fowler and D. E. Manolopoulos, \textit{An Atlas of Fullerenes}
 (Dover Publ., New York, 2006). This book is highly recommended. 
 It helps understanding how this program functions.  Many of the concepts used 
@@ -125,14 +124,14 @@ We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful
 
 %Introduction
 \section{Introduction}
-\textit{Program Fullerene} is a general purpose program that creates a reasonably accurate 3D structure
-(cartesian coordinates) for any fullerene isomer through various different methods and algorithms, and subsequently performs a topological/graph 
-theoretical analysis. The results can be used for plotting 2D fullerene graphs (Schlegel diagrams) 
+\textit{Program Fullerene} is a general purpose program that creates the adjacency matrix for any fullerene isomer, 
+performs a topological/graph theoretical analysis, and creates a reasonably accurate 3D structure (cartesian or internal
+coordinates) through various different methods and algorithms. The results can be used for plotting 2D fullerene graphs (Schlegel diagrams) 
 and 3D structures, and serves as a good starting point for further quantum theoretical treatment. The program is 
 written in standard FORTRAN and C++ and is easily implemented within a Linux/\acr{UNIX} environment.
 Although there are several other computer programs already available to deal with fullerene graphs 
-like \program{CAGE} \cite{Brinkmanx}, \program{FULLGEN} \cite{Brinkmann}, \program{BUCKYGEN} \cite{Goedgebeur,Goedgebeur1} or VEGA \cite{Pisanski},
-we felt that there is a need to write a general purpose program which does what other programs do and (of course) a lot more.
+like \program{CaGe} \cite{Brinkmanx}, \program{FULLGEN} \cite{Brinkmann}, \program{BUCKYGEN} \cite{Goedgebeur,Goedgebeur1}, FuiGui \cite{FuiGui} 
+or VEGA \cite{Pisanski}, we felt that there is a need to write a general purpose program which does what other programs do and (of course) a lot more.
 The first version (1.0) was written in Fortran for calculating the surface area and volume of a fullerene and corresponding changes due to endohedral 
 incorporation of rare gas atoms \cite{Tonner}. A much improved version 2.0 allowed for the creation of fullerene structures using
 the ring-spiral algorithm introduced in the book by Fowler and Manolopoulos \cite{Atlas}, and version 3.0 was already dealing with
@@ -199,7 +198,7 @@ and crazy about rugby), and close packing of ellipsoids;
 8) A restart option for subroutine Hamilton;
 9) Perfect matchings, Kekul\'e structures and Clar sextets;
 10) Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals
-with a good graphical interface similar to the \program{CAGE} program \cite{Brinkmanx}.
+with a good graphical interface similar to the \program{CaGe} program \cite{Brinkmanx}.
 
 We are also open to any other suggestions and welcome additions to this program suite. In this case please feel free to contact us per email.
 
@@ -1224,15 +1223,15 @@ We are currently working on this problem.
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{102} and for IPR isomers up to
-\C{120} including the number of Hamiltonian cycles, and without Hamiltonian cycles
-up to \C{122} for general and up to \C{170} for IPR isomers. The database should be copied into
+\C{122} including the number of Hamiltonian cycles, and without Hamiltonian cycles
+up to \C{140} for general and up to \C{180} for IPR isomers. The database should be copied into
 the main program folder and can be used to read the ring-spiral pentagon indices.
 The numbering scheme is in canonical order and identical to the one introduced in the book by Fowler 
 and Manolopoulos \cite{Atlas}, that is each isomer in the book's appendix can be 
 constructed easily from our database. Example is given in input files  \filename{DBc40.inp},
 \filename{DBc66.inp} and \filename{DBc158.inp}.  The data files are formatted and can easily be read
 by the program (\filename{ISOMERc80.inp}). It is our 
-intention to extend the isomer list beyond \C{122}/\C{170} (without Hamiltonian cycles) using the ``House of Graphs'' database. 
+intention to extend the isomer list beyond \C{140}/\C{180} (without Hamiltonian cycles) using the ``House of Graphs'' database. 
 New lists will be available on our website in due time.  The determination of the number of
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
@@ -1265,7 +1264,9 @@ Note that the maximum number of vertices in the database is defined in the confi
 \bibitem{Goedgebeur} G. Brinkmann, J. Goedgebeur, and B. McKay, ``Program Buckygen - a program for the efficient generation of all nonisomorphic fullerenes'',
 see http://caagt.ugent.be/buckygen/.
 
-\bibitem{Goedgebeur1} G. Brinkmann, J. Goedgebeur, and B. McKay, ``The Generation of Fullerenes'', \textit{J. Chem. Inf. Sci.} \textbf{52}, 2910-2918 (2012). 
+\bibitem{Goedgebeur1} G. Brinkmann, J. Goedgebeur, and B. McKay, ``The Generation of Fullerenes'', \textit{J. Chem. Inf. Sci.} \textbf{52}, 2910-2918 (2012).
+
+\bibitem{FuiGui} W. Myrvold, B. Bultena, S. Daugherty, B. Debroni, S. Girn, M. Minchenko, J. Woodcock, and P.W. Fowler,``FuiGui: A Graphical User Interface for Investigating Conjectures about Fullerenes'', \textit{MATCH Commun. Math. Comput. Chem.} \textbf{58} 403-422 (2007).
 
 \bibitem{Pisanski} T. Pisanski, ``Program VEGA - A Mathematica based system for manipulating graphs'', see http://www.ijp.si/.
 
