@@ -2,19 +2,18 @@
 to-do list
 -----------------
 
+Separation of topological and caresian coordinate input (Peter 5.0)
 nano tubes (lukas, 5.0)
 general spiral (lukas, 5.0)
 minumum covering ellispoid (Peter, 5.0)
-GUI ()
 Nanotube input (lukas, 5.0)
 Efficient treatment of matrices (5.0)
 Perfect matchings (5.1)
 Generalized Goldberg-Coxeter (5.2)
 Efficient ring spiral search (Peter, 4.4)
-Interface to Gromacs (Peter, 4.4)
 Faster diagonalization (James, 4.4)
-Compacter database files (Peter, 5.0)
 Extension of database using HOG (Peter, 5.1)
 More patch replacements (Peter, 6.0)
 Introduction of 4-, 7-, and 8-rings (Peter 7.0)
 Genus 1 Fullerenes (Peter 7.0)
+GUI ()

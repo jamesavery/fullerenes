@@ -292,6 +292,7 @@ C Produce list from ring spiral algorithm
        hamhigh=0
        hamlowIPR=1000000000
        hamhighIPR=0
+       no5ringstart=0
 
        do J =1,Nisoloop
         if(IP.eq.0) then
@@ -300,6 +301,7 @@ Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
           Read(4,1004,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
      2     ncycHam,(INMR(I),I=1,6)
+          if(RSPI(1).ne.1) no5ringstart=no5ringstart+1
           PNI(5)=12-PNI(0)-PNI(1)-PNI(2)-PNI(3)-PNI(4)
           IFus5G=IPentInd(PNI)
           HNI(6)=number_vertices/2-10
@@ -357,6 +359,7 @@ Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
           Read(4,1007,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
      2    (INMR(I),I=1,6)
+          if(RSPI(1).ne.1) no5ringstart=no5ringstart+1
           PNI(5)=12-PNI(0)-PNI(1)-PNI(2)-PNI(3)-PNI(4)
           IFus5G=IPentInd(PNI)
           HNI(6)=number_vertices/2-10
@@ -470,6 +473,11 @@ C Final statistics
         WRITE(Iout,612) sigmahlow,ISigmaL,sigmahhigh,ISigmaH
        if(IH.eq.1) WRITE(Iout,610) hamlow,islow,hamhigh,ishigh
       endif
+      if(no5ringstart.eq.0) then
+       Write(Iout,614)
+      else
+       Write(Iout,615) no5ringstart
+      endif
       WRITE(Iout,613) 
 
       Close(unit=4)
@@ -534,6 +542,10 @@ C Final statistics
  612  FORMAT(1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
      1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
  613  FORMAT(1X,'Isomer List Complete')
+ 614  FORMAT(1X,'All isomers haven ring spirals starting from a ',
+     1 'pentagon')
+ 615  FORMAT(1X,'Number of isomers with ring spirals without ',
+     1 'a pentagon start: ',I5)
   701  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
