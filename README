@@ -8,8 +8,8 @@
     The program creates cartesian coordinates for fullerenes isomers
         and performs a topological/graph theoretical analysis.
         The results can be used for plotting fullerene graphs
-     (Schlegel diagrams) and structures, and as a starting point
-            for further quantum theoretical treatment. 
+      (Schlegel diagrams) and 3D structures, and as a starting 
+           point for further quantum theoretical treatment. 
 ----------------------------------------------------------------------------
 
 -->  See Manual/UserManual.pdf for input instructions and copyright message.
@@ -35,12 +35,11 @@
 -----------------------------------------------------------------------------------
   F U L L E R E N E     I S O M E R     D A T A B A S E
 -----------------------------------------------------------------------------------
- A database is provided for general isomers up tp C100 and for IPR isomers up to
- C120 including the number of Hamiltonian cycles. The database can be copied into
- the main program folder and can be used to read the ring spiral pentagon indices.
- The numbering scheme is exactly that chosen in the book by Fowler and Manolopoulus
- (Atlas of Fullerenes), that is each isomer in the books appendix can be constructed 
- easily from the database. 
- Note: the directory database needs to be in the main directory where source or 
+ A database is provided for general isomers up tp C140 and for IPR isomers up to
+ C180. The database can be copied into the main program folder and can be used to 
+ read the ring spiral pentagon indices. The numbering scheme is canonical as chosen 
+ in the book by Fowler and Manolopoulus (Atlas of Fullerenes), that is each isomer 
+ in the books appendix can be constructed easily from the database. 
+ Note: the directory 'database' needs to be in the main directory where source or 
  libgraph is.
 -----------------------------------------------------------------------------------

@@ -81,7 +81,6 @@ vector<unsigned int> Graph::all_pairs_shortest_paths(const unsigned int max_dept
   vector<unsigned int> distances(N*N);
   vector<bool> dummy_edges(N*(N-1)/2), dummy_nodes(N);
 
-#pragma omp parallel for
   for(node_t u=0;u<N;u++){
     const vector<unsigned int> row(shortest_paths(u,dummy_edges,dummy_nodes,max_depth));
     memcpy(&distances[u*N],&row[0],N*sizeof(unsigned int));
@@ -271,9 +270,9 @@ void Graph::update_from_neighbours()
 
 ostream& operator<<(ostream& s, const Graph& g) 
 {
-  s << g.name<< "Graph[Range[0,"<<(g.N-1)<<"],\n\tUndirectedEdge@@#&/@{";
+  s << g.name<< "Graph[Range["<<(g.N)<<"],\n\tUndirectedEdge@@#&/@{";
   for(set<edge_t>::const_iterator e(g.edge_set.begin()); e!=g.edge_set.end(); ){    
-    s << "{" << e->first << "," << e->second << "}";
+    s << "{" << (e->first+1) << "," << (e->second+1) << "}";
     if(++e != g.edge_set.end())
       s << ", ";
     else
