@@ -20,7 +20,7 @@
       end select
 
       return
-      END SUBROUTINE
+      END SUBROUTINE func3d
 
 
       SUBROUTINE wu(IERR,p,fc,force,iopt,
@@ -122,7 +122,7 @@ C     total energy
       fc=0.5d0 * fc
 
       Return
-      END SUBROUTINE
+      END SUBROUTINE wu
 
 
 
@@ -313,9 +313,9 @@ C     total energy
      3 +fdppp*ehookdppp+fdhpp*ehookdhpp+fdhhp*ehookdhhp+fdhhh*ehookdhhh! dihedral
      4 +fco*ecoulomb
       fc=0.5d0 * fc
-c      write(*,*)fc,"energy"
+
       Return
-      END SUBROUTINE
+      END SUBROUTINE extwu
 
 
 
@@ -340,7 +340,7 @@ c      write(*,*)fc,"energy"
       end select
 
       return
-      END SUBROUTINE
+      END SUBROUTINE dfunc3d
 
 
       SUBROUTINE dwu(p,x,force,iopt,
@@ -492,7 +492,7 @@ C     Coulomb repulsion from origin
       endif
 
       return
-      END
+      END SUBROUTINE dwu
 
 
       SUBROUTINE dextwu(p,x,force,iopt,
@@ -820,4 +820,4 @@ C     Coulomb repulsion from origin
       endif
 
       return
-      END
+      END SUBROUTINE dextwu
