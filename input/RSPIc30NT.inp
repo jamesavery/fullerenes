@@ -1,5 +1,5 @@
 D5h-C30 nanotube. Using FM algorithm to produce coordinates through ring spiral indices
-&General  NA=30 IP=1, ixyz=1, filename='C30extfile' / 
+&General  NA=30 ispsearch=2 / 
 &Coord ICart=3 /
 &FFChoice Iopt=3 /
 &FFParameters /
