@@ -1,5 +1,5 @@
 D5d-C40 nanotube using FM algorithm to produce coordinates from ring spiral indices
-&General NA=40, IP=1 /
+&General NA=40, IP=1 ispsearch=2 /
 &Coord ICart=2 /
 &FFChoice Iopt=1 /
 &FFParameters /
