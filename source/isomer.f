@@ -194,7 +194,7 @@ C Check if database can be taken instead
         Go to 99
       else
         Write(Iout,1011) databasefile
-       call Printdatabase(Iout,databasefile)
+       call Printdatabase(Iout,iham,databasefile)
       endif
       return
       endif
@@ -240,7 +240,7 @@ C Produce list from ring spiral algorithm
       Return
       END
  
-      SUBROUTINE Printdatabase(Iout,databasefile)
+      SUBROUTINE Printdatabase(Iout,iham,databasefile)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Character*50 databasefile
@@ -373,9 +373,26 @@ Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
           nmrloop=2
           if(INMR(3).ne.0) nmrloop=4
           if(INMR(5).ne.0) nmrloop=6
-          WRITE(Iout,607) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
-     1     IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
-     2     Occup,(INMR(I),I=1,nmrloop)
+          if(iham.eq.0) then
+           WRITE(Iout,607) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1      IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
+     2      Occup,(INMR(I),I=1,nmrloop)
+          else
+C   Calculate Hamiltonian cycles
+           stop
+           Call HamiltonCyc(maxiter,Iout,nbatch,IDA,nhamcycle)
+           WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1      IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
+     2      Occup,ncycHam,(INMR(I),I=1,nmrloop)
+           if(ncycham.le.hamlow) then
+            hamlow=ncycham
+            islow=J
+           endif
+           if(ncycham.ge.hamhigh) then
+            hamhigh=ncycham
+            ishigh=J
+           endif
+          endif
           if(IFus5G.le.IFus5Glow) then
            IFus5Glow=IFus5G
            IFusL=J
@@ -444,9 +461,26 @@ Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
           nmrloop=2
           if(INMR(3).ne.0) nmrloop=4
           if(INMR(5).ne.0) nmrloop=6
-          WRITE(Iout,607) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
-     1     IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
-     2     Occup,(INMR(I),I=1,nmrloop)
+          if(iham.eq.0) then
+           WRITE(Iout,607) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1      IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
+     2      Occup,(INMR(I),I=1,nmrloop)
+          else
+C   Calculate Hamiltonian cycles
+           stop
+           Call HamiltonCyc(maxiter,Iout,nbatch,IDA,nhamcycle)
+           WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
+     1      IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
+     2      Occup,ncycHam,(INMR(I),I=1,nmrloop)
+           if(sigmah.le.sigmahlow) then
+            sigmahlow=sigmah
+            ISigmaL=J
+           endif
+           if(sigmah.ge.sigmahhigh) then
+            sigmahhigh=sigmah
+            ISigmaH=J
+           endif
+          endif
            if(sigmah.le.sigmahlow) then
            sigmahlow=sigmah
            ISigmaL=J
