@@ -1772,87 +1772,87 @@ C     and determine if molecule is open shell
       NV6=0
       IER=0
       Do I=1,M
-       Ddiag(I)=0
-       Do J=1,M
-        Ddiag(I)=Ddiag(I)+D(J,I)
-       enddo
-       Itest=Ddiag(I)
-       If(Itest.eq.5) then
-        NV5=NV5+1
-        NR5(NV5)=I
-       endif
-       If(Itest.eq.6) NV6=NV6+1
+        Ddiag(I)=0
+        Do J=1,M
+          Ddiag(I)=Ddiag(I)+D(J,I)
+        enddo
+        Itest=Ddiag(I)
+        If(Itest.eq.5) then
+          NV5=NV5+1
+          NR5(NV5)=I
+        endif
+        If(Itest.eq.6) NV6=NV6+1
       enddo
 C     NV=NV5+NV6
 C     If(NV.ne.M) Write(Iout,1000)
 C     Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
 C     First pentagon indices
       Do I=0,5
-       IRhag5(I)=0
+        IRhag5(I)=0
       enddo
       do I=1,12
-       IRcount=0
-       IRing5=NR5(I)
-       do J=1,12
-        JRing5=NR5(J)
-        If(D(JRing5,IRing5).eq.1) then
-         IRcount=IRcount+1
-        endif
-       enddo
-       IRhag5(IRcount)=IRhag5(IRcount)+1
+        IRcount=0
+        IRing5=NR5(I)
+        do J=1,12
+          JRing5=NR5(J)
+          If(D(JRing5,IRing5).eq.1) then
+            IRcount=IRcount+1
+          endif
+        enddo
+        IRhag5(IRcount)=IRhag5(IRcount)+1
       enddo
       IFus5G=IPentInd(IRhag5)
 
 C     Now hexagon indices
       Do I=0,6
-       IRhag6(I)=0
+        IRhag6(I)=0
       enddo
-      do 10 I=1,M
-       IRcount=0
-       IR5=Ddiag(I)
-       if(IR5.eq.5) go to 10
-       do J=1,M
-        JR5=Ddiag(J)
-        If(JR5.ne.5.and.D(I,J).eq.1) then
-         IRcount=IRcount+1
-        endif
-       enddo
-       IRhag6(IRcount)=IRhag6(IRcount)+1
-   10 Continue
+      foo: do 10 I=1,M
+        IRcount=0
+        IR5=Ddiag(I)
+        if(IR5.eq.5) exit foo
+        do J=1,M
+          JR5=Ddiag(J)
+          If(JR5.ne.5.and.D(I,J).eq.1) then
+            IRcount=IRcount+1
+          endif
+        enddo
+        IRhag6(IRcount)=IRhag6(IRcount)+1
+      enddo foo
 C     Strain Parameter
       sigmah=HexInd(IRhag6,ihk)
 
 C     Now produce adjacency matrix
       CALL DUAL(D,MMAX,IDA,IER)
       Do I=1,number_vertices
-       df(I)=0.d0
-      Do J=I,number_vertices
-        A(I,J)=0.d0
-        if(IDA(I,J).eq.1) A(I,J)=1.d0
-        A(J,I)=A(I,J)
-      enddo
+        df(I)=0.d0
+        Do J=I,number_vertices
+          A(I,J)=0.d0
+          if(IDA(I,J).eq.1) A(I,J)=1.d0
+          A(J,I)=A(I,J)
+        enddo
       enddo
 C Diagonalize without producing eigenvectors
       do i=1,nmax
-         evec(i) = 0
+        evec(i) = 0
       enddo
       call tred2l(A,number_vertices,NMAX,evec,df)
       call tqlil(evec,df,number_vertices,NMAX)
 C Sort eigenvalues
       Do I=1,number_vertices
-       e0=evec(I)
-       jmax=I
+        e0=evec(I)
+        jmax=I
         Do J=I+1,number_vertices
-         e1=evec(J)
-          if(e1.gt.e0) then 
-           jmax=j
-           e0=e1
-          endif
-        enddo
+          e1=evec(J)
+            if(e1.gt.e0) then 
+              jmax=j
+              e0=e1
+            endif
+          enddo
         if(i.ne.jmax) then
-         ex=evec(jmax)
-         evec(jmax)=evec(I)
-         evec(I)=ex
+          ex=evec(jmax)
+          evec(jmax)=evec(I)
+          evec(I)=ex
         endif
       enddo
 
@@ -1862,38 +1862,37 @@ C Now sort degeneracies
       ideg=1
       IDG(1)=ideg
       Do I=2,number_vertices
-       diff=dabs(evec(I-1)-evec(I))
-       if(diff.lt.Tol) then
-        ideg=ideg+1
-        IDG(ieigv)=ideg
-       else
-        ieigv=ieigv+1
-        ideg=1
-        IDG(ieigv)=ideg
-        df(ieigv)=evec(I)
-       endif
+        diff=dabs(evec(I-1)-evec(I))
+        if(diff.lt.Tol) then
+          ideg=ideg+1
+          IDG(ieigv)=ideg
+        else
+          ieigv=ieigv+1
+          ideg=1
+          IDG(ieigv)=ideg
+          df(ieigv)=evec(I)
+        endif
       enddo
        
 C Produce number of electrons in HOMO, degeneracy and gap
       Noc=number_vertices/2
       Norb=0
-      Do I=1,ieigv
-      Iorb=I
-      Norb=Norb+IDG(I)
-      if(Norb.eq.Noc) then 
-      gap=df(Iorb)-df(Iorb+1)
-      ndeg=IDG(Iorb)
-      nelec=ndeg*2
-      go to 111
-      endif
-      if(Norb.gt.Noc) then 
-      gap=df(Iorb)-df(Iorb+1)
-      ndeg=IDG(Iorb)
-      nelec=(ndeg-Norb+Noc)*2
-      go to 111
-      endif
-      enddo
-  111 Continue
+      eigv: Do I=1,ieigv
+        Iorb=I
+        Norb=Norb+IDG(I)
+        if(Norb.eq.Noc) then 
+          gap=df(Iorb)-df(Iorb+1)
+          ndeg=IDG(Iorb)
+          nelec=ndeg*2
+          exit eigv
+        endif
+        if(Norb.gt.Noc) then 
+          gap=df(Iorb)-df(Iorb+1)
+          ndeg=IDG(Iorb)
+          nelec=(ndeg-Norb+Noc)*2
+          exit eigv
+        endif
+      enddo eigv
       
       Return
       END
