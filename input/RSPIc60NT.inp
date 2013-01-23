@@ -1,5 +1,5 @@
 C60  Using FM algorithm to produce coordinates of C60 nanotube through ring spiral indices
-&General  NA=60, ixyz=1 /
+&General  NA=60, ixyz=1 ispsearch=2/
 &Coord ICart=2, IV1=2, IV2=4, IV3=5 /
 &FFChoice Iopt=1 /
 &FFParameters /

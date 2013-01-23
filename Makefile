@@ -5,11 +5,11 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS= -g3 -O3 -m64 -Wall -Wno-sign-compare
-FFLAGS= -g3 -O3 -m64 -Wall
+CXXFLAGS= -g3 -m64 -O3 -Wall -Wno-sign-compare
+FFLAGS= -g3 -m64 -O3 -Wall
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
 # you might need to change the gfortran compiler options:
-#FFLAGS= -O3 -m64 -mcmodel=medium 
+#FFLAGS= -O3 -mcmodel=medium 
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o geometry.o dddihedral.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
 GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o polyhedron.o fullerenegraph.o graph_fortran.o mgmres.o
