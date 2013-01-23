@@ -1,5 +1,5 @@
 C50 Using Tutte embedding to produce coordinates through ring spiral indices
-&General NA=50 ip=1 ixyz=1 /
+&General NA=50 ip=1 ixyz=1 ispsearch=2 /
 &Coord ICart=3 /
 &FFChoice Iopt=3 /
 &FFParameters /
