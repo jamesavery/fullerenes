@@ -147,7 +147,7 @@ Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
  1008 Format(A3,12I3,3I2,I2,I1,F7.5,I7,6I3)
  1009 Format(A3,12I3,3I2,I2,I1,F7.5,6I3)
  1010 Format(1X,'Isomer number ',I10,' not identical to list number ',
-     1 I10)
+     1 I10,' ===> STOP')
  1011 Format(1X,'No Hamiltonian cycles recorded ==> RETURN')
  2000 Format(I9,2X,A3,1X,12I4,3X,6(I2,1X),2X,I2,3X,6(I2,1X),
      1 I3,1X,F10.5,1X,2I3,F9.5,1X,A6,1X,I10,2X,A26)
