@@ -1,18 +1,15 @@
-#include <cstdlib>
+//#include <cstdlib>
 #include <vector>
-#include <math.h>
+//#include <math.h>
 #include <iostream>
 
-
-void connect(const int &i, const int &j, int (*connectivity)[6], std::vector<int> &uv) // or int connectivity[][6]
+void connect(const int &i, const int &j, int connectivity[][6], std::vector<int> &uv)
 {
   connectivity[i][uv[i]] = j+1;
   connectivity[j][uv[j]] = i+1;
   ++uv[i];
   ++uv[j];
-//  std::cout << "ij(i)(j) " << i << j<< uv[i] << " uv2 " << uv[j] << std::endl;
 }
-
 
 bool windup_general(const std::vector<int> pot_spiral, const unsigned int size, std::vector<int> &pos, std::vector<int> &dist, int connectivity[][6]){
   //number of used valencies per vertex (0-5(6))
@@ -38,17 +35,9 @@ bool windup_general(const std::vector<int> pot_spiral, const unsigned int size, 
     used_pentagons += 6 - pot_spiral[k];
   
     //check if jump
-    x=0;
-//    std::cout << k << "iii" << std::endl;
-    if(pot_spiral[open_valencies.front()] - used_valencies[open_valencies.front()] == 2 && open_valencies.size() > 6)
-    {
-//      std::cout << "x" << x << ", d1: " << pot_spiral[*(open_valencies.begin()+x)] - used_valencies[*(open_valencies.begin()+x)] << std::endl;
-
-//      std::cout << "d2: " << pot_spiral[*(open_valencies.begin()+x+1)] - used_valencies[*(open_valencies.begin()+x+1)] << std::endl;
-//      std::cout << "d3: " << pot_spiral[*(open_valencies.begin()+x+2)] - used_valencies[*(open_valencies.begin()+x+2)] << std::endl;
-      while(pot_spiral[*(open_valencies.begin()+x)] - used_valencies[*(open_valencies.begin()+x)] == 2)
-      {
-//        std::cout << k<< " x " << x << std::endl;
+    x = 0;
+    if(pot_spiral[open_valencies.front()] - used_valencies[open_valencies.front()] == 2 && open_valencies.size() > 6){
+      while(pot_spiral[*(open_valencies.begin()+x)] - used_valencies[*(open_valencies.begin()+x)] == 2){
         ++x;
       }
       //two error cases
@@ -81,11 +70,9 @@ bool windup_general(const std::vector<int> pot_spiral, const unsigned int size, 
     if(x>1){// x=1 is no jump
       pos.push_back(k);
       dist.push_back(x);
-//      std::cout << "jump of " << x << " at " << k+1 << "." << std::endl;
     }
 
-        // perform cyclic rotation on open_valencies
-//    std::cout << k << "v" << std::endl;
+    // perform cyclic rotation on open_valencies
     for(int i = 1; i<x; ++i){
       int j = open_valencies.front();
       open_valencies.erase(open_valencies.begin());
@@ -137,7 +124,7 @@ bool windup_general(const std::vector<int> pot_spiral, const unsigned int size, 
 
 int main(int argc, char* argv[])
 {
-  unsigned int size = 191;
+  unsigned int size = 192;
 //  unsigned int size = 16;
   std::vector<int> potential_spiral (size,6);
 //normal
