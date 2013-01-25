@@ -506,13 +506,14 @@ C     Analyze dual matrix
  2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
  2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
  2002 Format(A18)
-      END
+      END subroutine spiralrestart
+
 
       SUBROUTINE SpiralFind(IPR,ivar,In,Iout,IDA,A)
 C     This subroutine comes directly from the book of Fowler and 
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006),
 C     and has been modified to search for ring spirals around an
-C     icosahedral fullerene clostest to the vertex number required.           
+C     icosahedral fullerene closest to the vertex number required.           
 C     This sub-program catalogues fullerenes with a given number of      
 C     vertices using the spiral algorithm and a uniqueness test 
 C     based on equivalent spirals. IPR = 0  for all isomers. 
@@ -856,7 +857,7 @@ C     Analyze dual matrix
  807  Format(1X,'Pentagon indices taken from input')
 
 C     RETURN
-      END
+      END subroutine spiralfind
 
       SUBROUTINE Spiral(IPR,Iout,Isonum,IsoIPR,iham,IDA,A)
 C     This subroutine comes directly from the book of Fowler and 
@@ -1153,7 +1154,8 @@ C     Analyze dual matrix
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-')) 
       Return
-      END
+      END subroutine spiral
+
 
       SUBROUTINE spwindup(IER,number_faces,MP,D1,S,JP,FreeRing)
       use config
@@ -1170,57 +1172,58 @@ C This algorithm is much faster than the one in version 4.2
 C   Big loop from ring 4 onwards to the end of the spiral
 C---- Start loop
       nsmall=1
-      Do 10 i=4,number_faces
+      faces: Do i=4,number_faces
 
-C    First collect next possible faces connected to the previous 
-C    5- or 6-ring (nloop=5 or 6) numbered IP=S(i-1) 
-C    and make sure it is not one of the previous rings
-C    in the spiral
-       IP=S(i-1)
-       nloop=6
-       nring=0
-       if(D1(6,IP).eq.0) nloop=5
-        do 11 j=1,nloop
-C       Get all adjacent rings to previous one
-         nr=D1(j,IP)
-C       Make sure it is not one in the existing spiral
-         do j1=I-2,1,-1
-          if(nr.eq.S(j1)) go to 11
-         enddo
+C       First collect next possible faces connected to the previous 
+C       5- or 6-ring (nloop=5 or 6) numbered IP=S(i-1) 
+C       and make sure it is not one of the previous rings
+C       in the spiral
+        IP=S(i-1)
+        nloop=6
+        nring=0
+        if(D1(6,IP).eq.0) nloop=5
+        bar: do j=1,nloop
+C         Get all adjacent rings to previous one
+          nr=D1(j,IP)
+C         Make sure it is not one in the existing spiral
+          do j1=I-2,1,-1
+            if(nr.eq.S(j1)) exit bar
+          enddo
 C       Collect them
-          nring=nring+1
-          FreeRing(nring)=nr
-   11   continue
-         
-C    Now it needs to be connected to a previous ring
-C    Last 2 are not needed
-         do k=nsmall,i-3
+        nring=nring+1
+        FreeRing(nring)=nr
+        enddo bar
+          
+C       Now it needs to be connected to a previous ring
+C       Last 2 are not needed
+        do k=nsmall,i-3
           KP=S(k)
           do k1=1,6
-           do j2=1,nring
-            nr=FreeRing(j2)
-            if(D1(k1,KP).eq.nr) then
-             nsmall=k
-             S(i)=nr
-             if(D1(6,nr).eq.0) then
-              MP=MP+1
-              JP(MP)=i
-             endif
-            go to 10
-            endif
-           enddo
+            do j2=1,nring
+              nr=FreeRing(j2)
+              if(D1(k1,KP).eq.nr) then
+                nsmall=k
+                S(i)=nr
+                if(D1(6,nr).eq.0) then
+                  MP=MP+1
+                  JP(MP)=i
+                endif
+                exit faces
+              endif
+            enddo
           enddo
-         enddo
+        enddo
 
-      if(S(i).eq.0) then
-       IER=1   ! Spiral has dead end
-       Return
-      endif
+        if(S(i).eq.0) then
+          IER=1   ! Spiral has dead end
+          Return
+        endif
+      enddo faces
 
-  10  continue
 C  Finally success, spiral found
       Return
       END
+
 
       SUBROUTINE SpiralSearch(Iout,IRG55,IRG66,IRG56,
      1 NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP,spcount)
@@ -1702,18 +1705,19 @@ C     Print ring numbers
       IMPLICIT Integer (A-Z)
       DIMENSION SpiralT(12,MaxSpirals),dif(12)
       Do I=1,nspiral-1
-      sum=0
-      Do J=1,12
-       dif(J)=SpiralT(J,I)-SpiralT(J,nspiral)
-       sum=sum+iabs(dif(J))
-      enddo
-       if(sum.eq.0) then
-        nspiral=nspiral-1
-        return
-       endif
+        sum=0
+        Do J=1,12
+          dif(J)=SpiralT(J,I)-SpiralT(J,nspiral)
+          sum=sum+iabs(dif(J))
+        enddo
+        if(sum.eq.0) then
+          nspiral=nspiral-1
+          return
+        endif
       enddo
       Return
       END
+
 
       SUBROUTINE CanSpiral(MS0,S,P)
       use config
@@ -1722,40 +1726,41 @@ C     Print ring numbers
 C     Find canonical spiral by sorting
       IS=1
       MS=MS0
-         Do I=1,12
-         PI(I)=0
-         enddo
+      Do I=1,12
+        PI(I)=0
+      enddo
 C     Find lowest value
   1   Smax=100000
-          Do I=1,MS
-          IF(S(IS,I).le.Smax) Smax=S(IS,I)
-          enddo
+      Do I=1,MS
+        IF(S(IS,I).le.Smax) Smax=S(IS,I)
+      enddo
       IZ=0
-          Do I=1,MS
-           if(S(IS,I).eq.Smax) then
-           IZ=IZ+1
-            do j=1,12
+      Do I=1,MS
+        if(S(IS,I).eq.Smax) then
+          IZ=IZ+1
+          do j=1,12
             SM(j,IZ)=S(j,I)
-            enddo
-           endif
-           enddo
-      MS=IZ
-       if(MS.eq.1) then
-          Do I=1,12
-          P(I)=SM(I,1)
           enddo
-          return
-       else
-         Do I=1,MS
-         Do J=1,12
-          S(J,I)=SM(J,I)
-         enddo
-         enddo
-       IS=IS+1
-       go to 1
+        endif
+      enddo
+      MS=IZ
+      if(MS.eq.1) then
+        Do I=1,12
+          P(I)=SM(I,1)
+        enddo
+        return
+      else
+        Do I=1,MS
+          Do J=1,12
+            S(J,I)=SM(J,I)
+          enddo
+        enddo
+        IS=IS+1
+        go to 1
       endif
       return
       END
+
 
       SUBROUTINE DualAnalyze(M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
@@ -1766,93 +1771,94 @@ C     Find lowest value
       Dimension A(NMAX,NMAX),evec(NMAX),df(NMAX)
 C     Analyze dual matrix and get pentagon and hexagon indices
 C     and determine if molecule is open shell
-      Data Tol/1.d-5/
+
+      Tol=1.d-5
 
       NV5=0
       NV6=0
       IER=0
       Do I=1,M
-       Ddiag(I)=0
-       Do J=1,M
-        Ddiag(I)=Ddiag(I)+D(J,I)
-       enddo
-       Itest=Ddiag(I)
-       If(Itest.eq.5) then
-        NV5=NV5+1
-        NR5(NV5)=I
-       endif
-       If(Itest.eq.6) NV6=NV6+1
+        Ddiag(I)=0
+        Do J=1,M
+          Ddiag(I)=Ddiag(I)+D(J,I)
+        enddo
+        Itest=Ddiag(I)
+        If(Itest.eq.5) then
+          NV5=NV5+1
+          NR5(NV5)=I
+        endif
+        If(Itest.eq.6) NV6=NV6+1
       enddo
 C     NV=NV5+NV6
 C     If(NV.ne.M) Write(Iout,1000)
 C     Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
 C     First pentagon indices
       Do I=0,5
-       IRhag5(I)=0
+        IRhag5(I)=0
       enddo
       do I=1,12
-       IRcount=0
-       IRing5=NR5(I)
-       do J=1,12
-        JRing5=NR5(J)
-        If(D(JRing5,IRing5).eq.1) then
-         IRcount=IRcount+1
-        endif
-       enddo
-       IRhag5(IRcount)=IRhag5(IRcount)+1
+        IRcount=0
+        IRing5=NR5(I)
+        do J=1,12
+          JRing5=NR5(J)
+          If(D(JRing5,IRing5).eq.1) then
+            IRcount=IRcount+1
+          endif
+        enddo
+        IRhag5(IRcount)=IRhag5(IRcount)+1
       enddo
       IFus5G=IPentInd(IRhag5)
 
 C     Now hexagon indices
       Do I=0,6
-       IRhag6(I)=0
+        IRhag6(I)=0
       enddo
-      do 10 I=1,M
-       IRcount=0
-       IR5=Ddiag(I)
-       if(IR5.eq.5) go to 10
-       do J=1,M
-        JR5=Ddiag(J)
-        If(JR5.ne.5.and.D(I,J).eq.1) then
-         IRcount=IRcount+1
-        endif
-       enddo
-       IRhag6(IRcount)=IRhag6(IRcount)+1
-   10 Continue
+      foo: do I=1,M
+        IRcount=0
+        IR5=Ddiag(I)
+        if(IR5.eq.5) exit foo
+        do J=1,M
+          JR5=Ddiag(J)
+          If(JR5.ne.5.and.D(I,J).eq.1) then
+            IRcount=IRcount+1
+          endif
+        enddo
+        IRhag6(IRcount)=IRhag6(IRcount)+1
+      enddo foo
 C     Strain Parameter
       sigmah=HexInd(IRhag6,ihk)
 
 C     Now produce adjacency matrix
       CALL DUAL(D,MMAX,IDA,IER)
       Do I=1,number_vertices
-       df(I)=0.d0
-      Do J=I,number_vertices
-        A(I,J)=0.d0
-        if(IDA(I,J).eq.1) A(I,J)=1.d0
-        A(J,I)=A(I,J)
-      enddo
+        df(I)=0.d0
+        Do J=I,number_vertices
+          A(I,J)=0.d0
+          if(IDA(I,J).eq.1) A(I,J)=1.d0
+          A(J,I)=A(I,J)
+        enddo
       enddo
 C Diagonalize without producing eigenvectors
       do i=1,nmax
-         evec(i) = 0
+        evec(i) = 0
       enddo
       call tred2l(A,number_vertices,NMAX,evec,df)
       call tqlil(evec,df,number_vertices,NMAX)
 C Sort eigenvalues
       Do I=1,number_vertices
-       e0=evec(I)
-       jmax=I
+        e0=evec(I)
+        jmax=I
         Do J=I+1,number_vertices
-         e1=evec(J)
-          if(e1.gt.e0) then 
-           jmax=j
-           e0=e1
-          endif
-        enddo
+          e1=evec(J)
+            if(e1.gt.e0) then 
+              jmax=j
+              e0=e1
+            endif
+          enddo
         if(i.ne.jmax) then
-         ex=evec(jmax)
-         evec(jmax)=evec(I)
-         evec(I)=ex
+          ex=evec(jmax)
+          evec(jmax)=evec(I)
+          evec(I)=ex
         endif
       enddo
 
@@ -1862,38 +1868,37 @@ C Now sort degeneracies
       ideg=1
       IDG(1)=ideg
       Do I=2,number_vertices
-       diff=dabs(evec(I-1)-evec(I))
-       if(diff.lt.Tol) then
-        ideg=ideg+1
-        IDG(ieigv)=ideg
-       else
-        ieigv=ieigv+1
-        ideg=1
-        IDG(ieigv)=ideg
-        df(ieigv)=evec(I)
-       endif
+        diff=dabs(evec(I-1)-evec(I))
+        if(diff.lt.Tol) then
+          ideg=ideg+1
+          IDG(ieigv)=ideg
+        else
+          ieigv=ieigv+1
+          ideg=1
+          IDG(ieigv)=ideg
+          df(ieigv)=evec(I)
+        endif
       enddo
        
 C Produce number of electrons in HOMO, degeneracy and gap
       Noc=number_vertices/2
       Norb=0
-      Do I=1,ieigv
-      Iorb=I
-      Norb=Norb+IDG(I)
-      if(Norb.eq.Noc) then 
-      gap=df(Iorb)-df(Iorb+1)
-      ndeg=IDG(Iorb)
-      nelec=ndeg*2
-      go to 111
-      endif
-      if(Norb.gt.Noc) then 
-      gap=df(Iorb)-df(Iorb+1)
-      ndeg=IDG(Iorb)
-      nelec=(ndeg-Norb+Noc)*2
-      go to 111
-      endif
-      enddo
-  111 Continue
+      eigv: Do I=1,ieigv
+        Iorb=I
+        Norb=Norb+IDG(I)
+        if(Norb.eq.Noc) then 
+          gap=df(Iorb)-df(Iorb+1)
+          ndeg=IDG(Iorb)
+          nelec=ndeg*2
+          exit eigv
+        endif
+        if(Norb.gt.Noc) then 
+          gap=df(Iorb)-df(Iorb+1)
+          ndeg=IDG(Iorb)
+          nelec=(ndeg-Norb+Noc)*2
+          exit eigv
+        endif
+      enddo eigv
       
       Return
       END
