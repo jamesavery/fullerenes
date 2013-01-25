@@ -248,7 +248,10 @@ C Produce list from ring spiral algorithm
       CHARACTER*6  Occup
       Integer hamlow,hamhigh,hamlowIPR,hamhighIPR
       Integer RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
+      Integer D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
 
+      nbatch=0
+      maxiter=1000000000
       Open(UNIT=4,FILE=databasefile,STATUS='old',ACTION='Read',
      1  FORM='FORMATTED')
        Read(4,1003) IN,IP,IH
@@ -256,6 +259,7 @@ C Produce list from ring spiral algorithm
         Write(Iout,1002) IN,number_vertices
         return
        endif
+       number_faces=number_vertices/2+2
        Write(Iout,1000) IN,IP,IH
       if(IH.eq.0) then
       if(IP.EQ.0) then
@@ -379,8 +383,28 @@ Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
      2      Occup,(INMR(I),I=1,nmrloop)
           else
 C   Calculate Hamiltonian cycles
-           stop
-           Call HamiltonCyc(maxiter,Iout,nbatch,IDA,nhamcycle)
+C   Get dual and then adjacency matrix
+           do K1=1,number_faces
+           do K2=1,number_faces
+            D(K1,K2)=0
+           enddo
+           enddo
+           Do K=1,number_faces
+            S(K)=6
+           enddo
+           Do K=1,12
+            S(RSPI(K))=5
+           enddo
+           IPRS=0
+           IER=0
+           CALL Windup(number_faces,IPRS,IER,S,D) ! Wind up spiral into dual
+           IF(IER.gt.0) then
+            WRITE(Iout,1010) IER
+            return
+           endif
+           CALL DUAL(D,MMAX,IDA,IER)
+C  Now do Hamiltonian cycles
+           Call HamiltonCyc(maxiter,Iout,nbatch,IDA,ncycham)
            WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
      1      IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
      2      Occup,ncycHam,(INMR(I),I=1,nmrloop)
@@ -467,8 +491,27 @@ Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
      2      Occup,(INMR(I),I=1,nmrloop)
           else
 C   Calculate Hamiltonian cycles
-           stop
-           Call HamiltonCyc(maxiter,Iout,nbatch,IDA,nhamcycle)
+C   Get dual and then adjacency matrix
+           do K1=1,number_faces
+           do K2=1,number_faces
+            D(K1,K2)=0
+           enddo
+           enddo
+           Do K=1,number_faces
+            S(K)=6
+           enddo
+           Do K=1,12
+            S(RSPI(K))=5
+           enddo
+           IPRS=0
+           IER=0
+           CALL Windup(number_faces,IPRS,IER,S,D) ! Wind up spiral into dual
+           IF(IER.gt.0) then
+            WRITE(Iout,1010) IER
+            return
+           endif
+           CALL DUAL(D,MMAX,IDA,IER)
+           Call HamiltonCyc(maxiter,Iout,nbatch,IDA,ncycham)
            WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
      1      IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
      2      Occup,ncycHam,(INMR(I),I=1,nmrloop)
@@ -523,6 +566,8 @@ C Final statistics
  1007 Format(A3,12I3,5I2,6I2,I2,I1,F7.5,6I3)
  1008 Format(A3,12I3,3I2,I2,I1,F7.5,I7,6I3)
  1009 Format(A3,12I3,3I2,I2,I1,F7.5,6I3)
+ 1010 FORMAT(/1X,'Cannot produce dual matrix, error IER= ',I2,
+     1 ' Error in Database ==> Return')
  601  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
