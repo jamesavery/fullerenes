@@ -1,4 +1,4 @@
-      SUBROUTINE HamiltonCyc(maxiter,Iout,nbatch,A,Nhamilton)
+      SUBROUTINE HamiltonCyc(maxiter,Iout,nbatch,A,nhamilton)
       use config
 C     Back-track algorithm from Darko Babic to create Hamitonian cycles
 C      optimized for program Isomer

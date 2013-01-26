@@ -23,7 +23,7 @@ C Set parameters
       skip=4
       nhamcycle=0
       IPRdect=0
-      maxiter=10000000
+      maxiter=1000000000
       islow=1
       islowIPR=1
       ishigh=1
