@@ -113,7 +113,7 @@ C  INPUT and setting parameters for running the subroutines
      1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
      1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1  ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1  iprinthessian,ndbconvert,ihamstore,nhamcyc,
+     1  iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1  force,forceP,boost,filename,filenameout,TEXTINPUT)
 
@@ -216,7 +216,8 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS        '
       Write(Iout,1008) routine
-      CALL Isomers(IPR,isearch,In,Iout,iprintham,ichk,IDA,A,filename)
+      CALL Isomers(IPR,isearch,In,Iout,iprintham,isomerl,isomerh,
+     1 ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
 
 C------------------MOVECM------------------------------------------
@@ -624,8 +625,8 @@ C Formats
      1 /1X,'|         and James Avery with routines from             |',
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
-     1 /1X,'|    First version: 1.0:               from 08/06/10     |',
-     1 /1X,'|    This  version: 4.4, last revision from 13/01/13     |',
+     1 /1X,'|    First version: 1.0                from 08/06/10     |',
+     1 /1X,'|    This  version: 4.4, last revision from 26/01/13     |',
      1 /1X,'|________________________________________________________|',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
