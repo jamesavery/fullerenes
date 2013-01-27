@@ -268,7 +268,7 @@ of the fullerene graph $F$, $A(F)$
 (needed for the AME algorithm and the H\"uckel analysis ($\mathcal{O}(n^3)$)), the force-field optimization for
 very large fullerenes ($>$ 2000 atoms)  and the diagonalization of
 the force-field Hessian, the determination of the number of Hamiltonian cycles
-($>$ 80 atoms) (this is an NP-complete problem), the creation of a list of ring-spiral pentagon
+($>$ 80 atoms) (this is a $\#P$-hard problem), the creation of a list of ring-spiral pentagon
 indices for all possible isomers with a given vertex count $n_v$ ($>$ 80 atoms), 
 and the Tutte embedding algorithm ($>$ 2000 atoms). We try to improve the performance of these algorithms
 in our next major version to be released. For version 4.1 the fullerene database was increased and a link to
@@ -336,17 +336,17 @@ The program can print all general and IPR isomers for a specific fullerene and p
 in the book by Fowler and Manolopoulos \cite{Atlas}, e.g. pentagon indices and 
 pentagon number, hexagon indices and strain parameter, NMR information and number of distinct Hamiltonian cycles if 
 required. The number of isomers scales polynomially as $n_v^9$, thus it becomes computationally
-too demanding for a full isomer list beyond \C{120}. Moreover, the database provided, can be used to print all isomers up to 
-\C{122}, and up to \C{170} for all IPR isomers. Fowler and Manolopoulos use a numbering scheme ($N_\mathrm{isomers}= 1,\dots, n_\mathrm{max}$) 
+very demanding to produce a full isomer list for fullerenes larger than \C{120}. Moreover, the database provided, can be used to print all isomers up to 
+\C{140}, and up to \C{184} for all IPR isomers. Fowler and Manolopoulos use a numbering scheme ($N_\mathrm{isomers}= 1,\dots, n_\mathrm{max}$) 
 obtained from the natural sequence of canonical RSPIs to distinguish between the different isomers \cite{Atlas}. From their book \cite{Atlas} the
-general isomer number can be taken and the RSPIs for a specific isomer up to \C{122} can be read-in from the database provided. 
-The numbering scheme for IPR isomers only ($N_\mathrm{isomers}^\mathrm{IPR}= 1,\dots, n_\mathrm{max}$) can also be used up to \C{170}, 
+general isomer number can be taken and the RSPIs for a specific isomer up to \C{140} can be read-in from the database provided. 
+The numbering scheme for IPR isomers only ($N_\mathrm{isomers}^\mathrm{IPR}= 1,\dots, n_\mathrm{max}$) can also be used up to \C{184}, 
 see for example the input file \filename{DBc158.inp}.
 
 %H\"uckel analysis and topological indicators
 \subsection{H\"uckel analysis and topological indicators}
 From the adjacency matrix $A_{ij}$ of eq.(\ref{eq:adjacencymatrix}), a H\"uckel analysis is performed (Subroutine \funname{Hueckel}). This gives you a good hint if the 
-fullerene is open or closed shell \cite{Atlas}. For smaller fullerenes or non-IPR fullerenes, the H\"uckel analysis may not be very reliable 
+fullerene is of open or of closed shell \cite{Atlas}. For smaller fullerenes or non-IPR fullerenes, the H\"uckel analysis may not be very reliable 
 as hybridization with the C(2s) orbitals occurs due to non-planarity. Hence the $\sigma-\pi$ separation breaks down. The orbital energies are defined as
 \begin{equation}
   \label{Hueckel}
@@ -357,12 +357,12 @@ from the experimental ionization potential (7.58 eV) and excitation energy (3.02
 into the second LUMO of $t_{1g}$ symmetry). This gives also orbital energies for \C{60} in reasonable 
 agreement with DFT Kohn-Sham orbital energies. The fullerene structure might also undergo a Jahn-Teller distortion adopting a singlet 
 ground state instead of one of a higher multiplicity, as this is the case for \C{20}. Such electronic effects are not
-captured in this program, and one needs to perform a proper quantum theoretical calculation. The program gives information
+captured in this program, and one needs to perform a proper quantum-theoretical calculation. The program gives information
 on the HOMO-LUMO gap and calculates the topological resonance energy from Babi\'c's matching polynomial calculations \cite{Babic1995,Babic1997}.
 
 A topological index is a structurally invariant natural or real number related to a molecular graph, which does not depend on the labelling 
 or the 2D representation of a graph $G$. There are several other topological indicators \cite{Cataldo,Caporossi} of which the Estrada 
-index, the Wiener index, the hyper-Wiener index, the Balaban index , the Szeged index, the topological radius, diameter and and mean distance
+index, the Wiener index, the hyper-Wiener index, the Balaban index, the Szeged index, the topological radius, diameter and and mean distance
 are printed. The Estrada $E(G)$ and bipartivity $\beta(G)$ indices are obtained from the eigenvalues of the adjacency
 matrix $A(G)$, $\{ x_i, i=1,...,n_v \} \in [-3,3]$, of a graph $G$ (in our case a regular fullerene graph $G=F$) \cite{Estrada,Doslic2005},
 \begin{equation}
@@ -433,10 +433,10 @@ and we have $\mu_0 = n_v$, $\mu_1 = 0$, $\mu_2 = 3n_v$, $\mu_3 = 0$, $\mu_4 = 15
 The higher spectral moments depend on the fullerene structure.\cite{Fowler93}\\
 One of the first topological indicators introduced to discuss the stability of fullerenes are the neighbour indices for pentagons and
 hexagons. The program calculates the pentagon neighbour indices,\cite{Atlas,Albertazzi} hexagon neighbour indices and the pentagon arm indices.\cite{Reti}
-Every fullerene isomer can be characterized by a signature of the form $\{i_k | k=1,n\}$. The pentagon indices $(p_i | i=0, \dots 5)$ define the
+Every fullerene isomer can be characterized by a signature of the form $\{i_k | k=1, \dots , n\}$. The pentagon indices $(p_i | i=0, \dots , 5)$ define the
 number of pentagons attached to another pentagon, i.e. for IPR fullerenes $p_0 = 12$ and all other pentagon indices are zero. Hexagon indices are similarly
-defined, i.e. $(h_i | i=0, \dots 5)$, where $h_k$ is the number of hexagons with neighbour index $k$. In an IPR fullerene every hexagon is adjacent to a
-minimum of three others and we can restrict the list to $(h_3, h_4, h_5, h_6)$. The pentagon arm indices $(n_i | i=0, \dots 5)$ counts the number of arms
+defined, i.e. $(h_i | i=0, \dots , 5)$, where $h_k$ is the number of hexagons with neighbour index $k$. In an IPR fullerene every hexagon is adjacent to a
+minimum of three others and we can restrict the list to $(h_3, h_4, h_5, h_6)$. The pentagon arm indices $(n_i | i=0, \dots , 5)$ counts the number of arms
 of the pentagons. Here an edge $E$ incident to a vertex of a pentagon not belonging to the pentagon is called an arm if i) both end-vertices of edge $E$ 
 are incident to pentagons, and ii) $E$ shares two neighbor hexagons.\cite{Reti} It is clear that this is nothing else than a Stone-Wales pattern.\\
 We can now define some useful topological invariants. The pentagon index $N_p$ is defined as
@@ -460,18 +460,18 @@ R\'eti and L\'aszl\'o define the pentagon arm index $N_A$ in a similar way to th
   \label{arms}
   N_A = \frac{1}{2}\sum_{k=1}^{5} kn_k  \quad \text{ with } \quad  \sum_{k=0}^{5} n_k = 12
 \end{equation}
-The first and second moments $M_1$ and $M_2$ and the variance $V$ are defined as (real numbers),
+The first and second moments $M_1$ and $M_2$ and the variance $\text{Var}$ are defined as (real numbers),
 \begin{equation}
   \label{Moments}
-  M_i = \frac{1}{12}\sum_{k=1}^{5} k^i n_k  \quad \text{ and } \quad  V = M_2 - M_1^2
+  M_i = \frac{1}{12}\sum_{k=1}^{5} k^i n_k  \quad \text{ and } \quad  \text{Var}= M_2 - M_1^2
 \end{equation}
 We now define the R\'eti-L\'aszl\'o topological descriptor as $\Psi$,
 \begin{equation}
   \label{Moments}
-  \Psi = \frac{30+6M_1}{1+4.5N_p+C(M_1,M_2)} \quad \text{ with } \quad  C(M_1,M_2) = \frac{(120M_2)^{1/2}}{(1+7M_1)^{1/2}(1+0.9V^{1.5})}
+  \Psi = \frac{30+6M_1}{1+4.5N_p+C(M_1,M_2)} \quad \text{ with } \quad  C(M_1,M_2) = \frac{(120M_2)^{1/2}}{(1+7M_1)^{1/2}(1+0.9\text{Var}^{1.5})}
 \end{equation}
 If there exists a non-negative integer $q$ for which one of the arm indices $n_q = 12$, the fullerene is called $q$-balanced. In this
-case $V = 0$.\cite{Reti} If $N_p + N_A = 0$, the fullerene is called strongly isolated. \C{60} contains Stone-Wales patterns and is therefore not
+case $\text{Var} = 0$.\cite{Reti} If $N_p + N_A = 0$, the fullerene is called strongly isolated. \C{60} contains Stone-Wales patterns and is therefore not
 strongly isolated. The first leapfrog of \C{60}, \C{180}, and the ones to follow are strongly isolated.
 
 
@@ -631,7 +631,7 @@ The number of spirals in the output agree with the examples given by Yoshida and
 A more general ring-spiral algorithm is currently in preparation.
 
 %Volume and surface area, minimum covering sphere
-\subsection{Volume and surface area, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
+\subsection{Volume $V$ and surface area $A$, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
 The volume and surface area of the fullerene are calculated in Subroutine \funname{Volume}. This is done by\\
 1) The convex hull.\\
 2) The normal vector algorithm resulting in the exact volume of the polyhedron (identical to convex hull if polyhedron is convex).\\
@@ -641,13 +641,13 @@ tetrahedrons spanned by the three vectors CM-CR (center(mass)-center(ring): bary
 CM-CA1 (barycenter of fullerene to atom~1 in ring), and CM-CA2 (barycenter of fullerene  to atom~2 in ring) is calculated.
 There are 5 such tetrahedrons in a pentagon and 6 in a hexagon.  The barycenter CM has been set to the origin in a previous step.
 
-In a similar way the surface area is obtained by summing over all triangles from the ring center to
+In a similar way the surface area $A$ is obtained by summing over all triangles from the ring center to
 neighbouring vertices in the ring. $I_h$-\C{20} and $I_h$-\C{60} coordinates can be constructed easily
 using basic geometry. For these, the volume and surface areas are known analytically.
 
 The \textit{isoperimetric quotient} (IPQ) is defined as
 \begin{equation}
- q_{\textrm{IPQ}} =36\pi \frac{V^{2} }{S^{3}}\quad\text{with}\quad q_{\textrm{IPQ}}\in [0,1]
+ q_{\textrm{IPQ}} =36\pi \frac{V^{2} }{A^{3}}\quad\text{with}\quad q_{\textrm{IPQ}}\in [0,1]
  \label{IPQ}
  \end{equation}
 which for an ideal sphere is trivially $q_{\textrm{IPQ}}=1$, and for zero volume $q_{\textrm{IPQ}}=0$. For \C{20} 
@@ -669,9 +669,9 @@ D_{\textrm{IPQ}} =100\left(1-q_{\textrm{IPQ}} \right)
 The program also calculates the \textit{sphericity parameter} of Diaz-Tendero \cite{Diaz},
 \begin{equation}
 \label{Diaz}
-q_{\textrm{SP}} = \sqrt{(A-B)^2+(A-C)^2+(B-C)^2}/A 
+q_{\textrm{SP}} = \sqrt{(a-b)^2+(a-c)^2+(b-c)^2}/A 
 \end{equation}
-where $A \ge B \ge C$ are the rotational constants. Note that we deviate from the original definition by dividing 
+where $a \ge b \ge c$ are the rotational constants. Note that we deviate from the original definition by dividing 
 the square-root by the rotational constant $A$. Further, the \textit{asymmetry parameter} of Fowler is printed,
 \begin{equation}
 \label{Diaz}
