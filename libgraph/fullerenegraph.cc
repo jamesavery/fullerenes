@@ -202,7 +202,7 @@ void wg_connect(const int i, const int j, set<edge_t> &edge_set, std::vector<int
   ++uv[j];
 }
 
-bool windup_general(const int n, const std::vector<int> &pot_spiral, std::vector<int> &pos, std::vector<int> &dist, set<edge_t> &edge_set){
+bool do_windup_general(const int n, const std::vector<int> &pot_spiral, std::vector<int> &pos, std::vector<int> &dist, set<edge_t> &edge_set){
   //number of used valencies per vertex (0-5(6))
   std::vector<int> used_valencies(n,0);
   //list of vertices that have open valencies
@@ -307,12 +307,7 @@ bool windup_general(const int n, const std::vector<int> &pot_spiral, std::vector
 }//windup_general
 
 
-FullereneGraph::FullereneGraph(const int n, const int spiral_indices_array[12], bool IPR, bool general) : CubicGraph() {
-
-  std::vector<int> spiral_indices(12);
-  for(int i=0; i<12; ++i){
-    spiral_indices[i] = spiral_indices_array[i];
-  }
+FullereneGraph::FullereneGraph(const unsigned int n, const std::vector<int> spiral_indices, int ier, bool IPR, bool general) : CubicGraph() {
 
   if(!general){
     int m = n/2+2;
@@ -363,7 +358,8 @@ FullereneGraph::FullereneGraph(const int n, const int spiral_indices_array[12], 
     std::vector<int> jump_positions;
     std::vector<int> jump_distances;
     
-    if(windup_general(n, potential_spiral, jump_positions, jump_distances, edge_set)){
+    if(do_windup_general(n, potential_spiral, jump_positions, jump_distances, edge_set)){
+      std::cerr << "No general spiral found either ... aborting." << std::endl;
       abort();
     }
     
