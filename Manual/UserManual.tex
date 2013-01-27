@@ -178,7 +178,7 @@ that PS is good in old-fashioned Fortran, JA is good in C++ (and LW is doing bot
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
 and geometry optimization. Version 4.3 included the Hessian of the force field, although 
 we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
-4.4 introduced a search algorithm for neighborhood RSPIs, the Szeged index, pentagon arm indices as further topological descriptors,
+4.4 introduced a search algorithm for neighbourhood RSPIs, the Szeged index, pentagon arm indices as further topological descriptors,
 and new (conjectured) upper and lower bound for Hamiltonian cycles in fullerenes.
 The Tutte embedding algorithm has also been made much faster and the fullerene database has been transformed into a more compact and efficient version.
 Version 5 to be released late 2013 will separate the topological from the cartesian input part and uses sparse matrix handling for the
@@ -438,7 +438,7 @@ number of pentagons attached to another pentagon, i.e. for IPR fullerenes $p_0 =
 defined, i.e. $(h_i | i=0, \dots , 5)$, where $h_k$ is the number of hexagons with neighbour index $k$. In an IPR fullerene every hexagon is adjacent to a
 minimum of three others and we can restrict the list to $(h_3, h_4, h_5, h_6)$. The pentagon arm indices $(n_i | i=0, \dots , 5)$ counts the number of arms
 of the pentagons. Here an edge $E$ incident to a vertex of a pentagon not belonging to the pentagon is called an arm if i) both end-vertices of edge $E$ 
-are incident to pentagons, and ii) $E$ shares two neighbor hexagons.\cite{Reti} It is clear that this is nothing else than a Stone-Wales pattern.\\
+are incident to pentagons, and ii) $E$ shares two neighbour hexagons.\cite{Reti} It is clear that this is nothing else than a Stone-Wales pattern.\\
 We can now define some useful topological invariants. The pentagon index $N_p$ is defined as
 \begin{equation}
   \label{pentindex}
@@ -498,14 +498,14 @@ a cubic planar graph $G_{0}$ and take its dual (faces become vertices and
 vertices become faces), $D_{t}(G_{0})$. This transforms the graph $G_{0}$
 with $n_v$ vertices into a triangulation, i.e. a geodesic sphere with $n_v$ triangles; (\textit{ii})
 Each triangle $T_{k}$ ($k=1, \dots, n_{v}$) of the geodesic sphere is
-subdivided into another set of faces $t_i$ using the Coxeter indices ($k,l$).
+tiled into another set of faces $t_i$ using the Coxeter indices ($k,l$).
 If the obtained new smaller faces $t_i$ are not
-triangles themselves within one $T_k$, when neighboring $T_k$s are glued
+triangles themselves within one $T_k$, when neighbouring $T_k$s are glued
 together with other non-triangle faces, new triangles are formed and we end up with a new triangulation,
 i.e. a larger geodesic sphere $GC_{k,l}D_{t}(G_{0})$;
 (\textit{iii}) Finally we take the dual which yields a new fullerene,
 \begin{equation}
- 	G_1 = GC_{k,l}[G_0] = D_t GC_{k,l} D_t(G_0)
+ 	G_1 = GC_{k,l}[G_0] = D_t[GC_{k,l} D_t(G_0)]
 	\label{eq:GC}
 \end{equation}
 
@@ -526,9 +526,10 @@ Hamiltonian cycles and subsequently (if required) the IUPAC name of the fulleren
 to the starting point. The number of distinct (non-isomorphic) Hamiltonian cycles has carefully been checked 
 against a second algorithm developed by us for various fullerenes. Left-right cycles and cyclic vertex permutations count as the 
 same cycle as they are isomorphic to each other. Although finding all Hamiltonian cycles is an NP-complete problem, the algorithm works fine up to about \C{100}. 
-After that it becomes computationally very demanding. Therefore, for the larger fullerenes the program prints upper and lower limits instead. The existence of Hamiltonian cycles for fullerenes is only conjectured at this stage, and only for layered fullerenes 
-(e.g. fullerene with onion-shaped 2D graphs such as nanotubes) existence has been proven. Our recent calculations verified that
-Hamiltonian cycles exist for all fullerene isomers up to \C{122} and for all IPR isomers up to \C{170} \cite{PSAJDB}.
+After that it becomes computationally very demanding as the algorithm scales like $O(2^{n_v})$. Therefore, for the larger fullerenes the program prints 
+tight upper and lower limits for the number of Hamiltonian cycles instead. The existence of Hamiltonian cycles for fullerenes is only conjectured at this 
+stage, and only for layered fullerenes (e.g. fullerene with onion-shaped 2D graphs such as nanotubes) existence has been proven. Our recent calculations verified that
+Hamiltonian cycles exist for all fullerene isomers up to \C{102} and for all IPR isomers up to \C{122} \cite{PSAJDB}.
 
 %Force-field optimization
 \subsection{Force-field optimization}
@@ -593,7 +594,7 @@ optional Coulomb force defined in eq.(\ref{eq:Ewu}).
 Subroutine \funname{Ring} identifies all pentagons and hexagons (faces) and checks if Euler's theorem is fulfilled.
 Subroutine \funname{RingC} then determines the center for each pentagon and hexagon later used for the trigonal pyramidal tessellation to obtain
 the fullerene volume and surface. This routine also analyzes all 2- and 3-ring fusions and many other useful patterns needed for example
-in Stone-Wales transformations or vertex insertions. It further determines the Rhagavachari-Fowler-Manolopoulos neighboring pentagon 
+in Stone-Wales transformations or vertex insertions. It further determines the Rhagavachari-Fowler-Manolopoulos neighbouring pentagon 
 and hexagon indices as described in detail in Fowler and Manolopoulos' book \cite{Atlas}.
 From the hexagon indices one derives if the fullerene is IPR or not. If it is IPR, Cioslowski's scheme is used to calculate the 
 heat of formation \cite{Cioslowski2000}. For all fullerenes, Martin's scheme is used to calculate the heat of formation \cite{Alcami}.
