@@ -25,7 +25,8 @@ C mapping
       CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
 c      integer ke, isw, iyf, ibf
-      type(c_ptr) :: g, halma, new_C20, halma_fullerene
+      type(c_ptr) :: g, halma, new_C20, halma_fullerene, windup_general
+      logical*1 general
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
 C If nalgorithm=2 use Goldberg-Coxeter and matrix eigenvector algorithm
@@ -40,207 +41,211 @@ C If nalgorithm=4 use connectivity input
 
 C Ring spiral first:
 C Read pentagon list and produce adjacency matrix
-  99  if(nalgorithm.le.1) then
-      if(isonum.eq.0) then
-        if(iprev.eq.0.and.jumpGC.eq.0) Read(IN,*) (JP(I),I=1,12)
-      else
+  99  if(nalgorithm.eq.0 .or. nalgorithm.eq.1) then
+        if(isonum.eq.0) then
+          if(iprev.eq.0.and.jumpGC.eq.0) Read(IN,*) (JP(I),I=1,12)
+        else
 C Read from database
-        Call Isomerget(Iout,Isonum,IPRC,JP)
-      endif
-C     Produce the Spiral S using the program WINDUP and UNWIND
-      do I=1,MMAX
-      do J=1,MMAX
-       D(I,J)=0
-      enddo
-      enddo
-      Do I=1,6
-       NMR(I)=0
-      enddo
-      Do I=1,M
-       S(I)=6
-      enddo
-C     Search where the 5-rings are in the spiral
-      Do I=1,12
-       S(JP(I))=5
-      enddo
-      IPRS=0
-      IER=0
-      CALL Windup(M,IPRS,IER,S,D)              ! Wind up spiral into dual
-      IF(IER.gt.0) then
-      WRITE(Iout,1000) IER
-      endif
-      IT=1
-      Do I=1,12
-      Spiral(I,1)=JP(I)
-      enddo
-      CALL Unwind(M,IER,IT,ispiral,
-     1 Spiral,S,D,NMR,Group)                       ! Unwind dual into spirals
-      K=0
-      DO J=1,6
-       IF(NMR(J).EQ.0) GO TO 3
-       K=J
-      enddo
-  3   If(K.le.0) then
-        WRITE(Iout,1020)
-     1    M,number_vertices,GROUP,(JP(I),I=1,12)
-      else
-        WRITE(Iout,1001)
-     1    M,number_vertices,GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
-      endif
-      if(ispiral.ge.2) then
-       if(ispiral.eq.2) then
-       WRITE(Iout,1023)
-       Do II=1,12
-       JP(II)=spiral(II,2)
-       enddo 
-       else
-       WRITE(Iout,1019) ispiral-1
-       endif
-      Do JJ=2,ispiral 
-      WRITE(Iout,1021) (spiral(II,JJ),II=1,12)
-      enddo
-      else
-      WRITE(Iout,1022)
-      endif
-      if(ispiral.gt.2) then
-      CALL CanSpiral(ispiral,spiral,JP)
-      WRITE(Iout,1023)
-      WRITE(Iout,1021) (JP(I),I=1,12)
-      endif
-      Do I=1,M
-      S(I)=6
-      enddo
-      Do I=1,12
-      S(JP(I))=5
-      enddo
-      WRITE(Iout,1024)
-      WRITE(Iout,1025) (S(I),I=1,M)
+          Call Isomerget(Iout,Isonum,IPRC,JP)
+        endif
+C       Produce the Spiral S using the program WINDUP and UNWIND
+c       init dual
+        do I=1,MMAX
+          do J=1,MMAX
+            D(I,J)=0
+          enddo
+        enddo
+        Do I=1,6
+          NMR(I)=0
+        enddo
+c       init spiral
+        Do I=1,M
+          S(I)=6
+        enddo
+C       Search where the 5-rings are in the spiral
+        Do I=1,12
+          S(JP(I))=5
+        enddo
+        IPRS=0
+        IER=0
+        CALL Windup(M,IPRS,IER,S,D)              ! Wind up spiral into dual
+        IF(IER.gt.0) then
+          WRITE(Iout,1000) IER
+          general = .true.
+          g = windup_general(m, jp, ier, iprs, general)
+c         get the adjcaency matrix
+          call adjacency_matrix(g,Nmax,IDA)
+          call delete_fullerene_graph(g)
+          go to 666 ! evil number for evil code
+        endif
+        IT=1
+        Do I=1,12
+          Spiral(I,1)=JP(I)
+        enddo
+        CALL Unwind(M,IER,IT,ispiral,
+     1   Spiral,S,D,NMR,Group)                       ! Unwind dual into spirals
+        K=0
+        DO J=1,6
+          IF(NMR(J).EQ.0) GO TO 3
+          K=J
+        enddo
+  3     If(K.le.0) then
+          WRITE(Iout,1020)
+     1      M,number_vertices,GROUP,(JP(I),I=1,12)
+        else
+          WRITE(Iout,1001)
+     1      M,number_vertices,GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
+        endif
+        if(ispiral.ge.2) then
+          if(ispiral.eq.2) then
+            WRITE(Iout,1023)
+            Do II=1,12
+              JP(II)=spiral(II,2)
+            enddo 
+          else
+            WRITE(Iout,1019) ispiral-1
+          endif
+          Do JJ=2,ispiral 
+            WRITE(Iout,1021) (spiral(II,JJ),II=1,12)
+          enddo
+        else
+          WRITE(Iout,1022)
+        endif
+        if(ispiral.gt.2) then
+          CALL CanSpiral(ispiral,spiral,JP)
+          WRITE(Iout,1023)
+          WRITE(Iout,1021) (JP(I),I=1,12)
+        endif
+        Do I=1,M
+          S(I)=6
+        enddo
+        Do I=1,12
+          S(JP(I))=5
+        enddo
+        WRITE(Iout,1024)
+        WRITE(Iout,1025) (S(I),I=1,M)
+C Now produce the adjaceny matrix from the dual matrix
+        CALL DUAL(D,MMAX,IDA,IER)
+        IF(IER.ne.0) then
+          WRITE(Iout,1002) IER
+          stop
+        endif
+      endif ! ring spiral
 C End of Spiral Program, dual matrix in D(i,j)
 
-C Now produce the adjaceny matrix from the dual matrix
-      CALL DUAL(D,MMAX,IDA,IER)
-      IF(IER.ne.0) then
-      WRITE(Iout,1002) IER
-      stop
-      endif
-
-C End ring spiral
-      endif
 
 C Start Goldberg-Coxeter
-      if(nalgorithm.gt.1.and.nalgorithm.lt.4) then
-      itGC=kGC*(kGC+lGC) +lGC*lGC
-       igcfullerne=itGC*20
-       if(igcfullerne.gt.NMax) then
-        Write(Iout,*) ' N =',igcfullerne,' > Nmax =',NMax,' ==> STOP'
-        stop
-       endif
-      Write(Iout,1040) kGC,lGC,kGC,lGC,itGC
-      if(lGC .ne. 0) then
-        Call GetPentIndex(number_vertices,M,Iout,kGC,lGC,JP)
-        nalgorithm=nalgorithm-2
-        jumpGC=1
-        Go to 99
-      endif
-      g = new_C20();
-      halma = halma_fullerene(g,kGC-1)
-      isafullerene = graph_is_a_fullerene(halma)
-      ihalma=1
-      IF (isafullerene .eq. 1) then
-        write (iout,1043) 
-      else
-        write (iout,1044)
-        stop
-      endif
-C Update fortran structures
-      number_vertices  = NVertices(halma)
-      Medges = NEdges(halma)
+      if(nalgorithm.eq.2.or.nalgorithm.eq.3) then
+        itGC=kGC*(kGC+lGC) +lGC*lGC
+        igcfullerne=itGC*20
+        if(igcfullerne.gt.NMax) then
+          Write(Iout,*) ' N =',igcfullerne,' > Nmax =',NMax,' ==> STOP'
+          stop
+        endif
+        Write(Iout,1040) kGC,lGC,kGC,lGC,itGC
+        if(lGC .ne. 0) then
+          Call GetPentIndex(number_vertices,M,Iout,kGC,lGC,JP)
+          nalgorithm=nalgorithm-2
+          jumpGC=1
+          Go to 99
+        endif
+        g = new_C20();
+        halma = halma_fullerene(g,kGC-1)
+        isafullerene = graph_is_a_fullerene(halma)
+        ihalma=1
+        IF (isafullerene .eq. 1) then
+          write (iout,1043) 
+        else
+          write (iout,1044)
+          stop
+        endif
+C       Update fortran structures
+        number_vertices  = NVertices(halma)
+        Medges = NEdges(halma)
         write(Iout,1042)  number_vertices,Medges
-      call adjacency_matrix(halma,NMax,IDA)
-C End Goldberg-Coxeter
-      endif
+        call adjacency_matrix(halma,NMax,IDA)
+      endif ! Goldberg-Coxeter
 
 C Input connectivities and construct adjacency matrix
       if(nalgorithm.eq.4 .or. nalgorithm.eq.5) then
-       Call ConnectivityInput(Iout,In,Isonum,IDA,filename)
+        Call ConnectivityInput(Iout,In,Isonum,IDA,filename)
       endif
       
+
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
-      Do I=1,number_vertices
-      Do J=1,number_vertices
-       A(I,J)=dfloat(IDA(I,J))
-      enddo
+ 666  Do I=1,number_vertices
+        Do J=1,number_vertices
+          A(I,J)=dfloat(IDA(I,J))
+        enddo
       enddo
       nsum=0
       Do I=1,number_vertices
-      isum=0
-      Do J=1,number_vertices
-      isum=isum+IDA(I,J)
-      enddo
-      If(isum.ne.3) nsum=nsum+1
+        isum=0
+        Do J=1,number_vertices
+          isum=isum+IDA(I,J)
+        enddo
+        If(isum.ne.3) nsum=nsum+1
       enddo
       if(nsum.ne.0) then
-      WRITE(Iout,1037) nsum,isum
-      stop
+        WRITE(Iout,1037) nsum,isum
+        stop
       else
-      WRITE(Iout,1038)
+        WRITE(Iout,1038)
       endif
+
 
 C Produce Hueckel matrix and diagonalize
       if(nohueckel.eq.0.or.nalgorithm.eq.0.
      1 or.nalgorithm.eq.2.or.nalgorithm.eq.4) then
-C     Diagonalize
-      call tred2(A,number_vertices,NMax,evec,df)
-      call tqli(evec,df,number_vertices,NMax,A)
-      Write(Iout,1004) number_vertices,number_vertices
-C     Sort eigenvalues evec(i) and eigenvectors A(*,i)
-      Do I=1,number_vertices
-      e0=evec(I)
-      jmax=I
-      Do J=I+1,number_vertices
-      e1=evec(J)
-      if(e1.gt.e0) then 
-      jmax=j
-      e0=e1
-      endif
-      enddo
-      if(i.ne.jmax) then
-      ex=evec(jmax)
-      evec(jmax)=evec(I)
-      evec(I)=ex
-      Do k=1,number_vertices
-      df(k)=A(k,jmax)
-      A(k,jmax)=A(k,I)
-      A(k,I)=df(k)
-      enddo
-      endif
-      enddo
-
-C Analyze eigenenergies
-      Call HueckelAnalyze(Iout,iocc,df,evec)
-C     End of Hueckel
-      endif
+C       Diagonalize
+        call tred2(A,number_vertices,NMax,evec,df)
+        call tqli(evec,df,number_vertices,NMax,A)
+        Write(Iout,1004) number_vertices,number_vertices
+C       Sort eigenvalues evec(i) and eigenvectors A(*,i)
+        Do I=1,number_vertices
+          e0=evec(I)
+          jmax=I
+          Do J=I+1,number_vertices
+            e1=evec(J)
+            if(e1.gt.e0) then 
+              jmax=j
+              e0=e1
+            endif
+          enddo
+          if(i.ne.jmax) then
+            ex=evec(jmax)
+            evec(jmax)=evec(I)
+            evec(I)=ex
+            Do k=1,number_vertices
+              df(k)=A(k,jmax)
+              A(k,jmax)=A(k,I)
+              A(k,I)=df(k)
+            enddo
+          endif
+        enddo
+C       Analyze eigenenergies
+        Call HueckelAnalyze(Iout,iocc,df,evec)
+      endif ! hueckel
 
 
 c      if(ke + isw + iyf + ibf .eq. 0) then
 C Now produce the 3D image (unless the graph is going to change later)
-        if(nalgorithm.eq.0.or.nalgorithm.eq.2.
-     1   or.nalgorithm.eq.4) then
-          call AME(Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,
-     1     CDist)
-        endif
+      if(nalgorithm.eq.0.or.nalgorithm.eq.2.or.nalgorithm.eq.4) then
+        call AME(Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,CDist)
+      endif
+
   
-        if(nalgorithm.eq.1.or.nalgorithm.eq.3.
-     1   or.nalgorithm.eq.5) then
-          call Tutte(Iout,nohueckel,IDA,
-     1     A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
-        endif
+      if(nalgorithm.eq.1.or.nalgorithm.eq.3.or.nalgorithm.eq.5) then
+        call Tutte(Iout,nohueckel,IDA,
+     1   A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
+      endif
 c      endif
 
-
- 1000 FORMAT(/1X,'Cannot produce dual matrix, error IER= ',I2,
-     1 ' Check your input for pentagon locations')
+c 1000 FORMAT(/1X,'Cannot produce dual matrix, error IER= ',I2,
+c     1 ' Check your input for pentagon locations')
+ 1000 FORMAT(/1X,'No simple spiral found (IER = ',
+     1 I2,') ... searching for a general spiral.)')
  1001 FORMAT(/1X,'Program to create cartesian coordinates through ',
      1 'pentagon index list producing the dual matrix and finally '
      1 'the Hueckel matrix',/1X,'Number of faces: ',I5,
@@ -637,7 +642,6 @@ c       create graph object
 
 c       get the adjcaency matrix
         call adjacency_matrix(graph,Nmax,A)
-
         call delete_fullerene_graph(graph)
  
       endif

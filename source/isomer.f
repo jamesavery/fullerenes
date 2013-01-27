@@ -1,4 +1,5 @@
-      SUBROUTINE Isomers(IPR,isearch,IN,IOUT,iham,ichk,IDA,A,filename)
+      SUBROUTINE Isomers(IPR,isearch,IN,IOUT,iham,isomerl,isomerh,
+     1 ichk,IDA,A,filename)
 C Information on number of isomers with or without fulfilling the
 C the IPR rule. The routine also calls SPIRAL using the subroutines
 C written by P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes"
@@ -194,7 +195,7 @@ C Check if database can be taken instead
         Go to 99
       else
         Write(Iout,1011) databasefile
-       call Printdatabase(Iout,iham,databasefile)
+       call Printdatabase(Iout,iham,isomerl,isomerh,databasefile)
       endif
       return
       endif
@@ -240,7 +241,7 @@ C Produce list from ring spiral algorithm
       Return
       END
  
-      SUBROUTINE Printdatabase(Iout,iham,databasefile)
+      SUBROUTINE Printdatabase(Iout,iham,isomerl,isomerh,databasefile)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Character*50 databasefile
@@ -250,6 +251,8 @@ C Produce list from ring spiral algorithm
       Integer RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
       Integer D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
 
+      if(isomerl.ne.1) Write(Iout,1011) isomerl
+      if(isomerh.ne.Nisoloop) Write(Iout,1012) isomerh
       nbatch=0
       maxiter=1000000000
       Open(UNIT=4,FILE=databasefile,STATUS='old',ACTION='Read',
@@ -305,6 +308,8 @@ Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
           Read(4,1004,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
      2     ncycHam,(INMR(I),I=1,6)
+          if(J.ge.isomerl) then
+          if(J.gt.isomerh) go to 99
           if(RSPI(1).ne.1) no5ringstart=no5ringstart+1
           PNI(5)=12-PNI(0)-PNI(1)-PNI(2)-PNI(3)-PNI(4)
           IFus5G=IPentInd(PNI)
@@ -322,40 +327,41 @@ Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
           WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
      1     IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
      2     Occup,ncycHam,(INMR(I),I=1,nmrloop)
-         if(IFus5G.le.IFus5Glow) then
-          IFus5Glow=IFus5G
-          IFusL=J
-         endif
-         if(IFus5G.ge.IFus5Ghigh) then
-          IFus5Ghigh=IFus5G
-          IFusH=J
-         endif
-         if(sigmah.le.sigmahlow) then
-          sigmahlow=sigmah
-          ISigmaL=J
-         endif
-         if(sigmah.ge.sigmahhigh) then
-          sigmahhigh=sigmah
-          ISigmaH=J
-         endif
-         if(ncycham.le.hamlow) then
-          hamlow=ncycham
-          islow=J
-         endif
-         if(ncycham.ge.hamhigh) then
-          hamhigh=ncycham
-          ishigh=J
-         endif
-         if((number_vertices.eq.60.or.number_vertices.ge.70).
-     1    and.IFus5G.eq.0) then
-          if(ncycham.le.hamlowIPR) then
-           hamlowIPR=ncycham
-           islowIPR=J
+          if(IFus5G.le.IFus5Glow) then
+           IFus5Glow=IFus5G
+           IFusL=J
           endif
-          if(ncycham.ge.hamhighIPR) then
-           hamhighIPR=ncycham
-           ishighIPR=J
+          if(IFus5G.ge.IFus5Ghigh) then
+           IFus5Ghigh=IFus5G
+           IFusH=J
           endif
+          if(sigmah.le.sigmahlow) then
+           sigmahlow=sigmah
+           ISigmaL=J
+          endif
+          if(sigmah.ge.sigmahhigh) then
+           sigmahhigh=sigmah
+           ISigmaH=J
+          endif
+          if(ncycham.le.hamlow) then
+           hamlow=ncycham
+           islow=J
+          endif
+          if(ncycham.ge.hamhigh) then
+           hamhigh=ncycham
+           ishigh=J
+          endif
+          if((number_vertices.eq.60.or.number_vertices.ge.70).
+     1     and.IFus5G.eq.0) then
+           if(ncycham.le.hamlowIPR) then
+            hamlowIPR=ncycham
+            islowIPR=J
+           endif
+           if(ncycham.ge.hamhighIPR) then
+            hamhighIPR=ncycham
+            ishighIPR=J
+           endif
+         endif
          endif
 
          else
@@ -363,6 +369,8 @@ Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
           Read(4,1007,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
      2    (INMR(I),I=1,6)
+          if(J.ge.isomerl) then
+          if(J.gt.isomerh) go to 99
           if(RSPI(1).ne.1) no5ringstart=no5ringstart+1
           PNI(5)=12-PNI(0)-PNI(1)-PNI(2)-PNI(3)-PNI(4)
           IFus5G=IPentInd(PNI)
@@ -434,6 +442,7 @@ C  Now do Hamiltonian cycles
            ISigmaH=J
           endif
          endif
+         endif
 
         else
          if(IH.eq.1) then
@@ -441,6 +450,8 @@ Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
           Read(4,1008,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,ncycHam,
      2     (INMR(I),I=1,6)
+          if(J.ge.isomerl) then
+          if(J.gt.isomerh) go to 99
           HNI(6)=number_vertices/2-10-HNI(3)-HNI(4)-HNI(5)
           sigmah=HexInd(HNI,ihk)
           if(2*NedegHOMO.eq.NeHOMO) then
@@ -470,12 +481,15 @@ Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
            hamhigh=ncycham
            ishigh=J
           endif
+          endif
 
          else
 Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
           Read(4,1009,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,(INMR(I),I=1,6)
           HNI(6)=number_vertices/2-10-HNI(3)-HNI(4)-HNI(5)
+          if(J.ge.isomerl) then
+          if(J.gt.isomerh) go to 99
           sigmah=HexInd(HNI,ihk)
           if(2*NedegHOMO.eq.NeHOMO) then
            Occup='closed'
@@ -533,9 +547,11 @@ C   Get dual and then adjacency matrix
            ISigmaH=J
           endif
          endif
+         endif
 
         endif
        enddo
+
 C Final statistics
   99  if(IP.eq.0) then
         WRITE(Iout,611) IFus5Glow,IFusL,IFus5Ghigh,IFusH,
@@ -568,6 +584,8 @@ C Final statistics
  1009 Format(A3,12I3,3I2,I2,I1,F7.5,6I3)
  1010 FORMAT(/1X,'Cannot produce dual matrix, error IER= ',I2,
      1 ' Error in Database ==> Return')
+ 1011 FORMAT(1X,'Start at isomer ',I10)
+ 1012 FORMAT(1X,'End   at isomer ',I10)
  601  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
