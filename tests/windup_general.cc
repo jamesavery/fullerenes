@@ -15,8 +15,9 @@ int main(int ac, char **av)
   int pentagon_indices[] = {1, 2, 3, 137, 138, 147, 148, 157, 158, 166, 173, 180};
   bool ipr=false;
   bool general=true;
+  int ier=0;
 
-  FullereneGraph fg(n, pentagon_indices, ipr, general);
+  FullereneGraph fg(n, pentagon_indices, ier, ipr, general);
 
   cout << "fg = " << fg << endl;
 
