@@ -9,7 +9,8 @@ extern "C" {
   // Graph construction and destruction
   fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *N, const int *adjacency);
   fullerene_graph_ptr read_fullerene_graph_(const char *f_path);
-  fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *f_path);
+  fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const char *f_path);
+  fullerene_graph_ptr windup_general_(const unsigned int *n, const int indices[12], int *ier, bool *ipr, bool *general);
   void delete_fullerene_graph_(fullerene_graph_ptr*);
 
   polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points);
@@ -142,7 +143,7 @@ fullerene_graph_ptr read_fullerene_graph_(const char *f_path){
   return g;
 }
 
-fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *f_path){
+fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const char *f_path){
   fullerene_graph_ptr g;
 
 // strip the whitespace (fortran passes an array of 50 characters)
@@ -159,6 +160,18 @@ fullerene_graph_ptr read_fullerene_graph_hog_(unsigned int *index, const char *f
   fclose(f);
   return g;
 }
+
+fullerene_graph_ptr windup_general_(const unsigned int *n, const int spiral_indices_array[12], int *ier, bool *ipr, bool *general){
+  
+  std::vector<int> spiral_indices(12);
+  for(int i=0; i<12; ++i){
+    spiral_indices[i] = spiral_indices_array[i];
+  }
+
+  fullerene_graph_ptr g = new FullereneGraph(*n, spiral_indices, *ier, *ipr, *general);
+  return g;
+}
+
 
 void delete_fullerene_graph_(fullerene_graph_ptr *g){  delete (*g); }
 
