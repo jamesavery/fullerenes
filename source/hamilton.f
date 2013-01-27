@@ -117,7 +117,7 @@ c Start algorithm
     5 path(l+1)=next
       if (l.eq.number_vertices-1) then
       nhamilton=nhamilton+1
-      if(nhamilton.gt.maxiter) then
+      if(nhamilton.ge.maxiter) then
        if(maxiter.lt.1000000000) then
         nbatch=nbatch+1
         Write(Iout,1000) nbatch,nhamilton
