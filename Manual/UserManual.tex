@@ -215,8 +215,8 @@ You need to use the \filename{Makefile} included in the \filename{fullerene.zip}
 
 In the Makefile several compile flags are set.  Per default, the machine dependent flag \verb|-m64| is set (if you are
 using a 32-bit environment you will need to change this to \verb|-m32|).  The optimization level is set to \verb|-O3|.  
-If you require an atom count above 6800 (the upper limit can be set in \filename{source/config.f}) there will be arrays which are larger
-than 2\,GB.  Per default most compilers don't support this.  If your machine has enough memory, your gfortran is sufficiently new
+If you require an atom count above 5000 (the upper limit can be set in \filename{source/config.f}, see entry \paramname{Nmax=5000})
+there will be arrays which are larger than 2\,GB.  Per default most compilers don't support this.  If your machine has enough memory, your gfortran is sufficiently new
 (4.4.3, 4.4.4  and 4.6 on 64-bit Linux work, ) you can set \verb|-mcmodel| to \verb|medium| to switch to the medium code model in
 which objects are permitted to be larger than 2\,GB.  All binary objects must be compiled with the same options; delete all
 binaries before you recompile using a different code model. 
@@ -1115,8 +1115,9 @@ Option for calculating Hamiltonian cycles and IUPAC numbers.
 
 %---Isomers---
 \subsection{\&Isomers line}
- Option for producing list of isomers and properties.
-\paragraph{List of options:}\ \paramname{IPR}, \paramname{isearch}, \paramname{IPH}, \paramname{IStop}, \paramname{IChk} (Default 0 for all options).\\
+ Option for producing list of isomers and properties. If available, data are taken from database.
+\paragraph{List of options:}\ \paramname{IPR}, \paramname{isearch}, \paramname{IPH}, \paramname{IStop}, \paramname{IChk} (Default 0 for all these options),
+\paramname{isomerl} (Default 1), \paramname{isomerh} (Default to very large value)\\
 \paragraph{Option description:}
 \begin{description}
 \item[IPR] 
@@ -1130,11 +1131,13 @@ If \paramname{isearch} = $m (m > 0)$ then an input of initial RSPIs is required,
 is taken (Default 0). The input is connected to the IPR input otherwise the default value of  \paramname{IPR} = 1 is chosen. This option searches for all
 possible isomers in the neighbourhood of $ \{ i_p - m, \dot ,i_p, \dot , i_p + m \} $. Note that \paramname{isearch} = 2 is relatively fast, larger values can soon
 become computer time expensive.\\
-If \paramname{IPH} = 1 then number of distinct Hamiltonian cycles is calculated for every isomer (this is computer time extensive).\\
+If \paramname{IPH} = 1 then number of distinct Hamiltonian cycles is calculated for every isomer (this is computer time extensive). Note that if this parameter is set but the database does not contain the number of Hamiltonian cycles, it will start to produce them, which is very computer time consuming.\\
 If \paramname{istop} = 1 program stops after calling this routine.\\
 If \paramname{IChk} = 1  Restart: Isomer list is continued from previous output file called 'checkpoint' as default if not otherwise give in \paramname{filename.chkpnt}.
 This is a restart option from a previous run which terminated. The new output file does not contain the previous one.
-The resulting output is a catalogue of the isomers found containing their idealized point groups, canonical spirals, and NMR patterns
+The resulting output is a catalogue of the isomers found containing their idealized point groups, canonical spirals, and NMR patterns.
+If \paramname{isomerl} = $m$, them start printing from isomer list in database from isomer $m$.
+If \paramname{isomerh} = $k$, them end printing from isomer list in database at isomer $k$. 
 \cite{Atlas}.
 \end{description}
 
@@ -1226,14 +1229,15 @@ We are currently working on this problem.
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{102} and for IPR isomers up to
 \C{122} including the number of Hamiltonian cycles, and without Hamiltonian cycles
-up to \C{140} for general and up to \C{180} for IPR isomers. The database should be copied into
+up to \C{140} for general and up to \C{184} for IPR isomers. The database should be copied into
 the main program folder and can be used to read the ring-spiral pentagon indices.
+The files are compressed (gzip) so you need to uncompress them (gunzip) before usage.
 The numbering scheme is in canonical order and identical to the one introduced in the book by Fowler 
 and Manolopoulos \cite{Atlas}, that is each isomer in the book's appendix can be 
-constructed easily from our database. Example is given in input files  \filename{DBc40.inp},
+constructed easily from our database. Examples are given in input files  \filename{DBc40.inp},
 \filename{DBc66.inp} and \filename{DBc158.inp}.  The data files are formatted and can easily be read
 by the program (\filename{ISOMERc80.inp}). It is our 
-intention to extend the isomer list beyond \C{140}/\C{180} (without Hamiltonian cycles) using the ``House of Graphs'' database. 
+intention to extend the isomer list beyond \C{140}/\C{184} (without Hamiltonian cycles) using the ``House of Graphs'' database. 
 New lists will be available on our website in due time.  The determination of the number of
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
 computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
