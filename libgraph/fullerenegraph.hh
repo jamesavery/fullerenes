@@ -9,8 +9,8 @@ public:
   FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
   FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
-  FullereneGraph(unsigned int *index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
-  FullereneGraph(const int N, const int spiral_indices_array[12], bool IPR, bool general=false); 
+  FullereneGraph(const unsigned int *index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
+  FullereneGraph(const unsigned int N, const std::vector<int> spiral_indices, int ier, bool IPR, bool general=false); 
 
   void fullerene_check() const
   {
