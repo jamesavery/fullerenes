@@ -50,7 +50,7 @@ CubicGraph::CubicGraph(FILE *file = stdin){
     update_from_neighbours();
   }
 
-CubicGraph::CubicGraph(unsigned int *index, FILE* file){
+CubicGraph::CubicGraph(const unsigned int *index, FILE* file){
   const int header_size = 15;	
 	
   // Get file size
