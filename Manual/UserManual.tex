@@ -76,12 +76,11 @@ For any questions concerning this program please feel free to contact us.
 We are always open to improvements and suggestions.
 
 \subsubsection*{Please cite the following papers if you use this program for publishing data:}
-1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{Fullerene -- A Software Package for Constructing and Analyzing 
-Structures of Regular Fullerenes}, submitted to J. Comput. Chem., 2013); Version 4.4.\\
+1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{Program \program{Fullerene} -- A Software Package for 
+Constructing and Analyzing Structures of Regular Fullerenes}, submitted to J. Comput. Chem., 2013); Version 4.4.\\
 2) P. W. Fowler and D. E. Manolopoulos, \textit{An Atlas of Fullerenes}
-(Dover Publ., New York, 2006). This book is highly recommended. 
-It helps understanding how this program functions.  Many of the concepts used 
-can be found in this book. \\
+(Dover Publ., New York, 2006). This book is highly recommended. It helps understanding how this program functions.
+Many of the concepts used can be found in this book. \\
 3) D. Babi\'c, \textit{Nomenclature and Coding of Fullerenes}, J. Chem. Inf. Comput. Sci. \textbf{35}, 515-526 (1995).
 
 \subsubsection*{Further suggested reading:}
@@ -126,12 +125,13 @@ We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful
 \section{Introduction}
 \textit{Program Fullerene} is a general purpose program that creates the adjacency matrix for any fullerene isomer, 
 performs a topological/graph theoretical analysis, and creates a reasonably accurate 3D structure (cartesian or internal
-coordinates) through various different methods and algorithms. The results can be used for plotting 2D fullerene graphs (Schlegel diagrams) 
-and 3D structures, and serves as a good starting point for further quantum theoretical treatment. The program is 
-written in standard FORTRAN and C++ and is easily implemented within a Linux/\acr{UNIX} environment.
-Although there are several other computer programs already available to deal with fullerene graphs 
-like \program{CaGe} \cite{Brinkmanx}, \program{FULLGEN} \cite{Brinkmann}, \program{BUCKYGEN} \cite{Goedgebeur,Goedgebeur1}, FuiGui \cite{FuiGui} 
-or VEGA \cite{Pisanski}, we felt that there is a need to write a general purpose program which does what other programs do and (of course) a lot more.
+coordinates) through various different methods and algorithms. The results can be used for plotting 2D fullerene graphs 
+(e.g., Schlegel diagrams) and 3D structures, and serves as a good starting point for further quantum theoretical treatment.
+The program is written in standard FORTRAN and C++ and is easily implemented within a Linux/\acr{UNIX} environment.
+Although there are several other computer programs already available to deal with fullerene graphs like 
+\program{CaGe}(\program{plantri},\cite{Brinkmann05} \program{fullgen},\cite{Brinkmann} \program{Buckygen}\cite{Goedgebeur,Goedgebeur1}),\cite{Brinkmanx}
+\program{Vega},\cite{Pisanski}, \program{FuiGui},\cite{FuiGui}  or the routines introduced in the book by Fowler and Manolopoulos,\cite{Atlas}
+we felt that there is a need to write a general purpose program which does what other programs do and (of course) a lot more.
 The first version (1.0) was written in Fortran for calculating the surface area and volume of a fullerene and corresponding changes due to endohedral 
 incorporation of rare gas atoms \cite{Tonner}. A much improved version 2.0 allowed for the creation of fullerene structures using
 the ring-spiral algorithm introduced in the book by Fowler and Manolopoulos \cite{Atlas}, and version 3.0 was already dealing with
@@ -146,7 +146,7 @@ from the canonical ring spiral pentagon indices (RSPI) through either a 3D Tutte
 eigenvector (AME) method \cite{Atlas}. One can also construct the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene or a halma fullerene 
 $GC_{k,0}[C_{n_v}]$ as special cases of the more general Goldberg-Coxeter transformation $GC_{k,l}$ with $k \geq l$, which is implemented
 only for \C{20}, i.e. $GC_{k,l}[C_{20}]$). Starting from a given fullerene structure one can 
-perform vertex insertions (such as Endo-Kroto \cite{Endo92}, Yoshida-Fowler \cite{Yoshida97} or Brinkmann-Fowler \cite{BrinkmannFowler03})
+perform vertex insertions (such as Endo-Kroto \cite{Endo92}, Yoshida-Fowler \cite{Yoshida97a} or Brinkmann-Fowler \cite{BrinkmannFowler03})
 or Stone-Wales transformations \cite{Stone86}. 
 Vertex insertions allow for the construction of non-spiral fullerenes such as \C{380} or \C{384}. 
 Geometry optimization using a Fletcher-Reeves-Polak-Ribiere
@@ -159,7 +159,7 @@ and the maximum inner sphere. The program further calculates the number of Hamil
 and produces ring spiral indices. Cioslowski's scheme for the calculation of the heat of formation for IPR
 (isolated pentagon rule) fullerenes is implemented \cite{Cioslowski2000}, as well as Babi{\'c}'s scheme for calculating the 
 total resonance energy of a general fullerene \cite{Babic1995,Babic1997}, and Martin's scheme for the heat of formation \cite{Alcami}.
-A variety of topological indicators, such as the Wiener index or Balaban index, are calculated.\cite{Wiener1947,Balaban}
+A variety of topological indicators, such as the Wiener index, Szeged index or Balaban index are calculated.\cite{Wiener1947,Balaban}
 
 This program works for any (distorted or not) regular fullerene. The spiral algorithm of Fowler and Manolopoulos used here \cite{Atlas}
 is not restricted to a pentagon start or to canonical indices. For a general list of fullerenes see ``The House of Graphs'' \cite{HouseofGraphs}. 
@@ -168,9 +168,8 @@ like CYLview \cite{CYLview}, Avogadro \cite{Avogadro}, Jmol \cite{JMol}, Pymol \
 it is important that the fullerene has a reasonable structure, obtained for example by a force field 
 optimization, otherwise bonds cannot be correctly identified using .xyz files. It may therefore not be advisable to use structures that come out directly from
 the AME or 3D-TE algorithm, or the .cc1 file should be used which contains information on vertex adjacencies. 
-We recommend CYLview, it is more robust and works for large fullerenes up to about 1000 atoms. 
-For larger fullerenes VMD or Pymol is recommended. The program produces fullerene 2D graphs in latex format, but can
-be used by any other program which is capable of producing 2D graphs, for example QMGA \cite{Gabriel2008}. 
+We recommend VMD \cite{vmd}, it is more robust and works even for the largest fullerenes beyond 1000 atoms. The program produces fullerene 2D graphs 
+in latex format, but can be used by any other program which is capable of producing 2D graphs, for example QMGA \cite{Gabriel2008}. 
 For this an external file is written out called \filename{Fullerene-2D.dat} containing all the information required for plotting a 2D graph.
 
 From version 4.0 onwards (released July 2012) C++ routines embedded into the original FORTRAN program incorporate
@@ -182,22 +181,25 @@ we have not yet optimized the force constants to match experimental or calculate
 4.4 introduced a search algorithm for neighborhood RSPIs, the Szeged index, pentagon arm indices as further topological descriptors,
 and new (conjectured) upper and lower bound for Hamiltonian cycles in fullerenes.
 The Tutte embedding algorithm has also been made much faster and the fullerene database has been transformed into a more compact and efficient version.
-This program is under permanent construction and has been tested extensively for bugs.
+Version 5 to be released late 2013 will separate the topological from the cartesian input part and uses sparse matrix handling for the
+largest fullerenes. This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bug please report it to one of us.
 
 There are many things on our to-do list. We try hard to release more functionality to this program in due time.
 Not implemented yet is: 
+
 \begin{itemize}
-\item The minimum covering ellipsoid useful for  rugby-ball shaped fullerenes (yes this is New Zealand and crazy about rugby), and close packing of ellipsoids; 
-\item The general Goldberg-Coxeter (GC$_{k,l}(n)$) construction for fullerenes other than \C{20};
-\item Construction of non-ring-spiral isomers using a generalized ring spiral algorithm; 
-\item Symmetrization of optimized coordinates to point group symmetry; 
-\item Symmetry labels for H\"uckel orbital energies and vibrational frequencies; 
-\item Extension to non-classical fullerenes of genus 0 (heptagons and squares); 
-\item Extension to non-regular fullerenes of genus 1 (hmmm, donuts!); 
-\item A restart option for subroutine Hamilton;
-\item Perfect matchings, Kekul\'e structures and Clar sextets;
-\item Plotting program (other than latex) for producing Schlegel diagrams and corresponding duals with a good graphical interface similar to the \program{CaGe} program \cite{Brinkmanx}.
+\item The minimum covering ellipsoid useful for rugby-ball shaped fullerenes, and close packing of ellipsoids;
+\item The Goldberg-Coxeter ($T^\mathrm{GC}_{k,l}$[\C{n}]) transformation for fullerenes other than \C{20};
+\item Construction of all (including non-ring-spiral) isomers using a generalized ring spiral algorithm;
+\item Symmetrization of optimized coordinates to point group symmetry (or a chosen lower symmetry) and symmetry labels for H\"uckel orbital energies and vibrational frequencies;
+\item Extension to non-classical fullerenes of genus~0 (heptagons and squares); 
+\item Extension to non-regular fullerenes of genus~1;
+\item A restart option for subroutine Hamilton as it is an $\#P$-hard problem and we like to test the limitations of the back-track algorithm used in program;  
+\item Kekul\'e structures (perfect matchings) and Clar sextets;
+\item General plotting program (other than latex) for producing Schlegel diagrams and corresponding duals with a good graphical interface similar to the \program{CaGe} program;\cite{Brinkmanx}
+\item Further extension of the fullerene database.
+\item Implementation of the Brinkmann-Goedgebeur fast-generation algorithm for fullerenes, which is more efficient than the original ring-spiral code of Fowler and Manolopoulos.
 \end{itemize}
 
 We are also open to any other suggestions and welcome additions to this program suite. In this case please feel free to contact us per email.
@@ -608,7 +610,7 @@ heat of formation \cite{Cioslowski2000}. For all fullerenes, Martin's scheme is 
 Information from subroutine \funname{RingC} can be used to perform Stone-Wales transformations \cite{Stone86}
 (subroutine \funname{StoneWalesTrans}), Endo-Kroto 2-vertex insertions \cite{Endo92} (subroutine \funname{EndoKrotoTrans}),
 Yoshida-Fowler 4-vertex ($D_{3h}$ 6555) (subroutine \funname{YoshidaFowler4}) and 6-vertex ($D_{3h}$ 666555)
-insertions (subroutine \funname{YoshidaFowler6}) \cite{Yoshida97}, or a Brinkmann-Fowler 6-vertex (6-55-55) insertion 
+insertions (subroutine \funname{YoshidaFowler6}) \cite{Yoshida97a}, or a Brinkmann-Fowler 6-vertex (6-55-55) insertion 
 (subroutine \funname{BrinkmannFowler}) \cite{BrinkmannFowler03}, see for example input files \textit{CCc50EK.inp, GEOMc60SW.inp, CCc80YF.inp}.
 The vertex-insertion nomenclature introduced by Brinkmann and Fowler \cite{BrinkmannFowler03} defines these insertions uniquely:\\
 Endo-Kroto: 2 pentagon G2.12.1.1 ($n_v$=12) $\rightarrow$ G2.12.1.2 ($n_v$=14);\\ 
@@ -625,7 +627,7 @@ initial fullerene structure was modified. It produces the canonical ring-spiral 
 if the fullerene contains a face spiral, and fails if it does not (as for the two examples shown in 
 Figure \ref{pic:C380andC384}). Note that considerable improvements were made to optimize the ring spiral search algorithm, and if 
 \paramname{ispsearch}=2 is chosen it counts all possible ring spirals (this is computationally more expensive). 
-The number of spirals in the output agree with the examples given by Yoshida and Fowler.\cite{Yoshida97} 
+The number of spirals in the output agree with the examples given by Yoshida and Fowler.\cite{Yoshida97a} 
 A more general ring-spiral algorithm is currently in preparation.
 
 %Volume and surface area, minimum covering sphere
@@ -986,10 +988,10 @@ pentagon ring numbers. Numbers are between 1 and 12. These can be obtained
 from a previous output in the section where ring connections are analyzed
 and Endo-Kroto patterns are printed. Input is equivalent to the Stone-Wales transformation described above.
 \item[IYF] 
-If \paramname{IYF} = 1 or 2 then a Yoshida-Fowler 4-vertex insertion \cite{Yoshida97} is performed (Default: 0). 
+If \paramname{IYF} = 1 or 2 then a Yoshida-Fowler 4-vertex insertion \cite{Yoshida97a} is performed (Default: 0). 
 In this case an input is required  with either hexagon numbers (\paramname{IYF}=1) or the position in
 the list of Yoshida-Fowler patterns given in the output (\paramname{IYF}=2).
-If \paramname{IYF} = 3 or 4 then a Yoshida-Fowler 6-vertex insertion \cite{Yoshida97} is performed (Default: 0). 
+If \paramname{IYF} = 3 or 4 then a Yoshida-Fowler 6-vertex insertion \cite{Yoshida97a} is performed (Default: 0). 
 In this case an input is required with the three hexagon numbers (\paramname{IYF}=3) or the position in
 the list of Yoshida-Fowler patterns given in the output (IYF=4).
 \item[IBF] 
@@ -1257,8 +1259,8 @@ Note that the maximum number of vertices in the database is defined in the confi
 %References
 \begin{thebibliography}{99}
 
-\bibitem{Brinkmanx} G. Brinkmann, O. D. Friedrichs, A. Dress, and T. Harmuth, ``CaGe -- a virtual environment for studying some special classes of large molecules'', \textit{Match-Commun. Math. Comput. Chem.} 233 (1997).
- 
+\bibitem{Brinkmann05} Brinkmann, G., McKay, B. D., Discrete Math., \textbf{2005}, 301, 147-163.
+
 \bibitem{Brinkmann} G. Brinkmann, ``Program Fullgen - a program for generating nonisomorphic fullerenes'', see http://cs.anu.edu.au/~bdm/plantri/.
  
 \bibitem{Goedgebeur} G. Brinkmann, J. Goedgebeur, and B. McKay, ``Program Buckygen - a program for the efficient generation of all nonisomorphic fullerenes'',
@@ -1266,21 +1268,24 @@ see http://caagt.ugent.be/buckygen/.
 
 \bibitem{Goedgebeur1} G. Brinkmann, J. Goedgebeur, and B. McKay, ``The Generation of Fullerenes'', \textit{J. Chem. Inf. Sci.} \textbf{52}, 2910-2918 (2012).
 
-\bibitem{FuiGui} W. Myrvold, B. Bultena, S. Daugherty, B. Debroni, S. Girn, M. Minchenko, J. Woodcock, and P.W. Fowler,
-``FuiGui: A Graphical User Interface for Investigating Conjectures about Fullerenes'', \textit{MATCH Commun. Math. Comput. Chem.} \textbf{58} 403-422 (2007).
+\bibitem{Brinkmanx} G. Brinkmann, O. D.Friedrichs, S. Lisken, A. Peeters, N. Van Cleemput, ``\program{CaGe} - a Virtual Environment for Studying Some Special 
+Classes of Plane Graphs - an Update'', Match Commun. Math. Comput. Chem. \textbf{2010}, 63, 533-552; see http://www.math.uni-bielefeld.de/$\sim$CaGe/.
 
 \bibitem{Pisanski} T. Pisanski, ``Program VEGA - A Mathematica based system for manipulating graphs'', see http://www.ijp.si/.
 
-\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, and P. Schwerdtfeger, ``Packed to the Rafters - Filling up C60 with Rare Gas Atoms'', 
-\textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
+\bibitem{FuiGui} W. Myrvold, B. Bultena, S. Daugherty, B. Debroni, S. Girn, M. Minchenko, J. Woodcock, and P.W. Fowler,
+``FuiGui: A Graphical User Interface for Investigating Conjectures about Fullerenes'', \textit{MATCH Commun. Math. Comput. Chem.} \textbf{58} 403-422 (2007).
 
 \bibitem{Atlas} P. W. Fowler and D. E. Manolopoulos, ``An Atlas of Fullerenes'' (Dover Publ., New York, 2006).
  
+\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, and P. Schwerdtfeger, ``Packed to the Rafters - Filling up C60 with Rare Gas Atoms'', 
+\textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
+
 \bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', \textit{Proc. London Math. Soc.} \textbf{13}, 743-767 (1963).
 
 \bibitem{Endo92} M. Endo and H.W. Kroto, ``Formation of carbon nanofibers'', \textit{J. Phys. Chem.} \textbf{96}, 6941-6944 (1992).
 
-\bibitem{Yoshida97} M. Yoshida and P. Fowler, ``Systematic relationships between fullerenes without spirals'', \textit{Chem. Phys. Lett.} \textbf{278}, 256-261(1997).
+\bibitem{Yoshida97a} M. Yoshida and P. Fowler, ``Systematic relationships between fullerenes without spirals'', \textit{Chem. Phys. Lett.} \textbf{278}, 256-261(1997).
 
 \bibitem{BrinkmannFowler03} G. Brinkmann and P. W. Fowler, "A catalogue of growth transformations of fullerene polyhedra",
 \textit{J. Chem. Inf. Comput. Sci.} \textbf{43}, 1837-1843 (2003).
