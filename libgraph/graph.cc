@@ -1,5 +1,14 @@
 #include "graph.hh"
 
+bool Graph::is_connected() const 
+{
+  node_t s = edge_set.begin()->first; // Pick a node that is part of an edge
+  const vector<unsigned int> dist(shortest_paths(s));
+
+  for(int i=0;i<dist.size();i++) if(dist[i] == INT_MAX) return false;
+  return true;
+}
+
 vector<node_t> Graph::shortest_path(const node_t& source, const node_t& dest, const vector<unsigned int>& dist) const
 {
   // Fill in shortest paths -- move to own function.
