@@ -1,11 +1,10 @@
-I-C140 Coordinates produced by Tutte embedding from ring spiral indices
-leapfrog to I-C420
-&General NA=140 /
-&Coord ICart=3, R6=1.39, leap=1 /
-&FFChoice Iopt=3 /
+C140
+&General NA=140 ispsearch=2 /
+&Coord ICart=3 /
+&FFChoice /
 &FFParameters /
 &Hamilton /
 &Isomers /
-&Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /
-1  17  20  23  26  29  48  51  54  57  60  72
+&Graph  /
+1   5  11  19  33  42  44  53  61  64  66  69  
 
