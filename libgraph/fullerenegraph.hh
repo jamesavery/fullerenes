@@ -10,7 +10,7 @@ public:
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
   FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
   FullereneGraph(const unsigned int *index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
-  FullereneGraph(const unsigned int N, const std::vector<int> spiral_indices, int ier, bool IPR, bool general=false); 
+  FullereneGraph(const int N, const std::vector<int> spiral_indices, bool IPR, bool general=false); 
 
   void fullerene_check() const
   {
@@ -33,9 +33,8 @@ public:
   // Compute sets <P,H> of pentagonal and hexagonal faces.
   pair<set< face_t>, set<face_t> > compute_faces56() const;
 
-  // perform a general unwind and return 12 pentagon indices
-  // not sure what we need: first face, second face, reference to 2D array to write the jumps into ...
-  //std::vector<int> pentagon_indices();
+  // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
+  void get_pentagon_indices(const int f1, const int f2, const int f3, std::vector<int> &pentagon_indices, std::vector<int> &jumps) const;
 
   static FullereneGraph C20() {
     PlanarGraph g;

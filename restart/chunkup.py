@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import sys, string,os;
 from util import *;
 
@@ -16,27 +16,34 @@ chunkrem  = length % N;
 
 print "(length,chunksize,remainder) = ",(length,chunksize,chunkrem);
 
-
-
 text   = readfile(inputfile);
 lltext = readfile("llsubmit.sh");
+
+def prepare(dirname,s,e):
+    mkdirp(dirname);
+
+    with open(dirname+"/info.txt","w") as f:
+        print >> f, "Parameters: ", (inputfile,jobdir,start,end,N);
+        print >> f, "Index: ",i;
+        print >> f, "Interval: "+ str(s)+"-"+str(e);
+
+    with open(dirname+"/input.inp","w") as f:
+        f.write(replace_input(text,{"FROM":s,"TO":e}));
     
 for i in range(N):
     s = i*chunksize+start;
     e = (i+1)*chunksize+start-1;
 
-    dirname = jobdir+"/"+str(i);
-    mkdirp(dirname);
+    prepare(jobdir+"/"+str(i),s,e);
+prepare(jobdir+"/"+str(N),e+1,end);
 
-    with open(dirname+"/input-"+str(s)+"-"+str(e)+".inp","w") as f:
-        f.write(replace_input(text,{"FROM":s,"TO":e}));
+iN = N/8;
+ifrom = [i*8 for i in range(iN)]
+ito   = [(i+1)*8-1 for i in range(iN)];
+ito[-1] = N;
 
-    with open(dirname+"/llsubmit.sh","w") as f:
-        f.write(replace_input(lltext,{"PWD":os.environ["PWD"],"WORKDIR":os.environ["PWD"]+"/"+dirname}));
+for i in range(iN):
+    with open(jobdir+"/llsubmit-%d-%d.sh" % (ifrom[i],ito[i]),"w") as f:
+        f.write(replace_input(lltext,{"JOBDIR":os.environ["PWD"]+"/"+jobdir,"iFROM":ifrom[i],"iTO":ito[i],"I":i}));
 
 
-dirname = jobdir+"/"+str(N);
-mkdirp(dirname);
-
-with open(dirname+"/input-"+str(e+1)+"-"+str(end)+".inp","w") as f:
-    f.write(replace_input(text,{"FROM":e+1,"TO":end}));
