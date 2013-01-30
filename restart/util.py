@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import os;
 
 def replace_input(text,keyvalues):
