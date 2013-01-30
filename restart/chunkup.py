@@ -1,5 +1,6 @@
 #!/usr/bin/python
-import sys, string;
+import sys, string,os;
+from util import *;
 
 try:
     (inputfile,jobdir,start,end,N) = sys.argv[1:];
@@ -15,25 +16,27 @@ chunkrem  = length % N;
 
 print "(length,chunksize,remainder) = ",(length,chunksize,chunkrem);
 
-def replace_input(text,keyvalues):
-    for k in keyvalues:
-        text = text.replace("$%s"%k,str(keyvalues[k]))
-    return text;
 
-text = ();
-with open(inputfile,'r') as f:
-    text = f.read();
+
+text   = readfile(inputfile);
+lltext = readfile("llsubmit.sh");
     
 for i in range(N):
     s = i*chunksize+start;
     e = (i+1)*chunksize+start-1;
 
-    with open(jobdir+"/"+str(s)+"-"+str(e)+".inp","w") as f:
+    dirname = jobdir+"/"+str(i);
+    mkdirp(dirname);
+
+    with open(dirname+"/input-"+str(s)+"-"+str(e)+".inp","w") as f:
         f.write(replace_input(text,{"FROM":s,"TO":e}));
 
-with open(jobdir+"/"+str(e+1)+"-"+str(end)+".inp","w") as f:
+    with open(dirname+"/llsubmit.sh","w") as f:
+        f.write(replace_input(lltext,{"PWD":os.environ["PWD"],"WORKDIR":os.environ["PWD"]+"/"+dirname}));
+
+
+dirname = jobdir+"/"+str(N);
+mkdirp(dirname);
+
+with open(dirname+"/input-"+str(e+1)+"-"+str(end)+".inp","w") as f:
     f.write(replace_input(text,{"FROM":e+1,"TO":end}));
-
-
-
-    
