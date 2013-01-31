@@ -419,13 +419,13 @@ harmonic oscillator force field including dihedrals.</li>
 </tr></table><br>
 
 A database is provided for general isomers up to C<SUB>140</SUB> and for IPR isomers up to
-C<SUB>180</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>102</SUB> 
+C<SUB>190</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>102</SUB> 
 and for IPR isomers up to C<SUB>122</SUB>. The database can be copied into
 the main program folder and can be used to read the ring spiral pentagon indices.
 The numbering scheme is identical to that chosen in the "Atlas of Fullerenes" by Fowler and Manolopoulos,
 that is each isomer in the book's appendix can be constructed easily from the database.  
 The data files are formatted and can easily be read on its own. It is our intention to
-extend the isomer list beyond C<SUB>140</SUB>/C<SUB>180</SUB> (without Hamiltonian cycles).
+extend the isomer list beyond C<SUB>140</SUB>/C<SUB>190</SUB> (without Hamiltonian cycles).
 A link to the  "House of Graphs" database by Brinkmann and co-workers is already implemented, 
 and the database can be downloaded from <a href="http://hog.grinvin.org/Fullerenes">House of Graphs Database</a>.<br><br>
 A link to the Yoshida database is also implemented and the database can be downloaded from
@@ -436,7 +436,7 @@ You can check the date on the right hand side of the download button to see
 if you already have the newest version. 
 Please report any bug to <a href="mailto:p.a.schwerdtfeger&#64massey.ac.nz">p.a.schwerdtfeger&#64massey.ac.nz</a>.<br>
 The program is in use in the following countries: 
-Brazil, China, Colombia, France, Germany, Japan, India, Itali, Iran, New Zealand, Poland, Russia, Taiwan, Ukraine, United Kingdom, USA.
+Brazil, China, Colombia, France, Germany, Japan, India, Italy, Iran, New Zealand, Poland, Russia, Taiwan, Ukraine, United Kingdom, USA.
 <br><br>
 <b>Acknowledgment:</b><br>
 PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support
