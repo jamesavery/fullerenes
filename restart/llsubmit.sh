@@ -6,12 +6,10 @@
 # @ resources = ConsumableCpus(8) ConsumableMemory(2000mb) 
 # @ queue
 
-cd $JOBDIR
+cd $ROOT
 
 for i in `seq $iFROM $iTO`; do 
-    cd $i
-    ../../../fullerene < input.inp > output.log &
-    cd ..
+    ./fullerene < $JOBDIR/$i/input.inp > $JOBDIR/$i/output.log &
 done
 
 echo "Running $iFROM to $iTO. Cancel job when all programs are done."
