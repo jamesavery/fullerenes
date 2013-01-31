@@ -44,6 +44,7 @@ ito[-1] = N;
 
 for i in range(iN):
     with open(jobdir+"/llsubmit-%d-%d.sh" % (ifrom[i],ito[i]),"w") as f:
-        f.write(replace_input(lltext,{"JOBDIR":os.environ["PWD"]+"/"+jobdir,"iFROM":ifrom[i],"iTO":ito[i],"I":i}));
+        f.write(replace_input(lltext,{"ROOT":os.environ["PWD"]+"/..","JOBDIR":os.environ["PWD"]+"/"+jobdir,
+                                      "iFROM":ifrom[i],"iTO":ito[i],"I":i}));
 
 
