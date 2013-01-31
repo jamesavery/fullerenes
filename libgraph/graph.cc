@@ -1,11 +1,22 @@
 #include "graph.hh"
 
-bool Graph::is_connected() const 
+bool Graph::is_connected(const set<node_t> &include) const 
 {
-  node_t s = edge_set.begin()->first; // Pick a node that is part of an edge
-  const vector<unsigned int> dist(shortest_paths(s));
+  if(!include.empty()){
+    node_t s = *include.begin();
+    const vector<unsigned int> dist(shortest_paths(s));
 
-  for(int i=0;i<dist.size();i++) if(dist[i] == INT_MAX) return false;
+    for(set<node_t>::const_iterator u(include.begin()); u!=include.end();u++) 
+      if(dist[*u] == INT_MAX) return false;
+
+  } else {
+    node_t s = edge_set.begin()->first; // Pick a node that is part of an edge
+    const vector<unsigned int> dist(shortest_paths(s));
+
+    for(int i=0;i<dist.size();i++) 
+      if(dist[i] == INT_MAX) return false;
+  }
+
   return true;
 }
 
