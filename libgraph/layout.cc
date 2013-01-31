@@ -110,7 +110,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     MKL_INT nrhs = 2;		/* Number of right hand sides. */
     void *pt[64];        /* Internal solver memory pointer pt, */
     MKL_INT iparm[64];  /* Pardiso control parameters. */
-    MKL_INT maxfct = 1, mnum = 1, phase, error = 0, msglvl = 1;
+    MKL_INT maxfct = 1, mnum = 1, phase, error = 0, msglvl = 0;
     /* Auxiliary variables. */
     double ddum;			/* Double dummy */
     MKL_INT idum;			/* Integer dummy. */
@@ -143,7 +143,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
 	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
     if (error != 0)
       {
-	printf ("\nERROR during symbolic factorization: %d", error);
+	printf ("\nERROR during symbolic factorization of Tutte embedding: %d", error);
 	exit (1);
       }
     printf ("\nReordering completed ... ");
@@ -157,7 +157,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
 	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
     if (error != 0)
       {
-	printf ("\nERROR during numerical factorization: %d", error);
+	printf ("\nERROR during numerical factorization of Tutte embedding: %d", error);
 	exit (2);
       }
     printf ("\nFactorization completed ... ");
@@ -166,12 +166,12 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     /* -------------------------------------------------------------------- */
     phase = 33;
 
-    printf ("\n\nSolving system...\n");
+    //    printf ("\n\nSolving system...\n");
     PARDISO (pt, &maxfct, &mnum, &mtype, &phase,
 	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, rhs, x, &error);
     if (error != 0)
       {
-	printf ("\nERROR during solution: %d", error);
+	printf ("\nERROR during direct sparse solution of Tutte embedding: %d", error);
 	exit (3);
       }
 
