@@ -34,7 +34,7 @@ public:
   pair<set< face_t>, set<face_t> > compute_faces56() const;
 
   // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-  void get_pentagon_indices(const int f1, const int f2, const int f3, std::vector<int> &pentagon_indices, std::vector<int> &jumps) const;
+  void get_pentagon_indices(const int f1, const int f2, const int f3, std::vector<int> &pentagon_indices, std::vector<pair<int,int> > &jumps) const;
 
   static FullereneGraph C20() {
     PlanarGraph g;
