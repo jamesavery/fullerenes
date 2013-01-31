@@ -391,13 +391,14 @@ void gpi_connect_backward(std::deque<pair<int,int> > &open_valencies){
   --(*(open_valencies.end() -2)).second;//decrement the last but one entry
 }
 
+// debug only
 void pdp(std::deque<pair<int,int> > &open_valencies){
   for(std::deque<pair<int,int> >::iterator it(open_valencies.begin()); it!= open_valencies.end(); ++it){
      std::cout << it->first << ": " << it->second << std::endl;
   }
 }
 
-void gpi_remove_node(const int i, PlanarGraph &remaining_dual, std::set<int> &remaining_nodes){
+void gpi_remove_node(const node_t i, PlanarGraph &remaining_dual, std::set<int> &remaining_nodes){
   remaining_nodes.erase(i);
   //iterate over the neighbours of i and delete all connecting edges. it is legal to delete non-existing objects from a set, which will happen if the neighbour vector hasn't been updated
   for(std::vector<node_t>::iterator it = remaining_dual.neighbours[i].begin(); it != remaining_dual.neighbours[i].end(); ++it){
@@ -406,7 +407,7 @@ void gpi_remove_node(const int i, PlanarGraph &remaining_dual, std::set<int> &re
 }
 
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-void FullereneGraph::get_pentagon_indices(const int f1, const int f2, const int f3, std::vector<int> &pentagon_indices, std::vector<int> &jumps) const {
+void FullereneGraph::get_pentagon_indices(const int f1, const int f2, const int f3, std::vector<int> &pentagon_indices, std::vector<pair<int,int> >&jumps) const {
 
   std::cout << "entering 'get_pentagon_indices'" << std::endl;
 
@@ -429,92 +430,95 @@ void FullereneGraph::get_pentagon_indices(const int f1, const int f2, const int 
   // open_valencies is a list with one entry per node that has been added to the spiral but is not fully saturated yet.  The entry contains the number of the node and the number of open valencies
   std::deque<pair<int,int> > open_valencies;
 
-  //init
-  for(int i=0; i<dual.N; ++i){
-    valencies[i] = dual.neighbours[i].size();
-    std::cout << i << ": " << valencies[i]<< std::endl;
+  //init of the valency-list and the set of nodes in the remaining graph
+  for(int i=0; i<remaining_dual.N; ++i){
+    valencies[i] = remaining_dual.neighbours[i].size();
+    //std::cout << i << ": " << valencies[i]<< std::endl;
     remaining_nodes.insert(i);
   }
 
   // add the first three (defining) nodes
+  //first node
   spiral.push_back(valencies[f1]);
   gpi_remove_node(f1, remaining_dual, remaining_nodes);
   open_valencies.push_back(make_pair(f1,valencies[f1]));
 
+  //second node
   spiral.push_back(valencies[f2]);
   gpi_remove_node(f2, remaining_dual, remaining_nodes);
   open_valencies.push_back(make_pair(f2,valencies[f2]));
   gpi_connect_backward(open_valencies);
-  pdp(open_valencies);
+  //pdp(open_valencies);
 
+  //third node
   spiral.push_back(valencies[f3]);
   gpi_remove_node(f3, remaining_dual, remaining_nodes);
   open_valencies.push_back(make_pair(f3,valencies[f3]));
   gpi_connect_backward(open_valencies);
   gpi_connect_forward(open_valencies);
-  pdp(open_valencies);
+  //pdp(open_valencies);
 
   // iterate over all nodes (of the dual) but not by their respective number
   // starting at 3 because we added 3 already
   for(int i=3; i<dual.N; ++i){
 
-    PlanarGraph remaining_dual_bak(remaining_dual);
+    //PlanarGraph remaining_dual_bak(remaining_dual);
 
     // find *the* node in dual (not the remaining_dual), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_dual because there are some edges deleted already
     std::set<int>::iterator j=remaining_nodes.begin();
+    node_t u = open_valencies.back().first, w = open_valencies.front().first;
     for( ; j!=remaining_nodes.end(); ++j){
-      std::cout << open_valencies.back().first<< ", " << open_valencies.front().first << ", " << *j << ", " << valencies[*j] << std::endl;
-      if(dual.edge_set.find(edge_t(open_valencies.back().first,*j)) != dual.edge_set.end() &&
-         dual.edge_set.find(edge_t(open_valencies.front().first,*j)) != dual.edge_set.end()) break;
+    //   std::cout << open_valencies.back().first<< ", " << open_valencies.front().first << ", " << *seti << ", " << valencies[*seti] << std::endl;
+      if(dual.edge_set.find(edge_t(u,*j)) != dual.edge_set.end() &&
+         dual.edge_set.find(edge_t(w,*j)) != dual.edge_set.end()) break;
     }
+    assert(j!=remaining_nodes.end());
+
     std::cout << "adding node " << *j << std::endl;
     spiral.push_back(valencies[*j]);
     open_valencies.push_back(make_pair(*j,valencies[*j]));
     gpi_connect_backward(open_valencies);
     gpi_connect_forward(open_valencies);
 
-    // there are three positions in open_valencies that can be 0---every case requires interaction.
-    while(true){
-      bool a=0;
-      if(open_valencies.back().second==0){
-        open_valencies.pop_back();
-        gpi_connect_forward(open_valencies);
-        a=1;
-      }
-      if((*(open_valencies.end()-2)).second==0){
-        open_valencies.erase (open_valencies.end()-2);
-        gpi_connect_backward(open_valencies);
-        a=1;
-      }
-      if(open_valencies.front().second==0){
-        open_valencies.pop_front();
-        gpi_connect_forward(open_valencies);
-        a=1;
-      }
-      if(!a) break;
-    }
+   // there are three positions in open_valencies that can be 0---one shouldn't happen, the other two cases requires interaction.
+   while(true){
+     bool a=0;
+     assert(open_valencies.back().second!=0);//can only happen if the psiral missed a jump
+     if((*(open_valencies.end()-2)).second==0){
+       open_valencies.erase (open_valencies.end()-2);
+       gpi_connect_backward(open_valencies);
+       a=1;
+     }
+     if(open_valencies.front().second==0){
+       open_valencies.pop_front();
+       gpi_connect_forward(open_valencies);
+       a=1;
+     }
+     if(!a) break;
+   }
 
-    remaining_nodes.erase(j); //remove node *j from remaining dual
-    gpi_remove_node(*j, remaining_dual, remaining_nodes); //remove all edges of which *j is part from the remaining dual
-    pdp(open_valencies);
+   node_t v = *j;
+   gpi_remove_node(*j, remaining_dual, remaining_nodes); //remove all edges of which *j is part from the remaining dual
+   pdp(open_valencies);
 
-    if(!remaining_dual.is_connected()){
-      std::cout << "entering reversion" << std::endl;
-      //revert the last operations
-      remaining_dual = remaining_dual_bak;
-      remaining_nodes.insert(*j);
-      //perform  cyclic rotation on open_valencies
-      open_valencies.push_back(open_valencies.front());
-      open_valencies.pop_front();
-    }
+   if(!remaining_dual.is_connected()){
+     std::cout << "entering reversion" << std::endl;
+     //revert the last operations
+     remaining_nodes.insert(v);
+     //perform  cyclic rotation on open_valencies
+     open_valencies.push_back(open_valencies.front());
+     open_valencies.pop_front();
+   } else {
+     cout << "\nremaining_dual = " << remaining_dual << " is connected.\n";
+   }
   }
   
-  int j=0;
-  for(std::deque<int>::iterator i=spiral.begin(); i != spiral.end(); ++i, ++j){
-    std::cout << j << ", " << *i << std::endl;
-    if(*i==5){
-      pentagon_indices.push_back(j+1);
+  int k=0;
+  for(std::deque<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){
+    //std::cout << j << ", " << *it << std::endl;
+    if(*it==5){
+      pentagon_indices.push_back(k+1);
       //std::cout << j << ", ";
     }
   }
