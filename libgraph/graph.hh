@@ -40,7 +40,7 @@ struct Graph {
     update_auxiliaries();
   }
 
-  bool is_connected() const;
+  bool is_connected(const set<node_t>& include = set<node_t>()) const;
   vector<node_t> shortest_path(const node_t& source, const node_t& dest, const vector<unsigned int>& D0) const;
   vector<unsigned int> shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 				      const vector<bool>& used_nodes, const unsigned int max_depth = INT_MAX) const;
