@@ -1693,9 +1693,9 @@ C     Print ring numbers
      1 ' (',I4,' faces)')
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
      1 ' (',I5,' faces)')
- 634  FORMAT(1X,I6,' distinct RSPIs found out of total',I7,
+ 634  FORMAT(1X,I7,' distinct RSPIs found out of total',I7,
      1 ' (maximum possible: ',I7,')',/1X,I7,' spirals with a ',
-     1 'pentagon start (',I7,' symmetry distinct)')
+     1 'pentagon start    (',I7,' symmetry distinct)')
  635  FORMAT(1X,' Spiral found, avoid counting of spirals')
       Return
       END
