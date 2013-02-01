@@ -15,12 +15,12 @@ int main(int ac, char **av)
 //jump
 //  int pentagon_indices_array[] = {1, 2, 3, 5, 8, 9, 11, 12, 13, 14, 15, 16};
 //jump, 380
-  int pentagon_indices_array[] = {1, 2, 3, 137, 138, 147, 148, 157, 158, 166, 173, 180};
+//  int pentagon_indices_array[] = {1, 2, 3, 137, 138, 147, 148, 157, 158, 166, 173, 180};
+  int pentagon_indices_array[] = {1, 5, 6, 135, 136, 145, 146, 155, 156, 164, 171, 180};
   std::vector<int> pentagon_indices_input(12);
   std::vector<int> pentagon_indices_output;
   std::vector<pair<int,int> > jumps;
   bool ipr=false;
-  bool general=true;
 
   std::cout << "Input spiral indices: ";
   for (int i=0; i<12; ++i){
@@ -29,7 +29,7 @@ int main(int ac, char **av)
   }
   std::cout << std::endl;
 
-  FullereneGraph fg(n, pentagon_indices_input, ipr, general);
+  FullereneGraph fg(n, pentagon_indices_input, ipr);
 
 //  cout << "fg = " << fg << endl;
 
