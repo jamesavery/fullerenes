@@ -31,7 +31,7 @@ int main(int ac, char **av)
 
   FullereneGraph fg(n, pentagon_indices_input, ipr, general);
 
-  cout << "fg = " << fg << endl;
+//  cout << "fg = " << fg << endl;
 
 
 
@@ -39,9 +39,15 @@ int main(int ac, char **av)
 
   fg.get_pentagon_indices(0, 1, 2, pentagon_indices_output, jumps);  
 
-  std::cout << "Input spiral indices: ";
+  std::cout << "Output spiral indices: ";
   for (int i=0; i<12; ++i){
     std::cout <<  pentagon_indices_output[i] << ", ";
+  }
+  std::cout << std::endl;
+  
+  std::cout << "Jumps: ";
+  for (std::vector<pair<int,int> >::iterator it=jumps.begin(); it!=jumps.end(); ++it){
+    std::cout <<  it->first << ": " << it->second << ", ";
   }
   std::cout << std::endl;
   
