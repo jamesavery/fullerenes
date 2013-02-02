@@ -1187,7 +1187,7 @@ C         Get all adjacent rings to previous one
           nr=D1(j,IP)
 C         Make sure it is not one in the existing spiral
           do j1=I-2,1,-1
-            if(nr.eq.S(j1)) exit bar
+            if(nr.eq.S(j1)) cycle
           enddo
 C       Collect them
         nring=nring+1
@@ -1208,7 +1208,7 @@ C       Last 2 are not needed
                   MP=MP+1
                   JP(MP)=i
                 endif
-                exit faces
+                cycle
               endif
             enddo
           enddo
@@ -1816,7 +1816,7 @@ C     Now hexagon indices
       foo: do I=1,M
         IRcount=0
         IR5=Ddiag(I)
-        if(IR5.eq.5) exit foo
+        if(IR5.eq.5) cycle
         do J=1,M
           JR5=Ddiag(J)
           If(JR5.ne.5.and.D(I,J).eq.1) then
