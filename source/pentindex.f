@@ -26,7 +26,6 @@ C mapping
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
 c      integer ke, isw, iyf, ibf
       type(c_ptr) :: g, halma, new_C20, halma_fullerene, windup_general
-      logical*1 general
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
 C If nalgorithm=2 use Goldberg-Coxeter and matrix eigenvector algorithm
@@ -71,8 +70,7 @@ C       Search where the 5-rings are in the spiral
         CALL Windup(M,IPRS,IER,S,D)              ! Wind up spiral into dual
         IF(IER.gt.0) then
           WRITE(Iout,1000) IER
-          general = .true.
-          g = windup_general(m, jp, ier, iprs, general)
+          g = windup_general(m, jp, iprs)
 c         get the adjcaency matrix
           call adjacency_matrix(g,Nmax,IDA)
           call delete_fullerene_graph(g)
