@@ -1187,11 +1187,12 @@ C         Get all adjacent rings to previous one
           nr=D1(j,IP)
 C         Make sure it is not one in the existing spiral
           do j1=I-2,1,-1
-            if(nr.eq.S(j1)) cycle
+            if(nr.eq.S(j1)) go to 11
           enddo
 C       Collect them
         nring=nring+1
         FreeRing(nring)=nr
+   11   continue
         enddo bar
           
 C       Now it needs to be connected to a previous ring
@@ -1208,7 +1209,7 @@ C       Last 2 are not needed
                   MP=MP+1
                   JP(MP)=i
                 endif
-                cycle
+                go to 10
               endif
             enddo
           enddo
@@ -1218,6 +1219,7 @@ C       Last 2 are not needed
           IER=1   ! Spiral has dead end
           Return
         endif
+  10  continue
       enddo faces
 
 C       if(JP(12).eq.0) then
