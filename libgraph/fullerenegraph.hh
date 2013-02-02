@@ -10,7 +10,7 @@ public:
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
   FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
   FullereneGraph(const unsigned int *index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
-  FullereneGraph(const int N, const std::vector<int> spiral_indices, bool IPR, bool general=false); 
+  FullereneGraph(const int N, const std::vector<int> spiral_indices, bool IPR); 
 
   void fullerene_check() const
   {

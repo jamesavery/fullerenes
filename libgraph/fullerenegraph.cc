@@ -305,80 +305,42 @@ bool do_windup_general(const int n, const std::vector<int> &pot_spiral, std::vec
       std::cout << "Fail 2 (cage not closed but no faces left)" << std::endl;
       return 1;
   } 
-  return 0;//success
-}//windup_general
+  return 0;// success
+}// do_windup_general
 
 
-FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indices, bool IPR, bool general) : CubicGraph() {
-  if(!general){
-//    int m = n/2+2;
-//    int s[m], d[m*m], ipr = IPR, error = 0;
-//    cerr << "Spiral constructor: " << n << ", " << face_t(spiral_indices) << endl; 
-//    assert(spiral_indices.size() == 12);
-// 
-//    // Call Peter's fortran routine for constructing dual from spiral.
-//    for(int i=0;i<n/2+2;i++) s[i] = 6;
-//    for(int i=0;i<12;i++) s[spiral_indices[i]-1] = 5;
-//
-//    windup_(&m,&ipr,&error,s,d);
-//    if(error != 0){
-//      fprintf(stderr,"Spiral windup failed after %d pentagons.\n",error);
-//      //    delete d;
-//      N = 0;
-//    } else {
-//      //    cerr << " Spiral windup is successful.\n";
-//      PlanarGraph dual;
-//      //    printf("Dual should have %d nodes\n",m);
-//      for(node_t u=0;u<m;u++)
-//        for(node_t v=0;v<m;v++)
-//      if(d[u*m+v] == 1)
-//        dual.edge_set.insert(edge_t(u,v)); 
-//
-//      //    delete d;
-//      cerr << "dual = " << dual << endl;
-//      dual.update_auxiliaries();
-//      dual.layout2d = dual.tutte_layout(-1,-1,-1,3);
-//
-//      *this = dual.dual_graph(3);
-//      //    cerr << "dual = " << dual << endl;
-//      //    cerr << "G    = " << G << endl;
-//
-//    }
+FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indices, bool IPR) : CubicGraph() {
+  assert(spiral_indices.size() == 12);
+
+  std::vector<int> potential_spiral (n,6);
+  for (int i=0; i<12; ++i){
+    //std::cout << spiral_indices[i] << " " ;
+    potential_spiral[spiral_indices[i]-1] = 5;//because the spiral input starts at 1 but this vector starts at 0
   }
-  else
-  {
-    assert(spiral_indices.size() == 12);
 
-    std::vector<int> potential_spiral (n,6);
-    for (int i=0; i<12; ++i){
-      //std::cout << spiral_indices[i] << " " ;
-      potential_spiral[spiral_indices[i]-1] = 5;//because the spiral input starts at 1 but this vector starts at 0
-    }
-
-    set<edge_t> edge_set;
-    std::vector<int> jump_positions;
-    std::vector<int> jump_distances;
-    
-    if(do_windup_general(n, potential_spiral, jump_positions, jump_distances, edge_set)){
-      std::cerr << "No general spiral found either ... aborting." << std::endl;
-      abort();
-    }
-    
-    std::cout << jump_positions.size() << " jump(s) required.";
-    for (std::vector<int>::iterator i(jump_positions.begin()); i<jump_positions.end(); ++i) {
-      std::cout << *i+1 << ", ";//because k is relative to 0
-    }
-    
-    for (std::vector<int>::iterator i(jump_distances.begin()); i<jump_distances.end(); ++i) {
-      std::cout << *i << ", ";
-    }
-    std::cout << std::endl;
-
-    PlanarGraph dual(edge_set);
-    dual.update_auxiliaries();
-
-    *this = dual.dual_graph(3);
+  set<edge_t> edge_set;
+  std::vector<int> jump_positions;
+  std::vector<int> jump_distances;
+  
+  if(do_windup_general(n, potential_spiral, jump_positions, jump_distances, edge_set)){
+    std::cerr << "No general spiral found either ... aborting." << std::endl;
+    abort();
   }
+  
+  std::cout << jump_positions.size() << " jump(s) required.";
+  for (std::vector<int>::iterator i(jump_positions.begin()); i<jump_positions.end(); ++i) {
+    std::cout << *i+1 << ", ";//because k is relative to 0
+  }
+  
+  for (std::vector<int>::iterator i(jump_distances.begin()); i<jump_distances.end(); ++i) {
+    std::cout << *i << ", ";
+  }
+  std::cout << std::endl;
+
+  PlanarGraph dual(edge_set);
+  dual.update_auxiliaries();
+
+  *this = dual.dual_graph(3);
 }
 
 void gpi_connect_forward(std::deque<pair<int,int> > &open_valencies){
@@ -411,12 +373,8 @@ void gpi_remove_node(const node_t i, PlanarGraph &remaining_dual, std::set<int> 
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
 void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, std::vector<int> &pentagon_indices, std::vector<pair<int,int> >&jumps) const {
 
-//  std::cout << "entering 'get_pentagon_indices'" << std::endl;
-
   PlanarGraph dual = this->dual_graph(6);
   dual.update_auxiliaries();
-
-//  std::cout << "dual created: " << dual << std::endl;
 
   // remaining_dual is the graph that consists of all nodes that haven't been added to the graph yet
   PlanarGraph remaining_dual(dual);
@@ -531,7 +489,7 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
       ++x;
     } else {
       if(!x==0){
-        jumps.push_back(make_pair(i+1,x+1));
+        jumps.push_back(make_pair(i,x+1));
         x=0;
       }
     }
