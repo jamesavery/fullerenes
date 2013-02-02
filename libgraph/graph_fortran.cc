@@ -10,7 +10,7 @@ extern "C" {
   fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *N, const int *adjacency);
   fullerene_graph_ptr read_fullerene_graph_(const char *f_path);
   fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const char *f_path);
-  fullerene_graph_ptr windup_general_(const int *n, const int indices[12], bool *ipr, bool *general);
+  fullerene_graph_ptr windup_general_(const int *n, const int indices[12], bool *ipr);
   void delete_fullerene_graph_(fullerene_graph_ptr*);
 
   polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points);
@@ -161,14 +161,14 @@ fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const c
   return g;
 }
 
-fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array[12], bool *ipr, bool *general){
+fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array[12], bool *ipr){
   
   std::vector<int> spiral_indices(12);
   for(int i=0; i<12; ++i){
     spiral_indices[i] = spiral_indices_array[i];
   }
 
-  fullerene_graph_ptr g = new FullereneGraph(*n, spiral_indices, *ipr, *general);
+  fullerene_graph_ptr g = new FullereneGraph(*n, spiral_indices, *ipr);
   return g;
 }
 
