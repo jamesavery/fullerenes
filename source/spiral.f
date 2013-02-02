@@ -1220,6 +1220,12 @@ C       Last 2 are not needed
         endif
       enddo faces
 
+C       if(JP(12).eq.0) then
+C        IER=1   ! Spiral has dead end
+C        Return
+C       endif
+
+
 C  Finally success, spiral found
       Return
       END
@@ -1695,7 +1701,7 @@ C     Print ring numbers
      1 ' (',I5,' faces)')
  634  FORMAT(1X,I7,' distinct RSPIs found out of total',I7,
      1 ' (maximum possible: ',I7,')',/1X,I7,' spirals with a ',
-     1 'pentagon start    (',I7,' symmetry distinct)')
+     1 'pentagon start   (',I7,'  symmetry distinct)')
  635  FORMAT(1X,' Spiral found, avoid counting of spirals')
       Return
       END
