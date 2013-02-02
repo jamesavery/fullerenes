@@ -1977,7 +1977,7 @@ C Input: initial graph, and GC indices (kGC,lGC)
       if(leapGC.gt.0) then
       Write(Iout,1010) kGC,lGC,kGC,lGC
       MGCLimit=(kgc*kgc+lgc*(kgc+lgc))*number_vertices
-      if(MMGCLimit.gt.Nmax) then
+      if(MGCLimit.gt.Nmax) then
          Write(Iout,1003) MGCLimit,Nmax
          LeapErr=1
          return
