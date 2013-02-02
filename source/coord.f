@@ -1921,8 +1921,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE GoldbergCoxeter(Iout,
-     1 leap,leapGC,kGC,lGC,
+      SUBROUTINE GoldbergCoxeter(Iout,leap,leapGC,kGC,lGC,
      1 nohueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad) 
 C     Construct Leapfrog fullerene through adjacency matrix
@@ -1977,6 +1976,13 @@ C Goldberg-Coxeter transform of initial fullerene
 C Input: initial graph, and GC indices (kGC,lGC) 
       if(leapGC.gt.0) then
       Write(Iout,1010) kGC,lGC,kGC,lGC
+      MGCLimit=(kgc*kgc+lgc*(kgc+lgc))*number_vertices
+      if(MMGCLimit.gt.Nmax) then
+         Write(Iout,1003) MGCLimit,Nmax
+         LeapErr=1
+         return
+      endif
+
       if(kGC.eq.1.and.lGC.eq.0) then
        Write(Iout,1006) kGC,lGC
        return
@@ -2021,7 +2027,9 @@ C Produce adjacency matrix
      1 ' fullerene: ',I5,' --> ',I5)
  1001 Format(/1X,'Creating the adjacency matrix of the ',I2,
      1 'th leap-frog fullerene: ',I4,' --> ',I4)
- 1002 Format(1X,'Error: Dimension of leapfrof fullerene is ',I5,
+ 1002 Format(1X,'Error: Dimension of leapfrog fullerene is ',I5,
+     1 ' greater than dimension of Nmax (',I5,') set in program')
+ 1003 Format(1X,'Error: Dimension of GC fullerene is ',I5,
      1 ' greater than dimension of Nmax (',I5,') set in program')
  1004 FORMAT(1X,'Fullerene graph deleted')
  1005 Format(1x,'Produce new adjacency matrix')
