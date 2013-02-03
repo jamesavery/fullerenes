@@ -1182,18 +1182,17 @@ C       in the spiral
         nloop=6
         nring=0
         if(D1(6,IP).eq.0) nloop=5
-        bar: do j=1,nloop
+        loops: do j=1,nloop
 C         Get all adjacent rings to previous one
           nr=D1(j,IP)
 C         Make sure it is not one in the existing spiral
           do j1=I-2,1,-1
-            if(nr.eq.S(j1)) go to 11
+            if(nr.eq.S(j1)) cycle loops
           enddo
 C       Collect them
         nring=nring+1
         FreeRing(nring)=nr
-   11   continue
-        enddo bar
+        enddo loops
           
 C       Now it needs to be connected to a previous ring
 C       Last 2 are not needed
@@ -1209,7 +1208,7 @@ C       Last 2 are not needed
                   MP=MP+1
                   JP(MP)=i
                 endif
-                go to 10
+                cycle faces
               endif
             enddo
           enddo
@@ -1219,7 +1218,6 @@ C       Last 2 are not needed
           IER=1   ! Spiral has dead end
           Return
         endif
-  10  continue
       enddo faces
 
 C       if(JP(12).eq.0) then
@@ -1821,10 +1819,10 @@ C     Now hexagon indices
       Do I=0,6
         IRhag6(I)=0
       enddo
-      foo: do I=1,M
+      faces: do I=1,M
         IRcount=0
         IR5=Ddiag(I)
-        if(IR5.eq.5) cycle
+        if(IR5.eq.5) cycle faces
         do J=1,M
           JR5=Ddiag(J)
           If(JR5.ne.5.and.D(I,J).eq.1) then
@@ -1832,7 +1830,7 @@ C     Now hexagon indices
           endif
         enddo
         IRhag6(IRcount)=IRhag6(IRcount)+1
-      enddo foo
+      enddo faces
 C     Strain Parameter
       sigmah=HexInd(IRhag6,ihk)
 
@@ -2319,41 +2317,41 @@ C            Store all non-identical spirals
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(M,M),A(NMAX,NMAX)
       DIMENSION V(3,NMAX)
-c       Given a fullerene dual adjacency matrix D, this subroutine 
-c       constructs the corresponding fullerene adjacency matrix A. 
-c       IER = 0 on return if the construction is successful. 	 
-        I=0
-        DO 3 L = 1,M 
-           DO 2 K=1,L 
-              IF (D(K,L).EQ.0) GO TO 2
-              DO 1 J = 1,K
-                 IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
-                  I = I+1
-                 IF (I.GT.number_vertices) GO TO 1
-                 V(1,I) = J ! Associate the three mutually adjacent 
-                 V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
-                 V(3,I) = L ! with fullerene vertex I 	 
- 1            CONTINUE
- 2        CONTINUE
- 3      CONTINUE
-        IER = I-number_vertices
-        IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
-        DO 7 J = 1,number_vertices           ! and is therefore NOT a fullerene dual 
-           DO 6 I = 1,J
-              K = 0
-              DO 5 JJ = 1,3
-                 DO 4 II = 1,3
-                  IF(V(II,I).EQ.V(JJ,J)) K = K+1
- 4               CONTINUE
- 5             CONTINUE
-              IF (K.EQ.2) THEN
-                 A(I,J)=1   ! Fullerene vertices I and J are adjacent 
-                 A(J,I)=1   ! if they have 2 dual vertices in common
-               ELSE
-                 A(I,J)=0
-                 A(J,I)=0
-              ENDIF
- 6         CONTINUE
- 7      CONTINUE
-        RETURN
-        END
+c     Given a fullerene dual adjacency matrix D, this subroutine 
+c     constructs the corresponding fullerene adjacency matrix A. 
+c     IER = 0 on return if the construction is successful. 	 
+      I=0
+      DO 3 L = 1,M 
+        DO 2 K=1,L 
+          IF (D(K,L).EQ.0) GO TO 2
+          DO 1 J = 1,K
+            IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
+            I = I+1
+            IF (I.GT.number_vertices) GO TO 1
+            V(1,I) = J ! Associate the three mutually adjacent 
+            V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
+            V(3,I) = L ! with fullerene vertex I 	 
+ 1        CONTINUE
+ 2      CONTINUE
+ 3    CONTINUE
+      IER = I-number_vertices
+      IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
+      DO 7 J = 1,number_vertices           ! and is therefore NOT a fullerene dual 
+        DO 6 I = 1,J
+          K = 0
+          DO 5 JJ = 1,3
+            DO 4 II = 1,3
+              IF(V(II,I).EQ.V(JJ,J)) K = K+1
+ 4          CONTINUE
+ 5        CONTINUE
+          IF (K.EQ.2) THEN
+            A(I,J)=1   ! Fullerene vertices I and J are adjacent 
+            A(J,I)=1   ! if they have 2 dual vertices in common
+          ELSE
+            A(I,J)=0
+            A(J,I)=0
+          ENDIF
+ 6      CONTINUE
+ 7    CONTINUE
+      RETURN
+      END
