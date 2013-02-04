@@ -3,11 +3,28 @@
 
 #include <string.h>
 #include <iostream>
+#include <vector>
+#include <set>
+#include <map>
+#include <math.h>
 using namespace std;
 
 typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
+
+template <typename T> ostream& operator<<(ostream& s, const vector<T>& v)
+{
+  s << "{";
+  for(int i=0;i<v.size();i++) s << v[i] << (i+1<v.size()? ",":"}");
+  return s;
+}
+
+template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p)
+{
+  s << "{" << p.first << "," << p.second << "}";
+  return s;
+}
 
 // Undirected edge is an unordered pair of nodes
 struct edge_t : public pair<node_t,node_t> {
