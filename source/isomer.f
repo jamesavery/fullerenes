@@ -276,11 +276,13 @@ C Produce list from ring spiral algorithm
          IF(number_vertices.ge.100) WRITE(Iout,604) number_vertices
       endif
       else
-      vertnum=dfloat(number_vertices)
-      hamlow=5.*(2.**(vertnum/10.-1.))
-      hamhigh=hamlow*2.*(3.**(vertnum/20.-1.)+1.)
-      nhamlow=hamlow
-      nhamhigh=hamhigh
+       vertnum=dfloat(number_vertices)
+       ahamlow=5.*2.**(vertnum/10.-1.)
+       nhamlow=int(ahamlow)
+       an=2.*3.**(vertnum/20.-1.)+1.
+       ahamhigh=ahamlow*an
+       nhamhigh=int(ahamlow*an)
+       Write(Iout,619) nhamlow,nhamhigh
       if(IP.EQ.0) then
          IF(number_vertices.lt.100) WRITE(Iout,701) number_vertices
          IF(number_vertices.ge.100) WRITE(Iout,702) number_vertices
@@ -680,6 +682,8 @@ C Final statistics
  617  Format(1X,I3,' exceptions found for upper bound with isomer',
      1 ' numbers:')
  618  Format(10I9)
+ 619  Format(' Semi-tight lower and upper limits for Hamiltonian ',
+     1 'cycles:'I9,'/',I9)
   701  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
