@@ -2,15 +2,6 @@
 #include "cubicgraph.hh"
 #include <sstream>
 
-template <class T> ostream& operator<<(ostream& s, const vector<T>& v)
-{
-  s << "{";
-  for(int i=0;i<v.size();i++)
-    s << v[i] << (i+1<v.size()? ", ":"");
-  s << "}";
-  return s;
-}
-
 struct ToleranceLess {
   const double tolerance;
   ToleranceLess(const double tolerance) : tolerance(tolerance) {}
