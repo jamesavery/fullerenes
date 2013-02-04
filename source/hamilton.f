@@ -70,7 +70,7 @@ c Start algorithm
       flag=.false.
       l=1
       path(1)=1
-      goto 5
+      go to 5
 
     4 jngb1=list(prev,jlast,2)
       jngb2=list(prev,jlast,3)
@@ -430,7 +430,7 @@ C Start algorithm
       ptr=oldptr
       oldptr=stack(ptr)
 C     put this one in to avoid segmentation fault
-      if (oldptr.le.0) return
+      if (oldptr.le.0) go to 99
       pass(path(l1+1))=.true.
       stack(ptr)=path(l1+1)
       ptr=ptr+1
@@ -448,7 +448,7 @@ C     if (oldptr.gt.0) go to 5
          Return
       endif
  
-      write (Iout,1003) nhamilton
+  99  write (Iout,1003) nhamilton
       write (Iout,1000) (x(i),i=0,(number_vertices-2)/2)
       write (Iout,1000) (y(i),i=0,(number_vertices-2)/2)
       write (Iout,1006)
