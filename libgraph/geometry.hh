@@ -16,7 +16,8 @@ typedef vector< bool > edges_t;
 template <typename T> ostream& operator<<(ostream& s, const vector<T>& v)
 {
   s << "{";
-  for(int i=0;i<v.size();i++) s << v[i] << (i+1<v.size()? ",":"}");
+  for(int i=0;i<v.size();i++) s << v[i] << (i+1<v.size()? ",":"");
+  s << "}";
   return s;
 }
 
