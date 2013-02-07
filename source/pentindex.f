@@ -25,7 +25,7 @@ C mapping
       CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
 c      integer ke, isw, iyf, ibf
-      type(c_ptr) :: g, halma, new_C20, halma_fullerene, windup_general
+      type(c_ptr) :: g, halma, new_C20, halma_fullerene
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
 C If nalgorithm=2 use Goldberg-Coxeter and matrix eigenvector algorithm
@@ -172,7 +172,7 @@ C Input connectivities and construct adjacency matrix
 
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
- 666  Do I=1,number_vertices
+      Do I=1,number_vertices
         Do J=1,number_vertices
           A(I,J)=dfloat(IDA(I,J))
         enddo
@@ -240,10 +240,8 @@ C Now produce the 3D image (unless the graph is going to change later)
       endif
 c      endif
 
-c 1000 FORMAT(/1X,'Cannot produce dual matrix, error IER= ',I2,
-c     1 ' Check your input for pentagon locations')
- 1000 FORMAT(/1X,'No simple spiral found (IER = ',
-     1 I2,') ... searching for a general spiral.)')
+ 1000 FORMAT(/1X,'Cannot produce dual matrix, error IER= ',I2,
+     1 ' Check your input for pentagon locations')
  1001 FORMAT(/1X,'Program to create cartesian coordinates through ',
      1 'pentagon index list producing the dual matrix and finally '
      1 'the Hueckel matrix',/1X,'Number of faces: ',I5,
