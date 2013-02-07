@@ -201,7 +201,7 @@ void wg_connect_backward(set<edge_t> &edge_set, std::deque<pair<node_t, int> > &
 {
   edge_set.insert(edge_t(ov.back().first, (ov.end()-2)->first));
   --ov.back().second;
-  --(*(ov.end() -2)).second;//decrement the last but one entry
+  --((ov.end() -2)->second);//decrement the last but one entry
 }
 
 void wg_connect_forward(set<edge_t> &edge_set, std::deque<pair<node_t, int> > &ov)
@@ -211,12 +211,12 @@ void wg_connect_forward(set<edge_t> &edge_set, std::deque<pair<node_t, int> > &o
   --ov.front().second;
 }
 
-bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std::deque<pair<int,int> > jumps,  set<edge_t> &edge_set){
-//  //number of used valencies per vertex (0-5(6))
-//  std::vector<int> used_valencies(n_faces,0);
+bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std::deque<pair<node_t,int> > jumps,  set<edge_t> &edge_set){
+
   // open_valencies is a list with one entry per node that has been added to the spiral but is not fully saturated yet.  The entry contains the number of the node and the number of open valencies
   std::deque<pair<node_t,int> > open_valencies;
 
+  // set up first two nodes
   open_valencies.push_back(make_pair(0,spiral[0]));
   open_valencies.push_back(make_pair(1,spiral[1]));
   //connect first two faces
@@ -224,44 +224,7 @@ bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std:
 
   //iterate over atoms
   //k=0, k=1 have been done already
-  for (int k=2; k<n_faces; ++k){
-//    //check if jump
-//    x = 0;
-//    if(pot_spiral[open_valencies[0]] - used_valencies[open_valencies[0]] == 2 && open_valencies.size() > 6){
-//      while(pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 2){
-//        ++x;
-//      }
-//      //two error cases
-//      if (pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 1 &&
-//        pot_spiral[open_valencies[x+1]] - used_valencies[open_valencies[x+1]] == 1 &&
-//        pot_spiral[open_valencies[x+2]] - used_valencies[open_valencies[x+2]] == 1 &&
-//        pot_spiral[open_valencies[x+3]] - used_valencies[open_valencies[x+3]] == 1)
-//                {std::cerr << "There is no spiral." << std::endl;
-//        return 1;}
-//      if (pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 1 &&
-//        pot_spiral[open_valencies[x+1]] - used_valencies[open_valencies[x+1]] == 1 &&
-//        pot_spiral[open_valencies[x+2]] - used_valencies[open_valencies[x+2]] == 1 &&
-//        pot_spiral[open_valencies[x]] == 5)
-//                {std::cerr << "There is no spiral." << std::endl;
-//        return 1;}
-//      //two jump cases
-//      if ((pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 1 &&
-//         pot_spiral[open_valencies[x+1]] - used_valencies[open_valencies[x+1]] == 1 &&
-//         pot_spiral[open_valencies[x]] == 5) || 
-//        (pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 1 &&
-//        pot_spiral[open_valencies[x+1]] - used_valencies[open_valencies[x+1]] == 1 &&
-//        pot_spiral[open_valencies[x+2]] - used_valencies[open_valencies[x+2]] == 1 &&
-//        pot_spiral[open_valencies[x]] == 6))
-//        ++x;
-//        else
-//        x=0;
-//    }
-
-//    //jump positions and distances
-//    if(x>1){// x=1 is no jump
-//      pos.push_back(k);
-//      dist.push_back(x);
-//    }
+  for (int k=2; k<n_faces-1; ++k){
 
     if(k == jumps[0].first){
       // perform cyclic rotation on open_valencies
@@ -272,42 +235,59 @@ bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std:
       jumps.pop_front();
     }
 
+    // add node to spiral
     open_valencies.push_back(make_pair(k,spiral[k]));
 
-    //connect k to k-1
+    // connect k to k-1
     wg_connect_backward(edge_set, open_valencies);
 
-    //connect k to k-2, etc
+    // connect k to k-2, etc
     wg_connect_forward(edge_set, open_valencies);
 
+    // do the remaining connect forwards
     while(open_valencies.front().second==0){
       open_valencies.pop_front();
       wg_connect_forward(edge_set, open_valencies);
     }
-
+    // do the remaining connect backwards
     while((open_valencies.end()-2)->second==0){
       open_valencies.erase(open_valencies.end()-2);
       wg_connect_backward(edge_set, open_valencies);
     }
 
-    //append k to the open valencies (after making sure it has some valencies left)
-    if (open_valencies.back().second == 0 && k!= n_faces){//the current atom is saturated (which may only happen for the last one)
+    if (open_valencies.back().second == 0){//the current atom is saturated (which may only happen for the last one)
       std::cout << "Cage closed but faces left (or otherwise invalid spiral)" << std::endl;
       return 1;
     }
   }//iterate over atoms
 
-  if(open_valencies.size() != 0){
-      std::cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << std::endl;
-      return 1;
+  // make sure we left the spiral in a sane state
+  // open_valencies must be either 5 or 6 times '1' at this stage
+  if(open_valencies.size() != spiral.back()){
+    std::cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << std::endl;
+    return 1;
   }
+  for(std::deque<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
+    if(it->second!=1){
+      std::cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << std::endl;
+    }
+  }
+
+  // add last node to spiral // the name of the last node is n_faces -1 (because it's the last one)
+  open_valencies.push_back(make_pair(n_faces-1,spiral[n_faces-1]));
+
+  for(int i=0; i<spiral.back(); ++i){
+    wg_connect_forward(edge_set, open_valencies);
+    open_valencies.pop_front();
+  }
+
   return 0;// success
 }// do_windup_general
 
 
 // both the pentagon indices and the jumps start at 0
 // n is the number of vertices
-FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indices, const std::deque<pair<int,int> > jumps) : CubicGraph() {
+FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indices, const std::deque<pair<node_t,int> > jumps) : CubicGraph() {
   assert(spiral_indices.size() == 12);
 
   const int n_faces = n/2 + 2;
@@ -318,24 +298,12 @@ FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indice
   }
 
   set<edge_t> edge_set;
-  //std::vector<int> jump_positions;
-  //std::vector<int> jump_distances;
   
   if(do_windup_general(n_faces, potential_spiral, jumps, edge_set)){
     std::cerr << "No general spiral found ... aborting." << std::endl;
     abort();
   }
   
-  //std::cout << jump_positions.size() << " jump(s) required.";
-  //for (std::vector<int>::iterator i(jump_positions.begin()); i<jump_positions.end(); ++i) {
-  //  std::cout << *i+1 << ", ";//because k is relative to 0
-  //}
-  
-  //for (std::vector<int>::iterator i(jump_distances.begin()); i<jump_distances.end(); ++i) {
-  //  std::cout << *i << ", ";
-  //}
-  //std::cout << std::endl;
-
   PlanarGraph dual(edge_set);
   dual.update_auxiliaries();
 
@@ -343,22 +311,22 @@ FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indice
 }
 
 
-void gpi_connect_forward(std::deque<pair<int,int> > &open_valencies){
+void gpi_connect_forward(std::deque<pair<node_t,int> > &open_valencies){
   --open_valencies.back().second;
   --open_valencies.front().second;
 }
 
-void gpi_connect_backward(std::deque<pair<int,int> > &open_valencies){
+void gpi_connect_backward(std::deque<pair<node_t,int> > &open_valencies){
   --open_valencies.back().second;
   --(*(open_valencies.end() -2)).second;//decrement the last but one entry
 }
 
 // debug only
-//void pdp(std::deque<pair<int,int> > &open_valencies){
-//  for(std::deque<pair<int,int> >::iterator it(open_valencies.begin()); it!= open_valencies.end(); ++it){
-//     std::cout << it->first << ": " << it->second << std::endl;
-//  }
-//}
+void pdp(std::deque<pair<node_t,int> > &open_valencies){
+  for(std::deque<pair<node_t,int> >::iterator it(open_valencies.begin()); it!= open_valencies.end(); ++it){
+     std::cout << it->first << ": " << it->second << std::endl;
+  }
+}
 
 void gpi_remove_node(const node_t i, PlanarGraph &remaining_dual, std::set<int> &remaining_nodes, std::vector<int> &deleted_neighbours){
   remaining_nodes.erase(i);
@@ -370,8 +338,13 @@ void gpi_remove_node(const node_t i, PlanarGraph &remaining_dual, std::set<int> 
   remaining_dual.neighbours[i].clear();
 }
 
+// pentagon indices and jumps start to count at 0
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, std::vector<int> &pentagon_indices, std::deque<pair<int,int> > &jumps) const {
+void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, std::vector<int> &pentagon_indices, std::deque<pair<node_t,int> > &jumps) const {
+
+  //this routine expects empty containers pentagon_indices and jumps.  we make sure the *are* empty
+  pentagon_indices.clear();
+  jumps.clear();
 
   PlanarGraph dual = this->dual_graph(6);
   dual.update_auxiliaries();
@@ -515,7 +488,7 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   int k=0;
   for(std::deque<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){
     if(*it==5){
-      pentagon_indices.push_back(k+1);
+      pentagon_indices.push_back(k);
     }
   }
   assert(pentagon_indices.size()==12);
