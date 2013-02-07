@@ -60,11 +60,11 @@ C Now read database
         nlines=0
         Do J=1,Nisoloop
          if(IH.eq.1) then
-         Read(1,2000,ERR=199) number,Group,(RSPI(i),I=1,12),
+         Read(1,2000,ERR=199,end=199) number,Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,5),NP,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,
      1    HLgap,shell,ncycHam,nmrstring
          else
-         Read(1,2001,ERR=199) number,Group,(RSPI(i),I=1,12),
+         Read(1,2001,ERR=199,end=199) number,Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,5),NP,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,
      1    HLgap,shell,nmrstring
          endif
