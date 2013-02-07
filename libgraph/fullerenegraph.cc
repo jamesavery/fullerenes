@@ -197,151 +197,151 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   return frog;
 }
 
-void wg_connect(const int i, const int j, set<edge_t> &edge_set, std::vector<int> &uv)
+void wg_connect_backward(set<edge_t> &edge_set, std::deque<pair<node_t, int> > &ov)
 {
-  edge_set.insert(edge_t(i,j));
-  ++uv[i];
-  ++uv[j];
+  edge_set.insert(edge_t(ov.back().first, (ov.end()-2)->first));
+  --ov.back().second;
+  --(*(ov.end() -2)).second;//decrement the last but one entry
 }
 
-bool do_windup_general(const int n, const std::vector<int> &pot_spiral, std::vector<int> &pos, std::vector<int> &dist, set<edge_t> &edge_set){
-  //number of used valencies per vertex (0-5(6))
-  std::vector<int> used_valencies(n,0);
-  //list of vertices that have open valencies
-  std::vector<int> open_valencies;
+void wg_connect_forward(set<edge_t> &edge_set, std::deque<pair<node_t, int> > &ov)
+{
+  edge_set.insert(edge_t(ov.back().first, ov.front().first));
+  --ov.back().second;
+  --ov.front().second;
+}
 
+bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std::deque<pair<int,int> > jumps,  set<edge_t> &edge_set){
+//  //number of used valencies per vertex (0-5(6))
+//  std::vector<int> used_valencies(n_faces,0);
+  // open_valencies is a list with one entry per node that has been added to the spiral but is not fully saturated yet.  The entry contains the number of the node and the number of open valencies
+  std::deque<pair<node_t,int> > open_valencies;
+
+  open_valencies.push_back(make_pair(0,spiral[0]));
+  open_valencies.push_back(make_pair(1,spiral[1]));
   //connect first two faces
-  wg_connect(0, 1, edge_set, used_valencies);
+  wg_connect_backward(edge_set, open_valencies);
 
-  open_valencies.push_back(0);
-  open_valencies.push_back(1);
-
-  int x; //jump distance (x=1 is no jump)
-  
   //iterate over atoms
   //k=0, k=1 have been done already
-  for (int k=2; k<n; ++k){
-    //check if jump
-    x = 0;
-    if(pot_spiral[open_valencies.front()] - used_valencies[open_valencies.front()] == 2 && open_valencies.size() > 6){
-      while(pot_spiral[*(open_valencies.begin()+x)] - used_valencies[*(open_valencies.begin()+x)] == 2){
-        ++x;
+  for (int k=2; k<n_faces; ++k){
+//    //check if jump
+//    x = 0;
+//    if(pot_spiral[open_valencies[0]] - used_valencies[open_valencies[0]] == 2 && open_valencies.size() > 6){
+//      while(pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 2){
+//        ++x;
+//      }
+//      //two error cases
+//      if (pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 1 &&
+//        pot_spiral[open_valencies[x+1]] - used_valencies[open_valencies[x+1]] == 1 &&
+//        pot_spiral[open_valencies[x+2]] - used_valencies[open_valencies[x+2]] == 1 &&
+//        pot_spiral[open_valencies[x+3]] - used_valencies[open_valencies[x+3]] == 1)
+//                {std::cerr << "There is no spiral." << std::endl;
+//        return 1;}
+//      if (pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 1 &&
+//        pot_spiral[open_valencies[x+1]] - used_valencies[open_valencies[x+1]] == 1 &&
+//        pot_spiral[open_valencies[x+2]] - used_valencies[open_valencies[x+2]] == 1 &&
+//        pot_spiral[open_valencies[x]] == 5)
+//                {std::cerr << "There is no spiral." << std::endl;
+//        return 1;}
+//      //two jump cases
+//      if ((pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 1 &&
+//         pot_spiral[open_valencies[x+1]] - used_valencies[open_valencies[x+1]] == 1 &&
+//         pot_spiral[open_valencies[x]] == 5) || 
+//        (pot_spiral[open_valencies[x]] - used_valencies[open_valencies[x]] == 1 &&
+//        pot_spiral[open_valencies[x+1]] - used_valencies[open_valencies[x+1]] == 1 &&
+//        pot_spiral[open_valencies[x+2]] - used_valencies[open_valencies[x+2]] == 1 &&
+//        pot_spiral[open_valencies[x]] == 6))
+//        ++x;
+//        else
+//        x=0;
+//    }
+
+//    //jump positions and distances
+//    if(x>1){// x=1 is no jump
+//      pos.push_back(k);
+//      dist.push_back(x);
+//    }
+
+    if(k == jumps[0].first){
+      // perform cyclic rotation on open_valencies
+      for(int i = jumps[0].second; i>1; --i){ // 1 is no jump
+        open_valencies.push_back(open_valencies.front());
+        open_valencies.pop_front();
       }
-      //two error cases
-      if (pot_spiral[*(open_valencies.begin()+x)] - used_valencies[*(open_valencies.begin()+x)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x+1)] - used_valencies[*(open_valencies.begin()+x+1)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x+2)] - used_valencies[*(open_valencies.begin()+x+2)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x+3)] - used_valencies[*(open_valencies.begin()+x+3)] == 1)
-                {std::cerr << "There is no spiral." << std::endl;
-        return 1;}
-      if (pot_spiral[*(open_valencies.begin()+x)] - used_valencies[*(open_valencies.begin()+x)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x+1)] - used_valencies[*(open_valencies.begin()+x+1)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x+2)] - used_valencies[*(open_valencies.begin()+x+2)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x)] == 5)
-                {std::cerr << "There is no spiral." << std::endl;
-        return 1;}
-      //two jump cases
-      if ((pot_spiral[*(open_valencies.begin()+x)] - used_valencies[*(open_valencies.begin()+x)] == 1 &&
-         pot_spiral[*(open_valencies.begin()+x+1)] - used_valencies[*(open_valencies.begin()+x+1)] == 1 &&
-         pot_spiral[*(open_valencies.begin()+x)] == 5) || 
-        (pot_spiral[*(open_valencies.begin()+x)] - used_valencies[*(open_valencies.begin()+x)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x+1)] - used_valencies[*(open_valencies.begin()+x+1)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x+2)] - used_valencies[*(open_valencies.begin()+x+2)] == 1 &&
-        pot_spiral[*(open_valencies.begin()+x)] == 6))
-        ++x;
-        else
-        x=0;
+      jumps.pop_front();
     }
 
-    //jump positions and distances
-    if(x>1){// x=1 is no jump
-      pos.push_back(k);
-      dist.push_back(x);
-    }
-
-    // perform cyclic rotation on open_valencies
-    for(int i = 1; i<x; ++i){
-      int j = open_valencies.front();
-      open_valencies.erase(open_valencies.begin());
-      open_valencies.push_back(j);
-    }
+    open_valencies.push_back(make_pair(k,spiral[k]));
 
     //connect k to k-1
-    wg_connect(open_valencies.back(), k, edge_set, used_valencies);
+    wg_connect_backward(edge_set, open_valencies);
 
     //connect k to k-2, etc
-    while(open_valencies.size() != 0 && pot_spiral[open_valencies.back()] - used_valencies[open_valencies.back()] == 0){
-//      std::cout << pot_spiral[open_valencies.back()] << used_valencies[open_valencies.back()] << std:: endl;
-      open_valencies.erase(open_valencies.end()-1);
-      if(open_valencies.size() != 0 && pot_spiral[k] - used_valencies[k] != 0){
-        wg_connect(open_valencies.back(), k, edge_set, used_valencies);
-      }
+    wg_connect_forward(edge_set, open_valencies);
+
+    while(open_valencies.front().second==0){
+      open_valencies.pop_front();
+      wg_connect_forward(edge_set, open_valencies);
     }
 
-//    std::cout << k << "vii" << std::endl;
-    //connect k to oldest unconnected (etc)
-    if(pot_spiral[k] - used_valencies[k] != 0){
-      wg_connect(open_valencies.front(), k, edge_set, used_valencies);
+    while((open_valencies.end()-2)->second==0){
+      open_valencies.erase(open_valencies.end()-2);
+      wg_connect_backward(edge_set, open_valencies);
     }
-//    std::cout << open_valencies.front() << " " << pot_spiral[open_valencies.front()] << " " << used_valencies[open_valencies.front()] << std:: endl;
-    while(open_valencies.size() != 0 && pot_spiral[open_valencies.front()] - used_valencies[open_valencies.front()] == 0){
-      open_valencies.erase(open_valencies.begin());
-      if(open_valencies.size() != 0 && pot_spiral[k] - used_valencies[k] != 0){
-        wg_connect(open_valencies.front(), k, edge_set, used_valencies);
-      }
-    }
-    
+
     //append k to the open valencies (after making sure it has some valencies left)
-    if (pot_spiral[k] - used_valencies[k] != 0){//the current atom is not saturated (which may only happen for the last one)
-      open_valencies.push_back(k);
-    }else{
-      if(k + 1 != n){
-        std::cout << "Fail 1 (cage closed but faces left)" << std::endl;
-        return 1;
-      }
+    if (open_valencies.back().second == 0 && k!= n_faces){//the current atom is saturated (which may only happen for the last one)
+      std::cout << "Cage closed but faces left (or otherwise invalid spiral)" << std::endl;
+      return 1;
     }
   }//iterate over atoms
+
   if(open_valencies.size() != 0){
-      std::cout << "Fail 2 (cage not closed but no faces left)" << std::endl;
+      std::cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << std::endl;
       return 1;
-  } 
+  }
   return 0;// success
 }// do_windup_general
 
 
-FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indices, bool IPR) : CubicGraph() {
+// both the pentagon indices and the jumps start at 0
+// n is the number of vertices
+FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indices, const std::deque<pair<int,int> > jumps) : CubicGraph() {
   assert(spiral_indices.size() == 12);
 
-  std::vector<int> potential_spiral (n,6);
+  const int n_faces = n/2 + 2;
+
+  std::vector<int> potential_spiral (n_faces,6);
   for (int i=0; i<12; ++i){
-    //std::cout << spiral_indices[i] << " " ;
-    potential_spiral[spiral_indices[i]-1] = 5;//because the spiral input starts at 1 but this vector starts at 0
+    potential_spiral[spiral_indices[i]] = 5;
   }
 
   set<edge_t> edge_set;
-  std::vector<int> jump_positions;
-  std::vector<int> jump_distances;
+  //std::vector<int> jump_positions;
+  //std::vector<int> jump_distances;
   
-  if(do_windup_general(n, potential_spiral, jump_positions, jump_distances, edge_set)){
-    std::cerr << "No general spiral found either ... aborting." << std::endl;
+  if(do_windup_general(n_faces, potential_spiral, jumps, edge_set)){
+    std::cerr << "No general spiral found ... aborting." << std::endl;
     abort();
   }
   
-  std::cout << jump_positions.size() << " jump(s) required.";
-  for (std::vector<int>::iterator i(jump_positions.begin()); i<jump_positions.end(); ++i) {
-    std::cout << *i+1 << ", ";//because k is relative to 0
-  }
+  //std::cout << jump_positions.size() << " jump(s) required.";
+  //for (std::vector<int>::iterator i(jump_positions.begin()); i<jump_positions.end(); ++i) {
+  //  std::cout << *i+1 << ", ";//because k is relative to 0
+  //}
   
-  for (std::vector<int>::iterator i(jump_distances.begin()); i<jump_distances.end(); ++i) {
-    std::cout << *i << ", ";
-  }
-  std::cout << std::endl;
+  //for (std::vector<int>::iterator i(jump_distances.begin()); i<jump_distances.end(); ++i) {
+  //  std::cout << *i << ", ";
+  //}
+  //std::cout << std::endl;
 
   PlanarGraph dual(edge_set);
   dual.update_auxiliaries();
 
   *this = dual.dual_graph(3);
 }
+
 
 void gpi_connect_forward(std::deque<pair<int,int> > &open_valencies){
   --open_valencies.back().second;
@@ -371,7 +371,7 @@ void gpi_remove_node(const node_t i, PlanarGraph &remaining_dual, std::set<int> 
 }
 
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, std::vector<int> &pentagon_indices, std::vector<pair<int,int> >&jumps) const {
+void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, std::vector<int> &pentagon_indices, std::deque<pair<int,int> > &jumps) const {
 
   PlanarGraph dual = this->dual_graph(6);
   dual.update_auxiliaries();
