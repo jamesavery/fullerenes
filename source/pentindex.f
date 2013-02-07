@@ -70,11 +70,11 @@ C       Search where the 5-rings are in the spiral
         CALL Windup(M,IPRS,IER,S,D)              ! Wind up spiral into dual
         IF(IER.gt.0) then
           WRITE(Iout,1000) IER
-          g = windup_general(m, jp, iprs)
+c          g = windup_general(m, jp, iprs)
 c         get the adjcaency matrix
-          call adjacency_matrix(g,Nmax,IDA)
-          call delete_fullerene_graph(g)
-          go to 666 ! evil number for evil code
+c          call adjacency_matrix(g,Nmax,IDA)
+c          call delete_fullerene_graph(g)
+c          go to 666 ! evil number for evil code
         endif
         IT=1
         Do I=1,12
