@@ -2,6 +2,8 @@
 # define FULLERENE_GRAPH_HH
 
 #include "cubicgraph.hh"
+#include "geometry.hh"
+#include <deque>
 
 class FullereneGraph : public CubicGraph {
 public:
@@ -10,7 +12,7 @@ public:
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
   FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
   FullereneGraph(const unsigned int *index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
-  FullereneGraph(const int N, const std::vector<int> spiral_indices, bool IPR); 
+  FullereneGraph(const int N, const std::vector<int> spiral_indices, const std::deque<pair<node_t,int> > jumps); 
 
   void fullerene_check() const
   {
@@ -34,7 +36,7 @@ public:
   pair<set< face_t>, set<face_t> > compute_faces56() const;
 
   // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-  void get_pentagon_indices(const int f1, const int f2, const int f3, std::vector<int> &pentagon_indices, std::vector<pair<int,int> > &jumps) const;
+  void get_pentagon_indices(const int f1, const int f2, const int f3, std::vector<int> &pentagon_indices, std::deque<pair<node_t,int> > &jumps) const;
 
   static FullereneGraph C20() {
     PlanarGraph g;

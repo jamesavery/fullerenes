@@ -161,14 +161,19 @@ fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const c
   return g;
 }
 
-fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array[12], bool *ipr){
+fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array[12], const int jumps_array[][2], const int no_jumps){
   
   std::vector<int> spiral_indices(12);
   for(int i=0; i<12; ++i){
     spiral_indices[i] = spiral_indices_array[i];
   }
 
-  fullerene_graph_ptr g = new FullereneGraph(*n, spiral_indices, *ipr);
+  std::deque<pair<node_t,int> > jumps;
+  for(int i=0; i<no_jumps; ++i){
+    jumps.push_back(make_pair(jumps_array[i][0],jumps_array[i][1]));
+  }
+
+  fullerene_graph_ptr g = new FullereneGraph(*n, spiral_indices, jumps);
   return g;
 }
 
