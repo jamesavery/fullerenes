@@ -3,16 +3,18 @@
 
 #include "cubicgraph.hh"
 #include "geometry.hh"
-#include <deque>
+#include <list>
 
 class FullereneGraph : public CubicGraph {
 public:
+  typedef list<pair<int,int> > jumplist_t;
+  
   FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { if(N>0) fullerene_check();  }
   FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
   FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
   FullereneGraph(const unsigned int *index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
-  FullereneGraph(const int N, const std::vector<int> spiral_indices, const std::deque<pair<node_t,int> > jumps); 
+  FullereneGraph(const int N, const vector<int> spiral_indices, const jumplist_t jumps = jumplist_t()); 
 
   void fullerene_check() const
   {
@@ -36,7 +38,7 @@ public:
   pair<set< face_t>, set<face_t> > compute_faces56() const;
 
   // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-  void get_pentagon_indices(const int f1, const int f2, const int f3, std::vector<int> &pentagon_indices, std::deque<pair<node_t,int> > &jumps) const;
+  void get_pentagon_indices(const int f1, const int f2, const int f3, vector<int> &pentagon_indices, jumplist_t &jumps) const;
 
   static FullereneGraph C20() {
     PlanarGraph g;

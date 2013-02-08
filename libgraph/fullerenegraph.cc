@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <vector>
+#include <list>
 #include <deque>
 #include <utility> //required for pair
 
@@ -197,24 +198,31 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   return frog;
 }
 
-void wg_connect_backward(set<edge_t> &edge_set, std::deque<pair<node_t, int> > &ov)
+void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
 {
-  edge_set.insert(edge_t(ov.back().first, (ov.end()-2)->first));
+  list< pair<node_t,int> >::iterator second_last(ov.end());
+  second_last--;
+  second_last--;
+
+  edge_set.insert(edge_t(ov.back().first, second_last->first));
   --ov.back().second;
-  --((ov.end() -2)->second);//decrement the last but one entry
+  --(second_last->second);//decrement the last but one entry
 }
 
-void wg_connect_forward(set<edge_t> &edge_set, std::deque<pair<node_t, int> > &ov)
+void wg_connect_forward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
 {
   edge_set.insert(edge_t(ov.back().first, ov.front().first));
   --ov.back().second;
   --ov.front().second;
 }
 
-bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std::deque<pair<node_t,int> > jumps,  set<edge_t> &edge_set){
+bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair<int,int> > jumps,  set<edge_t> &edge_set){
 
   // open_valencies is a list with one entry per node that has been added to the spiral but is not fully saturated yet.  The entry contains the number of the node and the number of open valencies
-  std::deque<pair<node_t,int> > open_valencies;
+  list<pair<int,int> > open_valencies;
+  list<pair<int,int> >::iterator second_last(open_valencies.end());
+  second_last--;
+  second_last--;
 
   // set up first two nodes
   open_valencies.push_back(make_pair(0,spiral[0]));
@@ -225,10 +233,10 @@ bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std:
   //iterate over atoms
   //k=0, k=1 have been done already
   for (int k=2; k<n_faces-1; ++k){
-
-    if(k == jumps[0].first){
+    cout << k << endl;
+    if(jumps.size() != 0 && k == jumps.front().first){
       // perform cyclic rotation on open_valencies
-      for(int i = jumps[0].second; i>1; --i){ // 1 is no jump
+      for(int i = jumps.front().second; i>1; --i){ // 1 is no jump
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
       }
@@ -250,26 +258,28 @@ bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std:
       wg_connect_forward(edge_set, open_valencies);
     }
     // do the remaining connect backwards
-    while((open_valencies.end()-2)->second==0){
-      open_valencies.erase(open_valencies.end()-2);
+    while(second_last->second==0){
+      open_valencies.erase(second_last);
       wg_connect_backward(edge_set, open_valencies);
     }
 
     if (open_valencies.back().second == 0){//the current atom is saturated (which may only happen for the last one)
-      std::cout << "Cage closed but faces left (or otherwise invalid spiral)" << std::endl;
+      cout << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
       return 1;
     }
   }//iterate over atoms
-
+  cout << n_faces-1 << endl;
   // make sure we left the spiral in a sane state
   // open_valencies must be either 5 or 6 times '1' at this stage
   if(open_valencies.size() != spiral.back()){
-    std::cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << std::endl;
+    cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << endl;
+    cout << open_valencies.size() << ", "<< spiral.back() << endl;
     return 1;
   }
-  for(std::deque<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
+  for(list<pair<int,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
     if(it->second!=1){
-      std::cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << std::endl;
+      cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << endl;
+      cout << "2" << endl;
     }
   }
 
@@ -287,20 +297,23 @@ bool do_windup_general(const int n_faces,  const std::vector<int> &spiral,  std:
 
 // both the pentagon indices and the jumps start at 0
 // n is the number of vertices
-FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indices, const std::deque<pair<node_t,int> > jumps) : CubicGraph() {
+FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, const list<pair<int,int> > jumps) : CubicGraph() {
+
   assert(spiral_indices.size() == 12);
 
   const int n_faces = n/2 + 2;
 
-  std::vector<int> potential_spiral (n_faces,6);
+  printf("n_faces = %d\n",n_faces);
+  vector<int> potential_spiral (n_faces,6);
   for (int i=0; i<12; ++i){
+    printf("spiral_indices[%d] = %d\n",i,spiral_indices[i]);
     potential_spiral[spiral_indices[i]] = 5;
   }
 
   set<edge_t> edge_set;
   
   if(do_windup_general(n_faces, potential_spiral, jumps, edge_set)){
-    std::cerr << "No general spiral found ... aborting." << std::endl;
+    cerr << "No general spiral found ... aborting." << endl;
     abort();
   }
   
@@ -311,28 +324,32 @@ FullereneGraph::FullereneGraph(const int n, const std::vector<int> spiral_indice
 }
 
 
-void gpi_connect_forward(std::deque<pair<node_t,int> > &open_valencies){
+void gpi_connect_forward(list<pair<int,int> > &open_valencies){
   --open_valencies.back().second;
   --open_valencies.front().second;
 }
 
-void gpi_connect_backward(std::deque<pair<node_t,int> > &open_valencies){
+void gpi_connect_backward(list<pair<int,int> > &open_valencies){
+  list<pair<int,int> >::iterator second_last(open_valencies.end());
+  second_last--;
+  second_last--;
+
   --open_valencies.back().second;
-  --(*(open_valencies.end() -2)).second;//decrement the last but one entry
+  --second_last->second;//decrement the last but one entry
 }
 
-// debug only
-void pdp(std::deque<pair<node_t,int> > &open_valencies){
-  for(std::deque<pair<node_t,int> >::iterator it(open_valencies.begin()); it!= open_valencies.end(); ++it){
-     std::cout << it->first << ": " << it->second << std::endl;
-  }
-}
+// // debug only
+// void pdp(list<pair<int,int> > &open_valencies){
+//   for(list<pair<int,int> >::iterator it(open_valencies.begin()); it!= open_valencies.end(); ++it){
+//      cout << it->first << ": " << it->second << endl;
+//   }
+// }
 
-void gpi_remove_node(const node_t i, PlanarGraph &remaining_dual, std::set<int> &remaining_nodes, std::vector<int> &deleted_neighbours){
+void gpi_remove_node(const int i, PlanarGraph &remaining_dual, set<int> &remaining_nodes, vector<int> &deleted_neighbours){
   remaining_nodes.erase(i);
   //remove i from all neighbour lists and erase all neighbours from the i-list
-  for(std::vector<node_t>::iterator it = remaining_dual.neighbours[i].begin(); it != remaining_dual.neighbours[i].end(); ++it){
-    remaining_dual.neighbours[*it].erase(std::find(remaining_dual.neighbours[*it].begin(),remaining_dual.neighbours[*it].end(),i));
+  for(vector<int>::iterator it = remaining_dual.neighbours[i].begin(); it != remaining_dual.neighbours[i].end(); ++it){
+    remaining_dual.neighbours[*it].erase(find(remaining_dual.neighbours[*it].begin(),remaining_dual.neighbours[*it].end(),i));
   }
   deleted_neighbours = remaining_dual.neighbours[i];
   remaining_dual.neighbours[i].clear();
@@ -340,7 +357,7 @@ void gpi_remove_node(const node_t i, PlanarGraph &remaining_dual, std::set<int> 
 
 // pentagon indices and jumps start to count at 0
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, std::vector<int> &pentagon_indices, std::deque<pair<node_t,int> > &jumps) const {
+void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, vector<int> &pentagon_indices, list<pair<node_t,int> > &jumps) const {
 
   //this routine expects empty containers pentagon_indices and jumps.  we make sure the *are* empty
   pentagon_indices.clear();
@@ -352,18 +369,18 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   // remaining_dual is the graph that consists of all nodes that haven't been added to the graph yet
   PlanarGraph remaining_dual(dual);
   remaining_dual.update_auxiliaries();
-//  std::cout << "remaining dual created" << std::endl;
+//  cout << "remaining dual created" << endl;
   // all the nodes that haven't been added yet, not ordered and starting at 0
-  std::set<node_t> remaining_nodes;
+  set<node_t> remaining_nodes;
 
   // the spiral is a string of numbers 5 and 6 and is built up during the loop
-  std::deque<int> spiral; 
+  deque<int> spiral; 
   // valencies is a list of length N and contains the valencies of each node (5 or 6)
-  std::vector<node_t> valencies(dual.N, 0);  
+  vector<node_t> valencies(dual.N, 0);  
   // open_valencies is a list with one entry per node that has been added to the spiral but is not fully saturated yet.  The entry contains the number of the node and the number of open valencies
-  std::deque<pair<node_t,int> > open_valencies;
+  list<pair<node_t,int> > open_valencies;
   // a backup of the neighbours of he current node ... required in case of a jump
-  std::vector<int> deleted_neighbours_bak;
+  vector<int> deleted_neighbours_bak;
 
   //the current jumping state
   int x=0;
@@ -371,19 +388,19 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   //init of the valency-list and the set of nodes in the remaining graph
   for(int i=0; i<remaining_dual.N; ++i){
     valencies[i] = remaining_dual.neighbours[i].size();
-    //std::cout << i << ": " << valencies[i]<< std::endl;
+    //cout << i << ": " << valencies[i]<< endl;
     remaining_nodes.insert(i);
   }
 
   // add the first three (defining) nodes
   //first node
-//  std::cout << "node 1" << std::endl;
+//  cout << "node 1" << endl;
   spiral.push_back(valencies[f1]);
   gpi_remove_node(f1, remaining_dual, remaining_nodes, deleted_neighbours_bak);
   open_valencies.push_back(make_pair(f1,valencies[f1]));
 
   //second node
-//  std::cout << "node 2" << std::endl;
+//  cout << "node 2" << endl;
   spiral.push_back(valencies[f2]);
   gpi_remove_node(f2, remaining_dual, remaining_nodes, deleted_neighbours_bak);
   open_valencies.push_back(make_pair(f2,valencies[f2]));
@@ -391,7 +408,7 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   //pdp(open_valencies);
 
   //third node
-//  std::cout << "node 3" << std::endl;
+//  cout << "node 3" << endl;
   spiral.push_back(valencies[f3]);
   gpi_remove_node(f3, remaining_dual, remaining_nodes, deleted_neighbours_bak);
   open_valencies.push_back(make_pair(f3,valencies[f3]));
@@ -403,20 +420,20 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   // starting at 3 because we added 3 already
   for(int i=3; i<dual.N -1; ++i){
 
-    std::deque<pair<int,int> > open_valencies_bak(open_valencies);
+    list<pair<int,int> > open_valencies_bak(open_valencies);
 
     // find *the* node in dual (not the remaining_dual), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_dual because there are some edges deleted already
-    std::set<int>::iterator j=remaining_nodes.begin();
+    set<int>::iterator j=remaining_nodes.begin();
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
     for( ; j!=remaining_nodes.end(); ++j){
-    //   std::cout << open_valencies.back().first<< ", " << open_valencies.front().first << ", " << *seti << ", " << valencies[*seti] << std::endl;
+    //   cout << open_valencies.back().first<< ", " << open_valencies.front().first << ", " << *seti << ", " << valencies[*seti] << endl;
       if(dual.edge_set.find(edge_t(u,*j)) != dual.edge_set.end() &&
          dual.edge_set.find(edge_t(w,*j)) != dual.edge_set.end()) break;
     }
     assert(j!=remaining_nodes.end());
 
-//    std::cout << "adding node " << *j << std::endl;
+//    cout << "adding node " << *j << endl;
     spiral.push_back(valencies[*j]);
     open_valencies.push_back(make_pair(*j,valencies[*j]));
     gpi_connect_backward(open_valencies);
@@ -424,10 +441,14 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
 
     // there are three positions in open_valencies that can be 0---one shouldn't happen, the other two cases requires interaction.
     while(true){
+      list<pair<int,int> >::iterator second_last(open_valencies.end());
+      second_last--;
+      second_last--;
+      
       bool a=0;
       assert(open_valencies.back().second!=0);//can only happen if the psiral missed a jump
-      if((*(open_valencies.end()-2)).second==0){
-        open_valencies.erase (open_valencies.end()-2);
+      if(second_last->second==0){
+        open_valencies.erase (second_last);
         gpi_connect_backward(open_valencies);
         a=1;
       }
@@ -445,13 +466,13 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
     //pdp(open_valencies);
 
     if(!remaining_dual.is_connected(remaining_nodes)){
-//      std::cout << "entering reversion" << std::endl;
+//      cout << "entering reversion" << endl;
       //revert the last operations
       remaining_nodes.insert(v);
       spiral.pop_back();
       open_valencies = open_valencies_bak;
       remaining_dual.neighbours[v] = deleted_neighbours_bak;
-      for(std::vector<node_t>::iterator it = remaining_dual.neighbours[v].begin(); it != remaining_dual.neighbours[v].end(); ++it){
+      for(vector<node_t>::iterator it = remaining_dual.neighbours[v].begin(); it != remaining_dual.neighbours[v].end(); ++it){
         remaining_dual.neighbours[*it].push_back(v);
       }
       //perform  cyclic rotation on open_valencies
@@ -472,13 +493,13 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   assert(remaining_nodes.size() == 1);
   if(valencies[*remaining_nodes.begin()] == 5){
     assert(open_valencies.size() == 5);
-    for(std::deque<pair<int,int> >::iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
+    for(list<pair<int,int> >::iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
       assert(it->second == 1);
     }
     spiral.push_back(5);
   } else if (valencies[*remaining_nodes.begin()] == 6){
     assert(open_valencies.size() == 6);
-    for(std::deque<pair<int,int> >::iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
+    for(list<pair<int,int> >::iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
       assert(it->second == 1);
     }
     spiral.push_back(6);
@@ -486,7 +507,7 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   
   // extract spiral indices from spiral
   int k=0;
-  for(std::deque<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){
+  for(deque<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){
     if(*it==5){
       pentagon_indices.push_back(k);
     }
