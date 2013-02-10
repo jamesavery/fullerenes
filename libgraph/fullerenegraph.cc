@@ -258,7 +258,6 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
 
     // do the remaining connect forwards
     while(open_valencies.front().second==0){
-//      cout << "delete first item" << endl;
       open_valencies.pop_front();
       wg_connect_forward(edge_set, open_valencies);
     }
@@ -270,9 +269,8 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
       if(second_last->second==0){
         open_valencies.erase(second_last);
         wg_connect_backward(edge_set, open_valencies);
-      }else{
-        break;
-      }
+      } else break;
+      
     }
 
     if (open_valencies.back().second == 0){//the current atom is saturated (which may only happen for the last one)
@@ -447,25 +445,22 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
     gpi_connect_forward(open_valencies);
 
     // there are three positions in open_valencies that can be 0---one shouldn't happen, the other two cases requires interaction.
+    while(open_valencies.front().second==0){
+      open_valencies.pop_front();
+      gpi_connect_forward(open_valencies);
+    }
     while(true){
       list<pair<int,int> >::iterator second_last(open_valencies.end());
       second_last--;
       second_last--;
       
-      bool a=0;
-      assert(open_valencies.back().second!=0);//can only happen if the psiral missed a jump
       if(second_last->second==0){
         open_valencies.erase (second_last);
         gpi_connect_backward(open_valencies);
-        a=1;
       }
-      if(open_valencies.front().second==0){
-        open_valencies.pop_front();
-        gpi_connect_forward(open_valencies);
-        a=1;
-      }
-      if(!a) break;
+      else break;
     }
+    assert(open_valencies.back().second!=0);//can only happen if the spiral missed a jump
 
     node_t v = *j;
     //remove all edges of which *j is part from the remaining dual
