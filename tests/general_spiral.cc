@@ -1,6 +1,8 @@
 #include "libgraph/cubicgraph.hh"
 #include "libgraph/fullerenegraph.hh"
 
+#include <vector>
+
 using namespace std;
 
 int main(int ac, char **av)
