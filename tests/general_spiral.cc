@@ -38,10 +38,10 @@ int main(int ac, char **av)
   }
   std::cout << std::endl;
 
-//  FullereneGraph fg(n, pentagon_indices_input, jumps);
-  FullereneGraph fg(n, pentagon_indices_input);
+  FullereneGraph fg(n, pentagon_indices_input, jumps);
+//  FullereneGraph fg(n, pentagon_indices_input);
 
-  cout << "fg = " << fg << endl;
+//  cout << "fg = " << fg << endl;
 
 
 
