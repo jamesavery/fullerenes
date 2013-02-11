@@ -1,5 +1,5 @@
 T-C364, a precursor to construct T-C380
-&General NA=364, ispsearch=2, nohueckel=1, nosort=1, ixyz=1, ipsphere=3 /
+&General NA=364, ispsearch=2, nosort=1, ixyz=1, ipsphere=3 /
 &Coord ICart=3 /
 &FFChoice Iopt=2 /
 &FFParameters fcoulomb=250. /
