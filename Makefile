@@ -61,6 +61,6 @@ clean:
 	find . \( -name  "*~" -or  -name "#*#" -or -name "*.o" \) -exec rm {} \;
 
 distclean: clean
-	rm -f fullerene build/libgraph.a qmga.dat config.mod
+	rm -f fullerene build/libgraph.a qmga.dat config.mod test-*
 
 #-----------------------------------------------------
