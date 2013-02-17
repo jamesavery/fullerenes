@@ -18,6 +18,7 @@
 !---------------------------------------------------------------------------!
 !  This main routine calls all major subroutines                            !
 !---------------------------------------------------------------------------!
+
       PROGRAM Fullerene
       use iso_c_binding
       use config
