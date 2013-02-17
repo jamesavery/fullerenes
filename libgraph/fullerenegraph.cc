@@ -394,6 +394,14 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
     remaining_nodes.insert(i);
   }
 
+  //check if starting nodes share a face
+  if(dual.edge_set.find(edge_t(f1,f2)) == dual.edge_set.end() ||
+     dual.edge_set.find(edge_t(f1,f3)) == dual.edge_set.end() ||
+     dual.edge_set.find(edge_t(f2,f3)) == dual.edge_set.end()){
+    cerr << "The requested nodes are not connected.  Aborting ..." << endl;
+    abort();
+  }
+
   // add the first three (defining) nodes
   //first node
   spiral.push_back(valencies[f1]);
