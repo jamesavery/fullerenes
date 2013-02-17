@@ -36,7 +36,7 @@ fullerdl.php receives the password, checks it and if correct
 </td>
 <td valign="middle"  align="center">
 <h1> <big> Program FULLERENE <br>
-Version 4.3.1</big> <br><br>
+Version 4.4</big> <br><br>
 A Fortran/C++ Program for Fullerene Structures <br> 
 and Topological Analysis <br><br> </h1>
 <h2>by Peter Schwerdtfeger, Lukas Wirz and James Avery<br>
@@ -62,8 +62,8 @@ and contains a more extended evaluation of topological indicators, a harmonic os
 vibrational frequencies (although the force constants have not been adjusted yet), general Goldberg-Coxeter transformations
 of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to both the Yoshida and House of Graphs 
 databases, an improved Tutte embedder, a correct ring spiral count, tight lower and upper bounds for Hamiltonian cycles 
-and a neighborhood spiral ring search algorithm. The fullerene database has been extended up to C<SUB>140</SUB>, and up to 
-C<SUB>180</SUB> for IPR isomers, and is now more compact.  
+and a neighborhood spiral ring search algorithm. The fullerene database has been brought into a more compact form and
+extended up to C<SUB>144</SUB>, and up to C<SUB>190</SUB> for IPR isomers, and is now more compact.  
 <br><br>
 
 This is an open-source code and free for distribution (except for commercial purposes). The following references should be used for citation:<br><br>
@@ -85,14 +85,16 @@ is found in the User's Manual.<br><br>
 <b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.4.pdf">UserManualv4.4.pdf (19/01/2013)</a> (2.4 MB)
 <br><br>
 
-The following database is different to the one used in version 4.3, the previous one is therefore obsolete:<br>
-<b>Download for Database1: General fullerenes C<SUB>20</SUB>-C<SUB>122</SUB> </b><a href="http://ctcp.massey.ac.nz/data/ALL.zip"> ALL.zip (01/11/2012)</a> (compressed 198.9 MB, uncompressed 1.92 GB)
+The following database is different to the one used in version 4.3 (which is now obsolete):<br>
+<b>Download for Database1 (General fullerenes):</b><br> 
+C<SUB>20</SUB>-C<SUB>122</SUB> <a href="http://ctcp.massey.ac.nz/data/ALL.zip"> ALL.zip (01/11/2012)</a> (compressed 198.9 MB, uncompressed 1.92 GB)
 <br>
-<b>Download for Database2: IPR fullerenes C<SUB>60</SUB>-C<SUB>170</SUB> </b><a href="http://ctcp.massey.ac.nz/data/IPR.zip"> IPR.zip (01/11/2012)</a> (compressed 169.2 MB, uncompressed 1.86 GB)
+<b>Download for Database2 (IPR fullerenes):</b><br>
+C<SUB>60</SUB>-C<SUB>170</SUB> <a href="http://ctcp.massey.ac.nz/data/IPR.zip"> IPR.zip (01/11/2012)</a> (compressed 169.2 MB, uncompressed 1.86 GB)
 <br>
-<b>Download for Database3: Yoshida selected fullerenes C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip</a> (compressed 4.4 MB, uncompressed 15.4 MB)
-<br>
-<br>
+<b>Download for Database3 (Yoshida selected fullerenes):</b><br>
+C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip</a> (compressed 4.4 MB, uncompressed 15.4 MB)
+<br><br>
 
 <b>Download for fullerene program:</b><br>
 If you are a new user or if your password expired, please supply Title (Prof., Dr., Mr., Mrs.), 
