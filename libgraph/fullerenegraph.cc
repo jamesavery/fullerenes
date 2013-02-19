@@ -237,6 +237,8 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
   //iterate over atoms
   //k=0, k=1 have been done already
   for (int k=2; k<n_faces-1; ++k){
+//    cout << "k: " << k << endl;
+
     if(jumps.size() != 0 && k == jumps.front().first){
       // perform cyclic rotation on open_valencies
       for(int i = jumps.front().second; i>1; --i){ // 1 is no jump
@@ -271,6 +273,7 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
       } else break;
       
     }
+//    pdp(open_valencies);
 
     if (open_valencies.back().second == 0){//the current atom is saturated (which may only happen for the last one)
       cout << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
@@ -322,7 +325,7 @@ FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, co
   set<edge_t> edge_set;
   
   if(do_windup_general(n_faces, potential_spiral, jumps, edge_set)){
-    cerr << "No general spiral found ... aborting.  This shouldn't happen unless the input is wrong.  Mind, that wrong input can lead to errors, even towards the end of the spiral!" << endl;
+    cerr << "No general spiral found ... aborting.  This shouldn't happen unless the input is wrong." << endl;
     abort();
   }
   
