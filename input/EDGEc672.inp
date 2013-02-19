@@ -1,5 +1,5 @@
 C60 build from input connectivities (edges)
-&General NA=672 /
+&General NA=672 ixyz=1 /
 &Coord ICart=6, scalerad=6/
 &FFChoice Iopt=2 /
 &FFParameters /
