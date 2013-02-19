@@ -22,15 +22,19 @@ int main(int ac, char **av)
 //  int jumps_array[][2] = {{165,2}, {172,3}, {179,3}};
 //  int n_jumps = 3;
 //jump, 440
-  int n = 440;
-  int pentagon_indices_array[] = {159, 160, 161, 174, 175, 176, 189, 190, 191, 195, 204, 212};
-  int jumps_array[][2] = {{192,6}, {195,6}, {204,6}, {212,7}};
-  int n_jumps = 4;
+//  int n = 440;
+//  int pentagon_indices_array[] = {159, 160, 161, 174, 175, 176, 189, 190, 191, 195, 204, 212};
+//  int jumps_array[][2] = {{192,6}, {195,6}, {204,6}, {212,7}};
+//  int n_jumps = 4;
+//jump, 672
+  int n = 672;
+  int pentagon_indices_array[] = {140, 142, 144, 161, 163, 165, 225, 242, 328, 330, 333, 335};
+  int jumps_array[][2] = {{225,5}, {242,6}}; //actually it should be 4 and 5
+  int n_jumps = 2;
 
   vector<int> pentagon_indices_input(12);
   vector<int> pentagon_indices_output;
   list<pair<int,int> > jumps;
-  //bool ipr=false;
 
   cout << "Input spiral indices: ";
   for (int i=0; i<12; ++i){
@@ -50,7 +54,7 @@ int main(int ac, char **av)
 //  FullereneGraph fg(n, pentagon_indices_input);
 
 
-//  cout << "fg = " << fg << endl;
+  cout << "fg = " << fg << endl;
 //  cout << "number of faces: " << fg.N << endl;
 //  cout << "number of edges: " << fg.edge_set.size() << endl;
 //  int j=0;
