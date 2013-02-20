@@ -9,9 +9,13 @@
 
 using namespace std;
 
-template <typename T> void printduplicate(string indextype, T value)
+template <typename T> void checkduplicates(const string& indextype, const map<T,int>& counts)
 {
-  cout << "Duplicate "<<indextype<<"-index: " << value << endl;
+  cout << "Duplicate "<<indextype<<"-indices (value:count):\n";
+  for(typename map<T,int>::const_iterator kv(counts.begin()); kv!=counts.end();kv++)
+    if(kv->second>1){
+      cout << "\t"<<kv->first <<": " << kv->second << endl;
+    }
 }
 
 int main(int ac, char **av)
@@ -27,40 +31,37 @@ int main(int ac, char **av)
   //  cout << "Attempting to open " << filename << endl;
   ifstream rspifile(filename);
   string s;
-  set<int>    wiener, hyperwiener, reversewiener, szeged;
-  set<double> balaban;
+  map<int,int>    wiener, hyperwiener, reversewiener, szeged;
+  map<double,int> balaban;
 
   int linenumber =0;
   while(getline(rspifile,s)){
     vector<int> rspi(12);
     stringstream l(s);
-    for(int i=0;i<12;i++){ l >> rspi[i]; rspi[i]--; if(l.fail()) abort(); }
+    for(int i=0;i<12;i++){ 
+      l >> rspi[i]; rspi[i]--; 
+      if(l.fail()){ cerr << "Malformed line: " << s << endl;  abort(); }
+    }
 
-    cout << (++linenumber) << ": " << rspi << endl;
+    cerr << (++linenumber) << ": " << rspi << endl;
 
     // Generate fullerene graph from spiral
     FullereneGraph g(N,rspi,jumps);
     // Are the topological indicators unique?
     TopologicalIndices T(g);
     
-    int w = T.Wiener(), ww = T.hyperWiener(), rw = T.reverseWiener(), sz = T.Szeged();
-    double b = T.Balaban();
-    
-    if(wiener.find(w) != wiener.end()) printduplicate("Wiener",w);
-    else wiener.insert(w);
-
-    if(hyperwiener.find(ww) != hyperwiener.end()) printduplicate("hyper-Wiener",ww);
-    else hyperwiener.insert(ww);
-
-    if(reversewiener.find(rw) != reversewiener.end()) printduplicate("reverse-Wiener",rw);
-    else reversewiener.insert(rw);
-
-    if(szeged.find(sz) != szeged.end()) printduplicate("Szeged",sz);
-    else szeged.insert(sz);
-
-    if(balaban.find(b) != balaban.end()) printduplicate("Balaban",b);
-    else balaban.insert(b);
+    wiener[T.Wiener()]++;
+    hyperwiener[T.hyperWiener()]++;
+    reversewiener[T.reverseWiener()]++;
+    szeged[T.Szeged()]++;
+    balaban[T.Balaban()]++;
   }
+
+  checkduplicates("Wiener",wiener);
+  checkduplicates("hyperWiener",hyperwiener);
+  checkduplicates("reverseWiener",reversewiener);
+  checkduplicates("Szeged",szeged);
+  checkduplicates("Balaban",balaban);
   
   return 0;
 }
