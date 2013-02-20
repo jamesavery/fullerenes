@@ -1,12 +1,12 @@
 #include "graph.hh"
 
-bool Graph::is_connected(const set<node_t> &include) const 
+bool Graph::is_connected(const set<node_t> &subgraph) const 
 {
-  if(!include.empty()){
-    node_t s = *include.begin();
+  if(!subgraph.empty()){
+    node_t s = *subgraph.begin();
     const vector<unsigned int> dist(shortest_paths(s));
 
-    for(set<node_t>::const_iterator u(include.begin()); u!=include.end();u++) 
+    for(set<node_t>::const_iterator u(subgraph.begin()); u!=subgraph.end();u++) 
       if(dist[*u] == INT_MAX) return false;
 
   } else {
