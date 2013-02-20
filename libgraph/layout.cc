@@ -35,7 +35,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
     initial_coords[outer_face[i]] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
   }
 
-  cout << "g = " << *this << endl;
+//  cout << "g = " << *this << endl;
 
   //  initial_coords = tutte_layout_direct(outer_face,initial_coords);
   return tutte_layout_iterative(outer_face,initial_coords);
