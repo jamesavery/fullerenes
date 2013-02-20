@@ -4,6 +4,7 @@
 #include <fstream>
 #include <vector>
 #include <list>
+#include <vector>
 #include <utility> //required for pair
 
 pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const 
@@ -215,6 +216,12 @@ void wg_connect_forward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
   --ov.front().second;
 }
 
+// // debug only (do not remove, please [lukas])
+// void pdp(list<pair<int,int> > &open_valencies){
+//   for(list<pair<int,int> >::iterator it(open_valencies.begin()); it!= open_valencies.end(); ++it){
+//      cout << it->first << ": " << it->second << endl;
+//   }
+// }
 
 bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair<int,int> > jumps,  set<edge_t> &edge_set){
 
@@ -230,7 +237,8 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
   //iterate over atoms
   //k=0, k=1 have been done already
   for (int k=2; k<n_faces-1; ++k){
-    //cout << k << endl;
+//    cout << "k: " << k << endl;
+
     if(jumps.size() != 0 && k == jumps.front().first){
       // perform cyclic rotation on open_valencies
       for(int i = jumps.front().second; i>1; --i){ // 1 is no jump
@@ -246,7 +254,7 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
     // connect k to k-1
     wg_connect_backward(edge_set, open_valencies);
 
-    // connect k to 1, etc
+    // connect k to k-2, etc
     wg_connect_forward(edge_set, open_valencies);
 
     // do the remaining connect forwards
@@ -265,7 +273,9 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
       } else break;
       
     }
-    if (open_valencies.back().second <= 0){//the current atom is saturated (which may only happen for the last one)
+//    pdp(open_valencies);
+
+    if (open_valencies.back().second == 0){//the current atom is saturated (which may only happen for the last one)
       cout << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
       return 1;
     }
@@ -275,14 +285,12 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
   // make sure we left the spiral in a sane state
   // open_valencies must be either 5 or 6 times '1' at this stage
   if(open_valencies.size() != spiral.back()){
-    cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << endl;
-    //cout << open_valencies.size() << ", "<< spiral.back() << endl;
+    cout << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
     return 1;
   }
   for(list<pair<int,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
     if(it->second!=1){
-      cout << "Cage not closed but no faces left (or otherwise invalid spiral)" << endl;
-    //cout << open_valencies.size() << ", "<< spiral.back() << endl;
+      cout << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
     return 1;
     }
   }
@@ -307,10 +315,10 @@ FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, co
 
   const int n_faces = n/2 + 2;
 
-  //printf("n_faces = %d\n",n_faces);
+//  printf("n_faces = %d\n",n_faces);
   vector<int> potential_spiral (n_faces,6);
   for (int i=0; i<12; ++i){
-    //printf("spiral_indices[%d] = %d\n",i,spiral_indices[i]);
+//    printf("spiral_indices[%d] = %d\n",i,spiral_indices[i]);
     potential_spiral[spiral_indices[i]] = 5;
   }
 
@@ -325,6 +333,7 @@ FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, co
   dual.update_auxiliaries();
 
   *this = dual.dual_graph(3);
+  fullerene_check();
 }
 
 
@@ -356,7 +365,7 @@ void gpi_remove_node(const int i, PlanarGraph &remaining_dual, set<int> &remaini
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
 void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, vector<int> &pentagon_indices, list<pair<node_t,int> > &jumps) const {
 
-  //this routine expects empty containers pentagon_indices and jumps.  we make sure the *are* empty
+  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
   pentagon_indices.clear();
   jumps.clear();
 
@@ -366,7 +375,6 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   // remaining_dual is the graph that consists of all nodes that haven't been added to the graph yet
   PlanarGraph remaining_dual(dual);
   remaining_dual.update_auxiliaries();
-//  cout << "remaining dual created" << endl;
   // all the nodes that haven't been added yet, not ordered and starting at 0
   set<node_t> remaining_nodes;
 
@@ -383,10 +391,18 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   int x=0;
 
   //init of the valency-list and the set of nodes in the remaining graph
-  for(int i=0; i<remaining_dual.N; ++i){
+  for(int i=0; i!=remaining_dual.N; ++i){
     valencies[i] = remaining_dual.neighbours[i].size();
     //cout << i << ": " << valencies[i]<< endl;
     remaining_nodes.insert(i);
+  }
+
+  //check if starting nodes share a face
+  if(dual.edge_set.find(edge_t(f1,f2)) == dual.edge_set.end() ||
+     dual.edge_set.find(edge_t(f1,f3)) == dual.edge_set.end() ||
+     dual.edge_set.find(edge_t(f2,f3)) == dual.edge_set.end()){
+    cerr << "The requested nodes are not connected.  Aborting ..." << endl;
+    abort();
   }
 
   // add the first three (defining) nodes
@@ -419,19 +435,17 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
     set<int>::iterator j=remaining_nodes.begin();
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
     for( ; j!=remaining_nodes.end(); ++j){
-    //   cout << open_valencies.back().first<< ", " << open_valencies.front().first << ", " << *seti << ", " << valencies[*seti] << endl;
       if(dual.edge_set.find(edge_t(u,*j)) != dual.edge_set.end() &&
          dual.edge_set.find(edge_t(w,*j)) != dual.edge_set.end()) break;
     }
-    assert(j!=remaining_nodes.end()); // i.e. there is no node to be added next
+    assert(j!=remaining_nodes.end());// there is allways a node to be added next
 
-//    cout << "adding node " << *j << endl;
     spiral.push_back(valencies[*j]);
     open_valencies.push_back(make_pair(*j,valencies[*j]));
     gpi_connect_backward(open_valencies);
     gpi_connect_forward(open_valencies);
 
-    // there are three positions in open_valencies that can be 0---one shouldn't happen, the other two cases requires interaction.
+    // there are three positions in open_valencies that can be 0---one shouldn't happen, the other two cases require interaction.
     while(open_valencies.front().second==0){
       open_valencies.pop_front();
       gpi_connect_forward(open_valencies);
@@ -442,19 +456,18 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
       second_last--;
       
       if(second_last->second==0){
-        open_valencies.erase (second_last);
+        open_valencies.erase(second_last);
         gpi_connect_backward(open_valencies);
       }
       else break;
     }
-    assert(open_valencies.back().second > 0);//can only happen if the spiral missed a jump
+    assert(open_valencies.back().second!=0);//can only happen if the spiral missed a jump
 
     node_t v = *j;
     //remove all edges of which *j is part from the remaining dual
-    gpi_remove_node(*j, remaining_dual, remaining_nodes, deleted_neighbours_bak);
+    gpi_remove_node(v, remaining_dual, remaining_nodes, deleted_neighbours_bak);
 
     if(!remaining_dual.is_connected(remaining_nodes)){
-//      cout << "entering reversion" << endl;
       //revert the last operations
       remaining_nodes.insert(v);
       spiral.pop_back();
@@ -463,14 +476,14 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
       for(vector<node_t>::iterator it = remaining_dual.neighbours[v].begin(); it != remaining_dual.neighbours[v].end(); ++it){
         remaining_dual.neighbours[*it].push_back(v);
       }
-      //perform  cyclic rotation on open_valencies
+      //perform cyclic rotation on open_valencies
       open_valencies.push_back(open_valencies.front());
       open_valencies.pop_front();
       //there was no atom added, so 'i' must not be incremented
       --i;
       ++x;
     } else {
-      if(!x==0){
+      if(x!=0){
         jumps.push_back(make_pair(i,x+1));
         x=0;
       }

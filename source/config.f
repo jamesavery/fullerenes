@@ -1,5 +1,9 @@
       module config
-      integer,parameter :: Nmax=5000 !  Change NMAX if RAM is not sufficient
+!---------------------------------------------------------------------------!
+!  This module is called by most subroutines, it defines most of the        !
+!  parameters and constants used.                                           !
+!---------------------------------------------------------------------------!
+      integer,parameter :: Nmax=5300 !  Change NMAX if RAM is not sufficient
       integer,parameter :: msrs=56+1 !  Size of Schlegel output matrix
       integer,parameter :: NmaxL=(Nmax*(Nmax-1))/2
       integer,parameter :: Mmax=Nmax/2+2
