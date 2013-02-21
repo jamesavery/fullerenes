@@ -48,6 +48,9 @@ build/libgraph.a: $(COBJECTS)
 test-%: tests/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ 
 #-----------------------------------------------------
+app-%: apps/%.cc build/libgraph.a
+	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ 
+#-----------------------------------------------------
 
 output/%.out: input/%.inp
 	./fullerene < $< > $@
