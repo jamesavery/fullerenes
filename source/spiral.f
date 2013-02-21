@@ -161,7 +161,7 @@ C With Hamiltonian cycles
       endif
   400  Write(Iout,1008) L,GROUP,K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,K11,K12
       if(L.eq.0) then
-       WRITE (Iout,1015)
+       WRITE (Iout,1015) I
        return
       endif
        Close(unit=1)
@@ -501,7 +501,7 @@ C     Analyze dual matrix
  1013 FORMAT(/1X,'Starting with new list:')
  1014 Format(1X,'File: ',A20,' does not exist ==> ABORT')
  1015 Format(1X,'Last entry is zero, so check that you do not have ',
-     1 'an empty line at the end of the input')
+     1 'an empty line at the end of the input, line ,'I10)
  1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
  2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
