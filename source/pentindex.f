@@ -1,6 +1,6 @@
       SUBROUTINE CoordBuild(IN,Iout,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,nohueckel,JP,iprev,
-     1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
+     1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,jumps,
      1 GROUP,filename)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
@@ -21,22 +21,25 @@ C mapping
       DIMENSION NMR(6),JP(12),A(NMAX,NMAX),IDA(NMAX,NMAX)
       DIMENSION evec(NMAX),df(NMAX)
       DIMENSION Spiral(12,NMAX)
+      integer jumps(10)
       CHARACTER*3 GROUP
       CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
 c      integer ke, isw, iyf, ibf
-      type(c_ptr) :: g, halma, new_C20, halma_fullerene
+      type(c_ptr) :: g, halma, new_C20, halma_fullerene, windup_general
 C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
 C If nalgorithm=1 use ring-spiral and Tutte algorithm
 C If nalgorithm=2 use Goldberg-Coxeter and matrix eigenvector algorithm
 C If nalgorithm=3 use Goldberg-Coxeter and Tutte algorithm
-C If nalgorithm=4 use connectivity input
+C If nalgorithm=4 use connectivity input (ame)
+C If nalgorithm=5 use connectivity input (tutte)
+C If nalgorithm=6 use general ring-spiral and matrix eigenvector algorithm
+C If nalgorithm=7 use general ring-spiral and Tutte algorithm
       nalgorithm=ICart-2
 
       M=number_vertices/2+2
       Group='NA '
       jumpGC=0
-
 
 C Ring spiral first:
 C Read pentagon list and produce adjacency matrix
@@ -70,11 +73,6 @@ C       Search where the 5-rings are in the spiral
         CALL Windup(M,IPRS,IER,S,D)              ! Wind up spiral into dual
         IF(IER.gt.0) then
           WRITE(Iout,1000) IER
-c          g = windup_general(m, jp, iprs)
-c         get the adjcaency matrix
-c          call adjacency_matrix(g,Nmax,IDA)
-c          call delete_fullerene_graph(g)
-c          go to 666 ! evil number for evil code
         endif
         IT=1
         Do I=1,12
@@ -133,7 +131,7 @@ C End of Spiral Program, dual matrix in D(i,j)
 
 
 C Start Goldberg-Coxeter
-      if(nalgorithm.eq.2.or.nalgorithm.eq.3) then
+      if(nalgorithm.eq.2 .or. nalgorithm.eq.3) then
         itGC=kGC*(kGC+lGC) +lGC*lGC
         igcfullerne=itGC*20
         if(igcfullerne.gt.NMax) then
@@ -169,6 +167,20 @@ C Input connectivities and construct adjacency matrix
         Call ConnectivityInput(Iout,In,Isonum,IDA,filename)
       endif
       
+
+      if(nalgorithm.eq.6 .or. nalgorithm.eq.7) then
+c       if(isonum.eq.0) then
+        if(iprev.eq.0.and.jumpGC.eq.0) Read(IN,*) (JP(I),I=1,12)
+c       else
+
+        g = windup_general(number_vertices, jp, jumps)
+c       get the adjcaency matrix
+        call adjacency_matrix(g,Nmax,IDA)
+        call delete_fullerene_graph(g)
+c       go to 666 ! evil number for evil code
+          
+      endif
+
 
 C Adjacency matrix constructed
 C Now analyze the adjacency matrix if it is correct
@@ -229,12 +241,14 @@ C       Analyze eigenenergies
 
 c      if(ke + isw + iyf + ibf .eq. 0) then
 C Now produce the 3D image (unless the graph is going to change later)
-      if(nalgorithm.eq.0.or.nalgorithm.eq.2.or.nalgorithm.eq.4) then
+      if(nalgorithm.eq.0 .or. nalgorithm.eq.2 .or.
+     1   nalgorithm.eq.4 .or. nalgorithm.eq.6) then
         call AME(Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,CDist)
       endif
 
   
-      if(nalgorithm.eq.1.or.nalgorithm.eq.3.or.nalgorithm.eq.5) then
+      if(nalgorithm.eq.1 .or. nalgorithm.eq.3 .or.
+     1   nalgorithm.eq.5 .or. nalgorithm.eq.7) then
         call Tutte(Iout,nohueckel,IDA,
      1   A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
       endif

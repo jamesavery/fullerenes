@@ -119,7 +119,7 @@ C  INPUT and setting parameters for running the subroutines
      1  ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1  iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
      1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
-     1  force,forceP,boost,filename,filenameout,TEXTINPUT)
+     1  jumps,force,forceP,boost,filename,filenameout,TEXTINPUT)
 
 C  Stop if isomer closest to icosahedral is searched for
       if(isearch.ne.0) then
@@ -138,7 +138,7 @@ C  Convert printed database into a more compressed file
 
 C------------------Coordinates-------------------------------------
 C Options for Input coordinates
-      go to (10,20,30,30,30,30,30,98) Icart+1
+      go to (10,20,30,30,30,30,30,98,30,30) Icart+1
 
 C  Cartesian coordinates produced for Ih C20 or C60
    10 routine='COORDC20/60    '
@@ -205,7 +205,7 @@ C the 3D fullerene
       Write(Iout,1008) routine
       CALL CoordBuild(IN,Iout,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,JP,
-     1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
+     1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,jumps,
      1 GROUP,filename)
       Do I=1,number_vertices
         IAtom(I)=6

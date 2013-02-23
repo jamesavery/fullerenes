@@ -1,9 +1,0 @@
-This is an example how to create the coordinates for the non-general-spiral T-C380
-&General NA=380, nohueckel=1, nosort=1, ixyz=1, ispsearch=2, ipsphere=3 /
-&Coord ICart=3/
-&FFChoice Iopt=3 /
-&FFParameters  /
-&Hamilton /
-&Isomers /
-&Graph ischlegel=1 ifs=1 PS=6.12 iso1=1  iso2=2   iso3=12  /
-1 2 3 137 138 147 148 157 158 166 173 180

@@ -4,13 +4,14 @@
      1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
-     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
+     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,jumps,
      1 force,forceP,boost,filename,filenameout,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer NA,iopt
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF (and a backup)
       integer endzeile
+      integer jumps(10)
       Character*1 DATEN(nzeile)
       Character filename*50
       Character filenameout*50
@@ -18,7 +19,7 @@
      1 nohueckel,loop,ndbconvert,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
-     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad
+     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,jumps
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
@@ -158,6 +159,10 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
 
       scaleRad=4    ! scale size of initial tutte sphere by factor.  The more non-spherical the structure is, the larger this factor should be
 
+      do k=1,10
+        jumps(k)=0
+      enddo
+
 C Now process namelist input
       READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
       endzeile=0
@@ -256,11 +261,11 @@ C ExtWu force field
 
 C Set IC and ichk parameters
       if(ICart.lt.0) ICart=0
-      if(ICart.gt.7) ICart=7
+      if(ICart.gt.9) ICart=9
       if(ichk.ne.0) istop=1
       if(ihamstore.ne.0.or.nhamcyc.ne.0) then
-       nosort=1
-       iupac=1
+        nosort=1
+        iupac=1
       endif
 
 C  Check on number of atoms (vertices)
@@ -279,27 +284,27 @@ C  Check on number of atoms (vertices)
 
 C  Setting minimum distance
       if(R6.ne.R.and.R6.gt.1.d0) then
-      Rdist=R6
-      WRITE(Iout,106) Rdist
+        Rdist=R6
+        WRITE(Iout,106) Rdist
       else
-      Rdist=R
-      WRITE(Iout,107) Rdist
+        Rdist=R
+        WRITE(Iout,107) Rdist
       endif
 
 C  Output list
       if(IP.gt.0) then
-       WRITE(IOUT,105)
-       IP=1
+        WRITE(IOUT,105)
+        IP=1
       endif
       if(IP.lt.0) then
-       IP=0
+        IP=0
       endif
 
 C  Tolerance for finding 5- and 6-ring connections
       if(TolR.le.0.d0) then
-      TolX=Tol
+        TolX=Tol
       else
-      TolX=TolR*0.01d0
+        TolX=TolR*0.01d0
       endif
 
       if(IPRC.lt.0) IPRC=0
