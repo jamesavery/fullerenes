@@ -10,7 +10,7 @@ extern "C" {
   fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *N, const int *adjacency);
   fullerene_graph_ptr read_fullerene_graph_(const char *f_path);
   fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const char *f_path);
-  fullerene_graph_ptr windup_general_(const int *n, const int indices[12], bool *ipr);
+  fullerene_graph_ptr windup_general_(const int *n, const int indices[12], const int jumps_array[10]);
   void delete_fullerene_graph_(fullerene_graph_ptr*);
 
   polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points);
@@ -161,20 +161,22 @@ fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const c
   return g;
 }
 
-fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array[12], const int jumps_array[][2], const int no_jumps){
+fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array[12], const int jumps_array[10]){
   
   vector<int> spiral_indices(12);
   for(int i=0; i<12; ++i){
-    spiral_indices[i] = spiral_indices_array[i];
+    spiral_indices[i] = spiral_indices_array[i]-1;
+  //  cout << spiral_indices[i] << endl;
   }
 
   list<pair<int,int> > jumps;
-  for(int i=0; i<no_jumps; ++i){
-    jumps.push_back(make_pair(jumps_array[i][0],jumps_array[i][1]));
+  for(int i=0; i<10; ++i,++i){
+    if(jumps_array[i]==0) break;
+    jumps.push_back(make_pair(jumps_array[i]-1,jumps_array[i+1]));
+  //  cout << jumps.back().first << ", " << jumps.back().second << endl;
   }
 
-  fullerene_graph_ptr g = new FullereneGraph(*n, spiral_indices, jumps);
-  return g;
+  return new FullereneGraph(*n, spiral_indices, jumps);
 }
 
 
