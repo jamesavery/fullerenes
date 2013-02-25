@@ -532,21 +532,14 @@ void gpi_remove_node(const int i, PlanarGraph &remaining_graph, set<int> &remain
 void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, list<pair<node_t,int> > &jumps) const {
 
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
-  //pentagon_indices.clear();
   spiral.clear();
   jumps.clear();
 
-//  PlanarGraph dual = this->dual_graph(6);
-//  dual.update_auxiliaries();
-
   // remaining_graph is the graph that consists of all nodes that haven't been added to the graph yet
   PlanarGraph remaining_graph(*this);
-//  remaining_graph.update_auxiliaries();
   // all the nodes that haven't been added yet, not ordered and starting at 0
   set<node_t> remaining_nodes;
 
-  // the spiral is a string of numbers 5 and 6 and is built up during the loop
-//  vector<int> spiral; 
   // valencies is a list of length N and contains the valencies of each node (5 or 6)
   vector<node_t> valencies(N, 0);  
   // open_valencies is a list with one entry per node that has been added to the spiral but is not fully saturated yet.  The entry contains the number of the node and the number of open valencies
@@ -659,7 +652,20 @@ void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node
 
   // make sure we left the loop in a sane state
   assert(remaining_nodes.size() == 1);
-  if(valencies[*remaining_nodes.begin()] == 5){
+
+  if(valencies[*remaining_nodes.begin()] == 3){
+    assert(open_valencies.size() == 3);
+    for(list<pair<int,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
+      assert(it->second == 1);
+    }
+    spiral.push_back(3);
+  } else if (valencies[*remaining_nodes.begin()] == 4){
+    assert(open_valencies.size() == 4);
+    for(list<pair<int,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
+      assert(it->second == 1);
+    }
+    spiral.push_back(4);
+  } else if (valencies[*remaining_nodes.begin()] == 5){
     assert(open_valencies.size() == 5);
     for(list<pair<int,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
       assert(it->second == 1);
@@ -673,14 +679,5 @@ void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node
     spiral.push_back(6);
   }
   
-//  // extract spiral indices from spiral
-//  int k=0;
-//  for(vector<int>::const_iterator it=spiral.begin(); it != spiral.end(); ++it){
-//    if(*it==5){
-//      pentagon_indices.push_back(k);
-//      ++k;
-//    }
-//  }
-//  assert(pentagon_indices.size()==12);
 }
 
