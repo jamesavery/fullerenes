@@ -41,6 +41,7 @@ int main(int ac, char **av)
 
   vector<int> pentagon_indices_input(pentagon_indices_array,pentagon_indices_array+12);
   vector<int> pentagon_indices_output;
+  vector<int> spiral;
   list<pair<int,int> > jumps;
   
   cout << "N: " << n << endl
@@ -60,14 +61,26 @@ int main(int ac, char **av)
   PlanarGraph dual(fg.dual_graph(6));
   vector<face_t> faces(dual.compute_faces_flat(3));
 
-  for(int i=0; i<faces.size(); i++){ 
+  for(int i=0; i<faces.size(); i++){
     int permutations[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
     const face_t& f = faces[i];
     for(int j=0; j<6; j++){
+      pentagon_indices_output.clear();
 
       int f1 = f[permutations[j][0]], f2 = f[permutations[j][1]], f3 = f[permutations[j][2]];
 
-      fg.get_pentagon_indices(f1, f2, f3, pentagon_indices_output, jumps);
+      //fg.get_pentagon_indices(f1, f2, f3, pentagon_indices_output, jumps);
+      dual.get_vertex_spiral(f1, f2, f3, spiral, jumps);
+
+      // extract spiral indices from spiral
+      int k=0;
+      for(vector<int>::const_iterator it=spiral.begin(); it != spiral.end(); ++it){
+        if(*it==5){
+          pentagon_indices_output.push_back(k);
+        }
+        ++k;
+      }
+      assert(pentagon_indices_output.size()==12);
 
       printf("Face %d:%d vertices defining the face(%d,%d,%d)\n",i,j,f1,f2,f3);
 //      for(list<pair<int,int> >::iterator it(jumps.begin()); it!= jumps.end(); ++it) {
