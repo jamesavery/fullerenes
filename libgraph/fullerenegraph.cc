@@ -337,6 +337,33 @@ FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, co
 }
 
 
+// pentagon indices and jumps start to count at 0
+// perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
+void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, vector<int> &pentagon_indices, list<pair<node_t,int> > &jumps) const {
+
+  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
+  pentagon_indices.clear();
+  jumps.clear();
+
+  PlanarGraph dual = this->dual_graph(6);
+  dual.update_auxiliaries();
+
+  // the spiral is a string of numbers 5 and 6 and is built up during the loop
+  vector<int> spiral; 
+
+  dual.get_vertex_spiral(f1, f2, f3, spiral, jumps);
+  
+  // extract spiral indices from spiral
+  int k=0;
+  for(vector<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){
+    if(*it==5){
+      pentagon_indices.push_back(k);
+    }
+  }
+  assert(pentagon_indices.size()==12);
+
+}
+
 node_t FullereneGraph::C20_edges[30][2] ={{0,13},{0,14},{0,15},{1,4},{1,5},{1,12},{2,6},{2,13},{2,18},{3,7},{3,14},{3,19},{4,10},{4,18},{5,11},{5,19},{6,10},{6,15},{7,11},{7,15},{8,9},{8,13},{8,16},{9,14},{9,17},{10,11},{12,16},{12,17},{16,18},{17,19}};
 
 double FullereneGraph::C20_layout2d[20][2] = {{1.548,0.503},{-1.134,-0.368},{0.,1.628},{0.957,-1.317},{-1.548,0.503},{-0.957,-1.317},{0.,2.466},{1.449,-1.995},{0.302,0.416},{0.489,-0.159},{-2.345,0.762},{-1.45,-1.995},{-0.489,-0.159},{0.7,0.965},{1.133,-0.369},{2.345,0.762},{-0.302,0.416},{0.,-0.514},{-0.7,0.965},{0.,-1.192}};
