@@ -58,6 +58,7 @@ C    Set the dimensions for the distance matrix
       integer istop
       Logical lexist
       integer mdist(nmax,nmax)
+      integer jumps(10)
 
 C Set parameters
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
@@ -112,14 +113,14 @@ C  INPUT and setting parameters for running the subroutines
       leapspiral=0
       SWspiral=0
       Write(Iout,1008) routine
-        CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
-     1  nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
-     1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
-     1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
-     1  ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1  iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
-     1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
-     1  jumps,force,forceP,boost,filename,filenameout,TEXTINPUT)
+      CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
+     1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
+     1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
+     1 icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
+     1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
+     1 iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
+     1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
+     1 jumps,force,forceP,boost,filename,filenameout,TEXTINPUT)
 
 C  Stop if isomer closest to icosahedral is searched for
       if(isearch.ne.0) then
