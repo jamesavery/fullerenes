@@ -4,14 +4,14 @@
      1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
-     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,jumps,
-     1 force,forceP,boost,filename,filenameout,DATEN)
+     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,rspi,
+     1 jumps,force,forceP,boost,filename,filenameout,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       integer NA,iopt
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF (and a backup)
       integer endzeile
-      integer jumps(10)
+      integer rspi(12), jumps(10)
       Character*1 DATEN(nzeile)
       Character filename*50
       Character filenameout*50
@@ -19,7 +19,7 @@
      1 nohueckel,loop,ndbconvert,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
-     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,jumps
+     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
@@ -159,6 +159,11 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
 
       scaleRad=4    ! scale size of initial tutte sphere by factor.  The more non-spherical the structure is, the larger this factor should be
 
+c init of rspi (always 12)
+      do k=1,12
+        rspi(k)=0
+      enddo
+c init of jumps (should be more than 10 (should ... ))
       do k=1,10
         jumps(k)=0
       enddo
