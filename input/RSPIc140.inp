@@ -1,7 +1,7 @@
 C140
 &General NA=140 ispsearch=2 /
 &Coord ICart=3 /
-&FFChoice /
+&FFChoice Iopt=3 /
 &FFParameters /
 &Hamilton /
 &Isomers /
