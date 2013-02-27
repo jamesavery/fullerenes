@@ -11,7 +11,7 @@
 !      The results can be used for plotting 2D/3D fullerene graphs          !
 !    (e.g. Schlegel diagrams) and structures, and as a starting point       !
 !            for further quantum theoretical treatment.                     !
-!        Version 4.3 now incorporates C++ routines linked to the            !
+!        Version 4.4 now incorporates C++ routines linked to the            !
 !       original Fortran program using much improved algorithms.            !
 !---------------------------------------------------------------------------!
 
@@ -38,7 +38,7 @@ C    Set the dimensions for the distance matrix
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
       DIMENSION IDual(Mmax,Mmax),nSW(4,66),nFM(4,66),nYF(6,66),nBF(5,66)
-      DIMENSION NEK(3,Nmax),JP(12)
+      DIMENSION NEK(3,Nmax)
       DIMENSION Symbol(Mmax)
       Real*4 TimeX
       CHARACTER CDAT*8,CTIM*10,Zone*5
@@ -58,7 +58,7 @@ C    Set the dimensions for the distance matrix
       integer istop
       Logical lexist
       integer mdist(nmax,nmax)
-      integer jumps(10)
+      integer rspi(12),jumps(10)
 
 C Set parameters
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
@@ -120,7 +120,7 @@ C  INPUT and setting parameters for running the subroutines
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
      1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
-     1 jumps,force,forceP,boost,filename,filenameout,TEXTINPUT)
+     1 rspi,jumps,force,forceP,boost,filename,filenameout,TEXTINPUT)
 
 C  Stop if isomer closest to icosahedral is searched for
       if(isearch.ne.0) then
@@ -205,9 +205,9 @@ C the 3D fullerene
       routine='COORDBUILD     '
       Write(Iout,1008) routine
       CALL CoordBuild(IN,Iout,IDA,IDual,
-     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,JP,
-     1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,jumps,
-     1 GROUP,filename)
+     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,
+     1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
+     1 rspi,jumps,GROUP,filename)
       Do I=1,number_vertices
         IAtom(I)=6
       enddo
@@ -409,7 +409,7 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
         if(ispsearch.gt.1) ispcount=1
         Write(Iout,1008) routine
         CALL SpiralSearch(Iout,Iring5,Iring6,Iring56,NringA,NringB,
-     1   NringC,NringD,NringE,NringF,JP,GROUP,ispcount)
+     1   NringC,NringD,NringE,NringF,rspi,GROUP,ispcount)
       endif
 
 C--------------TOPOLOGICAL INDICATORS-----------------------------
