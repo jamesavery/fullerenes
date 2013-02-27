@@ -1,7 +1,7 @@
       SUBROUTINE CoordBuild(IN,Iout,IDA,D,ICart,
-     1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,nohueckel,JP,iprev,
-     1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,jumps,
-     1 GROUP,filename)
+     1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,nohueckel,iprev,
+     1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
+     1 rspi,jumps,GROUP,filename)
 C Cartesian coordinates produced from ring spiral pentagon list
 C or Coxeter-Goldberg construction to get the adjacency matrix
 C This is followed by using either the Fowler-Manolopoulos matrix
@@ -18,38 +18,52 @@ C mapping
       integer :: graph_is_a_fullerene
       DIMENSION layout2d(2,NMAX)
       DIMENSION D(MMAX,MMAX),S(MMAX),Dist(3,NMAX),distP(NMAX)
-      DIMENSION NMR(6),JP(12),A(NMAX,NMAX),IDA(NMAX,NMAX)
+      DIMENSION NMR(6),A(NMAX,NMAX),IDA(NMAX,NMAX)
       DIMENSION evec(NMAX),df(NMAX)
       DIMENSION Spiral(12,NMAX)
-      integer jumps(10)
+      integer rspi(12),jumps(10)
       CHARACTER*3 GROUP
       CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
 c      integer ke, isw, iyf, ibf
       type(c_ptr) :: g, halma, new_C20, halma_fullerene, windup_general
-C If nalgorithm=0 use ring-spiral and matrix eigenvector algorithm
-C If nalgorithm=1 use ring-spiral and Tutte algorithm
-C If nalgorithm=2 use Goldberg-Coxeter and matrix eigenvector algorithm
-C If nalgorithm=3 use Goldberg-Coxeter and Tutte algorithm
-C If nalgorithm=4 use connectivity input (ame)
-C If nalgorithm=5 use connectivity input (tutte)
-C If nalgorithm=6 use general ring-spiral and matrix eigenvector algorithm
-C If nalgorithm=7 use general ring-spiral and Tutte algorithm
+C If nalgorithm=0 use ring-spiral         + matrix eigenvector algorithm
+C If nalgorithm=1 use ring-spiral         + Tutte algorithm
+C If nalgorithm=2 use Goldberg-Coxeter    + matrix eigenvector algorithm
+C If nalgorithm=3 use Goldberg-Coxeter    + Tutte algorithm
+C If nalgorithm=4 use connectivity input  + ame
+C If nalgorithm=5 use connectivity input  + tutte
+C If nalgorithm=6 use general ring-spiral + ame
+C If nalgorithm=7 use general ring-spiral + tutte
       nalgorithm=ICart-2
 
       M=number_vertices/2+2
       Group='NA '
       jumpGC=0
 
+c check for correct rspi if we need it
+
+      if(nalgorithm.eq.0 .or. nalgorithm.eq.1 .or. 
+     1   nalgorithm.eq.6 .or. nalgorithm.eq.7) then
+        if(isonum.eq.0) then
+          if(iprev.eq.0.and.jumpGC.eq.0)then
+            do i=1,12
+              if(rspi(i) .eq. 0) then
+              write(*,*)"Spiral was not read (completely/successfully)",
+     1               "exiting ..."
+                call abort()            
+              endif
+            enddo
+          endif
+        else
+C Read from database
+          Call Isomerget(Iout,Isonum,IPRC,rspi)
+        endif
+      endif
+
 C Ring spiral first:
 C Read pentagon list and produce adjacency matrix
   99  if(nalgorithm.eq.0 .or. nalgorithm.eq.1) then
-        if(isonum.eq.0) then
-          if(iprev.eq.0.and.jumpGC.eq.0) Read(IN,*) (JP(I),I=1,12)
-        else
-C Read from database
-          Call Isomerget(Iout,Isonum,IPRC,JP)
-        endif
 C       Produce the Spiral S using the program WINDUP and UNWIND
 c       init dual
         do I=1,MMAX
@@ -66,7 +80,7 @@ c       init spiral
         enddo
 C       Search where the 5-rings are in the spiral
         Do I=1,12
-          S(JP(I))=5
+          S(rspi(I))=5
         enddo
         IPRS=0
         IER=0
@@ -76,7 +90,7 @@ C       Search where the 5-rings are in the spiral
         endif
         IT=1
         Do I=1,12
-          Spiral(I,1)=JP(I)
+          Spiral(I,1)=rspi(I)
         enddo
         CALL Unwind(M,IER,IT,ispiral,
      1   Spiral,S,D,NMR,Group)                       ! Unwind dual into spirals
@@ -87,16 +101,16 @@ C       Search where the 5-rings are in the spiral
         enddo
   3     If(K.le.0) then
           WRITE(Iout,1020)
-     1      M,number_vertices,GROUP,(JP(I),I=1,12)
+     1      M,number_vertices,GROUP,(rspi(I),I=1,12)
         else
           WRITE(Iout,1001)
-     1      M,number_vertices,GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
+     1      M,number_vertices,GROUP,(rspi(I),I=1,12),(NMR(J),J=1,K)
         endif
         if(ispiral.ge.2) then
           if(ispiral.eq.2) then
             WRITE(Iout,1023)
             Do II=1,12
-              JP(II)=spiral(II,2)
+              rspi(II)=spiral(II,2)
             enddo 
           else
             WRITE(Iout,1019) ispiral-1
@@ -108,15 +122,15 @@ C       Search where the 5-rings are in the spiral
           WRITE(Iout,1022)
         endif
         if(ispiral.gt.2) then
-          CALL CanSpiral(ispiral,spiral,JP)
+          CALL CanSpiral(ispiral,spiral,rspi)
           WRITE(Iout,1023)
-          WRITE(Iout,1021) (JP(I),I=1,12)
+          WRITE(Iout,1021) (rspi(I),I=1,12)
         endif
         Do I=1,M
           S(I)=6
         enddo
         Do I=1,12
-          S(JP(I))=5
+          S(rspi(I))=5
         enddo
         WRITE(Iout,1024)
         WRITE(Iout,1025) (S(I),I=1,M)
@@ -140,7 +154,7 @@ C Start Goldberg-Coxeter
         endif
         Write(Iout,1040) kGC,lGC,kGC,lGC,itGC
         if(lGC .ne. 0) then
-          Call GetPentIndex(number_vertices,M,Iout,kGC,lGC,JP)
+          Call GetPentIndex(number_vertices,M,Iout,kGC,lGC,rspi)
           nalgorithm=nalgorithm-2
           jumpGC=1
           Go to 99
@@ -169,11 +183,8 @@ C Input connectivities and construct adjacency matrix
       
 
       if(nalgorithm.eq.6 .or. nalgorithm.eq.7) then
-c       if(isonum.eq.0) then
-        if(iprev.eq.0.and.jumpGC.eq.0) Read(IN,*) (JP(I),I=1,12)
-c       else
 
-        g = windup_general(number_vertices, jp, jumps)
+        g = windup_general(number_vertices, rspi, jumps)
 c       get the adjcaency matrix
         call adjacency_matrix(g,Nmax,IDA)
         call delete_fullerene_graph(g)
@@ -294,9 +305,9 @@ c      endif
       Return 
       END
 
-      SUBROUTINE GetPentIndex(number_vertices,Nfaces,Iout,I,J,S)
+      SUBROUTINE GetPentIndex(number_vertices,Nfaces,Iout,I,J,rspi)
       IMPLICIT Integer (A-Z)
-      DIMENSION S(12)
+      DIMENSION rspi(12)
       if(J.EQ.0) stop
       I2=I*I
       J2=J*J
@@ -310,20 +321,20 @@ C     Getting exponents
       WRITE(Iout,1000) number_vertices,IA,IB,IC,ID,IE 
 C     Construct the ring spiral
       NFaces=number_vertices/2+2
-      S(1)=1
-      S(2)=IA+2
-      S(3)=S(2)+IB+1
-      S(4)=S(3)+IB+1
-      S(5)=S(4)+IB+1
-      S(6)=S(5)+IB+1
-      S(7)=S(6)+IC+1
-      S(8)=S(7)+ID+1
-      S(9)=S(8)+ID+1
-      S(10)=S(9)+ID+1
-      S(11)=S(10)+ID+1
-      S(12)=S(11)+IE+1
-      if(S(12).ne.Nfaces) Write(Iout,1001) S(12),Nfaces
-      Write(Iout,1002) (S(I),I=1,12)
+      rspi(1)=1
+      rspi(2)=IA+2
+      rspi(3)=rspi(2)+IB+1
+      rspi(4)=rspi(3)+IB+1
+      rspi(5)=rspi(4)+IB+1
+      rspi(6)=rspi(5)+IB+1
+      rspi(7)=rspi(6)+IC+1
+      rspi(8)=rspi(7)+ID+1
+      rspi(9)=rspi(8)+ID+1
+      rspi(10)=rspi(9)+ID+1
+      rspi(11)=rspi(10)+ID+1
+      rspi(12)=rspi(11)+IE+1
+      if(rspi(12).ne.Nfaces) Write(Iout,1001) rspi(12),Nfaces
+      Write(Iout,1002) (rspi(I),I=1,12)
       
  1000 Format(1X,'General Goldberg-Coxeter transformation of C20 -> Cn',
      1 ' with n=: ',I5,/1X,'Construction of icosahedral fullerenes ',
