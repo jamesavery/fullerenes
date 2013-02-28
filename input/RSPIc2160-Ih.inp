@@ -1,9 +1,8 @@
 Ih-C2160 Using FM algorithm to produce coordinates through ring spiral indices
 &General  NA=2160 ixyz=1 ispsearch=1 /
-&Coord ICart=3, R6=1.42 /
+&Coord ICart=3, R6=1.42 rspi=1, 337, 349, 361, 373, 385, 703, 715, 727, 739, 751, 1082/
 &FFChoice Iopt=3 /
 &FFParameters /
 &Hamilton /
 &Isomers /
 &Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /
-1 337 349 361 373 385 703 715 727 739 751 1082
