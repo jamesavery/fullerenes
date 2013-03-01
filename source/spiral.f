@@ -1645,10 +1645,10 @@ C     Print ring numbers
      1 ' (',I2,' faces)')
  602  FORMAT(1X,'Spiral for fullerene isomers of C',I3,':',
      1 ' (',I3,' faces)')
- 603  FORMAT(1X,A3,9X,12I4)
- 604  FORMAT(1X,90('-'),/1X,'Corresponding ring numbers:') 
- 605  FORMAT(1X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
- 607  Format(12(1X,I4))
+ 603  FORMAT(1X,A3,9X,12I6)
+ 604  FORMAT(1X,131('-'),/1X,'Corresponding ring numbers:') 
+ 605  FORMAT(1X,A3,9X,12I6,2X,3(I3,' x',I3,:,','))
+ 607  Format(12(1X,I6))
  608  Format(1X,'Input spiral is canonical')
  610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
      1 'loop over')
@@ -1657,7 +1657,8 @@ C     Print ring numbers
  613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
  614  Format(1X,I7,' RSPIs taken from spiral list to be analyzed:',/1X,
      2 'Point group   Ring spiral pentagon positions',
-     3 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
+     3 42X,'NMR pattern (for fullerene in ideal symmetry)',
+     4 /1X,131('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
  616  Format(1X,'No (6,6) fusions to loop over')
  617  Format(1X,'--->',I7,' ring spirals found ',
@@ -1667,7 +1668,7 @@ C     Print ring numbers
      1 'higher priority: (',I4,' spirals found)') 
  620  Format(1X,'Search ',I7,' spirals to produce canonical'
      1 ' list of faces:')
- 621  Format(12(1X,I4))
+ 621  Format(72('-'),/,12(1X,I6),/,72('-'))
  622  Format(1X,'Pentagons are not in sequence, stopped at pentagon ',
      1 I6)
  623  Format(1X,'Canonical spiral list of pentagon positions:')
