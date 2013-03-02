@@ -1,4 +1,4 @@
-Read the first and only C384 without a spiral from the house of graphs database
+Read the first and only C384 without a spiral from the house of graphs database, for this you need to download the file from HOG and name it as specified in filename
 &General NA=384, filename='database/hog/nospiral/No_spiral_384'/
 &Coord ICart=7 ,isonum=1/
 &FFChoice Iopt=3 /

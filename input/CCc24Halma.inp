@@ -1,4 +1,4 @@
-Cartesian coordinate input and subsequent Goldberg-Coxeter transformation
+Cartesian coordinate input and subsequent Halma transformation
 from D6d-C24 to D6d-C96
 &General NA=24, nosort=1 / 
 &Coord ICart=1, IGCtrans=1, kGC=2 /
