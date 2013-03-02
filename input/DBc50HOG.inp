@@ -1,4 +1,5 @@
 Read the 5th C-50 isomer from the house of graphs database
+For this you need to download the House of Graphs file for C50 and name it as specified in filename below
 &General NA=50, filename='database/hog/Fullerenes_50'/
 &Coord ICart=7 ,isonum=5/
 &FFChoice Iopt=3 /
