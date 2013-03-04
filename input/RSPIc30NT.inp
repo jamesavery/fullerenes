@@ -1,6 +1,6 @@
 D5h-C30 (5,0) nanotube. Using FM algorithm to produce coordinates through ring spiral indices
-&General  NA=30 ispsearch=2 / 
-&Coord ICart=3 nosort=1 rspi=1, 2, 3, 4, 5, 6, 12, 13, 14, 15, 16, 17/
+&General  NA=30 ispsearch=2 nosort=1 / 
+&Coord ICart=3 rspi=1, 2, 3, 4, 5, 6, 12, 13, 14, 15, 16, 17/
 &FFChoice /
 &FFParameters /
 &Hamilton iham=1 ihamstore=1  /
