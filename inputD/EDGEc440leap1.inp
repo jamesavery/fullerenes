@@ -1,11 +1,11 @@
-Non-spiral C440 build from input connectivities (edges), last input is a zero
-&General NA=440 /
-&Coord ICart=6 /
+C440 build from input connectivities (edges)
+&General NA=440 ixyz=1 loop=1 ispsearch=2 /
+&Coord ICart=6 IGCtrans=1, kGC=2 /
 &FFChoice Iopt=3 /
 &FFParameters /
 &Hamilton /
 &Isomers /
-&Graph ischlegel=7 iso1=1 iso2=2 iso3=3 ifs=3/
+&Graph /
 1 2 3 7 
 2 1 6 8 
 3 1 4 11 
@@ -447,3 +447,14 @@ Non-spiral C440 build from input connectivities (edges), last input is a zero
 439 437 438 440 
 440 429 434 439 
 0
+
+--- Start new input here ---
+New input for leapfrog of Halma C380
+&General ixyz=3 ispsearch=2  filename='Fullerene-3D' /
+&Coord ICart=1 leap=1 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+~                     

@@ -1,4 +1,4 @@
-C60 build from input connectivities (edges)
+C60 build from input connectivities (edges), last input is a zero
 &General NA=60 /
 &Coord ICart=6 /
 &FFChoice Iopt=3 /

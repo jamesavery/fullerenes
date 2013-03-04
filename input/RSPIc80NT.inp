@@ -1,4 +1,4 @@
-C80 nanotube. Using FM algorithm to produce coordinates from ring spiral indices
+D5d-C80 (5,0) nanotube. Using FM algorithm to produce coordinates from ring spiral indices
 &General  NA=80 ixyz=1 /
 &Coord ICart=2, IV2=4, IV3=5 rspi=1, 2, 3, 4, 5, 6, 37, 38, 39, 40, 41, 42/
 &FFChoice Iopt=2 /

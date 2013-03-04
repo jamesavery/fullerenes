@@ -1,0 +1,23 @@
+This is an example how to create the coordinate for the non-spiral T-C380
+through a ring-spiral fullerene T-C364 and 4 Yoshida-Fowler 4-vertex insertions
+The transformation preserves symmetry, afterwards a leap-frog transformation
+is performed to show that the halma transformed has a ring spiral
+&General NA=364, nohueckel=1, nosort=1, ixyz=1, ipsphere=3 loop=1
+rspi=52,61,70,78,80,88,90,98,100,179,181,183 /
+&Coord ICart=3, IYF=2 /
+&FFChoice Iopt=3 /
+&FFParameters  /
+&Hamilton /
+&Isomers /
+&Graph ischlegel=1 ifs=1 PS=6.12 iso1=1  iso2=2   iso3=12  /
+1 2 3 4
+
+--- Start new input here, leave empty line above ---
+New input for leapfrog C380
+&General ixyz=2 ispsearch=2  filename='Fullerene-3D' /
+&Coord ICart=1 IGCtrans=1, kGC=2  /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /

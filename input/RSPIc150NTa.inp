@@ -1,0 +1,8 @@
+D5h-C150 (5,0) nanotube
+&General NA=150, ixyz=1 /
+&Coord ICart=3 scalerad=7. rspi=1,2,3,4,5,6,72,73,74,75,76,77 /
+&FFChoice Iopt=3 ftol=1.d-9 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph ISchlegel=2 ISO1=1, ISO2=3, ISO3=7 /
