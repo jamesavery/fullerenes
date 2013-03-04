@@ -1,4 +1,4 @@
-C140
+I-C140 ring spiral pentagon indices input
 &General NA=140 ispsearch=2 /
 &Coord ICart=3 rspi=1, 5, 11, 19, 33, 42, 44, 53, 61, 64, 66, 69, /
 &FFChoice Iopt=3 /

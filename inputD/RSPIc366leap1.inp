@@ -1,0 +1,17 @@
+T-C366, a precursor to construct T-C384
+&General NA=366, nosort=1, ixyz=1, ipsphere=3 loop=1 /
+&Coord ICart=3 IGCtrans=1, kGC=2 rspi=63,64,81,92,94,111,113,140,171,172,181,183/
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+T-C366, a precursor to construct T-C384
+&General ispsearch=2, nosort=1, ixyz=3, ipsphere=3 filename='Fullerene-3D' /
+&Coord ICart=1 leap=1 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+

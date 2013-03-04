@@ -1,4 +1,4 @@
-C380, the fast way
+Non-spiral T-C380, the fast way
 &General NA=380 /
 &Coord ICart=9 jumps= 110,4 rspi=45, 70, 71, 82, 83, 110, 119, 120, 144, 184, 185, 192/
 &FFChoice iopt=3/
