@@ -1668,7 +1668,7 @@ C     Print ring numbers
      1 'higher priority: (',I4,' spirals found)') 
  620  Format(1X,'Search ',I7,' spirals to produce canonical'
      1 ' list of faces:')
- 621  Format(72('-'),/,12(1X,I6),/,72('-'))
+ 621  Format(84('-'),/,12(1X,I6),/,84('-'))
  622  Format(1X,'Pentagons are not in sequence, stopped at pentagon ',
      1 I6)
  623  Format(1X,'Canonical spiral list of pentagon positions:')
