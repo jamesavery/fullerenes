@@ -8,6 +8,7 @@
      1 jumps,force,forceP,boost,filename,filenameout,DATEN)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
+      parameter (nlines=9999)
       integer NA,iopt
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF (and a backup)
       integer endzeile
@@ -32,7 +33,7 @@
 C Input send to output
       if(ilp.eq.0) then   
         WRITE(IOUT,100)
-        Do I=1,200
+        Do I=1,nlines
           READ(IN,'(132(A1))',END=11) (DATEN(j),j=1,nzeile)
             endzeile=0
             do j=1,nzeile
