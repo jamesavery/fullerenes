@@ -1,5 +1,5 @@
 C440 build from input connectivities (edges)
-&General NA=440 ispsearch=2  filename='Fullerene-3D' /
+&General NA=440 ispsearch=2 filename='c440', ixyz=1 nohueckel=1 loop=1 / 
 &Coord ICart=6 leap=1 /
 &FFChoice /
 &FFParameters /
@@ -447,3 +447,14 @@ C440 build from input connectivities (edges)
 439 437 438 440 
 440 429 434 439 
 0
+--Start new job--
+C440 build from input connectivities (edges)
+&General NA=440 ispsearch=2 ixyz=2 filename='c440-3D' /
+&Coord ICart=1 IGCtrans=1, kGC=3 /
+&FFChoice iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+
+

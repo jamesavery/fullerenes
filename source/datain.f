@@ -170,8 +170,8 @@ c init of jumps (should be more than 10 (should ... ))
       enddo
 
 C Now process namelist input
-      READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
-      endzeile=0
+      READ(IN,'(132(A1))',Err=98,end=98) (DATEN(j),j=1,nzeile)
+   98 endzeile=0
       do j=1,nzeile
         if(DATEN(j).ne.' ') endzeile=j
       enddo
