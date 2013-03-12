@@ -54,7 +54,7 @@ Massey University Auckland<br>
 </tr></table><br>
 
 
-The program creates cartesian coordinates for fullerene isomers and performs a topological/graph theoretical analysis.
+The program generates cartesian/internal coordinates for fullerene isomers and performs a topological/graph theoretical analysis.
 The results can be used for plotting 2D/3D fullerene graphs (e.g. Schlegel diagrams and 3D structures), and serves as 
 a starting point for further quantum theoretical treatment. Version 4 incorporated C++ routines for the first time
 linked to the original Fortran program using much improved algorithms. Version 4.4 is more robust than previous versions, 
@@ -63,14 +63,16 @@ vibrational frequencies (although the force constants have not been adjusted yet
 of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to both the Yoshida and House of Graphs 
 databases, an improved Tutte embedder, a correct ring spiral count, tight lower and upper bounds for Hamiltonian cycles 
 and a neighborhood spiral ring search algorithm. The fullerene database has been brought into a more compact form and
-extended up to C<SUB>144</SUB>, and up to C<SUB>190</SUB> for IPR isomers, and is now more compact.  
+extended up to C<SUB>1504</SUB>, and up to C<SUB>200</SUB> for IPR isomers, and is now more compact.  
 <br><br>
 
-This is an open-source code and free for distribution (except for commercial purposes). The following references should be used for citation:<br><br>
-1) P. W. Fowler and D. E. Manolopoulos, "An Atlas of Fullerenes"
+This is an open-source code and free for distribution (except for commercial purposes). Please cite the following paper if you use this program for publishing data:<br><br>
+1) P. Schwerdtfeger, L. Wirz, and J. Avery, "Program Fullerene - A Software Package for Constructing and Analyzing 
+Structures of Regular Fullerenes", Version 4.4, J. Comput. Chem., in press. DOI10.1002/jcc.23278.<br>
+We also recommend to cite the following book (many of the concepts used can be found here):<br>
+2) P. W. Fowler and D. E. Manolopoulos, "An Atlas of Fullerenes"
 (Dover Publ., New York, 2006).<br>
-2) P. Schwerdtfeger, L. Wirz, and J. Avery, "Program Fullerene - A Software Package for Constructing and Analyzing 
-Structures of Regular Fullerenes", Version 4.3, submitted to J. Comput. Chem.<br>
+The Hamiltonian cycle part of the program uses the code by Babic:<br>
 3) D. Babic, "Nomenclature and Coding of Fullerenes", J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).<br>
 For further literature see the User's Manual.<br><br>
 
@@ -177,7 +179,7 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Cote DIvoire">Cote D'Ivoire</option>
 <option value="Croatia">Croatia</option>
 <option value="Cuba">Cuba</option>
-<option value="Curaco">Curacao</option>
+<option value="Curacao">Curacao</option>
 <option value="Cyprus">Cyprus</option>
 <option value="Czech Republic">Czech Republic</option>
 <option value="Denmark">Denmark</option>
@@ -236,7 +238,7 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Kenya">Kenya</option>
 <option value="Kiribati">Kiribati</option>
 <option value="Korea North">Korea North</option>
-<option value="Korea Sout">Korea South</option>
+<option value="Korea South">Korea South</option>
 <option value="Kuwait">Kuwait</option>
 <option value="Kyrgyzstan">Kyrgyzstan</option>
 <option value="Laos">Laos</option>
@@ -270,7 +272,7 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Morocco">Morocco</option>
 <option value="Mozambique">Mozambique</option>
 <option value="Myanmar">Myanmar</option>
-<option value="Nambia">Nambia</option>
+<option value="Namibia">Namibia</option>
 <option value="Nauru">Nauru</option>
 <option value="Nepal">Nepal</option>
 <option value="Netherland Antilles">Netherland Antilles</option>
@@ -292,7 +294,7 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Papua New Guinea">Papua New Guinea</option>
 <option value="Paraguay">Paraguay</option>
 <option value="Peru">Peru</option>
-<option value="Phillipines">Philippines</option>
+<option value="Philipines">Philippines</option>
 <option value="Pitcairn Island">Pitcairn Island</option>
 <option value="Poland">Poland</option>
 <option value="Portugal">Portugal</option>
@@ -351,10 +353,10 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Tuvalu">Tuvalu</option>
 <option value="Uganda">Uganda</option>
 <option value="Ukraine">Ukraine</option>
-<option value="United Arab Erimates">United Arab Emirates</option>
+<option value="United Arab Emirates">United Arab Emirates</option>
 <option value="United Kingdom">United Kingdom</option>
 <option value="United States of America">United States of America</option>
-<option value="Uraguay">Uruguay</option>
+<option value="Uruguay">Uruguay</option>
 <option value="Uzbekistan">Uzbekistan</option>
 <option value="Vanuatu">Vanuatu</option>
 <option value="Vatican City State">Vatican City State</option>
@@ -420,14 +422,15 @@ harmonic oscillator force field including dihedrals.</li>
 </td>
 </tr></table><br>
 
-A database is provided for general isomers up to C<SUB>140</SUB> and for IPR isomers up to
-C<SUB>190</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>102</SUB> 
+A database is provided for general isomers up to C<SUB>150</SUB> and for IPR isomers up to
+C<SUB>200</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>110</SUB> 
 and for IPR isomers up to C<SUB>122</SUB>. The database can be copied into
 the main program folder and can be used to read the ring spiral pentagon indices.
 The numbering scheme is identical to that chosen in the "Atlas of Fullerenes" by Fowler and Manolopoulos,
 that is each isomer in the book's appendix can be constructed easily from the database.  
-The data files are formatted and can easily be read on its own. It is our intention to
-extend the isomer list beyond C<SUB>140</SUB>/C<SUB>190</SUB> (without Hamiltonian cycles).
+The data files are gzipped. before usage of a specific fullerene database you need to unzip the specific file.
+Once printed by the program the data can easily be read. It is our intention to
+extend the isomer list beyond C<SUB>150</SUB>/C<SUB>200</SUB> in due time (without Hamiltonian cycles).
 A link to the  "House of Graphs" database by Brinkmann and co-workers is already implemented, 
 and the database can be downloaded from <a href="http://hog.grinvin.org/Fullerenes">House of Graphs Database</a>.<br><br>
 A link to the Yoshida database is also implemented and the database can be downloaded from
@@ -435,7 +438,7 @@ A link to the Yoshida database is also implemented and the database can be downl
 
 <b>Note: </b>The program is under construction and new features are being added.
 You can check the date on the right hand side of the download button to see
-if you already have the newest version. 
+if you already have the newest version. The next intended version 5 will undergo major restructuring.
 Please report any bug to <a href="mailto:p.a.schwerdtfeger&#64massey.ac.nz">p.a.schwerdtfeger&#64massey.ac.nz</a>.<br>
 The program is in use in the following countries: 
 Brazil, China, Colombia, France, Germany, Japan, India, Italy, Iran, New Zealand, Poland, Russia, Taiwan, Ukraine, United Kingdom, USA.
