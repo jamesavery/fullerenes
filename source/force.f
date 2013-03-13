@@ -4,6 +4,7 @@
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       integer iopt
+      real(8) p(nmax*3),force(ffmaxdim),fc
 
       select case(iopt)
         case(1, 2)
@@ -31,8 +32,7 @@
 
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
-      real(8) p(nmax*3),force(ffmaxdim)
-      real(8) fc
+      real(8) p(nmax*3),force(ffmaxdim),fc
       integer iopt
 
 c     edges with 0, 1, 2 pentagons
@@ -325,6 +325,7 @@ C     total energy
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       integer iopt
+      real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
       
       select case(iopt)
         case(1, 2)
