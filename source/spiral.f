@@ -1663,7 +1663,7 @@ C     Print ring numbers
  616  Format(1X,'No (6,6) fusions to loop over')
  617  Format(1X,'--->',I7,' ring spirals found ',
      1 'but RSPIs detected were not valid')
- 618  Format(20(1X,32(I4,'-'),/))
+ 618  Format(30(1X,20(I5,'-'),/))
  619  Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I4,' spirals found)') 
  620  Format(1X,'Search ',I7,' spirals to produce canonical'
@@ -1689,7 +1689,7 @@ C     Print ring numbers
      1 'list',/1X,'Routine will stop here and tries to work with ',
      1 'existing spirals (otherwise increase NSpScale parameter ',
      1 'in main program')
- 629  Format(20(1X,32(I4,'-'),/))
+ 629  Format(100(1X,20(I5,'-'),/))
  630  Format(1X,'Failed to find ring spiral: ',I7,
      1 ' detected (maximum possible: ',I7,')',/1X,
      1 'This is a non-spiral fullerene')
