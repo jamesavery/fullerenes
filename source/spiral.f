@@ -822,7 +822,7 @@ C     Analyze dual matrix
  600  FORMAT(/1X,'Subroutine Spiral from Fowler and Manolopoulos',
      1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)',
      2 /1X,'(Symmetries are given for undistorted fullerenes)',
-     1 /1X,' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
      2 /8X,'n  PG   Ring spiral pentagon positions',
