@@ -33,5 +33,5 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -f UserManual.pdf tree.pdf gc.pdf
+	rm -f UserManual.pdf tree.pdf gc.pdf workflow.pdf
 
