@@ -29,7 +29,7 @@ gc.pdf: gc.tex
 
 .PHONY: clean
 clean:
-	rm -f *.log *.aux *.dvi *.ps *.bib *.out *_tmp.pdf
+	rm -f *.log *.aux *.dvi *.ps *.bib *.out *_tmp.pdf *.toc
 
 .PHONY: distclean
 distclean: clean
