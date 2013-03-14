@@ -2,6 +2,7 @@
 \usepackage{graphicx,textcomp,authblk,wallpaper,xcolor}
 \usepackage{amsmath,amssymb,amsfonts,hyperref,tikz}
 \usepackage[T1]{fontenc}
+
 % JA: Is this used?
 %\usepackage{mathrsfs}`
 \usepackage{relsize}
@@ -27,7 +28,7 @@
 
 \aliaspagestyle{title}{empty}
 
-\title{PROGRAM FULLERENE (Version 4.4)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
+\title{\program{Fullerene} (Version 4.4)\\ -- A Program for the Topological Analysis of Fullerenes --\\ USER'S MANUAL}
 
 \author{Peter Schwerdtfeger%
   \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
@@ -76,7 +77,7 @@ For any questions concerning this program please feel free to contact us.
 We are always open to improvements and suggestions.
 
 \subsubsection*{Please cite the following paper if you use this program for publishing data:}
-1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{Program \program{Fullerene} -- A Software Package for Constructing 
+1) P. Schwerdtfeger, L. Wirz, and J. Avery, \textit{\program{Fullerene} -- A Software Package for Constructing 
 and Analyzing Structures of Regular Fullerenes}, J. Comput. Chem., in press, 2013); Version 4.4.
 \subsubsection*{We also recommend to cite the following book (many of the concepts used can be found here):}
 2) P. W. Fowler and D. E. Manolopoulos, \textit{An Atlas of Fullerenes}
@@ -113,14 +114,16 @@ their Fortran subroutines which we modified and implemented in this program pack
 We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful discussions.}
 
 \clearpage
+\tableofcontents
+\clearpage
 
 %Introduction
 \section{Introduction}
-\textit{Program Fullerene} is a general purpose program that creates the adjacency matrix for any fullerene isomer, 
+\textit{Fullerene} is a general purpose program that creates the adjacency matrix for any fullerene isomer, 
 performs a topological/graph theoretical analysis, and creates a reasonably accurate 3D structure (cartesian or internal
 coordinates) through various different methods and algorithms. The results can be used for plotting 2D fullerene graphs 
 (e.g., Schlegel diagrams) and 3D structures, and serves as a good starting point for further quantum theoretical treatment.
-The program is written in standard FORTRAN and C++ and is easily implemented within a Linux/\acr{UNIX} environment.
+The program is written in standard \acr{FORTRAN} and C++ and is easily implemented within a Linux/\acr{UNIX} environment.
 Although there are several other computer programs already available to deal with fullerene graphs like 
 \program{CaGe}(\program{plantri},\cite{Brinkmann05} \program{fullgen},\cite{Brinkmann} \program{Buckygen}\cite{Goedgebeur,Goedgebeur1}),\cite{Brinkmanx}
 \program{Vega},\cite{Pisanski}, \program{FuiGui},\cite{FuiGui}  or the routines introduced in the book by Fowler and Manolopoulos,\cite{Atlas}
@@ -165,7 +168,7 @@ We recommend VMD \cite{vmd}, it is more robust and works even for the largest fu
 in latex format, but can be used by any other program which is capable of producing 2D graphs, for example QMGA \cite{Gabriel2008}. 
 For this an external file is written out called \filename{Fullerene-2D.dat} containing all the information required for plotting a 2D graph.
 
-From version 4.0 onwards (released July 2012) C++ routines embedded into the original FORTRAN program incorporate
+From version 4.0 onwards (released July 2012) C++ routines embedded into the original \acr{FORTRAN} program incorporate
 much improved algorithms compared to the older versions. The reason for using two different program languages is
 that PS is good in old-fashioned Fortran, JA is good in C++ (and LW is doing both).  Furthermore, some of the original routines used were available 
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
@@ -184,7 +187,6 @@ Not implemented yet is:
 \begin{itemize}
 \item The minimum covering ellipsoid useful for rugby-ball shaped fullerenes, and close packing of ellipsoids;
 \item The Goldberg-Coxeter ($T^\mathrm{GC}_{k,l}$[\C{n}]) transformation for fullerenes other than \C{20};
-\item Construction of all (including non-ring-spiral) isomers using a generalized ring spiral algorithm;
 \item Symmetrization of optimized coordinates to point group symmetry (or a chosen lower symmetry) and symmetry labels for H\"uckel orbital energies and vibrational frequencies;
 \item Extension to non-classical fullerenes of genus~0 (heptagons and squares); 
 \item Extension to non-regular fullerenes of genus~1;
@@ -247,18 +249,27 @@ To use the latex program for the 2D fullerene graphs you need to use the files \
 
 %Program Structure
 \section{Program Structure}
-The main program (\filename{main.f}) calls a number of subroutines for certain tasks and in a certain sequence.
+The main program (\filename{main.f}) calls a number of subroutines for certain tasks and in a certain sequence (see  \ref{pic:flow_long}).
 Subroutine \funname{DataIn} manages all the input and determines these main tasks to be carried out.
 The input is in \textit{Namelist format} if not otherwise stated. 
-Important steps in the program are given in the flow diagram below and are
-explained in some detail in this section. More information can be obtained in an up-coming review article \cite{PSJA}.
+Important steps in the program are given in the \ref{pic:flow_long} and are
+explained in some detail in this section.   \ref{pic:flow_short} visualizes the workflow in a more abstract way.
+More information can be obtained in an up-coming review article \cite{PSJA}.
 
 %Figure 1
 \begin{figure}[htbp]
    	\centering
-	\includegraphics[width=0.95\textwidth]{tree.pdf} 
+	\includegraphics[]{tree.pdf} 
     \caption{Flow diagram for main program tasks.}
-    \label{pic:flowdiagram}
+    \label{pic:flow_long}
+\end{figure}
+
+%Figure 2
+\begin{figure}[htbp]
+   	\centering
+	\includegraphics[]{workflow.pdf} 
+    \caption{Simplfied diagram of the workflow.}
+    \label{pic:flow_short}
 \end{figure}
 
 The most time-consuming steps in the program are the diagonalization of the adjacency matrix 
@@ -275,10 +286,13 @@ and Version 4.3 was extended to calculate frequencies from the force-field Hessi
 the implementation of the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k \geq l$,
 new topological descriptors and a more compact version of the database.
 
+%there should a subsection "creation of the fullerene graph" in this place
+%\subsection{Create a 3D structure for a specific fullerene}
+
 %Create a 3D structure for a specific fullerene
 \subsection{Create a 3D structure for a specific fullerene}
 
-The easiest way to create a 3D structure for program Fullerene is of course to read-in cartesian coordinates for a specific
+The easiest way to create a 3D structure for \program{Fullerene} is of course to read-in cartesian coordinates for a specific
 fullerene (see input files \filename{CCc20.inp} to \filename{CCc540.inp}), or to construct them internally for the high
 symmetry $I_h-$\C{20} or $I_h-$\C{60} isomers (Subroutine \funname{CoordC20C60}, see input files \filename{GEOMc60.inp},
 \filename{GEOMc60exp.inp}, \filename{GEOMc60ideal.inp}), or to construct the cartesian coordinates from the ring-spiral
@@ -293,6 +307,13 @@ the canonical fullerene number as defined in the book ``Atlas of Fullerenes'' by
 The program prints internal coordinates in form of a $Z$-Matrix (distances, angles and dihedrals).
 For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
 coordinates, e.g. cartesian coordinates obtained from a force-field optimization.
+
+In addition to the ring spiral algorithm by Fowler and Manolopoulos we have implemented a general ring spiral algorithm for cubic graphs.
+It differs from the classical ring spiral algorithm in that it can insert jumps between the addition of two vertices to spiral in order
+to prevent walking into a cul-de-sac at a later stage.  It is therefore capable of describing all fullerene graphs (and any other cubic graph).
+The criterion for jumping (while deriving the spiral from a graph) is, that the
+subgraph that hasn't been added to the spiral yet, must never be disconnected.  For deriving the graph from the spiral it is necessairy
+to explicitly give the jump positions and distances. 
 
 We recommend reading Fowler and Manolopoulos' book \cite{Atlas,cvetkovic2002} for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
 to construct 3D fullerene graphs. For the Goldberg-Coxeter transformation of \C{20} we obtain the RSPI from the scheme introduced by
@@ -814,6 +835,7 @@ simulated annealing algorithm we start with a Tutte 2D graph and perform a minim
 For other 2D graph embedding methods implemented see the following input section.
        
 
+
 %Input description
 \section{Input description}
 
@@ -839,13 +861,12 @@ A typical input is in \textit{Namelist format}, or if additional data are requir
 C80  Using FM algorithm to produce coordinates for C80 nanotube, \\
 input file: \filename{RSPIc80NT.inp}
 &General NA=80 / 
-&Coord ICart=2, IV2=4, IV3=5 / 
+&Coord ICart=2, IV2=4, IV3=5 , rspi=1, 2, 3, 4, 5, 6, 37, 38, 39, 40, 41, 42 /
 &FFChoice Iopt=1 / 
 &FFParameters / 
 &Hamilton IHam=1 / 
 &Isomers IPR=1 / 
 &Graph ISchlegel=2, ISO1=2, ISO2=4, ISO3=5 / 
-1 2 3 4 5 6 37 38 39 40 41 42 
 \end{verbatim}
 The first line is a text line, the second \&General is a general
 command line in \textit{namelist format} containing many useful flags,
@@ -855,8 +876,7 @@ and \paramname{\&FFParameters} are specifications for the force field
 to be used (none in this case), line 5 (\paramname{\&Hamilton})
 concerns the Hamiltonian cycles, line 6 (\&Isomers) is for an isomer list
 to be created, and line 7 (\paramname{\&Graph}) for the 2D fullerene
-graph (Schlegel diagram). The last line in the input is for the 12
-ring-spiral pentagon indices (RSPI) or for some other inputs required, e.g.
+graph (Schlegel diagram). The last line in the input is for other input required, e.g.
 the indices for vertex insertions.
 
 In the following, the input in the required sequence is described in detail (either Namelist or in Free Format):
@@ -929,7 +949,7 @@ until it is successful. If \paramname{ispsearch} = 2, all spirals are counted (t
 Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2, R6=1.42 /|).
 \paragraph{List of options:}\ 
 
-\paramname{ICart, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6, ScaleRad}
+\paramname{ICart, rspi, jumps, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6, ScaleRad}
 
 \paragraph{Option description:} 
 \begin{description}
@@ -945,10 +965,17 @@ vertex connectivities input as series of cards is required each with 4~integers:
 i.e. 1~3~6~4 gives the following edges: 1-3, 1-6, and 1-4.  Zeros for IC2 and IC3 can be used, i.e. 1~3~6~0
 gives 1-3 and 1-6, and 1~3~0~0 just gives 1-3 as an edge.  For the last card in the input stream, IV1 needs
 to be set to zero. For an example see input file \filename{EDGEc20.inp}.  It is legal but not necessary to define edges twice.\\
-If \paramname{ICart} = 8 A spiral search algorithm is used, see \paramname{isearch} keyword in \paramname{Isomer} section.
+If \paramname{ICart} = 10 A spiral search algorithm is used, see \paramname{isearch} keyword in \paramname{Isomer} section.
 
 When importing graphs from the ``House of Graphs'' database, the isomers are numbered starting at~1 (Although,
 internally we start counting at~0.).  There are two example files called \filename{DBc50HOG.inp} and \filename{DBc384HOG.inp}.
+
+\item[rspi] An array of 12 comma separated pentagon indices.  \paramname{rspi} can be given in case of \paramname{icart}=\{2,3,8,9\}.
+
+
+\item[jumps] And array of up to 10 jumps positions and step length.  \paramname{jumps} is required in case of \paramname=\{8,9\}
+
+
 
 \item[{IPRC}]
 There are two databases, one for the general isomers
