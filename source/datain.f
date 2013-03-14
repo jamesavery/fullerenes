@@ -266,8 +266,10 @@ C ExtWu force field
       enddo
 
 C Set IC and ichk parameters
-      if(ICart.lt.0) ICart=0
-      if(ICart.gt.9) ICart=9
+      if(ICart.lt.0 .or. icart.gt.10) then
+        write(*,*)"Invalic value for icart given.  Exiting ..."
+        call exit(1)
+      endif
       if(ichk.ne.0) istop=1
       if(ihamstore.ne.0.or.nhamcyc.ne.0) then
         nosort=1

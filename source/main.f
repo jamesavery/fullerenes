@@ -139,7 +139,7 @@ C  Convert printed database into a more compressed file
 
 C------------------Coordinates-------------------------------------
 C Options for Input coordinates
-      go to (10,20,30,30,30,30,30,98,30,30) Icart+1
+      go to (10,20,30,30,30,30,30,30,30,30,98) Icart+1
 
 C  Cartesian coordinates produced for Ih C20 or C60
    10 routine='COORDC20/60    '
