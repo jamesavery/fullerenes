@@ -965,7 +965,7 @@ Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2
 \begin{description}
 \item[{ICart}] Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 If \paramname{ICart} = 1 then Cartesian Coordinate input is expected.\\
-If \paramname{ICart} = 2, 3 then 12 pentagon indices are used for input.\\
+If \paramname{ICart} = 2, 3 then 12 pentagon indices are used for input using \paramname{rspi}.\\
 If \paramname{ICart} = 4, 5 then Goldberg-Coxeter transformation of \C{20} is used, i.e. $GC_{k,l}(20)$ with $k \geq l$ and $k > 0$.\\
 If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$, then pentagon indices are taken from the
 isomer list contained in a database (see below).\\
@@ -975,12 +975,17 @@ vertex connectivities input as series of cards is required each with 4~integers:
 i.e., 1~3~6~4 gives the following edges: 1-3, 1-6, and 1-4.  Zeros for IC2 and IC3 can be used, i.e. 1~3~6~0
 gives 1-3 and 1-6, and 1~3~0~0 just gives 1-3 as an edge.  For the last card in the input stream, IV1 needs
 to be set to zero. For an example see input file \filename{EDGEc20.inp}.  It is legal but not necessary to define edges twice.\\
+If \paramname{ICart} = 8 or 9 general spiral input required using  \paramname{rspi} and \paramname{jumps}.\\ 
 If \paramname{ICart} = 10 A spiral search algorithm is used, see \paramname{isearch} keyword in \paramname{Isomer} section.
 
 When importing graphs from the ``House of Graphs'' database, the isomers are numbered starting at~1 (Although,
 internally we start counting at~0.).  There are two example files called \filename{DBc50HOG.inp} and \filename{DBc384HOG.inp}.
 
 \item[rspi] An array of 12 comma separated pentagon indices.  \paramname{rspi} can be given in case of \paramname{icart}=\{2,3,8,9\}.
+The integers are of the form $n_1 n_2 \cdots n_{12}$, where the $n_i$ are the 12 Fowler-Manolopoulos ring-spiral
+pentagon indices, which uniquely identify the locations of the
+pentagons if the fullerene is spirable \cite{Atlas}. Use the canonical
+pentagon ring indices if possible (however, a non-canonical from should work as well).
 
 \item[jumps] An array of up to 10 jump positions and step lengths.  \paramname{jumps} is required in case of \paramname=\{8,9\}
 (unless you use the general spiral algorithm to create a graph that doesn't require jumps [which is possible of course]).
@@ -1058,22 +1063,18 @@ If \paramname{ICart} = 1 Cartesian Coordinates expected as input. In this case, 
 Here, $X_i, Y_i, Z_i$ are the cartesian
 coordinates for atom $i$ in \AA. $N_{Z_i}$ is not used by
 this program, but is kept so that \filename{.xyz}-files can be simply copy/pasted from other quantum theoretical programs to the input file.
-If \paramname{ICart} = 2 or 3 the adjacency matrix is created from a ring-spiral pentagon list. An extra input line is required 
-of the form $n_1 n_2 \cdots n_{12}$, where the $n_i$ are the 12 Fowler-Manolopoulos ring-spiral
-pentagon indices, which uniquely identify the locations of the
-pentagons if the fullerene is spirable \cite{Atlas}. Use the canonical
-pentagon ring indices if possible (transformation to the canonical from should work as well).
+If \paramname{ICart} = 2 or 3 the adjacency matrix is created from a ring-spiral pentagon list.
 
 If \paramname{ICart} = 4 or 5 adjacency matrix is created from a Goldberg-Coxeter transform of \C{20}, i.e. $GC_{k,l}$[\C{20}] with $k \geq l$.  
 In this case the parameter \paramname{kGC} in the namelist input has to be used.
 
-If \paramname{ICart} = 2, 4 or 6 the AME algorithm using $P$-type eigenvectors produced from the adjacency matrix to get cartesian
+If \paramname{ICart} = 2, 4, 6 or 8 the AME algorithm using $P$-type eigenvectors produced from the adjacency matrix to get cartesian
 coordinates.  If the $P$-type eigenvectors are not in sequence (position 2,3 and 4, see ref.\cite{Atlas} for details), three integer
 values \paramname{IV1, IV2, IV3} can be specified in the \paramname{\&Coord} namelist input identifying the position of the eigenvectors (see
 \filename{RSPIc80NT.inp} for such an example).  In this case a warning occurs which means you should carefully check the eigenvectors used and
 cartesian coordinates produced. Otherwise coordinates produced are useless. This is more often the case as you might expect.
 
-If \paramname{ICart} = 3, 5 or 7 the Tutte embedding (3D-TE) algorithm is chosen for the construction of the 3D fullerene structure from the
+If \paramname{ICart} = 3, 5, 7 or 9 the Tutte embedding (3D-TE) algorithm is chosen for the construction of the 3D fullerene structure from the
 adjacency matrix.  This should always work, although the fullerene created might be too spherical compared to the AME algorithm. But this
 algorithm is easier, and (in theory) should never fail. Examples are given in the input files starting with ``pentagon''.
 
