@@ -322,7 +322,7 @@ In addition to the ring spiral algorithm by Fowler and Manolopoulos we have impl
 It differs from the classical ring spiral algorithm in that it can insert jumps between the addition of two vertices to spiral in order
 to prevent walking into a cul-de-sac at a later stage.  It is therefore capable of describing all fullerene graphs (and any other cubic graph).
 The criterion for jumping (while deriving the spiral from a graph) is, that the
-subgraph that hasn't been added to the spiral yet, must never be disconnected.  For deriving the graph from the spiral it is necessairy
+subgraph that hasn't been added to the spiral yet, must never be disconnected.  For deriving the graph from the spiral it is necessary
 to explicitly give the jump positions and distances. 
 
 We recommend reading Fowler and Manolopoulos' book \cite{Atlas,cvetkovic2002} for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
@@ -660,6 +660,7 @@ Figure \ref{pic:C380andC384}). Note that considerable improvements were made to 
 The number of spirals in the output agree with the examples given by Yoshida and Fowler.\cite{Yoshida97a} 
 A more general ring-spiral algorithm is currently in preparation.
 
+\clearpage
 %Volume and surface area, minimum covering sphere
 \subsection{Volume $V$ and surface area $A$, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
 The volume and surface area of the fullerene are calculated in Subroutine \funname{Volume}. This is done by\\
