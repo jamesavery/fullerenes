@@ -87,17 +87,6 @@ is found in the User's Manual.<br><br>
 <b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.4.pdf">UserManualv4.4.pdf (19/01/2013)</a> (2.4 MB)
 <br><br>
 
-The following database is different to the one used in version 4.3 (which is now obsolete):<br>
-<b>Download for Database1 (General fullerenes):</b><br> 
-C<SUB>20</SUB>-C<SUB>122</SUB> <a href="http://ctcp.massey.ac.nz/data/ALL.zip"> ALL.zip (01/11/2012)</a> (compressed 198.9 MB, uncompressed 1.92 GB)
-<br>
-<b>Download for Database2 (IPR fullerenes):</b><br>
-C<SUB>60</SUB>-C<SUB>170</SUB> <a href="http://ctcp.massey.ac.nz/data/IPR.zip"> IPR.zip (01/11/2012)</a> (compressed 169.2 MB, uncompressed 1.86 GB)
-<br>
-<b>Download for Database3 (Yoshida selected fullerenes):</b><br>
-C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip</a> (compressed 4.4 MB, uncompressed 15.4 MB)
-<br><br>
-
 <b>Download for fullerene program:</b><br>
 If you are a new user or if your password expired, please supply Title (Prof., Dr., Mr., Mrs.), 
 First and Last name, Institution etc, and Email address. 
@@ -381,7 +370,34 @@ This has the advantage that you will receive an email message if a new major upg
 Once you have a password you can download the program here: (Version 4.4, last update 19/01/2013)<br>
 <form action="fullerdl.php" method="get">
 Password: <input type="password" name="pwd" size="10" /><br> <input type="submit" value="Download" /> 
-</form>
+</form><br><br>
+
+<b>Database files:</b> The database is provided for general isomers up to C<SUB>150</SUB> and for IPR isomers up to
+C<SUB>200</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>110</SUB> 
+and for IPR isomers up to C<SUB>122</SUB>. The database can be copied into
+the main program folder and can be used to read the ring spiral pentagon indices.
+The numbering scheme is identical to that chosen in the "Atlas of Fullerenes" by Fowler and Manolopoulos,
+that is each isomer in the book's appendix can be constructed easily from the database.  
+The data files are gzipped. before usage of a specific fullerene database you need to unzip the specific file.
+Once printed by the program the data can easily be read. It is our intention to
+extend the isomer list beyond C<SUB>150</SUB>/C<SUB>200</SUB> in due time (without Hamiltonian cycles).
+A link to the  "House of Graphs" database by Brinkmann and co-workers is already implemented, 
+and the database can be downloaded from <a href="http://hog.grinvin.org/Fullerenes">House of Graphs Database</a>.<br><br>
+A link to the Yoshida database is also implemented and the database can be downloaded from
+<a href="http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html">Yoshida Database</a>.<br><br>
+
+<b>Download for DatabaseY (Yoshida selected fullerenes):</b><br>
+C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip</a> (compressed 4.4 MB, uncompressed 15.4 MB)
+<br>
+The following database files are different to the one used in version 4.3 (which are now obsolete). Once the complete database has been downloaded,
+the gzipped files require about 2.3 GB of space. To save space, only unzip the files which are in use. Start downloading here for various fullerene database files:<br>
+<b>Download for DatabaseAll20-100 (General fullerenes):</b><br> 
+C<SUB>20</SUB>-C<SUB>100</SUB> <a href="http://ctcp.massey.ac.nz/data/ALL.zip"> ALL20-100.zip (01/11/2012)</a> (compressed 198.9 MB)
+<br>
+<b>Download for DatabaseIPR60-150 (IPR fullerenes):</b><br>
+C<SUB>60</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/IPR.zip"> IPR60-150.zip (01/11/2012)</a> (compressed 169.2 MB)
+<br>
+
 
 <table width="95%" align="center">
 <tr>
@@ -422,19 +438,6 @@ harmonic oscillator force field including dihedrals.</li>
 </td>
 </tr></table><br>
 
-A database is provided for general isomers up to C<SUB>150</SUB> and for IPR isomers up to
-C<SUB>200</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>110</SUB> 
-and for IPR isomers up to C<SUB>122</SUB>. The database can be copied into
-the main program folder and can be used to read the ring spiral pentagon indices.
-The numbering scheme is identical to that chosen in the "Atlas of Fullerenes" by Fowler and Manolopoulos,
-that is each isomer in the book's appendix can be constructed easily from the database.  
-The data files are gzipped. before usage of a specific fullerene database you need to unzip the specific file.
-Once printed by the program the data can easily be read. It is our intention to
-extend the isomer list beyond C<SUB>150</SUB>/C<SUB>200</SUB> in due time (without Hamiltonian cycles).
-A link to the  "House of Graphs" database by Brinkmann and co-workers is already implemented, 
-and the database can be downloaded from <a href="http://hog.grinvin.org/Fullerenes">House of Graphs Database</a>.<br><br>
-A link to the Yoshida database is also implemented and the database can be downloaded from
-<a href="http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html">Yoshida Database</a>.
 
 <b>Note: </b>The program is under construction and new features are being added.
 You can check the date on the right hand side of the download button to see
