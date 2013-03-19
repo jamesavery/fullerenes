@@ -6,7 +6,7 @@
 <!
 --------------------------------------------------------------------------
 This is the main webpage for the Fullerene program 
-Last update: December 22, 2012
+Last update: March 19, 2013
 Two php files are called:
 
 fulleruf.php
@@ -37,8 +37,8 @@ fullerdl.php receives the password, checks it and if correct
 <td valign="middle"  align="center">
 <h1> <big> Program FULLERENE <br>
 Version 4.4</big> <br><br>
-A Fortran/C++ Program for Fullerene Structures <br> 
-and Topological Analysis <br><br> </h1>
+A Fortran/C++ Program for Creating Fullerene Structures <br> 
+and for Performing Topological Analyses <br><br> </h1>
 <h2>by Peter Schwerdtfeger, Lukas Wirz and James Avery<br>
 <I>Centre for Theoretical Chemistry and Physics<br>
 The Quantum Chemistry and Physics Group<br>
@@ -61,9 +61,10 @@ linked to the original Fortran program using much improved algorithms. Version 4
 and contains a more extended evaluation of topological indicators, a harmonic oscillator force field including dihedral angles, 
 vibrational frequencies (although the force constants have not been adjusted yet), general Goldberg-Coxeter transformations
 of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to both the Yoshida and House of Graphs 
-databases, an improved Tutte embedder, a correct ring spiral count, tight lower and upper bounds for Hamiltonian cycles 
-and a neighborhood spiral ring search algorithm. The fullerene database has been brought into a more compact form and
-extended up to C<SUB>1504</SUB>, and up to C<SUB>200</SUB> for IPR isomers, and is now more compact.  
+databases, an improved Tutte embedder, a correct ring spiral count, a generalized ring spiral algorithm with jumps, 
+tight lower and upper bounds for Hamiltonian cycles, and a neighbourhood spiral ring search algorithm. The fullerene database 
+has been brought into a more compact form and extended up to C<SUB>150</SUB>, and up to C<SUB>200</SUB> for IPR isomers, 
+and is now more compact.  
 <br><br>
 
 This is an open-source code and free for distribution (except for commercial purposes). Please cite the following paper if you use this program for publishing data:<br><br>
@@ -389,14 +390,24 @@ A link to the Yoshida database is also implemented and the database can be downl
 <b>Download for DatabaseY (Yoshida selected fullerenes):</b><br>
 C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip</a> (compressed 4.4 MB, uncompressed 15.4 MB)
 <br>
-The following database files are different to the one used in version 4.3 (which are now obsolete). Once the complete database has been downloaded,
-the gzipped files require about 2.3 GB of space. To save space, only unzip the files which are in use. Start downloading here for various fullerene database files:<br>
-<b>Download for DatabaseAll20-100 (General fullerenes):</b><br> 
-C<SUB>20</SUB>-C<SUB>100</SUB> <a href="http://ctcp.massey.ac.nz/data/ALL.zip"> ALL20-100.zip (01/11/2012)</a> (compressed 198.9 MB)
-<br>
-<b>Download for DatabaseIPR60-150 (IPR fullerenes):</b><br>
-C<SUB>60</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/IPR.zip"> IPR60-150.zip (01/11/2012)</a> (compressed 169.2 MB)
-<br>
+The following database files are more compact to the ones used in version 4.3 (which are now obsolete). Once the database has been downloaded,
+the gzipped files require about 2.3 GB of space. To save space, only gunzip the files which are to be used. Start downloading here for various fullerene database files (in tar format):<br>
+<b>Download for DatabaseAllC20-C200 (General fullerenes):</b><br> 
+C<SUB>020</SUB>-C<SUB>110</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C020-110.tar"> databaseAll.C020-110.tar (19/03/2013)</a> (compressed 60.4 MB)<br>
+C<SUB>112</SUB>-C<SUB>120</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C112-120.tar"> databaseAll.C112-120.tar (19/03/2013)</a> (compressed 66.3 MB)<br>
+C<SUB>122</SUB>-C<SUB>130</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C122-130.tar"> databaseAll.C122-130.tar (19/03/2013)</a> (compressed 144.8 MB)<br>
+C<SUB>132</SUB>-C<SUB>140</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C132-140.tar"> databaseAll.C132-140.tar (19/03/2013)</a> (compressed 298.7 MB)<br>
+C<SUB>142</SUB>-C<SUB>146</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C142-146.tar"> databaseAll.C142-160.tar (19/03/2013)</a> (compressed 303.0 MB)<br>
+C<SUB>148</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C148-150.tar"> databaseAll.C118-150.tar (19/03/2013)</a> (compressed 278.2 MB)<br>
+<b>Download for DatabaseIPRC60-C200 (IPR fullerenes):</b><br>
+C<SUB>060</SUB>-C<SUB>160</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C060-160.tar"> databaseIPR.C060-160.tar (19/03/2013)</a> (compressed 45.8 MB)<br>
+C<SUB>162</SUB>-C<SUB>170</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C162-170.tar"> databaseIPR.C162-170.tar (19/03/2013)</a> (compressed 67.1 MB)<br>
+C<SUB>172</SUB>-C<SUB>180</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C172-180.tar"> databaseIPR.C172-180.tar (19/03/2013)</a> (compressed 145.9 MB)<br>
+C<SUB>182</SUB>-C<SUB>186</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C182-186.tar"> databaseIPR.C182-186.tar (19/03/2013)</a> (compressed 153.5 MB)<br>
+C<SUB>188</SUB>-C<SUB>190</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C188-190.tar"> databaseIPR.C188-190.tar (19/03/2013)</a> (compressed 144.3 MB)<br>
+C<SUB>192</SUB>-C<SUB>194</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C192-194.tar"> databaseIPR.C192-194.tar (19/03/2013)</a> (compressed 188.0 MB)<br>
+C<SUB>196</SUB>-C<SUB>198</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C196-198.tar"> databaseIPR.C196-198.tar (19/03/2013)</a> (compressed 243.6 MB)<br>
+C<SUB>200</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C200.tar"> databaseIPR.C200.tar (19/03/2013)</a> (compressed 146.8 MB)<br>
 
 
 <table width="95%" align="center">
@@ -408,12 +419,13 @@ C<SUB>60</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/IPR.zip"> 
 <li>Establish connectivities between vertices to construct the adjacency matrix.</li>
 <li>Construct cartesian coordinates for the Ih isomer of C<SUB>60</SUB> or C<SUB>20</SUB>.
 <li>Construct cartesian coordinates using the ring-spiral pentagon indices of Fowler and Manolopoulos.</li>
+<li>Construct cartesian coordinates for non-spiral fullerenes using generalized ring-spiral pentagon indices with jumps.</li>
 <li>Construct cartesian coordinates from a Goldberg-Coxeter transformation of C<SUB>20</SUB>.</li>
 <li>Use matrix-eigenvector or Tutte embedding algorithms to obtain cartesian coordinates.</li>
 <li>Goldberg-Coxeter leapfrog and halma transformations of a fullerene.</li>
 <li>Endo-Kroto 2-vertex, Yoshida-Fowler 4- and 6-vertex and Brinkmann-Fowler 6-vertex insertions.</li>
 <li>Use of program SPIRAL of Fowler and Manolopoulos for face-spiral fullerenes.</li>
-<li>Find fullerenes in the neighborhood of given ring-spiral pentagon indices.</li>
+<li>Find fullerenes in the neighbourhood of given ring-spiral pentagon indices.</li>
 <li>Use of program HAMILTON of Babic for Hamiltonian cycles and IUPAC Nomenclature.</li> 
 <li>Tight upper and lower bounds for Hamiltonian cycles</li>
 <li>Perform a Hueckel analysis. This gives you a good hint if the fullerene is open or closed shell.</li>
@@ -441,7 +453,7 @@ harmonic oscillator force field including dihedrals.</li>
 
 <b>Note: </b>The program is under construction and new features are being added.
 You can check the date on the right hand side of the download button to see
-if you already have the newest version. The next intended version 5 will undergo major restructuring.
+if you already have the newest version. The next intended version 5 will undergo major restructering.
 Please report any bug to <a href="mailto:p.a.schwerdtfeger&#64massey.ac.nz">p.a.schwerdtfeger&#64massey.ac.nz</a>.<br>
 The program is in use in the following countries: 
 Brazil, China, Colombia, France, Germany, Japan, India, Italy, Iran, New Zealand, Poland, Russia, Taiwan, Ukraine, United Kingdom, USA.
