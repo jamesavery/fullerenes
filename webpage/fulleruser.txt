@@ -49,4 +49,38 @@ Ms. & Dominic & Esan & University of Illinois at Chicago & Chemistry & Chicago &
 ---------------
 Version 4.3
 Ms. & Xiaojie & Zhang & Fudan University & Chemistry & Shanghai & China & zxjzxj9@gmail.com & Check the structure, great program!
-Dr. & Antti & Kuronen & University of Helsinki & Department of Physics & Helsinki & Finland & antti.kuronen@helsinki.fi &
+Dr. & Antti & Kuronen & University of Helsinki & Department of Physics & Helsinki & Finland & antti.kuronen@helsinki.fi &Dr. & Biswajit & Saha & NU & Chemistry & Evanston & United States of America & bisajit@gmail.com & 
+Ms. & John & May & EMBL-EBI & Cheminformatics & Cambridge & United Kingdom & john.wilkinsonmay@gmail.com & Generating some stress-tests for cheminformatics toolkit , just what I needed
+Ms. & Martin & Blood-Forsythe & Harvard University & Physics & Cambridge & United States of America & mbloodforsythe@physics.harvard.edu & 
+Dr. & Ricardo & Ramirez & Universidad Catolica de Chile & Physics & Santiago & Chile & rricardo0@gmail.com & 
+Prof. Dr. & Yi-Bo  & WANG & Guizhou University & Chemistry & Guiyang & China & ybw@gzu.edu.cn & 
+Dr. & Chung & Jin & Michigan State University & Chemistry & East Lansing & United States of America & yunchungjin@gmail.com & May I please also have the old full Fortran version. I am not good at C++
+Mr. & Helen & Labendik & MSU & Chemistry & Moscow & Russia & helen.labendik@gmail.com &
+Dr. & Arijit & Roy & Stony Brook University & Laufer Center & Stony Brook & United States of America & r.arijit@gmail.com & 
+Dr. & Sidney Ramos & Santana & Universidade Federal da Paraiba & Lab. de Química Quântica e Computacional - Dep. de Química - CCEN & João Pessoa - PB & Brazil & santanasidney@quimica.ufpb.br & 
+Ms. & Balamurugan & Kanagasabai & Central Leather Research Institute & Chemical Lab & Chennai & India & balakanagasabai@gmail.com & 
+Prof. Dr. & Ali Reza & Ashrafi & University of Kashan & Department of Nanocomputing & Kashan & Iran & ashrafi_1385@yahoo.co.in & 
+Ms. & Karol & Strutynski & University of Porto & Department of Chemistry & Porto & Portugal & strutynski.karol@gmail.com & 
+Dr. & Awomir & Ostrowski & Industrial Chemistry Research Institutie &  & Warsaw & Poland & kistry@gmail.com & 
+Dr. & Lalit & Deshmukh & NIH & NIDDK & Bethesda & United States of America & lalit.deshmukh@nih.gov & none
+Dr. & Amir & Barati & UIUC & Mech & champaign & United States of America & barati06@yahoo.com & thanks
+Dr. & Deepti & Verma & IIT K & MSE & Kanpur & India & deeptiiverma@gmail.com &
+Ms. & Marc & Garcia-Borràs & Institute of Computational Chemistry, University of Girona & Department of Chemistry & Girona & Spain & marcgbq@gmail.com & 
+Ms. & Vassa & Pupkunder & MSU &  & Moscow & Russia & vassapup@narod.ru & 
+Ms. & Paul & Schwarz & FAU Erlangen-Nuernberg & Computer Chemistry Center & Erlangen & Germany & schwarz-paul@live.de & 
+Dr. & Viorel & Chihaia & Institute of Physical Chemistry  & Surface Chemistry and Catalysis & Bucharest & Romania & vchihaia@icf.ro & Thank you very much to make available your code.
+Ms. & John & Waddle & Bowling Green State University & Physics and Astronomy & Bowling Green, OH & United States of America & jwaddle@falcon.bgsu.edu & 
+Ms. & Khaled & ELKELANY & Pau University & Physical chemistry & Pau & France & elkelanystar2008@yahoo.com & I am a PhD student in France
+Dr. & Bakhyt & Matkarimov & Nazarbayev University & NURIS & Astana & Kazakhstan & bmatkarimov@nu.edu.kz & Thank you!
+Prof. & mohammad & sabra & damscus university & physics & damscus & Syria & sabra1962@gmx.com & I use pcgamess and gamess_UK
+Ms. & Vicente & Munizaga & Pontificia Universidad Católica de Chile & Physics & Santiago & Chile & vpmuniza@uc.cl & I need to build caps of carbon nanotubes 
+Ms. & David & Beard &  &  & Bingil Bay & Australia & dbeard100@iinet.net.au & 
+Ms. & Jacob & Martin & University of Auckland & Department of Chemistry & Auckland & New Zealand & nzjakemartin@gmail.com & I would like to be able to quickly generate fullerenes for my MD simulations. Thanks
+Dr. & Jesus Nain & Pedroza Montero & UNAM & Physics & Mexico City & Mexico & nain.pedroza@gmail.com & 
+Dr. & Changzeng & Fan &  & Material Science and Technology & Qinhuangdao & China & chzfan@ysu.edu.cn & From AMN6, I got to know Fullerene, wanna to try!
+Ms. & Serkan & Polad & metu & Physics & Ankara & Turkey & serkanpolad@gmail.com & 
+Dr. & Manuel  & Melle Franco & University of Minho & Engeneering  & Braga & Portugal & manuelmelle@gmail.com & 
+Prof. & Ming-Hsien & Lee & Tamkang University & Physics & New Taipei City & Taiwan & mhslee@mail.tku.edu.tw & Great jobs!
+---------------
+Version 4.4
+ 
