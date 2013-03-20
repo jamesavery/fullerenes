@@ -82,10 +82,10 @@ You need to use the Makefile included in fullerene.zip. The executable runs
 just fine on a PC or Mac running LINUX/UNIX.
 The program is written in standard Fortran and C++ and has been checked
 for a large number of fullerenes up to 35,000 vertices. A number of input 
-and output files are included in the fullerene.zip file and a more detailed description 
+and output files are included in the fullerenev4.4.zip file and a more detailed description 
 is found in the User's Manual.<br><br>
 
-<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.4.pdf">UserManualv4.4.pdf (19/01/2013)</a> (2.4 MB)
+<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.4.pdf">UserManualv4.4.pdf (20/01/2013)</a> (2.4 MB)
 <br><br>
 
 <b>Download for fullerene program:</b><br>
@@ -114,7 +114,7 @@ This has the advantage that you will receive an email message if a new major upg
 <tr> <td> City: </td> <td> <input type="text" name="city" size="30" /></td> </tr>
 <tr> <td> Country: </td> <td> <select name="country" />
 <option value="">Country...</option>
-<option value="Afganistan">Afghanistan</option>
+<option value="Afghanistan">Afghanistan</option>
 <option value="Albania">Albania</option>
 <option value="Algeria">Algeria</option>
 <option value="American Samoa">American Samoa</option>
@@ -388,26 +388,27 @@ A link to the Yoshida database is also implemented and the database can be downl
 <a href="http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html">Yoshida Database</a>.<br><br>
 
 <b>Download for DatabaseY (Yoshida selected fullerenes):</b><br>
-C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip</a> (compressed 4.4 MB, uncompressed 15.4 MB)
+C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip (31/10/2012)</a> (compressed 4.4 MB, uncompressed 15.4 MB)
 <br>
-The following database files are more compact to the ones used in version 4.3 (which are now obsolete). Once the database has been downloaded,
-the gzipped files require about 2.3 GB of space. To save space, only gunzip the files which are to be used. Start downloading here for various fullerene database files (in tar format):<br>
+The following database files are more compact than the ones used in the previous version 4.3. They are now obsolete. Once the new database has been downloaded,
+the gzipped files require about 2.3 GB of space. In order to save disk space, only gunzip the files which are to be used in the calculation. 
+Start downloading here for the various fullerene database files (in tar format):<br>
 <b>Download for DatabaseAllC20-C200 (General fullerenes):</b><br> 
-C<SUB>020</SUB>-C<SUB>110</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C020-110.tar"> databaseAll.C020-110.tar (19/03/2013)</a> (compressed 60.4 MB)<br>
-C<SUB>112</SUB>-C<SUB>120</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C112-120.tar"> databaseAll.C112-120.tar (19/03/2013)</a> (compressed 66.3 MB)<br>
-C<SUB>122</SUB>-C<SUB>130</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C122-130.tar"> databaseAll.C122-130.tar (19/03/2013)</a> (compressed 144.8 MB)<br>
-C<SUB>132</SUB>-C<SUB>140</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C132-140.tar"> databaseAll.C132-140.tar (19/03/2013)</a> (compressed 298.7 MB)<br>
-C<SUB>142</SUB>-C<SUB>146</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C142-146.tar"> databaseAll.C142-160.tar (19/03/2013)</a> (compressed 303.0 MB)<br>
-C<SUB>148</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C148-150.tar"> databaseAll.C118-150.tar (19/03/2013)</a> (compressed 278.2 MB)<br>
+C<SUB>020</SUB>-C<SUB>110</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C020-110.tar"> databaseAll.C020-110.tar (20/03/2013)</a> (compressed 60.4 MB)<br>
+C<SUB>112</SUB>-C<SUB>120</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C112-120.tar"> databaseAll.C112-120.tar (20/03/2013)</a> (compressed 66.3 MB)<br>
+C<SUB>122</SUB>-C<SUB>130</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C122-130.tar"> databaseAll.C122-130.tar (20/03/2013)</a> (compressed 144.8 MB)<br>
+C<SUB>132</SUB>-C<SUB>140</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C132-140.tar"> databaseAll.C132-140.tar (20/03/2013)</a> (compressed 298.7 MB)<br>
+C<SUB>142</SUB>-C<SUB>146</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C142-146.tar"> databaseAll.C142-146.tar (20/03/2013)</a> (compressed 303.0 MB)<br>
+C<SUB>148</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C148-150.tar"> databaseAll.C148-150.tar (20/03/2013)</a> (compressed 278.2 MB)<br>
 <b>Download for DatabaseIPRC60-C200 (IPR fullerenes):</b><br>
-C<SUB>060</SUB>-C<SUB>160</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C060-160.tar"> databaseIPR.C060-160.tar (19/03/2013)</a> (compressed 45.8 MB)<br>
-C<SUB>162</SUB>-C<SUB>170</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C162-170.tar"> databaseIPR.C162-170.tar (19/03/2013)</a> (compressed 67.1 MB)<br>
-C<SUB>172</SUB>-C<SUB>180</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C172-180.tar"> databaseIPR.C172-180.tar (19/03/2013)</a> (compressed 145.9 MB)<br>
-C<SUB>182</SUB>-C<SUB>186</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C182-186.tar"> databaseIPR.C182-186.tar (19/03/2013)</a> (compressed 153.5 MB)<br>
-C<SUB>188</SUB>-C<SUB>190</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C188-190.tar"> databaseIPR.C188-190.tar (19/03/2013)</a> (compressed 144.3 MB)<br>
-C<SUB>192</SUB>-C<SUB>194</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C192-194.tar"> databaseIPR.C192-194.tar (19/03/2013)</a> (compressed 188.0 MB)<br>
-C<SUB>196</SUB>-C<SUB>198</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C196-198.tar"> databaseIPR.C196-198.tar (19/03/2013)</a> (compressed 243.6 MB)<br>
-C<SUB>200</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C200.tar"> databaseIPR.C200.tar (19/03/2013)</a> (compressed 146.8 MB)<br>
+C<SUB>060</SUB>-C<SUB>160</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C060-160.tar"> databaseIPR.C060-160.tar (20/03/2013)</a> (compressed 45.8 MB)<br>
+C<SUB>162</SUB>-C<SUB>170</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C162-170.tar"> databaseIPR.C162-170.tar (20/03/2013)</a> (compressed 67.1 MB)<br>
+C<SUB>172</SUB>-C<SUB>180</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C172-180.tar"> databaseIPR.C172-180.tar (20/03/2013)</a> (compressed 145.9 MB)<br>
+C<SUB>182</SUB>-C<SUB>186</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C182-186.tar"> databaseIPR.C182-186.tar (20/03/2013)</a> (compressed 153.5 MB)<br>
+C<SUB>188</SUB>-C<SUB>190</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C188-190.tar"> databaseIPR.C188-190.tar (20/03/2013)</a> (compressed 144.3 MB)<br>
+C<SUB>192</SUB>-C<SUB>194</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C192-194.tar"> databaseIPR.C192-194.tar (20/03/2013)</a> (compressed 188.0 MB)<br>
+C<SUB>196</SUB>-C<SUB>198</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C196-198.tar"> databaseIPR.C196-198.tar (20/03/2013)</a> (compressed 243.6 MB)<br>
+C<SUB>200</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C200.tar"> databaseIPR.C200.tar (20/03/2013)</a> (compressed 146.8 MB)<br>
 
 
 <table width="95%" align="center">
@@ -441,7 +442,7 @@ harmonic oscillator force field including dihedrals.</li>
 <li>Calculate the minimum distance sphere (MDS) and maximum inner sphere (MIS).</li>
 <li>Measure of distortion from spherical symmetry and convexity.</li>
 <li>Produce (x,y) coordinates of a fullerene graph (Schlegel diagram) using a variety of different algorithms.</li>
-<li>Produce Schlegel diagram with Hamiltonian cycle included.</li>
+<li>Produce Schlegel diagram, with Hamiltonian cycle or the dual graph included, in .tex format.</li>
 <li>The output file ending with .xyz or .cc1 can be used as input for CYLVIEW, AVOGADRO, VMD or PYMOL.</li>
 <li>The output file ending with .dat can be used as input for drawing Schlegel diagrams.</li><br>
 </td>
@@ -453,11 +454,9 @@ harmonic oscillator force field including dihedrals.</li>
 
 <b>Note: </b>The program is under construction and new features are being added.
 You can check the date on the right hand side of the download button to see
-if you already have the newest version. The next intended version 5 will undergo major restructering.
+if you already have the newest version. The next intended version 5 will undergo major restructuring.
 Please report any bug to <a href="mailto:p.a.schwerdtfeger&#64massey.ac.nz">p.a.schwerdtfeger&#64massey.ac.nz</a>.<br>
-The program is in use in the following countries: 
-Brazil, China, Colombia, France, Germany, Japan, India, Italy, Iran, New Zealand, Poland, Russia, Taiwan, Ukraine, United Kingdom, USA.
-<br><br>
+The program is used in over 30 countries worldwide.<br><br>
 <b>Acknowledgment:</b><br>
 PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support
 in terms of a Humboldt Research Award. The first version of the program was written during

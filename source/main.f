@@ -26,11 +26,12 @@
       IMPLICIT REAL*8 (A-H,O-Z)
 C    Set the dimensions for the distance matrix
       parameter (nzeile=132)
+      real(8) force(ffmaxdim), forceP(ffmaxdim)
+      Real*4 TimeX
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
       DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
       DIMENSION DistStore(3,Nmax)
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
-      real(8) force(ffmaxdim), forceP(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
       DIMENSION distP(Nmax),IDA(Nmax,Nmax)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
@@ -40,17 +41,14 @@ C    Set the dimensions for the distance matrix
       DIMENSION IDual(Mmax,Mmax),nSW(4,66),nFM(4,66),nYF(6,66),nBF(5,66)
       DIMENSION NEK(3,Nmax)
       DIMENSION Symbol(Mmax)
-      Real*4 TimeX
       CHARACTER CDAT*8,CTIM*10,Zone*5
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
-      CHARACTER*7 Namecc1,Namexyz
-      CHARACTER*4 Endcc1,Endxyz
+      CHARACTER*7 Namecc1,Namexyz,Namemol
+      CHARACTER*4 Endcc1,Endxyz,Endmol
       CHARACTER*15 routine
-      CHARACTER*50 filename
-      CHARACTER*50 filenameout
-      CHARACTER*50 xyzname
-      CHARACTER*50 cc1name
+      CHARACTER*50 filename,filenameout
+      CHARACTER*50 xyzname,cc1name,molname
       CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
@@ -61,6 +59,7 @@ C    Set the dimensions for the distance matrix
       integer rspi(12),jumps(10)
 
 C Set parameters
+C Element Names
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
      2 'MN','FE','CO','NI','CU','ZN','GA','GE','AS','SE','BR','KR',    
@@ -70,12 +69,20 @@ C Set parameters
      6 'TA',' W','RE','OS','IR','PT','AU','HG','TL','PB','BI','PO',
      7 'AT','RN','FR','RA','AC','TH','PA',' U','NP','PU','AM','CM',   
      8 'BK','CF','ES'/                                               
+
+C External file names
       Namecc1='-3D.cc1'
       Namexyz='-3D.xyz'
+      Namemol='-3D.mol'
       Endcc1='.cc1'
       Endxyz='.xyz'
+      Endmol='.mol'
+
+C Input / Output
       IN=5
       Iout=6
+
+C Set parameters to zero
       nloop=0
       nxyz=0
       ncc1=0
