@@ -1,11 +1,15 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,ICart,Iopt,IP,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
-     1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
+     1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,rspi,
      1 jumps,force,forceP,boost,filename,filenameout,DATEN)
+C-----------------------------------------------------------------
+C  This is the main routine handling the input
+C  It is called from the main program
+C-----------------------------------------------------------------
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       parameter (nlines=9999)
@@ -347,3 +351,67 @@ C  Tolerance for finding 5- and 6-ring connections
   108 Format(1X,'Start new job',F12.6)
       RETURN
       END
+
+      Subroutine ReadFromFile(nchoice,iextfile,iout,iatom,
+     1 extfilename,Dist)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+C-----------------------------------------------------------------
+C  Routine to read cartesian coordinates from external file
+C  It is called from the main program
+C  Formats: 
+C   nchoice=1   .cc1 file
+C   nchoice=2   .xyz file
+C   nchoice=3   .mol file
+C  iextfile: unit number for external file
+C  iout:     unit number for output
+C  iatom:    Field for atom number for each atom (6 for carbon)
+C  extfilename: external file name
+C  Dist(3,i): Filed of (x,y,z) coordinates for each atom i
+C-----------------------------------------------------------------
+      DIMENSION Dist(3,Nmax),Iatom(Nmax)
+      CHARACTER*50 extfilename
+      Character*1 TEXTINPUT(nzeile)
+      CHARACTER*2 element
+      Integer endzeile
+      Logical lexist
+
+         inquire(file=extfilename,exist=lexist)
+          if(lexist.neqv..True.) then
+            Write(Iout,1001) extfilename
+            stop
+          endif
+         Open(unit=iextfile,file=extfilename,form='formatted')
+         WRITE(Iout,1000) extfilename,nchoice
+C .cc1 files
+         if(nchoice.eq.1) then
+          Read(7,*) number_vertices
+          Do J=1,number_vertices
+           Read(iextfile,*,end=1) element,JJ,(Dist(I,J),I=1,3)
+           Iatom(j)=6
+          enddo
+         endif
+C .xyz files
+         if(nchoice.eq.2) then
+          Read(7,*) number_vertices
+          Read(7,1002) (TEXTINPUT(I),I=1,nzeile)
+          endzeile=0
+          do j=1,nzeile
+            if(TEXTINPUT(j).ne.' ') endzeile=j
+          enddo 
+          WRITE(Iout,1003) number_vertices,(TEXTINPUT(I),I=1,endzeile)
+          Do J=1,number_vertices
+            Read(7,*,end=1) element,(Dist(I,J),I=1,3)
+            Iatom(j)=6
+          enddo
+         endif
+
+   1     close(unit=7)
+ 1000 FORMAT(/1X,'Read coordinates from external file: ',A60,
+     1 /1X,'Choice: ',I1)
+ 1001 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
+ 1002 FORMAT(132A1)
+ 1003 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
+      RETURN
+      END
+
