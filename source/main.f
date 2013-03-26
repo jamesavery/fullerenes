@@ -25,7 +25,6 @@
 
       IMPLICIT REAL*8 (A-H,O-Z)
 C    Set the dimensions for the distance matrix
-      parameter (nzeile=132)
       real(8) force(ffmaxdim), forceP(ffmaxdim)
       Real*4 TimeX
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
@@ -49,12 +48,10 @@ C    Set the dimensions for the distance matrix
       CHARACTER*15 routine
       CHARACTER*50 filename,filenameout
       CHARACTER*50 xyzname,cc1name,molname
-      CHARACTER*20 element
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
       Integer endzeile,Values(8)
       integer istop
-      Logical lexist
       integer mdist(nmax,nmax)
       integer rspi(12),jumps(10)
 
@@ -81,6 +78,7 @@ C External file names
 C Input / Output
       IN=5
       Iout=6
+      Iext=7
 
 C Set parameters to zero
       nloop=0
@@ -105,6 +103,7 @@ C Set parameters to zero
        Dist2D(2,I)=0.d0
       enddo
 
+C------------------TIME-AND-DATE-----------------------------------
 C Get time and date
       CALL date_and_time(CDAT,CTIM,zone,values)
       TIMEX=0.d0
@@ -123,86 +122,74 @@ C  INPUT and setting parameters for running the subroutines
       CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
-     1 icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
+     1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
      1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
      1 rspi,jumps,force,forceP,boost,filename,filenameout,TEXTINPUT)
 
+C  Simple checks
+C  Stop if error in input
+      If(IER.ne.0) go to 99
 C  Stop if isomer closest to icosahedral is searched for
       if(isearch.ne.0) then
         istop=1
         go to 98
       endif
-C  Stop if error in input
-      If(IER.ne.0) go to 99
 C  Only do isomer statistics
       if(istop.ne.0) go to 98
+
+C------------------COMPRESS----------------------------------------
 C  Convert printed database into a more compressed file
+C  This is a routine used by the programmers to compresse the
+C  database files to a reasonable format
       if(ndbconvert.ne.0) then
+      routine='COMPRESS       '
+      Write(Iout,1008) routine
        Call CompressDatabase(Iout,filename)
        go to 99
       endif
 
 C------------------Coordinates-------------------------------------
+C This controls how fullerene is read in
 C Options for Input coordinates
+
       go to (10,20,30,30,30,30,30,30,30,30,98) Icart+1
 
-C  Cartesian coordinates produced for Ih C20 or C60
+C  Cartesian coordinates produced for Ih C20 or C60 using basic geometry
    10 routine='COORDC20/60    '
       Write(Iout,1008) routine
       CALL CoordC20C60(Iout,R5,R6,Dist)
-      Do I=1,60
+      Do I=1,number_vertices
         IAtom(I)=6
       enddo
       Go to 40
 
 C Input Cartesian coordinates for fullerenes
-   20 if(icyl.eq.2.or.icyl.eq.3.or.icyl.eq.5) then
-        if(icyl.eq.5) then
+   20 if(ixyz.eq.2.or.ixyz.eq.3.or.ixyz.eq.5) then
+        if(ixyz.eq.5) then
+C Read from .xyz file
          cc1name=trim(filename)//".cc1"
-         inquire(file=cc1name,exist=lexist)
-          if(lexist.neqv..True.) then
-            Write(Iout,1023) cc1name
-            stop
-          endif
-         Open(unit=7,file=cc1name,form='formatted')
-         WRITE(Iout,1021) cc1name 
-         Read(7,*) number_vertices
-         Do J=1,number_vertices
-           Read(7,*,end=23) element,JJ,(Dist(I,J),I=1,3)
-           Iatom(j)=6
-         enddo
-   23    close(unit=7)
+         Call ReadFromFile(1,Iext,iout,iatom,cc1name,Dist)
          cc1name=trim(filename)//'-3D.new.xyz'
-        else
+       else
+C Read from .cc1 file
          xyzname=trim(filename)//".xyz"
-         Open(unit=7,file=xyzname,form='formatted')
-         WRITE(Iout,1015) xyzname 
-         Read(7,*) number_vertices
-         Read(7,1018) (TEXTINPUT(I),I=1,nzeile)
-         endzeile=0
-         do j=1,nzeile
-           if(TEXTINPUT(j).ne.' ') endzeile=j
-         enddo 
-         WRITE(Iout,1017) number_vertices,(TEXTINPUT(I),I=1,endzeile)
-         Do J=1,number_vertices
-           Read(7,*,end=22) element,(Dist(I,J),I=1,3)
-           Iatom(j)=6
-         enddo
-   22    close(unit=7)
+         Call ReadFromFile(2,Iext,iout,iatom,xyzname,Dist)
          xyzname=trim(filename)//'-3D.new.xyz'
         endif
 
       else
 
+C Read cartesian coordinates directly
        Do J=1,number_vertices
         Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
        enddo
       endif
-      Go to 40
-   21 WRITE(Iout,1016)
-      Go to 99
+
+       Go to 40
+   21  WRITE(Iout,1016)
+       Go to 99
 
 C Cartesian coordinates produced ring from spiral pentagon list
 C or from adjacency matrix. Uses the Fowler-Manolopoulos algorithm 
@@ -487,7 +474,7 @@ C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs
 
 C xyz format
-      if(icyl.le.2) then
+      if(ixyz.le.2) then
       nxyz=nxyz+1
       Call FileMod(filenameout,xyzname,Namexyz,Endxyz,nxyz,ifind)
         if(ifind.ne.0) then
@@ -521,7 +508,7 @@ C xyz format
       endif
 
 C cc1 format
-      if(icyl.ge.4) then
+      if(ixyz.ge.4) then
 C     Name handling
       ncc1=ncc1+1
       Call FileMod(filenameout,cc1name,Namecc1,Endcc1,ncc1,ifind)
@@ -578,7 +565,7 @@ C------------------PROJECTSPHERE----------------------------------
 C Projecting vertices on minimum covering sphere
 C  producing a spherical fullerene
       if(ipsphere.ne.0) then
-       call ProjectSphere(ipsphere,Iout,IAtom,nzeile,
+       call ProjectSphere(ipsphere,Iout,IAtom,
      1 IC3,Dist,cmcs,rmcs,filename,El,TEXTINPUT)
       endif
 C-----------------------------------------------------------------
@@ -673,16 +660,11 @@ C Formats
  1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
  1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
  1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
- 1015 FORMAT(/1X,'Read coordinates from xyz file: ',A60)
  1016 FORMAT(/1X,'End of file reached ==> Stop')
- 1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
- 1018 FORMAT(132A1)
  1019 FORMAT(140('='),/1X,'Loop ',I2)
  1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
- 1021 FORMAT(/1X,'Read coordinates from cc1 file: ',A60)
  1022 FORMAT(/1X,'You try to write into the database filesystem',
      1 ' which is not allowed  ===>  ABORT')
- 1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  1024 Format(1X,'2D Graph for such a large fullerene with ',I6,
      1 ' vertices is not meaningful ===> RETURN')
  1025 FORMAT(I2)
