@@ -285,9 +285,11 @@ C     Calculate the moment of inertia tensor and diagonalize (no mass)
       SUBROUTINE CoordC20C60(Iout,R5,R6,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
+C------------------------------------------------------------------------
 C     This routine constructs coordinates for the ideal capped icosahedron
 C     as described by P. Senn, J. Chem. Ed. 72, 302 (1995)
 C     or for a dodecahedron
+C------------------------------------------------------------------------
       DIMENSION NUM(30),NUN(30)
       DIMENSION Dist(3,Nmax)
       DIMENSION DIco(3,12)

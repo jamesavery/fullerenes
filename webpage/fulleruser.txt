@@ -72,6 +72,7 @@ Dr. & Viorel & Chihaia & Institute of Physical Chemistry  & Surface Chemistry an
 Ms. & John & Waddle & Bowling Green State University & Physics and Astronomy & Bowling Green, OH & United States of America & jwaddle@falcon.bgsu.edu & 
 Ms. & Khaled & ELKELANY & Pau University & Physical chemistry & Pau & France & elkelanystar2008@yahoo.com & I am a PhD student in France
 Dr. & Bakhyt & Matkarimov & Nazarbayev University & NURIS & Astana & Kazakhstan & bmatkarimov@nu.edu.kz & Thank you!
+Dr. & Bakhyt & Matkarimov & Nazarbayev University & NURIS & Astana & Kazakhstan & bmatkarimov@nu.edu.kz & Thank you!
 Prof. & mohammad & sabra & damscus university & physics & damscus & Syria & sabra1962@gmx.com & I use pcgamess and gamess_UK
 Ms. & Vicente & Munizaga & Pontificia Universidad Católica de Chile & Physics & Santiago & Chile & vpmuniza@uc.cl & I need to build caps of carbon nanotubes 
 Ms. & David & Beard &  &  & Bingil Bay & Australia & dbeard100@iinet.net.au & 
@@ -83,4 +84,3 @@ Dr. & Manuel  & Melle Franco & University of Minho & Engeneering  & Braga & Port
 Prof. & Ming-Hsien & Lee & Tamkang University & Physics & New Taipei City & Taiwan & mhslee@mail.tku.edu.tw & Great jobs!
 ---------------
 Version 4.4
- 
