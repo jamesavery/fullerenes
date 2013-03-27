@@ -174,14 +174,14 @@ C  Cartesian coordinates produced for Ih C20 or C60 using basic geometry
 C Input Cartesian coordinates for fullerenes
    20 if(ixyz.eq.2.or.ixyz.eq.3.or.ixyz.eq.5) then
         if(ixyz.eq.5) then
-C Read from .xyz file
+C Read from .cc1 file
          cc1name=trim(filename)//".cc1"
          Call ReadFromFile(1,Iext,iout,iatom,IC3,cc1name,Dist)
          ncartflag=1
          nadjacencyflag=1
          cc1name=trim(filename)//'-3D.new.xyz'
        else
-C Read from .cc1 file (Chem3D format)
+C Read from .xyz file (Chem3D format)
          xyzname=trim(filename)//".xyz"
          Call ReadFromFile(2,Iext,iout,iatom,IC3,xyzname,Dist)
          ncartflag=1
