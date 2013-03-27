@@ -178,9 +178,16 @@ C Read from .cc1 file
          cc1name=trim(filename)//".cc1"
          Call ReadFromFile(1,Iext,iout,iatom,IC3,cc1name,Dist)
          ncartflag=1
-         nadjacencyflag=1
+C This routine complements missing entries in IC3
+         Call CheckIC3(IERROR,IC3)
+         if(IERROR.eq.1) then
+          nadjacencyflag=1
+          Write(iout,1015)
+         endif
          cc1name=trim(filename)//'-3D.new.xyz'
+
        else
+
 C Read from .xyz file (Chem3D format)
          xyzname=trim(filename)//".xyz"
          Call ReadFromFile(2,Iext,iout,iatom,IC3,xyzname,Dist)
@@ -673,6 +680,8 @@ C Formats
  1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
  1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
  1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
+ 1015 FORMAT(1X,'Connectivity field IC3 in input is errorneous: ',
+     1 'taking only cartesian coordinates from input')
  1016 FORMAT(/1X,'End of file reached ==> Stop')
  1019 FORMAT(140('='),/1X,'Loop ',I2)
  1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
