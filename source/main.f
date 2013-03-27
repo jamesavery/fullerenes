@@ -114,11 +114,16 @@ C Get time and date
 C------------------DATAIN------------------------------------------
 C  INPUT and setting parameters for running the subroutines
  9    routine='DATAIN         '
+      Write(Iout,1008) routine
       Group='   '
       isort=0
       leapspiral=0
       SWspiral=0
-      Write(Iout,1008) routine
+C  Next two flags tells us if input has information on Cartesian Coordinates
+C   or Adjacency Matrix (through connectivity IC3)
+      ncartflag=0
+      nadjacencyflag=0
+C  Call Datain
       CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
@@ -160,6 +165,7 @@ C  Cartesian coordinates produced for Ih C20 or C60 using basic geometry
    10 routine='COORDC20/60    '
       Write(Iout,1008) routine
       CALL CoordC20C60(Iout,R5,R6,Dist)
+      ncartflag=1
       Do I=1,number_vertices
         IAtom(I)=6
       enddo
@@ -170,12 +176,15 @@ C Input Cartesian coordinates for fullerenes
         if(ixyz.eq.5) then
 C Read from .xyz file
          cc1name=trim(filename)//".cc1"
-         Call ReadFromFile(1,Iext,iout,iatom,cc1name,Dist)
+         Call ReadFromFile(1,Iext,iout,iatom,IC3,cc1name,Dist)
+         ncartflag=1
+         nadjacencyflag=1
          cc1name=trim(filename)//'-3D.new.xyz'
        else
-C Read from .cc1 file
+C Read from .cc1 file (Chem3D format)
          xyzname=trim(filename)//".xyz"
-         Call ReadFromFile(2,Iext,iout,iatom,xyzname,Dist)
+         Call ReadFromFile(2,Iext,iout,iatom,IC3,xyzname,Dist)
+         ncartflag=1
          xyzname=trim(filename)//'-3D.new.xyz'
         endif
 
@@ -185,6 +194,7 @@ C Read cartesian coordinates directly
        Do J=1,number_vertices
         Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
        enddo
+       ncartflag=1
       endif
 
        Go to 40
@@ -205,6 +215,7 @@ C the 3D fullerene
       Do I=1,number_vertices
         IAtom(I)=6
       enddo
+      ncartflag=1
 
    40 WRITE(Iout,1001) number_vertices,TolX*100.d0
 
@@ -526,9 +537,11 @@ C     Name handling
         if(number_vertices.ge.1000.and.number_vertices.lt.10000)
      1    WRITE(3,1027) number_vertices
         if(number_vertices.ge.10000) WRITE(3,1028) number_vertices
+        icc1flag=2
         Do J=1,number_vertices
           IM=IAtom(J)
-          Write(3,1005) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
+          Write(3,1005) El(IM),J,(Dist(I,J),I=1,3),icc1flag,
+     1     (IC3(J,I),I=1,3)
         enddo
         Close(unit=3)
       endif
@@ -649,7 +662,7 @@ C Formats
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
      1 'TIME: ',I2,'h',I2,'m',I2,'s')
- 1005 FORMAT(A2,I5,3F12.6,'    2',3I5)
+ 1005 FORMAT(A2,I5,3F12.6,4I5)
  1006 FORMAT(/1X,'Angle for Schlegel diagram reset to ',
      1 F10.4,' degrees')
  1007 FORMAT(A2,6X,3(F15.6,2X))
