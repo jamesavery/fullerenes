@@ -366,8 +366,10 @@ C   nchoice=3   .mol file
 C  iextfile: unit number for external file
 C  iout:     unit number for output
 C  iatom:    Field for atom number for each atom (6 for carbon)
+C  IC3:      Connectivity field for cubic graph 
+C             (short form of adjacency matrix)
 C  extfilename: external file name
-C  Dist(3,i): Filed of (x,y,z) coordinates for each atom i
+C  Dist(3,i): Field of (x,y,z) coordinates for each atom i
 C-----------------------------------------------------------------
       DIMENSION Dist(3,Nmax),Iatom(Nmax),IC3(Nmax,3)
       CHARACTER*50 extfilename
