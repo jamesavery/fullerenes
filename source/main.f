@@ -74,6 +74,8 @@ C External file names
       Endcc1='.cc1'
       Endxyz='.xyz'
       Endmol='.mol'
+      nxyz=0
+      ncc1=0
 
 C Input / Output
       IN=5
@@ -82,8 +84,6 @@ C Input / Output
 
 C Set parameters to zero
       nloop=0
-      nxyz=0
-      ncc1=0
       ilp=0
       iprev=0
       ihalma=0
@@ -110,6 +110,10 @@ C Get time and date
       CALL Timer(TIMEX)
       WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
      1  Values(6),Values(7),Nmax
+
+C------------------------------------------------------------------
+C  S T A R T   O F   I N P U T   S E C T I O N
+C------------------------------------------------------------------
 
 C------------------DATAIN------------------------------------------
 C  INPUT and setting parameters for running the subroutines
@@ -181,8 +185,10 @@ C Read from .cc1 file
 C This routine complements missing entries in IC3
          Call CheckIC3(IERROR,IC3)
          if(IERROR.eq.1) then
-          nadjacencyflag=1
+          nadjacencyflag=0
           Write(iout,1015)
+         else
+          nadjacencyflag=1
          endif
          cc1name=trim(filename)//'-3D.new.xyz'
 
@@ -226,6 +232,13 @@ C the 3D fullerene
 
    40 WRITE(Iout,1001) number_vertices,TolX*100.d0
 
+C------------------------------------------------------------------
+C  E N D   O F   I N P U T   S E C T I O N
+C------------------------------------------------------------------
+
+C------------------------------------------------------------------
+C  S T A R T   O F   T O P O L O G Y   S E C T I O N
+C------------------------------------------------------------------
 C------------------ISOMERS-----------------------------------------
 C Some general infos on isomers and spiral routine
 C of Fowler and Manolopoulos. Set parameter IPR for independent
@@ -435,6 +448,13 @@ C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
 C Produce perfect matchings (Kekule structures) and analyze
 c      CALL PerfectMatching(Iout,IDA)
+C------------------------------------------------------------------
+C  E N D   O F   T O P O L O G Y   S E C T I O N
+C------------------------------------------------------------------
+
+C------------------------------------------------------------------
+C  S T A R T   O F   3D   S T R U C T U R E   S E C T I O N
+C------------------------------------------------------------------
 
 C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
@@ -591,7 +611,12 @@ C  producing a spherical fullerene
 C-----------------------------------------------------------------
       endif
 
+C------------------------------------------------------------------
+C  E N D   O F   3D   S T R U C T U R E   S E C T I O N
+C------------------------------------------------------------------
 C------------------GRAPH2D----------------------------------------
+C Note: In the major restructuring, this routine may be subdivided
+C   into whether 3D structure is required or not for Graph2D
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
         routine='GRAPH2D        '
