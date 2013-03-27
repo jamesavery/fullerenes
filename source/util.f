@@ -13,6 +13,65 @@ c 1002 Format(1X,'Not implemented yet')
 c      RETURN
 c      END
 
+      SUBROUTINE  CheckIC3(IERR,IC3)
+      use config
+      IMPLICIT Integer (A-Z)
+      DIMENSION IC3(Nmax,3)
+C------------------------------------------------------------------
+C IC3 might contain only the required entry for the connectivities
+C For exalmle 1-2 and 2-1 are the same. This routine fills out
+C the empty entries in IC3, e.g. if 1-2 is there, but not 2-1
+C Output: Completed IC3 and
+C IERR=0 no zeros in IC3
+C IERR=1 information missing in the connectivity list
+C------------------------------------------------------------------
+      IERR=0
+      Do I=1,number_vertices
+      Do J=1,3
+       IJ=IC3(I,J)
+       if(IJ.eq.0) go to 10
+       ifind=0
+        Do K=1,3
+         if(IC3(IJ,K).eq.I) ifind=1
+        enddo
+       if(ifind.eq.0) then
+        Do K=1,3
+         if(IC3(IJ,K).eq.0) then
+          IC3(IJ,K)=I
+          go to 10
+         endif
+        enddo
+       endif
+  10  continue
+      enddo
+      enddo
+C Sort and check if there are any zeros left
+      Do I=1,number_vertices
+      Do J=1,3
+       if(IC3(I,J).eq.0) then
+        IERR=1
+        return
+       endif
+      enddo
+       if(IC3(I,1).gt.IC3(I,2)) then
+        imem=IC3(I,1)
+        IC3(I,1)=IC3(I,2)
+        IC3(I,2)=imem
+       endif
+       if(IC3(I,2).gt.IC3(I,3)) then
+        imem=IC3(I,3)
+        IC3(I,3)=IC3(I,2)
+        IC3(I,2)=imem
+       endif
+       if(IC3(I,1).gt.IC3(I,2)) then
+        imem=IC3(I,1)
+        IC3(I,1)=IC3(I,2)
+        IC3(I,2)=imem
+       endif
+      enddo
+      RETURN
+      END
+
       SUBROUTINE CompressDatabase(Iout,filename)
 C This routine turns a database file from the output into a new compreesed one
       use config
