@@ -50,7 +50,7 @@ C    Set the dimensions for the distance matrix
       CHARACTER*50 xyzname,cc1name,molname
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
-      Integer endzeile,Values(8)
+      Integer Values(8)
       integer istop
       integer mdist(nmax,nmax)
       integer rspi(12),jumps(10)
@@ -180,7 +180,7 @@ C Input Cartesian coordinates for fullerenes
         if(ixyz.eq.5) then
 C Read from .cc1 file
          cc1name=trim(filename)//".cc1"
-         Call ReadFromFile(1,Iext,iout,iatom,IC3,cc1name,Dist)
+         Call ReadFromFile(2,Iext,iout,iatom,IC3,cc1name,Dist)
          ncartflag=1
 C This routine complements missing entries in IC3
          Call CheckIC3(IERROR,IC3)
@@ -196,7 +196,7 @@ C This routine complements missing entries in IC3
 
 C Read from .xyz file (Chem3D format)
          xyzname=trim(filename)//".xyz"
-         Call ReadFromFile(2,Iext,iout,iatom,IC3,xyzname,Dist)
+         Call ReadFromFile(1,Iext,iout,iatom,IC3,xyzname,Dist)
          ncartflag=1
          xyzname=trim(filename)//'-3D.new.xyz'
         endif
@@ -513,64 +513,23 @@ C Print out Coordinates used as input for CYLview, VMD or other programs
 
 C xyz format
       if(ixyz.le.2) then
-      nxyz=nxyz+1
-      Call FileMod(filenameout,xyzname,Namexyz,Endxyz,nxyz,ifind)
-        if(ifind.ne.0) then
-         Write(Iout,1022)
-         go to 9999
-        endif
-        Open(unit=3,file=xyzname,form='formatted')
-        routine='PRINTCOORD     '
-        Write(Iout,1008) routine
-        WRITE(Iout,1002) xyzname 
-        endzeile=0
-        do j=1,nzeile
-          if(TEXTINPUT(j).ne.' ') endzeile=j
-        enddo
-        if(number_vertices.lt.100) WRITE(3,1011)
-     1    number_vertices,number_vertices, (TEXTINPUT(I),I=1,endzeile)
-        if(number_vertices.ge.100.and.number_vertices.lt.1000) 
-     1    WRITE(3,1012) number_vertices,number_vertices,
-     1    (TEXTINPUT(I),I=1,endzeile)
-        if(number_vertices.ge.1000.and.number_vertices.lt.10000) 
-     1    WRITE(3,1013) number_vertices,number_vertices,
-     1    (TEXTINPUT(I),I=1,endzeile)
-        if(number_vertices.ge.10000) 
-     1    WRITE(3,1020) number_vertices,number_vertices,
-     1    (TEXTINPUT(I),I=1,endzeile)
-        Do J=1,number_vertices
-          IM=IAtom(J)      
-          Write(3,1007) El(IM),(Dist(I,J),I=1,3)
-        enddo
-        Close(unit=3)
+       nxyz=nxyz+1
+       routine='PRINTCOORD     '
+       Write(Iout,1008) routine
+       WRITE(Iout,1002) xyzname 
+       Call WriteToFile(1,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+     1  IC3,El,Dist,filenameout,xyzname,Namexyz,Endxyz,TEXTINPUT)
+       if(IERROR1.eq.1) go to 9999
       endif
 
 C cc1 format
       if(ixyz.ge.4) then
-C     Name handling
-      ncc1=ncc1+1
-      Call FileMod(filenameout,cc1name,Namecc1,Endcc1,ncc1,ifind)
-        if(ifind.ne.0) then
-         Write(Iout,1022)
-         go to 9999
-        endif
-       Open(unit=3,file=cc1name,form='formatted')
-        routine='PRINTCOORD     '
-        Write(Iout,1008) routine
-        WRITE(Iout,1002) cc1name
-        if(number_vertices.lt.100) WRITE(3,1025) number_vertices
-        if(number_vertices.ge.100.and.number_vertices.lt.1000)
-     1    WRITE(3,1026) number_vertices
-        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
-     1    WRITE(3,1027) number_vertices
-        if(number_vertices.ge.10000) WRITE(3,1028) number_vertices
-        icc1flag=2
-        Do J=1,number_vertices
-          IM=IAtom(J)
-          Write(3,1005) El(IM),J,(Dist(I,J),I=1,3),icc1flag,
-     1     (IC3(J,I),I=1,3)
-        enddo
-        Close(unit=3)
+       ncc1=ncc1+1
+       routine='PRINTCOORD     '
+       Write(Iout,1008) routine
+       WRITE(Iout,1002) cc1name
+       Call WriteToFile(2,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+     1  IC3,El,Dist,filenameout,cc1name,Namecc1,Endcc1,TEXTINPUT)
       endif
       
       if(novolume.eq.0) then
@@ -694,29 +653,17 @@ C Formats
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
      1 'TIME: ',I2,'h',I2,'m',I2,'s')
- 1005 FORMAT(A2,I5,3F12.6,4I5)
  1006 FORMAT(/1X,'Angle for Schlegel diagram reset to ',
      1 F10.4,' degrees')
- 1007 FORMAT(A2,6X,3(F15.6,2X))
  1008 FORMAT(140('-'),/1x,'--> Enter Subroutine ',A15)
  1009 FORMAT(1x,'CPU Seconds: ',F15.2,', CPU Hours: ',F13.5)
  1010 FORMAT(1X,'Number of Hamiltonian cycles: ',I10)
- 1011 FORMAT(I5,/,'C',I2,'/  ',132A1)
- 1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
- 1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
  1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
  1015 FORMAT(1X,'Connectivity field IC3 in input is errorneous: ',
      1 'taking only cartesian coordinates from input')
  1016 FORMAT(/1X,'End of file reached ==> Stop')
  1019 FORMAT(140('='),/1X,'Loop ',I2)
- 1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
- 1022 FORMAT(/1X,'You try to write into the database filesystem',
-     1 ' which is not allowed  ===>  ABORT')
  1024 Format(1X,'2D Graph for such a large fullerene with ',I6,
      1 ' vertices is not meaningful ===> RETURN')
- 1025 FORMAT(I2)
- 1026 FORMAT(I3)
- 1027 FORMAT(I4)
- 1028 FORMAT(I8)
       STOP 
       END

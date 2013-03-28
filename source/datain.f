@@ -386,24 +386,8 @@ C-----------------------------------------------------------------
           endif
          Open(unit=iextfile,file=extfilename,form='formatted')
          WRITE(Iout,1000) extfilename,nchoice
-C .cc1 files
-         if(nchoice.eq.1) then
-          Read(7,*,end=99) number_vertices
-          Write(Iout,1007) number_vertices
-          Do J=1,number_vertices
-           Do I=1,3
-            IC3(J,I)=0
-           enddo
-           Read(iextfile,'(A132)',err=1,end=1) Line
-           Read(Line,*,end=10,err=10) 
-     1      element,JJ,(Dist(I,J),I=1,3),ncc1flag,(IC3(J,I),I=1,3)
-   10       Write(Iout,1008) element,JJ,(Dist(I,J),I=1,3),ncc1flag,
-     1       (IC3(J,I),I=1,3)
-           Iatom(j)=6
-          enddo
-         endif
 C .xyz files
-         if(nchoice.eq.2) then
+         if(nchoice.eq.1) then
           Read(7,*,end=99) number_vertices
           Write(Iout,1007) number_vertices
           Read(7,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
@@ -416,6 +400,22 @@ C .xyz files
             Read(7,*,end=1,err=1) element,(Dist(I,J),I=1,3)
             Write(Iout,1009) element,(Dist(I,J),I=1,3)
             Iatom(j)=6
+          enddo
+         endif
+C .cc1 files
+         if(nchoice.eq.2) then
+          Read(7,*,end=99) number_vertices
+          Write(Iout,1007) number_vertices
+          Do J=1,number_vertices
+           Do I=1,3
+            IC3(J,I)=0
+           enddo
+           Read(iextfile,'(A132)',err=1,end=1) Line
+           Read(Line,*,end=10,err=10) 
+     1      element,JJ,(Dist(I,J),I=1,3),ncc1flag,(IC3(J,I),I=1,3)
+   10       Write(Iout,1008) element,JJ,(Dist(I,J),I=1,3),ncc1flag,
+     1       (IC3(J,I),I=1,3)
+           Iatom(j)=6
           enddo
          endif
 C .mol files V2000 standard
@@ -433,6 +433,7 @@ C .mol files V2000 standard
          return
 
   99     WRITE(Iout,1004)
+         close(unit=7)
          stop
  1000 FORMAT(/1X,'Read coordinates from external file: ',A60,
      1 /1X,'Choice: ',I1)
