@@ -516,7 +516,6 @@ C xyz format
        nxyz=nxyz+1
        routine='PRINTCOORD     '
        Write(Iout,1008) routine
-       WRITE(Iout,1002) xyzname 
        Call WriteToFile(1,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
      1  IC3,El,Dist,filenameout,xyzname,Namexyz,Endxyz,TEXTINPUT)
        if(IERROR1.eq.1) go to 9999
@@ -527,14 +526,13 @@ C cc1 format
        ncc1=ncc1+1
        routine='PRINTCOORD     '
        Write(Iout,1008) routine
-       WRITE(Iout,1002) cc1name
        Call WriteToFile(2,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
      1  IC3,El,Dist,filenameout,cc1name,Namecc1,Endcc1,TEXTINPUT)
       endif
       
-      if(novolume.eq.0) then
 C------------------VOLUME-----------------------------------------
 C Calculate the volume
+      if(novolume.eq.0) then
       routine='VOLUME         '
       Write(Iout,1008) routine
       CALL Volume(Iout,N5MEM,N6MEM,
@@ -647,8 +645,6 @@ C Formats
      1 'concerning this program')
  1001 FORMAT(/1X,'Number of Atoms: ',I4,', and distance tolerance: ',
      1 F12.2,'%')
- 1002 FORMAT(/1X,'Input coordinates to be used for plotting program',
-     1 ' CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written into ',A31)
  1003 FORMAT(1X,'Pre-optimization using the Wu force field with ',
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
