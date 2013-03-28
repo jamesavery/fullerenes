@@ -85,8 +85,9 @@ c      END
  1008 FORMAT(I4)
  1009 FORMAT(I8)
  1010 FORMAT(A2,I5,3F12.6,4I5)
- 1011 FORMAT(/1X,'Write coordinates to external file: ',A60,
-     1 /1X,'Choice: ',I1)
+ 1011 FORMAT(/1X,'Input coordinates to be used for plotting programs',
+     1 ' like VMS, CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written ',
+     1 'into external file: ',A50,/1X,'Choice: ',I1)
       RETURN
       END
 
