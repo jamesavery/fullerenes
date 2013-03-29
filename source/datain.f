@@ -360,9 +360,9 @@ C-----------------------------------------------------------------
 C  Routine to read cartesian coordinates from external file
 C  It is called from the main program
 C  Formats: 
-C   nchoice=1   .cc1 file
-C   nchoice=2   .xyz file
-C   nchoice=3   .mol file
+C   nchoice=1   .xyz file
+C   nchoice=2   .cc1 file
+C   nchoice=3   .mol2 file (TRYPOS format)
 C  iextfile: unit number for external file
 C  iout:     unit number for output
 C  iatom:    Field for atom number for each atom (6 for carbon)
@@ -386,6 +386,7 @@ C-----------------------------------------------------------------
           endif
          Open(unit=iextfile,file=extfilename,form='formatted')
          WRITE(Iout,1000) extfilename,nchoice
+
 C .xyz files
          if(nchoice.eq.1) then
           Read(7,*,end=99) number_vertices
@@ -402,6 +403,7 @@ C .xyz files
             Iatom(j)=6
           enddo
          endif
+
 C .cc1 files
          if(nchoice.eq.2) then
           Read(7,*,end=99) number_vertices
@@ -418,7 +420,8 @@ C .cc1 files
            Iatom(j)=6
           enddo
          endif
-C .mol files V2000 standard
+
+C .mol2 files: tripos mol2 standard format
          if(nchoice.eq.3) then
           Read(7,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
           WRITE(Iout,1005) (TEXTINPUT(I),I=1,endzeile)
