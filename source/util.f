@@ -16,14 +16,32 @@ c      END
       SUBROUTINE WriteToFile(nchoice,Iext,ncyc,ifind,Iout,IERR,IAtom,
      1 IC3,El,Dist,filenameout,extname,Nameext,Endext,TEXTINPUT) 
       use config
+C-----------------------------------------------------------------
+C  Routine to write out cartesian coordinates to external file
+C  It is called from the main program
+C  Formats:
+C   nchoice=1   .xyz file
+C   nchoice=2   .cc1 file
+C   nchoice=3   .mol2 file (TRYPOS format)
+C  Iext: unit number for external file
+C  Iout:     unit number for output
+C  iatom:    Field for atom number for each atom (6 for carbon)
+C  IC3:      Connectivity field for cubic graph
+C             (short form of adjacency matrix)
+C  filenameout: external file name
+C  Dist(3,i): Field of (x,y,z) coordinates for each atom i
+C-----------------------------------------------------------------
+
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Dist(3,Nmax)
+      Integer Values(8)
+      integer endzeile
       CHARACTER*1 TEXTINPUT(nzeile)
+      CHARACTER CDAT*8,CTIM*10,Zone*5
       CHARACTER*2 El(99)
       CHARACTER*4 Endext
       CHARACTER*7 Nameext
       CHARACTER*50 filenameout,extname
-      integer endzeile
       IERR=0
       ncyc=ncyc+1
       Call FileMod(filenameout,extname,Nameext,Endext,ncyc,ifind)
@@ -34,22 +52,30 @@ c      END
        endif
       Open(unit=Iext,file=extname,form='formatted')
       Write(Iout,1011) extname,nchoice
+C Put Date and Time into comment line
+      call date_and_time(CDAT,CTIM,zone,values)
  
+C .xyz files
       if(nchoice.eq.1) then
        endzeile=0
        do j=1,nzeile
          if(TEXTINPUT(j).ne.' ') endzeile=j
        enddo
-       if(number_vertices.lt.100) WRITE(Iext,1001)
-     1  number_vertices,number_vertices, (TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.lt.100) 
+     1  WRITE(Iext,1001) number_vertices,number_vertices,
+     1   Values(3),Values(2),Values(1),Values(5),Values(6),Values(7),
+     1   (TEXTINPUT(I),I=1,endzeile)
        if(number_vertices.ge.100.and.number_vertices.lt.1000)
      1  WRITE(Iext,1002) number_vertices,number_vertices,
+     1   Values(3),Values(2),Values(1),Values(5),Values(6),Values(7),
      1   (TEXTINPUT(I),I=1,endzeile)
        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
      1  WRITE(Iext,1003) number_vertices,number_vertices,
+     1   Values(3),Values(2),Values(1),Values(5),Values(6),Values(7),
      1   (TEXTINPUT(I),I=1,endzeile)
        if(number_vertices.ge.10000)
      1  WRITE(Iext,1004) number_vertices,number_vertices,
+     1   Values(3),Values(2),Values(1),Values(5),Values(6),Values(7),
      1   (TEXTINPUT(I),I=1,endzeile)
        Do J=1,number_vertices
         IM=IAtom(J)
@@ -57,6 +83,7 @@ c      END
         enddo
        endif
 
+C .cc1 files
       if(nchoice.eq.2) then
        if(number_vertices.lt.100) WRITE(3,1006) number_vertices
        if(number_vertices.ge.100.and.number_vertices.lt.1000)
@@ -75,10 +102,14 @@ c      END
        Close(unit=Iext)
  1000 FORMAT(/1X,'You try to write into the database filesystem',
      1 ' which is not allowed  ===>  ABORT')
- 1001 FORMAT(I5,/,'C',I2,'/  ',132A1)
- 1002 FORMAT(I5,/,'C',I3,'/  ',132A1)
- 1003 FORMAT(I5,/,'C',I4,'/  ',132A1)
- 1004 FORMAT(I8,/,'C',I8,'/  ',132A1)
+ 1001 FORMAT(I5,/,'C',I2,' / DATE: ',I2,'/',I2,'/',I4,2X,'TIME: ',
+     1 I2,'h',I2,'m',I2,'s / ',132A1)
+ 1002 FORMAT(I5,/,'C',I3,' / DATE: ',I2,'/',I2,'/',I4,2X,'TIME: ',
+     1 I2,'h',I2,'m',I2,'s / ',132A1)
+ 1003 FORMAT(I5,/,'C',I4,' / DATE: ',I2,'/',I2,'/',I4,2X,'TIME: ',
+     1 I2,'h',I2,'m',I2,'s / ',132A1)
+ 1004 FORMAT(I8,/,'C',I8,' / DATE: ',I2,'/',I2,'/',I4,2X,'TIME: ',
+     1 I2,'h',I2,'m',I2,'s / ',132A1)
  1005 FORMAT(A2,6X,3(F15.6,2X))
  1006 FORMAT(I2)
  1007 FORMAT(I3)
