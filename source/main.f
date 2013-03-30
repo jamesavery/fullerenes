@@ -598,6 +598,7 @@ C Calculate Schlegel diagram
       endif
 C------------------END--------------------------------------------
 C  E N D   O F   P R O G R A M
+C-----------------------------------------------------------------
   99  if(loop-1) 100,101,102
  100  go to 9999
  101  iprev=0
@@ -627,7 +628,7 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0                from 08/06/10     |',
-     1 /1X,'|    This  version: 4.4, last revision from 15/03/13     |',
+     1 /1X,'|    This  version: 4.4, last revision from 28/03/13     |',
      1 /1X,'|________________________________________________________|',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
