@@ -12,7 +12,7 @@ public:
   Eisenstein(int a=0, int b=0) : pair<int,int>(a,b) {}
   Eisenstein operator*(const Eisenstein& y) const { return Eisenstein(first*y.first,second*y.second); }
   Eisenstein operator+(const Eisenstein& y) const { return Eisenstein(first+y.first,second+y.second); }
-  Eisenstein operator-(const Eisenstein& y) const { return Eisenstein(first+y.first,second+y.second); } 
+  Eisenstein operator-(const Eisenstein& y) const { return Eisenstein(first-y.first,second-y.second); } 
   Eisenstein& operator+=(const Eisenstein& y) { first += y.first; second += y.second; return *this; }
   Eisenstein& operator-=(const Eisenstein& y) { first -= y.first; second -= y.second; return *this; }
 
@@ -25,13 +25,13 @@ public:
     Eisenstein d(y-x);
     switch(d.second + 10*d.first){
     case  10+0: /*( 1 ,0)*/  return Eisenstein(1,-1);
-    case  10-1: /*( 1,-1)*/  return Eisenstein(-1,-1); 
-    case -10-1: /*(-1,-1)*/  return Eisenstein(-1,0);
+    case  10-1: /*( 1,-1)*/  return Eisenstein(0,-1); 
+    case   0-1: /*( 0,-1)*/  return Eisenstein(-1,0);
     case -10+0: /*(-1, 0)*/  return Eisenstein(-1,1);
-    case -10+1: /*(-1, 1)*/  return Eisenstein(1,1);
-    case  10+1: /*( 1, 1)*/  return Eisenstein(1,0);
+    case -10+1: /*(-1, 1)*/  return Eisenstein(0,1);
+    case   0+1: /*( 0, 1)*/  return Eisenstein(1,0);
     default:
-      cerr << "nextCW(): " << x << " does not neighbour " << y << endl;
+      cerr << "nextCW(): " << x << " does not neighbour " << y << "(difference: "<<(y-x)<<")\n";
       abort();
     }
   }
@@ -39,10 +39,13 @@ public:
   coord2d coord() const { return coord2d(1,0)*first + coord2d(0.5,0.8660254037844386)*second; }
 };
 
+
+// Preconditions: Triangles are oriented consistently
 map<Eisenstein,node_t> unfold(const vector<tri_t> &triangulation)
 {
 #define set_dedge(u,v,ux,vx) {	          \
   dedge_t uv(u,v), vu(v,u);               \
+  printf("set_dedge(%d,%d)\n",u,v);       \
   dedge_done[uv] = true;                  \
   workset.erase(uv);                      \
   if(!dedge_done[vu]){                    \
@@ -67,6 +70,9 @@ map<Eisenstein,node_t> unfold(const vector<tri_t> &triangulation)
 
   // 1. Place first triangle. 
   tri_t t(triangulation[0]);
+  cout << "Place " << t[0] << " at " << zero << endl;
+  cout << "Place " << t[1] << " at " << veci << endl;
+  cout << "Place " << t[2] << " at " << (veci-vecj) << endl;
   grid[zero]      = t[0];
   grid[veci]      = t[1];
   grid[veci-vecj] = t[2];
@@ -77,13 +83,14 @@ map<Eisenstein,node_t> unfold(const vector<tri_t> &triangulation)
 
   while(!workset.empty()){
     dedge_t uv(*workset.begin());
-
+    cout << "Next unused dedge is " << uv << endl;
     // set_triangle(uv)
     node_t u(uv.first), v(uv.second), w(nextNode[uv]);
 
     pair<Eisenstein,Eisenstein> uvpos(dedge_position[uv]);
-    Eisenstein ux(uvpos.first), vx(uvpos.second), wx(Eisenstein::nextCW(ux,vx));
-    
+    Eisenstein ux(uvpos.first), vx(uvpos.second), wx(ux+Eisenstein::nextCW(ux,vx));
+
+    cout << "Place " << w << " at " << wx << endl;
     grid[wx] = w;
 
     set_dedge(u,v,ux,vx);
@@ -93,7 +100,6 @@ map<Eisenstein,node_t> unfold(const vector<tri_t> &triangulation)
   }
   return grid;
 }
-
 
 
 int main(int ac, char **av)
@@ -108,39 +114,26 @@ int main(int ac, char **av)
 
   cout << "Attempting to create graph from spiral indices " << rspi << endl;
  
+
   FullereneGraph g(N, rspi, jumps);
-  PlanarGraph  dg(g.dual_graph(6));
+  PlanarGraph dual(g.dual_graph(6));
 
   g.layout2d = g.tutte_layout();
-  dg.layout2d = dg.tutte_layout();
+  dual.layout2d = dual.tutte_layout();
 
-  cout << "g = " << g << ";\n";
-  cout << "dg = " << dg << ";\n";
+  cout << "g = "  << g << ";\n";
+  cout << "dg = " << dual << ";\n";
 
-  ofstream g_latex("output/spiral-g.tex"), dg_latex("output/spiral-dg.tex");
-  
-  g_latex  << g.to_latex(20,20,true,true,false,0,0,0xffffff) << endl;
-  dg_latex << dg.to_latex(20,20,false,true,false,0,0,0xffffff) << endl;
+  vector<face_t> faces(dual.compute_faces_flat(3,true));
+  vector<tri_t>  triangles(faces.begin(),faces.end());
 
-  g_latex.close(); 
-  dg_latex.close();
+  map<Eisenstein,node_t> grid(unfold(triangles));
 
-  // Get and print distance matrix for all vertices and for pentagons
-  vector<unsigned int> D(dg.all_pairs_shortest_paths());
-  cout << "D = {\n";
-  for(int i=0;i<dg.N;i++) cout << "\t" << vector<unsigned int>(&D[i*dg.N],&D[(i+1)*dg.N]) << "}" << (i+1<dg.N?",\n":"\n");
-  cout << "};\n";
-  
-  vector<unsigned int> pentagons;
-  for(int i=0;i<dg.N;i++) if(dg.neighbours[i].size() == 5) pentagons.push_back(i);
-
-  cout << "D5 = {\n";
-  for(int i=0;i<12;i++){
-    cout << "\t{";
-    for(int j=0;j<12;j++) cout << D[i*dg.N+j] << (j+1<12?",":"");
-    cout << "}" << (i+1<12?",\n":"\n");
+  for(map<Eisenstein,node_t>::const_iterator i(grid.begin()); i!=grid.end();i++){
+    Eisenstein x(i->first);
+    node_t u(i->second);
+    cout << u << " at " << x << endl;
   }
-  cout << "};\n";
   
   return 0;
 }
