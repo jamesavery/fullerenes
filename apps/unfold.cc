@@ -10,12 +10,17 @@ using namespace std;
 class Eisenstein: public pair<int,int> {
 public:
   Eisenstein(int a=0, int b=0) : pair<int,int>(a,b) {}
+  Eisenstein(const coord2d& x) : pair<int,int>(round(x.first-x.second/sqrt(3)), round(2*x.second/sqrt(3)))
+  { }
   Eisenstein operator*(const Eisenstein& y) const { return Eisenstein(first*y.first,second*y.second); }
   Eisenstein operator+(const Eisenstein& y) const { return Eisenstein(first+y.first,second+y.second); }
   Eisenstein operator-(const Eisenstein& y) const { return Eisenstein(first-y.first,second-y.second); } 
   Eisenstein& operator+=(const Eisenstein& y) { first += y.first; second += y.second; return *this; }
   Eisenstein& operator-=(const Eisenstein& y) { first -= y.first; second -= y.second; return *this; }
 
+  Eisenstein GCtransform(int k, int l) const {
+    return Eisenstein(k*first - l*second, l*first + (k+l)*second);
+  }
   //  
   // (-1,1)   \ /  (1,1)
   // (-1,0)  --x-- (1,0)
@@ -41,7 +46,14 @@ public:
 
 typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
 
-// Preconditions: Triangles are oriented consistently
+// This function unfolds a triangulation and lays it out on an equilateran
+// triangular grid, such that if one were to cut along the outline
+// and glue together the nodes with the same labels, one would obtain
+// again the original fullerene dual.
+//
+// Preconditions: Triangles are oriented consistently, i.e. CW or CCW.
+// TODO: A more intricate directed edge selection scheme could lead to
+// more compact unfoldings (i.e. with more interior points).
 map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation)
 {
 #define set_dedge(u,v,ux,vx) {	          \
@@ -93,6 +105,9 @@ map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation)
   return dedge_position;
 }
 
+
+// Given the output of unfold(), this function efficiently computes the polygon outlining
+// the unfolded triangulation and returns it in clockwise order. 
 vector< pair<Eisenstein,node_t> > get_outline(const map<dedge_t,dedgecoord_t>& edgecoords)
 {
   map<Eisenstein,node_t>    label;
@@ -126,23 +141,63 @@ vector< pair<Eisenstein,node_t> > get_outline(const map<dedge_t,dedgecoord_t>& e
   return outline;
 }
 
-template<typename K, typename V> vector<K> get_keys(const map<K,V>& m)
+
+
+// (Not finished) Output a LaTeX/TiKZ figure of the unfolded triangulation, optionally GC(K,L)-transformed.
+void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > &outline, const map<dedge_t,dedgecoord_t> &dedge_positions, int K=1, int L=0,
+		    bool equilateralp=false, int label_vertices=1)
 {
-  vector<K> keys(m.size());
-  int i=0;
-  for(typename map<K,V>::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    keys[i] = kv->first;
-  return keys;
+  vector<Eisenstein> outline_gc(outline.size());
+  for(int i=0;i<outline.size();i++) outline_gc[i] = outline[i].first.GCtransform(K,L);
+
+  // Extract (I,J)-bounds
+  int imin = INT_MAX, imax = INT_MIN, jmin = INT_MAX, jmax = INT_MIN;
+  for(int i=0;i<outline_gc.size();i++){
+    const Eisenstein &x(outline_gc[i]);
+    //    cout << x << endl;
+    if(x.first < imin) imin = x.first;
+    if(x.first > imax) imax = x.first;
+    if(x.second < jmin) jmin = x.second;
+    if(x.second > jmax) jmax = x.second;
+    //    printf("(Imin,Jmin)-(Imax,Jmax) = (%d,%d)-(%d,%d)\n",Imin,Jmin,Imax,Jmax);
+
+  }
+  Eisenstein gcmin(imin-1,jmin-1), gcmax(imax+1,jmax+1);
+  
+  // Draw E-grid
+  if(equilateralp){
+  // -- as Regular grid
+      
+  } else {
+  // -- as equilateral triangles
+
+  }
+
+  // Draw outline polygon
+  cout << gcmin << " to " << gcmax << endl;
+  latexfile << "\\newcommand*{\\cols}{"<<(gcmax-gcmin).first<<"}\n"
+	    << "\\newcommand*{\\rows}{"<<(gcmax-gcmin).second<<"}\n";
+
+  latexfile << "\\draw[outline] ";
+  for(int i=0;i<outline.size();i++){
+    const Eisenstein &x((outline_gc[i]-gcmin));
+    latexfile << "(" << x.first << "," << x.second << ") -- ";
+  }
+  latexfile << "cycle;\n\n";
+
+  latexfile << "\\foreach \\place/\\name/\\lbl in {";
+  for(int i=0;i<outline.size();i++){
+    const coord2d &x((outline_gc[i]-gcmin).coord());
+    const node_t &v(outline[i].second);
+    latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<v<<(i+1<outline.size()?"},":"}");
+  }
+  latexfile << "}\n"
+	    << "\t \\node[vertex] (\\name) at \\place {\\lbl};\n\n";
+  
+
+
 }
 
-template<typename K, typename V> vector<V> get_values(const map<K,V>& m)
-{
-  vector<V> values(m.size());
-  int i=0;
-  for(typename map<K,V>::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    values[i] = kv->second;
-  return values;
-}
 
 int main(int ac, char **av)
 {
@@ -182,6 +237,8 @@ int main(int ac, char **av)
   output << "outline = " << outline << ";\n";
 
   output.close();
+
+  latex_GCunfold(cout,outline,grid,3,2);
   
   return 0;
 }
