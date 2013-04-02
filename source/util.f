@@ -16,7 +16,7 @@ c      END
       SUBROUTINE WriteToFile(nchoice,Iext,ncyc,ifind,Iout,IERR,IAtom,
      1 IC3,El,Dist,filenameout,extname,Nameext,Endext,TEXTINPUT) 
       use config
-C-----------------------------------------------------------------
+C--------------------------------------------------------------------
 C  Routine to write out cartesian coordinates to external file
 C  It is called from the main program
 C  Formats:
@@ -28,9 +28,14 @@ C  Iout:     unit number for output
 C  iatom:    Field for atom number for each atom (6 for carbon)
 C  IC3:      Connectivity field for cubic graph
 C             (short form of adjacency matrix)
-C  filenameout: external file name
+C  filenameout: initial external file name
+C  extname: final external filename
+C  Endext: .xyz, .cc1, .mol etc.
+C  Nameext: -3D.xyz, -3D.cc1 or -3D.mol
 C  Dist(3,i): Field of (x,y,z) coordinates for each atom i
-C-----------------------------------------------------------------
+C  ifind: 0 or 1, test for not allowed writing into database directory
+C  TEXTINPUT: Text line from input
+C---------------------------------------------------------------------
 
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Dist(3,Nmax)
@@ -38,11 +43,13 @@ C-----------------------------------------------------------------
       integer endzeile
       CHARACTER*1 TEXTINPUT(nzeile)
       CHARACTER CDAT*8,CTIM*10,Zone*5
+      CHARACTER*1 Number
       CHARACTER*2 El(99)
       CHARACTER*4 Endext
       CHARACTER*7 Nameext
       CHARACTER*50 filenameout,extname
       IERR=0
+      Number='2'
       ncyc=ncyc+1
       Call FileMod(filenameout,extname,Nameext,Endext,ncyc,ifind)
        if(ifind.ne.0) then
@@ -50,6 +57,7 @@ C-----------------------------------------------------------------
         IERR=1
         Return
        endif
+      if(nchoice.eq.3) filenameOut=filenameout//trim(adjustl(Number))
       Open(unit=Iext,file=extname,form='formatted')
       Write(Iout,1011) extname,nchoice
 C Put Date and Time into comment line
@@ -63,20 +71,16 @@ C .xyz files
        enddo
        if(number_vertices.lt.100) 
      1  WRITE(Iext,1001) number_vertices,number_vertices,
-     1   Values(3),Values(2),Values(1),Values(5),Values(6),Values(7),
-     1   (TEXTINPUT(I),I=1,endzeile)
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
        if(number_vertices.ge.100.and.number_vertices.lt.1000)
      1  WRITE(Iext,1002) number_vertices,number_vertices,
-     1   Values(3),Values(2),Values(1),Values(5),Values(6),Values(7),
-     1   (TEXTINPUT(I),I=1,endzeile)
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
      1  WRITE(Iext,1003) number_vertices,number_vertices,
-     1   Values(3),Values(2),Values(1),Values(5),Values(6),Values(7),
-     1   (TEXTINPUT(I),I=1,endzeile)
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
        if(number_vertices.ge.10000)
      1  WRITE(Iext,1004) number_vertices,number_vertices,
-     1   Values(3),Values(2),Values(1),Values(5),Values(6),Values(7),
-     1   (TEXTINPUT(I),I=1,endzeile)
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
        Do J=1,number_vertices
         IM=IAtom(J)
         Write(Iext,1005) El(IM),(Dist(I,J),I=1,3)
@@ -97,19 +101,24 @@ C .cc1 files
          Write(3,1010) El(IM),J,(Dist(I,J),I=1,3),icc1flag,
      1    (IC3(J,I),I=1,3)
         enddo
-       endif
+      endif
 
-       Close(unit=Iext)
+C .mol2 files
+      if(nchoice.eq.3) then
+      endif
+
+      Close(unit=Iext)
+
  1000 FORMAT(/1X,'You try to write into the database filesystem',
      1 ' which is not allowed  ===>  ABORT')
- 1001 FORMAT(I5,/,'C',I2,' / DATE: ',I2,'/',I2,'/',I4,2X,'TIME: ',
-     1 I2,'h',I2,'m',I2,'s / ',132A1)
- 1002 FORMAT(I5,/,'C',I3,' / DATE: ',I2,'/',I2,'/',I4,2X,'TIME: ',
-     1 I2,'h',I2,'m',I2,'s / ',132A1)
- 1003 FORMAT(I5,/,'C',I4,' / DATE: ',I2,'/',I2,'/',I4,2X,'TIME: ',
-     1 I2,'h',I2,'m',I2,'s / ',132A1)
- 1004 FORMAT(I8,/,'C',I8,' / DATE: ',I2,'/',I2,'/',I4,2X,'TIME: ',
-     1 I2,'h',I2,'m',I2,'s / ',132A1)
+ 1001 FORMAT(I5,/,'C',I2,' / DATE:',I2,'/',I2,'/',I4,
+     1 ' / Origin: Program Fullerene / ',132A1)
+ 1002 FORMAT(I5,/,'C',I3,' / DATE:',I2,'/',I2,'/',I4,
+     1 ' / Origin: Program Fullerene / ',132A1)
+ 1003 FORMAT(I5,/,'C',I4,' / DATE:',I2,'/',I2,'/',I4,
+     1 ' / Origin: Program Fullerene / ',132A1)
+ 1004 FORMAT(I8,/,'C',I8,' / DATE:',I2,'/',I2,'/',I4,
+     1 ' / Origin: Program Fullerene / ',132A1)
  1005 FORMAT(A2,6X,3(F15.6,2X))
  1006 FORMAT(I2)
  1007 FORMAT(I3)
@@ -135,8 +144,8 @@ C      compound jobs so not to overwrite old files. It also
 C      checks that the filename does not contain a link to the 
 C      database so not to write into this directory.
 C     Input: filenameIn        original filename
-C            EndName
-C            End               .xyz, .cc1 ot .mol
+C            EndName           -3D.xyz, -3D.cc1 or -3D.mol
+C            End               .xyz, .cc1 or .mol
 C            Ncyc              determines if it is a compound job
 C     Output: ifind=0          everything ok
 C            ifind.ne.0        link to one of the databases found

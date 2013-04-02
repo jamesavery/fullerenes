@@ -1,7 +1,7 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,ICart,Iopt,IP,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
-     1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
+     1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,rspi,
@@ -20,7 +20,7 @@ C-----------------------------------------------------------------
       Character*1 DATEN(nzeile)
       Character filename*50
       Character filenameout*50
-      Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,
+      Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
      1 nohueckel,loop,ndbconvert,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
@@ -30,7 +30,7 @@ C-----------------------------------------------------------------
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
       Namelist /Hamilton/ IHam,iupac,ihamstore
-      Namelist /Isomers/ IPR,IPH,IStop,IChk,ISearch,isomerl,isomerh
+      Namelist /Isomers/ IPR,IPH,IStop,Ichk,ISearch,isomerl,isomerh
       Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,nhamcyc,ifs,ndual,PS,
      1 scale,scalePPG,boost
 
@@ -138,7 +138,8 @@ C Integers
       IV1=2     !  Eigenvector option for fullerene construction
       IV2=3     !  Eigenvector option for fullerene construction
       IV3=4     !  Eigenvector option for fullerene construction
-      ixyz=0    !  Option for producing input for ploting program CYLVIEW
+      irext=0   !  Option for reading coordinates/connectivities from external file
+      iwext=0   !  Option for writing coordinates/connectivities from to file
       KE=0      !  Endo-Kroto C2 insertion
       kGC=0     !  First Goldberg-Coxeter index
       lGC=0     !  second Goldberg-Coxeter index

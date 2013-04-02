@@ -1,9 +1,9 @@
 C92 Restarting isomer list from checkpoint file
 If not available this job will abort
-&General NA=92, ichk=1 /
+&General NA=92 /
 &Coord ICart=0 /
 &FFChoice /
 &FFParameters /
 &Hamilton /
-&Isomers IPR=2 IPH=1 istop=1 /
+&Isomers IPR=2 IPH=1 istop=1 ichk=1 /
 &Graph /
