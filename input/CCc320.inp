@@ -1,5 +1,5 @@
 Ih-C320 6-31G opt. geom. minimum -12193.20655 au not converged out
-&General NA=320, ixyz=1, nosort=1 /
+&General NA=320, iwext=1, nosort=1 /
 &Coord ICart=1 /
 &FFChoice /
 &FFParameters /

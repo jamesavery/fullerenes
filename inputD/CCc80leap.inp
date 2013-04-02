@@ -1,5 +1,5 @@
 Ih-C80 leapfrog to Ih-C2160
-&General NA=80 nohueckel=1 ixyz=1 ispsearch=0 /
+&General NA=80 nohueckel=1 iwext=1 ispsearch=0 /
 &Coord ICart=1 leap=3 scaleRad=7. /
 &FFChoice Iopt=3 /
 &FFParameters /

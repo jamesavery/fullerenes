@@ -913,22 +913,23 @@ Namelist line that contains the main flags for the program.
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
 \item[{IP}]  If set to 1, verbose output is be produced, i.e. the full distance matrix, all Hamiltonian cycles 
   and all ring connections up to three rings (Default: 0).
-\item[{ixyz}] Flag for producing \filename{.xyz} input file for \program{CYLview}, \program{Avogadro} or other plotting programs in standard xyz format (Default: 0)
-  Default name for the external file is \filename{Fullerene-3D.xyz}. Otherwise \paramname{filename}='filename' needs to be specified (max. 50 characters).
-  Note that if the routine which writes out \filename{.xyz} or \filename{.cc1} files is used more than onve, for example through the paramname{nloop} parameter,
+\item[{iwext}] Flag for producing input file for \program{CYLview}, \program{Avogadro} or other plotting programs in standard formats (Default: 0)
+  Default name for the external file is \filename{Fullerene-3D} with the appropriate ending. Otherwise \paramname{filename}='filename' needs to be specified (max. 50 characters).
+  Note that if the routine which writes out \filename{.xyz}, \filename{.cc1} or \filename{.mol2} files is used more than once, for example through the \paramname{nloop} parameter,
   a number is added after the string "-3D" in order to not cause conflict with previous files.\\
-  If \paramname{ixyz} = 1: Produce \filename{.xyz} file named \filename{filename-3D.xyz} for further input.\\
-  If \paramname{ixyz} = 2: Read \filename{.xyz} from file specified by \paramname{filename}. The final name is chosen as \filename{filename-3D.xyz} (Default: Fullerene-3D.xyz). 
-  \paramname{ICart} = 0 needs to be specified for this. Another \filename{.xyz} file is also produced and named   \filename{filename-3Dnew.xyz}. (Default: Fullerene-3D2.xyz)\\
-  If \paramname{ixyz} = 3: Read .xyz from file specified in \paramname{filename}. The final name is chosen as \filename{filename-3D.xyz} (Default: Fullerene-3D.xyz). 
-  \paramname{ICart} = 0  needs to be specified.\\
-  If \paramname{ixyz} = 4: Produce .cc1 file (Chem3D cartesian coordinate format 1 file) for further input. Note that in contrast to .xyz files,
-  .cc1 files contain information about vertex connections. Programs like PYMOL can read such files.\\
-  If \paramname{ixyz} = 5: Read .cc1 from file specified in \paramname{filename}. The final name is chosen as \filename{filename-3D.cc1}. 
-  In this case ICart = 0  needs to be specified (see \paramname{\&Coord} input). This is useful for reading for example \filename{.cc1} files produced 
-  by M. Yoshida \cite{Yoshida}, which has been added to our database.
-\item[{ichk}] Flag for producing or reading a \filename{.xyz} file for \program{CYLview}, \program{Pymol}, 
-  \program{Avogadro} or other plotting programs (Default: 0).\\
+  If \paramname{iwext} = 1: Write out external \filename{.xyz}  file named \filename{filename-3D.xyz} for further input.\\
+  If \paramname{iwext} = 2: Write out external \filename{.cc1}  file named \filename{filename-3D.cc1} for further input.\\
+  If \paramname{iwext} = 3: Write out external \filename{.mol2} file named \filename{filename-3D.mol2} for further input.\\
+\item[{irext}] Flag for reading external input file which contains cartesian coordinates or connectivities (Default: 0). Note this makes the input of \paramname{ICart} obsolete if set non-zero.
+  If \paramname{irext} = 1: Read \filename{.xyz} from file specified by \paramname{filename}. The final name is chosen as \filename{filename-3D.xyz} (Default: Fullerene-3D.xyz). 
+  Another \filename{.xyz} file is also produced and named \filename{filename-3Dnew.xyz} if also \paramname{iwext} = 1 is specified. (Default: Fullerene-3D2.xyz)\\
+  If \paramname{irext} = 2: Read \filename{.cc1} from file specified by \paramname{filename}. The final name is chosen as \filename{filename-3D.cc1} (Default: Fullerene-3D.cc1). 
+  Another \filename{.cc1} file is also produced and named \filename{filename-3Dnew.cc1} if also \paramname{iwext} = 2 is specified. (Default: Fullerene-3D2.xyz).
+  .cc1 files contain information about vertex connections. Programs like PYMOL can read such files. This is useful for reading for example \filename{.cc1} files produced 
+  by M. Yoshida \cite{Yoshida}, which has been added to our database.\\
+  If \paramname{irext} = 3: Read \filename{.mol2} from file specified by \paramname{filename}. The final name is chosen as \filename{filename-3D.mol2} (Default: Fullerene-3D.mol2). 
+  Another \filename{.mol2} file is also produced and named \filename{filename-3Dnew.mol2} if also \paramname{iwext} = 1 is specified. (Default: Fullerene-3D2.mol2).
+  The file is in standard Tripos format.\\
 \item[{nohueckel}]  If \paramname{nohueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $\mathcal{O}(n^3)$ (recommended for large matrices over size 5000) (Default: 0).
 \item[{loop}] 
   If \paramname{loop} = 1: New input required (compound job), i.e. program does not stop at the end but loops back to the beginning (Default: 0). 

@@ -1,5 +1,5 @@
 D3-C366 as a precursor for D3-C384
-&General NA=366, ispsearch=2, ixyz=1, nosort=1, ipsphere=2 /
+&General NA=366, ispsearch=2, iwext=1, nosort=1, ipsphere=2 /
 &Coord ICart=2 IGCtrans=1, kGC=3 rspi=63,64,81,92,94,111,113,140,171,172,181,183/
 &FFChoice Iopt=2 ftol=.1d-10/
 &FFParameters fcoulomb=150. /
