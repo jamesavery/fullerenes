@@ -242,8 +242,12 @@ int main(int ac, char **av)
 
   if(ac<13) return -1;
 
-  int N = strtol(av[1],0,0);
+  int N = strtol(av[1],0,0), K=1, L=0;
   for(int i=0;i<12;i++) rspi[i] = strtol(av[2+i],0,0)-1;
+  if(ac>=15){
+    K = strtol(av[14],0,0);
+    L = strtol(av[15],0,0);
+  }
 
   cout << "Attempting to create graph from spiral indices " << rspi << endl;
  
@@ -274,9 +278,9 @@ int main(int ac, char **av)
   output << "outline = " << outline << ";\n";
 
   output.close();
-
-  ofstream latex_output("output/C"+to_string(N)+"-unfold.tex");
-  latex_GCunfold(latex_output,outline,grid,3,2,true,1,true);
+  ofstream latex_output("output/C"+to_string(N)+"-GC"+to_string(K)
+			+"x"+to_string(L)+"-unfold.tex");
+  latex_GCunfold(latex_output,outline,grid,K,L,true,1,true);
   latex_output.close();
   
   return 0;
