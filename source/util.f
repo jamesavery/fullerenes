@@ -43,11 +43,13 @@ C---------------------------------------------------------------------
       integer endzeile
       CHARACTER*1 TEXTINPUT(nzeile)
       CHARACTER CDAT*8,CTIM*10,Zone*5
+      CHARACTER*1 Number
       CHARACTER*2 El(99)
       CHARACTER*4 Endext
       CHARACTER*7 Nameext
       CHARACTER*50 filenameout,extname
       IERR=0
+      Number='2'
       ncyc=ncyc+1
       Call FileMod(filenameout,extname,Nameext,Endext,ncyc,ifind)
        if(ifind.ne.0) then
@@ -55,6 +57,7 @@ C---------------------------------------------------------------------
         IERR=1
         Return
        endif
+      if(nchoice.eq.3) filenameOut=filenameout//trim(adjustl(Number))
       Open(unit=Iext,file=extname,form='formatted')
       Write(Iout,1011) extname,nchoice
 C Put Date and Time into comment line
@@ -98,9 +101,14 @@ C .cc1 files
          Write(3,1010) El(IM),J,(Dist(I,J),I=1,3),icc1flag,
      1    (IC3(J,I),I=1,3)
         enddo
-       endif
+      endif
 
-       Close(unit=Iext)
+C .mol2 files
+      if(nchoice.eq.3) then
+      endif
+
+      Close(unit=Iext)
+
  1000 FORMAT(/1X,'You try to write into the database filesystem',
      1 ' which is not allowed  ===>  ABORT')
  1001 FORMAT(I5,/,'C',I2,' / DATE:',I2,'/',I2,'/',I4,

@@ -131,7 +131,7 @@ C  Call Datain
       CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
-     1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
+     1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
      1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
@@ -159,10 +159,57 @@ C  database files to a reasonable format
        go to 99
       endif
 
-C------------------Coordinates-------------------------------------
-C This controls how fullerene is read in
-C Options for Input coordinates
+C-------------Coordinates and Connectivities-----------------------
+C This controls how fullerene structure is read in
 
+C Input Cartesian coordinates/connectivities from external file
+C if irext.ne.0: overwrites completely the Icart option
+      if(irext.ne.0) then
+       if(irext.eq.1) then
+
+C Read from .xyz file
+        xyzname=trim(filename)//".xyz"
+        Call ReadFromFile(1,Iext,iout,iatom,IC3,xyzname,Dist)
+        ncartflag=1
+        xyzname=trim(filename)//'-3D.new.xyz'
+        go to 40
+       endif
+
+C Read from .cc1 file
+       if(irext.eq.2) then
+        cc1name=trim(filename)//".cc1"
+        Call ReadFromFile(2,Iext,iout,iatom,IC3,cc1name,Dist)
+        ncartflag=1
+C    This routine complements missing entries in IC3
+        Call CheckIC3(IERROR,IC3)
+        if(IERROR.eq.1) then
+         nadjacencyflag=0
+         Write(iout,1015)
+        else
+         nadjacencyflag=1
+        endif
+        cc1name=trim(filename)//'-3D.new.cc1'
+        go to 40
+       endif
+
+C Read from .mol2 file
+       if(irext.eq.3) then
+        molname=trim(filename)//".mol2"
+        Call ReadFromFile(3,Iext,iout,iatom,IC3,molname,Dist)
+        ncartflag=1
+C    This routine complements missing entries in IC3
+        Call CheckIC3(IERROR,IC3)
+        if(IERROR.eq.1) then
+         nadjacencyflag=0
+         Write(iout,1015)
+        else
+         nadjacencyflag=1
+        endif
+        molname=trim(filename)//'-3D.new.mol2'
+        go to 40
+       endif
+      endif
+C Options for direct Input 
       go to (10,20,30,30,30,30,30,30,30,30,98) Icart+1
 
 C  Cartesian coordinates produced for Ih C20 or C60 using basic geometry
@@ -175,41 +222,11 @@ C  Cartesian coordinates produced for Ih C20 or C60 using basic geometry
       enddo
       Go to 40
 
-C Input Cartesian coordinates for fullerenes
-   20 if(ixyz.eq.2.or.ixyz.eq.3.or.ixyz.eq.5) then
-        if(ixyz.eq.5) then
-C Read from .cc1 file
-         cc1name=trim(filename)//".cc1"
-         Call ReadFromFile(2,Iext,iout,iatom,IC3,cc1name,Dist)
-         ncartflag=1
-C This routine complements missing entries in IC3
-         Call CheckIC3(IERROR,IC3)
-         if(IERROR.eq.1) then
-          nadjacencyflag=0
-          Write(iout,1015)
-         else
-          nadjacencyflag=1
-         endif
-         cc1name=trim(filename)//'-3D.new.xyz'
-
-       else
-
-C Read from .xyz file (Chem3D format)
-         xyzname=trim(filename)//".xyz"
-         Call ReadFromFile(1,Iext,iout,iatom,IC3,xyzname,Dist)
-         ncartflag=1
-         xyzname=trim(filename)//'-3D.new.xyz'
-        endif
-
-      else
-
 C Read cartesian coordinates directly
-       Do J=1,number_vertices
+   20 Do J=1,number_vertices
         Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
        enddo
        ncartflag=1
-      endif
-
        Go to 40
    21  WRITE(Iout,1016)
        Go to 99
@@ -511,23 +528,34 @@ c  stuff previously done, but is ok for now, as it takes not much time
 C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs
 
-C xyz format
-      if(ixyz.le.2) then
-       nxyz=nxyz+1
-       routine='PRINTCOORD     '
-       Write(Iout,1008) routine
-       Call WriteToFile(1,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
-     1  IC3,El,Dist,filenameout,xyzname,Namexyz,Endxyz,TEXTINPUT)
-       if(IERROR1.eq.1) go to 9999
-      endif
+C .xyz format
+      if(iwext.ne.0) then
+       if(iwext.eq.1) then
+        nxyz=nxyz+1
+        routine='PRINTCOORD     '
+        Write(Iout,1008) routine
+        Call WriteToFile(1,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+     1   IC3,El,Dist,filenameout,xyzname,Namexyz,Endxyz,TEXTINPUT)
+        if(IERROR1.eq.1) go to 9999
+       endif
 
-C cc1 format
-      if(ixyz.ge.4) then
-       ncc1=ncc1+1
-       routine='PRINTCOORD     '
-       Write(Iout,1008) routine
-       Call WriteToFile(2,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
-     1  IC3,El,Dist,filenameout,cc1name,Namecc1,Endcc1,TEXTINPUT)
+C .cc1 format
+       if(iwext.eq.2) then
+        ncc1=ncc1+1
+        routine='PRINTCOORD     '
+        Write(Iout,1008) routine
+        Call WriteToFile(2,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+     1   IC3,El,Dist,filenameout,cc1name,Namecc1,Endcc1,TEXTINPUT)
+       endif
+
+C .mol2 format
+       if(iwext.eq.3) then
+        ncc1=ncc1+1
+        routine='PRINTCOORD     '
+        Write(Iout,1008) routine
+        Call WriteToFile(3,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+     1   IC3,El,Dist,filenameout,molname,Namemol,Endmol,TEXTINPUT)
+       endif
       endif
       
 C------------------VOLUME-----------------------------------------
