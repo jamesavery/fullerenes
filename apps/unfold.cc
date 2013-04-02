@@ -145,8 +145,34 @@ vector< pair<Eisenstein,node_t> > get_outline(const map<dedge_t,dedgecoord_t>& e
 
 // (Not finished) Output a LaTeX/TiKZ figure of the unfolded triangulation, optionally GC(K,L)-transformed.
 void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > &outline, const map<dedge_t,dedgecoord_t> &dedge_positions, int K=1, int L=0,
-		    bool equilateralp=false, int label_vertices=1)
+		    bool equilateralp=false, int label_vertices=1, bool include_headers=false)
 {
+  if(include_headers)
+    latexfile << 
+"\\documentclass{standalone}\n\
+\\usepackage{tikz}\n\
+\\begin{document}\n\
+\\definecolor{darkgreen}{rgb}{.4, .7, .2}\n\
+\\tikzstyle{outline}=[draw=black, ultra thick, fill opacity=.2, fill=darkgreen]\n\
+\\tikzstyle{vertex}=[circle, draw, inner sep=0, fill=white, minimum width=4.00000mm]\n\
+\n\
+\\pgfmathsetmacro{\\xcoord}{cos(60)}\n\
+\\pgfmathsetmacro{\\ycoord}{sin(60)}\n\
+\n\
+\\newcommand{\\drawEGrid}{\n\
+    \\path[clip,preaction = {draw=black}] (0,0) -- (\\last,0) -- (\\cols,\\rows) --(\\first,\\rows) -- cycle;\n\
+    \\draw (\\first,0) grid (\\last,\\rows);\n\
+    \\foreach \\x in {1,2,...,\\total}\n\
+        \\draw (-\\x,\\x*2) -- (\\x,0);\n\
+}\n\
+\\newcommand{\\drawRGrid}{\n\
+    \\path[clip,preaction = {draw=black}] (0,0) -- (\\last,0) -- (\\cols,\\rows) --(0,\\rows) -- cycle;\n\
+    \\draw (0,0) grid (\\cols,\\rows);\n\
+    \\foreach \\x in {1,2,...,\\total}\n\
+        \\draw (-\\x,\\x*2) -- (\\x,0);\n\
+}\n\
+";
+
   vector<Eisenstein> outline_gc(outline.size());
   for(int i=0;i<outline.size();i++) outline_gc[i] = outline[i].first.GCtransform(K,L);
 
@@ -154,48 +180,58 @@ void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > 
   int imin = INT_MAX, imax = INT_MIN, jmin = INT_MAX, jmax = INT_MIN;
   for(int i=0;i<outline_gc.size();i++){
     const Eisenstein &x(outline_gc[i]);
-    //    cout << x << endl;
     if(x.first < imin) imin = x.first;
     if(x.first > imax) imax = x.first;
     if(x.second < jmin) jmin = x.second;
     if(x.second > jmax) jmax = x.second;
-    //    printf("(Imin,Jmin)-(Imax,Jmax) = (%d,%d)-(%d,%d)\n",Imin,Jmin,Imax,Jmax);
-
   }
   Eisenstein gcmin(imin-1,jmin-1), gcmax(imax+1,jmax+1);
-  
+
+  latexfile << "\\begin{tikzpicture}\n";
+  // Define bounds
+  Eisenstein D(gcmax-gcmin);
+  latexfile << "\\newcommand*{\\cols}{"<<D.first<<"}\n"
+	    << "\\newcommand*{\\rows}{"<<D.second<<"}\n"
+	    << "\\newcommand*{\\total}{"<<(D.first+D.second)<<"}\n"
+	    << "\\newcommand*{\\first}{0}\n"
+	    << "\\newcommand*{\\last}{\\cols}\n";
+
   // Draw E-grid
+  latexfile << "\\bgroup\n";
   if(equilateralp){
-  // -- as Regular grid
-      
-  } else {
-  // -- as equilateral triangles
+    // -- as equilateral triangles
+    latexfile << "\\pgftransformcm{1}{0}{\\xcoord}{\\ycoord}{\\pgfpointorigin}\n"
+	      << "\\drawEGrid{}\n";
+  } else // -- or as a regular grid
+    latexfile << "\\drawRGrid{}\n";
 
-  }
-
+  
   // Draw outline polygon
-  cout << gcmin << " to " << gcmax << endl;
-  latexfile << "\\newcommand*{\\cols}{"<<(gcmax-gcmin).first<<"}\n"
-	    << "\\newcommand*{\\rows}{"<<(gcmax-gcmin).second<<"}\n";
-
-  latexfile << "\\draw[outline] ";
+    latexfile << "\\draw[outline] ";
   for(int i=0;i<outline.size();i++){
     const Eisenstein &x((outline_gc[i]-gcmin));
     latexfile << "(" << x.first << "," << x.second << ") -- ";
   }
-  latexfile << "cycle;\n\n";
+  latexfile << "cycle;\n"
+	    << "\\egroup\n\n";
 
   latexfile << "\\foreach \\place/\\name/\\lbl in {";
   for(int i=0;i<outline.size();i++){
-    const coord2d &x((outline_gc[i]-gcmin).coord());
+    const Eisenstein &ij(outline_gc[i]-gcmin);
+
+    coord2d x;
+    if(equilateralp) x = ij.coord();
+    else             x = coord2d(ij.first,ij.second);
+
     const node_t &v(outline[i].second);
     latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<v<<(i+1<outline.size()?"},":"}");
   }
   latexfile << "}\n"
-	    << "\t \\node[vertex] (\\name) at \\place {\\lbl};\n\n";
-  
-
-
+	    << "\t \\node[vertex] (\\name) at \\place {"
+	    << (label_vertices?"\\lbl":"")<<"};\n\n"
+	    << "\\end{tikzpicture}\n";
+  if(include_headers) 
+    latexfile << "\\end{document}\n";
 }
 
 
@@ -212,6 +248,7 @@ int main(int ac, char **av)
   cout << "Attempting to create graph from spiral indices " << rspi << endl;
  
   ofstream output("output/C"+to_string(N)+"-unfold.m");
+
 
   FullereneGraph g(N, rspi, jumps);
   PlanarGraph dual(g.dual_graph(6));
@@ -238,7 +275,9 @@ int main(int ac, char **av)
 
   output.close();
 
-  latex_GCunfold(cout,outline,grid,3,2);
+  ofstream latex_output("output/C"+to_string(N)+"-unfold.tex");
+  latex_GCunfold(latex_output,outline,grid,3,2,true,1,true);
+  latex_output.close();
   
   return 0;
 }
