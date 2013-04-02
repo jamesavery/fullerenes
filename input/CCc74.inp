@@ -1,5 +1,5 @@
 D3h-C74 cc-pvdz B3LYP opt. geom. minimum -2819.8928353 au
-&General NA=74, ixyz=1 /
+&General NA=74, iwext=1 /
 &Coord ICart=1 /
 &FFChoice  /
 &FFParameters /
