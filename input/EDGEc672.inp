@@ -1,5 +1,5 @@
 Non-spiral IPR C672 build from input connectivities (edges), last input is a zero
-&General NA=672 ixyz=1 /
+&General NA=672 iwext=1 /
 &Coord ICart=6, scalerad=6/
 &FFChoice Iopt=2 /
 &FFParameters /

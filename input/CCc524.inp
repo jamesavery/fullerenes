@@ -1,5 +1,5 @@
 C524 from Juan Perilla, Cone-shaped structure
-&General NA=524 ixyz=1 /
+&General NA=524 iwext=1 /
 &Coord ICart=1 /
 &FFChoice iopt=1 /
 &FFParameters /

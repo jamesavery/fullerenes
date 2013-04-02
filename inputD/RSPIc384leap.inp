@@ -2,7 +2,7 @@ This is an example how to create the coordinate for the non-spiral T-C380
 through a ring-spiral fullerene T-C364 and 4 Yoshida-Fowler 4-vertex insertions
 The transformation preserves symmetry, afterwards a leap-frog transformation
 is performed to show that the leap-frog transformed has a ring spiral
-&General NA=366, nohueckel=1, nosort=1, ixyz=1, ipsphere=3 loop=1 /
+&General NA=366, nohueckel=1, nosort=1, iwext=1, ipsphere=3 loop=1 /
 &Coord ICart=3, IBF=2 rspi=63,64,81,92,94,111,113,140,171,172,181,183 /
 &FFChoice Iopt=3 /
 &FFParameters  /
@@ -13,7 +13,7 @@ is performed to show that the leap-frog transformed has a ring spiral
 
 --- Start new input here, leave empty line above ---
 New input for leapfrog C384
-&General ixyz=2 filename='Fullerene-3D' ispsearch=2 /
+&General irext=1 iwext=1 filename='Fullerene-3D' ispsearch=2 /
 &Coord ICart=1 leap=1 /
 &FFChoice Iopt=3 /
 &FFParameters /
