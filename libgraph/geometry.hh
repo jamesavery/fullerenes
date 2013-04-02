@@ -13,6 +13,9 @@ typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
 
+// TODO: There are a number of functions in this file that are not particularly
+// pertaining to geometry, but are just "miscellaneous" stuff. Move to a more
+// fitting place.
 template <typename T> ostream& operator<<(ostream& s, const vector<T>& v)
 {
   s << "{";
@@ -26,6 +29,25 @@ template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T
   s << "{" << p.first << "," << p.second << "}";
   return s;
 }
+
+template<typename K, typename V> vector<K> get_keys(const map<K,V>& m)
+{
+  vector<K> keys(m.size());
+  int i=0;
+  for(typename map<K,V>::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
+    keys[i] = kv->first;
+  return keys;
+}
+
+template<typename K, typename V> vector<V> get_values(const map<K,V>& m)
+{
+  vector<V> values(m.size());
+  int i=0;
+  for(typename map<K,V>::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
+    values[i] = kv->second;
+  return values;
+}
+
 
 // Undirected edge is an unordered pair of nodes
 struct edge_t : public pair<node_t,node_t> {
