@@ -1,5 +1,5 @@
 D3-C128 Last in the RSPI isomer list
-&General NA=128 ixyz=1 ispsearch=2 rspi=1,2,3,4,41,47,48,54,55,60,61,66 /
+&General NA=128 iwext=1 ispsearch=2 rspi=1,2,3,4,41,47,48,54,55,60,61,66 /
 &Coord ICart=3 /
 &FFChoice iopt=3 /
 &FFParameters /

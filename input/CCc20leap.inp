@@ -1,5 +1,5 @@
 This input takes the coordinates for Ih-C20 and leapfrogs to Ih-C540
-&General NA=20 ixyz=1 ispsearch=0 /
+&General NA=20 iwext=1 ispsearch=0 /
 &Coord ICart=1, leap=3 /
 &FFChoice Iopt=1 /
 &FFParameters /

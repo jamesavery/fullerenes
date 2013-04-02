@@ -1,5 +1,5 @@
 D6-C120 Using FM algorithm to produce coordinates from ring spiral indices
-&General NA=120, IP=1 ixyz=1 /
+&General NA=120, IP=1 iwext=1 /
 &Coord ICart=3 , R6=1.42 rspi=1, 8, 12, 26, 28, 30, 33, 35, 37, 51, 55, 62/
 &FFChoice Iopt=1 /
 &FFParameters /

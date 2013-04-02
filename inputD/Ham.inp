@@ -1,5 +1,5 @@
 Hamiltonian Cycle
-&General NA=134 ixyz=1 ispsearch=2 /
+&General NA=134 iwext=1 ispsearch=2 /
 &Coord ICart=3 /
 &FFChoice iopt=3 /
 &FFParameters /

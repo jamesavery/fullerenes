@@ -1,5 +1,5 @@
 Ih-C60 test for Hamiltonian Cycle in 2D Graph
-&General NA=60, IP=1, ixyz=1, ispsearch=2, filename='C60extfile' /
+&General NA=60, IP=1, iwext=1, ispsearch=2, filename='C60extfile' /
 &Coord ICart=1 /
 &FFChoice Iopt=1 ihessian=1 /
 &FFParameters /

@@ -1,5 +1,5 @@
 Ih-C540  6-31G opt. geom. minimum -20577.06531 au not converged out
-&General NA=540, ixyz=1 /
+&General NA=540, iwext=1 /
 &Coord ICart=1 /
 &FFChoice iopt=1 ihessian=1/
 &FFParameters /
