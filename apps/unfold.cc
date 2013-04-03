@@ -41,10 +41,47 @@ public:
     }
   }
 
+  // Given a line segment, return all the grid points either directly on the line
+  // or of distance < 1 to it on the right hand side.
+  static vector<Eisenstein> rightofline(const Eisenstein &x0, const Eisenstein &x1)
+  {
+    vector<Eisenstein> result;
+
+    // Deal with degenerate cases first
+    if(x0.first == x1.first){
+      result.reserve(x1.second - x0.second + 1);
+      for(int y=x0.second; y<=x1.second; y++) result.push_back(Eisenstein(x0.first,y));
+    } 
+
+    if(x0.second == x1.second){
+      result.reserve(x1.first - x0.first + 1);
+      for(int x=x0.first; x<=x1.first; x++) result.push_back(Eisenstein(x,x0.second));
+    }
+
+    // Line segment is not vertical or horizontal
+    int Dx = x1.first - x0.first, Dy = x1.second - x0.second;
+    double slope = Dx/Dy, sign = slope/abs(slope);
+
+    for(int i=0,y=x0.second; y<=x1.second; y++,i++){
+      
+    }
+
+    return result;
+  }
+
   coord2d coord() const { return coord2d(1,0)*first + coord2d(0.5,0.8660254037844386)*second; }
 };
 
 typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
+
+struct dedge_sort : public std::binary_function<dedge_t, dedge_t, bool>
+{
+    bool operator()(const dedge_t &x, const dedge_t &y) const
+    {   
+      int maxx = max(x.first,x.second), maxy = max(y.first,y.second);
+      return maxx < maxy || (maxx == maxy && min(x.first,x.second) < min(y.first,y.second));
+    }
+};
 
 // This function unfolds a triangulation and lays it out on an equilateran
 // triangular grid, such that if one were to cut along the outline
@@ -75,9 +112,9 @@ map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation)
   }
 
   map<dedge_t,bool> dedge_done;
-  set<dedge_t>   workset;
-  map<dedge_t, dedgecoord_t > dedge_position;
-
+  set<dedge_t,dedge_sort>   workset;
+  map<dedge_t, dedgecoord_t > dedge_position
+;
   map<Eisenstein,node_t> grid;
   Eisenstein zero(0,0), veci(1,0), vecj(0,1);
 
@@ -187,7 +224,7 @@ void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > 
   }
   Eisenstein gcmin(imin-1,jmin-1), gcmax(imax+1,jmax+1);
 
-  latexfile << "\\begin{tikzpicture}\n";
+  latexfile << "\\begin{tikzpicture}"<<(K==1 && L==0?"[scale=2.5]":"")<<"\n";
   // Define bounds
   Eisenstein D(gcmax-gcmin);
   latexfile << "\\newcommand*{\\cols}{"<<D.first<<"}\n"
@@ -215,20 +252,43 @@ void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > 
   latexfile << "cycle;\n"
 	    << "\\egroup\n\n";
 
+  // Place vertex labels according to scheme chosen in parameter 'label_vertices':
   latexfile << "\\foreach \\place/\\name/\\lbl in {";
-  for(int i=0;i<outline.size();i++){
-    const Eisenstein &ij(outline_gc[i]-gcmin);
+  switch(label_vertices){
+  case 0: break; // Don't label vertices at all.
+  case 1:        // Only label vertices on polygon outline.
+    if(label_vertices == 1)	
+      for(int i=0;i<outline.size();i++){
+	const Eisenstein &ij(outline_gc[i]-gcmin);
 
-    coord2d x;
-    if(equilateralp) x = ij.coord();
-    else             x = coord2d(ij.first,ij.second);
+	coord2d x;
+	if(equilateralp) x = ij.coord();
+	else             x = coord2d(ij.first,ij.second);
 
-    const node_t &v(outline[i].second);
-    latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<v<<(i+1<outline.size()?"},":"}");
+	const node_t &u(outline[i].second);
+	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(i+1<outline.size()?"},":"}");
+      }
+    break;
+  case 2: // Label all original vertices, including internal ones
+    {
+      int i=0;
+      for(map<dedge_t,dedgecoord_t>::const_iterator it(dedge_positions.begin()); it!=dedge_positions.end(); i++){
+	node_t u(it->first.first);
+	Eisenstein ij(it->second.first.GCtransform(K,L)-gcmin);
+
+	coord2d x;
+	if(equilateralp) x = ij.coord();
+	else             x = coord2d(ij.first,ij.second);
+
+	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(++it != dedge_positions.end()? "},":"}");
+      }
+    }
+    break;
+  case 3: // Label ALL vertices, both old and new.
+    break;
   }
   latexfile << "}\n"
-	    << "\t \\node[vertex] (\\name) at \\place {"
-	    << (label_vertices?"\\lbl":"")<<"};\n\n"
+	    << "\t \\node[vertex] (\\name) at \\place {\\lbl};\n\n"
 	    << "\\end{tikzpicture}\n";
   if(include_headers) 
     latexfile << "\\end{document}\n";
@@ -280,7 +340,7 @@ int main(int ac, char **av)
   output.close();
   ofstream latex_output("output/C"+to_string(N)+"-GC"+to_string(K)
 			+"x"+to_string(L)+"-unfold.tex");
-  latex_GCunfold(latex_output,outline,grid,K,L,true,1,true);
+  latex_GCunfold(latex_output,outline,grid,K,L,true,2,true);
   latex_output.close();
   
   return 0;
