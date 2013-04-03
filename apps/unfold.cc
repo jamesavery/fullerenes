@@ -216,13 +216,25 @@ void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > 
   // Extract (I,J)-bounds
   int imin = INT_MAX, imax = INT_MIN, jmin = INT_MAX, jmax = INT_MIN;
   for(int i=0;i<outline_gc.size();i++){
-    const Eisenstein &x(outline_gc[i]);
+    Eisenstein x(outline_gc[i]);
+
+    if(equilateralp){
+      coord2d X(x.coord());
+      x.first  = floor(X.first);
+      x.second = floor(X.second);
+    }
+
     if(x.first < imin) imin = x.first;
     if(x.first > imax) imax = x.first;
     if(x.second < jmin) jmin = x.second;
     if(x.second > jmax) jmax = x.second;
+
   }
   Eisenstein gcmin(imin-1,jmin-1), gcmax(imax+1,jmax+1);
+  if(equilateralp){
+    gcmin = Eisenstein(coord2d(gcmin.first-1,gcmin.second));
+    gcmax = Eisenstein(coord2d(gcmax.first,gcmax.second+1));
+  }
 
   latexfile << "\\begin{tikzpicture}"<<(K==1 && L==0?"[scale=2.5]":"")<<"\n";
   // Define bounds
@@ -230,8 +242,8 @@ void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > 
   latexfile << "\\newcommand*{\\cols}{"<<D.first<<"}\n"
 	    << "\\newcommand*{\\rows}{"<<D.second<<"}\n"
 	    << "\\newcommand*{\\total}{"<<(D.first+D.second)<<"}\n"
-	    << "\\newcommand*{\\first}{0}\n"
-	    << "\\newcommand*{\\last}{\\cols}\n";
+	    << "\\newcommand*{\\first}{-\\rows/2}\n"
+	    << "\\newcommand*{\\last}{\\cols+\\rows/2}\n";
 
   // Draw E-grid
   latexfile << "\\bgroup\n";
