@@ -76,6 +76,7 @@ C External file names
       Endmol='.mol'
       nxyz=0
       ncc1=0
+      nmol=0
 
 C Input / Output
       IN=5
@@ -209,6 +210,7 @@ C    This routine complements missing entries in IC3
         go to 40
        endif
       endif
+
 C Options for direct Input 
       go to (10,20,30,30,30,30,30,30,30,30,98) Icart+1
 
@@ -544,16 +546,16 @@ C .cc1 format
         ncc1=ncc1+1
         routine='PRINTCOORD     '
         Write(Iout,1008) routine
-        Call WriteToFile(2,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+        Call WriteToFile(2,Iext,ncc1,ifind,Iout,IERROR1,IAtom,
      1   IC3,El,Dist,filenameout,cc1name,Namecc1,Endcc1,TEXTINPUT)
        endif
 
 C .mol2 format
        if(iwext.eq.3) then
-        ncc1=ncc1+1
+        nmol=nmol+1
         routine='PRINTCOORD     '
         Write(Iout,1008) routine
-        Call WriteToFile(3,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+        Call WriteToFile(3,Iext,nmol,ifind,Iout,IERROR1,IAtom,
      1   IC3,El,Dist,filenameout,molname,Namemol,Endmol,TEXTINPUT)
        endif
       endif
