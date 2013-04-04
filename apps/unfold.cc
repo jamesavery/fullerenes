@@ -26,9 +26,8 @@ public:
   // (-1,0)  --x-- (1,0)
   // (-1,-1)  / \  (1,-1)
   // 
-  static Eisenstein nextCW(const Eisenstein& x, const Eisenstein& y){
-    Eisenstein d(y-x);
-    switch(d.second + 10*d.first){
+  Eisenstein nextCW() const {
+    switch(second + 10*first){
     case  10+0: /*( 1 ,0)*/  return Eisenstein(1,-1);
     case  10-1: /*( 1,-1)*/  return Eisenstein(0,-1); 
     case   0-1: /*( 0,-1)*/  return Eisenstein(-1,0);
@@ -36,40 +35,47 @@ public:
     case -10+1: /*(-1, 1)*/  return Eisenstein(0,1);
     case   0+1: /*( 0, 1)*/  return Eisenstein(1,0);
     default:
-      cerr << "nextCW(): " << x << " does not neighbour " << y << "(difference: "<<(y-x)<<")\n";
+      cerr << "nextCW(): " << *this << " is not a grid direction.\n";
       abort();
     }
   }
 
-  // Given a line segment, return all the grid points either directly on the line
-  // or of distance < 1 to it on the right hand side.
-  static vector<Eisenstein> rightofline(const Eisenstein &x0, const Eisenstein &x1)
-  {
-    vector<Eisenstein> result;
+  coord2d coord() const { return coord2d(1,0)*first + coord2d(0.5,0.8660254037844386)*second; }
+};
 
-    // Deal with degenerate cases first
-    if(x0.first == x1.first){
-      result.reserve(x1.second - x0.second + 1);
-      for(int y=x0.second; y<=x1.second; y++) result.push_back(Eisenstein(x0.first,y));
-    } 
+class EOp {
+public:
+  int a[4];
+  int denom;
 
-    if(x0.second == x1.second){
-      result.reserve(x1.first - x0.first + 1);
-      for(int x=x0.first; x<=x1.first; x++) result.push_back(Eisenstein(x,x0.second));
-    }
-
-    // Line segment is not vertical or horizontal
-    int Dx = x1.first - x0.first, Dy = x1.second - x0.second;
-    double slope = Dx/Dy, sign = slope/abs(slope);
-
-    for(int i=0,y=x0.second; y<=x1.second; y++,i++){
-      
-    }
-
-    return result;
+  EOp(int a0,int a1, int a2, int a3, int denom=1) : a{a0,a1,a2,a3}, 
+				     denom(denom) {}
+  EOp(int a[4], int denom=1) : a{a[0],a[1],a[2],a[3]}, 
+				     denom(denom) {}
+  
+  EOp operator*(const EOp& B) const {
+    return EOp(a[0]*B.a[0] + a[1]*B.a[2], a[0]*B.a[1] + a[1]*B.a[3],
+	       a[2]*B.a[0] + a[3]*B.a[2], a[2]*B.a[1] + a[3]*B.a[3], 
+	       denom*B.denom);
+  }
+  Eisenstein operator*(const Eisenstein& x) const {
+    return Eisenstein((a[0]*x.first + a[1]*x.second)/denom, (a[2]*x.first + a[3]*x.second)/denom);
   }
 
-  coord2d coord() const { return coord2d(1,0)*first + coord2d(0.5,0.8660254037844386)*second; }
+  static EOp GC(int k, int l)        { return EOp(k,-l,l,k+l); }
+  static EOp GCinverse(int k, int l) { return EOp(k+l,l,-l,k, k*k + k*l + l*l); }
+
+  static EOp Delta(const Eisenstein& d)
+  {
+    const Eisenstein e(d.nextCW());
+    return EOp(d.first, d.second,e.first,e.second);
+  }
+
+  // Transformation from \Delta_a coordinates to \Delta_0 coordinates
+  static EOp iDelta(const Eisenstein& d)
+  { // Delta[d] is its own inverse. 
+    return Delta(Eisenstein(1,0)) * Delta(d);
+  }
 };
 
 typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
@@ -95,15 +101,14 @@ map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation)
 {
 #define set_dedge(u,v,ux,vx) {	          \
   dedge_t uv(u,v), vu(v,u);               \
-  printf("set_dedge(%d,%d)\n",u,v);       \
   dedge_done[uv] = true;                  \
   workset.erase(uv);                      \
   dedge_position[vu] = make_pair(vx,ux);  \
-  if(!dedge_done[vu]){                    \
+  if(!dedge_done[vu])                     \
     workset.insert(vu);			  \
-  } \
 }
 
+  // A single directed edge uniquely defines the third node in the oriented triangle
   map<dedge_t,node_t> nextNode;
   for(int i=0;i<triangulation.size();i++){
     const tri_t &t(triangulation[i]);
@@ -112,7 +117,7 @@ map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation)
   }
 
   map<dedge_t,bool> dedge_done;
-  set<dedge_t,dedge_sort>   workset;
+  set<dedge_t, dedge_sort>   workset;
   map<dedge_t, dedgecoord_t > dedge_position
 ;
   map<Eisenstein,node_t> grid;
@@ -126,13 +131,12 @@ map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation)
   set_dedge(t[2],t[0],veci-vecj,zero);
 
   while(!workset.empty()){
-    dedge_t uv(*workset.rbegin());
-    //    cout << "Next unused dedge is " << uv << endl;
+    dedge_t uv(*workset.rbegin()); // Next placeable directed edge 
     // set_triangle(uv)
     node_t u(uv.first), v(uv.second), w(nextNode[uv]);
 
     dedgecoord_t uvpos(dedge_position[uv]);
-    Eisenstein ux(uvpos.first), vx(uvpos.second), wx(ux+Eisenstein::nextCW(ux,vx));
+    Eisenstein ux(uvpos.first), vx(uvpos.second), wx(ux+(vx-ux).nextCW());
 
     set_dedge(u,v,ux,vx);
     set_dedge(v,w,vx,wx);
