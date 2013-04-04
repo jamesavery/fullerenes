@@ -50,14 +50,13 @@ C---------------------------------------------------------------------
       CHARACTER*50 filenameout,extname
       IERR=0
       Number='2'
-      ncyc=ncyc+1
       Call FileMod(filenameout,extname,Nameext,Endext,ncyc,ifind)
        if(ifind.ne.0) then
         Write(Iout,1000)
         IERR=1
         Return
        endif
-      if(nchoice.eq.3) filenameOut=filenameout//trim(adjustl(Number))
+      if(nchoice.eq.3) extname=extname//trim(adjustl(Number))
       Open(unit=Iext,file=extname,form='formatted')
       Write(Iout,1011) extname,nchoice
 C Put Date and Time into comment line
