@@ -375,63 +375,135 @@ C-----------------------------------------------------------------
       DIMENSION Dist(3,Nmax),Iatom(Nmax),IC3(Nmax,3)
       CHARACTER*50 extfilename
       Character*1 TEXTINPUT(nzeile)
-      CHARACTER*2 element
+      CHARACTER*2 element,bondtype
+      CHARACTER*5 atomname,atomtype,substname
       CHARACTER*132 Line
       Integer endzeile
       Logical lexist
 
-         inquire(file=extfilename,exist=lexist)
-          if(lexist.neqv..True.) then
-            Write(Iout,1001) extfilename
-            stop
-          endif
-         Open(unit=iextfile,file=extfilename,form='formatted')
-         WRITE(Iout,1000) extfilename,nchoice
+      inquire(file=extfilename,exist=lexist)
+       if(lexist.neqv..True.) then
+         Write(Iout,1001) extfilename
+         stop
+       endif
+      Open(unit=iextfile,file=extfilename,form='formatted')
+      WRITE(Iout,1000) extfilename,nchoice
 
 C .xyz files
-         if(nchoice.eq.1) then
-          Read(7,*,end=99) number_vertices
-          Write(Iout,1007) number_vertices
-          Read(7,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
-          endzeile=0
-          do j=1,nzeile
-            if(TEXTINPUT(j).ne.' ') endzeile=j
-          enddo 
-          WRITE(Iout,1003) (TEXTINPUT(I),I=1,endzeile)
-          Do J=1,number_vertices
-            Read(7,*,end=1,err=1) element,(Dist(I,J),I=1,3)
-            Write(Iout,1009) element,(Dist(I,J),I=1,3)
-            Iatom(j)=6
-          enddo
-         endif
+      if(nchoice.eq.1) then
+       Read(iextfile,*,end=99) number_vertices
+       Write(Iout,1007) number_vertices
+       Read(iextfile,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
+       endzeile=0
+       do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+       enddo 
+       WRITE(Iout,1003) (TEXTINPUT(I),I=1,endzeile)
+       Do J=1,number_vertices
+        Read(iextfile,*,end=1,err=1) element,(Dist(I,J),I=1,3)
+        Write(Iout,1009) element,(Dist(I,J),I=1,3)
+        Iatom(j)=6
+       enddo
+      endif
 
 C .cc1 files
-         if(nchoice.eq.2) then
-          Read(7,*,end=99) number_vertices
-          Write(Iout,1007) number_vertices
-          Do J=1,number_vertices
-           Do I=1,3
-            IC3(J,I)=0
-           enddo
-           Read(iextfile,'(A132)',err=1,end=1) Line
-           Read(Line,*,end=10,err=10) 
-     1      element,JJ,(Dist(I,J),I=1,3),ncc1flag,(IC3(J,I),I=1,3)
-   10       Write(Iout,1008) element,JJ,(Dist(I,J),I=1,3),ncc1flag,
-     1       (IC3(J,I),I=1,3)
-           Iatom(j)=6
-          enddo
-         endif
+      if(nchoice.eq.2) then
+       Read(iextfile,*,end=99) number_vertices
+       Write(Iout,1007) number_vertices
+       Do J=1,number_vertices
+        Do I=1,3
+         IC3(J,I)=0
+        enddo
+        Read(iextfile,'(A132)',err=1,end=1) Line
+        Read(Line,*,end=10,err=10) 
+     1   element,JJ,(Dist(I,J),I=1,3),ncc1flag,(IC3(J,I),I=1,3)
+   10    Write(Iout,1008) element,JJ,(Dist(I,J),I=1,3),ncc1flag,
+     1    (IC3(J,I),I=1,3)
+        Iatom(j)=6
+       enddo
+      endif
 
 C .mol2 files: tripos mol2 standard format
-         if(nchoice.eq.3) then
-          Read(7,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
-          WRITE(Iout,1005) (TEXTINPUT(I),I=1,endzeile)
-          Read(7,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
-          WRITE(Iout,1006) (TEXTINPUT(I),I=1,endzeile)
-          Read(7,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
-          WRITE(Iout,1006) (TEXTINPUT(I),I=1,endzeile)
-          stop
+      if(nchoice.eq.3) then
+C    Read comment section
+       do I =1,1000
+        Read(iextfile,1002,end=99) (TEXTINPUT(J),J=1,nzeile)
+        endzeile=0
+        do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo 
+        WRITE(Iout,1005) (TEXTINPUT(J),J=1,endzeile)
+        do J=1,endzeile
+         if(TEXTINPUT(J).eq.'@'.and.TEXTINPUT(J+1).eq.'<') then
+          if(TEXTINPUT(J+9).eq.'M'.or.TEXTINPUT(J+9).eq.'m') go to 21
          endif
+        enddo
+       enddo
+       go to 99
+C    Comment section over, now read molecule section after @<TRIPOS>MOLECULE
+  21   Read(iextfile,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
+       WRITE(Iout,1006) (TEXTINPUT(I),I=1,endzeile)
+        endzeile=0
+        do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo 
+       Read(iextfile,*,end=99,err=99) number_vertices,number_edges,
+     1  isubstruct,ifeatures,isets
+       WRITE(Iout,1010) number_vertices,number_edges,
+     1  isubstruct,ifeatures,isets
+       Do I=1,1000
+        Read(iextfile,1002,end=99) (TEXTINPUT(J),J=1,nzeile)
+         endzeile=0
+         do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+         enddo 
+        WRITE(Iout,1006) (TEXTINPUT(J),J=1,endzeile)
+         do J=1,endzeile
+          if(TEXTINPUT(J).eq.'@'.and.TEXTINPUT(J+1).eq.'<') then
+           if(TEXTINPUT(J+9).eq.'A'.or.TEXTINPUT(J+9).eq.'a') go to 22
+          endif
+         enddo
+        enddo
+  22   Do I=1,number_vertices
+        Read(iextfile,*,end=99) idatom,atomname,(Dist(J,I),J=1,3),
+     1   atomtype,idsubst,substname,charge 
+        WRITE(Iout,1011) idatom,atomname,(Dist(J,I),J=1,3),
+     1   atomtype,idsubst,substname,charge
+       enddo
+       Do I=1,1000
+        Read(iextfile,1002,end=99) (TEXTINPUT(J),J=1,nzeile)
+         endzeile=0
+         do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+         enddo 
+        WRITE(Iout,1006) (TEXTINPUT(J),J=1,endzeile)
+         do J=1,endzeile
+          if(TEXTINPUT(J).eq.'@'.and.TEXTINPUT(J+1).eq.'<') then
+           if(TEXTINPUT(J+9).eq.'B'.or.TEXTINPUT(J+9).eq.'b') go to 23
+          endif
+         enddo
+        enddo
+C    @<TRIPOS>ATOM section done, now read @<TRIPOS>BOND section
+       Do J=1,number_vertices
+        Do I=1,3
+         IC3(J,I)=0
+        enddo
+       enddo
+  23   Do I=1,number_edges
+        Read(iextfile,*,end=99) idbond,idoriginatom,idtargetatom,
+     1   bondtype
+        WRITE(Iout,1012) idbond,idoriginatom,idtargetatom,bondtype
+        Call FillIC3(idoriginatom,idtargetatom,IC3)
+       enddo
+       Do I=1,1000
+        Read(iextfile,1002,end=1) (TEXTINPUT(J),J=1,nzeile)
+         endzeile=0
+         do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+         enddo 
+        WRITE(Iout,1006) (TEXTINPUT(J),J=1,endzeile)
+        enddo
+      endif
 
    1     close(unit=7)
          return
@@ -440,15 +512,36 @@ C .mol2 files: tripos mol2 standard format
          close(unit=7)
          stop
  1000 FORMAT(/1X,'Read coordinates from external file: ',A60,
-     1 /1X,'Choice: ',I1)
+     1 /1X,'Choice: ',I1,', Data content:',/)
  1001 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  1002 FORMAT(132A1)
  1003 FORMAT(1X,132A1)
  1004 FORMAT(1X,'File cannot be read')
- 1005 FORMAT(/1X,132A1)
+ 1005 FORMAT(1X,132A1)
  1006 FORMAT(1X,132A1)
  1007 FORMAT(1X,'File content:'/1X,'Number of vertices: ',I10)
  1008 FORMAT(1X,A2,I5,3F12.5,4I5)
  1009 FORMAT(1X,A2,3F12.5)
-         END
+ 1010 Format(5I6)
+ 1011 Format(I5,1X,A5,1X,3F10.5,1X,A5,1X,I2,1X,A5,1X,F10.5)
+ 1012 Format(I6,1X,I6,1X,I6,3X,A2)
+      END
+
+      Subroutine FillIC3(IA,IB,IC3)
+      use config
+      DIMENSION IC3(Nmax,3)
+      Do I=1,3
+       if(IC3(IA,I).eq.0) then
+        IC3(IA,I)=IB
+        go to 1
+       endif
+      enddo
+  1   Do I=1,3
+       if(IC3(IB,I).eq.0) then
+        IC3(IB,I)=IA
+        return
+       endif
+      enddo
+      return
+      END
 
