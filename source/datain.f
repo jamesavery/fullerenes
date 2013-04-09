@@ -1,37 +1,43 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,ICart,Iopt,IP,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
-     1 ixyz,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
+     1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
      1 iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
-     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
-     1 force,forceP,boost,filename,filenameout,DATEN)
+     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,rspi,
+     1 jumps,force,forceP,boost,filename,filenameout,DATEN)
+C-----------------------------------------------------------------
+C  This is the main routine handling the input
+C  It is called from the main program
+C-----------------------------------------------------------------
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
+      parameter (nlines=9999)
       integer NA,iopt
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF (and a backup)
       integer endzeile
+      integer rspi(12), jumps(10)
       Character*1 DATEN(nzeile)
       Character filename*50
       Character filenameout*50
-      Namelist /General/ NA,IP,TolR,R5,R6,ixyz,ichk,
+      Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
      1 nohueckel,loop,ndbconvert,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
-     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad
+     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
       Namelist /Hamilton/ IHam,iupac,ihamstore
-      Namelist /Isomers/ IPR,IPH,IStop,IChk,ISearch,isomerl,isomerh
+      Namelist /Isomers/ IPR,IPH,IStop,Ichk,ISearch,isomerl,isomerh
       Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,nhamcyc,ifs,ndual,PS,
      1 scale,scalePPG,boost
 
 C Input send to output
       if(ilp.eq.0) then   
         WRITE(IOUT,100)
-        Do I=1,200
+        Do I=1,nlines
           READ(IN,'(132(A1))',END=11) (DATEN(j),j=1,nzeile)
             endzeile=0
             do j=1,nzeile
@@ -132,7 +138,8 @@ C Integers
       IV1=2     !  Eigenvector option for fullerene construction
       IV2=3     !  Eigenvector option for fullerene construction
       IV3=4     !  Eigenvector option for fullerene construction
-      ixyz=0    !  Option for producing input for ploting program CYLVIEW
+      irext=0   !  Option for reading coordinates/connectivities from external file
+      iwext=0   !  Option for writing coordinates/connectivities from to file
       KE=0      !  Endo-Kroto C2 insertion
       kGC=0     !  First Goldberg-Coxeter index
       lGC=0     !  second Goldberg-Coxeter index
@@ -158,9 +165,18 @@ C     solid-state results of P.A.Heiney et al., Phys. Rev. Lett. 66, 2911 (1991)
 
       scaleRad=4    ! scale size of initial tutte sphere by factor.  The more non-spherical the structure is, the larger this factor should be
 
+c init of rspi (always 12)
+      do k=1,12
+        rspi(k)=0
+      enddo
+c init of jumps (should be more than 10 (should ... ))
+      do k=1,10
+        jumps(k)=0
+      enddo
+
 C Now process namelist input
-      READ(IN,'(132(A1))') (DATEN(j),j=1,nzeile)
-      endzeile=0
+      READ(IN,'(132(A1))',Err=98,end=98) (DATEN(j),j=1,nzeile)
+   98 endzeile=0
       do j=1,nzeile
         if(DATEN(j).ne.' ') endzeile=j
       enddo
@@ -255,12 +271,14 @@ C ExtWu force field
       enddo
 
 C Set IC and ichk parameters
-      if(ICart.lt.0) ICart=0
-      if(ICart.gt.7) ICart=7
+      if(ICart.lt.0 .or. icart.gt.10) then
+        write(*,*)"Invalic value for icart given.  Exiting ..."
+        call exit(1)
+      endif
       if(ichk.ne.0) istop=1
       if(ihamstore.ne.0.or.nhamcyc.ne.0) then
-       nosort=1
-       iupac=1
+        nosort=1
+        iupac=1
       endif
 
 C  Check on number of atoms (vertices)
@@ -279,27 +297,27 @@ C  Check on number of atoms (vertices)
 
 C  Setting minimum distance
       if(R6.ne.R.and.R6.gt.1.d0) then
-      Rdist=R6
-      WRITE(Iout,106) Rdist
+        Rdist=R6
+        WRITE(Iout,106) Rdist
       else
-      Rdist=R
-      WRITE(Iout,107) Rdist
+        Rdist=R
+        WRITE(Iout,107) Rdist
       endif
 
 C  Output list
       if(IP.gt.0) then
-       WRITE(IOUT,105)
-       IP=1
+        WRITE(IOUT,105)
+        IP=1
       endif
       if(IP.lt.0) then
-       IP=0
+        IP=0
       endif
 
 C  Tolerance for finding 5- and 6-ring connections
       if(TolR.le.0.d0) then
-      TolX=Tol
+        TolX=Tol
       else
-      TolX=TolR*0.01d0
+        TolX=TolR*0.01d0
       endif
 
       if(IPRC.lt.0) IPRC=0
@@ -334,3 +352,196 @@ C  Tolerance for finding 5- and 6-ring connections
   108 Format(1X,'Start new job',F12.6)
       RETURN
       END
+
+      Subroutine ReadFromFile(nchoice,iextfile,iout,iatom,IC3,
+     1 extfilename,Dist)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+C-----------------------------------------------------------------
+C  Routine to read cartesian coordinates from external file
+C  It is called from the main program
+C  Formats: 
+C   nchoice=1   .xyz file
+C   nchoice=2   .cc1 file
+C   nchoice=3   .mol2 file (TRYPOS format)
+C  iextfile: unit number for external file
+C  iout:     unit number for output
+C  iatom:    Field for atom number for each atom (6 for carbon)
+C  IC3:      Connectivity field for cubic graph 
+C             (short form of adjacency matrix)
+C  extfilename: external file name
+C  Dist(3,i): Field of (x,y,z) coordinates for each atom i
+C-----------------------------------------------------------------
+      DIMENSION Dist(3,Nmax),Iatom(Nmax),IC3(Nmax,3)
+      CHARACTER*50 extfilename
+      Character*1 TEXTINPUT(nzeile)
+      CHARACTER*2 element,bondtype
+      CHARACTER*5 atomname,atomtype,substname
+      CHARACTER*132 Line
+      Integer endzeile
+      Logical lexist
+
+      inquire(file=extfilename,exist=lexist)
+       if(lexist.neqv..True.) then
+         Write(Iout,1001) extfilename
+         stop
+       endif
+      Open(unit=iextfile,file=extfilename,form='formatted')
+      WRITE(Iout,1000) extfilename,nchoice
+
+C .xyz files
+      if(nchoice.eq.1) then
+       Read(iextfile,*,end=99) number_vertices
+       Write(Iout,1007) number_vertices
+       Read(iextfile,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
+       endzeile=0
+       do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+       enddo 
+       WRITE(Iout,1003) (TEXTINPUT(I),I=1,endzeile)
+       Do J=1,number_vertices
+        Read(iextfile,*,end=1,err=1) element,(Dist(I,J),I=1,3)
+        Write(Iout,1009) element,(Dist(I,J),I=1,3)
+        Iatom(j)=6
+       enddo
+      endif
+
+C .cc1 files
+      if(nchoice.eq.2) then
+       Read(iextfile,*,end=99) number_vertices
+       Write(Iout,1007) number_vertices
+       Do J=1,number_vertices
+        Do I=1,3
+         IC3(J,I)=0
+        enddo
+        Read(iextfile,'(A132)',err=1,end=1) Line
+        Read(Line,*,end=10,err=10) 
+     1   element,JJ,(Dist(I,J),I=1,3),ncc1flag,(IC3(J,I),I=1,3)
+   10    Write(Iout,1008) element,JJ,(Dist(I,J),I=1,3),ncc1flag,
+     1    (IC3(J,I),I=1,3)
+        Iatom(j)=6
+       enddo
+      endif
+
+C .mol2 files: tripos mol2 standard format
+      if(nchoice.eq.3) then
+C    Read comment section
+       do I =1,1000
+        Read(iextfile,1002,end=99) (TEXTINPUT(J),J=1,nzeile)
+        endzeile=0
+        do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo 
+        WRITE(Iout,1005) (TEXTINPUT(J),J=1,endzeile)
+        do J=1,endzeile
+         if(TEXTINPUT(J).eq.'@'.and.TEXTINPUT(J+1).eq.'<') then
+          if(TEXTINPUT(J+9).eq.'M'.or.TEXTINPUT(J+9).eq.'m') go to 21
+         endif
+        enddo
+       enddo
+       go to 99
+C    Comment section over, now read molecule section after @<TRIPOS>MOLECULE
+  21   Read(iextfile,1002,end=99) (TEXTINPUT(I),I=1,nzeile)
+       WRITE(Iout,1006) (TEXTINPUT(I),I=1,endzeile)
+        endzeile=0
+        do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+        enddo 
+       Read(iextfile,*,end=99,err=99) number_vertices,number_edges,
+     1  isubstruct,ifeatures,isets
+       WRITE(Iout,1010) number_vertices,number_edges,
+     1  isubstruct,ifeatures,isets
+       Do I=1,1000
+        Read(iextfile,1002,end=99) (TEXTINPUT(J),J=1,nzeile)
+         endzeile=0
+         do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+         enddo 
+        WRITE(Iout,1006) (TEXTINPUT(J),J=1,endzeile)
+         do J=1,endzeile
+          if(TEXTINPUT(J).eq.'@'.and.TEXTINPUT(J+1).eq.'<') then
+           if(TEXTINPUT(J+9).eq.'A'.or.TEXTINPUT(J+9).eq.'a') go to 22
+          endif
+         enddo
+        enddo
+  22   Do I=1,number_vertices
+        Read(iextfile,*,end=99) idatom,atomname,(Dist(J,I),J=1,3),
+     1   atomtype,idsubst,substname,charge 
+        WRITE(Iout,1011) idatom,atomname,(Dist(J,I),J=1,3),
+     1   atomtype,idsubst,substname,charge
+       enddo
+       Do I=1,1000
+        Read(iextfile,1002,end=99) (TEXTINPUT(J),J=1,nzeile)
+         endzeile=0
+         do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+         enddo 
+        WRITE(Iout,1006) (TEXTINPUT(J),J=1,endzeile)
+         do J=1,endzeile
+          if(TEXTINPUT(J).eq.'@'.and.TEXTINPUT(J+1).eq.'<') then
+           if(TEXTINPUT(J+9).eq.'B'.or.TEXTINPUT(J+9).eq.'b') go to 23
+          endif
+         enddo
+        enddo
+C    @<TRIPOS>ATOM section done, now read @<TRIPOS>BOND section
+       Do J=1,number_vertices
+        Do I=1,3
+         IC3(J,I)=0
+        enddo
+       enddo
+  23   Do I=1,number_edges
+        Read(iextfile,*,end=99) idbond,idoriginatom,idtargetatom,
+     1   bondtype
+        WRITE(Iout,1012) idbond,idoriginatom,idtargetatom,bondtype
+        Call FillIC3(idoriginatom,idtargetatom,IC3)
+       enddo
+       Do I=1,1000
+        Read(iextfile,1002,end=1) (TEXTINPUT(J),J=1,nzeile)
+         endzeile=0
+         do j=1,nzeile
+          if(TEXTINPUT(j).ne.' ') endzeile=j
+         enddo 
+        WRITE(Iout,1006) (TEXTINPUT(J),J=1,endzeile)
+        enddo
+      endif
+
+   1     close(unit=7)
+         return
+
+  99     WRITE(Iout,1004)
+         close(unit=7)
+         stop
+ 1000 FORMAT(/1X,'Read coordinates from external file: ',A60,
+     1 /1X,'Choice: ',I1,', Data content:',/)
+ 1001 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
+ 1002 FORMAT(132A1)
+ 1003 FORMAT(1X,132A1)
+ 1004 FORMAT(1X,'File cannot be read')
+ 1005 FORMAT(1X,132A1)
+ 1006 FORMAT(1X,132A1)
+ 1007 FORMAT(1X,'File content:'/1X,'Number of vertices: ',I10)
+ 1008 FORMAT(1X,A2,I5,3F12.5,4I5)
+ 1009 FORMAT(1X,A2,3F12.5)
+ 1010 Format(5I6)
+ 1011 Format(I5,1X,A5,1X,3F10.5,1X,A5,1X,I2,1X,A5,1X,F10.5)
+ 1012 Format(I6,1X,I6,1X,I6,3X,A2)
+      END
+
+      Subroutine FillIC3(IA,IB,IC3)
+      use config
+      DIMENSION IC3(Nmax,3)
+      Do I=1,3
+       if(IC3(IA,I).eq.0) then
+        IC3(IA,I)=IB
+        go to 1
+       endif
+      enddo
+  1   Do I=1,3
+       if(IC3(IB,I).eq.0) then
+        IC3(IB,I)=IA
+        return
+       endif
+      enddo
+      return
+      END
+

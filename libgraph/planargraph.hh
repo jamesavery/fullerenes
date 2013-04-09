@@ -11,6 +11,8 @@ public:
   using Graph::edge_set;
   using Graph::name;
 
+  typedef list<pair<int,int> > jumplist_t;
+
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
   bool layout_is_spherical;
@@ -40,6 +42,9 @@ public:
 
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX) const;
 
+
+  // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
+  void get_vertex_spiral(const int f1, const int f2, const int f3, vector<int> &spiral, jumplist_t &jumps) const;
 
 
   vector<tri_t>  triangulation(int face_max = INT_MAX) const;

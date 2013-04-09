@@ -6,7 +6,7 @@
 <!
 --------------------------------------------------------------------------
 This is the main webpage for the Fullerene program 
-Last update: December 22, 2012
+Last update: March 19, 2013
 Two php files are called:
 
 fulleruf.php
@@ -36,9 +36,9 @@ fullerdl.php receives the password, checks it and if correct
 </td>
 <td valign="middle"  align="center">
 <h1> <big> Program FULLERENE <br>
-Version 4.3.1</big> <br><br>
-A Fortran/C++ Program for Fullerene Structures <br> 
-and Topological Analysis <br><br> </h1>
+Version 4.4</big> <br><br>
+A Fortran/C++ Program for Creating Fullerene Structures <br> 
+and for Performing Topological Analyses <br><br> </h1>
 <h2>by Peter Schwerdtfeger, Lukas Wirz and James Avery<br>
 <I>Centre for Theoretical Chemistry and Physics<br>
 The Quantum Chemistry and Physics Group<br>
@@ -54,23 +54,26 @@ Massey University Auckland<br>
 </tr></table><br>
 
 
-The program creates cartesian coordinates for fullerene isomers and performs a topological/graph theoretical analysis.
+The program generates cartesian/internal coordinates for fullerene isomers and performs a topological/graph theoretical analysis.
 The results can be used for plotting 2D/3D fullerene graphs (e.g. Schlegel diagrams and 3D structures), and serves as 
 a starting point for further quantum theoretical treatment. Version 4 incorporated C++ routines for the first time
 linked to the original Fortran program using much improved algorithms. Version 4.4 is more robust than previous versions, 
 and contains a more extended evaluation of topological indicators, a harmonic oscillator force field including dihedral angles, 
 vibrational frequencies (although the force constants have not been adjusted yet), general Goldberg-Coxeter transformations
 of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to both the Yoshida and House of Graphs 
-databases, an improved Tutte embedder, a correct ring spiral count, tight lower and upper bounds for Hamiltonian cycles 
-and a neighborhood spiral ring search algorithm. The fullerene database has been extended up to C<SUB>140</SUB>, and up to 
-C<SUB>180</SUB> for IPR isomers, and is now more compact.  
+databases, an improved Tutte embedder, a correct ring spiral count, a generalized ring spiral algorithm with jumps, 
+tight lower and upper bounds for Hamiltonian cycles, and a neighbourhood spiral ring search algorithm. The fullerene database 
+has been brought into a more compact form and extended up to C<SUB>150</SUB>, and up to C<SUB>200</SUB> for IPR isomers, 
+and is now more compact.  
 <br><br>
 
-This is an open-source code and free for distribution (except for commercial purposes). The following references should be used for citation:<br><br>
-1) P. W. Fowler and D. E. Manolopoulos, "An Atlas of Fullerenes"
+This is an open-source code and free for distribution (except for commercial purposes). Please cite the following paper if you use this program for publishing data:<br><br>
+1) P. Schwerdtfeger, L. Wirz, and J. Avery, "Program Fullerene - A Software Package for Constructing and Analyzing 
+Structures of Regular Fullerenes", Version 4.4, J. Comput. Chem., in press. DOI10.1002/jcc.23278.<br>
+We also recommend to cite the following book (many of the concepts used can be found here):<br>
+2) P. W. Fowler and D. E. Manolopoulos, "An Atlas of Fullerenes"
 (Dover Publ., New York, 2006).<br>
-2) P. Schwerdtfeger, L. Wirz, and J. Avery, "Program Fullerene - A Software Package for Constructing and Analyzing 
-Structures of Regular Fullerenes", Version 4.3, submitted to J. Comput. Chem.<br>
+The Hamiltonian cycle part of the program uses the code by Babic:<br>
 3) D. Babic, "Nomenclature and Coding of Fullerenes", J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).<br>
 For further literature see the User's Manual.<br><br>
 
@@ -79,20 +82,11 @@ You need to use the Makefile included in fullerene.zip. The executable runs
 just fine on a PC or Mac running LINUX/UNIX.
 The program is written in standard Fortran and C++ and has been checked
 for a large number of fullerenes up to 35,000 vertices. A number of input 
-and output files are included in the fullerene.zip file and a more detailed description 
+and output files are included in the fullerenev4.4.zip file and a more detailed description 
 is found in the User's Manual.<br><br>
 
-<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.4.pdf">UserManualv4.4.pdf (19/01/2013)</a> (2.4 MB)
+<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.4.pdf">UserManualv4.4.pdf (20/01/2013)</a> (2.4 MB)
 <br><br>
-
-The following database is different to the one used in version 4.3, the previous one is therefore obsolete:<br>
-<b>Download for Database1: General fullerenes C<SUB>20</SUB>-C<SUB>122</SUB> </b><a href="http://ctcp.massey.ac.nz/data/ALL.zip"> ALL.zip (01/11/2012)</a> (compressed 198.9 MB, uncompressed 1.92 GB)
-<br>
-<b>Download for Database2: IPR fullerenes C<SUB>60</SUB>-C<SUB>170</SUB> </b><a href="http://ctcp.massey.ac.nz/data/IPR.zip"> IPR.zip (01/11/2012)</a> (compressed 169.2 MB, uncompressed 1.86 GB)
-<br>
-<b>Download for Database3: Yoshida selected fullerenes C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip</a> (compressed 4.4 MB, uncompressed 15.4 MB)
-<br>
-<br>
 
 <b>Download for fullerene program:</b><br>
 If you are a new user or if your password expired, please supply Title (Prof., Dr., Mr., Mrs.), 
@@ -120,7 +114,7 @@ This has the advantage that you will receive an email message if a new major upg
 <tr> <td> City: </td> <td> <input type="text" name="city" size="30" /></td> </tr>
 <tr> <td> Country: </td> <td> <select name="country" />
 <option value="">Country...</option>
-<option value="Afganistan">Afghanistan</option>
+<option value="Afghanistan">Afghanistan</option>
 <option value="Albania">Albania</option>
 <option value="Algeria">Algeria</option>
 <option value="American Samoa">American Samoa</option>
@@ -175,7 +169,7 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Cote DIvoire">Cote D'Ivoire</option>
 <option value="Croatia">Croatia</option>
 <option value="Cuba">Cuba</option>
-<option value="Curaco">Curacao</option>
+<option value="Curacao">Curacao</option>
 <option value="Cyprus">Cyprus</option>
 <option value="Czech Republic">Czech Republic</option>
 <option value="Denmark">Denmark</option>
@@ -234,7 +228,7 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Kenya">Kenya</option>
 <option value="Kiribati">Kiribati</option>
 <option value="Korea North">Korea North</option>
-<option value="Korea Sout">Korea South</option>
+<option value="Korea South">Korea South</option>
 <option value="Kuwait">Kuwait</option>
 <option value="Kyrgyzstan">Kyrgyzstan</option>
 <option value="Laos">Laos</option>
@@ -268,7 +262,7 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Morocco">Morocco</option>
 <option value="Mozambique">Mozambique</option>
 <option value="Myanmar">Myanmar</option>
-<option value="Nambia">Nambia</option>
+<option value="Namibia">Namibia</option>
 <option value="Nauru">Nauru</option>
 <option value="Nepal">Nepal</option>
 <option value="Netherland Antilles">Netherland Antilles</option>
@@ -290,7 +284,7 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Papua New Guinea">Papua New Guinea</option>
 <option value="Paraguay">Paraguay</option>
 <option value="Peru">Peru</option>
-<option value="Phillipines">Philippines</option>
+<option value="Philipines">Philippines</option>
 <option value="Pitcairn Island">Pitcairn Island</option>
 <option value="Poland">Poland</option>
 <option value="Portugal">Portugal</option>
@@ -349,10 +343,10 @@ This has the advantage that you will receive an email message if a new major upg
 <option value="Tuvalu">Tuvalu</option>
 <option value="Uganda">Uganda</option>
 <option value="Ukraine">Ukraine</option>
-<option value="United Arab Erimates">United Arab Emirates</option>
+<option value="United Arab Emirates">United Arab Emirates</option>
 <option value="United Kingdom">United Kingdom</option>
 <option value="United States of America">United States of America</option>
-<option value="Uraguay">Uruguay</option>
+<option value="Uruguay">Uruguay</option>
 <option value="Uzbekistan">Uzbekistan</option>
 <option value="Vanuatu">Vanuatu</option>
 <option value="Vatican City State">Vatican City State</option>
@@ -377,7 +371,45 @@ This has the advantage that you will receive an email message if a new major upg
 Once you have a password you can download the program here: (Version 4.4, last update 19/01/2013)<br>
 <form action="fullerdl.php" method="get">
 Password: <input type="password" name="pwd" size="10" /><br> <input type="submit" value="Download" /> 
-</form>
+</form><br><br>
+
+<b>Database files:</b> The database is provided for general isomers up to C<SUB>150</SUB> and for IPR isomers up to
+C<SUB>200</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>110</SUB> 
+and for IPR isomers up to C<SUB>122</SUB>. The database can be copied into
+the main program folder and can be used to read the ring spiral pentagon indices.
+The numbering scheme is identical to that chosen in the "Atlas of Fullerenes" by Fowler and Manolopoulos,
+that is each isomer in the book's appendix can be constructed easily from the database.  
+The data files are gzipped. before usage of a specific fullerene database you need to unzip the specific file.
+Once printed by the program the data can easily be read. It is our intention to
+extend the isomer list beyond C<SUB>150</SUB>/C<SUB>200</SUB> in due time (without Hamiltonian cycles).
+A link to the  "House of Graphs" database by Brinkmann and co-workers is already implemented, 
+and the database can be downloaded from <a href="http://hog.grinvin.org/Fullerenes">House of Graphs Database</a>.<br><br>
+A link to the Yoshida database is also implemented and the database can be downloaded from
+<a href="http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html">Yoshida Database</a>.<br><br>
+
+<b>Download for DatabaseY (Yoshida selected fullerenes):</b><br>
+C<SUB>20</SUB>-C<SUB>720</SUB></b><a href="http://ctcp.massey.ac.nz/data/Yoshida.zip"> Yoshida.zip (31/10/2012)</a> (compressed 4.4 MB, uncompressed 15.4 MB)
+<br>
+The following database files are more compact than the ones used in the previous version 4.3. They are now obsolete. Once the new database has been downloaded,
+the gzipped files require about 2.3 GB of space. In order to save disk space, only gunzip the files which are to be used in the calculation. 
+Start downloading here for the various fullerene database files (in tar format):<br>
+<b>Download for DatabaseAllC20-C200 (General fullerenes):</b><br> 
+C<SUB>020</SUB>-C<SUB>110</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C020-110.tar"> databaseAll.C020-110.tar (20/03/2013)</a> (compressed 60.4 MB)<br>
+C<SUB>112</SUB>-C<SUB>120</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C112-120.tar"> databaseAll.C112-120.tar (20/03/2013)</a> (compressed 66.3 MB)<br>
+C<SUB>122</SUB>-C<SUB>130</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C122-130.tar"> databaseAll.C122-130.tar (20/03/2013)</a> (compressed 144.8 MB)<br>
+C<SUB>132</SUB>-C<SUB>140</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C132-140.tar"> databaseAll.C132-140.tar (20/03/2013)</a> (compressed 298.7 MB)<br>
+C<SUB>142</SUB>-C<SUB>146</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C142-146.tar"> databaseAll.C142-146.tar (20/03/2013)</a> (compressed 303.0 MB)<br>
+C<SUB>148</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C148-150.tar"> databaseAll.C148-150.tar (03/04/2013)</a> (compressed 278.3 MB)<br>
+<b>Download for DatabaseIPRC60-C200 (IPR fullerenes):</b><br>
+C<SUB>060</SUB>-C<SUB>160</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C060-160.tar"> databaseIPR.C060-160.tar (20/03/2013)</a> (compressed 45.8 MB)<br>
+C<SUB>162</SUB>-C<SUB>170</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C162-170.tar"> databaseIPR.C162-170.tar (20/03/2013)</a> (compressed 67.1 MB)<br>
+C<SUB>172</SUB>-C<SUB>180</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C172-180.tar"> databaseIPR.C172-180.tar (20/03/2013)</a> (compressed 145.9 MB)<br>
+C<SUB>182</SUB>-C<SUB>186</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C182-186.tar"> databaseIPR.C182-186.tar (20/03/2013)</a> (compressed 153.5 MB)<br>
+C<SUB>188</SUB>-C<SUB>190</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C188-190.tar"> databaseIPR.C188-190.tar (20/03/2013)</a> (compressed 144.3 MB)<br>
+C<SUB>192</SUB>-C<SUB>194</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C192-194.tar"> databaseIPR.C192-194.tar (20/03/2013)</a> (compressed 188.0 MB)<br>
+C<SUB>196</SUB>-C<SUB>198</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C196-198.tar"> databaseIPR.C196-198.tar (20/03/2013)</a> (compressed 243.6 MB)<br>
+C<SUB>200</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C200.tar"> databaseIPR.C200.tar (20/03/2013)</a> (compressed 146.8 MB)<br>
+
 
 <table width="95%" align="center">
 <tr>
@@ -388,12 +420,13 @@ Password: <input type="password" name="pwd" size="10" /><br> <input type="submit
 <li>Establish connectivities between vertices to construct the adjacency matrix.</li>
 <li>Construct cartesian coordinates for the Ih isomer of C<SUB>60</SUB> or C<SUB>20</SUB>.
 <li>Construct cartesian coordinates using the ring-spiral pentagon indices of Fowler and Manolopoulos.</li>
+<li>Construct cartesian coordinates for non-spiral fullerenes using generalized ring-spiral pentagon indices with jumps.</li>
 <li>Construct cartesian coordinates from a Goldberg-Coxeter transformation of C<SUB>20</SUB>.</li>
 <li>Use matrix-eigenvector or Tutte embedding algorithms to obtain cartesian coordinates.</li>
 <li>Goldberg-Coxeter leapfrog and halma transformations of a fullerene.</li>
 <li>Endo-Kroto 2-vertex, Yoshida-Fowler 4- and 6-vertex and Brinkmann-Fowler 6-vertex insertions.</li>
 <li>Use of program SPIRAL of Fowler and Manolopoulos for face-spiral fullerenes.</li>
-<li>Find fullerenes in the neighborhood of given ring-spiral pentagon indices.</li>
+<li>Find fullerenes in the neighbourhood of given ring-spiral pentagon indices.</li>
 <li>Use of program HAMILTON of Babic for Hamiltonian cycles and IUPAC Nomenclature.</li> 
 <li>Tight upper and lower bounds for Hamiltonian cycles</li>
 <li>Perform a Hueckel analysis. This gives you a good hint if the fullerene is open or closed shell.</li>
@@ -409,7 +442,7 @@ harmonic oscillator force field including dihedrals.</li>
 <li>Calculate the minimum distance sphere (MDS) and maximum inner sphere (MIS).</li>
 <li>Measure of distortion from spherical symmetry and convexity.</li>
 <li>Produce (x,y) coordinates of a fullerene graph (Schlegel diagram) using a variety of different algorithms.</li>
-<li>Produce Schlegel diagram with Hamiltonian cycle included.</li>
+<li>Produce Schlegel diagram, with Hamiltonian cycle or the dual graph included, in .tex format.</li>
 <li>The output file ending with .xyz or .cc1 can be used as input for CYLVIEW, AVOGADRO, VMD or PYMOL.</li>
 <li>The output file ending with .dat can be used as input for drawing Schlegel diagrams.</li><br>
 </td>
@@ -418,26 +451,12 @@ harmonic oscillator force field including dihedrals.</li>
 </td>
 </tr></table><br>
 
-A database is provided for general isomers up to C<SUB>140</SUB> and for IPR isomers up to
-C<SUB>180</SUB>, including the number of Hamiltonian cycles for general isomers up to C<SUB>102</SUB> 
-and for IPR isomers up to C<SUB>122</SUB>. The database can be copied into
-the main program folder and can be used to read the ring spiral pentagon indices.
-The numbering scheme is identical to that chosen in the "Atlas of Fullerenes" by Fowler and Manolopoulos,
-that is each isomer in the book's appendix can be constructed easily from the database.  
-The data files are formatted and can easily be read on its own. It is our intention to
-extend the isomer list beyond C<SUB>140</SUB>/C<SUB>180</SUB> (without Hamiltonian cycles).
-A link to the  "House of Graphs" database by Brinkmann and co-workers is already implemented, 
-and the database can be downloaded from <a href="http://hog.grinvin.org/Fullerenes">House of Graphs Database</a>.<br><br>
-A link to the Yoshida database is also implemented and the database can be downloaded from
-<a href="http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html">Yoshida Database</a>.
 
 <b>Note: </b>The program is under construction and new features are being added.
 You can check the date on the right hand side of the download button to see
-if you already have the newest version. 
+if you already have the newest version. The next intended version 5 will undergo major restructuring.
 Please report any bug to <a href="mailto:p.a.schwerdtfeger&#64massey.ac.nz">p.a.schwerdtfeger&#64massey.ac.nz</a>.<br>
-The program is in use in the following countries: 
-Brazil, China, Colombia, France, Germany, Japan, India, Itali, Iran, New Zealand, Poland, Russia, Taiwan, Ukraine, United Kingdom, USA.
-<br><br>
+The program is used in over 30 countries worldwide.<br><br>
 <b>Acknowledgment:</b><br>
 PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support
 in terms of a Humboldt Research Award. The first version of the program was written during

@@ -775,6 +775,7 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3)
+      real*8 force(ffmaxdim)
       PARAMETER (TOL=1.d-5)
 c      real*8 length, cutoff, xi_tmp(nmax*3)
 c      integer damping
@@ -826,7 +827,7 @@ c        p(j)=p(j)+xi_tmp(j)
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3)
+      REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
 C     USES func3d
       do j=1,3*number_vertices
         xt(j)=pcom(j)+x*xicom(j)
@@ -846,7 +847,7 @@ C     USES func3d
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
-      REAL*8 pcom(NMAX*3),xicom(NMAX*3)
+      REAL*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
       CALL f1dim3d(
      1 fa,ax,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
@@ -957,7 +958,7 @@ C BRENT is a FORTRAN library which contains algorithms for finding zeros
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
-      REAL*8 pcom(NMAX*3),xicom(NMAX*3)
+      REAL*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
       a=min(ax,cx)
       b=max(ax,cx)
       v=bx

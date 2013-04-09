@@ -11,8 +11,12 @@
 !      The results can be used for plotting 2D/3D fullerene graphs          !
 !    (e.g. Schlegel diagrams) and structures, and as a starting point       !
 !            for further quantum theoretical treatment.                     !
-!        Version 4.3 now incorporates C++ routines linked to the            !
+!        Version 4.4 now incorporates C++ routines linked to the            !
 !       original Fortran program using much improved algorithms.            !
+!---------------------------------------------------------------------------!
+
+!---------------------------------------------------------------------------!
+!  This main routine calls all major subroutines                            !
 !---------------------------------------------------------------------------!
 
       PROGRAM Fullerene
@@ -21,12 +25,12 @@
 
       IMPLICIT REAL*8 (A-H,O-Z)
 C    Set the dimensions for the distance matrix
-      parameter (nzeile=132)
+      real(8) force(ffmaxdim), forceP(ffmaxdim)
+      Real*4 TimeX
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
       DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
       DIMENSION DistStore(3,Nmax)
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
-      real(8) force(ffmaxdim), forceP(ffmaxdim)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
       DIMENSION distP(Nmax),IDA(Nmax,Nmax)
       DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
@@ -34,28 +38,25 @@ C    Set the dimensions for the distance matrix
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
       DIMENSION IDual(Mmax,Mmax),nSW(4,66),nFM(4,66),nYF(6,66),nBF(5,66)
-      DIMENSION NEK(3,Nmax),JP(12)
+      DIMENSION NEK(3,Nmax)
       DIMENSION Symbol(Mmax)
-      Real*4 TimeX
       CHARACTER CDAT*8,CTIM*10,Zone*5
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
-      CHARACTER*7 Namecc1,Namexyz
-      CHARACTER*4 Endcc1,Endxyz
+      CHARACTER*7 Namecc1,Namexyz,Namemol
+      CHARACTER*4 Endcc1,Endxyz,Endmol
       CHARACTER*15 routine
-      CHARACTER*50 filename
-      CHARACTER*50 filenameout
-      CHARACTER*50 xyzname
-      CHARACTER*50 cc1name
-      CHARACTER*20 element
+      CHARACTER*50 filename,filenameout
+      CHARACTER*50 xyzname,cc1name,molname
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
-      Integer endzeile,Values(8)
+      Integer Values(8)
       integer istop
-      Logical lexist
       integer mdist(nmax,nmax)
+      integer rspi(12),jumps(10)
 
 C Set parameters
+C Element Names
       DATA El/' H','HE','LI','BE',' B',' C',' N',' O',' F','NE','NA',
      1 'MG','AL','SI',' P',' S','CL','AR',' K','CA','SC','TI',' V','CR',
      2 'MN','FE','CO','NI','CU','ZN','GA','GE','AS','SE','BR','KR',    
@@ -65,15 +66,25 @@ C Set parameters
      6 'TA',' W','RE','OS','IR','PT','AU','HG','TL','PB','BI','PO',
      7 'AT','RN','FR','RA','AC','TH','PA',' U','NP','PU','AM','CM',   
      8 'BK','CF','ES'/                                               
+
+C External file names
       Namecc1='-3D.cc1'
       Namexyz='-3D.xyz'
+      Namemol='-3D.mol'
       Endcc1='.cc1'
       Endxyz='.xyz'
-      IN=5
-      Iout=6
-      nloop=0
+      Endmol='.mol'
       nxyz=0
       ncc1=0
+      nmol=0
+
+C Input / Output
+      IN=5
+      Iout=6
+      Iext=7
+
+C Set parameters to zero
+      nloop=0
       ilp=0
       iprev=0
       ihalma=0
@@ -93,6 +104,7 @@ C Set parameters
        Dist2D(2,I)=0.d0
       enddo
 
+C------------------TIME-AND-DATE-----------------------------------
 C Get time and date
       CALL date_and_time(CDAT,CTIM,zone,values)
       TIMEX=0.d0
@@ -100,97 +112,126 @@ C Get time and date
       WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
      1  Values(6),Values(7),Nmax
 
+C------------------------------------------------------------------
+C  S T A R T   O F   I N P U T   S E C T I O N
+C------------------------------------------------------------------
+
 C------------------DATAIN------------------------------------------
 C  INPUT and setting parameters for running the subroutines
  9    routine='DATAIN         '
+      Write(Iout,1008) routine
       Group='   '
       isort=0
       leapspiral=0
       SWspiral=0
-      Write(Iout,1008) routine
-        CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
-     1  nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
-     1  leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
-     1  icyl,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,nzeile,ifs,
-     1  ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1  iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
-     1  ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
-     1  force,forceP,boost,filename,filenameout,TEXTINPUT)
+C  Next two flags tells us if input has information on Cartesian Coordinates
+C   or Adjacency Matrix (through connectivity IC3)
+      ncartflag=0
+      nadjacencyflag=0
+C  Call Datain
+      CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
+     1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
+     1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
+     1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
+     1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
+     1 iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
+     1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
+     1 rspi,jumps,force,forceP,boost,filename,filenameout,TEXTINPUT)
 
+C  Simple checks
+C  Stop if error in input
+      If(IER.ne.0) go to 99
 C  Stop if isomer closest to icosahedral is searched for
       if(isearch.ne.0) then
         istop=1
         go to 98
       endif
-C  Stop if error in input
-      If(IER.ne.0) go to 99
 C  Only do isomer statistics
       if(istop.ne.0) go to 98
+
+C------------------COMPRESS----------------------------------------
 C  Convert printed database into a more compressed file
+C  This is a routine used by the programmers to compresse the
+C  database files to a reasonable format
       if(ndbconvert.ne.0) then
+      routine='COMPRESS       '
+      Write(Iout,1008) routine
        Call CompressDatabase(Iout,filename)
        go to 99
       endif
 
-C------------------Coordinates-------------------------------------
-C Options for Input coordinates
-      go to (10,20,30,30,30,30,30,98) Icart+1
+C-------------Coordinates and Connectivities-----------------------
+C This controls how fullerene structure is read in
 
-C  Cartesian coordinates produced for Ih C20 or C60
+C Input Cartesian coordinates/connectivities from external file
+C if irext.ne.0: overwrites completely the Icart option
+      if(irext.ne.0) then
+       if(irext.eq.1) then
+
+C Read from .xyz file
+        xyzname=trim(filename)//".xyz"
+        Call ReadFromFile(1,Iext,iout,iatom,IC3,xyzname,Dist)
+        ncartflag=1
+        xyzname=trim(filename)//'-3D.new.xyz'
+        go to 40
+       endif
+
+C Read from .cc1 file
+       if(irext.eq.2) then
+        cc1name=trim(filename)//".cc1"
+        Call ReadFromFile(2,Iext,iout,iatom,IC3,cc1name,Dist)
+        ncartflag=1
+C    This routine complements missing entries in IC3
+        Call CheckIC3(IERROR,IC3)
+        if(IERROR.eq.1) then
+         nadjacencyflag=0
+         Write(iout,1012)
+        else
+         nadjacencyflag=1
+        endif
+        cc1name=trim(filename)//'-3D.new.cc1'
+        go to 40
+       endif
+
+C Read from .mol2 file
+       if(irext.eq.3) then
+        molname=trim(filename)//".mol2"
+        Call ReadFromFile(3,Iext,iout,iatom,IC3,molname,Dist)
+        ncartflag=1
+C    This routine complements missing entries in IC3
+        Call CheckIC3(IERROR,IC3)
+        if(IERROR.eq.1) then
+         nadjacencyflag=0
+         Write(iout,1012)
+        else
+         nadjacencyflag=1
+        endif
+        molname=trim(filename)//'-3D.new.mol2'
+        go to 40
+       endif
+      endif
+
+C Options for direct Input 
+      go to (10,20,30,30,30,30,30,30,30,30,98) Icart+1
+
+C  Cartesian coordinates produced for Ih C20 or C60 using basic geometry
    10 routine='COORDC20/60    '
       Write(Iout,1008) routine
       CALL CoordC20C60(Iout,R5,R6,Dist)
-      Do I=1,60
+      ncartflag=1
+      Do I=1,number_vertices
         IAtom(I)=6
       enddo
       Go to 40
 
-C Input Cartesian coordinates for fullerenes
-   20 if(icyl.eq.2.or.icyl.eq.3.or.icyl.eq.5) then
-        if(icyl.eq.5) then
-         cc1name=trim(filename)//".cc1"
-         inquire(file=cc1name,exist=lexist)
-          if(lexist.neqv..True.) then
-            Write(Iout,1023) cc1name
-            stop
-          endif
-         Open(unit=7,file=cc1name,form='formatted')
-         WRITE(Iout,1021) cc1name 
-         Read(7,*) number_vertices
-         Do J=1,number_vertices
-           Read(7,*,end=23) element,JJ,(Dist(I,J),I=1,3)
-           Iatom(j)=6
-         enddo
-   23    close(unit=7)
-         cc1name=trim(filename)//'-3D.new.xyz'
-        else
-         xyzname=trim(filename)//".xyz"
-         Open(unit=7,file=xyzname,form='formatted')
-         WRITE(Iout,1015) xyzname 
-         Read(7,*) number_vertices
-         Read(7,1018) (TEXTINPUT(I),I=1,nzeile)
-         endzeile=0
-         do j=1,nzeile
-           if(TEXTINPUT(j).ne.' ') endzeile=j
-         enddo 
-         WRITE(Iout,1017) number_vertices,(TEXTINPUT(I),I=1,endzeile)
-         Do J=1,number_vertices
-           Read(7,*,end=22) element,(Dist(I,J),I=1,3)
-           Iatom(j)=6
-         enddo
-   22    close(unit=7)
-         xyzname=trim(filename)//'-3D.new.xyz'
-        endif
-
-      else
-
-       Do J=1,number_vertices
+C Read cartesian coordinates directly
+   20 Do J=1,number_vertices
         Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
        enddo
-      endif
-      Go to 40
-   21 WRITE(Iout,1016)
-      Go to 99
+       ncartflag=1
+       Go to 40
+   21  WRITE(Iout,1013)
+       Go to 99
 
 C Cartesian coordinates produced ring from spiral pentagon list
 C or from adjacency matrix. Uses the Fowler-Manolopoulos algorithm 
@@ -200,15 +241,23 @@ C the 3D fullerene
       routine='COORDBUILD     '
       Write(Iout,1008) routine
       CALL CoordBuild(IN,Iout,IDA,IDual,
-     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,JP,
+     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,
      1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
-     1 GROUP,filename)
+     1 rspi,jumps,GROUP,filename)
       Do I=1,number_vertices
         IAtom(I)=6
       enddo
+      ncartflag=1
 
    40 WRITE(Iout,1001) number_vertices,TolX*100.d0
 
+C------------------------------------------------------------------
+C  E N D   O F   I N P U T   S E C T I O N
+C------------------------------------------------------------------
+
+C------------------------------------------------------------------
+C  S T A R T   O F   T O P O L O G Y   S E C T I O N
+C------------------------------------------------------------------
 C------------------ISOMERS-----------------------------------------
 C Some general infos on isomers and spiral routine
 C of Fowler and Manolopoulos. Set parameter IPR for independent
@@ -308,7 +357,7 @@ C adjacent vertices
         else
           CALL HamiltonCyc(maxiter,Iout,nbatch,IDA,Nhamilton)
           WRITE(Iout,1010) Nhamilton
-          if(nbatch.ne.0) WRITE(Iout,1014)
+          if(nbatch.ne.0) WRITE(Iout,1011)
         endif
       endif
       CALL PathStatistic(Iout,iprintf,IDA,A,evec,df)
@@ -404,7 +453,7 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
         if(ispsearch.gt.1) ispcount=1
         Write(Iout,1008) routine
         CALL SpiralSearch(Iout,Iring5,Iring6,Iring56,NringA,NringB,
-     1   NringC,NringD,NringE,NringF,JP,GROUP,ispcount)
+     1   NringC,NringD,NringE,NringF,rspi,GROUP,ispcount)
       endif
 
 C--------------TOPOLOGICAL INDICATORS-----------------------------
@@ -418,6 +467,13 @@ C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
 C Produce perfect matchings (Kekule structures) and analyze
 c      CALL PerfectMatching(Iout,IDA)
+C------------------------------------------------------------------
+C  E N D   O F   T O P O L O G Y   S E C T I O N
+C------------------------------------------------------------------
+
+C------------------------------------------------------------------
+C  S T A R T   O F   3D   S T R U C T U R E   S E C T I O N
+C------------------------------------------------------------------
 
 C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
@@ -474,69 +530,39 @@ c  stuff previously done, but is ok for now, as it takes not much time
 C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs
 
-C xyz format
-      if(icyl.le.2) then
-      nxyz=nxyz+1
-      Call FileMod(filenameout,xyzname,Namexyz,Endxyz,nxyz,ifind)
-        if(ifind.ne.0) then
-         Write(Iout,1022)
-         go to 9999
-        endif
-        Open(unit=3,file=xyzname,form='formatted')
+C .xyz format
+      if(iwext.ne.0) then
+       if(iwext.eq.1) then
+        nxyz=nxyz+1
         routine='PRINTCOORD     '
         Write(Iout,1008) routine
-        WRITE(Iout,1002) xyzname 
-        endzeile=0
-        do j=1,nzeile
-          if(TEXTINPUT(j).ne.' ') endzeile=j
-        enddo
-        if(number_vertices.lt.100) WRITE(3,1011)
-     1    number_vertices,number_vertices, (TEXTINPUT(I),I=1,endzeile)
-        if(number_vertices.ge.100.and.number_vertices.lt.1000) 
-     1    WRITE(3,1012) number_vertices,number_vertices,
-     1    (TEXTINPUT(I),I=1,endzeile)
-        if(number_vertices.ge.1000.and.number_vertices.lt.10000) 
-     1    WRITE(3,1013) number_vertices,number_vertices,
-     1    (TEXTINPUT(I),I=1,endzeile)
-        if(number_vertices.ge.10000) 
-     1    WRITE(3,1020) number_vertices,number_vertices,
-     1    (TEXTINPUT(I),I=1,endzeile)
-        Do J=1,number_vertices
-          IM=IAtom(J)      
-          Write(3,1007) El(IM),(Dist(I,J),I=1,3)
-        enddo
-        Close(unit=3)
-      endif
+        Call WriteToFile(1,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+     1   IC3,El,Dist,filenameout,xyzname,Namexyz,Endxyz,TEXTINPUT)
+        if(IERROR1.eq.1) go to 9999
+       endif
 
-C cc1 format
-      if(icyl.ge.4) then
-C     Name handling
-      ncc1=ncc1+1
-      Call FileMod(filenameout,cc1name,Namecc1,Endcc1,ncc1,ifind)
-        if(ifind.ne.0) then
-         Write(Iout,1022)
-         go to 9999
-        endif
-       Open(unit=3,file=cc1name,form='formatted')
+C .cc1 format
+       if(iwext.eq.2) then
+        ncc1=ncc1+1
         routine='PRINTCOORD     '
         Write(Iout,1008) routine
-        WRITE(Iout,1002) cc1name
-        if(number_vertices.lt.100) WRITE(3,1025) number_vertices
-        if(number_vertices.ge.100.and.number_vertices.lt.1000)
-     1    WRITE(3,1026) number_vertices
-        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
-     1    WRITE(3,1027) number_vertices
-        if(number_vertices.ge.10000) WRITE(3,1028) number_vertices
-        Do J=1,number_vertices
-          IM=IAtom(J)
-          Write(3,1005) El(IM),J,(Dist(I,J),I=1,3),(IC3(J,I),I=1,3)
-        enddo
-        Close(unit=3)
+        Call WriteToFile(2,Iext,ncc1,ifind,Iout,IERROR1,IAtom,
+     1   IC3,El,Dist,filenameout,cc1name,Namecc1,Endcc1,TEXTINPUT)
+       endif
+
+C .mol2 format
+       if(iwext.eq.3) then
+        nmol=nmol+1
+        routine='PRINTCOORD     '
+        Write(Iout,1008) routine
+        Call WriteToFile(3,Iext,nmol,ifind,Iout,IERROR1,IAtom,
+     1   IC3,El,Dist,filenameout,molname,Namemol,Endmol,TEXTINPUT)
+       endif
       endif
       
-      if(novolume.eq.0) then
 C------------------VOLUME-----------------------------------------
 C Calculate the volume
+      if(novolume.eq.0) then
       routine='VOLUME         '
       Write(Iout,1008) routine
       CALL Volume(Iout,N5MEM,N6MEM,
@@ -566,13 +592,18 @@ C------------------PROJECTSPHERE----------------------------------
 C Projecting vertices on minimum covering sphere
 C  producing a spherical fullerene
       if(ipsphere.ne.0) then
-       call ProjectSphere(ipsphere,Iout,IAtom,nzeile,
+       call ProjectSphere(ipsphere,Iout,IAtom,
      1 IC3,Dist,cmcs,rmcs,filename,El,TEXTINPUT)
       endif
 C-----------------------------------------------------------------
       endif
 
+C------------------------------------------------------------------
+C  E N D   O F   3D   S T R U C T U R E   S E C T I O N
+C------------------------------------------------------------------
 C------------------GRAPH2D----------------------------------------
+C Note: In the major restructuring, this routine may be subdivided
+C   into whether 3D structure is required or not for Graph2D
 C Calculate Schlegel diagram
       if(ISchlegel.ne.0) then
         routine='GRAPH2D        '
@@ -592,20 +623,21 @@ C Calculate Schlegel diagram
      1   Rmin,TolX,scales,scalePPG,boost,CR,CRing5,CRing6,
      1   Symbol,filename)
       else
-        Write(Iout,1024) number_vertices
+        Write(Iout,1007) number_vertices
       endif
       endif
 C------------------END--------------------------------------------
 C  E N D   O F   P R O G R A M
+C-----------------------------------------------------------------
   99  if(loop-1) 100,101,102
  100  go to 9999
  101  iprev=0
       nloop=nloop+1
-      WRITE(Iout,1019) nloop ! line of dashes
+      WRITE(Iout,1005) nloop ! line of dashes
       go to 9 ! datain
  102  iprev=1
       nloop=nloop+1
-      WRITE(Iout,1019) nloop ! line of dashes
+      WRITE(Iout,1005) nloop ! line of dashes
       go to 9 ! datain
 9999  call date_and_time(CDAT,CTIM,zone,values)
         WRITE(Iout,1004) Values(3),Values(2),Values(1),Values(5),
@@ -626,15 +658,16 @@ C Formats
      1 /1X,'|            Fowler, Manolopoulos and Babic              |',
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0                from 08/06/10     |',
-     1 /1X,'|    This  version: 4.4, last revision from 26/01/13     |',
+     1 /1X,'|    This  version: 4.4, last revision from 28/03/13     |',
      1 /1X,'|________________________________________________________|',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
      1 /1X,'For citation when running this program use:',/1X,
      1 '1) P. Schwerdtfeger, L. Wirz, J. Avery, Program Fullerene - ',
      1 'A Software Package for Constructing and Analyzing Structures ',
-     1 'of Regular Fullerenes (Version 4.3), submitted to J. Comput. ',
-     1 'Chem.',/1X,
+     1 'of Regular Fullerenes (Version 4.4), J. Comput. Chem.,',
+     1 'in press.',/1X,'If possible also cite the folowing two ',
+     1 'references:',/1X,
      1 '2) P. W. Fowler, D. E. Manolopoulos, An Atlas of Fullerenes',
      1 ' (Dover Publ., New York, 2006).',/1X,
      1 '3) D. Babic, Nomenclature and Coding of Fullerenes,',
@@ -643,38 +676,21 @@ C Formats
      1 'concerning this program')
  1001 FORMAT(/1X,'Number of Atoms: ',I4,', and distance tolerance: ',
      1 F12.2,'%')
- 1002 FORMAT(/1X,'Input coordinates to be used for plotting program',
-     1 ' CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written into ',A31)
  1003 FORMAT(1X,'Pre-optimization using the Wu force field with ',
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
      1 'TIME: ',I2,'h',I2,'m',I2,'s')
- 1005 FORMAT(A2,I5,3F12.6,'    2',3I5)
+ 1005 FORMAT(140('='),/1X,'Loop ',I2)
  1006 FORMAT(/1X,'Angle for Schlegel diagram reset to ',
      1 F10.4,' degrees')
- 1007 FORMAT(A2,6X,3(F15.6,2X))
+ 1007 Format(1X,'2D Graph for such a large fullerene with ',I6,
+     1 ' vertices is not meaningful ===> RETURN')
  1008 FORMAT(140('-'),/1x,'--> Enter Subroutine ',A15)
  1009 FORMAT(1x,'CPU Seconds: ',F15.2,', CPU Hours: ',F13.5)
  1010 FORMAT(1X,'Number of Hamiltonian cycles: ',I10)
- 1011 FORMAT(I5,/,'C',I2,'/  ',132A1)
- 1012 FORMAT(I5,/,'C',I3,'/  ',132A1)
- 1013 FORMAT(I5,/,'C',I4,'/  ',132A1)
- 1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
- 1015 FORMAT(/1X,'Read coordinates from xyz file: ',A60)
- 1016 FORMAT(/1X,'End of file reached ==> Stop')
- 1017 FORMAT(1X,'Number of Atoms: ',I5,/1X,132A1)
- 1018 FORMAT(132A1)
- 1019 FORMAT(140('='),/1X,'Loop ',I2)
- 1020 FORMAT(I8,/,'C',I8,'/  ',132A1)
- 1021 FORMAT(/1X,'Read coordinates from cc1 file: ',A60)
- 1022 FORMAT(/1X,'You try to write into the database filesystem',
-     1 ' which is not allowed  ===>  ABORT')
- 1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
- 1024 Format(1X,'2D Graph for such a large fullerene with ',I6,
-     1 ' vertices is not meaningful ===> RETURN')
- 1025 FORMAT(I2)
- 1026 FORMAT(I3)
- 1027 FORMAT(I4)
- 1028 FORMAT(I8)
+ 1011 FORMAT(3X,'(Add to this batches from previous cycles!)')
+ 1012 FORMAT(1X,'Connectivity field IC3 in input is errorneous: ',
+     1 'taking only cartesian coordinates from input')
+ 1013 FORMAT(/1X,'End of file reached ==> Stop')
       STOP 
       END

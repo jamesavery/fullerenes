@@ -1,7 +1,16 @@
       SUBROUTINE HamiltonCyc(maxiter,Iout,nbatch,A,nhamilton)
       use config
-C     Back-track algorithm from Darko Babic to create Hamitonian cycles
-C      optimized for program Isomer
+!---------------------------------------------------------------------------!
+!  This routine counts the number of Hamiltonian cycles using the           !
+!  back-track algorithm of Darko Babic. It has been optimized for speed     ! 
+!  and is called by the following subroutines:                              !
+!      Main program Fullerene                                               !
+!      Printdatabase                                                        !
+!      SpiralRestart                                                        !
+!                                                                           !
+!  Input: maxiter,Iout,A                                                    !
+!  Output: nbatch,nhamilton                                                 !
+!---------------------------------------------------------------------------!
       integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax)
       integer x(0:Nmax)
       integer i,j,k,l,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
@@ -70,7 +79,7 @@ c Start algorithm
       flag=.false.
       l=1
       path(1)=1
-      goto 5
+      go to 5
 
     4 jngb1=list(prev,jlast,2)
       jngb2=list(prev,jlast,3)
@@ -430,7 +439,7 @@ C Start algorithm
       ptr=oldptr
       oldptr=stack(ptr)
 C     put this one in to avoid segmentation fault
-      if (oldptr.le.0) return
+      if (oldptr.le.0) go to 99
       pass(path(l1+1))=.true.
       stack(ptr)=path(l1+1)
       ptr=ptr+1
@@ -448,7 +457,7 @@ C     if (oldptr.gt.0) go to 5
          Return
       endif
  
-      write (Iout,1003) nhamilton
+  99  write (Iout,1003) nhamilton
       write (Iout,1000) (x(i),i=0,(number_vertices-2)/2)
       write (Iout,1000) (y(i),i=0,(number_vertices-2)/2)
       write (Iout,1006)
@@ -483,17 +492,17 @@ C of length (n-1).
       DIMENSION IA(Nmax,Nmax),IM(Nmax,Nmax)
       DIMENSION IMF(Nmax,Nmax),IMF1(Nmax,Nmax)
       DIMENSION IS1(10),IS2(10),APN(10)
-      Integer IHamCycmax(42),IHamCycmin(42)
+      Integer IHamCycmax(46),IHamCycmin(46)
       Integer IHAMIPRmin(32),IHAMIPRmax(32)
       Data Ihuge,over,explimit/180,1.d-10,45.d0/
       Data IHamCycmin/30,0,34,24,18,20,40,28,42,24,68,44,120,76,152,80,
      1 262,66,440,173,618,288,1062,197,1750,320,2688,1182,4230,1596,
      1 7110,2400,10814,1980,17905,1280,29944,7930,46231,13307,72168,
-     1 20754/
+     1 20754,119540,40912,184445,5120/
       Data IHamCycmax/30,0,34,24,43,32,76,66,128,96,280,150,327,260,512,
      1 410,806,642,1746,1068,3040,1802,3340,3096,6018,4818,10428,7832,
      1 15926,12226,35200,20856,39067,33427,76063,51586,117106,90221,
-     1 209692,156288,417280,249148/
+     1 209692,156288,417280,249148,686286,421194,1104223,743346/
       Data IHAMIPRmin/ 1090,0,0,0,0,2790,3852,4794,6078,6988,9004,11226,
      1 14748,17853,22661,29277,36949,44730,60070,71950,93986,35907,
      1 149920,180243,237580,244254,383218,457235,630059,723505,1038971,
@@ -503,16 +512,18 @@ C of length (n-1).
      1 207165,257746,351976,426750,571622,699908,1013844,1151918,
      1 1590875,1888558/
 
+      nvhamcalc=110
+      nvhamcalcIPR=122
       dAtom=dfloat(number_vertices)
 C General fullerenes
 C     Correct upper and lower limit
-      if(number_vertices.le.102) then
+      if(number_vertices.le.nvhamcalc) then
        ifield=number_vertices/2-9
        Write(Iout,1016) IHamCycmin(ifield),IHamCycmax(ifield)
 
       else
 
-C     Conjectured upper and lower limit obtained from D5H and D5d nanotubes
+C     Upper and lower limit obtained from D5H and D5d nanotubes
 C     Lower limt
        alow=1.d-1*dAtom+1.33d0
        exp1=dAtom/1.d1-1.d0
@@ -528,7 +539,7 @@ C     Upper limt
        exp1=dAtom/1.d1-1.d0
        exp2=dAtom/2.d1-1.d0
        if(ahigh.le.explimit) then
-        ahigherNT=5.d0*(2.d0**exp1)*(2.d0*3.d0**exp2 + 1)
+        ahigherNT=5.d0*(2.d0**exp1)*(2.d0*3.d0**exp2 + 1.d0)
         write (Iout,1011) dint(ahigherNT+over)
        else
         write (Iout,1021) exp1,exp2
@@ -539,7 +550,7 @@ C     Upper limt
 C IPR fullerenes
 C     Correct upper and lower limit
       if(number_vertices.eq.60.or.number_vertices.ge.70) then
-      if(number_vertices.le.122) then
+      if(number_vertices.le.nvhamcalcIPR) then
        ifield=number_vertices/2-29
        Write(Iout,1010) IHamIPRmin(ifield),IHamIPRmax(ifield)
 
@@ -574,6 +585,15 @@ C     Epstein upper limit
        write (Iout,1005) dint(ulepstein+over)
       else
        write (Iout,1000) power
+      endif
+
+C     Modified Epstein upper limit for fullerenes
+      power=dAtom/5.477d0+1.3d0
+      if(power.lt.explimit) then
+       ulepstein=2.d0**power
+       write (Iout,1017) dint(ulepstein+over)
+      else
+       write (Iout,1018) power
       endif
 
 C     Limit for number of atoms
@@ -710,19 +730,24 @@ C     NP values
  1010 Format(1X,'Exact limits for Hamiltonian cycles for IPR ',
      1 'fullerenes. Upper limit =',I7,', lower limit= ',I7)
  1011 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
-     1 'fullerene graphs: ',F20.0)
+     1 'fullerene graphs from D5d (5,0) nanotubes: ',F20.0)
  1012 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
-     1 'fullerene graphs: ',F20.0)
+     1 'fullerene graphs from D5h (5,0) nanotubes: ',F20.0)
  1013 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
-     1 'fullerene graphs: 5*2**',F16.4)
+     1 'fullerene graphs from D5h (5,0) nanotubes: 5*2**',F16.4)
  1014 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between',F20.0,' and',F20.0)
  1015 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between ',D20.10,' and ',D20.10)
  1016 Format(1X,'Exact limits for Hamiltonian cycles. Upper ',
      1 'limit =',I7,', lower limit= ',I7)
+ 1017 Format(1X,'Modified Epstein upper limit for Hamiltonian cycles in'
+     1 ' fullerene graphs: ',F20.0)
+ 1018 Format(1X,'Modified Epstein upper limit for Hamiltonian cycles in'
+     1 ' fullerene graphs: 2**',F16.4)
  1021 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
-     1 'fullerene graphs: 5*2**',F16.4,' * (2*3**',F16.4,' + 1)')
+     1 'fullerene graphs from D5d (5,0) nanotubes: 5*2**',
+     1 F16.4,' * (2*3**',F16.4,' + 1)')
  1025 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr. e**a and e**b with a= ',
      1  D22.14,' and b= ',D22.14)
