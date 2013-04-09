@@ -1,0 +1,48 @@
+\documentclass[]{scrartcl}
+
+\usepackage[dvips]{pstricks}
+\usepackage{pst-all}
+%\usepackage[landscape]{geometry}
+
+\thispagestyle{empty}
+\pagestyle{empty}
+
+\begin{document}
+\psset{xunit=1cm,yunit=1cm}
+\begin{pspicture}(4,-4)(25,4)
+%\psgrid
+
+\newdimen\hdist\hdist=45mm
+\newdimen\vdist\vdist=3mm
+
+\rput[c](1.0\hdist,0){\rnode[c]{void}{}}
+\small
+\rput[c](2\hdist,0){\rnode[c]{fg}{\begin{minipage}[c]{1.0cm}\centering fullerene graph\end{minipage}}}
+\rput[c](3\hdist,0){\rnode[c]{3d}{\begin{minipage}[c]{1.5cm}\centering 3D structure\end{minipage}}}
+\tiny
+\rput[c](2\hdist,1.6){\rnode[c]{fg_ana}{\begin{minipage}[c]{2.0cm}\centering analysis of the graph\end{minipage}}}
+\rput[c](3\hdist,1.6){\rnode[c]{3d_ana}{\begin{minipage}[c]{1.9cm}\centering analysis of the 3D structure\end{minipage}}}
+\rput[c](3.6\hdist,0){\rnode[c]{final}{\begin{minipage}[c]{1.4cm}\centering output for further QC treatment\end{minipage}}}
+
+%\psset{nodesep=3mm}
+\ncline[nodesep=3mm,arcangle=15]{->}{void}{fg}
+\naput*[labelsep=1.mm, npos=.4]{\begin{minipage}[c]{3.6cm}\centering adjacency matrix input/\\(general) ring spiral algorithm/\end{minipage}}
+\nbput*[labelsep=1.mm, npos=.4]{\begin{minipage}[c]{3.6cm}\centering Cartesian input/\\hardcoded C$_{20}$/C$_{60}$\end{minipage}}
+
+\nccircle[angleA=180, nodesep=0mm]{->}{fg}{.7cm}
+\nbput*{\begin{minipage}[c]{4.0cm}\centering vertex insertion/\\Goldberg Coxeter transformation\\(leap frog/halma)\end{minipage}}
+
+\ncline[nodesep=3mm,arcangle=15]{->}{fg}{3d}
+\naput*[labelsep=1.0mm]{\begin{minipage}[c]{1.0cm}\centering AME/\end{minipage}}
+\nbput*[labelsep=1.0mm]{\begin{minipage}[c]{2.0cm}\centering Tutte embedding\end{minipage}}
+
+\nccircle[angleA=180, nodesep=0mm]{->}{3d}{.7cm}
+\nbput*{\begin{minipage}[c]{2.cm}\centering force field opt.\end{minipage}}
+
+\ncline[nodesep=2mm]{->}{fg}{fg_ana}
+\ncline[nodesep=2mm]{->}{3d}{3d_ana}
+\ncline[nodesep=2mm]{->}{3d}{final}
+
+\end{pspicture}
+
+\end{document}

@@ -1,0 +1,8 @@
+D3-C384, the fast way to construct the second non-spiral fullerene
+&General NA=384 /
+&Coord ICart=9 jumps=49,3 rspi=29, 30, 31, 49, 145, 146, 170, 171, 190, 191, 192, 194 /
+&FFChoice iopt=3/
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph  /

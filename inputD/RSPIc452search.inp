@@ -1,0 +1,9 @@
+Ih-C452 Using FM algorithm to produce coordinates from ring spiral indices
+&General  NA=452 /
+&Coord ICart=8 /
+&FFChoice /
+&FFParameters /
+&Hamilton /
+&Isomers isearch=1 /
+&Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /
+1    7   21   62   65   90  134  165  199  204  216  228

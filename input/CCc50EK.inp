@@ -1,4 +1,4 @@
-Starting from D5h-C50 cartesian coordinate input perform a Endo-Kroto transformation to C2-C50 
+Starting from D5h-C50 cartesian coordinate input perform a Endo-Kroto transformation to C2-C54 
 &General NA=50, IP=1, nosort=1 /
 &Coord ICart=1, KE=1 /
 &FFChoice /
