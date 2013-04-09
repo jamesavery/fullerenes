@@ -1,5 +1,5 @@
 Ih-C20 aug-cc-pvdz B3LYP opt. geom. high sym. Ih stationary point E=-761.4899671 au 
-&General NA=20 /
+&General NA=20 iwext=1 /
 &Coord ICart=1 /
 &FFChoice /
 &FFParameters /

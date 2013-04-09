@@ -31,15 +31,21 @@
       32 bits in the Makefile if necessary
     All fortran files are in the directory    source
     All C-files are in the directory          libgraph
+    All database files are in the directory   database
 
 -----------------------------------------------------------------------------------
   F U L L E R E N E     I S O M E R     D A T A B A S E
 -----------------------------------------------------------------------------------
- A database is provided for general isomers up tp C140 and for IPR isomers up to
- C180. The database can be copied into the main program folder and can be used to 
- read the ring spiral pentagon indices. The numbering scheme is canonical as chosen 
- in the book by Fowler and Manolopoulus (Atlas of Fullerenes), that is each isomer 
- in the books appendix can be constructed easily from the database. 
- Note: the directory 'database' needs to be in the main directory where source or 
- libgraph is.
+ A database is provided for general isomers up tp C150 and for IPR isomers up to
+ C200. The database files need to be moved into the right folders called
+
+ fullerene/database/All
+ fullerene/database/IPR
+ fullerene/database/Yoshida
+ fullerene/database/HOG
+
+ They need to be unzipped before use (gunzip). The files in the folders All and IPR
+ contain the ring spiral pentagon indices. The numbering scheme is canonical as 
+ chosen in the book by Fowler and Manolopoulus (Atlas of Fullerenes), that is each 
+ isomer in the books appendix can be constructed easily from the database. 
 -----------------------------------------------------------------------------------

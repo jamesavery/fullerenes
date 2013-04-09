@@ -250,10 +250,13 @@ C Produce list from ring spiral algorithm
       Integer hamlow,hamhigh,hamlowIPR,hamhighIPR
       Integer RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
       Integer D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
+      Integer IsoExceptl(100),IsoExcepth(100)
 
       if(isomerl.ne.1) Write(Iout,1011) isomerl
       if(isomerh.ne.Nisoloop) Write(Iout,1012) isomerh
       nbatch=0
+      nexceptionl=0
+      nexceptionh=0
       maxiter=1000000000
       Open(UNIT=4,FILE=databasefile,STATUS='old',ACTION='Read',
      1  FORM='FORMATTED')
@@ -273,6 +276,13 @@ C Produce list from ring spiral algorithm
          IF(number_vertices.ge.100) WRITE(Iout,604) number_vertices
       endif
       else
+       vertnum=dfloat(number_vertices)
+       ahamlow=5.*2.**(vertnum/10.-1.)
+       nhamlow=int(ahamlow)
+       an=2.*3.**(vertnum/20.-1.)+1.
+       ahamhigh=ahamlow*an
+       nhamhigh=int(ahamlow*an)
+       Write(Iout,619) nhamlow,nhamhigh
       if(IP.EQ.0) then
          IF(number_vertices.lt.100) WRITE(Iout,701) number_vertices
          IF(number_vertices.ge.100) WRITE(Iout,702) number_vertices
@@ -308,6 +318,14 @@ Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
           Read(4,1004,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
      2     ncycHam,(INMR(I),I=1,6)
+          if(ncycHam.lt.nhamlow) then
+           nexceptionl=nexceptionl+1
+           IsoExceptl(nexceptionl)=J  
+          endif
+          if(ncycHam.gt.nhamhigh) then
+           nexceptionh=nexceptionh+1
+           IsoExcepth(nexceptionh)=J  
+          endif
           if(J.ge.isomerl) then
           if(J.gt.isomerh) go to 99
           if(RSPI(1).ne.1) no5ringstart=no5ringstart+1
@@ -450,6 +468,14 @@ Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
           Read(4,1008,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,ncycHam,
      2     (INMR(I),I=1,6)
+          if(ncycHam.lt.nhamlow) then
+           nexceptionl=nexceptionl+1
+           IsoExceptl(nexceptionl)=J  
+          endif
+          if(ncycHam.gt.nhamhigh) then
+           nexceptionh=nexceptionh+1
+           IsoExcepth(nexceptionh)=J  
+          endif
           if(J.ge.isomerl) then
           if(J.gt.isomerh) go to 99
           HNI(6)=number_vertices/2-10-HNI(3)-HNI(4)-HNI(5)
@@ -561,6 +587,14 @@ C Final statistics
           if(number_vertices.eq.60.or.number_vertices.ge.70) then
            WRITE(Iout,610) hamlowIPR,islowIPR,hamhighIPR,ishighIPR
           endif
+           if(nexceptionl.ne.0) then
+            Write(iout,616) nexceptionl
+            Write(iout,618) (IsoExceptl(J),J=1,nexceptionl)
+           endif
+           if(nexceptionh.ne.0) then
+            Write(iout,617) nexceptionh
+            Write(iout,618) (IsoExcepth(J),J=1,nexceptionh)
+           endif
         endif
       else
         WRITE(Iout,612) sigmahlow,ISigmaL,sigmahhigh,ISigmaH
@@ -643,6 +677,13 @@ C Final statistics
      1 'pentagon')
  615  FORMAT(1X,'Number of isomers with ring spirals without ',
      1 'a pentagon start: ',I5)
+ 616  Format(1X,I3,' exceptions found for lower bound with isomer',
+     1 ' numbers:')
+ 617  Format(1X,I3,' exceptions found for upper bound with isomer',
+     1 ' numbers:')
+ 618  Format(10I9)
+ 619  Format(' Semi-tight lower and upper limits for Hamiltonian ',
+     1 'cycles:'I9,'/',I9)
   701  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
