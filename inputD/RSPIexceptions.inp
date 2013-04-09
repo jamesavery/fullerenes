@@ -1,0 +1,40 @@
+D3h-C38
+&General NA=38 iwext=1 loop=1 filename='D3h-C38' /
+&Coord ICart=3  rspi=1   2   3   4   5   9  13  17  18  19  20  21 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton iham=1 /
+&Isomers /
+&Graph  /
+D3-C38 
+&General NA=38 iwext=1 loop=1 filename='D3-C38' /
+&Coord ICart=3 rspi= 1   2   3   4  11  12  14  15  16  18  19  21 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton iham=1 /
+&Isomers /
+&Graph  /
+C2-C42
+&General NA=42 iwext=1 loop=1 filename='C2-C44' /
+&Coord ICart=3 rspi= 1   2   3   4   5   7  17  19  20  21  22  23 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton iham=1 /
+&Isomers /
+&Graph  /
+D3h-C54
+&General NA=54 iwext=1 loop=1 filename='D3h-C54' /
+&Coord ICart=3 rspi= 1   2   3   4  14  18  19  22  23  26  27  29 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton iham=1 /
+&Isomers /
+&Graph  /
+C2-C66
+&General NA=66 iwext=1 filename='C2-C66' /
+&Coord ICart=3  rspi=1   2   3   4   5  13  23  31  32  33  34  35 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton iham=1 /
+&Isomers /
+&Graph  /

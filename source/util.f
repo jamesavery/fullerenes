@@ -13,6 +13,271 @@ c 1002 Format(1X,'Not implemented yet')
 c      RETURN
 c      END
 
+      SUBROUTINE WriteToFile(nchoice,Iext,ncyc,ifind,Iout,IERR,IAtom,
+     1 IC3,El,Dist,filenameout,extname,Nameext,Endext,TEXTINPUT) 
+      use config
+C--------------------------------------------------------------------
+C  Routine to write out cartesian coordinates to external file
+C  It is called from the main program
+C  Formats:
+C   nchoice=1   .xyz file
+C   nchoice=2   .cc1 file
+C   nchoice=3   .mol2 file (TRYPOS format)
+C  Iext: unit number for external file
+C  Iout:     unit number for output
+C  iatom:    Field for atom number for each atom (6 for carbon)
+C  IC3:      Connectivity field for cubic graph
+C             (short form of adjacency matrix)
+C  filenameout: initial external file name
+C  extname: final external filename
+C  Endext: .xyz, .cc1, .mol etc.
+C  Nameext: -3D.xyz, -3D.cc1 or -3D.mol
+C  Dist(3,i): Field of (x,y,z) coordinates for each atom i
+C  ifind: 0 or 1, test for not allowed writing into database directory
+C  TEXTINPUT: Text line from input
+C---------------------------------------------------------------------
+
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION IATOM(Nmax),IC3(Nmax,3),Dist(3,Nmax)
+      Integer Values(8)
+      integer endzeile
+      CHARACTER*1 TEXTINPUT(nzeile)
+      CHARACTER CDAT*8,CTIM*10,Zone*5
+      CHARACTER*1 Number
+      CHARACTER*2 El(99)
+      CHARACTER*4 Endext
+      CHARACTER*7 Nameext
+      CHARACTER*50 filenameout,extname,extname1
+      IERR=0
+      Call FileMod(filenameout,extname,Nameext,Endext,ncyc,ifind)
+       if(ifind.ne.0) then
+        Write(Iout,1000)
+        IERR=1
+        Return
+       endif
+      if(nchoice.eq.3) then
+       Number='2'
+       extname1=extname//trim(adjustl(Number))
+       extname=extname1
+      endif
+      Open(unit=Iext,file=extname,form='formatted')
+      Write(Iout,1011) extname,nchoice
+C Put Date into comment line
+      call date_and_time(CDAT,CTIM,zone,values)
+ 
+C .xyz files
+      if(nchoice.eq.1) then
+       endzeile=0
+       do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+       enddo
+       if(number_vertices.lt.100) 
+     1  WRITE(Iext,1001) number_vertices,number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1  WRITE(Iext,1002) number_vertices,number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1  WRITE(Iext,1003) number_vertices,number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.10000)
+     1  WRITE(Iext,1004) number_vertices,number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       Do J=1,number_vertices
+        IM=IAtom(J)
+        Write(Iext,1005) El(IM),(Dist(I,J),I=1,3)
+        enddo
+       endif
+
+C .cc1 files
+      if(nchoice.eq.2) then
+       if(number_vertices.lt.100) WRITE(3,'(I2)') number_vertices
+       if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1  WRITE(3,'(I3)') number_vertices
+       if(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1  WRITE(3,'(I4)') number_vertices
+       if(number_vertices.ge.10000) WRITE(3,'(I8)') number_vertices
+        icc1flag=2
+        Do J=1,number_vertices
+         IM=IAtom(J)
+         Write(3,1010) El(IM),J,(Dist(I,J),I=1,3),icc1flag,
+     1    (IC3(J,I),I=1,3)
+        enddo
+      endif
+
+C .mol2 files TRIPOS/SYBIL format
+C   Comment section
+      if(nchoice.eq.3) then
+       endzeile=0
+       do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+       enddo
+       if(number_vertices.lt.100) 
+     1  WRITE(Iext,1021) number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1  WRITE(Iext,1022) number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1  WRITE(Iext,1023) number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.10000)
+     1  WRITE(Iext,1024) number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+        WRITE(Iext,*) ' '
+C   @<TRIPOS>MOLECULE section
+       WRITE(Iext,'(A17)') '@<TRIPOS>MOLECULE'
+       WRITE(Iext,'(A9)') 'Fullerene'
+       number_edges=3*number_vertices/2
+       WRITE(Iext,'(I8,I8,A9)') number_vertices,number_edges,'  0  0  0'
+       WRITE(Iext,'(A5)')'SMALL'
+       WRITE(Iext,'(A10)')'NO_CHARGES'
+       WRITE(Iext,'(A1)')' '
+C   @<TRIPOS>ATOM section
+       WRITE(Iext,'(A13)') '@<TRIPOS>ATOM'
+       Do I=1,number_vertices
+        IM=IAtom(I)
+        Write(Iext,1025) I,El(IM),(Dist(J,I),J=1,3)
+       enddo
+C   @<TRIPOS>BOND section
+       WRITE(Iext,'(A13)') '@<TRIPOS>BOND'
+       Inum=0
+       Do I=1,number_vertices
+        Do J=1,3
+         if(IC3(I,J).gt.I) then
+          Inum=Inum+1
+          Write(Iext,1026) Inum,I,IC3(I,J)
+         endif
+        enddo
+       enddo
+      endif
+
+      Close(unit=Iext)
+
+ 1000 FORMAT(/1X,'You try to write into the database filesystem',
+     1 ' which is not allowed  ===>  ABORT')
+ 1001 FORMAT(I5,/,'C',I2,' / DATE:',I2,'/',I2,'/',I4,
+     1 ' / Origin: Program Fullerene / ',132A1)
+ 1002 FORMAT(I5,/,'C',I3,' / DATE:',I2,'/',I2,'/',I4,
+     1 ' / Origin: Program Fullerene / ',132A1)
+ 1003 FORMAT(I5,/,'C',I4,' / DATE:',I2,'/',I2,'/',I4,
+     1 ' / Origin: Program Fullerene / ',132A1)
+ 1004 FORMAT(I8,/,'C',I8,' / DATE:',I2,'/',I2,'/',I4,
+     1 ' / Origin: Program Fullerene / ',132A1)
+ 1005 FORMAT(A2,6X,3(F16.8,2X))
+ 1010 FORMAT(A2,I5,3F12.6,4I5)
+ 1011 FORMAT(/1X,'Input coordinates to be used for plotting programs',
+     1 ' like VMS, CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written ',
+     1 'into external file: ',A50,/1X,'Choice: ',I1)
+ 1021 FORMAT('C',I2,/,'DATE:',I2,'/',I2,'/',I4,
+     1 /,'Origin: Program Fullerene',/,132A1)
+ 1022 FORMAT('C',I3,/,'DATE:',I2,'/',I2,'/',I4,
+     1 /,'Origin: Program Fullerene',/,132A1)
+ 1023 FORMAT('C',I4,/,'DATE:',I2,'/',I2,'/',I4,
+     1 /,'Origin: Program Fullerene',/,132A1)
+ 1024 FORMAT('C',I8,/,'DATE:',I2,'/',I2,'/',I4,
+     1 /,'Origin: Program Fullerene',/,132A1)
+ 1025 FORMAT(I8,A2,6X,3(F15.6,2X),'C.ar   1  LIG1    0.0000')
+ 1026 FORMAT(I8,1X,I8,1X,I8,'   ar')
+      RETURN
+      END
+
+      SUBROUTINE FileMod(filenameIn,filenameOut,EndName,End,Ncyc,ifind)
+      Implicit Integer (A-Z)
+      CHARACTER*4  End
+      CHARACTER*20 Number
+      CHARACTER*7  EndName
+      CHARACTER*50 filenameIn,filenameOut
+C----------------------------------------------------------------
+C     This routine constructs external output filenames for 
+C      .xyz, .cc1 or .mol files. It attaches a number for 
+C      compound jobs so not to overwrite old files. It also 
+C      checks that the filename does not contain a link to the 
+C      database so not to write into this directory.
+C     Input: filenameIn        original filename
+C            EndName           -3D.xyz, -3D.cc1 or -3D.mol
+C            End               .xyz, .cc1 or .mol
+C            Ncyc              determines if it is a compound job
+C     Output: ifind=0          everything ok
+C            ifind.ne.0        link to one of the databases found
+C            filenameOut       output filename
+C----------------------------------------------------------------
+
+C     If Ncyc > 1 then add number
+        if(Ncyc.le.1) then
+         filenameOut=trim(filenameIn)//EndName
+        else
+         write(Number,*) Ncyc
+         filenameOut=trim(filenameIn)//trim(adjustl(Number))//End
+        endif
+C     Check if filename contains link to database
+        ichar1=index(filenameOut,'database/ALL')
+        ichar2=index(filenameOut,'database/IPR')
+        ichar3=index(filenameOut,'database/Yoshida')
+        ichar4=index(filenameOut,'database/HOG')
+        ifind=ichar1+ichar2+ichar3+ichar4
+      RETURN
+      END
+
+      SUBROUTINE  CheckIC3(IERR,IC3)
+      use config
+      IMPLICIT Integer (A-Z)
+      DIMENSION IC3(Nmax,3)
+C------------------------------------------------------------------
+C IC3 might contain only the required entry for the connectivities
+C For exalmle 1-2 and 2-1 are the same. This routine fills out
+C the empty entries in IC3, e.g. if 1-2 is there, but not 2-1
+C Output: Completed IC3 and
+C IERR=0 no zeros in IC3
+C IERR=1 information missing in the connectivity list
+C------------------------------------------------------------------
+      IERR=0
+      Do I=1,number_vertices
+      Do J=1,3
+       IJ=IC3(I,J)
+       if(IJ.eq.0) go to 10
+       ifind=0
+        Do K=1,3
+         if(IC3(IJ,K).eq.I) ifind=1
+        enddo
+       if(ifind.eq.0) then
+        Do K=1,3
+         if(IC3(IJ,K).eq.0) then
+          IC3(IJ,K)=I
+          go to 10
+         endif
+        enddo
+       endif
+  10  continue
+      enddo
+      enddo
+C Sort and check if there are any zeros left
+      Do I=1,number_vertices
+      Do J=1,3
+       if(IC3(I,J).eq.0) then
+        IERR=1
+        return
+       endif
+      enddo
+       if(IC3(I,1).gt.IC3(I,2)) then
+        imem=IC3(I,1)
+        IC3(I,1)=IC3(I,2)
+        IC3(I,2)=imem
+       endif
+       if(IC3(I,2).gt.IC3(I,3)) then
+        imem=IC3(I,3)
+        IC3(I,3)=IC3(I,2)
+        IC3(I,2)=imem
+       endif
+       if(IC3(I,1).gt.IC3(I,2)) then
+        imem=IC3(I,1)
+        IC3(I,1)=IC3(I,2)
+        IC3(I,2)=imem
+       endif
+      enddo
+      RETURN
+      END
+
       SUBROUTINE CompressDatabase(Iout,filename)
 C This routine turns a database file from the output into a new compreesed one
       use config
@@ -60,11 +325,11 @@ C Now read database
         nlines=0
         Do J=1,Nisoloop
          if(IH.eq.1) then
-         Read(1,2000,ERR=199) number,Group,(RSPI(i),I=1,12),
+         Read(1,2000,ERR=199,end=199) number,Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,5),NP,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,
      1    HLgap,shell,ncycHam,nmrstring
          else
-         Read(1,2001,ERR=199) number,Group,(RSPI(i),I=1,12),
+         Read(1,2001,ERR=199,end=199) number,Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,5),NP,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,
      1    HLgap,shell,nmrstring
          endif
@@ -551,27 +816,4 @@ C     Sort the N integer numbers, input IS, Output JS
        TIMEX=TIME
       RETURN
       END
-
-      SUBROUTINE FileMod(filenameIn,filenameOut,EndName,End,Ncyc,ifind)
-      Implicit Integer (A-Z)
-      CHARACTER*4  End
-      CHARACTER*20 Number
-      CHARACTER*7  EndName
-      CHARACTER*50 filenameIn,filenameOut
-C     Construct filename for xyz or cc1 files
-C     If Ncyc > 1 then add number
-        if(Ncyc.le.1) then
-         filenameOut=trim(filenameIn)//EndName
-        else
-         write(Number,*) Ncyc
-         filenameOut=trim(filenameIn)//trim(adjustl(Number))//End
-        endif
-        ichar1=index(filenameOut,'database/ALL')
-        ichar2=index(filenameOut,'database/IPR')
-        ichar3=index(filenameOut,'database/Yoshida')
-        ichar4=index(filenameOut,'database/HOG')
-        ifind=ichar1+ichar2+ichar3+ichar4
-      RETURN
-      END
-
 

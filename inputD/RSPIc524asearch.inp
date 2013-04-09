@@ -1,0 +1,9 @@
+Ih-C524 Using FM algorithm to produce coordinates from ring spiral indices
+&General  NA=524 /
+&Coord ICart=8 /
+&FFChoice /
+&FFParameters /
+&Hamilton /
+&Isomers isearch=3 /
+&Graph ISchlegel=0 /
+1 7 10 13 16 195 208 211 237 242 255 258

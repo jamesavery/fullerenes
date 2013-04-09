@@ -1,5 +1,4 @@
-D5h-C50 aug-cc-pvdz B3LYP opt. geom. minimum to C2v-sym E=-1905.1079932 au 
-followed by 2 Endo-Kroto insertions to give C54
+D5h-C50 aug-cc-pvdz B3LYP opt. geom. minimum to C2v-sym E=-1905.1079932 au
 &General NA=50, IP=1 /
 &Coord ICart=1 /
 &FFChoice /

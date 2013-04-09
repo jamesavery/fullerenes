@@ -1,0 +1,8 @@
+File from converting large to small database
+&General ndbconvert=1 filename='database/LargeDatabaseALL/c148all.database' /
+&Coord /
+&FFChoice /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /

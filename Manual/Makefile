@@ -2,9 +2,16 @@
 .PHONY: all
 all: UserManual.pdf
 
-UserManual.pdf: UserManual.tex Makefile tree.pdf gc.pdf
+UserManual.pdf: UserManual.tex Makefile workflow.pdf tree.pdf gc.pdf
 	pdflatex UserManual.tex
 	pdflatex UserManual.tex
+
+workflow.pdf: workflow.tex
+	latex workflow.tex
+	latex workflow.tex
+	dvips workflow.dvi
+	ps2pdf workflow.ps workflow_tmp.pdf
+	pdfcrop workflow_tmp.pdf workflow.pdf
 
 tree.pdf: tree.tex
 	latex tree.tex
@@ -22,9 +29,9 @@ gc.pdf: gc.tex
 
 .PHONY: clean
 clean:
-	rm -f *.log *.aux *.dvi *.ps *.bib *.out *_tmp.pdf
+	rm -f *.log *.aux *.dvi *.ps *.bib *.out *_tmp.pdf *.toc
 
 .PHONY: distclean
 distclean: clean
-	rm -f UserManual.pdf tree.pdf gc.pdf
+	rm -f UserManual.pdf tree.pdf gc.pdf workflow.pdf
 
