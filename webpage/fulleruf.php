@@ -34,9 +34,11 @@ $subject = "Program Fullerene";
 $from = "p.a.schwerdtfeger@massey.ac.nz";
 $headers = "From:" . $from;
 $email = $_GET["Emailuser"];
+$commentS = $_GET["comment"];
 $userfile="fulleruser.txt";
 $separator=" & ";
 $string="@";
+$string1="http";
 
 $check = "True";
 /* 
@@ -54,6 +56,15 @@ if ($pos =="0") $check="False";
 $pos1 = strrpos($email,$string);
 if ($pos !="$pos1") $check="False";
 
+/* 
+--- Check for comment contains http to avoid spam --
+*/
+$pos2 = strpos($commentS,$string1);
+if ($pos2 !="") $check="False";
+
+/*
+--- If data is valid --
+*/
 if ($check=="True")
   {
 mail($email,$subject,$passwd,$headers);
@@ -84,6 +95,9 @@ fwrite($fh,"\n");
 fclose($fh);
   }
 else
+/*
+--- If data is invalid --
+*/
   {
 echo "Your entry is not acceptable or incorrect. Please provide all necessary information."; 
 echo " If you experience problems please email us directly.";

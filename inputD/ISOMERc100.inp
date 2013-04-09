@@ -1,0 +1,8 @@
+C100 Creating IPR isomer list only
+&General NA=100 /
+&Coord ICart=0 /
+&FFChoice /
+&FFParameters /
+&Hamilton /
+&Isomers IPR=2 istop=1 /
+&Graph /

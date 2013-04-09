@@ -161,7 +161,7 @@ C With Hamiltonian cycles
       endif
   400  Write(Iout,1008) L,GROUP,K1,K2,K3,K4,K5,K6,K7,K8,K9,K10,K11,K12
       if(L.eq.0) then
-       WRITE (Iout,1015)
+       WRITE (Iout,1015) I
        return
       endif
        Close(unit=1)
@@ -501,7 +501,7 @@ C     Analyze dual matrix
  1013 FORMAT(/1X,'Starting with new list:')
  1014 Format(1X,'File: ',A20,' does not exist ==> ABORT')
  1015 Format(1X,'Last entry is zero, so check that you do not have ',
-     1 'an empty line at the end of the input')
+     1 'an empty line at the end of the input, line ,'I10)
  1023 Format(1X,'Filename ',A50,' in database not found ==> ABORT')
  2000 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5)
  2001 Format(I9,2X,A3,1X,12I4,23X,I2,27X,F8.5,25X,I9)
@@ -822,7 +822,7 @@ C     Analyze dual matrix
  600  FORMAT(/1X,'Subroutine Spiral from Fowler and Manolopoulos',
      1 ' (An Atlas of Fullerenes, Dover Publ., New York, 2006)',
      2 /1X,'(Symmetries are given for undistorted fullerenes)',
-     1 /1X,' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' and gap the HOMO-LUMO gap in units of beta)',
      2 /8X,'n  PG   Ring spiral pentagon positions',
@@ -1182,17 +1182,17 @@ C       in the spiral
         nloop=6
         nring=0
         if(D1(6,IP).eq.0) nloop=5
-        bar: do j=1,nloop
+        loops: do j=1,nloop
 C         Get all adjacent rings to previous one
           nr=D1(j,IP)
 C         Make sure it is not one in the existing spiral
           do j1=I-2,1,-1
-            if(nr.eq.S(j1)) exit bar
+            if(nr.eq.S(j1)) cycle loops
           enddo
 C       Collect them
         nring=nring+1
         FreeRing(nring)=nr
-        enddo bar
+        enddo loops
           
 C       Now it needs to be connected to a previous ring
 C       Last 2 are not needed
@@ -1208,7 +1208,7 @@ C       Last 2 are not needed
                   MP=MP+1
                   JP(MP)=i
                 endif
-                exit faces
+                cycle faces
               endif
             enddo
           enddo
@@ -1219,6 +1219,12 @@ C       Last 2 are not needed
           Return
         endif
       enddo faces
+
+C       if(JP(12).eq.0) then
+C        IER=1   ! Spiral has dead end
+C        Return
+C       endif
+
 
 C  Finally success, spiral found
       Return
@@ -1639,10 +1645,10 @@ C     Print ring numbers
      1 ' (',I2,' faces)')
  602  FORMAT(1X,'Spiral for fullerene isomers of C',I3,':',
      1 ' (',I3,' faces)')
- 603  FORMAT(1X,A3,9X,12I4)
- 604  FORMAT(1X,90('-'),/1X,'Corresponding ring numbers:') 
- 605  FORMAT(1X,A3,9X,12I4,2X,3(I3,' x',I3,:,','))
- 607  Format(12(1X,I4))
+ 603  FORMAT(1X,A3,9X,12I6)
+ 604  FORMAT(1X,131('-'),/1X,'Corresponding ring numbers:') 
+ 605  FORMAT(1X,A3,9X,12I6,2X,3(I4,' x',I4,:,','))
+ 607  Format(12(1X,I6))
  608  Format(1X,'Input spiral is canonical')
  610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
      1 'loop over')
@@ -1651,17 +1657,18 @@ C     Print ring numbers
  613  Format(1X,'Loop over (6,6) fusions, ',I5,' max in total')
  614  Format(1X,I7,' RSPIs taken from spiral list to be analyzed:',/1X,
      2 'Point group   Ring spiral pentagon positions',
-     3 19X,'NMR pattern (for fullerene in ideal symmetry)',/1X,90('-')) 
+     3 42X,'NMR pattern (for fullerene in ideal symmetry)',
+     4 /1X,131('-')) 
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
  616  Format(1X,'No (6,6) fusions to loop over')
  617  Format(1X,'--->',I7,' ring spirals found ',
      1 'but RSPIs detected were not valid')
- 618  Format(20(1X,32(I4,'-'),/))
+ 618  Format(30(1X,20(I5,'-'),/))
  619  Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I4,' spirals found)') 
  620  Format(1X,'Search ',I7,' spirals to produce canonical'
      1 ' list of faces:')
- 621  Format(12(1X,I4))
+ 621  Format(84('-'),/,12(1X,I6),/,84('-'))
  622  Format(1X,'Pentagons are not in sequence, stopped at pentagon ',
      1 I6)
  623  Format(1X,'Canonical spiral list of pentagon positions:')
@@ -1682,7 +1689,7 @@ C     Print ring numbers
      1 'list',/1X,'Routine will stop here and tries to work with ',
      1 'existing spirals (otherwise increase NSpScale parameter ',
      1 'in main program')
- 629  Format(20(1X,32(I4,'-'),/))
+ 629  Format(100(1X,20(I5,'-'),/))
  630  Format(1X,'Failed to find ring spiral: ',I7,
      1 ' detected (maximum possible: ',I7,')',/1X,
      1 'This is a non-spiral fullerene')
@@ -1693,9 +1700,9 @@ C     Print ring numbers
      1 ' (',I4,' faces)')
  633  FORMAT(1X,'Spiral for fullerene isomers of C',I5,':',
      1 ' (',I5,' faces)')
- 634  FORMAT(1X,I6,' distinct RSPIs found out of total',I7,
+ 634  FORMAT(1X,I7,' distinct RSPIs found out of total',I7,
      1 ' (maximum possible: ',I7,')',/1X,I7,' spirals with a ',
-     1 'pentagon start (',I7,' symmetry distinct)')
+     1 'pentagon start   (',I7,'  symmetry distinct)')
  635  FORMAT(1X,' Spiral found, avoid counting of spirals')
       Return
       END
@@ -1813,10 +1820,10 @@ C     Now hexagon indices
       Do I=0,6
         IRhag6(I)=0
       enddo
-      foo: do I=1,M
+      faces: do I=1,M
         IRcount=0
         IR5=Ddiag(I)
-        if(IR5.eq.5) exit foo
+        if(IR5.eq.5) cycle faces
         do J=1,M
           JR5=Ddiag(J)
           If(JR5.ne.5.and.D(I,J).eq.1) then
@@ -1824,7 +1831,7 @@ C     Now hexagon indices
           endif
         enddo
         IRhag6(IRcount)=IRhag6(IRcount)+1
-      enddo foo
+      enddo faces
 C     Strain Parameter
       sigmah=HexInd(IRhag6,ihk)
 
@@ -1901,20 +1908,6 @@ C Produce number of electrons in HOMO, degeneracy and gap
       enddo eigv
       
       Return
-      END
-
-C     Inputs: M, IPR, S(M)
-C     Output: D(M,M)
-      SUBROUTINE Windup2(M,IPR,S,ier,D)
-      use config
-      integer bigD(Mmax,Mmax), D(M,M), i, j, ier
-
-      call Windup(M, IPR, S, ier, bigD)
-      do i=1,M
-         do j=1,M
-            D(i,j) = bigD(i,j)
-         enddo
-      enddo   
       END
 
       SUBROUTINE Windup(M,IPR,IER,S,D)
@@ -2325,41 +2318,41 @@ C            Store all non-identical spirals
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(M,M),A(NMAX,NMAX)
       DIMENSION V(3,NMAX)
-c       Given a fullerene dual adjacency matrix D, this subroutine 
-c       constructs the corresponding fullerene adjacency matrix A. 
-c       IER = 0 on return if the construction is successful. 	 
-        I=0
-        DO 3 L = 1,M 
-           DO 2 K=1,L 
-              IF (D(K,L).EQ.0) GO TO 2
-              DO 1 J = 1,K
-                 IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
-                  I = I+1
-                 IF (I.GT.number_vertices) GO TO 1
-                 V(1,I) = J ! Associate the three mutually adjacent 
-                 V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
-                 V(3,I) = L ! with fullerene vertex I 	 
- 1            CONTINUE
- 2        CONTINUE
- 3      CONTINUE
-        IER = I-number_vertices
-        IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
-        DO 7 J = 1,number_vertices           ! and is therefore NOT a fullerene dual 
-           DO 6 I = 1,J
-              K = 0
-              DO 5 JJ = 1,3
-                 DO 4 II = 1,3
-                  IF(V(II,I).EQ.V(JJ,J)) K = K+1
- 4               CONTINUE
- 5             CONTINUE
-              IF (K.EQ.2) THEN
-                 A(I,J)=1   ! Fullerene vertices I and J are adjacent 
-                 A(J,I)=1   ! if they have 2 dual vertices in common
-               ELSE
-                 A(I,J)=0
-                 A(J,I)=0
-              ENDIF
- 6         CONTINUE
- 7      CONTINUE
-        RETURN
-        END
+c     Given a fullerene dual adjacency matrix D, this subroutine 
+c     constructs the corresponding fullerene adjacency matrix A. 
+c     IER = 0 on return if the construction is successful. 	 
+      I=0
+      DO 3 L = 1,M 
+        DO 2 K=1,L 
+          IF (D(K,L).EQ.0) GO TO 2
+          DO 1 J = 1,K
+            IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
+            I = I+1
+            IF (I.GT.number_vertices) GO TO 1
+            V(1,I) = J ! Associate the three mutually adjacent 
+            V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
+            V(3,I) = L ! with fullerene vertex I 	 
+ 1        CONTINUE
+ 2      CONTINUE
+ 3    CONTINUE
+      IER = I-number_vertices
+      IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
+      DO 7 J = 1,number_vertices           ! and is therefore NOT a fullerene dual 
+        DO 6 I = 1,J
+          K = 0
+          DO 5 JJ = 1,3
+            DO 4 II = 1,3
+              IF(V(II,I).EQ.V(JJ,J)) K = K+1
+ 4          CONTINUE
+ 5        CONTINUE
+          IF (K.EQ.2) THEN
+            A(I,J)=1   ! Fullerene vertices I and J are adjacent 
+            A(J,I)=1   ! if they have 2 dual vertices in common
+          ELSE
+            A(I,J)=0
+            A(J,I)=0
+          ENDIF
+ 6      CONTINUE
+ 7    CONTINUE
+      RETURN
+      END

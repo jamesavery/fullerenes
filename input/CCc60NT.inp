@@ -1,5 +1,5 @@
 C60  nanotube Lanl2DZ B3LYP optimized
-&General NA=60 ixyz=1 /
+&General NA=60 iwext=1 /
 &Coord ICart=1 /
 &FFChoice Iopt=1 /
 &FFParameters /
