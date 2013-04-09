@@ -1,9 +1,0 @@
-C450 nanotube. Using FM algorithm to produce coordinates from ring spiral indices
-&General  NA=450, IP=1 ixyz=1 /
-&Coord ICart=3 /
-&FFChoice Iopt=3 /
-&FFParameters /
-&Hamilton /
-&Isomers /
-&Graph ISchlegel=2, ISO1=1, ISO2=2, ISO3=3 /
-1 2 3 4 5 6 222 223 224 225 226 227

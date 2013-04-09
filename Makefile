@@ -5,8 +5,8 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS= -g3 -m64 -O3 -Wall -Wno-sign-compare
-FFLAGS= -g3 -m64 -O3 -Wall
+CXXFLAGS= -g3 -O3 -m64 -fPIC -Wall -Wno-sign-compare
+FFLAGS= -g3 -O3 -m64 -Wall 
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
 # you might need to change the gfortran compiler options:
 #FFLAGS= -O3 -mcmodel=medium 
@@ -48,6 +48,9 @@ build/libgraph.a: $(COBJECTS)
 test-%: tests/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ 
 #-----------------------------------------------------
+app-%: apps/%.cc build/libgraph.a
+	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ 
+#-----------------------------------------------------
 
 output/%.out: input/%.inp
 	./fullerene < $< > $@
@@ -61,6 +64,6 @@ clean:
 	find . \( -name  "*~" -or  -name "#*#" -or -name "*.o" \) -exec rm {} \;
 
 distclean: clean
-	rm -f fullerene build/libgraph.a qmga.dat config.mod
+	rm -f fullerene build/libgraph.a qmga.dat config.mod test-*
 
 #-----------------------------------------------------

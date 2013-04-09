@@ -2,15 +2,6 @@
 #include "cubicgraph.hh"
 #include <sstream>
 
-template <class T> ostream& operator<<(ostream& s, const vector<T>& v)
-{
-  s << "{";
-  for(int i=0;i<v.size();i++)
-    s << v[i] << (i+1<v.size()? ", ":"");
-  s << "}";
-  return s;
-}
-
 struct ToleranceLess {
   const double tolerance;
   ToleranceLess(const double tolerance) : tolerance(tolerance) {}
@@ -44,7 +35,10 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
     initial_coords[outer_face[i]] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
   }
 
-  return tutte_layout_direct(outer_face,initial_coords);
+//  cout << "g = " << *this << endl;
+
+  //  initial_coords = tutte_layout_direct(outer_face,initial_coords);
+  return tutte_layout_iterative(outer_face,initial_coords);
 }
 #ifdef HAS_MKL
 # include <mkl.h>
@@ -73,7 +67,8 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
   int IA[N+1], JA[4*N];
   int nz = 0;
   {
-    double *Afull = new double[N*N];
+    double *Afull = (double*)calloc(N*N,sizeof(double));
+    assert(Afull != 0);
     memset(Afull,0,N*N*sizeof(double));
     for(node_t u=0;u<N;u++){
       Afull[u*(N+1)] = 1.0;
@@ -97,7 +92,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
 	  nz++;
 	}
     }
-    delete Afull;
+    free(Afull);
   }
   IA[N] = nz;
 
@@ -110,7 +105,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     MKL_INT nrhs = 2;		/* Number of right hand sides. */
     void *pt[64];        /* Internal solver memory pointer pt, */
     MKL_INT iparm[64];  /* Pardiso control parameters. */
-    MKL_INT maxfct = 1, mnum = 1, phase, error = 0, msglvl = 1;
+    MKL_INT maxfct = 1, mnum = 1, phase, error = 0, msglvl = 0;
     /* Auxiliary variables. */
     double ddum;			/* Double dummy */
     MKL_INT idum;			/* Integer dummy. */
@@ -143,7 +138,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
 	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
     if (error != 0)
       {
-	printf ("\nERROR during symbolic factorization: %d", error);
+	printf ("\nERROR during symbolic factorization of Tutte embedding: %d", error);
 	exit (1);
       }
     printf ("\nReordering completed ... ");
@@ -157,7 +152,7 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
 	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, &ddum, &ddum, &error);
     if (error != 0)
       {
-	printf ("\nERROR during numerical factorization: %d", error);
+	printf ("\nERROR during numerical factorization of Tutte embedding: %d", error);
 	exit (2);
       }
     printf ("\nFactorization completed ... ");
@@ -166,12 +161,12 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     /* -------------------------------------------------------------------- */
     phase = 33;
 
-    printf ("\n\nSolving system...\n");
+    //    printf ("\n\nSolving system...\n");
     PARDISO (pt, &maxfct, &mnum, &mtype, &phase,
 	     &n, A, IA, JA, &idum, &nrhs, iparm, &msglvl, rhs, x, &error);
     if (error != 0)
       {
-	printf ("\nERROR during solution: %d", error);
+	printf ("\nERROR during direct sparse solution of Tutte embedding: %d", error);
 	exit (3);
       }
 
@@ -201,7 +196,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
   vector<coord2d> xys(initial_coords.begin(), initial_coords.end()), newxys(N);
   vector<bool> fixed(N);
 
-  cerr << "tutte_layout: Outer face: " << outer_face << endl;
+  //  cerr << "tutte_layout: Outer face: " << outer_face << endl;
 
   unsigned int Nface = outer_face.size();
   for(unsigned int i=0;i<Nface;i++)
@@ -209,8 +204,8 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
 
   
   bool converged = false;
-  const unsigned int TUTTE_MAX_ITERATION = 100000;
-  const double TUTTE_CONVERGENCE = 5e-6;
+  const unsigned int TUTTE_MAX_ITERATION = 1000000;
+  const double TUTTE_CONVERGENCE = 5e-4;
   unsigned int i;
   double max_change;
   for(i=0;!converged && i<TUTTE_MAX_ITERATION; i++){
@@ -239,6 +234,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
   }
   if(i>=TUTTE_MAX_ITERATION){
     printf("Planar Tutte embedding failed to converge. Increase TUTTE_MAX_ITERATION. ");
+    cout << "layout = " << xys << ";\n";
     abort();
   }
   //  cerr << "Tutte layout of "<<N<<" vertices converged after " << i << " iterations, with maximal relative change " << max_change << endl;
@@ -248,6 +244,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
   if(point_set.size() != N){
     fprintf(stderr,"Tutte layout failed: only %d unique coordinates out of %d vertices (up to tolerance %g).\n",
 	    int(point_set.size()),N,0.0);
+    abort();
   }
   return xys;
 }
@@ -393,7 +390,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
       const coord2d xs(dual.layout2d[u]*coord2d(xscale,yscale));
-      s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<dual.N? ", ":"}\n\t");
+      s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << (u+1) << "$}" << (u+1<dual.N? ", ":"}\n\t");
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
     s << "\\foreach \\u/\\v in {";

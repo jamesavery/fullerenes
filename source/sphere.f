@@ -200,7 +200,7 @@ C     Calculate norm for minimum distance sphere
       Return
       End
 
-      SUBROUTINE ProjectSphere(ipsphere,Iout,IAtom,nzeile,
+      SUBROUTINE ProjectSphere(ipsphere,Iout,IAtom,
      1 IC3,Dist,c,rmcs,filename,El,TEXTINPUT)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
