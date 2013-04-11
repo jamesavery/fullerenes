@@ -1,0 +1,8 @@
+C114 Creating IPR isomer list, needed 1-1,008,444
+&General NA=114 /
+&Coord ICart=0 /
+&FFChoice /
+&FFParameters /
+&Hamilton /
+&Isomers IPR=2 iph=1 istop=1 isomerl=$FROM isomerh=$TO /
+&Graph /
