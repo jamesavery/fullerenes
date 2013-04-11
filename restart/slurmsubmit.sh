@@ -2,9 +2,11 @@
 #SBATCH -p octuplets 
 #SBATCH -o $JOBDIR/output-$I.log
 #SBATCH -D $ROOT
-#SBATCH -J HamiltonPaths
-#SBATCH -n $NCPUS
-#SBATCH --mem-per-cpu=500
+#SBATCH -J HamiltonPaths-$I
+#SBATCH --nodes=1
+#SBATCH --ntasks=$NCPUS
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=5000
 
 for i in `seq $iFROM $iTO`; do 
     ./fullerene < $JOBDIR/$i/input.inp > $JOBDIR/$i/output.log &
