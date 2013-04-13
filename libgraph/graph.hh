@@ -46,6 +46,7 @@ struct Graph {
 				      const vector<bool>& used_nodes, const unsigned int max_depth = INT_MAX) const;
   vector<unsigned int> shortest_paths(const node_t& source, const unsigned int max_depth = INT_MAX) const;
   vector<unsigned int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
+  list< list<node_t> > connected_components() const;
   
   // Find shortest cycle of the form s->...->s
   vector<node_t> shortest_cycle(const node_t& s, const int max_depth) const;
