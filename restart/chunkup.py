@@ -3,10 +3,10 @@ import sys, string,os;
 from util import *;
 
 try:
-    (inputfile,jobdir,start,end,N) = sys.argv[1:];
-    (start,end,N) = (int(start),int(end),int(N));
+    (inputfile,jobdir,start,end,N,NCPUs) = sys.argv[1:];
+    (start,end,N,NCPUs) = (int(start),int(end),int(N),int(NCPUs));
 except:
-    print >> sys.stderr, "Syntax: %s <input-file> <job-directory> <start> <end> <number-of-chunks>\n" % sys.argv[0];
+    print >> sys.stderr, "Syntax: %s <input-file> <job-directory> <start> <end> <number-of-chunks> <cpus-per-task>\n" % sys.argv[0];
     exit(-1);
 
 
@@ -18,6 +18,7 @@ print "(length,chunksize,remainder) = ",(length,chunksize,chunkrem);
 
 text   = readfile(inputfile);
 lltext = readfile("llsubmit.sh");
+slurmtext = readfile("slurmsubmit.sh");
 
 def prepare(dirname,s,e):
     mkdirp(dirname);
@@ -37,14 +38,18 @@ for i in range(N):
     prepare(jobdir+"/"+str(i),s,e);
 prepare(jobdir+"/"+str(N),e+1,end);
 
-iN = N/8;
-ifrom = [i*8 for i in range(iN)]
-ito   = [(i+1)*8-1 for i in range(iN)];
+iN = N/NCPUs;
+ifrom = [i*NCPUs for i in range(iN)]
+ito   = [(i+1)*NCPUs-1 for i in range(iN)];
 ito[-1] = N;
 
 for i in range(iN):
     with open(jobdir+"/llsubmit-%d-%d.sh" % (ifrom[i],ito[i]),"w") as f:
         f.write(replace_input(lltext,{"ROOT":os.environ["PWD"]+"/..","JOBDIR":os.environ["PWD"]+"/"+jobdir,
-                                      "iFROM":ifrom[i],"iTO":ito[i],"I":i}));
+                                      "iFROM":ifrom[i],"iTO":ito[i],"I":i,"NCPUS":NCPUs}));
+
+    with open(jobdir+"/slurmsubmit-%d-%d.sh" % (ifrom[i],ito[i]),"w") as f:
+        f.write(replace_input(slurmtext,{"ROOT":os.environ["PWD"]+"/..","JOBDIR":os.environ["PWD"]+"/"+jobdir,
+                                         "iFROM":ifrom[i],"iTO":ito[i],"I":i,"NCPUS":NCPUs}));
 
 

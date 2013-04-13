@@ -399,7 +399,7 @@ C<SUB>112</SUB>-C<SUB>120</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseA
 C<SUB>122</SUB>-C<SUB>130</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C122-130.tar"> databaseAll.C122-130.tar (20/03/2013)</a> (compressed 144.8 MB)<br>
 C<SUB>132</SUB>-C<SUB>140</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C132-140.tar"> databaseAll.C132-140.tar (20/03/2013)</a> (compressed 298.7 MB)<br>
 C<SUB>142</SUB>-C<SUB>146</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C142-146.tar"> databaseAll.C142-146.tar (20/03/2013)</a> (compressed 303.0 MB)<br>
-C<SUB>148</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C148-150.tar"> databaseAll.C148-150.tar (20/03/2013)</a> (compressed 278.2 MB)<br>
+C<SUB>148</SUB>-C<SUB>150</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseAll.C148-150.tar"> databaseAll.C148-150.tar (03/04/2013)</a> (compressed 278.3 MB)<br>
 <b>Download for DatabaseIPRC60-C200 (IPR fullerenes):</b><br>
 C<SUB>060</SUB>-C<SUB>160</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C060-160.tar"> databaseIPR.C060-160.tar (20/03/2013)</a> (compressed 45.8 MB)<br>
 C<SUB>162</SUB>-C<SUB>170</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C162-170.tar"> databaseIPR.C162-170.tar (20/03/2013)</a> (compressed 67.1 MB)<br>
