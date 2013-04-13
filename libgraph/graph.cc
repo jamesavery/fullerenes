@@ -1,5 +1,6 @@
 #include "graph.hh"
 
+ // TODO: Should make two functions: one that takes subgraph (empty is trivially connected) and one that works on full graph.
 bool Graph::is_connected(const set<node_t> &subgraph) const 
 {
   if(!subgraph.empty()){
@@ -18,6 +19,28 @@ bool Graph::is_connected(const set<node_t> &subgraph) const
   }
 
   return true;
+}
+
+list< list<node_t> > Graph::connected_components() const 
+{
+  vector<bool> done(N);
+
+  list<list<node_t> > components;
+  for(node_t u=0;u<N;u++)
+    if(!done[u]){
+      list<node_t> component;
+  
+      done[u] = true;
+      component.push_back(u);
+      list<node_t> q(neighbours[u].begin(),neighbours[u].end());
+      while(!q.empty()){
+	node_t v = q.back(); q.pop_back(); done[v] = true;
+	component.push_back(v);
+	for(int i=0;i<neighbours[v].size();i++) if(!done[neighbours[v][i]]) q.push_back(neighbours[v][i]);
+      }
+      components.push_back(component);
+    }
+  return components;
 }
 
 vector<node_t> Graph::shortest_path(const node_t& source, const node_t& dest, const vector<unsigned int>& dist) const
