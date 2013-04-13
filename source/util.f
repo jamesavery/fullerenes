@@ -47,20 +47,22 @@ C---------------------------------------------------------------------
       CHARACTER*2 El(99)
       CHARACTER*4 Endext
       CHARACTER*7 Nameext
-      CHARACTER*50 filenameout,extname
+      CHARACTER*50 filenameout,extname,extname1
       IERR=0
-      Number='2'
-      ncyc=ncyc+1
       Call FileMod(filenameout,extname,Nameext,Endext,ncyc,ifind)
        if(ifind.ne.0) then
         Write(Iout,1000)
         IERR=1
         Return
        endif
-      if(nchoice.eq.3) filenameOut=filenameout//trim(adjustl(Number))
+      if(nchoice.eq.3) then
+       Number='2'
+       extname1=extname//trim(adjustl(Number))
+       extname=extname1
+      endif
       Open(unit=Iext,file=extname,form='formatted')
       Write(Iout,1011) extname,nchoice
-C Put Date and Time into comment line
+C Put Date into comment line
       call date_and_time(CDAT,CTIM,zone,values)
  
 C .xyz files
@@ -89,12 +91,12 @@ C .xyz files
 
 C .cc1 files
       if(nchoice.eq.2) then
-       if(number_vertices.lt.100) WRITE(3,1006) number_vertices
+       if(number_vertices.lt.100) WRITE(3,'(I2)') number_vertices
        if(number_vertices.ge.100.and.number_vertices.lt.1000)
-     1  WRITE(3,1007) number_vertices
+     1  WRITE(3,'(I3)') number_vertices
        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
-     1  WRITE(3,1008) number_vertices
-       if(number_vertices.ge.10000) WRITE(3,1009) number_vertices
+     1  WRITE(3,'(I4)') number_vertices
+       if(number_vertices.ge.10000) WRITE(3,'(I8)') number_vertices
         icc1flag=2
         Do J=1,number_vertices
          IM=IAtom(J)
@@ -103,8 +105,51 @@ C .cc1 files
         enddo
       endif
 
-C .mol2 files
+C .mol2 files TRIPOS/SYBIL format
+C   Comment section
       if(nchoice.eq.3) then
+       endzeile=0
+       do j=1,nzeile
+         if(TEXTINPUT(j).ne.' ') endzeile=j
+       enddo
+       if(number_vertices.lt.100) 
+     1  WRITE(Iext,1021) number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1  WRITE(Iext,1022) number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1  WRITE(Iext,1023) number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+       if(number_vertices.ge.10000)
+     1  WRITE(Iext,1024) number_vertices,
+     1   Values(3),Values(2),Values(1),(TEXTINPUT(I),I=1,endzeile)
+        WRITE(Iext,*) ' '
+C   @<TRIPOS>MOLECULE section
+       WRITE(Iext,'(A17)') '@<TRIPOS>MOLECULE'
+       WRITE(Iext,'(A9)') 'Fullerene'
+       number_edges=3*number_vertices/2
+       WRITE(Iext,'(I8,I8,A9)') number_vertices,number_edges,'  0  0  0'
+       WRITE(Iext,'(A5)')'SMALL'
+       WRITE(Iext,'(A10)')'NO_CHARGES'
+       WRITE(Iext,'(A1)')' '
+C   @<TRIPOS>ATOM section
+       WRITE(Iext,'(A13)') '@<TRIPOS>ATOM'
+       Do I=1,number_vertices
+        IM=IAtom(I)
+        Write(Iext,1025) I,El(IM),(Dist(J,I),J=1,3)
+       enddo
+C   @<TRIPOS>BOND section
+       WRITE(Iext,'(A13)') '@<TRIPOS>BOND'
+       Inum=0
+       Do I=1,number_vertices
+        Do J=1,3
+         if(IC3(I,J).gt.I) then
+          Inum=Inum+1
+          Write(Iext,1026) Inum,I,IC3(I,J)
+         endif
+        enddo
+       enddo
       endif
 
       Close(unit=Iext)
@@ -119,15 +164,21 @@ C .mol2 files
      1 ' / Origin: Program Fullerene / ',132A1)
  1004 FORMAT(I8,/,'C',I8,' / DATE:',I2,'/',I2,'/',I4,
      1 ' / Origin: Program Fullerene / ',132A1)
- 1005 FORMAT(A2,6X,3(F15.6,2X))
- 1006 FORMAT(I2)
- 1007 FORMAT(I3)
- 1008 FORMAT(I4)
- 1009 FORMAT(I8)
+ 1005 FORMAT(A2,6X,3(F16.8,2X))
  1010 FORMAT(A2,I5,3F12.6,4I5)
  1011 FORMAT(/1X,'Input coordinates to be used for plotting programs',
      1 ' like VMS, CYLVIEW, PYMOL or AVOGADRO',/1X,'Output written ',
      1 'into external file: ',A50,/1X,'Choice: ',I1)
+ 1021 FORMAT('C',I2,/,'DATE:',I2,'/',I2,'/',I4,
+     1 /,'Origin: Program Fullerene',/,132A1)
+ 1022 FORMAT('C',I3,/,'DATE:',I2,'/',I2,'/',I4,
+     1 /,'Origin: Program Fullerene',/,132A1)
+ 1023 FORMAT('C',I4,/,'DATE:',I2,'/',I2,'/',I4,
+     1 /,'Origin: Program Fullerene',/,132A1)
+ 1024 FORMAT('C',I8,/,'DATE:',I2,'/',I2,'/',I4,
+     1 /,'Origin: Program Fullerene',/,132A1)
+ 1025 FORMAT(I8,A2,6X,3(F15.6,2X),'C.ar   1  LIG1    0.0000')
+ 1026 FORMAT(I8,1X,I8,1X,I8,'   ar')
       RETURN
       END
 

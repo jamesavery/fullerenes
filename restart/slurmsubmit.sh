@@ -1,12 +1,12 @@
 #!/bin/bash
-# @ output = $JOBDIR/output-$I.log
-# @ error =  $JOBDIR/error-$I.log
-# @ wall_clock_limit = 48:00:00
-# @ class = large
-# @ resources = ConsumableCpus(8) ConsumableMemory(2000mb) 
-# @ queue
-
-cd $ROOT
+#SBATCH -p octuplets 
+#SBATCH -o $JOBDIR/output-$I.log
+#SBATCH -D $ROOT
+#SBATCH -J HamiltonPaths-$I
+#SBATCH --nodes=1
+#SBATCH --ntasks=$NCPUS
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=5000
 
 for i in `seq $iFROM $iTO`; do 
     ./fullerene < $JOBDIR/$i/input.inp > $JOBDIR/$i/output.log &

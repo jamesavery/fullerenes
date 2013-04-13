@@ -1,5 +1,5 @@
-C110 Creating IPR isomer list, needed 118662-713,319  in batches of 10000
-&General NA=110 /
+C114 Creating IPR isomer list, needed 1-1,008,444
+&General NA=114 /
 &Coord ICart=0 /
 &FFChoice /
 &FFParameters /
