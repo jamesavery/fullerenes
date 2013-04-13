@@ -76,6 +76,7 @@ C External file names
       Endmol='.mol'
       nxyz=0
       ncc1=0
+      nmol=0
 
 C Input / Output
       IN=5
@@ -184,7 +185,7 @@ C    This routine complements missing entries in IC3
         Call CheckIC3(IERROR,IC3)
         if(IERROR.eq.1) then
          nadjacencyflag=0
-         Write(iout,1015)
+         Write(iout,1012)
         else
          nadjacencyflag=1
         endif
@@ -201,7 +202,7 @@ C    This routine complements missing entries in IC3
         Call CheckIC3(IERROR,IC3)
         if(IERROR.eq.1) then
          nadjacencyflag=0
-         Write(iout,1015)
+         Write(iout,1012)
         else
          nadjacencyflag=1
         endif
@@ -209,6 +210,7 @@ C    This routine complements missing entries in IC3
         go to 40
        endif
       endif
+
 C Options for direct Input 
       go to (10,20,30,30,30,30,30,30,30,30,98) Icart+1
 
@@ -228,7 +230,7 @@ C Read cartesian coordinates directly
        enddo
        ncartflag=1
        Go to 40
-   21  WRITE(Iout,1016)
+   21  WRITE(Iout,1013)
        Go to 99
 
 C Cartesian coordinates produced ring from spiral pentagon list
@@ -355,7 +357,7 @@ C adjacent vertices
         else
           CALL HamiltonCyc(maxiter,Iout,nbatch,IDA,Nhamilton)
           WRITE(Iout,1010) Nhamilton
-          if(nbatch.ne.0) WRITE(Iout,1014)
+          if(nbatch.ne.0) WRITE(Iout,1011)
         endif
       endif
       CALL PathStatistic(Iout,iprintf,IDA,A,evec,df)
@@ -544,16 +546,16 @@ C .cc1 format
         ncc1=ncc1+1
         routine='PRINTCOORD     '
         Write(Iout,1008) routine
-        Call WriteToFile(2,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+        Call WriteToFile(2,Iext,ncc1,ifind,Iout,IERROR1,IAtom,
      1   IC3,El,Dist,filenameout,cc1name,Namecc1,Endcc1,TEXTINPUT)
        endif
 
 C .mol2 format
        if(iwext.eq.3) then
-        ncc1=ncc1+1
+        nmol=nmol+1
         routine='PRINTCOORD     '
         Write(Iout,1008) routine
-        Call WriteToFile(3,Iext,nxyz,ifind,Iout,IERROR1,IAtom,
+        Call WriteToFile(3,Iext,nmol,ifind,Iout,IERROR1,IAtom,
      1   IC3,El,Dist,filenameout,molname,Namemol,Endmol,TEXTINPUT)
        endif
       endif
@@ -621,7 +623,7 @@ C Calculate Schlegel diagram
      1   Rmin,TolX,scales,scalePPG,boost,CR,CRing5,CRing6,
      1   Symbol,filename)
       else
-        Write(Iout,1024) number_vertices
+        Write(Iout,1007) number_vertices
       endif
       endif
 C------------------END--------------------------------------------
@@ -631,11 +633,11 @@ C-----------------------------------------------------------------
  100  go to 9999
  101  iprev=0
       nloop=nloop+1
-      WRITE(Iout,1019) nloop ! line of dashes
+      WRITE(Iout,1005) nloop ! line of dashes
       go to 9 ! datain
  102  iprev=1
       nloop=nloop+1
-      WRITE(Iout,1019) nloop ! line of dashes
+      WRITE(Iout,1005) nloop ! line of dashes
       go to 9 ! datain
 9999  call date_and_time(CDAT,CTIM,zone,values)
         WRITE(Iout,1004) Values(3),Values(2),Values(1),Values(5),
@@ -678,17 +680,17 @@ C Formats
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,
      1 'TIME: ',I2,'h',I2,'m',I2,'s')
+ 1005 FORMAT(140('='),/1X,'Loop ',I2)
  1006 FORMAT(/1X,'Angle for Schlegel diagram reset to ',
      1 F10.4,' degrees')
+ 1007 Format(1X,'2D Graph for such a large fullerene with ',I6,
+     1 ' vertices is not meaningful ===> RETURN')
  1008 FORMAT(140('-'),/1x,'--> Enter Subroutine ',A15)
  1009 FORMAT(1x,'CPU Seconds: ',F15.2,', CPU Hours: ',F13.5)
  1010 FORMAT(1X,'Number of Hamiltonian cycles: ',I10)
- 1014 FORMAT(3X,'(Add to this batches from previous cycles!)')
- 1015 FORMAT(1X,'Connectivity field IC3 in input is errorneous: ',
+ 1011 FORMAT(3X,'(Add to this batches from previous cycles!)')
+ 1012 FORMAT(1X,'Connectivity field IC3 in input is errorneous: ',
      1 'taking only cartesian coordinates from input')
- 1016 FORMAT(/1X,'End of file reached ==> Stop')
- 1019 FORMAT(140('='),/1X,'Loop ',I2)
- 1024 Format(1X,'2D Graph for such a large fullerene with ',I6,
-     1 ' vertices is not meaningful ===> RETURN')
+ 1013 FORMAT(/1X,'End of file reached ==> Stop')
       STOP 
       END
