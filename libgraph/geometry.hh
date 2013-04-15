@@ -84,7 +84,6 @@ struct edge_t : public pair<node_t,node_t> {
     const node_t v = first, u = second;
     return u*(u-1)/2 + v; 
   }
-  friend ostream& operator<<(ostream& s, const edge_t& e){ s<<"{"<<e.first <<","<<e.second<<"}"; return s; }
 };
 
 // Directed edge is an ordered pair of nodes
@@ -206,6 +205,7 @@ struct face_t : public vector<node_t> {
   }
 
   // http://www.softsurfer.com/Archive/algorithm_0103/algorithm_0103.htm#Winding%20Number
+  // TODO: This seems to fail when compiled with -std=c++0x and -O0!
   double winding_number(const vector<coord2d>& layout, const coord2d& x) const {
     vector<coord2d> Cp(size());
     for(int i=0;i<size();i++)
@@ -225,12 +225,6 @@ struct face_t : public vector<node_t> {
     return winding_number(layout,x) != 0;
   }
   bool contains(const node_t v) const { for(int i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
-  
-  
-
-  friend ostream& operator<<(ostream &s, const face_t& f){
-    s << "{"; for(unsigned int i=0;i<f.size();i++) s << f[i] << (i+1<f.size()?", ":"}"); return s;
-  }
 };
 
 struct tri_t : public face_t {
