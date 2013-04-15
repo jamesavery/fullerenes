@@ -40,7 +40,7 @@ public:
   vector<face_t> compute_faces_flat(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   face_t find_outer_face() const; 
 
-  PlanarGraph dual_graph(unsigned int Fmax=INT_MAX) const;
+  PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=false) const;
 
 
   // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length

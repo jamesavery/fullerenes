@@ -129,7 +129,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
 
   h.close();
   */
-  return G;
+  return FullereneGraph(G,G.layout2d);
 }
 
 unsigned int gcd(unsigned int a, unsigned int b)
@@ -150,9 +150,10 @@ FullereneGraph FullereneGraph::coxeter_fullerene(const unsigned int i, const uns
 FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   PlanarGraph dualfrog(*this);
 
-  //  cerr << "leapfrog()\n";
   vector<face_t> faces(dualfrog.compute_faces_flat(6,planar_layout)); 
-  //  cerr << "leapfrog::got "<< faces.size() << " faces.\n";
+
+  //  cout << "(*leapfrog*)outer_face = " << dualfrog.outer_face << ";\n";
+  //  cout << "(*leapfrog*)faces      = " << faces << ";\n";
 
   node_t v_new = N;
 
@@ -161,7 +162,6 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
 
   for(size_t i=0;i<faces.size();i++){
     const face_t& f(faces[i]);
-    //    cerr << "Face " << i << ": " << f << endl;
     for(size_t j=0;j<f.size();j++)
       dualfrog.edge_set.insert(edge_t(v_new,f[j]));
     
@@ -175,25 +175,30 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   // Note that dualfrog is no longer planar, but is a triangulation of the sphere.
   // The dual of dualfrog becomes planar again.
   vector<coord2d> new_layout;
+  face_t new_outer_face;
 
   if(planar_layout){
-    //    cerr << "leapfrog::find_outer_face and compute faces\n";
-    if(outer_face.size() < 5) outer_face = find_outer_face();
-
+    // The layout of dualfrog is not planar - faces must be computed without it
     vector<face_t> triangles(dualfrog.compute_faces_flat(3,false));
-
-    //    cerr << "leapfrog::planar layout of " << triangles.size() << " triangles\n";
     new_layout.resize(triangles.size());
 
     for(int i=0;i<triangles.size();i++){
       const face_t& t(triangles[i]);
       new_layout[i] = t.centroid(dualfrog.layout2d)*coord2d(1,-1);
-      if(t[0] == N || t[1] == N || t[2] == N) // triangle belongs to old outer face
-	new_layout[i] *= 2.0;		      // TODO: Ensure that loop encompasses remaining graph
+      for(int j=0;j<3;j++) if(t[j] == N){
+	  //	  cout << "Triangle number " << i << " = " << t << " belongs to outer face.\n";
+	  new_outer_face.push_back(i);
+	  new_layout[i] *= 1.88;		      
+	  break;
+      }
     }
   } 
-  //  cerr << "leapfrog::dual()\n";
-  FullereneGraph frog(dualfrog.dual_graph(3), new_layout);
+
+  FullereneGraph frog(dualfrog.dual_graph(3,false), new_layout);
+
+  sort_ccw_point CCW(new_layout,new_outer_face.centroid(new_layout));
+  sort(new_outer_face.begin(),new_outer_face.end(),CCW);
+  frog.outer_face = new_outer_face;
 
   return frog;
 }

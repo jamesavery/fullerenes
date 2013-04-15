@@ -48,7 +48,7 @@ bool PlanarGraph::is_a_fullerene() const {
 }
 
 
-PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
+PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const {
   PlanarGraph dual;
   unsigned int Nfaces = edge_set.size()-N+2;
   dual.N = Nfaces;
@@ -56,7 +56,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   dual.edges.resize(Nfaces*(Nfaces-1)/2);
   
   //  cerr << "dual_graph(" << Fmax << ")\n";
-  const vector<face_t> allfaces(compute_faces_flat(Fmax));
+  const vector<face_t> allfaces(compute_faces_flat(Fmax,planar_layout));
 
   if(Nfaces != allfaces.size()){
     fprintf(stderr,"%d != %d faces: Graph is not polyhedral.\n",Nfaces,int(allfaces.size()));
@@ -95,7 +95,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax) const {
   dual.update_auxiliaries();
 
   // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
-  if(layout2d.size() == N){
+  if(planar_layout && layout2d.size() == N){
     //    cerr << "dual_graph::compute layout.\n";
     dual.layout2d = vector<coord2d>(Nfaces);
 
@@ -202,6 +202,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
     for(node_t u=0;u<N;u++)
       if(!outer_face.contains(u) && !outer_face.point_inside(layout2d,u)){
 	cerr << "Point " << u << "/" << layout2d[u] << " is outside outer face " << outer_face << endl;
+	for(int i=0;i<outer_face.size();i++) cerr << "\t" << layout2d[outer_face[i]] << endl;
 	cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
 	abort();
       }
@@ -255,13 +256,18 @@ vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_la
 
 
   // Make sure that outer face is at position 0
-  if(planar_layout && outer_face.size() > 0){
-    const node_t s(outer_face[0]), t(outer_face[1]), r(outer_face[2]);
+  if(planar_layout){
+    if(outer_face.size() < 3)
+      outer_face = find_outer_face();
+
+    const set<node_t> of(outer_face.begin(),outer_face.end());
     for(int i=0;i<faces.size();i++){
-      const face_t f(faces[i]);
-      if(f[0] == s && f[1] == t && f[2] == r){ // swap faces[i] with faces[0]
-	faces[i] = faces[0];
-	faces[0] = f;
+      const face_t &f(faces[i]);
+      const set<node_t> sf(f.begin(),f.end());
+
+      if(of==sf){ // swap faces[i] with faces[0]
+      	faces[i] = faces[0];
+	faces[0] = outer_face;
       }
     }
   } else outer_face = face_t(faces[0]);
