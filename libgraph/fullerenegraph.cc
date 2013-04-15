@@ -188,7 +188,7 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
       for(int j=0;j<3;j++) if(t[j] == N){
 	  //	  cout << "Triangle number " << i << " = " << t << " belongs to outer face.\n";
 	  new_outer_face.push_back(i);
-	  new_layout[i] *= 1.88;		      
+	  new_layout[i] *= 2.0; // TODO: Scale to be 1.1*radius
 	  break;
       }
     }

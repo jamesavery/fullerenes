@@ -52,6 +52,9 @@ app-%: apps/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ 
 #-----------------------------------------------------
 
+app-leapfrog: apps/leapfrog.cc build/libgraph.a build/opt-standalone.o 
+	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ -lgfortran
+
 output/%.out: input/%.inp
 	./fullerene < $< > $@
 
