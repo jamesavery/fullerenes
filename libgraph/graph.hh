@@ -41,11 +41,11 @@ struct Graph {
   }
 
   bool is_connected(const set<node_t>& subgraph = set<node_t>()) const;
-  vector<node_t> shortest_path(const node_t& source, const node_t& dest, const vector<unsigned int>& D0) const;
-  vector<unsigned int> shortest_paths(const node_t& source, const vector<bool>& used_edges, 
+  vector<node_t> shortest_path(const node_t& source, const node_t& dest, const vector<int>& D0) const;
+  vector<int> shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 				      const vector<bool>& used_nodes, const unsigned int max_depth = INT_MAX) const;
-  vector<unsigned int> shortest_paths(const node_t& source, const unsigned int max_depth = INT_MAX) const;
-  vector<unsigned int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
+  vector<int> shortest_paths(const node_t& source, const unsigned int max_depth = INT_MAX) const;
+  vector<int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
   list< list<node_t> > connected_components() const;
   
   // Find shortest cycle of the form s->...->s
@@ -54,14 +54,14 @@ struct Graph {
   vector<node_t> shortest_cycle(const node_t& s, const node_t& t, const int max_depth) const;
   // Find shortest cycle of the form s->t->r->...->s
   vector<node_t> shortest_cycle(const node_t& s, const node_t& t, const node_t& r, const int max_depth) const;
-  vector<unsigned int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
+  vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
 
-  vector<unsigned int> multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges, 
+  vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges, 
 						      const vector<bool>& used_nodes, const unsigned int max_depth=INT_MAX) const;
 
 
   int hamiltonian_count() const;
-  int hamiltonian_count(const node_t& current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<unsigned int>& distances) const;
+  int hamiltonian_count(const node_t& current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
 
   coord2d centre2d(const vector<coord2d>& layout) const; 
   coord3d centre3d(const vector<coord3d>& layout) const; 
