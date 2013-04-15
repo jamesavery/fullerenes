@@ -5,14 +5,14 @@ bool Graph::is_connected(const set<node_t> &subgraph) const
 {
   if(!subgraph.empty()){
     node_t s = *subgraph.begin();
-    const vector<unsigned int> dist(shortest_paths(s));
+    const vector<int> dist(shortest_paths(s));
 
     for(set<node_t>::const_iterator u(subgraph.begin()); u!=subgraph.end();u++) 
       if(dist[*u] == INT_MAX) return false;
 
   } else {
     node_t s = edge_set.begin()->first; // Pick a node that is part of an edge
-    const vector<unsigned int> dist(shortest_paths(s));
+    const vector<int> dist(shortest_paths(s));
 
     for(int i=0;i<dist.size();i++) 
       if(dist[i] == INT_MAX) return false;
@@ -71,10 +71,10 @@ vector<node_t> Graph::shortest_path(const node_t& source, const node_t& dest, co
   return path;
 }
 
-vector<unsigned int> Graph::shortest_paths(const node_t& source, const vector<bool>& used_edges, 
+vector<int> Graph::shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 					   const vector<bool>& used_nodes, const unsigned int max_depth) const
 {
-  vector<unsigned int> distances(N,INT_MAX);
+  vector<int> distances(N,INT_MAX);
   list<node_t> queue;    
 
   distances[source] = 0;
@@ -95,9 +95,9 @@ vector<unsigned int> Graph::shortest_paths(const node_t& source, const vector<bo
   return distances;
 }
 
-vector<unsigned int> Graph::shortest_paths(const node_t& source, const unsigned int max_depth) const
+vector<int> Graph::shortest_paths(const node_t& source, const unsigned int max_depth) const
 {
-  vector<unsigned int> distances(N,INT_MAX);
+  vector<int> distances(N,INT_MAX);
   list<node_t> queue;    
 
   distances[source] = 0;
@@ -119,13 +119,13 @@ vector<unsigned int> Graph::shortest_paths(const node_t& source, const unsigned 
 }
 
 // Returns NxN matrix of shortest distances (or INT_MAX if not connected)
-vector<unsigned int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
+vector<int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
 {
-  vector<unsigned int> distances(N*N);
+  vector<int> distances(N*N);
   vector<bool> dummy_edges(N*(N-1)/2), dummy_nodes(N);
 
   for(node_t u=0;u<N;u++){
-    const vector<unsigned int> row(shortest_paths(u,dummy_edges,dummy_nodes,max_depth));
+    const vector<int> row(shortest_paths(u,dummy_edges,dummy_nodes,max_depth));
     memcpy(&distances[u*N],&row[0],N*sizeof(unsigned int));
   }
 
@@ -153,7 +153,7 @@ vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const int
 
   // Find shortest path t->s in G excluding edge (s,t)
   used_edges[edge_t(s,t).index()] = true;
-  vector<unsigned int> distances(shortest_paths(t,used_edges,used_nodes,max_depth));
+  vector<int> distances(shortest_paths(t,used_edges,used_nodes,max_depth));
 
   // If distances[s] is uninitialized, we have failed to reach s and there is no cycle <= max_depth.
   if(distances[s] == INT_MAX) return vector<node_t>();
@@ -214,7 +214,7 @@ vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const nod
   used_edges[edge_t(s,t).index()] = true;
   used_edges[edge_t(t,r).index()] = true;
 
-  vector<unsigned int> distances(shortest_paths(r,used_edges,used_nodes,max_depth));
+  vector<int> distances(shortest_paths(r,used_edges,used_nodes,max_depth));
 
   // If distances[s] is uninitialized, we have failed to reach s and there is no cycle <= max_depth.
   if(distances[s] == INT_MAX) return vector<node_t>();

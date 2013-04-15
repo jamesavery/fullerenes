@@ -9,14 +9,14 @@ int Graph::hamiltonian_count() const
     used_nodes[start_node] = true;
     path.push_back(start_node);
 
-    vector<unsigned int> distances(shortest_paths(start_node,used_edges,used_nodes,N));
+    vector<int> distances(shortest_paths(start_node,used_edges,used_nodes,N));
     
     fprintf(stderr,"distances:\n");
     for(unsigned int i=0;i<N;i++) fprintf(stderr,"\t%d : %d\n",i+1,distances[i]);
     return hamiltonian_count(start_node,used_edges,used_nodes,path,distances);
   }
 
-int Graph::hamiltonian_count(const node_t& current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<unsigned int>& distances) const {
+int Graph::hamiltonian_count(const node_t& current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const {
     if(path.size() == N){
       if(edges[edge_t(current_node,path[0]).index()] == true){	// Hamiltonian circuit
 	//	fprintf(stderr,"Hamiltonian: ");
