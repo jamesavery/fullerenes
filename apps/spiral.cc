@@ -7,6 +7,7 @@
 
 using namespace std;
 
+
 int main(int ac, char **av)
 {
   vector<int> rspi(12);
@@ -22,8 +23,8 @@ int main(int ac, char **av)
   FullereneGraph g(N, rspi, jumps);
   PlanarGraph  dg(g.dual_graph(6));
 
-  g.layout2d = g.tutte_layout(0,1,4);
-  dg.layout2d = dg.tutte_layout(0,1,2);
+  g.layout2d = g.tutte_layout();
+  dg.layout2d = dg.tutte_layout();
 
   cout << "g = " << g << ";\n";
   cout << "dg = " << dg << ";\n";
