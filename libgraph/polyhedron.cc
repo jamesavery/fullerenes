@@ -1,5 +1,15 @@
 #include "polyhedron.hh"
 
+double Polyhedron::diameter() const {
+  double dmax = -INFINITY;
+  for(int i=0;i<N;i++)
+    for(int j=i+1;j<N;j++){
+      double d = (points[i]-points[j]).norm();
+      if(d > dmax) dmax = d;
+    }
+  return dmax;
+};
+
 double Polyhedron::surface_area() const {
   double A = 0;  
 
