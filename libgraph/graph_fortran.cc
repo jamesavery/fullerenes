@@ -256,7 +256,7 @@ void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const in
 {
   unsigned int M=(*g)->N, N = *outer_dim;
   
-  vector<unsigned int> distances((*g)->all_pairs_shortest_paths(*max_depth));
+  vector<int> distances((*g)->all_pairs_shortest_paths(*max_depth));
   for(unsigned int i=0;i<M;i++)
     for(unsigned int j=0;j<M;j++)
       D[i*N+j] = distances[i*M+j];
@@ -459,7 +459,7 @@ void vertex_depth_(const graph_ptr *g, const int *outer_face, const int *of_leng
   vector<node_t> outer(*of_length);
   for(int i=0;i<outer.size();i++) outer[i] = outer_face[i]-1;
 
-  vector<unsigned int> D((*g)->multiple_source_shortest_paths(outer,vector<bool>(N*(N-1)/2),vector<bool>(N)));
+  vector<int> D((*g)->multiple_source_shortest_paths(outer,vector<bool>(N*(N-1)/2),vector<bool>(N)));
   
   *max_depth = -1;
   for(node_t u=0;u<N;u++){

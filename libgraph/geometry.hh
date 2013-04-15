@@ -7,6 +7,7 @@
 #include <set>
 #include <map>
 #include <math.h>
+#include <sstream>
 using namespace std;
 
 typedef int node_t;
@@ -85,6 +86,13 @@ struct edge_t : public pair<node_t,node_t> {
     return u*(u-1)/2 + v; 
   }
 };
+
+template <typename T> string to_string(const T& x)
+{
+  ostringstream s;
+  s << x;
+  return s.str();
+}
 
 // Directed edge is an ordered pair of nodes
 typedef pair<node_t,node_t> dedge_t;
