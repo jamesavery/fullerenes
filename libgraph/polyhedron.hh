@@ -109,12 +109,13 @@ struct Polyhedron : public PlanarGraph {
     return f;
   }
 
+  double  diameter() const;
   coord3d width_height_depth() const;
 
   string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
   string to_povray(double w_cm = 10, double h_cm = 10, 
-		   int line_colour = 0x6a5acd, int vertex_colour = 0x8b2500, int face_colour = 0x667744,
-		   double line_width = 0.1, double vertex_diameter = 2.0, double face_opacity = 0.5) const;
+		   int line_colour = 0x6a5acd, int vertex_colour = 0xb03500, int face_colour = 0x667744,
+		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.5) const;
 private:
   static double C20_points[20][3];
 };
