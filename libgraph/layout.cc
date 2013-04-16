@@ -252,10 +252,10 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
 vector<coord2d> PlanarGraph::spherical_projection() const
 {
   vector<node_t> outer_face(find_outer_face());
-  vector<unsigned int> vertex_depth(multiple_source_shortest_paths(outer_face,vector<bool>(N*(N-1)/2),vector<bool>(N)));
+  vector<int> vertex_depth(multiple_source_shortest_paths(outer_face,vector<bool>(N*(N-1)/2),vector<bool>(N)));
 
   // Step 1. Sort nodes wrt. vertex depth; partition into dmax sets V[d]. 
-  unsigned int dmax = 0;
+  int dmax = 0;
   map<int,list<node_t> > V;
   for(node_t u=0;u<N;u++){
     V[vertex_depth[u]].push_back(u);

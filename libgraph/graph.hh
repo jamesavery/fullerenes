@@ -41,7 +41,7 @@ struct Graph {
   }
 
   bool is_connected(const set<node_t>& subgraph = set<node_t>()) const;
-  vector<node_t> shortest_path(const node_t& source, const node_t& dest, const vector<int>& D0) const;
+  vector<int> shortest_path(const node_t& source, const node_t& dest, const vector<int>& D0) const;
   vector<int> shortest_paths(const node_t& source, const vector<bool>& used_edges, 
 				      const vector<bool>& used_nodes, const unsigned int max_depth = INT_MAX) const;
   vector<int> shortest_paths(const node_t& source, const unsigned int max_depth = INT_MAX) const;
