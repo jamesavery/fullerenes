@@ -69,10 +69,18 @@ int main(int ac, char **av)
   Polyhedron P(G,coordinates,6,faces);
 
   double C20diameter = 4.08, diameter = P.diameter();
-  double width = 3*diameter/C20diameter;
+  double width = 2.5*diameter/C20diameter;
 
+  cout << P.volume() << endl;
   ofstream outfile(outname.c_str());
-  outfile << P.to_povray(width,width);
+  int red = min(int(200.0*(exp(4.0-diameter)/40.0)),0xd0);
+  int blue = 0;//min(int(256.0*(1-exp((diameter-40.0)))),0x90);
+  int green = min(int(256.0*(exp(diameter-40))),0xa0);
+
+  int vertex_colour = (red<<16) | (green << 8) | blue;
+  printf("vertex colour: %x%x%x = %x\n",red,green,blue,vertex_colour);
+
+  outfile << P.to_povray(width,width,0x6a5acd,vertex_colour);
   outfile.close();
 
   return 0;
