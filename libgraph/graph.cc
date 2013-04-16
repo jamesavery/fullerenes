@@ -43,7 +43,7 @@ list< list<node_t> > Graph::connected_components() const
   return components;
 }
 
-vector<node_t> Graph::shortest_path(const node_t& source, const node_t& dest, const vector<unsigned int>& dist) const
+vector<int> Graph::shortest_path(const node_t& source, const node_t& dest, const vector<int>& dist) const
 {
   // Fill in shortest paths -- move to own function.
   node_t vi = source;
@@ -239,10 +239,10 @@ vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const nod
 }
 
 
-vector<unsigned int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges, 
+vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges, 
 							   const vector<bool>& used_nodes, const unsigned int max_depth) const
 {
-  vector<unsigned int> distances(N,INT_MAX);
+  vector<int> distances(N,INT_MAX);
   list<node_t> queue;
     
   for(unsigned int i=0;i<sources.size();i++){
@@ -265,7 +265,7 @@ vector<unsigned int> Graph::multiple_source_shortest_paths(const vector<node_t>&
   return distances;
 }
 
-vector<unsigned int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth) const
+vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth) const
 {
   return multiple_source_shortest_paths(sources,vector<bool>(N*(N-1)/2),vector<bool>(N),max_depth);
 }
