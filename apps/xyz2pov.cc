@@ -59,8 +59,8 @@ int main(int ac, char **av)
   }
   string filename(av[1]);
   string outname(filename.substr(0,filename.rfind("."))+".pov");
-  cerr << "Reading from: " << filename << endl
-       << "Writing to:   " << outname  << endl;
+  //  cerr << "Reading from: " << filename << endl
+  //       << "Writing to:   " << outname  << endl;
 
   vector<coord3d> coordinates(readxyz(filename));
   FullereneGraph G(connect_neighbours(1.6,coordinates));
@@ -68,17 +68,17 @@ int main(int ac, char **av)
   vector<face_t> faces(G.compute_faces_flat(6,true));
   Polyhedron P(G,coordinates,6,faces);
 
-  double C20diameter = 4.08, diameter = P.diameter();
-  double width = 2.5*diameter/C20diameter;
+  double min_diameter = 4, max_diameter = 30, diameter = P.diameter();
+  double width = 2.5*diameter/min_diameter;
 
-  cout << P.volume() << endl;
+  //  printf("{%d, %f, %f}\n",G.N,P.volume(),P.diameter());
+
   ofstream outfile(outname.c_str());
-  int red = min(int(200.0*(exp(4.0-diameter)/40.0)),0xd0);
-  int blue = 0;//min(int(256.0*(1-exp((diameter-40.0)))),0x90);
-  int green = min(int(256.0*(exp(diameter-40))),0xa0);
+  int red   = int(256.0*min(diameter/max_diameter-0.1,0.8));
+  int green = int(256.0*min(min_diameter/diameter-0.1,0.85));
+  int blue = 0;
 
   int vertex_colour = (red<<16) | (green << 8) | blue;
-  printf("vertex colour: %x%x%x = %x\n",red,green,blue,vertex_colour);
 
   outfile << P.to_povray(width,width,0x6a5acd,vertex_colour);
   outfile.close();
