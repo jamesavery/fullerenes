@@ -1,5 +1,5 @@
 File from converting large to small database
-&General ndbconvert=1 filename='database/LargeDatabaseALL/c148all.database' /
+&General ndbconvert=1 filename='database/LargeDatabaseALL/c112all.database' /
 &Coord /
 &FFChoice /
 &FFParameters /
