@@ -233,10 +233,6 @@ C Read cartesian coordinates directly
    21  WRITE(Iout,1013)
        Go to 99
 
-C Cartesian coordinates produced ring from spiral pentagon list
-C or from adjacency matrix. Uses the Fowler-Manolopoulos algorithm 
-C with P-type eigenvectors or the Tutte algorithm to construct 
-C the 3D fullerene
    30 Ipent=1
       routine='COORDBUILD     '
       Write(Iout,1008) routine
@@ -474,6 +470,15 @@ C------------------------------------------------------------------
 C------------------------------------------------------------------
 C  S T A R T   O F   3D   S T R U C T U R E   S E C T I O N
 C------------------------------------------------------------------
+
+C Cartesian coordinates produced ring from spiral pentagon list
+C or from adjacency matrix. Uses the Fowler-Manolopoulos algorithm 
+C with P-type eigenvectors or the Tutte algorithm to construct 
+C the 3D fullerene
+  
+C  More to come here
+      routine='COORDBUILD     '
+      Write(Iout,1008) routine
 
 C------------------OPTFF------------------------------------------
 C Optimize Geometry through force field method
