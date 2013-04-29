@@ -166,50 +166,26 @@ c abc_z=-ab_x*bc_y + ab_y*bc_x
 
 
 c abc_x=-ab_y*bc_z + ab_z*bc_y
-      dabc_x__day=
-     1   dabc_x__dab_y*dab_y__day
-      dabc_x__daz=
-     1  dabc_x__dab_z*dab_z__daz
-      dabc_x__dby=
-     1   dabc_x__dab_y*dab_y__dby
-     1 + dabc_x__dbc_y*dbc_y__dby
-      dabc_x__dbz=
-     1  dabc_x__dbc_z*dbc_z__dbz
-     1 + dabc_x__dab_z*dab_z__dbz
-      dabc_x__dcy=
-     1  dabc_x__dbc_y*dbc_y__dcy
-      dabc_x__dcz=
-     1  dabc_x__dbc_z*dbc_z__dcz
+      dabc_x__day= dabc_x__dab_y*dab_y__day
+      dabc_x__daz= dabc_x__dab_z*dab_z__daz
+      dabc_x__dby= dabc_x__dab_y*dab_y__dby + dabc_x__dbc_y*dbc_y__dby
+      dabc_x__dbz= dabc_x__dbc_z*dbc_z__dbz + dabc_x__dab_z*dab_z__dbz
+      dabc_x__dcy= dabc_x__dbc_y*dbc_y__dcy
+      dabc_x__dcz= dabc_x__dbc_z*dbc_z__dcz
 c abc_y=-ab_z*bc_x + ab_x*bc_z
-      dabc_y__dax=
-     1  dabc_y__dab_x*dab_x__dax
-      dabc_y__daz=
-     1   dabc_y__dab_z*dab_z__daz
-      dabc_y__dbx=
-     1  dabc_y__dbc_x*dbc_x__dbx
-     1 + dabc_y__dab_x*dab_x__dbx
-      dabc_y__dbz=
-     1   dabc_y__dab_z*dab_z__dbz
-     1 + dabc_y__dbc_z*dbc_z__dbz
-      dabc_y__dcx=
-     1  dabc_y__dbc_x*dbc_x__dcx
-      dabc_y__dcz=
-     1  dabc_y__dbc_z*dbc_z__dcz
+      dabc_y__dax= dabc_y__dab_x*dab_x__dax
+      dabc_y__daz= dabc_y__dab_z*dab_z__daz
+      dabc_y__dbx= dabc_y__dbc_x*dbc_x__dbx + dabc_y__dab_x*dab_x__dbx
+      dabc_y__dbz= dabc_y__dab_z*dab_z__dbz + dabc_y__dbc_z*dbc_z__dbz
+      dabc_y__dcx= dabc_y__dbc_x*dbc_x__dcx
+      dabc_y__dcz= dabc_y__dbc_z*dbc_z__dcz
 c abc_z=-ab_x*bc_y + ab_y*bc_x
-      dabc_z__dax=
-     1   dabc_z__dab_x*dab_x__dax
-      dabc_z__day= 
-     1  dabc_z__dab_y*dab_y__day
-      dabc_z__dbx=
-     1   dabc_z__dab_x*dab_x__dbx
-     1 + dabc_z__dbc_x*dbc_x__dbx
-      dabc_z__dby= 
-     1  dabc_z__dbc_y*dbc_y__dby
-     1 + dabc_z__dab_y*dab_y__dby
-      dabc_z__dcx=
-     1  dabc_z__dbc_x*dbc_x__dcx
-      dabc_z__dcy= 
-     1  dabc_z__dbc_y*dbc_y__dcy
+      dabc_z__dax= dabc_z__dab_x*dab_x__dax
+      dabc_z__day= dabc_z__dab_y*dab_y__day
+      dabc_z__dbx= dabc_z__dab_x*dab_x__dbx + dabc_z__dbc_x*dbc_x__dbx
+      dabc_z__dby= dabc_z__dbc_y*dbc_y__dby + dabc_z__dab_y*dab_y__dby
+      dabc_z__dcx= dabc_z__dbc_x*dbc_x__dcx
+      dabc_z__dcy= dabc_z__dbc_y*dbc_y__dcy
 
 
 c bcd_x=-bc_y*cd_z + bc_z*cd_y
@@ -689,18 +665,12 @@ c////////////////////////////////////////////////////////////////////////
 
 
 c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
-      dbc_length_inv__dbx=
-     1   dbc_length_inv__dbc_x*dbc_x__dbx
-      dbc_length_inv__dby=
-     1   dbc_length_inv__dbc_y*dbc_y__dby
-      dbc_length_inv__dbz=
-     1   dbc_length_inv__dbc_z*dbc_z__dbz
-      dbc_length_inv__dcx=
-     1   dbc_length_inv__dbc_x*dbc_x__dcx
-      dbc_length_inv__dcy=
-     1   dbc_length_inv__dbc_y*dbc_y__dcy
-      dbc_length_inv__dcz=
-     1   dbc_length_inv__dbc_z*dbc_z__dcz
+      dbc_length_inv__dbx= dbc_length_inv__dbc_x*dbc_x__dbx
+      dbc_length_inv__dby= dbc_length_inv__dbc_y*dbc_y__dby
+      dbc_length_inv__dbz= dbc_length_inv__dbc_z*dbc_z__dbz
+      dbc_length_inv__dcx= dbc_length_inv__dbc_x*dbc_x__dcx
+      dbc_length_inv__dcy= dbc_length_inv__dbc_y*dbc_y__dcy
+      dbc_length_inv__dcz= dbc_length_inv__dbc_z*dbc_z__dcz
 
 
 c bcd_length_inv_cub=bcd_length_inv**3
