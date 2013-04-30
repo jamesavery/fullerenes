@@ -673,7 +673,7 @@ C Final statistics
  612  FORMAT(1X,'Lowest  Sigmah= ',F8.5,' for isomer ',I10,
      1      /1X,'Highest Sigmah= ',F8.5,' for isomer ',I10)
  613  FORMAT(1X,'Isomer List Complete')
- 614  FORMAT(1X,'All isomers haven ring spirals starting from a ',
+ 614  FORMAT(1X,'All isomers have ring spirals starting from a ',
      1 'pentagon')
  615  FORMAT(1X,'Number of isomers with ring spirals without ',
      1 'a pentagon start: ',I5)
