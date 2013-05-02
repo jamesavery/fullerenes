@@ -1,4 +1,3 @@
-//#include "libgraph/geometry.hh"
 #include "libgraph/planargraph.hh"
 #include "libgraph/cubicgraph.hh"
 #include "libgraph/fullerenegraph.hh"
