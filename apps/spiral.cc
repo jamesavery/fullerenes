@@ -38,7 +38,7 @@ int main(int ac, char **av)
   dg_latex.close();
 
   // Get and print distance matrix for all vertices and for pentagons
-  vector<unsigned int> D(dg.all_pairs_shortest_paths());
+  vector<int> D(dg.all_pairs_shortest_paths());
   cout << "D = {\n";
   for(int i=0;i<dg.N;i++) cout << "\t" << vector<unsigned int>(&D[i*dg.N],&D[(i+1)*dg.N]) << "}" << (i+1<dg.N?",\n":"\n");
   cout << "};\n";
