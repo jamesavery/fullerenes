@@ -6,7 +6,7 @@
 class TopologicalIndices {
 public:
   const FullereneGraph& g;
-  const vector<unsigned int> D;
+  const vector<int> D;
   const int N;
   vector<int> dmax;
   int diameter, radius;
