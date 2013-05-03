@@ -73,7 +73,7 @@ public:
     return result;
   }
 
-  static vector< set<int> > rasterize_polygonb(const vector<Eisenstein>& outline)
+  static vector< set<int> > rasterize_polygon(const vector<Eisenstein>& outline)
   {
     int top = INT_MIN, bottom = INT_MAX;
     for(int i=0;i<outline.size();i++){
