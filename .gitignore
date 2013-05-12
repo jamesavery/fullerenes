@@ -10,3 +10,4 @@
 Manual/*pdf
 config.mod
 libgraph.a
+database/*
