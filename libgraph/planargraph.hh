@@ -7,7 +7,6 @@ class PlanarGraph : public Graph {
 public:
   using Graph::N;
   using Graph::neighbours;
-  using Graph::edges;
   using Graph::edge_set;
   using Graph::name;
 
@@ -42,6 +41,7 @@ public:
 
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=false) const;
 
+  size_t count_perfect_matchings() const;
 
   // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
   void get_vertex_spiral(const int f1, const int f2, const int f3, vector<int> &spiral, jumplist_t &jumps) const;

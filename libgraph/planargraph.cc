@@ -53,7 +53,6 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
   unsigned int Nfaces = edge_set.size()-N+2;
   dual.N = Nfaces;
   dual.neighbours.resize(Nfaces);
-  dual.edges.resize(Nfaces*(Nfaces-1)/2);
   
   //  cerr << "dual_graph(" << Fmax << ")\n";
   const vector<face_t> allfaces(compute_faces_flat(Fmax,planar_layout));
@@ -92,7 +91,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
   }
   //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
 
-  dual.update_auxiliaries();
+  dual.update_from_edgeset();
 
   // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
   if(planar_layout && layout2d.size() == N){
@@ -179,7 +178,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 {
   assert(layout2d.size() == N);
   facemap_t facemap;
-  cout << "Computing faces using 2D orientation." << endl;
+  //  cout << "Computing faces using 2D orientation." << endl;
   set<dedge_t> workset;
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
@@ -206,7 +205,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 	cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
 	abort();
       }
-    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face." << endl;
+    //    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face." << endl;
     facemap[outer_face.size()].insert(outer_face);
     // Add outer face to output, remove directed edges from work set
     for(unsigned int i=0;i<outer_face.size();i++){
@@ -365,11 +364,11 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
     done[dedge_t(tris[0][i],tris[0][(i+1)%3])] = true;
   }
 
-  deque<int> workset; 
-  for(int i=1;i<tris.size();i++) workset.push_back(i);
+  queue<int> workset; 
+  for(int i=1;i<tris.size();i++) workset.push(i);
 
   while(!workset.empty()){
-    int i = workset.front(); workset.pop_front();
+    int i = workset.front(); workset.pop();
     tri_t& t(tris[i]);
 
 
@@ -377,7 +376,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
     bool seen = false, rev_seen = false;
     for(int j=0;j<3;j++){  seen |= done[dedge_t(t[j],t[(j+1)%3])]; rev_seen |= done[dedge_t(t[(j+1)%3],t[j])]; }
     if(!seen && !rev_seen) {
-      workset.push_back(i);
+      workset.push(i);
       continue;
     }
 
@@ -508,7 +507,9 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
   return s;
 }
 
-
+// *********************************************************************
+//			     SPIRAL STUFF
+// *********************************************************************
 void gpi_connect_forward(list<pair<int,int> > &open_valencies){
   --open_valencies.back().second;
   --open_valencies.front().second;
@@ -687,3 +688,90 @@ void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node
   
 }
 
+// **********************************************************************
+//		       COMBINATORIAL PROPERTIES
+// **********************************************************************
+
+void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces, 
+		   map<dedge_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const dedge_t& e) 
+{
+  int frev = faceEdge[reverse(e)];
+  if(visited[frev]) return;
+  visited[frev] = true;
+
+  const face_t &f(faces[frev]);
+  for(int i=0;i<f.size();i++)
+    perfmatch_dfs(faceEdge,faces,matrix,faceSum,visited,dedge_t(f[i],f[(i+1)%f.size()]));
+
+  // NB: How to handle outer face?
+  if(!faceSum[frev]) { //not odd sum of CW edges
+    int fe = faceEdge[e];
+    faceSum[frev] = !faceSum[frev];
+    faceSum[fe] = !faceSum[fe];
+    matrix[e] *= -1;
+    matrix[reverse(e)] *= -1;
+  }
+
+}
+
+#ifdef HAS_LAPACK
+#ifdef HAS_MKL
+#include <mkl.h>
+#else
+extern "C" void dgetrf_(int *M, int *N, double *A, int *LDA, int *IPIV, int *INFO);		
+#endif
+
+double lu_det(const vector<double> &A, int N)	
+{
+  int info = 0;
+  double *result = new double[N*N];
+  int    *ipiv   = new int[N];
+  double prod = 1.0;
+  memcpy(result,&A[0],N*N*sizeof(double));
+  dgetrf_(&N,&N, result, &N, ipiv, &info);
+  {
+    int i;
+    for(i=0;i<N;i++) prod *= result[(N+1)*i];
+  }
+  free(result);
+  free(ipiv);
+  return fabs(prod);
+}
+
+
+size_t PlanarGraph::count_perfect_matchings() const 
+{
+  map<dedge_t,int> faceEdge;
+  vector<face_t> faces(compute_faces_flat(max_degree(), true));
+  vector<bool> faceSum(faces.size()), visited(faces.size());  
+
+  map<dedge_t,int> A;
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++){
+    A[*e] = 1;
+    A[reverse(*e)] = -1;
+  }
+  
+  for(int i=0;i<faces.size();i++){
+    const face_t &f(faces[i]);
+    for(int j=0;j<f.size();j++){
+      const dedge_t e(f[j],f[(j+1)%f.size()]);
+      faceEdge[e] = i;
+      if(A[e] == 1) faceSum[i] = !faceSum[i];
+    }
+  }
+
+  perfmatch_dfs(faceEdge,faces,A,faceSum,visited,*edge_set.begin());
+
+  vector<double> Af(N*N);
+  for(map<dedge_t,int>::const_iterator a(A.begin()); a!=A.end(); a++)
+    Af[a->first.first*N+a->first.second] = a->second;
+
+  return sqrt(fabs(lu_det(Af,N)));
+}
+#else
+size_t PlanarGraph::count_perfect_matchings() const 
+{
+  cerr << "count_perfect_matchings() requires LAPACK.\n";
+  return 0;
+}
+#endif
