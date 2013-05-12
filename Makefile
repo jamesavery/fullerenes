@@ -12,7 +12,7 @@ FFLAGS= -g3 -O3 -m64 -Wall
 #FFLAGS= -O3 -mcmodel=medium 
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o geometry.o dddihedral.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o polyhedron.o fullerenegraph.o graph_fortran.o mgmres.o
+GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o polyhedron.o fullerenegraph.o graph_fortran.o mgmres.o geometry.o
 
 FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))
 COBJECTS=$(patsubst %.o, build/%.o, $(GRAPHOBJECTS))
