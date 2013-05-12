@@ -102,7 +102,7 @@ struct Polyhedron : public PlanarGraph {
       P.points.push_back(x);
       u++;
     }
-    P.update_auxiliaries();
+    P.update_from_edgeset();
     P.layout2d = P.tutte_layout();
     P.faces = P.compute_faces_flat(P.face_max);
     P.centre = P.centre3d(P.points);
@@ -114,8 +114,8 @@ struct Polyhedron : public PlanarGraph {
 
   string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
   string to_povray(double w_cm = 10, double h_cm = 10, 
-		   int line_colour = 0x6a5acd, int vertex_colour = 0xb03500, int face_colour = 0x667744,
-		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.5) const;
+		   int line_colour = 0x6a5acd, int vertex_colour = 0xc03500, int face_colour = 0x667744,
+		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.4) const;
 private:
   static double C20_points[20][3];
 };

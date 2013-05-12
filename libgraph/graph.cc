@@ -271,10 +271,15 @@ vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources,
 }
 
 
+int Graph::max_degree() const
+{
+  int max_d = 0;
+  for(node_t u=0;u<N;u++) if(neighbours[u].size() > max_d) max_d = neighbours[u].size();
+  return max_d;
+}
 
 
-
-void Graph::update_auxiliaries() 
+void Graph::update_from_edgeset() 
 {
   // Instantiate auxiliary data strutures: sparse adjacency matrix and edge existence map.
   map<node_t,set<node_t> > ns;
@@ -286,11 +291,9 @@ void Graph::update_auxiliaries()
     N = max(N,max(e->first,e->second)+1);
   }
 
-  edges.resize(N*(N-1)/2);
   neighbours.resize(N);
 
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    edges[e->index()] = true;
     ns[e->first].insert(e->second);
     ns[e->second].insert(e->first);
   }
@@ -307,7 +310,7 @@ void Graph::update_from_neighbours()
   for(node_t u=0;u<neighbours.size();u++)
     for(unsigned int i=0;i<neighbours[u].size();i++)
       edge_set.insert(edge_t(u,neighbours[u][i]));
-  update_auxiliaries();
+  update_from_edgeset();
 }
 
 

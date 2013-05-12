@@ -18,7 +18,7 @@ int Graph::hamiltonian_count() const
 
 int Graph::hamiltonian_count(const node_t& current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const {
     if(path.size() == N){
-      if(edges[edge_t(current_node,path[0]).index()] == true){	// Hamiltonian circuit
+      if(edge_set.find(edge_t(current_node,path[0])) != edge_set.end()){ // Hamiltonian circuit
 	//	fprintf(stderr,"Hamiltonian: ");
 	for(unsigned int i=0;i<path.size();i++) fprintf(stderr,"%d ",path[i]+1); fprintf(stderr,"%d\n",path[0]+1);
 	return 1;

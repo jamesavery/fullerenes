@@ -49,7 +49,7 @@ public:
     for(int i=0;i<30;i++)
       g.edge_set.insert(edge_t(C20_edges[i][0],C20_edges[i][1]));
     
-    g.update_auxiliaries();
+    g.update_from_edgeset();
     return FullereneGraph(g,g.layout2d);
   }
 
