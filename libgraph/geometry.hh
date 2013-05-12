@@ -8,6 +8,7 @@
 #include <map>
 #include <math.h>
 #include <sstream>
+#include <list>
 using namespace std;
 
 typedef int node_t;
@@ -68,6 +69,8 @@ template<typename K, typename V> vector<V> get_values(const map<K,V>& m)
   return values;
 }
 
+template<typename S, typename T> pair<T,S> reverse(const pair<S,T>& p){ return pair<T,S>(p.second,p.first); }
+
 template <typename T> int sgn(const T& val) { return (T(0) < val) - (val < T(0)); }
 
 // Undirected edge is an unordered pair of nodes
@@ -93,6 +96,8 @@ template <typename T> string to_string(const T& x)
   s << x;
   return s.str();
 }
+
+string pad_string(const string& s, int length, char padchar = '0');
 
 // Directed edge is an ordered pair of nodes
 typedef pair<node_t,node_t> dedge_t;
