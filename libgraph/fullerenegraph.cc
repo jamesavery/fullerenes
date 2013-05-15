@@ -170,7 +170,7 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
 
     v_new++;
   }
-  dualfrog.update_auxiliaries();
+  dualfrog.update_from_edgeset();
 
   // Note that dualfrog is no longer planar, but is a triangulation of the sphere.
   // The dual of dualfrog becomes planar again.
@@ -335,7 +335,7 @@ FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, co
   }
   
   PlanarGraph dual(edge_set);
-  dual.update_auxiliaries();
+  dual.update_from_edgeset();
 
   *this = dual.dual_graph(3);
   fullerene_check();
@@ -351,7 +351,7 @@ void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, cons
   jumps.clear();
 
   PlanarGraph dual = this->dual_graph(6);
-  dual.update_auxiliaries();
+  dual.update_from_edgeset();
 
   // the spiral is a string of numbers 5 and 6 and is built up during the loop
   vector<int> spiral; 

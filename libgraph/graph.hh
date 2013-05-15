@@ -22,14 +22,13 @@ using namespace std;
 struct Graph {
   int N;
   neighbours_t neighbours;
-  edges_t edges;
   set<edge_t> edge_set;
   string name;
 
   Graph(const set<edge_t>& edge_set = set<edge_t>()) : edge_set(edge_set) {
-    update_auxiliaries();
+    update_from_edgeset();
   }
-  Graph(const unsigned int N, const vector<int>& adjacency) : N(N), neighbours(N), edges(N*(N-1)/2) {
+  Graph(const unsigned int N, const vector<int>& adjacency) : N(N), neighbours(N) {
     assert(adjacency.size() == N*N);
 
     for(unsigned int i=0;i<N;i++)
@@ -37,7 +36,7 @@ struct Graph {
 	if(adjacency[i*N+j]) edge_set.insert(edge_t(i,j));
       }
 
-    update_auxiliaries();
+    update_from_edgeset();
   }
 
   bool is_connected(const set<node_t>& subgraph = set<node_t>()) const;
@@ -59,7 +58,6 @@ struct Graph {
   vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges, 
 						      const vector<bool>& used_nodes, const unsigned int max_depth=INT_MAX) const;
 
-
   int hamiltonian_count() const;
   int hamiltonian_count(const node_t& current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
 
@@ -67,7 +65,9 @@ struct Graph {
   coord3d centre3d(const vector<coord3d>& layout) const; 
   void orient_neighbours(const vector<coord2d>& layout);
 
-  void update_auxiliaries(); 
+  int max_degree() const; 
+
+  void update_from_edgeset(); 
   void update_from_neighbours(); 
 
   friend ostream& operator<<(ostream& s, const Graph& g);
