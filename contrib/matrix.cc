@@ -30,6 +30,7 @@ int det(std::vector< std::vector<int> > A, int n) {
 				i0 = i; j0 = j;
 			}
 		}
+        if(i0 == -1) return 0; //Singular matrix
 		usedRow[i0] = 1; usedCol[j0] = 1;
 	}
 	return a[(n-1)%3][i0][j0];
