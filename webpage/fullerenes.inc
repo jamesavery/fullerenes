@@ -69,7 +69,7 @@ and is now more compact.
 
 This is an open-source code and free for distribution (except for commercial purposes). Please cite the following paper if you use this program for publishing data:<br><br>
 1) P. Schwerdtfeger, L. Wirz, and J. Avery, "Program Fullerene - A Software Package for Constructing and Analyzing 
-Structures of Regular Fullerenes", Version 4.4, J. Comput. Chem., in press. DOI10.1002/jcc.23278.<br>
+Structures of Regular Fullerenes", Version 4.4, J. Comput. Chem. 34, 1508-1526 (2013).<br>
 We also recommend to cite the following book (many of the concepts used can be found here):<br>
 2) P. W. Fowler and D. E. Manolopoulos, "An Atlas of Fullerenes"
 (Dover Publ., New York, 2006).<br>
