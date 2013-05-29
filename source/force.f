@@ -174,30 +174,42 @@ c we distinguish between bonds between two hexagons, two pentagons and hex/pent
       ehookrpp=0.d0
 
       if(ne_hh .ne. 0) then
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ratom)
+!$OMP DO REDUCTION(+:ehookrhh)
         do i=1,ne_hh
           call dist(p(3*e_hh(1,i)-2),p(3*e_hh(1,i)-1),p(3*e_hh(1,i)),
      1              p(3*e_hh(2,i)-2),p(3*e_hh(2,i)-1),p(3*e_hh(2,i)),
      1              ratom)
           ehookrhh=ehookrhh+(ratom-rhh)**2
         enddo
+!$OMP END DO
+!$OMP END PARALLEL
       endif
 
       if(ne_hp .ne. 0) then
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ratom)
+!$OMP DO REDUCTION(+:ehookrhp)
         do i=1,ne_hp
           call dist(p(3*e_hp(1,i)-2),p(3*e_hp(1,i)-1),p(3*e_hp(1,i)),
      1              p(3*e_hp(2,i)-2),p(3*e_hp(2,i)-1),p(3*e_hp(2,i)),
      2              ratom)
           ehookrhp=ehookrhp+(ratom-rhp)**2
         enddo
+!$OMP END DO
+!$OMP END PARALLEL
       endif
 
       if(ne_pp .ne. 0) then
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ratom)
+!$OMP DO REDUCTION(+:ehookrpp)
         do i=1,ne_pp
           call dist(p(3*e_pp(1,i)-2),p(3*e_pp(1,i)-1),p(3*e_pp(1,i)),
      1              p(3*e_pp(2,i)-2),p(3*e_pp(2,i)-1),p(3*e_pp(2,i)),
      1              ratom)
           ehookrpp=ehookrpp+(ratom-rpp)**2
         enddo
+!$OMP END DO
+!$OMP END PARALLEL
       endif
 
 C     Bending
@@ -205,6 +217,8 @@ c     we distinguish between angles of pentagons and hexagons
 C     Loop over 5-rings
       ehookap=0.d0
       ehookah=0.d0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abc)
+!$OMP DO REDUCTION(+:ehookap)
       do i=1,60
         call angle(p(3*a_p(1,i)-2),p(3*a_p(1,i)-1),p(3*a_p(1,i)),
      1             p(3*a_p(2,i)-2),p(3*a_p(2,i)-1),p(3*a_p(2,i)),
@@ -212,9 +226,13 @@ C     Loop over 5-rings
      1             angle_abc)
         ehookap=ehookap+(angle_abc-ap)**2
       enddo
+!$OMP END DO
+!$OMP END PARALLEL
 
       if(number_vertices .gt. 20) then
 C     Loop over 6-rings
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abc)
+!$OMP DO REDUCTION(+:ehookah)
       do i=1,3*number_vertices-60
         call angle(p(3*a_h(1,i)-2),p(3*a_h(1,i)-1),p(3*a_h(1,i)),
      1             p(3*a_h(2,i)-2),p(3*a_h(2,i)-1),p(3*a_h(2,i)),
@@ -222,6 +240,8 @@ C     Loop over 6-rings
      1             angle_abc)
         ehookah=ehookah+(angle_abc-ah)**2
       enddo
+!$OMP END DO
+!$OMP END PARALLEL
       endif
 
 
@@ -233,6 +253,8 @@ C dihedrals
 
       if(nd_hhh .ne. 0) then
 C     3 hexagons
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abcd)
+!$OMP DO REDUCTION(+:ehookdhhh)
       do i=1,nd_hhh
       call dihedral(p(3*d_hhh(1,i)-2),p(3*d_hhh(1,i)-1),p(3*d_hhh(1,i)),
      1              p(3*d_hhh(2,i)-2),p(3*d_hhh(2,i)-1),p(3*d_hhh(2,i)),
@@ -245,10 +267,14 @@ C     3 hexagons
 c        write(*,*)angle_abcd
         ehookdhhh=ehookdhhh+(angle_abcd-dhhh)**2
       enddo
+!$OMP END DO
+!$OMP END PARALLEL
       endif
 
       if(nd_hhp .ne. 0) then
 C     2 hexagons, 1 pentagon
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abcd)
+!$OMP DO REDUCTION(+:ehookdhhp)
       do i=1,nd_hhp
       call dihedral(p(3*d_hhp(1,i)-2),p(3*d_hhp(1,i)-1),p(3*d_hhp(1,i)),
      1              p(3*d_hhp(2,i)-2),p(3*d_hhp(2,i)-1),p(3*d_hhp(2,i)),
@@ -261,10 +287,14 @@ C     2 hexagons, 1 pentagon
 c        write(*,*)angle_abcd
         ehookdhhp=ehookdhhp+(angle_abcd-dhhp)**2
       enddo
+!$OMP END DO
+!$OMP END PARALLEL
       endif
 
       if(nd_hpp .ne. 0) then
 C     1 hexagon, 2 pentagons
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abcd)
+!$OMP DO REDUCTION(+:ehookdhpp)
       do i=1,nd_hpp
       call dihedral(p(3*d_hpp(1,i)-2),p(3*d_hpp(1,i)-1),p(3*d_hpp(1,i)),
      1              p(3*d_hpp(2,i)-2),p(3*d_hpp(2,i)-1),p(3*d_hpp(2,i)),
@@ -278,10 +308,14 @@ c        write(*,*)angle_abcd
         ehookdhpp=ehookdhpp+(angle_abcd-dhpp)**2
 c        write(*,*)'diff',angle_p,ap
       enddo
+!$OMP END DO
+!$OMP END PARALLEL
       endif
 
       if(nd_ppp .ne. 0) then
 C     3 pentagons
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abcd)
+!$OMP DO REDUCTION(+:ehookdppp)
       do i=1,nd_ppp
 c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
       call dihedral(p(3*d_ppp(1,i)-2),p(3*d_ppp(1,i)-1),p(3*d_ppp(1,i)),
@@ -296,6 +330,8 @@ c        write(*,*)angle_abcd
         ehookdppp=ehookdppp+(angle_abcd-dppp)**2
 c        write(*,*)'diff',angle_p,ap
       enddo
+!$OMP END DO
+!$OMP END PARALLEL
       endif
 
 C     Coulomb repulsion from origin
