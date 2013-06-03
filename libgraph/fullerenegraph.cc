@@ -7,6 +7,8 @@
 #include <vector>
 #include <utility> //required for pair
 
+typedef list<pair<int,int> > jumplist_t;
+
 pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const 
 {
   set<face_t> pentagons, hexagons;
@@ -344,7 +346,7 @@ FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, co
 
 // pentagon indices and jumps start to count at 0
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &pentagon_indices, list<pair<node_t,int> > &jumps) const {
+void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &pentagon_indices, jumplist_t &jumps) const {
 
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
   pentagon_indices.clear();
@@ -368,6 +370,95 @@ void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2
   assert(pentagon_indices.size()==12);
 
 }
+
+
+// perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
+void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_indices, jumplist_t &jumps) const {
+
+  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
+  pentagon_indices.clear();
+  jumps.clear();
+
+  vector<int> pentagon_indices_tmp;
+  vector<int> spiral_tmp;
+  list<pair<int,int> > jumps_tmp;
+  
+  //100 times 0 to make sure size() is large (so it get's overwritten in the first cycle)
+  vector<int> general_spiral_bak(100,0);
+
+  PlanarGraph dual(dual_graph(6));
+  vector<face_t> faces(dual.compute_faces_flat(3));
+
+//  cout << "generating all spirals ";
+
+  for(int i=0; i<faces.size(); i++){
+    int permutations[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
+    const face_t& f = faces[i];
+    for(int j=0; j<6; j++){
+      pentagon_indices_tmp.clear();
+
+      int f1 = f[permutations[j][0]], f2 = f[permutations[j][1]], f3 = f[permutations[j][2]];
+
+      dual.get_vertex_spiral(f1, f2, f3, spiral_tmp, jumps_tmp);
+
+      // extract spiral indices from spiral
+      int k=0;
+      for(vector<int>::const_iterator it=spiral_tmp.begin(); it != spiral_tmp.end(); ++it){
+        if(*it==5){
+          pentagon_indices_tmp.push_back(k);
+        }
+        ++k;
+      }
+      assert(pentagon_indices_tmp.size()==12);
+
+//      printf("Face %d:%d vertices defining the face(%d,%d,%d)\n",i,j,f1,f2,f3);
+
+      //flatten and combine:
+      vector<int> general_spiral;
+      for(list<pair<int,int> >::const_iterator it(jumps_tmp.begin()); it!= jumps_tmp.end(); ++it){
+        general_spiral.push_back(it->first);
+        general_spiral.push_back(it->second);
+      }
+      for(vector<int>::const_iterator it(pentagon_indices_tmp.begin()); it!=pentagon_indices_tmp.end(); ++it){ //there should be a simpler line for this: a.insert(a.end(), b.begin(), b.end());
+        general_spiral.push_back(*it);
+      }
+      // store the shortest / lexicographhicaly smallest one
+      if(general_spiral.size() < general_spiral_bak.size()){
+        general_spiral_bak = general_spiral;
+      }
+      else if(general_spiral.size() == general_spiral_bak.size()){ //there is an algorithm called lexicographical sort, which I ought to use
+        vector<int>::const_iterator it(general_spiral.begin());
+        vector<int>::const_iterator it_bak(general_spiral_bak.begin());
+        for( ; it !=general_spiral.end(); ++it, ++it_bak){
+          if(*it < *it_bak){
+            general_spiral_bak = general_spiral;
+            break;
+          }
+          else if(*it > *it_bak){break;}
+        }
+      }
+    }
+  }
+
+  // get rspi
+  vector<int> rspi(general_spiral_bak.end()-12, general_spiral_bak.end());
+  pentagon_indices = rspi;
+  general_spiral_bak.erase(general_spiral_bak.end()-12, general_spiral_bak.end());
+
+//  cout << "got rspi, size: " << general_spiral_bak.size() << endl;
+//  cout << "got rspi: " << rspi << endl;
+
+  //get jumps
+  while(general_spiral_bak.size() > 0){
+    jumps.push_back(make_pair(general_spiral_bak.front(), *(general_spiral_bak.begin()+1)));
+    general_spiral_bak.erase(general_spiral_bak.begin(), general_spiral_bak.begin()+2);
+  }
+//  cout << "got jumps, size: " << jumps.size() << endl;
+//  cout << "got jumps: " << jumps << endl;
+  //now pentagon_indices.size() should be 12, jumps.size() should be even, general_spiral_bak.size() should be 0
+
+}
+
 
 node_t FullereneGraph::C20_edges[30][2] ={{0,13},{0,14},{0,15},{1,4},{1,5},{1,12},{2,6},{2,13},{2,18},{3,7},{3,14},{3,19},{4,10},{4,18},{5,11},{5,19},{6,10},{6,15},{7,11},{7,15},{8,9},{8,13},{8,16},{9,14},{9,17},{10,11},{12,16},{12,17},{16,18},{17,19}};
 

@@ -40,6 +40,9 @@ public:
   // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
   void get_general_spiral_from_fg(const int f1, const int f2, const int f3, vector<int> &pentagon_indices, jumplist_t &jumps) const;
 
+  // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
+  void get_canonical_general_spiral_from_fg(vector<int> &pentagon_indices, jumplist_t &jumps) const;
+
   static FullereneGraph C20() {
     PlanarGraph g;
     g.layout2d.resize(20);
