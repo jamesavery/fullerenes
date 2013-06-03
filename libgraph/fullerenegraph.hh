@@ -1,5 +1,5 @@
 #ifndef FULLERENE_GRAPH_HH
-# define FULLERENE_GRAPH_HH
+#define FULLERENE_GRAPH_HH
 
 #include "cubicgraph.hh"
 #include "geometry.hh"
@@ -38,7 +38,7 @@ public:
   pair<set< face_t>, set<face_t> > compute_faces56() const;
 
   // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-  void get_pentagon_indices(const int f1, const int f2, const int f3, vector<int> &pentagon_indices, jumplist_t &jumps) const;
+  void get_general_spiral_from_fg(const int f1, const int f2, const int f3, vector<int> &pentagon_indices, jumplist_t &jumps) const;
 
   static FullereneGraph C20() {
     PlanarGraph g;

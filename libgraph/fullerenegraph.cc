@@ -344,7 +344,7 @@ FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, co
 
 // pentagon indices and jumps start to count at 0
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-void FullereneGraph::get_pentagon_indices(const node_t f1, const node_t f2, const node_t f3, vector<int> &pentagon_indices, list<pair<node_t,int> > &jumps) const {
+void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &pentagon_indices, list<pair<node_t,int> > &jumps) const {
 
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
   pentagon_indices.clear();
