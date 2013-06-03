@@ -362,7 +362,7 @@ void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2
   
   // extract spiral indices from spiral
   int k=0;
-  for(vector<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){
+  for(vector<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){ // FIXME use find
     if(*it==5){
       pentagon_indices.push_back(k);
     }
@@ -374,10 +374,6 @@ void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2
 
 // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
 void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_indices, jumplist_t &jumps) const {
-
-  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
-  pentagon_indices.clear();
-  jumps.clear();
 
   vector<int> pentagon_indices_tmp;
   vector<int> spiral_tmp;
@@ -403,7 +399,7 @@ void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_
 
       // extract spiral indices from spiral
       int k=0;
-      for(vector<int>::const_iterator it=spiral_tmp.begin(); it != spiral_tmp.end(); ++it){
+      for(vector<int>::const_iterator it=spiral_tmp.begin(); it != spiral_tmp.end(); ++it){ //FIXME use find.  is there some 'findall'?
         if(*it==5){
           pentagon_indices_tmp.push_back(k);
         }
@@ -419,14 +415,14 @@ void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_
         general_spiral.push_back(it->first);
         general_spiral.push_back(it->second);
       }
-      for(vector<int>::const_iterator it(pentagon_indices_tmp.begin()); it!=pentagon_indices_tmp.end(); ++it){ //there should be a simpler line for this: a.insert(a.end(), b.begin(), b.end());
+      for(vector<int>::const_iterator it(pentagon_indices_tmp.begin()); it!=pentagon_indices_tmp.end(); ++it){ //FIXME use insert: a.insert(a.end(), b.begin(), b.end());
         general_spiral.push_back(*it);
       }
       // store the shortest / lexicographhicaly smallest one
       if(general_spiral.size() < general_spiral_bak.size()){
         general_spiral_bak = general_spiral;
       }
-      else if(general_spiral.size() == general_spiral_bak.size()){ //there is an algorithm called lexicographical sort, which I ought to use
+      else if(general_spiral.size() == general_spiral_bak.size()){ // FIXME use lexicographical sort,
         vector<int>::const_iterator it(general_spiral.begin());
         vector<int>::const_iterator it_bak(general_spiral_bak.begin());
         for( ; it !=general_spiral.end(); ++it, ++it_bak){
@@ -439,6 +435,10 @@ void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_
       }
     }
   }
+
+  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
+  pentagon_indices.clear();
+  jumps.clear();
 
   // get rspi
   vector<int> rspi(general_spiral_bak.end()-12, general_spiral_bak.end());

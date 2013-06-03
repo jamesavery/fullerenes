@@ -510,6 +510,7 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
 // *********************************************************************
 //			     SPIRAL STUFF
 // *********************************************************************
+// gpi is for 'get pentagon indices'
 void gpi_connect_forward(list<pair<int,int> > &open_valencies){
   --open_valencies.back().second;
   --open_valencies.front().second;
