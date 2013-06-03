@@ -1,5 +1,3 @@
-#include "libgraph/planargraph.hh"
-#include "libgraph/cubicgraph.hh"
 #include "libgraph/fullerenegraph.hh"
 
 using namespace std;

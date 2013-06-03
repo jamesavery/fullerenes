@@ -1,4 +1,3 @@
-#include "libgraph/cubicgraph.hh"
 #include "libgraph/fullerenegraph.hh"
 
 #include <vector>
@@ -72,7 +71,7 @@ int main(int ac, char **av)
 
   jumps.clear();
   pentagon_indices_output.clear();
-  fg.get_pentagon_indices(0,115,151, pentagon_indices_output, jumps);  
+  fg.get_general_spiral_from_fg(0,115,151, pentagon_indices_output, jumps);  
 
   cout << "Output spiral indices: ";
   for (int i=0; i<12; ++i){

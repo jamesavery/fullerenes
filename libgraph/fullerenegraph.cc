@@ -415,9 +415,8 @@ void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_
         general_spiral.push_back(it->first);
         general_spiral.push_back(it->second);
       }
-      for(vector<int>::const_iterator it(pentagon_indices_tmp.begin()); it!=pentagon_indices_tmp.end(); ++it){ //FIXME use insert: a.insert(a.end(), b.begin(), b.end());
-        general_spiral.push_back(*it);
-      }
+      general_spiral.insert(general_spiral.end(), pentagon_indices_tmp.begin(), pentagon_indices_tmp.end());
+
       // store the shortest / lexicographhicaly smallest one
       if(general_spiral.size() < general_spiral_bak.size()){
         general_spiral_bak = general_spiral;
@@ -436,26 +435,23 @@ void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_
     }
   }
 
-  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
-  pentagon_indices.clear();
-  jumps.clear();
+  assert(general_spiral_bak.size() % 2 == 0);
 
   // get rspi
   vector<int> rspi(general_spiral_bak.end()-12, general_spiral_bak.end());
   pentagon_indices = rspi;
-  general_spiral_bak.erase(general_spiral_bak.end()-12, general_spiral_bak.end());
 
 //  cout << "got rspi, size: " << general_spiral_bak.size() << endl;
 //  cout << "got rspi: " << rspi << endl;
 
   //get jumps
-  while(general_spiral_bak.size() > 0){
+  jumps.clear();
+  while(general_spiral_bak.size() > 12){
     jumps.push_back(make_pair(general_spiral_bak.front(), *(general_spiral_bak.begin()+1)));
     general_spiral_bak.erase(general_spiral_bak.begin(), general_spiral_bak.begin()+2);
   }
 //  cout << "got jumps, size: " << jumps.size() << endl;
 //  cout << "got jumps: " << jumps << endl;
-  //now pentagon_indices.size() should be 12, jumps.size() should be even, general_spiral_bak.size() should be 0
 
 }
 
