@@ -362,7 +362,7 @@ void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2
   
   // extract spiral indices from spiral
   int k=0;
-  for(vector<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){ // FIXME use find
+  for(vector<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){
     if(*it==5){
       pentagon_indices.push_back(k);
     }
@@ -380,7 +380,7 @@ void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_
   list<pair<int,int> > jumps_tmp;
   
   //100 times 0 to make sure size() is large (so it get's overwritten in the first cycle)
-  vector<int> general_spiral_bak(100,0);
+  vector<int> general_spiral_bak(100,0); // FIXME
 
   PlanarGraph dual(dual_graph(6));
   vector<face_t> faces(dual.compute_faces_flat(3));
@@ -399,7 +399,7 @@ void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_
 
       // extract spiral indices from spiral
       int k=0;
-      for(vector<int>::const_iterator it=spiral_tmp.begin(); it != spiral_tmp.end(); ++it){ //FIXME use find.  is there some 'findall'?
+      for(vector<int>::const_iterator it=spiral_tmp.begin(); it != spiral_tmp.end(); ++it){
         if(*it==5){
           pentagon_indices_tmp.push_back(k);
         }
@@ -417,20 +417,11 @@ void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_
       }
       general_spiral.insert(general_spiral.end(), pentagon_indices_tmp.begin(), pentagon_indices_tmp.end());
 
-      // store the shortest / lexicographhicaly smallest one
-      if(general_spiral.size() < general_spiral_bak.size()){
-        general_spiral_bak = general_spiral;
-      }
-      else if(general_spiral.size() == general_spiral_bak.size()){ // FIXME use lexicographical sort,
-        vector<int>::const_iterator it(general_spiral.begin());
-        vector<int>::const_iterator it_bak(general_spiral_bak.begin());
-        for( ; it !=general_spiral.end(); ++it, ++it_bak){
-          if(*it < *it_bak){
-            general_spiral_bak = general_spiral;
-            break;
-          }
-          else if(*it > *it_bak){break;}
-        }
+      // store the shortest / lexicographically smallest one
+      if(general_spiral.size() < general_spiral_bak.size() || 
+			(general_spiral.size() == general_spiral_bak.size() &&
+			lexicographical_compare(general_spiral.begin(), general_spiral.end(), general_spiral_bak.begin(), general_spiral_bak.end()))){
+		general_spiral_bak = general_spiral;
       }
     }
   }
