@@ -511,12 +511,12 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
 //			     SPIRAL STUFF
 // *********************************************************************
 // gpi is for 'get pentagon indices'
-void gpi_connect_forward(list<pair<int,int> > &open_valencies){
+inline void gpi_connect_forward(list<pair<int,int> > &open_valencies){
   --open_valencies.back().second;
   --open_valencies.front().second;
 }
 
-void gpi_connect_backward(list<pair<int,int> > &open_valencies){
+inline void gpi_connect_backward(list<pair<int,int> > &open_valencies){
   list<pair<int,int> >::iterator second_last(open_valencies.end());
   second_last--;
   second_last--;
@@ -525,7 +525,7 @@ void gpi_connect_backward(list<pair<int,int> > &open_valencies){
   --second_last->second;//decrement the last but one entry
 }
 
-void gpi_remove_node(const int i, PlanarGraph &remaining_graph, set<int> &remaining_nodes, vector<int> &deleted_neighbours){
+inline void gpi_remove_node(const int i, PlanarGraph &remaining_graph, set<int> &remaining_nodes, vector<int> &deleted_neighbours){
   remaining_nodes.erase(i);
   //remove i from all neighbour lists and erase all neighbours from the i-list
   for(vector<int>::iterator it = remaining_graph.neighbours[i].begin(); it != remaining_graph.neighbours[i].end(); ++it){
