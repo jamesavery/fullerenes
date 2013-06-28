@@ -1,4 +1,6 @@
-      PROGRAM testderivations
+C to be linked against source/geometry.f and source/dddihedral.f
+
+      PROGRAM testderivatives
       use config
       IMPLICIT REAL*8 (a-z)
       integer iout,testno,minor
@@ -2186,5 +2188,5 @@ c      write(*,*) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
 
 
       stop
-      END
+      END PROGRAM testderivatives
 
