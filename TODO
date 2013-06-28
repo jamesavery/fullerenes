@@ -1,17 +1,15 @@
------------------
-to-do list
------------------
+-------------------------------------
+            TO-DO LIST
+-------------------------------------
 
 Generalized Goldberg-Coxeter (4.4)
-integrate general spiral (lukas, 4.4)
 Faster diagonalization / lapack (James, 4.4)
 
 direct ideal 3d construction (thurston)
-fit force field
+fit force field (lukas)
 minimum covering ellipsoid
-close packing
 Perfect matchings 
- i)count
+ i) count
  ii) find all
  iii) symmetry reduction
  iv) resulting properties
@@ -21,14 +19,17 @@ more robust Tutte embedding
 Separation of topological and caresian coordinate input (Peter 5.0)
 nano tubes (lukas, 5.0)
 minumum covering ellispoid (Peter, 5.0)
-Nanotube input (lukas, 5.0)
 Efficient treatment of matrices (5.0)
 Extension of database using HOG (Peter, 5.1)
 More patch replacements (Peter, 6.0)
 Introduction of 4-, 7-, and 8-rings (Peter 7.0)
 Genus 1 Fullerenes (Peter 7.0)
 GUI ()
+close packing
+general symmetry determination, which is not limited by non-general spirals (lukas)
+symmetrisation (lukas)
 
 
-done ? :
+done:
+integrate general spiral (lukas, 4.4)
 Efficient ring spiral search (Peter, 4.4)
