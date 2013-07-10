@@ -354,17 +354,21 @@ The criterion for jumping (while deriving the spiral from a graph) is, that the
 subgraph that hasn't been added to the spiral yet, must never be disconnected.  For deriving the graph from the spiral it is necessary
 to explicitly give the jump positions and distances. 
 
-We recommend reading Fowler and Manolopoulos' book \cite{Atlas,cvetkovic2002} for the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors 
-to construct 3D fullerene graphs. For the Goldberg-Coxeter transformation of \C{20} we obtain the RSPI from the scheme introduced by
-Fowler and Rogers.\cite{Rogers} For the AME algorithm it is critical to get the right 
-H\"uckel eigenvectors for the construction of cartesian coordinates,\cite{Atlas} which worked well for the icosahedral
-fullerenes, but less well for fullerene nanotubes. 
-The position of the three~$P$-type eigenvectors can be specified (see file \filename{RSPIc60NT.inp} for such an example).
-If the AME algorithm fails or you cannot find the required $P$-type eigenvectors, you should use our Tutte embedding algorithm,
-which (to our opinion) is less troublesome and may be used as the standard method to construct 3D structures. The disadvantage
-of this algorithm is, however, that the structure could be far off from a force-field optimized global minimum for a fullerene, and the
-force-field optimization might end up in a heavily distorted unreasonable 3D local minimum (for strategies to avoid this
-see the input section).
+We recommend reading Fowler and Manolopoulos' book \cite{Atlas,cvetkovic2002} for
+the use of RSPIs and H\"uckel (adjacency matrix) $P$-type eigenvectors to construct
+3D fullerene graphs.  For the Goldberg-Coxeter transformation of \C{20} we obtain
+the RSPI from the scheme introduced by Fowler and Rogers.\cite{Rogers}  For the AME
+algorithm it is critical to get the right H\"uckel eigenvectors for the construction
+of cartesian coordinates,\cite{Atlas} which worked well for the icosahedral fullerenes,
+but less well for fullerene nanotubes.  The position of the three~$P$-type eigenvectors
+can be specified (see file \filename{RSPIc60NT.inp} for such an example).  If the
+AME algorithm fails or you cannot find the required $P$-type eigenvectors, you should
+use our Tutte embedding algorithm, which (to our opinion) is less troublesome and
+may be used as the standard method to construct 3D structures.  The disadvantage
+of this algorithm is, however, that the structure could be far off from a force-field
+optimized global minimum for a fullerene, and the force-field optimization might
+end up in a heavily distorted unreasonable 3D local minimum (for strategies to avoid
+this see the input section).
 
 It is important that the end-product is viewed by a molecular visualization program. 
 We recommend CYLview by Claude Legault \cite{CYLview}, Avogadro \cite{Avogadro}, JMol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}. 
@@ -403,20 +407,26 @@ see for example the input file \filename{DBc158.inp}.
 
 %H\"uckel analysis and topological indicators
 \subsection{H\"uckel analysis and topological indicators}
-From the adjacency matrix $A_{ij}$ of eq.(\ref{eq:adjacencymatrix}), a H\"uckel analysis is performed (Subroutine \funname{Hueckel}). This gives you a good hint if the 
-fullerene is of open or of closed shell \cite{Atlas}. For smaller fullerenes or non-IPR fullerenes, the H\"uckel analysis may not be very reliable 
-as hybridization with the C(2s) orbitals occurs due to non-planarity. Hence the $\sigma-\pi$ separation breaks down. The orbital energies are defined as
+From the adjacency matrix $A_{ij}$ of eq.(\ref{eq:adjacencymatrix}), a H\"uckel analysis
+is performed (Subroutine \funname{Hueckel}).  This gives you a good hint if the fullerene
+is of open or of closed shell \cite{Atlas}.  For smaller fullerenes or non-IPR fullerenes,
+the H\"uckel analysis may not be very reliable as hybridization with the C(2s) orbitals
+occurs due to non-planarity.  Hence the $\sigma-\pi$ separation breaks down.  The
+orbital energies are defined as
 \begin{equation}
   \label{Hueckel}
   \epsilon_i=\alpha+x_i\beta
 \end{equation}
-and we adopt $\alpha = -0.21$ au  and  $\beta = -0.111$ au obtained
-from the experimental ionization potential (7.58 eV) and excitation energy (3.02 eV) of \C{60} (NB: the electron goes 
-into the second LUMO of $t_{1g}$ symmetry). This gives also orbital energies for \C{60} in reasonable 
-agreement with DFT Kohn-Sham orbital energies. The fullerene structure might also undergo a Jahn-Teller distortion adopting a singlet 
-ground state instead of one of a higher multiplicity, as this is the case for \C{20}. Such electronic effects are not
-captured in this program, and one needs to perform a proper quantum-theoretical calculation. The program gives information
-on the HOMO-LUMO gap and calculates the topological resonance energy from Babi\'c's matching polynomial calculations \cite{Babic1995,Babic1997}.
+and we adopt $\alpha = -0.21$ au  and  $\beta = -0.111$ au obtained from the experimental
+ionization potential (7.58 eV) and excitation energy (3.02\,eV) of \C{60} (NB: the
+electron goes into the second LUMO of $t_{1g}$ symmetry).  This gives also orbital
+energies for \C{60} in reasonable agreement with DFT Kohn-Sham orbital energies.
+The fullerene structure might also undergo a Jahn-Teller distortion adopting a singlet 
+ground state instead of one of a higher multiplicity, as this is the case for \C{20}.
+Such electronic effects are not captured in this program, and one needs to perform
+a proper quantum-theoretical calculation. The program gives information on the HOMO-LUMO
+gap and calculates the topological resonance energy from Babi\'c's matching polynomial
+calculations \cite{Babic1995,Babic1997}.
 
 A topological index is a structurally invariant natural or real number related to
 a molecular graph, which does not depend on the labelling or the 2D representation
@@ -495,23 +505,35 @@ For $I_h$-\C{60} both $\rho$ and $\rho_E$ are exactly 1.0. The spectral moments 
   \label{specmom}
   \mu_k=\sum_{i=1}^{n_v} x_i^k
 \end{equation}
-and we have $\mu_0 = n_v$, $\mu_1 = 0$, $\mu_2 = 3n_v$, $\mu_3 = 0$, $\mu_4 = 15n_v$, $\mu_5 = 120$, $\mu_4 = 93n_v - 120$, and $\mu_7 = 1680$.
-The higher spectral moments depend on the fullerene structure.\cite{Fowler93}\\
-One of the first topological indicators introduced to discuss the stability of fullerenes are the neighbour indices for pentagons and
-hexagons. The program calculates the pentagon neighbour indices,\cite{Atlas,Albertazzi} hexagon neighbour indices and the pentagon arm indices.\cite{Reti}
-Every fullerene isomer can be characterized by a signature of the form $\{i_k | k=1, \dots , n\}$. The pentagon indices $(p_i | i=0, \dots , 5)$ define the
-number of pentagons attached to another pentagon, i.e. for IPR fullerenes $p_0 = 12$ and all other pentagon indices are zero. Hexagon indices are similarly
-defined, i.e. $(h_i | i=0, \dots , 5)$, where $h_k$ is the number of hexagons with neighbour index $k$. In an IPR fullerene every hexagon is adjacent to a
-minimum of three others and we can restrict the list to $(h_3, h_4, h_5, h_6)$. The pentagon arm indices $(n_i | i=0, \dots , 5)$ counts the number of arms
-of the pentagons. Here an edge $E$ incident to a vertex of a pentagon not belonging to the pentagon is called an arm if i) both end-vertices of edge $E$ 
-are incident to pentagons, and ii) $E$ shares two neighbour hexagons.\cite{Reti} It is clear that this is nothing else than a Stone-Wales pattern.\\
+and we have $\mu_0 = n_v$, $\mu_1 = 0$, $\mu_2 = 3n_v$, $\mu_3 = 0$, $\mu_4 = 15n_v$,
+$\mu_5 = 120$, $\mu_4 = 93n_v - 120$, and $\mu_7 = 1680$.  The higher spectral moments
+depend on the fullerene structure.\cite{Fowler93}
+
+One of the first topological indicators introduced to discuss the stability of fullerenes
+are the neighbour indices for pentagons and hexagons.  The program calculates the
+pentagon neighbour indices,\cite{Atlas,Albertazzi} hexagon neighbour indices and
+the pentagon arm indices.\cite{Reti}  Every fullerene isomer can be characterized
+by a signature of the form $\{i_k | k=1, \dots, n\}$.  The pentagon indices $(p_i | i=0, \dots, 5)$
+define the number of pentagons attached to another pentagon, i.e., for IPR fullerenes
+$p_0 = 12$ and all other pentagon indices are zero.  Hexagon indices are similarly
+defined, i.e., $(h_i | i=0, \dots, 5)$, where $h_k$ is the number of hexagons with
+neighbour index $k$.  In an IPR fullerene every hexagon is adjacent to a minimum
+of three others and we can restrict the list to $(h_3, h_4, h_5, h_6)$.  The pentagon
+arm indices $(n_i | i=0, \dots, 5)$ counts the number of arms of the pentagons.  Here
+an edge $E$ incident to a vertex of a pentagon not belonging to the pentagon is called
+an arm if i) both end-vertices of edge $E$ are incident to pentagons, and ii) $E$ shares
+two neighbour hexagons.\cite{Reti}  It is clear that this is nothing else than a
+Stone-Wales pattern.
+
 We can now define some useful topological invariants. The pentagon index $N_p$ is defined as
 \begin{equation}
   \label{pentindex}
   N_p = \frac{1}{2}\sum_{k=1}^{5} kp_k \quad \text{ with } \quad  \sum_{k=0}^{5} p_k = 12
 \end{equation}
-For IPR fullerenes we have no pentagon attached to another and therefore $p_0 = 12$ and all other $p_i = 0$, and it follows that $N_p = 0$. For IPR fullerenes
-a more useful index is defined through the hexagon neighbour indices. The standard deviation $\sigma_h$ of the hexagon neighbour index distribution is defined as
+For IPR fullerenes we have no pentagon attached to another and therefore $p_0 = 12$
+and all other $p_i = 0$, and it follows that $N_p = 0$.  For IPR fullerenes a more
+useful index is defined through the hexagon neighbour indices.  The standard deviation
+$\sigma_h$ of the hexagon neighbour index distribution is defined as
 \begin{equation}
   \label{standev}
   \sigma_h = \sqrt{\langle k^2 \rangle - \langle k \rangle^2}
@@ -536,9 +558,11 @@ We now define the R\'eti-L\'aszl\'o topological descriptor as $\Psi$,
   \label{Moments}
   \Psi = \frac{30+6M_1}{1+4.5N_p+C(M_1,M_2)} \quad \text{ with } \quad  C(M_1,M_2) = \frac{(120M_2)^{1/2}}{(1+7M_1)^{1/2}(1+0.9\text{Var}^{1.5})}
 \end{equation}
-If there exists a non-negative integer $q$ for which one of the arm indices $n_q = 12$, the fullerene is called $q$-balanced. In this
-case $\text{Var} = 0$.\cite{Reti} If $N_p + N_A = 0$, the fullerene is called strongly isolated. \C{60} contains Stone-Wales patterns and is therefore not
-strongly isolated. The first leapfrog of \C{60}, \C{180}, and the ones to follow are strongly isolated.
+If there exists a non-negative integer $q$ for which one of the arm indices $n_q = 12$,
+the fullerene is called $q$-balanced.  In this case $\text{Var} = 0$.\cite{Reti}
+If $N_p + N_A = 0$, the fullerene is called strongly isolated.  \C{60} contains Stone-Wales
+patterns and is therefore not strongly isolated. The first leapfrog of \C{60}, \C{180},
+and the ones to follow are strongly isolated.
 
 
 %The Goldberg-Coxeter transformation
