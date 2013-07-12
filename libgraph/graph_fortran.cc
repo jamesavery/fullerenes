@@ -27,7 +27,6 @@ extern "C" {
   void edge_list_(const graph_ptr *, int *edges /* 2x|E| */, int *length);
   void adjacency_list_(const fullerene_graph_ptr *, const int *k, int *neighbours /* kxN */);
   void adjacency_matrix_(const graph_ptr *g, const int *outer_dim, int *adjacency);
-  void compute_fullerene_faces_(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
   void get_arc_face_(const graph_ptr *g, const int *u, const int *v, int *face, int *l);
 
   int hamiltonian_count_(const graph_ptr *);
@@ -43,12 +42,14 @@ extern "C" {
 			     const double *path_width, const double *vertex_diameter,const int *Npath, int *path);
   graph_ptr dual_graph_(const graph_ptr *);
 
-  void compute_fullerene_faces(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
-
 
   // Fullerene graph generation 
   fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n);
   fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps);
+
+  // Fullerene graph operations
+  void compute_fullerene_faces_(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
+  void get_pentagon_distance_mtx_(const fullerene_graph_ptr *, int *pentagon_distances);
 
 
   // Planar and spherical graph layout methods 
@@ -430,6 +431,19 @@ void compute_fullerene_faces_(const fullerene_graph_ptr *g, int *pentagons, int 
   for(int i=0;i<NH;i++)
     for(int j=0;j<6;j++)
       hexagons[i*6+j] = h[i][j];
+}
+
+void get_pentagon_distance_mtx_(const fullerene_graph_ptr *fg, int *pentagon_distances){
+
+  vector<int> mtx_v = (*fg)->pentagon_distance_mtx();
+  int mtx_a[144];
+
+  // how do I elegantly copy from vectors to arrays? I recall there was a trick ...
+  for (int i=0; i<144; ++i){
+    mtx_a[i] = mtx_v[i];
+  }
+
+  pentagon_distances = mtx_a;
 }
 
 // Only works for trivalent graphs. 

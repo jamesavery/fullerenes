@@ -43,6 +43,9 @@ public:
   // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
   void get_canonical_general_spiral_from_fg(vector<int> &pentagon_indices, jumplist_t &jumps) const;
 
+  // create a matrix that holds the topological distances between all pentagons
+  vector<int> pentagon_distance_mtx() const;
+
   static FullereneGraph C20() {
     PlanarGraph g;
     g.layout2d.resize(20);
