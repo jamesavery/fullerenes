@@ -457,18 +457,18 @@ vector<int> FullereneGraph::pentagon_distance_mtx() const{
   
   // I know the following line is very wasteful but it's good enough
   vector<int> all_distances = dual.all_pairs_shortest_paths(INT_MAX);
-  vector<int> pentagon_distance_mtx(144,0);
+  vector<int> mtx_vec(144,0);
   
   //cout << "pentagon distances: " << endl;
   for(int i=0; i!=12; ++i){
     for(int j=0; j!=12; ++j){
-      pentagon_distance_mtx[12*i+j] = all_distances[dual.N * pentagons[i] + pentagons[j]];
+      mtx_vec[12*i+j] = all_distances[dual.N * pentagons[i] + pentagons[j]];
     }
   }
  
 //  cout << pentagon_distance_mtx << endl;
   
-  return pentagon_distance_mtx;
+  return mtx_vec;
 
 //mathematica output, please do not remove (lukas)
 //    cout << "{";
