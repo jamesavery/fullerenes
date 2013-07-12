@@ -88,7 +88,6 @@ Ms. & Zoltan & Nemeth & KLTE &  & Debrecen & Hungary & nemethdebrzolt@citromail.
 Ms. & Bibek & Adhikari & Institute for Computational Physics & University of Stuttgart & Stuttgart & Germany & adbibek@icp.uni-stuttgart.de & Academic use
 Ms. & tarak & karmakar & jncasr & cpmu & bangalore & India & tarakk@jncasr.ac.in & 
 Ms. & Diwaker & kumar & IIT mandi India & physics, SBS & mandi & India & diwakerphysics@gmail.com & 
-Ms. & diwaker & kumar` & IIT mandi  & physics & mandi & India & diwakerphysics@gmal.com & 
 Dr. & jerry & lin & sioc & chem & SHANHAI & China & linfu3200@mail.sioc.ac.cn & thank you!
 Dr. & thanasis & koukoulas & University of Patras & Chemical Engineering & Patras & Greece & koukoulas_th@yahoo.gr & 
 Dr. & Yu-He & Kan & HYNU & Chemistry and Chemical Engineering & Huai'an & China & yhe@21cn.com & 
@@ -98,3 +97,23 @@ Ms. & Kirill & Berezovsky & PetrSU & Phys-Tech & Petrozavodsk & Russia & iberezk
  & leidy & bedoya & univalle & valle del cauca & cali & Colombia & yetzuko13@hotmail.com & 
 Prof. & Andrzej & Kaim & University of Warsaw & Chemistry & Warsaw & Poland & akaim@chem.uw.edu.pl & 
  & Amar Nath & Roy Chowdhury & National University of Singapore &  & Civil Engineering & Singapore & amar@nus.edu.sg & 
+Dr. & Igor & Petrushenko & Irkutsk State Technical University & Physical & Irkutsk & Russia & igor.petrushenko@istu.edu & 
+Mr. & Yasaman & Masoudi & SUT & mechanical engineering & Tehran & Iran & yas.masoudi@gmail.com & 
+Ms. & Andrzej & Cz&#322;api&#324;ski & - & - & Zgierz & Poland & andrewcz@wp.pl & 
+Ms. & mohsen & kheirodin & sharif university of technologt & mechanical engineering  & tehran & Iran & m.kheirodin@gmail.com & thank you
+Dr. & Li & Zong-Jun & Changchun Institute of Applied Chemistry & State Key Laboratory of Electroanalytical Chemistry & Changchun & China & lzj@ciac.jl.cn & 
+Dr. & Hitesh & Sharma & Punjab Technical University  & Department of Physics & Kapurthala & India & hitesh@ptu.ac.in & Academic institution 
+Ms. & Abhishek & Sirohiwal & IISER  & Chemical Sciences & Bhopal & India & abhisheks@iiserb.ac.in & i need this software for research purpose.
+Prof. Dr. & Qunxiang & Li & University of Science and Technology of China & Department of Chemical Physics & Hefei & China & liqun@ustc.edu.cn & We are interested in clusterfullerenes
+Prof. Dr. & Qunxiang & Li & University of Science and Technology of China & Department of Chemical Physics & Hefei & China & liqun@ustc.edu.cn & We are interested in clusterfullerenes
+Dr. & James & Avery & University of Copenhagen & Niels Bohr Institute & Copenhagen & Denmark & avery@diku.dk & 
+Prof. Dr. & wazirul haque & ansari & GoldField Inst. Tech. & Mgmt., Chhainsa & Physics & Faridabad-121004 & India & whansari161945@gmail.com & Your program is needed in our study of electronic structure & spectra of fullerenes
+Dr. & Kanchana & Thanthiriwatte & The University of Alabama & Depatment of Chemistry & Tuscaloosa & United States of America & sahanchem@gmail.com & 
+Dr. & Robin & Haunschild & Karlsruhe Institute of Technology & Physical Chemistry & Kalrsruhe & Germany & haunschild@kit.edu & 
+Ms. & Joseph & Held & University of Cologne & Theoretical Chemistry & Cologne & Germany & heldj@uni-koeln.de & 
+Dr. & James & Last & Woody & Stocky & White & Aruba & julian.gebhardt@gmx.net & 
+Prof. Dr. & Boris & Furtula & University of Kragujevac, Faculty of Science & Department of Chemistry & Kragujevac & Republic of Serbia & furtula@kg.ac.rs & 
+Ms. & Dietmar & Kahler & Softchem &  & Northeim & Germany & dkahler@t-online.de & 
+Prof. Dr. & Imran & Predhanekar & Islamiah College (Autonomous) & Chemistry & Vaniyambadi & India & imranpk@islamiahcollege.edu.in & I would like to work with this software
+Dr. & Vitaly & Chaban & MEMPHYS - Center for Biomembrane Physics &  & ODENSE & Denmark & vvchaban@gmail.com & 
+Prof. Dr. & Marek & Sierka & Friedrich-Schiller-Universität Jena & Institut für Materialwissenschaft und Werkstofftechnologi & Jena & Germany & marek.sierka@uni-jena.de & 
