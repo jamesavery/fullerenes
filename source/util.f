@@ -520,10 +520,10 @@ C     Get topological distance matrix
       call all_pairs_shortest_path(graph,number_vertices,Nmax,MDist)
       call edge_list(graph,edges,NE)
       call get_pentagon_distance_mtx(graph, pent_dist_mtx)
-c Peter, pent_dist_mtx i an array of 144 integers, which is redundant but easy and the performance is irrelevant.
+c     pent_dist_mtx i an array of 144 integers
 
 c     and finally delete the graph to free the mem
-      call delete_fullerene_graph(graph)     
+      call delete_fullerene_graph(graph)
 
 C     Wiener and hyper Wiener index, topological radius and diameter
       Xatom=dfloat(number_vertices)
@@ -570,7 +570,7 @@ C     Balaban index
         wii=wi(I)
         wij=wi(J)
         if(wii.lt.1.d-15.or.wij.lt.1.d-15) then
-         Write(Iout,1006)
+         Write(Iout,1005)
          Return
         endif
         balaban=balaban+1.d0/(dsqrt(wii*wij))
@@ -611,6 +611,9 @@ C     ori=wiener/vertnum**2.5
       Write(Iout,1003) maxdist,mRadius,Avdist
 C     Write(Iout,1004) ori
 
+C     Analyzing pentagon distance matrix
+      Write(Iout,1006)
+      Write(Iout,1007) (pent_dist_mtx(I),I=1,144)
  1000 Format(1X,'Topological Indicators:',/1X,
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
      1 '501, 442 (2011), and Behtoei et al., Appl. Math. Lett. ',
@@ -635,7 +638,10 @@ C     Write(Iout,1004) ori
      1 ' Topological radius R: ',I6,
      1 ', and average topological distance: ',F12.6)
 C1004 Format(' Ori constant for Wiener index: ',D15.9)
- 1006 Format(' Something wrong with Wiener sum')
+ 1005 Format(' Something wrong with Wiener sum')
+ 1006 Format(' Dual topological distance matrix for subspace of',
+     1 ' degree 5 vertices (PDM, pentagon distance matrix:')
+ 1007 Format(12(1X,I7))
 
       RETURN
       END

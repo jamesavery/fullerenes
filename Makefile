@@ -5,7 +5,8 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS= -g3 -O3 -m64 -fPIC -Wall -Wno-sign-compare -std=c++0x
+CXXFLAGS= -g3 -O3 -m64 -fPIC -Wall -Wno-sign-compare 
+# CXXFLAGS= -g3 -O3 -m64 -fPIC -Wall -Wno-sign-compare -std=c++0x
 FFLAGS= -g3 -O3 -m64 -Wall 
 LIBRARIES=-lstdc++ -lgomp
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
