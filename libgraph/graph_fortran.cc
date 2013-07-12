@@ -50,6 +50,7 @@ extern "C" {
   // Fullerene graph operations
   void compute_fullerene_faces_(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
   void get_pentagon_distance_mtx_(const fullerene_graph_ptr *, int *pentagon_distances);
+  void get_face_distance_mtx_(const fullerene_graph_ptr *, int *face_distances);
 
 
   // Planar and spherical graph layout methods 
@@ -434,16 +435,23 @@ void compute_fullerene_faces_(const fullerene_graph_ptr *g, int *pentagons, int 
 }
 
 void get_pentagon_distance_mtx_(const fullerene_graph_ptr *fg, int *pentagon_distances){
-
   vector<int> mtx_v = (*fg)->pentagon_distance_mtx();
-  int mtx_a[144];
-
   // how do I elegantly copy from vectors to arrays? I recall there was a trick ...
   for (int i=0; i<144; ++i){
-    mtx_a[i] = mtx_v[i];
+    pentagon_distances[i] = mtx_v[i];
   }
+}
 
-  pentagon_distances = mtx_a;
+void get_face_distance_mtx_(const fullerene_graph_ptr *fg, int *face_distances){
+
+  PlanarGraph dual((*fg)->dual_graph(6));
+  
+  vector<int> all_distances = dual.all_pairs_shortest_paths(INT_MAX);
+
+  int i=0;
+  for (vector<int>::iterator it=all_distances.begin();it!= all_distances.end(); ++it, ++i){
+    face_distances[i] = all_distances[i];
+  }
 }
 
 // Only works for trivalent graphs. 

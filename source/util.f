@@ -504,7 +504,7 @@ C     Now sort values of diamw, output diam
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer MDist(Nmax,Nmax),Edges(2,3*number_vertices/2)
-      integer pent_dist_mtx(144)
+      integer pent_dist_mtx(144), face_dist_mtx(number_vertices**2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
       type(c_ptr) :: graph, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
@@ -519,8 +519,9 @@ C     Get topological distance matrix
       graph = new_fullerene_graph(Nmax,number_vertices,IDA)
       call all_pairs_shortest_path(graph,number_vertices,Nmax,MDist)
       call edge_list(graph,edges,NE)
-      call get_pentagon_distance_mtx(graph, pent_dist_mtx)
 c     pent_dist_mtx i an array of 144 integers
+      call get_pentagon_distance_mtx(graph, pent_dist_mtx)
+      call get_face_distance_mtx(graph, face_dist_mtx)
 
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)
