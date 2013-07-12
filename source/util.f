@@ -503,7 +503,7 @@ C     Now sort values of diamw, output diam
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
-      Integer MDist(Nmax,Nmax),Edges(2,3*number_vertices/2)
+      Integer MDist(Nmax,Nmax),Edges(2,3*number_vertices/2),wienerp
       integer pent_dist_mtx(144), face_dist_mtx(number_vertices**2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
       type(c_ptr) :: graph, new_fullerene_graph
@@ -615,7 +615,13 @@ C     Write(Iout,1004) ori
 C     Analyzing pentagon distance matrix
       Write(Iout,1006)
       Write(Iout,1007) (pent_dist_mtx(I),I=1,144)
- 1000 Format(1X,'Topological Indicators for fullerene graph:',/1X,
+      wienerp=0
+      do i=1,144
+      wienerp=wienerp+pent_dist_mtx(I)
+      enddo
+      Write(Iout,1008) wienerp/2 
+ 1000 Format(/1X,'Topological Indicators for fullerene graph:',/1X,
+     1 43('-'),//1X,
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
      1 '501, 442 (2011), and Behtoei et al., Appl. Math. Lett. ',
      1 '22, 1571 (2009)',/1X,'Cn with n=',I5)
@@ -640,9 +646,11 @@ C     Analyzing pentagon distance matrix
      1 ', and average topological distance: ',F12.6)
 C1004 Format(' Ori constant for Wiener index: ',D15.9)
  1005 Format(' Something wrong with Wiener sum')
- 1006 Format(/1X,'Topological Indicators for dual fullerene graph:'  
-     1 /1X,'Topological distance matrix for pentagon distance matrix:')
+ 1006 Format(/1X,'Topological Indicators for dual fullerene graph:',  
+     1 /1X,48('-'),/1X,
+     1 /1X,'Topological distance matrix M_p for pentagons:')
  1007 Format(12(1X,I7))
+ 1008 Format(/1x,'Wiener(M_p) = ',I10)
 
       RETURN
       END
@@ -717,14 +725,14 @@ C       endif
       else
        Write(Iout,1003)
       endif
- 1000 Format(1X,'For this vertex number we can have 1 ',
+ 1000 Format(/1X,'For this vertex number we can have 1 ',
      1 ' icoshedral fullerene of Ih-symmetry')
- 1001 Format(1X,'For this vertex number we can have 1 ',
+ 1001 Format(/1X,'For this vertex number we can have 1 ',
      1 ' icoshedral fullerene of I-symmetry')
- 1002 Format(1X,'For this vertex number we can have ',I3,
+ 1002 Format(/1X,'For this vertex number we can have ',I3,
      1 ' icoshedral fullerenes. Out of this ',I3,' are of',
      1 ' Ih-symmetry and ',I3,' of I-symmetry')
- 1003 Format(1X,'There are no icosahedral fullerenes for ',
+ 1003 Format(/1X,'There are no icosahedral fullerenes for ',
      1 'this vertex number')
       RETURN
       END
