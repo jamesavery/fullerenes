@@ -616,10 +616,14 @@ C     Analyzing pentagon distance matrix
       Write(Iout,1006)
       Write(Iout,1007) (pent_dist_mtx(I),I=1,144)
       wienerp=0
+      wienerinv=0.
       do i=1,144
       wienerp=wienerp+pent_dist_mtx(I)
+      Fac=dfloat(pent_dist_mtx(I))
+      if(Fac.ne.0.d0) wienerinv=wienerinv+1./Fac
       enddo
-      Write(Iout,1008) wienerp/2 
+      wienerinvnorm=1.d0-wienerinv/94.d0
+      Write(Iout,1008) wienerp/2,wienerinvnorm 
  1000 Format(/1X,'Topological Indicators for fullerene graph:',/1X,
      1 43('-'),//1X,
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
@@ -650,7 +654,9 @@ C1004 Format(' Ori constant for Wiener index: ',D15.9)
      1 /1X,48('-'),/1X,
      1 /1X,'Topological distance matrix M_p for pentagons:')
  1007 Format(12(1X,I7))
- 1008 Format(/1x,'Wiener(M_p) = ',I10)
+ 1008 Format(/1x,'Pentagon Wiener PW(M_p) = ',I10,/1X,
+     1 'Inverse Pentagon Wiener Index IPWI(M_p) = ',F15.8,
+     1 ' (0 .le. IPWI .le. 1: 0 defines C20 and 1 the graphene limit)')
 
       RETURN
       END
