@@ -614,7 +614,7 @@ C     Write(Iout,1004) ori
 C     Analyzing pentagon distance matrix
       Write(Iout,1006)
       Write(Iout,1007) (pent_dist_mtx(I),I=1,144)
- 1000 Format(1X,'Topological Indicators:',/1X,
+ 1000 Format(1X,'Topological Indicators for fullerene graph:',/1X,
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
      1 '501, 442 (2011), and Behtoei et al., Appl. Math. Lett. ',
      1 '22, 1571 (2009)',/1X,'Cn with n=',I5)
@@ -639,8 +639,8 @@ C     Analyzing pentagon distance matrix
      1 ', and average topological distance: ',F12.6)
 C1004 Format(' Ori constant for Wiener index: ',D15.9)
  1005 Format(' Something wrong with Wiener sum')
- 1006 Format(' Dual topological distance matrix for subspace of',
-     1 ' degree 5 vertices (PDM, pentagon distance matrix:')
+ 1006 Format(/1X,'Topological Indicators for dual fullerene graph:'  
+     1 /1X,'Topological distance matrix for pentagon distance matrix:')
  1007 Format(12(1X,I7))
 
       RETURN
