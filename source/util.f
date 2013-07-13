@@ -515,12 +515,14 @@ C     Chem. Phys. Lett. 501, 442–445 (2011).
 
       Write(Iout,1000) number_vertices
 
-C     Get topological distance matrix
       graph = new_fullerene_graph(Nmax,number_vertices,IDA)
+c     topological distances between all pairs of vertices
       call all_pairs_shortest_path(graph,number_vertices,Nmax,MDist)
       call edge_list(graph,edges,NE)
-c     pent_dist_mtx i an array of 144 integers
+c     topological distances between all pairs of vertices of degree 5 in the dual of the fullerene graph
+c     i.e. the distances between the pentagons in the fullerene graph
       call get_pentagon_distance_mtx(graph, pent_dist_mtx)
+c     topological distances between all pairs of vertices in the dual of the fullerene graph
       call get_face_distance_mtx(graph, face_dist_mtx)
 
 c     and finally delete the graph to free the mem
