@@ -39,7 +39,7 @@ pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const
 FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_layout) const {
   if(m<0) return FullereneGraph(*this);
 
-  PlanarGraph dual(dual_graph(6));
+  PlanarGraph dual(dual_graph(6,true));
   vector<face_t> triangles(dual.compute_faces_flat(3,false));
   map<edge_t,vector<node_t> > edge_nodes;
   
