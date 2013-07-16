@@ -206,7 +206,8 @@ int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 
 fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n)
 {
-  return new FullereneGraph((*g)->halma_fullerene(*n,true));
+  bool has_layout = (*g)->layout2d.size() == (*g)->N;
+  return new FullereneGraph((*g)->halma_fullerene(*n,has_layout));
 }
 
 fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps)
