@@ -48,7 +48,7 @@ build/%.o: source/%.f build/config.o
 build/%.o: libgraph/%.cc
 	$(CXX) $(CXXFLAGS) $(OPTIONS) -c $< -o $@
 
-build/%.o: contrib/%.cpp
+build/%.o: contrib/%.cc
 	$(CXX) $(CXXFLAGS) $(OPTIONS) -c $< -o $@
 #-----------------------------------------------------
 .PHONY: build/libgraph.a
