@@ -234,7 +234,7 @@ vector< pair<Eisenstein,node_t> > get_outline(const map<dedge_t,dedgecoord_t>& e
   Eisenstein nextpos = next.begin()->first;
 
   for(int i=0;i<outline.size();i++, nextpos = next[nextpos]){
-    cout << i << ": " << label[nextpos] << " at " << nextpos << endl;
+    //    cout << i << ": " << label[nextpos] << " at " << nextpos << endl;
     outline[i] = make_pair(nextpos,label[nextpos]);
   }
 
@@ -389,7 +389,7 @@ int main(int ac, char **av)
 
   cout << "Attempting to create graph from spiral indices " << rspi << endl;
  
-  ofstream output("output/C"+to_string(N)+"-unfold.m");
+  ofstream output(("output/C"+to_string(N)+"-unfold.m").c_str());
 
 
   FullereneGraph g(N, rspi, jumps);
@@ -415,20 +415,32 @@ int main(int ac, char **av)
   vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
   output << "outline = " << outline << ";\n";
 
-  output.close();
-  ofstream latex_output("output/C"+to_string(N)+"-GC"+to_string(K)
-			+"x"+to_string(L)+"-unfold.tex");
+
+  ofstream latex_output(("output/C"+to_string(N)+"-GC"+to_string(K)
+			 +"x"+to_string(L)+"-unfold.tex").c_str());
   latex_GCunfold(latex_output,outline,dgrid,K,L,false,2,true);
-  latex_output.close();
+  latex_output.close(); 
 
   //  Graph gct = GCTransform(outline, dgrid, K,L);
   //  cout << "gct = " << gct << ";\n";
   
   vector<Eisenstein> outline_coords(get_keys(outline));
+  typedef pair<int,int> coord;
+  polygon outline_polygon(convert_vector<Eisenstein, coord>(Eisenstein(K,L)*outline_coords));
+  
+  cout << "P = " << outline_polygon << ";\n";
+  
+  polygon::scanline scans(outline_polygon.scanConvert());
+  
+  output << "scans[\"minY\"]      = " << scans.minY << ";\n";
+  output << "scans[\"xs\"]        = " << scans.xs << ";\n";
+  output << "scans[\"edge_xs\"]   = " << scans.edge_xs << ";\n";
+
   //  const vector< set<int> > raster(Eisenstein::rasterize_polygon(EOp::GC(K,L)*outline_coords));
   //  vector<int> raster(Eisenstein::rasterize_line(Eisenstein(0,0),Eisenstein(2,3)));
 
   //  cout << "raster = " << raster << endl;  
 
+  output.close();
   return 0;
 }

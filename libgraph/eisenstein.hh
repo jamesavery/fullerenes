@@ -14,6 +14,7 @@ using namespace std;
 class Eisenstein: public pair<int,int> {
 public:
   Eisenstein(int a=0, int b=0) : pair<int,int>(a,b) {}
+  Eisenstein(const pair<int,int>& x) : pair<int,int>(x.first,x.second) {}
   Eisenstein(const coord2d& x) : pair<int,int>(round(x.first-x.second/sqrt(3)), round(2*x.second/sqrt(3)))
   { }
   Eisenstein operator*(const int y) const { return Eisenstein(first*y,second*y); }

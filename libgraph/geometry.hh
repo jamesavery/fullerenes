@@ -9,6 +9,7 @@
 #include <math.h>
 #include <sstream>
 #include <list>
+#include "auxiliary.hh"
 using namespace std;
 
 typedef int node_t;
@@ -271,8 +272,12 @@ struct sort_ccw_point {
 };
 
 
+
 class polygon : public vector< pair<int,int> >  {
 public:  
+  typedef pair<int,int> coord_t;
+
+  polygon(const vector<coord_t>& v) : vector<coord_t>(v) {}
   
   class scanline {
   public:
@@ -286,7 +291,8 @@ public:
     //xs[k][0] ... xs[k][1]
     //xs[k][2] ... xs[k][3]
     //and so on.
-
+    //
+    //JA: What is edge_xs?
     vector< vector<int> > xs;
     vector< vector<int> > edge_xs;
   };
@@ -310,7 +316,8 @@ public:
     }
   };
 
-
+  pair<int,int> slope(int i) const;
+  polygon  reduce() const;
   scanline scanConvert() const;
 };
 

@@ -5,7 +5,7 @@
 #include <cassert>
 #include <complex>
 #include "geometry.hh"
-
+#include "eisenstein.hh"
 
 string pad_string(const string& s, int length, char padchar)
 {
@@ -16,18 +16,54 @@ string pad_string(const string& s, int length, char padchar)
   return padstring+result;
 }
 
+int gcd (int a, int b)
+{
+  int c;
+  while ( a != 0 ) {
+     c = a; a = b%a;  b = c;
+  }
+  return b;
+}
+
+
+pair<int,int> polygon::slope(int i) const
+{
+  Eisenstein x((*this)[i]), y((*this)[(i+1)%this->size()]), dx(y-x);
+  int d = gcd(dx.first,dx.second);
+  return make_pair(dx.first/d, dx.second/d);
+}
+
+polygon polygon::reduce() const {
+  vector<pair<int,int> > xs(1,(*this)[0]);
+
+  pair<int,int> slope0(slope(0));
+  for(int i=1;i<this->size();i++){
+    pair<int,int> slopei(slope(i));
+    if(slopei != slope0){
+      xs.push_back((*this)[i]);
+      slope0 = slopei;
+    }
+  }  
+  
+  return polygon(xs);
+}
+
 polygon::scanline polygon::scanConvert() const {
   
   vector<pointinfo> points;
-  
+  vector<int> x,y;
+  polygon p(reduce());
+  transform(p.begin(),p.end(),back_inserter(x), getFirst<int,int>);
+  transform(p.begin(),p.end(),back_inserter(y), getSecond<int,int>);
+
   for(size_t i = 0; i < y.size(); ++i) {
     size_t j = (i+1)%y.size();
     //scanning line i -> j.
     int x0 = x[i], y0 = y[i];
     int x1 = x[j], y1 = y[j];
     if(y0 > y1) { 
-      swap(x0, x1);
-      swap(y0, y1);
+      std::swap(x0, x1);
+      std::swap(y0, y1);
     }
     int dx = x1-x0, dy = y1-y0;
     int x = x0, y = y0, r = 0, d = dy;
@@ -65,7 +101,14 @@ polygon::scanline polygon::scanConvert() const {
 	  points.push_back(pointinfo(x[k], y[k], true, lineDir[i]*lineDir[k] == 1, x[j]-x[k]));
 	}
       } else { //lineDir[k] == 0, lineDir[j] != 0
+	// This fails if polygon is not "reduced", in the sense that there exists three points on the outline
+	// such that xy[i]--xy[j] has the same slope as xy[j]--xy[k].
 	assert(x[k] != x[l]);
+	//	if(lineDir[l] == 0){
+	  //	  printf("(i,j,k,l) = (%ld,%ld,%ld,%ld)\n",i,j,k,l);
+	  //	  printf("lineDir   = (%d,%d,%d,%d)\n",lineDir[i],lineDir[j],lineDir[k],lineDir[l]);
+	  //	  cout << (*this)[i] << "; "<< (*this)[j] << "; "<< (*this)[k] << "; " << (*this)[l] << "; " << (*this)[(k+2)%y.size()] << ";\n";
+	  //	}
 	assert(lineDir[l] != 0);
 	if(x[k] < x[l]) {
 	  points.push_back(pointinfo(x[k], y[k], true, lineDir[j]*lineDir[l] == 1, x[l]-x[k]));

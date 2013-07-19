@@ -1,6 +1,7 @@
 #ifndef AUXILIARY_HH
 # define AUXILIARY_HH
 #include <iostream>
+using namespace std;
 
 // TODO: There are a number of functions in this file that are not particularly
 // pertaining to geometry, but are just "miscellaneous" stuff. Move to a more
@@ -59,7 +60,15 @@ template<typename K, typename V> vector<V> get_values(const map<K,V>& m)
   return values;
 }
 
+template<typename from, typename to> vector<to> convert_vector(const vector<from>& x)
+{
+  vector<to> y(x.size());
+  for(int i=0;i<x.size();i++) y[i] = x[i];
+  return y;
+}
 
+template<typename K, typename V> K getFirst(const pair<K,V>& x){ return x.first; }
+template<typename K, typename V> V getSecond(const pair<K,V>& x){ return x.second; }
 
 template<typename S, typename T> pair<T,S> reverse(const pair<S,T>& p){ return pair<T,S>(p.second,p.first); }
 
