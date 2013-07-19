@@ -15,7 +15,7 @@
 
 using namespace std;
 #include "geometry.hh"
-
+#include "auxiliary.hh"
 
 // TODO: Separate planar graph stuff from general graph stuff.
 // TODO: Don't constantly pass layout2d around -- it's a member!

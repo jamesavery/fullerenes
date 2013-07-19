@@ -15,65 +15,10 @@ typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
 
-// TODO: There are a number of functions in this file that are not particularly
-// pertaining to geometry, but are just "miscellaneous" stuff. Move to a more
-// fitting place.
-#define container_output(container) \
-  template <typename T> ostream& operator<<(ostream& s, const container<T>& v) \
-  { \
-  s << "{"; \
-  for(typename container<T>::const_iterator x(v.begin());x!=v.end();){ \
-    s << *x; \
-    if(++x!=v.end()) s << ","; \
-  } \
-  s << "}"; \
-  return s; \
-}
 
-container_output(vector);
-container_output(list);
-container_output(set);
+// Directed edge is an ordered pair of nodes
+typedef pair<node_t,node_t> dedge_t;
 
-
-template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p)
-{
-  s << "{" << p.first << "," << p.second << "}";
-  return s;
-}
-
-template<typename K, typename V> vector<K> get_keys(const map<K,V>& m)
-{
-  vector<K> keys(m.size());
-  int i=0;
-  for(typename map<K,V>::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    keys[i] = kv->first;
-  return keys;
-}
-
-template<typename K, typename V> vector<K> get_keys(const vector<pair<K,V> >& m)
-{
-  vector<K> keys(m.size());
-  int i=0;
-  for(typename vector<pair<K,V> >::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    keys[i] = kv->first;
-  return keys;
-}
-
-
-template<typename K, typename V> vector<V> get_values(const map<K,V>& m)
-{
-  vector<V> values(m.size());
-  int i=0;
-  for(typename map<K,V>::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    values[i] = kv->second;
-  return values;
-}
-
-template<typename S, typename T> pair<T,S> reverse(const pair<S,T>& p){ return pair<T,S>(p.second,p.first); }
-
-template <typename T> int sgn(const T& val) { return (T(0) < val) - (val < T(0)); }
-
-// Undirected edge is an unordered pair of nodes
 struct edge_t : public pair<node_t,node_t> {
   edge_t(const pair<node_t,node_t>& p) : pair<node_t,node_t>(min(p.first,p.second),max(p.first,p.second)) {}
   edge_t(const node_t& u, const node_t& v): pair<node_t,node_t>(min(u,v),max(u,v)) {}
@@ -90,17 +35,6 @@ struct edge_t : public pair<node_t,node_t> {
   }
 };
 
-template <typename T> string to_string(const T& x)
-{
-  ostringstream s;
-  s << x;
-  return s.str();
-}
-
-string pad_string(const string& s, int length, char padchar = '0');
-
-// Directed edge is an ordered pair of nodes
-typedef pair<node_t,node_t> dedge_t;
 
 struct coord2d : public pair<double,double> {
   coord2d(const double x=0, const double y=0) : pair<double,double>(x,y) {}
@@ -334,6 +268,50 @@ struct sort_ccw_point {
     // 	   t,layout[t].first,layout[t].second,angt);
     return angs >= angt; 	// TODO: Is the sign here correct?
   }
+};
+
+
+class polygon : public vector< pair<int,int> >  {
+public:  
+  
+  class scanline {
+  public:
+    int minY;
+    //xs[k] is a vector describing all coordinates in the polygon
+    //with y-coordinate minY+k. If xs[k] is empty then no point on the
+    //form (x,minY+k) lies inside the polygon. Otherwise (x,minY+k) lies
+    //in the polygon iff there exists i such that:
+    //xs[k][2*i] <= x <= xs[k][2*i+1]
+    //That is: The x-coordinates are those in the intervals:
+    //xs[k][0] ... xs[k][1]
+    //xs[k][2] ... xs[k][3]
+    //and so on.
+
+    vector< vector<int> > xs;
+    vector< vector<int> > edge_xs;
+  };
+
+
+  class pointinfo {
+  public:
+    pointinfo(const int &_x, const int &_y, bool _integral, bool _sameDir, int _width) :
+      x(_x), y(_y), integral(_integral), sameDir(_sameDir), width(_width) { }
+    int x, y;
+    bool integral;
+    bool sameDir;
+    int width;
+    //if integral == true: the point is (x,y)
+    //if integral == false: the point is (x+r,y) where 0 < r < 1.
+    bool operator < (const pointinfo& rhs) const {
+      if(y != rhs.y) return y < rhs.y;
+      if(x != rhs.x) return x < rhs.x;
+      if(integral != rhs.integral) return integral;
+      return false;
+    }
+  };
+
+
+  scanline scanConvert() const;
 };
 
 
