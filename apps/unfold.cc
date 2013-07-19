@@ -9,138 +9,8 @@ using namespace std;
 
 
 typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
-#if 0
-Graph GCTransform(const vector< pair<Eisenstein,node_t> > &outline, const map<dedge_t,dedgecoord_t> &edgecoords, int K=1, int L=0)
-{
-#define insert_node(ijx) \
-  if(grid.find(ijx) == grid.end()) /* First time looking at this? */	\
-    grid[ijx] = new_node++ \
-
-  map<Eisenstein, node_t> grid;
-
-  const EOp GC(EOp::GC(K,L)), iGC(EOp::GCInverse(K,L)), Delta10(EOp::Delta(Eisenstein(1,0)));
-  node_t new_node = 0; 	// Set to number of nodes in original dual
-
-  // Rasterize the standard GC triangle (0,0) -- (k,l) -- (-l,k+l)
-  vector<Eisenstein> GCtriangle;
-  Eisenstein a(0,0), b(K,L),c(-L,K+L);
-  double
-    sab = K/double(L),
-    sac = -L/double(K+L),
-    sbc = (-L-K)/double(K);
-
-  cout << " a = " << a << "; b = " << b << "; c = " << c << endl;
-
-  double xleft = 0, xright = 0;
-  for(int j=0;j<L;j++,xleft+=sac,xright+=sab){
-    int ileft = ceil(xleft), iright = floor(xright);
-    for(int i=ileft;i<=iright;i++) GCtriangle.push_back(Eisenstein(i,j));
-    printf("%d: %g -- %g :: %d -- %d\n",j,xleft,xright,ileft,iright);
-
-  }
-
-  xright = b.first;
-  for(int j=L;j<=K+L;j++,xleft+=sac,xright+=sbc){
-    int ileft = ceil(xleft), iright = floor(xright);
-    for(int i=ileft;i<=iright;i++) GCtriangle.push_back(Eisenstein(i,j));
-    printf("%d: %g -- %g :: %d -- %d\n",j,xleft,xright,ileft,iright);
-  }
-
-  // Begin by computing all vertices inside GC-transformed graph
-  for(map<dedge_t,dedgecoord_t>::const_iterator i(edgecoords.begin()); i!= edgecoords.end(); i++){
-    const dedgecoord_t &vupos(i->second);
-
-    const Eisenstein ux(vupos.second), vx(vupos.first); // directed edge coordinates are stored in reverse order.
-
-    EOp T(GC*EOp::Delta(vx-ux)*iGC);
-    // Send triangle points into their final destinations
-    for(int k=0;k<GCtriangle.size();k++)
-      insert_node(T*GCtriangle[k] + GC*ux);
-  }
-
-  
-  // Now transform all exterior triangles to their matching position
-  // and identify the nodes with each other
-  map<Eisenstein, node_t> grid2;
-  map<Eisenstein, node_t>::const_iterator g,g1,g2;
-  int No = outline.size();
-  for(int ii=0;ii<No;ii++){
-    const node_t u = outline[ii].second, v = outline[(ii+1)%No].second;
-    const dedgecoord_t &uvx(edgecoords.find(dedge_t(u,v))->second);
-    const dedgecoord_t &vux(edgecoords.find(dedge_t(v,u))->second);
-    const Eisenstein ux0(uvx.second), vx0(uvx.first);
-    const Eisenstein ux1(vux.second), vx1(vux.first);
-    
-    EOp  T0(GC*EOp::Delta(vx0-ux0)*iGC),
-         T1(GC*EOp::Delta(ux1-vx1)*iGC);
-    
-    for(int k=0;k<GCtriangle.size();k++){
-      g = grid.find(T0*GCtriangle[k]+GC*ux0);
-      if(g != grid.end())
-	grid2[T1*GCtriangle[k]+GC*vx1] = g->second;
-    }
-  }
-  
-  // Now connect every node to all of its neighbours or transformed neighbours
-  set<edge_t> edge_set, new_edge_set;
-  for(g = grid.begin(); g!=grid.end(); g++){
-    const Eisenstein x(g->first);
-    const node_t u(g->second);
-
-    cerr << "Connecting node " << u << " at " << x << endl;
-    
-    Eisenstein d(1,0);
-    for(int i=0;i<6;i++,d=d.nextCW()){
-      g1 = grid.find(x+d);
-      g2 = grid2.find(x+d);
-      
-      if     (g2 != grid2.end()) edge_set.insert(edge_t(u,g2->second));
-      else if(g1 != grid.end())  edge_set.insert(edge_t(u,g1->second));
-    }
-  }
-  // write out lines corresponding to edges.
-  Graph G(edge_set);
-
-  set<edge_t> same_as;
-  Graph same;
-
-  // Finally merge nodes that are supposed to be the same
-  for(g2 = grid2.begin(); g2 != grid2.end(); g2++){
-    g1 = grid.find(g2->first);
-
-    if(g1 != grid.end() && g1->second != g2->second)
-      same_as.insert(edge_t(g1->second,g2->second));
-  }
 
 
-  // New nodes are the connected components of the graph same_as.
-  list< list<node_t> > components(Graph(same_as).connected_components());
-  cout << "components = " << components << endl;
-  map<node_t,node_t> id;
-  int i=0;
-  for(list< list<node_t> >::const_iterator c(components.begin()); c!=components.end();c++,i++)
-    for(list<node_t>::const_iterator u(c->begin()); u!=c->end();u++){
-      id[*u] = i;
-      printf("new id %d -> %d\n",*u,i);
-    }
-
-  // Build graph with new names
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();e++){
-    const node_t u(id[e->first]), v(id[e->second]);
-    if(u!=v) new_edge_set.insert(edge_t(u,v));
-  }
-    
-  ofstream f("misc/grid.m");
-  f << "outline = " << outline << ";\n";
-  f << "grid  = " << get_keys(grid) << ";\n";
-  f << "grid2 = " << get_keys(grid2) << ";\n";
-  f << "gct = " << Graph(edge_set) << ";\n";
-  f << "gctnew = " << Graph(new_edge_set) << ";\n";
-  f.close();
-
-  return Graph(new_edge_set);
-}
-#endif
 
 struct dedge_sort : public std::binary_function<dedge_t, dedge_t, bool>
 {
@@ -372,6 +242,84 @@ void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > 
     latexfile << "\\end{document}\n";
 }
 
+vector<edge_t> scanlineedges(const IDCounter<Eisenstein>& inner_nodes, const polygon::scanline& S, int N = 0, const Eisenstein& transform = Eisenstein(1,0))
+{
+  vector<edge_t> edges;
+  
+  for(int i=0;i<S.xs.size();i++){
+    const vector<int> &row(S.xs[i]);
+    for(int j=0;j<row.size()/2;j++)
+      for(int x=row[2*j];x+1<=row[2*j+1];x++){
+	Eisenstein x0(x,S.minY+i), x1(x+1,S.minY+i);
+	node_t u = inner_nodes(x0*transform)+N, v = inner_nodes(x1*transform)+N;
+	// cout << "0: inner_nodes("<<(x0*transform)<<") = " << u << endl;
+	// cout << "1: inner_nodes("<<(x1*transform)<<") = " << v << endl;
+	edges.push_back(edge_t(u,v));
+      }
+  }
+  return edges;
+}
+
+PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
+{
+  vector<face_t> faces(dual.compute_faces_flat(3,true));
+  vector<tri_t>  triangles(faces.begin(),faces.end());
+  map<dedge_t,dedgecoord_t>  dgrid(unfold(triangles));
+  vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
+
+
+
+  IDCounter<Eisenstein> inner_nodes;
+  vector<Eisenstein> outline_coords(get_keys(outline));
+  polygon outline_polygon = convert_vector<Eisenstein,pair<int,int> >(Eisenstein(K,L)*outline_coords);
+  polygon::scanline scans = outline_polygon.scanConvert();
+
+  // Register all nodes on interior of polygon.
+  for(int i=0;i<scans.xs.size();i++){
+    const vector<int> &row(scans.xs[i]);
+    for(int j=0;j<row.size()/2;j++)
+      for(int x=row[2*j];x<=row[2*j+1];x++){
+	Eisenstein xy(x,i+scans.minY);
+	inner_nodes.insert(xy);
+      }
+  }
+  cout << "inner_nodes.keys   = " << get_keys(inner_nodes) << endl;
+  cout << "inner_nodes.values = " << get_values(inner_nodes) << endl;
+
+  // Now connect internal node grid
+  polygon outline_polygonCW = convert_vector<Eisenstein,pair<int,int> >(Eisenstein(K,L).nextCW()*outline_coords),
+    outline_polygonCCW = convert_vector<Eisenstein,pair<int,int> >(Eisenstein(K,L).nextCCW()*outline_coords);
+
+  polygon::scanline 
+    scansA = outline_polygonCW.scanConvert(),
+    scansB = outline_polygonCCW.scanConvert();
+
+  vector<edge_t> 
+    e (scanlineedges(inner_nodes,scans,0)), 
+    eA(scanlineedges(inner_nodes,scansA,0,Eisenstein(0,1))), 
+    eB(scanlineedges(inner_nodes,scansB,0,Eisenstein(1,-1)));
+ 
+  vector<edge_t> inner_edges(e.begin(),e.end());
+  inner_edges.reserve(e.size()+eA.size()+eB.size());
+  copy(eA.begin(),eA.end(),inserter(inner_edges,inner_edges.end()));
+  copy(eB.begin(),eB.end(),inserter(inner_edges,inner_edges.end()));
+
+  printf("%ld + %ld + %ld = %ld\n",e.size(),eA.size(),eB.size(),inner_edges.size());
+
+  Graph dualGC(set<edge_t>(inner_edges.begin(), inner_edges.end()));
+  
+  int N = inner_nodes.nextid;
+  vector<coord2d> layout2d(N);
+  for(IDCounter<Eisenstein>::const_iterator ei(inner_nodes.begin()); ei!=inner_nodes.end(); ei++){
+    Eisenstein xy(ei->first);
+    node_t      u(ei->second);
+    layout2d[u] = coord2d(xy.first,xy.second);
+  }
+
+  return PlanarGraph(dualGC,layout2d);
+}
+
+
 
 int main(int ac, char **av)
 {
@@ -415,10 +363,11 @@ int main(int ac, char **av)
   vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
   output << "outline = " << outline << ";\n";
 
+  output << "gct = " << GCTransform(dual,K,L) << ";\n";
 
   ofstream latex_output(("output/C"+to_string(N)+"-GC"+to_string(K)
 			 +"x"+to_string(L)+"-unfold.tex").c_str());
-  latex_GCunfold(latex_output,outline,dgrid,K,L,false,2,true);
+  latex_GCunfold(latex_output,outline,dgrid,K,L,true,2,true);
   latex_output.close(); 
 
   //  Graph gct = GCTransform(outline, dgrid, K,L);

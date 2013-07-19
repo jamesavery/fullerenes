@@ -277,6 +277,7 @@ class polygon : public vector< pair<int,int> >  {
 public:  
   typedef pair<int,int> coord_t;
 
+  polygon(int size=0, const coord_t& x=coord_t()) : vector<coord_t>(size,x) {}
   polygon(const vector<coord_t>& v) : vector<coord_t>(v) {}
   
   class scanline {

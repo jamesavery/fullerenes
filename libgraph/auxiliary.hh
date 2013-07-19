@@ -85,4 +85,28 @@ template <typename T> string to_string(const T& x)
 
 string pad_string(const string& s, int length, char padchar = '0');
 
+
+template <typename T> class IDCounter: public map<T,int> {
+public:
+  int nextid;
+
+  IDCounter(int start=0) : nextid(start) {}
+  
+  int insert(const T& x){
+    typename map<T,int>::const_iterator it(map<T,int>::find(x));
+    if(it != this->end()) return it->second;
+    else {
+      map<T,int>::insert(make_pair(x,nextid));
+      return nextid++;
+    }
+  }
+
+  int operator()(const T& x) const {
+    typename map<T,int>::const_iterator it(map<T,int>::find(x));
+    if(it != this->end()) return it->second;
+    else return -1;
+  }
+};
+
+
 #endif
