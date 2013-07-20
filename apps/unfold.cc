@@ -260,6 +260,7 @@ vector<edge_t> scanlineedges(const IDCounter<Eisenstein>& inner_nodes, const pol
   return edges;
 }
 
+// TODO: Get rid of GC-transform, rename to "fold", and make this work for any polygon from unfolded triangulation?
 PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
 {
   vector<face_t> faces(dual.compute_faces_flat(3,true));
@@ -268,8 +269,8 @@ PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
   vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
 
 
-
-  IDCounter<Eisenstein> inner_nodes;
+  // TODO: Split into ConnectInner() and FoldOutline()
+  IDCounter<Eisenstein> inner_nodes, outer_nodes;
   vector<Eisenstein> outline_coords(get_keys(outline));
   polygon outline_polygon = convert_vector<Eisenstein,pair<int,int> >(Eisenstein(K,L)*outline_coords);
   polygon::scanline scans = outline_polygon.scanConvert();
@@ -283,6 +284,13 @@ PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
 	inner_nodes.insert(xy);
       }
   }
+  
+  // Register all nodes on boundary of polygon
+  for(int i=0;i<scans.edge_xs.size();i++){
+    const vector<int> &pts(scans.edge_xs[i]);
+    for(int j=0;j<pts.size();j++) outer_nodes.insert(Eisenstein(pts[j],i+scans.minY));
+  }
+  
   cout << "inner_nodes.keys   = " << get_keys(inner_nodes) << endl;
   cout << "inner_nodes.values = " << get_values(inner_nodes) << endl;
 
@@ -299,6 +307,30 @@ PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
     eA(scanlineedges(inner_nodes,scansA,0,Eisenstein(0,1))), 
     eB(scanlineedges(inner_nodes,scansB,0,Eisenstein(1,-1)));
  
+  // Connect outline:
+  // 1. Sort edge_xs CW
+  // 2. Traverse outline while connecting edge nodes
+
+  // Connect outline to interior:
+  // For each outline node u, if x_u + (1,0) or x_u + (1,-1) is in interior, make edge.
+
+  // Identify identical nodes on outline:
+  // Problem: How to connect nodes on interior across cuts?
+  // Idea: 
+  //  1. Make bounding box grid Rab of a--b and Rba of b--a, using nodes from inner_nodes and outer_nodes.
+  //  2. Transform Rab with T(ab->ba). 
+  //  3. For each node u in Rab
+  //  3.1 If x(ab,u) in outer_nodes, identify u with v = Rba(x(ba,u)) (replace v by u everywhere)
+  //  4. For each edge u--v in Rab
+  //  4.1 If Rab(T(u)) is inner, Rab(T(v)) is undefined, and Rba(T(v)) is inner, add edge (u,v)
+
+
+  for(int i=0;i<scans.edge_xs.size();i++){
+    const vector<int> &pts(scans.edge_xs[i]);
+    for(int j=0;j<pts.size();j++) outer_nodes.insert(Eisenstein(pts[j],i+scans.minY));
+  }
+
+  // Join up all the edges
   vector<edge_t> inner_edges(e.begin(),e.end());
   inner_edges.reserve(e.size()+eA.size()+eB.size());
   copy(eA.begin(),eA.end(),inserter(inner_edges,inner_edges.end()));
