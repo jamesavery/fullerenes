@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <iostream>
 #include <cstdio>
 #include <vector>
@@ -16,138 +17,193 @@ string pad_string(const string& s, int length, char padchar)
   return padstring+result;
 }
 
-int gcd (int a, int b)
+int gcd(int a, int b)
 {
   int c;
-  while ( a != 0 ) {
-     c = a; a = b%a;  b = c;
-  }
+  while ( a != 0 ) { c = a; a = b%a;  b = c;  }
   return b;
 }
 
+// vector<Eisenstein> draw_line(const Eisenstein &a, const Eisenstein &b)
+// {
+//   if(a.second == b.second)
+// }
 
-pair<int,int> polygon::slope(int i) const
+vector<Eisenstein> polygon::draw_line(const Eisenstein& x0, const Eisenstein& x1)
 {
-  Eisenstein x((*this)[i]), y((*this)[(i+1)%this->size()]), dx(y-x);
+  vector<Eisenstein> result;
+
+  Eisenstein D(x1-x0);
+  int Dx = D.first, Dy = D.second;
+  int sx = sgn(Dx), sy = sgn(Dy);
+  Eisenstein xy(x0);
+
+  // Invariant: (x-x0)*Dy >= (y-y0)*Dx
+  // Or:         sx*i*Dy  >= sy*j*Dx
+  // Or:         sx*i*Dy - sy*j*Dx >= 0
+
+  if(sx == 0){
+    while(xy.second-sy != x1.second){ result.push_back(xy); xy.second += sy; }
+    return result;
+  }
+  if(sy == 0){
+    //      while(xy.first-sx != x1.first){ result.push_back(xy); xy.first += sx; }
+    result.push_back(x0);
+    result.push_back(x1);
+    return result;
+  }
+
+  int threshold = 0, t0 = sx*sy>0? 0 : -abs(Dy)+1;
+  
+  if(abs(Dx) > abs(Dy)){	// X-major
+    for(xy = x0; xy.first-sx != x1.first; xy.first += sx, threshold += sx*Dy){
+      while(sx*sy*threshold >= t0){
+	result.push_back(xy);
+	xy.second += sy;
+	threshold-=sy*Dx;
+      }
+    }
+  } else {			// Y-major
+    for(xy = x0; xy.second-sy != x1.second; xy.second += sy, threshold -= sy*Dx){
+      while(sx*sy*threshold < t0){
+	xy.first  += sx;
+	threshold += sx*Dy;
+      }
+      result.push_back(xy);
+    }
+  }
+
+  return result;
+}
+
+// Slope of line segment i.
+pair<int,int> polygon::slope(int i,bool reduced) const
+{
+  const vector<Eisenstein>& pts(reduced? reduced_outline : outline);
+  Eisenstein x(pts[i]), y(pts[(i+1)%pts.size()]), dx(y-x);
   int d = gcd(dx.first,dx.second);
   return make_pair(dx.first/d, dx.second/d);
 }
 
-polygon polygon::reduce() const {
-  vector<pair<int,int> > xs(1,(*this)[0]);
+
+// Node j is at left-turn (-1), straight (0), or right-turn (1) 
+// in CW traversal
+int polygon::turn_direction(int j,bool reduced) const {
+
+  const vector<Eisenstein>& pts(reduced? reduced_outline : outline);
+  Eisenstein 
+    xi(pts[(pts.size()+j-1)%pts.size()]),
+    xj(pts[j]),
+    xk(pts[(j+1)%pts.size()]),
+    dx1(xj-xi), dx2(xk-xj);
+
+  return sgn(dx2.first * dx1.second - dx2.second * dx1.first);
+}
+
+// Node j is at peak turn.
+bool polygon::peak(int j, bool reduced) const {
+
+  const vector<Eisenstein>& pts(reduced? reduced_outline : outline);
+  Eisenstein 
+    xi(pts[(pts.size()+j-1)%pts.size()]),
+    xj(pts[j]),
+    xk(pts[(j+1)%pts.size()]),
+    dx1(xj-xi), dx2(xk-xj);
+
+  return sgn(dx1.second)*sgn(dx2.second) < 0;
+}
+
+// Exactly one of either segment i--j or j--k is horizontal
+bool polygon::saddle(int j, bool reduced) const {
+  const vector<Eisenstein>& pts(reduced? reduced_outline : outline);
+  Eisenstein 
+    xi(pts[(pts.size()+j-1)%pts.size()]),
+    xj(pts[j]),
+    xk(pts[(j+1)%pts.size()]),
+    dx1(xj-xi), dx2(xk-xj);
+
+  return (dx1.second == 0) ^ (dx2.second == 0);
+}
+
+
+vector<Eisenstein> polygon::reduce() const {
+  vector<Eisenstein> xs(1,outline[0]);
 
   pair<int,int> slope0(slope(0));
-  for(int i=1;i<this->size();i++){
+  for(int i=1;i<outline.size();i++){
     pair<int,int> slopei(slope(i));
     if(slopei != slope0){
-      xs.push_back((*this)[i]);
+      xs.push_back(outline[i]);
       slope0 = slopei;
     }
   }  
   
-  return polygon(xs);
+  return xs;
+}
+
+set<Eisenstein> polygon::allpoints() const {
+  scanline S = scanConvert();
+
+  set<Eisenstein> points;
+  for(int i=0;i<S.xs.size();i++)
+    for(int j=0;j<S.xs[i].size()/2;j++){
+      int start = S.xs[i][2*j], end = S.xs[i][2*j+1];
+      for(int x=start;x<=end;x++)
+	points.insert(Eisenstein(x,i+S.minY));
+    }
+
+  return points;
+}
+
+vector<Eisenstein> polygon::controlpoints() const {
+  scanline S = scanConvert();
+
+  vector<Eisenstein> points;
+  for(int i=0;i<S.xs.size();i++)
+    for(int j=0;j<S.xs[i].size();j++)
+      points.push_back(Eisenstein(S.xs[i][j],i+S.minY));
+
+  return points;
 }
 
 polygon::scanline polygon::scanConvert() const {
-  
-  vector<pointinfo> points;
-  vector<int> x,y;
-  polygon p(reduce());
-  transform(p.begin(),p.end(),back_inserter(x), getFirst<int,int>);
-  transform(p.begin(),p.end(),back_inserter(y), getSecond<int,int>);
+  int minY=INT_MAX, maxY=INT_MIN;
+  for(int i=0;i<reduced_outline.size();i++) {
+    if(reduced_outline[i].second < minY) minY = reduced_outline[i].second;
+    if(reduced_outline[i].second > maxY) maxY = reduced_outline[i].second;
+  }
+    
+  scanline S;
+  S.minY = minY;
+  S.xs = vector<vector<int> >(maxY-minY+1);
 
-  for(size_t i = 0; i < y.size(); ++i) {
-    size_t j = (i+1)%y.size();
-    //scanning line i -> j.
-    int x0 = x[i], y0 = y[i];
-    int x1 = x[j], y1 = y[j];
-    if(y0 > y1) { 
-      std::swap(x0, x1);
-      std::swap(y0, y1);
-    }
-    int dx = x1-x0, dy = y1-y0;
-    int x = x0, y = y0, r = 0, d = dy;
-    //the point is (x+r/d, y)
-    while(y < y1-1) {
-      //update x
-      r += dx;
-      while(r >= d) { r -= d; ++x; }
-      while(r < 0)  { r += d; --x; }
-      //update y
-      ++y;
-      //insert point
-      points.push_back(pointinfo(x, y, r == 0, true, 0));
-    }
-    //the above also works as intended when y0==y1
-  }
-  vector<int> lineDir(y.size());
-  //lineDir[i] holds the direction of the line:
-  //from x[i],y[i] to x[i+1],y[i+1] (mod y.size())
-  for(size_t i = 0; i < y.size(); ++i) {
-    size_t j = (i+1)%y.size();
-    lineDir[i] = y[j]-y[i];
-    lineDir[i] = lineDir[i] > 0 ? 1 : (lineDir[i] == 0 ? 0 : -1);
-  }
-  for(size_t k = 0;k < y.size(); ++k) {
-    size_t i = (k-2+y.size())%y.size(), j = (k-1+y.size())%y.size(), l = (k+1)%y.size();
-    if(lineDir[j] != 0 && lineDir[k] != 0) {
-      points.push_back(pointinfo(x[k], y[k], true, lineDir[j]*lineDir[k] == 1, 0));
-    } else {
-      assert(lineDir[j] != 0 || lineDir[k] != 0);
-      if(lineDir[j] == 0) { //lineDir[k] != 0
-	assert(x[j] != x[k]);
-	assert(lineDir[i] != 0);
-	if(x[k] < x[j]) {
-	  points.push_back(pointinfo(x[k], y[k], true, lineDir[i]*lineDir[k] == 1, x[j]-x[k]));
-	}
-      } else { //lineDir[k] == 0, lineDir[j] != 0
-	// This fails if polygon is not "reduced", in the sense that there exists three points on the outline
-	// such that xy[i]--xy[j] has the same slope as xy[j]--xy[k].
-	assert(x[k] != x[l]);
-	//	if(lineDir[l] == 0){
-	  //	  printf("(i,j,k,l) = (%ld,%ld,%ld,%ld)\n",i,j,k,l);
-	  //	  printf("lineDir   = (%d,%d,%d,%d)\n",lineDir[i],lineDir[j],lineDir[k],lineDir[l]);
-	  //	  cout << (*this)[i] << "; "<< (*this)[j] << "; "<< (*this)[k] << "; " << (*this)[l] << "; " << (*this)[(k+2)%y.size()] << ";\n";
-	  //	}
-	assert(lineDir[l] != 0);
-	if(x[k] < x[l]) {
-	  points.push_back(pointinfo(x[k], y[k], true, lineDir[j]*lineDir[l] == 1, x[l]-x[k]));
-	}
+  for(int i=0;i<reduced_outline.size();i++){ 
+    vector<Eisenstein> segment(draw_line(reduced_outline[i],reduced_outline[(i+1)%reduced_outline.size()]));
+
+    if(peak(i,true) || (saddle(i,true) && turn_direction(i,true) == -1)) // If peak or left-turning saddle
+      {
+	int loc = segment[0].second-minY;
+	assert(loc >= 0 && loc<S.xs.size());
+	S.xs[segment[0].second-minY].push_back(segment[0].first);          // include point twice.
       }
+
+    for(int j=1;j<segment.size();j++){
+      const Eisenstein& xy(segment[j]);
+      int loc = xy.second-minY;
+      assert(loc >= 0 && loc<S.xs.size());
+      S.xs[xy.second-minY].push_back(xy.first);
     }
   }
-  sort(points.begin(), points.end());
-  scanline s;
-  s.minY = points[0].y;
-  int y_cur = s.minY-1;
-  size_t i = 0;
-  while(i < points.size()) {
-    for(int t = 0;t < points[i].y-y_cur;++t) {
-      s.xs.push_back(vector<int>());
-      s.edge_xs.push_back(vector<int>());
-    }
-    y_cur = points[i].y;
-    size_t j = i+1;
-    while(j < points.size() && points[j].y == y_cur) ++j;
-    bool inside = false;
-    for(;i < j;++i) {
-      if(points[i].integral) {
-	for(int w = 0;w <= points[i].width; ++w) {
-	  s.edge_xs.back().push_back(points[i].x+w);
-	}
-      }
-      //cout << points[i].x << ", " << points[i].y << ", " << points[i].integral<< ", " << points[i].sameDir << ", " << points[i].width << endl;
-      if(inside) {
-	s.xs.back().push_back(points[i].x-(int)points[i].integral);
-      }
-      if(points[i].sameDir != inside) {
-	s.xs.back().push_back(points[i].x+points[i].width+1);
-      }
-      if(points[i].sameDir) {
-	inside = !inside;
-      }
-    }
-    i=j;
-  }
-  return s;
+
+  for(int i=0;i<S.xs.size();i++)
+    sort(S.xs[i].begin(),S.xs[i].end());
+
+  return S;
+}
+  
+
+ostream& operator<<(ostream& S, const polygon& P)
+{
+  S << make_pair(P.outline,P.reduced_outline);
+  return S;
 }

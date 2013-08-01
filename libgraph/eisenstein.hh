@@ -2,7 +2,9 @@
 # define EISENSTEIN_HH
 
 #include <stdlib.h>
-#include "geometry.hh"
+#include <algorithm>
+#include <complex>
+
 using namespace std;
 
 /*
@@ -16,7 +18,7 @@ class Eisenstein: public pair<int,int> {
 public:
   Eisenstein(int a=0, int b=0) : pair<int,int>(a,b) {}
   Eisenstein(const pair<int,int>& x) : pair<int,int>(x.first,x.second) {}
-  Eisenstein(const coord2d& x) : pair<int,int>(round(x.first-x.second/sqrt(3)), round(2*x.second/sqrt(3)))
+  Eisenstein(const pair<double,double>& x) : pair<int,int>(round(x.first-x.second/sqrt(3)), round(2*x.second/sqrt(3)))
   { }
   Eisenstein operator*(const int y) const { return Eisenstein(first*y,second*y); }
   Eisenstein operator/(const int y) const { return Eisenstein(first/y,second/y); }
@@ -31,10 +33,16 @@ public:
   }
   Eisenstein operator+(const Eisenstein& y) const { return Eisenstein(first+y.first,second+y.second); }
   Eisenstein operator-(const Eisenstein& y) const { return Eisenstein(first-y.first,second-y.second); } 
-  coord2d    operator-(const coord2d& y)    const { return coord2d(first-y.first,second-y.second); } 
-  coord2d    operator+(const coord2d& y)    const { return coord2d(first+y.first,second+y.second); } 
+  pair<double,double>    operator-(const pair<double,double>& y)    const { return pair<double,double>(first-y.first,second-y.second); } 
+  pair<double,double>    operator+(const pair<double,double>& y)    const { return pair<double,double>(first+y.first,second+y.second); } 
   Eisenstein& operator+=(const Eisenstein& y) { first += y.first; second += y.second; return *this; }
   Eisenstein& operator-=(const Eisenstein& y) { first -= y.first; second -= y.second; return *this; }
+
+  bool isUnit() const {
+    Eisenstein unit(1,0);
+    for(int i=0;i<6;i++,unit = unit.nextCW()) if((*this) == unit) return true;
+    return false;
+  }
 
   // invertn(a,b) * (a,b) == norm2() (1,0)
   Eisenstein invertn() const { return Eisenstein((first+second), -second); }
@@ -50,8 +58,13 @@ public:
   // 
   Eisenstein nextCW() const { return (*this) * Eisenstein(1,-1); }
   Eisenstein nextCCW() const { return (*this) * Eisenstein(0,1); }
+  Eisenstein transpose() const { return Eisenstein(second,first); }
+  Eisenstein conj() const { return Eisenstein(first,-second); }
 
-  coord2d coord() const { return coord2d(1,0)*first + coord2d(1/2.,sqrt(3/4.))*second; }
+
+  pair<double,double> coord() const { 
+    return make_pair(first + second/2., sqrt(3/4.)*second);
+  }
 
   int norm2() const { return first*first + first*second + second*second; }
   double norm() const { return sqrt(norm2()); }
@@ -61,10 +74,11 @@ public:
   Eisenstein div(const Eisenstein& y) const {
     // Naive, possibly non-robust algorithm
     Eisenstein z(*this * y.invertn());
-    coord2d zf(z.first,z.second);
-    zf *= 1.0/y.norm2();
 
-    return Eisenstein(round(zf.first),round(zf.second));
+    complex<double> zf(z.first,z.second);
+    zf /= y.norm2();
+
+    return Eisenstein(round(zf.real()),round(zf.imag()));
   }
 
   Eisenstein mod(const Eisenstein& y) const {
@@ -72,11 +86,12 @@ public:
     return (*this) - q*y;
   }
 
-  static coord2d average(const vector<Eisenstein>& xs)
+  static pair<double,double> average(const vector<Eisenstein>& xs)
   {
-    coord2d sum(0,0);
-    for(int i=0;i<xs.size();i++) sum += coord2d(xs[i].first,xs[i].second);
-    return sum / xs.size(); 
+    complex<double> avg(0,0);
+    for(int i=0;i<xs.size();i++) avg += complex<double>(xs[i].first,xs[i].second);
+    avg /= xs.size(); 
+    return make_pair(avg.real(),avg.imag());
   }
 
   static Eisenstein gcd(Eisenstein a, Eisenstein b)  {
@@ -94,7 +109,15 @@ public:
     for(int i=1;i<xs.size();i++) d = gcd(xs[i],d);
     return d;
   }
+
+
+  static int turn(const Eisenstein& a, const Eisenstein& b, const Eisenstein& c) {
+    int x = (b.first-a.first)*(c.second-a.second) - (b.second-a.second)*(c.first-a.first);
+    return x < 0 ? -1 : (x == 0 ? 0 : 1);
+  }
+
 };
+
 
 
 

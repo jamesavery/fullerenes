@@ -9,6 +9,7 @@
 #include <math.h>
 #include <sstream>
 #include <list>
+#include <complex>
 #include "auxiliary.hh"
 using namespace std;
 
@@ -21,8 +22,9 @@ typedef vector< bool > edges_t;
 typedef pair<node_t,node_t> dedge_t;
 
 struct edge_t : public pair<node_t,node_t> {
+  edge_t() {}
   edge_t(const pair<node_t,node_t>& p) : pair<node_t,node_t>(min(p.first,p.second),max(p.first,p.second)) {}
-  edge_t(const node_t& u, const node_t& v): pair<node_t,node_t>(min(u,v),max(u,v)) {}
+  edge_t(const node_t u, const node_t v): pair<node_t,node_t>(min(u,v),max(u,v)) {}
   edge_t(const int index) {
     node_t u=0;
     for(;u*(u-1)/2<=index;u++) ;
@@ -38,6 +40,8 @@ struct edge_t : public pair<node_t,node_t> {
 
 
 struct coord2d : public pair<double,double> {
+  coord2d(const complex<double>& x) : pair<double,double>(x.real(),x.imag()) {}
+  coord2d(const pair<double,double>& x) : pair<double,double>(x) {}
   coord2d(const double x=0, const double y=0) : pair<double,double>(x,y) {}
   coord2d operator/(const double s)   const { return coord2d(first/s,second/s); }
   coord2d operator*(const double s)   const { return coord2d(first*s,second*s); }
@@ -254,7 +258,7 @@ struct Tetra3D {
 
 struct sort_ccw_point {
   const vector<coord2d>& layout;
-  const coord2d& x;
+  const coord2d x;
   const bool periodic;
   sort_ccw_point(const vector<coord2d>& layout, const coord2d& x, const bool periodic = false)
     : layout(layout), x(x), periodic(periodic)
@@ -271,56 +275,39 @@ struct sort_ccw_point {
   }
 };
 
+#include "eisenstein.hh"
 
 
-class polygon : public vector< pair<int,int> >  {
-public:  
-  typedef pair<int,int> coord_t;
+class polygon { // Given in CW order
+public:
+  vector<Eisenstein> outline;
+  vector<Eisenstein> reduced_outline;
 
-  polygon(int size=0, const coord_t& x=coord_t()) : vector<coord_t>(size,x) {}
-  polygon(const vector<coord_t>& v) : vector<coord_t>(v) {}
-  
+  polygon(const vector<Eisenstein>& outline) : outline(outline), reduced_outline(reduce()) {  }
+  polygon(const vector<pair<int,int> >& outline) : outline(outline.begin(),outline.end()), reduced_outline(reduce()) {  }
+
   class scanline {
   public:
     int minY;
-    //xs[k] is a vector describing all coordinates in the polygon
-    //with y-coordinate minY+k. If xs[k] is empty then no point on the
-    //form (x,minY+k) lies inside the polygon. Otherwise (x,minY+k) lies
-    //in the polygon iff there exists i such that:
-    //xs[k][2*i] <= x <= xs[k][2*i+1]
-    //That is: The x-coordinates are those in the intervals:
-    //xs[k][0] ... xs[k][1]
-    //xs[k][2] ... xs[k][3]
-    //and so on.
-    //
-    //JA: What is edge_xs?
     vector< vector<int> > xs;
-    vector< vector<int> > edge_xs;
   };
 
+  // Draw line 
+  static vector<Eisenstein> draw_line(const Eisenstein& x0,const Eisenstein& x1); 
 
-  class pointinfo {
-  public:
-    pointinfo(const int &_x, const int &_y, bool _integral, bool _sameDir, int _width) :
-      x(_x), y(_y), integral(_integral), sameDir(_sameDir), width(_width) { }
-    int x, y;
-    bool integral;
-    bool sameDir;
-    int width;
-    //if integral == true: the point is (x,y)
-    //if integral == false: the point is (x+r,y) where 0 < r < 1.
-    bool operator < (const pointinfo& rhs) const {
-      if(y != rhs.y) return y < rhs.y;
-      if(x != rhs.x) return x < rhs.x;
-      if(integral != rhs.integral) return integral;
-      return false;
-    }
-  };
+  pair<int,int> slope(int i,bool reduced=false) const;
+  int turn_direction(int j,bool reduced=false) const;
+  bool peak(int j,bool reduced=false) const;
+  bool saddle(int j,bool reduced=false) const;
+    
+  scanline scanConvert() const;  
 
-  pair<int,int> slope(int i) const;
-  polygon  reduce() const;
-  scanline scanConvert() const;
+  set<Eisenstein> allpoints() const;
+  vector<Eisenstein> controlpoints() const;
+
+  friend ostream& operator<<(ostream& S, const polygon& P);
+private:
+  vector<Eisenstein> reduce() const;
 };
-
 
 #endif
