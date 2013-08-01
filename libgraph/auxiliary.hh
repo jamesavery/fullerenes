@@ -1,6 +1,11 @@
 #ifndef AUXILIARY_HH
 # define AUXILIARY_HH
 #include <iostream>
+#include <vector>
+#include <list>
+#include <set>
+#include <map>
+#include <sstream>
 using namespace std;
 
 // TODO: There are a number of functions in this file that are not particularly
@@ -85,10 +90,12 @@ template <typename T> string to_string(const T& x)
 
 string pad_string(const string& s, int length, char padchar = '0');
 
+int gcd(int a, int b);
 
 template <typename T> class IDCounter: public map<T,int> {
 public:
   int nextid;
+  vector<T> reverse;
 
   IDCounter(int start=0) : nextid(start) {}
   
@@ -97,8 +104,14 @@ public:
     if(it != this->end()) return it->second;
     else {
       map<T,int>::insert(make_pair(x,nextid));
+      reverse.push_back(x);
       return nextid++;
     }
+  }
+  
+  const T& invert(int idx) const { 
+    assert(idx>=0 && idx<nextid);
+    return reverse[idx];
   }
 
   int operator()(const T& x) const {
