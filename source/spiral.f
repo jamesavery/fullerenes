@@ -1703,7 +1703,9 @@ C     Print ring numbers
  634  FORMAT(1X,I7,' distinct RSPIs found out of total',I7,
      1 ' (maximum possible: ',I7,')',/1X,I7,' spirals with a ',
      1 'pentagon start   (',I7,'  symmetry distinct)')
- 635  FORMAT(1X,' Spiral found, avoid counting of spirals')
+ 635  FORMAT(1X,' Spiral found, avoid counting of spirals ',/2X,
+     1 '(WARNING: output contains only 1 spiral! Set ispsearch=2 ',
+     1 'to get the complete spiral count)')
       Return
       END
      

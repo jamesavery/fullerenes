@@ -1,5 +1,5 @@
 Ih-C240 6-31G opt. geom. minimum -9144.76260 au not converged out
-&General NA=240 ispsearch=2 /
+&General NA=240 iwext=1, ispsearch=2, filename='C240extfile' /
 &Coord ICart=1 /
 &FFChoice /
 &FFParameters /
