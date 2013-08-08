@@ -1220,12 +1220,6 @@ C       Last 2 are not needed
         endif
       enddo faces
 
-C       if(JP(12).eq.0) then
-C        IER=1   ! Spiral has dead end
-C        Return
-C       endif
-
-
 C  Finally success, spiral found
       Return
       END
@@ -1537,6 +1531,9 @@ C      Jump count if spcount=0
 C---- End of search
  199  if(nspiral.eq.0) then
        WRITE(Iout,630) nspiralT,6*number_vertices
+C**** Lukas, this is where you add the general spiral detection routine
+C     CALL GENERALSPIRALDETECT
+C**** Lukas, this is where you add the general spiral detection routine
        Return
       else
        nspiral5sym=0
@@ -1704,8 +1701,8 @@ C     Print ring numbers
      1 ' (maximum possible: ',I7,')',/1X,I7,' spirals with a ',
      1 'pentagon start   (',I7,'  symmetry distinct)')
  635  FORMAT(1X,' Spiral found, avoid counting of spirals ',/2X,
-     1 '(WARNING: output contains only 1 spiral! Set ispsearch=2 ',
-     1 'to get the complete spiral count)')
+     1 'WARNING: output contains only 1 spiral! Set ispsearch=2 ',
+     1 'to get the complete spiral count.')
       Return
       END
      
