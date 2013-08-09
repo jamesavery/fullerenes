@@ -201,7 +201,12 @@ polyhedron_ptr read_polyhedron_(const char *path)
 }
 void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 
-graph_ptr dual_graph_(const graph_ptr *g){  return new PlanarGraph((*g)->dual_graph()); }
+// The Fortarn call to dual_graph() assumes that g is either a fullerene
+// or a fullerene dual.
+graph_ptr dual_graph_(const graph_ptr *g){  
+  bool is_fullerene = (*g)->neighbours[0].size() == 3;
+  return new PlanarGraph((*g)->dual_graph(is_fullerene? 6 : 3)); 
+}
 int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 
 fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n)
