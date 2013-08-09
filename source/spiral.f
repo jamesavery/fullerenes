@@ -1228,6 +1228,7 @@ C  Finally success, spiral found
       SUBROUTINE SpiralSearch(Iout,IRG55,IRG66,IRG56,
      1 NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP,spcount)
       use config
+      use iso_c_binding
       IMPLICIT INTEGER (A-Z)
       DIMENSION NrA(EMAX),NrB(EMAX),NrC(EMAX),NrD(EMAX)
       DIMENSION NrE(EMAX),NrF(EMAX),NMR(6),JP(12)
@@ -1235,6 +1236,8 @@ C  Finally success, spiral found
       DIMENSION SpiralT(12,MaxSpirals),SpiralF(MMAX,MaxSpirals)
       DIMENSION D(MMAX,MMAX),S(MMAX),FreeRing(6)
       CHARACTER*3 GROUP
+      type(c_ptr) :: dg, fg, new_graph, dual_graph
+      integer gen_rspi(12), gen_jumps(10)
 
 C     Search for all spirals, set up first three rings then wind.
 C     Start ring spiral algorithm. Quit after first successful spiral.
@@ -1249,43 +1252,43 @@ C     Timing O(6 n_v n_f^2)
       number_faces=number_vertices/2+2
       ispiral=0
       WRITE (Iout,600)
-       IF(number_vertices.lt.100)   
+      IF(number_vertices.lt.100)   
      1  WRITE(Iout,601) number_vertices,number_faces
-       IF(number_vertices.ge.100.and.number_vertices.lt.1000)
+      IF(number_vertices.ge.100.and.number_vertices.lt.1000)
      1  WRITE(Iout,602) number_vertices,number_faces
-       IF(number_vertices.ge.1000.and.number_vertices.lt.10000)
+      IF(number_vertices.ge.1000.and.number_vertices.lt.10000)
      1  WRITE(Iout,632) number_vertices,number_faces
-       IF(number_vertices.ge.10000)
+      IF(number_vertices.ge.10000)
      1  WRITE(Iout,633) number_vertices,number_faces
       do I=1,MMAX
-      do J=1,MMAX
-       D(I,J)=0
-      enddo
+        do J=1,MMAX
+          D(I,J)=0
+        enddo
       enddo
       do I=1,12
-       do J=1,NMAX
-        Spiral(I,J)=0
-       enddo
-       do J=1,MaxSpirals
-        SpiralT(I,J)=0
-       enddo
+        do J=1,NMAX
+          Spiral(I,J)=0
+        enddo
+        do J=1,MaxSpirals
+          SpiralT(I,J)=0
+        enddo
       enddo
       do I=1,6
-       FreeRing(i)=0
+        FreeRing(i)=0
       enddo
 
 C     Set up dual matrix (adjacency matrix for faces)
       do I=1,IRG55
-       I1=NrA(I)
-       I2=NrB(I)
-       D(I1,I2)=1
-       D(I2,I1)=1
+        I1=NrA(I)
+        I2=NrB(I)
+        D(I1,I2)=1
+        D(I2,I1)=1
       enddo
       do I=1,IRG56
-       I1=NrC(I)
-       I2=NrD(I)
-       D(I1,I2)=1
-       D(I2,I1)=1
+        I1=NrC(I)
+        I2=NrD(I)
+        D(I1,I2)=1
+        D(I2,I1)=1
       enddo
       do I=1,IRG66
        I1=NrE(I)
@@ -1530,17 +1533,21 @@ C      Jump count if spcount=0
       spcount=1
 C---- End of search
  199  if(nspiral.eq.0) then
-       WRITE(Iout,630) nspiralT,6*number_vertices
+        WRITE(Iout,630) nspiralT,6*number_vertices
 C**** Lukas, this is where you add the general spiral detection routine
-C     CALL GENERALSPIRALDETECT
+      dg = new_graph(mmax,number_faces,D)
+      fg = dual_graph(dg)
+      call get_general_spiral(fg, gen_rspi, gen_jumps)
+      call delete_graph(dg) 
+      call delete_fullerene_graph(fg) 
 C**** Lukas, this is where you add the general spiral detection routine
-       Return
+c        Return
       else
-       nspiral5sym=0
-       do i=1,nspiral
-        if(SpiralT(1,i).eq.1) nspiral5sym=nspiral5sym+1
-       enddo
-       WRITE(Iout,634) nspiral,nspiralT,6*number_vertices,
+        nspiral5sym=0
+        do i=1,nspiral
+          if(SpiralT(1,i).eq.1) nspiral5sym=nspiral5sym+1
+        enddo
+        WRITE(Iout,634) nspiral,nspiralT,6*number_vertices,
      1  nspiral5,nspiral5sym
       endif
       if(spcount.ne.0) then
@@ -2354,4 +2361,4 @@ c     IER = 0 on return if the construction is successful.
  6      CONTINUE
  7    CONTINUE
       RETURN
-      END
+      END SUBROUTINE DUAL

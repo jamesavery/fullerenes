@@ -42,6 +42,8 @@ extern "C" {
 			     const double *path_width, const double *vertex_diameter,const int *Npath, int *path);
   graph_ptr dual_graph_(const graph_ptr *);
 
+  void get_general_spiral_(const fullerene_graph_ptr*, int rspi_a[12], int jumps_a[10]);
+
 
   // Fullerene graph generation 
   fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n);
@@ -459,6 +461,23 @@ void get_face_distance_mtx_(const fullerene_graph_ptr *fg, int *face_distances){
     face_distances[i] = all_distances[i];
   }
 }
+
+void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jumps_a[10]){
+//  12 will always be 12, 10 is just a arbitrary magic number
+  vector<int> rspi_v;
+  FullereneGraph::jumplist_t jumps_v;
+  (*fg)->get_canonical_general_spiral_from_fg(rspi_v, jumps_v);
+
+  for(int i=0; i!=12; i++){
+    rspi_a[i] = rspi_v[i];
+  }
+  int j=0;
+  for(list<pair<int,int> >::iterator it(jumps_v.begin()); it!=jumps_v.end(); it++){
+  	jumps_a[j++]=it->first;
+  	jumps_a[j++]=it->second;
+  }
+}
+
 
 // Only works for trivalent graphs. 
 void get_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face, int *l)
