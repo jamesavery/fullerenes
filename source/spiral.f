@@ -1534,14 +1534,15 @@ C      Jump count if spcount=0
 C---- End of search
  199  if(nspiral.eq.0) then
         WRITE(Iout,630) nspiralT,6*number_vertices
-C**** Lukas, this is where you add the general spiral detection routine
-      dg = new_graph(mmax,number_faces,D)
-      fg = dual_graph(dg)
-      call get_general_spiral(fg, gen_rspi, gen_jumps)
-      call delete_graph(dg) 
-      call delete_fullerene_graph(fg) 
-C**** Lukas, this is where you add the general spiral detection routine
-c        Return
+
+        dg = new_graph(mmax,number_faces,D)
+        fg = dual_graph(dg)
+        call get_general_spiral(fg, gen_rspi, gen_jumps)
+        call delete_graph(dg) 
+        call delete_fullerene_graph(fg) 
+c        write(*,*)'general spiral: p: ',gen_rspi
+c        write(*,*)'general spiral: j: ',gen_jumps
+
       else
         nspiral5sym=0
         do i=1,nspiral
