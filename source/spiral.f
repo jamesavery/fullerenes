@@ -1540,9 +1540,9 @@ C---- End of search
         call get_general_spiral(fg, gen_rspi, gen_jumps)
         call delete_graph(dg) 
         call delete_fullerene_graph(fg) 
-c        write(*,*)'general spiral: p: ',gen_rspi
-c        write(*,*)'general spiral: j: ',gen_jumps
-
+        write(*,*)'general spiral: p: ',gen_rspi
+        write(*,*)'general spiral: j: ',gen_jumps
+        return
       else
         nspiral5sym=0
         do i=1,nspiral
