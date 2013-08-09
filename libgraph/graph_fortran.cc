@@ -444,10 +444,8 @@ void compute_fullerene_faces_(const fullerene_graph_ptr *g, int *pentagons, int 
 
 void get_pentagon_distance_mtx_(const fullerene_graph_ptr *fg, int *pentagon_distances){
   vector<int> mtx_v = (*fg)->pentagon_distance_mtx();
-  // how do I elegantly copy from vectors to arrays? I recall there was a trick ...
-  for (int i=0; i<144; ++i){
-    pentagon_distances[i] = mtx_v[i];
-  }
+//  assert(mtx_v.size()==144);
+  std::copy(mtx_v.begin(), mtx_v.end(), pentagon_distances);
 }
 
 void get_face_distance_mtx_(const fullerene_graph_ptr *fg, int *face_distances){
