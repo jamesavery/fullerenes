@@ -1251,6 +1251,7 @@ C     Timing O(6 n_v n_f^2)
 
       number_faces=number_vertices/2+2
       ispiral=0
+      maxgen_jumps=10
       WRITE (Iout,600)
       IF(number_vertices.lt.100)   
      1  WRITE(Iout,601) number_vertices,number_faces
@@ -1540,8 +1541,16 @@ C---- End of search
         call get_general_spiral(fg, gen_rspi, gen_jumps)
         call delete_graph(dg) 
         call delete_fullerene_graph(fg) 
-        write(*,*)'general spiral: p: ',gen_rspi
-        write(*,*)'general spiral: j: ',gen_jumps
+        write(Iout,636) (gen_rspi(Mrspi),Mrspi=1,12)
+        maxgj=2
+        Do MJ=1,maxgen_jumps
+         if(gen_jumps(MJ).eq.0) then
+          maxgj=MJ-1
+          go to 640
+         endif
+        enddo
+  640   Write(Iout,637) maxgj/2
+        write(Iout,638) (gen_jumps(MJ),MJ=1,maxgj)
         return
       else
         nspiral5sym=0
@@ -1697,7 +1706,8 @@ C     Print ring numbers
  629  Format(100(1X,20(I5,'-'),/))
  630  Format(1X,'Failed to find ring spiral: ',I7,
      1 ' detected (maximum possible: ',I7,')',/1X,
-     1 'This is a non-spiral fullerene')
+     1 'This is a non-spiral fullerene: Entering the general spiral'
+     1 ' algorithm',/1X,'General Spiral:')
  631  FORMAT(1X,I7,' distinct (55)      RSPIs found out of ',I7,
      1 /1X,I7,' distinct (56)/(65) RSPIs found out of ',I7,
      1 /1X,I7,' distinct (66)      RSPIs found out of ',I7)
@@ -1711,6 +1721,9 @@ C     Print ring numbers
  635  FORMAT(1X,' Spiral found, avoid counting of spirals ',/2X,
      1 'WARNING: output contains only 1 spiral! Set ispsearch=2 ',
      1 'to get the complete spiral count.')
+ 636  FORMAT(1X,'RSPI : ',12I6)
+ 637  FORMAT(1X,'Number of jumps: ',I2)
+ 638  FORMAT(1X,'Jumps: ',10I6)
       Return
       END
      
