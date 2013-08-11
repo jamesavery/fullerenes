@@ -1053,8 +1053,10 @@ pentagon indices, which uniquely identify the locations of the
 pentagons if the fullerene is spirable \cite{Atlas}. Use the canonical
 pentagon ring indices if possible (however, a non-canonical from should work as well).
 
-\item[jumps] An array of up to 10 jump positions and step lengths.  \paramname{jumps} is required in case of \paramname{icart}=\{8,9\}
-(unless you use the general spiral algorithm to create a graph that doesn't require jumps [which is possible of course]).
+\item[jumps] An array of up to 10 jump positions $j_i$ and step lengths $l_i$, i.e. $(j_1,l_1,j_2,l_2,...)$.  
+\paramname{jumps} is required in case of \paramname{icart}=\{8,9\}
+(unless you use the general spiral algorithm to create a graph that does not require jumps [which is possible of course]).
+Note that $j_i$ denotes the face to jump to, and $l_i$ the number of moves ($l_i=1$ means no jump and is therefore obsolete).
 
 
 \item[{IPRC}]
