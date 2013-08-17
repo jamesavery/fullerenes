@@ -347,11 +347,15 @@ The program prints internal coordinates in form of a $Z$-Matrix (distances, angl
 For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
 coordinates, e.g. cartesian coordinates obtained from a force-field optimization.
 
-In addition to the ring spiral algorithm by Fowler and Manolopoulos we have implemented a general ring spiral algorithm for cubic graphs.
-It differs from the classical ring spiral algorithm in that it can insert jumps between the addition of two vertices to the spiral in order
-to prevent walking into a cul-de-sac at a later stage.  It is therefore capable of describing all fullerene graphs (and any other cubic graph).
-The criterion for jumping (while deriving the spiral from a graph) is, that the
-subgraph that hasn't been added to the spiral yet, must never be disconnected.  For deriving the graph from the spiral it is necessary
+In addition to the ring spiral algorithm by Fowler and Manolopoulos we
+have implemented a general ring spiral algorithm for cubic graphs.  It
+differs from the classical ring spiral algorithm in that it can insert
+jumps between the addition of two vertices to the spiral in order to
+prevent walking into a cul-de-sac at a later stage.  It is therefore
+capable of describing all fullerene graphs (and any other cubic graph).
+The criterion for jumping (while deriving the spiral from a graph) is,
+that the subgraph that hasn't been added to the spiral yet, must never
+be disconnected.  For deriving the graph from the spiral it is necessary
 to explicitly give the jump positions and distances. 
 
 We recommend reading Fowler and Manolopoulos' book \cite{Atlas,cvetkovic2002} for
@@ -370,10 +374,13 @@ optimized global minimum for a fullerene, and the force-field optimization might
 end up in a heavily distorted unreasonable 3D local minimum (for strategies to avoid
 this see the input section).
 
-It is important that the end-product is viewed by a molecular visualization program. 
-We recommend CYLview by Claude Legault \cite{CYLview}, Avogadro \cite{Avogadro}, JMol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}. 
-Most of these programs are freely available.  For this purpose a file is written to Fullerene-3D.xyz or Fullerene-3D.cc1 to be used as an input file 
-for the various molecular visualization programs available.
+It is important that the end-product is viewed by a molecular
+visualization program.  We recommend CYLview by Claude Legault
+\cite{CYLview}, Avogadro \cite{Avogadro}, JMol \cite{JMol}, Pymol
+\cite{Pymol} or VMD \cite{vmd}.  Most of these programs are freely
+available.  For this purpose a file is written to Fullerene-3D.xyz or
+Fullerene-3D.cc1 to be used as an input file for the various molecular
+visualization programs available.
 
 The program sets the barycenter of the fullerene 
 to the origin. Using the obtained cartesian coordinates the program calculates the smallest and largest cage diameters and the
@@ -1041,7 +1048,7 @@ vertex connectivities input as series of cards is required each with 4~integers:
 i.e., 1~3~6~4 gives the following edges: 1-3, 1-6, and 1-4.  Zeros for IC2 and IC3 can be used, i.e. 1~3~6~0
 gives 1-3 and 1-6, and 1~3~0~0 just gives 1-3 as an edge.  For the last card in the input stream, IV1 needs
 to be set to zero. For an example see input file \filename{EDGEc20.inp}.  It is legal but not necessary to define edges twice.\\
-If \paramname{ICart} = 8 or 9 general spiral input required using  \paramname{rspi} and \paramname{jumps}.\\ 
+If \paramname{ICart} = 8 or 9, general spiral input is required using  \paramname{rspi} and \paramname{jumps}.\\ 
 If \paramname{ICart} = 10 A spiral search algorithm is used, see \paramname{isearch} keyword in \paramname{Isomer} section.
 
 When importing graphs from the ``House of Graphs'' database, the isomers are numbered starting at~1 (Although,
@@ -1053,10 +1060,13 @@ pentagon indices, which uniquely identify the locations of the
 pentagons if the fullerene is spirable \cite{Atlas}. Use the canonical
 pentagon ring indices if possible (however, a non-canonical from should work as well).
 
-\item[jumps] An array of up to 10 jump positions $j_i$ and step lengths $l_i$, i.e. $(j_1,l_1,j_2,l_2,...)$.  
+\item[jumps] An array of up to 10 jump positions $j_i$ and step lengths
+$l_i$, i.e., $(j_1,l_1,j_2,l_2,\ldots,j_5,l_5)$.  
 \paramname{jumps} is required in case of \paramname{icart}=\{8,9\}
 (unless you use the general spiral algorithm to create a graph that does not require jumps [which is possible of course]).
-Note that $j_i$ denotes the face to jump to, and $l_i$ the number of moves ($l_i=1$ means no jump and is therefore obsolete).
+$j_i$ denotes the face to jump to, and $l_i$ the offset of the cyclic
+shift ($l_i=1$ is the smallest possible value, a jump $l_i=0$ doesn't
+have any effect).
 
 
 \item[{IPRC}]

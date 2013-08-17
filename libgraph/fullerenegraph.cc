@@ -247,8 +247,8 @@ bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair
 //    cout << "k: " << k << endl;
 
     if(jumps.size() != 0 && k == jumps.front().first){
-      // perform cyclic rotation on open_valencies
-      for(int i = jumps.front().second; i>1; --i){ // 1 is no jump
+      // perform cyclic shift on open_valencies
+      for(int i = jumps.front().second; i>0; --i){ // 0 is no jump
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
       }

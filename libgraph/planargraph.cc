@@ -594,7 +594,7 @@ void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node
 
   // iterate over all nodes (of the initial graph) but not by their respective number
   // starting at 3 because we added 3 already
-  for(int i=3; i<N -1; ++i){
+  for(int i=3; i<N-1; ++i){
 
     list<pair<int,int> > open_valencies_bak(open_valencies);
 
@@ -629,7 +629,7 @@ void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node
       }
       else break;
     }
-    assert(open_valencies.back().second!=0);//can only happen if the spiral missed a jump
+    assert(open_valencies.back().second!=0);//i.e., the spiral is stuck. This can only happen if the spiral missed a jump
 
     node_t v = *j;
     //remove all edges of which *j is part from the remaining graph
@@ -644,7 +644,7 @@ void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node
       for(vector<node_t>::iterator it = remaining_graph.neighbours[v].begin(); it != remaining_graph.neighbours[v].end(); ++it){
         remaining_graph.neighbours[*it].push_back(v);
       }
-      //perform cyclic rotation on open_valencies
+      //perform cyclic shift on open_valencies
       open_valencies.push_back(open_valencies.front());
       open_valencies.pop_front();
       //there was no atom added, so 'i' must not be incremented
@@ -652,7 +652,7 @@ void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node
       ++x;
     } else {
       if(x!=0){
-        jumps.push_back(make_pair(i,x+1));
+        jumps.push_back(make_pair(i,x));
         x=0;
       }
     }
