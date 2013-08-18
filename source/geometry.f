@@ -45,126 +45,51 @@ c all 21 second derivatives of the distance and the the distance itself
       f_inv_cub=f_inv**3
 
 c first derivatives
-      dab_x__dax=1
-      dab_x__dbx=-1
-      dab_y__day=1
-      dab_y__dby=-1
-      dab_z__daz=1
-      dab_z__dbz=-1
-
-      df__dab_x=ab_x*f_inv
-      df__dab_y=ab_y*f_inv
-      df__dab_z=ab_z*f_inv
-
-      df__dax=df__dab_x*dab_x__dax
-      df__dbx=df__dab_x*dab_x__dbx
-      df__day=df__dab_y*dab_y__day
-      df__dby=df__dab_y*dab_y__dby
-      df__daz=df__dab_z*dab_z__daz
-      df__dbz=df__dab_z*dab_z__dbz
+      df__dax= ab_x*f_inv
+      df__dbx=-ab_x*f_inv
+      df__day= ab_y*f_inv
+      df__dby=-ab_y*f_inv
+      df__daz= ab_z*f_inv
+      df__dbz=-ab_z*f_inv
 
 c second derivatives 
-
 c f_inv=1/dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
       df_inv__dab_x=-ab_x*f_inv_cub
       df_inv__dab_y=-ab_y*f_inv_cub
       df_inv__dab_z=-ab_z*f_inv_cub
 
-c f_inv=1/dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
-      df_inv__dax=df_inv__dab_x*dab_x__dax
-      df_inv__day=df_inv__dab_y*dab_y__day
-      df_inv__daz=df_inv__dab_z*dab_z__daz
-      df_inv__dbx=df_inv__dab_x*dab_x__dbx
-      df_inv__dby=df_inv__dab_y*dab_y__dby
-      df_inv__dbz=df_inv__dab_z*dab_z__dbz
-
-      ddf11dab_x__f_inv=ab_x
-      ddf11dab_y__f_inv=ab_y
-      ddf11dab_z__f_inv=ab_z
-
-      ddf11dab_x__dab_x=f_inv
-      ddf11dab_y__dab_y=f_inv
-      ddf11dab_z__dab_z=f_inv
-
-c df__dab_x=ab_x*f_inv
-c df__dab_y=ab_y*f_inv
-c df__dab_z=ab_z*f_inv
-      ddf11dab_x__dax=ddf11dab_x__dab_x*dab_x__dax
-     2 + ddf11dab_x__f_inv*df_inv__dax
-      ddf11dab_x__day=
-     2 + ddf11dab_x__f_inv*df_inv__day
-      ddf11dab_x__daz=
-     2 + ddf11dab_x__f_inv*df_inv__daz
-      ddf11dab_x__dbx=ddf11dab_x__dab_x*dab_x__dbx
-     2 + ddf11dab_x__f_inv*df_inv__dbx
-      ddf11dab_x__dby=
-     2 + ddf11dab_x__f_inv*df_inv__dby
-      ddf11dab_x__dbz=
-     2 + ddf11dab_x__f_inv*df_inv__dbz
-      ddf11dab_y__day=ddf11dab_y__dab_y*dab_y__day
-     2 + ddf11dab_y__f_inv*df_inv__day
-      ddf11dab_y__daz=
-     2 + ddf11dab_y__f_inv*df_inv__daz
-      ddf11dab_y__dbx=
-     2 + ddf11dab_y__f_inv*df_inv__dbx
-      ddf11dab_y__dby=ddf11dab_y__dab_y*dab_y__dby
-     2 + ddf11dab_y__f_inv*df_inv__dby
-      ddf11dab_y__dbz=
-     2 + ddf11dab_y__f_inv*df_inv__dbz
-      ddf11dab_z__daz=ddf11dab_z__dab_z*dab_z__daz
-     2 + ddf11dab_z__f_inv*df_inv__daz
-      ddf11dab_z__dbx=
-     2 + ddf11dab_z__f_inv*df_inv__dbx
-      ddf11dab_z__dby=
-     2 + ddf11dab_z__f_inv*df_inv__dby
-      ddf11dab_z__dbz=ddf11dab_z__dab_z*dab_z__dbz
-     2 + ddf11dab_z__f_inv*df_inv__dbz
-
-      ddf11dax__ddf11dab_x=dab_x__dax
-      ddf11dax__ddab_x11dax=df__dab_x
-      ddf11day__ddf11dab_y=dab_y__day
-      ddf11day__ddab_y11day=df__dab_y
-      ddf11daz__ddf11dab_z=dab_z__daz
-      ddf11daz__ddab_z11daz=df__dab_z
-      ddf11dbx__ddf11dab_x=dab_x__dbx
-      ddf11dbx__ddab_x11dbx=df__dab_x
-      ddf11dby__ddf11dab_y=dab_y__dby
-      ddf11dby__ddab_y11dby=df__dab_y
-      ddf11dbz__ddf11dab_z=dab_z__dbz
-      ddf11dbz__ddab_z11dbz=df__dab_z
-
 c df__dax=df__dab_x*dab_x__dax
-      ddf11dax__dax=ddf11dax__ddf11dab_x*ddf11dab_x__dax
-      ddf11dax__day=ddf11dax__ddf11dab_x*ddf11dab_x__day
-      ddf11dax__daz=ddf11dax__ddf11dab_x*ddf11dab_x__daz
-      ddf11dax__dbx=ddf11dax__ddf11dab_x*ddf11dab_x__dbx
-      ddf11dax__dby=ddf11dax__ddf11dab_x*ddf11dab_x__dby
-      ddf11dax__dbz=ddf11dax__ddf11dab_x*ddf11dab_x__dbz
+      ddf11dax__dax= f_inv + ab_x*df_inv__dab_x
+      ddf11dax__day= ab_x*df_inv__dab_y
+      ddf11dax__daz= ab_x*df_inv__dab_z
+      ddf11dax__dbx=-f_inv - ab_x*df_inv__dab_x
+      ddf11dax__dby=-ab_x*df_inv__dab_y
+      ddf11dax__dbz=-ab_x*df_inv__dab_z
 
 c df__day=df__dab_y*dab_y__day
-      ddf11day__day=ddf11day__ddf11dab_y*ddf11dab_y__day
-      ddf11day__daz=ddf11day__ddf11dab_y*ddf11dab_y__daz
-      ddf11day__dbx=ddf11day__ddf11dab_y*ddf11dab_y__dbx
-      ddf11day__dby=ddf11day__ddf11dab_y*ddf11dab_y__dby
-      ddf11day__dbz=ddf11day__ddf11dab_y*ddf11dab_y__dbz
+      ddf11day__day= f_inv + ab_y*df_inv__dab_y
+      ddf11day__daz= ab_y*df_inv__dab_z
+      ddf11day__dbx=-ab_y*df_inv__dab_x
+      ddf11day__dby=-f_inv - ab_y*df_inv__dab_y
+      ddf11day__dbz=-ab_y*df_inv__dab_z
 
 c df__daz=df__dab_z*dab_z__daz
-      ddf11daz__daz=ddf11daz__ddf11dab_z*ddf11dab_z__daz
-      ddf11daz__dbx=ddf11daz__ddf11dab_z*ddf11dab_z__dbx
-      ddf11daz__dby=ddf11daz__ddf11dab_z*ddf11dab_z__dby
-      ddf11daz__dbz=ddf11daz__ddf11dab_z*ddf11dab_z__dbz
+      ddf11daz__daz= f_inv + ab_z*df_inv__dab_z
+      ddf11daz__dbx=-ab_z*df_inv__dab_x
+      ddf11daz__dby=-ab_z*df_inv__dab_y
+      ddf11daz__dbz=-f_inv - ab_z*df_inv__dab_z
 
 c df__dbx=df__dab_x*dab_x__dbx
-      ddf11dbx__dbx=ddf11dbx__ddf11dab_x*ddf11dab_x__dbx
-      ddf11dbx__dby=ddf11dbx__ddf11dab_x*ddf11dab_x__dby
-      ddf11dbx__dbz=ddf11dbx__ddf11dab_x*ddf11dab_x__dbz
+      ddf11dbx__dbx= f_inv + ab_x*df_inv__dab_x
+      ddf11dbx__dby= ab_x*df_inv__dab_y
+      ddf11dbx__dbz= ab_x*df_inv__dab_z
 
 c df__dby=df__dab_y*dab_y__dby
-      ddf11dby__dby=ddf11dby__ddf11dab_y*ddf11dab_y__dby
-      ddf11dby__dbz=ddf11dby__ddf11dab_y*ddf11dab_y__dbz
+      ddf11dby__dby= f_inv + ab_y*df_inv__dab_y
+      ddf11dby__dbz= ab_y*df_inv__dab_z
 
 c df__dbz=df__dab_z*dab_z__dbz
-      ddf11dbz__dbz=ddf11dbz__ddf11dab_z*ddf11dab_z__dbz
+      ddf11dbz__dbz= f_inv + ab_z*df_inv__dab_z
 
       return
       END SUBROUTINE DDDIST
