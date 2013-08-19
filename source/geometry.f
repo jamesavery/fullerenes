@@ -210,16 +210,16 @@ c more auxiliary products
       aux_4x=bc_x*aux_4
       aux_4y=bc_y*aux_4
       aux_4z=bc_z*aux_4
-c the derivations
-      dax=((-bc_x)*aux_2-aux_3x)*den_inv
-      day=((-bc_y)*aux_2-aux_3y)*den_inv
-      daz=((-bc_z)*aux_2-aux_3z)*den_inv
+c the derivatives
+      dax=(-bc_x*aux_2-aux_3x)*den_inv
+      day=(-bc_y*aux_2-aux_3y)*den_inv
+      daz=(-bc_z*aux_2-aux_3z)*den_inv
       dbx=((bc_x-ab_x)*aux_2-aux_4x+aux_3x)*den_inv
       dby=((bc_y-ab_y)*aux_2-aux_4y+aux_3y)*den_inv
       dbz=((bc_z-ab_z)*aux_2-aux_4z+aux_3z)*den_inv
-      dcx=((ab_x)*aux_2+aux_4x)*den_inv
-      dcy=((ab_y)*aux_2+aux_4y)*den_inv
-      dcz=((ab_z)*aux_2+aux_4z)*den_inv
+      dcx=(ab_x*aux_2+aux_4x)*den_inv
+      dcy=(ab_y*aux_2+aux_4y)*den_inv
+      dcz=(ab_z*aux_2+aux_4z)*den_inv
 
       return
       END SUBROUTINE DANGLE
@@ -355,92 +355,40 @@ c more auxiliary products
       aux_4y=bc_y*aux_4
       aux_4z=bc_z*aux_4
 c the derivations
-      df__dax=((-bc_x)*aux_2 - aux_3x)*den_inv
-      df__day=((-bc_y)*aux_2 - aux_3y)*den_inv
-      df__daz=((-bc_z)*aux_2 - aux_3z)*den_inv
+      df__dax=(-bc_x*aux_2 - aux_3x)*den_inv
+      df__day=(-bc_y*aux_2 - aux_3y)*den_inv
+      df__daz=(-bc_z*aux_2 - aux_3z)*den_inv
       df__dbx=((bc_x-ab_x)*aux_2 - aux_4x + aux_3x)*den_inv
       df__dby=((bc_y-ab_y)*aux_2 - aux_4y + aux_3y)*den_inv
       df__dbz=((bc_z-ab_z)*aux_2 - aux_4z + aux_3z)*den_inv
-      df__dcx=((ab_x)*aux_2 + aux_4x)*den_inv
-      df__dcy=((ab_y)*aux_2 + aux_4y)*den_inv
-      df__dcz=((ab_z)*aux_2 + aux_4z)*den_inv
+      df__dcx=(ab_x*aux_2 + aux_4x)*den_inv
+      df__dcy=(ab_y*aux_2 + aux_4y)*den_inv
+      df__dcz=(ab_z*aux_2 + aux_4z)*den_inv
 
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 C SECOND DERIVATIVES
-
-      dab_x__dax=1
-      dab_x__dbx=-1
-      dab_y__day=1
-      dab_y__dby=-1
-      dab_z__daz=1
-      dab_z__dbz=-1
-      dac_x__dax=1
-      dac_x__dcx=-1
-      dac_y__day=1
-      dac_y__dcy=-1
-      dac_z__daz=1
-      dac_z__dcz=-1
-      dbc_x__dbx=1
-      dbc_x__dcx=-1
-      dbc_y__dby=1
-      dbc_y__dcy=-1
-      dbc_z__dbz=1
-      dbc_z__dcz=-1
 
       dr2ab__dab_x=2*ab_x
       dr2ab__dab_y=2*ab_y
       dr2ab__dab_z=2*ab_z
 
-c r2ab=ab_x**2 + ab_y**2 + ab_z**2
-      dr2ab__dax=dr2ab__dab_x*dab_x__dax
-      dr2ab__day=dr2ab__dab_y*dab_y__day
-      dr2ab__daz=dr2ab__dab_z*dab_z__daz
-      dr2ab__dbx=dr2ab__dab_x*dab_x__dbx
-      dr2ab__dby=dr2ab__dab_y*dab_y__dby
-      dr2ab__dbz=dr2ab__dab_z*dab_z__dbz
-c      dr2ab__dcx=0
-c      dr2ab__dcy=0
-c      dr2ab__dcz=0
-
       dr2bc__dbc_x=2*bc_x
       dr2bc__dbc_y=2*bc_y
       dr2bc__dbc_z=2*bc_z
-
-c r2bc=bc_x**2 + bc_y**2 + bc_z**2
-c      dr2bc__dax=0
-c      dr2bc__day=0
-c      dr2bc__daz=0
-      dr2bc__dbx=dr2bc__dbc_x*dbc_x__dbx
-      dr2bc__dby=dr2bc__dbc_y*dbc_y__dby
-      dr2bc__dbz=dr2bc__dbc_z*dbc_z__dbz
-      dr2bc__dcx=dr2bc__dbc_x*dbc_x__dcx
-      dr2bc__dcy=dr2bc__dbc_y*dbc_y__dcy
-      dr2bc__dcz=dr2bc__dbc_z*dbc_z__dcz
 
       dr2ac__dac_x=2*ac_x
       dr2ac__dac_y=2*ac_y
       dr2ac__dac_z=2*ac_z
 
-c r2ac=ac_x**2 + ac_y**2 + ac_z**2
-      dr2ac__dax=dr2ac__dac_x*dac_x__dax
-      dr2ac__day=dr2ac__dac_y*dac_y__day
-      dr2ac__daz=dr2ac__dac_z*dac_z__daz
-c      dr2ac__dbx=0
-c      dr2ac__dby=0
-c      dr2ac__dbz=0
-      dr2ac__dcx=dr2ac__dac_x*dac_x__dcx
-      dr2ac__dcy=dr2ac__dac_y*dac_y__dcy
-      dr2ac__dcz=dr2ac__dac_z*dac_z__dcz
-
       dr1ab__dr2ab=1/(2*dsqrt(r2ab))
 
 c r1ab=dsqrt(r2ab)
-      dr1ab__dax=dr1ab__dr2ab*dr2ab__dax
-      dr1ab__day=dr1ab__dr2ab*dr2ab__day
-      dr1ab__daz=dr1ab__dr2ab*dr2ab__daz
-      dr1ab__dbx=dr1ab__dr2ab*dr2ab__dbx
-      dr1ab__dby=dr1ab__dr2ab*dr2ab__dby
-      dr1ab__dbz=dr1ab__dr2ab*dr2ab__dbz
+      dr1ab__dax=dr1ab__dr2ab*dr2ab__dab_x
+      dr1ab__day=dr1ab__dr2ab*dr2ab__dab_y
+      dr1ab__daz=dr1ab__dr2ab*dr2ab__dab_z
+      dr1ab__dbx=-dr1ab__dr2ab*dr2ab__dab_x
+      dr1ab__dby=-dr1ab__dr2ab*dr2ab__dab_y
+      dr1ab__dbz=-dr1ab__dr2ab*dr2ab__dab_z
 c      dr1ab__dcx=0
 c      dr1ab__dcy=0
 c      dr1ab__dcz=0
@@ -451,67 +399,58 @@ c r1bc=dsqrt(r2bc)
 c      dr1bc__dax=0
 c      dr1bc__day=0
 c      dr1bc__daz=0
-      dr1bc__dbx=dr1bc__dr2bc*dr2bc__dbx
-      dr1bc__dby=dr1bc__dr2bc*dr2bc__dby
-      dr1bc__dbz=dr1bc__dr2bc*dr2bc__dbz
-      dr1bc__dcx=dr1bc__dr2bc*dr2bc__dcx
-      dr1bc__dcy=dr1bc__dr2bc*dr2bc__dcy
-      dr1bc__dcz=dr1bc__dr2bc*dr2bc__dcz
+      dr1bc__dbx=dr1bc__dr2bc*dr2bc__dbc_x
+      dr1bc__dby=dr1bc__dr2bc*dr2bc__dbc_y
+      dr1bc__dbz=dr1bc__dr2bc*dr2bc__dbc_z
+      dr1bc__dcx=-dr1bc__dr2bc*dr2bc__dbc_x
+      dr1bc__dcy=-dr1bc__dr2bc*dr2bc__dbc_y
+      dr1bc__dcz=-dr1bc__dr2bc*dr2bc__dbc_z
 
       dr1ac__dr2ac=1/(2*dsqrt(r2ac))
 
 c r1ac=dsqrt(r2ac)
-      dr1ac__dax=dr1ac__dr2ac*dr2ac__dax
-      dr1ac__day=dr1ac__dr2ac*dr2ac__day
-      dr1ac__daz=dr1ac__dr2ac*dr2ac__daz
+      dr1ac__dax=dr1ac__dr2ac*dr2ac__dac_x
+      dr1ac__day=dr1ac__dr2ac*dr2ac__dac_y
+      dr1ac__daz=dr1ac__dr2ac*dr2ac__dac_z
 c      dr1ac__dbx=0
 c      dr1ac__dby=0
 c      dr1ac__dbz=0
-      dr1ac__dcx=dr1ac__dr2ac*dr2ac__dcx
-      dr1ac__dcy=dr1ac__dr2ac*dr2ac__dcy
-      dr1ac__dcz=dr1ac__dr2ac*dr2ac__dcz
-
-      dr3ab__dr2ab=r1ab
-      dr3ab__dr1ab=r2ab  
+      dr1ac__dcx=-dr1ac__dr2ac*dr2ac__dac_x
+      dr1ac__dcy=-dr1ac__dr2ac*dr2ac__dac_y
+      dr1ac__dcz=-dr1ac__dr2ac*dr2ac__dac_z
 
 c r3ab=r2ab*r1ab
-      dr3ab__dax=dr3ab__dr2ab*dr2ab__dax + dr3ab__dr1ab*dr1ab__dax
-      dr3ab__day=dr3ab__dr2ab*dr2ab__day + dr3ab__dr1ab*dr1ab__day
-      dr3ab__daz=dr3ab__dr2ab*dr2ab__daz + dr3ab__dr1ab*dr1ab__daz
-      dr3ab__dbx=dr3ab__dr2ab*dr2ab__dbx + dr3ab__dr1ab*dr1ab__dbx
-      dr3ab__dby=dr3ab__dr2ab*dr2ab__dby + dr3ab__dr1ab*dr1ab__dby
-      dr3ab__dbz=dr3ab__dr2ab*dr2ab__dbz + dr3ab__dr1ab*dr1ab__dbz
+      dr3ab__dax=r1ab*dr2ab__dab_x + r2ab*dr1ab__dax
+      dr3ab__day=r1ab*dr2ab__dab_y + r2ab*dr1ab__day
+      dr3ab__daz=r1ab*dr2ab__dab_z + r2ab*dr1ab__daz
+      dr3ab__dbx=-r1ab*dr2ab__dab_x + r2ab*dr1ab__dbx
+      dr3ab__dby=-r1ab*dr2ab__dab_y + r2ab*dr1ab__dby
+      dr3ab__dbz=-r1ab*dr2ab__dab_z + r2ab*dr1ab__dbz
 c      dr3ab__dcx=0
 c      dr3ab__dcy=0
 c      dr3ab__dcz=0
-
-      dr3bc__dr2bc=r1bc
-      dr3bc__dr1bc=r2bc  
 
 c r3bc=r2bc*r1bc
 c      dr3bc__dax=0
 c      dr3bc__day=0
 c      dr3bc__daz=0
-      dr3bc__dbx=dr3bc__dr2bc*dr2bc__dbx + dr3bc__dr1bc*dr1bc__dbx
-      dr3bc__dby=dr3bc__dr2bc*dr2bc__dby + dr3bc__dr1bc*dr1bc__dby
-      dr3bc__dbz=dr3bc__dr2bc*dr2bc__dbz + dr3bc__dr1bc*dr1bc__dbz
-      dr3bc__dcx=dr3bc__dr2bc*dr2bc__dcx + dr3bc__dr1bc*dr1bc__dcx
-      dr3bc__dcy=dr3bc__dr2bc*dr2bc__dcy + dr3bc__dr1bc*dr1bc__dcy
-      dr3bc__dcz=dr3bc__dr2bc*dr2bc__dcz + dr3bc__dr1bc*dr1bc__dcz
-
-      dr3ac__dr2ac=r1ac
-      dr3ac__dr1ac=r2ac  
+      dr3bc__dbx=r1bc*dr2bc__dbc_x + r2bc*dr1bc__dbx
+      dr3bc__dby=r1bc*dr2bc__dbc_y + r2bc*dr1bc__dby
+      dr3bc__dbz=r1bc*dr2bc__dbc_z + r2bc*dr1bc__dbz
+      dr3bc__dcx=-r1bc*dr2bc__dbc_x + r2bc*dr1bc__dcx
+      dr3bc__dcy=-r1bc*dr2bc__dbc_y + r2bc*dr1bc__dcy
+      dr3bc__dcz=-r1bc*dr2bc__dbc_z + r2bc*dr1bc__dcz
 
 c r3ac=r2ac*r1ac
-      dr3ac__dax=dr3ac__dr2ac*dr2ac__dax + dr3ac__dr1ac*dr1ac__dax
-      dr3ac__day=dr3ac__dr2ac*dr2ac__day + dr3ac__dr1ac*dr1ac__day
-      dr3ac__daz=dr3ac__dr2ac*dr2ac__daz + dr3ac__dr1ac*dr1ac__daz
+      dr3ac__dax=r1ac*dr2ac__dac_x + r2ac*dr1ac__dax
+      dr3ac__day=r1ac*dr2ac__dac_y + r2ac*dr1ac__day
+      dr3ac__daz=r1ac*dr2ac__dac_z + r2ac*dr1ac__daz
 c      dr3ac__dbx=0
 c      dr3ac__dby=0
 c      dr3ac__dbz=0
-      dr3ac__dcx=dr3ac__dr2ac*dr2ac__dcx + dr3ac__dr1ac*dr1ac__dcx
-      dr3ac__dcy=dr3ac__dr2ac*dr2ac__dcy + dr3ac__dr1ac*dr1ac__dcy
-      dr3ac__dcz=dr3ac__dr2ac*dr2ac__dcz + dr3ac__dr1ac*dr1ac__dcz
+      dr3ac__dcx=-r1ac*dr2ac__dac_x + r2ac*dr1ac__dcx
+      dr3ac__dcy=-r1ac*dr2ac__dac_y + r2ac*dr1ac__dcy
+      dr3ac__dcz=-r1ac*dr2ac__dac_z + r2ac*dr1ac__dcz
 
       daux_11_inv__dr1ab=-1/(2 * r1ab**2 * r1bc)
       daux_11_inv__dr1bc=-1/(2 * r1ab * r1bc**2)
@@ -526,12 +465,9 @@ c aux_11_inv=1/(2*r1ab*r1bc)
      1 + daux_11_inv__dr1bc*dr1bc__dby
       daux_11_inv__dbz=daux_11_inv__dr1ab*dr1ab__dbz
      1 + daux_11_inv__dr1bc*dr1bc__dbz
-      daux_11_inv__dcx=
-     1  daux_11_inv__dr1bc*dr1bc__dcx
-      daux_11_inv__dcy=
-     1  daux_11_inv__dr1bc*dr1bc__dcy
-      daux_11_inv__dcz=
-     1  daux_11_inv__dr1bc*dr1bc__dcz
+      daux_11_inv__dcx=daux_11_inv__dr1bc*dr1bc__dcx
+      daux_11_inv__dcy=daux_11_inv__dr1bc*dr1bc__dcy
+      daux_11_inv__dcz=daux_11_inv__dr1bc*dr1bc__dcz
 
       daux_31_inv__dr3ab=-1/(2 * r3ab**2 * r1bc)
       daux_31_inv__dr1bc=-1/(2 * r3ab * r1bc**2)
@@ -546,12 +482,9 @@ c aux_31_inv=1/(2*r3ab*r1bc)
      1 + daux_31_inv__dr1bc*dr1bc__dby
       daux_31_inv__dbz=daux_31_inv__dr3ab*dr3ab__dbz
      1 + daux_31_inv__dr1bc*dr1bc__dbz
-      daux_31_inv__dcx=
-     1  daux_31_inv__dr1bc*dr1bc__dcx
-      daux_31_inv__dcy=
-     1  daux_31_inv__dr1bc*dr1bc__dcy
-      daux_31_inv__dcz=
-     1  daux_31_inv__dr1bc*dr1bc__dcz
+      daux_31_inv__dcx=daux_31_inv__dr1bc*dr1bc__dcx
+      daux_31_inv__dcy=daux_31_inv__dr1bc*dr1bc__dcy
+      daux_31_inv__dcz=daux_31_inv__dr1bc*dr1bc__dcz
 
 c aux_13_inv=1/(2*r1ab*r3bc)
       daux_13_inv__dr1ab=-1/(2 * r1ab**2 * r3bc)
@@ -567,61 +500,31 @@ c aux_13_inv=1/(2*r1ab*r3bc)
      1 + daux_13_inv__dr3bc*dr3bc__dby
       daux_13_inv__dbz=daux_13_inv__dr1ab*dr1ab__dbz
      1 + daux_13_inv__dr3bc*dr3bc__dbz
-      daux_13_inv__dcx=
-     1  daux_13_inv__dr3bc*dr3bc__dcx
-      daux_13_inv__dcy=
-     1  daux_13_inv__dr3bc*dr3bc__dcy
-      daux_13_inv__dcz=
-     1  daux_13_inv__dr3bc*dr3bc__dcz
+      daux_13_inv__dcx=daux_13_inv__dr3bc*dr3bc__dcx
+      daux_13_inv__dcy=daux_13_inv__dr3bc*dr3bc__dcy
+      daux_13_inv__dcz=daux_13_inv__dr3bc*dr3bc__dcz
 
 c aux_1=r2ab + r2bc - r2ac
-      daux_1__dr2ab=1
-      daux_1__dr2bc=1
-      daux_1__dr2ac=-1
-
-c aux_1=r2ab + r2bc - r2ac
-      daux_1__dax=daux_1__dr2ab*dr2ab__dax
-     1  + daux_1__dr2ac*dr2ac__dax
-      daux_1__day=daux_1__dr2ab*dr2ab__day
-     1  + daux_1__dr2ac*dr2ac__day
-      daux_1__daz=daux_1__dr2ab*dr2ab__daz
-     1  + daux_1__dr2ac*dr2ac__daz
-      daux_1__dbx=daux_1__dr2ab*dr2ab__dbx
-     1 + daux_1__dr2bc*dr2bc__dbx 
-      daux_1__dby=daux_1__dr2ab*dr2ab__dby
-     1 + daux_1__dr2bc*dr2bc__dby 
-      daux_1__dbz=daux_1__dr2ab*dr2ab__dbz
-     1 + daux_1__dr2bc*dr2bc__dbz 
-      daux_1__dcx=
-     1 + daux_1__dr2bc*dr2bc__dcx + daux_1__dr2ac*dr2ac__dcx
-      daux_1__dcy=
-     1 + daux_1__dr2bc*dr2bc__dcy + daux_1__dr2ac*dr2ac__dcy
-      daux_1__dcz=
-     1 + daux_1__dr2bc*dr2bc__dcz + daux_1__dr2ac*dr2ac__dcz
+      daux_1__dax=dr2ab__dab_x - dr2ac__dac_x
+      daux_1__day=dr2ab__dab_y - dr2ac__dac_y
+      daux_1__daz=dr2ab__dab_z - dr2ac__dac_z
+      daux_1__dbx=-dr2ab__dab_x + dr2bc__dbc_x 
+      daux_1__dby=-dr2ab__dab_y + dr2bc__dbc_y 
+      daux_1__dbz=-dr2ab__dab_z + dr2bc__dbc_z 
+      daux_1__dcx=-dr2bc__dbc_x + dr2ac__dac_x
+      daux_1__dcy=-dr2bc__dbc_y + dr2ac__dac_y
+      daux_1__dcz=-dr2bc__dbc_z + dr2ac__dac_z
 
 c arccos_arg=aux_1*aux_11_inv
-      darccos_arg__daux_1=aux_11_inv
-      darccos_arg__daux_11_inv=aux_1
-
-c arccos_arg=aux_1*aux_11_inv
-      darccos_arg__dax=darccos_arg__daux_1*daux_1__dax
-     1 + darccos_arg__daux_11_inv*daux_11_inv__dax
-      darccos_arg__day=darccos_arg__daux_1*daux_1__day
-     1 + darccos_arg__daux_11_inv*daux_11_inv__day
-      darccos_arg__daz=darccos_arg__daux_1*daux_1__daz
-     1 + darccos_arg__daux_11_inv*daux_11_inv__daz
-      darccos_arg__dbx=darccos_arg__daux_1*daux_1__dbx
-     1 + darccos_arg__daux_11_inv*daux_11_inv__dbx
-      darccos_arg__dby=darccos_arg__daux_1*daux_1__dby
-     1 + darccos_arg__daux_11_inv*daux_11_inv__dby
-      darccos_arg__dbz=darccos_arg__daux_1*daux_1__dbz
-     1 + darccos_arg__daux_11_inv*daux_11_inv__dbz
-      darccos_arg__dcx=darccos_arg__daux_1*daux_1__dcx
-     1 + darccos_arg__daux_11_inv*daux_11_inv__dcx
-      darccos_arg__dcy=darccos_arg__daux_1*daux_1__dcy
-     1 + darccos_arg__daux_11_inv*daux_11_inv__dcy
-      darccos_arg__dcz=darccos_arg__daux_1*daux_1__dcz
-     1 + darccos_arg__daux_11_inv*daux_11_inv__dcz
+      darccos_arg__dax=aux_11_inv*daux_1__dax + aux_1*daux_11_inv__dax
+      darccos_arg__day=aux_11_inv*daux_1__day + aux_1*daux_11_inv__day
+      darccos_arg__daz=aux_11_inv*daux_1__daz + aux_1*daux_11_inv__daz
+      darccos_arg__dbx=aux_11_inv*daux_1__dbx + aux_1*daux_11_inv__dbx
+      darccos_arg__dby=aux_11_inv*daux_1__dby + aux_1*daux_11_inv__dby
+      darccos_arg__dbz=aux_11_inv*daux_1__dbz + aux_1*daux_11_inv__dbz
+      darccos_arg__dcx=aux_11_inv*daux_1__dcx + aux_1*daux_11_inv__dcx
+      darccos_arg__dcy=aux_11_inv*daux_1__dcy + aux_1*daux_11_inv__dcy
+      darccos_arg__dcz=aux_11_inv*daux_1__dcz + aux_1*daux_11_inv__dcz
 
 c den_inv=-1/dsqrt(1-arccos_arg**2)
       dden_inv__darccos_arg=-arccos_arg*((1-arccos_arg**2)**(-3./2.))
@@ -649,142 +552,85 @@ c aux_2=2*aux_11_inv
       daux_2__dcz=2*daux_11_inv__dcz
       
 c aux_3=aux_1*aux_31_inv
-      daux_3__daux_1=aux_31_inv
-      daux_3__daux_31_inv=aux_1
-
-c aux_3=aux_1*aux_31_inv
-      daux_3__dax=daux_3__daux_1*daux_1__dax
-     1 + daux_3__daux_31_inv*daux_31_inv__dax
-      daux_3__day=daux_3__daux_1*daux_1__day
-     1 + daux_3__daux_31_inv*daux_31_inv__day
-      daux_3__daz=daux_3__daux_1*daux_1__daz
-     1 + daux_3__daux_31_inv*daux_31_inv__daz
-      daux_3__dbx=daux_3__daux_1*daux_1__dbx
-     1 + daux_3__daux_31_inv*daux_31_inv__dbx
-      daux_3__dby=daux_3__daux_1*daux_1__dby
-     1 + daux_3__daux_31_inv*daux_31_inv__dby
-      daux_3__dbz=daux_3__daux_1*daux_1__dbz
-     1 + daux_3__daux_31_inv*daux_31_inv__dbz
-      daux_3__dcx=daux_3__daux_1*daux_1__dcx
-     1 + daux_3__daux_31_inv*daux_31_inv__dcx
-      daux_3__dcy=daux_3__daux_1*daux_1__dcy
-     1 + daux_3__daux_31_inv*daux_31_inv__dcy
-      daux_3__dcz=daux_3__daux_1*daux_1__dcz
-     1 + daux_3__daux_31_inv*daux_31_inv__dcz
-
+      daux_3__dax=aux_31_inv*daux_1__dax + aux_1*daux_31_inv__dax
+      daux_3__day=aux_31_inv*daux_1__day + aux_1*daux_31_inv__day
+      daux_3__daz=aux_31_inv*daux_1__daz + aux_1*daux_31_inv__daz
+      daux_3__dbx=aux_31_inv*daux_1__dbx + aux_1*daux_31_inv__dbx
+      daux_3__dby=aux_31_inv*daux_1__dby + aux_1*daux_31_inv__dby
+      daux_3__dbz=aux_31_inv*daux_1__dbz + aux_1*daux_31_inv__dbz
+      daux_3__dcx=aux_31_inv*daux_1__dcx + aux_1*daux_31_inv__dcx
+      daux_3__dcy=aux_31_inv*daux_1__dcy + aux_1*daux_31_inv__dcy
+      daux_3__dcz=aux_31_inv*daux_1__dcz + aux_1*daux_31_inv__dcz
 
 c aux_3x=ab_x*aux_3
-      daux_3x__dab_x=aux_3
-      daux_3x__daux_3=ab_x
-c aux_3y=ab_y*aux_3
-      daux_3y__dab_y=aux_3
-      daux_3y__daux_3=ab_y
-c aux_3z=ab_z*aux_3
-      daux_3z__dab_z=aux_3
-      daux_3z__daux_3=ab_z
-
-c aux_3x=ab_x*aux_3
-      daux_3x__dax=daux_3x__dab_x*dab_x__dax+daux_3x__daux_3*daux_3__dax
-      daux_3x__day=daux_3x__daux_3*daux_3__day
-      daux_3x__daz=daux_3x__daux_3*daux_3__daz
-      daux_3x__dbx=daux_3x__dab_x*dab_x__dbx+daux_3x__daux_3*daux_3__dbx
-      daux_3x__dby=daux_3x__daux_3*daux_3__dby
-      daux_3x__dbz=daux_3x__daux_3*daux_3__dbz
-      daux_3x__dcx=daux_3x__daux_3*daux_3__dcx
-      daux_3x__dcy=daux_3x__daux_3*daux_3__dcy
-      daux_3x__dcz=daux_3x__daux_3*daux_3__dcz
+      daux_3x__dax=aux_3+ab_x*daux_3__dax
+      daux_3x__day=ab_x*daux_3__day
+      daux_3x__daz=ab_x*daux_3__daz
+      daux_3x__dbx=-aux_3+ab_x*daux_3__dbx
+      daux_3x__dby=ab_x*daux_3__dby
+      daux_3x__dbz=ab_x*daux_3__dbz
+      daux_3x__dcx=ab_x*daux_3__dcx
+      daux_3x__dcy=ab_x*daux_3__dcy
+      daux_3x__dcz=ab_x*daux_3__dcz
 
 c aux_3y=ab_y*aux_3
-      daux_3y__day=daux_3y__dab_y*dab_y__day+daux_3y__daux_3*daux_3__day
-      daux_3y__daz=daux_3y__daux_3*daux_3__daz
-      daux_3y__dbx=daux_3y__daux_3*daux_3__dbx
-      daux_3y__dby=daux_3y__dab_y*dab_y__dby+daux_3y__daux_3*daux_3__dby
-      daux_3y__dbz=daux_3y__daux_3*daux_3__dbz
-      daux_3y__dcx=daux_3y__daux_3*daux_3__dcx
-      daux_3y__dcy=daux_3y__daux_3*daux_3__dcy
-      daux_3y__dcz=daux_3y__daux_3*daux_3__dcz
+      daux_3y__day=aux_3+ab_y*daux_3__day
+      daux_3y__daz=ab_y*daux_3__daz
+      daux_3y__dbx=ab_y*daux_3__dbx
+      daux_3y__dby=-aux_3+ab_y*daux_3__dby
+      daux_3y__dbz=ab_y*daux_3__dbz
+      daux_3y__dcx=ab_y*daux_3__dcx
+      daux_3y__dcy=ab_y*daux_3__dcy
+      daux_3y__dcz=ab_y*daux_3__dcz
 
 c aux_3z=ab_z*aux_3
-      daux_3z__daz=daux_3z__dab_z*dab_z__daz+daux_3z__daux_3*daux_3__daz
-      daux_3z__dbx=daux_3z__daux_3*daux_3__dbx
-      daux_3z__dby=daux_3z__daux_3*daux_3__dby
-      daux_3z__dbz=daux_3z__dab_z*dab_z__dbz+daux_3z__daux_3*daux_3__dbz
-      daux_3z__dcx=daux_3z__daux_3*daux_3__dcx
-      daux_3z__dcy=daux_3z__daux_3*daux_3__dcy
-      daux_3z__dcz=daux_3z__daux_3*daux_3__dcz
+      daux_3z__daz=aux_3+ab_z*daux_3__daz
+      daux_3z__dbx=ab_z*daux_3__dbx
+      daux_3z__dby=ab_z*daux_3__dby
+      daux_3z__dbz=-aux_3+ab_z*daux_3__dbz
+      daux_3z__dcx=ab_z*daux_3__dcx
+      daux_3z__dcy=ab_z*daux_3__dcy
+      daux_3z__dcz=ab_z*daux_3__dcz
 
 c aux_4=aux_1*aux_13_inv
-      daux_4__daux_1=aux_13_inv
-      daux_4__daux_13_inv=aux_1
-
-c aux_4=aux_1*aux_13_inv
-      daux_4__dbx=daux_4__daux_1*daux_1__dbx
-     1 + daux_4__daux_13_inv*daux_13_inv__dbx
-      daux_4__dby=daux_4__daux_1*daux_1__dby
-     1 + daux_4__daux_13_inv*daux_13_inv__dby
-      daux_4__dbz=daux_4__daux_1*daux_1__dbz
-     1 + daux_4__daux_13_inv*daux_13_inv__dbz
-      daux_4__dcx=daux_4__daux_1*daux_1__dcx
-     1 + daux_4__daux_13_inv*daux_13_inv__dcx
-      daux_4__dcy=daux_4__daux_1*daux_1__dcy
-     1 + daux_4__daux_13_inv*daux_13_inv__dcy
-      daux_4__dcz=daux_4__daux_1*daux_1__dcz
-     1 + daux_4__daux_13_inv*daux_13_inv__dcz
+      daux_4__dbx=aux_13_inv*daux_1__dbx + aux_1*daux_13_inv__dbx
+      daux_4__dby=aux_13_inv*daux_1__dby + aux_1*daux_13_inv__dby
+      daux_4__dbz=aux_13_inv*daux_1__dbz + aux_1*daux_13_inv__dbz
+      daux_4__dcx=aux_13_inv*daux_1__dcx + aux_1*daux_13_inv__dcx
+      daux_4__dcy=aux_13_inv*daux_1__dcy + aux_1*daux_13_inv__dcy
+      daux_4__dcz=aux_13_inv*daux_1__dcz + aux_1*daux_13_inv__dcz
 
 c aux_4x=bc_x*aux_4
-      daux_4x__daux_4=bc_x
-      daux_4x__dbc_x=aux_4
-c aux_4y=bc_y*aux_4
-      daux_4y__daux_4=bc_y
-      daux_4y__dbc_y=aux_4
-c aux_4z=bc_z*aux_4
-      daux_4z__daux_4=bc_z
-      daux_4z__dbc_z=aux_4
-
-c aux_4x=bc_x*aux_4
-      daux_4x__dbx=daux_4x__dbc_x*dbc_x__dbx+daux_4x__daux_4*daux_4__dbx
-      daux_4x__dby=daux_4x__daux_4*daux_4__dby
-      daux_4x__dbz=daux_4x__daux_4*daux_4__dbz
-      daux_4x__dcx=daux_4x__dbc_x*dbc_x__dcx+daux_4x__daux_4*daux_4__dcx
-      daux_4x__dcy=daux_4x__daux_4*daux_4__dcy
-      daux_4x__dcz=daux_4x__daux_4*daux_4__dcz
+      daux_4x__dbx=aux_4+bc_x*daux_4__dbx
+      daux_4x__dby=bc_x*daux_4__dby
+      daux_4x__dbz=bc_x*daux_4__dbz
+      daux_4x__dcx=-aux_4+bc_x*daux_4__dcx
+      daux_4x__dcy=bc_x*daux_4__dcy
+      daux_4x__dcz=bc_x*daux_4__dcz
 
 c aux_4y=bc_y*aux_4
-      daux_4y__dby=daux_4y__dbc_y*dbc_y__dby+daux_4y__daux_4*daux_4__dby
-      daux_4y__dbz=daux_4y__daux_4*daux_4__dbz
-      daux_4y__dcx=daux_4y__daux_4*daux_4__dcx
-      daux_4y__dcy=daux_4y__dbc_y*dbc_y__dcy+daux_4y__daux_4*daux_4__dcy
-      daux_4y__dcz=daux_4y__daux_4*daux_4__dcz
+      daux_4y__dby=aux_4+bc_y*daux_4__dby
+      daux_4y__dbz=bc_y*daux_4__dbz
+      daux_4y__dcx=bc_y*daux_4__dcx
+      daux_4y__dcy=-aux_4+bc_y*daux_4__dcy
+      daux_4y__dcz=bc_y*daux_4__dcz
 
 c aux_4z=bc_z*aux_4
-      daux_4z__dbz=daux_4z__dbc_z*dbc_z__dbz+daux_4z__daux_4*daux_4__dbz
-      daux_4z__dcx=daux_4z__daux_4*daux_4__dcx
-      daux_4z__dcy=daux_4z__daux_4*daux_4__dcy
-      daux_4z__dcz=daux_4z__dbc_z*dbc_z__dcz+daux_4z__daux_4*daux_4__dcz
+      daux_4z__dbz=aux_4+bc_z*daux_4__dbz
+      daux_4z__dcx=bc_z*daux_4__dcx
+      daux_4z__dcy=bc_z*daux_4__dcy
+      daux_4z__dcz=-aux_4+bc_z*daux_4__dcz
 
 CCCCC
-      ddf11dax__dden_inv=((-bc_x)*aux_2 - aux_3x)
-      ddf11day__dden_inv=((-bc_y)*aux_2 - aux_3y)
-      ddf11daz__dden_inv=((-bc_z)*aux_2 - aux_3z)
+      ddf11dax__dden_inv=(-bc_x*aux_2 - aux_3x)
+      ddf11day__dden_inv=(-bc_y*aux_2 - aux_3y)
+      ddf11daz__dden_inv=(-bc_z*aux_2 - aux_3z)
       ddf11dbx__dden_inv=((bc_x-ab_x)*aux_2 - aux_4x + aux_3x)
       ddf11dby__dden_inv=((bc_y-ab_y)*aux_2 - aux_4y + aux_3y)
       ddf11dbz__dden_inv=((bc_z-ab_z)*aux_2 - aux_4z + aux_3z)
-      ddf11dcx__dden_inv=((ab_x)*aux_2 + aux_4x)
-      ddf11dcy__dden_inv=((ab_y)*aux_2 + aux_4y)
-      ddf11dcz__dden_inv=((ab_z)*aux_2 + aux_4z)
-
-      ddf11dax__daux_3x=-den_inv
-      ddf11day__daux_3y=-den_inv
-      ddf11daz__daux_3z=-den_inv
-      ddf11dbx__daux_3x=den_inv
-      ddf11dby__daux_3y=den_inv
-      ddf11dbz__daux_3z=den_inv
-      ddf11dbx__daux_4x=-den_inv
-      ddf11dby__daux_4y=-den_inv
-      ddf11dbz__daux_4z=-den_inv
-      ddf11dcx__daux_4x=den_inv
-      ddf11dcy__daux_4y=den_inv
-      ddf11dcz__daux_4z=den_inv
+      ddf11dcx__dden_inv=(ab_x*aux_2 + aux_4x)
+      ddf11dcy__dden_inv=(ab_y*aux_2 + aux_4y)
+      ddf11dcz__dden_inv=(ab_z*aux_2 + aux_4z)
 
       ddf11dax__daux_2=-bc_x*den_inv
       ddf11day__daux_2=-bc_y*den_inv
@@ -808,185 +654,185 @@ CCCCC
 
 c df__dax=((-bc_x)*aux_2-aux_3x)*den_inv
       ddf11dax__dax=ddf11dax__daux_2*daux_2__dax
-     1 + ddf11dax__daux_3x*daux_3x__dax
+     1 - den_inv*daux_3x__dax
      1 + ddf11dax__dden_inv*dden_inv__dax
       ddf11dax__day=ddf11dax__daux_2*daux_2__day
-     1 + ddf11dax__daux_3x*daux_3x__day
+     1 - den_inv*daux_3x__day
      1 + ddf11dax__dden_inv*dden_inv__day
       ddf11dax__daz=ddf11dax__daux_2*daux_2__daz
-     1 + ddf11dax__daux_3x*daux_3x__daz
+     1 - den_inv*daux_3x__daz
      1 + ddf11dax__dden_inv*dden_inv__daz
-      ddf11dax__dbx=ddf11dax__dbc_x*dbc_x__dbx
+      ddf11dax__dbx=ddf11dax__dbc_x
      1 + ddf11dax__daux_2*daux_2__dbx
-     1 + ddf11dax__daux_3x*daux_3x__dbx
+     1 - den_inv*daux_3x__dbx
      1 + ddf11dax__dden_inv*dden_inv__dbx
       ddf11dax__dby=ddf11dax__daux_2*daux_2__dby
-     1 + ddf11dax__daux_3x*daux_3x__dby
+     1 - den_inv*daux_3x__dby
      1 + ddf11dax__dden_inv*dden_inv__dby
       ddf11dax__dbz=ddf11dax__daux_2*daux_2__dbz
-     1 + ddf11dax__daux_3x*daux_3x__dbz
+     1 - den_inv*daux_3x__dbz
      1 + ddf11dax__dden_inv*dden_inv__dbz
-      ddf11dax__dcx=ddf11dax__dbc_x*dbc_x__dcx
+      ddf11dax__dcx=-ddf11dax__dbc_x
      1 + ddf11dax__daux_2*daux_2__dcx
-     1 + ddf11dax__daux_3x*daux_3x__dcx
+     1 - den_inv*daux_3x__dcx
      1 + ddf11dax__dden_inv*dden_inv__dcx
       ddf11dax__dcy=ddf11dax__daux_2*daux_2__dcy
-     1 + ddf11dax__daux_3x*daux_3x__dcy
+     1 - den_inv*daux_3x__dcy
      1 + ddf11dax__dden_inv*dden_inv__dcy
       ddf11dax__dcz=ddf11dax__daux_2*daux_2__dcz
-     1 + ddf11dax__daux_3x*daux_3x__dcz
+     1 - den_inv*daux_3x__dcz
      1 + ddf11dax__dden_inv*dden_inv__dcz
 
 c df__day=((-bc_y)*aux_2-aux_3y)*den_inv
       ddf11day__day=ddf11day__daux_2*daux_2__day
-     1 + ddf11day__daux_3y*daux_3y__day
+     1 - den_inv*daux_3y__day
      1 + ddf11day__dden_inv*dden_inv__day
       ddf11day__daz=ddf11day__daux_2*daux_2__daz
-     1 + ddf11day__daux_3y*daux_3y__daz
+     1 - den_inv*daux_3y__daz
      1 + ddf11day__dden_inv*dden_inv__daz
       ddf11day__dbx=ddf11day__daux_2*daux_2__dbx
-     1 + ddf11day__daux_3y*daux_3y__dbx
+     1 - den_inv*daux_3y__dbx
      1 + ddf11day__dden_inv*dden_inv__dbx
-      ddf11day__dby=ddf11day__dbc_y*dbc_y__dby
+      ddf11day__dby=ddf11day__dbc_y
      1 + ddf11day__daux_2*daux_2__dby
-     1 + ddf11day__daux_3y*daux_3y__dby
+     1 - den_inv*daux_3y__dby
      1 + ddf11day__dden_inv*dden_inv__dby
       ddf11day__dbz=ddf11day__daux_2*daux_2__dbz
-     1 + ddf11day__daux_3y*daux_3y__dbz
+     1 - den_inv*daux_3y__dbz
      1 + ddf11day__dden_inv*dden_inv__dbz
       ddf11day__dcx=ddf11day__daux_2*daux_2__dcx
-     1 + ddf11day__daux_3y*daux_3y__dcx
+     1 - den_inv*daux_3y__dcx
      1 + ddf11day__dden_inv*dden_inv__dcx
-      ddf11day__dcy=ddf11day__dbc_y*dbc_y__dcy
+      ddf11day__dcy=-ddf11day__dbc_y
      1 + ddf11day__daux_2*daux_2__dcy
-     1 + ddf11day__daux_3y*daux_3y__dcy
+     1 - den_inv*daux_3y__dcy
      1 + ddf11day__dden_inv*dden_inv__dcy
       ddf11day__dcz=ddf11day__daux_2*daux_2__dcz
-     1 + ddf11day__daux_3y*daux_3y__dcz
+     1 - den_inv*daux_3y__dcz
      1 + ddf11day__dden_inv*dden_inv__dcz
 
 c df__daz=((-bc_z)*aux_2-aux_3z)*den_inv
       ddf11daz__daz=ddf11daz__daux_2*daux_2__daz
-     1 + ddf11daz__daux_3z*daux_3z__daz
+     1 - den_inv*daux_3z__daz
      1 + ddf11daz__dden_inv*dden_inv__daz
       ddf11daz__dbx=ddf11daz__daux_2*daux_2__dbx
-     1 + ddf11daz__daux_3z*daux_3z__dbx
+     1 - den_inv*daux_3z__dbx
      1 + ddf11daz__dden_inv*dden_inv__dbx
       ddf11daz__dby=ddf11daz__daux_2*daux_2__dby
-     1 + ddf11daz__daux_3z*daux_3z__dby
+     1 - den_inv*daux_3z__dby
      1 + ddf11daz__dden_inv*dden_inv__dby
-      ddf11daz__dbz=ddf11daz__dbc_z*dbc_z__dbz
+      ddf11daz__dbz=ddf11daz__dbc_z
      1 + ddf11daz__daux_2*daux_2__dbz
-     1 + ddf11daz__daux_3z*daux_3z__dbz
+     1 - den_inv*daux_3z__dbz
      1 + ddf11daz__dden_inv*dden_inv__dbz
       ddf11daz__dcx=ddf11daz__daux_2*daux_2__dcx
-     1 + ddf11daz__daux_3z*daux_3z__dcx
+     1 - den_inv*daux_3z__dcx
      1 + ddf11daz__dden_inv*dden_inv__dcx
       ddf11daz__dcy=ddf11daz__daux_2*daux_2__dcy
-     1 + ddf11daz__daux_3z*daux_3z__dcy
+     1 - den_inv*daux_3z__dcy
      1 + ddf11daz__dden_inv*dden_inv__dcy
-      ddf11daz__dcz=ddf11daz__dbc_z*dbc_z__dcz
+      ddf11daz__dcz=-ddf11daz__dbc_z
      1 + ddf11daz__daux_2*daux_2__dcz
-     1 + ddf11daz__daux_3z*daux_3z__dcz
+     1 - den_inv*daux_3z__dcz
      1 + ddf11daz__dden_inv*dden_inv__dcz
 
 c df__dbx=((bc_x-ab_x)*aux_2-aux_4x+aux_3x)*den_inv
-      ddf11dbx__dbx=ddf11dbx__dbc_x*dbc_x__dbx
-     1 + ddf11dbx__dab_x*dab_x__dbx
+      ddf11dbx__dbx=ddf11dbx__dbc_x
+     1 - ddf11dbx__dab_x
      1 + ddf11dbx__daux_2*daux_2__dbx
-     1 + ddf11dbx__daux_3x*daux_3x__dbx
-     1 + ddf11dbx__daux_4x*daux_4x__dbx
+     1 + den_inv*daux_3x__dbx
+     1 - den_inv*daux_4x__dbx
      1 + ddf11dbx__dden_inv*dden_inv__dbx
       ddf11dbx__dby=ddf11dbx__daux_2*daux_2__dby
-     1 + ddf11dbx__daux_3x*daux_3x__dby
-     1 + ddf11dbx__daux_4x*daux_4x__dby
+     1 + den_inv*daux_3x__dby
+     1 - den_inv*daux_4x__dby
      1 + ddf11dbx__dden_inv*dden_inv__dby
       ddf11dbx__dbz=ddf11dbx__daux_2*daux_2__dbz
-     1 + ddf11dbx__daux_3x*daux_3x__dbz
-     1 + ddf11dbx__daux_4x*daux_4x__dbz
+     1 + den_inv*daux_3x__dbz
+     1 - den_inv*daux_4x__dbz
      1 + ddf11dbx__dden_inv*dden_inv__dbz
-      ddf11dbx__dcx=ddf11dbx__dbc_x*dbc_x__dcx
+      ddf11dbx__dcx=-ddf11dbx__dbc_x
      1 + ddf11dbx__daux_2*daux_2__dcx
-     1 + ddf11dbx__daux_3x*daux_3x__dcx
-     1 + ddf11dbx__daux_4x*daux_4x__dcx
+     1 + den_inv*daux_3x__dcx
+     1 - den_inv*daux_4x__dcx
      1 + ddf11dbx__dden_inv*dden_inv__dcx
       ddf11dbx__dcy=ddf11dbx__daux_2*daux_2__dcy
-     1 + ddf11dbx__daux_3x*daux_3x__dcy
-     1 + ddf11dbx__daux_4x*daux_4x__dcy
+     1 + den_inv*daux_3x__dcy
+     1 - den_inv*daux_4x__dcy
      1 + ddf11dbx__dden_inv*dden_inv__dcy
       ddf11dbx__dcz=ddf11dbx__daux_2*daux_2__dcz
-     1 + ddf11dbx__daux_3x*daux_3x__dcz
-     1 + ddf11dbx__daux_4x*daux_4x__dcz
+     1 + den_inv*daux_3x__dcz
+     1 - den_inv*daux_4x__dcz
      1 + ddf11dbx__dden_inv*dden_inv__dcz
 
 c df__dby=((bc_y-ab_y)*aux_2-aux_4y+aux_3y)*den_inv
-      ddf11dby__dby=ddf11dby__dbc_y*dbc_y__dby
-     1 + ddf11dby__dab_y*dab_y__dby
+      ddf11dby__dby=ddf11dby__dbc_y
+     1 - ddf11dby__dab_y
      1 + ddf11dby__daux_2*daux_2__dby
-     1 + ddf11dby__daux_3y*daux_3y__dby
-     1 + ddf11dby__daux_4y*daux_4y__dby
+     1 + den_inv*daux_3y__dby
+     1 - den_inv*daux_4y__dby
      1 + ddf11dby__dden_inv*dden_inv__dby
       ddf11dby__dbz=ddf11dby__daux_2*daux_2__dbz
-     1 + ddf11dby__daux_3y*daux_3y__dbz
-     1 + ddf11dby__daux_4y*daux_4y__dbz
+     1 + den_inv*daux_3y__dbz
+     1 - den_inv*daux_4y__dbz
      1 + ddf11dby__dden_inv*dden_inv__dbz
       ddf11dby__dcx=ddf11dby__daux_2*daux_2__dcx
-     1 + ddf11dby__daux_3y*daux_3y__dcx
-     1 + ddf11dby__daux_4y*daux_4y__dcx
+     1 + den_inv*daux_3y__dcx
+     1 - den_inv*daux_4y__dcx
      1 + ddf11dby__dden_inv*dden_inv__dcx
-      ddf11dby__dcy=ddf11dby__dbc_y*dbc_y__dcy
+      ddf11dby__dcy=-ddf11dby__dbc_y
      1 + ddf11dby__daux_2*daux_2__dcy
-     1 + ddf11dby__daux_3y*daux_3y__dcy
-     1 + ddf11dby__daux_4y*daux_4y__dcy
+     1 + den_inv*daux_3y__dcy
+     1 - den_inv*daux_4y__dcy
      1 + ddf11dby__dden_inv*dden_inv__dcy
       ddf11dby__dcz=ddf11dby__daux_2*daux_2__dcz
-     1 + ddf11dby__daux_3y*daux_3y__dcz
-     1 + ddf11dby__daux_4y*daux_4y__dcz
+     1 + den_inv*daux_3y__dcz
+     1 - den_inv*daux_4y__dcz
      1 + ddf11dby__dden_inv*dden_inv__dcz
 
 c df__dbz=((bc_z-ab_z)*aux_2-aux_4z+aux_3z)*den_inv
-      ddf11dbz__dbz=ddf11dbz__dbc_z*dbc_z__dbz
-     1 + ddf11dbz__dab_z*dab_z__dbz
+      ddf11dbz__dbz=ddf11dbz__dbc_z
+     1 - ddf11dbz__dab_z
      1 + ddf11dbz__daux_2*daux_2__dbz
-     1 + ddf11dbz__daux_3z*daux_3z__dbz
-     1 + ddf11dbz__daux_4z*daux_4z__dbz
+     1 + den_inv*daux_3z__dbz
+     1 - den_inv*daux_4z__dbz
      1 + ddf11dbz__dden_inv*dden_inv__dbz
       ddf11dbz__dcx=ddf11dbz__daux_2*daux_2__dcx
-     1 + ddf11dbz__daux_3z*daux_3z__dcx
-     1 + ddf11dbz__daux_4z*daux_4z__dcx
+     1 + den_inv*daux_3z__dcx
+     1 - den_inv*daux_4z__dcx
      1 + ddf11dbz__dden_inv*dden_inv__dcx
       ddf11dbz__dcy=ddf11dbz__daux_2*daux_2__dcy
-     1 + ddf11dbz__daux_3z*daux_3z__dcy
-     1 + ddf11dbz__daux_4z*daux_4z__dcy
+     1 + den_inv*daux_3z__dcy
+     1 - den_inv*daux_4z__dcy
      1 + ddf11dbz__dden_inv*dden_inv__dcy
-      ddf11dbz__dcz=ddf11dbz__dbc_z*dbc_z__dcz
+      ddf11dbz__dcz=-ddf11dbz__dbc_z
      1 + ddf11dbz__daux_2*daux_2__dcz
-     1 + ddf11dbz__daux_3z*daux_3z__dcz
-     1 + ddf11dbz__daux_4z*daux_4z__dcz
+     1 + den_inv*daux_3z__dcz
+     1 - den_inv*daux_4z__dcz
      1 + ddf11dbz__dden_inv*dden_inv__dcz
 
 c df__dcx=((ab_x)*aux_2+aux_4x)*den_inv
       ddf11dcx__dcx=ddf11dcx__daux_2*daux_2__dcx
-     1 + ddf11dcx__daux_4x*daux_4x__dcx
+     1 + den_inv*daux_4x__dcx
      1 + ddf11dcx__dden_inv*dden_inv__dcx
       ddf11dcx__dcy=ddf11dcx__daux_2*daux_2__dcy
-     1 + ddf11dcx__daux_4x*daux_4x__dcy
+     1 + den_inv*daux_4x__dcy
      1 + ddf11dcx__dden_inv*dden_inv__dcy
       ddf11dcx__dcz=ddf11dcx__daux_2*daux_2__dcz
-     1 + ddf11dcx__daux_4x*daux_4x__dcz
+     1 + den_inv*daux_4x__dcz
      1 + ddf11dcx__dden_inv*dden_inv__dcz
 
 c df__dcy=((ab_y)*aux_2+aux_4y)*den_inv
       ddf11dcy__dcy=ddf11dcy__daux_2*daux_2__dcy
-     1 + ddf11dcy__daux_4y*daux_4y__dcy
+     1 + den_inv*daux_4y__dcy
      1 + ddf11dcy__dden_inv*dden_inv__dcy
       ddf11dcy__dcz=ddf11dcy__daux_2*daux_2__dcz
-     1 + ddf11dcy__daux_4y*daux_4y__dcz
+     1 + den_inv*daux_4y__dcz
      1 + ddf11dcy__dden_inv*dden_inv__dcz
 
 c df__dcz=((ab_z)*aux_2+aux_4z)*den_inv
       ddf11dcz__dcz=ddf11dcz__daux_2*daux_2__dcz
-     1 + ddf11dcz__daux_4z*daux_4z__dcz
+     1 + den_inv*daux_4z__dcz
      1 + ddf11dcz__dden_inv*dden_inv__dcz
 
       return
