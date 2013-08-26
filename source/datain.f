@@ -231,6 +231,8 @@ C ExtWu force field
        if(isearch.ne.0.and.IPR.eq.-1) IPR=1
       Read(IN,nml=Graph,Err=99,end=99)
 
+c set ischlegel if ifs is non-zero
+      if(ifs.ne.0.and.ischlegel.eq.0) ischlegel=1
 c set force (custom parameters)
       if(iopt.eq.1 .or. iopt.eq.2)then
 C Wu force field

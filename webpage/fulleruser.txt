@@ -110,10 +110,35 @@ Dr. & James & Avery & University of Copenhagen & Niels Bohr Institute & Copenhag
 Prof. Dr. & wazirul haque & ansari & GoldField Inst. Tech. & Mgmt., Chhainsa & Physics & Faridabad-121004 & India & whansari161945@gmail.com & Your program is needed in our study of electronic structure & spectra of fullerenes
 Dr. & Kanchana & Thanthiriwatte & The University of Alabama & Depatment of Chemistry & Tuscaloosa & United States of America & sahanchem@gmail.com & 
 Dr. & Robin & Haunschild & Karlsruhe Institute of Technology & Physical Chemistry & Kalrsruhe & Germany & haunschild@kit.edu & 
-Ms. & Joseph & Held & University of Cologne & Theoretical Chemistry & Cologne & Germany & heldj@uni-koeln.de & 
-Dr. & James & Last & Woody & Stocky & White & Aruba & julian.gebhardt@gmx.net & 
+Ms. & Joseph & Held & University of Cologne & Theoretical Chemistry & Cologne & Germany & heldj@uni-koeln.de &
 Prof. Dr. & Boris & Furtula & University of Kragujevac, Faculty of Science & Department of Chemistry & Kragujevac & Republic of Serbia & furtula@kg.ac.rs & 
 Ms. & Dietmar & Kahler & Softchem &  & Northeim & Germany & dkahler@t-online.de & 
 Prof. Dr. & Imran & Predhanekar & Islamiah College (Autonomous) & Chemistry & Vaniyambadi & India & imranpk@islamiahcollege.edu.in & I would like to work with this software
 Dr. & Vitaly & Chaban & MEMPHYS - Center for Biomembrane Physics &  & ODENSE & Denmark & vvchaban@gmail.com & 
 Prof. Dr. & Marek & Sierka & Friedrich-Schiller-Universität Jena & Institut für Materialwissenschaft und Werkstofftechnologi & Jena & Germany & marek.sierka@uni-jena.de & 
+Dr. & tchoffo & fidele & cameroon yaounde 1 university & physics & yaounde & Cameroon & ftchoffo@uy1.uninet.cm & 
+Mr. & Rebecca & Sure & Mulliken Center for Theoretical Chemistry, University of Bonn &  & Bonn & Germany & rebecca.sure@thch.uni-bonn.de & Sorry, I forgot my password.
+ & xia & haibin & zhejiang university & student & hangzhou & China & tcxhb123@163.com & 
+Ms. & Alejandro & Speck-Planche & UP & REQUIMTE & Porto & Portugal & alejspivanovich@gmail.com & 
+Dr. & Jakub & Kaminsky & IOCB Prague & Molecular Spectroscopy & Prague & Czech Republic & kaminskj@gmail.com & 
+Mr. & Yuting & Li & Ohio University & Department of Physics and Astronomy & Athens & United States of America & yl218008@ohio.edu & 
+Prof. Dr. & Hector Armando & Baldoni & Universidad Nacional de San Luis & Area de Quimica General e Inorganica & San Luis & Argentina & hbaldoni@unsl.edu.ar & 
+Prof. & Hossein & Eslami & Technical University of Darmstadt & Chemistry & Darmstadt & Germany & h.eslami@theo.chemie.tu-darmstadt.de & I need a fortran code to generate fullerene
+Dr. & Pradeep & Varadwaj & Institute of Atomic and Molecular Sceinces & Chemistry & Taipei & Taiwan & pradeep@t.okayama-u.ac.jp & for research purpose 
+Dr. & Yang & Wang & Universidad Autonoma de Madrid & Quimica Modulo 13 & MADRID & Spain & yang.wang@uam.es & 
+Ms. & Emmanuel & Bourret & Université de Montréal & Mathématique et Statistique/Physique & Montréal & Canada & manubou5@hotmail.com & 
+ & Roxanne & Tutchton & The Colorado School of MInes & Physics & Golden & United States of America & rtutchto@mymail.mines.edu & 
+Ms. & Daniel & Lovey & Institute of Modelling and Innovation Technology - CONICET & Physics & Corrientes & Argentina & lovey.da@gmail.com & I am doing my PhD on Quantum Transport and I think that this program can be a good tool to test and compare my own results.
+ & Nannan & Li & POSTECH & Physics & Pohang & China & linannan@postech.ac.kr & 
+ & Nannan & Li & POSTECH & Physics & Pohang & Korea South & linannan@postech.ac.kr & 
+Ms. & Anthony & Cruz-Balberdy & Lehman College & Chemistry & Bronx & United States of America & anthony.cruzbalberdy@lehman.cuny.edu & 
+Ms. & Yuya & Nakajima & Waseda university & chemistry & biochemsitry & Tokyo & Japan & n-azure@ruri.waseda.jp & 
+Ms. & yaser & moradi & azad arak & chemistery & arak & Iran & y.moradi@yahoo.com & 
+Dr. & Tim & Kowalczyk & Nagoya University & Chemistry & Nagoya & Japan & kowalczyk.timothy@j.mbox.nagoya-u.ac.jp & Peter and Lukas, nice to meet you both at APCTCC-6.  I'll use Fullerene to get a birds' eye view of isomers of C62 and C72.  Best wishes, Tim
+Prof. Dr. & David & Azevedo & Universidade Federal do Maranhao & Physics & Sao Luis & Brazil & david888azv@gmail.com & 
+Prof. Dr. & Erin & Johnson & UC Merced & Chemistry & Merced & United States of America & ejohnson29@ucmerced.edu & 
+Ms. & Jason & Larkin & Carnegie Mellon & Mechanical Engineering & Pittsburgh & United States of America & jmlarkin@andrew.cmu.edu & 
+Mr. & Mehrnoosh & Hazrati & Tarbiat Modares University & Science & Tehran & Iran & mehrnoosh.hazrati@modares.ac.ir & I'm a PhD student researching about Fullerenes. Thank you in advance.
+Ms. & Jason & Rozick & Cleveland State U & BGES-mol bio & Mentor & United States of America & jrozick@yahoo.com & Complete C30
+Ms. & Tom & Pie&#324;ko & Warsaw Medical University & Physical Chemistry & Warsaw & Poland & tom.pienko@gmail.com & 
+ & Stefan & Taubert & Aalto University & Department of Chemistry & Espoo & Finland & staubert@chem.helsinki.fi & 
