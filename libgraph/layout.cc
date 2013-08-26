@@ -342,12 +342,12 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       "\\definecolor{pathcolour}{RGB}{"<<(path_colour>>16)<<","<<((path_colour>>8)&0xff)<<","<<(path_colour&0xff)<<"}\n"
       "\\definecolor{dualvertexcolour}{RGB}{205,79,57}\n"
       "\\definecolor{dualedgecolour}{RGB}{0,0,0}\n"
-      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
-      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
+      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0pt")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
+      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0pt")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
       "\\tikzstyle{edge}=[draw,color=edgecolour,line width="<<edge_width<<"mm]\n"
       "\\tikzstyle{pth}=[draw,color=pathcolour,line width="<<path_width<<"mm]\n"
       "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolour,line width="<<edge_width<<"mm]\n"
-      "\\tikzstyle{invisible}=[draw=none,inner sep=0,fill=none,minimum width=0pt]\n"
+      "\\tikzstyle{invisible}=[draw=none,inner sep=0pt,fill=none,minimum width=0pt]\n"
       ;
 
   // Find "internal" width and height of layout and scale to w_cm x h_cm
