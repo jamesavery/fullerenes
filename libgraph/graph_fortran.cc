@@ -35,7 +35,7 @@ extern "C" {
 		     int *depths, int *max_depth);
   int graph_is_a_fullerene_(const graph_ptr *);
   void print_graph_(const graph_ptr *);
-  void draw_graph_(const graph_ptr *g, const char *filename, const char *format, const int *show_dual, const double *dimensions,
+  void draw_graph_(const graph_ptr *g, const char *filename, const char *format, const int *show_dual, const int *show_labels, const double *dimensions,
 		   const int *edge_colour, const int *vertex_colour, const double *edge_width, const double *vertex_diameter);
   void draw_graph_with_path_(const graph_ptr *g, const char *filename, const char *format, const double *dimensions,
 			     const int *edge_colour,const int *path_colour, const int *vertex_colour, const double *edge_width,
@@ -337,7 +337,7 @@ polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }
 int nvertices_(const graph_ptr *g){ return (*g)->N; }
 int nedges_(const graph_ptr *g){ return (*g)->edge_set.size(); }
 
-void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, const int *show_dual, const double *dimensions,
+void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, const int *show_dual, const int *show_labels, const double *dimensions,
 		 const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter)
 {
   string fmt(format,3), filename;
@@ -360,7 +360,7 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
 
   ofstream graph_file(filename.c_str(),ios::out | ios::binary);
   if        (fmt == "tex"){
-    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],*show_dual,false,true,*line_colour,0,*vertex_colour,*line_width,0,*vertex_diameter,0,0);
+    graph_file <<  (*g)->to_latex(dimensions[0],dimensions[1],*show_dual,*show_labels,true,*line_colour,0,*vertex_colour,*line_width,0,*vertex_diameter,0,0);
   } else if (fmt == "pov"){
     graph_file << (*g)->to_povray(dimensions[0],dimensions[1],*line_colour,*vertex_colour,*line_width,*vertex_diameter);
   }
