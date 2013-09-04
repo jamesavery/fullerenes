@@ -65,6 +65,16 @@ template<typename K, typename V> vector<V> get_values(const map<K,V>& m)
   return values;
 }
 
+template<typename K, typename V> vector<V> get_values(const vector<pair<K,V> >& m)
+{
+  vector<V> values(m.size());
+  int i=0;
+  for(typename vector<pair<K,V> >::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
+    values[i] = kv->second;
+  return values;
+}
+
+
 template<typename from, typename to> vector<to> convert_vector(const vector<from>& x)
 {
   vector<to> y(x.size());

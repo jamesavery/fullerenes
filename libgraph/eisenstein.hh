@@ -35,6 +35,7 @@ public:
   Eisenstein operator-(const Eisenstein& y) const { return Eisenstein(first-y.first,second-y.second); } 
   pair<double,double>    operator-(const pair<double,double>& y)    const { return pair<double,double>(first-y.first,second-y.second); } 
   pair<double,double>    operator+(const pair<double,double>& y)    const { return pair<double,double>(first+y.first,second+y.second); } 
+  Eisenstein& operator*=(const Eisenstein& y) { return (*this = *this * y); }
   Eisenstein& operator+=(const Eisenstein& y) { first += y.first; second += y.second; return *this; }
   Eisenstein& operator-=(const Eisenstein& y) { first -= y.first; second -= y.second; return *this; }
 
