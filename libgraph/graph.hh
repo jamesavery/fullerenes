@@ -28,6 +28,9 @@ struct Graph {
   Graph(const set<edge_t>& edge_set = set<edge_t>()) : edge_set(edge_set) {
     update_from_edgeset();
   }
+  Graph(const neighbours_t& neighbours) : neighbours(neighbours) {
+    update_from_neighbours();
+  }
   Graph(const unsigned int N, const vector<int>& adjacency) : N(N), neighbours(N) {
     assert(adjacency.size() == N*N);
 
