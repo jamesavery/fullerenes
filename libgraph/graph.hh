@@ -42,6 +42,8 @@ struct Graph {
     update_from_edgeset();
   }
 
+  bool is_consistently_oriented() const;
+
   bool is_connected(const set<node_t>& subgraph = set<node_t>()) const;
   vector<int> shortest_path(const node_t& source, const node_t& dest, const vector<int>& D0) const;
   vector<int> shortest_paths(const node_t& source, const vector<bool>& used_edges, 

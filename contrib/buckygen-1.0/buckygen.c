@@ -14536,7 +14536,9 @@ open_output_file(void)
         write_dual_graph = write_dual_planar_code;
     }
 
+#ifndef DONT_OUTPUT
     write_header(outfile);
+#endif
 }
 
 /****************************************************************************/
@@ -14596,10 +14598,12 @@ simple_dispatch(void)
 
     strcpy(outtypename,"fullerenes");
 
+
     open_output_file();
 
     if(spiralcheck)
         make_outputfiles_spirals();
+
 
     if(fulleriprswitch)
         hint = MIN(MAX(maxnv - 20, 12), MAX_SPLITLEVEL_IPR);
@@ -14851,11 +14855,13 @@ MAIN(int argc, char *argv[])
                 fprintf(stderr, "Number of fullerenes with %d vertices which do not have a spiral: %llu\n", i, number_without_spiral[i]);
     }
     
+#ifndef DONT_OUTPUT
     for(i = start_output; i <= maxnv; i++) {
         fprintf(stderr, "Number of fullerenes generated with %d vertices: ", i);
         PRINTBIG(stderr, nout[i]);
         fprintf(stderr, "\n");
     }
+#endif
     
 #ifdef SPLITTEST
     PRINTBIG(msgfile,splitcases);
@@ -14878,6 +14884,7 @@ MAIN(int argc, char *argv[])
 	fprintf(msgfile," isomorphism classes\n");
     }
 
+#ifndef DONT_OUTPUT
     PRINTBIG(msgfile,(oswitch ? totalout_op : totalout));
     fprintf(msgfile," %s",outtypename);
     if (uswitch) fprintf(msgfile," generated");
@@ -14895,6 +14902,7 @@ MAIN(int argc, char *argv[])
 	PRINTBIG(msgfile,nout_V);
 	fprintf(msgfile," with trivial group.\n");
     }    
+#endif
 
 #ifdef STATS
     ZEROBIG(total_numrooted);

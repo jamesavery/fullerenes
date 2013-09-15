@@ -1,5 +1,42 @@
 #include "graph.hh"
 
+
+
+bool Graph::is_consistently_oriented() const 
+{
+  map<dedge_t,bool> seen_dedge;
+
+  set<dedge_t> workset;
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++){
+    const node_t s = e->first, t = e->second;
+    workset.insert(dedge_t(s,t));
+    workset.insert(dedge_t(t,s));
+  }
+
+  while(!workset.empty()){
+    const dedge_t e = *workset.begin();
+    node_t u(e.first), v(e.second);
+
+    // Process CW face starting in u->v
+    const node_t u0 = u;
+    workset.erase(dedge_t(u,v));
+    while(v != u0){
+      // Find w = nextCW(u,v)
+      const vector<node_t>& nb(neighbours[v]);
+      int ui = 0;
+      while(nb[ui] != u) ui++;
+      node_t w = nb[(ui+1)%nb.size()];	// u--v--w is CW-most corner
+      u = v;
+      v = w;
+      if(workset.find(dedge_t(u,v)) == workset.end()) // We have already processed arc u->v
+	return false;
+      workset.erase(dedge_t(u,v));
+    }
+  }
+  // Every directed edge is part of exactly one face <-> orientation is consistent
+  return true;
+}
+
  // TODO: Should make two functions: one that takes subgraph (empty is trivially connected) and one that works on full graph.
 bool Graph::is_connected(const set<node_t> &subgraph) const 
 {
@@ -307,9 +344,13 @@ void Graph::update_from_edgeset()
 void Graph::update_from_neighbours() 
 {
   edge_set.clear();
+
   for(node_t u=0;u<neighbours.size();u++)
-    for(unsigned int i=0;i<neighbours[u].size();i++)
-      edge_set.insert(edge_t(u,neighbours[u][i]));
+    for(unsigned int i=0;i<neighbours[u].size();i++){
+      const node_t &v= neighbours[u][i];
+      if(v>u) edge_set.insert(edge_set.begin(),edge_t(u,v));
+    }
+  
   update_from_edgeset();
 }
 

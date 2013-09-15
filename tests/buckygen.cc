@@ -7,9 +7,11 @@ int main(int ac, char **av)
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,0);
   
   Graph G;
+  int i=0;
   while(BuckyGen::next_fullerene(Q,G)){
-    //  G.update_from_neighbours();
-    cout << G << endl;
+    i++;
+    G.update_from_neighbours();
+    printf("Graph %d is %sconsistently oriented\n",i,G.is_consistently_oriented()?"":"not ");
   }
 
   return 0;
