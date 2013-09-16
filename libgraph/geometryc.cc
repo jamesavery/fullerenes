@@ -200,6 +200,28 @@ polygon::scanline polygon::scanConvert() const {
 
   return S;
 }
+
+// http://www.softsurfer.com/Archive/algorithm_0103/algorithm_0103.htm#Winding%20Number
+// TODO: This seems to fail when compiled with -std=c++0x and -O0!
+double polygon::winding_number(const Eisenstein& x) const {
+  vector<Eisenstein> Cp(reduced_outline.size());
+  for(int i=0;i<reduced_outline.size();i++)
+    Cp[i] = reduced_outline[i]-x;
+
+  double wn = 0;
+  for(int i=0;i<Cp.size();i++){
+    Eisenstein segment = Cp[(i+1)%Cp.size()] - Cp[i];
+    double theta = atan2(segment.second,segment.first);
+    wn += theta;
+  }
+  wn /= 2*M_PI;
+  return wn;
+}
+
+bool polygon::point_inside(const Eisenstein& x) const 
+{
+  return winding_number(x) != 0;
+}
   
 
 ostream& operator<<(ostream& S, const polygon& P)

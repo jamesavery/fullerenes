@@ -19,6 +19,7 @@ public:
 
 
   vector< pair<Eisenstein,node_t> > outline; // Polygon outline in the Eisenstein plane. This is always initialized.
+  map<node_t,int> degrees;
 
   // There are two ways to create an "unfolding":
   // 
@@ -26,15 +27,24 @@ public:
   Unfolding(const PlanarGraph& dual, bool planar_layout = false) : faces(dual.compute_faces_flat(3,planar_layout)), triangles(faces.begin(),faces.end()), edgecoords(unfold(triangles)), outline(get_outline(edgecoords)) 
   {
     // If 'dual' contains separating triangles, then a planar layout is necessary
-    // to compute the faces (depth-first search will detect non-existing faces).
+    // to compute the faces (depth-first search will detect non-existing faces)
+
+    // Store degrees of each node
+    for(int u=0;u<dual.N;u++) degrees[u] = dual.neighbours[u].size();
   }
 
   // 2. Provide a simple polygon in the Eisenstein plane, with polygon vertices annotated with
   //    the corresponding node numbers.
   Unfolding(const vector< pair<Eisenstein,node_t> > &outline) : outline(outline) {
+    // Calculate degrees of each node and store directed edge coordinates.
+    polygon P(get_keys(outline));
     for(int i=0;i<outline.size();i++){
       const pair<Eisenstein,node_t> &ux(outline[i]), &vy(outline[(i+1)%outline.size()]);
 
+      Eisenstein unit(1,0);
+      for(int j=0;j<6;j++,unit = unit.nextCW())
+	if(P.point_inside(ux.first+unit)) degrees[ux.second]++;
+	
       edgecoords[dedge_t(ux.second,vy.second)] = dedgecoord_t(ux.first,vy.first);
     }
   }
