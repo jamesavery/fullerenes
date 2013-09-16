@@ -1,9 +1,11 @@
 #ifndef EISENSTEIN_HH
 # define EISENSTEIN_HH
 
+#include <assert.h>
 #include <stdlib.h>
 #include <algorithm>
 #include <complex>
+#include <vector>
 
 using namespace std;
 
@@ -62,11 +64,35 @@ public:
   Eisenstein transpose() const { return Eisenstein(second,first); }
   Eisenstein conj() const { return Eisenstein(first,-second); }
 
+  int unit_angle() const {
+    assert(norm2() == 1);
+    switch(first*10+second){
+    case  1*10 + 0: return 0;
+    case  0*10 + 1: return 1;
+    case -1*10 + 1: return 2;
+    case -1*10 + 0: return 3;
+    case  0*10 - 1: return 4;
+    case  1*10 - 1: return 5;
+    default:
+      abort();
+    }
+  }
+
+  int nearest_unit_angle() const {
+    int l = first, k = second;
+    if(l>=0 && k<=0 && -k < l) return 0;
+    if(l>=0 && k>0)            return 1;
+    if(l<0  && k>0 && -l <= k) return 2;
+    if(l<0  && k>=0 && -l > k) return 3;
+    if(l<=0 && k<0)            return 4;
+    if(l>0 && k<=0 && -k >= l) return 5;
+    return -1;
+  }
+
 
   pair<double,double> coord() const { 
     return make_pair(first + second/2., sqrt(3/4.)*second);
   }
-
   int norm2() const { return first*first + first*second + second*second; }
   double norm() const { return sqrt(norm2()); }
 
