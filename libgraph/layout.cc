@@ -10,8 +10,8 @@ struct ToleranceLess {
 
 vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned int face_max) const
 {
-  if(!is_cubic())
-    printf("tutte_layout called for non-cubic graph. Tutte embedding is only guaranteed planar for cubic graphs.\n");
+  //  if(!is_cubic())
+    //    printf("tutte_layout called for non-cubic graph. Tutte embedding is only guaranteed planar for cubic graphs.\n");
 
   if(s<0) s = 0;
   if(t<0){
