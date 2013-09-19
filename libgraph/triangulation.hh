@@ -23,7 +23,7 @@ public:
 
 
   Triangulation(const vector<int>& spiral_string);
-  Triangulation(const vector<int>& spiral_string, const jumplist_t jumps = jumplist_t());
+  Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps);
 
 
   PlanarGraph& dual_graph() const;
