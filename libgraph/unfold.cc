@@ -120,49 +120,111 @@ void Unfolding::transform_line(const Unfolding::dedgecoord_t& l1, const Unfoldin
   w   = Tuvvu;
 }
 
-
+#include <unistd.h>
 Unfolding Unfolding::straighten_lines() const 
 {
-  vector< int > O;
-  
-  for(int i=0;i<outline.size();i++)	// Find non-hexagon node outline
-    if((degrees.find(outline[i].second))->second != 6) O.push_back(i);
+  vector< int > Oindex;
+  vector< pair<Eisenstein,node_t> > O;
 
+  for(int i=0;i<outline.size();i++)	// Find non-hexagon node outline
+    if((degrees.find(outline[i].second))->second != 6){
+      Oindex.push_back(i);
+      O.push_back(outline[i]);
+    }
+  
   // Directed graph defined by non-hexagon node outline
+  vector<bool> A(12*12);	// Always at most 12 nodes of degree 5 or less
   set<dedge_t> workset;
+
   // Arc annotations
-  map<dedge_t,dedgecoord_t> Xuv;
-  map<dedge_t,pair<int,int> > Wuv;
+  map<dedge_t,pair<int,int> > UVindex;
+  map<dedge_t,dedgecoord_t> XUV;
+  map<dedge_t,dedgecoord_t> XUv;
+  map<dedge_t,dedgecoord_t> XVu;
 
   for(int i=0;i<O.size();i++){
     int j = (i+1)%O.size();
-    int i1 = (O[i]+1)%outline.size(), j1 = (O[j]-1+outline.size())%outline.size();
+    int i1 = (Oindex[i]+1)%outline.size(), j1 = (Oindex[j]-1+outline.size())%outline.size();
 
-    dedge_t UV(outline[O[i]].second,outline[O[j]].second);
+    dedge_t UV(O[i].second,O[j].second);
 
     workset.insert(UV);
+    A[UV.first*12+UV.second] = true;
 
-    Eisenstein Ux(outline[O[i]].first), vx(outline[i1].first), Vx(outline[O[j]].first), ux(outline[j1].first);
+    Eisenstein Ux(O[i].first), vx(outline[i1].first), Vx(O[j].first), ux(outline[j1].first);
 
-    Xuv[UV] = dedgecoord_t(Ux,Vx);
-    Wuv[UV] = make_pair( (vx-Ux).nearest_unit_angle(), (ux-Vx).nearest_unit_angle() );
+    UVindex[UV]  = make_pair(i,j);
+    XUV[UV] = dedgecoord_t(Ux,Vx);
+    XUv[UV] = dedgecoord_t(Ux,vx);
+    XVu[UV] = dedgecoord_t(Vx,ux);
   }
-
-
 
   // Now repeatedly eliminate dedges by the following rules:
+  cerr << "workset = " << workset << ";\n";
   while(!workset.empty()){
+    
+    fprintf(stderr,"Step 1\n");
+    cerr << "workset = " << workset << ";\n";
     //  1. If u->v and v->u are both in the digraph, u->v matches up with v->u as
     //     desired, and we can remove the cycle u<->v from the digraph.
+    for(node_t U=0;U<12;U++)
+      for(node_t V=U+1;V<12;V++)
+	if(A[U*12+V] && A[V*12+U]){
+	  fprintf(stderr,"Found %d->%d and %d->%d, removing both\n",U,V,V,U);
+	  A[U*12+V] = false;
+	  A[V*12+U] = false;
 
-    for(set<dedge_t>::iterator e(workset.begin()); e!=workset.end(); e++)
-      if(workset.find(dedge_t(e->second,e->first)) != workset.end()){
-	set<dedge_t>::iterator er(e++);
-	workset.erase(er);
-      }
+	  workset.erase(dedge_t(U,V));
+	  workset.erase(dedge_t(V,U));
+	}
     
-    // 2. At this step, all cycles are of length >=3 and must be reduced. Find u->v->w 
+    fprintf(stderr,"\nStep 2\n");
+    cerr << "workset = " << workset << ";\n";
+
+    // 2. When this step is reached, edges in workset are part of cycles of length >=3 and must be reduced. 
+    // 2.1 Find first length-3 segment U->V->W
+    dedge_t UV(*workset.begin());
+    node_t U(UV.first), V(UV.second), W;
+    for(W=0;W<12;W++) if(A[V*12+W]) break; 
+    if(W==12){
+      assert(workset.empty());
+      break;
+    }
+
+    // 2.2 Transform W
+    dedge_t VW(V,W);
+    fprintf(stderr,"%d->%d->%d at ",U,V,W); cerr << UVindex[UV] << " and " << UVindex[VW] << endl;
+    Eisenstein x0, x0p, omega;
+
+    transform_line(XUv[VW], reverse(XVu[UV]), x0, x0p, omega);
+    cout << "XUV = " << XUV[UV] << "; XWv = " << XUv[VW] << "; XUv = " << XVu[UV] << ";\n";
+    Eisenstein Wxp = XUV[VW].second,  Wx((Wxp-x0)*omega+x0p);
+    cout << "Wxp = " << Wxp << "; Wx = " << Wx << endl;
+
+
+    // 2.3 Create annotation for new U->W arc
+    dedge_t UW(U,W);
+    dedgecoord_t Wuxp(XVu[VW]), Wux(dedgecoord_t((Wuxp.first-x0)*omega+x0p, (Wuxp.second-x0)*omega+x0p));
+    XUV[UW] = dedgecoord_t(XUV[UV].first,Wx);
+    XUv[UW] = XUv[UV];
+    XVu[UW] = Wux;
+
+    // 2.4 Replace U->V by U->W->V in new outline O
+    int Uindex(UVindex[UV].first);
+    O.insert(O.begin()+Uindex+1, make_pair(Wx,W));
+
+    // 2.5 Remove U->V and V->W from workset
+    fprintf(stderr,"Removing %d->%d and %d->%d\n",U,V,V,W);
+    A[U*12+V] = false;
+    A[V*12+W] = false;
+    workset.erase(UV);
+    workset.erase(VW);
+
+    // 2.6 Add U->W to workset
+    fprintf(stderr,"Adding %d->%d\n",U,W);
+    A[U*12+W] = true;
+    workset.insert(UW);
   }
   
-  
+  return Unfolding(O);
 }
