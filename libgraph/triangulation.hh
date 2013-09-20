@@ -22,8 +22,8 @@ public:
   Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) { orient_neighbours();  }
 
 
-  Triangulation(const vector<int>& spiral_string);
-  Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps);
+//  Triangulation(const vector<int>& spiral_string);
+  Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
 
 
   PlanarGraph& dual_graph() const;

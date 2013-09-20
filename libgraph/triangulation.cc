@@ -112,15 +112,6 @@ void Triangulation::orient_neighbours()
   }
 }
 
-// Takes full spiral string, e.g. 566764366348665
-// where the degrees are between 3 and 8 
-Triangulation::Triangulation(const vector<int>& spiral_string)
-{
-  N = spiral_string.size();
-  // Lukas: Can you implement a fast spiral windup?
-  
-}
-
 
 void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
 {
@@ -147,6 +138,9 @@ void wg_connect_forward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
 //   }
 // }
 
+
+// Takes full spiral string, e.g. 566764366348665
+// where the degrees are between 3 and 8 (or anything larger, really)
 Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j): PlanarGraph()
 {
   jumplist_t jumps = j; // we need a local copy to remove elements
