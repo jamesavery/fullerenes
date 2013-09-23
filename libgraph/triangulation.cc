@@ -11,60 +11,30 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
     const node_t& w(nv[i]);
     const vector<node_t>& nw(neighbours[w]);
     for(int j=0;j<nw.size();j++)
-      if(nw[j] == u) { 
-	if(++t == 1)  tris.first  = w;
+      if(nw[j] == u) {
+	//	printf("%d/%d: %d->%d->%d\n",i,t,u,v,w);
+	t++;
+	if(t == 1)  tris.first  = w;
 	else if(t==2) tris.second = w;
-      } else {
+	else {
 	  fprintf(stderr,"Triangulation is not orientable, edge %d--%d part of more than two faces.\n",u,v);
+	  cerr << "edges = " << edge_set << ";\n";
 	  abort();
 	}
+      }
   }
   return tris;
 }
 
-#define place_dedge(u,v) {   \
-  dedge_t uv(u,v), vu(v,u);  \
-  dedge_done[uv] = true;     \
-  workset.erase(uv);         \
-  if(dedge_done[vu] != true) \
-    workset.insert(vu);      \
-  }
-
-// Computes the faces of a triangulation, returning the faces in a consistent ordering
-vector<tri_t> Triangulation::compute_faces() const
+vector<tri_t> Triangulation::compute_faces() const // non-oriented triangles
 {
-  vector<tri_t> faces;
-  set<dedge_t> workset;
-  map<dedge_t,bool> dedge_done;
-  node_t u(0), v(neighbours[0][0]), w;
-
-  pair<node_t,node_t> tris(adjacent_tris(edge_t(u,v)));
-  w = tris.first;
-
-  // Place the first triangle, its orientation defines the global orientation of the graph
-  place_dedge(u,v);
-  place_dedge(v,w);
-  place_dedge(w,u);
-
-  while(!workset.empty()){
-    dedge_t uv(*workset.begin());
-    node_t u(uv.first), v(uv.second), w;
-
-    pair<node_t,node_t> tris(uv);
-    if(dedge_done[dedge_t(v,tris.first)])      // Already placed triangle defined by v->w0
-      if(dedge_done[dedge_t(v,tris.second)]){  // Already placed triangle defined by v->w1
-	fprintf(stderr,"Triangulation is not planar: Edge %d-%d is part of more than two faces.\n",u,v);
-	abort();
-      } else w = tris.second;
-    else w = tris.first;
-
-    place_dedge(u,v);
-    place_dedge(v,w);
-    place_dedge(w,u);
-
-    faces.push_back(tri_t(u,v,w));
+  set<tri_t> triangles;
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++){
+    pair<node_t,node_t> t(adjacent_tris(*e));
+    triangles.insert(tri_t(e->first,e->second,t.first));
+    triangles.insert(tri_t(e->first,e->second,t.second));
   }
-  return faces;
+  return vector<tri_t>(triangles.begin(),triangles.end());
 }
 
 vector<tri_t> Triangulation::compute_faces_oriented() const 
@@ -92,6 +62,7 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
 void Triangulation::orient_neighbours()
 {
   vector<tri_t> faces(compute_faces());
+  orient_triangulation(faces);
 
   for(int i=0;i<faces.size();i++){
     const tri_t& t(faces[i]);
@@ -232,3 +203,29 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   *this = Triangulation(PlanarGraph(edge_set));
 }
 
+PlanarGraph Triangulation::dual_graph() const {
+  //  assert(is_consistently_oriented());
+  IDCounter<tri_t> tri_numbers;
+  vector<tri_t> triangles(compute_faces());
+
+  for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
+
+  neighbours_t A(triangles.size(),vector<node_t>(3));
+
+  for(node_t U=0;U<triangles.size();U++){
+    const face_t& t(triangles[U]);
+    
+    for(int i=0;i<3;i++){
+      const node_t& u(t[i]), v(t[(i+1)%3]);
+      node_t w(nextCW.find(dedge_t(u,v))->second);      
+
+      A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
+
+      if(A[U][i] < 0){
+	cerr << "Triangle " << tri_t(u,v,w).sorted() << " (opposite " << t << ") not found!\n";
+	abort();
+      }
+    }
+  }
+  return PlanarGraph(Graph(A));
+};

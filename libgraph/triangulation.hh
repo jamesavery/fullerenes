@@ -18,19 +18,17 @@ public:
   //  4. Spirals (constructor + all_spirals + canonical_spiral)
   //  5. Embed in 2D
   //  6. Embed in 3D 
-  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) { orient_neighbours(); }
-  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) { orient_neighbours();  }
+  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) {  }
+  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) {  }
 
 
-//  Triangulation(const vector<int>& spiral_string);
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
 
-
-  PlanarGraph& dual_graph() const;
+  PlanarGraph dual_graph() const;
   
   pair<node_t,node_t> adjacent_tris(const edge_t &e) const;
 
-  vector<tri_t> compute_faces() const;          // Returns oriented triangulation
+  vector<tri_t> compute_faces() const;          // Returns non-oriented triangulation
   void          orient_neighbours();		// Ensures that neighbours are ordered consistently
   vector<tri_t> compute_faces_oriented() const; // If orient_neighbours() has been called, compute faces more efficiently
   

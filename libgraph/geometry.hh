@@ -10,6 +10,7 @@
 #include <sstream>
 #include <list>
 #include <complex>
+#include <algorithm>
 #include "auxiliary.hh"
 using namespace std;
 
@@ -209,7 +210,7 @@ struct face_t : public vector<node_t> {
 };
 
 struct tri_t : public face_t {
-  tri_t(const node_t a,const node_t b,const node_t c) : face_t(3) { u(0) = a; u(1) = b; u(2) = c; }
+  tri_t(const node_t a=0,const node_t b=0,const node_t c=0) : face_t(3) { u(0) = a; u(1) = b; u(2) = c; }
   tri_t(const vector<node_t>& f) : face_t(f) {}
   node_t& u(const unsigned int i)  { return (*this)[i]; }
   const node_t& u(const unsigned int i) const  { return (*this)[i]; }
@@ -217,6 +218,14 @@ struct tri_t : public face_t {
   coord3d centroid(const vector<coord3d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
   coord2d centroid(const vector<coord2d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
   void flip(){ node_t t = u(1); u(1) = u(2); u(2) = t; }
+
+  tri_t sorted() const { 
+    tri_t t(*this); 
+    if(t[0] > t[1]) std::swap(t[0],t[1]);
+    if(t[1] > t[2]) std::swap(t[1],t[2]);
+    if(t[0] > t[1]) std::swap(t[0],t[1]);
+    return t;
+  }
 };
 
 typedef map<unsigned int,set<face_t> > facemap_t;
