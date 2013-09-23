@@ -29,10 +29,12 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
 vector<tri_t> Triangulation::compute_faces() const // non-oriented triangles
 {
   set<tri_t> triangles;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++){
+
+  int i=0;
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++,i++){
     pair<node_t,node_t> t(adjacent_tris(*e));
-    triangles.insert(tri_t(e->first,e->second,t.first));
-    triangles.insert(tri_t(e->first,e->second,t.second));
+    triangles.insert(tri_t(e->first,e->second,t.first).sorted());
+    triangles.insert(tri_t(e->first,e->second,t.second).sorted());
   }
   return vector<tri_t>(triangles.begin(),triangles.end());
 }
@@ -213,7 +215,7 @@ PlanarGraph Triangulation::dual_graph() const {
   neighbours_t A(triangles.size(),vector<node_t>(3));
 
   for(node_t U=0;U<triangles.size();U++){
-    const face_t& t(triangles[U]);
+    const tri_t& t(triangles[U]);
     
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);

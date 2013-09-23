@@ -10,11 +10,18 @@ int main(int ac, char **av)
     spiral[i] = (ac>=13? strtol(av[i+2],0,0) : default_spiral[i])-1;
     full_spiral[spiral[i]] = 5;
   }
+  
+  Triangulation dual;
+  PlanarGraph g;
+  vector<tri_t> faces;
+ 
+  for(int i=0;i<10000;i++){
+    dual = Triangulation(full_spiral);
+    dual.orient_neighbours();
+    g = dual.dual_graph();
+  }
 
-  Triangulation dual(full_spiral);
-  dual.orient_neighbours();
-  PlanarGraph      g(dual.dual_graph());
-
+  cout << "tris = " << faces << ";\n";
   cout << "dual = " << dual << ";\n";
   cout << "g    = " << g << ";\n";
 

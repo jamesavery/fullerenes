@@ -346,7 +346,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   // Check that triangles are orientable: Every edge must appear in two faces
   map<edge_t,int> edgecount;
   for(int i=0;i<tris.size();i++)
-    for(int j=0;j<tris[i].size();j++){
+    for(int j=0;j<3;j++){
       edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]++;
       if(edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]>2)
 	cerr << tris[i] << " bad!\n";
