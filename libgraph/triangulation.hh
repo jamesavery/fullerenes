@@ -9,7 +9,7 @@ public:
   using Graph::N;
   using Graph::neighbours;
 
-  map<dedge_t,node_t> nextCW;
+  vector<tri_t> triangles;
 
   // Operations:
   //  1. Orient triangulation
@@ -18,8 +18,8 @@ public:
   //  4. Spirals (constructor + all_spirals + canonical_spiral)
   //  5. Embed in 2D
   //  6. Embed in 3D 
-  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) {  }
-  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) {  }
+  Triangulation(const Graph& g = Graph(), bool already_oriented = false) : PlanarGraph(g) { update(already_oriented); }
+  Triangulation(const neighbours_t& neighbours, bool already_oriented = false) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
 
@@ -27,16 +27,32 @@ public:
   
   pair<node_t,node_t> adjacent_tris(const edge_t &e) const;
 
-  vector<tri_t> compute_faces() const;          // Returns non-oriented triangulation
-  void          orient_neighbours();		// Ensures that neighbours are ordered consistently
-  vector<tri_t> compute_faces_oriented() const; // If orient_neighbours() has been called, compute faces more efficiently
   
+  node_t nextCW(const dedge_t& uv) const;
+  node_t nextCCW(const dedge_t& uv) const;
+
+  vector<tri_t> compute_faces() const;          // Returns non-oriented triangles
+  vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours
+  void          orient_neighbours();		// Ensures that neighbours are ordered consistently
   
   Unfolding unfold() const;
   Triangulation GCtransform(int k, int l) const;
 
   void get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, bool general=true) const;
   void get_canonical_spiral(vector<int>& v, jumplist_t& j, bool general=true) const;
+
+
+  void update(bool already_oriented) {
+    if(N>0){
+      if(already_oriented) 
+	triangles = compute_faces_oriented();
+      else {
+	triangles = compute_faces();
+	orient_triangulation(triangles);
+	orient_neighbours();
+      }
+    }
+  }
 
 };
 

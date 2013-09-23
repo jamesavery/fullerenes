@@ -20,7 +20,7 @@ int main(int ac, char **av)
     // printf("Graph %d with %d nodes is %sconsistently oriented\n",i,G.N,G.is_consistently_oriented()?"":"not ");
     //	printf("Graph %d is %sconsistently oriented and has %ld perfect matchings\n",i,G.is_consistently_oriented()?"":"not ",G.dual_graph().count_perfect_matchings());
   }
-  printf("Generated %d graphs (%d,%d)\n",i,G.neighbours.size(),dual.neighbours.size());
+  printf("Generated %d graphs (%d,%d)\n",i,int(G.neighbours.size()),int(dual.neighbours.size()));
   
   return 0;
 }
