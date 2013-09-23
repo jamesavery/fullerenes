@@ -343,15 +343,13 @@ void Graph::update_from_edgeset()
 
 void Graph::update_from_neighbours() 
 {
+  N = neighbours.size();
   edge_set.clear();
-
-  for(node_t u=0;u<neighbours.size();u++)
-    for(unsigned int i=0;i<neighbours[u].size();i++){
-      const node_t &v= neighbours[u][i];
-      if(v>u) edge_set.insert(edge_set.begin(),edge_t(u,v));
-    }
-  
-  update_from_edgeset();
+  for(node_t u=0;u<neighbours.size();u++){
+    const vector<node_t> &nu(neighbours[u]);
+    for(unsigned int i=0;i<nu.size();i++)
+      if(nu[i]>u) edge_set.insert(edge_set.begin(),edge_t(u,nu[i]));
+  }
 }
 
 
