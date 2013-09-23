@@ -10,6 +10,7 @@
 #include <sstream>
 #include <list>
 #include <complex>
+#include <algorithm>
 #include "auxiliary.hh"
 using namespace std;
 
@@ -160,10 +161,41 @@ struct coord3d {
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };
 
+struct tri_t {
+  int x_[3];
+  tri_t(const node_t a=0,const node_t b=0,const node_t c=0) { u(0) = a; u(1) = b; u(2) = c; }
+  tri_t(const vector<node_t>& f) { for(int i=0;i<3;i++) x_[i] = f[i]; }
+
+  node_t& operator[](const unsigned int i)  { return x_[i]; }
+  const node_t& operator[](const unsigned int i) const  { return x_[i]; }
+  
+  node_t& u(const unsigned int i)  { return x_[i]; }
+  const node_t& u(const unsigned int i) const  { return x_[i]; }
+
+  coord3d centroid(const vector<coord3d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
+  coord2d centroid(const vector<coord2d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
+  void flip(){ node_t t = u(1); u(1) = u(2); u(2) = t; }
+
+  bool operator!=(const tri_t& x) const { return x_[0] != x[0] || x_[1] != x[1] || x_[2] != x[2]; }
+  bool operator==(const tri_t& x) const { return x_[0] == x[0] && x_[1] == x[1] && x_[2] == x[2]; }
+  bool operator<(const tri_t& x)  const { return x_[0] < x[0] || (x_[0] == x[0] && (x_[1] < x[1] || (x_[1] == x[1] && x_[2] < x[2]))); }
+
+  tri_t sorted() const { 
+    tri_t t(*this); 
+    if(t[0] > t[1]) std::swap(t[0],t[1]);
+    if(t[1] > t[2]) std::swap(t[1],t[2]);
+    if(t[0] > t[1]) std::swap(t[0],t[1]);
+    return t;
+  }
+
+  friend ostream& operator<<(ostream& S, const tri_t& t){ S << vector<int>(t.x_,t.x_+3); return S; }
+};
+
 
 struct face_t : public vector<node_t> {
   face_t(const size_t size=0) : vector<node_t>(size) {}
   face_t(const vector<node_t>& vertices) : vector<node_t>(vertices) {}
+  face_t(const tri_t& t) : vector<node_t>(t.x_,t.x_+3) {}
   
   bool operator==(const face_t& B) const { 
     // Two faces are the same if they contain the same vertices
@@ -208,16 +240,6 @@ struct face_t : public vector<node_t> {
   bool contains(const node_t v) const { for(int i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
 };
 
-struct tri_t : public face_t {
-  tri_t(const node_t a,const node_t b,const node_t c) : face_t(3) { u(0) = a; u(1) = b; u(2) = c; }
-  tri_t(const vector<node_t>& f) : face_t(f) {}
-  node_t& u(const unsigned int i)  { return (*this)[i]; }
-  const node_t& u(const unsigned int i) const  { return (*this)[i]; }
-
-  coord3d centroid(const vector<coord3d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
-  coord2d centroid(const vector<coord2d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
-  void flip(){ node_t t = u(1); u(1) = u(2); u(2) = t; }
-};
 
 typedef map<unsigned int,set<face_t> > facemap_t;
 
