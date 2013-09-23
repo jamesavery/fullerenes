@@ -9,7 +9,7 @@ public:
   using Graph::N;
   using Graph::neighbours;
 
-  map<dedge_t,node_t> nextCW;
+  vector<tri_t> triangles;
 
   // Operations:
   //  1. Orient triangulation
@@ -18,8 +18,18 @@ public:
   //  4. Spirals (constructor + all_spirals + canonical_spiral)
   //  5. Embed in 2D
   //  6. Embed in 3D 
-  Triangulation(const Graph& g = Graph()) : PlanarGraph(g) {  }
-  Triangulation(const neighbours_t& neighbours) : PlanarGraph(Graph(neighbours)) {  }
+  Triangulation(const Graph& g = Graph(), bool already_oriented = false) : PlanarGraph(g) { update(already_oriented); }
+  Triangulation(const neighbours_t& neighbours_, bool already_oriented = false) { 
+    N = neighbours_.size();
+    neighbours = neighbours_;
+
+    // TODO: Do away with edge_set.
+    edge_set.clear();
+    for(node_t u=0;u<N;u++)
+      for(int i=0;i<neighbours[u].size();i++) if(neighbours[u][i]>u) edge_set.insert(edge_t(u,neighbours[u][i]));
+
+    update(already_oriented); 
+  }
 
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
@@ -28,14 +38,26 @@ public:
   
   pair<node_t,node_t> adjacent_tris(const edge_t &e) const;
 
+  node_t nextCW(const dedge_t& uv) const;
+  node_t nextCCW(const dedge_t& uv) const;
   vector<tri_t> compute_faces() const;          // Returns non-oriented triangulation
+  vector<tri_t> compute_faces_oriented() const; // Returns oriented triangulation assuming that neighbours are already oriented
   void          orient_neighbours();		// Ensures that neighbours are ordered consistently
-  vector<tri_t> compute_faces_oriented() const; // If orient_neighbours() has been called, compute faces more efficiently
-  
   
   Unfolding unfold() const;
   Triangulation GCtransform(int k, int l) const;
 
+  void update(bool already_oriented) {
+    if(N>0){
+      if(already_oriented) 
+	triangles = compute_faces_oriented();
+      else {
+	triangles = compute_faces();
+	orient_triangulation(triangles);
+	orient_neighbours();
+      }
+    }
+  }
 };
 
 class FullereneDual : public Triangulation {

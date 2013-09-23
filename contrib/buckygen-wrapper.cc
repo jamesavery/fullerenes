@@ -4,7 +4,7 @@
 #include <signal.h>
 #include <assert.h>
 
-#include "../libgraph/planargraph.hh"
+#include "../libgraph/graph.hh"
 #include "../libgraph/auxiliary.hh"
 #include "buckygen-wrapper.hh"
 
@@ -42,7 +42,7 @@ buckygen_queue start(int N, int IPR)
 {
   buckygen_queue Q;
   Q.qid = msgget(IPC_PRIVATE,IPC_CREAT | 0666);
-  Q.Nvertices = N;
+  Q.Nvertices = N/2+2;
   Q.IPR     = IPR;
 
   assert(Q.qid >= 0);

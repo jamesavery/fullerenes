@@ -39,38 +39,15 @@ vector<tri_t> Triangulation::compute_faces() const // non-oriented triangles
   return vector<tri_t>(triangles.begin(),triangles.end());
 }
 
-vector<tri_t> Triangulation::compute_faces_oriented() const 
-{
-  vector<tri_t> faces;
-  map<dedge_t,bool> dedge_done;
-
-  for(node_t u=0;u<N;u++){
-    const vector<node_t>& nu(neighbours[u]);
-    for(int i=0;i<nu.size();i++){
-      const node_t &v(nu[i]);
-      dedge_t uv(u,v);
-      if(!dedge_done[uv]){
-	node_t w = nextCW.find(uv)->second;
-	faces.push_back(tri_t(u,v,w));
-	dedge_done[uv] = true;
-	dedge_done[dedge_t(v,w)] = true;
-	dedge_done[dedge_t(w,u)] = true;
-      }
-    }
-  }
-  return faces;
-}
-
 void Triangulation::orient_neighbours()
 {
-  vector<tri_t> faces(compute_faces());
-  orient_triangulation(faces);
+  map<dedge_t,node_t> next;
 
-  for(int i=0;i<faces.size();i++){
-    const tri_t& t(faces[i]);
-    nextCW[dedge_t(t[0],t[1])] = t[2];
-    nextCW[dedge_t(t[1],t[2])] = t[0];
-    nextCW[dedge_t(t[2],t[0])] = t[1];
+  for(int i=0;i<triangles.size();i++){
+    const tri_t& t(triangles[i]);
+    next[dedge_t(t[0],t[1])] = t[2];
+    next[dedge_t(t[1],t[2])] = t[0];
+    next[dedge_t(t[2],t[0])] = t[1];
   }
 
   for(node_t u=0;u<N;u++){
@@ -78,13 +55,62 @@ void Triangulation::orient_neighbours()
 
     node_t v = neighbours[u][0]; 
     for(int i=1;i<d;i++){
-      node_t w = nextCW[dedge_t(u,v)];
+      node_t w = next[dedge_t(u,v)];
       neighbours[u][i] = w;
       v = w;
     }
   }
 }
 
+node_t Triangulation::nextCW(const dedge_t& uv) const
+{
+  const node_t &u(uv.first), &v(uv.second);
+  const vector<node_t>& nv(neighbours[v]);
+
+  for(int j=0;j<nv.size(); j++) if(nv[j] == u) return nv[(j+1)%nv.size()];
+
+  return -1;			// u-v is not an edge in a triangulation
+}
+
+node_t Triangulation::nextCCW(const dedge_t& uv) const
+{
+  const node_t &u(uv.first), &v(uv.second);
+  const vector<node_t>& nv(neighbours[v]);
+
+  for(int j=0;j<nv.size(); j++) if(nv[j] == u) return nv[(j-1+nv.size())%nv.size()];
+
+  return -1;			// u-v is not an edge in a triangulation
+}
+
+
+vector<tri_t> Triangulation::compute_faces_oriented() const 
+{
+  vector<tri_t> triangles(edge_set.size()-N+2);
+  map<dedge_t,bool> dedge_done;	// Change to vector<bool> dedge_done[N*3] to increase speed.
+
+  int k=0;
+  for(node_t u=0;u<N;u++){
+    const vector<node_t>& nu(neighbours[u]);
+    for(int i=0;i<nu.size();i++){ 
+      const node_t& v(nu[i]);	// Process directed edge u->v
+      const dedge_t uv(u,v);
+
+      if(!dedge_done[uv]){
+	node_t w = nextCW(uv);
+
+	if(!dedge_done[dedge_t(v,w)] && !dedge_done[dedge_t(w,u)]){
+			 
+	  triangles[k++] = tri_t(u,v,w);
+
+	  dedge_done[dedge_t(u,v)] = true;
+	  dedge_done[dedge_t(v,w)] = true;
+	  dedge_done[dedge_t(w,u)] = true;
+	}
+      }
+    }
+  }
+  return triangles;
+}
 
 void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
 {
@@ -208,9 +234,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 PlanarGraph Triangulation::dual_graph() const {
   //  assert(is_consistently_oriented());
   IDCounter<tri_t> tri_numbers;
-  vector<tri_t> triangles(compute_faces());
 
-  for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
+  for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted()); 
 
   neighbours_t A(triangles.size(),vector<node_t>(3));
 
@@ -219,7 +244,7 @@ PlanarGraph Triangulation::dual_graph() const {
     
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
-      node_t w(nextCW.find(dedge_t(u,v))->second);      
+      node_t w(nextCCW(dedge_t(u,v)));      
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
 
@@ -229,5 +254,6 @@ PlanarGraph Triangulation::dual_graph() const {
       }
     }
   }
+
   return PlanarGraph(Graph(A));
 };
