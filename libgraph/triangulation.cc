@@ -141,23 +141,8 @@ PlanarGraph Triangulation::dual_graph() const
 };
 
 
-void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
-{
-  list< pair<node_t,int> >::iterator second_last(ov.end());
-  --second_last;
-  --second_last;
-
-  edge_set.insert(edge_t(ov.back().first, second_last->first));
-  --ov.back().second;
-  --(second_last->second);//decrement the last but one entry
-}
-
-void wg_connect_forward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
-{
-  edge_set.insert(edge_t(ov.back().first, ov.front().first));
-  --ov.back().second;
-  --ov.front().second;
-}
+extern void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov);
+extern void wg_connect_forward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov);
 
 // // debug only (do not remove, please [lukas])
 // void pdp(list<pair<int,int> > &open_valencies){

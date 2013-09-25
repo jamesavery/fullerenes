@@ -62,6 +62,7 @@ public:
   // 2. Construct with buckygen
   // 3. Spiral+gen. spiral special case
   // 4. Embed-in-3D special case
+  FullereneDual(const Triangulation& g) : Triangulation(g) {}
 
   void get_canonical_fullerene_rspi(vector<int>& r, jumplist_t& j, bool general=true) const;
 
