@@ -384,7 +384,7 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     bool is_connected = remaining_graph.is_connected(remaining_nodes);
     if(!general && !is_connected){//failing spiral
       spiral.front() = INT_MAX; // as an error code tht behaves correctly with respect to lexicographical sorting
-      return; //FIXME is return correct?
+      return;
     }
     else if(general && !is_connected){//further cyclic rotation required
       //revert the last operations
@@ -425,8 +425,10 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 void Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps, bool general) const {
 
 //  vector<int> pentagon_indices_tmp;
-  vector<int> spiral_tmp(1,INT_MAX); // so it gets overwritten
+  vector<int> spiral_tmp;
   jumplist_t jumps_tmp;
+  spiral = vector<int>(1,INT_MAX); // so it gets overwritten
+  jumps = jumplist_t(100,make_pair(0,0));
   
   vector<face_t> faces(compute_faces_flat(3));
 
@@ -443,9 +445,9 @@ void Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps,
 
       // store the shortest / lexicographically smallest (general) spiral
       if(jumps_tmp.size() < jumps.size() || 
-		(jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps.begin(), jumps.end(), jumps_tmp.begin(), jumps_tmp.end())) ||
-		(jumps_tmp.size() == jumps.size() && jumps == jumps_tmp &&
-          lexicographical_compare(spiral.begin(), spiral.end(), spiral_tmp.begin(), spiral_tmp.end()))){
+		(jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
+		(jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
+          lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
 		jumps = jumps_tmp;
 		spiral = spiral_tmp;
       }
@@ -464,6 +466,7 @@ void Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps,
 void FullereneDual::get_canonical_fullerene_rspi(vector<int>& rspi, jumplist_t& jumps, bool general) const {
 
   rspi.clear();
+  jumps.clear();
   vector<int> spiral;
   get_canonical_spiral(spiral, jumps, general);
 
