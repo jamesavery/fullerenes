@@ -265,15 +265,31 @@ inline void gpi_connect_backward(list<pair<int,int> > &open_valencies){
   --second_last->second;//decrement the last but one entry
 }
 
-inline void gpi_remove_node(const int i, PlanarGraph &remaining_graph, set<int> &remaining_nodes, vector<int> &deleted_neighbours){
+void gpi_remove_node(const int i, PlanarGraph &remaining_graph, set<int> &remaining_nodes, vector<int> &deleted_neighbours){
   remaining_nodes.erase(i);
-  //remove i from all neighbour lists and erase all neighbours from the i-list
+   //remove i from all neighbour lists and erase all neighbours from the i-list
   for(vector<int>::iterator it = remaining_graph.neighbours[i].begin(); it != remaining_graph.neighbours[i].end(); ++it){
-    remaining_graph.neighbours[*it].erase(find(remaining_graph.neighbours[*it].begin(),remaining_graph.neighbours[*it].end(),i));
-  }
+    vector<node_t>& nv(remaining_graph.neighbours[*it]);
+    for(int j=0;j<nv.size();j++)
+      if(nv[j] == i){ nv[j] = nv[nv.size()-1]; nv.pop_back(); break; }
+   }
   deleted_neighbours = remaining_graph.neighbours[i];
   remaining_graph.neighbours[i].clear();
-}
+ }
+ 
+
+// void gpi_remove_node(const node_t u, PlanarGraph &remaining_graph, set<int> &remaining_nodes, vector<int> &deleted_neighbours){
+//   remaining_nodes.erase(u);
+//   const vector<node_t>& nu(remaining_graph.neighbours[u]);
+//   //remove i from all neighbour lists and erase all neighbours from the i-list
+//   for(int i=0;i<nu.size();i++){
+//     vector<node_t>& nv(remaining_graph.neighbours[nu[i]]);
+//     remove(nv.begin(),nv.end(),u);
+//     //    remaining_graph.neighbours[*it].erase(find(remaining_graph.neighbours[*it].begin(),remaining_graph.neighbours[*it].end(),i));
+//   }
+//   deleted_neighbours = remaining_graph.neighbours[u];
+//   remaining_graph.neighbours[u].clear();
+// }
 
 // jumps start to count at 0
 // perform a general spiral search and return the spiral and the jump positions + their length
@@ -290,7 +306,7 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   set<node_t> remaining_nodes;
 
   // valencies is a list of length N and contains the valencies of each node
-  vector<node_t> valencies(N, 0);  
+  vector<int> valencies(N, 0);  
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
   // of the node and the number of open valencies
@@ -308,6 +324,8 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     //cout << i << ": " << valencies[i]<< endl;
     remaining_nodes.insert(i);
   }
+
+  bool CW = nextCW(dedge_t(f1,f2)) == f3;
 
   //check if starting nodes share a face
   if(edge_set.find(edge_t(f1,f2)) == edge_set.end() ||
@@ -346,16 +364,21 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     // we can't search in the remaining_graph because there are some edges deleted already
     set<int>::iterator j=remaining_nodes.begin();
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
-    for( ; j!=remaining_nodes.end(); ++j){
-      if(edge_set.find(edge_t(u,*j)) != edge_set.end() &&
-         edge_set.find(edge_t(w,*j)) != edge_set.end()) break;
-    }
-    // there is allways a node to be added next
-    // even in the non-general spiral fails should be caught in the connectedness test
-    assert(j!=remaining_nodes.end());
+    node_t v = CW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
+    assert(v != -1);
+    // for( ; j!=remaining_nodes.end(); ++j){
+    //   if(edge_set.find(edge_t(u,*j)) != edge_set.end() &&
+    //      edge_set.find(edge_t(w,*j)) != edge_set.end()) break;
+    // }
 
-    spiral.push_back(valencies[*j]);
-    open_valencies.push_back(make_pair(*j,valencies[*j]));
+    // // there is allways a node to be added next
+    // // even in the non-general spiral fails should be caught in the connectedness test
+    // assert(j!=remaining_nodes.end());
+    
+    // node_t v = *j;
+    
+    spiral.push_back(valencies[v]);
+    open_valencies.push_back(make_pair(v,valencies[v]));
     gpi_connect_backward(open_valencies);
     gpi_connect_forward(open_valencies);
 
@@ -377,7 +400,6 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     }
 //    assert(open_valencies.back().second!=0);//i.e., the spiral is stuck. This can only happen if the spiral missed a jump
 
-    node_t v = *j;
     //remove all edges of which *j is part from the remaining graph
     gpi_remove_node(v, remaining_graph, remaining_nodes, deleted_neighbours_bak);
 
