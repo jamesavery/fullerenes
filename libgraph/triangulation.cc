@@ -251,18 +251,26 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 //			     SPIRAL STUFF
 // *********************************************************************
 // gpi is for 'get pentagon indices'
-inline void gpi_connect_forward(list<pair<node_t,int> > &open_valencies){
+bool gpi_connect_forward(list<pair<node_t,int> > &open_valencies){
   --open_valencies.back().second;
   --open_valencies.front().second;
+  if(open_valencies.back().second==0){
+    return false;
+  }
+  return true;
 }
 
-inline void gpi_connect_backward(list<pair<node_t,int> > &open_valencies){
+bool gpi_connect_backward(list<pair<node_t,int> > &open_valencies){
   list<pair<node_t,int> >::iterator second_last(open_valencies.end());
   second_last--;
   second_last--;
 
   --open_valencies.back().second;
   --second_last->second;//decrement the last but one entry
+  if(open_valencies.back().second==0){
+    return false;
+  }
+  return true;
 }
 
 void gpi_remove_node(const int i, PlanarGraph &remaining_graph, set<int> &remaining_nodes, vector<int> &deleted_neighbours){
@@ -351,8 +359,8 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   spiral.push_back(valencies[f3]);
   gpi_remove_node(f3, remaining_graph, remaining_nodes, deleted_neighbours_bak);
   open_valencies.push_back(make_pair(f3,valencies[f3]));
-  gpi_connect_backward(open_valencies);
-  gpi_connect_forward(open_valencies);
+  if(!gpi_connect_backward(open_valencies)) return false;
+  if(!gpi_connect_forward(open_valencies))return false;
 
   // iterate over all nodes (of the initial graph) but not by their respective number
   // starting at 3 because we added 3 already
@@ -365,7 +373,9 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     //set<int>::iterator j=remaining_nodes.begin();
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
     node_t v = CW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
-    assert(v != -1);
+    if(v == -1){ // non-general spiral failed
+      return false;
+    }
     // for( ; j!=remaining_nodes.end(); ++j){
     //   if(edge_set.find(edge_t(u,*j)) != edge_set.end() &&
     //      edge_set.find(edge_t(w,*j)) != edge_set.end()) break;
@@ -379,13 +389,13 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     
     spiral.push_back(valencies[v]);
     open_valencies.push_back(make_pair(v,valencies[v]));
-    gpi_connect_backward(open_valencies);
-    gpi_connect_forward(open_valencies);
+    if(!gpi_connect_backward(open_valencies))return false;
+    if(!gpi_connect_forward(open_valencies))return false;
 
     // there are three positions in open_valencies that can be 0---one shouldn't happen, the other two cases require interaction.
     while(open_valencies.front().second==0){
       open_valencies.pop_front();
-      gpi_connect_forward(open_valencies);
+      if(!gpi_connect_forward(open_valencies))return false;
     }
     while(true){
       list<pair<node_t,int> >::iterator second_last(open_valencies.end());
@@ -394,7 +404,7 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
       
       if(second_last->second==0){
         open_valencies.erase(second_last);
-        gpi_connect_backward(open_valencies);
+        if(!gpi_connect_backward(open_valencies))return false;
       }
       else break;
     }
@@ -404,10 +414,11 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     gpi_remove_node(v, remaining_graph, remaining_nodes, deleted_neighbours_bak);
 
     bool is_connected = remaining_graph.is_connected(remaining_nodes);
-    if(!general && !is_connected){//failing spiral
-      return false;
-    }
-    else if(general && !is_connected){//further cyclic rotation required
+//    if(!general && !is_connected){//failing spiral
+//      return false;
+//    }
+//    else if(general && !is_connected){//further cyclic rotation required
+    if(general && !is_connected){//further cyclic rotation required
       //revert the last operations
       remaining_nodes.insert(v);
       spiral.pop_back();
@@ -455,11 +466,10 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 bool Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps, bool general) const {
 
-//  vector<int> pentagon_indices_tmp;
   vector<int> spiral_tmp;
   jumplist_t jumps_tmp;
   spiral = vector<int>(1,INT_MAX); // so it gets overwritten
-  jumps = jumplist_t(100,make_pair(0,0));
+  jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
   
   vector<face_t> faces(compute_faces_flat(3));
 
