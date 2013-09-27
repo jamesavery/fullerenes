@@ -38,8 +38,8 @@ public:
   Unfolding unfold() const;
   Triangulation GCtransform(int k, int l) const;
 
-  void get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, bool general=true) const;
-  void get_canonical_spiral(vector<int>& v, jumplist_t& j, bool general=true) const;
+  bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, bool general=true) const;
+  bool get_canonical_spiral(vector<int>& v, jumplist_t& j, bool general=true) const;
 
 
   void update(bool already_oriented) {
@@ -64,7 +64,7 @@ public:
   // 4. Embed-in-3D special case
   FullereneDual(const Triangulation& g) : Triangulation(g) {}
 
-  void get_canonical_fullerene_rspi(vector<int>& r, jumplist_t& j, bool general=true) const;
+  bool get_canonical_fullerene_rspi(vector<int>& r, jumplist_t& j, bool general=true) const;
 
 };
 

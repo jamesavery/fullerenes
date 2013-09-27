@@ -164,7 +164,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
   // of the node and the number of open valencies
-  list<pair<int,int> > open_valencies;
+  list<pair<node_t,int> > open_valencies;
 
   // set up first two nodes
   open_valencies.push_back(make_pair(0,spiral_string[0]));
@@ -203,7 +203,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     }
     // do the remaining connect backwards //not neat but the most simple way to emulate 'while second_last->second==0) ...'
     while(true){
-      list<pair<int,int> >::iterator second_last(open_valencies.end());
+      list<pair<node_t,int> >::iterator second_last(open_valencies.end());
       --second_last;
       --second_last;
       if(second_last->second==0){
@@ -227,7 +227,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     cout << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
     abort();
   }
-  for(list<pair<int,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
+  for(list<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
     if(it->second!=1){
       cout << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
     abort();
@@ -251,13 +251,13 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 //			     SPIRAL STUFF
 // *********************************************************************
 // gpi is for 'get pentagon indices'
-inline void gpi_connect_forward(list<pair<int,int> > &open_valencies){
+inline void gpi_connect_forward(list<pair<node_t,int> > &open_valencies){
   --open_valencies.back().second;
   --open_valencies.front().second;
 }
 
-inline void gpi_connect_backward(list<pair<int,int> > &open_valencies){
-  list<pair<int,int> >::iterator second_last(open_valencies.end());
+inline void gpi_connect_backward(list<pair<node_t,int> > &open_valencies){
+  list<pair<node_t,int> >::iterator second_last(open_valencies.end());
   second_last--;
   second_last--;
 
@@ -293,7 +293,7 @@ void gpi_remove_node(const int i, PlanarGraph &remaining_graph, set<int> &remain
 
 // jumps start to count at 0
 // perform a general spiral search and return the spiral and the jump positions + their length
-void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, jumplist_t& jumps, bool general) const {
+bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, jumplist_t& jumps, bool general) const {
 
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
   spiral.clear();
@@ -311,12 +311,12 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   // the spiral but is not fully saturated yet.  The entry contains the number
   // of the node and the number of open valencies
   list<pair<node_t,int> > open_valencies;
-  // a backup of the neighbours of he current node ... required in case of a
+  // a backup of the neighbours of the current node ... required in case of a
   // jump
   vector<int> deleted_neighbours_bak;
 
-  //the current jumping state
-  int x=0;
+  //the current jumping state, counts the number of cyclic shifts of length 1 in the current series.
+  int jump_state=0;
 
   //init of the valency-list and the set of nodes in the remaining graph
   for(int i=0; i!=remaining_graph.N; ++i){
@@ -362,7 +362,7 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 
     // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_graph because there are some edges deleted already
-    set<int>::iterator j=remaining_nodes.begin();
+    //set<int>::iterator j=remaining_nodes.begin();
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
     node_t v = CW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
     assert(v != -1);
@@ -388,7 +388,7 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
       gpi_connect_forward(open_valencies);
     }
     while(true){
-      list<pair<int,int> >::iterator second_last(open_valencies.end());
+      list<pair<node_t,int> >::iterator second_last(open_valencies.end());
       second_last--;
       second_last--;
       
@@ -405,8 +405,7 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 
     bool is_connected = remaining_graph.is_connected(remaining_nodes);
     if(!general && !is_connected){//failing spiral
-      spiral.front() = INT_MAX; // as an error code tht behaves correctly with respect to lexicographical sorting
-      return;
+      return false;
     }
     else if(general && !is_connected){//further cyclic rotation required
       //revert the last operations
@@ -422,29 +421,39 @@ void Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
       open_valencies.pop_front();
       //there was no atom added, so 'i' must not be incremented
       --i;
-      ++x;
+      ++jump_state;
     }
-    else if(general && x!=0 && is_connected){//end of cyclic rotation
-      jumps.push_back(make_pair(i,x));
-      x=0;
+    else if(general && jump_state!=0 && is_connected){//end of cyclic rotation
+      jumps.push_back(make_pair(i,jump_state));
+      jump_state=0;
     }
   }
 
   // make sure we left the loop in a sane state
-  // this probably requires some proper error handling thow and catch and so on ...
-  assert(remaining_nodes.size() == 1);
-  const int last_valency = valencies[*remaining_nodes.begin()];
-  assert(open_valencies.size() == last_valency);
-  for(list<pair<int,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
-    assert(it->second == 1);
+  // this probably requires some proper error handling: throw and catch and so on ...
+  if(remaining_nodes.size() != 1){
+    cerr << "more than one node left ... exiting." << endl;
+    return false;
   }
+  const int last_valency = valencies[*remaining_nodes.begin()];
+  if(open_valencies.size() != last_valency){
+    cerr << "wrong number of nodes with open valencies: " << open_valencies.size() << " ... exiting." << endl;
+    return false;
+  }
+  for(list<pair<node_t,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
+    if(it->second != 1){
+	  cerr << "number of open valencies is not 1 (but it should be) ... exiting." << endl;
+      return false;
+    }
+  }
+
   spiral.push_back(last_valency);
- 
+  return true;
 }
 
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
-void Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps, bool general) const {
+bool Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps, bool general) const {
 
 //  vector<int> pentagon_indices_tmp;
   vector<int> spiral_tmp;
@@ -454,8 +463,6 @@ void Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps,
   
   vector<face_t> faces(compute_faces_flat(3));
 
-//  cout << "generating all spirals ";
-
   for(int i=0; i<faces.size(); i++){
     int permutations[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
     const face_t& f = faces[i];
@@ -463,7 +470,9 @@ void Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps,
 
       int f1 = f[permutations[j][0]], f2 = f[permutations[j][1]], f3 = f[permutations[j][2]];
 
-      get_spiral(f1, f2, f3, spiral_tmp, jumps_tmp, general);
+      if(!get_spiral(f1, f2, f3, spiral_tmp, jumps_tmp, general)){
+        return false;
+      }
 
       // store the shortest / lexicographically smallest (general) spiral
       if(jumps_tmp.size() < jumps.size() || 
@@ -482,15 +491,18 @@ void Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps,
 //  cout << "got jumps, size: " << jumps.size() << endl;
 //  cout << "got jumps: " << jumps << endl;
 
+  return true;
 }
 
 
-void FullereneDual::get_canonical_fullerene_rspi(vector<int>& rspi, jumplist_t& jumps, bool general) const {
+bool FullereneDual::get_canonical_fullerene_rspi(vector<int>& rspi, jumplist_t& jumps, bool general) const {
 
   rspi.clear();
   jumps.clear();
   vector<int> spiral;
-  get_canonical_spiral(spiral, jumps, general);
+  if(!get_canonical_spiral(spiral, jumps, general)){
+    return false;
+  }
 
   int i=0;
   vector<int>::const_iterator it=spiral.begin();
@@ -499,6 +511,8 @@ void FullereneDual::get_canonical_fullerene_rspi(vector<int>& rspi, jumplist_t& 
       rspi.push_back(i);
     }
   }
+  assert(rspi.size()==12);
+  return true;
 }
 
 
