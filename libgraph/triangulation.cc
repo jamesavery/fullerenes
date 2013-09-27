@@ -413,30 +413,30 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     //remove all edges of which *j is part from the remaining graph
     gpi_remove_node(v, remaining_graph, remaining_nodes, deleted_neighbours_bak);
 
-    bool is_connected = remaining_graph.is_connected(remaining_nodes);
-//    if(!general && !is_connected){//failing spiral
-//      return false;
-//    }
-//    else if(general && !is_connected){//further cyclic rotation required
-    if(general && !is_connected){//further cyclic rotation required
-      //revert the last operations
-      remaining_nodes.insert(v);
-      spiral.pop_back();
-      open_valencies = open_valencies_bak;
-      remaining_graph.neighbours[v] = deleted_neighbours_bak;
-      for(vector<node_t>::iterator it = remaining_graph.neighbours[v].begin(); it != remaining_graph.neighbours[v].end(); ++it){
-        remaining_graph.neighbours[*it].push_back(v);
+    if(general){
+      bool is_connected = remaining_graph.is_connected(remaining_nodes);
+
+      if(!is_connected){//further cyclic rotation required
+	//revert the last operations
+	remaining_nodes.insert(v);
+	spiral.pop_back();
+	open_valencies.swap(open_valencies_bak);
+
+	remaining_graph.neighbours[v] = deleted_neighbours_bak;
+	for(vector<node_t>::iterator it = remaining_graph.neighbours[v].begin(); it != remaining_graph.neighbours[v].end(); ++it){
+	  remaining_graph.neighbours[*it].push_back(v);
+	}
+	//perform cyclic shift on open_valencies
+	open_valencies.push_back(open_valencies.front());
+	open_valencies.pop_front();
+	//there was no atom added, so 'i' must not be incremented
+	--i;
+	++jump_state;
       }
-      //perform cyclic shift on open_valencies
-      open_valencies.push_back(open_valencies.front());
-      open_valencies.pop_front();
-      //there was no atom added, so 'i' must not be incremented
-      --i;
-      ++jump_state;
-    }
-    else if(general && jump_state!=0 && is_connected){//end of cyclic rotation
-      jumps.push_back(make_pair(i,jump_state));
-      jump_state=0;
+      else if(jump_state!=0 && is_connected){//end of cyclic rotation
+	jumps.push_back(make_pair(i,jump_state));
+	jump_state=0;
+      }
     }
   }
 
