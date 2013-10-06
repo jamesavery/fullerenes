@@ -14,7 +14,7 @@ public:
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
   FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
   FullereneGraph(const unsigned int *index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
-  FullereneGraph(const int N, const vector<int> spiral_indices, const jumplist_t jumps = jumplist_t()); 
+  FullereneGraph(const int N, const vector<int>& spiral_indices, const jumplist_t& jumps = jumplist_t()); 
 
   void fullerene_check() const
   {

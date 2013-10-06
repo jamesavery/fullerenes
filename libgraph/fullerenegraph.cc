@@ -1,4 +1,5 @@
 #include "fullerenegraph.hh"
+#include "triangulation.hh"
 #include "fortran.hh"
 
 #include <fstream>
@@ -205,142 +206,21 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   return frog;
 }
 
-void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
-{
-  list< pair<node_t,int> >::iterator second_last(ov.end());
-  --second_last;
-  --second_last;
-
-  edge_set.insert(edge_t(ov.back().first, second_last->first));
-  --ov.back().second;
-  --(second_last->second);//decrement the last but one entry
-}
-
-void wg_connect_forward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
-{
-  edge_set.insert(edge_t(ov.back().first, ov.front().first));
-  --ov.back().second;
-  --ov.front().second;
-}
-
-// // debug only (do not remove, please [lukas])
-// void pdp(list<pair<int,int> > &open_valencies){
-//   for(list<pair<int,int> >::iterator it(open_valencies.begin()); it!= open_valencies.end(); ++it){
-//      cout << it->first << ": " << it->second << endl;
-//   }
-// }
-
-bool do_windup_general(const int n_faces,  const vector<int> &spiral,  list<pair<int,int> > jumps,  set<edge_t> &edge_set){
-
-  // open_valencies is a list with one entry per node that has been added to the spiral but is not fully saturated yet.  The entry contains the number of the node and the number of open valencies
-  list<pair<int,int> > open_valencies;
-
-  // set up first two nodes
-  open_valencies.push_back(make_pair(0,spiral[0]));
-  open_valencies.push_back(make_pair(1,spiral[1]));
-  //connect first two faces
-  wg_connect_backward(edge_set, open_valencies);
-
-  //iterate over atoms
-  //k=0, k=1 have been done already
-  for (int k=2; k<n_faces-1; ++k){
-//    cout << "k: " << k << endl;
-
-    if(jumps.size() != 0 && k == jumps.front().first){
-      // perform cyclic shift on open_valencies
-      for(int i = jumps.front().second; i>0; --i){ // 0 is no jump
-        open_valencies.push_back(open_valencies.front());
-        open_valencies.pop_front();
-      }
-      jumps.pop_front();
-    }
-
-    // add node to spiral
-    open_valencies.push_back(make_pair(k,spiral[k]));
-
-    // connect k to k-1
-    wg_connect_backward(edge_set, open_valencies);
-
-    // connect k to k-2, etc
-    wg_connect_forward(edge_set, open_valencies);
-
-    // do the remaining connect forwards
-    while(open_valencies.front().second==0){
-      open_valencies.pop_front();
-      wg_connect_forward(edge_set, open_valencies);
-    }
-    // do the remaining connect backwards //not neat but the most simple way to emulate 'while second_last->second==0) ...'
-    while(true){
-      list<pair<int,int> >::iterator second_last(open_valencies.end());
-      --second_last;
-      --second_last;
-      if(second_last->second==0){
-        open_valencies.erase(second_last);
-        wg_connect_backward(edge_set, open_valencies);
-      } else break;
-      
-    }
-//    pdp(open_valencies);
-
-    if (open_valencies.back().second == 0){//the current atom is saturated (which may only happen for the last one)
-      cout << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
-      return 1;
-    }
-   
-  }//iterate over atoms
-
-  // make sure we left the spiral in a sane state
-  // open_valencies must be either 5 or 6 times '1' at this stage
-  if(open_valencies.size() != spiral.back()){
-    cout << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
-    return 1;
-  }
-  for(list<pair<int,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
-    if(it->second!=1){
-      cout << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
-    return 1;
-    }
-  }
-
-  // add last node to spiral // the name of the last node is n_faces -1 (because it's the last one)
-  open_valencies.push_back(make_pair(n_faces-1,spiral[n_faces-1]));
-
-  for(int i=0; i<spiral.back(); ++i){
-    wg_connect_forward(edge_set, open_valencies);
-    open_valencies.pop_front();
-  }
-
-  return 0;// success
-}// do_windup_general
 
 
 // both the pentagon indices and the jumps start at 0
 // n is the number of vertices
-FullereneGraph::FullereneGraph(const int n, const vector<int> spiral_indices, const list<pair<int,int> > jumps) : CubicGraph() {
-
+FullereneGraph::FullereneGraph(const int n, const vector<int>& spiral_indices, const jumplist_t& jumps) : CubicGraph() {
   assert(spiral_indices.size() == 12);
-
+  
   const int n_faces = n/2 + 2;
-
-//  printf("n_faces = %d\n",n_faces);
-  vector<int> potential_spiral (n_faces,6);
-  for (int i=0; i<12; ++i){
-//    printf("spiral_indices[%d] = %d\n",i,spiral_indices[i]);
-    potential_spiral[spiral_indices[i]] = 5;
-  }
-
-  set<edge_t> edge_set;
+  vector<int> spiral_string(n_faces,6);
+  for(int i=0;i<spiral_indices.size();i++) spiral_string[spiral_indices[i]] = 5;
   
-  if(do_windup_general(n_faces, potential_spiral, jumps, edge_set)){
-    cerr << "No general spiral found ... aborting.  This shouldn't happen unless the input is wrong." << endl;
-    abort();
-  }
-  
-  PlanarGraph dual(edge_set);
-  dual.update_from_edgeset();
+  Triangulation dual(spiral_string,jumps);
+  Graph G(dual.dual_graph());
 
-  *this = dual.dual_graph(3);
-  fullerene_check();
+  *this = G;
 }
 
 
@@ -485,7 +365,6 @@ vector<int> FullereneGraph::pentagon_distance_mtx() const{
 //    cout << "}" << endl;
   
 }
-
 
 node_t FullereneGraph::C20_edges[30][2] ={{0,13},{0,14},{0,15},{1,4},{1,5},{1,12},{2,6},{2,13},{2,18},{3,7},{3,14},{3,19},{4,10},{4,18},{5,11},{5,19},{6,10},{6,15},{7,11},{7,15},{8,9},{8,13},{8,16},{9,14},{9,17},{10,11},{12,16},{12,17},{16,18},{17,19}};
 

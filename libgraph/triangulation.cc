@@ -127,7 +127,7 @@ PlanarGraph Triangulation::dual_graph() const
     
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
-      node_t w(nextCCW(dedge_t(u,v)));      
+      node_t w(nextCW(dedge_t(u,v)));      
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
 
@@ -141,8 +141,23 @@ PlanarGraph Triangulation::dual_graph() const
 };
 
 
-extern void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov);
-extern void wg_connect_forward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov);
+void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
+{
+  list< pair<node_t,int> >::iterator second_last(ov.end());
+  --second_last;
+  --second_last;
+
+  edge_set.insert(edge_t(ov.back().first, second_last->first));
+  --ov.back().second;
+  --(second_last->second);//decrement the last but one entry
+}
+
+void wg_connect_forward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
+{
+  edge_set.insert(edge_t(ov.back().first, ov.front().first));
+  --ov.back().second;
+  --ov.front().second;
+}
 
 // // debug only (do not remove, please [lukas])
 // void pdp(list<pair<int,int> > &open_valencies){
@@ -243,7 +258,6 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   }
 
   *this = Triangulation(PlanarGraph(edge_set));
-//  FIXME is there any update_from ... required?
 }
 
 
