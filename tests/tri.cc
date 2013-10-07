@@ -15,17 +15,11 @@ int main(int ac, char **av)
   PlanarGraph g;
   vector<tri_t> faces;
  
-  for(int i=0;i<10000;i++){
-    dual = Triangulation(full_spiral);
-    dual.orient_neighbours();
-    g = dual.dual_graph();
-  }
+  dual = Triangulation(full_spiral);
+  g = dual.dual_graph();
 
-  cout << "tris = " << faces << ";\n";
-  cout << "dual = " << dual << ";\n";
-  cout << "g    = " << g << ";\n";
-
-  printf("dual is %soriented, g is %soriented\n",dual.is_consistently_oriented()? "":"not ",g.is_consistently_oriented()? "":"not ");
+  cout << "d = " << dual << ";\n"
+       << "g = " << g << ";\n";
 
   return 0;
 }
