@@ -1261,7 +1261,7 @@ If \paramname{isomerh} = $k$, them end printing from isomer list in database at 
  Option for producing $(X_i, Y_i)$ coordinates for fullerene 2D graphs (called Schlegel diagrams by some authors).
 \paragraph{List of options:}\ 
 
- \paramname{ISchlegel, ISO1, ISO2, ISO3, IFS, ncycham, PS, Scale, ScalePPG, boost, ndual} (Default: 0 for all values). We recommend \paramname{ISchlegel} = 1, 2, 4 or 7.
+ \paramname{ISchlegel, ISO1, ISO2, ISO3, IFS, ncycham, PS, Scale, ScalePPG, boost, ndual, labelvert} (Default: 0 for all values). We recommend \paramname{ISchlegel} = 1, 2, 4 or 7.
 
 
 \paragraph{Option description:}
@@ -1316,6 +1316,8 @@ for producing a 2D fullerene graph with a plotting program.\\
 If \paramname{IFS} = 3: Both files are produced.
 \item[ndual] 
 If \paramname{ndual} = 1, The dual graph is drawn as well in tex-file \filename{filename-2D.tex}. (Default: 0).\\
+\item[labelvert] 
+If \paramname{labelvert} = 1, The vertices are labelled by number. (Default: 0).\\
 If \paramname{ncycham} = k then the k-th Hamiltonian cycle produces in the subroutine HAMILTON is taken for use in
 the 2D graph.\\
 \end{description}

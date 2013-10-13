@@ -133,10 +133,11 @@ C  Call Datain
      1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
-     1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1 iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
-     1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,scaleRad,
-     1 rspi,jumps,force,forceP,boost,filename,filenameout,TEXTINPUT)
+     1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
+     1 isearch,iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,
+     1 isomerh,ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,
+     1 scaleRad,rspi,jumps,force,forceP,boost,filename,filenameout,
+     1 TEXTINPUT)
 
 C  Simple checks
 C  Stop if error in input
@@ -624,8 +625,8 @@ C Calculate Schlegel diagram
           ParamS=dabs(ParamS)
         endif
         CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,NRing,
-     1   Iring,Ischlegel,ifs,ndual,IC3,IDA,mdist,nhamcyc,Dist,ParamS,
-     1   Rmin,TolX,scales,scalePPG,boost,CR,CRing5,CRing6,
+     1   Iring,Ischlegel,ifs,ndual,labelvert,IC3,IDA,mdist,nhamcyc,Dist,
+     1   ParamS,Rmin,TolX,scales,scalePPG,boost,CR,CRing5,CRing6,
      1   Symbol,filename)
       else
         Write(Iout,1007) number_vertices

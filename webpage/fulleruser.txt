@@ -110,7 +110,8 @@ Dr. & James & Avery & University of Copenhagen & Niels Bohr Institute & Copenhag
 Prof. Dr. & wazirul haque & ansari & GoldField Inst. Tech. & Mgmt., Chhainsa & Physics & Faridabad-121004 & India & whansari161945@gmail.com & Your program is needed in our study of electronic structure & spectra of fullerenes
 Dr. & Kanchana & Thanthiriwatte & The University of Alabama & Depatment of Chemistry & Tuscaloosa & United States of America & sahanchem@gmail.com & 
 Dr. & Robin & Haunschild & Karlsruhe Institute of Technology & Physical Chemistry & Kalrsruhe & Germany & haunschild@kit.edu & 
-Ms. & Joseph & Held & University of Cologne & Theoretical Chemistry & Cologne & Germany & heldj@uni-koeln.de &
+Ms. & Joseph & Held & University of Cologne & Theoretical Chemistry & Cologne & Germany & heldj@uni-koeln.de & 
+Dr. & James & Last & Woody & Stocky & White & Aruba & julian.gebhardt@gmx.net & 
 Prof. Dr. & Boris & Furtula & University of Kragujevac, Faculty of Science & Department of Chemistry & Kragujevac & Republic of Serbia & furtula@kg.ac.rs & 
 Ms. & Dietmar & Kahler & Softchem &  & Northeim & Germany & dkahler@t-online.de & 
 Prof. Dr. & Imran & Predhanekar & Islamiah College (Autonomous) & Chemistry & Vaniyambadi & India & imranpk@islamiahcollege.edu.in & I would like to work with this software
@@ -129,6 +130,10 @@ Dr. & Yang & Wang & Universidad Autonoma de Madrid & Quimica Modulo 13 & MADRID 
 Ms. & Emmanuel & Bourret & Université de Montréal & Mathématique et Statistique/Physique & Montréal & Canada & manubou5@hotmail.com & 
  & Roxanne & Tutchton & The Colorado School of MInes & Physics & Golden & United States of America & rtutchto@mymail.mines.edu & 
 Ms. & Daniel & Lovey & Institute of Modelling and Innovation Technology - CONICET & Physics & Corrientes & Argentina & lovey.da@gmail.com & I am doing my PhD on Quantum Transport and I think that this program can be a good tool to test and compare my own results.
+Prof. & http://jsihiaclkkns.com/ & http://jsihiaclkkns.com/ & http://jsihiaclkkns.com/ & xYggYtaGISFcZKq & New York & Bhutan & avqskn@hykahk.com & USA
+Prof. & http://jsihiaclkkns.com/ & http://jsihiaclkkns.com/ & http://jsihiaclkkns.com/ & xYggYtaGISFcZKq & New York & Bhutan & avqskn@hykahk.com & USA
+Ms. & http://kjwvzthywmju.com/ & http://kjwvzthywmju.com/ & http://kjwvzthywmju.com/ & QOeKfvUlYpvlCysy & New York & Ethiopia & hpbzym@wiqswg.com & USA
+Ms. & http://kjwvzthywmju.com/ & http://kjwvzthywmju.com/ & http://kjwvzthywmju.com/ & QOeKfvUlYpvlCysy & New York & Ethiopia & hpbzym@wiqswg.com & USA
  & Nannan & Li & POSTECH & Physics & Pohang & China & linannan@postech.ac.kr & 
  & Nannan & Li & POSTECH & Physics & Pohang & Korea South & linannan@postech.ac.kr & 
 Ms. & Anthony & Cruz-Balberdy & Lehman College & Chemistry & Bronx & United States of America & anthony.cruzbalberdy@lehman.cuny.edu & 
@@ -142,3 +147,23 @@ Mr. & Mehrnoosh & Hazrati & Tarbiat Modares University & Science & Tehran & Iran
 Ms. & Jason & Rozick & Cleveland State U & BGES-mol bio & Mentor & United States of America & jrozick@yahoo.com & Complete C30
 Ms. & Tom & Pie&#324;ko & Warsaw Medical University & Physical Chemistry & Warsaw & Poland & tom.pienko@gmail.com & 
  & Stefan & Taubert & Aalto University & Department of Chemistry & Espoo & Finland & staubert@chem.helsinki.fi & 
+Dr. & Marco & De La Pierre & Università degli Studi di Torino & Dipartimento di Chimica & Torino & Italy & marco.delapierre@unito.it & I am a computational chemistry currently working on carbon nano-forms.
+Dr. & Bryant & York & Portland State University & Computer Science & Portland, Oregon & United States of America & york@cecs.pdx.edu & 
+Dr. & Marzena & Szajewska & Universite de Montreal & Centre de recherches mathematique & Montreal & Canada & m.szajewska@math.uwb.edu.pl & 
+Dr. & Stas & Avdoshenko & Purdue & MSE & West Lafayette  & United States of America & s.avdoshenko@gmail.com & Thank you 
+Prof. & Gonzalo  & Obal & Institut Pasteur de Montevideo & Protein Biophysics Unit & Montevideo & Uruguay & gobal@pasteur.edu.uy & 
+Ms. & Peter & Nagy & Eötvös Loránd University & Department of Chemistry & Budapest & Hungary & nagy0peter@gmail.com & 
+Mr. & Ingeborg  & Matthews & n/a & n/a & Houston & United States of America & Mingeborg@aol.com & 
+Prof. & Siemion & Fajtlowicz & University of Houston & Mathematics & Houston & United States of America & siemionf@msn.com & 
+Mr. & Gangotry & Vishwakarma & TIT College & Student & Bhopal & India & gangotrigv7@gmail.com & 
+Ms. & Christopher & Mauney & North Carolina State University & Physics & Raleigh & United States of America & cmmauney@ncsu.edu & Using for thesis work
+Ms. & Anton & Stepanov & MOSCOW STATE UNIVERSITY OF MECHANICAL ENGINEERING (branch) Cheboksary Politechnical Insitute & Physics & Cheboksary & Russia & for.anton_step@mail.ru & 
+Ms. & Gopi & Kaphle & Tribhuvan University & Physics & Kathmandu & Nepal & gck223@gmail.com & I am willling to use this programme
+ & Caroline & Gorham & University of Virginia & Department of Mechanical Engineering & Charlottesville & United States of America & csgorham@virginia.edu & modeling properties of fullerenes for PV devices
+Ms. & PRAVIN & AMBURE & JADAVPUR UNIVERSITY & DRUG THEORETICS AND CHEMINFORMATICS LAB & KOLKATA & India & ambure.pharmait@gmail.com & 
+Dr. & Yong & Xue & Indiana State University & Chemistry and Physics & Terre Haute & United States of America & yong.xue@indstate.edu & 
+Dr. & Yong & Xue & Indiana State University & Chemistry and Physics & Terre Haute & United States of America & yong.xue@indstate.edu & 
+Dr. & Vladislav & Bugaenko & ITEP &  & Moscow & Russia & bugaenko@itep.ru & 
+Ms. & Aaron & Sisto & Stanford & Chemistry & Palo Alto & United States of America & aa.sisto@gmail.com & 
+Mr. & Ana & Sanz Matias & Auntonomous University of Madrid/ KU Leuven  & Chemistry / Quantum Chemistry & Madrid / Leuven  & Spain & ana.sanzmatias@estudiante.uam.es & 
+Dr. & Zhifan & Chen & Clark Atlanta University & Physics & Tucker, Georgia & United States of America & zchen@cau.edu & I need the cartesian coordinates for Boron fullerene, such as B80

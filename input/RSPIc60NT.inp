@@ -1,7 +1,7 @@
 D5d-C60  Using FM algorithm to produce coordinates of C60 nanotube through ring spiral indices
-&General  NA=60, iwext=1 ispsearch=2/
+&General  NA=60, iwext=1 /
 &Coord ICart=2, IV1=2, IV2=4, IV3=5 rspi=1, 2, 3, 4, 5, 6, 27, 28, 29, 30, 31, 32/
-&FFChoice Iopt=1 /
+&FFChoice Iopt=4 /
 &FFParameters /
 &Hamilton /
 &Isomers /

@@ -2,8 +2,8 @@
      1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
-     1 ipsphere,ndual,nosort,ispsearch,novolume,ihessian,isearch,
-     1 iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
+     1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
+     1 isearch,iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,rspi,
      1 jumps,force,forceP,boost,filename,filenameout,DATEN)
 C-----------------------------------------------------------------
@@ -31,8 +31,8 @@ C-----------------------------------------------------------------
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
       Namelist /Hamilton/ IHam,iupac,ihamstore
       Namelist /Isomers/ IPR,IPH,IStop,Ichk,ISearch,isomerl,isomerh
-      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,nhamcyc,ifs,ndual,PS,
-     1 scale,scalePPG,boost
+      Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,nhamcyc,ifs,ndual,
+     1 labelvert,PS,scale,scalePPG,boost
 
 C Input send to output
       if(ilp.eq.0) then   
@@ -148,6 +148,7 @@ C Integers
       mirror=0  !  Invert coordinates
       NA=60     !  Number of Atoms
       ndual=0   !  Option for plotting dual graph as well
+      labelvert=0   !  Option labeling vertices in the 2D graph
 
 C Reals
       PS=0.d0       ! For graph production, angle input for Schlegel diagram

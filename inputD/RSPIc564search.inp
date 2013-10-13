@@ -1,10 +1,9 @@
 Ih-C564 Using FM algorithm to produce coordinates from ring spiral indices
-&General  NA=564 /
-&Coord ICart=8 /
-&FFChoice /
+&General  NA=564 iwext=1 /
+&Coord ICart=8 rspi= 1  2  3  4  5  203  230  237  242  261  267  282/
+&FFChoice Iopt=4 /
 &FFParameters /
 &Hamilton /
-&Isomers isearch=2 IPR=2 /
-&Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=3 /
-1  2  3  4  5  203  230  237  242  261  267  282
+&Isomers  /
+&Graph /
 

@@ -1,5 +1,5 @@
 Non-spiral C440 build from input connectivities (edges), last input is a zero
-&General NA=440 /
+&General NA=440 iwext=1 /
 &Coord ICart=6 /
 &FFChoice Iopt=3 /
 &FFParameters /

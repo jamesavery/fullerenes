@@ -1,6 +1,7 @@
       SUBROUTINE Graph2D(IOUT,IS1,IS2,IS3,N5M,N6M,N5R,N6R,NRing,
-     1 Iring,ISchlegel,ifs,ndual,IC3,IDA,Mdist,nhamcyc,Dist,angle,
-     1 Rmin,Tol,fscale,scalePPG,boost,CR,CR5,CR6,Symbol,filename)
+     1 Iring,ISchlegel,ifs,ndual,nlabel_vertices,IC3,IDA,Mdist,
+     1 nhamcyc,Dist,angle,Rmin,Tol,fscale,scalePPG,boost,CR,CR5,
+     1 CR6,Symbol,filename)
       use config
       use iso_c_binding
 C Produce points in 2D-space for Schlegel diagrams using the cone-
