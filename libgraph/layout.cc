@@ -386,7 +386,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
   }    
 
   if(show_dual){
-    PlanarGraph dual(dual_graph(6));	
+    PlanarGraph dual(dual_graph(6,true));
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
       const coord2d xs(dual.layout2d[u]*coord2d(xscale,yscale));
