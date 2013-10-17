@@ -109,6 +109,8 @@ struct Polyhedron : public PlanarGraph {
     return f;
   }
 
+  Polyhedron dual(int Fmax=INT_MAX, bool planar_layout=false) const;
+
   double  diameter() const;
   coord3d width_height_depth() const;
 

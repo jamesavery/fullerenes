@@ -271,7 +271,7 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max, const vector<face_t> faces_) : 
   PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points)), faces(faces_)
 {
-  //  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
+  //cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){
     if(layout2d.size() != N){
       if(is_cubic()){
@@ -279,11 +279,11 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
 	faces = compute_faces_flat(face_max,true);
 	assert(outer_face.size() <= face_max);
       } else {
-	layout2d = polar_angles();
+	layout2d = polar_angles(); 
 	layout_is_spherical = true;
 	faces = compute_faces_flat(face_max,true);
       }
-    }
+    } else faces = compute_faces_flat(face_max,true);
   }
   
   //  assert(faces[0] == outer_face);
@@ -358,5 +358,20 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   return s.str();
 }
 
+Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const 
+{
+  PlanarGraph d(dual_graph(Fmax,planar_layout));
+
+  printf("|faces| = %ld\n",faces.size());
+  vector<coord3d> coordinates(d.N);
+  for(node_t u=0;u<d.N;u++){
+    const face_t& f = faces[u];
+    coord3d avg;
+    for(int i=0;i<f.size();i++) avg += points[f[i]];
+    coordinates[u] = avg/double(f.size());
+  }
+  
+  return Polyhedron(d,points);
+}
 
 double Polyhedron::C20_points[20][3] = {{-1.376381920471174,0,0.2628655560595668},{1.376381920471174,0,-0.2628655560595668},{-0.4253254041760200,-1.309016994374947,0.2628655560595668},{-0.4253254041760200,1.309016994374947,0.2628655560595668},{1.113516364411607,-0.8090169943749474,0.2628655560595668},{1.113516364411607,0.8090169943749474,0.2628655560595668},{-0.2628655560595668,-0.8090169943749474,1.113516364411607},{-0.2628655560595668,0.8090169943749474,1.113516364411607},{-0.6881909602355868,-0.5000000000000000,-1.113516364411607},{-0.6881909602355868,0.5000000000000000,-1.113516364411607},{0.6881909602355868,-0.5000000000000000,1.113516364411607},{0.6881909602355868,0.5000000000000000,1.113516364411607},{0.8506508083520399,0,-1.113516364411607},{-1.113516364411607,-0.8090169943749474,-0.2628655560595668},{-1.113516364411607,0.8090169943749474,-0.2628655560595668},{-0.8506508083520399,0,1.113516364411607},{0.2628655560595668,-0.8090169943749474,-1.113516364411607},{0.2628655560595668,0.8090169943749474,-1.113516364411607},{0.4253254041760200,-1.309016994374947,-0.2628655560595668},{0.4253254041760200,1.309016994374947,-0.2628655560595668}};

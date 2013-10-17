@@ -2,6 +2,7 @@
 #include "libgraph/polyhedron.hh"
 #include "libgraph/isomerdb.hh"
 
+
 extern "C" void optff_(const FullereneGraph **graph, const int *N, const int *ihessian, const int *iprinthessian,
 		       const int *iopt,double *Dist,double *ftol,double *force);
 extern "C" void default_force_parameters_(const int *iopt, double *parameters);
@@ -48,9 +49,21 @@ int main(int ac, char **av)
   g.layout2d = g.tutte_layout();
   
   vector<coord3d> coordinates = optimize_fullerene(g);
+
+  ofstream output(("output/polyhedron-"+to_string(N)+"-"+to_string(isomer_number)+".m").c_str());
+
+  output << "g = " << g << ";\n";
+  output << "coordinates = " << coordinates << ";\n";
+
+  Polyhedron P(g,coordinates,6);
   
-  cout << "g = " << g << endl;
-  cout << "coordinates = " << coordinates << endl;
+  output << "P = " << P << ";\n";
+  
+  Polyhedron D(P.dual(6,true));
+
+  output << "D = " << D << ";\n";
+  
+  output.close();
 
   return 0;
 }

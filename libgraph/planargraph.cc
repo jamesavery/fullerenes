@@ -10,6 +10,7 @@ bool PlanarGraph::is_cubic() const {
   return true;
 }
 
+
 bool PlanarGraph::is_a_fullerene() const {
   if(!is_cubic()){
     fprintf(stdout,"Graph is not cubic.\n"); 
@@ -49,6 +50,7 @@ bool PlanarGraph::is_a_fullerene() const {
 
 
 PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const {
+  // TODO: Simplify
   PlanarGraph dual;
   unsigned int Nfaces = edge_set.size()-N+2;
   dual.N = Nfaces;
@@ -94,6 +96,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
   dual.update_from_edgeset();
 
   // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
+  // (but it is not planar -- might not want to use this!)
   if(planar_layout && layout2d.size() == N){
     //    cerr << "dual_graph::compute layout.\n";
     dual.layout2d = vector<coord2d>(Nfaces);
@@ -447,7 +450,7 @@ face_t PlanarGraph::find_outer_face() const
   sort(outer_face.begin(),outer_face.end(),CCW);
   reverse(outer_face.begin(),outer_face.end());  
 
-  cout << "Found outer face: " << outer_face << endl;
+  //  cout << "Found outer face: " << outer_face << endl;
   return outer_face;
 }
 
