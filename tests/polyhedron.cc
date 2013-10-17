@@ -12,11 +12,13 @@ vector<coord3d> zero_order_geometry(const FullereneGraph& g)
   assert(g.layout2d.size() == g.N);
   vector<coord2d> angles(g.spherical_projection());
 
+  double r = 2*sqrt(g.N);
+
   vector<coord3d> coordinates(g.N);
   for(int i=0;i<g.N;i++){
     double theta = angles[i].first, phi = angles[i].second;
     double x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
-    coordinates[i] = coord3d(x,y,z);
+    coordinates[i] = coord3d(x,y,z)*r;
   }
   return coordinates;
 }
@@ -30,9 +32,9 @@ vector<coord3d> optimize_fullerene(const FullereneGraph& g, int opt_method = 3, 
 
   cout << "force parameters: " << force_parameters << endl;
 
-  int zero = 0;
+  int zero = 0, one = 1;
   const FullereneGraph *g_f = &g;
-  optff_(&g_f,&g.N,&zero,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
+  optff_(&g_f,&g.N,&one,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
 
   return coordinates;
 }
@@ -48,7 +50,7 @@ int main(int ac, char **av)
   FullereneGraph g(IsomerDB::makeIsomer(N,DB.getIsomer(N,isomer_number,IPR)));
   g.layout2d = g.tutte_layout();
   
-  vector<coord3d> coordinates = optimize_fullerene(g);
+  vector<coord3d> coordinates = optimize_fullerene(g,3,1e-12);
 
   ofstream output(("output/polyhedron-"+to_string(N)+"-"+to_string(isomer_number)+".m").c_str());
 
@@ -61,7 +63,7 @@ int main(int ac, char **av)
   
   Polyhedron D(P.dual(6,true));
 
-  output << "D = " << D << ";\n";
+  output << "PD = " << D << ";\n";
   
   output.close();
 
