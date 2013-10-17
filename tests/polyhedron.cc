@@ -7,25 +7,51 @@ extern "C" void optff_(const FullereneGraph **graph, const int *N, const int *ih
 		       const int *iopt,double *Dist,double *ftol,double *force);
 extern "C" void default_force_parameters_(const int *iopt, double *parameters);
 
-vector<coord3d> zero_order_geometry(const FullereneGraph& g)
+vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
+{
+  for(int i=0;i<xs.size();i++) xs[i] -= y;
+  return xs;
+}
+
+vector<coord3d> &operator*=(vector<coord3d>& xs, const coord3d& y)
+{
+  for(int i=0;i<xs.size();i++) xs[i] -= y;
+  return xs;
+}
+
+vector<coord3d> zero_order_geometry(const FullereneGraph& g, double scalerad)
 {
   assert(g.layout2d.size() == g.N);
   vector<coord2d> angles(g.spherical_projection());
 
-  double r = 2*sqrt(g.N);
-
+  // Spherical projection
   vector<coord3d> coordinates(g.N);
   for(int i=0;i<g.N;i++){
     double theta = angles[i].first, phi = angles[i].second;
     double x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
-    coordinates[i] = coord3d(x,y,z)*r;
+    coordinates[i] = coord3d(x,y,z);
   }
+
+  // Move to centroid
+  coord3d cm;
+  for(node_t u=0;u<g.N;u++) cm += coordinates[u];
+  cm /= double(g.N);
+  coordinates -= cm;
+
+  // Scale spherical projection
+  double Ravg = 0;
+  for(node_t u=0;u<g.N;u++)
+    for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[g.neighbours[u][i]]).norm();
+  Ravg /= (3.0*g.N);
+  
+  coordinates *= scalerad*1.5/Ravg;
+
   return coordinates;
 }
 
-vector<coord3d> optimize_fullerene(const FullereneGraph& g, int opt_method = 3, double ftol = 1e-10)
+vector<coord3d> optimize_fullerene(const FullereneGraph& g, int opt_method = 3, double ftol = 1e-10, double scalerad = 4)
 {
-  vector<coord3d> coordinates(zero_order_geometry(g));
+  vector<coord3d> coordinates(zero_order_geometry(g,scalerad));
 
   vector<double> force_parameters(19);
   default_force_parameters_(&opt_method,&force_parameters[0]);
@@ -50,7 +76,7 @@ int main(int ac, char **av)
   FullereneGraph g(IsomerDB::makeIsomer(N,DB.getIsomer(N,isomer_number,IPR)));
   g.layout2d = g.tutte_layout();
   
-  vector<coord3d> coordinates = optimize_fullerene(g,3,1e-12);
+  vector<coord3d> coordinates = optimize_fullerene(g,3,1e-12,4);
 
   ofstream output(("output/polyhedron-"+to_string(N)+"-"+to_string(isomer_number)+".m").c_str());
 
