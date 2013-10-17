@@ -858,3 +858,4 @@ C     Coulomb repulsion from origin
 
       return
       END SUBROUTINE dextwu
+

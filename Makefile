@@ -5,7 +5,7 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS= -O3 -m64 -fPIC -Wall -Wno-sign-compare -Wno-char-subscripts
+CXXFLAGS= -O3 -m64 -march=native -fPIC -Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
 #CXXFLAGS= -g3 -O3 -m64 -fPIC -Wall -Wno-sign-compare -std=c++0x
 FFLAGS= -g3 -O3 -m64 -Wall 
 LIBRARIES=-lstdc++ -lgomp
@@ -24,9 +24,12 @@ LIBRARIES+=-lblas -llapack
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o geometry.o dddihedral.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
 GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o polyhedron.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o
+GRAPHFOBJECTS=opt-standalone.o geometry.o force.o diag.o  dddihedral.o config.o 
 
 FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))
 COBJECTS=$(patsubst %.o, build/%.o, $(GRAPHOBJECTS))
+FLIBOBJECTS=$(patsubst %.o, build/%.o, $(GRAPHFOBJECTS))
+
 TESTINP=$(wildcard input/*.inp)
 TESTOUT=$(patsubst input/%.inp, output/%.out, $(TESTINP))
 #
@@ -52,7 +55,7 @@ build/%.o: contrib/%.cc
 	$(CXX) $(CXXFLAGS) $(OPTIONS) -c $< -o $@
 #-----------------------------------------------------
 .PHONY: build/libgraph.a
-build/libgraph.a: $(COBJECTS)
+build/libgraph.a: $(COBJECTS) 
 	$(AR) rcs $@ $(COBJECTS)
 
 #-----------------------------------------------------
@@ -63,8 +66,12 @@ app-%: apps/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ $(LIBRARIES)
 #-----------------------------------------------------
 
-app-leapfrog: apps/leapfrog.cc build/libgraph.a build/opt-standalone.o 
-	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ -lgfortran
+app-leapfrog: apps/leapfrog.cc $(FLIBOBJECTS)  build/libgraph.a 
+	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ -lgfortran $(LIBRARIES)
+
+test-polyhedron: tests/polyhedron.cc $(FLIBOBJECTS)  build/libgraph.a 
+	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ -lgfortran $(LIBRARIES)
+
 
 output/%.out: input/%.inp
 	./fullerene < $< > $@

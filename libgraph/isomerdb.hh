@@ -127,7 +127,7 @@ public:
   {
     vector<int> RSPI(e.RSPI,e.RSPI+12);
     for(int i=0;i<12;i++) RSPI[i]--;
-    cout << "creating C"<<N<< " from spiral indices " << RSPI << endl;
+    //    cout << "creating C"<<N<< " from spiral indices " << RSPI << endl;
     return FullereneGraph(N,RSPI);
   }
 
