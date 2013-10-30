@@ -44,6 +44,13 @@ struct Polyhedron : public PlanarGraph {
     for(node_t u=0;u<N;u++) points[u] += x;
   }
 
+  void move_to_origin() {
+    for(node_t u=0;u<N;u++) points[u] -= centre;
+    centre=coord3d(0,0,0);
+  }
+
+  bool optimize();
+
   static Polyhedron C20() {
     vector<coord3d> points(20);
     for(node_t u=0;u<20;u++) points[u] = coord3d(C20_points[u][0],C20_points[u][1],C20_points[u][2]);
@@ -118,6 +125,7 @@ struct Polyhedron : public PlanarGraph {
   string to_povray(double w_cm = 10, double h_cm = 10, 
 		   int line_colour = 0x6a5acd, int vertex_colour = 0xc03500, int face_colour = 0x667744,
 		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.4) const;
+  string to_xyz() const;
 private:
   static double C20_points[20][3];
 };

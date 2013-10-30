@@ -1,4 +1,5 @@
 #include "polyhedron.hh"
+#include <iomanip>
 
 double Polyhedron::diameter() const {
   double dmax = -INFINITY;
@@ -355,6 +356,22 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   for(int i=0;i<centroid_points.size();i++) s<<(centroid_points[i]*xscale)<<(i+1<centroid_points.size()?",\n":"}\n\n"); 
 
   s << "#include \"drawpolyhedron.pov\"\n\n";
+  return s.str();
+}
+
+
+string Polyhedron::to_xyz() const {
+
+  ostringstream s;
+  s << setprecision(6);
+
+  s << N << endl;
+  s << "we could print something helpful here" << endl;
+
+  for(int i=0; i < N; ++i){
+    s << "C\t" << points[i][0] << "\t" << points[i][1] << "\t" << points[i][2] << endl;
+  }
+
   return s.str();
 }
 
