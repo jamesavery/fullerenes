@@ -13,9 +13,9 @@ vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
   return xs;
 }
 
-vector<coord3d> &operator*=(vector<coord3d>& xs, const coord3d& y)
+vector<coord3d> &operator*=(vector<coord3d>& xs, const double& y)
 {
-  for(int i=0;i<xs.size();i++) xs[i] -= y;
+  for(int i=0;i<xs.size();i++) xs[i] *= y;
   return xs;
 }
 
