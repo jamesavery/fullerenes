@@ -636,6 +636,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
       integer N
+      number_vertices=N
 
       call adjacency_matrix(graph,N,IDA)
       call get_edges(graph,N,

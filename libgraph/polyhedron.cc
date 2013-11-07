@@ -375,11 +375,44 @@ string Polyhedron::to_xyz() const {
   return s.str();
 }
 
+string Polyhedron::to_mol2() const {
+
+  ostringstream s;
+  s << setprecision(6);
+
+  size_t Nedges = 0;
+  for(node_t u=0;u<N;u++) Nedges += neighbours[u].size();
+  Nedges /= 2;
+
+  s << "# Created by Fullerene version " << VERSION_NUMBER << " (http://ctcp.massey.ac.nz/index.php?page=fullerenes)\n"
+    << "@<TRIPOS>MOLECULE\n"
+    << "Fullerene\n"
+    << "\t"<<N<<"\t"<<Nedges<<"\t0\t0\t0\n"
+    << "SMALL\n"
+    << "NO_CHARGES\n\n";
+
+
+  s << "@<TRIPOS>ATOM\n";
+  
+  for(node_t u=0; u < N; u++)
+    s << (u+1) << "\tC"<<u<<"\t" << points[u][0] << "\t" << points[u][1] << "\t" << points[u][2] << "\tC\t1\tUnk\t0\n";
+
+  s << "@<TRIPOS>BOND\n";
+  int i = 1;
+  for(node_t u=0;u<N;u++){
+    const vector<node_t> &ns(neighbours[u]);
+    for(int j=0;j<ns.size();j++)
+      if(ns[j]>=u) 
+	s << (i++) << "\t" << (u+1) << "\t" << (ns[j]+1) << "\tun\n";
+  }
+
+  return s.str();
+}
+
 Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const 
 {
   PlanarGraph d(dual_graph(Fmax,planar_layout));
 
-  printf("|faces| = %ld\n",faces.size());
   vector<coord3d> coordinates(d.N);
   for(node_t u=0;u<d.N;u++){
     const face_t& f = faces[u];
@@ -387,7 +420,10 @@ Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const
     for(int i=0;i<f.size();i++) avg += points[f[i]];
     coordinates[u] = avg/double(f.size());
   }
-  
+  // TODO: More elegant handling of layouts, faces, etc. 
+  // TODO: Fix orientation-from-spherical-layout
+  d.layout2d = d.tutte_layout();
+
   return Polyhedron(d,coordinates);
 }
 

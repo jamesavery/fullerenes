@@ -7,17 +7,6 @@ extern "C" void optff_(const FullereneGraph **graph, const int *N, const int *ih
 		       const int *iopt,double *Dist,double *ftol,double *force);
 extern "C" void default_force_parameters_(const int *iopt, double *parameters);
 
-vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
-{
-  for(int i=0;i<xs.size();i++) xs[i] -= y;
-  return xs;
-}
-
-vector<coord3d> &operator*=(vector<coord3d>& xs, const coord3d& y)
-{
-  for(int i=0;i<xs.size();i++) xs[i] -= y;
-  return xs;
-}
 
 vector<coord3d> zero_order_geometry(const FullereneGraph& g, double scalerad)
 {
@@ -65,20 +54,37 @@ vector<coord3d> optimize_fullerene(const FullereneGraph& g, int opt_method = 3, 
   return coordinates;
 }
 
+int testN = 80;
+int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
+
 int main(int ac, char **av)
 {
-  int N = ac>=2? strtol(av[1],0,0) : 20;
-  int isomer_number = ac>=3? strtol(av[2],0,0) : 1;
-  bool IPR = ac>=4? strtol(av[3],0,0) : false;
+  int N;
+  vector<int> RSPI(12);
+  if(ac>=14) {
+    N = strtol(av[1],0,0);
+    for(int i=0;i<12;i++) RSPI[i] = strtol(av[i+2],0,0)-1;
+  } else {
+    N = testN;
+    for(int i=0;i<12;i++) RSPI[i] = testRSPI[i]-1;
+  }
 
-  IsomerDB DB(N,IPR);
+  // int isomer_number = ac>=3? strtol(av[2],0,0) : 1;
+  // bool IPR = ac>=4? strtol(av[3],0,0) : false;
 
-  FullereneGraph g(IsomerDB::makeIsomer(N,DB.getIsomer(N,isomer_number,IPR)));
+  // IsomerDB DB(N,IPR);
+
+  // FullereneGraph g(IsomerDB::makeIsomer(N,DB.getIsomer(N,isomer_number,IPR)));
+
+  FullereneGraph g(N,RSPI);
   g.layout2d = g.tutte_layout();
   
   vector<coord3d> coordinates = optimize_fullerene(g,3,1e-12,4);
 
-  ofstream output(("output/polyhedron-"+to_string(N)+"-"+to_string(isomer_number)+".m").c_str());
+  //  string basename("polyhedron-"+to_string(N)+"-"+to_string(isomer_number));
+  string basename("polyhedron-"+to_string(N));
+
+  ofstream output(("output/"+basename+".m").c_str());
 
   output << "g = " << g << ";\n";
   output << "coordinates = " << coordinates << ";\n";
@@ -92,6 +98,18 @@ int main(int ac, char **av)
   output << "PD = " << D << ";\n";
   
   output.close();
+
+  {
+    ofstream mol2(("output/"+basename+".mol2").c_str());
+    mol2 << P.to_mol2();
+    mol2.close();
+  }
+
+  {
+    ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
+    mol2 << D.to_mol2();
+    mol2.close();
+  }
 
   return 0;
 }

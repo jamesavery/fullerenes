@@ -91,6 +91,21 @@ struct coord2d : public pair<double,double> {
   
   double norm() const { return sqrt(first*first+second*second); }
 
+  static coord2d displacement(const coord2d& x, const coord2d& y, bool layout_is_spherical)
+  {
+    if(!layout_is_spherical) return x-y;
+
+    int i0=0,j0=0;
+    double dmin = INFINITY;
+
+    for(int i=0;i<=1;i++)
+      for(int j=0;j<=1;j++){
+	double d = (x+coord2d(i*2*M_PI,j*M_PI) - y).norm();
+	if(d < dmin){ i0 = i; j0 = j; }
+      }
+    return x+coord2d(i0*2*M_PI,j0*M_PI) - y;
+  }
+
   friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << "{" << x.first << "," << x.second << "}"; return s; }
   friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; return s; }
 };
@@ -157,9 +172,24 @@ struct coord3d {
     
   // }
 
+  friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
+  {
+    for(int i=0;i<xs.size();i++) xs[i] -= y;
+    return xs;
+  }
+
+  friend vector<coord3d> &operator*=(vector<coord3d>& xs, const double& y)
+  {
+    for(int i=0;i<xs.size();i++) xs[i] *= y;
+    return xs;
+  }
+
+
   friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };
+
+
 
 struct tri_t {
   int x_[3];
