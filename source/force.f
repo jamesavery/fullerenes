@@ -538,7 +538,7 @@ C     Coulomb repulsion from origin
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       implicit real(8) (A-H,O-Z)
-      real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
+      real(8) p(number_vertices*3),x(number_vertices*3),force(ffmaxdim)
 
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
@@ -550,6 +550,10 @@ c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
+
+      do i=1,3*number_vertices
+        x(i)=0.d0
+      end do
 
       rpp=force(1)
       rhp=force(2)
