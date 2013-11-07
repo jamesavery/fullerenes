@@ -9,7 +9,7 @@ AR=ar
 
 CXXFLAGS= -g -O3 -m64 -march=native -fPIC -Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts -DVERSION_NUMBER=$(VERSION_NUMBER)
 #CXXFLAGS= -g3 -O3 -m64 -fPIC -Wall -Wno-sign-compare -std=c++0x
-FFLAGS= -g -O3 -m64 -Wall 
+FFLAGS= -g -O3 -m64 -Wall -cpp -D'VERSION_NUMBER="$(VERSION_NUMBER)"'
 LIBRARIES=-lstdc++ -lgomp
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
 # you might need to change the gfortran compiler options:
