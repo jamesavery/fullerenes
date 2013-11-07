@@ -152,21 +152,21 @@ face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
   while(v != s){
     const vector<node_t>& ns(neighbours[v]);
 
-    coord2d vu(layout2d[u]-layout2d[v]);
+    coord2d vu = coord2d::displacement(layout2d[u],layout2d[v],layout_is_spherical);
     double angle_max = -M_PI;
 
     node_t w=-1;
     for(unsigned int i=0;i<ns.size();i++) {
       //	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
       if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
-	  coord2d vw(layout2d[ns[i]]-layout2d[v]);
-	  double angle = vu.line_angle(vw);
-
-	  if(angle>= angle_max){
-	    angle_max = angle;
-	    w = ns[i];
-	  } 
+	coord2d vw = coord2d::displacement(layout2d[ns[i]],layout2d[v],layout_is_spherical);
+	double angle = vu.line_angle(vw);
+	
+	if(angle>= angle_max){
+	  angle_max = angle;
+	  w = ns[i];
 	} 
+      } 
     }
     if(w == -1) abort(); // There is no face!
 

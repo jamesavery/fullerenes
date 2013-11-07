@@ -7,17 +7,6 @@ extern "C" void optff_(const FullereneGraph **graph, const int *N, const int *ih
 		       const int *iopt,double *Dist,double *ftol,double *force);
 extern "C" void default_force_parameters_(const int *iopt, double *parameters);
 
-vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
-{
-  for(int i=0;i<xs.size();i++) xs[i] -= y;
-  return xs;
-}
-
-vector<coord3d> &operator*=(vector<coord3d>& xs, const double& y)
-{
-  for(int i=0;i<xs.size();i++) xs[i] *= y;
-  return xs;
-}
 
 vector<coord3d> zero_order_geometry(const FullereneGraph& g, double scalerad)
 {
@@ -110,9 +99,17 @@ int main(int ac, char **av)
   
   output.close();
 
-  ofstream xyz(("output/"+basename+".xyz").c_str());
-  xyz << P.to_xyz();
-  xyz.close();
+  {
+    ofstream mol2(("output/"+basename+".mol2").c_str());
+    mol2 << P.to_mol2();
+    mol2.close();
+  }
+
+  {
+    ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
+    mol2 << D.to_mol2();
+    mol2.close();
+  }
 
   return 0;
 }
