@@ -938,6 +938,10 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
       real*8 force(ffmaxdim)
       integer iopt
 
+      do i=1,3*N
+        xi(i)=0.d0
+      end do
+
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
