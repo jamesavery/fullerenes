@@ -7,7 +7,7 @@ This geometry is a Jahn-Teller distorted one
 &FFParameters /
 &Hamilton IHam=1 IUPAC=1/
 &Isomers IPR=1, IPH=1 /
-&Graph IFS=1 ISchlegel=1, ISO1=1, ISO2=2, ISO3=4 /
+&Graph IFS=1 ndual=1 ISchlegel=1, ISO1=1, ISO2=2, ISO3=4 /
 6                  -1.153700   -1.621816    0.618052
 6                   1.153589    1.621838   -0.618065
 6                   0.329515   -1.956189    0.629256

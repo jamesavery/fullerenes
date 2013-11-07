@@ -763,6 +763,9 @@ C     edge_width (in mm), path_width (in mm), vertex_diameter (in mm) )
 C     Call format: draw_graph(filename, format (string),ndual (0|1), dimensions ((w,h) in cm), 
 C     edge_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
 C     edge_width (in mm), vertex_diameter (in mm) )
+      if(ndual.ne.0) then
+       Print*,' Dual Graph option used, ndual =',ndual
+      endif
          call draw_graph(g,filename,"tex",ndual, nlabel_vertices,
      1                (/15.d0,15.d0/), x'274070',
      2                x'458b00', 0.3d0, 2.5d0)

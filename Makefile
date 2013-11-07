@@ -5,7 +5,7 @@ CXX=g++
 F90=gfortran
 AR=ar
 
-CXXFLAGS= -O3 -m64 -march=native -fPIC -Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
+CXXFLAGS= -O3 -m64 -fPIC -Wall -Wno-sign-compare -Wno-char-subscripts
 #CXXFLAGS= -g3 -O3 -m64 -fPIC -Wall -Wno-sign-compare -std=c++0x
 FFLAGS= -g3 -O3 -m64 -Wall 
 LIBRARIES=-lstdc++ -lgomp
