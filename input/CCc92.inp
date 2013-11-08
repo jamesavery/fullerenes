@@ -5,7 +5,7 @@ T-C92 cc-pvdz B3LYP opt. geom. minimum -3505.9228870 au
 &FFParameters /
 &Hamilton IHam=1 /
 &Isomers IPR=1 /
-&Graph ISchlegel=2, ISO1=40 /
+&Graph ndual=1 ifs=1 ISchlegel=2 /
 6            -3.252788   -2.537538    1.606819
 6            -2.437281   -3.465649    0.928030
 6            -2.659081   -3.598539   -0.481927

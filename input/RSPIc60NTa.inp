@@ -6,4 +6,4 @@ Difficult case to get the structure right through force field
 &FFParameters fcoulomb=41./
 &Hamilton /
 &Isomers /
-&Graph ISchlegel=7 ISO1=1 ISO2=2 ISO3=3 /
+&Graph ndual=1 ifs=1 ISchlegel=2 ISO1=1 ISO2=2 ISO3=3 /

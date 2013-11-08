@@ -5,7 +5,7 @@ Ih-C60  aug-cc-pvdz B3LYP opt. geom. minimum E=-2286.3878361 au
 &FFParameters /
 &Hamilton IHam=1, IUPAC=1 /
 &Isomers IPR=2, IPH=1 /
-&Graph ISchlegel=8, ISO1=1, ISO2=3, ISO3=5, ifs=1, ndual=0 /
+&Graph ISchlegel=1, ISO1=1, ISO2=3, ISO3=5, ifs=1, ndual=1 /
 6       0.234472451497E+01  0.260265792342E+01  -.594009459472E+00
 6       0.175071505550E+01  0.303423105776E+01  0.594009459472E+00
 6       0.157989089306E+01  0.260265792342E+01  -.183153625546E+01
