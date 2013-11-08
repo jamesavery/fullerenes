@@ -46,6 +46,9 @@ public:
   // create a matrix that holds the topological distances between all pentagons
   vector<int> pentagon_distance_mtx() const;
 
+  vector<coord3d> zero_order_geometry(double scalerad=4) const;
+  vector<coord3d> optimized_geometry(const vector<coord3d>& initial_geometry, int opt_method = 3, double ftol = 1e-12) const;
+
   static FullereneGraph C20() {
     PlanarGraph g;
     g.layout2d.resize(20);

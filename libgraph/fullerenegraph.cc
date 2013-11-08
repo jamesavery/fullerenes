@@ -351,20 +351,66 @@ vector<int> FullereneGraph::pentagon_distance_mtx() const{
   return mtx_vec;
 
 //mathematica output, please do not remove (lukas)
-//    cout << "{";
-//    for(int i=0; i!=12; ++i){
-//      cout << "{";
-//      for(int j=0; j!=12; ++j){
-//        cout << pentagon_distances[12*i + j];
-//        if(j!=11)cout << ", ";
-//      }
-//      cout << "}";
-//      if(i!=11)cout << ",";
-//      cout << endl;
-//    }
-//    cout << "}" << endl;
-  
+//  cout << "{";
+//  for(int i=0; i<12; ++i)
+//     cout << vector<int>(&mtx_vec[12*i],&mtx_vec[13*i]) << (i+1<12?",\n":"");
+//  cout << "}\n";
 }
+
+vector<coord3d> FullereneGraph::zero_order_geometry(double scalerad) const
+{
+  assert(layout2d.size() == N);
+  vector<coord2d> angles(spherical_projection());
+
+  // Spherical projection
+  vector<coord3d> coordinates(N);
+  for(int i=0;i<N;i++){
+    double theta = angles[i].first, phi = angles[i].second;
+    double x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
+    coordinates[i] = coord3d(x,y,z);
+  }
+
+  // Move to centroid
+  coord3d cm;
+  for(node_t u=0;u<N;u++) cm += coordinates[u];
+  cm /= double(N);
+  coordinates -= cm;
+
+  // Scale spherical projection
+  double Ravg = 0;
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[neighbours[u][i]]).norm();
+  Ravg /= (3.0*N);
+  
+  coordinates *= scalerad*1.5/Ravg;
+
+  return coordinates;
+}
+
+extern "C" void optff_(const FullereneGraph **graph, const int *N, const int *ihessian, const int *iprinthessian,
+		       const int *iopt,double *Dist,double *ftol,double *force);
+extern "C" void default_force_parameters_(const int *iopt, double *parameters);
+
+vector<coord3d> FullereneGraph::optimized_geometry(const vector<coord3d>& points, int opt_method, double ftol) const
+{
+  assert(layout2d.size() == N);
+  vector<coord3d> coordinates(points.begin(),points.end());
+  vector<double> force_parameters(19);
+
+  default_force_parameters_(&opt_method,&force_parameters[0]);
+
+  cout << "force parameters: " << force_parameters << endl;
+
+  cout << "g = " << *this << ";\n";
+
+  int zero = 0, one = 1;
+  const FullereneGraph *g = this;
+  optff_(&g,&N,&one,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
+
+  return coordinates;
+}
+
+
 
 node_t FullereneGraph::C20_edges[30][2] ={{0,13},{0,14},{0,15},{1,4},{1,5},{1,12},{2,6},{2,13},{2,18},{3,7},{3,14},{3,19},{4,10},{4,18},{5,11},{5,19},{6,10},{6,15},{7,11},{7,15},{8,9},{8,13},{8,16},{9,14},{9,17},{10,11},{12,16},{12,17},{16,18},{17,19}};
 
