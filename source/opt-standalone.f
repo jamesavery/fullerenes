@@ -1,4 +1,5 @@
-      SUBROUTINE OptGraph(N, IOP,Iout,IDA,IS,MDist,maxl,scalePPG,Dist)
+      SUBROUTINE SA_OptGraph(N, IOP,Iout,IDA,IS,MDist,
+     1                       maxl,scalePPG,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C  This subroutine optimizes the fullerene graph using spring embedding
@@ -45,7 +46,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
        Dist(2,i)=Dist(2,i)*scale 
        WRITE(*,1001) I,Dist(1,I),Dist(2,I)
       enddo
-      CALL frprmn2d(N,IOP,IDA,Iout,IS,MDist,
+      CALL SA_frprmn2d(N,IOP,IDA,Iout,IS,MDist,
      1 maxd,Dist,ftol,iter,fret,E0,RAA)
       if(fret-E0.gt.1.d-2) then
        fretn=(fret-E0)/dfloat(N)
@@ -82,7 +83,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Return 
       END
 
-      SUBROUTINE frprmn2d(N,IOP,AH,Iout,IS,MDist,
+      SUBROUTINE SA_frprmn2d(N,IOP,AH,Iout,IS,MDist,
      1 maxd,p,ftol,iter,fret,E0,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -107,11 +108,11 @@ C     IOP=3: Pisanski-Plestenjak-Graovac algorithm
 C     IOP=4: Kamada-Kawai embedding
 
       iter=0
-      CALL func2d(N,IOP,AH,IS,MDist,maxd,p,fp,RAA)
+      CALL SA_func2d(N,IOP,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
       Write(Iout,1003) E0
 C     dfunc3d input vector p of length 2*N, output gradient of length 2*N user defined
-      CALL dfunc2d(N,IOP,AH,IS,MDist,maxd,p,xi,RAA)
+      CALL SA_dfunc2d(N,IOP,AH,IS,MDist,maxd,p,xi,RAA)
       grad2=0.d0
       do I=1,2*N
        grad2=grad2+xi(i)*xi(i)
@@ -127,7 +128,7 @@ C     dfunc3d input vector p of length 2*N, output gradient of length 2*N user d
         fret=0.d0
       do its=1,ITMAX
         iter=its
-        CALL linmin2d(N,IOP,Iout,AH,IS,MDist,maxd,
+        CALL SA_linmin2d(N,IOP,Iout,AH,IS,MDist,maxd,
      1       p,pcom,xi,xicom,fret,RAA)
          grad2=0.d0
          do I=1,2*N
@@ -140,7 +141,7 @@ C     dfunc3d input vector p of length 2*N, output gradient of length 2*N user d
           return
         endif
         fp=fret
-        CALL dfunc2d(N,IOP,AH,IS,MDist,maxd,p,xi,RAA)
+        CALL SA_dfunc2d(N,IOP,AH,IS,MDist,maxd,p,xi,RAA)
         gg=0.d0
         dgg=0.d0
         do j=1,2*N
@@ -165,7 +166,7 @@ C         dgg=dgg+xi(j)**2
       return
       END
 
-      SUBROUTINE linmin2d(N,IOP,Iout,AH,IS,MDist,
+      SUBROUTINE SA_linmin2d(N,IOP,Iout,AH,IS,MDist,
      1 maxd,p,pcom,xi,xicom,fret,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -179,9 +180,9 @@ C     USES brent2d,f1dim2d,mnbrak2d
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak2d(N,IOP,Iout,AH,IS,MDist,maxd,
+      CALL SA_mnbrak2d(N,IOP,Iout,AH,IS,MDist,maxd,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,RAA)
-      CALL brent2d(N,IOP,Iout,AH,IS,MDist,maxd,
+      CALL SA_brent2d(N,IOP,Iout,AH,IS,MDist,maxd,
      1 fret,ax,xx,bx,TOL,xmin,xicom,pcom,RAA)
       do j=1,2*N
         xi(j)=xmin*xi(j)
@@ -190,7 +191,7 @@ C     USES brent2d,f1dim2d,mnbrak2d
       return
       END
 
-      SUBROUTINE f1dim2d(N,IOP,A,IS,MDist,maxd,
+      SUBROUTINE SA_f1dim2d(N,IOP,A,IS,MDist,maxd,
      1 f1dimf,x,xicom,pcom,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -200,11 +201,11 @@ C     USES func2d
       do j=1,2*N
         xt(j)=pcom(j)+x*xicom(j)
       enddo
-      CALL func2d(N,IOP,A,IS,MDist,maxd,xt,f1dimf,RAA)
+      CALL SA_func2d(N,IOP,A,IS,MDist,maxd,xt,f1dimf,RAA)
       return
       END
 
-      SUBROUTINE mnbrak2d(N,IOP,Iout,AH,IS,DD,maxd,
+      SUBROUTINE SA_mnbrak2d(N,IOP,Iout,AH,IS,DD,maxd,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -212,9 +213,9 @@ C     USES func2d
       Integer AH(N,N),IS(6)
       Integer DD(N,N)
       REAL*8 pcom(N*2),xicom(N*2)
-      CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fa,ax,xicom,pcom,
+      CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fa,ax,xicom,pcom,
      1 RAA)
-      CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fb,bx,xicom,pcom,
+      CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fb,bx,xicom,pcom,
      1 RAA)
       if(fb.gt.fa)then
         dum=ax
@@ -225,7 +226,7 @@ C     USES func2d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fc,cx,xicom,pcom,
+      CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fc,cx,xicom,pcom,
      1 RAA)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
@@ -233,7 +234,7 @@ C     USES func2d
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             ax=bx
@@ -247,10 +248,10 @@ C     USES func2d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           if(fu.lt.fc)then
             bx=cx
@@ -258,12 +259,12 @@ C     USES func2d
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         else
           u=cx+GOLD*(cx-bx)
@@ -271,7 +272,7 @@ C     USES func2d
         Write(Iout,1000)
         return
         endif
-        CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1 RAA)
         endif
         ax=bx
@@ -286,7 +287,7 @@ C     USES func2d
  1000 Format('**** Error in Subroutine mnbrak2d')
       END
 
-      SUBROUTINE brent2d(N,IOP,Iout,AH,IS,DD,maxd,
+      SUBROUTINE SA_brent2d(N,IOP,Iout,AH,IS,DD,maxd,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,RAA)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
@@ -302,7 +303,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fx,x,xicom,pcom,
+      CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fx,x,xicom,pcom,
      1 RAA)
       fv=fx
       fw=fx
@@ -338,7 +339,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
+        CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
      1    RAA)
         if(fu.le.fx) then
           if(u.ge.x) then
@@ -377,7 +378,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
 
 
 
-      SUBROUTINE func2d(N,IOP,A,IS,MDist,maxd,p,fc,RAA)
+      SUBROUTINE SA_func2d(N,IOP,A,IS,MDist,maxd,p,fc,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Embedding algorithms for fullerene graph, energy
@@ -474,7 +475,7 @@ C     total energy
       Return
       END
 
-      SUBROUTINE dfunc2d(N,IOP,A,IS,MDist,maxd,p,x,RAA)
+      SUBROUTINE SA_dfunc2d(N,IOP,A,IS,MDist,maxd,p,x,RAA)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
 C     Embedding algorithms for fullerene graph, gradient
@@ -608,7 +609,7 @@ C     * ? force
 C Input/output: 
 C     * real*8 Dist(3,N): On input, initial coordinate vector; on output, final coordinates.
 
-      SUBROUTINE OptFF(graph,N,ihessian,iprinthessian,iopt,
+      SUBROUTINE SA_OptFF(graph,N,ihessian,iprinthessian,iopt,
      1  Dist,ftol,force)
       use config
       use iso_c_binding
@@ -639,12 +640,12 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       number_vertices=N
 
       call adjacency_matrix(graph,N,IDA)
-      call get_edges(graph,N,
+      call SA_get_edges(graph,N,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
-      call get_corners(graph,N,
+      call SA_get_corners(graph,N,
      1 a_h,a_p)
       if(iopt .eq. 3 .or. iopt.eq.4) then
-        call get_dihedrals(graph,N,
+        call SA_get_dihedrals(graph,N,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
 
@@ -714,7 +715,7 @@ c        force(19)=force(19)
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(*,1004) force(9)
 
 C OPTIMIZE
-      CALL frprmn3d(N,
+      CALL SA_frprmn3d(N,
      1 Dist,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -723,14 +724,14 @@ C OPTIMIZE
         fretn=fret/dfloat(N)
         Write(*,1002) fretn
       endif
-      CALL Distan(N,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      CALL SA_Distan(N,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(*,1001) Rmin,Rmax,rms
 
 
 
 C HESSIAN
       if(ihessian.ne.0) then
-        call get_hessian(N,dist, force, iopt, hessian,
+        call SA_get_hessian(N,dist, force, iopt, hessian,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -888,7 +889,7 @@ C Sort for degeneracies
       Return 
       END
 
-      SUBROUTINE Distan(N,IDA,Dist,Rmin,Rminall,Rmax,rms)
+      SUBROUTINE SA_Distan(N,IDA,Dist,Rmin,Rminall,Rmax,rms)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,N)
@@ -924,7 +925,7 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
       Return 
       END
 
-      SUBROUTINE frprmn3d(N,
+      SUBROUTINE SA_frprmn3d(N,
      1 p,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -985,7 +986,7 @@ c       turn off coulomb pot towards the end (and go to iopt=3 to indicate that 
           write(*,*)'Switching off coulomb repulsive potential.'
         endif
         iter=its
-        call linmin3d(N,p,pcom,xi,xicom,fret,
+        call SA_linmin3d(N,p,pcom,xi,xicom,fret,
      1    force,iopt,e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
      1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -1039,7 +1040,7 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       return
       END
 
-      SUBROUTINE linmin3d(N,p,pcom,xi,xicom,fret,force,iopt,
+      SUBROUTINE SA_linmin3d(N,p,pcom,xi,xicom,fret,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
       use config
@@ -1057,11 +1058,11 @@ C     USES brent3d,f1dim3d,mnbrak3d
       enddo
       ax=0.d0
       xx=1.d0
-      CALL mnbrak3d(N,
+      CALL SA_mnbrak3d(N,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      CALL brent3d(N,fret,
+      CALL SA_brent3d(N,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -1091,7 +1092,7 @@ c        p(j)=p(j)+xi_tmp(j)
       return
       END
 
-      SUBROUTINE f1dim3d(N,
+      SUBROUTINE SA_f1dim3d(N,
      1 f1dimf,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -1110,7 +1111,7 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE mnbrak3d(N,
+      SUBROUTINE SA_mnbrak3d(N,
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -1120,12 +1121,12 @@ C     USES func3d
       integer e_hh(2,3*N/2),e_hp(2,3*N/2),e_pp(2,3*N/2)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       REAL*8 pcom(N*3),xicom(N*3),force(ffmaxdim)
-      CALL f1dim3d(N,
+      CALL SA_f1dim3d(N,
      1 fa,ax,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
-      CALL f1dim3d(N,
+      CALL SA_f1dim3d(N,
      1 fb,bx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -1139,7 +1140,7 @@ C     USES func3d
         fa=dum
       endif
       cx=bx+GOLD*(bx-ax)
-      CALL f1dim3d(N,
+      CALL SA_f1dim3d(N,
      1 fc,cx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -1150,7 +1151,7 @@ C     USES func3d
         u=bx-((bx-cx)*q-(bx-ax)*r)/(2.*sign(max(dabs(q-r),TINY),q-r))
         ulim=bx+GLIMIT*(cx-bx)
         if((bx-u)*(u-cx).gt.0.)then
-        CALL f1dim3d(N,
+        CALL SA_f1dim3d(N,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -1167,13 +1168,13 @@ C     USES func3d
             return
           endif
           u=cx+GOLD*(cx-bx)
-        CALL f1dim3d(N,
+        CALL SA_f1dim3d(N,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         else if((cx-u)*(u-ulim).gt.0.)then
-        CALL f1dim3d(N,
+        CALL SA_f1dim3d(N,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -1184,7 +1185,7 @@ C     USES func3d
             u=cx+GOLD*(cx-bx)
             fb=fc
             fc=fu
-        CALL f1dim3d(N,
+        CALL SA_f1dim3d(N,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -1192,7 +1193,7 @@ C     USES func3d
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
-        CALL f1dim3d(N,
+        CALL SA_f1dim3d(N,
      1   fu,u,xicom,pcom,force,iopt,
      2   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -1203,7 +1204,7 @@ C     USES func3d
         Print*,'**** Error in Subroutine mnbrak3d'
         return
         endif
-        CALL f1dim3d(N,
+        CALL SA_f1dim3d(N,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -1220,7 +1221,7 @@ C     USES func3d
       return
       END
 
-      SUBROUTINE brent3d(N,
+      SUBROUTINE SA_brent3d(N,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -1237,7 +1238,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
-      CALL f1dim3d(N,
+      CALL SA_f1dim3d(N,
      1 fx,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -1276,7 +1277,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
         else
           u=x+sign(tol1,d)
         endif
-        CALL f1dim3d(N,
+        CALL SA_f1dim3d(N,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
@@ -1317,7 +1318,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       return
       END
 
-      SUBROUTINE linminx(n,IOP,ier,
+      SUBROUTINE SA_linminx(n,IOP,ier,
      1 TOL,p,xi,fret,pcom,xicom,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1330,7 +1331,7 @@ CU    USES brentx,f1dimx,mnbrakx
 11    continue
       ax=0.d0
       xx=1.d0
-      call mnbrakx(n,IOP,ier,
+      call SA_mnbrakx(n,IOP,ier,
      1 pcom,xicom,ax,xx,bx,fa,fx,fb,Dist)
       if(ier.eq.1) Return
       fret=brentx(n,IOP,ier,pcom,xicom,ax,xx,bx,TOL,xmin,Dist)
@@ -1341,7 +1342,7 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-      SUBROUTINE mnbrakx(N,IOP,ier,pcom,xicom,ax,bx,cx,
+      SUBROUTINE SA_mnbrakx(N,IOP,ier,pcom,xicom,ax,bx,cx,
      1 fa,fb,fc,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1412,7 +1413,7 @@ CU    USES brentx,f1dimx,mnbrakx
       return
       END
 
-      DOUBLE PRECISION FUNCTION brentx(N,IOP,ier,
+      DOUBLE PRECISION FUNCTION SA_brentx(N,IOP,ier,
      1 pcom,xicom,ax,bx,cx,tol,xmin,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -1511,7 +1512,7 @@ C     - N = Nvertices(g)
 C     ------------------------------------------------------------
 C                              EDGES
 C     ------------------------------------------------------------
-      SUBROUTINE get_edges(graph,N,
+      SUBROUTINE SA_get_edges(graph,N,
      1 edges_hh,edges_hp,edges_pp,na_hh,na_hp,na_pp)
       use iso_c_binding
       type(c_ptr) :: graph
@@ -1570,7 +1571,7 @@ c        write (*,*) "Edge ",(/u,v/)," connects ",np,"pentagons.",lA,lB
 C     ------------------------------------------------------------
 C                              CORNERS
 C     ------------------------------------------------------------
-      SUBROUTINE get_corners(graph,N,a_h,a_p)
+      SUBROUTINE SA_get_corners(graph,N,a_h,a_p)
 c     here, n is the number of atoms
       use iso_c_binding
       type(c_ptr) :: graph
@@ -1625,7 +1626,7 @@ c            write (*,*) j,":",(/u,v,w/)
 C     ------------------------------------------------------------
 C                              DIHEDRALS
 C     ------------------------------------------------------------
-      SUBROUTINE get_dihedrals(graph,N,
+      SUBROUTINE SA_get_dihedrals(graph,N,
      1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use iso_c_binding
       integer neighbours(3,N), face(6), lA,lB,lC, u,s,r,t
@@ -1735,7 +1736,7 @@ c            write (*,*) "666"
       END SUBROUTINE
 
       
-      SUBROUTINE get_hessian(N,coord, force, iopt, hessian,
+      SUBROUTINE SA_get_hessian(N,coord, force, iopt, hessian,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
      1  d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -2268,7 +2269,7 @@ c copy hessian to the other half
       END SUBROUTINE
 
 
-      DOUBLE PRECISION FUNCTION f1dimx(N,IOP,ier,
+      DOUBLE PRECISION FUNCTION SA_f1dimx(N,IOP,ier,
      1 x,pcom,xicom,Dist)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2279,10 +2280,10 @@ c copy hessian to the other half
         xt(j)=pcom(j)+x*xicom(j)
 11    continue
       If(IOP.eq.0) then
-      Call MDSnorm(N,AN,R,xt,Dist)
+      Call SA_MDSnorm(N,AN,R,xt,Dist)
       f1dimx=AN
       else
-      Call MAInorm(N,IP,AN,xt,Dist)
+      Call SA_MAInorm(N,IP,AN,xt,Dist)
       f1dimx=-AN
       endif
       if(AN.gt.Huge) then
@@ -2294,7 +2295,7 @@ c copy hessian to the other half
       END
 
 
-      SUBROUTINE MAInorm(N,IP,dm,c,d)
+      SUBROUTINE SA_MAInorm(N,IP,dm,c,d)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION d(3,N),c(N)
@@ -2313,7 +2314,7 @@ C     Calculate minimum distance to center c
       Return
       End
 
-      SUBROUTINE MDSnorm(N,A,davd,c,d)
+      SUBROUTINE SA_MDSnorm(N,A,davd,c,d)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION d(3,N),c(N),dp(N)
@@ -2335,7 +2336,6 @@ C     Calculate norm for minimum distance sphere
       A=ddav/XM
       Return
       End
-
 
       subroutine default_force_parameters(iopt,force)
       use config
