@@ -1,3 +1,6 @@
+c tridiagonal matrix from a real symmetric matrix
+c reduced by all features that are required for eigenvectors
+c borrowed and modified from numerical recipes
       SUBROUTINE tred2l(a,n,np,d,e)
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 a(np,np),d(np),e(np)
@@ -57,6 +60,9 @@ C     np: dimension of array
       return
       END
 
+c eigenvalues from tridiagonal matrix
+c reduced by all features that are required for eigenvectors
+c borrowed and modified from numerical recipes
       SUBROUTINE tqlil(d,e,n,np)
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 d(np),e(np)
@@ -110,6 +116,8 @@ C     np: dimension of array
       return
       END
 
+c tridiagonal matrix from real symmetric matrix
+c borrowed from numerical recipes
       SUBROUTINE tred2(a,n,np,d,e)
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 a(np,np),d(np),e(np)
@@ -188,6 +196,8 @@ C     np: dimension of array
       return
       END
 
+c eigenvectors and eigenvalues from tridiagonal matrix
+c borrowed from numerical recipes
       SUBROUTINE tqli(d,e,n,np,z)
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 d(np),e(np),z(np,np)

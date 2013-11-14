@@ -497,10 +497,12 @@ C OPTIMIZE
 
 C HESSIAN
       if(ihessian.ne.0) then
+        write(*,1027,advance='no')
         call get_hessian(dist, force, iopt, hessian,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        write(*,*)" done."
         if(iprinthessian.gt.1) then
           write(iout,1023)
           write(iout,1024)
@@ -511,28 +513,31 @@ C  Mass of 12-C used
         amassC=12.0d0
         fachess=3.80879844d-4/amassC
         convw=2720.21d0
-C       Test if Hessian is symmetric
-        symmetric=0.d0
-        test=1.d-10
-        do i=1,3*number_vertices
-          do j=1,3*number_vertices
-            symmetric=symmetric+dabs(hessian(i,j)-hessian(j,i))
-          enddo
-        enddo
-        asym=symmetric*.5d0
-        if(asym.gt.test) then
-          Write(Iout,1013) asym
-        else
-          Write(Iout,1015) asym
-        endif
+c (LNW) this is debugging only
+cC       Test if Hessian is symmetric
+c        symmetric=0.d0
+c        test=1.d-10
+c        do i=1,3*number_vertices
+c          do j=1,3*number_vertices
+c            symmetric=symmetric+dabs(hessian(i,j)-hessian(j,i))
+c          enddo
+c        enddo
+c        asym=symmetric*.5d0
+c        if(asym.gt.test) then
+c          Write(Iout,1013) asym
+c        else
+c          Write(Iout,1015) asym
+c        endif
 C       Mass-weight Hessian
         do i=1,3*number_vertices
           do j=1,3*number_vertices
             hessian(i,j)=hessian(i,j)*fachess
           enddo
         enddo
+        write(*,1028,advance='no')
         call tred2l(hessian,3*number_vertices,3*number_vertices,evec,df)
         call tqlil(evec,df,3*number_vertices,3*number_vertices)
+        write(*,*)" done."
 C Sort eigenvalues
         negeig=0
         Do I=1,number_vertices*3
@@ -651,6 +656,8 @@ C Sort for degeneracies
      1 6(d12.6,' '))
  1026 Format(' Zero-point vibrational energy per atom: ',d12.6,
      1 ' a.u. , ',d12.6,' eV , ',d12.6,' cm-1 , ')
+ 1027 format('Calculating Hessian matrix ...')
+ 1028 format('Diagonalizing Hessian matrix ...')
      
       Return 
       END
