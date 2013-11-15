@@ -203,7 +203,7 @@ C Wu force field
         force(7)=WufA5
         force(8)=WufA6
         force(9)=fCoulomb
-      else if(iopt.eq.3 .or. iopt.eq.4)then
+      else if(iopt.eq.3.or.iopt.eq.4.or.iopt.eq.5.or.iopt.eq.6)then
 C ExtWu force field
         force(1)=ExtWuR55
         force(2)=ExtWuR56
@@ -246,7 +246,7 @@ C Wu force field
         force(7)=WufA5
         force(8)=WufA6
         force(9)=fCoulomb
-      else if(iopt.eq.3 .or. iopt.eq.4)then
+      else if(iopt.eq.3.or.iopt.eq.4.or.iopt.eq.5.or.iopt.eq.6)then
 C ExtWu force field
         force(1)=ExtWuR55
         force(2)=ExtWuR56

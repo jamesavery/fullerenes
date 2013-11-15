@@ -508,7 +508,8 @@ c       Store distances
           CALL OptFF(Iout,ihessian,iprinthessian,iopt,IDA, ! vanilla Wu
      1      Dist,dist2D,ftolP,force)
           Iprint=0
-        else if(Iopt.eq.3 .or. iopt.eq.4) then ! extended Wu, 19 parameters
+c       extended Wu, 19 parameters
+        else if(iopt.eq.3.or.iopt.eq.4.or.iopt.eq.5.or.iopt.eq.6)then
           CALL OptFF(Iout,ihessian,iprinthessian,iopt,IDA,
      1      Dist,dist2D,ftolP,force)
         endif

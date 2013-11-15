@@ -16,7 +16,7 @@
           CALL wu(IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1      a_h,a_p)
-        case(3, 4)
+        case(3, 4, 5, 6)
           CALL extwu(IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      2      a_h,a_p,
@@ -150,6 +150,9 @@ c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
+      integer iopt
+
+      hyperbolic_par_2 = 4.0
 
       IERR=0
       rpp=force(1)
@@ -179,42 +182,45 @@ c we distinguish between bonds between two hexagons, two pentagons and hex/pent
       ehookrpp=0.d0
 
       if(ne_hh .ne. 0) then
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ratom)
-!$OMP DO REDUCTION(+:ehookrhh)
         do i=1,ne_hh
           call dist(p(3*e_hh(1,i)-2),p(3*e_hh(1,i)-1),p(3*e_hh(1,i)),
      1              p(3*e_hh(2,i)-2),p(3*e_hh(2,i)-1),p(3*e_hh(2,i)),
      1              ratom)
-          ehookrhh=ehookrhh+(ratom-rhh)**2
+          if(iopt.eq.3 .or. iopt.eq.4) then
+            ehookrhh=ehookrhh+(ratom-rhh)**2
+          else
+            ehookrhh=ehookrhh+
+     1       ((ratom-rhh)**2)/dsqrt(hyperbolic_par_2 + (ratom-rhh)**2)
+          endif
         enddo
-!$OMP END DO
-!$OMP END PARALLEL
       endif
 
       if(ne_hp .ne. 0) then
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ratom)
-!$OMP DO REDUCTION(+:ehookrhp)
         do i=1,ne_hp
           call dist(p(3*e_hp(1,i)-2),p(3*e_hp(1,i)-1),p(3*e_hp(1,i)),
      1              p(3*e_hp(2,i)-2),p(3*e_hp(2,i)-1),p(3*e_hp(2,i)),
      2              ratom)
-          ehookrhp=ehookrhp+(ratom-rhp)**2
+          if(iopt.eq.3 .or.iopt.eq.4) then
+            ehookrhp=ehookrhp+(ratom-rhp)**2
+          else
+            ehookrhp=ehookrhp+
+     1       ((ratom-rhp)**2)/dsqrt(hyperbolic_par_2 + (ratom-rhp)**2)
+          endif
         enddo
-!$OMP END DO
-!$OMP END PARALLEL
       endif
 
       if(ne_pp .ne. 0) then
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ratom)
-!$OMP DO REDUCTION(+:ehookrpp)
         do i=1,ne_pp
           call dist(p(3*e_pp(1,i)-2),p(3*e_pp(1,i)-1),p(3*e_pp(1,i)),
      1              p(3*e_pp(2,i)-2),p(3*e_pp(2,i)-1),p(3*e_pp(2,i)),
      1              ratom)
-          ehookrpp=ehookrpp+(ratom-rpp)**2
+          if(iopt.eq.3 .or.iopt.eq.4) then
+            ehookrpp=ehookrpp+(ratom-rpp)**2
+          else
+            ehookrpp=ehookrpp+
+     1       ((ratom-rpp)**2)/dsqrt(hyperbolic_par_2 + (ratom-rpp)**2)
+          endif
         enddo
-!$OMP END DO
-!$OMP END PARALLEL
       endif
 
 C     Bending
@@ -222,31 +228,33 @@ c     we distinguish between angles of pentagons and hexagons
 C     Loop over 5-rings
       ehookap=0.d0
       ehookah=0.d0
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abc)
-!$OMP DO REDUCTION(+:ehookap)
       do i=1,60
         call angle(p(3*a_p(1,i)-2),p(3*a_p(1,i)-1),p(3*a_p(1,i)),
      1             p(3*a_p(2,i)-2),p(3*a_p(2,i)-1),p(3*a_p(2,i)),
      1             p(3*a_p(3,i)-2),p(3*a_p(3,i)-1),p(3*a_p(3,i)),
      1             angle_abc)
-        ehookap=ehookap+(angle_abc-ap)**2
+        if(iopt.eq.3 .or.iopt.eq.4) then
+          ehookap=ehookap+(angle_abc-ap)**2
+        else
+          ehookap=ehookap+
+     1     ((angle_abc-ap)**2)/dsqrt(hyperbolic_par_2+(angle_abc-ap)**2)
+        endif
       enddo
-!$OMP END DO
-!$OMP END PARALLEL
 
       if(number_vertices .gt. 20) then
 C     Loop over 6-rings
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abc)
-!$OMP DO REDUCTION(+:ehookah)
       do i=1,3*number_vertices-60
         call angle(p(3*a_h(1,i)-2),p(3*a_h(1,i)-1),p(3*a_h(1,i)),
      1             p(3*a_h(2,i)-2),p(3*a_h(2,i)-1),p(3*a_h(2,i)),
      1             p(3*a_h(3,i)-2),p(3*a_h(3,i)-1),p(3*a_h(3,i)),
      1             angle_abc)
-        ehookah=ehookah+(angle_abc-ah)**2
+        if(iopt.eq.3 .or.iopt.eq.4) then 
+          ehookah=ehookah+(angle_abc-ah)**2
+        else
+          ehookah=ehookah+
+     1     ((angle_abc-ah)**2)/dsqrt(hyperbolic_par_2+(angle_abc-ah)**2)
+        endif
       enddo
-!$OMP END DO
-!$OMP END PARALLEL
       endif
 
 
@@ -258,8 +266,6 @@ C dihedrals
 
       if(nd_hhh .ne. 0) then
 C     3 hexagons
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abcd)
-!$OMP DO REDUCTION(+:ehookdhhh)
       do i=1,nd_hhh
       call dihedral(p(3*d_hhh(1,i)-2),p(3*d_hhh(1,i)-1),p(3*d_hhh(1,i)),
      1              p(3*d_hhh(2,i)-2),p(3*d_hhh(2,i)-1),p(3*d_hhh(2,i)),
@@ -270,16 +276,18 @@ C     3 hexagons
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
 c        write(*,*)angle_abcd
-        ehookdhhh=ehookdhhh+(angle_abcd-dhhh)**2
+        if(iopt.eq.3 .or.iopt.eq.4) then
+          ehookdhhh=ehookdhhh+(angle_abcd-dhhh)**2
+        else
+          ehookdhhh=ehookdhhh+
+     1     ((angle_abcd-dhhh)**2)/dsqrt(hyperbolic_par_2+
+     1     (angle_abcd-dhhh)**2)
+        endif
       enddo
-!$OMP END DO
-!$OMP END PARALLEL
       endif
 
       if(nd_hhp .ne. 0) then
 C     2 hexagons, 1 pentagon
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abcd)
-!$OMP DO REDUCTION(+:ehookdhhp)
       do i=1,nd_hhp
       call dihedral(p(3*d_hhp(1,i)-2),p(3*d_hhp(1,i)-1),p(3*d_hhp(1,i)),
      1              p(3*d_hhp(2,i)-2),p(3*d_hhp(2,i)-1),p(3*d_hhp(2,i)),
@@ -290,16 +298,18 @@ C     2 hexagons, 1 pentagon
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
 c        write(*,*)angle_abcd
-        ehookdhhp=ehookdhhp+(angle_abcd-dhhp)**2
+        if(iopt.eq.3 .or.iopt.eq.4) then
+          ehookdhhp=ehookdhhp+(angle_abcd-dhhp)**2
+        else
+          ehookdhhp=ehookdhhp+
+     1     ((angle_abcd-dhhp)**2)/dsqrt(hyperbolic_par_2+
+     1     (angle_abcd-dhhp)**2)
+        endif
       enddo
-!$OMP END DO
-!$OMP END PARALLEL
       endif
 
       if(nd_hpp .ne. 0) then
 C     1 hexagon, 2 pentagons
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abcd)
-!$OMP DO REDUCTION(+:ehookdhpp)
       do i=1,nd_hpp
       call dihedral(p(3*d_hpp(1,i)-2),p(3*d_hpp(1,i)-1),p(3*d_hpp(1,i)),
      1              p(3*d_hpp(2,i)-2),p(3*d_hpp(2,i)-1),p(3*d_hpp(2,i)),
@@ -310,17 +320,19 @@ C     1 hexagon, 2 pentagons
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
 c        write(*,*)angle_abcd
-        ehookdhpp=ehookdhpp+(angle_abcd-dhpp)**2
+        if(iopt.eq.3 .or.iopt.eq.4) then
+          ehookdhpp=ehookdhpp+(angle_abcd-dhpp)**2
+        else
+          ehookdhpp=ehookdhpp+
+     1     ((angle_abcd-dhpp)**2)/dsqrt(hyperbolic_par_2+
+     1     (angle_abcd-dhpp)**2)
+        endif
 c        write(*,*)'diff',angle_p,ap
       enddo
-!$OMP END DO
-!$OMP END PARALLEL
       endif
 
       if(nd_ppp .ne. 0) then
 C     3 pentagons
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(angle_abcd)
-!$OMP DO REDUCTION(+:ehookdppp)
       do i=1,nd_ppp
 c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
       call dihedral(p(3*d_ppp(1,i)-2),p(3*d_ppp(1,i)-1),p(3*d_ppp(1,i)),
@@ -332,16 +344,20 @@ c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
         angle_abcd=dabs(angle_abcd)
 c        write(*,*)angle_abcd
-        ehookdppp=ehookdppp+(angle_abcd-dppp)**2
+        if(iopt.eq.3 .or.iopt.eq.4) then
+          ehookdppp=ehookdppp+(angle_abcd-dppp)**2
+        else
+          ehookdppp=ehookdppp+
+     1     ((angle_abcd-dppp)**2)/dsqrt(hyperbolic_par_2+
+     1     (angle_abcd-dppp)**2)
+        endif
 c        write(*,*)'diff',angle_p,ap
       enddo
-!$OMP END DO
-!$OMP END PARALLEL
       endif
 
 C     Coulomb repulsion from origin
       ecoulomb=0.d0
-      if (iopt.eq.4 .and. fco.ne.0.d0)  then
+      if ((iopt.eq.4 .or. iopt.eq.6) .and. fco.ne.0.d0)  then
         Do I=1,number_vertices
           rinv=1.d0/dsqrt(p(3*I-2)**2+p(3*I-1)**2+p(3*I)**2)
           ecoulomb=ecoulomb+rinv
@@ -378,7 +394,7 @@ C     total energy
           CALL dwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p)
-        case(3, 4)
+        case(3, 4, 5, 6)
           CALL dextwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
@@ -561,6 +577,8 @@ c     counter for edges with 0, 1, 2 pentagons neighbours
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
+      hyperbolic_par_2 = 4.0
+
       do i=1,3*number_vertices
         x(i)=0.d0
       end do
@@ -597,6 +615,10 @@ c      write(*,*)'before stretch'
           zero_value=rhh
           force_constant=frhh
           dE_over_dc=force_constant*(ratom-zero_value)
+          if(iopt.eq.5.or.iopt.eq.6) then
+            dE_over_dc=dE_over_dc /
+     1       dsqrt(hyperbolic_par_2 + (ratom-zero_value)**2)
+          endif
           x(3*e_hh(1,i)-2)=x(3*e_hh(1,i)-2) + dax*dE_over_dc
           x(3*e_hh(1,i)-1)=x(3*e_hh(1,i)-1) + day*dE_over_dc
           x(3*e_hh(1,i))  =x(3*e_hh(1,i))   + daz*dE_over_dc
@@ -614,6 +636,10 @@ c      write(*,*)'before stretch'
           zero_value=rhp
           force_constant=frhp
           dE_over_dc=force_constant*(ratom-zero_value)
+          if(iopt.eq.5.or.iopt.eq.6) then
+            dE_over_dc=dE_over_dc /
+     1       dsqrt(hyperbolic_par_2 + (ratom-zero_value)**2)
+          endif
           x(3*e_hp(1,i)-2)=x(3*e_hp(1,i)-2) + dax*dE_over_dc
           x(3*e_hp(1,i)-1)=x(3*e_hp(1,i)-1) + day*dE_over_dc
           x(3*e_hp(1,i))  =x(3*e_hp(1,i))   + daz*dE_over_dc
@@ -631,6 +657,10 @@ c      write(*,*)'before stretch'
           zero_value=rpp
           force_constant=frpp
           dE_over_dc=force_constant*(ratom-zero_value)
+          if(iopt.eq.5.or.iopt.eq.6) then
+            dE_over_dc=dE_over_dc /
+     1       dsqrt(hyperbolic_par_2 + (ratom-zero_value)**2)
+          endif
           x(3*e_pp(1,i)-2)=x(3*e_pp(1,i)-2) + dax*dE_over_dc
           x(3*e_pp(1,i)-1)=x(3*e_pp(1,i)-1) + day*dE_over_dc
           x(3*e_pp(1,i))  =x(3*e_pp(1,i))   + daz*dE_over_dc
@@ -658,6 +688,10 @@ C     Loop over 5-rings
         zero_value=ap
         force_constant=fap
         dE_over_dc=force_constant*(angle_abc-zero_value)
+        if(iopt.eq.5.or.iopt.eq.6) then
+          dE_over_dc=dE_over_dc /
+     1     dsqrt(hyperbolic_par_2 + (angle_abc-zero_value)**2)
+        endif
         x(3*a_p(1,i)-2)=x(3*a_p(1,i)-2)+dax*dE_over_dc
         x(3*a_p(1,i)-1)=x(3*a_p(1,i)-1)+day*dE_over_dc
         x(3*a_p(1,i))  =x(3*a_p(1,i))  +daz*dE_over_dc
@@ -687,6 +721,10 @@ C     Loop over 6-rings
           zero_value=ah
           force_constant=fah
           dE_over_dc=force_constant*(angle_abc-zero_value)
+          if(iopt.eq.5.or.iopt.eq.6) then
+            dE_over_dc=dE_over_dc /
+     1       dsqrt(hyperbolic_par_2 + (angle_abc-zero_value)**2)
+          endif
           x(3*a_h(1,i)-2)=x(3*a_h(1,i)-2)+dax*dE_over_dc
           x(3*a_h(1,i)-1)=x(3*a_h(1,i)-1)+day*dE_over_dc
           x(3*a_h(1,i))  =x(3*a_h(1,i))  +daz*dE_over_dc
@@ -724,6 +762,10 @@ c        angle_abcd=dabs(angle_abcd)
         zero_value=sign(dhhh,angle_abcd)
         force_constant=fdhhh
         dE_over_dc=force_constant*(angle_abcd-zero_value)
+        if(iopt.eq.5.or.iopt.eq.6) then
+          dE_over_dc=dE_over_dc /
+     1     dsqrt(hyperbolic_par_2 + (angle_abcd-zero_value)**2)
+        endif
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(3*d_hhh(1,i)-2)=x(3*d_hhh(1,i)-2)+dax*dE_over_dc
         x(3*d_hhh(1,i)-1)=x(3*d_hhh(1,i)-1)+day*dE_over_dc
@@ -764,6 +806,10 @@ c        angle_abcd=dabs(angle_abcd)
         zero_value=sign(dhhp,angle_abcd)
         force_constant=fdhhp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
+        if(iopt.eq.5.or.iopt.eq.6) then
+          dE_over_dc=dE_over_dc /
+     1     dsqrt(hyperbolic_par_2 + (angle_abcd-zero_value)**2)
+        endif
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(3*d_hhp(1,i)-2)=x(3*d_hhp(1,i)-2)+dax*dE_over_dc
         x(3*d_hhp(1,i)-1)=x(3*d_hhp(1,i)-1)+day*dE_over_dc
@@ -804,6 +850,10 @@ c        angle_abcd=dabs(angle_abcd)
         zero_value=sign(dhpp,angle_abcd)
         force_constant=fdhpp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
+        if(iopt.eq.5.or.iopt.eq.6) then
+          dE_over_dc=dE_over_dc /
+     1     dsqrt(hyperbolic_par_2 + (angle_abcd-zero_value)**2)
+        endif
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(3*d_hpp(1,i)-2)=x(3*d_hpp(1,i)-2)+dax*dE_over_dc
         x(3*d_hpp(1,i)-1)=x(3*d_hpp(1,i)-1)+day*dE_over_dc
@@ -844,6 +894,10 @@ c        angle_abcd=dabs(angle_abcd)
         zero_value=dsign(dppp, angle_abcd)
         force_constant=fdppp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
+        if(iopt.eq.5.or.iopt.eq.6) then
+          dE_over_dc=dE_over_dc /
+     1     dsqrt(hyperbolic_par_2 + (angle_abcd-zero_value)**2)
+        endif
 c derivations of the energy with respect the x,y,z of each of the four atoms
         x(3*d_ppp(1,i)-2)=x(3*d_ppp(1,i)-2)+dax*dE_over_dc
         x(3*d_ppp(1,i)-1)=x(3*d_ppp(1,i)-1)+day*dE_over_dc
@@ -872,5 +926,4 @@ C     Coulomb repulsion from origin
 
       return
       END SUBROUTINE dextwu
-
 

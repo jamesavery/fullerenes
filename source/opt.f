@@ -410,7 +410,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
       call get_corners(graph,number_vertices,
      1 a_h,a_p)
-      if(iopt.eq.3.or.iopt.eq.4) then
+      if(iopt.eq.3.or.iopt.eq.4.or.iopt.eq.5.or.iopt.eq.6) then
         call get_dihedrals(graph,number_vertices,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
@@ -430,6 +430,8 @@ c     and finally delete the graph to free the mem
       case(4)
         Write(IOUT,1007)
         Write(Iout,1018) ftol,(force(i),i=1,19)
+      case(5,6)
+        write(*,*)"exp. hyp. pot."
       end select
 C       Conversion to kJ/mol
 C       energies in KJ/mol, gradients in kJ/mol/A and hessian kJ/mol/A^2
@@ -446,7 +448,7 @@ C       Conversion of angles in rad
         force(8)=force(8)*unitconv
 C       Leave parameter for Coulomb force as it is
 c        force(9)=force(9)
-      else if (iopt.eq.3.or.iopt.eq.4) then
+      else if (iopt.eq.3.or.iopt.eq.4.or.iopt.eq.5.or.iopt.eq.6) then
 c        force(1)=force(1)
 c        force(2)=force(2)
 c        force(3)=force(3)
@@ -479,6 +481,8 @@ c        force(19)=force(19)
         Write(Iout,1005) (force(i),i=1,18)
       case(4)
         Write(Iout,1008) (force(i),i=1,19)
+      case(5,6)
+        write(*,*) "exp. hyp. pot."
       end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(Iout,1004) force(9)
 
@@ -1399,6 +1403,7 @@ C       Edge is part of how many pentagons?
         call get_arc_face(graph,u,v,faceA,lA) ! O(1) operation
         call get_arc_face(graph,v,u,faceB,lB) ! O(1) operation
         np = 12-lA-lB
+        
 
 C       Do what needs to be done to u--v here 
         select case(np)
@@ -1658,7 +1663,7 @@ c get force constants
           fap=force(7)
           fah=force(8)
           fco=force(9)
-        case(3, 4)
+        case(3, 4, 5, 6)
           rpp=force(1)
           rhp=force(2)
           rhh=force(3)
