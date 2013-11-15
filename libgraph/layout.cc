@@ -224,7 +224,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
         
         // Did the solution converge yet?
         double neighbour_dist = 0;
-        for(size_t i=0;i<ns.size();i++) neighbour_dist += (xys[u]-xys[ns[0]]).norm()/ns.size();
+        for(size_t i=0;i<ns.size();i++) neighbour_dist += (xys[u]-xys[ns[i]]).norm()/ns.size();
         if(neighbour_dist > 0.0){ // let's not divide by zero
           double relative_change = (xys[u]-newxys[u]).norm()/neighbour_dist;
           if(relative_change > max_change) max_change = relative_change;
