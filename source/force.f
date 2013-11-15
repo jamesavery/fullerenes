@@ -5,6 +5,11 @@
       use config
       integer iopt
       real(8) p(nmax*3),force(ffmaxdim),fc
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
+      integer e_pp(2,3*number_vertices/2)
+      integer a_p(3,60), a_h(3,3*number_vertices-60)
+      integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
+      integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
 
       select case(iopt)
         case(1, 2)
@@ -362,6 +367,11 @@ C     total energy
       use config
       integer iopt
       real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
+      integer e_pp(2,3*number_vertices/2)
+      integer a_p(3,60), a_h(3,3*number_vertices-60)
+      integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
+      integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
       
       select case(iopt)
         case(1, 2)

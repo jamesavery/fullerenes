@@ -410,7 +410,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
       call get_corners(graph,number_vertices,
      1 a_h,a_p)
-      if(iopt .eq. 3 .or. iopt.eq.4) then
+      if(iopt.eq.3.or.iopt.eq.4) then
         call get_dihedrals(graph,number_vertices,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       endif
@@ -446,7 +446,7 @@ C       Conversion of angles in rad
         force(8)=force(8)*unitconv
 C       Leave parameter for Coulomb force as it is
 c        force(9)=force(9)
-      else if (iopt.eq.3 .or. iopt.eq.4) then
+      else if (iopt.eq.3.or.iopt.eq.4) then
 c        force(1)=force(1)
 c        force(2)=force(2)
 c        force(3)=force(3)
@@ -635,10 +635,10 @@ C Sort for degeneracies
  1010 Format(10(1X,D12.6))
  1011 Format(' Number of zero and negative eigenvalues: ',I6)
  1012 Format(' Frequencies (cm-1):')
- 1013 Format(' Severe problem. Hessian is not symmetric: asym= ',d12.6)
+c 1013 Format(' Severe problem. Hessian is not symmetric: asym= ',d12.6)
  1014 Format(' Zero-point vibrational energy: ',d12.6,' a.u. , ',
      1 d12.6,' eV , ',d12.6,' cm-1 , ')
- 1015 Format(' Hessian is symmetric: asym= ',d12.6)
+c 1015 Format(' Hessian is symmetric: asym= ',d12.6)
  1016 Format(' Tolerance= ',D9.3,', Force field parameters in ',
      1 'A, deg, N/m:',/1X,8F12.3)
  1018 Format(' Tolerance= ',D9.3,', Force field parameters in ',
@@ -674,6 +674,11 @@ C Sort for degeneracies
       Real*8 pcom(NMAX*3),xicom(NMAX*3)
       real*8 force(ffmaxdim)
       integer iopt
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1  e_pp(2,3*number_vertices/2)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
+     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
 
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
@@ -783,9 +788,15 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3)
       real*8 force(ffmaxdim)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1  e_pp(2,3*number_vertices/2)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
+     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
       PARAMETER (TOL=1.d-5)
 c      real*8 length, cutoff, xi_tmp(nmax*3)
 c      integer damping
+
 C     USES brent3d,f1dim3d,mnbrak3d
       do j=1,3*number_vertices
         pcom(j)=p(j)
@@ -835,6 +846,12 @@ c        p(j)=p(j)+xi_tmp(j)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(NMAX*3),xt(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1  e_pp(2,3*number_vertices/2)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
+     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
+
 C     USES func3d
       do j=1,3*number_vertices
         xt(j)=pcom(j)+x*xicom(j)
@@ -855,6 +872,12 @@ C     USES func3d
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1  e_pp(2,3*number_vertices/2)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
+     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
+
       CALL f1dim3d(
      1 fa,ax,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
@@ -966,6 +989,12 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(NMAX*3),xicom(NMAX*3),force(ffmaxdim)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1  e_pp(2,3*number_vertices/2)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
+     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
+
       a=min(ax,cx)
       b=max(ax,cx)
       v=bx
@@ -1370,7 +1399,7 @@ C       Edge is part of how many pentagons?
         call get_arc_face(graph,u,v,faceA,lA) ! O(1) operation
         call get_arc_face(graph,v,u,faceB,lB) ! O(1) operation
         np = 12-lA-lB
-         
+
 C       Do what needs to be done to u--v here 
         select case(np)
         case(0)

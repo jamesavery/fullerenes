@@ -2161,7 +2161,7 @@ C     Check distances
       CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1017) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
-      iratio=dint(ratio)
+      iratio=idint(ratio)
       CALL Diameter(IOUT,Dist,distp)
       if(iratio.lt.33) then
         Write(IOUT,1018) iratio
@@ -2313,7 +2313,7 @@ C     Check distances
       CALL Distan(IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(IOUT,1015) Rmin,Rmax,rms
       ratio=(Rmax/Rmin-1.d0)*1.d2
-      iratio=dint(ratio)
+      iratio=idint(ratio)
       CALL Diameter(IOUT,Dist,distp)
       if(iratio.lt.33) then
       Write(IOUT,1016) iratio

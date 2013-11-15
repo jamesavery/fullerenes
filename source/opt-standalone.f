@@ -625,7 +625,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       integer iopt,ideg(N*3)
       real(8) hessian(N*3,N*3),
      1 evec(N*3),df(N*3)
-      type(c_ptr) :: graph, new_fullerene_graph
+      type(c_ptr) :: graph
 
 c edges with 0, 1, 2 pentagons
       integer e_hh(2,3*N/2), e_hp(2,3*N/2),
@@ -933,11 +933,15 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=99999,EPS=1.d-9)
-      integer e_hh(2,3*N/2)
       Real*8 p(N*3),g(N*3),h(N*3),xi(N*3)
       Real*8 pcom(N*3),xicom(N*3)
       real*8 force(ffmaxdim)
       integer iopt
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1  e_pp(2,3*number_vertices/2)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
+     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
 
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
@@ -1045,12 +1049,17 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      integer e_hh(2,3*N/2)
       REAL*8 p(N*3),pcom(N*3),xicom(N*3),xi(N*3)
       real*8 force(ffmaxdim)
       PARAMETER (TOL=1.d-5)
+      integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
+     1  e_pp(2,3*number_vertices/2)
+      integer a_h(3,3*number_vertices-60), a_p(3,60)
+      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
+     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
 c      real*8 length, cutoff, xi_tmp(nmax*3)
 c      integer damping
+
 C     USES brent3d,f1dim3d,mnbrak3d
       do j=1,3*N
         pcom(j)=p(j)
@@ -1100,6 +1109,12 @@ c        p(j)=p(j)+xi_tmp(j)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(N*3),xt(N*3),xicom(N*3),force(ffmaxdim)
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2),
+     1  e_pp(2,3*N/2)
+      integer a_h(3,3*N-60), a_p(3,60)
+      integer d_hhh(4,N), d_hpp(4,N),
+     1  d_hhp(4,N), d_ppp(4,N)
+
 C     USES func3d
       do j=1,3*N
         xt(j)=pcom(j)+x*xicom(j)
@@ -1118,9 +1133,14 @@ C     USES func3d
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      integer e_hh(2,3*N/2),e_hp(2,3*N/2),e_pp(2,3*N/2)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       REAL*8 pcom(N*3),xicom(N*3),force(ffmaxdim)
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2),
+     1  e_pp(2,3*N/2)
+      integer a_h(3,3*N-60), a_p(3,60)
+      integer d_hhh(4,N), d_hpp(4,N),
+     1  d_hhp(4,N), d_ppp(4,N)
+
       CALL SA_f1dim3d(N,
      1 fa,ax,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
@@ -1232,6 +1252,12 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(N*3),xicom(N*3),force(ffmaxdim)
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2),
+     1  e_pp(2,3*N/2)
+      integer a_h(3,3*N-60), a_p(3,60)
+      integer d_hhh(4,N), d_hpp(4,N),
+     1  d_hhp(4,N), d_ppp(4,N)
+
       a=min(ax,cx)
       b=max(ax,cx)
       v=bx
@@ -1494,7 +1520,7 @@ CU    USES brentx,f1dimx,mnbrakx
 11    continue
       Print*, 'WARNING: brent exceed maximum iterations'
 3     xmin=x
-      brentx=fx
+      sa_brentx=fx
       return
       END
 
@@ -2280,16 +2306,16 @@ c copy hessian to the other half
         xt(j)=pcom(j)+x*xicom(j)
 11    continue
       If(IOP.eq.0) then
-      Call SA_MDSnorm(N,AN,R,xt,Dist)
-      f1dimx=AN
+        Call SA_MDSnorm(N,AN,R,xt,Dist)
+        sa_f1dimx=AN
       else
-      Call SA_MAInorm(N,IP,AN,xt,Dist)
-      f1dimx=-AN
+        Call SA_MAInorm(N,IP,AN,xt,Dist)
+        sa_f1dimx=-AN
       endif
       if(AN.gt.Huge) then
-       Print*,'**** Severe Error, check coordinates'
-       ier=1
-       stop
+        Print*,'**** Severe Error, check coordinates'
+        ier=1
+        stop
       endif
       return
       END
@@ -2341,6 +2367,10 @@ C     Calculate norm for minimum distance sphere
       use config
       integer iopt
       real*8 force(ffmaxdim)
+      real*8 WuR5, WuR6, WuA5, WuA6, WufR5, WufR6, WufA5, WufA6,
+     1 fcoulomb, ftol, ExtWuR55, ExtWuR56, ExtWuR66, ExtWuA5, ExtWuA6,
+     1 ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR, ExtWufA,
+     1 ExtWufD
 
 C     Defining the HO force field using Fowler force constants 
 C     Distances are taken in Angstroems and angles in rad
@@ -2356,7 +2386,6 @@ C     Force constants in N/m for distances and N/m A^2/rad^2 for angles (default
       fcoulomb=0.d0
 C     tolerance parameter (to be used in all force fields)
       ftol=1.d-7
-
 
 C     Defining an extension of the Wu force field (default values)
 c     three distances: zero values
@@ -2379,7 +2408,7 @@ c     four dihedrals: forces (let's assume they are all the same)
       ExtWufD=1.0d2
 
       
- 99   if(iopt.eq.1 .or. iopt.eq.2)then
+      if(iopt.eq.1 .or. iopt.eq.2)then
 C     Wu force field
          force(1)=WuR5
          force(2)=WuR6
