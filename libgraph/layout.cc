@@ -214,19 +214,21 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
 
     for(node_t u=0;u<N;u++)
       if(fixed[u]){
-	newxys[u] = xys[u];
+        newxys[u] = xys[u];
       } else {
-	const vector<node_t>& ns(neighbours[u]);
-	coord2d neighbour_sum(0.0);
-
-	for(int i=0;i<ns.size();i++) neighbour_sum += xys[ns[i]];
-	newxys[u] = xys[u]*0.15 + (neighbour_sum/ns.size())*0.85;
-
-	// Did the solution converge yet?
-	double neighbour_dist = 0;
-	for(size_t i=0;i<ns.size();i++) neighbour_dist += (xys[u]-xys[ns[0]]).norm()/ns.size();
-	double relative_change = (xys[u]-newxys[u]).norm()/neighbour_dist;
-	if(relative_change > max_change) max_change = relative_change;
+        const vector<node_t>& ns(neighbours[u]);
+        coord2d neighbour_sum(0.0);
+        
+        for(int i=0;i<ns.size();i++) neighbour_sum += xys[ns[i]];
+        newxys[u] = xys[u]*0.15 + (neighbour_sum/ns.size())*0.85;
+        
+        // Did the solution converge yet?
+        double neighbour_dist = 0;
+        for(size_t i=0;i<ns.size();i++) neighbour_dist += (xys[u]-xys[ns[0]]).norm()/ns.size();
+        if(neighbour_dist > 0.0){ // let's not divide by zero
+          double relative_change = (xys[u]-newxys[u]).norm()/neighbour_dist;
+          if(relative_change > max_change) max_change = relative_change;
+        }
       }
       
     if(max_change <= TUTTE_CONVERGENCE) converged = true;
