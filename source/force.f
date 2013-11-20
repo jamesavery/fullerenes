@@ -3,13 +3,19 @@
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
+c     function for switching between forcefields     
+      implicit none
+
+      integer ierr
+      real(8) p(nmax*3),fc,force(ffmaxdim)
       integer iopt
-      real(8) p(nmax*3),force(ffmaxdim),fc
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
       integer e_pp(2,3*number_vertices/2)
+      integer ne_hh,ne_hp,ne_pp
       integer a_p(3,60), a_h(3,3*number_vertices-60)
       integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
       integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
+      integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
       select case(iopt)
         case(1, 2)
@@ -33,19 +39,25 @@
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p)
       use config
-      implicit real(8) (A-H,O-Z)
-
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, energy
-      real(8) p(nmax*3),force(ffmaxdim),fc
-      integer iopt
+      implicit none
 
+      integer ierr
+      real(8) p(nmax*3),fc,force(ffmaxdim)
+      integer iopt
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
       integer e_pp(2,3*number_vertices/2)
-      integer a_p(3,60), a_h(3,3*number_vertices-60)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
+      integer a_p(3,60), a_h(3,3*number_vertices-60)
+
+      integer i
+      real(8) rp, rh, ap, ah, frp, frh, fap, fah, fco
+      real(8) ratom,angle_h,angle_p
+      real(8) ehookrp, ehookrh, ehookap, ehookah
+      real(8) rinv, ecoulomb
 
       IERR=0
       rp=force(1)
@@ -136,25 +148,34 @@ C     total energy
      1  a_h,a_p,
      1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
-      implicit real(8) (A-H,O-Z)
-      real(8) p(nmax*3),force(ffmaxdim)
-      real(8) fc
+      implicit none
 
+      integer ierr
+      real(8) p(nmax*3),fc,force(ffmaxdim)
+      integer iopt
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
       integer e_pp(2,3*number_vertices/2)
+c     counter for edges with 0, 1, 2 pentagons neighbours
+      integer ne_hh,ne_hp,ne_pp
       integer a_p(3,60), a_h(3,3*number_vertices-60)
       integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
       integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
-c     counter for edges with 0, 1, 2 pentagons neighbours
-      integer ne_hh,ne_hp,ne_pp
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
-      integer iopt
 
-      hyperbolic_par_2 = 4.0
+      integer i
+      real(8) :: hyperbolic_par_2 = 4.0
+      real(8) rpp, rhp, rhh, ap, ah, dppp, dhpp, dhhp, dhhh, frpp, frhp,
+     1  frhh, fap, fah, fdppp, fdhpp, fdhhp, fdhhh, fco
+      real(8) ehookrhh,ehookrhp,ehookrpp,ehookah,ehookap,
+     1  ehookdhhh,ehookdhhp,ehookdhpp,ehookdppp
+      real(8) ecoulomb
+      real(8) ratom,angle_abc,angle_abcd
+      real(8) rinv
 
-      IERR=0
+      ierr=0
+
       rpp=force(1)
       rhp=force(2)
       rhh=force(3)
@@ -381,13 +402,17 @@ C     total energy
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
-      integer iopt
+      implicit none
+
       real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
+      integer iopt
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
       integer e_pp(2,3*number_vertices/2)
+      integer ne_hh,ne_hp,ne_pp
       integer a_p(3,60), a_h(3,3*number_vertices-60)
       integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
       integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
+      integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
       
       select case(iopt)
         case(1, 2)
@@ -410,18 +435,25 @@ C     total energy
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p)
       use config
-      implicit real(8) (A-H,O-Z)
 C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
+      implicit none
+
       real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
       integer iopt
-
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
       integer e_pp(2,3*number_vertices/2)
-      integer a_p(3,60), a_h(3,3*number_vertices-60)
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
+      integer a_p(3,60), a_h(3,3*number_vertices-60)
+
+      integer i
+      real(8) rp,rh,ap,ah,frp,frh,fap,fah,fco
+      real(8) zero_value,force_constant,dE_over_dc,rinv
+      real(8) ax,ay,az,bx,by,bz,cx,cy,cz
+      real(8) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz
+      real(8) ratom,angle_abc
 
       rp=force(1)
       rh=force(2)
@@ -563,19 +595,29 @@ C     Coulomb repulsion from origin
      1 a_h,a_p,
      1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
-      implicit real(8) (A-H,O-Z)
-      real(8) p(number_vertices*3),x(number_vertices*3),force(ffmaxdim)
+      implicit none
 
+      real(8) p(number_vertices*3),x(number_vertices*3),force(ffmaxdim)
+      integer iopt
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
       integer e_pp(2,3*number_vertices/2)
+c     counter for edges with 0, 1, 2 pentagons neighbours
+      integer ne_hh,ne_hp,ne_pp
       integer a_p(3,60), a_h(3,3*number_vertices-60)
       integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
       integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
-c     counter for edges with 0, 1, 2 pentagons neighbours
-      integer ne_hh,ne_hp,ne_pp
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
+
+      integer i
+      real(8) hyperbolic_par_2
+      real(8) rpp, rhp, rhh, ap, ah, dppp, dhpp, dhhp, dhhh, frpp, frhp,
+     1  frhh, fap, fah, fdppp, fdhpp, fdhhp, fdhhh, fco
+      real(8) ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz
+      real(8) dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz
+      real(8) zero_value,force_constant,dE_over_dc,rinv
+      real(8) ratom,angle_abc,angle_abcd
 
       hyperbolic_par_2 = 4.0
 
