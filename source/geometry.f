@@ -1,6 +1,6 @@
 c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
       SUBROUTINE DIST(ax,ay,az,bx,by,bz,dist_ab)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
       dist_ab=dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
       return
       END SUBROUTINE DIST
@@ -9,7 +9,7 @@ c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
 c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivatives of the distance
       SUBROUTINE DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz,
      2  dist_ab)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
       ab_x=ax-bx
       ab_y=ay-by
       ab_z=az-bz
@@ -36,7 +36,7 @@ c all 21 second derivatives of the distance and the the distance itself
      7 ddf11dbx__dby,ddf11dbx__dbz,ddf11dby__dby,ddf11dby__dbz,
      5 ddf11dbz__dbz,
      6 f)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
       ab_x=ax-bx
       ab_y=ay-by
       ab_z=az-bz
@@ -99,7 +99,7 @@ c subroutine angle takes 9 reals (=3 coordinates) and yields an angel between 0 
 c via law of cosines
 c mult: 11, div: 1, root: 2, add/sub: 8, arccos: 1
       SUBROUTINE ANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
       r2L=(ax-bx)**2 + (ay-by)**2 + (az-bz)**2
       r2M=(ax-cx)**2 + (ay-cy)**2 + (az-cz)**2
       r2R=(bx-cx)**2 + (by-cy)**2 + (bz-cz)**2
@@ -117,7 +117,7 @@ c subroutine angle takes 9 reals (=3 coordinates) and yields an angel between 0 
 c via vector definition of the cosine
 c mult: 10, div: 1, root: 2, add/sub: 12, arccos: 1
 c      SUBROUTINE ANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
-c      implicit real*8 (a-z)
+c      implicit real(8) (a-z)
 c      aux_ax=ax-bx
 c      aux_ay=ay-by
 c      aux_az=az-bz
@@ -139,7 +139,7 @@ c via law of cosines (calculating the derivative of Abs[foo] is rather troubleso
       SUBROUTINE DANGLE(ax,ay,az,bx,by,bz,cx,cy,cz,
      2 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
      3 angle_abc)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
 c vectors from a to b and b to c and a to c
       ab_x=ax-bx
       ab_y=ay-by
@@ -243,7 +243,7 @@ c via law of cosines (calculating the derivative of Abs[foo] is rather troubleso
      1 ddf11dcx__dcy, ddf11dcx__dcz, ddf11dcy__dcy, ddf11dcy__dcz,
      1 ddf11dcz__dcz,
      1 angle_abc)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
 
 c vectors from a to b and b to c and a to c
       ab_x=ax-bx
@@ -844,7 +844,7 @@ c df__dcz=((ab_z)*aux_2+aux_4z)*den_inv
 c subroutine dist takes 12 reals (=4 coordinates) and yields an angel between -\pi and +\pi (in radians)
       SUBROUTINE DIHEDRAL(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
      2 dihedral_abcd)
-      IMPLICIT REAL*8 (a-z)
+      IMPLICIT real(8) (a-z)
 c vectors ab, bc and cd
       ab_x=ax-bx
       ab_y=ay-by
@@ -894,7 +894,7 @@ c the result
       SUBROUTINE DDIHEDRAL(ax,ay,az,bx,by,bz,cx,cy,cz,dx,dy,dz,
      2  dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,ddx,ddy,ddz,
      3  dihedral_abcd)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
 C at first the dihedral (copied from above)
 c vectors ab, bc and cd
       ab_x=ax-bx
@@ -1612,14 +1612,14 @@ c fortran (and most other sources) use 'atan2(y,x)' while mathematica uses 'atan
 
 c probably not helpful
 c      SUBROUTINE COULOMB(ax,ay,az,c)
-c      implicit real*8 (a-z)
+c      implicit real(8) (a-z)
 c      c=1/dsqrt(ax**2 + ay**2 + az**2)
 c      return
 c      END SUBROUTINE
 
 
       SUBROUTINE DCOULOMB(ax,ay,az,dax,day,daz,c)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
       dist_2=ax**2 + ay**2 + az**2
       c=1/dsqrt(dist_2)
       dist_3_2_inv=c/dist_2
@@ -1632,7 +1632,7 @@ c      END SUBROUTINE
 
       SUBROUTINE DDCOULOMB(ax,ay,az,dax,day,daz,
      1 daxax,daxay,daxaz,dayay,dayaz,dazaz,c)
-      implicit real*8 (a-z)
+      implicit real(8) (a-z)
       dist_2=ax**2 + ay**2 + az**2
       c=1/dsqrt(dist_2)
       dist_3_2_inv=c/dist_2

@@ -236,7 +236,8 @@ C     by comparing bond distances
 C Calculate largest and smallest atom-to-atom diameters
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),diam(Nmax),imirror(Nmax),jmirror(Nmax)
-      Data difeps/1.d-6/
+      real(8),parameter :: diff_eps = 1.d-6
+
       kmin=0
       Do i=1,number_vertices
 C     Search for the closest carbon atom to dmirror
@@ -268,7 +269,7 @@ C     and delete duplicates
       endif
       Write(IOUT,1001) (imirror(i),jmirror(i),diam(i),i=1,MNew)
       dif=diam(1)-diam(MNew)
-      if(dif.lt.difeps) then
+      if(dif.lt.diff_eps) then
       Write(IOUT,1003)
       else
 C     Calculate the moment of inertia tensor and diagonalize (no mass)
@@ -2058,6 +2059,7 @@ C Produce adjacency matrix
       Return
       END
 
+
       SUBROUTINE Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
 C   Tutte 3D embedding Algorithm:
@@ -2073,6 +2075,8 @@ C     number_vertices: Working Dimension of Matrix
       DIMENSION Dist(3,Nmax),distP(Nmax)
       DIMENSION IDA(Nmax,Nmax)
       type(c_ptr) :: g, new_fullerene_graph
+      real(8) scaleRad
+      real(8),parameter :: diff_eps = 1.d-6
 
 C Produce Hueckel matrix and diagonalize
 C     Diagonalize
@@ -2143,7 +2147,7 @@ c			get the minimal distance
       enddo
       rsum=rsum/(3*number_vertices/2)
 c     make sure the default value of scaleRad is not much too large (but don't correct custom values)
-      if(scaleRad .eq. 4.0 .and. scaleRad*R0 .ge. cdist) then
+      if(dabs(scaleRad-4.0).lt.diff_eps.and.(scaleRad*R0).ge.cdist)then
         scaleRad=2.d0
         if(scaleRad*R0 .ge. cdist) scaleRad=1.d0
       endif

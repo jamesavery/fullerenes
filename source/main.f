@@ -26,7 +26,7 @@
       IMPLICIT REAL*8 (A-H,O-Z)
 C    Set the dimensions for the distance matrix
       real(8) force(ffmaxdim), forceP(ffmaxdim)
-      Real*4 TimeX
+      Real(4) TimeX
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax),cmcs(3),CR(3,Mmax)
       DIMENSION DistMat(NmaxL),Dist(3,Nmax),DistCM(3),Dist2D(2,Nmax)
       DIMENSION DistStore(3,Nmax)
@@ -54,6 +54,7 @@ C    Set the dimensions for the distance matrix
       integer istop
       integer mdist(nmax,nmax)
       integer rspi(12),jumps(10)
+      integer leapspiral,SWspiral, scaleRad
 
 C Set parameters
 C Element Names
@@ -442,7 +443,7 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
-      if((ipent.eq.0.or.leapspiral.ne.0.or.SWspiral.ne.0.
+      if((ipent.eq.0 .or. leapspiral.ne.0.or.SWspiral.ne.0.
      1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).or.
      1   ispsearch.ne.0) then
         routine='SPIRALSEARCH   '
