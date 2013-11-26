@@ -387,7 +387,7 @@ vector<coord3d> FullereneGraph::zero_order_geometry(double scalerad) const
   return coordinates;
 }
 
-extern "C" void optff_(const FullereneGraph **graph, const int *N, const int *ihessian, const int *iprinthessian,
+extern "C" void sa_optff_(const FullereneGraph **graph, const int *N, const int *ihessian, const int *iprinthessian,
 		       const int *iopt,double *Dist,double *ftol,double *force);
 extern "C" void default_force_parameters_(const int *iopt, double *parameters);
 
@@ -405,7 +405,7 @@ vector<coord3d> FullereneGraph::optimized_geometry(const vector<coord3d>& points
 
   int zero = 0, one = 1;
   const FullereneGraph *g = this;
-  optff_(&g,&N,&one,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
+  sa_optff_(&g,&N,&one,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
 
   return coordinates;
 }
