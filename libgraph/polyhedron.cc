@@ -434,8 +434,9 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     points = g.optimized_geometry(points);
     return true;
   } else {
-    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra.\n";
-    return false;
+    return optimize_other();
+    //cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra.\n";
+    //return false;
   }
 }
 

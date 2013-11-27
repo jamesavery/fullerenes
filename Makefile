@@ -21,7 +21,7 @@ LIBRARIES=-lstdc++ -lgomp
 #LIBRARIES+=-mkl
 # Uncomment the following lines if you want to use system BLAS and LAPACK
 CXXFLAGS+=-DHAS_LAPACK 
-LIBRARIES+=-lblas -llapack 
+LIBRARIES+=-lblas -llapack -lgsl
 
 
 OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o geometry.o dddihedral.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
