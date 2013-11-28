@@ -3,10 +3,15 @@
 
 #include "math.h"
 
+#ifdef HAS_GSL
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_multimin.h>
+#endif
 
 using namespace std;
+
+
+#ifdef HAS_GSL
 
 inline double dist(const double ax, const double ay, const double az, const double bx, const double by, const double bz){
   return sqrt(pow(ax-bx,2) + pow(ay-by,2) + pow(az-bz,2));
@@ -225,3 +230,10 @@ bool Polyhedron::optimize_other(){
   
   return status==0 ? true : false;
 }
+
+#else
+bool Polyhedron::optimize_other(){
+  cout << "Optimizing other polyhedra than fullerenes is only available through GSL." << endl;
+}
+#endif
+
