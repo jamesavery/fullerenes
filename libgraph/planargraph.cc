@@ -17,21 +17,22 @@ bool PlanarGraph::is_a_fullerene() const {
     return false;
   }
     
-  facemap_t faces(PlanarGraph(*this).compute_faces(7));
+  facemap_t faces(compute_faces(6,true));
   int n_faces = 0;
   for(facemap_t::const_iterator f(faces.begin()); f!=faces.end();f++)
     n_faces += f->second.size();
 
   const int E = 3*N/2;
   const int F = 2+E-N;
-    
+
   if(E != edge_set.size()){
-    fprintf(stdout,"Graph is not planar: wrong number of edges: %d != %d\n",int(edge_set.size()),E);
+    fprintf(stdout,"Graph is not planar cubic: wrong number of edges: %d != %d\n",int(edge_set.size()),E);
     return false;
   }
 
   if(F != n_faces){
-    fprintf(stdout,"Graph is not planar: wrong number of faces: %d != %d\n",n_faces,F);
+    fprintf(stdout,"Graph is not planar cubic: wrong number of faces: %d != %d\n",n_faces,F);
+    cout << "faces = " << get_values(faces) << ";\n";
     return false;
   }
 
@@ -782,3 +783,34 @@ size_t PlanarGraph::count_perfect_matchings() const
   return 0;
 }
 #endif
+
+
+vector<coord3d> PlanarGraph::zero_order_geometry(double scalerad) const
+{
+  assert(layout2d.size() == N);
+  vector<coord2d> angles(spherical_projection());
+
+  // Spherical projection
+  vector<coord3d> coordinates(N);
+  for(int i=0;i<N;i++){
+    double theta = angles[i].first, phi = angles[i].second;
+    double x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
+    coordinates[i] = coord3d(x,y,z);
+  }
+
+  // Move to centroid
+  coord3d cm;
+  for(node_t u=0;u<N;u++) cm += coordinates[u];
+  cm /= double(N);
+  coordinates -= cm;
+
+  // Scale spherical projection
+  double Ravg = 0;
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[neighbours[u][i]]).norm();
+  Ravg /= (3.0*N);
+  
+  coordinates *= scalerad*1.5/Ravg;
+
+  return coordinates;
+}

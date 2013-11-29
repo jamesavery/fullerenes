@@ -63,6 +63,8 @@ public:
   void scale(const coord2d& x);
   void move (const coord2d& x);
 
+  vector<coord3d> zero_order_geometry(double scalerad=4) const;
+
   string to_latex(double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false,
 		  int edge_colour = 0x6a5acd, int path_colour = 0x6a5acd, int vertex_colour = 0x8b2500,
 		  double edge_width = 0.1,double path_width = 0.1, double vertex_diameter = 2.0,
