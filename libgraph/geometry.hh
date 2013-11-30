@@ -141,13 +141,13 @@ struct coord3d {
   double& operator[](unsigned int i){ return x[i]; }
   double  operator[](unsigned int i) const { return x[i]; }
 
-  static double  dist(const coord3d& x, const coord3d& y){ return (x-y).norm(); }
+  static double dist(const coord3d& x, const coord3d& y){ return (x-y).norm(); }
   // d/dx_i ||x|| = x_i/||x||.
   static coord3d dnorm(const coord3d& x){ return x/x.norm(); }
   // d^2/(dx_i dx_j) ||x|| = -x_i x_j/||x||^3 + [i==j]/||x||
   static void ddnorm(const coord3d& x, vector<double> &H)
   {
-    double n = 1.0/x.norm(), n3 = n*n*n;
+    const double n = 1.0/x.norm(), n3 = n*n*n;
 
     for(int i=0;i<3;i++)
       for(int j=0;j<3;j++)
@@ -156,21 +156,21 @@ struct coord3d {
 
   static double angle(const coord3d& b, const coord3d& c)
   {
-    double L2 = b.dot(b);
-    double R2 = c.dot(c);
-    double M2 = (c-b).dot(c-b);
-    double den = 2.0*sqrt(L2 * R2);
+    const double L2 = b.dot(b);
+    const double R2 = c.dot(c);
+    const double M2 = (c-b).dot(c-b);
+    const double den = 2.0*sqrt(L2 * R2);
     double arg = (L2+R2-M2)/den;
     if(arg > 1)  arg = 1;
     if(arg < -1) arg = -1;
     return acos(arg);    
   }
 
-  // static double dangle(const coord3d& b, const coord3d& c, coord3d& db, coord3d& dc)
-  // {
-  //   coord3d bc(c-b);
-    
-  // }
+  static void dangle(const coord3d& b, const coord3d& c, coord3d& db, coord3d& dc)
+  {
+  //  coord3d bc(c-b);
+  cerr << "dangle has not been defined yet.  Aborting ..." << endl;
+  }
 
   friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
   {
