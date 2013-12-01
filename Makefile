@@ -71,7 +71,6 @@ app-%: apps/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ $(LIBRARIES)
 #-----------------------------------------------------
 
-
 output/%.out: input/%.inp
 	./fullerene < $< > $@
 
