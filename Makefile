@@ -27,7 +27,7 @@ LIBRARIES+=-lblas -llapack
 # LIBRARIES+=-lgsl
 
 
-OBJECTS=main.o coord.o diag.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o force.o geometry.o dddihedral.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
+OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
 GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o opt-standalone.o
 GRAPHFOBJECTS=geometry.o force.o diag.o  dddihedral.o config.o 
 
@@ -39,7 +39,7 @@ TESTINP=$(wildcard input/*.inp)
 TESTOUT=$(patsubst input/%.inp, output/%.out, $(TESTINP))
 #
 #
-fullerene: build/config.o $(FOBJECTS) build/libgraph.a
+fullerene: $(FOBJECTS) build/libgraph.a
 	$(F90) $(FFLAGS) $(OPTIONS) $^ $(LIBRARIES) -o $@ -lstdc++ -lgomp
 
 #
@@ -60,8 +60,8 @@ build/%.o: contrib/%.cc
 	$(CXX) $(CXXFLAGS) $(OPTIONS) -c $< -o $@
 #-----------------------------------------------------
 .PHONY: build/libgraph.a
-build/libgraph.a: $(COBJECTS) 
-	$(AR) rcs $@ $(COBJECTS)
+build/libgraph.a: $(COBJECTS) $(FLIBOBJECTS)
+	$(AR) rcs $@ $(COBJECTS) $(FLIBOBJECTS)
 
 #-----------------------------------------------------
 test-%: tests/%.cc build/libgraph.a
@@ -74,7 +74,7 @@ app-%: apps/%.cc build/libgraph.a
 app-leapfrog: apps/leapfrog.cc $(FLIBOBJECTS)  build/libgraph.a 
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ -lgfortran $(LIBRARIES)
 
-test-polyhedron: tests/polyhedron.cc $(FLIBOBJECTS)  build/libgraph.a 
+test-polyhedron: tests/polyhedron.cc build/libgraph.a 
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ -lgfortran $(LIBRARIES)
 
 
