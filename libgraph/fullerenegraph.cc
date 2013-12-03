@@ -405,7 +405,7 @@ vector<coord3d> FullereneGraph::optimized_geometry(const vector<coord3d>& points
 
   int zero = 0, one = 1;
   const FullereneGraph *g = this;
-  sa_optff_(&g,&N,&one,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
+  sa_optff_(&g,&N,&zero,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
 
   return coordinates;
 }
