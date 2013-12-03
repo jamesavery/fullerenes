@@ -55,11 +55,15 @@ double pot(const gsl_vector* coordinates, void* parameters){
   // get map<face size, face>
   facemap_t faces(graph.compute_faces_oriented());
   //iterate over all faces
+  cout << "number of faces: " << faces.size() << endl;
   for(facemap_t::const_iterator it=faces.begin(); it!=faces.end(); ++it){
     // iterate over vertices in face
     vector<int> f(it->first,0); // it->first is the face size
     set<face_t>::const_iterator jt=it->second.begin();
-    for(int i=0; i!=it->first; ++i, ++jt){f[i] = (*jt)[i];} // only because sets cannot be subscripted
+    // cout << "it first: " << it->first << endl;
+    // cout << "*jt: " << *jt << endl;
+    for(int i=0; i!=it->first; ++i){f[i] = (*jt)[i];} // only because sets cannot be subscripted
+    // cout << "f: " << f << endl;
     for(int i=0; i!=it->first; ++i){
       const double ax = gsl_vector_get(coordinates, 3*f[(i+ it->first -1) % it->first]);
       const double ay = gsl_vector_get(coordinates, 3*f[(i+ it->first -1) % it->first] +1);
@@ -153,6 +157,7 @@ void pot_grad(const gsl_vector* coordinates, void* parameters, double* potential
 
 
 bool Polyhedron::optimize_other(){
+  // cout << "entering opt other" << endl;
 
   // setings for the optimizations
   const double stepsize = 1e-3;// FIXME final value
