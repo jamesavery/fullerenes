@@ -436,7 +436,7 @@ bool Polyhedron::optimize(int opt_method, double ftol)
   } else if(is_cubic()) {
     return optimize_other();
   }else{
-    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra." << endl;
+    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra and other cubic graphs." << endl;
     return false;
   }
 }
