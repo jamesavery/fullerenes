@@ -168,8 +168,24 @@ struct coord3d {
 
   static void dangle(const coord3d& b, const coord3d& c, coord3d& db, coord3d& dc)
   {
-  //  coord3d bc(c-b);
-  cerr << "dangle has not been defined yet.  Aborting ..." << endl;
+    const double L2 = b.dot(b);
+    const double R2 = c.dot(c);
+    const double M2 = (c-b).dot(c-b);
+    const double den = 2.0*sqrt(L2 * R2);
+    double arg = (L2+R2-M2)/den;
+
+    const coord3d dM2__db = (b-c)*2;
+    const coord3d dL2__db = b*2;
+    const coord3d dden__db = dL2__db * R2/sqrt(L2*R2);
+    const coord3d darg__db = dL2__db * 1/den - dM2__db * 1/den - dden__db * (L2+R2-M2)/(den*den);
+
+    const coord3d dM2__dc = (c-b)*2;
+    const coord3d dR2__dc = c*2;
+    const coord3d dden__dc = dR2__dc * L2/sqrt(L2*R2);
+    const coord3d darg__dc = dR2__dc * 1/den - dM2__dc * 1/den - dden__dc * (L2+R2-M2)/(den*den);
+
+    db = darg__db * 1/sqrt(1-arg*arg);
+    dc = darg__dc * 1/sqrt(1-arg*arg);
   }
 
   friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)

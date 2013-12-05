@@ -46,7 +46,7 @@ double pot(const gsl_vector* coordinates, void* parameters){
     const double bx = gsl_vector_get(coordinates,3 * e->second);
     const double by = gsl_vector_get(coordinates,3 * e->second +1);
     const double bz = gsl_vector_get(coordinates,3 * e->second +2);
-    potential_energy += 0.5 * force_constants_dist[i] * pow(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i], 2); //FIXME why cannot I just say dist?
+    potential_energy += 0.5 * force_constants_dist[i] * pow(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i], 2);
   }
 
   //  determine size
@@ -74,7 +74,7 @@ double pot(const gsl_vector* coordinates, void* parameters){
       const double cx = gsl_vector_get(coordinates, 3*f[(i+1) % it->first]);
       const double cy = gsl_vector_get(coordinates, 3*f[(i+1) % it->first] +1);
       const double cz = gsl_vector_get(coordinates, 3*f[(i+1) % it->first] +2);
-      potential_energy += 0.5 * force_constants_angle[1] * pow(coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(ax,ay,az) - coord3d(cx,cy,cz)) - M_PI*(1-2/it->first),2); // FIXME an angle function with three arguments would be more convenient
+      potential_energy += 0.5 * force_constants_angle[1] * pow(coord3d::angle(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az)) - M_PI*(1-2/it->first),2);
     }
   }
 
@@ -131,7 +131,7 @@ void grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient)
       const double cy = gsl_vector_get(coordinates, 3*f[(i+1) % it->first] +1);
       const double cz = gsl_vector_get(coordinates, 3*f[(i+1) % it->first] +2);
 
-      coord3d b(coord3d(ax,ay,az) - coord3d(bx,by,bz)), c(coord3d(ax,ay,az) - coord3d(cx,cy,cz)), db, dc;
+      coord3d b(coord3d(bx,by,bz) - coord3d(ax,ay,az)), c(coord3d(cx,cy,cz) - coord3d(ax,ay,az)), db, dc;
       coord3d::dangle(b, c, db, dc);
 
       derivatives[f[(i+ it->first -1) % it->first]] += db * (coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(ax,ay,az) - coord3d(cx,cy,cz)) - M_PI*(1-2/it->first)) * force_constants_angle[f[i]];
