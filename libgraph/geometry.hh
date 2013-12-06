@@ -52,6 +52,7 @@ struct coord2d : public pair<double,double> {
   coord2d& operator+=(const coord2d& y){ first += y.first; second += y.second; return *this; }
   coord2d& operator*=(const coord2d& y){ first *= y.first; second *= y.second; return *this; }
   coord2d& operator*=(const double s)  { first*=s;second*=s; return *this;}
+  coord2d operator-() const {coord2d y(-first,-second); return y;}
   double dot(const coord2d& y) const { return first*y.first+second*y.second; }
 
   double line_angle(const coord2d& v) const { // CCW between two lines ([-pi;pi] where -*this is +/-pi and *this is 0 -- i.e. pi is "leftmost", -pi is "rightmost")
@@ -125,6 +126,7 @@ struct coord3d {
   coord3d& operator*=(const coord3d& y){ x[0] *= y[0]; x[1] *= y[1]; x[2] *= y[2]; return *this; }
   coord3d& operator*=(const double& y){ x[0] *= y; x[1] *= y; x[2] *= y; return *this; }
   coord3d& operator/=(const double& y){ x[0] /= y; x[1] /= y; x[2] /= y; return *this; }
+  coord3d operator-() const {coord3d y(-x[0],-x[1],-x[2]); return y;}
 
   coord3d cross(const coord3d& y) const {
     return coord3d(x[1]*y[2]-x[2]*y[1], x[2]*y[0]-x[0]*y[2], x[0]*y[1] - x[1]*y[0]);
@@ -177,15 +179,15 @@ struct coord3d {
     const coord3d dM2__db = (b-c)*2;
     const coord3d dL2__db = b*2;
     const coord3d dden__db = dL2__db * R2/sqrt(L2*R2);
-    const coord3d darg__db = dL2__db * 1/den - dM2__db * 1/den - dden__db * (L2+R2-M2)/(den*den);
+    const coord3d darg__db = dL2__db * 1.0/den - dM2__db * 1.0/den - dden__db * (L2+R2-M2)/(den*den);
 
     const coord3d dM2__dc = (c-b)*2;
     const coord3d dR2__dc = c*2;
     const coord3d dden__dc = dR2__dc * L2/sqrt(L2*R2);
-    const coord3d darg__dc = dR2__dc * 1/den - dM2__dc * 1/den - dden__dc * (L2+R2-M2)/(den*den);
+    const coord3d darg__dc = dR2__dc * 1.0/den - dM2__dc * 1.0/den - dden__dc * (L2+R2-M2)/(den*den);
 
-    db = darg__db * 1/sqrt(1-arg*arg);
-    dc = darg__dc * 1/sqrt(1-arg*arg);
+    db = -darg__db * 1.0/sqrt(1.0-arg*arg);
+    dc = -darg__dc * 1.0/sqrt(1.0-arg*arg);
   }
 
   friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
