@@ -54,6 +54,7 @@ Graph example2(){
     
     neighbours[3+i][0] = 0+i;
     neighbours[3+i][1] = 3*m+i;
+
     neighbours[3+i][2] = 4*m+i;
     
     neighbours[6+i][0] = 0+i;
@@ -116,19 +117,37 @@ Graph example2(){
   return Graph(neighbours);
 }
 
+Graph examples[2] = {example1(), example2()};
 
 int main(int ac, char **av)
 {
-  string basename("gs-ex-"+to_string(1));
+  int Nex = ac>=2? strtol(av[1],0,0) : 1;
+  string basename("gs-ex-"+to_string(Nex));
 
-  PlanarGraph g(example1());
+  ofstream output(("output/"+basename+".m").c_str());
+
+  PlanarGraph g(examples[Nex-1]);
+  output << "g = " << g << ";\n";
+  output.flush();
+
+  printf("Computing planar layout\n");
   g.layout2d = g.tutte_layout();
+
+  printf("Computing dual\n");
   PlanarGraph dg(g.dual_graph(8,true));
+
+  printf("Computing planar layour of dual\n");
   dg.layout2d = dg.tutte_layout();
 
+  output << "g = " << g << ";\n";
+  output << "dg = " << dg << ";\n";
+  
+  output.flush();
 
   Polyhedron P0(g,g.zero_order_geometry(),8);
   Polyhedron dP0(dg,dg.zero_order_geometry(),8);
+
+  output << "P0coordinates = " << P0.points << ";\n";
 
   {
     ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
@@ -143,19 +162,13 @@ int main(int ac, char **av)
   }
 
 
-  ofstream output(("output/"+basename+".m").c_str());
-
-  output << "g = " << g << ";\n";
-  output << "dg = " << dg << ";\n";
-  output << "coordinates0 = " << P0.points << ";\n";
-
   
-  output.close(); return 0;
-
   Polyhedron P(P0);
+
+  printf("Optimizing polyhedron.\n");
   P.optimize();
 
-  output << "coordinates = "  << P.points << ";\n";
+  output << "Pcoordinates = "  << P.points << ";\n";
   output << "P = " << P << ";\n";
   
   Polyhedron D(P.dual(8,true));
