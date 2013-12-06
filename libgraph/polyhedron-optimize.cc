@@ -48,16 +48,16 @@ double pot(const gsl_vector* coordinates, void* parameters){
     potential_energy += 0.5 * force_constants_dist[i] * pow(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i], 2);
   }
 
-//  cout << " pot_E: " << potential_energy<< endl;
-
   facemap_t faces(graph.compute_faces_oriented());
   //iterate over all faces
   for(facemap_t::const_iterator it=faces.begin(); it!=faces.end(); ++it){
     // it->first is the face size
     // iterate over faces of equal size
     for(set<face_t>::const_iterator jt=it->second.begin(); jt!=it->second.end(); ++jt){
+//      cout << " face of size-" << it->first << ": " << *jt << endl;
       // iterate over nodes in face
       for (int i=0; i!=it->first; ++i){
+//        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
         const double ax = gsl_vector_get(coordinates, 3* (*jt)[(i+ it->first -1) % it->first]);
         const double ay = gsl_vector_get(coordinates, 3* (*jt)[(i+ it->first -1) % it->first] +1);
         const double az = gsl_vector_get(coordinates, 3* (*jt)[(i+ it->first -1) % it->first] +2);
@@ -67,15 +67,15 @@ double pot(const gsl_vector* coordinates, void* parameters){
         const double cx = gsl_vector_get(coordinates, 3* (*jt)[(i+1) % it->first]);
         const double cy = gsl_vector_get(coordinates, 3* (*jt)[(i+1) % it->first] +1);
         const double cz = gsl_vector_get(coordinates, 3* (*jt)[(i+1) % it->first] +2);
-//        const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
+
+        const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
+        potential_energy += 0.5 * force_constants_angle[1] * pow(angle_beta - M_PI*(1.0-2.0/it->first),2);
 //        cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
-        potential_energy += 0.5 * force_constants_angle[1] * pow(coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz)) - M_PI*(1.0-2.0/it->first),2);
       }
     }
   }
   
-//  cout << " pot_E: " << potential_energy<< endl;
-
+//  cout << "pot_E: " << potential_energy << endl;
   return potential_energy;
 }
 
@@ -103,11 +103,10 @@ void grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient)
     const double by = gsl_vector_get(coordinates,3 * e->second +1);
     const double bz = gsl_vector_get(coordinates,3 * e->second +2);
 //    cout << "ax " << ax << " ay " << ay << " az " << az << " bx " << bx << " by " << by << " bz " << bz << endl;
-    derivatives[e->first] += coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i]);
+    derivatives[e->first]  += coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i]);
     derivatives[e->second] -= coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i]);
 //    cout << "dist(" << i << "): " << coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) << endl;
   }
-//  cout << "dr1: " << derivatives << endl;
   
   facemap_t faces(graph.compute_faces_oriented());
   //iterate over all faces
@@ -115,8 +114,10 @@ void grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient)
     // it->first is the face size
     // iterate over faces of equal size
     for(set<face_t>::const_iterator jt=it->second.begin(); jt!=it->second.end(); ++jt){
+//      cout << " face of size-" << it->first << ": " << *jt << endl;
       // iterate over nodes in face
       for (int i=0; i!=it->first; ++i){
+//        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
         const double ax = gsl_vector_get(coordinates, 3* (*jt)[(i+ it->first -1) % it->first]);
         const double ay = gsl_vector_get(coordinates, 3* (*jt)[(i+ it->first -1) % it->first] +1);
         const double az = gsl_vector_get(coordinates, 3* (*jt)[(i+ it->first -1) % it->first] +2);
@@ -130,16 +131,16 @@ void grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient)
         coord3d a(coord3d(ax,ay,az) - coord3d(bx,by,bz)), c(coord3d(cx,cy,cz) - coord3d(bx,by,bz)), da, dc;
         coord3d::dangle(a, c, da, dc);
   
-//        const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
+        const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
 //        cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
+//        cout << "da: " << da << endl;
 
-        derivatives[(*jt)[(i+ it->first -1) % it->first]] += da * (coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz)) - M_PI*(1.0-2.0/it->first)) * force_constants_angle[(*jt)[i]];
-        derivatives[(*jt)[i]] -= (da+dc) * (coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz)) - M_PI*(1.0-2.0/it->first)) * force_constants_angle[(*jt)[i]];
-        derivatives[(*jt)[(i+1) % it->first]] += dc * (coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz)) - M_PI*(1.0-2.0/it->first)) * force_constants_angle[(*jt)[i]];
+        derivatives[(*jt)[(i+ it->first -1) % it->first]] += da *       (angle_beta - M_PI*(1.0-2.0/it->first)) * force_constants_angle[(*jt)[i]];
+        derivatives[(*jt)[i]]                             += -(da+dc) * (angle_beta - M_PI*(1.0-2.0/it->first)) * force_constants_angle[(*jt)[i]];
+        derivatives[(*jt)[(i+1) % it->first]]             += dc *       (angle_beta - M_PI*(1.0-2.0/it->first)) * force_constants_angle[(*jt)[i]];
       }
     }
   }
-//  cout << "dr2: " << derivatives << endl;
 
   // return gradient
   for(int i = 0; i < graph.N; ++i) {
@@ -148,11 +149,16 @@ void grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient)
     gsl_vector_set(gradient, 3*i+2, derivatives[i][2]);
   }
 
-//  cout << "grad: " << gradient << endl;
+//   double grad_debug = 0.0;
+//   for(int i = 0; i < graph.N; ++i) {
+//     grad_debug += sqrt(pow(gsl_vector_get(gradient, 3*i),2) + pow(gsl_vector_get(gradient, 3*i+1),2) + pow(gsl_vector_get(gradient, 3*i+2),2));
+//   }
+//   cout << "grad: " << grad_debug << endl;
+
 }
 
 
-//FIXME redo
+//FIXME redo for performance reasons
 void pot_grad(const gsl_vector* coordinates, void* parameters, double* potential, gsl_vector* gradient) {
   *potential = pot(coordinates, parameters);
   grad(coordinates, parameters, gradient);
@@ -160,13 +166,13 @@ void pot_grad(const gsl_vector* coordinates, void* parameters, double* potential
 
 
 bool Polyhedron::optimize_other(){
-  cout << "entering opt other" << endl;
+//  cout << "entering opt other" << endl;
 
   // settings for the optimizations
   const double stepsize = 1e-3;// FIXME final value
-  const double terminate_gradient = 1e-8;// FIXME final value
+  const double terminate_gradient = 1e-5;// FIXME final value
   const double tol = 1e-1; // accuracy of line minimization, the manual suggests 0.1
-  const int max_iterations = 1000;// FIXME final value
+  const int max_iterations = 500;// FIXME final value
   
   // init values
   vector<double> zero_values_dist(this->edge_set.size());
@@ -209,9 +215,8 @@ bool Polyhedron::optimize_other(){
     ++iter;
     status = gsl_multimin_fdfminimizer_iterate(s);
   
-    cout << "it: " << iter << " stat: " << status << endl;
-    printf ("error: %s\n", gsl_strerror (status));
-
+//    cout << "it: " << iter << " stat: " << status << endl;
+//    printf ("error: %s\n", gsl_strerror (status));
 
     if(status) break;
   
