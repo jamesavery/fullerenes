@@ -156,11 +156,12 @@ struct coord3d {
 	H[i*3+j] = -x[i]*x[j]*n3 + (i==j? n : 0);
   }
 
-  static double angle(const coord3d& b, const coord3d& c)
+  // calculation of the angle beta at b(0,0,0)
+  static double angle(const coord3d& a, const coord3d& c)
   {
-    const double L2 = b.dot(b);
+    const double L2 = a.dot(a);
     const double R2 = c.dot(c);
-    const double M2 = (c-b).dot(c-b);
+    const double M2 = (c-a).dot(c-a);
     const double den = 2.0*sqrt(L2 * R2);
     double arg = (L2+R2-M2)/den;
     if(arg > 1)  arg = 1;
@@ -168,25 +169,26 @@ struct coord3d {
     return acos(arg);    
   }
 
-  static void dangle(const coord3d& b, const coord3d& c, coord3d& db, coord3d& dc)
+  // calculation of the derivative of angle beta at b(0,0,0) according to coordinates a and c with fixed b
+  static void dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& dc)
   {
-    const double L2 = b.dot(b);
+    const double L2 = a.dot(a);
     const double R2 = c.dot(c);
-    const double M2 = (c-b).dot(c-b);
+    const double M2 = (c-a).dot(c-a);
     const double den = 2.0*sqrt(L2 * R2);
     double arg = (L2+R2-M2)/den;
 
-    const coord3d dM2__db = (b-c)*2;
-    const coord3d dL2__db = b*2;
-    const coord3d dden__db = dL2__db * R2/sqrt(L2*R2);
-    const coord3d darg__db = dL2__db * 1.0/den - dM2__db * 1.0/den - dden__db * (L2+R2-M2)/(den*den);
+    const coord3d dM2__da = (a-c)*2;
+    const coord3d dL2__da = a*2;
+    const coord3d dden__da = dL2__da * R2/sqrt(L2*R2);
+    const coord3d darg__da = dL2__da * 1.0/den - dM2__da * 1.0/den - dden__da * (L2+R2-M2)/(den*den);
 
-    const coord3d dM2__dc = (c-b)*2;
+    const coord3d dM2__dc = (c-a)*2;
     const coord3d dR2__dc = c*2;
     const coord3d dden__dc = dR2__dc * L2/sqrt(L2*R2);
     const coord3d darg__dc = dR2__dc * 1.0/den - dM2__dc * 1.0/den - dden__dc * (L2+R2-M2)/(den*den);
 
-    db = -darg__db * 1.0/sqrt(1.0-arg*arg);
+    da = -darg__da * 1.0/sqrt(1.0-arg*arg);
     dc = -darg__dc * 1.0/sqrt(1.0-arg*arg);
   }
 
