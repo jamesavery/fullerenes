@@ -8,9 +8,8 @@
 #include <sstream>
 using namespace std;
 
-// TODO: There are a number of functions in this file that are not particularly
-// pertaining to geometry, but are just "miscellaneous" stuff. Move to a more
-// fitting place.
+#define insert_unique(v,x) if(std::find(v.begin(),v.end(),x) == v.end()) v.push_back(x); 
+
 #define container_output(container) \
   template <typename T> ostream& operator<<(ostream& s, const container<T>& v) \
   { \
@@ -24,12 +23,9 @@ using namespace std;
 }
 
 
-
-
 container_output(vector);
 container_output(list);
 container_output(set);
-
 
 template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p)
 {

@@ -288,6 +288,12 @@ struct face_t : public vector<node_t> {
     return winding_number(layout,x) != 0;
   }
   bool contains(const node_t v) const { for(int i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
+
+  face_t sorted() const {
+    face_t f(*this);
+    sort(f.begin(),f.end());
+    return f;
+  }
 };
 
 

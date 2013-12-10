@@ -132,14 +132,32 @@ PlanarGraph Triangulation::dual_graph() const
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
 
       if(A[U][i] < 0){
-    cerr << "Triangle " << tri_t(u,v,w).sorted() << " (opposite " << t << ") not found!\n";
-    abort();
+	cerr << "Triangle " << tri_t(u,v,w).sorted() << " (opposite " << t << ") not found!\n";
+	abort();
       }
     }
   }
   return PlanarGraph(Graph(A));
 };
 
+vector<face_t> Triangulation::dual_faces() const 
+{
+  vector<face_t> dfaces(N);
+
+  IDCounter<tri_t> tri_numbers;
+  for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
+
+  for(node_t u=0;u<N;u++){
+    const vector<node_t> &nu(neighbours[u]);
+    face_t f(nu.size());
+    for(int i=0;i<nu.size();i++){
+      node_t v=nu[i], w = nextCW(dedge_t(u,v));
+      f[i] = tri_numbers(tri_t(u,v,w).sorted());
+    }
+    dfaces[u] = f;
+  }
+  return dfaces;
+}
 
 void wg_connect_backward(set<edge_t> &edge_set, list<pair<node_t, int> > &ov)
 {
@@ -233,6 +251,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // open_valencies must be either spiral.back() times '1' at this stage
   if(open_valencies.size() != spiral_string.back()){
     cout << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
+    cout << "Incomplete graph g = " << Graph(edge_set) << "\n";
     abort();
   }
   for(list<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){

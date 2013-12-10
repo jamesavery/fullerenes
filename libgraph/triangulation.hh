@@ -9,7 +9,7 @@ public:
   using Graph::N;
   using Graph::neighbours;
 
-  vector<tri_t> triangles;
+  vector<tri_t> triangles;	// Faces
 
   // Operations:
   //  1. Orient triangulation
@@ -24,6 +24,7 @@ public:
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
 
   PlanarGraph dual_graph() const;
+  vector<face_t> dual_faces() const;
   
   pair<node_t,node_t> adjacent_tris(const edge_t &e) const;
 
