@@ -6,8 +6,29 @@ bool compute_polyhedron = true;
 int halma_level = 0;
 
 int testN = 380;
-int testjump[2] = {110,2};
-int testRSPI[12] = {45, 70, 71, 82, 83, 110, 119, 120, 144, 184, 185, 192};
+
+//Canonical GSPI for C380
+//int testNjumps = 1;
+//int testjump[1][2] = {{110,2}};
+//int testRSPI[12] = {45, 70, 71, 82, 83, 110, 119, 120, 144, 184, 185, 192};
+
+// But in fact, we want a spiral with a long-ish starting sequence that starts in one of the corners, i.e.
+// in one of the pentagons.
+// int RSPIstart[3] = {45, 70, 71}; // We find a 555-spiral by getting the GSPI starting with 45,70,71.
+int testNjumps = 3;
+
+// 555 -- too long (almost no visible missing faces)
+// int testRSPI[12] = {1, 2, 3, 142, 143, 152, 153, 162, 163, 170, 177, 183};
+// int testjump[3][2] = {{170,3},{177,3},{183,4}};
+
+// 556 -- shorter, but still too long.
+//int testRSPI[12] = {1, 2, 6, 136, 137, 146, 147, 156, 157, 165, 172, 180};
+//int testjump[3][2] = {{165,1},{172,2},{180,1}};
+
+// 565 -- better.
+int testRSPI[12] = {1,3,4,127,128,146,147,155,164,165,173,183};
+int testjump[3][2] = {{155,1},{173,1},{183,3}};
+
 
 struct windup_t {
   Triangulation   dual;
@@ -42,11 +63,22 @@ int main(int ac, char **av)
   if(ac>=16) {
     for(int i=0;i<ac-14;i++)
       jumps.push_back(make_pair(strtol(av[i+15],0,0),strtol(av[i+16],0,0)));
-  } else 
-    jumps.push_back(make_pair(testjump[0]-1,testjump[1]));
+  } else
+    for(int i=0;i<testNjumps;i++)
+      jumps.push_back(make_pair(testjump[i][0]-1,testjump[i][1]));
 
   cout << "Constructing C"<<N<<" and dual from GSPI "<< make_pair(jumps,spiral_string) << "\n";
   windup_t w(spiral_string,jumps);
+
+  vector<int> rspi;
+  FullereneGraph::jumplist_t j;
+
+  // Run once in order to find the spiral we want to use.
+  //w.dual.get_spiral(RSPIstart[0]-1,RSPIstart[1]-1,RSPIstart[2]-1,rspi,j);
+  //w.dual.get_spiral(0,1,5,rspi,j); // WRT 555...
+  w.dual.get_spiral(0,3,2,rspi,j);   // WRT 555
+  cout << "RSPI = " << rspi << ";\n"
+       << "jumps = " << j << ";\n";
 
   printf("Computing planar layout\n");
   w.graph.layout2d = w.graph.tutte_layout();
