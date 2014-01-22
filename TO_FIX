@@ -2,21 +2,3 @@ This is a list of open bugs and similar kinds of misbehaviour.  This is not a li
 
 ----------------------
 
-(2013-12-06, lukas)
-running valgrind on app-gs-ex on my (lukas) desktop yields multiple instances of the following error
-
-==16297== Memcheck, a memory error detector
-==16297== Copyright (C) 2002-2012, and GNU GPL'd, by Julian Seward et al.
-==16297== Using Valgrind-3.8.1 and LibVEX; rerun with -h for copyright info
-==16297== Command: ./app-gs-ex
-==16297== 
-==16297== Conditional jump or move depends on uninitialised value(s)
-==16297==    at 0x417841: PlanarGraph::compute_faces_oriented() const (planargraph.cc:199)
-==16297==    by 0x418193: PlanarGraph::compute_faces(unsigned int, bool) const (planargraph.cc:119)
-==16297==    by 0x4185AB: PlanarGraph::compute_faces_flat(unsigned int, bool) const (planargraph.cc:243)
-==16297==    by 0x418FC2: PlanarGraph::dual_graph(unsigned int, bool) const (planargraph.cc:61)
-==16297==    by 0x403D6A: main (gs-ex.cc:51)
-==16297== 
-
-which means, that 'layout_is_spherical' may be uninitialized when 'PlanarGraph::compute_faces_oriented()' is called.
-
