@@ -44,70 +44,69 @@ Graph example1()
 
 // Tutte graph
 Graph example2(){
-  const int m=3, n = 46;
-  neighbours_t neighbours(n,vector<node_t>(3));
+  const int M=3, N=46;
+  neighbours_t neighbours(N,vector<node_t>(3));
 
   for(int i=0; i!=3; ++i){
     neighbours[i][0] = 45;
-    neighbours[i][1] = m+i;
-    neighbours[i][2] = 2*m+i;
+    neighbours[i][1] = 1*M+i;
+    neighbours[i][2] = 2*M+i;
     
-    neighbours[3+i][0] = 0+i;
-    neighbours[3+i][1] = 3*m+i;
-
-    neighbours[3+i][2] = 4*m+i;
+    neighbours[1*M+i][0] =     i;
+    neighbours[1*M+i][1] = 3*M+i;
+    neighbours[1*M+i][2] = 4*M+i;
     
-    neighbours[6+i][0] = 0+i;
-    neighbours[6+i][1] = 9+i;
-    neighbours[6+i][2] = 18+i;
+    neighbours[2*M+i][0] =     i;
+    neighbours[2*M+i][1] = 3*M+i;
+    neighbours[2*M+i][2] = 6*M+i;
     
-    neighbours[9+i][0] = 3+i;
-    neighbours[9+i][1] = 6+i;
-    neighbours[9+i][2] = 15+i;
+    neighbours[3*M+i][0] = 1*M+i;
+    neighbours[3*M+i][1] = 2*M+i;
+    neighbours[3*M+i][2] = 5*M+i;
     
-    neighbours[12+i][0] = 3+i;
-    neighbours[12+i][1] = 21+i;
-    neighbours[12+i][2] = 24+i;
+    neighbours[4*M+i][0] = 1*M+i;
+    neighbours[4*M+i][1] = 7*M+i;
+    neighbours[4*M+i][2] = 8*M+i;
     
-    neighbours[15+i][0] = 9+i;
-    neighbours[15+i][1] = 24+i;
-    neighbours[15+i][2] = 27+i;
+    neighbours[5*M+i][0] = 3*M+i;
+    neighbours[5*M+i][1] = 8*M+i;
+    neighbours[5*M+i][2] = 9*M+i;
     
-    neighbours[6*m+i][0] = 2*m+i;
-    neighbours[6*m+i][1] = 9*m+i;
-    neighbours[6*m+i][2] = 10*m+i;
+    neighbours[6*M+i][0] = 2*M+i;
+    neighbours[6*M+i][1] = 9*M+i;
+    neighbours[6*M+i][2] = 10*M+i;
     
-    neighbours[7*m+i][0] = 4*m+i;
-    neighbours[7*m+i][1] = 11*m+i;
-    neighbours[7*m+i][2] = 12*m+i;
+    neighbours[7*M+i][0] = 4*M+i;
+    neighbours[7*M+i][1] = 11*M+i;
+    neighbours[7*M+i][2] = 12*M+i;
     
-    neighbours[8*m+i][0] = 4*m+i;
-    neighbours[8*m+i][1] = 11*m+i;
-    neighbours[8*m+i][2] = 12*m+i;
+    neighbours[8*M+i][0] = 4*M+i;
+    neighbours[8*M+i][1] = 5*M+i;
+    neighbours[8*M+i][2] = 12*M+i;
     
-    neighbours[9*m+i][0] = 5*m+i;
-    neighbours[9*m+i][1] = 6*m+i;
-    neighbours[9*m+i][2] = 13*m+i;
+    neighbours[9*M+i][0] = 5*M+i;
+    neighbours[9*M+i][1] = 6*M+i;
+    neighbours[9*M+i][2] = 13*M+i;
     
-    neighbours[10*m+i][0] = 6*m+i;
-    neighbours[10*m+i][1] = 11*m+((i+1+3)%3);
-    neighbours[10*m+i][2] = 14*m+i;
+    neighbours[10*M+i][0] = 6*M+i;
+    neighbours[10*M+i][1] = 11*M+((i+1+3)%3);
+    neighbours[10*M+i][2] = 14*M+i;
     
-    neighbours[11*m+i][0] = 7*m+i;
-    neighbours[11*m+i][1] = 10*m+((i-1+3)%3);
-    neighbours[11*m+i][2] = 14*m+i;
+    neighbours[11*M+i][0] = 7*M+i;
+    neighbours[11*M+i][1] = 10*M+((i-1+3)%3);
+    neighbours[11*M+i][2] = 14*M+i;
     
-    neighbours[12*m+i][0] = 7*m+i;
-    neighbours[12*m+i][1] = 8*m+i;
-    neighbours[12*m+i][2] = 13*m+i;
+    neighbours[12*M+i][0] = 7*M+i;
+    neighbours[12*M+i][1] = 8*M+i;
+    neighbours[12*M+i][2] = 13*M+i;
     
-    neighbours[13*m+i][0] = 9*m+i;
-    neighbours[13*m+i][1] = 12*m+i;
-    neighbours[13*m+i][2] = 14*m+i;
+    neighbours[13*M+i][0] = 9*M+i;
+    neighbours[13*M+i][1] = 12*M+i;
+    neighbours[13*M+i][2] = 14*M+i;
     
-    neighbours[14*m+i][0] = 10*m+i;
-    neighbours[14*m+i][1] = 11*m+i;
-    neighbours[14*m+i][2] = 13*m+i;
+    neighbours[14*M+i][0] = 10*M+i;
+    neighbours[14*M+i][1] = 11*M+i;
+    neighbours[14*M+i][2] = 13*M+i;
   }
 
   neighbours[45][0] = 0;
@@ -122,6 +121,9 @@ Graph examples[2] = {example1(), example2()};
 int main(int ac, char **av)
 {
   int Nex = ac>=2? strtol(av[1],0,0) : 1;
+
+  if(Nex < 1 || Nex > 2){cerr << "invalid graph chosen, aborting ..." << endl; abort();}
+
   string basename("gs-ex-"+to_string(Nex));
 
   ofstream output(("output/"+basename+".m").c_str());
@@ -144,8 +146,8 @@ int main(int ac, char **av)
   
   output.flush();
 
-  Polyhedron P0(g,g.zero_order_geometry(),8);
-  Polyhedron dP0(dg,dg.zero_order_geometry(),8);
+  Polyhedron P0(g,g.zero_order_geometry(),10);
+  Polyhedron dP0(dg,dg.zero_order_geometry(),3);
 
   output << "P0coordinates = " << P0.points << ";\n";
 
