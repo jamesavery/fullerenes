@@ -346,8 +346,8 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   if(edge_set.find(edge_t(f1,f2)) == edge_set.end() ||
      edge_set.find(edge_t(f1,f3)) == edge_set.end() ||
      edge_set.find(edge_t(f2,f3)) == edge_set.end()){
-    cerr << "The requested nodes are not connected.  Aborting ..." << endl;
-    abort();
+    cerr << "The requested nodes are not connected." << endl;
+    return false;
   }
 
   // add the first three (defining) nodes
