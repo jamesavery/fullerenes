@@ -447,11 +447,9 @@ bool Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps,
   spiral = vector<int>(1,INT_MAX); // so it gets overwritten
   jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
   
-  vector<face_t> faces(compute_faces_flat(3));
-
-  for(int i=0; i<faces.size(); i++){
+  for(int i=0; i<triangles.size(); i++){
     int permutations[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
-    const face_t& f = faces[i];
+    const tri_t& f = triangles[i];
     for(int j=0; j<6; j++){
 
       int f1 = f[permutations[j][0]], f2 = f[permutations[j][1]], f3 = f[permutations[j][2]];

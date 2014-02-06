@@ -146,15 +146,19 @@ int main(int ac, char **av)
   output << "dg = " << dg << ";\n";  
   output.flush();
 
-  
-  Triangulation dt(dg);
+  vector<face_t> faces = dg.compute_faces_flat(3,true);
+  vector<tri_t>  triangles(faces.begin(),faces.end());
+  cout << "triangles = " << triangles << ";\n";
+
+  //  Triangulation dt(dg,triangles);
+  Triangulation dt(dg,triangles);
   vector<int> spiral;
   Triangulation::jumplist_t jumplist;
   bool success = dt.get_canonical_spiral(spiral,jumplist);
   if(!success) cerr << "Canonical general spiral not found.\n";
 
   output << "spiral   = " << spiral << ";\n"
-	 << "jumplist = " << jumplist << ";\n";
+  	 << "jumplist = " << jumplist << ";\n";
   
 
   Polyhedron P0(g,g.zero_order_geometry(),10);
