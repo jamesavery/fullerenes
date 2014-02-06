@@ -3,6 +3,7 @@
 #include <sys/msg.h>
 #include <signal.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "../libgraph/graph.hh"
 #include "../libgraph/auxiliary.hh"
