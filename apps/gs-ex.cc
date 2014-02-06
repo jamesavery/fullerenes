@@ -1,6 +1,7 @@
 #include "libgraph/fullerenegraph.hh"
 #include "libgraph/polyhedron.hh"
 #include "libgraph/isomerdb.hh"
+#include "libgraph/triangulation.hh"
 
 int testN = 80;
 int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
@@ -142,9 +143,19 @@ int main(int ac, char **av)
   dg.layout2d = dg.tutte_layout();
 
   output << "g = " << g << ";\n";
-  output << "dg = " << dg << ";\n";
-  
+  output << "dg = " << dg << ";\n";  
   output.flush();
+
+  
+  Triangulation dt(dg);
+  vector<int> spiral;
+  Triangulation::jumplist_t jumplist;
+  bool success = dt.get_canonical_spiral(spiral,jumplist);
+  if(!success) cerr << "Canonical general spiral not found.\n";
+
+  output << "spiral   = " << spiral << ";\n"
+	 << "jumplist = " << jumplist << ";\n";
+  
 
   Polyhedron P0(g,g.zero_order_geometry(),10);
   Polyhedron dP0(dg,dg.zero_order_geometry(),3);
