@@ -117,13 +117,73 @@ Graph example2(){
   return Graph(neighbours);
 }
 
-Graph examples[2] = {example1(), example2()};
+
+// smallest non-spiral graph with face sizes less/equal 6
+Graph example3(){
+  const int M=3, N=36;
+  neighbours_t neighbours(N,vector<node_t>(3));
+
+  for(int i=0; i!=3; ++i){
+    neighbours[i][0] = (i+1)%M;
+    neighbours[i][1] = (i-1+M)%M;
+    neighbours[i][2] = M+i;
+    
+    neighbours[1*M+i][0] =     i;
+    neighbours[1*M+i][1] = 2*M+i;
+    neighbours[1*M+i][2] = 3*M+i;
+    
+    neighbours[2*M+i][0] = 1*M+i;
+    neighbours[2*M+i][1] = 3*M+(i+1)%M;
+    neighbours[2*M+i][2] = 4*M+i;
+    
+    neighbours[3*M+i][0] = 1*M+i;
+    neighbours[3*M+i][1] = 2*M+(i-1+M)%M;
+    neighbours[3*M+i][2] = 5*M+i;
+    
+    neighbours[4*M+i][0] = 2*M+i;
+    neighbours[4*M+i][1] = 6*M+i;
+    neighbours[4*M+i][2] = 7*M+i;
+  
+    neighbours[5*M+i][0] = 3*M+i;
+    neighbours[5*M+i][1] = 6*M+i;
+    neighbours[5*M+i][2] = 8*M+(i-1+M)%M;
+    
+    neighbours[6*M+i][0] = 4*M+i;
+    neighbours[6*M+i][1] = 5*M+i;
+    neighbours[6*M+i][2] = 10*M+i;
+    
+    neighbours[7*M+i][0] = 4*M+i;
+    neighbours[7*M+i][1] = 8*M+i;
+    neighbours[7*M+i][2] = 9*M+i;
+  
+    neighbours[8*M+i][0] = 5*M+(i+1)%M;
+    neighbours[8*M+i][1] = 7*M+i;
+    neighbours[8*M+i][2] = 9*M+i;
+    
+    neighbours[9*M+i][0] = 7*M+i;
+    neighbours[9*M+i][1] = 8*M+i;
+    neighbours[9*M+i][2] = 11*M+i;
+    
+    neighbours[10*M+i][0] = 6*M+i;
+    neighbours[10*M+i][1] = 11*M+i;
+    neighbours[10*M+i][2] = 11*M+(i-1+M)%M;
+    
+    neighbours[11*M+i][0] = 9*M+i;
+    neighbours[11*M+i][1] = 10*M+i;
+    neighbours[11*M+i][2] = 10*M+(i+1)%M;
+  }
+
+  return Graph(neighbours);
+}
+
+
+Graph examples[3] = {example1(), example2(), example3()};
 
 int main(int ac, char **av)
 {
   int Nex = ac>=2? strtol(av[1],0,0) : 1;
 
-  if(Nex < 1 || Nex > 2){cerr << "invalid graph chosen, aborting ..." << endl; abort();}
+  if(Nex < 1 || Nex > 3){cerr << "invalid graph chosen, aborting ..." << endl; abort();}
 
   string basename("gs-ex-"+to_string(Nex));
 
