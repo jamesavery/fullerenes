@@ -1,4 +1,5 @@
 #include "triangulation.hh"
+#include <algorithm>
 
 pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
 {
@@ -438,6 +439,26 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   return true;
 }
 
+vector< vector<int> > Triangulation::get_all_spirals() const {
+  vector< vector<int> > all_spirals;
+  vector<int> spiral;
+  jumplist_t  jumps_dummy;  
+
+  const int permutations[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
+  for(int i=0; i<triangles.size(); i++){
+    const tri_t& f = triangles[i];
+
+    for(int j=0;j<6;j++){
+      int f1=f[permutations[j][0]], f2=f[permutations[j][1]], f3=f[permutations[j][2]];
+
+      bool success = get_spiral(f1,f2,f3,spiral,jumps_dummy,false);
+
+      if(success) all_spirals.push_back(spiral);
+    }
+  }  
+  sort(all_spirals.begin(),all_spirals.end());
+  return all_spirals;
+}
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 bool Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps, bool general) const {

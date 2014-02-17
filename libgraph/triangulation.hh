@@ -46,6 +46,7 @@ public:
   bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, bool general=true) const;
   bool get_canonical_spiral(vector<int>& v, jumplist_t& j, bool general=true) const;
 
+  vector< vector<int> > get_all_spirals() const;
 
   void update(bool already_oriented) {
     if(N>0){

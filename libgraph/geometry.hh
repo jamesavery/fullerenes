@@ -18,6 +18,7 @@ typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
 
+// TODO: geometry.hh is getting big. Perhaps move most of the implementation to geometryc.cc
 
 // Directed edge is an ordered pair of nodes
 typedef pair<node_t,node_t> dedge_t;
@@ -204,6 +205,13 @@ struct coord3d {
     return xs;
   }
 
+  // NB: Does this belong here?
+  static coord3d line_plane_intersect(const coord3d& x0, const coord3d& x1, const coord3d& X0, const coord3d& n)
+  {
+    const coord3d dx(x1-x0);
+    double t = (X0-x0).dot(n)/dx.dot(n);
+    return x0+dx*t;
+  }
 
   friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
