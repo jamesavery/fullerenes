@@ -262,9 +262,21 @@ int main(int ac, char **av)
   }
 
   {
+    ofstream latex(("output/"+basename+".tex").c_str());
+    latex << PlanarGraph(P).to_latex(10, 10, false, false, true);
+    latex.close();
+  }
+
+  {
     ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
     mol2 << D.to_mol2();
     mol2.close();
+  }
+
+  {
+    ofstream latex(("output/"+basename+"-dual.tex").c_str());
+    latex << PlanarGraph(D).to_latex(10, 10, false, false, true);
+    latex.close();
   }
 
   return 0;
