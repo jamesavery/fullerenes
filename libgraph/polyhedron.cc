@@ -433,10 +433,11 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     const FullereneGraph g(*this,layout2d);
     points = g.optimized_geometry(points);
     return true;
-  } else {
+  } else if(is_cubic()) {
     return optimize_other();
-    //cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra.\n";
-    //return false;
+  }else{
+    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra and other cubic graphs." << endl;
+    return false;
   }
 }
 

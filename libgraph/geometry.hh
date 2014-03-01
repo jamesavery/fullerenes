@@ -18,6 +18,7 @@ typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
 
+// TODO: geometry.hh is getting big. Perhaps move most of the implementation to geometryc.cc
 
 // Directed edge is an ordered pair of nodes
 typedef pair<node_t,node_t> dedge_t;
@@ -52,6 +53,7 @@ struct coord2d : public pair<double,double> {
   coord2d& operator+=(const coord2d& y){ first += y.first; second += y.second; return *this; }
   coord2d& operator*=(const coord2d& y){ first *= y.first; second *= y.second; return *this; }
   coord2d& operator*=(const double s)  { first*=s;second*=s; return *this;}
+  coord2d operator-() const {coord2d y(-first,-second); return y;}
   double dot(const coord2d& y) const { return first*y.first+second*y.second; }
 
   double line_angle(const coord2d& v) const { // CCW between two lines ([-pi;pi] where -*this is +/-pi and *this is 0 -- i.e. pi is "leftmost", -pi is "rightmost")
@@ -125,6 +127,7 @@ struct coord3d {
   coord3d& operator*=(const coord3d& y){ x[0] *= y[0]; x[1] *= y[1]; x[2] *= y[2]; return *this; }
   coord3d& operator*=(const double& y){ x[0] *= y; x[1] *= y; x[2] *= y; return *this; }
   coord3d& operator/=(const double& y){ x[0] /= y; x[1] /= y; x[2] /= y; return *this; }
+  coord3d operator-() const {coord3d y(-x[0],-x[1],-x[2]); return y;}
 
   coord3d cross(const coord3d& y) const {
     return coord3d(x[1]*y[2]-x[2]*y[1], x[2]*y[0]-x[0]*y[2], x[0]*y[1] - x[1]*y[0]);
@@ -154,11 +157,12 @@ struct coord3d {
 	H[i*3+j] = -x[i]*x[j]*n3 + (i==j? n : 0);
   }
 
-  static double angle(const coord3d& b, const coord3d& c)
+  // calculation of the angle beta at b(0,0,0)
+  static double angle(const coord3d& a, const coord3d& c)
   {
-    const double L2 = b.dot(b);
+    const double L2 = a.dot(a);
     const double R2 = c.dot(c);
-    const double M2 = (c-b).dot(c-b);
+    const double M2 = (c-a).dot(c-a);
     const double den = 2.0*sqrt(L2 * R2);
     double arg = (L2+R2-M2)/den;
     if(arg > 1)  arg = 1;
@@ -166,10 +170,27 @@ struct coord3d {
     return acos(arg);    
   }
 
-  static void dangle(const coord3d& b, const coord3d& c, coord3d& db, coord3d& dc)
+  // calculation of the derivative of angle beta at b(0,0,0) according to coordinates a and c with fixed b
+  static void dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& dc)
   {
-  //  coord3d bc(c-b);
-  cerr << "dangle has not been defined yet.  Aborting ..." << endl;
+    const double L2 = a.dot(a);
+    const double R2 = c.dot(c);
+    const double M2 = (c-a).dot(c-a);
+    const double den = 2.0*sqrt(L2 * R2);
+    double arg = (L2+R2-M2)/den;
+
+    const coord3d dM2__da = (a-c)*2;
+    const coord3d dL2__da = a*2;
+    const coord3d dden__da = dL2__da * R2/sqrt(L2*R2);
+    const coord3d darg__da = dL2__da * 1.0/den - dM2__da * 1.0/den - dden__da * (L2+R2-M2)/(den*den);
+
+    const coord3d dM2__dc = (c-a)*2;
+    const coord3d dR2__dc = c*2;
+    const coord3d dden__dc = dR2__dc * L2/sqrt(L2*R2);
+    const coord3d darg__dc = dR2__dc * 1.0/den - dM2__dc * 1.0/den - dden__dc * (L2+R2-M2)/(den*den);
+
+    da = -darg__da * 1.0/sqrt(1.0-arg*arg);
+    dc = -darg__dc * 1.0/sqrt(1.0-arg*arg);
   }
 
   friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
@@ -184,6 +205,13 @@ struct coord3d {
     return xs;
   }
 
+  // NB: Does this belong here?
+  static coord3d line_plane_intersect(const coord3d& x0, const coord3d& x1, const coord3d& X0, const coord3d& n)
+  {
+    const coord3d dx(x1-x0);
+    double t = (X0-x0).dot(n)/dx.dot(n);
+    return x0+dx*t;
+  }
 
   friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
@@ -268,6 +296,12 @@ struct face_t : public vector<node_t> {
     return winding_number(layout,x) != 0;
   }
   bool contains(const node_t v) const { for(int i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
+
+  face_t sorted() const {
+    face_t f(*this);
+    sort(f.begin(),f.end());
+    return f;
+  }
 };
 
 

@@ -2027,9 +2027,9 @@ C Produce adjacency matrix
       call delete_fullerene_graph(g)
       write (Iout,1004) 
  1000 Format(/1X,'Creating the adjacency matrix of the next leap-frog',
-     1 ' fullerene: ',I5,' --> ',I5)
+     1 ' fullerene: ',I6,' --> ',I6)
  1001 Format(/1X,'Creating the adjacency matrix of the ',I2,
-     1 'th leap-frog fullerene: ',I4,' --> ',I4)
+     1 'th leap-frog fullerene: ',I5,' --> ',I5)
  1002 Format(1X,'Error: Dimension of leapfrog fullerene is ',I5,
      1 ' greater than dimension of Nmax (',I5,') set in program')
  1003 Format(1X,'Error: Dimension of GC fullerene is ',I5,

@@ -3,6 +3,8 @@
 
 #include "graph.hh"
 
+// TODO: Separate planar cubic graph stuff away from general planar graph into CubicGraph class.
+//       Exploit duality between triangulation and cubic planar graph.
 class PlanarGraph : public Graph {
 public:
   using Graph::N;
@@ -18,7 +20,7 @@ public:
 
   PlanarGraph() : layout_is_spherical(false) {}
   PlanarGraph(const PlanarGraph& g) : Graph(g), layout2d(g.layout2d), layout_is_spherical(g.layout_is_spherical) {  }
-  PlanarGraph(const Graph& g, const node_t s=-1, const node_t t=0, const node_t r=0) : Graph(g)
+  PlanarGraph(const Graph& g, const node_t s=-1, const node_t t=0, const node_t r=0) : Graph(g), layout_is_spherical(false)
   {
     if(s!=-1){ // Compute planar layout
       layout2d = tutte_layout(s,t,r);

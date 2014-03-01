@@ -10,6 +10,7 @@ public:
   typedef list<pair<int,int> > jumplist_t;
   
   FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { if(N>0) fullerene_check();  }
+  FullereneGraph(const PlanarGraph& g) : CubicGraph(g,g.layout2d) { if(N>0) fullerene_check(); }
   FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
   FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
