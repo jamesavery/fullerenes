@@ -114,7 +114,7 @@ struct coord2d : public pair<double,double> {
 struct coord3d {
   double x[3];
 
-  coord3d(const double y[3]) { memcpy(x,y,3*sizeof(double)); }
+  coord3d(const double y[3]) { x[0] = y[0]; x[1] = y[1]; x[2] = y[2]; }
   coord3d(const double x_=0, const double y=0, const double z=0) { x[0] = x_; x[1] = y; x[2] = z; }
   coord3d operator/(const double s)   const { return coord3d(*this) /= s; }
   coord3d operator*(const double s)   const { return coord3d(*this) *= s; }
