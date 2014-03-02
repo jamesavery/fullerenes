@@ -123,7 +123,7 @@ public:
     return e;
   }
 
-  static FullereneGraph makeIsomer(int N, Entry e)
+  static FullereneGraph makeIsomer(int N, const Entry& e)
   {
     vector<int> RSPI(e.RSPI,e.RSPI+12);
     for(int i=0;i<12;i++) RSPI[i]--;
