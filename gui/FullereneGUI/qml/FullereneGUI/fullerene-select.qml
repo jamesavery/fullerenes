@@ -1,6 +1,6 @@
 import QtQuick 2.0
 import QtQuick.Controls 1.1
-
+import QtQuick.Layouts 1.1
 
 Rectangle {
     id: select_body
@@ -69,6 +69,12 @@ Rectangle {
                     maximumValue: 9999
                 }
 
+            }
+
+            Button {
+                id: button_OK
+                objectName: "button_OK"
+                text: hellofriend.test_invoke()
             }
 
         }

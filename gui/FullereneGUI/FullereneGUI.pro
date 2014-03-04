@@ -7,8 +7,8 @@ DEPLOYMENTFOLDERS = folder_01
 QML_IMPORT_PATH =
 
 # The .cpp file which was generated for your project. Feel free to hack it.
-SOURCES += main.cpp
-
+SOURCES += main.cpp \
+    fullereneselect.cpp
 # Installation path
 # target.path =
 
@@ -18,3 +18,15 @@ qtcAddDeployment()
 
 OTHER_FILES += \
     qml/FullereneGUI/fullerene-select.qml
+
+unix: LIBS += -L$$PWD/../../build/ -lgraph
+
+INCLUDEPATH += $$PWD/../../
+DEPENDPATH += $$PWD/../../build
+QMAKE_CXXFLAGS_WARN_OFF
+unix: PRE_TARGETDEPS += $$PWD/../../build/libgraph.a
+
+QMAKE_CXXFLAGS += -Wno-sign-compare
+
+HEADERS += \
+    fullereneselect.h
