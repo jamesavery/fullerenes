@@ -249,7 +249,7 @@ C Produce list from ring spiral algorithm
       CHARACTER*6  Occup
       Integer hamlow,hamhigh,hamlowIPR,hamhighIPR
       Integer RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
-      Integer D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
+      Integer D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX),IC3(NMAX,3)
       Integer IsoExceptl(100),IsoExcepth(100)
 
       if(isomerl.ne.1) Write(Iout,1011) isomerl
@@ -314,7 +314,7 @@ C Produce list from ring spiral algorithm
        do J =1,Nisoloop
         if(IP.eq.0) then
          if(IH.eq.1) then
-Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
+C Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
           Read(4,1004,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
      2     ncycHam,(INMR(I),I=1,6)
@@ -383,7 +383,7 @@ Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
          endif
 
          else
-Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
+C Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
           Read(4,1007,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
      2    (INMR(I),I=1,6)
@@ -430,7 +430,17 @@ C   Get dual and then adjacency matrix
            endif
            CALL DUAL(D,MMAX,IDA,IER)
 C  Now do Hamiltonian cycles
-           Call HamiltonCyc(maxiter,Iout,nbatch,IDA,ncycham)
+C create IC3 from IDA        
+           do ia=1,number_vertices
+             ka=0
+             do ja=1,number_vertices
+               if(IDA(Ia,Ja).eq.1) then
+                 ka=ka+1
+                 IC3(ia,ka)=ja
+               endif
+             end do
+           end do
+           Call HamiltonCyc(maxiter,Iout,nbatch,IC3,ncycham)
            WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
      1      IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
      2      Occup,ncycHam,(INMR(I),I=1,nmrloop)
@@ -464,7 +474,7 @@ C  Now do Hamiltonian cycles
 
         else
          if(IH.eq.1) then
-Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
+C Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
           Read(4,1008,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,ncycHam,
      2     (INMR(I),I=1,6)
@@ -510,7 +520,7 @@ Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
           endif
 
          else
-Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
+C Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
           Read(4,1009,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,(INMR(I),I=1,6)
           HNI(6)=number_vertices/2-10-HNI(3)-HNI(4)-HNI(5)
@@ -551,7 +561,17 @@ C   Get dual and then adjacency matrix
             return
            endif
            CALL DUAL(D,MMAX,IDA,IER)
-           Call HamiltonCyc(maxiter,Iout,nbatch,IDA,ncycham)
+C create IC3 from IDA        
+           do ia=1,number_vertices
+             ka=0
+             do ja=1,number_vertices
+               if(IDA(Ia,Ja).eq.1) then
+                 ka=ka+1
+                 IC3(ia,ka)=ja
+               endif
+             end do
+           end do
+           Call HamiltonCyc(maxiter,Iout,nbatch,IC3,ncycham)
            WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
      1      IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
      2      Occup,ncycHam,(INMR(I),I=1,nmrloop)

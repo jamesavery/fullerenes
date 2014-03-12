@@ -353,7 +353,7 @@ C adjacent vertices
           CALL Hamilton(Iout,iprintf,ihamstore,maxiter,IC3,filename)
           Close(unit=8)
         else
-          CALL HamiltonCyc(maxiter,Iout,nbatch,IDA,Nhamilton)
+          CALL HamiltonCyc(maxiter,Iout,nbatch,IC3,Nhamilton)
           WRITE(Iout,1010) Nhamilton
           if(nbatch.ne.0) WRITE(Iout,1011)
         endif

@@ -3,7 +3,7 @@
 C     Restart version of Subroutine Spiral
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
+      DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX),IC3(NMAX,3)
       Real*8 A(NMAX,NMAX),gap
       Integer Isonum(119),IsoIPR(123)
       DIMENSION NMR(6),IRhag5(0:5),IRhag6(0:6)
@@ -316,7 +316,16 @@ C     Analyze dual matrix
      1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
        else
-        Call HamiltonCyc(maxiter,Iout,nbatch,IDA,nhamcycle)
+         do ia=1,number_vertices
+           ka=0
+            do ja=1,number_vertices
+              if(IDA(Ia,Ja).eq.1) then
+               ka=ka+1
+               IC3(ia,ka)=ja
+               endif
+            end do
+         end do
+        Call HamiltonCyc(maxiter,Iout,nbatch,IC3,nhamcycle)
         WRITE(Iout,608) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
      1   (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2   nelec,ndeg,gap,Occup,nhamcycle,(NMR(J),J=1,K)
@@ -871,7 +880,7 @@ C     their idealized point groups, canonical spirals, and NMR patterns.
 C     number_vertices is the nuclearity of the fullerene.
       use config
       IMPLICIT INTEGER (A-Z)
-      DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX)
+      DIMENSION D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX),IC3(NMAX,3)
       Real*8 A(NMAX,NMAX),gap
       Integer Isonum(119),IsoIPR(123)
       DIMENSION NMR(6),IRhag5(0:5),IRhag6(0:6)
@@ -1009,7 +1018,16 @@ C     Analyze dual matrix
      1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
        else
-        Call HamiltonCyc(maxiter,Iout,nbatch,IDA,nhamcycle)
+         do ia=1,number_vertices
+           ka=0
+            do ja=1,number_vertices
+              if(IDA(Ia,Ja).eq.1) then
+               ka=ka+1
+               IC3(ia,ka)=ja
+               endif
+            end do
+         end do
+        Call HamiltonCyc(maxiter,Iout,nbatch,IC3,nhamcycle)
         WRITE(Iout,608) L,GROUP,J1,J2,J3,J4,J5,J6,J7,J8,J9,J10,J11,J12,
      1   (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2   nelec,ndeg,gap,Occup,nhamcycle,(NMR(J),J=1,K)

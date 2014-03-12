@@ -1,4 +1,4 @@
-      SUBROUTINE HamiltonCyc(maxiter,Iout,nbatch,A,nhamilton)
+      SUBROUTINE HamiltonCyc(maxiter,Iout,nbatch,IC3,nhamilton)
       use config
 !---------------------------------------------------------------------------!
 !  This routine counts the number of Hamiltonian cycles using the           !
@@ -15,52 +15,41 @@
       integer x(0:Nmax)
       integer i,j,k,l,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
       integer ptr,prev,oldptr
-      logical occ(Nmax),pass(Nmax),end(Nmax),flag
-      integer ic3(Nmax,3),A(Nmax,Nmax)
+      logical occ_bool(Nmax),pass_bool(Nmax),end_bool(Nmax),flag
+      integer IC3(Nmax,3)
       ifirst=0 
       nhamilton=0
       maxN=30
       nbatch=0
 
-C Prepare field list
       do i=1,number_vertices
-        k=0
-         do j=1,number_vertices
-           if(A(I,J).eq.1) then
-            k=k+1
-            ic3(i,k)=j
+        do j=1,3
+          list(i,j,1)=ic3(i,j)
+        enddo
+      enddo
+      
+      do i=1,number_vertices
+        do j=1,3
+          k=list(i,j,1) 
+          l=1
+          do m=1,3
+            if (list(k,m,1).ne.i) then
+              l=l+1
+              list(i,j,l)=m
             endif
-         end do
-      end do
-      
-      do i=1,number_vertices
-         do j=1,3
-            list(i,j,1)=ic3(i,j)
-         end do
-      end do
-      
-      do i=1,number_vertices
-         do j=1,3
-            k=list(i,j,1) 
-            l=1
-            do m=1,3
-               if (list(k,m,1).ne.i) then
-                  l=l+1
-                  list(i,j,l)=m
-               endif
-            end do
-         end do
-      end do
+          enddo
+        enddo
+      enddo
 
 c Start algorithm
       do i=1,number_vertices
-         pass(i)=.false.
-         occ(i)=.false.
-         end(i)=.false.
-      end do
+        pass_bool(i)=.false.
+        occ_bool(i)=.false.
+        end_bool(i)=.false.
+      enddo
       do i=0,Nmax+1
-         path(i)=0
-      end do
+        path(i)=0
+      enddo
       x(0)=number_vertices
 
       stack(1)=0
@@ -70,185 +59,12 @@ c Start algorithm
       stack(5)=2
       oldptr=3
       ptr=6
-      occ(1)=.true.
+      occ_bool(1)=.true.
       last=1
       next=list(1,1,1)
       jnext=1
-      end(list(1,2,1))=.true.
-      end(list(1,3,1))=.true.
-      flag=.false.
-      l=1
-      path(1)=1
-      go to 5
-
-    4 jngb1=list(prev,jlast,2)
-      jngb2=list(prev,jlast,3)
-      ngb1=list(last,jngb1,1)
-      ngb2=list(last,jngb2,1)
-
-      if (occ(ngb1)) then
-         next=ngb2
-         jnext=jngb2
-      else
-         if (occ(ngb2)) then
-            next=ngb1
-            jnext=jngb1
-         else
-            if (pass(ngb1)) then
-               if (pass(ngb2).or.end(ngb1)) go to 6
-               next=ngb1
-               jnext=jngb1
-               pass(ngb2)=.true.
-               stack(ptr)=ngb2
-               ptr=ptr+1
-            else
-               if (pass(ngb2)) then
-                  if (end(ngb2)) go to 6
-                  next=ngb2
-                  jnext=jngb2
-                  pass(ngb1)=.true.
-                  stack(ptr)=ngb1
-                  ptr=ptr+1
-               else
-                  next=ngb1
-                  jnext=jngb1
-                  pass(ngb2)=.true.
-                  stack(ptr)=oldptr
-                  stack(ptr+1)=l
-                  stack(ptr+2)=jngb2
-                  oldptr=ptr
-                  ptr=ptr+3
-               endif
-            endif
-         endif
-      endif
-
-    5 path(l+1)=next
-      if (l.eq.number_vertices-1) then
-      nhamilton=nhamilton+1
-      if(nhamilton.ge.maxiter) then
-       if(maxiter.lt.1000000000) then
-        nbatch=nbatch+1
-        Write(Iout,1000) nbatch,nhamilton
-        nhamilton=0
-       else 
-        Return
-       endif
-      endif
-      endif
-
-      if (end(next)) then
-         if (flag.or.pass(next)) go to 6
-         flag=.true.
-      endif
-
-      l=l+1
-      occ(next)=.true.
-
-      prev=last
-      last=next
-      jlast=jnext
-      go to 4
-
-
-    6 l1=stack(oldptr+1)
-      do i=oldptr+3,ptr-1
-         pass(stack(i))=.false.
-      end do
-      do i=l1+1,l
-         occ(path(i))=.false.
-         if (end(path(i))) flag=.false.
-      end do
-      ptr=oldptr
-      oldptr=stack(ptr)
-C     put this one in to avoid segmentation fault
-      if(oldptr.le.0) return
-      pass(path(l1+1))=.true.
-      stack(ptr)=path(l1+1)
-      ptr=ptr+1
-      last=path(l1)
-      jnext=stack(ptr+1)
-      next=list(last,jnext,1)
-      pass(next)=.false.
-
-      l=l1
-      go to 5
-C     if (oldptr.gt.0) go to 5
-
-1000  Format(1X,'Batch ',I3,' of Hamiltonian cycles: ',I10)
-      return
-      END
-
-      SUBROUTINE Hamilton(Iout,iprint,ihamstore,maxiter,IC3,filename)
-C     Back-track algorithm from Darko Babic to create Hamitonian cycles
-C     and the IUPAC name of a fullerene
-      use config
-      integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax),pos(Nmax)
-      integer bridge(Nmax),x(0:Nmax),y(0:Nmax),saved(Nmax)
-      integer i,j,k,l,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
-      integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
-      logical occ(Nmax),pass(Nmax),end(Nmax),flag,better
-      integer ic3(Nmax,3)
-      CHARACTER*50 filename,hamname
-      
-      if(number_vertices.gt.999) ihamstore=0 
-      if(ihamstore.ne.0) then
-       hamname=trim(filename)//".ham"
-       Open(unit=8,file=hamname,form='formatted')
-       Write(8,*) number_vertices
-       Write(Iout,1012) hamname
-      endif
-
-      ifirst=0 
-      nhamilton=0
-      maxN=30
-      if(number_vertices.lt.maxN) maxN=number_vertices
-      write (Iout,1009) maxiter
-
-C Set field list
-      do i=1,number_vertices
-         do j=1,3
-            list(i,j,1)=ic3(i,j)
-         end do
-      end do
-
-      do i=1,number_vertices
-         do j=1,3
-            k=list(i,j,1) 
-            l=1
-            do m=1,3
-               if (list(k,m,1).ne.i) then
-                  l=l+1
-                  list(i,j,l)=m
-               endif
-            end do
-         end do
-      end do
-
-C Start algorithm
-      do i=1,number_vertices
-         pass(i)=.false.
-         occ(i)=.false.
-         end(i)=.false.
-      end do
-      do i=0,Nmax+1
-         path(i)=0
-      end do
-      x(0)=number_vertices
-
-      stack(1)=0
-      stack(2)=0
-      stack(3)=1
-      stack(4)=1
-      stack(5)=2
-      oldptr=3
-      ptr=6
-      occ(1)=.true.
-      last=1
-      next=list(1,1,1)
-      jnext=1
-      end(list(1,2,1))=.true.
-      end(list(1,3,1))=.true.
+      end_bool(list(1,2,1))=.true.
+      end_bool(list(1,3,1))=.true.
       flag=.false.
       l=1
       path(1)=1
@@ -259,202 +75,376 @@ C Start algorithm
       ngb1=list(last,jngb1,1)
       ngb2=list(last,jngb2,1)
 
-      if (occ(ngb1)) then
-         next=ngb2
-         jnext=jngb2
+      if (occ_bool(ngb1)) then
+        next=ngb2
+        jnext=jngb2
       else
-         if (occ(ngb2)) then
+        if (occ_bool(ngb2)) then
+          next=ngb1
+          jnext=jngb1
+        else
+          if (pass_bool(ngb1)) then
+            if (pass_bool(ngb2).or.end_bool(ngb1)) goto 6
             next=ngb1
             jnext=jngb1
-         else
-            if (pass(ngb1)) then
-               if (pass(ngb2).or.end(ngb1)) go to 6
-               next=ngb1
-               jnext=jngb1
-               pass(ngb2)=.true.
-               stack(ptr)=ngb2
-               ptr=ptr+1
+            pass_bool(ngb2)=.true.
+            stack(ptr)=ngb2
+            ptr=ptr+1
+          else
+            if (pass_bool(ngb2)) then
+              if (end_bool(ngb2)) goto 6
+              next=ngb2
+              jnext=jngb2
+              pass_bool(ngb1)=.true.
+              stack(ptr)=ngb1
+              ptr=ptr+1
             else
-               if (pass(ngb2)) then
-                  if (end(ngb2)) go to 6
-                  next=ngb2
-                  jnext=jngb2
-                  pass(ngb1)=.true.
-                  stack(ptr)=ngb1
-                  ptr=ptr+1
-               else
-                  next=ngb1
-                  jnext=jngb1
-                  pass(ngb2)=.true.
-                  stack(ptr)=oldptr
-                  stack(ptr+1)=l
-                  stack(ptr+2)=jngb2
-                  oldptr=ptr
-                  ptr=ptr+3
-               endif
+              next=ngb1
+              jnext=jngb1
+              pass_bool(ngb2)=.true.
+              stack(ptr)=oldptr
+              stack(ptr+1)=l
+              stack(ptr+2)=jngb2
+              oldptr=ptr
+              ptr=ptr+3
             endif
-         endif
+          endif
+        endif
       endif
 
     5 path(l+1)=next
       if (l.eq.number_vertices-1) then
-         nhamilton=nhamilton+1
-         if(nhamilton.gt.maxiter) then
-            write (Iout,1010) maxiter
+        nhamilton=nhamilton+1
+        if(nhamilton.ge.maxiter) then
+          if(maxiter.lt.1000000000) then
+            nbatch=nbatch+1
+            Write(Iout,1000) nbatch,nhamilton
+            nhamilton=0
+          else 
             Return
-         endif
-         if(ifirst.eq.0) then
-            write (Iout,1011)
-         endif
-         if(ihamstore.ne.0) write (8,*) (path(j),j=1,number_vertices)
-         if(iprint.ne.0) then
-            if(ifirst.eq.0) write (Iout,1005)
-            write (Iout,1004) nhamilton,(path(j),j=1,maxN)
-            if(number_vertices.gt.30) then
-               do I=31,number_vertices,30
-                  jmax=I+29
-                  if(jmax.gt.number_vertices) jmax=number_vertices
-                  write (Iout,1001) (path(j),j=I,jmax)
-               enddo
-            endif
-         endif
-         ifirst=1
-         do j=1,number_vertices
-            pos(path(j))=j
-         end do
-         path(0)=path(number_vertices)
-         path(number_vertices+1)=path(1)
-
-         maxdif=number_vertices
-         do j=1,number_vertices
-            cur=path(j)
-            prv=path(j-1)
-            nxt=path(j+1)
-            do k=1,3
-               ngb=list(cur,k,1)
-               if (ngb.ne.prv.and.ngb.ne.nxt) then
-                  bridge(j)=pos(ngb)
-                  diff=abs(bridge(j)-j)
-                  if (number_vertices-diff.gt.diff)
-     1              diff=number_vertices-diff
-                  if (maxdif.gt.diff) maxdif=diff
-                  go to 11
-               endif
-            end do
-   11    continue
-         end do
-
-         maxdif=maxdif-1
-         if (maxdif.gt.x(0)) go to 6
-
-         do 13 j=1,number_vertices
-            better=.false.
-            diff=mod(number_vertices+bridge(j)-j,number_vertices)-1
-            if (diff.eq.maxdif) then
-               if (maxdif.lt.x(0)) then
-                  x(0)=maxdif
-                  y(0)=number_vertices-maxdif-2
-                  better=.true.
-               endif
-               i=0
-               k=j
-               do 14 m=1,number_vertices-1
-                  k=mod(k,number_vertices)+1
-                  relk=mod(number_vertices+k-j,number_vertices)+1
-                  relbr=
-     1                mod(number_vertices+bridge(k)-j,number_vertices)+1
-                  if (relbr.lt.relk) go to 14
-                  i=i+1
-                  if (.not.better) then
-                     if (x(i)-relk) 17,15,16
-   15                if (y(i)-relbr) 17,14,16
-   16                better=.true.
-                  endif
-                  x(i)=relk
-                  y(i)=relbr
-   14          continue
-            endif
-
-            if (better) then
-               do m=1,number_vertices
-                  saved(m)=path(m)
-               end do
-            end if
-   17       better=.false.
-            diff=number_vertices-diff-2
-            if (diff.eq.maxdif) then
-               if (maxdif.lt.x(0)) then
-                  x(0)=maxdif
-                  y(0)=number_vertices-maxdif-2
-                  better=.true.
-               endif
-               i=0
-               k=j
-               do 18 m=1,number_vertices-1
-                  k=mod(number_vertices+k-2,number_vertices)+1
-                  relk=mod(number_vertices+j-k,number_vertices)+1
-                  relbr=
-     1               mod(number_vertices+j-bridge(k),number_vertices)+1
-                  if (relbr.lt.relk) go to 18
-                  i=i+1
-                  if (.not.better) then
-                     if (x(i)-relk) 13,19,20
-   19                if (y(i)-relbr) 13,18,20
-   20                better=.true.
-                  endif
-                  x(i)=relk
-                  y(i)=relbr
-   18          continue
-            endif
-            if (better) then
-               do m=1,number_vertices
-                  saved(m)=path(m)
-               end do
-            end if
-   13    continue
-         go to 6
+          endif
+        endif
       endif
-      if (end(next)) then
-         if (flag.or.pass(next)) go to 6
+
+      if (end_bool(next)) then
+         if (flag.or.pass_bool(next)) goto 6
          flag=.true.
       endif
 
       l=l+1
-      occ(next)=.true.
+      occ_bool(next)=.true.
 
       prev=last
       last=next
       jlast=jnext
-      go to 4
+      goto 4
 
 
     6 l1=stack(oldptr+1)
       do i=oldptr+3,ptr-1
-         pass(stack(i))=.false.
-      end do
+        pass_bool(stack(i))=.false.
+      enddo
       do i=l1+1,l
-         occ(path(i))=.false.
-         if (end(path(i))) flag=.false.
-      end do
+        occ_bool(path(i))=.false.
+        if (end_bool(path(i))) flag=.false.
+      enddo
       ptr=oldptr
       oldptr=stack(ptr)
 C     put this one in to avoid segmentation fault
-      if (oldptr.le.0) go to 99
-      pass(path(l1+1))=.true.
+      if(oldptr.le.0) return
+      pass_bool(path(l1+1))=.true.
       stack(ptr)=path(l1+1)
       ptr=ptr+1
       last=path(l1)
       jnext=stack(ptr+1)
       next=list(last,jnext,1)
-      pass(next)=.false.
+      pass_bool(next)=.false.
 
       l=l1
-C     if (oldptr.gt.0) go to 5
-      go to 5
+      goto 5
+C     if (oldptr.gt.0) goto 5
+
+1000  Format(1X,'Batch ',I3,' of Hamiltonian cycles: ',I10)
+
+      return
+      END SUBROUTINE HamiltonCyc
+
+
+
+      SUBROUTINE Hamilton(Iout,iprint,ihamstore,maxiter,IC3,filename)
+C     Back-track algorithm from Darko Babic to create Hamitonian cycles
+C     and the IUPAC name of a fullerene
+      use config
+      integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax),pos(Nmax)
+      integer bridge(Nmax),x(0:Nmax),y(0:Nmax),saved(Nmax)
+      integer i,j,k,l,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
+      integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
+      logical occ_bool(Nmax),pass_bool(Nmax),end_bool(Nmax),flag,better
+      integer ic3(Nmax,3)
+      CHARACTER*50 filename,hamname
+
+      if(number_vertices.gt.999) ihamstore=0 
+      if(ihamstore.ne.0) then
+        hamname=trim(filename)//".ham"
+        Open(unit=8,file=hamname,form='formatted')
+        Write(8,*) number_vertices
+        Write(Iout,1012) hamname
+      endif
+
+      ifirst=0 
+      nhamilton=0
+      maxN=30
+      if(number_vertices.lt.maxN) maxN=number_vertices
+      write (Iout,1009) maxiter
+
+C Set field list
+      do i=1,number_vertices
+        do j=1,3
+          list(i,j,1)=ic3(i,j)
+        enddo
+      enddo
+
+      do i=1,number_vertices
+        do j=1,3
+          k=list(i,j,1) 
+          l=1
+          do m=1,3
+            if (list(k,m,1).ne.i) then
+              l=l+1
+              list(i,j,l)=m
+            endif
+          enddo
+        enddo
+      enddo
+
+C Start algorithm
+      do i=1,number_vertices
+        pass_bool(i)=.false.
+        occ_bool(i)=.false.
+        end_bool(i)=.false.
+      enddo
+      do i=0,Nmax+1
+        path(i)=0
+      enddo
+      x(0)=number_vertices
+
+      stack(1)=0
+      stack(2)=0
+      stack(3)=1
+      stack(4)=1
+      stack(5)=2
+      oldptr=3
+      ptr=6
+      occ_bool(1)=.true.
+      last=1
+      next=list(1,1,1)
+      jnext=1
+      end_bool(list(1,2,1))=.true.
+      end_bool(list(1,3,1))=.true.
+      flag=.false.
+      l=1
+      path(1)=1
+      goto 5
+
+    4 jngb1=list(prev,jlast,2)
+      jngb2=list(prev,jlast,3)
+      ngb1=list(last,jngb1,1)
+      ngb2=list(last,jngb2,1)
+
+      if (occ_bool(ngb1)) then
+        next=ngb2
+        jnext=jngb2
+      else
+        if (occ_bool(ngb2)) then
+          next=ngb1
+          jnext=jngb1
+        else
+          if (pass_bool(ngb1)) then
+            if (pass_bool(ngb2).or.end_bool(ngb1)) goto 6
+            next=ngb1
+            jnext=jngb1
+            pass_bool(ngb2)=.true.
+            stack(ptr)=ngb2
+            ptr=ptr+1
+          else
+            if (pass_bool(ngb2)) then
+              if (end_bool(ngb2)) goto 6
+              next=ngb2
+              jnext=jngb2
+              pass_bool(ngb1)=.true.
+              stack(ptr)=ngb1
+              ptr=ptr+1
+            else
+              next=ngb1
+              jnext=jngb1
+              pass_bool(ngb2)=.true.
+              stack(ptr)=oldptr
+              stack(ptr+1)=l
+              stack(ptr+2)=jngb2
+              oldptr=ptr
+              ptr=ptr+3
+            endif
+          endif
+        endif
+      endif
+
+    5 path(l+1)=next
+      if (l.eq.number_vertices-1) then
+        nhamilton=nhamilton+1
+        if(nhamilton.gt.maxiter) then
+          write (Iout,1010) maxiter
+          Return
+        endif
+        if(ifirst.eq.0) then
+          write (Iout,1011)
+        endif
+        if(ihamstore.ne.0) write (8,*) (path(j),j=1,number_vertices)
+        if(iprint.ne.0) then
+          if(ifirst.eq.0) write (Iout,1005)
+          write (Iout,1004) nhamilton,(path(j),j=1,maxN)
+          if(number_vertices.gt.30) then
+            do I=31,number_vertices,30
+              jmax=I+29
+              if(jmax.gt.number_vertices) jmax=number_vertices
+              write (Iout,1001) (path(j),j=I,jmax)
+            enddo
+          endif
+        endif
+        ifirst=1
+        do j=1,number_vertices
+          pos(path(j))=j
+        enddo
+        path(0)=path(number_vertices)
+        path(number_vertices+1)=path(1)
+
+        maxdif=number_vertices
+        do j=1,number_vertices
+          cur=path(j)
+          prv=path(j-1)
+          nxt=path(j+1)
+          do k=1,3
+            ngb=list(cur,k,1)
+            if (ngb.ne.prv.and.ngb.ne.nxt) then
+              bridge(j)=pos(ngb)
+              diff=abs(bridge(j)-j)
+              if (number_vertices-diff.gt.diff)
+     1          diff=number_vertices-diff
+              if (maxdif.gt.diff) maxdif=diff
+              goto 11
+            endif
+          enddo
+   11     continue
+        enddo
+
+        maxdif=maxdif-1
+        if (maxdif.gt.x(0)) goto 6
+
+        do 13 j=1,number_vertices
+          better=.false.
+          diff=mod(number_vertices+bridge(j)-j,number_vertices)-1
+          if (diff.eq.maxdif) then
+            if (maxdif.lt.x(0)) then
+              x(0)=maxdif
+              y(0)=number_vertices-maxdif-2
+              better=.true.
+            endif
+            i=0
+            k=j
+            do 14 m=1,number_vertices-1
+              k=mod(k,number_vertices)+1
+              relk=mod(number_vertices+k-j,number_vertices)+1
+              relbr=mod(number_vertices+bridge(k)-j,number_vertices)+1
+              if (relbr.lt.relk) goto 14
+              i=i+1
+              if (.not.better) then
+                if (x(i)-relk) 17,15,16
+   15           if (y(i)-relbr) 17,14,16
+   16           better=.true.
+              endif
+              x(i)=relk
+              y(i)=relbr
+   14       continue
+          endif
+
+          if (better) then
+            do m=1,number_vertices
+              saved(m)=path(m)
+            enddo
+          endif
+   17     better=.false.
+          diff=number_vertices-diff-2
+          if (diff.eq.maxdif) then
+            if (maxdif.lt.x(0)) then
+              x(0)=maxdif
+              y(0)=number_vertices-maxdif-2
+              better=.true.
+            endif
+            i=0
+            k=j
+            do 18 m=1,number_vertices-1
+              k=mod(number_vertices+k-2,number_vertices)+1
+              relk=mod(number_vertices+j-k,number_vertices)+1
+              relbr=mod(number_vertices+j-bridge(k),number_vertices)+1
+              if (relbr.lt.relk) goto 18
+              i=i+1
+              if (.not.better) then
+                if (x(i)-relk) 13,19,20
+   19           if (y(i)-relbr) 13,18,20
+   20           better=.true.
+              endif
+              x(i)=relk
+              y(i)=relbr
+   18       continue
+          endif
+          if (better) then
+            do m=1,number_vertices
+              saved(m)=path(m)
+            enddo
+          endif
+   13   continue
+        goto 6
+      endif
+      if (end_bool(next)) then
+        if (flag.or.pass_bool(next)) goto 6
+        flag=.true.
+      endif
+
+      l=l+1
+      occ_bool(next)=.true.
+
+      prev=last
+      last=next
+      jlast=jnext
+      goto 4
+
+
+    6 l1=stack(oldptr+1)
+      do i=oldptr+3,ptr-1
+        pass_bool(stack(i))=.false.
+      enddo
+      do i=l1+1,l
+        occ_bool(path(i))=.false.
+        if (end_bool(path(i))) flag=.false.
+      enddo
+      ptr=oldptr
+      oldptr=stack(ptr)
+C     put this one in to avoid segmentation fault
+      if (oldptr.le.0) goto 99
+      pass_bool(path(l1+1))=.true.
+      stack(ptr)=path(l1+1)
+      ptr=ptr+1
+      last=path(l1)
+      jnext=stack(ptr+1)
+      next=list(last,jnext,1)
+      pass_bool(next)=.false.
+
+      l=l1
+C     if (oldptr.gt.0) goto 5
+      goto 5
 
       if (x(0).eq.0) then
-         write (Iout,1002) 
-         Return
+        write (Iout,1002) 
+        Return
       endif
  
   99  write (Iout,1003) nhamilton
@@ -473,13 +463,17 @@ C     if (oldptr.gt.0) go to 5
  1006 format (/1X,'The best Hamiltonian cycle:')
  1008 format (30(I4,'-'))
  1009 format (/1X,'Calculate Hamiltonian cycles, half-ring sizes'
-     1 ' and IUPAC superscripts: (D. Babic, J. Chem. Inf. Comput. Sci.'
-     1 ' 35, 515-526 (1995).)',/1X,'Maximum allowed iteration: ',I10)
+     1 ' and IUPAC superscripts: (D. Babic, A. T. Balaban, D. J. Klein,'
+     1 ' J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).)'
+     1 ,/1X,'Maximum allowed iteration: ',I10)
  1010 format (I10,' Maximum Hamiltonian cycles reached: Return')
  1011 format (1X,' Hamiltonian cycle detected')
  1012 format (1X,' Write Hamiltonian cycles to external file ',A50)
+
       return
-      END
+      END SUBROUTINE Hamilton
+
+
 
       SUBROUTINE PathStatistic(IOUT,iprintf,IA,A,evec,df)
       use config
@@ -622,8 +616,8 @@ C     Now loop do (A^2)^8
       IMF(j,i)=IM(j,i)
       IMF1(i,j)=0
       IMF1(j,i)=0
-      end do
-      end do
+      enddo
+      enddo
 
       nloop=(number_vertices-2)/2-1
       do loop=1,nloop
@@ -751,5 +745,7 @@ C     NP values
  1025 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between appr. e**a and e**b with a= ',
      1  D22.14,' and b= ',D22.14)
+
       RETURN
-      END
+      END SUBROUTINE PathStatistic
+
