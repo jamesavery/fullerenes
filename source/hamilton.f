@@ -11,23 +11,37 @@
 !  Input: maxiter,Iout,A                                                    !
 !  Output: nbatch,nhamilton                                                 !
 !---------------------------------------------------------------------------!
-      integer list(Nmax,3,3),path(0:Nmax+1),stack(3*Nmax)
-      integer x(0:Nmax)
-      integer i,j,k,l,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
+      implicit none
+      integer maxiter
+      integer iout
+      integer nbatch ! number of batches
+      integer IC3(nmax,3) ! is only of size N, but is input as nmax, which makes this size necassary at this point
+      integer nhamilton ! number of found cycles
+      integer list(number_vertices,3,3)
+      integer path(0:number_vertices+1)
+      integer stack(2*number_vertices) !FIXME: find correct minimal size. N+5?
+      integer i,j,k,l,l1,m
+      integer last,next,ngb1,ngb2
+      integer jlast,jnext,jngb1,jngb2
       integer ptr,prev,oldptr
-      logical occ_bool(Nmax),pass_bool(Nmax),end_bool(Nmax),flag
-      integer IC3(Nmax,3)
-      ifirst=0 
+      logical occ_bool(number_vertices) ! true for vertices that have been added to the path, else false
+      logical pass_bool(number_vertices) ! true for vertices that have been passed by the path and thus have one less valency left, else false
+      logical end_bool(number_vertices) ! true for the two vertices that are neighbours of the first one (and could be the end of the path), else false
+      logical flag ! second neighbour of starting point has been used, i.e. there is a defined last vertex
+
       nhamilton=0
-      maxN=30
       nbatch=0
 
+c copy adjacency list from IC3(*,*) to list(*,*,1)
       do i=1,number_vertices
         do j=1,3
-          list(i,j,1)=ic3(i,j)
+          list(i,j,1)=IC3(i,j)
         enddo
       enddo
       
+c list(*,*,1): neighbour list
+c list(*,*,2): which second neighbour (dist=2 in the graph) is the first != self
+c list(*,*,3): which second neighbour (dist=2 in the graph) is the second != self
       do i=1,number_vertices
         do j=1,3
           k=list(i,j,1) 
@@ -41,17 +55,15 @@
         enddo
       enddo
 
-c Start algorithm
+c init
       do i=1,number_vertices
         pass_bool(i)=.false.
         occ_bool(i)=.false.
         end_bool(i)=.false.
       enddo
-      do i=0,Nmax+1
+      do i=0,number_vertices+1
         path(i)=0
       enddo
-      x(0)=number_vertices
-
       stack(1)=0
       stack(2)=0
       stack(3)=1
@@ -68,8 +80,11 @@ c Start algorithm
       flag=.false.
       l=1
       path(1)=1
+
+c Start algorithm
       goto 5
 
+c choose next vertex in path
     4 jngb1=list(prev,jlast,2)
       jngb2=list(prev,jlast,3)
       ngb1=list(last,jngb1,1)
@@ -114,19 +129,20 @@ c Start algorithm
 
     5 path(l+1)=next
       if (l.eq.number_vertices-1) then
-        nhamilton=nhamilton+1
-        if(nhamilton.ge.maxiter) then
-          if(maxiter.lt.1000000000) then
-            nbatch=nbatch+1
-            Write(Iout,1000) nbatch,nhamilton
-            nhamilton=0
-          else 
-            Return
-          endif
+        nhamilton=nhamilton+1 ! one circuit completed
+         if(nhamilton.ge.maxiter) then
+           if(maxiter.lt.1000000000) then
+             nbatch=nbatch+1
+             Write(Iout,1000) nbatch,nhamilton
+             nhamilton=0
+           else 
+             Return
+           endif
         endif
       endif
 
-      if (end_bool(next)) then
+      if (end_bool(next)) then ! is the next vertex adjacent to the starting point?
+         ! is 'next' the second of the two ends or has the next vertex been passed before? : backtrack (also backtrack if a cycle was completet)
          if (flag.or.pass_bool(next)) goto 6
          flag=.true.
       endif
@@ -139,7 +155,7 @@ c Start algorithm
       jlast=jnext
       goto 4
 
-
+c backtrack
     6 l1=stack(oldptr+1)
       do i=oldptr+3,ptr-1
         pass_bool(stack(i))=.false.
@@ -150,8 +166,6 @@ c Start algorithm
       enddo
       ptr=oldptr
       oldptr=stack(ptr)
-C     put this one in to avoid segmentation fault
-      if(oldptr.le.0) return
       pass_bool(path(l1+1))=.true.
       stack(ptr)=path(l1+1)
       ptr=ptr+1
@@ -161,8 +175,7 @@ C     put this one in to avoid segmentation fault
       pass_bool(next)=.false.
 
       l=l1
-      goto 5
-C     if (oldptr.gt.0) goto 5
+      if(oldptr.gt.0) goto 5
 
 1000  Format(1X,'Batch ',I3,' of Hamiltonian cycles: ',I10)
 
@@ -179,8 +192,11 @@ C     and the IUPAC name of a fullerene
       integer bridge(Nmax),x(0:Nmax),y(0:Nmax),saved(Nmax)
       integer i,j,k,l,m,last,next,ngb1,ngb2,jlast,jnext,jngb1,jngb2
       integer ptr,prev,oldptr,cur,prv,nxt,ngb,diff,maxdif,relk,relbr
-      logical occ_bool(Nmax),pass_bool(Nmax),end_bool(Nmax),flag,better
-      integer ic3(Nmax,3)
+      logical occ_bool(number_vertices)
+      logical pass_bool(number_vertices)
+      logical end_bool(number_vertices)
+      logical flag,better
+      integer IC3(Nmax,3)
       CHARACTER*50 filename,hamname
 
       if(number_vertices.gt.999) ihamstore=0 
@@ -200,7 +216,7 @@ C     and the IUPAC name of a fullerene
 C Set field list
       do i=1,number_vertices
         do j=1,3
-          list(i,j,1)=ic3(i,j)
+          list(i,j,1)=IC3(i,j)
         enddo
       enddo
 
@@ -223,7 +239,7 @@ C Start algorithm
         occ_bool(i)=.false.
         end_bool(i)=.false.
       enddo
-      do i=0,Nmax+1
+      do i=0,number_vertices+1
         path(i)=0
       enddo
       x(0)=number_vertices
