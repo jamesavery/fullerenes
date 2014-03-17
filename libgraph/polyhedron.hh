@@ -1,3 +1,6 @@
+#ifndef POLYHEDRON_HH
+#define POLYHEDRON_HH
+
 #include "planargraph.hh"
 #include "fullerenegraph.hh"
 #include <fstream>
@@ -132,3 +135,4 @@ private:
   static double C20_points[20][3];
 };
 
+#endif
