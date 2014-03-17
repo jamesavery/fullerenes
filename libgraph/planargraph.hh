@@ -1,5 +1,5 @@
 #ifndef PLANARGRAPH_HH
-# define PLANARGRAPH_HH
+#define PLANARGRAPH_HH
 
 #include "graph.hh"
 
