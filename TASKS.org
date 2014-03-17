@@ -1,0 +1,35 @@
+* DEVELOPMENT
+
+3. 3D structure numerically via distorted icosahedron, subsequent tiling
+
+1. GUI
+   decide functionality
+   design properly
+
+2. 2d optimizer in cpp, acting on the layout, member of PlanarGraph (lukas)
+   -- fancy extension: choose outer face such that layout get maximal symmetry
+
+4. symmetry ...
+   calulate equivalence classes under symmetry group of triangulation via brinkmann (james)
+   identify pointgroup (harder than expected)
+   Brinkmann's graph enumeration
+   1. Orientation -> strings -> lex. smallest string starting at node with deg != 6. Easy.
+   2. Following that: Symmetry classification. (Lots of work but useful for doing general cubic)
+
+
+
+* WRITING
+
+5. GS Paper
+   2. James: Write up pretty pseudocode for both operations general spiral <-> graph.
+   3. Lukas+James: Examples - run and describe, possible output stuff from program for figures.
+   4. James: Write introduction,conclusion to GS paper.
+
+6. Review ...
+
+
+
+* LATER
+
+7. direct3d
+
