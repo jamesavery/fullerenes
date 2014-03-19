@@ -59,6 +59,7 @@ public:
   vector<coord2d> tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> spherical_projection() const;
+  bool optimize_layout(const double k_dist, const double k_angle, const double k_area);
 
   vector<double> edge_lengths() const;
   coord2d width_height() const;
