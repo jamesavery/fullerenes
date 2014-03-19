@@ -51,6 +51,7 @@ struct coord2d : public pair<double,double> {
   coord2d operator+(const coord2d& y) const { return coord2d(first+y.first,second+y.second); }
   coord2d operator-(const coord2d& y) const { return coord2d(first-y.first,second-y.second); }
   coord2d& operator+=(const coord2d& y){ first += y.first; second += y.second; return *this; }
+  coord2d& operator-=(const coord2d& y){ first -= y.first; second -= y.second; return *this; }
   coord2d& operator*=(const coord2d& y){ first *= y.first; second *= y.second; return *this; }
   coord2d& operator*=(const double s)  { first*=s;second*=s; return *this;}
   coord2d operator-() const {coord2d y(-first,-second); return y;}
@@ -92,6 +93,8 @@ struct coord2d : public pair<double,double> {
   }
   
   double norm() const { return sqrt(first*first+second*second); }
+  // d/dx_i ||x|| = x_i/||x||.
+  static coord2d dnorm(const coord2d& x){ return x/x.norm(); }
 
   static coord2d displacement(const coord2d& x, const coord2d& y, bool layout_is_spherical)
   {

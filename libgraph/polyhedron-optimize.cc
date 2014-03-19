@@ -14,14 +14,16 @@ using namespace std;
 
 #ifdef HAS_GSL
 
-struct params_t {
+struct params_t
+{
   PlanarGraph *graph;
   vector<double> *zero_values_dist;
   vector<double> *force_constants_dist;
   vector<double> *force_constants_angle;
 };
 
-double pot(const gsl_vector* coordinates, void* parameters){
+double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
+{
 
   params_t &params = *static_cast<params_t*>(parameters);
   PlanarGraph &graph = *params.graph;
@@ -80,7 +82,8 @@ double pot(const gsl_vector* coordinates, void* parameters){
 }
 
 
-void grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient){
+void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient)
+{
 
   params_t &params = *static_cast<params_t*>(parameters);
   PlanarGraph &graph = *params.graph;
@@ -159,13 +162,15 @@ void grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gradient)
 
 
 //FIXME redo for performance reasons
-void pot_grad(const gsl_vector* coordinates, void* parameters, double* potential, gsl_vector* gradient) {
-  *potential = pot(coordinates, parameters);
-  grad(coordinates, parameters, gradient);
+void polyhedron_pot_grad(const gsl_vector* coordinates, void* parameters, double* potential, gsl_vector* gradient)
+{
+  *potential = polyhedron_pot(coordinates, parameters);
+  polyhedron_grad(coordinates, parameters, gradient);
 }
 
 
-bool Polyhedron::optimize_other(){
+bool Polyhedron::optimize_other()
+{
 //  cout << "entering opt other" << endl;
 
   // settings for the optimizations
@@ -192,9 +197,9 @@ bool Polyhedron::optimize_other(){
   // Create the minimisation function block, define the different functions and parameters
   gsl_multimin_function_fdf potential_function;
   potential_function.n = 3*N;
-  potential_function.f = &pot;
-  potential_function.df = &grad;
-  potential_function.fdf = &pot_grad;
+  potential_function.f = &polyhedron_pot;
+  potential_function.df = &polyhedron_grad;
+  potential_function.fdf = &polyhedron_pot_grad;
   potential_function.params = static_cast<void*>(&params);
   
   // Starting point
