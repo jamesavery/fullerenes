@@ -8,7 +8,7 @@ T-C366, a precursor to construct T-C384
 &Graph /
 T-C366, a precursor to construct T-C384
 &General ispsearch=2, nosort=1, irext=3, iwext=1, ipsphere=3 filename='Fullerene-3D' /
-&Coord ICart=1 leap=1 /
+&Coord ICart=1 IGCtrans=1, kGC=2 /
 &FFChoice Iopt=3 /
 &FFParameters /
 &Hamilton /
