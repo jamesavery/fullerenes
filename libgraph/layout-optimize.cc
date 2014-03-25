@@ -416,8 +416,8 @@ bool PlanarGraph::optimize_layout(const double k_dist_inp, const double k_angle_
 }
 
 #else
-bool PlanarGraph::optimize_layout(){
-  cout << "Optimizing layouts is only available through GSL." << endl;
+bool PlanarGraph::optimize_layout(const double a, const double b, const double c, const double d){
+  cerr << "Optimizing layouts is only available through GSL." << endl;
   return 0;
 }
 #endif
