@@ -442,7 +442,7 @@ bool PlanarGraph::optimize_layout(const double zv_dist_inp, const double k_dist_
 }
 
 #else
-bool PlanarGraph::optimize_layout(){
+bool PlanarGraph::optimize_layout(const double a, const double b, const double c, const double d){
   cerr << "Optimizing layouts is only available through GSL." << endl;
   return 0;
 }
