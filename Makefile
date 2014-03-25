@@ -28,7 +28,7 @@ LIBRARIES+=-lblas -llapack -lgfortran
 
 
 OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o opt-standalone.o
+GRAPHOBJECTS= graph.o cubicgraph.o layout.o layout-optimize.o hamiltonian.o graph.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o opt-standalone.o
 GRAPHFOBJECTS=geometry.o force.o diag.o  dddihedral.o config.o 
 
 FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))
