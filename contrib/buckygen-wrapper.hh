@@ -1,3 +1,6 @@
+#ifndef BUCKYGEN_WRAPPER_HH
+# define BUCKYGEN_WRAPPER_HH
+
 namespace BuckyGen {
   
   typedef struct {
@@ -12,3 +15,5 @@ namespace BuckyGen {
 
   bool next_fullerene(const buckygen_queue& Q, Graph& G);
 }
+
+#endif
