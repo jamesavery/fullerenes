@@ -93,17 +93,19 @@ public:
       return IsomerDB(-1);
     }
     u_int16_t header;
-    fread(&header,2,1,f);
-
+    size_t nread1 = fread(&header,2,1,f);
+    
     IsomerDB DB(header & 0xff, header >> 8 & 1, header >> 9 & 1);
-    fread(&DB.Nisomers,4,1,f);
+    size_t nread2 = fread(&DB.Nisomers,4,1,f);
     DB.entries.resize(DB.Nisomers);
-    fread(&DB.entries[0],sizeof(Entry),DB.Nisomers,f);
+    size_t nread3 = fread(&DB.entries[0],sizeof(Entry),DB.Nisomers,f);
+
+    if(!nread1 || !nread2 || !nread3) return IsomerDB(-1);
     return DB;
   }
  
   static Entry getIsomer(int N, int isomer, bool IPR=false){
-    string filename = "database/binary/c"+pad_string(to_string(N),3)+(IPR?"IPR":"all")+".bin";
+    string filename = FULLERENE_DATABASE"/binary/c"+pad_string(to_string(N),3)+(IPR?"IPR":"all")+".bin";
     FILE *f = fopen(filename.c_str(),"rb");
     if(!f){
       cerr << "Couldn't open database file " << filename << " for reading: " << strerror(errno) << ".\n";
@@ -129,6 +131,11 @@ public:
     for(int i=0;i<12;i++) RSPI[i]--;
     //    cout << "creating C"<<N<< " from spiral indices " << RSPI << endl;
     return FullereneGraph(N,RSPI);
+  }
+
+  static IsomerDB readBinary(int N=20, bool IPR=false) {
+    string filename = FULLERENE_DATABASE"/binary/c"+pad_string(to_string(N),3,'0')+(IPR?"IPR":"all")+string(".bin");
+    return readBinary(filename);
   }
 
   static IsomerDB readPDB(int N=20, bool IPR=false) {
@@ -193,7 +200,33 @@ public:
     return DB;
   }
 
-  IsomerDB(int N=-1, bool IPR = false, bool IH=false, vector<Entry> entries=vector<Entry>()) : 
+  static size_t number_isomers(int N, const string& sym="Any"){ 
+    int Nindex = (N-20)/2;
+    if(Nindex >= Nisomers_data.size()) return 0;
+
+    if(sym == "Any") return Nisomers_data[Nindex]; 
+
+    if(sym == "Nontrivial"){
+      size_t sum = 0;
+      for(int i=0;i<symmetries_data[Nindex].size();i++) 
+	if(symmetries_data[Nindex][i] != " C1") 
+	  sum += symmetry_count_data[Nindex][i];
+      return sum;
+    } else {
+      for(int i=0;i<symmetries_data[Nindex].size();i++) 
+	if(symmetries_data[Nindex][i] == sym) 
+	  return symmetry_count_data[Nindex][i];
+    }
+    return 0;
+  }
+  static vector<string> symmetries(int N){ return symmetries_data[(N-20)/2]; }
+
+  static vector<size_t> Nisomers_data;
+  static vector< vector<string> > symmetries_data;
+  static vector< vector<size_t> > symmetry_count_data;
+
+  IsomerDB(int N=-1, bool IPR = false, bool IH=false, 
+	   vector<Entry> entries=vector<Entry>()) : 
     N(N), IPR(IPR), with_ncycham(IH), entries(entries) { }
 
 };
