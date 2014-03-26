@@ -53,15 +53,15 @@ int main(int ac, char **av)
   cout << endl;
 
   FullereneGraph fg(n, pentagon_indices_input, jumps_input);
-
-  fg.get_canonical_general_spiral_from_fg(pentagon_indices_output,jumps_output);
-
+  //  fg.get_canonical_general_spiral_from_fg(pentagon_indices_output,jumps_output);
+  fg = fg.halma_fullerene(1);
   fg.layout2d = fg.tutte_layout();
   Triangulation dual(fg.dual_graph(6,true));
-  
-  FullereneDual(dual).get_canonical_fullerene_rspi(pentagon_indices_output2,jumps_output2);
 
-  cout << "FullereneGraph general RSPI: " << jumps_output  << "; " << pentagon_indices_output << endl;
+  bool found_spiral = FullereneDual(dual).get_fullerene_rspi(pentagon_indices_output2,jumps_output2,true);
+
+  //  cout << "FullereneGraph general RSPI: " << jumps_output  << "; " << pentagon_indices_output << endl;
+  
   cout << "FullereneDual  general RSPI: " << jumps_output2 << "; " << pentagon_indices_output2 << endl;
 
   return 0;

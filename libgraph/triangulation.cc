@@ -128,7 +128,8 @@ PlanarGraph Triangulation::dual_graph() const
     
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
-      node_t w(nextCW(dedge_t(u,v)));      
+      node_t w(nextCCW(dedge_t(u,v))); // TODO: CCW for buckygen -- will this give problems elsewhere?
+
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
 
@@ -337,7 +338,8 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   if(edge_set.find(edge_t(f1,f2)) == edge_set.end() ||
      edge_set.find(edge_t(f1,f3)) == edge_set.end() ||
      edge_set.find(edge_t(f2,f3)) == edge_set.end()){
-    cerr << "The requested nodes are not connected." << endl;
+    // TODO: Set a global verbosity level; Often, we don't want to look at all this stuff.
+    //    cerr << "The requested nodes are not connected." << endl;
     return false;
   }
 
@@ -420,17 +422,17 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   // make sure we left the loop in a sane state
   // this probably requires some proper error handling: throw and catch and so on ...
   if(remaining_nodes.size() != 1){
-    cerr << "more than one node left ... exiting." << endl;
+    //    cerr << "more than one node left ... exiting." << endl;
     return false;
   }
   const int last_valency = valencies[*remaining_nodes.begin()];
   if(open_valencies.size() != last_valency){
-    cerr << "wrong number of nodes with open valencies: " << open_valencies.size() << " ... exiting." << endl;
+    //    cerr << "wrong number of nodes with open valencies: " << open_valencies.size() << " ... exiting." << endl;
     return false;
   }
   for(list<pair<node_t,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
     if(it->second != 1){
-      cerr << "number of open valencies is not 1 (but it should be) ... exiting." << endl;
+      //      cerr << "number of open valencies is not 1 (but it should be) ... exiting." << endl;
       return false;
     }
   }
@@ -461,7 +463,7 @@ vector< vector<int> > Triangulation::get_all_spirals() const {
 }
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
-bool Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps, bool general) const {
+bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool canonical, bool general) const {
 
   vector<int> spiral_tmp;
   jumplist_t jumps_tmp;
@@ -475,9 +477,14 @@ bool Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps,
 
       int f1 = f[permutations[j][0]], f2 = f[permutations[j][1]], f3 = f[permutations[j][2]];
 
-      if(!get_spiral(f1, f2, f3, spiral_tmp, jumps_tmp, general)){
-//        cout << "get_spiral failed" << endl;
-//        return false; // FIXME this only means there is no non-general
+      if(!get_spiral(f1, f2, f3, spiral_tmp, jumps_tmp, general))
+	continue;
+
+      //If we don't need the canonical spiral, just return the first one that works
+      if(!canonical){
+	jumps  = jumps_tmp;
+	spiral = spiral_tmp;
+	return; 
       }
 
       // store the shortest / lexicographically smallest (general) spiral
@@ -497,12 +504,12 @@ bool Triangulation::get_canonical_spiral(vector<int> &spiral, jumplist_t &jumps,
 
 
 // call for the canonical general spiral and extract the pentagon indices
-bool FullereneDual::get_canonical_fullerene_rspi(vector<int>& rspi, jumplist_t& jumps, bool general) const {
+bool FullereneDual::get_fullerene_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonical, bool general) const {
 
   rspi.clear();
   jumps.clear();
   vector<int> spiral;
-  if(!get_canonical_spiral(spiral, jumps, general)) return false;
+  if(!get_spiral(spiral, jumps, canonical, general)) return false;
 
   int i=0;
   vector<int>::const_iterator it=spiral.begin();
