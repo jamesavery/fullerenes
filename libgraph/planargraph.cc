@@ -10,6 +10,12 @@ bool PlanarGraph::is_cubic() const {
   return true;
 }
 
+bool PlanarGraph::is_triangulation() const { // NB: A bit expensive
+  facemap_t faces(compute_faces(INT_MAX,true));
+  const int F = 2+edge_set.size()-N;
+
+  return (faces[3].size() == F);
+}
 
 bool PlanarGraph::is_a_fullerene() const {
   if(!is_cubic()){

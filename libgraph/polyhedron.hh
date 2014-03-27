@@ -53,7 +53,7 @@ struct Polyhedron : public PlanarGraph {
   }
 
   bool optimize(int opt_method = 3, double ftol = 1e-10);
-  bool optimize_other(vector<double> zero_values_dist=vector<double>());
+  bool optimize_other(bool optimize_angles = true, vector<double> zero_values_dist=vector<double>());
 
   static Polyhedron C20() {
     vector<coord3d> points(20);
@@ -121,6 +121,7 @@ struct Polyhedron : public PlanarGraph {
   }
 
   Polyhedron dual(int Fmax=INT_MAX, bool planar_layout=false) const;
+  bool is_triangulation() const;
 
   double  diameter() const;
   coord3d width_height_depth() const;

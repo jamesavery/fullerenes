@@ -33,6 +33,7 @@ public:
 
   bool is_a_fullerene() const;
   bool is_cubic() const;
+  bool is_triangulation() const;
 
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;
@@ -59,8 +60,6 @@ public:
   vector<coord2d> tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> spherical_projection() const;
-  bool optimize_layout(const double zv_dist=0.2, const double k_dist=10.0, const double k_angle=10.0, const double k_area=10.0);
-
   bool optimize_layout(const double zv_dist=0.2, const double k_dist=10.0, const double k_angle=10.0, const double k_area=10.0);
 
   vector<double> edge_lengths() const;
