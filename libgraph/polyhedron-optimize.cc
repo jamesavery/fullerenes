@@ -169,7 +169,7 @@ void polyhedron_pot_grad(const gsl_vector* coordinates, void* parameters, double
 }
 
 
-bool Polyhedron::optimize_other()
+bool Polyhedron::optimize_other(vector<double> zero_values_dist)
 {
 //  cout << "entering opt other" << endl;
 
@@ -180,13 +180,12 @@ bool Polyhedron::optimize_other()
   const int max_iterations = 500;// FIXME final value
   
   // init values
-  vector<double> zero_values_dist(this->edge_set.size());
-  vector<double> force_constants_dist(this->edge_set.size());
-  for(int i=0; i!=this->edge_set.size(); i++){
-    zero_values_dist[i] = 1.4; // FIXME possibly change later
-    force_constants_dist[i] = 500.0; // FIXME possibly change later
+  vector<double> force_constants_dist(edge_set.size(), 500.0);
+  if(zero_values_dist.size() != edge_set.size())
+  {
+    zero_values_dist.resize(edge_set.size(), 1.4);
   }
-  vector<double> force_constants_angle(2 * this->edge_set.size(), 200.0); // FIXME possibly change later
+  vector<double> force_constants_angle(2 * edge_set.size(), 200.0); // FIXME possibly change later
 
   params_t params;
   params.graph = this; //FIXME is this legal?
@@ -243,8 +242,9 @@ bool Polyhedron::optimize_other()
 }
 
 #else
-bool Polyhedron::optimize_other(){
-  cout << "Optimizing other polyhedra than fullerenes is only available through GSL." << endl;
+bool Polyhedron::optimize_other(vector<double> unused)
+{
+  cerr << "Optimizing other polyhedra than fullerenes is only available through GSL." << endl;
   return 0;
 }
 #endif
