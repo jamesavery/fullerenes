@@ -49,7 +49,7 @@ public:
   void get_vertex_spiral(const int f1, const int f2, const int f3, vector<int> &spiral, jumplist_t &jumps) const;
 
 
-  vector<tri_t>  triangulation(int face_max = INT_MAX) const;
+  vector<tri_t>  triangulation(int face_max=INT_MAX) const;
   vector<tri_t>  triangulation(const vector<face_t>& faces) const;
   vector<tri_t>  centroid_triangulation(const vector<face_t>& faces) const ;
   vector<tri_t>&  orient_triangulation(vector<tri_t>& tris) const;
@@ -59,6 +59,7 @@ public:
   vector<coord2d> tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> spherical_projection() const;
+  bool optimize_layout(const double zv_dist=0.2, const double k_dist=10.0, const double k_angle=10.0, const double k_area=10.0);
 
   bool optimize_layout(const double zv_dist=0.2, const double k_dist=10.0, const double k_angle=10.0, const double k_area=10.0);
 
