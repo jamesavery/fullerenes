@@ -128,7 +128,7 @@ PlanarGraph Triangulation::dual_graph() const
     
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
-      node_t w(nextCCW(dedge_t(u,v))); // TODO: CCW for buckygen -- will this give problems elsewhere?
+      node_t w(nextCW(dedge_t(u,v))); // TODO: CCW for buckygen -- will this give problems elsewhere?
 
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
@@ -484,7 +484,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool cano
       if(!canonical){
 	jumps  = jumps_tmp;
 	spiral = spiral_tmp;
-	return; 
+	return true; 
       }
 
       // store the shortest / lexicographically smallest (general) spiral
@@ -504,7 +504,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool cano
 
 
 // call for the canonical general spiral and extract the pentagon indices
-bool FullereneDual::get_fullerene_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonical, bool general) const {
+bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonical, bool general) const {
 
   rspi.clear();
   jumps.clear();

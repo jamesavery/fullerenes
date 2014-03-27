@@ -70,7 +70,7 @@ public:
   // 4. Embed-in-3D special case
   FullereneDual(const Triangulation& g = Triangulation()) : Triangulation(g) {}
 
-  bool get_fullerene_rspi(vector<int>& r, jumplist_t& j, bool canonical=true, bool general=true) const;
+  bool get_rspi(vector<int>& r, jumplist_t& j, bool canonical=true, bool general=true) const;
 
 };
 
