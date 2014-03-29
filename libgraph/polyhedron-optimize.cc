@@ -246,7 +246,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
 }
 
 #else
-bool Polyhedron::optimize_other(vector<double> unused)
+bool Polyhedron::optimize_other(bool, vector<double>)
 {
   cerr << "Optimizing other polyhedra than fullerenes is only available through GSL." << endl;
   return 0;
