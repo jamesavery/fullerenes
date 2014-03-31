@@ -42,12 +42,12 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
   assert(k_angle.size() == 2*graph.edge_set.size());
   assert(k_area.size() == n_faces);
 
-
 //
 // DISTANCE TERM
 //
   //get average edge_length
   double log_sum_edge_length=0;
+
   set<edge_t>::const_iterator e=graph.edge_set.begin(), ee=graph.edge_set.end();
   for(; e!=ee; e++){
     //cout << *e << endl;
@@ -74,6 +74,7 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
 //      cout << "omitting " << *it1 << "-" << *it2 << endl;
       continue; // edge is part of outer face
     }
+
     const double ax = gsl_vector_get(coordinates, 2 * e->first);
     const double ay = gsl_vector_get(coordinates, 2 * e->first +1);
     const double bx = gsl_vector_get(coordinates, 2 * e->second);
@@ -81,6 +82,7 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
 //    cout << "r: " << coord2d(ax-bx,ay-by).norm() << " r_0: " << zero_values_dist[i] << endl;
     potential_energy += 0.5 * k_dist[i] * pow(coord2d(ax-bx,ay-by).norm() - zero_values_dist[i], 2);
   }
+
 
 
 //
@@ -110,7 +112,6 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
     }
   }
 
-
 //
 // AREA TERM
 //
@@ -130,6 +131,7 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
 //    cout << "area of one triangle: " << ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2 << endl;
   }
 //  cout << "area of outer polygon: " << A_tot << endl;
+
   const double A_av = abs(A_tot)/(n_faces-1); // (excluding the outer face)
 //  cout << "average area of polygon: " << A_av << endl;
 
@@ -194,6 +196,7 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
 //  cout << "(ought to be all zero): " << derivatives << endl;
 
   //get average edge_length
+
   double log_sum_edge_length=0;
   set<edge_t>::const_iterator e=graph.edge_set.begin(), ee=graph.edge_set.end();
   for(; e!=ee; e++){
@@ -333,7 +336,6 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
     derivatives[*it].second = 0;
   }
 //  cout << "d: " << derivatives << endl;
-
   // return gradient
   for(int i=0; i < graph.N; ++i) {
     gsl_vector_set(gradient, 2*i, derivatives[i].first);
@@ -355,6 +357,7 @@ void layout_pot_grad(const gsl_vector* coordinates, void* parameters, double* po
   *potential = layout_pot(coordinates, parameters);
   layout_grad(coordinates, parameters, gradient);
 }
+
 
 
 bool PlanarGraph::optimize_layout(const double zv_dist_inp, const double k_dist_inp, const double k_angle_inp, const double k_area_inp)
@@ -424,7 +427,6 @@ bool PlanarGraph::optimize_layout(const double zv_dist_inp, const double k_dist_
     status = gsl_multimin_test_gradient(s->gradient, terminate_gradient);
 //    printf ("error: %s\n", gsl_strerror (status));
     //cout << "Status 2: " << status << endl;
-  
   } while (status == GSL_CONTINUE && iter < max_iterations);
   
   for(int i=0; i<N; ++i){

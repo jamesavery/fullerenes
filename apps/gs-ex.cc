@@ -214,7 +214,7 @@ int main(int ac, char **av)
   Triangulation dt(dg,triangles);
   vector<int> spiral;
   Triangulation::jumplist_t jumplist;
-  bool success = dt.get_canonical_spiral(spiral,jumplist);
+  bool success = dt.get_spiral(spiral,jumplist,true);
   if(!success) cerr << "Canonical general spiral not found.\n";
 
   output << "spiral   = " << spiral << ";\n"

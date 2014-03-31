@@ -33,6 +33,7 @@ public:
 
   bool is_a_fullerene() const;
   bool is_cubic() const;
+  bool is_triangulation() const;
 
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;

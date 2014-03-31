@@ -10,6 +10,12 @@ bool PlanarGraph::is_cubic() const {
   return true;
 }
 
+bool PlanarGraph::is_triangulation() const { // NB: A bit expensive
+  facemap_t faces(compute_faces(INT_MAX,true));
+  const int F = 2+edge_set.size()-N;
+
+  return (faces[3].size() == F);
+}
 
 bool PlanarGraph::is_a_fullerene() const {
   if(!is_cubic()){
@@ -272,8 +278,8 @@ vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_la
       const set<node_t> sf(f.begin(),f.end());
 
       if(of==sf){ // swap faces[i] with faces[0]
-        faces[i] = faces[0];
-        faces[0] = outer_face;
+       faces[i] = faces[0];
+       faces[0] = outer_face;
       }
     }
   } else outer_face = face_t(faces[0]);

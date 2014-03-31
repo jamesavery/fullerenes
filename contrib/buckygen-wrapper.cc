@@ -38,21 +38,32 @@ void stop(const buckygen_queue& Q)
   msgctl(Q.qid,IPC_RMID,0);
 }
 
-
-buckygen_queue start(int N, int IPR)
+  
+buckygen_queue start(int N, int IPR, bool only_nontrivial, 
+		     size_t chunk_index, size_t chunk_number)
 {
   buckygen_queue Q;
   Q.qid = msgget(IPC_PRIVATE,IPC_CREAT | 0666);
   Q.Nvertices = N/2+2;
   Q.IPR     = IPR;
+  Q.chunk_index  = chunk_index;
+  Q.chunk_number = chunk_number;
 
   assert(Q.qid >= 0);
 
   if(!(Q.pid = fork())){	// Child?
     QGlobal = Q;
     
-    char *av[3] = {strdup("buckygen"), strdup((to_string(N)+"d").c_str()),strdup(IPR? "-I" : "")};
-    buckygen_main(IPR?3:2, av);
+    int  npar = 2;
+    char *av[5]  = {strdup("buckygen"), strdup((to_string(N)+"d").c_str())};
+    char *ipr    = strdup(IPR? "-I" : "");
+    char *chunks = strdup((to_string(chunk_index)+"/"+to_string(chunk_number)).c_str());
+    
+    if(IPR) av[npar++] = ipr;
+    if(chunk_number != 1) av[npar++] = chunks;
+    if(only_nontrivial)   av[npar++] = strdup("-V");
+
+    buckygen_main(npar, av);
     signal_finished(Q);
     exit(0);
   } else {			// Parent?

@@ -25,31 +25,33 @@ int main(int ac, char **av)
   // FullereneGraph g(IsomerDB::makeIsomer(N,DB.getIsomer(N,isomer_number,IPR)));
   string basename("polyhedron-"+to_string(N));
 
+
   FullereneGraph g(N,RSPI);
   g.layout2d = g.tutte_layout();
 
   Polyhedron P0(g,g.zero_order_geometry(),6);
 
-  {
-    ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
-    mol2 << P0.to_mol2();
-    mol2.close();
-  }
-  
-  Polyhedron P(P0);
-  P.optimize();
+   {
+     ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
+     mol2 << P0.to_mol2();
+     mol2.close();
+   }
 
-  ofstream output(("output/"+basename+".m").c_str());
+   Polyhedron P(P0);
+   P.optimize();
 
-  output << "g = " << g << ";\n";
-  output << "coordinates0 = " << P0.points << ";\n";
-  output << "coordinates = "  << P.points << ";\n";
+   ofstream output(("output/"+basename+".m").c_str());
 
-  output << "P = " << P << ";\n";
-  
-  Polyhedron D(P.dual(6,true));
+   output << "g = " << g << ";\n";
+   output << "coordinates0 = " << P0.points << ";\n";
+   output << "coordinates = "  << P.points << ";\n";
 
-  output << "PD = " << D << ";\n";
+   output << "P = " << P << ";\n";
+
+   Polyhedron D(P.dual(6,true));
+   
+   D.optimize();
+   output << "PD = " << D << ";\n";
   
   output.close();
 
