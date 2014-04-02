@@ -285,26 +285,33 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
 	faces = compute_faces_flat(face_max,true);
       }
     } else faces = compute_faces_flat(face_max,true);
+  } 
+}
+
+matrix3d Polyhedron::inertia_matrix() const
+{
+  matrix3d I;
+
+  for(int k=0;k<points.size();k++){
+    const coord3d& x(points[k]);
+    const double   xx(x.dot(x));
+    for(int i=0;i<3;i++){
+      I(i,i) += xx;
+
+      for(int j=0;j<3;j++)
+	I(i,j) -= x[i]*x[j];
+    }
   }
+
+  return I;
+}
+
+matrix3d Polyhedron::inertial_frame() const
+{
+  const matrix3d I(inertia_matrix());
+  pair<coord3d,matrix3d> ES(I.eigensystem());
   
-  //  assert(faces[0] == outer_face);
-  //   }
-
-  // cerr << "points = {"; for(int i=0;i<points.size();i++) cerr << points[i] << (i+1<points.size()? ", ":"};\n");
-  // cerr << "faces  = {"; for(int i=0;i<faces.size();i++) cerr << faces[i] << (i+1<faces.size()? ", ":"};\n");
-  // cerr << "G = " << static_cast<PlanarGraph>(*this) << endl;
-  // cerr << "Layout has " << layout2d.size() << " points.\n";
-
-  //  if(points.size() != N) 
-  //    points = polar_mapping(spherical_projection());
-
-
-
-
-  // cerr << "Found " << faces.size() << " faces.\n";
-  // cerr << "Volume divergence: " << volume_divergence() << "\n";
-  // cerr << "Volume tetra:      " << volume_tetra() << "\n";
-  // cerr << "P = " << *this << endl;
+  return ES.second;
 }
 
 coord3d Polyhedron::width_height_depth() const {

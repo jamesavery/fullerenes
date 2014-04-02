@@ -18,7 +18,7 @@ typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
 
-// TODO: geometry.hh is getting big. Perhaps move most of the implementation to geometryc.cc
+// TODO: geometry.hh is getting huge. Move most of the implementation to geometryc.cc
 
 // Directed edge is an ordered pair of nodes
 typedef pair<node_t,node_t> dedge_t;
@@ -114,6 +114,7 @@ struct coord2d : public pair<double,double> {
   friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << "{" << x.first << "," << x.second << "}"; return s; }
   friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; return s; }
 };
+
 
 
 struct coord3d {
@@ -218,6 +219,116 @@ struct coord3d {
 
   friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
+};
+
+
+
+struct matrix3d {
+  double values[9];
+
+  matrix3d()                { memset(values,0,9*sizeof(double)); }
+  matrix3d(const double *v) { memcpy(values,v,9*sizeof(double)); }
+
+  double& operator()(int i, int j)       { return values[i*3+j]; }
+  double  operator()(int i, int j) const { return values[i*3+j]; }
+
+  matrix3d transpose() const {
+    const matrix3d &M(*this);
+    matrix3d Mt;
+    for(int i=0;i<3;i++)
+      for(int j=0;j<3;j++)
+	Mt(i,j) = M(j,i);
+    return Mt;
+  }
+
+  coord3d operator*(const coord3d& x) const {
+    coord3d y;
+    for(int i=0;i<3;i++)
+      y += coord3d(values[3*i]*x[0],values[3*i+1]*x[1],values[3*i+2]*x[2]);
+    return y;
+  }
+  
+  vector<coord3d> operator*(const vector<coord3d>& xs) const {
+    const matrix3d &A(*this);
+    vector<coord3d> ys(xs.size());
+
+    for(int i=0;i<xs.size();i++) ys[i] = A*xs[i];
+    return ys;
+  }
+
+  // Eigenvalue solver specialized to symmetric real 3x3 matrices using Viete's 
+  // closed form solution to cubic polynomials with three real roots.
+  coord3d eigenvalues() const
+  {
+    const matrix3d &M(*this);
+    // Make sure that matrix is symmetric. TODO: FP comparison, not exact.
+    assert(M(0,1) == M(1,0) && M(0,2) == M(2,0) && M(1,2) == M(2,1));
+
+    // Coefficients up to symmetry
+    double a(M(0,0)), b(M(0,1)), c(M(0,2)), d(M(1,1)), e(M(1,2)), f(M(2,2));
+    
+    // Coefficients of characteristic polynomial, calculated with Mathematica
+    long double 
+      A = -1.L,
+      B = a+d+f,
+      C = b*b + c*c - a*d + e*e - a*f - d*f,
+      D = -c*c*d + 2*b*c*e - a*e*e - b*b*f + a*d*f;
+
+    if(D==0){			// Second order equation. TODO: FP comparison
+      long double Disc = sqrtl(B*B-4*A*C);
+      cout << "D = " << Disc << endl;
+      return coord3d(0,(-B-Disc)/(2.L*A),(-B+Disc)/(2.L*A));
+    }
+
+    // Depress characteristic polynomial - see http://en.wikipedia.org/wiki/Cubic_equation#Reduction_to_a_depressed_cubic
+    long double 
+      p  = (3.L*A*C - B*B)/(3.L*A*A),
+      q  = (2.L*B*B*B - 9.L*A*B*C + 27.L*A*A*D)/(27.L*A*A*A),
+      xc = B/(3.L*A);
+
+    // double v[6] = {a,b,c,d,e,f};
+    // double V[4] = {A,B,C,D};
+    // cout << "{a,b,c,d,e,f} = " << vector<double>(v,v+6) << endl;
+    // cout << "{A,B,C,D} = " << vector<double>(V,V+4) << endl;
+    // cout << "{p,q} = {" << p << "," << q << "}\n";
+
+    // François Viète's solution to cubic polynomials with three real roots. 
+    coord3d t;
+    long double K = 2*sqrtl(-p/3.L), 
+                theta0 = (1.L/3.L)*acosl((3.L*q)/(2.L*p)*sqrtl(-3.L/p));
+    for(int k=0;k<3;k++) t[k] = K*cosl(theta0-k*2.L*M_PI/3.L);
+
+    // lambda = t - B/(3A)
+    return t - coord3d(xc,xc,xc);
+  }
+  
+  coord3d eigenvector(const double lambda) const {
+// [ a_12 * a_23 - a_13 * (a_22 - r) ]
+// [ a_12 * a_13 - a_23 * (a_11 - r) ]
+// [(a_11 - r) * (a_22 - r) - a_12^2 ]
+
+    const matrix3d &M(*this);
+    coord3d x(M(0,1)*M(1,2) - M(0,2)*(M(1,1)-lambda),
+	      M(0,1)*M(0,2) - M(1,2)*(M(0,0)-lambda),
+	      (M(0,0)-lambda)*(M(1,1)-lambda)-M(0,1)*M(0,1));
+    return x/x.norm();
+  }
+
+  pair<coord3d,matrix3d> eigensystem() const {
+    coord3d lambda(eigenvalues());
+    matrix3d C;
+    for(int i=0;i<3;i++){
+      coord3d c(eigenvector(lambda[i]));
+      for(int j=0;j<3;j++) C(i,j) = c[j];
+    }
+    return make_pair(lambda,C);
+  }
+  
+  friend ostream& operator<<(ostream& S, const matrix3d &M)
+  {
+    S << "{"; for(int i=0;i<3;i++) S << vector<double>(&M.values[i*3],&M.values[(i+1)*3]) << (i+1<3?",":"}");
+    return S;
+  }
 };
 
 

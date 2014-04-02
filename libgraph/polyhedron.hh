@@ -39,6 +39,9 @@ struct Polyhedron : public PlanarGraph {
   Polyhedron convex_hull() const { return incremental_convex_hull(); }
   Polyhedron incremental_convex_hull() const;
 
+  matrix3d inertia_matrix() const;
+  matrix3d inertial_frame() const;
+
   void scale(const coord3d& x) {
     for(node_t u=0;u<N;u++) points[u] *= x;
   }

@@ -6,6 +6,7 @@
 #include <set>
 #include <map>
 #include <sstream>
+#include <assert.h>
 using namespace std;
 
 #define insert_unique(v,x) if(std::find(v.begin(),v.end(),x) == v.end()) v.push_back(x); 
