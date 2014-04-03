@@ -63,6 +63,22 @@ int main(int ac, char **av)
   }
 
   {
+    P.move_to_origin();
+    coord3d centre_check;
+    for(int i=0;i<P.points.size();i++) centre_check += P.points[i];
+    centre_check /= double(P.points.size());
+    cout << "centre_check = " << centre_check << endl;
+
+    matrix3d If(P.inertial_frame());
+    P.points = If*P.points;
+
+    ofstream mol2(("output/"+basename+"-if.mol2").c_str());
+    mol2 << P.to_mol2();
+    mol2.close();
+  }
+
+
+  {
     ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
     mol2 << D.to_mol2();
     mol2.close();
