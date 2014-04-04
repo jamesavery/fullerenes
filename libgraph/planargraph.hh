@@ -39,6 +39,8 @@ public:
   facemap_t compute_faces_oriented() const;
   face_t get_face_oriented(int u, int v) const;
 
+  void          orient_neighbours();   // Ensures that neighbours are ordered CCW
+
   vector<face_t> compute_faces_flat(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   face_t find_outer_face() const; 
 
