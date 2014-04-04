@@ -279,7 +279,9 @@ C     Loop over 6-rings
       endif
 
 
-C dihedrals 
+C dihedrals
+
+c init
       ehookdppp=0.d0
       ehookdhpp=0.d0
       ehookdhhp=0.d0
@@ -295,7 +297,7 @@ C     3 hexagons
      1              angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
+c        angle_abcd=dabs(angle_abcd)
 c        write(*,*)angle_abcd
         if(iopt.eq.3 .or.iopt.eq.4) then
           ehookdhhh=ehookdhhh+(angle_abcd-dhhh)**2
@@ -317,7 +319,7 @@ C     2 hexagons, 1 pentagon
      1              angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
+c        angle_abcd=dabs(angle_abcd)
 c        write(*,*)angle_abcd
         if(iopt.eq.3 .or.iopt.eq.4) then
           ehookdhhp=ehookdhhp+(angle_abcd-dhhp)**2
@@ -339,7 +341,7 @@ C     1 hexagon, 2 pentagons
      1              angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
+c        angle_abcd=dabs(angle_abcd)
 c        write(*,*)angle_abcd
         if(iopt.eq.3 .or.iopt.eq.4) then
           ehookdhpp=ehookdhpp+(angle_abcd-dhpp)**2
@@ -363,7 +365,7 @@ c        write(*,*)a_p(1,i),a_p(2,i),a_p(3,i)
      1              angle_abcd)
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
-        angle_abcd=dabs(angle_abcd)
+c        angle_abcd=dabs(angle_abcd)
 c        write(*,*)angle_abcd
         if(iopt.eq.3 .or.iopt.eq.4) then
           ehookdppp=ehookdppp+(angle_abcd-dppp)**2
@@ -801,7 +803,8 @@ c     3 hexagons
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
 c        angle_abcd=dabs(angle_abcd)
-        zero_value=sign(dhhh,angle_abcd)
+c        zero_value=sign(dhhh,angle_abcd)
+        zero_value=dhhh
         force_constant=fdhhh
         dE_over_dc=force_constant*(angle_abcd-zero_value)
         if(iopt.eq.5.or.iopt.eq.6) then
@@ -845,7 +848,8 @@ c     2 hexagon, 1 pentagon
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
 c        angle_abcd=dabs(angle_abcd)
-        zero_value=sign(dhhp,angle_abcd)
+c        zero_value=sign(dhhp,angle_abcd)
+        zero_value=dhhp
         force_constant=fdhhp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
         if(iopt.eq.5.or.iopt.eq.6) then
@@ -889,7 +893,8 @@ c     1 hexagon, 2 pentagons
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
 c        angle_abcd=dabs(angle_abcd)
-        zero_value=sign(dhpp,angle_abcd)
+c        zero_value=sign(dhpp,angle_abcd)
+        zero_value=dhpp
         force_constant=fdhpp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
         if(iopt.eq.5.or.iopt.eq.6) then
@@ -933,7 +938,8 @@ c     3 pentagons
         if(angle_abcd.gt.dpi)angle_abcd=angle_abcd-2*dpi
         if(angle_abcd.lt.-dpi)angle_abcd=angle_abcd+2*dpi
 c        angle_abcd=dabs(angle_abcd)
-        zero_value=dsign(dppp, angle_abcd)
+c        zero_value=dsign(dppp, angle_abcd)
+        zero_value=dppp
         force_constant=fdppp
         dE_over_dc=force_constant*(angle_abcd-zero_value)
         if(iopt.eq.5.or.iopt.eq.6) then
