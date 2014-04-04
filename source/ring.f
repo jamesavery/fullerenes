@@ -869,8 +869,18 @@ C     Now hexagon indices
       enddo
       IRhag6(IRcount)=IRhag6(IRcount)+1
       enddo
+C     Hexagon Neighbor Index
+      ih0=0
+      ih1=0
+      ih2=0
+       Do I=0,6
+        ih0=ih0+IRhag6(I)
+        ih1=ih1+I*IRhag6(I)
+        ih2=ih2+I*I*IRhag6(I)
+       enddo
 C     Strain Parameter
       sigmah=HexInd(IRhag6,ihk)
+      Write(Iout,1024) ih0,ih1,ih2 
       if(ihk.eq.0) Write(Iout,1027) 
   112 Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
       Ifus6=0
@@ -909,6 +919,8 @@ C     Strain Parameter
      1 6(I3,','),I5,')  and strain parameter sigma = ',F12.6)
  1022 Format(1X,'--> Fullerene is IPR')
  1023 Format(1X,'--> Fullerene is not IPR')
+ 1024 Format(1X,'Hexagon-hexagon fusion indices: ',
+     1 'H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
  1027 Format(1X,'sum hk is zero -> sigmah set to zero')
       Return
       END
