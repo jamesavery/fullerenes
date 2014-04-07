@@ -506,6 +506,8 @@ C     Now sort values of diamw, output diam
       Integer MDist(Nmax,Nmax),Edges(2,3*number_vertices/2),wienerp
       integer pent_dist_mtx(144), face_dist_mtx(number_vertices**2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
+      REAL*8 layout2d(2,Nmax)
+      Integer*8 perfmatch, perfect_match_count
       type(c_ptr) :: graph, new_fullerene_graph
 C     This routine calculates the Wiener index, Hyperwiener index,
 C     minimal and maximal vertex contribution, rho and rhoE,
@@ -524,6 +526,9 @@ c     i.e. the distances between the pentagons in the fullerene graph
       call get_pentagon_distance_mtx(graph, pent_dist_mtx)
 c     topological distances between all pairs of vertices in the dual of the fullerene graph
       call get_face_distance_mtx(graph, face_dist_mtx)
+
+      call tutte_layout(graph, layout2d)
+      call set_layout2d(graph, layout2d)
 
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)
@@ -626,6 +631,11 @@ C     Analyzing pentagon distance matrix
       enddo
       wienerinvnorm=1.d0-wienerinv/94.d0
       Write(Iout,1008) wienerp/2,wienerinvnorm 
+
+C     Count number of perfect matchings      
+      perfmatch = perfect_match_count(graph)
+      Write(Iout,1009) permatch
+
  1000 Format(/1X,'Topological Indicators for fullerene graph:',/1X,
      1 43('-'),//1X,
      1 'For definitions see Vukicevic et al., Chem. Phys. Lett. ',
@@ -659,7 +669,7 @@ C1004 Format(' Ori constant for Wiener index: ',D15.9)
  1008 Format(/1x,'Pentagon Wiener PW(M_p) = ',I10,/1X,
      1 'Inverse Pentagon Wiener Index IPWI(M_p) = ',F15.8,
      1 ' (0 .le. IPWI .le. 1: 0 defines C20 and 1 the graphene limit)')
-
+ 1009 Format(/1x,'Number of perfect matchings = ',I12)
       RETURN
       END
 
