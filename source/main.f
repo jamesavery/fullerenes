@@ -463,8 +463,6 @@ C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout)
 C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
-C Produce perfect matchings (Kekule structures) and analyze
-c      CALL PerfectMatching(Iout,IDA)
 C------------------------------------------------------------------
 C  E N D   O F   T O P O L O G Y   S E C T I O N
 C------------------------------------------------------------------

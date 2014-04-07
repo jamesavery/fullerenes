@@ -632,9 +632,11 @@ C     Analyzing pentagon distance matrix
       wienerinvnorm=1.d0-wienerinv/94.d0
       Write(Iout,1008) wienerp/2,wienerinvnorm 
 
-C     Count number of perfect matchings      
+C Produce perfect matchings (Kekule structures) and analyze
+C     First count number of perfect matchings      
       perfmatch = perfect_match_count(graph)
-      Write(Iout,1009) permatch
+      Write(Iout,1009) perfmatch
+c     CALL PerfectMatching(Iout,IDA)
 
  1000 Format(/1X,'Topological Indicators for fullerene graph:',/1X,
      1 43('-'),//1X,
