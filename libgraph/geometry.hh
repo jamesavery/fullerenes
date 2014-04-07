@@ -240,6 +240,20 @@ struct matrix3d {
 	Mt(i,j) = M(j,i);
     return Mt;
   }
+  
+  matrix3d operator*(const matrix3d& B) const {
+    const matrix3d &A(*this);
+    matrix3d C;
+
+    for(int i=0;i<3;i++)
+      for(int j=0;j<3;j++){
+	double sum = 0;
+	for(int k=0;k<3;k++)
+	  sum += A(i,k)*B(k,j);
+	C(i,j) = sum;
+      }
+    return C;
+  }
 
   coord3d operator*(const coord3d& x) const {
     coord3d y;
@@ -285,12 +299,6 @@ struct matrix3d {
       p  = (3.L*A*C - B*B)/(3.L*A*A),
       q  = (2.L*B*B*B - 9.L*A*B*C + 27.L*A*A*D)/(27.L*A*A*A),
       xc = B/(3.L*A);
-
-    // double v[6] = {a,b,c,d,e,f};
-    // double V[4] = {A,B,C,D};
-    // cout << "{a,b,c,d,e,f} = " << vector<double>(v,v+6) << endl;
-    // cout << "{A,B,C,D} = " << vector<double>(V,V+4) << endl;
-    // cout << "{p,q} = {" << p << "," << q << "}\n";
 
     // François Viète's solution to cubic polynomials with three real roots. 
     coord3d t;
