@@ -1503,12 +1503,12 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       nd_ppp=0
 
       do j=1,4
-      do i=1,n
-        d_hhh(j,i)=0
-        d_hhp(j,i)=0
-        d_hpp(j,i)=0
-        d_ppp(j,i)=0
-      enddo
+        do i=1,n
+          d_hhh(j,i)=0
+          d_hhp(j,i)=0
+          d_hpp(j,i)=0
+          d_ppp(j,i)=0
+        enddo
       enddo
 
       call adjacency_list(graph,3,neighbours)
@@ -1525,7 +1525,7 @@ C          r
 
 c         write (*,*) "Dihedral ",u-1,r-1,s-1,t-1
          call get_face(graph,s,u,r,6,face,lA)
-         call get_face(graph,s,u,t,6,face,lB)
+         call get_face(graph,t,u,s,6,face,lB)
          call get_face(graph,r,u,t,6,face,lC)
 
          select case ( lA+lB+lC )
@@ -1533,11 +1533,11 @@ c         write (*,*) "Dihedral ",u-1,r-1,s-1,t-1
 c            write (*,*) "555"
 C     Do stuff here
 
-          nd_ppp=nd_ppp+1
-          d_ppp(1,nd_ppp)=u
-          d_ppp(2,nd_ppp)=r
-          d_ppp(3,nd_ppp)=s
-          d_ppp(4,nd_ppp)=t
+             nd_ppp=nd_ppp+1
+             d_ppp(1,nd_ppp)=u
+             d_ppp(2,nd_ppp)=r
+             d_ppp(3,nd_ppp)=s
+             d_ppp(4,nd_ppp)=t
 
          case ( 16 )            ! Two pentagons, one hexagon
 C     Do stuff common to all three (2,1)-cases here
@@ -1546,17 +1546,28 @@ C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 655 )  ! BC are pentagons, u--t common edge
 c               write (*,*) "655"
-
-          nd_hpp=nd_hpp+1
-          d_hpp(1,nd_hpp)=u
-          d_hpp(2,nd_hpp)=r
-          d_hpp(3,nd_hpp)=s
-          d_hpp(4,nd_hpp)=t
+              nd_hpp=nd_hpp+1
+              d_hpp(1,nd_hpp)=u
+              d_hpp(2,nd_hpp)=r
+              d_hpp(3,nd_hpp)=s
+              d_hpp(4,nd_hpp)=t
 
             case ( 565 )  ! AC are pentagons, u--r common edge
 c               write (*,*) "565"
+              nd_hpp=nd_hpp+1
+              d_hpp(1,nd_hpp)=u
+              d_hpp(2,nd_hpp)=t
+              d_hpp(3,nd_hpp)=r
+              d_hpp(4,nd_hpp)=s
+
             case ( 556 )  ! AB are pentagons, u--s common edge
 c               write (*,*) "556"
+              nd_hpp=nd_hpp+1
+              d_hpp(1,nd_hpp)=u
+              d_hpp(2,nd_hpp)=s
+              d_hpp(3,nd_hpp)=t
+              d_hpp(4,nd_hpp)=r
+
             end select
 
          case ( 17 )            ! One pentagon, two hexagons
@@ -1566,17 +1577,28 @@ C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 566 )  ! BC are hexagons, u--t common edge
 c               write (*,*) "566"
-
-          nd_hhp=nd_hhp+1
-          d_hhp(1,nd_hhp)=u
-          d_hhp(2,nd_hhp)=r
-          d_hhp(3,nd_hhp)=s
-          d_hhp(4,nd_hhp)=t
+              nd_hhp=nd_hhp+1
+              d_hhp(1,nd_hhp)=u
+              d_hhp(2,nd_hhp)=r
+              d_hhp(3,nd_hhp)=s
+              d_hhp(4,nd_hhp)=t
 
             case ( 656 )  ! AC are hexagons, u--r common edge
 c               write (*,*) "656"
+              nd_hhp=nd_hhp+1
+              d_hhp(1,nd_hhp)=u
+              d_hhp(2,nd_hhp)=t
+              d_hhp(3,nd_hhp)=r
+              d_hhp(4,nd_hhp)=s
+
             case ( 665 )  ! AB are hexagons, u--s common edge
 c               write (*,*) "665"
+              nd_hhp=nd_hhp+1
+              d_hhp(1,nd_hhp)=u
+              d_hhp(2,nd_hhp)=s
+              d_hhp(3,nd_hhp)=t
+              d_hhp(4,nd_hhp)=r
+
             end select
 
          case ( 18 )            ! (6,6,6) - all hexagons

@@ -121,7 +121,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const 
 {
   facemap_t facemap;
-  // TODO: This is a much better and faster method, but needs to be debugged.
+  // TODO: This is a much better and faster method, but requires a planar layout
   if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
 
   //  cout << " Non-oriented face computation (loop search)\n";
@@ -242,6 +242,13 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 }
 
 
+void PlanarGraph::orient_neighbours() 
+{
+  for(node_t u=0;u<N;u++){
+    sort_ccw_point CCW(layout2d,layout2d[u]);
+    sort(neighbours[u].begin(),neighbours[u].end(),CCW);
+  }
+}
 
 vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const 
 {

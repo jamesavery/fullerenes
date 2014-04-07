@@ -279,12 +279,16 @@ inline void gpi_connect_backward(list<pair<node_t,int> > &open_valencies, int& p
   ++pre_used_valencies;
 }
 
-void gpi_remove_node(const node_t i, PlanarGraph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
-  remaining_nodes.erase(i);
-  //remove i from all neighbour lists and erase all neighbours from the i-list
-  for(vector<node_t>::iterator it = remaining_graph.neighbours[i].begin(); it != remaining_graph.neighbours[i].end(); ++it){
-    vector<node_t>& nv(remaining_graph.neighbours[*it]);
-    for(int j=0;j<nv.size();j++){
+void gpi_remove_node(const node_t u, PlanarGraph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
+  remaining_nodes.erase(u);	// O(log(N)) with big coefficient - is set<node_t> the best data structure to use?
+  vector<node_t>& nu(remaining_graph.neighbours[u]);
+
+  //remove u from all neighbour lists and erase all neighbours from the u-list
+  for(int i=0;i<nu.size();i++){	// O(1) since neighbour count is bounded by max degree
+    const node_t& v = nu[i];
+    vector<node_t>& nv(remaining_graph.neighbours[v]);
+
+    for(int j=0;j<nv.size();j++){ // O(1) since neighbour count is bounded by max degree
       if(nv[j] == i){
         nv[j] = nv[nv.size()-1];//shift the last entry to the deleted pos
         nv.pop_back();//delete the last
@@ -292,8 +296,8 @@ void gpi_remove_node(const node_t i, PlanarGraph &remaining_graph, set<node_t> &
       }
     }
   }
-  deleted_neighbours = remaining_graph.neighbours[i];
-  remaining_graph.neighbours[i].clear();
+  deleted_neighbours = nu;
+  nu.clear();
 }
  
 // jumps start to count at 0
@@ -304,32 +308,25 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   spiral.clear();
   jumps.clear();
 
-  // remaining_graph is the graph that consists of all nodes that haven't been
-  // added to the graph yet
-  PlanarGraph remaining_graph(*this);
-  // all the nodes that haven't been added yet, not ordered and starting at 0
-  set<node_t> remaining_nodes;
+  PlanarGraph remaining_graph(*this); // remaining_graph consists of all nodes that haven't been added to the result yet
+  set<node_t> remaining_nodes; // all the nodes that haven't been added yet, not ordered and starting at 0
+  vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
 
-  // valencies is a list of length N and contains the valencies of each node
-  vector<int> valencies(N, 0);  
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
   // of the node and the number of open valencies
   list<pair<node_t,int> > open_valencies;
-  // a backup of the neighbours of the current node ... required in case of a
-  // jump
-  vector<int> deleted_neighbours_bak;
 
-  // number of valencies that are removed from the last vertex *before* it is added to the spiral
-  int pre_used_valencies=0;
-  // the current jumping state, counts the number of cyclic shifts of length 1 in the current series.
-  int jump_state=0;
+  // a backup of the neighbours of the current node ... required in case of a jump
+  vector<int> deleted_neighbours_bak;
+  
+  int pre_used_valencies=0; // number of valencies removed from the last vertex *before* it is added to the spiral
+  int jump_state=0; // the number of cyclic shifts of length 1 in the current series.
 
   //init of the valency-list and the set of nodes in the remaining graph
-  for(int i=0; i!=remaining_graph.N; ++i){
-    valencies[i] = remaining_graph.neighbours[i].size();
-    //cout << i << ": " << valencies[i]<< endl;
-    remaining_nodes.insert(i);
+  for(node_t u=0; u<remaining_graph.N; u++){
+    valencies[u] = remaining_graph.neighbours[u].size();
+    remaining_nodes.insert(u);
   }
 
   bool CW = nextCW(dedge_t(f1,f2)) == f3;
@@ -367,7 +364,7 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   for(int i=3; i<N-1; ++i){
 
     pre_used_valencies=0;
-    list<pair<int,int> > open_valencies_bak(open_valencies);
+    //    list<pair<int,int> > open_valencies_bak(open_valencies); // Makes the whole thing O(N^2), but is never used!
 
     // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_graph because there are some edges deleted already
