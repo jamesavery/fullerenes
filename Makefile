@@ -11,7 +11,7 @@ DIRECTORIES=-DFULLERENE_ROOT=\"${PWD}\" -DFULLERENE_DATABASE=\"${PWD}/database\"
 WARNINGS=-Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
 
 CXXFLAGS= -g -O3 -std=c++11 -m64 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
-FFLAGS= -g -O3 -m64 -Wall -cpp -D'VERSION_NUMBER="$(VERSION_NUMBER)"'
+FFLAGS= -g -O3 -m64 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"'
 LIBRARIES=-lstdc++ -lgomp -lgfortran
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
 # you might need to change the gfortran compiler options:
@@ -30,7 +30,7 @@ LIBRARIES=-lstdc++ -lgomp -lgfortran
 
 
 OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o graph.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o
+GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o
 GRAPHFOBJECTS=geometry.o force.o diag.o dddihedral.o config.o opt-standalone.o
 
 FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))
