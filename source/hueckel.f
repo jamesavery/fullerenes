@@ -164,7 +164,8 @@ C     Spectral moments
        enddo
       enddo
       Write(Iout,1001) 
-       do I=1,nspec
+      specmom(0)=dfloat(number_vertices)
+       do I=0,nspec
         Write(Iout,1011) I,dint(specmom(i)+1.d-5)
        enddo
 
