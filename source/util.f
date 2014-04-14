@@ -518,6 +518,8 @@ C     Chem. Phys. Lett. 501, 442–445 (2011).
       Write(Iout,1000) number_vertices
 
       graph = new_fullerene_graph(Nmax,number_vertices,IDA)
+      call tutte_layout(graph, layout2d)
+      call set_layout2d(graph, layout2d)
 c     topological distances between all pairs of vertices
       call all_pairs_shortest_path(graph,number_vertices,Nmax,MDist)
       call edge_list(graph,edges,NE)
@@ -526,12 +528,6 @@ c     i.e. the distances between the pentagons in the fullerene graph
       call get_pentagon_distance_mtx(graph, pent_dist_mtx)
 c     topological distances between all pairs of vertices in the dual of the fullerene graph
       call get_face_distance_mtx(graph, face_dist_mtx)
-
-      call tutte_layout(graph, layout2d)
-      call set_layout2d(graph, layout2d)
-
-c     and finally delete the graph to free the mem
-      call delete_fullerene_graph(graph)
 
 C     Wiener and hyper Wiener index, topological radius and diameter
       Xatom=dfloat(number_vertices)
@@ -637,6 +633,8 @@ C     First count number of perfect matchings
       perfmatch = perfect_match_count(graph)
       Write(Iout,1009) perfmatch
 c     CALL PerfectMatching(Iout,IDA)
+
+      call delete_fullerene_graph(graph)
 
  1000 Format(/1X,'Topological Indicators for fullerene graph:',/1X,
      1 43('-'),//1X,
