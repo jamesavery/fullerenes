@@ -37,6 +37,21 @@ bool Graph::is_consistently_oriented() const
   return true;
 }
 
+bool Graph::adjacency_is_symmetric() const
+{
+  for(node_t u=0;u<N;u++){
+    const vector<node_t> &nu = neighbours[u];
+    for(int i=0;i<nu.size();i++){
+      const vector<node_t> &nv = neighbours[nu[i]];
+
+      bool symmetric = false;
+      for(int j=0;j<nv.size();j++) if(nv[j] == u) symmetric = true;
+      if(!symmetric) return false;
+    }
+  }
+  return true;
+}
+
  // TODO: Should make two functions: one that takes subgraph (empty is trivially connected) and one that works on full graph.
 bool Graph::is_connected(const set<node_t> &subgraph) const 
 {
