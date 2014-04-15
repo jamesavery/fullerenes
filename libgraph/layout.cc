@@ -314,14 +314,14 @@ void Graph::orient_neighbours(const vector<coord2d>& layout)
 
 coord2d Graph::centre2d(const vector<coord2d>& layout) const {
   coord2d centre(0,0);
-  for(node_t u=0;u<N;u++) centre += layout[u];
-  return centre/N;
+  for(node_t u=0;u<layout.size();u++) centre += layout[u];
+  return centre/double(layout.size());
 }
 
 coord3d Graph::centre3d(const vector<coord3d>& layout) const {
   coord3d centre(0,0,0);
-  for(node_t u=0;u<N;u++) centre += layout[u];
-  return centre/N;
+  for(node_t u=0;u<layout.size();u++) centre += layout[u];
+  return centre/double(layout.size());
 }
 // TODO: 
 // * Move layout to member variable
