@@ -270,7 +270,7 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
 }
 
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max, const vector<face_t> faces_) : 
-  PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points)), faces(faces_)
+  PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points_)), faces(faces_)
 {
   //cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){
@@ -294,7 +294,7 @@ matrix3d Polyhedron::inertia_matrix() const
 
   for(int k=0;k<points.size();k++){
     const coord3d& x(points[k]);
-    const double   xx(x.dot(x));
+    const long double xx(x.dot(x));
     for(int i=0;i<3;i++){
       I(i,i) += xx;
 
@@ -302,7 +302,6 @@ matrix3d Polyhedron::inertia_matrix() const
 	I(i,j) -= x[i]*x[j];
     }
   }
-
   return I;
 }
 
@@ -310,7 +309,18 @@ matrix3d Polyhedron::inertial_frame() const
 {
   const matrix3d I(inertia_matrix());
   pair<coord3d,matrix3d> ES(I.eigensystem());
+
+  for(int i=0;i<3;i++) 
+    if(std::isnan(ES.first[i])){
+      cerr << "Warning: Inertial frame returned NaN. Setting inertial frame transformation to identity.\n";
+      matrix3d Id;
+      Id(0,0) = 1; 
+      Id(1,1) = 1; 
+      Id(2,2) = 1; 
+      return Id;
+    }
   
+
   return ES.second;
 }
 
@@ -333,15 +343,15 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
 		   int line_colour, int vertex_colour, int face_colour,
 		   double line_width, double vertex_diameter, double face_opacity) const 
 {
-  coord3d whd(width_height_depth());
-  double xscale = w_cm/whd[0];
+  coord3d whd(width_height_depth()); // TODO: Removed width/height -- much better to use real coordinates and handle layout in host pov file.
 
   ostringstream s;
   s << "#declare facecolour=color rgb <"<<((face_colour>>16)&0xff)/256.<<","<<((face_colour>>8)&0xff)/256.<<","<<(face_colour&0xff)/256.<<">;\n";
-  s << "#declare faceopacity="<<face_opacity<<";\n";
+  s << "#declare faceopacity="<<face_opacity<<";\n\n";
 
   s << PlanarGraph(*this).to_povray(w_cm,h_cm,line_colour,vertex_colour,line_width,vertex_diameter);
-  s << "#declare layout3D=array["<<N<<"][3]{"; for(int i=0;i<N;i++) s<<(points[i]*xscale)<<(i+1<N?",":"}\n\n"); 
+  s << "#declare layout3D=array["<<N<<"][3]" << points <<";\n\n";
+
   s << "#declare faces   =array["<<faces.size()<<"]["<<(face_max+1)<<"]{"; 
   for(int i=0;i<faces.size();i++) {
     const face_t& f(faces[i]);
@@ -352,17 +362,40 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   }
   s << "#declare facelength=array["<<faces.size()<<"]{";for(int i=0;i<faces.size();i++) s<< faces[i].size() << (i+1<faces.size()?",":"}\n\n");
 
+
   vector<tri_t>   tris(centroid_triangulation(faces));
+  vector<int>     triface;
   vector<coord3d> centroid_points(points.begin(),points.end());
-  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
+  vector<coord3d> trinormals(tris.size()), facenormals(faces.size());
 
-  s << "#declare tris = array["<<tris.size()<<"][3]{";
-  for(int i=0;i<tris.size();i++) s <<  "{" << tris[i][0] << "," << tris[i][1] << "," << tris[i][2] << "}" << (i+1<tris.size()?",":"}\n\n");
+  for(int i=0;i<faces.size();i++)
+    centroid_points.push_back(faces[i].centroid(points));
 
-  s << "#declare cpoints=array["<<centroid_points.size()<<"][3]{"; 
-  for(int i=0;i<centroid_points.size();i++) s<<(centroid_points[i]*xscale)<<(i+1<centroid_points.size()?",\n":"}\n\n"); 
+  for(int i=0;i<tris.size();i++){
+    coord3d n(Tri3D(centroid_points[tris[i][0]],centroid_points[tris[i][1]],centroid_points[tris[i][2]]).n);
+    trinormals[i] = n/n.norm();
+  }
 
-  s << "#include \"drawpolyhedron.pov\"\n\n";
+  for(int i=0;i<faces.size();i++) {
+    coord3d normal;
+    for(int j=0;j<faces[i].size();j++){
+      triface.push_back(i);
+      normal += trinormals[triface.size()-1];
+    }
+    facenormals[i] = normal;
+  }
+
+
+
+  s << "#declare Ntris = "<<tris.size()<<";\n";
+  s << "#declare tris = array["<<tris.size()<<"][3]" << tris << ";\n\n";
+  s << "#declare triface = array["<<tris.size()<<"]" << triface << ";\n\n";
+    
+  s << "#declare cpoints=array["<<centroid_points.size()<<"][3]" << centroid_points << ";\n\n"; 
+  s << "#declare trinormals =array["<<tris.size()<<"][3]" << trinormals << ";\n\n";
+  s << "#declare facenormals=array["<<faces.size()<<"][3]" << facenormals << ";\n\n";
+
+  //  s << "#include \"drawpolyhedron.pov\"\n\n";
   return s.str();
 }
 
