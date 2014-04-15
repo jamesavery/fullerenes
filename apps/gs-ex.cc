@@ -177,13 +177,40 @@ Graph example3(){
 }
 
 
-Graph examples[3] = {example1(), example2(), example3()};
+// smallest (?) polyhedron with only pentagons and heptagons
+Graph example4(){
+  const int M=7, N=28;
+  neighbours_t neighbours(N,vector<node_t>(3));
+
+  for(int i=0; i!=7; ++i){
+    neighbours[i][0] = (i+1)%M;
+    neighbours[i][1] = (i-1+M)%M;
+    neighbours[i][2] = M+i;
+    
+    neighbours[1*M+i][0] =     i;
+    neighbours[1*M+i][1] = 2*M+i;
+    neighbours[1*M+i][2] = 2*M+(i-1+M)%M;
+    
+    neighbours[2*M+i][0] = 1*M+i%M;
+    neighbours[2*M+i][1] = 1*M+(i+1)%M;
+    neighbours[2*M+i][2] = 3*M+i;
+    
+    neighbours[3*M+i][0] = 2*M+i;
+    neighbours[3*M+i][1] = 3*M+(i+1)%M;
+    neighbours[3*M+i][2] = 3*M+(i-1+M)%M;
+  }
+
+  return Graph(neighbours);
+}
+
+
+Graph examples[4] = {example1(), example2(), example3(), example4()};
 
 int main(int ac, char **av)
 {
   int Nex = ac>=2? strtol(av[1],0,0) : 1;
 
-  if(Nex < 1 || Nex > 3){cerr << "invalid graph chosen, aborting ..." << endl; abort();}
+  if(Nex < 1 || Nex > 4){cerr << "invalid graph chosen, aborting ..." << endl; abort();}
 
   string basename("gs-ex-"+to_string(Nex));
 
@@ -210,15 +237,15 @@ int main(int ac, char **av)
   vector<tri_t>  triangles(faces.begin(),faces.end());
   cout << "triangles = " << triangles << ";\n";
 
-  //  Triangulation dt(dg,triangles);
   Triangulation dt(dg,triangles);
+  cout << "t" << endl;
   vector<int> spiral;
   Triangulation::jumplist_t jumplist;
-  bool success = dt.get_spiral(spiral,jumplist,true);
-  if(!success) cerr << "Canonical general spiral not found.\n";
-
-  output << "spiral   = " << spiral << ";\n"
-  	 << "jumplist = " << jumplist << ";\n";
+//  bool success = dt.get_spiral(spiral,jumplist,true);
+//  if(!success) cerr << "Canonical general spiral not found.\n";
+//
+//  output << "spiral   = " << spiral << ";\n"
+//  	 << "jumplist = " << jumplist << ";\n";
   
 
   Polyhedron P0(g,g.zero_order_geometry(),10);
@@ -259,6 +286,12 @@ int main(int ac, char **av)
     ofstream mol2(("output/"+basename+".mol2").c_str());
     mol2 << P.to_mol2();
     mol2.close();
+  }
+
+  {
+    ofstream xyz(("output/"+basename+".xyz").c_str());
+    xyz << P.to_xyz();
+    xyz.close();
   }
 
   {
