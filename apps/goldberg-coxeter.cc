@@ -4,6 +4,7 @@
 #include "libgraph/fullerenegraph.hh"
 #include "libgraph/eisenstein.hh"
 #include "libgraph/unfold.hh"
+#include "libgraph/triangulation.hh"
 #include <vector>
 
 using namespace std;
@@ -56,15 +57,24 @@ vector< pair<Eisenstein, node_t> > GCDreduce(const vector< pair<Eisenstein, node
 }
 
 
+int N_default = 28;
+int rspi_default[12] = {1,2,3,5,7,9,10,11,12,13,14,15};
+
 int main(int ac, char **av)
 {
   vector<int> rspi(12);
   FullereneGraph::jumplist_t jumps;
 
-  if(ac<13) return -1;
+  int N = N_default, K=1, L=0;
+  if(ac<13){
+    rspi = vector<int>(rspi_default,rspi_default+12);
+    for(int i=0;i<12;i++) rspi[i]--;
+  }
 
-  int N = strtol(av[1],0,0), K=1, L=0;
-  for(int i=0;i<12;i++) rspi[i] = strtol(av[2+i],0,0)-1;
+  else {
+    N = strtol(av[1],0,0);
+    for(int i=0;i<12;i++) rspi[i] = strtol(av[2+i],0,0)-1;
+  }
   if(ac>=15){
     K = strtol(av[14],0,0);
     L = strtol(av[15],0,0);
@@ -104,8 +114,14 @@ int main(int ac, char **av)
   output << "gctdual = " << gctdual << ";\n"
 	 << "gct     = " << gct << ";\n";
 
+  vector<int> gct_rspi(12);
+  FullereneGraph::jumplist_t gct_jumps;
+  FullereneDual Tgctdual(gctdual);
   
-  typedef pair<int,int> coord;
+  Tgctdual.get_rspi(gct_rspi,gct_jumps,false,false);
+
+  output << "RSPI = "    << (rspi+1) << ";\n"
+         << "gctRSPI = " << (gct_rspi+1) << ";\n";
   
   cout << "P = " << fld.P << ";\n";
   
