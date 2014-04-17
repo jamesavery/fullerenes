@@ -1,6 +1,6 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,ICart,Iopt,IP,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
-     1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
+     1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,IPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
@@ -21,9 +21,9 @@ C-----------------------------------------------------------------
       Character filename*50
       Character filenameout*50
       Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
-     1 nohueckel,loop,ndbconvert,
+     1 nohueckel,loop,ndbconvert,iPFcount,IPMC,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
-      Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
+      Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
@@ -113,6 +113,7 @@ C Integers
       ifs=0     !  Option for .dat and .tex files
       iham=0    !  Number of Hamiltonian cycles
       iFS=0     !  Option for producing files for 2D fullerene graphs
+      iPMC=0    !  Option for perfect match count
       nohueckel=0 ! Option for diagonalizing the Hueckel matrix
       iopt=0    !  No (force field) optimization
       ihessian=0 ! No Hessian matrix produced

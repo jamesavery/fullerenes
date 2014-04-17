@@ -499,7 +499,7 @@ C     Now sort values of diamw, output diam
       RETURN
       END
 
-      SUBROUTINE TopIndicators(Iout,IDA,MDist)
+      SUBROUTINE TopIndicators(Iout,IDA,IPMC,MDist)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -630,10 +630,11 @@ C     Analyzing pentagon distance matrix
 
 C Produce perfect matchings (Kekule structures) and analyze
 C     First count number of perfect matchings      
+      if(IPMC.ne.0) then
       perfmatch = perfect_match_count(graph)
       Write(Iout,1009) perfmatch
 c     CALL PerfectMatching(Iout,IDA)
-
+      endif
       call delete_fullerene_graph(graph)
 
  1000 Format(/1X,'Topological Indicators for fullerene graph:',/1X,

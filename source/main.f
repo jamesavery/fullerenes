@@ -132,7 +132,7 @@ C   or Adjacency Matrix (through connectivity IC3)
 C  Call Datain
       CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
-     1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,
+     1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,iPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,
@@ -458,7 +458,7 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         routine='TOPOLOINDICATOR'
         Write(Iout,1008) routine
 C Topological Indicators
-      CALL TopIndicators(Iout,IDA,mdist)
+      CALL TopIndicators(Iout,IDA,iPMC,mdist)
 C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout)
 C Determine if fullerene is chiral
