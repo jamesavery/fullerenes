@@ -1,10 +1,10 @@
 D5d-C60 Using Tutte embedding to produce coordinates through ring spiral indices
-&General NA=60 ip=1 iwext=1 /
+&General NA=60 ip=1 iwext=1 filename='C60NTHam'/
 &Coord ICart=3 rspi=1, 2, 3, 4, 5, 6, 27, 28, 29, 30, 31, 32/
-&FFChoice Iopt=3 /
+&FFChoice iopt=2 /
 &FFParameters /
 &Hamilton iham=1 ihamstore=1 /
 &Isomers /
-&Graph ISchlegel=1 ifs=1 nhamcyc=1 /
+&Graph ISchlegel=2 ifs=1 nhamcyc=1 ISO1=1, ISO2=2, ISO3=3 /
 
 

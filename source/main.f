@@ -458,7 +458,7 @@ C--------------TOPOLOGICAL INDICATORS-----------------------------
         routine='TOPOLOINDICATOR'
         Write(Iout,1008) routine
 C Topological Indicators
-      CALL TopIndicators(Iout,IDA,iPMC,mdist)
+      CALL TopIndicators(Iout,iPMC,IDA,mdist)
 C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout)
 C Determine if fullerene is chiral

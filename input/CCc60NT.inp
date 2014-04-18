@@ -1,11 +1,11 @@
 C60 nanotube Lanl2DZ B3LYP optimized
-&General NA=60 iwext=1 ipsphere=3 /
+&General NA=60 iwext=1 nosort=1 ipsphere=3 filename='C60NTham' /
 &Coord ICart=1 /
 &FFChoice /
 &FFParameters /
-&Hamilton /
+&Hamilton IHam=1, IUPAC=1, ihamstore=1 /
 &Isomers /
-&Graph ISchlegel=2 IFS = 1 ISO1=1 ISO2=2 ISO3=3 /
+&Graph ISchlegel=2 boost=1.25 PS=35. IFS = 1 ISO1=1 ISO2=2 ISO3=3 nhamcyc=1 /
 6      0.100961500634E+01  0.565879646891E+01  0.727371771185E+00
 6      0.100961500634E+01  0.565879646891E+01  -.727371771185E+00
 6      -.373914193432E+00  0.566054760345E+01  -.117680982465E+01
@@ -66,4 +66,3 @@ C60 nanotube Lanl2DZ B3LYP optimized
 6      0.373914193432E+00  -.566054760345E+01  0.117680982465E+01
 6      0.373914193432E+00  -.566054760345E+01  -.117680982465E+01
 6      0.122890145040E+01  -.566155853608E+01  -.294551495700E-15
-
