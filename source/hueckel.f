@@ -133,6 +133,11 @@ C     Babic's resonance energy
       DTREkcal=DTRE*beta*6.27509541D+02
       Graphene=0.0468d0
       Write(Iout,1003) Etot,TRE,Graphene,DTRE,DTREkcal
+C     Calculate Hueckel resonance energy
+      vertnum=dfloat(number_vertices)
+      Eres=Etot-vertnum
+      EresPA=Eres/vertnum
+      Write(Iout,1012) Eres,EresPA,Eres*beta,EresPA*beta
 
 C     Estrada and bibartivity index
       Write(Iout,1008) estrada,bipartivity/estrada
@@ -196,5 +201,9 @@ C     Spectral moments
  1009 FORMAT(/1X,'Fullerene has a properly closed shell')
  1010 FORMAT(/1X,'Fullerene has a pseudo closed shell')
  1011 FORMAT(1X,I2,5X,F20.0)
+ 1012 FORMAT(1X,'Total resonance energy in units of beta: ',F12.6,
+     1 ' (per atom: ',F12.6,')',
+     2 /1X,'Total resonance energy in atomic units ',F12.6,
+     3 ' (per atom: ',F12.6,')')
       Return
       END 
