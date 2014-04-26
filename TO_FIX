@@ -2,3 +2,12 @@ This is a list of open bugs and similar kinds of misbehaviour.  This is not a li
 
 ----------------------
 
+some jobs/routines (e474f1c1a5d261; input/CCc28.inp) fail because of missing
+layouts.  either put in some 'ifnot exists layout; create layout' whenever
+layouts are used (in the lib) or use the lib such that it doesn't fail.  I (lnw)
+think the first approach is better, a lib should be written such that it is
+hard to use wrongly.
+
+----------------------
+
+there is something wrong about opt-standalone: find and fix
