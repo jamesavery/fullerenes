@@ -66,7 +66,7 @@ C Analyze eigenenergies
       Character*10 Symbol
 C Parameters alpha and beta are in atomic units and are adjusted 
 C  to HOMO DFT orbital energies
-      Data Tol,Tol1,alpha,beta/1.d-5,.15d0,-.21d0,-0.111/
+      Data Tol,Tol1,alpha,beta,scale/1.d-5,.15d0,-.21d0,-0.111,3.1/
 C Perform Hueckel matrix diagonalization to obtain eigenvalues
 C Now sort degeneracies
       WRITE(IOUT,1007) 
@@ -129,10 +129,13 @@ C     Now Print
 C     Other useful properties from Hueckel matrix
 C     Babic's resonance energy
       TRE=1.024296d0*Etot/dfloat(number_vertices)-1.562211d0
+C     Subtracting the C60 value
       DTRE=TRE-2.82066353359331501d-2
       DTREkcal=DTRE*beta*6.27509541D+02
       Graphene=0.0468d0
       Write(Iout,1003) Etot,TRE,Graphene,DTRE,DTREkcal
+      Write(Iout,1013) beta
+      Write(Iout,1014) scale,DTREkcal*scale
 C     Calculate Hueckel resonance energy
       vertnum=dfloat(number_vertices)
       Eres=Etot-vertnum
@@ -205,5 +208,9 @@ C     Spectral moments
      1 ' (per atom: ',F12.6,')',
      2 /1X,'Total resonance energy in atomic units ',F12.6,
      3 ' (per atom: ',F12.6,')')
+ 1013 FORMAT(1X,'beta used in this program in atomic units: ',F8.3)
+ 1014 FORMAT(1X,'Scaling of ',F5.2,' applied to represent DFT value: ',
+     1 /2X,'Difference of total resonance energy per atom ',
+     1 'compared to C60 in kcal/mol: ',F12.6)
       Return
       END 
