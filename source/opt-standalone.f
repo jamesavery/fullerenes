@@ -1712,16 +1712,16 @@ C     Do case specific stuff here
 c               write (*,*) "655"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
-              d_hpp(2,nd_hpp)=r
+              d_hpp(2,nd_hpp)=t
               d_hpp(3,nd_hpp)=s
-              d_hpp(4,nd_hpp)=t
+              d_hpp(4,nd_hpp)=r
 
             case ( 565 )  ! AC are pentagons, u--r common edge
 c               write (*,*) "565"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
-              d_hpp(2,nd_hpp)=t
-              d_hpp(3,nd_hpp)=r
+              d_hpp(2,nd_hpp)=r
+              d_hpp(3,nd_hpp)=t
               d_hpp(4,nd_hpp)=s
 
             case ( 556 )  ! AB are pentagons, u--s common edge
@@ -1729,8 +1729,8 @@ c               write (*,*) "556"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=s
-              d_hpp(3,nd_hpp)=t
-              d_hpp(4,nd_hpp)=r
+              d_hpp(3,nd_hpp)=r
+              d_hpp(4,nd_hpp)=t
 
             end select
 
@@ -1743,16 +1743,16 @@ C     Do case specific stuff here
 c               write (*,*) "566"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
-              d_hhp(2,nd_hhp)=r
+              d_hhp(2,nd_hhp)=t
               d_hhp(3,nd_hhp)=s
-              d_hhp(4,nd_hhp)=t
+              d_hhp(4,nd_hhp)=r
 
             case ( 656 )  ! AC are hexagons, u--r common edge
 c               write (*,*) "656"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
-              d_hhp(2,nd_hhp)=t
-              d_hhp(3,nd_hhp)=r
+              d_hhp(2,nd_hhp)=r
+              d_hhp(3,nd_hhp)=t
               d_hhp(4,nd_hhp)=s
 
             case ( 665 )  ! AB are hexagons, u--s common edge
@@ -1760,8 +1760,8 @@ c               write (*,*) "665"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=s
-              d_hhp(3,nd_hhp)=t
-              d_hhp(4,nd_hhp)=r
+              d_hhp(3,nd_hhp)=r
+              d_hhp(4,nd_hhp)=t
 
             end select
 
