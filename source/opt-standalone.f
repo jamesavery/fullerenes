@@ -628,11 +628,9 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       type(c_ptr) :: graph
 
 c edges with 0, 1, 2 pentagons
-      integer e_hh(2,3*N/2), e_hp(2,3*N/2),
-     1  e_pp(2,3*N/2)
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer a_h(3,3*N-60), a_p(3,60)
-      integer d_hhh(4,N), d_hpp(4,N),
-     1  d_hhp(4,N), d_ppp(4,N)
+      integer d_hhh(4,N), d_hhp(4,N), d_hpp(4,N), d_ppp(4,N)
 c counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
@@ -719,7 +717,7 @@ C OPTIMIZE
      1 Dist,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(fret.gt.1.d-2) then
         fretn=fret/dfloat(N)
         Write(*,1002) fretn
@@ -929,7 +927,7 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
      1 p,force,iopt,ftol,iter,fret,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=99999,EPS=1.d-9)
@@ -940,8 +938,8 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
      1  e_pp(2,3*number_vertices/2)
       integer a_h(3,3*number_vertices-60), a_p(3,60)
-      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
-     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
+      integer d_hhh(4,number_vertices), d_hhp(4,number_vertices),
+     1  d_hpp(4,number_vertices), d_ppp(4,number_vertices)
 
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
 C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
@@ -959,7 +957,7 @@ C     IOPT=1: Wu force field optimization
       CALL func3d(IERR,p,fp,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(IERR.ne.0) then
         Write(*,1004)
         return
@@ -968,7 +966,7 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
       CALL dfunc3d(p,xi,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       grad2=0.d0
       do I=1,3*N
         grad2=grad2+xi(i)*xi(i)
@@ -993,7 +991,7 @@ c       turn off coulomb pot towards the end (and go to iopt=3 to indicate that 
         call SA_linmin3d(N,p,pcom,xi,xicom,fret,
      1    force,iopt,e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
-     1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1    d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         grad2=0.d0
         do I=1,3*N
           grad2=grad2+xi(i)*xi(i)
@@ -1013,7 +1011,7 @@ c        endif
         CALL dfunc3d(p,xi,force,iopt,
      1    e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1    a_h,a_p,
-     1    d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1    d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         gg=0.d0
         dgg=0.d0
         do j=1,3*N
@@ -1046,7 +1044,7 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
 
       SUBROUTINE SA_linmin3d(N,p,pcom,xi,xicom,fret,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)!,damping)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(N*3),pcom(N*3),xicom(N*3),xi(N*3)
@@ -1055,8 +1053,8 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
      1  e_pp(2,3*number_vertices/2)
       integer a_h(3,3*number_vertices-60), a_p(3,60)
-      integer d_hhh(4,number_vertices), d_hpp(4,number_vertices),
-     1  d_hhp(4,number_vertices), d_ppp(4,number_vertices)
+      integer d_hhh(4,number_vertices), d_hhp(4,number_vertices),
+     1  d_hpp(4,number_vertices), d_ppp(4,number_vertices)
 c      real*8 length, cutoff, xi_tmp(nmax*3)
 c      integer damping
 
@@ -1070,11 +1068,11 @@ C     USES brent3d,f1dim3d,mnbrak3d
       CALL SA_mnbrak3d(N,
      1 ax,xx,bx,fa,fx,fb,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       CALL SA_brent3d(N,fret,
      1 ax,xx,bx,TOL,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 c lets scale all displacements that are longer than a chosen cutoff to that cutoff.
 c the direction of the displacement vector is maintained
       do j=1,3*N
@@ -1105,15 +1103,13 @@ c        p(j)=p(j)+xi_tmp(j)
      1 f1dimf,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 pcom(N*3),xt(N*3),xicom(N*3),force(ffmaxdim)
-      integer e_hh(2,3*N/2), e_hp(2,3*N/2),
-     1  e_pp(2,3*N/2)
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer a_h(3,3*N-60), a_p(3,60)
-      integer d_hhh(4,N), d_hpp(4,N),
-     1  d_hhp(4,N), d_ppp(4,N)
+      integer d_hhh(4,N), d_hhp(4,N), d_hpp(4,N), d_ppp(4,N)
 
 C     USES func3d
       do j=1,3*N
@@ -1122,7 +1118,7 @@ C     USES func3d
       CALL func3d(IERR,xt,f1dimf,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       return
       END
 
@@ -1130,27 +1126,25 @@ C     USES func3d
      1 ax,bx,cx,fa,fb,fc,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (GOLD=1.618034d0,GLIMIT=1.d2,TINY=1.d-20)
       REAL*8 pcom(N*3),xicom(N*3),force(ffmaxdim)
-      integer e_hh(2,3*N/2), e_hp(2,3*N/2),
-     1  e_pp(2,3*N/2)
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer a_h(3,3*N-60), a_p(3,60)
-      integer d_hhh(4,N), d_hpp(4,N),
-     1  d_hhp(4,N), d_ppp(4,N)
+      integer d_hhh(4,N), d_hhp(4,N), d_hpp(4,N), d_ppp(4,N)
 
       CALL SA_f1dim3d(N,
      1 fa,ax,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       CALL SA_f1dim3d(N,
      1 fb,bx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(fb.gt.fa)then
         dum=ax
         ax=bx
@@ -1164,7 +1158,7 @@ C     USES func3d
      1 fc,cx,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
 1     if(fb.ge.fc)then
         r=(bx-ax)*(fb-fc)
         q=(bx-cx)*(fb-fa)
@@ -1175,7 +1169,7 @@ C     USES func3d
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
-     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
           if(fu.lt.fc)then
             ax=bx
             fa=fb
@@ -1192,13 +1186,13 @@ C     USES func3d
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
-     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         else if((cx-u)*(u-ulim).gt.0.)then
         CALL SA_f1dim3d(N,
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
-     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
           if(fu.lt.fc)then
             bx=cx
             cx=u
@@ -1209,7 +1203,7 @@ C     USES func3d
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
-     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
           endif
         else if((u-ulim)*(ulim-cx).ge.0.)then
           u=ulim
@@ -1217,7 +1211,7 @@ C     USES func3d
      1   fu,u,xicom,pcom,force,iopt,
      2   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
-     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         else
           u=cx+GOLD*(cx-bx)
         if(u.gt.1.d10) then
@@ -1228,7 +1222,7 @@ C     USES func3d
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
-     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         endif
         ax=bx
         bx=cx
@@ -1245,18 +1239,16 @@ C     USES func3d
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
 C BRENT is a FORTRAN library which contains algorithms for finding zeros 
 C or minima of a scalar function of a scalar variable, by Richard Brent. 
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(N*3),xicom(N*3),force(ffmaxdim)
-      integer e_hh(2,3*N/2), e_hp(2,3*N/2),
-     1  e_pp(2,3*N/2)
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer a_h(3,3*N-60), a_p(3,60)
-      integer d_hhh(4,N), d_hpp(4,N),
-     1  d_hhp(4,N), d_ppp(4,N)
+      integer d_hhh(4,N), d_hhp(4,N), d_hpp(4,N), d_ppp(4,N)
 
       a=min(ax,cx)
       b=max(ax,cx)
@@ -1268,7 +1260,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
      1 fx,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       fv=fx
       fw=fx
       do 11 iter=1,ITMAX
@@ -1307,7 +1299,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
      1   fu,u,xicom,pcom,force,iopt,
      1   e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1   a_h,a_p,
-     1   d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         if(fu.le.fx) then
           if(u.ge.x) then
             a=x
@@ -1793,12 +1785,10 @@ c      use iso_c_binding
 c      type(c_ptr) :: graph
       implicit real*8 (a-h,o-z)
       integer iopt, i, j, m
-      integer e_hh(2,3*N/2), e_hp(2,3*N/2),
-     1 e_pp(2,3*N/2)
+      integer e_hh(2,3*N/2), e_hp(2,3*N/2), e_pp(2,3*N/2)
       integer ne_hh, ne_hp, ne_pp
       integer a_h(3,3*N-60), a_p(3,60)
-      integer d_hhh(4,N), d_hhp(4,N),
-     1 d_hpp(4,N), d_ppp(4,N)
+      integer d_hhh(4,N), d_hhp(4,N), d_hpp(4,N), d_ppp(4,N)
       integer nd_hhh, nd_hhp, nd_hpp, nd_ppp
       integer a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12
       real(8) coord(N*3), force(ffmaxdim),
