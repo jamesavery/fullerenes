@@ -10,4 +10,11 @@ hard to use wrongly.
 
 ----------------------
 
-there is something wrong about opt-standalone: find and fix
+there is something wrong about opt-standalone: find and fix (lnw)
+
+----------------------
+
+general spiral is broken since 917d49d2b4.  maybe not all of that stuff was unnecessary ... (lnw)
+
+---------------------
+
