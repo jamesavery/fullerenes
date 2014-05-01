@@ -23,7 +23,7 @@ C-----------------------------------------------------------------
       Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
      1 nohueckel,loop,ndbconvert,iPFcount,IPMC,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
-      Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,
+      Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,IPRC,leap,isonum,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,

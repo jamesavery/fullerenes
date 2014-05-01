@@ -1,20 +1,20 @@
       SUBROUTINE func3d(IERR,p,fc,force,iopt,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
-     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1  d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
 c     function for switching between forcefields     
       implicit none
 
       integer ierr
-      real(8) p(nmax*3),fc,force(ffmaxdim)
+      real(8) p(number_vertices*3),fc,force(ffmaxdim)
       integer iopt
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
       integer e_pp(2,3*number_vertices/2)
       integer ne_hh,ne_hp,ne_pp
       integer a_p(3,60), a_h(3,3*number_vertices-60)
-      integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
-      integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
+      integer d_hhh(4,number_vertices),d_hhp(4,number_vertices)
+      integer d_hpp(4,number_vertices),d_ppp(4,number_vertices)
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
       select case(iopt)
@@ -26,7 +26,7 @@ c     function for switching between forcefields
           CALL extwu(IERR,p,fc,force,iopt,
      1      e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      2      a_h,a_p,
-     1      d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1      d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         case default
           IERR=1
       end select
@@ -146,7 +146,7 @@ C     total energy
       SUBROUTINE extwu(IERR,p,fc,force,iopt,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
-     1  d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1  d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       implicit none
 
@@ -159,8 +159,8 @@ c     edges with 0, 1, 2 pentagons
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
       integer a_p(3,60), a_h(3,3*number_vertices-60)
-      integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
-      integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
+      integer d_hhh(4,number_vertices),d_hhp(4,number_vertices)
+      integer d_hpp(4,number_vertices),d_ppp(4,number_vertices)
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
@@ -402,20 +402,21 @@ C     total energy
       SUBROUTINE dfunc3d(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       implicit none
 
-      real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
+      real(8) p(number_vertices*3),x(number_vertices*3)
+      real(8) force(ffmaxdim)
       integer iopt
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
       integer e_pp(2,3*number_vertices/2)
       integer ne_hh,ne_hp,ne_pp
       integer a_p(3,60), a_h(3,3*number_vertices-60)
-      integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
-      integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
+      integer d_hhh(4,number_vertices),d_hhp(4,number_vertices)
+      integer d_hpp(4,number_vertices),d_ppp(4,number_vertices)
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
-      
+  
       select case(iopt)
         case(1, 2)
           CALL dwu(p,x,force,iopt,
@@ -425,7 +426,7 @@ C     total energy
           CALL dextwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         case default
       end select
 
@@ -441,7 +442,8 @@ C     Wu force field in terms of harmonic oscillators for stretching
 C     and bending, gradient
       implicit none
 
-      real(8) p(nmax*3),x(nmax*3),force(ffmaxdim)
+      real(8) p(number_vertices*3),x(number_vertices*3)
+      real(8) force(ffmaxdim)
       integer iopt
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
@@ -595,11 +597,12 @@ C     Coulomb repulsion from origin
       SUBROUTINE dextwu(p,x,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1 a_h,a_p,
-     1 d_hhh,d_hpp,d_hhp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+     1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       implicit none
 
-      real(8) p(number_vertices*3),x(number_vertices*3),force(ffmaxdim)
+      real(8) p(number_vertices*3),x(number_vertices*3)
+      real(8) force(ffmaxdim)
       integer iopt
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
@@ -607,8 +610,8 @@ c     edges with 0, 1, 2 pentagons
 c     counter for edges with 0, 1, 2 pentagons neighbours
       integer ne_hh,ne_hp,ne_pp
       integer a_p(3,60), a_h(3,3*number_vertices-60)
-      integer d_hhh(4,number_vertices),d_hpp(4,number_vertices)
-      integer d_hhp(4,number_vertices),d_ppp(4,number_vertices)
+      integer d_hhh(4,number_vertices),d_hhp(4,number_vertices)
+      integer d_hpp(4,number_vertices),d_ppp(4,number_vertices)
 c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
@@ -649,7 +652,7 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
 
 C     Stretching
 c     we distinguish between bonds between two hexagons, two pentagons and hex/pent
-      
+
 c      write(*,*)'before stretch'
       if(ne_hh .ne. 0) then
         do i=1,ne_hh

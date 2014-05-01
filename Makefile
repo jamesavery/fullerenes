@@ -22,15 +22,15 @@ LIBRARIES=-lstdc++ -lgomp -lgfortran
 #CXXFLAGS+=-mkl -DHAS_MKL -DHAS_LAPACK
 #LIBRARIES+=-mkl
 #Uncomment the following lines if you want to use system BLAS and LAPACK
-CXXFLAGS+=-DHAS_LAPACK 
-LIBRARIES+=-llapack -lblas
+#CXXFLAGS+=-DHAS_LAPACK 
+#LIBRARIES+=-llapack -lblas
 #uncomment that following lines to use gsl (gnu scientific library)
 #CXXFLAGS+=-DHAS_GSL
 #LIBRARIES+=-lgsl
 
 
 OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o
+GRAPHOBJECTS= graph.o cubicgraph.o layout.o hamiltonian.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o layout-optimize.o
 GRAPHFOBJECTS=geometry.o force.o diag.o dddihedral.o config.o opt-standalone.o
 
 FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))

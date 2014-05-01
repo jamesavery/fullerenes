@@ -2045,6 +2045,21 @@ C       also calculated if this test is passed, in which case the
 C       spiral is canonical and IER = 0 on return. Otherwise IER = 13.
 C       IF IT=0 this option is supressed as noncanonical spirals are
 C       analyzed as well.      
+C       Input: M: Number of Faces
+C         1 specific spiral S which contains a sequence of numbers 
+C             5 and 6 of the spiral
+C         D which is the dual adjacency matrix
+
+
+C-------------------------------------------------------------------
+C----    STEP 1
+C        In this step one loops over all 6N spirals and compares with
+C         input spiral S. If identical because of symmetry, and there
+C         should be |G| many (the order of the group), it is used
+C         to obtain the face permutation stored in FP. For each 
+C         symmetry equivalent spiral the permutation is in field P.
+C         Getting all symmetry equivalent spirals results in the
+C         order of the group stored in SO.
       SO=0
       ispiral=0
       DO 10 I1=1,M      ! Begin multiple loop over all      
@@ -2152,6 +2167,17 @@ C            Store all non-identical spirals
  10            CONTINUE
          IER=0      !         Spiral S is canonical, and 
          ORDER=SO   !         SO is the point group order.
+         Print*,' Order of the Group:',SO
+C-------------------------------------------------------------------
+
+C----    STEP 2
+C         For this part the face permutations FP and dual adjacency
+C          matrix are needed.
+C         First get all the faces related to vertices (3 of them)
+C          and edges (2 of them) and store them in fields V and E
+C          respectively. Then get the vertex-, edge- and face-orbits
+C          and assign to each orbit the site-symmetry. Count the number
+C          of specific site-symmetries for each vertex-, edge- and face-orbit.
          N=0        !         Now calculate GROUP and NMR: 
          L=0
          DO 13 K=2,M
@@ -2253,6 +2279,11 @@ C            Store all non-identical spirals
          DO 29 K=1,12                !  And ALL special point orbits
             MS(K)=MV(K)+ME(K)+MF(K)  !  with site group order K in MS(K)
  29         CONTINUE
+
+
+C       
+C-------------------------------------------------------------------
+C       Interlude: Get NMP pattern
          DO 30 J=1,6
             NMR(J)=0
  30         CONTINUE
@@ -2264,6 +2295,10 @@ C            Store all non-identical spirals
             J=J+1
             NMR(J)=ORDER/K
  31         CONTINUE
+C-------------------------------------------------------------------
+
+C      Step 3: Go through the tree structure to get the point group
+C       by using MS (site group order) and ORDER (full group order)
          GROUP='???'                 !  And, finally, the full
          IF (ORDER.EQ.1) THEN        !  special point orbit counts
             GROUP = ' C1'            !  (in conjunction with the
