@@ -91,16 +91,18 @@ C .xyz files
 
 C .cc1 files
       if(nchoice.eq.2) then
-       if(number_vertices.lt.100) WRITE(3,'(I2)') number_vertices
-       if(number_vertices.ge.100.and.number_vertices.lt.1000)
-     1  WRITE(3,'(I3)') number_vertices
-       if(number_vertices.ge.1000.and.number_vertices.lt.10000)
-     1  WRITE(3,'(I4)') number_vertices
-       if(number_vertices.ge.10000) WRITE(3,'(I8)') number_vertices
+        if(number_vertices.lt.100)
+     1   WRITE(iext,'(I5)') number_vertices
+        if(number_vertices.ge.100.and.number_vertices.lt.1000)
+     1    WRITE(iext,'(I3)') number_vertices
+        if(number_vertices.ge.1000.and.number_vertices.lt.10000)
+     1    WRITE(iext,'(I4)') number_vertices
+        if(number_vertices.ge.10000)
+     1    WRITE(iext,'(I8)') number_vertices
         icc1flag=2
         Do J=1,number_vertices
          IM=IAtom(J)
-         Write(3,1010) El(IM),J,(Dist(I,J),I=1,3),icc1flag,
+         Write(iext,1010) El(IM),J,(Dist(I,J),I=1,3),icc1flag,
      1    (IC3(J,I),I=1,3)
         enddo
       endif
