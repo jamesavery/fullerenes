@@ -449,6 +449,22 @@ string Polyhedron::to_mol2() const {
   return s.str();
 }
 
+string Polyhedron::to_cc1() const
+{
+  const int weird_constant = 2;
+  ostringstream s;
+  s << setprecision(8);
+
+  s << N << endl;
+
+  for(node_t u=0; u < N; u++){
+    s << "C\t" << u+1 << "\t" << points[u][0] << "\t" << points[u][1] << "\t" << points[u][2] << "\t" << weird_constant << "\t" << neighbours[u][0] << "\t" << neighbours[u][1] <<"\t" << neighbours[u][2] << endl;
+  }
+
+  return s.str();
+
+}
+
 Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const 
 {
   PlanarGraph d(dual_graph(Fmax,planar_layout));

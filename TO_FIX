@@ -2,8 +2,6 @@ This is a list of open bugs and similar kinds of misbehaviour.  This is not a li
 
 ----------------------
 
-* Problem with opt-standalone
-* C60 is no longer spherical
 * Need to homogenize layout2d - make sure that it exists whenever it's needed
 * .CC1 crashes in fortran - use C++ file writing routine; implement cc1
 * Make orientation the same for buckygen-generated fullerenes and spiral-generated.
@@ -13,13 +11,7 @@ This is a list of open bugs and similar kinds of misbehaviour.  This is not a li
   layouts are used (in the lib) or use the lib such that it doesn't fail.  I (lnw)
   think the first approach is better, a lib should be written such that it is
   hard to use wrongly.
-----------------------
+* general spiral is broken since 917d49d2b4.  maybe not all of that stuff was unnecessary ... (lnw)
+* inertial frame returns 'nan' in case of C60
 
-there is something wrong about opt-standalone: find and fix (lnw)
-
-----------------------
-
-general spiral is broken since 917d49d2b4.  maybe not all of that stuff was unnecessary ... (lnw)
-
----------------------
 

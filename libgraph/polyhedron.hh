@@ -125,6 +125,8 @@ struct Polyhedron : public PlanarGraph {
 		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.4) const;
   string to_xyz() const;
   string to_mol2() const;
+  string to_cc1() const;
+
 private:
   static double C20_points[20][3];
 };
