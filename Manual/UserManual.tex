@@ -970,7 +970,7 @@ every line until the first namelist line is interpreted as a comment.
 \subsection{\&General line}
 Namelist line that contains the main flags for the program. 
 
-\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, nohueckel, loop, ipsphere, nosort, ispsearch, novolume, TolR, R5, R6, filenamedb, filename, ndbconvert}.
+\paragraph{List of options:}\  \paramname{NA, IP, ixyz, ichk, nohueckel, loop, ipsphere, nosort, ispsearch, novolume, TolR, R5, R6, filenamedb, filename, ndbconvert, IPMC}.
 \paragraph{Option description:}
 \begin{description}
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
@@ -1033,7 +1033,7 @@ until it is successful. If \paramname{ispsearch} = 2, all spirals are counted (t
 Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2, R6=1.42 /|).
 \paragraph{List of options:}\ 
 
-\paramname{ICart, rspi, jumps, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6, ScaleRad}
+\paramname{ICart, rspi, jumps, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6, ScaleRad, nanotube}
 
 \paragraph{Option description:} 
 \begin{description}
@@ -1055,11 +1055,19 @@ If \paramname{ICart} = 10 A spiral search algorithm is used, see \paramname{isea
 When importing graphs from the ``House of Graphs'' database, the isomers are numbered starting at~1 (Although,
 internally we start counting at~0.).  There are two example files called \filename{DBc50HOG.inp} and \filename{DBc384HOG.inp}.
 
-\item[rspi] An array of 12 comma separated pentagon indices.  \paramname{rspi} can be given in case of \paramname{icart}=\{2,3,8,9\}.
+\item[{rspi}] An array of 12 comma separated pentagon indices.  \paramname{rspi} can be given in case of \paramname{icart}=\{2,3,8,9\}.
 The integers are of the form $n_1 n_2 \cdots n_{12}$, where the $n_i$ are the 12 Fowler-Manolopoulos ring-spiral
 pentagon indices, which uniquely identify the locations of the
 pentagons if the fullerene is spirable \cite{Atlas}. Use the canonical
 pentagon ring indices if possible (however, a non-canonical from should work as well).
+
+\item[{nanotube}] Flag for the construction of the smallest $D_{5h}$ and $D_{5d}$ fullerene nanotubes, or for the somewhat larger
+$D_{6h}$ and $D_{6d}$ fullerene nanotubes. The $D_{5h/d}$ nanotubes have caps on each side consisting of 6 fused pentagons, while
+the $D_{6h/d}$ nanotubes have 6 pentagons connected to the to and bottom hexagon. This option creates the \paramname{rspi} as defined above
+just from the vertex number. Note that for the $D_{5h/d}$ nanotubes one must have fullerenes of the type \C{_N} with $N=20+10n$, and
+for $D_{6h/d}$ we have $N=24+12n$.\\
+If \paramname{nanotube} = 1 Create \paramname{rspi} for $D_{5h/d}$ nanotubes.\\
+If \paramname{nanotube} = 2 Create \paramname{rspi} for $D_{6h/d}$ nanotubes.
 
 \item[jumps] An array of up to 10 jump positions $j_i$ and step lengths
 $l_i$, i.e., $(j_1,l_1,j_2,l_2,\ldots,j_5,l_5)$.  
