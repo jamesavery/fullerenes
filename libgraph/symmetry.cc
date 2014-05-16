@@ -18,28 +18,6 @@ PointGroup PointGroup::FullereneSymmetries[28] = {
 };
 
 
-PointGroup::PointGroup(const Triangulation& T)
-{
-  // TODO: 
-  // 1) Port the fortran symmetry detection routine, or
-  // 2) Make the fortran routine callable from C++, or
-  // 3) Implement the more efficient and general symmetry detection based on Brinkman's method.
-
-  // Orders of fullerene point groups
-  // 1: C1
-  // 2: C2, Ci, Cs
-  // 3: C3
-  // 4: S4, D2, C2h, C2v
-  // 6: S6, D3, C3h, C3v
-  // 8: D2d, D2h
-  // 10: D5
-  // 12: T, D6, D3d, D3h
-  // 20: D5d, D5h
-  // 24: Th, Td, D6d, D6h
-  // 60: I
-  //120: Ih
-
-}
 
 string PointGroup::to_string() const {
   const char ts[7] = {'?','C','D','T','S','O','I'};
@@ -249,3 +227,162 @@ bool Symmetry::reverses_orientation(const Permutation& pi) const
   return true;
 }
 
+
+PointGroup Symmetry::point_group() const
+{
+  vector<int> 
+    mF = site_symmetry_counts(G),
+    mV = site_symmetry_counts(Gtri),
+    mE = site_symmetry_counts(Gedge);
+
+  vector<int> mS(13,0);
+  for(int i=0;i<12;i++) mS[i+1] = mF[i] + mV[i] + mE[i];
+  
+  switch(G.size()){
+  case 1:
+    return PointGroup(PointGroup::C,1);
+
+  case 2:
+    switch(mS[2]){
+    case 0: 
+      return PointGroup(PointGroup::C,PointGroup::REF_I);
+    case 2:
+      return PointGroup(PointGroup::C,2);
+    default:
+      if(mS[2]>2) 
+	return PointGroup(PointGroup::C,PointGroup::REF_S);
+    }
+    break;
+  case 3:
+    PointGroup(PointGroup::C,3);
+
+  case 4: 
+    switch(mS[4]){
+    case 0:
+      switch(mS[2]){
+      case 1:
+	return PointGroup(PointGroup::S,4);
+      case 3: 
+	return PointGroup(PointGroup::D,2);
+      default:
+	if(mS[2]>3) return PointGroup(PointGroup::C,2,PointGroup::REF_H);
+      }
+      break;
+    case 2:
+      return PointGroup(PointGroup::C,2,PointGroup::REF_V);
+    default:
+      break;
+    }
+    break;
+  case 5:  // No fullerene groups of order 5 -- fill out for fulleroids
+    break;
+
+  case 6:
+    switch(mS[6]){
+    case 0:
+      switch(mS[2]){
+      case 0:
+	return PointGroup(PointGroup::S,6);
+      case 2:
+	return PointGroup(PointGroup::D,3);
+      default:
+	if(mS[2]>2) return PointGroup(PointGroup::C,3,PointGroup::REF_H);	
+      }
+      break;
+    case 2:
+      return PointGroup(PointGroup::C,3,PointGroup::REF_V);
+    default:
+      break;
+    }
+    break;
+
+  case 7:  // No fullerene groups of order 7 -- fill out for fulleroids
+    break;
+
+  case 8:
+    switch(mS[4]){
+    case 1: 
+      return PointGroup(PointGroup::D,2,PointGroup::REF_D);
+    case 3:
+      return PointGroup(PointGroup::D,2,PointGroup::REF_H);
+    default:
+      break;
+    }
+    break;
+
+  case 10:
+    return PointGroup(PointGroup::D,5);
+
+  case 12:
+    switch(mS[6]){
+    case 0:
+      return PointGroup(PointGroup::T);
+    case 1:
+      switch(mS[4]){
+      case 0:
+	switch(mS[2]){
+	case 0:
+	  return PointGroup(PointGroup::D,6);
+	default:
+	  if(mS[2]>2) return PointGroup(PointGroup::D,3,PointGroup::REF_D);
+	}
+	break;
+      case 2:
+	return PointGroup(PointGroup::D,3,PointGroup::REF_H);
+      default:
+	break;
+      }     
+    default:
+      break;
+    }
+    break;
+
+  case 20:
+    switch(mS[4]){
+    case 0:
+      return PointGroup(PointGroup::D,5,PointGroup::REF_D);
+    case 2:
+      return PointGroup(PointGroup::D,5,PointGroup::REF_H);
+    default:
+      break;
+    }
+    break;
+
+  case 24:
+    switch(mS[12]){
+    case 0:
+      switch(mS[6]){
+      case 0:
+	return PointGroup(PointGroup::T,PointGroup::REF_H);
+      case 2:
+	return PointGroup(PointGroup::T,PointGroup::REF_D);
+      default:
+	break;
+      }
+      break;
+    case 1:
+      switch(mS[4]){
+      case 0:
+	return PointGroup(PointGroup::D,6,PointGroup::REF_D);
+      case 2:
+	return PointGroup(PointGroup::D,6,PointGroup::REF_H);
+      default:
+	break;
+      }
+    default:
+      break;
+    }
+    break;
+    
+  case 60:
+    return PointGroup(PointGroup::I);
+
+  case 120:
+    return PointGroup(PointGroup::I,PointGroup::REF_H);
+
+  default:
+    break;
+  }
+
+  return PointGroup();
+}
