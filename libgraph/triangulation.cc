@@ -299,14 +299,33 @@ void gpi_remove_node(const node_t u, PlanarGraph &remaining_graph, set<node_t> &
   deleted_neighbours = nu;
   nu.clear();
 }
- 
+
+bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3, 
+			       vector<int> &spiral, jumplist_t& jumps, vector<node_t>& permutation,
+			       bool general) const {
+  bool normal_spiral = get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,false);
+
+  return normal_spiral || get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true);
+}
+
 // jumps start to count at 0
 // perform a general spiral search and return the spiral and the jump positions + their length
-bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, jumplist_t& jumps, bool general) const {
-
+// TODO: Add jumps to S0. 
+// TODO: Make GSpiral data type
+// TODO: if S0 is given, no need to test for connectedness at every step - jump positions are predetermined.
+// TODO: return GSpiral
+bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, 
+					      jumplist_t& jumps, vector<node_t> &permutation,
+					      bool general, const vector<int>& S0) const {
+  
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
+  permutation.clear();
   spiral.clear();
   jumps.clear();
+
+  // TODO: Static allocation everywhere. Simplify function.
+  permutation.resize(N);
+  spiral.resize(N);
 
   PlanarGraph remaining_graph(*this); // remaining_graph consists of all nodes that haven't been added to the result yet
   set<node_t> remaining_nodes; // all the nodes that haven't been added yet, not ordered and starting at 0
@@ -329,35 +348,42 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     remaining_nodes.insert(u);
   }
 
-  bool CW = nextCW(dedge_t(f1,f2)) == f3;
+  bool 
+    CW  = nextCW(dedge_t(f1,f2)) == f3,
+    CCW = nextCCW(dedge_t(f1,f2)) == f3;
 
-  //check if starting nodes share a face
-  if(edge_set.find(edge_t(f1,f2)) == edge_set.end() ||
-     edge_set.find(edge_t(f1,f3)) == edge_set.end() ||
-     edge_set.find(edge_t(f2,f3)) == edge_set.end()){
-    // TODO: Set a global verbosity level; Often, we don't want to look at all this stuff.
+  // check if starting nodes are a valid spiral start.
+  // TODO: Input f1,f2 and bool CW instead to only allow valid spiral starts.
+    if(!(CW || CCW)){
+    // TODO: Set a global verbosity level; Usually we don't want to look at all this stuff.
     //    cerr << "The requested nodes are not connected." << endl;
     return false;
   }
 
   // add the first three (defining) nodes
   // first node
-  spiral.push_back(valencies[f1]);
+  spiral[0] = valencies[f1];
+  permutation[0] = f1;
   gpi_remove_node(f1, remaining_graph, remaining_nodes, deleted_neighbours_bak);
   open_valencies.push_back(make_pair(f1,valencies[f1]));
 
   // second node
-  spiral.push_back(valencies[f2]);
+  spiral[1] = valencies[f2];
+  permutation[1] = f2;
   gpi_remove_node(f2, remaining_graph, remaining_nodes, deleted_neighbours_bak);
   gpi_connect_backward(open_valencies, pre_used_valencies);
   open_valencies.push_back(make_pair(f2,valencies[f2]-1));
 
+
   // third node
-  spiral.push_back(valencies[f3]);
+  spiral[2] = valencies[f3];
+  permutation[2] = f3;
   gpi_remove_node(f3, remaining_graph, remaining_nodes, deleted_neighbours_bak);
   gpi_connect_backward(open_valencies, pre_used_valencies);
   gpi_connect_forward(open_valencies, pre_used_valencies);
   open_valencies.push_back(make_pair(f3,valencies[f3]-2));
+
+  if(!S0.empty() && (spiral[0] != S0[0] || spiral[1] != S0[1] || spiral[2] != S0[2])) return false;
 
   // iterate over all nodes (of the initial graph) but not by their respective number
   // starting at 3 because we added 3 already
@@ -410,7 +436,10 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
       gpi_connect_backward(open_valencies, pre_used_valencies);
     }
 
-    spiral.push_back(valencies[v]);
+    spiral[i] = valencies[v];
+    permutation[i] = v;
+    if(!S0.empty() && spiral[i] != S0[i]) return false;
+
     if(valencies[v]-pre_used_valencies < 1) return false;
     open_valencies.push_back(make_pair(v,valencies[v]-pre_used_valencies));
     if(open_valencies.back().second < 1) return false; //i.e., the spiral is stuck. This can only happen if the spiral missed a jump
@@ -434,66 +463,116 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
     }
   }
 
-  spiral.push_back(last_valency);
+  spiral[N-1] = last_valency;
+  permutation[N-1] = *remaining_nodes.begin();
   return true;
 }
 
-vector< vector<int> > Triangulation::get_all_spirals() const {
-  vector< vector<int> > all_spirals;
-  vector<int> spiral;
-  jumplist_t  jumps_dummy;  
+void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps, // TODO: Should only need to supply jumps when general=true
+		     vector< vector<int> >& permutations,
+		     bool only_special, bool general) const
+{
+  vector<node_t> node_starts;
 
-  const int permutations[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
-  for(int i=0; i<triangles.size(); i++){
-    const tri_t& f = triangles[i];
+  vector<int> spiral(N);
+  jumplist_t  jump;
+  vector<int> permutation;
 
-    for(int j=0;j<6;j++){
-      int f1=f[permutations[j][0]], f2=f[permutations[j][1]], f3=f[permutations[j][2]];
+  for(node_t u=0;u<N;u++) 
+    if(!only_special || neighbours[u].size() != 6) node_starts.push_back(u);
 
-      bool success = get_spiral(f1,f2,f3,spiral,jumps_dummy,false);
+  for(int i=0; i<node_starts.size(); i++){ // Looks like O(N^3), is O(N)
+    const node_t u=node_starts[i];
+    const vector<node_t>& nu(neighbours[u]);
 
-      if(success) all_spirals.push_back(spiral);
+    for(int j=0;j<nu.size();j++){
+      node_t v=nu[j], w[2];
+      w[0] = nextCW(dedge_t(u,v));
+      w[1] = nextCCW(dedge_t(u,v));
+      
+      for(int k=0;k<2;k++)
+	if(get_spiral(u,v,w[k],spiral,jump,permutation,general)){
+	  spirals.push_back(spiral);
+	  jumps.push_back(jump);
+	  permutations.push_back(permutation);
+	}
+
     }
   }  
-  sort(all_spirals.begin(),all_spirals.end());
-  return all_spirals;
+}
+
+void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const
+{
+  vector< vector<int> > spirals, permutations;
+  vector<jumplist_t>    jumps;
+  
+  get_all_spirals(spirals,jumps,permutations,true,false);
+
+  if(spirals.empty()) 
+    get_all_spirals(spirals,jumps,permutations,true,true);
+
+  // // Now get the spiral corresponding to this triangulation
+  // // TDO: define S,J,P
+  // get_spiral(0,1,2,S,J,P,true);
+  // vector< int > group_actions; // Referring to the 'permutations' array.
+  // for(int i=0;i<spirals.size();i++)
+  //   if(J == jumps[i] && S == spirals[i]) group_actions.push_back(i);
+  
+  // Since finite point groups are Coxeter groups, they are generated
+  // by a set of involutions. But... not every involution is a generator! What do?
+
+  // Stuff for symmetry:
+  //- Multiplication table can be represented as a directed graph.
+  //-- Given any spanning tree, the leafs generate the group
+  //-- Point groups are generated by involutions. Can we build up a spanning tree ending in involutions only?
+
 }
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
-bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool canonical, bool general) const {
+bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool canonical, bool only_special, bool general) const 
+{
+  vector<node_t> node_starts;
 
-  vector<int> spiral_tmp;
+  for(node_t u=0;u<N;u++) 
+    if(!only_special || neighbours[u].size() != 6) node_starts.push_back(u);
+
+  vector<int> spiral_tmp,permutation_tmp;
   jumplist_t jumps_tmp;
   spiral = vector<int>(1,INT_MAX); // so it gets overwritten
   jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
   
-  for(int i=0; i<triangles.size(); i++){
-    int permutations[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
-    const tri_t& f = triangles[i];
-    for(int j=0; j<6; j++){
+  for(int i=0; i<node_starts.size(); i++){
+    const node_t u=node_starts[i];
+    const vector<node_t>& nu(neighbours[u]);
 
-      int f1 = f[permutations[j][0]], f2 = f[permutations[j][1]], f3 = f[permutations[j][2]];
+    for(int j=0;j<nu.size();j++){
+      node_t v=nu[j], w[2];
+      w[0] = nextCW(dedge_t(u,v));
+      w[1] = nextCCW(dedge_t(u,v));
+      
+      for(int k=0;k<2;k++){	// Looks like O(N^3), is O(N) (or O(1) is only_special is set)
+	if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,general))
+	  continue;
 
-      if(!get_spiral(f1, f2, f3, spiral_tmp, jumps_tmp, general))
-	continue;
+	//If we don't need the canonical spiral, just return the first one that works
+	if(!canonical){
+	  jumps  = jumps_tmp;
+	  spiral = spiral_tmp;
+	  return true;
+	}
 
-      //If we don't need the canonical spiral, just return the first one that works
-      if(!canonical){
-	jumps  = jumps_tmp;
-	spiral = spiral_tmp;
-	return true; 
-      }
-
-      // store the shortest / lexicographically smallest (general) spiral
-      if(jumps_tmp.size() < jumps.size() || 
-        (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
-        (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
-          lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
-        jumps = jumps_tmp;
-        spiral = spiral_tmp;
+	// store the shortest / lexicographically smallest (general) spiral
+	if(jumps_tmp.size() < jumps.size() || 
+	   (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
+	   (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
+	    lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
+	  jumps = jumps_tmp;
+	  spiral = spiral_tmp;
+	}
       }
     }
-  }
+  }  
+
   if(spiral.size()!=N) return false;
 
   return true;
