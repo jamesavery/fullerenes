@@ -19,7 +19,7 @@ Triangulation from_rspi(int F, const vector<int>& rspi, const PlanarGraph::jumpl
   return Triangulation(spiral,jumps);
 }
 
-void extrude(Triangulation &T, int p)
+bool extrude(Triangulation &T, int p)
 {
   fprintf(stderr,"Supposedly degree 5 node %d has %d neighbours\n",p,int(T.neighbours[p].size()));
   // Insert 5 new pentagons p0,...,p4 surrounding p
@@ -27,7 +27,7 @@ void extrude(Triangulation &T, int p)
   int Hi[5], v2[5], v3[5], v4[5];
   for(int i=0;i<5;i++){
     Hi[i] = T.neighbours[p][i];
-    assert(T.neighbours[Hi[i]].size() == 6);
+    if(T.neighbours[Hi[i]].size() != 6) return false; // p is not valid patch replacement site.
 
     const vector<node_t> &nHi(T.neighbours[Hi[i]]);
 
@@ -47,7 +47,76 @@ void extrude(Triangulation &T, int p)
   }
   T.neighbours[p] = vector<node_t>({T.N,T.N+1,T.N+2,T.N+3,T.N+4}); // neighbours(p) = {p0,...,p4}
   T.N += 5;
+
+  return true;
 }
+
+
+bool extrude(Polyhedron& P, int p) // Requires that P is a triangulation.
+{
+  assert(P.is_triangulation());
+
+  int Hi[5], v2[5], v3[5], v4[5], pi[5];
+  for(int i=0;i<5;i++){
+    pi[i] = P.N+i;
+    Hi[i] = P.neighbours[p][i];
+    if(P.neighbours[Hi[i]].size() != 6) return false; // p is not valid patch replacement site.
+
+    const vector<node_t> &nHi(P.neighbours[Hi[i]]);
+    int ip = 0; 
+    for(;ip<nHi.size();ip++) if(nHi[ip] == p) break;
+
+    v2[i] = nHi[(ip+2)%6];	// Assuming p's neighbours are all hexagons
+    v3[i] = nHi[(ip+3)%6];
+    v4[i] = nHi[(ip+4)%6];
+  }
+
+  // Derive new planar layout 
+  if(P.layout2d.size() == P.N){
+    P.layout2d.resize(P.N+5);
+    
+    // coord2d cm;
+    // for(int i=0;i<5;i++) cm += P.layout2d[Hi[i]]/5.;
+    // P.layout2d[p] = cm;
+
+    for(int i=0;i<5;i++) P.layout2d[pi[i]] = (P.layout2d[Hi[i]]+P.layout2d[Hi[(i+1)%5]] + P.layout2d[p])/3.0;
+  }
+
+  // Derive new approximate geometry
+  if(P.points.size() == P.N){
+    P.points.resize(P.N+5);
+    
+    // coord3d cm;
+    // for(int i=0;i<5;i++) cm += P.points[Hi[i]]/5.;
+    // P.points[p] = cm;
+
+    for(int i=0;i<5;i++) P.points[pi[i]] = (P.points[Hi[i]]+P.points[Hi[(i+1)%5]] + P.points[p])/3.0;
+  }
+
+  // Update graph
+  for(int i=0;i<5;i++) {
+    P.neighbours.push_back(vector<int>({p,pi[(i+4)%5],Hi[i],Hi[(i+1)%5],pi[(i+1)%5]})); // Neighbour list of pi
+    P.neighbours[Hi[i]] = vector<int>({pi[i],pi[(i+4)%5],Hi[(i+4)%5],v2[i],v3[i],v4[i],Hi[(i+1)%5]});  // Neighbour list of Hi
+  }
+  P.neighbours[p] = vector<node_t>({pi[0],pi[1],pi[2],pi[3],pi[4]}); 
+  P.N += 5;
+
+  P.update_from_neighbours();
+
+  // TODO: Fix derived planar embedding instead
+  //       My suspicion is that the problem arises from the outer face.
+  P.layout2d = P.tutte_layout();
+
+  // Update faces
+  // TODO: Replace triangles directly instead of recomputing?
+  P.faces    = P.compute_faces_flat(3,true);
+  P.face_max = 3;
+
+
+  return true;
+}
+
+
 
 int main(int ac, char **av)
 {
@@ -59,78 +128,102 @@ int main(int ac, char **av)
   else 
     for(int i=0;i<12;i++) 
       rspi[i] = rspi_default[i]-1;
+
+  string basename("fulleroid-"+to_string(N));
   
   int F = N/2+2;
   Triangulation dual(from_rspi(F,rspi));
+  dual.layout2d = dual.tutte_layout();
 
-  for(int i=0;i<12;i++) extrude(dual,rspi[i]);
-  //  fprintf(stderr,"Edges before: %d\n",int(dual.edge_set.size()));
-  //  extrude(dual,rspi[1]);
-  dual.update_from_neighbours();
-  //  fprintf(stderr,"Edges after: %d\n",int(dual.edge_set.size()));
-  cout << "dual = " << dual << ";\n";
+  Polyhedron PD(dual,dual.zero_order_geometry()*coord3d(1.4,1.4,1.4));
 
-   fprintf(stderr,"-2\n");
-   cout << dual.neighbours[0] << endl;
-   //   dual.orient_neighbours();
-   //   dual.update(true);
-   fprintf(stderr,"-1\n");
+  {
+    ofstream mol2(("output/"+basename+"-step0.mol2").c_str());
+    mol2 << PD.to_mol2();
+    mol2.close();
+  }
 
-   
-   dual.layout2d = dual.tutte_layout();
-   fprintf(stderr,"0\n");
-   //   Polyhedron PD(dual,dual.zero_order_geometry());
-   //   PD.optimize();
+  PD.optimize(4);
 
-   string basename("fulleroid-"+to_string(N));
-   // {
-   //   ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
-   //   mol2 << PD.to_mol2();
-   //   mol2.close();
-   // }
-   fprintf(stderr,"A\n");
-   cout << "dual = " << dual << ";\n";
-   PlanarGraph G  = PlanarGraph(dual,dual.layout2d).dual_graph(3,true);
-   fprintf(stderr,"B\n");
-   G.layout2d = G.tutte_layout();
-   fprintf(stderr,"C\n");
-   
-   cout << "graph = " << G << ";\n";
-   fprintf(stderr,"D\n");
-
-   Polyhedron P(G,G.zero_order_geometry());
-   fprintf(stderr,"E\n");
-   {
-     ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
-     mol2 << P.to_mol2();
-     mol2.close();
-   }
-   fprintf(stderr,"F\n");
-   P.optimize(4);
-
-   P.move_to_origin();
-   matrix3d If(P.inertial_frame());
-   P.points = If*P.points;
+  {
+    ofstream mol2(("output/"+basename+"-step0.5.mol2").c_str());
+    mol2 << PD.to_mol2();
+    mol2.close();
+  }
 
 
-   fprintf(stderr,"G\n");
+  for(int p=0;p<12;p++)
+    if(extrude(PD,rspi[p])){
+      cerr << "Completed extrusion at pentagon " << p << endl;
+      PD.update_from_neighbours();
+      // {
+      // 	ofstream mol2(("output/"+basename+"-step"+to_string(p+1)+".mol2").c_str());
+      // 	mol2 << PD.to_mol2();
+      // 	mol2.close();
+      // }
+      // PD.optimize(4);
+      // PD.optimize(3);
+      // {
+      // 	ofstream mol2(("output/"+basename+"-step"+to_string(p+1)+".5.mol2").c_str());
+      // 	mol2 << PD.to_mol2();
+      // 	mol2.close();
+      // }
 
-   P.faces    = P.compute_faces_flat(7,true);
-   P.face_max = 7;
+    } else {
+      cerr << "No extrusion patch replacement site at pentagon " << p << endl;
+    }
 
-   {
-     ofstream mol2(("output/"+basename+".mol2").c_str());
-     mol2 << P.to_mol2();
-     mol2.close();
+  {
+    ofstream mol2(("output/"+basename+"-step12.mol2").c_str());
+    mol2 << PD.to_mol2();
+    mol2.close();
+  }
+  PD.optimize(4);
+  PD.optimize(3);
+  {
+    ofstream mol2(("output/"+basename+"-step12.5.mol2").c_str());
+    mol2 << PD.to_mol2();
+    mol2.close();
+  }
+
+  // PD.move_to_origin();
+  // matrix3d If(PD.inertial_frame());
+  // PD.points = If*PD.points;
+
+  cout << "PD = " << PD << ";\n";
+  cout << "dual = " << static_cast<PlanarGraph>(PD) << ";\n";
+
+  assert(PD.is_triangulation());
+  //  PD.orient_neighbours();
+  //  PD.layout2d = PD.tutte_layout();
+
+  fprintf(stderr,"Getting fulleroid as dual of dual, B.\n");
+  Polyhedron P  = PD.dual(3,true);
+
+  cout << "G = " << static_cast<PlanarGraph>(PD) << ";\n";
+
+  {
+    ofstream mol2(("output/"+basename+"-step-preopt.mol2").c_str());
+    mol2 << P.to_mol2();
+    mol2.close();
+  }
+
+  P.optimize(4);
+  P.optimize(3);
+  
+  {
+    ofstream mol2(("output/"+basename+".mol2").c_str());
+    mol2 << P.to_mol2();
+    mol2.close();
      
-     ofstream pov(("output/"+basename+".pov").c_str());
-     pov << P.to_povray();
-     pov.close();
+    ofstream pov(("output/"+basename+".pov").c_str());
+    pov << P.to_povray();
+    pov.close();
 
-     ofstream math(("output/"+basename+".m").c_str());
-     math << "P = " << P;
-     math.close();
-   }   
+    ofstream math(("output/"+basename+".m").c_str());
+    math << "P = " << P;
+    math.close();
+  }   
 
   return 0;
 }
