@@ -1,6 +1,6 @@
-D5h-C250 nanotube. Using Tutte algorithm to produce coordinates from ring spiral indices
-&General  NA=48 /
-&Coord ICart=3 nanotube=2 /
+D5h-C360 nanotube. Using Tutte algorithm to produce coordinates from ring spiral indices
+&General  NA=360 /
+&Coord ICart=3 nanotube=1 /
 &FFChoice /
 &FFParameters /
 &Hamilton /
