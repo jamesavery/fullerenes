@@ -210,7 +210,6 @@ RSPIExample SymmetryExample(string sym, int number=0)
   string padded_sym = sym;
   padded_sym.insert(padded_sym.begin(), 3 - padded_sym.size(), ' ');
   
-  printf("Nexamples = %d\n",Nexamples);
   for(i=0;i<Nexamples;i++)
     if(symmetry_examples[i].sym == padded_sym) break;
 

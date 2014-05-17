@@ -17,8 +17,7 @@ public:
   PointGroup(symmetry_type t = UNKNOWN, symmetry_reflection r = NONE) : sym_type(t), n(0), sym_reflection(r) {}
   PointGroup(symmetry_type t, unsigned int n, symmetry_reflection r = NONE) :
     sym_type(t), n(n), sym_reflection(r) {}
-
-  PointGroup(const Triangulation& g);
+  PointGroup(const string& name);
 
   static PointGroup FullereneSymmetries[28];
 
@@ -27,6 +26,10 @@ public:
   friend std::ostream& operator<<(ostream& S, const PointGroup& G){
     S << G.to_string();
     return S;
+  }
+
+  bool operator==(const PointGroup& G){
+    return sym_type == G.sym_type && n == G.n && sym_reflection == G.sym_reflection;
   }
 };
 
@@ -50,6 +53,7 @@ struct Permutation : public vector<int> {
 class Symmetry : public Triangulation {
 public:
 
+
   vector<int> S0;
   vector< Permutation > G, Gedge, Gtri;
 
@@ -64,6 +68,8 @@ public:
   vector<int>           site_symmetry_counts(const vector<Permutation>& pi) const;
   vector< vector<int> > multiplication_table() const ;
   bool                  reverses_orientation(const Permutation& pi) const;
+
+  PointGroup point_group() const;
 
   Symmetry(const vector<int>& spiral) : Triangulation(spiral), S0(spiral)
   {

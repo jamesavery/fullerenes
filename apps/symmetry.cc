@@ -67,6 +67,7 @@ int main(int ac, char **av)
     << "|Fixed_E| = " << g.group_fixpoints(g.Gedge).size() << "\n";
 
 
+  cout << "Calculated point group: " << g.point_group() << endl;
   //  cout << "coxmatrix = " << g.coxeter_matrix() << ";\n";
   //  cout << "multtable = " << g.multiplication_table() << ";\n";
 

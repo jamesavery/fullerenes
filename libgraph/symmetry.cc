@@ -1,4 +1,5 @@
 #include "symmetry.hh"
+#include "auxiliary.hh"
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////
@@ -17,16 +18,40 @@ PointGroup PointGroup::FullereneSymmetries[28] = {
   {T,REF_D},  {T,REF_H},   {I},         {I,REF_H}
 };
 
+PointGroup::PointGroup(const string& name_) : sym_type(UNKNOWN), n(0), sym_reflection(NONE)
+{
+  string name(name_);
+  const char ts[7] = {'?','C','D','T','S','O','I'};
+  const char rs[6] = {' ','v','h','d','i','s'};
+
+  // trim name - TODO: fix
+  while(name[0] == ' ') name = name.substr(1);
+
+  for(int st=6;st>0;st--) 
+    if(name[0] == ts[st]) sym_type = symmetry_type(st);
+  
+  if(name.size()  == 1) return;
+
+  size_t idx = 0;
+  if(name[1] >= '0' && name[1] <='9')
+    n = stol(name.substr(1),&idx,0);
+  
+  if(name.size() <= idx+1) return;
+  
+  for(int sr=5;sr>0;sr--)
+    if(name[idx+1] == rs[sr]) sym_reflection = symmetry_reflection(sr);
+}
 
 
 string PointGroup::to_string() const {
   const char ts[7] = {'?','C','D','T','S','O','I'};
   const char rs[6] = {' ','v','h','d','i','s'};
-  char result[4]   = {0,0,0,0};
-  result[0] = ts[sym_type];
-  result[1] = n>0? '0'+n : ' ';
-  result[2] = rs[sym_reflection];
-  return string(result);
+
+  string result;
+  result += ts[sym_type];
+  if(n>0) result += std::to_string(n);
+  if(sym_reflection != NONE) result += rs[sym_reflection];
+  return result;
 }
 
 
@@ -240,36 +265,36 @@ PointGroup Symmetry::point_group() const
   
   switch(G.size()){
   case 1:
-    return PointGroup(PointGroup::C,1);
+    return PointGroup("C1");
 
   case 2:
     switch(mS[2]){
     case 0: 
-      return PointGroup(PointGroup::C,PointGroup::REF_I);
+      return PointGroup("Ci");
     case 2:
-      return PointGroup(PointGroup::C,2);
+      return PointGroup("C2");
     default:
       if(mS[2]>2) 
-	return PointGroup(PointGroup::C,PointGroup::REF_S);
+	return PointGroup("Cs");
     }
     break;
   case 3:
-    PointGroup(PointGroup::C,3);
+    return PointGroup("C3");
 
   case 4: 
     switch(mS[4]){
     case 0:
       switch(mS[2]){
       case 1:
-	return PointGroup(PointGroup::S,4);
+	return PointGroup("S4");
       case 3: 
-	return PointGroup(PointGroup::D,2);
+	return PointGroup("D2");
       default:
-	if(mS[2]>3) return PointGroup(PointGroup::C,2,PointGroup::REF_H);
+	if(mS[2]>3) return PointGroup("C2h");
       }
       break;
     case 2:
-      return PointGroup(PointGroup::C,2,PointGroup::REF_V);
+      return PointGroup("C2v");
     default:
       break;
     }
@@ -282,15 +307,15 @@ PointGroup Symmetry::point_group() const
     case 0:
       switch(mS[2]){
       case 0:
-	return PointGroup(PointGroup::S,6);
+	return PointGroup("S6");
       case 2:
-	return PointGroup(PointGroup::D,3);
+	return PointGroup("D3");
       default:
-	if(mS[2]>2) return PointGroup(PointGroup::C,3,PointGroup::REF_H);	
+	if(mS[2]>2) return PointGroup("C3h");	
       }
       break;
     case 2:
-      return PointGroup(PointGroup::C,3,PointGroup::REF_V);
+      return PointGroup("C3v");
     default:
       break;
     }
@@ -302,33 +327,33 @@ PointGroup Symmetry::point_group() const
   case 8:
     switch(mS[4]){
     case 1: 
-      return PointGroup(PointGroup::D,2,PointGroup::REF_D);
+      return PointGroup("D2d");
     case 3:
-      return PointGroup(PointGroup::D,2,PointGroup::REF_H);
+      return PointGroup("D2h");
     default:
       break;
     }
     break;
 
   case 10:
-    return PointGroup(PointGroup::D,5);
+    return PointGroup("D5");
 
   case 12:
     switch(mS[6]){
     case 0:
-      return PointGroup(PointGroup::T);
+      return PointGroup("T");
     case 1:
       switch(mS[4]){
       case 0:
 	switch(mS[2]){
-	case 0:
-	  return PointGroup(PointGroup::D,6);
+	case 2:
+	  return PointGroup("D6");
 	default:
-	  if(mS[2]>2) return PointGroup(PointGroup::D,3,PointGroup::REF_D);
+	  if(mS[2]>2) return PointGroup("D3d");
 	}
 	break;
       case 2:
-	return PointGroup(PointGroup::D,3,PointGroup::REF_H);
+	return PointGroup("D3h");
       default:
 	break;
       }     
@@ -340,9 +365,9 @@ PointGroup Symmetry::point_group() const
   case 20:
     switch(mS[4]){
     case 0:
-      return PointGroup(PointGroup::D,5,PointGroup::REF_D);
+      return PointGroup("D5d");
     case 2:
-      return PointGroup(PointGroup::D,5,PointGroup::REF_H);
+      return PointGroup("D5h");
     default:
       break;
     }
@@ -353,9 +378,9 @@ PointGroup Symmetry::point_group() const
     case 0:
       switch(mS[6]){
       case 0:
-	return PointGroup(PointGroup::T,PointGroup::REF_H);
+	return PointGroup("Th");
       case 2:
-	return PointGroup(PointGroup::T,PointGroup::REF_D);
+	return PointGroup("Td");
       default:
 	break;
       }
@@ -363,9 +388,9 @@ PointGroup Symmetry::point_group() const
     case 1:
       switch(mS[4]){
       case 0:
-	return PointGroup(PointGroup::D,6,PointGroup::REF_D);
+	return PointGroup("D6d");
       case 2:
-	return PointGroup(PointGroup::D,6,PointGroup::REF_H);
+	return PointGroup("D6h");
       default:
 	break;
       }
@@ -375,10 +400,10 @@ PointGroup Symmetry::point_group() const
     break;
     
   case 60:
-    return PointGroup(PointGroup::I);
+    return PointGroup("I");
 
   case 120:
-    return PointGroup(PointGroup::I,PointGroup::REF_H);
+    return PointGroup("Ih");
 
   default:
     break;
