@@ -279,7 +279,7 @@ inline void gpi_connect_backward(list<pair<node_t,int> > &open_valencies, int& p
   ++pre_used_valencies;
 }
 
-void gpi_remove_node(const node_t u, PlanarGraph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
+void gpi_remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
   remaining_nodes.erase(u);	// O(log(N)) with big coefficient - is set<node_t> the best data structure to use?
   vector<node_t>& nu(remaining_graph.neighbours[u]);
 
@@ -305,11 +305,12 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 			       bool general) const {
   bool normal_spiral = get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,false);
 
-  return normal_spiral || get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true);
+  return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
 }
 
 // jumps start to count at 0
 // perform a general spiral search and return the spiral and the jump positions + their length
+// TODO: General spiral doesn't work properly anymore. FIX!
 // TODO: Add jumps to S0. 
 // TODO: Make GSpiral data type
 // TODO: if S0 is given, no need to test for connectedness at every step - jump positions are predetermined.
@@ -327,7 +328,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   permutation.resize(N);
   spiral.resize(N);
 
-  PlanarGraph remaining_graph(*this); // remaining_graph consists of all nodes that haven't been added to the result yet
+  Graph remaining_graph(neighbours); // remaining_graph consists of all nodes that haven't been added to the result yet
   set<node_t> remaining_nodes; // all the nodes that haven't been added yet, not ordered and starting at 0
   vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
 
@@ -396,6 +397,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     // we can't search in the remaining_graph because there are some edges deleted already
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
     node_t v = CW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
+    //    cout << "u->v: " << u << " -> " << v << endl;
     if(v == -1) return false; // non-general spiral failed
 
     //remove all edges of which *j is part from the remaining graph
@@ -406,19 +408,23 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
 
       if(!is_connected){//further cyclic rotation required
         //revert the last operations
+	//	cout << "Reverting deleted node " << v << " to neighbours " << deleted_neighbours_bak << endl;
         remaining_graph.neighbours[v] = deleted_neighbours_bak;
+	deleted_neighbours_bak.clear();
+
         for(vector<node_t>::iterator it = remaining_graph.neighbours[v].begin(); it != remaining_graph.neighbours[v].end(); ++it){
           remaining_graph.neighbours[*it].push_back(v);
         }
         //perform cyclic shift on open_valencies
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
+	//	cout << "open valencies = " << open_valencies << endl;
         //there was no atom added, so 'i' must not be incremented
         --i;
         ++jump_state;
         continue;
-      }
-      else if(jump_state!=0 && is_connected){//end of cyclic rotation
+      } else if(jump_state!=0){//end of cyclic rotation
+	//	cout << "//end of cyclic rotation\n";
         jumps.push_back(make_pair(i,jump_state));
         jump_state=0;
       }
@@ -478,8 +484,10 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
   jumplist_t  jump;
   vector<int> permutation;
 
+  // Prefer special nodes. TODO: Automatic renumber in order of degrees.
+  for(node_t u=0;u<N;u++) if(neighbours[u].size() != 6) node_starts.push_back(u);
   for(node_t u=0;u<N;u++) 
-    if(!only_special || neighbours[u].size() != 6) node_starts.push_back(u);
+    if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
 
   for(int i=0; i<node_starts.size(); i++){ // Looks like O(N^3), is O(N)
     const node_t u=node_starts[i];
