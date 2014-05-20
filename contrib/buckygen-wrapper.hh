@@ -1,6 +1,9 @@
 #ifndef BUCKYGEN_WRAPPER_HH
 # define BUCKYGEN_WRAPPER_HH
 #include <limits.h>
+#include <sys/types.h>
+#include "../libgraph/graph.hh"
+
 
 namespace BuckyGen {
   
