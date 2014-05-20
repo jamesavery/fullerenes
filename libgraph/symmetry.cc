@@ -411,3 +411,17 @@ PointGroup Symmetry::point_group() const
 
   return PointGroup();
 }
+
+
+vector< pair<int,int> > Symmetry::NMR_pattern() const
+{
+  vector<int>  mV = site_symmetry_counts(Gtri);
+  vector< pair<int,int> > NMR;
+  
+  // F&M
+  int order = G.size();
+  for(int K=6;K>=1;K--)
+    if(mV[K-1] != 0) NMR.push_back(make_pair(mV[K-1],order/K));
+  
+  return NMR;
+}
