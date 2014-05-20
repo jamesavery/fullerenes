@@ -35,7 +35,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
 
 //  cout << "g = " << *this << endl;
 
-  initial_coords = tutte_layout_direct(outer_face,initial_coords);
+//  initial_coords = tutte_layout_direct(outer_face,initial_coords);
   return tutte_layout_iterative(outer_face,initial_coords);
 }
 #ifdef HAS_MKL
