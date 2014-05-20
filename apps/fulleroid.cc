@@ -10,6 +10,7 @@
 int N_default = 140;
 int rspi_default[12] = {1,17,20,23,26,29,48,51,54,57,60,72};
 
+vector<int> spiral = {5,5,5,5,5,5,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,5,5,5,7,7,5,5,5,7,7,5,5,5,7,7,5,5,5,7,7,5,5,5,7,7,5,5,5,7,7,7,5,5,5,7,7,7,5,5,5,7,7,7,5,5,5,7,7,7,5,5,5,7,7,5,5,7,7,5,5,5,7,7,5,5,5,7,7,5,5,5,7,7,5,5,5,7,7,5,5,5,5,5,5,7,7,5,5,5,7,7,5,5,5,7,7,5,5,5,7,7,5,7,7,5,5,5,5,5,5};
 
 
 Triangulation from_rspi(int F, const vector<int>& rspi, const PlanarGraph::jumplist_t& jumps = PlanarGraph::jumplist_t())
@@ -198,10 +199,18 @@ int main(int ac, char **av)
   //  PD.layout2d = PD.tutte_layout();
 
   fprintf(stderr,"Getting fulleroid as dual of dual, B.\n");
+
+  Triangulation T(PD,true);
+  vector<int> spiral;
+  Triangulation::jumplist_t jumps;
+  T.get_spiral(spiral,jumps,false,true,true);
+
+  
   Polyhedron P  = PD.dual(3,true);
 
   cout << "G = " << static_cast<PlanarGraph>(PD) << ";\n";
-
+  cout << "spiral = " << spiral << ";\n"
+       << "jumps  = " << jumps << ";\n";
   {
     ofstream mol2(("output/"+basename+"-step-preopt.mol2").c_str());
     mol2 << P.to_mol2();
@@ -210,6 +219,8 @@ int main(int ac, char **av)
 
   P.optimize(4);
   P.optimize(3);
+
+  
   
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
