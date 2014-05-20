@@ -1,5 +1,5 @@
 #ifndef GEOMETRY_HH
-# define GEOMETRY_HH
+#define GEOMETRY_HH
 
 #include <string.h>
 #include <iostream>
@@ -12,11 +12,14 @@
 #include <complex>
 #include <algorithm>
 #include "auxiliary.hh"
+
 using namespace std;
 
 typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
+
+struct matrix3d; // required for coord3d.outer(coord3d)
 
 // TODO: geometry.hh is getting huge. Move most of the implementation to geometryc.cc
 
@@ -134,8 +137,9 @@ struct coord3d {
   coord3d operator-() const {coord3d y(-x[0],-x[1],-x[2]); return y;}
 
   coord3d cross(const coord3d& y) const {
-    return coord3d(x[1]*y[2]-x[2]*y[1], x[2]*y[0]-x[0]*y[2], x[0]*y[1] - x[1]*y[0]);
+    return coord3d(x[1]*y[2]-x[2]*y[1], x[2]*y[0]-x[0]*y[2], x[0]*y[1]-x[1]*y[0]);
   }
+  matrix3d outer(const coord3d& y) const;
   double dot(const coord3d& y) const { return x[0]*y[0]+x[1]*y[1]+x[2]*y[2]; }
   double norm() const { return sqrt(dot(*this)); }
   coord2d polar_angle(const coord3d& centre = coord3d()) const
@@ -162,40 +166,16 @@ struct coord3d {
   }
 
   // calculation of the angle beta at b(0,0,0)
-  static double angle(const coord3d& a, const coord3d& c)
-  {
-    const double L2 = a.dot(a);
-    const double R2 = c.dot(c);
-    const double M2 = (c-a).dot(c-a);
-    const double den = 2.0*sqrt(L2 * R2);
-    double arg = (L2+R2-M2)/den;
-    if(arg > 1)  arg = 1;
-    if(arg < -1) arg = -1;
-    return acos(arg);    
-  }
-
+  static double angle(const coord3d& a, const coord3d& c);
   // calculation of the derivative of angle beta at b(0,0,0) according to coordinates a and c with fixed b
-  static void dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& dc)
-  {
-    const double L2 = a.dot(a);
-    const double R2 = c.dot(c);
-    const double M2 = (c-a).dot(c-a);
-    const double den = 2.0*sqrt(L2 * R2);
-    double arg = (L2+R2-M2)/den;
+  static void dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& dc);
+  // calculation of the dihedral angle theta at a(0,0,0), b, c and d,  the result is an angel between -\pi and +\pi (in radians)
+  static double dihedral(const coord3d& b, const coord3d& c, const coord3d& d);
+  // calculation of the derivative of dihedral angle theta at a(0,0,0), b, c and d  according to coordinates b, c and d with fixed a
+  static void ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, coord3d& db, coord3d& dc, coord3d& dd);
 
-    const coord3d dM2__da = (a-c)*2;
-    const coord3d dL2__da = a*2;
-    const coord3d dden__da = dL2__da * R2/sqrt(L2*R2);
-    const coord3d darg__da = dL2__da * 1.0/den - dM2__da * 1.0/den - dden__da * (L2+R2-M2)/(den*den);
+  static double ideal_dihedral(double lA, double lB, double lC);
 
-    const coord3d dM2__dc = (c-a)*2;
-    const coord3d dR2__dc = c*2;
-    const coord3d dden__dc = dR2__dc * L2/sqrt(L2*R2);
-    const coord3d darg__dc = dR2__dc * 1.0/den - dM2__dc * 1.0/den - dden__dc * (L2+R2-M2)/(den*den);
-
-    da = -darg__da * 1.0/sqrt(1.0-arg*arg);
-    dc = -darg__dc * 1.0/sqrt(1.0-arg*arg);
-  }
 
   friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
   {
@@ -226,11 +206,18 @@ struct coord3d {
 struct matrix3d {
   double values[9];
 
-  matrix3d()                { memset(values,0,9*sizeof(double)); }
+//  matrix3d()                { memset(values,0,9*sizeof(double)); }
   matrix3d(const double *v) { memcpy(values,v,9*sizeof(double)); }
+  matrix3d(const double r=0, const double s=0, const double t=0, const double u=0, const double v=0, const double w=0, const double x=0, const double y=0, const double z=0) {
+    values[0]=r; values[1]=s; values[2]=t; values[3]=u; values[4]=v; values[5]=w; values[6]=x; values[7]=y; values[8]=z;
+  }
 
   double& operator()(int i, int j)       { return values[i*3+j]; }
   double  operator()(int i, int j) const { return values[i*3+j]; }
+  matrix3d operator+(const matrix3d& y) const { return matrix3d(*this) += y; }
+  matrix3d& operator+=(const matrix3d& y){ for(int i=0;i<3;++i){for(int j=0;j<3;++j){values[3*i+j] += y(i,j);}}; return *this; }
+  matrix3d operator*(const double s)   const { return matrix3d(*this) *= s; }
+  matrix3d& operator*=(const double& s){ for(int i=0;i<3;++i){for(int j=0;j<3;++j){values[3*i+j] *= s;}}; return *this; }
 
   matrix3d transpose() const {
     const matrix3d &M(*this);
