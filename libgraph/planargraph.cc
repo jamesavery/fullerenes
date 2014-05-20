@@ -787,7 +787,7 @@ size_t PlanarGraph::count_perfect_matchings() const
   for(map<dedge_t,int>::const_iterator a(A.begin()); a!=A.end(); a++)
     Af[a->first.first*N+a->first.second] = a->second;
 
-  return round(sqrt(fabs(lu_det(Af,N))));
+  return round(sqrtl(fabs(lu_det(Af,N))));
 }
 #else
 size_t PlanarGraph::count_perfect_matchings() const 

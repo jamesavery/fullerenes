@@ -1,6 +1,6 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,ICart,Iopt,IP,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
-     1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,
+     1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,IPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
@@ -18,13 +18,13 @@ C-----------------------------------------------------------------
       integer endzeile
       integer rspi(12), jumps(10)
       Character*1 DATEN(nzeile)
-      Character filename*50
-      Character filenameout*50
+      Character filename*50,filenameout*50,flagsym*3
       Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
-     1 nohueckel,loop,ndbconvert,
+     1 nohueckel,loop,ndbconvert,iPFcount,IPMC,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
-      Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,leap,isonum,IPRC,
-     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps
+      Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,IPRC,leap,isonum,
+     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps,
+     1 nanotube
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
@@ -106,6 +106,8 @@ C Integers
       ihamstore=0 ! Flag for storing all Hamiltonian cycles
       nhamcyc=0 ! Flag for reading Hamiltonian cycle for 2D graph
       novolume=0 ! Flag for volume calculation
+      nohueckel=0 ! Option for diagonalizing the Hueckel matrix
+      nanotube=0!  Flag for creating nanotubes
       IGCtrans=0 ! Initial flag for Goldberg-Coxeter transformed fullerene
       ICart=1   !  Input for fullerene structure
       ichk=0    !  Option for restarting the isomer list
@@ -113,7 +115,7 @@ C Integers
       ifs=0     !  Option for .dat and .tex files
       iham=0    !  Number of Hamiltonian cycles
       iFS=0     !  Option for producing files for 2D fullerene graphs
-      nohueckel=0 ! Option for diagonalizing the Hueckel matrix
+      iPMC=0    !  Option for perfect match count
       iopt=0    !  No (force field) optimization
       ihessian=0 ! No Hessian matrix produced
       iprinth=0 !  No Hessian matrix printed
@@ -298,6 +300,16 @@ C  Check on number of atoms (vertices)
         return
       endif
 
+C Create rspi if nanotube.ne.0
+      if(nanotube.ne.0)then
+       flagsym='   '
+       Call RNanotube(nanotube,number_vertices,rspi,ierrnano,flagsym)
+       if(ierrnano.ne.0) then
+        Write(IOUT,110) number_vertices
+        Stop
+       endif
+       Write(IOUT,109) flagsym,(rspi,I=1,12)
+      endif
 C  Setting minimum distance
       if(R6.ne.R.and.R6.gt.1.d0) then
         Rdist=R6
@@ -353,9 +365,73 @@ C  Tolerance for finding 5- and 6-ring connections
   107 Format(1X,'Minimum bond distance set to default value ',
      1 'taken from C60 bond distance: ',F12.6)
   108 Format(1X,'Start new job',F12.6)
+  109 Format(1X,'Create ring spiral pentagon indices for smallest ',
+     1 'nanotube of ',A3,' symmetry:',/,' rspi= ',11(I6,','),I6,/)
+  110 Format(1X,'Number of vertices ',I6,
+     1 ' not consistent with a nanotube')
       RETURN
       END
 
+      Subroutine RNanotube(nano,NV,rspi,ierrnano,csym)
+      IMPLICIT INTEGER (A-Z)
+      Character*3 csym
+      integer rspi(12)
+C     number of faces
+      Nf=NV/2+2
+      ierrnano=0
+C     Smallest nanotube
+      if(nano.eq.1) then
+       ncount=NV/10
+       if(ncount*10.ne.NV) then
+        ierrnano=1
+        return
+       endif
+       neven=ncount/2
+       if(neven*2.eq.ncount) then
+        csym='D5h'
+       else
+        csym='D5d'
+       endif
+       rspi(1)=1
+       rspi(2)=2
+       rspi(3)=3
+       rspi(4)=4
+       rspi(5)=5
+       rspi(6)=6
+       rspi(7)=Nf-5
+       rspi(8)=Nf-4
+       rspi(9)=Nf-3
+       rspi(10)=Nf-2
+       rspi(11)=Nf-1
+       rspi(12)=Nf
+      endif
+      if(nano.eq.2) then
+       ncount=NV/12
+       if(ncount*12.ne.NV) then
+        ierrnano=1
+        return
+       endif
+       neven=ncount/2
+       if(neven*2.eq.ncount) then
+        csym='D6h'
+       else
+        csym='D6d'
+       endif
+       rspi(1)=2
+       rspi(2)=3
+       rspi(3)=4
+       rspi(4)=5
+       rspi(5)=6
+       rspi(6)=7
+       rspi(7)=Nf-6
+       rspi(8)=Nf-5
+       rspi(9)=Nf-4
+       rspi(10)=Nf-3
+       rspi(11)=Nf-2
+       rspi(12)=Nf-1
+      endif
+      RETURN
+      END
       Subroutine ReadFromFile(nchoice,iextfile,iout,iatom,IC3,
      1 extfilename,Dist)
       use config

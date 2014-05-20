@@ -2,3 +2,29 @@ This is a list of open bugs and similar kinds of misbehaviour.  This is not a li
 
 ----------------------
 
+* Need to homogenize layout2d - make sure that it exists whenever it's needed
+* .CC1 crashes in fortran - use C++ file writing routine; implement cc1
+* Make orientation the same for buckygen-generated fullerenes and spiral-generated.
+  tutte_layout randomly chooses orientation.
+* some jobs/routines (e474f1c1a5d261; input/CCc28.inp) fail because of missing
+  layouts.  either put in some 'ifnot exists layout; create layout' whenever
+  layouts are used (in the lib) or use the lib such that it doesn't fail.  I (lnw)
+  think the first approach is better, a lib should be written such that it is
+  hard to use wrongly.
+* general spiral is broken since 917d49d2b4.  maybe not all of that stuff was unnecessary ... (lnw)
+* inertial frame returns 'nan' in case of C60
+
+* Tutte-embedding fails:
+** input/RSPInano.failed
+** input/RSPInanofailed2.inp
+
+* Force-field fails
+** C40-C2{1,2,3,4,7,11,12,16,19,20,21,22}
+** C42-C1{1,2,3,4,11,12,14,15,17,20,22,23}
+** C42-C1{1,2,3,5,10,12,14,15,17,20,22,23}
+** C44-C2{1,2,3,10,11,12,14,15,17,21,23,24}
+** C44-C2{1,2,3,4,7,11,14,18,21,22,23,24}
+** C90-C2v{1,2,3,10,14,24,28,38,40,42,46,47}
+
+
+

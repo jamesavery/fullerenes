@@ -84,17 +84,7 @@ struct Polyhedron : public PlanarGraph {
   friend ostream& operator<<(ostream& s, const Polyhedron& P){
     vector<node_t> reachable_points;
     for(node_t u=0;u<P.N;u++) if(P.neighbours[u].size()!=0) reachable_points.push_back(u);
-    s << "{{";
-    for(unsigned int i=0;i<reachable_points.size();i++) s << reachable_points[i] << (i+1<reachable_points.size()?", ":"},{");
-    for(unsigned int i=0;i<P.points.size();i++) s << P.points[i] << (i+1<P.points.size()?", ":"},");
-    s << "{";
-    for(int i=0;i<P.faces.size();i++){
-	s << "{";
-	for(int j=0; j < P.faces[i].size();j++) 
-	      s << P.faces[i][j] << (j+1<P.faces[i].size()?", ":"}");
-      s << (i+1<P.faces.size()?", ":"},");
-    }
-    s << static_cast<Graph>(P) << "}";
+    s << "{" << (reachable_points+1) << ", " << P.points << ", " << (vector<vector<int> >(P.faces.begin(),P.faces.end())+1) << ", " << static_cast<Graph>(P) << "}";
     return s;
   }
 
@@ -130,11 +120,13 @@ struct Polyhedron : public PlanarGraph {
   coord3d width_height_depth() const;
 
   string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
-  string to_povray(double w_cm = 10, double h_cm = 10, 
-		   int line_colour = 0x6a5acd, int vertex_colour = 0xc03500, int face_colour = 0x667744,
+  string to_povray(double w_cm = -1, double h_cm = 10, 
+		   int line_colour = 0x888888, int vertex_colour = 0x667744, int face_colour = 0xc03500,
 		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.4) const;
   string to_xyz() const;
   string to_mol2() const;
+  string to_cc1() const;
+
 private:
   static double C20_points[20][3];
 };

@@ -1,4 +1,5 @@
 #include <inttypes.h>
+
 #include "libgraph/triangulation.hh"
 #include "libgraph/fullerenegraph.hh"
 #include "contrib/buckygen-wrapper.hh"

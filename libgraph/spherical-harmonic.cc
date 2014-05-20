@@ -31,19 +31,19 @@ namespace RealSphericalHarmonic {
       const coord3d u = xs[i]/r;
 
       for(int l=0;l<=Lmax;l++)
-	for(int m=-l;l<=m;m++){
-	  const double Ylm = Y3(l,m,u);
-	  norm[l*l+l+m] += Ylm*Ylm;
-	  sum[l*l+l+m] += Ylm*r;
-	}
+        for(int m=-l;m<=l;m++){
+          const double Ylm = Y3(l,m,u);
+          norm[l*l+l+m] += Ylm*Ylm;
+          sum[l*l+l+m] += Ylm*r;
+        }
     }
     
     vector<Ylm_coefficient> C(Nlm);
     for(int l=0,i=0;l<=Lmax;l++)
-      for(int m=-l;l<=m;m++,i++){
-	C[i].l = l;
-	C[i].m = m;
-	C[i].coefficient = sum[i]/sqrt(norm[i]);
+      for(int m=-l;m<=l;m++,i++){
+        C[i].l = l;
+        C[i].m = m;
+        C[i].coefficient = sum[i]/sqrt(norm[i]);
       }
     return C;
   }

@@ -1,8 +1,10 @@
-D5d-C60  Using FM algorithm to produce coordinates of C60 nanotube through ring spiral indices
-&General  NA=60, iwext=1 /
-&Coord ICart=2, IV1=2, IV2=4, IV3=5 rspi=1, 2, 3, 4, 5, 6, 27, 28, 29, 30, 31, 32/
-&FFChoice Iopt=4 /
+D5d-C60 Using Tutte embedding to produce coordinates through ring spiral indices
+&General NA=60 ip=1 iwext=1 filename='C60NTHam'/
+&Coord ICart=3 rspi=1, 2, 3, 4, 5, 6, 27, 28, 29, 30, 31, 32/
+&FFChoice iopt=2 /
 &FFParameters /
-&Hamilton /
+&Hamilton iham=1 ihamstore=1 /
 &Isomers /
-&Graph ISchlegel=1 /
+&Graph ISchlegel=2 ifs=1 nhamcyc=1 ISO1=1, ISO2=2, ISO3=3 /
+
+

@@ -355,6 +355,12 @@ C     Determine the center of each 5-and 6-ring system
      1 nFM(4,66),n3rc(3,Nmax),n3rd(3,Nmax),nYF(6,66),nBF(5,66)
       Integer MPatt(30)
       Character*6,Label
+      ic566=0
+      ib566=0
+      il566=0
+      ic666=0
+      ib666=0
+      il666=0
 C     Center for 5-rings
       numbersw=0
       numberFM=0
@@ -534,6 +540,7 @@ C     (c5-5-6) 3-ring fusions with (5-5)
       IR3=6
       Label='closed'
       Write(Iout,1008) Label,IR1,IR2,IR3,KRing3
+      ic556=KRing3
       if(Kring3.ne.0) then
        if(iprint.eq.1) write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
 C       Search for Brinkmann-Fowler D2h 55-6-55 patterns
@@ -591,6 +598,7 @@ C     (c6-5-6) 3-ring fusions
       IR1=6
       IR2=5
       IR3=6
+      ic566=KRing3
       Write(Iout,1008) Label,IR1,IR2,IR3,KRing3
       if(Kring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
@@ -606,6 +614,7 @@ C     Store closed 6-5-6 for Yashido-Fowler 9-vertex insertion
 C     (o6-5-6) 3-ring fusions
       Label='open  '
       Write(Iout,1008) Label,IR1,IR2,IR3,LRing3
+      io566=LRing3
       if(Lring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3rb(J,I),J=1,3),i=1,Lring3)
       N3Ring=N3Ring+LRing3
@@ -624,6 +633,7 @@ C     (l5-6-6) 3-ring fusions
       CALL Ring566(IRing6,IRing56,NringC,NringD,NringE,NringF,
      1 N5MEM,N6MEM,KRing3,LRing3,n3r,n3ra,n3rb)
       endif
+      il566=KRing3
       Write(Iout,1008) Label,IR1,IR2,IR3,KRing3
       if(Kring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
@@ -631,6 +641,7 @@ C     (l5-6-6) 3-ring fusions
 
 C     (b5-6-6) 3-ring fusions
       Label='linear'
+      ib566=LRing3
       Write(Iout,1008) Label,IR1,IR2,IR3,LRing3
       if(Lring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3rb(J,I),J=1,3),i=1,Lring3)
@@ -646,6 +657,7 @@ C     (c6-6-6) 3-ring fusions
       CALL Ring666(IRing6,NringE,NringF,
      1 N6MEM,KRing3,LRing3b,LRing3l,n3r,n3ra)
       endif
+      ic666=KRing3
       Write(Iout,1008) Label,IR1,IR2,IR3,KRing3
       if(Kring3.ne.0.and.iprint.eq.1) 
      1 write(Iout,1011) ((n3ra(J,I),J=1,3),i=1,Kring3)
@@ -656,6 +668,7 @@ C     Search for Yoshida-Fowler D3h 666555 patterns - C80-like corner patch
 C     (b6-6-6) 3-ring fusions
       Label='bent  '
       Write(Iout,1008) Label,IR1,IR2,IR3,LRing3b
+      ib666=LRing3b
       if(Lring3b.ne.0.and.iprint.eq.1.and.number_vertices.lt.1000) 
      1 write(Iout,1011) ((n3r(J,I),J=1,3),i=1,Lring3b)
       if(Lring3b.ne.0.and.iprint.eq.1.and.number_vertices.ge.1000) 
@@ -667,6 +680,7 @@ C     (l6-6-6) 3-ring fusions
       ndimh=(Nmax*11)/2
       ncount=Lring3l-ndimh
       if(Lring3l.lt.ndimh) ncount=0
+      il666=ncount
       Write(Iout,1008) Label,IR1,IR2,IR3,ncount
       if(ncount.ne.0.and.iprint.eq.1) write(Iout,1011) 
      1  ((n3r(J,I),J=1,3),i=ndimh+1,Lring3l)
@@ -678,6 +692,20 @@ C     Final 3-ring count
       Ndif=N3ringexp-N3ring
       if(Ndif.ne.0) then
       Write(Iout,1012)
+      endif
+
+C     Get the hexagon signatures from the paper of
+C     Y. Ju, H. Liang, J. Zhang, and F. Bai, MATCH Commun. 
+C     Math. Comput. Chem. 64, 419424 (2010) and
+C     D. Stevanovic, MATCH Commun. Math. Comput. Chem. 66, 285292 (2011).
+      ih0=number_vertices/2-10
+      ih1=3*(number_vertices-20)-iring56
+      ih2=18*(number_vertices-20)-(6*iring56+2*ic566+il566+ib566)
+      Write(Iout,1015) ih0,ih1,ih2
+      if(IPR.eq.1) then
+       ih1=2*iring6
+       ih2=9*number_vertices+2*(ib666+il666)-480
+       Write(Iout,1013) ih0,ih1,ih2
       endif
 
 C Print Stone-Wales patterns
@@ -763,7 +791,11 @@ C Print Cioslowsky analysis and check of correctness
  1011 Format(10(1X,'(',I3,',',I3,','I3,')'))
  1012 Format(' WARNING: expected 3-ring count does not match ',
      1 'number found')
+ 1013 Format(1X,'nth moment hexagon signatures for IPR-fullerenes ',
+     1 'from Ju et al: H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
  1014 Format(//1X,'3-ring fusions between rings (RNI,RNJ,RNK):') 
+ 1015 Format(1X,'nth moment hexagon signatures from Stevanovic:',
+     1 ' H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
  1021 Format(10(1X,'(',I3,',',I3,','I3,')'))
  1024 Format(/1X,'Calculate Standard Enthalpy for fullerene ',
      1 'from structural motifs (M)',/2X,'M.Alcami, G.Sanchez, ',
@@ -901,8 +933,8 @@ C     Strain Parameter
       endif
 
  1013 Format(1X,'Rhagavachari-Fowler-Manolopoulos neighboring '
-     1 'pentagon indices: (',5(I2,','),I2,')',
-     1 ' and number of pentagon-pentagon fusions Np: ',I2)
+     1 'pentagon indices: (',5(I2,','),I2,') and number of fused ',
+     1 'pentagon pairs (pentagon signature) Np: ',I2)
  1015 Format(1X,'Number of (5,5) fusions matches the ',I2,
      1 ' value obtained from Rhagavachari-/Fowler-Manolopoulos '
      1 'neighboring pentagon indices')
@@ -919,8 +951,8 @@ C     Strain Parameter
      1 6(I3,','),I5,')  and strain parameter sigma = ',F12.6)
  1022 Format(1X,'--> Fullerene is IPR')
  1023 Format(1X,'--> Fullerene is not IPR')
- 1024 Format(1X,'Hexagon-hexagon fusion indices: ',
-     1 'H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
+ 1024 Format(1X,'nth moment hexagon signatures from neighboring ',
+     1 'hexagon indices: H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
  1027 Format(1X,'sum hk is zero -> sigmah set to zero')
       Return
       END

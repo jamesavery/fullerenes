@@ -43,6 +43,8 @@ struct Graph {
   }
 
   bool is_consistently_oriented() const;
+  bool adjacency_is_symmetric() const;
+
 
   bool is_connected(const set<node_t>& subgraph = set<node_t>()) const;
   vector<int> shortest_path(const node_t& source, const node_t& dest, const vector<int>& D0) const;

@@ -99,6 +99,28 @@ string pad_string(const string& s, int length, char padchar = '0');
 
 int gcd(int a, int b);
 
+template <typename T> vector<T> operator*(const vector<T>& xs, const T& x)
+{
+  vector<T> ys(xs.size());
+  for(int i=0;i<xs.size();i++) ys[i] = xs[i] * x;
+  return ys;
+}
+
+template <typename T> vector<T> operator+(const vector<T>& xs, const T& x)
+{
+  vector<T> ys(xs.size());
+  for(int i=0;i<xs.size();i++) ys[i] = xs[i] + x;
+  return ys;
+}
+
+template <typename T> vector< vector<T> > operator+(const vector< vector<T> >& xs, const T& x)
+{
+  vector< vector<T> > ys(xs.size());
+  for(int i=0;i<xs.size();i++) ys[i] = xs[i] + x;
+  return ys;
+}
+
+
 template <typename T> class IDCounter: public map<T,int> {
 public:
   int nextid;

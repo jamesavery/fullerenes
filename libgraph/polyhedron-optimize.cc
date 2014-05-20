@@ -79,7 +79,13 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 	//        cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
       }
     }
-  
+
+  // NB: Try out, then remove or rewrite
+  for(int i=0;i<P.points.size();i++){
+    const coord3d x(gsl_vector_get(coordinates,3*i),gsl_vector_get(coordinates,3*i+1),gsl_vector_get(coordinates,3*i+2));
+    potential_energy += 2000/x.dot(x);
+  }
+
   //  cout << "pot_E: " << potential_energy << endl;
   return potential_energy;
 }
@@ -125,7 +131,7 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
       for (int i=0; i<face_size; ++i){
 	int f0 = f[(i-1+face_size)%face_size], f1 = f[i], f2 = f[(i+1)%face_size];
 	//        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
-	const double ax = gsl_vector_get(coordinates, 3*f0);
+	const double ax = gsl_vector_get(coordinates,   3*f0);
 	const double ay = gsl_vector_get(coordinates,   3*f0 + 1);
 	const double az = gsl_vector_get(coordinates,   3*f0 + 2);
 	const double bx = gsl_vector_get(coordinates,   3*f1   );
@@ -147,6 +153,14 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
 	derivatives[f2] += dc *       (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
       }
     }
+
+  // NB: Try out, then remove or rewrite
+  for(int i=0;i<P.points.size();i++){
+    const coord3d x(gsl_vector_get(coordinates,3*i),gsl_vector_get(coordinates,3*i+1),gsl_vector_get(coordinates,3*i+2));
+    const double norm2 = x.dot(x);
+    const double dcoul = -2000.0*2/(norm2*norm2);
+    for(int j=0;j<3;j++) derivatives[i][j] += x[j]*dcoul;
+  }
 
   // return gradient
   for(int i = 0; i < P.N; ++i) {
@@ -178,9 +192,9 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
 
   // settings for the optimizations
   const double stepsize = 1e-3;// FIXME final value
-  const double terminate_gradient = 1e-5;// FIXME final value
+  const double terminate_gradient = 1e-6;// FIXME final value
   const double tol = 1e-1; // accuracy of line minimization, the manual suggests 0.1
-  const int max_iterations = 500;// FIXME final value
+  const int max_iterations = 15000;// FIXME final value
   
   // init values
   vector<double> force_constants_dist(edge_set.size(), 500.0);
@@ -222,10 +236,11 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
   do {
     ++iter;
     status = gsl_multimin_fdfminimizer_iterate(s);
-  
-//    cout << "it: " << iter << " stat: " << status << endl;
-//    printf ("error: %s\n", gsl_strerror (status));
-
+    
+    if(iter % 1000 == 0){
+      cout << "it: " << iter << " stat: " << status << endl;
+      printf ("error: %s\n", gsl_strerror (status));
+    }
     if(status) break;
   
     status = gsl_multimin_test_gradient(s->gradient, terminate_gradient);
