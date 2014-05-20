@@ -558,12 +558,14 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool cano
       w[0] = nextCW(dedge_t(u,v));
       w[1] = nextCCW(dedge_t(u,v));
       
-      for(int k=0;k<2;k++){	// Looks like O(N^3), is O(N) (or O(1) is only_special is set)
+      for(int k=0;k<2;k++){	// Looks like O(N^3), is O(N) (or O(1) if only_special is set)
 	if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,general))
 	  continue;
 
-	//If we don't need the canonical spiral, just return the first one that works
-	if(!canonical){
+	// + If we don't need the canonical spiral, just return the first one that works
+	// + If we have a regular spiral, then there will never be a lexicographically smaller one than this
+	//   because all following spiral starts will be larger.
+	if(!canonical || jumps_tmp.size() == 0){
 	  jumps  = jumps_tmp;
 	  spiral = spiral_tmp;
 	  return true;
