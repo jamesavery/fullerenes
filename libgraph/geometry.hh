@@ -135,6 +135,7 @@ struct coord3d {
   coord3d& operator*=(const double& y){ x[0] *= y; x[1] *= y; x[2] *= y; return *this; }
   coord3d& operator/=(const double& y){ x[0] /= y; x[1] /= y; x[2] /= y; return *this; }
   coord3d operator-() const {coord3d y(-x[0],-x[1],-x[2]); return y;}
+  coord3d operator*(const matrix3d& m) const;
 
   coord3d cross(const coord3d& y) const {
     return coord3d(x[1]*y[2]-x[2]*y[1], x[2]*y[0]-x[0]*y[2], x[0]*y[1]-x[1]*y[0]);
@@ -208,7 +209,7 @@ struct matrix3d {
 
 //  matrix3d()                { memset(values,0,9*sizeof(double)); }
   matrix3d(const double *v) { memcpy(values,v,9*sizeof(double)); }
-  matrix3d(const double r=0, const double s=0, const double t=0, const double u=0, const double v=0, const double w=0, const double x=0, const double y=0, const double z=0) {
+  explicit matrix3d(const double r=0, const double s=0, const double t=0, const double u=0, const double v=0, const double w=0, const double x=0, const double y=0, const double z=0) {
     values[0]=r; values[1]=s; values[2]=t; values[3]=u; values[4]=v; values[5]=w; values[6]=x; values[7]=y; values[8]=z;
   }
 

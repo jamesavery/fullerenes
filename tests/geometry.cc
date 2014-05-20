@@ -34,10 +34,10 @@ int main(int ac, char **av)
   cout << "a: " << a << " b: " << b << " c: " << c << " d: " << d << endl;
   coord3d::ddihedral(b-a,c-a,d-a,db,dc,dd);
   cout << "dihedral: " << coord3d::dihedral(b-a,c-a,d-a) << "[pi/2]" << endl;
-  cout << "da: " << -(db+dc+dd) << "[0,0,1]" << endl;
-  cout << "db: " << db << "[0,0,-1]" << endl;
-  cout << "dc: " << dc << "[-1,0,0]" <<endl;
-  cout << "dd: " << dd << "[1,0,0]" << endl;
+  cout << "da: " << -(db+dc+dd) << "[0,0,-1]" << endl;
+  cout << "db: " << db << "[0,0,1]" << endl;
+  cout << "dc: " << dc << "[1,0,0]" <<endl;
+  cout << "dd: " << dd << "[-1,0,0]" << endl;
 
 
 

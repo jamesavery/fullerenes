@@ -234,6 +234,14 @@ matrix3d coord3d::outer(const coord3d& y) const {
   return matrix3d(x[0]*y[0],x[0]*y[1],x[0]*y[2],  x[1]*y[0],x[1]*y[1],x[1]*y[2],  x[2]*y[0],x[2]*y[1],x[2]*y[2]);
 }
 
+coord3d coord3d::operator*(const matrix3d& m) const {
+  coord3d c(*this);
+  c[0] = x[0]*m(0,0)+x[1]*m(0,1)+x[2]*m(0,2);
+  c[1] = x[0]*m(1,0)+x[1]*m(1,1)+x[2]*m(1,2);
+  c[2] = x[0]*m(2,0)+x[1]*m(2,1)+x[2]*m(2,2);
+  return c;
+}
+
 // calculation of the angle beta at b(0,0,0)
 double coord3d::angle(const coord3d& a, const coord3d& c)
 {
@@ -277,27 +285,20 @@ double coord3d::dihedral(const coord3d& b, const coord3d& c, const coord3d& d)
   const coord3d ab = b;
   const coord3d bc = c-b;
   const coord3d cd = d-c;
-  cout << "ab,bc,cd" << ab<<bc<<cd<<endl;
 
   const coord3d bc1 = bc/bc.norm();
-  cout << "bc1" << bc1 <<endl;
 
   const coord3d abc = ab.cross(bc);
   const coord3d bcd = bc.cross(cd);
-  cout << "abc,bcd" << abc<<bcd <<endl;
 
   const coord3d abc1 = abc/abc.norm();
   const coord3d bcd1 = bcd/bcd.norm();
-  cout << "abc1,bcd1" << abc1<<bcd1 <<endl;
 
   const coord3d aux = abc1.cross(bc1);
-  cout << "aux" << aux <<endl;
 
   const double x = abc1.dot(bcd1);
   const double y = aux.dot(bcd1);
   const coord3d aux2 = bc1.dot(bcd1);
-  cout << "aux2" << aux2 <<endl;
-  cout << "x,y" << x<<y <<endl;
 
   return atan2(y,x);
 }
@@ -377,51 +378,17 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 
 // C THE DERIVATIVES
 // c to be read from bottom to top
-// 
-// c derivatives of single vectors
-// c all other combinations are zero
-//       1=1
-//       dab_x__dbx=-1
-//       1=1
-//       dab_y__dby=-1
-//       1=1
-//       dab_z__dbz=-1
-// 
-//       //dbc_x__dbx=1
-//       dbc_x__dcx=-1
-//       dbc_y__dby=1
-//       dbc_y__dcy=-1
-//       dbc_z__dbz=1
-//       dbc_z__dcz=-1
-// 
-//       dcd_x__dcx=1
-//       dcd_x__ddx=-1
-//       dcd_y__dcy=1
-//       dcd_y__ddy=-1
-//       dcd_z__dcz=1
-//       dcd_z__ddz=-1
 
-//          dab__da = ab.dnorm();
-//          dab__db = -ab.dnorm();
-//          dab__dc = coord3d(0,0,0);
-        const matrix3d dab__da = matrix3d(-1,0,0,0,-1,0,0,0,-1);
+        const matrix3d dab__da = matrix3d(-1,0,0,0,-1,0,0,0,-1);//FIXME remove
         const matrix3d dab__db = matrix3d(1,0,0,0,1,0,0,0,1);
         const matrix3d dab__dc = matrix3d();
         const matrix3d dab__dd = matrix3d();
-// 
-//          dbc__da = coord3d(0,0,0);
-//          dbc__db = bc.dnorm();
-//          dbc__dc = -bc.norm();
-//          dbc__dd = coord3d(0,0,0);
+
         const matrix3d dbc__da = matrix3d();
         const matrix3d dbc__db = matrix3d(-1,0,0,0,-1,0,0,0,-1);
         const matrix3d dbc__dc = matrix3d(1,0,0,0,1,0,0,0,1);
         const matrix3d dbc__dd = matrix3d();
-// 
-//          dcd__da = coord3d(0,0,0);
-//          dcd__db = coord3d(0,0,0);
-//          dcd__dc = cd.dnorm();
-//          dcd__dd = -cd.dnorm();
+
         const matrix3d dcd__da = matrix3d();
         const matrix3d dcd__db = matrix3d();
         const matrix3d dcd__dc = matrix3d(-1,0,0,0,-1,0,0,0,-1);
@@ -433,8 +400,7 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 //       dbc_length_inv__dbc_y=-bc_y*bc_length_inv_cub
 //       dbc_length_inv__dbc_z=-bc_z*bc_length_inv_cub
 
-        const double bc_length_inv_cub = pow(bc_length_inv, 3);
-        const coord3d dbc_length_inv__dbc = -bc * bc_length_inv_cub;
+        const coord3d dbc_length_inv__dbc = -bc * pow(bc_length_inv, 3);
 
 // c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
 // c and the other terms are zero
@@ -557,10 +523,15 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 //       dabc_z__dcz=0
 
          // mtx = mtx * mtx = mtx * mtx
-         const matrix3d dabc__da = dabc__dbc*dbc__da + dabc__dcd*dcd__da;
-         const matrix3d dabc__db = dabc__dbc*dbc__db + dabc__dcd*dcd__db;
-         const matrix3d dabc__dc = dabc__dbc*dbc__dc + dabc__dcd*dcd__dc;
-         const matrix3d dabc__dd = dabc__dbc*dbc__dd + dabc__dcd*dcd__dd;//FIXME remove
+         const matrix3d dabc__da = dabc__dab*dab__da + dabc__dbc*dbc__da;
+         const matrix3d dabc__db = dabc__dab*dab__db + dabc__dbc*dbc__db;
+         const matrix3d dabc__dc = dabc__dab*dab__dc + dabc__dbc*dbc__dc;
+         const matrix3d dabc__dd = dabc__dab*dab__dd + dabc__dbc*dbc__dd;//FIXME remove
+//         cout << "dabc__da, dabc__dab,dab__da , dabc__dbc,dbc__da" << dabc__da << dabc__dab<<dab__da << dabc__dbc<<dbc__da << endl;
+//         cout << "dabc__db, dabc__dab*dab__db + dabc__dbc*dbc__db" << dabc__db << dabc__dab<<dab__db << dabc__dbc<<dbc__db << endl;
+//         cout << " dabc__dc = dabc__dab*dab__dc + dabc__dbc*dbc__dc" <<  dabc__dc << dabc__dab<<dab__dc << dabc__dbc<<dbc__dc<< endl;
+
+
 
 // c bcd_x=-bc_y*cd_z + bc_z*cd_y
 // c      dbcd_x__dbx=0
@@ -598,6 +569,9 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
          const matrix3d dbcd__db = dbcd__dbc*dbc__db + dbcd__dcd*dcd__db;
          const matrix3d dbcd__dc = dbcd__dbc*dbc__dc + dbcd__dcd*dcd__dc;
          const matrix3d dbcd__dd = dbcd__dbc*dbc__dd + dbcd__dcd*dcd__dd;
+  //  cout << "dbcd__db = dbcd__dbc*dbc__db + dbcd__dcd*dcd__db" << dbcd__db << dbcd__dbc<<dbc__db << dbcd__dcd<<dcd__db<< endl;
+  //  cout << "dbcd__dc = dbcd__dbc*dbc__dc + dbcd__dcd*dcd__dc;" << dbcd__dc << dbcd__dbc<<dbc__dc << dbcd__dcd<<dcd__dc<< endl;
+  //  cout << "dbcd__dd = dbcd__dbc*dbc__dd + dbcd__dcd*dcd__dd" << dbcd__dd << dbcd__dbc<<dbc__dd << dbcd__dcd<<dcd__dd<< endl;
 
 // c abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
 //       abc_length_inv_cub=abc_length_inv**3
@@ -605,8 +579,7 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 //       dabc_length_inv__dabc_y=-abc_y*abc_length_inv_cub
 //       dabc_length_inv__dabc_z=-abc_z*abc_length_inv_cub
 
-        const double abc_length_inv_cub = pow(abc_length_inv,3);
-        const coord3d dabc_length_inv__dabc = -abc*abc_length_inv_cub;
+        const coord3d dabc_length_inv__dabc = -abc*pow(abc_length_inv,3);
 
 // c bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
 //       bcd_length_inv_cub=bcd_length_inv**3
@@ -614,61 +587,66 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 //       dbcd_length_inv__dbcd_y=-bcd_y*bcd_length_inv_cub
 //       dbcd_length_inv__dbcd_z=-bcd_z*bcd_length_inv_cub
 
-        const double bcd_length_inv_cub = pow(bcd_length_inv,3);
-        const coord3d dbcd_length_inv__dbcd = -bcd*bcd_length_inv_cub;
+        const coord3d dbcd_length_inv__dbcd = -bcd*pow(bcd_length_inv,3);
 
 // c abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
-//       dabc_length_inv__dax=dabc_length_inv__dabc_y*dabc_y__dax
-//      4 + dabc_length_inv__dabc_z*dabc_z__dax
-//       dabc_length_inv__day=dabc_length_inv__dabc_x*dabc_x__day
-//      4 + dabc_length_inv__dabc_z*dabc_z__day
-//       dabc_length_inv__daz=dabc_length_inv__dabc_x*dabc_x__daz
-//      3 + dabc_length_inv__dabc_y*dabc_y__daz
-//       dabc_length_inv__dbx=dabc_length_inv__dabc_y*dabc_y__dbx
-//      4 + dabc_length_inv__dabc_z*dabc_z__dbx
-//       dabc_length_inv__dby=dabc_length_inv__dabc_x*dabc_x__dby
-//      4 + dabc_length_inv__dabc_z*dabc_z__dby
-//       dabc_length_inv__dbz=dabc_length_inv__dabc_x*dabc_x__dbz
-//      3 + dabc_length_inv__dabc_y*dabc_y__dbz
-//       dabc_length_inv__dcx=dabc_length_inv__dabc_y*dabc_y__dcx
-//      4 + dabc_length_inv__dabc_z*dabc_z__dcx
-//       dabc_length_inv__dcy=dabc_length_inv__dabc_x*dabc_x__dcy
-//      4 + dabc_length_inv__dabc_z*dabc_z__dcy
-//       dabc_length_inv__dcz=dabc_length_inv__dabc_x*dabc_x__dcz
-//      3 + dabc_length_inv__dabc_y*dabc_y__dcz
-// 
-         // vec = mtx*vec + mtx*vec
-         const coord3d dabc_length_inv__da = dabc__da*dabc_length_inv__dabc + dabc__da*dabc_length_inv__dabc;
-         const coord3d dabc_length_inv__db = dabc__db*dabc_length_inv__dabc + dabc__db*dabc_length_inv__dabc;
-         const coord3d dabc_length_inv__dc = dabc__dc*dabc_length_inv__dabc + dabc__dc*dabc_length_inv__dabc;
-         const coord3d dabc_length_inv__dd = dabc__dd*dabc_length_inv__dabc + dabc__dd*dabc_length_inv__dabc; // FIXME remove
+//    dabc_length_inv__dax=dabc_length_inv__dabc_y*dabc_y__dax + dabc_length_inv__dabc_z*dabc_z__dax
+//    dabc_length_inv__day=dabc_length_inv__dabc_z*dabc_z__day + dabc_length_inv__dabc_x*dabc_x__day
+//    dabc_length_inv__daz=dabc_length_inv__dabc_x*dabc_x__daz + dabc_length_inv__dabc_y*dabc_y__daz
+
+//    dabc_length_inv__dbx=dabc_length_inv__dabc_y*dabc_y__dbx + dabc_length_inv__dabc_z*dabc_z__dbx
+//    dabc_length_inv__dby=dabc_length_inv__dabc_z*dabc_z__dby + dabc_length_inv__dabc_x*dabc_x__dby
+//    dabc_length_inv__dbz=dabc_length_inv__dabc_x*dabc_x__dbz + dabc_length_inv__dabc_y*dabc_y__dbz
+
+//    dabc_length_inv__dcx=dabc_length_inv__dabc_y*dabc_y__dcx + dabc_length_inv__dabc_z*dabc_z__dcx
+//    dabc_length_inv__dcy=dabc_length_inv__dabc_z*dabc_z__dcy + dabc_length_inv__dabc_x*dabc_x__dcy
+//    dabc_length_inv__dcz=dabc_length_inv__dabc_x*dabc_x__dcz + dabc_length_inv__dabc_y*dabc_y__dcz
+
+       const matrix3d t1(0,1,0, 0,0,1, 1,0,0), t2(0,0,1, 1,0,0, 0,1,0);
+       const coord3d dabc_length_inv__da = matrix3d(dabc__da(1,0),0,0,0,dabc__da(2,1),0,0,0,dabc__da(0,2))*(t1*dabc_length_inv__dabc) +
+						                   matrix3d(dabc__da(2,0),0,0,0,dabc__da(0,1),0,0,0,dabc__da(1,2))*(t2*dabc_length_inv__dabc);// FIXME might have to be transposed
+       const coord3d dabc_length_inv__db = matrix3d(dabc__db(1,0),0,0,0,dabc__db(2,1),0,0,0,dabc__db(0,2))*(t1*dabc_length_inv__dabc) +
+						                   matrix3d(dabc__db(2,0),0,0,0,dabc__db(0,1),0,0,0,dabc__db(1,2))*(t2*dabc_length_inv__dabc);// FIXME might have to be transposed
+       const coord3d dabc_length_inv__dc = matrix3d(dabc__dc(1,0),0,0,0,dabc__dc(2,1),0,0,0,dabc__dc(0,2))*(t1*dabc_length_inv__dabc) +
+						                   matrix3d(dabc__dc(2,0),0,0,0,dabc__dc(0,1),0,0,0,dabc__dc(1,2))*(t2*dabc_length_inv__dabc);// FIXME might have to be transposed
+
+
+
+
+ 
+//       // vec = mtx*vec + mtx*vec
+////       const matrix3d trafo(0,1,1, 1,0,1, 1,1,0);
+//       const coord3d dabc_length_inv__da = (t1*dabc__da)*(t1*dabc_length_inv__dabc) + (t2*dabc__da)*(t2*dabc_length_inv__dabc);// FIXME might have to be transposed
+//       const coord3d dabc_length_inv__db = (t1*dabc__db)*(t1*dabc_length_inv__dabc) + (t2*dabc__db)*(t2*dabc_length_inv__dabc);
+//       const coord3d dabc_length_inv__dc = (t1*dabc__dc)*(t1*dabc_length_inv__dabc) + (t2*dabc__dc)*(t2*dabc_length_inv__dabc);
+//       const coord3d dabc_length_inv__dd = (t1*dabc__dd)*(t1*dabc_length_inv__dabc) + (t2*dabc__dd)*(t2*dabc_length_inv__dabc); // FIXME remove
 
 // c bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
 // c derivatives according to dax, day, daz
-//       dbcd_length_inv__dbx=dbcd_length_inv__dbcd_y*dbcd_y__dbx
-//      4 + dbcd_length_inv__dbcd_z*dbcd_z__dbx
-//       dbcd_length_inv__dby=dbcd_length_inv__dbcd_x*dbcd_x__dby
-//      4 + dbcd_length_inv__dbcd_z*dbcd_z__dby
-//       dbcd_length_inv__dbz=dbcd_length_inv__dbcd_x*dbcd_x__dbz
-//      3 + dbcd_length_inv__dbcd_y*dbcd_y__dbz
-//       dbcd_length_inv__dcx=dbcd_length_inv__dbcd_y*dbcd_y__dcx
-//      4 + dbcd_length_inv__dbcd_z*dbcd_z__dcx
-//       dbcd_length_inv__dcy=dbcd_length_inv__dbcd_x*dbcd_x__dcy
-//      4 + dbcd_length_inv__dbcd_z*dbcd_z__dcy
-//       dbcd_length_inv__dcz=dbcd_length_inv__dbcd_x*dbcd_x__dcz
-//      3 + dbcd_length_inv__dbcd_y*dbcd_y__dcz
-//       dbcd_length_inv__ddx=dbcd_length_inv__dbcd_y*dbcd_y__ddx
-//      4 + dbcd_length_inv__dbcd_z*dbcd_z__ddx
-//       dbcd_length_inv__ddy=dbcd_length_inv__dbcd_x*dbcd_x__ddy
-//      4 + dbcd_length_inv__dbcd_z*dbcd_z__ddy
-//       dbcd_length_inv__ddz=dbcd_length_inv__dbcd_x*dbcd_x__ddz
-//      3 + dbcd_length_inv__dbcd_y*dbcd_y__ddz
+//       dbcd_length_inv__dbx=dbcd_length_inv__dbcd_y*dbcd_y__dbx + dbcd_length_inv__dbcd_z*dbcd_z__dbx
+//       dbcd_length_inv__dby=dbcd_length_inv__dbcd_x*dbcd_x__dby + dbcd_length_inv__dbcd_z*dbcd_z__dby
+//       dbcd_length_inv__dbz=dbcd_length_inv__dbcd_x*dbcd_x__dbz + dbcd_length_inv__dbcd_y*dbcd_y__dbz
 
-         // vec = mtx*vec + mtx*vec
-         const coord3d dbcd_length_inv__da = dbcd__da*dbcd_length_inv__dbcd + dbcd__da*dbcd_length_inv__dbcd; // FIXME remove
-         const coord3d dbcd_length_inv__db = dbcd__db*dbcd_length_inv__dbcd + dbcd__db*dbcd_length_inv__dbcd;
-         const coord3d dbcd_length_inv__dc = dbcd__dc*dbcd_length_inv__dbcd + dbcd__dc*dbcd_length_inv__dbcd;
-         const coord3d dbcd_length_inv__dd = dbcd__dd*dbcd_length_inv__dbcd + dbcd__dd*dbcd_length_inv__dbcd;
+//       dbcd_length_inv__dcx=dbcd_length_inv__dbcd_y*dbcd_y__dcx + dbcd_length_inv__dbcd_z*dbcd_z__dcx
+//       dbcd_length_inv__dcy=dbcd_length_inv__dbcd_x*dbcd_x__dcy + dbcd_length_inv__dbcd_z*dbcd_z__dcy
+//       dbcd_length_inv__dcz=dbcd_length_inv__dbcd_x*dbcd_x__dcz + dbcd_length_inv__dbcd_y*dbcd_y__dcz
+
+//       dbcd_length_inv__ddx=dbcd_length_inv__dbcd_y*dbcd_y__ddx + dbcd_length_inv__dbcd_z*dbcd_z__ddx
+//       dbcd_length_inv__ddy=dbcd_length_inv__dbcd_x*dbcd_x__ddy + dbcd_length_inv__dbcd_z*dbcd_z__ddy
+//       dbcd_length_inv__ddz=dbcd_length_inv__dbcd_x*dbcd_x__ddz + dbcd_length_inv__dbcd_y*dbcd_y__ddz
+
+       const coord3d dbcd_length_inv__db = matrix3d(dbcd__db(1,0),0,0,0,dbcd__db(2,1),0,0,0,dbcd__db(0,2))*(t1*dbcd_length_inv__dbcd) +
+						                   matrix3d(dbcd__db(2,0),0,0,0,dbcd__db(0,1),0,0,0,dbcd__db(1,2))*(t2*dbcd_length_inv__dbcd);// FIXME might have to be transposed
+       const coord3d dbcd_length_inv__dc = matrix3d(dbcd__dc(1,0),0,0,0,dbcd__dc(2,1),0,0,0,dbcd__dc(0,2))*(t1*dbcd_length_inv__dbcd) +
+						                   matrix3d(dbcd__dc(2,0),0,0,0,dbcd__dc(0,1),0,0,0,dbcd__dc(1,2))*(t2*dbcd_length_inv__dbcd);// FIXME might have to be transposed
+       const coord3d dbcd_length_inv__dd = matrix3d(dbcd__dd(1,0),0,0,0,dbcd__dd(2,1),0,0,0,dbcd__dd(0,2))*(t1*dbcd_length_inv__dbcd) +
+						                   matrix3d(dbcd__dd(2,0),0,0,0,dbcd__dd(0,1),0,0,0,dbcd__dd(1,2))*(t2*dbcd_length_inv__dbcd);// FIXME might have to be transposed
+
+//          // vec = mtx*vec + mtx*vec
+//        const coord3d dbcd_length_inv__da = (t1*dbcd__da)*(t1*dbcd_length_inv__dbcd) + (t2*dbcd__da)*(t2*dbcd_length_inv__dbcd); // FIXME remove// FIXME might have to be transposed
+//        const coord3d dbcd_length_inv__db = (t1*dbcd__db)*(t1*dbcd_length_inv__dbcd) + (t2*dbcd__db)*(t2*dbcd_length_inv__dbcd);
+//        const coord3d dbcd_length_inv__dc = (t1*dbcd__dc)*(t1*dbcd_length_inv__dbcd) + (t2*dbcd__dc)*(t2*dbcd_length_inv__dbcd);
+//        const coord3d dbcd_length_inv__dd = (t1*dbcd__dd)*(t1*dbcd_length_inv__dbcd) + (t2*dbcd__dd)*(t2*dbcd_length_inv__dbcd);
 
 // c abc1_x=abc_x*abc_length_inv
 // c abc1_y=abc_y*abc_length_inv
@@ -726,24 +704,17 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 //       dabc1_z__dbz=
 //      2 dabc1_z__dabc_length_inv*dabc_length_inv__dbz
 // 
-//       dabc1_x__dcx=
-//      2 dabc1_x__dabc_length_inv*dabc_length_inv__dcx
-//       dabc1_y__dcx=dabc1_y__dabc_y*dabc_y__dcx +
-//      2 dabc1_y__dabc_length_inv*dabc_length_inv__dcx
-//       dabc1_z__dcx=dabc1_z__dabc_z*dabc_z__dcx +
-//      2 dabc1_z__dabc_length_inv*dabc_length_inv__dcx
-//       dabc1_x__dcy=dabc1_x__dabc_x*dabc_x__dcy +
-//      2 dabc1_x__dabc_length_inv*dabc_length_inv__dcy
-//       dabc1_y__dcy=
-//      2 dabc1_y__dabc_length_inv*dabc_length_inv__dcy
-//       dabc1_z__dcy=dabc1_z__dabc_z*dabc_z__dcy +
-//      2 dabc1_z__dabc_length_inv*dabc_length_inv__dcy
-//       dabc1_x__dcz=dabc1_x__dabc_x*dabc_x__dcz +
-//      2 dabc1_x__dabc_length_inv*dabc_length_inv__dcz
-//       dabc1_y__dcz=dabc1_y__dabc_y*dabc_y__dcz +
-//      2 dabc1_y__dabc_length_inv*dabc_length_inv__dcz
-//       dabc1_z__dcz=
-//      2 dabc1_z__dabc_length_inv*dabc_length_inv__dcz
+//        dabc1_x__dcx=                              dabc1_x__dabc_length_inv*dabc_length_inv__dcx
+//        dabc1_y__dcx=dabc1_y__dabc_y*dabc_y__dcx + dabc1_y__dabc_length_inv*dabc_length_inv__dcx
+//        dabc1_z__dcx=dabc1_z__dabc_z*dabc_z__dcx + dabc1_z__dabc_length_inv*dabc_length_inv__dcx
+
+//        dabc1_x__dcy=dabc1_x__dabc_x*dabc_x__dcy + dabc1_x__dabc_length_inv*dabc_length_inv__dcy
+//        dabc1_y__dcy=                              dabc1_y__dabc_length_inv*dabc_length_inv__dcy
+//        dabc1_z__dcy=dabc1_z__dabc_z*dabc_z__dcy + dabc1_z__dabc_length_inv*dabc_length_inv__dcy
+
+//        dabc1_x__dcz=dabc1_x__dabc_x*dabc_x__dcz + dabc1_x__dabc_length_inv*dabc_length_inv__dcz
+//        dabc1_y__dcz=dabc1_y__dabc_y*dabc_y__dcz + dabc1_y__dabc_length_inv*dabc_length_inv__dcz
+//        dabc1_z__dcz=                              dabc1_z__dabc_length_inv*dabc_length_inv__dcz
 // 
 // c      dabc1_x__ddx=0
 // c      dabc1_y__ddx=0
@@ -756,10 +727,13 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 // c      dabc1_z__ddz=0
 
         // mtx = mtx * mtx + vec outer vec
-        const matrix3d dabc1__da = dabc1__dabc*dabc__da + dabc1__dabc_length_inv.outer(dabc_length_inv__da); //FIXME cross is wrong
+        const matrix3d dabc1__da = dabc1__dabc*dabc__da + dabc1__dabc_length_inv.outer(dabc_length_inv__da); //FIXME outer could be wrong
         const matrix3d dabc1__db = dabc1__dabc*dabc__db + dabc1__dabc_length_inv.outer(dabc_length_inv__db);
         const matrix3d dabc1__dc = dabc1__dabc*dabc__dc + dabc1__dabc_length_inv.outer(dabc_length_inv__dc);
         const matrix3d dabc1__dd = matrix3d();
+   cout << "dabc1__da, dabc1__dabc, dabc__da, dabc1__dabc_length_inv, dabc_length_inv__da" << dabc1__da << dabc1__dabc<<dabc__da << dabc1__dabc_length_inv<<dabc_length_inv__da << endl;
+   cout << "dabc1__db = dabc1__dabc*dabc__db + dabc1__dabc_length_inv.outer(dabc_length_inv__db);" << dabc1__db << dabc1__dabc<<dabc__db << dabc1__dabc_length_inv<< dabc_length_inv__db<< endl;
+   cout << "dabc1__dc = dabc1__dabc*dabc__dc + dabc1__dabc_length_inv.outer(dabc_length_inv__dc);" << dabc1__dc << dabc1__dabc<<dabc__dc << dabc1__dabc_length_inv<<dabc_length_inv__dc<< endl;
 
 // c bcd1_x=bcd_x*bcd_length_inv
 // c bcd1_y=bcd_y*bcd_length_inv
@@ -1099,11 +1073,11 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 //      3 dx__dbcd1_y*dbcd1_y__ddz +
 //      4 dx__dbcd1_z*dbcd1_z__ddz
 
-      //vec = mtx * vec
-//      const coord3d dx__da = dabc1__da * dx__dabc1;
-      const coord3d dx__db = dabc1__db * dx__dabc1 + dbcd1__db * dx__dbcd1;
-      const coord3d dx__dc = dabc1__dc * dx__dabc1 + dbcd1__dc * dx__dbcd1;
-      const coord3d dx__dd =                         dbcd1__dd * dx__dbcd1;
+      //vec = vec * mtx
+      const coord3d dx__da = dx__dabc1 * dabc1__da;
+      const coord3d dx__db = dx__dabc1 * dabc1__db + dx__dbcd1 * dbcd1__db;
+      const coord3d dx__dc = dx__dabc1 * dabc1__dc + dx__dbcd1 * dbcd1__dc;
+      const coord3d dx__dd =                         dx__dbcd1 * dbcd1__dd;
 
 // c derivation atan2(y,x) according to x and y
 //       df__dx=-y/(x**2 + y**2)
@@ -1131,6 +1105,7 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
     db=dx__db*df__dx + dy__db*df__dy;
     dc=dx__dc*df__dx + dy__dc*df__dy;
     dd=dx__dd*df__dx + dy__dd*df__dy;
+    cout << "db, dx__db, df__dx, dy__db, df__dy " << db<<dx__db<<df__dx << dy__db<<df__dy << endl;
 
 }
 
