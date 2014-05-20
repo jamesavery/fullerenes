@@ -63,12 +63,12 @@ public:
   static IsomerDB readBinary(int N=20, bool IPR=false); // Read DB in binary format
   static IsomerDB readPDB(int N=20, bool IPR=false);    // Read DB in Peter's ASCII text format
 
-  static size_t         number_isomers(int N, const string& sym="Any");
-  static vector<string> symmetries(int N){ return symmetries_data[(N-20)/2]; }
+  static size_t         number_isomers(int N, const string& sym="Any", bool IPR=false);
+  static vector<string> symmetries(int N, bool IPR=false){ return symmetries_data[IPR][(N-20)/2]; }
 
-  static vector<size_t> Nisomers_data;
-  static vector< vector<string> > symmetries_data;
-  static vector< vector<size_t> > symmetry_count_data;
+  static vector<size_t> Nisomers_data[2];
+  static vector< vector<string> > symmetries_data[2];
+  static vector< vector<size_t> > symmetry_count_data[2];
 
   IsomerDB(int N=-1, bool IPR = false, bool IH=false, 
 	   vector<Entry> entries=vector<Entry>()) : 
