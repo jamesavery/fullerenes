@@ -542,7 +542,10 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool cano
   vector<node_t> node_starts;
 
   for(node_t u=0;u<N;u++) 
-    if(!only_special || neighbours[u].size() != 6) node_starts.push_back(u);
+    if(neighbours[u].size() != 6) node_starts.push_back(u);
+  
+  for(node_t u=0;u<N;u++) 
+    if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
 
   vector<int> spiral_tmp,permutation_tmp;
   jumplist_t jumps_tmp;
@@ -563,9 +566,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool cano
 	  continue;
 
 	// + If we don't need the canonical spiral, just return the first one that works
-	// + If we have a regular spiral, then there will never be a lexicographically smaller one than this
-	//   because all following spiral starts will be larger.
-	if(!canonical || jumps_tmp.size() == 0){
+	if(!canonical){
 	  jumps  = jumps_tmp;
 	  spiral = spiral_tmp;
 	  return true;
