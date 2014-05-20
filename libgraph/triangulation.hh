@@ -55,6 +55,7 @@ public:
   void symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const;
 
   void update(bool already_oriented) {
+    //    renumber(); // TODO!
     if(N>0){
       if(already_oriented) 
 	triangles = compute_faces_oriented();
@@ -65,6 +66,8 @@ public:
       }
     }
   }
+
+  //  void renumber();		// Renumber nodes such that deg(v_i) <= deg(v_{i+1})
 
 };
 

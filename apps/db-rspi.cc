@@ -1,4 +1,5 @@
 #include <inttypes.h>
+
 #include "libgraph/triangulation.hh"
 #include "libgraph/fullerenegraph.hh"
 #include "contrib/buckygen-wrapper.hh"
@@ -23,10 +24,16 @@ int main(int ac, char **av)
   PlanarGraph dual;
   int i=0;
 
-  FILE *output = fopen(("output/c"+to_string(N)+(ipr?"-IPR":"")+(only_nontrivial?"-nontrivial":"")+".rspi"
-			+(chunk_number==1?"":("."+to_string(chunk_number)+"-"+to_string(chunk_index)))).c_str(),"wb");
+  string outputfile = ("output/c"+to_string(N)+(ipr?"-IPR":"")+(only_nontrivial?"-nontrivial":"")+".rspi"
+		       +(chunk_number==1?"":("."+to_string(chunk_number)+"-"+to_string(chunk_index))));
+  FILE *output = fopen(outputfile.c_str(),"wb");
 
-  if(!output) abort();
+  if(!output){
+	 perror(outputfile.c_str());
+	 abort();
+  }
+
+  cerr << "Writing to " << outputfile << "\n";
 
   while(BuckyGen::next_fullerene(Q,G)){
     uint8_t rspi[12];
