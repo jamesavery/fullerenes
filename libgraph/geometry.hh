@@ -124,7 +124,7 @@ struct coord3d {
   double x[3];
 
   coord3d(const double y[3]) { x[0] = y[0]; x[1] = y[1]; x[2] = y[2]; }
-  coord3d(const double x_=0, const double y=0, const double z=0) { x[0] = x_; x[1] = y; x[2] = z; }
+  explicit coord3d(const double x_=0, const double y=0, const double z=0) { x[0] = x_; x[1] = y; x[2] = z; }
   coord3d operator/(const double s)   const { return coord3d(*this) /= s; }
   coord3d operator*(const double s)   const { return coord3d(*this) *= s; }
   coord3d operator*(const coord3d& y) const { return coord3d(*this) *= y; }
@@ -234,13 +234,15 @@ struct matrix3d {
     const matrix3d &A(*this);
     matrix3d C;
 
-    for(int i=0;i<3;i++)
+    for(int i=0;i<3;i++){
       for(int j=0;j<3;j++){
-	double sum = 0;
-	for(int k=0;k<3;k++)
-	  sum += A(i,k)*B(k,j);
-	C(i,j) = sum;
+        double sum = 0;
+        for(int k=0;k<3;k++){
+          sum += A(i,k)*B(k,j);
+        }
+        C(i,j) = sum;
       }
+    }
     return C;
   }
 

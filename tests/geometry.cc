@@ -39,8 +39,26 @@ int main(int ac, char **av)
   cout << "dc: " << dc << "[1,0,0]" <<endl;
   cout << "dd: " << dd << "[-1,0,0]" << endl;
 
+  a = coord3d(1.0,1.0,0.0), b = coord3d(0.0,0.0,0.0), c = coord3d(-1.0,1.0,0.0), d = coord3d(-1.0,1.0,1.0);
+  cout << "a: " << a << " b: " << b << " c: " << c << " d: " << d << endl;
+  coord3d::ddihedral(b-a,c-a,d-a,db,dc,dd);
+  cout << "dihedral: " << coord3d::dihedral(b-a,c-a,d-a) << "[pi/2]" << endl;
+  cout << "da: " << -(db+dc+dd) << "[0,0,-0.707]" << endl;
+  cout << "db: " << db << "[0,0,0.707]" << endl;
+  cout << "dc: " << dc << "[0.707,0.707,0]" <<endl;
+  cout << "dd: " << dd << "[-0.707,-0.707,0]" << endl;
+
+  a = coord3d(-0.5, 2.16, -1.08), b = coord3d(0.93, -1.76, -1.63), c = coord3d(2.74, 0.7, 1.12), d = coord3d(-1.0,1.0,1.0);
+  cout << "a: " << a << " b: " << b << " c: " << c << " d: " << d << endl;
+  coord3d::ddihedral(b-a,c-a,d-a,db,dc,dd);
+  cout << "dihedral: " << coord3d::dihedral(b-a,c-a,d-a) << "[-0.685]" << endl;
+  cout << "da: " << -(db+dc+dd) << "[-0.172, -0.090, 0.193]" << endl;
+  cout << "db: " << db << "[0.0757, -0.0347, -0.0188]" << endl;
+  cout << "dc: " << dc << "[0.0725, -0.084, 0.0284]" <<endl;
+  cout << "dd: " << dd << "[0.023, 0.209, -0.202]" << endl;
 
 
 
   return 0;
 }
+
