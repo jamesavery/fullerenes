@@ -87,45 +87,42 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 
   // iterate over all dihedrals, i.e., all points
   if(P.is_cubic()){
-  for(int u=0; u<P.N; u++)
-  {
-  
-//      s   B   t      
-//        \   /
-//       A  u   C
-//          |
-//          r
+    for(int u=0; u<P.N; u++)
+    {
+//        s   B   t      
+//          \   /
+//         A  u   C
+//            |
+//            r
 
-       node_t r = P.neighbours[u][0];
-       node_t s = P.neighbours[u][1];
-       node_t t = P.neighbours[u][2];
+      node_t r = P.neighbours[u][0];
+      node_t s = P.neighbours[u][1];
+      node_t t = P.neighbours[u][2];
 
-       int lA = P.get_face_oriented(r,u).size();
-       int lB = P.get_face_oriented(s,u).size();
-       int lC = P.get_face_oriented(t,u).size();
+      int lA = P.get_face_oriented(r,u).size();
+      int lB = P.get_face_oriented(s,u).size();
+      int lC = P.get_face_oriented(t,u).size();
 
-       const double theta_naught = coord3d::ideal_dihedral(lA,lB,lC);  // goes to geometry
+      const double ax = gsl_vector_get(coordinates, 3*u    );
+      const double ay = gsl_vector_get(coordinates, 3*u + 1);
+      const double az = gsl_vector_get(coordinates, 3*u + 2);
+      const double bx = gsl_vector_get(coordinates, 3*r    );
+      const double by = gsl_vector_get(coordinates, 3*r + 1);
+      const double bz = gsl_vector_get(coordinates, 3*r + 2);
+      const double cx = gsl_vector_get(coordinates, 3*s    );
+      const double cy = gsl_vector_get(coordinates, 3*s + 1);
+      const double cz = gsl_vector_get(coordinates, 3*s + 2);
+      const double dx = gsl_vector_get(coordinates, 3*t    );
+      const double dy = gsl_vector_get(coordinates, 3*t + 1);
+      const double dz = gsl_vector_get(coordinates, 3*t + 2);
 
-        const double ax = gsl_vector_get(coordinates, 3*u    );
-        const double ay = gsl_vector_get(coordinates, 3*u + 1);
-        const double az = gsl_vector_get(coordinates, 3*u + 2);
-        const double bx = gsl_vector_get(coordinates, 3*r    );
-        const double by = gsl_vector_get(coordinates, 3*r + 1);
-        const double bz = gsl_vector_get(coordinates, 3*r + 2);
-        const double cx = gsl_vector_get(coordinates, 3*s    );
-        const double cy = gsl_vector_get(coordinates, 3*s + 1);
-        const double cz = gsl_vector_get(coordinates, 3*s + 2);
-        const double dx = gsl_vector_get(coordinates, 3*t    );
-        const double dy = gsl_vector_get(coordinates, 3*t + 1);
-        const double dz = gsl_vector_get(coordinates, 3*t + 2);
-
-        const double dihedral_abcd = coord3d::dihedral(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az), coord3d(dx,dy,dz) - coord3d(ax,ay,az));
-        potential_energy += 0.5 * force_constants_dihedral[u] * pow(dihedral_abcd - theta_naught,2);
-        // cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
-  
+      const double dihedral_abcd = coord3d::dihedral(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az), coord3d(dx,dy,dz) - coord3d(ax,ay,az));
+      const double theta_naught = coord3d::ideal_dihedral(lA,lB,lC);
+      potential_energy += 0.5 * force_constants_dihedral[u] * pow(dihedral_abcd - theta_naught,2);
+    
+      //cout << dihedral_abcd << ", " << theta_naught << ", " << u << endl;
+    }
   }
-  }
-
 
   // NB: Try out, then remove or rewrite
   for(int i=0;i<P.points.size();i++){
@@ -205,11 +202,48 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   }
 
 
-  // iterate over all dihedral, i.e., all points
-  for(int i=0; i<P.N; i++)
-  {
+  // iterate over all dihedrals, i.e., all points
+  if(P.is_cubic()){
+    for(int u=0; u<P.N; u++)
+    {
+//        s   B   t      
+//          \   /
+//         A  u   C
+//            |
+//            r
 
+      node_t r = P.neighbours[u][0];
+      node_t s = P.neighbours[u][1];
+      node_t t = P.neighbours[u][2];
 
+      int lA = P.get_face_oriented(r,u).size();
+      int lB = P.get_face_oriented(s,u).size();
+      int lC = P.get_face_oriented(t,u).size();
+
+      const double ax = gsl_vector_get(coordinates, 3*u    );
+      const double ay = gsl_vector_get(coordinates, 3*u + 1);
+      const double az = gsl_vector_get(coordinates, 3*u + 2);
+      const double bx = gsl_vector_get(coordinates, 3*r    );
+      const double by = gsl_vector_get(coordinates, 3*r + 1);
+      const double bz = gsl_vector_get(coordinates, 3*r + 2);
+      const double cx = gsl_vector_get(coordinates, 3*s    );
+      const double cy = gsl_vector_get(coordinates, 3*s + 1);
+      const double cz = gsl_vector_get(coordinates, 3*s + 2);
+      const double dx = gsl_vector_get(coordinates, 3*t    );
+      const double dy = gsl_vector_get(coordinates, 3*t + 1);
+      const double dz = gsl_vector_get(coordinates, 3*t + 2);
+
+      coord3d b(coord3d(bx,by,bz) - coord3d(ax,ay,az)), c(coord3d(cx,cy,cz) - coord3d(ax,ay,az)), d(coord3d(dx,dy,dz) - coord3d(ax,ay,az)), db, dc, dd;
+      coord3d::ddihedral(b, c, d, db, dc, dd);
+        
+      const double dihedral_abcd = coord3d::dihedral(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az), coord3d(dx,dy,dz) - coord3d(ax,ay,az));
+      const double theta_naught = coord3d::ideal_dihedral(lA,lB,lC);
+        
+      derivatives[u] += -(db+dc+dd) * (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+      derivatives[r] += db *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+      derivatives[s] += dc *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+      derivatives[t] += dd *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+    }
   }
 
 
