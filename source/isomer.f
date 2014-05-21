@@ -242,6 +242,18 @@ C Produce list from ring spiral algorithm
       END
  
       SUBROUTINE Printdatabase(Iout,iham,isomerl,isomerh,databasefile)
+C---------------------------------------------------------------------
+C  This routine reads from the database using a specific format, and prints
+C  various parameters for each isomer, that is
+C  IN,IP,IH  (IN: number of vertices, IP: 0 (all isomers), 1 (only IPR)
+C             IH: 0 (no) 1 (yes) for number of Hamilton cycles
+C  Group,(RSPI(i),I=1,12),(PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
+C         ncycHam,(INMR(I),I=1,6)
+C  Symmetry group, face spiral pentagon indices RSPI, pentagon indices PNI,
+C    hexagon indices HNI, NeHOMO number of electrons in HOMO,
+C    NedegHOMO degeneracy of HOMO, HLgap HOMO-LUMO gap, ncycHam number of
+C    Hamilton cycles, INMR NMR pattern 
+C---------------------------------------------------------------------
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       Character*50 databasefile

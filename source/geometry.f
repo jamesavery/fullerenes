@@ -855,7 +855,7 @@ c vectors ab, bc and cd
       cd_x=cx-dx
       cd_y=cy-dy
       cd_z=cz-dz
-c vector bc normed to length 1
+c vector bc normalized to length 1
       bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc_1_x=bc_x*bc_length_inv
       bc_1_y=bc_y*bc_length_inv
@@ -906,7 +906,7 @@ c vectors ab, bc and cd
       cd_x=cx-dx
       cd_y=cy-dy
       cd_z=cz-dz
-c vector bc normed to length 1
+c vector bc normalized to length 1
       bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc1_x=bc_x*bc_length_inv
       bc1_y=bc_y*bc_length_inv

@@ -20,6 +20,7 @@ struct params_t
   vector<double> *zero_values_dist;
   vector<double> *force_constants_dist;
   vector<double> *force_constants_angle;
+  vector<double> *force_constants_dihedral;
   bool optimize_angles;
 };
 
@@ -30,11 +31,13 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   vector<double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
-
+  vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
 
   assert(zero_values_dist.size() == P.edge_set.size());
   assert(force_constants_dist.size() == P.edge_set.size());
   assert(force_constants_angle.size() == 2*P.edge_set.size()); // only for cubic graphs
+  assert(force_constants_dihedral.size() == P.N);
+
 
   // iterate over edges
   //  V = k (r - r0)**2
@@ -54,16 +57,17 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   
   // it->first is the face size
   // iterate over faces of equal size
-  if(params.optimize_angles)
+  if(params.optimize_angles){
     for(int i=0;i<P.faces.size();i++){
       const face_t &f(P.faces[i]);
       const int face_size = f.size();
     
       //      cout << " face of size-" << it->first << ": " << *jt << endl;
       // iterate over nodes in face
-      for (int i=0; i<face_size; ++i){
-	int f0 = f[(i-1+face_size)%face_size], f1 = f[i], f2 = f[(i+1)%face_size];
-	//        cout << " 3 nodes: " << f[(i+ it->first -1) % it->first] << ", " << f[i] <<", " <<  f[(i+1) % it->first] << endl;
+      for (int i=0; i<face_size; ++i)
+      {
+        int f0 = f[(i-1+face_size)%face_size], f1 = f[i], f2 = f[(i+1)%face_size];
+        // cout << " 3 nodes: " << f[(i+ it->first -1) % it->first] << ", " << f[i] <<", " <<  f[(i+1) % it->first] << endl;
         const double ax = gsl_vector_get(coordinates, 3*f0    );
         const double ay = gsl_vector_get(coordinates, 3*f0 + 1);
         const double az = gsl_vector_get(coordinates, 3*f0 + 2);
@@ -76,9 +80,49 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 
         const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
         potential_energy += 0.5 * force_constants_angle[1] * pow(angle_beta - M_PI*(1.0-2.0/double(face_size)),2);
-	//        cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
+        // cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
       }
     }
+  }
+
+  // iterate over all dihedrals, i.e., all points
+  if(P.is_cubic()){
+    for(int u=0; u<P.N; u++)
+    {
+//        s   B   t      
+//          \   /
+//         A  u   C
+//            |
+//            r
+
+      node_t r = P.neighbours[u][0];
+      node_t s = P.neighbours[u][1];
+      node_t t = P.neighbours[u][2];
+
+      int lA = P.get_face_oriented(r,u).size();
+      int lB = P.get_face_oriented(s,u).size();
+      int lC = P.get_face_oriented(t,u).size();
+
+      const double ax = gsl_vector_get(coordinates, 3*u    );
+      const double ay = gsl_vector_get(coordinates, 3*u + 1);
+      const double az = gsl_vector_get(coordinates, 3*u + 2);
+      const double bx = gsl_vector_get(coordinates, 3*r    );
+      const double by = gsl_vector_get(coordinates, 3*r + 1);
+      const double bz = gsl_vector_get(coordinates, 3*r + 2);
+      const double cx = gsl_vector_get(coordinates, 3*s    );
+      const double cy = gsl_vector_get(coordinates, 3*s + 1);
+      const double cz = gsl_vector_get(coordinates, 3*s + 2);
+      const double dx = gsl_vector_get(coordinates, 3*t    );
+      const double dy = gsl_vector_get(coordinates, 3*t + 1);
+      const double dz = gsl_vector_get(coordinates, 3*t + 2);
+
+      const double dihedral_abcd = coord3d::dihedral(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az), coord3d(dx,dy,dz) - coord3d(ax,ay,az));
+      const double theta_naught = coord3d::ideal_dihedral(lA,lB,lC);
+      potential_energy += 0.5 * force_constants_dihedral[u] * pow(dihedral_abcd - theta_naught,2);
+    
+      //cout << dihedral_abcd << ", " << theta_naught << ", " << u << endl;
+    }
+  }
 
   // NB: Try out, then remove or rewrite
   for(int i=0;i<P.points.size();i++){
@@ -99,10 +143,12 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   vector<double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
+  vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
 
   assert(zero_values_dist.size() == P.edge_set.size());
   assert(force_constants_dist.size() == P.edge_set.size());
   assert(force_constants_angle.size() == 2*P.edge_set.size()); // only for cubic graphs
+  assert(force_constants_dihedral.size() == P.points.size());
 
   vector<coord3d> derivatives(P.N);  
 
@@ -121,7 +167,7 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   }
   
   //iterate over all faces
-  if(params.optimize_angles)
+  if(params.optimize_angles){
     for(int i=0;i<P.faces.size();i++){
       const face_t &f(P.faces[i]);
       const int face_size = f.size();
@@ -129,30 +175,77 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
       //      cout << " face of size-" << it->first << ": " << *jt << endl;
       // iterate over nodes in face
       for (int i=0; i<face_size; ++i){
-	int f0 = f[(i-1+face_size)%face_size], f1 = f[i], f2 = f[(i+1)%face_size];
-	//        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
-	const double ax = gsl_vector_get(coordinates,   3*f0);
-	const double ay = gsl_vector_get(coordinates,   3*f0 + 1);
-	const double az = gsl_vector_get(coordinates,   3*f0 + 2);
-	const double bx = gsl_vector_get(coordinates,   3*f1   );
-	const double by = gsl_vector_get(coordinates,   3*f1 + 1);
-	const double bz = gsl_vector_get(coordinates,   3*f1 + 2);
-	const double cx = gsl_vector_get(coordinates,   3*f2   );
-	const double cy = gsl_vector_get(coordinates,   3*f2 + 1);
-	const double cz = gsl_vector_get(coordinates,   3*f2 + 2);
-  
-	coord3d a(coord3d(ax,ay,az) - coord3d(bx,by,bz)), c(coord3d(cx,cy,cz) - coord3d(bx,by,bz)), da, dc;
-	coord3d::dangle(a, c, da, dc);
-  
-	const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
-	//        cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
-	//        cout << "da: " << da << endl;
-
-	derivatives[f0] += da *       (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
-	derivatives[f1] += -(da+dc) * (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
-	derivatives[f2] += dc *       (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
+        int f0 = f[(i-1+face_size)%face_size], f1 = f[i], f2 = f[(i+1)%face_size];
+        //        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
+        const double ax = gsl_vector_get(coordinates,   3*f0);
+        const double ay = gsl_vector_get(coordinates,   3*f0 + 1);
+        const double az = gsl_vector_get(coordinates,   3*f0 + 2);
+        const double bx = gsl_vector_get(coordinates,   3*f1   );
+        const double by = gsl_vector_get(coordinates,   3*f1 + 1);
+        const double bz = gsl_vector_get(coordinates,   3*f1 + 2);
+        const double cx = gsl_vector_get(coordinates,   3*f2   );
+        const double cy = gsl_vector_get(coordinates,   3*f2 + 1);
+        const double cz = gsl_vector_get(coordinates,   3*f2 + 2);
+        
+        coord3d a(coord3d(ax,ay,az) - coord3d(bx,by,bz)), c(coord3d(cx,cy,cz) - coord3d(bx,by,bz)), da, dc;
+        coord3d::dangle(a, c, da, dc);
+        
+        const double angle_beta = coord3d::angle(coord3d(ax,ay,az) - coord3d(bx,by,bz), coord3d(cx,cy,cz) - coord3d(bx,by,bz));
+        //        cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
+        //        cout << "da: " << da << endl;
+        
+        derivatives[f0] += da *       (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
+        derivatives[f1] += -(da+dc) * (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
+        derivatives[f2] += dc *       (angle_beta - M_PI*(1.0-2.0/face_size)) * force_constants_angle[f1];
       }
     }
+  }
+
+
+  // iterate over all dihedrals, i.e., all points
+  if(P.is_cubic()){
+    for(int u=0; u<P.N; u++)
+    {
+//        s   B   t      
+//          \   /
+//         A  u   C
+//            |
+//            r
+
+      node_t r = P.neighbours[u][0];
+      node_t s = P.neighbours[u][1];
+      node_t t = P.neighbours[u][2];
+
+      int lA = P.get_face_oriented(r,u).size();
+      int lB = P.get_face_oriented(s,u).size();
+      int lC = P.get_face_oriented(t,u).size();
+
+      const double ax = gsl_vector_get(coordinates, 3*u    );
+      const double ay = gsl_vector_get(coordinates, 3*u + 1);
+      const double az = gsl_vector_get(coordinates, 3*u + 2);
+      const double bx = gsl_vector_get(coordinates, 3*r    );
+      const double by = gsl_vector_get(coordinates, 3*r + 1);
+      const double bz = gsl_vector_get(coordinates, 3*r + 2);
+      const double cx = gsl_vector_get(coordinates, 3*s    );
+      const double cy = gsl_vector_get(coordinates, 3*s + 1);
+      const double cz = gsl_vector_get(coordinates, 3*s + 2);
+      const double dx = gsl_vector_get(coordinates, 3*t    );
+      const double dy = gsl_vector_get(coordinates, 3*t + 1);
+      const double dz = gsl_vector_get(coordinates, 3*t + 2);
+
+      coord3d b(coord3d(bx,by,bz) - coord3d(ax,ay,az)), c(coord3d(cx,cy,cz) - coord3d(ax,ay,az)), d(coord3d(dx,dy,dz) - coord3d(ax,ay,az)), db, dc, dd;
+      coord3d::ddihedral(b, c, d, db, dc, dd);
+        
+      const double dihedral_abcd = coord3d::dihedral(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az), coord3d(dx,dy,dz) - coord3d(ax,ay,az));
+      const double theta_naught = coord3d::ideal_dihedral(lA,lB,lC);
+        
+      derivatives[u] += -(db+dc+dd) * (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+      derivatives[r] += db *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+      derivatives[s] += dc *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+      derivatives[t] += dd *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+    }
+  }
+
 
   // NB: Try out, then remove or rewrite
   for(int i=0;i<P.points.size();i++){
@@ -197,18 +290,20 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
   const int max_iterations = 15000;// FIXME final value
   
   // init values
-  vector<double> force_constants_dist(edge_set.size(), 500.0);
   if(zero_values_dist.size() != edge_set.size())
   {
     zero_values_dist.resize(edge_set.size(), 1.4);
   }
-  vector<double> force_constants_angle(2 * edge_set.size(), 200.0); // FIXME possibly change later
+  vector<double> force_constants_dist(edge_set.size(), 500.0);
+  vector<double> force_constants_angle(2 * edge_set.size(), 200.0); // FIXME possibly change later // only for cubic graphs
+  vector<double> force_constants_dihedral(N, 50.0);
 
   params_t params;
   params.P = this; 
   params.zero_values_dist = &zero_values_dist;
   params.force_constants_dist = &force_constants_dist;
   params.force_constants_angle = &force_constants_angle;
+  params.force_constants_dihedral = &force_constants_dihedral;
   params.optimize_angles = optimize_angles;
   
   // Create the minimisation function block, define the different functions and parameters
