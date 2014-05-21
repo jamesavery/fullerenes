@@ -144,13 +144,12 @@ IsomerDB IsomerDB::readPDB(int N, bool IPR) {
       for(int i=3;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2);
       // for(int i=0;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2); // Discrepancy between util.f and db files
     } else {
+      for(int i=0;i<5;i++) e.PNI[i] = 0;
       for(int i=0;i<3;i++) e.HNI[i] = 0;
       for(int i=3;i<6;i++) e.HNI[i] = fortran_readI(line,pos,2);
     }
     e.NeHOMO = fortran_readI(line,pos,2);
-    //      e.NedgeHOMO = fortran_readI(line,pos,1); // Discrepancy between util.f and db files
-    e.NedgeHOMO = fortran_readI(line,pos,2);
-    fortran_readI(line,pos,2); // Mysterious column in db files
+    e.NedgeHOMO = fortran_readI(line,pos,1); 
     e.HLgap = fortran_readF(line,pos,10);
     if(IH==1) e.ncycham = fortran_readI(line,pos,7);
     for(int i=0;i<6;i++) e.INMR[i] = fortran_readI(line,pos,3);
