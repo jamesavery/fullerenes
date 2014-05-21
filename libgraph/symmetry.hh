@@ -69,6 +69,8 @@ public:
   vector< vector<int> > multiplication_table() const ;
   bool                  reverses_orientation(const Permutation& pi) const;
 
+  vector< pair<int,int> > NMR_pattern() const;
+  
   PointGroup point_group() const;
 
   Symmetry(const vector<int>& spiral) : Triangulation(spiral), S0(spiral)

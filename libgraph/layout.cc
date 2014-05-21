@@ -10,9 +10,7 @@ struct ToleranceLess {
 
 vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned int face_max) const
 {
-  //  if(!is_cubic())
-    //    printf("tutte_layout called for non-cubic graph. Tutte embedding is only guaranteed planar for cubic graphs.\n");
-
+  //D'oh! The Tutte embedding is guaranteed to work for **3-connected**, not **3-valent**, i.e. cubic, graphs.
   if(s<0) s = 0;
   if(t<0){
     //    fprintf(stderr,"t = %d\n",t);
@@ -37,7 +35,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
 
 //  cout << "g = " << *this << endl;
 
-  //  initial_coords = tutte_layout_direct(outer_face,initial_coords);
+//  initial_coords = tutte_layout_direct(outer_face,initial_coords);
   return tutte_layout_iterative(outer_face,initial_coords);
 }
 #ifdef HAS_MKL
