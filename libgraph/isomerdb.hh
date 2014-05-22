@@ -64,12 +64,7 @@ public:
   static IsomerDB readPDB(int N=20, bool IPR=false, string extension = "");    // Read DB in Peter's ASCII text format
 
   static size_t         number_isomers(int N, const string& sym="Any", bool IPR=false);
-  static vector<string> symmetries(int N, bool IPR=false){ 
-    int Nindex = (N-(IPR?60:20))/2;
-    printf("symmetries(%d,%d) : %d = ",N,IPR,Nindex);
-    cout << symmetries_data[IPR][Nindex] << endl;
-    return symmetries_data[IPR][Nindex]; 
-  }
+  static vector<string> symmetries(int N, bool IPR=false);
 
   static vector<size_t> Nisomers_data[2];
   static vector< vector<string> > symmetries_data[2];
