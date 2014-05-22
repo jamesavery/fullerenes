@@ -15,8 +15,8 @@ class IsomerDB {
  public:
   int N, Nisomers;
 
-  static size_t number_isomers(int N, const string& sym = "Any");
-  static vector<string> symmetries(int N);
+  static size_t number_isomers(int N, const string& sym = "Any", bool IPR=true);
+  static vector<string> symmetries(int N,bool IPR);
 };
 
 /* class Unfolding { */

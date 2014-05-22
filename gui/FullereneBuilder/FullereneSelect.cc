@@ -1,10 +1,11 @@
 #include "FullereneSelect.hh"
 
-FullereneSelect::FullereneSelect(int N, bool IPR) {
+FullereneSelect::FullereneSelect(int N, bool IPR, string extension) {
   // Is there a binary DB?
   has_db = true;
-  db = IsomerDB::readBinary(N,IPR);
-  if(db.N<0) db = IsomerDB::readPDB(N,IPR);
+  printf("FullereneSelect(%d,%d,%s)\n",N,IPR,extension.c_str());
+  db = IsomerDB::readBinary(N,IPR,extension);
+  if(db.N<0) db = IsomerDB::readPDB(N,IPR,extension);
   if(db.N<0) { db.N = N; db.IPR = IPR; has_db = false; }
 }
 
@@ -15,7 +16,7 @@ vector<Entry> FullereneSelect::get_fullerenes(int max_results, int iso_start, in
   iso_end = min(iso_end,iso_start+max_results-1);
   vector<Entry> results;
   if(has_db){
-    for(int i=iso_start; i<=iso_end; i++){
+    for(int i=iso_start; i<=iso_end && i <= db.entries.size(); i++){
       const IsomerDB::Entry &e = db.entries[i];
       if(sym_filter != "Any" && string(e.group,3) != sym_filter){
 	//	printf("sym-filter '%s' != '%s'\n",string(e.group,3).c_str(),sym_filter.c_str());
@@ -30,10 +31,9 @@ vector<Entry> FullereneSelect::get_fullerenes(int max_results, int iso_start, in
       results.push_back(Entry(i,e));
     }
 
-  } //else {
-
+  } else {
     // Generate the lot - store graphs, but don't do RSPI, perhaps?
-
+  }
  return results;
 
 }

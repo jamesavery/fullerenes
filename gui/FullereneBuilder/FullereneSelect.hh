@@ -33,7 +33,7 @@ public:
   IsomerDB db;
   bool has_db;
 
-  FullereneSelect(int N, bool IPR);
+  FullereneSelect(int N, bool IPR, string extension="");
 
   vector<Entry> get_fullerenes(int max_results, int iso_from, int iso_to, string sym_filter="Any", int oc_filter=0, double gap_min=-1e6, double gap_max=1e6) const;
 

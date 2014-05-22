@@ -20,18 +20,20 @@ class FullereneWidget(FullereneGUI):
 
 
     def set_label_Nisomers(self):
-        N = self.spinbox_N.value();
+        N   = self.spinbox_N.value();
+        IPR = self.checkbox_IPR.isChecked();
         filter_symmetry = str(self.combobox_symmetry.currentText());
 
-        Nisomers     = IsomerDB.number_isomers(N);        
-        Nisomers_sym = IsomerDB.number_isomers(N,filter_symmetry);
+        Nisomers     = IsomerDB.number_isomers(N,"Any",IPR);        
+        Nisomers_sym = IsomerDB.number_isomers(N,filter_symmetry,IPR);
 
         self.label_Nisomers.setText(str(Nisomers)+" C"+str(N)+" isomers in total, "+str(Nisomers_sym)+" matching filter.");
 
     def N_changed(self):
         N = self.spinbox_N.value();
-        Nisomers = IsomerDB.number_isomers(N);
-        syms     = list(IsomerDB.symmetries(N));
+        IPR = self.checkbox_IPR.isChecked();
+        Nisomers = IsomerDB.number_isomers(N,"Any",IPR);
+        syms     = list(IsomerDB.symmetries(N,IPR));
 
         self.spinbox_iso_to.setValue(Nisomers);
 
@@ -47,19 +49,19 @@ class FullereneWidget(FullereneGUI):
         
     def filter_changed(self,sym_index):
         self.set_label_Nisomers();
-
+ 
     def selection_changed(self):
 #        print [str(I.text()) for I in self.table_select.selectedItems()]
         return;
 
     def populate_table(self):
         N = self.spinbox_N.value();
-        IPR = False; #self.checkbox_IPR.checkedState();
+        IPR = self.checkbox_IPR.isChecked();
         iso_from = self.spinbox_iso_from.value();
         iso_to   = self.spinbox_iso_to.value();
         sym_filter = str(self.combobox_symmetry.currentText());
 
-        state = self.fullstate = FullereneSelect(N,IPR);
+        state = self.fullstate = FullereneSelect(N,IPR,"" if(sym_filter == "Any" or sym_filter == " C1") else "-nontrivial");
         if(state.has_db): 
             Nisomers = state.db.Nisomers;
         else:
