@@ -15,15 +15,16 @@ int main(int ac, char **av)
 {
   if(ac<3) return -1;
   int Nmax = strtol(av[1],0,0), IPR = strtol(av[2],0,0);
+  
+  int first = IPR?60:20;
+  vector<size_t> Nisomers((Nmax-first)/2+1);
+  vector< map<string,size_t> > symmetry_count((Nmax-first)/2+1);
+  vector< vector<string> >      symmetries((Nmax-first)/2+1);
+  vector< vector<size_t> >   symmetry_count_data((Nmax-first)/2+1);
 
-  vector<size_t> Nisomers((Nmax-20)/2+1);
-  vector< map<string,size_t> > symmetry_count((Nmax-20)/2+1);
-  vector< vector<string> >      symmetries((Nmax-20)/2+1);
-  vector< vector<size_t> >   symmetry_count_data((Nmax-20)/2+1);
-
-  for(int N=20;N<=Nmax;N+=2){
-    int Nindex = (N-20)/2;
-    if(N==22){
+  for(int N=first;N<=Nmax;N+=2){
+    int Nindex = (N-first)/2;
+    if(N==22 || (IPR && N>60 && N<70)){
       Nisomers[Nindex] = 0;
       continue;
     }
