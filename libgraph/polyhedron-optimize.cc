@@ -18,6 +18,7 @@ struct params_t
 {
   Polyhedron *P;
   vector<double> *zero_values_dist;
+  vector<double> *zero_values_dihedral;
   vector<double> *force_constants_dist;
   vector<double> *force_constants_angle;
   vector<double> *force_constants_dihedral;
@@ -29,6 +30,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   params_t &params = *static_cast<params_t*>(parameters);
   Polyhedron &P = *params.P;
   vector<double> &zero_values_dist = *params.zero_values_dist;
+  vector<double> &zero_values_dihedral = *params.zero_values_dihedral;
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
@@ -62,7 +64,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
       const face_t &f(P.faces[i]);
       const int face_size = f.size();
     
-      //      cout << " face of size-" << it->first << ": " << *jt << endl;
+//      cout << " face of size-" << it->first << ": " << *jt << endl;
       // iterate over nodes in face
       for (int i=0; i<face_size; ++i)
       {
@@ -99,10 +101,6 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
       node_t s = P.neighbours[u][1];
       node_t t = P.neighbours[u][2];
 
-      int lA = P.get_face_oriented(r,u).size();
-      int lB = P.get_face_oriented(s,u).size();
-      int lC = P.get_face_oriented(t,u).size();
-
       const double ax = gsl_vector_get(coordinates, 3*u    );
       const double ay = gsl_vector_get(coordinates, 3*u + 1);
       const double az = gsl_vector_get(coordinates, 3*u + 2);
@@ -117,10 +115,9 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
       const double dz = gsl_vector_get(coordinates, 3*t + 2);
 
       const double dihedral_abcd = coord3d::dihedral(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az), coord3d(dx,dy,dz) - coord3d(ax,ay,az));
-      const double theta_naught = coord3d::ideal_dihedral(lA,lB,lC);
-      potential_energy += 0.5 * force_constants_dihedral[u] * pow(dihedral_abcd - theta_naught,2);
+      potential_energy += 0.5 * force_constants_dihedral[u] * pow(dihedral_abcd - zero_values_dihedral[u],2);
     
-      //cout << dihedral_abcd << ", " << theta_naught << ", " << u << endl;
+      // cout << "value: " <<  dihedral_abcd << ", " << zero_values_dihedral[u] << ", " << u << endl;
     }
   }
 
@@ -141,6 +138,7 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   params_t &params = *static_cast<params_t*>(parameters);
   Polyhedron &P = *params.P;
   vector<double> &zero_values_dist = *params.zero_values_dist;
+  vector<double> &zero_values_dihedral = *params.zero_values_dihedral;
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
@@ -216,10 +214,6 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
       node_t s = P.neighbours[u][1];
       node_t t = P.neighbours[u][2];
 
-      int lA = P.get_face_oriented(r,u).size();
-      int lB = P.get_face_oriented(s,u).size();
-      int lC = P.get_face_oriented(t,u).size();
-
       const double ax = gsl_vector_get(coordinates, 3*u    );
       const double ay = gsl_vector_get(coordinates, 3*u + 1);
       const double az = gsl_vector_get(coordinates, 3*u + 2);
@@ -237,12 +231,13 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
       coord3d::ddihedral(b, c, d, db, dc, dd);
         
       const double dihedral_abcd = coord3d::dihedral(coord3d(bx,by,bz) - coord3d(ax,ay,az), coord3d(cx,cy,cz) - coord3d(ax,ay,az), coord3d(dx,dy,dz) - coord3d(ax,ay,az));
-      const double theta_naught = coord3d::ideal_dihedral(lA,lB,lC);
         
-      derivatives[u] += -(db+dc+dd) * (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
-      derivatives[r] += db *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
-      derivatives[s] += dc *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
-      derivatives[t] += dd *          (dihedral_abcd - theta_naught) * force_constants_dihedral[u];
+      derivatives[u] += -(db+dc+dd) * (dihedral_abcd - zero_values_dihedral[u]) * force_constants_dihedral[u];
+      derivatives[r] += db *          (dihedral_abcd - zero_values_dihedral[u]) * force_constants_dihedral[u];
+      derivatives[s] += dc *          (dihedral_abcd - zero_values_dihedral[u]) * force_constants_dihedral[u];
+      derivatives[t] += dd *          (dihedral_abcd - zero_values_dihedral[u]) * force_constants_dihedral[u];
+
+      // cout << "derivarive: " << dihedral_abcd << ", " << zero_values_dihedral[u] << ", " << u << endl;
     }
   }
 
@@ -294,6 +289,17 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
   {
     zero_values_dist.resize(edge_set.size(), 1.4);
   }
+  vector<double> zero_values_dihedral(N);
+  orient_neighbours();
+  for(int u=0; u<N; ++u){
+    node_t r = neighbours[u][0];
+    node_t s = neighbours[u][1];
+    node_t t = neighbours[u][2];
+    int lA = get_face_oriented(r,u).size();
+    int lB = get_face_oriented(s,u).size();
+    int lC = get_face_oriented(t,u).size();
+    zero_values_dihedral[u] = coord3d::ideal_dihedral(lA,lB,lC);
+  }  
   vector<double> force_constants_dist(edge_set.size(), 500.0);
   vector<double> force_constants_angle(2 * edge_set.size(), 200.0); // FIXME possibly change later // only for cubic graphs
   vector<double> force_constants_dihedral(N, 50.0);
@@ -301,6 +307,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
   params_t params;
   params.P = this; 
   params.zero_values_dist = &zero_values_dist;
+  params.zero_values_dihedral = &zero_values_dihedral;
   params.force_constants_dist = &force_constants_dist;
   params.force_constants_angle = &force_constants_angle;
   params.force_constants_dihedral = &force_constants_dihedral;
