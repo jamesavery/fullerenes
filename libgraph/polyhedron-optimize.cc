@@ -87,7 +87,6 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
     }
   }
 
-#if 0
   // iterate over all dihedrals, i.e., all points
   if(P.is_cubic()){
     for(int u=0; u<P.N; u++)
@@ -121,7 +120,6 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 //      cout << "value: " << dihedral_abcd << ", " << zero_values_dihedral[u] << ", " << u << endl;
     }
   }
-#endif
 
 //  // NB: Try out, then remove or rewrite
 //  for(int i=0;i<P.points.size();i++){
@@ -201,7 +199,6 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
     }
   }
 
-#if 0
   // iterate over all dihedrals, i.e., all points
   if(P.is_cubic()){
     for(int u=0; u<P.N; u++)
@@ -241,7 +238,6 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
 //      cout << "derivarive: " << dihedral_abcd << ", " << zero_values_dihedral[u] << ", " << u << endl;
     }
   }
-#endif
 
 //   // NB: Try out, then remove or rewrite
 //   for(int i=0;i<P.points.size();i++){

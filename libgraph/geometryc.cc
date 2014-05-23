@@ -454,7 +454,6 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 }
 
 double coord3d::ideal_dihedral(double lA, double lB, double lC){
-
   const double eps = 1.0e-10;
   if (1.0/lA + 1.0/lB + 1.0/lC > 0.5+eps){ // positive curvature // make sure 3 * 1/6 is recognised to be planar
 //        t   B   s      
@@ -468,23 +467,22 @@ double coord3d::ideal_dihedral(double lA, double lB, double lC){
     const double rs_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lA)));
     const double st_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lB)));
     const double tr_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lC)));
-//    cout << "A,B,C,sum of 1/x: " << lA<<" " <<lB<<" " <<lC << " " << 1.0/lA + 1.0/lB + 1.0/lC <<endl;
-//    cout << "rs_2,st_2,tr_2: " << rs_2<<" " <<st_2<<" " <<tr_2<<endl;
 
 //    const double ax = 0.0, ay=0.0, az=0.0;
     const double bx = 0.0, by=1.0, bz=0.0;
     const double cx = 0.5 * sqrt( (4.0-rs_2)*rs_2 );
     const double cy = 1.0 - rs_2/2.0;
     const double cz = 0.0;
-    const double dx = -(rs_2*(-2.0 + tr_2) - 2.0*tr_2 + 2.0*st_2)/(2.0*sqrt(-((-4.0 + rs_2)*rs_2)));
+    const double dx = -(rs_2*(-2.0 + tr_2) - 2.0*tr_2 + 2.0*st_2)/(2.0*sqrt((4.0 - rs_2)*rs_2));
     const double dy = 1.0 - tr_2/2.0;
     const double dz = sqrt(( rs_2*rs_2 + rs_2*(tr_2*(-2.0 + st_2) - 2.0*st_2) + pow(tr_2 - st_2,2))/((-4.0 + rs_2)*rs_2));
-//   cout << "bx,by,bz: " << bx<<" " <<by<<" "<<bz << endl;
-//   cout << "cx,cy,cz: " << cx<<" " <<cy<<" "<<cz << endl;
-//   cout << "dx,dy,dz: " << dx<<" " <<dy<<" "<<dz << endl;
-
-//   cout << "ideal dihedral: " << coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz)) << endl;
-    return coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz));
+//    cout << "bx,by,bz: " << bx<<" " <<by<<" "<<bz << endl;
+//    cout << "cx,cy,cz: " << cx<<" " <<cy<<" "<<cz << endl;
+//    cout << "dx,dy,dz: " << dx<<" " <<dy<<" "<<dz << endl;
+// 
+//    cout << "ideal dihedral: " << coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz)) << endl;
+    // don't ask me why there is a minus here, but it works (lnw)
+    return - coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz));
   }
   else{ //planar or negative curvature
     return 0.0;
