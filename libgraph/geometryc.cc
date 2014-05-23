@@ -448,20 +448,46 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 
   // f=atan2(y,x)
   // vec = vec*sca + vec*sca
-  db=dx__db*df__dx + dy__db*df__dy;
-  dc=dx__dc*df__dx + dy__dc*df__dy;
-  dd=dx__dd*df__dx + dy__dd*df__dy;
+  db = dx__db*df__dx + dy__db*df__dy;
+  dc = dx__dc*df__dx + dy__dc*df__dy;
+  dd = dx__dd*df__dx + dy__dd*df__dy;
 }
 
 double coord3d::ideal_dihedral(double lA, double lB, double lC){
 
-  double theta_naught = 0.0;
   const double eps = 1.0e-10;
   if (1.0/lA + 1.0/lB + 1.0/lC > 0.5+eps){ // positive curvature // make sure 3 * 1/6 is recognised to be planar
-    return 0.0; //FIXME: add actural functionality
+//        t   B   s      
+//          \   /
+//        C   u   A
+//            |
+//            r
+    // neighbours are sorted CCW
+    // assumption: the length of ur, us and ut is 1.  Faces A, B and C are planar.
+    // calculate squares of rs, st and rt via law of cosines
+    const double rs_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lA)));
+    const double st_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lB)));
+    const double tr_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lC)));
+//    cout << "A,B,C,sum of 1/x: " << lA<<" " <<lB<<" " <<lC << " " << 1.0/lA + 1.0/lB + 1.0/lC <<endl;
+//    cout << "rs_2,st_2,tr_2: " << rs_2<<" " <<st_2<<" " <<tr_2<<endl;
+
+//    const double ax = 0.0, ay=0.0, az=0.0;
+    const double bx = 0.0, by=1.0, bz=0.0;
+    const double cx = 0.5 * sqrt( (4.0-rs_2)*rs_2 );
+    const double cy = 1.0 - rs_2/2.0;
+    const double cz = 0.0;
+    const double dx = -(rs_2*(-2.0 + tr_2) - 2.0*tr_2 + 2.0*st_2)/(2.0*sqrt(-((-4.0 + rs_2)*rs_2)));
+    const double dy = 1.0 - tr_2/2.0;
+    const double dz = sqrt(( rs_2*rs_2 + rs_2*(tr_2*(-2.0 + st_2) - 2.0*st_2) + pow(tr_2 - st_2,2))/((-4.0 + rs_2)*rs_2));
+//   cout << "bx,by,bz: " << bx<<" " <<by<<" "<<bz << endl;
+//   cout << "cx,cy,cz: " << cx<<" " <<cy<<" "<<cz << endl;
+//   cout << "dx,dy,dz: " << dx<<" " <<dy<<" "<<dz << endl;
+
+//   cout << "ideal dihedral: " << coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz)) << endl;
+    return coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz));
   }
   else{ //planar or negative curvature
-    return theta_naught;
+    return 0.0;
   }
 
 }

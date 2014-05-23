@@ -58,6 +58,16 @@ int main(int ac, char **av)
   cout << "dd: " << dd << "[0.023, 0.209, -0.202]" << endl;
 
 
+  cout << "ideal dihedral between three squares: " << coord3d::ideal_dihedral(4,4,4) << endl;
+  a = coord3d(0,0,0), b = coord3d(.1,1,0), c = coord3d(1,.1,0), d = coord3d(0,0,1);
+  cout << "a: " << a << " b: " << b << " c: " << c << " d: " << d << endl;
+  coord3d::ddihedral(b-a,c-a,d-a,db,dc,dd);
+  cout << "dihedral: " << coord3d::dihedral(b-a,c-a,d-a) << endl;
+  cout << "da: " << -(db+dc+dd) << endl;
+  cout << "db: " << db << endl;
+  cout << "dc: " << dc << endl;
+  cout << "dd: " << dd << endl;
+
 
   return 0;
 }
