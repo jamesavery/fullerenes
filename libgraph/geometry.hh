@@ -176,7 +176,7 @@ struct coord3d {
   // calculation of the derivative of dihedral angle theta at a(0,0,0), b, c and d  according to coordinates b, c and d with fixed a
   static void ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, coord3d& db, coord3d& dc, coord3d& dd);
 
-  static double ideal_dihedral(double lA, double lB, double lC);
+  static double ideal_dihedral(const int lA, const int lB, const int lC);
 
 
   friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
