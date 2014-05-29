@@ -1,6 +1,9 @@
 #include "isomerdb.hh"
+// TODO: Hov! Isomer count is wrong when reading text database. Find and fix!
+
 // TODO: Make C++98 compatible to support old compilers or make optional
-// TODO: Extend Nisomers to N=400 or so.
+
+string IsomerDB::database_path = FULLERENE_DATABASE;
 
 // Metadata for Cn isomers
 vector<size_t> IsomerDB::Nisomers_data[2]                 = {
@@ -35,6 +38,7 @@ bool IsomerDB::writeBinary(const string filename) const
 
   return true;
 }
+
 
 bool IsomerDB::writeCSV(const string filename) const
   {
@@ -72,7 +76,7 @@ IsomerDB IsomerDB::readBinary(const string filename){
 }
  
 IsomerDB::Entry IsomerDB::getIsomer(int N, int isomer, bool IPR){
-  string filename = FULLERENE_DATABASE"/binary/c"+pad_string(to_string(N),3)+(IPR?"IPR":"all")+".bin";
+  string filename = database_path+"/binary/c"+pad_string(to_string(N),3)+(IPR?"IPR":"all")+".bin";
   FILE *f = fopen(filename.c_str(),"rb");
   if(!f){
     cerr << "Couldn't open database file " << filename << " for reading: " << strerror(errno) << ".\n";
@@ -101,16 +105,16 @@ FullereneGraph IsomerDB::makeIsomer(int N, const Entry& e)
 }
 
 IsomerDB IsomerDB::readBinary(int N, bool IPR, string extension) {
-  string filename = FULLERENE_DATABASE"/binary/c"+pad_string(to_string(N),3,'0')+(IPR?"IPR":"all")+extension+string(".bin");
+  string filename = database_path+"/binary/c"+pad_string(to_string(N),3,'0')+(IPR?"IPR":"all")+extension+string(".bin");
   return readBinary(filename);
 }
 
 IsomerDB IsomerDB::readPDB(int N, bool IPR, string extension) {
   string filename;
   if(IPR)
-    filename= FULLERENE_DATABASE"/IPR/c"+pad_string(to_string(N),3,'0')+"IPR"+extension+".database";      
+    filename= database_path+"/IPR/c"+pad_string(to_string(N),3,'0')+"IPR"+extension+".database";      
   else 
-    filename= FULLERENE_DATABASE"/All/c"+pad_string(to_string(N),3,'0')+"all"+extension+".database";
+    filename= database_path+"/All/c"+pad_string(to_string(N),3,'0')+"all"+extension+".database";
 
   ifstream dbfile(filename.c_str());
   if(!dbfile){
@@ -168,9 +172,9 @@ IsomerDB IsomerDB::readPDB(int N, bool IPR, string extension) {
 
 size_t IsomerDB::number_isomers(int N, const string& sym, bool IPR){ 
   int Nindex = (N-(IPR?60:20))/2;
-  fprintf(stderr,"number_isomers(%d,%s,%d) : %d = %s\n",N,sym.c_str(),IPR,Nindex,
-	  (Nindex >= Nisomers_data[IPR].size()? "Out of range" : to_string(Nisomers_data[IPR][Nindex]).c_str())
-	  );
+  // fprintf(stderr,"number_isomers(%d,%s,%d) : %d = %s\n",N,sym.c_str(),IPR,Nindex,
+  // 	  (Nindex >= Nisomers_data[IPR].size()? "Out of range" : to_string(Nisomers_data[IPR][Nindex]).c_str())
+  // 	  );
   if(Nindex >= Nisomers_data[IPR].size()) return 0;
 
   if(sym == "Any" || sym == "") return Nisomers_data[IPR][Nindex]; 
@@ -191,9 +195,9 @@ size_t IsomerDB::number_isomers(int N, const string& sym, bool IPR){
 
 vector<string> IsomerDB::symmetries(int N, bool IPR){ 
   int Nindex = (N-(IPR?60:20))/2;
-  printf("symmetries(%d,%d) : %d = ",N,IPR,Nindex);
+  //  printf("symmetries(%d,%d) : %d = ",N,IPR,Nindex);
   if(Nindex >= symmetries_data[IPR].size()) return vector<string>();
-  cout << symmetries_data[IPR][Nindex] << endl;
+  //  cout << symmetries_data[IPR][Nindex] << endl;
 
   return symmetries_data[IPR][Nindex]; 
 }

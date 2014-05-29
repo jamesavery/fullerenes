@@ -31,6 +31,8 @@ public:
   vector<Entry> entries;
   map<vector<int>, int> RSPIindex;
 
+  static string database_path;
+
   static void fortran_readA(char *result, string s, int& pos, int len){
     for(int i=0;i<len;i++) result[i] = s[pos+i];
     pos += len;
