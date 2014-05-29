@@ -5,8 +5,9 @@
 
 #include "linalg.cc"
 
+typedef enum {PSEUDO,PROPER,META} valence_qualifier_t;
 
-int open_closed(const Graph& g)
+void open_closed(const Graph& g)
 {
   DenseSqrMatrix A(g.N);
   for(node_t u=0;u<g.N;u++)
@@ -16,10 +17,26 @@ int open_closed(const Graph& g)
     }
 
   vector<double> lambda = A.eigenvalues(g.N/2-1,g.N/2);
+  //  vector<double> lambda = A.eigenvalues(0,g.N-1);
 
-  cout << lambda << endl;
+  double HOMO = lambda[0], LUMO = lambda[1];
 
-  return 0;
+  bool open = false;
+  int qualifier;
+  
+  if(HOMO == LUMO){ open = true; }
+  if(!open){
+    if(LUMO>0) qualifier = PSEUDO;
+    else 
+      if (HOMO<0) qualifier = PROPER;
+      else qualifier = META;
+  } {
+    if(LUMO > 0) qualifier = PSEUDO;
+    else if (LUMO == 0) qualifier = PROPER;
+    else qualifier = META;
+  }
+
+  return open | (qualifier << 1);
 }
 
 int main(int ac, char **av)
