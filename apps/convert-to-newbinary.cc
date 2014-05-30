@@ -1,7 +1,6 @@
 #include "libgraph/isomerdb.hh"
 
 
-
 typedef struct {
   uint8_t RSPI[11]; 		// RSPI[2-12]
   struct {
@@ -23,7 +22,7 @@ int main(int ac, char **av)
 
   bool nontrivial = (extension == "-nontrivial");
 
-  string filename = string(FULLERENE_DATABASE)+"/binary_new/c"+to_string(N)+(IPR?"IPR":"all")+extension+".smallbin";
+  string filename = string(FULLERENE_DATABASE)+"/binary_new/"+(IPR?"IPR":"All")+extension+"/c"+to_string(N)+".smallbin";
 
   FILE *f = fopen(filename.c_str(),"wb");
   if(!f){
@@ -31,7 +30,7 @@ int main(int ac, char **av)
     exit(-1);
   }
 
-  printf("Nisomers: %d,%d\n",DB.Nisomers,int(DB.entries.size()));
+  printf("Nisomers: %d,%d,%d\n",int(IsomerDB::number_isomers(N,nontrivial?"Nontrivial":"Any",IPR)),DB.Nisomers,int(DB.entries.size()));
 
 
   for(int i=0;i<DB.Nisomers;i++){

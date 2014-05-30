@@ -7,7 +7,7 @@
 
 typedef enum {PSEUDO,PROPER,META} valence_qualifier_t;
 
-void open_closed(const Graph& g)
+void open_closed(const Graph& g, bool &open, int &qualifier, double &HOMO, double &LUMO)
 {
   DenseSqrMatrix A(g.N);
   for(node_t u=0;u<g.N;u++)
@@ -19,10 +19,9 @@ void open_closed(const Graph& g)
   vector<double> lambda = A.eigenvalues(g.N/2-1,g.N/2);
   //  vector<double> lambda = A.eigenvalues(0,g.N-1);
 
-  double HOMO = lambda[0], LUMO = lambda[1];
-
-  bool open = false;
-  int qualifier;
+  HOMO = lambda[0];
+  LUMO = lambda[1];
+  open = false;
   
   if(HOMO == LUMO){ open = true; }
   if(!open){
@@ -35,8 +34,6 @@ void open_closed(const Graph& g)
     else if (LUMO == 0) qualifier = PROPER;
     else qualifier = META;
   }
-
-  return open | (qualifier << 1);
 }
 
 int main(int ac, char **av)
@@ -61,7 +58,7 @@ int main(int ac, char **av)
 
       Symmetry S(spiral);
       cout << S.point_group() << ", NMR = " << S.NMR_pattern() << endl;
-      open_closed(S.dual_graph());
+      //      open_closed(S.dual_graph());
     }
     if(rspi[0] != 0) cout << vector<int>(rspi,rspi+12) << endl;
   }

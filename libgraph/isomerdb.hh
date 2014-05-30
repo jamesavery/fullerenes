@@ -65,7 +65,7 @@ public:
   static IsomerDB readBinary(int N=20, bool IPR=false, string extension = ""); // Read DB in binary format
   static IsomerDB readPDB(int N=20, bool IPR=false, string extension = "");    // Read DB in Peter's ASCII text format
 
-  static size_t         number_isomers(int N, const string& sym="Any", bool IPR=false);
+  static int64_t        number_isomers(int N, const string& sym="Any", bool IPR=false);
   static vector<string> symmetries(int N, bool IPR=false);
 
   static vector<size_t> Nisomers_data[2];
