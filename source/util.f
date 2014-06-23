@@ -620,6 +620,21 @@ C     Write(Iout,1004) ori
 C     Analyzing pentagon distance matrix
       Write(Iout,1006)
       Write(Iout,1007) (pent_dist_mtx(I),I=1,144)
+C     Mean and root mean square deviation
+      means=0
+      Do I=1,144
+       means=means+pent_dist_mtx(I)
+      enddo
+      amean=dfloat(means)/132.
+      vars=0.
+      Do I=1,144
+       im=pent_dist_mtx(I)
+       if(im.ne.0) then
+        vars=(dfloat(im)-amean)**2
+       endif
+        rmsd=dsqrt(vars/132.)
+      enddo
+      Write(Iout,1010) amean,rmsd
       wienerp=0
       wienerinv=0.
       do i=1,144
@@ -673,6 +688,8 @@ C1004 Format(' Ori constant for Wiener index: ',D15.9)
      1 'Inverse Pentagon Wiener Index IPWI(M_p) = ',F15.8,
      1 ' (0 .le. IPWI .le. 1: 0 defines C20 and 1 the graphene limit)')
  1009 Format(/1x,'Number of perfect matchings = ',I12)
+ 1010 Format(/1x,'Mean topological pentagon distance: ',F15.8,
+     1 ', and root mean square deviation: ',F15.8)
       RETURN
       END
 

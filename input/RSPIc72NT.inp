@@ -1,9 +1,10 @@
 D6d-C72 Using Tutte algorithm for coordinates for C72 nanotube
 Difficult case to get the structure right through force field
-&General NA=72, IP=1, iwext=1 /
-&Coord ICart=3, IGCtrans=1, kGC=4 R6=1.42 rspi=2 3 4 5 6 7 32 33 34 35 36 37 /
+fcoulomb=41. used originally
+&General NA=72, iwext=3 /
+&Coord ICart=3, R6=1.42, IGCtrans=1, kGC=4, scaleRad=3.0, rspi=2 3 4 5 6 7 32 33 34 35 36 37 /
 &FFChoice Iopt=3 /
-&FFParameters fcoulomb=41./
+&FFParameters /
 &Hamilton /
 &Isomers /
 &Graph /

@@ -13,6 +13,7 @@ This is a list of open bugs and similar kinds of misbehaviour.  This is not a li
   hard to use wrongly.
 * general spiral is broken since 917d49d2b4.  maybe not all of that stuff was unnecessary ... (lnw)
 * inertial frame returns 'nan' in case of C60
+* minimum empty sphere problem, algorithm fails too often
 
 * Tutte-embedding fails:
 ** input/RSPInano.failed
