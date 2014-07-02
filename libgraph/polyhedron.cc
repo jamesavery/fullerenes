@@ -466,6 +466,70 @@ string Polyhedron::to_mol2() const {
   return s.str();
 }
 
+// Read in .mol2 files. 
+// NB: Doesn't support full format. Can only read .mol2 files that we've written ourselves!
+Polyhedron Polyhedron::from_mol2(const string& filename)
+{
+  string 
+    header_marker = "@<TRIPOS>MOLECULE",
+    point_marker  = "@<TRIPOS>ATOM",
+    edge_marker   = "@<TRIPOS>BOND";
+
+  int N, Nedges;
+  vector<coord3d> points;
+  set<edge_t>     edges;
+  string line;
+
+  ifstream file(filename.c_str());
+
+  // Fast forward to metadata section
+  while(getline(file,line) && line.compare(0,header_marker.size(),header_marker)) ;
+  getline(file,line);
+  assert(!line.compare(0,9,"Fullerene")); // TODO: Fail gracefully if we didn't create the file.
+
+  getline(file,line);
+  stringstream l(line);
+  l >> N;
+  l >> Nedges;
+  
+  // Fast forward to coordinate section
+  while(getline(file,line) && line.compare(0,point_marker.size(),point_marker)) ;
+
+  for(int i=0;i<N && file.good();i++){
+    getline(file,line);
+    stringstream l(line);
+    string vid,element;
+    coord3d x;
+
+    if(file.good()) l >> vid;
+    if(file.good()) l >> element;
+    for(int j=0;j<3 && l.good(); j++) l >> x[j];
+    points.push_back(x);
+  }
+  assert(points.size() == N); 	// TODO: Fail gracefully if file format error.
+
+  // Fast forward to edge section
+  while(getline(file,line) && line.compare(0,edge_marker.size(),edge_marker)) ;  
+
+  for(int i=0;i<Nedges && file.good();i++){
+    getline(file,line);
+    stringstream l(line);
+    int eid, u[2];
+
+    l >> eid;
+    for(int j=0;j<2 && l.good(); j++) l >> u[j];
+    edges.insert(edge_t(u[0]-1,u[1]-1));
+  }
+  file.close();
+
+  if(edges.size() != Nedges){
+    cerr << "MOL2 file format error in " << filename << ": Expected "<<Nedges<<" edges, found "<<edges.size()<<".\n";
+  }
+
+  return Polyhedron(PlanarGraph(edges), points);
+}
+
+
 string Polyhedron::to_cc1() const
 {
   const int weird_constant = 2;
@@ -554,5 +618,6 @@ Polyhedron Polyhedron::from_xyz(const string& filename)
 
   return Polyhedron(points);
 }
+
 
 double Polyhedron::C20_points[20][3] = {{-1.376381920471174,0,0.2628655560595668},{1.376381920471174,0,-0.2628655560595668},{-0.4253254041760200,-1.309016994374947,0.2628655560595668},{-0.4253254041760200,1.309016994374947,0.2628655560595668},{1.113516364411607,-0.8090169943749474,0.2628655560595668},{1.113516364411607,0.8090169943749474,0.2628655560595668},{-0.2628655560595668,-0.8090169943749474,1.113516364411607},{-0.2628655560595668,0.8090169943749474,1.113516364411607},{-0.6881909602355868,-0.5000000000000000,-1.113516364411607},{-0.6881909602355868,0.5000000000000000,-1.113516364411607},{0.6881909602355868,-0.5000000000000000,1.113516364411607},{0.6881909602355868,0.5000000000000000,1.113516364411607},{0.8506508083520399,0,-1.113516364411607},{-1.113516364411607,-0.8090169943749474,-0.2628655560595668},{-1.113516364411607,0.8090169943749474,-0.2628655560595668},{-0.8506508083520399,0,1.113516364411607},{0.2628655560595668,-0.8090169943749474,-1.113516364411607},{0.2628655560595668,0.8090169943749474,-1.113516364411607},{0.4253254041760200,-1.309016994374947,-0.2628655560595668},{0.4253254041760200,1.309016994374947,-0.2628655560595668}};
