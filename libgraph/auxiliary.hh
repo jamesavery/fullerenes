@@ -95,6 +95,15 @@ template <typename T> string to_string(const T& x)
   return s.str();
 }
 
+template <typename T> T from_string(const string& s)
+{
+  stringstream S(s);
+  T x;
+  S >> x;
+  return x;
+}
+
+
 string pad_string(const string& s, int length, char padchar = '0');
 
 int gcd(int a, int b);

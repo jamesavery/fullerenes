@@ -28,7 +28,9 @@ struct Polyhedron : public PlanarGraph {
     file >> *this;
     file.close();
   }
-  
+
+  // Create polyhedron from point collection, assuming shortest distance is approximate bond length
+  Polyhedron(const vector<coord3d>& xs, double tolerance = 1.2);
 
   double surface_area() const;
 
@@ -123,9 +125,15 @@ struct Polyhedron : public PlanarGraph {
   string to_povray(double w_cm = -1, double h_cm = 10, 
 		   int line_colour = 0x888888, int vertex_colour = 0x667744, int face_colour = 0xc03500,
 		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.4) const;
+
+
   string to_xyz() const;
   string to_mol2() const;
   string to_cc1() const;
+
+  static Polyhedron from_xyz(const string& path);
+  static Polyhedron from_mol2(const string& path);
+  static Polyhedron from_cc1(const string& path); 
 
 private:
   static double C20_points[20][3];

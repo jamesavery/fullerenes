@@ -1,5 +1,6 @@
 #include "polyhedron.hh"
 #include <iomanip>
+#include <limits>
 
 double Polyhedron::diameter() const {
   double dmax = -INFINITY;
@@ -275,18 +276,34 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
   //cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){
     if(layout2d.size() != N){
-      if(is_cubic()){
 	layout2d = tutte_layout(-1,-1,-1,face_max);
 	faces = compute_faces_flat(face_max,true);
 	assert(outer_face.size() <= face_max);
-      } else {
-	layout2d = polar_angles(); 
-	layout_is_spherical = true;
-	faces = compute_faces_flat(face_max,true);
-      }
     } else faces = compute_faces_flat(face_max,true);
   } 
 }
+
+Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 
+{
+  double bondlength = INFINITY;
+
+  for(int i=0;i<xs.size();i++)
+    for(int j=i+1;j<xs.size();j++){
+      double d = (xs[i]-xs[j]).norm();
+      if(d < bondlength) bondlength = d;
+    }
+     
+  set<edge_t> edges;
+  for(int i=0;i<xs.size();i++)
+    for(int j=0;j<xs.size();j++){
+      double d = (xs[i]-xs[j]).norm();
+      if(bondlength/tolerance <= d && d <= bondlength*tolerance) 
+	edges.insert(edge_t(i,j));
+    }
+  
+  (*this) = Polyhedron(PlanarGraph(edges), points);
+}
+
 
 matrix3d Polyhedron::inertia_matrix() const
 {
@@ -501,6 +518,41 @@ bool Polyhedron::optimize(int opt_method, double ftol)
 bool Polyhedron::is_triangulation() const {
   for(int i=0;i<faces.size();i++) if(faces[i].size()!=3) return false;
   return true;
+}
+
+
+
+Polyhedron Polyhedron::from_xyz(const string& filename)
+{
+  ifstream file(filename.c_str());
+  int N;
+  string Nstring, comment, element,line;
+  vector<coord3d> points;
+
+  getline(file,Nstring);
+  getline(file,comment);
+  
+  N = from_string<int>(Nstring);
+
+  //  cout << "N = " << Nstring << "; comment = " << comment << endl;
+
+  for(int i=0; i < N && getline(file,line); i++){
+    stringstream l(line);
+    coord3d x;
+
+    l >> element;
+    for(int j=0;j<3 && l.good(); j++)
+      l >> x[j];
+
+    points.push_back(x);
+    //    cout << i << ": " << x << endl;
+  }
+
+  file.close();  
+
+  assert(points.size() == N);
+
+  return Polyhedron(points);
 }
 
 double Polyhedron::C20_points[20][3] = {{-1.376381920471174,0,0.2628655560595668},{1.376381920471174,0,-0.2628655560595668},{-0.4253254041760200,-1.309016994374947,0.2628655560595668},{-0.4253254041760200,1.309016994374947,0.2628655560595668},{1.113516364411607,-0.8090169943749474,0.2628655560595668},{1.113516364411607,0.8090169943749474,0.2628655560595668},{-0.2628655560595668,-0.8090169943749474,1.113516364411607},{-0.2628655560595668,0.8090169943749474,1.113516364411607},{-0.6881909602355868,-0.5000000000000000,-1.113516364411607},{-0.6881909602355868,0.5000000000000000,-1.113516364411607},{0.6881909602355868,-0.5000000000000000,1.113516364411607},{0.6881909602355868,0.5000000000000000,1.113516364411607},{0.8506508083520399,0,-1.113516364411607},{-1.113516364411607,-0.8090169943749474,-0.2628655560595668},{-1.113516364411607,0.8090169943749474,-0.2628655560595668},{-0.8506508083520399,0,1.113516364411607},{0.2628655560595668,-0.8090169943749474,-1.113516364411607},{0.2628655560595668,0.8090169943749474,-1.113516364411607},{0.4253254041760200,-1.309016994374947,-0.2628655560595668},{0.4253254041760200,1.309016994374947,-0.2628655560595668}};
