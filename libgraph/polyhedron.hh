@@ -22,13 +22,8 @@ struct Polyhedron : public PlanarGraph {
 	     const vector<face_t> faces = vector<face_t>());
 
   // Create polyhedron from skeleton graph and 3D vertex coordinates 
-  // Read polyhedron from a .pol file
-  Polyhedron(const string& path) {
-    ifstream file(path.c_str());
-    file >> *this;
-    file.close();
-  }
-
+  // Read polyhedron from a .xyz or .mol2 file.
+  Polyhedron(const string& path);
   // Create polyhedron from point collection, assuming shortest distance is approximate bond length
   Polyhedron(const vector<coord3d>& xs, double tolerance = 1.2);
 
@@ -88,31 +83,6 @@ struct Polyhedron : public PlanarGraph {
     for(node_t u=0;u<P.N;u++) if(P.neighbours[u].size()!=0) reachable_points.push_back(u);
     s << "{" << (reachable_points+1) << ", " << P.points << ", " << (vector<vector<int> >(P.faces.begin(),P.faces.end())+1) << ", " << static_cast<Graph>(P) << "}";
     return s;
-  }
-
-  friend istream& operator>>(istream& f, Polyhedron& P){
-    string s;
-    node_t u=0,v;
-    coord3d x;
-
-    while(getline(f,s)){
-      stringstream l(s);
-      l >> x;
-      if(l.fail()) continue; // Invalid line
-      l >> v;
-      if(l.fail()) continue; // Invalid line
-      while(!l.fail()){
-	P.edge_set.insert(edge_t(u,v-1)); // File format numbers nodes from 1 
-	l >> v;
-      }
-      P.points.push_back(x);
-      u++;
-    }
-    P.update_from_edgeset();
-    P.layout2d = P.tutte_layout();
-    P.faces = P.compute_faces_flat(P.face_max);
-    P.centre = P.centre3d(P.points);
-    return f;
   }
 
   Polyhedron dual(int Fmax=INT_MAX, bool planar_layout=false) const;

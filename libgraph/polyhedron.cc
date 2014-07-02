@@ -270,6 +270,18 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
   return s.str();
 }
 
+Polyhedron::Polyhedron(const string& filename)
+{
+  string extension = filename_extension(filename);
+  if      (extension == ".xyz") 
+    (*this) = from_xyz(filename);
+  else if (extension == ".mol2")
+    (*this) = from_mol2(filename);
+  else
+    cerr << "File extension " << extension << " unknown. Can't infer file format.";
+}
+
+
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max, const vector<face_t> faces_) : 
   PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points_)), faces(faces_)
 {

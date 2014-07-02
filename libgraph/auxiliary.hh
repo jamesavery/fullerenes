@@ -103,8 +103,10 @@ template <typename T> T from_string(const string& s)
   return x;
 }
 
-
 string pad_string(const string& s, int length, char padchar = '0');
+
+string filename_extension(const string& filename);
+
 
 int gcd(int a, int b);
 

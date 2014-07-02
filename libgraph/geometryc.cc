@@ -8,6 +8,8 @@
 #include "geometry.hh"
 #include "eisenstein.hh"
 
+// TODO: This stuff does not belong here. Start auxiliary.cc. Also, clean up!
+
 string pad_string(const string& s, int length, char padchar)
 {
   string result(s);
@@ -22,6 +24,16 @@ int gcd(int a, int b)
   int c;
   while ( a != 0 ) { c = a; a = b%a;  b = c;  }
   return b;
+}
+
+string filename_extension(const string& filename)
+{
+  size_t i = filename.rfind(".");
+  bool found = i != string::npos;
+  if(found) 
+    return filename.substr(i,filename.size());
+  else 
+    return "";
 }
 
 // vector<Eisenstein> draw_line(const Eisenstein &a, const Eisenstein &b)

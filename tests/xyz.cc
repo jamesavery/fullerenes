@@ -6,7 +6,7 @@ int main(int ac, char **av)
 
   string filename = av[1];
 
-  Polyhedron P(Polyhedron::from_xyz(filename));
+  Polyhedron P(filename);
 
   cout << "P = " << P << endl;
 
