@@ -11,10 +11,10 @@ bool PlanarGraph::is_cubic() const {
 }
 
 bool PlanarGraph::is_triangulation() const { // NB: A bit expensive
-  facemap_t faces(compute_faces(INT_MAX,true));
-  const int F = 2+edge_set.size()-N;
+  vector<face_t> faces(compute_faces_flat(INT_MAX, true));
 
-  return (faces[3].size() == F);
+  for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) return false;
+  return true;
 }
 
 bool PlanarGraph::is_a_fullerene() const {
@@ -124,7 +124,7 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
   // TODO: This is a much better and faster method, but requires a planar layout
   if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
 
-  //  cout << " Non-oriented face computation (loop search)\n";
+  cerr << " Non-oriented face computation (loop search). This is not reliable!\n";
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
 

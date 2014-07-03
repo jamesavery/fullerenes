@@ -85,7 +85,7 @@ struct Polyhedron : public PlanarGraph {
     return s;
   }
 
-  Polyhedron dual(int Fmax=INT_MAX, bool planar_layout=false) const;
+  Polyhedron dual(int Fmax=INT_MAX, bool planar_layout=true) const;
   bool is_triangulation() const;
 
   double  diameter() const;

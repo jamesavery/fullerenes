@@ -41,10 +41,10 @@ public:
 
   void orient_neighbours();   // Ensures that neighbours are ordered CCW
 
-  vector<face_t> compute_faces_flat(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
+  vector<face_t> compute_faces_flat(unsigned int Nmax=INT_MAX, bool planar_layout=true) const;
   face_t find_outer_face() const; 
 
-  PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=false) const;
+  PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
 
   size_t count_perfect_matchings() const;
 
