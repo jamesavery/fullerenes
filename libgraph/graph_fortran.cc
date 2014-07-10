@@ -196,12 +196,9 @@ polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points)
 }
 polyhedron_ptr read_polyhedron_(const char *path)
 {
-  polyhedron_ptr P = new Polyhedron(6);
-  ifstream file(path);
-  file >> *P;
-  file.close();
-  return P;
+  return new Polyhedron(path);
 }
+
 void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 
 // The Fortarn call to dual_graph() assumes that g is either a fullerene

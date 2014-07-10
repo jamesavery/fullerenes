@@ -277,13 +277,15 @@ Polyhedron::Polyhedron(const string& filename)
     (*this) = from_xyz(filename);
   else if (extension == ".mol2")
     (*this) = from_mol2(filename);
+  else if (extension == ".rspi")
+    (*this) = from_rspi(filename);
   else
     cerr << "File extension " << extension << " unknown. Can't infer file format.";
 }
 
 
-Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max, const vector<face_t> faces_) : 
-  PlanarGraph(G), face_max(face_max), points(points_), centre(centre3d(points_)), faces(faces_)
+Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) : 
+  PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
   //cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){
@@ -291,6 +293,8 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
 	layout2d = tutte_layout(-1,-1,-1,face_max);
 	faces = compute_faces_flat(face_max,true);
 	assert(outer_face.size() <= face_max);
+	face_max = 0;
+	for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
     } else faces = compute_faces_flat(face_max,true);
   } 
 }
@@ -313,7 +317,7 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
 	edges.insert(edge_t(i,j));
     }
   
-  (*this) = Polyhedron(PlanarGraph(edges), points);
+  (*this) = Polyhedron(PlanarGraph(edges), xs);
 }
 
 
@@ -372,7 +376,7 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
 		   int line_colour, int vertex_colour, int face_colour,
 		   double line_width, double vertex_diameter, double face_opacity) const 
 {
-  coord3d whd(width_height_depth()); // TODO: Removed width/height -- much better to use real coordinates and handle layout in host pov file.
+  //  coord3d whd(width_height_depth()); // TODO: Removed width/height -- much better to use real coordinates and handle layout in host pov file.
 
   ostringstream s;
   s << "#declare facecolour=color rgb <"<<((face_colour>>16)&0xff)/256.<<","<<((face_colour>>8)&0xff)/256.<<","<<(face_colour&0xff)/256.<<">;\n";
@@ -596,6 +600,25 @@ bool Polyhedron::is_triangulation() const {
   return true;
 }
 
+// Polyhedron Polyhedron::from_rspi(const string& filename)
+// {
+//   int N, j;
+//   vector<int> spiral(N/2+2,6);
+//   ifstream file(filename.c_str());
+//   string line;
+//   getline(file,line);
+//   stringstream l(line);
+
+//   l >> N;
+//   for(int i=0;i<12 && l.good(); i++){
+//     l >> j;
+//     spiral[j-1] = 5;
+//   }
+
+//   Triangulation dual(spiral);
+//   PlanarGraph G(dual.dual_graph());
+  
+// }
 
 
 Polyhedron Polyhedron::from_xyz(const string& filename)

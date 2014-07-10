@@ -317,12 +317,10 @@ struct matrix3d {
     coord3d lambda(eigenvalues());
     matrix3d C;
 
-    cout << "lambda = " << lambda << endl;
     // Sort eigenvalues by absolute value, smallest first
     if(fabs(lambda[0]) > fabs(lambda[1])) std::swap(lambda[0],lambda[1]);
     if(fabs(lambda[1]) > fabs(lambda[2])) std::swap(lambda[1],lambda[2]);
     if(fabs(lambda[0]) > fabs(lambda[1])) std::swap(lambda[0],lambda[1]);
-    cout << "lambda = " << lambda << endl;
 
     // Build eigenvector matrix
     for(int i=0;i<3;i++){

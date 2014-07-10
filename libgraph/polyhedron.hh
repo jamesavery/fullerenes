@@ -12,7 +12,6 @@ using namespace std;
 struct Polyhedron : public PlanarGraph {
   int face_max;
   vector<coord3d> points;
-  coord3d centre;
   vector<face_t> faces;
 
   //---- Constructors ----//
@@ -48,8 +47,8 @@ struct Polyhedron : public PlanarGraph {
   }
 
   void move_to_origin() {
-    for(node_t u=0;u<N;u++) points[u] -= centre;
-    centre=coord3d(0,0,0);
+    coord3d x0(centre3d(points));
+    move(-x0);
   }
 
   bool optimize(int opt_method = 3, double ftol = 1e-10);
@@ -103,7 +102,8 @@ struct Polyhedron : public PlanarGraph {
 
   static Polyhedron from_xyz(const string& path);
   static Polyhedron from_mol2(const string& path);
-  static Polyhedron from_cc1(const string& path); 
+  //  static Polyhedron from_rspi(const string& path); 
+
 
 private:
   static double C20_points[20][3];
