@@ -277,8 +277,8 @@ Polyhedron::Polyhedron(const string& filename)
     (*this) = from_xyz(filename);
   else if (extension == ".mol2")
     (*this) = from_mol2(filename);
-  else if (extension == ".rspi")
-    (*this) = from_rspi(filename);
+//  else if (extension == ".rspi")
+//    (*this) = from_rspi(filename);
   else
     cerr << "File extension " << extension << " unknown. Can't infer file format.";
 }
