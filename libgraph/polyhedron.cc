@@ -343,16 +343,26 @@ matrix3d Polyhedron::inertial_frame() const
   const matrix3d I(inertia_matrix());
   pair<coord3d,matrix3d> ES(I.eigensystem());
 
+  matrix3d Id;
+  Id(0,0) = 1; 
+  Id(1,1) = 1; 
+  Id(2,2) = 1; 
+
+  cerr << "Inertial frame:\n " 
+       << " inertia_matrix = " << I << ";\n"
+       << " lambda  = " << ES.first << ";\n"
+       << " vectors = " << ES.second << ";\n";
+
   for(int i=0;i<3;i++) 
     if(std::isnan(ES.first[i])){
       cerr << "Warning: Inertial frame returned NaN. Setting inertial frame transformation to identity.\n";
-      matrix3d Id;
-      Id(0,0) = 1; 
-      Id(1,1) = 1; 
-      Id(2,2) = 1; 
       return Id;
     }
-  
+
+  if((ES.second*ES.second.transpose() - Id).norm() > 1e-2){
+    cerr << "Warning: Inertial frame transform is not unitary. Setting inertial frame transformation to identity.\n";
+    return Id;
+  }  
 
   return ES.second;
 }
@@ -422,7 +432,7 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
 
   s << "#declare Ntris = "<<tris.size()<<";\n";
   s << "#declare tris = array["<<tris.size()<<"][3]" << tris << ";\n\n";
-  s << "#declare triface = array["<<tris.size()<<"]" << triface << ";\n\n";
+  s << "#declare triface = array["<<triface.size()<<"]" << triface << ";\n\n";
     
   s << "#declare cpoints=array["<<centroid_points.size()<<"][3]" << centroid_points << ";\n\n"; 
   s << "#declare trinormals =array["<<tris.size()<<"][3]" << trinormals << ";\n\n";
@@ -644,7 +654,6 @@ Polyhedron Polyhedron::from_xyz(const string& filename)
       l >> x[j];
 
     points.push_back(x);
-    //    cout << i << ": " << x << endl;
   }
 
   file.close();  

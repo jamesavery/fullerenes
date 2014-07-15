@@ -35,6 +35,7 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
 
 //  cout << "g = " << *this << endl;
 
+// TODO: There seems to currently be a bug in the direct solver! When did this appear? Need to investigate and fix.
 //  initial_coords = tutte_layout_direct(outer_face,initial_coords);
   return tutte_layout_iterative(outer_face,initial_coords);
 }

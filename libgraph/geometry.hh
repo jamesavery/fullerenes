@@ -217,7 +217,9 @@ struct matrix3d {
   double& operator()(int i, int j)       { return values[i*3+j]; }
   double  operator()(int i, int j) const { return values[i*3+j]; }
   matrix3d operator+(const matrix3d& y) const { return matrix3d(*this) += y; }
+  matrix3d operator-(const matrix3d& y) const { return matrix3d(*this) -= y; }
   matrix3d& operator+=(const matrix3d& y){ for(int i=0;i<3;++i){for(int j=0;j<3;++j){values[3*i+j] += y(i,j);}}; return *this; }
+  matrix3d& operator-=(const matrix3d& y){ for(int i=0;i<3;++i){for(int j=0;j<3;++j){values[3*i+j] -= y(i,j);}}; return *this; }
   matrix3d operator*(const double s)   const { return matrix3d(*this) *= s; }
   matrix3d& operator*=(const double& s){ for(int i=0;i<3;++i){for(int j=0;j<3;++j){values[3*i+j] *= s;}}; return *this; }
 
@@ -228,6 +230,17 @@ struct matrix3d {
       for(int j=0;j<3;j++)
 	Mt(i,j) = M(j,i);
     return Mt;
+  }
+
+  double norm() const {
+    const matrix3d &M(*this);
+
+    double norm = 0;
+    for(int i=0;i<3;i++)
+      for(int j=0;j<3;j++)
+	norm += M(i,j)*M(i,j);
+
+    return sqrt(norm);
   }
   
   matrix3d operator*(const matrix3d& B) const {
