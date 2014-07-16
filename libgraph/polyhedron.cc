@@ -347,22 +347,23 @@ matrix3d Polyhedron::inertial_frame() const
   Id(0,0) = 1; 
   Id(1,1) = 1; 
   Id(2,2) = 1; 
-
+/*
   cerr << "Inertial frame:\n " 
        << " inertia_matrix = " << I << ";\n"
        << " lambda  = " << ES.first << ";\n"
        << " vectors = " << ES.second << ";\n";
+*/
 
   for(int i=0;i<3;i++) 
     if(std::isnan(ES.first[i])){
       cerr << "Warning: Inertial frame returned NaN. Setting inertial frame transformation to identity.\n";
       return Id;
     }
-
+  
   if((ES.second*ES.second.transpose() - Id).norm() > 1e-2){
     cerr << "Warning: Inertial frame transform is not unitary. Setting inertial frame transformation to identity.\n";
     return Id;
-  }  
+  }
 
   return ES.second;
 }
@@ -418,6 +419,19 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
     coord3d n(Tri3D(centroid_points[tris[i][0]],centroid_points[tris[i][1]],centroid_points[tris[i][2]]).n);
     trinormals[i] = n/n.norm();
   }
+
+  // Calculate volume
+  double V=0;
+  for(size_t i=0;i<tris.size();i++){
+    const face_t& t(tris[i]);
+    Tri3D T(centroid_points[t[0]],centroid_points[t[1]],centroid_points[t[2]]);
+
+    V += ((T.a).dot(T.n))*T.area()/T.n.norm();
+  }
+  s << "#declare volume="<<fabs(V)<<";\n";
+
+  if(V<0)			// Calculated normals are pointing inwards!
+    for(int i=0;i<tris.size();i++) trinormals[i] *= -1;
 
   for(int i=0;i<faces.size();i++) {
     coord3d normal;
@@ -597,7 +611,7 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     points = g.optimized_geometry(points);
     return true;
   } else if(is_cubic() || is_triangulation()) {
-    bool optimize_angles = !is_triangulation();
+    bool optimize_angles = true;//!is_triangulation();
     return optimize_other(optimize_angles);
   }else{
     cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra and other cubic graphs." << endl;
@@ -654,6 +668,7 @@ Polyhedron Polyhedron::from_xyz(const string& filename)
       l >> x[j];
 
     points.push_back(x);
+    //    cout << i << ": " << x << endl;
   }
 
   file.close();  
