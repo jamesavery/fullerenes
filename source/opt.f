@@ -1536,8 +1536,8 @@ C     Do stuff here
              nd_ppp=nd_ppp+1
              d_ppp(1,nd_ppp)=u
              d_ppp(2,nd_ppp)=r
-             d_ppp(3,nd_ppp)=s
-             d_ppp(4,nd_ppp)=t
+             d_ppp(3,nd_ppp)=t
+             d_ppp(4,nd_ppp)=s
 
          case ( 16 )            ! Two pentagons, one hexagon
 C     Do stuff common to all three (2,1)-cases here
@@ -1608,8 +1608,8 @@ c            write (*,*) "666"
           nd_hhh=nd_hhh+1
           d_hhh(1,nd_hhh)=u
           d_hhh(2,nd_hhh)=r
-          d_hhh(3,nd_hhh)=s
-          d_hhh(4,nd_hhh)=t
+          d_hhh(3,nd_hhh)=t
+          d_hhh(4,nd_hhh)=s
 
          case DEFAULT
             write (*,*) "INVALID: ",(/lA,lB,lC/)
