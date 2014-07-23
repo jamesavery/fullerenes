@@ -8,33 +8,56 @@
 using namespace std;
 typedef list<pair<int,int> > jumplist_t;
 
-void get_rspi(const vector<int>& spiral, uint8_t rspi[12])
-{
-  for(int i=0, j=0;i<spiral.size();i++) if(spiral[i] == 5) rspi[j++] = i;
-}
-
 
 int main(int ac, char **av)
 {
   string inputfile = av[1];
   FILE *input = fopen(inputfile.c_str(),"r");
-  string outputfile = av[2];
+  int N = strtol(av[2],0,0);
 
   vector<int> pentagon_indices;
   jumplist_t jumps;
 
-  for(int i=0; i!=1; i++){
+  // get number of graphs per file
+  const int header_size = 15;	
+  // Get file size
+  fseek(input, 0, SEEK_END);
+  size_t file_size = ftell(input);
+  //find number of vertices per graph
+  //this only works for files with graphs of the equal size
+  fseek(input, header_size, SEEK_SET);
+  // Read the number N of vertices per graph.
+  fread(reinterpret_cast<char*>(&N), 1, 1, input);
+  if(N == 0){
+    fread(reinterpret_cast<char*>(&N), 2, 1, input);
+  }
+  //only for files with graphs of the equal size
+  unsigned int step;
+  if(N<=255)
+    {step = N * 4 + 1;}
+  else
+    {step = N * 8 + 3;}
+  unsigned int graphs_per_file = (file_size - header_size ) /step;
+
+  cout << graphs_per_file << " graphs found." << endl;
+
+
+  for(int i=0; i!=graphs_per_file; i++){
     FullereneGraph fg = FullereneGraph(i, input);
 
-    cout << 0 << fg.neighbours[0][0] <<  fg.neighbours[0][1] << endl;
+//    cout << 0 << fg.neighbours[0][0] <<  fg.neighbours[0][1] << endl;
     fg.layout2d = fg.tutte_layout(fg.neighbours[0][0],0, fg.neighbours[0][1]);
     //fg.layout2d = fg.tutte_layout();
-    cout << "fg: " << fg << endl;
+//    cout << "fg: " << fg << endl;
 
     fg.get_canonical_general_spiral_from_fg(pentagon_indices, jumps);
-    cout << "pentagon indices: " << pentagon_indices << endl;
+//    cout << "pentagon indices: " << pentagon_indices << endl;
 
-    ofstream output(("output/" + outputfile).c_str());
+    //start indices at 1 for fortran
+    for(int i=0;i<12;++i) ++pentagon_indices[i];
+
+    ofstream output;
+    output.open(("output/" + to_string(N) + "-rspi").c_str(),ios::out | ios::app);
     output << pentagon_indices << endl;
     output.close();
 
