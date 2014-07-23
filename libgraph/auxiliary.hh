@@ -11,6 +11,12 @@ using namespace std;
 
 #define insert_unique(v,x) if(std::find(v.begin(),v.end(),x) == v.end()) v.push_back(x); 
 
+template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p)
+{
+  s << "{" << p.first << "," << p.second << "}";
+  return s;
+}
+
 #define container_output(container) \
   template <typename T> ostream& operator<<(ostream& s, const container<T>& v) \
   { \
@@ -23,16 +29,9 @@ using namespace std;
   return s; \
 }
 
-
 container_output(vector);
 container_output(list);
 container_output(set);
-
-template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p)
-{
-  s << "{" << p.first << "," << p.second << "}";
-  return s;
-}
 
 template<typename K, typename V> vector<K> get_keys(const map<K,V>& m)
 {
