@@ -17,7 +17,7 @@ struct CubicGraph : public PlanarGraph {
 
   CubicGraph(const Graph& g, const vector<coord2d>& layout) : PlanarGraph(g,layout) {}
 
-  CubicGraph(FILE *file);
+  CubicGraph(FILE *file=stdin);
 
   CubicGraph(const unsigned int index, FILE *file=stdin);
 };

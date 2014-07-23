@@ -6,7 +6,7 @@
 #include <fstream>
 
 
-CubicGraph::CubicGraph(FILE *file = stdin){
+CubicGraph::CubicGraph(FILE *file){
     char line[0x300];
     while(!feof(file)){
       node_t n, ns[3];
