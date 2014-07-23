@@ -3,6 +3,9 @@ This is a list of open bugs and similar kinds of misbehaviour.  This is not a li
 ----------------------
 
 * Need to homogenize layout2d - make sure that it exists whenever it's needed
+  ** there appears to be some undefined behaviour with respect to layouts.
+apps/hog-to-rspi works in my (lnw) laptop but segfaults on desktop because
+there is no layout2d in 'find_outer_face' and the assertion fails.
 * .CC1 crashes in fortran - use C++ file writing routine; implement cc1
 * Make orientation the same for buckygen-generated fullerenes and spiral-generated.
   tutte_layout randomly chooses orientation.
