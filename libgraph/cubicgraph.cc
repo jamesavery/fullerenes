@@ -50,7 +50,8 @@ CubicGraph::CubicGraph(FILE *file = stdin){
     update_from_neighbours();
   }
 
-CubicGraph::CubicGraph(const unsigned int *index, FILE* file){
+// parse house of graphs
+CubicGraph::CubicGraph(const unsigned int index, FILE* file){
   const int header_size = 15;	
 	
   // Get file size
@@ -75,12 +76,12 @@ CubicGraph::CubicGraph(const unsigned int *index, FILE* file){
     {step = N * 4 + 1;}
   else
     {step = N * 8 + 3;}
-  size_t address = header_size + step * *index;
+  size_t address = header_size + step * index;
 
   //check if selected graphnumber is valid
   unsigned int graphs_per_file = (file_size - header_size ) /step;
-  if(graphs_per_file -1 < *index){
-    cerr << "You asked for the " << *index+1 << "th fullerene, but there are only " << graphs_per_file << " stored in this file." << std::endl;
+  if(graphs_per_file -1 < index){
+    cerr << "You asked for the " << index+1 << "th fullerene, but there are only " << graphs_per_file << " stored in this file." << std::endl;
     abort();
   }
 
