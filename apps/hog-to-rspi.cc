@@ -1,3 +1,7 @@
+// usage:  ./app-hog-to-rspi hog-file
+// creates one file with all spirals in output/
+
+
 #include <vector>
 #include <fstream>
 
@@ -13,7 +17,7 @@ int main(int ac, char **av)
 {
   string inputfile = av[1];
   FILE *input = fopen(inputfile.c_str(),"r");
-  int N = strtol(av[2],0,0);
+  int N = 0;
 
   vector<int> pentagon_indices;
   jumplist_t jumps;
@@ -39,7 +43,7 @@ int main(int ac, char **av)
     {step = N * 8 + 3;}
   unsigned int graphs_per_file = (file_size - header_size ) /step;
 
-  cout << graphs_per_file << " graphs found." << endl;
+  cout << graphs_per_file << " graphs with " << N << " nodes found." << endl;
 
 
   for(int i=0; i!=graphs_per_file; i++){
