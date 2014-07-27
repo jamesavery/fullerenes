@@ -161,7 +161,7 @@ fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const c
     return NULL;
   }
 
-  g = new FullereneGraph(index,f);
+  g = new FullereneGraph(*index,f);
   fclose(f);
   return g;
 }
