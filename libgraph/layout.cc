@@ -10,7 +10,6 @@ struct ToleranceLess {
 
 vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned int face_max) const
 {
-  //D'oh! The Tutte embedding is guaranteed to work for **3-connected**, not **3-valent**, i.e. cubic, graphs.
   if(s<0) s = 0;
   if(t<0){
     //    fprintf(stderr,"t = %d\n",t);
@@ -27,6 +26,11 @@ vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned
   //  fprintf(stderr,"tutte_layout(%d,%d,%d)\n",s,t,r);
   outer_face = shortest_cycle(s,t,r,face_max);
 
+  return tutte_layout(outer_face);
+}
+
+vector<coord2d> PlanarGraph::tutte_layout(const face_t& outer_face) const
+{
   unsigned int Nface = outer_face.size();
   vector<coord2d> initial_coords(N);
   for(unsigned int i=0;i<Nface;i++){
