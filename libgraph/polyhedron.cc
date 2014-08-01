@@ -525,7 +525,7 @@ Polyhedron Polyhedron::from_mol2(const string& filename)
   // Fast forward to metadata section
   while(getline(file,line) && line.compare(0,header_marker.size(),header_marker)) ;
   getline(file,line);
-  assert(!line.compare(0,9,"Fullerene")); // TODO: Fail gracefully if we didn't create the file.
+  //  assert(!line.compare(0,9,"Fullerene")); // TODO: Fail gracefully if we didn't create the file.
 
   getline(file,line);
   stringstream l(line);
