@@ -1043,6 +1043,51 @@ C     Print center of edges
       Return
       END
 
+      SUBROUTINE RingCoord(Iout,Dist,N5,N6,N5M,N6M)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION Dist(3,Nmax),N5M(Mmax,5),N6M(Mmax,6)
+C     Print center of rings
+      Write(Iout,1000)
+      IR=5
+      Do I=1,N5
+        X=0.
+        Y=0.
+        Z=0.
+      Do J=1,5
+        X=X+Dist(1,N5M(I,J))
+        Y=Y+Dist(2,N5M(I,J))
+        Z=Z+Dist(3,N5M(I,J))
+      enddo
+        X=X/5.
+        Y=Y/5.
+        Z=Z/5.
+        Write(Iout,1001) I,IR,X,Y,Z
+      enddo
+
+      IR=6
+      Do I=1,N6
+        X=0.
+        Y=0.
+        Z=0.
+      Do J=1,6
+        X=X+Dist(1,N6M(I,J))
+        Y=Y+Dist(2,N6M(I,J))
+        Z=Z+Dist(3,N6M(I,J))
+      enddo
+        X=X/6.
+        Y=Y/6.
+        Z=Z/6.
+        Write(Iout,1001) I,IR,X,Y,Z
+      enddo
+
+ 1000 Format(/1X,'Print center coordinates of faces:',
+     1 /1X,'    I    IR      X            Y            Z',
+     1 /1X,49('-')) 
+ 1001 Format(1X,2I5,3(1X,F12.8))
+      Return
+      END
+
       SUBROUTINE Alcami(Iout,Medges,IC3,IVR3)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)

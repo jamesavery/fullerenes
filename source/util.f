@@ -635,6 +635,9 @@ C     Mean and root mean square deviation
         rmsd=dsqrt(vars/132.)
       enddo
       Write(Iout,1010) amean,rmsd
+C     Get metric of pentagon icosahedron
+C     Call PentIcoMetric(pent_dist_mtx)
+C     Wiener index for pentagons
       wienerp=0
       wienerinv=0.
       do i=1,144
@@ -690,6 +693,23 @@ C1004 Format(' Ori constant for Wiener index: ',D15.9)
  1009 Format(/1x,'Number of perfect matchings = ',I12)
  1010 Format(/1x,'Mean topological pentagon distance: ',F15.8,
      1 ', and root mean square deviation: ',F15.8)
+      RETURN
+      END
+
+      SUBROUTINE PentIcoMetric(pent)
+C     Get Metric for icoshedron formed by pentagons
+      integer pent(12,12),nsort(2,12)
+C     Find distance for icosahedron
+      do I=1,12
+        Call pentsort(I,pent,nsort)
+       do J=1,12
+       enddo
+      enddo
+      RETURN
+      END
+
+      SUBROUTINE pentsort(I,pent,nsort)
+      integer pent(12,12),nsort(2,12)
       RETURN
       END
 

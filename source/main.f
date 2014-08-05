@@ -378,6 +378,8 @@ C Analyze ring connections
      1 IC3,IVR3,nEK,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
 C     Print edge coordinates (barycenter)
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
+      if(iprintf.ne.0) Call RingCoord(Iout,DIST,N5Ring,
+     1 N6Ring,N5MEM,N6MEM)
 
 C------------------STONE-WALES------------------------------------
 C Perform Stone-Wales transformation
@@ -532,6 +534,9 @@ c  stuff previously done, but is ok for now, as it takes not much time
         CALL Ring(Medges,MCon2,Iout,N5Ring,N6Ring,
      1   IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       endif
+      if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
+      if(iprintf.ne.0) Call RingCoord(Iout,DIST,N5Ring,
+     1 N6Ring,N5MEM,N6MEM)
 
 C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs
