@@ -410,7 +410,7 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   vector<tri_t>   tris(centroid_triangulation(faces));
   vector<int>     triface;
   vector<coord3d> centroid_points(points.begin(),points.end());
-  vector<coord3d> trinormals(tris.size()), facenormals(faces.size());
+  vector<coord3d> trinormals(tris.size()), facenormals(faces.size()), vertexnormals(centroid_points.size());
 
   for(int i=0;i<faces.size();i++)
     centroid_points.push_back(faces[i].centroid(points));
@@ -418,7 +418,11 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   for(int i=0;i<tris.size();i++){
     coord3d n(Tri3D(centroid_points[tris[i][0]],centroid_points[tris[i][1]],centroid_points[tris[i][2]]).n);
     trinormals[i] = n/n.norm();
+    for(int j=0;j<3;j++) vertexnormals[tris[i][j]] += trinormals[i];
   }
+
+  for(int i=0;i<N;i++)
+    vertexnormals[i] /= vertexnormals[i].norm();
 
   // Calculate volume
   double V=0;
@@ -435,14 +439,16 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
 
   for(int i=0;i<faces.size();i++) {
     coord3d normal;
-    if(faces[i].size()>3) 
+    if(faces[i].size()>3){
       for(int j=0;j<faces[i].size();j++){
 	triface.push_back(i);
 	normal += trinormals[triface.size()-1];
-      } else {
+      } 
+      facenormals[i] = normal/normal.norm();
+    } else {
       triface.push_back(i);
+      facenormals[i] = trinormals[i];
     }
-    facenormals[i] = normal;
   }
 
 
@@ -452,6 +458,7 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   s << "#declare triface = array["<<triface.size()<<"]" << triface << ";\n\n";
     
   s << "#declare cpoints=array["<<centroid_points.size()<<"][3]" << centroid_points << ";\n\n"; 
+  s << "#declare vertexnormals =array["<<vertexnormals.size()<<"][3]" << vertexnormals << ";\n\n";
   s << "#declare trinormals =array["<<tris.size()<<"][3]" << trinormals << ";\n\n";
   s << "#declare facenormals=array["<<faces.size()<<"][3]" << facenormals << ";\n\n";
 
