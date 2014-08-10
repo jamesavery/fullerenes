@@ -435,9 +435,12 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
 
   for(int i=0;i<faces.size();i++) {
     coord3d normal;
-    for(int j=0;j<faces[i].size();j++){
+    if(faces[i].size()>3) 
+      for(int j=0;j<faces[i].size();j++){
+	triface.push_back(i);
+	normal += trinormals[triface.size()-1];
+      } else {
       triface.push_back(i);
-      normal += trinormals[triface.size()-1];
     }
     facenormals[i] = normal;
   }
