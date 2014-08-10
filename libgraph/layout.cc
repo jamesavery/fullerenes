@@ -429,7 +429,11 @@ string PlanarGraph::to_povray(double w_cm, double h_cm,
   s << "#declare edgecolour=color rgb <" << byte2(edge_colour)/256. << "," << byte1(edge_colour)/256. << "," << byte0(edge_colour)/256. << ">;\n";
   s << "#declare nodecolour=color rgb <" << byte2(vertex_colour)/256. << "," << byte1(vertex_colour)/256. << "," << byte0(vertex_colour)/256. << ">;\n";
   s << "#declare edgewidth="<<edge_width/10.<<";\n";
-  s << "#declare nodediameter="<<vertex_diameter/10.<<";\n";
+  s << "#declare nodediameter="<<vertex_diameter/10.<<";\n\n";
+
+  vector<int> degrees(N);
+  for(node_t u=0;u<N;u++) degrees[u] = neighbours[u].size();
+  s << "#declare vertexdegree=array["<<N<<"]" << degrees << ";\n";
 
   if(layout2d.size() == N){
     coord2d wh(width_height());
