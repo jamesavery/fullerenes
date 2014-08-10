@@ -410,7 +410,7 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   vector<tri_t>   tris(centroid_triangulation(faces));
   vector<int>     triface;
   vector<coord3d> centroid_points(points.begin(),points.end());
-  vector<coord3d> trinormals(tris.size()), facenormals(faces.size()), vertexnormals(centroid_points.size());
+  vector<coord3d> trinormals(tris.size()), facenormals(faces.size()), vertexnormals(points.size()+faces.size());
 
   for(int i=0;i<faces.size();i++)
     centroid_points.push_back(faces[i].centroid(points));
