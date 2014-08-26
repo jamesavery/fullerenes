@@ -1,7 +1,6 @@
 // usage:  ./app-hog-to-rspi hog-file
 // creates one file with all spirals in output/
 
-
 #include <vector>
 #include <fstream>
 

@@ -1,3 +1,5 @@
+// compile with lapack and with gsl
+
 #include "libgraph/fullerenegraph.hh"
 
 #include <vector>
