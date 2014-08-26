@@ -71,40 +71,40 @@ C We allow for vertices, edges and ring centers
 
 C Check of errors in input
       if(is1.lt.0.or.is2.lt.0.or.is3.lt.0) then
-       WRITE(IOUT,1007)
-       Return
+        WRITE(IOUT,1007)
+        Return
       endif
       if(is2.gt.0.and.is1.eq.is2) then
-       WRITE(IOUT,1007)
-       Return
+        WRITE(IOUT,1007)
+        Return
       endif
       if(is3.gt.0.and.(is3.eq.is2.or.is3.eq.is1)) then
-       WRITE(IOUT,1007)
-       Return
+        WRITE(IOUT,1007)
+        Return
       endif
 
 C Vertex
       If(is2.eq.0) then
         Do I=1,3
-         c(I)=DIST(I,is1)
+          c(I)=DIST(I,is1)
         enddo
-       WRITE(IOUT,1008) is1,(c(i),i=1,3)
+        WRITE(IOUT,1008) is1,(c(i),i=1,3)
       endif
 
 C Edge
       If(is2.ne.0.and.is3.eq.0) then
-       rd=0.d0
+        rd=0.d0
         Do I=1,3
-         rd=rd+(DIST(I,is1)-DIST(I,is2))**2
-         c(I)=.5d0*(DIST(I,is1)+DIST(I,is2))
+          rd=rd+(DIST(I,is1)-DIST(I,is2))**2
+          c(I)=.5d0*(DIST(I,is1)+DIST(I,is2))
         enddo
-       rdist=dsqrt(rd)
-       rtol=rmin*(1.d0+Tol)
-        If(rdist.gt.rtol) then
-         WRITE(IOUT,1012) rdist,rtol
-         Return
-        endif
-       WRITE(IOUT,1009) is1,is2,(c(i),i=1,3)
+        rdist=dsqrt(rd)
+        rtol=rmin*(1.d0+Tol)
+          If(rdist.gt.rtol) then
+            WRITE(IOUT,1012) rdist,rtol
+            Return
+          endif
+        WRITE(IOUT,1009) is1,is2,(c(i),i=1,3)
       endif
 
 C Ring center
@@ -112,51 +112,52 @@ C Ring center
 
 C   Find ring
 C   Search in 5-ring
+      n5hit=0
       n6hit=0
       Do I=1,N5R
-       n5hit=0
+        n5hit=0
         Do J=1,5
-         if(is1.eq.N5M(I,J)) n5hit=n5hit+1
-         if(is2.eq.N5M(I,J)) n5hit=n5hit+1
-         if(is3.eq.N5M(I,J)) n5hit=n5hit+1
+          if(is1.eq.N5M(I,J)) n5hit=n5hit+1
+          if(is2.eq.N5M(I,J)) n5hit=n5hit+1
+          if(is3.eq.N5M(I,J)) n5hit=n5hit+1
           if(n5hit.eq.3) then
-           c(1)=cr5(1,I) 
-           c(2)=cr5(2,I) 
-           c(3)=cr5(3,I) 
-           IR=I
-           go to 150
+            c(1)=cr5(1,I) 
+            c(2)=cr5(2,I) 
+            c(3)=cr5(3,I) 
+            IR=I
+            go to 150
           endif
         enddo
       enddo
 C   Search in 6-ring
       Do I=1,N6R
       n6hit=0
-       Do J=1,6
-        if(is1.eq.N6M(I,J)) n6hit=n6hit+1
-        if(is2.eq.N6M(I,J)) n6hit=n6hit+1
-        if(is3.eq.N6M(I,J)) n6hit=n6hit+1
-        if(n6hit.eq.3) then 
-         c(1)=cr6(1,I) 
-         c(2)=cr6(2,I) 
-         c(3)=cr6(3,I)
-         IR=N5R+I 
-         go to 150
-        endif
-       enddo
+        Do J=1,6
+          if(is1.eq.N6M(I,J)) n6hit=n6hit+1
+          if(is2.eq.N6M(I,J)) n6hit=n6hit+1
+          if(is3.eq.N6M(I,J)) n6hit=n6hit+1
+          if(n6hit.eq.3) then 
+            c(1)=cr6(1,I) 
+            c(2)=cr6(2,I) 
+            c(3)=cr6(3,I)
+            IR=N5R+I 
+            go to 150
+          endif
+        enddo
       enddo
  150  nhit=0
       if(n5hit.eq.3) then
-       WRITE(IOUT,1010) IR,is1,is2,is3,(c(i),i=1,3)
-       nhit=1
+        WRITE(IOUT,1010) IR,is1,is2,is3,(c(i),i=1,3)
+        nhit=1
       endif
       if(n6hit.eq.3) then
-       WRITE(IOUT,1016) IR,is1,is2,is3,(c(i),i=1,3)
-       nhit=1
+        WRITE(IOUT,1016) IR,is1,is2,is3,(c(i),i=1,3)
+        nhit=1
       endif
-       if(nhit.eq.0) then
-        WRITE(IOUT,1017)
-        Return
-       endif
+        if(nhit.eq.0) then
+          WRITE(IOUT,1017)
+          Return
+        endif
       endif
 
 
@@ -320,9 +321,11 @@ C   Get shortest distance
 C   Determine the rotation angle
 C   Coordinates of vector to rotate
 C   Get atom label
+      ian=0
+      ibn=0
       Do j=1,number_vertices
-      if(IAL.eq.IATOM(j)) IAN=J
-      if(IBL.eq.IATOM(j)) IBN=J
+        if(IAL.eq.IATOM(j)) IAN=J
+        if(IBL.eq.IATOM(j)) IBN=J
       enddo
       X=.5d0*(Dist(1,IAN)+Dist(1,IBN))
       Y=.5d0*(Dist(2,IAN)+Dist(2,IBN))
@@ -394,27 +397,28 @@ C   Print the sorted ring centers
       WRITE(IOUT,1015) eps
       Natomcirc=0
       Ncircle=1
+      iboost = 0 ! only to remove compiler warning
       DO I=1,NR
-      Natomcirc=Natomcirc+1
-      If(I.gt.1) then
-      dif=dabs(CR(3,I)-CR(3,I-1))
-      if(dif.gt.eps) then
-      Ncircle=Ncircle+1
-      Natomcirc=1
-      endif
-      endif
-      If(IRing(I).le.N5R) then
-      Symbol(I)='P'
-      iboost=5
-      else
-      Symbol(I)='H'
-      iboost=6
-      endif
-      WRITE(IOUT,1019) IRing(I),(CR(ii,I),II=1,3),
-     1 Ncircle,Natomcirc,Symbol(I)
+        Natomcirc=Natomcirc+1
+        If(I.gt.1) then
+          dif=dabs(CR(3,I)-CR(3,I-1))
+          if(dif.gt.eps) then
+            Ncircle=Ncircle+1
+            Natomcirc=1
+          endif
+        endif
+        If(IRing(I).le.N5R) then
+          Symbol(I)='P'
+          iboost=5
+        else
+          Symbol(I)='H'
+          iboost=6
+        endif
+        WRITE(IOUT,1019) IRing(I),(CR(ii,I),II=1,3),
+     1   Ncircle,Natomcirc,Symbol(I)
       enddo
       if(Natomcirc.ne.1) then
-      WRITE(IOUT,1005)
+        WRITE(IOUT,1005)
       endif
 
 C   Choice between Schlegel projection or Tutte embedding
@@ -428,31 +432,32 @@ C   Calculate distance of vertices from z-axis for projection
 C     Write out on file unit=2 for schlegel.dat
       sfac=dtan(angle*deg2rad)
       Do I=1,number_vertices
-      X=Dist(1,I)
-      Y=Dist(2,I)
-      Z=Dist(3,I)
-      R=dsqrt(X*X+Y*Y)
-      If(R.gt.eps) then
-      Fac=(app-Z)/R*sfac
-      else
-      Fac=1.d0
-      If(I.ne.1) Write(IOUT,1003)
-      endif
-C   Extra boost for the last ring points
-      IVert=number_vertices-Iboost
-      If(I.gt.IVert) then
-      Fac=Fac*boost
-      endif
-      IAT=IAtom(I)
-      layout2d(1,IAT)=Dist(1,I)*Fac
-      layout2d(2,IAT)=Dist(2,I)*Fac
+        X=Dist(1,I)
+        Y=Dist(2,I)
+        Z=Dist(3,I)
+        R=dsqrt(X*X+Y*Y)
+        If(R.gt.eps) then
+          Fac=(app-Z)/R*sfac
+        else
+          Fac=1.d0
+          If(I.ne.1) Write(IOUT,1003)
+        endif
+C     Extra boost for the last ring points
+        IVert=number_vertices-Iboost
+        If(I.gt.IVert) then
+          Fac=Fac*boost
+        endif
+        IAT=IAtom(I)
+        layout2d(1,IAT)=Dist(1,I)*Fac
+        layout2d(2,IAT)=Dist(2,I)*Fac
 
-C   Print
-      WRITE(IOUT,1004) IAT,layout2d(1,IAT),layout2d(2,IAT),
-     1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3),Fac
-      if(ifs.ge.2) 
-     1 Write(2,902) IAT,layout2d(1,IAT),layout2d(2,IAT),
-     1 IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
+C     Print
+        WRITE(IOUT,1004) IAT,layout2d(1,IAT),layout2d(2,IAT),
+     1   IC3(IAT,1),IC3(IAT,2),IC3(IAT,3),Fac
+        if(ifs.ge.2) then
+          Write(2,902) IAT,layout2d(1,IAT),layout2d(2,IAT),
+     1     IC3(IAT,1),IC3(IAT,2),IC3(IAT,3)
+        endif
       enddo
       if(ifs.ge.2) WRITE(IOUT,1032) trim(filename)//"-2D.dat"
 
@@ -616,6 +621,7 @@ C   Take top ring for outer rim
       else
 C   Find ring
 C   Search in 5-ring
+      n5hit=0 ! only to remove warning
       n6hit=0
       Do I=1,N5R
        n5hit=0

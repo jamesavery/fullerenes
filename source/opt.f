@@ -302,11 +302,12 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
+      d=0.d0
       CALL f1dim2d(IOP,AH,IS,DD,maxd,fx,x,xicom,pcom,
      1 RAA)
       fv=fx
       fw=fx
-      do 11 iter=1,ITMAX
+      do iter=1,ITMAX
         xm=0.5d0*(a+b)
         tol1=tol*dabs(x)+ZEPS
         tol2=2.d0*tol1
@@ -368,7 +369,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
             fv=fu
           endif
         endif
-11    continue
+      enddo
       Write(Iout,1000)
  1000 Format('WARNING: Subroutine brent2d: maximum iterations exceeded')
 3     xmin=x
@@ -1005,6 +1006,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
+      d=0.d0
       CALL f1dim3d(
      1 fx,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
@@ -1012,7 +1014,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
      1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       fv=fx
       fw=fx
-      do 11 iter=1,ITMAX
+      do iter=1,ITMAX
         xm=0.5d0*(a+b)
         tol1=tol*dabs(x)+ZEPS
         tol2=2.d0*tol1
@@ -1077,7 +1079,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
             fv=fu
           endif
         endif
-11    continue
+      enddo
       Write(Iout,1000)
  1000 Format(' WARNING: Subroutine brent3d: maximum iterations
      1 exceeded')
@@ -1186,10 +1188,10 @@ c   fret      ... value of f at p
       REAL*8 p(n),xi(n),pcom(n),xicom(n)
       REAL*8 Dist(3,Nmax)
 CU    USES brentx,f1dimx,mnbrakx
-      do 11 j=1,n
+      do j=1,n
         pcom(j)=p(j)
         xicom(j)=xi(j)
-11    continue
+      enddo
       ax=0.d0
       xx=1.d0
       call mnbrakx(n,IOP,ier,
@@ -1287,11 +1289,12 @@ CU    USES brentx,f1dimx,mnbrakx
       v=bx
       w=v
       x=v
-      e=0.
+      e=0.d0
+      d=0.d0
       fx=f1dimx(ncom,IOP,ier,x,pcom,xicom,Dist)
       fv=fx
       fw=fx
-      do 11 iter=1,ITMAX
+      do iter=1,ITMAX
         xm=0.5*(a+b)
         tol1=tol*dabs(x)+ZEPS
         tol2=2.*tol1
@@ -1352,7 +1355,7 @@ CU    USES brentx,f1dimx,mnbrakx
             fv=fu
           endif
         endif
-11    continue
+      end do
       Print*, 'WARNING: brent exceed maximum iterations'
 3     xmin=x
       brentx=fx

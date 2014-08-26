@@ -702,8 +702,8 @@ C     Get Metric for icoshedron formed by pentagons
 C     Find distance for icosahedron
       do I=1,12
         Call pentsort(I,pent,nsort)
-       do J=1,12
-       enddo
+        do J=1,12
+        enddo
       enddo
       RETURN
       END
