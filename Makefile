@@ -3,6 +3,7 @@
 #
 VERSION_NUMBER=4.4
 
+#CXX=clang++
 CXX=g++
 F90=gfortran
 AR=ar
@@ -67,11 +68,15 @@ build/libgraph.a: $(COBJECTS) $(FLIBOBJECTS)
 
 build/libgraph.so: $(COBJECTS) $(FLIBOBJECTS)
 	c++ -shared -o $@ $(COBJECTS) $(FLIBOBJECTS)
+
 #-----------------------------------------------------
 test-%: tests/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ $(LIBRARIES)
 #-----------------------------------------------------
 app-%: apps/%.cc build/libgraph.a
+	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ $(LIBRARIES)
+#-----------------------------------------------------
+play-%: playground/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ $(LIBRARIES)
 #-----------------------------------------------------
 
