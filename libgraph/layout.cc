@@ -283,7 +283,6 @@ vector<coord2d> PlanarGraph::spherical_projection() const
   // at the same depth.
   double dtheta = M_PI/(dmax+1.0);
 
-  coord2d centroid(centre2d(layout2d));
   vector< coord2d > spherical_layout(N);
   for(unsigned int d=0;d<=dmax;d++){
     double phi = dtheta*(d+0.5);
