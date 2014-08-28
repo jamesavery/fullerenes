@@ -303,6 +303,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
+      d=0.d0
       CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fx,x,xicom,pcom,
      1 RAA)
       fv=fx
@@ -1256,6 +1257,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       w=v
       x=v
       e=0.d0
+      d=0.d0
       CALL SA_f1dim3d(N,
      1 fx,x,xicom,pcom,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
@@ -1444,7 +1446,8 @@ CU    USES brentx,f1dimx,mnbrakx
       v=bx
       w=v
       x=v
-      e=0.
+      e=0.d0
+      d=0.d0
       fx=sa_f1dimx(N,IOP,ier,x,pcom,xicom,Dist)
       fv=fx
       fw=fx
