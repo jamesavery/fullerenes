@@ -1,5 +1,5 @@
-      SUBROUTINE Isomers(IPR,isearch,IN,IOUT,iham,isomerl,isomerh,
-     1 ichk,IDA,A,filename)
+      SUBROUTINE Isomers(IPR,isearch,IN,IOUT,iham,ihamstat,
+     1 isomerl,isomerh,ichk,IDA,A,filename)
 C Information on number of isomers with or without fulfilling the
 C the IPR rule. The routine also calls SPIRAL using the subroutines
 C written by P. W. Fowler and D. E. Manopoulus, "An Atlas of Fullerenes"
@@ -195,7 +195,8 @@ C Check if database can be taken instead
         Go to 99
       else
         Write(Iout,1011) databasefile
-       call Printdatabase(Iout,iham,isomerl,isomerh,databasefile)
+       call Printdatabase(Iout,iham,ihamstat,
+     1  isomerl,isomerh,databasefile)
       endif
       return
       endif
@@ -241,7 +242,8 @@ C Produce list from ring spiral algorithm
       Return
       END
  
-      SUBROUTINE Printdatabase(Iout,iham,isomerl,isomerh,databasefile)
+      SUBROUTINE Printdatabase(Iout,iham,ihamstat,
+     1  isomerl,isomerh,databasefile)
 C---------------------------------------------------------------------
 C  This routine reads from the database using a specific format, and prints
 C  various parameters for each isomer, that is
@@ -262,7 +264,7 @@ C---------------------------------------------------------------------
       Integer hamlow,hamhigh,hamlowIPR,hamhighIPR
       Integer RSPI(12),PNI(0:5),HNI(0:6),INMR(6)
       Integer D(MMAX,MMAX),S(MMAX),IDA(NMAX,NMAX),IC3(NMAX,3)
-      Integer IsoExceptl(100),IsoExcepth(100)
+      Integer IsoExceptl(100),IsoExcepth(100),nbarval(nbardim)
 
       if(isomerl.ne.1) Write(Iout,1011) isomerl
       if(isomerh.ne.Nisoloop) Write(Iout,1012) isomerh
@@ -280,6 +282,10 @@ C---------------------------------------------------------------------
        number_faces=number_vertices/2+2
        Write(Iout,1000) IN,IP,IH
       if(IH.eq.0) then
+       if(ihamstat.ne.0) then
+        Write(Iout,1013)
+        ihamstat=0
+       endif
       if(IP.EQ.0) then
          IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices
          IF(number_vertices.ge.100) WRITE(Iout,602) number_vertices
@@ -295,6 +301,20 @@ C---------------------------------------------------------------------
        ahamhigh=ahamlow*an
        nhamhigh=int(ahamlow*an)
        Write(Iout,619) nhamlow,nhamhigh
+       if(ihamstat.ne.0) then
+        do i=1,nbardim
+         nbarval(i)=0
+        enddo
+        nhamdif=nhamhigh-nhamlow
+        nbars=int(.9*nbardim)
+        nwidth=nhamdif/nbars
+        if(nwidth.lt.10) then
+         ihamstat=0
+         Write(Iout,1014) nwidth
+        else
+         Write(Iout,1017) nwidth
+        endif
+       endif
       if(IP.EQ.0) then
          IF(number_vertices.lt.100) WRITE(Iout,701) number_vertices
          IF(number_vertices.ge.100) WRITE(Iout,702) number_vertices
@@ -357,6 +377,12 @@ C Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
           WRITE(Iout,608) J,GROUP,(RSPI(i),I=1,12),(PNI(I),I=0,5),
      1     IFus5G,(HNI(I),I=0,6),sigmah,NeHOMO,NedegHOMO,HLgap,
      2     Occup,ncycHam,(INMR(I),I=1,nmrloop)
+          if(ihamstat.ne.0) then
+           ifield=(ncycHam-nhamlow)/nwidth+1           
+           if(ifield.gt.nbardim) ifield=nbardim
+           if(ifield.le.0) ifield=1
+           nbarval(ifield)=nbarval(ifield)+1
+          endif
           if(IFus5G.le.IFus5Glow) then
            IFus5Glow=IFus5G
            IFusL=J
@@ -396,6 +422,7 @@ C Case 1 All isomers with Hamiltonian cycles IP=0 IH=1
 
          else
 C Case 2 All isomers without Hamiltonian cycles IP=0 IH=0
+          ihamstat=0
           Read(4,1007,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1    (PNI(I),I=0,4),(HNI(I),I=0,5),NeHOMO,NedegHOMO,HLgap,
      2    (INMR(I),I=1,6)
@@ -487,6 +514,7 @@ C create IC3 from IDA
         else
          if(IH.eq.1) then
 C Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
+          ihamstat=0
           Read(4,1008,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,ncycHam,
      2     (INMR(I),I=1,6)
@@ -533,6 +561,7 @@ C Case 3 IPR isomers with Hamiltonian cycles IP=1 IH=1
 
          else
 C Case 4 IPR isomers without Hamiltonian cycles IP=1 IH=0
+          ihamstat=0
           Read(4,1009,ERR=99,end=99) Group,(RSPI(i),I=1,12),
      1     (HNI(I),I=3,5),NeHOMO,NedegHOMO,HLgap,(INMR(I),I=1,6)
           HNI(6)=number_vertices/2-10-HNI(3)-HNI(4)-HNI(5)
@@ -638,7 +667,16 @@ C Final statistics
        Write(Iout,615) no5ringstart
       endif
       WRITE(Iout,613) 
-
+      if(ihamstat.ne.0) then
+       write(Iout,1015)
+       do i=1,nbardim
+        nhamcount=nbarval(i)
+        if(nhamcount.ne.0) then
+         jhamcyc=i*nwidth+nhamlow
+         write(Iout,1016) i,jhamcyc,nbarval(i)
+        endif
+       enddo
+      endif
       Close(unit=4)
  1000 Format(/1X,I10,2I2)
  1002 Format(/1X,'Atom number ',I5,' not identical to that on file: ',
@@ -652,6 +690,14 @@ C Final statistics
      1 ' Error in Database ==> Return')
  1011 FORMAT(1X,'Start at isomer ',I10)
  1012 FORMAT(1X,'End   at isomer ',I10)
+ 1013 FORMAT(1X,'File does not contain Hamilton cycle count,'
+     1 ' statistics not performed')
+ 1014 FORMAT(1X,'Number of Hamilton cycles to small to do ',
+     1 'statistics, width of bar would be ',I4)
+ 1015 Format(/1X,'Frequency of Hamilton cycles',
+     1 /,3X,'I',4x,'hamcyc',4x,'hamcount',/1X,27('-'))
+ 1016 FORMAT(1X,I3,1X,I9,1X,I9)
+ 1017 FORMAT(1X,'Performing Hamilton cycle statistics with width ',I7)
  601  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -717,7 +763,7 @@ C Final statistics
  619  Format(' Semi-tight lower and upper limits for Hamiltonian ',
      1 'cycles:'I9,'/',I9)
   701  FORMAT(1X,'General fullerene isomers of C',I2,':',
-     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
@@ -726,7 +772,7 @@ C Final statistics
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
  702  FORMAT(1X,'General fullerene isomers of C',I3,':',
-     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
@@ -735,7 +781,7 @@ C Final statistics
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
  703  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
-     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',
@@ -744,7 +790,7 @@ C Final statistics
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
      5 /1X,170('-'))
  704  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
-     1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
+     1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
      1 /35x,' gap the HOMO-LUMO gap in units of beta, and NHamCyc the ',
      1 ' number of Hamiltonian cycles)',

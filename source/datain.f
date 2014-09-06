@@ -3,9 +3,9 @@
      1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,IPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
-     1 isearch,iprinth,ndbconvert,ihamstore,nhamcyc,isomerl,isomerh,
-     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,rspi,
-     1 jumps,force,forceP,boost,filename,filenameout,DATEN)
+     1 isearch,iprinth,ndbconvert,ihamstore,ihamstats,nhamcyc,isomerl,
+     1 isomerh,PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
+     1 rspi,jumps,force,forceP,boost,filename,filenameout,DATEN)
 C-----------------------------------------------------------------
 C  This is the main routine handling the input
 C  It is called from the main program
@@ -29,7 +29,7 @@ C-----------------------------------------------------------------
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
      1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
-      Namelist /Hamilton/ IHam,iupac,ihamstore
+      Namelist /Hamilton/ IHam,iupac,ihamstore,ihamstats
       Namelist /Isomers/ IPR,IPH,IStop,Ichk,ISearch,isomerl,isomerh
       Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,nhamcyc,ifs,ndual,
      1 labelvert,PS,scale,scalePPG,boost
@@ -104,6 +104,7 @@ C Integers
       nosort=0  !  Flag for sorting cartesian coordinates
       ispsearch=1 ! Flag for searching for canonical spiral
       ihamstore=0 ! Flag for storing all Hamiltonian cycles
+      ihamstats=0 ! Flag for Hamiltonian cycle statistics
       nhamcyc=0 ! Flag for reading Hamiltonian cycle for 2D graph
       novolume=0 ! Flag for volume calculation
       nohueckel=0 ! Option for diagonalizing the Hueckel matrix

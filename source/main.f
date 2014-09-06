@@ -135,10 +135,10 @@ C  Call Datain
      1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,iPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
-     1 isearch,iprinthessian,ndbconvert,ihamstore,nhamcyc,isomerl,
-     1 isomerh,ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,ftolP,
-     1 scaleRad,rspi,jumps,force,forceP,boost,filename,filenameout,
-     1 TEXTINPUT)
+     1 isearch,iprinthessian,ndbconvert,ihamstore,ihamstats,nhamcyc,
+     1 isomerl,isomerh,ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,
+     1 ftolP,scaleRad,rspi,jumps,force,forceP,boost,
+     1 filename,filenameout,TEXTINPUT)
 
 C  Simple checks
 C  Stop if error in input
@@ -263,8 +263,8 @@ C pentagon rule as full list beyond C60 is computer time
 C intensive
   98  routine='ISOMERS        '
       Write(Iout,1008) routine
-      CALL Isomers(IPR,isearch,In,Iout,iprintham,isomerl,isomerh,
-     1 ichk,IDA,A,filename)
+      CALL Isomers(IPR,isearch,In,Iout,iprintham,ihamstats,
+     1 isomerl,isomerh,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
 
 C------------------MOVECM------------------------------------------
