@@ -85,6 +85,7 @@ C isomers point group, pentagon ring spiral indices and NMR pattern.
      *       '34345173894','36259212641','38179777473','40286153024'/
 
       Write(Iout,1012)
+      isocount=0
       chkname=trim(filename)//".chkpnt"
       IPRERR=0
 C     Number of Isomers
@@ -99,6 +100,7 @@ C     Both values fit 32bit signed integer
          isomIPR=0
         endif
        Write(Iout,1000) Isonum(M1),isomIPR
+       isocount=Isonum(M1)
        AisoNIPR=dfloat(Isonum(M1))
        AisoIPR=dfloat(isomIPR)
       endif
@@ -195,7 +197,7 @@ C Check if database can be taken instead
         Go to 99
       else
         Write(Iout,1011) databasefile
-       call Printdatabase(Iout,iham,ihamstat,
+       call Printdatabase(Iout,iham,ihamstat,isocount,
      1  isomerl,isomerh,databasefile)
       endif
       return
@@ -242,7 +244,7 @@ C Produce list from ring spiral algorithm
       Return
       END
  
-      SUBROUTINE Printdatabase(Iout,iham,ihamstat,
+      SUBROUTINE Printdatabase(Iout,iham,ihamstat,isocount,
      1  isomerl,isomerh,databasefile)
 C---------------------------------------------------------------------
 C  This routine reads from the database using a specific format, and prints
@@ -669,13 +671,25 @@ C Final statistics
       WRITE(Iout,613) 
       if(ihamstat.ne.0) then
        write(Iout,1015)
+        ibars=0
+        mem=1
        do i=1,nbardim
         nhamcount=nbarval(i)
         if(nhamcount.ne.0) then
          jhamcyc=i*nwidth+nhamlow
-         write(Iout,1016) i,jhamcyc,nbarval(i)
+         barnormal=0
+         if(isocount.ne.0) then
+          if(mem.eq.1) then
+           nlowest=jhamcyc
+           mem=0
+          endif
+          ibars=ibars+1
+          barnormal=dfloat(nhamcount)/dfloat(isocount)
+         endif
+         write(Iout,1016) i,jhamcyc,nhamcount,barnormal
         endif
        enddo
+         write(Iout,1018) ibars,nwidth,nlowest
       endif
       Close(unit=4)
  1000 Format(/1X,I10,2I2)
@@ -695,9 +709,12 @@ C Final statistics
  1014 FORMAT(1X,'Number of Hamilton cycles to small to do ',
      1 'statistics, width of bar would be ',I4)
  1015 Format(/1X,'Frequency of Hamilton cycles',
-     1 /,3X,'I',4x,'hamcyc',4x,'hamcount',/1X,27('-'))
- 1016 FORMAT(1X,I3,1X,I9,1X,I9)
+     1 /,3X,'I',4x,'hamcyc',4x,'hamcount',2X,'normalized',
+     1 /1X,42('-'))
+ 1016 FORMAT(1X,I3,1X,I9,1X,I9,3X,E12.6)
  1017 FORMAT(1X,'Performing Hamilton cycle statistics with width ',I7)
+ 1018 FORMAT(/1X,'Number of bars =',I5,', width =',I9,', lowest',
+     1 ' bar sits at Hamilton cycle count of ',I9)
  601  FORMAT(1X,'General fullerene isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
