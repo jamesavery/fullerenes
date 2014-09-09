@@ -308,7 +308,7 @@ C---------------------------------------------------------------------
          nbarval(i)=0
         enddo
         nhamdif=nhamhigh-nhamlow
-        nbars=int(.9*nbardim)
+        nbars=int(.9*nbardim+1)
         nwidth=nhamdif/nbars
         if(nwidth.lt.10) then
          ihamstat=0
@@ -671,12 +671,13 @@ C Final statistics
       WRITE(Iout,613) 
       if(ihamstat.ne.0) then
        write(Iout,1015)
+        nwidthhalf=nwidth/2
         ibars=0
         mem=1
        do i=1,nbardim
         nhamcount=nbarval(i)
         if(nhamcount.ne.0) then
-         jhamcyc=i*nwidth+nhamlow
+         jhamcyc=i*nwidth+nhamlow-nwidthhalf
          barnormal=0
          if(isocount.ne.0) then
           if(mem.eq.1) then
@@ -709,7 +710,9 @@ C Final statistics
  1014 FORMAT(1X,'Number of Hamilton cycles to small to do ',
      1 'statistics, width of bar would be ',I4)
  1015 Format(/1X,'Frequency of Hamilton cycles',
-     1 /,3X,'I',4x,'hamcyc',4x,'hamcount',2X,'normalized',
+     1 /,1X,'midpoint gives number of Hamiltonian cycles ',
+     1 ' at center of bar, range = midpoint plusminus width/2',
+     1 /,1X,'bar',4x,'midpoint',2x,'hamcount',2X,'normalized',
      1 /1X,42('-'))
  1016 FORMAT(1X,I3,1X,I9,1X,I9,3X,E12.6)
  1017 FORMAT(1X,'Performing Hamilton cycle statistics with width ',I7)
