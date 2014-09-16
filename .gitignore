@@ -11,3 +11,5 @@ Manual/*pdf
 config.mod
 libgraph.a
 database/*
+output/*
+app-*
