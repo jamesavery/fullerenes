@@ -10,32 +10,6 @@
 
 typedef list<pair<int,int> > jumplist_t;
 
-pair<set< face_t>, set<face_t> > FullereneGraph::compute_faces56() const 
-{
-  set<face_t> pentagons, hexagons;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    const node_t s = e->first, t = e->second;
-
-    const vector<node_t>& ns(neighbours[t]);
-    for(unsigned int i=0;i<ns.size();i++)
-      if(ns[i] != s) {
-	const node_t u = ns[i];
-	
-	// Assumes fullerene. Remove 6 and return map instead of pair to allow cubic graphs with arbitrary polygons
-	face_t face(shortest_cycle(s,t,u,6)); 
-	if      (face.size() == 5) pentagons.insert(face);
-	else if (face.size() == 6) hexagons.insert(face);
-	else {
-	  fprintf(stderr,"Graph is not a fullerene: Contains face ");
-	  for(unsigned int i=0;i<face.size();i++)
-	    fprintf(stderr,"%d ",face[i]);
-	  fprintf(stderr,"of size %d\n",int(face.size()));
-	}
-    }
-  }
-  return pair< set<face_t>,set<face_t> >(pentagons,hexagons);
-}
-
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_layout) const {
   if(m<0) return FullereneGraph(*this);
@@ -55,7 +29,9 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
   }
     
   // Create n new vertices for each edge
-  for(set<edge_t>::const_iterator e(dual.edge_set.begin()); e!=dual.edge_set.end(); e++){
+  set<edge_t> dual_edges = dual.undirected_edges();
+
+  for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end(); e++){
     vector<node_t>& nodes(edge_nodes[*e]);
     for(unsigned int i=0;i<m;i++) nodes.push_back(v_new++);
     
@@ -159,6 +135,7 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   //  cout << "(*leapfrog*)faces      = " << faces << ";\n";
 
   node_t v_new = N;
+  set<edge_t> dual_edges = dualfrog.undirected_edges();
 
   if(planar_layout)
     dualfrog.layout2d.resize(N+faces.size());
@@ -166,14 +143,14 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   for(size_t i=0;i<faces.size();i++){
     const face_t& f(faces[i]);
     for(size_t j=0;j<f.size();j++)
-      dualfrog.edge_set.insert(edge_t(v_new,f[j]));
+      dual_edges.insert(edge_t(v_new,f[j]));
     
     if(planar_layout)
       dualfrog.layout2d[v_new] = f.centroid(layout2d);
 
     v_new++;
   }
-  dualfrog.update_from_edgeset();
+  dualfrog.update_from_edgeset(dual_edges);
 
   // Note that dualfrog is no longer planar, but is a triangulation of the sphere.
   // The dual of dualfrog becomes planar again.
@@ -233,7 +210,6 @@ void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2
   jumps.clear();
 
   PlanarGraph dual = this->dual_graph(6);
-  dual.update_from_edgeset();
 
   // the spiral is a string of numbers 5 and 6 and is built up during the loop
   vector<int> spiral; 

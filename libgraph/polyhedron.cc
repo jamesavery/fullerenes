@@ -210,6 +210,9 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
   ostringstream s;
   s.precision(2);
   s << fixed;
+
+  set<edge_t> edge_set = undirected_edges();
+
   if(include_latex_header)
     s << "\\documentclass{article}\n"
          "\\usepackage{fullpage,fourier,tikz}\n"
@@ -256,9 +259,10 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
     s << "\\foreach \\u/\\v in {";
-    for(set<edge_t>::const_iterator e(dual.edge_set.begin()); e!=dual.edge_set.end();){
+    set<edge_t> dual_edges = dual.undirected_edges();
+    for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end();){
       s << "{v"<<e->first<<"/v"<<e->second<<"}";
-      if(++e != dual.edge_set.end()) s << ", ";
+      if(++e != dual_edges.end()) s << ", ";
     }
     s << "}\n\t\\draw[dualedge] (\\u) -- (\\v);\n";
   }

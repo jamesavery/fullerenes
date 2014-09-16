@@ -207,7 +207,7 @@ graph_ptr dual_graph_(const graph_ptr *g){
   bool is_fullerene = (*g)->neighbours[0].size() == 3;
   return new PlanarGraph((*g)->dual_graph(is_fullerene? 6 : 3)); 
 }
-int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
+//int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 int perfect_match_count_(const graph_ptr *g){ return (*g)->count_perfect_matchings(); }
 
 fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n)
@@ -336,7 +336,10 @@ void set_layout2d_(graph_ptr *g, const double *layout2d)
 polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }
 
 int nvertices_(const graph_ptr *g){ return (*g)->N; }
-int nedges_(const graph_ptr *g){ return (*g)->edge_set.size(); }
+int nedges_(const graph_ptr *g){ 
+  set<edge_t> edge_set = (*g)->undirected_edges(); // TODO: Better solution to this.
+  return edge_set.size(); 
+}
 
 void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, const int *show_dual, const int *show_labels, const double *dimensions,
 		 const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter)
@@ -401,7 +404,7 @@ void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char
 
 void edge_list_(const graph_ptr *g, int *edges, int *length)
 {
-  const set<edge_t>& edge_set((*g)->edge_set);
+  const set<edge_t>& edge_set((*g)->undirected_edges());
   *length = edge_set.size();
   int i=0;
   for(set<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();e++,i++){

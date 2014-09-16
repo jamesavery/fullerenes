@@ -31,6 +31,7 @@ bool PlanarGraph::is_a_fullerene() const {
   const int E = 3*N/2;
   const int F = 2+E-N;
 
+  set<edge_t> edge_set = undirected_edges(); // TODO: Do with neighbours - this is a bit slow.
   if(E != edge_set.size()){
     fprintf(stdout,"Graph is not planar cubic: wrong number of edges: %d != %d\n",int(edge_set.size()),E);
     return false;
@@ -59,6 +60,7 @@ bool PlanarGraph::is_a_fullerene() const {
 PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const {
   // TODO: Simplify
   PlanarGraph dual;
+  set<edge_t> edge_set = undirected_edges(); // TODO: In new planargraph, this is unnecessary
   unsigned int Nfaces = edge_set.size()-N+2;
   dual.N = Nfaces;
   dual.neighbours.resize(Nfaces);
@@ -90,17 +92,18 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
   
   // Insert edge between each pair of faces that share an edge
   //  cerr << "dual_graph::construct graph\n";
+  set<edge_t> dual_edges;
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const set<int>& adjacent_faces(facenodes[*e]);
     for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
       set<int>::const_iterator g(f);
       for(++g; g!= adjacent_faces.end(); g++)
-	dual.edge_set.insert(edge_t(*f,*g));
+	dual_edges.insert(edge_t(*f,*g));
     }
   }
   //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
 
-  dual.update_from_edgeset();
+  dual = Graph(dual_edges);
 
   // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
   // (but it is not planar -- might not want to use this!)
@@ -120,6 +123,8 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 // This produces "phantom" faces! Fix and use the oriented version instead.
 facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const 
 {
+  set<edge_t> edge_set = undirected_edges();
+
   facemap_t facemap;
   // TODO: This is a much better and faster method, but requires a planar layout
   if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
@@ -193,6 +198,8 @@ facemap_t PlanarGraph::compute_faces_oriented() const
   facemap_t facemap;
   //  cout << "Computing faces using 2D orientation." << endl;
   set<dedge_t> workset;
+  set<edge_t> edge_set = undirected_edges();
+
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
     workset.insert(dedge_t(s,t));
@@ -411,6 +418,8 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   // Check consistency of orientation. It is consistent if and only if
   // each edge has been used exactly once in each direction.
   bool consistent = true;
+  set<edge_t> edge_set = undirected_edges();
+
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     if(!done[dedge_t(e->first,e->second)]){
       fprintf(stderr,"A: Directed edge %d->%d is missing: triangulation is not consistently oriented.\n",e->first,e->second);
@@ -474,6 +483,7 @@ face_t PlanarGraph::find_outer_face() const
 vector<double> PlanarGraph::edge_lengths() const 
 {
   assert(layout2d.size() == N);
+  set<edge_t> edge_set = undirected_edges();
 
   vector<double> lengths(edge_set.size());
   unsigned int i = 0;
@@ -506,17 +516,19 @@ void PlanarGraph::move(const coord2d& x) {
 
 ostream& operator<<(ostream& s, const PlanarGraph& g) 
 {
-  s << g.name<< "Graph[Range["<<g.N<<"],\n\tUndirectedEdge@@#&/@{";
-  for(set<edge_t>::const_iterator e(g.edge_set.begin()); e!=g.edge_set.end(); ){    
+  set<edge_t> edge_set = g.undirected_edges();
+
+  s << "Graph[Range["<<g.N<<"],\n\tUndirectedEdge@@#&/@{";
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); ){    
     s << "{" << (e->first+1) << "," << (e->second+1) << "}";
-    if(++e != g.edge_set.end())
+    if(++e != edge_set.end())
       s << ", ";
     else
       s << "}";
   }
 
   if(g.layout2d.size() == g.N){
-    s << g.name << ",\n\tVertexCoordinates->{";
+    s << ",\n\tVertexCoordinates->{";
     for(unsigned int i=0;i<g.N;i++){
       coord2d xy(g.layout2d[i]);
       s << xy << (i+1<g.N?", ":"}");
@@ -584,6 +596,7 @@ void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node
     //cout << i << ": " << valencies[i]<< endl;
     remaining_nodes.insert(i);
   }
+  set<edge_t> edge_set = undirected_edges();
 
   //check if starting nodes share a face
   if(edge_set.find(edge_t(f1,f2)) == edge_set.end() ||

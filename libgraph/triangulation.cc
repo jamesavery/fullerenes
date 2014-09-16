@@ -19,7 +19,7 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
     else if(t==2) tris.second = w;
     else {
       fprintf(stderr,"Triangulation is not orientable, edge %d--%d part of more than two faces.\n",u,v);
-      cerr << "edges = " << edge_set << ";\n";
+      cerr << "edges = " << undirected_edges() << ";\n";
       abort();
     }
       }
@@ -30,6 +30,7 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
 vector<tri_t> Triangulation::compute_faces() const // non-oriented triangles
 {
   set<tri_t> triangles;
+  set<edge_t> edge_set = undirected_edges();
 
   int i=0;
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++,i++){
@@ -86,6 +87,8 @@ node_t Triangulation::nextCCW(const dedge_t& uv) const
 
 vector<tri_t> Triangulation::compute_faces_oriented() const 
 {
+  set<edge_t> edge_set = undirected_edges();
+
   vector<tri_t> triangles(edge_set.size()-N+2);
   map<dedge_t,bool> dedge_done;    // Change to vector<bool> dedge_done[N*3] to increase speed.
 
