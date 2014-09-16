@@ -1,8 +1,8 @@
-C108 Creating IPR isomer list, needed 170,000-604,217 in batches of 10000
+C80 Creating IPR isomer list only
 &General NA=110 /
 &Coord ICart=0 /
 &FFChoice /
 &FFParameters /
-&Hamilton /
-&Isomers IPR=2 iph=1 istop=1 /
+&Hamilton ihamstats=1 /
+&Isomers IPR=2 istop=1 /
 &Graph /

@@ -6,6 +6,7 @@
       integer,parameter :: nzeile=132 ! Maximum length of text character in a line
       integer,parameter :: Nmax=5300 !  Change NMAX if RAM is not sufficient
       integer,parameter :: msrs=56+1 !  Size of Schlegel output matrix
+      integer,parameter :: nbardim=100+10 !Number of bars in Hamilton cycle statistics
       integer,parameter :: NmaxL=(Nmax*(Nmax-1))/2
       integer,parameter :: Mmax=Nmax/2+2
       integer,parameter :: MaxSpirals=6*Nmax
