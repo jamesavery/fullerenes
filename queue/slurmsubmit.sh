@@ -13,11 +13,8 @@ for i in `seq $iFROM $iTO`; do
 done
 
 hostname
-echo "Running $iFROM to $iTO. Cancel job when all programs are done."
-while true; do 
-    top -b -n1 | head -n 20;
-    sleep 10000;
-done
-echo "This should never be reached."
+echo "Running $iFROM to $iTO."
+wait
+echo "Range $iFROM to $iTO is done."
 
 

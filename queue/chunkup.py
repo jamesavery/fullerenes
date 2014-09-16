@@ -46,7 +46,7 @@ prepare(jobdir+"/"+str(N),e+1,end);
 iN = N/NCPUs;
 ifrom = [i*NCPUs for i in range(iN)]
 ito   = [(i+1)*NCPUs-1 for i in range(iN)];
-ito[-1] = N;
+ito[-1] = N-1;
 
 for i in range(iN):
     with open(jobdir+"/llsubmit-%d-%d.sh" % (ifrom[i],ito[i]),"w") as f:
