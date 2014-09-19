@@ -6,9 +6,6 @@
 
 class Triangulation : public PlanarGraph {
 public:
-  using Graph::N;
-  using Graph::neighbours;
-
   vector<tri_t> triangles;	// Faces
 
   // Operations:
@@ -68,6 +65,8 @@ public:
   }
 
   //  void renumber();		// Renumber nodes such that deg(v_i) <= deg(v_{i+1})
+
+  Triangulation sort_nodes() const;
 
 };
 

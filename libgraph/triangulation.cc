@@ -613,3 +613,23 @@ bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonica
 }
 
 
+Triangulation Triangulation::sort_nodes() const 
+{
+  vector< pair<int,int> > degrees(N);
+
+  for(int u=0;u<N;u++) degrees[u] = make_pair(neighbours[u].size(), u);
+  
+  sort(degrees.begin(), degrees.end());
+
+  cout << "degrees = " << degrees << endl;
+
+  vector<int> newname(N);
+  for(int u=0;u<N;u++) newname[degrees[u].second] = u;
+  
+  neighbours_t new_neighbours(N);
+  for(int u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++)
+      new_neighbours[newname[u]].push_back(newname[neighbours[u][i]]);
+  
+  return Triangulation(new_neighbours);
+}
