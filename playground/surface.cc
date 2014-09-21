@@ -49,7 +49,15 @@ public:
   }
 };
 
-#include <math.h>
+minplus_matrix APSP_weighted(const minplus_matrix &A0)
+{
+  int count = ceil(log2(A0.m));
+
+  minplus_matrix A(A0);
+  for(int i=0;i<count;i++) A = A*A;
+
+  return A;
+}
 
 minplus_matrix APSP_unweighted(const Graph& g)
 {
@@ -62,17 +70,41 @@ minplus_matrix APSP_unweighted(const Graph& g)
       A[u*A.n+v] = 1;
     }
   }
-  
-  int count = ceil(log2(g.N));
-  
-
-  for(int i=0;i<count;i++){
-    //    cout << "step " << i << ": " << A << endl;
-    A = A*A;
-  }
-
-  return A;
+  return APSP_weighted(A);
 }
+
+
+node_t findEndOfPath(const Triangulation& G, int u, int v, int a, int b)
+{
+  int t[3],t_next[3];
+
+  // First triangle
+  t[0] = u;
+  t[1] = v;
+  t[2] = G.nextCCW(dedge_t(u,v));
+  
+  if(a == 1 && b == 0) return t[1];
+  if(a == 0 && b == 1) return t[2];
+  
+  t_next[0] = t[2];
+  t_next[1] = t[1];
+  t_next[2] = G.nextCCW(dedge_t(t_next[0],t_next[1]));
+
+  int p[3][2] = {{0,0},{1,0},{0,1}};
+}
+
+minplus_matrix findSurfaceDistances(const Triangulation& G)
+{
+  minplus_matrix H = APSP_unweighted(G);  // Shortest path u--v is upper bound to d(u,v)
+  int M = *max_element(H.begin(),H.end()); // M is diameter of G
+  
+  for(int i=0;i<H.size();i++) H[i] *= H[i]; // Work with square distances, so that all distances are integers.
+  
+
+  for(int u=0;u<G.N;u++) 
+}
+
+
 
 int main(int ac, char **av)
 {
@@ -85,6 +117,8 @@ int main(int ac, char **av)
 
   Triangulation   dg(spiral);
   PlanarGraph      g(dg.dual_graph());
+
+  assert(dg.is_consistently_oriented());
 
   if(0){
     cout << "\n\nMatrix-APSP:\n";
