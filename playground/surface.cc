@@ -3,78 +3,68 @@
 
 typedef unsigned long int_l;
 
-class minplus_matrix : public vector<int_l> {
-public: 
-  int m,n;
-  static const int_l zero = UINT_MAX;
+template <typename T> class matrix : public vector<T> {
+public:
+  int m,n; 
 
-  minplus_matrix(int m, int n, const vector<int_l>& A) : vector<int_l>(A.begin(),A.end()),m(m), n(n) { assert(A.size() == m*n); }
-  minplus_matrix(int m, int n) : vector<int_l>(m*n,zero),m(m),n(n) { }
+  matrix(int m, int n, const vector<T>& A) : vector<T>(A.begin(), A.end()), m(m), n(n) { assert(A.size()==m*n); }
+  matrix(int m, int n, const T& zero = 0) : vector<T>(m*n,zero), m(m), n(n) {}
 
-  minplus_matrix operator+(const minplus_matrix& B)
+  // Convert from compatible type
+  template <typename S> matrix(const matrix<S>& A) : vector<T>(A.begin(),A.end()), m(A.m), n(A.n) {}
+
+  T& operator()       (int i, int j){ return (*this)[i*n+j]; }
+  T  operator()(int i, int j) const { return (*this)[i*n+j]; }
+
+  static matrix minplus_multiply(const matrix& A, const matrix& B, const T& infty_value = USHRT_MAX)
   {
-    const minplus_matrix& A(*this);
-    assert(A.m == B.m && A.n == B.n);
-    minplus_matrix C(A.m,A.n);
-
-    for(int i=0;i<B.size();i++) C[i] = min(A[i],B[i]);
-    return C;
-  }
-
-  minplus_matrix operator*(const minplus_matrix& B)
-  {
-    const minplus_matrix& A(*this);
     assert(A.n == B.m);
-    minplus_matrix C(A.m,B.n);
+    matrix C(A.m,B.n);
 
     for(int i=0;i<A.m;i++)
       for(int j=0;j<B.n;j++){
-	int_l x = zero;
-	for(int k=0;k<A.n;k++) x = min(x, int_l(A[i*A.n+k]+B[k*B.n+j]));
-	x = min(x,zero);
+	T x = infty_value;
+	for(int k=0;k<A.n;k++) x = min(x, T(A[i*A.n+k]+B[k*B.n+j]));
+	x = min(x,infty_value);
 	C[i*C.n+j] = x;
       }
-    return C;
+    return C;    
   }
 
-  int_l& operator()(int i, int j)      { return (*this)[i*n+j]; }
-  int_l operator()(int i, int j) const { return (*this)[i*n+j]; }
+  matrix APSP() const {
+    int count = ceil(log2(m));
+    matrix A(*this);
+    for(int i=0;i<count;i++) A = minplus_multiply(A,A);
+    
+    return A;
+  }
 
-  friend ostream& operator<<(ostream& S, const minplus_matrix& A)
+  matrix operator*(const matrix& B)
   {
-    vector< vector<int_l> > VV(A.m, vector<int_l>(A.n,zero));
+    assert(n == B.m);
+    matrix C(m,B.n);
+
+    for(int i=0;i<m;i++)
+      for(int j=0;j<B.n;j++){
+	T x = 0;
+	for(int k=0;k<n;k++) x += (*this)[i*n+k]*B[k*B.n+j];
+	C[i*C.n+j] = x;
+      }
+    return C;    
+  }
+
+  friend ostream& operator<<(ostream& S, const matrix& A)
+  {
+    vector< vector<T> > VV(A.m, vector<T>(A.n));
     for(int i=0;i<A.m;i++) 
       for(int j=0;j<A.n;j++)
-	if(A[i*A.n+j] != zero) VV[i][j] = A[i*A.n+j];
+	VV[i][j] = A[i*A.n+j];
 
     S << VV;
     return S;
   }
 };
 
-minplus_matrix APSP_weighted(const minplus_matrix &A0)
-{
-  int count = ceil(log2(A0.m));
-
-  minplus_matrix A(A0);
-  for(int i=0;i<count;i++) A = A*A;
-
-  return A;
-}
-
-minplus_matrix APSP_unweighted(const Graph& g)
-{
-  minplus_matrix A(g.N,g.N);
-
-  for(node_t u=0;u<g.N;u++){
-    A[u*(A.n+1)] = 0;
-    for(int i=0;i<g.neighbours[u].size();i++){
-      node_t v = g.neighbours[u][i];
-      A[u*A.n+v] = 1;
-    }
-  }
-  return APSP_weighted(A);
-}
 
 
 vector<int> draw_path(int major, int minor)
@@ -138,9 +128,9 @@ node_t end_of_the_line(const Triangulation& G, node_t u0, int i, int a, int b)
 }
 
 
-minplus_matrix semisimple_distances(const minplus_matrix& Hinit, const Triangulation& G)
+matrix<int> semisimple_distances(const matrix<int>& Hinit, const Triangulation& G)
 {
-  minplus_matrix H(Hinit);  
+  matrix<int> H(Hinit);  
   int M = *max_element(H.begin(),H.end());      // M is upper bound to path length
   
   for(int i=0;i<H.size();i++) H[i] *= H[i]; // Work with square distances, so that all distances are integers.
@@ -155,18 +145,21 @@ minplus_matrix semisimple_distances(const minplus_matrix& Hinit, const Triangula
 	for(int b=1; a*a + a*b + b*b < M*M; b++){
 	  // Check: if(gcd(a,b) != 1) continue.
 	  const node_t v = end_of_the_line(G,u,i,a,b);
-	  H(u,v) = min(H(u,v), int_l(a*a + a*b + b*b));
+	  H(u,v) = min(H(u,v), a*a + a*b + b*b);
 	}
     }
   return H;
 }
 
-minplus_matrix surface_distances(const Triangulation& G)
+matrix<double> surface_distances(const Triangulation& G)
 {
-  minplus_matrix Hinit(APSP_unweighted(G)); // Shortest path u--v is upper bound to d(u,v)
+  matrix<int> Hinit(G.N,G.N,G.all_pairs_shortest_paths()); // Shortest path u--v is upper bound to d(u,v)
   
-  minplus_matrix Hsimple = semisimple_distances(Hinit,G);
-  minplus_matrix H = APSP_weighted(Hsimple);
+  matrix<int> Hsimple_sqr = semisimple_distances(Hinit,G);
+  matrix<float> Hsimple(Hsimple_sqr);
+  for(int i=0;i<Hsimple.size();i++) Hsimple[i] = sqrt(Hsimple[i]);
+
+  matrix<double> H = Hsimple.APSP();
 
   return H;
 }
@@ -187,32 +180,16 @@ int main(int ac, char **av)
 
   assert(dg.is_consistently_oriented());
 
-  if(0){
-    cout << "\n\nMatrix-APSP:\n";
-    minplus_matrix Da(dg.N,dg.N);
-    for(int i=0;i<500;i++)
-      Da = APSP_unweighted(dg);
-    cout << "Da = " << Da << endl;
-} else {
-    cout << "Dijkstra-APSP:\n";
-    vector<int> Dt(dg.N*dg.N);
-    for(int i=0;i<500;i++)
-      Dt = dg.all_pairs_shortest_paths(dg.N);
-  
-    minplus_matrix Db(dg.N,dg.N,vector<int_l>(Dt.begin(),Dt.end()));
-    cout << "Db = " << Db << endl;
-}
-
-  minplus_matrix Hinit(APSP_unweighted(dg));
+  matrix<int> Hinit(dg.N,dg.N,dg.all_pairs_shortest_paths());
   cout << "Hinit = " << Hinit << "];\n\n";
 
-  minplus_matrix Hsimple(semisimple_distances(Hinit,dg));
+  matrix<int> Hsimple(semisimple_distances(Hinit,dg));
   
   cout << "Hsimple = Sqrt[" << Hsimple << "];\n\n";
 
-  minplus_matrix H = surface_distances(dg);
+  matrix<double> H = surface_distances(dg);
   
-  cout << "H = Sqrt[" << H << "];\n\n";
+  cout << "H = " << H << ";\n\n";
 
   return 0;
 }
