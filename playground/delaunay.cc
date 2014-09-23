@@ -18,7 +18,7 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
 //     \   |   /             \       /   
 //     d \ | / a               \   /     
 //         A                     A       
-
+ 
 
   int A, B, C, D;
   unsigned int delaunay_flips = 0;
@@ -33,13 +33,13 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
 
   while(delaunay_flips != 0){
     delaunay_flips=0;
-    for(int i=0; i<T.neighbours.size(); ++i){
-      for(int j=0; j<T.neighbours[i].size(); ++j){
+    for(node_t u=0; u<T.N; ++u){
+      for(int j=0; j<T.neighbours[u].size(); ++j){
 
-        A = i;
-        C = T.neighbours[i][j];
-        B = T.neighbours[i][(j+1)%T.neighbours[i].size()];
-        D = T.neighbours[i][(j+2)%T.neighbours[i].size()];
+        A = u;
+        C = T.neighbours[u][j];
+        B = T.neighbours[u][(j+1)%T.neighbours[u].size()];
+        D = T.neighbours[u][(j+2)%T.neighbours[u].size()];
         const double a = distances[A][B],
                      b = distances[B][C],
                      c = distances[C][D],

@@ -1,7 +1,6 @@
 #include "libgraph/auxiliary.hh"
 #include "libgraph/triangulation.hh"
 
-typedef unsigned long int_l;
 
 template <typename T> class matrix : public vector<T> {
 public:
@@ -181,7 +180,7 @@ int main(int ac, char **av)
   assert(dg.is_consistently_oriented());
 
   matrix<int> Hinit(dg.N,dg.N,dg.all_pairs_shortest_paths());
-  cout << "Hinit = " << Hinit << "];\n\n";
+  cout << "Hinit = " << Hinit << ";\n\n";
 
   matrix<int> Hsimple(semisimple_distances(Hinit,dg));
   
