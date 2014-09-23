@@ -26,19 +26,26 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
 
   int A, B, C, D;
   unsigned int delaunay_flips = 1;
+  vector< vector<node_t> > flip_moves;
 
   auto flip = [&](){
     delaunay_flips++;
+    flip_moves.push_back({A,B,C,D});
     T.remove_edge(edge_t(A,C));
 
     insert_before(T.neighbours[B],A,D);
     insert_before(T.neighbours[D],C,B);
   };
 
-  
+
+  ofstream debug("output/delaunayify.m");
+  int step = 0;
+
 
   while(delaunay_flips != 0){
     delaunay_flips=0;
+    debug << "T[" << step << "] = " << T << ";\n";
+
     double total_angles = 0;
     for(node_t u=0; u<T.N; ++u){
       for(int j=0; j<T.neighbours[u].size(); ++j){
@@ -69,7 +76,12 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
       }
     }
     printf("Number of flips: %d; Total_angles: %g\n",delaunay_flips, total_angles);
+    debug << "moves[" << step << "] = " << flip_moves << ";\n";
+
+    if(++step > 20) break;
   }
+
+  debug.close();
 
   return T;
 }
@@ -93,10 +105,9 @@ Triangulation reduce_triangulation(Triangulation T){
  
     // remove node and neighbor entries
     for(vector<int>::iterator it=T.neighbours.back().begin(), to=T.neighbours.back().end(); it!=to; ++it){
-//      cout << *it <<endl;
-//      cout << T.neighbours[*it]<< endl;
       vector<int>::iterator to_erase = std::find(T.neighbours[*it].begin(), T.neighbours[*it].end(), T.N-1);
-      //if(to_erase == T.neighbours[*it].end()) cout << "BAD" << endl;
+
+      assert(to_erase != T.neighbours[*it].end());
       T.neighbours[*it].erase(to_erase);
     }
     T.neighbours.pop_back();
@@ -376,10 +387,12 @@ int main(int ac, char **av) {
     for(int j=0;j<12;j++)
       Pdist[i][j] = D(i,j);
 
+  rT.layout2d = rT.tutte_layout();
+
   // return 0; /* NB: Comment out this line to inspect previous results in output/reduce-graph-CN.m if Delaunayify gets stuck. */
   Triangulation dT = Delaunayify(rT,Pdist);
 
-  dT.layout2d = dT.tutte_layout();
+
 
   output << "dT = " << dT << ";\n";
 
