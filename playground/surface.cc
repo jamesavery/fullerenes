@@ -129,6 +129,7 @@ node_t end_of_the_line(const Triangulation& G, node_t u0, int i, int a, int b)
       if(i+1<runlengths.size()) go_north();
     } else {			// b is major axis
       for(int j=0;j<L-1;j++)    go_north();
+
       if(i+1<runlengths.size()) go_east();
     }
   }
@@ -201,8 +202,17 @@ int main(int ac, char **av)
     minplus_matrix Db(dg.N,dg.N,vector<int_l>(Dt.begin(),Dt.end()));
     cout << "Db = " << Db << endl;
 }
-    //cout << ((Da ==Db)? "OK" : "Error") << endl;
+
+  minplus_matrix Hinit(APSP_unweighted(dg));
+  cout << "Hinit = " << Hinit << "];\n\n";
+
+  minplus_matrix Hsimple(semisimple_distances(Hinit,dg));
   
+  cout << "Hsimple = Sqrt[" << Hsimple << "];\n\n";
+
+  minplus_matrix H = surface_distances(dg);
+  
+  cout << "H = Sqrt[" << H << "];\n\n";
 
   return 0;
 }
