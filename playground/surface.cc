@@ -125,11 +125,11 @@ node_t end_of_the_line(const Triangulation& G, node_t u0, int i, int a, int b)
     int L = runlengths[i];
 
     if(a>=b){			// a is major axis
-      for(int j=0;j<L-1;j++)    go_north();
-      if(i+1<runlengths.size()) go_east();
-    } else {			// b is major axis
       for(int j=0;j<L-1;j++)    go_east();
       if(i+1<runlengths.size()) go_north();
+    } else {			// b is major axis
+      for(int j=0;j<L-1;j++)    go_north();
+      if(i+1<runlengths.size()) go_east();
     }
   }
   
