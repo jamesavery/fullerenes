@@ -780,6 +780,7 @@ size_t PlanarGraph::count_perfect_matchings() const
   vector<bool> faceSum(faces.size()), visited(faces.size());  
 
   map<dedge_t,int> A;
+  set<edge_t> edge_set = undirected_edges();
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++){
     A[*e] = 1;
     A[reverse(*e)] = -1;
