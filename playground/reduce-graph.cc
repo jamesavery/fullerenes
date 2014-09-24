@@ -3,6 +3,7 @@
 
 #include "libgraph/fullerenegraph.hh"
 #include "libgraph/triangulation.hh"
+#include "libgraph/polyhedron.hh"
 
 void insert_before(vector<int> &v, const int before_what, const int value){
   vector<int>::iterator pos = std::find(v.begin(), v.end(), before_what);
@@ -20,31 +21,36 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
 //     d \ | / a               \   /     
 //         A                     A       
 
+  assert(T.is_consistently_oriented());
+
   vector< vector<double> > Pdist;
   for(int i=0;i<12;i++) Pdist.push_back(vector<double>(distances[i],distances[i]+12));
   cout << "Pdist = " << Pdist << ";\n\n";
 
   int A, B, C, D;
   unsigned int delaunay_flips = 1;
-  vector< vector<node_t> > flip_moves;
+  vector< vector<node_t> > moves;
+  vector<Triangulation>    steps(1,T);
+  
 
   auto flip = [&](){
     delaunay_flips++;
-    flip_moves.push_back({A,B,C,D});
+
     T.remove_edge(edge_t(A,C));
 
     insert_before(T.neighbours[B],A,D);
     insert_before(T.neighbours[D],C,B);
+
+    moves.push_back({A+1,B+1,C+1,D+1});    
+    steps.push_back(T);
   };
 
 
   ofstream debug("output/delaunayify.m");
   int step = 0;
 
-
   while(delaunay_flips != 0){
     delaunay_flips=0;
-    debug << "T[" << step << "] = " << T << ";\n";
 
     double total_angles = 0;
     for(node_t u=0; u<T.N; ++u){
@@ -76,11 +82,11 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
       }
     }
     printf("Number of flips: %d; Total_angles: %g\n",delaunay_flips, total_angles);
-    debug << "moves[" << step << "] = " << flip_moves << ";\n";
-
     if(++step > 20) break;
   }
 
+  debug << "moves = " << moves << ";\n"
+	<< "steps = " << steps << ";\n";
   debug.close();
 
   return T;
@@ -335,6 +341,27 @@ matrix<int> fullerene_surface_distances_sqr(const Triangulation& G)
 }
 
 
+Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
+{
+  FullereneGraph g(dg.dual_graph());
+  g.layout2d = g.tutte_layout();
+
+  vector<coord3d> points = g.zero_order_geometry();
+  points = g.optimized_geometry(points);
+
+  vector<coord3d> dual_points(dg.N);
+
+  vector<face_t> faces(dg.N);
+  for(int i=0;i<dg.triangles.size();i++)
+    for(int j=0;j<3;j++)
+      faces[dg.triangles[i][j]].push_back(i);
+
+  for(int i=0;i<faces.size();i++)
+    dual_points[i] = faces[i].centroid(points);
+
+  return Polyhedron(dg, dual_points);
+}
+
 
 
 int main(int ac, char **av) {
@@ -362,11 +389,13 @@ int main(int ac, char **av) {
   Triangulation T1(spiral);
   Triangulation T(T1.sort_nodes());
 
+  Polyhedron PT = fullerene_dual_polyhedron(T);
+
   cout << "number vertices in T: " << T.N << endl;
   cout << "neighbours in T: " << T.neighbours << endl;
 
-  output << "T = " << T << ";\n";
-
+  output << "T = " << T << ";\n"
+	 << "PT =" << PT<< ";\n";
   Triangulation rT = reduce_triangulation(T);
 
   cout << "number vertices in rT: " << rT.N << endl;
