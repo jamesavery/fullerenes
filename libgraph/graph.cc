@@ -5,17 +5,8 @@ void Graph::remove_edge(const edge_t& e)
   node_t u = e.first, v = e.second;
   vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
 
-  // cout << "remove edge " << e << endl;
-  // cout << "n["<<u<<"] = " << nu << endl;
-  // cout << "n["<<v<<"] = " << nv << endl;
-
   for(int i=0;i<nu.size();i++) if(nu[i] == v){ nu.erase(nu.begin()+i); break; }
   for(int i=0;i<nv.size();i++) if(nv[i] == u){ nv.erase(nv.begin()+i); break; }
-
-  // cout << "np["<<u<<"] = " << neighbours[u] << endl;
-  // cout << "np["<<v<<"] = " << neighbours[v] << endl;
-
-  // abort();
 }
 
 

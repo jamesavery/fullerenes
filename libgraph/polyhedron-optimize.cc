@@ -35,9 +35,11 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
 
-  assert(zero_values_dist.size() == P.edge_set.size());
-  assert(force_constants_dist.size() == P.edge_set.size());
-  assert(force_constants_angle.size() == 2*P.edge_set.size()); // only for cubic graphs
+  set<edge_t> edge_set = P.undirected_edges();
+
+  assert(zero_values_dist.size() == edge_set.size());
+  assert(force_constants_dist.size() == edge_set.size());
+  assert(force_constants_angle.size() == 2*edge_set.size()); // only for cubic graphs
   assert(force_constants_dihedral.size() == P.N);
 
 
@@ -45,7 +47,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   //  V = k (r - r0)**2
   double potential_energy = 0.0;
   int i=0;
-  set<edge_t>::const_iterator e=P.edge_set.begin(), ee=P.edge_set.end();
+  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(; e!=ee; e++, i++){
     const double ax = gsl_vector_get(coordinates,3 * e->first);
     const double ay = gsl_vector_get(coordinates,3 * e->first +1);
@@ -143,14 +145,15 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
 
-  assert(zero_values_dist.size() == P.edge_set.size());
-  assert(force_constants_dist.size() == P.edge_set.size());
-  assert(force_constants_angle.size() == 2*P.edge_set.size()); // only for cubic graphs
+  set<edge_t> edge_set = P.undirected_edges();
+  assert(zero_values_dist.size() == edge_set.size());
+  assert(force_constants_dist.size() == edge_set.size());
+  assert(force_constants_angle.size() == 2*edge_set.size()); // only for cubic graphs
   assert(force_constants_dihedral.size() == P.points.size());
 
   vector<coord3d> derivatives(P.N);  
 
-  set<edge_t>::const_iterator e=P.edge_set.begin(), ee=P.edge_set.end();
+  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(int i=0; e!=ee; e++, i++){
     const double ax = gsl_vector_get(coordinates,3 * e->first);
     const double ay = gsl_vector_get(coordinates,3 * e->first +1);
@@ -282,6 +285,8 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
   const int max_iterations = 15000;// FIXME final value
   
   // init values
+  set<edge_t> edge_set = undirected_edges();
+
   if(zero_values_dist.size() != edge_set.size())
   {
     zero_values_dist.resize(edge_set.size(), 1.4);

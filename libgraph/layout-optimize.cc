@@ -35,11 +35,12 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
   vector<double> &k_angle = *params.k_angle;
   vector<double> &k_area = *params.k_area;
 
-  const int n_faces = 2 + graph.edge_set.size() - graph.N;
+  set<edge_t> edge_set = graph.undirected_edges();
+  const int n_faces = 2 + edge_set.size() - graph.N;
 
-  assert(zero_values_dist.size() == graph.edge_set.size());
-  assert(k_dist.size() == graph.edge_set.size());
-  assert(k_angle.size() == 2*graph.edge_set.size());
+  assert(zero_values_dist.size() == edge_set.size());
+  assert(k_dist.size() == edge_set.size());
+  assert(k_angle.size() == 2*edge_set.size());
   assert(k_area.size() == n_faces);
 
 //
@@ -48,7 +49,7 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
   //get average edge_length
   double log_sum_edge_length=0;
 
-  set<edge_t>::const_iterator e=graph.edge_set.begin(), ee=graph.edge_set.end();
+  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(; e!=ee; e++){
     //cout << *e << endl;
     const double ax = gsl_vector_get(coordinates, 2 * e->first);
@@ -58,14 +59,14 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
     log_sum_edge_length += log(coord2d(ax-bx,ay-by).norm());
 //    cout << "l: " << coord2d(ax-bx,ay-by).norm() << " ll: " << log(coord2d(ax-bx,ay-by).norm()) << endl;
   }
-  log_sum_edge_length /= graph.edge_set.size();
+  log_sum_edge_length /= edge_set.size();
   //const double zero_value = exp(log_sum_edge_length); // selfreferentiallity makes the optimization unstable
 //  double zero_value = 0.25;
 //  cout << "log average length: " << exp(log_sum_edge_length) << endl;
 
 //  //  V = k (r - r0)**2
   double potential_energy = 0.0;
-  e=graph.edge_set.begin();
+  e=edge_set.begin();
   for(int i=0; e!=ee; ++e, ++i){
     vector<node_t>::const_iterator it1, it2;
     it1 = find (graph.outer_face.begin(), graph.outer_face.end(), e->first);
@@ -185,11 +186,12 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
   vector<double> &k_angle = *params.k_angle;
   vector<double> &k_area = *params.k_area;
 
-  const int n_faces = 2+graph.edge_set.size() - graph.N;
+  set<edge_t> edge_set = graph.undirected_edges();
+  const int n_faces = 2+edge_set.size() - graph.N;
 
-  assert(zero_values_dist.size() == graph.edge_set.size());
-  assert(k_dist.size() == graph.edge_set.size());
-  assert(k_angle.size() == 2*graph.edge_set.size());
+  assert(zero_values_dist.size() == edge_set.size());
+  assert(k_dist.size() == edge_set.size());
+  assert(k_angle.size() == 2*edge_set.size());
   assert(k_area.size() == n_faces);
 
   vector<coord2d> derivatives(graph.N);
@@ -198,7 +200,7 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
   //get average edge_length
 
   double log_sum_edge_length=0;
-  set<edge_t>::const_iterator e=graph.edge_set.begin(), ee=graph.edge_set.end();
+  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(; e!=ee; e++){
     //cout << *e << endl;
     const double ax = gsl_vector_get(coordinates, 2 * e->first);
@@ -208,12 +210,12 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
     log_sum_edge_length += log(coord2d(ax-bx,ay-by).norm());
 //    cout << "l: " << coord2d(ax-bx,ay-by).norm() << " ll: " << log(coord2d(ax-bx,ay-by).norm()) << endl;
   }
-  log_sum_edge_length /= graph.edge_set.size();
+  log_sum_edge_length /= edge_set.size();
   //const double zero_value = exp(log_sum_edge_length); // selfreferentiallity makes the optimization unstable
 //  const double zero_value = 0.25;
 //  cout << "log average length: " << exp(log_sum_edge_length) << endl;
 
-  e=graph.edge_set.begin();
+  e=edge_set.begin();
   for(int i=0; e!=ee; e++, i++){
     //cout << *e << endl;
     const double ax = gsl_vector_get(coordinates, 2 * e->first);
@@ -374,6 +376,7 @@ bool PlanarGraph::optimize_layout(const double zv_dist_inp, const double k_dist_
   const double tol = 1e-1; // accuracy of line minimization, the manual suggests 0.1
   const int max_iterations = 5000;// FIXME final value
 
+  set<edge_t> edge_set = undirected_edges();
   const int n_faces = 2 + edge_set.size() - N;
   
   // init values
