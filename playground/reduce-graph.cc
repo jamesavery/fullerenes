@@ -31,7 +31,6 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
   unsigned int delaunay_flips = 1;
   vector< vector<node_t> > moves;
   vector<Triangulation>    steps(1,T);
-  
 
   auto flip = [&](){
     delaunay_flips++;
@@ -45,6 +44,13 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
     steps.push_back(T);
   };
 
+  auto angle = [&](int A, int B, int C){
+    double 
+    a = distances[A][B],
+    b = distances[A][C],
+    c = distances[B][C];
+    return acos((a*a+b*b-c*c)/(2*a*b));
+  };
 
   ofstream debug("output/delaunayify.m");
   int step = 0;
@@ -52,7 +58,6 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
   while(delaunay_flips != 0){
     delaunay_flips=0;
 
-    double total_angles = 0;
     for(node_t u=0; u<T.N; ++u){
       for(int j=0; j<T.neighbours[u].size(); ++j){
 
@@ -60,29 +65,54 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
         B = T.neighbours[u][j];
         C = T.neighbours[u][(j+1)%T.neighbours[u].size()];
         D = T.neighbours[u][(j+2)%T.neighbours[u].size()];
-        const double a = distances[A][B],
-                     b = distances[B][C],
-                     c = distances[C][D],
-                     d = distances[D][A],
-                     AC = distances[A][C];
-        const double 
-	  beta  = acos((a*a + b*b - AC*AC) / (2*a*b)),
-	  delta = acos((c*c + d*d - AC*AC) / (2*c*d));
-	//	printf("beta + delta = %g+%g = %g: ",beta,delta,beta+delta);
 
-	total_angles += beta+delta;
-        if(beta + delta > M_PI){
-	  //	  printf("flip!\n");
+	
+	double 
+	  beta  = angle(B,A,C),
+	  beta1 = angle(B,A,D),
+   	  beta2 = angle(B,D,C),
+	  
+	  delta  = angle(D,A,C),
+	  delta1 = angle(D,B,C),
+	  delta2 = angle(D,A,B);
+
+	// int P[4] = {A,B,C,D};
+	// double theta[4], theta1[4], theta2[4];
+
+	// for(int i=0;i<4;i++){
+	//   theta[i]  = angle(P[i],P[(i+1)%4],P[(i+3)%4]);
+	//   theta1[i] = angle(P[i],P[(i+2)%4],P[(i+3)%4]);
+	//   theta2[i] = angle(P[i],P[(i+2)%4],P[(i+1)%4]);
+	// }
+
+	// if(theta[1]+theta[3] > M_PI+0.01
+	// || fabs(theta1[1] + theta2[1] + theta[1] - 2*M_PI) < 0.01 
+	// || fabs(theta1[3] + theta2[3] + theta[3] - 2*M_PI) < 0.01
+	//    ){
+	//   printf("flip!\n");
+	//   flip();
+	//   continue;
+	// }
+
+
+
+	bool bad[2] = {fabs(beta1+beta2-beta)>0.01,
+		       fabs(delta1+delta2-delta)>0.01};
+
+	printf("%d: (%d,%d,%d,%d); beta = %g + %g \"=\" %g; delta = %g + %g \"=\" %g (%sbad, %sbad)\n",
+	       int(steps.size()), A+1,B+1,C+1,D+1, beta1,beta2,beta, delta1,delta2,delta,
+	       bad[0]?"":"not ",bad[1]?"":"not ");
+
+	if((beta+delta > M_PI+0.01) ||(bad[0] || bad[1])){
+	  printf("flip!\n");
 	  flip();
-	} else { 
-	  //	  printf("don't flip!\n");
-	  //	  printf("a^2 + b^2 - AC^2 = %g^2 + %g^2 - %g^2 = %g\n",a,b,AC,a*a+b*b-AC*AC);
+	  steps.push_back(T);
+	  moves.push_back({A+1,B+1,C+1,D+1});
 	}
-
       }
+    
     }
-    printf("Number of flips: %d; Total_angles: %g\n",delaunay_flips, total_angles);
-    if(++step > 20) break;
+    if(steps.size() > 20) break;
   }
 
   debug << "moves = " << moves << ";\n"
@@ -95,21 +125,22 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
 
 Triangulation reduce_triangulation(Triangulation T){
 
-  for( int k=T.N; k>12; --k){
-  //for( ; T.N>12; --T.N){
 
-    // cout << "n1" << T.neighbours << endl;
-    // cout << "n1" << T.neighbours << endl;
-    // cout << "N: " << T.N << endl;    
-    // cout << "T1=" << T << endl;
-    // cout << "deg N:" << T.neighbours[T.N-1].size() << endl;
+  vector<Triangulation>    steps;
+  vector< vector<node_t> > holes;
+  steps.push_back(T);
 
-    // find a deg-6-node (if the vertices are sorted, then just take the last)
-  
+  for( int k=T.N; k>12; --k){	// Go through every deg 6 node and remove
     // save its neighbours
     vector<int> hole(T.neighbours.back());
- 
+    
+    holes.push_back(hole);
     // remove node and neighbor entries
+
+    
+
+
+    // Erase last node from all its neighbours
     for(vector<int>::iterator it=T.neighbours.back().begin(), to=T.neighbours.back().end(); it!=to; ++it){
       vector<int>::iterator to_erase = std::find(T.neighbours[*it].begin(), T.neighbours[*it].end(), T.N-1);
 
@@ -150,11 +181,15 @@ Triangulation reduce_triangulation(Triangulation T){
       insert_before(T.neighbours[hole[(0+shift+2)%hole.size()]], hole[(0+shift+1)%hole.size()],             hole[0+shift]);
       hole.erase(hole.begin() + (0+shift+1)%hole.size());
     }
-//    cout << "n3" << T.neighbours << endl;
-//    cout << "T3=" << T << endl;
-//  if(! T.is_consistently_oriented()) cout << "not consistently oriented" << endl;
-//    cout << "------------------------" << endl;
+
+    steps.push_back(T);
+    assert(T.is_consistently_oriented());
   }
+
+  ofstream debug("output/debug-reduce.m");
+  debug << "holes = " << holes << ";\n"
+	<< "steps = " << steps << ";\n";
+  debug.close();
 
   return T;
 }
@@ -418,14 +453,12 @@ int main(int ac, char **av) {
 
   rT.layout2d = rT.tutte_layout();
 
+  output.close();
+
   // return 0; /* NB: Comment out this line to inspect previous results in output/reduce-graph-CN.m if Delaunayify gets stuck. */
   Triangulation dT = Delaunayify(rT,Pdist);
 
 
-
-  output << "dT = " << dT << ";\n";
-
-  output.close();
   return 0;
 }
 
