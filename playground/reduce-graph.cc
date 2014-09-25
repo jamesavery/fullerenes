@@ -11,6 +11,33 @@ void insert_before(vector<int> &v, const int before_what, const int value){
   v.insert(pos, value);
 }
 
+pair<bool,bool> is_delaunay(const Triangulation& T, const double distances[12][12], node_t A, node_t B, node_t C, node_t D)
+{
+  auto angle = [&](int A, int B, int C){
+    double 
+    a = distances[A][B],
+    b = distances[A][C],
+    c = distances[B][C];
+    return acos((a*a+b*b-c*c)/(2*a*b));
+  };
+
+  double 
+    beta  = angle(B,A,C),
+    beta1 = angle(B,A,D),
+    beta2 = angle(B,D,C),
+	  
+    delta  = angle(D,A,C),
+    delta1 = angle(D,B,C),
+    delta2 = angle(D,A,B);
+  
+  bool 
+    flat_delaunay_condition = fabs(beta+delta)-0.01<=M_PI,    // b + d <= 180 degrees
+    beta_is_consistent      = fabs(beta1+beta2-beta) >0.01,   // b1+b2 = b
+    delta_is_consistent     = fabs(delta1+delta2-delta)>0.01; // d1+d2 = d
+  
+  return make_pair(flat_delaunay_condition,beta_is_consistent && delta_is_consistent);
+}
+
 Triangulation Delaunayify(Triangulation T, double distances[12][12]){
 
 //         C                     C       
@@ -44,13 +71,6 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
     steps.push_back(T);
   };
 
-  auto angle = [&](int A, int B, int C){
-    double 
-    a = distances[A][B],
-    b = distances[A][C],
-    c = distances[B][C];
-    return acos((a*a+b*b-c*c)/(2*a*b));
-  };
 
   ofstream debug("output/delaunayify.m");
   int step = 0;
@@ -66,44 +86,13 @@ Triangulation Delaunayify(Triangulation T, double distances[12][12]){
         C = T.neighbours[u][(j+1)%T.neighbours[u].size()];
         D = T.neighbours[u][(j+2)%T.neighbours[u].size()];
 
+	pair<bool,bool>OK = is_delaunay(T,distances,A,B,C,D);
+
+	if(!OK.second){
+	  printf("Messed up quadrilateral {%d,%d,%d,%d} - Delaunay test inconclusive.\n",A,B,C,D);
+	} 
 	
-	double 
-	  beta  = angle(B,A,C),
-	  beta1 = angle(B,A,D),
-   	  beta2 = angle(B,D,C),
-	  
-	  delta  = angle(D,A,C),
-	  delta1 = angle(D,B,C),
-	  delta2 = angle(D,A,B);
-
-	// int P[4] = {A,B,C,D};
-	// double theta[4], theta1[4], theta2[4];
-
-	// for(int i=0;i<4;i++){
-	//   theta[i]  = angle(P[i],P[(i+1)%4],P[(i+3)%4]);
-	//   theta1[i] = angle(P[i],P[(i+2)%4],P[(i+3)%4]);
-	//   theta2[i] = angle(P[i],P[(i+2)%4],P[(i+1)%4]);
-	// }
-
-	// if(theta[1]+theta[3] > M_PI+0.01
-	// || fabs(theta1[1] + theta2[1] + theta[1] - 2*M_PI) < 0.01 
-	// || fabs(theta1[3] + theta2[3] + theta[3] - 2*M_PI) < 0.01
-	//    ){
-	//   printf("flip!\n");
-	//   flip();
-	//   continue;
-	// }
-
-
-
-	bool bad[2] = {fabs(beta1+beta2-beta)>0.01,
-		       fabs(delta1+delta2-delta)>0.01};
-
-	printf("%d: (%d,%d,%d,%d); beta = %g + %g \"=\" %g; delta = %g + %g \"=\" %g (%sbad, %sbad)\n",
-	       int(steps.size()), A+1,B+1,C+1,D+1, beta1,beta2,beta, delta1,delta2,delta,
-	       bad[0]?"":"not ",bad[1]?"":"not ");
-
-	if((beta+delta > M_PI+0.01) ||(bad[0] || bad[1])){
+	if(!OK.first || !OK.second){
 	  printf("flip!\n");
 	  flip();
 	  steps.push_back(T);
