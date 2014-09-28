@@ -1,6 +1,7 @@
 #ifndef TRIANGULATION_HH
 # define TRIANGULATION_HH
 
+#include "matrix.hh"
 #include "planargraph.hh"
 #include "unfold.hh"
 
@@ -32,6 +33,9 @@ public:
   
   node_t nextCW(const dedge_t& uv) const;
   node_t nextCCW(const dedge_t& uv) const;
+  node_t nextCW(node_t u,  node_t v) const { return nextCW(dedge_t(u,v));  }
+  node_t nextCCW(node_t u, node_t v) const { return nextCCW(dedge_t(u,v)); }
+
 
   vector<tri_t> compute_faces() const;          // Returns non-oriented triangles
   vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours
@@ -68,6 +72,10 @@ public:
 
   Triangulation sort_nodes() const;
 
+
+  matrix<double> surface_distances() const;
+  matrix<int>    convex_square_surface_distances() const;
+  node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
 };
 
 class FullereneDual : public Triangulation {

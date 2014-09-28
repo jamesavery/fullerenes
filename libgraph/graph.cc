@@ -9,6 +9,23 @@ void Graph::remove_edge(const edge_t& e)
   for(int i=0;i<nv.size();i++) if(nv[i] == u){ nv.erase(nv.begin()+i); break; }
 }
 
+void Graph::insert_edge(const edge_t& e, const node_t suc_uv, const node_t suc_vu)
+{
+  const node_t u = e.first, v = e.second;
+  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
+
+  vector<node_t>::iterator pos_uv = suc_uv<0? nu.end() : find(nu.begin(),nu.end(),v);
+  vector<node_t>::iterator pos_vu = suc_vu<0? nv.end() : find(nv.begin(),nv.end(),u);
+
+  nu.insert(pos_uv,v);
+  nv.insert(pos_vu,u);
+}
+
+bool Graph::edge_exists(const edge_t& e) const
+{
+  const vector<node_t> &nu(neighbours[e.first]);
+  return find(nu.begin(),nu.end(),e.second) != nu.end();
+}
 
 bool Graph::is_consistently_oriented() const 
 {

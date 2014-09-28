@@ -1,6 +1,13 @@
 #ifndef MATRIX_HH
 # define MATRIX_HH
 
+#include <vector>
+#include <iostream>
+#include <limits.h>
+#include <math.h>
+#include <assert.h>
+using namespace std;
+
 template <typename T> class matrix : public vector<T> {
 public:
   int m,n; 

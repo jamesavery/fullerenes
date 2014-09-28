@@ -37,7 +37,9 @@ struct Graph {
     update_from_edgeset(edge_set);
   }
 
+  void insert_edge(const edge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
   void remove_edge(const edge_t& e);
+  bool edge_exists(const edge_t& e) const;
 
   bool is_consistently_oriented() const;
   bool adjacency_is_symmetric() const;

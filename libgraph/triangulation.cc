@@ -19,7 +19,7 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
     else if(t==2) tris.second = w;
     else {
       fprintf(stderr,"Triangulation is not orientable, edge %d--%d part of more than two faces.\n",u,v);
-      cerr << "edges = " << undirected_edges() << ";\n";
+      cerr << "neighbours = " << neighbours << ";\n";
       abort();
     }
       }
@@ -30,14 +30,13 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
 vector<tri_t> Triangulation::compute_faces() const // non-oriented triangles
 {
   set<tri_t> triangles;
-  set<edge_t> edge_set = undirected_edges();
 
-  int i=0;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++,i++){
-    pair<node_t,node_t> t(adjacent_tris(*e));
-    triangles.insert(tri_t(e->first,e->second,t.first).sorted());
-    triangles.insert(tri_t(e->first,e->second,t.second).sorted());
-  }
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++){
+      node_t v = neighbours[u][i];
+      triangles.insert(tri_t(u,v,nextCCW(u,v)).sorted());
+    }
+
   return vector<tri_t>(triangles.begin(),triangles.end());
 }
 
@@ -87,9 +86,7 @@ node_t Triangulation::nextCCW(const dedge_t& uv) const
 
 vector<tri_t> Triangulation::compute_faces_oriented() const 
 {
-  set<edge_t> edge_set = undirected_edges();
-
-  vector<tri_t> triangles(edge_set.size()-N+2);
+  vector<tri_t> triangles(2*(N-2)); // Assumes cubic
   map<dedge_t,bool> dedge_done;    // Change to vector<bool> dedge_done[N*3] to increase speed.
 
   int k=0;
@@ -613,23 +610,112 @@ bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonica
 }
 
 
-Triangulation Triangulation::sort_nodes() const 
+
+vector<int> draw_path(int major, int minor) 
 {
-  vector< pair<int,int> > degrees(N);
+  int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
 
-  for(int u=0;u<N;u++) degrees[u] = make_pair(neighbours[u].size(), u);
-  
-  sort(degrees.begin(), degrees.end());
+  vector<int> paths(minor+1,0), runs(minor);
 
-  cout << "degrees = " << degrees << endl;
+  for(int i=0; i<minor; i++){
+    slope_accumulator += slope_remainder;
 
-  vector<int> newname(N);
-  for(int u=0;u<N;u++) newname[degrees[u].second] = u;
+    paths[i+1] = paths[i] + slope + (slope_accumulator != 0);
+
+    if((i+1<minor) && (slope_accumulator >= minor || slope_remainder == 0)){
+      paths[i+1]++;
+      slope_accumulator %= minor;
+    }
+
+    runs[i]    = paths[i+1]-paths[i];
+  }
+
+  //  cout << make_pair(major,minor) << " runlengths is " << runs << endl;
+
+  return runs;
+}
+
+// Given start node u0 and adjacent face F_i, lay down triangles along the the straight
+// line to Eisenstein number (a,b), and report what the final node is.
+//
+// Assumes a,b >= 1. 
+// TODO: Add special cases for (a,0) and (b,0) to make more general.
+// TODO: Better name.
+node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
+{
+  node_t q,r,s,t;		// Current square
+
+  auto go_north = [&](){ 
+    const node_t S(s), T(t); // From old square
+    q = S; r = T; s = nextCCW(dedge_t(S,T)); t = nextCCW(dedge_t(s,r)); 
+  };
   
-  neighbours_t new_neighbours(N);
-  for(int u=0;u<N;u++)
-    for(int i=0;i<neighbours[u].size();i++)
-      new_neighbours[newname[u]].push_back(newname[neighbours[u][i]]);
+  auto go_east = [&](){
+    const node_t R(r), T(t); // From old square
+    q = R; s = T; r = nextCCW(dedge_t(s,q)); t = nextCCW(dedge_t(s,r)); 
+  };
+
+  // Square one
+  q = u0; 			// (0,0)
+  r = neighbours[u0][i];	// (1,0)
+  s = nextCCW(dedge_t(q,r));	// (0,1)
+  t = nextCCW(dedge_t(s,r));	// (1,1)
+
+  if(a==1 && b==1) return t;
+
+  vector<int> runlengths = draw_path(max(a,b), min(a,b));
+
+  for(int i=0;i<runlengths.size();i++){
+    int L = runlengths[i];
+
+    if(a>=b){			// a is major axis
+      for(int j=0;j<L-1;j++)    go_east();
+      if(i+1<runlengths.size()) go_north();
+    } else {			// b is major axis
+      for(int j=0;j<L-1;j++)    go_north();
+
+      if(i+1<runlengths.size()) go_east();
+    }
+  }
   
-  return Triangulation(new_neighbours);
+  return t;			// End node is upper right corner.
+}
+
+
+matrix<int> Triangulation::convex_square_surface_distances() const
+{
+  matrix<int> H = matrix<int>(N,N,all_pairs_shortest_paths());
+  int M = *max_element(H.begin(),H.end());      // M is upper bound to path length
+
+  for(int i=0;i<H.size();i++) H[i] *= H[i]; // Work with square distances, so that all distances are integers.
+
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++){
+
+      // Note: All Eisenstein numbers of the form (a,0) or (0,b) yield same lengths
+      //       as graph distance, and are hence covered by initial step. So start from 1.
+      //       M is upper bound for distance, so only need to do a^2+ab+b^2 strictly less than M.
+      for(int a=1; a<M;a++)
+	for(int b=1; a*a + a*b + b*b < M*M; b++){
+	  // Check: if(gcd(a,b) != 1) continue.
+	  const node_t v = end_of_the_line(u,i,a,b);
+
+	  // printf("min(H(%d,%d),|(%d,%d)|^2)  = min(%d,%d)\n",
+	  // 	 u,v,a,b,H(u,v), a*a+a*b+b*b);
+	  H(u,v) = min(H(u,v), a*a + a*b + b*b);
+	}
+    }
+  return H;
+}
+
+matrix<double> Triangulation::surface_distances() const
+{
+  matrix<double> H(convex_square_surface_distances());
+  for(int i=0;i<N*N;i++) H[i] = sqrt(H[i]);
+
+  bool nonconvex = false;
+  for(node_t u=0;u<N;u++) if(neighbours[u].size() > 6) nonconvex = true;
+
+  if(nonconvex) return H.APSP();
+  else return H;
 }
