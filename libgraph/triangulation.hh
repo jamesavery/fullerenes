@@ -68,14 +68,12 @@ public:
     }
   }
 
-  //  void renumber();		// Renumber nodes such that deg(v_i) <= deg(v_{i+1})
-
-  Triangulation sort_nodes() const;
-
 
   matrix<double> surface_distances() const;
   matrix<int>    convex_square_surface_distances() const;
   node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
+
+  Triangulation sort_nodes() const;
 };
 
 class FullereneDual : public Triangulation {
