@@ -34,7 +34,7 @@ public:
   }
 
   bool is_delaunay(const Quad& Q) const { return fabs(angle(Q,1) + angle(Q,3)) - epsilon <= M_PI; }
-  bool is_consistent(const Quad& Q,int i) const { return fabs(angle(Q,i,0) - angle(Q,i,1) - angle(Q,i,2)) > epsilon; }
+  bool is_consistent(const Quad& Q,int i) const { return fabs(angle(Q,i,0) - angle(Q,i,1) - angle(Q,i,2)) < epsilon; }
   bool is_consistent(const Quad& Q)       const { 
     return is_consistent(Q,0) && is_consistent(Q,1) && is_consistent(Q,2) && is_consistent(Q,3); 
   }
