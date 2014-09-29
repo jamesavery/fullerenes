@@ -5,7 +5,7 @@
 #include "triangulation.hh"
 #include "polyhedron.hh"
 
-class FulleroidDelaunay: Triangulation {
+class FulleroidDelaunay: public Triangulation {
 public:
   matrix<double> distances;
   static constexpr double epsilon = 1e-5;
@@ -17,8 +17,8 @@ public:
     Quad flipped() const { return Quad(v[1],v[2],v[3],v[0]); }
   };
 
-  FulleroidDelaunay(const Triangulation& T) : Triangulation(T),
-					      distances(T.surface_distances()) {}
+  FulleroidDelaunay(const Triangulation& T) : Triangulation(T.sort_nodes()),
+					      distances(surface_distances()) {}
 
   double angle(node_t A, node_t B, node_t C) const {
     double 

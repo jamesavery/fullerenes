@@ -78,3 +78,12 @@ void FulleroidDelaunay::remove_last_vertex()
   vector<dedge_t> triangle_edges = triangulate_hole(hole);
   vector<dedge_t> delaunay_edges = delaunayify_hole(triangle_edges);
 }
+
+void FulleroidDelaunay::remove_flat_vertices()
+{
+  // TODO: Assume that vertices are sorted such that hexagons appear
+  // at the end. This needs a fix for fulleroids with negative
+  // curvature.
+  while(neighbours.back().size() == 6) remove_last_vertex();
+  // TODO: Perform a final Delaunayification.
+}
