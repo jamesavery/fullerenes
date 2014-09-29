@@ -50,7 +50,7 @@ vector<dedge_t> FulleroidDelaunay::delaunayify_hole(const vector<dedge_t>& edges
 
       Quad q(A,B,C,D);
 
-      if(!is_delaunay(q)){ // flip!
+      if(!is_delaunay(q) && is_consistent(q.flipped())){ // Do a flip!
 	remove_edge(dedge_t(A,C));
 	insert_edge(dedge_t(B,D),A,C);
 	
