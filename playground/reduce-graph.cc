@@ -33,14 +33,6 @@ int main(int ac, char **av) {
   for (int i = 0; i < 12; i++)
     RSPI[i] = strtol(av[i + 2], 0, 0) - 1;
 
-  // int isomer_number = ac>=3? strtol(av[2],0,0) : 1;
-  // bool IPR = ac>=4? strtol(av[3],0,0) : false;
-
-  // IsomerDB DB(N,IPR);
-
-  // FullereneGraph
-  // g(IsomerDB::makeIsomer(N,DB.getIsomer(N,isomer_number,IPR)));
-
   string filename = "output/reduce-graph-C"+to_string<int>(N)+".m";
   ofstream output(filename);
 
@@ -48,8 +40,14 @@ int main(int ac, char **av) {
   for (int i = 0; i < 12; i++)
     spiral[RSPI[i]] = 5;
 
+  cout << "spiral = " << spiral << endl;
+
   Triangulation T1(spiral);
+  cout << "T1 = " << T1 << endl;
+
   FulleroidDelaunay T(T1);
+
+  cout << "T = " << T << endl;
 
   output << "T = " << T << ";\n"
 	 << "dDist = " << T.distances << ";\n";
@@ -68,5 +66,3 @@ int main(int ac, char **av) {
   output.close();
   return 0;
 }
-
-

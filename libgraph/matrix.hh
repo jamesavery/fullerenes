@@ -6,6 +6,9 @@
 #include <limits.h>
 #include <math.h>
 #include <assert.h>
+
+#include "auxiliary.hh"
+
 using namespace std;
 
 template <typename T> class matrix : public vector<T> {

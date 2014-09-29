@@ -257,14 +257,6 @@ vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const int
   return cycle;
 }
 
-vector<node_t> remove_node(const vector<node_t>& ns, const node_t& v)
-{
-  vector<node_t> r(ns.size()-1);
-  for(int i=0,j=0;i<ns.size();i++)
-    if(ns[i] != v) r[j++] = ns[i];
-  return r;
-}
-
 vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const node_t& r, const int max_depth) const 
 { 
   //  fprintf(stderr,"3: shortest_cycle(%d,%d,%d,max_depth=%d)\n",s,t,r,max_depth);
