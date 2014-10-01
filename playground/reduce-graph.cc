@@ -43,8 +43,6 @@ int main(int ac, char **av) {
   cout << "spiral = " << spiral << endl;
 
   Triangulation T1(spiral);
-  cout << "T1 = " << T1 << endl;
-
   FulleroidDelaunay T(T1);
 
   cout << "T = " << T << endl;

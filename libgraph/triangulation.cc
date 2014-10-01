@@ -73,6 +73,7 @@ node_t Triangulation::nextCW(const dedge_t& uv) const
   const node_t &u(uv.first), &v(uv.second);
   const vector<node_t>& nv(neighbours[v]);
 
+  assert(u>=0 && v>=0);
   for(int j=0;j<nv.size(); j++) if(nv[j] == u) return nv[(j+1)%nv.size()];
 
   return -1;            // u-v is not an edge in a triangulation
@@ -83,6 +84,7 @@ node_t Triangulation::nextCCW(const dedge_t& uv) const
   const node_t &u(uv.first), &v(uv.second);
   const vector<node_t>& nv(neighbours[v]);
 
+  assert(u>=0 && v>=0);
   for(int j=0;j<nv.size(); j++) if(nv[j] == u) return nv[(j-1+nv.size())%nv.size()];
 
   return -1;            // u-v is not an edge in a triangulation
