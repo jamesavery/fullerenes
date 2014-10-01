@@ -27,14 +27,19 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
   return tris;
 }
 
-vector<tri_t> Triangulation::compute_faces() const // non-oriented triangles
+vector<tri_t> Triangulation::compute_faces() const 
+// Does not assume graph is oriented
+// Produces non-oriented triangles
 {
   set<tri_t> triangles;
 
   for(node_t u=0;u<N;u++)
     for(int i=0;i<neighbours[u].size();i++){
       node_t v = neighbours[u][i];
-      triangles.insert(tri_t(u,v,nextCCW(u,v)).sorted());
+      pair<node_t,node_t> ws(adjacent_tris(edge_t(u,v)));
+
+      triangles.insert(tri_t(u,v,ws.first ).sorted());
+      triangles.insert(tri_t(u,v,ws.second).sorted());
     }
 
   return vector<tri_t>(triangles.begin(),triangles.end());
@@ -260,7 +265,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     edge_set.insert(edge_t(N-1, open_valencies.front().first));
     open_valencies.pop_front();
   }
-
+  
   *this = Triangulation(PlanarGraph(edge_set));
 }
 
