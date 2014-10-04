@@ -58,12 +58,14 @@ public:
   void update(bool already_oriented) {
     //    renumber(); // TODO!
     if(N>0){
-      if(already_oriented) 
-	triangles = compute_faces_oriented();
+      if(already_oriented){
+        triangles = compute_faces_oriented();
+      }
       else {
-	triangles = compute_faces();
-	orient_triangulation(triangles);
-	orient_neighbours();
+        triangles = compute_faces();
+        orient_triangulation(triangles); //FIXME should have a return type ? (lnw)
+        orient_neighbours();
+        // FIXME set already_oriented to true? (lnw)
       }
     }
   }

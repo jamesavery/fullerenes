@@ -161,21 +161,6 @@ vector<face_t> Triangulation::dual_faces() const
   return dfaces;
 }
 
-//connect k and <last>
-inline void wg_connect_backward(const int k, set<edge_t> &edge_set, list<pair<node_t, int> > &ov, int &pre_used_valencies)
-{
-  edge_set.insert(edge_t(k, ov.back().first));
-  --ov.back().second;
-  ++pre_used_valencies;
-}
-
-// connect k and <first>
-inline void wg_connect_forward(const int k, set<edge_t> &edge_set, list<pair<node_t, int> > &ov, int &pre_used_valencies)
-{
-  edge_set.insert(edge_t(k, ov.front().first));
-  --ov.front().second;
-  ++pre_used_valencies;
-}
 
 // Takes full spiral string, e.g. 566764366348665
 // where the degrees are between 3 and 8 (or anything larger, really)
@@ -213,22 +198,33 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       jumps.pop_front();
     }
 
-    // connect k to <last>
-    wg_connect_backward(k, edge_set, open_valencies, pre_used_valencies);
+    // connect k and <last>
+    auto connect_backward = [&](){
+      edge_set.insert(edge_t(k, open_valencies.back().first));
+      --open_valencies.back().second;
+      ++pre_used_valencies;
+    };
 
-    // connect k to <first>
-    wg_connect_forward(k, edge_set, open_valencies, pre_used_valencies);
+    // connect k and <first>
+    auto connect_forward = [&](){
+      edge_set.insert(edge_t(k, open_valencies.front().first));
+      --open_valencies.front().second;
+      ++pre_used_valencies;
+    };
+
+    connect_backward();
+    connect_forward();
 
     // do the remaining connect forwards
     while(open_valencies.front().second==0){
       open_valencies.pop_front();
-      wg_connect_forward(k, edge_set, open_valencies, pre_used_valencies);
+      connect_forward();
     }
 
     // do the remaining connect backwards
     while(open_valencies.back().second==0){
       open_valencies.pop_back();
-      wg_connect_backward(k, edge_set, open_valencies, pre_used_valencies);
+      connect_backward();
     }
 
     if(spiral_string[k] - pre_used_valencies < 1){//the current atom is saturated (which may only happen for the last one)
@@ -268,16 +264,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 // *********************************************************************
 //                 SPIRAL STUFF
 // *********************************************************************
-// gpi is for 'get pentagon indices'
-inline void gpi_connect_forward(list<pair<node_t,int> > &open_valencies, int& pre_used_valencies){
-  --open_valencies.front().second;
-  ++pre_used_valencies;
-}
 
-inline void gpi_connect_backward(list<pair<node_t,int> > &open_valencies, int& pre_used_valencies){
-  --open_valencies.back().second;
-  ++pre_used_valencies;
-}
 
 void gpi_remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
   remaining_nodes.erase(u);	// O(log(N)) with big coefficient - is set<node_t> the best data structure to use?
@@ -361,6 +348,15 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     return false;
   }
 
+  auto connect_forward = [&](){
+    --open_valencies.front().second;
+    ++pre_used_valencies;
+  };
+  auto connect_backward = [&](){
+    --open_valencies.back().second;
+    ++pre_used_valencies;
+  };
+
   // add the first three (defining) nodes
   // first node
   spiral[0] = valencies[f1];
@@ -372,7 +368,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   spiral[1] = valencies[f2];
   permutation[1] = f2;
   gpi_remove_node(f2, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-  gpi_connect_backward(open_valencies, pre_used_valencies);
+  connect_backward();
   open_valencies.push_back(make_pair(f2,valencies[f2]-1));
 
 
@@ -380,8 +376,8 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   spiral[2] = valencies[f3];
   permutation[2] = f3;
   gpi_remove_node(f3, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-  gpi_connect_backward(open_valencies, pre_used_valencies);
-  gpi_connect_forward(open_valencies, pre_used_valencies);
+  connect_backward();
+  connect_forward();
   open_valencies.push_back(make_pair(f3,valencies[f3]-2));
 
   if(!S0.empty() && (spiral[0] != S0[0] || spiral[1] != S0[1] || spiral[2] != S0[2])) return false;
@@ -430,16 +426,16 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
       }
     }
     
-    gpi_connect_forward(open_valencies, pre_used_valencies);
+    connect_forward();
     while (open_valencies.front().second==0){
       open_valencies.pop_front(); 
-      gpi_connect_forward(open_valencies, pre_used_valencies);
+      connect_forward();
     }
 
-    gpi_connect_backward(open_valencies, pre_used_valencies);
+    connect_backward();
     while (open_valencies.back().second==0){
       open_valencies.pop_back(); 
-      gpi_connect_backward(open_valencies, pre_used_valencies);
+      connect_backward();
     }
 
     spiral[i] = valencies[v];
