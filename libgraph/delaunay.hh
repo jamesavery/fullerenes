@@ -20,24 +20,12 @@ public:
   FulleroidDelaunay(const Triangulation& T) : Triangulation(T.sort_nodes()),
 					      distances(surface_distances()) {}
 
-  double angle(node_t A, node_t B, node_t C) const {
-    double 
-      a = distances(B,A),
-      b = distances(B,C),
-      c = distances(A,C);
-    return acos((a*a+b*b-c*c)/(2*a*b));
-  }
-
-  double angle(const Quad& Q, int i, int subangle = 0) const {
-    int A(Q.v[(i+3+(subangle&2))%4]), B(Q.v[i]), C(Q.v[(i+1+(subangle&1))%4]);
-    return angle(A,B,C);
-  }
+  double angle(node_t A, node_t B, node_t C) const;
+  double angle(const Quad& Q, int i, int subangle = 0) const;
 
   bool is_delaunay(const Quad& Q) const { return fabs(angle(Q,1) + angle(Q,3)) - epsilon <= M_PI; }
-  bool is_consistent(const Quad& Q,int i) const { return fabs(angle(Q,i,0) - angle(Q,i,1) - angle(Q,i,2)) < epsilon; }
-  bool is_consistent(const Quad& Q)       const { 
-    return is_consistent(Q,0) && is_consistent(Q,1) && is_consistent(Q,2) && is_consistent(Q,3); 
-  }
+  bool is_consistent(const Quad& Q,int i) const;
+  bool is_consistent(const Quad& Q) const;
   
 
 

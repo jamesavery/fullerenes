@@ -369,7 +369,6 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
 
 vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
 {
-
   // Check that triangles are orientable: Every edge must appear in two faces
   map<edge_t,int> edgecount;
   for(int i=0;i<tris.size();i++)
