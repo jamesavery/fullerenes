@@ -1,4 +1,4 @@
-# thing we never want to commit
+# things we never want to commit
 
 *.out
 *.log
@@ -10,6 +10,10 @@
 Manual/*pdf
 config.mod
 libgraph.a
+fullerene
 database/*
 output/*
 app-*
+test-*
+play-*
+
