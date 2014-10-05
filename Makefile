@@ -11,8 +11,8 @@ AR=ar
 DIRECTORIES=-DFULLERENE_ROOT=\"${PWD}\" -DFULLERENE_DATABASE=\"${PWD}/database\"
 WARNINGS=-Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
 
-CXXFLAGS= -g -O3 -std=c++11 -m64 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
-FFLAGS= -g -O3 -m64 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"'
+CXXFLAGS= -g -O3 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
+FFLAGS= -g -O3 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"'
 LIBRARIES=-lstdc++ -lgomp -lgfortran
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
 # you might need to change the gfortran compiler options:
@@ -92,6 +92,6 @@ clean:
 	find . \( -name  "*~" -or  -name "#*#" -or -name "*.o" \) -exec rm {} \;
 
 distclean: clean
-	rm -rf fullerene build/libgraph.a qmga.dat config.mod test-* app-*
+	rm -rf fullerene build/libgraph.a qmga.dat config.mod test-* app-* play-*
 
 #-----------------------------------------------------
