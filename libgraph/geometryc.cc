@@ -242,11 +242,13 @@ ostream& operator<<(ostream& S, const polygon& P)
   return S;
 }
 
-matrix3d coord3d::outer(const coord3d& y) const {
+matrix3d coord3d::outer(const coord3d& y) const
+{
   return matrix3d(x[0]*y[0],x[0]*y[1],x[0]*y[2],  x[1]*y[0],x[1]*y[1],x[1]*y[2],  x[2]*y[0],x[2]*y[1],x[2]*y[2]);
 }
 
-coord3d coord3d::operator*(const matrix3d& m) const {
+coord3d coord3d::operator*(const matrix3d& m) const
+{
   return coord3d(x[0]*m(0,0)+x[1]*m(1,0)+x[2]*m(2,0),  x[0]*m(0,1)+x[1]*m(1,1)+x[2]*m(2,1),  x[0]*m(0,2)+x[1]*m(1,2)+x[2]*m(2,2));
 }
 
@@ -290,7 +292,7 @@ void coord3d::dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& d
 // calculation of the dihedral angle theta at a(0,0,0), b, c and d,  the result is an angel between -\pi and +\pi (in radians)
 double coord3d::dihedral(const coord3d& b, const coord3d& c, const coord3d& d)
 {
-  const coord3d ab = b;
+  const coord3d ab = b; // a=0
   const coord3d bc = c-b;
   const coord3d cd = d-c;
 
@@ -311,7 +313,7 @@ double coord3d::dihedral(const coord3d& b, const coord3d& c, const coord3d& d)
 // calculation of the derivative of dihedral angle theta at a(0,0,0), b, c and d  according to coordinates b, c and d with fixed a
 void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, coord3d& db, coord3d& dc, coord3d& dd)
 {
-  const coord3d ab = b;
+  const coord3d ab = b; // a=0
   const coord3d bc = c-b;
   const coord3d cd = d-c;
 
@@ -334,11 +336,11 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
 //  const double dihedral_abcd = atan2(y,x);
 //  cout << "D: "<< dihedral_abcd<<endl;
 
-  const matrix3d dab__db = matrix3d(1,0,0,0,1,0,0,0,1);
-  const matrix3d dbc__db = matrix3d(-1,0,0,0,-1,0,0,0,-1);
-  const matrix3d dbc__dc = matrix3d(1,0,0,0,1,0,0,0,1);
-  const matrix3d dcd__dc = matrix3d(-1,0,0,0,-1,0,0,0,-1);
-  const matrix3d dcd__dd = matrix3d(1,0,0,0,1,0,0,0,1);
+  const matrix3d dab__db = matrix3d::unit_matrix();
+  const matrix3d dbc__db = -matrix3d::unit_matrix();
+  const matrix3d dbc__dc = matrix3d::unit_matrix();
+  const matrix3d dcd__dc = -matrix3d::unit_matrix();
+  const matrix3d dcd__dd = matrix3d::unit_matrix();
 
   // bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
   const coord3d dbc_length_inv__dbc = -bc * pow(bc_length_inv, 3);
@@ -348,7 +350,7 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
   const coord3d dbc_length_inv__db = dbc_length_inv__dbc * dbc__db;
   const coord3d dbc_length_inv__dc = dbc_length_inv__dbc * dbc__dc;
 
-  const matrix3d dbc1__dbc = matrix3d(1,0,0,0,1,0,0,0,1) * bc_length_inv; 
+  const matrix3d dbc1__dbc = matrix3d::unit_matrix() * bc_length_inv; 
 
   // bc1_x=bc_x*bc_length_inv
   // bc1_y=bc_y*bc_length_inv
@@ -361,8 +363,8 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
   // abc_y=ab_z*bc_x - ab_x*bc_z
   // abc_z=ab_x*bc_y - ab_y*bc_x
   //FIXME is there a more elegant way of doing this?
-    const matrix3d dabc__dab = matrix3d(0,bc[2],-bc[1], -bc[2],0,bc[0], bc[1],-bc[0],0); 
-    const matrix3d dabc__dbc = matrix3d(0,-ab[2],ab[1], ab[2],0,-ab[0], -ab[1],ab[0],0); 
+  const matrix3d dabc__dab = matrix3d(0,bc[2],-bc[1], -bc[2],0,bc[0], bc[1],-bc[0],0); 
+  const matrix3d dabc__dbc = matrix3d(0,-ab[2],ab[1], ab[2],0,-ab[0], -ab[1],ab[0],0); 
 
   // bcd_x=bc_y*cd_z - bc_z*cd_y
   // bcd_y=bc_z*cd_x - bc_x*cd_z
@@ -405,7 +407,7 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
   // abc1_x=abc_x*abc_length_inv
   // abc1_y=abc_y*abc_length_inv
   // abc1_z=abc_z*abc_length_inv
-  const matrix3d dabc1__dabc = matrix3d(1,0,0,0,1,0,0,0,1) * abc_length_inv;
+  const matrix3d dabc1__dabc = matrix3d::unit_matrix() * abc_length_inv;
 
   // abc1_x=abc_x*abc_length_inv
   // abc1_y=abc_y*abc_length_inv
@@ -417,7 +419,7 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
   // bcd1_x=bcd_x*bcd_length_inv
   // bcd1_y=bcd_y*bcd_length_inv
   // bcd1_z=bcd_z*bcd_length_inv
-  const matrix3d dbcd1__dbcd = matrix3d(1,0,0,0,1,0,0,0,1) * bcd_length_inv;
+  const matrix3d dbcd1__dbcd = matrix3d::unit_matrix() * bcd_length_inv;
 
   // bcd1_x=bcd_x*bcd_length_inv
   // bcd1_y=bcd_y*bcd_length_inv
@@ -492,17 +494,14 @@ double coord3d::ideal_dihedral(const int lA, const int lB, const int lC){
 //    cout << "bx,by,bz: " << bx<<" " <<by<<" "<<bz << endl;
 //    cout << "cx,cy,cz: " << cx<<" " <<cy<<" "<<cz << endl;
 //    cout << "dx,dy,dz: " << dx<<" " <<dy<<" "<<dz << endl;
-// 
-//    cout << "ideal dihedral: " << coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz)) << endl;
-    // don't ask me why there is a minus here, but it works (lnw)
-    return - coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz));
-  }
-  else{
+
+    // and it's b,d,c because the dihedral should be math-positive from the outside
+    return coord3d::dihedral(coord3d(bx,by,bz), coord3d(dx,dy,dz), coord3d(cx,cy,cz));
+  } else {
 	// planar or negative curvature
     // in the case of negative curvature the adjacent faces cannot be planar
     // and the dihedral cannot be calculated (but 0 is a plausible value)
     return 0.0;
   }
-
 }
 

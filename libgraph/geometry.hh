@@ -171,9 +171,9 @@ struct coord3d {
   static double angle(const coord3d& a, const coord3d& c);
   // calculation of the derivative of angle beta at b(0,0,0) according to coordinates a and c with fixed b
   static void dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& dc);
-  // calculation of the dihedral angle theta at a(0,0,0), b, c and d,  the result is an angel between -\pi and +\pi (in radians)
+  // calculation of the dihedral angle theta at a(0,0,0), b, c and d,  the result is an angle between -\pi and +\pi (in radians)
   static double dihedral(const coord3d& b, const coord3d& c, const coord3d& d);
-  // calculation of the derivative of dihedral angle theta at a(0,0,0), b, c and d  according to coordinates b, c and d with fixed a
+  // calculation of the derivative of dihedral angle theta at a(0,0,0), b, c and d according to coordinates b, c and d with fixed a
   static void ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, coord3d& db, coord3d& dc, coord3d& dd);
 
   static double ideal_dihedral(const int lA, const int lB, const int lC);
@@ -222,6 +222,7 @@ struct matrix3d {
   matrix3d& operator-=(const matrix3d& y){ for(int i=0;i<3;++i){for(int j=0;j<3;++j){values[3*i+j] -= y(i,j);}}; return *this; }
   matrix3d operator*(const double s)   const { return matrix3d(*this) *= s; }
   matrix3d& operator*=(const double& s){ for(int i=0;i<3;++i){for(int j=0;j<3;++j){values[3*i+j] *= s;}}; return *this; }
+  matrix3d operator-() const {matrix3d m(-values[0],-values[1],-values[2],-values[3],-values[4],-values[5],-values[6],-values[7],-values[8]); return m;}
 
   matrix3d transpose() const {
     const matrix3d &M(*this);
@@ -341,6 +342,10 @@ struct matrix3d {
       for(int j=0;j<3;j++) C(i,j) = c[j];
     }
     return make_pair(lambda,C);
+  }
+
+  static matrix3d unit_matrix(){
+    return matrix3d(1,0,0,0,1,0,0,0,1);
   }
   
   friend ostream& operator<<(ostream& S, const matrix3d &M)
