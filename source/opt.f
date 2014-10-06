@@ -4,7 +4,9 @@
 C  This subroutine optimizes the fullerene graph using spring embedding
       DIMENSION Dist(2,NMAX),IC3(NMAX,3)
       DIMENSION IDA(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
-      Data Rdist,ftol,conv/1.d0,.5d-10,1 6.0221367d-3/
+      real*8 Rdist,ftol
+      rdist=1.d0
+      ftol=0.5d-10
       rmin=1.d10
       rmax=0.d0
       rper=0.d0

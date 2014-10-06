@@ -81,7 +81,7 @@ c     three distances: zero values
 c     two angles: zero values
       ExtWuA5=1.08d2
       ExtWuA6=1.20d2
-c     four dihedrals: zero values (all guessed)
+c     four dihedrals: zero values (according to ideal_dihedral)
       ExtWuDppp=37.4d0
       ExtWuDhpp=29.3d0
       ExtWuDhhp=23.8d0

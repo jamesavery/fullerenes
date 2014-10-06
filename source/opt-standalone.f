@@ -5,21 +5,23 @@
 C  This subroutine optimizes the fullerene graph using spring embedding
       DIMENSION Dist(2,N)
       DIMENSION IDA(N,N),IS(6),MDist(N,N)
-      Data Rdist,ftol,conv/1.d0,.5d-10,1 6.0221367d-3/
+      real*8 Rdist,ftol
+      rdist=1.d0
+      ftol=0.5d-10
       rmin=1.d10
       rmax=0.d0
       rper=0.d0
       maxd=0
       do i=1,N
-         do j=i+1,N
-            if(IDA(I,J).eq.1) then
-               x=Dist(1,I)-Dist(1,J)
-               y=Dist(2,I)-Dist(2,J)
-               rd=dsqrt(x*x+y*y)
-               if(rd.lt.rmin) rmin=rd
-               if(rd.gt.rmax) rmax=rd
-            endif
-         enddo
+        do j=i+1,N
+          if(IDA(I,J).eq.1) then
+            x=Dist(1,I)-Dist(1,J)
+            y=Dist(2,I)-Dist(2,J)
+            rd=dsqrt(x*x+y*y)
+            if(rd.lt.rmin) rmin=rd
+            if(rd.gt.rmax) rmax=rd
+          endif
+        enddo
         rv=dsqrt(Dist(1,I)**2+Dist(2,I)**2)
         if(rv.gt.rper) rper=rv
       enddo
@@ -27,30 +29,30 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       If(IOP.eq.1) Write(*,101)
       If(IOP.eq.2) Write(*,102)
       If(IOP.eq.3) then
-       do i=1,N
-       do j=i+1,N
-        if(Mdist(i,j).gt.maxd) maxd=Mdist(i,j)
-       enddo
-       enddo
-       rper=rper*scale
-       Write(*,103) maxd,rper,scalePPG
-       RAA=scalePPG
+        do i=1,N
+        do j=i+1,N
+          if(Mdist(i,j).gt.maxd) maxd=Mdist(i,j)
+        enddo
+        enddo
+        rper=rper*scale
+        Write(*,103) maxd,rper,scalePPG
+        RAA=scalePPG
       endif
       if(IOP.eq.4) then
-       RAA=rmax*scale/dfloat(maxl)
-       Write(*,104) maxl,RAA
+        RAA=rmax*scale/dfloat(maxl)
+        Write(*,104) maxl,RAA
       endif
       Write(*,1000) rmin,Rdist
       do i=1,N
-       Dist(1,i)=Dist(1,i)*scale 
-       Dist(2,i)=Dist(2,i)*scale 
-       WRITE(*,1001) I,Dist(1,I),Dist(2,I)
+        Dist(1,i)=Dist(1,i)*scale 
+        Dist(2,i)=Dist(2,i)*scale 
+        WRITE(*,1001) I,Dist(1,I),Dist(2,I)
       enddo
       CALL SA_frprmn2d(N,IOP,IDA,Iout,IS,MDist,
      1 maxd,Dist,ftol,iter,fret,E0,RAA)
       if(fret-E0.gt.1.d-2) then
-       fretn=(fret-E0)/dfloat(N)
-       Write(*,1002) fretn
+        fretn=(fret-E0)/dfloat(N)
+        Write(*,1002) fretn
       endif
 
   101 Format(/1X,'Optimization of fullerene graph using a ',
@@ -641,8 +643,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       call adjacency_matrix(graph,N,IDA)
       call SA_get_edges(graph,N,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
-      call SA_get_corners(graph,N,
-     1 a_h,a_p)
+      call SA_get_corners(graph,N,a_h,a_p)
       if(iopt .eq. 3 .or. iopt.eq.4) then
         call SA_get_dihedrals(graph,N,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -2410,10 +2411,10 @@ c     three distances: zero values
 c     two angles: zero values
       ExtWuA5=1.08d2
       ExtWuA6=1.20d2
-c     four dihedrals: zero values (all guessed)
-      ExtWuDppp=4.0d1
-      ExtWuDhpp=3.5d1
-      ExtWuDhhp=2.4d1
+c     four dihedrals: zero values (according to ideal_dihedral)
+      ExtWuDppp=37.4d0
+      ExtWuDhpp=29.3d0
+      ExtWuDhhp=23.8d0
       ExtWuDhhh=0.0d0
 c     three distances: forces (let's assume they are all the same)
       ExtWufR=390.7d0

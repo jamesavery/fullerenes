@@ -617,13 +617,13 @@ Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const
 bool Polyhedron::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
-    const FullereneGraph g(*this,layout2d);
+    const FullereneGraph g(*this, layout2d);
     points = g.optimized_geometry(points, opt_method, ftol);
     return true;
   } else if(is_cubic() || is_triangulation()) {
-    bool optimize_angles = true;//!is_triangulation();
+    bool optimize_angles = true; //!is_triangulation();
     return optimize_other(optimize_angles);
-  }else{
+  } else {
     cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra and other cubic graphs." << endl;
     return false;
   }

@@ -400,6 +400,7 @@ vector<coord3d> FullereneGraph::optimized_geometry(const vector<coord3d>& points
   default_force_parameters_(&opt_method,&force_parameters[0]);
 
   cout << "force parameters: " << force_parameters << endl;
+  cout << "optimization method: " << opt_method << endl;
 
   cout << "g = " << *this << ";\n";
 
