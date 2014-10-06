@@ -53,7 +53,7 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
     cout << "Trying edge " << uw << ": ";
     if(!edge_exists(uw)){
 	// Edge doesn't already exist - but does it lead to a consistent triangle?
-      insert_edge(uw,v,next(u,v));  // w: ...,u,v,... ; u: ..v,w,x,..
+      insert_edge(uw,next(u,v),v);  // u: ..v,w,x,.. w: ...,u,v,... ; 
 	
 	// New triangle uvw has already-Delaunay neighbour triangles uvs and vwt. Is uvw screwy?
 	node_t s = nextCW(v,u), t = nextCW(w,v);
