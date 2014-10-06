@@ -11,7 +11,7 @@ int main(int ac, char **av)
   matrix3d m = matrix3d::unit_matrix();
   matrix3d mm = -m;
   cout << "unit matrix: " << m << endl;
-  cout << "minux unit matrix: " << mm << endl;
+  cout << "minus unit matrix: " << mm << endl;
 
 
   coord3d a, b, c, d, da, db, dc, dd;
@@ -70,26 +70,23 @@ int main(int ac, char **av)
   cout << "dd: " << dd << " [0.023, 0.209, -0.202]" << endl;
 
 
+// ideal dihedrals
   cout << endl << "ideal dihedrals" << endl;
-  cout << "ideal dihedral between three squares: " << coord3d::ideal_dihedral(4,4,4) << endl;
-  a = coord3d(0,0,0), b = coord3d(.1,1,0), c = coord3d(1,.1,0), d = coord3d(0,0,1);
-  cout << "a: " << a << " b: " << b << " c: " << c << " d: " << d << endl;
-  coord3d::ddihedral(b-a,c-a,d-a,db,dc,dd);
-  cout << "dihedral: " << coord3d::dihedral(b-a,c-a,d-a) << endl;
-  cout << "da: " << -(db+dc+dd) << endl;
-  cout << "db: " << db << endl;
-  cout << "dc: " << dc << endl;
-  cout << "dd: " << dd << endl;
+  cout << "ideal dihedral between three triangles, counter clockwise/convex --> positive: " << coord3d::ideal_dihedral(3,3,3) << " [1.23096]" << endl;
+  cout << "ideal dihedral between three squares, counter clockwise/convex --> positive: "   << coord3d::ideal_dihedral(4,4,4) << " [0.95531]" << endl;
+  cout << "ideal dihedral between three pentagons, counter clockwise/convex --> positive: " << coord3d::ideal_dihedral(5,5,5) << " []" << endl;
+  cout << "ideal dihedral between three hexagons, counter clockwise/convex --> positive: "  << coord3d::ideal_dihedral(6,6,6) << " [0.0]" << endl;
+  cout << "ideal dihedral between three heptagons, counter clockwise/convex --> positive: " << coord3d::ideal_dihedral(7,7,7) << " [0.0]" << endl;
 
-  cout << "ideal dihedral between 5,6,6: " << coord3d::ideal_dihedral(5,6,6) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,6,6) << endl;
-  cout << "ideal dihedral between 6,5,6: " << coord3d::ideal_dihedral(6,5,6) << ", " << 180/M_PI * coord3d::ideal_dihedral(6,5,6) << endl;
-  cout << "ideal dihedral between 6,6,5: " << coord3d::ideal_dihedral(6,6,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(6,6,5) << endl;
+  cout << "ideal dihedral between 5,6,6: " << coord3d::ideal_dihedral(5,6,6) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,6,6) << " deg" << endl;
+  cout << "ideal dihedral between 6,5,6: " << coord3d::ideal_dihedral(6,5,6) << ", " << 180/M_PI * coord3d::ideal_dihedral(6,5,6) << " deg" << endl;
+  cout << "ideal dihedral between 6,6,5: " << coord3d::ideal_dihedral(6,6,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(6,6,5) << " deg" << endl;
 
-  cout << "ideal dihedral between 5,5,6: " << coord3d::ideal_dihedral(5,5,6) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,5,6) << endl;
-  cout << "ideal dihedral between 5,6,5: " << coord3d::ideal_dihedral(5,6,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,6,5) << endl;
-  cout << "ideal dihedral between 6,5,5: " << coord3d::ideal_dihedral(6,5,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(6,5,5) << endl;
+  cout << "ideal dihedral between 5,5,6: " << coord3d::ideal_dihedral(5,5,6) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,5,6) << " deg" << endl;
+  cout << "ideal dihedral between 5,6,5: " << coord3d::ideal_dihedral(5,6,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,6,5) << " deg" << endl;
+  cout << "ideal dihedral between 6,5,5: " << coord3d::ideal_dihedral(6,5,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(6,5,5) << " deg" << endl;
 
-  cout << "ideal dihedral between 5,5,5: " << coord3d::ideal_dihedral(5,5,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,5,5) << endl;
+  cout << "ideal dihedral between 5,5,5: " << coord3d::ideal_dihedral(5,5,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,5,5) << " deg" << endl;
 
   return 0;
 }

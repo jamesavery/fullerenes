@@ -289,7 +289,13 @@ void coord3d::dangle(const coord3d& a, const coord3d& c, coord3d& da, coord3d& d
 }
 
 
-// calculation of the dihedral angle theta at a(0,0,0), b, c and d,  the result is an angel between -\pi and +\pi (in radians)
+// calculation of the dihedral angle theta at a(0,0,0), b, c and d,  the result is an angle between -\pi and +\pi (in radians)
+// rotate c-d around b-c to a-b mathematically positive
+// in a polyhedron, the dihedral abcd, where a is in the centre, surrounded by b c and d:
+//    clockwise, convex --> negative
+//    counterclockwise, convex --> positive  ... this is the default case
+//    clockwise, concave --> positive
+//    counterclockwise, concave --> negative
 double coord3d::dihedral(const coord3d& b, const coord3d& c, const coord3d& d)
 {
   const coord3d ab = b; // a=0
@@ -467,8 +473,10 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
   dd = dx__dd*df__dx + dy__dd*df__dy;
 }
 
-double coord3d::ideal_dihedral(const int lA, const int lB, const int lC){
-  const double eps = 1.0e-10;
+// assumes counter clockwise orientation and a convex singularity
+double coord3d::ideal_dihedral(const int lA, const int lB, const int lC)
+{
+  const double eps = 1.0e-8;
   if (1.0/lA + 1.0/lB + 1.0/lC > 0.5+eps){ // positive curvature // make sure 3 * 1/6 is recognised to be planar
 //        t   B   s      
 //          \   /
@@ -495,8 +503,7 @@ double coord3d::ideal_dihedral(const int lA, const int lB, const int lC){
 //    cout << "cx,cy,cz: " << cx<<" " <<cy<<" "<<cz << endl;
 //    cout << "dx,dy,dz: " << dx<<" " <<dy<<" "<<dz << endl;
 
-    // and it's b,d,c because the dihedral should be math-positive from the outside
-    return coord3d::dihedral(coord3d(bx,by,bz), coord3d(dx,dy,dz), coord3d(cx,cy,cz));
+    return coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz));
   } else {
 	// planar or negative curvature
     // in the case of negative curvature the adjacent faces cannot be planar
