@@ -35,6 +35,23 @@ bool Graph::edge_exists(const edge_t& e) const
   return find(nu.begin(),nu.end(),e.second) != nu.end();
 }
 
+node_t Graph::next(const node_t& u, const node_t& v) const
+{
+  const vector<node_t>& nu(neighbours[u]);
+  for(int j=0;j<nu.size(); j++) if(nu[j] == v) return nu[(j+1)%nu.size()];
+
+  return -1;            // u-v is not an edge in a triangulation
+}
+
+node_t Graph::prev(const node_t& u, const node_t& v) const
+{
+  const vector<node_t>& nu(neighbours[u]);
+  for(int j=0;j<nu.size(); j++) if(nu[j] == v) return nu[(j-1+nu.size())%nu.size()];
+
+  return -1;            // u-v is not an edge in a triangulation
+}
+
+
 bool Graph::is_consistently_oriented() const 
 {
   map<dedge_t,bool> seen_dedge;

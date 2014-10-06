@@ -7,7 +7,10 @@
 
 Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
 {
-  FullereneGraph g(dg.dual_graph());
+  PlanarGraph pg(dg.dual_graph());
+  cout << "pg = " << pg << endl;
+
+  FullereneGraph g(pg);
   g.layout2d = g.tutte_layout();
 
   vector<coord3d> points = g.zero_order_geometry();
@@ -45,12 +48,14 @@ int main(int ac, char **av) {
   Triangulation T1(spiral);
   FulleroidDelaunay T(T1);
 
-  cout << "T = " << T << endl;
-
+  cout << "T = " << T << ";\n"
+       << "dDist = " << T.distances << ";\n";
   output << "T = " << T << ";\n"
 	 << "dDist = " << T.distances << ";\n";
 
   Polyhedron PT = fullerene_dual_polyhedron(T);
+
+  output << "PT = " << PT << "\n";
 
   T.remove_flat_vertices();
   output << "rT = " << T << ";\n";

@@ -31,10 +31,10 @@ public:
   pair<node_t,node_t> adjacent_tris(const edge_t &e) const;
 
   
-  node_t nextCW(const dedge_t& uv) const;
-  node_t nextCCW(const dedge_t& uv) const;
-  node_t nextCW(node_t u,  node_t v) const { return nextCW(dedge_t(u,v));  }
-  node_t nextCCW(node_t u, node_t v) const { return nextCCW(dedge_t(u,v)); }
+  node_t nextCW(const dedge_t& uv)   const { return nextCW(uv.first,uv.second);  } // TODO: Remove.
+  node_t nextCCW(const dedge_t& uv)  const { return nextCCW(uv.first,uv.second); }
+  node_t nextCW(node_t u,  node_t v) const;
+  node_t nextCCW(node_t u, node_t v) const;
 
 
   vector<tri_t> compute_faces() const;          // Returns non-oriented triangles
@@ -63,9 +63,7 @@ public:
       }
       else {
         triangles = compute_faces();
-        orient_triangulation(triangles); //FIXME should have a return type ? (lnw)
         orient_neighbours();
-        // FIXME set already_oriented to true? (lnw)
       }
     }
   }

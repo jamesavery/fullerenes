@@ -29,20 +29,23 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
 
 vector<tri_t> Triangulation::compute_faces() const 
 // Does not assume graph is oriented
-// Produces non-oriented triangles
+// Produces oriented triangles
 {
-  set<tri_t> triangles;
+  set<tri_t> triangle_set;
 
   for(node_t u=0;u<N;u++)
     for(int i=0;i<neighbours[u].size();i++){
       node_t v = neighbours[u][i];
       pair<node_t,node_t> ws(adjacent_tris(edge_t(u,v)));
 
-      triangles.insert(tri_t(u,v,ws.first ).sorted());
-      triangles.insert(tri_t(u,v,ws.second).sorted());
+      triangle_set.insert(tri_t(u,v,ws.first ).sorted());
+      triangle_set.insert(tri_t(u,v,ws.second).sorted());
     }
 
-  return vector<tri_t>(triangles.begin(),triangles.end());
+
+  vector<tri_t> triangles(triangle_set.begin(),triangle_set.end());
+  orient_triangulation(triangles);
+  return triangles;
 }
 
 
@@ -68,26 +71,14 @@ void Triangulation::orient_neighbours()
   }
 }
 
-node_t Triangulation::nextCW(const dedge_t& uv) const
+node_t Triangulation::nextCW(node_t u, node_t v) const
 {
-  const node_t &u(uv.first), &v(uv.second);
-  const vector<node_t>& nv(neighbours[v]);
-
-  assert(u>=0 && v>=0);
-  for(int j=0;j<nv.size(); j++) if(nv[j] == u) return nv[(j+1)%nv.size()];
-
-  return -1;            // u-v is not an edge in a triangulation
+  return next(u,v);
 }
 
-node_t Triangulation::nextCCW(const dedge_t& uv) const
+node_t Triangulation::nextCCW(node_t u, node_t v) const
 {
-  const node_t &u(uv.first), &v(uv.second);
-  const vector<node_t>& nv(neighbours[v]);
-
-  assert(u>=0 && v>=0);
-  for(int j=0;j<nv.size(); j++) if(nv[j] == u) return nv[(j-1+nv.size())%nv.size()];
-
-  return -1;            // u-v is not an edge in a triangulation
+  return prev(u,v);
 }
 
 
@@ -135,10 +126,12 @@ PlanarGraph Triangulation::dual_graph() const
     
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
-      node_t w(nextCW(dedge_t(u,v))); // TODO: CCW for buckygen -- will this give problems elsewhere?
+      node_t w(nextCCW(u,v)); // TODO: CCW for buckygen -- will this give problems elsewhere?
 
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
+
+      //      printf("A[%d][%d] = %d (%s)\n",U,i,tri_numbers(tri_t(u,v,w).sorted()),to_string(tri_t(u,v,w).sorted()).c_str());
 
       if(A[U][i] < 0){
 	cerr << "Triangle " << tri_t(u,v,w).sorted() << " (opposite " << t << ") not found!\n";
@@ -399,7 +392,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_graph because there are some edges deleted already
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
-    node_t v = CW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
+    node_t v = CCW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
     //    cout << "u->v: " << u << " -> " << v << endl;
     if(v == -1) return false; // non-general spiral failed
 
@@ -650,19 +643,19 @@ node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
 
   auto go_north = [&](){ 
     const node_t S(s), T(t); // From old square
-    q = S; r = T; s = nextCCW(dedge_t(S,T)); t = nextCCW(dedge_t(s,r)); 
+    q = S; r = T; s = next(S,T); t = next(s,r); 
   };
   
   auto go_east = [&](){
     const node_t R(r), T(t); // From old square
-    q = R; s = T; r = nextCCW(dedge_t(s,q)); t = nextCCW(dedge_t(s,r)); 
+    q = R; s = T; r = next(s,q); t = next(s,r); 
   };
 
   // Square one
   q = u0; 			// (0,0)
   r = neighbours[u0][i];	// (1,0)
-  s = nextCCW(dedge_t(q,r));	// (0,1)
-  t = nextCCW(dedge_t(s,r));	// (1,1)
+  s = next(q,r);	// (0,1)
+  t = next(s,r);	// (1,1)
 
   if(a==1 && b==1) return t;
 
