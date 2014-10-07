@@ -30,31 +30,31 @@
       IMPLICIT REAL*8 (a-z)
 
 c vectors ab, bc and cd
-      ab_x=ax-bx
-      ab_y=ay-by
-      ab_z=az-bz
-      bc_x=bx-cx
-      bc_y=by-cy
-      bc_z=bz-cz
-      cd_x=cx-dx
-      cd_y=cy-dy
-      cd_z=cz-dz
+      ab_x=bx-ax
+      ab_y=by-ay
+      ab_z=bz-az
+      bc_x=cx-bx
+      bc_y=cy-by
+      bc_z=cz-bz
+      cd_x=dx-cx
+      cd_y=dy-cy
+      cd_z=dz-cz
 c vector bc normed to length 1
-      bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
+      bc_length_inv=1.d0/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc1_x=bc_x*bc_length_inv
       bc1_y=bc_y*bc_length_inv
       bc1_z=bc_z*bc_length_inv
 c normal vectors on abc and bcd
 c and the signs are this way because one of the two vectors points in the wrong direction
-      abc_x=-ab_y*bc_z + ab_z*bc_y
-      abc_y=-ab_z*bc_x + ab_x*bc_z
-      abc_z=-ab_x*bc_y + ab_y*bc_x
-      bcd_x=-bc_y*cd_z + bc_z*cd_y
-      bcd_y=-bc_z*cd_x + bc_x*cd_z
-      bcd_z=-bc_x*cd_y + bc_y*cd_x
+      abc_x=ab_y*bc_z - ab_z*bc_y
+      abc_y=ab_z*bc_x - ab_x*bc_z
+      abc_z=ab_x*bc_y - ab_y*bc_x
+      bcd_x=bc_y*cd_z - bc_z*cd_y
+      bcd_y=bc_z*cd_x - bc_x*cd_z
+      bcd_z=bc_x*cd_y - bc_y*cd_x
 c their respective lengths
-      abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
-      bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
+      abc_length_inv=1.d0/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
+      bcd_length_inv=1.d0/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
 c normal vectors (length 1) on abc and bcd
       abc1_x=abc_x*abc_length_inv
       abc1_y=abc_y*abc_length_inv
@@ -63,9 +63,9 @@ c normal vectors (length 1) on abc and bcd
       bcd1_y=bcd_y*bcd_length_inv
       bcd1_z=bcd_z*bcd_length_inv
 c abc \times bc
-      aux_x=abc1_y*bc1_z-bc1_y*abc1_z
-      aux_y=abc1_z*bc1_x-bc1_z*abc1_x
-      aux_z=abc1_x*bc1_y-bc1_x*abc1_y
+      aux_x=abc1_y*bc1_z - bc1_y*abc1_z
+      aux_y=abc1_z*bc1_x - bc1_z*abc1_x
+      aux_z=abc1_x*bc1_y - bc1_x*abc1_y
 c two auxiliary reals
 c     x=\vec abc1 \cdot \vec bcd_1
       x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
@@ -85,26 +85,26 @@ c//////////////////////////////////////////////////////////////
 c derivatives of single vectors
 c all other combinations are zero
 
-      dab_x__dax=1
-      dab_x__dbx=-1
-      dab_y__day=1
-      dab_y__dby=-1
-      dab_z__daz=1
-      dab_z__dbz=-1
+      dab_x__dax=-1
+      dab_x__dbx=1
+      dab_y__day=-1
+      dab_y__dby=1
+      dab_z__daz=-1
+      dab_z__dbz=1
 
-      dbc_x__dbx=1
-      dbc_x__dcx=-1
-      dbc_y__dby=1
-      dbc_y__dcy=-1
-      dbc_z__dbz=1
-      dbc_z__dcz=-1
+      dbc_x__dbx=-1
+      dbc_x__dcx=1
+      dbc_y__dby=-1
+      dbc_y__dcy=1
+      dbc_z__dbz=-1
+      dbc_z__dcz=1
 
-      dcd_x__dcx=1
-      dcd_x__ddx=-1
-      dcd_y__dcy=1
-      dcd_y__ddy=-1
-      dcd_z__dcz=1
-      dcd_z__ddz=-1
+      dcd_x__dcx=-1
+      dcd_x__ddx=1
+      dcd_y__dcy=-1
+      dcd_y__ddy=1
+      dcd_z__dcz=-1
+      dcd_z__ddz=1
 
 
 c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
@@ -113,73 +113,81 @@ c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       dbc_length_inv__dbc_y=-bc_y*bc_length_inv_cub
       dbc_length_inv__dbc_z=-bc_z*bc_length_inv_cub
 
+c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
+      dbc_length_inv__dbx=dbc_length_inv__dbc_x*dbc_x__dbx
+      dbc_length_inv__dby=dbc_length_inv__dbc_y*dbc_y__dby
+      dbc_length_inv__dbz=dbc_length_inv__dbc_z*dbc_z__dbz
+      dbc_length_inv__dcx=dbc_length_inv__dbc_x*dbc_x__dcx
+      dbc_length_inv__dcy=dbc_length_inv__dbc_y*dbc_y__dcy
+      dbc_length_inv__dcz=dbc_length_inv__dbc_z*dbc_z__dcz
 
 c bc1_x=bc_x*bc_length_inv
-      dbc1_x__dbx= bc_length_inv + bc_x*dbc_length_inv__dbc_x
-      dbc1_x__dby= bc_x*dbc_length_inv__dbc_y
-      dbc1_x__dbz= bc_x*dbc_length_inv__dbc_z
-      dbc1_x__dcx= -bc_length_inv - bc_x*dbc_length_inv__dbc_x
-      dbc1_x__dcy= -bc_x*dbc_length_inv__dbc_y
-      dbc1_x__dcz= -bc_x*dbc_length_inv__dbc_z
+      dbc1_x__dbx= bc_length_inv*dbc_x__dbx + bc_x*dbc_length_inv__dbx
+      dbc1_x__dby=                            bc_x*dbc_length_inv__dby
+      dbc1_x__dbz=                            bc_x*dbc_length_inv__dbz
+      dbc1_x__dcx= bc_length_inv*dbc_x__dcx + bc_x*dbc_length_inv__dcx
+      dbc1_x__dcy=                            bc_x*dbc_length_inv__dcy
+      dbc1_x__dcz=                            bc_x*dbc_length_inv__dcz
 c bc1_y=bc_y*bc_length_inv
-      dbc1_y__dbx= bc_y*dbc_length_inv__dbc_x
-      dbc1_y__dby= bc_length_inv + bc_y*dbc_length_inv__dbc_y
-      dbc1_y__dbz= bc_y*dbc_length_inv__dbc_z
-      dbc1_y__dcx= -bc_y*dbc_length_inv__dbc_x
-      dbc1_y__dcy= -bc_length_inv - bc_y*dbc_length_inv__dbc_y
-      dbc1_y__dcz= -bc_y*dbc_length_inv__dbc_z
+      dbc1_y__dbx=                            bc_y*dbc_length_inv__dbx
+      dbc1_y__dby= bc_length_inv*dbc_y__dby + bc_y*dbc_length_inv__dby
+      dbc1_y__dbz=                            bc_y*dbc_length_inv__dbz
+      dbc1_y__dcx=                            bc_y*dbc_length_inv__dcx
+      dbc1_y__dcy= bc_length_inv*dbc_y__dcy + bc_y*dbc_length_inv__dcy
+      dbc1_y__dcz=                            bc_y*dbc_length_inv__dcz
 c bc1_z=bc_z*bc_length_inv
-      dbc1_z__dbx= bc_z*dbc_length_inv__dbc_x
-      dbc1_z__dby= bc_z*dbc_length_inv__dbc_y
-      dbc1_z__dbz= bc_length_inv + bc_z*dbc_length_inv__dbc_z
-      dbc1_z__dcx= -bc_z*dbc_length_inv__dbc_x
-      dbc1_z__dcy= -bc_z*dbc_length_inv__dbc_y
-      dbc1_z__dcz= -bc_length_inv - bc_z*dbc_length_inv__dbc_z
+      dbc1_z__dbx=                            bc_z*dbc_length_inv__dbx
+      dbc1_z__dby=                            bc_z*dbc_length_inv__dby
+      dbc1_z__dbz= bc_length_inv*dbc_z__dbz + bc_z*dbc_length_inv__dbz
+      dbc1_z__dcx=                            bc_z*dbc_length_inv__dcx
+      dbc1_z__dcy=                            bc_z*dbc_length_inv__dcy
+      dbc1_z__dcz= bc_length_inv*dbc_z__dcz + bc_z*dbc_length_inv__dcz
 
 
-c abc_x=-ab_y*bc_z + ab_z*bc_y
-      dabc_x__dby=bc_z + ab_z
-      dabc_x__dbz=-ab_y - bc_y
-c abc_y=-ab_z*bc_x + ab_x*bc_z
-      dabc_y__dbx=-ab_z - bc_z
-      dabc_y__dbz=bc_x + ab_x
-c abc_z=-ab_x*bc_y + ab_y*bc_x
-      dabc_z__dbx=ab_y + bc_y
-      dabc_z__dby=-ab_x - bc_x 
+c c oddly correct (lnw)
+c c abc_x=ab_y*bc_z - ab_z*bc_y
+c       dabc_x__dby=bc_z + ab_z
+c       dabc_x__dbz=-ab_y - bc_y
+c c abc_y=ab_z*bc_x - ab_x*bc_z
+c       dabc_y__dbx=-ab_z - bc_z
+c       dabc_y__dbz=bc_x + ab_x
+c c abc_z=ab_x*bc_y - ab_y*bc_x
+c       dabc_z__dbx=ab_y + bc_y
+c       dabc_z__dby=-ab_x - bc_x 
 
 
-c abc_x=-ab_y*bc_z + ab_z*bc_y
-      dabc_x__dab_y=-bc_z
-      dabc_x__dab_z=bc_y
-      dabc_x__dbc_y=ab_z
-      dabc_x__dbc_z=-ab_y
-c abc_y=-ab_z*bc_x + ab_x*bc_z
-      dabc_y__dab_x=bc_z
-      dabc_y__dab_z=-bc_x
-      dabc_y__dbc_x=-ab_z
-      dabc_y__dbc_z=ab_x
-c abc_z=-ab_x*bc_y + ab_y*bc_x
-      dabc_z__dab_x=-bc_y
-      dabc_z__dab_y=bc_x
-      dabc_z__dbc_x=ab_y
-      dabc_z__dbc_y=-ab_x
+c abc_x=ab_y*bc_z - ab_z*bc_y
+      dabc_x__dab_y=bc_z
+      dabc_x__dab_z=-bc_y
+      dabc_x__dbc_y=-ab_z
+      dabc_x__dbc_z=ab_y
+c abc_y=ab_z*bc_x - ab_x*bc_z
+      dabc_y__dab_x=-bc_z
+      dabc_y__dab_z=bc_x
+      dabc_y__dbc_x=ab_z
+      dabc_y__dbc_z=-ab_x
+c abc_z=ab_x*bc_y - ab_y*bc_x
+      dabc_z__dab_x=bc_y
+      dabc_z__dab_y=-bc_x
+      dabc_z__dbc_x=-ab_y
+      dabc_z__dbc_y=ab_x
 
 
-c abc_x=-ab_y*bc_z + ab_z*bc_y
+c abc_x=ab_y*bc_z - ab_z*bc_y
       dabc_x__day= dabc_x__dab_y*dab_y__day
       dabc_x__daz= dabc_x__dab_z*dab_z__daz
       dabc_x__dby= dabc_x__dab_y*dab_y__dby + dabc_x__dbc_y*dbc_y__dby
       dabc_x__dbz= dabc_x__dbc_z*dbc_z__dbz + dabc_x__dab_z*dab_z__dbz
       dabc_x__dcy= dabc_x__dbc_y*dbc_y__dcy
       dabc_x__dcz= dabc_x__dbc_z*dbc_z__dcz
-c abc_y=-ab_z*bc_x + ab_x*bc_z
+c abc_y=ab_z*bc_x - ab_x*bc_z
       dabc_y__dax= dabc_y__dab_x*dab_x__dax
       dabc_y__daz= dabc_y__dab_z*dab_z__daz
       dabc_y__dbx= dabc_y__dbc_x*dbc_x__dbx + dabc_y__dab_x*dab_x__dbx
       dabc_y__dbz= dabc_y__dab_z*dab_z__dbz + dabc_y__dbc_z*dbc_z__dbz
       dabc_y__dcx= dabc_y__dbc_x*dbc_x__dcx
       dabc_y__dcz= dabc_y__dbc_z*dbc_z__dcz
-c abc_z=-ab_x*bc_y + ab_y*bc_x
+c abc_z=ab_x*bc_y - ab_y*bc_x
       dabc_z__dax= dabc_z__dab_x*dab_x__dax
       dabc_z__day= dabc_z__dab_y*dab_y__day
       dabc_z__dbx= dabc_z__dab_x*dab_x__dbx + dabc_z__dbc_x*dbc_x__dbx
@@ -188,38 +196,38 @@ c abc_z=-ab_x*bc_y + ab_y*bc_x
       dabc_z__dcy= dabc_z__dbc_y*dbc_y__dcy
 
 
-c bcd_x=-bc_y*cd_z + bc_z*cd_y
-      dbcd_x__dbc_y=-cd_z
-      dbcd_x__dbc_z=cd_y
-      dbcd_x__dcd_y=bc_z
-      dbcd_x__dcd_z=-bc_y
-c bcd_y=-bc_z*cd_x + bc_x*cd_z
-      dbcd_y__dbc_x=cd_z
-      dbcd_y__dbc_z=-cd_x
-      dbcd_y__dcd_x=-bc_z
-      dbcd_y__dcd_z=bc_x
-c bcd_z=-bc_x*cd_y + bc_y*cd_x
-      dbcd_z__dbc_x=-cd_y
-      dbcd_z__dbc_y=cd_x
-      dbcd_z__dcd_x=bc_y
-      dbcd_z__dcd_y=-bc_x
+c bcd_x=bc_y*cd_z - bc_z*cd_y
+      dbcd_x__dbc_y=cd_z
+      dbcd_x__dbc_z=-cd_y
+      dbcd_x__dcd_y=-bc_z
+      dbcd_x__dcd_z=bc_y
+c bcd_y=bc_z*cd_x - bc_x*cd_z
+      dbcd_y__dbc_x=-cd_z
+      dbcd_y__dbc_z=cd_x
+      dbcd_y__dcd_x=bc_z
+      dbcd_y__dcd_z=-bc_x
+c bcd_z=bc_x*cd_y - bc_y*cd_x
+      dbcd_z__dbc_x=cd_y
+      dbcd_z__dbc_y=-cd_x
+      dbcd_z__dcd_x=-bc_y
+      dbcd_z__dcd_y=bc_x
 
 
-c bcd_x=-bc_y*cd_z + bc_z*cd_y
+c bcd_x=bc_y*cd_z - bc_z*cd_y
       dbcd_x__dby= dbcd_x__dbc_y*dbc_y__dby 
       dbcd_x__dbz= dbcd_x__dbc_z*dbc_z__dbz
       dbcd_x__dcy= dbcd_x__dbc_y*dbc_y__dcy + dbcd_x__dcd_y*dcd_y__dcy
       dbcd_x__dcz= dbcd_x__dcd_z*dcd_z__dcz + dbcd_x__dbc_z*dbc_z__dcz 
       dbcd_x__ddy= dbcd_x__dcd_y*dcd_y__ddy
       dbcd_x__ddz= dbcd_x__dcd_z*dcd_z__ddz
-c bcd_y=-bc_z*cd_x + bc_x*cd_z
+c bcd_y=bc_z*cd_x - bc_x*cd_z
       dbcd_y__dbx= dbcd_y__dbc_x*dbc_x__dbx
       dbcd_y__dbz= dbcd_y__dbc_z*dbc_z__dbz
       dbcd_y__dcx= dbcd_y__dcd_x*dcd_x__dcx + dbcd_y__dbc_x*dbc_x__dcx
       dbcd_y__dcz= dbcd_y__dbc_z*dbc_z__dcz + dbcd_y__dcd_z*dcd_z__dcz
       dbcd_y__ddx= dbcd_y__dcd_x*dcd_x__ddx
       dbcd_y__ddz= dbcd_y__dcd_z*dcd_z__ddz
-c bcd_z=-bc_x*cd_y + bc_y*cd_x
+c bcd_z=bc_x*cd_y - bc_y*cd_x
       dbcd_z__dbx= dbcd_z__dbc_x*dbc_x__dbx
       dbcd_z__dby= dbcd_z__dbc_y*dbc_y__dby
       dbcd_z__dcx= dbcd_z__dbc_x*dbc_x__dcx + dbcd_z__dcd_x*dcd_x__dcx
@@ -243,44 +251,44 @@ c bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
 
 
 c abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
-      dabc_length_inv__dax=dabc_length_inv__dabc_y*bc_z
-     4 - dabc_length_inv__dabc_z*bc_y
-      dabc_length_inv__day=-dabc_length_inv__dabc_x*bc_z
-     4 + dabc_length_inv__dabc_z*bc_x
-      dabc_length_inv__daz=dabc_length_inv__dabc_x*bc_y
-     3 - dabc_length_inv__dabc_y*bc_x
+      dabc_length_inv__dax=dabc_length_inv__dabc_y*dabc_y__dax
+     4 + dabc_length_inv__dabc_z*dabc_z__dax
+      dabc_length_inv__day=dabc_length_inv__dabc_x*dabc_x__day
+     4 + dabc_length_inv__dabc_z*dabc_z__day
+      dabc_length_inv__daz=dabc_length_inv__dabc_x*dabc_x__daz
+     4 + dabc_length_inv__dabc_y*dabc_y__daz
       dabc_length_inv__dbx=dabc_length_inv__dabc_y*dabc_y__dbx
      4 + dabc_length_inv__dabc_z*dabc_z__dbx
       dabc_length_inv__dby=dabc_length_inv__dabc_x*dabc_x__dby
      4 + dabc_length_inv__dabc_z*dabc_z__dby
       dabc_length_inv__dbz=dabc_length_inv__dabc_x*dabc_x__dbz
-     3 + dabc_length_inv__dabc_y*dabc_y__dbz
-      dabc_length_inv__dcx=dabc_length_inv__dabc_y*ab_z
-     4 - dabc_length_inv__dabc_z*ab_y
-      dabc_length_inv__dcy=-dabc_length_inv__dabc_x*ab_z
-     4 + dabc_length_inv__dabc_z*ab_x
-      dabc_length_inv__dcz=dabc_length_inv__dabc_x*ab_y
-     3 - dabc_length_inv__dabc_y*ab_x
+     4 + dabc_length_inv__dabc_y*dabc_y__dbz
+      dabc_length_inv__dcx=dabc_length_inv__dabc_y*dabc_y__dcx
+     4 + dabc_length_inv__dabc_z*dabc_z__dcx
+      dabc_length_inv__dcy=dabc_length_inv__dabc_x*dabc_x__dcy
+     4 + dabc_length_inv__dabc_z*dabc_z__dcy
+      dabc_length_inv__dcz=dabc_length_inv__dabc_x*dabc_x__dcz
+     4 + dabc_length_inv__dabc_y*dabc_y__dcz
 
 c bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
-      dbcd_length_inv__dbx=dbcd_length_inv__dbcd_y*cd_z
-     4 - dbcd_length_inv__dbcd_z*cd_y
-      dbcd_length_inv__dby=-dbcd_length_inv__dbcd_x*cd_z
-     4 + dbcd_length_inv__dbcd_z*cd_x
-      dbcd_length_inv__dbz=dbcd_length_inv__dbcd_x*cd_y
-     3 - dbcd_length_inv__dbcd_y*cd_x
-      dbcd_length_inv__dcx=dbcd_length_inv__dbcd_y*dbcd_y__dcx
+      dbcd_length_inv__dbx=dbcd_length_inv__dbcd_y*dbcd_y__dbx 
+     4 + dbcd_length_inv__dbcd_z*dbcd_z__dbx
+      dbcd_length_inv__dby=dbcd_length_inv__dbcd_x*dbcd_x__dby 
+     4 + dbcd_length_inv__dbcd_z*dbcd_z__dby
+      dbcd_length_inv__dbz=dbcd_length_inv__dbcd_x*dbcd_x__dbz 
+     4 + dbcd_length_inv__dbcd_y*dbcd_y__dbz
+      dbcd_length_inv__dcx=dbcd_length_inv__dbcd_y*dbcd_y__dcx 
      4 + dbcd_length_inv__dbcd_z*dbcd_z__dcx
-      dbcd_length_inv__dcy=dbcd_length_inv__dbcd_x*dbcd_x__dcy
+      dbcd_length_inv__dcy=dbcd_length_inv__dbcd_x*dbcd_x__dcy 
      4 + dbcd_length_inv__dbcd_z*dbcd_z__dcy
-      dbcd_length_inv__dcz=dbcd_length_inv__dbcd_x*dbcd_x__dcz
-     3 + dbcd_length_inv__dbcd_y*dbcd_y__dcz
-      dbcd_length_inv__ddx=dbcd_length_inv__dbcd_y*bc_z
-     4 - dbcd_length_inv__dbcd_z*bc_y
-      dbcd_length_inv__ddy=-dbcd_length_inv__dbcd_x*bc_z
-     4 + dbcd_length_inv__dbcd_z*bc_x
-      dbcd_length_inv__ddz=dbcd_length_inv__dbcd_x*bc_y
-     3 - dbcd_length_inv__dbcd_y*bc_x
+      dbcd_length_inv__dcz=dbcd_length_inv__dbcd_x*dbcd_x__dcz 
+     4 + dbcd_length_inv__dbcd_y*dbcd_y__dcz
+      dbcd_length_inv__ddx=dbcd_length_inv__dbcd_y*dbcd_y__ddx 
+     4 + dbcd_length_inv__dbcd_z*dbcd_z__ddx
+      dbcd_length_inv__ddy=dbcd_length_inv__dbcd_x*dbcd_x__ddy 
+     4 + dbcd_length_inv__dbcd_z*dbcd_z__ddy
+      dbcd_length_inv__ddz=dbcd_length_inv__dbcd_x*dbcd_x__ddz 
+     4 + dbcd_length_inv__dbcd_y*dbcd_y__ddz
 
 
 c abc1_x=abc_x*abc_length_inv
@@ -295,7 +303,7 @@ c abc1_z=abc_z*abc_length_inv
       dabc1_z__dabc_length_inv=abc_z
 
 
-c derivation of the components of the normals
+c derivative of the components of the normals
 c abc1_x=abc_x*abc_length_inv
 c abc1_y=abc_y*abc_length_inv
 c abc1_z=abc_z*abc_length_inv
@@ -368,7 +376,7 @@ c bcd1_z=bcd_z*bcd_length_inv
       dbcd1_y__dbcd_length_inv=bcd_y
       dbcd1_z__dbcd_length_inv=bcd_z
 
-
+ 
 c bcd1_x=bcd_x*bcd_length_inv
 c bcd1_y=bcd_y*bcd_length_inv
 c bcd1_z=bcd_z*bcd_length_inv
@@ -525,7 +533,7 @@ c aux_z=abc1_x*bc1_y-bc1_x*abc1_y
      4 + daux_z__dbc1_x*dbc1_x__dcz + daux_z__dabc1_y*dabc1_y__dcz
 
 
-c derivation of y
+c derivative of y
 c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
       dy__dax=
      2 bcd1_x*daux_x__dax + 
@@ -577,7 +585,7 @@ c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
      4 aux_z*dbcd1_z__ddz
 
 
-c derivation of x
+c derivative of x
 c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
       dx__dax=
      2 bcd1_x*dabc1_x__dax + 
@@ -629,7 +637,7 @@ c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
      4 abc1_z*dbcd1_z__ddz
 
 
-c derivation atan2(y,x) according to x and y
+c derivative atan2(y,x) according to x and y
       df__dx=-y/(x**2 + y**2)
       df__dy=x/(x**2 + y**2)
 
@@ -663,14 +671,6 @@ c// to be read from bottom to top
 c////////////////////////////////////////////////////////////////////////
 c////////////////////////////////////////////////////////////////////////
 
-
-c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
-      dbc_length_inv__dbx= dbc_length_inv__dbc_x*dbc_x__dbx
-      dbc_length_inv__dby= dbc_length_inv__dbc_y*dbc_y__dby
-      dbc_length_inv__dbz= dbc_length_inv__dbc_z*dbc_z__dbz
-      dbc_length_inv__dcx= dbc_length_inv__dbc_x*dbc_x__dcx
-      dbc_length_inv__dcy= dbc_length_inv__dbc_y*dbc_y__dcy
-      dbc_length_inv__dcz= dbc_length_inv__dbc_z*dbc_z__dcz
 
 
 c bcd_length_inv_cub=bcd_length_inv**3
@@ -718,6 +718,9 @@ c dabc_length_inv__dabc_z=-abc_z*abc_length_inv_cub
 c bc_length_inv_cub=bc_length_inv**3
       dbc_length_inv_cub__dbx=
      1        dbc_length_inv_cub__dbc_length_inv*dbc_length_inv__dbx
+c correct
+      write(*,*)"dbc_length_inv_cub__dbx [-0.0537]",
+     1                                       dbc_length_inv_cub__dbx
       dbc_length_inv_cub__dby=
      1        dbc_length_inv_cub__dbc_length_inv*dbc_length_inv__dby
       dbc_length_inv_cub__dbz=
@@ -960,38 +963,38 @@ c dabc_z__dby=-ab_x - bc_x
       ddabc_z11dby__dab_x=-1
       ddabc_z11dby__dbc_x=-1
 
+c double
+c c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
+c       dbc_length_inv__dbx=dbc_length_inv__dbc_x*dbc_x__dbx
+c       dbc_length_inv__dby=dbc_length_inv__dbc_y*dbc_y__dby
+c       dbc_length_inv__dbz=dbc_length_inv__dbc_z*dbc_z__dbz
+c       dbc_length_inv__dcx=dbc_length_inv__dbc_x*dbc_x__dcx
+c       dbc_length_inv__dcy=dbc_length_inv__dbc_y*dbc_y__dcy
+c       dbc_length_inv__dcz=dbc_length_inv__dbc_z*dbc_z__dcz
 
-c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
-      dbc_length_inv__dbx=dbc_length_inv__dbc_x*dbc_x__dbx
-      dbc_length_inv__dby=dbc_length_inv__dbc_y*dbc_y__dby
-      dbc_length_inv__dbz=dbc_length_inv__dbc_z*dbc_z__dbz
-      dbc_length_inv__dcx=dbc_length_inv__dbc_x*dbc_x__dcx
-      dbc_length_inv__dcy=dbc_length_inv__dbc_y*dbc_y__dcy
-      dbc_length_inv__dcz=dbc_length_inv__dbc_z*dbc_z__dcz
 
-
-c dbc_length_inv__dbc_x=-bc_x*bc_length_inv_cub
-      ddbc_length_inv11dbc_x__dbx=
-     1   ddbc_length_inv11dbc_x__dbc_x*dbc_x__dbx
-     1 + ddbc_length_inv11dbc_x__dbc_length_inv_cub*
+c dbc_length_inv__dbx=-bc_x*bc_length_inv_cub
+      ddbc_length_inv11dbx__dbx=
+     1   ddbc_length_inv11dbx__dbc_x*dbc_x__dbx
+     1 + ddbc_length_inv11dbx__dbc_length_inv_cub*
      1                                     dbc_length_inv_cub__dbx
       ddbc_length_inv11dbc_x__dby=
-     1  ddbc_length_inv11dbc_x__dbc_length_inv_cub*
+     1  ddbc_length_inv11dbx__dbc_length_inv_cub*
      1                                     dbc_length_inv_cub__dby
       ddbc_length_inv11dbc_x__dbz=
-     1  ddbc_length_inv11dbc_x__dbc_length_inv_cub*
+     1  ddbc_length_inv11dbx__dbc_length_inv_cub*
      1                                     dbc_length_inv_cub__dbz
       ddbc_length_inv11dbc_x__dcx=
-     1   ddbc_length_inv11dbc_x__dbc_x*dbc_x__dcx
-     1 + ddbc_length_inv11dbc_x__dbc_length_inv_cub*
+     1   ddbc_length_inv11dbx__dbc_x*dbc_x__dcx
+     1 + ddbc_length_inv11dbx__dbc_length_inv_cub*
      1                                     dbc_length_inv_cub__dcx
       ddbc_length_inv11dbc_x__dcy=
-     1  ddbc_length_inv11dbc_x__dbc_length_inv_cub*
+     1  ddbc_length_inv11dbx__dbc_length_inv_cub*
      1                                     dbc_length_inv_cub__dcy
       ddbc_length_inv11dbc_x__dcz=
-     1  ddbc_length_inv11dbc_x__dbc_length_inv_cub*
+     1  ddbc_length_inv11dbx__dbc_length_inv_cub*
      1                                     dbc_length_inv_cub__dcz
-c dbc_length_inv__dbc_y=-bc_y*bc_length_inv_cub
+c dbc_length_inv__dby=-bc_y*bc_length_inv_cub
       ddbc_length_inv11dbc_y__dby=
      1   ddbc_length_inv11dbc_y__dbc_y*dbc_y__dby
      1 + ddbc_length_inv11dbc_y__dbc_length_inv_cub*
@@ -1009,7 +1012,7 @@ c dbc_length_inv__dbc_y=-bc_y*bc_length_inv_cub
       ddbc_length_inv11dbc_y__dcz=
      1  ddbc_length_inv11dbc_y__dbc_length_inv_cub*
      1                                     dbc_length_inv_cub__dcz
-c dbc_length_inv__dbc_z=-bc_z*bc_length_inv_cub
+c dbc_length_inv__dbz=-bc_z*bc_length_inv_cub
       ddbc_length_inv11dbc_z__dbz=
      1   ddbc_length_inv11dbc_z__dbc_z*dbc_z__dbz
      1 + ddbc_length_inv11dbc_z__dbc_length_inv_cub*
@@ -1026,65 +1029,65 @@ c dbc_length_inv__dbc_z=-bc_z*bc_length_inv_cub
      1                                     dbc_length_inv_cub__dcz
 
 
-c dbc1_x__dbx= bc_length_inv + bc_x*dbc_length_inv__dbc_x
+c dbc1_x__dbx= bc_length_inv + bc_x*dbc_length_inv__dbx
       ddbc1_x11dbx__dbc_length_inv=1
-      ddbc1_x11dbx__dbc_x=dbc_length_inv__dbc_x
+      ddbc1_x11dbx__dbc_x=dbc_length_inv__dbx
       ddbc1_x11dbx__ddbc_length_inv11dbc_x=bc_x
-c dbc1_x__dby= bc_x*dbc_length_inv__dbc_y
-      ddbc1_x11dby__dbc_x=dbc_length_inv__dbc_y
+c dbc1_x__dby= bc_x*dbc_length_inv__dby
+      ddbc1_x11dby__dbc_x=dbc_length_inv__dby
       ddbc1_x11dby__ddbc_length_inv11dbc_y=bc_x
-c dbc1_x__dbz= bc_x*dbc_length_inv__dbc_z
-      ddbc1_x11dbz__dbc_x=dbc_length_inv__dbc_z
+c dbc1_x__dbz= bc_x*dbc_length_inv__dbz
+      ddbc1_x11dbz__dbc_x=dbc_length_inv__dbz
       ddbc1_x11dbz__ddbc_length_inv11dbc_z=bc_x
-c dbc1_x__dcx= -bc_length_inv - bc_x*dbc_length_inv__dbc_x
+c dbc1_x__dcx= -bc_length_inv - bc_x*dbc_length_inv__dbx
       ddbc1_x11dcx__dbc_length_inv=-1
-      ddbc1_x11dcx__dbc_x=-dbc_length_inv__dbc_x
+      ddbc1_x11dcx__dbc_x=-dbc_length_inv__dbx
       ddbc1_x11dcx__ddbc_length_inv11dbc_x=-bc_x
-c dbc1_x__dcy= -bc_x*dbc_length_inv__dbc_y
-      ddbc1_x11dcy__dbc_x=-dbc_length_inv__dbc_y
+c dbc1_x__dcy= -bc_x*dbc_length_inv__dby
+      ddbc1_x11dcy__dbc_x=-dbc_length_inv__dby
       ddbc1_x11dcy__ddbc_length_inv11dbc_y=-bc_x
-c dbc1_x__dcz= -bc_x*dbc_length_inv__dbc_z
-      ddbc1_x11dcz__dbc_x=-dbc_length_inv__dbc_z
+c dbc1_x__dcz= -bc_x*dbc_length_inv__dbz
+      ddbc1_x11dcz__dbc_x=-dbc_length_inv__dbz
       ddbc1_x11dcz__ddbc_length_inv11dbc_z=-bc_x
-c dbc1_y__dbx= bc_y*dbc_length_inv__dbc_x
-      ddbc1_y11dbx__dbc_y=dbc_length_inv__dbc_x
-      ddbc1_y11dbx__ddbc_length_inv11dbc_x=bc_y
-c dbc1_y__dby= bc_length_inv + bc_y*dbc_length_inv__dbc_y
+c dbc1_y__dbx= bc_y*dbc_length_inv__dbx
+      ddbc1_y11dbx__dbc_y=dbc_length_inv__dbx
+      ddbc1_y11dbx__ddbc_length_inv11dbx=bc_y
+c dbc1_y__dby= bc_length_inv + bc_y*dbc_length_inv__dby
       ddbc1_y11dby__dbc_length_inv=1
-      ddbc1_y11dby__dbc_y=dbc_length_inv__dbc_y
+      ddbc1_y11dby__dbc_y=dbc_length_inv__dby
       ddbc1_y11dby__ddbc_length_inv11dbc_y=bc_y
-c dbc1_y__dbz= bc_y*dbc_length_inv__dbc_z
-      ddbc1_y11dbz__dbc_y=dbc_length_inv__dbc_z
+c dbc1_y__dbz= bc_y*dbc_length_inv__dbz
+      ddbc1_y11dbz__dbc_y=dbc_length_inv__dbz
       ddbc1_y11dbz__ddbc_length_inv11dbc_z=bc_y
-c dbc1_y__dcx= -bc_y*dbc_length_inv__dbc_x
-      ddbc1_y11dcx__dbc_y=-dbc_length_inv__dbc_x
+c dbc1_y__dcx= -bc_y*dbc_length_inv__dbx
+      ddbc1_y11dcx__dbc_y=-dbc_length_inv__dbx
       ddbc1_y11dcx__ddbc_length_inv11dbc_x=-bc_y
-c dbc1_y__dcy= -bc_length_inv - bc_y*dbc_length_inv__dbc_y
+c dbc1_y__dcy= -bc_length_inv - bc_y*dbc_length_inv__dby
       ddbc1_y11dcy__dbc_length_inv=-1
-      ddbc1_y11dcy__dbc_y=-dbc_length_inv__dbc_y
+      ddbc1_y11dcy__dbc_y=-dbc_length_inv__dby
       ddbc1_y11dcy__ddbc_length_inv11dbc_y=-bc_y
-c dbc1_y__dcz= -bc_y*dbc_length_inv__dbc_z
-      ddbc1_y11dcz__dbc_y=-dbc_length_inv__dbc_z
+c dbc1_y__dcz= -bc_y*dbc_length_inv__dbz
+      ddbc1_y11dcz__dbc_y=-dbc_length_inv__dbz
       ddbc1_y11dcz__ddbc_length_inv11dbc_z=-bc_y
-c dbc1_z__dbx= bc_z*dbc_length_inv__dbc_x
-      ddbc1_z11dbx__dbc_z=dbc_length_inv__dbc_x
+c dbc1_z__dbx= bc_z*dbc_length_inv__dbx
+      ddbc1_z11dbx__dbc_z=dbc_length_inv__dbx
       ddbc1_z11dbx__ddbc_length_inv11dbc_x=bc_z
-c dbc1_z__dby= bc_z*dbc_length_inv__dbc_y
-      ddbc1_z11dby__dbc_z=dbc_length_inv__dbc_y
+c dbc1_z__dby= bc_z*dbc_length_inv__dby
+      ddbc1_z11dby__dbc_z=dbc_length_inv__dby
       ddbc1_z11dby__ddbc_length_inv11dbc_y=bc_z
-c dbc1_z__dbz= bc_length_inv + bc_z*dbc_length_inv__dbc_z
+c dbc1_z__dbz= bc_length_inv + bc_z*dbc_length_inv__dbz
       ddbc1_z11dbz__dbc_length_inv=1
-      ddbc1_z11dbz__dbc_z=dbc_length_inv__dbc_z
+      ddbc1_z11dbz__dbc_z=dbc_length_inv__dbz
       ddbc1_z11dbz__ddbc_length_inv11dbc_z=bc_z
-c dbc1_z__dcx= -bc_z*dbc_length_inv__dbc_x
-      ddbc1_z11dcx__dbc_z=-dbc_length_inv__dbc_x
+c dbc1_z__dcx= -bc_z*dbc_length_inv__dbx
+      ddbc1_z11dcx__dbc_z=-dbc_length_inv__dbx
       ddbc1_z11dcx__ddbc_length_inv11dbc_x=-bc_z
-c dbc1_z__dcy= -bc_z*dbc_length_inv__dbc_y
-      ddbc1_z11dcy__dbc_z=-dbc_length_inv__dbc_y
+c dbc1_z__dcy= -bc_z*dbc_length_inv__dby
+      ddbc1_z11dcy__dbc_z=-dbc_length_inv__dby
       ddbc1_z11dcy__ddbc_length_inv11dbc_y=-bc_z
-c dbc1_z__dcz= -bc_length_inv - bc_z*dbc_length_inv__dbc_z
+c dbc1_z__dcz= -bc_length_inv - bc_z*dbc_length_inv__dbz
       ddbc1_z11dcz__dbc_length_inv=-1
-      ddbc1_z11dcz__dbc_z=-dbc_length_inv__dbc_z
+      ddbc1_z11dcz__dbc_z=-dbc_length_inv__dbz
       ddbc1_z11dcz__ddbc_length_inv11dbc_z=-bc_z
 
 
@@ -1671,86 +1674,95 @@ c dabc1_z__dcz= abc_z*dabc_length_inv__dcz
       ddabc1_z11dcz__ddabc_length_inv11dcz=abc_z
 
 
-
-c dbc1_x__dbx= bc_length_inv + bc_x*dbc_length_inv__dbc_x
+c dbc1_x__dbx= bc_length_inv            + bc_x*dbc_length_inv__dbx
+c dbc1_x__dbx= bc_length_inv*dbc_x__dbx + bc_x*dbc_length_inv__dbx
       ddbc1_x11dbx__dbx=
      1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dbx
      1 +ddbc1_x11dbx__dbc_x*dbc_x__dbx
-     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbx
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dbx
       ddbc1_x11dbx__dby=
      1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dby
-     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dby
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dby
       ddbc1_x11dbx__dbz=
      1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dbz
-     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbz
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dbz
       ddbc1_x11dbx__dcx=
      1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dcx
      1 +ddbc1_x11dbx__dbc_x*dbc_x__dcx
-     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcx
       ddbc1_x11dbx__dcy=
      1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dcy
-     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcy
       ddbc1_x11dbx__dcz=
      1  ddbc1_x11dbx__dbc_length_inv*dbc_length_inv__dcz
-     1 +ddbc1_x11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
-c dbc1_x__dby= bc_x*dbc_length_inv__dbc_y
+     1 +ddbc1_x11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcz
+c dbc1_x__dby= bc_x*dbc_length_inv__dby
+c dbc1_x__dby=                            bc_x*dbc_length_inv__dby
       ddbc1_x11dby__dby=
-     1 ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dby
+     1 ddbc1_x11dby__ddbc_length_inv11dby*ddbc_length_inv11dby__dby
       ddbc1_x11dby__dbz=
-     1 ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dbz
+     1 ddbc1_x11dby__ddbc_length_inv11dby*ddbc_length_inv11dby__dbz
       ddbc1_x11dby__dcx=
      1  ddbc1_x11dby__dbc_x*dbc_x__dcx
-     1 +ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcx
+     1 +ddbc1_x11dby__ddbc_length_inv11dby*ddbc_length_inv11dby__dcx
       ddbc1_x11dby__dcy=
-     1 ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcy
+     1 ddbc1_x11dby__ddbc_length_inv11dby*ddbc_length_inv11dby__dcy
       ddbc1_x11dby__dcz=
-     1 ddbc1_x11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
-c dbc1_x__dbz= bc_x*dbc_length_inv__dbc_z
+     1 ddbc1_x11dby__ddbc_length_inv11dby*ddbc_length_inv11dby__dcz
+c dbc1_x__dbz= bc_x*dbc_length_inv__dbz
+c dbc1_x__dbz=                            bc_x*dbc_length_inv__dbz
       ddbc1_x11dbz__dbz=
-     1 ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dbz
+     1 ddbc1_x11dbz__ddbc_length_inv11dbz*ddbc_length_inv11dbz__dbz
       ddbc1_x11dbz__dcx=
      1  ddbc1_x11dbz__dbc_x*dbc_x__dcx
-     1 +ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcx
+     1 +ddbc1_x11dbz__ddbc_length_inv11dbz*ddbc_length_inv11dbz__dcx
       ddbc1_x11dbz__dcy=
-     1 ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcy
+     1 ddbc1_x11dbz__ddbc_length_inv11dbz*ddbc_length_inv11dbz__dcy
       ddbc1_x11dbz__dcz=
-     1 ddbc1_x11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
-c dbc1_x__dcx= -bc_length_inv - bc_x*dbc_length_inv__dbc_x
+     1 ddbc1_x11dbz__ddbc_length_inv11dbz*ddbc_length_inv11dbz__dcz
+c dbc1_x__dcx= -bc_length_inv - bc_x*dbc_length_inv__dbx
+c dbc1_x__dcx= bc_length_inv*dbc_x__dcx + bc_x*dbc_length_inv__dcx
       ddbc1_x11dcx__dcx=
      1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__dcx
      1 +ddbc1_x11dcx__dbc_x*dbc_x__dcx
-     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcx
       ddbc1_x11dcx__dcy=
      1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__dcy
-     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcy
       ddbc1_x11dcx__dcz=
      1  ddbc1_x11dcx__dbc_length_inv*dbc_length_inv__dcz
-     1 +ddbc1_x11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
-c dbc1_x__dcy= -bc_x*dbc_length_inv__dbc_y
+     1 +ddbc1_x11dcx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcz
+c dbc1_x__dcy= -bc_x*dbc_length_inv__dby
+c dbc1_x__dcy=                            bc_x*dbc_length_inv__dcy
       ddbc1_x11dcy__dcy=
-     1 ddbc1_x11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcy
+     1 ddbc1_x11dcy__ddbc_length_inv11dby*ddbc_length_inv11dby__dcy
       ddbc1_x11dcy__dcz=
-     1 ddbc1_x11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
-c dbc1_x__dcz= -bc_x*dbc_length_inv__dbc_z
+     1 ddbc1_x11dcy__ddbc_length_inv11dby*ddbc_length_inv11dby__dcz
+c dbc1_x__dcz= -bc_x*dbc_length_inv__dbz
+c dbc1_x__dcz=                            bc_x*dbc_length_inv__dcz
       ddbc1_x11dcz__dcz=
-     1 ddbc1_x11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
+     1 ddbc1_x11dcz__ddbc_length_inv11dbz*ddbc_length_inv11dbz__dcz
 
-c dbc1_y__dbx= bc_y*dbc_length_inv__dbc_x
-      ddbc1_y11dbx__dbx=
-     1 ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbx
+c dbc1_y__dbx= bc_y*dbc_length_inv__dbx
+c dbc1_y__dbx= bc_y*dbc_length_inv__dbx
+      ddbc1_y11dbx__dbx= 
+     1  ddbc1_y11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dbx
+      write(*,*)"ddbc1_y11dbx__dbx [0.0716]",ddbc1_y11dbx__dbx
+      write(*,*)
+     1  ddbc1_y11dbx__ddbc_length_inv11dbx,ddbc_length_inv11dbx__dbx
       ddbc1_y11dbx__dby=
      1  ddbc1_y11dbx__dbc_y*dbc_y__dby
-     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dby
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dby
       ddbc1_y11dbx__dbz=
-     1 ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbz
+     1  ddbc1_y11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dbz
       ddbc1_y11dbx__dcx=
-     1 ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
+     1  ddbc1_y11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcx
       ddbc1_y11dbx__dcy=
      1  ddbc1_y11dbx__dbc_y*dbc_y__dcy
-     1 +ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
+     1 +ddbc1_y11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcy
       ddbc1_y11dbx__dcz=
-     1 ddbc1_y11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
-c dbc1_y__dby= bc_length_inv + bc_y*dbc_length_inv__dbc_y
+     1  ddbc1_y11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcz
+c dbc1_y__dby= bc_length_inv + bc_y*dbc_length_inv__dby
       ddbc1_y11dby__dby=
      1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__dby
      1 +ddbc1_y11dby__dbc_y*dbc_y__dby
@@ -1768,7 +1780,7 @@ c dbc1_y__dby= bc_length_inv + bc_y*dbc_length_inv__dbc_y
       ddbc1_y11dby__dcz=
      1  ddbc1_y11dby__dbc_length_inv*dbc_length_inv__dcz
      1 +ddbc1_y11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
-c dbc1_y__dbz= bc_y*dbc_length_inv__dbc_z
+c dbc1_y__dbz= bc_y*dbc_length_inv__dbz
       ddbc1_y11dbz__dbz=
      1 ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dbz
       ddbc1_y11dbz__dcx=
@@ -1778,7 +1790,7 @@ c dbc1_y__dbz= bc_y*dbc_length_inv__dbc_z
      1 +ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcy
       ddbc1_y11dbz__dcz=
      1 ddbc1_y11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
-c dbc1_y__dcx= -bc_y*dbc_length_inv__dbc_x
+c dbc1_y__dcx= -bc_y*dbc_length_inv__dbx
       ddbc1_y11dcx__dcx=
      1 ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
       ddbc1_y11dcx__dcy=
@@ -1786,7 +1798,7 @@ c dbc1_y__dcx= -bc_y*dbc_length_inv__dbc_x
      1 +ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
       ddbc1_y11dcx__dcz=
      1 ddbc1_y11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
-c dbc1_y__dcy= -bc_length_inv - bc_y*dbc_length_inv__dbc_y
+c dbc1_y__dcy= -bc_length_inv - bc_y*dbc_length_inv__dby
       ddbc1_y11dcy__dcy=
      1  ddbc1_y11dcy__dbc_length_inv*dbc_length_inv__dcy
      1 +ddbc1_y11dcy__dbc_y*dbc_y__dcy
@@ -1794,26 +1806,27 @@ c dbc1_y__dcy= -bc_length_inv - bc_y*dbc_length_inv__dbc_y
       ddbc1_y11dcy__dcz=
      1  ddbc1_y11dcy__dbc_length_inv*dbc_length_inv__dcz
      1 +ddbc1_y11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
-c dbc1_y__dcz= -bc_y*dbc_length_inv__dbc_z
+c dbc1_y__dcz= -bc_y*dbc_length_inv__dbz
       ddbc1_y11dcz__dcz=
      1 ddbc1_y11dcz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
 
-c dbc1_z__dbx= bc_z*dbc_length_inv__dbc_x
+c dbc1_z__dbx= bc_z*dbc_length_inv__dbx
+c dbc1_z__dbx= bc_z*dbc_length_inv__dbx
       ddbc1_z11dbx__dbx=
-     1 ddbc1_z11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbx
+     1 ddbc1_z11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dbx
       ddbc1_z11dbx__dby=
-     1 ddbc1_z11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dby
+     1 ddbc1_z11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dby
       ddbc1_z11dbx__dbz=
      1  ddbc1_z11dbx__dbc_z*dbc_z__dbz
-     1 +ddbc1_z11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dbz
+     1 +ddbc1_z11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dbz
       ddbc1_z11dbx__dcx=
-     1 ddbc1_z11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
+     1 ddbc1_z11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcx
       ddbc1_z11dbx__dcy=
-     1 ddbc1_z11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcy
+     1 ddbc1_z11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcy
       ddbc1_z11dbx__dcz=
      1  ddbc1_z11dbx__dbc_z*dbc_z__dcz
-     1 +ddbc1_z11dbx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
-c dbc1_z__dby= bc_z*dbc_length_inv__dbc_y
+     1 +ddbc1_z11dbx__ddbc_length_inv11dbx*ddbc_length_inv11dbx__dcz
+c dbc1_z__dby= bc_z*dbc_length_inv__dby
       ddbc1_z11dby__dby=
      1 ddbc1_z11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dby
       ddbc1_z11dby__dbz=
@@ -1826,7 +1839,7 @@ c dbc1_z__dby= bc_z*dbc_length_inv__dbc_y
       ddbc1_z11dby__dcz=
      1  ddbc1_z11dby__dbc_z*dbc_z__dcz
      1 +ddbc1_z11dby__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
-c dbc1_z__dbz= bc_length_inv + bc_z*dbc_length_inv__dbc_z
+c dbc1_z__dbz= bc_length_inv + bc_z*dbc_length_inv__dbz
       ddbc1_z11dbz__dbz=
      1  ddbc1_z11dbz__dbc_length_inv*dbc_length_inv__dbz
      1 +ddbc1_z11dbz__dbc_z*dbc_z__dbz
@@ -1841,7 +1854,7 @@ c dbc1_z__dbz= bc_length_inv + bc_z*dbc_length_inv__dbc_z
      1  ddbc1_z11dbz__dbc_length_inv*dbc_length_inv__dcz
      1 +ddbc1_z11dbz__dbc_z*dbc_z__dcz
      1 +ddbc1_z11dbz__ddbc_length_inv11dbc_z*ddbc_length_inv11dbc_z__dcz
-c dbc1_z__dcx= -bc_z*dbc_length_inv__dbc_x
+c dbc1_z__dcx= -bc_z*dbc_length_inv__dbx
       ddbc1_z11dcx__dcx=
      1 ddbc1_z11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcx
       ddbc1_z11dcx__dcy=
@@ -1849,13 +1862,13 @@ c dbc1_z__dcx= -bc_z*dbc_length_inv__dbc_x
       ddbc1_z11dcx__dcz=
      1  ddbc1_z11dcx__dbc_z*dbc_z__dcz
      1 +ddbc1_z11dcx__ddbc_length_inv11dbc_x*ddbc_length_inv11dbc_x__dcz
-c dbc1_z__dcy= -bc_z*dbc_length_inv__dbc_y
+c dbc1_z__dcy= -bc_z*dbc_length_inv__dby
       ddbc1_z11dcy__dcy=
      1 ddbc1_z11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcy
       ddbc1_z11dcy__dcz=
      1  ddbc1_z11dcy__dbc_z*dbc_z__dcz
      1 +ddbc1_z11dcy__ddbc_length_inv11dbc_y*ddbc_length_inv11dbc_y__dcz
-c dbc1_z__dcz= -bc_length_inv - bc_z*dbc_length_inv__dbc_z
+c dbc1_z__dcz= -bc_length_inv - bc_z*dbc_length_inv__dbz
       ddbc1_z11dcz__dcz=
      1  ddbc1_z11dcz__dbc_length_inv*dbc_length_inv__dcz
      1 +ddbc1_z11dcz__dbc_z*dbc_z__dcz
@@ -2467,8 +2480,8 @@ cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 c block 3a
 
 c df__dx=-y/(x**2 + y**2)
-      ddf11dx__dx= -2*x/(x**2 + y**2) * df__dx
-      ddf11dx__dy= (-2*y/(x**2 + y**2) + 1/y ) * df__dx
+      ddf11dx__dx= -2.d0*x/(x**2 + y**2) * df__dx
+      ddf11dx__dy= (-2.d0*y/(x**2 + y**2) + 1.d0/y ) * df__dx
 c df__dy=x/(x**2 + y**2)
       ddf11dy__dx= ddf11dx__dy
       ddf11dy__dy= -ddf11dx__dx
@@ -3236,6 +3249,16 @@ c daux_x__dbx= bc1_z*dabc1_y__dbx + abc1_y*dbc1_z__dbx - abc1_z*dbc1_y__dbx - bc
      1 + ddaux_x11dbx__ddbc1_y11dbx*ddbc1_y11dbx__dbx
      1 + ddaux_x11dbx__dbc1_y*dbc1_y__dbx
      1 + ddaux_x11dbx__ddabc1_z11dbx*ddabc1_z11dbx__dbx
+      write(*,*)"ddaux_x11dbx__dbx",ddaux_x11dbx__dbx
+      write(*,*)
+     1  ddaux_x11dbx__dbc1_z,dbc1_z__dbx,
+     1  ddaux_x11dbx__ddabc1_y11dbx,ddabc1_y11dbx__dbx,
+     1  ddaux_x11dbx__dabc1_y,dabc1_y__dbx,
+     1  ddaux_x11dbx__ddbc1_z11dbx,ddbc1_z11dbx__dbx,
+     1  ddaux_x11dbx__dabc1_z,dabc1_z__dbx,
+     1  ddaux_x11dbx__ddbc1_y11dbx,ddbc1_y11dbx__dbx,
+     1  ddaux_x11dbx__dbc1_y,dbc1_y__dbx,
+     1  ddaux_x11dbx__ddabc1_z11dbx,ddabc1_z11dbx__dbx
       ddaux_x11dbx__dby=
      1   ddaux_x11dbx__dbc1_z*dbc1_z__dby
      1 + ddaux_x11dbx__ddabc1_y11dbx*ddabc1_y11dbx__dby
@@ -5524,6 +5547,19 @@ c dy__dbx= bcd1_x*daux_x__dbx + aux_x*dbcd1_x__dbx + bcd1_y*daux_y__dbx + aux_y*
      1            + ddy11dbx__ddaux_z11dbx*ddaux_z11dbx__dbx
      1            + ddy11dbx__daux_z*daux_z__dbx
      1            + ddy11dbx__ddbcd1_z11dbx*ddbcd1_z11dbx__dbx
+      write(*,*)"ddy11dbx__dbx",ddy11dbx__dbx 
+      write(*,*) ddy11dbx__dbcd1_x,dbcd1_x__dbx,
+     1           ddy11dbx__ddaux_x11dbx,ddaux_x11dbx__dbx,
+     1           ddy11dbx__daux_x,daux_x__dbx,
+     1           ddy11dbx__ddbcd1_x11dbx,ddbcd1_x11dbx__dbx,
+     1           ddy11dbx__dbcd1_y,dbcd1_y__dbx,
+     1           ddy11dbx__ddaux_y11dbx,ddaux_y11dbx__dbx,
+     1           ddy11dbx__daux_y,daux_y__dbx,
+     1           ddy11dbx__ddbcd1_y11dbx,ddbcd1_y11dbx__dbx,
+     1           ddy11dbx__dbcd1_z,dbcd1_z__dbx,
+     1           ddy11dbx__ddaux_z11dbx,ddaux_z11dbx__dbx,
+     1           ddy11dbx__daux_z,daux_z__dbx,
+     1           ddy11dbx__ddbcd1_z11dbx,ddbcd1_z11dbx__dbx
       ddy11dbx__dby=
      1              ddy11dbx__dbcd1_x*dbcd1_x__dby
      1            + ddy11dbx__ddaux_x11dbx*ddaux_x11dbx__dby
@@ -6055,7 +6091,7 @@ c df__dax=df__dx*dx__dax + df__dy*dy__dax
      1 + ddf11dax__ddx11dax*ddx11dax__dcz
      1 + ddf11dax__ddf11dy*ddf11dy__dcz
      1 + ddf11dax__ddy11dax*ddy11dax__dcz
-c the 9 derivations with respect to a{xyz} and d{xyz} are 0
+c the 9 derivatives with respect to a{xyz} and d{xyz} are 0
       ddf11dax__ddx=0
 c     1   ddf11dax__ddf11dx*ddf11dx__ddx
 c     1 + ddf11dax__ddx11dax*ddx11dax__ddx
@@ -6184,16 +6220,32 @@ c df__dbx=df__dx*dx__dbx + df__dy*dy__dbx
      1 + ddf11dbx__ddx11dbx*ddx11dbx__dbx
      1 + ddf11dbx__ddf11dy*ddf11dy__dbx
      1 + ddf11dbx__ddy11dbx*ddy11dbx__dbx
+      write(*,*)"bxbx", ddf11dbx__dbx
+      write(*,*)ddf11dbx__ddf11dx,ddf11dx__dbx,
+     1  ddf11dbx__ddx11dbx,ddx11dbx__dbx,
+     1  ddf11dbx__ddf11dy,ddf11dy__dbx,
+     1  ddf11dbx__ddy11dbx,ddy11dbx__dbx
       ddf11dbx__dby=
      1   ddf11dbx__ddf11dx*ddf11dx__dby
      1 + ddf11dbx__ddx11dbx*ddx11dbx__dby
      1 + ddf11dbx__ddf11dy*ddf11dy__dby
      1 + ddf11dbx__ddy11dbx*ddy11dbx__dby
+      write(*,*)"bxby", ddf11dbx__dby
+      write(*,*)
+     1  ddf11dbx__ddf11dx,ddf11dx__dby,
+     1  ddf11dbx__ddx11dbx,ddx11dbx__dby,
+     1  ddf11dbx__ddf11dy,ddf11dy__dby,
+     1  ddf11dbx__ddy11dbx,ddy11dbx__dby
       ddf11dbx__dbz=
      1   ddf11dbx__ddf11dx*ddf11dx__dbz
      1 + ddf11dbx__ddx11dbx*ddx11dbx__dbz
      1 + ddf11dbx__ddf11dy*ddf11dy__dbz
      1 + ddf11dbx__ddy11dbx*ddy11dbx__dbz
+c      write(*,*)"bxbz", ddf11dbx__dbz
+c      write(*,*)ddf11dbx__ddf11dx,ddf11dx__dbz,
+c     1  ddf11dbx__ddx11dbx,ddx11dbx__dbz,
+c     1  ddf11dbx__ddf11dy,ddf11dy__dbz,
+c     1  ddf11dbx__ddy11dbx,ddy11dbx__dbz
       ddf11dbx__dcx=
      1   ddf11dbx__ddf11dx*ddf11dx__dcx
      1 + ddf11dbx__ddx11dbx*ddx11dbx__dcx
