@@ -17,7 +17,6 @@ C######################################################################
 
 c######################################################################
       testno=6
-      minor=1
       ax=2
       ay=0
       az=0
@@ -27,15 +26,18 @@ c######################################################################
       cx=0
       cy=1
       cz=0
+
+      minor=1
       call angle(ax,ay,az,bx,by,bz,cx,cy,cz,angle_abc)
       if(dabs(angle_abc - dpi/2).lt.e) then
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
       end if
+
+      minor=2
       call dangle(ax,ay,az,bx,by,bz,cx,cy,cz,
      2 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc)
-      minor=2
       if(dabs(dax-(0.)).lt.e.and.
      2   dabs(day-(-.5)).lt.e.and.
      2   dabs(daz-(0.)).lt.e.and.
@@ -48,7 +50,9 @@ c######################################################################
         write(iout,1)testno,minor
       else
         write(iout,2)testno,minor
+        write(*,*)dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,angle_abc
       end if
+
       minor=3
       if(dabs(angle_abc - dpi/2).lt.e) then
         write(iout,1)testno,minor
@@ -67,6 +71,7 @@ c######################################################################
      2 dcycy,dcycz,
      2 dczcz,
      3 angle_abc)
+
       minor=4
       if(dabs(daxax-(0.)).lt.e.and.
      2   dabs(daxay-(0.25)).lt.e.and.
@@ -134,6 +139,7 @@ c######################################################################
         write(*,*)dcycy,dcycz
         write(*,*)dczcz
       end if
+
       minor=5
       if(dabs(dax-(0.)).lt.e.and.
      2   dabs(day-(-.5)).lt.e.and.
@@ -148,6 +154,7 @@ c######################################################################
       else
         write(iout,2)testno,minor
       end if
+
       minor=6
       if(dabs(angle_abc - dpi/2).lt.e) then
         write(iout,1)testno,minor
