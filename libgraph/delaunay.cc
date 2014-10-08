@@ -50,28 +50,27 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
     node_t u = hole[i], v = hole[(i+1)%hole.size()], w = hole[(i+2)%hole.size()];
     dedge_t uw(u,w);
     
-    cout << "Trying edge " << uw << ": ";
+    cout << "Trying edge " << make_pair(u+1,w+1) << ": ";
     if(!edge_exists(uw)){
-	// Edge doesn't already exist - but does it lead to a consistent triangle?
+      // Edge doesn't already exist - but does it lead to a consistent triangle?
       insert_edge(uw,next(u,v),v);  // u: ..v,w,x,.. w: ...,u,v,... ; 
 	
-	// New triangle uvw has already-Delaunay neighbour triangles uvs and vwt. Is uvw screwy?
-	node_t s = nextCW(v,u), t = nextCW(w,v);
-
-	Quad q1(u,s,v,w), q2(v,t,w,u);
+      // New triangle uvw has already-Delaunay neighbour triangles uvs and vwt. Is uvw screwy?
+      node_t s = nextCW(v,u), t = nextCW(w,v);
+      Quad q1(u,s,v,w), q2(v,t,w,u);
 	
-	if(!is_consistent(q1) || !is_consistent(q2)){ // New triangle is screwy -- discard edge
-	  cout << "leads to inconsistent neighbourhood " << vector<int>(q1.v,q1.v+4) << "("<< is_consistent(q1) << ")"
-	       << " or " << vector<int>(q2.v,q2.v+4)  << "("<< is_consistent(q2) << ")\n";
+      if(!is_consistent(q1) || !is_consistent(q2)){ // New triangle is screwy -- discard edge
+	cout << "leads to inconsistent neighbourhood " << (vector<int>(q1.v,q1.v+4)+1) << "("<< is_consistent(q1) << ")"
+	     << " or " << (vector<int>(q2.v,q2.v+4)+1)  << "("<< is_consistent(q2) << ")\n";
 
-	  remove_edge(dedge_t(u,w));
-	} else { 			// New triangle is OK. Delaunayify!
-	  hole.erase(hole.begin()+((i+1)%hole.size()));       // Remove v from hole
+	remove_edge(dedge_t(u,w));
+      } else { 			// New triangle is OK. Delaunayify!
+	hole.erase(hole.begin()+((i+1)%hole.size()));       // Remove v from hole
 	  
-	  // We have possibly removed an element before the current one - find current element again.
-	  i = hole.begin() - find(hole.begin(),hole.end(),u); 
-	  new_arcs.push_back(dedge_t(u,w));
-	}
+	// We have possibly removed an element before the current one - find current element again.
+	i = hole.begin() - find(hole.begin(),hole.end(),u); 
+	new_arcs.push_back(dedge_t(u,w));
+      }
     } else {
       cout << "edge exists.\n";
     }
@@ -79,7 +78,7 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
     if(++steps > 10){
       cout << "Got stuck; graph is:\n"
 	   <<"g = " << *this << ";\n"
-	   <<"hole = " << hole << ";\n"
+	   <<"hole = " << hole+1 << ";\n"
 	   <<"newarcs = " << new_arcs <<";\n";
       abort();
     }

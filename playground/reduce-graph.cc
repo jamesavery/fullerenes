@@ -56,6 +56,7 @@ int main(int ac, char **av) {
   Polyhedron PT = fullerene_dual_polyhedron(T);
 
   output << "PT = " << PT << "\n";
+  output.close();
 
   T.remove_flat_vertices();
   output << "rT = " << T << ";\n";
