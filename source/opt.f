@@ -1519,9 +1519,10 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       call adjacency_list(graph,3,neighbours)
 
       do u=1,N
-C      s   B   t      
+C neighbours must be ordered CCW
+C      t   B   s
 C        \   /
-C       A  u   C
+C      C   u   A
 C          |
 C          r
          r = neighbours(1,u)
@@ -1541,8 +1542,8 @@ C     Do stuff here
              nd_ppp=nd_ppp+1
              d_ppp(1,nd_ppp)=u
              d_ppp(2,nd_ppp)=r
-             d_ppp(3,nd_ppp)=t
-             d_ppp(4,nd_ppp)=s
+             d_ppp(3,nd_ppp)=s
+             d_ppp(4,nd_ppp)=t
 
          case ( 16 )            ! Two pentagons, one hexagon
 C     Do stuff common to all three (2,1)-cases here
@@ -1554,24 +1555,24 @@ c               write (*,*) "655"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=t
-              d_hpp(3,nd_hpp)=s
-              d_hpp(4,nd_hpp)=r
+              d_hpp(3,nd_hpp)=r
+              d_hpp(4,nd_hpp)=s
 
             case ( 565 )  ! AC are pentagons, u--r common edge
 c               write (*,*) "565"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=r
-              d_hpp(3,nd_hpp)=t
-              d_hpp(4,nd_hpp)=s
+              d_hpp(3,nd_hpp)=s
+              d_hpp(4,nd_hpp)=t
 
             case ( 556 )  ! AB are pentagons, u--s common edge
 c               write (*,*) "556"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=s
-              d_hpp(3,nd_hpp)=r
-              d_hpp(4,nd_hpp)=t
+              d_hpp(3,nd_hpp)=t
+              d_hpp(4,nd_hpp)=r
 
             end select
 
@@ -1585,24 +1586,24 @@ c               write (*,*) "566"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=t
-              d_hhp(3,nd_hhp)=s
-              d_hhp(4,nd_hhp)=r
+              d_hhp(3,nd_hhp)=r
+              d_hhp(4,nd_hhp)=s
 
             case ( 656 )  ! AC are hexagons, u--r common edge
 c               write (*,*) "656"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=r
-              d_hhp(3,nd_hhp)=t
-              d_hhp(4,nd_hhp)=s
+              d_hhp(3,nd_hhp)=s
+              d_hhp(4,nd_hhp)=t
 
             case ( 665 )  ! AB are hexagons, u--s common edge
 c               write (*,*) "665"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=s
-              d_hhp(3,nd_hhp)=r
-              d_hhp(4,nd_hhp)=t
+              d_hhp(3,nd_hhp)=t
+              d_hhp(4,nd_hhp)=r
 
             end select
 
@@ -1613,8 +1614,8 @@ c            write (*,*) "666"
           nd_hhh=nd_hhh+1
           d_hhh(1,nd_hhh)=u
           d_hhh(2,nd_hhh)=r
-          d_hhh(3,nd_hhh)=t
-          d_hhh(4,nd_hhh)=s
+          d_hhh(3,nd_hhh)=s
+          d_hhh(4,nd_hhh)=t
 
          case DEFAULT
             write (*,*) "INVALID: ",(/lA,lB,lC/)

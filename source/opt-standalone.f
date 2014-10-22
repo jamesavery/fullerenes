@@ -94,7 +94,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Real*8 pcom(N*2),xicom(N*2)
       Integer AH(N,N),IS(6),MDist(N,N)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
-C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
+C     is performed on a function func3d, using its gradient as calculated by a routine dfunc2d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
 C     p (the location of the minimum), iter (the number of iterations that were performed),
 C     and fret (the minimum value of the function). The routine linmin3d is called to perform
@@ -113,7 +113,7 @@ C     IOP=4: Kamada-Kawai embedding
       CALL SA_func2d(N,IOP,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
       Write(Iout,1003) E0
-C     dfunc3d input vector p of length 2*N, output gradient of length 2*N user defined
+C     dfunc2d input vector p of length 2*N, output gradient of length 2*N user defined
       CALL SA_dfunc2d(N,IOP,AH,IS,MDist,maxd,p,xi,RAA)
       grad2=0.d0
       do I=1,2*N
@@ -714,6 +714,7 @@ c        force(19)=force(19)
       end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(*,1004) force(9)
 
+
 C OPTIMIZE
       CALL SA_frprmn3d(N,
      1 Dist,force,iopt,ftol,iter,fret,
@@ -726,7 +727,6 @@ C OPTIMIZE
       endif
       CALL SA_Distan(N,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(*,1001) Rmin,Rmax,rms
-
 
 
 C HESSIAN
@@ -855,7 +855,7 @@ C Sort for degeneracies
  1006 Format(' Force field parameters in au/A^2 and au/rad^2:',
      1 /1X,8F12.6,/)
  1007 Format(1X,'Optimization of geometry using harmonic oscillators',
-     1 ' for stretching and bending modes using an extension of the',
+     1 ' for bonds, angles, and dihedrals using an extension of the',
      1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
      1 ' algorithm used')
  1008 Format(' Force field parameters in au/A^2 and au/rad^2:',
@@ -1100,6 +1100,7 @@ c        p(j)=p(j)+xi_tmp(j)
       enddo
       return
       END
+
 
       SUBROUTINE SA_f1dim3d(N,
      1 f1dimf,x,xicom,pcom,force,iopt,
@@ -1674,9 +1675,10 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       call adjacency_list(graph,3,neighbours)
 
       do u=1,N
-C      s   B   t      
+C neighbours should be ordered CCW
+C      t   B   s      
 C        \   /
-C       A  u   C
+C      C   u   A
 C          |
 C          r
          r = neighbours(1,u)
@@ -1696,8 +1698,8 @@ C     Do stuff here
           nd_ppp=nd_ppp+1
           d_ppp(1,nd_ppp)=u
           d_ppp(2,nd_ppp)=r
-          d_ppp(3,nd_ppp)=t
-          d_ppp(4,nd_ppp)=s
+          d_ppp(3,nd_ppp)=s
+          d_ppp(4,nd_ppp)=t
 
          case ( 16 )            ! Two pentagons, one hexagon
 C     Do stuff common to all three (2,1)-cases here
@@ -1709,24 +1711,24 @@ c               write (*,*) "655"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=t
-              d_hpp(3,nd_hpp)=s
-              d_hpp(4,nd_hpp)=r
+              d_hpp(3,nd_hpp)=r
+              d_hpp(4,nd_hpp)=s
 
             case ( 565 )  ! AC are pentagons, u--r common edge
 c               write (*,*) "565"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=r
-              d_hpp(3,nd_hpp)=t
-              d_hpp(4,nd_hpp)=s
+              d_hpp(3,nd_hpp)=s
+              d_hpp(4,nd_hpp)=t
 
             case ( 556 )  ! AB are pentagons, u--s common edge
 c               write (*,*) "556"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=s
-              d_hpp(3,nd_hpp)=r
-              d_hpp(4,nd_hpp)=t
+              d_hpp(3,nd_hpp)=t
+              d_hpp(4,nd_hpp)=r
 
             end select
 
@@ -1740,24 +1742,24 @@ c               write (*,*) "566"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=t
-              d_hhp(3,nd_hhp)=s
-              d_hhp(4,nd_hhp)=r
+              d_hhp(3,nd_hhp)=r
+              d_hhp(4,nd_hhp)=s
 
             case ( 656 )  ! AC are hexagons, u--r common edge
 c               write (*,*) "656"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=r
-              d_hhp(3,nd_hhp)=t
-              d_hhp(4,nd_hhp)=s
+              d_hhp(3,nd_hhp)=s
+              d_hhp(4,nd_hhp)=t
 
             case ( 665 )  ! AB are hexagons, u--s common edge
 c               write (*,*) "665"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=s
-              d_hhp(3,nd_hhp)=r
-              d_hhp(4,nd_hhp)=t
+              d_hhp(3,nd_hhp)=t
+              d_hhp(4,nd_hhp)=r
 
             end select
 
@@ -1768,8 +1770,8 @@ c            write (*,*) "666"
           nd_hhh=nd_hhh+1
           d_hhh(1,nd_hhh)=u
           d_hhh(2,nd_hhh)=r
-          d_hhh(3,nd_hhh)=t
-          d_hhh(4,nd_hhh)=s
+          d_hhh(3,nd_hhh)=s
+          d_hhh(4,nd_hhh)=t
 
          case DEFAULT
             write (*,*) "INVALID: ",(/lA,lB,lC/)
@@ -2381,6 +2383,7 @@ C     Calculate norm for minimum distance sphere
 
       subroutine default_force_parameters(iopt,force)
       use config
+      implicit none
       integer iopt
       real*8 force(ffmaxdim)
       real*8 WuR5, WuR6, WuA5, WuA6, WufR5, WufR6, WufA5, WufA6,
@@ -2417,11 +2420,11 @@ c     four dihedrals: zero values (according to ideal_dihedral)
       ExtWuDhhp=23.8d0
       ExtWuDhhh=0.0d0
 c     three distances: forces (let's assume they are all the same)
-      ExtWufR=390.7d0
+      ExtWufR=390.7d0 
 c     three angles: forces (let's assume they are all the same)
       ExtWufA=160.4d0*1.45d0*1.37d0
 c     four dihedrals: forces (let's assume they are all the same)
-      ExtWufD=1.0d2
+      ExtWufD=2.0d2
 
       
       if(iopt.eq.1 .or. iopt.eq.2)then
