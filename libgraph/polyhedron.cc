@@ -270,6 +270,28 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
   return s.str();
 }
 
+void Polyhedron::orient_neighbours()
+{
+  PlanarGraph::orient_neighbours();
+  
+  // Calculate volume
+  double V=0;
+  for(node_t u=0;u<N;u++){
+    const face_t nu(neighbours[u]);
+    const coord3d centroid(nu.centroid(points));
+
+    for(int i=0;i<nu.size();i++){
+      Tri3D T(centroid, points[nu[i]],points[nu[(i+1)%nu.size()]]);
+      V += ((T.a).dot(T.n))*T.area()/T.n.norm();
+    }
+  }
+
+  if(V<0){ // Calculated normals are pointing inwards - reverse order.
+    //    printf("Inverted normals - reversing neighbours lists.\n");
+    for(node_t u=0;u<N;u++) reverse(neighbours[u].begin(), neighbours[u].end());
+  }
+}
+
 Polyhedron::Polyhedron(const string& filename)
 {
   string extension = filename_extension(filename);
@@ -281,6 +303,8 @@ Polyhedron::Polyhedron(const string& filename)
 //    (*this) = from_rspi(filename);
   else
     cerr << "File extension " << extension << " unknown. Can't infer file format.";
+
+  orient_neighbours();
 }
 
 
@@ -297,6 +321,8 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
 	for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
     } else faces = compute_faces_flat(face_max,true);
   } 
+
+  orient_neighbours();
 }
 
 Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 
@@ -617,10 +643,12 @@ Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const
 bool Polyhedron::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
+    printf("This is a fullerene.\n");
     const FullereneGraph g(*this, layout2d);
     points = g.optimized_geometry(points, opt_method, ftol);
     return true;
   } else if(is_cubic() || is_triangulation()) {
+    printf("This is not a fullerene, but is a %s.\n",is_cubic()? "cubic graph" : "triangulation");
     bool optimize_angles = true; //!is_triangulation();
     return optimize_other(optimize_angles);
   } else {
