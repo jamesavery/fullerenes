@@ -62,7 +62,7 @@ int main(int ac, char **av)
    }
 
    Polyhedron P(P0);
-   P.optimize_other();
+   P.optimize();
 
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());

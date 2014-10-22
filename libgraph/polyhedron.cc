@@ -287,7 +287,7 @@ void Polyhedron::orient_neighbours()
   }
 
   if(V<0){ // Calculated normals are pointing inwards - reverse order.
-    //printf("Inverted normals - reversing neighbours lists.\n");
+    //    printf("Inverted normals - reversing neighbours lists.\n");
     for(node_t u=0;u<N;u++) reverse(neighbours[u].begin(), neighbours[u].end());
   }
 }
