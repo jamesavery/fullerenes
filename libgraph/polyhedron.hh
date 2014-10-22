@@ -51,6 +51,8 @@ struct Polyhedron : public PlanarGraph {
     move(-x0);
   }
 
+  void orient_neighbours();
+
   bool optimize(int opt_method = 3, double ftol = 1e-10);
   bool optimize_other(bool optimize_angles = true, vector<double> zero_values_dist=vector<double>());
 
