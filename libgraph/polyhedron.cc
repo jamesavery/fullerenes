@@ -643,12 +643,12 @@ Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const
 bool Polyhedron::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
-    printf("This is a fullerene.\n");
+    //    printf("This is a fullerene.\n");
     const FullereneGraph g(*this, layout2d);
     points = g.optimized_geometry(points, opt_method, ftol);
     return true;
   } else if(is_cubic() || is_triangulation()) {
-    printf("This is not a fullerene, but is a %s.\n",is_cubic()? "cubic graph" : "triangulation");
+    //    printf("This is not a fullerene, but is a %s.\n",is_cubic()? "cubic graph" : "triangulation");
     bool optimize_angles = true; //!is_triangulation();
     return optimize_other(optimize_angles);
   } else {
