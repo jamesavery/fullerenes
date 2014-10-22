@@ -272,6 +272,7 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
 
 void Polyhedron::orient_neighbours()
 {
+  assert(layout2d.size() == N);
   PlanarGraph::orient_neighbours();
   
   // Calculate volume
@@ -311,15 +312,16 @@ Polyhedron::Polyhedron(const string& filename)
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) : 
   PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
-  //cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
+  if(layout2d.size() != N){
+    layout2d = tutte_layout(-1,-1,-1,face_max);
+  }
+
+//  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){
-    if(layout2d.size() != N){
-	layout2d = tutte_layout(-1,-1,-1,face_max);
-	faces = compute_faces_flat(face_max,true);
-	assert(outer_face.size() <= face_max);
-	face_max = 0;
-	for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
-    } else faces = compute_faces_flat(face_max,true);
+    faces = compute_faces_flat(face_max,true);
+    assert(outer_face.size() <= face_max);
+    face_max = 0;
+    for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
   } 
 
   orient_neighbours();
@@ -652,7 +654,7 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     bool optimize_angles = true; //!is_triangulation();
     return optimize_other(optimize_angles);
   } else {
-    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra and other cubic graphs." << endl;
+    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra, other cubic graphs and triangulations." << endl;
     return false;
   }
 }
