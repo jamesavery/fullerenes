@@ -473,32 +473,41 @@ void coord3d::ddihedral(const coord3d& b, const coord3d& c, const coord3d& d, co
   dd = dx__dd*df__dx + dy__dd*df__dy;
 }
 
+
 // assumes counter clockwise orientation and a convex singularity
-double coord3d::ideal_dihedral(const int lA, const int lB, const int lC)
+double coord3d::ideal_dihedral(const int A, const int B, const int C, const double ur, const double us, const double ut)
 {
-  const double eps = 1.0e-8;
-  if (1.0/lA + 1.0/lB + 1.0/lC > 0.5+eps){ // positive curvature // make sure 3 * 1/6 is recognised to be planar
 //        t   B   s      
 //          \   /
 //        C   u   A
 //            |
 //            r
+  const double eps = 1.0e-8;
+  if (1.0/A + 1.0/B + 1.0/C > 0.5+eps){ // positive curvature // make sure 3 * 1/6 is recognised to be planar
     // neighbours are sorted CCW
-    // assumption: the length of ur, us and ut is 1.  Faces A, B and C are planar.
+    // assumption: Faces A, B and C are planar.
     // calculate squares of rs, st and rt via law of cosines
-    const double rs_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lA)));
-    const double st_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lB)));
-    const double tr_2 = 2.0-2.0*cos(M_PI*(1.0-2.0/double(lC)));
+    const double ur_2 = ur*ur;
+    const double us_2 = us*us;
+    const double ut_2 = ut*ut;
+    const double rs_2 = us_2 + ur_2 - 2.0*us*ur*cos(M_PI*(1.0-2.0/double(A)));
+    const double st_2 = us_2 + ut_2 - 2.0*us*ut*cos(M_PI*(1.0-2.0/double(B)));
+    const double tr_2 = ut_2 + ur_2 - 2.0*ut*ur*cos(M_PI*(1.0-2.0/double(C)));
 
-    const double aux = sqrt( (4.0 - rs_2)*rs_2 );
-//    const double ax = 0.0, ay=0.0, az=0.0;
-    const double bx = 0.0, by=1.0, bz=0.0;
-    const double cx = 0.5 * aux;
-    const double cy = 1.0 - rs_2/2.0;
-    const double cz = 0.0;
-    const double dx = (rs_2*(2.0 - tr_2) + 2.0*tr_2 - 2.0*st_2) / (2.0*aux);
-    const double dy = 1.0 - tr_2/2.0;
-    const double dz = sqrt(-( rs_2*rs_2 + rs_2*(tr_2*(-2.0 + st_2) - 2.0*st_2) + pow(tr_2 - st_2,2))) / aux;
+    const double bx = 0;
+    const double by = sqrt(ur_2);
+    const double bz = 0;
+    const double cx = 0.5 * sqrt((-pow(ur_2,2) - pow(us_2 - rs_2,2) + 2*ur_2*(us_2 + rs_2))/(ur_2));
+    const double cy = (ur_2 + us_2 - rs_2)/(2.*sqrt(ur_2));
+    const double cz = 0;
+    const double dx = -(pow(ur_2,2) + (us_2 - rs_2)*(ut_2 - tr_2) - ur_2*(us_2 + ut_2 + rs_2 + tr_2 - 2*st_2))
+                        / (2.*sqrt(ur_2)*sqrt(-pow(ur_2,2) - pow(us_2 - rs_2,2) + 2*ur_2*(us_2 + rs_2)));
+    const double dy = (ur_2 + ut_2 - tr_2)/(2.*sqrt(ur_2));
+    const double dz = sqrt((pow(us_2,2)*tr_2 + pow(ur_2,2)*st_2 + rs_2*(pow(ut_2,2) + ut_2*(rs_2 - tr_2 - st_2) + tr_2*st_2) 
+                       - us_2*(ut_2*(rs_2 + tr_2 - st_2) + tr_2*(rs_2 - tr_2 + st_2))
+                       - ur_2*((rs_2 + tr_2 - st_2)*st_2 + ut_2*(rs_2 - tr_2 + st_2) + us_2*(-rs_2 + tr_2 + st_2)))
+                       / (pow(ur_2,2) + pow(us_2 - rs_2,2) - 2*ur_2*(us_2 + rs_2)));
+
 //    cout << "bx,by,bz: " << bx<<" " <<by<<" "<<bz << endl;
 //    cout << "cx,cy,cz: " << cx<<" " <<cy<<" "<<cz << endl;
 //    cout << "dx,dy,dz: " << dx<<" " <<dy<<" "<<dz << endl;
