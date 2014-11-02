@@ -14,7 +14,6 @@ extern "C" {
   void delete_fullerene_graph_(fullerene_graph_ptr*);
 
   polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points);
-  polyhedron_ptr new_polyhedron_from_thin_air_(const graph_ptr *g);
   polyhedron_ptr read_polyhedron_(const char *path);
   polyhedron_ptr new_c20_();	
   void delete_polyhedron_(polyhedron_ptr*);
@@ -194,13 +193,6 @@ polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points)
   vector<coord3d> vertex_points(G.N);
   for(size_t i=0;i<G.N;i++) vertex_points[i] = coord3d(&points[3*i]);
   return new Polyhedron(G,vertex_points,6); 
-}
-
-polyhedron_ptr new_polyhedron_from_thin_air_(const graph_ptr *g)
-{
-  PlanarGraph G(*(*g));
-  G.layout2d = G.tutte_layout();
-  return new Polyhedron(G,G.zero_order_geometry(),6); 
 }
 
 polyhedron_ptr read_polyhedron_(const char *path) { return new Polyhedron(path); }

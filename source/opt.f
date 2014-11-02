@@ -395,7 +395,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       real(8) hessian(number_vertices*3,number_vertices*3),
      1 evec(number_vertices*3),df(number_vertices*3)
       type(c_ptr) :: graph, new_fullerene_graph
-      type(c_ptr) :: new_polyhedron_from_thin_air, polyhedron
+      type(c_ptr) :: new_polyhedron, polyhedron
 
 c edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
@@ -415,7 +415,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       call get_corners(graph,number_vertices,
      1 a_h,a_p)
       if(iopt.eq.3.or.iopt.eq.4.or.iopt.eq.5.or.iopt.eq.6) then
-        polyhedron = new_polyhedron_from_thin_air(graph)
+        polyhedron = new_polyhedron(graph,dist)
 c       the neighbour lists of the graph must be oriented CCW when the
 c       polyhedron is viewed from the outside before get_dihedrals is called.
 c       this can only be done for an existing 3d structure.
