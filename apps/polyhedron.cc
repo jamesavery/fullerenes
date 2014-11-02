@@ -55,14 +55,14 @@ int main(int ac, char **av)
   }
 
   string basename("polyhedron-"+to_string(N));
-   {
-     ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
-     mol2 << P0.to_mol2();
-     mol2.close();
-   }
+  {
+    ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
+    mol2 << P0.to_mol2();
+    mol2.close();
+  }
 
-   Polyhedron P(P0);
-   P.optimize();
+  Polyhedron P(P0);
+  P.optimize();
 
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
@@ -84,25 +84,25 @@ int main(int ac, char **av)
     pov.close();
   }
 
-   ofstream output(("output/"+basename+".m").c_str());
+  ofstream output(("output/"+basename+".m").c_str());
 
-   facemap_t facemap(g.compute_faces(8,true));
-   output << "g = " << g << ";\n";
-   output << "coordinates0 = " << P0.points << ";\n";
-   output << "coordinates = "  << P.points << ";\n";
-   output << "pentagons = " << facemap[5] << ";\n"
-   	  << "hexagons  = " << facemap[6] << ";\n"
-   	  << "RSPI = " << RSPI << ";\n";
+  facemap_t facemap(g.compute_faces(8,true));
+  output << "g = " << g << ";\n";
+  output << "coordinates0 = " << P0.points << ";\n";
+  output << "coordinates = "  << P.points << ";\n";
+  output << "pentagons = " << facemap[5] << ";\n"
+  	  << "hexagons  = " << facemap[6] << ";\n"
+  	  << "RSPI = " << RSPI << ";\n";
 
-   output << "P0 = " << P0 << ";\n";
-   output << "P = " << P << ";\n";
+  output << "P0 = " << P0 << ";\n";
+  output << "P = " << P << ";\n";
 
-   Polyhedron D(P.dual(6,true));
-   D.layout2d = D.tutte_layout();
-   D.faces    = D.compute_faces_flat(3,true);
-   D.face_max = 3;
-   //   D.optimize();
-   output << "PD = " << D << ";\n";
+  Polyhedron D(P.dual(6,true));
+  D.layout2d = D.tutte_layout();
+  D.faces    = D.compute_faces_flat(3,true);
+  D.face_max = 3;
+  //   D.optimize();
+  output << "PD = " << D << ";\n";
   
   output.close();
 
@@ -110,8 +110,8 @@ int main(int ac, char **av)
   {
     ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
     mol2 << D.to_mol2();
-    mol2.close()
-;
+    mol2.close() ;
+
     ofstream pov(("output/"+basename+"-dual.pov").c_str());
     pov << D.to_povray();
     pov.close();

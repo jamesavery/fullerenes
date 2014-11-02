@@ -22,14 +22,14 @@ there is no layout2d in 'find_outer_face' and the assertion fails.
 ** input/RSPInano.failed
 ** input/RSPInanofailed2.inp
 
-* Force-field fails
-** C40-C2{1,2,3,4,7,11,12,16,19,20,21,22} works
-** C42-C1{1,2,3,4,11,12,14,15,17,20,22,23}
-** C42-C1{1,2,3,5,10,12,14,15,17,20,22,23}
-** C44-C2{1,2,3,10,11,12,14,15,17,21,23,24} works
-** C44-C2{1,2,3,4,7,11,14,18,21,22,23,24} works
-** C90-C2v{1,2,3,10,14,24,28,38,40,42,46,47}
-** 40  1  2  3  5  7 10 14 17 18 20 21 22 fails with and without dihedrals
+* Force-field:  these all work from app-polyhedron but some fail from fortran because the orientation is wrong
+** 40 1 2 3 4 7 11 12 16 19 20 21 22
+** 42 1 2 3 4 11 12 14 15 17 20 22 23
+** 42 1 2 3 5 10 12 14 15 17 20 22 23
+** 44 1 2 3 10 11 12 14 15 17 21 23 24
+** 44 1 2 3 4 7 11 14 18 21 22 23 24
+** 90 1 2 3 10 14 24 28 38 40 42 46 47
+** 40 1  2  3  5  7 10 14 17 18 20 21 22
 
 * [FIXED] IsomerDB class can no longer read database text-format, only binary.
 

@@ -395,6 +395,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       real(8) hessian(number_vertices*3,number_vertices*3),
      1 evec(number_vertices*3),df(number_vertices*3)
       type(c_ptr) :: graph, new_fullerene_graph
+      type(c_ptr) :: new_polyhedron_from_thin_air, polyhedron
 
 c edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
@@ -414,9 +415,17 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       call get_corners(graph,number_vertices,
      1 a_h,a_p)
       if(iopt.eq.3.or.iopt.eq.4.or.iopt.eq.5.or.iopt.eq.6) then
-        call get_dihedrals(graph,number_vertices,
+        polyhedron = new_polyhedron_from_thin_air(graph)
+c       the neighbour lists of the graph must be oriented CCW when the
+c       polyhedron is viewed from the outside before get_dihedrals is called.
+c       this can only be done for an existing 3d structure.
+c       creating a polyhedron in this place may only be temporary solution:
+c       we need to start pasing around pointers to graphs and polyhedra!
+        call get_dihedrals(polyhedron,number_vertices,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        call delete_polyhedron(polyhedron)     
       endif
+
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)     
 
