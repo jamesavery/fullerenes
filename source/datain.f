@@ -5,7 +5,8 @@
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinth,ndbconvert,ihamstore,ihamstats,nhamcyc,isomerl,
      1 isomerh,PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
-     1 rspi,jumps,force,forceP,boost,filename,filenameout,DATEN)
+     1 rspi,jumps,force,forceP,boost,dualdist,
+     1 filename,filenameout,DATEN)
 C-----------------------------------------------------------------
 C  This is the main routine handling the input
 C  It is called from the main program
@@ -24,7 +25,7 @@ C-----------------------------------------------------------------
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,IPRC,leap,isonum,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps,
-     1 nanotube
+     1 nanotube,dualdist
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuD555,
@@ -168,6 +169,7 @@ C Reals
       R=1.391d0     ! C-C distance 
       R5=1.455d0    ! Distance in 5-Ring
       R6=R          ! Distance in 6-Ring
+      dualdist=R    ! scaling dual distances
       Tol=0.33d0    ! Tolerance
       TolR=0.d0     ! Tolerance for finding ring connections
 C     Van der Waals radius of carbon, adjusted approximately to the

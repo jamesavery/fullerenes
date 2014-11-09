@@ -1043,11 +1043,18 @@ C     Print center of edges
       Return
       END
 
-      SUBROUTINE RingCoord(Iout,Dist,N5,N6,N5M,N6M)
+      SUBROUTINE RingCoord(Iout,dualdist,R6,Rmin5,Rmin6,
+     1 Dist,N5,N6,N5M,N6M)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),N5M(Mmax,5),N6M(Mmax,6)
 C     Print center of rings
+      factor=1.d0
+      if(dualdist.ne.R6) then
+       Rmin=Dmin1(Rmin5,Rmin6)
+       factor=dualdist/Rmin
+       Write(Iout,1002) factor,dualdist
+      endif
       Write(Iout,1000)
       IR=5
       Do I=1,N5
@@ -1059,9 +1066,9 @@ C     Print center of rings
         Y=Y+Dist(2,N5M(I,J))
         Z=Z+Dist(3,N5M(I,J))
       enddo
-        X=X/5.
-        Y=Y/5.
-        Z=Z/5.
+        X=X*factor/5.
+        Y=Y*factor/5.
+        Z=Z*factor/5.
         Write(Iout,1001) I,IR,X,Y,Z
       enddo
 
@@ -1075,9 +1082,9 @@ C     Print center of rings
         Y=Y+Dist(2,N6M(I,J))
         Z=Z+Dist(3,N6M(I,J))
       enddo
-        X=X/6.
-        Y=Y/6.
-        Z=Z/6.
+        X=X*factor/6.
+        Y=Y*factor/6.
+        Z=Z*factor/6.
         Write(Iout,1001) I,IR,X,Y,Z
       enddo
 
@@ -1085,6 +1092,8 @@ C     Print center of rings
      1 /1X,'    I    IR      X            Y            Z',
      1 /1X,49('-')) 
  1001 Format(1X,2I5,3(1X,F12.8))
+ 1002 Format(1X,'Coordinates multiplied by ',F12.8,
+     1 ' to reach distance of ',F12.8)
       Return
       END
 

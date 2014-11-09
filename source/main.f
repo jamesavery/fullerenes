@@ -138,9 +138,11 @@ C  Call Datain
      1 isearch,iprinthessian,ndbconvert,ihamstore,ihamstats,nhamcyc,
      1 isomerl,isomerh,ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,
      1 ftolP,scaleRad,rspi,jumps,force,forceP,boost,
-     1 filename,filenameout,TEXTINPUT)
+     1 dualdist,filename,filenameout,TEXTINPUT)
 
 C  Simple checks
+       Rmin5=R5
+       Rmin6=R6
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Stop if isomer closest to icosahedral is searched for
@@ -378,8 +380,8 @@ C Analyze ring connections
      1 IC3,IVR3,nEK,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
 C     Print edge coordinates (barycenter)
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
-      if(iprintf.ne.0) Call RingCoord(Iout,DIST,N5Ring,
-     1 N6Ring,N5MEM,N6MEM)
+      if(iprintf.ne.0) Call RingCoord(Iout,dualdist,R6,
+     1 Rmin5,Rmin6,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
 
 C------------------STONE-WALES------------------------------------
 C Perform Stone-Wales transformation
@@ -535,8 +537,8 @@ c  stuff previously done, but is ok for now, as it takes not much time
      1   IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       endif
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
-      if(iprintf.ne.0) Call RingCoord(Iout,DIST,N5Ring,
-     1 N6Ring,N5MEM,N6MEM)
+      if(iprintf.ne.0.or.dualdist.ne.R6) Call RingCoord(Iout,
+     1 dualdist,R6,Rmin5,Rmin6,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
 
 C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs
