@@ -15,7 +15,6 @@ there is no layout2d in 'find_outer_face' and the assertion fails.
   think the first approach is better, a lib should be written such that it is
   hard to use wrongly.
 * general spiral is broken since 917d49d2b4.  maybe not all of that stuff was unnecessary ... (lnw)
-* inertial frame returns 'nan' in case of C60
 * minimum empty sphere problem, algorithm fails too often
 
 * Tutte-embedding fails:
@@ -26,3 +25,4 @@ there is no layout2d in 'find_outer_face' and the assertion fails.
 
 * Direct sparse linear solver fails for fulleroid example. Why?
 
+* there is a problem with the c++ std-lib of OSX that causes a segfault as soon as one writes to an ostringstream (but creating the object is ok)
