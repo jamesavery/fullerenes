@@ -12,6 +12,7 @@ DIRECTORIES=-DFULLERENE_ROOT=\"${PWD}\" -DFULLERENE_DATABASE=\"${PWD}/database\"
 WARNINGS=-Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
 
 CXXFLAGS= -g -O3 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
+# -stdlib=libc++
 FFLAGS= -g -O3 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"'
 LIBRARIES=-lstdc++ -lgomp -lgfortran
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
@@ -23,8 +24,8 @@ LIBRARIES=-lstdc++ -lgomp -lgfortran
 #CXXFLAGS+=-mkl -DHAS_MKL -DHAS_LAPACK
 #LIBRARIES+=-mkl
 #Uncomment the following lines if you want to use system BLAS and LAPACK
-#CXXFLAGS+=-DHAS_LAPACK 
-#LIBRARIES+=-llapack -lblas
+CXXFLAGS+=-DHAS_LAPACK 
+LIBRARIES+=-llapack -lblas
 #uncomment that following lines to use gsl (gnu scientific library)
 #CXXFLAGS+=-DHAS_GSL
 #LIBRARIES+=-lgsl

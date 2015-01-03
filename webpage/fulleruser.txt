@@ -130,7 +130,6 @@ Dr. & Yang & Wang & Universidad Autonoma de Madrid & Quimica Modulo 13 & MADRID 
 Ms. & Emmanuel & Bourret & Université de Montréal & Mathématique et Statistique/Physique & Montréal & Canada & manubou5@hotmail.com & 
  & Roxanne & Tutchton & The Colorado School of MInes & Physics & Golden & United States of America & rtutchto@mymail.mines.edu & 
 Ms. & Daniel & Lovey & Institute of Modelling and Innovation Technology - CONICET & Physics & Corrientes & Argentina & lovey.da@gmail.com & I am doing my PhD on Quantum Transport and I think that this program can be a good tool to test and compare my own results.
- & Nannan & Li & POSTECH & Physics & Pohang & China & linannan@postech.ac.kr & 
  & Nannan & Li & POSTECH & Physics & Pohang & Korea South & linannan@postech.ac.kr & 
 Ms. & Anthony & Cruz-Balberdy & Lehman College & Chemistry & Bronx & United States of America & anthony.cruzbalberdy@lehman.cuny.edu & 
 Ms. & Yuya & Nakajima & Waseda university & chemistry & biochemsitry & Tokyo & Japan & n-azure@ruri.waseda.jp & 
@@ -260,8 +259,32 @@ Prof. Dr. & Yuewen & Mu & Shanxi University & Institute of Molecular Science & T
 Prof. Dr. & Yuewen & Mu & Shanxi University & Institute of Molecular Science & Taiyuan & China & ywmu@live.com & 
 Mr. & Sonanki & Keshri & IIT BOMBAY & Chemistry & Mumbai & India & mona.keshri07@gmail.com & fullerene
  & THEJUS & MAHAJAN & NATIONAL INSTITUTE OF TECHNOLOGY CALICUT & PHYSICS & CALICUT & India & thejusmahajanmarrat@gmail.com & I am a doing research in endohedral fullerenes 
- & THEJUS & MAHAJAN & NATIONAL INSTITUTE OF TECHNOLOGY CALICUT & PHYSICS & CALICUT & India & thejusmahajanmarrat@gmail.com & I am a doing research in endohedral fullerenes 
 Mr. & Sonanki & Keshri & IIT BOMBAY & Chemistry & Mumbai & India & mona.keshri07@gmail.com & fullerene
 Dr. & Carlos & Jimenez-Hoyos & Rice University & Chemistry & Houston & United States of America & jimenez.hoyos@gmail.com & 
 Ms. & Zoltan & Nemth & KLTE & student & Debrecen & Hungary & nemethzoltdebr@citromail.hu & internet
 Dr. & Alexander & Kobryn & National Institute for Nanotechnology & Theory and Modeling & Edmonton & Canada & alex.kobryn@nrc-cnrc.gc.ca & 
+Ms. & Shibananda & Das & IISER Pune & Physics & Pune & India & s4shiv009@gmail.com & Great work
+Dr. & Joanna & Kauczor & Linkoping University & IFM & Linkoping & Sweden & joaka@ifm.liu.se & 
+Dr. & KRS & Chandrakumar & Bhabha Atomic Research Centre & Theoretical Chemistry Section, Chemistry Group & Mumbai & India & krschandrakumar@gmail.com & This program will be useful in generating different fullerene structures for the purpose of topological analysis.  In addition, we are also interested in studying their reactivity of different fulllerenes. 
+Dr. & Tadeusz & Pluta & University of Silesia & Chemistry & Katowice & Poland & tadeusz.pluta@gmail.com & 
+Mr. & Caroline & Gorham & Carnegie Mellon University & Mechanical Engineering & Pittsburgh & United States of America & caroline.gorham@gmail.com & 
+Dr. & Truong & Ba Tai & University of Leuven & Chemistry & Leuven & Belgium & truong.batai@chem.kuleuven.be & 
+Dr. & Mesut & Kirca & Istanbul Technical University & Mechanical Engineering  & Istanbul & Turkey & kircam@itu.edu.tr & Thanks
+Dr. & Sandip & Paul & IIT Guwahati & Chemistry & Guwahati & India & sandipp@iitg.ernet.in & Would like to generate fullerene for research purpose
+Dr. & Matthias & Lein & Victoria University of Wellington & School of of Chemistry and Physics & Wellington & New Zealand & matthias.lein@vuw.ac.nz & 
+Dr. & Dan  & Bennett & Edinboro University of PA & Math and CS & Edinboro & United States of America & dbennett@edinboro.edu & For a colleague in math, I'm CS
+ & Alfredo & Tlahuice & UANL & Physics & Monterrey & Mexico & tlahuicef@gmail.com & Please let me get your code to generate fullerenes
+Dr. & Alain & COMTE & AcES Inc. & NanoGeomerty Applications & BORDEAUX & France & alain.comte33@edf.fr & 
+Dr. & Michal & Straka & Academy of Sciences of Czech Republic & Institute of Organic Chemistry and Biochemistry & Prague & Czech Republic & straka@uochb.cas.cz & 
+Ms. & shadrack & barnabas & virginia commonwealth university & chemistry & Richmond & United States of America & sjabes@vcu.edu & 
+Dr. & Giuseppe & D'Adamo & Scuola Internazionale Superiore di Studi Avanzati &  & Trieste & Italy & gdadamo@sissa.it & 
+Prof. Dr. & Manuel & Alcami & Universidad Autonoma de Madrid & Chemistry & Madrid & Spain & manuel.alcami@uam.es & 
+Prof. Dr. & Lihua & GAN & SOUTHWEST UNIVERSITY & CHENSITRY & CHONGQING & China & ganlh@swu.edu.cn & 
+Ms. & Yuto & Nakagami & Graduate School of Science and Technology, Shizuoka University & Optoelectronics and Nanostructure Science & Shizuoka & Japan & f5144001@ipc.shizuoka.ac.jp & 
+Mr. & Vesna & Andova & Faculty of electrical engineering and information technologies   &  & Skopje & Macedonia & vesnaa@feit.ukim.edu.mk & 
+Dr. & Matthias & Vandichel & Center for Molecular Modeling (CMM, Ghent University) & Applied Physics & Zwijnaarde & Belgium & Matthias.Vandichel@Ugent.be & 
+Prof. Dr. & Daniel  & Codorniu-Pujals & InSTEC & Nanosciences & La Habana  & Cuba & dcodorniu@instec.cu & 
+Ms. & juan & morales & Universidad de Guadalajara & chemistry & Guadalajara & Mexico & espartacos0911@gmail.com & 
+Dr. & Csaba & Nagy & Babes-Bolyai University & Chemical Department & Cluj-Napoca & Romania & nc35@chem.ubbcluj.ro & thank you
+Dr. & zhicheng & guo & Laboratory for Extreme Conditions Matter Properties & Southwest University of Science and Technology & Mianyang & China & zcguo@swust.edu.cn & 
+Mr. & MARYAM & SALAMI & Instituto di Analisi dei sistemi ed Informatics & consiglio nazionale della Ricerca & Rome & Italy & maryam.salami@iasi.cnr.com & 

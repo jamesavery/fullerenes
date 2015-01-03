@@ -342,20 +342,22 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   string fmt(format,3), filename;
   filename = fortran_string(filename_,50)+"-2D."+fmt;
 
-  // printf("draw_graph({\n"
-  // 	 "\tformat:     '%3s',\n"
-  // 	 "\tfilename:   '%s',\n"
-  // 	 "\tshow_dual:  %d,\n"
-  // 	 "\tdimensions: %gcm x %gcm,\n"
-  // 	 "\tline_colour: #%.6x,\n"
-  // 	 "\tnode_colour: #%.6x,\n"
-  // 	 "\tline_width: %.2gmm,\n"
-  // 	 "\tnode_diameter: %.2gmm,\n"
-  // 	 "})\n\n",
-  // 	 format, filename.c_str(), *show_dual, dimensions[0], dimensions[1],
-  // 	 *line_colour, *vertex_colour,
-  // 	 *line_width, *vertex_diameter);
+   printf("draw_graph({\n"
+   	 "\tformat:     '%3s',\n"
+   	 "\tfilename:   '%s',\n"
+   	 "\tshow_dual:  %d,\n"
+   	 "\tdimensions: %gcm x %gcm,\n"
+   	 "\tline_colour: #%.6x,\n"
+   	 "\tnode_colour: #%.6x,\n"
+   	 "\tline_width: %.2gmm,\n"
+   	 "\tnode_diameter: %.2gmm,\n"
+   	 "})\n\n",
+   	 format, filename.c_str(), *show_dual, dimensions[0], dimensions[1],
+   	 *line_colour, *vertex_colour,
+   	 *line_width, *vertex_diameter);
 
+   cout << endl;
+   cout << **g << endl;
 
   ofstream graph_file(filename.c_str(),ios::out | ios::binary);
   if        (fmt == "tex"){
@@ -363,6 +365,7 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   } else if (fmt == "pov"){
     graph_file << (*g)->to_povray(dimensions[0],dimensions[1],*line_colour,*vertex_colour,*line_width,*vertex_diameter);
   }
+  cout << "write done" << endl;
   graph_file.close();
 }
 

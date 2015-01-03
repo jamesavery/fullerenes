@@ -175,13 +175,14 @@ C Asymmetric
       return
       END
 
-      SUBROUTINE CompareStruct(Iout,IDA,Dist,DistS)
+      SUBROUTINE CompareStruct(Iout,IC3,Dist,DistS)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),DistS(3,Nmax)
-      DIMENSION IDA(Nmax,Nmax)
+      DIMENSION IC3(Nmax,3)
 C     This routine calculates the RMSD between two structures
-C     by comparing bond distances
+C     by comparing bond distances, angles and torsions
+C     Linear in number of vertices, O(N)
       diff=0.d0
       dif=0.d0
       ncount=0
@@ -190,7 +191,10 @@ C     by comparing bond distances
       RSmax=-1.d10
       RDmax=-1.d10
       Do I=1,number_vertices
-      Do J=I+1,number_vertices
+      Do J1=1,3
+       J=IC3(I,J1)
+C  Distances first
+       if(I.lt.J) then
         X=Dist(1,I)-Dist(1,J)
         Y=Dist(2,I)-Dist(2,J)
         Z=Dist(3,I)-Dist(3,J)
@@ -200,34 +204,35 @@ C     by comparing bond distances
         Zs=DistS(3,I)-DistS(3,J)
         RS=dsqrt(Xs*Xs+Ys*Ys+Zs*Zs)
        if(RS.gt.RSmax) RSmax=RS
-       if(RD.gt.RDmax) RDmax=RD
-       if(IDA(I,J).eq.1) then
+       if(RD.gt.RDmax) then
+        RDmax=RD
+        difRSRD=RS-RDmax
+       endif
         ncount=ncount+1
-       dif=RS-RD
-       if(dif.gt.difmax) then
-        difmax=dif
-        iv1=I
-        iv2=J
-       endif
-       if(dif.lt.difmin) then
-        difmin=dif
-        iv3=I
-        iv4=J
-       endif
+        dif=RS-RD
+        if(dif.gt.difmax) then
+         difmax=dif
+         iv1=I
+         iv2=J
+        endif
+        if(dif.lt.difmin) then
+         difmin=dif
+         iv3=I
+         iv4=J
+        endif
        diff=diff+dif*dif
        endif
       enddo
       enddo
       RMSD=dsqrt(diff/dfloat(ncount))
-      difRSRD=RSmax-RDmax
       Write(Iout,1000) RMSD,ncount,difmin,iv1,iv2,difmax,iv3,iv4,difRSRD
  1000 Format(1X,'Root mean square deviation between intitial (i) and ',
      1 'final (f) structure (counting edges only): ',D15.9,
-     1 ' (N= ',I7,')',/1X,'Smallest deviation (Ri-Rf)= ',D15.9,
+     1 ' (Ne= ',I7,')',/1X,'Smallest deviation (Ri-Rf)= ',D15.9,
      1 ' (between vertices ',I7,' and ',I7,')',
      1 /1X,'Largest  deviation (Ri-Rf)= ',D15.9,
      1 ' (between vertices ',I7,' and ',I7,')',
-     1 /1X,'Largest deciation in diameter: ',D15.9)
+     1 /1X,'Deviation in largest nonbonding distance (R0-Ropt): ',D15.9)
       return
       END
 

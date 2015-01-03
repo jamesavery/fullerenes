@@ -517,7 +517,7 @@ c       extended Wu, 19 parameters
      1      Dist,dist2D,ftolP,force)
         endif
 c       Compare structures
-        CALL CompareStruct(Iout,IDA,Dist,DistStore)
+        CALL CompareStruct(Iout,IC3,Dist,DistStore)
         routine='MOVECM_2       '
         Write(Iout,1008) routine
         CALL MoveCM(Iout,Iprint,IAtom,mirror,isort,
