@@ -185,6 +185,7 @@ C     by comparing bond distances, angles and torsions
 C     Linear in number of vertices, O(N)
       diff=0.d0
       diffa=0.d0
+      difft=0.d0
       dif=0.d0
       ncount=0
       difmin=1.d10
@@ -235,12 +236,28 @@ C     Using cosine rule cos(beta)=(a^2+b^2-c^2)/2(ab)
       diffa=diffa+(angled1-angles1)**2+(angled2-angles2)**2
      1  +(angled3-angles3)**2
 C  Finally, the torsions, 3 per vertex
+C     1st Torsion (I,J1,J2,J3)
+      Call TorsionAngle(tangle1d,dist,I,J1,J2,J3)
+      Call TorsionAngle(tangle1s,dists,I,J1,J2,J3)
+C     2nd Torsion (I,J2,J3,J1)
+      Call TorsionAngle(tangle2d,dist,I,J2,J3,J1)
+      Call TorsionAngle(tangle2s,dists,I,J2,J3,J1)
+C     3rd Torsion (I,J3,J1,J2)
+      Call TorsionAngle(tangle3d,dist,I,J3,J1,J2)
+      Call TorsionAngle(tangle3s,dists,I,J3,J1,J2)
+      difft=difft+(tangle1d-tangle1s)**2+(tangle2d-tangle2s)**2
+     1  +(tangle3d-tangle3s)**2
+C     Print*,tangle1d*rad2deg,tangle1s*rad2deg,tangle2d*rad2deg,
+C    1  tangle2s*rad2deg,tangle3d*rad2deg,tangle3s*rad2deg
       enddo
       RMSD=dsqrt(diff/dfloat(ncount))
       RMSA=dsqrt(diffa/dfloat(3*number_vertices))
-      RMSAdeg=1.8d2*RMSA/dpi
+      RMSAdeg=RMSA*rad2deg
+      RMST=dsqrt(difft/dfloat(3*number_vertices))
+      RMSTdeg=RMST*rad2deg
       Write(Iout,1000) RMSD,ncount,difmin,iv1,iv2,difmax,iv3,iv4
       Write(Iout,1001) RMSA,RMSAdeg,3*number_vertices
+      Write(Iout,1002) RMST,RMSTdeg,3*number_vertices
  1000 Format(1X,'Root mean square deviation between intitial (i) and ',
      1 'final (f) distances (counting edges only): ',D15.9,
      1 ' (Ne= ',I7,')',/1X,'Smallest difference (Ri-Rf)= ',D15.9,
@@ -250,6 +267,52 @@ C  Finally, the torsions, 3 per vertex
  1001 Format(1X,'Root mean square deviation between (i) and ',
      1 '(f) bond angles (counting adjacent edges only):',
      1 /3X,D15.9,' rad , ',D15.9,' deg (number of bond angles= ',I7,')')
+ 1002 Format(1X,'Root mean square deviation between (i) and ',
+     1 '(f) torsion angles (counting adjacent edges only):',
+     1 /3X,D15.9,' rad , ',D15.9,' deg (number of torsion angles= ',
+     1 I7,')')
+      return
+      END
+
+      SUBROUTINE TorsionAngle(angle,dist,I1,I2,I3,I4)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      REAL*8 n1x,n1y,n1z,n2x,n2y,n2z
+      DIMENSION Dist(3,Nmax)
+C     vector I1 to I2
+      v1x=dist(1,I1)-dist(1,I2)
+      v1y=dist(2,I1)-dist(2,I2)
+      v1z=dist(3,I1)-dist(3,I2)
+C     vector I2 to I3
+      v2x=dist(1,I2)-dist(1,I3)
+      v2y=dist(2,I2)-dist(2,I3)
+      v2z=dist(3,I2)-dist(3,I3)
+C     vector I3 to I4
+      v3x=dist(1,I3)-dist(1,I4)
+      v3y=dist(2,I3)-dist(2,I4)
+      v3z=dist(3,I3)-dist(3,I4)
+C     Normal vector of plane spanned by v1 and v2: v1 x v2
+      n1x=v1y*v2z-v1z*v2y
+      n1y=v1z*v2x-v1x*v2z
+      n1z=v1x*v2y-v1y*v2x
+C     Normalize n1
+      anorm=dsqrt(n1x**2+n1y**2+n1z**2)
+      n1x=n1x/anorm
+      n1y=n1y/anorm
+      n1z=n1z/anorm
+C     Normal vector of plane spanned by v2 and v3: v2 x v3
+      n2x=v2y*v3z-v2z*v3y
+      n2y=v2z*v3x-v2x*v3z
+      n2z=v2x*v3y-v2y*v3x
+C     Normalize n2
+      anorm=dsqrt(n2x**2+n2y**2+n2z**2)
+      n2x=n2x/anorm
+      n2y=n2y/anorm
+      n2z=n2z/anorm
+C     dot product between n1 and n2
+      dotn1n2=n1x*n2x+n1y*n2y+n1z*n2z
+C     angle between normal vectors
+      angle=dacos(dotn1n2)
       return
       END
 

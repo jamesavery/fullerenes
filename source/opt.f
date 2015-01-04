@@ -658,11 +658,11 @@ c 1015 Format(' Hessian is symmetric: asym= ',d12.6)
  1016 Format(' Tolerance= ',D9.3,', Force field parameters in ',
      1 'A, deg, N/m:',/1X,8F12.3)
  1018 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,19F12.2)
+     1 'A, deg, N/m:'/1X,19F12.3)
  1019 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,9F12.2)
+     1 'A, deg, N/m:'/1X,9F12.3)
  1020 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,18F12.2)
+     1 'A, deg, N/m:'/1X,18F12.3)
  1021 Format(1X,I6,' non-zero frequencies (should be ',I6,').',
      1 ' Frequencies (in cm-1) and (quasi) degeneracies (n):')
  1022 Format(10(' ',f7.1,'(',I2,')'))
