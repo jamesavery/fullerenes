@@ -205,10 +205,7 @@ C  Distances first
         Zs=DistS(3,I)-DistS(3,J)
         RS=dsqrt(Xs*Xs+Ys*Ys+Zs*Zs)
         if(RS.gt.RSmax) RSmax=RS
-        if(RD.gt.RDmax) then
-         RDmax=RD
-         difRSRD=RS-RDmax
-        endif
+        if(RD.gt.RDmax) RDmax=RD
          ncount=ncount+1
          dif=RS-RD
          if(dif.gt.difmax) then
@@ -242,15 +239,14 @@ C  Finally, the torsions, 3 per vertex
       RMSD=dsqrt(diff/dfloat(ncount))
       RMSA=dsqrt(diffa/dfloat(3*number_vertices))
       RMSAdeg=1.8d2*RMSA/dpi
-      Write(Iout,1000) RMSD,ncount,difmin,iv1,iv2,difmax,iv3,iv4,difRSRD
+      Write(Iout,1000) RMSD,ncount,difmin,iv1,iv2,difmax,iv3,iv4
       Write(Iout,1001) RMSA,RMSAdeg,3*number_vertices
  1000 Format(1X,'Root mean square deviation between intitial (i) and ',
      1 'final (f) distances (counting edges only): ',D15.9,
-     1 ' (Ne= ',I7,')',/1X,'Smallest deviation (Ri-Rf)= ',D15.9,
+     1 ' (Ne= ',I7,')',/1X,'Smallest difference (Ri-Rf)= ',D15.9,
      1 ' (between vertices ',I7,' and ',I7,')',
-     1 /1X,'Largest  deviation (Ri-Rf)= ',D15.9,
-     1 ' (between vertices ',I7,' and ',I7,')',
-     1 /1X,'Deviation in largest nonbonding distance (R0-Ropt): ',D15.9)
+     1 /1X,'Largest difference (Ri-Rf)= ',D15.9,
+     1 ' (between vertices ',I7,' and ',I7,')')
  1001 Format(1X,'Root mean square deviation between (i) and ',
      1 '(f) bond angles (counting adjacent edges only):',
      1 /3X,D15.9,' rad , ',D15.9,' deg (number of bond angles= ',I7,')')
