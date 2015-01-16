@@ -38,7 +38,7 @@ int main(int ac, char **av) {
     RSPI[i] = strtol(av[i + 2], 0, 0) - 1;
   }
 
-  string filename = "output/reduce-graph-C"+to_string<int>(N)+".m";
+  string filename = "output/reduced-graph-C"+to_string<int>(N)+".m";
   ofstream output(filename);
 
   vector<int> spiral(N/2+2, 6);
@@ -56,19 +56,19 @@ int main(int ac, char **av) {
   output << "T = " << T << ";\n"
 	 << "dDist = " << T.distances << ";\n";
 
-  Polyhedron PT = fullerene_dual_polyhedron(T);
+//  Polyhedron PT = fullerene_dual_polyhedron(T);
 
-  output << "PT = " << PT << "\n";
-  output.close();
+//  output << "PT = " << PT << "\n";
+//  output.close();
 
   T.remove_flat_vertices();
-  output << "rT = " << T << ";\n";
+  cout << "rT = " << T << ";\n";
 
-  matrix<double> D = T.surface_distances();
-  matrix<int>    Dsqr = T.convex_square_surface_distances();
- 
-  output << "Dist = " << D << ";\n";
-  output << "iDist = Sqrt[" << Dsqr << "];\n";
+//   matrix<double> D = T.surface_distances();
+//   matrix<int>    Dsqr = T.convex_square_surface_distances();
+//  
+//   output << "Dist = " << D << ";\n";
+//   output << "iDist = Sqrt[" << Dsqr << "];\n";
   
   output.close();
   return 0;

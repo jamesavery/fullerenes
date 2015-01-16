@@ -692,14 +692,14 @@ matrix<int> Triangulation::convex_square_surface_distances() const
       //       as graph distance, and are hence covered by initial step. So start from 1.
       //       M is upper bound for distance, so only need to do a^2+ab+b^2 strictly less than M.
       for(int a=1; a<M;a++)
-	for(int b=1; a*a + a*b + b*b < M*M; b++){
-	  // Check: if(gcd(a,b) != 1) continue.
-	  const node_t v = end_of_the_line(u,i,a,b);
+        for(int b=1; a*a + a*b + b*b < M*M; b++){
+          // Check: if(gcd(a,b) != 1) continue.
+          const node_t v = end_of_the_line(u,i,a,b);
 
-	  // printf("min(H(%d,%d),|(%d,%d)|^2)  = min(%d,%d)\n",
-	  // 	 u,v,a,b,H(u,v), a*a+a*b+b*b);
-	  H(u,v) = min(H(u,v), a*a + a*b + b*b);
-	}
+          // printf("min(H(%d,%d),|(%d,%d)|^2)  = min(%d,%d)\n",
+          // 	 u,v,a,b,H(u,v), a*a+a*b+b*b);
+          H(u,v) = min(H(u,v), a*a + a*b + b*b);
+        }
     }
   return H;
 }

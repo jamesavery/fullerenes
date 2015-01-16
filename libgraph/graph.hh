@@ -1,5 +1,5 @@
 #ifndef GRAPH_HH
-# define GRAPH_HH
+#define GRAPH_HH
 
 #include <stdio.h>
 #include <map>
