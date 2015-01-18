@@ -1,5 +1,12 @@
 #include "delaunay.hh"
 
+
+ostream& operator<<(ostream& s, const FulleroidDelaunay::Quad& q) 
+{
+  s << "{" << q.v[0] << ", " << q.v[1] << ", " << q.v[2] << ", " << q.v[3] << "}";
+  return s;
+}
+
 double FulleroidDelaunay::angle(node_t A, node_t B, node_t C) const {
 // returns angle at B
   double 
@@ -20,15 +27,15 @@ double FulleroidDelaunay::angle(node_t A, node_t B, node_t C) const {
 double FulleroidDelaunay::angle_d6y(node_t A, node_t B, node_t C) const {
 // returns angle at B
   double 
-    a = edge_lengths(B,A),
-    b = edge_lengths(B,C),
-    c = edge_lengths(A,C);
+    a = edge_lengths_d6y(B,A),
+    b = edge_lengths_d6y(B,C),
+    c = edge_lengths_d6y(A,C);
    printf("dist(%d,%d) = %g\n"
             "dist(%d,%d) = %g\n"
             "dist(%d,%d) = %g\n",
-            B,A,edge_lengths(B,A),
-            B,C,edge_lengths(B,C),
-            A,C,edge_lengths(A,C));
+            B,A,edge_lengths_d6y(B,A),
+            B,C,edge_lengths_d6y(B,C),
+            A,C,edge_lengths_d6y(A,C));
     printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),acos((a*a+b*b-c*c)/(2*a*b)));
   return acos((a*a+b*b-c*c)/(2.0*a*b));
 }
@@ -41,6 +48,16 @@ double FulleroidDelaunay::angle(const Quad& Q, int i, int subangle) const {
   //          A,B,C);
 
   return angle(A,B,C);
+}
+
+
+double FulleroidDelaunay::angle_d6y(const Quad& Q, int i, int subangle) const {
+  int A(Q.v[(i+3-(subangle==2))%4]), B(Q.v[i]), C(Q.v[(i+1+(subangle==1))%4]);
+  // printf("angle({%d,%d,%d,%d},%d(%d),%d) = angle(%d,%d,%d)\n",
+  //          Q.v[0],Q.v[1],Q.v[2],Q.v[3],i,Q.v[i],subangle,
+  //          A,B,C);
+
+  return angle_d6y(A,B,C);
 }
 
 bool FulleroidDelaunay::is_consistent(const Quad& Q,int i) const { 
@@ -139,32 +156,33 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
 
 void FulleroidDelaunay::delaunayify_hole_2(const vector<dedge_t>& edges)
 {
-//  vector<dedge_t> new_edges(edges);
-//  vector<dedge_t> removed_edges;
+  vector<dedge_t> new_edges(edges);
 
   int flips = 0;
   bool done = false;
-  while(!done){ // Naive |edges|^2 algorithm
+  while(!done){ // Naive |new_edges|^2 algorithm
     done = true;
-    for(int i=0;i<edges.size();i++){
-      node_t A = edges[i].first, C = edges[i].second;
+    for(int i=0;i<new_edges.size();i++){
+      node_t A = new_edges[i].first, C = new_edges[i].second;
       node_t B = nextCW(C,A), D = nextCW(A,C);
 
       Quad q(A,B,C,D);
 
-      if(!is_delaunay(q)){ // Do a flip!
-        remove_edge_d6y(A,C);
+      if(!is_delaunay_d6y(q)){ // Do a flip!
+        cout << q << " is not delaunay -- flipping." << endl;
 
-        double ab = edge_lengths(A,B);
-        double ac = edge_lengths(A,C);
-        double ad = edge_lengths(D,A);
-        double bc = edge_lengths(B,C);
-        double cd = edge_lengths(C,D);
-        double alpha1 = acos((ad*ad + ac*ac - cd*cd) / (2*ad*ac));
-        double alpha2 = acos((ab*ab + ac*ac - bc*bc) / (2*ab*ac));
-        double length = sqrt( ad*ad + ab*ab - 2.0*ad*ab*cos(alpha1+alpha2) );
-        insert_edge_d6y(dedge_t(B,D),A,C,length);
+        double ab = edge_lengths_d6y(A,B);
+        double ad = edge_lengths_d6y(D,A);
+        double alpha1 = angle_d6y(D,A,C);
+        double alpha2 = angle_d6y(C,A,B);
+        double bd = sqrt( ad*ad + ab*ab - 2.0*ad*ab*cos(alpha1+alpha2) );
+
+        remove_edge_d6y(dedge_t(A,C));
+        insert_edge_d6y(dedge_t(B,D),A,C,bd);
         
+        new_edges.erase(std::remove(new_edges.begin(), new_edges.end(), dedge_t(A,C)), new_edges.end());
+        new_edges.push_back(dedge_t(B,D));
+
         flips++;
         done = false;
       }
@@ -174,25 +192,26 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<dedge_t>& edges)
 
 void FulleroidDelaunay::remove_flat_vertex(node_t v)
 {
+  cout << "begin remove flat vertex" << endl;
   vector<node_t> hole(neighbours[v]);
-
-  node_t h = N-1; // FIXME remove ?
+  cout << "hole: " << hole << endl;
 
   // get distances of hole[0] to all hole[2]--hole[n-2] within the hole and before removing the vertex
-  vector<double> saved_distances;
+  vector<double> new_distances;
   double accumulated_angle = angle_d6y(hole[0], v, hole[1]);
   cout << "angle: " << accumulated_angle << endl;
-  double d0 = edge_lengths(v, hole[0]);
+  double d0 = edge_lengths_d6y(v, hole[0]);
   for (int i=2; i<hole.size()-1; i++){
-    double di = edge_lengths(v, hole[i]);
+    double di = edge_lengths_d6y(v, hole[i]);
     accumulated_angle += angle_d6y(hole[i-1], v, hole[i]);
     cout << "angle: " << accumulated_angle << endl;
-    saved_distances.push_back( sqrt( d0*d0 + di*di - 2.0*d0*di*cos(accumulated_angle) ) );
+    new_distances.push_back( sqrt( d0*d0 + di*di - 2.0*d0*di*cos(accumulated_angle) ) );
   }
+  cout << "new distances: " << new_distances << endl;
 
   // remove vertices from graph and distance mtx
   for(int i=0; i<hole.size(); i++){
-    remove_edge_d6y(v,hole[i]);
+    remove_edge_d6y(dedge_t(v,hole[i]));
   }
   neighbours.pop_back();
   N--;
@@ -200,14 +219,21 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   //triangulate hole
   // vector<dedge_t> triangle_edges = triangulate_hole(hole);
   vector<dedge_t> triangle_edges;
+  cout << "triangulate hole " << hole << endl;
   for (int i=2; i< hole.size()-1; i++){
-    node_t a=hole[0], b=hole[i-1], c=hole[i], d=hole[i+1];
-    insert_edge_d6y(dedge_t(a,c),b,d,saved_distances[i-2]);
+    cout << "hole[" << i << "]: " << hole[i] << endl;
+    node_t a=hole[0], b=hole[hole.size()-1], c=hole[i], d=hole[i-1];
+    if(hole[0] > hole[i]){ // FIXME write elegantly
+      node_t buf = b; b=d; d=buf;
+    }
+    cout << a << ", " << b << ", " << c << ", " << d << endl;
+    insert_edge_d6y(dedge_t(a,c),b,d,new_distances[i-2]);
+    cout << neighbours << endl;
     triangle_edges.push_back(dedge_t(a,c));
   }
   
   // delaunayify hole (not sure if it's enough to only delaunayify the hole)
-  delaunayify_hole_2(triangle_edges);  // TODO implement this
+  delaunayify_hole_2(triangle_edges);
 
   cout << "g=" << *this << endl;
 }
@@ -224,13 +250,15 @@ void FulleroidDelaunay::remove_flat_vertices()
 
 
   while(neighbours.size() > 12){
-  cout << edge_lengths << endl;
-
+    cout << "-----" << endl;
+    assert(edge_lengths_d6y_are_symmetric());
+    cout << "edge_lengths_d6y: " << edge_lengths_d6y << endl;
     node_t remove = neighbours.size()-1;
     cout << "remove node-" << remove << endl;
     remove_flat_vertex(remove);
     cout << "removed node-" << remove << endl;
-    //cout << "neighbours: " << neighbours << endl;
+    cout << "neighbours: " << neighbours << endl;
+    cout << "-----" << endl;
   }
   // TODO: Perform a final Delaunayification.
 }
