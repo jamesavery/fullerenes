@@ -57,15 +57,13 @@ public:
     insert_edge(e, b, d);
     edge_lengths_d6y(e.first,e.second)=length;
     edge_lengths_d6y(e.second,e.first)=length;
-    cout << edge_lengths_d6y(e.first,e.second) << endl;
-    cout << edge_lengths_d6y(e.second,e.first) << endl;
     cout << "--insert_edge_d6y--" << endl;
   }
 
 
   vector<dedge_t> triangulate_hole(const vector<node_t>& hole);
   vector<dedge_t> delaunayify_hole(const vector<dedge_t>& edges);
-  void delaunayify_hole_2(const vector<dedge_t>& edges);
+  void delaunayify_hole_2(const vector<edge_t>& edges);
 
   void remove_flat_vertices();
   void remove_flat_vertex(node_t v);

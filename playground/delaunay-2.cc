@@ -69,7 +69,23 @@ int main(int ac, char **av) {
 //  
 //   output << "Dist = " << D << ";\n";
 //   output << "iDist = Sqrt[" << Dsqr << "];\n";
-  
+
   output.close();
+ 
+  cout << "creating P from T" << endl;
+  Polyhedron P(T);
+  cout << "created P from T" << endl;
+  cout << "P=" << P << endl;
+
+  //TODO optimize P with distances from edge_lengths_d6y
+
+  string mol2_name = "output/reduced-graph-C"+to_string(N)+".mol2";
+  {
+    ofstream mol2(mol2_name);
+    mol2 << P.to_mol2();
+    mol2.close();
+  }
+
+  
   return 0;
 }

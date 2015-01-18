@@ -154,15 +154,17 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
 //   return new_edges;
 // }
 
-void FulleroidDelaunay::delaunayify_hole_2(const vector<dedge_t>& edges)
+void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
 {
-  vector<dedge_t> new_edges(edges);
+  vector<edge_t> new_edges(edges);
 
   int flips = 0;
   bool done = false;
-  while(!done){ // Naive |new_edges|^2 algorithm
+  while(!done){ // Naive |edges|^2 algorithm
     done = true;
     for(int i=0;i<new_edges.size();i++){
+      cout << "edges considered for dealaunayification: " << new_edges << ". current index: " << i << endl;
+
       node_t A = new_edges[i].first, C = new_edges[i].second;
       node_t B = nextCW(C,A), D = nextCW(A,C);
 
@@ -171,20 +173,29 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<dedge_t>& edges)
       if(!is_delaunay_d6y(q)){ // Do a flip!
         cout << q << " is not delaunay -- flipping." << endl;
 
+        // TODO: implement void flip()
+
         double ab = edge_lengths_d6y(A,B);
         double ad = edge_lengths_d6y(D,A);
         double alpha1 = angle_d6y(D,A,C);
         double alpha2 = angle_d6y(C,A,B);
         double bd = sqrt( ad*ad + ab*ab - 2.0*ad*ab*cos(alpha1+alpha2) );
 
-        remove_edge_d6y(dedge_t(A,C));
-        insert_edge_d6y(dedge_t(B,D),A,C,bd);
+        remove_edge_d6y(edge_t(A,C));
+        if(B > D){ // FIXME write elegantly
+          node_t buf=A; A=C; C=buf;
+        }
+        insert_edge_d6y(edge_t(B,D),A,C,bd);
         
-        new_edges.erase(std::remove(new_edges.begin(), new_edges.end(), dedge_t(A,C)), new_edges.end());
-        new_edges.push_back(dedge_t(B,D));
+        new_edges.erase(new_edges.begin()+i);
+        new_edges.push_back(edge_t(B,D));
 
         flips++;
         done = false;
+        cout << "flip done" << endl;
+      }
+      else{
+        cout << q << " is delaunay, all good." << endl;
       }
     }
   }
@@ -211,14 +222,14 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
 
   // remove vertices from graph and distance mtx
   for(int i=0; i<hole.size(); i++){
-    remove_edge_d6y(dedge_t(v,hole[i]));
+    remove_edge_d6y(edge_t(v,hole[i]));
   }
   neighbours.pop_back();
   N--;
 
   //triangulate hole
   // vector<dedge_t> triangle_edges = triangulate_hole(hole);
-  vector<dedge_t> triangle_edges;
+  vector<edge_t> triangle_edges;
   cout << "triangulate hole " << hole << endl;
   for (int i=2; i< hole.size()-1; i++){
     cout << "hole[" << i << "]: " << hole[i] << endl;
@@ -227,9 +238,9 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
       node_t buf = b; b=d; d=buf;
     }
     cout << a << ", " << b << ", " << c << ", " << d << endl;
-    insert_edge_d6y(dedge_t(a,c),b,d,new_distances[i-2]);
+    insert_edge_d6y(edge_t(a,c),b,d,new_distances[i-2]);
     cout << neighbours << endl;
-    triangle_edges.push_back(dedge_t(a,c));
+    triangle_edges.push_back(edge_t(a,c));
   }
   
   // delaunayify hole (not sure if it's enough to only delaunayify the hole)
