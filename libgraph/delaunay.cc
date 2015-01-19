@@ -37,8 +37,12 @@ double FulleroidDelaunay::angle_d6y(node_t A, node_t B, node_t C) const {
            B,C,edge_lengths_d6y(B,C),
            A,C,edge_lengths_d6y(A,C));
     assert(a>epsilon && b>epsilon && c>epsilon);
-  if( fabs(a*a+b*b-c*c)/(2.0*a*b) >= 1.0 ){ // catch 180 degree case + numerical inaccuracy
-    printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),M_PI);
+  if( (a*a+b*b-c*c)/(2.0*a*b) >= 1.0 ){ // catch 0 degree case + numerical inaccuracy
+    printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g (exception used)\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),0.0);
+    return 0;
+  }
+  if( (a*a+b*b-c*c)/(2.0*a*b) <= -1.0 ){ // catch 180 degree case + numerical inaccuracy
+    printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g (exception used)\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),M_PI);
     return M_PI;
   }
   printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),acos((a*a+b*b-c*c)/(2*a*b)));
@@ -185,6 +189,7 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
         double alpha1 = angle_d6y(D,A,C);
         double alpha2 = angle_d6y(C,A,B);
         double bd = sqrt( ad*ad + ab*ab - 2.0*ad*ab*cos(alpha1+alpha2) );
+        cout << ab << ", " << ad << ", " << alpha1 << ", " << alpha2 << ", " << bd << endl;
 
         remove_edge_d6y(edge_t(A,C));
         if(B > D){ // FIXME write elegantly
@@ -211,6 +216,9 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   cout << "begin remove flat vertex" << endl;
   vector<node_t> hole(neighbours[v]);
   cout << "hole: " << hole << endl;
+
+  // TODO: check if hole[0] already connected to any of the other hole-nodes
+
 
   // get distances of hole[0] to all hole[2]--hole[n-2] within the hole and before removing the vertex
   vector<double> new_distances;
