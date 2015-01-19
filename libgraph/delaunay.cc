@@ -30,13 +30,18 @@ double FulleroidDelaunay::angle_d6y(node_t A, node_t B, node_t C) const {
     a = edge_lengths_d6y(B,A),
     b = edge_lengths_d6y(B,C),
     c = edge_lengths_d6y(A,C);
-   printf("dist(%d,%d) = %g\n"
-            "dist(%d,%d) = %g\n"
-            "dist(%d,%d) = %g\n",
-            B,A,edge_lengths_d6y(B,A),
-            B,C,edge_lengths_d6y(B,C),
-            A,C,edge_lengths_d6y(A,C));
-    printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),acos((a*a+b*b-c*c)/(2*a*b)));
+    printf("dist(%d,%d) = %g\n"
+           "dist(%d,%d) = %g\n"
+           "dist(%d,%d) = %g\n",
+           B,A,edge_lengths_d6y(B,A),
+           B,C,edge_lengths_d6y(B,C),
+           A,C,edge_lengths_d6y(A,C));
+    assert(a>epsilon && b>epsilon && c>epsilon);
+  if( fabs(a*a+b*b-c*c)/(2.0*a*b) >= 1.0 ){ // catch 180 degree case + numerical inaccuracy
+    printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),M_PI);
+    return M_PI;
+  }
+  printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),acos((a*a+b*b-c*c)/(2*a*b)));
   return acos((a*a+b*b-c*c)/(2.0*a*b));
 }
 
@@ -271,6 +276,22 @@ void FulleroidDelaunay::remove_flat_vertices()
     cout << "neighbours: " << neighbours << endl;
     cout << "-----" << endl;
   }
+
+ cout << "--- done ---" << endl;
+
+  cout << edge_lengths_d6y << endl;
+
+  set<edge_t> set_ue = undirected_edges();
+  vector<edge_t> vec_ue;
+  for(set<edge_t>::iterator it = set_ue.begin(), to = set_ue.end(); it!=to; it++){
+    vec_ue.push_back(*it);
+  }
+  delaunayify_hole_2(vec_ue);
+
+  cout << edge_lengths_d6y << endl;
+ cout << "--- done ---" << endl;
+  
   // TODO: Perform a final Delaunayification.
+
 }
 
