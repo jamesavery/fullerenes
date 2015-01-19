@@ -204,9 +204,7 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
         done = false;
         cout << "flip done" << endl;
       }
-      else{
-        cout << q << " is delaunay, all good." << endl;
-      }
+      else{ cout << q << " is delaunay, all good." << endl; }
     }
   }
 }
@@ -217,8 +215,17 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   vector<node_t> hole(neighbours[v]);
   cout << "hole: " << hole << endl;
 
-  // TODO: check if hole[0] already connected to any of the other hole-nodes
+  
+  // check if hole[0] is already connected to any of the other hole-nodes in
+  // which case we have to start the fan-connecting from somewhere else
+  //TODO what about the second one
 
+  for(int i=2; i< hole.size()-1; i++){
+    if(find(neighbours[hole[0]].begin(), neighbours[hole[0]].end(), hole[i]) != neighbours[hole[0]].end()){
+      hole.push_back(hole[0]);
+      hole.erase(hole.begin());
+    }
+  }
 
   // get distances of hole[0] to all hole[2]--hole[n-2] within the hole and before removing the vertex
   vector<double> new_distances;
