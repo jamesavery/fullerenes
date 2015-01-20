@@ -136,7 +136,8 @@ C  Call Datain
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinthessian,ndbconvert,ihamstore,ihamstats,nhamcyc,
-     1 isomerl,isomerh,ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,
+     1 isomerl,isomerh,ngaudiene,
+     1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,
      1 ftolP,scaleRad,rspi,jumps,force,forceP,boost,
      1 dualdist,filename,filenameout,TEXTINPUT)
 
@@ -539,6 +540,7 @@ c  stuff previously done, but is ok for now, as it takes not much time
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
       if(iprintf.ne.0.or.dualdist.ne.R6) Call RingCoord(Iout,
      1 dualdist,R6,Rmin5,Rmin6,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
+      if(iprintf.ne.0.or.ngaudiene.ne.0) Call Gaudiene(Iout,R6,DIST,IC3)
 
 C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs

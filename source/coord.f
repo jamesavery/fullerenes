@@ -175,6 +175,30 @@ C Asymmetric
       return
       END
 
+      SUBROUTINE Gaudiene(Iout,R6,DIST,IC3)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION Dist(3,Nmax)
+      DIMENSION IC3(Nmax,3)
+C     Producing and printing Gaudiene structure
+C     First scale original structure
+C     Distance used from one original vertex to the other:
+C     RG = 2*R(fullerene,average)+R(triple-bond)
+      factor=2.d0+1.2d0/1.4d0
+      RG = factor*R6
+      scalef=RG/R6
+      Write(Iout,1000) 
+C     Now scale all original distances
+      Do I=1,number_vertices
+       Write(Iout,1001) I,(Dist(I,J)*scalef,J=1,3)
+      enddo
+C     Now get the extra triply bonded carbon atoms 
+ 1000 FORMAT(/1x,'Cartesian Input',
+     1  /1X,'    I      Z Element Cartesian Coordinates')
+ 1001 FORMAT(1X,I5,1X,'6',5X,'C',7X,3(D18.12,2X))
+      return
+      END
+
       SUBROUTINE CompareStruct(Iout,IC3,Dist,DistS)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
