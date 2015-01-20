@@ -496,17 +496,13 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
 
 
 string Polyhedron::to_xyz() const {
-
   ostringstream s;
-  s << setprecision(6);
-
+  s << setprecision(6) << fixed;
   s << N << endl;
   s << "we could print something helpful here" << endl;
-
   for(int i=0; i < N; ++i){
-    s << "C\t" << points[i][0] << "\t" << points[i][1] << "\t" << points[i][2] << endl;
+    s << "C   " << setw(10) << points[i][0] << "   " << setw(10) << points[i][1] << "   " << setw(10) << points[i][2] << endl;
   }
-
   return s.str();
 }
 
@@ -525,7 +521,6 @@ string Polyhedron::to_mol2() const {
     << "\t"<<N<<"\t"<<Nedges<<"\t0\t0\t0\n"
     << "SMALL\n"
     << "NO_CHARGES\n\n";
-
 
   s << "@<TRIPOS>ATOM\n";
   
