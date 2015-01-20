@@ -77,8 +77,8 @@ C Force constants in N/m for distances and N/m A^2/rad^2 for angles (default val
 
 C     Defining an extension of the Wu force field (default values)
 c     three distances: zero values
-      ExtWuR55=1.506d0
-      ExtWuR56=1.485d0
+      ExtWuR55=1.479d0
+      ExtWuR56=1.458d0
       ExtWuR66=1.401d0
 c     two angles: zero values
       ExtWuA5=1.08d2
@@ -93,12 +93,12 @@ c     three distances: forces (let's assume they are all the same)
       ExtWufR56=390.d0
       ExtWufR66=435.d0
 c     three angles: forces (let's assume they are all the same)
-      ExtWufA5=100.d0
-      ExtWufA6=105.d0
+      ExtWufA5=95.d0
+      ExtWufA6=100.d0
 c     four dihedrals: forces (let's assume they are all the same)
-      ExtWufD555=30.d0
+      ExtWufD555=35.d0
       ExtWufD556=75.d0
-      ExtWufD566=85.d0
+      ExtWufD566=80.d0
       ExtWufD666=275.d0
 
 C Default parameters for external files
