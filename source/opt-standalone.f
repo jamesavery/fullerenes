@@ -2413,9 +2413,9 @@ C     Force constants in N/m for distances and N/m A^2/rad^2 for angles (default
 
 C     Defining an extension of the Wu force field (default values)
 c     three distances: zero values
-      ExtWuR55=1.463d0
-      ExtWuR56=1.442d0
-      ExtWuR66=1.435d0
+      ExtWuR55=1.506d0
+      ExtWuR56=1.485d0
+      ExtWuR66=1.401d0
 c     two angles: zero values
       ExtWuA5=1.08d2
       ExtWuA6=1.20d2
@@ -2426,16 +2426,16 @@ c     four dihedrals: zero values (according to ideal_dihedral)
       ExtWuD666=0.0d0
 c     three distances: forces (let's assume they are all the same)
       ExtWufR55=260.d0
-      ExtWufR56=400.d0
+      ExtWufR56=390.d0
       ExtWufR66=435.d0
 c     three angles: forces (let's assume they are all the same)
-      ExtWufA5=90.d0
+      ExtWufA5=100.d0
       ExtWufA6=105.d0
 c     four dihedrals: forces (let's assume they are all the same)
       ExtWufD555=30.d0
       ExtWufD556=75.d0
       ExtWufD566=85.d0
-      ExtWufD666=285.d0
+      ExtWufD666=275.d0
 
 
       if(iopt.eq.1 .or. iopt.eq.2)then
