@@ -91,15 +91,15 @@ c     four dihedrals: zero values (according to ideal_dihedral)
 c     three distances: forces (let's assume they are all the same)
       ExtWufR55=260.d0
       ExtWufR56=390.d0
-      ExtWufR66=435.d0
+      ExtWufR66=450.d0
 c     three angles: forces (let's assume they are all the same)
-      ExtWufA5=95.d0
+      ExtWufA5=100.d0
       ExtWufA6=100.d0
 c     four dihedrals: forces (let's assume they are all the same)
       ExtWufD555=35.d0
-      ExtWufD556=75.d0
-      ExtWufD566=80.d0
-      ExtWufD666=275.d0
+      ExtWufD556=65.d0
+      ExtWufD566=85.d0
+      ExtWufD666=270.d0
 
 C Default parameters for external files
       filename= 'Fullerene'
