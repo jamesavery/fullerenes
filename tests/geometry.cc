@@ -85,7 +85,8 @@ int main(int ac, char **av)
 
   cout << "ideal dihedral between 5,5,5: " << coord3d::ideal_dihedral(5,5,5) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,5,5) << " deg" << endl;
 
-  cout << "ideal dihedral between 6,5,6 (corrected): " << coord3d::ideal_dihedral(6,5,6,1.455,1.391,1.391) << ", " << 180/M_PI * coord3d::ideal_dihedral(6,5,6,1.455,1.391,1.391) << " deg" << endl;
+  cout << "ideal dihedral between 6,5,6 (corrected): " << coord3d::ideal_dihedral(6,5,6,1.401,1.458,1.458) << ", " << 180/M_PI * coord3d::ideal_dihedral(6,5,6,1.401,1.458,1.458) << " deg" << endl;
+  cout << "ideal dihedral between 5,6,5 (corrected): " << coord3d::ideal_dihedral(5,6,5,1.479,1.458,1.458) << ", " << 180/M_PI * coord3d::ideal_dihedral(5,6,5,1.479,1.458,1.458) << " deg" << endl;
 
   return 0;
 }

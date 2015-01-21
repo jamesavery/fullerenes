@@ -86,7 +86,7 @@ c     two angles: zero values
 c     four dihedrals: zero values (according to ideal_dihedral)
       ExtWuD555=37.38d0
       ExtWuD556=29.20d0
-      ExtWuD566=23.82d0
+      ExtWuD566=23.49d0
       ExtWuD666=0.0d0
 c     three distances: forces (let's assume they are all the same)
       ExtWufR55=260.d0
