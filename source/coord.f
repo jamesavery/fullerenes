@@ -175,7 +175,7 @@ C Asymmetric
       return
       END
 
-      SUBROUTINE Gaudiene(Iout,R6,DIST,IC3)
+      SUBROUTINE Gaudiene(Iout,IC3,DIST)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax)
@@ -184,22 +184,25 @@ C     Producing and printing Gaudiene structure
 C     First scale original structure
 C     Distance used from one original vertex to the other:
 C     RG = 2*R(fullerene,average)+R(triple-bond)
+      Open(unit=7,file='gaudifullerene.xyz',form='formatted')
       Write(Iout,1003)
-      factor=2.d0+1.2d0/1.4d0
-      RG = factor*R6
-      scalef=RG/R6
-      Write(Iout,1000) 
-C     Now scale all original distances
-      Do I=1,number_vertices
-       Write(Iout,1001) I,(Dist(I,J)*scalef,J=1,3)
-      enddo
-C     Now get the extra triply bonded carbon atoms into each edge 
 C     Triple and single bond length
       RT=1.2
       RS=1.4
       Rtotal=2*RS+RT
+      scalef=2.d0+RT/RS
       rfac1=RS/Rtotal
       rfac2=(RS+RT)/Rtotal
+      NewVertNum=4*number_vertices
+      Write(Iout,1000) NewVertNum,scalef 
+      Write(7,100) NewVertNum
+      Write(7,101)
+C     Now scale all original distances
+      Do I=1,number_vertices
+       Write(Iout,1001) I,(Dist(J,I)*scalef,J=1,3)
+       Write(7,102) (Dist(J,I)*scalef,J=1,3)
+      enddo
+C     Now get the extra triply bonded carbon atoms into each edge 
       Write(Iout,1004) rfac1,rfac2
       Write(Iout,1002) 
       Icount=number_vertices
@@ -208,22 +211,32 @@ C     Triple and single bond length
         J1=IC3(I,J)
        if(I.lt.J1) then
         Do K=1,3
-         XG1(K)=(Dist(I,K)+rfac1*(Dist(J1,K)-Dist(I,K)))*scalef
-         XG2(K)=(Dist(I,K)+rfac2*(Dist(J1,K)-Dist(I,K)))*scalef
+         XG1(K)=(Dist(K,I)+rfac1*(Dist(K,J1)-Dist(K,I)))*scalef
+         XG2(K)=(Dist(K,I)+rfac2*(Dist(K,J1)-Dist(K,I)))*scalef
         enddo
         Write(Iout,1001) Icount+1,(XG1(L),L=1,3)
         Write(Iout,1001) Icount+2,(XG2(L),L=1,3)
+        Write(7,102) (XG1(L),L=1,3)
+        Write(7,102) (XG2(L),L=1,3)
         Icount=Icount+2
        endif
       enddo
       enddo
- 1000 FORMAT(/1x,'Cartesian Coordinates of ETB fullerene vertices',
+      Close(unit=7)
+  100 FORMAT(I7)
+  101 FORMAT('Gaudi_Fullerenes with all edges replaced by 2 vertices')
+  102 FORMAT('6',2X,3(E18.12,2X))
+ 1000 FORMAT(/1x,'Creating gaudi-fullerene with all edges replaced ',
+     1 'by 2 new vertices of degree 2',/1x,'Number of vertices: ',I6,
+     1  /1X,'Scale distances by ',F10.6,
+     1  /1x,'Cartesian Coordinates of gaudi-fullerene deg(3) vertices:',
      1  /1X,'    I      Z Element Cartesian Coordinates')
  1001 FORMAT(1X,I5,6X,'6',4X,'C',4X,3(E18.12,2X))
- 1002 FORMAT(1x,'Extra cartesian Coordinates of ETB fullerene edges',
+ 1002 FORMAT(1x,'Extra cartesian Coordinates of deg(2) vertices '
+     1 'on original fullerene edges:',
      1  /1X,'    I      Z Element Cartesian Coordinates')
  1003 FORMAT(/1x,'Fullerene where every edge contains 2 extra vertices')
- 1004 FORMAT(1x,'Factors for putting vertices on an unit edge:',
+ 1004 FORMAT(1x,'Factors for putting vertices on a unit edge:',
      1 F10.6,2X,F10.6)
       return
       END

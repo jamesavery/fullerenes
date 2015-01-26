@@ -540,7 +540,7 @@ c  stuff previously done, but is ok for now, as it takes not much time
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
       if(iprintf.ne.0.or.dualdist.ne.R6) Call RingCoord(Iout,
      1 dualdist,R6,Rmin5,Rmin6,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
-      if(iprintf.ne.0.or.ngaudiene.ne.0) Call Gaudiene(Iout,R6,DIST,IC3)
+      if(iprintf.ne.0.or.ngaudiene.ne.0) Call Gaudiene(Iout,IC3,DIST)
 
 C------------------XYZ-and-CC1-FILES------------------------------
 C Print out Coordinates used as input for CYLview, VMD or other programs
