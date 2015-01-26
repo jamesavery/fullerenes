@@ -179,11 +179,12 @@ C Asymmetric
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax)
-      DIMENSION IC3(Nmax,3)
+      DIMENSION IC3(Nmax,3),XG1(3),XG2(3)
 C     Producing and printing Gaudiene structure
 C     First scale original structure
 C     Distance used from one original vertex to the other:
 C     RG = 2*R(fullerene,average)+R(triple-bond)
+      Write(Iout,1003)
       factor=2.d0+1.2d0/1.4d0
       RG = factor*R6
       scalef=RG/R6
@@ -192,10 +193,38 @@ C     Now scale all original distances
       Do I=1,number_vertices
        Write(Iout,1001) I,(Dist(I,J)*scalef,J=1,3)
       enddo
-C     Now get the extra triply bonded carbon atoms 
- 1000 FORMAT(/1x,'Cartesian Input',
+C     Now get the extra triply bonded carbon atoms into each edge 
+C     Triple and single bond length
+      RT=1.2
+      RS=1.4
+      Rtotal=2*RS+RT
+      rfac1=RS/Rtotal
+      rfac2=(RS+RT)/Rtotal
+      Write(Iout,1004) rfac1,rfac2
+      Write(Iout,1002) 
+      Icount=number_vertices
+      Do I=1,number_vertices
+      Do J=1,3
+        J1=IC3(I,J)
+       if(I.lt.J1) then
+        Do K=1,3
+         XG1(K)=(Dist(I,K)+rfac1*(Dist(J1,K)-Dist(I,K)))*scalef
+         XG2(K)=(Dist(I,K)+rfac2*(Dist(J1,K)-Dist(I,K)))*scalef
+        enddo
+        Write(Iout,1001) Icount+1,(XG1(L),L=1,3)
+        Write(Iout,1001) Icount+2,(XG2(L),L=1,3)
+        Icount=Icount+2
+       endif
+      enddo
+      enddo
+ 1000 FORMAT(/1x,'Cartesian Coordinates of ETB fullerene vertices',
      1  /1X,'    I      Z Element Cartesian Coordinates')
- 1001 FORMAT(1X,I5,1X,'6',5X,'C',7X,3(D18.12,2X))
+ 1001 FORMAT(1X,I5,6X,'6',4X,'C',4X,3(E18.12,2X))
+ 1002 FORMAT(1x,'Extra cartesian Coordinates of ETB fullerene edges',
+     1  /1X,'    I      Z Element Cartesian Coordinates')
+ 1003 FORMAT(/1x,'Fullerene where every edge contains 2 extra vertices')
+ 1004 FORMAT(1x,'Factors for putting vertices on an unit edge:',
+     1 F10.6,2X,F10.6)
       return
       END
 
