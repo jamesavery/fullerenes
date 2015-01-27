@@ -92,29 +92,28 @@ C     Identify all 6-membered rings
       Ncount5=Ncount5-1
       Write(IOUT,1000) Ncount5
 C     Check bond distances
-      Do I=1,Ncount5
-      Rsum=0.
       Rmin5=1000.d0
       Rmax5=0.d0
-      Do J=1,5
-      IAT1=N5MEM(I,J)
-      J1=J+1
-      IF(J1.eq.6) J1=1
-      IAT2=N5MEM(I,J1)
-      DM=FunDistMat(IAT1,IAT2,DistMat)
-      Rd(J)=DM
-      if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
-      if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
-      RSum=Rsum+Rd(J)
-      enddo
-      RAv5=RSum*.2d0
-      Rsum=0.
-      Do J=1,5
-      Rsum=Rsum+(RAv5-Rd(J))**2
-      enddo
-      Rrmsd=dsqrt(Rsum*.2d0)
-      Write(IOUT,1001) (N5MEM(I,J),J=1,5),RAv5,Rrmsd,(Rd(J),J=1,5)
-      CALL DifDist(Ndif,5,Tol,Rd,Rmem)
+      Do I=1,Ncount5
+       Rsum=0.
+       Do J=1,5
+        IAT1=N5MEM(I,J)
+        J1=J+1
+        IF(J1.eq.6) J1=1
+        IAT2=N5MEM(I,J1)
+        Rd(J)=FunDistMat(IAT1,IAT2,DistMat)
+        if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
+        if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
+        RSum=Rsum+Rd(J)
+       enddo
+       RAv5=RSum*.2d0
+       Rsum=0.
+       Do J=1,5
+        Rsum=Rsum+(RAv5-Rd(J))**2
+       enddo
+       Rrmsd=dsqrt(Rsum*.2d0)
+       Write(IOUT,1001) (N5MEM(I,J),J=1,5),RAv5,Rrmsd,(Rd(J),J=1,5)
+       CALL DifDist(Ndif,5,Tol,Rd,Rmem)
       enddo
       Write(IOUT,1007) Rmin5,Rmax5
 
@@ -160,8 +159,7 @@ C     Check bond distances
       J1=J+1
       IF(J1.eq.7) J1=1
       IAT2=N6MEM(I,J1)
-      DM=FunDistMat(IAT1,IAT2,DistMat)
-      Rd(J)=DM
+      Rd(J)=FunDistMat(IAT1,IAT2,DistMat)
       if(Rd(J).LT.Rmin6) Rmin6=Rd(J)
       if(Rd(J).GT.Rmax6) Rmax6=Rd(J)
       RSum=Rsum+Rd(J)

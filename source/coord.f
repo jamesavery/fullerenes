@@ -182,8 +182,11 @@ C Asymmetric
       DIMENSION IC3(Nmax,3),XG1(3),XG2(3)
 C     Producing and printing Gaudiene structure
 C     First scale original structure
-C     Distance used from one original vertex to the other:
-C     RG = 2*R(fullerene,average)+R(triple-bond)
+C     Then add 2 additional vertices per edge in the right ratio along the line
+      NewVertNum=4*number_vertices
+      if(NewVertNum.gt.Nmax) then
+       Write(Iout,1005) NewVertNum,Nmax
+      endif
       Open(unit=7,file='gaudifullerene.xyz',form='formatted')
       Write(Iout,1003)
 C     Triple and single bond length
@@ -193,7 +196,6 @@ C     Triple and single bond length
       scalef=2.d0+RT/RS
       rfac1=RS/Rtotal
       rfac2=(RS+RT)/Rtotal
-      NewVertNum=4*number_vertices
       Write(Iout,1000) NewVertNum,scalef 
       Write(7,100) NewVertNum
       Write(7,101)
@@ -238,6 +240,7 @@ C     Now get the extra triply bonded carbon atoms into each edge
  1003 FORMAT(/1x,'Fullerene where every edge contains 2 extra vertices')
  1004 FORMAT(1x,'Factors for putting vertices on a unit edge:',
      1 F10.6,2X,F10.6)
+ 1005 FORMAT(1x,'New number of vertices ',I6,' greater than Nmax=',I6)
       return
       END
 
@@ -2724,10 +2727,12 @@ c   Check if distances are within certain range
      1 'N3',4X,'N4',/1X,64('-'))
  1001 Format(1X,I5,3(1X,F12.6),3(1X,I5))
  1002 Format(1X,'Analysis of distances: All are bond distances',
-     1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
+     1 /1X,'In this list: Smallest distance: ',F12.6,
+     1 ', Largest distance: ',F12.6)
  1003 Format(1X,'Analysis of distances: May require sorting of ',
      1 'cartesian coordinates or optimization of structure',
-     1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
+     1 /1X,'In this list: Smallest distance: ',F12.6,
+     1 ', Largest distance: ',F12.6)
  1004 Format('WARNING: Problem with smallest bond distance detected!',
      1 /1X,' Geometry of fullerene may be wrong')
       return
