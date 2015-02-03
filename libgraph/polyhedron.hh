@@ -52,7 +52,7 @@ struct Polyhedron : public PlanarGraph {
   }
 
   bool optimize(int opt_method = 3, double ftol = 1e-10);
-  bool optimize_other(bool optimize_angles = true, vector<double> zero_values_dist=vector<double>());
+  bool optimize_other(bool optimize_angles = true, map<edge_t, double> zero_values_dist=map<edge_t, double>());
 
   static Polyhedron C20() {
     vector<coord3d> points(20);
