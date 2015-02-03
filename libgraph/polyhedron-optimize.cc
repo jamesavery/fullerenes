@@ -22,6 +22,7 @@ struct params_t
   vector<double> *force_constants_dist;
   vector<double> *force_constants_angle;
   vector<double> *force_constants_dihedral;
+  set<edge_t> *edge_set;
   bool optimize_angles;
 };
 
@@ -34,8 +35,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
-
-  set<edge_t> edge_set = P.undirected_edges();
+  set<edge_t> &edge_set = *params.edge_set;
 
   assert(zero_values_dist.size() == edge_set.size());
   assert(force_constants_dist.size() == edge_set.size());
@@ -144,8 +144,7 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
-
-  set<edge_t> edge_set = P.undirected_edges();
+  set<edge_t> &edge_set = *params.edge_set;
 
   assert(zero_values_dist.size() == edge_set.size());
   assert(force_constants_dist.size() == edge_set.size());
@@ -267,7 +266,6 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
 }
 
 
-//FIXME redo for performance reasons
 void polyhedron_pot_grad(const gsl_vector* coordinates, void* parameters, double* potential, gsl_vector* gradient)
 {
   *potential = polyhedron_pot(coordinates, parameters);
@@ -330,6 +328,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   params.force_constants_dist = &force_constants_dist;
   params.force_constants_angle = &force_constants_angle;
   params.force_constants_dihedral = &force_constants_dihedral;
+  params.edge_set = &edge_set;
   params.optimize_angles = optimize_angles;
   
   // Create the minimisation function block, define the different functions and parameters
