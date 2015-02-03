@@ -110,8 +110,8 @@ int main(int ac, char **av)
   {
     ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
     mol2 << D.to_mol2();
-    mol2.close()
-;
+    mol2.close() ;
+
     ofstream pov(("output/"+basename+"-dual.pov").c_str());
     pov << D.to_povray();
     pov.close();
