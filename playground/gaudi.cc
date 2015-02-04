@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 
+//#include "libgraph/planargraph.hh"
 #include "libgraph/cubicgraph.hh"
 #include "libgraph/fullerenegraph.hh"
 #include "libgraph/eisenstein.hh"
@@ -59,7 +60,6 @@ vector< pair<Eisenstein, node_t> > GCDreduce(const vector< pair<Eisenstein, node
 }
 
 
-// the cube
 Graph cube()
 {
   const int N = 8;
@@ -74,39 +74,68 @@ Graph cube()
     neighbours[i+4][1] = (i-1+4)%4 + 4;
     neighbours[i+4][2] = (i+4)%4;
   }
+  return Graph(neighbours);
+}
+
+
+Graph oct_2()
+{
+  const int N = 8;
+  neighbours_t neighbours(N,vector<node_t>(3));
+
+  neighbours[0][0] = 1;
+  neighbours[0][1] = 4;
+  neighbours[0][2] = 5;
+
+  neighbours[1][0] = 0;
+  neighbours[1][1] = 2;
+  neighbours[1][2] = 5;
+
+  neighbours[2][0] = 1;
+  neighbours[2][1] = 3;
+  neighbours[2][2] = 6;
+
+  neighbours[3][0] = 2;
+  neighbours[3][1] = 4;
+  neighbours[3][2] = 7;
+
+  neighbours[4][0] = 0;
+  neighbours[4][1] = 3;
+  neighbours[4][2] = 7;
+
+  neighbours[5][0] = 0;
+  neighbours[5][1] = 1;
+  neighbours[5][2] = 6;
+
+  neighbours[6][0] = 2;
+  neighbours[6][1] = 5;
+  neighbours[6][2] = 7;
+
+  neighbours[7][0] = 3;
+  neighbours[7][1] = 4;
+  neighbours[7][2] = 6;
+
+  return Graph(neighbours);
+}
+
+
+Graph tetraeder()
+{
+  const int N = 4;
+  neighbours_t neighbours(N,vector<node_t>(3));
+
+  for(int i=0; i<4; i++){
+    neighbours[i][0] = (i+1)%4;
+    neighbours[i][1] = (i+2)%4;
+    neighbours[i][2] = (i+3)%4;
+  }
   cout << neighbours << endl;
   return Graph(neighbours);
 }
 
 
-// smallest polyhedron with only pentagons and heptagons
-Graph example1(){
-  const int M=7, N=28;
-  neighbours_t neighbours(N,vector<node_t>(3));
 
-  for(int i=0; i!=7; ++i){
-    neighbours[i][0] = (i+1)%M;
-    neighbours[i][1] = (i-1+M)%M;
-    neighbours[i][2] = M+i;
-    
-    neighbours[1*M+i][0] =     i;
-    neighbours[1*M+i][1] = 2*M+i;
-    neighbours[1*M+i][2] = 2*M+(i-1+M)%M;
-    
-    neighbours[2*M+i][0] = 1*M+i%M;
-    neighbours[2*M+i][1] = 1*M+(i+1)%M;
-    neighbours[2*M+i][2] = 3*M+i;
-    
-    neighbours[3*M+i][0] = 2*M+i;
-    neighbours[3*M+i][1] = 3*M+(i+1)%M;
-    neighbours[3*M+i][2] = 3*M+(i-1+M)%M;
-  }
-
-  return Graph(neighbours);
-}
-
-
-Graph examples[2] = {cube(), example1()};
+Graph examples[3] = {cube(), tetraeder(), oct_2()};
 
 
 
@@ -153,6 +182,7 @@ int main(int ac, char **av)
   Unfolding gct_unfld = unfld * Eisenstein(K,L);
 
   output << "gctoutline = " << get_keys(gct_unfld.outline) << ";\n";
+  output.close();
 
   Folding fld(gct_unfld);
   PlanarGraph gctdual = fld.fold(), gct = gctdual.dual_graph(3,false);
@@ -170,18 +200,96 @@ int main(int ac, char **av)
     mol2.close();
   }
 
-   Polyhedron P(P0);
-   P.optimize_other();
+  Polyhedron P(P0);
 
-  cout << P << endl;
-  
+  bool optimize_angles = true;
+  set<edge_t> es=gct.undirected_edges();
+  set<edge_t> long_edges;
+  map<edge_t, double> lengths;
+  facemap_t faces=gct.compute_faces(6);
+
+
+// find long edges
+  cout << "faces-3: " << faces[3] << endl;
+  cout << "faces-4: " << faces[4] << endl;
+  cout << "faces-5: " << faces[5] << endl;
+  for(int i=3; i<6; i++){  
+    for(set<face_t>::iterator it=faces[i].begin(), to=faces[i].end(); it!=to; it++){
+      for(int j=0; j<i; j++){
+        long_edges.insert(edge_t((*it)[j], (*it)[(j+1)%i]));
+        es.erase(edge_t((*it)[j], (*it)[(j+1)%i]));
+      }
+    }
+  }
+  cout << "long edges: " << long_edges << endl;
+  cout << "normal edges: " << es << endl;
+
+
+// optimize cubic graph with long edges
+  const double normal_edge_length=1.42;
+  const double long_edge_single=1.45;
+  const double long_edge_triple=1.28;
+  const double long_edge_length=2*long_edge_single + long_edge_triple;
+  for(set<edge_t>::iterator it=es.begin(), to=es.end(); it!=to; it++){
+    lengths.insert(make_pair(*it, normal_edge_length));
+  }
+  for(set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
+    lengths.insert(make_pair(*it, long_edge_length));
+  }
+  P.optimize_other(optimize_angles, lengths);
+  cout << "P: " << P << endl;  
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
     mol2 << P.to_mol2();
     mol2.close();
   }
 
+// replace long edges, don't reoptimize
+  cout << "neighbours : " << P.neighbours << endl;
+    cout << "-----" << endl;
+  for (set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
+    cout << "edge to zap: " << *it << endl;
+    edge_t to_zap(*it);
+    cout << "edge to zap: " << to_zap << endl;
+    //vector<int>& n1 = P.neighbours[it->first];
+    //vector<int>& n2 = P.neighbours[it->second];
+    //cout << n1 << ", " << n2 <<  endl;
+    P.remove_edge(to_zap);
+    //cout << "neighbours : " << P.neighbours << endl;
+    //cout << n1 << ", " << n2 <<  endl;
+    P.N += 2;
+    P.neighbours.resize(P.N);
+    //cout << "neighbours : " << P.neighbours << endl;
+    cout << "trying to insert : " << edge_t(to_zap.first,P.N-2) << edge_t(to_zap.second,P.N-1) << edge_t(P.N-2,P.N-1) << endl;
+    P.neighbours[to_zap.first].push_back(P.N-2);
+    P.neighbours[P.N-2].push_back(to_zap.first);
+    P.neighbours[to_zap.second].push_back(P.N-1);
+    P.neighbours[P.N-1].push_back(to_zap.second);
+    P.neighbours[P.N-2].push_back(P.N-1);
+    P.neighbours[P.N-1].push_back(P.N-2);
+    //cout << "neighbours : " << P.neighbours << endl;
+    
+    const coord3d & c1=P.points[it->first];
+    const coord3d & c2=P.points[it->second];
+    coord3d dc = c2-c1;
+    cout << "c1, c2, dc: " << c1 << c2 << dc << endl;
+    P.points.push_back(c1 + dc*(long_edge_single/long_edge_length)); 
+    P.points.push_back(c2 - dc*(long_edge_single/long_edge_length)); 
+    cout << "new point at c1: " << c1 + dc*(long_edge_length/long_edge_single) << endl;
+    cout << "new point at c2: " << c2 - dc*(long_edge_length/long_edge_single) << endl;
+    cout << "size: " << P.points.size() << endl;
+    cout << "neighbours : " << P.neighbours << endl;
+    cout << "-----" << endl;
+  }
 
-  output.close();
+  cout << P.neighbours << endl;
+
+  cout << "P: " << P << endl;  
+  {
+    ofstream mol2(("output/"+basename+".mol2").c_str());
+    mol2 << P.to_mol2();
+    mol2.close();
+  }
+
   return 0;
 }
