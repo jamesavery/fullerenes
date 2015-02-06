@@ -78,6 +78,21 @@ Graph cube()
 }
 
 
+Graph tetraeder()
+{
+  const int N = 4;
+  neighbours_t neighbours(N,vector<node_t>(3));
+
+  for(int i=0; i<4; i++){
+    neighbours[i][0] = (i+1)%4;
+    neighbours[i][1] = (i+2)%4;
+    neighbours[i][2] = (i+3)%4;
+  }
+  cout << neighbours << endl;
+  return Graph(neighbours);
+}
+
+
 Graph oct_2()
 {
   const int N = 8;
@@ -118,24 +133,13 @@ Graph oct_2()
   return Graph(neighbours);
 }
 
-
-Graph tetraeder()
+Graph C20()
 {
-  const int N = 4;
-  neighbours_t neighbours(N,vector<node_t>(3));
-
-  for(int i=0; i<4; i++){
-    neighbours[i][0] = (i+1)%4;
-    neighbours[i][1] = (i+2)%4;
-    neighbours[i][2] = (i+3)%4;
-  }
-  cout << neighbours << endl;
-  return Graph(neighbours);
+  return FullereneGraph::C20();
 }
 
 
-
-Graph examples[3] = {cube(), tetraeder(), oct_2()};
+Graph examples[4] = {cube(), tetraeder(), oct_2(), C20()};
 
 
 
@@ -193,7 +197,7 @@ int main(int ac, char **av)
   gct.layout2d = gct.tutte_layout();
   Polyhedron P0 = Polyhedron(gct,gct.zero_order_geometry(),6);
 
-  string basename("polyhedron-"+to_string(N));
+  string basename("gaudi-"+to_string(N));
   {
     ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
     mol2 << P0.to_mol2();
@@ -213,14 +217,48 @@ int main(int ac, char **av)
   cout << "faces-3: " << faces[3] << endl;
   cout << "faces-4: " << faces[4] << endl;
   cout << "faces-5: " << faces[5] << endl;
-  for(int i=3; i<6; i++){  
+  set<node_t> marked_nodes;
+  // the easy part: all small faces
+  for(int i=3; i<6; i++){
     for(set<face_t>::iterator it=faces[i].begin(), to=faces[i].end(); it!=to; it++){
       for(int j=0; j<i; j++){
         long_edges.insert(edge_t((*it)[j], (*it)[(j+1)%i]));
         es.erase(edge_t((*it)[j], (*it)[(j+1)%i]));
+        marked_nodes.insert((*it)[j]);
       }
     }
   }
+  // the harder part:  additional hexagons, such that each vertex is part of one 'marked' face
+  for(set<face_t>::iterator it=faces[6].begin(), to=faces[6].end(); it!=to; it++){
+    bool face_relevant = true;
+    // check if any node of this face is marked
+    for(int j=0; j<6; j++){
+      if(marked_nodes.find((*it)[j]) != marked_nodes.end()){
+        face_relevant = false; break;
+      }
+    }
+    if(!face_relevant) continue;
+         
+    // check if any node of this face shares an edge with a marked node
+    face_relevant = false;
+    for(int j=0; j<6; j++){
+      for(int k=0; k<3; k++){
+        if(marked_nodes.find(P.neighbours[(*it)[j]][k]) != marked_nodes.end()){
+          face_relevant = true;
+        }    
+      }
+    }
+
+    if(face_relevant){
+      for(int j=0; j<6; j++){
+        long_edges.insert(edge_t((*it)[j], (*it)[(j+1)%6]));
+        es.erase(edge_t((*it)[j], (*it)[(j+1)%6]));
+        marked_nodes.insert((*it)[j]);
+      }
+    }
+  }
+  
+  cout << "marked nodes: " << marked_nodes << endl;
   cout << "long edges: " << long_edges << endl;
   cout << "normal edges: " << es << endl;
 
@@ -229,12 +267,12 @@ int main(int ac, char **av)
   const double normal_edge_length=1.42;
   const double long_edge_single=1.45;
   const double long_edge_triple=1.28;
-  const double long_edge_length=2*long_edge_single + long_edge_triple;
+  const double long_edge_total=2*long_edge_single + long_edge_triple;
   for(set<edge_t>::iterator it=es.begin(), to=es.end(); it!=to; it++){
     lengths.insert(make_pair(*it, normal_edge_length));
   }
   for(set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
-    lengths.insert(make_pair(*it, long_edge_length));
+    lengths.insert(make_pair(*it, long_edge_total));
   }
   P.optimize_other(optimize_angles, lengths);
   cout << "P: " << P << endl;  
@@ -269,20 +307,21 @@ int main(int ac, char **av)
     P.neighbours[P.N-1].push_back(P.N-2);
     //cout << "neighbours : " << P.neighbours << endl;
     
-    const coord3d & c1=P.points[it->first];
-    const coord3d & c2=P.points[it->second];
+    const coord3d c1=P.points[it->first];
+    const coord3d c2=P.points[it->second];
     coord3d dc = c2-c1;
     cout << "c1, c2, dc: " << c1 << c2 << dc << endl;
-    P.points.push_back(c1 + dc*(long_edge_single/long_edge_length)); 
-    P.points.push_back(c2 - dc*(long_edge_single/long_edge_length)); 
-    cout << "new point at c1: " << c1 + dc*(long_edge_length/long_edge_single) << endl;
-    cout << "new point at c2: " << c2 - dc*(long_edge_length/long_edge_single) << endl;
+    P.points.push_back(c1 + dc*(long_edge_single/long_edge_total)); 
+    P.points.push_back(c2 - dc*(long_edge_single/long_edge_total)); 
+    cout << "new point connected to c1: " << c1 + dc*(long_edge_single/long_edge_total) << endl;
+    cout << "new point connected to c2: " << c2 - dc*(long_edge_single/long_edge_total) << endl;
     cout << "size: " << P.points.size() << endl;
     cout << "neighbours : " << P.neighbours << endl;
     cout << "-----" << endl;
   }
 
-  cout << P.neighbours << endl;
+// write output
+  //cout << P.neighbours << endl;
 
   cout << "P: " << P << endl;  
   {
