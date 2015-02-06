@@ -2,7 +2,6 @@
 #include <fstream>
 #include <vector>
 
-//#include "libgraph/planargraph.hh"
 #include "libgraph/cubicgraph.hh"
 #include "libgraph/fullerenegraph.hh"
 #include "libgraph/eisenstein.hh"
@@ -184,12 +183,17 @@ int main(int ac, char **av)
   output << "outlinecoords = " << get_keys(unfld.outline) << ";\n";
 
   Unfolding gct_unfld = unfld * Eisenstein(K,L);
+  cout << "outline multiplied" << endl;
 
   output << "gctoutline = " << get_keys(gct_unfld.outline) << ";\n";
   output.close();
 
   Folding fld(gct_unfld);
-  PlanarGraph gctdual = fld.fold(), gct = gctdual.dual_graph(3,false);
+  cout << "folding created" << endl;
+  PlanarGraph gctdual = fld.fold();
+  cout << "triangulation created" << endl;
+  PlanarGraph gct = gctdual.dual_graph(3,false);
+  cout << "cubic graph created" << endl;
   cout << "gctdual = " << gctdual << ";\n"
 	 << "gct     = " << gct << ";\n";
 
@@ -197,7 +201,8 @@ int main(int ac, char **av)
   gct.layout2d = gct.tutte_layout();
   Polyhedron P0 = Polyhedron(gct,gct.zero_order_geometry(),6);
 
-  string basename("gaudi-"+to_string(N));
+  const int finalN = N * (K*K + K*L + L*L) * 3;
+  string basename("gaudi-"+to_string(finalN));
   {
     ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
     mol2 << P0.to_mol2();
@@ -229,31 +234,36 @@ int main(int ac, char **av)
     }
   }
   // the harder part:  additional hexagons, such that each vertex is part of one 'marked' face
-  for(set<face_t>::iterator it=faces[6].begin(), to=faces[6].end(); it!=to; it++){
-    bool face_relevant = true;
-    // check if any node of this face is marked
-    for(int j=0; j<6; j++){
-      if(marked_nodes.find((*it)[j]) != marked_nodes.end()){
-        face_relevant = false; break;
-      }
-    }
-    if(!face_relevant) continue;
-         
-    // check if any node of this face shares an edge with a marked node
-    face_relevant = false;
-    for(int j=0; j<6; j++){
-      for(int k=0; k<3; k++){
-        if(marked_nodes.find(P.neighbours[(*it)[j]][k]) != marked_nodes.end()){
-          face_relevant = true;
-        }    
-      }
-    }
-
-    if(face_relevant){
+  bool face_found_in_this_iteration = true;
+  while(face_found_in_this_iteration){
+    face_found_in_this_iteration = false;
+    for(set<face_t>::iterator it=faces[6].begin(), to=faces[6].end(); it!=to; it++){
+      bool face_relevant = true;
+      // check if any node of this face is marked
       for(int j=0; j<6; j++){
-        long_edges.insert(edge_t((*it)[j], (*it)[(j+1)%6]));
-        es.erase(edge_t((*it)[j], (*it)[(j+1)%6]));
-        marked_nodes.insert((*it)[j]);
+        if(marked_nodes.find((*it)[j]) != marked_nodes.end()){
+          face_relevant = false; break;
+        }
+      }
+      if(!face_relevant) continue;
+           
+      // check if any node of this face shares an edge with a marked node
+      face_relevant = false;
+      for(int j=0; j<6; j++){
+        for(int k=0; k<3; k++){
+          if(marked_nodes.find(P.neighbours[(*it)[j]][k]) != marked_nodes.end()){
+            face_relevant = true;
+          }    
+        }
+      }
+
+      if(face_relevant){
+        for(int j=0; j<6; j++){
+          long_edges.insert(edge_t((*it)[j], (*it)[(j+1)%6]));
+          es.erase(edge_t((*it)[j], (*it)[(j+1)%6]));
+          marked_nodes.insert((*it)[j]);
+        }
+        face_found_in_this_iteration = true;
       }
     }
   }
@@ -283,12 +293,10 @@ int main(int ac, char **av)
   }
 
 // replace long edges, don't reoptimize
-  cout << "neighbours : " << P.neighbours << endl;
-    cout << "-----" << endl;
   for (set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
-    cout << "edge to zap: " << *it << endl;
+    //cout << "edge to zap: " << *it << endl;
     edge_t to_zap(*it);
-    cout << "edge to zap: " << to_zap << endl;
+    //cout << "edge to zap: " << to_zap << endl;
     //vector<int>& n1 = P.neighbours[it->first];
     //vector<int>& n2 = P.neighbours[it->second];
     //cout << n1 << ", " << n2 <<  endl;
@@ -298,7 +306,7 @@ int main(int ac, char **av)
     P.N += 2;
     P.neighbours.resize(P.N);
     //cout << "neighbours : " << P.neighbours << endl;
-    cout << "trying to insert : " << edge_t(to_zap.first,P.N-2) << edge_t(to_zap.second,P.N-1) << edge_t(P.N-2,P.N-1) << endl;
+    //cout << "trying to insert : " << edge_t(to_zap.first,P.N-2) << edge_t(to_zap.second,P.N-1) << edge_t(P.N-2,P.N-1) << endl;
     P.neighbours[to_zap.first].push_back(P.N-2);
     P.neighbours[P.N-2].push_back(to_zap.first);
     P.neighbours[to_zap.second].push_back(P.N-1);
@@ -310,19 +318,17 @@ int main(int ac, char **av)
     const coord3d c1=P.points[it->first];
     const coord3d c2=P.points[it->second];
     coord3d dc = c2-c1;
-    cout << "c1, c2, dc: " << c1 << c2 << dc << endl;
+    //cout << "c1, c2, dc: " << c1 << c2 << dc << endl;
     P.points.push_back(c1 + dc*(long_edge_single/long_edge_total)); 
     P.points.push_back(c2 - dc*(long_edge_single/long_edge_total)); 
-    cout << "new point connected to c1: " << c1 + dc*(long_edge_single/long_edge_total) << endl;
-    cout << "new point connected to c2: " << c2 - dc*(long_edge_single/long_edge_total) << endl;
-    cout << "size: " << P.points.size() << endl;
-    cout << "neighbours : " << P.neighbours << endl;
-    cout << "-----" << endl;
+    //cout << "new point connected to c1: " << c1 + dc*(long_edge_single/long_edge_total) << endl;
+    //cout << "new point connected to c2: " << c2 - dc*(long_edge_single/long_edge_total) << endl;
+    //cout << "size: " << P.points.size() << endl;
+    //cout << "neighbours : " << P.neighbours << endl;
+    //cout << "-----" << endl;
   }
 
 // write output
-  //cout << P.neighbours << endl;
-
   cout << "P: " << P << endl;  
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
