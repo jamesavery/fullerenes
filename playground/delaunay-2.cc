@@ -49,35 +49,44 @@ int main(int ac, char **av) {
   cout << "spiral = " << spiral << endl;
 
   Triangulation T1(spiral);
-  FulleroidDelaunay T(T1);
+  FulleroidDelaunay DY(T1);
 
-  cout << "T = " << T << ";\n"
-       << "dDist = " << T.distances << ";\n";
-  output << "T = " << T << ";\n"
-	 << "dDist = " << T.distances << ";\n";
+  cout << "DY = " << DY << ";\n"
+       << "dDist = " << DY.distances << ";\n";
+  output << "DY = " << DY << ";\n"
+	 << "dDist = " << DY.distances << ";\n";
 
-//  Polyhedron PT = fullerene_dual_polyhedron(T);
+//  Polyhedron PT = fullerene_dual_polyhedron(DY);
 
 //  output << "PT = " << PT << "\n";
-//  output.close();
-
-  T.remove_flat_vertices();
-  cout << "rT = " << T << ";\n";
-
-//   matrix<double> D = T.surface_distances();
-//   matrix<int>    Dsqr = T.convex_square_surface_distances();
-//  
-//   output << "Dist = " << D << ";\n";
-//   output << "iDist = Sqrt[" << Dsqr << "];\n";
-
   output.close();
+
+  DY.remove_flat_vertices();
+  cout << "rT = " << DY << ";\n";
+
+  map<edge_t,double> edge_lengths;
+  for (int i=0; i<12;i++){
+    for (int j=i; j<12;j++){
+      if(DY.edge_lengths_d6y(i,j)){
+        edge_lengths.insert(make_pair(edge_t(i,j), DY.edge_lengths_d6y(i,j)));
+      }
+    }
+  }
+//  cout << edge_lengths << endl;
+
+
  
-  cout << "creating P from T" << endl;
-  Polyhedron P(T);
-  cout << "created P from T" << endl;
+  cout << "creating P from DY" << endl;
+  DY.layout2d = DY.tutte_layout();
+  Polyhedron P = Polyhedron(DY,DY.zero_order_geometry(),6);
+  cout << "created P from DY" << endl;
   cout << "P=" << P << endl;
 
-  //TODO optimize P with distances from edge_lengths_d6y
+
+  cout << "optimizing" << endl;
+  P.optimize_other(false, edge_lengths);
+  cout << "optimized" << endl;
+
 
   string mol2_name = "output/reduced-graph-C"+to_string(N)+".mol2";
   {

@@ -292,7 +292,7 @@ void FulleroidDelaunay::remove_flat_vertices()
     cout << "-----" << endl;
   }
 
- cout << "--- done ---" << endl;
+  cout << "--- done ---" << endl;
 
   cout << edge_lengths_d6y << endl;
 
@@ -304,7 +304,7 @@ void FulleroidDelaunay::remove_flat_vertices()
   delaunayify_hole_2(vec_ue);
 
   cout << edge_lengths_d6y << endl;
- cout << "--- done ---" << endl;
+  cout << "--- done ---" << endl;
   
   // TODO: Perform a final Delaunayification.
 

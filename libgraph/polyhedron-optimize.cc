@@ -28,6 +28,8 @@ struct params_t
 
 double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 {
+  //cout << "entering polyhedron pot" << endl;
+
   params_t &params = *static_cast<params_t*>(parameters);
   Polyhedron &P = *params.P;
   map<edge_t, double> &zero_values_dist = *params.zero_values_dist;
@@ -275,7 +277,9 @@ void polyhedron_pot_grad(const gsl_vector* coordinates, void* parameters, double
 
 bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_values_dist)
 {
-//  cout << "entering opt other" << endl;
+  //cout << "entering opt other" << endl;
+
+  assert(points.size() == N);
 
   // settings for the optimizations
   const double stepsize = 1e-3;// FIXME final value
