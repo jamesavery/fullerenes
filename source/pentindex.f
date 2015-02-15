@@ -288,9 +288,10 @@ c      endif
      1 ', Point group of fullerene (in ideal symmetry): ',A3,/1X,
      1 'Ring spiral pentagon positions: ',12I6)
  1021 Format(12(1X,I5))
- 1022 Format(1X,'Input spiral is canonical')
- 1023 Format(1X,'Canonical spiral list of pentagon positions:')
- 1024 Format(1X,'Canonical spiral list of hexagons and pentagons:')
+ 1022 Format(1X,'Input spiral may not be canonical, use spiral-search',
+     1 ' program to obtain canonical spiral')
+ 1023 Format(1X,'Spiral list of pentagon positions:')
+ 1024 Format(1X,'Spiral list of hexagons and pentagons:')
  1025 Format(1X,100I1)
  1037 FORMAT(1X,'Graph is not cubic, ',I5,' vertices detected which ',
      1 'are not of degree 3, last one is of degree ',I5)

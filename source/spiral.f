@@ -1681,7 +1681,7 @@ C     Print ring numbers
  604  FORMAT(1X,131('-'),/1X,'Corresponding ring numbers:') 
  605  FORMAT(1X,A3,9X,12I6,2X,3(I4,' x',I4,:,','))
  607  Format(12(1X,I6))
- 608  Format(1X,'Input spiral is canonical')
+ 608  Format(1X,'Spiral is canonical')
  610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
      1 'loop over')
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
