@@ -28,4 +28,4 @@ there is no layout2d in 'find_outer_face' and the assertion fails.
 * there is a problem with the c++ std-lib of OSX that causes a segfault as soon as one writes to an ostringstream (but creating the object is ok)
 
 * there is an example where cartesian input leads to a valid but non-canonical spiral, input of that non-canonical spiral returns canonical spiral but claims input had been canonical in the first place
-
+Problem is in Subroutine CoordBuild, problem circumvented for the moment by not stating that spiral in canonical
