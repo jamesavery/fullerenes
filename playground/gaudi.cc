@@ -137,8 +137,50 @@ Graph C20()
   return FullereneGraph::C20();
 }
 
+Graph c32_1(){
+  //  C2 
+  const int N=32;
+  const vector<int> rspi = {0, 1, 2, 3, 4, 6, 11, 13, 14, 15, 16, 17};
+  return FullereneGraph(N, rspi);
+}
 
-Graph examples[4] = {cube(), tetraeder(), oct_2(), C20()};
+Graph c32_2(){
+  // D2 
+  const int N=32;
+  const vector<int> rspi = {0, 1, 2, 3, 4, 7, 11, 12, 14, 15, 16, 17};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c32_3(){
+  // D3d
+  const int N=32;
+  const vector<int> rspi = {0, 1, 2, 3, 4, 8, 11, 12, 13, 15, 16, 17};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c32_4(){
+  // C2 
+  const int N=32;
+  const vector<int> rspi = {0, 1, 2, 3, 6, 9, 10, 11, 13, 14, 16, 17};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c32_5(){
+  // D3h 
+  const int N=32;
+  const vector<int> rspi = {0, 1, 2, 3, 6, 9, 10, 12, 13, 15, 16, 17};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c32_6(){
+  // D3
+  const int N=32;
+  const vector<int> rspi = {0, 1, 2, 4, 6, 8, 9, 11, 13, 15, 16, 17};
+  return FullereneGraph(N, rspi);
+}
+
+
+Graph examples[10] = {cube(), tetraeder(), oct_2(), C20(), c32_1(), c32_2(), c32_3(), c32_4(), c32_5(), c32_6()};
 
 
 
