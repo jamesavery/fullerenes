@@ -179,8 +179,88 @@ Graph c32_6(){
   return FullereneGraph(N, rspi);
 }
 
+Graph c18_1()
+{
+  const int N = 18;
+  neighbours_t neighbours(N,vector<node_t>(3));
 
-Graph examples[10] = {cube(), tetraeder(), oct_2(), C20(), c32_1(), c32_2(), c32_3(), c32_4(), c32_5(), c32_6()};
+  neighbours[0][0] = 1;
+  neighbours[0][1] = 2;
+  neighbours[0][2] = 17;
+
+  neighbours[1][0] = 0;
+  neighbours[1][1] = 3;
+  neighbours[1][2] = 7;
+
+  neighbours[2][0] = 0;
+  neighbours[2][1] = 4;
+  neighbours[2][2] = 10;
+
+  neighbours[3][0] = 1;
+  neighbours[3][1] = 4;
+  neighbours[3][2] = 5;
+
+  neighbours[4][0] = 2;
+  neighbours[4][1] = 3;
+  neighbours[4][2] = 6;
+
+  neighbours[5][0] = 3;
+  neighbours[5][1] = 6;
+  neighbours[5][2] = 8;
+
+  neighbours[6][0] = 4;
+  neighbours[6][1] = 5;
+  neighbours[6][2] = 9;
+
+  neighbours[7][0] = 1;
+  neighbours[7][1] = 8;
+  neighbours[7][2] = 15;
+
+  neighbours[8][0] = 5;
+  neighbours[8][1] = 7;
+  neighbours[8][2] = 11;
+
+  neighbours[9][0] = 6;
+  neighbours[9][1] = 10;
+  neighbours[9][2] = 12;
+
+  neighbours[10][0] = 2;
+  neighbours[10][1] = 9;
+  neighbours[10][2] = 16;
+
+  neighbours[11][0] = 8;
+  neighbours[11][1] = 12;
+  neighbours[11][2] = 13;
+
+  neighbours[12][0] = 9;
+  neighbours[12][1] = 11;
+  neighbours[12][2] = 14;
+
+  neighbours[13][0] = 11;
+  neighbours[13][1] = 14;
+  neighbours[13][2] = 15;
+
+  neighbours[14][0] = 12;
+  neighbours[14][1] = 13;
+  neighbours[14][2] = 16;
+
+  neighbours[15][0] = 7;
+  neighbours[15][1] = 13;
+  neighbours[15][2] = 17;
+
+  neighbours[16][0] = 10;
+  neighbours[16][1] = 14;
+  neighbours[16][2] = 17;
+
+  neighbours[17][0] = 0;
+  neighbours[17][1] = 15;
+  neighbours[17][2] = 16;
+
+  return Graph(neighbours);
+}
+
+
+Graph examples[11] = {cube(), tetraeder(), oct_2(), C20(), c32_1(), c32_2(), c32_3(), c32_4(), c32_5(), c32_6(), c18_1()};
 
 
 
@@ -327,10 +407,9 @@ int main(int ac, char **av)
     lengths.insert(make_pair(*it, long_edge_total));
   }
   P.optimize_other(optimize_angles, lengths);
-  cout << "P: " << P << endl;  
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
-    mol2 << P.to_mol2();
+    mol2 << P.to_turbomole();
     mol2.close();
   }
 
@@ -375,6 +454,16 @@ int main(int ac, char **av)
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
     mol2 << P.to_mol2();
+    mol2.close();
+  }
+  {
+    ofstream mol2(("output/"+basename+".coord").c_str());
+    mol2 << P.to_turbomole();
+    mol2.close();
+  }
+  {
+    ofstream mol2(("output/"+basename+".xyz").c_str());
+    mol2 << P.to_xyz();
     mol2.close();
   }
 

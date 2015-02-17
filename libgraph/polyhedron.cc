@@ -470,6 +470,18 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   return s.str();
 }
 
+string Polyhedron::to_turbomole() const {
+  const double aa2bohr = 1.889716164632;
+  ostringstream s;
+  s << setprecision(8) << fixed;
+  s << "$coord" << endl;
+  for(int i=0; i < N; ++i){
+    s << setw(12) << points[i][0]*aa2bohr << "  "<< setw(12) << points[i][1]*aa2bohr << "  " << setw(12) << points[i][2]*aa2bohr << "  c" << endl;
+  }
+  s << "$end" << endl;
+
+  return s.str();
+}
 
 string Polyhedron::to_xyz() const {
 
