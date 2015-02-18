@@ -19,7 +19,7 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
     else if(t==2) tris.second = w;
     else {
       fprintf(stderr,"Triangulation is not orientable, edge %d--%d part of more than two faces.\n",u,v);
-      cerr << "edges = " << edge_set << ";\n";
+      cerr << "neighbours = " << neighbours << ";\n";
       abort();
     }
       }
@@ -27,17 +27,25 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
   return tris;
 }
 
-vector<tri_t> Triangulation::compute_faces() const // non-oriented triangles
+vector<tri_t> Triangulation::compute_faces() const 
+// Does not assume graph is oriented
+// Produces oriented triangles
 {
-  set<tri_t> triangles;
+  set<tri_t> triangle_set;
 
-  int i=0;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++,i++){
-    pair<node_t,node_t> t(adjacent_tris(*e));
-    triangles.insert(tri_t(e->first,e->second,t.first).sorted());
-    triangles.insert(tri_t(e->first,e->second,t.second).sorted());
-  }
-  return vector<tri_t>(triangles.begin(),triangles.end());
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++){
+      node_t v = neighbours[u][i];
+      pair<node_t,node_t> ws(adjacent_tris(edge_t(u,v)));
+
+      triangle_set.insert(tri_t(u,v,ws.first ).sorted());
+      triangle_set.insert(tri_t(u,v,ws.second).sorted());
+    }
+
+
+  vector<tri_t> triangles(triangle_set.begin(),triangle_set.end());
+  orient_triangulation(triangles);
+  return triangles;
 }
 
 
@@ -63,30 +71,20 @@ void Triangulation::orient_neighbours()
   }
 }
 
-node_t Triangulation::nextCW(const dedge_t& uv) const
+node_t Triangulation::nextCW(node_t u, node_t v) const
 {
-  const node_t &u(uv.first), &v(uv.second);
-  const vector<node_t>& nv(neighbours[v]);
-
-  for(int j=0;j<nv.size(); j++) if(nv[j] == u) return nv[(j+1)%nv.size()];
-
-  return -1;            // u-v is not an edge in a triangulation
+  return next(u,v);
 }
 
-node_t Triangulation::nextCCW(const dedge_t& uv) const
+node_t Triangulation::nextCCW(node_t u, node_t v) const
 {
-  const node_t &u(uv.first), &v(uv.second);
-  const vector<node_t>& nv(neighbours[v]);
-
-  for(int j=0;j<nv.size(); j++) if(nv[j] == u) return nv[(j-1+nv.size())%nv.size()];
-
-  return -1;            // u-v is not an edge in a triangulation
+  return prev(u,v);
 }
 
 
 vector<tri_t> Triangulation::compute_faces_oriented() const 
 {
-  vector<tri_t> triangles(edge_set.size()-N+2);
+  vector<tri_t> triangles(2*(N-2)); // Assumes cubic
   map<dedge_t,bool> dedge_done;    // Change to vector<bool> dedge_done[N*3] to increase speed.
 
   int k=0;
@@ -128,10 +126,12 @@ PlanarGraph Triangulation::dual_graph() const
     
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
-      node_t w(nextCW(dedge_t(u,v))); // TODO: CCW for buckygen -- will this give problems elsewhere?
+      node_t w(nextCCW(u,v)); // TODO: CCW for buckygen -- will this give problems elsewhere?
 
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
+
+      //      printf("A[%d][%d] = %d (%s)\n",U,i,tri_numbers(tri_t(u,v,w).sorted()),to_string(tri_t(u,v,w).sorted()).c_str());
 
       if(A[U][i] < 0){
 	cerr << "Triangle " << tri_t(u,v,w).sorted() << " (opposite " << t << ") not found!\n";
@@ -161,21 +161,6 @@ vector<face_t> Triangulation::dual_faces() const
   return dfaces;
 }
 
-//connect k and <last>
-inline void wg_connect_backward(const int k, set<edge_t> &edge_set, list<pair<node_t, int> > &ov, int &pre_used_valencies)
-{
-  edge_set.insert(edge_t(k, ov.back().first));
-  --ov.back().second;
-  ++pre_used_valencies;
-}
-
-// connect k and <first>
-inline void wg_connect_forward(const int k, set<edge_t> &edge_set, list<pair<node_t, int> > &ov, int &pre_used_valencies)
-{
-  edge_set.insert(edge_t(k, ov.front().first));
-  --ov.front().second;
-  ++pre_used_valencies;
-}
 
 // Takes full spiral string, e.g. 566764366348665
 // where the degrees are between 3 and 8 (or anything larger, really)
@@ -213,22 +198,33 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       jumps.pop_front();
     }
 
-    // connect k to <last>
-    wg_connect_backward(k, edge_set, open_valencies, pre_used_valencies);
+    // connect k and <last>
+    auto connect_backward = [&](){
+      edge_set.insert(edge_t(k, open_valencies.back().first));
+      --open_valencies.back().second;
+      ++pre_used_valencies;
+    };
 
-    // connect k to <first>
-    wg_connect_forward(k, edge_set, open_valencies, pre_used_valencies);
+    // connect k and <first>
+    auto connect_forward = [&](){
+      edge_set.insert(edge_t(k, open_valencies.front().first));
+      --open_valencies.front().second;
+      ++pre_used_valencies;
+    };
+
+    connect_backward();
+    connect_forward();
 
     // do the remaining connect forwards
     while(open_valencies.front().second==0){
       open_valencies.pop_front();
-      wg_connect_forward(k, edge_set, open_valencies, pre_used_valencies);
+      connect_forward();
     }
 
     // do the remaining connect backwards
     while(open_valencies.back().second==0){
       open_valencies.pop_back();
-      wg_connect_backward(k, edge_set, open_valencies, pre_used_valencies);
+      connect_backward();
     }
 
     if(spiral_string[k] - pre_used_valencies < 1){//the current atom is saturated (which may only happen for the last one)
@@ -260,7 +256,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     edge_set.insert(edge_t(N-1, open_valencies.front().first));
     open_valencies.pop_front();
   }
-
+  
   *this = Triangulation(PlanarGraph(edge_set));
 }
 
@@ -268,16 +264,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 // *********************************************************************
 //                 SPIRAL STUFF
 // *********************************************************************
-// gpi is for 'get pentagon indices'
-inline void gpi_connect_forward(list<pair<node_t,int> > &open_valencies, int& pre_used_valencies){
-  --open_valencies.front().second;
-  ++pre_used_valencies;
-}
 
-inline void gpi_connect_backward(list<pair<node_t,int> > &open_valencies, int& pre_used_valencies){
-  --open_valencies.back().second;
-  ++pre_used_valencies;
-}
 
 void gpi_remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
   remaining_nodes.erase(u);	// O(log(N)) with big coefficient - is set<node_t> the best data structure to use?
@@ -361,6 +348,15 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     return false;
   }
 
+  auto connect_forward = [&](){
+    --open_valencies.front().second;
+    ++pre_used_valencies;
+  };
+  auto connect_backward = [&](){
+    --open_valencies.back().second;
+    ++pre_used_valencies;
+  };
+
   // add the first three (defining) nodes
   // first node
   spiral[0] = valencies[f1];
@@ -372,7 +368,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   spiral[1] = valencies[f2];
   permutation[1] = f2;
   gpi_remove_node(f2, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-  gpi_connect_backward(open_valencies, pre_used_valencies);
+  connect_backward();
   open_valencies.push_back(make_pair(f2,valencies[f2]-1));
 
 
@@ -380,8 +376,8 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   spiral[2] = valencies[f3];
   permutation[2] = f3;
   gpi_remove_node(f3, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-  gpi_connect_backward(open_valencies, pre_used_valencies);
-  gpi_connect_forward(open_valencies, pre_used_valencies);
+  connect_backward();
+  connect_forward();
   open_valencies.push_back(make_pair(f3,valencies[f3]-2));
 
   if(!S0.empty() && (spiral[0] != S0[0] || spiral[1] != S0[1] || spiral[2] != S0[2])) return false;
@@ -396,7 +392,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_graph because there are some edges deleted already
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
-    node_t v = CW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
+    node_t v = CCW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
     //    cout << "u->v: " << u << " -> " << v << endl;
     if(v == -1) return false; // non-general spiral failed
 
@@ -430,16 +426,16 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
       }
     }
     
-    gpi_connect_forward(open_valencies, pre_used_valencies);
+    connect_forward();
     while (open_valencies.front().second==0){
       open_valencies.pop_front(); 
-      gpi_connect_forward(open_valencies, pre_used_valencies);
+      connect_forward();
     }
 
-    gpi_connect_backward(open_valencies, pre_used_valencies);
+    connect_backward();
     while (open_valencies.back().second==0){
       open_valencies.pop_back(); 
-      gpi_connect_backward(open_valencies, pre_used_valencies);
+      connect_backward();
     }
 
     spiral[i] = valencies[v];
@@ -610,3 +606,133 @@ bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonica
 }
 
 
+
+vector<int> draw_path(int major, int minor) 
+{
+  int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
+
+  vector<int> paths(minor+1,0), runs(minor);
+
+  for(int i=0; i<minor; i++){
+    slope_accumulator += slope_remainder;
+
+    paths[i+1] = paths[i] + slope + (slope_accumulator != 0);
+
+    if((i+1<minor) && (slope_accumulator >= minor || slope_remainder == 0)){
+      paths[i+1]++;
+      slope_accumulator %= minor;
+    }
+
+    runs[i]    = paths[i+1]-paths[i];
+  }
+
+  //  cout << make_pair(major,minor) << " runlengths is " << runs << endl;
+
+  return runs;
+}
+
+// Given start node u0 and adjacent face F_i, lay down triangles along the the straight
+// line to Eisenstein number (a,b), and report what the final node is.
+//
+// Assumes a,b >= 1. 
+// TODO: Add special cases for (a,0) and (b,0) to make more general.
+// TODO: Better name.
+node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
+{
+  node_t q,r,s,t;		// Current square
+
+  auto go_north = [&](){ 
+    const node_t S(s), T(t); // From old square
+    q = S; r = T; s = next(S,T); t = next(s,r); 
+  };
+  
+  auto go_east = [&](){
+    const node_t R(r), T(t); // From old square
+    q = R; s = T; r = next(s,q); t = next(s,r); 
+  };
+
+  // Square one
+  q = u0; 			// (0,0)
+  r = neighbours[u0][i];	// (1,0)
+  s = next(q,r);	// (0,1)
+  t = next(s,r);	// (1,1)
+
+  if(a==1 && b==1) return t;
+
+  vector<int> runlengths = draw_path(max(a,b), min(a,b));
+
+  for(int i=0;i<runlengths.size();i++){
+    int L = runlengths[i];
+
+    if(a>=b){			// a is major axis
+      for(int j=0;j<L-1;j++)    go_east();
+      if(i+1<runlengths.size()) go_north();
+    } else {			// b is major axis
+      for(int j=0;j<L-1;j++)    go_north();
+
+      if(i+1<runlengths.size()) go_east();
+    }
+  }
+  
+  return t;			// End node is upper right corner.
+}
+
+
+matrix<int> Triangulation::convex_square_surface_distances() const
+{
+  matrix<int> H = matrix<int>(N,N,all_pairs_shortest_paths());
+  int M = *max_element(H.begin(),H.end());      // M is upper bound to path length
+
+  for(int i=0;i<H.size();i++) H[i] *= H[i]; // Work with square distances, so that all distances are integers.
+
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++){
+
+      // Note: All Eisenstein numbers of the form (a,0) or (0,b) yield same lengths
+      //       as graph distance, and are hence covered by initial step. So start from 1.
+      //       M is upper bound for distance, so only need to do a^2+ab+b^2 strictly less than M.
+      for(int a=1; a<M;a++)
+        for(int b=1; a*a + a*b + b*b < M*M; b++){
+          // Check: if(gcd(a,b) != 1) continue.
+          const node_t v = end_of_the_line(u,i,a,b);
+
+          // printf("min(H(%d,%d),|(%d,%d)|^2)  = min(%d,%d)\n",
+          // 	 u,v,a,b,H(u,v), a*a+a*b+b*b);
+          H(u,v) = min(H(u,v), a*a + a*b + b*b);
+        }
+    }
+  return H;
+}
+
+matrix<double> Triangulation::surface_distances() const
+{
+  matrix<double> H(convex_square_surface_distances());
+  for(int i=0;i<N*N;i++) H[i] = sqrt(H[i]);
+
+  bool nonconvex = false;
+  for(node_t u=0;u<N;u++) if(neighbours[u].size() > 6) nonconvex = true;
+
+  if(nonconvex) return H.APSP();
+  else return H;
+}
+
+Triangulation Triangulation::sort_nodes() const 
+{
+  vector< pair<int,int> > degrees(N);
+
+  for(int u=0;u<N;u++) degrees[u] = make_pair(neighbours[u].size(), u);
+  
+  sort(degrees.begin(), degrees.end());
+
+  cout << "degrees = " << degrees << endl;
+
+  vector<int> newname(N);
+  for(int u=0;u<N;u++) newname[degrees[u].second] = u;
+  
+  neighbours_t new_neighbours(N);
+  for(int u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++)
+      new_neighbours[newname[u]].push_back(newname[neighbours[u][i]]);
+  
+  return Triangulation(new_neighbours);
+}

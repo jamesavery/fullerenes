@@ -7,11 +7,6 @@
 //       Exploit duality between triangulation and cubic planar graph.
 class PlanarGraph : public Graph {
 public:
-  using Graph::N;
-  using Graph::neighbours;
-  using Graph::edge_set;
-  using Graph::name;
-
   typedef list<pair<int,int> > jumplist_t;
 
   mutable face_t outer_face;
