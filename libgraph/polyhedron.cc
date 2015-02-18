@@ -503,7 +503,7 @@ string Polyhedron::to_turbomole() const {
   ostringstream s;
   s << setprecision(8) << fixed;
   s << "$coord" << endl;
-  for(int i=0; i < N; ++i){
+  for(int i=0; i<N; ++i){
     s << setw(12) << points[i][0]*aa2bohr << "  "<< setw(12) << points[i][1]*aa2bohr << "  " << setw(12) << points[i][2]*aa2bohr << "  c" << endl;
   }
   s << "$end" << endl;
@@ -515,9 +515,9 @@ string Polyhedron::to_xyz() const {
   ostringstream s;
   s << setprecision(6) << fixed;
   s << N << endl;
-  s << "we could print something helpful here" << endl;
-  for(int i=0; i < N; ++i){
-    s << "C   " << setw(10) << points[i][0] << "   " << setw(10) << points[i][1] << "   " << setw(10) << points[i][2] << endl;
+//  s << "we could print something helpful here" << endl;
+  for(int i=0; i<N; ++i){
+    s << "C  " << setw(10) << points[i][0] << "  " << setw(10) << points[i][1] << "  " << setw(10) << points[i][2] << endl;
   }
   return s.str();
 }
@@ -661,7 +661,7 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     points = g.optimized_geometry(points, opt_method, ftol);
     return true;
   }else if(is_cubic()) {
-    bool optimize_angles = true;//!is_triangulation();
+    bool optimize_angles = true;
     return optimize_other(optimize_angles);
   }else if(is_triangulation()) {
     bool optimize_angles = false;

@@ -283,6 +283,8 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
 
   assert(points.size() == N);
 
+  const double eps=1e-8;  
+
   // settings for the optimizations
   const double stepsize = 1e-3;// FIXME final value
   const double terminate_gradient = 1e-8;// FIXME final value
@@ -313,13 +315,60 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
       node_t r = neighbours[u][0];
       node_t s = neighbours[u][1];
       node_t t = neighbours[u][2];
-//       const int lA = get_face_oriented(u,r).size();
-//       const int lB = get_face_oriented(u,s).size();
-//       const int lC = get_face_oriented(u,t).size();
-      const int lA = shortest_cycle(r,u,s,fmax).size();
-      const int lB = shortest_cycle(s,u,t,fmax).size();
-      const int lC = shortest_cycle(t,u,r,fmax).size();
-      zero_values_dihedral[u] = coord3d::ideal_dihedral(lA,lB,lC);
+      // face sizes
+      int lA = shortest_cycle(r,u,s,fmax).size();
+      int lB = shortest_cycle(s,u,t,fmax).size();
+      int lC = shortest_cycle(t,u,r,fmax).size();
+      // bond lengths
+      double ur = zero_values_dist.find(edge_t(u,r))->second;
+      double us = zero_values_dist.find(edge_t(u,s))->second;
+      double ut = zero_values_dist.find(edge_t(u,t))->second;
+
+      // we may have to rearrange the neighbour list to preserve symmetry
+      auto right_shift = [&](){
+        neighbours[u][0] = t; neighbours[u][1] = r; neighbours[u][2] = s;
+        int tmp_f=lA; lA=lC; lC=lB; lB=tmp_f;
+        double tmp_l=ur; ur=ut; ut=us; us=tmp_l;
+      };
+      auto left_shift = [&](){
+        neighbours[u][0] = s; neighbours[u][1] = t; neighbours[u][2] = r;
+        int tmp_f=lA; lA=lB; lB=lC; lC=tmp_f;
+        double tmp_l=ur; ur=us; us=ut; ut=tmp_l;
+      };
+      // check for face sizes
+      if(lA==lB && lA!=lC){ // AAB --> ABA
+        left_shift();
+      }
+      else if(lA!=lB && lB==lC){ // BAA --> ABA
+        right_shift();
+      }
+      else if(lA!=lB && lB!=lC && lA!=lC){ // rotate the smallest to the front
+        if(lB<lA && lB<lC){
+          left_shift();
+        }
+        else if(lC<lA && lC<lA){
+          right_shift();
+        }
+      }
+      // and if the face sizes are all the same, check for edge length
+      else if(lA==lB && lA==lC){
+        if(ur-us<eps && abs(ur-ut)>eps){ // aab --> baa
+          right_shift();
+        }
+        else if(abs(ur-us)>eps && us-ut<eps){ // aba --> baa
+          left_shift();
+        }
+        else if(abs(ur-us)>eps && abs(us-ut)>eps && abs(ur-ut)>eps){ // rotate the shortest to the front
+          if(us<ur && us<ut){
+            left_shift();
+          }
+          else if(ut<ur && ut<ur){
+            right_shift();
+          }
+        }
+      }
+
+      zero_values_dihedral[u] = coord3d::ideal_dihedral(lA, lB, lC, ur, us, ut);
 //      cout << "opt-main, r,s,t, a,lb,lc, th_0: " <<r<<" " <<s<<" " <<t<<" " << lA<<" " <<lB<<" "<<lC<<" "<<zero_values_dihedral[u] << endl;
     }
   }
