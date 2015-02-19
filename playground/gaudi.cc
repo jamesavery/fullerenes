@@ -259,8 +259,39 @@ Graph c18_1()
   return Graph(neighbours);
 }
 
+Graph c48_1(){
+  // D6d
+  const int N=48;
+  const vector<int> rspi = {0, 1,  3,  7,  8, 9, 18, 19, 20, 21, 22, 24};
+  return FullereneGraph(N, rspi);
+}
 
-Graph examples[11] = {cube(), tetraeder(), oct_2(), C20(), c32_1(), c32_2(), c32_3(), c32_4(), c32_5(), c32_6(), c18_1()};
+Graph c48_2(){
+  // D6d
+  const int N=48;
+  const vector<int> rspi = {0,  1,  3,  6, 10, 14, 18, 19, 22, 23, 24, 25};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c12_prism()
+{
+  const int N = 12;
+  neighbours_t neighbours(N,vector<node_t>(3));
+
+  for(int i=0; i<6; i++){
+    neighbours[i][0] = (i+1)%6;
+    neighbours[i][1] = (i-1+6)%6;
+    neighbours[i][2] = i+6;
+
+    neighbours[i+6][0] = (i+1)%6+6;
+    neighbours[i+6][1] = (i-1+6)%6+6;
+    neighbours[i+6][2] = i;
+  }
+  cout << neighbours << endl;
+  return Graph(neighbours);
+}
+
+Graph examples[14] = {cube(), tetraeder(), oct_2(), C20(), c32_1(), c32_2(), c32_3(), c32_4(), c32_5(), c32_6(), c18_1(), c48_1(), c48_2(), c12_prism()};
 
 
 
@@ -273,7 +304,9 @@ int main(int ac, char **av)
   const int index = strtol(av[1],0,0) - 1;
   const int K = strtol(av[2],0,0);
   const int L = strtol(av[3],0,0);
-  cout << "index, K, L: " << index << ", " << K << ", " <<  L << endl;
+  const int trafo = strtol(av[4],0,0);
+  if(trafo != 0 && trafo != 1){cerr << "valid transformations are '0' and '1', exiting" << endl; return 1;}
+  cout << "index, K, L: " << index << ", " << K << ", " <<  L << ", " <<  trafo << endl;
 
 
   PlanarGraph g(examples[index]);
@@ -323,7 +356,13 @@ int main(int ac, char **av)
   gct.layout2d = gct.tutte_layout();
   Polyhedron P0 = Polyhedron(gct,gct.zero_order_geometry(),6);
 
-  const int finalN = N * (K*K + K*L + L*L) * 3;
+  int finalN = N * (K*K + K*L + L*L);
+  if(trafo==0){
+    finalN *= 3;
+  }else if(trafo==1){
+    finalN *= 2;
+  }
+      
   string basename("gaudi-"+to_string(finalN));
   {
     ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
@@ -350,7 +389,7 @@ int main(int ac, char **av)
     for(set<face_t>::iterator it=faces[i].begin(), to=faces[i].end(); it!=to; it++){
       for(int j=0; j<i; j++){
         long_edges.insert(edge_t((*it)[j], (*it)[(j+1)%i]));
-        es.erase(edge_t((*it)[j], (*it)[(j+1)%i]));
+        es.erase(         edge_t((*it)[j], (*it)[(j+1)%i]));
         marked_nodes.insert((*it)[j]);
       }
     }
@@ -394,11 +433,22 @@ int main(int ac, char **av)
   cout << "long edges: " << long_edges << endl;
   cout << "normal edges: " << es << endl;
 
+  // depending on whether the beta or gamma analogon is required, we switch edge lists
+  if(trafo==1){
+    set<edge_t> tmp = long_edges;
+    long_edges = es;
+    es = tmp;
+    cout << "gamma graphyne chosen, edges swapped." << endl;
+  }else{
+    cout << "beta graphyne chosen." << endl;
+  }
+    
+
 
 // optimize cubic graph with long edges
-  const double normal_edge_length=1.42;
-  const double long_edge_single=1.45;
-  const double long_edge_triple=1.28;
+  const double normal_edge_length=1.393;
+  const double long_edge_single=1.452;
+  const double long_edge_triple=1.242;
   const double long_edge_total=2*long_edge_single + long_edge_triple;
   for(set<edge_t>::iterator it=es.begin(), to=es.end(); it!=to; it++){
     lengths.insert(make_pair(*it, normal_edge_length));
