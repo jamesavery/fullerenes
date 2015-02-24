@@ -50,6 +50,10 @@ struct Polyhedron : public PlanarGraph {
     coord3d x0(centre3d(points));
     move(-x0);
   }
+  void align_with_axes(){
+    matrix3d If(inertial_frame());
+    points = If*points;
+  }
 
   void orient_neighbours();
 

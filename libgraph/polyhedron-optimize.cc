@@ -100,7 +100,6 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 //        C   u   A
 //            |
 //            r
-//      P.orient_neighbours();
       node_t r = P.neighbours[u][0];
       node_t s = P.neighbours[u][1];
       node_t t = P.neighbours[u][2];
@@ -283,11 +282,11 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
 
   assert(points.size() == N);
 
-  const double eps=1e-8;  
+  const double eps=1e-4;
 
   // settings for the optimizations
   const double stepsize = 1e-3;// FIXME final value
-  const double terminate_gradient = 1e-8;// FIXME final value
+  const double terminate_gradient = 1e-10;// FIXME final value
   const double tol = 1e-1; // accuracy of line minimization, the manual suggests 0.1
   const int max_iterations = 10000;// FIXME final value
   
@@ -305,7 +304,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   if(is_cubic())
   {
     orient_neighbours(); // CCW
-    const int fmax = 10;
+    const int fmax = 10; // maximum face size
 //          t   B   s
 //            \   /
 //          C   u   A

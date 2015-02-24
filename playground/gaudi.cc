@@ -260,16 +260,58 @@ Graph c18_1()
 }
 
 Graph c48_1(){
-  // D6d
+  // D6d / 186
   const int N=48;
-  const vector<int> rspi = {0, 1,  3,  7,  8, 9, 18, 19, 20, 21, 22, 24};
+  const vector<int> rspi = {0, 1, 3, 7, 8, 9, 18, 19, 20, 21, 22, 24};
   return FullereneGraph(N, rspi);
 }
 
 Graph c48_2(){
-  // D6d
+  // D6d / 189
   const int N=48;
-  const vector<int> rspi = {0,  1,  3,  6, 10, 14, 18, 19, 22, 23, 24, 25};
+  const vector<int> rspi = {0, 1, 3, 6, 10, 14, 18, 19, 22, 23, 24, 25};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c48_3(){
+  // D2h / 15
+  const int N=48;
+  const vector<int> rspi = {0, 1, 2, 3, 6, 9, 16, 19, 22, 23, 24, 25};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c48_4(){
+  // D2v / 17
+  const int N=48;
+  const vector<int> rspi = {0, 1, 2, 3, 6, 10, 15, 19, 22, 23, 24, 25};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c48_5(){
+  // D2h / 41
+  const int N=48;
+  const vector<int> rspi = {0, 1, 2, 3, 10, 12, 14, 16, 20, 23, 24, 25};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c48_6(){
+  // C2v / 56
+  const int N=48;
+  const vector<int> rspi = {0, 1, 2, 3, 10, 13, 16, 18, 20, 21, 23, 25};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c48_7(){
+  // C2h / 80
+  const int N=48;
+  const vector<int> rspi = {0, 1, 2, 4, 9, 12, 13, 16, 21, 23, 24, 25};
+  return FullereneGraph(N, rspi);
+}
+
+Graph c48_8(){
+  // C2v / 138
+  const int N=48;
+  const vector<int> rspi = {0, 1, 2, 9, 10, 12, 14, 16, 19, 21, 22, 24};
   return FullereneGraph(N, rspi);
 }
 
@@ -291,7 +333,8 @@ Graph c12_prism()
   return Graph(neighbours);
 }
 
-Graph examples[14] = {cube(), tetraeder(), oct_2(), C20(), c32_1(), c32_2(), c32_3(), c32_4(), c32_5(), c32_6(), c18_1(), c48_1(), c48_2(), c12_prism()};
+Graph examples[20] = {cube(), tetraeder(), oct_2(), C20(), c32_1(), c32_2(), c32_3(), c32_4(), c32_5(), c32_6(), c18_1(),
+                      c48_1(), c48_2(), c48_3(), c48_4(), c48_5(), c48_6(), c48_7(), c48_8(), c12_prism()};
 
 
 
@@ -501,6 +544,11 @@ int main(int ac, char **av)
 
 // write output
   cout << "P: " << P << endl;  
+
+
+    P.move_to_origin();
+    P.align_with_axes();
+
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
     mol2 << P.to_mol2();

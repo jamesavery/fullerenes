@@ -31,10 +31,10 @@ public:
 
     for(int i=0;i<A.m;i++)
       for(int j=0;j<B.n;j++){
-	T x = infty_value;
-	for(int k=0;k<A.n;k++) x = min(x, T(A[i*A.n+k]+B[k*B.n+j]));
-	x = min(x,infty_value);
-	C[i*C.n+j] = x;
+        T x = infty_value;
+        for(int k=0;k<A.n;k++) x = min(x, T(A[i*A.n+k]+B[k*B.n+j]));
+        x = min(x,infty_value);
+        C[i*C.n+j] = x;
       }
     return C;    
   }
@@ -54,9 +54,9 @@ public:
 
     for(int i=0;i<m;i++)
       for(int j=0;j<B.n;j++){
-	T x = 0;
-	for(int k=0;k<n;k++) x += (*this)[i*n+k]*B[k*B.n+j];
-	C(i,j) = x;
+        T x = 0;
+        for(int k=0;k<n;k++) x += (*this)[i*n+k]*B[k*B.n+j];
+        C(i,j) = x;
       }
     return C;    
   }
@@ -72,7 +72,7 @@ public:
     vector< vector<T> > VV(A.m, vector<T>(A.n));
     for(int i=0;i<A.m;i++) 
       for(int j=0;j<A.n;j++)
-	VV[i][j] = A[i*A.n+j];
+        VV[i][j] = A[i*A.n+j];
 
     S << VV;
     return S;
