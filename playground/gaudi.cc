@@ -1,3 +1,10 @@
+// usage: ./play-gaudi <base-structure> <k> <l> <trafo> <insert>
+// base structure: 1..20
+// k: 1..
+// l: 0..k
+// trafo 0,1
+// insert: 2,4
+
 #include <stdlib.h>
 #include <fstream>
 #include <vector>
@@ -348,9 +355,10 @@ int main(int ac, char **av)
   const int K = strtol(av[2],0,0);
   const int L = strtol(av[3],0,0);
   const int trafo = strtol(av[4],0,0);
+  const int insert = strtol(av[5],0,0);
   if(trafo != 0 && trafo != 1){cerr << "valid transformations are '0' and '1', exiting" << endl; return 1;}
-  cout << "index, K, L: " << index << ", " << K << ", " <<  L << ", " <<  trafo << endl;
-
+  if(insert != 2 && insert != 4){cerr << "valid insertions are '2' and '4', exiting" << endl; return 1;}
+  cout << "index, K, L: " << index << ", " << K << ", " <<  L << ", " <<  trafo <<  ", " << insert << endl;
 
   PlanarGraph g(examples[index]);
   cout << "planar graph created" << endl;
@@ -400,11 +408,10 @@ int main(int ac, char **av)
   Polyhedron P0 = Polyhedron(gct,gct.zero_order_geometry(),6);
 
   int finalN = N * (K*K + K*L + L*L);
-  if(trafo==0){
-    finalN *= 3;
-  }else if(trafo==1){
-    finalN *= 2;
-  }
+  if     (trafo==0 && insert==2){finalN *= 3;}
+  else if(trafo==0 && insert==4){finalN *= 5;}
+  else if(trafo==1 && insert==2){finalN *= 2;}
+  else if(trafo==1 && insert==4){finalN *= 3;}
       
   string basename("gaudi-"+to_string(finalN));
   {
@@ -492,7 +499,10 @@ int main(int ac, char **av)
   const double normal_edge_length=1.393;
   const double long_edge_single=1.452;
   const double long_edge_triple=1.242;
-  const double long_edge_total=2*long_edge_single + long_edge_triple;
+  double long_edge_total;
+  if(insert==2){     long_edge_total=2*long_edge_single +   long_edge_triple;}
+  else if(insert==4){long_edge_total=3*long_edge_single + 2*long_edge_triple;}
+  cout << "short, long, total: " << long_edge_single << ", " << long_edge_triple << ", " << long_edge_total << endl;
   for(set<edge_t>::iterator it=es.begin(), to=es.end(); it!=to; it++){
     lengths.insert(make_pair(*it, normal_edge_length));
   }
@@ -500,13 +510,8 @@ int main(int ac, char **av)
     lengths.insert(make_pair(*it, long_edge_total));
   }
   P.optimize_other(optimize_angles, lengths);
-  {
-    ofstream mol2(("output/"+basename+".mol2").c_str());
-    mol2 << P.to_turbomole();
-    mol2.close();
-  }
 
-// replace long edges, don't reoptimize
+  // replace long edges by C2, don't reoptimize
   for (set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
     //cout << "edge to zap: " << *it << endl;
     edge_t to_zap(*it);
@@ -517,34 +522,67 @@ int main(int ac, char **av)
     P.remove_edge(to_zap);
     //cout << "neighbours : " << P.neighbours << endl;
     //cout << n1 << ", " << n2 <<  endl;
-    P.N += 2;
-    P.neighbours.resize(P.N);
-    //cout << "neighbours : " << P.neighbours << endl;
-    //cout << "trying to insert : " << edge_t(to_zap.first,P.N-2) << edge_t(to_zap.second,P.N-1) << edge_t(P.N-2,P.N-1) << endl;
-    P.neighbours[to_zap.first].push_back(P.N-2);
-    P.neighbours[P.N-2].push_back(to_zap.first);
-    P.neighbours[to_zap.second].push_back(P.N-1);
-    P.neighbours[P.N-1].push_back(to_zap.second);
-    P.neighbours[P.N-2].push_back(P.N-1);
-    P.neighbours[P.N-1].push_back(P.N-2);
-    //cout << "neighbours : " << P.neighbours << endl;
-    
-    const coord3d c1=P.points[it->first];
-    const coord3d c2=P.points[it->second];
-    coord3d dc = c2-c1;
-    //cout << "c1, c2, dc: " << c1 << c2 << dc << endl;
-    P.points.push_back(c1 + dc*(long_edge_single/long_edge_total)); 
-    P.points.push_back(c2 - dc*(long_edge_single/long_edge_total)); 
-    //cout << "new point connected to c1: " << c1 + dc*(long_edge_single/long_edge_total) << endl;
-    //cout << "new point connected to c2: " << c2 - dc*(long_edge_single/long_edge_total) << endl;
-    //cout << "size: " << P.points.size() << endl;
-    //cout << "neighbours : " << P.neighbours << endl;
-    //cout << "-----" << endl;
+    if(insert==2){
+      P.N += 2;
+      P.neighbours.resize(P.N);
+      //cout << "neighbours : " << P.neighbours << endl;
+      //cout << "trying to insert : " << edge_t(to_zap.first,P.N-2) << edge_t(to_zap.second,P.N-1) << edge_t(P.N-2,P.N-1) << endl;
+      P.neighbours[to_zap.first].push_back(P.N-2);
+      P.neighbours[P.N-2].push_back(to_zap.first);
+      P.neighbours[P.N-2].push_back(P.N-1);
+      P.neighbours[P.N-1].push_back(P.N-2);
+      P.neighbours[P.N-1].push_back(to_zap.second);
+      P.neighbours[to_zap.second].push_back(P.N-1);
+      //cout << "neighbours : " << P.neighbours << endl;
+      
+      const coord3d c1=P.points[it->first];
+      const coord3d c2=P.points[it->second];
+      coord3d dc = c2-c1;
+      //cout << "c1, c2, dc: " << c1 << c2 << dc << endl;
+      P.points.push_back(c1 + dc*(long_edge_single/long_edge_total)); 
+      P.points.push_back(c2 - dc*(long_edge_single/long_edge_total)); 
+      //cout << "new point connected to c1: " << c1 + dc*(long_edge_single/long_edge_total) << endl;
+      //cout << "new point connected to c2: " << c2 - dc*(long_edge_single/long_edge_total) << endl;
+      //cout << "size: " << P.points.size() << endl;
+      //cout << "neighbours : " << P.neighbours << endl;
+      //cout << "-----" << endl;
+    }
+    else if(insert==4){
+      //cout << n1 << ", " << n2 <<  endl;
+      P.N += 4;
+      P.neighbours.resize(P.N);
+      //cout << "neighbours : " << P.neighbours << endl;
+      //cout << "trying to insert : " << edge_t(to_zap.first,P.N-2) << edge_t(to_zap.second,P.N-1) << edge_t(P.N-2,P.N-1) << endl;
+      P.neighbours[to_zap.first].push_back(P.N-4);
+      P.neighbours[P.N-4].push_back(to_zap.first);
+      P.neighbours[P.N-4].push_back(P.N-3);
+      P.neighbours[P.N-3].push_back(P.N-4);
+      P.neighbours[P.N-3].push_back(P.N-2);
+      P.neighbours[P.N-2].push_back(P.N-3);
+      P.neighbours[P.N-2].push_back(P.N-1);
+      P.neighbours[P.N-1].push_back(P.N-2);
+      P.neighbours[P.N-1].push_back(to_zap.second);
+      P.neighbours[to_zap.second].push_back(P.N-1);
+      //cout << "neighbours : " << P.neighbours << endl;
+      
+      const coord3d c1=P.points[it->first];
+      const coord3d c2=P.points[it->second];
+      coord3d dc = c2-c1;
+      //cout << "c1, c2, dc: " << c1 << c2 << dc << endl;
+      P.points.push_back(c1 + dc*(long_edge_single/long_edge_total)); 
+      P.points.push_back(c1 + dc*((long_edge_single+long_edge_triple)/long_edge_total)); 
+      P.points.push_back(c2 - dc*((long_edge_single+long_edge_triple)/long_edge_total)); 
+      P.points.push_back(c2 - dc*(long_edge_single/long_edge_total)); 
+      //cout << "new point connected to c1: " << c1 + dc*(long_edge_single/long_edge_total) << endl;
+      //cout << "new point connected to c2: " << c2 - dc*(long_edge_single/long_edge_total) << endl;
+      //cout << "size: " << P.points.size() << endl;
+      //cout << "neighbours : " << P.neighbours << endl;
+      //cout << "-----" << endl;
+    }
   }
 
 // write output
   cout << "P: " << P << endl;  
-
 
     P.move_to_origin();
     P.align_with_axes();
@@ -567,3 +605,4 @@ int main(int ac, char **av)
 
   return 0;
 }
+
