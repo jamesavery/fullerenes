@@ -72,8 +72,7 @@ int main(int ac, char **av)
 
   {
     P.move_to_origin();
-    matrix3d If(P.inertial_frame());
-    P.points = If*P.points;
+    P.align_with_axes();
 
     ofstream mol2(("output/"+basename+"-if.mol2").c_str());
     mol2 << P.to_mol2();

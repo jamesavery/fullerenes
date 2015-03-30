@@ -210,6 +210,9 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
   ostringstream s;
   s.precision(2);
   s << fixed;
+
+  set<edge_t> edge_set = undirected_edges();
+
   if(include_latex_header)
     s << "\\documentclass{article}\n"
          "\\usepackage{fullpage,fourier,tikz}\n"
@@ -256,9 +259,10 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
     s << "\\foreach \\u/\\v in {";
-    for(set<edge_t>::const_iterator e(dual.edge_set.begin()); e!=dual.edge_set.end();){
+    set<edge_t> dual_edges = dual.undirected_edges();
+    for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end();){
       s << "{v"<<e->first<<"/v"<<e->second<<"}";
-      if(++e != dual.edge_set.end()) s << ", ";
+      if(++e != dual_edges.end()) s << ", ";
     }
     s << "}\n\t\\draw[dualedge] (\\u) -- (\\v);\n";
   }
@@ -494,14 +498,26 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   return s.str();
 }
 
+string Polyhedron::to_turbomole() const {
+  const double aa2bohr = 1.889716164632;
+  ostringstream s;
+  s << setprecision(8) << fixed;
+  s << "$coord" << endl;
+  for(int i=0; i<N; ++i){
+    s << setw(12) << points[i][0]*aa2bohr << "  "<< setw(12) << points[i][1]*aa2bohr << "  " << setw(12) << points[i][2]*aa2bohr << "  c" << endl;
+  }
+  s << "$end" << endl;
+
+  return s.str();
+}
 
 string Polyhedron::to_xyz() const {
   ostringstream s;
   s << setprecision(6) << fixed;
   s << N << endl;
-  s << "we could print something helpful here" << endl;
-  for(int i=0; i < N; ++i){
-    s << "C   " << setw(10) << points[i][0] << "   " << setw(10) << points[i][1] << "   " << setw(10) << points[i][2] << endl;
+//  s << "we could print something helpful here" << endl;
+  for(int i=0; i<N; ++i){
+    s << "C  " << setw(10) << points[i][0] << "  " << setw(10) << points[i][1] << "  " << setw(10) << points[i][2] << endl;
   }
   return s.str();
 }
@@ -644,11 +660,13 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     const FullereneGraph g(*this, layout2d);
     points = g.optimized_geometry(points, opt_method, ftol);
     return true;
-  } else if(is_cubic() || is_triangulation()) {
-    //    printf("This is not a fullerene, but is a %s.\n",is_cubic()? "cubic graph" : "triangulation");
-    bool optimize_angles = true; //!is_triangulation();
+  }else if(is_cubic()) {
+    bool optimize_angles = true;
     return optimize_other(optimize_angles);
-  } else {
+  }else if(is_triangulation()) {
+    bool optimize_angles = false;
+    return optimize_other(optimize_angles);
+  }else{
     cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra, other cubic graphs and triangulations." << endl;
     return false;
   }

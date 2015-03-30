@@ -383,6 +383,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
   }
 
+  set<edge_t> edge_set = undirected_edges();
 
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();){
     s << "\\foreach \\u/\\v in {";
@@ -412,9 +413,11 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
     s << "\\foreach \\u/\\v in {";
-    for(set<edge_t>::const_iterator e(dual.edge_set.begin()); e!=dual.edge_set.end();){
+
+    set<edge_t> dual_edges = dual.undirected_edges();
+    for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end();){
       s << "{v"<<e->first<<"/v"<<e->second<<"}";
-      if(++e != dual.edge_set.end()) s << ", ";
+      if(++e != dual_edges.end()) s << ", ";
     }
     s << "}\n\t\\draw[dualedge] (\\u) -- (\\v);\n";
   }
@@ -436,6 +439,8 @@ string PlanarGraph::to_povray(double w_cm, double h_cm,
 {
   ostringstream s;
   s << fixed;
+
+  set<edge_t> edge_set = undirected_edges();
 
   s << "#declare Nvertices="<<N<<";\n";
   s << "#declare Nedges="<<edge_set.size()<<";\n";

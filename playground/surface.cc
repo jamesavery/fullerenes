@@ -1,107 +1,168 @@
 #include "libgraph/auxiliary.hh"
 #include "libgraph/triangulation.hh"
+#include "libgraph/matrix.hh"
 
-typedef unsigned long int_l;
 
-class minplus_matrix : public vector<int_l> {
-public: 
-  int m,n;
-  static const int_l zero = UINT_MAX;
 
-  minplus_matrix(int m, int n, const vector<int_l>& A) : vector<int_l>(A.begin(),A.end()),m(m), n(n) { assert(A.size() == m*n); }
-  minplus_matrix(int m, int n) : vector<int_l>(m*n,zero),m(m),n(n) { }
+// template <typename T> class matrix : public vector<T> {
+// public:
+//   int m,n; 
+// 
+//   matrix(int m, int n, const vector<T>& A) : vector<T>(A.begin(), A.end()), m(m), n(n) { assert(A.size()==m*n); }
+//   matrix(int m, int n, const T& zero = 0) : vector<T>(m*n,zero), m(m), n(n) {}
+// 
+//   // Convert from compatible type
+//   template <typename S> matrix(const matrix<S>& A) : vector<T>(A.begin(),A.end()), m(A.m), n(A.n) {}
+// 
+//   T& operator()       (int i, int j){ return (*this)[i*n+j]; }
+//   T  operator()(int i, int j) const { return (*this)[i*n+j]; }
+// 
+//   static matrix minplus_multiply(const matrix& A, const matrix& B, const T& infty_value = USHRT_MAX)
+//   {
+//     assert(A.n == B.m);
+//     matrix C(A.m,B.n);
+// 
+//     for(int i=0;i<A.m;i++)
+//       for(int j=0;j<B.n;j++){
+// 	T x = infty_value;
+// 	for(int k=0;k<A.n;k++) x = min(x, T(A[i*A.n+k]+B[k*B.n+j]));
+// 	x = min(x,infty_value);
+// 	C[i*C.n+j] = x;
+//       }
+//     return C;    
+//   }
+// 
+//   matrix APSP() const {
+//     int count = ceil(log2(m));
+//     matrix A(*this);
+//     for(int i=0;i<count;i++) A = minplus_multiply(A,A);
+//     
+//     return A;
+//   }
+// 
+//   matrix operator*(const matrix& B)
+//   {
+//     assert(n == B.m);
+//     matrix C(m,B.n);
+// 
+//     for(int i=0;i<m;i++)
+//       for(int j=0;j<B.n;j++){
+// 	T x = 0;
+// 	for(int k=0;k<n;k++) x += (*this)[i*n+k]*B[k*B.n+j];
+// 	C[i*C.n+j] = x;
+//       }
+//     return C;    
+//   }
+// 
+//   friend ostream& operator<<(ostream& S, const matrix& A)
+//   {
+//     vector< vector<T> > VV(A.m, vector<T>(A.n));
+//     for(int i=0;i<A.m;i++) 
+//       for(int j=0;j<A.n;j++)
+// 	VV[i][j] = A[i*A.n+j];
+// 
+//     S << VV;
+//     return S;
+//   }
+// };
 
-  minplus_matrix operator+(const minplus_matrix& B)
-  {
-    const minplus_matrix& A(*this);
-    assert(A.m == B.m && A.n == B.n);
-    minplus_matrix C(A.m,A.n);
 
-    for(int i=0;i<B.size();i++) C[i] = min(A[i],B[i]);
-    return C;
-  }
 
-  minplus_matrix operator*(const minplus_matrix& B)
-  {
-    const minplus_matrix& A(*this);
-    assert(A.n == B.m);
-    minplus_matrix C(A.m,B.n);
-
-    for(int i=0;i<A.m;i++)
-      for(int j=0;j<B.n;j++){
-	int_l x = zero;
-	for(int k=0;k<A.n;k++) x = min(x, int_l(A[i*A.n+k]+B[k*B.n+j]));
-	x = min(x,zero);
-	C[i*C.n+j] = x;
-      }
-    return C;
-  }
-
-  friend ostream& operator<<(ostream& S, const minplus_matrix& A)
-  {
-    vector< vector<int_l> > VV(A.m, vector<int_l>(A.n,zero));
-    for(int i=0;i<A.m;i++) 
-      for(int j=0;j<A.n;j++)
-	if(A[i*A.n+j] != zero) VV[i][j] = A[i*A.n+j];
-
-    S << VV;
-    return S;
-  }
-};
-
-minplus_matrix APSP_weighted(const minplus_matrix &A0)
+vector<int> draw_path(int major, int minor)
 {
-  int count = ceil(log2(A0.m));
+  int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
 
-  minplus_matrix A(A0);
-  for(int i=0;i<count;i++) A = A*A;
+  vector<int> runs(minor);
 
-  return A;
+  for(int i=0; i<minor; i++){
+    runs[i] = slope;
+    slope_accumulator += slope_remainder;
+
+    runs[i] += (slope_accumulator >= minor);
+    slope_accumulator %= minor;
+  }
+
+  return runs;
 }
 
-minplus_matrix APSP_unweighted(const Graph& g)
+// Given start node u0 and adjacent face F_i, lay down triangles along the the straight
+// line to Eisenstein number (a,b), and report what the final node is.
+//
+// Assumes a,b >= 1.
+//
+node_t end_of_the_line(const Triangulation& G, node_t u0, int i, int a, int b)
 {
-  minplus_matrix A(g.N,g.N);
+  node_t q,r,s,t;		// Current square
 
-  for(node_t u=0;u<g.N;u++){
-    A[u*(A.n+1)] = 0;
-    for(int i=0;i<g.neighbours[u].size();i++){
-      node_t v = g.neighbours[u][i];
-      A[u*A.n+v] = 1;
+  auto go_north = [&](){ 
+    const node_t S(s), T(t); // From old square
+    q = S; r = T; s = G.nextCCW(dedge_t(S,T)); t = G.nextCCW(dedge_t(s,r)); 
+  };
+  
+  auto go_east = [&](){
+    const node_t R(r), T(t); // From old square
+    q = R; s = T; r = G.nextCCW(dedge_t(s,q)); t = G.nextCCW(dedge_t(s,r)); 
+  };
+
+  // Square one
+  q = u0; 			// (0,0)
+  r = G.neighbours[u0][i];	// (1,0)
+  s = G.nextCCW(dedge_t(q,r));	// (0,1)
+  t = G.nextCCW(dedge_t(s,r));	// (1,1)
+
+  vector<int> runlengths = draw_path(max(a,b), min(a,b));
+
+  for(int i=0;i<runlengths.size();i++){
+    int L = runlengths[i];
+
+    if(a>=b){			// a is major axis
+      for(int j=0;j<L-1;j++)    go_east();
+      if(i+1<runlengths.size()) go_north();
+    } else {			// b is major axis
+      for(int j=0;j<L-1;j++)    go_north();
+
+      if(i+1<runlengths.size()) go_east();
     }
   }
-  return APSP_weighted(A);
+  
+  return t;			// End node is upper right corner.
 }
 
 
-node_t findEndOfPath(const Triangulation& G, int u, int v, int a, int b)
+matrix<int> semisimple_distances(const matrix<int>& Hinit, const Triangulation& G)
 {
-  int t[3],t_next[3];
-
-  // First triangle
-  t[0] = u;
-  t[1] = v;
-  t[2] = G.nextCCW(dedge_t(u,v));
-  
-  if(a == 1 && b == 0) return t[1];
-  if(a == 0 && b == 1) return t[2];
-  
-  t_next[0] = t[2];
-  t_next[1] = t[1];
-  t_next[2] = G.nextCCW(dedge_t(t_next[0],t_next[1]));
-
-  int p[3][2] = {{0,0},{1,0},{0,1}};
-}
-
-minplus_matrix findSurfaceDistances(const Triangulation& G)
-{
-  minplus_matrix H = APSP_unweighted(G);  // Shortest path u--v is upper bound to d(u,v)
-  int M = *max_element(H.begin(),H.end()); // M is diameter of G
+  matrix<int> H(Hinit);  
+  int M = *max_element(H.begin(),H.end());      // M is upper bound to path length
   
   for(int i=0;i<H.size();i++) H[i] *= H[i]; // Work with square distances, so that all distances are integers.
-  
 
-  for(int u=0;u<G.N;u++) 
+  for(node_t u=0;u<G.N;u++)
+    for(int i=0;i<G.neighbours[u].size();i++){
+
+      // Note: All Eisenstein numbers of the form (a,0) or (0,b) yield same lengths
+      //       as graph distance, and are hence covered by initial step. So start from 1.
+      //       M is upper bound for distance, so only need to do a^2+ab+b^2 strictly less than M.
+      for(int a=1; a<M;a++)
+	for(int b=1; a*a + a*b + b*b < M*M; b++){
+	  // Check: if(gcd(a,b) != 1) continue.
+	  const node_t v = end_of_the_line(G,u,i,a,b);
+	  H(u,v) = min(H(u,v), a*a + a*b + b*b);
+	}
+    }
+  return H;
+}
+
+matrix<double> surface_distances(const Triangulation& G)
+{
+  matrix<int> Hinit(G.N,G.N,G.all_pairs_shortest_paths()); // Shortest path u--v is upper bound to d(u,v)
+  
+  matrix<int> Hsimple_sqr = semisimple_distances(Hinit,G);
+  matrix<float> Hsimple(Hsimple_sqr);
+  for(int i=0;i<Hsimple.size();i++) Hsimple[i] = sqrt(Hsimple[i]);
+
+  matrix<double> H = Hsimple.APSP();
+
+  return H;
 }
 
 
@@ -120,23 +181,16 @@ int main(int ac, char **av)
 
   assert(dg.is_consistently_oriented());
 
-  if(0){
-    cout << "\n\nMatrix-APSP:\n";
-    minplus_matrix Da(dg.N,dg.N);
-    for(int i=0;i<500;i++)
-      Da = APSP_unweighted(dg);
-    cout << "Da = " << Da << endl;
-} else {
-    cout << "Dijkstra-APSP:\n";
-    vector<int> Dt(dg.N*dg.N);
-    for(int i=0;i<500;i++)
-      Dt = dg.all_pairs_shortest_paths(dg.N);
+  matrix<int> Hinit(dg.N,dg.N,dg.all_pairs_shortest_paths());
+  cout << "Hinit = " << Hinit << ";\n\n";
+
+  matrix<int> Hsimple(semisimple_distances(Hinit,dg));
   
-    minplus_matrix Db(dg.N,dg.N,vector<int_l>(Dt.begin(),Dt.end()));
-    cout << "Db = " << Db << endl;
-}
-    //cout << ((Da ==Db)? "OK" : "Error") << endl;
+  cout << "Hsimple = Sqrt[" << Hsimple << "];\n\n";
+
+  matrix<double> H = surface_distances(dg);
   
+  cout << "H = " << H << ";\n\n";
 
   return 0;
 }
