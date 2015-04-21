@@ -2,7 +2,7 @@ C20 aug-cc-pvdz B3LYP opt. geom. minimum E=-761.5231573 au
 Also calculates vibrational frequencies
 This geometry is a Jahn-Teller distorted one
 &General NA=20 iwext=1 /
-&Coord ICart=1 ngaudiene=1 /
+&Coord ICart=1 dualdist=2.4 /
 &FFChoice iopt=1 ihessian=1 /
 &FFParameters /
 &Hamilton IHam=1 IUPAC=1/

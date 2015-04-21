@@ -1,7 +1,7 @@
 Ih-C80  cc-pvdz B3LYP opt. geom. minimum -3048.53107840 au
 &General NA=80 iwext=1 /
-&Coord ICart=1 /
-&FFChoice /
+&Coord ICart=1 dualdist=2.4 /
+&FFChoice iopt=3 /
 &FFParameters /
 &Hamilton /
 &Isomers IPR=1 /

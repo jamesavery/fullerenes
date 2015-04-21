@@ -463,13 +463,13 @@ C     Get the largest ring to ring distance
       enddo
       Write(Iout,1026) Rmin5,Rmin6,Rmin56,Rmax5,Rmax6,Rmax56
 C     Smallest ring distance
-      SmallRingDist=Rmin6
+ 2001 SmallRingDist=Rmin6
       if(Rmin56.lt.Rmin6) SmallRingDist=Rmin56
       if(Rmin5.lt.SmallRingDist) SmallRingDist=Rmin5
 
 C     Analyzing the ring fusions
 C     All 2-ring fusions
- 2001 Write(Iout,1004)
+      Write(Iout,1004)
       IR1=5
       IR2=5
       N2ring=0
@@ -1051,6 +1051,7 @@ C     Print center of edges
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),N5M(Mmax,5),N6M(Mmax,6)
 C     Print center of rings
+      print*,dualdist,R6,SmallRingDist
       factor=1.d0
       if(dualdist.ne.R6) then
        factor=dualdist/SmallRingDist

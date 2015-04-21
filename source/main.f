@@ -378,7 +378,7 @@ C Analyze ring connections
      1 N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,
      1 n565,numberSW,numberFM,numberYF,numberBF,
      1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
-     1 IC3,IVR3,nEK,nSW,nFM,nYF,nBF,SmallRingDistDIST,CRing5,CRing6)
+     1 IC3,IVR3,nEK,nSW,nFM,nYF,nBF,SmallRingDist,DIST,CRing5,CRing6)
 C     Print edge coordinates (barycenter)
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
       if(iprintf.ne.0) Call RingCoord(Iout,iwext,dualdist,R6,
@@ -539,8 +539,7 @@ c  stuff previously done, but is ok for now, as it takes not much time
       endif
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
       if(iprintf.ne.0.or.dualdist.ne.R6) Call RingCoord(Iout,iwext,
-     1 dualdist,R6,SmallRingDist,DIST,
-     1 N5Ring,N6Ring,N5MEM,N6MEM)
+     1 dualdist,R6,SmallRingDist,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
       if(iprintf.ne.0.or.ngaudiene.ne.0) Call Gaudiene(Iout,IC3,DIST)
 
 C------------------XYZ-and-CC1-FILES------------------------------
