@@ -26,6 +26,7 @@ GUI ()
 close packing
 general symmetry determination, which is not limited by non-general spirals (lukas)
 symmetrisation (lukas)
+Check dualdist definition, should be rather the distance between vertices in the dual
 
 unit testing + regression tests (lukas: I really want them!)
 cmake build system might be helpful if we include more third party libraries

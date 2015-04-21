@@ -3,7 +3,7 @@ This job also calculated vibrational frequencies using extended Wu
 force field
 &General NA=180, iwext=1 ispsearch=2 /
 &Coord ICart=1 /
-&FFChoice iopt=3 ihessian=1 /
+&FFChoice iopt=1 ihessian=1 /
 &FFParameters /
 &Hamilton /
 &Isomers /

@@ -334,7 +334,7 @@ C1011 Format(3X,96(I3))
      1 N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
      1 nl565,numbersw,numberFM,numberYF,numberBF,
      1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
-     1 IC3,IVR3,n3rc,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
+     1 IC3,IVR3,n3rc,nSW,nFM,nYF,nBF,SmallRingDist,DIST,CRing5,CRing6)
 C     This routine analyzes the pentagons and hexagons
 C     The first 12 faces are pentagons (many routines need this order)
 C     All other which follow are hexagons
@@ -462,6 +462,10 @@ C     Get the largest ring to ring distance
       enddo
       enddo
       Write(Iout,1026) Rmin5,Rmin6,Rmin56,Rmax5,Rmax6,Rmax56
+C     Smallest ring distance
+      SmallRingDist=Rmin6
+      if(Rmin56.lt.Rmin6) SmallRingDist=Rmin56
+      if(Rmin5.lt.SmallRingDist) SmallRingDist=Rmin5
 
 C     Analyzing the ring fusions
 C     All 2-ring fusions
@@ -1041,16 +1045,15 @@ C     Print center of edges
       Return
       END
 
-      SUBROUTINE RingCoord(Iout,dualdist,R6,Rmin5,Rmin6,
-     1 Dist,N5,N6,N5M,N6M)
+      SUBROUTINE RingCoord(Iout,iwext,dualdist,R6,
+     1 SmallRingDist,Dist,N5,N6,N5M,N6M)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),N5M(Mmax,5),N6M(Mmax,6)
 C     Print center of rings
       factor=1.d0
       if(dualdist.ne.R6) then
-       Rmin=Dmin1(Rmin5,Rmin6)
-       factor=dualdist/Rmin
+       factor=dualdist/SmallRingDist
        Write(Iout,1002) factor,dualdist
       endif
       Write(Iout,1000)
@@ -1091,7 +1094,7 @@ C     Print center of rings
      1 /1X,49('-')) 
  1001 Format(1X,2I5,3(1X,F12.8))
  1002 Format(1X,'Coordinates multiplied by ',F12.8,
-     1 ' to reach distance of ',F12.8)
+     1 ' to reach distance n dual of ',F12.8)
       Return
       END
 
