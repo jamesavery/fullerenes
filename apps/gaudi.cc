@@ -356,7 +356,7 @@ int main(int ac, char **av)
   const int L = strtol(av[3],0,0);
   const int trafo = strtol(av[4],0,0);
   const int insert = strtol(av[5],0,0);
-  if(trafo != 0 && trafo != 1){cerr << "valid transformations are '0' and '1', exiting" << endl; return 1;}
+  if(trafo != 0 && trafo != 1){cerr << "valid transformations are '0' (beta) and '1' (gamma), exiting" << endl; return 1;}
   if(insert != 2 && insert != 4){cerr << "valid insertions are '2' and '4', exiting" << endl; return 1;}
   cout << "index, K, L: " << index << ", " << K << ", " <<  L << ", " <<  trafo <<  ", " << insert << endl;
 
