@@ -2,6 +2,7 @@
 #include "libgraph/delaunay.hh"
 #include "libgraph/polyhedron.hh"
 #include "libgraph/fullerenegraph.hh"
+#include "libgraph/debug.hh"
 
 #include <fstream>
 
@@ -19,8 +20,10 @@ Triangulation regular_polygon(int n)
 
 int main(int ac, char **av) 
 {
-  const size_t n = 5;
+  const size_t n = 6;
   Triangulation pT(regular_polygon(n));
+
+  Debug::channel_verbosity["Delaunay"] = Debug::INFO3;
 
   FulleroidDelaunay DY(pT);
 

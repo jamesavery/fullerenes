@@ -374,13 +374,15 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   map<edge_t,int> edgecount;
   for(int i=0;i<tris.size();i++)
     for(int j=0;j<3;j++){
-      edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]++;
-      if(edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]>2)
+      node_t u = tris[i][j], v = tris[i][(j+1)%3];
+      edgecount[edge_t(u,v)]++;
+      if(edgecount[edge_t(u,v)]>2)
 	cerr << tris[i] << " bad!\n";
     }
-  for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
-    if(e->second != 2){
-      cerr << "Triangulation not orientable: Edge "<< e->first << " appears in " << e->second <<" tris, not two.\n";
+  for(auto e: edgecount)
+    if(e.second != 2){
+      cerr << "Triangulation not orientable: Edge "<< e.first << " appears in " << e.second <<" tris, not two.\n";
+      cout << "triangles = " << tris << ";\n";
       abort();
     }
 

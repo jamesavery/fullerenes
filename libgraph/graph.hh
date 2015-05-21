@@ -27,14 +27,11 @@ struct Graph {
   Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
   Graph(const unsigned int N, const vector<int>& adjacency) : N(N), neighbours(N) {
     assert(adjacency.size() == N*N);
-    set<edge_t> edge_set;
 
     for(unsigned int i=0;i<N;i++)
-      for(unsigned int j=i+1;j<N;j++){
-	if(adjacency[i*N+j]) edge_set.insert(edge_t(i,j));
-      }
+      for(unsigned int j=i+1;j<N;j++)
+	if(adjacency[i*N+j]) insert_edge(edge_t(i,j));
 
-    update_from_edgeset(edge_set);
   }
 
   void insert_edge(const edge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
