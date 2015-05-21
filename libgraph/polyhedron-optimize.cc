@@ -427,7 +427,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
     gsl_vector_set(coordinates, 3*i+2, points[i][2]);
   }
 
-  const gsl_multimin_fdfminimizer_type *fT = gsl_multimin_fdfminimizer_conjugate_fr;
+  const gsl_multimin_fdfminimizer_type *fT = gsl_multimin_fdfminimizer_conjugate_pr;
   gsl_multimin_fdfminimizer *s = gsl_multimin_fdfminimizer_alloc(fT, potential_function.n);
   gsl_multimin_fdfminimizer_set(s, &potential_function, coordinates, stepsize, tol); // runs fdf once
   size_t iter = 0;

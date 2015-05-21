@@ -515,7 +515,7 @@ string Polyhedron::to_xyz() const {
   ostringstream s;
   s << setprecision(6) << fixed;
   s << N << endl;
-//  s << "we could print something helpful here" << endl;
+  s << "# Created by Fullerene version " << VERSION_NUMBER << " (http://ctcp.massey.ac.nz/index.php?page=fullerenes)" << endl;
   for(int i=0; i<N; ++i){
     s << "C  " << setw(10) << points[i][0] << "  " << setw(10) << points[i][1] << "  " << setw(10) << points[i][2] << endl;
   }

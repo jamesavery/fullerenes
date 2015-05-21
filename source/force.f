@@ -814,7 +814,7 @@ c        zero_value=sign(dhhh,angle_abcd)
           dE_over_dc=dE_over_dc /
      1     dsqrt(hyperbolic_par_2 + (angle_abcd-zero_value)**2)
         endif
-c derivations of the energy with respect the x,y,z of each of the four atoms
+c derivatives of the energy with respect the x,y,z of each of the four atoms
         x(3*d_hhh(1,i)-2)=x(3*d_hhh(1,i)-2)+dax*dE_over_dc
         x(3*d_hhh(1,i)-1)=x(3*d_hhh(1,i)-1)+day*dE_over_dc
         x(3*d_hhh(1,i))  =x(3*d_hhh(1,i))  +daz*dE_over_dc
@@ -859,7 +859,7 @@ c        zero_value=sign(dhhp,angle_abcd)
           dE_over_dc=dE_over_dc /
      1     dsqrt(hyperbolic_par_2 + (angle_abcd-zero_value)**2)
         endif
-c derivations of the energy with respect the x,y,z of each of the four atoms
+c derivatives of the energy with respect the x,y,z of each of the four atoms
         x(3*d_hhp(1,i)-2)=x(3*d_hhp(1,i)-2)+dax*dE_over_dc
         x(3*d_hhp(1,i)-1)=x(3*d_hhp(1,i)-1)+day*dE_over_dc
         x(3*d_hhp(1,i))  =x(3*d_hhp(1,i))  +daz*dE_over_dc
@@ -904,7 +904,7 @@ c        zero_value=sign(dhpp,angle_abcd)
           dE_over_dc=dE_over_dc /
      1     dsqrt(hyperbolic_par_2 + (angle_abcd-zero_value)**2)
         endif
-c derivations of the energy with respect the x,y,z of each of the four atoms
+c derivatives of the energy with respect the x,y,z of each of the four atoms
         x(3*d_hpp(1,i)-2)=x(3*d_hpp(1,i)-2)+dax*dE_over_dc
         x(3*d_hpp(1,i)-1)=x(3*d_hpp(1,i)-1)+day*dE_over_dc
         x(3*d_hpp(1,i))  =x(3*d_hpp(1,i))  +daz*dE_over_dc
@@ -949,7 +949,7 @@ c        zero_value=dsign(dppp, angle_abcd)
           dE_over_dc=dE_over_dc /
      1     dsqrt(hyperbolic_par_2 + (angle_abcd-zero_value)**2)
         endif
-c derivations of the energy with respect the x,y,z of each of the four atoms
+c derivatives of the energy with respect the x,y,z of each of the four atoms
         x(3*d_ppp(1,i)-2)=x(3*d_ppp(1,i)-2)+dax*dE_over_dc
         x(3*d_ppp(1,i)-1)=x(3*d_ppp(1,i)-1)+day*dE_over_dc
         x(3*d_ppp(1,i))  =x(3*d_ppp(1,i))  +daz*dE_over_dc

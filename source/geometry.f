@@ -356,7 +356,7 @@ c more auxiliary products
       aux_4x=bc_x*aux_4
       aux_4y=bc_y*aux_4
       aux_4z=bc_z*aux_4
-c the derivations
+c the derivatives
       df__dax=(-bc_x*aux_2 - aux_3x)*den_inv
       df__day=(-bc_y*aux_2 - aux_3y)*den_inv
       df__daz=(-bc_z*aux_2 - aux_3z)*den_inv
@@ -1197,7 +1197,7 @@ c abc1_z=abc_z*abc_length_inv
       dabc1_y__dabc_length_inv=abc_y
       dabc1_z__dabc_length_inv=abc_z
 
-c derivation of the components of the normals
+c derivative of the components of the normals
 c abc1_x=abc_x*abc_length_inv
 c abc1_y=abc_y*abc_length_inv
 c abc1_z=abc_z*abc_length_inv
@@ -1470,7 +1470,7 @@ c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
       dx__dbcd1_y=abc1_y
       dx__dbcd1_z=abc1_z
 
-c derivation of y
+c derivative of y
 c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
       dy__dax=
      2 dy__daux_x*daux_x__dax + 
@@ -1521,7 +1521,7 @@ c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
      3 dy__dbcd1_y*dbcd1_y__ddz +
      4 dy__dbcd1_z*dbcd1_z__ddz
 
-c derivation of x
+c derivative of x
 c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
       dx__dax=
      2 dx__dabc1_x*dabc1_x__dax + 
@@ -1572,7 +1572,7 @@ c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
      3 dx__dbcd1_y*dbcd1_y__ddz +
      4 dx__dbcd1_z*dbcd1_z__ddz
 
-c derivation atan2(y,x) according to x and y
+c derivative of atan2(y,x) according to x and y
       df__dx=-y/(x**2 + y**2)
       df__dy=x/(x**2 + y**2)
 
