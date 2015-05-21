@@ -23,7 +23,7 @@ int main(int ac, char **av)
   const size_t n = 6;
   Triangulation pT(regular_polygon(n));
 
-  Debug::channel_verbosity["Delaunay"] = Debug::INFO3;
+  //  Debug::channel_verbosity["Delaunay"] = Debug::INFO3;
 
   FulleroidDelaunay DY(pT);
 

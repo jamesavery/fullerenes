@@ -259,7 +259,6 @@ vector<double> FulleroidDelaunay::new_distances_d6y(const node_t& v, const vecto
     double angle = angle_d6y(hole[i], v, hole[(i+1)%n]); // angles[i-1];
     accumulated_angle += angle;
     distances[i] = sqrt( d0*d0 + di*di - 2.0*d0*di*cos(accumulated_angle) ) ;
-    cerr << distances[i] << endl;
   }  
   return distances;
 }
@@ -268,29 +267,34 @@ vector<double> FulleroidDelaunay::new_distances_d6y(const node_t& v, const vecto
 vector<edge_t> FulleroidDelaunay::triangulate_hole_d6y(const vector<node_t>& hole, const vector<double>& new_distances) 
 {
   vector<edge_t> triangle_edges;
-  cerr << "triangulate hole " << hole << endl;
+  Debug debug("Delaunay",Debug::INFO3);
+  
+  debug << "triangulate hole " << hole << endl;
 
   for (int i=2; i< hole.size()-1; i++){
-    cerr << "hole[" << i << "]: " << hole[i] << endl;
+    debug << "hole[" << i << "]: " << hole[i] << endl;
 
     node_t a=hole[0], b=hole[hole.size()-1], c=hole[i], d=hole[i-1];
     if(hole[0] > hole[i]) swap(b,d);
 
-    cerr << vector<int>({a,b,c,d}) << endl;
+    debug << vector<int>({a,b,c,d}) << endl;
 
     insert_edge_d6y(edge_t(a,c),b,d,new_distances[i-2]);
     triangle_edges.push_back(edge_t(a,c));
 
-    cerr << neighbours << endl;
+    debug << neighbours << endl;
   }
   return triangle_edges;
 }
 
 void FulleroidDelaunay::remove_flat_vertex(node_t v)
 {
-  cerr << "begin remove flat vertex" << endl;
+  Debug debug("Delaunay",Debug::INFO3);
+  
+
+  debug << "begin remove flat vertex" << endl;
   vector<node_t> hole(neighbours[v]);
-  cerr << "hole: " << hole << endl;
+  debug << "hole: " << hole << endl;
 
   // check if hole[0] is already connected to any of the other hole-nodes in
   // which case we have to start the fan-connecting from somewhere else
@@ -298,7 +302,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
 
   // get distances of hole[0] to all hole[2]--hole[n-2] within the hole and before removing the vertex
   vector<double> new_distances = new_distances_d6y(v,hole);
-  cerr << "new distances: " << new_distances << endl;
+  debug << "new distances: " << new_distances << endl;
 
   // remove vertices from graph and distance mtx
   for(int i=0; i<hole.size(); i++)
@@ -313,35 +317,35 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   // delaunayify hole (not sure if it's enough to only delaunayify the hole)
   delaunayify_hole_2(triangle_edges);
 
-  cerr << "g=" << *this << endl;
+  debug << "g=" << *this << endl;
 }
 
 void FulleroidDelaunay::remove_flat_vertices()
 {
-
+  Debug debug("Delaunay",Debug::INFO3);
   // TODO: Assume that vertices are sorted such that hexagons appear at the
   // end, i.e., vertices 12 -- N-1 are hexagons. This needs a fix for
   // fulleroids with negative curvature.
 
-  cerr << "neighbours: " << neighbours << endl;
-  cerr << "neighbours-size: " << neighbours.size() << endl;
+  debug << "neighbours: " << neighbours << endl;
+  debug << "neighbours-size: " << neighbours.size() << endl;
 
 
   while(neighbours.size() > 12){
-    cerr << "-----" << endl;
+    debug << "-----" << endl;
     assert(edge_lengths_d6y_are_symmetric());
-    cerr << "edge_lengths_d6y: " << edge_lengths_d6y << endl;
+    debug << "edge_lengths_d6y: " << edge_lengths_d6y << endl;
     node_t remove = neighbours.size()-1;
-    cerr << "remove node-" << remove << endl;
+    debug << "remove node-" << remove << endl;
     remove_flat_vertex(remove);
-    cerr << "removed node-" << remove << endl;
-    cerr << "neighbours: " << neighbours << endl;
-    cerr << "-----" << endl;
+    debug << "removed node-" << remove << endl;
+    debug << "neighbours: " << neighbours << endl;
+    debug << "-----" << endl;
   }
 
-  cerr << "--- done ---" << endl;
+  debug << "--- done ---" << endl;
 
-  cerr << edge_lengths_d6y << endl;
+  debug << edge_lengths_d6y << endl;
 
   set<edge_t> set_ue = undirected_edges();
   vector<edge_t> vec_ue;
@@ -350,8 +354,8 @@ void FulleroidDelaunay::remove_flat_vertices()
   }
   delaunayify_hole_2(vec_ue);
 
-  cerr << edge_lengths_d6y << endl;
-  cerr << "--- done ---" << endl;
+  debug << edge_lengths_d6y << endl;
+  debug << "--- done ---" << endl;
   
   // TODO: Perform a final Delaunayification.
 
