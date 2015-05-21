@@ -11,7 +11,7 @@ AR=ar
 DIRECTORIES=-DFULLERENE_ROOT=\"${PWD}\" -DFULLERENE_DATABASE=\"${PWD}/database\"
 WARNINGS=-Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
 
-CXXFLAGS= -g -O2 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
+CXXFLAGS= -g -g3 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
 # -stdlib=libc++
 FFLAGS= -g -O2 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' -mcmodel=medium 
 LIBRARIES=-lstdc++ -lgomp -lgfortran
@@ -23,15 +23,15 @@ LIBRARIES=-lstdc++ -lgomp -lgfortran
 #CXXFLAGS+=-mkl -DHAS_MKL -DHAS_LAPACK
 #LIBRARIES+=-mkl
 #Uncomment the following lines if you want to use system BLAS and LAPACK
-#CXXFLAGS+=-DHAS_LAPACK 
-#LIBRARIES+=-llapack -lblas
+CXXFLAGS+=-DHAS_LAPACK 
+LIBRARIES+=-llapack -lblas
 #uncomment that following lines to use gsl (gnu scientific library)
-#CXXFLAGS+=-DHAS_GSL
-#LIBRARIES+=-lgsl
+CXXFLAGS+=-DHAS_GSL
+LIBRARIES+=-lgsl
 
 
-OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS= graph.o cubicgraph.o layout.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o layout-optimize.o delaunay.o
+OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o 
+GRAPHOBJECTS= graph.o cubicgraph.o layout.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o layout-optimize.o delaunay.o debug.o
 GRAPHFOBJECTS=geometry.o force.o diag.o dddihedral.o config.o opt-standalone.o
 
 FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))

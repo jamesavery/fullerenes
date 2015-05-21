@@ -1,5 +1,5 @@
 #include "delaunay.hh"
-
+#include "debug.hh"
 
 ostream& operator<<(ostream& s, const FulleroidDelaunay::Quad& q) 
 {
@@ -13,14 +13,15 @@ double FulleroidDelaunay::angle(node_t A, node_t B, node_t C) const {
     a = distances(B,A),
     b = distances(B,C),
     c = distances(A,C);
-  // printf("dist(%d,%d) = %g\n"
-  //          "dist(%d,%d) = %g\n"
-  //          "dist(%d,%d) = %g\n",
-  //          B,A,distances(B,A),
-  //          B,C,distances(B,C),
-  //          A,C,distances(A,C));
-  //  printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),acos((a*a+b*b-c*c)/(2*a*b)));
-  return acos((a*a+b*b-c*c)/(2*a*b));
+  double cos_theta = (a*a+b*b-c*c)/(2*a*b);
+
+  Debug("Delaunay",Debug::INFO3) 
+    << "dist(" << make_pair(B,A) << ") = " << distances(B,A) << "; "
+    << "dist(" << make_pair(B,C) << ") = " << distances(B,A) << "; "
+    << "dist(" << make_pair(A,C) << ") = " << distances(B,A) << "\n"
+    << "(a,b,c) = " << vector<double>({a,b,c}) << " ~> acos("<<cos_theta<<") = " << acos(cos_theta) << "\n\n";
+
+  return acos(cos_theta);
 }
 
 
@@ -30,23 +31,34 @@ double FulleroidDelaunay::angle_d6y(node_t A, node_t B, node_t C) const {
     a = edge_lengths_d6y(B,A),
     b = edge_lengths_d6y(B,C),
     c = edge_lengths_d6y(A,C);
-    printf("dist(%d,%d) = %g\n"
-           "dist(%d,%d) = %g\n"
-           "dist(%d,%d) = %g\n",
-           B,A,edge_lengths_d6y(B,A),
-           B,C,edge_lengths_d6y(B,C),
-           A,C,edge_lengths_d6y(A,C));
+  double cos_theta = (a*a+b*b-c*c)/(2*a*b);
+
+  Debug("Delaunay",Debug::INFO3) 
+    << "dist(" << make_pair(B,A) << ") = " << distances(B,A) << "; "
+    << "dist(" << make_pair(B,C) << ") = " << distances(B,A) << "; "
+    << "dist(" << make_pair(A,C) << ") = " << distances(B,A) << "\n";
+
     assert(a>epsilon && b>epsilon && c>epsilon);
-  if( (a*a+b*b-c*c)/(2.0*a*b) >= 1.0 ){ // catch 0 degree case + numerical inaccuracy
-    printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g (exception used)\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),0.0);
+  if( cos_theta >= 1.0 ){ // catch 0 degree case + numerical inaccuracy
+    Debug("Delaunay",Debug::INFO2)  
+      << "(a,b,c) = " << vector<double>({a,b,c}) 
+      << " ~> acos("<<cos_theta<<") = " << acos(cos_theta) << " (exception used)\n\n";
+
     return 0;
   }
-  if( (a*a+b*b-c*c)/(2.0*a*b) <= -1.0 ){ // catch 180 degree case + numerical inaccuracy
-    printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g (exception used)\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),M_PI);
+  if( cos_theta <= -1.0 ){ // catch 180 degree case + numerical inaccuracy
+    Debug("Delaunay",Debug::INFO2)  
+      << "(a,b,c) = " << vector<double>({a,b,c}) 
+      << " ~> acos("<<cos_theta<<") = " << acos(cos_theta) << " (exception used)\n\n";
+
     return M_PI;
   }
-  printf("(a,b,c) = (%g,%g,%g) ~> acos(%g) = %g\n",a,b,c,(a*a+b*b-c*c)/(2*a*b),acos((a*a+b*b-c*c)/(2*a*b)));
-  return acos((a*a+b*b-c*c)/(2.0*a*b));
+
+    Debug("Delaunay",Debug::INFO3)  
+      << "(a,b,c) = " << vector<double>({a,b,c}) 
+      << " ~> acos("<<cos_theta<<") = " << acos(cos_theta) << " (exception used)\n\n";
+
+  return acos(cos_theta);
 }
 
 
@@ -192,9 +204,8 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
         cout << ab << ", " << ad << ", " << alpha1 << ", " << alpha2 << ", " << bd << endl;
 
         remove_edge_d6y(edge_t(A,C));
-        if(B > D){ // FIXME write elegantly
-          node_t buf=A; A=C; C=buf;
-        }
+        if(B > D) swap(A,C);
+
         insert_edge_d6y(edge_t(B,D),A,C,bd);
         
         new_edges.erase(new_edges.begin()+i);
@@ -226,19 +237,29 @@ void FulleroidDelaunay::align_hole(vector<node_t>& hole) const
   }
 }
 
+vector<double> FulleroidDelaunay::hole_angles(const node_t&v, const vector<node_t>& nv) const 
+{
+  vector<double> angles(nv.size());
+  for(int i=0;i<nv.size();i++) angles[i] = angle_d6y(nv[i],v,nv[(i+1)%nv.size()]);
+  return angles;
+}
+
+// Distance from hole[0] to every other element in the hole
 vector<double> FulleroidDelaunay::new_distances_d6y(const node_t& v, const vector<node_t>& hole) const
 {
-  vector<double> distances(hole.size()-2);
+  const size_t n = hole.size();
+  vector<double> distances(n);
+  
+  double accumulated_angle = 0;//angle_d6y(hole[0], v, hole[1]);//angles[0]
+  double d0 = edge_lengths_d6y(v, hole[0]);    
 
-  double accumulated_angle = angle_d6y(hole[0], v, hole[1]);
-  cerr << "angle: " << accumulated_angle << endl;
-  double d0 = edge_lengths_d6y(v, hole[0]);
-  for (int i=2; i<hole.size()-1; i++){
-    double di = edge_lengths_d6y(v, hole[i]);
-    double angle = angle_d6y(hole[i-1], v, hole[i]);
-    accumulated_angle += angle; // Possible bug: Seems to double-count angles
-    cerr << "angle: " << angle << ", accumulated: " << accumulated_angle << endl;
-    distances[i-2] = sqrt( d0*d0 + di*di - 2.0*d0*di*cos(accumulated_angle) ) ;
+  distances[0]   = 0;
+  for (int i=1; i<n; i++){
+    double di    = edge_lengths_d6y(v, hole[i+1]);
+    double angle = angle_d6y(hole[i], v, hole[(i+1)%n]); // angles[i-1];
+    accumulated_angle += angle;
+    distances[i] = sqrt( d0*d0 + di*di - 2.0*d0*di*cos(accumulated_angle) ) ;
+    cerr << distances[i] << endl;
   }  
   return distances;
 }
