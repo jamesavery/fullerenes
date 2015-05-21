@@ -218,13 +218,19 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   
   // check if hole[0] is already connected to any of the other hole-nodes in
   // which case we have to start the fan-connecting from somewhere else
-  //TODO what about the second one
 
-  for(int i=2; i< hole.size()-1; i++){
-    if(find(neighbours[hole[0]].begin(), neighbours[hole[0]].end(), hole[i]) != neighbours[hole[0]].end()){
-      hole.push_back(hole[0]);
-      hole.erase(hole.begin());
-    }
+  bool done = false;
+  while(!done){ // Rotate hole until hole[0] is connected only to hole[-1] and hole[1].
+    const vector<node_t>& n0(neighbours[hole[0]]);    
+    done = true;
+
+    for(int i=2; i< hole.size()-1; i++)
+      if(find(n0.begin(), n0.end(), hole[i]) != n0.end()){
+	hole.push_back(hole[0]);
+	hole.erase(hole.begin());
+	done = false;
+	break;
+      }
   }
 
   // get distances of hole[0] to all hole[2]--hole[n-2] within the hole and before removing the vertex
@@ -276,25 +282,25 @@ void FulleroidDelaunay::remove_flat_vertices()
   // end, i.e., vertices 12 -- N-1 are hexagons. This needs a fix for
   // fulleroids with negative curvature.
 
-  cout << "neighbours: " << neighbours << endl;
-  cout << "neighbours-size: " << neighbours.size() << endl;
+  cerr << "neighbours: " << neighbours << endl;
+  cerr << "neighbours-size: " << neighbours.size() << endl;
 
 
   while(neighbours.size() > 12){
-    cout << "-----" << endl;
+    cerr << "-----" << endl;
     assert(edge_lengths_d6y_are_symmetric());
-    cout << "edge_lengths_d6y: " << edge_lengths_d6y << endl;
+    cerr << "edge_lengths_d6y: " << edge_lengths_d6y << endl;
     node_t remove = neighbours.size()-1;
-    cout << "remove node-" << remove << endl;
+    cerr << "remove node-" << remove << endl;
     remove_flat_vertex(remove);
-    cout << "removed node-" << remove << endl;
-    cout << "neighbours: " << neighbours << endl;
-    cout << "-----" << endl;
+    cerr << "removed node-" << remove << endl;
+    cerr << "neighbours: " << neighbours << endl;
+    cerr << "-----" << endl;
   }
 
-  cout << "--- done ---" << endl;
+  cerr << "--- done ---" << endl;
 
-  cout << edge_lengths_d6y << endl;
+  cerr << edge_lengths_d6y << endl;
 
   set<edge_t> set_ue = undirected_edges();
   vector<edge_t> vec_ue;
@@ -303,8 +309,8 @@ void FulleroidDelaunay::remove_flat_vertices()
   }
   delaunayify_hole_2(vec_ue);
 
-  cout << edge_lengths_d6y << endl;
-  cout << "--- done ---" << endl;
+  cerr << edge_lengths_d6y << endl;
+  cerr << "--- done ---" << endl;
   
   // TODO: Perform a final Delaunayification.
 
