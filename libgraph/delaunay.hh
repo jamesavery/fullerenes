@@ -43,21 +43,25 @@ public:
   bool is_consistent(const Quad& Q) const;
   
   void remove_edge_d6y(const dedge_t e){
-    cout << "remove " << e << endl;
+    cerr << "remove " << e << endl;
     remove_edge(e);
     edge_lengths_d6y(e.first,e.second)=0;
     edge_lengths_d6y(e.second,e.first)=0;
   }
 
-  // in the neighbour list of e.first, insert e.second in the position of b
-  // in the neighbour list of e.second, insert e.first in the position of d
+  void           align_hole(vector<node_t>& hole) const;
+  vector<double>  new_distances_d6y(const node_t& v, const vector<node_t>& hole) const;
+  vector<edge_t> triangulate_hole_d6y(const vector<node_t>& hole, const vector<double>& distances);
+
+  // in the neighbour list of e.first, insert e.second just before b
+  // in the neighbour list of e.second, insert e.first just before d
   void insert_edge_d6y(const edge_t e, const node_t b, const node_t d, const double length){
-    cout << "--insert_edge_d6y--" << endl;
-    cout << "  edge;length: " << e << "/" << length<< endl;
+    cerr << "--insert_edge_d6y--" << endl;
+    cerr << "  edge;length: " << e << "/" << length<< endl;
     insert_edge(e, b, d);
     edge_lengths_d6y(e.first,e.second)=length;
     edge_lengths_d6y(e.second,e.first)=length;
-    cout << "--insert_edge_d6y--" << endl;
+    cerr << "--insert_edge_d6y--" << endl;
   }
 
 

@@ -209,16 +209,8 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
   }
 }
 
-void FulleroidDelaunay::remove_flat_vertex(node_t v)
+void FulleroidDelaunay::align_hole(vector<node_t>& hole) const
 {
-  cout << "begin remove flat vertex" << endl;
-  vector<node_t> hole(neighbours[v]);
-  cout << "hole: " << hole << endl;
-
-  
-  // check if hole[0] is already connected to any of the other hole-nodes in
-  // which case we have to start the fan-connecting from somewhere else
-
   bool done = false;
   while(!done){ // Rotate hole until hole[0] is connected only to hole[-1] and hole[1].
     const vector<node_t>& n0(neighbours[hole[0]]);    
@@ -232,47 +224,75 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
 	break;
       }
   }
+}
 
-  // get distances of hole[0] to all hole[2]--hole[n-2] within the hole and before removing the vertex
-  vector<double> new_distances;
+vector<double> FulleroidDelaunay::new_distances_d6y(const node_t& v, const vector<node_t>& hole) const
+{
+  vector<double> distances(hole.size()-2);
+
   double accumulated_angle = angle_d6y(hole[0], v, hole[1]);
-  cout << "angle: " << accumulated_angle << endl;
+  cerr << "angle: " << accumulated_angle << endl;
   double d0 = edge_lengths_d6y(v, hole[0]);
   for (int i=2; i<hole.size()-1; i++){
     double di = edge_lengths_d6y(v, hole[i]);
-    accumulated_angle += angle_d6y(hole[i-1], v, hole[i]);
-    cout << "angle: " << accumulated_angle << endl;
-    new_distances.push_back( sqrt( d0*d0 + di*di - 2.0*d0*di*cos(accumulated_angle) ) );
+    double angle = angle_d6y(hole[i-1], v, hole[i]);
+    accumulated_angle += angle; // Possible bug: Seems to double-count angles
+    cerr << "angle: " << angle << ", accumulated: " << accumulated_angle << endl;
+    distances[i-2] = sqrt( d0*d0 + di*di - 2.0*d0*di*cos(accumulated_angle) ) ;
+  }  
+  return distances;
+}
+  
+
+vector<edge_t> FulleroidDelaunay::triangulate_hole_d6y(const vector<node_t>& hole, const vector<double>& new_distances) 
+{
+  vector<edge_t> triangle_edges;
+  cerr << "triangulate hole " << hole << endl;
+
+  for (int i=2; i< hole.size()-1; i++){
+    cerr << "hole[" << i << "]: " << hole[i] << endl;
+
+    node_t a=hole[0], b=hole[hole.size()-1], c=hole[i], d=hole[i-1];
+    if(hole[0] > hole[i]) swap(b,d);
+
+    cerr << vector<int>({a,b,c,d}) << endl;
+
+    insert_edge_d6y(edge_t(a,c),b,d,new_distances[i-2]);
+    triangle_edges.push_back(edge_t(a,c));
+
+    cerr << neighbours << endl;
   }
-  cout << "new distances: " << new_distances << endl;
+  return triangle_edges;
+}
+
+void FulleroidDelaunay::remove_flat_vertex(node_t v)
+{
+  cerr << "begin remove flat vertex" << endl;
+  vector<node_t> hole(neighbours[v]);
+  cerr << "hole: " << hole << endl;
+
+  // check if hole[0] is already connected to any of the other hole-nodes in
+  // which case we have to start the fan-connecting from somewhere else
+  align_hole(hole);
+
+  // get distances of hole[0] to all hole[2]--hole[n-2] within the hole and before removing the vertex
+  vector<double> new_distances = new_distances_d6y(v,hole);
+  cerr << "new distances: " << new_distances << endl;
 
   // remove vertices from graph and distance mtx
-  for(int i=0; i<hole.size(); i++){
+  for(int i=0; i<hole.size(); i++)
     remove_edge_d6y(edge_t(v,hole[i]));
-  }
+
   neighbours.pop_back();
   N--;
 
   //triangulate hole
-  // vector<dedge_t> triangle_edges = triangulate_hole(hole);
-  vector<edge_t> triangle_edges;
-  cout << "triangulate hole " << hole << endl;
-  for (int i=2; i< hole.size()-1; i++){
-    cout << "hole[" << i << "]: " << hole[i] << endl;
-    node_t a=hole[0], b=hole[hole.size()-1], c=hole[i], d=hole[i-1];
-    if(hole[0] > hole[i]){ // FIXME write elegantly
-      node_t buf = b; b=d; d=buf;
-    }
-    cout << a << ", " << b << ", " << c << ", " << d << endl;
-    insert_edge_d6y(edge_t(a,c),b,d,new_distances[i-2]);
-    cout << neighbours << endl;
-    triangle_edges.push_back(edge_t(a,c));
-  }
+  vector<edge_t> triangle_edges = triangulate_hole_d6y(hole,new_distances);
   
   // delaunayify hole (not sure if it's enough to only delaunayify the hole)
   delaunayify_hole_2(triangle_edges);
 
-  cout << "g=" << *this << endl;
+  cerr << "g=" << *this << endl;
 }
 
 void FulleroidDelaunay::remove_flat_vertices()
