@@ -18,25 +18,58 @@ Triangulation regular_polygon(int n)
 }
 
 
+int testN = 24;
+vector<int> testRSPI = {1,2,3,4,5,7,8,10,11,12,13,14};
+
 int main(int ac, char **av) 
 {
-  const size_t n = 6;
-  Triangulation pT(regular_polygon(n));
+  int N;
+  vector<int> RSPI(12);
+
+  Debug::channel_verbosity["all"] = Debug::INFO1;
+  Debug warning("main",Debug::WARNING);
+  Debug info("main",Debug::INFO1);
+
+  if(ac==14){
+    N = strtol(av[1], 0, 0);
+    for (int i = 0; i < 12; i++){
+      RSPI[i] = strtol(av[i + 2], 0, 0) - 1;
+    }
+  } else {
+    warning << "Using test fullerene C" << testN << " " << testRSPI << "\n";
+    N = testN;
+    RSPI = testRSPI;
+    for(int i=0;i<12;i++) RSPI[i]--;
+  }
+
+  string filename = "output/reduced-graph-C"+to_string<int>(N)+".m";
+  ofstream output(filename);
+
+  vector<int> spiral(N/2+2, 6);
+  for (int i = 0; i < 12; i++){
+    spiral[RSPI[i]] = 5;
+  }
+
+  cout << "spiral = " << spiral << endl;
+
+  Triangulation T1(spiral);
+  FulleroidDelaunay DY(T1);
 
   //  Debug::channel_verbosity["Delaunay"] = Debug::INFO3;
 
-  FulleroidDelaunay DY(pT);
+  {
+    vector<node_t> hole(DY.neighbours[N-1]);
+    int n = hole.size();
 
-  vector<double> angles(n);
-  for(node_t u=0;u<n;u++) angles[u] = DY.angle_d6y(u,n,(u+1)%n);
+    vector<double> angles(n);
+    for(node_t u=0;u<n;u++) angles[u] = DY.angle_d6y(u,n,(u+1)%n);
 
-  vector<node_t> hole(n);
-  for(node_t u=0;u<n;u++) hole[u] = u;
+    vector<double> distances = DY.new_distances_d6y(n,hole);
 
-  vector<double> distances = DY.new_distances_d6y(n,hole);
-
-  cout << "angles    = " << angles << ";\n";
-  cout << "distances = " << distances << ";\n";
+    cout << "angles    = " << angles << ";\n";
+    cout << "distances = " << distances << ";\n";
+    
+  }
   
 
   return 0;
