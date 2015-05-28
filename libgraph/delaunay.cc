@@ -34,11 +34,12 @@ double FulleroidDelaunay::angle_d6y(node_t A, node_t B, node_t C) const {
   double cos_theta = (a*a+b*b-c*c)/(2*a*b);
 
   Debug("Delaunay",Debug::INFO3) 
-    << "dist(" << make_pair(B,A) << ") = " << distances(B,A) << "; "
-    << "dist(" << make_pair(B,C) << ") = " << distances(B,A) << "; "
-    << "dist(" << make_pair(A,C) << ") = " << distances(B,A) << "\n";
+    << "dist(" << make_pair(B,A) << ") = " << a << "/" << distances(B,A) << "; "
+    << "dist(" << make_pair(B,C) << ") = " << b << "/" << distances(B,A) << "; "
+    << "dist(" << make_pair(A,C) << ") = " << c << "/" << distances(B,A) << "\n";
 
     assert(a>epsilon && b>epsilon && c>epsilon);
+
   if( cos_theta >= 1.0 ){ // catch 0 degree case + numerical inaccuracy
     Debug("Delaunay",Debug::INFO2)  
       << "(a,b,c) = " << vector<double>({a,b,c}) 
@@ -96,6 +97,9 @@ bool FulleroidDelaunay::is_consistent(const Quad& Q)       const {
 
 vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
 {
+  Debug debug("Delaunay",Debug::INFO2);
+  Debug error("Delaunay",Debug::ERROR);
+
   vector<node_t> hole(hole0);
   vector<dedge_t> new_arcs;
   
@@ -107,7 +111,7 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
      node_t u = hole[i], v = hole[(i+1)%hole.size()], w = hole[(i+2)%hole.size()];
      dedge_t uw(u,w);
      
-     cout << "Trying edge " << make_pair(u+1,w+1) << ": ";
+     debug << "Trying edge " << make_pair(u+1,w+1) << ": ";
      if(!edge_exists(uw)){
        // Edge doesn't already exist - but does it lead to a consistent triangle?
        insert_edge(uw,next(u,v),v);  // u: ..v,w,x,.. w: ...,u,v,... ; 
@@ -117,8 +121,8 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
        Quad q1(u,s,v,w), q2(v,t,w,u);
          
        if(!is_consistent(q1) || !is_consistent(q2)){ // New triangle is screwy -- discard edge
-         cout << "leads to inconsistent neighbourhood " << (vector<int>(q1.v,q1.v+4)+1) << "("<< is_consistent(q1) << ")"
-              << " or " << (vector<int>(q2.v,q2.v+4)+1)  << "("<< is_consistent(q2) << ")\n";
+         debug << "leads to inconsistent neighbourhood " << (vector<int>(q1.v,q1.v+4)+1) << "("<< is_consistent(q1) << ")"
+	       << " or " << (vector<int>(q2.v,q2.v+4)+1)  << "("<< is_consistent(q2) << ")\n";
  
          remove_edge(dedge_t(u,w));
        } else {         		// New triangle is OK. Delaunayify!
@@ -129,14 +133,14 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
          new_arcs.push_back(dedge_t(u,w));
        }
      } else {
-       cout << "edge exists.\n";
+       debug << "edge exists.\n";
      }
      i = (i+1)%hole.size();
      if(++steps > 10){
-       cout << "Got stuck; graph is:\n"
-            <<"g = " << *this << ";\n"
-            <<"hole = " << hole+1 << ";\n"
-            <<"newarcs = " << new_arcs <<";\n";
+       error << "Got stuck; graph is:\n"
+	     <<"g = " << *this << ";\n"
+	     <<"hole = " << hole+1 << ";\n"
+	     <<"newarcs = " << new_arcs <<";\n";
        abort();
      }
    }
@@ -177,6 +181,7 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
 
 void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
 {
+  Debug debug("Delaunay",Debug::INFO2);
   vector<edge_t> new_edges(edges);
 
   int flips = 0;
@@ -184,7 +189,7 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
   while(!done){ // Naive |edges|^2 algorithm
     done = true;
     for(int i=0;i<new_edges.size();i++){
-      cout << "edges considered for dealaunayification: " << new_edges << ". current index: " << i << endl;
+      debug << "edges considered for dealaunayification: " << new_edges << ". current index: " << i << endl;
 
       node_t A = new_edges[i].first, C = new_edges[i].second;
       node_t B = nextCW(C,A), D = nextCW(A,C);
@@ -192,7 +197,7 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
       Quad q(A,B,C,D);
 
       if(!is_delaunay_d6y(q)){ // Do a flip!
-        cout << q << " is not delaunay -- flipping." << endl;
+        debug << q << " is not delaunay -- flipping." << endl;
 
         // TODO: implement void flip()
 
@@ -201,7 +206,7 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
         double alpha1 = angle_d6y(D,A,C);
         double alpha2 = angle_d6y(C,A,B);
         double bd = sqrt( ad*ad + ab*ab - 2.0*ad*ab*cos(alpha1+alpha2) );
-        cout << ab << ", " << ad << ", " << alpha1 << ", " << alpha2 << ", " << bd << endl;
+        debug << ab << ", " << ad << ", " << alpha1 << ", " << alpha2 << ", " << bd << endl;
 
         remove_edge_d6y(edge_t(A,C));
         if(B > D) swap(A,C);
@@ -213,9 +218,9 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
 
         flips++;
         done = false;
-        cout << "flip done" << endl;
+        debug << "flip done" << endl;
       }
-      else{ cout << q << " is delaunay, all good." << endl; }
+      else{ debug << q << " is delaunay, all good." << endl; }
     }
   }
 }
@@ -277,12 +282,12 @@ vector<edge_t> FulleroidDelaunay::triangulate_hole_d6y(const vector<node_t>& hol
     node_t a=hole[0], b=hole[hole.size()-1], c=hole[i], d=hole[i-1];
     if(hole[0] > hole[i]) swap(b,d);
 
-    debug << vector<int>({a,b,c,d}) << endl;
+    debug << "(a,b,c,d) = " << vector<int>({a,b,c,d}) << endl;
 
-    insert_edge_d6y(edge_t(a,c),b,d,new_distances[i-2]);
+    insert_edge_d6y(edge_t(a,c),b,d,new_distances[i]);
     triangle_edges.push_back(edge_t(a,c));
 
-    debug << neighbours << endl;
+    debug << "neighbours = " << neighbours << endl;
   }
   return triangle_edges;
 }
@@ -316,8 +321,6 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   
   // delaunayify hole (not sure if it's enough to only delaunayify the hole)
   delaunayify_hole_2(triangle_edges);
-
-  debug << "g=" << *this << endl;
 }
 
 void FulleroidDelaunay::remove_flat_vertices()
