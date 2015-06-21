@@ -27,4 +27,30 @@ public:
   }
 };
 
+class MathDebug {
+public:
+  static map<string,int>       channel_verbosity; 
+  static map<string,ostream*>  channel_stream;
+
+  string channel;
+  int level;
+  static int prefix;
+
+  static ostream nullstream;
+ 
+  MathDebug(string channel, int level, int prefix=1) : channel(channel), level(level) {}
+
+  template <typename T> friend ostream& operator<<(const MathDebug& S, const T& x)
+  {
+    if(channel_verbosity[S.channel] < S.level && channel_verbosity["all"] < S.level) return nullstream;
+
+    ostream& stream = *channel_stream[S.channel];
+
+    stream << x;
+    stream.flush();
+
+    return stream;
+  }
+};
+
 #endif

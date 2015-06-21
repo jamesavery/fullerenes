@@ -7,74 +7,95 @@
 
 class FulleroidDelaunay: public Triangulation {
 public:
-  matrix<double> distances;
-  matrix<double> edge_lengths_d6y; // zero if !edge
-  static constexpr double epsilon = 1e-5;
+  matrix<double> edge_lengths; // zero if !edge
+
+  FulleroidDelaunay(const Triangulation& T) : Triangulation(T.sort_nodes()), edge_lengths(N,N,0)
+  {
+    for(node_t u=0;u<N;u++)
+      for(node_t v: neighbours[u])
+	edge_lengths(u,v) = 1;
+  }
 
   struct Quad {
+    /*   v1
+     *  /  \
+     *v0---v2
+     *  \  /
+     *   v3
+     */
     node_t v[4];
 
     Quad(node_t A, node_t B, node_t C, node_t D) : v{A,B,C,D} {}
     Quad flipped() const { return Quad(v[1],v[2],v[3],v[0]); }
 
+
+    vector<int> to_vector() const { return vector<int>(&v[0],&v[4]); }
+
     friend ostream& operator<<(ostream& s, const Quad& q);
   };
 
-  FulleroidDelaunay(const Triangulation& T) : Triangulation(T.sort_nodes()),
-					      distances(surface_distances()), edge_lengths_d6y(N,N,0) {
-    for(int i=0; i<N; i++){
-      for(int j=i; j<N; j++){
-        if(edge_exists(dedge_t(i,j))){
-          edge_lengths_d6y(i,j) = distances(i,j);
-          edge_lengths_d6y(j,i) = distances(j,i);
-        }
-      }
-    }
-  }
 
-  double angle(node_t A, node_t B, node_t C) const;
-  double angle_d6y(node_t A, node_t B, node_t C) const;
-  double angle(const Quad& Q, int i, int subangle = 0) const;
-  double angle_d6y(const Quad& Q, int i, int subangle = 0) const;
+  double tan_halfangle(node_t vi, node_t vj, node_t  vk) const;
+  double cot_angle(node_t  vi, node_t  vj, node_t  vk) const;
+  double tan_adh(const Quad& Q) const;
+  double cos_ad(const Quad& Q) const;
+  static double add_tan(double t_a, double t_b);
 
-  bool is_delaunay(const Quad& Q) const { return fabs(angle(Q,1) + angle(Q,3)) - epsilon <= M_PI; }
-  bool is_delaunay_d6y(const Quad& Q) const { return fabs(angle_d6y(Q,1) + angle_d6y(Q,3)) - epsilon <= M_PI; }
-  bool is_consistent(const Quad& Q,int i) const;
-  bool is_consistent(const Quad& Q) const;
+  /*  length of side f, where:
+   *       
+   *  b /  f
+   *   /   |
+   *  v0-e-- 
+   *   \   |
+   *  c \  f
+   */
+  double flipped_length(const Quad& Q) const;
   
-  void remove_edge_d6y(const dedge_t e){
-    remove_edge(e);
-    edge_lengths_d6y(e.first,e.second)=0;
-    edge_lengths_d6y(e.second,e.first)=0;
+
+  bool is_delaunay(const Quad& Q) const;
+  void flip(const Quad& Q);
+
+  void remove_edge(const dedge_t e){
+    Graph::remove_edge(e);
+    edge_lengths(e.first,e.second)=0;
+    edge_lengths(e.second,e.first)=0;
   }
 
   void           align_hole(vector<node_t>& hole) const;
-  vector<double> hole_angles(const node_t&v, const vector<node_t>& nv) const;
-  vector<double>  new_distances_d6y(const node_t& v, const vector<node_t>& hole) const;
-  vector<edge_t> triangulate_hole_d6y(const vector<node_t>& hole, const vector<double>& distances);
+  vector<double>  new_distances(const node_t& v, const vector<node_t>& hole) const;
+  vector<edge_t> triangulate_hole(const vector<node_t>& hole, const vector<double>& distances);
 
-  // in the neighbour list of e.first, insert e.second just before b
-  // in the neighbour list of e.second, insert e.first just before d
-  void insert_edge_d6y(const edge_t e, const node_t b, const node_t d, const double length){
-    insert_edge(e, b, d);
-    edge_lengths_d6y(e.first,e.second)=length;
-    edge_lengths_d6y(e.second,e.first)=length;
+  void insert_edge(const dedge_t& uv, const node_t p, const node_t q, const double length){
+    node_t u=uv.first, v = uv.second;
+    /* Insert v in neighbours[u] just before p, and insert u in neighbours[v] just before q:
+     * 
+     *     p
+     *    /                
+     *   /                  
+     *  u ---- v
+     *        /  
+     *       / 
+     *      q
+     */
+    Graph::insert_edge(uv, p, q);
+    edge_lengths(u,v)=length;
+    edge_lengths(v,u)=length;
   }
 
+  bool is_consistent(const Quad& Q,int i) const;
+  bool is_consistent(const Quad& Q) const;
 
-  vector<dedge_t> triangulate_hole(const vector<node_t>& hole);
-  vector<dedge_t> delaunayify_hole(const vector<dedge_t>& edges);
-  void delaunayify_hole_2(const vector<edge_t>& edges);
+
+  vector<dedge_t> delaunayify_hole(const vector<edge_t>& edges);
 
   void remove_flat_vertices();
   void remove_flat_vertex(node_t v);
 
-  bool edge_lengths_d6y_are_symmetric(){
-    for(int i=0; i<N; i++){
-      for(int j=i; j<N; j++){
-        if(edge_lengths_d6y(i,j) != edge_lengths_d6y(j,i)) return false;
-      }
-    }
+  bool edge_lengths_are_symmetric(){
+    for(int i=0; i<N; i++)
+      for(int j=i; j<N; j++)
+        if(edge_lengths(i,j) != edge_lengths(j,i)) return false;
+
     return true;
   }
 };
