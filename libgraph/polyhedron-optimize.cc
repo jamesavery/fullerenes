@@ -17,27 +17,31 @@ using namespace std;
 struct params_t
 {
   Polyhedron *P;
-  vector<double> *zero_values_dist;
+  map<edge_t, double> *zero_values_dist;
   vector<double> *zero_values_dihedral;
   vector<double> *force_constants_dist;
   vector<double> *force_constants_angle;
   vector<double> *force_constants_dihedral;
+  set<edge_t> *edge_set;
   bool optimize_angles;
 };
 
 double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 {
+  //cout << "entering polyhedron pot" << endl;
+
   params_t &params = *static_cast<params_t*>(parameters);
   Polyhedron &P = *params.P;
-  vector<double> &zero_values_dist = *params.zero_values_dist;
+  map<edge_t, double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &zero_values_dihedral = *params.zero_values_dihedral;
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
+  set<edge_t> &edge_set = *params.edge_set;
 
-  assert(zero_values_dist.size() == P.edge_set.size());
-  assert(force_constants_dist.size() == P.edge_set.size());
-  assert(force_constants_angle.size() == 2*P.edge_set.size()); // only for cubic graphs
+  assert(zero_values_dist.size() == edge_set.size());
+  assert(force_constants_dist.size() == edge_set.size());
+  assert(force_constants_angle.size() == 2*edge_set.size()); // only for cubic graphs
   assert(force_constants_dihedral.size() == P.N);
 
 
@@ -45,7 +49,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   //  V = k (r - r0)**2
   double potential_energy = 0.0;
   int i=0;
-  set<edge_t>::const_iterator e=P.edge_set.begin(), ee=P.edge_set.end();
+  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(; e!=ee; e++, i++){
     const double ax = gsl_vector_get(coordinates,3 * e->first);
     const double ay = gsl_vector_get(coordinates,3 * e->first +1);
@@ -53,7 +57,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
     const double bx = gsl_vector_get(coordinates,3 * e->second);
     const double by = gsl_vector_get(coordinates,3 * e->second +1);
     const double bz = gsl_vector_get(coordinates,3 * e->second +2);
-    potential_energy += 0.5 * force_constants_dist[i] * pow(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i], 2);
+    potential_energy += 0.5 * force_constants_dist[i] * pow(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[*e], 2);
   }
   
   
@@ -96,7 +100,6 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 //        C   u   A
 //            |
 //            r
-//      P.orient_neighbours();
       node_t r = P.neighbours[u][0];
       node_t s = P.neighbours[u][1];
       node_t t = P.neighbours[u][2];
@@ -137,20 +140,21 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
 
   params_t &params = *static_cast<params_t*>(parameters);
   Polyhedron &P = *params.P;
-  vector<double> &zero_values_dist = *params.zero_values_dist;
+  map<edge_t, double> &zero_values_dist = *params.zero_values_dist;
   vector<double> &zero_values_dihedral = *params.zero_values_dihedral;
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
+  set<edge_t> &edge_set = *params.edge_set;
 
-  assert(zero_values_dist.size() == P.edge_set.size());
-  assert(force_constants_dist.size() == P.edge_set.size());
-  assert(force_constants_angle.size() == 2*P.edge_set.size()); // only for cubic graphs
+  assert(zero_values_dist.size() == edge_set.size());
+  assert(force_constants_dist.size() == edge_set.size());
+  assert(force_constants_angle.size() == 2*edge_set.size()); // only for cubic graphs
   assert(force_constants_dihedral.size() == P.points.size());
 
-  vector<coord3d> derivatives(P.N);  
+  vector<coord3d> derivatives(P.N, coord3d(0.0,0.0,0.0));
 
-  set<edge_t>::const_iterator e=P.edge_set.begin(), ee=P.edge_set.end();
+  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(int i=0; e!=ee; e++, i++){
     const double ax = gsl_vector_get(coordinates,3 * e->first);
     const double ay = gsl_vector_get(coordinates,3 * e->first +1);
@@ -158,19 +162,21 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
     const double bx = gsl_vector_get(coordinates,3 * e->second);
     const double by = gsl_vector_get(coordinates,3 * e->second +1);
     const double bz = gsl_vector_get(coordinates,3 * e->second +2);
-//    cout << "ax " << ax << " ay " << ay << " az " << az << " bx " << bx << " by " << by << " bz " << bz << endl;
-    derivatives[e->first]  += coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i]);
-    derivatives[e->second] -= coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[i]);
-//    cout << "dist(" << i << "): " << coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) << endl;
+    // cout << "edge: " << *e << endl;
+    // cout << "ax " << ax << " ay " << ay << " az " << az << " bx " << bx << " by " << by << " bz " << bz << endl;
+    // cout << "norm(" << i << "): " << coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) << endl;
+    derivatives[e->first]  += coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[*e]);
+    derivatives[e->second] -= coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[*e]);
+    // cout << "dist(" << i << "): " << coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) << endl;
   }
-  
+
   //iterate over all faces
   if(params.optimize_angles){
     for(int i=0;i<P.faces.size();i++){
       const face_t &f(P.faces[i]);
       const int face_size = f.size();
     
-      //      cout << " face of size-" << it->first << ": " << *jt << endl;
+      // cout << " face of size-" << it->first << ": " << *jt << endl;
       // iterate over nodes in face
       for (int i=0; i<face_size; ++i){
         int f0 = f[(i-1+face_size)%face_size], f1 = f[i], f2 = f[(i+1)%face_size];
@@ -263,7 +269,6 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
 }
 
 
-//FIXME redo for performance reasons
 void polyhedron_pot_grad(const gsl_vector* coordinates, void* parameters, double* potential, gsl_vector* gradient)
 {
   *potential = polyhedron_pot(coordinates, parameters);
@@ -271,26 +276,35 @@ void polyhedron_pot_grad(const gsl_vector* coordinates, void* parameters, double
 }
 
 
-bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values_dist)
+bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_values_dist)
 {
-//  cout << "entering opt other" << endl;
+  //cout << "entering opt other" << endl;
+
+  assert(points.size() == N);
+
+  const double eps=1e-4;
 
   // settings for the optimizations
   const double stepsize = 1e-3;// FIXME final value
-  const double terminate_gradient = 1e-6;// FIXME final value
+  const double terminate_gradient = 1e-10;// FIXME final value
   const double tol = 1e-1; // accuracy of line minimization, the manual suggests 0.1
-  const int max_iterations = 15000;// FIXME final value
+  const int max_iterations = 10000;// FIXME final value
   
   // init values
-  if(zero_values_dist.size() != edge_set.size())
-  {
-    zero_values_dist.resize(edge_set.size(), 1.4);
+  set<edge_t> edge_set = undirected_edges();
+
+  const double default_edge_length = 1.4;
+  if(zero_values_dist.size() != edge_set.size()){
+    for(set<edge_t>::iterator it=edge_set.begin(), to=edge_set.end(); it!=to; it++){
+      zero_values_dist.insert(make_pair(*it, default_edge_length));
+    }
   }
+
   vector<double> zero_values_dihedral(N);
   if(is_cubic())
   {
     orient_neighbours(); // CCW
-    const int fmax = 10;
+    const int fmax = 10; // maximum face size
 //          t   B   s
 //            \   /
 //          C   u   A
@@ -300,13 +314,60 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
       node_t r = neighbours[u][0];
       node_t s = neighbours[u][1];
       node_t t = neighbours[u][2];
-//       const int lA = get_face_oriented(u,r).size();
-//       const int lB = get_face_oriented(u,s).size();
-//       const int lC = get_face_oriented(u,t).size();
-      const int lA = shortest_cycle(r,u,s,fmax).size();
-      const int lB = shortest_cycle(s,u,t,fmax).size();
-      const int lC = shortest_cycle(t,u,r,fmax).size();
-      zero_values_dihedral[u] = coord3d::ideal_dihedral(lA,lB,lC);
+      // face sizes
+      int lA = shortest_cycle(r,u,s,fmax).size();
+      int lB = shortest_cycle(s,u,t,fmax).size();
+      int lC = shortest_cycle(t,u,r,fmax).size();
+      // bond lengths
+      double ur = zero_values_dist.find(edge_t(u,r))->second;
+      double us = zero_values_dist.find(edge_t(u,s))->second;
+      double ut = zero_values_dist.find(edge_t(u,t))->second;
+
+      // we may have to rearrange the neighbour list to preserve symmetry
+      auto right_shift = [&](){
+        neighbours[u][0] = t; neighbours[u][1] = r; neighbours[u][2] = s;
+        int tmp_f=lA; lA=lC; lC=lB; lB=tmp_f;
+        double tmp_l=ur; ur=ut; ut=us; us=tmp_l;
+      };
+      auto left_shift = [&](){
+        neighbours[u][0] = s; neighbours[u][1] = t; neighbours[u][2] = r;
+        int tmp_f=lA; lA=lB; lB=lC; lC=tmp_f;
+        double tmp_l=ur; ur=us; us=ut; ut=tmp_l;
+      };
+      // check for face sizes
+      if(lA==lB && lA!=lC){ // AAB --> ABA
+        left_shift();
+      }
+      else if(lA!=lB && lB==lC){ // BAA --> ABA
+        right_shift();
+      }
+      else if(lA!=lB && lB!=lC && lA!=lC){ // rotate the smallest to the front
+        if(lB<lA && lB<lC){
+          left_shift();
+        }
+        else if(lC<lA && lC<lA){
+          right_shift();
+        }
+      }
+      // and if the face sizes are all the same, check for edge length
+      else if(lA==lB && lA==lC){
+        if(ur-us<eps && abs(ur-ut)>eps){ // aab --> baa
+          right_shift();
+        }
+        else if(abs(ur-us)>eps && us-ut<eps){ // aba --> baa
+          left_shift();
+        }
+        else if(abs(ur-us)>eps && abs(us-ut)>eps && abs(ur-ut)>eps){ // rotate the shortest to the front
+          if(us<ur && us<ut){
+            left_shift();
+          }
+          else if(ut<ur && ut<ur){
+            right_shift();
+          }
+        }
+      }
+
+      zero_values_dihedral[u] = coord3d::ideal_dihedral(lA, lB, lC, ur, us, ut);
 //      cout << "opt-main, r,s,t, a,lb,lc, th_0: " <<r<<" " <<s<<" " <<t<<" " << lA<<" " <<lB<<" "<<lC<<" "<<zero_values_dihedral[u] << endl;
     }
   }
@@ -321,6 +382,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
   params.force_constants_dist = &force_constants_dist;
   params.force_constants_angle = &force_constants_angle;
   params.force_constants_dihedral = &force_constants_dihedral;
+  params.edge_set = &edge_set;
   params.optimize_angles = optimize_angles;
   
   // Create the minimisation function block, define the different functions and parameters
@@ -331,6 +393,31 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
   potential_function.fdf = &polyhedron_pot_grad;
   potential_function.params = static_cast<void*>(&params);
   
+  // our zero-th order geometry sometimes places two vertices at exactly the same coordinates
+  // solution:  displace randomly and let the FF do the rest
+  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
+  for(int i=0; e!=ee; e++, i++){
+    const double ax = points[e->first][0];
+    const double ay = points[e->first][1];
+    const double az = points[e->first][2];
+    const double bx = points[e->second][0];
+    const double by = points[e->second][1];
+    const double bz = points[e->second][2];
+    // cout << "edge: " << *e << endl;
+    // cout << "ax " << ax << " ay " << ay << " az " << az << " bx " << bx << " by " << by << " bz " << bz << endl;
+    // cout << "dist(" << i << "): " << coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) << endl;
+    if(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) < 1e-1 ){
+      // cout << "short bond found ... displacing." << endl;
+      const double displacement = 0.5;
+      points[e->first][0]  += displacement;
+      points[e->first][1]  += displacement;
+      points[e->first][2]  += displacement;
+      points[e->second][0] -= displacement;
+      points[e->second][1] -= displacement;
+      points[e->second][2] -= displacement;
+    }
+  }
+
   // Starting point
   gsl_vector* coordinates = gsl_vector_alloc(potential_function.n);
 
@@ -340,7 +427,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
     gsl_vector_set(coordinates, 3*i+2, points[i][2]);
   }
 
-  const gsl_multimin_fdfminimizer_type *fT = gsl_multimin_fdfminimizer_conjugate_fr;
+  const gsl_multimin_fdfminimizer_type *fT = gsl_multimin_fdfminimizer_conjugate_pr;
   gsl_multimin_fdfminimizer *s = gsl_multimin_fdfminimizer_alloc(fT, potential_function.n);
   gsl_multimin_fdfminimizer_set(s, &potential_function, coordinates, stepsize, tol); // runs fdf once
   size_t iter = 0;
@@ -373,7 +460,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, vector<double> zero_values
 }
 
 #else
-bool Polyhedron::optimize_other(bool, vector<double>)
+bool Polyhedron::optimize_other(bool, map<edge_t, double>)
 {
   cerr << "Optimizing other polyhedra than fullerenes is only available through GSL." << endl;
   return 0;

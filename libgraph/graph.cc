@@ -1,5 +1,55 @@
 #include "graph.hh"
 
+void Graph::remove_edge(const edge_t& e)
+{
+  node_t u = e.first, v = e.second;
+  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
+  
+  for(int i=0;i<nu.size();i++) if(nu[i] == v){ nu.erase(nu.begin()+i); break; }
+  for(int i=0;i<nv.size();i++) if(nv[i] == u){ nv.erase(nv.begin()+i); break; }
+}
+
+void Graph::insert_edge(const edge_t& e, const node_t suc_uv, const node_t suc_vu)
+{
+  if(edge_exists(e)) return;	// insert_edge must be idempotent
+
+  const node_t u = e.first, v = e.second;
+
+  assert(u>=0 && v>=0);
+  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
+
+  size_t oldsize[2] = {nu.size(),nv.size()};
+  
+  vector<node_t>::iterator pos_uv = suc_uv<0? nu.end() : find(nu.begin(),nu.end(),suc_uv);
+  vector<node_t>::iterator pos_vu = suc_vu<0? nv.end() : find(nv.begin(),nv.end(),suc_vu);
+
+  nu.insert(pos_uv,v);
+  nv.insert(pos_vu,u);
+
+  assert(nu.size() == oldsize[0]+1 && nv.size() == oldsize[1]+1);
+}
+
+bool Graph::edge_exists(const edge_t& e) const
+{
+  const vector<node_t> &nu(neighbours[e.first]);
+  return find(nu.begin(),nu.end(),e.second) != nu.end();
+}
+
+node_t Graph::next(const node_t& u, const node_t& v) const
+{
+  const vector<node_t>& nu(neighbours[u]);
+  for(int j=0;j<nu.size(); j++) if(nu[j] == v) return nu[(j+1)%nu.size()];
+
+  return -1;            // u-v is not an edge in a triangulation
+}
+
+node_t Graph::prev(const node_t& u, const node_t& v) const
+{
+  const vector<node_t>& nu(neighbours[u]);
+  for(int j=0;j<nu.size(); j++) if(nu[j] == v) return nu[(j-1+nu.size())%nu.size()];
+
+  return -1;            // u-v is not an edge in a triangulation
+}
 
 
 bool Graph::is_consistently_oriented() const 
@@ -7,11 +57,12 @@ bool Graph::is_consistently_oriented() const
   map<dedge_t,bool> seen_dedge;
 
   set<dedge_t> workset;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++){
-    const node_t s = e->first, t = e->second;
-    workset.insert(dedge_t(s,t));
-    workset.insert(dedge_t(t,s));
-  }
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++){
+      const node_t v = neighbours[u][i];
+      workset.insert(dedge_t(u,v));
+      workset.insert(dedge_t(v,u));
+    }
 
   while(!workset.empty()){
     const dedge_t e = *workset.begin();
@@ -63,7 +114,10 @@ bool Graph::is_connected(const set<node_t> &subgraph) const
       if(dist[*u] == INT_MAX) return false;
 
   } else {
-    node_t s = edge_set.begin()->first; // Pick a node that is part of an edge
+    node_t s = 0; // Pick a node that is part of an edge
+    for(;neighbours[s].empty();s++) ;
+    assert(s < N);
+
     const vector<int> dist(shortest_paths(s));
 
     for(int i=0;i<dist.size();i++) 
@@ -228,14 +282,6 @@ vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const int
   return cycle;
 }
 
-vector<node_t> remove_node(const vector<node_t>& ns, const node_t& v)
-{
-  vector<node_t> r(ns.size()-1);
-  for(int i=0,j=0;i<ns.size();i++)
-    if(ns[i] != v) r[j++] = ns[i];
-  return r;
-}
-
 vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const node_t& r, const int max_depth) const 
 { 
   //  fprintf(stderr,"3: shortest_cycle(%d,%d,%d,max_depth=%d)\n",s,t,r,max_depth);
@@ -331,7 +377,7 @@ int Graph::max_degree() const
 }
 
 
-void Graph::update_from_edgeset() 
+void Graph::update_from_edgeset(const set<edge_t>& edge_set) 
 {
   // Instantiate auxiliary data strutures: sparse adjacency matrix and edge existence map.
   map<node_t,set<node_t> > ns;
@@ -356,24 +402,31 @@ void Graph::update_from_edgeset()
 
 }
 
-void Graph::update_from_neighbours() 
-{
-  N = neighbours.size();
-  edge_set.clear();
-  for(node_t u=0;u<neighbours.size();u++){
-    const vector<node_t> &nu(neighbours[u]);
-    for(unsigned int i=0;i<nu.size();i++)
-      if(nu[i]>u) edge_set.insert(edge_set.begin(),edge_t(u,nu[i]));
-  }
+set<edge_t> Graph::undirected_edges() const {
+  set<edge_t> edges;
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++)
+      edges.insert(edge_t(u,neighbours[u][i]));
+  return edges;
+}
+
+set<dedge_t> Graph::directed_edges() const {
+  set<dedge_t> edges;
+  for(node_t u=0;u<N;u++)
+    for(int i=0;i<neighbours[u].size();i++)
+      edges.insert(dedge_t(u,neighbours[u][i]));
+  return edges;
 }
 
 
 ostream& operator<<(ostream& s, const Graph& g) 
 {
-  s << g.name<< "Graph[Range["<<(g.N)<<"],\n\tUndirectedEdge@@#&/@{";
-  for(set<edge_t>::const_iterator e(g.edge_set.begin()); e!=g.edge_set.end(); ){    
+  set<edge_t> edge_set = g.undirected_edges();
+
+  s << "Graph[Range["<<(g.N)<<"],\n\tUndirectedEdge@@#&/@{";
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); ){    
     s << "{" << (e->first+1) << "," << (e->second+1) << "}";
-    if(++e != g.edge_set.end())
+    if(++e != edge_set.end())
       s << ", ";
     else
       s << "}";

@@ -334,10 +334,21 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
 			     int edge_colour, int path_colour, int vertex_colour, double edge_width, double path_width,
 			     double vertex_diameter, int Npath, int *path) const
 {
+  cout << "entering to latex" << endl;
+  cout << include_latex_header << endl;
+  cout << edge_colour << ", " << path_colour << ", " << vertex_colour << endl;
+  cout << number_vertices << endl;
+  cout << edge_width << ", " << path_width << endl;
+  cout << vertex_diameter << endl;
+  cout << (edge_colour>>16) << endl;
+
+
   ostringstream s;
   s << fixed;
-  // If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
+  cout << "stream opened" << endl;
+// If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
   if(include_latex_header)
+// Problem starts here immediately with next line
     s << "\\documentclass{standalone}\n"
       "\\usepackage{tikz}\n"
       "\\begin{document}\n"
@@ -353,6 +364,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolour,line width="<<edge_width<<"mm]\n"
       "\\tikzstyle{invisible}=[draw=none,inner sep=0pt,fill=none,minimum width=0pt]\n"
       ;
+
 
   // Find "internal" width and height of layout and scale to w_cm x h_cm
   coord2d wh(width_height());
@@ -371,6 +383,8 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
   }
 
+  set<edge_t> edge_set = undirected_edges();
+
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();){
     s << "\\foreach \\u/\\v in {";
     for(int i=0;i<100 && e!=edge_set.end();){
@@ -379,6 +393,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     }
     s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
   }
+
 
   // Draw path if non-empty
   if(Npath){
@@ -398,9 +413,11 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
     s << "\\foreach \\u/\\v in {";
-    for(set<edge_t>::const_iterator e(dual.edge_set.begin()); e!=dual.edge_set.end();){
+
+    set<edge_t> dual_edges = dual.undirected_edges();
+    for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end();){
       s << "{v"<<e->first<<"/v"<<e->second<<"}";
-      if(++e != dual.edge_set.end()) s << ", ";
+      if(++e != dual_edges.end()) s << ", ";
     }
     s << "}\n\t\\draw[dualedge] (\\u) -- (\\v);\n";
   }
@@ -422,6 +439,8 @@ string PlanarGraph::to_povray(double w_cm, double h_cm,
 {
   ostringstream s;
   s << fixed;
+
+  set<edge_t> edge_set = undirected_edges();
 
   s << "#declare Nvertices="<<N<<";\n";
   s << "#declare Nedges="<<edge_set.size()<<";\n";

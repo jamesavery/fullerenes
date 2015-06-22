@@ -47,7 +47,7 @@ CubicGraph::CubicGraph(FILE *file){
 	 }
        }
     }
-    update_from_neighbours();
+    N = neighbours.size();
   }
 
 // parse house of graphs
@@ -111,6 +111,6 @@ CubicGraph::CubicGraph(const unsigned int index, FILE* file){
     }
   }
 
-  update_from_neighbours();
+  N = neighbours.size();
 }
 

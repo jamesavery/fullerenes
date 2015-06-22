@@ -175,14 +175,86 @@ C Asymmetric
       return
       END
 
-      SUBROUTINE CompareStruct(Iout,IDA,Dist,DistS)
+      SUBROUTINE Gaudiene(Iout,IC3,DIST)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION Dist(3,Nmax)
+      DIMENSION IC3(Nmax,3),XG1(3),XG2(3)
+C     Producing and printing Gaudiene structure
+C     First scale original structure
+C     Then add 2 additional vertices per edge in the right ratio along the line
+      NewVertNum=4*number_vertices
+      if(NewVertNum.gt.Nmax) then
+       Write(Iout,1005) NewVertNum,Nmax
+      endif
+      Open(unit=7,file='gaudifullerene.xyz',form='formatted')
+      Write(Iout,1003)
+C     Triple and single bond length
+      RT=1.2
+      RS=1.4
+      Rtotal=2*RS+RT
+      scalef=2.d0+RT/RS
+      rfac1=RS/Rtotal
+      rfac2=(RS+RT)/Rtotal
+      Write(Iout,1000) NewVertNum,scalef 
+      Write(7,100) NewVertNum
+      Write(7,101)
+C     Now scale all original distances
+      Do I=1,number_vertices
+       Write(Iout,1001) I,(Dist(J,I)*scalef,J=1,3)
+       Write(7,102) (Dist(J,I)*scalef,J=1,3)
+      enddo
+C     Now get the extra triply bonded carbon atoms into each edge 
+      Write(Iout,1004) rfac1,rfac2
+      Write(Iout,1002) 
+      Icount=number_vertices
+      Do I=1,number_vertices
+      Do J=1,3
+        J1=IC3(I,J)
+       if(I.lt.J1) then
+        Do K=1,3
+         XG1(K)=(Dist(K,I)+rfac1*(Dist(K,J1)-Dist(K,I)))*scalef
+         XG2(K)=(Dist(K,I)+rfac2*(Dist(K,J1)-Dist(K,I)))*scalef
+        enddo
+        Write(Iout,1001) Icount+1,(XG1(L),L=1,3)
+        Write(Iout,1001) Icount+2,(XG2(L),L=1,3)
+        Write(7,102) (XG1(L),L=1,3)
+        Write(7,102) (XG2(L),L=1,3)
+        Icount=Icount+2
+       endif
+      enddo
+      enddo
+      Close(unit=7)
+  100 FORMAT(I7)
+  101 FORMAT('Gaudi_Fullerenes with all edges replaced by 2 vertices')
+  102 FORMAT('6',2X,3(E18.12,2X))
+ 1000 FORMAT(/1x,'Creating gaudi-fullerene with all edges replaced ',
+     1 'by 2 new vertices of degree 2',/1x,'Number of vertices: ',I6,
+     1  /1X,'Scale distances by ',F10.6,
+     1  /1x,'Cartesian Coordinates of gaudi-fullerene deg(3) vertices:',
+     1  /1X,'    I      Z Element Cartesian Coordinates')
+ 1001 FORMAT(1X,I5,6X,'6',4X,'C',4X,3(E18.12,2X))
+ 1002 FORMAT(1x,'Extra cartesian Coordinates of deg(2) vertices '
+     1 'on original fullerene edges:',
+     1  /1X,'    I      Z Element Cartesian Coordinates')
+ 1003 FORMAT(/1x,'Fullerene where every edge contains 2 extra vertices')
+ 1004 FORMAT(1x,'Factors for putting vertices on a unit edge:',
+     1 F10.6,2X,F10.6)
+ 1005 FORMAT(1x,'New number of vertices ',I6,' greater than Nmax=',I6)
+      return
+      END
+
+      SUBROUTINE CompareStruct(Iout,IC3,Dist,DistS)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),DistS(3,Nmax)
-      DIMENSION IDA(Nmax,Nmax)
+      DIMENSION IC3(Nmax,3)
 C     This routine calculates the RMSD between two structures
-C     by comparing bond distances
+C     by comparing bond distances, angles and torsions
+C     Linear in number of vertices, O(N)
       diff=0.d0
+      diffa=0.d0
+      difft=0.d0
       dif=0.d0
       ncount=0
       difmin=1.d10
@@ -190,7 +262,10 @@ C     by comparing bond distances
       RSmax=-1.d10
       RDmax=-1.d10
       Do I=1,number_vertices
-      Do J=I+1,number_vertices
+C  Distances first
+      Do J1=1,3
+       J=IC3(I,J1)
+       if(I.lt.J) then
         X=Dist(1,I)-Dist(1,J)
         Y=Dist(2,I)-Dist(2,J)
         Z=Dist(3,I)-Dist(3,J)
@@ -199,35 +274,137 @@ C     by comparing bond distances
         Ys=DistS(2,I)-DistS(2,J)
         Zs=DistS(3,I)-DistS(3,J)
         RS=dsqrt(Xs*Xs+Ys*Ys+Zs*Zs)
-       if(RS.gt.RSmax) RSmax=RS
-       if(RD.gt.RDmax) RDmax=RD
-       if(IDA(I,J).eq.1) then
-        ncount=ncount+1
-       dif=RS-RD
-       if(dif.gt.difmax) then
-        difmax=dif
-        iv1=I
-        iv2=J
-       endif
-       if(dif.lt.difmin) then
-        difmin=dif
-        iv3=I
-        iv4=J
-       endif
-       diff=diff+dif*dif
-       endif
+        if(RS.gt.RSmax) RSmax=RS
+        if(RD.gt.RDmax) RDmax=RD
+         ncount=ncount+1
+         dif=RS-RD
+         if(dif.gt.difmax) then
+          difmax=dif
+          iv1=I
+          iv2=J
+         endif
+         if(dif.lt.difmin) then
+          difmin=dif
+          iv3=I
+          iv4=J
+         endif
+        diff=diff+dif*dif
+        endif
       enddo
+C  Now the bond angles, 3 per vertex
+      j1=IC3(I,1)
+      j2=IC3(I,2)
+      j3=IC3(I,3)
+C     Using cosine rule cos(beta)=(a^2+b^2-c^2)/2(ab)
+      Call CosineRule(angled1,dist,I,J1,J2)
+      Call CosineRule(angled2,dist,I,J1,J3)
+      Call CosineRule(angled3,dist,I,J3,J2)
+      Call CosineRule(angles1,dists,I,J1,J2)
+      Call CosineRule(angles2,dists,I,J1,J3)
+      Call CosineRule(angles3,dists,I,J3,J2)
+      diffa=diffa+(angled1-angles1)**2+(angled2-angles2)**2
+     1  +(angled3-angles3)**2
+C  Finally, the torsions, 3 per vertex
+C     1st Torsion (I,J1,J2,J3)
+      Call TorsionAngle(tangle1d,dist,I,J1,J2,J3)
+      Call TorsionAngle(tangle1s,dists,I,J1,J2,J3)
+C     2nd Torsion (I,J2,J3,J1)
+      Call TorsionAngle(tangle2d,dist,I,J2,J3,J1)
+      Call TorsionAngle(tangle2s,dists,I,J2,J3,J1)
+C     3rd Torsion (I,J3,J1,J2)
+      Call TorsionAngle(tangle3d,dist,I,J3,J1,J2)
+      Call TorsionAngle(tangle3s,dists,I,J3,J1,J2)
+      difft=difft+(tangle1d-tangle1s)**2+(tangle2d-tangle2s)**2
+     1  +(tangle3d-tangle3s)**2
+C     Print*,tangle1d*rad2deg,tangle1s*rad2deg,tangle2d*rad2deg,
+C    1  tangle2s*rad2deg,tangle3d*rad2deg,tangle3s*rad2deg
       enddo
       RMSD=dsqrt(diff/dfloat(ncount))
-      difRSRD=RSmax-RDmax
-      Write(Iout,1000) RMSD,ncount,difmin,iv1,iv2,difmax,iv3,iv4,difRSRD
+      RMSA=dsqrt(diffa/dfloat(3*number_vertices))
+      RMSAdeg=RMSA*rad2deg
+      RMST=dsqrt(difft/dfloat(3*number_vertices))
+      RMSTdeg=RMST*rad2deg
+      Write(Iout,1000) RMSD,ncount,difmin,iv1,iv2,difmax,iv3,iv4
+      Write(Iout,1001) RMSA,RMSAdeg,3*number_vertices
+      Write(Iout,1002) RMST,RMSTdeg,3*number_vertices
  1000 Format(1X,'Root mean square deviation between intitial (i) and ',
-     1 'final (f) structure (counting edges only): ',D15.9,
-     1 ' (N= ',I7,')',/1X,'Smallest deviation (Ri-Rf)= ',D15.9,
+     1 'final (f) distances (counting edges only): ',D15.9,
+     1 ' (Ne= ',I7,')',/1X,'Smallest difference (Ri-Rf)= ',D15.9,
      1 ' (between vertices ',I7,' and ',I7,')',
-     1 /1X,'Largest  deviation (Ri-Rf)= ',D15.9,
-     1 ' (between vertices ',I7,' and ',I7,')',
-     1 /1X,'Largest deciation in diameter: ',D15.9)
+     1 /1X,'Largest difference (Ri-Rf)= ',D15.9,
+     1 ' (between vertices ',I7,' and ',I7,')')
+ 1001 Format(1X,'Root mean square deviation between (i) and ',
+     1 '(f) bond angles (counting adjacent edges only):',
+     1 /3X,D15.9,' rad , ',D15.9,' deg (number of bond angles= ',I7,')')
+ 1002 Format(1X,'Root mean square deviation between (i) and ',
+     1 '(f) torsion angles (counting adjacent edges only):',
+     1 /3X,D15.9,' rad , ',D15.9,' deg (number of torsion angles= ',
+     1 I7,')')
+      return
+      END
+
+      SUBROUTINE TorsionAngle(angle,dist,I1,I2,I3,I4)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      REAL*8 n1x,n1y,n1z,n2x,n2y,n2z
+      DIMENSION Dist(3,Nmax)
+C     vector I1 to I2
+      v1x=dist(1,I1)-dist(1,I2)
+      v1y=dist(2,I1)-dist(2,I2)
+      v1z=dist(3,I1)-dist(3,I2)
+C     vector I2 to I3
+      v2x=dist(1,I2)-dist(1,I3)
+      v2y=dist(2,I2)-dist(2,I3)
+      v2z=dist(3,I2)-dist(3,I3)
+C     vector I3 to I4
+      v3x=dist(1,I3)-dist(1,I4)
+      v3y=dist(2,I3)-dist(2,I4)
+      v3z=dist(3,I3)-dist(3,I4)
+C     Normal vector of plane spanned by v1 and v2: v1 x v2
+      n1x=v1y*v2z-v1z*v2y
+      n1y=v1z*v2x-v1x*v2z
+      n1z=v1x*v2y-v1y*v2x
+C     Normalize n1
+      anorm=dsqrt(n1x**2+n1y**2+n1z**2)
+      n1x=n1x/anorm
+      n1y=n1y/anorm
+      n1z=n1z/anorm
+C     Normal vector of plane spanned by v2 and v3: v2 x v3
+      n2x=v2y*v3z-v2z*v3y
+      n2y=v2z*v3x-v2x*v3z
+      n2z=v2x*v3y-v2y*v3x
+C     Normalize n2
+      anorm=dsqrt(n2x**2+n2y**2+n2z**2)
+      n2x=n2x/anorm
+      n2y=n2y/anorm
+      n2z=n2z/anorm
+C     dot product between n1 and n2
+      dotn1n2=n1x*n2x+n1y*n2y+n1z*n2z
+C     angle between normal vectors
+      angle=dacos(dotn1n2)
+      return
+      END
+
+      SUBROUTINE CosineRule(angle,dist,I,J1,J2)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION Dist(3,Nmax)
+      xcs=dist(1,j1)-dist(1,j2)
+      ycs=dist(2,j1)-dist(2,j2)
+      zcs=dist(3,j1)-dist(3,j2)
+      cs2=xcs**2+ycs**2+zcs**2
+      cs=dsqrt(cs2)
+      xas=dist(1,I)-dist(1,j1)
+      yas=dist(2,I)-dist(2,j1)
+      zas=dist(3,I)-dist(3,j1)
+      as2=xas**2+yas**2+zas**2
+      as=dsqrt(as2)
+      xbs=dist(1,I)-dist(1,j2)
+      ybs=dist(2,I)-dist(2,j2)
+      zbs=dist(3,I)-dist(3,j2)
+      bs2=xbs**2+ybs**2+zbs**2
+      bs=dsqrt(bs2)
+      angle=dacos((as2+bs2-cs2)/(2.d0*as*bs))
       return
       END
 
@@ -2550,10 +2727,12 @@ c   Check if distances are within certain range
      1 'N3',4X,'N4',/1X,64('-'))
  1001 Format(1X,I5,3(1X,F12.6),3(1X,I5))
  1002 Format(1X,'Analysis of distances: All are bond distances',
-     1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
+     1 /1X,'In this list: Smallest distance: ',F12.6,
+     1 ', Largest distance: ',F12.6)
  1003 Format(1X,'Analysis of distances: May require sorting of ',
      1 'cartesian coordinates or optimization of structure',
-     1 /1X,'Smallest distance: ',F12.6,', Largest distance: ',F12.6)
+     1 /1X,'In this list: Smallest distance: ',F12.6,
+     1 ', Largest distance: ',F12.6)
  1004 Format('WARNING: Problem with smallest bond distance detected!',
      1 /1X,' Geometry of fullerene may be wrong')
       return

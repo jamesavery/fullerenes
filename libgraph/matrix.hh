@@ -53,8 +53,9 @@ public:
 
   matrix operator+(const matrix& B){ 
     assert(n == B.n && m == B.m);
-    matrix C(m,n);
+    matrix C(*this);
     for(int i=0;i<C.size();i++) C[i] += B[i];
+	return C;
   }
 
   friend ostream& operator<<(ostream& S, const matrix& A)

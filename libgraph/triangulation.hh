@@ -1,14 +1,12 @@
 #ifndef TRIANGULATION_HH
 # define TRIANGULATION_HH
 
+#include "matrix.hh"
 #include "planargraph.hh"
 #include "unfold.hh"
 
 class Triangulation : public PlanarGraph {
 public:
-  using Graph::N;
-  using Graph::neighbours;
-
   vector<tri_t> triangles;	// Faces
 
   // Operations:
@@ -33,8 +31,11 @@ public:
   pair<node_t,node_t> adjacent_tris(const edge_t &e) const;
 
   
-  node_t nextCW(const dedge_t& uv) const;
-  node_t nextCCW(const dedge_t& uv) const;
+  node_t nextCW(const dedge_t& uv)   const { return nextCW(uv.first,uv.second);  } // TODO: Remove.
+  node_t nextCCW(const dedge_t& uv)  const { return nextCCW(uv.first,uv.second); }
+  node_t nextCW(node_t u,  node_t v) const;
+  node_t nextCCW(node_t u, node_t v) const;
+
 
   vector<tri_t> compute_faces() const;          // Returns non-oriented triangles
   vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours
@@ -57,18 +58,22 @@ public:
   void update(bool already_oriented) {
     //    renumber(); // TODO!
     if(N>0){
-      if(already_oriented) 
-	triangles = compute_faces_oriented();
+      if(already_oriented){
+        triangles = compute_faces_oriented();
+      }
       else {
-	triangles = compute_faces();
-	orient_triangulation(triangles);
-	orient_neighbours();
+        triangles = compute_faces();
+        orient_neighbours();
       }
     }
   }
 
-  //  void renumber();		// Renumber nodes such that deg(v_i) <= deg(v_{i+1})
 
+  matrix<double> surface_distances() const;
+  matrix<int>    convex_square_surface_distances() const;
+  node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
+
+  Triangulation sort_nodes() const;
 };
 
 class FullereneDual : public Triangulation {

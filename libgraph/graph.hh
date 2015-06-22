@@ -1,5 +1,5 @@
 #ifndef GRAPH_HH
-# define GRAPH_HH
+#define GRAPH_HH
 
 #include <stdio.h>
 #include <map>
@@ -17,30 +17,31 @@ using namespace std;
 #include "geometry.hh"
 #include "auxiliary.hh"
 
-// TODO: Separate planar graph stuff from general graph stuff.
-// TODO: Don't constantly pass layout2d around -- it's a member!
 struct Graph {
   int N;
   neighbours_t neighbours;
-  set<edge_t> edge_set;
-  string name;
 
-  Graph(const set<edge_t>& edge_set = set<edge_t>()) : edge_set(edge_set) {
-    update_from_edgeset();
+  Graph(const set<edge_t>& edge_set = set<edge_t>()) {
+    update_from_edgeset(edge_set);
   }
-  Graph(const neighbours_t& neighbours) : neighbours(neighbours) {
-    update_from_neighbours();
-  }
+  Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
   Graph(const unsigned int N, const vector<int>& adjacency) : N(N), neighbours(N) {
     assert(adjacency.size() == N*N);
+    set<edge_t> edge_set;
 
     for(unsigned int i=0;i<N;i++)
       for(unsigned int j=i+1;j<N;j++){
 	if(adjacency[i*N+j]) edge_set.insert(edge_t(i,j));
       }
 
-    update_from_edgeset();
+    update_from_edgeset(edge_set);
   }
+
+  void insert_edge(const edge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
+  void remove_edge(const edge_t& e);
+  bool edge_exists(const edge_t& e) const;
+  node_t next(const node_t& u, const node_t& v) const;
+  node_t prev(const node_t& u, const node_t& v) const;
 
   bool is_consistently_oriented() const;
   bool adjacency_is_symmetric() const;
@@ -74,8 +75,9 @@ struct Graph {
 
   int max_degree() const; 
 
-  void update_from_edgeset(); 
-  void update_from_neighbours(); 
+  void update_from_edgeset(const set<edge_t>& edge_set); 
+  set<edge_t>  undirected_edges() const;
+  set<dedge_t> directed_edges()   const;
 
   friend ostream& operator<<(ostream& s, const Graph& g);
 };

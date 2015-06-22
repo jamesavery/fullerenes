@@ -4,8 +4,10 @@
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinth,ndbconvert,ihamstore,ihamstats,nhamcyc,isomerl,
-     1 isomerh,PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
-     1 rspi,jumps,force,forceP,boost,filename,filenameout,DATEN)
+     1 isomerh,ngaudiene,
+     1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
+     1 rspi,jumps,force,forceP,boost,dualdist,
+     1 filename,filenameout,DATEN)
 C-----------------------------------------------------------------
 C  This is the main routine handling the input
 C  It is called from the main program
@@ -24,11 +26,12 @@ C-----------------------------------------------------------------
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,IPRC,leap,isonum,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps,
-     1 nanotube
+     1 nanotube,dualdist,ngaudiene
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
-     1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuDppp,
-     1 ExtWuDhpp,ExtWuDhhp,ExtWuDhhh,ExtWufR,ExtWufA,ExtWufD
+     1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuD555,
+     1 ExtWuD556,ExtWuD566,ExtWuD666,ExtWufR55,ExtWufR56,ExtWufR66,
+     1 ExtWufA5,ExtWufA6,ExtWufD555,ExtWufD556,ExtWufD566,ExtWufD666
       Namelist /Hamilton/ IHam,iupac,ihamstore,ihamstats
       Namelist /Isomers/ IPR,IPH,IStop,Ichk,ISearch,isomerl,isomerh
       Namelist /Graph/ ISchlegel,ISO1,ISO2,ISO3,nhamcyc,ifs,ndual,
@@ -57,6 +60,10 @@ C Input send to output
         forceP(i)=0.d0
       enddo
 
+C tolerance parameter (to be used in all force fields)
+      fcoulomb=0.d0
+      ftol=1.d-7
+
 C Defining the HO force field using Fowler force constants 
 C Distances are taken in Angstroems and angles in rad
 C Force constants in N/m for distances and N/m A^2/rad^2 for angles (default values)
@@ -68,30 +75,32 @@ C Force constants in N/m for distances and N/m A^2/rad^2 for angles (default val
       WufR6=499.7d0
       WufA5=47.88d0*1.45d0**2
       WufA6=80.86d0*1.45d0*1.37d0
-      fcoulomb=0.d0
-C tolerance parameter (to be used in all force fields)
-      ftol=1.d-7
 
-
-C Defining an extension of the Wu force field (default values)
+C     Defining an extension of the Wu force field (default values)
 c     three distances: zero values
-      ExtWuR55=1.455d0 ! capprox. that of C20
-      ExtWuR56=1.455d0
-      ExtWuR66=1.391d0
+      ExtWuR55=1.479d0
+      ExtWuR56=1.458d0
+      ExtWuR66=1.401d0
 c     two angles: zero values
       ExtWuA5=1.08d2
       ExtWuA6=1.20d2
-c     four dihedrals: zero values (all guessed)
-      ExtWuDppp=37.4d0
-      ExtWuDhpp=29.3d0
-      ExtWuDhhp=23.8d0
-      ExtWuDhhh=0.0d0
+c     four dihedrals: zero values (according to ideal_dihedral)
+      ExtWuD555=37.38d0
+      ExtWuD556=29.20d0
+      ExtWuD566=23.49d0
+      ExtWuD666=0.0d0
 c     three distances: forces (let's assume they are all the same)
-      ExtWufR=390.7d0
+      ExtWufR55=260.d0
+      ExtWufR56=390.d0
+      ExtWufR66=450.d0
 c     three angles: forces (let's assume they are all the same)
-      ExtWufA=160.4d0*1.45d0*1.37d0
+      ExtWufA5=100.d0
+      ExtWufA6=100.d0
 c     four dihedrals: forces (let's assume they are all the same)
-      ExtWufD=1.0d2
+      ExtWufD555=35.d0
+      ExtWufD556=65.d0
+      ExtWufD566=85.d0
+      ExtWufD666=270.d0
 
 C Default parameters for external files
       filename= 'Fullerene'
@@ -151,6 +160,7 @@ C Integers
       mirror=0  !  Invert coordinates
       NA=60     !  Number of Atoms
       ndual=0   !  Option for plotting dual graph as well
+      ngaudiene=0   !  Option for plotting gaudiene structure
       labelvert=0   !  Option labeling vertices in the 2D graph
 
 C Reals
@@ -161,6 +171,7 @@ C Reals
       R=1.391d0     ! C-C distance 
       R5=1.455d0    ! Distance in 5-Ring
       R6=R          ! Distance in 6-Ring
+      dualdist=R    ! Scaling dual distances
       Tol=0.33d0    ! Tolerance
       TolR=0.d0     ! Tolerance for finding ring connections
 C     Van der Waals radius of carbon, adjusted approximately to the
@@ -213,19 +224,19 @@ C ExtWu force field
         force(3)=ExtWuR66
         force(4)=ExtWuA5
         force(5)=ExtWuA6
-        force(6)=ExtWuDppp
-        force(7)=ExtWuDhpp
-        force(8)=ExtWuDhhp
-        force(9)=ExtWuDhhh
-        force(10)=ExtWufR
-        force(11)=ExtWufR
-        force(12)=ExtWufR
-        force(13)=ExtWufA
-        force(14)=ExtWufA
-        force(15)=ExtWufD
-        force(16)=ExtWufD
-        force(17)=ExtWufD
-        force(18)=ExtWufD
+        force(6)=ExtWuD555
+        force(7)=ExtWuD556
+        force(8)=ExtWuD566
+        force(9)=ExtWuD666
+        force(10)=ExtWufR55
+        force(11)=ExtWufR56
+        force(12)=ExtWufR66
+        force(13)=ExtWufA5
+        force(14)=ExtWufA6
+        force(15)=ExtWufD555
+        force(16)=ExtWufD556
+        force(17)=ExtWufD566
+        force(18)=ExtWufD666
         force(19)=fCoulomb
       endif
 
@@ -256,19 +267,19 @@ C ExtWu force field
         force(3)=ExtWuR66
         force(4)=ExtWuA5
         force(5)=ExtWuA6
-        force(6)=ExtWuDppp
-        force(7)=ExtWuDhpp
-        force(8)=ExtWuDhhp
-        force(9)=ExtWuDhhh
-        force(10)=ExtWufR
-        force(11)=ExtWufR
-        force(12)=ExtWufR
-        force(13)=ExtWufA
-        force(14)=ExtWufA
-        force(15)=ExtWufD
-        force(16)=ExtWufD
-        force(17)=ExtWufD
-        force(18)=ExtWufD
+        force(6)=ExtWuD555
+        force(7)=ExtWuD556
+        force(8)=ExtWuD566
+        force(9)=ExtWuD666
+        force(10)=ExtWufR55
+        force(11)=ExtWufR56
+        force(12)=ExtWufR66
+        force(13)=ExtWufA5
+        force(14)=ExtWufA6
+        force(15)=ExtWufD555
+        force(16)=ExtWufD556
+        force(17)=ExtWufD566
+        force(18)=ExtWufD666
         force(19)=fCoulomb
       endif
 

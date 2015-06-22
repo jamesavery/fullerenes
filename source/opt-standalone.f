@@ -5,21 +5,23 @@
 C  This subroutine optimizes the fullerene graph using spring embedding
       DIMENSION Dist(2,N)
       DIMENSION IDA(N,N),IS(6),MDist(N,N)
-      Data Rdist,ftol,conv/1.d0,.5d-10,1 6.0221367d-3/
+      real*8 Rdist,ftol
+      rdist=1.d0
+      ftol=0.5d-10
       rmin=1.d10
       rmax=0.d0
       rper=0.d0
       maxd=0
       do i=1,N
-         do j=i+1,N
-            if(IDA(I,J).eq.1) then
-               x=Dist(1,I)-Dist(1,J)
-               y=Dist(2,I)-Dist(2,J)
-               rd=dsqrt(x*x+y*y)
-               if(rd.lt.rmin) rmin=rd
-               if(rd.gt.rmax) rmax=rd
-            endif
-         enddo
+        do j=i+1,N
+          if(IDA(I,J).eq.1) then
+            x=Dist(1,I)-Dist(1,J)
+            y=Dist(2,I)-Dist(2,J)
+            rd=dsqrt(x*x+y*y)
+            if(rd.lt.rmin) rmin=rd
+            if(rd.gt.rmax) rmax=rd
+          endif
+        enddo
         rv=dsqrt(Dist(1,I)**2+Dist(2,I)**2)
         if(rv.gt.rper) rper=rv
       enddo
@@ -27,30 +29,30 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       If(IOP.eq.1) Write(*,101)
       If(IOP.eq.2) Write(*,102)
       If(IOP.eq.3) then
-       do i=1,N
-       do j=i+1,N
-        if(Mdist(i,j).gt.maxd) maxd=Mdist(i,j)
-       enddo
-       enddo
-       rper=rper*scale
-       Write(*,103) maxd,rper,scalePPG
-       RAA=scalePPG
+        do i=1,N
+        do j=i+1,N
+          if(Mdist(i,j).gt.maxd) maxd=Mdist(i,j)
+        enddo
+        enddo
+        rper=rper*scale
+        Write(*,103) maxd,rper,scalePPG
+        RAA=scalePPG
       endif
       if(IOP.eq.4) then
-       RAA=rmax*scale/dfloat(maxl)
-       Write(*,104) maxl,RAA
+        RAA=rmax*scale/dfloat(maxl)
+        Write(*,104) maxl,RAA
       endif
       Write(*,1000) rmin,Rdist
       do i=1,N
-       Dist(1,i)=Dist(1,i)*scale 
-       Dist(2,i)=Dist(2,i)*scale 
-       WRITE(*,1001) I,Dist(1,I),Dist(2,I)
+        Dist(1,i)=Dist(1,i)*scale
+        Dist(2,i)=Dist(2,i)*scale
+        WRITE(*,1001) I,Dist(1,I),Dist(2,I)
       enddo
       CALL SA_frprmn2d(N,IOP,IDA,Iout,IS,MDist,
      1 maxd,Dist,ftol,iter,fret,E0,RAA)
       if(fret-E0.gt.1.d-2) then
-       fretn=(fret-E0)/dfloat(N)
-       Write(*,1002) fretn
+        fretn=(fret-E0)/dfloat(N)
+        Write(*,1002) fretn
       endif
 
   101 Format(/1X,'Optimization of fullerene graph using a ',
@@ -80,7 +82,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
  1001 Format(1X,I4,2(1X,F12.6),1X)
  1002 Format(1X,'Energy gain per vertex: ',F12.6)
 
-      Return 
+      Return
       END
 
       SUBROUTINE SA_frprmn2d(N,IOP,AH,Iout,IS,MDist,
@@ -92,7 +94,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Real*8 pcom(N*2),xicom(N*2)
       Integer AH(N,N),IS(6),MDist(N,N)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
-C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
+C     is performed on a function func3d, using its gradient as calculated by a routine dfunc2d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
 C     p (the location of the minimum), iter (the number of iterations that were performed),
 C     and fret (the minimum value of the function). The routine linmin3d is called to perform
@@ -111,7 +113,7 @@ C     IOP=4: Kamada-Kawai embedding
       CALL SA_func2d(N,IOP,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
       Write(Iout,1003) E0
-C     dfunc3d input vector p of length 2*N, output gradient of length 2*N user defined
+C     dfunc2d input vector p of length 2*N, output gradient of length 2*N user defined
       CALL SA_dfunc2d(N,IOP,AH,IS,MDist,maxd,p,xi,RAA)
       grad2=0.d0
       do I=1,2*N
@@ -155,7 +157,7 @@ C         dgg=dgg+xi(j)**2
           g(j)=-xi(j)
           h(j)=g(j)+gam*h(j)
           xi(j)=h(j)
-        enddo   
+        enddo
       enddo
       Write(Iout,1000) fret,fret-fp
  1000 Format(' WARNING: Subroutine frprmn2d: maximum iterations
@@ -290,8 +292,8 @@ C     USES func2d
       SUBROUTINE SA_brent2d(N,IOP,Iout,AH,IS,DD,maxd,
      1 fx,ax,bx,cx,tol,xmin,xicom,pcom,RAA)
       use config
-C BRENT is a FORTRAN library which contains algorithms for finding zeros 
-C or minima of a scalar function of a scalar variable, by Richard Brent. 
+C BRENT is a FORTRAN library which contains algorithms for finding zeros
+C or minima of a scalar function of a scalar variable, by Richard Brent.
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(N*2),xicom(N*2)
@@ -402,7 +404,7 @@ C     simple spring embedding
          endif
       enddo
       enddo
-C     total energy  
+C     total energy
       fc=f*ehook
       endif
 
@@ -447,7 +449,7 @@ C     Pisanski-Plestenjak-Graovac algorithm
         endif
       enddo
       enddo
-C     total energy  
+C     total energy
       fc=ehook
       endif
 
@@ -469,7 +471,7 @@ C     Kamada-Kawai embedding
           ehook=ehook+((ratom-RAA*DD)/DD)**2
       enddo
       enddo
-C     total energy  
+C     total energy
       fc=f*ehook
       endif
 
@@ -511,7 +513,7 @@ C     Fix outer vertices
         endif
       enddo
       endif
-  
+
 C     Repulsive Coulomb
       if(IOP.eq.2) then
       Do I=1,2*N,2
@@ -599,7 +601,7 @@ C---------------------------------------------
 C     OPTIMIZE 3D GEOMETRY
 C---------------------------------------------
 C
-C Input: 
+C Input:
 C     * graph: C++ graph object
 C     * int N: Number of vertices
 C     * bool ihessian: If 1, compute hessian matrix
@@ -607,7 +609,7 @@ C     * bool iprinthessian: If 1, print hessian matrix
 C     * int iopt: Optimization method
 C     * real ftol: Convergence tolerance
 C     * ? force
-C Input/output: 
+C Input/output:
 C     * real*8 Dist(3,N): On input, initial coordinate vector; on output, final coordinates.
 
       SUBROUTINE SA_OptFF(graph,N,ihessian,iprinthessian,iopt,
@@ -641,8 +643,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       call adjacency_matrix(graph,N,IDA)
       call SA_get_edges(graph,N,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
-      call SA_get_corners(graph,N,
-     1 a_h,a_p)
+      call SA_get_corners(graph,N,a_h,a_p)
       if(iopt .eq. 3 .or. iopt.eq.4) then
         call SA_get_dihedrals(graph,N,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
@@ -713,6 +714,7 @@ c        force(19)=force(19)
       end select
       if(iopt.eq.2 .and. force(9).gt.0.d0) Write(*,1004) force(9)
 
+
 C OPTIMIZE
       CALL SA_frprmn3d(N,
      1 Dist,force,iopt,ftol,iter,fret,
@@ -725,7 +727,6 @@ C OPTIMIZE
       endif
       CALL SA_Distan(N,IDA,Dist,Rmin,Rminall,Rmax,rms)
       Write(*,1001) Rmin,Rmax,rms
-
 
 
 C HESSIAN
@@ -854,7 +855,7 @@ C Sort for degeneracies
  1006 Format(' Force field parameters in au/A^2 and au/rad^2:',
      1 /1X,8F12.6,/)
  1007 Format(1X,'Optimization of geometry using harmonic oscillators',
-     1 ' for stretching and bending modes using an extension of the',
+     1 ' for bonds, angles, and dihedrals using an extension of the',
      1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
      1 ' algorithm used')
  1008 Format(' Force field parameters in au/A^2 and au/rad^2:',
@@ -884,8 +885,8 @@ C Sort for degeneracies
      1 6(d12.6,' '))
  1026 Format(' Zero-point vibrational energy per atom: ',d12.6,
      1 ' a.u. , ',d12.6,' eV , ',d12.6,' cm-1 , ')
-     
-      Return 
+
+      Return
       END
 
       SUBROUTINE SA_Distan(N,IDA,Dist,Rmin,Rminall,Rmax,rms)
@@ -921,7 +922,7 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
          stop
       endif
       rms=dsqrt(Rrms/dfloat(mc))
-      Return 
+      Return
       END
 
       SUBROUTINE SA_frprmn3d(N,
@@ -998,7 +999,7 @@ c       turn off coulomb pot towards the end (and go to iopt=3 to indicate that 
           grad2=grad2+xi(i)*xi(i)
         enddo
         grad=dsqrt(grad2)
-c        if(damping.eq.0) then 
+c        if(damping.eq.0) then
           write(*,1001) iter,fret,grad
 c        else
 c          write(*,1002) iter,fret,grad,damping
@@ -1026,7 +1027,7 @@ C         dgg=dgg+xi(j)**2
           g(j)=-xi(j)
           h(j)=g(j)+gam*h(j)
           xi(j)=h(j)
-        enddo   
+        enddo
       enddo
       Write(*,1000) fret,fret-fp
  1000 Format(' WARNING: Subroutine frprmn3d: maximum iterations
@@ -1099,6 +1100,7 @@ c        p(j)=p(j)+xi_tmp(j)
       enddo
       return
       END
+
 
       SUBROUTINE SA_f1dim3d(N,
      1 f1dimf,x,xicom,pcom,force,iopt,
@@ -1242,8 +1244,8 @@ C     USES func3d
      1 a_h,a_p,
      1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
-C BRENT is a FORTRAN library which contains algorithms for finding zeros 
-C or minima of a scalar function of a scalar variable, by Richard Brent. 
+C BRENT is a FORTRAN library which contains algorithms for finding zeros
+C or minima of a scalar function of a scalar variable, by Richard Brent.
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=500,CGOLD=.3819660,ZEPS=1.d-10)
       REAL*8 pcom(N*3),xicom(N*3),force(ffmaxdim)
@@ -1526,7 +1528,7 @@ C      2. corners
 C      3. dihedrals
 C     in linear time (i.e. constant time per element), while providing the information you asked for.
 C
-C     Assumptions: 
+C     Assumptions:
 C     - g is a fullerene graph and has had a call to set_layout2d(g,layout2d) with its Tutte embedding as layout.
 C       (or another strictly planar layout)
 C     - N = Nvertices(g)
@@ -1563,8 +1565,8 @@ C       Edge is part of how many pentagons?
         call get_arc_face(graph,u,v,faceA,lA) ! O(1) operation
         call get_arc_face(graph,v,u,faceB,lB) ! O(1) operation
         np = 12-lA-lB
-         
-C       Do what needs to be done to u--v here 
+
+C       Do what needs to be done to u--v here
         select case(np)
         case(0)
           na_hh=na_hh+1
@@ -1584,7 +1586,7 @@ C       Do what needs to be done to u--v here
           exit
         end select
 
-c        write (*,*) "Edge ",(/u,v/)," connects ",np,"pentagons.",lA,lB 
+c        write (*,*) "Edge ",(/u,v/)," connects ",np,"pentagons.",lA,lB
       end do
 
       END SUBROUTINE
@@ -1597,7 +1599,7 @@ c     here, n is the number of atoms
       use iso_c_binding
       type(c_ptr) :: graph
       integer pentagons(5,12), hexagons(6,N/2-10), u,v,w,i,j
-c     arrays for atoms that are part of angles ... 
+c     arrays for atoms that are part of angles ...
       integer a_p(3,60), a_h(3,3*n-60)
 c     counter for angles around hexagons and pentagons
       integer NH
@@ -1673,9 +1675,10 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       call adjacency_list(graph,3,neighbours)
 
       do u=1,N
-C      s   B   t      
+C neighbours should be ordered CCW
+C      t   B   s
 C        \   /
-C       A  u   C
+C      C   u   A
 C          |
 C          r
          r = neighbours(1,u)
@@ -1695,12 +1698,12 @@ C     Do stuff here
           nd_ppp=nd_ppp+1
           d_ppp(1,nd_ppp)=u
           d_ppp(2,nd_ppp)=r
-          d_ppp(3,nd_ppp)=t
-          d_ppp(4,nd_ppp)=s
+          d_ppp(3,nd_ppp)=s
+          d_ppp(4,nd_ppp)=t
 
          case ( 16 )            ! Two pentagons, one hexagon
 C     Do stuff common to all three (2,1)-cases here
-            
+
 C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 655 )  ! BC are pentagons, u--t common edge
@@ -1708,30 +1711,30 @@ c               write (*,*) "655"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=t
-              d_hpp(3,nd_hpp)=s
-              d_hpp(4,nd_hpp)=r
+              d_hpp(3,nd_hpp)=r
+              d_hpp(4,nd_hpp)=s
 
             case ( 565 )  ! AC are pentagons, u--r common edge
 c               write (*,*) "565"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=r
-              d_hpp(3,nd_hpp)=t
-              d_hpp(4,nd_hpp)=s
+              d_hpp(3,nd_hpp)=s
+              d_hpp(4,nd_hpp)=t
 
             case ( 556 )  ! AB are pentagons, u--s common edge
 c               write (*,*) "556"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=s
-              d_hpp(3,nd_hpp)=r
-              d_hpp(4,nd_hpp)=t
+              d_hpp(3,nd_hpp)=t
+              d_hpp(4,nd_hpp)=r
 
             end select
 
          case ( 17 )            ! One pentagon, two hexagons
 C     Do stuff common to all three (1,2)-cases here
-            
+
 C     Do case specific stuff here
             select case ( lA*100+lB*10+lC )
             case ( 566 )  ! BC are hexagons, u--t common edge
@@ -1739,24 +1742,24 @@ c               write (*,*) "566"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=t
-              d_hhp(3,nd_hhp)=s
-              d_hhp(4,nd_hhp)=r
+              d_hhp(3,nd_hhp)=r
+              d_hhp(4,nd_hhp)=s
 
             case ( 656 )  ! AC are hexagons, u--r common edge
 c               write (*,*) "656"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=r
-              d_hhp(3,nd_hhp)=t
-              d_hhp(4,nd_hhp)=s
+              d_hhp(3,nd_hhp)=s
+              d_hhp(4,nd_hhp)=t
 
             case ( 665 )  ! AB are hexagons, u--s common edge
 c               write (*,*) "665"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=s
-              d_hhp(3,nd_hhp)=r
-              d_hhp(4,nd_hhp)=t
+              d_hhp(3,nd_hhp)=t
+              d_hhp(4,nd_hhp)=r
 
             end select
 
@@ -1767,8 +1770,8 @@ c            write (*,*) "666"
           nd_hhh=nd_hhh+1
           d_hhh(1,nd_hhh)=u
           d_hhh(2,nd_hhh)=r
-          d_hhh(3,nd_hhh)=t
-          d_hhh(4,nd_hhh)=s
+          d_hhh(3,nd_hhh)=s
+          d_hhh(4,nd_hhh)=t
 
          case DEFAULT
             write (*,*) "INVALID: ",(/lA,lB,lC/)
@@ -1778,7 +1781,7 @@ c            write (*,*) "666"
 
       END SUBROUTINE
 
-      
+
       SUBROUTINE SA_get_hessian(N,coord, force, iopt, hessian,
      1  e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,
      1  a_h,a_p,
@@ -1966,7 +1969,7 @@ c              = k * ((partial r/partial x_i)(partial r/partial x_j) + (partial^
           end do edges
         endif
       end do edge_types
-      
+
 c angles
       angle_types: do i=1,2
 c       iopt doesn't matter in this case
@@ -2287,7 +2290,7 @@ c coulomb
           ax=coord(a1)
           ay=coord(a2)
           az=coord(a3)
-          call ddcoulomb(ax, ay, az, dax, day, daz, 
+          call ddcoulomb(ax, ay, az, dax, day, daz,
      1      daxax, daxay, daxaz, dayay, dayaz, dazaz, c)
           hessian(a1,a1)=hessian(a1,a1) + k * (dax*dax + daxax*c)
           hessian(a1,a2)=hessian(a1,a2) + k * (dax*day + daxay*c)
@@ -2304,7 +2307,7 @@ c copy hessian to the other half
           hessian(i,j)=hessian(j,i)+hessian(i,j)
           hessian(j,i)=hessian(i,j)
         enddo
-      enddo      
+      enddo
 
       return
       END SUBROUTINE
@@ -2372,7 +2375,7 @@ C     Calculate norm for minimum distance sphere
       davd=dav/XM
       ddav=0.d0
       Do i=1,N
-       ddav=ddav+dabs(davd-dp(i)) 
+       ddav=ddav+dabs(davd-dp(i))
       enddo
       A=ddav/XM
       Return
@@ -2380,14 +2383,23 @@ C     Calculate norm for minimum distance sphere
 
       subroutine default_force_parameters(iopt,force)
       use config
+      implicit none
       integer iopt
       real*8 force(ffmaxdim)
-      real*8 WuR5, WuR6, WuA5, WuA6, WufR5, WufR6, WufA5, WufA6,
-     1 fcoulomb, ftol, ExtWuR55, ExtWuR56, ExtWuR66, ExtWuA5, ExtWuA6,
-     1 ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR, ExtWufA,
-     1 ExtWufD
+      real*8 fcoulomb, ftol
+      real*8 WuR5, WuR6, WuA5, WuA6, WufR5, WufR6, WufA5, WufA6
+      real*8 ExtWuR55, ExtWuR56, ExtWuR66,
+     1 ExtWuA5, ExtWuA6,
+     1 ExtWuD555, ExtWuD556, ExtWuD566, ExtWuD666,
+     1 ExtWufR55, ExtWufR56, ExtWufR66,
+     1 ExtWufA5, ExtWufA6,
+     1 ExtWufD555, ExtWufD556, ExtWufD566, ExtWufD666
 
-C     Defining the HO force field using Fowler force constants 
+C     tolerance parameter (to be used in all force fields)
+      fcoulomb=0.d0
+      ftol=1.d-7
+
+C     Defining the HO force field using Fowler force constants
 C     Distances are taken in Angstroems and angles in rad
 C     Force constants in N/m for distances and N/m A^2/rad^2 for angles (default values)
       WuR5=1.455d0              ! in angstroem from solid-state
@@ -2398,31 +2410,34 @@ C     Force constants in N/m for distances and N/m A^2/rad^2 for angles (default
       WufR6=499.7d0
       WufA5=47.88d0*1.45d0**2
       WufA6=80.86d0*1.45d0*1.37d0
-      fcoulomb=0.d0
-C     tolerance parameter (to be used in all force fields)
-      ftol=1.d-7
 
 C     Defining an extension of the Wu force field (default values)
 c     three distances: zero values
-      ExtWuR55=1.455d0          ! capprox. that of C20
-      ExtWuR56=1.455d0
-      ExtWuR66=1.391d0
+      ExtWuR55=1.479d0
+      ExtWuR56=1.458d0
+      ExtWuR66=1.401d0
 c     two angles: zero values
       ExtWuA5=1.08d2
       ExtWuA6=1.20d2
-c     four dihedrals: zero values (all guessed)
-      ExtWuDppp=4.0d1
-      ExtWuDhpp=3.5d1
-      ExtWuDhhp=2.4d1
-      ExtWuDhhh=0.0d0
+c     four dihedrals: zero values (according to ideal_dihedral)
+      ExtWuD555=37.38d0
+      ExtWuD556=29.20d0
+      ExtWuD566=23.49d0
+      ExtWuD666=0.0d0
 c     three distances: forces (let's assume they are all the same)
-      ExtWufR=390.7d0
+      ExtWufR55=260.d0
+      ExtWufR56=390.d0
+      ExtWufR66=450.d0
 c     three angles: forces (let's assume they are all the same)
-      ExtWufA=160.4d0*1.45d0*1.37d0
+      ExtWufA5=100.d0
+      ExtWufA6=100.d0
 c     four dihedrals: forces (let's assume they are all the same)
-      ExtWufD=1.0d2
+      ExtWufD555=35.d0
+      ExtWufD556=65.d0
+      ExtWufD566=85.d0
+      ExtWufD666=270.d0
 
-      
+
       if(iopt.eq.1 .or. iopt.eq.2)then
 C     Wu force field
          force(1)=WuR5
@@ -2441,20 +2456,21 @@ C     ExtWu force field
          force(3)=ExtWuR66
          force(4)=ExtWuA5
          force(5)=ExtWuA6
-         force(6)=ExtWuDppp
-         force(7)=ExtWuDhpp
-         force(8)=ExtWuDhhp
-         force(9)=ExtWuDhhh
-         force(10)=ExtWufR
-         force(11)=ExtWufR
-         force(12)=ExtWufR
-         force(13)=ExtWufA
-         force(14)=ExtWufA
-         force(15)=ExtWufD
-         force(16)=ExtWufD
-         force(17)=ExtWufD
-         force(18)=ExtWufD
+         force(6)=ExtWuD555
+         force(7)=ExtWuD556
+         force(8)=ExtWuD566
+         force(9)=ExtWuD666
+         force(10)=ExtWufR55
+         force(11)=ExtWufR56
+         force(12)=ExtWufR66
+         force(13)=ExtWufA5
+         force(14)=ExtWufA6
+         force(15)=ExtWufD555
+         force(16)=ExtWufD556
+         force(17)=ExtWufD566
+         force(18)=ExtWufD666
          force(19)=fCoulomb
       endif
-      
+
       END SUBROUTINE
+

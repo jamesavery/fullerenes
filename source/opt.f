@@ -4,7 +4,9 @@
 C  This subroutine optimizes the fullerene graph using spring embedding
       DIMENSION Dist(2,NMAX),IC3(NMAX,3)
       DIMENSION IDA(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
-      Data Rdist,ftol,conv/1.d0,.5d-10,1 6.0221367d-3/
+      real*8 Rdist,ftol
+      rdist=1.d0
+      ftol=0.5d-10
       rmin=1.d10
       rmax=0.d0
       rper=0.d0
@@ -393,6 +395,7 @@ C  Data from Table 1 of Wu in dyn/cm = 10**-3 N/m
       real(8) hessian(number_vertices*3,number_vertices*3),
      1 evec(number_vertices*3),df(number_vertices*3)
       type(c_ptr) :: graph, new_fullerene_graph
+      type(c_ptr) :: new_polyhedron, polyhedron
 
 c edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
@@ -412,9 +415,17 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       call get_corners(graph,number_vertices,
      1 a_h,a_p)
       if(iopt.eq.3.or.iopt.eq.4.or.iopt.eq.5.or.iopt.eq.6) then
-        call get_dihedrals(graph,number_vertices,
+        polyhedron = new_polyhedron(graph,dist)
+c       the neighbour lists of the graph must be oriented CCW when the
+c       polyhedron is viewed from the outside before get_dihedrals is called.
+c       this can only be done for an existing 3d structure.
+c       creating a polyhedron in this place may only be temporary solution:
+c       we need to start pasing around pointers to graphs and polyhedra!
+        call get_dihedrals(polyhedron,number_vertices,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
+        call delete_polyhedron(polyhedron)     
       endif
+
 c     and finally delete the graph to free the mem
       call delete_fullerene_graph(graph)     
 
@@ -647,11 +658,11 @@ c 1015 Format(' Hessian is symmetric: asym= ',d12.6)
  1016 Format(' Tolerance= ',D9.3,', Force field parameters in ',
      1 'A, deg, N/m:',/1X,8F12.3)
  1018 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,19F12.2)
+     1 'A, deg, N/m:'/1X,19F12.3)
  1019 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,9F12.2)
+     1 'A, deg, N/m:'/1X,9F12.3)
  1020 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,18F12.2)
+     1 'A, deg, N/m:'/1X,18F12.3)
  1021 Format(1X,I6,' non-zero frequencies (should be ',I6,').',
      1 ' Frequencies (in cm-1) and (quasi) degeneracies (n):')
  1022 Format(10(' ',f7.1,'(',I2,')'))
@@ -1517,9 +1528,10 @@ c     counter for dihedrals with 0, 1, 2, 3 pentagons neighbours
       call adjacency_list(graph,3,neighbours)
 
       do u=1,N
-C      s   B   t      
+C neighbours must be ordered CCW
+C      t   B   s
 C        \   /
-C       A  u   C
+C      C   u   A
 C          |
 C          r
          r = neighbours(1,u)
@@ -1539,8 +1551,8 @@ C     Do stuff here
              nd_ppp=nd_ppp+1
              d_ppp(1,nd_ppp)=u
              d_ppp(2,nd_ppp)=r
-             d_ppp(3,nd_ppp)=t
-             d_ppp(4,nd_ppp)=s
+             d_ppp(3,nd_ppp)=s
+             d_ppp(4,nd_ppp)=t
 
          case ( 16 )            ! Two pentagons, one hexagon
 C     Do stuff common to all three (2,1)-cases here
@@ -1552,24 +1564,24 @@ c               write (*,*) "655"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=t
-              d_hpp(3,nd_hpp)=s
-              d_hpp(4,nd_hpp)=r
+              d_hpp(3,nd_hpp)=r
+              d_hpp(4,nd_hpp)=s
 
             case ( 565 )  ! AC are pentagons, u--r common edge
 c               write (*,*) "565"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=r
-              d_hpp(3,nd_hpp)=t
-              d_hpp(4,nd_hpp)=s
+              d_hpp(3,nd_hpp)=s
+              d_hpp(4,nd_hpp)=t
 
             case ( 556 )  ! AB are pentagons, u--s common edge
 c               write (*,*) "556"
               nd_hpp=nd_hpp+1
               d_hpp(1,nd_hpp)=u
               d_hpp(2,nd_hpp)=s
-              d_hpp(3,nd_hpp)=r
-              d_hpp(4,nd_hpp)=t
+              d_hpp(3,nd_hpp)=t
+              d_hpp(4,nd_hpp)=r
 
             end select
 
@@ -1583,24 +1595,24 @@ c               write (*,*) "566"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=t
-              d_hhp(3,nd_hhp)=s
-              d_hhp(4,nd_hhp)=r
+              d_hhp(3,nd_hhp)=r
+              d_hhp(4,nd_hhp)=s
 
             case ( 656 )  ! AC are hexagons, u--r common edge
 c               write (*,*) "656"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=r
-              d_hhp(3,nd_hhp)=t
-              d_hhp(4,nd_hhp)=s
+              d_hhp(3,nd_hhp)=s
+              d_hhp(4,nd_hhp)=t
 
             case ( 665 )  ! AB are hexagons, u--s common edge
 c               write (*,*) "665"
               nd_hhp=nd_hhp+1
               d_hhp(1,nd_hhp)=u
               d_hhp(2,nd_hhp)=s
-              d_hhp(3,nd_hhp)=r
-              d_hhp(4,nd_hhp)=t
+              d_hhp(3,nd_hhp)=t
+              d_hhp(4,nd_hhp)=r
 
             end select
 
@@ -1611,8 +1623,8 @@ c            write (*,*) "666"
           nd_hhh=nd_hhh+1
           d_hhh(1,nd_hhh)=u
           d_hhh(2,nd_hhh)=r
-          d_hhh(3,nd_hhh)=t
-          d_hhh(4,nd_hhh)=s
+          d_hhh(3,nd_hhh)=s
+          d_hhh(4,nd_hhh)=t
 
          case DEFAULT
             write (*,*) "INVALID: ",(/lA,lB,lC/)

@@ -210,6 +210,9 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
   ostringstream s;
   s.precision(2);
   s << fixed;
+
+  set<edge_t> edge_set = undirected_edges();
+
   if(include_latex_header)
     s << "\\documentclass{article}\n"
          "\\usepackage{fullpage,fourier,tikz}\n"
@@ -256,9 +259,10 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
     }    
     s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
     s << "\\foreach \\u/\\v in {";
-    for(set<edge_t>::const_iterator e(dual.edge_set.begin()); e!=dual.edge_set.end();){
+    set<edge_t> dual_edges = dual.undirected_edges();
+    for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end();){
       s << "{v"<<e->first<<"/v"<<e->second<<"}";
-      if(++e != dual.edge_set.end()) s << ", ";
+      if(++e != dual_edges.end()) s << ", ";
     }
     s << "}\n\t\\draw[dualedge] (\\u) -- (\\v);\n";
   }
@@ -268,6 +272,29 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
     s << "\\end{document}\n";
 
   return s.str();
+}
+
+void Polyhedron::orient_neighbours()
+{
+  assert(layout2d.size() == N);
+  PlanarGraph::orient_neighbours();
+  
+  // Calculate volume
+  double V=0;
+  for(node_t u=0;u<N;u++){
+    const face_t nu(neighbours[u]);
+    const coord3d ux(points[u]);
+
+    for(int i=0;i<nu.size();i++){
+      Tri3D T(ux, points[nu[i]],points[nu[(i+1)%nu.size()]]);
+      V += ((T.a).dot(T.n))*T.area()/T.n.norm();
+    }
+  }
+
+  if(V<0){ // Calculated normals are pointing inwards - reverse order.
+    //    printf("Inverted normals - reversing neighbours lists.\n");
+    for(node_t u=0;u<N;u++) reverse(neighbours[u].begin(), neighbours[u].end());
+  }
 }
 
 Polyhedron::Polyhedron(const string& filename)
@@ -281,22 +308,27 @@ Polyhedron::Polyhedron(const string& filename)
 //    (*this) = from_rspi(filename);
   else
     cerr << "File extension " << extension << " unknown. Can't infer file format.";
+
+  orient_neighbours();
 }
 
 
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) : 
   PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
-  //cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
+  if(layout2d.size() != N){
+    layout2d = tutte_layout(-1,-1,-1,face_max);
+  }
+
+//  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){
-    if(layout2d.size() != N){
-	layout2d = tutte_layout(-1,-1,-1,face_max);
-	faces = compute_faces_flat(face_max,true);
-	assert(outer_face.size() <= face_max);
-	face_max = 0;
-	for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
-    } else faces = compute_faces_flat(face_max,true);
+    faces = compute_faces_flat(face_max,true);
+    assert(outer_face.size() <= face_max);
+    face_max = 0;
+    for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
   } 
+
+  orient_neighbours();
 }
 
 Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 
@@ -466,19 +498,27 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   return s.str();
 }
 
+string Polyhedron::to_turbomole() const {
+  const double aa2bohr = 1.889716164632;
+  ostringstream s;
+  s << setprecision(8) << fixed;
+  s << "$coord" << endl;
+  for(int i=0; i<N; ++i){
+    s << setw(12) << points[i][0]*aa2bohr << "  "<< setw(12) << points[i][1]*aa2bohr << "  " << setw(12) << points[i][2]*aa2bohr << "  c" << endl;
+  }
+  s << "$end" << endl;
+
+  return s.str();
+}
 
 string Polyhedron::to_xyz() const {
-
   ostringstream s;
-  s << setprecision(6);
-
+  s << setprecision(6) << fixed;
   s << N << endl;
-  s << "we could print something helpful here" << endl;
-
-  for(int i=0; i < N; ++i){
-    s << "C\t" << points[i][0] << "\t" << points[i][1] << "\t" << points[i][2] << endl;
+  s << "# Created by Fullerene version " << VERSION_NUMBER << " (http://ctcp.massey.ac.nz/index.php?page=fullerenes)" << endl;
+  for(int i=0; i<N; ++i){
+    s << "C  " << setw(10) << points[i][0] << "  " << setw(10) << points[i][1] << "  " << setw(10) << points[i][2] << endl;
   }
-
   return s.str();
 }
 
@@ -497,7 +537,6 @@ string Polyhedron::to_mol2() const {
     << "\t"<<N<<"\t"<<Nedges<<"\t0\t0\t0\n"
     << "SMALL\n"
     << "NO_CHARGES\n\n";
-
 
   s << "@<TRIPOS>ATOM\n";
   
@@ -617,14 +656,18 @@ Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const
 bool Polyhedron::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
-    const FullereneGraph g(*this,layout2d);
+    //    printf("This is a fullerene.\n");
+    const FullereneGraph g(*this, layout2d);
     points = g.optimized_geometry(points, opt_method, ftol);
     return true;
-  } else if(is_cubic() || is_triangulation()) {
-    bool optimize_angles = true;//!is_triangulation();
+  }else if(is_cubic()) {
+    bool optimize_angles = true;
+    return optimize_other(optimize_angles);
+  }else if(is_triangulation()) {
+    bool optimize_angles = false;
     return optimize_other(optimize_angles);
   }else{
-    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra and other cubic graphs." << endl;
+    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra, other cubic graphs and triangulations." << endl;
     return false;
   }
 }

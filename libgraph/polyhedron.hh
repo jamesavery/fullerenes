@@ -50,9 +50,15 @@ struct Polyhedron : public PlanarGraph {
     coord3d x0(centre3d(points));
     move(-x0);
   }
+  void align_with_axes(){
+    matrix3d If(inertial_frame());
+    points = If*points;
+  }
+
+  void orient_neighbours();
 
   bool optimize(int opt_method = 3, double ftol = 1e-10);
-  bool optimize_other(bool optimize_angles = true, vector<double> zero_values_dist=vector<double>());
+  bool optimize_other(bool optimize_angles = true, map<edge_t, double> zero_values_dist=map<edge_t, double>());
 
   static Polyhedron C20() {
     vector<coord3d> points(20);
@@ -96,6 +102,7 @@ struct Polyhedron : public PlanarGraph {
 		   double line_width = 0.7, double vertex_diameter = 2.0, double face_opacity = 0.4) const;
 
 
+  string to_turbomole() const;
   string to_xyz() const;
   string to_mol2() const;
   string to_cc1() const;

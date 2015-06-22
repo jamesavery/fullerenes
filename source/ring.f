@@ -92,29 +92,28 @@ C     Identify all 6-membered rings
       Ncount5=Ncount5-1
       Write(IOUT,1000) Ncount5
 C     Check bond distances
-      Do I=1,Ncount5
-      Rsum=0.
       Rmin5=1000.d0
       Rmax5=0.d0
-      Do J=1,5
-      IAT1=N5MEM(I,J)
-      J1=J+1
-      IF(J1.eq.6) J1=1
-      IAT2=N5MEM(I,J1)
-      DM=FunDistMat(IAT1,IAT2,DistMat)
-      Rd(J)=DM
-      if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
-      if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
-      RSum=Rsum+Rd(J)
-      enddo
-      RAv5=RSum*.2d0
-      Rsum=0.
-      Do J=1,5
-      Rsum=Rsum+(RAv5-Rd(J))**2
-      enddo
-      Rrmsd=dsqrt(Rsum*.2d0)
-      Write(IOUT,1001) (N5MEM(I,J),J=1,5),RAv5,Rrmsd,(Rd(J),J=1,5)
-      CALL DifDist(Ndif,5,Tol,Rd,Rmem)
+      Do I=1,Ncount5
+       Rsum=0.
+       Do J=1,5
+        IAT1=N5MEM(I,J)
+        J1=J+1
+        IF(J1.eq.6) J1=1
+        IAT2=N5MEM(I,J1)
+        Rd(J)=FunDistMat(IAT1,IAT2,DistMat)
+        if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
+        if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
+        RSum=Rsum+Rd(J)
+       enddo
+       RAv5=RSum*.2d0
+       Rsum=0.
+       Do J=1,5
+        Rsum=Rsum+(RAv5-Rd(J))**2
+       enddo
+       Rrmsd=dsqrt(Rsum*.2d0)
+       Write(IOUT,1001) (N5MEM(I,J),J=1,5),RAv5,Rrmsd,(Rd(J),J=1,5)
+       CALL DifDist(Ndif,5,Tol,Rd,Rmem)
       enddo
       Write(IOUT,1007) Rmin5,Rmax5
 
@@ -160,8 +159,7 @@ C     Check bond distances
       J1=J+1
       IF(J1.eq.7) J1=1
       IAT2=N6MEM(I,J1)
-      DM=FunDistMat(IAT1,IAT2,DistMat)
-      Rd(J)=DM
+      Rd(J)=FunDistMat(IAT1,IAT2,DistMat)
       if(Rd(J).LT.Rmin6) Rmin6=Rd(J)
       if(Rd(J).GT.Rmax6) Rmax6=Rd(J)
       RSum=Rsum+Rd(J)
@@ -336,7 +334,7 @@ C1011 Format(3X,96(I3))
      1 N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
      1 nl565,numbersw,numberFM,numberYF,numberBF,
      1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
-     1 IC3,IVR3,n3rc,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
+     1 IC3,IVR3,n3rc,nSW,nFM,nYF,nBF,SmallRingDist,DIST,CRing5,CRing6)
 C     This routine analyzes the pentagons and hexagons
 C     The first 12 faces are pentagons (many routines need this order)
 C     All other which follow are hexagons
@@ -464,10 +462,14 @@ C     Get the largest ring to ring distance
       enddo
       enddo
       Write(Iout,1026) Rmin5,Rmin6,Rmin56,Rmax5,Rmax6,Rmax56
+C     Smallest ring distance
+ 2001 SmallRingDist=Rmin6
+      if(Rmin56.lt.Rmin6) SmallRingDist=Rmin56
+      if(Rmin5.lt.SmallRingDist) SmallRingDist=Rmin5
 
 C     Analyzing the ring fusions
 C     All 2-ring fusions
- 2001 Write(Iout,1004)
+      Write(Iout,1004)
       IR1=5
       IR2=5
       N2ring=0
@@ -1043,11 +1045,18 @@ C     Print center of edges
       Return
       END
 
-      SUBROUTINE RingCoord(Iout,Dist,N5,N6,N5M,N6M)
+      SUBROUTINE RingCoord(Iout,iwext,dualdist,R6,
+     1 SmallRingDist,Dist,N5,N6,N5M,N6M)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),N5M(Mmax,5),N6M(Mmax,6)
 C     Print center of rings
+      print*,dualdist,R6,SmallRingDist
+      factor=1.d0
+      if(dualdist.ne.R6) then
+       factor=dualdist/SmallRingDist
+       Write(Iout,1002) factor,dualdist
+      endif
       Write(Iout,1000)
       IR=5
       Do I=1,N5
@@ -1059,9 +1068,9 @@ C     Print center of rings
         Y=Y+Dist(2,N5M(I,J))
         Z=Z+Dist(3,N5M(I,J))
       enddo
-        X=X/5.
-        Y=Y/5.
-        Z=Z/5.
+        X=X*factor/5.
+        Y=Y*factor/5.
+        Z=Z*factor/5.
         Write(Iout,1001) I,IR,X,Y,Z
       enddo
 
@@ -1075,9 +1084,9 @@ C     Print center of rings
         Y=Y+Dist(2,N6M(I,J))
         Z=Z+Dist(3,N6M(I,J))
       enddo
-        X=X/6.
-        Y=Y/6.
-        Z=Z/6.
+        X=X*factor/6.
+        Y=Y*factor/6.
+        Z=Z*factor/6.
         Write(Iout,1001) I,IR,X,Y,Z
       enddo
 
@@ -1085,6 +1094,8 @@ C     Print center of rings
      1 /1X,'    I    IR      X            Y            Z',
      1 /1X,49('-')) 
  1001 Format(1X,2I5,3(1X,F12.8))
+ 1002 Format(1X,'Coordinates multiplied by ',F12.8,
+     1 ' to reach distance n dual of ',F12.8)
       Return
       END
 

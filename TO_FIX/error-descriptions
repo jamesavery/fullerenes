@@ -15,23 +15,17 @@ there is no layout2d in 'find_outer_face' and the assertion fails.
   think the first approach is better, a lib should be written such that it is
   hard to use wrongly.
 * general spiral is broken since 917d49d2b4.  maybe not all of that stuff was unnecessary ... (lnw)
-* inertial frame returns 'nan' in case of C60
 * minimum empty sphere problem, algorithm fails too often
 
 * Tutte-embedding fails:
 ** input/RSPInano.failed
 ** input/RSPInanofailed2.inp
 
-* Force-field fails
-** C40-C2{1,2,3,4,7,11,12,16,19,20,21,22} works
-** C42-C1{1,2,3,4,11,12,14,15,17,20,22,23}
-** C42-C1{1,2,3,5,10,12,14,15,17,20,22,23}
-** C44-C2{1,2,3,10,11,12,14,15,17,21,23,24} works
-** C44-C2{1,2,3,4,7,11,14,18,21,22,23,24} works
-** C90-C2v{1,2,3,10,14,24,28,38,40,42,46,47}
-** 40  1  2  3  5  7 10 14 17 18 20 21 22 fails with and without dihedrals
-
 * [FIXED] IsomerDB class can no longer read database text-format, only binary.
 
 * Direct sparse linear solver fails for fulleroid example. Why?
 
+* there is a problem with the c++ std-lib of OSX that causes a segfault as soon as one writes to an ostringstream (but creating the object is ok)
+
+* there is an example where cartesian input leads to a valid but non-canonical spiral, input of that non-canonical spiral returns canonical spiral but claims input had been canonical in the first place
+Problem is in Subroutine CoordBuild, problem circumvented for the moment by not stating that spiral in canonical

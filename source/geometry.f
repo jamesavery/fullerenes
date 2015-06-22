@@ -1,7 +1,7 @@
 c subroutine dist takes 6 reals (=2 coordinates) and yields a positive distance
       SUBROUTINE DIST(ax,ay,az,bx,by,bz,dist_ab)
       implicit real(8) (a-z)
-      dist_ab=dsqrt((ax-bx)**2 + (ay-by)**2 + (az-bz)**2)
+      dist_ab=dsqrt((bx-ax)**2 + (by-ay)**2 + (bz-az)**2)
       return
       END SUBROUTINE DIST
 
@@ -10,16 +10,16 @@ c subroutine ddist takes 6 reals (=2 coordinates) and yields all 6 first derivat
       SUBROUTINE DDIST(ax,ay,az,bx,by,bz,dax,day,daz,dbx,dby,dbz,
      2  dist_ab)
       implicit real(8) (a-z)
-      ab_x=ax-bx
-      ab_y=ay-by
-      ab_z=az-bz
+      ab_x=bx-ax
+      ab_y=by-ay
+      ab_z=bz-az
       dist_ab=dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
-      dist_ab_inv=1/dist_ab
-      dax=ab_x*dist_ab_inv
+      dist_ab_inv=1.0/dist_ab
+      dax=-ab_x*dist_ab_inv
       dbx=-dax
-      day=ab_y*dist_ab_inv
+      day=-ab_y*dist_ab_inv
       dby=-day
-      daz=ab_z*dist_ab_inv
+      daz=-ab_z*dist_ab_inv
       dbz=-daz
       return
       END SUBROUTINE DDIST
@@ -37,20 +37,20 @@ c all 21 second derivatives of the distance and the the distance itself
      5 ddf11dbz__dbz,
      6 f)
       implicit real(8) (a-z)
-      ab_x=ax-bx
-      ab_y=ay-by
-      ab_z=az-bz
+      ab_x=bx-ax
+      ab_y=by-ay
+      ab_z=bz-az
       f=dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
       f_inv=1/f
       f_inv_cub=f_inv**3
 
 c first derivatives
-      df__dax= ab_x*f_inv
-      df__dbx=-ab_x*f_inv
-      df__day= ab_y*f_inv
-      df__dby=-ab_y*f_inv
-      df__daz= ab_z*f_inv
-      df__dbz=-ab_z*f_inv
+      df__dax=-ab_x*f_inv
+      df__dbx= ab_x*f_inv
+      df__day=-ab_y*f_inv
+      df__dby= ab_y*f_inv
+      df__daz=-ab_z*f_inv
+      df__dbz= ab_z*f_inv
 
 c second derivatives 
 c f_inv=1/dsqrt((ab_x)**2 + (ab_y)**2 + (ab_z)**2)
@@ -106,8 +106,10 @@ c mult: 11, div: 1, root: 2, add/sub: 8, arccos: 1
       den=2.0 * dsqrt(r2L * r2R)
       arg=(r2L+r2R-r2M)/den
 c the following two exceptions may be called in case of rounding errors
-      if(arg .gt. 1.d0) arg=1.d0
-      if(arg .lt. -1.d0) arg=-1.d0
+      arg = min(arg, 1.d0)
+      arg = max(arg, -1.d0)
+c      if(arg .gt. 1.d0) arg=1.d0
+c      if(arg .lt. -1.d0) arg=-1.d0
       angle_abc=dacos(arg)
       return
       END SUBROUTINE ANGLE
@@ -140,20 +142,20 @@ c via law of cosines (calculating the derivative of Abs[foo] is rather troubleso
      2 dax,day,daz,dbx,dby,dbz,dcx,dcy,dcz,
      3 angle_abc)
       implicit real(8) (a-z)
-c vectors from a to b and b to c and a to c
-      ab_x=ax-bx
-      ab_y=ay-by
-      ab_z=az-bz
-      bc_x=bx-cx
-      bc_y=by-cy
-      bc_z=bz-cz
-      ac_x=ax-cx
-      ac_y=ay-cy
-      ac_z=az-cz
-c length of a-b and b-c
+c the direction of vectors doesn't matter here, only the length does.
+      ab_x=bx-ax
+      ab_y=by-ay
+      ab_z=bz-az
+      bc_x=cx-bx
+      bc_y=cy-by
+      bc_z=cz-bz
+      ca_x=ax-cx
+      ca_y=ay-cy
+      ca_z=az-cz
+c length of a-b, b-c and a-c
       r2L=ab_x**2 + ab_y**2 + ab_z**2
       r2R=bc_x**2 + bc_y**2 + bc_z**2
-      r2M=ac_x**2 + ac_y**2 + ac_z**2
+      r2M=ca_x**2 + ca_y**2 + ca_z**2
       r1L=dsqrt(r2L)
       r1R=dsqrt(r2R)
       r1M=dsqrt(r2M)
@@ -161,9 +163,9 @@ c length of a-b and b-c
       r3R=r2R*r1R
       r3M=r2M*r1M
 c some auxiliary products
-      aux_11_inv=1/(2*r1L*r1R)
-      aux_31_inv=1/(2*r3L*r1R)
-      aux_13_inv=1/(2*r1L*r3R)
+      aux_11_inv=1.d0/(2.d0*r1L*r1R)
+      aux_31_inv=1.d0/(2.d0*r3L*r1R)
+      aux_13_inv=1.d0/(2.d0*r1L*r3R)
       aux_1=r2L + r2R - r2M
       arccos_arg=aux_1*aux_11_inv
 c if the angle is defined as the smallest angle (which it should be) there is a singularity
@@ -198,28 +200,28 @@ c (in case of sides of length 1)
 c the actual angle, because it will always be required
       angle_abc=dacos(arccos_arg)
 c not sure which is faster
-      den_inv=-1/dsqrt(1-arccos_arg**2)
+      den_inv=-1.d0/dsqrt(1-arccos_arg**2)
 c      den_inv=-1/dabs(dsin(angle_abc))            
 c more auxiliary products
       aux_2=2*aux_11_inv
       aux_3=aux_1*aux_31_inv
-      aux_3x=ab_x*aux_3
-      aux_3y=ab_y*aux_3
-      aux_3z=ab_z*aux_3
+      aux_3x=-ab_x*aux_3
+      aux_3y=-ab_y*aux_3
+      aux_3z=-ab_z*aux_3
       aux_4=aux_1*aux_13_inv
-      aux_4x=bc_x*aux_4
-      aux_4y=bc_y*aux_4
-      aux_4z=bc_z*aux_4
+      aux_4x=-bc_x*aux_4
+      aux_4y=-bc_y*aux_4
+      aux_4z=-bc_z*aux_4
 c the derivatives
-      dax=(-bc_x*aux_2-aux_3x)*den_inv
-      day=(-bc_y*aux_2-aux_3y)*den_inv
-      daz=(-bc_z*aux_2-aux_3z)*den_inv
-      dbx=((bc_x-ab_x)*aux_2-aux_4x+aux_3x)*den_inv
-      dby=((bc_y-ab_y)*aux_2-aux_4y+aux_3y)*den_inv
-      dbz=((bc_z-ab_z)*aux_2-aux_4z+aux_3z)*den_inv
-      dcx=(ab_x*aux_2+aux_4x)*den_inv
-      dcy=(ab_y*aux_2+aux_4y)*den_inv
-      dcz=(ab_z*aux_2+aux_4z)*den_inv
+      dax=(bc_x*aux_2-aux_3x)*den_inv
+      day=(bc_y*aux_2-aux_3y)*den_inv
+      daz=(bc_z*aux_2-aux_3z)*den_inv
+      dbx=((-bc_x+ab_x)*aux_2-aux_4x+aux_3x)*den_inv
+      dby=((-bc_y+ab_y)*aux_2-aux_4y+aux_3y)*den_inv
+      dbz=((-bc_z+ab_z)*aux_2-aux_4z+aux_3z)*den_inv
+      dcx=(-ab_x*aux_2+aux_4x)*den_inv
+      dcy=(-ab_y*aux_2+aux_4y)*den_inv
+      dcz=(-ab_z*aux_2+aux_4z)*den_inv
 
       return
       END SUBROUTINE DANGLE
@@ -354,7 +356,7 @@ c more auxiliary products
       aux_4x=bc_x*aux_4
       aux_4y=bc_y*aux_4
       aux_4z=bc_z*aux_4
-c the derivations
+c the derivatives
       df__dax=(-bc_x*aux_2 - aux_3x)*den_inv
       df__day=(-bc_y*aux_2 - aux_3y)*den_inv
       df__daz=(-bc_z*aux_2 - aux_3z)*den_inv
@@ -368,19 +370,19 @@ c the derivations
 CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
 C SECOND DERIVATIVES
 
-      dr2ab__dab_x=2*ab_x
-      dr2ab__dab_y=2*ab_y
-      dr2ab__dab_z=2*ab_z
+      dr2ab__dab_x=2.d0*ab_x
+      dr2ab__dab_y=2.d0*ab_y
+      dr2ab__dab_z=2.d0*ab_z
 
-      dr2bc__dbc_x=2*bc_x
-      dr2bc__dbc_y=2*bc_y
-      dr2bc__dbc_z=2*bc_z
+      dr2bc__dbc_x=2.d0*bc_x
+      dr2bc__dbc_y=2.d0*bc_y
+      dr2bc__dbc_z=2.d0*bc_z
 
-      dr2ac__dac_x=2*ac_x
-      dr2ac__dac_y=2*ac_y
-      dr2ac__dac_z=2*ac_z
+      dr2ac__dac_x=2.d0*ac_x
+      dr2ac__dac_y=2.d0*ac_y
+      dr2ac__dac_z=2.d0*ac_z
 
-      dr1ab__dr2ab=1/(2*dsqrt(r2ab))
+      dr1ab__dr2ab=1.d0/(2.d0*dsqrt(r2ab))
 
 c r1ab=dsqrt(r2ab)
       dr1ab__dax=dr1ab__dr2ab*dr2ab__dab_x
@@ -393,7 +395,7 @@ c      dr1ab__dcx=0
 c      dr1ab__dcy=0
 c      dr1ab__dcz=0
 
-      dr1bc__dr2bc=1/(2*dsqrt(r2bc))
+      dr1bc__dr2bc=1.d0/(2.d0*dsqrt(r2bc))
 
 c r1bc=dsqrt(r2bc)
 c      dr1bc__dax=0
@@ -406,7 +408,7 @@ c      dr1bc__daz=0
       dr1bc__dcy=-dr1bc__dr2bc*dr2bc__dbc_y
       dr1bc__dcz=-dr1bc__dr2bc*dr2bc__dbc_z
 
-      dr1ac__dr2ac=1/(2*dsqrt(r2ac))
+      dr1ac__dr2ac=1.d0/(2.d0*dsqrt(r2ac))
 
 c r1ac=dsqrt(r2ac)
       dr1ac__dax=dr1ac__dr2ac*dr2ac__dac_x
@@ -452,8 +454,8 @@ c      dr3ac__dbz=0
       dr3ac__dcy=-r1ac*dr2ac__dac_y + r2ac*dr1ac__dcy
       dr3ac__dcz=-r1ac*dr2ac__dac_z + r2ac*dr1ac__dcz
 
-      daux_11_inv__dr1ab=-1/(2 * r1ab**2 * r1bc)
-      daux_11_inv__dr1bc=-1/(2 * r1ab * r1bc**2)
+      daux_11_inv__dr1ab=-1.d0/(2.d0 * r1ab**2 * r1bc)
+      daux_11_inv__dr1bc=-1.d0/(2.d0 * r1ab * r1bc**2)
 
 c aux_11_inv=1/(2*r1ab*r1bc)
       daux_11_inv__dax=daux_11_inv__dr1ab*dr1ab__dax
@@ -469,8 +471,8 @@ c aux_11_inv=1/(2*r1ab*r1bc)
       daux_11_inv__dcy=daux_11_inv__dr1bc*dr1bc__dcy
       daux_11_inv__dcz=daux_11_inv__dr1bc*dr1bc__dcz
 
-      daux_31_inv__dr3ab=-1/(2 * r3ab**2 * r1bc)
-      daux_31_inv__dr1bc=-1/(2 * r3ab * r1bc**2)
+      daux_31_inv__dr3ab=-1.d0/(2.d0 * r3ab**2 * r1bc)
+      daux_31_inv__dr1bc=-1.d0/(2.d0 * r3ab * r1bc**2)
 
 c aux_31_inv=1/(2*r3ab*r1bc)
       daux_31_inv__dax=daux_31_inv__dr3ab*dr3ab__dax
@@ -487,8 +489,8 @@ c aux_31_inv=1/(2*r3ab*r1bc)
       daux_31_inv__dcz=daux_31_inv__dr1bc*dr1bc__dcz
 
 c aux_13_inv=1/(2*r1ab*r3bc)
-      daux_13_inv__dr1ab=-1/(2 * r1ab**2 * r3bc)
-      daux_13_inv__dr3bc=-1/(2 * r1ab * r3bc**2)
+      daux_13_inv__dr1ab=-1.d0/(2.d0 * r1ab**2 * r3bc)
+      daux_13_inv__dr3bc=-1.d0/(2.d0 * r1ab * r3bc**2)
 
 c aux_13_inv=1/(2*r1ab*r3bc)
       daux_13_inv__dax=daux_13_inv__dr1ab*dr1ab__dax
@@ -527,7 +529,7 @@ c arccos_arg=aux_1*aux_11_inv
       darccos_arg__dcz=aux_11_inv*daux_1__dcz + aux_1*daux_11_inv__dcz
 
 c den_inv=-1/dsqrt(1-arccos_arg**2)
-      dden_inv__darccos_arg=-arccos_arg*((1-arccos_arg**2)**(-3./2.))
+      dden_inv__darccos_arg=-arccos_arg*((1-arccos_arg**2)**(-1.5d0))
 
 c den_inv=-1/dsqrt(1-arccos_arg**2)
       dden_inv__dax=dden_inv__darccos_arg*darccos_arg__dax
@@ -541,15 +543,15 @@ c den_inv=-1/dsqrt(1-arccos_arg**2)
       dden_inv__dcz=dden_inv__darccos_arg*darccos_arg__dcz
 
 c aux_2=2*aux_11_inv
-      daux_2__dax=2*daux_11_inv__dax
-      daux_2__day=2*daux_11_inv__day
-      daux_2__daz=2*daux_11_inv__daz
-      daux_2__dbx=2*daux_11_inv__dbx
-      daux_2__dby=2*daux_11_inv__dby
-      daux_2__dbz=2*daux_11_inv__dbz
-      daux_2__dcx=2*daux_11_inv__dcx
-      daux_2__dcy=2*daux_11_inv__dcy
-      daux_2__dcz=2*daux_11_inv__dcz
+      daux_2__dax=2.d0*daux_11_inv__dax
+      daux_2__day=2.d0*daux_11_inv__day
+      daux_2__daz=2.d0*daux_11_inv__daz
+      daux_2__dbx=2.d0*daux_11_inv__dbx
+      daux_2__dby=2.d0*daux_11_inv__dby
+      daux_2__dbz=2.d0*daux_11_inv__dbz
+      daux_2__dcx=2.d0*daux_11_inv__dcx
+      daux_2__dcy=2.d0*daux_11_inv__dcy
+      daux_2__dcz=2.d0*daux_11_inv__dcz
       
 c aux_3=aux_1*aux_31_inv
       daux_3__dax=aux_31_inv*daux_1__dax + aux_1*daux_31_inv__dax
@@ -846,17 +848,17 @@ c subroutine dist takes 12 reals (=4 coordinates) and yields an angel between -\
      2 dihedral_abcd)
       IMPLICIT real(8) (a-z)
 c vectors ab, bc and cd
-      ab_x=ax-bx
-      ab_y=ay-by
-      ab_z=az-bz
-      bc_x=bx-cx
-      bc_y=by-cy
-      bc_z=bz-cz
-      cd_x=cx-dx
-      cd_y=cy-dy
-      cd_z=cz-dz
+      ab_x=bx-ax
+      ab_y=by-ay
+      ab_z=bz-az
+      bc_x=cx-bx
+      bc_y=cy-by
+      bc_z=cz-bz
+      cd_x=dx-cx
+      cd_y=dy-cy
+      cd_z=dz-cz
 c vector bc normalized to length 1
-      bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
+      bc_length_inv=1.d0/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc_1_x=bc_x*bc_length_inv
       bc_1_y=bc_y*bc_length_inv
       bc_1_z=bc_z*bc_length_inv
@@ -869,8 +871,8 @@ c and the signs are this way because one of the two vectors points in the wrong 
       bcd_y=-bc_z*cd_x + bc_x*cd_z
       bcd_z=-bc_x*cd_y + bc_y*cd_x
 c their respective lengths
-      abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
-      bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
+      abc_length_inv=1.d0/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
+      bcd_length_inv=1.d0/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
 c normal vectors (length 1) on abc and bcd
       abc_1_x=abc_x*abc_length_inv
       abc_1_y=abc_y*abc_length_inv
@@ -897,17 +899,17 @@ c the result
       implicit real(8) (a-z)
 C at first the dihedral (copied from above)
 c vectors ab, bc and cd
-      ab_x=ax-bx
-      ab_y=ay-by
-      ab_z=az-bz
-      bc_x=bx-cx
-      bc_y=by-cy
-      bc_z=bz-cz
-      cd_x=cx-dx
-      cd_y=cy-dy
-      cd_z=cz-dz
+      ab_x=bx-ax
+      ab_y=by-ay
+      ab_z=bz-az
+      bc_x=cx-bx
+      bc_y=cy-by
+      bc_z=cz-bz
+      cd_x=dx-cx
+      cd_y=dy-cy
+      cd_z=dz-cz
 c vector bc normalized to length 1
-      bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
+      bc_length_inv=1.d0/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc1_x=bc_x*bc_length_inv
       bc1_y=bc_y*bc_length_inv
       bc1_z=bc_z*bc_length_inv
@@ -920,8 +922,8 @@ c and the signs are this way because one of the two vectors points in the wrong 
       bcd_y=-bc_z*cd_x + bc_x*cd_z
       bcd_z=-bc_x*cd_y + bc_y*cd_x
 c their respective lengths
-      abc_length_inv=1/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
-      bcd_length_inv=1/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
+      abc_length_inv=1.d0/dsqrt(abc_x**2 + abc_y**2 + abc_z**2)
+      bcd_length_inv=1.d0/dsqrt(bcd_x**2 + bcd_y**2 + bcd_z**2)
 c normal vectors (length 1) on abc and bcd
       abc1_x=abc_x*abc_length_inv
       abc1_y=abc_y*abc_length_inv
@@ -946,26 +948,26 @@ c to be read from bottom to top
 
 c derivatives of single vectors
 c all other combinations are zero
-      dab_x__dax=1
-      dab_x__dbx=-1
-      dab_y__day=1
-      dab_y__dby=-1
-      dab_z__daz=1
-      dab_z__dbz=-1
+      dab_x__dax=-1
+      dab_x__dbx=1
+      dab_y__day=-1
+      dab_y__dby=1
+      dab_z__daz=-1
+      dab_z__dbz=1
 
-      dbc_x__dbx=1
-      dbc_x__dcx=-1
-      dbc_y__dby=1
-      dbc_y__dcy=-1
-      dbc_z__dbz=1
-      dbc_z__dcz=-1
+      dbc_x__dbx=-1
+      dbc_x__dcx=1
+      dbc_y__dby=-1
+      dbc_y__dcy=1
+      dbc_z__dbz=-1
+      dbc_z__dcz=1
 
-      dcd_x__dcx=1
-      dcd_x__ddx=-1
-      dcd_y__dcy=1
-      dcd_y__ddy=-1
-      dcd_z__dcz=1
-      dcd_z__ddz=-1
+      dcd_x__dcx=-1
+      dcd_x__ddx=1
+      dcd_y__dcy=-1
+      dcd_y__ddy=1
+      dcd_z__dcz=-1
+      dcd_z__ddz=1
 
 c bc_length_inv=1/dsqrt(bc_x**2 + bc_y**2 + bc_z**2)
       bc_length_inv_cub=bc_length_inv**3
@@ -1195,7 +1197,7 @@ c abc1_z=abc_z*abc_length_inv
       dabc1_y__dabc_length_inv=abc_y
       dabc1_z__dabc_length_inv=abc_z
 
-c derivation of the components of the normals
+c derivative of the components of the normals
 c abc1_x=abc_x*abc_length_inv
 c abc1_y=abc_y*abc_length_inv
 c abc1_z=abc_z*abc_length_inv
@@ -1468,7 +1470,7 @@ c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
       dx__dbcd1_y=abc1_y
       dx__dbcd1_z=abc1_z
 
-c derivation of y
+c derivative of y
 c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
       dy__dax=
      2 dy__daux_x*daux_x__dax + 
@@ -1519,7 +1521,7 @@ c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
      3 dy__dbcd1_y*dbcd1_y__ddz +
      4 dy__dbcd1_z*dbcd1_z__ddz
 
-c derivation of x
+c derivative of x
 c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
       dx__dax=
      2 dx__dabc1_x*dabc1_x__dax + 
@@ -1570,7 +1572,7 @@ c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
      3 dx__dbcd1_y*dbcd1_y__ddz +
      4 dx__dbcd1_z*dbcd1_z__ddz
 
-c derivation atan2(y,x) according to x and y
+c derivative of atan2(y,x) according to x and y
       df__dx=-y/(x**2 + y**2)
       df__dy=x/(x**2 + y**2)
 
@@ -1621,7 +1623,7 @@ c      END SUBROUTINE
       SUBROUTINE DCOULOMB(ax,ay,az,dax,day,daz,c)
       implicit real(8) (a-z)
       dist_2=ax**2 + ay**2 + az**2
-      c=1/dsqrt(dist_2)
+      c=1.d0/dsqrt(dist_2)
       dist_3_2_inv=c/dist_2
       dax=-ax*dist_3_2_inv
       day=-ay*dist_3_2_inv
@@ -1634,7 +1636,7 @@ c      END SUBROUTINE
      1 daxax,daxay,daxaz,dayay,dayaz,dazaz,c)
       implicit real(8) (a-z)
       dist_2=ax**2 + ay**2 + az**2
-      c=1/dsqrt(dist_2)
+      c=1.d0/dsqrt(dist_2)
       dist_3_2_inv=c/dist_2
       dist_5_2_inv=dist_3_2_inv/dist_2
 

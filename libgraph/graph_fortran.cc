@@ -194,10 +194,8 @@ polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points)
   for(size_t i=0;i<G.N;i++) vertex_points[i] = coord3d(&points[3*i]);
   return new Polyhedron(G,vertex_points,6); 
 }
-polyhedron_ptr read_polyhedron_(const char *path)
-{
-  return new Polyhedron(path);
-}
+
+polyhedron_ptr read_polyhedron_(const char *path) { return new Polyhedron(path); }
 
 void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 
@@ -207,7 +205,7 @@ graph_ptr dual_graph_(const graph_ptr *g){
   bool is_fullerene = (*g)->neighbours[0].size() == 3;
   return new PlanarGraph((*g)->dual_graph(is_fullerene? 6 : 3)); 
 }
-int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
+//int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 int perfect_match_count_(const graph_ptr *g){ return (*g)->count_perfect_matchings(); }
 
 fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n)
@@ -336,7 +334,10 @@ void set_layout2d_(graph_ptr *g, const double *layout2d)
 polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }
 
 int nvertices_(const graph_ptr *g){ return (*g)->N; }
-int nedges_(const graph_ptr *g){ return (*g)->edge_set.size(); }
+int nedges_(const graph_ptr *g){ 
+  set<edge_t> edge_set = (*g)->undirected_edges(); // TODO: Better solution to this.
+  return edge_set.size(); 
+}
 
 void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, const int *show_dual, const int *show_labels, const double *dimensions,
 		 const int *line_colour, const int *vertex_colour, const double *line_width, const double *vertex_diameter)
@@ -344,20 +345,22 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   string fmt(format,3), filename;
   filename = fortran_string(filename_,50)+"-2D."+fmt;
 
-  // printf("draw_graph({\n"
-  // 	 "\tformat:     '%3s',\n"
-  // 	 "\tfilename:   '%s',\n"
-  // 	 "\tshow_dual:  %d,\n"
-  // 	 "\tdimensions: %gcm x %gcm,\n"
-  // 	 "\tline_colour: #%.6x,\n"
-  // 	 "\tnode_colour: #%.6x,\n"
-  // 	 "\tline_width: %.2gmm,\n"
-  // 	 "\tnode_diameter: %.2gmm,\n"
-  // 	 "})\n\n",
-  // 	 format, filename.c_str(), *show_dual, dimensions[0], dimensions[1],
-  // 	 *line_colour, *vertex_colour,
-  // 	 *line_width, *vertex_diameter);
+   printf("draw_graph({\n"
+   	 "\tformat:     '%3s',\n"
+   	 "\tfilename:   '%s',\n"
+   	 "\tshow_dual:  %d,\n"
+   	 "\tdimensions: %gcm x %gcm,\n"
+   	 "\tline_colour: #%.6x,\n"
+   	 "\tnode_colour: #%.6x,\n"
+   	 "\tline_width: %.2gmm,\n"
+   	 "\tnode_diameter: %.2gmm,\n"
+   	 "})\n\n",
+   	 format, filename.c_str(), *show_dual, dimensions[0], dimensions[1],
+   	 *line_colour, *vertex_colour,
+   	 *line_width, *vertex_diameter);
 
+   cout << endl;
+   cout << **g << endl;
 
   ofstream graph_file(filename.c_str(),ios::out | ios::binary);
   if        (fmt == "tex"){
@@ -365,6 +368,7 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   } else if (fmt == "pov"){
     graph_file << (*g)->to_povray(dimensions[0],dimensions[1],*line_colour,*vertex_colour,*line_width,*vertex_diameter);
   }
+  cout << "write done" << endl;
   graph_file.close();
 }
 
@@ -401,7 +405,7 @@ void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char
 
 void edge_list_(const graph_ptr *g, int *edges, int *length)
 {
-  const set<edge_t>& edge_set((*g)->edge_set);
+  const set<edge_t>& edge_set((*g)->undirected_edges());
   *length = edge_set.size();
   int i=0;
   for(set<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();e++,i++){
