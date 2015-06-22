@@ -385,15 +385,13 @@ void Graph::update_from_edgeset(const set<edge_t>& edge_set)
 
   // Update node count
   N = 0;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    N = max(N,max(e->first,e->second)+1);
-  }
+  for(auto e: edge_set) N = max(N,max(e.first,e.second)+1);
 
   neighbours.resize(N);
 
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    ns[e->first].insert(e->second);
-    ns[e->second].insert(e->first);
+  for(auto e: edge_set){
+    ns[e.first].insert (e.second);
+    ns[e.second].insert(e.first);
   }
 
   //  fprintf(stderr,"Initializing adjacencies\n");

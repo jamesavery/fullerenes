@@ -116,6 +116,12 @@ template <typename T> vector<T> operator*(const vector<T>& xs, const T& x)
   return ys;
 }
 
+template <typename T> pair<T,T> operator+(const pair<T,T>& xs, const T& x)
+{
+  return make_pair(xs.first+x,xs.second+x);
+}
+
+
 template <typename T> vector<T> operator+(const vector<T>& xs, const T& x)
 {
   vector<T> ys(xs.size());

@@ -72,7 +72,7 @@ struct Graph {
 
   int max_degree() const; 
 
-  void update_from_edgeset(const set<edge_t>& edge_set); 
+  void update_from_edgeset(const set<edge_t>& edge_set);
   set<edge_t>  undirected_edges() const;
   set<dedge_t> directed_edges()   const;
 
