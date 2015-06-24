@@ -65,6 +65,7 @@ public:
     assert(n == B.n && m == B.m);
     matrix C(*this);
     for(int i=0;i<C.size();i++) C[i] += B[i];
+    return C;
   }
 
   friend ostream& operator<<(ostream& S, const matrix& A)
@@ -76,6 +77,16 @@ public:
 
     S << VV;
     return S;
+  }
+
+  vector<vector<pair<int, T> > > sparse_representation() const {
+    const matrix &A(*this);
+    vector<vector<pair<int, T> > > result(m);
+
+    for(int i=0;i<m;i++)
+      for(int j=0;j<n;j++) if(A(i,j) != 0) result[i].push_back(make_pair(j,A(i,j))); 
+
+    return result;
   }
 };
 

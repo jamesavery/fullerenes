@@ -122,6 +122,9 @@ void Unfolding::transform_line(const Unfolding::dedgecoord_t& l1, const Unfoldin
 
 #include <unistd.h>
 Unfolding Unfolding::straighten_lines() const 
+// ASSUMES: that nodes 1-12 are pentagons. 
+// ASSUMES: that this is a triangulation of a fullerene
+// TODO:    Work out how to do this for negative-curvature graphs.
 {
   vector< int > Oindex;
   vector< pair<Eisenstein,node_t> > O;
@@ -133,7 +136,7 @@ Unfolding Unfolding::straighten_lines() const
     }
   
   // Directed graph defined by non-hexagon node outline
-  vector<bool> A(12*12);	// Always at most 12 nodes of degree 5 or less
+  vector<bool> A(12*12,false);	// Always at most 12 nodes of degree 5 or less
   set<dedge_t> workset;
 
   // Arc annotations
@@ -228,3 +231,151 @@ Unfolding Unfolding::straighten_lines() const
   
   return Unfolding(O);
 }
+
+string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilaterally, bool include_headers) const 
+{
+  string result;
+  ostringstream latexfile(result);
+
+  if(include_headers)
+    latexfile << 
+"\\documentclass{standalone}\n\
+\\usepackage{tikz}\n\
+\\begin{document}\n\
+\\definecolor{darkgreen}{rgb}{.4, .7, .2}\n\
+\\tikzstyle{outline}=[draw=black, ultra thick, fill opacity=.2, fill=darkgreen]\n\
+\\tikzstyle{vertex}=[circle, draw, inner sep=0, fill=white, minimum width=4.00000mm]\n\
+\n\
+\\pgfmathsetmacro{\\xcoord}{cos(60)}\n\
+\\pgfmathsetmacro{\\ycoord}{sin(60)}\n\
+\n\
+\\newcommand{\\drawEGrid}{\n\
+    \\path[clip,preaction = {draw=black}] (0,0) -- (\\last,0) -- (\\cols,\\rows) --(\\first,\\rows) -- cycle;\n\
+    \\draw (\\first,0) grid (\\last,\\rows);\n\
+    \\foreach \\x in {1,2,...,\\total}\n\
+        \\draw (-\\x,\\x*2) -- (\\x,0);\n\
+}\n\
+\\newcommand{\\drawRGrid}{\n\
+    \\path[clip,preaction = {draw=black}] (0,0) -- (\\last,0) -- (\\cols,\\rows) --(0,\\rows) -- cycle;\n\
+    \\draw (0,0) grid (\\cols,\\rows);\n\
+    \\foreach \\x in {1,2,...,\\total}\n\
+        \\draw (-\\x,\\x*2) -- (\\x,0);\n\
+}\n\
+";
+
+  vector<Eisenstein> outline_gc(outline.size());
+  for(int i=0;i<outline.size();i++) outline_gc[i] = outline[i].first.GCtransform(K,L);
+
+  // Extract (I,J)-bounds
+  int imin = INT_MAX, imax = INT_MIN, jmin = INT_MAX, jmax = INT_MIN;
+  for(int i=0;i<outline_gc.size();i++){
+    Eisenstein x(outline_gc[i]);
+
+    if(draw_equilaterally){
+      coord2d X(x.coord());
+      x.first  = floor(X.first);
+      x.second = floor(X.second);
+    }
+
+    if(x.first < imin) imin = x.first;
+    if(x.first > imax) imax = x.first;
+    if(x.second < jmin) jmin = x.second;
+    if(x.second > jmax) jmax = x.second;
+
+  }
+  Eisenstein gcmin(imin-1,jmin-1), gcmax(imax+1,jmax+1);
+  if(draw_equilaterally){
+    gcmin = Eisenstein(coord2d(gcmin.first-1,gcmin.second));
+    gcmax = Eisenstein(coord2d(gcmax.first,gcmax.second+1));
+  }
+
+  latexfile << "\\begin{tikzpicture}\n";
+  // Define bounds
+  Eisenstein D(gcmax-gcmin);
+  latexfile << "\\newcommand*{\\cols}{"<<D.first<<"}\n"
+	    << "\\newcommand*{\\rows}{"<<D.second<<"}\n"
+	    << "\\newcommand*{\\total}{"<<(D.first+D.second)<<"}\n"
+	    << "\\newcommand*{\\first}{-\\rows/2}\n"
+	    << "\\newcommand*{\\last}{\\cols+\\rows/2}\n";
+
+  // Draw E-grid
+  latexfile << "\\bgroup\n";
+  if(draw_equilaterally){
+    // -- as equilateral triangles
+    latexfile << "\\pgftransformcm{1}{0}{\\xcoord}{\\ycoord}{\\pgfpointorigin}\n"
+	      << "\\drawEGrid{}\n";
+  } else // -- or as a regular grid
+    latexfile << "\\drawRGrid{}\n";
+
+  
+  // Draw outline polygon
+    latexfile << "\\draw[outline] ";
+  for(int i=0;i<outline.size();i++){
+    const Eisenstein &x((outline_gc[i]-gcmin));
+    latexfile << "(" << x.first << "," << x.second << ") -- ";
+  }
+  latexfile << "cycle;\n"
+	    << "\\egroup\n\n";
+
+  // Place vertex labels according to scheme chosen in parameter 'label_vertices':
+  latexfile << "\\foreach \\place/\\name/\\lbl in {";
+  switch(label_vertices){
+  case 0: break; // Don't label vertices at all.
+  case 1:        // Only label non-hexagon vertices on polygon outline.
+    if(label_vertices == 1)	
+      for(int i=0;i<outline.size();i++) 
+	if(degrees.find(outline[i].second)->second != 6) {
+	const Eisenstein &IJ(outline_gc[i]-gcmin);
+
+	coord2d x;
+	if(draw_equilaterally) x = IJ.coord();
+	else                   x = coord2d(IJ.first,IJ.second);
+
+	const node_t &u(outline[i].second);
+	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(i+1<outline.size()?"},":"}");
+      }
+    break;
+  case 2:        // Only label vertices on polygon outline.
+    if(label_vertices == 2)	
+      for(int i=0;i<outline.size();i++){
+	const Eisenstein &IJ(outline_gc[i]-gcmin);
+
+	coord2d x;
+	if(draw_equilaterally) x = IJ.coord();
+	else                   x = coord2d(IJ.first,IJ.second);
+
+	const node_t &u(outline[i].second);
+	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(i+1<outline.size()?"},":"}");
+      }
+    break;
+  case 3: // Label all original vertices, including internal ones
+    {
+      int i=0;
+      for(map<dedge_t,dedgecoord_t>::const_iterator it(edgecoords.begin()); it!=edgecoords.end(); i++){
+	const dedge_t& uv(it->first);
+	const dedgecoord_t& ij(it->second);
+
+	node_t u(uv.first);
+	Eisenstein IJ(ij.first.GCtransform(K,L)-gcmin);
+
+	coord2d x;
+	if(draw_equilaterally) x = IJ.coord();
+	else                   x = coord2d(IJ.first,IJ.second);
+
+	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(++it != edgecoords.end()? "},":"}");
+      }
+    }
+    break;
+  case 4: // Label ALL vertices, both old and new.
+    break;
+  }
+  latexfile << "}\n"
+	    << "\t \\node[vertex] (\\name) at \\place {\\lbl};\n\n"
+	    << "\\end{tikzpicture}\n";
+  if(include_headers) 
+    latexfile << "\\end{document}\n";
+  
+  return latexfile.str();
+}
+
+

@@ -79,7 +79,7 @@ public:
 
 
   // Output
-  string to_latex() const;
+  string to_latex(int K=1, int L=0,int label_vertices=1, bool draw_equilaterally=true, bool include_headers=false) const;
   string to_mathematica() const;
 };
 
