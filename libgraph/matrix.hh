@@ -1,5 +1,13 @@
 #ifndef MATRIX_HH
-# define MATRIX_HH
+#define MATRIX_HH
+
+#include <vector>
+#include <iostream>
+#include <climits>
+#include <cassert>
+#include <cmath>
+
+using namespace std;
 
 template <typename T> class matrix : public vector<T> {
 public:
