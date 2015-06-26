@@ -517,6 +517,7 @@ vector<int> identify_nodes(const vector<pair<Eisenstein,node_t> >& outline, cons
   return same;
 }
 
+/*
 set<edge_t> connect_mathias(const vector<pair<Eisenstein,node_t> >& outline, const IDCounter<Eisenstein> &inner_nodes, const IDCounter<Eisenstein> &outer_nodes, map<dedge_t,dedgecoord_t>& reverse_arc, const Eisenstein& w)
 {
   set<edge_t> edges;
@@ -585,7 +586,7 @@ set<edge_t> connect_mathias(const vector<pair<Eisenstein,node_t> >& outline, con
   output.close();
   return edges;
 }
-
+*/
 
 
 

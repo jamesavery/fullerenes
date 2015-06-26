@@ -232,7 +232,7 @@ Unfolding Unfolding::straighten_lines() const
   return Unfolding(O);
 }
 
-string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilaterally, bool include_headers) const 
+string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilaterally, bool include_headers) const 
 {
   string result;
   ostringstream latexfile(result);
@@ -261,6 +261,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilater
     \\foreach \\x in {1,2,...,\\total}\n\
         \\draw (-\\x,\\x*2) -- (\\x,0);\n\
 }\n\
+\\begin{tikzpicture}\n\
 ";
 
   vector<Eisenstein> outline_gc(outline.size());
@@ -289,7 +290,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilater
     gcmax = Eisenstein(coord2d(gcmax.first,gcmax.second+1));
   }
 
-  latexfile << "\\begin{tikzpicture}\n";
+  
   // Define bounds
   Eisenstein D(gcmax-gcmin);
   latexfile << "\\newcommand*{\\cols}{"<<D.first<<"}\n"
@@ -307,16 +308,6 @@ string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilater
   } else // -- or as a regular grid
     latexfile << "\\drawRGrid{}\n";
 
-  
-  // Draw outline polygon
-    latexfile << "\\draw[outline] ";
-  for(int i=0;i<outline.size();i++){
-    const Eisenstein &x((outline_gc[i]-gcmin));
-    latexfile << "(" << x.first << "," << x.second << ") -- ";
-  }
-  latexfile << "cycle;\n"
-	    << "\\egroup\n\n";
-
   // Place vertex labels according to scheme chosen in parameter 'label_vertices':
   latexfile << "\\foreach \\place/\\name/\\lbl in {";
   switch(label_vertices){
@@ -327,12 +318,8 @@ string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilater
 	if(degrees.find(outline[i].second)->second != 6) {
 	const Eisenstein &IJ(outline_gc[i]-gcmin);
 
-	coord2d x;
-	if(draw_equilaterally) x = IJ.coord();
-	else                   x = coord2d(IJ.first,IJ.second);
-
 	const node_t &u(outline[i].second);
-	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(i+1<outline.size()?"},":"}");
+	latexfile << "{(" << IJ.first << "," << IJ.second << ")/"<<i<<"/"<<u<<(i+1<outline.size()?"},":"}");
       }
     break;
   case 2:        // Only label vertices on polygon outline.
@@ -340,12 +327,8 @@ string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilater
       for(int i=0;i<outline.size();i++){
 	const Eisenstein &IJ(outline_gc[i]-gcmin);
 
-	coord2d x;
-	if(draw_equilaterally) x = IJ.coord();
-	else                   x = coord2d(IJ.first,IJ.second);
-
 	const node_t &u(outline[i].second);
-	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(i+1<outline.size()?"},":"}");
+	latexfile << "{(" << IJ.first << "," << IJ.second << ")/"<<i<<"/"<<u<<(i+1<outline.size()?"},":"}");
       }
     break;
   case 3: // Label all original vertices, including internal ones
@@ -358,11 +341,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilater
 	node_t u(uv.first);
 	Eisenstein IJ(ij.first.GCtransform(K,L)-gcmin);
 
-	coord2d x;
-	if(draw_equilaterally) x = IJ.coord();
-	else                   x = coord2d(IJ.first,IJ.second);
-
-	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(++it != edgecoords.end()? "},":"}");
+	latexfile << "{(" << IJ.first << "," << IJ.second << ")/"<<i<<"/"<<u<<(++it != edgecoords.end()? "},":"}");
       }
     }
     break;
@@ -370,10 +349,19 @@ string Unfolding::to_latex(int K, int L, int label_vertices, bool draw_equilater
     break;
   }
   latexfile << "}\n"
-	    << "\t \\node[vertex] (\\name) at \\place {\\lbl};\n\n"
-	    << "\\end{tikzpicture}\n";
+	    << "\t \\node[vertex] (\\name) at \\place {\\lbl};\n\n";
+
+  
+  // Draw outline polygon
+  latexfile << "\\begin{pgfonlayer}{bg}\n"
+	    << "\\draw[outline] (0.center) \\foreach \\i in {1,...,"<<(outline.size()-1)<<"}{ -- (\\i.center) } -- cycle;\n\n";
+  
+  latexfile << "\\end{pgfonlayer}\n"
+	    << "\\egroup\n\n";
+
   if(include_headers) 
-    latexfile << "\\end{document}\n";
+    latexfile << "\\end{tikzpicture}\n"
+	      << "\\end{document}\n";
   
   return latexfile.str();
 }

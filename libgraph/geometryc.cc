@@ -153,7 +153,7 @@ vector<Eisenstein> polygon::reduce() const {
   return xs;
 }
 
-set<Eisenstein> polygon::allpoints() const {
+vector<Eisenstein> polygon::allpoints() const {
   scanline S = scanConvert();
 
   set<Eisenstein> points;
@@ -164,7 +164,7 @@ set<Eisenstein> polygon::allpoints() const {
 	points.insert(Eisenstein(x,i+S.minY));
     }
 
-  return points;
+  return vector<Eisenstein>(points.begin(),points.end());
 }
 
 vector<Eisenstein> polygon::controlpoints() const {

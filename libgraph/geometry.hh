@@ -191,6 +191,9 @@ struct coord3d {
     return xs;
   }
 
+  bool operator==(const coord3d& y) const { return x[0]==y[0] && x[1]==y[1] && x[2]==y[2]; }
+  bool operator!=(const coord3d& y) const { return x[0]!=y[0] || x[1]!=y[1] || x[2]!=y[2]; }
+
   // NB: Does this belong here?
   static coord3d line_plane_intersect(const coord3d& x0, const coord3d& x1, const coord3d& X0, const coord3d& n)
   {
@@ -370,6 +373,7 @@ struct tri_t {
 
   coord3d centroid(const vector<coord3d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
   coord2d centroid(const vector<coord2d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
+
   void flip(){ node_t t = u(1); u(1) = u(2); u(2) = t; }
 
   bool operator!=(const tri_t& x) const { return x_[0] != x[0] || x_[1] != x[1] || x_[2] != x[2]; }
@@ -557,7 +561,7 @@ public:
   double winding_number(const Eisenstein& x) const;
   bool point_inside(const Eisenstein& x) const;
 
-  set<Eisenstein> allpoints() const;
+  vector<Eisenstein> allpoints() const;
   vector<Eisenstein> controlpoints() const;
 
   friend ostream& operator<<(ostream& S, const polygon& P);

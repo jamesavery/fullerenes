@@ -103,8 +103,8 @@ public:
   Folding(const Unfolding& U, int debug_flags=0, ostream& debug_file = std::cerr) : 
     outline(U.outline), P(get_keys(outline)), debug_flags(debug_flags), debug_file(debug_file)
   {
-    set<Eisenstein> allpoints(P.allpoints());
-    for(set<Eisenstein>::const_iterator x(allpoints.begin()); x!=allpoints.end();x++) grid.insert(*x);
+    const vector<Eisenstein> allpoints(P.allpoints());
+    for(auto &x: allpoints) grid.insert(x);
   }
 
   vector<edge_t> connect();    
@@ -114,7 +114,8 @@ public:
   vector<edge_t> connect(const Eisenstein& w);		 // Both of the above operations.
 
   // Collect nodes in unfolding that will correspond to the same nodes in the folded graph.
-  vector<int> identify_nodes();
+  vector<node_t> identify_nodes() const;
+  vector<node_t> outline_nodes() const;
 
   PlanarGraph fold();
 };

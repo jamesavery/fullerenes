@@ -116,7 +116,7 @@ vector<edge_t> Folding::connect()
 }
 
 
-vector<int> Folding::identify_nodes()
+vector<int> Folding::identify_nodes() const
 {
   set<edge_t> same_as;
 
@@ -229,4 +229,28 @@ PlanarGraph Folding::fold()
   if(debug_flags & WRITE_FILE) debug_file << "G = " << G << ";\n";
 
   return G;
+}
+
+vector<node_t> Folding::outline_nodes() const
+{
+  vector<node_t> same_nodes(identify_nodes());
+  vector<node_t> outline_newnames(outline.size());
+  int outline_N=0;
+  for(int i=0;i<outline.size();i++){ outline_newnames[i] = grid(outline[i].first); outline_N = max(outline_N,outline[i].second+1); }
+  
+  vector<node_t> new_nodenames(outline_N,-1);
+  for(int i=0;i<outline.size();i++){
+    cerr << new_nodenames << endl;
+
+    int u = outline[i].second;
+    int stored_up = new_nodenames[u];
+
+    if(stored_up != -1 && same_nodes[stored_up] != same_nodes[outline_newnames[i]]){
+      fprintf(stderr,"outline[%d] = {{%d,%d},%d} -> u = %d. stored_up = %d, outline_newnames[%d] = %d\n",i,outline[i].first.first,outline[i].first.second,outline[i].second,u,stored_up,i,outline_newnames[i]);
+      abort();
+    }
+    new_nodenames[u] = same_nodes[outline_newnames[i]];
+  }
+  
+  return new_nodenames;
 }
