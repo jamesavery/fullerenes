@@ -335,21 +335,25 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
 {
   double bondlength = INFINITY;
 
-  for(int i=0;i<xs.size();i++)
+  for(int i=0;i<xs.size();i++){
     for(int j=i+1;j<xs.size();j++){
       double d = (xs[i]-xs[j]).norm();
       if(d < bondlength) bondlength = d;
     }
+  }
      
   set<edge_t> edges;
-  for(int i=0;i<xs.size();i++)
-    for(int j=0;j<xs.size();j++){
+  for(int i=0;i<xs.size();i++){
+    for(int j=i+1;j<xs.size();j++){
       double d = (xs[i]-xs[j]).norm();
-      if(bondlength/tolerance <= d && d <= bondlength*tolerance) 
-	edges.insert(edge_t(i,j));
+      if(d <= bondlength*tolerance) {
+        edges.insert(edge_t(i,j));
+      }
     }
+  }
   
   (*this) = Polyhedron(PlanarGraph(edges), xs);
+  
 }
 
 
@@ -364,7 +368,7 @@ matrix3d Polyhedron::inertia_matrix() const
       I(i,i) += xx;
 
       for(int j=0;j<3;j++)
-	I(i,j) -= x[i]*x[j];
+        I(i,j) -= x[i]*x[j];
     }
   }
   return I;
