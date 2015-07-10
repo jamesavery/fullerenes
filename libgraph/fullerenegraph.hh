@@ -35,12 +35,9 @@ public:
   // Creates the (i,j)-Goldberg-Coxeter construction C_{(i^2+ij+k^2)n} of the current fullerene C_n
   FullereneGraph coxeter_fullerene(const unsigned int i, const unsigned int j, const bool do_layout=false) const;
 
-
-  // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-  void get_general_spiral_from_fg(const int f1, const int f2, const int f3, vector<int> &pentagon_indices, jumplist_t &jumps) const;
-
-  // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
-  void get_canonical_general_spiral_from_fg(vector<int> &pentagon_indices, jumplist_t &jumps) const;
+  // spiral from graph, with or without starting point
+  bool get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general=true) const;
+  bool get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical=true, const bool general=true) const;
 
   // create a matrix that holds the topological distances between all pentagons
   vector<int> pentagon_distance_mtx() const;

@@ -1,5 +1,5 @@
 #ifndef TRIANGULATION_HH
-# define TRIANGULATION_HH
+#define TRIANGULATION_HH
 
 #include "matrix.hh"
 #include "planargraph.hh"
@@ -33,7 +33,7 @@ public:
   
   node_t nextCW(const dedge_t& uv)   const { return nextCW(uv.first,uv.second);  } // TODO: Remove.
   node_t nextCCW(const dedge_t& uv)  const { return nextCCW(uv.first,uv.second); }
-  node_t nextCW(node_t u,  node_t v) const;
+  node_t nextCW(node_t u, node_t v) const;
   node_t nextCCW(node_t u, node_t v) const;
 
 
@@ -45,13 +45,14 @@ public:
   Triangulation GCtransform(int k, int l) const;
 
   bool get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, 
-				 vector<node_t>& permutation, bool general=true, const vector<int>& S0=vector<int>()) const;
-  bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, vector<node_t>& permutation, bool general=true) const;
-  bool get_spiral(vector<int>& v, jumplist_t& j, bool canonical=true, bool only_special=false, bool general=true) const;
-
+				 vector<node_t>& permutation, const bool general=true, const vector<int>& S0=vector<int>()) const;
+  // the one defined by three nodes
+  bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, vector<node_t>& permutation, const bool general=true) const;
+  // the canonical one
+  bool get_spiral(vector<int>& v, jumplist_t& j, const bool canonical=true, const bool only_special=false, const bool general=true) const;
   void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps, // TODO: Should only need to supply jumps when general=true
 		       vector< vector<int> >& permutations,
-		       bool only_special=false, bool general=false) const;
+		       const bool only_special=false, const bool general=false) const;
 
   void symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const;
 
@@ -68,7 +69,6 @@ public:
     }
   }
 
-
   matrix<double> surface_distances() const;
   matrix<int>    convex_square_surface_distances() const;
   node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
@@ -84,7 +84,8 @@ public:
   // 4. Embed-in-3D special case
   FullereneDual(const Triangulation& g = Triangulation()) : Triangulation(g) {}
 
-  bool get_rspi(vector<int>& r, jumplist_t& j, bool canonical=true, bool general=true) const;
+  bool get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& r, jumplist_t& j, const bool general=true) const;
+  bool get_rspi(vector<int>& r, jumplist_t& j, const bool canonical=true, const bool general=true) const;
 
 };
 

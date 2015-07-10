@@ -27,7 +27,7 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
   return tris;
 }
 
-vector<tri_t> Triangulation::compute_faces() const 
+vector<tri_t> Triangulation::compute_faces() const
 // Does not assume graph is oriented
 // Produces oriented triangles
 {
@@ -62,7 +62,7 @@ void Triangulation::orient_neighbours()
   for(node_t u=0;u<N;u++){
     int d = neighbours[u].size();
 
-    node_t v = neighbours[u][0]; 
+    node_t v = neighbours[u][0];
     for(int i=1;i<d;i++){
       node_t w = next[dedge_t(u,v)];
       neighbours[u][i] = w;
@@ -82,7 +82,7 @@ node_t Triangulation::nextCCW(node_t u, node_t v) const
 }
 
 
-vector<tri_t> Triangulation::compute_faces_oriented() const 
+vector<tri_t> Triangulation::compute_faces_oriented() const
 {
   vector<tri_t> triangles(2*(N-2)); // Assumes cubic
   map<dedge_t,bool> dedge_done;    // Change to vector<bool> dedge_done[N*3] to increase speed.
@@ -90,7 +90,7 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
   int k=0;
   for(node_t u=0;u<N;u++){
     const vector<node_t>& nu(neighbours[u]);
-    for(int i=0;i<nu.size();i++){ 
+    for(int i=0;i<nu.size();i++){
       const node_t& v(nu[i]);    // Process directed edge u->v
       const dedge_t uv(u,v);
 
@@ -98,7 +98,7 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
         node_t w = nextCW(uv);
 
         if(!dedge_done[dedge_t(v,w)] && !dedge_done[dedge_t(w,u)]){
-             
+
           triangles[k++] = tri_t(u,v,w);
 
           dedge_done[dedge_t(u,v)] = true;
@@ -111,9 +111,9 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
   return triangles;
 }
 
- 
 
-PlanarGraph Triangulation::dual_graph() const 
+
+PlanarGraph Triangulation::dual_graph() const
 {
   IDCounter<tri_t> tri_numbers;
 
@@ -123,7 +123,7 @@ PlanarGraph Triangulation::dual_graph() const
 
   for(node_t U=0;U<triangles.size();U++){
     const tri_t& t(triangles[U]);
-    
+
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
       node_t w(nextCCW(u,v)); // TODO: CCW for buckygen -- will this give problems elsewhere?
@@ -142,7 +142,7 @@ PlanarGraph Triangulation::dual_graph() const
   return PlanarGraph(Graph(A));
 };
 
-vector<face_t> Triangulation::dual_faces() const 
+vector<face_t> Triangulation::dual_faces() const
 {
   vector<face_t> dfaces(N);
 
@@ -234,7 +234,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 
     // add node to spiral
     open_valencies.push_back(make_pair(k,spiral_string[k]-pre_used_valencies));
-   
+
   } // iterate over atoms
 
   // make sure we left the spiral in a sane state
@@ -256,7 +256,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     edge_set.insert(edge_t(N-1, open_valencies.front().first));
     open_valencies.pop_front();
   }
-  
+
   *this = Triangulation(PlanarGraph(edge_set));
 }
 
@@ -287,9 +287,9 @@ void gpi_remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remain
   nu.clear();
 }
 
-bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3, 
+bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3,
 			       vector<int> &spiral, jumplist_t& jumps, vector<node_t>& permutation,
-			       bool general) const {
+			       const bool general) const {
   bool normal_spiral = get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,false);
 
   return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
@@ -298,14 +298,14 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 // jumps start to count at 0
 // perform a general spiral search and return the spiral and the jump positions + their length
 // TODO: General spiral doesn't work properly anymore. FIX!
-// TODO: Add jumps to S0. 
+// TODO: Add jumps to S0.
 // TODO: Make GSpiral data type
 // TODO: if S0 is given, no need to test for connectedness at every step - jump positions are predetermined.
 // TODO: return GSpiral
-bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, 
+bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
 					      jumplist_t& jumps, vector<node_t> &permutation,
-					      bool general, const vector<int>& S0) const {
-  
+					      const bool general, const vector<int>& S0) const {
+
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
   permutation.clear();
   spiral.clear();
@@ -326,7 +326,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
 
   // a backup of the neighbours of the current node ... required in case of a jump
   vector<int> deleted_neighbours_bak;
-  
+
   int pre_used_valencies=0; // number of valencies removed from the last vertex *before* it is added to the spiral
   int jump_state=0; // the number of cyclic shifts of length 1 in the current series.
 
@@ -336,7 +336,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     remaining_nodes.insert(u);
   }
 
-  bool 
+  bool
     CW  = nextCW(dedge_t(f1,f2)) == f3,
     CCW = nextCCW(dedge_t(f1,f2)) == f3;
 
@@ -392,7 +392,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_graph because there are some edges deleted already
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
-    node_t v = CCW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w)); 
+    node_t v = CCW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w));
     //    cout << "u->v: " << u << " -> " << v << endl;
     if(v == -1) return false; // non-general spiral failed
 
@@ -425,16 +425,16 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
         jump_state=0;
       }
     }
-    
+
     connect_forward();
     while (open_valencies.front().second==0){
-      open_valencies.pop_front(); 
+      open_valencies.pop_front();
       connect_forward();
     }
 
     connect_backward();
     while (open_valencies.back().second==0){
-      open_valencies.pop_back(); 
+      open_valencies.pop_back();
       connect_backward();
     }
 
@@ -471,8 +471,8 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
 }
 
 void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps, // TODO: Should only need to supply jumps when general=true
-		     vector< vector<int> >& permutations,
-		     bool only_special, bool general) const
+                     vector< vector<int> >& permutations,
+                     const bool only_special, const bool general) const
 {
   vector<node_t> node_starts;
 
@@ -482,7 +482,7 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
 
   // Prefer special nodes. TODO: Automatic renumber in order of degrees.
   for(node_t u=0;u<N;u++) if(neighbours[u].size() != 6) node_starts.push_back(u);
-  for(node_t u=0;u<N;u++) 
+  for(node_t u=0;u<N;u++)
     if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
 
   for(int i=0; i<node_starts.size(); i++){ // Looks like O(N^3), is O(N)
@@ -493,35 +493,89 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
       node_t v=nu[j], w[2];
       w[0] = nextCW(dedge_t(u,v));
       w[1] = nextCCW(dedge_t(u,v));
-      
-      for(int k=0;k<2;k++)
-	if(get_spiral(u,v,w[k],spiral,jump,permutation,general)){
-	  spirals.push_back(spiral);
-	  jumps.push_back(jump);
-	  permutations.push_back(permutation);
-	}
 
+      for(int k=0;k<2;k++){
+        if(get_spiral(u,v,w[k],spiral,jump,permutation,general)){
+          spirals.push_back(spiral);
+          jumps.push_back(jump);
+          permutations.push_back(permutation);
+        }
+      }
     }
-  }  
+  }
+}
+
+// perform the canonical general spiral search and the spiral and the jump positions + their length
+// special_only is a switch to search for spirals starting at non-hexagons only
+bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool only_special, const bool general) const
+{
+  vector<node_t> node_starts;
+
+  for(node_t u=0;u<N;u++)
+    if(neighbours[u].size() != 6) node_starts.push_back(u);
+
+  for(node_t u=0;u<N;u++)
+    if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
+
+  vector<int> spiral_tmp,permutation_tmp;
+  jumplist_t jumps_tmp;
+  spiral = vector<int>(1,INT_MAX); // so it gets overwritten
+  jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
+
+  for(int i=0; i<node_starts.size(); i++){
+    const node_t u=node_starts[i];
+    const vector<node_t>& nu(neighbours[u]);
+
+    for(int j=0;j<nu.size();j++){
+      node_t v=nu[j], w[2];
+      w[0] = nextCW(dedge_t(u,v));
+      w[1] = nextCCW(dedge_t(u,v));
+
+      for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
+        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,general))
+          continue;
+
+        // + If we don't need the canonical spiral, just return the first one that works
+        if(!canonical){
+          jumps  = jumps_tmp;
+          spiral = spiral_tmp;
+          return true;
+        }
+
+        // store the shortest / lexicographically smallest (general) spiral
+        if(jumps_tmp.size() < jumps.size() ||
+           (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
+           (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
+            lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
+          jumps = jumps_tmp;
+          spiral = spiral_tmp;
+        }
+      }
+    }
+  }
+
+  if(spiral.size()!=N) return false;
+
+  return true;
 }
 
 void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const
 {
   vector< vector<int> > spirals, permutations;
   vector<jumplist_t>    jumps;
-  
+
   get_all_spirals(spirals,jumps,permutations,true,false);
 
-  if(spirals.empty()) 
+  if(spirals.empty())
     get_all_spirals(spirals,jumps,permutations,true,true);
 
   // // Now get the spiral corresponding to this triangulation
-  // // TDO: define S,J,P
+  // // TODO: define S,J,P
   // get_spiral(0,1,2,S,J,P,true);
   // vector< int > group_actions; // Referring to the 'permutations' array.
   // for(int i=0;i<spirals.size();i++)
   //   if(J == jumps[i] && S == spirals[i]) group_actions.push_back(i);
-  
+
   // Since finite point groups are Coxeter groups, they are generated
   // by a set of involutions. But... not every involution is a generator! What do?
 
@@ -532,82 +586,7 @@ void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagra
 
 }
 
-// perform the canonical general spiral search and the spiral and the jump positions + their length
-bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, bool canonical, bool only_special, bool general) const 
-{
-  vector<node_t> node_starts;
-
-  for(node_t u=0;u<N;u++) 
-    if(neighbours[u].size() != 6) node_starts.push_back(u);
-  
-  for(node_t u=0;u<N;u++) 
-    if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
-
-  vector<int> spiral_tmp,permutation_tmp;
-  jumplist_t jumps_tmp;
-  spiral = vector<int>(1,INT_MAX); // so it gets overwritten
-  jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
-  
-  for(int i=0; i<node_starts.size(); i++){
-    const node_t u=node_starts[i];
-    const vector<node_t>& nu(neighbours[u]);
-
-    for(int j=0;j<nu.size();j++){
-      node_t v=nu[j], w[2];
-      w[0] = nextCW(dedge_t(u,v));
-      w[1] = nextCCW(dedge_t(u,v));
-      
-      for(int k=0;k<2;k++){	// Looks like O(N^3), is O(N) (or O(1) if only_special is set)
-	if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,general))
-	  continue;
-
-	// + If we don't need the canonical spiral, just return the first one that works
-	if(!canonical){
-	  jumps  = jumps_tmp;
-	  spiral = spiral_tmp;
-	  return true;
-	}
-
-	// store the shortest / lexicographically smallest (general) spiral
-	if(jumps_tmp.size() < jumps.size() || 
-	   (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
-	   (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
-	    lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
-	  jumps = jumps_tmp;
-	  spiral = spiral_tmp;
-	}
-      }
-    }
-  }  
-
-  if(spiral.size()!=N) return false;
-
-  return true;
-}
-
-
-// call for the canonical general spiral and extract the pentagon indices
-bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonical, bool general) const {
-
-  rspi.clear();
-  jumps.clear();
-  vector<int> spiral;
-  if(!get_spiral(spiral, jumps, canonical, general)) return false;
-
-  int i=0;
-  vector<int>::const_iterator it=spiral.begin();
-  for(; it!=spiral.end(); ++it,++i){
-    if(*it==5){
-      rspi.push_back(i);
-    }
-  }
-  //assert(rspi.size()==12);
-  return true;
-}
-
-
-
-vector<int> draw_path(int major, int minor) 
+vector<int> draw_path(int major, int minor)
 {
   int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
 
@@ -634,21 +613,21 @@ vector<int> draw_path(int major, int minor)
 // Given start node u0 and adjacent face F_i, lay down triangles along the the straight
 // line to Eisenstein number (a,b), and report what the final node is.
 //
-// Assumes a,b >= 1. 
+// Assumes a,b >= 1.
 // TODO: Add special cases for (a,0) and (b,0) to make more general.
 // TODO: Better name.
 node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
 {
   node_t q,r,s,t;		// Current square
 
-  auto go_north = [&](){ 
+  auto go_north = [&](){
     const node_t S(s), T(t); // From old square
-    q = S; r = T; s = next(S,T); t = next(s,r); 
+    q = S; r = T; s = next(S,T); t = next(s,r);
   };
-  
+
   auto go_east = [&](){
     const node_t R(r), T(t); // From old square
-    q = R; s = T; r = next(s,q); t = next(s,r); 
+    q = R; s = T; r = next(s,q); t = next(s,r);
   };
 
   // Square one
@@ -673,10 +652,9 @@ node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
       if(i+1<runlengths.size()) go_east();
     }
   }
-  
+
   return t;			// End node is upper right corner.
 }
-
 
 matrix<int> Triangulation::convex_square_surface_distances() const
 {
@@ -716,23 +694,64 @@ matrix<double> Triangulation::surface_distances() const
   else return H;
 }
 
-Triangulation Triangulation::sort_nodes() const 
+Triangulation Triangulation::sort_nodes() const
 {
   vector< pair<int,int> > degrees(N);
 
   for(int u=0;u<N;u++) degrees[u] = make_pair(neighbours[u].size(), u);
-  
+
   sort(degrees.begin(), degrees.end());
 
   cout << "degrees = " << degrees << endl;
 
   vector<int> newname(N);
   for(int u=0;u<N;u++) newname[degrees[u].second] = u;
-  
+
   neighbours_t new_neighbours(N);
   for(int u=0;u<N;u++)
     for(int i=0;i<neighbours[u].size();i++)
       new_neighbours[newname[u]].push_back(newname[neighbours[u][i]]);
-  
+
   return Triangulation(new_neighbours);
 }
+
+// call for the canonical general spiral and extract the pentagon indices
+bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
+{
+  rspi.clear();
+  jumps.clear();
+  vector<int> spiral;
+  vector<node_t> permutation;
+  if(!get_spiral(f1, f2, f3, spiral, jumps, permutation, general)) return false;
+
+  int i=0;
+  vector<int>::const_iterator it=spiral.begin();
+  for(; it!=spiral.end(); ++it,++i){
+    if(*it==5){
+      rspi.push_back(i);
+    }
+  }
+  //assert(rspi.size()==12);
+  return true;
+}
+
+// call for the canonical general spiral and extract the pentagon indices
+bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonical, bool general) const
+{
+  rspi.clear();
+  jumps.clear();
+  vector<int> spiral;
+  bool special_only = false;
+  if(!get_spiral(spiral, jumps, canonical, special_only, general)) return false;
+
+  int i=0;
+  vector<int>::const_iterator it=spiral.begin();
+  for(; it!=spiral.end(); ++it,++i){
+    if(*it==5){
+      rspi.push_back(i);
+    }
+  }
+  //assert(rspi.size()==12);
+  return true;
+}
+

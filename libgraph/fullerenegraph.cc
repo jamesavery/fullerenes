@@ -203,103 +203,30 @@ FullereneGraph::FullereneGraph(const int n, const vector<int>& spiral_indices, c
 
 // pentagon indices and jumps start to count at 0
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-void FullereneGraph::get_general_spiral_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &pentagon_indices, jumplist_t &jumps) const {
-
-  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
-  pentagon_indices.clear();
+bool FullereneGraph::get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general) const
+{
+  rspi.clear();
   jumps.clear();
 
-  PlanarGraph dual = this->dual_graph(6);
+  FullereneDual FDual = Triangulation(this->dual_graph(6));
 
-  // the spiral is a string of numbers 5 and 6 and is built up during the loop
-  vector<int> spiral; 
-
-  dual.get_vertex_spiral(f1, f2, f3, spiral, jumps);
-  
-  // extract spiral indices from spiral
-  int k=0;
-  for(vector<int>::iterator it=spiral.begin(); it != spiral.end(); ++it, ++k){
-    if(*it==5){
-      pentagon_indices.push_back(k);
-    }
-  }
-  assert(pentagon_indices.size()==12);
-
+  if(!FDual.get_rspi(f1, f2, f3, rspi, jumps, general)) return false;
+  assert(rspi.size()==12);
+  return true;
 }
 
-
+// pentagon indices and jumps start to count at 0
 // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
-void FullereneGraph::get_canonical_general_spiral_from_fg(vector<int> &pentagon_indices, jumplist_t &jumps) const {
-
-  vector<int> pentagon_indices_tmp;
-  vector<int> spiral_tmp;
-  list<pair<int,int> > jumps_tmp;
-  
-  //100 times 0 to make sure size() is large (so it get's overwritten in the first cycle)
-  vector<int> general_spiral_bak(100,0); // FIXME
-
-  PlanarGraph dual(dual_graph(6));
-  vector<face_t> faces(dual.compute_faces_flat(3));
-
-//  cout << "generating all spirals ";
-
-  for(int i=0; i<faces.size(); i++){
-    int permutations[6][3] = {{0,1,2},{0,2,1},{1,0,2},{1,2,0},{2,0,1},{2,1,0}};
-    const face_t& f = faces[i];
-    for(int j=0; j<6; j++){
-      pentagon_indices_tmp.clear();
-
-      int f1 = f[permutations[j][0]], f2 = f[permutations[j][1]], f3 = f[permutations[j][2]];
-
-      dual.get_vertex_spiral(f1, f2, f3, spiral_tmp, jumps_tmp);
-
-      // extract spiral indices from spiral
-      int k=0;
-      for(vector<int>::const_iterator it=spiral_tmp.begin(); it != spiral_tmp.end(); ++it){
-        if(*it==5){
-          pentagon_indices_tmp.push_back(k);
-        }
-        ++k;
-      }
-      assert(pentagon_indices_tmp.size()==12);
-
-//      printf("Face %d:%d vertices defining the face(%d,%d,%d)\n",i,j,f1,f2,f3);
-
-      //flatten and combine:
-      vector<int> general_spiral;
-      for(list<pair<int,int> >::const_iterator it(jumps_tmp.begin()); it!= jumps_tmp.end(); ++it){
-        general_spiral.push_back(it->first);
-        general_spiral.push_back(it->second);
-      }
-      general_spiral.insert(general_spiral.end(), pentagon_indices_tmp.begin(), pentagon_indices_tmp.end());
-
-      // store the shortest / lexicographically smallest one
-      if(general_spiral.size() < general_spiral_bak.size() || 
-			(general_spiral.size() == general_spiral_bak.size() &&
-			lexicographical_compare(general_spiral.begin(), general_spiral.end(), general_spiral_bak.begin(), general_spiral_bak.end()))){
-		general_spiral_bak = general_spiral;
-      }
-    }
-  }
-
-  assert(general_spiral_bak.size() % 2 == 0);
-
-  // get rspi
-  vector<int> rspi(general_spiral_bak.end()-12, general_spiral_bak.end());
-  pentagon_indices = rspi;
-
-//  cout << "got rspi, size: " << general_spiral_bak.size() << endl;
-//  cout << "got rspi: " << rspi << endl;
-
-  //get jumps
+bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical, const bool general) const
+{
+  rspi.clear();
   jumps.clear();
-  while(general_spiral_bak.size() > 12){
-    jumps.push_back(make_pair(general_spiral_bak.front(), *(general_spiral_bak.begin()+1)));
-    general_spiral_bak.erase(general_spiral_bak.begin(), general_spiral_bak.begin()+2);
-  }
-//  cout << "got jumps, size: " << jumps.size() << endl;
-//  cout << "got jumps: " << jumps << endl;
 
+  FullereneDual FDual = Triangulation(this->dual_graph(6));
+
+  if(!FDual.get_rspi(rspi, jumps, canonical, general)) return false;
+  assert(rspi.size()==12);
+  return true;
 }
 
 

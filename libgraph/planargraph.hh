@@ -43,9 +43,6 @@ public:
 
   size_t count_perfect_matchings() const;
 
-  // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-  void get_vertex_spiral(const int f1, const int f2, const int f3, vector<int> &spiral, jumplist_t &jumps) const;
-
 
   vector<tri_t>  triangulation(int face_max=INT_MAX) const;
   vector<tri_t>  triangulation(const vector<face_t>& faces) const;
