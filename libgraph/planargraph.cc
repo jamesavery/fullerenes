@@ -64,7 +64,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
   unsigned int Nfaces = edge_set.size()-N+2;
   dual.N = Nfaces;
   dual.neighbours.resize(Nfaces);
-  
+
   //  cerr << "dual_graph(" << Fmax << ")\n";
   const vector<face_t> allfaces(compute_faces_flat(Fmax,planar_layout));
 
