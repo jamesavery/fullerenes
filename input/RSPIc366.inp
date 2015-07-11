@@ -1,7 +1,7 @@
 D3-C366 as a precursor to construct non-spiral D3-C384 by vertex insertion
 &General NA=366, ispsearch=2, iwext=1, nosort=1, ipsphere=2 /
 &Coord ICart=2 rspi=63, 64, 81, 92, 94, 111, 113, 140, 171, 172, 181, 183/
-&FFChoice Iopt=2 ftol=.1d-10/
+&FFChoice Iopt=3 ftol=.1d-10/
 &FFParameters fcoulomb=150. /
 &Hamilton /
 &Isomers /

@@ -297,7 +297,6 @@ void remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_
 
 // jumps start to count at 0
 // perform a general spiral search and return the spiral and the jump positions + their length
-// TODO: General spiral doesn't work properly anymore. FIX!
 // TODO: Add jumps to S0.
 // TODO: Make GSpiral data type
 // TODO: if S0 is given, no need to test for connectedness at every step - jump positions are predetermined.

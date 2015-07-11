@@ -14,7 +14,6 @@ there is no layout2d in 'find_outer_face' and the assertion fails.
   layouts are used (in the lib) or use the lib such that it doesn't fail.  I (lnw)
   think the first approach is better, a lib should be written such that it is
   hard to use wrongly.
-* general spiral is broken since 917d49d2b4.  maybe not all of that stuff was unnecessary ... (lnw)
 * minimum empty sphere problem, algorithm fails too often
 
 * Tutte-embedding fails:
