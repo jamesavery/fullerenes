@@ -266,7 +266,15 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 // *********************************************************************
 
 
-void gpi_remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
+bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3,
+			       vector<int> &spiral, jumplist_t& jumps, vector<node_t>& permutation,
+			       const bool general) const {
+  bool normal_spiral = get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,false);
+
+  return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
+}
+
+void remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
   remaining_nodes.erase(u);	// O(log(N)) with big coefficient - is set<node_t> the best data structure to use?
   vector<node_t>& nu(remaining_graph.neighbours[u]);
 
@@ -276,7 +284,7 @@ void gpi_remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remain
     vector<node_t>& nv(remaining_graph.neighbours[v]);
 
     for(int j=0;j<nv.size();j++){ // O(1) since neighbour count is bounded by max degree
-      if(nv[j] == i){
+      if(nv[j] == u){
         nv[j] = nv[nv.size()-1];//shift the last entry to the deleted pos
         nv.pop_back();//delete the last
         break;
@@ -287,14 +295,6 @@ void gpi_remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remain
   nu.clear();
 }
 
-bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3,
-			       vector<int> &spiral, jumplist_t& jumps, vector<node_t>& permutation,
-			       const bool general) const {
-  bool normal_spiral = get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,false);
-
-  return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
-}
-
 // jumps start to count at 0
 // perform a general spiral search and return the spiral and the jump positions + their length
 // TODO: General spiral doesn't work properly anymore. FIX!
@@ -303,13 +303,12 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 // TODO: if S0 is given, no need to test for connectedness at every step - jump positions are predetermined.
 // TODO: return GSpiral
 bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
-					      jumplist_t& jumps, vector<node_t> &permutation,
-					      const bool general, const vector<int>& S0) const {
-
+        				      jumplist_t& jumps, vector<node_t> &permutation,
+        				      const bool general, const vector<int>& S0) const {
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
-  permutation.clear();
   spiral.clear();
   jumps.clear();
+  permutation.clear();
 
   // TODO: Static allocation everywhere. Simplify function.
   permutation.resize(N);
@@ -344,7 +343,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // TODO: Input f1,f2 and bool CW instead to only allow valid spiral starts.
     if(!(CW || CCW)){
     // TODO: Set a global verbosity level; Usually we don't want to look at all this stuff.
-    //    cerr << "The requested nodes are not connected." << endl;
+    // cerr << "The requested nodes are not connected." << endl;
     return false;
   }
 
@@ -361,21 +360,20 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // first node
   spiral[0] = valencies[f1];
   permutation[0] = f1;
-  gpi_remove_node(f1, remaining_graph, remaining_nodes, deleted_neighbours_bak);
+  remove_node(f1, remaining_graph, remaining_nodes, deleted_neighbours_bak);
   open_valencies.push_back(make_pair(f1,valencies[f1]));
 
   // second node
   spiral[1] = valencies[f2];
   permutation[1] = f2;
-  gpi_remove_node(f2, remaining_graph, remaining_nodes, deleted_neighbours_bak);
+  remove_node(f2, remaining_graph, remaining_nodes, deleted_neighbours_bak);
   connect_backward();
   open_valencies.push_back(make_pair(f2,valencies[f2]-1));
-
 
   // third node
   spiral[2] = valencies[f3];
   permutation[2] = f3;
-  gpi_remove_node(f3, remaining_graph, remaining_nodes, deleted_neighbours_bak);
+  remove_node(f3, remaining_graph, remaining_nodes, deleted_neighbours_bak);
   connect_backward();
   connect_forward();
   open_valencies.push_back(make_pair(f3,valencies[f3]-2));
@@ -385,42 +383,41 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // iterate over all nodes (of the initial graph) but not by their respective number
   // starting at 3 because we added 3 already
   for(int i=3; i<N-1; ++i){
-
     pre_used_valencies=0;
     //    list<pair<int,int> > open_valencies_bak(open_valencies); // Makes the whole thing O(N^2), but is never used!
 
     // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_graph because there are some edges deleted already
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
-    node_t v = CCW? nextCCW(dedge_t(u,w)) : nextCW(dedge_t(u,w));
+    node_t v = CCW? nextCW(dedge_t(u,w)) : nextCCW(dedge_t(u,w));
     //    cout << "u->v: " << u << " -> " << v << endl;
     if(v == -1) return false; // non-general spiral failed
 
     //remove all edges of which *j is part from the remaining graph
-    gpi_remove_node(v, remaining_graph, remaining_nodes, deleted_neighbours_bak);
+    remove_node(v, remaining_graph, remaining_nodes, deleted_neighbours_bak);
 
     if(general){
       bool is_connected = remaining_graph.is_connected(remaining_nodes);
 
       if(!is_connected){//further cyclic rotation required
         //revert the last operations
-	//	cout << "Reverting deleted node " << v << " to neighbours " << deleted_neighbours_bak << endl;
+        //	cout << "Reverting deleted node " << v << " to neighbours " << deleted_neighbours_bak << endl;
         remaining_graph.neighbours[v] = deleted_neighbours_bak;
-	deleted_neighbours_bak.clear();
-
+        deleted_neighbours_bak.clear();
         for(vector<node_t>::iterator it = remaining_graph.neighbours[v].begin(); it != remaining_graph.neighbours[v].end(); ++it){
           remaining_graph.neighbours[*it].push_back(v);
         }
+
         //perform cyclic shift on open_valencies
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
-	//	cout << "open valencies = " << open_valencies << endl;
+        //	cout << "open valencies = " << open_valencies << endl;
         //there was no atom added, so 'i' must not be incremented
         --i;
         ++jump_state;
         continue;
       } else if(jump_state!=0){//end of cyclic rotation
-	//	cout << "//end of cyclic rotation\n";
+        //	cout << "//end of cyclic rotation\n";
         jumps.push_back(make_pair(i,jump_state));
         jump_state=0;
       }
@@ -450,17 +447,17 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // make sure we left the loop in a sane state
   // this probably requires some proper error handling: throw and catch and so on ...
   if(remaining_nodes.size() != 1){
-    //    cerr << "more than one node left ... exiting." << endl;
+    // cerr << "more than one node left ... exiting." << endl;
     return false;
   }
   const int last_valency = valencies[*remaining_nodes.begin()];
   if(open_valencies.size() != last_valency){
-    //    cerr << "wrong number of nodes with open valencies: " << open_valencies.size() << " ... exiting." << endl;
+    // cerr << "wrong number of nodes with open valencies: " << open_valencies.size() << " ... exiting." << endl;
     return false;
   }
   for(list<pair<node_t,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
     if(it->second != 1){
-      //      cerr << "number of open valencies is not 1 (but it should be) ... exiting." << endl;
+      // cerr << "number of open valencies is not 1 (but it should be) ... exiting." << endl;
       return false;
     }
   }

@@ -42,12 +42,12 @@ int main(int ac, char **av)
     
     i++;
     G = Triangulation(G.neighbours,true);
-    bool spiral_OK = G.get_spiral(spiral,jumps,true,false);
+    bool spiral_OK = G.get_spiral(spiral,jumps,true,false,false);
     if(!spiral_OK){
       vector<int> rspi2(12);
-      FullereneGraph F(G.dual_graph());
+      FullereneDual FD(G);
 
-      F.get_canonical_general_spiral_from_fg(rspi2,jumps);
+      spiral_OK = FD.get_rspi(rspi2,jumps,true,true);
 
       cout << jumps << endl;
       cout << rspi2 << endl;

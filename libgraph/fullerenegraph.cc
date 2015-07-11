@@ -205,6 +205,7 @@ FullereneGraph::FullereneGraph(const int n, const vector<int>& spiral_indices, c
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
 bool FullereneGraph::get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general) const
 {
+  assert(layout2d.size() != 0);
   rspi.clear();
   jumps.clear();
 
@@ -219,6 +220,7 @@ bool FullereneGraph::get_rspi_from_fg(const node_t f1, const node_t f2, const no
 // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
 bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical, const bool general) const
 {
+  assert(layout2d.size() != 0);
   rspi.clear();
   jumps.clear();
 

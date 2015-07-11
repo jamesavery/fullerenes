@@ -39,14 +39,14 @@ int main(int ac, char **av)
 //  int n_jumps = 2;
 //  //0, 115, 151
 
-  vector<int> pentagon_indices_input(12);
-  vector<int> pentagon_indices_output;
+  vector<int> rspi_in(12);
+  vector<int> rspi_out;
   list<pair<int,int> > jumps;
 
   cout << "Input spiral indices: ";
   for (int i=0; i<12; ++i){
-    pentagon_indices_input[i] = pentagon_indices_array[i];
-    cout <<  pentagon_indices_input[i] << ", ";
+    rspi_in[i] = pentagon_indices_array[i];
+    cout <<  rspi_in[i] << ", ";
   }
   cout << endl;
 
@@ -57,9 +57,10 @@ int main(int ac, char **av)
   }
   cout << endl;
 
-  FullereneGraph fg(n, pentagon_indices_input, jumps);
-//  FullereneGraph fg(n, pentagon_indices_input);
-
+  FullereneGraph fg(n, rspi_in, jumps);
+  cout << "graph created" << endl;
+  fg.layout2d = fg.tutte_layout();
+  cout << "layout created" << endl;
 
 //  cout << "fg = " << fg << endl;
 //  cout << "number of faces: " << fg.N << endl;
@@ -76,19 +77,22 @@ int main(int ac, char **av)
   cout << "Attempting to create spiral from (previously created) graph ..." << endl;
 
   jumps.clear();
-  pentagon_indices_output.clear();
-//  fg.get_general_spiral_from_fg(0,1,2, pentagon_indices_output, jumps);  
-  fg.get_canonical_general_spiral_from_fg(pentagon_indices_output, jumps);  
+  rspi_out.clear();
+  if(!fg.get_rspi_from_fg(rspi_out, jumps, true, true)){
+    cerr << "no spiral found, which is not possible. " << endl;
+    return 1;
+  }
 
   cout << "Output spiral: ";
   vector<int> out_spiral(n/2+2,6);
+  cerr << out_spiral << endl;
   for (int i=0; i<12; ++i){
-    out_spiral[pentagon_indices_output[i]] = 5;
+    out_spiral[rspi_out[i]] = 5;
   }
   cout << out_spiral << endl;
   
   cout << "Output spiral indices: ";
-  cout << pentagon_indices_output << endl;
+  cout << rspi_out << endl;
   
   cout << "Jumps: ";
   cout << jumps << endl;

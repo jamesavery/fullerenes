@@ -53,7 +53,7 @@ int main(int ac, char **av)
     //fg.layout2d = fg.tutte_layout();
 //    cout << "fg: " << fg << endl;
 
-    fg.get_canonical_general_spiral_from_fg(pentagon_indices, jumps);
+    fg.get_rspi_from_fg(pentagon_indices, jumps);
 //    cout << "pentagon indices: " << pentagon_indices << endl;
 
     //start indices at 1 for fortran
