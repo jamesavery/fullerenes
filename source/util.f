@@ -696,22 +696,22 @@ C1004 Format(' Ori constant for Wiener index: ',D15.9)
       RETURN
       END
 
-      SUBROUTINE PentIcoMetric(pent)
+C     SUBROUTINE PentIcoMetric(pent)
 C     Get Metric for icoshedron formed by pentagons
-      integer pent(12,12),nsort(2,12)
+C     integer pent(12,12),nsort(2,12)
 C     Find distance for icosahedron
-      do I=1,12
-        Call pentsort(I,pent,nsort)
-        do J=1,12
-        enddo
-      enddo
-      RETURN
-      END
+C     do I=1,12
+C       Call pentsort(I,pent,nsort)
+C       do J=1,12
+C       enddo
+C     enddo
+C     RETURN
+C     END
 
-      SUBROUTINE pentsort(I,pent,nsort)
-      integer pent(12,12),nsort(2,12)
-      RETURN
-      END
+C     SUBROUTINE pentsort(I,pent,nsort)
+C     integer pent(12,12),nsort(2,12)
+C     RETURN
+C     END
 
       SUBROUTINE Szeged(Edges,mdist,Sz)
       use config

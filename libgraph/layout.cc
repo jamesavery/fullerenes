@@ -342,11 +342,18 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
   cout << vertex_diameter << endl;
   cout << (edge_colour>>16) << endl;
 
+  
+  string str;
+  cerr << "Just before constructor.\n";
+  ostringstream s(str);
+  cerr << "stream opened" << endl;
+  s << std::fixed;
 
-  ostringstream s;
-  s << fixed;
-  cout << "stream opened" << endl;
 // If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
+  cerr << "Hello stream.\n";
+  s << "Hello, world.\n";
+  cerr << "Hello again.\n";
+
   if(include_latex_header)
 // Problem starts here immediately with next line
     s << "\\documentclass{standalone}\n"

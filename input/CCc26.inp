@@ -1,7 +1,7 @@
 D3h-C26 aug-cc-pvdz B3LYP opt. geom. minimum to C1-sym E=-990.1561223 au
 &General NA=26 IP=1, iwext=1, ispsearch=2, nosort=1 /
 &Coord ICart=1 /
-&FFChoice /
+&FFChoice iopt=3 /
 &FFParameters /
 &Hamilton IHam=1 /
 &Isomers IPR=1, IPH=1 /

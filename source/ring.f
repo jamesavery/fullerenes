@@ -1045,13 +1045,12 @@ C     Print center of edges
       Return
       END
 
-      SUBROUTINE RingCoord(Iout,iwext,dualdist,R6,
+      SUBROUTINE RingCoord(Iout,dualdist,R6,
      1 SmallRingDist,Dist,N5,N6,N5M,N6M)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),N5M(Mmax,5),N6M(Mmax,6)
 C     Print center of rings
-      print*,dualdist,R6,SmallRingDist
       factor=1.d0
       if(dualdist.ne.R6) then
        factor=dualdist/SmallRingDist

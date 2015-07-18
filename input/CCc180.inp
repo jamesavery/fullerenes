@@ -2,7 +2,7 @@ Ih-C180  cc-pvdz opt. geom. minimum -6860.35515 au not converged out
 This job also calculated vibrational frequencies using extended Wu
 force field
 &General NA=180, iwext=1 ispsearch=2 /
-&Coord ICart=1 /
+&Coord ICart=1 dualdist=2.4 /
 &FFChoice iopt=1 ihessian=1 /
 &FFParameters /
 &Hamilton /
