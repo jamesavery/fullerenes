@@ -119,10 +119,15 @@ unsigned int gcd(unsigned int a, unsigned int b)
 
 
 // Actually works for all cubic graphs -- perhaps stick it there instead
-FullereneGraph FullereneGraph::coxeter_fullerene(const unsigned int i, const unsigned int j, const bool do_layout) const
+// works for all CG, but here we know, the maximum ring size is 6
+FullereneGraph FullereneGraph::GCtransform(const unsigned k, const unsigned l, const bool do_layout) const
 {
-  FullereneGraph CG;
-  return CG;
+  assert(layout2d.size()==N);
+  Triangulation t(dual_graph(6));
+  t.layout2d = t.tutte_layout(); // FIXME remove because unnecessary?
+  Triangulation t_inflated(t.GCtransform(k,l));
+  FullereneGraph fg(t_inflated.dual_graph());
+  return fg;
 }
 
 // Creates the next leapfrog fullerene C_{3n} from the current fullerene C_n

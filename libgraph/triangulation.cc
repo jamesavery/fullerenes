@@ -261,6 +261,20 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 }
 
 
+//FIXME remove / replace layout assertion ?
+Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) const
+{
+  assert(layout2d.size() == N);
+  Unfolding u(*this,true);
+  Unfolding gcu(u*Eisenstein(k,l));
+  Folding gcf(gcu);
+  Triangulation t(gcf.fold());
+  t.layout2d = t.tutte_layout();
+  return t;
+}
+
+
+
 // *********************************************************************
 //                 SPIRAL STUFF
 // *********************************************************************

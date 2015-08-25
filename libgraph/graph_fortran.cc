@@ -49,6 +49,7 @@ extern "C" {
   // Fullerene graph generation 
   fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n);
   fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps);
+  fullerene_graph_ptr goldberg_coxeter_(const fullerene_graph_ptr *g, const int *k, const int *l);
 
   // Fullerene graph operations
   void compute_fullerene_faces_(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
@@ -225,6 +226,12 @@ fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int 
 
   return new FullereneGraph(frog);
 }
+
+fullerene_graph_ptr goldberg_coxeter_(const fullerene_graph_ptr *g, const int *k, const int *l)
+{
+  return new FullereneGraph((**g).GCtransform(*k,*l));
+}
+
 
 void tutte_layout_(graph_ptr *g, double *LAYOUT)
 {

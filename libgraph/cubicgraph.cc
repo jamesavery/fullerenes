@@ -154,3 +154,13 @@ bool CubicGraph::get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, cons
 }
 
 
+// Creates the (k,l)-Goldberg-Coxeter construction C_{(k^2+kl+l^2)n} of the current C_n
+CubicGraph CubicGraph::GCtransform(const unsigned k, const unsigned l, const bool do_layout) const
+{
+  assert(layout2d.size()==N);
+  Triangulation t(dual_graph());
+  t.layout2d = t.tutte_layout(); // FIXME remove because unnecessary?
+  Triangulation t_inflated(t.GCtransform(k,l));
+  CubicGraph cg(t_inflated.dual_graph());
+  return cg;
+}

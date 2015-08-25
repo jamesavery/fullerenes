@@ -1,4 +1,4 @@
-// usage: ./play-gaudi <base-structure> <k> <l> <trafo> <insert>
+// usage: ./app-gaudi <base-structure> <k> <l> <trafo> <insert>
 // base structure: 1..20
 // k: 1..
 // l: 0..k
@@ -17,53 +17,6 @@
 #include "libgraph/polyhedron.hh"
 
 using namespace std;
-
-PlanarGraph fold(vector< pair<Eisenstein, node_t> > &outline);
-
-typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
-
-
-
-
-int turn_direction(const Eisenstein& xi,const Eisenstein& xj,const Eisenstein& xk) 
-{
-  Eisenstein dx1(xj-xi), dx2(xk-xj);
-  return sgn(dx2.first * dx1.second - dx2.second * dx1.first);
-}
-
-
-Eisenstein tfm(const Eisenstein& x, const Eisenstein& x0, const Eisenstein& w, const Eisenstein& x0p)
-{
-  return (x-x0)*w + x0p;
-}
-
-
-PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
-{
-  Unfolding U(dual);
-  Folding F(U*Eisenstein(K,L));
-  return F.fold();
-}
-
-
-vector< pair<Eisenstein, node_t> > GCDreduce(const vector< pair<Eisenstein, node_t> > &outline)
-{
-  vector<Eisenstein> segments(outline.size());
-
-  for(int i=0;i<outline.size();i++) segments[i] = outline[(i+1)%outline.size()].first - outline[i].first;
-
-  cout << "segments  = " << segments << ";\n";
-
-  Eisenstein d(Eisenstein::gcd(segments)); // TODO: Only do GCD between pentagon nodes.
-
-  cout << "GCD = " << d << endl;
-  for(int i=0;i<segments.size();i++) segments[i] = segments[i].div(d);
-
-  vector< pair<Eisenstein,node_t> > new_outline(outline);
-  for(int i=0;i+1<outline.size();i++) new_outline[i+1].first = new_outline[i].first+segments[i];
-
-  return new_outline;
-}
 
 
 Graph cube()
@@ -350,7 +303,8 @@ int main(int ac, char **av)
   vector<int> rspi(12);
   FullereneGraph::jumplist_t jumps;
 
-  if(ac!=4) {cout << "three arguments required" << endl;}
+  cout << ac << endl;
+  if(ac!=6) {cout << "five arguments required" << endl; abort();}
   const int index = strtol(av[1],0,0) - 1;
   const int K = strtol(av[2],0,0);
   const int L = strtol(av[3],0,0);
@@ -360,49 +314,51 @@ int main(int ac, char **av)
   if(insert != 2 && insert != 4){cerr << "valid insertions are '2' and '4', exiting" << endl; return 1;}
   cout << "index, K, L: " << index << ", " << K << ", " <<  L << ", " <<  trafo <<  ", " << insert << endl;
 
-  PlanarGraph g(examples[index]);
-  cout << "planar graph created" << endl;
+  CubicGraph g(examples[index]);
+  cout << "Cubic graph created" << endl;
   cout << g << endl;
   g.layout2d = g.tutte_layout(0,-1,-1,4);
-  cout << "layout created" << endl;
+  cout << "gaudi-app: layout created" << endl;
 
   const int N = g.N;
   ofstream output(("output/C"+to_string(N)+"-unfold.m").c_str());
 
-  PlanarGraph dual(g.dual_graph(6));
-  cout << "dual graph created" << endl;
-  dual.layout2d = dual.tutte_layout();
-  cout << "layout created" << endl;
+//   PlanarGraph dual(g.dual_graph(6));
+//   cout << "dual graph created" << endl;
+//   dual.layout2d = dual.tutte_layout();
+//   cout << "layout created" << endl;
+// 
+//   output << "g = "  << g << ";\n";
+//   output << "dg = " << dual << ";\n";
+// //  cout << "Need to place 2x"<<dual.edge_set.size()<<" edges.\n";
+// 
+//   Unfolding unfld(dual,true);
+// 
+//   
+//   cout << "Placed " << unfld.edgecoords.size() << " edges.\n";
+// 
+//   output << "dedges   = " << get_keys(unfld.edgecoords) << ";\n";
+//   output << "dedgepos = " << get_values(unfld.edgecoords) << ";\n";
+//   output << "outline = "  << unfld.outline << ";\n";
+//   output << "outlinecoords = " << get_keys(unfld.outline) << ";\n";
+// 
+//   Unfolding gct_unfld = unfld * Eisenstein(K,L);
+//   cout << "outline multiplied" << endl;
+// 
+//   output << "gctoutline = " << get_keys(gct_unfld.outline) << ";\n";
+//   output.close();
+// 
+//   Folding fld(gct_unfld);
+//   cout << "folding created" << endl;
+//   PlanarGraph gctdual = fld.fold();
+//   cout << "triangulation created" << endl;
+//   CubicGraph gct = gctdual.dual_graph(3,false);
+//   cout << "cubic graph created" << endl;
+//   cout << "gctdual = " << gctdual << ";\n" << "gct     = " << gct << ";\n";
 
-  output << "g = "  << g << ";\n";
-  output << "dg = " << dual << ";\n";
-//  cout << "Need to place 2x"<<dual.edge_set.size()<<" edges.\n";
-
-  Unfolding unfld(dual,true);
-
-  
-  cout << "Placed " << unfld.edgecoords.size() << " edges.\n";
-
-  output << "dedges   = " << get_keys(unfld.edgecoords) << ";\n";
-  output << "dedgepos = " << get_values(unfld.edgecoords) << ";\n";
-  output << "outline = "  << unfld.outline << ";\n";
-  output << "outlinecoords = " << get_keys(unfld.outline) << ";\n";
-
-  Unfolding gct_unfld = unfld * Eisenstein(K,L);
-  cout << "outline multiplied" << endl;
-
-  output << "gctoutline = " << get_keys(gct_unfld.outline) << ";\n";
-  output.close();
-
-  Folding fld(gct_unfld);
-  cout << "folding created" << endl;
-  PlanarGraph gctdual = fld.fold();
-  cout << "triangulation created" << endl;
-  PlanarGraph gct = gctdual.dual_graph(3,false);
-  cout << "cubic graph created" << endl;
-  cout << "gctdual = " << gctdual << ";\n"
-	 << "gct     = " << gct << ";\n";
-
+  CubicGraph gct = g.GCtransform(K,L);
+  cout << "multiplying with " << K << ", " << L << endl;
+  cout << gct << endl;
 
   gct.layout2d = gct.tutte_layout();
   Polyhedron P0 = Polyhedron(gct,gct.zero_order_geometry(),6);
@@ -412,6 +368,7 @@ int main(int ac, char **av)
   else if(trafo==0 && insert==4){finalN *= 5;}
   else if(trafo==1 && insert==2){finalN *= 2;}
   else if(trafo==1 && insert==4){finalN *= 3;}
+  else{assert(false);}
       
   string basename("gaudi-"+to_string(finalN));
   {
@@ -502,6 +459,7 @@ int main(int ac, char **av)
   double long_edge_total;
   if(insert==2){     long_edge_total=2*long_edge_single +   long_edge_triple;}
   else if(insert==4){long_edge_total=3*long_edge_single + 2*long_edge_triple;}
+  else{assert(false);}
   cout << "short, long, total: " << long_edge_single << ", " << long_edge_triple << ", " << long_edge_total << endl;
   for(set<edge_t>::iterator it=es.begin(), to=es.end(); it!=to; it++){
     lengths.insert(make_pair(*it, normal_edge_length));
