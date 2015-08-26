@@ -27,7 +27,7 @@ struct CubicGraph : public PlanarGraph {
   bool get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, const bool canonical=true, const bool general=true) const;
 
   // creates the (k,l)-Goldberg-Coxeter construction C_{(k^2+kl+l^2)n} of the current C_n
-  CubicGraph GCtransform(const unsigned k, const unsigned l, const bool do_layout=false) const;
+  CubicGraph GCtransform(const unsigned k=1, const unsigned l=0, const bool do_layout=false) const;
 
 };
 

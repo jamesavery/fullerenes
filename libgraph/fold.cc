@@ -40,14 +40,14 @@ vector<edge_t> Folding::connect_cross(const Eisenstein& w)
     for(int j=0;j<segment.size();j++){
       const Eisenstein& x(segment[j]), y(revsegment[j]);
       if(x != y){
-	Eisenstein xp((x-x0)*T+x0p);
-	Eisenstein yp((y-x0)*T+x0p);
-	node_t u = grid(x*iw), v = grid(yp*iw);
-	assert(u>=0 && v>=0);
-	edges.push_back(edge_t(u,v));
-	
-	EC.push_back(make_pair(x,y));
-	ECp.push_back(make_pair(xp,yp));
+        Eisenstein xp((x-x0)*T+x0p);
+        Eisenstein yp((y-x0)*T+x0p);
+        node_t u = grid(x*iw), v = grid(yp*iw);
+        assert(u>=0 && v>=0);
+        edges.push_back(edge_t(u,v));
+        
+        EC.push_back(make_pair(x,y));
+        ECp.push_back(make_pair(xp,yp));
       }
       
     }
@@ -77,8 +77,8 @@ vector<edge_t> Folding::connect_polygon(const Eisenstein& w)
     for(int j=0;j<S.xs[i].size()/2;j++){
       int start = S.xs[i][2*j], end = S.xs[i][2*j+1];
       for(int x=start;x<end;x++){
-	node_t u = grid(Eisenstein(x,i+S.minY)*iw), v = grid(Eisenstein(x+1,i+S.minY)*iw);
-	if(u>=0 && v>=0) edges.push_back(edge_t(u,v));
+        node_t u = grid(Eisenstein(x,i+S.minY)*iw), v = grid(Eisenstein(x+1,i+S.minY)*iw);
+        if(u>=0 && v>=0) edges.push_back(edge_t(u,v));
       }
     }
   }
@@ -148,10 +148,10 @@ vector<int> Folding::identify_nodes()
     for(int j=0;j<segment.size();j++){
       const Eisenstein& x(segment[j]), y(revsegment[j]);
       if(x == y){
-	Eisenstein xp((x-x0)*T+x0p);
-	node_t u = grid(x), v = grid(xp);
-	assert(u>=0 && v>=0);
-	same_as.insert(edge_t(u,v));
+        Eisenstein xp((x-x0)*T+x0p);
+        node_t u = grid(x), v = grid(xp);
+        assert(u>=0 && v>=0);
+        same_as.insert(edge_t(u,v));
       }
     }
   }

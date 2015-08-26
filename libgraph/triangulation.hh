@@ -42,7 +42,7 @@ public:
   void          orient_neighbours();		// Ensures that neighbours are ordered consistently
   
   //  Unfolding unfold() const;
-  Triangulation GCtransform(const unsigned k, const unsigned l) const;
+  Triangulation GCtransform(const unsigned k=1, const unsigned l=0) const;
 
   // spiral stuff
   bool get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, 

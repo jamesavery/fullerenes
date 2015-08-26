@@ -17,7 +17,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
   PlanarGraph dual(dual_graph(6,planar_layout));
   vector<face_t> triangles(dual.compute_faces_flat(3,false));
   map<edge_t,vector<node_t> > edge_nodes;
-  
+
   set<edge_t> edgeset_new;
   node_t v_new = dual.N;
 
@@ -27,19 +27,19 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
     new_layout.resize(dual.N);
     for(int i=0;i<dual.N;i++) new_layout[i] = dual.layout2d[i];
   }
-    
+
   // Create n new vertices for each edge
   set<edge_t> dual_edges = dual.undirected_edges();
 
   for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end(); e++){
     vector<node_t>& nodes(edge_nodes[*e]);
     for(unsigned int i=0;i<m;i++) nodes.push_back(v_new++);
-    
-    if(planar_layout && layout2d.size() == N) 
+
+    if(planar_layout && layout2d.size() == N)
       for(unsigned int i=0;i<m;i++){
-	double lambda = (1.0+i)*(1.0/(m+1));
-	const coord2d &a(dual.layout2d[e->first]), &b(dual.layout2d[e->second]);
-	new_layout.push_back(a*(1.0-lambda) + b*lambda);
+        double lambda = (1.0+i)*(1.0/(m+1));
+        const coord2d &a(dual.layout2d[e->first]), &b(dual.layout2d[e->second]);
+        new_layout.push_back(a*(1.0-lambda) + b*lambda);
       }
   }
 
@@ -55,7 +55,7 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
     grid[edge_t(m+1,0)]   = T[1];
     grid[edge_t(m+1,m+1)] = T[2];
     // Insert new edge vertices
-    for(size_t j=0;j<m;j++){	
+    for(size_t j=0;j<m;j++){
       grid[edge_t(0,j+1)]   = ns0[j];
       grid[edge_t(j+1,m+1)] = ns1[j];
       grid[edge_t(j+1,j+1)] = ns2[j];
@@ -63,28 +63,28 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
     // Create and insert inner vertices
     for(int j=1;j<m;j++)
       for(int k=j+1;k<=m;k++)
-	grid[edge_t(j,k)] = v_new++;
+        grid[edge_t(j,k)] = v_new++;
 
     if(planar_layout && layout2d.size() == N){
       double sqrt2inv = 1.0/sqrt(2.0);
-      const coord2d &a(dual.layout2d[T[0]]), &b(dual.layout2d[T[1]]), &c(dual.layout2d[T[2]]);      
+      const coord2d &a(dual.layout2d[T[0]]), &b(dual.layout2d[T[1]]), &c(dual.layout2d[T[2]]);
       for(int j=1;j<m;j++)
-	for(int k=j+1;k<=m;k++){
-	  double s = (1+j)*(1.0/(m+2)), t = k*(1.0/(m+2));
-	  //fprintf(stderr,"(s,t) = (%g,%g)\n",s,t);
-	  new_layout.push_back(a+((b-a)*s + (c-a)*t)*sqrt2inv);
-	}
+        for(int k=j+1;k<=m;k++){
+          double s = (1+j)*(1.0/(m+2)), t = k*(1.0/(m+2));
+          //fprintf(stderr,"(s,t) = (%g,%g)\n",s,t);
+          new_layout.push_back(a+((b-a)*s + (c-a)*t)*sqrt2inv);
+        }
     }
-      
+
     // Connect the vertices in the grid
     for(int j=0;j<=m;j++)
       for(int k=j+1;k<=m+1;k++){
-	node_t v(grid[edge_t(j,k)]), down(grid[edge_t(j+1,k)]), 
-	  left(grid[edge_t(j,k-1)]);
+        node_t v(grid[edge_t(j,k)]), down(grid[edge_t(j+1,k)]),
+          left(grid[edge_t(j,k-1)]);
 
-	edgeset_new.insert(edge_t(v,down));
-	edgeset_new.insert(edge_t(v,left));
-	edgeset_new.insert(edge_t(left,down));
+        edgeset_new.insert(edge_t(v,down));
+        edgeset_new.insert(edge_t(v,left));
+        edgeset_new.insert(edge_t(left,down));
       }
   }
 
@@ -134,7 +134,7 @@ FullereneGraph FullereneGraph::GCtransform(const unsigned k, const unsigned l, c
 FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   PlanarGraph dualfrog(*this);
 
-  vector<face_t> faces(dualfrog.compute_faces_flat(6,planar_layout)); 
+  vector<face_t> faces(dualfrog.compute_faces_flat(6,planar_layout));
 
   //  cout << "(*leapfrog*)outer_face = " << dualfrog.outer_face << ";\n";
   //  cout << "(*leapfrog*)faces      = " << faces << ";\n";
@@ -149,7 +149,7 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
     const face_t& f(faces[i]);
     for(size_t j=0;j<f.size();j++)
       dual_edges.insert(edge_t(v_new,f[j]));
-    
+
     if(planar_layout)
       dualfrog.layout2d[v_new] = f.centroid(layout2d);
 
@@ -171,13 +171,13 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
       const face_t& t(triangles[i]);
       new_layout[i] = t.centroid(dualfrog.layout2d)*coord2d(1,-1);
       for(int j=0;j<3;j++) if(t[j] == N){
-	  //	  cout << "Triangle number " << i << " = " << t << " belongs to outer face.\n";
-	  new_outer_face.push_back(i);
-	  new_layout[i] *= 2.0; // TODO: Scale to be 1.1*radius
-	  break;
+          //          cout << "Triangle number " << i << " = " << t << " belongs to outer face.\n";
+          new_outer_face.push_back(i);
+          new_layout[i] *= 2.0; // TODO: Scale to be 1.1*radius
+          break;
       }
     }
-  } 
+  }
 
   FullereneGraph frog(dualfrog.dual_graph(3,false), new_layout);
 
@@ -194,11 +194,11 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
 // n is the number of vertices
 FullereneGraph::FullereneGraph(const int n, const vector<int>& spiral_indices, const jumplist_t& jumps) : CubicGraph() {
   assert(spiral_indices.size() == 12);
-  
+
   const int n_faces = n/2 + 2;
   vector<int> spiral_string(n_faces,6);
   for(int i=0;i<spiral_indices.size();i++) spiral_string[spiral_indices[i]] = 5;
-  
+
   Triangulation dual(spiral_string,jumps);
   Graph G(dual.dual_graph());
 
@@ -241,23 +241,23 @@ bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, cons
 vector<int> FullereneGraph::pentagon_distance_mtx() const{
 
   PlanarGraph dual(dual_graph(6));
-  
+
   vector<int> pentagons;
   for(int i=0; i<dual.N; i++) if(dual.neighbours[i].size() == 5) pentagons.push_back(i);
-  
+
   // I know the following line is very wasteful but it's good enough
   vector<int> all_distances = dual.all_pairs_shortest_paths(INT_MAX);
   vector<int> mtx_vec(144,0);
-  
+
   //cout << "pentagon distances: " << endl;
   for(int i=0; i!=12; ++i){
     for(int j=0; j!=12; ++j){
       mtx_vec[12*i+j] = all_distances[dual.N * pentagons[i] + pentagons[j]];
     }
   }
- 
+
 //  cout << pentagon_distance_mtx << endl;
-  
+
   return mtx_vec;
 
 //mathematica output, please do not remove (lukas)
@@ -291,14 +291,14 @@ vector<coord3d> FullereneGraph::zero_order_geometry(double scalerad) const
   for(node_t u=0;u<N;u++)
     for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[neighbours[u][i]]).norm();
   Ravg /= (3.0*N);
-  
+
   coordinates *= scalerad*1.5/Ravg;
 
   return coordinates;
 }
 
 extern "C" void sa_optff_(const FullereneGraph **graph, const int *N, const int *ihessian, const int *iprinthessian,
-		       const int *iopt,double *Dist,double *ftol,double *force);
+                       const int *iopt,double *Dist,double *ftol,double *force);
 extern "C" void default_force_parameters_(const int *iopt, double *parameters);
 
 vector<coord3d> FullereneGraph::optimized_geometry(const vector<coord3d>& points, int opt_method, double ftol) const

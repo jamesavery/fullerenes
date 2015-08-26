@@ -33,7 +33,7 @@ public:
   FullereneGraph leapfrog_fullerene(const bool do_layout=false) const;
 
   // Creates the (k,l)-Goldberg-Coxeter construction C_{(k^2+kl+l^2)n} of the current fullerene C_n
-  FullereneGraph GCtransform(const unsigned k, const unsigned l, const bool do_layout=false) const;
+  FullereneGraph GCtransform(const unsigned k=1, const unsigned l=0, const bool do_layout=false) const;
 
   // spiral from graph, with or without starting point
   bool get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general=true) const;
