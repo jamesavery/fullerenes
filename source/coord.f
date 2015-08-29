@@ -2173,32 +2173,40 @@ C Input: initial graph, and GC indices (kGC,lGC)
         leap=1
         go to 10       
       endif
-C General Goldberg-Coxeter to be implemented
+
+C--> Start of transformation
+C General Goldberg-Coxeter if l>0
       if(lGC .ne. 0) then
         write(Iout,1011)
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
         goldcox = goldberg_coxeter(g,kGC,lGC)
         isafullerene = graph_is_a_fullerene(goldcox)
-      endif
-      g = new_fullerene_graph(Nmax,number_vertices,IDA)
-      halma = halma_fullerene(g,kGC-1)
-      isafullerene = graph_is_a_fullerene(halma)
-      IF (isafullerene.eq.1) then
-        write (iout,1013)
+
       else
-        write (iout,1009)
-        stop
-      endif
+
+C Halma if l=0
+        g = new_fullerene_graph(Nmax,number_vertices,IDA)
+        halma = halma_fullerene(g,kGC-1)
+        isafullerene = graph_is_a_fullerene(halma)
+        IF (isafullerene.eq.1) then
+          write (iout,1013)
+        else
+          write (iout,1009)
+          stop
+        endif
 C Update fortran structures
-      MLeap  = NVertices(halma)
-      Medges = NEdges(halma)
-        write(Iout,1012)  MLeap,Medges
+        MLeap  = NVertices(halma)
+        Medges = NEdges(halma)
+          write(Iout,1012)  MLeap,Medges
 C Produce adjacency matrix 
-      write (Iout,1005) 
-      call adjacency_matrix(halma,Nmax,IDA)
-      write (Iout,1007) 
+        write (Iout,1005) 
+        call adjacency_matrix(halma,Nmax,IDA)
+        write (Iout,1007) 
+        endif
+        number_vertices = MLeap
+
       endif
-      number_vertices = MLeap
+C--> End of transformation
 
       Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
