@@ -229,7 +229,9 @@ fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int 
 
 fullerene_graph_ptr goldberg_coxeter_(const fullerene_graph_ptr *g, const int *k, const int *l)
 {
-  return new FullereneGraph((**g).GCtransform(*k,*l));
+  FullereneGraph fg(**g);
+  fg.layout2d = fg.tutte_layout(); // FIXME remove, and pass argument to GCtransform?
+  return new FullereneGraph(fg.GCtransform(*k,*l));
 }
 
 

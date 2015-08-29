@@ -2179,7 +2179,6 @@ C General Goldberg-Coxeter to be implemented
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
         goldcox = goldberg_coxeter(g,kGC,lGC)
         isafullerene = graph_is_a_fullerene(goldcox)
-        stop
       endif
       g = new_fullerene_graph(Nmax,number_vertices,IDA)
       halma = halma_fullerene(g,kGC-1)
