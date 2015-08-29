@@ -2116,71 +2116,89 @@ C     Construct Leapfrog fullerene through adjacency matrix
      1 goldcox,leapfrog_fullerene, halma_fullerene, goldberg_coxeter
       LeapErr=0 
 
-C Leapfrog fullerene
+C--> Start leapfrog fullerene if leap > 0
   10  if(leap.gt.0) then
-      MLeap=(3**leap)*number_vertices
+       MLeap=(3**leap)*number_vertices
 
-      if(MLeap.gt.Nmax) then
+       if(MLeap.gt.Nmax) then
          Write(Iout,1002) MLeap,Nmax
          LeapErr=1
          return
-      endif
+       endif
 
-      if(leap.eq.1) then
-       Write(Iout,1000) number_vertices,MLeap
-      else
-       if(leap.gt.3) Write(Iout,1001) leap,number_vertices,MLeap
-       if(leap.eq.2) Write(Iout,1021) leap,number_vertices,MLeap
-       if(leap.eq.3) Write(Iout,1022) leap,number_vertices,MLeap
-      endif 
+       if(leap.eq.1) then
+        Write(Iout,1000) number_vertices,MLeap
+       else
+        if(leap.gt.3) Write(Iout,1001) leap,number_vertices,MLeap
+        if(leap.eq.2) Write(Iout,1021) leap,number_vertices,MLeap
+        if(leap.eq.3) Write(Iout,1022) leap,number_vertices,MLeap
+       endif 
 
-      g = new_fullerene_graph(Nmax,number_vertices,IDA)
-      frog = leapfrog_fullerene(g,leap)
+       g = new_fullerene_graph(Nmax,number_vertices,IDA)
+       frog = leapfrog_fullerene(g,leap)
 
 C Test that the created leapfrog graph is a fullerene graph
 C (cubic, satisfies Eulers formula, has 12 pentagons, remaining 
 C  faces are hexagons)
-      isafullerene = graph_is_a_fullerene(frog)
+       isafullerene = graph_is_a_fullerene(frog)
 
-      if(isafullerene .eq. 1) then
-         write (Iout,1014) 
-      else
-         write (Iout,1015) 
-      endif
+       if(isafullerene .eq. 1) then
+          write (Iout,1014) 
+       else
+          write (Iout,1015) 
+       endif
 C Produce adjacency matrix
-      write (Iout,1005) 
-      call adjacency_matrix(frog,Nmax,IDA)
+       write (Iout,1005) 
+       call adjacency_matrix(frog,Nmax,IDA)
       endif
+C--> End of leapfrog fullerene construction
+
 
 C Goldberg-Coxeter transform of initial fullerene
 C Input: initial graph, and GC indices (kGC,lGC) 
       if(leapGC.gt.0) then
-      Write(Iout,1010) kGC,lGC,kGC,lGC
-      MGCLimit=(kgc*kgc+lgc*(kgc+lgc))*number_vertices
-      if(MGCLimit.gt.Nmax) then
-         Write(Iout,1003) MGCLimit,Nmax
-         LeapErr=1
-         return
+       Write(Iout,1010) kGC,lGC,kGC,lGC
+       MGCLimit=(kgc*kgc+lgc*(kgc+lgc))*number_vertices
+       if(MGCLimit.gt.Nmax) then
+          Write(Iout,1003) MGCLimit,Nmax
+          LeapErr=1
+          return
+       endif
+
+       if(kGC.eq.1.and.lGC.eq.0) then
+        Write(Iout,1006) kGC,lGC
+        return
+       endif
+       if(kgc.eq.1.and.lGC.eq.1) then
+         write(Iout,1008)
+         leapGC=0
+         leap=1
+         go to 10       
       endif
 
-      if(kGC.eq.1.and.lGC.eq.0) then
-       Write(Iout,1006) kGC,lGC
-       return
-      endif
-      if(kgc.eq.1.and.lGC.eq.1) then
-        write(Iout,1008)
-        leapGC=0
-        leap=1
-        go to 10       
-      endif
 
-C--> Start of transformation
+C--> Start of GC and halma transformations
 C General Goldberg-Coxeter if l>0
       if(lGC .ne. 0) then
         write(Iout,1011)
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
         goldcox = goldberg_coxeter(g,kGC,lGC)
         isafullerene = graph_is_a_fullerene(goldcox)
+        IF (isafullerene.eq.1) then
+          write (iout,1013)
+        else
+          write (iout,1009)
+          stop
+        endif
+C Update fortran structures
+        MLeap  = NVertices(goldcox)
+        Medges = NEdges(goldcox)
+          write(Iout,1012)  MLeap,Medges
+C Produce adjacency matrix 
+        write (Iout,1005) 
+        call adjacency_matrix(goldcox,Nmax,IDA)
+        write (Iout,1007) 
+        number_vertices = MLeap
 
       else
 
