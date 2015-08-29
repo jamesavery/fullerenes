@@ -2175,10 +2175,10 @@ C Input: initial graph, and GC indices (kGC,lGC)
       endif
 C General Goldberg-Coxeter to be implemented
       if(lGC .ne. 0) then
+        write(Iout,1011)
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
         goldcox = goldberg_coxeter(g,kGC,lGC)
         isafullerene = graph_is_a_fullerene(goldcox)
-        write(Iout,1011)
         stop
       endif
       g = new_fullerene_graph(Nmax,number_vertices,IDA)
@@ -2225,7 +2225,7 @@ C Produce adjacency matrix
  1010 Format(/1x,'Goldberg-Coxeter transformation with indices ',
      1 '(k,l) = (',I2,',',I2,') of initial fullerene: GC(',I2,',',I2,
      1 ')[G0]')
- 1011 Format(/1x,'Gneral Goldberg-Coxeter transformation',
+ 1011 Format(/1x,'General Goldberg-Coxeter transformation',
      1 ' for l > 0.')
  1012 Format(1x,'Updating number of vertices (',I5,') and edges (',
      1 I5,')')
