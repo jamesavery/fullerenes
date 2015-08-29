@@ -2181,14 +2181,15 @@ C Also if this is a leapfrog use leapfrog_fullerene instead
 
 C General Goldberg-Coxeter if l>0 and not just leapfrog
       if(lGC .ne. 0) then
+C Not halma
         write(Iout,1011)
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
         goldcox = goldberg_coxeter(g,kGC,lGC)
         isafullerene = graph_is_a_fullerene(goldcox)
-        IF (isafullerene.eq.1) then
-          write (iout,1013)
+        if (isafullerene.eq.1) then
+          write (iout,1016)
         else
-          write (iout,1009)
+          write (iout,1017)
           stop
         endif
 C Update fortran structures
@@ -2230,7 +2231,10 @@ C--> End of transformation
       Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
       if(leap.ne.0) call delete_fullerene_graph(frog)
-      if(leapGC.ne.0) call delete_fullerene_graph(halma)
+      if(leapGC.ne.0) then
+       if(lGC .eq. 0) call delete_fullerene_graph(halma)
+       if(lGC .ne. 0) call delete_fullerene_graph(goldcox)
+      endif
       call delete_fullerene_graph(g)
       write (Iout,1004) 
  1000 Format(/1X,'Creating the adjacency matrix of the next leap-frog',
@@ -2247,7 +2251,7 @@ C--> End of transformation
      1 '(k,l) = (',I2,',',I2,') is the identity ==> Return')
  1007 Format(1x,'Adjacency matrix produced')
  1008 Format(1x,'Goldberg-Coxeter transformation is of leapfrog type')
- 1009 Format(1x,'Halma fullerene is not a fullerene')
+ 1009 Format(1x,'Halma transform is not a fullerene')
  1010 Format(/1x,'Goldberg-Coxeter transformation with indices ',
      1 '(k,l) = (',I2,',',I2,') of initial fullerene: GC(',I2,',',I2,
      1 ')[G0]')
@@ -2255,10 +2259,12 @@ C--> End of transformation
      1 ' for l > 0.')
  1012 Format(1x,'Updating number of vertices (',I5,') and edges (',
      1 I5,')')
- 1013 Format(1x,'Halma fullerene is a fullerene')
+ 1013 Format(1x,'Halma transform is a fullerene')
  1014 Format(1X,'Leapfrog graph satisfies all fullerene conditions')
  1015 Format(1X,'Leapfrog graph does not satisfy all fullerene ',
      1 'conditions')
+ 1016 Format(1x,'Goldberg-Coxeter transform is a fullerene')
+ 1017 Format(1x,'Goldberg-Coxeter transform is not a fullerene')
  1021 Format(/1X,'Creating the adjacency matrix of the ',I2,
      1 'nd leap-frog fullerene: ',I5,' --> ',I5)
  1022 Format(/1X,'Creating the adjacency matrix of the ',I2,
