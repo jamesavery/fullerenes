@@ -2154,8 +2154,11 @@ C Produce adjacency matrix
 C--> End of leapfrog fullerene construction
 
 
+C--> Start of GC and halma transformations
 C Goldberg-Coxeter transform of initial fullerene
 C Input: initial graph, and GC indices (kGC,lGC) 
+C Initial test if everything is in order
+C Also if this is a leapfrog use leapfrog_fullerene instead
       if(leapGC.gt.0) then
        Write(Iout,1010) kGC,lGC,kGC,lGC
        MGCLimit=(kgc*kgc+lgc*(kgc+lgc))*number_vertices
@@ -2176,9 +2179,7 @@ C Input: initial graph, and GC indices (kGC,lGC)
          go to 10       
       endif
 
-
-C--> Start of GC and halma transformations
-C General Goldberg-Coxeter if l>0
+C General Goldberg-Coxeter if l>0 and not just leapfrog
       if(lGC .ne. 0) then
         write(Iout,1011)
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
