@@ -28,7 +28,7 @@
 
 \aliaspagestyle{title}{empty}
 
-\title{\program{Fullerene} (Version 4.4)\\ -- A Program for the Topological Analysis of Fullerenes --\\ User's Manual}
+\title{\program{Fullerene} (Version 4.5)\\ -- A Program for the Topological Analysis of Fullerenes --\\ User's Manual}
 
 \author{Peter Schwerdtfeger%
   \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
@@ -80,7 +80,7 @@ We are always open to improvements and suggestions.
 \begin{enumerate}
 	\tightlist
 	\item P. Schwerdtfeger, L. Wirz, J. Avery, \textit{\program{Fullerene} -- A Software
-	 Package for Constructing and Analyzing Structures of Regular Fullerenes}, J. Comput. Chem. 2013, 34, 1508--1526
+	 Package for Constructing and Analyzing Structures of Regular Fullerenes}, J. Comput. Chem. 2013, 34, 1508--1526.
 \end{enumerate}
 \subsubsection*{We also recommend to cite the following book (many of the concepts used can be found here):}
 \begin{enumerate}
@@ -93,6 +93,8 @@ We are always open to improvements and suggestions.
 \begin{enumerate}
 	\setcounter{enumi}{2}
 	\tightlist
+	\item P. Schwerdtfeger, L. Wirz, J. Avery, \textit{The Topology of Fullerenes}, WIRE Comput. Mol. Sci. \textbf{5}, 96--145 (2015).
+	 \item L. Wirz, R. Sure, R. Tonner, A. Hermann, P. Schwerdtfeger, \textit{A Harmonic Force-Field Method for Fullerenes and a Comparison to Density Functional Calculations for Goldberg-Coxeter Fullerenes up to C$_{980}$}, J. Comput. Chem., in press.
 	\item D. Babi\'c, \textit{Nomenclature and Coding of Fullerenes}, J. Chem. Inf. Comput. Sci. \textbf{35}, 515--526 (1995).
 	\item D. E. Manolopoulos and P. W. Fowler, \textit{Molecular graphs, point groups, and fullerenes}, J. Chem. Phys. \textbf{96}, 7603--7614 (1992).
 	\item Z. C. Wu, D. A. Jelski, and T. F. George, \textit{Vibrational Motions of Buckminsterfullerene}, Chem. Phys. Lett. \textbf{137}, 291--295 (1987).
@@ -108,17 +110,14 @@ We are always open to improvements and suggestions.
 	\item F. Cataldo, A. Graovac, O. Ori \textit{The Mathematics and Topology of Fullerenes} (Springer, Berlin, 2011).
 \end{enumerate}
 
-\textbf{Acknowledgement:} \textit{PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support 
-in terms of a Humboldt Research Award, and to both Prof. Gernot Frenking and 
-Dr. Ralf Tonner (Marburg) for support during his extended stay in Marburg where 
-writing of this program began. We acknowledge the help of Darko Babi\'c, Patrick 
-W. Fowler (Sheffield) and David E. Manolopoulos (Oxford) for permission to freely distribute 
-their Fortran subroutines which we modified and implemented in this program package.
-We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful discussions.}
-
 \clearpage
-\tableofcontents
 
+\tableofcontents
+\begin{center}
+\line(1,0){350}
+\end{center}
+
+\vspace{1cm}
 %Figure 6
  \begin{figure}[htbp]
 	\centering
@@ -127,6 +126,14 @@ We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful
      \label{pic:Finalgraph}
  \end{figure}
 
+\vspace{2cm}
+\textbf{Acknowledgement:} \textit{PS is indebted to the Alexander von Humboldt Foundation (Bonn) for financial support 
+in terms of a Humboldt Research Award, and to both Prof. Gernot Frenking and 
+Dr. Ralf Tonner (Marburg) for support during his extended stay in Marburg where 
+writing of this program began. We acknowledge the help of Darko Babi\'c, Patrick 
+W. Fowler (Sheffield) and David E. Manolopoulos (Oxford) for permission to freely distribute 
+their Fortran subroutines which we modified and implemented in this program package.
+We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful discussions.}
 
 \clearpage
 
@@ -162,9 +169,11 @@ and $n_f$ the number of faces (5- or 6-rings). The program constructs an accurat
 3D structure (in cartesian coordinates) of any fullerene isomer from the canonical
 ring spiral pentagon indices (RSPI) through either a 3D Tutte embedding (3D-TE) \cite{Tutte}
 or the adjacency matrix eigenvector (AME) method \cite{Atlas}. One can also construct
-the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene or a halma fullerene $GC_{k,0}[C_{n_v}]$
-as special cases of the more general Goldberg-Coxeter transformation $GC_{k,l}$
-with $k \geq l$, which is implemented only for \C{20}, i.e. $GC_{k,l}[C_{20}]$).
+the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene, the halma fullerene $GC_{k,0}[C_{n_v}]$
+or the more general Goldberg-Coxeter transformation of a fullerene $GC_{k,l}$
+with $k \geq l$, which is implemented not only for \C{20}, i.e. $GC_{k,l}[C_{20}]$, as in a
+previous version of the program, but also for any fullerene using an algorithm developed
+by Avery.\cite{Avery2015}
 Starting from a given fullerene structure one can perform vertex insertions (such
 as Endo-Kroto \cite{Endo92}, Yoshida-Fowler \cite{Yoshida97a} or Brinkmann-Fowler \cite{BrinkmannFowler03})
 or Stone-Wales transformations \cite{Stone86}.  Vertex insertions allow for the
@@ -1403,6 +1412,8 @@ Classes of Plane Graphs - an Update'', Match Commun. Math. Comput. Chem. \textbf
 \textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
 
 \bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', \textit{Proc. London Math. Soc.} \textbf{13}, 743-767 (1963).
+
+\bibitem{Avery2015} J. Avery, to be published.
 
 \bibitem{Endo92} M. Endo and H.W. Kroto, ``Formation of carbon nanofibers'', \textit{J. Phys. Chem.} \textbf{96}, 6941-6944 (1992).
 

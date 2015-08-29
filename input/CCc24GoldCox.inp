@@ -1,6 +1,6 @@
 Cartesian coordinate input and subsequent Goldberg-Coxeter transformation
 from D6d-C24 to C456
-&General NA=24, nosort=1 / 
+&General NA=24, nosort=1, iwext=1, filename='C456extfile' / 
 &Coord ICart=1, IGCtrans=1, kGC=3, lGC=2 /
 &FFChoice Iopt=1 /
 &FFParameters /
