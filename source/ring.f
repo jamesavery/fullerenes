@@ -861,6 +861,7 @@ C Print Cioslowsky analysis and check of correctness
 C Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
 C     First pentagon indices
       IPR=0
+      ihk=0
       Do I=0,5
        IRhag5(I)=0
       enddo
@@ -916,8 +917,7 @@ C     Strain Parameter
       sigmah=HexInd(IRhag6,ihk)
       Write(Iout,1024) ih0,ih1,ih2 
       if(ihk.eq.0) Write(Iout,1027) 
-  112 write(*,*) "'ihk' is uninit here (leading to IEEE_DENORMAL)"
-      Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
+  112 Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
       Ifus6=0
       Do I=3,6
       IFus6=IFus6+IRhag6(I)
