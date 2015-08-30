@@ -264,7 +264,7 @@ using a 32-bit environment you will need to change this to \verb|-m32|).  The op
 If you require an atom count above 5000 (the upper limit can be set in \filename{source/config.f}, see entry \paramname{Nmax=5000})
 there will be arrays which are larger than 2\,GB.  Per default most compilers don't support this. 
 If your machine has enough memory, your gfortran is sufficiently new
-(4.4.3, 4.4.4  and 4.6 on 64-bit Linux work) you can set \verb|-mcmodel| to \verb|medium| to switch to the medium code model in
+(4.4.3 to 4.4.7  and 4.6 on 64-bit Linux work) you can set \verb|-mcmodel| to \verb|medium| to switch to the medium code model in
 which objects are permitted to be larger than 2\,GB.  All binary objects must be compiled with the same options; delete all
 binaries before you recompile using a different code model. 
 
@@ -315,7 +315,7 @@ More information can be obtained in our review article \cite{WIRE2015}.
 \begin{figure}[htbp]
    	\centering
 	\includegraphics[]{workflow.pdf} 
-    \caption{Simplfied diagram of the workflow.}
+    \caption{Simplified diagram of the workflow.}
     \label{pic:flow_short}
 \end{figure}
 
@@ -331,7 +331,8 @@ in our next major version to be released. For version 4.1 the fullerene database
 the House of Graphs was introduced. Version 4.2 saw the introduction of dihedral angles into the force field,
 and Version 4.3 was extended to calculate frequencies from the force-field Hessian, and Version 4.4 saw
 the implementation of the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k \geq l$,
-new topological descriptors and a more compact version of the database.
+new topological descriptors and a more compact version of the database. Version 4.5 removed some of the bugs and includes
+a general Goldberg-Coxeter transformation $GC_{k,l}[C_n] ~(k\ge l, l\ge 0)$ of any fullerene.
 
 %there should a subsection "creation of the fullerene graph" in this place
 %\subsection{Create a 3D structure for a specific fullerene}
@@ -342,8 +343,8 @@ new topological descriptors and a more compact version of the database.
 The easiest way to create a 3D structure for \program{Fullerene} is of course to read-in cartesian coordinates for a specific
 fullerene (see input files \filename{CCc20.inp} to \filename{CCc540.inp}), or to construct them internally for the high
 symmetry $I_h-$\C{20} or $I_h-$\C{60} isomers (Subroutine \funname{CoordC20C60}, see input files \filename{GEOMc60.inp},
-\filename{GEOMc60exp.inp}, \filename{GEOMc60ideal.inp}), or to construct the cartesian coordinates from the ring-spiral
-pentagon-indices RSPI by using either the Fowler-Manolopoulos AME algorithm \cite{Atlas},
+\filename{GEOMc60exp.inp}, \filename{GEOMc60ideal.inp}), or to construct the cartesian coordinates from a generalized ring-spiral
+pentagon-indices RSPI (plus jumps if necessary) by using either the Fowler-Manolopoulos AME algorithm \cite{Atlas},
 or the more reliable 3D-TE algorithm (Subroutine \funname{CoordBuild}, see input files \filename{RSPIc20.inp} or \filename{RSPIc840.inp}),
 or from a Goldberg-Coxeter 2-index transformation of \C{20}, i.e. $GC_{k,l}(20)$ with $k \geq l$ and $k > 0$
 (triangulation algorithm described below, see input files \filename{GEOMc20Halma.inp}, \filename{GEOMc500Halma.inp}) or \filename{GGCK6L2.inp}). 
@@ -355,7 +356,7 @@ The program prints internal coordinates in form of a $Z$-Matrix (distances, angl
 For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
 coordinates, e.g. cartesian coordinates obtained from a force-field optimization.
 
-In addition to the ring spiral algorithm by Fowler and Manolopoulos we
+In addition to the original ring spiral algorithm by Fowler and Manolopoulos we
 have implemented a general ring spiral algorithm for cubic graphs.  It
 differs from the classical ring spiral algorithm in that it can insert
 jumps between the addition of two vertices to the spiral in order to
@@ -416,8 +417,8 @@ required. The number of isomers scales polynomially as $n_v^9$, thus it becomes 
 very demanding to produce a full isomer list for fullerenes larger than \C{120}. Moreover, the database provided, can be used to print all isomers up to 
 \C{140}, and up to \C{184} for all IPR isomers. Fowler and Manolopoulos use a numbering scheme ($N_\mathrm{isomers}= 1,\dots, n_\mathrm{max}$) 
 obtained from the natural sequence of canonical RSPIs to distinguish between the different isomers \cite{Atlas}. From their book \cite{Atlas} the
-general isomer number can be taken and the RSPIs for a specific isomer up to \C{140} can be read-in from the database provided. 
-The numbering scheme for IPR isomers only ($N_\mathrm{isomers}^\mathrm{IPR}= 1,\dots, n_\mathrm{max}$) can also be used up to \C{184}, 
+general isomer number can be taken and the RSPIs for a specific isomer up to \C{150} can be read-in from the database provided. 
+The numbering scheme for IPR isomers only ($N_\mathrm{isomers}^\mathrm{IPR}= 1,\dots, n_\mathrm{max}$) can also be used up to \C{200}, 
 see for example the input file \filename{DBc158.inp}.
 
 %H\"uckel analysis and topological indicators
@@ -587,7 +588,7 @@ In a next step a Goldberg-Coxeter transformation $GC_{k,l}(n)$ for a fullerene \
 (Subroutine \funname{GoldbergCoxeter}). This leads to a fullerene C$_{k^2+kl+l^2}$. The current implementation allows only for
 \textit{leapfrog transformations} ($k=l=1$) and for \textit{halma transformations} ($k \neq 0$ and $l=0$) for all fullerenes
 (but all indices are allowed for $GC_{k,l}(20)$). A general $GC_{k,l}(n)$ for all values of $k$, $l$ and $n$ with $k \geq l$ 
-is currently in preparation. 
+is now implemented. 
 
 
 %Figure 2
@@ -598,7 +599,7 @@ is currently in preparation.
 	\label{pic:GoldbergCoxeter}
  \end{figure}
 
-The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ used here and shown in Figure\ref{pic:GoldbergCoxeter}
+The general Goldberg-Coxeter construction $GC_{k,l}[G_{0}]$ used here and shown in Figure \ref{pic:GoldbergCoxeter}
 works in the following way: ($i$) Consider
 a cubic planar graph $G_{0}$ and take its dual (faces become vertices and
 vertices become faces), $D_{t}(G_{0})$. This transforms the graph $G_{0}$
@@ -636,7 +637,7 @@ same cycle as they are isomorphic to each other. Although finding all Hamiltonia
 After that it becomes computationally very demanding as the algorithm scales like $O(2^{n_v})$. Therefore, for the larger fullerenes the program prints 
 tight upper and lower limits for the number of Hamiltonian cycles instead. The existence of Hamiltonian cycles for fullerenes is only conjectured at this 
 stage, and only for layered fullerenes (e.g. fullerene with onion-shaped 2D graphs such as nanotubes) existence has been proven. Our recent calculations verified that
-Hamiltonian cycles exist for all fullerene isomers up to \C{102} and for all IPR isomers up to \C{122} \cite{PSAJDB}.
+Hamiltonian cycles exist for all fullerene isomers up to \C{120} and for all IPR isomers up to \C{122} \cite{PSAJDB}.
 
 %Force-field optimization
 \subsection{Force-field optimization}
@@ -671,7 +672,7 @@ lead to a more spherical arrangement prior to a force-field optimization with ra
 e.g. barrels instead of nanotubes. 
 
 A more sophisticated force field using dihedral angles is implemented as well (extended \acr{HOFF} force field),
-which enhances planarity for areas of connected hexagons. The extended Wu force field takes three types of bonds (adjacent to 0, 1 or 2 pentagons),
+which enhances planarity for areas of connected hexagons \cite{Wirz2015}. The extended Wu force field takes three types of bonds (adjacent to 0, 1 or 2 pentagons),
 two types of angles, and four types of dihedral angles into account. There is one dihedral per atom.  Dihedrals~$\theta_{abcd}$ 
 are defined between one atom~$a$ and its three neighbours~$b$, $c$ and $d$.  As one atom is part of three faces
 (0, 1, 2, or 3 pentagons) there are four different types of dihedrals which differ in their respective
@@ -736,7 +737,7 @@ if the fullerene contains a face spiral, and fails if it does not (as for the tw
 Figure \ref{pic:C380andC384}). Note that considerable improvements were made to optimize the ring spiral search algorithm, and if 
 \paramname{ispsearch}=2 is chosen it counts all possible ring spirals (this is computationally more expensive). 
 The number of spirals in the output agree with the examples given by Yoshida and Fowler.\cite{Yoshida97a} 
-A more general ring-spiral algorithm is currently in preparation.
+A generalized ring-spiral algorithm has been implemented, and if the search for a canonical ring spiral algorithm fails, RSPIs are produced with additional jumps.
 
 
 %Volume and surface area, minimum covering sphere
@@ -921,8 +922,23 @@ distance matrix $D$,
 where  $j_P$ is the vertex number belonging to the (5 or 6) peripheral vertices.  Instead of a
 simulated annealing algorithm we start with a Tutte 2D graph and perform a minimization procedure for $E_{\mathrm{PPG}}$.
 
-For other 2D graph embedding methods implemented see the following input section.
-       
+For other 2D graph embedding methods implemented as shown in Figure \ref{pic:ManySchlegel} see the following input section.
+
+\vspace{1cm}       
+%Figure 7
+ \begin{figure}[htbp]
+	\centering
+  		 \includegraphics[width=0.225\textwidth]{Graph1.png}
+		 \includegraphics[width=0.225\textwidth]{Graph2.png}
+		 \includegraphics[width=0.225\textwidth]{Graph3.png}
+		 \includegraphics[width=0.225\textwidth]{Graph4.png}
+		 \includegraphics[width=0.225\textwidth]{Graph5.png}
+		 \includegraphics[width=0.225\textwidth]{Graph6.png}
+		 \includegraphics[width=0.225\textwidth]{Graph7.png}
+		 \includegraphics[width=0.225\textwidth]{Graph8.png}
+     \caption{From the left to right: 2D fullerene structures created using \paramname{ISchlegel}=1 to 8 described in the input section.}
+     \label{pic:ManySchlegel}
+ \end{figure}
 
 \clearpage
 %Input description
@@ -1096,9 +1112,8 @@ There are two databases, one for the general isomers
 \item[{leap}] If \paramname{leap} = $n_\mathrm{leap}$ the initial fullerene C$_{N_A}$ is subjected to an $n^\mathrm{th}$ leapfrog transformation. 
 This converts the number of atoms $N_A$ to $N'_A = 3^{n_\mathrm{leap}}N_A$. (Default: 0)
 \item[{ICGtrans}] 
-If \paramname{IGCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}[\C{N_A}]$ (Default: 0).
-At the moment only $l=0$ is implemented, also the leapfrog transformation $k=1$ and $l=1$ is available in this input.
-In this case \paramname{kGC} in the namelist input has to be specified. 
+If \paramname{IGCtrans} = 1 the initial fullerene structure is subjected to a Goldberg-Coxeter transformation $GC_{k,l}[\C{N_A}]$ (Default: 0). In this case \paramname{kGC} and \paramname{lGC} in the namelist input have to be specified.
+For $l=0$ (halma transformation), $k=1$ and $l=1$ (leapfrog transformation), and for the Goldberg-Coxeter transformation of \C{20} $(k\ge 1, l\ge 0)$ more efficient and fast algorithms are implemented. 
 \item[ISW] 
   If \paramname{ISW} = 1 the initial fullerene structure is subjected
   to a Stone-Wales transformation (Default: 0). In this case an input
@@ -1343,25 +1358,11 @@ The different algorithms for drawing 2D fullerene graphs are shown in Figure \re
 fullerenes which are far from spherical symmetry, the algorithms here may not produce the best 2D graph representation.
 We are currently working on this problem.
 
-%Figure 5
- \begin{figure}[htbp]
-	\centering
-  		 \includegraphics[width=0.225\textwidth]{Graph1.png}
-		 \includegraphics[width=0.225\textwidth]{Graph2.png}
-		 \includegraphics[width=0.225\textwidth]{Graph3.png}
-		 \includegraphics[width=0.225\textwidth]{Graph4.png}
-		 \includegraphics[width=0.225\textwidth]{Graph5.png}
-		 \includegraphics[width=0.225\textwidth]{Graph6.png}
-		 \includegraphics[width=0.225\textwidth]{Graph7.png}
-		 \includegraphics[width=0.225\textwidth]{Graph8.png}
-     \caption{From the left to right: 2D fullerene structures created using \paramname{ISchlegel}=1 to 8.}
-     \label{pic:ManySchlegel}
- \end{figure}
 
 \clearpage
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
-A database is provided for general isomers up to \C{110} and for IPR isomers up to
+A database is provided for general isomers up to \C{120} and for IPR isomers up to
 \C{122} including the number of Hamiltonian cycles, and without Hamiltonian cycles
 up to \C{150} for general and up to \C{200} for IPR isomers. The database should be copied into
 the main program folder and can be used to read the ring-spiral pentagon indices.
@@ -1371,10 +1372,10 @@ and Manolopoulos \cite{Atlas}, that is each isomer in the book's appendix can be
 constructed easily from our database. Examples are given in input files  \filename{DBc40.inp} and
 \filename{DBc66.inp}.  Note that these files require the \filename{c40all.database}, \filename{c66all.database} 
 and \filename{ISOMERc80.inp} in the \filename{database/ALL} folder. The data files are formatted and can easily be read
-by the program. It is our intention to extend the isomer list beyond \C{140}/\C{184} (without Hamiltonian cycles) using the 
+by the program. It is our intention to extend the isomer list beyond \C{150}/\C{200} (without Hamiltonian cycles) using the 
 ``House of Graphs'' database. New lists will be available on our website in due time.  The determination of the number of
 distinct Hamiltonian cycles is NP-complete and beyond 100 (120 for IPR) 
-computationally too demanding. The longest file for our database ran for 3~months on a single 2.4 GHz AMD processor.
+computationally very demanding. The longest file for our database ran for 1 month on 400 CPUs.
 The Yoshida database (from http://www.jcrystal.com/steffenweber/gallery/Fullerenes/Fullerenes.html) 
 often used has also been added into our database and is placed in the
 folder \filename{database/Yoshida} \cite{Yoshida}. The input file \filename{DBc180Yoshida.inp} shows an example for reading from
@@ -1408,14 +1409,14 @@ Classes of Plane Graphs - an Update'', Match Commun. Math. Comput. Chem. \textbf
 
 \bibitem{Atlas} P. W. Fowler and D. E. Manolopoulos, ``An Atlas of Fullerenes'' (Dover Publ., New York, 2006).
  
-\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, and P. Schwerdtfeger, ``Packed to the Rafters - Filling up C60 with Rare Gas Atoms'', 
+\bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, and P. Schwerdtfeger, ``Packed to the Rafters - Filling up \C{60} with Rare Gas Atoms'', 
 \textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
 
-\bibitem{WIRE2015} P. Schwerdtfeger, L. Wirz, J. Avery, ``The Topology of Fullerenes, WIRE Comput. Mol. Sci. \textbf{5}, 96-145 (2015).
+\bibitem{WIRE2015} P. Schwerdtfeger, L. Wirz, J. Avery, ``The Topology of Fullerenes'', \textit{WIRE Comput. Mol. Sci.} \textbf{5}, 96-145 (2015).
 
 \bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', \textit{Proc. London Math. Soc.} \textbf{13}, 743-767 (1963).
 
-\bibitem{Avery2015} J. Avery, to be published.
+\bibitem{Avery2015} J. Avery, to be published (2015).
 
 \bibitem{Endo92} M. Endo and H.W. Kroto, ``Formation of carbon nanofibers'', \textit{J. Phys. Chem.} \textbf{96}, 6941-6944 (1992).
 
