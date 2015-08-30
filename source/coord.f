@@ -2104,7 +2104,12 @@ C Now analyze the adjacency matrix if it is correct
       SUBROUTINE GoldbergCoxeter(Iout,leap,leapGC,kGC,lGC,
      1 nohueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad) 
-C     Construct Leapfrog fullerene through adjacency matrix
+C     Routine for Goldberg-Coxeter transformation of a fullerene
+C     GK(k,l) with k.ge.l and l.ge.0 
+C     Three types are considered separately:
+C      1) leapfrog transformation, k=1, l=1
+C      2) halma transformation with l=0, 
+C      3) General Goldberg-Coxeter excluding cases 1 and 2
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2116,6 +2121,7 @@ C     Construct Leapfrog fullerene through adjacency matrix
      1 goldcox,leapfrog_fullerene, halma_fullerene, goldberg_coxeter
       LeapErr=0 
 
+C--> Case 1
 C--> Start leapfrog fullerene if leap > 0
   10  if(leap.gt.0) then
        MLeap=(3**leap)*number_vertices
@@ -2182,6 +2188,7 @@ C Also if this is a leapfrog use leapfrog_fullerene instead
 C General Goldberg-Coxeter if l>0 and not just leapfrog
       if(lGC .ne. 0) then
 C Not halma
+C--> Case 3
         write(Iout,1011)
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
         goldcox = goldberg_coxeter(g,kGC,lGC)
@@ -2199,16 +2206,15 @@ C Update fortran structures
 C Produce adjacency matrix 
         write (Iout,1005) 
         call adjacency_matrix(goldcox,Nmax,IDA)
-        write (Iout,1007) 
-        number_vertices = MLeap
 
       else
 
 C Halma if l=0
+C--> Case 2
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
         halma = halma_fullerene(g,kGC-1)
         isafullerene = graph_is_a_fullerene(halma)
-        IF (isafullerene.eq.1) then
+        if (isafullerene.eq.1) then
           write (iout,1013)
         else
           write (iout,1009)
@@ -2221,9 +2227,9 @@ C Update fortran structures
 C Produce adjacency matrix 
         write (Iout,1005) 
         call adjacency_matrix(halma,Nmax,IDA)
-        write (Iout,1007) 
-        endif
-        number_vertices = MLeap
+       endif
+       write (Iout,1007) 
+       number_vertices = MLeap
 
       endif
 C--> End of transformation
