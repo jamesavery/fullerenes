@@ -28,7 +28,7 @@
 
 \aliaspagestyle{title}{empty}
 
-\title{\program{Fullerene} (Version 4.5)\\ -- A Program for the Topological Analysis of Fullerenes --\\ User's Manual}
+\title{\program{Fullerene} (Version 4.5) \\A Program for the Topological Analysis of Fullerenes \\ User's Manual}
 
 \author{Peter Schwerdtfeger%
   \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
@@ -94,7 +94,7 @@ We are always open to improvements and suggestions.
 	\setcounter{enumi}{2}
 	\tightlist
 	\item P. Schwerdtfeger, L. Wirz, J. Avery, \textit{The Topology of Fullerenes}, WIRE Comput. Mol. Sci. \textbf{5}, 96--145 (2015).
-	 \item L. Wirz, R. Sure, R. Tonner, A. Hermann, P. Schwerdtfeger, \textit{A Harmonic Force-Field Method for Fullerenes and a Comparison to Density Functional Calculations for Goldberg-Coxeter Fullerenes up to C$_{980}$}, J. Comput. Chem., in press.
+	 \item L. N. Wirz, R. Sure, R. Tonner, A. Hermann, P. Schwerdtfeger, \textit{A Harmonic Force-Field Method for Fullerenes and a Comparison to Density Functional Calculations for Goldberg-Coxeter Fullerenes up to C$_{980}$}, J. Comput. Chem., in press.
 	\item D. Babi\'c, \textit{Nomenclature and Coding of Fullerenes}, J. Chem. Inf. Comput. Sci. \textbf{35}, 515--526 (1995).
 	\item D. E. Manolopoulos and P. W. Fowler, \textit{Molecular graphs, point groups, and fullerenes}, J. Chem. Phys. \textbf{96}, 7603--7614 (1992).
 	\item Z. C. Wu, D. A. Jelski, and T. F. George, \textit{Vibrational Motions of Buckminsterfullerene}, Chem. Phys. Lett. \textbf{137}, 291--295 (1987).
@@ -154,20 +154,20 @@ in the book by Fowler and Manolopoulos,\cite{Atlas} we felt that there is a need
 to write a general purpose program which does what other programs do and (of course)
 a lot more.  The first version (1.0) was written in Fortran for calculating the
 surface area and volume of a fullerene and corresponding changes due to endohedral
-incorporation of rare gas atoms\cite{Tonner}.  A much improved version 2.0 allowed
+incorporation of rare gas atoms \cite{Tonner}.  A much improved version 2.0 allowed
 for the creation of fullerene structures using the ring-spiral algorithm introduced
 in the book by Fowler and Manolopoulos \cite{Atlas}, and version 3.0 was already
 dealing with topological and graph theoretical properties.  It became soon clear
 that many open problems remain in fullerene structure generations which needed to
-be addressed, and it was therefore decided to extend version 3 to a general purpose
-program package and make it available to the scientific community.
+be addressed,\cite{WIRE2015} and it was therefore decided to extend version 3 to a general purpose
+program package and make it available to the scientific community.cite{}
 
 In the current version only regular fullerenes are considered (i.e. of genus~0 consisting
 of pentagons and hexagons only) fulfilling Euler's theorem, $n_v - n_e + n_f = 2$,
 where $n_v$ is the number of vertices (atoms), $n_e$ the number of edges (bonds),
 and $n_f$ the number of faces (5- or 6-rings). The program constructs an accurate
 3D structure (in cartesian coordinates) of any fullerene isomer from the canonical
-ring spiral pentagon indices (RSPI) through either a 3D Tutte embedding (3D-TE) \cite{Tutte}
+ring spiral pentagon indices (RSPI) (or its generalized version) through either a 3D Tutte embedding (3D-TE) \cite{Tutte}
 or the adjacency matrix eigenvector (AME) method \cite{Atlas}. One can also construct
 the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene, the halma fullerene $GC_{k,0}[C_{n_v}]$
 or the more general Goldberg-Coxeter transformation of a fullerene $GC_{k,l}$
@@ -179,7 +179,7 @@ as Endo-Kroto \cite{Endo92}, Yoshida-Fowler \cite{Yoshida97a} or Brinkmann-Fowle
 or Stone-Wales transformations \cite{Stone86}.  Vertex insertions allow for the
 construction of non-spiral fullerenes such as \C{380} or \C{384}.  Geometry optimization
 using a Fletcher-Reeves-Polak-Ribiere minimization \cite{NumRec} with analytical
-gradients for the harmonic oscillator force field\cite{Wu87} is implemented in the
+gradients for the harmonic oscillator force field \cite{Wu87,Wirz2015} is implemented in the
 current version, providing a good initial guess for 3D cartesian coordinates.  2D~fullerene
 graphs (Schlegel diagrams) can be produced using a variety of different algorithms \cite{Plestenjak}.
 The program determines the volume and surface area of a fullerene (irregular or
@@ -212,10 +212,11 @@ that PS is good in old-fashioned Fortran, JA is good in C++ (and LW is doing bot
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
 and geometry optimization. Version 4.3 included the Hessian of the force field, although 
 we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
-4.4 introduced a search algorithm for neighbourhood RSPIs, the Szeged index, pentagon arm indices as further topological descriptors,
+Version 4.4 introduced a search algorithm for neighbourhood RSPIs, the Szeged index, pentagon arm indices as further topological descriptors,
 and new (conjectured) upper and lower bound for Hamiltonian cycles in fullerenes.
+Version 4.5 has a new algorithm for general Goldberg-Coxeter transforms \cite{Avery}.
 The Tutte embedding algorithm has also been made much faster and the fullerene database has been transformed into a more compact and efficient version.
-Version 5 to be released late 2013 will separate the topological from the cartesian input part and uses sparse matrix handling for the
+Version 5 to be released late 2016 will separate the topological from the cartesian input part and uses sparse matrix handling for the
 largest fullerenes. This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bug please report it to one of us.
 
@@ -226,12 +227,10 @@ Not implemented yet is:
 \tightlist
 \item The minimum covering ellipsoid useful for rugby-ball shaped fullerenes, and
 close packing of ellipsoids;
-\item The Goldberg-Coxeter ($T^\mathrm{GC}_{k,l}$[\C{n}]) transformation for fullerenes
-other than \C{20};
 \item Symmetrization of optimized coordinates to point group symmetry (or a chosen
 lower symmetry) and symmetry labels for H\"uckel orbital energies and vibrational frequencies;
-\item Extension to non-classical fullerenes of genus~0 (heptagons and squares); 
-\item Extension to non-regular fullerenes of genus~1;
+\item Extension to general cubic polyhedra of genus~0 (heptagons and squares); 
+\item Extension to non-regular fullerenes of higher genus;
 \item A restart option for subroutine Hamilton as it is an $\#P$-hard problem and
 we like to test the limitations of the back-track algorithm used in program;  
 \item Kekul\'e structures (perfect matchings) and Clar sextets;
@@ -251,6 +250,7 @@ In this case please feel free to contact us per email.
 %    \label{pic:toc}
  \end{figure} 
  
+\clearpage
 %Installation and running the program
 \section{Installation and running the program}
 All fortran source files are located in the directory ``source'' and all C++ files are in ``libgraph''.
@@ -293,14 +293,7 @@ Please make all filenames in the database read-only.
 
 To use the latex program for the 2D fullerene graphs you need to use the files \filename{standalone.cfg} and \filename{standalone.cls}.
 
-%Figure 1
-\begin{figure}[htbp]
-   	\centering
-	\includegraphics[]{tree.pdf} 
-    \caption{Flow diagram for main program tasks.}
-    \label{pic:flow_long}
-\end{figure}
-
+\clearpage
 %Program Structure
 \section{Program Structure}
 The main program (\filename{main.f}) calls a number of subroutines for certain tasks and in a certain sequence (see Figure \ref{pic:flow_long}).
@@ -308,9 +301,15 @@ Subroutine \funname{DataIn} manages all the input and determines these main task
 The input is in \textit{Namelist format} if not otherwise stated. 
 Important steps in the program are given in Figure \ref{pic:flow_long} and are
 explained in some detail in this section. Figure \ref{pic:flow_short} visualizes the workflow in a more abstract way.
-More information can be obtained in an up-coming review article \cite{PSJA}.
+More information can be obtained in our review article \cite{WIRE2015}.
 
-
+%Figure 1
+\begin{figure}[htbp]
+   	\centering
+	\includegraphics[]{tree.pdf} 
+    \caption{Flow diagram for main program tasks.}
+    \label{pic:flow_long}
+\end{figure}
 
 %Figure 2
 \begin{figure}[htbp]
@@ -739,7 +738,7 @@ Figure \ref{pic:C380andC384}). Note that considerable improvements were made to 
 The number of spirals in the output agree with the examples given by Yoshida and Fowler.\cite{Yoshida97a} 
 A more general ring-spiral algorithm is currently in preparation.
 
-\clearpage
+
 %Volume and surface area, minimum covering sphere
 \subsection{Volume $V$ and surface area $A$, minimum covering sphere, \\ minimum distance sphere and maximum inner sphere}
 The volume and surface area of the fullerene are calculated in Subroutine \funname{Volume}. This is done by\\
@@ -925,7 +924,7 @@ simulated annealing algorithm we start with a Tutte 2D graph and perform a minim
 For other 2D graph embedding methods implemented see the following input section.
        
 
-
+\clearpage
 %Input description
 \section{Input description}
 
@@ -1359,6 +1358,7 @@ We are currently working on this problem.
      \label{pic:ManySchlegel}
  \end{figure}
 
+\clearpage
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{110} and for IPR isomers up to
@@ -1385,7 +1385,7 @@ The directory database needs to be in the same directory as ``source'' or ``libg
 Note that the maximum number of vertices in the database is defined in the config.f file (LimitALL and LimitIPR).
 
 
-%\clearpage
+\clearpage
 %References
 \begin{thebibliography}{99}
 
@@ -1411,6 +1411,8 @@ Classes of Plane Graphs - an Update'', Match Commun. Math. Comput. Chem. \textbf
 \bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, and P. Schwerdtfeger, ``Packed to the Rafters - Filling up C60 with Rare Gas Atoms'', 
 \textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
 
+\bibitem{WIRE2015} P. Schwerdtfeger, L. Wirz, J. Avery, ``The Topology of Fullerenes, WIRE Comput. Mol. Sci. \textbf{5}, 96-145 (2015).
+
 \bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', \textit{Proc. London Math. Soc.} \textbf{13}, 743-767 (1963).
 
 \bibitem{Avery2015} J. Avery, to be published.
@@ -1428,6 +1430,8 @@ Classes of Plane Graphs - an Update'', Match Commun. Math. Comput. Chem. \textbf
 
 \bibitem{Wu87} Z. C. Wu, D. A. Jelski, and T. F. George, ``Vibrational Motions of
 Buckminsterfullerene'', \textit{Chem. Phys. Lett.} \textbf{137}, 291-295 (1987).
+
+\bibitem{Wirz2015} L. N. Wirz, R. Sure, R. Tonner, A. Hermann, and P. Schwerdtfeger, ``A Harmonic Force-Field Method for Fullerenes and a Comparison to Density Functional Calculations for Goldberg-Coxeter Fullerenes up to C$_{980}$'', \textit{J. Comput. Chem.}, in press.
 
 \bibitem{Plestenjak} B. Plestenjak, ``An algorithm for drawing Schlegel diagrams'', see http://www-lp.fmf.uni-lj.si/plestenjak/Papers/NICEGR.pdf.
 
@@ -1462,8 +1466,6 @@ House of Graphs: a database of interesting graphs, available for fullerenes at h
 ``Molecular graphics of convex body fluids'', \textit{J. Chem. Theory Comput.}
 \textbf{4}, 468--476 (2008). The program is available at http://qmga.sourceforge.net/.
 
-\bibitem{PSJA} P. Schwerdtfeger and J. Avery, ``Topological and Graph Theoretical Properties of Regular Fullerenes'', in preparation.
-
 \bibitem{Cataldo} F. Cataldo, A. Graovac, and O. Ori ``The Mathematics and Topology of Fullerenes'', Springer, Berlin (2011).
 
 \bibitem{Caporossi} P. W. Fowler, G. Caporossi, and P. Hansen, ``Distance Matrices, Wiener Indices, and Related Invariants of Fullerenes'', 
@@ -1496,7 +1498,7 @@ Fullerene Stability,'', \textit{Phys. Chem. Chem. Phys.} \textbf{1}, 2913-2918 (
 
 \bibitem{Babic1995a} D. Babi\'c, ``Nomenclature and Coding of Fullerenes'', \textit{J. Chem. Inf. Comput. Sci.} \textbf{35}, 515-526 (1995).
 
-\bibitem{PSAJDB} P. Schwerdtfeger, D. Babi\'c, and J. Avery, ``Hamiltonian cycles in regular fullerenes'', in preparation.
+\bibitem{PSAJDB} L. Wirz, D. Babi\'c, J. Avery, and P. Schwerdtfeger, ``Toward Tight Upper and Lower Bounds for Hamiltonian Cycle Counts in Fullerene Graphs'', in preparation.
 
 \bibitem{NumericalRecipes} ``Numerical Recipes in Fortran 77. The Art of Scientific Computing'' (2nd Edition, 1992); see http://www.nr.com/.
 
