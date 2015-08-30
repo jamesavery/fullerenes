@@ -2156,6 +2156,7 @@ C  faces are hexagons)
 C Produce adjacency matrix
        write (Iout,1005) 
        call adjacency_matrix(frog,Nmax,IDA)
+       call delete_fullerene_graph(frog)
       endif
 C--> End of leapfrog fullerene construction
 
@@ -2165,6 +2166,7 @@ C Goldberg-Coxeter transform of initial fullerene
 C Input: initial graph, and GC indices (kGC,lGC) 
 C Initial test if everything is in order
 C Also if this is a leapfrog use leapfrog_fullerene instead
+C==>  Big loop
       if(leapGC.gt.0) then
        Write(Iout,1010) kGC,lGC,kGC,lGC
        MGCLimit=(kgc*kgc+lgc*(kgc+lgc))*number_vertices
@@ -2206,6 +2208,7 @@ C Update fortran structures
 C Produce adjacency matrix 
         write (Iout,1005) 
         call adjacency_matrix(goldcox,Nmax,IDA)
+        call delete_fullerene_graph(goldcox)
 
       else
 
@@ -2227,20 +2230,17 @@ C Update fortran structures
 C Produce adjacency matrix 
         write (Iout,1005) 
         call adjacency_matrix(halma,Nmax,IDA)
+        call delete_fullerene_graph(halma)
        endif
+C--> End of transformation
        write (Iout,1007) 
        number_vertices = MLeap
 
       endif
-C--> End of transformation
+C==>  End of Big loop
 
       Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
-      if(leap.ne.0) call delete_fullerene_graph(frog)
-      if(leapGC.ne.0) then
-       if(lGC .eq. 0) call delete_fullerene_graph(halma)
-       if(lGC .ne. 0) call delete_fullerene_graph(goldcox)
-      endif
       call delete_fullerene_graph(g)
       write (Iout,1004) 
  1000 Format(/1X,'Creating the adjacency matrix of the next leap-frog',
