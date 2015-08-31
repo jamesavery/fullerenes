@@ -100,8 +100,10 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
   h << "dual = " << dual << endl;
   h << "newdual = " << new_dual << endl;
   */
-
+  
+  new_dual.layout2d = new_dual.tutte_layout(); // FIXME remove
   PlanarGraph G(new_dual.dual_graph(3));
+  G.layout2d = G.tutte_layout(); // FIXME remove
 
   /*
   h << "halma = " << G << endl;
