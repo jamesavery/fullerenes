@@ -98,7 +98,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
       set<int>::const_iterator g(f);
       for(++g; g!= adjacent_faces.end(); g++)
-	dual_edges.insert(edge_t(*f,*g));
+        dual_edges.insert(edge_t(*f,*g));
     }
   }
   //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
@@ -173,14 +173,14 @@ face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
     for(unsigned int i=0;i<ns.size();i++) {
       //	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
       if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
-	//	coord2d vw = coord2d::displacement(layout2d[ns[i]],layout2d[v],layout_is_spherical);
-	coord2d vw = layout2d[ns[i]]-layout2d[v];
-	double angle = vu.line_angle(vw);
-	
-	if(angle>= angle_max){
-	  angle_max = angle;
-	  w = ns[i];
-	} 
+        //	coord2d vw = coord2d::displacement(layout2d[ns[i]],layout2d[v],layout_is_spherical);
+        coord2d vw = layout2d[ns[i]]-layout2d[v];
+        double angle = vu.line_angle(vw);
+        
+        if(angle>= angle_max){
+          angle_max = angle;
+          w = ns[i];
+        } 
       } 
     }
     if(w == -1) abort(); // There is no face!
@@ -215,16 +215,16 @@ facemap_t PlanarGraph::compute_faces_oriented() const
     outer_face = find_outer_face();
 
     if(outer_face.size() < 3){
-      cerr << "Invaid outer face: " << outer_face << endl;
+      cerr << "Invalid outer face: " << outer_face << endl;
       assert(outer_face.size() < 3);
     }
 
     for(node_t u=0;u<N;u++)
       if(!outer_face.contains(u) && !outer_face.point_inside(layout2d,u)){
-	cerr << "Point " << u << "/" << layout2d[u] << " is outside outer face " << outer_face << endl;
-	for(int i=0;i<outer_face.size();i++) cerr << "\t" << layout2d[outer_face[i]] << endl;
-	cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
-	abort();
+        cerr << "Point " << u << "/" << layout2d[u] << " is outside outer face " << outer_face << endl;
+        for(int i=0;i<outer_face.size();i++) cerr << "\t" << layout2d[outer_face[i]] << endl;
+        cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
+        abort();
       }
     //    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face." << endl;
     facemap[outer_face.size()].insert(outer_face);
@@ -244,11 +244,10 @@ facemap_t PlanarGraph::compute_faces_oriented() const
     facemap[face.size()].insert(face);
     faces_found++;
 
-    //    cout << "face = " << face << endl;
     for(int i=0;i<face.size();i++)
       workset.erase(dedge_t(face[i],face[(i+1)%face.size()]));
   }
-  assert(faces_found == N);
+  assert(faces_found == N/2+2);
   return facemap;
 }
 
@@ -281,7 +280,7 @@ vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_la
       cerr << "compute_faces_flat: Graph not orientable - edge "<< e->first << " appears in " << e->second <<" faces, not two.\n";
       cerr << "faces = {"; for(int i=0;i<faces.size();i++) cerr << faces[i] << (i+1<faces.size()?", ":"};\n");
       cerr << "G = " << *this << ";\n";
-	
+
       abort();
     }
 
@@ -355,7 +354,7 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
   } else {
     for(int i=0;i<faces.size();i++) 
       if(faces[i].size() != 3){
-	fprintf(stderr,"Face %d has %d sides: ",i,int(faces[i].size())); cerr << faces[i] << endl;
+        fprintf(stderr,"Face %d has %d sides: ",i,int(faces[i].size())); cerr << faces[i] << endl;
       }
   }
 
@@ -380,7 +379,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
     for(int j=0;j<3;j++){
       edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]++;
       if(edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]>2)
-	cerr << tris[i] << " bad!\n";
+        cerr << tris[i] << " bad!\n";
     }
   for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
     if(e->second != 2){
@@ -446,7 +445,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
 
 // Finds the vertices belonging to the outer face in a symmetric planar
 // layout centered at (0,0). Returns the face in CW order.
-face_t PlanarGraph::find_outer_face() const 	
+face_t PlanarGraph::find_outer_face() const 
 {
   assert(layout2d.size() == N);
 
@@ -574,10 +573,10 @@ void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces,
 #ifdef HAS_MKL
 #include <mkl.h>
 #else
-extern "C" void dgetrf_(int *M, int *N, double *A, int *LDA, int *IPIV, int *INFO);		
+extern "C" void dgetrf_(int *M, int *N, double *A, int *LDA, int *IPIV, int *INFO);
 #endif
 
-double lu_det(const vector<double> &A, int N)	
+double lu_det(const vector<double> &A, int N)
 {
   int info = 0;
   double *result = new double[N*N];
