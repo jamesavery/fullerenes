@@ -2140,6 +2140,7 @@ C--> Start leapfrog fullerene if leap > 0
         if(leap.eq.3) Write(Iout,1022) leap,number_vertices,MLeap
        endif 
 
+       number_vertices=MLeap
        g = new_fullerene_graph(Nmax,number_vertices,IDA)
        frog = leapfrog_fullerene(g,leap)
 
