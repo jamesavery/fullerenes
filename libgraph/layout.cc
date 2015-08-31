@@ -330,14 +330,14 @@ coord3d Graph::centre3d(const vector<coord3d>& layout) const {
 // * Check if layout is planar before allowing it (this function crashes if it is not).
 
 
-string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool number_vertices, bool include_latex_header,
+string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool print_numbers, bool include_latex_header,
 			     int edge_colour, int path_colour, int vertex_colour, double edge_width, double path_width,
 			     double vertex_diameter, int Npath, int *path) const
 {
-  cout << "entering to latex" << endl;
+  cout << "entering to_latex" << endl;
   cout << include_latex_header << endl;
   cout << edge_colour << ", " << path_colour << ", " << vertex_colour << endl;
-  cout << number_vertices << endl;
+  cout << print_numbers << endl;
   cout << edge_width << ", " << path_width << endl;
   cout << vertex_diameter << endl;
   cout << (edge_colour>>16) << endl;
@@ -364,8 +364,8 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       "\\definecolor{pathcolour}{RGB}{"<<(path_colour>>16)<<","<<((path_colour>>8)&0xff)<<","<<(path_colour&0xff)<<"}\n"
       "\\definecolor{dualvertexcolour}{RGB}{205,79,57}\n"
       "\\definecolor{dualedgecolour}{RGB}{0,0,0}\n"
-      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0pt")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
-      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0pt")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
+      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(print_numbers?"1pt":"0pt")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
+      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(print_numbers?"1pt":"0pt")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
       "\\tikzstyle{edge}=[draw,color=edgecolour,line width="<<edge_width<<"mm]\n"
       "\\tikzstyle{pth}=[draw,color=pathcolour,line width="<<path_width<<"mm]\n"
       "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolour,line width="<<edge_width<<"mm]\n"
@@ -387,7 +387,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << (u+1) << "$}" << ((u+1<N && u_+1<100)
 ? ", ":"}\n\t");
     }
-    s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
+    s << "\\node[vertex] (\\name) at \\place {"<<(print_numbers?"\\lbl":"")<<"};\n";
   }
 
   set<edge_t> edge_set = undirected_edges();
@@ -418,7 +418,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       const coord2d xs(dual.layout2d[u]*coord2d(xscale,yscale));
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << (u+1) << "$}" << (u+1<dual.N? ", ":"}\n\t");
     }    
-    s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
+    s << "\\node[dualvertex] (\\name) at \\place {"<<(print_numbers?"\\lbl":"")<<"};\n";
     s << "\\foreach \\u/\\v in {";
 
     set<edge_t> dual_edges = dual.undirected_edges();

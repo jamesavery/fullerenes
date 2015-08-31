@@ -506,7 +506,8 @@ C     Now sort values of diamw, output diam
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer MDist(Nmax,Nmax),Edges(2,3*number_vertices/2),wienerp
-      integer pent_dist_mtx(144), face_dist_mtx(number_vertices**2)
+      integer pent_dist_mtx(144)
+      integer face_dist_mtx((number_vertices/2+2)**2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
       REAL*8 layout2d(2,Nmax)
       Integer*8 perfmatch, perfect_match_count

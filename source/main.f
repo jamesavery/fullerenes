@@ -624,22 +624,22 @@ C Calculate Schlegel diagram
         routine='GRAPH2D        '
         Write(Iout,1008) routine
         if(number_vertices.lt.10000) then
-        anglew=45.d0
-        if(ISchlegel.eq.2) then
-          if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
-            ParamS=anglew
-            WRITE(Iout,1006) ParamS
+          anglew=45.d0
+          if(ISchlegel.eq.2) then
+            if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
+              ParamS=anglew
+              WRITE(Iout,1006) ParamS
+            endif
+          else
+            ParamS=dabs(ParamS)
           endif
-        else
-          ParamS=dabs(ParamS)
-        endif
-        CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,NRing,
+          CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,NRing,
      1   Iring,Ischlegel,ifs,ndual,labelvert,IC3,IDA,mdist,nhamcyc,Dist,
      1   ParamS,Rmin,TolX,scales,scalePPG,boost,CR,CRing5,CRing6,
      1   Symbol,filename)
-      else
-        Write(Iout,1007) number_vertices
-      endif
+        else
+          Write(Iout,1007) number_vertices
+        endif
       endif
 C------------------END--------------------------------------------
 C  E N D   O F   P R O G R A M

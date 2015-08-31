@@ -196,6 +196,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 {
   assert(layout2d.size() == N);
   facemap_t facemap;
+  int faces_found =0;
   //  cout << "Computing faces using 2D orientation." << endl;
   set<dedge_t> workset;
   set<edge_t> edge_set = undirected_edges();
@@ -227,6 +228,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
       }
     //    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face." << endl;
     facemap[outer_face.size()].insert(outer_face);
+    faces_found++;
     // Add outer face to output, remove directed edges from work set
     for(unsigned int i=0;i<outer_face.size();i++){
       const node_t u = outer_face[i], v = outer_face[(i+1)%outer_face.size()];
@@ -240,11 +242,13 @@ facemap_t PlanarGraph::compute_faces_oriented() const
     dedge_t e = *workset.begin(); 
     face_t face(get_face_oriented(e.first,e.second));
     facemap[face.size()].insert(face);
+    faces_found++;
 
     //    cout << "face = " << face << endl;
     for(int i=0;i<face.size();i++)
       workset.erase(dedge_t(face[i],face[(i+1)%face.size()]));
   }
+  assert(faces_found == N);
   return facemap;
 }
 
