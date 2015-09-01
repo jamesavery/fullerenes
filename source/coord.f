@@ -2216,9 +2216,7 @@ C Produce adjacency matrix
 C Halma if l=0
 C--> Case 2
         g = new_fullerene_graph(Nmax,number_vertices,IDA)
-C It bombs in the next statement
         halma = halma_fullerene(g,kGC-1)
-        print*,Nmax,number_vertices
         isafullerene = graph_is_a_fullerene(halma)
         if (isafullerene.eq.1) then
           write (iout,1013)

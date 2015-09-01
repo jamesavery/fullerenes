@@ -3168,93 +3168,95 @@ C     Filling in Tree structure at level Istep
 C     Get the connectivities between 2 and 3 atoms
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION DistMat(NmaxL)
-      DIMENSION Icon2(3*Nmax),IDA(Nmax,Nmax)
-      DIMENSION NCI(12),NCJ(12)
+      integer Icon2(3*number_vertices/2+1)
+      integer IDA(Nmax,Nmax)
+      integer NCI(12),NCJ(12)
       DIMENSION IC3(Nmax,3)
       Rtol=Rmin*(1.d0+Tol)
       Mcon2=0
-      Do I=1,3*Nmax
-       Icon2(I)=0
+c '+1' because num2 relies on finding a '0' after the end of the array.  wtf.
+      Do I=1,3*number_vertices/2+1
+        Icon2(I)=0
       enddo
       Do I=1,Nmax
-      Do J=1,3
-       IC3(I,J)=0
-      enddo
+        Do J=1,3
+          IC3(I,J)=0
+        enddo
       enddo
       if(Ipent.eq.0) then
-       Do I=1,number_vertices
-       Do J=I+1,number_vertices
-        DM=FunDistMat(I,J,DistMat)
-         If (DM.lt.Rtol) then
-          Mcon2=Mcon2+1
-          Ncount=I*number_vertices+J
-          Icon2(Mcon2)=Ncount
-         endif
-       enddo
-       enddo
+        Do I=1,number_vertices
+          Do J=I+1,number_vertices
+            DM=FunDistMat(I,J,DistMat)
+            If (DM.lt.Rtol) then
+              Mcon2=Mcon2+1
+              Ncount=I*number_vertices+J
+              Icon2(Mcon2)=Ncount
+            endif
+          enddo
+        enddo
       else
-       Do I=1,number_vertices
-       Do J=I+1,number_vertices
-        If (IDA(I,J).eq.1) then
-         Mcon2=Mcon2+1
-         Ncount=I*number_vertices+J
-         Icon2(Mcon2)=Ncount
-        endif
-       enddo
-       enddo
+        Do I=1,number_vertices
+          Do J=I+1,number_vertices
+            If (IDA(I,J).eq.1) then
+              Mcon2=Mcon2+1
+              Ncount=I*number_vertices+J
+              Icon2(Mcon2)=Ncount
+            endif
+          enddo
+        enddo
       endif
       Write(IOUT,1000) Mcon2
       If(Mcon2.lt.number_vertices) then
-      Write(IOUT,1004)
-      Stop
+        Write(IOUT,1004)
+        Stop
       endif
       Do I=1,Mcon2,12
-      Do J=1,12
-       NCI(J)=0
-       NCJ(J)=0
-      enddo
-      M12=12
-      Do J=1,12
-       IArray=I+J-1
-        CALL Num2(Icon2(IArray),NCI(J),NCJ(J))
-        If(NCI(J).Eq.0) then
-        M12=J-1
-        Go to 11
-       endif
-      enddo
-   11 if(number_vertices.lt.100)
-     1  Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
-      if(number_vertices.ge.100.and.number_vertices.lt.1000) 
-     1  Write(IOUT,1006) (NCI(J),NCJ(J),J=1,M12)
-      if(number_vertices.ge.1000.and.number_vertices.lt.10000) 
-     1  Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
-      if(number_vertices.ge.10000) 
-     1  Write(IOUT,1008) (NCI(J),NCJ(J),J=1,M12)
+        Do J=1,12
+          NCI(J)=0
+          NCJ(J)=0
+        enddo
+        M12=12
+        Do J=1,12
+          IArray=I+J-1
+          CALL Num2(Icon2(IArray),NCI(J),NCJ(J))
+          If(NCI(J).Eq.0) then
+            M12=J-1
+            Go to 11
+          endif
+        enddo
+   11   if(number_vertices.lt.100)
+     1    Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
+        if(number_vertices.ge.100.and.number_vertices.lt.1000) 
+     1    Write(IOUT,1006) (NCI(J),NCJ(J),J=1,M12)
+        if(number_vertices.ge.1000.and.number_vertices.lt.10000) 
+     1    Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
+        if(number_vertices.ge.10000) 
+     1    Write(IOUT,1008) (NCI(J),NCJ(J),J=1,M12)
       enddo
       Write(IOUT,1002)
 C     Get all vertices
       Do I=1,number_vertices
-      IZ=0
-      Do J=1,MCon2
-      CALL Num2(Icon2(J),IX,IY)
-      IF(IX.EQ.I) then
-      IZ=IZ+1
-      IC3(I,IZ)=IY
-      endif
-      IF(IY.EQ.I) then
-      IZ=IZ+1
-      IC3(I,IZ)=IX
-      endif
-      IF(IZ.EQ.3) Go to 10
-      enddo
-   10 Continue
-      Write(IOUT,1003) I,(IC3(I,J),J=1,3)
+        IZ=0
+        Do J=1,MCon2
+          CALL Num2(Icon2(J),IX,IY)
+          IF(IX.EQ.I) then
+            IZ=IZ+1
+            IC3(I,IZ)=IY
+          endif
+          IF(IY.EQ.I) then
+            IZ=IZ+1
+            IC3(I,IZ)=IX
+          endif
+          IF(IZ.EQ.3) Go to 10
+        enddo
+   10   Continue
+        Write(IOUT,1003) I,(IC3(I,J),J=1,3)
       enddo
 C     Check if structure is alright at this point
       nexpedge=number_vertices*3/2
       if(Mcon2.ne.nexpedge) then
-      Write(IOUT,1005) Mcon2,nexpedge
-      stop
+        Write(IOUT,1005) Mcon2,nexpedge
+        stop
       endif
  1000 Format(/1X,' Number of connected surface atoms (edges, bonds): ',
      1 I5,/1X,' Connectivities (edge set):')

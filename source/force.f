@@ -44,7 +44,7 @@ C     and bending, energy
       implicit none
 
       integer ierr
-      real(8) p(nmax*3),fc,force(ffmaxdim)
+      real(8) p(number_vertices*3),fc,force(ffmaxdim)
       integer iopt
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)
@@ -151,7 +151,7 @@ C     total energy
       implicit none
 
       integer ierr
-      real(8) p(nmax*3),fc,force(ffmaxdim)
+      real(8) p(number_vertices*3),fc,force(ffmaxdim)
       integer iopt
 c     edges with 0, 1, 2 pentagons
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2)

@@ -108,9 +108,9 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   output.push_back(tri_t(0,2,*v));
   output.push_back(tri_t(1,2,*v));
 
+  coord3d c((points[0]+points[1]+points[2]+points[*v])/4.0);
   work_queue.erase(v);
 
-  coord3d c((points[0]+points[1]+points[2]+points[*v])/4.0);
   for(triit t(output.begin());t!=output.end();t++){
     // Make sure all faces point away from the centroid. 
     if(!Tri3D(points,*t).back_face(c)) t->flip(); 
@@ -319,6 +319,7 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
   if(layout2d.size() != N){
     layout2d = tutte_layout(-1,-1,-1,face_max);
   }
+  layout_is_spherical = false;
 
 //  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){

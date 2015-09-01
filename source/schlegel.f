@@ -25,6 +25,7 @@ C or face is at the top. Euler angles are used for rotation.
       Character*50 filename
       Character*50 hamname
       type(c_ptr) :: g, new_fullerene_graph
+      integer layout_is_spherical
 
       Data epsf/.12d0/
 C     Parameter set for Program QMGA
@@ -740,7 +741,8 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
        enddo
       endif
 
- 9999 call set_layout2d(g,layout2d)
+ 9999 layout_is_spherical = 0
+      call set_layout2d(g, layout2d, layout_is_spherical)
       if(ifs.eq.1.or.ifs.eq.3) then
 
       if(nhamcyc.ne.0) then

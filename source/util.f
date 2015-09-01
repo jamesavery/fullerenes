@@ -859,15 +859,16 @@ C     Sort the N integer numbers, input IS, Output JS
       SUBROUTINE Num2(IArray,I,J)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
+c I and J may be uninitialised
       I=IArray/number_vertices
       J=IArray-I*number_vertices
       If(J.eq.0) then
-      J=number_vertices
-      I=I-1
+        J=number_vertices
+        I=I-1
       endif
       If(I.eq.-1) then
-      I=0
-      J=0
+        I=0
+        J=0
       endif
       RETURN
       END
