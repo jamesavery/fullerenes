@@ -3173,6 +3173,9 @@ C     Get the connectivities between 2 and 3 atoms
       DIMENSION IC3(Nmax,3)
       Rtol=Rmin*(1.d0+Tol)
       Mcon2=0
+      Do I=1,3*Nmax
+       Icon2(I)=0
+      enddo
       Do I=1,Nmax
       Do J=1,3
        IC3(I,J)=0
