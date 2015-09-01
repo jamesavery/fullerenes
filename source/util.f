@@ -512,6 +512,7 @@ C     Now sort values of diamw, output diam
       REAL*8 layout2d(2,Nmax)
       Integer*8 perfmatch, perfect_match_count
       type(c_ptr) :: graph, new_fullerene_graph
+      integer layout_is_spherical
 C     This routine calculates the Wiener index, Hyperwiener index,
 C     minimal and maximal vertex contribution, rho and rhoE,
 C     Schultz index and Balaban index
@@ -522,7 +523,9 @@ C     Chem. Phys. Lett. 501, 442–445 (2011).
 
       graph = new_fullerene_graph(Nmax,number_vertices,IDA)
       call tutte_layout(graph, layout2d)
-      call set_layout2d(graph, layout2d)
+c not spherical because of tutte
+      layout_is_spherical = 0
+      call set_layout2d(graph, layout2d, layout_is_spherical)
 c     topological distances between all pairs of vertices
       call all_pairs_shortest_path(graph,number_vertices,Nmax,MDist)
       call edge_list(graph,edges,NE)

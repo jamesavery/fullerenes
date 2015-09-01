@@ -64,7 +64,7 @@ extern "C" {
   void get_layout2d_(const graph_ptr *p, double *layout2d);
   void get_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face, int *l);
 
-  void set_layout2d_(graph_ptr *g, const double *layout2d);
+  void set_layout2d_(graph_ptr *g, const double *layout2d, const int *layout_is_spherical);
 
   double shortest_planar_distance_(const graph_ptr *g);
 
@@ -327,16 +327,17 @@ void get_layout2d_(const graph_ptr *g, double *points)
   }
 }
 
-void set_layout2d_(graph_ptr *g, const double *layout2d)
+void set_layout2d_(graph_ptr *g, const double *layout2d, const int *layout_is_spherical)
 {
   PlanarGraph& G(*(*g));
 
   G.layout2d.resize(G.N);
 
-  for(node_t u=0;u<G.N;u++)
+  for(node_t u=0;u<G.N;u++){
     G.layout2d[u] = coord2d(layout2d[u*2],layout2d[u*2+1]);
-
+  }
   G.orient_neighbours();
+  G.layout_is_spherical = *layout_is_spherical;
 }
 
 

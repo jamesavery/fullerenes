@@ -261,12 +261,6 @@ vector<int> FullereneGraph::pentagon_distance_mtx() const{
 //  cout << pentagon_distance_mtx << endl;
 
   return mtx_vec;
-
-//mathematica output, please do not remove (lukas)
-//  cout << "{";
-//  for(int i=0; i<12; ++i)
-//     cout << vector<int>(&mtx_vec[12*i],&mtx_vec[13*i]) << (i+1<12?",\n":"");
-//  cout << "}\n";
 }
 
 vector<coord3d> FullereneGraph::zero_order_geometry(double scalerad) const
