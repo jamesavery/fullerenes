@@ -56,6 +56,38 @@ bool PlanarGraph::is_a_fullerene() const {
   return true;
 }
 
+// the following is a naive approach that iterates over all pairs of edges
+// for some purposes it would be sufficient to ensure that each face intersects itself an even number of times (while figures of eight are problematic)
+bool PlanarGraph::layout_is_crossingfree() const 
+{
+  assert(layout2d.size() == N);
+  set<edge_t> es = undirected_edges(); // TODO: In new planargraph, this is unnecessary
+  for (set<edge_t>::iterator e1(es.begin()); e1!=es.end(); e1++){
+    for (set<edge_t>::iterator e2(e1); e2!=es.end(); e2++){
+      if (e1->first == e2->first || e1->second == e2->first || e1->first == e2->second || e1->second == e2->second) continue; // equal edges and edges that share a vertex
+      const double e1ax = layout2d[e1->first].first,
+                   e1ay = layout2d[e1->first].second,
+                   e1bx = layout2d[e1->second].first,
+                   e1by = layout2d[e1->second].second,
+                   e2ax = layout2d[e2->first].first,
+                   e2ay = layout2d[e2->first].second,
+                   e2bx = layout2d[e2->second].first,
+                   e2by = layout2d[e2->second].second;
+      const double a1 = (e1ay - e1by)/(e1ax - e1bx);
+      const double b1 = e1ay - a1 * e1ax;
+      if ((e2ay > a1*e2ax+b1 && e2by > a1*e2bx+b1) || (e2ay < a1*e2ax+b1 && e2by < a1*e2bx+b1)) continue; // both points of the second edge lie on the same side of the first edge
+      const double a2 = (e2ay - e2by)/(e2ax - e2bx);
+      const double b2 = e2ay - a2 * e2ax;
+      if ((e1ay > a2*e1ax+b2 && e1by > a2*e1bx+b2) || (e1ay < a2*e1ax+b2 && e1by < a2*e1bx+b2)) continue; // both points of the first edge lie on the same side of the second edge
+      cerr << "edges " << *e1 << " and " << *e2 << " intersect." << endl;
+      return false;
+    }
+  }
+  return true;
+}
+
+
+
 
 PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const {
   // TODO: Simplify

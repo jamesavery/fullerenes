@@ -30,6 +30,8 @@ public:
   bool is_cubic() const;
   bool is_triangulation() const;
 
+  bool layout_is_crossingfree() const;
+
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;
   face_t get_face_oriented(int u, int v) const;

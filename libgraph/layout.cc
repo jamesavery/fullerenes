@@ -325,37 +325,26 @@ coord3d Graph::centre3d(const vector<coord3d>& layout) const {
   for(node_t u=0;u<layout.size();u++) centre += layout[u];
   return centre/double(layout.size());
 }
+
+
 // TODO: 
 // * Move layout to member variable
 // * Check if layout is planar before allowing it (this function crashes if it is not).
-
-
 string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool print_numbers, bool include_latex_header,
 			     int edge_colour, int path_colour, int vertex_colour, double edge_width, double path_width,
 			     double vertex_diameter, int Npath, int *path) const
 {
-  cout << "entering to_latex" << endl;
-  cout << include_latex_header << endl;
-  cout << edge_colour << ", " << path_colour << ", " << vertex_colour << endl;
-  cout << print_numbers << endl;
-  cout << edge_width << ", " << path_width << endl;
-  cout << vertex_diameter << endl;
-  cout << (edge_colour>>16) << endl;
-
-  
   string str;
-  cerr << "Just before constructor.\n";
   ostringstream s(str);
-  cerr << "stream opened" << endl;
   s << std::fixed;
 
-// If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
-  cerr << "Hello stream.\n";
-  s << "Hello, world.\n";
-  cerr << "Hello again.\n";
+  if(show_dual && !layout_is_crossingfree()) {
+    s << "get a proper layout first" << endl;
+    return s.str();
+  }
 
+// If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
   if(include_latex_header)
-// Problem starts here immediately with next line
     s << "\\documentclass{standalone}\n"
       "\\usepackage{tikz}\n"
       "\\begin{document}\n"
