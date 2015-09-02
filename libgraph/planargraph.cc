@@ -283,13 +283,14 @@ facemap_t PlanarGraph::compute_faces_oriented() const
   return facemap;
 }
 
-
+// sort neighbour list CW
 void PlanarGraph::orient_neighbours() 
 {
   assert(layout2d.size() == N);
   for(node_t u=0;u<N;u++){
     sort_ccw_point CCW(layout2d,layout2d[u]);
     sort(neighbours[u].begin(),neighbours[u].end(),CCW);
+    reverse(neighbours[u].begin(),neighbours[u].end());
   }
 }
 

@@ -309,10 +309,10 @@ void Graph::orient_neighbours(const vector<coord2d>& layout)
   for(node_t u=0;u<N;u++){
     vector<node_t>& ns(neighbours[u]);
 
-    sort_ccw_point CW(layout,layout[u]);
-    sort(ns.begin(), ns.end(), CW);
+    sort_ccw_point CCW(layout,layout[u]);
+    sort(ns.begin(), ns.end(), CCW);
+    reverse(ns.begin(),ns.end()); // reverse to get CW
   }
-
 }
 
 coord2d Graph::centre2d(const vector<coord2d>& layout) const {

@@ -183,8 +183,10 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
 
   FullereneGraph frog(dualfrog.dual_graph(3,false), new_layout);
 
+  // outer faces should be sorted CW
   sort_ccw_point CCW(new_layout,new_outer_face.centroid(new_layout));
   sort(new_outer_face.begin(),new_outer_face.end(),CCW);
+  reverse(new_outer_face.begin(),new_outer_face.end());
   frog.outer_face = new_outer_face;
 
   return frog;
