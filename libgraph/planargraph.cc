@@ -508,8 +508,8 @@ face_t PlanarGraph::find_outer_face() const
   assert(i<N);
 
   sort_ccw_point CCW(layout2d,outer_face.centroid(layout2d));
-  sort(outer_face.begin(),outer_face.end(),CCW);
-  reverse(outer_face.begin(),outer_face.end());  
+  sort(outer_face.begin(),outer_face.end(),CCW); // sort CCW
+  reverse(outer_face.begin(),outer_face.end()); // reverse to get CW
 
   //  cout << "Found outer face: " << outer_face << endl;
   return outer_face;

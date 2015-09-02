@@ -34,6 +34,7 @@ vector<coord2d> PlanarGraph::tutte_layout(const face_t& outer_face) const
   unsigned int Nface = outer_face.size();
   vector<coord2d> initial_coords(N);
   for(unsigned int i=0;i<Nface;i++){
+    // the outer face is layed out CW:
     initial_coords[outer_face[i]] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
   }
 

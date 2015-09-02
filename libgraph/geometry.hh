@@ -524,7 +524,8 @@ struct sort_ccw_point {
     // printf("compare: %d:{%g,%g}:%g %d:{%g,%g}:%g\n",
     // 	   s,layout[s].first,layout[s].second,angs,
     // 	   t,layout[t].first,layout[t].second,angt);
-    return angs >= angt; 	// TODO: Is the sign here correct?
+    // ascending sorting of angles, implies CCW orientation, and sort requires 'less' for ascending sorting
+    return angs <= angt; 	// TODO: Is the sign here correct? // lnw: changed, i think less/equal is correct
   }
 };
 
