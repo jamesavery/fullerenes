@@ -131,16 +131,16 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) 
     list<triit> visible;
     map<dedge_t,bool> is_visible;
-    coord3d centre;		// Centre of visible faces
+    coord3d centre; // Centre of visible faces
     for(triit t(output.begin());t!=output.end();t++){
       if(!Tri3D(points,*t).back_face(p)) { 
-	visible.push_back(t);
-	for(int i=0;i<3;i++) 
-	  is_visible[dedge_t(t->u(i),t->u((i+1)%3))] = true; 
-	centre += t->centroid(points);
+        visible.push_back(t);
+        for(int i=0;i<3;i++) 
+          is_visible[dedge_t(t->u(i),t->u((i+1)%3))] = true; 
+        centre += t->centroid(points);
       }
     }
-    centre /= visible.size();
+    if(visible.size() != 0) centre /= visible.size();
 
     // 2.2 Build set of horizon edges: each edge e in visible faces that has f_a visible, f_b invisible
     list<edge_t> horizon;
@@ -148,10 +148,10 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
       const tri_t& tv(**tvi);
 
       for(int j=0;j<3;j++){
-	const dedge_t e(tv[j],tv[(j+1)%3]);
+        const dedge_t e(tv[j],tv[(j+1)%3]);
 
-	if( (is_visible[e] && !is_visible[dedge_t(e.second,e.first)]) || (!is_visible[e] && is_visible[dedge_t(e.second,e.first)]) )
-	  horizon.push_back(edge_t(e));
+        if( (is_visible[e] && !is_visible[dedge_t(e.second,e.first)]) || (!is_visible[e] && is_visible[dedge_t(e.second,e.first)]) )
+          horizon.push_back(edge_t(e));
       }
       // 2.3 Delete visible faces from output set. 
       output.erase(*tvi);
@@ -161,18 +161,18 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
     for(list<edge_t>::const_iterator e(horizon.begin()); e!=horizon.end(); e++){
       tri_t t(*u,e->first,e->second);
 
-      //	Make sure new faces point outwards. 
+      //        Make sure new faces point outwards. 
       if(!Tri3D(points,t).back_face(centre)) t.flip();
 
 
       triit ti = output.insert(output.end(),t);
       //      for(int j=0;j<3;j++)
-	//	edgetri[dedge_t(t[j],t[(j+1)%3])] = ti;
+        //        edgetri[dedge_t(t[j],t[(j+1)%3])] = ti;
     }
     if(output.size() > N*N*10){
       fprintf(stderr,"Something went horribly wrong in computation of convex hull:\n");
       fprintf(stderr,"Data sizes: output(%ld), visible(%ld), is_visible(%ld), horizon(%ld), horizon-visible: %ld\n",
-	      output.size(),visible.size(),is_visible.size(),horizon.size(),horizon.size()-visible.size());
+              output.size(),visible.size(),is_visible.size(),horizon.size(),horizon.size()-visible.size());
     }
   }
     
@@ -251,7 +251,7 @@ string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_l
 
 
   if(show_dual){
-    PlanarGraph dual(dual_graph(face_max));	// TODO: This breaks for everything else than fullerenes
+    PlanarGraph dual(dual_graph(face_max));        // TODO: This breaks for everything else than fullerenes
     s << "\\foreach \\place/\\name/\\lbl in {";
     for(node_t u=0;u<dual.N;u++){
       const coord2d& xs(dual.layout2d[u]);
@@ -421,8 +421,8 @@ coord3d Polyhedron::width_height_depth() const {
 
 
 string Polyhedron::to_povray(double w_cm, double h_cm, 
-		   int line_colour, int vertex_colour, int face_colour,
-		   double line_width, double vertex_diameter, double face_opacity) const 
+                   int line_colour, int vertex_colour, int face_colour,
+                   double line_width, double vertex_diameter, double face_opacity) const 
 {
   //  coord3d whd(width_height_depth()); // TODO: Removed width/height -- much better to use real coordinates and handle layout in host pov file.
 
@@ -471,15 +471,15 @@ string Polyhedron::to_povray(double w_cm, double h_cm,
   }
   s << "#declare volume="<<fabs(V)<<";\n";
 
-  if(V<0)			// Calculated normals are pointing inwards!
+  if(V<0)                        // Calculated normals are pointing inwards!
     for(int i=0;i<tris.size();i++) trinormals[i] *= -1;
 
   for(int i=0;i<faces.size();i++) {
     coord3d normal;
     if(faces[i].size()>3){
       for(int j=0;j<faces[i].size();j++){
-	triface.push_back(i);
-	normal += trinormals[triface.size()-1];
+        triface.push_back(i);
+        normal += trinormals[triface.size()-1];
       } 
       facenormals[i] = normal/normal.norm();
     } else {
@@ -554,7 +554,7 @@ string Polyhedron::to_mol2() const {
     const vector<node_t> &ns(neighbours[u]);
     for(int j=0;j<ns.size();j++)
       if(ns[j]>=u) 
-	s << (i++) << "\t" << (u+1) << "\t" << (ns[j]+1) << "\tun\n";
+        s << (i++) << "\t" << (u+1) << "\t" << (ns[j]+1) << "\tun\n";
   }
 
   return s.str();
@@ -600,7 +600,7 @@ Polyhedron Polyhedron::from_mol2(const string& filename)
     for(int j=0;j<3 && l.good(); j++) l >> x[j];
     points.push_back(x);
   }
-  assert(points.size() == N); 	// TODO: Fail gracefully if file format error.
+  assert(points.size() == N);         // TODO: Fail gracefully if file format error.
 
   // Fast forward to edge section
   while(getline(file,line) && line.compare(0,edge_marker.size(),edge_marker)) ;  
