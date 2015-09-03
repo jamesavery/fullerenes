@@ -163,17 +163,15 @@ C Start Goldberg-Coxeter
         if(itGC.le.1) then
           Write(iout,1045) itGC
           stop
-        else
-          halma = halma_fullerene(g,kGC-1)
-          isafullerene = graph_is_a_fullerene(halma)
         endif
-        ihalma=1
-        IF (isafullerene .eq. 1) then
-          write (iout,1043) 
-        else
+        halma = halma_fullerene(g,kGC-1)
+        isafullerene = graph_is_a_fullerene(halma)
+        if (isafullerene .ne. 1) then
           write (iout,1044)
           stop
         endif
+        write (iout,1043) 
+        ihalma=1
 C       Update fortran structures
         number_vertices  = NVertices(halma)
         Medges = NEdges(halma)
