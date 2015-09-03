@@ -1725,7 +1725,7 @@ C     Print ring numbers
  630  Format(1X,'Failed to find ring spiral: ',I7,
      1 ' detected (maximum possible: ',I7,')',/1X,
      1 'This is a non-spiral fullerene: Entering the general spiral'
-     1 ' algorithm',/1X,'General Spiral:')
+     1 ' algorithm',/1X,'Canonical General Spiral:')
  631  FORMAT(1X,I7,' distinct (55)      RSPIs found out of ',I7,
      1 /1X,I7,' distinct (56)/(65) RSPIs found out of ',I7,
      1 /1X,I7,' distinct (66)      RSPIs found out of ',I7)
