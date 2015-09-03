@@ -7,7 +7,7 @@ C     I am sure there are better algorithms, but this one is not too bad and fas
 C     enough and fast.
       IMPLICIT REAL*8 (A-H,O-Z)
 C     IC3 contains vertex adjacencies and IVR3 ring numbers for a vertex
-      DIMENSION IC3(Nmax,3),IVR3(Nmax,3)
+      DIMENSION IC3(Nmax,3),IVR3(Nmax+4,3)
       DIMENSION N5MEM(Mmax,5),N5MEMS(Mmax,5)
       DIMENSION N6MEM(Mmax,6),N6MEMS(Mmax,6)
       DIMENSION IPa(6,96)
@@ -219,10 +219,10 @@ C     Deviation from ideal hexagon angle of 120 deg
      1  Write(IOUT,1016) asmall,asmalldif,abig,abigdif
 
 C     Establish ring numbers for specific vertex
-      do I=1,number_vertices
-      Do J=1,3
-       IVR3(I,J)=0
-      enddo
+      do I=1,nmax+4
+        Do J=1,3
+          IVR3(I,J)=0
+        enddo
       enddo
 C     First pentagons
       Do I=1,Ncount5
@@ -257,9 +257,9 @@ C     Next hexagons
       enddo
       Write(IOUT,1017)
       Do I=1,number_vertices,5
-      Write(IOUT,1018) I,(IVR3(I,J),J=1,3),
-     1 I+1,(IVR3(I+1,J),J=1,3),I+2,(IVR3(I+2,J),J=1,3),
-     1 I+3,(IVR3(I+3,J),J=1,3),I+4,(IVR3(I+4,J),J=1,3)
+        Write(IOUT,1018) I,(IVR3(I,J),J=1,3),
+     1   I+1,(IVR3(I+1,J),J=1,3),I+2,(IVR3(I+2,J),J=1,3),
+     1   I+3,(IVR3(I+3,J),J=1,3),I+4,(IVR3(I+4,J),J=1,3)
       enddo
       
 C     Check Euler characteristic
@@ -344,7 +344,7 @@ C     Determine the center of each 5-and 6-ring system
       DIMENSION Dist(3,Nmax),Distac(6)
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Nring(Mmax)
-      DIMENSION IC3(Nmax,3),IVR3(Nmax,3)
+      DIMENSION IC3(Nmax,3),IVR3(nmax+4,3) ! up to four values past the required ones are read
       DIMENSION IedgeA(Emax),IedgeB(Emax)
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
@@ -862,6 +862,7 @@ C Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
 C     First pentagon indices
       IPR=0
       ihk=0
+      sigmah = 0
       Do I=0,5
        IRhag5(I)=0
       enddo
@@ -888,51 +889,51 @@ C     Pentagon index
       endif
 C     Now hexagon indices
       if(N6Ring.eq.0) Return
-       Do I=0,6
+      Do I=0,6
         IRhag6(I)=0
-       enddo
-       If(IRing6.eq.0) then
+      enddo
+      If(IRing6.ne.0) then
+        do I=13,12+N6Ring
+          IRcount=0
+          do J=1,IRing6
+            If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
+              IRcount=IRcount+1
+            endif
+          enddo
+          IRhag6(IRcount)=IRhag6(IRcount)+1
+        enddo
+C       Hexagon Neighbor Index
+        ih0=0
+        ih1=0
+        ih2=0
+        Do I=0,6
+          ih0=ih0+IRhag6(I)
+          ih1=ih1+I*IRhag6(I)
+          ih2=ih2+I*I*IRhag6(I)
+        enddo
+C       Strain Parameter
+        sigmah=HexInd(IRhag6,ihk)
+        Write(Iout,1024) ih0,ih1,ih2 
+        if(ihk.eq.0) Write(Iout,1027) 
+      else
         IRhag6(0)=N6Ring
-        go to 112
-       endif
-      do I=13,12+N6Ring
-      IRcount=0
-      do J=1,IRing6
-       If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
-        IRcount=IRcount+1
-       endif
-      enddo
-      IRhag6(IRcount)=IRhag6(IRcount)+1
-      enddo
-C     Hexagon Neighbor Index
-      ih0=0
-      ih1=0
-      ih2=0
-       Do I=0,6
-        ih0=ih0+IRhag6(I)
-        ih1=ih1+I*IRhag6(I)
-        ih2=ih2+I*I*IRhag6(I)
-       enddo
-C     Strain Parameter
-      sigmah=HexInd(IRhag6,ihk)
-      Write(Iout,1024) ih0,ih1,ih2 
-      if(ihk.eq.0) Write(Iout,1027) 
-  112 Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
+      endif
+      Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
       Ifus6=0
       Do I=3,6
-      IFus6=IFus6+IRhag6(I)
+        IFus6=IFus6+IRhag6(I)
       enddo
       IFus6G=IFus6*2+20
       If(IFus6G.eq.number_vertices) then
-       Write(Iout,1018) IFus6G
+        Write(Iout,1018) IFus6G
       else
-       Write(Iout,1019) IFus6G
+        Write(Iout,1019) IFus6G
       endif
       If(IRing5.eq.0) then
-       IPR=1
-       Write(Iout,1022) 
+        IPR=1
+        Write(Iout,1022) 
       else
-       Write(Iout,1023)
+        Write(Iout,1023)
       endif
 
  1013 Format(1X,'Rhagavachari-Fowler-Manolopoulos neighboring '
@@ -1102,7 +1103,9 @@ C     Print center of rings
       SUBROUTINE Alcami(Iout,Medges,IC3,IVR3)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      Dimension IC3(Nmax,3),IVR3(Nmax,3),nring(4),npattern(9),eps(9)
+      integer IC3(Nmax,3),IVR3(number_vertices+4,3)
+      integer nring(4),npattern(9)
+      real*8 eps(9)
 C     Finds different ring patterns of 4 rings connected
 C     see M.Alcami, G.Sanchez, S.Diaz-Tendero, Y.Wang, F.Martin, 
 C      J. Nanosci. Nanotech. 7, 1329 (2007)

@@ -33,7 +33,8 @@ C    Set the dimensions for the distance matrix
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
       DIMENSION distP(Nmax),IDA(Nmax,Nmax)
-      DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
+      DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax)
+      integer IVR3(nmax+4,3) ! in ring.f up to four values to many are read
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)

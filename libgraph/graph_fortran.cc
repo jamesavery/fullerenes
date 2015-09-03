@@ -231,6 +231,7 @@ fullerene_graph_ptr goldberg_coxeter_(const fullerene_graph_ptr *g, const int *k
 {
   FullereneGraph fg(**g);
   fg.layout2d = fg.tutte_layout(); // FIXME remove, and pass argument to GCtransform?
+  fg.layout_is_spherical = false;
   return new FullereneGraph(fg.GCtransform(*k,*l));
 }
 
@@ -480,7 +481,7 @@ void get_face_distance_mtx_(const fullerene_graph_ptr *fg, int *face_distances){
 
 // rspi_a and jumps_a start counting at 1
 void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jumps_a[10]){
-//  12 will always be 12, 10 is just a arbitrary magic number
+//  12 will always be 12, 10 is just an arbitrary magic number
   assert((*fg)->layout2d.size() == (*fg)->N);
   vector<int> rspi_v;
   FullereneGraph::jumplist_t jumps_v;
