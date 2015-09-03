@@ -231,6 +231,7 @@ fullerene_graph_ptr goldberg_coxeter_(const fullerene_graph_ptr *g, const int *k
 {
   FullereneGraph fg(**g);
   fg.layout2d = fg.tutte_layout(); // FIXME remove, and pass argument to GCtransform?
+  fg.layout_is_spherical = false;
   return new FullereneGraph(fg.GCtransform(*k,*l));
 }
 

@@ -279,7 +279,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
     for(int i=0;i<face.size();i++)
       workset.erase(dedge_t(face[i],face[(i+1)%face.size()]));
   }
-  assert(faces_found == N/2+2);
+  assert(faces_found == N/2+2 || faces_found == (N-2)*2); // assuming the graph is either cubic or a triangulation // FIXME remove when things are more stable
   return facemap;
 }
 
