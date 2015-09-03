@@ -862,6 +862,7 @@ C Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
 C     First pentagon indices
       IPR=0
       ihk=0
+      sigmah = 0
       Do I=0,5
        IRhag5(I)=0
       enddo
@@ -888,51 +889,51 @@ C     Pentagon index
       endif
 C     Now hexagon indices
       if(N6Ring.eq.0) Return
-       Do I=0,6
+      Do I=0,6
         IRhag6(I)=0
-       enddo
-       If(IRing6.eq.0) then
+      enddo
+      If(IRing6.ne.0) then
+        do I=13,12+N6Ring
+          IRcount=0
+          do J=1,IRing6
+            If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
+              IRcount=IRcount+1
+            endif
+          enddo
+          IRhag6(IRcount)=IRhag6(IRcount)+1
+        enddo
+C       Hexagon Neighbor Index
+        ih0=0
+        ih1=0
+        ih2=0
+        Do I=0,6
+          ih0=ih0+IRhag6(I)
+          ih1=ih1+I*IRhag6(I)
+          ih2=ih2+I*I*IRhag6(I)
+        enddo
+C       Strain Parameter
+        sigmah=HexInd(IRhag6,ihk)
+        Write(Iout,1024) ih0,ih1,ih2 
+        if(ihk.eq.0) Write(Iout,1027) 
+      else
         IRhag6(0)=N6Ring
-        go to 112
-       endif
-      do I=13,12+N6Ring
-      IRcount=0
-      do J=1,IRing6
-       If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
-        IRcount=IRcount+1
-       endif
-      enddo
-      IRhag6(IRcount)=IRhag6(IRcount)+1
-      enddo
-C     Hexagon Neighbor Index
-      ih0=0
-      ih1=0
-      ih2=0
-       Do I=0,6
-        ih0=ih0+IRhag6(I)
-        ih1=ih1+I*IRhag6(I)
-        ih2=ih2+I*I*IRhag6(I)
-       enddo
-C     Strain Parameter
-      sigmah=HexInd(IRhag6,ihk)
-      Write(Iout,1024) ih0,ih1,ih2 
-      if(ihk.eq.0) Write(Iout,1027) 
-  112 Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
+      endif
+      Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
       Ifus6=0
       Do I=3,6
-      IFus6=IFus6+IRhag6(I)
+        IFus6=IFus6+IRhag6(I)
       enddo
       IFus6G=IFus6*2+20
       If(IFus6G.eq.number_vertices) then
-       Write(Iout,1018) IFus6G
+        Write(Iout,1018) IFus6G
       else
-       Write(Iout,1019) IFus6G
+        Write(Iout,1019) IFus6G
       endif
       If(IRing5.eq.0) then
-       IPR=1
-       Write(Iout,1022) 
+        IPR=1
+        Write(Iout,1022) 
       else
-       Write(Iout,1023)
+        Write(Iout,1023)
       endif
 
  1013 Format(1X,'Rhagavachari-Fowler-Manolopoulos neighboring '
