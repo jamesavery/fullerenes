@@ -11,7 +11,7 @@
 !      The results can be used for plotting 2D/3D fullerene graphs          !
 !    (e.g. Schlegel diagrams) and structures, and as a starting point       !
 !            for further quantum theoretical treatment.                     !
-!        Version 4.4 now incorporates C++ routines linked to the            !
+!        Version 4.5 incorporates C++ routines linked to the                !
 !       original Fortran program using much improved algorithms.            !
 !---------------------------------------------------------------------------!
 
@@ -674,7 +674,7 @@ C Formats
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0                from 08/06/10     |',
      1 /1X,'|    This  version: ',VERSION_NUMBER,
-     1                            ', last revision from 28/03/13     |',
+     1                            ', last revision from 03/09/15     |',
      1 /1X,'|________________________________________________________|',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
