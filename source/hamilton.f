@@ -533,8 +533,8 @@ C     Correct upper and lower limit
 
       else
 
-C     Upper and lower limit obtained from D5H and D5d nanotubes
-C     Lower limt
+C     Upper and lower limit obtained from D5h and D5d nanotubes
+C     Lower limit
        alow=1.d-1*dAtom+1.33d0
        exp1=dAtom/1.d1-1.d0
        if(alow.le.explimit) then
@@ -544,7 +544,7 @@ C     Lower limt
         write (Iout,1013) exp1
        endif
 
-C     Upper limt
+C     Upper limit
        ahigh=1.8d-1*dAtom+2.33d0
        exp1=dAtom/1.d1-1.d0
        exp2=dAtom/2.d1-1.d0
@@ -738,7 +738,7 @@ C     NP values
  1009 Format(1X,'Number of atoms exceeds ',I3,', change Ihuge value ',
      1 ' (if you dare)') 
  1010 Format(1X,'Exact limits for Hamiltonian cycles for IPR ',
-     1 'fullerenes. Upper limit =',I7,', lower limit= ',I7)
+     1 'fullerenes. Lower limit =',I7,', upper limit= ',I7)
  1011 Format(1X,'Estimated upper limit for Hamiltonian cycles in '
      1 'fullerene graphs from D5d (5,0) nanotubes: ',F20.0)
  1012 Format(1X,'Estimated lower limit for Hamiltonian cycles in '
@@ -749,8 +749,8 @@ C     NP values
      1 'fullerene graphs: between',F20.0,' and',F20.0)
  1015 Format(1X,'Approximate number of Hamiltonian cycles in IPR '
      1 'fullerene graphs: between ',D20.10,' and ',D20.10)
- 1016 Format(1X,'Exact limits for Hamiltonian cycles. Upper ',
-     1 'limit =',I7,', lower limit= ',I7)
+ 1016 Format(1X,'Exact limits for Hamiltonian cycles. Lower ',
+     1 'limit =',I7,', upper limit= ',I7)
  1017 Format(1X,'Modified Epstein upper limit for Hamiltonian cycles in'
      1 ' fullerene graphs: ',F20.0)
  1018 Format(1X,'Modified Epstein upper limit for Hamiltonian cycles in'
