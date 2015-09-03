@@ -104,7 +104,6 @@ Dr. & Li & Zong-Jun & Changchun Institute of Applied Chemistry & State Key Labor
 Dr. & Hitesh & Sharma & Punjab Technical University  & Department of Physics & Kapurthala & India & hitesh@ptu.ac.in & Academic institution 
 Ms. & Abhishek & Sirohiwal & IISER  & Chemical Sciences & Bhopal & India & abhisheks@iiserb.ac.in & i need this software for research purpose.
 Prof. Dr. & Qunxiang & Li & University of Science and Technology of China & Department of Chemical Physics & Hefei & China & liqun@ustc.edu.cn & We are interested in clusterfullerenes
-Prof. Dr. & Qunxiang & Li & University of Science and Technology of China & Department of Chemical Physics & Hefei & China & liqun@ustc.edu.cn & We are interested in clusterfullerenes
 Dr. & James & Avery & University of Copenhagen & Niels Bohr Institute & Copenhagen & Denmark & avery@diku.dk & 
 Prof. Dr. & wazirul haque & ansari & GoldField Inst. Tech. & Mgmt., Chhainsa & Physics & Faridabad-121004 & India & whansari161945@gmail.com & Your program is needed in our study of electronic structure & spectra of fullerenes
 Dr. & Kanchana & Thanthiriwatte & The University of Alabama & Depatment of Chemistry & Tuscaloosa & United States of America & sahanchem@gmail.com & 
@@ -220,7 +219,6 @@ Mr. & Corina & Vasilescu & West University of Timisoara & Chemistry-Biology Depa
 Dr. & Emilio & Scalise & MPIE &  & Düsseldorf & Germany & scaliseemilio@gmail.com & 
 Ms. & Sasha & Severyukhin & IM Ural Branch RAS &  & Izhevsk & Russia & severfam@mail.ru & 
 Ms. & Xue & Minmin & nanoinstitue of science  & NUAA & Nanjing & China & mmxue@nuaa.edu.cn & This program is good and the works are impressive
-Prof. & zbscplpm & zbscplpm & nDwbeJDvaaLm & MBqhwWFYKlpo & New York & Tanzania & nfyweg@sfmldd.com & USA
 Dr. & Denis & Sabirov & Inst. Petrochem. Catalysis & Lab. of Phys. Chem. Problems & Ufa & Russia & sabirovdsh@mail.ru & 
  & John & Crimmy & University of Georgia & Chemistry & Athens & United States of America & websiteacct200@gmail.com & none
 Dr. & pravin & paul & polyclone & bioinformatics & Bangalore & India & pravinpaul2@gmail.com & study
@@ -320,3 +318,66 @@ Mr. & MIJIN & KIM & U OF MARYLAND & CHEMISTRY & COLLEGE PARK & United States of 
 Mr. & Agni & Stefanou & University of Ioannina & CHEMISTRY & IOANNINA & Greece & agni_stephanou@yahoo.com & 
 Ms. & Xiaoyang & Liu & Virginia Tech & Chemistry & Blacksburg & United States of America & xiaoyang@vt.edu & 
 Dr. & Konstantin & Amsharov & Institute of Organic Chemistry FAU & Chemistry & Erlangen & Germany & konstantin.amsharov@fau.de & 
+Dr. & Douglas & Puharic & Edinboro University of Pennsylvania & Mathematics and Computer Science & Edinboro & United States of America & dpuharic@edinboro.edu & I would like to use this program to aid in investigating graph theoretical properties of fullerenes.
+ & Ethan & Thomas & UA & Chemistry & Barcelona & Spain & udg190@gmail.com & 
+Ms. & Xiaoyang & Liu & Virginia Tech & Chemistry & Blacksburg & United States of America & xiaoyang@vt.edu & 
+Dr. & Badri & Narayanan & Argonne National Laboratory & Center for Nanoscale Materials & Argonne & United States of America & bnarayanan@anl.gov & 
+Ms. & Matej & Krajnc & Jozef Stefan Institute & F1 & Ljubljana & Slovenia & matej.krajnc@ijs.si & 
+Mr. & ADRIJA & CHOWDHURY & AMITY UNIVERSITY & PHYSICS & LUCKNOW & India & adrj_10@rediffmail.com & 
+Ms. & Jong Yoon & Han & Pohang University of Science & Technology (POSTECH) & The Department of Chemistry & Pohang & Korea South & hjy0013@postech.ac.kr & I am a graduate student studying about the fullerene formation in the gas phase.
+Prof. Dr. & Ming & Zhu & Nanjing University & chemistry & Nanjing & China & zhuming223@126.com & 
+Dr. & Sonja & Nikolic & Rugjer Boskovic Institute & Department for marine sciences and environmental & Zagreb & Croatia & sonja.nikolic.zg@gmail.com & 
+Ms. & Richard & Kinch & University of Puerto Rico & Chemistry & San Juan & Puerto Rico & richard.t.kinch@gmail.com & 
+Dr. & Abdul & Baig & CIIT & Math & Attock & Pakistan & aqbaig1@gmail.com & See to fullerene structure
+Dr. & Jean-Joseph & Adjizian & UCLouvain & NAPS & Louvain la Neuve & Belgium & jean.adjizian@uclouvain.be & 
+Dr. & Clement & Angkawidjaja & Osaka University & International College & Toyonaka & Japan & clement@bio.mls.eng.osaka-u.ac.jp & 
+Prof. Dr. & Yeng-Tseng & Wang & Kaohsiung Medical University &  & KAOHSIUNG & Taiwan & c00jsw00@kmu.edu.tw & 
+Prof. Dr. & john & chuang & national university of kaohsiung & applied chemistry & kaohsiung & Taiwan & ychuang@nuk.edu.tw & 
+Dr. & Dolly & Vijay & University of Delhi & Department of Chemistry & New Delhi & India & dollsvijay@gmail.com & 
+Dr. & Evgeny & Pidko & Eindhoven University of Technology & Inorganic Materials Chemistry & Eindhoven & Netherlands & e.a.pidko@tue.nl & 
+Ms. & Andrew & Punnett & Massey University & CTCP & Auckland & New Zealand & andrew.punnett@gmail.com & Great software!
+Dr. & Alister & Page & The University of Newcastle & Discipline of Chemistry & newcastle & Australia & alister.page@newcastle.edu.au & 
+Dr. & xu & shaogang & South China University of Technology & Department of Physics & guangzhou & China & 572548544@qq.com & I'm interested in these program, it's my honor to learn these.Thank you very much!
+Ms. & Pratik & Narain & Institute of Engineering and Technology & Biotechnology & Lucknow & India & pratik.narain@gmail.com &
+Dr. & Igor & Alperovich & Research Institute of Biology Southern Federal University & Biophysics & Rostov-on-Don & Russia & ialp@sfedu.ru & Thank you!
+Dr. & Stefan & Taubert & University of Helsinki & Department of Chemistry & Helsinki & Finland & stefan.taubert@helsinki.fi & 
+Dr. & Morteza & Ghorbanzadeh Ahangari & Mazandaran University & Mechanical Engineering & Babolsar & Iran & m.ghorbanzadeh@umz.ac.ir & 
+Mr. & Mina & Moradi &  &  & Muttenz, Basel & Switzerland & minamoradi.1989@gmail.com & 
+Dr. & Antônio & Arapiraca & CEFET-MG & Science & Belo Horizonte & Brazil & arapiraca@deii.cefetmg.br & I'm a theoretical physicist working in computational chemistry and interested in explore the program capabilities
+Dr. & Igor & Alperovich & Southern Federal University & Physics & Rostov & Russia & ialp@sfedu.ru & May I create hydroxo-derivatives of the fullerenes with your program?
+ & Meggie & Young & Florida State University & Chemistry & Tallahassee & United States of America & myoung@chem.fsu.edu & 
+Ms. & Markus & Rauhalahti & University of Helsinki & Department of Chemistry, Laboratory for Instruction in Swedish & Helsinki & Finland & markus.rauhalahti@helsinki.fi & 
+Ms. & Tamal & Goswami & University of North Bengal & Chemistry & Darjeeling & India & tamal.nbu@gmail.com & 
+Ms. & Athanasios & Arvanitidis & KULeuven & Quantum Chemistry and Physical Chemistry Section & Leuven & Belgium & athanasios.arvanitidis@chem.kuleuven.be  & 
+Dr. & Lei & Xu & Chang'an University & School of Materials Science and Engineering & Xi'an & China & leixu3@nankai.edu.cn & Thanks for the contributions to fullerene science
+Dr. & masoud & harat & araku & chemistry & arak & Iran & haratian.md@gmail.com & 
+Dr. & Maciej  & Kolaski & University of Silesia & Chemistry & Katowice & Poland & maciejkolaski@gmail.com & 
+Dr. & Michael & Muzheve & Texas A&M University - Kingsville & Mathematics & Kingsveill & United States of America & kumtm000@tamuk.edu & 
+Dr. & Htein & Win & University of Technology (Yatanarpon Cyber City) & Faculty of Advanced Materials Engineering & Pwin Oo Lwin & Myanmar & kohtein@gmail.com & I am a techer teaching Nanotechnology, We have 400 student studying Materials Science and Engneering and Nanotechnology. 
+Ms. & Philippe & PALIARD &  &  & Saint-Martin-le-Vinoux & France & philippe.paliard@hotmail.fr & 
+Ms. & Ramon & Sampaio & Universidade Federal do Piauí & Física & Teresina & Brazil & rsampaioti@gmail.com & ramon
+Ms. & anwwar & anwwar & college  & mathe & najaf & Iraq & aanw87@yahoo.com & 
+Dr. & Alvaro & Fernandez & IVIC & Chemistry & Merida & Venezuela & afernandez@ivic.gob.ve & 
+Ms. & Shui-Xing & Wu & Northeast Normal University & Chemistry & Changhcun & China & sxwu@live.com & Thank you very much.
+Ms. & sa & hara & usst & ee & shanghai & China & smwzw@qq.com & I need it
+Ms. & Boyer & Mathew & University of Texas - Austin & Chemical Engineering & Austin & United States of America & mjboyer@utexas.edu & 
+Ms. & Kristhian Omar & Alcantar Medina & Cinvestav & Nanosciencies and nanotechnologies & ramos arizpe, coahuila & Mexico & prko2009@gmail.com & I would like to use this package, please help me with that. Greetings
+Dr. & christian  & celaya & materials research institute  & solid state  & D.F. & Mexico & cacl_42@yahoo.com.mx & ok
+ & Christopher & Myers & University at Albany & Physics & Albany & United States of America & cmyers2@albany.edu & 
+Ms. & Abbey & Philip & Indian Institute of Science Education and Research, Thiruvananthapuram & Chemistry & Thiruvananthapuram & India & abbey@iisertvm.ac.in & 
+Ms. & Sebastian & Radke & TU Dresden & Institute for Materials Science & Dresden & Germany & sradke@nano.tu-dresden.de & 
+Prof. Dr. & Mihai & Medeleanu & University Politehnica Timisoara & Applied Chemistry and Organic and Natural Compounds Engineering & Timisoara & Romania & mihai.medeleanu@upt.ro & 
+Prof. Dr. & Vijay & Kumar & Dr. Vijay Kumar Foundation &  & Gurgaon & India & kumar@vkf.in & 
+ & Nastaran & Hosseini & Shiraz university & mechanical enginnering & Shiraz & Iran & hosseini_nastaran82@yahoo.com & 
+Ms. & Kai & Guo & Brown University & School of Engineering & PROVIDENCE & United States of America & kai_guo@brown.edu & 
+Ms. & sang young  & noh & university of warwick & chemistry  & coventry & United Kingdom & sangyoung123@googlemail.com & I'm using this program to create a coarse-grained c60 molecule for molecular dynamics simualtions
+Ms. & Muhammad Ali & Hashmi & Victoria University of Wellington & School of Chemical & Physical Sciences & Wellington & New Zealand & Muhammad.Hashmi@vuw.ac.nz & 
+Ms. & KUANG-YU & CHANG & University of Basel & Chemistry & Basel & Switzerland & k.chang@unibas.ch &
+Mr. & Taegyu & Kim & sogang univ. & chemistry & seoul & Korea South & taegyu0111@naver.com & dd
+Ms. & vikrant sa & sahu & university of delhi & chemistry & delhi & India & nsvsahu@gmail.com & 
+Ms. & Tanay & Debnath & Indian Association for the Cultivation of Scienece & Spectroscopy & Jadavpur, Kolkata & India & tanay.iitk@gmail.com & new user
+Mr. & Sarbani & Ghosh & IIT kgp & Chemical Engineering & Kharagpur & India & sarbani.ghosh.chemical@gmail.com & 
+Ms. & Simon & winther & university of copenhagen & Datalogisk institut & KBH NV & Denmark & zhk712@alumni.ku.dk & 
+Ms. & XIAOYANG & LIU & Virginia Tech & Chemistry & blacksburg & United States of America & xiaoyang@vt.edu & 
+Dr. & DEBASHREE & MANNA & WEIZMANN INSTITUTE OF SCIENCE & DEPARTMENT OF ORGANIC CHEMISTRY & REHOVOT & Israel & mannadebashree2014@gmail.com & I want to generate few non-classical fullerenes.
+Ms. & Gerard & O'COnnor & UNSW & Chemistry & Sydney & Australia & goconn@gmail.com & Thankyou

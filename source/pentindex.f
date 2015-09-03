@@ -160,8 +160,13 @@ C Start Goldberg-Coxeter
           Go to 99
         endif
         g = new_C20();
-        halma = halma_fullerene(g,kGC-1)
-        isafullerene = graph_is_a_fullerene(halma)
+        if(itGC.le.1) then
+          Write(iout,1045) itGC
+          stop
+        else
+          halma = halma_fullerene(g,kGC-1)
+          isafullerene = graph_is_a_fullerene(halma)
+        endif
         ihalma=1
         IF (isafullerene .eq. 1) then
           write (iout,1043) 
@@ -303,6 +308,8 @@ c      endif
      1 I5,')')
  1043 Format(1x,'Halma fullerene is a fullerene')
  1044 Format(1x,'Halma fullerene is not a fullerene')
+ 1045 Format(1x,'No Halma transformation performed as t(k,l)= ',I8,
+     1 ' Program stops here')
       Return 
       END
 
