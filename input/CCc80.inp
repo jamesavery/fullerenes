@@ -5,7 +5,7 @@ Ih-C80  cc-pvdz B3LYP opt. geom. minimum -3048.53107840 au
 &FFParameters /
 &Hamilton /
 &Isomers IPR=1 /
-&Graph ndual=1 ISchlegel=1, ISO1=1, ISO2=2, ISO3=3, ifs=1 /
+&Graph ndual=1 labelvert=1 ISchlegel=2, ISO1=1, ISO2=2, ISO3=3, ifs=1 /
 6    -1.9503131644    -2.5372343879     2.5760958278
 6    -3.0785755552    -1.8995347325     1.9301893981
 6    -3.3854532761    -0.566965373      2.3125959407
