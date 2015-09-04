@@ -1,7 +1,7 @@
 #
 # Makefile for FULLERENE program
 #
-VERSION_NUMBER=4.4
+VERSION_NUMBER=4.5
 
 #CXX=clang++
 CXX=g++
