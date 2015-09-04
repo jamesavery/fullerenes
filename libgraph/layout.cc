@@ -341,6 +341,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool prin
 
   if(show_dual && !layout_is_crossingfree()) {
     s << "Get a crossing free layout first.  For example by optimising the layout or using a different algorithm to create it." << endl;
+    cerr << "Get a crossing free layout first.  For example by optimising the layout or using a different algorithm to create it." << endl;
     return s.str();
   }
 
