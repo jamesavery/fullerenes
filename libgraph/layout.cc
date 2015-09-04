@@ -77,8 +77,8 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     for(node_t u=0;u<N;u++){
       Afull[u*(N+1)] = 1.0;
       for(int i=0;i<neighbours[u].size();i++){
-	const node_t& v(neighbours[u][i]);
-	Afull[u*N+v] = -1.0L/3.0;
+        const node_t& v(neighbours[u][i]);
+        Afull[u*N+v] = -1.0L/3.0;
       }
     }
     for(int i=0;i<outer_face.size();i++){
@@ -90,11 +90,11 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     for(node_t u=0;u<N;u++){
       IA[u] = nz;
       for(node_t v=0;v<N;v++)
-	if(Afull[u*N+v]!=0){
-	  A[nz] = Afull[u*N+v];
-	  JA[nz] = v;
-	  nz++;
-	}
+        if(Afull[u*N+v]!=0){
+          A[nz] = Afull[u*N+v];
+          JA[nz] = v;
+          nz++;
+        }
     }
     free(Afull);
   }
@@ -340,7 +340,7 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool prin
   s << std::fixed;
 
   if(show_dual && !layout_is_crossingfree()) {
-    s << "get a proper layout first" << endl;
+    s << "Get a crossing free layout first.  For example by optimising the layout or using a different algorithm to create it." << endl;
     return s.str();
   }
 
