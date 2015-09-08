@@ -1,17 +1,23 @@
 #include "graph.hh"
 
-void Graph::remove_edge(const edge_t& e)
+// Returns true if edge existed prior to call, false if not
+bool Graph::remove_edge(const edge_t& e)
 {
   node_t u = e.first, v = e.second;
   vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
-  
-  for(int i=0;i<nu.size();i++) if(nu[i] == v){ nu.erase(nu.begin()+i); break; }
-  for(int i=0;i<nv.size();i++) if(nv[i] == u){ nv.erase(nv.begin()+i); break; }
+
+  bool value = false;
+
+  for(int i=0;i<nu.size();i++) if(nu[i] == v){ nu.erase(nu.begin()+i); value = true; break; }
+  for(int i=0;i<nv.size();i++) if(nv[i] == u){ nv.erase(nv.begin()+i); value = true; break; }
+
+  return value;
 }
 
-void Graph::insert_edge(const edge_t& e, const node_t suc_uv, const node_t suc_vu)
+// Returns true if edge existed prior to call, false if not
+bool Graph::insert_edge(const dedge_t& e, const node_t suc_uv, const node_t suc_vu)
 {
-  if(edge_exists(e)) return;	// insert_edge must be idempotent
+  if(edge_exists(e)) return true;	// insert_edge must be idempotent
 
   const node_t u = e.first, v = e.second;
 
@@ -24,9 +30,11 @@ void Graph::insert_edge(const edge_t& e, const node_t suc_uv, const node_t suc_v
   vector<node_t>::iterator pos_vu = suc_vu<0? nv.end() : find(nv.begin(),nv.end(),suc_vu);
 
   nu.insert(pos_uv,v);
-  nv.insert(pos_vu,u);
+  if(u!=v) nv.insert(pos_vu,u);
 
   assert(nu.size() == oldsize[0]+1 && nv.size() == oldsize[1]+1);
+
+  return false;
 }
 
 bool Graph::edge_exists(const edge_t& e) const
@@ -56,32 +64,28 @@ bool Graph::is_consistently_oriented() const
 {
   map<dedge_t,bool> seen_dedge;
 
-  set<dedge_t> workset;
+  set<dedge_t> work;
   for(node_t u=0;u<N;u++)
-    for(int i=0;i<neighbours[u].size();i++){
-      const node_t v = neighbours[u][i];
-      workset.insert(dedge_t(u,v));
-      workset.insert(dedge_t(v,u));
-    }
+    for(auto v: neighbours[u])
+      work.insert({u,v});
 
-  while(!workset.empty()){
-    const dedge_t e = *workset.begin();
+  while(!work.empty()){
+    const dedge_t e = *work.begin();
     node_t u(e.first), v(e.second);
 
     // Process CW face starting in u->v
     const node_t u0 = u;
-    workset.erase(dedge_t(u,v));
+    work.erase(dedge_t(u,v));
     while(v != u0){
-      // Find w = nextCW(u,v)
-      const vector<node_t>& nb(neighbours[v]);
-      int ui = 0;
-      while(nb[ui] != u) ui++;
-      node_t w = nb[(ui+1)%nb.size()];	// u--v--w is CW-most corner
+      node_t w = next(u,v);	// u--v--w is CW-most corner
       u = v;
       v = w;
-      if(workset.find(dedge_t(u,v)) == workset.end()) // We have already processed arc u->v
+      if(work.find(dedge_t(u,v)) == work.end()){ // We have already processed arc u->v
+	//	cerr << "Directed edge " << dedge_t(u,v) << " is part of two faces.\n";
 	return false;
-      workset.erase(dedge_t(u,v));
+      }
+
+      work.erase(dedge_t(u,v));
     }
   }
   // Every directed edge is part of exactly one face <-> orientation is consistent
@@ -376,6 +380,9 @@ int Graph::max_degree() const
   return max_d;
 }
 
+int Graph::degree(const node_t& u) const { 
+  return neighbours[u].size(); 
+}
 
 void Graph::update_from_edgeset(const set<edge_t>& edge_set) 
 {
@@ -428,10 +435,8 @@ ostream& operator<<(ostream& s, const Graph& g)
     s << "{" << (e->first+1) << "," << (e->second+1) << "}";
     if(++e != edge_set.end())
       s << ", ";
-    else
-      s << "}";
   } 
-  s << "]";
+  s << "}]";
 
   return s;
 }

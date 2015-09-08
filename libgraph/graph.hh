@@ -21,7 +21,8 @@ struct Graph {
   int N;
   neighbours_t neighbours;
 
-  Graph(const set<edge_t>& edge_set = set<edge_t>()) {
+  Graph(size_t N=0) : N(N), neighbours(N) {}
+  Graph(const set<edge_t>& edge_set) {
     update_from_edgeset(edge_set);
   }
   Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
@@ -37,8 +38,8 @@ struct Graph {
     update_from_edgeset(edge_set);
   }
 
-  void insert_edge(const edge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
-  void remove_edge(const edge_t& e);
+  bool insert_edge(const dedge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
+  bool remove_edge(const edge_t& e);
   bool edge_exists(const edge_t& e) const;
   node_t next(const node_t& u, const node_t& v) const;
   node_t prev(const node_t& u, const node_t& v) const;
@@ -73,6 +74,7 @@ struct Graph {
   coord3d centre3d(const vector<coord3d>& layout) const; 
   void orient_neighbours(const vector<coord2d>& layout);
 
+  int degree(const node_t& u) const;
   int max_degree() const; 
 
   void update_from_edgeset(const set<edge_t>& edge_set); 
