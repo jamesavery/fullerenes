@@ -130,14 +130,14 @@ C  Next two flags tells us if input has information on Cartesian Coordinates
 C   or Adjacency Matrix (through connectivity IC3)
       ncartflag=0
       nadjacencyflag=0
-C  Call Datain
+C  Call Datain (main input routine)
       CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,iPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinthessian,ndbconvert,ihamstore,ihamstats,nhamcyc,
-     1 isomerl,isomerh,ngaudiene,
+     1 isomerl,isomerh,ngaudiene,imcs,
      1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,
      1 ftolP,scaleRad,rspi,jumps,force,forceP,boost,
      1 dualdist,filename,filenameout,TEXTINPUT)
@@ -235,6 +235,24 @@ C Read cartesian coordinates directly
         Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
        enddo
        ncartflag=1
+       if(imcs.ne.0) then
+        WRITE(Iout,1002)
+        CALL MoveCM(Iout,Iprint,IAtom,mirror,isort,
+     1   nosort,SP,Dist,DistCM,El)
+        CALL Diameter(Iout,Dist,distp)
+        Rmin=1.d15
+        Do I=1,number_vertices
+        Do J=I+1,number_vertices
+         X=Dist(1,I)-Dist(1,J)
+         Y=Dist(2,I)-Dist(2,J)
+         Z=Dist(3,I)-Dist(3,J)
+         R2=X*X+Y*Y+Z*Z
+         R=dsqrt(R2)
+         if(R.lt.Rmin) Rmin=R
+        enddo
+        enddo
+        go to 97
+       endif
        Go to 40
    21  WRITE(Iout,1013)
        Go to 99
@@ -578,18 +596,20 @@ C .mol2 format
       
 C------------------VOLUME-----------------------------------------
 C Calculate the volume
-      if(novolume.eq.0) then
-      routine='VOLUME         '
-      Write(Iout,1008) routine
-      CALL Volume(Iout,N5MEM,N6MEM,
-     1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
-     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)!,filename)
+  97  if(novolume.eq.0) then
+      if(imcs.eq.0) then
+       routine='VOLUME         '
+       Write(Iout,1008) routine
+       CALL Volume(Iout,N5MEM,N6MEM,
+     1  IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
+     2  Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)!,filename)
+      endif
 
 C------------------MINCOVSPHERE-----------------------------------
 C Calculate the minimum covering sphere and volumes
       routine='MINCOVSPHERE2  '
       Write(Iout,1008) routine
-      CALL MinCovSphere2(Iout,SP,Dist,Rmin,Rmax,
+      CALL MinCovSphere2(Iout,imcs,SP,Dist,Rmin,Rmax,
      1 VolSphere,ASphere,Atol,VTol,distP,cmcs,rmcs,RVdWC)
 
 C------------------MINDISTSPHERE----------------------------------
@@ -602,7 +622,8 @@ C------------------MAXINSPHERE------------------------------------
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE    '
       Write(Iout,1008) routine
-      CALL MaxInSphere(Iout,Dist,cmcs,RVdWC)
+      CALL MaxInSphere(Iout,imcs,Dist,cmcs,RVdWC)
+      if(imcs.ne.0) go to 99 
 
 C------------------PROJECTSPHERE----------------------------------
 C Projecting vertices on minimum covering sphere
@@ -694,6 +715,7 @@ C VERSION_NUMBER is set in the Makefile
      1 'concerning this program')
  1001 FORMAT(/1X,'Number of Atoms: ',I4,', and distance tolerance: ',
      1 F12.2,'%')
+ 1002 FORMAT(/1X,'Perform only minimum covering sphere calculations')
  1003 FORMAT(1X,'Pre-optimization using the Wu force field with ',
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,

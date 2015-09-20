@@ -1,4 +1,4 @@
-      SUBROUTINE MaxInSphere(IOUT,Dist,cmcs,RVdWC)
+      SUBROUTINE MaxInSphere(IOUT,imcs,Dist,cmcs,RVdWC)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),c(3),cmax(3),cmcs(3)
@@ -40,9 +40,11 @@ C     End Iteration
       VMIS=4.d0/3.d0*dpi*RMIS**3
       AMIS=4.d0*dpi*RMIS**2
       Write(IOUT,1004) RMIS,VMIS,AMIS
-      RealMIS=RMIS-RVdWC
-      VVdWC=4.d0/3.d0*dpi*RealMIS**3
-      Write(IOUT,1005) RVdWC,RealMIS,VVdWC
+      if(imcs.eq.0) then
+       RealMIS=RMIS-RVdWC
+       VVdWC=4.d0/3.d0*dpi*RealMIS**3
+       Write(IOUT,1005) RVdWC,RealMIS,VVdWC
+      endif
  1000 Format(/1X,'Calculate the maximum inner sphere')
  1001 Format(1X,'Initial inner radius: ',d12.6,' to point ',I5,
      1 ' taken from center of MCS at (X,Y,Z): ',3(D14.8,2X))
@@ -297,7 +299,7 @@ C Write out cc1 file
       Return
       End
 
-      SUBROUTINE MinCovSphere2(IOUT,SP,Dist,Rmin,Rmax,
+      SUBROUTINE MinCovSphere2(IOUT,imcs,SP,Dist,Rmin,Rmax,
      1 VCS,ACS,Atol,VTol,u,c,radius,RVdWC)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -511,6 +513,10 @@ C     Check if there is no point outside the sphere
 C     Finally calculate the surface and volume and compare to previous results
       VMCS=4.d0/3.d0*dpi*RMCS**3
       AMCS=4.d0*dpi*RMCS**2
+      if(imcs.ne.0) then
+       Write(IOUT,1016) VMCS,AMCS
+       Go to 11
+      endif
       RatioMCS=AMCS/VMCS
       RatioCS=ACS/VCS
       RatioT=Atol/Vtol
@@ -521,7 +527,7 @@ C     Finally calculate the surface and volume and compare to previous results
      1 RatioMCS,RatioCS,RatioT,RatioV,AIPQ,DIPQ,
      1 SP,SP*1.d2,asym
 C     Do statistics
-      Write(IOUT,1011)
+  11  Write(IOUT,1011)
       keq=0
       kgt=0
       klo=0
@@ -543,12 +549,14 @@ C     Do statistics
       radius=dsqrt((1.d0+deltak)*gammak)
       Write(IOUT,1008) radius
 C     Add the carbon Van der Waals radius
-      RVdWF=radius+RVdWC
-      VVdWF=4.d0/3.d0*dpi*RVdWF**3
-      VFCC=VVdWF*3.d0*dsqrt(2.d0)/dpi
-      Write(IOUT,1009) RVdWC,RVdWF,VVdWF
-      ALC=2.d0*RVdWF*dsqrt(2.d0)
-      Write(IOUT,1010) ALC,VFCC,VFCC*0.60221367d0
+      if(imcs.eq.0) then
+       RVdWF=radius+RVdWC
+       VVdWF=4.d0/3.d0*dpi*RVdWF**3
+       VFCC=VVdWF*3.d0*dsqrt(2.d0)/dpi
+       Write(IOUT,1009) RVdWC,RVdWF,VVdWF
+       ALC=2.d0*RVdWF*dsqrt(2.d0)
+       Write(IOUT,1010) ALC,VFCC,VFCC*0.60221367d0
+      endif
 C     For each vertex (atom) use the distance to the sphere
 C     to calculate the root mean square as a measure for distortion
       rsum=0.d0
@@ -615,6 +623,9 @@ C     to calculate the root mean square as a measure for distortion
  1013 Format(8(1X,'(',I5,')',1X,D10.4))
  1014 Format(/1x,' Atom and distance from sphere:')
  1015 Format(1x,' Atoms lie on a sphere!')
+ 1016 Format(/1x,' Final result (in units of input):',
+     1 /1x,' Volume of minimum covering sphere: ',D14.8,
+     1 /1x,' Area of minimum covering sphere  : ',D14.8)
       return
       END
 

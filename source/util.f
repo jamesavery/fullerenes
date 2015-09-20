@@ -788,11 +788,11 @@ C       endif
        Write(Iout,1003)
       endif
  1000 Format(/1X,'For this vertex number we can have 1 ',
-     1 ' icoshedral fullerene of Ih-symmetry')
+     1 ' icosahedral fullerene of Ih-symmetry')
  1001 Format(/1X,'For this vertex number we can have 1 ',
-     1 ' icoshedral fullerene of I-symmetry')
+     1 ' icosahedral fullerene of I-symmetry')
  1002 Format(/1X,'For this vertex number we can have ',I3,
-     1 ' icoshedral fullerenes. Out of this ',I3,' are of',
+     1 ' icosahedral fullerenes. Out of this ',I3,' are of',
      1 ' Ih-symmetry and ',I3,' of I-symmetry')
  1003 Format(/1X,'There are no icosahedral fullerenes for ',
      1 'this vertex number')
