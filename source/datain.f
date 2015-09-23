@@ -4,7 +4,7 @@
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinth,ndbconvert,ihamstore,ihamstats,nhamcyc,isomerl,
-     1 isomerh,ngaudiene,imcs,
+     1 isomerh,ngaudiene,imcs,itop,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
      1 rspi,jumps,force,forceP,boost,dualdist,
      1 filename,filenameout,DATEN)
@@ -22,11 +22,11 @@ C-----------------------------------------------------------------
       Character*1 DATEN(nzeile)
       Character filename*50,filenameout*50,flagsym*3
       Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
-     1 nohueckel,loop,ndbconvert,iPFcount,IPMC,imcs,
+     1 nohueckel,loop,ndbconvert,iPFcount,IPMC,imcs,itop,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,IPRC,leap,isonum,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps,
-     1 nanotube,dualdist,ngaudiene,imcs
+     1 nanotube,dualdist,ngaudiene
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
      1 WufA5,WufA6,ExtWuR55,ExtWuR56,ExtWuR66,ExtWuA5,ExtWuA6,ExtWuD555,
@@ -126,6 +126,7 @@ C Integers
       iham=0    !  Number of Hamiltonian cycles
       iFS=0     !  Option for producing files for 2D fullerene graphs
       imcs=0    !  Option for cartesian input and only producing minimum covering sphere
+      itop=0    !  Option for stopping after topological analysis (and not creating 3D coordinates after GC transformation)
       iPMC=0    !  Option for perfect match count
       iopt=0    !  No (force field) optimization
       ihessian=0 ! No Hessian matrix produced

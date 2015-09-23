@@ -2101,7 +2101,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE GoldbergCoxeter(Iout,leap,leapGC,kGC,lGC,
+      SUBROUTINE GoldbergCoxeter(Iout,leap,leapGC,kGC,lGC,itop,
      1 nohueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad) 
 C     Routine for Goldberg-Coxeter transformation of a fullerene
@@ -2240,7 +2240,7 @@ C--> End of transformation
       endif
 C==>  End of Big loop
 
-      Call Tutte(Iout,nohueckel,IDA,
+      if(itop.eq.0) Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
       call delete_fullerene_graph(g)
       write (Iout,1004) 
@@ -2414,11 +2414,9 @@ C     Check distances
       END
 
 
-      SUBROUTINE AME(Iout,IDA,A,evec,
-     1 Dist,distp,iocc,iv1,iv2,iv3,CDist)
+      SUBROUTINE AME(Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,CDist)
 C   Fowler-Manolopoulos matrix eigenvector algorithm
-C     Now search for lowest energy P-type vectors
-C     This needs to be changed
+C   Now search for lowest energy P-type vectors (this needs to be changed)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)

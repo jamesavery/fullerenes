@@ -137,7 +137,7 @@ C  Call Datain (main input routine)
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinthessian,ndbconvert,ihamstore,ihamstats,nhamcyc,
-     1 isomerl,isomerh,ngaudiene,imcs,
+     1 isomerl,isomerh,ngaudiene,imcs,itop,
      1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,
      1 ftolP,scaleRad,rspi,jumps,force,forceP,boost,
      1 dualdist,filename,filenameout,TEXTINPUT)
@@ -345,7 +345,7 @@ C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
         routine='GOLDBERGCOXETER'
         Write(Iout,1008) routine
-        CALL GoldbergCoxeter(Iout,leap,leapGC,IGC1,IGC2,
+        CALL GoldbergCoxeter(Iout,leap,leapGC,IGC1,IGC2,itop,
      1   nohueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
      1   scaleRad)
         leap=0
@@ -353,6 +353,7 @@ C Produce the nth leapfrog of the fullerene
         ipent=1
         leapspiral=1
         if(number_vertices.gt.100) IHam=0
+        if(itop.ne.0) go to 888
         if(LeapErr.eq.0) go to 999 ! moveCM
       endif
 
@@ -479,14 +480,15 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       endif
 
 C--------------TOPOLOGICAL INDICATORS-----------------------------
-        routine='TOPOLOINDICATOR'
-        Write(Iout,1008) routine
+      routine='TOPOLOINDICATOR'
+ 888  Write(Iout,1008) routine
 C Topological Indicators
       CALL TopIndicators(Iout,iPMC,IDA,mdist)
 C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout)
 C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
+      if(itop.ne.0) go to 99
 C------------------------------------------------------------------
 C  E N D   O F   T O P O L O G Y   S E C T I O N
 C------------------------------------------------------------------
