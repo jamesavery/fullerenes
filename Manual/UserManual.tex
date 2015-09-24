@@ -624,9 +624,16 @@ If the initial graph $G_0$ has $n_v$ vertices, the number of vertices of $GC_{k,
 $t(k,l)$ is called the {\em triangulation number}. We work with the dual triangulation instead of
 a hexagonal mesh as it is easier to be implemented in a computer code.
 This is shown in Figure \ref{pic:GoldbergCoxeter}. For icosahedral fullerenes ($I_h$ and $I$) with $l = k$ or $l = 0$, Fowler and Rogers 
-showed how to construct the RSPIs,\cite{Rogers} which is implemented in this program as well for $GC_{k,l}(20)$.
+showed how to construct the RSPIs,\cite{Rogers} which is implemented in this program as well for $GC_{k,l}(20)$. Figure \ref{pic:GK21C80} shows a $GC_{k,l}[\C{80}]$ transformation of a $D_{5d}$-\C{80} carbon nanotube transforming it into a chiral nanotube.
 
-
+%Figure 2a
+ \begin{figure}[htbp]
+   	\centering
+  	\includegraphics[width=0.6\textwidth]{GC(2,1)C80.png}
+    \caption{Goldberg-Coxeter transformation $GC_{k,l}[\C{80}]$ transformation of a $D_{5d}$-\C{80} carbon nanotube into a chiral nanotube.}
+	\label{pic:GK21C80}
+ \end{figure}
+ 
 %Hamiltonian cycles
 \subsection{Hamiltonian cycles}
 Subroutine \funname{Hamilton} uses the back-track algorithm of Babi\'c \cite{Babic1995a} to obtain all 
@@ -1049,6 +1056,7 @@ until it is successful. If \paramname{ispsearch} = 2, all spirals are counted (t
     and write .xyz-file out to another filename called \filename{filenameout}.
 \item[{ndbconvert}] Programmers option to convert output from isomer routine into a more compact format.
 \item[{imcs}] By setting \paramname{imcs}=1 only minimum covering sphere is calculated. This works only for \paramname{ICart}=1 (see next input section), however, in this case any cartesian coordinate input can be taken, i.e., any points in 3D space.
+\item[{itop}] If \paramname{itop} = 1, after creating the adjacency matrix skips directly to the topological analysis. Good for very large fullerenes, e.g. Goldberg-Coxeter transforms. If \paramname{itop} = 2 in addition writes out the connectivity vector to external file \filename{ic3file} (formatted), which can be used as further input.
 \end{description}
 
 
