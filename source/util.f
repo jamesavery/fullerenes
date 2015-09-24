@@ -1,3 +1,22 @@
+       Subroutine CubeConnect(Iout,IDA,IC3)
+       use config
+       Dimension IDA(Nmax,Nmax),IC3(Nmax,3)
+C      Transform adjacency matric into connectivity vector
+       Write(Iout,100)
+       do I=1,number_vertices
+       k=0
+       do J=1,number_vertices
+        if(I.ne.J.and.IDA(I,J).eq.1) then
+         k=k+1
+         if(k.eq.4) Exit
+         IC3(I,K)=J
+        endif
+       enddo
+       enddo
+ 100   Format(1X,'Convert adjacency matrix into connectivity vector')
+       RETURN
+       END
+
 c      SUBROUTINE PerfectMatching(Iout,IDA)
 c      use config
 c      IMPLICIT REAL*8 (A-H,O-Z)

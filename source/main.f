@@ -47,7 +47,7 @@ C    Set the dimensions for the distance matrix
       CHARACTER*7 Namecc1,Namexyz,Namemol
       CHARACTER*4 Endcc1,Endxyz,Endmol
       CHARACTER*15 routine
-      CHARACTER*50 filename,filenameout
+      CHARACTER*50 filename,filenameout,extname
       CHARACTER*50 xyzname,cc1name,molname
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
@@ -353,9 +353,24 @@ C Produce the nth leapfrog of the fullerene
         ipent=1
         leapspiral=1
         if(number_vertices.gt.100) IHam=0
-        if(itop.ne.0) go to 888
+C   Write out IC3 on external file
+        if(itop.eq.2) then
+         Call CubeConnect(Iout,IDA,IC3)
+         iext=1
+         extname='ic3file'
+         Open(unit=Iext,file=extname,form='formatted')
+         Write(iext,*) number_vertices
+         Do I=1,number_vertices
+          Write(iext,*) (IC3(I,J),J=1,3)
+         enddo
+         Close(unit=Iext)
+         Go to 888
+        endif
         if(LeapErr.eq.0) go to 999 ! moveCM
       endif
+
+C     Check if only topological analysis is needed 
+      if(itop.ne.0) go to 888
 
 C------------------HAMILTON---------------------------------------
 C Generate IUPAC name and locate Hamiltonian cycles. 

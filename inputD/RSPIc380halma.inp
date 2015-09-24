@@ -1,5 +1,5 @@
 Non-spiral T-C380, the fast way
-&General NA=380 ,iwext=1 ispsearch=2 itop=1 /
+&General NA=380 ,iwext=1 ispsearch=2 itop=2 /
 &Coord ICart=9 IGCtrans=1 kGC=2 lGC=0 jumps= 110,2 rspi=45, 70, 71, 82, 83, 110, 119, 120, 144, 184, 185, 192/
 &FFChoice /
 &FFParameters /
