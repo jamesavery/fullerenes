@@ -139,7 +139,7 @@ We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful
 
 %Introduction
 \section{Introduction}
-\textit{Fullerene} is a general purpose program that creates the adjacency matrix
+\textit{Fullerene} is a general purpose computer program that creates the adjacency matrix
 for any fullerene isomer, performs a topological/graph theoretical analysis, and
 creates a reasonably accurate 3D structure (cartesian or internal coordinates) through
 various different methods and algorithms. The results can be used for plotting 2D
@@ -160,7 +160,7 @@ in the book by Fowler and Manolopoulos \cite{Atlas}, and version 3.0 was already
 dealing with topological and graph theoretical properties.  It became soon clear
 that many open problems remain in fullerene structure generations which needed to
 be addressed,\cite{WIRE2015} and it was therefore decided to extend version 3 to a general purpose
-program package and make it available to the scientific community.cite{}
+program package and make it available to the scientific community.\cite{Schwerdtfeger2013}
 
 In the current version only regular fullerenes are considered (i.e. of genus~0 consisting
 of pentagons and hexagons only) fulfilling Euler's theorem, $n_v - n_e + n_f = 2$,
@@ -172,7 +172,7 @@ or the adjacency matrix eigenvector (AME) method \cite{Atlas}. One can also cons
 the $n$-th leapfrog $GC_{1,1}^n[C_{n_v}]$ fullerene, the halma fullerene $GC_{k,0}[C_{n_v}]$
 or the more general Goldberg-Coxeter transformation of a fullerene $GC_{k,l}$
 with $k \geq l$, which is implemented not only for \C{20}, i.e. $GC_{k,l}[C_{20}]$, as in a
-previous version of the program, but also for any fullerene using an algorithm developed
+previous version (4.4) of the program, but also for any fullerene using an algorithm developed
 by Avery.\cite{Avery2015}
 Starting from a given fullerene structure one can perform vertex insertions (such
 as Endo-Kroto \cite{Endo92}, Yoshida-Fowler \cite{Yoshida97a} or Brinkmann-Fowler \cite{BrinkmannFowler03})
@@ -181,9 +181,9 @@ construction of non-spiral fullerenes such as \C{380} or \C{384}.  Geometry opti
 using a Fletcher-Reeves-Polak-Ribiere minimization \cite{NumRec} with analytical
 gradients for the harmonic oscillator force field \cite{Wu87,Wirz2015} is implemented in the
 current version, providing a good initial guess for 3D cartesian coordinates.  2D~fullerene
-graphs (Schlegel diagrams) can be produced using a variety of different algorithms \cite{Plestenjak}.
+graphs (e.g. Schlegel diagrams) can be produced using a variety of different algorithms \cite{Plestenjak}.
 The program determines the volume and surface area of a fullerene (irregular or
-not) through tesselation in trigonal pyramids or from the convex hull, and gives
+not) through tesselation in trigonal pyramids or from its convex hull, and gives
 measures for spherical distortion and convexity.  It determines the minimum covering
 sphere, the minimum distance sphere and the maximum inner sphere.  The program further
 calculates the number of Hamiltonian cycles and produces ring spiral indices.  Cioslowski's
@@ -198,10 +198,10 @@ is not restricted to a pentagon start or to canonical indices. For a general lis
 The program produces an external file with default name \filename{Fullerene-3D.xyz} or \filename{Fullerene-3D.cc1}
 to be used for standard molecular plotting programs
 like CYLview \cite{CYLview}, Avogadro \cite{Avogadro}, Jmol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}.  For using these programs 
-it is important that the fullerene has a reasonable structure, obtained for example by a force field 
-optimization, otherwise bonds cannot be correctly identified using .xyz files. It may therefore not
+it is important that the fullerene has a reasonable 3D structure, obtained for example by a force field 
+optimization, otherwise bonds cannot be correctly identified from the .xyz file only. It may therefore not
 be advisable to use structures that come out directly from
-the AME or 3D-TE algorithm, or the .cc1 file should be used which contains information on vertex adjacencies. 
+the AME or 3D-TE algorithm, or the .cc1 file could be used containing information on vertex adjacencies. 
 We recommend VMD \cite{vmd}, it is more robust and works even for the largest fullerenes beyond 1000 atoms. The program produces fullerene 2D graphs 
 in latex format, but can be used by any other program which is capable of producing 2D graphs, for example QMGA \cite{Gabriel2008}. 
 For this an external file is written out called \filename{Fullerene-2D.dat} containing all the information required for plotting a 2D graph.
@@ -210,15 +210,15 @@ From version 4.0 onwards (released July 2012) C++ routines embedded into the ori
 much improved algorithms compared to the older versions. The reason for using two different program languages is
 that PS is good in old-fashioned Fortran, JA is good in C++ (and LW is doing both).  Furthermore, some of the original routines used were available 
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
-and geometry optimization. Version 4.3 included the Hessian of the force field, although 
-we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
+and geometry optimization. Version 4.3 included the Hessian of the force field, and in this version (4.5) 
+force constants are used which match experimental or calculated vibrational frequencies.
 Version 4.4 introduced a search algorithm for neighbourhood RSPIs, the Szeged index, pentagon arm indices as further topological descriptors,
 and new (conjectured) upper and lower bound for Hamiltonian cycles in fullerenes.
-Version 4.5 has a new algorithm for general Goldberg-Coxeter transforms \cite{Avery}.
-The Tutte embedding algorithm has also been made much faster and the fullerene database has been transformed into a more compact and efficient version.
+Version 4.5 has a new algorithm for general Goldberg-Coxeter transforms \cite{Avery2015}.
+The Tutte embedding algorithm has also been optimized to perform much faster, and the fullerene database has been transformed into a more compact and efficient version.
 Version 5 to be released late 2016 will separate the topological from the cartesian input part and uses sparse matrix handling for the
 largest fullerenes. This program is under permanent construction and has been tested extensively for bugs.
-Nevertheless, if you have any problem or find any bug please report it to one of us.
+Nevertheless, if you have any problem or find any bugs please report to one of us.
 
 There are many things on our to-do list. We try hard to release more functionality to this program in due time.
 Not implemented yet is: 
@@ -233,7 +233,7 @@ lower symmetry) and symmetry labels for H\"uckel orbital energies and vibrationa
 \item Extension to non-regular fullerenes of higher genus;
 \item A restart option for subroutine Hamilton as it is an $\#P$-hard problem and
 we like to test the limitations of the back-track algorithm used in program;  
-\item Kekul\'e structures (perfect matchings) and Clar sextets;
+\item Kekul\'e structures (perfect matchings, so far only the counting is implemented) and Clar sextets;
 \item General plotting program (other than latex) for producing Schlegel diagrams
 and corresponding duals with a good graphical interface similar to the \program{CaGe} program;\cite{Brinkmanx}
 \item Further extension of the fullerene database.
@@ -265,7 +265,7 @@ If you require an atom count above 5000 (the upper limit can be set in \filename
 there will be arrays which are larger than 2\,GB.  Per default most compilers don't support this. 
 If your machine has enough memory, your gfortran is sufficiently new
 (4.4.3 to 4.4.7  and 4.6 on 64-bit Linux work) you can set \verb|-mcmodel| to \verb|medium| to switch to the medium code model in
-which objects are permitted to be larger than 2\,GB.  All binary objects must be compiled with the same options; delete all
+which objects are permitted to be larger than 2\,GB (on Macs this may not always work).  All binary objects must be compiled with the same options; delete all
 binaries before you recompile using a different code model. 
 
 The executable ``fullerene'' can be executed on a Linux/\acr{UNIX} as\\\\
@@ -332,7 +332,8 @@ the House of Graphs was introduced. Version 4.2 saw the introduction of dihedral
 and Version 4.3 was extended to calculate frequencies from the force-field Hessian, and Version 4.4 saw
 the implementation of the Goldberg-Coxeter transformation $GC_{k,l}$ of \C{20} for all possible combinations of $k \geq l$,
 new topological descriptors and a more compact version of the database. Version 4.5 removed some of the bugs and includes
-a general Goldberg-Coxeter transformation $GC_{k,l}[C_n] ~(k\ge l, l\ge 0)$ of any fullerene.
+a general Goldberg-Coxeter transformation $GC_{k,l}[C_n] ~(k\ge l, l\ge 0)$ of any fullerene. Version 4.5 also has optimized 
+force constants for a frequency analysis.
 
 %there should a subsection "creation of the fullerene graph" in this place
 %\subsection{Create a 3D structure for a specific fullerene}
@@ -624,13 +625,13 @@ If the initial graph $G_0$ has $n_v$ vertices, the number of vertices of $GC_{k,
 $t(k,l)$ is called the {\em triangulation number}. We work with the dual triangulation instead of
 a hexagonal mesh as it is easier to be implemented in a computer code.
 This is shown in Figure \ref{pic:GoldbergCoxeter}. For icosahedral fullerenes ($I_h$ and $I$) with $l = k$ or $l = 0$, Fowler and Rogers 
-showed how to construct the RSPIs,\cite{Rogers} which is implemented in this program as well for $GC_{k,l}(20)$. Figure \ref{pic:GK21C80} shows a $GC_{k,l}[\C{80}]$ transformation of a $D_{5d}$-\C{80} carbon nanotube transforming it into a chiral nanotube.
+showed how to construct the RSPIs,\cite{Rogers} which is implemented in this program as well for $GC_{k,l}(20)$. Figure \ref{pic:GK21C80} shows a $GC_{2,1}[\C{80}]$ transformation of a $D_{5d}$-\C{80} carbon nanotube transforming it into a chiral nanotube.
 
 %Figure 2a
  \begin{figure}[htbp]
    	\centering
   	\includegraphics[width=0.6\textwidth]{GC(2,1)C80.png}
-    \caption{Goldberg-Coxeter transformation $GC_{k,l}[\C{80}]$ transformation of a $D_{5d}$-\C{80} carbon nanotube into a chiral nanotube.}
+    \caption{Goldberg-Coxeter transformation $GC_{2,1}[\C{80}]$ transformation of a $D_{5d}$-\C{80} carbon nanotube into the chiral $D_{5}$-\C{560} nanotube.}
 	\label{pic:GK21C80}
  \end{figure}
  
@@ -1229,7 +1230,7 @@ ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR,
   as soon as the gradient falls below a value of 10.
   
    \paramname{ihessian} = 1 then Hessian matrix is calculated and diagonalized. The $3n_v-6$ eigenvalues are sorted according to their values
-   and degeneracies and should be greater than zero for a minimum, and the last six should be close to zero representing translation and rotation.
+   and degeneracies and should be greater than zero for a minimum, and the last six should be close to zero representing translation and rotation. The frequencies produced are used to calculate the zero-point vibrational energy of the fullerene.
    \paramname{iprinth}  = 1 print all eigenvalue information.   
    \paramname{iprinth}  = 2 print all eigenvalue information and full Hessian matrix.
    
@@ -1417,12 +1418,15 @@ Classes of Plane Graphs - an Update'', Match Commun. Math. Comput. Chem. \textbf
 ``FuiGui: A Graphical User Interface for Investigating Conjectures about Fullerenes'', \textit{MATCH Commun. Math. Comput. Chem.} \textbf{58} 403-422 (2007).
 
 \bibitem{Atlas} P. W. Fowler and D. E. Manolopoulos, ``An Atlas of Fullerenes'' (Dover Publ., New York, 2006).
- 
+
 \bibitem{Tonner} R. Tonner, G. Frenking, M. Lein, and P. Schwerdtfeger, ``Packed to the Rafters - Filling up \C{60} with Rare Gas Atoms'', 
 \textit{Chem. Phys. Chem.} \textbf{12}, 2081-2084 (2011).
 
 \bibitem{WIRE2015} P. Schwerdtfeger, L. Wirz, J. Avery, ``The Topology of Fullerenes'', \textit{WIRE Comput. Mol. Sci.} \textbf{5}, 96-145 (2015).
 
+\bibitem{Schwerdtfeger2013} P. Schwerdtfeger, L. Wirz, J. Avery, ``\program{Fullerene} -- A Software
+	 Package for Constructing and Analyzing Structures of Regular Fullerenes'', \textit{J. Comput. Chem.} \textbf{34}, 1508-1526 (2013).
+ 
 \bibitem{Tutte} W. T. Tutte, ``How to Draw a Graph'', \textit{Proc. London Math. Soc.} \textbf{13}, 743-767 (1963).
 
 \bibitem{Avery2015} J. Avery, to be published (2015).
