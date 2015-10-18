@@ -51,7 +51,9 @@
     \includegraphics[width=0.9\textwidth]{Toc.png}
     \large \lineskip 0.5em%
     \begin{tabular}[t]{c}
+\vspace{1cm}
 }
+
 
 \begin{document}
 
@@ -216,7 +218,7 @@ Version 4.4 introduced a search algorithm for neighbourhood RSPIs, the Szeged in
 and new (conjectured) upper and lower bound for Hamiltonian cycles in fullerenes.
 Version 4.5 has a new algorithm for general Goldberg-Coxeter transforms \cite{Avery2015}.
 The Tutte embedding algorithm has also been optimized to perform much faster, and the fullerene database has been transformed into a more compact and efficient version.
-Version 5 to be released late 2016 will separate the topological from the cartesian input part and uses sparse matrix handling for the
+Version 5 to be released late 2016 will separate the topological from the cartesian part and uses sparse matrix handling for the
 largest fullerenes. This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bugs please report to one of us.
 
@@ -236,7 +238,7 @@ we like to test the limitations of the back-track algorithm used in program;
 \item Kekul\'e structures (perfect matchings, so far only the counting is implemented) and Clar sextets;
 \item General plotting program (other than latex) for producing Schlegel diagrams
 and corresponding duals with a good graphical interface similar to the \program{CaGe} program;\cite{Brinkmanx}
-\item Further extension of the fullerene database.
+\item Further extension of the fullerene database;
 \item Implementation of the Brinkmann-Goedgebeur fast-generation algorithm for fullerenes,
 which is more efficient than the original ring-spiral code of Fowler and Manolopoulos.
 \end{itemize}
@@ -244,6 +246,7 @@ which is more efficient than the original ring-spiral code of Fowler and Manolop
 We are also open to any other suggestions and welcome additions to this program suite.
 In this case please feel free to contact us per email.
 
+\vspace{2cm}
  \begin{figure}[htbp]
    	\centering
   	\includegraphics[width=\textwidth]{C840.png}
@@ -289,7 +292,8 @@ directories are located. Please download our databases and move it into this fol
 the folders \filename{ALL} with our database for general fullerenes, \filename{IPR} with our database 
 for IPR fullerenes, \filename{Yoshida} with Yoshida's database of selected fullerenes (directories containing .cc1 files),
 and \filename{HOG} with (if downloaded from http://hog.grinvin.org/Fullerenes ) the House of Graph data files. Important: 
-Please make all filenames in the database read-only.
+Please make all filenames in the database read-only. The files downloaded from our website are gziped, so you need to
+gunzip the file you like to use before executing the program.
 
 To use the latex program for the 2D fullerene graphs you need to use the files \filename{standalone.cfg} and \filename{standalone.cls}.
 
@@ -886,8 +890,9 @@ This is shown in Figure \ref{pic:Schlegel}.
 %Figure 4
  \begin{figure}[htbp]
    	\centering
-  	\includegraphics[width=0.5\textwidth]{Schlegel.png}
-    \caption{Perspective Schlegel projection for \C{60}.}
+  	  (a) \includegraphics[width=0.43\textwidth]{Schlegela.png}
+	  (b) \includegraphics[width=0.49\textwidth]{Cone.png}
+    \caption{a) Perspective Schlegel projection and b) cone projection for \C{60}}
 	\label{pic:Schlegel}
  \end{figure}
 
@@ -1400,6 +1405,8 @@ Note that the maximum number of vertices in the database is defined in the confi
 %References
 \begin{thebibliography}{99}
 
+\bibitem{vmd} Program VMD, ``Visual Molecular Dynamics'', http://www.ks.uiuc.edu/Research/vmd/.
+
 \bibitem{Brinkmann05} Brinkmann, G., McKay, B. D., Discrete Math., \textbf{2005}, 301, 147-163.
 
 \bibitem{Brinkmann} G. Brinkmann, ``Program Fullgen - a program for generating nonisomorphic fullerenes'', see http://cs.anu.edu.au/~bdm/plantri/.
@@ -1473,8 +1480,6 @@ House of Graphs: a database of interesting graphs, available for fullerenes at h
 \bibitem{JMol} Program JMOL, ``A Java-based development component'', see http://jmol.sourceforge.net/.
 
 \bibitem{Pymol} Program Pymol, ``A user-sponsored molecular visualization system on an open-source foundation'', see http://www.pymol.org/.
-
-\bibitem{vmd} Program VMD, ``Visual Molecular Dynamics'', http://www.ks.uiuc.edu/Research/vmd/.
 
 \bibitem{Gabriel2008} A. T. Gabriel, T. Meyer, and G. Germano, 
 ``Molecular graphics of convex body fluids'', \textit{J. Chem. Theory Comput.}
