@@ -1,4 +1,5 @@
-C2v-C100 data from B3LYP calculations  
+C2v-C100 cartesian coordinates from DFT-B3LYP calculations  
+This input produces also also a list of all IPR isomers for C100
 &General NA=100 /
 &Coord ICart=1 /
 &FFChoice /

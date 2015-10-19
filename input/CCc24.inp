@@ -1,7 +1,9 @@
 D6d-C24 aug-cc-pvdz B3LYP opt. geom. minimum D2-sym E=-913.9314011 au
-&General NA=24 /
+Force field optimization using Wu forrce field
+IP=1 and Iham=1 also cause to print all Hamilton cycles
+&General NA=24 IP=1 /
 &Coord ICart=1 /
-&FFChoice iopt=2 /
+&FFChoice iopt=1 /
 &FFParameters /
 &Hamilton Iham=1 /
 &Isomers IPR=1, IPH=1 /

@@ -387,7 +387,7 @@ C adjacent vertices
       endif
       if(IHam.ne.0 .and. 
      1    ke.eq.0 .and. isw.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
-        if(iupac.ne.0) then
+        if(iupac.ne.0.or.iprintf.ne.0) then
           CALL Hamilton(Iout,iprintf,ihamstore,maxiter,IC3,filename)
           Close(unit=8)
         else
