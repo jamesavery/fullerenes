@@ -4,7 +4,7 @@ The following password needs to be identical to
 the one in defined in file    userdata.php
 */
 
-$file='data/fullerenev4.4.zip';
+$file='data/fullerenev4.5.zip';
 $passwd = $_GET["pwd"];
 
 if ($passwd == "R4TY19KVBN")
@@ -16,7 +16,7 @@ if ($passwd == "R4TY19KVBN")
         //content type
         header('Content-type: application/zip');
         //open/save dialog box
-        header('Content-Disposition: attachment; filename="fullerenev4.4.zip"');
+        header('Content-Disposition: attachment; filename="fullerenev4.5.zip"');
         //read from server and write to buffer
         readfile($file);
   }

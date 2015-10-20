@@ -36,7 +36,7 @@ fullerdl.php receives the password, checks it and if correct
 </td>
 <td valign="middle"  align="center">
 <h1> <big> Program FULLERENE <br>
-Version 4.4</big> <br><br>
+Version 4.5</big> <br><br>
 A Fortran/C++ Program for Creating Fullerene Structures <br> 
 and for Performing Topological Analyses <br><br> </h1>
 <h2>by Peter Schwerdtfeger, Lukas Wirz and James Avery<br>
@@ -57,14 +57,14 @@ Massey University Auckland<br>
 The program generates cartesian/internal coordinates for fullerene isomers and performs a topological/graph theoretical analysis.
 The results can be used for plotting 2D/3D fullerene graphs (e.g. Schlegel diagrams and 3D structures), and serves as 
 a starting point for further quantum theoretical treatment. Version 4 incorporated C++ routines for the first time
-linked to the original Fortran program using much improved algorithms. Version 4.4 is more robust than previous versions, 
+linked to the original Fortran program using much improved algorithms. Version 4.5 is more robust than previous versions, 
 and contains a more extended evaluation of topological indicators, a harmonic oscillator force field including dihedral angles, 
 vibrational frequencies (although the force constants have not been adjusted yet), general Goldberg-Coxeter transformations
-of C<SUB>20</SUB> (now all icosahedral fullerenes can be constructed), access to both the Yoshida and House of Graphs 
+of any fullerene, access to both the Yoshida and House of Graphs 
 databases, an improved Tutte embedder, a correct ring spiral count, a generalized ring spiral algorithm with jumps, 
 tight lower and upper bounds for Hamiltonian cycles, and a neighbourhood spiral ring search algorithm. The fullerene database 
 has been brought into a more compact form and extended up to C<SUB>150</SUB>, and up to C<SUB>200</SUB> for IPR isomers, 
-and is now more compact.  
+and is now more compact. 
 <br><br>
 
 This is an open-source code and free for distribution (except for commercial purposes). Please cite the following paper if you use this program for publishing data:<br><br>
@@ -73,8 +73,9 @@ Structures of Regular Fullerenes", Version 4.4, J. Comput. Chem. 34, 1508-1526 (
 We also recommend to cite the following book (many of the concepts used can be found here):<br>
 2) P. W. Fowler and D. E. Manolopoulos, "An Atlas of Fullerenes"
 (Dover Publ., New York, 2006).<br>
+3) P. Schwerdtfeger, L. Wirz, and J. Avery, "The Topology of Fullerenes", Wiley Interdisciplinary Reviews (WIRE): Computational Molecular Science 5, 96-145 (2015).<br>
 The Hamiltonian cycle part of the program uses the code by Babic:<br>
-3) D. Babic, "Nomenclature and Coding of Fullerenes", J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).<br>
+4) D. Babic, "Nomenclature and Coding of Fullerenes", J. Chem. Inf. Comput. Sci. 35, 515-526 (1995).<br>
 For further literature see the User's Manual.<br><br>
 
 The program has been tested for the gnu compiler collection (gfortran and g++). 
@@ -82,10 +83,10 @@ You need to use the Makefile included in fullerene.zip. The executable runs
 just fine on a PC or Mac running LINUX/UNIX.
 The program is written in standard Fortran and C++ and has been checked
 for a large number of fullerenes up to 35,000 vertices. A number of input 
-and output files are included in the fullerenev4.4.zip file and a more detailed description 
+and output files are included in the fullerenev4.5.zip file and a more detailed description 
 is found in the User's Manual.<br><br>
 
-<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.4.pdf">UserManualv4.4.pdf (20/01/2013)</a> (2.4 MB)
+<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.5.pdf">UserManualv4.5.pdf (20/01/2013)</a> (2.4 MB)
 <br><br>
 
 <b>Download for fullerene program:</b><br>
@@ -368,7 +369,7 @@ This has the advantage that you will receive an email message if a new major upg
 </form>
 </table> <br><br>
 
-Once you have a password you can download the program here: (Version 4.4, last update 19/01/2013)<br>
+Once you have a password you can download the program here: (Version 4.5, last update 20/10/2015)<br>
 <form action="fullerdl.php" method="get">
 Password: <input type="password" name="pwd" size="10" /><br> <input type="submit" value="Download" /> 
 </form><br><br>
@@ -423,7 +424,7 @@ C<SUB>200</SUB> <a href="http://ctcp.massey.ac.nz/data/databaseIPR.C200.tar"> da
 <li>Construct cartesian coordinates for non-spiral fullerenes using generalized ring-spiral pentagon indices with jumps.</li>
 <li>Construct cartesian coordinates from a Goldberg-Coxeter transformation of C<SUB>20</SUB>.</li>
 <li>Use matrix-eigenvector or Tutte embedding algorithms to obtain cartesian coordinates.</li>
-<li>Goldberg-Coxeter leapfrog and halma transformations of a fullerene.</li>
+<li>Goldberg-Coxeter including leapfrog and halma transformations of any fullerene.</li>
 <li>Endo-Kroto 2-vertex, Yoshida-Fowler 4- and 6-vertex and Brinkmann-Fowler 6-vertex insertions.</li>
 <li>Use of program SPIRAL of Fowler and Manolopoulos for face-spiral fullerenes.</li>
 <li>Find fullerenes in the neighbourhood of given ring-spiral pentagon indices.</li>
