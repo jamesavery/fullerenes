@@ -1,4 +1,6 @@
-leapfrog of C380 to C1140
+Leapfrog of nonspiralable T-C380 to T-C1140 plus subsequent optimization
+This job takes a few minutes time to execute
+Most of the time is consumed for determining the canonical general ring spiral with jumps
 &General NA=380 /
 &Coord ICart=1 leap=1 /
 &FFChoice Iopt=3 /

@@ -1,4 +1,5 @@
 D3-C32  aug-cc-pvdz B3LYP opt. geom. minimum to C2-sym E=-1218.9516264 au
+Hamilton cycles are printed
 &General NA=32, IP=1 /
 &Coord ICart=1 /
 &FFChoice /

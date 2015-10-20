@@ -1,4 +1,5 @@
 C60 Geometry optimized and frequency analysis for Wu force field
+Hessian produced and printed
 &General NA=60 /
 &Coord ICart=1 /
 &FFChoice Iopt=1 ihessian=1 iprinth=1/

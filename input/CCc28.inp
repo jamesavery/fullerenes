@@ -1,5 +1,8 @@
 Td-C28  aug-cc-pvdz B3LYP opt. geom. minimum to C1-sym E=-1066.4090397 au
-&General NA=28, IP=1, iwext=1, IPMC=1 /
+Number of perfect matchings are counted: LAPACK is required for that and 
+needs to be activated in the Makefile
+Hamilton cycles are all printed
+&General NA=28, IP=1, IPMC=1 /
 &Coord ICart=1 /
 &FFChoice /
 &FFParameters /

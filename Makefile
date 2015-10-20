@@ -25,8 +25,8 @@ LIBRARIES=-lstdc++ -lgomp -lgfortran
 #CXXFLAGS+=-mkl -DHAS_MKL -DHAS_LAPACK
 #LIBRARIES+=-mkl
 #Uncomment the following lines if you want to use system BLAS and LAPACK
-#CXXFLAGS+=-DHAS_LAPACK 
-#LIBRARIES+=-llapack -lblas
+CXXFLAGS+=-DHAS_LAPACK 
+LIBRARIES+=-llapack -lblas
 #uncomment that following lines to use gsl (gnu scientific library)
 #CXXFLAGS+=-DHAS_GSL
 #LIBRARIES+=-lgsl

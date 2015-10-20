@@ -1,7 +1,9 @@
-Ih-C320 6-31G opt. geom. minimum -12193.20655 au not converged out
+Ih-C320 6-31G opt. geom. minimum -12193.20655 au 
+External xyz file written out to Fullerene-3D.xyz
+Optimization using extended Wu force field
 &General NA=320, iwext=1, nosort=1 /
 &Coord ICart=1 /
-&FFChoice /
+&FFChoice iopt=3 /
 &FFParameters /
 &Hamilton /
 &Isomers /

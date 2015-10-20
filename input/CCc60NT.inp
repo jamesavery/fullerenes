@@ -1,4 +1,6 @@
 C60 nanotube Lanl2DZ B3LYP optimized
+xyz coordinates written to external file
+Canonical Hamilton cycles printed including IUPAC name
 &General NA=60 iwext=1 nosort=1 ipsphere=3 filename='C60NTham' /
 &Coord ICart=1 /
 &FFChoice /

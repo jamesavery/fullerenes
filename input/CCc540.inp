@@ -1,4 +1,5 @@
-Ih-C540  6-31G opt. geom. minimum -20577.06531 au not converged out
+Ih-C540 DFT 6-31G opt. geom. minimum -20577.06531 au
+Hessian and vibrational frequencies are produced
 &General NA=540, iwext=1 /
 &Coord ICart=1 /
 &FFChoice iopt=1 ihessian=1/

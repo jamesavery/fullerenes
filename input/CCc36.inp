@@ -5,7 +5,7 @@ D6h-C36 aug-cc-pvdz B3LYP opt. geom. minimum to D2h-sym E=-1371.3904747 au
 &FFParameters /
 &Hamilton IHam=1/
 &Isomers IPR=2/
-&Graph ISchlegel=2, ISO1=1, ISO2=3, ISO3=18 /
+&Graph ISchlegel=2, ISO1=1, ISO2=3, ISO3=4 /
 6                  -0.721900    0.000000    2.483010
 6                  -0.722051    2.150832    1.241371
 6                  -0.722051    2.150832   -1.241371

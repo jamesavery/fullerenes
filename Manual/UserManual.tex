@@ -590,6 +590,8 @@ If $N_p + N_A = 0$, the fullerene is called strongly isolated.  \C{60} contains 
 patterns and is therefore not strongly isolated. The first leapfrog of \C{60}, \C{180},
 and the ones to follow are strongly isolated.
 
+The program also calculates the number of perfect matchings in polynomial time using the algorithm of Fisher, Kasteleyn, and Temperley \cite{jerrum2003}. The algorithm uses a \funname{Pfaffian} computation of a skew-symmetric matrix derived from a planar embedding of the graph. To use this you need \filename{lapack} installed on your computer and change the \filename{Makefile}.
+
 
 %The Goldberg-Coxeter transformation
 \subsection{The Goldberg-Coxeter transformation}
@@ -921,6 +923,21 @@ applying a linear scaling factor $\lambda_i$ to all vertices $v_i$ ($i=5(6),\dot
 is a parameter to be determined, $r_{\mathrm{min}}$ is the smallest distance to the vertices of the peripheral
 taken from the barycenter $P$ of the innermost ring (or alternatively the barycenter of the 2D convex hull), 
 and $r_i$ is the distance from that point $P$ to the vertex $v_i$.
+       
+%Figure 7
+ \begin{figure}[htbp]
+	\centering
+  		 \includegraphics[width=0.225\textwidth]{Graph1.png}
+		 \includegraphics[width=0.225\textwidth]{Graph2.png}
+		 \includegraphics[width=0.225\textwidth]{Graph3.png}
+		 \includegraphics[width=0.225\textwidth]{Graph4.png}
+		 \includegraphics[width=0.225\textwidth]{Graph5.png}
+		 \includegraphics[width=0.225\textwidth]{Graph6.png}
+		 \includegraphics[width=0.225\textwidth]{Graph7.png}
+		 \includegraphics[width=0.225\textwidth]{Graph8.png}
+     \caption{From the left to right: 2D fullerene structures created using \paramname{ISchlegel}=1 to 8 described in the input section.}
+     \label{pic:ManySchlegel}
+ \end{figure}
 
 4) Pisanski-Plestenjak-Graovac embedding algorithm (PPGA) \cite{pisanski95}. This is one of the more successful algorithms developed by 
 Pisanski, Plestenjak and Graovac in conjunction with a simulated annealing procedure for better visualization of graphs, 
@@ -941,23 +958,8 @@ simulated annealing algorithm we start with a Tutte 2D graph and perform a minim
 
 For other 2D graph embedding methods implemented as shown in Figure \ref{pic:ManySchlegel} see the following input section.
 
-\vspace{1cm}       
-%Figure 7
- \begin{figure}[htbp]
-	\centering
-  		 \includegraphics[width=0.225\textwidth]{Graph1.png}
-		 \includegraphics[width=0.225\textwidth]{Graph2.png}
-		 \includegraphics[width=0.225\textwidth]{Graph3.png}
-		 \includegraphics[width=0.225\textwidth]{Graph4.png}
-		 \includegraphics[width=0.225\textwidth]{Graph5.png}
-		 \includegraphics[width=0.225\textwidth]{Graph6.png}
-		 \includegraphics[width=0.225\textwidth]{Graph7.png}
-		 \includegraphics[width=0.225\textwidth]{Graph8.png}
-     \caption{From the left to right: 2D fullerene structures created using \paramname{ISchlegel}=1 to 8 described in the input section.}
-     \label{pic:ManySchlegel}
- \end{figure}
 
-\clearpage
+%\clearpage
 %Input description
 \section{Input description}
 
@@ -1008,7 +1010,7 @@ In the following, the input in the required sequence is described in detail (eit
 A comment line of of max. 132 characters. You can have as many comment lines as you want, so long as they are 132 characters or less (overflow characters do not appear in the output): 
 every line until the first namelist line is interpreted as a comment.
 
-\clearpage
+%\clearpage
 %---General---
 \subsection{\&General line}
 Namelist line that contains the main flags for the program. 
@@ -1018,7 +1020,8 @@ Namelist line that contains the main flags for the program.
 \begin{description}
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
 \item[{IP}]  If set to 1, verbose output is be produced, i.e. the full distance matrix, all Hamiltonian cycles 
-  and all ring connections up to three rings (Default: 0).
+  and all ring connections up to three rings (Default: 0). Warnings: Usage of IP=1 with Iham not set to zero (see below)
+  is a dabgerous option and should be used only for small fullerenes.
 \item[{iwext}] Flag for producing input file for \program{CYLview}, \program{Avogadro} or other plotting programs in standard formats (Default: 0)
   Default name for the external file is \filename{Fullerene-3D} with the appropriate ending. Otherwise \paramname{filename}='filename' needs to be specified (max. 50 characters).
   Note that if the routine which writes out \filename{.xyz}, \filename{.cc1} or \filename{.mol2} files is used more than once, for example through the \paramname{nloop} parameter,
@@ -1379,7 +1382,7 @@ fullerenes which are far from spherical symmetry, the algorithms here may not pr
 We are currently working on this problem.
 
 
-\clearpage
+%\clearpage
 %Fullerene Isomer Database
 \section{Fullerene Isomer Database}
 A database is provided for general isomers up to \C{120} and for IPR isomers up to
@@ -1497,6 +1500,8 @@ House of Graphs: a database of interesting graphs, available for fullerenes at h
 
 \bibitem{cvetkovic2002} D. Cvetkovi\'c, P. Fowler, P. Rowlinson, and D. Stevanovi\'c, ``Constructing fullerene graphs from eigenvalues and angles'',
 \textit{Linear Algebra Appl.} \textbf{356}, 37-56 (2002).
+
+\bibitem{jerrum2003} M. Jerrum, ``Counting, sampling and integrating: algorithms and complexity'', Springer, Berlin (2003).
 
 \bibitem{Rogers} P. W. Fowler and K. M. Rogers, ``Spiral Codes and Goldberg Representations of Icosahedral Fullerenes and Octahedral
 Analogues'', \textit{J. Chem. Inf. Comput. Sci.}, \textbf{41}, 108-111 (2001).

@@ -1,11 +1,12 @@
-C524 from Juan Perilla, Cone-shaped structure
+C524 from Juan Perilla, Cone-shaped fullerene structure
+Write out an external xyz file
 &General NA=524 iwext=1 /
 &Coord ICart=1 /
 &FFChoice iopt=1 /
 &FFParameters /
 &Hamilton /
 &Isomers /
-&Graph ISchlegel=1, ISO1=1, ISO2=2, ISO3=4 /
+&Graph /
 6      -4.926000  -17.146000   -5.347000
 6      -4.338000  -17.957000   -6.411000
 6      -4.011000  -17.295000   -7.650000
