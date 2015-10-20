@@ -1,4 +1,5 @@
 D5h-C350 nanotube. Using Tutte algorithm to produce coordinates from ring spiral indices
+This job fails badly and we are on it
 &General  NA=350 /
 &Coord ICart=3 nanotube=1 /
 &FFChoice /

@@ -1,4 +1,5 @@
 D6d-C504 nanotube. Using Tutte algorithm to produce coordinates from ring spiral indices
+This job fails badly and we are on it
 &General  NA=504 /
 &Coord ICart=2, IGCtrans=1, IV2=14  IV3=15 nanotube=2 /
 &FFChoice /
