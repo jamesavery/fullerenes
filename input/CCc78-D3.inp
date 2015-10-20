@@ -1,4 +1,4 @@
-D3-C78 cc-pvdz B3LYP opt. geom. minimum E=-2972.34944163 au
+IPR D3-C78 cc-pvdz B3LYP opt. geom. minimum E=-2972.34944163 au
 &General NA=78 /
 &Coord ICart=1 /
 &FFChoice Iopt=1 /

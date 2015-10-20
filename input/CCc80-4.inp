@@ -1,4 +1,4 @@
-D3-C80 Def2SVP PBE opt. geom. minimum to C1-sym Isomer 4
+IPR D3-C80 Def2SVP PBE opt. geom. minimum to C1-sym Isomer 4
 &General NA=80 /
 &Coord ICart=1 /
 &FFChoice /

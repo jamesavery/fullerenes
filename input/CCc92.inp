@@ -1,4 +1,5 @@
-T-C92 cc-pvdz B3LYP opt. geom. minimum -3505.9228870 au  
+IPR T-C92 cc-pvdz B3LYP opt. geom. minimum -3505.9228870 au  
+IPR isomer list produced, Hamilton cycles analyzed
 &General NA=92 /
 &Coord ICart=1 /
 &FFChoice /

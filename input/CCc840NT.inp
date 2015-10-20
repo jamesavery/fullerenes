@@ -1,4 +1,4 @@
-D5d-C840 Nanotube  
+D5d-C840 Nanotube, output written to mol2 file C840NT-3D.mol 
 &General NA=840 iwext=3, filename='C840NT' /
 &Coord ICart=1 /
 &FFChoice /

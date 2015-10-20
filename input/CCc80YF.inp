@@ -1,4 +1,5 @@
 2 Yoshida-Fowler 6-vertex insertions from Ih-C80to C2-C92
+Geometry optimization using initial coulomb repulsion
 Cartesian coordinate input
 &General NA=80, IP=1 /
 &Coord ICart=1, IYF=3 /

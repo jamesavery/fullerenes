@@ -1,4 +1,4 @@
-D3h-C78 second isomer cc-pvdz B3LYP opt. geom. minimum -2972.326271116 au
+IPR D3h-C78 second isomer cc-pvdz B3LYP opt. geom. minimum -2972.326271116 au
 &General NA=78 /
 &Coord ICart=1 /
 &FFChoice Iopt=1 /
