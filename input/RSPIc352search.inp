@@ -1,5 +1,6 @@
 C1-C352 Using FM algorithm to produce coordinates from ring spiral indices
 This is a cone structures and uses an algorithm to find similar cone structures
+Initial ring spiral is given at the end of input
 &General  NA=352 /
 &Coord ICart=10 /
 &FFChoice /

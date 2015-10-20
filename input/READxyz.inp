@@ -1,4 +1,5 @@
 This is an input where the geometry comes from an xyz file
+which has been produced in a previous run for example
 &General irext=1, filename='Fullerene-3D' /
 &Coord ICart=1 /
 &FFChoice /
