@@ -1,9 +1,0 @@
-Coxeter fullerene with indices (k,l)=(4,0) G0=Ih-C20 to give Ih-320
-&General iwext=1 /
-&Coord ICart=5 , kGC=4 /
-&FFChoice Iopt=3 /
-&FFParameters /
-&Hamilton /
-&Isomers /
-&Graph /
-
