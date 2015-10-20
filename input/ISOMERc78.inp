@@ -1,4 +1,5 @@
-C80 Creating IPR isomer list only
+C78 Creating IPR isomer list only
+Runs faster if database is available
 &General NA=78 /
 &Coord ICart=0 /
 &FFChoice /

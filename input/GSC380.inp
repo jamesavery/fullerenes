@@ -1,5 +1,6 @@
-Non-spiral T-C380, the fast way
-&General NA=380 ,iwext=1/
+Non-spiral T-C380, the fast way using a general spiral input
+Non-canonical spiral using 3 jumps
+&General NA=380 ,iwext=1 ispsearch=2/
 &Coord ICart=9 jumps= 152,5,161,1,168,2 rspi=1,2,3,137,138,147,148,152,153,161,168,177/
 &FFChoice iopt=3/
 &FFParameters /

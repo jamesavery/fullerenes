@@ -1,4 +1,4 @@
-C20  Using subroutine to produce coordinates for C20
+C20  Using geometry to produce coordinates for C20
 &General NA=20 /
 &Coord ICart=0, R5=0.14548E+1 /
 &FFChoice /

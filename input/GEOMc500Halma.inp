@@ -1,9 +1,0 @@
-Coxeter fullerene with indices (k,l)=(5,0) G0=C20 to Ih-C500
-&General NA=20, iwext=1, nohueckel=1 /
-&Coord ICart=0, IGCtrans=1, kGC=5 /
-&FFChoice Iopt=1 /
-&FFParameters /
-&Hamilton /
-&Isomers /
-&Graph /
-
