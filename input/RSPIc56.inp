@@ -1,0 +1,9 @@
+D3h-C36 Ring spiral input 
+&General NA=56 nosort=1 ispsearch=2 /
+&Coord ICart=3 rspi=1  2  3 12 15 18 19 21 22 24 25 27 /
+&FFChoice /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph ISchlegel=4 ISO1=1 ISO2=2 ISO3=3 IFS=1 /  
+
