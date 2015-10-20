@@ -1,0 +1,10 @@
+C20  Using geometry to produce coordinates for C20
+Followed by a Goldberg-Coxeter transformation with indices (k,l)=(3,2) to I-C380
+&General NA=20, iwext=1, nohueckel=1 /
+&Coord ICart=0, IGCtrans=1, kGC=3 lGC=2
+&FFChoice Iopt=1 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+

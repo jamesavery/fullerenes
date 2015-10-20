@@ -1,0 +1,11 @@
+Non-spiral T-C380, the fast way using a non-canonical spiral with 2 jumps
+Followed by a Stone-Wales transformation which ends in a spiralable fullerene
+&General NA=380 ,iwext=1, ispsearch=2/
+&Coord ICart=9 ISW=1 jumps= 175,5,179,5 rspi=2,3,6,116,118,145,154,155,164,165,175,179/
+&FFChoice iopt=3/
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph  /
+2 0
+

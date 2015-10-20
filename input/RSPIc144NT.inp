@@ -1,6 +1,5 @@
-D6d-C96 Using Tutte algorithm for coordinates for C72 nanotube
+D6d-C144 Using Tutte algorithm for coordinates for C144 nanotube
 Difficult case to get the structure right through force field
-fcoulomb=41. used originally
 &General NA=144, iwext=1 /
 &Coord ICart=3, dualdist=2.4, R6=1.42, rspi=2 3 4 5 6 7 68 69 70 71 72 73 /
 &FFChoice Iopt=3 /

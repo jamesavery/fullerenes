@@ -1,0 +1,10 @@
+Halma fullerene with indices (k,l)=(5,0) G0=C20 (Ih), produces I-C500
+Geometry optimization using extended Wu force field
+&General iwext=1 /
+&Coord ICart=4 , kGC=5 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+
