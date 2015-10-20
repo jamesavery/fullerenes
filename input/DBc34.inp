@@ -1,8 +1,0 @@
-C34 from database, isomer to test Reti-Laszlo index
-&General NA=34 iwext=1 /
-&Coord ICart=3, isonum=6, IPRC=0 /
-&FFChoice Iopt=3 /
-&FFParameters /
-&Hamilton /
-&Isomers /
-&Graph /

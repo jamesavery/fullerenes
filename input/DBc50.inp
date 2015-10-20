@@ -1,4 +1,5 @@
-C50 from database, isomer to test Reti-Laszlo index
+C50 from database
+The file   database/All/c050all.database  is required (in uncompressed form)
 &General NA=50 /
 &Coord ICart=3, isonum=193, IPRC=0 /
 &FFChoice iopt=3 ihessian=1 /

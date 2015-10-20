@@ -1,4 +1,5 @@
 C66 from database, isomer 4348
+The file   database/All/c066all.database  is required (in uncompressed form)
 &General NA=66 /
 &Coord ICart=3, isonum=4348, IPRC=0 /
 &FFChoice /

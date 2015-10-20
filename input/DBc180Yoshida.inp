@@ -1,4 +1,6 @@
-This is an input where the geometry for C500 comes from an .cc1 file in the Yoshida library, for this you need to download the Yoshida library from our web
+This is an input where the geometry for C500 comes from an .cc1 file in the Yoshida library
+For this you need to download the Yoshida library from our web
+and put it into the right folder. This file sits in database/Yoshida/C180-720/C500
 &General irext=2, filename='database/Yoshida/C180-720/C500', filenameout='YoshidaC500' /
 &Coord ICart=1 /
 &FFChoice /

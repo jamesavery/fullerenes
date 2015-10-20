@@ -1,5 +1,7 @@
-Read the first and only C384 without a spiral from the house of graphs database, for this you need to download the file from HOG and name it as specified in filename
-&General NA=384, filename='database/hog/nospiral/No_spiral_384'/
+Read the first and only C384 without a spiral from the house of graphs database
+For this you need to download the file from HOG at  http://hog.grinvin.org/Fullerenes#no_spiral
+and name it as specified in filename below
+&General NA=384, filename='database/HOG/No_spiral_384'/
 &Coord ICart=7 ,isonum=1/
 &FFChoice Iopt=3 /
 &FFParameters /
