@@ -197,7 +197,7 @@ indicators, such as the Wiener index, Szeged index and Balaban index are calcula
 
 This program works for any (distorted or not) regular fullerene. The spiral algorithm of Fowler and Manolopoulos used here \cite{Atlas}
 is not restricted to a pentagon start or to canonical indices. For a general list of fullerenes see ``The House of Graphs'' \cite{HouseofGraphs}. 
-The program produces an external file with default name \filename{Fullerene-3D.xyz} or \filename{Fullerene-3D.cc1}
+The program produces an external file with default name \filename{Fullerene-3D.xyz}, \filename{Fullerene-3D.cc1} or \filename{Fullerene-3D.mol}
 to be used for standard molecular plotting programs
 like CYLview \cite{CYLview}, Avogadro \cite{Avogadro}, Jmol \cite{JMol}, Pymol \cite{Pymol} or VMD \cite{vmd}.  For using these programs 
 it is important that the fullerene has a reasonable 3D structure, obtained for example by a force field 
@@ -347,16 +347,16 @@ force constants for a frequency analysis.
 
 The easiest way to create a 3D structure for \program{Fullerene} is of course to read-in cartesian coordinates for a specific
 fullerene (see input files \filename{CCc20.inp} to \filename{CCc540.inp}), or to construct them internally for the high
-symmetry $I_h-$\C{20} or $I_h-$\C{60} isomers (Subroutine \funname{CoordC20C60}, see input files \filename{GEOMc60.inp},
+symmetry $I_h-$\C{20} or $I_h-$\C{60} isomers (Subroutine \funname{CoordC20C60}, see input files \filename{GEOMc20.inp}, \filename{GEOMc60.inp},
 \filename{GEOMc60exp.inp}, \filename{GEOMc60ideal.inp}), or to construct the cartesian coordinates from a generalized ring-spiral
 pentagon-indices RSPI (plus jumps if necessary) by using either the Fowler-Manolopoulos AME algorithm \cite{Atlas},
-or the more reliable 3D-TE algorithm (Subroutine \funname{CoordBuild}, see input files \filename{RSPIc20.inp} or \filename{RSPIc840.inp}),
-or from a Goldberg-Coxeter 2-index transformation of \C{20}, i.e. $GC_{k,l}(\C{20})$ with $k \geq l$ and $k > 0$
-(triangulation algorithm described below, see input files \filename{GEOMc20Halma.inp}, \filename{GEOMc500Halma.inp}) or \filename{GGCK6L2.inp}). 
+or the more reliable 3D-TE algorithm (Subroutine \funname{CoordBuild}, see input files \filename{RSPIc60Ih} or \filename{RSPIc840-D5.inp}),
+or from a Goldberg-Coxeter 2-index transformation of for example \C{20}, i.e. $GC_{k,l}(\C{20})$ with $k \geq l$ and $k > 0$
+(triangulation algorithm described below, see input files \filename{GCK2L1c20.inp}, \filename{GCK4L3C20.inp}) or \filename{GCK5L3c20.inp}). 
 The 12 pentagon indices can also be obtained from the \textit{fullerene database} using 
 the canonical fullerene number as defined in the book ``Atlas of Fullerenes'' by Fowler and Manolopoulos \cite{Atlas,cvetkovic2002} 
 (e.g. input file \filename{DBc66.inp}). Information of vertex connections (edges) can also be used as input 
-(input files \filename{EDGEc20.inp} and \filename{EDGEc60.inp}).
+(input files \filename{EDGEc20.inp}, \filename{EDGEc60.inp} and \filename{EDGEc440.inp}).
 The program prints internal coordinates in form of a $Z$-Matrix (distances, angles and dihedrals).
 For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
 coordinates, e.g. cartesian coordinates obtained from a force-field optimization.
@@ -379,8 +379,7 @@ the RSPI from the scheme introduced by Fowler and Rogers.\cite{Rogers}  For the 
 algorithm it is critical to get the right H\"uckel eigenvectors for the construction
 of cartesian coordinates,\cite{Atlas} which works well for the icosahedral fullerenes,
 but less well for fullerene nanotubes.  The position of the three~$P$-type eigenvectors
-can be specified (see file \filename{RSPIc60NT.inp} for such an example).  If the
-AME algorithm fails or you cannot find the required $P$-type eigenvectors, you should
+can be specified.  If the AME algorithm fails or you cannot find the required $P$-type eigenvectors, you should
 use our Tutte embedding algorithm, which (to our opinion) is less troublesome and
 may be used as the standard method to construct 3D structures.  The disadvantage
 of this algorithm is, however, that the structure could be far off from a force-field
@@ -427,7 +426,7 @@ very demanding to produce a full isomer list for fullerenes larger than \C{120}.
 obtained from the natural sequence of canonical RSPIs to distinguish between the different isomers \cite{Atlas}. From their book \cite{Atlas} the
 general isomer number can be taken and the RSPIs for a specific isomer up to \C{150} can be read-in from the database provided. 
 The numbering scheme for IPR isomers only ($N_\mathrm{isomers}^\mathrm{IPR}= 1,\dots, n_\mathrm{max}$) can also be used up to \C{200}, 
-see for example the input file \filename{DBc158.inp}.
+see for example the input file \filename{DBc50.inp}.
 
 %H\"uckel analysis and topological indicators
 \subsection{H\"uckel analysis and topological indicators}
@@ -729,7 +728,7 @@ Information from subroutine \funname{RingC} can be used to perform Stone-Wales t
 (subroutine \funname{StoneWalesTrans}), Endo-Kroto 2-vertex insertions \cite{Endo92} (subroutine \funname{EndoKrotoTrans}),
 Yoshida-Fowler 4-vertex ($D_{3h}$ 6555) (subroutine \funname{YoshidaFowler4}) and 6-vertex ($D_{3h}$ 666555)
 insertions (subroutine \funname{YoshidaFowler6}) \cite{Yoshida97a}, or a Brinkmann-Fowler 6-vertex (6-55-55) insertion 
-(subroutine \funname{BrinkmannFowler}) \cite{BrinkmannFowler03}, see for example input files \filename{CCc50EK.inp, GEOMc60SW.inp, CCc80YF.inp}.
+(subroutine \funname{BrinkmannFowler}) \cite{BrinkmannFowler03}, see for example input files \filename{CCc50EK.inp, GEOMc60SW.inp, CCc60YF.inp}.
 The vertex-insertion nomenclature introduced by Brinkmann and Fowler \cite{BrinkmannFowler03} defines these insertions uniquely:\\
 Endo-Kroto: 2 pentagon G2.12.1.1 ($n_v$=12) $\rightarrow$ G2.12.1.2 ($n_v$=14);\\ 
 Yoshida-Fowler 4 vertex insertion: 3 pentagon G3.15.31.1 ($n_v$=15) $\rightarrow$ G3.17.3.2 ($n_v$=19);\\
@@ -970,10 +969,10 @@ for many fullerenes found in the following input files:\\
 \C{20} (\filename{CCc20.inp}), \C{24} (\filename{CCc24.inp}), \C{60} (\filename{CCc60.inp}), or \C{540} (\filename{CCc540.inp}).
 \item[2:] All files starting with \filename{GEOM} use basic geometry to construct \C{20} or \C{60}, e.g. \filename{GEOMc60.inp} or \filename{GEOMc60exp.inp}.
 \item[3:] All files starting with \filename{EDGE} have vertex connectivities as input, e.g. \filename{EDGEc20.inp}.
-\item[4:] All files starting with \filename{RSPI} have the ring-spiral pentagon indices as input, e.g. \filename{RSPIc20.inp} or \filename{RSPIc60NT.inp}
+\item[4:] All files starting with \filename{RSPI} have the ring-spiral pentagon indices as input, e.g. \filename{RSPIc32.inp} or \filename{RSPIc60NT-D5d.inp}
 including and the non-spirable fullerenes \C{380} (\filename{RSPIc380.inp}) and \C{384} (\filename{RSPIc384.inp}).
-\item[5:] All files starting with \filename{ISOMER} produces an isomer list, e.g. \filename{ISOMERc92.inp}.
-\item[6:] All files starting with \filename{GC} uses the Goldberg-Coxeter transform of \C{20}, e.g. \filename{GCc720Halma.inp}.
+\item[5:] All files starting with \filename{ISOMER} produces an isomer list, e.g. \filename{ISOMERc78.inp}.
+\item[6:] All files starting with \filename{GC} uses the Goldberg-Coxeter transform of \C{20}, e.g. \filename{GCK2L0c168.inp}.
 \item[7:] All files starting with \filename{READ} uses an external \filename{.xyz} file to read in in cartesian coordinates, e.g. \filename{READxyz.inp}.
 NB: You need to produce such a file first.
 \end{enumerate}
@@ -1021,7 +1020,7 @@ Namelist line that contains the main flags for the program.
 \item[{NA}]   Number of atoms (vertices) $N_A$ (Default: 60)
 \item[{IP}]  If set to 1, verbose output is be produced, i.e. the full distance matrix, all Hamiltonian cycles 
   and all ring connections up to three rings (Default: 0). Warnings: Usage of IP=1 with Iham not set to zero (see below)
-  is a dabgerous option and should be used only for small fullerenes.
+  is a dangerous option and should be used only for small fullerenes.
 \item[{iwext}] Flag for producing input file for \program{CYLview}, \program{Avogadro} or other plotting programs in standard formats (Default: 0)
   Default name for the external file is \filename{Fullerene-3D} with the appropriate ending. Otherwise \paramname{filename}='filename' needs to be specified (max. 50 characters).
   Note that if the routine which writes out \filename{.xyz}, \filename{.cc1} or \filename{.mol2} files is used more than once, for example through the \paramname{nloop} parameter,
@@ -1029,7 +1028,7 @@ Namelist line that contains the main flags for the program.
   i.e. \filename{filename-3D.xyz}, \filename{filename-3D2.xyz} etc. (the case \paramname{nloop}=1 is omitted in the name)\\
   If \paramname{iwext} = 1: Write out external \filename{.xyz}  file named \filename{filename-3D.xyz} for further input.\\
   If \paramname{iwext} = 2: Write out external \filename{.cc1}  file named \filename{filename-3D.cc1} for further input.\\
-  If \paramname{iwext} = 3: Write out external \filename{.mol2} file named \filename{filename-3D.mol2} for further input.\\
+  If \paramname{iwext} = 3: Write out external \filename{.mol} file named \filename{filename-3D.mol} for further input.\\
 \item[{irext}] Flag for reading external input file which contains cartesian coordinates or vertex connectivities (Default: 0). Note this makes the input of \paramname{ICart} obsolete if set non-zero.
   If \paramname{irext} = 1: Read \filename{.xyz} from file specified by \paramname{filename}. The final name is chosen as \filename{filename.xyz} (Default: \filename{Fullerene.xyz}). 
   Another \filename{.xyz} file is also produced and named \filename{filename-3D.xyz} if \paramname{iwext} = 1 is specified.\\
@@ -1037,8 +1036,8 @@ Namelist line that contains the main flags for the program.
   Another \filename{.cc1} file is also produced and named \filename{filename-3D.cc1} if \paramname{iwext} = 2 is specified.
   .cc1 files contain information about vertex connections. Programs like PYMOL can read such files. This is useful for reading for example \filename{.cc1} files produced 
   by M. Yoshida \cite{Yoshida}, which has been added to our database.\\
-  If \paramname{irext} = 3: Read \filename{.mol2} from file specified by \paramname{filename}. The final name is chosen as \filename{filename.mol2} (Default: \filename{Fullerene.mol2}). 
-  Another \filename{.mol2} file is also produced and named \filename{filename-3D.mol2} if \paramname{iwext} = 3 is specified.
+  If \paramname{irext} = 3: Read \filename{.mol} from file specified by \paramname{filename}. The final name is chosen as \filename{filename.mol} (Default: \filename{Fullerene.mol}). 
+  Another \filename{.mol} file is also produced and named \filename{filename-3D.mol} if \paramname{iwext} = 3 is specified.
   The file is in standard Tripos format.\\
 \item[{nohueckel}]  If \paramname{nohueckel} = 1 diagonalization of H\"uckel matrix is avoided which is of order $\mathcal{O}(n^3)$ (recommended for large matrices over size 5000) (Default: 0).
 \item[{loop}] 
@@ -1096,7 +1095,7 @@ then the isomer number from the isomer list contained in the ``House of Graphs''
 vertex connectivities input as series of cards is required each with 4~integers: IV1, IC1, IC2, IC3,
 i.e., 1~3~6~4 gives the following edges: 1-3, 1-6, and 1-4.  Zeros for IC2 and IC3 can be used, i.e. 1~3~6~0
 gives 1-3 and 1-6, and 1~3~0~0 just gives 1-3 as an edge.  For the last card in the input stream, IV1 needs
-to be set to zero to indicate the end of input. For an example see input file \filename{EDGEc20.inp}.  It is legal but not necessary to define same edges twice.\\
+to be set to zero to indicate the end of input. For an example see input file \filename{EDGEc60.inp}.  It is legal but not necessary to define same edges twice.\\
 If \paramname{ICart} = 8 or 9, general spiral input is required using  \paramname{rspi} and \paramname{jumps} (if required).\\ 
 If \paramname{ICart} = 10 A spiral search algorithm is used, see \paramname{isearch} keyword in \paramname{Isomer} section.
 
@@ -1392,7 +1391,7 @@ the main program folder and can be used to read the ring-spiral pentagon indices
 The files are compressed (gzip) so you need to uncompress the individual file used (gunzip) before usage.
 The numbering scheme is in canonical order and identical to the one introduced in the book by Fowler 
 and Manolopoulos \cite{Atlas}, that is each isomer in the book's appendix can be 
-constructed easily from our database. Examples are given in input files  \filename{DBc40.inp} and
+constructed easily from our database. Examples are given in input files  \filename{DBc50.inp} and
 \filename{DBc66.inp}.  Note that these files require the \filename{c40all.database} and \filename{c66all.database} 
 in the \filename{database/ALL} folder. The data files are formatted and can easily be read
 by the program. It is our intention to extend the isomer list beyond \C{150}/\C{200} (without Hamiltonian cycles) using the 
