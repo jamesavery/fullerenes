@@ -1,3 +1,8 @@
+#include <stdlib.h>
+#include <vector>
+
+using namespace std;
+
 extern "C" {
 #if defined LAPACK_IS_MKL
 # include <mkl_lapack.h>
@@ -24,7 +29,7 @@ void dsyevx_(char *jobz, char *range,char *uplo,int *n, double *a, int *lda,  do
   }
 }
 
-class DenseSqrMatrix : vector<double> {
+class DenseSqrMatrix: vector<double> {
 public:
   int n;
 

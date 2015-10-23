@@ -1,0 +1,24 @@
+Apps are small useful auxiliary programs that are apart of the main fullerene
+program.  They can be compiled by 'make app-<name>'.
+
+
+
+ convert-to-binary:
+ convert-to-csv: 
+ convert-to-newbinary:
+ convert-to-sqlite:
+ db-rspi:
+ file-to-pov:  convert xyz coordinates to pov (for subsequent rendering)
+ file-to-spiral: convert xyz cooerdinates to spiral string
+ gather-metadata:
+ gaudi:  create Gaudiene structures (see 10.1039/C5NR04370K)
+ generate-db:
+ generate-metadata:
+ gs-ex:  examples for general spirals
+ hamilton-nt:
+ hog-to-rspi:  convert 'planar-graph' format as found in the house of graphs collection of graphs to general spirals
+ polyhedron:  create polyheron (as xyz) from spiral string
+ spiral: ?
+ straighten:
+ symmetry:
+ xyz2pov:
