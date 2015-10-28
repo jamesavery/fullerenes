@@ -381,3 +381,25 @@ Ms. & Simon & winther & university of copenhagen & Datalogisk institut & KBH NV 
 Ms. & XIAOYANG & LIU & Virginia Tech & Chemistry & blacksburg & United States of America & xiaoyang@vt.edu & 
 Dr. & DEBASHREE & MANNA & WEIZMANN INSTITUTE OF SCIENCE & DEPARTMENT OF ORGANIC CHEMISTRY & REHOVOT & Israel & mannadebashree2014@gmail.com & I want to generate few non-classical fullerenes.
 Ms. & Gerard & O'COnnor & UNSW & Chemistry & Sydney & Australia & goconn@gmail.com & Thankyou
+Dr. & xu & shaogang & South China University of Technology & physics & guangzhou & China & 572548544@qq.com & thank you very much
+Dr. & Chien-Pin & Chou & National Chiao Tung University & Department of Applied Chemistry & Hsinchu & Taiwan & sol.chou@gmail.com & 
+ & Nicholas & Schiefer & California Institute of Technology &  & Pasadena & United States of America & nschiefer@caltech.edu & 
+Ms. & TaeHwan & OH & Sejong University & Chemistry & Seoul & Korea South & Hadronian@icloud.com & 
+Dr. & Bun & Chan & University of Sydney & School of Chemistry & University of Sydney & Australia & bun.chan@sydney.edu.au & 
+Dr. & mehran & hosseini & pgu & chemistry & busher & Iran & mehr.hosseini@yahoo.com & Thanks for all
+Ms. & Antonio & Alvarez & Instituto de Fisica & Fisica Teorica & Distrito Federal & Mexico & ant.adlp1986@gmail.com & 
+Dr. & Andrew & Hung & RMIT University & Applied Sciences & Melbourne & Australia & andrew.hung@rmit.edu.au & Dear Peter, Lukas & James, I am co-ordinator of a nanotech degree and would be interested in exploring use of FULLERENE for teaching purposes.
+Ms. & Baurzhan & Abdykadyrov & Kazakh National University named after al-Farabi & Physics Department & Almaty & Kazakhstan & baurzhan_163@mail.ru & 
+Dr. & Shulai & Lei & free university of Berlin & Chemistry & Berlin & Germany & leishulai2010@gmail.com & 
+Dr. & Xi & Zhu & Nanyang Technological University & School of Materials Science and Engineering & Singapore & Singapore & zhuxi@ntu.edu.sg & 
+Ms. & sunil & kumar & IIT DELHI & nv1 iit delhi & delhi & India & suniliitd14@gmail.com & 
+Dr. & Reza & Ghafouri & azad university & , Department of Chemistry & tehran & Iran & reghafouri@gmail.com & 
+Dr. & Alvaro & Muñoz-Castro & Universidad Autonoma de Chile & Chemistry & Santiago & Chile & armunozc@gmail.com & Thanks for share!
+Ms. & Yuan-Jia & Fan & National Taiwan University & Chemistry & Taipei & Taiwan & b88203054@gmail.com & 
+Dr. & wang & li & The northeast normal university & College of chemistry & changchun & China & 1074783096@qq.com & 
+Ms. & Jafet & Zetina & ITESO & Physics & Guadalajara & Mexico & jafet620@gmail.com & 
+Prof. & Kim  & Baldridge & University of Zürich & Chemistry & Zürich & Switzerland & kimb@oci.uzh.ch & 
+Prof. Dr. & Cercis & Morera & University of Havana & Physical Chemistry & La Havana & Cuba & cercis@fq.uh.cu & needed for academic purposes
+Prof. & Yulia & Novakovskaya & Moscow State University & Chemistry & Mosciw & Russia & jvnovakovskaya@gmail.com &
+---------------
+Version 4.5

@@ -6,7 +6,7 @@
 <!
 --------------------------------------------------------------------------
 This is the main webpage for the Fullerene program 
-Last update: March 19, 2013
+Last update: October 29, 2015
 Two php files are called:
 
 fulleruf.php
@@ -36,7 +36,7 @@ fullerdl.php receives the password, checks it and if correct
 </td>
 <td valign="middle"  align="center">
 <h1> <big> Program FULLERENE <br>
-Version 4.5</big> <br><br>
+Version 4.5 (October 29, 2015)</big> <br><br>
 A Fortran/C++ Program for Creating Fullerene Structures <br> 
 and for Performing Topological Analyses <br><br> </h1>
 <h2>by Peter Schwerdtfeger, Lukas Wirz and James Avery<br>
@@ -86,7 +86,7 @@ for a large number of fullerenes up to 35,000 vertices. A number of input
 and output files are included in the fullerenev4.5.zip file and a more detailed description 
 is found in the User's Manual.<br><br>
 
-<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.5.pdf">UserManualv4.5.pdf (20/01/2013)</a> (2.4 MB)
+<b>Download for Manual: </b><a href="http://ctcp.massey.ac.nz/data/UserManualv4.5.pdf">UserManualv4.5.pdf (29/10/2015)</a> (3.0 MB)
 <br><br>
 
 <b>Download for fullerene program:</b><br>
