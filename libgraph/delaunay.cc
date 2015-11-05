@@ -328,7 +328,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
 
 void FulleroidDelaunay::remove_flat_vertices()
 {
-  MathDebug debug("Delaunay",0);
+  MathematicaDebug debug("Delaunay",0);
   // Assumes that vertices are sorted such that hexagons appear at the
   // end. Procedure incrementally removes vertices from the back until 
   // reaching a vertex that is not of degree 6.
@@ -344,11 +344,11 @@ void FulleroidDelaunay::remove_flat_vertices()
   while(original_degrees[v] == 6){
     assert(edge_lengths_are_symmetric());
     debug << "(* removing node " << (v+1) << " *)\n";
-    MathDebug::channel_stream["Delaunay"]->flush();
+    MathematicaDebug::channel_stream["Delaunay"]->flush();
     remove_flat_vertex(v);
     debug << "g["<<(i++)<<"] = " << *this << ";\n";
     v = neighbours.size()-1;
-    MathDebug::channel_stream["Delaunay"]->flush();
+    MathematicaDebug::channel_stream["Delaunay"]->flush();
   }
 
   debug << "(* --- done --- *)" << endl;

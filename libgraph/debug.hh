@@ -45,14 +45,14 @@ public:
   {
     if(channel_verbosity[S.channel] < S.level && channel_verbosity["all"] < S.level) return nullstream;
 
-    ostream& stream = channel_stream.find(S.channel) != channel_stream.end()? channel_stream[S.channel]
-				      : (channel_stream.find("all") != channel_stream.end()?
-					 channel_stream["all"] : cout);
+    ostream *stream = channel_stream.find(S.channel) != channel_stream.end()? channel_stream[S.channel]
+     				      : (channel_stream.find("all") != channel_stream.end()?
+     					 channel_stream["all"] : &cout);
     
-    if(prefix>0) stream << "(*" << S.channel << "*) ";
-    stream << x;
+    if(prefix>0) *stream << "(*" << S.channel << "*) ";
+    *stream << x;
 
-    return stream;
+    return *stream;
   }
 };
 
