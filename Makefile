@@ -28,8 +28,8 @@ LIBRARIES=-lstdc++ -lgomp -lgfortran
 CXXFLAGS+=-DHAS_LAPACK 
 LIBRARIES+=-llapack -lblas
 #uncomment that following lines to use gsl (gnu scientific library)
-#CXXFLAGS+=-DHAS_GSL
-#LIBRARIES+=-lgsl
+CXXFLAGS+=-DHAS_GSL
+LIBRARIES+=-lgsl
 
 
 OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
@@ -94,6 +94,6 @@ clean:
 	find . \( -name  "*~" -or  -name "#*#" -or -name "*.o" \) -exec rm {} \;
 
 distclean: clean
-	rm -rf fullerene build/libgraph.a qmga.dat config.mod test-* app-* play-*
+	rm -rf fullerene build/libgraph.a build/libgraph.so qmga.dat config.mod test-* app-* play-*
 
 #-----------------------------------------------------
