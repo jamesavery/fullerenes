@@ -362,7 +362,7 @@ C   Write out IC3 on external file
          Open(unit=Iext,file=extname,form='formatted')
          Write(iext,*) number_vertices
          Do I=1,number_vertices
-          Write(iext,*) (IC3(I,J),J=1,3)
+          Write(iext,*) I,(IC3(I,J),J=1,3)
          enddo
          Close(unit=Iext)
          Go to 888
