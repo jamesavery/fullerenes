@@ -44,7 +44,9 @@ C    Set the dimensions for the distance matrix
       CHARACTER CDAT*8,CTIM*10,Zone*5
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
+      CHARACTER*5 xtext
       CHARACTER*7 Namecc1,Namexyz,Namemol
+      CHARACTER*8 fmt
       CHARACTER*4 Endcc1,Endxyz,Endmol
       CHARACTER*15 routine
       CHARACTER*50 filename,filenameout,extname
@@ -358,7 +360,10 @@ C   Write out IC3 on external file
         if(itop.eq.2) then
          Call CubeConnect(Iout,IDA,IC3)
          iext=1
-         extname='ic3file'
+         fmt = '(I5.5)'
+         Write(xtext,fmt) number_vertices
+         extname='ic3file'//'.'//trim(xtext)
+         Print*,' Write external file to extname ',extname
          Open(unit=Iext,file=extname,form='formatted')
          Write(iext,*) number_vertices
          Do I=1,number_vertices

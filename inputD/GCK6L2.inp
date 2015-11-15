@@ -1,6 +1,6 @@
 Coxeter fullerene with indices (k,l)=(6,2) G0=C20, produces C1040 
 &General iwext=1 /
-&Coord ICart=4  kGC=6 lGC=6 /
+&Coord ICart=4  kGC=6 lGC=2 /
 &FFChoice iopt=2 /
 &FFParameters /
 &Hamilton /
