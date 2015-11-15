@@ -354,6 +354,7 @@ C Produce the nth leapfrog of the fullerene
         leapspiral=1
         if(number_vertices.gt.100) IHam=0
 C   Write out IC3 on external file
+        if(LeapErr.ne.0) go to 9999   ! Stop 
         if(itop.eq.2) then
          Call CubeConnect(Iout,IDA,IC3)
          iext=1
@@ -366,7 +367,6 @@ C   Write out IC3 on external file
          Close(unit=Iext)
          Go to 888
         endif
-        if(LeapErr.eq.0) go to 999 ! moveCM
       endif
 
 C     Check if only topological analysis is needed 
