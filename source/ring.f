@@ -794,10 +794,10 @@ C Print Cioslowsky analysis and check of correctness
  1012 Format(' WARNING: expected 3-ring count does not match ',
      1 'number found')
  1013 Format(1X,'nth moment hexagon signatures for IPR-fullerenes ',
-     1 'from Ju et al: H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
+     1 'from Ju et al: H0 = ',I6,', H1 = ',I6,', H2 = ',I6)
  1014 Format(//1X,'3-ring fusions between rings (RNI,RNJ,RNK):') 
  1015 Format(1X,'nth moment hexagon signatures from Stevanovic:',
-     1 ' H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
+     1 ' H0 = ',I6,', H1 = ',I6,', H2 = ',I6)
  1021 Format(10(1X,'(',I3,',',I3,','I3,')'))
  1024 Format(/1X,'Calculate Standard Enthalpy for fullerene ',
      1 'from structural motifs (M)',/2X,'M.Alcami, G.Sanchez, ',
@@ -956,7 +956,7 @@ C       Strain Parameter
  1022 Format(1X,'--> Fullerene is IPR')
  1023 Format(1X,'--> Fullerene is not IPR')
  1024 Format(1X,'nth moment hexagon signatures from neighboring ',
-     1 'hexagon indices: H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
+     1 'hexagon indices: H0 = ',I6,', H1 = ',I6,', H2 = ',I6)
  1027 Format(1X,'sum hk is zero -> sigmah set to zero')
       Return
       END
