@@ -1,4 +1,4 @@
-      SUBROUTINE CoordBuild(IN,Iout,IDA,D,ICart,
+      SUBROUTINE CoordBuild(IN,Iout,itop,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,nohueckel,iprev,
      1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
      1 rspi,jumps,GROUP,filename)
@@ -251,6 +251,7 @@ C       Sort eigenvalues evec(i) and eigenvectors A(*,i)
 C       Analyze eigenenergies
         Call HueckelAnalyze(Iout,iocc,df,evec)
       endif ! hueckel
+       if(itop.eq.1) return
 
 
 c      if(ke + isw + iyf + ibf .eq. 0) then

@@ -1,4 +1,72 @@
-      SUBROUTINE Ring(Me,MCon2,IOUT,Ncount5,Ncount6,
+      SUBROUTINE IDAIC3(IDA,IC3)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION IC3(Nmax,3)
+      integer IDA(Nmax,Nmax)
+       Do I=1,number_vertices
+        num=0
+       Do J=1,number_vertices
+        if(IDA(I,J).eq.1) then
+         num=num+1
+         IC3(I,num)=J
+        endif
+       enddo
+       enddo
+      Return
+      End
+
+      SUBROUTINE ringanalyze(Iout,Iring5,Iring6,N5MEM,N6MEM,Iring56,
+     1  NringA,NringB,NringC,NringD,NringE,NringF,N5Ring,N6Ring)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+C     Routine for locating all ring 55, 56 and 66 ring connections
+C     Only input is N5MEM and N6MEM
+      DIMENSION NringA(Emax),NringB(Emax)
+      DIMENSION NringC(Emax),NringD(Emax)
+      DIMENSION NringE(Emax),NringF(Emax)
+      DIMENSION IedgeA(Emax),IedgeB(Emax)
+      DIMENSION Nring(Mmax)
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
+      N2ring=0
+      IRing5=0
+      IRing6=0
+      IRing56=0
+      Do I=1,N5Ring+N6Ring
+       Nring(I)=I
+      enddo
+C     (5-5) 2-ring fusions
+      IR1=5
+      IR2=5
+      CALL Ring55(IRing5,N5Ring,NringA,NringB,Nring,N5MEM,IedgeA,IedgeB)
+      Write(Iout,1005) IR1,IR2,IRing5
+      if(IRing5.ne.0) Write(Iout,1006) (NringA(I),NringB(I),I=1,IRing5)
+      N2ring=IRing5
+      If(N6Ring.eq.0) Go to 100
+
+C     (5-6) 2-ring fusions
+      IR2=6
+      CALL Ring56(IRing56,N5Ring,N6Ring,NringC,NringD,Nring,N5MEM,N6MEM)
+      Write(Iout,1005) IR1,IR2,IRing56
+      if(IRing56.ne.0) Write(Iout,1006)(NringC(I),NringD(I),I=1,IRing56)
+      N2ring=N2ring+IRing56
+
+C     (6-6) 2-ring fusions
+      IR1=6
+      CALL Ring66(IRing6,N5Ring,N6Ring,NringE,NringF,Nring,N6MEM)
+      Write(Iout,1005) IR1,IR2,IRing6
+      if(IRing6.ne.0) Write(Iout,1006) (NringE(I),NringF(I),I=1,IRing6)
+      N2ring=N2ring+IRing6
+
+C     Final 2-ring
+  100 Write(Iout,1007) N2ring
+ 1005 Format(2X,'(',I1,'-',I1,') fusions: ',I5,' in total')
+ 1006 Format(12(1X,'(',I5,',',I5,')'))
+ 1007 Format(1X,'Total number of distinct two-ring fusions:',I5,
+     1 ' (should be identical to the number of edges Ne)',/)
+      Return
+      end
+
+      Subroutine Ring(Me,MCon2,IOUT,itop,Ncount5,Ncount6,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       use config
 C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
@@ -20,14 +88,14 @@ C     IC3 contains vertex adjacencies and IVR3 ring numbers for a vertex
       Ncount5=1
       Ncount6=1
       Do I=1,6
-      Rd(I)=0.d0
+       Rd(I)=0.d0
       enddo
       Do IS=1,number_vertices
       Do 1 I=1,6
       Do 1 J=1,96
-    1 IPa(I,J)=0
+    1  IPa(I,J)=0
       Do 2 I=1,3
-    2 IPa(1,I)=IC3(IS,I)     
+    2  IPa(1,I)=IC3(IS,I)     
       Do I2=1,3
       IX1=IPa(1,I2)
       if(IX1.ne.0) CALL Step(2,I2,IS,IX1,IPA,IC3)
@@ -77,20 +145,38 @@ C     Identify all 5-membered rings
       Do I=1,48
       IN5=IPa(5,I)
       IF(IN5.eq.IS) then
-      CALL Ring5(Ncount5,I,IN5,Mmax,IPA,N5MEM,N5MEMS)
+       CALL Ring5(Ncount5,I,IN5,Mmax,IPA,N5MEM,N5MEMS)
       endif
       enddo
 C     Identify all 6-membered rings
       Do I=1,96
       IN6=IPa(6,I)
       IF(IN6.eq.IS) then
-      CALL Ring6(Ncount6,I,IN6,Mmax,IPA,N6MEM,N6MEMS)
+       CALL Ring6(Ncount6,I,IN6,Mmax,IPA,N6MEM,N6MEMS)
       endif
       enddo
       enddo
 
       Ncount5=Ncount5-1
+      if(itop.eq.1) then
+      Ncount6=Ncount6-1
+       Write(IOUT,1019) Ncount5
+       if(Ncount5.eq.0) stop
+       Do I=1,Ncount5
+        Write(IOUT,1001) (N5MEM(I,J),J=1,5)
+       enddo
+       Write(IOUT,1002) Ncount6
+       If(Ncount6.ne.0) then 
+        Write(IOUT,1020)
+        Do I=1,Ncount6
+         Write(IOUT,1003) (N6MEM(I,J),J=1,6)
+        enddo
+       endif
+       Mcon2=(5*Ncount5+6*Ncount6)/2
+       Go to 777
+      endif
       Write(IOUT,1000) Ncount5
+
 C     Check bond distances
       Rmin5=1000.d0
       Rmax5=0.d0
@@ -219,7 +305,7 @@ C     Deviation from ideal hexagon angle of 120 deg
      1  Write(IOUT,1016) asmall,asmalldif,abig,abigdif
 
 C     Establish ring numbers for specific vertex
-      do I=1,nmax+4
+ 777  do I=1,nmax+4
         Do J=1,3
           IVR3(I,J)=0
         enddo
@@ -274,10 +360,12 @@ C     Check Euler characteristic
       Write(IOUT,1014)
       stop 20
       endif
-      Write(IOUT,1009) NMin,RminT,MaxN,RmaxT
       ameas=dfloat(Ndif)/dfloat(Mcon2)
-      Write(Iout,1012) Ndif,ameas,Tol
-      Write(Iout,1013) (Rmem(I),I=1,Ndif)
+      if(itop.eq.0) then
+       Write(IOUT,1009) NMin,RminT,MaxN,RmaxT
+       Write(Iout,1012) Ndif,ameas,Tol
+       Write(Iout,1013) (Rmem(I),I=1,Ndif)
+      endif
 
       call flush(iout)
 
@@ -327,6 +415,11 @@ C1011 Format(3X,96(I3))
  1017 Format(/1X,'List of ring numbers RNj containing vertex Ni  ',
      1 '(Ni: RNj, RNk, RNl)',/1X,135('-'))
  1018 Format(5(1X,'(',I5,':',I5,',',I5,',',I5,') '))
+ 1019 Format(/1X,I3,' five-membered-rings identified',/,
+     1 ' Atom numbers in ring: Ni',
+     1 /4X,'N1    N2    N3    N4    N5')
+ 1020 Format(/1X,' Atom numbers in ring: Ni',
+     1 /5X,'N1    N2    N3    N4    N5    N6')
       RETURN
       END
 
@@ -2712,8 +2805,7 @@ C     Sort array n555f
       Return
       END
  
-      SUBROUTINE Ring56(IR56,N5R,N6R,NrA,NrB,Nring,
-     1 N5MEM,N6MEM)
+      SUBROUTINE Ring56(IR56,N5R,N6R,NrA,NrB,Nring,N5MEM,N6MEM)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Nring(Mmax)
@@ -2778,8 +2870,7 @@ C     (5-6) 2-ring fusions
       Return
       END
  
-      SUBROUTINE Ring55(IR5,N5R,NrA,NrB,Nring,
-     1 N5MEM,IedA,IedB)
+      SUBROUTINE Ring55(IR5,N5R,NrA,NrB,Nring,N5MEM,IedA,IedB)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION N5MEM(Mmax,5),Nring(Mmax)
@@ -2849,8 +2940,7 @@ C     (5-5) 2-ring fusions
       Return
       END
  
-      SUBROUTINE Ring66(IR6,N5R,N6R,NrA,NrB,
-     1 Nring,N6MEM)
+      SUBROUTINE Ring66(IR6,N5R,N6R,NrA,NrB,Nring,N6MEM)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION N6MEM(Mmax,6),Nring(Mmax)

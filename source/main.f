@@ -78,9 +78,6 @@ C External file names
       Endcc1='.cc1'
       Endxyz='.xyz'
       Endmol='.mol'
-      nxyz=0
-      ncc1=0
-      nmol=0
 
 C Input / Output
       IN=5
@@ -88,6 +85,9 @@ C Input / Output
       Iext=7
 
 C Set parameters to zero
+      nxyz=0
+      ncc1=0
+      nmol=0
       nloop=0
       ilp=0
       iprev=0
@@ -100,6 +100,14 @@ C Set parameters to zero
           IDA(I,J)=0
         enddo
       enddo
+      Do I=1,Emax
+       NRingA(I)=0
+       NRingB(I)=0
+       NRingC(I)=0
+       NRingD(I)=0
+       NRingE(I)=0
+       NRingF(I)=0
+      enddo
       Do I=1,Nmax
        Dist(1,I)=0.d0
        Dist(2,I)=0.d0
@@ -110,11 +118,13 @@ C Set parameters to zero
 
 C------------------TIME-AND-DATE-----------------------------------
 C Get time and date
+C You may have to change this part for different compiler
       CALL date_and_time(CDAT,CTIM,zone,values)
       TIMEX=0.d0
       CALL Timer(TIMEX)
       WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
      1  Values(6),Values(7),Nmax
+
 
 C------------------------------------------------------------------
 C  S T A R T   O F   I N P U T   S E C T I O N
@@ -143,10 +153,10 @@ C  Call Datain (main input routine)
      1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,
      1 ftolP,scaleRad,rspi,jumps,force,forceP,boost,
      1 dualdist,filename,filenameout,TEXTINPUT)
-
-C  Simple checks
        Rmin5=R5
        Rmin6=R6
+
+C  Simple checks
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Stop if isomer closest to icosahedral is searched for
@@ -262,7 +272,7 @@ C Read cartesian coordinates directly
    30 Ipent=1
       routine='COORDBUILD     '
       Write(Iout,1008) routine
-      CALL CoordBuild(IN,Iout,IDA,IDual,
+      CALL CoordBuild(IN,Iout,itop,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,
      1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
      1 rspi,jumps,GROUP,filename)
@@ -290,6 +300,10 @@ C intensive
       CALL Isomers(IPR,isearch,In,Iout,iprintham,ihamstats,
      1 isomerl,isomerh,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
+      if(itop.eq.1) then
+       Call IDAIC3(IDA,IC3)
+       go to 777
+      endif
 
 C------------------MOVECM------------------------------------------
 C Move carbon cage to Atomic Center
@@ -374,9 +388,6 @@ C   Write out IC3 on external file
         endif
       endif
 
-C     Check if only topological analysis is needed 
-      if(itop.ne.0) go to 888
-
 C------------------HAMILTON---------------------------------------
 C Generate IUPAC name and locate Hamiltonian cycles. 
 C Routine written by D. Babic. Note routine
@@ -384,7 +395,7 @@ C is called only if IPR>0 as computer time is extensive beyond
 C C100 (PN-hard problem). Last routine uses the adjaceny matrix
 C to calculate the number of all distinct paths between 
 C adjacent vertices
-      routine='HAMILTON       '
+ 777  routine='HAMILTON       '
       Write(Iout,1008) routine
       maxiter=maxit
       if(IHam.gt.1.and.IHam.le.9) then
@@ -407,8 +418,14 @@ C------------------RING-------------------------------------------
 C Establish all closed ring systems
       routine='RING           '
       Write(Iout,1008) routine
-      CALL Ring(Medges,MCon2,Iout,N5Ring,N6Ring,
+      CALL Ring(Medges,MCon2,Iout,itop,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
+C     Check if only topological analysis is needed 
+      if(itop.eq.1) then
+       call ringanalyze(Iout,Iring5,Iring6,N5MEM,N6MEM,Iring56,
+     1  NringA,NringB,NringC,NringD,NringE,NringF,N5Ring,N6Ring)
+       go to 889
+      endif
 
 C------------------RINGC------------------------------------------
 C Analyze ring connections
@@ -488,7 +505,7 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
-      if((ipent.eq.0 .or. leapspiral.ne.0.or.SWspiral.ne.0.
+ 889  if((ipent.eq.0 .or. leapspiral.ne.0.or.SWspiral.ne.0.
      1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).or.
      1   ispsearch.ne.0) then
         routine='SPIRALSEARCH   '
@@ -575,7 +592,8 @@ c       Compare structures
         Write(Iout,1008) routine
 c  call ring again, this needs some reprogramming as ring duplicates some
 c  stuff previously done, but is ok for now, as it takes not much time
-        CALL Ring(Medges,MCon2,Iout,N5Ring,N6Ring,
+        itop=0
+        CALL Ring(Medges,MCon2,Iout,itop,N5Ring,N6Ring,
      1   IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       endif
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
