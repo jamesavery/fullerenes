@@ -307,6 +307,7 @@ C Set IC and ichk parameters
 
 C  Check on number of atoms (vertices)
       number_vertices=IABS(NA)
+      if(imcs.eq.0) then
       if(number_vertices.gt.NAtomax) WRITE(IOUT,102) number_vertices
       if(number_vertices.lt.20.or.number_vertices.eq.22) then
         Write(IOUT,103) number_vertices
@@ -317,6 +318,7 @@ C  Check on number of atoms (vertices)
         Write(IOUT,104) number_vertices
         IER=1
         return
+      endif
       endif
 
 C Create rspi if nanotube.ne.0
