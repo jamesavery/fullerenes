@@ -15,6 +15,10 @@ int main(int ac, char **av)
   if(ac==2){
     from_file = true;
     N = 0;
+  } else if(ac==3) {//RSPI is quoted
+    N = strtol(av[1],0,0);
+    istringstream iss(av[2]);
+    for(int i=0;i<12;i++){ iss >> RSPI[i]; RSPI[i]--; }
   } else if(ac<14){
     N = testN;
     for(int i=0;i<12;i++) RSPI[i] = testRSPI[i]-1;
@@ -39,6 +43,8 @@ int main(int ac, char **av)
   vector<int> spiral(N/2+2,6);
   for(int i=0;i<12;i++) spiral[RSPI[i]] = 5;
 
+  //  cerr << "rspi="<<RSPI<<"\n";
+  
   Polyhedron P0;
   PlanarGraph g;
   if(from_file){
