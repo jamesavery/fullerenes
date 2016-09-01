@@ -1,4 +1,72 @@
-      SUBROUTINE Ring(Me,MCon2,IOUT,Ncount5,Ncount6,
+      SUBROUTINE IDAIC3(IDA,IC3)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+      DIMENSION IC3(Nmax,3)
+      integer IDA(Nmax,Nmax)
+       Do I=1,number_vertices
+        num=0
+       Do J=1,number_vertices
+        if(IDA(I,J).eq.1) then
+         num=num+1
+         IC3(I,num)=J
+        endif
+       enddo
+       enddo
+      Return
+      End
+
+      SUBROUTINE ringanalyze(Iout,Iring5,Iring6,N5MEM,N6MEM,Iring56,
+     1  NringA,NringB,NringC,NringD,NringE,NringF,N5Ring,N6Ring)
+      use config
+      IMPLICIT REAL*8 (A-H,O-Z)
+C     Routine for locating all ring 55, 56 and 66 ring connections
+C     Only input is N5MEM and N6MEM
+      DIMENSION NringA(Emax),NringB(Emax)
+      DIMENSION NringC(Emax),NringD(Emax)
+      DIMENSION NringE(Emax),NringF(Emax)
+      DIMENSION IedgeA(Emax),IedgeB(Emax)
+      DIMENSION Nring(Mmax)
+      DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6)
+      N2ring=0
+      IRing5=0
+      IRing6=0
+      IRing56=0
+      Do I=1,N5Ring+N6Ring
+       Nring(I)=I
+      enddo
+C     (5-5) 2-ring fusions
+      IR1=5
+      IR2=5
+      CALL Ring55(IRing5,N5Ring,NringA,NringB,Nring,N5MEM,IedgeA,IedgeB)
+      Write(Iout,1005) IR1,IR2,IRing5
+      if(IRing5.ne.0) Write(Iout,1006) (NringA(I),NringB(I),I=1,IRing5)
+      N2ring=IRing5
+      If(N6Ring.eq.0) Go to 100
+
+C     (5-6) 2-ring fusions
+      IR2=6
+      CALL Ring56(IRing56,N5Ring,N6Ring,NringC,NringD,Nring,N5MEM,N6MEM)
+      Write(Iout,1005) IR1,IR2,IRing56
+      if(IRing56.ne.0) Write(Iout,1006)(NringC(I),NringD(I),I=1,IRing56)
+      N2ring=N2ring+IRing56
+
+C     (6-6) 2-ring fusions
+      IR1=6
+      CALL Ring66(IRing6,N5Ring,N6Ring,NringE,NringF,Nring,N6MEM)
+      Write(Iout,1005) IR1,IR2,IRing6
+      if(IRing6.ne.0) Write(Iout,1006) (NringE(I),NringF(I),I=1,IRing6)
+      N2ring=N2ring+IRing6
+
+C     Final 2-ring
+  100 Write(Iout,1007) N2ring
+ 1005 Format(2X,'(',I1,'-',I1,') fusions: ',I5,' in total')
+ 1006 Format(12(1X,'(',I5,',',I5,')'))
+ 1007 Format(1X,'Total number of distinct two-ring fusions:',I5,
+     1 ' (should be identical to the number of edges Ne)',/)
+      Return
+      end
+
+      Subroutine Ring(Me,MCon2,IOUT,itop,Ncount5,Ncount6,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       use config
 C     Get all 6 and 5 ring systems by checking all possible branches (vertices)
@@ -7,7 +75,7 @@ C     I am sure there are better algorithms, but this one is not too bad and fas
 C     enough and fast.
       IMPLICIT REAL*8 (A-H,O-Z)
 C     IC3 contains vertex adjacencies and IVR3 ring numbers for a vertex
-      DIMENSION IC3(Nmax,3),IVR3(Nmax,3)
+      DIMENSION IC3(Nmax,3),IVR3(Nmax+4,3)
       DIMENSION N5MEM(Mmax,5),N5MEMS(Mmax,5)
       DIMENSION N6MEM(Mmax,6),N6MEMS(Mmax,6)
       DIMENSION IPa(6,96)
@@ -20,14 +88,14 @@ C     IC3 contains vertex adjacencies and IVR3 ring numbers for a vertex
       Ncount5=1
       Ncount6=1
       Do I=1,6
-      Rd(I)=0.d0
+       Rd(I)=0.d0
       enddo
       Do IS=1,number_vertices
       Do 1 I=1,6
       Do 1 J=1,96
-    1 IPa(I,J)=0
+    1  IPa(I,J)=0
       Do 2 I=1,3
-    2 IPa(1,I)=IC3(IS,I)     
+    2  IPa(1,I)=IC3(IS,I)     
       Do I2=1,3
       IX1=IPa(1,I2)
       if(IX1.ne.0) CALL Step(2,I2,IS,IX1,IPA,IC3)
@@ -77,20 +145,38 @@ C     Identify all 5-membered rings
       Do I=1,48
       IN5=IPa(5,I)
       IF(IN5.eq.IS) then
-      CALL Ring5(Ncount5,I,IN5,Mmax,IPA,N5MEM,N5MEMS)
+       CALL Ring5(Ncount5,I,IN5,Mmax,IPA,N5MEM,N5MEMS)
       endif
       enddo
 C     Identify all 6-membered rings
       Do I=1,96
       IN6=IPa(6,I)
       IF(IN6.eq.IS) then
-      CALL Ring6(Ncount6,I,IN6,Mmax,IPA,N6MEM,N6MEMS)
+       CALL Ring6(Ncount6,I,IN6,Mmax,IPA,N6MEM,N6MEMS)
       endif
       enddo
       enddo
 
       Ncount5=Ncount5-1
+      if(itop.eq.1) then
+      Ncount6=Ncount6-1
+       Write(IOUT,1019) Ncount5
+       if(Ncount5.eq.0) stop
+       Do I=1,Ncount5
+        Write(IOUT,1001) (N5MEM(I,J),J=1,5)
+       enddo
+       Write(IOUT,1002) Ncount6
+       If(Ncount6.ne.0) then 
+        Write(IOUT,1020)
+        Do I=1,Ncount6
+         Write(IOUT,1003) (N6MEM(I,J),J=1,6)
+        enddo
+       endif
+       Mcon2=(5*Ncount5+6*Ncount6)/2
+       Go to 777
+      endif
       Write(IOUT,1000) Ncount5
+
 C     Check bond distances
       Rmin5=1000.d0
       Rmax5=0.d0
@@ -219,10 +305,10 @@ C     Deviation from ideal hexagon angle of 120 deg
      1  Write(IOUT,1016) asmall,asmalldif,abig,abigdif
 
 C     Establish ring numbers for specific vertex
-      do I=1,number_vertices
-      Do J=1,3
-       IVR3(I,J)=0
-      enddo
+ 777  do I=1,nmax+4
+        Do J=1,3
+          IVR3(I,J)=0
+        enddo
       enddo
 C     First pentagons
       Do I=1,Ncount5
@@ -257,9 +343,9 @@ C     Next hexagons
       enddo
       Write(IOUT,1017)
       Do I=1,number_vertices,5
-      Write(IOUT,1018) I,(IVR3(I,J),J=1,3),
-     1 I+1,(IVR3(I+1,J),J=1,3),I+2,(IVR3(I+2,J),J=1,3),
-     1 I+3,(IVR3(I+3,J),J=1,3),I+4,(IVR3(I+4,J),J=1,3)
+        Write(IOUT,1018) I,(IVR3(I,J),J=1,3),
+     1   I+1,(IVR3(I+1,J),J=1,3),I+2,(IVR3(I+2,J),J=1,3),
+     1   I+3,(IVR3(I+3,J),J=1,3),I+4,(IVR3(I+4,J),J=1,3)
       enddo
       
 C     Check Euler characteristic
@@ -274,10 +360,12 @@ C     Check Euler characteristic
       Write(IOUT,1014)
       stop 20
       endif
-      Write(IOUT,1009) NMin,RminT,MaxN,RmaxT
       ameas=dfloat(Ndif)/dfloat(Mcon2)
-      Write(Iout,1012) Ndif,ameas,Tol
-      Write(Iout,1013) (Rmem(I),I=1,Ndif)
+      if(itop.eq.0) then
+       Write(IOUT,1009) NMin,RminT,MaxN,RmaxT
+       Write(Iout,1012) Ndif,ameas,Tol
+       Write(Iout,1013) (Rmem(I),I=1,Ndif)
+      endif
 
       call flush(iout)
 
@@ -327,6 +415,11 @@ C1011 Format(3X,96(I3))
  1017 Format(/1X,'List of ring numbers RNj containing vertex Ni  ',
      1 '(Ni: RNj, RNk, RNl)',/1X,135('-'))
  1018 Format(5(1X,'(',I5,':',I5,',',I5,',',I5,') '))
+ 1019 Format(/1X,I3,' five-membered-rings identified',/,
+     1 ' Atom numbers in ring: Ni',
+     1 /4X,'N1    N2    N3    N4    N5')
+ 1020 Format(/1X,' Atom numbers in ring: Ni',
+     1 /5X,'N1    N2    N3    N4    N5    N6')
       RETURN
       END
 
@@ -334,7 +427,7 @@ C1011 Format(3X,96(I3))
      1 N5Ring,N6Ring,Nring,Iring5,Iring6,Iring56,
      1 nl565,numbersw,numberFM,numberYF,numberBF,
      1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
-     1 IC3,IVR3,n3rc,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
+     1 IC3,IVR3,n3rc,nSW,nFM,nYF,nBF,SmallRingDist,DIST,CRing5,CRing6)
 C     This routine analyzes the pentagons and hexagons
 C     The first 12 faces are pentagons (many routines need this order)
 C     All other which follow are hexagons
@@ -344,7 +437,7 @@ C     Determine the center of each 5-and 6-ring system
       DIMENSION Dist(3,Nmax),Distac(6)
       DIMENSION CRing5(3,Mmax),CRing6(3,Mmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Nring(Mmax)
-      DIMENSION IC3(Nmax,3),IVR3(Nmax,3)
+      DIMENSION IC3(Nmax,3),IVR3(nmax+4,3) ! up to four values past the required ones are read
       DIMENSION IedgeA(Emax),IedgeB(Emax)
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
@@ -462,10 +555,14 @@ C     Get the largest ring to ring distance
       enddo
       enddo
       Write(Iout,1026) Rmin5,Rmin6,Rmin56,Rmax5,Rmax6,Rmax56
+C     Smallest ring distance
+ 2001 SmallRingDist=Rmin6
+      if(Rmin56.lt.Rmin6) SmallRingDist=Rmin56
+      if(Rmin5.lt.SmallRingDist) SmallRingDist=Rmin5
 
 C     Analyzing the ring fusions
 C     All 2-ring fusions
- 2001 Write(Iout,1004)
+      Write(Iout,1004)
       IR1=5
       IR2=5
       N2ring=0
@@ -790,10 +887,10 @@ C Print Cioslowsky analysis and check of correctness
  1012 Format(' WARNING: expected 3-ring count does not match ',
      1 'number found')
  1013 Format(1X,'nth moment hexagon signatures for IPR-fullerenes ',
-     1 'from Ju et al: H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
+     1 'from Ju et al: H0 = ',I6,', H1 = ',I6,', H2 = ',I6)
  1014 Format(//1X,'3-ring fusions between rings (RNI,RNJ,RNK):') 
  1015 Format(1X,'nth moment hexagon signatures from Stevanovic:',
-     1 ' H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
+     1 ' H0 = ',I6,', H1 = ',I6,', H2 = ',I6)
  1021 Format(10(1X,'(',I3,',',I3,','I3,')'))
  1024 Format(/1X,'Calculate Standard Enthalpy for fullerene ',
      1 'from structural motifs (M)',/2X,'M.Alcami, G.Sanchez, ',
@@ -857,6 +954,8 @@ C Print Cioslowsky analysis and check of correctness
 C Get Rhagavachari-Fowler-Manolopoulos neighboring pentagon and hexagon indices
 C     First pentagon indices
       IPR=0
+      ihk=0
+      sigmah = 0
       Do I=0,5
        IRhag5(I)=0
       enddo
@@ -883,51 +982,51 @@ C     Pentagon index
       endif
 C     Now hexagon indices
       if(N6Ring.eq.0) Return
-       Do I=0,6
+      Do I=0,6
         IRhag6(I)=0
-       enddo
-       If(IRing6.eq.0) then
+      enddo
+      If(IRing6.ne.0) then
+        do I=13,12+N6Ring
+          IRcount=0
+          do J=1,IRing6
+            If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
+              IRcount=IRcount+1
+            endif
+          enddo
+          IRhag6(IRcount)=IRhag6(IRcount)+1
+        enddo
+C       Hexagon Neighbor Index
+        ih0=0
+        ih1=0
+        ih2=0
+        Do I=0,6
+          ih0=ih0+IRhag6(I)
+          ih1=ih1+I*IRhag6(I)
+          ih2=ih2+I*I*IRhag6(I)
+        enddo
+C       Strain Parameter
+        sigmah=HexInd(IRhag6,ihk)
+        Write(Iout,1024) ih0,ih1,ih2 
+        if(ihk.eq.0) Write(Iout,1027) 
+      else
         IRhag6(0)=N6Ring
-        go to 112
-       endif
-      do I=13,12+N6Ring
-      IRcount=0
-      do J=1,IRing6
-       If(NRingE(J).eq.I.or.NRingF(J).eq.I) then
-        IRcount=IRcount+1
-       endif
-      enddo
-      IRhag6(IRcount)=IRhag6(IRcount)+1
-      enddo
-C     Hexagon Neighbor Index
-      ih0=0
-      ih1=0
-      ih2=0
-       Do I=0,6
-        ih0=ih0+IRhag6(I)
-        ih1=ih1+I*IRhag6(I)
-        ih2=ih2+I*I*IRhag6(I)
-       enddo
-C     Strain Parameter
-      sigmah=HexInd(IRhag6,ihk)
-      Write(Iout,1024) ih0,ih1,ih2 
-      if(ihk.eq.0) Write(Iout,1027) 
-  112 Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
+      endif
+      Write(Iout,1020) (IRhag6(I),I=0,6),sigmah
       Ifus6=0
       Do I=3,6
-      IFus6=IFus6+IRhag6(I)
+        IFus6=IFus6+IRhag6(I)
       enddo
       IFus6G=IFus6*2+20
       If(IFus6G.eq.number_vertices) then
-       Write(Iout,1018) IFus6G
+        Write(Iout,1018) IFus6G
       else
-       Write(Iout,1019) IFus6G
+        Write(Iout,1019) IFus6G
       endif
       If(IRing5.eq.0) then
-       IPR=1
-       Write(Iout,1022) 
+        IPR=1
+        Write(Iout,1022) 
       else
-       Write(Iout,1023)
+        Write(Iout,1023)
       endif
 
  1013 Format(1X,'Rhagavachari-Fowler-Manolopoulos neighboring '
@@ -950,7 +1049,7 @@ C     Strain Parameter
  1022 Format(1X,'--> Fullerene is IPR')
  1023 Format(1X,'--> Fullerene is not IPR')
  1024 Format(1X,'nth moment hexagon signatures from neighboring ',
-     1 'hexagon indices: H0 = ',I5,', H1 = ',I5,', H2 = ',I5)
+     1 'hexagon indices: H0 = ',I6,', H1 = ',I6,', H2 = ',I6)
  1027 Format(1X,'sum hk is zero -> sigmah set to zero')
       Return
       END
@@ -1041,16 +1140,15 @@ C     Print center of edges
       Return
       END
 
-      SUBROUTINE RingCoord(Iout,dualdist,R6,Rmin5,Rmin6,
-     1 Dist,N5,N6,N5M,N6M)
+      SUBROUTINE RingCoord(Iout,dualdist,R6,
+     1 SmallRingDist,Dist,N5,N6,N5M,N6M)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION Dist(3,Nmax),N5M(Mmax,5),N6M(Mmax,6)
 C     Print center of rings
       factor=1.d0
       if(dualdist.ne.R6) then
-       Rmin=Dmin1(Rmin5,Rmin6)
-       factor=dualdist/Rmin
+       factor=dualdist/SmallRingDist
        Write(Iout,1002) factor,dualdist
       endif
       Write(Iout,1000)
@@ -1091,14 +1189,16 @@ C     Print center of rings
      1 /1X,49('-')) 
  1001 Format(1X,2I5,3(1X,F12.8))
  1002 Format(1X,'Coordinates multiplied by ',F12.8,
-     1 ' to reach distance of ',F12.8)
+     1 ' to reach distance n dual of ',F12.8)
       Return
       END
 
       SUBROUTINE Alcami(Iout,Medges,IC3,IVR3)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      Dimension IC3(Nmax,3),IVR3(Nmax,3),nring(4),npattern(9),eps(9)
+      integer IC3(Nmax,3),IVR3(number_vertices+4,3)
+      integer nring(4),npattern(9)
+      real*8 eps(9)
 C     Finds different ring patterns of 4 rings connected
 C     see M.Alcami, G.Sanchez, S.Diaz-Tendero, Y.Wang, F.Martin, 
 C      J. Nanosci. Nanotech. 7, 1329 (2007)
@@ -2705,8 +2805,7 @@ C     Sort array n555f
       Return
       END
  
-      SUBROUTINE Ring56(IR56,N5R,N6R,NrA,NrB,Nring,
-     1 N5MEM,N6MEM)
+      SUBROUTINE Ring56(IR56,N5R,N6R,NrA,NrB,Nring,N5MEM,N6MEM)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Nring(Mmax)
@@ -2771,8 +2870,7 @@ C     (5-6) 2-ring fusions
       Return
       END
  
-      SUBROUTINE Ring55(IR5,N5R,NrA,NrB,Nring,
-     1 N5MEM,IedA,IedB)
+      SUBROUTINE Ring55(IR5,N5R,NrA,NrB,Nring,N5MEM,IedA,IedB)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION N5MEM(Mmax,5),Nring(Mmax)
@@ -2842,8 +2940,7 @@ C     (5-5) 2-ring fusions
       Return
       END
  
-      SUBROUTINE Ring66(IR6,N5R,N6R,NrA,NrB,
-     1 Nring,N6MEM)
+      SUBROUTINE Ring66(IR6,N5R,N6R,NrA,NrB,Nring,N6MEM)
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION N6MEM(Mmax,6),Nring(Mmax)
@@ -3164,90 +3261,95 @@ C     Filling in Tree structure at level Istep
 C     Get the connectivities between 2 and 3 atoms
       IMPLICIT REAL*8 (A-H,O-Z)
       DIMENSION DistMat(NmaxL)
-      DIMENSION Icon2(3*Nmax),IDA(Nmax,Nmax)
-      DIMENSION NCI(12),NCJ(12)
+      integer Icon2(3*number_vertices/2+1)
+      integer IDA(Nmax,Nmax)
+      integer NCI(12),NCJ(12)
       DIMENSION IC3(Nmax,3)
       Rtol=Rmin*(1.d0+Tol)
       Mcon2=0
-      Do I=1,Nmax
-      Do J=1,3
-       IC3(I,J)=0
+c '+1' because num2 relies on finding a '0' after the end of the array.  wtf.
+      Do I=1,3*number_vertices/2+1
+        Icon2(I)=0
       enddo
+      Do I=1,Nmax
+        Do J=1,3
+          IC3(I,J)=0
+        enddo
       enddo
       if(Ipent.eq.0) then
-       Do I=1,number_vertices
-       Do J=I+1,number_vertices
-        DM=FunDistMat(I,J,DistMat)
-         If (DM.lt.Rtol) then
-          Mcon2=Mcon2+1
-          Ncount=I*number_vertices+J
-          Icon2(Mcon2)=Ncount
-         endif
-       enddo
-       enddo
+        Do I=1,number_vertices
+          Do J=I+1,number_vertices
+            DM=FunDistMat(I,J,DistMat)
+            If (DM.lt.Rtol) then
+              Mcon2=Mcon2+1
+              Ncount=I*number_vertices+J
+              Icon2(Mcon2)=Ncount
+            endif
+          enddo
+        enddo
       else
-       Do I=1,number_vertices
-       Do J=I+1,number_vertices
-        If (IDA(I,J).eq.1) then
-         Mcon2=Mcon2+1
-         Ncount=I*number_vertices+J
-         Icon2(Mcon2)=Ncount
-        endif
-       enddo
-       enddo
+        Do I=1,number_vertices
+          Do J=I+1,number_vertices
+            If (IDA(I,J).eq.1) then
+              Mcon2=Mcon2+1
+              Ncount=I*number_vertices+J
+              Icon2(Mcon2)=Ncount
+            endif
+          enddo
+        enddo
       endif
       Write(IOUT,1000) Mcon2
       If(Mcon2.lt.number_vertices) then
-      Write(IOUT,1004)
-      Stop
+        Write(IOUT,1004)
+        Stop
       endif
       Do I=1,Mcon2,12
-      Do J=1,12
-       NCI(J)=0
-       NCJ(J)=0
-      enddo
-      M12=12
-      Do J=1,12
-       IArray=I+J-1
-        CALL Num2(Icon2(IArray),NCI(J),NCJ(J))
-        If(NCI(J).Eq.0) then
-        M12=J-1
-        Go to 11
-       endif
-      enddo
-   11 if(number_vertices.lt.100)
-     1  Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
-      if(number_vertices.ge.100.and.number_vertices.lt.1000) 
-     1  Write(IOUT,1006) (NCI(J),NCJ(J),J=1,M12)
-      if(number_vertices.ge.1000.and.number_vertices.lt.10000) 
-     1  Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
-      if(number_vertices.ge.10000) 
-     1  Write(IOUT,1008) (NCI(J),NCJ(J),J=1,M12)
+        Do J=1,12
+          NCI(J)=0
+          NCJ(J)=0
+        enddo
+        M12=12
+        Do J=1,12
+          IArray=I+J-1
+          CALL Num2(Icon2(IArray),NCI(J),NCJ(J))
+          If(NCI(J).Eq.0) then
+            M12=J-1
+            Go to 11
+          endif
+        enddo
+   11   if(number_vertices.lt.100)
+     1    Write(IOUT,1001) (NCI(J),NCJ(J),J=1,M12)
+        if(number_vertices.ge.100.and.number_vertices.lt.1000) 
+     1    Write(IOUT,1006) (NCI(J),NCJ(J),J=1,M12)
+        if(number_vertices.ge.1000.and.number_vertices.lt.10000) 
+     1    Write(IOUT,1007) (NCI(J),NCJ(J),J=1,M12)
+        if(number_vertices.ge.10000) 
+     1    Write(IOUT,1008) (NCI(J),NCJ(J),J=1,M12)
       enddo
       Write(IOUT,1002)
 C     Get all vertices
       Do I=1,number_vertices
-      IZ=0
-      Do J=1,MCon2
-      CALL Num2(Icon2(J),IX,IY)
-      IF(IX.EQ.I) then
-      IZ=IZ+1
-      IC3(I,IZ)=IY
-      endif
-      IF(IY.EQ.I) then
-      IZ=IZ+1
-      IC3(I,IZ)=IX
-      endif
-      IF(IZ.EQ.3) Go to 10
-      enddo
-   10 Continue
-      Write(IOUT,1003) I,(IC3(I,J),J=1,3)
+        IZ=0
+        Do J=1,MCon2
+          CALL Num2(Icon2(J),IX,IY)
+          IF(IX.EQ.I) then
+            IZ=IZ+1
+            IC3(I,IZ)=IY
+          endif
+          IF(IY.EQ.I) then
+            IZ=IZ+1
+            IC3(I,IZ)=IX
+          endif
+          IF(IZ.EQ.3) Go to 10
+        enddo
+   10   Continue
+        Write(IOUT,1003) I,(IC3(I,J),J=1,3)
       enddo
 C     Check if structure is alright at this point
       nexpedge=number_vertices*3/2
       if(Mcon2.ne.nexpedge) then
-      Write(IOUT,1005) Mcon2,nexpedge
-      stop
+        Write(IOUT,1005) Mcon2,nexpedge
+        stop
       endif
  1000 Format(/1X,' Number of connected surface atoms (edges, bonds): ',
      1 I5,/1X,' Connectivities (edge set):')

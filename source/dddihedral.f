@@ -285,7 +285,7 @@ c abc1_z=abc_z*abc_length_inv
       dabc1_z__dabc_length_inv=abc_z
 
 
-c derivation of the components of the normals
+c derivative of the components of the normals
 c abc1_x=abc_x*abc_length_inv
 c abc1_y=abc_y*abc_length_inv
 c abc1_z=abc_z*abc_length_inv
@@ -515,7 +515,7 @@ c aux_z=abc1_x*bc1_y-bc1_x*abc1_y
      4 + daux_z__dbc1_x*dbc1_x__dcz + daux_z__dabc1_y*dabc1_y__dcz
 
 
-c derivation of y
+c derivative of y
 c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
       dy__dax=
      2 bcd1_x*daux_x__dax + 
@@ -567,7 +567,7 @@ c y=aux_x*bcd1_x + aux_y*bcd1_y + aux_z*bcd1_z
      4 aux_z*dbcd1_z__ddz
 
 
-c derivation of x
+c derivative of x
 c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
       dx__dax=
      2 bcd1_x*dabc1_x__dax + 
@@ -619,7 +619,7 @@ c x=abc1_x*bcd1_x + abc1_y*bcd1_y + abc1_z*bcd1_z
      4 abc1_z*dbcd1_z__ddz
 
 
-c derivation atan2(y,x) according to x and y
+c derivative of atan2(y,x) according to x and y
       df__dx=-y/(x**2 + y**2)
       df__dy=x/(x**2 + y**2)
 
@@ -6060,7 +6060,7 @@ c df__dax=df__dx*dx__dax + df__dy*dy__dax
      1 + ddf11dax__ddx11dax*ddx11dax__dcz
      1 + ddf11dax__ddf11dy*ddf11dy__dcz
      1 + ddf11dax__ddy11dax*ddy11dax__dcz
-c the 9 derivations with respect to a{xyz} and d{xyz} are 0
+c the 9 derivatives with respect to a{xyz} and d{xyz} are 0
       ddf11dax__ddx=0
 c     1   ddf11dax__ddf11dx*ddf11dx__ddx
 c     1 + ddf11dax__ddx11dax*ddx11dax__ddx

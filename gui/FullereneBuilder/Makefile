@@ -1,4 +1,4 @@
-SWIG=swig2 -w365,366,367,368,124,362,503 
+SWIG=swig -w365,366,367,368,124,362,503 
 # -debug-template
 # -debug-tmsearch
 # -debug-top 1,2,3,4

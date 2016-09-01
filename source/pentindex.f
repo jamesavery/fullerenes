@@ -1,4 +1,4 @@
-      SUBROUTINE CoordBuild(IN,Iout,IDA,D,ICart,
+      SUBROUTINE CoordBuild(IN,Iout,itop,IDA,D,ICart,
      1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,nohueckel,iprev,
      1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
      1 rspi,jumps,GROUP,filename)
@@ -160,15 +160,18 @@ C Start Goldberg-Coxeter
           Go to 99
         endif
         g = new_C20();
+        if(itGC.le.1) then
+          Write(iout,1045) itGC
+          stop
+        endif
         halma = halma_fullerene(g,kGC-1)
         isafullerene = graph_is_a_fullerene(halma)
-        ihalma=1
-        IF (isafullerene .eq. 1) then
-          write (iout,1043) 
-        else
+        if (isafullerene .ne. 1) then
           write (iout,1044)
           stop
         endif
+        write (iout,1043) 
+        ihalma=1
 C       Update fortran structures
         number_vertices  = NVertices(halma)
         Medges = NEdges(halma)
@@ -248,6 +251,7 @@ C       Sort eigenvalues evec(i) and eigenvectors A(*,i)
 C       Analyze eigenenergies
         Call HueckelAnalyze(Iout,iocc,df,evec)
       endif ! hueckel
+       if(itop.eq.1) return
 
 
 c      if(ke + isw + iyf + ibf .eq. 0) then
@@ -288,9 +292,10 @@ c      endif
      1 ', Point group of fullerene (in ideal symmetry): ',A3,/1X,
      1 'Ring spiral pentagon positions: ',12I6)
  1021 Format(12(1X,I5))
- 1022 Format(1X,'Input spiral is canonical')
- 1023 Format(1X,'Canonical spiral list of pentagon positions:')
- 1024 Format(1X,'Canonical spiral list of hexagons and pentagons:')
+ 1022 Format(1X,'Input spiral may not be canonical, use spiral-search',
+     1 ' program to obtain canonical spiral')
+ 1023 Format(1X,'Spiral list of pentagon positions:')
+ 1024 Format(1X,'Spiral list of hexagons and pentagons:')
  1025 Format(1X,100I1)
  1037 FORMAT(1X,'Graph is not cubic, ',I5,' vertices detected which ',
      1 'are not of degree 3, last one is of degree ',I5)
@@ -302,6 +307,8 @@ c      endif
      1 I5,')')
  1043 Format(1x,'Halma fullerene is a fullerene')
  1044 Format(1x,'Halma fullerene is not a fullerene')
+ 1045 Format(1x,'No Halma transformation performed as t(k,l)= ',I8,
+     1 ' Program stops here')
       Return 
       END
 

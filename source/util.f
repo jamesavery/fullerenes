@@ -1,3 +1,22 @@
+       Subroutine CubeConnect(Iout,IDA,IC3)
+       use config
+       Dimension IDA(Nmax,Nmax),IC3(Nmax,3)
+C      Transform adjacency matric into connectivity vector
+       Write(Iout,100)
+       do I=1,number_vertices
+       k=0
+       do J=1,number_vertices
+        if(I.ne.J.and.IDA(I,J).eq.1) then
+         k=k+1
+         if(k.eq.4) Exit
+         IC3(I,K)=J
+        endif
+       enddo
+       enddo
+ 100   Format(1X,'Convert adjacency matrix into connectivity vector')
+       RETURN
+       END
+
 c      SUBROUTINE PerfectMatching(Iout,IDA)
 c      use config
 c      IMPLICIT REAL*8 (A-H,O-Z)
@@ -506,11 +525,13 @@ C     Now sort values of diamw, output diam
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
       Integer MDist(Nmax,Nmax),Edges(2,3*number_vertices/2),wienerp
-      integer pent_dist_mtx(144), face_dist_mtx(number_vertices**2)
+      integer pent_dist_mtx(144)
+      integer face_dist_mtx((number_vertices/2+2)**2)
       DIMENSION IDA(Nmax,Nmax),wi(Nmax)
       REAL*8 layout2d(2,Nmax)
       Integer*8 perfmatch, perfect_match_count
       type(c_ptr) :: graph, new_fullerene_graph
+      integer layout_is_spherical
 C     This routine calculates the Wiener index, Hyperwiener index,
 C     minimal and maximal vertex contribution, rho and rhoE,
 C     Schultz index and Balaban index
@@ -521,7 +542,9 @@ C     Chem. Phys. Lett. 501, 442–445 (2011).
 
       graph = new_fullerene_graph(Nmax,number_vertices,IDA)
       call tutte_layout(graph, layout2d)
-      call set_layout2d(graph, layout2d)
+c not spherical because of tutte
+      layout_is_spherical = 0
+      call set_layout2d(graph, layout2d, layout_is_spherical)
 c     topological distances between all pairs of vertices
       call all_pairs_shortest_path(graph,number_vertices,Nmax,MDist)
       call edge_list(graph,edges,NE)
@@ -696,22 +719,22 @@ C1004 Format(' Ori constant for Wiener index: ',D15.9)
       RETURN
       END
 
-      SUBROUTINE PentIcoMetric(pent)
+C     SUBROUTINE PentIcoMetric(pent)
 C     Get Metric for icoshedron formed by pentagons
-      integer pent(12,12),nsort(2,12)
+C     integer pent(12,12),nsort(2,12)
 C     Find distance for icosahedron
-      do I=1,12
-        Call pentsort(I,pent,nsort)
-        do J=1,12
-        enddo
-      enddo
-      RETURN
-      END
+C     do I=1,12
+C       Call pentsort(I,pent,nsort)
+C       do J=1,12
+C       enddo
+C     enddo
+C     RETURN
+C     END
 
-      SUBROUTINE pentsort(I,pent,nsort)
-      integer pent(12,12),nsort(2,12)
-      RETURN
-      END
+C     SUBROUTINE pentsort(I,pent,nsort)
+C     integer pent(12,12),nsort(2,12)
+C     RETURN
+C     END
 
       SUBROUTINE Szeged(Edges,mdist,Sz)
       use config
@@ -784,11 +807,11 @@ C       endif
        Write(Iout,1003)
       endif
  1000 Format(/1X,'For this vertex number we can have 1 ',
-     1 ' icoshedral fullerene of Ih-symmetry')
+     1 ' icosahedral fullerene of Ih-symmetry')
  1001 Format(/1X,'For this vertex number we can have 1 ',
-     1 ' icoshedral fullerene of I-symmetry')
+     1 ' icosahedral fullerene of I-symmetry')
  1002 Format(/1X,'For this vertex number we can have ',I3,
-     1 ' icoshedral fullerenes. Out of this ',I3,' are of',
+     1 ' icosahedral fullerenes. Out of this ',I3,' are of',
      1 ' Ih-symmetry and ',I3,' of I-symmetry')
  1003 Format(/1X,'There are no icosahedral fullerenes for ',
      1 'this vertex number')
@@ -855,15 +878,16 @@ C     Sort the N integer numbers, input IS, Output JS
       SUBROUTINE Num2(IArray,I,J)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
+c I and J may be uninitialised
       I=IArray/number_vertices
       J=IArray-I*number_vertices
       If(J.eq.0) then
-      J=number_vertices
-      I=I-1
+        J=number_vertices
+        I=I-1
       endif
       If(I.eq.-1) then
-      I=0
-      J=0
+        I=0
+        J=0
       endif
       RETURN
       END

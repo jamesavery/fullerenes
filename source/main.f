@@ -11,7 +11,7 @@
 !      The results can be used for plotting 2D/3D fullerene graphs          !
 !    (e.g. Schlegel diagrams) and structures, and as a starting point       !
 !            for further quantum theoretical treatment.                     !
-!        Version 4.4 now incorporates C++ routines linked to the            !
+!        Version 4.5 incorporates C++ routines linked to the                !
 !       original Fortran program using much improved algorithms.            !
 !---------------------------------------------------------------------------!
 
@@ -33,7 +33,8 @@ C    Set the dimensions for the distance matrix
       DIMENSION A(Nmax,Nmax),evec(Nmax),df(Nmax)
       DIMENSION N5MEM(Mmax,5),N6MEM(Mmax,6),Iring(Mmax)
       DIMENSION distP(Nmax),IDA(Nmax,Nmax)
-      DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax),IVR3(Nmax,3)
+      DIMENSION IATOM(Nmax),IC3(Nmax,3),Nring(Mmax)
+      integer IVR3(nmax+4,3) ! in ring.f up to four values to many are read
       DIMENSION NringA(Emax),NringB(Emax)
       DIMENSION NringC(Emax),NringD(Emax)
       DIMENSION NringE(Emax),NringF(Emax)
@@ -43,10 +44,12 @@ C    Set the dimensions for the distance matrix
       CHARACTER CDAT*8,CTIM*10,Zone*5
       CHARACTER*1 Symbol
       CHARACTER*2 El(99)
+      CHARACTER*5 xtext
       CHARACTER*7 Namecc1,Namexyz,Namemol
+      CHARACTER*8 fmt
       CHARACTER*4 Endcc1,Endxyz,Endmol
       CHARACTER*15 routine
-      CHARACTER*50 filename,filenameout
+      CHARACTER*50 filename,filenameout,extname
       CHARACTER*50 xyzname,cc1name,molname
       Character*1 TEXTINPUT(nzeile)
       CHARACTER*3 GROUP
@@ -75,9 +78,6 @@ C External file names
       Endcc1='.cc1'
       Endxyz='.xyz'
       Endmol='.mol'
-      nxyz=0
-      ncc1=0
-      nmol=0
 
 C Input / Output
       IN=5
@@ -85,6 +85,9 @@ C Input / Output
       Iext=7
 
 C Set parameters to zero
+      nxyz=0
+      ncc1=0
+      nmol=0
       nloop=0
       ilp=0
       iprev=0
@@ -97,6 +100,14 @@ C Set parameters to zero
           IDA(I,J)=0
         enddo
       enddo
+      Do I=1,Emax
+       NRingA(I)=0
+       NRingB(I)=0
+       NRingC(I)=0
+       NRingD(I)=0
+       NRingE(I)=0
+       NRingF(I)=0
+      enddo
       Do I=1,Nmax
        Dist(1,I)=0.d0
        Dist(2,I)=0.d0
@@ -107,11 +118,13 @@ C Set parameters to zero
 
 C------------------TIME-AND-DATE-----------------------------------
 C Get time and date
+C You may have to change this part for different compiler
       CALL date_and_time(CDAT,CTIM,zone,values)
       TIMEX=0.d0
       CALL Timer(TIMEX)
       WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
      1  Values(6),Values(7),Nmax
+
 
 C------------------------------------------------------------------
 C  S T A R T   O F   I N P U T   S E C T I O N
@@ -129,21 +142,21 @@ C  Next two flags tells us if input has information on Cartesian Coordinates
 C   or Adjacency Matrix (through connectivity IC3)
       ncartflag=0
       nadjacencyflag=0
-C  Call Datain
+C  Call Datain (main input routine)
       CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
      1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,iPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinthessian,ndbconvert,ihamstore,ihamstats,nhamcyc,
-     1 isomerl,isomerh,ngaudiene,
+     1 isomerl,isomerh,ngaudiene,imcs,itop,
      1 ParamS,TolX,R5,R6,Rdist,rvdwc,scales,scalePPG,
      1 ftolP,scaleRad,rspi,jumps,force,forceP,boost,
      1 dualdist,filename,filenameout,TEXTINPUT)
-
-C  Simple checks
        Rmin5=R5
        Rmin6=R6
+
+C  Simple checks
 C  Stop if error in input
       If(IER.ne.0) go to 99
 C  Stop if isomer closest to icosahedral is searched for
@@ -234,6 +247,24 @@ C Read cartesian coordinates directly
         Read(IN,*,end=21) IAtom(J),(Dist(I,J),I=1,3)
        enddo
        ncartflag=1
+       if(imcs.ne.0) then
+        WRITE(Iout,1002)
+        CALL MoveCM(Iout,Iprint,IAtom,mirror,isort,
+     1   nosort,SP,Dist,DistCM,El)
+        CALL Diameter(Iout,Dist,distp)
+        Rmin=1.d15
+        Do I=1,number_vertices
+        Do J=I+1,number_vertices
+         X=Dist(1,I)-Dist(1,J)
+         Y=Dist(2,I)-Dist(2,J)
+         Z=Dist(3,I)-Dist(3,J)
+         R2=X*X+Y*Y+Z*Z
+         R=dsqrt(R2)
+         if(R.lt.Rmin) Rmin=R
+        enddo
+        enddo
+        go to 97
+       endif
        Go to 40
    21  WRITE(Iout,1013)
        Go to 99
@@ -241,7 +272,7 @@ C Read cartesian coordinates directly
    30 Ipent=1
       routine='COORDBUILD     '
       Write(Iout,1008) routine
-      CALL CoordBuild(IN,Iout,IDA,IDual,
+      CALL CoordBuild(IN,Iout,itop,IDA,IDual,
      1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,
      1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
      1 rspi,jumps,GROUP,filename)
@@ -269,6 +300,10 @@ C intensive
       CALL Isomers(IPR,isearch,In,Iout,iprintham,ihamstats,
      1 isomerl,isomerh,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
+      if(itop.eq.1) then
+       Call IDAIC3(IDA,IC3)
+       go to 777
+      endif
 
 C------------------MOVECM------------------------------------------
 C Move carbon cage to Atomic Center
@@ -326,7 +361,7 @@ C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
         routine='GOLDBERGCOXETER'
         Write(Iout,1008) routine
-        CALL GoldbergCoxeter(Iout,leap,leapGC,IGC1,IGC2,
+        CALL GoldbergCoxeter(Iout,leap,leapGC,IGC1,IGC2,itop,
      1   nohueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
      1   scaleRad)
         leap=0
@@ -334,7 +369,23 @@ C Produce the nth leapfrog of the fullerene
         ipent=1
         leapspiral=1
         if(number_vertices.gt.100) IHam=0
-        if(LeapErr.eq.0) go to 999 ! moveCM
+C   Write out IC3 on external file
+        if(LeapErr.ne.0) go to 9999   ! Stop 
+        if(itop.eq.2) then
+         Call CubeConnect(Iout,IDA,IC3)
+         iext=1
+         fmt = '(I5.5)'
+         Write(xtext,fmt) number_vertices
+         extname='ic3file'//'.'//trim(xtext)
+         Print*,' Write external file to extname ',extname
+         Open(unit=Iext,file=extname,form='formatted')
+         Write(iext,*) number_vertices
+         Do I=1,number_vertices
+          Write(iext,*) I,(IC3(I,J),J=1,3)
+         enddo
+         Close(unit=Iext)
+         Go to 888
+        endif
       endif
 
 C------------------HAMILTON---------------------------------------
@@ -344,7 +395,7 @@ C is called only if IPR>0 as computer time is extensive beyond
 C C100 (PN-hard problem). Last routine uses the adjaceny matrix
 C to calculate the number of all distinct paths between 
 C adjacent vertices
-      routine='HAMILTON       '
+ 777  routine='HAMILTON       '
       Write(Iout,1008) routine
       maxiter=maxit
       if(IHam.gt.1.and.IHam.le.9) then
@@ -352,7 +403,7 @@ C adjacent vertices
       endif
       if(IHam.ne.0 .and. 
      1    ke.eq.0 .and. isw.eq.0 .and. iyf.eq.0 .and. ibf.eq.0) then
-        if(iupac.ne.0) then
+        if(iupac.ne.0.or.iprintf.ne.0) then
           CALL Hamilton(Iout,iprintf,ihamstore,maxiter,IC3,filename)
           Close(unit=8)
         else
@@ -367,8 +418,14 @@ C------------------RING-------------------------------------------
 C Establish all closed ring systems
       routine='RING           '
       Write(Iout,1008) routine
-      CALL Ring(Medges,MCon2,Iout,N5Ring,N6Ring,
+      CALL Ring(Medges,MCon2,Iout,itop,N5Ring,N6Ring,
      1 IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
+C     Check if only topological analysis is needed 
+      if(itop.eq.1) then
+       call ringanalyze(Iout,Iring5,Iring6,N5MEM,N6MEM,Iring56,
+     1  NringA,NringB,NringC,NringD,NringE,NringF,N5Ring,N6Ring)
+       go to 889
+      endif
 
 C------------------RINGC------------------------------------------
 C Analyze ring connections
@@ -378,11 +435,11 @@ C Analyze ring connections
      1 N5Ring,N6Ring,NRing,Iring5,Iring6,Iring56,
      1 n565,numberSW,numberFM,numberYF,numberBF,
      1 N5MEM,N6MEM,NringA,NringB,NringC,NringD,NringE,NringF,
-     1 IC3,IVR3,nEK,nSW,nFM,nYF,nBF,DIST,CRing5,CRing6)
+     1 IC3,IVR3,nEK,nSW,nFM,nYF,nBF,SmallRingDist,DIST,CRing5,CRing6)
 C     Print edge coordinates (barycenter)
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
       if(iprintf.ne.0) Call RingCoord(Iout,dualdist,R6,
-     1 Rmin5,Rmin6,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
+     1 SmallRingDist,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
 
 C------------------STONE-WALES------------------------------------
 C Perform Stone-Wales transformation
@@ -448,7 +505,7 @@ C Perform Brinkmann-Fowler 6-vertex 6-55-55 insertion
 
 C------------------SPIRALSEARCH-----------------------------------
 C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
-      if((ipent.eq.0 .or. leapspiral.ne.0.or.SWspiral.ne.0.
+ 889  if((ipent.eq.0 .or. leapspiral.ne.0.or.SWspiral.ne.0.
      1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).or.
      1   ispsearch.ne.0) then
         routine='SPIRALSEARCH   '
@@ -460,14 +517,15 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       endif
 
 C--------------TOPOLOGICAL INDICATORS-----------------------------
-        routine='TOPOLOINDICATOR'
-        Write(Iout,1008) routine
+      routine='TOPOLOINDICATOR'
+ 888  Write(Iout,1008) routine
 C Topological Indicators
       CALL TopIndicators(Iout,iPMC,IDA,mdist)
 C Check if vertex number allows for icosahedral fullerenes
       Call IcoFullDetect(Iout)
 C Determine if fullerene is chiral
       CALL Chiral(Iout,GROUP)
+      if(itop.ne.0) go to 99
 C------------------------------------------------------------------
 C  E N D   O F   T O P O L O G Y   S E C T I O N
 C------------------------------------------------------------------
@@ -534,12 +592,13 @@ c       Compare structures
         Write(Iout,1008) routine
 c  call ring again, this needs some reprogramming as ring duplicates some
 c  stuff previously done, but is ok for now, as it takes not much time
-        CALL Ring(Medges,MCon2,Iout,N5Ring,N6Ring,
+        itop=0
+        CALL Ring(Medges,MCon2,Iout,itop,N5Ring,N6Ring,
      1   IC3,IVR3,N5MEM,N6MEM,Rmin5,Rmin6,Rmax5,Rmax6,DistMat)
       endif
       if(iprintf.ne.0) Call EdgeCoord(Iout,DIST,IC3)
       if(iprintf.ne.0.or.dualdist.ne.R6) Call RingCoord(Iout,
-     1 dualdist,R6,Rmin5,Rmin6,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
+     1 dualdist,R6,SmallRingDist,DIST,N5Ring,N6Ring,N5MEM,N6MEM)
       if(iprintf.ne.0.or.ngaudiene.ne.0) Call Gaudiene(Iout,IC3,DIST)
 
 C------------------XYZ-and-CC1-FILES------------------------------
@@ -577,18 +636,20 @@ C .mol2 format
       
 C------------------VOLUME-----------------------------------------
 C Calculate the volume
-      if(novolume.eq.0) then
-      routine='VOLUME         '
-      Write(Iout,1008) routine
-      CALL Volume(Iout,N5MEM,N6MEM,
-     1 IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
-     2 Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)!,filename)
+  97  if(novolume.eq.0) then
+      if(imcs.eq.0) then
+       routine='VOLUME         '
+       Write(Iout,1008) routine
+       CALL Volume(Iout,N5MEM,N6MEM,
+     1  IDA,N5Ring,N6Ring,DIST,CRing5,CRing6,VolSphere,ASphere,
+     2  Atol,VTol,Rmin5,Rmin6,Rmax5,Rmax6)!,filename)
+      endif
 
 C------------------MINCOVSPHERE-----------------------------------
 C Calculate the minimum covering sphere and volumes
       routine='MINCOVSPHERE2  '
       Write(Iout,1008) routine
-      CALL MinCovSphere2(Iout,SP,Dist,Rmin,Rmax,
+      CALL MinCovSphere2(Iout,imcs,SP,Dist,Rmin,Rmax,
      1 VolSphere,ASphere,Atol,VTol,distP,cmcs,rmcs,RVdWC)
 
 C------------------MINDISTSPHERE----------------------------------
@@ -601,7 +662,8 @@ C------------------MAXINSPHERE------------------------------------
 C Calculate the maximum inner sphere
       routine='MAXINSPHERE    '
       Write(Iout,1008) routine
-      CALL MaxInSphere(Iout,Dist,cmcs,RVdWC)
+      CALL MaxInSphere(Iout,imcs,Dist,cmcs,RVdWC)
+      if(imcs.ne.0) go to 99 
 
 C------------------PROJECTSPHERE----------------------------------
 C Projecting vertices on minimum covering sphere
@@ -624,22 +686,22 @@ C Calculate Schlegel diagram
         routine='GRAPH2D        '
         Write(Iout,1008) routine
         if(number_vertices.lt.10000) then
-        anglew=45.d0
-        if(ISchlegel.eq.2) then
-          if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
-            ParamS=anglew
-            WRITE(Iout,1006) ParamS
+          anglew=45.d0
+          if(ISchlegel.eq.2) then
+            if(ParamS.le.1.d0.or.ParamS.gt.8.9d1) then
+              ParamS=anglew
+              WRITE(Iout,1006) ParamS
+            endif
+          else
+            ParamS=dabs(ParamS)
           endif
-        else
-          ParamS=dabs(ParamS)
-        endif
-        CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,NRing,
+          CALL Graph2D(Iout,IS1,IS2,IS3,N5MEM,N6MEM,N5Ring,N6Ring,NRing,
      1   Iring,Ischlegel,ifs,ndual,labelvert,IC3,IDA,mdist,nhamcyc,Dist,
      1   ParamS,Rmin,TolX,scales,scalePPG,boost,CR,CRing5,CRing6,
      1   Symbol,filename)
-      else
-        Write(Iout,1007) number_vertices
-      endif
+        else
+          Write(Iout,1007) number_vertices
+        endif
       endif
 C------------------END--------------------------------------------
 C  E N D   O F   P R O G R A M
@@ -662,6 +724,7 @@ C-----------------------------------------------------------------
       WRITE(Iout,1009) TIMEX,Hours
 
 C Formats 
+C VERSION_NUMBER is set in the Makefile
  1000 FORMAT(
      1  1X,' ________________________________________________________ ',
      1 /1X,'|                                                        |',
@@ -674,7 +737,7 @@ C Formats
      1 /1X,'|    Massey University,  Auckland,  New Zealand          |',
      1 /1X,'|    First version: 1.0                from 08/06/10     |',
      1 /1X,'|    This  version: ',VERSION_NUMBER,
-     1                            ', last revision from 28/03/13     |',
+     1                            ', last revision from 03/09/15     |',
      1 /1X,'|________________________________________________________|',
      1 //1X,'Date: ',I2,'/',I2,'/',I4,10X,'Time: ',I2,'h',I2,'m',I2,'s',
      1 /1X,'Limited to ',I6,' Atoms',
@@ -692,6 +755,7 @@ C Formats
      1 'concerning this program')
  1001 FORMAT(/1X,'Number of Atoms: ',I4,', and distance tolerance: ',
      1 F12.2,'%')
+ 1002 FORMAT(/1X,'Perform only minimum covering sphere calculations')
  1003 FORMAT(1X,'Pre-optimization using the Wu force field with ',
      1 'input parameter')
  1004 FORMAT(140(1H-),/1X,'DATE: ',I2,'/',I2,'/',I4,10X,

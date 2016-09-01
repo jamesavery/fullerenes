@@ -93,7 +93,7 @@ C  This subroutine optimizes the fullerene graph using spring embedding
       Real*8 pcom(NMAX*2),xicom(NMAX*2)
       Integer AH(NMAX,NMAX),IS(6),MDist(NMAX,NMAX)
 C     Given a starting point p that is a vector of length n, Fletcher-Reeves-Polak-Ribiere minimization
-C     is performed on a function func3d, using its gradient as calculated by a routine dfunc3d.
+C     is performed on a function func2d, using its gradient as calculated by a routine dfunc2d.
 C     The convergence tolerance on the function value is input as ftol. Returned quantities are
 C     p (the location of the minimum), iter (the number of iterations that were performed),
 C     and fret (the minimum value of the function). The routine linmin3d is called to perform
@@ -112,7 +112,7 @@ C     IOP=4: Kamada-Kawai embedding
       CALL func2d(IOP,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
       Write(Iout,1003) E0
-C     dfunc3d input vector p of length 2*number_vertices, output gradient of length 2*number_vertices user defined
+C     dfunc2d input vector p of length 2*number_vertices, output gradient of length 2*number_vertices user defined
       CALL dfunc2d(IOP,AH,IS,MDist,maxd,p,xi,RAA)
       grad2=0.d0
       do I=1,2*number_vertices
@@ -379,7 +379,7 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
       END
 
       SUBROUTINE OptFF(Iout,ihessian,iprinthessian,iopt,IDA,
-     1  Dist,dist2D,ftol,force)
+     1  Dist,layout2d,ftol,force)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -408,8 +408,10 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       integer nd_hhh,nd_hhp,nd_hpp,nd_ppp
 
       graph = new_fullerene_graph(Nmax,number_vertices,IDA)
-      call tutte_layout(graph,Dist2D)
-      call set_layout2d(graph,Dist2D)
+      call tutte_layout(graph,layout2d)
+c not spherical because of tutte
+      layout_is_spherical = 0
+      call set_layout2d(graph, layout2d, layout_is_spherical)
       call get_edges(graph,number_vertices,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
       call get_corners(graph,number_vertices,
@@ -686,7 +688,8 @@ c 1015 Format(' Hessian is symmetric: asym= ',d12.6)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
       PARAMETER (ITMAX=99999,EPS=1.d-9)
-      Real*8 p(NMAX*3),g(NMAX*3),h(NMAX*3),xi(NMAX*3)
+      real*8 p(number_vertices*3),g(number_vertices*3)
+      real*8 h(number_vertices*3),xi(number_vertices*3)
       Real*8 pcom(NMAX*3),xicom(NMAX*3)
       real*8 force(ffmaxdim)
       integer iopt
@@ -708,6 +711,12 @@ C     zero function value.
 C     USES dfunc3d,func3d,linmin3d
 C     func3d input vector p of length n user defined to be optimized
 C     IOPT=1: Wu force field optimization
+
+      do i=1,3*number_vertices
+        g(i) = 0.d0
+        h(i) = 0.d0
+        xi(i) = 0.d0
+      enddo
       iter=0
       CALL func3d(IERR,p,fp,force,iopt,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp,

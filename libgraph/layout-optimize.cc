@@ -35,7 +35,7 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
   vector<double> &k_angle = *params.k_angle;
   vector<double> &k_area = *params.k_area;
 
-  set<edge_t> edge_set = graph.undirected_edges();
+  vector<edge_t> edge_set = graph.undirected_edges();
   const int n_faces = 2 + edge_set.size() - graph.N;
 
   assert(zero_values_dist.size() == edge_set.size());
@@ -49,7 +49,7 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
   //get average edge_length
   double log_sum_edge_length=0;
 
-  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
+  vector<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(; e!=ee; e++){
     //cout << *e << endl;
     const double ax = gsl_vector_get(coordinates, 2 * e->first);
@@ -186,7 +186,7 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
   vector<double> &k_angle = *params.k_angle;
   vector<double> &k_area = *params.k_area;
 
-  set<edge_t> edge_set = graph.undirected_edges();
+  vector<edge_t> edge_set = graph.undirected_edges();
   const int n_faces = 2+edge_set.size() - graph.N;
 
   assert(zero_values_dist.size() == edge_set.size());
@@ -200,7 +200,7 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
   //get average edge_length
 
   double log_sum_edge_length=0;
-  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
+  vector<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(; e!=ee; e++){
     //cout << *e << endl;
     const double ax = gsl_vector_get(coordinates, 2 * e->first);
@@ -376,7 +376,7 @@ bool PlanarGraph::optimize_layout(const double zv_dist_inp, const double k_dist_
   const double tol = 1e-1; // accuracy of line minimization, the manual suggests 0.1
   const int max_iterations = 5000;// FIXME final value
 
-  set<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edge_set = undirected_edges();
   const int n_faces = 2 + edge_set.size() - N;
   
   // init values

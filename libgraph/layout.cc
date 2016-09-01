@@ -34,6 +34,7 @@ vector<coord2d> PlanarGraph::tutte_layout(const face_t& outer_face) const
   unsigned int Nface = outer_face.size();
   vector<coord2d> initial_coords(N);
   for(unsigned int i=0;i<Nface;i++){
+    // the outer face is layed out CW:
     initial_coords[outer_face[i]] = coord2d(sin(i*2*M_PI/double(Nface)),cos(i*2*M_PI/double(Nface)));
   }
 
@@ -76,8 +77,8 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     for(node_t u=0;u<N;u++){
       Afull[u*(N+1)] = 1.0;
       for(int i=0;i<neighbours[u].size();i++){
-	const node_t& v(neighbours[u][i]);
-	Afull[u*N+v] = -1.0L/3.0;
+        const node_t& v(neighbours[u][i]);
+        Afull[u*N+v] = -1.0L/3.0;
       }
     }
     for(int i=0;i<outer_face.size();i++){
@@ -89,11 +90,11 @@ vector<coord2d> PlanarGraph::tutte_layout_direct(const face_t& outer_face, const
     for(node_t u=0;u<N;u++){
       IA[u] = nz;
       for(node_t v=0;v<N;v++)
-	if(Afull[u*N+v]!=0){
-	  A[nz] = Afull[u*N+v];
-	  JA[nz] = v;
-	  nz++;
-	}
+        if(Afull[u*N+v]!=0){
+          A[nz] = Afull[u*N+v];
+          JA[nz] = v;
+          nz++;
+        }
     }
     free(Afull);
   }
@@ -207,7 +208,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
 
   
   bool converged = false;
-  const unsigned int TUTTE_MAX_ITERATION = 1000000;
+  const unsigned int TUTTE_MAX_ITERATION = 10000000;
   const double TUTTE_CONVERGENCE = 5e-4;
   unsigned int i;
   double max_change;
@@ -308,10 +309,10 @@ void Graph::orient_neighbours(const vector<coord2d>& layout)
   for(node_t u=0;u<N;u++){
     vector<node_t>& ns(neighbours[u]);
 
-    sort_ccw_point CW(layout,layout[u]);
-    sort(ns.begin(), ns.end(), CW);
+    sort_ccw_point CCW(layout,layout[u]);
+    sort(ns.begin(), ns.end(), CCW);
+    reverse(ns.begin(),ns.end()); // reverse to get CW
   }
-
 }
 
 coord2d Graph::centre2d(const vector<coord2d>& layout) const {
@@ -325,30 +326,27 @@ coord3d Graph::centre3d(const vector<coord3d>& layout) const {
   for(node_t u=0;u<layout.size();u++) centre += layout[u];
   return centre/double(layout.size());
 }
+
+
 // TODO: 
 // * Move layout to member variable
 // * Check if layout is planar before allowing it (this function crashes if it is not).
-
-
-string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool number_vertices, bool include_latex_header,
+string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool print_numbers, bool include_latex_header,
 			     int edge_colour, int path_colour, int vertex_colour, double edge_width, double path_width,
 			     double vertex_diameter, int Npath, int *path) const
 {
-  cout << "entering to latex" << endl;
-  cout << include_latex_header << endl;
-  cout << edge_colour << ", " << path_colour << ", " << vertex_colour << endl;
-  cout << number_vertices << endl;
-  cout << edge_width << ", " << path_width << endl;
-  cout << vertex_diameter << endl;
-  cout << (edge_colour>>16) << endl;
+  string str;
+  ostringstream s(str);
+  s << std::fixed;
 
+  if(show_dual && !layout_is_crossingfree()) {
+    s << "Get a crossing free layout first.  For example by optimising the layout or using a different algorithm to create it." << endl;
+    cerr << "Get a crossing free layout first.  For example by optimising the layout or using a different algorithm to create it." << endl;
+    return s.str();
+  }
 
-  ostringstream s;
-  s << fixed;
-  cout << "stream opened" << endl;
 // If we're outputting a stand-alone LaTeX file, spit out a reasonable header.
   if(include_latex_header)
-// Problem starts here immediately with next line
     s << "\\documentclass{standalone}\n"
       "\\usepackage{tikz}\n"
       "\\begin{document}\n"
@@ -357,8 +355,8 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       "\\definecolor{pathcolour}{RGB}{"<<(path_colour>>16)<<","<<((path_colour>>8)&0xff)<<","<<(path_colour&0xff)<<"}\n"
       "\\definecolor{dualvertexcolour}{RGB}{205,79,57}\n"
       "\\definecolor{dualedgecolour}{RGB}{0,0,0}\n"
-      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0pt")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
-      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0pt")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
+      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(print_numbers?"1pt":"0pt")<<", fill=vertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
+      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(print_numbers?"1pt":"0pt")<<", fill=dualvertexcolour, minimum width="<<vertex_diameter<<"mm]\n"
       "\\tikzstyle{edge}=[draw,color=edgecolour,line width="<<edge_width<<"mm]\n"
       "\\tikzstyle{pth}=[draw,color=pathcolour,line width="<<path_width<<"mm]\n"
       "\\tikzstyle{dualedge}=[dotted,draw,color=dualedgecolour,line width="<<edge_width<<"mm]\n"
@@ -380,12 +378,12 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << (u+1) << "$}" << ((u+1<N && u_+1<100)
 ? ", ":"}\n\t");
     }
-    s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
+    s << "\\node[vertex] (\\name) at \\place {"<<(print_numbers?"\\lbl":"")<<"};\n";
   }
 
-  set<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edge_set = undirected_edges();
 
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();){
+  for(auto e(edge_set.begin()); e!=edge_set.end();){
     s << "\\foreach \\u/\\v in {";
     for(int i=0;i<100 && e!=edge_set.end();){
       s << "{v"<<e->first<<"/v"<<e->second<<"}";
@@ -411,11 +409,11 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool numb
       const coord2d xs(dual.layout2d[u]*coord2d(xscale,yscale));
       s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << (u+1) << "$}" << (u+1<dual.N? ", ":"}\n\t");
     }    
-    s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
+    s << "\\node[dualvertex] (\\name) at \\place {"<<(print_numbers?"\\lbl":"")<<"};\n";
     s << "\\foreach \\u/\\v in {";
 
-    set<edge_t> dual_edges = dual.undirected_edges();
-    for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end();){
+    vector<edge_t> dual_edges = dual.undirected_edges();
+    for(auto e(dual_edges.begin()); e!=dual_edges.end();){
       s << "{v"<<e->first<<"/v"<<e->second<<"}";
       if(++e != dual_edges.end()) s << ", ";
     }
@@ -440,7 +438,7 @@ string PlanarGraph::to_povray(double w_cm, double h_cm,
   ostringstream s;
   s << fixed;
 
-  set<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edge_set = undirected_edges();
 
   s << "#declare Nvertices="<<N<<";\n";
   s << "#declare Nedges="<<edge_set.size()<<";\n";
@@ -460,7 +458,7 @@ string PlanarGraph::to_povray(double w_cm, double h_cm,
     s << "#declare layout2D=array[Nvertices][2]{"; for(int i=0;i<N;i++) s<<layout2d[i]*coord2d(xscale,yscale)<<(i+1<N?",":"}\n\n");
   }
   s << "#declare edges   =array[Nedges][2]{"; 
-  for(set<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();){ s << *e; s <<(++e != edge_set.end()? ",":"}\n\n"); }
+  for(vector<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();){ s << *e; s <<(++e != edge_set.end()? ",":"}\n\n"); }
 
   return s.str();
 }

@@ -30,6 +30,8 @@ public:
   bool is_cubic() const;
   bool is_triangulation() const;
 
+  bool layout_is_crossingfree() const;
+
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;
   face_t get_face_oriented(int u, int v) const;
@@ -42,9 +44,6 @@ public:
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
 
   size_t count_perfect_matchings() const;
-
-  // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-  void get_vertex_spiral(const int f1, const int f2, const int f3, vector<int> &spiral, jumplist_t &jumps) const;
 
 
   vector<tri_t>  triangulation(int face_max=INT_MAX) const;

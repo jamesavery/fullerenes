@@ -49,6 +49,7 @@ extern "C" {
   // Fullerene graph generation 
   fullerene_graph_ptr halma_fullerene_(const fullerene_graph_ptr *g, const int *n);
   fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int *n_leaps);
+  fullerene_graph_ptr goldberg_coxeter_(const fullerene_graph_ptr *g, const int *k, const int *l);
 
   // Fullerene graph operations
   void compute_fullerene_faces_(const fullerene_graph_ptr *, int *pentagons, int *hexagons);
@@ -63,7 +64,7 @@ extern "C" {
   void get_layout2d_(const graph_ptr *p, double *layout2d);
   void get_face_(const graph_ptr *g, const int *s, const int *t, const int *r, const int *fmax, int *face, int *l);
 
-  void set_layout2d_(graph_ptr *g, const double *layout2d);
+  void set_layout2d_(graph_ptr *g, const double *layout2d, const int *layout_is_spherical);
 
   double shortest_planar_distance_(const graph_ptr *g);
 
@@ -199,11 +200,14 @@ polyhedron_ptr read_polyhedron_(const char *path) { return new Polyhedron(path);
 
 void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 
-// The Fortarn call to dual_graph() assumes that g is either a fullerene
+// The Fortran call to dual_graph() assumes that g is either a fullerene
 // or a fullerene dual.
 graph_ptr dual_graph_(const graph_ptr *g){  
+  (*g)->layout2d = (*g)->tutte_layout();
   bool is_fullerene = (*g)->neighbours[0].size() == 3;
-  return new PlanarGraph((*g)->dual_graph(is_fullerene? 6 : 3)); 
+  graph_ptr pg = new PlanarGraph((*g)->dual_graph(is_fullerene? 6 : 3));
+  pg->layout2d = pg->tutte_layout();
+  return pg;
 }
 //int hamiltonian_count_(const graph_ptr *g){ return (*g)->hamiltonian_count(); }
 int perfect_match_count_(const graph_ptr *g){ return (*g)->count_perfect_matchings(); }
@@ -222,6 +226,15 @@ fullerene_graph_ptr leapfrog_fullerene_(const fullerene_graph_ptr *g, const int 
 
   return new FullereneGraph(frog);
 }
+
+fullerene_graph_ptr goldberg_coxeter_(const fullerene_graph_ptr *g, const int *k, const int *l)
+{
+  FullereneGraph fg(**g);
+  fg.layout2d = fg.tutte_layout(); // FIXME remove, and pass argument to GCtransform?
+  fg.layout_is_spherical = false;
+  return new FullereneGraph(fg.GCtransform(*k,*l));
+}
+
 
 void tutte_layout_(graph_ptr *g, double *LAYOUT)
 {
@@ -315,16 +328,17 @@ void get_layout2d_(const graph_ptr *g, double *points)
   }
 }
 
-void set_layout2d_(graph_ptr *g, const double *layout2d)
+void set_layout2d_(graph_ptr *g, const double *layout2d, const int *layout_is_spherical)
 {
   PlanarGraph& G(*(*g));
 
   G.layout2d.resize(G.N);
 
-  for(node_t u=0;u<G.N;u++)
+  for(node_t u=0;u<G.N;u++){
     G.layout2d[u] = coord2d(layout2d[u*2],layout2d[u*2+1]);
-
+  }
   G.orient_neighbours();
+  G.layout_is_spherical = *layout_is_spherical;
 }
 
 
@@ -335,7 +349,7 @@ polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }
 
 int nvertices_(const graph_ptr *g){ return (*g)->N; }
 int nedges_(const graph_ptr *g){ 
-  set<edge_t> edge_set = (*g)->undirected_edges(); // TODO: Better solution to this.
+  vector<edge_t> edge_set = (*g)->undirected_edges(); // TODO: Better solution to this.
   return edge_set.size(); 
 }
 
@@ -345,22 +359,22 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   string fmt(format,3), filename;
   filename = fortran_string(filename_,50)+"-2D."+fmt;
 
-   printf("draw_graph({\n"
-   	 "\tformat:     '%3s',\n"
-   	 "\tfilename:   '%s',\n"
-   	 "\tshow_dual:  %d,\n"
-   	 "\tdimensions: %gcm x %gcm,\n"
-   	 "\tline_colour: #%.6x,\n"
-   	 "\tnode_colour: #%.6x,\n"
-   	 "\tline_width: %.2gmm,\n"
-   	 "\tnode_diameter: %.2gmm,\n"
-   	 "})\n\n",
-   	 format, filename.c_str(), *show_dual, dimensions[0], dimensions[1],
-   	 *line_colour, *vertex_colour,
-   	 *line_width, *vertex_diameter);
-
-   cout << endl;
-   cout << **g << endl;
+//   printf("draw_graph({\n"
+//   	 "\tformat:     '%3s',\n"
+//   	 "\tfilename:   '%s',\n"
+//   	 "\tshow_dual:  %d,\n"
+//   	 "\tdimensions: %gcm x %gcm,\n"
+//   	 "\tline_colour: #%.6x,\n"
+//   	 "\tnode_colour: #%.6x,\n"
+//   	 "\tline_width: %.2gmm,\n"
+//   	 "\tnode_diameter: %.2gmm,\n"
+//   	 "})\n\n",
+//   	 format, filename.c_str(), *show_dual, dimensions[0], dimensions[1],
+//   	 *line_colour, *vertex_colour,
+//   	 *line_width, *vertex_diameter);
+//
+//   cout << endl;
+//   cout << **g << endl;
 
   ofstream graph_file(filename.c_str(),ios::out | ios::binary);
   if        (fmt == "tex"){
@@ -368,7 +382,7 @@ void draw_graph_(const graph_ptr *g, const char *filename_, const char *format, 
   } else if (fmt == "pov"){
     graph_file << (*g)->to_povray(dimensions[0],dimensions[1],*line_colour,*vertex_colour,*line_width,*vertex_diameter);
   }
-  cout << "write done" << endl;
+//  cout << "write done" << endl;
   graph_file.close();
 }
 
@@ -405,10 +419,10 @@ void draw_polyhedron_(const polyhedron_ptr *P, const char *filename_, const char
 
 void edge_list_(const graph_ptr *g, int *edges, int *length)
 {
-  const set<edge_t>& edge_set((*g)->undirected_edges());
+  const vector<edge_t>& edge_set((*g)->undirected_edges());
   *length = edge_set.size();
   int i=0;
-  for(set<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();e++,i++){
+  for(vector<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();e++,i++){
     edges[2*i+0] = e->first;
     edges[2*i+1] = e->second;
   }
@@ -467,10 +481,12 @@ void get_face_distance_mtx_(const fullerene_graph_ptr *fg, int *face_distances){
 
 // rspi_a and jumps_a start counting at 1
 void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jumps_a[10]){
-//  12 will always be 12, 10 is just a arbitrary magic number
+//  12 will always be 12, 10 is just an arbitrary magic number
+  assert((*fg)->layout2d.size() == (*fg)->N);
   vector<int> rspi_v;
   FullereneGraph::jumplist_t jumps_v;
-  (*fg)->get_canonical_general_spiral_from_fg(rspi_v, jumps_v);
+  const bool canonical=true, general=true;
+  (*fg)->get_rspi_from_fg(rspi_v, jumps_v, canonical, general);
 
   for(int i=0; i!=12; i++){
     rspi_a[i] = rspi_v[i] +1;//start counting at 1

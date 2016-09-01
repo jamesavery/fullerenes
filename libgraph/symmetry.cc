@@ -121,7 +121,7 @@ vector<Permutation> Symmetry::tri_permutation(const vector<Permutation>& Gf) con
 }
 
 vector<Permutation> Symmetry::edge_permutation(const vector<Permutation>& Gf) const {
-  set<edge_t> edge_set = undirected_edges();//TODO: Do this another way
+  vector<edge_t> edge_set = undirected_edges();//TODO: Do this another way
 
   vector<Permutation> Gedge(Gf.size(),Permutation(edge_set.size()));
   IDCounter<edge_t> edge_id;

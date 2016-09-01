@@ -4,7 +4,7 @@
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinth,ndbconvert,ihamstore,ihamstats,nhamcyc,isomerl,
-     1 isomerh,ngaudiene,
+     1 isomerh,ngaudiene,imcs,itop,
      1 PS,TolX,R5,R6,Rdist,rvdwc,scale,scalePPG,ftol,scaleRad,
      1 rspi,jumps,force,forceP,boost,dualdist,
      1 filename,filenameout,DATEN)
@@ -22,7 +22,7 @@ C-----------------------------------------------------------------
       Character*1 DATEN(nzeile)
       Character filename*50,filenameout*50,flagsym*3
       Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
-     1 nohueckel,loop,ndbconvert,iPFcount,IPMC,
+     1 nohueckel,loop,ndbconvert,iPFcount,IPMC,imcs,itop,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,IPRC,leap,isonum,
      1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps,
@@ -125,6 +125,8 @@ C Integers
       ifs=0     !  Option for .dat and .tex files
       iham=0    !  Number of Hamiltonian cycles
       iFS=0     !  Option for producing files for 2D fullerene graphs
+      imcs=0    !  Option for cartesian input and only producing minimum covering sphere
+      itop=0    !  Option for stopping after topological analysis (and not creating 3D coordinates after GC transformation)
       iPMC=0    !  Option for perfect match count
       iopt=0    !  No (force field) optimization
       ihessian=0 ! No Hessian matrix produced
@@ -287,6 +289,11 @@ C ExtWu force field
         forceP(i)=force(i)
       enddo
 
+C Check imcs parameter
+      if(imcs.eq.1.and.ICart.ne.1) then
+        write(*,*)"icms and icart parameters don't fit together"
+        call exit(1)
+      endif
 C Set IC and ichk parameters
       if(ICart.lt.0 .or. icart.gt.10) then
         write(*,*)"Invalic value for icart given.  Exiting ..."
@@ -300,6 +307,7 @@ C Set IC and ichk parameters
 
 C  Check on number of atoms (vertices)
       number_vertices=IABS(NA)
+      if(imcs.eq.0) then
       if(number_vertices.gt.NAtomax) WRITE(IOUT,102) number_vertices
       if(number_vertices.lt.20.or.number_vertices.eq.22) then
         Write(IOUT,103) number_vertices
@@ -310,6 +318,7 @@ C  Check on number of atoms (vertices)
         Write(IOUT,104) number_vertices
         IER=1
         return
+      endif
       endif
 
 C Create rspi if nanotube.ne.0
@@ -323,12 +332,14 @@ C Create rspi if nanotube.ne.0
        Write(IOUT,109) flagsym,(rspi,I=1,12)
       endif
 C  Setting minimum distance
+      if(imcs.eq.0) then
       if(R6.ne.R.and.R6.gt.1.d0) then
         Rdist=R6
         WRITE(Iout,106) Rdist
       else
         Rdist=R
         WRITE(Iout,107) Rdist
+      endif
       endif
 
 C  Output list

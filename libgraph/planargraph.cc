@@ -31,7 +31,7 @@ bool PlanarGraph::is_a_fullerene() const {
   const int E = 3*N/2;
   const int F = 2+E-N;
 
-  set<edge_t> edge_set = undirected_edges(); // TODO: Do with neighbours - this is a bit slow.
+  vector<edge_t> edge_set = undirected_edges(); // TODO: Do with neighbours - this is a bit slow.
   if(E != edge_set.size()){
     fprintf(stdout,"Graph is not planar cubic: wrong number of edges: %d != %d\n",int(edge_set.size()),E);
     return false;
@@ -56,15 +56,47 @@ bool PlanarGraph::is_a_fullerene() const {
   return true;
 }
 
+// the following is a naive approach that iterates over all pairs of edges
+// for some purposes it would be sufficient to ensure that each face intersects itself an even number of times (while figures of eight are problematic)
+bool PlanarGraph::layout_is_crossingfree() const 
+{
+  assert(layout2d.size() == N);
+  vector<edge_t> es = undirected_edges(); // TODO: In new planargraph, this is unnecessary
+  for (auto e1(es.begin()); e1!=es.end(); e1++){
+    for (auto e2(e1); e2!=es.end(); e2++){
+      if (e1->first == e2->first || e1->second == e2->first || e1->first == e2->second || e1->second == e2->second) continue; // equal edges and edges that share a vertex
+      const double e1ax = layout2d[e1->first].first,
+                   e1ay = layout2d[e1->first].second,
+                   e1bx = layout2d[e1->second].first,
+                   e1by = layout2d[e1->second].second,
+                   e2ax = layout2d[e2->first].first,
+                   e2ay = layout2d[e2->first].second,
+                   e2bx = layout2d[e2->second].first,
+                   e2by = layout2d[e2->second].second;
+      const double a1 = (e1ay - e1by)/(e1ax - e1bx);
+      const double b1 = e1ay - a1 * e1ax;
+      if ((e2ay > a1*e2ax+b1 && e2by > a1*e2bx+b1) || (e2ay < a1*e2ax+b1 && e2by < a1*e2bx+b1)) continue; // both points of the second edge lie on the same side of the first edge
+      const double a2 = (e2ay - e2by)/(e2ax - e2bx);
+      const double b2 = e2ay - a2 * e2ax;
+      if ((e1ay > a2*e1ax+b2 && e1by > a2*e1bx+b2) || (e1ay < a2*e1ax+b2 && e1by < a2*e1bx+b2)) continue; // both points of the first edge lie on the same side of the second edge
+      cerr << "edges " << *e1 << " and " << *e2 << " intersect." << endl;
+      return false;
+    }
+  }
+  return true;
+}
+
+
+
 
 PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const {
   // TODO: Simplify
   PlanarGraph dual;
-  set<edge_t> edge_set = undirected_edges(); // TODO: In new planargraph, this is unnecessary
+  vector<edge_t> edge_set = undirected_edges(); // TODO: In new planargraph, this is unnecessary
   unsigned int Nfaces = edge_set.size()-N+2;
   dual.N = Nfaces;
   dual.neighbours.resize(Nfaces);
-  
+
   //  cerr << "dual_graph(" << Fmax << ")\n";
   const vector<face_t> allfaces(compute_faces_flat(Fmax,planar_layout));
 
@@ -93,12 +125,12 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
   // Insert edge between each pair of faces that share an edge
   //  cerr << "dual_graph::construct graph\n";
   set<edge_t> dual_edges;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+  for(vector<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const set<int>& adjacent_faces(facenodes[*e]);
     for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
       set<int>::const_iterator g(f);
       for(++g; g!= adjacent_faces.end(); g++)
-	dual_edges.insert(edge_t(*f,*g));
+        dual_edges.insert(edge_t(*f,*g));
     }
   }
   //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
@@ -123,14 +155,14 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 // This produces "phantom" faces! Fix and use the oriented version instead.
 facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const 
 {
-  set<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edge_set = undirected_edges();
 
   facemap_t facemap;
   // TODO: This is a much better and faster method, but requires a planar layout
   if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
 
   cerr << " Non-oriented face computation (loop search). This is not reliable!\n";
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+  for(vector<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
 
     const vector<node_t>& ns(neighbours[t]);
@@ -173,14 +205,14 @@ face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
     for(unsigned int i=0;i<ns.size();i++) {
       //	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
       if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
-	//	coord2d vw = coord2d::displacement(layout2d[ns[i]],layout2d[v],layout_is_spherical);
-	coord2d vw = layout2d[ns[i]]-layout2d[v];
-	double angle = vu.line_angle(vw);
-	
-	if(angle>= angle_max){
-	  angle_max = angle;
-	  w = ns[i];
-	} 
+        //	coord2d vw = coord2d::displacement(layout2d[ns[i]],layout2d[v],layout_is_spherical);
+        coord2d vw = layout2d[ns[i]]-layout2d[v];
+        double angle = vu.line_angle(vw);
+        
+        if(angle>= angle_max){
+          angle_max = angle;
+          w = ns[i];
+        } 
       } 
     }
     if(w == -1) abort(); // There is no face!
@@ -196,11 +228,12 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 {
   assert(layout2d.size() == N);
   facemap_t facemap;
+  int faces_found =0;
   //  cout << "Computing faces using 2D orientation." << endl;
   set<dedge_t> workset;
-  set<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edge_set = undirected_edges();
 
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+  for(vector<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
     workset.insert(dedge_t(s,t));
     workset.insert(dedge_t(t,s));
@@ -214,19 +247,20 @@ facemap_t PlanarGraph::compute_faces_oriented() const
     outer_face = find_outer_face();
 
     if(outer_face.size() < 3){
-      cerr << "Invaid outer face: " << outer_face << endl;
+      cerr << "Invalid outer face: " << outer_face << endl;
       assert(outer_face.size() < 3);
     }
 
     for(node_t u=0;u<N;u++)
       if(!outer_face.contains(u) && !outer_face.point_inside(layout2d,u)){
-	cerr << "Point " << u << "/" << layout2d[u] << " is outside outer face " << outer_face << endl;
-	for(int i=0;i<outer_face.size();i++) cerr << "\t" << layout2d[outer_face[i]] << endl;
-	cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
-	abort();
+        cerr << "Point " << u << "/" << layout2d[u] << " is outside outer face " << outer_face << endl;
+        for(int i=0;i<outer_face.size();i++) cerr << "\t" << layout2d[outer_face[i]] << endl;
+        cerr << "Winding number: " << outer_face.winding_number(layout2d,u) << endl;
+        abort();
       }
     //    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face." << endl;
     facemap[outer_face.size()].insert(outer_face);
+    faces_found++;
     // Add outer face to output, remove directed edges from work set
     for(unsigned int i=0;i<outer_face.size();i++){
       const node_t u = outer_face[i], v = outer_face[(i+1)%outer_face.size()];
@@ -240,21 +274,23 @@ facemap_t PlanarGraph::compute_faces_oriented() const
     dedge_t e = *workset.begin(); 
     face_t face(get_face_oriented(e.first,e.second));
     facemap[face.size()].insert(face);
+    faces_found++;
 
-    //    cout << "face = " << face << endl;
     for(int i=0;i<face.size();i++)
       workset.erase(dedge_t(face[i],face[(i+1)%face.size()]));
   }
+  assert(faces_found == N/2+2 || faces_found == (N-2)*2); // assuming the graph is either cubic or a triangulation // FIXME remove when things are more stable
   return facemap;
 }
 
-
+// sort neighbour list CW
 void PlanarGraph::orient_neighbours() 
 {
   assert(layout2d.size() == N);
   for(node_t u=0;u<N;u++){
     sort_ccw_point CCW(layout2d,layout2d[u]);
     sort(neighbours[u].begin(),neighbours[u].end(),CCW);
+    reverse(neighbours[u].begin(),neighbours[u].end());
   }
 }
 
@@ -277,7 +313,7 @@ vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_la
       cerr << "compute_faces_flat: Graph not orientable - edge "<< e->first << " appears in " << e->second <<" faces, not two.\n";
       cerr << "faces = {"; for(int i=0;i<faces.size();i++) cerr << faces[i] << (i+1<faces.size()?", ":"};\n");
       cerr << "G = " << *this << ";\n";
-	
+
       abort();
     }
 
@@ -351,7 +387,7 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
   } else {
     for(int i=0;i<faces.size();i++) 
       if(faces[i].size() != 3){
-	fprintf(stderr,"Face %d has %d sides: ",i,int(faces[i].size())); cerr << faces[i] << endl;
+        fprintf(stderr,"Face %d has %d sides: ",i,int(faces[i].size())); cerr << faces[i] << endl;
       }
   }
 
@@ -374,15 +410,13 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   map<edge_t,int> edgecount;
   for(int i=0;i<tris.size();i++)
     for(int j=0;j<3;j++){
-      node_t u = tris[i][j], v = tris[i][(j+1)%3];
-      edgecount[edge_t(u,v)]++;
-      if(edgecount[edge_t(u,v)]>2)
-	cerr << tris[i] << " bad!\n";
+      edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]++;
+      if(edgecount[edge_t(tris[i][j],tris[i][(j+1)%3])]>2)
+        cerr << tris[i] << " bad!\n";
     }
-  for(auto e: edgecount)
-    if(e.second != 2){
-      cerr << "Triangulation not orientable: Edge "<< e.first << " appears in " << e.second <<" tris, not two.\n";
-      cout << "triangles = " << tris << ";\n";
+  for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
+    if(e->second != 2){
+      cerr << "Triangulation not orientable: Edge "<< e->first << " appears in " << e->second <<" tris, not two.\n";
       abort();
     }
 
@@ -420,9 +454,9 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   // Check consistency of orientation. It is consistent if and only if
   // each edge has been used exactly once in each direction.
   bool consistent = true;
-  set<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edge_set = undirected_edges();
 
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+  for(vector<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     if(!done[dedge_t(e->first,e->second)]){
       fprintf(stderr,"A: Directed edge %d->%d is missing: triangulation is not consistently oriented.\n",e->first,e->second);
       consistent = false;
@@ -444,7 +478,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
 
 // Finds the vertices belonging to the outer face in a symmetric planar
 // layout centered at (0,0). Returns the face in CW order.
-face_t PlanarGraph::find_outer_face() const 	
+face_t PlanarGraph::find_outer_face() const 
 {
   assert(layout2d.size() == N);
 
@@ -475,8 +509,8 @@ face_t PlanarGraph::find_outer_face() const
   assert(i<N);
 
   sort_ccw_point CCW(layout2d,outer_face.centroid(layout2d));
-  sort(outer_face.begin(),outer_face.end(),CCW);
-  reverse(outer_face.begin(),outer_face.end());  
+  sort(outer_face.begin(),outer_face.end(),CCW); // sort CCW
+  reverse(outer_face.begin(),outer_face.end()); // reverse to get CW
 
   //  cout << "Found outer face: " << outer_face << endl;
   return outer_face;
@@ -485,11 +519,11 @@ face_t PlanarGraph::find_outer_face() const
 vector<double> PlanarGraph::edge_lengths() const 
 {
   assert(layout2d.size() == N);
-  set<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edge_set = undirected_edges();
 
   vector<double> lengths(edge_set.size());
   unsigned int i = 0;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();e++, i++)
+  for(vector<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();e++, i++)
     lengths[i] = (layout2d[e->first]-layout2d[e->second]).norm();
 
   return lengths;
@@ -518,10 +552,10 @@ void PlanarGraph::move(const coord2d& x) {
 
 ostream& operator<<(ostream& s, const PlanarGraph& g) 
 {
-  set<edge_t> edge_set = g.undirected_edges();
+  vector<edge_t> edge_set = g.undirected_edges();
 
   s << "Graph[Range["<<g.N<<"],\n\tUndirectedEdge@@#&/@{";
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); ){    
+  for(vector<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); ){    
     s << "{" << (e->first+1) << "," << (e->second+1) << "}";
     if(++e != edge_set.end())
       s << ", ";
@@ -541,188 +575,6 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
   return s;
 }
 
-// *********************************************************************
-//			     SPIRAL STUFF
-// *********************************************************************
-// gpi is for 'get pentagon indices'
-inline void gpi_connect_forward(list<pair<int,int> > &open_valencies){
-  --open_valencies.back().second;
-  --open_valencies.front().second;
-}
-
-inline void gpi_connect_backward(list<pair<int,int> > &open_valencies){
-  list<pair<int,int> >::iterator second_last(open_valencies.end());
-  second_last--;
-  second_last--;
-
-  --open_valencies.back().second;
-  --second_last->second;//decrement the last but one entry
-}
-
-inline void gpi_remove_node(const int i, PlanarGraph &remaining_graph, set<int> &remaining_nodes, vector<int> &deleted_neighbours){
-  remaining_nodes.erase(i);
-  //remove i from all neighbour lists and erase all neighbours from the i-list
-  for(vector<int>::iterator it = remaining_graph.neighbours[i].begin(); it != remaining_graph.neighbours[i].end(); ++it){
-    remaining_graph.neighbours[*it].erase(find(remaining_graph.neighbours[*it].begin(),remaining_graph.neighbours[*it].end(),i));
-  }
-  deleted_neighbours = remaining_graph.neighbours[i];
-  remaining_graph.neighbours[i].clear();
-}
-
-// pentagon indices and jumps start to count at 0
-// perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
-void PlanarGraph::get_vertex_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, list<pair<node_t,int> > &jumps) const {
-
-  //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
-  spiral.clear();
-  jumps.clear();
-
-  // remaining_graph is the graph that consists of all nodes that haven't been added to the graph yet
-  PlanarGraph remaining_graph(*this);
-  // all the nodes that haven't been added yet, not ordered and starting at 0
-  set<node_t> remaining_nodes;
-
-  // valencies is a list of length N and contains the valencies of each node (5 or 6)
-  vector<node_t> valencies(N, 0);  
-  // open_valencies is a list with one entry per node that has been added to the spiral but is not fully saturated yet.  The entry contains the number of the node and the number of open valencies
-  list<pair<node_t,int> > open_valencies;
-  // a backup of the neighbours of he current node ... required in case of a jump
-  vector<int> deleted_neighbours_bak;
-
-  //the current jumping state
-  int x=0;
-
-  //init of the valency-list and the set of nodes in the remaining graph
-  for(int i=0; i!=remaining_graph.N; ++i){
-    valencies[i] = remaining_graph.neighbours[i].size();
-    //cout << i << ": " << valencies[i]<< endl;
-    remaining_nodes.insert(i);
-  }
-  set<edge_t> edge_set = undirected_edges();
-
-  //check if starting nodes share a face
-  if(edge_set.find(edge_t(f1,f2)) == edge_set.end() ||
-     edge_set.find(edge_t(f1,f3)) == edge_set.end() ||
-     edge_set.find(edge_t(f2,f3)) == edge_set.end()){
-    cerr << "The requested nodes are not connected.  Aborting ..." << endl;
-    abort();
-  }
-
-  // add the first three (defining) nodes
-  //first node
-  spiral.push_back(valencies[f1]);
-  gpi_remove_node(f1, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-  open_valencies.push_back(make_pair(f1,valencies[f1]));
-
-  //second node
-  spiral.push_back(valencies[f2]);
-  gpi_remove_node(f2, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-  open_valencies.push_back(make_pair(f2,valencies[f2]));
-  gpi_connect_backward(open_valencies);
-
-  //third node
-  spiral.push_back(valencies[f3]);
-  gpi_remove_node(f3, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-  open_valencies.push_back(make_pair(f3,valencies[f3]));
-  gpi_connect_backward(open_valencies);
-  gpi_connect_forward(open_valencies);
-
-  // iterate over all nodes (of the initial graph) but not by their respective number
-  // starting at 3 because we added 3 already
-  for(int i=3; i<N-1; ++i){
-
-    list<pair<int,int> > open_valencies_bak(open_valencies);
-
-    // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
-    // we can't search in the remaining_graph because there are some edges deleted already
-    set<int>::iterator j=remaining_nodes.begin();
-    node_t u = open_valencies.back().first, w = open_valencies.front().first;
-    for( ; j!=remaining_nodes.end(); ++j){
-      if(edge_set.find(edge_t(u,*j)) != edge_set.end() &&
-         edge_set.find(edge_t(w,*j)) != edge_set.end()) break;
-    }
-    assert(j!=remaining_nodes.end());// there is allways a node to be added next
-
-    spiral.push_back(valencies[*j]);
-    open_valencies.push_back(make_pair(*j,valencies[*j]));
-    gpi_connect_backward(open_valencies);
-    gpi_connect_forward(open_valencies);
-
-    // there are three positions in open_valencies that can be 0---one shouldn't happen, the other two cases require interaction.
-    while(open_valencies.front().second==0){
-      open_valencies.pop_front();
-      gpi_connect_forward(open_valencies);
-    }
-    while(true){
-      list<pair<int,int> >::iterator second_last(open_valencies.end());
-      second_last--;
-      second_last--;
-      
-      if(second_last->second==0){
-        open_valencies.erase(second_last);
-        gpi_connect_backward(open_valencies);
-      }
-      else break;
-    }
-    assert(open_valencies.back().second!=0);//i.e., the spiral is stuck. This can only happen if the spiral missed a jump
-
-    node_t v = *j;
-    //remove all edges of which *j is part from the remaining graph
-    gpi_remove_node(v, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-
-    if(!remaining_graph.is_connected(remaining_nodes)){
-      //revert the last operations
-      remaining_nodes.insert(v);
-      spiral.pop_back();
-      open_valencies = open_valencies_bak;
-      remaining_graph.neighbours[v] = deleted_neighbours_bak;
-      for(vector<node_t>::iterator it = remaining_graph.neighbours[v].begin(); it != remaining_graph.neighbours[v].end(); ++it){
-        remaining_graph.neighbours[*it].push_back(v);
-      }
-      //perform cyclic shift on open_valencies
-      open_valencies.push_back(open_valencies.front());
-      open_valencies.pop_front();
-      //there was no atom added, so 'i' must not be incremented
-      --i;
-      ++x;
-    } else {
-      if(x!=0){
-        jumps.push_back(make_pair(i,x));
-        x=0;
-      }
-    }
-  }
-
-  // make sure we left the loop in a sane state
-  assert(remaining_nodes.size() == 1);
-
-  if(valencies[*remaining_nodes.begin()] == 3){
-    assert(open_valencies.size() == 3);
-    for(list<pair<int,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
-      assert(it->second == 1);
-    }
-    spiral.push_back(3);
-  } else if (valencies[*remaining_nodes.begin()] == 4){
-    assert(open_valencies.size() == 4);
-    for(list<pair<int,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
-      assert(it->second == 1);
-    }
-    spiral.push_back(4);
-  } else if (valencies[*remaining_nodes.begin()] == 5){
-    assert(open_valencies.size() == 5);
-    for(list<pair<int,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
-      assert(it->second == 1);
-    }
-    spiral.push_back(5);
-  } else if (valencies[*remaining_nodes.begin()] == 6){
-    assert(open_valencies.size() == 6);
-    for(list<pair<int,int> >::const_iterator it=open_valencies.begin(); it!=open_valencies.end(); ++it){
-      assert(it->second == 1);
-    }
-    spiral.push_back(6);
-  }
-  
-}
 
 // **********************************************************************
 //		       COMBINATORIAL PROPERTIES
@@ -754,10 +606,10 @@ void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces,
 #ifdef HAS_MKL
 #include <mkl.h>
 #else
-extern "C" void dgetrf_(int *M, int *N, double *A, int *LDA, int *IPIV, int *INFO);		
+extern "C" void dgetrf_(int *M, int *N, double *A, int *LDA, int *IPIV, int *INFO);
 #endif
 
-double lu_det(const vector<double> &A, int N)	
+double lu_det(const vector<double> &A, int N)
 {
   int info = 0;
   double *result = new double[N*N];
@@ -782,8 +634,8 @@ size_t PlanarGraph::count_perfect_matchings() const
   vector<bool> faceSum(faces.size()), visited(faces.size());  
 
   map<dedge_t,int> A;
-  set<edge_t> edge_set = undirected_edges();
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++){
+  vector<edge_t> edge_set = undirected_edges();
+  for(vector<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); e++){
     A[*e] = 1;
     A[reverse(*e)] = -1;
   }

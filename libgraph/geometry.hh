@@ -60,6 +60,9 @@ struct coord2d : public pair<double,double> {
   coord2d operator-() const {coord2d y(-first,-second); return y;}
   double dot(const coord2d& y) const { return first*y.first+second*y.second; }
 
+  double operator()(int i) const { return i? second : first; }
+  double& operator()(int i)      { return i? second : first; }
+  
   double line_angle(const coord2d& v) const { // CCW between two lines ([-pi;pi] where -*this is +/-pi and *this is 0 -- i.e. pi is "leftmost", -pi is "rightmost")
     double angle = fmod(atan2(first*v.second-v.first*second,first*v.first+second*v.second)+2*M_PI,2*M_PI)-M_PI;
     //    fprintf(stderr,"angle[{%f,%f},{%f,%f}] == %f\n",first,second,v.first,v.second,angle);
@@ -191,9 +194,6 @@ struct coord3d {
     return xs;
   }
 
-  bool operator==(const coord3d& y) const { return x[0]==y[0] && x[1]==y[1] && x[2]==y[2]; }
-  bool operator!=(const coord3d& y) const { return x[0]!=y[0] || x[1]!=y[1] || x[2]!=y[2]; }
-
   // NB: Does this belong here?
   static coord3d line_plane_intersect(const coord3d& x0, const coord3d& x1, const coord3d& X0, const coord3d& n)
   {
@@ -206,15 +206,25 @@ struct coord3d {
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };
 
+struct matrix2d {
+  double values[4];
+  matrix2d(const double *v) { for(int i=0;i<4;i++) values[i] = v[i]; }
+  explicit matrix2d(const double r=0, const double s=0, const double t=0, const double u=0) : values{r,s,t,u} { }
+  double& operator()(int i, int j)      { return values[i*2+j]; }
+  double operator()(int i, int j) const { return values[i*2+j]; }
 
+  coord2d operator*(const coord2d& x){ return {values[0*2+0]*x(0) + values[1*2+0]*x(1), values[0*2+1]*x(0)+values[1*2+1]*x(1)}; }
+  static matrix2d rotation(double th){ 
+    return matrix2d{cos(th),-sin(th),
+	            sin(th), cos(th)};
+  }
+};
 
 struct matrix3d {
   double values[9];
 
-//  matrix3d()                { memset(values,0,9*sizeof(double)); }
-  matrix3d(const double *v) { memcpy(values,v,9*sizeof(double)); }
-  explicit matrix3d(const double r=0, const double s=0, const double t=0, const double u=0, const double v=0, const double w=0, const double x=0, const double y=0, const double z=0) {
-    values[0]=r; values[1]=s; values[2]=t; values[3]=u; values[4]=v; values[5]=w; values[6]=x; values[7]=y; values[8]=z;
+  matrix3d(const double *v) { for(int i=0;i<9;i++) values[i] = v[i]; }
+  explicit matrix3d(const double r=0, const double s=0, const double t=0, const double u=0, const double v=0, const double w=0, const double x=0, const double y=0, const double z=0) : values{r,s,t,u,v,w,x,y,z} {
   }
 
   double& operator()(int i, int j)       { return values[i*3+j]; }
@@ -373,7 +383,6 @@ struct tri_t {
 
   coord3d centroid(const vector<coord3d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
   coord2d centroid(const vector<coord2d>& points) const { return (points[u(0)]+points[u(1)]+points[u(2)])/3.0; }
-
   void flip(){ node_t t = u(1); u(1) = u(2); u(2) = t; }
 
   bool operator!=(const tri_t& x) const { return x_[0] != x[0] || x_[1] != x[1] || x_[2] != x[2]; }
@@ -528,7 +537,8 @@ struct sort_ccw_point {
     // printf("compare: %d:{%g,%g}:%g %d:{%g,%g}:%g\n",
     // 	   s,layout[s].first,layout[s].second,angs,
     // 	   t,layout[t].first,layout[t].second,angt);
-    return angs >= angt; 	// TODO: Is the sign here correct?
+    // ascending sorting of angles, implies CCW orientation, and sort requires 'less' for ascending sorting
+    return angs <= angt; 	// TODO: Is the sign here correct? // lnw: changed, i think less/equal is correct
   }
 };
 

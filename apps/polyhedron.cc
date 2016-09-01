@@ -43,8 +43,6 @@ int main(int ac, char **av)
   vector<int> spiral(N/2+2,6);
   for(int i=0;i<12;i++) spiral[RSPI[i]] = 5;
 
-  //  cerr << "rspi="<<RSPI<<"\n";
-  
   Polyhedron P0;
   PlanarGraph g;
   if(from_file){
@@ -78,8 +76,7 @@ int main(int ac, char **av)
 
   {
     P.move_to_origin();
-    matrix3d If(P.inertial_frame());
-    P.points = If*P.points;
+    P.align_with_axes();
 
     ofstream mol2(("output/"+basename+"-if.mol2").c_str());
     mol2 << P.to_mol2();
@@ -107,7 +104,7 @@ int main(int ac, char **av)
   D.layout2d = D.tutte_layout();
   D.faces    = D.compute_faces_flat(3,true);
   D.face_max = 3;
-  //   D.optimize();
+  D.optimize();
   output << "PD = " << D << ";\n";
   
   output.close();

@@ -21,21 +21,31 @@ struct Graph {
   int N;
   neighbours_t neighbours;
 
-  Graph(const set<edge_t>& edge_set = set<edge_t>()) {
+  Graph(size_t N=0) : N(N), neighbours(N) {}
+  Graph(const set<edge_t>& edge_set) {
+    update_from_edgeset(edge_set); // TODO: set<edge_t> -> vector<edge_t> everywhere. STL sets slow things down.
+  }
+  template <typename Iterator> Graph(Iterator begin, Iterator end)
+  {
+    set<edge_t> edge_set(begin,end);
     update_from_edgeset(edge_set);
   }
   Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
   Graph(const unsigned int N, const vector<int>& adjacency) : N(N), neighbours(N) {
     assert(adjacency.size() == N*N);
+    set<edge_t> edge_set;
 
     for(unsigned int i=0;i<N;i++)
-      for(unsigned int j=i+1;j<N;j++)
-	if(adjacency[i*N+j]) insert_edge(edge_t(i,j));
+      for(unsigned int j=i+1;j<N;j++){
+	if(adjacency[i*N+j]) edge_set.insert(edge_t(i,j));
+      }
 
+    update_from_edgeset(edge_set);
   }
 
-  void insert_edge(const edge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
-  void remove_edge(const edge_t& e);
+  bool insert_edge(const dedge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
+  bool insert_dedge(const dedge_t& e, const node_t suc_uv=-1);
+  bool remove_edge(const edge_t& e);
   bool edge_exists(const edge_t& e) const;
   node_t next(const node_t& u, const node_t& v) const;
   node_t prev(const node_t& u, const node_t& v) const;
@@ -70,11 +80,12 @@ struct Graph {
   coord3d centre3d(const vector<coord3d>& layout) const; 
   void orient_neighbours(const vector<coord2d>& layout);
 
+  int degree(const node_t& u) const;
   int max_degree() const; 
 
-  void update_from_edgeset(const set<edge_t>& edge_set);
-  set<edge_t>  undirected_edges() const;
-  set<dedge_t> directed_edges()   const;
+  void update_from_edgeset(const set<edge_t>& edge_set); 
+  vector<edge_t>  undirected_edges() const;
+  vector<dedge_t> directed_edges()   const;
 
   friend ostream& operator<<(ostream& s, const Graph& g);
 };

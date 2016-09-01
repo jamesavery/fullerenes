@@ -4,18 +4,18 @@
 !  parameters, dimensions and constants used.                               !
 !---------------------------------------------------------------------------!
       integer,parameter :: nzeile=132 ! Maximum length of text character in a line
-      integer,parameter :: Nmax=5300 !  Change NMAX if RAM is not sufficient
+      integer,parameter :: Nmax=6600 !  Change NMAX if RAM is not sufficient
       integer,parameter :: msrs=56+1 !  Size of Schlegel output matrix
       integer,parameter :: nbardim=100+10 !Number of bars in Hamilton cycle statistics
       integer,parameter :: NmaxL=(Nmax*(Nmax-1))/2
       integer,parameter :: Mmax=Nmax/2+2
-      integer,parameter :: MaxSpirals=6*Nmax
+      integer,parameter :: MaxSpirals=6*Mmax
       integer,parameter :: Emax=3*Nmax/2
       integer,parameter :: maxit=2000000
       integer,parameter :: maxRS=20000000
       integer,parameter :: Nisoloop=1000000000
-      integer,parameter :: LimitAll=138
-      integer,parameter :: LimitIPR=190
+      integer,parameter :: LimitAll=150
+      integer,parameter :: LimitIPR=200
       integer,parameter :: ffmaxdim=19 ! maximum number of parameters per force field
       integer,parameter :: intmax8=2147483647 ! maximum integer before overflow
       real(8),parameter :: dpi=3.14159265358979d0 

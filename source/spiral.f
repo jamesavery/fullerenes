@@ -1681,7 +1681,7 @@ C     Print ring numbers
  604  FORMAT(1X,131('-'),/1X,'Corresponding ring numbers:') 
  605  FORMAT(1X,A3,9X,12I6,2X,3(I4,' x',I4,:,','))
  607  Format(12(1X,I6))
- 608  Format(1X,'Input spiral is canonical')
+ 608  Format(1X,'Spiral is canonical')
  610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
      1 'loop over')
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
@@ -1725,7 +1725,7 @@ C     Print ring numbers
  630  Format(1X,'Failed to find ring spiral: ',I7,
      1 ' detected (maximum possible: ',I7,')',/1X,
      1 'This is a non-spiral fullerene: Entering the general spiral'
-     1 ' algorithm',/1X,'General Spiral:')
+     1 ' algorithm',/1X,'Canonical General Spiral:')
  631  FORMAT(1X,I7,' distinct (55)      RSPIs found out of ',I7,
      1 /1X,I7,' distinct (56)/(65) RSPIs found out of ',I7,
      1 /1X,I7,' distinct (66)      RSPIs found out of ',I7)

@@ -22,7 +22,7 @@ struct params_t
   vector<double> *force_constants_dist;
   vector<double> *force_constants_angle;
   vector<double> *force_constants_dihedral;
-  set<edge_t> *edge_set;
+  vector<edge_t> *edge_set;
   bool optimize_angles;
 };
 
@@ -37,7 +37,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
-  set<edge_t> &edge_set = *params.edge_set;
+  vector<edge_t> &edge_set = *params.edge_set;
 
   assert(zero_values_dist.size() == edge_set.size());
   assert(force_constants_dist.size() == edge_set.size());
@@ -49,7 +49,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   //  V = k (r - r0)**2
   double potential_energy = 0.0;
   int i=0;
-  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
+  vector<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(; e!=ee; e++, i++){
     const double ax = gsl_vector_get(coordinates,3 * e->first);
     const double ay = gsl_vector_get(coordinates,3 * e->first +1);
@@ -100,7 +100,6 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
 //        C   u   A
 //            |
 //            r
-//      P.orient_neighbours();
       node_t r = P.neighbours[u][0];
       node_t s = P.neighbours[u][1];
       node_t t = P.neighbours[u][2];
@@ -146,7 +145,7 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
-  set<edge_t> &edge_set = *params.edge_set;
+  vector<edge_t> &edge_set = *params.edge_set;
 
   assert(zero_values_dist.size() == edge_set.size());
   assert(force_constants_dist.size() == edge_set.size());
@@ -155,7 +154,7 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
 
   vector<coord3d> derivatives(P.N, coord3d(0.0,0.0,0.0));
 
-  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
+  vector<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(int i=0; e!=ee; e++, i++){
     const double ax = gsl_vector_get(coordinates,3 * e->first);
     const double ay = gsl_vector_get(coordinates,3 * e->first +1);
@@ -283,20 +282,20 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
 
   assert(points.size() == N);
 
-  const double eps=1e-8;  
+  const double eps=1e-4;
 
   // settings for the optimizations
   const double stepsize = 1e-3;// FIXME final value
-  const double terminate_gradient = 1e-8;// FIXME final value
+  const double terminate_gradient = 1e-10;// FIXME final value
   const double tol = 1e-1; // accuracy of line minimization, the manual suggests 0.1
   const int max_iterations = 10000;// FIXME final value
   
   // init values
-  set<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edge_set = undirected_edges();
 
-  const double default_edge_length = 1.4;
+  const double default_edge_length = 1.45*1.73205;
   if(zero_values_dist.size() != edge_set.size()){
-    for(set<edge_t>::iterator it=edge_set.begin(), to=edge_set.end(); it!=to; it++){
+    for(vector<edge_t>::iterator it=edge_set.begin(), to=edge_set.end(); it!=to; it++){
       zero_values_dist.insert(make_pair(*it, default_edge_length));
     }
   }
@@ -305,7 +304,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   if(is_cubic())
   {
     orient_neighbours(); // CCW
-    const int fmax = 10;
+    const int fmax = 10; // maximum face size
 //          t   B   s
 //            \   /
 //          C   u   A
@@ -396,7 +395,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   
   // our zero-th order geometry sometimes places two vertices at exactly the same coordinates
   // solution:  displace randomly and let the FF do the rest
-  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
+  vector<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
   for(int i=0; e!=ee; e++, i++){
     const double ax = points[e->first][0];
     const double ay = points[e->first][1];
@@ -428,7 +427,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
     gsl_vector_set(coordinates, 3*i+2, points[i][2]);
   }
 
-  const gsl_multimin_fdfminimizer_type *fT = gsl_multimin_fdfminimizer_conjugate_fr;
+  const gsl_multimin_fdfminimizer_type *fT = gsl_multimin_fdfminimizer_conjugate_pr;
   gsl_multimin_fdfminimizer *s = gsl_multimin_fdfminimizer_alloc(fT, potential_function.n);
   gsl_multimin_fdfminimizer_set(s, &potential_function, coordinates, stepsize, tol); // runs fdf once
   size_t iter = 0;

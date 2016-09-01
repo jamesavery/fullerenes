@@ -2101,10 +2101,15 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE GoldbergCoxeter(Iout,leap,leapGC,kGC,lGC,
+      SUBROUTINE GoldbergCoxeter(Iout,leap,leapGC,kGC,lGC,itop,
      1 nohueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad) 
-C     Construct Leapfrog fullerene through adjacency matrix
+C     Routine for Goldberg-Coxeter transformation of a fullerene
+C     GK(k,l) with k.ge.l and l.ge.0 
+C     Three types are considered separately:
+C      1) leapfrog transformation, k=1, l=1
+C      2) halma transformation with l=0, 
+C      3) General Goldberg-Coxeter excluding cases 1 and 2
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)
@@ -2113,94 +2118,130 @@ C     Construct Leapfrog fullerene through adjacency matrix
       DIMENSION Dist(3,Nmax),distP(Nmax)
       integer graph_is_a_fullerene
       type(c_ptr) :: g, frog, halma, new_fullerene_graph,
-     1 leapfrog_fullerene, halma_fullerene
+     1 goldcox,leapfrog_fullerene, halma_fullerene, goldberg_coxeter
       LeapErr=0 
 
-C Leapfrog fullerene
+C--> Case 1
+C--> Start leapfrog fullerene if leap > 0
   10  if(leap.gt.0) then
-      MLeap=(3**leap)*number_vertices
+       MLeap=(3**leap)*number_vertices
 
-      if(MLeap.gt.Nmax) then
+       if(MLeap.gt.Nmax) then
          Write(Iout,1002) MLeap,Nmax
          LeapErr=1
          return
-      endif
+       endif
 
-      if(leap.eq.1) then
-       Write(Iout,1000) number_vertices,MLeap
-      else
-       if(leap.gt.3) Write(Iout,1001) leap,number_vertices,MLeap
-       if(leap.eq.2) Write(Iout,1021) leap,number_vertices,MLeap
-       if(leap.eq.3) Write(Iout,1022) leap,number_vertices,MLeap
-      endif 
+       if(leap.eq.1) then
+        Write(Iout,1000) number_vertices,MLeap
+       else
+        if(leap.gt.3) Write(Iout,1001) leap,number_vertices,MLeap
+        if(leap.eq.2) Write(Iout,1021) leap,number_vertices,MLeap
+        if(leap.eq.3) Write(Iout,1022) leap,number_vertices,MLeap
+       endif 
 
-      g = new_fullerene_graph(Nmax,number_vertices,IDA)
-      frog = leapfrog_fullerene(g,leap)
+       number_vertices=MLeap
+       g = new_fullerene_graph(Nmax,number_vertices,IDA)
+       frog = leapfrog_fullerene(g,leap)
 
 C Test that the created leapfrog graph is a fullerene graph
 C (cubic, satisfies Eulers formula, has 12 pentagons, remaining 
 C  faces are hexagons)
-      isafullerene = graph_is_a_fullerene(frog)
+       isafullerene = graph_is_a_fullerene(frog)
 
-      if(isafullerene .eq. 1) then
-         write (Iout,1014) 
-      else
-         write (Iout,1015) 
-      endif
+       if(isafullerene .eq. 1) then
+          write (Iout,1014) 
+       else
+          write (Iout,1015) 
+       endif
 C Produce adjacency matrix
-      write (Iout,1005) 
-      call adjacency_matrix(frog,Nmax,IDA)
+       write (Iout,1005) 
+       call adjacency_matrix(frog,Nmax,IDA)
+       call delete_fullerene_graph(frog)
       endif
+C--> End of leapfrog fullerene construction
 
+
+C--> Start of GC and halma transformations
 C Goldberg-Coxeter transform of initial fullerene
 C Input: initial graph, and GC indices (kGC,lGC) 
+C Initial test if everything is in order
+C Also if this is a leapfrog use leapfrog_fullerene instead
+C==>  Big loop
       if(leapGC.gt.0) then
-      Write(Iout,1010) kGC,lGC,kGC,lGC
-      MGCLimit=(kgc*kgc+lgc*(kgc+lgc))*number_vertices
-      if(MGCLimit.gt.Nmax) then
-         Write(Iout,1003) MGCLimit,Nmax
-         LeapErr=1
-         return
+       Write(Iout,1010) kGC,lGC,kGC,lGC
+       MGCLimit=(kgc*kgc+lgc*(kgc+lgc))*number_vertices
+       if(MGCLimit.gt.Nmax) then
+          Write(Iout,1003) MGCLimit,Nmax
+          LeapErr=1
+          return
+       endif
+
+       if(kGC.eq.1.and.lGC.eq.0) then
+        Write(Iout,1006) kGC,lGC
+        return
+       endif
+       if(kgc.eq.1.and.lGC.eq.1) then
+         write(Iout,1008)
+         leapGC=0
+         leap=1
+         go to 10       
       endif
 
-      if(kGC.eq.1.and.lGC.eq.0) then
-       Write(Iout,1006) kGC,lGC
-       return
-      endif
-      if(kgc.eq.1.and.lGC.eq.1) then
-        write(Iout,1008)
-        leapGC=0
-        leap=1
-        go to 10       
-      endif
+C General Goldberg-Coxeter if l>0 and not just leapfrog
       if(lGC .ne. 0) then
+C Not halma
+C--> Case 3
         write(Iout,1011)
-        stop
-      endif
-      g = new_fullerene_graph(Nmax,number_vertices,IDA)
-      halma = halma_fullerene(g,kGC-1)
-      isafullerene = graph_is_a_fullerene(halma)
-      IF (isafullerene.eq.1) then
-        write (iout,1013)
-      else
-        write (iout,1009)
-        stop
-      endif
+        g = new_fullerene_graph(Nmax,number_vertices,IDA)
+        goldcox = goldberg_coxeter(g,kGC,lGC)
+        isafullerene = graph_is_a_fullerene(goldcox)
+        if (isafullerene.eq.1) then
+          write (iout,1016)
+        else
+          write (iout,1017)
+          stop
+        endif
 C Update fortran structures
-      MLeap  = NVertices(halma)
-      Medges = NEdges(halma)
-        write(Iout,1012)  MLeap,Medges
+        MLeap  = NVertices(goldcox)
+        Medges = NEdges(goldcox)
+          write(Iout,1012)  MLeap,Medges
 C Produce adjacency matrix 
-      write (Iout,1005) 
-      call adjacency_matrix(halma,Nmax,IDA)
-      write (Iout,1007) 
-      endif
-      number_vertices = MLeap
+        write (Iout,1005) 
+        call adjacency_matrix(goldcox,Nmax,IDA)
+        call delete_fullerene_graph(goldcox)
 
-      Call Tutte(Iout,nohueckel,IDA,
+      else
+
+C Halma if l=0
+C--> Case 2
+        g = new_fullerene_graph(Nmax,number_vertices,IDA)
+        halma = halma_fullerene(g,kGC-1)
+        isafullerene = graph_is_a_fullerene(halma)
+        if (isafullerene.eq.1) then
+          write (iout,1013)
+        else
+          write (iout,1009)
+          stop
+        endif
+C Update fortran structures
+        MLeap  = NVertices(halma)
+        Medges = NEdges(halma)
+          write(Iout,1012)  MLeap,Medges
+C Produce adjacency matrix 
+        write (Iout,1005) 
+        call adjacency_matrix(halma,Nmax,IDA)
+        call delete_fullerene_graph(halma)
+       endif
+C--> End of transformation
+       write (Iout,1007) 
+       number_vertices = MLeap
+
+      endif
+C==>  End of Big loop
+
+      if(itop.eq.0) Call Tutte(Iout,nohueckel,IDA,
      1 A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
-      if(leap.ne.0) call delete_fullerene_graph(frog)
-      if(leapGC.ne.0) call delete_fullerene_graph(halma)
       call delete_fullerene_graph(g)
       write (Iout,1004) 
  1000 Format(/1X,'Creating the adjacency matrix of the next leap-frog',
@@ -2217,18 +2258,20 @@ C Produce adjacency matrix
      1 '(k,l) = (',I2,',',I2,') is the identity ==> Return')
  1007 Format(1x,'Adjacency matrix produced')
  1008 Format(1x,'Goldberg-Coxeter transformation is of leapfrog type')
- 1009 Format(1x,'Halma fullerene is not a fullerene')
+ 1009 Format(1x,'Halma transform is not a fullerene')
  1010 Format(/1x,'Goldberg-Coxeter transformation with indices ',
      1 '(k,l) = (',I2,',',I2,') of initial fullerene: GC(',I2,',',I2,
      1 ')[G0]')
- 1011 Format(/1x,'Goldberg-Coxeter construction not implemented',
+ 1011 Format(/1x,'General Goldberg-Coxeter transformation',
      1 ' for l > 0.')
  1012 Format(1x,'Updating number of vertices (',I5,') and edges (',
      1 I5,')')
- 1013 Format(1x,'Halma fullerene is a fullerene')
+ 1013 Format(1x,'Halma transform is a fullerene')
  1014 Format(1X,'Leapfrog graph satisfies all fullerene conditions')
  1015 Format(1X,'Leapfrog graph does not satisfy all fullerene ',
      1 'conditions')
+ 1016 Format(1x,'Goldberg-Coxeter transform is a fullerene')
+ 1017 Format(1x,'Goldberg-Coxeter transform is not a fullerene')
  1021 Format(/1X,'Creating the adjacency matrix of the ',I2,
      1 'nd leap-frog fullerene: ',I5,' --> ',I5)
  1022 Format(/1X,'Creating the adjacency matrix of the ',I2,
@@ -2371,11 +2414,9 @@ C     Check distances
       END
 
 
-      SUBROUTINE AME(Iout,IDA,A,evec,
-     1 Dist,distp,iocc,iv1,iv2,iv3,CDist)
+      SUBROUTINE AME(Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,CDist)
 C   Fowler-Manolopoulos matrix eigenvector algorithm
-C     Now search for lowest energy P-type vectors
-C     This needs to be changed
+C   Now search for lowest energy P-type vectors (this needs to be changed)
       use config
       use iso_c_binding
       IMPLICIT REAL*8 (A-H,O-Z)

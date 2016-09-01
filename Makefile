@@ -1,7 +1,7 @@
 #
 # Makefile for FULLERENE program
 #
-VERSION_NUMBER=4.4
+VERSION_NUMBER=4.5
 
 #CXX=clang++
 CXX=g++
@@ -11,28 +11,31 @@ AR=ar
 DIRECTORIES=-DFULLERENE_ROOT=\"${PWD}\" -DFULLERENE_DATABASE=\"${PWD}/database\"
 WARNINGS=-Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
 
-CXXFLAGS= -g -g3 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
+#CXXFLAGS= -g3 -O2 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
+CXXFLAGS= -O3 -march=native -m64 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
 # -stdlib=libc++
-FFLAGS= -g -O2 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' -mcmodel=medium 
-LIBRARIES=-lstdc++ -lgomp -lgfortran
+#FFLAGS= -g -O2 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' -mcmodel=medium 
+FFLAGS= -O3 -m64 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' -mcmodel=medium 
+LIBRARIES=-lstdc++ -lgomp -lgfortran -lnetcdf
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
 # you might need to change the gfortran compiler options:
 
 # Uncomment the following lines if you want to use Intel C++ and MKL
 #CXX=icpc
+#F90=ifort
 #CXXFLAGS+=-mkl -DHAS_MKL -DHAS_LAPACK
-#LIBRARIES+=-mkl
+#LIBRARIES+=-mkl -lifcore -limf
 #Uncomment the following lines if you want to use system BLAS and LAPACK
 CXXFLAGS+=-DHAS_LAPACK 
-LIBRARIES+=-llapack -lblas
+#LIBRARIES+=-llapack -lblas
 #uncomment that following lines to use gsl (gnu scientific library)
 CXXFLAGS+=-DHAS_GSL
-LIBRARIES+=-lgsl
+LIBRARIES+=-lgsl -lblas -llapack
 
 
-OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o 
-GRAPHOBJECTS= graph.o cubicgraph.o layout.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o layout-optimize.o delaunay.o debug.o
-GRAPHFOBJECTS=geometry.o force.o diag.o dddihedral.o config.o opt-standalone.o
+OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
+GRAPHOBJECTS= graph.o cubicgraph.o layout.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o layout-optimize.o delaunay.o
+GRAPHFOBJECTS=geometry.o force.o diag.o dddihedral.o config.o opt-standalone.o spiral-standalone.o
 
 FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))
 COBJECTS=$(patsubst %.o, build/%.o, $(GRAPHOBJECTS))
@@ -75,6 +78,7 @@ test-%: tests/%.cc build/libgraph.a
 #-----------------------------------------------------
 app-%: apps/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ $(LIBRARIES)
+
 #-----------------------------------------------------
 play-%: playground/%.cc build/libgraph.a
 	$(CXX) -I${PWD} $(CXXFLAGS) -o $@ $^ $(LIBRARIES)
