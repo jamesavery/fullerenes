@@ -19,10 +19,10 @@ bool PlanarGraph::is_triangulation() const { // NB: A bit expensive
 
 bool PlanarGraph::is_a_fullerene() const {
   if(!is_cubic()){
-    fprintf(stdout,"Graph is not cubic.\n"); 
+    fprintf(stdout,"Graph is not cubic.\n");
     return false;
   }
-    
+
   facemap_t faces(compute_faces(6,true));
   int n_faces = 0;
   for(facemap_t::const_iterator f(faces.begin()); f!=faces.end();f++)
@@ -58,7 +58,7 @@ bool PlanarGraph::is_a_fullerene() const {
 
 // the following is a naive approach that iterates over all pairs of edges
 // for some purposes it would be sufficient to ensure that each face intersects itself an even number of times (while figures of eight are problematic)
-bool PlanarGraph::layout_is_crossingfree() const 
+bool PlanarGraph::layout_is_crossingfree() const
 {
   assert(layout2d.size() == N);
   set<edge_t> es = undirected_edges(); // TODO: In new planargraph, this is unnecessary
@@ -87,6 +87,32 @@ bool PlanarGraph::layout_is_crossingfree() const
 }
 
 
+// checks if the planar graph stays connected after removing v.
+// this function implies and relies on the condition, that the graph has at most one face larger than a triangle.
+// If there is more than one larger face the function may return 'false', even though the correct answer is 'true'
+bool PlanarGraph::remains_connected_after_removal(const node_t v) const {
+//  cerr << "removing v " << v << endl;
+  const vector<vector<node_t> > &n = neighbours;
+  set<edge_t> e;
+//  cerr << "n of " << v << ": " << n[v] << endl;
+  for(int i=0; i<n[v].size(); i++){
+//    cerr << "n of v " << n[v][i] << ": " << n[n[v][i]] << endl;
+    for(int j=0; j<n[n[v][i]].size(); j++){
+      for(int k=0; k<n[v].size(); k++){
+//        cerr << n[v][k] << ", " << n[n[v][i]][j] << endl;
+        if(n[v][k] == n[n[v][i]][j]){
+          e.insert(edge_t(n[v][i], n[n[v][i]][j]));
+//          cerr << edge_t(n[v][i], n[n[v][i]][j]) << endl;
+        }
+      }
+    }
+  }
+//  cout << e << endl;
+//  cout << e.size() << endl;
+  // in a ring of n vertices where each vertex may only be connected to its immediate neighbours,
+  // the induced graph is connected exactly when there are at least n-1 edges
+  return e.size() >= n[v].size()-1;
+}
 
 
 PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const {
@@ -121,7 +147,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     if(connects.size() != 2)
       fprintf(stderr,"Edge (%d,%d) connects %d faces: Graph is not planar.\n",e.first,e.second,int(connects.size()));
   }
-  
+
   // Insert edge between each pair of faces that share an edge
   //  cerr << "dual_graph::construct graph\n";
   set<edge_t> dual_edges;
@@ -153,7 +179,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 
 // NB: TODO: What happens, for example, if a triangle is comprised of three smaller triangles?
 // This produces "phantom" faces! Fix and use the oriented version instead.
-facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const 
+facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const
 {
   set<edge_t> edge_set = undirected_edges();
 
@@ -171,32 +197,32 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
       if(ns[i] != s) {
 	const node_t u = ns[i];
 
-	face_t face(shortest_cycle(s,t,u,Nmax));  
+	face_t face(shortest_cycle(s,t,u,Nmax));
 	//	cerr << face << endl;
 	if(face.size() > 0 && face.size() <= Nmax){
 	  facemap[face.size()].insert(face);
 	} //else {
-	  //	  fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u); 
+	  //	  fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u);
 	  //	  cerr << face << endl;
-	  
+
 	//	}
       }
   }
   return facemap;
 }
 
-face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const 
+face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
 {
   face_t face;
   face.push_back(s);
   face.push_back(t);
-  
+
   node_t u = s, v = t;
   //    printf("%d->%d\n",e.first,e.second);
   while(v != s){
     const vector<node_t>& ns(neighbours[v]);
 
-    
+
     //coord2d vu = coord2d::displacement(layout2d[u],layout2d[v],layout_is_spherical);
     coord2d vu = layout2d[u]-layout2d[v];
     double angle_max = -M_PI;
@@ -208,23 +234,23 @@ face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
         //	coord2d vw = coord2d::displacement(layout2d[ns[i]],layout2d[v],layout_is_spherical);
         coord2d vw = layout2d[ns[i]]-layout2d[v];
         double angle = vu.line_angle(vw);
-        
+
         if(angle>= angle_max){
           angle_max = angle;
           w = ns[i];
-        } 
-      } 
+        }
+      }
     }
     if(w == -1) abort(); // There is no face!
 
     u = v; v = w;
-      
+
     if(w != s) face.push_back(w);
   }
   return face;
 }
 
-facemap_t PlanarGraph::compute_faces_oriented() const 
+facemap_t PlanarGraph::compute_faces_oriented() const
 {
   assert(layout2d.size() == N);
   facemap_t facemap;
@@ -271,7 +297,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 
   // Now visit every other edge once in each direction.
   while(!workset.empty()){
-    dedge_t e = *workset.begin(); 
+    dedge_t e = *workset.begin();
     face_t face(get_face_oriented(e.first,e.second));
     facemap[face.size()].insert(face);
     faces_found++;
@@ -284,7 +310,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 }
 
 // sort neighbour list CW
-void PlanarGraph::orient_neighbours() 
+void PlanarGraph::orient_neighbours()
 {
   assert(layout2d.size() == N);
   for(node_t u=0;u<N;u++){
@@ -294,7 +320,7 @@ void PlanarGraph::orient_neighbours()
   }
 }
 
-vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const 
+vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const
 {
   vector<face_t> faces;
   facemap_t facemap(compute_faces(Nmax,planar_layout));
@@ -341,11 +367,11 @@ vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_la
 
 vector<tri_t> PlanarGraph::triangulation(int face_max) const
 {
-  vector<face_t> faces(compute_faces_flat(face_max));  
+  vector<face_t> faces(compute_faces_flat(face_max));
   return triangulation(faces);
 }
 
-vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) const 
+vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) const
 {
   // Test whether faces already form a triangulation
   bool is_tri = true; for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) is_tri = false;
@@ -371,10 +397,10 @@ vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) c
     for(int j=0;j<f.size();j++)
       tris.push_back(tri_t(f[j],v_new,f[(j+1)%f.size()]));
   }
-  
+
   return orient_triangulation(tris);
 }
-  
+
 
 vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
 {
@@ -385,7 +411,7 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
     vector<tri_t> tris(faces.begin(),faces.end());
     return orient_triangulation(tris);
   } else {
-    for(int i=0;i<faces.size();i++) 
+    for(int i=0;i<faces.size();i++)
       if(faces[i].size() != 3){
         fprintf(stderr,"Face %d has %d sides: ",i,int(faces[i].size())); cerr << faces[i] << endl;
       }
@@ -399,7 +425,7 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
     for(size_t j=1;j<f.size()-1;j++)
       tris.push_back(tri_t(f[0],f[j],f[j+1]));
   }
-  
+
   return orient_triangulation(tris);
 }
 
@@ -427,7 +453,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
     done[dedge_t(tris[0][i],tris[0][(i+1)%3])] = true;
   }
 
-  queue<int> workset; 
+  queue<int> workset;
   for(int i=1;i<tris.size();i++) workset.push(i);
 
   while(!workset.empty()){
@@ -446,7 +472,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
     if(seen){
       node_t u = t[2]; t[2] = t[1]; t[1] = u;
     }
-    
+
     done[dedge_t(t[0],t[1])] = true;
     done[dedge_t(t[1],t[2])] = true;
     done[dedge_t(t[2],t[0])] = true;
@@ -478,7 +504,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
 
 // Finds the vertices belonging to the outer face in a symmetric planar
 // layout centered at (0,0). Returns the face in CW order.
-face_t PlanarGraph::find_outer_face() const 
+face_t PlanarGraph::find_outer_face() const
 {
   assert(layout2d.size() == N);
 
@@ -490,7 +516,7 @@ face_t PlanarGraph::find_outer_face() const
     radii[u] = layout2d[u].norm();
     if(radii[u] > rmax){ rmax = radii[u]; u_farthest = u; }
   }
-  
+
   face_t outer_face;
   int i = 0;
   for(node_t t = u_farthest, u = u_farthest, v = -1; v != u_farthest && i <= N; i++){
@@ -516,7 +542,7 @@ face_t PlanarGraph::find_outer_face() const
   return outer_face;
 }
 
-vector<double> PlanarGraph::edge_lengths() const 
+vector<double> PlanarGraph::edge_lengths() const
 {
   assert(layout2d.size() == N);
   set<edge_t> edge_set = undirected_edges();
@@ -550,12 +576,12 @@ void PlanarGraph::move(const coord2d& x) {
 }
 
 
-ostream& operator<<(ostream& s, const PlanarGraph& g) 
+ostream& operator<<(ostream& s, const PlanarGraph& g)
 {
   set<edge_t> edge_set = g.undirected_edges();
 
   s << "Graph[Range["<<g.N<<"],\n\tUndirectedEdge@@#&/@{";
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); ){    
+  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); ){
     s << "{" << (e->first+1) << "," << (e->second+1) << "}";
     if(++e != edge_set.end())
       s << ", ";
@@ -580,8 +606,8 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
 //		       COMBINATORIAL PROPERTIES
 // **********************************************************************
 
-void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces, 
-		   map<dedge_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const dedge_t& e) 
+void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces,
+		   map<dedge_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const dedge_t& e)
 {
   int frev = faceEdge[reverse(e)];
   if(visited[frev]) return;
@@ -627,11 +653,11 @@ double lu_det(const vector<double> &A, int N)
 }
 
 
-size_t PlanarGraph::count_perfect_matchings() const 
+size_t PlanarGraph::count_perfect_matchings() const
 {
   map<dedge_t,int> faceEdge;
   vector<face_t> faces(compute_faces_flat(max_degree(), true));
-  vector<bool> faceSum(faces.size()), visited(faces.size());  
+  vector<bool> faceSum(faces.size()), visited(faces.size());
 
   map<dedge_t,int> A;
   set<edge_t> edge_set = undirected_edges();
@@ -639,7 +665,7 @@ size_t PlanarGraph::count_perfect_matchings() const
     A[*e] = 1;
     A[reverse(*e)] = -1;
   }
-  
+
   for(int i=0;i<faces.size();i++){
     const face_t &f(faces[i]);
     for(int j=0;j<f.size();j++){
@@ -658,7 +684,7 @@ size_t PlanarGraph::count_perfect_matchings() const
   return round(sqrtl(fabs(lu_det(Af,N))));
 }
 #else
-size_t PlanarGraph::count_perfect_matchings() const 
+size_t PlanarGraph::count_perfect_matchings() const
 {
   cerr << "count_perfect_matchings() requires LAPACK.\n";
   return 0;
@@ -690,8 +716,9 @@ vector<coord3d> PlanarGraph::zero_order_geometry(double scalerad) const
   for(node_t u=0;u<N;u++)
     for(int i=0;i<3;i++) Ravg += (coordinates[u]-coordinates[neighbours[u][i]]).norm();
   Ravg /= (3.0*N);
-  
+
   coordinates *= scalerad*1.5/Ravg;
 
   return coordinates;
 }
+

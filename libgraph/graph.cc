@@ -107,7 +107,7 @@ bool Graph::adjacency_is_symmetric() const
   return true;
 }
 
- // TODO: Should make two functions: one that takes subgraph (empty is trivially connected) and one that works on full graph.
+// TODO: Should make two functions: one that takes subgraph (empty is trivially connected) and one that works on full graph.
 bool Graph::is_connected(const set<node_t> &subgraph) const 
 {
   if(!subgraph.empty()){

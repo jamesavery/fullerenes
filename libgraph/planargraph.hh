@@ -32,6 +32,8 @@ public:
 
   bool layout_is_crossingfree() const;
 
+  bool remains_connected_after_removal(const node_t v) const;
+
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;
   face_t get_face_oriented(int u, int v) const;

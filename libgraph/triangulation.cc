@@ -288,7 +288,7 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
 }
 
-void remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_nodes, vector<node_t> &deleted_neighbours){
+void remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_nodes){
   remaining_nodes.erase(u);	// O(log(N)) with big coefficient - is set<node_t> the best data structure to use?
   vector<node_t>& nu(remaining_graph.neighbours[u]);
 
@@ -305,7 +305,6 @@ void remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_
       }
     }
   }
-  deleted_neighbours = nu;
   nu.clear();
 }
 
@@ -327,7 +326,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   permutation.resize(N);
   spiral.resize(N);
 
-  Graph remaining_graph(neighbours); // remaining_graph consists of all nodes that haven't been added to the result yet
+  PlanarGraph remaining_graph(neighbours); // remaining_graph consists of all nodes that haven't been added to the result yet
   set<node_t> remaining_nodes; // all the nodes that haven't been added yet, not ordered and starting at 0
   vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
 
@@ -335,9 +334,6 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // the spiral but is not fully saturated yet.  The entry contains the number
   // of the node and the number of open valencies
   list<pair<node_t,int> > open_valencies;
-
-  // a backup of the neighbours of the current node ... required in case of a jump
-  vector<int> deleted_neighbours_bak;
 
   int pre_used_valencies=0; // number of valencies removed from the last vertex *before* it is added to the spiral
   int jump_state=0; // the number of cyclic shifts of length 1 in the current series.
@@ -373,20 +369,20 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // first node
   spiral[0] = valencies[f1];
   permutation[0] = f1;
-  remove_node(f1, remaining_graph, remaining_nodes, deleted_neighbours_bak);
+  remove_node(f1, remaining_graph, remaining_nodes);
   open_valencies.push_back(make_pair(f1,valencies[f1]));
 
   // second node
   spiral[1] = valencies[f2];
   permutation[1] = f2;
-  remove_node(f2, remaining_graph, remaining_nodes, deleted_neighbours_bak);
+  remove_node(f2, remaining_graph, remaining_nodes);
   connect_backward();
   open_valencies.push_back(make_pair(f2,valencies[f2]-1));
 
   // third node
   spiral[2] = valencies[f3];
   permutation[2] = f3;
-  remove_node(f3, remaining_graph, remaining_nodes, deleted_neighbours_bak);
+  remove_node(f3, remaining_graph, remaining_nodes);
   connect_backward();
   connect_forward();
   open_valencies.push_back(make_pair(f3,valencies[f3]-2));
@@ -406,21 +402,11 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     //    cout << "u->v: " << u << " -> " << v << endl;
     if(v == -1) return false; // non-general spiral failed
 
-    //remove all edges of which *j is part from the remaining graph
-    remove_node(v, remaining_graph, remaining_nodes, deleted_neighbours_bak);
-
     if(general){
-      bool is_connected = remaining_graph.is_connected(remaining_nodes);
+      bool remains_connected = remaining_graph.remains_connected_after_removal(v);
+      // cout << "connected? " << remains_connected << endl;
 
-      if(!is_connected){//further cyclic rotation required
-        //revert the last operations
-        //	cout << "Reverting deleted node " << v << " to neighbours " << deleted_neighbours_bak << endl;
-        remaining_graph.neighbours[v] = deleted_neighbours_bak;
-        deleted_neighbours_bak.clear();
-        for(vector<node_t>::iterator it = remaining_graph.neighbours[v].begin(); it != remaining_graph.neighbours[v].end(); ++it){
-          remaining_graph.neighbours[*it].push_back(v);
-        }
-
+      if(!remains_connected){//further cyclic rotation required
         //perform cyclic shift on open_valencies
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
@@ -435,6 +421,9 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
         jump_state=0;
       }
     }
+
+    //remove all edges of which *j is part from the remaining graph
+    remove_node(v, remaining_graph, remaining_nodes);
 
     connect_forward();
     while (open_valencies.front().second==0){
