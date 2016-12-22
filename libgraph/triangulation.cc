@@ -506,17 +506,42 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
   }
 }
 
+
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 // special_only is a switch to search for spirals starting at non-hexagons only
 bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool only_special, const bool general) const
 {
   vector<node_t> node_starts;
 
+// switch between old and new canon-definition
+#if 0
   for(node_t u=0;u<N;u++)
     if(neighbours[u].size() != 6) node_starts.push_back(u);
 
   for(node_t u=0;u<N;u++)
     if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
+#else
+  int max_face_size=0;
+  for(node_t u=0;u<N;u++) if(neighbours[u].size()>max_face_size) max_face_size=neighbours[u].size();
+  //cerr << max_face_size << endl;
+  vector<int> face_counts(max_face_size,0);
+  for(node_t u=0;u<N;u++) face_counts[neighbours[u].size()-1]++;
+  //cerr << face_counts << endl;
+  pair<int,int> fewest_face(0,INT_MAX); // size, number
+  for(int i=0; i<max_face_size; i++){
+    //cerr << face_counts[i] << fewest_face << endl;
+    if(face_counts[i]>0 && face_counts[i]<fewest_face.second){
+      fewest_face.first=i+1;
+      fewest_face.second=face_counts[i];
+    }
+  }
+  //cerr << fewest_face << endl;
+
+  for(node_t u=0;u<N;u++)
+    if(neighbours[u].size() == fewest_face.first) node_starts.push_back(u);
+  //cerr << node_starts << endl;
+
+#endif
 
   vector<int> spiral_tmp,permutation_tmp;
   jumplist_t jumps_tmp;
@@ -559,6 +584,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, const boo
 
   return true;
 }
+
 
 void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const
 {
