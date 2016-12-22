@@ -120,8 +120,6 @@ CubicGraph::CubicGraph(const unsigned int index, FILE* file){
 CubicGraph::CubicGraph(const int n, const vector<int>& spiral_string, const jumplist_t& jumps) : CubicGraph() {
   assert(spiral_string.size() == n/2 + 2);
 
-  const int n_faces = n/2 + 2;
-
   Triangulation dual(spiral_string,jumps);
   CubicGraph G(dual.dual_graph());
 

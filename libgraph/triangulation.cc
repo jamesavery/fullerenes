@@ -422,7 +422,9 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     }
     
     // record the number of the last vertex, as the neighbour of the second to last one
-    if(remaining_graph.N==2) last_vertex=remaining_graph.neighbours[v][0];
+    // this only needs to be done when remaining_graph.N==2, but writing this value each cycle should be cheaper than testing something each cycle
+    // if(remaining_graph.N==2) 
+    last_vertex=remaining_graph.neighbours[v][0];
 
     //remove all edges of which *j is part from the remaining graph
     remove_node(v, remaining_graph);
