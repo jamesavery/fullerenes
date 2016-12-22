@@ -288,8 +288,8 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
   return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
 }
 
-void remove_node(const node_t u, Graph &remaining_graph, set<node_t> &remaining_nodes){
-  remaining_nodes.erase(u);	// O(log(N)) with big coefficient - is set<node_t> the best data structure to use?
+void remove_node(const node_t u, Graph &remaining_graph){
+  remaining_graph.N--;
   vector<node_t>& nu(remaining_graph.neighbours[u]);
 
   //remove u from all neighbour lists and erase all neighbours from the u-list
@@ -327,8 +327,8 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   spiral.resize(N);
 
   PlanarGraph remaining_graph(neighbours); // remaining_graph consists of all nodes that haven't been added to the result yet
-  set<node_t> remaining_nodes; // all the nodes that haven't been added yet, not ordered and starting at 0
   vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
+  int last_vertex; // we'd like to know the number of the last vertex
 
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
@@ -341,7 +341,6 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   //init of the valency-list and the set of nodes in the remaining graph
   for(node_t u=0; u<remaining_graph.N; u++){
     valencies[u] = remaining_graph.neighbours[u].size();
-    remaining_nodes.insert(u);
   }
 
   bool
@@ -369,20 +368,20 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // first node
   spiral[0] = valencies[f1];
   permutation[0] = f1;
-  remove_node(f1, remaining_graph, remaining_nodes);
+  remove_node(f1, remaining_graph);
   open_valencies.push_back(make_pair(f1,valencies[f1]));
 
   // second node
   spiral[1] = valencies[f2];
   permutation[1] = f2;
-  remove_node(f2, remaining_graph, remaining_nodes);
+  remove_node(f2, remaining_graph);
   connect_backward();
   open_valencies.push_back(make_pair(f2,valencies[f2]-1));
 
   // third node
   spiral[2] = valencies[f3];
   permutation[2] = f3;
-  remove_node(f3, remaining_graph, remaining_nodes);
+  remove_node(f3, remaining_graph);
   connect_backward();
   connect_forward();
   open_valencies.push_back(make_pair(f3,valencies[f3]-2));
@@ -421,9 +420,12 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
         jump_state=0;
       }
     }
+    
+    // record the number of the last vertex, as the neighbour of the second to last one
+    if(remaining_graph.N==2) last_vertex=remaining_graph.neighbours[v][0];
 
     //remove all edges of which *j is part from the remaining graph
-    remove_node(v, remaining_graph, remaining_nodes);
+    remove_node(v, remaining_graph);
 
     connect_forward();
     while (open_valencies.front().second==0){
@@ -448,11 +450,11 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
 
   // make sure we left the loop in a sane state
   // this probably requires some proper error handling: throw and catch and so on ...
-  if(remaining_nodes.size() != 1){
+  if(remaining_graph.N != 1){
     // cerr << "more than one node left ... exiting." << endl;
     return false;
   }
-  const int last_valency = valencies[*remaining_nodes.begin()];
+  const int last_valency = valencies[last_vertex];
   if(open_valencies.size() != last_valency){
     // cerr << "wrong number of nodes with open valencies: " << open_valencies.size() << " ... exiting." << endl;
     return false;
@@ -465,7 +467,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   }
 
   spiral[N-1] = last_valency;
-  permutation[N-1] = *remaining_nodes.begin();
+  permutation[N-1] = last_vertex;
   return true;
 }
 
