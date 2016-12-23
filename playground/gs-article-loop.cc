@@ -5,9 +5,8 @@
 
 int main(int ac, char **av) {
   int N = strtol(av[1], 0, 0);
-  int k = strtol(av[2], 0, 0);
-  int l = strtol(av[3], 0, 0);
-  cout << N << ", " << k << ", " << l << endl;
+  int maxcount = strtol(av[2], 0, 0);
+  cout << N << ", " << maxcount << endl;
 
   FullereneGraph g;
   switch (N) {
@@ -49,6 +48,10 @@ int main(int ac, char **av) {
   g.layout_is_spherical = false;
   cout << "Tutte done" << endl;
 
+  for (int k = 1; k <= 9; k++) {
+    for (int l = 0; l <= k; l++) {
+      cout << k << ", " << l << endl;
+      if (N * (k * k + k * l + l * l) > maxcount ) continue;
 
       FullereneGraph gkl(g.GCtransform(k, l, true));
       cout << "gc done " << endl;
@@ -68,6 +71,8 @@ int main(int ac, char **av) {
              << "jumplist = " << jumps << ";\n"
              << "spiral   = " << rspi << ";\n";
       output.close();
+    }
+  }
 
   return 0;
 }
