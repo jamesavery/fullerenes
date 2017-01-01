@@ -112,10 +112,10 @@ C Integers
       ndbconvert=0 ! Flag for conversion of database
       nosort=0  !  Flag for sorting cartesian coordinates
       ispsearch=1-3 ! Flag for searching for canonical spiral
-      ispsearch=1 ! Search through all spirals
-      ispsearch=2 ! Search through spirals without jumps
-      ispsearch=3 ! Search through spirals with jumps
-      ispsearch=4 ! Search through spirals without jumps but stop in (55), (56) or (66) space
+      ispsearch=1 ! Search through all spirals without jumps, if unsuccessful do general spiral algorithm
+      ispsearch=2 ! Search through spirals without jumps, but stop in 55), (56) or (66) batch if found, if unsuccessful do general spiral algorithm
+      ispsearch=3 ! Go directly to general spiral algorithm
+      ispsearch=4 ! Same as ispsearch=1 but only do pentagon starts
       ihamstore=0 ! Flag for storing all Hamiltonian cycles
       ihamstats=0 ! Flag for Hamiltonian cycle statistics
       nhamcyc=0 ! Flag for reading Hamiltonian cycle for 2D graph
