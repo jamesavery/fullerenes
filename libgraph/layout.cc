@@ -208,7 +208,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
 
   
   bool converged = false;
-  const unsigned int TUTTE_MAX_ITERATION = 1000000;
+  const unsigned int TUTTE_MAX_ITERATION = 10000000;
   const double TUTTE_CONVERGENCE = 5e-4;
   unsigned int i;
   double max_change;

@@ -53,7 +53,8 @@ int main(int ac, char **av)
     //fg.layout2d = fg.tutte_layout();
 //    cout << "fg: " << fg << endl;
 
-    fg.get_rspi_from_fg(pentagon_indices, jumps);
+    bool pentagon_start = false;
+    fg.get_rspi_from_fg(pentagon_indices, jumps, pentagon_start);
 //    cout << "pentagon indices: " << pentagon_indices << endl;
 
     //start indices at 1 for fortran

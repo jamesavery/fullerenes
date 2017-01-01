@@ -511,18 +511,11 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 // special_only is a switch to search for spirals starting at non-hexagons only
-bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool only_special, const bool general) const
+bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool only_special, const bool general, const bool pentagon_start) const
 {
   vector<node_t> node_starts;
 
-// switch between old and new canon-definition
-#if 0
-  for(node_t u=0;u<N;u++)
-    if(neighbours[u].size() != 6) node_starts.push_back(u);
-
-  for(node_t u=0;u<N;u++)
-    if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
-#else
+if(pentagon_start){
   int max_face_size=0;
   for(node_t u=0;u<N;u++) if(neighbours[u].size()>max_face_size) max_face_size=neighbours[u].size();
   //cerr << max_face_size << endl;
@@ -542,8 +535,14 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, const boo
   for(node_t u=0;u<N;u++)
     if(neighbours[u].size() == fewest_face.first) node_starts.push_back(u);
   //cerr << node_starts << endl;
+}
+else {
+  for(node_t u=0;u<N;u++)
+    if(neighbours[u].size() != 6) node_starts.push_back(u);
 
-#endif
+  for(node_t u=0;u<N;u++)
+    if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
+}
 
   vector<int> spiral_tmp,permutation_tmp;
   jumplist_t jumps_tmp;
@@ -765,13 +764,13 @@ bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, 
 }
 
 // call for the canonical general spiral and extract the pentagon indices
-bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonical, bool general) const
+bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonical, bool general, bool pentagon_start) const
 {
   rspi.clear();
   jumps.clear();
   vector<int> spiral;
   bool special_only = false;
-  if(!get_spiral(spiral, jumps, canonical, special_only, general)) return false;
+  if(!get_spiral(spiral, jumps, canonical, special_only, general, pentagon_start)) return false;
 
   int i=0;
   vector<int>::const_iterator it=spiral.begin();

@@ -37,7 +37,7 @@ public:
 
   // spiral from graph, with or without starting point
   bool get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general=true) const;
-  bool get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical=true, const bool general=true) const;
+  bool get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical=true, const bool general=true, const bool pentagon_start=true) const;
 
   // create a matrix that holds the topological distances between all pentagons
   vector<int> pentagon_distance_mtx() const;

@@ -10,7 +10,7 @@ extern "C" {
   fullerene_graph_ptr new_fullerene_graph_(const int *nmax, const int *N, const int *adjacency);
   fullerene_graph_ptr read_fullerene_graph_(const char *f_path);
   fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const char *f_path);
-  fullerene_graph_ptr windup_general_(const int *n, const int indices[12], const int jumps_array[10]);
+  fullerene_graph_ptr windup_general_(const int *n, const int indices[12], const int jumps_array[100]);
   void delete_fullerene_graph_(fullerene_graph_ptr*);
 
   polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points);
@@ -43,7 +43,7 @@ extern "C" {
 			     const double *path_width, const double *vertex_diameter,const int *Npath, int *path);
   graph_ptr dual_graph_(const graph_ptr *);
 
-  void get_general_spiral_(const fullerene_graph_ptr*, int rspi_a[12], int jumps_a[10]);
+  void get_general_spiral_(const fullerene_graph_ptr*, int rspi_a[12], int jumps_a[100]);
 
 
   // Fullerene graph generation 
@@ -167,7 +167,7 @@ fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const c
   return g;
 }
 
-fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array[12], const int jumps_array[10]){
+fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array[12], const int jumps_array[100]){
   
   vector<int> spiral_indices(12);
   for(int i=0; i<12; ++i){
@@ -176,7 +176,7 @@ fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array
   }
 
   list<pair<int,int> > jumps;
-  for(int i=0; i<10; ++i,++i){
+  for(int i=0; i<100; ++i,++i){
     if(jumps_array[i]==0) break;
     jumps.push_back(make_pair(jumps_array[i]-1,jumps_array[i+1]));
   //  cout << jumps.back().first << ", " << jumps.back().second << endl;
@@ -480,19 +480,19 @@ void get_face_distance_mtx_(const fullerene_graph_ptr *fg, int *face_distances){
 }
 
 // rspi_a and jumps_a start counting at 1
-void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jumps_a[10]){
-//  12 will always be 12, 10 is just an arbitrary magic number
+void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jumps_a[100]){
+//  12 will always be 12, 100 is just an arbitrary magic number
   assert((*fg)->layout2d.size() == (*fg)->N);
   vector<int> rspi_v;
   FullereneGraph::jumplist_t jumps_v;
-  const bool canonical=true, general=true;
-  (*fg)->get_rspi_from_fg(rspi_v, jumps_v, canonical, general);
+  const bool canonical=true, general=true, pentagon_start=false;
+  (*fg)->get_rspi_from_fg(rspi_v, jumps_v, canonical, general, pentagon_start);
 
   for(int i=0; i!=12; i++){
     rspi_a[i] = rspi_v[i] +1;//start counting at 1
   }
   int j=0;
-  std::fill(jumps_a,jumps_a+10, 0);
+  std::fill(jumps_a,jumps_a+100, 0);
   for(list<pair<int,int> >::iterator it(jumps_v.begin()); it!=jumps_v.end(); it++){
   	jumps_a[j++]=it->first +1;//start counting at 1
   	jumps_a[j++]=it->second;

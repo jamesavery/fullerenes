@@ -124,22 +124,12 @@ unsigned int gcd(unsigned int a, unsigned int b)
 // works for all CG, but here we know, the maximum ring size is 6
 FullereneGraph FullereneGraph::GCtransform(const unsigned k, const unsigned l, const bool do_layout) const
 {
-  // this should be faster
-  // furthermore, for reasons I don't understand, the general GC(x,0) with x=2,3,4.. fails for the non-spiral c380.
-  if(l==0){
-    FullereneGraph fg(*this);
-    for(int i=1; i< k; i++){
-      fg=FullereneGraph(fg.leapfrog_fullerene());
-    }
-    return fg;
-  } else {
-    assert(layout2d.size()==N);// FIXME remove
-    Triangulation t(dual_graph(6));
-    t.layout2d = t.tutte_layout(); // FIXME remove because unnecessary?
-    Triangulation t_inflated(t.GCtransform(k,l));
-    FullereneGraph fg(t_inflated.dual_graph());
-    return fg;
-  }
+  assert(layout2d.size()==N);// FIXME remove
+  Triangulation t(dual_graph(6));
+  t.layout2d = t.tutte_layout(); // FIXME remove because unnecessary?
+  Triangulation t_inflated(t.GCtransform(k,l));
+  FullereneGraph fg(t_inflated.dual_graph());
+  return fg;
 }
 
 // Creates the next leapfrog fullerene C_{3n} from the current fullerene C_n
@@ -237,7 +227,7 @@ bool FullereneGraph::get_rspi_from_fg(const node_t f1, const node_t f2, const no
 
 // pentagon indices and jumps start to count at 0
 // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
-bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical, const bool general) const
+bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical, const bool general, const bool pentagon_start) const
 {
   assert(layout2d.size() == N);
   rspi.clear();
@@ -245,7 +235,7 @@ bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, cons
 
   FullereneDual FDual = Triangulation(this->dual_graph(6));
 
-  if(!FDual.get_rspi(rspi, jumps, canonical, general)) return false;
+  if(!FDual.get_rspi(rspi, jumps, canonical, general, pentagon_start)) return false;
   assert(rspi.size()==12);
   return true;
 }

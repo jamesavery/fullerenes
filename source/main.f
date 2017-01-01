@@ -56,7 +56,7 @@ C    Set the dimensions for the distance matrix
       Integer Values(8)
       integer istop
       integer mdist(nmax,nmax)
-      integer rspi(12),jumps(10)
+      integer rspi(12),jumps(100)
       integer leapspiral,SWspiral, scaleRad
 
 C Set parameters
