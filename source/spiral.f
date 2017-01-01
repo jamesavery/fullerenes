@@ -1243,18 +1243,22 @@ C  Finally success, spiral found
       END
 
       SUBROUTINE FindCanonical(iout,n55,n56,n66,nsp,msp,NCS,SpiralT)
+C---------------------------------------------------------------------
+C     Routine to find canonical spiral out of produced list of spirals
+C      without jumps
+C     Algorithm is linear aO(n), in the worst case a=12
+C---------------------------------------------------------------------
       use config
       IMPLICIT INTEGER (A-Z)
       DIMENSION SpiralT(12,MaxSpirals),SpiralS(MaxSpirals)
       Dimension n(3),ncs(12)
       
-C     Initiallize spirals to search and do first sorting
       n(1)=n55
       n(2)=n56+n(1)
       n(3)=n66+n(2)
       indexs=huge(largest)
-      msp=1
 
+C     Initiallize spirals to search and do first sorting
       Do I=1,3
       if(n(i).eq.0) cycle 
        batch=i
@@ -1268,10 +1272,9 @@ C     Initiallize spirals to search and do first sorting
          J1=J1+1
         else
          J1=1
+         indexs=index
         endif
-        indexs=index
         SpiralS(J1)=J
-        msp=J
        enddo
        exit      
       enddo
@@ -1286,17 +1289,18 @@ C     Initiallize spirals to search and do first sorting
        do K=1,12
         ncs(k)=SpiralT(K,JS)
        enddo
+        msp=SpiralS(1)
       Write(Iout,102) 
       Write(Iout,103) (SpiralT(K,JS),K=1,12)
        return
       endif
 
-C     Further search
+C     Further search through pentagon indices 2...12
       Write(Iout,101) 
-      J1=1
       do I=2,12
        indexs=SpiralT(I,SpiralS(1))
        nindpent=I
+       J1=1
        do J=2,nspc
         index=SpiralT(I,SpiralS(J))
         inddif=index-indexs
@@ -1305,19 +1309,20 @@ C     Further search
          J1=J1+1
         else
          J1=1
+         indexs=index
         endif
-        indexs=index
-        SpiralS(J1)=J
-        msp=J
+        SpiralS(J1)=SpiralS(J)
        enddo
        nspc=J1
-       if(nspc.eq.1) exit
+       if(nspc==1) exit
       enddo
+
+      msp=SpiralS(1)
       do K=1,12
-       ncs(k)=SpiralT(K,SpiralS(1))
+       ncs(k)=SpiralT(K,msp)
       enddo
       Write(Iout,104) nindpent 
-      Write(Iout,103) (SpiralT(K,SpiralS(1)),K=1,12)
+      Write(Iout,103) (SpiralT(K,msp),K=1,12)
 
  100  Format(1X,I6,' potential canonical spirals found out of ',I6,
      1 ' spirals in batch ',I2:)
