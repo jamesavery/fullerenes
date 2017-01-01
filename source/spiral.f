@@ -1364,6 +1364,7 @@ C     Timing O(6 n_v n_f^2)
       number_faces=number_vertices/2+2
       ispiral=0
       maxgen_jumps=100
+      pentagon_start = .false.
       WRITE (Iout,600)
       IF(number_vertices.lt.100)   
      1  WRITE(Iout,601) number_vertices,number_faces
@@ -1373,6 +1374,7 @@ C     Timing O(6 n_v n_f^2)
      1  WRITE(Iout,632) number_vertices,number_faces
       IF(number_vertices.ge.10000)
      1  WRITE(Iout,633) number_vertices,number_faces
+
       do I=1,MMAX
         do J=1,MMAX
           D(I,J)=0
@@ -1440,6 +1442,7 @@ C     Start searching for spiral from pentagon 1 to 12, then stop
 C      and store the pentagon indices. Note this may still be an
 C      unsuccessful ring spiral. Also throw duplicates out.
       nspiral=0
+      if(ispsearch.eq.3) go to 199
       nspiral5=0
       nspiralT=0
 
@@ -1585,6 +1588,15 @@ C      Jump count if spcount=0
       endif
       nspiral56=nspiral-nspiral55
       nspiralT56=nspiralT-nspiralT55
+       nspiral5sym=0
+       do i=1,nspiral
+         if(SpiralT(1,i).eq.1) nspiral5sym=nspiral5sym+1
+       enddo
+      if(nspiral5sym.eq.0.and.ispsearch.eq.4) then
+        WRITE(Iout,640)
+        pentagon_start = .true.
+        Go to 199
+       endif
       
 C Loop over all (6,6) fusions
 C Dito, see above
@@ -1644,14 +1656,13 @@ C      Jump count if spcount=0
       enddo 
       endif
       spcount=1
+      if(nspiral.eq.0) WRITE(Iout,630) nspiralT,6*number_vertices
 C---- End of search
 
  199  if(nspiral.eq.0) then
-        WRITE(Iout,630) nspiralT,6*number_vertices
-
+        WRITE(Iout,639) 
         dg = new_graph(mmax,number_faces,D)
         fg = dual_graph(dg)
-        pentagon_start = .false.
         call get_general_spiral(fg, gen_rspi, gen_jumps, pentagon_start)
         call delete_graph(dg) 
         call delete_fullerene_graph(fg) 
@@ -1660,17 +1671,13 @@ C---- End of search
         Do MJ=1,maxgen_jumps
          if(gen_jumps(MJ).eq.0) then
           maxgj=MJ-1
-          go to 640
+          go to 64
          endif
         enddo
-  640   Write(Iout,637) maxgj/2
+  64    Write(Iout,637) maxgj/2
         write(Iout,638) (gen_jumps(MJ),MJ=1,maxgj)
         return
       else
-        nspiral5sym=0
-        do i=1,nspiral
-          if(SpiralT(1,i).eq.1) nspiral5sym=nspiral5sym+1
-        enddo
         WRITE(Iout,634) nspiral,nspiralT,6*number_vertices,
      1  nspiral5,nspiral5sym
         if(iprint.ne.0) then
@@ -1826,8 +1833,7 @@ C     Print ring numbers
  629  Format(100(1X,20(I5,'-'),/))
  630  Format(1X,'Failed to find ring spiral: ',I7,
      1 ' detected (maximum possible: ',I7,')',/1X,
-     1 'This is a non-spiral fullerene: Entering the general spiral'
-     1 ' algorithm',/1X,'Canonical General Spiral:')
+     1 'This is a non-spiral fullerene')
  631  FORMAT(1X,I7,' distinct (55)      RSPIs found out of ',I7,
      1 /1X,I7,' distinct (56)/(65) RSPIs found out of ',I7,
      1 /1X,I7,' distinct (66)      RSPIs found out of ',I7)
@@ -1844,6 +1850,9 @@ C     Print ring numbers
  636  FORMAT(1X,'RSPI : ',12I6)
  637  FORMAT(1X,'Number of jumps: ',I2)
  638  FORMAT(1X,'Jumps: ',10I6)
+ 639  Format(' Entering the general spiral algorithm',
+     1 /1X,'Canonical General Spiral:')
+ 640  Format(' No pentagon start found, go to general spiral algorithm')
       Return
       END
      
