@@ -59,7 +59,8 @@ int main(int ac, char **av) {
 
       vector<int> rspi(12, 0);
       Triangulation::jumplist_t jumps;
-      gkl.get_rspi_from_fg(rspi, jumps, true, true);
+      bool pentagon_start = true;
+      gkl.get_rspi_from_fg(rspi, jumps, true, true, pentagon_start);
 
       ofstream output(("spiral-" + to_string(N) + "-" + to_string(k) + "-" + to_string(l)).c_str());
       for (int i = 0; i < 12; i++) rspi[i]++;

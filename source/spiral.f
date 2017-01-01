@@ -1255,7 +1255,8 @@ C  Finally success, spiral found
       DIMENSION D(MMAX,MMAX),S(MMAX),FreeRing(6)
       CHARACTER*3 GROUP
       type(c_ptr) :: dg, fg, new_graph, dual_graph
-      integer gen_rspi(12), gen_jumps(10)
+      integer gen_rspi(12), gen_jumps(100)
+      logical pentagon_start
 
 C     Search for all spirals, set up first three rings then wind.
 C     Start ring spiral algorithm. Quit after first successful spiral.
@@ -1269,7 +1270,7 @@ C     Timing O(6 n_v n_f^2)
 
       number_faces=number_vertices/2+2
       ispiral=0
-      maxgen_jumps=10
+      maxgen_jumps=100
       WRITE (Iout,600)
       IF(number_vertices.lt.100)   
      1  WRITE(Iout,601) number_vertices,number_faces
@@ -1556,7 +1557,8 @@ C---- End of search
 
         dg = new_graph(mmax,number_faces,D)
         fg = dual_graph(dg)
-        call get_general_spiral(fg, gen_rspi, gen_jumps)
+        pentagon_start = .false.
+        call get_general_spiral(fg, gen_rspi, gen_jumps, pentagon_start)
         call delete_graph(dg) 
         call delete_fullerene_graph(fg) 
         write(Iout,636) (gen_rspi(Mrspi),Mrspi=1,12)

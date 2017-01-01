@@ -47,7 +47,7 @@ int main(int ac, char **av)
       vector<int> rspi2(12);
       FullereneDual FD(G);
 
-      spiral_OK = FD.get_rspi(rspi2,jumps,true,true);
+      spiral_OK = FD.get_rspi(rspi2,jumps,true,true,true);
 
       cout << jumps << endl;
       cout << rspi2 << endl;

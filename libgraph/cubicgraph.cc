@@ -139,14 +139,14 @@ bool CubicGraph::get_spiral_from_cg(const node_t f1, const node_t f2, const node
   return true;
 }
 
-bool CubicGraph::get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool general) const
+bool CubicGraph::get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool general, const bool pentagon_start) const
 {
   spiral.clear();
   jumps.clear();
 
   Triangulation Dual(this->dual_graph(6));
 
-  if(!Dual.get_spiral(spiral, jumps, canonical, general)) return false;
+  if(!Dual.get_spiral(spiral, jumps, canonical, general, pentagon_start)) return false;
   assert(spiral.size()==N/2+2);
   return true;
 }

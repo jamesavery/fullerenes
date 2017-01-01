@@ -50,7 +50,7 @@ public:
   // the one defined by three nodes
   bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, vector<node_t>& permutation, const bool general=true) const;
   // the canonical one
-  bool get_spiral(vector<int>& v, jumplist_t& j, const bool canonical=true, const bool only_special=false, const bool general=true) const;
+  bool get_spiral(vector<int>& v, jumplist_t& j, const bool canonical=true, const bool only_special=false, const bool general=true, const bool pentagon_start=true) const;
   void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps, // TODO: Should only need to supply jumps when general=true
 		       vector< vector<int> >& permutations,
 		       const bool only_special=false, const bool general=false) const;
@@ -86,7 +86,7 @@ public:
   FullereneDual(const Triangulation& g = Triangulation()) : Triangulation(g) {}
 
   bool get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& r, jumplist_t& j, const bool general=true) const;
-  bool get_rspi(vector<int>& r, jumplist_t& j, const bool canonical=true, const bool general=true) const;
+  bool get_rspi(vector<int>& r, jumplist_t& j, const bool canonical=true, const bool general=true, const bool pentagon_start=true) const;
 
 };
 
