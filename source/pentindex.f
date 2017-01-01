@@ -21,7 +21,7 @@ C mapping
       DIMENSION NMR(6),A(NMAX,NMAX),IDA(NMAX,NMAX)
       DIMENSION evec(NMAX),df(NMAX)
       DIMENSION Spiral(12,NMAX)
-      integer rspi(12),jumps(10)
+      integer rspi(12),jumps(100)
       CHARACTER*3 GROUP
       CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/

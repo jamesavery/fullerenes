@@ -18,7 +18,7 @@ C-----------------------------------------------------------------
       integer NA,iopt
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF (and a backup)
       integer endzeile
-      integer rspi(12), jumps(10)
+      integer rspi(12), jumps(100)
       Character*1 DATEN(nzeile)
       Character filename*50,filenameout*50,flagsym*3
       Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
@@ -187,7 +187,7 @@ c init of rspi (always 12)
         rspi(k)=0
       enddo
 c init of jumps (should be more than 10 (should ... ))
-      do k=1,10
+      do k=1,100
         jumps(k)=0
       enddo
 
