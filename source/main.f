@@ -122,6 +122,7 @@ C You may have to change this part for different compiler
       CALL date_and_time(CDAT,CTIM,zone,values)
       TIMEX=0.d0
       CALL Timer(TIMEX)
+      Timex1=TIMEX
       WRITE(Iout,1000) Values(3),Values(2),Values(1),Values(5),
      1  Values(6),Values(7),Nmax
 
@@ -508,12 +509,23 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
  889  if((ipent.eq.0 .or. leapspiral.ne.0.or.SWspiral.ne.0.
      1   or.Icart.eq.6.or.Icart.eq.7.or.ihalma.eq.1).or.
      1   ispsearch.ne.0) then
+      CALL Timer(TIMEX)
+      Hours=TIMEX/3.6d3
+      TIMEX1=TIMEX+Timex1
+      WRITE(Iout,1009) TIMEX,Hours
+      call flush(iout)
         routine='SPIRALSEARCH   '
         ispcount=0
         if(ispsearch.gt.1) ispcount=1
         Write(Iout,1008) routine
-        CALL SpiralSearch(Iout,Iring5,Iring6,Iring56,NringA,NringB,
-     1   NringC,NringD,NringE,NringF,rspi,GROUP,ispcount)
+        CALL SpiralSearch(Iout,iprintf,Iring5,Iring6,Iring56,
+     1  NringA,NringB,NringC,NringD,NringE,NringF,
+     1  ispcount,ispsearch,rspi,GROUP)
+      CALL Timer(TIMEX)
+      Hours=TIMEX/3.6d3
+      TIMEX1=TIMEX+TIMEX1
+      WRITE(Iout,1009) TIMEX,Hours
+      call flush(iout)
       endif
 
 C--------------TOPOLOGICAL INDICATORS-----------------------------
@@ -720,8 +732,11 @@ C-----------------------------------------------------------------
         WRITE(Iout,1004) Values(3),Values(2),Values(1),Values(5),
      1    Values(6),Values(7)
       CALL Timer(TIMEX)
+      TIMEX1=TIMEX+TIMEX1
       Hours=TIMEX/3.6d3
+      Hours1=TIMEX1/3.6d3
       WRITE(Iout,1009) TIMEX,Hours
+      WRITE(Iout,1014) TIMEX1,Hours1
 
 C Formats 
 C VERSION_NUMBER is set in the Makefile
@@ -772,5 +787,6 @@ C VERSION_NUMBER is set in the Makefile
  1012 FORMAT(1X,'Connectivity field IC3 in input is errorneous: ',
      1 'taking only cartesian coordinates from input')
  1013 FORMAT(/1X,'End of file reached ==> Stop')
+ 1014 FORMAT(1x,'Total CPU, Seconds: ',F15.2,', CPU Hours: ',F13.5)
       STOP 
       END

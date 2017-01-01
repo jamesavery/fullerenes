@@ -1242,9 +1242,97 @@ C  Finally success, spiral found
       Return
       END
 
+      SUBROUTINE FindCanonical(iout,n55,n56,n66,nsp,msp,NCS,SpiralT)
+      use config
+      IMPLICIT INTEGER (A-Z)
+      DIMENSION SpiralT(12,MaxSpirals),SpiralS(MaxSpirals)
+      Dimension n(3),ncs(12)
+      
+C     Initiallize spirals to search and do first sorting
+      n(1)=n55
+      n(2)=n56+n(1)
+      n(3)=n66+n(2)
+      indexs=huge(largest)
+      msp=1
 
-      SUBROUTINE SpiralSearch(Iout,IRG55,IRG66,IRG56,
-     1 NrA,NrB,NrC,NrD,NrE,NrF,JP,GROUP,spcount)
+      Do I=1,3
+      if(n(i).eq.0) cycle 
+       batch=i
+       nsp=n(I)
+       J1=0
+       do J=1,nsp
+        index=SpiralT(1,J)
+        inddif=index-indexs
+        if(inddif>0) cycle
+        if(inddif==0) then
+         J1=J1+1
+        else
+         J1=1
+        endif
+        indexs=index
+        SpiralS(J1)=J
+        msp=J
+       enddo
+       exit      
+      enddo
+      nspc=J1
+      Write(iout,100) nspc,n(batch),batch
+       do J=1,nspc
+       JS=SpiralS(J)
+       Write(Iout,105) (SpiralT(K,JS),K=1,12)
+       enddo
+      if(nspc.eq.1) then
+       JS=SpiralS(1)
+       do K=1,12
+        ncs(k)=SpiralT(K,JS)
+       enddo
+      Write(Iout,102) 
+      Write(Iout,103) (SpiralT(K,JS),K=1,12)
+       return
+      endif
+
+C     Further search
+      Write(Iout,101) 
+      J1=1
+      do I=2,12
+       indexs=SpiralT(I,SpiralS(1))
+       nindpent=I
+       do J=2,nspc
+        index=SpiralT(I,SpiralS(J))
+        inddif=index-indexs
+        if(inddif>0) cycle
+        if(inddif==0) then
+         J1=J1+1
+        else
+         J1=1
+        endif
+        indexs=index
+        SpiralS(J1)=J
+        msp=J
+       enddo
+       nspc=J1
+       if(nspc.eq.1) exit
+      enddo
+      do K=1,12
+       ncs(k)=SpiralT(K,SpiralS(1))
+      enddo
+      Write(Iout,104) nindpent 
+      Write(Iout,103) (SpiralT(K,SpiralS(1)),K=1,12)
+
+ 100  Format(1X,I6,' potential canonical spirals found out of ',I6,
+     1 ' spirals in batch ',I2:)
+ 101  Format(1X,'Searching through remaining pentagon indices')
+ 102  Format(1X,'Search stopped at pentagon index 1',
+     1 '. Canonical spiral:')
+ 103  Format(1X,85('-'),/1X,I6,11(',',I6),/1X,85('-'))
+ 104  Format(1X,'Search stopped at pentagon index ',I6,
+     1 '. Canonical spiral:')
+ 105  Format(1X,I6,11(',',I6))
+      Return
+      END
+
+      SUBROUTINE SpiralSearch(Iout,iprint,IRG55,IRG66,IRG56,
+     1 NrA,NrB,NrC,NrD,NrE,NrF,spcount,ispsearch,JP,GROUP)
       use config
       use iso_c_binding
       IMPLICIT INTEGER (A-Z)
@@ -1552,6 +1640,7 @@ C      Jump count if spcount=0
       endif
       spcount=1
 C---- End of search
+
  199  if(nspiral.eq.0) then
         WRITE(Iout,630) nspiralT,6*number_vertices
 
@@ -1579,6 +1668,12 @@ C---- End of search
         enddo
         WRITE(Iout,634) nspiral,nspiralT,6*number_vertices,
      1  nspiral5,nspiral5sym
+        if(iprint.ne.0) then
+          Write(Iout,606)
+         Do I=1,nspiral
+          Write(Iout,609) I,(SpiralT(k,I),k=1,12)
+         enddo
+        endif
       endif
       if(spcount.ne.0) then
        nspiral66=nspiral-nspiral55-nspiral56
@@ -1586,23 +1681,22 @@ C---- End of search
        WRITE(Iout,631) nspiral55,nspiralT55,nspiral56,nspiralT56,
      1  nspiral66,nspiralT66
       endif
+C     Find canonical spiral
+      Call FindCanonical(iout,nspiral55,nspiral56,nspiral66,
+     1  nspiral,msp,JP,SpiralT)
      
-C     Now loop over with found spiral until success with
-C     Fowler algorithm
+C     Now go over found spiral with Fowler algorithm
       IT=1
       IPR=0
-      nspfound=0
-      Do 13 msp=1,nspiral
        Do I=1,number_faces
         S(I)=6
        enddo
        Do I=1,12
-        S(SpiralT(I,msp))=5
-        JP(I)=SpiralT(I,msp)
+        S(JP(I))=5
        enddo
        IER=0
        CALL Windup(number_faces,IPR,IER,S,D)     !      Wind up spiral into dual 
-       IF(IER.ne.0) GO TO 13                     !      and check for closure 
+       IF(IER.ne.0) GO TO 99                     !      and check for closure 
        Do I=1,12 
         Spiral(I,1)=JP(I)
        enddo
@@ -1613,14 +1707,13 @@ C     Fowler algorithm
          IF(NMR(J).EQ.0) GO TO 16
          K=J
        enddo
- 16    nspfound=nspfound+1
-       if(nspfound.eq.1) write(Iout,614) nspiral 
+ 16    write(Iout,614) nspiral 
        If(K.le.0) then
         WRITE(Iout,603) GROUP,(JP(I),I=1,12)
        else
         WRITE(Iout,605) GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
        endif
-       WRITE(Iout,604) 
+       WRITE(Iout,604) msp
        if(number_faces.lt.1000) 
      1  WRITE(Iout,618) (SpiralF(I,msp),I=1,number_faces)
        if(number_faces.ge.1000) 
@@ -1653,8 +1746,7 @@ C     Fowler algorithm
        enddo
        WRITE(Iout,624)
        WRITE(Iout,625) (S(I),I=1,number_faces)
-       go to 99
- 13   CONTINUE 
+
  99   if(IER.eq.0) then
        if(ispiral.ge.2) then
 C     Print ring numbers
@@ -1680,10 +1772,13 @@ C     Print ring numbers
  602  FORMAT(1X,'Spiral for fullerene isomers of C',I3,':',
      1 ' (',I3,' faces)')
  603  FORMAT(1X,A3,9X,12I6)
- 604  FORMAT(1X,131('-'),/1X,'Corresponding ring numbers:') 
+ 604  FORMAT(1X,131('-'),/1X,'Corresponding ring numbers for spiral',
+     1  I6,':') 
  605  FORMAT(1X,A3,9X,12I6,2X,3(I4,' x',I4,:,','))
+ 606  Format(1X,'Printing all found spirals:')
  607  Format(12(1X,I6))
  608  Format(1X,'Spiral is canonical')
+ 609  Format(1x,I6,' | ',I6,11(',',I6))
  610  Format(1X,'This is an IPR fullerene, no (5,5) fusions to ',
      1 'loop over')
  611  Format(1X,'Loop over (5,5) fusions, ',I5,' max in total')
