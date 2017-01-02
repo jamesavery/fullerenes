@@ -1337,7 +1337,7 @@ C     Further search through pentagon indices 2...12
       END
 
       SUBROUTINE SpiralSearch(Iout,iprint,IRG55,IRG66,IRG56,
-     1 NrA,NrB,NrC,NrD,NrE,NrF,spcount,ispsearch,JP,GROUP)
+     1 NrA,NrB,NrC,NrD,NrE,NrF,ispsearch,JP,GROUP)
       use config
       use iso_c_binding
       IMPLICIT INTEGER (A-Z)
@@ -1365,6 +1365,12 @@ C     Timing O(6 n_v n_f^2)
       ispiral=0
       maxgen_jumps=100
       pentagon_start = .false.
+      nspiral55=0
+      nspiralT55=0
+      nspiral56=0
+      nspiralT56=0
+      nspiral66=0
+      nspiralT66=0
       WRITE (Iout,600)
       IF(number_vertices.lt.100)   
      1  WRITE(Iout,601) number_vertices,number_faces
@@ -1504,11 +1510,6 @@ C       Now everything works fine
           do k=1,number_faces
            SpiralF(k,nspiral)=S(k)
           enddo 
-C      Jump count if spcount=0
-        if(spcount.eq.0) then
-         Write(Iout,635)
-         go to 199
-        endif
 C       Delete identical spirals
           if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
          endif
@@ -1520,6 +1521,10 @@ C---- End outer loop
       endif
       nspiral55=nspiral
       nspiralT55=nspiralT
+      if(ispsearch.eq.2.and.nspiral55.ne.0) then
+       Write(Iout,635) nspiralT55
+       go to 199
+      endif
 
 C Loop over all (5,6) fusions
 C Dito, see above
@@ -1575,11 +1580,6 @@ C     Reset arrays
          do k=1,number_faces
           SpiralF(k,nspiral)=S(k)
          enddo 
-C      Jump count if spcount=0
-        if(spcount.eq.0) then
-         Write(Iout,635)
-         go to 199
-        endif
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
        endif
@@ -1612,6 +1612,10 @@ C      Jump count if spcount=0
         nspiral=nspiral5sym
         Go to 199
        endif
+      if(ispsearch.eq.2.and.nspiral56.ne.0) then
+       Write(Iout,642) nspiralT56
+       go to 199
+      endif
       
 C Loop over all (6,6) fusions
 C Dito, see above
@@ -1659,18 +1663,12 @@ C Dito, see above
         do k=1,number_faces
          SpiralF(k,nspiral)=S(k)
         enddo 
-C      Jump count if spcount=0
-        if(spcount.eq.0) then
-         Write(Iout,635)
-         go to 199
-        endif
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
       endif
       enddo 
       enddo 
       endif
-      spcount=1
       if(nspiral.eq.0) WRITE(Iout,630) nspiralT,6*number_vertices
 C---- End of search
 
@@ -1702,7 +1700,7 @@ C---- End of search
          enddo
         endif
       endif
-      if(spcount.ne.0.and.ispsearch.ne.4) then
+      if(ispsearch.ne.4) then
        nspiral66=nspiral-nspiral55-nspiral56
        nspiralT66=nspiralT-nspiralT55-nspiralT56
        WRITE(Iout,631) nspiral55,nspiralT55,nspiral56,nspiralT56,
@@ -1859,9 +1857,8 @@ C     Print ring numbers
  634  FORMAT(1X,I7,' distinct RSPIs found out of total',I7,
      1 ' (maximum possible: ',I7,')',/1X,I7,' spirals with a ',
      1 'pentagon start   (',I7,'  symmetry distinct)')
- 635  FORMAT(1X,' Spiral found, avoid counting of spirals ',/2X,
-     1 'WARNING: output contains only 1 spiral! Set ispsearch=2 ',
-     1 'to get the complete spiral count.')
+ 635  FORMAT(1X,I6,' spirals in (55) found, no further analysis.',
+     1 ' Remaining batches show up as 0 spirals found')
  636  FORMAT(1X,'RSPI : ',12I6)
  637  FORMAT(1X,'Number of jumps: ',I2)
  638  FORMAT(1X,'Jumps: ',10I6)
@@ -1871,6 +1868,8 @@ C     Print ring numbers
      1 'No pentagon start found, go to general spiral algorithm')
  641  Format(' Only searching for pentagon starts, ',
      1 '(65) and (66) batch avoided')
+ 642  FORMAT(1X,I6,' spirals in (56)/(65) found, no further analysis.',
+     1 ' Remaining batches show up as 0 spirals found')
       Return
       END
      
