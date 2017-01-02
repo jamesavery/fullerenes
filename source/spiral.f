@@ -1592,9 +1592,24 @@ C      Jump count if spcount=0
        do i=1,nspiral
          if(SpiralT(1,i).eq.1) nspiral5sym=nspiral5sym+1
        enddo
-      if(nspiral5sym.eq.0.and.ispsearch.eq.4) then
+       if(nspiral5sym.eq.0.and.ispsearch.eq.4) then
         WRITE(Iout,640)
+        nspiral=0
         pentagon_start = .true.
+        Go to 199
+       endif
+       if(nspiral5sym.ne.0.and.ispsearch.eq.4) then
+        WRITE(Iout,641)
+        J1=0
+        do i=1,nspiral
+         if(SpiralT(1,i).eq.1) then
+          J1=J1+1
+          do K=1,12
+           SpiralT(K,J1)=SpiralT(K,i)
+          enddo
+         endif
+        enddo
+        nspiral=nspiral5sym
         Go to 199
        endif
       
@@ -1687,7 +1702,7 @@ C---- End of search
          enddo
         endif
       endif
-      if(spcount.ne.0) then
+      if(spcount.ne.0.and.ispsearch.ne.4) then
        nspiral66=nspiral-nspiral55-nspiral56
        nspiralT66=nspiralT-nspiralT55-nspiralT56
        WRITE(Iout,631) nspiral55,nspiralT55,nspiral56,nspiralT56,
@@ -1852,7 +1867,10 @@ C     Print ring numbers
  638  FORMAT(1X,'Jumps: ',10I6)
  639  Format(' Entering the general spiral algorithm',
      1 /1X,'Canonical General Spiral:')
- 640  Format(' No pentagon start found, go to general spiral algorithm')
+ 640  Format(' Only searching for pentagon starts. ',
+     1 'No pentagon start found, go to general spiral algorithm')
+ 641  Format(' Only searching for pentagon starts, ',
+     1 '(65) and (66) batch avoided')
       Return
       END
      
