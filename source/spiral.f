@@ -190,22 +190,22 @@ C Now check if list is complete or not
        endif
 
 C Now do the calculation for the remainder
-      Write(Iout,1013) 
+      Write(Iout,1013)
       if(iham.eq.0) then
-      if(IPR.EQ.0) then 
+      if(IPR.EQ.0) then
          IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices
          IF(number_vertices.ge.100) WRITE(Iout,602) number_vertices
       else
-         IPR=1 
+         IPR=1
          IF(number_vertices.lt.100) WRITE(Iout,603) number_vertices
          IF(number_vertices.ge.100) WRITE(Iout,604) number_vertices
       endif
       else
-      if(IPR.EQ.0) then 
+      if(IPR.EQ.0) then
          IF(number_vertices.lt.100) WRITE(Iout,701) number_vertices
          IF(number_vertices.ge.100) WRITE(Iout,702) number_vertices
       else
-         IPR=1 
+         IPR=1
          IF(number_vertices.lt.100) WRITE(Iout,703) number_vertices
          IF(number_vertices.ge.100) WRITE(Iout,704) number_vertices
       endif
@@ -264,8 +264,8 @@ C Now do the calculation for the remainder
       S(J10)=5
       S(J11)=5
       S(J12)=5
-      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
-      IF(IER.EQ.12) GO TO 12               !      and check for closure 
+      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual
+      IF(IER.EQ.12) GO TO 12               !      and check for closure
       IF(IER.EQ.11) GO TO 11
       IF(IER.EQ.10) GO TO 10
       IF(IER.EQ.9)  GO TO 9
@@ -278,10 +278,10 @@ C Now do the calculation for the remainder
       IF(IER.EQ.2)  GO TO 2
       IF(IER.EQ.1)  GO TO 1
       CALL Unwind(M,IER,IT,ispiral,
-     1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals 
+     1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals
       IF(IER.EQ.13) GO TO 13                             ! and check for uniqueness
       K=0
-      L=L+1                                              ! Spiral S is canonical      
+      L=L+1                                              ! Spiral S is canonical
       DO J=1,6
          IF(NMR(J).EQ.0) GO TO 16
          K=J
@@ -289,7 +289,7 @@ C Now do the calculation for the remainder
 C     Analyze dual matrix
    16  CALL DualAnalyze(M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
-       if(2*ndeg.eq.nelec) then 
+       if(2*ndeg.eq.nelec) then
         Occup='closed'
        else
         Occup='open  '
@@ -354,9 +354,9 @@ C     Analyze dual matrix
        else
         if(M2.le.123.and.M2.gt.0.and.L.ge.IsoIPR(M2)) go to 99
       endif
- 13     CONTINUE 
- 12     CONTINUE        ! Close loop over spiral 
- 11     CONTINUE        ! combinations      
+ 13     CONTINUE
+ 12     CONTINUE        ! Close loop over spiral
+ 11     CONTINUE        ! combinations
  10     CONTINUE
  9      CONTINUE
  8      CONTINUE
@@ -397,7 +397,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  602  FORMAT(1X,'General fullerene isomers of C',I3,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -405,7 +405,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  603  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -413,7 +413,7 @@ C     Analyze dual matrix
      1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  604  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -421,7 +421,7 @@ C     Analyze dual matrix
      1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  606  FORMAT(/1X,170('-'),/1X,'End of subroutine Spiral')
  607  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
      1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
@@ -452,7 +452,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  702  FORMAT(1X,'General fullerene isomers of C',I3,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -461,7 +461,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  703  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -470,7 +470,7 @@ C     Analyze dual matrix
      1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  704  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -479,7 +479,7 @@ C     Analyze dual matrix
      1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  1000 Format(1X,'Opening file: ',A20)
  1001 Format(1X,'Looped over ',I9,' lines. Characterestic card ',
      1 'for isomer list not found: ',A18,' ==> ABORT')
@@ -519,15 +519,15 @@ C     Analyze dual matrix
 
 
       SUBROUTINE SpiralFind(IPR,ivar,In,Iout,IDA,A)
-C     This subroutine comes directly from the book of Fowler and 
+C     This subroutine comes directly from the book of Fowler and
 C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006),
 C     and has been modified to search for ring spirals around an
-C     icosahedral fullerene closest to the vertex number required.           
-C     This sub-program catalogues fullerenes with a given number of      
-C     vertices using the spiral algorithm and a uniqueness test 
-C     based on equivalent spirals. IPR = 0  for all isomers. 
-C     The resulting output is a catalogue of the isomers found containing 
-C     their idealized point groups, canonical spirals, and NMR patterns.        
+C     icosahedral fullerene closest to the vertex number required.
+C     This sub-program catalogues fullerenes with a given number of
+C     vertices using the spiral algorithm and a uniqueness test
+C     based on equivalent spirals. IPR = 0  for all isomers.
+C     The resulting output is a catalogue of the isomers found containing
+C     their idealized point groups, canonical spirals, and NMR patterns.
 C     number_vertices is the nuclearity of the fullerene.
       use config
       IMPLICIT INTEGER (A-Z)
@@ -546,8 +546,8 @@ C     number_vertices is the nuclearity of the fullerene.
        Write(Iout,805)
        Return
       endif
-      if(number_vertices.gt.NMAX) Return     ! Increase NMAX 
-      if(2*(number_vertices/2).ne.number_vertices) Return  ! number_vertices must be even 
+      if(number_vertices.gt.NMAX) Return     ! Increase NMAX
+      if(2*(number_vertices/2).ne.number_vertices) Return  ! number_vertices must be even
 
 C   Search for icosahedral fullerene Cm closest to Cm with m<n
       dex=dfloat(number_vertices)
@@ -566,7 +566,7 @@ C   Search for icosahedral fullerene Cm closest to Cm with m<n
        enddo
        enddo
        if(icon.eq.0) then
-        Write(Iout,800) 
+        Write(Iout,800)
         stop
        endif
        if(icon.eq.number_vertices) then
@@ -615,7 +615,7 @@ C  Set loop limits
        Write(Iout,*) 'Last RSPI ',SS(12),'>',M,' ==> RETURN'
        return
       endif
-      
+
 
 C  Set parameters
       IRSPI=0
@@ -648,7 +648,7 @@ C  Set parameters
        if(IVH2.gt.M) then
         Write(Iout,*) 'Loop1 ',IVH2,'>',M,' ==> RETURN'
         Return
-       endif 
+       endif
       DO 2  J2=IVL2,IVH2         !   combinations
        IVL3=IVL(3)
        IVH3=IVH(3)
@@ -755,8 +755,8 @@ C  Set parameters
       S(J10)=5
       S(J11)=5
       S(J12)=5
-      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
-      IF(IER.EQ.12) GO TO 12          !      and check for closure 
+      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual
+      IF(IER.EQ.12) GO TO 12          !      and check for closure
       IF(IER.EQ.11) GO TO 11
       IF(IER.EQ.10) GO TO 10
       IF(IER.EQ.9)  GO TO 9
@@ -769,10 +769,10 @@ C  Set parameters
       IF(IER.EQ.2)  GO TO 2
       IF(IER.EQ.1)  GO TO 1
       CALL Unwind(M,IER,IT,ispiral,
-     1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals 
-      IF(IER.EQ.13) GO TO 13                             ! and check for uniqueness      
+     1 Spiralx,S,D,NMR,Group)                            ! Unwind dual into spirals
+      IF(IER.EQ.13) GO TO 13                             ! and check for uniqueness
       K=0
-      L=L+1                                              ! Spiral S is canonical      
+      L=L+1                                              ! Spiral S is canonical
       DO J=1,6
          IF(NMR(J).EQ.0) GO TO 16
          K=J
@@ -780,7 +780,7 @@ C  Set parameters
 C     Analyze dual matrix
    16  CALL DualAnalyze(M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
-       if(2*ndeg.eq.nelec) then 
+       if(2*ndeg.eq.nelec) then
         Occup='closed'
        else
         Occup='open  '
@@ -806,9 +806,9 @@ C     Analyze dual matrix
      1 (IRhag5(J),J=0,5),IFus5G,(IRhag6(J),J=0,6),sigmah,
      2 nelec,ndeg,gap,Occup,(NMR(J),J=1,K)
         IRSPI=IRSPI+1
- 13     CONTINUE 
- 12     CONTINUE        ! Close loop over spiral 
- 11     CONTINUE        ! combinations      
+ 13     CONTINUE
+ 12     CONTINUE        ! Close loop over spiral
+ 11     CONTINUE        ! combinations
  10     CONTINUE
  9      CONTINUE
  8      CONTINUE
@@ -837,7 +837,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  606  FORMAT(/1X,170('-'),/1X,'End of subroutine Spiral')
  607  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
      1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
@@ -869,14 +869,14 @@ C     RETURN
       END subroutine spiralfind
 
       SUBROUTINE Spiral(IPR,Iout,Isonum,IsoIPR,iham,IDA,A)
-C     This subroutine comes directly from the book of Fowler and 
-C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
-C     This sub-program catalogues fullerenes with a given number of      
-C     vertices using the spiral algorithm and a uniqueness test 
-C     based on equivalent spirals. The required input is IPR, 
-C     where IPR = 0 for general and 1 for isolated-pentagon isomers. 
-C     The resulting output is a catalogue of the isomers found containing 
-C     their idealized point groups, canonical spirals, and NMR patterns.        
+C     This subroutine comes directly from the book of Fowler and
+C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).
+C     This sub-program catalogues fullerenes with a given number of
+C     vertices using the spiral algorithm and a uniqueness test
+C     based on equivalent spirals. The required input is IPR,
+C     where IPR = 0 for general and 1 for isolated-pentagon isomers.
+C     The resulting output is a catalogue of the isomers found containing
+C     their idealized point groups, canonical spirals, and NMR patterns.
 C     number_vertices is the nuclearity of the fullerene.
       use config
       IMPLICIT INTEGER (A-Z)
@@ -889,8 +889,8 @@ C     number_vertices is the nuclearity of the fullerene.
       CHARACTER*6 Occup
       Real*8 sigmah,sigmahlow,sigmahhigh
 
-      if(number_vertices.gt.NMAX) Return            ! Increase NMAX 
-      if(2*(number_vertices/2).ne.number_vertices) Return         ! number_vertices must be even 
+      if(number_vertices.gt.NMAX) Return            ! Increase NMAX
+      if(2*(number_vertices/2).ne.number_vertices) Return         ! number_vertices must be even
       M1=number_vertices/2-9
       M2=number_vertices/2-29
       nhamcycle=0
@@ -912,20 +912,20 @@ C     number_vertices is the nuclearity of the fullerene.
       sigmahhigh=-1.d0
       WRITE (Iout,600) number_vertices,IPR,iham
       if(iham.eq.0) then
-        if(IPR.EQ.0) then 
+        if(IPR.EQ.0) then
            IF(number_vertices.lt.100) WRITE(Iout,601) number_vertices
            IF(number_vertices.ge.100) WRITE(Iout,602) number_vertices
         else
-           IPR=1 
+           IPR=1
            IF(number_vertices.lt.100) WRITE(Iout,603) number_vertices
            IF(number_vertices.ge.100) WRITE(Iout,604) number_vertices
         endif
       else
-        if(IPR.EQ.0) then 
+        if(IPR.EQ.0) then
            IF(number_vertices.lt.100) WRITE(Iout,701) number_vertices
            IF(number_vertices.ge.100) WRITE(Iout,702) number_vertices
         else
-           IPR=1 
+           IPR=1
            IF(number_vertices.lt.100) WRITE(Iout,703) number_vertices
            IF(number_vertices.ge.100) WRITE(Iout,704) number_vertices
         endif
@@ -967,8 +967,8 @@ C     number_vertices is the nuclearity of the fullerene.
       S(J10)=5
       S(J11)=5
       S(J12)=5
-      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual 
-      IF(IER.EQ.12) GO TO 12               !      and check for closure 
+      CALL Windup(M,IPR,IER,S,D)      !      Wind up spiral into dual
+      IF(IER.EQ.12) GO TO 12               !      and check for closure
       IF(IER.EQ.11) GO TO 11
       IF(IER.EQ.10) GO TO 10
       IF(IER.EQ.9)  GO TO 9
@@ -981,9 +981,9 @@ C     number_vertices is the nuclearity of the fullerene.
       IF(IER.EQ.2)  GO TO 2
       IF(IER.EQ.1)  GO TO 1
       CALL Unwind(M,IER,IT,ispiral,Spiralx,S,D,NMR,Group)! Unwind dual into spirals and check for uniqueness
-      IF(IER.EQ.13) GO TO 13                
+      IF(IER.EQ.13) GO TO 13
       K=0
-      L=L+1                                              ! Spiral S is canonical      
+      L=L+1                                              ! Spiral S is canonical
       DO J=1,6
         IF(NMR(J).EQ.0) GO TO 16
         K=J
@@ -991,7 +991,7 @@ C     number_vertices is the nuclearity of the fullerene.
 C     Analyze dual matrix
    16  CALL DualAnalyze(M,D,IRhag5,IRhag6,
      1 IFus5G,IDA,nelec,ndeg,sigmah,A,gap)
-       if(2*ndeg.eq.nelec) then 
+       if(2*ndeg.eq.nelec) then
         Occup='closed'
        else
         Occup='open  '
@@ -1056,9 +1056,9 @@ C     Analyze dual matrix
        else
         if(M2.le.123.and.M2.gt.0.and.L.eq.IsoIPR(M2)) go to 99
       endif
- 13     CONTINUE 
- 12     CONTINUE        ! Close loop over spiral 
- 11     CONTINUE        ! combinations      
+ 13     CONTINUE
+ 12     CONTINUE        ! Close loop over spiral
+ 11     CONTINUE        ! combinations
  10     CONTINUE
  9      CONTINUE
  8      CONTINUE
@@ -1090,7 +1090,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  602  FORMAT(1X,'General fullerene isomers of C',I3,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -1098,7 +1098,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  603  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -1106,7 +1106,7 @@ C     Analyze dual matrix
      1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  604  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain parameter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -1114,7 +1114,7 @@ C     Analyze dual matrix
      1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  606  FORMAT(/1X,170('-'),/1X,'End of subroutine Spiral')
  607  FORMAT(1X,I8,2X,A3,1X,12I4,2X,'(',5(I2,','),I2,')  ',I2,
      1 2X,'(',6(I2,','),I3,')  ',F8.5,2X,I2,1X,I2,1X,F8.5,
@@ -1143,7 +1143,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  702  FORMAT(1X,'General fullerene isomers of C',I3,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -1152,7 +1152,7 @@ C     Analyze dual matrix
      2 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  703  FORMAT(1X,'Isolated-pentagon isomers of C',I2,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -1161,7 +1161,7 @@ C     Analyze dual matrix
      1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
  704  FORMAT(1X,'Isolated-pentagon isomers of C',I3,':',
      1 ' (Np=0 implies IPR isomer, sigmah is the strain paramter, ',
      1 ' Ne the number of HOMO electrons, deg the HOMO degeneracy, ',
@@ -1170,7 +1170,7 @@ C     Analyze dual matrix
      1 /8X,'n  PG   Ring spiral pentagon positions',
      3 19X,'Pentagon indices',5x,'Np  Hexagon indices',11x,'Sigmah',
      4 '   Ne  deg  gap    c/o     NHamCyc   NMR pattern',
-     5 /1X,170('-')) 
+     5 /1X,170('-'))
       Return
       END subroutine spiral
 
@@ -1192,8 +1192,8 @@ C---- Start loop
       nsmall=1
       faces: Do i=4,number_faces
 
-C       First collect next possible faces connected to the previous 
-C       5- or 6-ring (nloop=5 or 6) numbered IP=S(i-1) 
+C       First collect next possible faces connected to the previous
+C       5- or 6-ring (nloop=5 or 6) numbered IP=S(i-1)
 C       and make sure it is not one of the previous rings
 C       in the spiral
         IP=S(i-1)
@@ -1211,7 +1211,7 @@ C       Collect them
         nring=nring+1
         FreeRing(nring)=nr
         enddo loops
-          
+
 C       Now it needs to be connected to a previous ring
 C       Last 2 are not needed
         do k=nsmall,i-3
@@ -1260,7 +1260,7 @@ C---------------------------------------------------------------------
 
 C     Initiallize spirals to search and do first sorting
       Do I=1,3
-      if(n(i).eq.0) cycle 
+      if(n(i).eq.0) cycle
        batch=i
        nsp=n(I)
        J1=0
@@ -1276,7 +1276,7 @@ C     Initiallize spirals to search and do first sorting
         endif
         SpiralS(J1)=J
        enddo
-       exit      
+       exit
       enddo
       nspc=J1
       Write(iout,100) nspc,n(batch),batch
@@ -1353,8 +1353,8 @@ C     Further search through pentagon indices 2...12
 
 C     Search for all spirals, set up first three rings then wind.
 C     Start ring spiral algorithm. Quit after first successful spiral.
-C     This subroutine has been modified from the original one of Fowler and 
-C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).           
+C     This subroutine has been modified from the original one of Fowler and
+C     Manolopoulos "An Atlas of Fullerenes" (Dover Publ., New York, 2006).
 C     It is used if dual matrix is already known. See subroutine Spiral for details.
 C     number_vertices is the nuclearity of the fullerene.
 C     JP contains the pentagon indices, S the ring numbers
@@ -1372,7 +1372,7 @@ C     Timing O(6 n_v n_f^2)
       nspiral66=0
       nspiralT66=0
       WRITE (Iout,600)
-      IF(number_vertices.lt.100)   
+      IF(number_vertices.lt.100)
      1  WRITE(Iout,601) number_vertices,number_faces
       IF(number_vertices.ge.100.and.number_vertices.lt.1000)
      1  WRITE(Iout,602) number_vertices,number_faces
@@ -1506,7 +1506,7 @@ C       Check if enough space
 C       Now everything works fine
           do k=1,12
            SpiralT(k,nspiral)=JP(k)
-          enddo 
+          enddo
           do k=1,number_faces
            SpiralF(k,nspiral)=S(k)
           enddo 
@@ -1514,9 +1514,9 @@ C       Delete identical spirals
           if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
          endif
         endif
-       enddo 
+       enddo
 C---- End inner loop
-       enddo 
+       enddo
 C---- End outer loop
       endif
       nspiral55=nspiral
@@ -1576,15 +1576,15 @@ C     Reset arrays
          endif
          do k=1,12
           SpiralT(k,nspiral)=JP(k)
-         enddo 
+         enddo
          do k=1,number_faces
           SpiralF(k,nspiral)=S(k)
          enddo 
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
        endif
-      enddo 
-      enddo 
+      enddo
+      enddo
       endif
       nspiral56=nspiral-nspiral55
       nspiralT56=nspiralT-nspiralT55
@@ -1666,8 +1666,8 @@ C Dito, see above
         if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
        endif
       endif
-      enddo 
-      enddo 
+      enddo
+      enddo
       endif
       if(nspiral.eq.0) WRITE(Iout,630) nspiralT,6*number_vertices
 C---- End of search
@@ -1677,8 +1677,8 @@ C---- End of search
         dg = new_graph(mmax,number_faces,D)
         fg = dual_graph(dg)
         call get_general_spiral(fg, gen_rspi, gen_jumps, pentagon_start)
-        call delete_graph(dg) 
-        call delete_fullerene_graph(fg) 
+        call delete_graph(dg)
+        call delete_fullerene_graph(fg)
         write(Iout,636) (gen_rspi(Mrspi),Mrspi=1,12)
         maxgj=2
         Do MJ=1,maxgen_jumps
@@ -1709,7 +1709,7 @@ C---- End of search
 C     Find canonical spiral
       Call FindCanonical(iout,nspiral55,nspiral56,nspiral66,
      1  nspiral,msp,JP,SpiralT)
-     
+
 C     Now go over found spiral with Fowler algorithm
       IT=1
       IPR=0
@@ -1720,39 +1720,39 @@ C     Now go over found spiral with Fowler algorithm
         S(JP(I))=5
        enddo
        IER=0
-       CALL Windup(number_faces,IPR,IER,S,D)     !      Wind up spiral into dual 
-       IF(IER.ne.0) GO TO 99                     !      and check for closure 
-       Do I=1,12 
+       CALL Windup(number_faces,IPR,IER,S,D)     !      Wind up spiral into dual
+       IF(IER.ne.0) GO TO 99                     !      and check for closure
+       Do I=1,12
         Spiral(I,1)=JP(I)
        enddo
         CALL Unwind(number_faces,IER,IT,ispiral,
-     1   Spiral,S,D,NMR,Group)                    ! Unwind dual into spirals 
+     1   Spiral,S,D,NMR,Group)                    ! Unwind dual into spirals
        K=0
        DO J=1,6
          IF(NMR(J).EQ.0) GO TO 16
          K=J
        enddo
- 16    write(Iout,614) nspiral 
+ 16    write(Iout,614) nspiral
        If(K.le.0) then
         WRITE(Iout,603) GROUP,(JP(I),I=1,12)
        else
         WRITE(Iout,605) GROUP,(JP(I),I=1,12),(NMR(J),J=1,K)
        endif
        WRITE(Iout,604) msp
-       if(number_faces.lt.1000) 
+       if(number_faces.lt.1000)
      1  WRITE(Iout,618) (SpiralF(I,msp),I=1,number_faces)
-       if(number_faces.ge.1000) 
+       if(number_faces.ge.1000)
      1  WRITE(Iout,629) (SpiralF(I,msp),I=1,number_faces)
        if(ispiral.ge.2) then
         if(ispiral.eq.2) then
          WRITE(Iout,623)
          Do II=1,12
           JP(II)=spiral(II,2)
-         enddo 
+         enddo
         else
          WRITE(Iout,619) ispiral-1
         endif
-       Do JJ=2,ispiral 
+       Do JJ=2,ispiral
         WRITE(Iout,607) (spiral(II,JJ),II=1,12)
        enddo
        else
@@ -1775,7 +1775,7 @@ C     Now go over found spiral with Fowler algorithm
  99   if(IER.eq.0) then
        if(ispiral.ge.2) then
 C     Print ring numbers
-        WRITE(Iout,620) nspiral 
+        WRITE(Iout,620) nspiral
        Do msp=1,nspiral
          jpc=0
        Do ipent=1,12
@@ -1787,7 +1787,7 @@ C     Print ring numbers
         endif
        enddo
        endif
-      else 
+      else
        WRITE(Iout,617) nspiral
       endif
  600  FORMAT(/1X,'Modified spiral algorithm Fowler and Manolopoulos',
@@ -1798,7 +1798,7 @@ C     Print ring numbers
      1 ' (',I3,' faces)')
  603  FORMAT(1X,A3,9X,12I6)
  604  FORMAT(1X,131('-'),/1X,'Corresponding ring numbers for spiral',
-     1  I6,':') 
+     1  I6,':')
  605  FORMAT(1X,A3,9X,12I6,2X,3(I4,' x',I4,:,','))
  606  Format(1X,'Printing all found spirals:')
  607  Format(12(1X,I6))
@@ -1812,14 +1812,14 @@ C     Print ring numbers
  614  Format(1X,I7,' RSPIs taken from spiral list to be analyzed:',/1X,
      2 'Point group   Ring spiral pentagon positions',
      3 42X,'NMR pattern (for fullerene in ideal symmetry)',
-     4 /1X,131('-')) 
+     4 /1X,131('-'))
  615  Format(1X,'This is C20, no (5,6) fusions to loop over')
  616  Format(1X,'No (6,6) fusions to loop over')
  617  Format(1X,'--->',I7,' ring spirals found ',
      1 'but RSPIs detected were not valid')
  618  Format(30(1X,20(I5,'-'),/))
  619  Format(1X,'Spiral list of pentagon positions with ',
-     1 'higher priority: (',I4,' spirals found)') 
+     1 'higher priority: (',I4,' spirals found)')
  620  Format(1X,'Search ',I7,' spirals to produce canonical'
      1 ' list of faces:')
  621  Format(84('-'),/,12(1X,I6),/,84('-'))
@@ -1872,8 +1872,8 @@ C     Print ring numbers
      1 ' Remaining batches show up as 0 spirals found')
       Return
       END
-     
-      SUBROUTINE SpiralCheck(nspiral,SpiralT) 
+
+      SUBROUTINE SpiralCheck(nspiral,SpiralT)
       use config
       IMPLICIT Integer (A-Z)
       DIMENSION SpiralT(12,MaxSpirals),dif(12)
@@ -2023,7 +2023,7 @@ C Sort eigenvalues
         jmax=I
         Do J=I+1,number_vertices
           e1=evec(J)
-            if(e1.gt.e0) then 
+            if(e1.gt.e0) then
               jmax=j
               e0=e1
             endif
@@ -2052,27 +2052,27 @@ C Now sort degeneracies
           df(ieigv)=evec(I)
         endif
       enddo
-       
+
 C Produce number of electrons in HOMO, degeneracy and gap
       Noc=number_vertices/2
       Norb=0
       eigv: Do I=1,ieigv
         Iorb=I
         Norb=Norb+IDG(I)
-        if(Norb.eq.Noc) then 
+        if(Norb.eq.Noc) then
           gap=df(Iorb)-df(Iorb+1)
           ndeg=IDG(Iorb)
           nelec=ndeg*2
           exit eigv
         endif
-        if(Norb.gt.Noc) then 
+        if(Norb.gt.Noc) then
           gap=df(Iorb)-df(Iorb+1)
           ndeg=IDG(Iorb)
           nelec=(ndeg-Norb+Noc)*2
           exit eigv
         endif
       enddo eigv
-      
+
       Return
       END
 
@@ -2082,8 +2082,8 @@ C Produce number of electrons in HOMO, degeneracy and gap
       DIMENSION S(MMAX),D(MMAX,MMAX)
       DIMENSION R(MMAX),C(MMAX,6)
 C       This subroutine attempts to wind up an input spiral S into
-C       a fullerene dual (face) adjacency matrix D. It returns with      
-C       IER = P if the spiral shorts or is discovered to be open-ended      
+C       a fullerene dual (face) adjacency matrix D. It returns with
+C       IER = P if the spiral shorts or is discovered to be open-ended
 C       after P pentagons have been added. Otherwise IER = 0 on return.
       J=1
       C(1,1)=2
@@ -2096,15 +2096,15 @@ C       after P pentagons have been added. Otherwise IER = 0 on return.
          P=P+6-S(K)
          R(K)=1
          I=K-1
- 1       IF(IPR.EQ.1.AND.S(I).EQ.5.AND.S(K).EQ.5) GO TO 10      
-         IF(R(K).GE.S(K)) GO TO 10      
+ 1       IF(IPR.EQ.1.AND.S(I).EQ.5.AND.S(K).EQ.5) GO TO 10
+         IF(R(K).GE.S(K)) GO TO 10
          C(I,R(I))=K    ! Connect face K to the last open face I
-         C(K,R(K))=I    ! in the preceding spiral      
+         C(K,R(K))=I    ! in the preceding spiral
          R(I)=R(I)+1
          R(K)=R(K)+1
          IF(R(I).GT.S(I)) THEN
             L=I-1              ! If this closes face I update I and go
-            DO I=L,J+1,-1    ! back to connect face K to the new I      
+            DO I=L,J+1,-1    ! back to connect face K to the new I
              IF(R(I).LE.S(I)) GO TO 1
             enddo
             GO TO 10
@@ -2112,20 +2112,20 @@ C       after P pentagons have been added. Otherwise IER = 0 on return.
  3       IF(IPR.EQ.1.AND.S(J).EQ.5.AND.S(K).EQ.5) GO TO 10
          IF(R(K).GE.S(K)) GO TO 10
          C(J,R(J))=K    ! Connect face K to the first open face J
-         C(K,R(K))=J    ! in the preceding spiral 
+         C(K,R(K))=J    ! in the preceding spiral
          R(J)=R(J)+1
          R(K)=R(K)+1
          IF (R(J).GT.S(J)) THEN
             L=J+1              ! If this closes face J update J and go
-            DO J=L,I-1,+1      ! back to connect face K to the new J 
+            DO J=L,I-1,+1      ! back to connect face K to the new J
              IF(R(J).LE.S(J)) GO TO 3
             enddo
             GO TO 10
          ENDIF
          H=K-P
-         E=E+R(K)-1     ! Use Euler's theorem to streamline the 
-         V=3+2*P+3*H-E  ! search. F is a lower bound on the # of 
-         F=(V+1)/2+1    ! additional faces required for closure 
+         E=E+R(K)-1     ! Use Euler's theorem to streamline the
+         V=3+2*P+3*H-E  ! search. F is a lower bound on the # of
+         F=(V+1)/2+1    ! additional faces required for closure
          IF(F.GT.M-K) GO TO 10
  5    CONTINUE
       P=12
@@ -2165,16 +2165,16 @@ C       after P pentagons have been added. Otherwise IER = 0 on return.
       DIMENSION FP(MMAX,MMAX),Spiral(12,NMAX)
       DIMENSION MV(12),ME(12),MF(12),MS(12)
       CHARACTER*3 GROUP
-C       This subroutine unwinds a fullerene dual adjacency matrix D 
-C       into each of its constituent spirals and checks that none has      
-C       a lexicographically smaller code than the input spiral S. The 
-C       idealized point group and NMR signature of the fullerene are      
-C       also calculated if this test is passed, in which case the      
+C       This subroutine unwinds a fullerene dual adjacency matrix D
+C       into each of its constituent spirals and checks that none has
+C       a lexicographically smaller code than the input spiral S. The
+C       idealized point group and NMR signature of the fullerene are
+C       also calculated if this test is passed, in which case the
 C       spiral is canonical and IER = 0 on return. Otherwise IER = 13.
 C       IF IT=0 this option is supressed as noncanonical spirals are
-C       analyzed as well.      
+C       analyzed as well.
 C       Input: M: Number of Faces
-C         1 specific spiral S which contains a sequence of numbers 
+C         1 specific spiral S which contains a sequence of numbers
 C             5 and 6 of the spiral
 C         D which is the dual adjacency matrix
 
@@ -2184,21 +2184,21 @@ C----    STEP 1
 C        In this step one loops over all 6N spirals and compares with
 C         input spiral S. If identical because of symmetry, and there
 C         should be |G| many (the order of the group), it is used
-C         to obtain the face permutation stored in FP. For each 
+C         to obtain the face permutation stored in FP. For each
 C         symmetry equivalent spiral the permutation is in field P.
 C         Getting all symmetry equivalent spirals results in the
 C         order of the group stored in SO.
       SO=0
       ispiral=0
-      DO 10 I1=1,M      ! Begin multiple loop over all      
-         P(1)=I1        ! 6*N possible spiral starts 
-         FLAG1=0        ! with initial faces I1,I2,I3      
+      DO 10 I1=1,M      ! Begin multiple loop over all
+         P(1)=I1        ! 6*N possible spiral starts
+         FLAG1=0        ! with initial faces I1,I2,I3
          IF (S(P(1)).NE.S(1)) THEN
             IF (S(P(1)).GT.S(1)) GO TO 10
             FLAG1=1
          ENDIF
          DO 9 I2=1,M
-            IF(D(I1,I2).EQ.0) GO TO 9     
+            IF(D(I1,I2).EQ.0) GO TO 9
             P(2)=I2
             FLAG2=FLAG1
             IF(FLAG2.EQ.0.AND.S(P(2)).NE.S(2)) THEN
@@ -2209,9 +2209,9 @@ C         order of the group stored in SO.
            IF(D(I1,I3).EQ.0.OR.D(I2,I3).EQ.0) GO TO 8
            IF(SO.EQ.0) THEN
               SO=1        !     Store a face permutation for
-              DO K=1,M    !     each symmetry operation in FP, 
-               FP(K,SO)=K !     with the identity operation 
-              enddo       !     (here) in column 1      
+              DO K=1,M    !     each symmetry operation in FP,
+               FP(K,SO)=K !     with the identity operation
+              enddo       !     (here) in column 1
               GO TO 8
            ENDIF
            P(3)=I3
@@ -2233,17 +2233,17 @@ C         order of the group stored in SO.
                  IF(I.EQ.J-1) GO TO 8
                  GO TO 3
               ENDIF
-                 IFX=P(I)    !  These are the first (IF)      
-                 IL=P(J-1)   !  and last (IL) open faces      
-                 DO 5 IJ=1,M !  in the preceding spiral 
+                 IFX=P(I)    !  These are the first (IF)
+                 IL=P(J-1)   !  and last (IL) open faces
+                 DO 5 IJ=1,M !  in the preceding spiral
                 IF (D(IJ,IFX).EQ.0.OR.D(IJ,IL).EQ.0) GO TO 5
                 IF (R(IJ).GT.0) GO TO 5
                 P(J)=IJ
                 IF (FLAG3.EQ.0.AND.S(P(J)).NE.S(J)) THEN
                    IF (S(P(J)).GT.S(J)) GO TO 8
-                   FLAG3=J    ! This spiral has a smaller      
-                ENDIF         ! code than S, but it may not      
-                DO 4 K=1,J-1  ! close properly. Flag it      
+                   FLAG3=J    ! This spiral has a smaller
+                ENDIF         ! code than S, but it may not
+                DO 4 K=1,J-1  ! close properly. Flag it
                    IF (D(P(J),P(K)).EQ.1) THEN
                   R(P(J))=R(P(J))+1
                   R(P(K))=R(P(K))+1
@@ -2254,15 +2254,15 @@ C         order of the group stored in SO.
                  GO TO 8
  6          CONTINUE
               IF (FLAG3.EQ.0) THEN
-                 SO=SO+1      ! Arrive here once for each 
-                 DO 7 K=1,M   ! spiral with the same code as 
-                FP(K,SO)=P(K) ! S, which is once for each 
- 7             CONTINUE       ! symmetry operation SO      
+                 SO=SO+1      ! Arrive here once for each
+                 DO 7 K=1,M   ! spiral with the same code as
+                FP(K,SO)=P(K) ! S, which is once for each
+ 7             CONTINUE       ! symmetry operation SO
               ELSE
                  If(IT.eq.0) then
-                 IER=13       ! The flagged spiral has closed, 
-                 RETURN       ! so call it a day  
-                 endif    
+                 IER=13       ! The flagged spiral has closed,
+                 RETURN       ! so call it a day
+                 endif
               ENDIF
 C            Store all non-identical spirals
              If(IT.ne.0) then
@@ -2293,7 +2293,7 @@ C            Store all non-identical spirals
  8           CONTINUE
  9            CONTINUE
  10            CONTINUE
-         IER=0      !         Spiral S is canonical, and 
+         IER=0      !         Spiral S is canonical, and
          ORDER=SO   !         SO is the point group order.
          Print*,' Order of the Group:',SO
 C-------------------------------------------------------------------
@@ -2306,7 +2306,7 @@ C          and edges (2 of them) and store them in fields V and E
 C          respectively. Then get the vertex-, edge- and face-orbits
 C          and assign to each orbit the site-symmetry. Count the number
 C          of specific site-symmetries for each vertex-, edge- and face-orbit.
-         N=0        !         Now calculate GROUP and NMR: 
+         N=0        !         Now calculate GROUP and NMR:
          L=0
          DO 13 K=2,M
             DO 12 J=1,K-1
@@ -2314,13 +2314,13 @@ C          of specific site-symmetries for each vertex-, edge- and face-orbit.
            DO 11 I=1,J-1
               IF (D(I,J).EQ.0.OR.D(I,K).EQ.0) GO TO 11
               N=N+1
-              V(1,N)=I    ! Associate the three mutually 
-              V(2,N)=J    ! adjacent faces I,J,K 
-              V(3,N)=K    ! with vertex N 
+              V(1,N)=I    ! Associate the three mutually
+              V(2,N)=J    ! adjacent faces I,J,K
+              V(3,N)=K    ! with vertex N
  11      CONTINUE
            L=L+1
-           E(1,L)=J    ! And the two mutually adjacent 
-           E(2,L)=K    ! faces J,K with edge L 
+           E(1,L)=J    ! And the two mutually adjacent
+           E(2,L)=K    ! faces J,K with edge L
  12     CONTINUE
  13    CONTINUE
        DO 18 SO=1,ORDER
@@ -2332,8 +2332,8 @@ C          of specific site-symmetries for each vertex-, edge- and face-orbit.
            I3=MAX(J1,J2,J3)
            I2=J1+J2+J3-I1-I3
            DO 14 I=1,N
-              IF (V(1,I).EQ.I1.AND.V(2,I).EQ.I2.AND.V(3,I).EQ.I3) THEN 
-                 VP(J,SO)=I ! Store a vertex permutation for 
+              IF (V(1,I).EQ.I1.AND.V(2,I).EQ.I2.AND.V(3,I).EQ.I3) THEN
+                 VP(J,SO)=I ! Store a vertex permutation for
                  GO TO 15   ! each symmetry operation in VP
               ENDIF
  14         CONTINUE
@@ -2345,7 +2345,7 @@ C          of specific site-symmetries for each vertex-, edge- and face-orbit.
            I2=J1+J2-I1
            DO 16 I=1,L
               IF(E(1,I).EQ.I1.AND.E(2,I).EQ.I2) THEN
-                 EP(J,SO)=I ! And similarly an edge permutation 
+                 EP(J,SO)=I ! And similarly an edge permutation
                  GO TO 17   ! in EP
               ENDIF
  16         CONTINUE
@@ -2366,8 +2366,8 @@ C          of specific site-symmetries for each vertex-, edge- and face-orbit.
               VP(I,1)=0
               K=K+1
  20         CONTINUE
-            K=ORDER/K        ! Count vertex orbits with 
-            MV(K)=MV(K)+1    ! site group order K in MV(K)      
+            K=ORDER/K        ! Count vertex orbits with
+            MV(K)=MV(K)+1    ! site group order K in MV(K)
  21      CONTINUE
          DO 22 J=1,N
             VP(J,1)=J
@@ -2382,8 +2382,8 @@ C          of specific site-symmetries for each vertex-, edge- and face-orbit.
            EP(I,1)=0
            K=K+1
  23      CONTINUE
-            K=ORDER/K        ! And edge orbits with 
-            ME(K)=ME(K)+1    ! site group order K in ME(K)      
+            K=ORDER/K        ! And edge orbits with
+            ME(K)=ME(K)+1    ! site group order K in ME(K)
  24         CONTINUE
          DO 25 J=1,L
             EP(J,1)=J
@@ -2409,7 +2409,7 @@ C          of specific site-symmetries for each vertex-, edge- and face-orbit.
  29         CONTINUE
 
 
-C       
+C
 C-------------------------------------------------------------------
 C       Interlude: Get NMP pattern
          DO 30 J=1,6
@@ -2505,7 +2505,7 @@ C       by using MS (site group order) and ORDER (full group order)
           ELSE IF (MS(4) .EQ. 2) THEN
              GROUP = 'D6h'
           ENDIF
-           ENDIF 
+           ENDIF
         ELSE IF (ORDER.EQ.60) THEN
            GROUP ='  I'
         ELSE IF (ORDER.EQ.120) THEN
@@ -2519,26 +2519,26 @@ C       by using MS (site group order) and ORDER (full group order)
       IMPLICIT INTEGER (A-Z)
       DIMENSION D(M,M),A(NMAX,NMAX)
       DIMENSION V(3,NMAX)
-c     Given a fullerene dual adjacency matrix D, this subroutine 
-c     constructs the corresponding fullerene adjacency matrix A. 
-c     IER = 0 on return if the construction is successful. 	 
+c     Given a fullerene dual adjacency matrix D, this subroutine
+c     constructs the corresponding fullerene adjacency matrix A.
+c     IER = 0 on return if the construction is successful.
       I=0
-      DO 3 L = 1,M 
-        DO 2 K=1,L 
+      DO 3 L = 1,M
+        DO 2 K=1,L
           IF (D(K,L).EQ.0) GO TO 2
           DO 1 J = 1,K
             IF (D(J,K).EQ.0.OR.D(J,L).EQ.0) GO TO 1
             I = I+1
             IF (I.GT.number_vertices) GO TO 1
-            V(1,I) = J ! Associate the three mutually adjacent 
-            V(2,I) = K ! dual vertices (fullerene faces) J,K,L 
-            V(3,I) = L ! with fullerene vertex I 	 
+            V(1,I) = J ! Associate the three mutually adjacent
+            V(2,I) = K ! dual vertices (fullerene faces) J,K,L
+            V(3,I) = L ! with fullerene vertex I
  1        CONTINUE
  2      CONTINUE
  3    CONTINUE
       IER = I-number_vertices
-      IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles 
-      DO 7 J = 1,number_vertices           ! and is therefore NOT a fullerene dual 
+      IF (IER .NE. 0) RETURN ! D contains IER > 0 separating triangles
+      DO 7 J = 1,number_vertices           ! and is therefore NOT a fullerene dual
         DO 6 I = 1,J
           K = 0
           DO 5 JJ = 1,3
@@ -2547,7 +2547,7 @@ c     IER = 0 on return if the construction is successful.
  4          CONTINUE
  5        CONTINUE
           IF (K.EQ.2) THEN
-            A(I,J)=1   ! Fullerene vertices I and J are adjacent 
+            A(I,J)=1   ! Fullerene vertices I and J are adjacent
             A(J,I)=1   ! if they have 2 dual vertices in common
           ELSE
             A(I,J)=0

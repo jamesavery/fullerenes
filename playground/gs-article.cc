@@ -50,25 +50,25 @@ int main(int ac, char **av) {
   cout << "Tutte done" << endl;
 
 
-      FullereneGraph gkl(g.GCtransform(k, l, true));
-      cout << "gc done " << endl;
+  FullereneGraph gkl(g.GCtransform(k, l, true));
+  cout << "gc done " << endl;
 
-      gkl.layout2d = gkl.tutte_layout();
-      gkl.layout_is_spherical = false;
-      cout << "Tutte done" << endl;
+  gkl.layout2d = gkl.tutte_layout();
+  gkl.layout_is_spherical = false;
+  cout << "Tutte done" << endl;
 
-      vector<int> rspi(12, 0);
-      Triangulation::jumplist_t jumps;
-      bool pentagon_start = true;
-      gkl.get_rspi_from_fg(rspi, jumps, true, true, pentagon_start);
+  vector<int> rspi(12, 0);
+  Triangulation::jumplist_t jumps;
+  bool pentagon_start = true;
+  gkl.get_rspi_from_fg(rspi, jumps, true, true, pentagon_start);
 
-      ofstream output(("spiral-" + to_string(N) + "-" + to_string(k) + "-" + to_string(l)).c_str());
-      for (int i = 0; i < 12; i++) rspi[i]++;
-      for (auto it = jumps.begin(); it != jumps.end(); it++) it->first++;
-      output << "N = " << N*(k * k + k * l + l * l) << ";\n"
-             << "jumplist = " << jumps << ";\n"
-             << "spiral   = " << rspi << ";\n";
-      output.close();
+  ofstream output(("spiral-" + to_string(N) + "-" + to_string(k) + "-" + to_string(l)).c_str());
+  for (int i = 0; i < 12; i++) rspi[i]++;
+  for (auto it = jumps.begin(); it != jumps.end(); it++) it->first++;
+  output << "N = " << N*(k * k + k * l + l * l) << ";\n"
+         << "jumplist = " << jumps << ";\n"
+         << "spiral   = " << rspi << ";\n";
+  output.close();
 
   return 0;
 }

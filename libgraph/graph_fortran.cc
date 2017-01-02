@@ -43,7 +43,7 @@ extern "C" {
 			     const double *path_width, const double *vertex_diameter,const int *Npath, int *path);
   graph_ptr dual_graph_(const graph_ptr *);
 
-  void get_general_spiral_(const fullerene_graph_ptr*, int rspi_a[12], int jumps_a[100], bool *pentagon_start);
+  void get_general_spiral_(const fullerene_graph_ptr*, int rspi_a[12], int jumps_a[100], const bool *pentagon_start);
 
 
   // Fullerene graph generation 
@@ -480,7 +480,7 @@ void get_face_distance_mtx_(const fullerene_graph_ptr *fg, int *face_distances){
 }
 
 // rspi_a and jumps_a start counting at 1
-void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jumps_a[100], bool *pentagon_start){
+void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jumps_a[100], const bool *pentagon_start){
 //  12 will always be 12, 100 is just an arbitrary magic number
   assert((*fg)->layout2d.size() == (*fg)->N);
   vector<int> rspi_v;

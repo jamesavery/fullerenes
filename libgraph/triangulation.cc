@@ -392,8 +392,6 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   // starting at 3 because we added 3 already
   for(int i=3; i<N-1; ++i){
     pre_used_valencies=0;
-    //    list<pair<int,int> > open_valencies_bak(open_valencies); // Makes the whole thing O(N^2), but is never used!
-
     // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_graph because there are some edges deleted already
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
@@ -511,11 +509,11 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 // special_only is a switch to search for spirals starting at non-hexagons only
-bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool only_special, const bool general, const bool pentagon_start) const
+bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, const bool canonical, const bool only_special, const bool general, const bool rarest_only) const
 {
   vector<node_t> node_starts;
 
-if(pentagon_start){
+if(rarest_only){
   int max_face_size=0;
   for(node_t u=0;u<N;u++) if(neighbours[u].size()>max_face_size) max_face_size=neighbours[u].size();
   //cerr << max_face_size << endl;
@@ -764,7 +762,7 @@ bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, 
 }
 
 // call for the canonical general spiral and extract the pentagon indices
-bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonical, bool general, bool pentagon_start) const
+bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, const bool canonical, const bool general, const bool pentagon_start) const
 {
   rspi.clear();
   jumps.clear();

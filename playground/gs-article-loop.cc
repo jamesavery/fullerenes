@@ -48,8 +48,8 @@ int main(int ac, char **av) {
   g.layout_is_spherical = false;
   cout << "Tutte done" << endl;
 
-  for (int k = 1; k <= 9; k++) {
-    for (int l = 0; l <= k; l++) {
+  for (int k = 1; k < 10; k++) {
+    for (int l = 0; l < 10; l++) {
       cout << k << ", " << l << endl;
       if (N * (k * k + k * l + l * l) > maxcount ) continue;
 
