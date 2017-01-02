@@ -752,7 +752,7 @@ for the search of a ring spiral if, for the input, cartesian coordinates or vert
 initial fullerene structure was modified. It produces the canonical ring-spiral pentagon indices
 if the fullerene contains a face spiral, and fails if it does not (as for the two examples shown in 
 Figure \ref{pic:C380andC384}). Note that considerable improvements were made to optimize the ring spiral search algorithm, and if 
-\paramname{ispsearch}=2 is chosen it counts all possible ring spirals (this is computationally more expensive). 
+\paramname{ispsearch}=1 is chosen it counts all possible ring spirals (this is computationally more expensive). 
 The number of spirals in the output agree with the examples given by Yoshida and Fowler.\cite{Yoshida97a} 
 A generalized ring-spiral algorithm has been implemented, and if the search for a simple ring spiral algorithm fails, 
 RSPIs are produced with additional jumps using our general spiral algorithm.\cite{Wirz2016}
@@ -1055,7 +1055,11 @@ Namelist line that contains the main flags for the program.
 \item[{nosort}] If \paramname{nosort} = 1, permutation of vertices for optimizing $Z$-Matrix is suppressed (Default: 0).
 \item[{IPMC}] If \paramname{IPMC} = 1, the number of perfect matchings are counted using the Pfaffian (Default: 0).
 \item[{ispsearch}] If \paramname{ispsearch} = 0, search for the canonical ring spiral is avoided  (Default: 1). If \paramname{ispsearch} = 1, ring spiral search takes place
-until it is successful. If \paramname{ispsearch} = 2, all spirals are counted (this is computationally expensive for very large fullerenes). 
+until it is successful. If \paramname{ispsearch} = 1, search through all spirals without jumps, if unsuccessful do general spiral algorithm.
+If \paramname{ispsearch} = 2, search through spirals without jumps, but stop in (55), (56) or (66) batch if one spiral is found.
+If unsuccessful do general spiral algorithm
+If \paramname{ispsearch} = 3, go directly to general spiral algorithm.
+If \paramname{ispsearch} = 4, same as ispsearch=1 but only do pentagon starts.
 \item[{novolume}] If \paramname{novolume} = 1, all parts for volume determination is avoided  (Default: 0).
 \item[{TolR}] Tolerance in \% (Default: 33). Only change this parameter if the program cannot produce correctly the adjacency matrix. 
   This is only necessary for the cartesian coordinate input (\paramname{ICart}=1) and only fails if bond distances are unusually large or small. 
