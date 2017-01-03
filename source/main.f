@@ -515,12 +515,9 @@ C Now produce clockwise spiral ring pentagon count a la Fowler and Manolopoulos
       WRITE(Iout,1009) TIMEX,Hours
       call flush(iout)
         routine='SPIRALSEARCH   '
-        ispcount=0
-        if(ispsearch.gt.1) ispcount=1
         Write(Iout,1008) routine
         CALL SpiralSearch(Iout,iprintf,Iring5,Iring6,Iring56,
-     1  NringA,NringB,NringC,NringD,NringE,NringF,
-     1  ispcount,ispsearch,rspi,GROUP)
+     1  NringA,NringB,NringC,NringD,NringE,NringF,ispsearch,rspi,GROUP)
       CALL Timer(TIMEX)
       Hours=TIMEX/3.6d3
       TIMEX1=TIMEX+TIMEX1
