@@ -53,7 +53,12 @@ int main(int ac, char **av) {
       cout << k << ", " << l << endl;
       if (N * (k * k + k * l + l * l) > maxcount ) continue;
 
-      FullereneGraph gkl(g.GCtransform(k, l, true));
+      FullereneGraph gkl;
+      if(l==0){
+        gkl = FullereneGraph(g.halma_fullerene(k-1, true));
+      } else {
+        gkl = FullereneGraph(g.GCtransform(k, l, true));
+      }
       cout << "gc done " << endl;
 
       gkl.layout2d = gkl.tutte_layout();
