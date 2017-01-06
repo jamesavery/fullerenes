@@ -1,19 +1,19 @@
-      SUBROUTINE IDAIC3(IDA,IC3)
-      use config
-      IMPLICIT REAL*8 (A-H,O-Z)
-      DIMENSION IC3(Nmax,3)
-      integer IDA(Nmax,Nmax)
-       Do I=1,number_vertices
-        num=0
-       Do J=1,number_vertices
-        if(IDA(I,J).eq.1) then
-         num=num+1
-         IC3(I,num)=J
-        endif
-       enddo
-       enddo
-      Return
-      End
+C     SUBROUTINE IDAIC3(IDA,IC3)
+C     use config
+C     IMPLICIT REAL*8 (A-H,O-Z)
+C     DIMENSION IC3(Nmax,3)
+C     integer IDA(Nmax,Nmax)
+C      Do I=1,number_vertices
+C       num=0
+C      Do J=1,number_vertices
+C       if(IDA(I,J).eq.1) then
+C        num=num+1
+C        IC3(I,num)=J
+C       endif
+C      enddo
+C      enddo
+C     Return
+C     End
 
       SUBROUTINE ringanalyze(Iout,Iring5,Iring6,N5MEM,N6MEM,Iring56,
      1  NringA,NringB,NringC,NringD,NringE,NringF,N5Ring,N6Ring)
