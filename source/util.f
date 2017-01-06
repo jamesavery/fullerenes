@@ -1,3 +1,46 @@
+       Subroutine CheckGCkl(Iout,kGC,lGC)
+       INTEGER, DIMENSION(1:5) :: kRC,lRC
+       if(kGC==0.and.lGC.eq.0) then
+        Write(Iout,100)
+        stop
+       endif
+       if(kGC<0.or.lGC<0) then
+        Write(Iout,101)
+        kRC(1)=kGC+lGC
+        lRC(1)=-kGC 
+        kRC(2)=lGC
+        lRC(2)=-kGC-lGC
+        kRC(3)=-kGC
+        lRC(3)=-lGC
+        kRC(4)=-kGC-lGC
+        lRC(4)=kGC
+        kRC(5)=-lGC
+        lRC(5)=kGC+lGC
+        Write(Iout,102) (kRC(I),lRC(I),I=1,5)
+        Do I=1,5
+         if(kRC(I)>=0.and.lRC(I)>=0) then
+          kGC=kRC(I)
+          lGC=lRC(I)
+          Write(Iout,103) kGC,lGC
+          exit    
+         endif
+        enddo
+       endif
+       if(kGC==0) then
+        kmem=kGC
+        kGC=lGC
+        lGC=kmem
+        Write(Iout,104)
+       endif
+ 100   Format(1X,'k=0 and l=0 not a valid GC combination, ----> STOP')
+ 101   Format(1X,'Negative index discovered. Eisenstein rotation ',
+     1  'is performed')
+ 102   Format(1X,'(k,l) equivalences: ',5('(',I4,',',I4,')'))
+ 103   Format(1X,'(k,l) = (',I4,',',I4,') chosen for GC transformation')
+ 104   Format(1X,'kGC and lGC swapped')
+       RETURN
+       END
+
        Subroutine CubeConnect(Iout,IDA,IC3)
        use config
        Dimension IDA(Nmax,Nmax),IC3(Nmax,3)
@@ -16,6 +59,22 @@ C      Transform adjacency matric into connectivity vector
  100   Format(1X,'Convert adjacency matrix into connectivity vector')
        RETURN
        END
+C     SUBROUTINE IDAIC3(IDA,IC3)
+C     use config
+C     IMPLICIT REAL*8 (A-H,O-Z)
+C     DIMENSION IC3(Nmax,3)
+C     integer IDA(Nmax,Nmax)
+C      Do I=1,number_vertices
+C       num=0
+C      Do J=1,number_vertices
+C       if(IDA(I,J).eq.1) then
+C        num=num+1
+C        IC3(I,num)=J
+C       endif
+C      enddo
+C      enddo
+C     Return
+C     End
 
 c      SUBROUTINE PerfectMatching(Iout,IDA)
 c      use config
