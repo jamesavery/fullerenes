@@ -135,6 +135,7 @@ C       Search where the 5-rings are in the spiral
         WRITE(Iout,1024)
         WRITE(Iout,1025) (S(I),I=1,M)
 C Now produce the adjaceny matrix from the dual matrix
+        Write(Iout,1007)
         CALL DUAL(D,MMAX,IDA,IER)
         IF(IER.ne.0) then
           WRITE(Iout,1002) IER
@@ -153,6 +154,7 @@ C Start Goldberg-Coxeter
           stop
         endif
         Write(Iout,1040) kGC,lGC,kGC,lGC,itGC
+        Call CheckGCkl(Iout,kGC,lGC)
         if(lGC .ne. 0) then
           Call GetPentIndex(number_vertices,M,Iout,kGC,lGC,rspi)
           nalgorithm=nalgorithm-2
@@ -258,12 +260,14 @@ c      if(ke + isw + iyf + ibf .eq. 0) then
 C Now produce the 3D image (unless the graph is going to change later)
       if(nalgorithm.eq.0 .or. nalgorithm.eq.2 .or.
      1   nalgorithm.eq.4 .or. nalgorithm.eq.6) then
+        Write(Iout,1005)
         call AME(Iout,IDA,A,evec,Dist,distp,iocc,iv1,iv2,iv3,CDist)
       endif
 
   
       if(nalgorithm.eq.1 .or. nalgorithm.eq.3 .or.
      1   nalgorithm.eq.5 .or. nalgorithm.eq.7) then
+        Write(Iout,1006)
         call Tutte(Iout,nohueckel,IDA,
      1   A,evec,df,Dist,layout2D,distp,CDist,scaleRad)
       endif
@@ -283,6 +287,9 @@ c      endif
  1004 FORMAT(/1X,'Construct the (',I5,','I5,') Hueckel ',
      1 ' matrix, diagonalize (E=alpha+x*beta) and get eigenvectors',
      1 /1X,'Eigenvalues are between [-3,+3]')
+ 1005 FORMAT(/1X,'AME algorithm')
+ 1006 FORMAT(/1X,'Tutte algorithm')
+ 1007 FORMAT(/1X,'Produce adjacency matrix')
  1019 Format(1X,'Spiral list of pentagon positions with ',
      1 'higher priority: (',I5,' spirals found)')
  1020 FORMAT(/1X,'Program to create cartesian coordinates through ',
