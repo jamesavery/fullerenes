@@ -302,7 +302,8 @@ C intensive
      1 isomerl,isomerh,ichk,IDA,A,filename)
       if(istop.ne.0) go to 99
       if(itop.eq.1) then
-       Call IDAIC3(IDA,IC3)
+       Call CubeConnect(Iout,IDA,IC3)
+C      Call IDAIC3(IDA,IC3)
        go to 777
       endif
 
@@ -365,6 +366,8 @@ C Produce the nth leapfrog of the fullerene
         CALL GoldbergCoxeter(Iout,leap,leapGC,IGC1,IGC2,itop,
      1   nohueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
      1   scaleRad)
+        Call CubeConnect(Iout,IDA,IC3)
+C       Call IDAIC3(IDA,IC3)
         leap=0
         leapGC=0
         ipent=1
@@ -373,7 +376,7 @@ C Produce the nth leapfrog of the fullerene
 C   Write out IC3 on external file
         if(LeapErr.ne.0) go to 9999   ! Stop 
         if(itop.eq.2) then
-         Call CubeConnect(Iout,IDA,IC3)
+C        Call CubeConnect(Iout,IDA,IC3)
          iext=1
          fmt = '(I5.5)'
          Write(xtext,fmt) number_vertices
