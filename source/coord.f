@@ -2121,6 +2121,7 @@ C      3) General Goldberg-Coxeter excluding cases 1 and 2
      1 goldcox,leapfrog_fullerene, halma_fullerene, goldberg_coxeter
       LeapErr=0 
 
+      Call CheckGCkl(Iout,kGC,lGC)
 C--> Case 1
 C--> Start leapfrog fullerene if leap > 0
   10  if(leap.gt.0) then
@@ -2177,7 +2178,7 @@ C==>  Big loop
           return
        endif
 
-       if(kGC.eq.1.and.lGC.eq.0) then
+       if((kGC.eq.1.and.lGC.eq.0).or.(lGC.eq.1.and.kGC.eq.0)) then
         Write(Iout,1006) kGC,lGC
         return
        endif
