@@ -1,5 +1,51 @@
-       Subroutine CheckGCkl(Iout,kGC,lGC)
+       Subroutine CheckGCkl(Iout,IGC,kGC,lGC)
+!-----------------------------------------------------------------------------
+!      This routing takes in subsequent GC transformations from field IGC and
+!      returns the indeces (kGC,lGC) for the product. If one of the indices
+!      are smaller than zero, a rotation in the Eisenstein plane is performed.
+!-----------------------------------------------------------------------------
        INTEGER, DIMENSION(1:5) :: kRC,lRC
+       INTEGER, DIMENSION(1:20) :: IGC
+! Interpret initial input
+       ntrans=0
+       do I=1,20,2
+        J=I+1
+        if(IGC(I).ne.0.or.IGC(J).ne.0) then
+         ntrans=ntrans+1
+         I1=2*ntrans-1
+         I2=2*ntrans
+         if(I1==I) cycle
+         IGC(I1)=IGC(I)
+         IGC(I2)=IGC(J)
+        endif
+       enddo
+       Write(Iout,110) ntrans
+       do I=1,ntrans
+        I1=2*I-1
+        I2=2*I
+        Write(Iout,111) IGC(I1),IGC(I2)
+       enddo
+
+!      Combine transformations
+       if(ntrans.eq.1) then
+        kGC=IGC(1)
+        lGC=IGC(2)
+       else
+        k1=IGC(1)
+        l1=IGC(2)
+        Do I=2,ntrans
+         k2=IGC(2*I-1)
+         l2=IGC(2*I)
+         km=k1*k2-l1*l2
+         lm=l1*k2+(k1+l1)*l2
+         k1=km
+         l1=lm
+        enddo
+        kGC=k1
+        lGC=l1
+       endif
+
+! Sort out final (k,l) indices
        if(kGC==0.and.lGC.eq.0) then
         Write(Iout,100)
         stop
@@ -32,12 +78,17 @@
         lGC=kmem
         Write(Iout,104)
        endif
+       Write(Iout,105) kGC,lGC
  100   Format(1X,'k=0 and l=0 not a valid GC combination, ----> STOP')
  101   Format(1X,'Negative index discovered. Eisenstein rotation ',
      1  'is performed')
  102   Format(1X,'(k,l) equivalences: ',5('(',I4,',',I4,')'))
  103   Format(1X,'(k,l) = (',I4,',',I4,') chosen for GC transformation')
  104   Format(1X,'kGC and lGC swapped')
+ 105   Format(1X,'Final GC transformation: (k,l) = (',I4,',',I4,')')
+ 110   Format(1X,'Number of GC transformations ntrans=',I3,
+     1  ', List of GC transformations:')
+ 111   Format(1X,'(',I6,',',I6,')')
        RETURN
        END
 
