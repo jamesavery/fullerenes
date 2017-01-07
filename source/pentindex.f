@@ -1,5 +1,5 @@
       SUBROUTINE CoordBuild(IN,Iout,itop,IDA,D,ICart,
-     1 IV1,IV2,IV3,kGC,lGC,isonum,IPRC,nohueckel,iprev,
+     1 IV1,IV2,IV3,IGC,isonum,IPRC,nohueckel,iprev,
      1 ihalma,A,evec,df,Dist,layout2d,distp,Cdist,scaleRad,
      1 rspi,jumps,GROUP,filename)
 C Cartesian coordinates produced from ring spiral pentagon list
@@ -21,7 +21,7 @@ C mapping
       DIMENSION NMR(6),A(NMAX,NMAX),IDA(NMAX,NMAX)
       DIMENSION evec(NMAX),df(NMAX)
       DIMENSION Spiral(12,NMAX)
-      integer rspi(12),jumps(100)
+      integer rspi(12),jumps(100),IGC(20)
       CHARACTER*3 GROUP
       CHARACTER*50 filename
       Data Tol,Tol1,Tol2,ftol/1.d-5,.15d0,1.5d1,1.d-10/
@@ -147,6 +147,7 @@ C End of Spiral Program, dual matrix in D(i,j)
 
 C Start Goldberg-Coxeter
       if(nalgorithm.eq.2 .or. nalgorithm.eq.3) then
+        Call CheckGCkl(Iout,IGC,kGC,lGC)
         itGC=kGC*(kGC+lGC) +lGC*lGC
         igcfullerne=itGC*20
         if(igcfullerne.gt.NMax) then
@@ -154,7 +155,6 @@ C Start Goldberg-Coxeter
           stop
         endif
         Write(Iout,1040) kGC,lGC,kGC,lGC,itGC
-        Call CheckGCkl(Iout,kGC,lGC)
         if(lGC .ne. 0) then
           Call GetPentIndex(number_vertices,M,Iout,kGC,lGC,rspi)
           nalgorithm=nalgorithm-2
