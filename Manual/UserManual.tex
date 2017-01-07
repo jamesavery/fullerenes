@@ -28,7 +28,7 @@
 
 \aliaspagestyle{title}{empty}
 
-\title{\program{Fullerene} (Version 4.5) \\A Program for the Topological Analysis of Fullerenes \\ User's Manual}
+\title{\program{Fullerene} (Version 4.6) \\A Program for the Topological Analysis of Fullerenes \\ User's Manual}
 
 \author{Peter Schwerdtfeger%
   \thanks{Email: \texttt{p.a.schwerdtfeger@massey.ac.nz}}
@@ -218,6 +218,7 @@ Version 4.4 introduced a search algorithm for neighbourhood RSPIs, the Szeged in
 and new (conjectured) upper and lower bound for Hamiltonian cycles in fullerenes.
 Version 4.5 has a new algorithm for general Goldberg-Coxeter transforms \cite{Avery2015}.
 The Tutte embedding algorithm has also been optimized to perform much faster, and the fullerene database has been transformed into a more compact and efficient version.
+Version 4.6 contains bug fixes and also allows for subsequent GC transformations.
 Version 5 to be released late 2016 will separate the topological from the cartesian part and uses sparse matrix handling for the
 largest fullerenes. This program is under permanent construction and has been tested extensively for bugs.
 Nevertheless, if you have any problem or find any bugs please report to one of us.
@@ -637,7 +638,7 @@ showed how to construct the RSPIs,\cite{Rogers} which is implemented in this pro
 Note that negative values of $k$ or $l$ are allowed as this is a simple rotation in the Eisenstein plane. If the fullerene graph
 belongs to one of the chiral point groups $G_C\subset G_F$ out of the possible set of
 groups $G_F$ for fullerenes, then the two $GC_{k,l}[G_C-C_n]$ and $GC_{l,k}[G_C-C_n]$ transformations will lead to
-two different graphs if $k\ne l$ and $k,l\ne 0$.
+two different graphs if $k\ne l$ and $k,l\ne 0$. Subsequent GC transformations are implemented as well, i.e. $GC_{k_1,l_1} \circ GC_{k_2,l_2} \circ GC_{k_3,l_3}\ldots$ with $GC_{k_1,l_1} \circ GC_{k_2,l_2} = GC_{k_1k_2-l_1l_2,l_1k_2+(k_1+l_1)l_2}$.
 
 
 %Figure 2a
@@ -1089,14 +1090,14 @@ If \paramname{ispsearch} = 4, same as ispsearch=1 but only do pentagon starts.
 Input to create cartesian coordinates for the program (e.g. \verb|&Coord ICart=2, R6=1.42 /|).
 \paragraph{List of options:}\ 
 
-\paramname{ICart, rspi, jumps, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, lGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6, ScaleRad, nanotube}
+\paramname{ICart, rspi, jumps, IV1, IV2, IV3, isonum, leap, IGCtrans, kGC, ISW, KE, IYF, ISW, mirror, IPRC, R5, R6, ScaleRad, nanotube}
 
 \paragraph{Option description:} 
 \begin{description}
 \item[{ICart}] Flag for the construction of the 3D structure (cartesian coordinates) (Default: 0). For more details see below.\\
 If \paramname{ICart} = 1: Cartesian Coordinate input is expected.\\
 If \paramname{ICart} = 2, 3: in this case 12 pentagon indices are used for input using \paramname{rspi}.\\
-If \paramname{ICart} = 4, 5: Goldberg-Coxeter transformation of \C{20} is used, i.e. $GC_{k,l}(\C{20})$ with $k \geq l$ and $k > 0$. This is computationally cheaper than for any other fullerene.\\
+If \paramname{ICart} = 4, 5: Goldberg-Coxeter transformation of \C{20} is used, i.e. $GC_{k,l}(\C{20})$. This is computationally cheaper than for any other fullerene.\\
 If \paramname{ICart} = 2 or 3 and \paramname{isonum} $\neq 0$: pentagon indices are taken from the
 isomer list contained in a database (see below).\\
 If \paramname{ICart} = 6 or 7 input vertex connectivities (edges) directly. If \paramname{isonum} $\neq 0$,
@@ -1144,8 +1145,8 @@ There are two databases, one for the general isomers
 \item[{leap}] If \paramname{leap} = $n_\mathrm{leap}$ the initial fullerene C$_{N_A}$ is subjected to an $n^\mathrm{th}$ leapfrog transformation. 
 This converts the number of atoms $N_A$ to $N'_A = 3^{n_\mathrm{leap}}N_A$. (Default: 0)
 \item[{ICGtrans}] 
-If \paramname{IGCtrans} = 1 the initial fullerene structure is subjected to a subsequent Goldberg-Coxeter transformation $GC_{k,l}[\C{N_A}]$ (Default: 0). In this case \paramname{kGC} and \paramname{lGC} in the namelist input have to be specified (which can be negative).
-For $l=0$ (halma transformation), $k=1$ and $l=1$ (leapfrog transformation), and for the general Goldberg-Coxeter transformation of \C{20} $(k\ge 1, l\ge 0)$ more efficient and faster algorithms are implemented compared to the general case. 
+If \paramname{IGCtrans} = 1 the initial fullerene structure is subjected to a subsequent Goldberg-Coxeter transformation $GC_{k,l}[\C{N_A}]$ (Default: 0). In this case \paramname{kGC} in the namelist input has to be specified (which can be negative). It also allows for subsequent GC transformations of a fullerene, i.e. $GC_{k_1,l_1}\circ GC_{k_2,l_2} \circ GC_{k_3,l_3}(\C{N_A})$ require the input \paramname{kGC}=$k_1,l_1,k_2,l_2,k_3,l_3$. A maximum of up to 10 transformations is allowed.
+For $l_1=0$ (halma transformation), $k_1=1$ and $l_1=1$ (leapfrog transformation), and for the general Goldberg-Coxeter transformation of \C{20} more efficient and faster algorithms are implemented compared to the general case. 
 \item[ISW] 
   If \paramname{ISW} = 1 the initial fullerene structure is subjected
   to a Stone-Wales transformation (Default: 0). In this case an input
