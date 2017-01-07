@@ -56,7 +56,7 @@ C    Set the dimensions for the distance matrix
       Integer Values(8)
       integer istop
       integer mdist(nmax,nmax)
-      integer rspi(12),jumps(100)
+      integer rspi(12),jumps(100),IGC(20)
       integer leapspiral,SWspiral, scaleRad
 
 C Set parameters
@@ -146,7 +146,7 @@ C   or Adjacency Matrix (through connectivity IC3)
 C  Call Datain (main input routine)
       CALL Datain(IN,Iout,Nmax,Icart,Iopt,iprintf,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,IS1,IS2,IS3,IER,istop,
-     1 leap,leapGC,iupac,Ipent,iprintham,IGC1,IGC2,IV1,IV2,IV3,iPMC,
+     1 leap,leapGC,iupac,Ipent,iprintham,IGC,IV1,IV2,IV3,iPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinthessian,ndbconvert,ihamstore,ihamstats,nhamcyc,
@@ -274,7 +274,7 @@ C Read cartesian coordinates directly
       routine='COORDBUILD     '
       Write(Iout,1008) routine
       CALL CoordBuild(IN,Iout,itop,IDA,IDual,
-     1 Icart,IV1,IV2,IV3,IGC1,IGC2,isonum,IPRC,nohueckel,
+     1 Icart,IV1,IV2,IV3,IGC,isonum,IPRC,nohueckel,
      1 iprev,ihalma,A,evec,df,Dist,Dist2D,distp,Rdist,scaleRad,
      1 rspi,jumps,GROUP,filename)
       Do I=1,number_vertices
@@ -363,7 +363,7 @@ C Produce the nth leapfrog of the fullerene
       if(leap.gt.0.or.leapGC.gt.0) then
         routine='GOLDBERGCOXETER'
         Write(Iout,1008) routine
-        CALL GoldbergCoxeter(Iout,leap,leapGC,IGC1,IGC2,itop,
+        CALL GoldbergCoxeter(Iout,leap,leapGC,IGC,itop,
      1   nohueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
      1   scaleRad)
         Call CubeConnect(Iout,IDA,IC3)
