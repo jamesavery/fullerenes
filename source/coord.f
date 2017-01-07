@@ -2101,7 +2101,7 @@ C Now analyze the adjacency matrix if it is correct
       Return
       END
 
-      SUBROUTINE GoldbergCoxeter(Iout,leap,leapGC,kGC,lGC,itop,
+      SUBROUTINE GoldbergCoxeter(Iout,leap,leapGC,IGC,itop,
      1 nohueckel,LeapErr,IDA,A,evec,df,Dist,layout2D,distp,
      1 CDist,scalerad) 
 C     Routine for Goldberg-Coxeter transformation of a fullerene
@@ -2116,12 +2116,13 @@ C      3) General Goldberg-Coxeter excluding cases 1 and 2
       Real*8 layout2D(2,Nmax)
       DIMENSION evec(Nmax),df(Nmax),A(Nmax,Nmax),IDA(Nmax,Nmax)
       DIMENSION Dist(3,Nmax),distP(Nmax)
+      integer IGC(20)
       integer graph_is_a_fullerene
       type(c_ptr) :: g, frog, halma, new_fullerene_graph,
      1 goldcox,leapfrog_fullerene, halma_fullerene, goldberg_coxeter
       LeapErr=0 
 
-      Call CheckGCkl(Iout,kGC,lGC)
+      Call CheckGCkl(Iout,IGC,kGC,lGC)
 C--> Case 1
 C--> Start leapfrog fullerene if leap > 0
   10  if(leap.gt.0) then
