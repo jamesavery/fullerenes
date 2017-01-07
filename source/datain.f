@@ -1,6 +1,6 @@
       SUBROUTINE Datain(IN,IOUT,NAtomax,ICart,Iopt,IP,IHam,
      1 nohueckel,KE,IPR,IPRC,ISchlegel,ISO1,ISO2,ISO3,IER,istop,
-     1 leap,IGCtrans,iupac,Ipent,IPH,kGC,lGC,IV1,IV2,IV3,IPMC,
+     1 leap,IGCtrans,iupac,Ipent,IPH,kGC,IV1,IV2,IV3,IPMC,
      1 irext,iwext,ichk,isonum,loop,mirror,ilp,ISW,IYF,IBF,ifs,
      1 ipsphere,ndual,labelvert,nosort,ispsearch,novolume,ihessian,
      1 isearch,iprinth,ndbconvert,ihamstore,ihamstats,nhamcyc,isomerl,
@@ -18,14 +18,14 @@ C-----------------------------------------------------------------
       integer NA,iopt
       real(8) force(ffmaxdim),forceP(ffmaxdim) ! user chosen FF (and a backup)
       integer endzeile
-      integer rspi(12), jumps(100)
+      integer rspi(12), jumps(100),kGC(20)
       Character*1 DATEN(nzeile)
       Character filename*50,filenameout*50,flagsym*3
       Namelist /General/ NA,IP,TolR,R5,R6,irext,iwext,
      1 nohueckel,loop,ndbconvert,iPFcount,IPMC,imcs,itop,
      1 filename,filenameout,ipsphere,nosort,ispsearch,novolume
       Namelist /Coord/ ICart,IV1,IV2,IV3,R5,R6,IPRC,leap,isonum,
-     1 kGC,lGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps,
+     1 kGC,IGCtrans,ISW,KE,mirror,IYF,IBF,scaleRad,rspi,jumps,
      1 nanotube,dualdist,ngaudiene
       Namelist /FFChoice/ Iopt,ftol,ihessian,iprinth
       Namelist /FFParameters/ fCoulomb,WuR5,WuR6,WuA5,WuA6,WufR5,WufR6,
@@ -155,8 +155,7 @@ C Integers
       irext=0   !  Option for reading coordinates/connectivities from external file
       iwext=0   !  Option for writing coordinates/connectivities from to file
       KE=0      !  Endo-Kroto C2 insertion
-      kGC=0     !  First Goldberg-Coxeter index
-      lGC=0     !  second Goldberg-Coxeter index
+      kGC=0     !  Goldberg-Coxeter indices read in as (k1,k2),(k3,k4)...
       leap=0    !  Initial flag for leapfrog fullerene
       loop=0    !  Option for compound job
       mirror=0  !  Invert coordinates
@@ -189,6 +188,10 @@ c init of rspi (always 12)
 c init of jumps (should be more than 10 (should ... ))
       do k=1,100
         jumps(k)=0
+      enddo
+c init of GC
+      do k=1,20
+        kGC(k)=0
       enddo
 
 C Now process namelist input
