@@ -366,8 +366,9 @@ C Produce the nth leapfrog of the fullerene
         CALL GoldbergCoxeter(Iout,leap,leapGC,IGC,itop,
      1   nohueckel,LeapErr,IDA,A,evec,df,Dist,Dist2D,distp,Rdist,
      1   scaleRad)
+        Medges=3*number_vertices/2
+        Print*,number_vertices,Medges
         Call CubeConnect(Iout,IDA,IC3)
-C       Call IDAIC3(IDA,IC3)
         leap=0
         leapGC=0
         ipent=1
@@ -375,8 +376,11 @@ C       Call IDAIC3(IDA,IC3)
         if(number_vertices.gt.100) IHam=0
 C   Write out IC3 on external file
         if(LeapErr.ne.0) go to 9999   ! Stop 
+        if(itop.eq.0) then
+         CALL DistMatrix(Iout,iprintf,0,Iopt,
+     1    Dist,DistMat,Rmin,Rmax,VolSphere,ASphere)
+        endif
         if(itop.eq.2) then
-C        Call CubeConnect(Iout,IDA,IC3)
          iext=1
          fmt = '(I5.5)'
          Write(xtext,fmt) number_vertices
