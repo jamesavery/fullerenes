@@ -141,7 +141,7 @@ C     Identify all 6-membered rings
       enddo
 
       Ncount5=Ncount5-1
-      if(itop.eq.1) then
+      if(itop.eq.0) then
       Ncount6=Ncount6-1
        Write(IOUT,1019) Ncount5
        if(Ncount5.eq.0) stop
