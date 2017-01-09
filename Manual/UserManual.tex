@@ -1080,7 +1080,7 @@ If \paramname{ispsearch} = 4, same as ispsearch=1 but only do pentagon starts.
     and write .xyz-file out to another filename called \filename{filenameout}.
 \item[{ndbconvert}] Programmers option to convert output from isomer routine into a more compact format.
 \item[{imcs}] By setting \paramname{imcs}=1 only minimum covering sphere is calculated. This works only for \paramname{ICart}=1 (see next input section), however, in this case any cartesian coordinate input can be taken, i.e., any points in 3D space.
-\item[{itop}] If \paramname{itop} = 1, after creating the adjacency matrix skips directly to the topological analysis. Good for very large fullerenes, e.g. Goldberg-Coxeter transforms. If \paramname{itop} = 2 in addition writes out the connectivity vector to external file \filename{ic3file} (formatted), which can be used as further input. Note, this skipes any other actions including transformations.
+\item[{itop}] If \paramname{itop} = 1, after creating the adjacency matrix skips directly to the topological analysis. Good for very large fullerenes, e.g. Goldberg-Coxeter transforms. Note, this skips any other actions including transformations and it will not create print out cartesian coordinates (it prints zeros instead). If \paramname{itop} = 2 in addition writes out the connectivity vector to external file \filename{ic3file} (formatted), which can be used as further input.
 \end{description}
 
 
