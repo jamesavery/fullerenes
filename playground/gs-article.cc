@@ -3,6 +3,11 @@
 #include "libgraph/triangulation.hh"
 #include "libgraph/polyhedron.hh"
 
+#include <iostream>
+#include <chrono>
+typedef std::chrono::high_resolution_clock Clock;
+
+
 int main(int ac, char **av) {
   int N = strtol(av[1], 0, 0);
   int k = strtol(av[2], 0, 0);
@@ -11,6 +16,13 @@ int main(int ac, char **av) {
 
   FullereneGraph g;
   switch (N) {
+  case 140: {
+    vector<int> input_rspi({0, 16, 19, 22, 25, 28, 47, 50, 53, 56, 59, 71});
+    Triangulation::jumplist_t input_jumps = Triangulation::jumplist_t();
+    g = FullereneGraph(N, input_rspi, input_jumps);
+    break;
+  }
+
   case 380: {
     vector<int> input_rspi({44, 69, 70, 81, 82, 109, 118, 119, 143, 183, 184, 191});
     Triangulation::jumplist_t input_jumps({{109, 2}});
@@ -45,10 +57,12 @@ int main(int ac, char **av) {
 
   cout << "g = " << g << ";\n";
 
+    auto t0 = Clock::now();
   g.layout2d = g.tutte_layout();
   g.layout_is_spherical = false;
   cout << "Tutte done" << endl;
 
+    auto t1 = Clock::now();
   FullereneGraph gkl;
   if(l==0){
     gkl = FullereneGraph(g.halma_fullerene(k-1, true));
@@ -57,10 +71,12 @@ int main(int ac, char **av) {
   }
   cout << "gc done " << endl;
 
+    auto t2 = Clock::now();
   gkl.layout2d = gkl.tutte_layout();
   gkl.layout_is_spherical = false;
   cout << "Tutte done" << endl;
 
+    auto t3 = Clock::now();
   vector<int> rspi(12, 0);
   Triangulation::jumplist_t jumps;
   bool pentagon_start = true;
@@ -73,6 +89,13 @@ int main(int ac, char **av) {
          << "jumplist = " << jumps << ";\n"
          << "spiral   = " << rspi << ";\n";
   output.close();
+    auto t4 = Clock::now();
+
+    std::cout << "Delta t1-t0 (layout): " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count() << " ms" << std::endl;
+    std::cout << "Delta t2-t1 (gc): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() << " ms" << std::endl;
+    std::cout << "Delta t3-t2 (layout): " << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2).count() << " ms" << std::endl;
+    std::cout << "Delta t4-t3 (spiral): " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count() << " ms" << std::endl;
+
 
   return 0;
 }
