@@ -32,7 +32,7 @@ public:
 
   bool layout_is_crossingfree() const;
 
-  bool remains_connected_after_removal(const node_t v) const;
+  bool is_cut_vertex(const node_t v) const;
 
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;

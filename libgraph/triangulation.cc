@@ -400,10 +400,10 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     if(v == -1) return false; // non-general spiral failed
 
     if(general){
-      bool remains_connected = remaining_graph.remains_connected_after_removal(v);
-      // cout << "connected? " << remains_connected << endl;
+      bool is_cut_vertex = remaining_graph.is_cut_vertex(v);
+      // cout << "connected? " << !is_cut_vertex << endl;
 
-      if(!remains_connected){//further cyclic rotation required
+      if(is_cut_vertex){//further cyclic rotation required
         //perform cyclic shift on open_valencies
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
