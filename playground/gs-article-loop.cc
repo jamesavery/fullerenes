@@ -57,6 +57,7 @@ int main(int ac, char **av) {
     for (int l = 0; l < 10; l++) {
       cout << k << ", " << l << endl;
       if (N * (k * k + k * l + l * l) > maxcount) continue;
+      //if (N * (k * k + k * l + l * l) < 30000) continue;
 
       auto t1 = Clock::now();
       FullereneGraph gkl;
@@ -77,8 +78,7 @@ int main(int ac, char **av) {
       Triangulation::jumplist_t jumps;
       gkl.get_rspi_from_fg(rspi, jumps, true, true, pentagon_start);
 
-      ofstream output(("spiral-" + to_string(N) + "-" + to_string(k) + "-" +
-                       to_string(l) + "-" + to_string(pentagon_start)).c_str());
+      ofstream output(("spiral-" + to_string(N) + "-" + to_string(k) + "-" + to_string(l) + "-" + to_string(pentagon_start)).c_str());
       for (int i = 0; i < 12; i++) rspi[i]++;
       for (auto it = jumps.begin(); it != jumps.end(); it++) it->first++;
       auto t4 = Clock::now();
