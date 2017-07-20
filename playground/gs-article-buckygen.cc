@@ -38,7 +38,7 @@ int main(int ac, char **av)
 
     i++;
     //    if(i%100000 == 0)
-    if(i==86325){
+    if(i==86325){ // First fullerene without a spiral starting in a pentagon, for N=100
       G = Triangulation(G.neighbours,true);
       FullereneDual(G).get_spiral(spiral,jumps,true,true,true,true);
       //    if(jumps.size()!=0) fprintf(stderr,"Isomer %ld has jump length %ld\n",i,jumps.size());

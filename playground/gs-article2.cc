@@ -60,7 +60,7 @@ int main(int ac, char **av) {
   cout << "g = " << g << ";\n";
 
   auto t0 = Clock::now();
-  cout << "Won't calculate layout" << endl;
+  cout << "Don't calculate layout, stay with triangulation" << endl;
 
   auto t1 = Clock::now();
   FullereneDual gkl;
@@ -68,7 +68,7 @@ int main(int ac, char **av) {
   cout << "gc done " << endl;
 
   auto t2 = Clock::now();
-  cout << "Still won't calculate layout" << endl;
+  cout << "Still don't calculate layout" << endl;
 
   auto t3 = Clock::now();
   vector<int> rspi(12, 0);
