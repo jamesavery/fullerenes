@@ -30,7 +30,8 @@ int main(int ac, char **av)
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial,
 					       chunk_index,chunk_number);
     
-
+  bool only_do_buckygen = false;
+  
   while(BuckyGen::next_fullerene(Q,G)){
     vector<int> rspi;
     vector<int> spiral;
@@ -38,11 +39,16 @@ int main(int ac, char **av)
 
     i++;
     //    if(i%100000 == 0)
-    FullereneDual F(G.neighbours);
-    F.get_spiral(spiral,jumps,true,true,true,true);
-    //    if(jumps.size()!=0) fprintf(stderr,"Isomer %ld has jump length %ld\n",i,jumps.size());
-    if(jumps.size()!=0) cout << "jumps="<<jumps << endl;
-    //   cout << "RSPI: " << rspi_from_fullerene_spiral(spiral) << "; JUMPS: " << jumps << endl;
+    if(!only_do_buckygen){
+      FullereneDual F(G.neighbours);
+      F.get_spiral(spiral,jumps,true,true,true,true);
+      //    if(jumps.size()!=0) fprintf(stderr,"Isomer %ld has jump length %ld\n",i,jumps.size());
+      if(jumps.size()!=0){
+	cout << "(* BuckyGen isomer number " << i << " has a jump in its canonical general spiral: *)\n";
+	cout << "rspi=" << rspi_from_fullerene_spiral(spiral) << "; jumps=" << jumps << ";\n";
+      }
+    }
+
     //    cout << "SPIRAL: " << spiral << "; JUMPS: " << jumps << endl;
     
     // dual = G.dual_graph();
