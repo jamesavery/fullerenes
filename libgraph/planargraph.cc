@@ -88,9 +88,10 @@ bool PlanarGraph::layout_is_crossingfree() const
 
 
 // checks if the planar graph stays connected after removing v.  this function
-// implies and relies on the condition, that the graph has at most one face
-// larger than a triangle.  If there is more than one larger face the function
-// may return 'false', even though the correct answer is 'true'
+// implies and relies on the condition that the graph has at most one face
+// larger than a triangle, and that there are no separating triangles.
+// If there is more than one larger face than a triangle, the function
+// may return 'false', even though the correct answer is 'true'.
 bool PlanarGraph::is_cut_vertex(const node_t v) const {
 //  cerr << "removing v " << v << endl;
   const vector<vector<node_t> > &n = neighbours;
@@ -108,8 +109,7 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
       }
     }
   }
-  PlanarGraph pg(e);
-  return pg.is_connected();
+  return e.size() < n[v].size()-1;
 }
 
 
