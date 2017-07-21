@@ -109,6 +109,11 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
       }
     }
   }
+
+  //  cout << e << endl;
+  //  cout << e.size() << endl;
+  // in a ring of n vertices where each vertex may only be connected to its immediate neighbours,
+  // the induced graph is connected exactly when there are at least n-1 edges
   return e.size() < n[v].size()-1;
 }
 
