@@ -264,7 +264,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 //FIXME remove / replace layout assertion ?
 Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) const
 {
-  assert(layout2d.size() == N);
+  //  assert(layout2d.size() == N); // Shouldn't need layout!
   Unfolding u(*this,true);
   Unfolding gcu(u*Eisenstein(k,l));
   Folding gcf(gcu);
@@ -538,6 +538,7 @@ else {
   for(node_t u=0;u<N;u++)
     if(neighbours[u].size() != 6) node_starts.push_back(u);
 
+  // NB: "only_special" is obsoleted by "rarest_only"
   for(node_t u=0;u<N;u++)
     if(!only_special && neighbours[u].size() == 6) node_starts.push_back(u);
 }
@@ -547,19 +548,23 @@ else {
   spiral = vector<int>(1,INT_MAX); // so it gets overwritten
   jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
 
+  // TODO: Write this way neater.
+  bool found_one = false;
   for(int i=0; i<node_starts.size(); i++){
     const node_t u=node_starts[i];
     const vector<node_t>& nu(neighbours[u]);
 
+    // Get regular spiral if it exists
     for(int j=0;j<nu.size();j++){
       node_t v=nu[j], w[2];
       w[0] = nextCW(dedge_t(u,v));
       w[1] = nextCCW(dedge_t(u,v));
 
       for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
-        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,general))
+        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false))
           continue;
 
+	found_one = true;
         // + If we don't need the canonical spiral, just return the first one that works
         if(!canonical){
           jumps  = jumps_tmp;
@@ -578,6 +583,44 @@ else {
       }
     }
   }
+
+  // If no regular spiral exists, go for the smallest general one
+  if(general && !found_one)
+    for(int i=0; i<node_starts.size(); i++){
+      const node_t u=node_starts[i];
+      const vector<node_t>& nu(neighbours[u]);
+
+      // Get regular spiral if it exists
+      for(int j=0;j<nu.size();j++){
+	node_t v=nu[j], w[2];
+	w[0] = nextCW(dedge_t(u,v));
+	w[1] = nextCCW(dedge_t(u,v));
+
+	for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
+	  if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true))
+	    continue;
+
+	  found_one = true;
+	  // + If we don't need the canonical spiral, just return the first one that works
+	  if(!canonical){
+	    jumps  = jumps_tmp;
+	    spiral = spiral_tmp;
+	    return true;
+	  }
+
+	  // store the shortest / lexicographically smallest (general) spiral
+	  if(jumps_tmp.size() < jumps.size() ||
+	     (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
+	     (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
+	      lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
+	    jumps = jumps_tmp;
+	    spiral = spiral_tmp;
+	  }
+	}
+      }
+    }
+  
+  
 
   if(spiral.size()!=N) return false;
 
