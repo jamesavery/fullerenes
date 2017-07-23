@@ -118,64 +118,116 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
 }
 
 
-PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const {
-  // TODO: Simplify
+
+PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
+{
   PlanarGraph dual;
-  set<edge_t> edge_set = undirected_edges(); // TODO: In new planargraph, this is unnecessary
-  unsigned int Nfaces = edge_set.size()-N+2;
-  dual.N = Nfaces;
-  dual.neighbours.resize(Nfaces);
+  IDCounter<face_t> face_numbers;
 
-  //  cerr << "dual_graph(" << Fmax << ")\n";
-  const vector<face_t> allfaces(compute_faces_flat(Fmax,planar_layout));
+  auto normalize_face = [&](const face_t& f) -> face_t {
+    int i_min=0;
+    for(int i=1;i<f.size();i++) if(f[i]<f[i_min]) i_min = i;
 
-  if(Nfaces != allfaces.size()){
-    fprintf(stderr,"%d != %d faces: Graph is not polyhedral.\n",Nfaces,int(allfaces.size()));
-    cout << "errgraph = " << *this << endl;
-  }
+    face_t F(f.size());
+    for(int i=0;i<f.size();i++) F[i] = f[(i+i_min)%f.size()];
 
-  // Construct mapping e -> faces containing e (these are mutually adjacent)
-  //  cerr << "dual_graph::construct facenodes\n";
-  map< edge_t, set<int> > facenodes;
-  for(unsigned int i=0;i<allfaces.size(); i++){
-    const face_t& face(allfaces[i]);
-    //  cerr << "Face "<<i<<": " << face << endl;
-    for(unsigned int j=0;j<face.size();j++)
-      facenodes[edge_t(face[j],face[(j+1)%face.size()])].insert(i);
-  }
-  //  cerr << "dual_graph::test planarity\n";
-  for(map<edge_t,set<int> >::const_iterator fs(facenodes.begin());fs!=facenodes.end();fs++){
-    const edge_t&   e(fs->first);
-    const set<int>& connects(fs->second);
-    if(connects.size() != 2)
-      fprintf(stderr,"Edge (%d,%d) connects %d faces: Graph is not planar.\n",e.first,e.second,int(connects.size()));
-  }
+    return F;
+  };
+  
+  if(is_oriented){
+    //    cerr << "Oriented dualizer!\n";
+    
+    set<edge_t> edges;		// TODO: Do this in a consistently oriented way
+    
+    for(node_t u=0;u<N;u++){
+      //      cerr << "u = " << u << endl;
+      
+      for(node_t v: neighbours[u]){
+	//	cerr << "v = " << v << ";\n";
+	
+	face_t f = normalize_face(get_face_actually_oriented(u,v,Fmax));
+	face_t g = normalize_face(get_face_actually_oriented(v,u,Fmax));
 
-  // Insert edge between each pair of faces that share an edge
-  //  cerr << "dual_graph::construct graph\n";
-  set<edge_t> dual_edges;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    const set<int>& adjacent_faces(facenodes[*e]);
-    for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
-      set<int>::const_iterator g(f);
-      for(++g; g!= adjacent_faces.end(); g++)
-        dual_edges.insert(edge_t(*f,*g));
+	int fid = face_numbers.insert(f);
+	int gid = face_numbers.insert(g);
+
+	//	cerr << "fid = " << fid << "; gid = " << gid << ";\n";
+	//	cerr << "f = " << f << "; g = " << g << ";\n";
+	
+	edges.insert(edge_t{fid,gid});
+	//	cerr << "edges = " << edges << ";\n";
+      }
     }
-  }
-  //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
+    // TODO: Don't use edge set, it's slow and loses orientation
+    dual     = Graph(edges);
 
-  dual = Graph(dual_edges);
+    if(planar_layout && layout2d.size() == N){
+      //    cerr << "dual_graph::compute layout.\n";
+      dual.layout2d = vector<coord2d>(face_numbers.size());
+      
+      for(int i=0;i<face_numbers.size();i++)
+	dual.layout2d[i] = face_numbers.reverse[i].centroid(layout2d);
+    }
+  } else {
+    // TODO: Get rid of all this junk!
+    PlanarGraph dual;
+    set<edge_t> edge_set = undirected_edges(); // TODO: In new planargraph, this is unnecessary
+    int Nfaces = edge_set.size()-N+2;
+    dual.N = Nfaces;
+    dual.neighbours.resize(Nfaces);
 
-  // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
-  // (but it is not planar -- might not want to use this!)
-  if(planar_layout && layout2d.size() == N){
-    //    cerr << "dual_graph::compute layout.\n";
-    dual.layout2d = vector<coord2d>(Nfaces);
+    //  cerr << "dual_graph(" << Fmax << ")\n";
+    vector<face_t> allfaces = compute_faces_flat(Fmax,planar_layout);
 
-    for(int i=0;i<Nfaces;i++)
-      dual.layout2d[i] = allfaces[i].centroid(layout2d);
-  }
-  return dual;
+    if(Nfaces != allfaces.size()){
+      fprintf(stderr,"%d != %d faces: Graph is not polyhedral.\n",Nfaces,int(allfaces.size()));
+      cout << "errgraph = " << *this << endl;
+    }
+
+    // Construct mapping e -> faces containing e (these are mutually adjacent)
+    //  cerr << "dual_graph::construct facenodes\n";
+    map< edge_t, set<int> > facenodes;
+    for(unsigned int i=0;i<allfaces.size(); i++){
+      const face_t& face(allfaces[i]);
+      //  cerr << "Face "<<i<<": " << face << endl;
+      for(unsigned int j=0;j<face.size();j++)
+	facenodes[edge_t(face[j],face[(j+1)%face.size()])].insert(i);
+    }
+    //  cerr << "dual_graph::test planarity\n";
+    for(map<edge_t,set<int> >::const_iterator fs(facenodes.begin());fs!=facenodes.end();fs++){
+      const edge_t&   e(fs->first);
+      const set<int>& connects(fs->second);
+      if(connects.size() != 2)
+	fprintf(stderr,"Edge (%d,%d) connects %d faces: Graph is not planar.\n",e.first,e.second,int(connects.size()));
+    }
+
+    // Insert edge between each pair of faces that share an edge
+    //  cerr << "dual_graph::construct graph\n";
+    set<edge_t> dual_edges;
+    for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+      const set<int>& adjacent_faces(facenodes[*e]);
+      for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
+	set<int>::const_iterator g(f);
+	for(++g; g!= adjacent_faces.end(); g++)
+	  dual_edges.insert(edge_t(*f,*g));
+      }
+    }
+    //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
+
+    dual = Graph(dual_edges);
+
+  
+    // If original graph was planar with 2D layout, there's a corresponding layout for the dual graph
+    // (but it is not planar, because the outer face is placed in (0,0))
+    if(planar_layout && layout2d.size() == N){
+      //    cerr << "dual_graph::compute layout.\n";
+      dual.layout2d = vector<coord2d>(allfaces.size());
+
+      for(int i=0;i<allfaces.size();i++)
+	dual.layout2d[i] = allfaces[i].centroid(layout2d);
+    }
+  }    
+    return dual;
 }
 
 
@@ -315,12 +367,15 @@ facemap_t PlanarGraph::compute_faces_oriented() const
 // sort neighbour list CW
 void PlanarGraph::orient_neighbours()
 {
+  if(is_oriented) return;
+  
   assert(layout2d.size() == N);
   for(node_t u=0;u<N;u++){
     sort_ccw_point CCW(layout2d,layout2d[u]);
     sort(neighbours[u].begin(),neighbours[u].end(),CCW);
     reverse(neighbours[u].begin(),neighbours[u].end());
   }
+  is_oriented = true;
 }
 
 vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const
@@ -725,3 +780,101 @@ vector<coord3d> PlanarGraph::zero_order_geometry(double scalerad) const
   return coordinates;
 }
 
+// TODO: Where does this belong?
+// Assumes file is at position of a graph start
+Graph PlanarGraph::read_hog_planarcode(FILE *planarcode_file)
+{
+  // Read the number N of vertices per graph.
+  int number_length=1, N=0;
+  fread(reinterpret_cast<unsigned char*>(&N), 1, 1, planarcode_file);
+  if(N == 0){
+    fread(reinterpret_cast<unsigned char*>(&N), 2, 1, planarcode_file);
+    number_length=2;
+  }
+  
+  Graph g(N);
+  for(node_t u=0; u<N && !feof(planarcode_file); ++u){
+    int v=0;
+    do{
+      int n_read = fread(reinterpret_cast<char*>(&v), number_length, 1, planarcode_file);
+      if(n_read != 1 && !feof(planarcode_file)){
+	perror("Error reading HoG PlanarCode file: ");
+	abort();
+      }
+      if(v!=0) g.neighbours[u].push_back(v-1); // In oriented order
+    } while(v!=0 && !feof(planarcode_file));
+  }
+  // Check graph
+  for(node_t u=0;u<N;u++){
+    for(auto v: g.neighbours[u]){
+      bool found_vu = false;
+      
+      for(node_t w: g.neighbours[v])
+	if(w == u) found_vu = true;
+      if(!found_vu){
+	fprintf(stderr,"Graph is not symmetric: (u,v) = (%d,%d) has\n",u,v);
+	cerr << "neighbours["<<u<<"] = " << g.neighbours[u] <<";\n";
+	cerr << "neighbours["<<v<<"] = " << g.neighbours[v] <<";\n";
+	abort();
+      }
+    }
+  }
+    
+  return g;
+}
+
+vector<Graph> PlanarGraph::read_hog_planarcodes(FILE *planarcode_file) {
+  const int header_size = 15;
+  vector<Graph> graph_list;
+
+  //the actual parsing of the selected graph:
+  //go to the beginning of the selected graph
+  fseek(planarcode_file,  header_size, SEEK_SET);
+
+  int i = 1;
+  while(!feof(planarcode_file)){
+    //    cerr << "Reading graph " << (i++) << ".\n";
+    Graph g = read_hog_planarcode(planarcode_file);
+    //    cerr << "Got graph on " << g.N << " vertices.\n";
+    if(g.N != 0){
+      g.is_oriented = true;
+      graph_list.push_back(g);
+    }
+  }
+    
+  return graph_list;
+}
+
+face_t PlanarGraph::get_face_actually_oriented(node_t u, node_t v, int Fmax) const
+{
+  assert(is_oriented);
+
+  face_t f = vector<int>{{u}};
+  node_t u0 = u;
+
+  int i=0;
+  while(i<Fmax && v!=u0){
+    node_t w = next(v,u);
+    //    fprintf(stderr,"next(%d,%d) = %d\n",u,v,w);
+    f.push_back(v);
+    u=v; v=w; i++;
+    assert(w != -1);
+  }
+  assert(i<=Fmax);
+  return f;
+}
+
+
+// node_t PlanarGraph::nextCW(const node_t& u, const node_t& v) const
+// {
+//   assert(is_oriented);
+
+//   return next(u,v);
+// }
+
+// node_t PlanarGraph::prevCW(const node_t& u, const node_t& v) const
+// {
+//   assert(is_oriented);
+
+//   return prev(u,v);
+// }

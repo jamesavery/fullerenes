@@ -13,6 +13,7 @@ public:
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
   bool layout_is_spherical;
 
+  // TODO: Get rid of layout_is_spherical
   PlanarGraph() : layout_is_spherical(false) {}
   PlanarGraph(const PlanarGraph& g) : Graph(g), layout2d(g.layout2d), layout_is_spherical(g.layout_is_spherical) {  }
   PlanarGraph(const Graph& g, const node_t s=-1, const node_t t=0, const node_t r=0) : Graph(g), layout_is_spherical(false)
@@ -23,7 +24,15 @@ public:
     } 
   }
 
+  // Assumes file is at position of a graph start
+  static Graph read_hog_planarcode(FILE *planarcode_file);
+  static vector<Graph> read_hog_planarcodes(FILE *planarcode_file);
+  
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g), layout2d(layout) {  }
+
+  
+  // node_t nextCW(const node_t& u,const node_t& v) const;
+  // node_t prevCW(const node_t& u,const node_t& v) const; 
 
 
   bool is_a_fullerene() const;
@@ -36,12 +45,14 @@ public:
 
   facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   facemap_t compute_faces_oriented() const;
-  face_t get_face_oriented(int u, int v) const;
+  face_t get_face_oriented(int u, int v) const; // TODO: This uses the layout, should work towards retirement
+  face_t get_face_actually_oriented(int u, int v, int Fmax=INT_MAX) const; // TODO: This doesn't use layout, should replace ^
 
   void orient_neighbours();   // Ensures that neighbours are ordered CCW
 
   vector<face_t> compute_faces_flat(unsigned int Nmax=INT_MAX, bool planar_layout=true) const;
-  face_t find_outer_face() const; 
+  face_t find_outer_face() const;
+
 
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
 

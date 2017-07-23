@@ -20,13 +20,14 @@ using namespace std;
 struct Graph {
   int N;
   neighbours_t neighbours;
+  bool is_oriented;
 
-  Graph(size_t N=0) : N(N), neighbours(N) {}
-  Graph(const set<edge_t>& edge_set) {
+  Graph(size_t N=0) : N(N), neighbours(N), is_oriented(false) {}
+  Graph(const set<edge_t>& edge_set) : is_oriented(false) {
     update_from_edgeset(edge_set);
   }
-  Graph(const neighbours_t& neighbours) : N(neighbours.size()), neighbours(neighbours) { }
-  Graph(const unsigned int N, const vector<int>& adjacency) : N(N), neighbours(N) {
+  Graph(const neighbours_t& neighbours, bool is_oriented=false) : N(neighbours.size()), neighbours(neighbours), is_oriented(is_oriented) { }
+  Graph(const unsigned int N, const vector<int>& adjacency, bool is_oriented=false) : N(N), neighbours(N), is_oriented(is_oriented) {
     assert(adjacency.size() == N*N);
     set<edge_t> edge_set;
 

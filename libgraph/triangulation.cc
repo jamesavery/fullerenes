@@ -328,7 +328,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
 
   PlanarGraph remaining_graph(neighbours); // remaining_graph consists of all nodes that haven't been added to the result yet
   vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
-  int last_vertex; // we'd like to know the number of the last vertex
+  int last_vertex=-1; // we'd like to know the number of the last vertex
 
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
@@ -561,7 +561,7 @@ else {
       w[1] = nextCCW(dedge_t(u,v));
 
       for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
-        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false))
+        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,general))
           continue;
 
 	found_one = true;
@@ -584,41 +584,41 @@ else {
     }
   }
 
-  // If no regular spiral exists, go for the smallest general one
-  if(general && !found_one)
-    for(int i=0; i<node_starts.size(); i++){
-      const node_t u=node_starts[i];
-      const vector<node_t>& nu(neighbours[u]);
+  // // If no regular spiral exists, go for the smallest general one
+  // if(general && !found_one)
+  //   for(int i=0; i<node_starts.size(); i++){
+  //     const node_t u=node_starts[i];
+  //     const vector<node_t>& nu(neighbours[u]);
 
-      // Get regular spiral if it exists
-      for(int j=0;j<nu.size();j++){
-	node_t v=nu[j], w[2];
-	w[0] = nextCW(dedge_t(u,v));
-	w[1] = nextCCW(dedge_t(u,v));
+  //     // Get regular spiral if it exists
+  //     for(int j=0;j<nu.size();j++){
+  // 	node_t v=nu[j], w[2];
+  // 	w[0] = nextCW(dedge_t(u,v));
+  // 	w[1] = nextCCW(dedge_t(u,v));
 
-	for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
-	  if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true))
-	    continue;
+  // 	for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
+  // 	  if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true))
+  // 	    continue;
 
-	  found_one = true;
-	  // + If we don't need the canonical spiral, just return the first one that works
-	  if(!canonical){
-	    jumps  = jumps_tmp;
-	    spiral = spiral_tmp;
-	    return true;
-	  }
+  // 	  found_one = true;
+  // 	  // + If we don't need the canonical spiral, just return the first one that works
+  // 	  if(!canonical){
+  // 	    jumps  = jumps_tmp;
+  // 	    spiral = spiral_tmp;
+  // 	    return true;
+  // 	  }
 
-	  // store the shortest / lexicographically smallest (general) spiral
-	  if(jumps_tmp.size() < jumps.size() ||
-	     (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
-	     (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
-	      lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
-	    jumps = jumps_tmp;
-	    spiral = spiral_tmp;
-	  }
-	}
-      }
-    }
+  // 	  // store the shortest / lexicographically smallest (general) spiral
+  // 	  if(jumps_tmp.size() < jumps.size() ||
+  // 	     (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
+  // 	     (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
+  // 	      lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
+  // 	    jumps = jumps_tmp;
+  // 	    spiral = spiral_tmp;
+  // 	  }
+  // 	}
+  //     }
+  //   }
   
   
 
