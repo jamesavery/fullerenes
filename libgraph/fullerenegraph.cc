@@ -14,8 +14,8 @@ typedef list<pair<int,int> > jumplist_t;
 FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_layout) const {
   if(m<0) return FullereneGraph(*this);
 
-  PlanarGraph dual(dual_graph(6,planar_layout));
-  vector<face_t> triangles(dual.compute_faces_flat(3,false));
+  Triangulation dual(dual_graph(6,planar_layout),false);
+  vector<tri_t> triangles(dual.triangles);
   map<edge_t,vector<node_t> > edge_nodes;
 
   set<edge_t> edgeset_new;
@@ -90,7 +90,8 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
 
   //cerr << "new_layout.size() = " << new_layout.size() << endl;
 
-  PlanarGraph new_dual(Graph(edgeset_new), new_layout);
+  Triangulation new_dual(Graph(edgeset_new), false);
+  
   //cerr << "newdual.N = " << new_dual.N << endl;
 
   /*
@@ -101,9 +102,9 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
   h << "newdual = " << new_dual << endl;
   */
   
-  new_dual.layout2d = new_dual.tutte_layout(); // FIXME remove
-  PlanarGraph G(new_dual.dual_graph(3));
-  G.layout2d = G.tutte_layout(); // FIXME remove
+  //  new_dual.layout2d = new_dual.tutte_layout(); // FIXME remove
+  PlanarGraph G(new_dual.dual_graph());
+  //  G.layout2d = G.tutte_layout(); // FIXME remove
 
   /*
   h << "halma = " << G << endl;

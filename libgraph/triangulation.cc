@@ -1,5 +1,7 @@
 #include "triangulation.hh"
+#include "unfold.hh"
 #include <algorithm>
+
 
 pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
 {
@@ -283,9 +285,12 @@ Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) con
 bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3,
 			       vector<int> &spiral, jumplist_t& jumps, vector<node_t>& permutation,
 			       const bool general) const {
-  bool normal_spiral = get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,false);
+  return get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,general);
 
-  return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
+  // I think our implementation is now so fast that it makes sense to just use that! Let's see.
+  // bool normal_spiral = get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,false);
+
+  // return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
 }
 
 void remove_node(const node_t u, Graph &remaining_graph){
@@ -787,40 +792,32 @@ Triangulation Triangulation::sort_nodes() const
 // call for the canonical general spiral and extract the pentagon indices
 bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
 {
-  rspi.clear();
+  rspi.resize(12);
   jumps.clear();
   vector<int> spiral;
   vector<node_t> permutation;
   if(!get_spiral(f1, f2, f3, spiral, jumps, permutation, general)) return false;
 
-  int i=0;
-  vector<int>::const_iterator it=spiral.begin();
-  for(; it!=spiral.end(); ++it,++i){
-    if(*it==5){
-      rspi.push_back(i);
-    }
-  }
-  //assert(rspi.size()==12);
+  for(int i=0,j=0;i<spiral.size();i++)
+    if(spiral[i] == 5)
+      rspi[j++] = i;
+
   return true;
 }
 
 // call for the canonical general spiral and extract the pentagon indices
 bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, const bool canonical, const bool general, const bool pentagon_start) const
 {
-  rspi.clear();
+  rspi.resize(12);
   jumps.clear();
   vector<int> spiral;
   bool special_only = false;
   if(!get_spiral(spiral, jumps, canonical, special_only, general, pentagon_start)) return false;
 
-  int i=0;
-  vector<int>::const_iterator it=spiral.begin();
-  for(; it!=spiral.end(); ++it,++i){
-    if(*it==5){
-      rspi.push_back(i);
-    }
-  }
-  //assert(rspi.size()==12);
+  for(int i=0,j=0;i<spiral.size();i++)
+    if(spiral[i] == 5)
+      rspi[j++] = i;
+
   return true;
 }
 

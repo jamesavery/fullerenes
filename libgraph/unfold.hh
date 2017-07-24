@@ -1,13 +1,12 @@
-#ifndef UNFOLD_HH
-# define UNFOLD_HH
-#include "planargraph.hh"
+#pragma once
+#include "triangulation.hh"
 #include "eisenstein.hh"
 
 class Unfolding {
 public:
   typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
 
-  vector<face_t> faces;		// Original triangulation. These two
+  vector<tri_t> faces;		// Original triangulation. These two
 				// variables may not always be
 				// initialized, but we keep them
   vector<tri_t>  triangles;	// around if we have them.
@@ -24,7 +23,7 @@ public:
   // There are two ways to create an "unfolding":
   // 
   // 1. Provide a triangulation of the sphere, i.e., the dual of a planar cubic graph.
-  Unfolding(const PlanarGraph& dual, bool planar_layout = false) : faces(dual.compute_faces_flat(3,planar_layout)), triangles(faces.begin(),faces.end()), edgecoords(unfold(triangles)), outline(get_outline(edgecoords)) 
+  Unfolding(const Triangulation& dual, bool planar_layout = false) : faces(dual.triangles), triangles(dual.triangles), edgecoords(unfold(triangles)), outline(get_outline(edgecoords)) 
   {
     // If 'dual' contains separating triangles, then a planar layout is necessary
     // to compute the faces (depth-first search will detect non-existing faces)
@@ -116,7 +115,7 @@ public:
   // Collect nodes in unfolding that will correspond to the same nodes in the folded graph.
   vector<int> identify_nodes();
 
-  PlanarGraph fold();
+  Triangulation fold();
 };
 
-#endif
+

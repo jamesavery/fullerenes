@@ -178,7 +178,7 @@ vector<int> Folding::identify_nodes()
   return same;
 }
 
-PlanarGraph Folding::fold()
+Triangulation Folding::fold()
 {
   vector<int> same_as;
   vector<edge_t> edge_list(connect());
@@ -212,19 +212,20 @@ PlanarGraph Folding::fold()
   }
 
   int N = new_names.size();
-  vector<coord2d> layout2d;
+  // vector<coord2d> layout2d;
 
-  if(debug_flags & DO_NONPLANAR_LAYOUT){
-    layout2d.resize(N);
-    for(IDCounter<Eisenstein>::const_iterator xi(grid.begin()); xi!=grid.end(); xi++){
-      Eisenstein xy(xi->first);
-      node_t      u(new_names(xi->second));
+  // if(debug_flags & DO_NONPLANAR_LAYOUT){
+  //   layout2d.resize(N);
+  //   for(IDCounter<Eisenstein>::const_iterator xi(grid.begin()); xi!=grid.end(); xi++){
+  //     Eisenstein xy(xi->first);
+  //     node_t      u(new_names(xi->second));
 
-      if(u>=0) layout2d[u] = coord2d(xy.first,xy.second);
-    }
-  }
-
-  PlanarGraph G(edges,layout2d);
+  //     if(u>=0) layout2d[u] = coord2d(xy.first,xy.second);
+  //   }
+  // }
+  Graph g(N);
+  g.update_from_edgeset(edges);
+  Triangulation G(g,false);
 
   if(debug_flags & WRITE_FILE) debug_file << "G = " << G << ";\n";
 

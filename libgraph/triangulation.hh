@@ -1,9 +1,7 @@
-#ifndef TRIANGULATION_HH
-#define TRIANGULATION_HH
+#pragma once
 
 #include "matrix.hh"
 #include "planargraph.hh"
-#include "unfold.hh"
 
 class Triangulation : public PlanarGraph {
 public:
@@ -90,4 +88,4 @@ public:
 
 };
 
-#endif
+

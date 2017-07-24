@@ -60,15 +60,16 @@ int main(int ac, char **av) {
   auto t0 = Clock::now();
   g.layout2d = g.tutte_layout();
   g.layout_is_spherical = false;
+  g.orient_neighbours(); 
   cout << "Tutte done" << endl;
 
   auto t1 = Clock::now();
   FullereneGraph gkl;
-  if (l == 0) {
-    gkl = FullereneGraph(g.halma_fullerene(k - 1, true));
-  } else {
-    gkl = FullereneGraph(g.GCtransform(k, l, true));
-  }
+  // if (l == 0) {
+  //   gkl = g.halma_fullerene(k - 1, false);
+  // } else {
+  gkl = g.GCtransform(k, l, false);
+  //  }
   cout << "gc done " << endl;
 
   auto t2 = Clock::now();

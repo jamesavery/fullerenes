@@ -23,17 +23,17 @@ int main(int ac, char **av) {
   int k = strtol(av[2], 0, 0);
   int l = strtol(av[3], 0, 0);
   bool pentagon_start = strtol(av[4], 0, 0);
-  cout << N << ", " << k << ", " << l << endl;
+  //  cerr << N << ", " << k << ", " << l << endl;
 
   FullereneDual g;
   switch (N) {
   case 140: {
-
+    g = FullereneDual_from_rspi(N, {0, 16, 19, 22, 25, 28, 47, 50, 53, 56, 59, 71});
     break;
   }
 
-  case 380: {
-    g = FullereneDual_from_rspi(N, {44, 69, 70, 81, 82, 109, 118, 119, 143, 183, 184, 191});
+  case 380: {    
+    g = FullereneDual_from_rspi(N, {44, 69, 70, 81, 82, 109, 118, 119, 143, 183, 184, 191},jumplist_t{{109, 2}});
     break;
   }
 
@@ -57,39 +57,40 @@ int main(int ac, char **av) {
     return 1;
   }
 
-  cout << "g = " << g << ";\n";
-
-  auto t0 = Clock::now();
-  cout << "Don't calculate layout, stay with triangulation" << endl;
-
-  auto t1 = Clock::now();
+  
   FullereneDual gkl;
+  auto gc_start = std::clock();
   gkl = FullereneDual(g.GCtransform(k, l));
-  cout << "gc done " << endl;
+  auto gc_end   = std::clock();
+  cerr << "GC done " << endl;
 
-  auto t2 = Clock::now();
-  cout << "Still don't calculate layout" << endl;
-
-  auto t3 = Clock::now();
   vector<int> rspi(12, 0);
   jumplist_t jumps;
-  gkl.get_rspi(rspi, jumps, true, true, pentagon_start);
-  cout << "Got RSPI: " << rspi << endl;
   
-  ofstream output(("spiral-" + to_string(N) + "-" + to_string(k) + "-" +
-                   to_string(l) + "-" + to_string(pentagon_start)).c_str());
+  auto grspi_start = std::clock();
+  gkl.get_rspi(rspi, jumps, true, true, pentagon_start);
+  auto grspi_end   = std::clock();
+  cerr << "Got RSPI: " << rspi << endl;
+  
+  // ofstream output(("spiral-" + to_string(N) + "-" + to_string(k) + "-" +
+  //                  to_string(l) + "-" + to_string(pentagon_start)).c_str());
+
   for (int i = 0; i < 12; i++) rspi[i]++;
   for (auto it = jumps.begin(); it != jumps.end(); it++) it->first++;
   auto t4 = Clock::now();
-  output << "N = " << N *(k * k + k * l + l * l) << ";\n"
-         << "jumplist = " << jumps << ";\n"
-         << "spiral   = " << rspi << ";\n";
+  double grspi_time = (grspi_end-grspi_start) * 1.0/CLOCKS_PER_SEC;
+  double gc_time = (gc_end-gc_start) * 1.0/CLOCKS_PER_SEC;
+  
+  cout << "Ngc       = " << N *(k * k + k * l + l * l) << ";\n"
+       << "{n,k,l}   = " << vector<int>{N,k,l} << ";\n"
+       << "jumplist  = " << jumps << ";\n"
+       << "spiral    = " << rspi << ";\n"
+       << "gctime    = " << gc_time << ";\n"
+       << "grspitime = " << grspi_time << ";\n";
 
-  output << "Delta t1-t0 (layout): " << std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0) .count() << " ms" << std::endl;
-  output << "Delta t2-t1 (gc): " << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1) .count() << " ms" << std::endl;
-  output << "Delta t3-t2 (layout): " << std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2) .count() << " ms" << std::endl;
-  output << "Delta t4-t3 (spiral): " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3) .count() << " ms" << std::endl;
-  output.close();
+  
+  
+  //  output.close();
 
   return 0;
 }

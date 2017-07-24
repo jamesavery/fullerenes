@@ -122,7 +122,7 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
 PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 {
   PlanarGraph dual;
-  IDCounter<face_t> face_numbers;
+  IDCounter<face_t> face_numbers; // This makes things unnecessarily slow
 
   auto normalize_face = [&](const face_t& f) -> face_t {
     int i_min=0;
@@ -239,10 +239,15 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
   set<edge_t> edge_set = undirected_edges();
 
   facemap_t facemap;
+  // TODO: This should supercede using the planar embedding for orientation
+  //  if(is_oriented) return compute_faces_actually_oriented();
   // TODO: This is a much better and faster method, but requires a planar layout
   if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
 
+  
+  // TODO: This should never be used
   cerr << " Non-oriented face computation (loop search). This is not reliable!\n";
+  abort();
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
 
@@ -304,6 +309,8 @@ face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
   }
   return face;
 }
+
+
 
 facemap_t PlanarGraph::compute_faces_oriented() const
 {
@@ -381,6 +388,9 @@ void PlanarGraph::orient_neighbours()
 vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const
 {
   vector<face_t> faces;
+  if(is_oriented) return compute_faces_actually_oriented();
+  assert(is_oriented);
+
   facemap_t facemap(compute_faces(Nmax,planar_layout));
 
   for(facemap_t::const_iterator fs(facemap.begin()); fs != facemap.end(); fs++)
@@ -831,7 +841,7 @@ vector<Graph> PlanarGraph::read_hog_planarcodes(FILE *planarcode_file) {
   //go to the beginning of the selected graph
   fseek(planarcode_file,  header_size, SEEK_SET);
 
-  int i = 1;
+  //  int i = 1;
   while(!feof(planarcode_file)){
     //    cerr << "Reading graph " << (i++) << ".\n";
     Graph g = read_hog_planarcode(planarcode_file);
@@ -864,6 +874,16 @@ face_t PlanarGraph::get_face_actually_oriented(node_t u, node_t v, int Fmax) con
   return f;
 }
 
+vector<face_t> PlanarGraph::compute_faces_actually_oriented() const
+{
+  vector<face_t> faces;
+
+  for(node_t u=0;u<N;u++)
+    for(node_t v: neighbours[u])
+      faces.push_back(get_face_actually_oriented(u,v));
+
+  return faces;
+}
 
 // node_t PlanarGraph::nextCW(const node_t& u, const node_t& v) const
 // {
