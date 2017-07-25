@@ -41,6 +41,7 @@ public:
   
   //  Unfolding unfold() const;
   Triangulation GCtransform(const unsigned k=1, const unsigned l=0) const;
+  Triangulation halma_transform(int m) const;
 
   // spiral stuff
   bool get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, 
@@ -82,7 +83,12 @@ public:
   // 3. Spiral+gen. spiral special case
   // 4. Embed-in-3D special case
   FullereneDual(const Triangulation& g = Triangulation()) : Triangulation(g) {}
-
+  FullereneDual(const int N, const vector<int>& rspi, const jumplist_t& jumps = jumplist_t()) {
+    vector<int> spiral(N/2+2,6);
+    for(int i: rspi) spiral[i] = 5;
+    *this = Triangulation(spiral,jumps);
+  }
+  
   bool get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& r, jumplist_t& j, const bool general=true) const;
   bool get_rspi(vector<int>& r, jumplist_t& j, const bool canonical=true, const bool general=true, const bool pentagon_start=true) const;
 

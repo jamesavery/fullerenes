@@ -267,6 +267,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) const
 {
   //  assert(layout2d.size() == N); // Shouldn't need layout!
+  if(l==0) return halma_transform(k-1);
+  
   Unfolding u(*this,true);
   Unfolding gcu(u*Eisenstein(k,l));
   Folding gcf(gcu);
@@ -275,6 +277,59 @@ Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) con
   return t;
 }
 
+// TODO: Get rid of maps, edge-sets, etc. Simplify and make faster.
+//       Keep orientation.
+Triangulation Triangulation::halma_transform(int m) const {
+  if(m<0) return Triangulation(*this);
+
+  map<edge_t,vector<node_t> > edge_nodes;
+
+  set<edge_t> edgeset_new;
+  node_t v_new = N;
+
+  // Create n new vertices for each edge
+  set<edge_t> dual_edges = undirected_edges();
+
+  for(const auto &e: dual_edges){
+    vector<node_t>& nodes(edge_nodes[e]);
+    for(unsigned int i=0;i<m;i++) nodes.push_back(v_new++);
+  }
+
+  // For every triangle in the dual, we create and connect a halma-type grid
+  for(size_t i=0;i<triangles.size();i++){
+    map<edge_t,node_t> grid;
+    const face_t& T(triangles[i]);
+    edge_t e0(T[0],T[1]),e1(T[1],T[2]),e2(T[2],T[0]);
+    const vector<node_t>& ns0(edge_nodes[e0]), ns1(edge_nodes[e1]), ns2(edge_nodes[e2]);
+    // Insert original vertices
+    grid[edge_t(0,0)]     = T[0];
+    grid[edge_t(m+1,0)]   = T[1];
+    grid[edge_t(m+1,m+1)] = T[2];
+    // Insert new edge vertices
+    for(size_t j=0;j<m;j++){
+      grid[edge_t(0,j+1)]   = ns0[j];
+      grid[edge_t(j+1,m+1)] = ns1[j];
+      grid[edge_t(j+1,j+1)] = ns2[j];
+    }
+    // Create and insert inner vertices
+    for(int j=1;j<m;j++)
+      for(int k=j+1;k<=m;k++)
+        grid[edge_t(j,k)] = v_new++;
+
+    // Connect the vertices in the grid
+    for(int j=0;j<=m;j++)
+      for(int k=j+1;k<=m+1;k++){
+        node_t v(grid[edge_t(j,k)]), down(grid[edge_t(j+1,k)]),
+          left(grid[edge_t(j,k-1)]);
+
+        edgeset_new.insert(edge_t(v,down));
+        edgeset_new.insert(edge_t(v,left));
+        edgeset_new.insert(edge_t(left,down));
+      }
+  }
+
+  return Triangulation(Graph(edgeset_new),false);
+}
 
 
 // *********************************************************************
@@ -566,7 +621,7 @@ else {
       w[1] = nextCCW(dedge_t(u,v));
 
       for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
-        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,general))
+        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false))
           continue;
 
 	found_one = true;
@@ -589,41 +644,41 @@ else {
     }
   }
 
-  // // If no regular spiral exists, go for the smallest general one
-  // if(general && !found_one)
-  //   for(int i=0; i<node_starts.size(); i++){
-  //     const node_t u=node_starts[i];
-  //     const vector<node_t>& nu(neighbours[u]);
+  // If no regular spiral exists, go for the smallest general one
+  if(general && !found_one)
+    for(int i=0; i<node_starts.size(); i++){
+      const node_t u=node_starts[i];
+      const vector<node_t>& nu(neighbours[u]);
 
-  //     // Get regular spiral if it exists
-  //     for(int j=0;j<nu.size();j++){
-  // 	node_t v=nu[j], w[2];
-  // 	w[0] = nextCW(dedge_t(u,v));
-  // 	w[1] = nextCCW(dedge_t(u,v));
+      // Get regular spiral if it exists
+      for(int j=0;j<nu.size();j++){
+  	node_t v=nu[j], w[2];
+  	w[0] = nextCW(dedge_t(u,v));
+  	w[1] = nextCCW(dedge_t(u,v));
 
-  // 	for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
-  // 	  if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true))
-  // 	    continue;
+  	for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
+  	  if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true))
+  	    continue;
 
-  // 	  found_one = true;
-  // 	  // + If we don't need the canonical spiral, just return the first one that works
-  // 	  if(!canonical){
-  // 	    jumps  = jumps_tmp;
-  // 	    spiral = spiral_tmp;
-  // 	    return true;
-  // 	  }
+  	  found_one = true;
+  	  // + If we don't need the canonical spiral, just return the first one that works
+  	  if(!canonical){
+  	    jumps  = jumps_tmp;
+  	    spiral = spiral_tmp;
+  	    return true;
+  	  }
 
-  // 	  // store the shortest / lexicographically smallest (general) spiral
-  // 	  if(jumps_tmp.size() < jumps.size() ||
-  // 	     (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
-  // 	     (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
-  // 	      lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
-  // 	    jumps = jumps_tmp;
-  // 	    spiral = spiral_tmp;
-  // 	  }
-  // 	}
-  //     }
-  //   }
+  	  // store the shortest / lexicographically smallest (general) spiral
+  	  if(jumps_tmp.size() < jumps.size() ||
+  	     (jumps_tmp.size() == jumps.size() && lexicographical_compare(jumps_tmp.begin(), jumps_tmp.end(), jumps.begin(), jumps.end())) ||
+  	     (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps &&
+  	      lexicographical_compare(spiral_tmp.begin(), spiral_tmp.end(), spiral.begin(), spiral.end()))){
+  	    jumps = jumps_tmp;
+  	    spiral = spiral_tmp;
+  	  }
+  	}
+      }
+    }
   
   
 
@@ -789,6 +844,7 @@ Triangulation Triangulation::sort_nodes() const
   return Triangulation(new_neighbours);
 }
 
+
 // call for the canonical general spiral and extract the pentagon indices
 bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
 {
@@ -811,7 +867,7 @@ bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, const bool ca
   rspi.resize(12);
   jumps.clear();
   vector<int> spiral;
-  bool special_only = false;
+  bool special_only = pentagon_start;
   if(!get_spiral(spiral, jumps, canonical, special_only, general, pentagon_start)) return false;
 
   for(int i=0,j=0;i<spiral.size();i++)
