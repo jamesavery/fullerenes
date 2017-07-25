@@ -60,7 +60,7 @@ int main(int ac, char **av)
   double walltime = chrono::duration<double,std::ratio<1,1>>(wall_end-wall_start).count();
   double cputime  = (cpu_end-cpu_start) * 1.0 / CLOCKS_PER_SEC;
   cerr << "Computed all spirals.\n";
-  cout << "N        = " << N << ";\n";
+  cout << "Nv       = " << N << ";\n";
   cout << "Nisomers = " << duals.size() << ";\n";
   cout << "walltime = " << walltime << ";\n";
   cout << "cputime  = " << cputime << ";\n";
