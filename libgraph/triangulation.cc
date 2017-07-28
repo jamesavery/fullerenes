@@ -273,7 +273,7 @@ Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) con
   Unfolding gcu(u*Eisenstein(k,l));
   Folding gcf(gcu);
   Triangulation t(gcf.fold());
-  t.layout2d = t.tutte_layout();
+  //  t.layout2d = t.tutte_layout();
   return t;
 }
 
@@ -621,7 +621,9 @@ else {
       w[1] = nextCCW(dedge_t(u,v));
 
       for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
-        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false))
+	// NB: general -> false to only to general if all originals fail
+	//     That's much faster on average, but gives bigger variation in times.
+        if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,general))
           continue;
 
 	found_one = true;
