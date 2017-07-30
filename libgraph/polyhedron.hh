@@ -32,11 +32,13 @@ struct Polyhedron : public PlanarGraph {
   double volume_tetra() const;
   double volume_divergence() const;
 
+  pair<coord3d,coord3d> bounding_box() const;
+
   Polyhedron convex_hull() const { return incremental_convex_hull(); }
   Polyhedron incremental_convex_hull() const;
 
   matrix3d inertia_matrix() const;
-  matrix3d inertial_frame() const;
+  matrix3d principal_axes() const; 
 
   void scale(const coord3d& x) {
     for(node_t u=0;u<N;u++) points[u] *= x;
@@ -51,7 +53,7 @@ struct Polyhedron : public PlanarGraph {
     move(-x0);
   }
   void align_with_axes(){
-    matrix3d If(inertial_frame());
+    matrix3d If(principal_axes());
     points = If*points;
   }
 

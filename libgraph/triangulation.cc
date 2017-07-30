@@ -141,7 +141,7 @@ PlanarGraph Triangulation::dual_graph() const
       }
     }
   }
-  return PlanarGraph(Graph(A));
+  return PlanarGraph(Graph(A),true);
 };
 
 vector<face_t> Triangulation::dual_faces() const
