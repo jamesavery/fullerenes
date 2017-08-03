@@ -247,7 +247,8 @@ facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) cons
   
   // TODO: This should never be used
   cerr << " Non-oriented face computation (loop search). This is not reliable!\n";
-  abort();
+  // abort();
+  cerr << "This shouldn't happen but we'll accept it for now." << endl;
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
 
@@ -389,7 +390,8 @@ vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_la
 {
   vector<face_t> faces;
   if(is_oriented) return compute_faces_actually_oriented();
-  assert(is_oriented);
+  // assert(is_oriented);
+  cerr << "This shouldn't happen but we'll accept it for now." << endl;
 
   facemap_t facemap(compute_faces(Nmax,planar_layout));
 
