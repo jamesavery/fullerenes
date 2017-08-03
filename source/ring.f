@@ -71,92 +71,92 @@ C     IC3 contains vertex adjacencies and IVR3 ring numbers for a vertex
       Ncount5=1
       Ncount6=1
       Do I=1,6
-       Rd(I)=0.d0
+        Rd(I)=0.d0
       enddo
       Do IS=1,number_vertices
-      Do 1 I=1,6
-      Do 1 J=1,96
-    1  IPa(I,J)=0
-      Do 2 I=1,3
-    2  IPa(1,I)=IC3(IS,I)     
-      Do I2=1,3
-      IX1=IPa(1,I2)
-      if(IX1.ne.0) CALL Step(2,I2,IS,IX1,IPA,IC3)
-      Do I3=1,6
-      IV=I3/2
-      IV1=(I3+1)/2
-      IDIF=IV1-IV
-      IF(IDIF.EQ.1) IV=IV+1
-      IForbid=IPa(1,IV)
-      IX2=IPa(2,I3)
-      if(IX2.ne.0) CALL Step(3,I3,IForbid,IX2,IPA,IC3)
-      Do I4=1,12
-      IV=I4/2
-      IV1=(I4+1)/2
-      IDIF=IV1-IV
-      IF(IDIF.EQ.1) IV=IV+1
-      IForbid=IPa(2,IV)
-      IX3=IPa(3,I4)
-      if(IX3.ne.0) CALL Step(4,I4,IForbid,IX3,IPA,IC3)
-      Do I5=1,24
-      IV=I5/2
-      IV1=(I5+1)/2
-      IDIF=IV1-IV
-      IF(IDIF.EQ.1) IV=IV+1
-      IForbid=IPa(3,IV)
-      IX4=IPa(4,I5)
-      if(IX4.ne.0) CALL Step(5,I5,IForbid,IX4,IPA,IC3)
-      Do I6=1,48
-      IV=I6/2
-      IV1=(I6+1)/2
-      IDIF=IV1-IV
-      IF(IDIF.EQ.1) IV=IV+1
-      IForbid=IPa(4,IV)
-      IX5=IPa(5,I6)
-      if(IX5.ne.0) CALL Step(6,I6,IForbid,IX5,IPA,IC3)
-      enddo
-      enddo
-      enddo
-      enddo
-      enddo
-C     Print*,' Tree ',IS
-C     Do 3 I=1,6
-C     Write(IOUT,1010) (IPa(I,J),J=1,48)
-C   3 Write(IOUT,1011) (IPa(I,J),J=49,96)
+        Do 1 I=1,6
+          Do 1 J=1,96
+    1       IPa(I,J)=0
+        Do 2 I=1,3
+    2     IPa(1,I)=IC3(IS,I)     
+        Do I2=1,3
+          IX1=IPa(1,I2)
+          if(IX1.ne.0) CALL Step(2,I2,IS,IX1,IPA,IC3)
+          Do I3=1,6
+            IV=I3/2
+            IV1=(I3+1)/2
+            IDIF=IV1-IV
+            IF(IDIF.EQ.1) IV=IV+1
+            IForbid=IPa(1,IV)
+            IX2=IPa(2,I3)
+            if(IX2.ne.0) CALL Step(3,I3,IForbid,IX2,IPA,IC3)
+            Do I4=1,12
+              IV=I4/2
+              IV1=(I4+1)/2
+              IDIF=IV1-IV
+              IF(IDIF.EQ.1) IV=IV+1
+              IForbid=IPa(2,IV)
+              IX3=IPa(3,I4)
+              if(IX3.ne.0) CALL Step(4,I4,IForbid,IX3,IPA,IC3)
+              Do I5=1,24
+                IV=I5/2
+                IV1=(I5+1)/2
+                IDIF=IV1-IV
+                IF(IDIF.EQ.1) IV=IV+1
+                IForbid=IPa(3,IV)
+                IX4=IPa(4,I5)
+                if(IX4.ne.0) CALL Step(5,I5,IForbid,IX4,IPA,IC3)
+                Do I6=1,48
+                  IV=I6/2
+                  IV1=(I6+1)/2
+                  IDIF=IV1-IV
+                  IF(IDIF.EQ.1) IV=IV+1
+                  IForbid=IPa(4,IV)
+                  IX5=IPa(5,I6)
+                  if(IX5.ne.0) CALL Step(6,I6,IForbid,IX5,IPA,IC3)
+                enddo
+              enddo
+            enddo
+          enddo
+        enddo
+C       Print*,' Tree ',IS
+C       Do 3 I=1,6
+C       Write(IOUT,1010) (IPa(I,J),J=1,48)
+C   3   Write(IOUT,1011) (IPa(I,J),J=49,96)
 
-C     Identify all 5-membered rings
-      Do I=1,48
-      IN5=IPa(5,I)
-      IF(IN5.eq.IS) then
-       CALL Ring5(Ncount5,I,IN5,Mmax,IPA,N5MEM,N5MEMS)
-      endif
-      enddo
+C       Identify all 5-membered rings
+        Do I=1,48
+          IN5=IPa(5,I)
+          IF(IN5.eq.IS) then
+            CALL Ring5(Ncount5,I,IN5,Mmax,IPA,N5MEM,N5MEMS)
+          endif
+        enddo
 C     Identify all 6-membered rings
-      Do I=1,96
-      IN6=IPa(6,I)
-      IF(IN6.eq.IS) then
-       CALL Ring6(Ncount6,I,IN6,Mmax,IPA,N6MEM,N6MEMS)
-      endif
-      enddo
+        Do I=1,96
+          IN6=IPa(6,I)
+          IF(IN6.eq.IS) then
+            CALL Ring6(Ncount6,I,IN6,Mmax,IPA,N6MEM,N6MEMS)
+          endif
+        enddo
       enddo
 
       Ncount5=Ncount5-1
       if(itop.eq.0) then
-      Ncount6=Ncount6-1
-       Write(IOUT,1019) Ncount5
-       if(Ncount5.eq.0) stop
-       Do I=1,Ncount5
-        Write(IOUT,1001) (N5MEM(I,J),J=1,5)
-       enddo
-       Write(IOUT,1002) Ncount6
-       If(Ncount6.ne.0) then 
-        Write(IOUT,1020)
-        Do I=1,Ncount6
-         Write(IOUT,1003) (N6MEM(I,J),J=1,6)
+        Ncount6=Ncount6-1
+        Write(IOUT,1019) Ncount5
+        if(Ncount5.eq.0) stop
+        Do I=1,Ncount5
+          Write(IOUT,1001) (N5MEM(I,J),J=1,5)
         enddo
-       endif
-       Mcon2=(5*Ncount5+6*Ncount6)/2
-       Go to 777
+        Write(IOUT,1002) Ncount6
+        If(Ncount6.ne.0) then 
+          Write(IOUT,1020)
+          Do I=1,Ncount6
+            Write(IOUT,1003) (N6MEM(I,J),J=1,6)
+          enddo
+        endif
+        Mcon2=(5*Ncount5+6*Ncount6)/2
+        Go to 777
       endif
       Write(IOUT,1000) Ncount5
 
@@ -164,25 +164,25 @@ C     Check bond distances
       Rmin5=1000.d0
       Rmax5=0.d0
       Do I=1,Ncount5
-       Rsum=0.
-       Do J=1,5
-        IAT1=N5MEM(I,J)
-        J1=J+1
-        IF(J1.eq.6) J1=1
-        IAT2=N5MEM(I,J1)
-        Rd(J)=FunDistMat(IAT1,IAT2,DistMat)
-        if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
-        if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
-        RSum=Rsum+Rd(J)
-       enddo
-       RAv5=RSum*.2d0
-       Rsum=0.
-       Do J=1,5
-        Rsum=Rsum+(RAv5-Rd(J))**2
-       enddo
-       Rrmsd=dsqrt(Rsum*.2d0)
-       Write(IOUT,1001) (N5MEM(I,J),J=1,5),RAv5,Rrmsd,(Rd(J),J=1,5)
-       CALL DifDist(Ndif,5,Tol,Rd,Rmem)
+        Rsum=0.
+        Do J=1,5
+          IAT1=N5MEM(I,J)
+          J1=J+1
+          IF(J1.eq.6) J1=1
+          IAT2=N5MEM(I,J1)
+          Rd(J)=FunDistMat(IAT1,IAT2,DistMat)
+          if(Rd(J).LT.Rmin5) Rmin5=Rd(J)
+          if(Rd(J).GT.Rmax5) Rmax5=Rd(J)
+          RSum=Rsum+Rd(J)
+        enddo
+        RAv5=RSum*.2d0
+        Rsum=0.
+        Do J=1,5
+          Rsum=Rsum+(RAv5-Rd(J))**2
+        enddo
+        Rrmsd=dsqrt(Rsum*.2d0)
+        Write(IOUT,1001) (N5MEM(I,J),J=1,5),RAv5,Rrmsd,(Rd(J),J=1,5)
+        CALL DifDist(Ndif,5,Tol,Rd,Rmem)
       enddo
       Write(IOUT,1007) Rmin5,Rmax5
 
@@ -190,25 +190,25 @@ C     Check bond angles
       asmall=1.d10
       abig=-1.d10
       Do I=1,Ncount5
-      Do J=1,5
-      IAT1=N5MEM(I,J)
-      J1=J+1
-      IF(J1.eq.6) J1=1
-      IAT2=N5MEM(I,J1)
-      J2=J+2
-      IF(J2.eq.6) J2=1
-      IF(J2.eq.7) J2=2
-      IAT3=N5MEM(I,J2)
+        Do J=1,5
+          IAT1=N5MEM(I,J)
+          J1=J+1
+          IF(J1.eq.6) J1=1
+          IAT2=N5MEM(I,J1)
+          J2=J+2
+          IF(J2.eq.6) J2=1
+          IF(J2.eq.7) J2=2
+          IAT3=N5MEM(I,J2)
 
-C     Deviation from ideal pentagon angle of 108 deg
-      AngleM=FunAngleMat(IAT1,IAT2,IAT3,DistMat)
-      if(AngleM.gt.abig) then
-      abig=AngleM
-      endif
-      if(AngleM.lt.asmall) then
-      asmall=AngleM
-      endif
-      enddo
+C         Deviation from ideal pentagon angle of 108 deg
+          AngleM=FunAngleMat(IAT1,IAT2,IAT3,DistMat)
+          if(AngleM.gt.abig) then
+            abig=AngleM
+          endif
+          if(AngleM.lt.asmall) then
+            asmall=AngleM
+          endif
+        enddo
       enddo
       asmalldif=asmall-1.08d2
       abigdif=abig-1.08d2
@@ -222,65 +222,67 @@ C     Check bond distances
       Rmin6=1000.d0
       Rmax6=0.d0
       Do I=1,Ncount6
-      Rsum=0.
-      Do J=1,6
-      IAT1=N6MEM(I,J)
-      J1=J+1
-      IF(J1.eq.7) J1=1
-      IAT2=N6MEM(I,J1)
-      Rd(J)=FunDistMat(IAT1,IAT2,DistMat)
-      if(Rd(J).LT.Rmin6) Rmin6=Rd(J)
-      if(Rd(J).GT.Rmax6) Rmax6=Rd(J)
-      RSum=Rsum+Rd(J)
-      enddo
-      RAv6=RSum/6.d0
-      Rsum=0.
-      Do J=1,6
-      Rsum=Rsum+(RAv6-Rd(J))**2
-      enddo
-      Rrmsd=dsqrt(Rsum*.2d0)
-      Write(IOUT,1003) (N6MEM(I,J),J=1,6),RAv6,Rrmsd,(Rd(J),J=1,6)
-      CALL DifDist(Ndif,6,Tol,Rd,Rmem)
+        Rsum=0.
+        Do J=1,6
+          IAT1=N6MEM(I,J)
+          J1=J+1
+          IF(J1.eq.7) J1=1
+          IAT2=N6MEM(I,J1)
+          Rd(J)=FunDistMat(IAT1,IAT2,DistMat)
+          if(Rd(J).LT.Rmin6) Rmin6=Rd(J)
+          if(Rd(J).GT.Rmax6) Rmax6=Rd(J)
+          RSum=Rsum+Rd(J)
+        enddo
+        RAv6=RSum/6.d0
+        Rsum=0.
+        Do J=1,6
+          Rsum=Rsum+(RAv6-Rd(J))**2
+        enddo
+        Rrmsd=dsqrt(Rsum*.2d0)
+        Write(IOUT,1003) (N6MEM(I,J),J=1,6),RAv6,Rrmsd,(Rd(J),J=1,6)
+        CALL DifDist(Ndif,6,Tol,Rd,Rmem)
       enddo
       If(Ncount6.ne.0) Write(IOUT,1008) Rmin6,Rmax6
       If(Rmin5.lt.Rmin6) then
-      NMin=5
-      RminT=Rmin5
+        NMin=5
+        RminT=Rmin5
+        write(*,*)'hello 1'
       else
-      NMin=6
-      RminT=Rmin6
+        NMin=6
+        RminT=Rmin6
+        write(*,*)'hello 2'
       endif
       If(Rmax5.ge.(Rmax6-1.d-12)) then
-      MaxN=5
-      RmaxT=Rmax5
+        MaxN=5
+        RmaxT=Rmax5
       else
-      MaxN=6
-      RmaxT=Rmax6
+        MaxN=6
+        RmaxT=Rmax6
       endif
 
 C     Check bond angles
       asmall=1.d10
       abig=-1.d10
       Do I=1,Ncount6
-      Do J=1,6
-      IAT1=N6MEM(I,J)
-      J1=J+1
-      IF(J1.eq.7) J1=1
-      IAT2=N6MEM(I,J1)
-      J2=J+2
-      IF(J2.eq.7) J2=1
-      IF(J2.eq.8) J2=2
-      IAT3=N6MEM(I,J2)
+        Do J=1,6
+          IAT1=N6MEM(I,J)
+          J1=J+1
+          IF(J1.eq.7) J1=1
+          IAT2=N6MEM(I,J1)
+          J2=J+2
+          IF(J2.eq.7) J2=1
+          IF(J2.eq.8) J2=2
+          IAT3=N6MEM(I,J2)
 
 C     Deviation from ideal hexagon angle of 120 deg
-      AngleM=FunAngleMat(IAT1,IAT2,IAT3,DistMat)
-      if(AngleM.gt.abig) then
-      abig=AngleM
-      endif
-      if(AngleM.lt.asmall) then
-      asmall=AngleM
-      endif
-      enddo
+          AngleM=FunAngleMat(IAT1,IAT2,IAT3,DistMat)
+          if(AngleM.gt.abig) then
+            abig=AngleM
+          endif
+          if(AngleM.lt.asmall) then
+            asmall=AngleM
+          endif
+        enddo
       enddo
       asmalldif=asmall-1.2d2
       abigdif=abig-1.2d2
@@ -295,34 +297,34 @@ C     Establish ring numbers for specific vertex
       enddo
 C     First pentagons
       Do I=1,Ncount5
-      Do J=1,5
-       IAT=N5MEM(I,J)
-       if(IVR3(IAT,1).eq.0) then
-        IVR3(IAT,1)=I
-       else
-        if(IVR3(IAT,2).eq.0) then
-         IVR3(IAT,2)=I
-        else
-         IVR3(IAT,3)=I
-        endif
-       endif
-      enddo
+        Do J=1,5
+          IAT=N5MEM(I,J)
+          if(IVR3(IAT,1).eq.0) then
+            IVR3(IAT,1)=I
+          else
+            if(IVR3(IAT,2).eq.0) then
+              IVR3(IAT,2)=I
+            else
+              IVR3(IAT,3)=I
+            endif
+          endif
+        enddo
       enddo
 C     Next hexagons
       Do I=1,Ncount6
-       II=I+12
-      Do J=1,6
-       IAT=N6MEM(I,J)
-       if(IVR3(IAT,1).eq.0) then
-        IVR3(IAT,1)=II
-       else
-        if(IVR3(IAT,2).eq.0) then
-         IVR3(IAT,2)=II
-        else
-         IVR3(IAT,3)=II
-        endif
-       endif
-      enddo
+        II=I+12
+        Do J=1,6
+          IAT=N6MEM(I,J)
+          if(IVR3(IAT,1).eq.0) then
+            IVR3(IAT,1)=II
+          else
+            if(IVR3(IAT,2).eq.0) then
+              IVR3(IAT,2)=II
+            else
+              IVR3(IAT,3)=II
+            endif
+          endif
+        enddo
       enddo
       Write(IOUT,1017)
       Do I=1,number_vertices,5
@@ -340,14 +342,15 @@ C     Check Euler characteristic
      1  Ncount6,Mv,Me
       If(MEuler.ne.2) Write(IOUT,1005)
       If(Ncount5.ne.12) then
-      Write(IOUT,1014)
-      stop 20
+        Write(IOUT,1014)
+        stop 20
       endif
       ameas=dfloat(Ndif)/dfloat(Mcon2)
       if(itop.eq.0) then
-       Write(IOUT,1009) NMin,RminT,MaxN,RmaxT
-       Write(Iout,1012) Ndif,ameas,Tol
-       Write(Iout,1013) (Rmem(I),I=1,Ndif)
+        ! I removed the following, because rminT and rmaxT are sometimes uninitialised
+        ! Write(IOUT,1009) NMin,RminT,MaxN,RmaxT
+        Write(Iout,1012) Ndif,ameas,Tol
+        Write(Iout,1013) (Rmem(I),I=1,Ndif)
       endif
 
       call flush(iout)
