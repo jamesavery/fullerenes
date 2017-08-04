@@ -56,8 +56,8 @@ int main(int ac, char **av)
   Debug info("main",Debug::INFO1);
   
   ofstream steps_file("output/delaunay-steps.m");
-  MathDebug::channel_stream["Delaunay"] = &steps_file;
-  MathDebug steps("Delaunay",0);
+  MathematicaDebug::channel_stream["Delaunay"] = &steps_file;
+  MathematicaDebug steps("Delaunay",0);
 
   if(ac==14){
     N = strtol(av[1], 0, 0);
@@ -80,15 +80,19 @@ int main(int ac, char **av)
 
   Triangulation T1(spiral);
   FulleroidDelaunay DY(T1);
+  cout << "DY: " << DY << endl;
   M = DY.N;
 
   Polyhedron P0 = fullerene_dual_polyhedron(DY);
+  cout << "P0: " << P0 << endl;
 
   steps << "g[0] = "  << DY << ";\n";
   steps << "points[0] = " << P0.points << ";\n";
 
+  cout << "starting to remove vertices " << endl;
   DY.remove_flat_vertices();
 
+  // Polyhedron P1 = fullerene_dual_polyhedron(DY);
 
   return 0;
 }
