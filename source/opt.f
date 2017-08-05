@@ -410,8 +410,7 @@ c counter for edges with 0, 1, 2 pentagons neighbours
       graph = new_fullerene_graph(Nmax,number_vertices,IDA)
       call tutte_layout(graph,layout2d)
 c not spherical because of tutte
-      layout_is_spherical = 0
-      call set_layout2d(graph, layout2d, layout_is_spherical)
+      call set_layout2d(graph, layout2d)
       call get_edges(graph,number_vertices,
      1 e_hh,e_hp,e_pp,ne_hh,ne_hp,ne_pp)
       call get_corners(graph,number_vertices,
