@@ -38,10 +38,19 @@ int main(int ac, char **av)
   assert(dF.is_consistently_oriented());
   assert(F.is_consistently_oriented());
   
-  PlanarGraph G = F.leapfrog_dual();
+  Triangulation G = F.leapfrog_dual();
 
   assert(G.is_consistently_oriented());  
   cout << "G = " << G << ";\n";
+
+  {
+    vector<int> spiral;
+    jumplist_t  jumps;
+    G.get_spiral(spiral,jumps);
+
+    cout << "LFspiral = " << spiral << ";\n"
+	 << "LFjumps  = " << jumps  << ";\n";
+  }
   
   return 0;
 }
