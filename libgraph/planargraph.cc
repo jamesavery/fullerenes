@@ -244,13 +244,12 @@ Graph PlanarGraph::leapfrog_dual() const
   // Now connect new face-center nodes in oriented order
   for(int i=0;i<faces.size();i++){
     const face_t &f  = faces[i];
-
+    node_t c = N+i;		// Face-center node
+  
     for(int j=0;j<f.size();j++){
-      node_t u = f[(j+f.size()-1)%f.size()], v = f[j], w = f[(j+1)%f.size()];
-      node_t c = N+i;		// Face-center node
+      node_t u = f[j], v = f[(j+1)%f.size()];
 
-      // v->c after w, c->v after u
-      lf.insert_edge(dedge_t{v,c},w,u);
+      lf.insert_edge(dedge_t{u,c},v,-1);
     }
   }
 
@@ -904,13 +903,13 @@ face_t PlanarGraph::get_face_actually_oriented(node_t u, node_t v, int Fmax) con
 
 vector<face_t> PlanarGraph::compute_faces_actually_oriented() const
 {
-  vector<face_t> faces;
+  set<face_t> faces;
 
   for(node_t u=0;u<N;u++)
     for(node_t v: neighbours[u])
-      faces.push_back(get_face_actually_oriented(u,v));
+      faces.insert(get_face_actually_oriented(u,v).sorted());
 
-  return faces;
+  return vector<face_t>(faces.begin(),faces.end());
 }
 
 // node_t PlanarGraph::nextCW(const node_t& u, const node_t& v) const
