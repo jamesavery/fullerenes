@@ -316,10 +316,9 @@ Polyhedron::Polyhedron(const string& filename)
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) : 
   PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
-  if(layout2d.size() != N){
-    layout2d = tutte_layout(-1,-1,-1,face_max);
-  }
-  layout_is_spherical = false;
+  // if(layout2d.size() != N){
+  //   layout2d = tutte_layout(-1,-1,-1,face_max);
+  // }
 
 //  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){
@@ -329,7 +328,7 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
     for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
   } 
 
-  orient_neighbours();
+  if(!is_oriented) orient_neighbours();
 }
 
 Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 

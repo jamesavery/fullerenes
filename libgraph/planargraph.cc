@@ -310,7 +310,6 @@ face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
     const vector<node_t>& ns(neighbours[v]);
 
 
-    //coord2d vu = coord2d::displacement(layout2d[u],layout2d[v],layout_is_spherical);
     coord2d vu = layout2d[u]-layout2d[v];
     double angle_max = -M_PI;
 
@@ -318,7 +317,6 @@ face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
     for(unsigned int i=0;i<ns.size();i++) {
       //	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
       if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
-        //	coord2d vw = coord2d::displacement(layout2d[ns[i]],layout2d[v],layout_is_spherical);
         coord2d vw = layout2d[ns[i]]-layout2d[v];
         double angle = vu.line_angle(vw);
 
@@ -357,7 +355,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
   // If layout is planar, outer face must exist and be ordered CW,
   // rest of faces CCW. If layout is spherical / periodic, all faces
   // should be ordered CCW.
-  if(!layout_is_spherical){
+
     if(outer_face.size() < 3)
     outer_face = find_outer_face();
 
@@ -382,7 +380,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
       //    printf("Removing directed edge (%d,%d)\n",u,v);
       workset.erase(dedge_t(u,v));
     }
-  }
+
 
   // Now visit every other edge once in each direction.
   while(!workset.empty()){
@@ -495,6 +493,7 @@ vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) c
       tris.push_back(tri_t(f[j],v_new,f[(j+1)%f.size()]));
   }
 
+  //return tris;			// TODO: Make sure triangulation is oriented.
   return orient_triangulation(tris);
 }
 

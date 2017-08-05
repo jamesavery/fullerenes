@@ -11,12 +11,11 @@ public:
 
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
-  bool layout_is_spherical;
 
   // TODO: Get rid of layout_is_spherical
-  PlanarGraph() : layout_is_spherical(false) {}
-  PlanarGraph(const PlanarGraph& g) : Graph(g), layout2d(g.layout2d), layout_is_spherical(g.layout_is_spherical) {  }
-  PlanarGraph(const Graph& g, const node_t s=-1, const node_t t=0, const node_t r=0) : Graph(g), layout_is_spherical(false)
+  PlanarGraph() {}
+  PlanarGraph(const PlanarGraph& g) : Graph(g), layout2d(g.layout2d) {  }
+  PlanarGraph(const Graph& g, const node_t s=-1, const node_t t=0, const node_t r=0) : Graph(g)
   {
     if(s!=-1){ // Compute planar layout
       layout2d = tutte_layout(s,t,r);
