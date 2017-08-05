@@ -56,10 +56,12 @@ public:
 
 
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
-
+  
   size_t count_perfect_matchings() const;
 
 
+  Graph leapfrog_dual() const;
+  
   vector<tri_t>  triangulation(int face_max=INT_MAX) const;
   vector<tri_t>  triangulation(const vector<face_t>& faces) const;
   vector<tri_t>  centroid_triangulation(const vector<face_t>& faces) const ;
@@ -77,6 +79,8 @@ public:
   coord2d width_height() const;
   void scale(const coord2d& x);
   void move (const coord2d& x);
+
+  
 
   vector<coord3d> zero_order_geometry(double scalerad=4) const;
 

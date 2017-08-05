@@ -231,6 +231,32 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 }
 
 
+Graph PlanarGraph::leapfrog_dual() const
+{
+  assert(is_oriented);
+  vector<face_t> faces = compute_faces_flat();
+
+  Graph lf(N+faces.size(),true);
+
+  // Start with all the existing nodes
+  for(node_t u=0;u<N;u++) lf.neighbours[u] = neighbours[u];
+
+  // Now connect new face-center nodes in oriented order
+  for(int i=0;i<faces.size();i++){
+    const face_t &f  = faces[i];
+
+    for(int j=0;j<f.size();j++){
+      node_t u = f[(j+f.size()-1)%f.size()], v = f[j], w = f[(j+1)%f.size()];
+      node_t c = N+i;		// Face-center node
+
+      // v->c after w, c->v after u
+      lf.insert_edge(dedge_t{v,c},w,u);
+    }
+  }
+
+  return lf;
+}
+
 
 // NB: TODO: What happens, for example, if a triangle is comprised of three smaller triangles?
 // This produces "phantom" faces! Fix and use the oriented version instead.
@@ -389,6 +415,7 @@ void PlanarGraph::orient_neighbours()
 vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const
 {
   vector<face_t> faces;
+  // TODO: Clean up
   if(is_oriented) return compute_faces_actually_oriented();
   // assert(is_oriented);
   cerr << "This shouldn't happen but we'll accept it for now." << endl;

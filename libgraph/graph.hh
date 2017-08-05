@@ -22,7 +22,7 @@ struct Graph {
   neighbours_t neighbours;
   bool is_oriented;
 
-  Graph(size_t N=0) : N(N), neighbours(N), is_oriented(false) {}
+  Graph(size_t N=0, bool is_oriented=false) : N(N), neighbours(N), is_oriented(is_oriented) {}
   Graph(const set<edge_t>& edge_set) : is_oriented(false) {
     update_from_edgeset(edge_set);
   }
