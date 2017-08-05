@@ -3,6 +3,7 @@
 #include <algorithm>
 
 
+
 pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
 {
   const node_t &u(e.first), &v(e.second);
@@ -15,15 +16,15 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
     const vector<node_t>& nw(neighbours[w]);
     for(int j=0;j<nw.size();j++)
       if(nw[j] == u) {
-    //    printf("%d/%d: %d->%d->%d\n",i,t,u,v,w);
-    t++;
-    if(t == 1)  tris.first  = w;
-    else if(t==2) tris.second = w;
-    else {
-      fprintf(stderr,"Triangulation is not orientable, edge %d--%d part of more than two faces.\n",u,v);
-      cerr << "neighbours = " << neighbours << ";\n";
-      abort();
-    }
+	//    printf("%d/%d: %d->%d->%d\n",i,t,u,v,w);
+	t++;
+	if(t == 1)  tris.first  = w;
+	else if(t==2) tris.second = w;
+	else {
+	  fprintf(stderr,"Triangulation is not orientable, edge %d--%d part of more than two faces.\n",u,v);
+	  cerr << "neighbours = " << neighbours << ";\n";
+	  abort();
+	}
       }
   }
   return tris;
@@ -71,6 +72,7 @@ void Triangulation::orient_neighbours()
       v = w;
     }
   }
+  is_oriented = true;
 }
 
 node_t Triangulation::nextCW(node_t u, node_t v) const
@@ -128,21 +130,22 @@ PlanarGraph Triangulation::dual_graph() const
 
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
-      node_t w(nextCCW(u,v)); // TODO: CCW for buckygen -- will this give problems elsewhere?
-
+      node_t w(prev(u,v)); // TODO: CCW for buckygen -- will this give problems elsewhere?
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
 
-      //      printf("A[%d][%d] = %d (%s)\n",U,i,tri_numbers(tri_t(u,v,w).sorted()),to_string(tri_t(u,v,w).sorted()).c_str());
-
       if(A[U][i] < 0){
-	cerr << "Triangle " << tri_t(u,v,w).sorted() << " (opposite " << t << ") not found!\n";
-	abort();
+  	cerr << "Triangle " << tri_t(u,v,w).sorted() << " (opposite " << t << ") not found!\n";
+  	abort();
       }
     }
   }
-  return PlanarGraph(Graph(A),true);
+  Graph G(A,true);
+  // G must be consistently oriented, or something went wrong.
+  // assert(G.is_consistently_oriented());
+  return PlanarGraph(G);
 };
+
 
 vector<face_t> Triangulation::dual_faces() const
 {
@@ -259,7 +262,10 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     open_valencies.pop_front();
   }
 
+  // TODO: It should really be possible to construct the graph in an oriented way
+  //       (i.e. neighbours are in CW or CCW order). It is also much faster than using edge sets.
   *this = Triangulation(PlanarGraph(edge_set));
+  orient_neighbours();
 }
 
 
