@@ -31,7 +31,7 @@ bool Graph::insert_edge(const dedge_t& e, const node_t suc_uv, const node_t suc_
 
   nu.insert(pos_uv,v);
   if(u!=v) nv.insert(pos_vu,u);
-
+  
   assert(nu.size() == oldsize[0]+1 && nv.size() == oldsize[1]+1);
 
   return false;
@@ -77,7 +77,7 @@ bool Graph::is_consistently_oriented() const
     const node_t u0 = u;
     work.erase(dedge_t(u,v));
     while(v != u0){
-      node_t w = next(u,v);	// u--v--w is CW-most corner
+      node_t w = next(v,u);	// u--v--w is CW-most corner
       u = v;
       v = w;
       if(work.find(dedge_t(u,v)) == work.end()){ // We have already processed arc u->v
