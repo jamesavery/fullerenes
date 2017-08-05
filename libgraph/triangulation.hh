@@ -49,13 +49,14 @@ public:
   // the one defined by three nodes
   bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, vector<node_t>& permutation, const bool general=true) const;
   // the canonical one
-  bool get_spiral(vector<int>& v, jumplist_t& j, const bool canonical=true, const bool only_special=false, const bool general=true, const bool pentagon_start=true) const;
+  bool get_spiral(vector<int>& v, jumplist_t& j, const bool canonical=true, const bool only_special=true, const bool general=true, const bool pentagon_start=true) const;
   void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps, // TODO: Should only need to supply jumps when general=true
 		       vector< vector<int> >& permutations,
 		       const bool only_special=false, const bool general=false) const;
 
   void symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const;
 
+  
   void update(bool already_oriented) {
     //    renumber(); // TODO!
     if(N>0){
