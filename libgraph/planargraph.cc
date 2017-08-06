@@ -23,32 +23,36 @@ bool PlanarGraph::is_a_fullerene() const {
     return false;
   }
 
-  facemap_t faces(compute_faces(6,true));
-  int n_faces = 0;
-  for(facemap_t::const_iterator f(faces.begin()); f!=faces.end();f++)
-    n_faces += f->second.size();
-
+  vector<face_t> faces(compute_faces(6,true));
+  int n_faces = faces.size();
+  int n_edges = count_edges();
+  
   const int E = 3*N/2;
   const int F = 2+E-N;
 
-  set<edge_t> edge_set = undirected_edges(); // TODO: Do with neighbours - this is a bit slow.
-  if(E != edge_set.size()){
-    fprintf(stdout,"Graph is not planar cubic: wrong number of edges: %d != %d\n",int(edge_set.size()),E);
+  if(E != n_edges){
+    fprintf(stdout,"Graph is not planar cubic: wrong number of edges: %d != %d\n",n_edges,E);
     return false;
   }
 
   if(F != n_faces){
     fprintf(stdout,"Graph is not planar cubic: wrong number of faces: %d != %d\n",n_faces,F);
-    cout << "faces = " << get_values(faces) << ";\n";
+    cout << "faces = " << faces << ";\n";
     return false;
   }
 
-  if(faces[5].size() != 12){
+  int Np=0, Nh=0;
+  for(const face_t &f: faces){
+    if(f.size()==5) Np++;
+    if(f.size()==6) Nh++;
+  }
+  
+  if(Np != 12){
     fprintf(stdout,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",int(faces[5].size()));
     return false;
   }
 
-  if(faces[6].size() != (F-12)){
+  if(Nh != (F-12)){
     fprintf(stdout,"Graph is not fullerene: wrong number of hexagons: %d != %d\n",int(faces[6].size()),F-12);
     return false;
   }
@@ -257,44 +261,59 @@ Graph PlanarGraph::leapfrog_dual() const
 }
 
 
-// NB: TODO: What happens, for example, if a triangle is comprised of three smaller triangles?
-// This produces "phantom" faces! Fix and use the oriented version instead.
-facemap_t PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const
+vector<face_t> PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const
 {
-  set<edge_t> edge_set = undirected_edges();
-
-  facemap_t facemap;
   // TODO: This should supercede using the planar embedding for orientation
-  //  if(is_oriented) return compute_faces_actually_oriented();
-  // TODO: This is a much better and faster method, but requires a planar layout
-  if(planar_layout && layout2d.size() == N) return compute_faces_oriented();
+  if(is_oriented) return compute_faces_actually_oriented();
+  
+  // TODO: Clean up.
+  if(planar_layout && layout2d.size() == N) return compute_faces_layout_oriented();
 
   
   // TODO: This should never be used
   cerr << " Non-oriented face computation (loop search). This is not reliable!\n";
   // abort();
   cerr << "This shouldn't happen but we'll accept it for now." << endl;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    const node_t s = e->first, t = e->second;
-
-    const vector<node_t>& ns(neighbours[t]);
-
-    for(unsigned int i=0;i<ns.size();i++)
-      if(ns[i] != s) {
-	const node_t u = ns[i];
+  set<edge_t> edge_set = undirected_edges();
+  vector<face_t> faces;
+  for(const edge_t &e: edge_set){
+    const node_t s = e.first, t = e.second;
+    
+    const vector<node_t>& nt(neighbours[t]);
+    
+    for(unsigned int i=0;i<nt.size();i++)
+      if(nt[i] != s) {
+	const node_t u = nt[i];
 
 	face_t face(shortest_cycle(s,t,u,Nmax));
 	//	cerr << face << endl;
-	if(face.size() > 0 && face.size() <= Nmax){
-	  facemap[face.size()].insert(face);
+	if(face.size() > 0 && face.size() <= Nmax)
+	  faces.push_back(face);
 	} //else {
 	  //	  fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u);
 	  //	  cerr << face << endl;
-
 	//	}
-      }
   }
-  return facemap;
+
+
+  // Make sure that outer face is at position 0
+  if(planar_layout){
+    if(outer_face.size() < 3)
+      outer_face = find_outer_face();
+
+    const set<node_t> of(outer_face.begin(),outer_face.end());
+    for(int i=0;i<faces.size();i++){
+      const face_t &f(faces[i]);
+      const set<node_t> sf(f.begin(),f.end());
+
+      if(of==sf){ // swap faces[i] with faces[0]
+       faces[i] = faces[0];
+       faces[0] = outer_face;
+      }
+    }
+  } else outer_face = face_t(faces[0]);
+
+  return faces;
 }
 
 face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
@@ -336,15 +355,16 @@ face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
 
 
 
-facemap_t PlanarGraph::compute_faces_oriented() const
+vector<face_t> PlanarGraph::compute_faces_layout_oriented() const
 {
   assert(layout2d.size() == N);
-  facemap_t facemap;
-  int faces_found =0;
   //  cout << "Computing faces using 2D orientation." << endl;
   set<dedge_t> workset;
   set<edge_t> edge_set = undirected_edges();
 
+  vector<face_t> faces;
+  set<face_t> face_set;
+  
   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
     const node_t s = e->first, t = e->second;
     workset.insert(dedge_t(s,t));
@@ -371,8 +391,7 @@ facemap_t PlanarGraph::compute_faces_oriented() const
         abort();
       }
     //    cout << "compute_faces_oriented: Outer face "<<outer_face<<" is OK: All vertices are inside face." << endl;
-    facemap[outer_face.size()].insert(outer_face);
-    faces_found++;
+    faces.push_back(outer_face);
     // Add outer face to output, remove directed edges from work set
     for(unsigned int i=0;i<outer_face.size();i++){
       const node_t u = outer_face[i], v = outer_face[(i+1)%outer_face.size()];
@@ -380,19 +399,19 @@ facemap_t PlanarGraph::compute_faces_oriented() const
       workset.erase(dedge_t(u,v));
     }
 
-
   // Now visit every other edge once in each direction.
   while(!workset.empty()){
     dedge_t e = *workset.begin();
     face_t face(get_face_oriented(e.first,e.second));
-    facemap[face.size()].insert(face);
-    faces_found++;
+    face_set.insert(face);
 
     for(int i=0;i<face.size();i++)
       workset.erase(dedge_t(face[i],face[(i+1)%face.size()]));
   }
-  assert(faces_found == N/2+2 || faces_found == (N-2)*2); // assuming the graph is either cubic or a triangulation // FIXME remove when things are more stable
-  return facemap;
+
+  copy(face_set.begin(), face_set.end(), std::back_inserter(faces));
+  
+  return faces;
 }
 
 // sort neighbour list CW
@@ -411,51 +430,8 @@ void PlanarGraph::orient_neighbours()
 
 vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const
 {
-  vector<face_t> faces;
-  // TODO: Clean up
-  if(is_oriented) return compute_faces_actually_oriented();
-  // assert(is_oriented);
-  cerr << "This shouldn't happen but we'll accept it for now." << endl;
-
-  facemap_t facemap(compute_faces(Nmax,planar_layout));
-
-  for(facemap_t::const_iterator fs(facemap.begin()); fs != facemap.end(); fs++)
-    copy(fs->second.begin(),fs->second.end(),inserter(faces,faces.end()));
-
-  // Check that faces are orientable: Every edge must appear in two faces
-  map<edge_t,int> edgecount;
-  for(int i=0;i<faces.size();i++)
-    for(int j=0;j<faces[i].size();j++)
-      edgecount[edge_t(faces[i][j],faces[i][(j+1)%faces[i].size()])]++;
-
-  for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
-    if(e->second != 2){
-      cerr << "compute_faces_flat: Graph not orientable - edge "<< e->first << " appears in " << e->second <<" faces, not two.\n";
-      cerr << "faces = {"; for(int i=0;i<faces.size();i++) cerr << faces[i] << (i+1<faces.size()?", ":"};\n");
-      cerr << "G = " << *this << ";\n";
-
-      abort();
-    }
-
-
-  // Make sure that outer face is at position 0
-  if(planar_layout){
-    if(outer_face.size() < 3)
-      outer_face = find_outer_face();
-
-    const set<node_t> of(outer_face.begin(),outer_face.end());
-    for(int i=0;i<faces.size();i++){
-      const face_t &f(faces[i]);
-      const set<node_t> sf(f.begin(),f.end());
-
-      if(of==sf){ // swap faces[i] with faces[0]
-       faces[i] = faces[0];
-       faces[0] = outer_face;
-      }
-    }
-  } else outer_face = face_t(faces[0]);
-
-  return faces;
+  // This function should soon disappear
+  return compute_faces(Nmax,planar_layout);
 }
 
 
@@ -907,7 +883,7 @@ vector<face_t> PlanarGraph::compute_faces_actually_oriented() const
 
   for(node_t u=0;u<N;u++)
     for(node_t v: neighbours[u])
-      faces.insert(get_face_actually_oriented(u,v).sorted());
+      faces.insert(get_face_actually_oriented(u,v).rotated());
 
   return vector<face_t>(faces.begin(),faces.end());
 }

@@ -55,13 +55,6 @@ int main(int ac, char **av)
 //
 //   ofstream output(("output/"+basename+".m").c_str());
 //
-//   facemap_t facemap(g.compute_faces(6,true));
-//   output << "g = " << g << ";\n";
-//   output << "coordinates0 = " << P0.points << ";\n";
-//   output << "coordinates = "  << P.points << ";\n";
-//   output << "pentagons = " << facemap[5] << ";\n"
-//	  << "hexagons  = " << facemap[6] << ";\n";
-//
 //   output << "P = " << P << ";\n";
 //
 //   Polyhedron D(P.dual(6,true));

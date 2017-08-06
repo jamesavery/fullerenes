@@ -49,13 +49,12 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
   //get average edge_length
   double log_sum_edge_length=0;
 
-  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
-  for(; e!=ee; e++){
+  for(const edge_t &e: edge_set){
     //cout << *e << endl;
-    const double ax = gsl_vector_get(coordinates, 2 * e->first);
-    const double ay = gsl_vector_get(coordinates, 2 * e->first +1);
-    const double bx = gsl_vector_get(coordinates, 2 * e->second);
-    const double by = gsl_vector_get(coordinates, 2 * e->second +1);
+    const double ax = gsl_vector_get(coordinates, 2 * e.first);
+    const double ay = gsl_vector_get(coordinates, 2 * e.first +1);
+    const double bx = gsl_vector_get(coordinates, 2 * e.second);
+    const double by = gsl_vector_get(coordinates, 2 * e.second +1);
     log_sum_edge_length += log(coord2d(ax-bx,ay-by).norm());
 //    cout << "l: " << coord2d(ax-bx,ay-by).norm() << " ll: " << log(coord2d(ax-bx,ay-by).norm()) << endl;
   }
@@ -66,52 +65,47 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
 
 //  //  V = k (r - r0)**2
   double potential_energy = 0.0;
-  e=edge_set.begin();
-  for(int i=0; e!=ee; ++e, ++i){
+  int i=0;
+  for(const edge_t &e: edge_set){
     vector<node_t>::const_iterator it1, it2;
-    it1 = find (graph.outer_face.begin(), graph.outer_face.end(), e->first);
-    it2 = find (graph.outer_face.begin(), graph.outer_face.end(), e->second);
+    it1 = find (graph.outer_face.begin(), graph.outer_face.end(), e.first);
+    it2 = find (graph.outer_face.begin(), graph.outer_face.end(), e.second);
     if (it1 != graph.outer_face.end() && it2 != graph.outer_face.end() && ( it1 == it2+1 || it1 == it2-1 || (it1 == graph.outer_face.begin() && it2 == graph.outer_face.end()-1) || (it1 == graph.outer_face.end()-1 && it2 == graph.outer_face.begin()))){
 //      cout << "omitting " << *it1 << "-" << *it2 << endl;
       continue; // edge is part of outer face
     }
 
-    const double ax = gsl_vector_get(coordinates, 2 * e->first);
-    const double ay = gsl_vector_get(coordinates, 2 * e->first +1);
-    const double bx = gsl_vector_get(coordinates, 2 * e->second);
-    const double by = gsl_vector_get(coordinates, 2 * e->second +1);
+    const double ax = gsl_vector_get(coordinates, 2 * e.first);
+    const double ay = gsl_vector_get(coordinates, 2 * e.first +1);
+    const double bx = gsl_vector_get(coordinates, 2 * e.second);
+    const double by = gsl_vector_get(coordinates, 2 * e.second +1);
 //    cout << "r: " << coord2d(ax-bx,ay-by).norm() << " r_0: " << zero_values_dist[i] << endl;
     potential_energy += 0.5 * k_dist[i] * pow(coord2d(ax-bx,ay-by).norm() - zero_values_dist[i], 2);
+    i++;
   }
-
+  
 
 
 //
 // ANGLE TERM
 //
-  facemap_t faces(graph.compute_faces_oriented());
-  //iterate over all faces
-  for(facemap_t::const_iterator it=faces.begin(); it!=faces.end(); ++it){
-    // it->first is the face size
-    // iterate over faces of equal size
-    for(set<face_t>::const_iterator jt=it->second.begin(); jt!=it->second.end(); ++jt){
-//      cout << " face of size-" << it->first << ": " << *jt << endl;
-      // iterate over nodes in face
-      for (int i=0; i!=it->first; ++i){
-//        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
-        const double ax = gsl_vector_get(coordinates, 2* (*jt)[(i+ it->first -1) % it->first]);
-        const double ay = gsl_vector_get(coordinates, 2* (*jt)[(i+ it->first -1) % it->first] +1);
-        const double bx = gsl_vector_get(coordinates, 2* (*jt)[i]);
-        const double by = gsl_vector_get(coordinates, 2* (*jt)[i] +1);
-        const double cx = gsl_vector_get(coordinates, 2* (*jt)[(i+1) % it->first]);
-        const double cy = gsl_vector_get(coordinates, 2* (*jt)[(i+1) % it->first] +1);
+  vector<face_t> faces(graph.compute_faces());
+  for(const face_t &f: faces)
+    for(int i=0;i<f.size();i++){
+      int d = f.size();
 
-        const double angle_beta = coord3d::angle(coord3d(ax,ay,0) - coord3d(bx,by,0), coord3d(cx,cy,0) - coord3d(bx,by,0));
-        potential_energy += 0.5 * k_angle[(*jt)[i]] * pow(angle_beta - M_PI*(1.0-2.0/it->first),2);
-        //cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
-      }
+      const double ax = gsl_vector_get(coordinates, 2*f[(i+d-1) % d]  );
+      const double ay = gsl_vector_get(coordinates, 2*f[(i+d-1) % d]+1);
+      const double bx = gsl_vector_get(coordinates, 2*f[i]  );
+      const double by = gsl_vector_get(coordinates, 2*f[i]+1);
+      const double cx = gsl_vector_get(coordinates, 2*f[(i+1) % d]  );
+      const double cy = gsl_vector_get(coordinates, 2*f[(i+1) % d]+1);
+
+      const double angle_beta = coord3d::angle(coord3d(ax,ay,0) - coord3d(bx,by,0),
+					       coord3d(cx,cy,0) - coord3d(bx,by,0));
+      
+      potential_energy += 0.5 * k_angle[f[i]] * pow(angle_beta - M_PI*(1.0-2.0/d),2); 
     }
-  }
 
 //
 // AREA TERM
@@ -121,12 +115,12 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
   const double bx = gsl_vector_get(coordinates, 2* graph.outer_face[0]);
   const double by = gsl_vector_get(coordinates, 2* graph.outer_face[0] +1);
   // iterate over nodes in face
-  for (int i=1; i!=graph.outer_face.size() -1; ++i){
+  for (int i=1; i<graph.outer_face.size()-1; ++i){
 //    cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
-    const double ax = gsl_vector_get(coordinates, 2* graph.outer_face[(i)]);
-    const double ay = gsl_vector_get(coordinates, 2* graph.outer_face[(i)] +1);
-    const double cx = gsl_vector_get(coordinates, 2* graph.outer_face[(i+1)]);
-    const double cy = gsl_vector_get(coordinates, 2* graph.outer_face[(i+1)] +1);
+    const double ax = gsl_vector_get(coordinates, 2* graph.outer_face[i]  );
+    const double ay = gsl_vector_get(coordinates, 2* graph.outer_face[i]+1);
+    const double cx = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]  );
+    const double cy = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]+1);
 
     A_tot += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
 //    cout << "area of one triangle: " << ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2 << endl;
@@ -134,40 +128,31 @@ double layout_pot(const gsl_vector* coordinates, void* parameters)
 //  cout << "area of outer polygon: " << A_tot << endl;
 
   const double A_av = abs(A_tot)/(n_faces-1); // (excluding the outer face)
-//  cout << "average area of polygon: " << A_av << endl;
-
+  //  cout << "average area of polygon: " << A_av << endl;
 
   //iterate over all faces
-  int i=0;
-  for(facemap_t::const_iterator it=faces.begin(); it!=faces.end(); ++it){
-    // it->first is the face size
-    // iterate over faces of equal size
-    for(set<face_t>::const_iterator jt=it->second.begin(); jt!=it->second.end(); ++jt){
-//      cout << " face of size-" << it->first << ": " << *jt << endl;
-      double A=0;
-      const double bx = gsl_vector_get(coordinates, 2* (*jt)[0]);
-      const double by = gsl_vector_get(coordinates, 2* (*jt)[0] +1);
-      // iterate over nodes in face
-      for (int i=1; i!=it->first -1; ++i){
-//        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
-        const double ax = gsl_vector_get(coordinates, 2* (*jt)[(i)]);
-        const double ay = gsl_vector_get(coordinates, 2* (*jt)[(i)] +1);
-        const double cx = gsl_vector_get(coordinates, 2* (*jt)[(i+1)]);
-        const double cy = gsl_vector_get(coordinates, 2* (*jt)[(i+1)] +1);
+  for(int i=0;i<faces.size();i++){
+    const face_t &f(faces[i]);
+    double A=0;
+    const double bx = gsl_vector_get(coordinates, 2*f[0]);
+    const double by = gsl_vector_get(coordinates, 2*f[0]+1);
+    // iterate over nodes in face
+    for (int j=1; j+1<f.size();j++){
+      const double ax = gsl_vector_get(coordinates, 2*f[j]  );
+      const double ay = gsl_vector_get(coordinates, 2*f[j]+1);
+      const double cx = gsl_vector_get(coordinates, 2*f[j+1]  );
+      const double cy = gsl_vector_get(coordinates, 2*f[j+1]+1);
 
-        A += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
-//        cout << "area of one triangle: " << ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2 << endl;
-      }
-//      cout << "area of one polygon: " << A << endl;
-      potential_energy += 0.5 * k_area[i] * pow(abs(A) - A_av,2);
-      ++i;
+      A += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
+      //        cout << "area of one triangle: " << ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2 << endl;
     }
-    ++i;
+    //      cout << "area of one polygon: " << A << endl;
+    potential_energy += 0.5 * k_area[i] * (abs(A) - A_av)*(abs(A)-A_av);
   }
 
 //  cout << "pot_E: " << potential_energy << endl;
 //  cout << "leaving layout_pot" << endl;
-  
+
   return potential_energy;
 }
 
@@ -200,13 +185,11 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
   //get average edge_length
 
   double log_sum_edge_length=0;
-  set<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
-  for(; e!=ee; e++){
-    //cout << *e << endl;
-    const double ax = gsl_vector_get(coordinates, 2 * e->first);
-    const double ay = gsl_vector_get(coordinates, 2 * e->first +1);
-    const double bx = gsl_vector_get(coordinates, 2 * e->second);
-    const double by = gsl_vector_get(coordinates, 2 * e->second +1);
+  for(const edge_t &e: edge_set){
+    const double ax = gsl_vector_get(coordinates, 2 * e.first);
+    const double ay = gsl_vector_get(coordinates, 2 * e.first +1);
+    const double bx = gsl_vector_get(coordinates, 2 * e.second);
+    const double by = gsl_vector_get(coordinates, 2 * e.second +1);
     log_sum_edge_length += log(coord2d(ax-bx,ay-by).norm());
 //    cout << "l: " << coord2d(ax-bx,ay-by).norm() << " ll: " << log(coord2d(ax-bx,ay-by).norm()) << endl;
   }
@@ -215,55 +198,53 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
 //  const double zero_value = 0.25;
 //  cout << "log average length: " << exp(log_sum_edge_length) << endl;
 
-  e=edge_set.begin();
-  for(int i=0; e!=ee; e++, i++){
+  int i=0;
+  for(const edge_t &e: edge_set){
     //cout << *e << endl;
-    const double ax = gsl_vector_get(coordinates, 2 * e->first);
-    const double ay = gsl_vector_get(coordinates, 2 * e->first +1);
-    const double bx = gsl_vector_get(coordinates, 2 * e->second);
-    const double by = gsl_vector_get(coordinates, 2 * e->second +1);
+    const double ax = gsl_vector_get(coordinates, 2 * e.first);
+    const double ay = gsl_vector_get(coordinates, 2 * e.first +1);
+    const double bx = gsl_vector_get(coordinates, 2 * e.second);
+    const double by = gsl_vector_get(coordinates, 2 * e.second +1);
 //    cout << "ax " << ax << " ay " << ay << " az " << az << " bx " << bx << " by " << by << " bz " << bz << endl;
-    derivatives[e->first]  += coord2d::dnorm(coord2d(ax-bx,ay-by)) * k_dist[i] * (coord2d(ax-bx,ay-by).norm() - zero_values_dist[i]);
-    derivatives[e->second] -= coord2d::dnorm(coord2d(ax-bx,ay-by)) * k_dist[i] * (coord2d(ax-bx,ay-by).norm() - zero_values_dist[i]);
+    derivatives[e.first]  += coord2d::dnorm(coord2d(ax-bx,ay-by))
+                           * k_dist[i] * (coord2d(ax-bx,ay-by).norm() - zero_values_dist[i]);
+    derivatives[e.second] -= coord2d::dnorm(coord2d(ax-bx,ay-by)) * k_dist[i]
+                           * (coord2d(ax-bx,ay-by).norm() - zero_values_dist[i]);
 //    cout << "dist(" << i << "): " << coord2d(ax-bx,ay-by).norm() << endl;
 //    cout << "gradient: " << derivatives << endl;
+    i++;
   }
   
 
  //
  // ANGLE TERM
  //
-   facemap_t faces(graph.compute_faces_oriented());
-   //iterate over all faces
-   for(facemap_t::const_iterator it=faces.begin(); it!=faces.end(); ++it){
-     // it->first is the face size
-     // iterate over faces of equal size
-     for(set<face_t>::const_iterator jt=it->second.begin(); jt!=it->second.end(); ++jt){
-       //cout << " face of size: " << it->first << ": " << *jt << endl;
-       // iterate over nodes in face
-       for (int i=0; i!=it->first; ++i){
- //        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
-         const double ax = gsl_vector_get(coordinates, 2* (*jt)[(i+ it->first -1) % it->first]);
-         const double ay = gsl_vector_get(coordinates, 2* (*jt)[(i+ it->first -1) % it->first] +1);
-         const double bx = gsl_vector_get(coordinates, 2* (*jt)[i]);
-         const double by = gsl_vector_get(coordinates, 2* (*jt)[i] +1);
-         const double cx = gsl_vector_get(coordinates, 2* (*jt)[(i+1) % it->first]);
-         const double cy = gsl_vector_get(coordinates, 2* (*jt)[(i+1) % it->first] +1);
+  vector<face_t> faces(graph.compute_faces());
+  //iterate over all faces
+  for(const face_t &f: faces)
+    // iterate over nodes in face
+    for (int i=0; i<f.size(); i++){
+      const int d = f.size();
+
+      const double ax = gsl_vector_get(coordinates, 2*f[(i+d-1) % d]  );
+      const double ay = gsl_vector_get(coordinates, 2*f[(i+d-1) % d]+1);
+      const double bx = gsl_vector_get(coordinates, 2*f[i]  );
+      const double by = gsl_vector_get(coordinates, 2*f[i]+1);
+      const double cx = gsl_vector_get(coordinates, 2*f[(i+1) % d]  );
+      const double cy = gsl_vector_get(coordinates, 2*f[(i+1) % d]+1);
    
-         coord3d a(coord3d(ax,ay,0) - coord3d(bx,by,0)), c(coord3d(cx,cy,0) - coord3d(bx,by,0)), da, dc;
-         coord3d::dangle(a, c, da, dc);
- //        cout << da << dc << endl;
+      coord3d a(coord3d(ax,ay,0) - coord3d(bx,by,0)), c(coord3d(cx,cy,0) - coord3d(bx,by,0)), da, dc;
+      coord3d::dangle(a, c, da, dc);
    
-         const double angle_beta = coord3d::angle(coord3d(ax,ay,0) - coord3d(bx,by,0), coord3d(cx,cy,0) - coord3d(bx,by,0));
-         //cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
- //        cout << "da: " << da << endl;
+      const double angle_beta = coord3d::angle(coord3d(ax,ay,0) - coord3d(bx,by,0),
+					       coord3d(cx,cy,0) - coord3d(bx,by,0));
+      //cout << angle_beta << ", " << M_PI*(1.0-2.0/it->first) << ", " << it->first << endl;
+      //        cout << "da: " << da << endl;
  
-         derivatives[(*jt)[(i+ it->first -1) % it->first]] += coord2d(da[0],da[1]) *       (angle_beta - M_PI*(1.0-2.0/it->first)) * k_angle[(*jt)[i]];
-         derivatives[(*jt)[i]]                             += -coord2d((da+dc)[0],(da+dc)[1]) * (angle_beta - M_PI*(1.0-2.0/it->first)) * k_angle[(*jt)[i]];
-         derivatives[(*jt)[(i+1) % it->first]]             += coord2d(dc[0],dc[1]) *       (angle_beta - M_PI*(1.0-2.0/it->first)) * k_angle[(*jt)[i]];
-       }
-     }
-   }
+      derivatives[f[(i+d-1) % d]] +=  coord2d(da[0],da[1])*(angle_beta-M_PI*(1.0-2.0/d)) * k_angle[f[i]];
+      derivatives[f[i]] += -coord2d((da+dc)[0],(da+dc)[1])*(angle_beta-M_PI*(1.0-2.0/d)) * k_angle[f[i]];
+      derivatives[f[(i+1) % d]]   += coord2d(dc[0],dc[1]) *(angle_beta-M_PI*(1.0-2.0/d)) * k_angle[f[i]];
+    }
 
 
  //
@@ -274,11 +255,11 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
    const double bx = gsl_vector_get(coordinates, 2* graph.outer_face[0]);
    const double by = gsl_vector_get(coordinates, 2* graph.outer_face[0] +1);
    // iterate over nodes in face
-   for (int i=1; i!=graph.outer_face.size() -1; ++i){
-     const double ax = gsl_vector_get(coordinates, 2* graph.outer_face[(i)]);
-     const double ay = gsl_vector_get(coordinates, 2* graph.outer_face[(i)] +1);
-     const double cx = gsl_vector_get(coordinates, 2* graph.outer_face[(i+1)]);
-     const double cy = gsl_vector_get(coordinates, 2* graph.outer_face[(i+1)] +1);
+   for (int i=1; i+1<graph.outer_face.size(); ++i){
+     const double ax = gsl_vector_get(coordinates, 2* graph.outer_face[i  ]  );
+     const double ay = gsl_vector_get(coordinates, 2* graph.outer_face[i  ]+1);
+     const double cx = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]  );
+     const double cy = gsl_vector_get(coordinates, 2* graph.outer_face[i+1]+1);
  
      A_tot += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
      //cout << "area of one triangle: " << ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2 << endl;
@@ -287,23 +268,20 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
    const double A_av = abs(A_tot)/(n_faces-1); // (excluding the outer face)
    //cout << "average area of polygon: " << A_av << endl;
  
-   int i=0;
+   i=0;
    //iterate over all faces
-   for(facemap_t::const_iterator it=faces.begin(); it!=faces.end(); ++it){
-     // it->first is the face size
-     // iterate over faces of equal size
-     for(set<face_t>::const_iterator jt=it->second.begin(); jt!=it->second.end(); ++jt){
- //      cout << " face of size-" << it->first << ": " << *jt << endl;
+   for(const face_t &f: faces){
        double A=0;
-       const double bx = gsl_vector_get(coordinates, 2* (*jt)[0]);
-       const double by = gsl_vector_get(coordinates, 2* (*jt)[0] +1);
-       // iterate over nodes in face
-       for (int i=1; i!=it->first -1; ++i){
- //        cout << " 3 nodes: " << (*jt)[(i+ it->first -1) % it->first] << ", " << (*jt)[i] <<", " <<  (*jt)[(i+1) % it->first] << endl;
-         const double ax = gsl_vector_get(coordinates, 2* (*jt)[(i)]);
-         const double ay = gsl_vector_get(coordinates, 2* (*jt)[(i)] +1);
-         const double cx = gsl_vector_get(coordinates, 2* (*jt)[(i+1)]);
-         const double cy = gsl_vector_get(coordinates, 2* (*jt)[(i+1)] +1);
+       int d = f.size();
+       
+       const double bx = gsl_vector_get(coordinates, 2*f[0]  );
+       const double by = gsl_vector_get(coordinates, 2*f[0]+1);
+       // iterate over nodes in face except first and last
+       for (int j=1; j+1<f.size(); i++){
+         const double ax = gsl_vector_get(coordinates, 2*f[i  ]  );
+         const double ay = gsl_vector_get(coordinates, 2*f[i  ]+1);
+         const double cx = gsl_vector_get(coordinates, 2*f[i+1]  );
+         const double cy = gsl_vector_get(coordinates, 2*f[i+1]+1);
  
          A += ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2;
          //cout << "area of one triangle: " << ((ax-bx)*(cy-by) - (ay-by)*(cx-bx))/2 << endl;
@@ -315,22 +293,21 @@ void layout_grad(const gsl_vector* coordinates, void* parameters, gsl_vector* gr
  //      cout << "face: " << *jt << endl;
  //      cout << "sign: " << sign << endl;
        // iterate over nodes in face
-       for (int i=0; i!=it->first; ++i){
-         const double ax = gsl_vector_get(coordinates, 2* (*jt)[(i+ it->first -1) % it->first]);
-         const double ay = gsl_vector_get(coordinates, 2* (*jt)[(i+ it->first -1) % it->first] +1);
-         const double cx = gsl_vector_get(coordinates, 2* (*jt)[(i+1) % it->first]);
-         const double cy = gsl_vector_get(coordinates, 2* (*jt)[(i+1) % it->first] +1);
+       for (int j=0; j<f.size(); j++){
+         const double ax = gsl_vector_get(coordinates, 2*f[(j+d-1) % d]);
+         const double ay = gsl_vector_get(coordinates, 2*f[(i+d-1) % d] +1);
+         const double cx = gsl_vector_get(coordinates, 2*f[(i+1)   % d]);
+         const double cy = gsl_vector_get(coordinates, 2*f[(i+1)   % d] +1);
  
  //        cout << "dA/dr(" << i << "): " << coord2d(cy-ay, -(cx-ax))/2 << endl;
  //        cout << "dE/dr(" << i << "): " << coord2d(cy-ay, -(cx-ax))/2 * k_area[i] * (abs(A) - A_av) * sign << endl;
-         derivatives[(*jt)[i]] += coord2d(cy-ay, ax-cx)/2 * k_area[i] * (abs(A) - A_av) * sign;
+         derivatives[f[j]] += coord2d(cy-ay, ax-cx)/2 * k_area[i] * (abs(A) - A_av) * sign;
        }
-       ++i;
-     }
-     ++i;
+       i++;
    }
 
-  // fix outer face
+
+// fix outer face
 //  cout << "d: " << derivatives << endl;
 //  cout << "outer face: " << graph.outer_face << endl;
   for(vector<node_t>::iterator it = graph.outer_face.begin(); it != graph.outer_face.end(); ++it){

@@ -435,9 +435,17 @@ struct face_t : public vector<node_t> {
   }
   bool contains(const node_t v) const { for(int i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
 
-  face_t sorted() const {
+  // Unique representation for sets and maps.
+  // To preserve orientation: don't sort, but rotate so as to start at smallest node.
+  // NB: Not necessary because of == and < operations?
+  face_t rotated() const {
     face_t f(*this);
-    sort(f.begin(),f.end());
+
+    // Find smallest node
+    node_t i_min = 0;
+    for(int i=0;i<f.size();i++) if(f[i] < f[i_min]) i_min = i;
+    // Rotate so smallest node is first
+    rotate(f.begin(),f.begin()+i_min,f.end());
     return f;
   }
 };

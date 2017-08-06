@@ -42,11 +42,12 @@ public:
 
   bool is_cut_vertex(const node_t v) const;
 
-  facemap_t compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
-  facemap_t compute_faces_oriented() const;
+  vector<face_t> compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
+  vector<face_t> compute_faces_layout_oriented() const;
+  vector<face_t> compute_faces_actually_oriented() const; // TODO: This should replace the old layout-based method
   face_t get_face_oriented(int u, int v) const; // TODO: This uses the layout, should work towards retirement
   face_t get_face_actually_oriented(int u, int v, int Fmax=INT_MAX) const; // TODO: This doesn't use layout, should replace ^
-  vector<face_t> compute_faces_actually_oriented() const; // TODO: This should replace the old layout-based method
+
 
   void orient_neighbours();   // Ensures that neighbours are ordered CCW
 

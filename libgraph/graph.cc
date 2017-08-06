@@ -425,6 +425,14 @@ set<dedge_t> Graph::directed_edges() const {
   return edges;
 }
 
+size_t Graph::count_edges() const {
+  // Don't use edge_set -- it's slow
+  size_t twoE = 0;
+  for(node_t u=0;u<N;u++)
+    twoE += neighbours[u].size();
+
+  return twoE/2;
+}
 
 ostream& operator<<(ostream& s, const Graph& g) 
 {

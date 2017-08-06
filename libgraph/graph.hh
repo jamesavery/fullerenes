@@ -82,6 +82,8 @@ struct Graph {
   set<edge_t>  undirected_edges() const;
   set<dedge_t> directed_edges()   const;
 
+  size_t count_edges() const;
+  
   friend ostream& operator<<(ostream& s, const Graph& g);
 };
 

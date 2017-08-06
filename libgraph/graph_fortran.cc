@@ -439,24 +439,26 @@ void adjacency_list_(const fullerene_graph_ptr *g, const int *k, int *neighbours
 
 void compute_fullerene_faces_(const fullerene_graph_ptr *g, int *pentagons, int *hexagons)
 {
-  assert((*g)->layout2d.size() == (*g)->N);
-
-  facemap_t faces((*g)->compute_faces_oriented());
+  vector<face_t> faces((*g)->compute_faces(6,true));
   int NH = (*g)->N/2-10;
+
+  int i_p=0,i_h=0;
   
-  assert(faces[5].size() == 12);
-  assert(faces[6].size() == NH);
-
-  const vector<face_t> p(faces[5].begin(),faces[5].end()), 
-                       h(faces[6].begin(),faces[6].end());
-
-  for(int i=0;i<12;i++)
-    for(int j=0;j<5;j++)
-      pentagons[i*5+j] = p[i][j];
-
-  for(int i=0;i<NH;i++)
-    for(int j=0;j<6;j++)
-      hexagons[i*6+j] = h[i][j];
+  for(const auto &f: faces){
+    switch(f.size()){
+    case 5:
+      for(int j=0;j<5;j++) pentagons[i_p*5+j] = f[j];
+      i_p++;
+      break;
+    case 6:
+      for(int j=0;j<6;j++) hexagons[i_h*6+j] = f[j];
+      i_h++;
+      break;
+    default:
+      break;
+    }
+  }
+  assert(i_p==12 && i_h == NH);	// Otherwise graph is not a fullerene.
 }
 
 void get_pentagon_distance_mtx_(const fullerene_graph_ptr *fg, int *pentagon_distances){

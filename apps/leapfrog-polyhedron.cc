@@ -33,6 +33,7 @@ Graph planargraph_from_args(int ac, char **av)
     int index  = strtol(av[2],0,0);
     assert(file != 0);
 
+    //    Graph G(PlanarGraph::read_hog_planarcode(file));
     vector<Graph> graphs = PlanarGraph::read_hog_planarcodes(file);
     return graphs[index];
   } else {
@@ -45,29 +46,46 @@ int main(int ac, char **av)
 {
 
   PlanarGraph  g(planargraph_from_args(ac,av));
+  PlanarGraph  dg(g.dual_graph());
   g.layout2d = g.tutte_layout();
   
   cout << "g  = " << g  << ";\n";
+  cout << "dg = " << dg  << ";\n";
 
+  // PlanarGraph::dual_graph doesn't currently preserve orientation
+  dg.layout2d = dg.tutte_layout();
+  dg.orient_neighbours();
+  
   assert(g.is_consistently_oriented());
   
-  Triangulation dG = g.leapfrog_dual();
+  PlanarGraph dG = dg.leapfrog_dual();
 
-  assert(dG.is_consistently_oriented());  
-  cout << "dG = " << dG << ";\n";
+  dG.layout2d = dG.tutte_layout();
+  //  dG.orient_neighbours();
+  cout << "dG  = " <<  dG << ";\n";
 
-  PlanarGraph G = dG.dual_graph();
+  assert(dG.is_consistently_oriented());
+  vector<face_t> dGfaces = dG.compute_faces();
+  cout << "dGfaces = " << dGfaces << "+1;\n";
+  Triangulation TdG(dG,true);
+  TdG.layout2d = TdG.tutte_layout();
+  TdG.orient_neighbours();
+  cout << "TdG = " << TdG << ";\n";
+  
+  assert(TdG.is_consistently_oriented());
+
+  PlanarGraph G = TdG.dual_graph();
   assert(G.is_consistently_oriented());  
   cout << "G = " << G << ";\n";
    
-  {
-    vector<int> spiral;
-    jumplist_t  jumps;
-    dG.get_spiral(spiral,jumps);
+  // {
+  //   vector<int> spiral;
+  //   jumplist_t  jumps;
+  //   dG.get_spiral(spiral,jumps);
 
-    cout << "LFspiral = " << spiral << ";\n"
-	 << "LFjumps  = " << jumps  << ";\n";
-  }
+  //   cout << "LFspiral = " << spiral << ";\n"
+  // 	 << "LFjumps  = " << jumps  << ";\n";
+  // }
 
   
   return 0;

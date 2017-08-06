@@ -85,12 +85,11 @@ int main(int ac, char **av)
 
   ofstream output(("output/"+basename+".m").c_str());
 
-  facemap_t facemap(g.compute_faces(8,true));
+  vector<face_t> faces(g.compute_faces(8,true));
   output << "g = " << g << ";\n";
   output << "coordinates0 = " << P0.points << ";\n";
   output << "coordinates = "  << P.points << ";\n";
-  output << "pentagons = " << facemap[5] << ";\n"
-  	  << "hexagons  = " << facemap[6] << ";\n"
+  output << "faces = " << faces << ";\n"
   	  << "RSPI = " << RSPI << ";\n";
 
   output << "P0 = " << P0 << ";\n";
@@ -98,7 +97,7 @@ int main(int ac, char **av)
 
   Polyhedron D(P.dual(6,true));
   D.layout2d = D.tutte_layout();
-  D.faces    = D.compute_faces_flat(3,true);
+  D.faces    = D.compute_faces(3,true);
   D.face_max = 3;
   //   D.optimize();
   output << "PD = " << D << ";\n";
