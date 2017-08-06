@@ -805,7 +805,7 @@ Graph PlanarGraph::read_hog_planarcode(FILE *planarcode_file)
     number_length=2;
   }
   
-  Graph g(N);
+  Graph g(N,true);
   for(node_t u=0; u<N && !feof(planarcode_file); ++u){
     int v=0;
     do{
@@ -832,7 +832,7 @@ Graph PlanarGraph::read_hog_planarcode(FILE *planarcode_file)
       }
     }
   }
-    
+
   return g;
 }
 
@@ -850,7 +850,6 @@ vector<Graph> PlanarGraph::read_hog_planarcodes(FILE *planarcode_file) {
     Graph g = read_hog_planarcode(planarcode_file);
     //    cerr << "Got graph on " << g.N << " vertices.\n";
     if(g.N != 0){
-      g.is_oriented = true;
       graph_list.push_back(g);
     }
   }

@@ -33,30 +33,39 @@ Graph planargraph_from_args(int ac, char **av)
     int index  = strtol(av[2],0,0);
     assert(file != 0);
 
-    //    Graph G(PlanarGraph::read_hog_planarcode(file));
-    vector<Graph> graphs = PlanarGraph::read_hog_planarcodes(file);
-    return graphs[index];
+    PlanarGraph G = PlanarGraph::read_hog_planarcodes(file)[index];
+    
+    bool read_dual = ac==4;
+    if(read_dual) return G.dual_graph();
+    else return G;
   } else {
-    fprintf(stderr,"Syntax: %s [<HoG file> <index> | <N> <general spiral>]\n",av[0]);
+    fprintf(stderr,"Syntax: %s [<HoG file> <index> [dual] | <N> <general spiral>]\n",av[0]);
     abort();
   }
 }
 
 int main(int ac, char **av)
 {
+  // Read or construct dual
+  PlanarGraph  g(planargraph_from_args(ac,av));
+  g.layout2d = g.tutte_layout();
+  g.orient_neighbours();
+  assert(g.is_oriented);
+  assert(g.is_consistently_oriented());
 
-  PlanarGraph  dg(planargraph_from_args(ac,av));
-  PlanarGraph  g(dg.dual_graph());
+  // Get non-dual as dual of dual
+  PlanarGraph  dg(g.dual_graph());
   dg.layout2d = dg.tutte_layout();
   
   cout << "g  = " << g  << ";\n";
   cout << "dg = " << dg  << ";\n";
 
   // PlanarGraph::dual_graph doesn't currently preserve orientation
-  g.layout2d = g.tutte_layout();
-  g.orient_neighbours();
-  
-  assert(g.is_consistently_oriented());
+  dg.layout2d = dg.tutte_layout();
+  dg.orient_neighbours();
+
+  assert(dg.is_oriented);  
+  assert(dg.is_consistently_oriented());
   
   PlanarGraph dG = g.leapfrog_dual();
 
