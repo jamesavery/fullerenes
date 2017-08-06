@@ -45,20 +45,20 @@ Graph planargraph_from_args(int ac, char **av)
 int main(int ac, char **av)
 {
 
-  PlanarGraph  g(planargraph_from_args(ac,av));
-  PlanarGraph  dg(g.dual_graph());
-  g.layout2d = g.tutte_layout();
+  PlanarGraph  dg(planargraph_from_args(ac,av));
+  PlanarGraph  g(dg.dual_graph());
+  dg.layout2d = dg.tutte_layout();
   
   cout << "g  = " << g  << ";\n";
   cout << "dg = " << dg  << ";\n";
 
   // PlanarGraph::dual_graph doesn't currently preserve orientation
-  dg.layout2d = dg.tutte_layout();
-  dg.orient_neighbours();
+  g.layout2d = g.tutte_layout();
+  g.orient_neighbours();
   
   assert(g.is_consistently_oriented());
   
-  PlanarGraph dG = dg.leapfrog_dual();
+  PlanarGraph dG = g.leapfrog_dual();
 
   dG.layout2d = dG.tutte_layout();
   //  dG.orient_neighbours();
