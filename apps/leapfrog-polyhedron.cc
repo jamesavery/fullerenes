@@ -87,14 +87,14 @@ int main(int ac, char **av)
   assert(G.is_consistently_oriented());  
   cout << "G = " << G << ";\n";
    
-  // {
-  //   vector<int> spiral;
-  //   jumplist_t  jumps;
-  //   dG.get_spiral(spiral,jumps);
+  {
+    vector<int> spiral;
+    jumplist_t  jumps;
+    TdG.get_spiral(spiral,jumps);
 
-  //   cout << "LFspiral = " << spiral << ";\n"
-  // 	 << "LFjumps  = " << jumps  << ";\n";
-  // }
+    cout << "LFspiral = " << spiral << ";\n"
+  	 << "LFjumps  = " << jumps  << ";\n";
+  }
 
   
   return 0;
