@@ -43,6 +43,23 @@ struct edge_t : public pair<node_t,node_t> {
   }
 };
 
+namespace std {
+  template<>
+  struct hash<edge_t> {
+    std::size_t operator()(const edge_t &p) const {
+      std::size_t seed1(0);
+      ::hash_combine(seed1, p.first);
+      ::hash_combine(seed1, p.second);
+
+      std::size_t seed2(0);
+      ::hash_combine(seed2, p.second);
+      ::hash_combine(seed2, p.first);
+
+      return std::min(seed1, seed2);
+    }
+  };
+}
+
 
 struct coord2d : public pair<double,double> {
   coord2d(const complex<double>& x) : pair<double,double>(x.real(),x.imag()) {}

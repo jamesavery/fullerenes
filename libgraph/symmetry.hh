@@ -45,7 +45,7 @@ struct Permutation : public vector<int> {
 
   // Permutation composition
   Permutation operator*(const Permutation& q) const;
-  bool operator==(const Permutation& q) const;
+  //  bool operator==(const Permutation& q) const;
 
 };
 

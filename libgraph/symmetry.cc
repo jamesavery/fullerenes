@@ -59,6 +59,15 @@ string PointGroup::to_string() const {
 //////////////////////////////////////////////////////////////////////
 //			PERMUTATION DATA TYPE
 //////////////////////////////////////////////////////////////////////
+namespace std {
+  template<> struct hash<Permutation> { // Vectors of integers smaller than 32 bit
+    size_t operator()(const Permutation &v) const {
+      return std::hash<vector<int>>()(v);      
+    }
+  };
+
+}
+
 Permutation Permutation::inverse() const {
   const vector<int> &p(*this);
   vector<int> ip(size());
@@ -93,13 +102,14 @@ Permutation Permutation::operator*(const Permutation& q) const {
   return Permutation(r);
 }
 
-bool Permutation::operator==(const Permutation& q) const {
-  const vector<int> &p(*this);
+// NB: Removed. This seems identical to vector '=='-operator?
+// bool Permutation::operator==(const Permutation& q) const {
+//   const vector<int> &p(*this);
 
-  if(size() != q.size()) return false;
-  for(int i=0;i<size();i++) if(p[i] != q[i]) return false;
-  return true;
-}
+//   if(size() != q.size()) return false;
+//   for(int i=0;i<size();i++) if(p[i] != q[i]) return false;
+//   return true;
+// }
 
 
 //////////////////////////////////////////////////////////////////////
@@ -150,7 +160,7 @@ vector<Permutation> Symmetry::permutation_representation() const
 	  vector<int> spiral,permutation;
 	  jumplist_t  jumps;
 
-	  node_t wCCW = nextCCW(dedge_t(u,v)), wCW = nextCW(dedge_t(u,v));
+	  node_t wCCW = next(u,v), wCW = prev(u,v);
 
 	  const vector<node_t> &nwCCW(neighbours[wCCW]), &nwCW(neighbours[wCW]);
 
@@ -239,14 +249,14 @@ bool Symmetry::reverses_orientation(const Permutation& pi) const
     const vector<node_t>& nu(neighbours[u]);
     for(int i=0;i<nu.size();i++) piG.neighbours[pi[u]][i] = pi[nu[i]];
   }
-  if(piG.nextCCW(dedge_t(0,1)) == 2) return false;
-  if(piG.nextCW(dedge_t(0,1))!=2){
+  if(piG.next(0,1) == 2) return false;
+  if(piG.prev(0,1) != 2){
     fprintf(stderr,"G.next(0,1) == {%d,%d} (CW,CCW)\n",
-	    nextCW(dedge_t(0,1)),
-	    nextCCW(dedge_t(0,1)));
+	    prev(0,1),
+	    next(0,1));
     fprintf(stderr,"pi(G).next(0,1) == {%d,%d} (CW,CCW)\n",
-	    piG.nextCW(dedge_t(0,1)),
-	    piG.nextCCW(dedge_t(0,1)));
+	    piG.prev(0,1),
+	    piG.next(0,1));
     cout << "pi(G).neighbours[0] = " << piG.neighbours[0] << ";\n"
 	 << "pi(G).neighbours[1] = " << piG.neighbours[1] << ";\n";
     abort();

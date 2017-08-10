@@ -169,8 +169,7 @@ namespace std {
 
   template<typename IntType> struct hash<vector<IntType>> { // Vectors of integers smaller than 32 bit
     size_t operator()(const vector<IntType> &v) const {
-      size_t seed(0);
-      return std::hash<u32string>()(v.begin(),v.end());      
+      return std::hash<u32string>()(u32string(v.begin(),v.end()));      
     }
   };
 
