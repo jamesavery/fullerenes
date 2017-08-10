@@ -36,7 +36,7 @@ Graph example2(){
   neighbours_t neighbours(N,vector<node_t>(3));
 
   for(int i=0; i!=M; ++i){
-    neighbours[i][0] = M+1;
+    neighbours[i][0] = M+i;
     neighbours[i][1] = (i+1)%M;
     neighbours[i][2] = (i-1+M)%M;
     
