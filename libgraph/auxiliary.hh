@@ -7,6 +7,9 @@
 #include <map>
 #include <sstream>
 #include <assert.h>
+#include <unordered_map>
+#include <unordered_set>
+
 using namespace std;
 
 #define insert_unique(v,x) if(std::find(v.begin(),v.end(),x) == v.end()) v.push_back(x); 
@@ -33,12 +36,22 @@ container_output(vector);
 container_output(list);
 container_output(set);
 
+// TODO: Macro instead of repeating
 template<typename K, typename V> vector<K> get_keys(const map<K,V>& m)
 {
   vector<K> keys(m.size());
   int i=0;
-  for(typename map<K,V>::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    keys[i] = kv->first;
+  for(const auto &kv: m)
+    keys[i++] = kv.first;
+  return keys;
+}
+
+template<typename K, typename V> vector<K> get_keys(const unordered_map<K,V>& m)
+{
+  vector<K> keys(m.size());
+  int i=0;
+  for(const auto &kv: m)
+    keys[i++] = kv.first;
   return keys;
 }
 
@@ -46,8 +59,8 @@ template<typename K, typename V> vector<K> get_keys(const vector<pair<K,V> >& m)
 {
   vector<K> keys(m.size());
   int i=0;
-  for(typename vector<pair<K,V> >::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    keys[i] = kv->first;
+  for(const auto &kv: m)
+    keys[i++] = kv.first;
   return keys;
 }
 
@@ -56,8 +69,17 @@ template<typename K, typename V> vector<V> get_values(const map<K,V>& m)
 {
   vector<V> values(m.size());
   int i=0;
-  for(typename map<K,V>::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    values[i] = kv->second;
+  for(const auto &kv: m)
+    values[i++] = kv.second;
+  return values;
+}
+
+template<typename K, typename V> vector<V> get_values(const unordered_map<K,V>& m)
+{
+  vector<V> values(m.size());
+  int i=0;
+  for(const auto &kv: m)
+    values[i++] = kv.second;
   return values;
 }
 
@@ -65,8 +87,8 @@ template<typename K, typename V> vector<V> get_values(const vector<pair<K,V> >& 
 {
   vector<V> values(m.size());
   int i=0;
-  for(typename vector<pair<K,V> >::const_iterator kv(m.begin()); kv!=m.end(); kv++,i++)
-    values[i] = kv->second;
+  for(const auto &kv: m)
+    values[i++] = kv.second;
   return values;
 }
 
@@ -130,8 +152,30 @@ template <typename T> vector< vector<T> > operator+(const vector< vector<T> >& x
   return ys;
 }
 
+template<typename T> void hash_combine(size_t &seed, T const &key) {
+  hash<T> hasher;
+  seed ^= hasher(key) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
 
-template <typename T> class IDCounter: public map<T,int> {
+namespace std {
+  template<typename T1, typename T2> struct hash<pair<T1, T2>> {
+    size_t operator()(const pair<T1, T2> &p) const {
+      size_t seed(0);
+      hash_combine(seed, p.first);
+      hash_combine(seed, p.second);
+      return seed;
+    }
+  };
+
+  template<typename IntType> struct hash<vector<IntType>> { // Vectors of integers smaller than 32 bit
+    size_t operator()(const vector<IntType> &v) const {
+      size_t seed(0);
+      return std::hash<u32string>()(v.begin(),v.end());      
+    }
+  };
+
+}
+template <typename T> class IDCounter: public unordered_map<T,int> {
 public:
   int nextid;
   vector<T> reverse;
@@ -139,10 +183,10 @@ public:
   IDCounter(int start=0) : nextid(start) {}
   
   int insert(const T& x){
-    typename map<T,int>::const_iterator it(map<T,int>::find(x));
+    typename unordered_map<T,int>::const_iterator it(unordered_map<T,int>::find(x));
     if(it != this->end()) return it->second;
     else {
-      map<T,int>::insert(make_pair(x,nextid));
+      unordered_map<T,int>::insert(make_pair(x,nextid));
       reverse.push_back(x);
       return nextid++;
     }
@@ -154,7 +198,7 @@ public:
   }
 
   int operator()(const T& x) const {
-    typename map<T,int>::const_iterator it(map<T,int>::find(x));
+    typename unordered_map<T,int>::const_iterator it(unordered_map<T,int>::find(x));
     if(it != this->end()) return it->second;
     else return -1;
   }

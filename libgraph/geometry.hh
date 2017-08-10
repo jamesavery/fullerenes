@@ -123,8 +123,9 @@ struct coord2d : public pair<double,double> {
 struct coord3d {
   double x[3];
 
+  coord3d() { x[0] = 0; x[1] = 0; x[2] = 0; }
   coord3d(const double y[3]) { x[0] = y[0]; x[1] = y[1]; x[2] = y[2]; }
-  explicit coord3d(const double x_=0, const double y=0, const double z=0) { x[0] = x_; x[1] = y; x[2] = z; }
+  coord3d(const double x_, const double y, const double z) { x[0] = x_; x[1] = y; x[2] = z; }
   coord3d operator/(const double s)   const { return coord3d(*this) /= s; }
   coord3d operator*(const double s)   const { return coord3d(*this) *= s; }
   coord3d operator*(const coord3d& y) const { return coord3d(*this) *= y; }
@@ -387,6 +388,19 @@ struct tri_t {
   friend ostream& operator<<(ostream& S, const tri_t& t){ S << vector<int>(t.x_,t.x_+3); return S; }
 };
 
+// TODO: Hash functions gathered in single file?
+namespace std {
+  template<> struct hash<tri_t> { // Vectors of integers smaller than 32 bit
+    size_t operator()(const tri_t &t) const {
+      size_t seed(0);
+      hash_combine(seed, t[0]);
+      hash_combine(seed, t[1]);
+      hash_combine(seed, t[2]);
+      return seed;
+    }
+  };
+}
+
 
 struct face_t : public vector<node_t> {
   face_t(const size_t size=0) : vector<node_t>(size) {}
@@ -408,7 +422,7 @@ struct face_t : public vector<node_t> {
     return c/size();
   }
   coord3d centroid(const vector<coord3d>& layout) const { 
-    coord3d c(0.0);
+    coord3d c;
     for(size_t i=0;i<size();i++) c += layout[(*this)[i]];
     return c/size();
   }
@@ -438,7 +452,7 @@ struct face_t : public vector<node_t> {
   // Unique representation for sets and maps.
   // To preserve orientation: don't sort, but rotate so as to start at smallest node.
   // NB: Not necessary because of == and < operations?
-  face_t rotated() const {
+  face_t normalized() const {
     face_t f(*this);
 
     // Find smallest node
@@ -448,10 +462,29 @@ struct face_t : public vector<node_t> {
     rotate(f.begin(),f.begin()+i_min,f.end());
     return f;
   }
+
+  // The directed edge with minimal start vertex gives a unique representation of an oriented face
+  dedge_t minimal_edge() const {
+    face_t f(*this);
+    
+    dedge_t e_min{f[0],f[1]};
+    for(int i=1;i<f.size();i++) if(f[i] < e_min.first) e_min = {f[i],f[(i+1)%f.size()]};
+
+    return e_min;
+  }
 };
 
+namespace std {
+  template<> struct hash<face_t> { // Vectors of integers smaller than 32 bit
+    size_t operator()(face_t const &f) const {
+      u32string s(f.begin(),f.end());
+      return std::hash<u32string>()(s);      
+    }
+  };
+}
 
-typedef map<unsigned int,set<face_t> > facemap_t;
+
+typedef map<unsigned int,set<face_t> > facemap_t; // Never really used -- candidate for retirement
 
 struct Tri3D {
   coord3d a,b,c,u,v,n;
