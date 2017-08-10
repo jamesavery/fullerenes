@@ -232,10 +232,10 @@ Polyhedron Example2()
 // triakis tetrahedron
 Polyhedron Example3()
 {
-  PlanarGraph g = example2();
+  PlanarGraph g = example3();
   g.layout2d = g.tutte_layout();
   Polyhedron P(g,g.zero_order_geometry(),6);
-  //  P.optimize(); // Doesn't work
+  P.optimize(); // Doesn't work. Lukas, what are the coordinates supposed to be?
   
   return P;
 }
