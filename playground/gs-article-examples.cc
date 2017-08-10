@@ -357,6 +357,13 @@ int main(int ac, char **av)
     mol2.close();
   }
   
-  
+  {
+    ofstream tex(("output/"+basename+"-layout.tex").c_str());
+    auto l = g.tutte_layout();
+    g.layout2d = l;
+    tex << g.to_latex(10, 10, false, false, true, 0, 0, 0, 0.5, 0.5, 2);
+    tex.close();
+  }  
+
   return 0;
 }
