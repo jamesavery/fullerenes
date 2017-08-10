@@ -224,13 +224,9 @@ Polyhedron Example1()
 // truncated tetrahedron
 Polyhedron Example2()
 {
-  // TODO. Lukas?
-  PlanarGraph g = example2();
-  g.layout2d = g.tutte_layout();
-  Polyhedron P(g,g.zero_order_geometry(),6);
-  //  P.optimize(); // Doesn't work
+  vector<coord3d> points{{2.23258, 1.27088, 1.35686}, {1.93473, 1.89196, 0.740234}, {1.73005, 1.99506, 1.63557}, {1.78308, 0.227817, 1.3746}, {1.11948, 1.61198, 0.}, {0.663781, 1.84211, 1.99578}, {1.11992, 0., 0.771796}, {0.251611, 1.48704, 0.293499}, {0.297776, 0.992821, 2.01007}, {0.915066, 0.102857, 1.66793}, {0.753787, 0.762954, 0.0142968}, {0., 1.6143, 1.3943}};
 
-  return P;
+  return Polyhedron(example2(),points,7);
 }
 
 // triakis tetrahedron
@@ -300,7 +296,6 @@ Polyhedron ExamplePolyhedron(int Nex)
   abort();    
 }
 
-Graph      examples[6] = {example1(), example2(), example3(), example4(), example5(), example6()};
 
 int main(int ac, char **av)
 {
