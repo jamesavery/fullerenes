@@ -232,12 +232,9 @@ Polyhedron Example2()
 // triakis tetrahedron
 Polyhedron Example3()
 {
-  PlanarGraph g = example3();
-  g.layout2d = g.tutte_layout();
-  Polyhedron P(g,g.zero_order_geometry(),6);
-  P.optimize(); // Doesn't work. Lukas, what are the coordinates supposed to be?
+  vector<coord3d> points{{0., 1.44541, 1.0108}, {0.700212, 0.138249, 0.}, {1.77793, 1.19982, 0.966152}, {0.317815, 0.446968, 0.92929}, {1.19803, 0.32425, 0.907385}, {0.851496, 0.971668, 1.40765}, {0.838477, 1.04014, 0.522258}, {0.725846, 0., 1.78837}};
   
-  return P;
+  return Polyhedron(example3(),points,3);
 }
 
 Polyhedron Example4()
