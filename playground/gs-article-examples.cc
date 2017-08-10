@@ -209,6 +209,35 @@ Graph example6(){
   return Graph(neighbours,true);
 }
 
+// elongated square bipyramid (should we want it)
+Graph example7(){
+  const int M=4, N=10;
+  neighbours_t neighbours(N,vector<node_t>(4));
+
+  for(int i=0; i!=M; ++i){
+    neighbours[i][0] = 8;
+    neighbours[i][1] = (i-1+M)%M;
+    neighbours[i][2] = M+i;
+    neighbours[i][3] = (i+1)%M;
+
+    neighbours[M+i][0] = i;
+    neighbours[M+i][1] = M+(i-1+M)%M;
+    neighbours[M+i][2] = 9;
+    neighbours[M+i][3] = M+(i+1)%M;
+  }
+  neighbours[8][0] = 0;
+  neighbours[8][1] = 1;
+  neighbours[8][2] = 2;
+  neighbours[8][3] = 3;
+
+  neighbours[9][0] = 7;
+  neighbours[9][1] = 6;
+  neighbours[9][2] = 5;
+  neighbours[9][3] = 4;
+  return Graph(neighbours,true);
+}
+
+
 // tetrahedron
 Polyhedron Example1()
 {
@@ -261,6 +290,18 @@ Polyhedron Example6()
   return Polyhedron(example6(),points,4);
 }
 
+// elongated square bipyramid
+Polyhedron Example7()
+{
+  PlanarGraph g = example7();
+  g.layout2d = g.tutte_layout();
+  Polyhedron P(g,g.zero_order_geometry(),6);
+  // P.optimize();
+
+  return P;
+}
+
+
 PlanarGraph ExampleGraph(int Nex)
 {
   switch(Nex){
@@ -270,6 +311,7 @@ PlanarGraph ExampleGraph(int Nex)
   case 4: return example4();
   case 5: return example5();
   case 6: return example6();
+  case 7: return example7();
   default:
     break;
   }
@@ -286,6 +328,7 @@ Polyhedron ExamplePolyhedron(int Nex)
   case 4: return Example4();
   case 5: return Example5();
   case 6: return Example6();
+  case 7: return Example7();
   default:
     break;
   }
