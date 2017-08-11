@@ -26,8 +26,8 @@ C  This subroutine optimizes the fullerene graph using spring embedding
         if(rv.gt.rper) rper=rv
       enddo
       scale=Rdist/rmin
-      If(IOP.eq.1) Write(*,101)
-      If(IOP.eq.2) Write(*,102)
+c$$$      If(IOP.eq.1) Write(*,101)
+c$$$      If(IOP.eq.2) Write(*,102)
       If(IOP.eq.3) then
         do i=1,N
         do j=i+1,N
@@ -35,52 +35,52 @@ C  This subroutine optimizes the fullerene graph using spring embedding
         enddo
         enddo
         rper=rper*scale
-        Write(*,103) maxd,rper,scalePPG
+C        Write(*,103) maxd,rper,scalePPG
         RAA=scalePPG
       endif
       if(IOP.eq.4) then
         RAA=rmax*scale/dfloat(maxl)
-        Write(*,104) maxl,RAA
+C        Write(*,104) maxl,RAA
       endif
-      Write(*,1000) rmin,Rdist
+C      Write(*,1000) rmin,Rdist
       do i=1,N
         Dist(1,i)=Dist(1,i)*scale
         Dist(2,i)=Dist(2,i)*scale
-        WRITE(*,1001) I,Dist(1,I),Dist(2,I)
+C        WRITE(*,1001) I,Dist(1,I),Dist(2,I)
       enddo
       CALL SA_frprmn2d(N,IOP,IDA,Iout,IS,MDist,
      1 maxd,Dist,ftol,iter,fret,E0,RAA)
       if(fret-E0.gt.1.d-2) then
         fretn=(fret-E0)/dfloat(N)
-        Write(*,1002) fretn
+C        Write(*,1002) fretn
       endif
 
-  101 Format(/1X,'Optimization of fullerene graph using a ',
-     1 'simple spring embedding algorithm for edges',
-     1 /1X,'Energy at starting point set to zero')
-  102 Format(/1X,'Optimization of fullerene graph using a ',
-     1 'spring embedding algorithm for edges plus ',
-     1 'Coulomb repulsion between barycenter and vertices',
-     1 /1X,'Energy at starting point set to zero')
-  103 Format(/1X,'Optimization of fullerene graph using a ',
-     1 'scaled spring embedding algorithm for edges ',
-     1 '(Pisanski-Plestenjak-Graovac algorithm)',
-     1 /1X,'Max graph distance to periphery: ',I5,
-     1 /1X,'Distance from barycenter to periphery: ',F15.4,
-     1 /1X,'Scaling factor for exponential: ',F15.4,
-     1 /1X,'Energy at starting point set to zero')
-  104 Format(/1X,'Optimization of fullerene graph using a ',
-     1 'Kamada-Kawai embedding algorithm',/1X,
-     1 'Max integer graph distance: ',I5,', length of ',
-     1 'display square area: ',F15.4,
-     1 /1X,'Energy at starting point set to zero')
- 1000 Format(/1X,'Fletcher-Reeves-Polak-Ribiere optimization',
-     1 /1X,'Smallest distance in Tutte graph: ',F12.6,
-     1 /1X,'Smallest distance reset to ',F12.6,
-     1 /1X,'Rescaled Tutte graph coordinates:',
-     1 /1X,'  Atom       X            Y        N1   N2   N3')
- 1001 Format(1X,I4,2(1X,F12.6),1X)
- 1002 Format(1X,'Energy gain per vertex: ',F12.6)
+c$$$  101 Format(/1X,'Optimization of fullerene graph using a ',
+c$$$     1 'simple spring embedding algorithm for edges',
+c$$$     1 /1X,'Energy at starting point set to zero')
+c$$$  102 Format(/1X,'Optimization of fullerene graph using a ',
+c$$$     1 'spring embedding algorithm for edges plus ',
+c$$$     1 'Coulomb repulsion between barycenter and vertices',
+c$$$     1 /1X,'Energy at starting point set to zero')
+c$$$  103 Format(/1X,'Optimization of fullerene graph using a ',
+c$$$     1 'scaled spring embedding algorithm for edges ',
+c$$$     1 '(Pisanski-Plestenjak-Graovac algorithm)',
+c$$$     1 /1X,'Max graph distance to periphery: ',I5,
+c$$$     1 /1X,'Distance from barycenter to periphery: ',F15.4,
+c$$$     1 /1X,'Scaling factor for exponential: ',F15.4,
+c$$$     1 /1X,'Energy at starting point set to zero')
+c$$$  104 Format(/1X,'Optimization of fullerene graph using a ',
+c$$$     1 'Kamada-Kawai embedding algorithm',/1X,
+c$$$     1 'Max integer graph distance: ',I5,', length of ',
+c$$$     1 'display square area: ',F15.4,
+c$$$     1 /1X,'Energy at starting point set to zero')
+c$$$ 1000 Format(/1X,'Fletcher-Reeves-Polak-Ribiere optimization',
+c$$$     1 /1X,'Smallest distance in Tutte graph: ',F12.6,
+c$$$     1 /1X,'Smallest distance reset to ',F12.6,
+c$$$     1 /1X,'Rescaled Tutte graph coordinates:',
+c$$$     1 /1X,'  Atom       X            Y        N1   N2   N3')
+c$$$ 1001 Format(1X,I4,2(1X,F12.6),1X)
+c$$$ 1002 Format(1X,'Energy gain per vertex: ',F12.6)
 
       Return
       END
@@ -112,7 +112,7 @@ C     IOP=4: Kamada-Kawai embedding
       iter=0
       CALL SA_func2d(N,IOP,AH,IS,MDist,maxd,p,fp,RAA)
        E0=fp
-      Write(Iout,1003) E0
+C      Write(Iout,1003) E0
 C     dfunc2d input vector p of length 2*N, output gradient of length 2*N user defined
       CALL SA_dfunc2d(N,IOP,AH,IS,MDist,maxd,p,xi,RAA)
       grad2=0.d0
@@ -120,7 +120,7 @@ C     dfunc2d input vector p of length 2*N, output gradient of length 2*N user d
        grad2=grad2+xi(i)*xi(i)
       enddo
       grad=dsqrt(grad2)
-      Write(Iout,1001) iter,fp-E0,grad
+C      Write(Iout,1001) iter,fp-E0,grad
       if(grad.lt.ftol) return
       do j=1,2*N
         g(j)=-xi(j)
@@ -137,9 +137,9 @@ C     dfunc2d input vector p of length 2*N, output gradient of length 2*N user d
           grad2=grad2+xi(i)*xi(i)
          enddo
          grad=dsqrt(grad2)
-        Write(Iout,1001) iter,fret-E0,grad
+C        Write(Iout,1001) iter,fret-E0,grad
         if(2.d0*dabs(fret-fp).le.ftol*(dabs(fret)+dabs(fp)+EPS))then
-          Write(Iout,1002) fret-E0,fret-fp
+C          Write(Iout,1002) fret-E0,fret-fp
           return
         endif
         fp=fret
@@ -159,12 +159,12 @@ C         dgg=dgg+xi(j)**2
           xi(j)=h(j)
         enddo
       enddo
-      Write(Iout,1000) fret,fret-fp
- 1000 Format(' WARNING: Subroutine frprmn2d: maximum iterations
-     1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
- 1001 Format(' Iteration ',I4,', energy ',D14.8,', gradient ',D14.8)
- 1002 Format(/1X,'Convergence achieved, energy ',F20.7,', diff= ',D12.3)
- 1003 Format(/1X,'E0= ',D12.3)
+C      Write(Iout,1000) fret,fret-fp
+c$$$ 1000 Format(' WARNING: Subroutine frprmn2d: maximum iterations
+c$$$     1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
+c$$$ 1001 Format(' Iteration ',I4,', energy ',D14.8,', gradient ',D14.8)
+c$$$ 1002 Format(/1X,'Convergence achieved, energy ',F20.7,', diff= ',D12.3)
+c$$$ 1003 Format(/1X,'E0= ',D12.3)
       return
       END
 
@@ -271,7 +271,7 @@ C     USES func2d
         else
           u=cx+GOLD*(cx-bx)
         if(u.gt.1.d10) then
-        Write(Iout,1000)
+C        Write(Iout,1000)
         return
         endif
         CALL SA_f1dim2d(N,IOP,AH,IS,DD,maxd,fu,u,xicom,pcom,
@@ -286,7 +286,7 @@ C     USES func2d
         goto 1
       endif
       return
- 1000 Format('**** Error in Subroutine mnbrak2d')
+C 1000 Format('**** Error in Subroutine mnbrak2d')
       END
 
       SUBROUTINE SA_brent2d(N,IOP,Iout,AH,IS,DD,maxd,
@@ -373,8 +373,8 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
           endif
         endif
 11    continue
-      Write(Iout,1000)
- 1000 Format('WARNING: Subroutine brent2d: maximum iterations exceeded')
+C      Write(Iout,1000)
+C 1000 Format('WARNING: Subroutine brent2d: maximum iterations exceeded')
 3     xmin=x
       return
       END
@@ -461,7 +461,7 @@ C     Kamada-Kawai embedding
       Do J=I+2,2*N,2
         J1=(J+1)/2
         if(MDist(I1,J1).le.0) then
-         Print*,I1,J1,MDist(I1,J1)
+C         Print*,I1,J1,MDist(I1,J1)
          stop
         endif
         DD=dfloat(MDist(I1,J1))
@@ -651,17 +651,17 @@ c counter for edges with 0, 1, 2 pentagons neighbours
 
       select case(iopt)
       case(1)
-        Write(*,1000)
-        Write(*,1016) ftol,(force(i),i=1,8)
+C        Write(*,1000)
+C        Write(*,1016) ftol,(force(i),i=1,8)
       case(2)
-        Write(*,1000)
-        Write(*,1019) ftol,(force(i),i=1,9)
+C        Write(*,1000)
+C        Write(*,1019) ftol,(force(i),i=1,9)
       case(3)
-        Write(*,1007)
-        Write(*,1020) ftol,(force(i),i=1,18)
+C        Write(*,1007)
+C        Write(*,1020) ftol,(force(i),i=1,18)
       case(4)
-        Write(*,1007)
-        Write(*,1018) ftol,(force(i),i=1,19)
+C        Write(*,1007)
+C        Write(*,1018) ftol,(force(i),i=1,19)
       end select
 C       Conversion to kJ/mol
 C       energies in KJ/mol, gradients in kJ/mol/A and hessian kJ/mol/A^2
@@ -704,15 +704,15 @@ c        force(19)=force(19)
       end if
       select case(iopt)
       case(1)
-        Write(*,1006) (force(i),i=1,8)
+C        Write(*,1006) (force(i),i=1,8)
       case(2)
-        Write(*,1003) (force(i),i=1,9)
+C        Write(*,1003) (force(i),i=1,9)
       case(3)
-        Write(*,1005) (force(i),i=1,18)
+C        Write(*,1005) (force(i),i=1,18)
       case(4)
-        Write(*,1008) (force(i),i=1,19)
+C        Write(*,1008) (force(i),i=1,19)
       end select
-      if(iopt.eq.2 .and. force(9).gt.0.d0) Write(*,1004) force(9)
+C      if(iopt.eq.2 .and. force(9).gt.0.d0) Write(*,1004) force(9)
 
 
 C OPTIMIZE
@@ -723,10 +723,10 @@ C OPTIMIZE
      1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(fret.gt.1.d-2) then
         fretn=fret/dfloat(N)
-        Write(*,1002) fretn
+C        Write(*,1002) fretn
       endif
       CALL SA_Distan(N,IDA,Dist,Rmin,Rminall,Rmax,rms)
-      Write(*,1001) Rmin,Rmax,rms
+C      Write(*,1001) Rmin,Rmax,rms
 
 
 C HESSIAN
@@ -736,9 +736,9 @@ C HESSIAN
      1   a_h,a_p,
      1   d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
         if(iprinthessian.gt.1) then
-          write(*,1023)
-          write(*,1024)
-     1      ((hessian(i,j),i=1,3*N),j=1,3*N)
+c          write(*,1023)
+c          write(*,1024)
+c     1      ((hessian(i,j),i=1,3*N),j=1,3*N)
         endif
 C Diagonalize without producing eigenvectors
 C  Mass of 12-C used
@@ -755,9 +755,9 @@ C       Test if Hessian is symmetric
         enddo
         asym=symmetric*.5d0
         if(asym.gt.test) then
-          Write(*,1013) asym
+C          Write(*,1013) asym
         else
-          Write(*,1015) asym
+C          Write(*,1015) asym
         endif
 C       Mass-weight Hessian
         do i=1,3*N
@@ -786,8 +786,8 @@ C Sort eigenvalues
           endif
         enddo
         if(iprinthessian.ne.0) then
-          write(*,1009)
-          write(*,1010) (evec(i),i=1,3*N)
+c          write(*,1009)
+c          write(*,1010) (evec(i),i=1,3*N)
         endif
         Do I=1,N*3
           if(evec(i).lt.0.d0) then
@@ -797,13 +797,13 @@ C Sort eigenvalues
             evec(i)=dsqrt(evec(i))
           endif
         enddo
-        write(*,1011) negeig
+c        write(*,1011) negeig
         Do I=1,N*3
           evec(i)=evec(i)*convw
         enddo
         if(iprinthessian.ne.0) then
-          write(*,1012)
-          write(*,1010) (evec(i),i=1,N*3)
+c          write(*,1012)
+c          write(*,1010) (evec(i),i=1,N*3)
         endif
 C Zero-point vibrational energy
         zerops=0.d0
@@ -815,8 +815,8 @@ C Zero-point vibrational energy
         zeropau=zerop/au2wavenumbers
         zeropeV=zeropau*au2eV
         peratom=dfloat(N)
-        write(*,1014) zeropau,zeropeV,zeropwn
-        write(*,1026) zeropau/peratom,zeropeV/peratom,zeropwn/peratom
+c        write(*,1014) zeropau,zeropeV,zeropwn
+c        write(*,1026) zeropau/peratom,zeropeV/peratom,zeropwn/peratom
 C Sort for degeneracies
         tolfreq=1.d-1
         icount=0
@@ -833,58 +833,58 @@ C Sort for degeneracies
             idegc=0
           endif
         enddo
-        write(*,1021) ndeg,N*3-6
-        write(*,1022) (evec(i),ideg(i),i=1,icount)
-        write(*,1025)
-     1    (evec(i),i=N*3-5,3*N)
+c        write(*,1021) ndeg,N*3-6
+c        write(*,1022) (evec(i),ideg(i),i=1,icount)
+c        write(*,1025)
+c     1    (evec(i),i=N*3-5,3*N)
       endif
 
- 1000 Format(1X,'Optimization of geometry using harmonic oscillators',
-     1 ' for stretching and bending modes using the force-field of',
-     1 ' Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere algorithm used')
- 1001 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
-     1 ', RMS distance: ',F12.6)
- 1002 FORMAT(1X,'Distances and angles defined in the force field can',
-     1 ' not be reached',/1X,'Energy per atom in atomic units: ',F12.6)
- 1003 Format(' Force field parameters in au/A^2 and au/rad^2:',
-     1 /1X,9F12.6,/)
- 1004 Format(' Coulomb repulsion from center of origin with force ',
-     1 F12.6,/)
- 1005 Format(' Force field parameters in au/A^2 and au/rad^2:',
-     1 /1X,18F12.6,/)
- 1006 Format(' Force field parameters in au/A^2 and au/rad^2:',
-     1 /1X,8F12.6,/)
- 1007 Format(1X,'Optimization of geometry using harmonic oscillators',
-     1 ' for bonds, angles, and dihedrals using an extension of the',
-     1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
-     1 ' algorithm used')
- 1008 Format(' Force field parameters in au/A^2 and au/rad^2:',
-     1 /1X,19F12.6,/)
- 1009 Format(' Eigenvalues of mass-weighted Hessian:')
- 1010 Format(10(1X,D12.6))
- 1011 Format(' Number of zero and negative eigenvalues: ',I6)
- 1012 Format(' Frequencies (cm-1):')
- 1013 Format(' Severe problem. Hessian is not symmetric: asym= ',d12.6)
- 1014 Format(' Zero-point vibrational energy: ',d12.6,' a.u. , ',
-     1 d12.6,' eV , ',d12.6,' cm-1 , ')
- 1015 Format(' Hessian is symmetric: asym= ',d12.6)
- 1016 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:',/1X,8F12.3)
- 1018 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,19F12.2)
- 1019 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,9F12.2)
- 1020 Format(' Tolerance= ',D9.3,', Force field parameters in ',
-     1 'A, deg, N/m:'/1X,18F12.2)
- 1021 Format(1X,I6,' non-zero frequencies (should be ',I6,').',
-     1 ' Frequencies (in cm-1) and (quasi) degeneracies (n):')
- 1022 Format(10(' ',f7.1,'(',I2,')'))
- 1023 Format(' Hessian matrix:')
- 1024 Format(8(d12.6,' '))
- 1025 Format(' Zero frequencies for translation and rotation: ',
-     1 6(d12.6,' '))
- 1026 Format(' Zero-point vibrational energy per atom: ',d12.6,
-     1 ' a.u. , ',d12.6,' eV , ',d12.6,' cm-1 , ')
+c$$$ 1000 Format(1X,'Optimization of geometry using harmonic oscillators',
+c$$$     1 ' for stretching and bending modes using the force-field of',
+c$$$     1 ' Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere algorithm used')
+c$$$ 1001 FORMAT(1X,'Minimum distance: ',F12.6,', Maximum distance: ',F12.6,
+c$$$     1 ', RMS distance: ',F12.6)
+c$$$ 1002 FORMAT(1X,'Distances and angles defined in the force field can',
+c$$$     1 ' not be reached',/1X,'Energy per atom in atomic units: ',F12.6)
+c$$$ 1003 Format(' Force field parameters in au/A^2 and au/rad^2:',
+c$$$     1 /1X,9F12.6,/)
+c$$$ 1004 Format(' Coulomb repulsion from center of origin with force ',
+c$$$     1 F12.6,/)
+c$$$ 1005 Format(' Force field parameters in au/A^2 and au/rad^2:',
+c$$$     1 /1X,18F12.6,/)
+c$$$ 1006 Format(' Force field parameters in au/A^2 and au/rad^2:',
+c$$$     1 /1X,8F12.6,/)
+c$$$ 1007 Format(1X,'Optimization of geometry using harmonic oscillators',
+c$$$     1 ' for bonds, angles, and dihedrals using an extension of the',
+c$$$     1 ' force-field of Wu et al.',/1X,'Fletcher-Reeves-Polak-Ribiere',
+c$$$     1 ' algorithm used')
+c$$$ 1008 Format(' Force field parameters in au/A^2 and au/rad^2:',
+c$$$     1 /1X,19F12.6,/)
+c$$$ 1009 Format(' Eigenvalues of mass-weighted Hessian:')
+c$$$ 1010 Format(10(1X,D12.6))
+c$$$ 1011 Format(' Number of zero and negative eigenvalues: ',I6)
+c$$$ 1012 Format(' Frequencies (cm-1):')
+c$$$ 1013 Format(' Severe problem. Hessian is not symmetric: asym= ',d12.6)
+c$$$ 1014 Format(' Zero-point vibrational energy: ',d12.6,' a.u. , ',
+c$$$     1 d12.6,' eV , ',d12.6,' cm-1 , ')
+c$$$ 1015 Format(' Hessian is symmetric: asym= ',d12.6)
+c$$$ 1016 Format(' Tolerance= ',D9.3,', Force field parameters in ',
+c$$$     1 'A, deg, N/m:',/1X,8F12.3)
+c$$$ 1018 Format(' Tolerance= ',D9.3,', Force field parameters in ',
+c$$$     1 'A, deg, N/m:'/1X,19F12.2)
+c$$$ 1019 Format(' Tolerance= ',D9.3,', Force field parameters in ',
+c$$$     1 'A, deg, N/m:'/1X,9F12.2)
+c$$$ 1020 Format(' Tolerance= ',D9.3,', Force field parameters in ',
+c$$$     1 'A, deg, N/m:'/1X,18F12.2)
+c$$$ 1021 Format(1X,I6,' non-zero frequencies (should be ',I6,').',
+c$$$     1 ' Frequencies (in cm-1) and (quasi) degeneracies (n):')
+c$$$ 1022 Format(10(' ',f7.1,'(',I2,')'))
+c$$$ 1023 Format(' Hessian matrix:')
+c$$$ 1024 Format(8(d12.6,' '))
+c$$$ 1025 Format(' Zero frequencies for translation and rotation: ',
+c$$$     1 6(d12.6,' '))
+c$$$ 1026 Format(' Zero-point vibrational energy per atom: ',d12.6,
+c$$$     1 ' a.u. , ',d12.6,' eV , ',d12.6,' cm-1 , ')
 
       Return
       END
@@ -961,7 +961,7 @@ C     IOPT=1: Wu force field optimization
      1 a_h,a_p,
      1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       if(IERR.ne.0) then
-        Write(*,1004)
+C        Write(*,1004)
         return
       endif
 C     dfunc3d input vector p of length N, output gradient of length n user defined
@@ -974,7 +974,7 @@ C     dfunc3d input vector p of length N, output gradient of length n user defin
         grad2=grad2+xi(i)*xi(i)
       enddo
       grad=dsqrt(grad2)
-      Write(*,1001) iter,fp,grad
+C      Write(*,1001) iter,fp,grad
       if(grad.lt.ftol) return
       do j=1,3*N
         g(j)=-xi(j)
@@ -1000,13 +1000,13 @@ c       turn off coulomb pot towards the end (and go to iopt=3 to indicate that 
         enddo
         grad=dsqrt(grad2)
 c        if(damping.eq.0) then
-          write(*,1001) iter,fret,grad
+C          write(*,1001) iter,fret,grad
 c        else
 c          write(*,1002) iter,fret,grad,damping
 c        endif
         if(2.d0*dabs(fret-fp).le.ftol*(dabs(fret)+dabs(fp)+EPS))then
           fretperatom=3.d0*fret/dfloat(3*N)
-          Write(*,1003) fret,fret-fp,fretperatom
+C          Write(*,1003) fret,fret-fp,fretperatom
           return
         endif
         fp=fret
@@ -1029,18 +1029,18 @@ C         dgg=dgg+xi(j)**2
           xi(j)=h(j)
         enddo
       enddo
-      Write(*,1000) fret,fret-fp
- 1000 Format(' WARNING: Subroutine frprmn3d: maximum iterations
-     1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
- 1001 Format(' Iteration ',I6,', energy [kJ/mol] ',D14.8,
-     1 ', gradient [kJ/mol/A] ',D14.8)
-c 1002 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8,
-c     1 ' The displacements of ',I4,' atoms were damped.')
- 1003 Format(/1X,'Convergence achieved, energy [kJ/mol] ',D14.8,
-     1 ', diff= ',D12.3,/1X,'Energy per atom [kJ/mol]: ',D14.8)
- 1004 Format('**** Severe error in angle, check input coordiantes:',
-     1 ' One angle either 0 or 180 degrees, ill-alligned structure',
-     1 /1X,'Cannot optimize structure, check eigenvector input')
+c$$$C      Write(*,1000) fret,fret-fp
+c$$$ 1000 Format(' WARNING: Subroutine frprmn3d: maximum iterations
+c$$$     1 exceeded',/1X,'energy ',F15.9,', diff= ',D12.3)
+c$$$ 1001 Format(' Iteration ',I6,', energy [kJ/mol] ',D14.8,
+c$$$     1 ', gradient [kJ/mol/A] ',D14.8)
+c$$$c 1002 Format(' Iteration ',I6,', energy ',D14.8,', gradient ',D14.8,
+c$$$c     1 ' The displacements of ',I4,' atoms were damped.')
+c$$$ 1003 Format(/1X,'Convergence achieved, energy [kJ/mol] ',D14.8,
+c$$$     1 ', diff= ',D12.3,/1X,'Energy per atom [kJ/mol]: ',D14.8)
+c$$$ 1004 Format('**** Severe error in angle, check input coordiantes:',
+c$$$     1 ' One angle either 0 or 180 degrees, ill-alligned structure',
+c$$$     1 /1X,'Cannot optimize structure, check eigenvector input')
       return
       END
 
@@ -1333,9 +1333,9 @@ C or minima of a scalar function of a scalar variable, by Richard Brent.
           endif
         endif
 11    continue
-      Write(*,1000)
- 1000 Format(' WARNING: Subroutine brent3d: maximum iterations
-     1 exceeded')
+C      Write(*,1000)
+C 1000 Format(' WARNING: Subroutine brent3d: maximum iterations
+C     1 exceeded')
 3     xmin=x
       return
       END

@@ -513,7 +513,7 @@ void get_face_(const graph_ptr *g, const int *s, const int *t, const int *r, con
 void get_arc_face_(const graph_ptr *g, const int *u, const int *v, int *face, int *l)
 {
   assert((*g)->layout2d.size() == (*g)->N);
-  face_t f((*g)->get_face_oriented(*u,*v));
+  face_t f((*g)->get_face_oriented({*u,*v}));
   
   for(int i=0;i<f.size();i++) face[i] = f[i];
   *l = f.size();

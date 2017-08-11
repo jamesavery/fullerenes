@@ -3,43 +3,26 @@
 #include <algorithm>
 
 
-
-pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
+pair<node_t,node_t> Triangulation::adjacent_tris(const dedge_t& e) const
 {
-  const node_t &u(e.first), &v(e.second);
-  const vector<node_t>& nv(neighbours[v]);
+  node_t u  = e.first, v = e.second;
+  node_t w1 = next_on_face(u,v), w2 = next_on_face(v,u);
 
-  pair<node_t,node_t> tris;
-
-  for(int i=0, t=0;i<nv.size();i++){
-    const node_t& w(nv[i]);
-    const vector<node_t>& nw(neighbours[w]);
-    for(int j=0;j<nw.size();j++)
-      if(nw[j] == u) {
-	//    printf("%d/%d: %d->%d->%d\n",i,t,u,v,w);
-	t++;
-	if(t == 1)  tris.first  = w;
-	else if(t==2) tris.second = w;
-	else {
-	  fprintf(stderr,"Triangulation is not orientable, edge %d--%d part of more than two faces.\n",u,v);
-	  cerr << "neighbours = " << neighbours << ";\n";
-	  abort();
-	}
-      }
-  }
-  return tris;
+  return make_pair(w1,w2);
 }
 
 vector<tri_t> Triangulation::compute_faces() const
 // Does not assume graph is oriented
 // Produces oriented triangles
 {
-  set<tri_t> triangle_set;
+  if(is_oriented) return compute_faces_oriented();
+
+  unordered_set<tri_t> triangle_set;
 
   for(node_t u=0;u<N;u++)
     for(int i=0;i<neighbours[u].size();i++){
       node_t v = neighbours[u][i];
-      pair<node_t,node_t> ws(adjacent_tris(edge_t(u,v)));
+      pair<node_t,node_t> ws(adjacent_tris({u,v}));
 
       triangle_set.insert(tri_t(u,v,ws.first ).sorted());
       triangle_set.insert(tri_t(u,v,ws.second).sorted());
@@ -48,6 +31,7 @@ vector<tri_t> Triangulation::compute_faces() const
 
   vector<tri_t> triangles(triangle_set.begin(),triangle_set.end());
   orient_triangulation(triangles);
+
   return triangles;
 }
 
@@ -75,23 +59,12 @@ void Triangulation::orient_neighbours()
   is_oriented = true;
 }
 
-node_t Triangulation::nextCW(node_t u, node_t v) const
-{
-  return next(u,v);
-}
-
-node_t Triangulation::nextCCW(node_t u, node_t v) const
-{
-  return prev(u,v);
-}
-
-
 vector<tri_t> Triangulation::compute_faces_oriented() const
 {
-  vector<tri_t> triangles(2*(N-2)); // Assumes cubic
-  map<dedge_t,bool> dedge_done;    // Change to vector<bool> dedge_done[N*3] to increase speed.
+  unordered_map<dedge_t,bool> dedge_done(2*count_edges());
+  vector<tri_t> triangles;
+  triangles.reserve(2*(N-2));	// Most common case is cubic dual, but we no longer know it for sure.
 
-  int k=0;
   for(node_t u=0;u<N;u++){
     const vector<node_t>& nu(neighbours[u]);
     for(int i=0;i<nu.size();i++){
@@ -99,15 +72,15 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
       const dedge_t uv(u,v);
 
       if(!dedge_done[uv]){
-        node_t w = nextCW(uv);
+        node_t w = next_on_face(u,v);
 
-        if(!dedge_done[dedge_t(v,w)] && !dedge_done[dedge_t(w,u)]){
+        if(!dedge_done[{v,w}] && !dedge_done[{w,u}]){
 
-          triangles[k++] = tri_t(u,v,w);
+          triangles.push_back(tri_t(u,v,w));
 
-          dedge_done[dedge_t(u,v)] = true;
-          dedge_done[dedge_t(v,w)] = true;
-          dedge_done[dedge_t(w,u)] = true;
+          dedge_done[{u,v}] = true;
+          dedge_done[{v,w}] = true;
+          dedge_done[{w,u}] = true;
         }
       }
     }
@@ -131,6 +104,7 @@ PlanarGraph Triangulation::dual_graph() const
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
       node_t w(prev(u,v)); // TODO: CCW for buckygen -- will this give problems elsewhere?
+      // TODO: Should this not be prev(v,u)? Or next(v,u)? 
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
 
@@ -158,7 +132,7 @@ vector<face_t> Triangulation::dual_faces() const
     const vector<node_t> &nu(neighbours[u]);
     face_t f(nu.size());
     for(int i=0;i<nu.size();i++){
-      node_t v=nu[i], w = nextCW(dedge_t(u,v));
+      node_t v=nu[i], w = next_on_face(u,v);
       f[i] = tri_numbers(tri_t(u,v,w).sorted());
     }
     dfaces[u] = f;
@@ -347,11 +321,6 @@ bool Triangulation::get_spiral(const node_t f1, const node_t f2, const node_t f3
 			       vector<int> &spiral, jumplist_t& jumps, vector<node_t>& permutation,
 			       const bool general) const {
   return get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,general);
-
-  // I think our implementation is now so fast that it makes sense to just use that! Let's see.
-  // bool normal_spiral = get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,false);
-
-  // return normal_spiral || (general && get_spiral_implementation(f1,f2,f3,spiral,jumps,permutation,true));
 }
 
 void remove_node(const node_t u, Graph &remaining_graph){
@@ -410,8 +379,8 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   }
 
   bool
-    CW  = nextCW(dedge_t(f1,f2)) == f3,
-    CCW = nextCCW(dedge_t(f1,f2)) == f3;
+    CW  = prev(f1,f2) == f3,
+    CCW = next(f1,f2) == f3;
 
   // check if starting nodes are a valid spiral start.
   // TODO: Input f1,f2 and bool CW instead to only allow valid spiral starts.
@@ -461,7 +430,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
     // find *the* node in *this (not the remaining_graph), that is connected to open_valencies.back() und open_valencies.front()
     // we can't search in the remaining_graph because there are some edges deleted already
     node_t u = open_valencies.back().first, w = open_valencies.front().first;
-    node_t v = CCW? nextCW(dedge_t(u,w)) : nextCCW(dedge_t(u,w));
+    node_t v = CCW? prev(u,w) : next(u,w); // TODO: What is the rationale here?
     //    cout << "u->v: " << u << " -> " << v << endl;
     if(v == -1) return false; // non-general spiral failed
 
@@ -558,8 +527,8 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
 
     for(int j=0;j<nu.size();j++){
       node_t v=nu[j], w[2];
-      w[0] = nextCW(dedge_t(u,v));
-      w[1] = nextCCW(dedge_t(u,v));
+      w[0] = prev(u,v);
+      w[1] = next(u,v);
 
       for(int k=0;k<2;k++){
         if(get_spiral(u,v,w[k],spiral,jump,permutation,general)){
@@ -583,13 +552,16 @@ if(rarest_only){
   int max_face_size=0;
   for(node_t u=0;u<N;u++) if(neighbours[u].size()>max_face_size) max_face_size=neighbours[u].size();
   //cerr << max_face_size << endl;
+  
   vector<int> face_counts(max_face_size,0);
   for(node_t u=0;u<N;u++) face_counts[neighbours[u].size()-1]++;
   //cerr << face_counts << endl;
+
+  // Find rarest non-hexagon face size
   pair<int,int> fewest_face(0,INT_MAX); // size, number
   for(int i=0; i<max_face_size; i++){
     //cerr << face_counts[i] << fewest_face << endl;
-    if(face_counts[i]>0 && face_counts[i]<fewest_face.second){
+    if((i+1 != 6) && face_counts[i]>0 && face_counts[i]<fewest_face.second){
       fewest_face.first=i+1;
       fewest_face.second=face_counts[i];
     }
@@ -623,8 +595,8 @@ else {
     // Get regular spiral if it exists
     for(int j=0;j<nu.size();j++){
       node_t v=nu[j], w[2];
-      w[0] = nextCW(dedge_t(u,v));
-      w[1] = nextCCW(dedge_t(u,v));
+      w[0] = prev(u,v);
+      w[1] = next(u,v);
 
       for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
 	// NB: general -> false to only to general if all originals fail
@@ -661,8 +633,8 @@ else {
       // Get regular spiral if it exists
       for(int j=0;j<nu.size();j++){
   	node_t v=nu[j], w[2];
-  	w[0] = nextCW(dedge_t(u,v));
-  	w[1] = nextCCW(dedge_t(u,v));
+  	w[0] = prev(u,v);
+  	w[1] = next(u,v);
 
   	for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_special is set)
   	  if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true))

@@ -30,10 +30,6 @@ public:
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g), layout2d(layout) {  }
 
   
-  // node_t nextCW(const node_t& u,const node_t& v) const;
-  // node_t prevCW(const node_t& u,const node_t& v) const; 
-
-
   bool is_a_fullerene() const;
   bool is_cubic() const;
   bool is_triangulation() const;
@@ -42,11 +38,17 @@ public:
 
   bool is_cut_vertex(const node_t v) const;
 
+  // This group of functions should be used whenever the graphs are oriented. Fmax is not necessary, just an extra back-stop.
+  vector<face_t> compute_faces_oriented(int Fmax=INT_MAX) const; // TODO: This should replace the old layout-based method  
+  face_t get_face_oriented(const dedge_t &e, int Fmax=INT_MAX) const; 
+  dedge_t get_face_representation(dedge_t e, int Fmax=INT_MAX) const; 
+  vector<dedge_t> compute_face_representations(int Fmax=INT_MAX) const; // Unique representation of face in oriented planar graph
+
+  // This should all be phased out. For non-oriented graphs, better to compute planar embedding and orient once and for all,
+  // than to use planar layout for orientation everywhere (or better yet, make sure graph is oriented in the first place).
   vector<face_t> compute_faces(unsigned int Nmax=INT_MAX, bool planar_layout=false) const;
   vector<face_t> compute_faces_layout_oriented() const;
-  vector<face_t> compute_faces_actually_oriented() const; // TODO: This should replace the old layout-based method
-  face_t get_face_oriented(int u, int v) const; // TODO: This uses the layout, should work towards retirement
-  face_t get_face_actually_oriented(int u, int v, int Fmax=INT_MAX) const; // TODO: This doesn't use layout, should replace ^
+  face_t get_face_layout_oriented(int u, int v) const; // TODO: This uses the layout, should work towards retirement
 
 
   void orient_neighbours();   // Ensures that neighbours are ordered CCW

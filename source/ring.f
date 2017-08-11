@@ -385,8 +385,6 @@ C     Check Euler characteristic
      1 3X,' maximum bond distance: ',d12.6) 
  1008 Format(1X,' 6-ring minimum bond distance: ',d12.6,
      1 3X,' maximum bond distance: ',d12.6) 
- 1009 Format(1X,' Minimum bond distance in ',I1,'-ring: ',d12.6,
-     1 3X,' maximum bond distance in ',I1,'-ring: ',d12.6) 
 C1010 Format(1X,96(I3))
 C1011 Format(3X,96(I3))
  1012 Format(/1X,'Number of different bond distances Nr=',I4,

@@ -122,58 +122,60 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
 }
 
 
-
 PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 {
-  PlanarGraph dual;
-  IDCounter<face_t> face_numbers; // This makes things unnecessarily slow
-
-  auto normalize_face = [&](const face_t& f) -> face_t {
-    int i_min=0;
-    for(int i=1;i<f.size();i++) if(f[i]<f[i_min]) i_min = i;
-
-    face_t F(f.size());
-    for(int i=0;i<f.size();i++) F[i] = f[(i+i_min)%f.size()];
-
-    return F;
-  };
-  
   if(is_oriented){
-    //    cerr << "Oriented dualizer!\n";
+
+    // Each directed edge uniquely identifies a face
+    vector<dedge_t>            face_reps = compute_face_representations(Fmax);
+    unordered_map<dedge_t,int> face_numbers(face_reps.size());
+    for(int i=0;i<face_reps.size();i++) face_numbers[face_reps[i]] = i;
+
+    cerr << "face_reps  = " << face_reps << ";\n";
+    cerr << "face_reps' = " << get_keys(face_numbers) << ";\n";
+    cerr << "face_nums  = " << get_values(face_numbers) << ";\n";
+    //    cerr << "faces      = " << compute_faces_oriented(Fmax) << ";\n";
     
-    set<edge_t> edges;		// TODO: Do this in a consistently oriented way
+    PlanarGraph dual(face_numbers.size());
     
-    for(node_t u=0;u<N;u++){
-      //      cerr << "u = " << u << endl;
+    for(const auto &ei: face_numbers){
+      // e_f is minimal directed edge representation of face f, i_f is its face number.
+      dedge_t e_f = ei.first; node_t i_f = ei.second;
+      //      cerr << "Processing face " << i_f << ": " << e_f << " -> " << get_face_oriented(e_f,Fmax) << ";\n";
       
-      for(node_t v: neighbours[u]){
-	//	cerr << "v = " << v << ";\n";
-	
-	face_t f = normalize_face(get_face_actually_oriented(u,v,Fmax));
-	face_t g = normalize_face(get_face_actually_oriented(v,u,Fmax));
+      // Now iterate along face f's directed edges in CCW order:
+      // This visits each face neighbour in CCW order.
+      node_t u=e_f.first, v=e_f.second, w=-1, i=0;
+      do {
+	// e_g is MDE-representation of opposite face along edge e_f
+	dedge_t e_g = get_face_representation({v,u},Fmax);
+	// cerr << "Processing face: " << dedge_t{u,v} << " -> " << get_face_oriented({u,v},Fmax)<<" "
+	//      << " opposite " << e_g << " -> " << get_face_oriented(e_g,Fmax) << ";\n";
+	dual.neighbours[i_f].push_back(face_numbers[e_g]);
 
-	int fid = face_numbers.insert(f);
-	int gid = face_numbers.insert(g);
+	w = prev(v,u); u = v; v = w; // CCW node neighbour order + CCW face order
+	assert(++i <= Fmax);	// Face larger than Fmax or corrupted graph
+      } while (u != e_f.first);
+    }
+    assert(dual.is_consistently_oriented());
+    dual.is_oriented = true;
+    
+    if(planar_layout && layout2d.size() == N){
+      dual.layout2d = vector<coord2d>(face_numbers.size());
 
-	//	cerr << "fid = " << fid << "; gid = " << gid << ";\n";
-	//	cerr << "f = " << f << "; g = " << g << ";\n";
+      for(const auto &ei: face_numbers){
+	dedge_t e_f = ei.first; node_t i_f = ei.second;
+	face_t f = get_face_oriented(e_f,Fmax);
 	
-	edges.insert(edge_t{fid,gid});
-	//	cerr << "edges = " << edges << ";\n";
+	dual.layout2d[i_f] = f.centroid(layout2d);
       }
     }
-    // TODO: Don't use edge set, it's slow and loses orientation
-    dual     = Graph(edges);
 
-    if(planar_layout && layout2d.size() == N){
-      //    cerr << "dual_graph::compute layout.\n";
-      dual.layout2d = vector<coord2d>(face_numbers.size());
-      
-      for(int i=0;i<face_numbers.size();i++)
-	dual.layout2d[i] = face_numbers.reverse[i].centroid(layout2d);
-    }
+    return dual;
+    // Proper implementation of general oriented planar graph dual ends
   } else {
-    // TODO: Get rid of all this junk!
+    // TODO: ********** Get rid of all this junk below! ******************
+    IDCounter<face_t> face_numbers;
     PlanarGraph dual;
     set<edge_t> edge_set = undirected_edges(); // TODO: In new planargraph, this is unnecessary
     int Nfaces = edge_set.size()-N+2;
@@ -230,15 +232,15 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
       for(int i=0;i<allfaces.size();i++)
 	dual.layout2d[i] = allfaces[i].centroid(layout2d);
     }
-  }    
     return dual;
+  }    
 }
 
 
 Graph PlanarGraph::leapfrog_dual() const
 {
   assert(is_oriented);
-  vector<face_t> faces = compute_faces_flat();
+  vector<face_t> faces = compute_faces_oriented();
 
   Graph lf(N+faces.size(),true);
 
@@ -249,11 +251,13 @@ Graph PlanarGraph::leapfrog_dual() const
   for(int i=0;i<faces.size();i++){
     const face_t &f  = faces[i];
     node_t c = N+i;		// Face-center node
-  
+
+    cerr << "new node " << c << " at face " << f << "\n";
+    
     for(int j=0;j<f.size();j++){
       node_t u = f[j], v = f[(j+1)%f.size()];
 
-      lf.insert_edge(dedge_t{u,c},v,-1);
+      lf.insert_edge(dedge_t{v,c},u,-1);
     }
   }
 
@@ -264,7 +268,7 @@ Graph PlanarGraph::leapfrog_dual() const
 vector<face_t> PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout) const
 {
   // TODO: This should supercede using the planar embedding for orientation
-  if(is_oriented) return compute_faces_actually_oriented();
+  if(is_oriented) return compute_faces_oriented();
   
   // TODO: Clean up.
   if(planar_layout && layout2d.size() == N) return compute_faces_layout_oriented();
@@ -316,7 +320,8 @@ vector<face_t> PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout)
   return faces;
 }
 
-face_t PlanarGraph::get_face_oriented(node_t s, node_t t) const
+ 
+face_t PlanarGraph::get_face_layout_oriented(node_t s, node_t t) const
 {
   face_t face;
   face.push_back(s);
@@ -402,7 +407,7 @@ vector<face_t> PlanarGraph::compute_faces_layout_oriented() const
   // Now visit every other edge once in each direction.
   while(!workset.empty()){
     dedge_t e = *workset.begin();
-    face_t face(get_face_oriented(e.first,e.second));
+    face_t face(get_face_layout_oriented(e.first,e.second));
     face_set.insert(face);
 
     for(int i=0;i<face.size();i++)
@@ -836,6 +841,7 @@ Graph PlanarGraph::read_hog_planarcode(FILE *planarcode_file)
   return g;
 }
 
+// TODO: Read only a range
 vector<Graph> PlanarGraph::read_hog_planarcodes(FILE *planarcode_file) {
   const int header_size = 15;
   vector<Graph> graph_list;
@@ -857,46 +863,78 @@ vector<Graph> PlanarGraph::read_hog_planarcodes(FILE *planarcode_file) {
   return graph_list;
 }
 
-face_t PlanarGraph::get_face_actually_oriented(node_t u, node_t v, int Fmax) const
+ 
+ 
+// In an oriented planar graph, the directed edge starting in the smallest node
+// is a unique representation of the face.
+dedge_t PlanarGraph::get_face_representation(dedge_t e, int Fmax) const
 {
   assert(is_oriented);
 
-  face_t f = vector<int>{{u}};
-  node_t u0 = u;
+
+  int i=0;  
+  dedge_t e_min = e;
+  node_t u = e.first, v = e.second;
+
+  while(v!=e.first){
+    node_t w = prev(v,u);	// Previous neighbour in v following u in CCW (corner u-v-w in face)
+    u=v; v=w; 
+
+    if(u<e_min.first) e_min = {u,v};
+    
+    assert(w != -1);
+    assert(++i<=Fmax); // Fmax is a back-stop to avoid infinite loops in a corrupted graph
+  }
+  return e_min;
+}
+
+// In an oriented planar graph, the directed edge starting in the smallest node
+// is a unique representation of the face.
+vector<dedge_t> PlanarGraph::compute_face_representations(int Fmax) const
+{
+  assert(is_oriented);
+
+  unordered_set<dedge_t> faces(2*count_edges());
+  
+  for(node_t u=0;u<N;u++)
+    for(node_t v: neighbours[u]){
+      // For each directed edge, find the representative edge of the specified face
+      // and assign an identifier
+      faces.insert(get_face_representation({u,v},Fmax));
+    }
+
+  return vector<dedge_t>(faces.begin(),faces.end());
+}
+
+
+face_t PlanarGraph::get_face_oriented(const dedge_t &e, int Fmax) const
+{
+  assert(is_oriented);
 
   int i=0;
-  while(i<Fmax && v!=u0){
-    node_t w = next(v,u);
-    //    fprintf(stderr,"next(%d,%d) = %d\n",u,v,w);
+  node_t u = e.first, v=e.second;
+  face_t f = vector<int>{{u}};
+  
+  while(v!=e.first){
+    node_t w = prev(v,u);	// Previous neighbour to u in v defines corner u-v-w in face
+
     f.push_back(v);
     u=v; v=w; i++;
     assert(w != -1);
+    assert(i<=Fmax);		// Fmax is a back-stop to avoid infinite loops in a corrupted graph
   }
-  assert(i<=Fmax);
   return f;
 }
 
-vector<face_t> PlanarGraph::compute_faces_actually_oriented() const
+vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
 {
-  set<face_t> faces;
+  vector<dedge_t> face_representations = compute_face_representations(Fmax);
 
-  for(node_t u=0;u<N;u++)
-    for(node_t v: neighbours[u])
-      faces.insert(get_face_actually_oriented(u,v).rotated());
+  vector<face_t> faces(face_representations.size());
+  for(int i=0;i<face_representations.size();i++) faces[i] = get_face_oriented(face_representations[i],Fmax);
 
-  return vector<face_t>(faces.begin(),faces.end());
+  cerr << "facereps = " << face_representations << ";\n"
+       << "faces    = " << faces << ";\n";
+  
+  return faces;
 }
-
-// node_t PlanarGraph::nextCW(const node_t& u, const node_t& v) const
-// {
-//   assert(is_oriented);
-
-//   return next(u,v);
-// }
-
-// node_t PlanarGraph::prevCW(const node_t& u, const node_t& v) const
-// {
-//   assert(is_oriented);
-
-//   return prev(u,v);
-// }

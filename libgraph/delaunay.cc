@@ -101,7 +101,7 @@ vector<dedge_t> FulleroidDelaunay::triangulate_hole(const vector<node_t>& hole0)
        insert_edge(uw,next(u,v),v);  // u: ..v,w,x,.. w: ...,u,v,... ; 
          
        // New triangle uvw has already-Delaunay neighbour triangles uvs and vwt. Is uvw screwy?
-       node_t s = nextCW(v,u), t = nextCW(w,v);
+       node_t s = next_on_face(u,v), t = next_on_face(v,w);
        Quad q1(u,s,v,w), q2(v,t,w,u);
          
        if(!is_consistent(q1) || !is_consistent(q2)){ // New triangle is screwy -- discard edge
@@ -175,7 +175,7 @@ void FulleroidDelaunay::delaunayify_hole_2(const vector<edge_t>& edges)
       cout << "edges considered for dealaunayification: " << new_edges << ". current index: " << i << endl;
 
       node_t A = new_edges[i].first, C = new_edges[i].second;
-      node_t B = nextCW(C,A), D = nextCW(A,C);
+      node_t B = prev(C,A), D = prev(A,C);
 
       Quad q(A,B,C,D);
 

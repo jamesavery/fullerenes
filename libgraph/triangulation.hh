@@ -26,14 +26,7 @@ public:
   PlanarGraph dual_graph() const;
   vector<face_t> dual_faces() const;
   
-  pair<node_t,node_t> adjacent_tris(const edge_t &e) const;
-
-  
-  node_t nextCW(const dedge_t& uv)   const { return nextCW(uv.first,uv.second);  } // TODO: Remove.
-  node_t nextCCW(const dedge_t& uv)  const { return nextCCW(uv.first,uv.second); }
-  node_t nextCW(node_t u, node_t v) const;
-  node_t nextCCW(node_t u, node_t v) const;
-
+  pair<node_t,node_t> adjacent_tris(const dedge_t &e) const;
 
   vector<tri_t> compute_faces() const;          // Returns non-oriented triangles
   vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours

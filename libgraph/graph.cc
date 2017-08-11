@@ -43,6 +43,7 @@ bool Graph::edge_exists(const edge_t& e) const
   return find(nu.begin(),nu.end(),e.second) != nu.end();
 }
 
+// Successor to v in oriented neigbhours of u
 node_t Graph::next(const node_t& u, const node_t& v) const
 {
   const vector<node_t>& nu(neighbours[u]);
@@ -51,6 +52,7 @@ node_t Graph::next(const node_t& u, const node_t& v) const
   return -1;            // u-v is not an edge in a triangulation
 }
 
+// Predecessor to v in oriented neigbhours of u
 node_t Graph::prev(const node_t& u, const node_t& v) const
 {
   const vector<node_t>& nu(neighbours[u]);
@@ -59,6 +61,17 @@ node_t Graph::prev(const node_t& u, const node_t& v) const
   return -1;            // u-v is not an edge in a triangulation
 }
 
+// Successor to v in face containing directed edge u->v
+node_t Graph::next_on_face(const node_t &u, const node_t &v) const
+{
+  return prev(v,u);
+}
+
+// Predecessor to v in face containing directed edge u->v
+node_t Graph::prev_on_face(const node_t &u, const node_t &v) const
+{
+  return prev(u,v);
+}
 
 bool Graph::is_consistently_oriented() const 
 {

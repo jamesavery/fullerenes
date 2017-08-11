@@ -1259,6 +1259,7 @@ C---------------------------------------------------------------------
       indexs=huge(largest)
 
 C     Initiallize spirals to search and do first sorting
+      J1=0
       Do I=1,3
       if(n(i).eq.0) cycle
        batch=i

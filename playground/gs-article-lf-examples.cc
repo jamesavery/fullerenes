@@ -360,7 +360,6 @@ int main(int ac, char **av)
   ofstream output(("output/"+basename+".m").c_str());
   output << "g   = " << g << ";\n";
   output << "LFg = " << Graph(LFP) << ";\n";
-  output.close();
   
   {
     ofstream mol2(("output/"+basename+"-P.mol2").c_str());
@@ -389,5 +388,20 @@ int main(int ac, char **av)
     tex.close();
   }  
 
+
+  {
+    vector<int> spiral;
+    jumplist_t  jumps;
+    Triangulation LFT = LFP;
+
+    assert(LFT.is_consistently_oriented());
+    LFT.get_spiral(spiral,jumps);
+
+    output << "LFspiral = " << spiral << ";\n"
+  	 << "LFjumps  = " << jumps  << ";\n";
+  }
+  output.close();
+  
+  
   return 0;
 }

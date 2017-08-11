@@ -42,8 +42,11 @@ struct Graph {
   bool insert_edge(const dedge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
   bool remove_edge(const edge_t& e);
   bool edge_exists(const edge_t& e) const;
+
   node_t next(const node_t& u, const node_t& v) const;
   node_t prev(const node_t& u, const node_t& v) const;
+  node_t next_on_face(const node_t &u, const node_t &v) const;
+  node_t prev_on_face(const node_t &u, const node_t &v) const;
 
   bool is_consistently_oriented() const;
   bool adjacency_is_symmetric() const;
