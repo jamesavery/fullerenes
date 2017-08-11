@@ -293,12 +293,9 @@ Polyhedron Example6()
 // elongated square bipyramid
 Polyhedron Example7()
 {
-  PlanarGraph g = example7();
-  g.layout2d = g.tutte_layout();
-  Polyhedron P(g,g.zero_order_geometry(),6);
-  // P.optimize();
+  vector<coord3d> points{{1.86326, 0.943837, 1.01121}, {1.86309, 0.000344775, 0.942934}, {1.86242, 0.0673821, 0.000117863}, {1.86215, 1.0116, 0.0669785}, {0.645347, 0.944092, 1.01077}, {0.644878, 0., 0.942999}, {0.64477, 0.0683175, 0.}, {0.645068, 1.01163, 0.0676111}, {2.50817, 0.506387, 0.504544}, {0., 0.506155, 0.505309}};
 
-  return P;
+  return Polyhedron(example7(),points,4);
 }
 
 
