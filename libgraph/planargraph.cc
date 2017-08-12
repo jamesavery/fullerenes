@@ -93,32 +93,28 @@ bool PlanarGraph::layout_is_crossingfree() const
 
 // checks if the planar graph stays connected after removing v.  this function
 // implies and relies on the condition that the graph has at most one face
-// larger than a triangle, and that there are no separating triangles.
-// If there is more than one larger face than a triangle, the function
-// may return 'false', even though the correct answer is 'true'.
+// larger than a triangle.  If there is more than one larger face than a
+// triangle, the function may return 'false', even though the correct answer is
+// 'true'.
 bool PlanarGraph::is_cut_vertex(const node_t v) const {
-//  cerr << "removing v " << v << endl;
-  const vector<vector<node_t> > &n = neighbours;
-  set<edge_t> e;
-//  cerr << "n of " << v << ": " << n[v] << endl;
-  for(int i=0; i<n[v].size(); i++){
-//    cerr << "n of v " << n[v][i] << ": " << n[n[v][i]] << endl;
-    for(int j=0; j<n[n[v][i]].size(); j++){
-      for(int k=0; k<n[v].size(); k++){
-//        cerr << n[v][k] << ", " << n[n[v][i]][j] << endl;
-        if(n[v][k] == n[n[v][i]][j]){
-          e.insert(edge_t(n[v][i], n[n[v][i]][j]));
-//          cerr << edge_t(n[v][i], n[n[v][i]][j]) << endl;
-        }
-      }
+  assert(is_oriented); // we need oriented (sorted) neighbours of v (direction doesn't matter)
+  const vector<node_t> &nv = neighbours[v];
+  const int n_neighbours = nv.size();
+  if(n_neighbours < 2) return false;
+
+  int n_edges = 0;
+  for(int i=0; i<n_neighbours; i++){
+    const int v1=nv[i], v2=nv[(i+1)%n_neighbours];
+	// and by counting this way we don't count edges between non-neighbours,
+	// thus avoid the separating triangle problem
+    if( edge_exists(edge_t(v1,v2)) ){
+      n_edges++;
     }
   }
-
-  //  cout << e << endl;
-  //  cout << e.size() << endl;
-  // in a ring of n vertices where each vertex may only be connected to its immediate neighbours,
-  // the induced graph is connected exactly when there are at least n-1 edges
-  return e.size() < n[v].size()-1;
+  // in a ring of n vertices where each except one adjacent face are triangles,
+  // the induced graph is connected exactly when there are at least n-1
+  // triangles
+  return n_edges < n_neighbours-1;
 }
 
 
