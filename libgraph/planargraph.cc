@@ -48,12 +48,12 @@ bool PlanarGraph::is_a_fullerene() const {
   }
   
   if(Np != 12){
-    fprintf(stdout,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",int(faces[5].size()));
+    fprintf(stdout,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",Np);
     return false;
   }
 
   if(Nh != (F-12)){
-    fprintf(stdout,"Graph is not fullerene: wrong number of hexagons: %d != %d\n",int(faces[6].size()),F-12);
+    fprintf(stdout,"Graph is not fullerene: wrong number of hexagons: %d != %d\n",Nh,F-12);
     return false;
   }
 
