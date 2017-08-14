@@ -137,7 +137,7 @@ FullereneGraph FullereneGraph::GCtransform(const unsigned k, const unsigned l, c
 FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   PlanarGraph dualfrog(*this);
 
-  vector<face_t> faces(dualfrog.compute_faces_flat(6,planar_layout));
+  vector<face_t> faces(dualfrog.compute_faces(6,planar_layout));
 
   //  cout << "(*leapfrog*)outer_face = " << dualfrog.outer_face << ";\n";
   //  cout << "(*leapfrog*)faces      = " << faces << ";\n";
@@ -167,7 +167,7 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
 
   if(planar_layout){
     // The layout of dualfrog is not planar - faces must be computed without it
-    vector<face_t> triangles(dualfrog.compute_faces_flat(3,false));
+    vector<face_t> triangles(dualfrog.compute_faces(3,false));
     new_layout.resize(triangles.size());
 
     for(int i=0;i<triangles.size();i++){

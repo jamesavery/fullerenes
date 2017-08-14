@@ -30,7 +30,7 @@ public:
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g), layout2d(layout) {  }
 
   
-  bool is_a_fullerene() const;
+  bool is_a_fullerene(bool verbose=false) const; // TODO: Do something better with output
   bool is_cubic() const;
   bool is_triangulation() const;
 
@@ -53,7 +53,6 @@ public:
 
   void orient_neighbours();   // Ensures that neighbours are ordered CCW
 
-  vector<face_t> compute_faces_flat(unsigned int Nmax=INT_MAX, bool planar_layout=true) const;
   face_t find_outer_face() const;
 
 

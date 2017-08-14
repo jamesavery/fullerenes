@@ -346,6 +346,48 @@ Polyhedron LFPolyhedron(const Polyhedron& P)
   return Polyhedron(LF,points);
 }
 
+string name_that_graph(const PlanarGraph &g, const string &atom)
+{
+  string name_prefix = "[GS";
+  string name_suffix = "]-"+atom+to_string(g.N);
+  string name_jumps  = "";
+  string name_spiral = "";
+
+  bool is_a_fullerene  = false, needs_leapfrog = false;
+  Triangulation triangulation;
+
+
+  if(g.is_triangulation()){
+    cerr << "Graph is a triangulation.\n";
+    is_a_fullerene = g.dual_graph().is_a_fullerene();
+    triangulation  = g;
+    name_prefix += ",d";
+  } else if(g.is_cubic()){
+    cerr << "Graph is cubic.\n";
+    triangulation  = g.dual_graph();    
+    is_a_fullerene = g.is_a_fullerene();
+  } else { // Non-cubic, non-triangulation: Needs a leapfrog
+    cerr << "Graph is non-cubic, non-triangulation.\n";
+    triangulation  = g.leapfrog_dual();
+    needs_leapfrog = true;
+    name_prefix += ",LF";
+  } 
+
+    
+  jumplist_t jumps;
+  vector<int> spiral;
+  triangulation.get_spiral(spiral,jumps);
+
+  name_suffix += is_a_fullerene? "-fullerene" : "-cage";
+  name_spiral = to_string(spiral);
+  if(!jumps.empty()){
+    cerr << "jumps = " << jumps << ";\n";
+    name_jumps = to_string(jumps)+"; ";
+  }
+
+  return name_prefix + ": " + name_jumps + name_spiral + name_suffix;
+}
+
 int main(int ac, char **av)
 {
   int Nex = ac>=2? strtol(av[1],0,0) : 1;
@@ -355,6 +397,8 @@ int main(int ac, char **av)
   PlanarGraph g = ExampleGraph(Nex);
   Polyhedron  P = ExamplePolyhedron(Nex);
 
+  cerr << "Graph has "<<(g.has_separating_triangles()?"":"no ")<<"separating triangles.\n";
+  
   Polyhedron LFP = LFPolyhedron(P);
     
   ofstream output(("output/"+basename+".m").c_str());
@@ -375,7 +419,7 @@ int main(int ac, char **av)
 
   {
     ofstream mol2(("output/"+basename+"-LFP.mol2").c_str());
-    LFP.optimize();
+    LFP.optimize();		// This doesn't really work well for some reason..?
     mol2 << LFP.to_mol2();
     mol2.close();
   }  
@@ -401,7 +445,8 @@ int main(int ac, char **av)
   	 << "LFjumps  = " << jumps  << ";\n";
   }
   output.close();
-  
+
+  cout << name_that_graph(g,"C") << "\n";
   
   return 0;
 }

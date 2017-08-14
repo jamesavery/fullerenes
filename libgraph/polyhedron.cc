@@ -322,7 +322,7 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
 
 //  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
   if(faces.size() == 0){
-    faces = compute_faces_flat(face_max,true);
+    faces = compute_faces(face_max);
     assert(outer_face.size() <= face_max);
     face_max = 0;
     for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();

@@ -105,6 +105,24 @@ bool Graph::is_consistently_oriented() const
   return true;
 }
 
+// TODO: Doesn't need to be planar and oriented, but is easier to write if it is. Make it work in general.
+bool Graph::has_separating_triangles() const
+{
+  assert(is_oriented);
+
+  for(node_t u=0;u<N;u++){
+    const vector<node_t> &nu(neighbours[u]);
+    
+    for(int i=0;i<nu.size();i++){
+      node_t t = nu[i];
+      node_t v = prev(u,t), w = next(u,t); // edges: u--t, u--v, u--w
+      if(edge_exists({t,w}) && edge_exists({t,v}) && edge_exists({v,w})) return true;
+    }
+  }
+  return false;
+}
+
+
 bool Graph::adjacency_is_symmetric() const
 {
   for(node_t u=0;u<N;u++){

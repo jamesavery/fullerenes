@@ -334,8 +334,7 @@ void remove_node(const node_t u, Graph &remaining_graph){
 
     for(int j=0;j<nv.size();j++){ // O(1) since neighbour count is bounded by max degree
       if(nv[j] == u){
-        nv[j] = nv[nv.size()-1];//shift the last entry to the deleted pos
-        nv.pop_back();//delete the last
+	nv.erase(nv.begin()+j);	// Previous method destroyed orientation
         break;
       }
     }
@@ -361,7 +360,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   permutation.resize(N);
   spiral.resize(N);
 
-  PlanarGraph remaining_graph(neighbours); // remaining_graph consists of all nodes that haven't been added to the result yet
+  PlanarGraph remaining_graph(Graph(neighbours,true)); // remaining_graph consists of all nodes that haven't been added to the result yet
   vector<int> valencies(N, 0); // valencies is the N-tuple consisting of the valencies for each node
   int last_vertex=-1; // we'd like to know the number of the last vertex
 

@@ -11,15 +11,15 @@ bool PlanarGraph::is_cubic() const {
 }
 
 bool PlanarGraph::is_triangulation() const { // NB: A bit expensive
-  vector<face_t> faces(compute_faces_flat(INT_MAX, true));
+  vector<face_t> faces(compute_faces());
 
   for(int i=0;i<faces.size();i++) if(faces[i].size() != 3) return false;
   return true;
 }
 
-bool PlanarGraph::is_a_fullerene() const {
+bool PlanarGraph::is_a_fullerene(bool verbose) const {
   if(!is_cubic()){
-    fprintf(stdout,"Graph is not cubic.\n");
+    if(verbose) fprintf(stdout,"Graph is not cubic.\n");
     return false;
   }
 
@@ -31,13 +31,15 @@ bool PlanarGraph::is_a_fullerene() const {
   const int F = 2+E-N;
 
   if(E != n_edges){
-    fprintf(stdout,"Graph is not planar cubic: wrong number of edges: %d != %d\n",n_edges,E);
+    if(verbose) fprintf(stdout,"Graph is not planar cubic: wrong number of edges: %d != %d\n",n_edges,E);
     return false;
   }
 
   if(F != n_faces){
-    fprintf(stdout,"Graph is not planar cubic: wrong number of faces: %d != %d\n",n_faces,F);
-    cout << "faces = " << faces << ";\n";
+    if(verbose){
+      fprintf(stdout,"Graph is not planar cubic: wrong number of faces: %d != %d\n",n_faces,F);
+      cout << "faces = " << faces << ";\n";
+    }
     return false;
   }
 
@@ -48,12 +50,12 @@ bool PlanarGraph::is_a_fullerene() const {
   }
   
   if(Np != 12){
-    fprintf(stdout,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",Np);
+    if(verbose) fprintf(stdout,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",Np);
     return false;
   }
 
   if(Nh != (F-12)){
-    fprintf(stdout,"Graph is not fullerene: wrong number of hexagons: %d != %d\n",Nh,F-12);
+    if(verbose) fprintf(stdout,"Graph is not fullerene: wrong number of hexagons: %d != %d\n",Nh,F-12);
     return false;
   }
 
@@ -179,7 +181,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     dual.neighbours.resize(Nfaces);
 
     //  cerr << "dual_graph(" << Fmax << ")\n";
-    vector<face_t> allfaces = compute_faces_flat(Fmax,planar_layout);
+    vector<face_t> allfaces = compute_faces(Fmax,planar_layout);
 
     if(Nfaces != allfaces.size()){
       fprintf(stderr,"%d != %d faces: Graph is not polyhedral.\n",Nfaces,int(allfaces.size()));
@@ -429,16 +431,10 @@ void PlanarGraph::orient_neighbours()
   is_oriented = true;
 }
 
-vector<face_t> PlanarGraph::compute_faces_flat(unsigned int Nmax, bool planar_layout) const
-{
-  // This function should soon disappear
-  return compute_faces(Nmax,planar_layout);
-}
-
 
 vector<tri_t> PlanarGraph::triangulation(int face_max) const
 {
-  vector<face_t> faces(compute_faces_flat(face_max));
+  vector<face_t> faces(compute_faces(face_max));
   return triangulation(faces);
 }
 
@@ -728,7 +724,7 @@ double lu_det(const vector<double> &A, int N)
 size_t PlanarGraph::count_perfect_matchings() const
 {
   map<dedge_t,int> faceEdge;
-  vector<face_t> faces(compute_faces_flat(max_degree(), true));
+  vector<face_t> faces(compute_faces());
   vector<bool> faceSum(faces.size()), visited(faces.size());
 
   map<dedge_t,int> A;
