@@ -2,6 +2,7 @@
 #include "libgraph/polyhedron.hh"
 #include "libgraph/isomerdb.hh"
 #include "libgraph/triangulation.hh"
+#include "libgraph/symmetry.hh"
 
 // all lists are CCW
 
@@ -412,7 +413,21 @@ string name_that_graph(const PlanarGraph &g, const string &atom)
     name_jumps = jumps_to_string(jumps)+"; ";
   }
 
-  return name_prefix + ": " + name_jumps + name_spiral + name_suffix;
+  cerr << "Checking general spiral by reconstruction.\n";
+  Triangulation tri_reconstructed(spiral,jumps);
+
+  jumplist_t  jumps_check;
+  vector<int> spiral_check;
+  spiral_success = tri_reconstructed.get_spiral(spiral_check,jumps_check);
+
+  assert(spiral_success);
+  assert(jumps_check == jumps && spiral_check == spiral);
+
+  cerr << "Calculating symmetry group and point group.\n";
+  Symmetry   group(spiral,jumps);
+  PointGroup PG(group.point_group());
+  
+  return PG.to_string()+"-"+name_prefix + ": " + name_jumps + name_spiral + name_suffix;
 }
 
 int main(int ac, char **av)
