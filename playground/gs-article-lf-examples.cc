@@ -346,6 +346,32 @@ Polyhedron LFPolyhedron(const Polyhedron& P)
   return Polyhedron(LF,points);
 }
 
+string jumps_to_string(const jumplist_t &jumps)
+{
+  string s="";
+  for(const auto &j: jumps)
+    s += to_string(j.first) +"," + to_string(j.second) + ",";
+  s.pop_back();
+
+  return s;
+}
+
+string spiral_to_string(const vector<int>& spiral)
+{
+  string s="";
+  for(int i=0;i<spiral.size();i++)
+    s += to_string(spiral[i]) + (i+1<spiral.size()? ",":"");
+  return s;
+}
+
+string spiral_to_rspi_string(const vector<int>& spiral)
+{
+  vector<int> rspi;
+  for(int i=0;i<spiral.size();i++) if(spiral[i] == 5) rspi.push_back(i+1);
+  assert(rspi.size() == 12);
+  return spiral_to_string(rspi);
+}
+
 string name_that_graph(const PlanarGraph &g, const string &atom)
 {
   string name_prefix = "[GS";
@@ -355,7 +381,6 @@ string name_that_graph(const PlanarGraph &g, const string &atom)
 
   bool is_a_fullerene  = false, needs_leapfrog = false;
   Triangulation triangulation;
-
 
   if(g.is_triangulation()){
     cerr << "Graph is a triangulation.\n";
@@ -376,13 +401,15 @@ string name_that_graph(const PlanarGraph &g, const string &atom)
     
   jumplist_t jumps;
   vector<int> spiral;
-  triangulation.get_spiral(spiral,jumps);
+  bool spiral_success = triangulation.get_spiral(spiral,jumps);
+
+  assert(spiral_success);
 
   name_suffix += is_a_fullerene? "-fullerene" : "-cage";
-  name_spiral = to_string(spiral);
+  name_spiral = is_a_fullerene? spiral_to_rspi_string(spiral) : spiral_to_string(spiral);
   if(!jumps.empty()){
     cerr << "jumps = " << jumps << ";\n";
-    name_jumps = to_string(jumps)+"; ";
+    name_jumps = jumps_to_string(jumps)+"; ";
   }
 
   return name_prefix + ": " + name_jumps + name_spiral + name_suffix;
@@ -442,11 +469,13 @@ int main(int ac, char **av)
     LFT.get_spiral(spiral,jumps);
 
     output << "LFspiral = " << spiral << ";\n"
-  	 << "LFjumps  = " << jumps  << ";\n";
+	   << "LFjumps  = " << jumps  << ";\n";
   }
+
+  output << "moleculename = " << name_that_graph(g,"C") << "\n";
   output.close();
 
-  cout << name_that_graph(g,"C") << "\n";
+
   
   return 0;
 }
