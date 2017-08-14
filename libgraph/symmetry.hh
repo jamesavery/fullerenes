@@ -52,9 +52,10 @@ struct Permutation : public vector<int> {
 
 class Symmetry : public Triangulation {
 public:
-
+  using Triangulation::jumplist_t;
 
   vector<int> S0;
+  jumplist_t  J0;
   vector< Permutation > G, Gedge, Gtri;
 
   vector<Permutation> permutation_representation() const;
@@ -73,7 +74,7 @@ public:
   
   PointGroup point_group() const;
 
-  Symmetry(const vector<int>& spiral) : Triangulation(spiral), S0(spiral)
+  Symmetry(const vector<int>& spiral, const jumplist_t& jumps) : Triangulation(spiral,jumps), S0(spiral), J0(jumps)
   {
     G = permutation_representation();
     Gedge = edge_permutation(G);

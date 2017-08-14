@@ -347,6 +347,7 @@ void remove_node(const node_t u, Graph &remaining_graph){
 // TODO: Add jumps to S0.
 // TODO: Make GSpiral data type
 // TODO: if S0 is given, no need to test for connectedness at every step - jump positions are predetermined.
+//       Pass J0 and jump according to J0
 // TODO: return GSpiral
 bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
         				      jumplist_t& jumps, vector<node_t> &permutation,
