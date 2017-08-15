@@ -80,6 +80,15 @@ public:
     Gedge = edge_permutation(G);
     Gtri  = tri_permutation(G);
   }
+
+  Symmetry(const Triangulation& g) : Triangulation(g)
+  {
+    g.get_spiral(S0,J0);
+
+    G = permutation_representation();
+    Gedge = edge_permutation(G);
+    Gtri  = tri_permutation(G);
+  }  
   
 };
 

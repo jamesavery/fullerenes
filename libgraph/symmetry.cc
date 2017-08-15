@@ -151,23 +151,18 @@ vector<Permutation> Symmetry::permutation_representation() const
   vector<Permutation> pi;
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t>& nu(neighbours[u]);
-    if(nu.size() == S0[0]) // u has same degree as vertex 1: possible spiral start
-      for(int i=0;i<nu.size();i++){
-	node_t v = nu[i];
-	const vector<node_t>& nv(neighbours[v]);
-	if(nv.size() == S0[1]){ // v has same degree as vertex 2: still possible spiral start
+    if(neighbours[u].size() == S0[0]) // u has same degree as vertex 1: possible spiral start
+      for(const node_t &v: neighbours[u]){
+	if(neighbours[v].size() == S0[1]){ // v has same degree as vertex 2: still possible spiral start
 	  vector<int> spiral,permutation;
 	  jumplist_t  jumps;
 
 	  node_t wCCW = next(u,v), wCW = prev(u,v);
 
-	  const vector<node_t> &nwCCW(neighbours[wCCW]), &nwCW(neighbours[wCW]);
-
-	  if(nwCCW.size() == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,false,S0))
+	  if(neighbours[wCCW].size() == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,true,S0,J0))
 	    pi.push_back(permutation);
-	  if(nwCW.size() == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,false,S0))
-	    pi.push_back(Permutation(permutation));
+	  if(neighbours[wCW ].size() == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,true,S0,J0))
+	    pi.push_back(permutation);
 	}
       }
   }	    
@@ -193,7 +188,7 @@ vector<int> Symmetry::site_symmetry_counts(const vector<Permutation>& pi) const
       orbit_length++;
     }	
     int site_order = order/orbit_length; 
-    assert(site_order <= 12);
+    assert(site_order <= 12); // Only holds for fullerenes?
     m[site_order-1]++;
   }
   return m;
