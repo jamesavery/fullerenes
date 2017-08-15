@@ -511,6 +511,8 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   for(map<edge_t,int>::const_iterator e(edgecount.begin()); e!=edgecount.end();e++)
     if(e->second != 2){
       cerr << "Triangulation not orientable: Edge "<< e->first << " appears in " << e->second <<" tris, not two.\n";
+      cerr << "tris = " << tris << "+1;\n";
+      cerr << "g    = " << *this << ";\n";
       abort();
     }
 

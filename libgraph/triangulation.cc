@@ -14,6 +14,7 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const dedge_t& e) const
 vector<tri_t> Triangulation::compute_faces() const
 // Does not assume graph is oriented
 // Produces oriented triangles
+// TODO: Fails in the presence of separating triangles. Make sure spiral-windup produces oriented graph.
 {
   if(is_oriented) return compute_faces_oriented();
 
@@ -177,6 +178,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       jumps.pop_front();
     }
 
+    // TODO: Lukas, can the edges be inserted oriented? (i.e., not using edge_set)
     // connect k and <last>
     auto connect_backward = [&](){
       edge_set.insert(edge_t(k, open_valencies.back().first));
@@ -184,6 +186,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       ++pre_used_valencies;
     };
 
+    // TODO: Lukas, can the edges be inserted oriented?    
     // connect k and <first>
     auto connect_forward = [&](){
       edge_set.insert(edge_t(k, open_valencies.front().first));
@@ -231,6 +234,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   }
 
   // add remaining edges, we don't care about the valency list at this stage
+  // TODO: Lukas, can the edges be inserted oriented?
   for(int i=0; i<spiral_string.back(); ++i){
     edge_set.insert(edge_t(N-1, open_valencies.front().first));
     open_valencies.pop_front();
@@ -243,18 +247,15 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 }
 
 
-//FIXME remove / replace layout assertion ?
 Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) const
 {
-  //  assert(layout2d.size() == N); // Shouldn't need layout!
   if(l==0) return halma_transform(k-1);
   
   Unfolding u(*this,true);
   Unfolding gcu(u*Eisenstein(k,l));
   Folding gcf(gcu);
   Triangulation t(gcf.fold());
-  //  t.layout2d = t.tutte_layout();
-  return t;
+   return t;
 }
 
 // TODO: Get rid of maps, edge-sets, etc. Simplify and make faster.
@@ -351,7 +352,10 @@ void remove_node(const node_t u, Graph &remaining_graph){
 // TODO: return GSpiral
 bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral,
         				      jumplist_t& jumps, vector<node_t> &permutation,
-        				      const bool general, const vector<int>& S0) const {
+        				      const bool general, const vector<int>& S0, const jumplist_t &J0) const {
+  // TODO: If S0 and J0 are specified, we are finding symmetry group permutations and should follow (S0,J0).
+  //       Currently J0 is ignored, but J0 should control jumps in this case.
+  
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
   spiral.clear();
   jumps.clear();

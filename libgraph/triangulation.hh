@@ -38,7 +38,8 @@ public:
 
   // spiral stuff
   bool get_spiral_implementation(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, 
-				 vector<node_t>& permutation, const bool general=true, const vector<int>& S0=vector<int>()) const;
+				 vector<node_t>& permutation, const bool general=true,
+				 const vector<int>& S0=vector<int>(), const jumplist_t& J0=jumplist_t()) const;
   // the one defined by three nodes
   bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, vector<node_t>& permutation, const bool general=true) const;
   // the canonical one
