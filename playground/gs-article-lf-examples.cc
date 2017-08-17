@@ -378,15 +378,17 @@ struct general_spiral {
 struct name_info {
   enum { CUBIC, TRIANGULATION, GENERAL } graph_type;
   bool is_a_fullerene;
+  string atom;
   //  string point_group;
 
+  
   PlanarGraph   graph;
   Triangulation triangulation;
 
   general_spiral GS;
   Permutation permutation;
 
-  name_info(const PlanarGraph &g) : graph(g) {
+  name_info(const PlanarGraph &g, const string& atom="") : atom(atom), graph(g) {
     if(g.is_triangulation()){
       graph_type     = TRIANGULATION;
       is_a_fullerene = g.dual_graph().is_a_fullerene();
@@ -420,76 +422,14 @@ struct name_info {
   }
 };
 
-string name_that_graph(const PlanarGraph &g, const string &atom)
-{
-  string name_prefix = "[GS";
-  string name_suffix = "]-"+atom+to_string(g.N);
-  string name_jumps  = "";
-  string name_spiral = "";
-
-  bool is_a_fullerene  = false, needs_leapfrog = false;
-  Triangulation triangulation;
-
-  if(g.is_triangulation()){
-    cerr << "Graph is a triangulation.\n";
-    is_a_fullerene = g.dual_graph().is_a_fullerene();
-    triangulation  = g;
-    name_prefix += ",d";
-  } else if(g.is_cubic()){
-    cerr << "Graph is cubic.\n";
-    triangulation  = g.dual_graph();    
-    is_a_fullerene = g.is_a_fullerene();
-  } else { // Non-cubic, non-triangulation: Needs a leapfrog
-    cerr << "Graph is non-cubic, non-triangulation.\n";
-    triangulation  = g.leapfrog_dual();
-    needs_leapfrog = true;
-    name_prefix += ",LF";
-  } 
-
-
-  cerr << "tris0 = " << triangulation.triangles << ";\n";
-  cerr << "g0    = " << triangulation << ";\n";
-  
-  general_spiral GS;
-  bool spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps);
-
-  assert(spiral_success);
-
-  name_suffix += is_a_fullerene? "-fullerene" : "-cage";
-  name_spiral = is_a_fullerene? spiral_to_rspi_string(GS.spiral) : spiral_to_string(GS.spiral);
-  if(!GS.jumps.empty()){
-    cerr << "jumps = " << GS.jumps << ";\n";
-    name_jumps = jumps_to_string(GS.jumps)+"; ";
-  }
-  cerr << "spiral = " << GS.spiral << ";\n";
-
-  // cerr << "Checking general spiral by reconstruction.\n";
-  // Triangulation tri_reconstructed(spiral,jumps);
-
-  // jumplist_t  jumps_check;
-  // vector<int> spiral_check;
-  // spiral_success = tri_reconstructed.get_spiral(spiral_check,jumps_check);
-
-  // assert(spiral_success);
-  // assert(jumps_check == jumps && spiral_check == spiral);
-
-  cerr << "Calculating symmetry group and point group.\n";
-  Symmetry   group(triangulation);
-  cerr << "Found symmetry group of size " << group.G.size() << ".\n";
-  //  PointGroup PG(group.point_group());
-  
-  return // PG.to_string()+"-"+ // TODO: Point-group only works for fullerenes currently!
-    name_prefix + ": " + name_jumps + name_spiral + name_suffix;
-}
-
-
 int main(int ac, char **av)
 {
   int Nex = ac>=2? strtol(av[1],0,0) : 1;
 
   string basename("gs-ex-"+to_string(Nex));
 
-  PlanarGraph g = ExampleGraph(Nex);
+  PlanarGraph g  = ExampleGraph(Nex);
+  PlanarGraph dg = g.dual_graph();
   Polyhedron  P = ExamplePolyhedron(Nex);
 
   P.points *= 3;		// Triangle bond length is 3
@@ -499,11 +439,42 @@ int main(int ac, char **av)
   cerr << "Graph has "<<(g.has_separating_triangles()?"":"no ")<<"separating triangles.\n";
   
   Polyhedron LFP = LFPolyhedron(P);
-    
+
   ofstream output(("output/"+basename+".m").c_str());
+  if(Nex != 1)
+  {
+    vector<int> spiral;
+    jumplist_t  jumps;
+    Triangulation LFT = LFP;
+
+    assert(LFT.is_consistently_oriented());
+    LFT.get_spiral(spiral,jumps);
+
+    output << "LFspiral = " << spiral << ";\n"
+	   << "LFjumps  = " << jumps  << ";\n";
+
+    name_info name(g,"C");
+
+    // End at outer face, or as close to it as possible
+    vector<int> outer_faces[7] = {{0,1,2},{0,1,4,10,6,3},{3,4,5},{0,1,2,3},{1,9,6,2},{1,5,2,28},{0,3,7,4}};
+    
+    g.layout2d = g.tutte_layout(outer_faces[Nex-1]);
+    vector<face_t> faces = g.compute_faces();
+    vector<coord2d> LFlayout2d(g.layout2d);
+
+    for(int i=0;i<faces.size();i++) LFlayout2d.push_back( faces[i].centroid(g.layout2d) );
+    LFP.layout2d = LFlayout2d;
+
+    output << "triangulation = "  << name.triangulation << ";\n"
+	   << "permutation   = " << name.permutation << "+1;\n"
+	   << "jumps         = " << name.GS.jumps << ";\n"
+	   << "spiral        = " << name.GS.spiral << "+1;\n";
+    output << "moleculename = \"" << name << "\";\n";
+  }
+  
   output << "g   = " << g << ";\n";
-  output << "dg  = " << g.dual_graph() << ";\n";
-  output << "LFg = " << Graph(LFP) << ";\n";
+  output << "dg  = " << dg << ";\n";
+  output << "LFg = " << PlanarGraph(LFP) << ";\n";
   output << "faces   = " << g.compute_faces() << "+1;\n"
 	 << "LFfaces = " << LFP.faces << "+1;\n";
   
@@ -532,26 +503,10 @@ int main(int ac, char **av)
   
   {
     ofstream tex(("output/"+basename+"-layout.tex").c_str());
-    auto l = g.tutte_layout();
-    g.layout2d = l;
     tex << g.to_latex(10, 10, false, false, true, 0, 0, 0, 0.5, 0.5, 2);
     tex.close();
   }  
 
-  if(Nex != 1)
-  {
-    vector<int> spiral;
-    jumplist_t  jumps;
-    Triangulation LFT = LFP;
-
-    assert(LFT.is_consistently_oriented());
-    LFT.get_spiral(spiral,jumps);
-
-    output << "LFspiral = " << spiral << ";\n"
-	   << "LFjumps  = " << jumps  << ";\n";
-
-  output << "moleculename = \"" << name_that_graph(g,"C") << "\";\n";
-  }
   output.close();
 
 
