@@ -461,8 +461,11 @@ vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) c
     const node_t v_new = N+i;
     const face_t& f(faces[i]);
 
-    for(int j=0;j<f.size();j++)
-      tris.push_back(tri_t(f[j],v_new,f[(j+1)%f.size()]));
+    if(f.size() > 3)
+      for(int j=0;j<f.size();j++)
+	tris.push_back({f[j],v_new,f[(j+1)%f.size()]});
+    else
+      tris.push_back({f[0],f[1],f[2]});
   }
 
   //return tris;			// TODO: Make sure triangulation is oriented.

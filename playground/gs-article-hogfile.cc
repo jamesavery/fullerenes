@@ -57,7 +57,7 @@ int main(int ac, char **av)
   auto cpu_start  = clock();
   for(int ii=0;ii<n_it;ii++)
     for(int i=0;i<duals.size();i++){
-      duals[i].get_spiral(spiral,jumps,true,true,true,true);
+      duals[i].get_spiral(spiral,jumps,true,true);
       all_jumps[i] = jumps;
     }
   auto cpu_end = clock();

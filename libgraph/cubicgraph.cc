@@ -146,7 +146,7 @@ bool CubicGraph::get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, cons
 
   Triangulation Dual(this->dual_graph(6));
 
-  if(!Dual.get_spiral(spiral, jumps, canonical, general, pentagon_start)) return false;
+  if(!Dual.get_spiral(spiral, jumps, general, pentagon_start)) return false;
   assert(spiral.size()==N/2+2);
   return true;
 }

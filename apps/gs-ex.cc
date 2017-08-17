@@ -241,7 +241,7 @@ int main(int ac, char **av)
   cout << "t" << endl;
   vector<int> spiral;
   Triangulation::jumplist_t jumplist;
-//  bool success = dt.get_spiral(spiral,jumplist,true);
+//  bool success = dt.get_spiral(spiral,jumplist);
 //  if(!success) cerr << "Canonical general spiral not found.\n";
 //
 //  output << "spiral   = " << spiral << ";\n"

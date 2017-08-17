@@ -50,7 +50,7 @@ int main(int ac, char **av)
     if(i%100000 == 0) cerr << "Reached isomer " << i << ".\n";
     if(!only_do_buckygen){
       FullereneDual F(G.neighbours);
-      F.get_spiral(spiral,jumps,true,true,true,true);
+      F.get_spiral(spiral,jumps,true,true);
       //    if(jumps.size()!=0) fprintf(stderr,"Isomer %ld has jump length %ld\n",i,jumps.size());
       if(jumps.size()!=0){
 	vector<int> rspi = rspi_from_fullerene_spiral(spiral);

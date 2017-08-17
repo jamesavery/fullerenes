@@ -40,7 +40,7 @@ int main(int ac, char **av)
       cnt++;
       //      g.update_from_neighbours();
       //      cout << "Calling spiral on graph " << g << "\n";
-      if(g.get_spiral(spiral,jumps,false,false,false)){
+      if(g.get_spiral(spiral,jumps,false,false)){
 	Symmetry S(spiral);
 	symmetry_count[Nindex][S.point_group().to_string()]++;
 	//	cout << "spiral = " << spiral << ";\n";

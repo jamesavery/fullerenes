@@ -47,7 +47,7 @@ int main(int ac, char **av) {
 
   for (int foo=0; foo<10 ; foo++){
     t3 = Clock::now();
-    g.get_rspi_from_fg(rspi, jumps, true, true, pentagon_start);
+    g.get_rspi_from_fg(rspi, jumps, true, pentagon_start);
     t4 = Clock::now();
     cout << "Delta t4-t3 (spiral): " << std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3) .count() << " ms" << std::endl;
   }

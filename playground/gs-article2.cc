@@ -68,7 +68,7 @@ int main(int ac, char **av) {
   jumplist_t jumps;
   
   auto grspi_start = std::clock();
-  gkl.get_rspi(rspi, jumps, true, true, pentagon_start);
+  gkl.get_rspi(rspi, jumps, true, pentagon_start);
   auto grspi_end   = std::clock();
   cerr << "Got RSPI: " << rspi << endl;
   

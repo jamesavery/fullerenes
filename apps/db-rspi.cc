@@ -42,7 +42,7 @@ int main(int ac, char **av)
     
     i++;
     G = Triangulation(G.neighbours,true);
-    bool spiral_OK = G.get_spiral(spiral,jumps,true,false,false);
+    bool spiral_OK = G.get_spiral(spiral,jumps,false,false);
     if(!spiral_OK){
       vector<int> rspi2(12);
       FullereneDual FD(G);

@@ -486,7 +486,7 @@ void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jump
   vector<int> rspi_v;
   FullereneGraph::jumplist_t jumps_v;
   const bool canonical=true, general=true;
-  (*fg)->get_rspi_from_fg(rspi_v, jumps_v, canonical, general, *pentagon_start);
+  (*fg)->get_rspi_from_fg(rspi_v, jumps_v, general, *pentagon_start);
 
   for(int i=0; i!=12; i++){
     rspi_a[i] = rspi_v[i] +1;//start counting at 1

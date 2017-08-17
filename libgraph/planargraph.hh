@@ -7,6 +7,7 @@
 //       Exploit duality between triangulation and cubic planar graph.
 class PlanarGraph : public Graph {
 public:
+  // TODO: Change jumplist_t to vector<pair<int,int>> - faster and easier access!
   typedef list<pair<int,int> > jumplist_t;
 
   mutable face_t outer_face;

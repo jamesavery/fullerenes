@@ -36,7 +36,7 @@ public:
 
 struct Permutation : public vector<int> {
   Permutation(const vector<int>& p) : vector<int>(p){}
-  Permutation(int N) : vector<int>(N){}
+  Permutation(int N=0) : vector<int>(N){}
 
   static Permutation identity(int N);
 

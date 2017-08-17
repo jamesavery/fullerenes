@@ -93,7 +93,7 @@ int main(int ac, char **av) {
 
       auto rspi_start = clock();
       for(int ii=0;ii<n_it;ii++)      
-	gkl.get_rspi(rspi, jumps, true, true, pentagon_start);
+	gkl.get_rspi(rspi, jumps, true, pentagon_start);
       auto rspi_end   = clock();
 
       for(auto &i: rspi)  i++;

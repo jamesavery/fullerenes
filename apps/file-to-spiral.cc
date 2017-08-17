@@ -25,7 +25,7 @@ int main(int ac, char **av)
 
   Triangulation::jumplist_t jumps;
   vector<int> spiral;
-  Tdual.get_spiral(spiral, jumps, false);
+  Tdual.get_spiral(spiral, jumps);
   
   cout << "jumps = " << jumps << ";\n"
        << "spiral = " << spiral << ";\n";

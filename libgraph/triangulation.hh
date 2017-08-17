@@ -42,9 +42,14 @@ public:
 				 const vector<int>& S0=vector<int>(), const jumplist_t& J0=jumplist_t()) const;
   // the one defined by three nodes
   bool get_spiral(const node_t f1, const node_t f2, const node_t f3, vector<int>& v, jumplist_t& j, vector<node_t>& permutation, const bool general=true) const;
-  // the canonical one
-  bool get_spiral(vector<int>& v, jumplist_t& j, const bool canonical=true, const bool only_special=true, const bool general=true, const bool pentagon_start=true) const;
-  void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps, // TODO: Should only need to supply jumps when general=true
+
+
+  // Get canonical general spiral and permutation of nodes compared to current triangulation
+  bool get_spiral(vector<int>& v, jumplist_t& j, vector<int> &permutation, const bool only_rarest_special=true, const bool general=true) const;  
+  // Get canonical general spiral
+  bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true) const;  
+
+  void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps,
 		       vector< vector<int> >& permutations,
 		       const bool only_special=false, const bool general=false) const;
 
@@ -85,7 +90,7 @@ public:
   }
   
   bool get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& r, jumplist_t& j, const bool general=true) const;
-  bool get_rspi(vector<int>& r, jumplist_t& j, const bool canonical=true, const bool general=true, const bool pentagon_start=true) const;
+  bool get_rspi(vector<int>& r, jumplist_t& j, const bool general=true, const bool pentagon_start=true) const;
 
 };
 
