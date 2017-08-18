@@ -13,7 +13,8 @@ public:
   //  3. GC     (assert deg(v) <= 6 for all v)
   //  4. Spirals (constructor + all_spirals + canonical_spiral)
   //  5. Embed in 2D
-  //  6. Embed in 3D 
+  //  6. Embed in 3D
+  Triangulation(int N) : PlanarGraph(Graph(N,true)) {}
   Triangulation(const Graph& g = Graph(), bool already_oriented = false) : PlanarGraph(g) { update(already_oriented); }
   Triangulation(const Graph& g, const vector<tri_t>& tris) : PlanarGraph(g), triangles(tris) { 
     orient_triangulation(triangles);
@@ -58,7 +59,7 @@ public:
   
   void update(bool already_oriented) {
     //    renumber(); // TODO!
-    if(N>0){
+    if(count_edges() > 0){
       if(already_oriented){
         triangles = compute_faces_oriented();
       }

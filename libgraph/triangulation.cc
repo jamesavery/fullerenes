@@ -5,9 +5,23 @@
 
 pair<node_t,node_t> Triangulation::adjacent_tris(const dedge_t& e) const
 {
-  node_t u  = e.first, v = e.second;
-  node_t w1 = next_on_face(u,v), w2 = next_on_face(v,u);
+  node_t u  = e.first, v = e.second;  
+  node_t w1=-1, w2=-1;
+  
+  if(is_oriented) {
+    w1 = next_on_face(u,v), w2 = next_on_face(v,u);
+  } else {
+    vector<node_t> ws;
+    auto is_in = [](const vector<node_t> &v, node_t x)
+      { return find(v.begin(),v.end(),x) != v.end(); };
+    
+    for(node_t w: neighbours[u])
+      if(is_in(neighbours[w],u) && is_in(neighbours[w],v)) ws.push_back(w);
 
+    assert(ws.size() == 2);
+    w1 = ws[0], w2 = ws[1];
+  }
+  
   return make_pair(w1,w2);
 }
 
@@ -21,8 +35,7 @@ vector<tri_t> Triangulation::compute_faces() const
   unordered_set<tri_t> triangle_set;
 
   for(node_t u=0;u<N;u++)
-    for(int i=0;i<neighbours[u].size();i++){
-      node_t v = neighbours[u][i];
+    for(node_t v: neighbours[u]){
       pair<node_t,node_t> ws(adjacent_tris({u,v}));
 
       triangle_set.insert(tri_t(u,v,ws.first ).sorted());
@@ -144,12 +157,11 @@ vector<face_t> Triangulation::dual_faces() const
 
 // Takes full spiral string, e.g. 566764366348665
 // where the degrees are between 3 and 8 (or anything larger, really)
-Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j): PlanarGraph()
+Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j):
+  PlanarGraph(spiral_string.size())
 {
   jumplist_t jumps = j; // we need a local copy to remove elements
-  N = spiral_string.size();
-
-  Triangulation dual(N);
+  is_oriented = false;	// TODO: Need to insert edges in oriented way
 
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
@@ -159,7 +171,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // set up first two nodes
   open_valencies.push_back(make_pair(0,spiral_string[0]-1));
   open_valencies.push_back(make_pair(1,spiral_string[1]-1));
-  dual.insert_edge({0,1});
+  insert_edge({0,1});
 
   //iterate over atoms
   //k=0, k=1 have been done already
@@ -181,7 +193,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     // TODO: Lukas, can the edges be inserted oriented? (i.e., not using edge_set)
     // connect k and <last>
     auto connect_backward = [&](){
-      dual.insert_edge({k,open_valencies.back().first});
+      insert_edge({k,open_valencies.back().first});
       --open_valencies.back().second;
       ++pre_used_valencies;
     };
@@ -192,7 +204,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     //               inserts u in v's neighbour list right *before* succ_vu (-1 means at end).
     // connect k and <first>
     auto connect_forward = [&](){
-      dual.insert_edge({k, open_valencies.front().first},-1,-1);
+      insert_edge({k, open_valencies.front().first},-1,-1);
       --open_valencies.front().second;
       ++pre_used_valencies;
     };
@@ -226,7 +238,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // open_valencies must be either spiral.back() times '1' at this stage
   if(open_valencies.size() != spiral_string.back()){
     cout << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
-    cout << "Incomplete graph g = " << dual << "\n";
+    cout << "Incomplete triangulation = " << *this << "\n";
     abort();
   }
   for(list<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
@@ -239,14 +251,13 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // add remaining edges, we don't care about the valency list at this stage
   // TODO: Lukas, can the edges be inserted oriented?
   for(int i=0; i<spiral_string.back(); ++i){
-    dual.insert_edge({N-1, open_valencies.front().first});
+    insert_edge({N-1, open_valencies.front().first});
     open_valencies.pop_front();
   }
 
   // TODO: It should really be possible to construct the graph in an oriented way
   //       (i.e. neighbours are in CW or CCW order). It is also much faster than using edge sets.
-  *this = dual;
-  orient_neighbours();
+  update(false);
 }
 
 
