@@ -413,8 +413,8 @@ struct name_info {
   }
 
   friend ostream& operator<<(ostream &s, const name_info &n){
-    string graph_type_string[3] = {"",",T",",LF"};
-    s << "[GS" << graph_type_string[n.graph_type] << ": "
+    string graph_type_string[3] = {"","D,","LF,"};
+    s << "[" << graph_type_string[n.graph_type] << "GS: "
       << (n.GS.jumps.empty()? "": (jumps_to_string(n.GS.jumps)+"; "))
       << (n.is_a_fullerene? spiral_to_rspi_string(n.GS.spiral) : spiral_to_string(n.GS.spiral))
       << "]-" << (n.is_a_fullerene? "fullerene" : "cage");
