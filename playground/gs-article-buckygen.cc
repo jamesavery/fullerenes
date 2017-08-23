@@ -54,6 +54,8 @@ int main(int ac, char **av)
       //    if(jumps.size()!=0) fprintf(stderr,"Isomer %ld has jump length %ld\n",i,jumps.size());
       if(jumps.size()!=0){
 	vector<int> rspi = rspi_from_fullerene_spiral(spiral);
+	for(auto &j: jumps) jumps.first++;
+	
 	cout << "(* BuckyGen isomer number " << i << " has a jump in its canonical general spiral: *)\n";
 	cout << "rspi"<<i<<" = " << rspi << "; jumps"<<i<<" = " << jumps << ";\n";
 

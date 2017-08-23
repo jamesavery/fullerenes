@@ -2,6 +2,7 @@
 #include "libgraph/polyhedron.hh"
 #include "libgraph/isomerdb.hh"
 #include "libgraph/triangulation.hh"
+#include "libgraph/fullerenegraph.hh"
 #include "libgraph/symmetry.hh"
 
 // all lists are CCW
@@ -296,6 +297,48 @@ Polyhedron Example7()
   return Polyhedron(example7(),points,4);
 }
 
+// First fullerene without a pentagon-starting spiral is Td-C100
+// with classical canonical spiral [CS: 2,8,9,23,24,28,29,37,41,45,46,52]
+// and  canonical                  [GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]
+Graph example8_TdC100()
+{
+  vector<int> RSPI{{2,8,9,23,24,28,29,37,41,45,46,52}};
+  FullereneDual dF(100,RSPI+(-1));
+  return dF.dual_graph();
+}
+
+Polyhedron Example8_TdC100()
+{
+  FullereneGraph F(example8_TdC100());
+
+  vector<face_t>   faces  = F.compute_faces(6);
+  cerr << "facesTdC100 = " << faces << ";\n";
+  F.layout2d = F.tutte_layout(face_t{{0,71,70,9,14,63}});
+  vector<coord3d>  points = F.optimized_geometry(F.zero_order_geometry());
+
+  return Polyhedron(F,points,6,faces);
+}
+
+// Random C1-C100 fullerene 
+// with classical canonical pentagon indices [GS:  1,2,3,4,5,12,43,46,49,50,51,52]
+Graph example9_C1C100()
+{
+  vector<int> RSPI{{1,2,3,4,5,12,43,46,49,50,51,52}};
+  FullereneDual dF(100,RSPI+(-1));
+  return dF.dual_graph();
+}
+
+Polyhedron Example9_C1C100()
+{
+  FullereneGraph F(example9_C1C100());
+
+  vector<face_t>   faces  = F.compute_faces(6);
+  cerr << "facesC1C100 = " << faces << ";\n";
+  F.layout2d = F.tutte_layout(face_t{{54,98,64,88,90}});
+  vector<coord3d>  points = F.optimized_geometry(F.zero_order_geometry());
+
+  return Polyhedron(F,points,6,faces);
+}
 
 PlanarGraph ExampleGraph(int Nex)
 {
@@ -307,6 +350,8 @@ PlanarGraph ExampleGraph(int Nex)
   case 5: return example5();
   case 6: return example6();
   case 7: return example7();
+  case 8: return example8_TdC100();
+  case 9: return example9_C1C100();
   default:
     break;
   }
@@ -324,6 +369,8 @@ Polyhedron ExamplePolyhedron(int Nex)
   case 5: return Example5();
   case 6: return Example6();
   case 7: return Example7();
+  case 8: return Example8_TdC100();
+  case 9: return Example9_C1C100();
   default:
     break;
   }
@@ -362,12 +409,17 @@ string spiral_to_string(const vector<int>& spiral)
   return s;
 }
 
+vector<int> spiral_to_rspi(vector<int> spiral)
+{
+  vector<int> rspi(12);
+  for(int i=0,j=0;i<spiral.size();i++) if(spiral[i] == 5) rspi[j++] = i;
+  return rspi;
+}
+
+
 string spiral_to_rspi_string(const vector<int>& spiral)
 {
-  vector<int> rspi;
-  for(int i=0;i<spiral.size();i++) if(spiral[i] == 5) rspi.push_back(i+1);
-  assert(rspi.size() == 12);
-  return spiral_to_string(rspi);
+  return spiral_to_string(spiral_to_rspi(spiral)+1);
 }
 
 struct general_spiral {
@@ -384,11 +436,12 @@ struct name_info {
   
   PlanarGraph   graph;
   Triangulation triangulation;
+  bool cs;
 
   general_spiral GS;
   Permutation permutation;
 
-  name_info(const PlanarGraph &g, const string& atom="") : atom(atom), graph(g) {
+  name_info(const PlanarGraph &g, const string& atom="",bool compatibility=false) : atom(atom), graph(g),cs(compatibility) {
     if(g.is_triangulation()){
       graph_type     = TRIANGULATION;
       is_a_fullerene = g.dual_graph().is_a_fullerene();
@@ -404,28 +457,34 @@ struct name_info {
     }
 
     permutation.resize(triangulation.N);
-    bool spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps);
+    bool spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,!cs);
     assert(spiral_success);
 
     // Find spiral order with respect to triangulation vertices
     permutation.resize(triangulation.N);
-    spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,permutation);
+    spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,permutation,!cs);
+
+    // See if we can reconstruct the triangulation:
+    //    Triangulation t(GS.spiral,GS.jumps);
+    // Nope! Spiral wind-up breaks in the presence of separating triangles; needs to be made oriented.
   }
 
   friend ostream& operator<<(ostream &s, const name_info &n){
-    string graph_type_string[3] = {"",",T",",LF"};
-    s << "[GS" << graph_type_string[n.graph_type] << ": "
+    string graph_type_string[3] = {"","D,",",LF,"};
+    s << "["<<graph_type_string[n.graph_type] <<(n.cs?"CS":"GS") << ": "
       << (n.GS.jumps.empty()? "": (jumps_to_string(n.GS.jumps)+"; "))
       << (n.is_a_fullerene? spiral_to_rspi_string(n.GS.spiral) : spiral_to_string(n.GS.spiral))
-      << "]-" << (n.is_a_fullerene? "fullerene" : "cage");
+      << "]-" <<n.atom<< n.graph.N <<"-" << (n.is_a_fullerene? "fullerene" : "cage");
     return s;
   }
 };
 
+#include "gs-article-fix-examples.cc"
+
 int main(int ac, char **av)
 {
   int Nex = ac>=2? strtol(av[1],0,0) : 1;
-
+  
   string basename("gs-ex-"+to_string(Nex));
 
   PlanarGraph g  = ExampleGraph(Nex);
@@ -441,8 +500,9 @@ int main(int ac, char **av)
   Polyhedron LFP = LFPolyhedron(P);
 
   ofstream output(("output/"+basename+".m").c_str());
-  if(Nex != 1)
-  {
+  if(Nex == 1){
+    g.layout2d = g.tutte_layout();
+  } else {
     vector<int> spiral;
     jumplist_t  jumps;
     Triangulation LFT = LFP;
@@ -455,21 +515,35 @@ int main(int ac, char **av)
 
     name_info name(g,"C");
 
+    name_info compat_name(g,"C",true);
+
     // End at outer face, or as close to it as possible
-    vector<int> outer_faces[7] = {{0,1,2},{0,1,4,10,6,3},{3,4,5},{0,1,2,3},{1,9,6,2},{1,5,2,28},{0,3,7,4}};
+    vector<int> outer_faces[9] = {{0,1,2},{0,1,4,10,6,3},{3,4,5},{0,1,2,3},{20,23,22,21},{1,5,2,28},{0,3,7,4},{72, 97, 99, 82, 89},{54,98,64,88,90}};
+				  //{26,87,98,49,37,35}};
     
     g.layout2d = g.tutte_layout(outer_faces[Nex-1]);
+    // Hack:
+    if(Nex==8) fix_up_TdC100_layout(g);
+    if(Nex==9) fix_up_C1C100_layout(g);
+    
     vector<face_t> faces = g.compute_faces();
-    vector<coord2d> LFlayout2d(g.layout2d);
+    vector<coord2d> dglayout(faces.size()), LFlayout2d(g.layout2d);
 
-    for(int i=0;i<faces.size();i++) LFlayout2d.push_back( faces[i].centroid(g.layout2d) );
+    for(int i=0;i<faces.size();i++){
+      coord2d x = faces[i].centroid(g.layout2d);
+      LFlayout2d.push_back(x);
+      dglayout[i] = x;
+    }
     LFP.layout2d = LFlayout2d;
+    dg.layout2d  = dglayout;
 
     output << "triangulation = "  << name.triangulation << ";\n"
 	   << "permutation   = " << name.permutation << "+1;\n"
 	   << "jumps         = " << name.GS.jumps << ";\n"
-	   << "spiral        = " << name.GS.spiral << "+1;\n";
-    output << "moleculename = \"" << name << "\";\n";
+	   << "spiral        = " << name.GS.spiral << ";\n";
+    if(name.is_a_fullerene) output << "rspi = " << spiral_to_rspi(name.GS.spiral) << ";\n";
+    output << "gsname = \"" << name << "\";\n";
+    output << "csname = \"" << compat_name << "\";\n";    
   }
   
   output << "g   = " << g << ";\n";
@@ -494,12 +568,12 @@ int main(int ac, char **av)
     mol2.close();
   }
 
-  {
-    ofstream mol2(("output/"+basename+"-LFP.mol2").c_str());
-    LFP.optimize();		// This doesn't really work well for some reason..?
-    mol2 << LFP.to_mol2();
-    mol2.close();
-  }  
+  // {
+  //   ofstream mol2(("output/"+basename+"-LFP.mol2").c_str());
+  //   LFP.optimize();		// This doesn't really work well for some reason..?
+  //   mol2 << LFP.to_mol2();
+  //   mol2.close();
+  // }  
   
   {
     ofstream tex(("output/"+basename+"-layout.tex").c_str());

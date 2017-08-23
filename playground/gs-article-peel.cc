@@ -41,7 +41,8 @@ int main(int ac, char **av) {
   Polyhedron       P(F,points,6,faces);
   P.move_to_origin();
   P.align_with_axes();
-  
+
+  P.points *= 3;		// Scale the whole thing up!
 
   
   vector<coord3d> dpoints(g.N);
@@ -85,7 +86,7 @@ int main(int ac, char **av) {
     double t     = f/double(faces.size());
     double bulge = (t-.5)*(t-.5);
     
-    spiral_centers[f] = dpoints[f]- coord3d{0,0,t*t*t*t*t*t*(xmax-xmin)/2.0};
+    spiral_centers[f] = dpoints[f]- coord3d{0,0,t*t*(xmax-xmin)/2.0};
   }
 
   // Now do the vertices of the faces.

@@ -129,9 +129,9 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     unordered_map<dedge_t,int> face_numbers(face_reps.size());
     for(int i=0;i<face_reps.size();i++) face_numbers[face_reps[i]] = i;
 
-    cerr << "face_reps  = " << face_reps << ";\n";
-    cerr << "face_reps' = " << get_keys(face_numbers) << ";\n";
-    cerr << "face_nums  = " << get_values(face_numbers) << ";\n";
+    // cerr << "face_reps  = " << face_reps << ";\n";
+    // cerr << "face_reps' = " << get_keys(face_numbers) << ";\n";
+    // cerr << "face_nums  = " << get_values(face_numbers) << ";\n";
     //    cerr << "faces      = " << compute_faces_oriented(Fmax) << ";\n";
     
     PlanarGraph dual(face_numbers.size());
@@ -468,8 +468,8 @@ vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) c
       tris.push_back({f[0],f[1],f[2]});
   }
 
-  //return tris;			// TODO: Make sure triangulation is oriented.
-  return orient_triangulation(tris);
+  return tris;			// TODO: Make sure triangulation is oriented.
+  //return orient_triangulation(tris);
 }
 
 
@@ -930,8 +930,8 @@ vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
   vector<face_t> faces(face_representations.size());
   for(int i=0;i<face_representations.size();i++) faces[i] = get_face_oriented(face_representations[i],Fmax);
 
-  cerr << "facereps = " << face_representations << ";\n"
-       << "faces    = " << faces << ";\n";
+  // cerr << "facereps = " << face_representations << ";\n"
+  //      << "faces    = " << faces << ";\n";
   
   return faces;
 }
