@@ -470,7 +470,7 @@ struct name_info {
   }
 
   friend ostream& operator<<(ostream &s, const name_info &n){
-    string graph_type_string[3] = {"","D,",",LF,"};
+    string graph_type_string[3] = {"","D,","LF,"};
     s << "["<<graph_type_string[n.graph_type] <<(n.cs?"CS":"GS") << ": "
       << (n.GS.jumps.empty()? "": (jumps_to_string(n.GS.jumps)+"; "))
       << (n.is_a_fullerene? spiral_to_rspi_string(n.GS.spiral) : spiral_to_string(n.GS.spiral))
@@ -543,7 +543,11 @@ int main(int ac, char **av)
 	   << "spiral        = " << name.GS.spiral << ";\n";
     if(name.is_a_fullerene) output << "rspi = " << spiral_to_rspi(name.GS.spiral) << ";\n";
     output << "gsname = \"" << name << "\";\n";
-    output << "csname = \"" << compat_name << "\";\n";    
+    output << "csname = \"" << compat_name << "\";\n";
+
+    Symmetry S(name.triangulation);
+    cerr << "groupsize = " << S.G.size() << ";\n";
+    
   }
   
   output << "g   = " << g << ";\n";
@@ -582,7 +586,6 @@ int main(int ac, char **av)
   }  
 
   output.close();
-
 
   
   return 0;
