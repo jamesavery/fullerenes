@@ -18,7 +18,12 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const dedge_t& e) const
     for(node_t w: neighbours[u])
       if(is_in(neighbours[w],u) && is_in(neighbours[w],v)) ws.push_back(w);
 
-    assert(ws.size() == 2);
+    if(ws.size() != 2){
+      cerr <<  "Error in triangulation: Edge " << edge_t{u,v} << " is adjacent to "<<ws.size()<<" != 2 vertices.\n"
+	   <<  "ws = " << ws << "+1;\n"
+	   <<  "neighbours = " << neighbours << "+1;\n";
+      abort();
+    }
     w1 = ws[0], w2 = ws[1];
   }
   
