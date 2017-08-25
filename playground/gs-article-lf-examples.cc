@@ -465,7 +465,7 @@ struct name_info {
     spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,permutation,!cs);
 
     // See if we can reconstruct the triangulation:
-    //    Triangulation t(GS.spiral,GS.jumps);
+    Triangulation t(GS.spiral,GS.jumps);
     // Nope! Spiral wind-up breaks in the presence of separating triangles; needs to be made oriented.
   }
 

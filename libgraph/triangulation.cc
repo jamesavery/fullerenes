@@ -166,7 +166,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   PlanarGraph(spiral_string.size())
 {
   jumplist_t jumps = j; // we need a local copy to remove elements
-  is_oriented = false;	// TODO: Need to insert edges in oriented way
+  is_oriented = true;
 
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
@@ -195,21 +195,21 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       jumps.pop_front();
     }
 
-    // TODO: Lukas, can the edges be inserted oriented? (i.e., not using edge_set)
     // connect k and <last>
-    auto connect_backward = [&](){
-      insert_edge({k,open_valencies.back().first});
+    auto connect_backward = [&](const node_t suc_uv=-1){
+      const node_t suc_vu = std::prev(open_valencies.end(), 2)->first; // second to last node in open_valencies
+      insert_edge({k,open_valencies.back().first}, suc_uv, suc_vu);
       --open_valencies.back().second;
       ++pre_used_valencies;
     };
 
-    // TODO: Lukas, can the edges be inserted oriented?
     //       How-to: insert_edge({u,v}, succ_uv,succ_vu)
     //               inserts v in u's neighbour list right *before* succ_uv, and
     //               inserts u in v's neighbour list right *before* succ_vu (-1 means at end).
     // connect k and <first>
-    auto connect_forward = [&](){
-      insert_edge({k, open_valencies.front().first},-1,-1);
+    auto connect_forward = [&](const node_t suc_vu = -1){
+      const node_t suc_uv = std::next(open_valencies.begin(), 1)->first; // second node in open_valencies
+      insert_edge({k, open_valencies.front().first}, suc_uv, suc_vu);
       --open_valencies.front().second;
       ++pre_used_valencies;
     };
@@ -219,14 +219,16 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 
     // do the remaining connect forwards
     while(open_valencies.front().second==0){
+      const node_t suc_vu = open_valencies.front().first;
       open_valencies.pop_front();
-      connect_forward();
+      connect_forward(suc_vu);
     }
 
     // do the remaining connect backwards
     while(open_valencies.back().second==0){
+      const node_t suc_uv = open_valencies.back().first;
       open_valencies.pop_back();
-      connect_backward();
+      connect_backward(suc_uv);
     }
 
     if(spiral_string[k] - pre_used_valencies < 1){//the current atom is saturated (which may only happen for the last one)
@@ -254,10 +256,13 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   }
 
   // add remaining edges, we don't care about the valency list at this stage
-  // TODO: Lukas, can the edges be inserted oriented?
+  vector<node_t> last_nodes;
+  for(auto n: open_valencies) last_nodes.push_back(n.first);
+  // cout << "xxx: " << last_nodes << endl;
   for(int i=0; i<spiral_string.back(); ++i){
-    insert_edge({N-1, open_valencies.front().first});
-    open_valencies.pop_front();
+    const node_t suc_uv=last_nodes[(i+1)%last_nodes.size()];
+    const node_t suc_vu=last_nodes[(i-1+last_nodes.size())%last_nodes.size()];
+    insert_edge({N-1, last_nodes[i]}, suc_uv, suc_vu);
   }
 
   // TODO: It should really be possible to construct the graph in an oriented way

@@ -15,6 +15,8 @@ bool Graph::remove_edge(const edge_t& e)
 }
 
 // Returns true if edge existed prior to call, false if not
+// insert v right before suc_uv in the list of neighbours of u
+// insert u right before suc_vu in the list of neighbours of v
 bool Graph::insert_edge(const dedge_t& e, const node_t suc_uv, const node_t suc_vu)
 {
   if(edge_exists(e)) return true;	// insert_edge must be idempotent
