@@ -464,8 +464,11 @@ struct name_info {
     permutation.resize(triangulation.N);
     spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,permutation,!cs);
 
+    cout << "original: " << triangulation << endl;
+
     // See if we can reconstruct the triangulation:
     Triangulation t(GS.spiral,GS.jumps);
+    cout << "reproduction: " << t << endl;
     // Nope! Spiral wind-up breaks in the presence of separating triangles; needs to be made oriented.
   }
 
