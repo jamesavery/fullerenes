@@ -179,8 +179,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   open_valencies.push_back(make_pair(1,spiral_string[1]-1));
   insert_edge({0,1});
 
-  //iterate over atoms
-  //k=0, k=1 have been done already
+  // iterate over atoms
+  // k=0, k=1 have been done already
   // omit the last one because it requires special treatment
   for (int k=2; k<N-1; ++k){
     int pre_used_valencies=0;
@@ -257,6 +257,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   }
 
   // add remaining edges, we don't care about the valency list at this stage
+  // get a vector of nodes of the final hole, for easier orientation
   vector<node_t> last_nodes;
   for(auto n: open_valencies) last_nodes.push_back(n.first);
   for(int i=0; i<spiral_string.back(); ++i){
@@ -265,8 +266,6 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     insert_edge({N-1, last_nodes[i]}, suc_uv, suc_vu);
   }
 
-  // TODO: It should really be possible to construct the graph in an oriented way
-  //       (i.e. neighbours are in CW or CCW order). It is also much faster than using edge sets.
   update(false);
 }
 
