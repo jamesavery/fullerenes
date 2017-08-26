@@ -167,7 +167,6 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   PlanarGraph(spiral_string.size())
 {
   jumplist_t jumps = j; // we need a local copy to remove elements
-  is_oriented = true;
 
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
@@ -266,7 +265,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
     insert_edge({N-1, last_nodes[i]}, suc_uv, suc_vu);
   }
 
-  update(false);
+  is_oriented = true;
+  update(is_oriented);
 }
 
 
