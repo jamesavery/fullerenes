@@ -253,7 +253,7 @@ int main(int ac, char **av)
   g.layout2d = g.tutte_layout(g.outer_face);
 
   printf("Computing dual\n");
-  PlanarGraph dg(g.dual_graph(8,true));
+  PlanarGraph dg(g.dual_graph(10,true));
 
   printf("Computing planar layour of dual\n");
   dg.layout2d = dg.tutte_layout();
@@ -262,7 +262,7 @@ int main(int ac, char **av)
   output << "dg2d = " << dg << ";\n";  
   output.flush();
 
-  vector<face_t>  faces =  g.compute_faces(8,true);
+  vector<face_t>  faces =  g.compute_faces(10,true);
   vector<face_t> dfaces = dg.compute_faces(3,true);
 
   output << "faces  = " << faces  << ";\n"
@@ -320,7 +320,7 @@ int main(int ac, char **av)
   output << "Pcoordinates = "  << P.points << ";\n";
   output << "P = " << P << ";\n";
   
-  Polyhedron D(P.dual(8,true));
+  Polyhedron D(P.dual(10,true));
 
   output << "PD = " << D << ";\n";
   
