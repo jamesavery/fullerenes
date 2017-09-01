@@ -43,8 +43,8 @@ vector<tri_t> Triangulation::compute_faces() const
     for(node_t v: neighbours[u]){
       pair<node_t,node_t> ws(adjacent_tris({u,v}));
 
-      triangle_set.insert(tri_t(u,v,ws.first ).sorted());
-      triangle_set.insert(tri_t(u,v,ws.second).sorted());
+      triangle_set.insert(tri_t{u,v,ws.first }.sorted());
+      triangle_set.insert(tri_t{u,v,ws.second}.sorted());
     }
 
 

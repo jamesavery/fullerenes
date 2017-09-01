@@ -280,7 +280,7 @@ vector<face_t> PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout)
   // abort();
   cerr << "This shouldn't happen but we'll accept it for now." << endl;
   set<edge_t> edge_set = undirected_edges();
-  vector<face_t> faces;
+  set<face_t> faces;
   for(const edge_t &e: edge_set){
     const node_t s = e.first, t = e.second;
     
@@ -291,34 +291,36 @@ vector<face_t> PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout)
         const node_t u = nt[i];
 
         face_t face(shortest_cycle(s,t,u,Nmax));
-        //        cerr << face << endl;
+        //	cerr << face << endl;
         if(face.size() > 0 && face.size() <= Nmax)
-          faces.push_back(face);
+          faces.insert(face.normalized());
         } //else {
-          //          fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u);
-          //          cerr << face << endl;
-        //        }
+          //	  fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u);
+          //	  cerr << face << endl;
+        //	}
   }
 
 
-  // Make sure that outer face is at position 0
-  if(planar_layout){
-    if(outer_face.size() < 3)
-      outer_face = find_outer_face();
+  // // Make sure that outer face is at position 0
+  // if(planar_layout){
+  //   if(outer_face.size() < 3)
+  //     outer_face = find_outer_face();
 
-    const set<node_t> of(outer_face.begin(),outer_face.end());
-    for(int i=0;i<faces.size();i++){
-      const face_t &f(faces[i]);
-      const set<node_t> sf(f.begin(),f.end());
+  //   const set<node_t> of(outer_face.begin(),outer_face.end());
+  //   for(int i=0;i<faces.size();i++){
+  //     const face_t &f(faces[i]);
+  //     const set<node_t> sf(f.begin(),f.end());
 
-      if(of==sf){ // swap faces[i] with faces[0]
-       faces[i] = faces[0];
-       faces[0] = outer_face;
-      }
-    }
-  } else outer_face = face_t(faces[0]);
+  //     if(of==sf){ // swap faces[i] with faces[0]
+  //      faces[i] = faces[0];
+  //      faces[0] = outer_face;
+  //     }
+  //   }
+  // } else outer_face = face_t(faces[0]);
+  
+  vector<face_t> face_vector(faces.begin(),faces.end());
 
-  return faces;
+  return face_vector;
 }
 
  
