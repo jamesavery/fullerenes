@@ -57,7 +57,7 @@ public:
   face_t find_outer_face() const;
 
 
-  PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
+  PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true, unordered_map<dedge_t,int> *FM=nullptr) const;
   
   size_t count_perfect_matchings() const;
 
