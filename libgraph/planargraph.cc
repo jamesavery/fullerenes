@@ -107,8 +107,8 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
   int n_edges = 0;
   for(int i=0; i<n_neighbours; i++){
     const int v1=nv[i], v2=nv[(i+1)%n_neighbours];
-	// and by counting this way we don't count edges between non-neighbours,
-	// thus avoid the separating triangle problem
+        // and by counting this way we don't count edges between non-neighbours,
+        // thus avoid the separating triangle problem
     if( edge_exists(edge_t(v1,v2)) ){
       n_edges++;
     }
@@ -120,7 +120,7 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
 }
 
 
-PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
+PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout, unordered_map<dedge_t,int> * FM) const
 {
   if(is_oriented){
 
@@ -128,6 +128,9 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     vector<dedge_t>            face_reps = compute_face_representations(Fmax);
     unordered_map<dedge_t,int> face_numbers(face_reps.size());
     for(int i=0;i<face_reps.size();i++) face_numbers[face_reps[i]] = i;
+
+    // if FM is not a null pointer, copy face numbers back
+    if(FM) *FM=face_numbers;
 
     // cerr << "face_reps  = " << face_reps << ";\n";
     // cerr << "face_reps' = " << get_keys(face_numbers) << ";\n";
@@ -139,20 +142,20 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     for(const auto &ei: face_numbers){
       // e_f is minimal directed edge representation of face f, i_f is its face number.
       dedge_t e_f = ei.first; node_t i_f = ei.second;
-      //      cerr << "Processing face " << i_f << ": " << e_f << " -> " << get_face_oriented(e_f,Fmax) << ";\n";
+      // cerr << "Processing face " << i_f << ": " << e_f << " -> " << get_face_oriented(e_f,Fmax) << ";\n";
       
       // Now iterate along face f's directed edges in CCW order:
       // This visits each face neighbour in CCW order.
       node_t u=e_f.first, v=e_f.second, w=-1, i=0;
       do {
-	// e_g is MDE-representation of opposite face along edge e_f
-	dedge_t e_g = get_face_representation({v,u},Fmax);
-	// cerr << "Processing face: " << dedge_t{u,v} << " -> " << get_face_oriented({u,v},Fmax)<<" "
-	//      << " opposite " << e_g << " -> " << get_face_oriented(e_g,Fmax) << ";\n";
-	dual.neighbours[i_f].push_back(face_numbers[e_g]);
+        // e_g is MDE-representation of opposite face along edge e_f
+        dedge_t e_g = get_face_representation({v,u},Fmax);
+        // cerr << "Processing face: " << dedge_t{u,v} << " -> " << get_face_oriented({u,v},Fmax)<<" "
+        //      << " opposite " << e_g << " -> " << get_face_oriented(e_g,Fmax) << ";\n";
+        dual.neighbours[i_f].push_back(face_numbers[e_g]);
 
-	w = prev(v,u); u = v; v = w; // CCW node neighbour order + CCW face order
-	assert(++i <= Fmax);	// Face larger than Fmax or corrupted graph
+        w = prev(v,u); u = v; v = w; // CCW node neighbour order + CCW face order
+        assert(++i <= Fmax);        // Face larger than Fmax or corrupted graph
       } while (u != e_f.first);
     }
     assert(dual.is_consistently_oriented());
@@ -162,10 +165,10 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
       dual.layout2d = vector<coord2d>(face_numbers.size());
 
       for(const auto &ei: face_numbers){
-	dedge_t e_f = ei.first; node_t i_f = ei.second;
-	face_t f = get_face_oriented(e_f,Fmax);
-	
-	dual.layout2d[i_f] = f.centroid(layout2d);
+        dedge_t e_f = ei.first; node_t i_f = ei.second;
+        face_t f = get_face_oriented(e_f,Fmax);
+        
+        dual.layout2d[i_f] = f.centroid(layout2d);
       }
     }
 
@@ -195,14 +198,14 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
       const face_t& face(allfaces[i]);
       //  cerr << "Face "<<i<<": " << face << endl;
       for(unsigned int j=0;j<face.size();j++)
-	facenodes[edge_t(face[j],face[(j+1)%face.size()])].insert(i);
+        facenodes[edge_t(face[j],face[(j+1)%face.size()])].insert(i);
     }
     //  cerr << "dual_graph::test planarity\n";
     for(map<edge_t,set<int> >::const_iterator fs(facenodes.begin());fs!=facenodes.end();fs++){
       const edge_t&   e(fs->first);
       const set<int>& connects(fs->second);
       if(connects.size() != 2)
-	fprintf(stderr,"Edge (%d,%d) connects %d faces: Graph is not planar.\n",e.first,e.second,int(connects.size()));
+        fprintf(stderr,"Edge (%d,%d) connects %d faces: Graph is not planar.\n",e.first,e.second,int(connects.size()));
     }
 
     // Insert edge between each pair of faces that share an edge
@@ -211,9 +214,9 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
       const set<int>& adjacent_faces(facenodes[*e]);
       for(set<int>::const_iterator f(adjacent_faces.begin()); f!= adjacent_faces.end(); f++){
-	set<int>::const_iterator g(f);
-	for(++g; g!= adjacent_faces.end(); g++)
-	  dual_edges.insert(edge_t(*f,*g));
+        set<int>::const_iterator g(f);
+        for(++g; g!= adjacent_faces.end(); g++)
+          dual_edges.insert(edge_t(*f,*g));
       }
     }
     //fprintf(stderr,"%d nodes, and %d edges in dual graph.\n",int(dual.N), int(dual.edge_set.size()));
@@ -228,7 +231,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
       dual.layout2d = vector<coord2d>(allfaces.size());
 
       for(int i=0;i<allfaces.size();i++)
-	dual.layout2d[i] = allfaces[i].centroid(layout2d);
+        dual.layout2d[i] = allfaces[i].centroid(layout2d);
     }
     return dual;
   }    
@@ -248,7 +251,7 @@ Graph PlanarGraph::leapfrog_dual() const
   // Now connect new face-center nodes in oriented order
   for(int i=0;i<faces.size();i++){
     const face_t &f  = faces[i];
-    node_t c = N+i;		// Face-center node
+    node_t c = N+i;                // Face-center node
 
     cerr << "new node " << c << " at face " << f << "\n";
     
@@ -285,16 +288,16 @@ vector<face_t> PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout)
     
     for(unsigned int i=0;i<nt.size();i++)
       if(nt[i] != s) {
-	const node_t u = nt[i];
+        const node_t u = nt[i];
 
-	face_t face(shortest_cycle(s,t,u,Nmax));
-	//	cerr << face << endl;
-	if(face.size() > 0 && face.size() <= Nmax)
-	  faces.insert(face.normalized());
-	} //else {
-	  //	  fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u);
-	  //	  cerr << face << endl;
-	//	}
+        face_t face(shortest_cycle(s,t,u,Nmax));
+        //	cerr << face << endl;
+        if(face.size() > 0 && face.size() <= Nmax)
+          faces.insert(face.normalized());
+        } //else {
+          //	  fprintf(stderr,"Erroneous face starting at (%d -> %d -> %d) found: ",s,t,u);
+          //	  cerr << face << endl;
+        //	}
   }
 
 
@@ -338,7 +341,7 @@ face_t PlanarGraph::get_face_layout_oriented(node_t s, node_t t) const
 
     node_t w=-1;
     for(unsigned int i=0;i<ns.size();i++) {
-      //	printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
+      //        printf("%d : %d (%d->%d) angle %g\n",i,ns[i],u,v,vu.line_angle(layout[ns[i]]-layout[v]));
       if(ns[i] != u) { // Find and use first unvisited edge in order of angle to u->v
         coord2d vw = layout2d[ns[i]]-layout2d[v];
         double angle = vu.line_angle(vw);
@@ -465,12 +468,12 @@ vector<tri_t> PlanarGraph::centroid_triangulation(const vector<face_t>& faces) c
 
     if(f.size() > 3)
       for(int j=0;j<f.size();j++)
-	tris.push_back({f[j],v_new,f[(j+1)%f.size()]});
+        tris.push_back({f[j],v_new,f[(j+1)%f.size()]});
     else
       tris.push_back({f[0],f[1],f[2]});
   }
 
-  return tris;			// TODO: Make sure triangulation is oriented.
+  return tris;                        // TODO: Make sure triangulation is oriented.
   //return orient_triangulation(tris);
 }
 
@@ -678,11 +681,11 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
 
 
 // **********************************************************************
-//		       COMBINATORIAL PROPERTIES
+//                       COMBINATORIAL PROPERTIES
 // **********************************************************************
 
 void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces,
-		   map<dedge_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const dedge_t& e)
+                   map<dedge_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const dedge_t& e)
 {
   int frev = faceEdge[reverse(e)];
   if(visited[frev]) return;
@@ -815,8 +818,8 @@ Graph PlanarGraph::read_hog_planarcode(FILE *planarcode_file)
     do{
       int n_read = fread(reinterpret_cast<char*>(&v), number_length, 1, planarcode_file);
       if(n_read != 1 && !feof(planarcode_file)){
-	perror("Error reading HoG PlanarCode file: ");
-	abort();
+        perror("Error reading HoG PlanarCode file: ");
+        abort();
       }
       if(v!=0) g.neighbours[u].push_back(v-1); // In oriented order
     } while(v!=0 && !feof(planarcode_file));
@@ -827,12 +830,12 @@ Graph PlanarGraph::read_hog_planarcode(FILE *planarcode_file)
       bool found_vu = false;
       
       for(node_t w: g.neighbours[v])
-	if(w == u) found_vu = true;
+        if(w == u) found_vu = true;
       if(!found_vu){
-	fprintf(stderr,"Graph is not symmetric: (u,v) = (%d,%d) has\n",u,v);
-	cerr << "neighbours["<<u<<"] = " << g.neighbours[u] <<";\n";
-	cerr << "neighbours["<<v<<"] = " << g.neighbours[v] <<";\n";
-	abort();
+        fprintf(stderr,"Graph is not symmetric: (u,v) = (%d,%d) has\n",u,v);
+        cerr << "neighbours["<<u<<"] = " << g.neighbours[u] <<";\n";
+        cerr << "neighbours["<<v<<"] = " << g.neighbours[v] <<";\n";
+        abort();
       }
     }
   }
@@ -876,7 +879,7 @@ dedge_t PlanarGraph::get_face_representation(dedge_t e, int Fmax) const
   node_t u = e.first, v = e.second;
 
   while(v!=e.first){
-    node_t w = prev(v,u);	// Previous neighbour in v following u in CCW (corner u-v-w in face)
+    node_t w = prev(v,u);        // Previous neighbour in v following u in CCW (corner u-v-w in face)
     u=v; v=w; 
 
     if(u<e_min.first) e_min = {u,v};
@@ -915,12 +918,12 @@ face_t PlanarGraph::get_face_oriented(const dedge_t &e, int Fmax) const
   face_t f = vector<int>{{u}};
   
   while(v!=e.first){
-    node_t w = prev(v,u);	// Previous neighbour to u in v defines corner u-v-w in face
+    node_t w = prev(v,u);        // Previous neighbour to u in v defines corner u-v-w in face
 
     f.push_back(v);
     u=v; v=w; i++;
     assert(w != -1);
-    assert(i<=Fmax);		// Fmax is a back-stop to avoid infinite loops in a corrupted graph
+    assert(i<=Fmax);                // Fmax is a back-stop to avoid infinite loops in a corrupted graph
   }
   return f;
 }
