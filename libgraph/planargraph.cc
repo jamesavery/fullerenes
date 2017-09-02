@@ -120,7 +120,7 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
 }
 
 
-PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout, unordered_map<dedge_t,int> * FM) const
+PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 {
   if(is_oriented){
 
@@ -128,9 +128,6 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout, unord
     vector<dedge_t>            face_reps = compute_face_representations(Fmax);
     unordered_map<dedge_t,int> face_numbers(face_reps.size());
     for(int i=0;i<face_reps.size();i++) face_numbers[face_reps[i]] = i;
-
-    // if FM is not a null pointer, copy face numbers back
-    if(FM) *FM=face_numbers;
 
     // cerr << "face_reps  = " << face_reps << ";\n";
     // cerr << "face_reps' = " << get_keys(face_numbers) << ";\n";
