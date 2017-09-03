@@ -1,9 +1,10 @@
 #ifndef GRAPH3_HH
 #define GRAPH3_HH
 
-#include "planargraph.hh"
 #include <iostream>
 
+#include "planargraph.hh"
+#include "triangulation.hh"
 
 
 // TODO: Assumes planarity. Should perhaps split into cubic class and planar class?
@@ -28,6 +29,8 @@ struct CubicGraph : public PlanarGraph {
 
   // creates the (k,l)-Goldberg-Coxeter construction C_{(k^2+kl+l^2)n} of the current C_n
   CubicGraph GCtransform(const unsigned k=1, const unsigned l=0, const bool do_layout=false) const;
+
+  vector<int> vertex_numbers(const Triangulation &T, const vector<int> &perm) const;
 
 };
 

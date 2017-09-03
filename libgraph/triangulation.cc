@@ -5,16 +5,16 @@
 
 pair<node_t,node_t> Triangulation::adjacent_tris(const dedge_t& e) const
 {
-  node_t u  = e.first, v = e.second;  
+  node_t u  = e.first, v = e.second;
   node_t w1=-1, w2=-1;
-  
+
   if(is_oriented) {
     w1 = next_on_face(u,v), w2 = next_on_face(v,u);
   } else {
     vector<node_t> ws;
     auto is_in = [](const vector<node_t> &v, node_t x)
       { return find(v.begin(),v.end(),x) != v.end(); };
-    
+
     for(node_t w: neighbours[u])
       if(is_in(neighbours[w],u) && is_in(neighbours[w],v)) ws.push_back(w);
 
@@ -26,7 +26,7 @@ pair<node_t,node_t> Triangulation::adjacent_tris(const dedge_t& e) const
     }
     w1 = ws[0], w2 = ws[1];
   }
-  
+
   return make_pair(w1,w2);
 }
 
@@ -43,8 +43,8 @@ vector<tri_t> Triangulation::compute_faces() const
     for(node_t v: neighbours[u]){
       pair<node_t,node_t> ws(adjacent_tris({u,v}));
 
-      triangle_set.insert(tri_t(u,v,ws.first ).sorted());
-      triangle_set.insert(tri_t(u,v,ws.second).sorted());
+      triangle_set.insert(tri_t{u,v,ws.first }.sorted());
+      triangle_set.insert(tri_t{u,v,ws.second}.sorted());
     }
 
 
@@ -123,7 +123,7 @@ PlanarGraph Triangulation::dual_graph() const
     for(int i=0;i<3;i++){
       const node_t& u(t[i]), v(t[(i+1)%3]);
       node_t w(prev(u,v)); // TODO: CCW for buckygen -- will this give problems elsewhere?
-      // TODO: Should this not be prev(v,u)? Or next(v,u)? 
+      // TODO: Should this not be prev(v,u)? Or next(v,u)?
 
       A[U][i] = tri_numbers(tri_t(u,v,w).sorted());
 
@@ -273,7 +273,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) const
 {
   if(l==0) return halma_transform(k-1);
-  
+
   Unfolding u(*this,true);
   Unfolding gcu(u*Eisenstein(k,l));
   Folding gcf(gcu);
@@ -378,7 +378,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
                                               const bool general, const vector<int>& S0, const jumplist_t &J0) const {
   // TODO: If S0 and J0 are specified, we are finding symmetry group permutations and should follow (S0,J0).
   //       Currently J0 is ignored, but J0 should control jumps in this case.
-  
+
   //this routine expects empty containers pentagon_indices and jumps.  we make sure they *are* empty
   spiral.clear();
   jumps.clear();
@@ -480,10 +480,10 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
         jump_state=0;
       }
     }
-    
+
     // record the number of the last vertex, as the neighbour of the second to last one
     // this only needs to be done when remaining_graph.N==2, but writing this value each cycle should be cheaper than testing something each cycle
-    // if(remaining_graph.N==2) 
+    // if(remaining_graph.N==2)
     last_vertex=remaining_graph.neighbours[v][0];
 
     //remove all edges of which *j is part from the remaining graph
@@ -533,7 +533,7 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   return true;
 }
 
-void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps, 
+void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps,
                      vector< vector<int> >& permutations,
                      const bool only_special, const bool general) const
 {
@@ -572,7 +572,8 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
 bool Triangulation::get_spiral(vector<int>& spiral, jumplist_t& jumps, const bool only_rarest_special, const bool general) const
 {
   vector<int> permutation(N);
-  return get_spiral(spiral,jumps,permutation,only_rarest_special,general);
+  bool success = get_spiral(spiral,jumps,permutation,only_rarest_special,general);
+  return success;
 }
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
@@ -585,7 +586,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
     int max_face_size=0;
     for(node_t u=0;u<N;u++) if(neighbours[u].size()>max_face_size) max_face_size=neighbours[u].size();
     //cerr << max_face_size << endl;
-  
+
     vector<int> face_counts(max_face_size,0);
     for(node_t u=0;u<N;u++) face_counts[neighbours[u].size()-1]++;
     //cerr << face_counts << endl;

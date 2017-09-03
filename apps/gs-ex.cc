@@ -206,10 +206,15 @@ Graph example4(){
 
 Graph examples[4] = {example1(), example2(), example3(), example4()};
 
+
 int main(int ac, char **av)
 {
   int Nex = ac>=2? strtol(av[1],0,0) : 1;
 
+  vector<vector<int>> outer_faces{{1, 3, 4, 6, 17, 16, 15, 14},
+      {1,4,13,22,34,33,21,9,3,46},{32,34,31,36,33,35},
+				    {1,7,6,5,4,3,2}};
+  
   if(Nex < 1 || Nex > 4){cerr << "invalid graph chosen, aborting ..." << endl; abort();}
 
   string basename("gs-ex-"+to_string(Nex));
@@ -221,31 +226,53 @@ int main(int ac, char **av)
   output.flush();
 
   printf("Computing planar layout\n");
-  g.layout2d = g.tutte_layout();
+  if(Nex <= outer_faces.size()){
+    g.outer_face = outer_faces[Nex-1]+(-1);
+    g.layout2d = g.tutte_layout(g.outer_face);
+  } else 
+    g.layout2d = g.tutte_layout();
+
+  g.orient_neighbours();
 
   printf("Computing dual\n");
-  PlanarGraph dg(g.dual_graph(8,true));
+  PlanarGraph dg(g.dual_graph(10,true));
 
   printf("Computing planar layour of dual\n");
   dg.layout2d = dg.tutte_layout();
 
-  output << "g = " << g << ";\n";
-  output << "dg = " << dg << ";\n";  
+  output << "g2d  = " << g << ";\n";
+  output << "dg2d = " << dg << ";\n";  
   output.flush();
 
-  vector<face_t> faces = dg.compute_faces_flat(3,true);
-  vector<tri_t>  triangles(faces.begin(),faces.end());
+  vector<face_t>  faces =  g.compute_faces(10,true);
+  vector<face_t> dfaces = dg.compute_faces(3,true);
+
+  output << "faces  = " << faces  << ";\n"
+	 << "dfaces = " << dfaces << ";\n";
+  output.flush();
+  
+  bool dual_is_triangulation = true, graph_is_cubic = true;
+  for(auto &f: dfaces) if(f.size() != 3) dual_is_triangulation = false;
+  for(auto &n: g.neighbours) if(n.size() != 3) graph_is_cubic = false;
+
+  if(graph_is_cubic != dual_is_triangulation){
+    fprintf(stderr,"Graph is %scubic, but dual is %striangulation.\n",
+	    graph_is_cubic?"":"not ", dual_is_triangulation?"":"not ");
+    abort();
+  }
+  
+  vector<tri_t>  triangles(dfaces.begin(),dfaces.end());
   cout << "triangles = " << triangles << ";\n";
 
   Triangulation dt(dg,triangles);
-  cout << "t" << endl;
+
   vector<int> spiral;
-  Triangulation::jumplist_t jumplist;
-//  bool success = dt.get_spiral(spiral,jumplist);
-//  if(!success) cerr << "Canonical general spiral not found.\n";
+  jumplist_t jumplist;
+  bool success = dt.get_spiral(spiral,jumplist);
+  if(!success) cerr << "Canonical general spiral not found.\n";
 //
-//  output << "spiral   = " << spiral << ";\n"
-//  	 << "jumplist = " << jumplist << ";\n";
+  output << "spiral   = " << spiral << ";\n"
+  	 << "jumplist = " << jumplist << ";\n";
   
 
   Polyhedron P0(g,g.zero_order_geometry(),10);
@@ -272,10 +299,13 @@ int main(int ac, char **av)
   printf("Optimizing polyhedron.\n");
   P.optimize();
 
+  P.move_to_origin();
+  P.align_with_axes();
+
   output << "Pcoordinates = "  << P.points << ";\n";
   output << "P = " << P << ";\n";
   
-  Polyhedron D(P.dual(8,true));
+  Polyhedron D(P.dual(10,true));
 
   output << "PD = " << D << ";\n";
   
@@ -286,8 +316,14 @@ int main(int ac, char **av)
     ofstream mol2(("output/"+basename+".mol2").c_str());
     mol2 << P.to_mol2();
     mol2.close();
+
+    ofstream pov(("output/"+basename+".pov").c_str());
+    pov << P.to_povray();
+    pov.close();    
   }
 
+  
+  
   {
     ofstream xyz(("output/"+basename+".xyz").c_str());
     xyz << P.to_xyz();
