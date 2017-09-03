@@ -177,6 +177,10 @@ int intersection_3(vector<int> &a, vector<int> &b, vector<int> &c){
   return -1;
 }
 
+
+// permutation of cub vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices)
+// here T is the dual of the cubic graph
+// and perm is the permutation as returned by T.get_spiral()
 vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<int> &perm) const{
   // cout << "permutation of vertex numbers of triangulation: " << perm << endl;
   vector<int> perm_inv(perm.size());
@@ -223,5 +227,4 @@ vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<int>
   // cout << "permutation of cub vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices): " << vertex_numbers << endl;
   return vertex_numbers;
 } 
-
 

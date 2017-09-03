@@ -3,10 +3,6 @@
 #include "libgraph/triangulation.hh"
 
 
-// triangulations: we get the permutation of vertices. done.
-// cubic graphs: get dual (how are the new vertex numbers derived from the old?), order faces, translate back (how are indices inherited?)
-// leap-frog: (permutation of leap frog?), identify "
-
 
 // elongated square bipyramid
 PlanarGraph non_cubic_graph(){

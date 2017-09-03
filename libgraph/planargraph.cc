@@ -939,8 +939,9 @@ vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
 }
 
 
-// where perm is the permutation of the spiral of the leapfrog_dual
-vector<int> PlanarGraph::vertex_numbers(vector<int> &perm){
+// permutation of vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices)
+// where perm is the permutation as returned by PG.leapfrog_dual().get_spiral()
+vector<int> PlanarGraph::vertex_numbers(vector<int> &perm) const{
   assert(!is_cubic());
   
   vector<int> vn;
