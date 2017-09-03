@@ -614,17 +614,16 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
   spiral = vector<int>(1,INT_MAX); // so it gets overwritten
   jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
 
-  //  cerr << "spiralstarts = " << node_starts << ";\n";
+  //cerr << "spiralstarts = " << node_starts << ";\n";
   
   // TODO: Write this way neater.
   bool found_one = false;
   for(int i=0; i<node_starts.size(); i++){
     const node_t u=node_starts[i];
-    const vector<node_t>& nu(neighbours[u]);
 
     // Get regular spiral if it exists
-    for(int j=0;j<nu.size();j++){
-      node_t v=nu[j], w[2];
+    for(node_t v: neighbours[u]){
+      node_t w[2];
       w[0] = prev(v,u);
       w[1] = next(v,u);
 
@@ -650,11 +649,10 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
   if(general && !found_one){
     for(int i=0; i<node_starts.size(); i++){
       const node_t u=node_starts[i];
-      const vector<node_t>& nu(neighbours[u]);
 
       // Get regular spiral if it exists
-      for(int j=0;j<nu.size();j++){
-          node_t v=nu[j], w[2];
+      for(node_t v: neighbours[u]){
+          node_t w[2];
           w[0] = prev(v,u);
           w[1] = next(v,u);
 
@@ -672,7 +670,7 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
             spiral      = spiral_tmp;
             permutation = permutation_tmp;
           } else {
-	    //    cerr << general_spiral{jumps_tmp,spiral_tmp} << " >= " << general_spiral{jumps,spiral} << "\n";	    
+	    //	    cerr << general_spiral{jumps_tmp,spiral_tmp} << " >= " << general_spiral{jumps,spiral} << "\n";	    
 	  }
         }
       }

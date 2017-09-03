@@ -211,9 +211,12 @@ struct general_spiral {
 
   bool operator<(const general_spiral &s)
   {
-    return jumps.size() < s.jumps.size() || 
-    (jumps.size() == s.jumps.size() && spiral < s.spiral) ||
-      (jumps.size() == s.jumps.size() && spiral == s.spiral && jumps < s.jumps);
+    return jumps.size() < s.jumps.size() ||
+    (jumps.size() == s.jumps.size() && jumps < s.jumps) ||
+      (jumps == s.jumps && spiral < s.spiral);
+      // The following gives spiral strings precedence over jump content (but still prefers shorter jump lists)
+      //    (jumps.size() == s.jumps.size() && spiral < s.spiral) ||
+      //      (jumps.size() == s.jumps.size() && spiral == s.spiral && jumps < s.jumps);
   }
   
   friend ostream &operator<<(ostream &s, const general_spiral &GS)
