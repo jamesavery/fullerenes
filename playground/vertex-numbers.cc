@@ -68,7 +68,7 @@ int main(int ac, char **av)
 // vertex numbers in the triangulation
   cout << "*** trig" << endl;
   Triangulation T1(spiral,jumps);
-  cout << T1 << endl;
+  // cout << T1 << endl;
 
   vector<int> S1;
   jumplist_t J1;
@@ -77,13 +77,14 @@ int main(int ac, char **av)
   cout << "vertex numbers of triangulation: " << permutation1 << endl;
 
 
-  // vertex numbers in the cubic graph
+// vertex numbers in the cubic graph
   cout << "*** cub" << endl;
   FullereneGraph FG(N, RSPI,jumps);
   FG.layout2d = FG.tutte_layout();
 
   // get triangulation
   Triangulation T2(FG.dual_graph());
+
   vector<int> S2;
   jumplist_t J2;
   vector<int> perm2;
@@ -105,7 +106,7 @@ int main(int ac, char **av)
   vector<int> perm3;
   T3.get_spiral(S3, J3, perm3);
 
-  vector<int> vn3(PG.vertex_numbers(T3, perm3));
+  vector<int> vn3(PG.vertex_numbers(perm3));
   cout << vn3 << endl;
 
   return 0;

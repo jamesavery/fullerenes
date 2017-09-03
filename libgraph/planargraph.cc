@@ -250,7 +250,7 @@ Graph PlanarGraph::leapfrog_dual() const
     const face_t &f  = faces[i];
     node_t c = N+i;                // Face-center node
 
-    cerr << "new node " << c << " at face " << f << "\n";
+    // cerr << "new node " << c << " at face " << f << "\n";
     
     for(int j=0;j<f.size();j++){
       node_t u = f[j], v = f[(j+1)%f.size()];
@@ -938,7 +938,9 @@ vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
   return faces;
 }
 
-vector<int> PlanarGraph::vertex_numbers(Triangulation &T, vector<int> &perm){
+
+// where perm is the permutation of the spiral of the leapfrog_dual
+vector<int> PlanarGraph::vertex_numbers(vector<int> &perm){
   assert(!is_cubic());
   
   vector<int> vn;

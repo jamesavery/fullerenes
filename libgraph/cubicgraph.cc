@@ -178,13 +178,13 @@ int intersection_3(vector<int> &a, vector<int> &b, vector<int> &c){
 }
 
 vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<int> &perm) const{
-  cout << "permutation of vertex numbers of triangulation: " << perm << endl;
+  // cout << "permutation of vertex numbers of triangulation: " << perm << endl;
   vector<int> perm_inv(perm.size());
   for(int i=0; i< perm.size(); i++) perm_inv[perm[i]] = i;
-  cout << "inverse permutation of vertex numbers of triangulation: " << perm_inv << endl;
+  // cout << "inverse permutation of vertex numbers of triangulation: " << perm_inv << endl;
 
   vector<tri_t> tri_faces = T.compute_faces();
-  cout << "triangles, relative to trig internal vertex numbers: " << tri_faces << endl;
+  // cout << "triangles, relative to trig internal vertex numbers: " << tri_faces << endl;
   for(int i=0; i<tri_faces.size(); i++){
     for(int j=0; j<3; j++){
       tri_faces[i][j] = perm_inv[tri_faces[i][j]];
@@ -197,7 +197,7 @@ vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<int>
     if(t[0] > t[1]) swap(t[0], t[1]);
   }
   sort(tri_faces.begin(), tri_faces.end()); 
-  cout <<  "triangles, relative to canon vertex numbers: " << tri_faces << endl;
+  // cout <<  "triangles, relative to canon vertex numbers: " << tri_faces << endl;
   
   // permute back
   for(int i=0; i<tri_faces.size(); i++){
@@ -205,11 +205,11 @@ vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<int>
       tri_faces[i][j] = perm[tri_faces[i][j]];
     }
   }
-  cout << "triangles, in terms of internal numbers, sorted according to canon numbers: " << tri_faces << endl;
+  // cout << "triangles, in terms of internal numbers, sorted according to canon numbers: " << tri_faces << endl;
 
   // and then find the vertex in cub, which is part of faces {0,1,2},{0,1,5}, ...
   vector<face_t> cub_faces = compute_faces_oriented();
-  cout << "faces " << cub_faces << endl;
+  // cout << "faces " << cub_faces << endl;
   vector<int> vertex_numbers_inv(N);
   for(int v=0; v<N; v++){
     face_t f0 = cub_faces[tri_faces[v][0]];
@@ -217,10 +217,10 @@ vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<int>
     face_t f2 = cub_faces[tri_faces[v][2]];
     vertex_numbers_inv[v] = intersection_3(f0, f1, f2);
   }
-  cout << "permutation of cub vertex numbers inv: " << vertex_numbers_inv << endl;
+  // cout << "permutation of cub vertex numbers inv: " << vertex_numbers_inv << endl;
   vector<int> vertex_numbers(N);
   for(int i=0; i<vertex_numbers.size(); i++) vertex_numbers[vertex_numbers_inv[i]] = i;
-  cout << "permutation of cub vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices): " << vertex_numbers << endl;
+  // cout << "permutation of cub vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices): " << vertex_numbers << endl;
   return vertex_numbers;
 } 
 
