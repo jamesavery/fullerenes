@@ -1,5 +1,4 @@
-#ifndef AUXILIARY_HH
-# define AUXILIARY_HH
+#pragma once
 #include <iostream>
 #include <vector>
 #include <list>
@@ -203,5 +202,25 @@ public:
   }
 };
 
+// TODO: Gather spiral stuff in spiral.hh
+typedef list<pair<int,int> > jumplist_t;
 
-#endif
+struct general_spiral {
+  jumplist_t  jumps;
+  vector<int> spiral;
+
+  bool operator<(const general_spiral &s)
+  {
+    return jumps.size() < s.jumps.size() || 
+    (jumps.size() == s.jumps.size() && spiral < s.spiral) ||
+      (jumps.size() == s.jumps.size() && spiral == s.spiral && jumps < s.jumps);
+  }
+  
+  friend ostream &operator<<(ostream &s, const general_spiral &GS)
+  {
+    return s << make_pair(GS.jumps,GS.spiral); 
+  }
+};
+
+
+

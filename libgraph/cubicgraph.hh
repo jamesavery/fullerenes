@@ -4,7 +4,7 @@
 #include "planargraph.hh"
 #include <iostream>
 
-typedef list<pair<int,int> > jumplist_t;
+
 
 // TODO: Assumes planarity. Should perhaps split into cubic class and planar class?
 struct CubicGraph : public PlanarGraph {

@@ -606,14 +606,15 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
     //cerr << node_starts << endl;
   }
   else 
-    for(node_t u=0;u<N;u++)
-      if(neighbours[u].size() != 6) node_starts.push_back(u);
+    for(node_t u=0;u<N;u++) node_starts.push_back(u);
 
   vector<int> spiral_tmp(N),permutation_tmp(N);
   jumplist_t jumps_tmp;
   spiral = vector<int>(1,INT_MAX); // so it gets overwritten
   jumps = jumplist_t(100,make_pair(0,0)); // so it gets overwritten
 
+  //  cerr << "spiralstarts = " << node_starts << ";\n";
+  
   // TODO: Write this way neater.
   bool found_one = false;
   for(int i=0; i<node_starts.size(); i++){
@@ -623,11 +624,11 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
     // Get regular spiral if it exists
     for(int j=0;j<nu.size();j++){
       node_t v=nu[j], w[2];
-      w[0] = prev(u,v);
-      w[1] = next(u,v);
+      w[0] = prev(v,u);
+      w[1] = next(v,u);
 
       for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
-        // NB: general -> false to only to general if all originals fail
+        // NB: general -> false to only do general if all originals fail
         //     That's much faster on average, but gives bigger variation in times.
         if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,false))
           continue;
@@ -635,13 +636,11 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
         found_one = true;
 
         // store the shortest / lexicographically smallest (general) spiral
-        if(jumps_tmp.size() < jumps.size() ||
-           (jumps_tmp.size() == jumps.size() && jumps_tmp < jumps) ||
-           (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps && spiral_tmp < spiral)){
+        if(general_spiral{jumps_tmp,spiral_tmp} < general_spiral{jumps,spiral}){
           jumps       = jumps_tmp;
           spiral      = spiral_tmp;
           permutation = permutation_tmp;
-        }
+        } 
       }
     }
   }
@@ -655,23 +654,25 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
       // Get regular spiral if it exists
       for(int j=0;j<nu.size();j++){
           node_t v=nu[j], w[2];
-          w[0] = prev(u,v);
-          w[1] = next(u,v);
+          w[0] = prev(v,u);
+          w[1] = next(v,u);
 
         for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
-          if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true))
-            continue;
-
+          if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true)){
+	    cerr << "General spiral failed -- this should never happen!\n";
+	    abort();
+	  }
           found_one = true;
 
           // store the shortest / lexicographically smallest (general) spiral
-          if(jumps_tmp.size() < jumps.size() ||
-             (jumps_tmp.size() == jumps.size() && jumps_tmp < jumps) ||
-             (jumps_tmp.size() == jumps.size() && jumps_tmp == jumps && spiral_tmp < spiral)){
+          if(general_spiral{jumps_tmp,spiral_tmp} < general_spiral{jumps,spiral}){
+	    //	    cerr << general_spiral{jumps_tmp,spiral_tmp} << " < " << general_spiral{jumps,spiral} << "\n";	 
             jumps       = jumps_tmp;
             spiral      = spiral_tmp;
             permutation = permutation_tmp;
-          }
+          } else {
+	    //    cerr << general_spiral{jumps_tmp,spiral_tmp} << " >= " << general_spiral{jumps,spiral} << "\n";	    
+	  }
         }
       }
     }
