@@ -4,8 +4,8 @@
 #include <iostream>
 
 #include "planargraph.hh"
-#include "triangulation.hh"
 
+class Triangulation;
 
 // TODO: Assumes planarity. Should perhaps split into cubic class and planar class?
 struct CubicGraph : public PlanarGraph {

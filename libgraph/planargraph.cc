@@ -937,3 +937,15 @@ vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
   
   return faces;
 }
+
+vector<int> PlanarGraph::vertex_numbers(Triangulation &T, vector<int> &perm){
+  assert(!is_cubic());
+  
+  vector<int> vn;
+  for(int i=0; i<perm.size(); i++){
+    if(perm[i] < N) vn.push_back(perm[i]);
+  }
+  assert(vn.size() == N);
+  return vn; 
+}
+

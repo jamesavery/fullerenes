@@ -173,7 +173,7 @@ int intersection_3(vector<int> &a, vector<int> &b, vector<int> &c){
       }
     }
   }
-  assert(true);
+  assert(false);
   return -1;
 }
 
