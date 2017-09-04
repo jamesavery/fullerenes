@@ -340,6 +340,80 @@ Polyhedron Example9_C1C100()
   return Polyhedron(F,points,6,faces);
 }
 
+
+Graph example10_Tutte()
+{ 
+  Triangulation tutte_dual({5,10,5,5,5,9,5,4,5,4,4,5,4,10,5,5,5,5,5,10,4,5,5,4,5},jumplist_t{{10,1},{16,1}});
+  //cerr << "tuttedual = " << tutte_dual << ";\n";
+  return tutte_dual.dual_graph();
+}
+
+Polyhedron Example10_Tutte()
+{
+  PlanarGraph g(example10_Tutte());
+  g.layout2d = g.tutte_layout();
+  vector<coord3d> points = g.zero_order_geometry();
+  Polyhedron P(g,points,10,g.compute_faces());
+
+  return P;
+}
+
+//[GS: 4, 6^3,(6,4)^5]-24-cage
+Graph example11_OmniOct()
+{ 
+  Triangulation omnioct_dual({{4,6,6,6,6,4,6,4,6,4,6,4,6,4}},jumplist_t{});
+  return omnioct_dual.dual_graph();
+}
+
+//[GS: 9,3; (8, 3, 6, 3)^2, 3, 8, 3]-18-cage
+Graph example12_OmniPrism()
+{ 
+  Triangulation omniprism_dual({{8,3,6,3,8,3,6,3,3,8,3}},jumplist_t{{8,3}});
+  return omniprism_dual.dual_graph();
+}
+
+//Smallest non-spiralable polyhedral graph with faces up to hexagons
+//[GS: 18,2; 3, 6^11, 3, 6, (6, 3)^2, 6^2]-36-cage
+Graph example13_SmallestNS()
+{
+  Triangulation dual({{3,6,6,6,6,6,6,6,6,6,6,6,3,6,6,3,6,3,6,6}},jumplist_t{{17,2}});
+  return dual.dual_graph();
+}
+
+
+
+Polyhedron Example11_OmniOct()
+{
+  PlanarGraph g(example11_OmniOct());
+  g.layout2d = g.tutte_layout();
+  vector<coord3d> points = g.zero_order_geometry();
+  Polyhedron P(g,points,10,g.compute_faces());
+
+  return P;
+}
+
+Polyhedron Example12_OmniPrism()
+{
+  PlanarGraph g(example12_OmniPrism());
+  g.layout2d = g.tutte_layout();
+  vector<coord3d> points = g.zero_order_geometry();
+  Polyhedron P(g,points,10,g.compute_faces());
+
+  return P;
+}
+
+
+Polyhedron Example13_SmallestNS()
+{
+  PlanarGraph g(example13_SmallestNS());
+  g.layout2d = g.tutte_layout();
+  vector<coord3d> points = g.zero_order_geometry();
+  Polyhedron P(g,points,10,g.compute_faces());
+
+  return P;
+}
+
+
 PlanarGraph ExampleGraph(int Nex)
 {
   switch(Nex){
@@ -352,6 +426,10 @@ PlanarGraph ExampleGraph(int Nex)
   case 7: return example7();
   case 8: return example8_TdC100();
   case 9: return example9_C1C100();
+  case 10: return example10_Tutte();
+  case 11: return example11_OmniOct();
+  case 12: return example12_OmniPrism();
+  case 13: return example13_SmallestNS();
   default:
     break;
   }
@@ -371,6 +449,10 @@ Polyhedron ExamplePolyhedron(int Nex)
   case 7: return Example7();
   case 8: return Example8_TdC100();
   case 9: return Example9_C1C100();
+  case 10: return Example10_Tutte();
+  case 11: return Example11_OmniOct();
+  case 12: return Example12_OmniPrism();
+  case 13: return Example13_SmallestNS();
   default:
     break;
   }
@@ -421,11 +503,6 @@ string spiral_to_rspi_string(const vector<int>& spiral)
 {
   return spiral_to_string(spiral_to_rspi(spiral)+1);
 }
-
-struct general_spiral {
-  jumplist_t jumps;
-  vector<int> spiral;  
-};
 
 struct name_info {
   enum { CUBIC, TRIANGULATION, GENERAL } graph_type;
@@ -492,6 +569,12 @@ int main(int ac, char **av)
 
   PlanarGraph g  = ExampleGraph(Nex);
   PlanarGraph dg = g.dual_graph();
+
+  ofstream goutput(("output/"+basename+"-g.m").c_str());
+  goutput << "g = " << g << ";\n"
+	  << "dg = " << dg << ";\n";
+  goutput.close();
+  
   Polyhedron  P = ExamplePolyhedron(Nex);
 
   P.points *= 3;		// Triangle bond length is 3
@@ -521,15 +604,22 @@ int main(int ac, char **av)
     name_info compat_name(g,"C",true);
 
     // End at outer face, or as close to it as possible
-    vector<int> outer_faces[9] = {{0,1,2},{0,1,4,10,6,3},{3,4,5},{0,1,2,3},{20,23,22,21},{1,5,2,28},{0,3,7,4},{72, 97, 99, 82, 89},{54,98,64,88,90}};
-				  //{26,87,98,49,37,35}};
+    vector<int> outer_faces[13] = {{0,1,2},
+				   {6, 9, 8, 11, 7, 10},
+				   {3,4,5},{0,1,2,3},{20,21,22,23},{23, 27, 29, 24},{0,3,7,4},{93,95,97,99,94},{54,98,64,88,90},{},
+				   {0, 3, 7, 14, 15, 11},{3, 12, 13, 14, 15, 10, 9, 4},{27, 31, 32, 34, 35, 28}};
+
+    face_t outer_face = outer_faces[Nex-1];
+    if(outer_face.empty())
+      g.layout2d = g.tutte_layout();
+    else 
+      g.layout2d = g.tutte_layout(outer_faces[Nex-1]);
     
-    g.layout2d = g.tutte_layout(outer_faces[Nex-1]);
     // Hack:
     if(Nex==8) fix_up_TdC100_layout(g);
-    if(Nex==9) fix_up_C1C100_layout(g);
+    //    if(Nex==9) fix_up_C1C100_layout(g);
     
-    vector<face_t> faces = g.compute_faces();
+    vector<face_t> faces = g.compute_faces(12);
     vector<coord2d> dglayout(faces.size()), LFlayout2d(g.layout2d);
 
     for(int i=0;i<faces.size();i++){
@@ -543,7 +633,11 @@ int main(int ac, char **av)
     output << "triangulation = "  << name.triangulation << ";\n"
 	   << "permutation   = " << name.permutation << "+1;\n"
 	   << "jumps         = " << name.GS.jumps << ";\n"
-	   << "spiral        = " << name.GS.spiral << ";\n";
+	   << "spiral        = " << name.GS.spiral << ";\n"
+      	   << "cspermutation   = " << compat_name.permutation << "+1;\n"
+      	   << "csjumps         = " << compat_name.GS.jumps << ";\n"
+    	   << "csspiral        = " << compat_name.GS.spiral << ";\n";
+
     if(name.is_a_fullerene) output << "rspi = " << spiral_to_rspi(name.GS.spiral) << ";\n";
     output << "gsname = \"" << name << "\";\n";
     output << "csname = \"" << compat_name << "\";\n";
