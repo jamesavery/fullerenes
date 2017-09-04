@@ -70,7 +70,7 @@ public:
   vector<tri_t>&  orient_triangulation(vector<tri_t>& tris) const;
 
 
-  vector<coord2d> tutte_layout(node_t s=0, node_t t=-1, node_t r=-1, unsigned int face_max=6) const;
+  vector<coord2d> tutte_layout(node_t s=0, node_t t=-1, node_t r=-1, unsigned int face_max=INT_MAX) const;
   vector<coord2d> tutte_layout(const face_t& outer_face) const;
   vector<coord2d> tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
