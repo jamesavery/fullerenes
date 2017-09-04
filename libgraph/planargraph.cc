@@ -250,7 +250,7 @@ Graph PlanarGraph::leapfrog_dual() const
     const face_t &f  = faces[i];
     node_t c = N+i;                // Face-center node
 
-    cerr << "new node " << c << " at face " << f << "\n";
+    // cerr << "new node " << c << " at face " << f << "\n";
     
     for(int j=0;j<f.size();j++){
       node_t u = f[j], v = f[(j+1)%f.size()];
@@ -937,3 +937,18 @@ vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
   
   return faces;
 }
+
+
+// permutation of vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices)
+// where perm is the permutation as returned by PG.leapfrog_dual().get_spiral()
+vector<int> PlanarGraph::vertex_numbers(vector<int> &perm) const{
+  assert(!is_cubic());
+  
+  vector<int> vn;
+  for(int i=0; i<perm.size(); i++){
+    if(perm[i] < N) vn.push_back(perm[i]);
+  }
+  assert(vn.size() == N);
+  return vn; 
+}
+

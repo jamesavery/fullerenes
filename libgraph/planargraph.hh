@@ -61,8 +61,9 @@ public:
   
   size_t count_perfect_matchings() const;
 
-
   Graph leapfrog_dual() const;
+
+  vector<int> vertex_numbers(vector<int> &perm) const;
   
   vector<tri_t>  triangulation(int face_max=INT_MAX) const;
   vector<tri_t>  triangulation(const vector<face_t>& faces) const;
