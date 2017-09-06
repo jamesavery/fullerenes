@@ -533,15 +533,15 @@ bool Triangulation::get_spiral_implementation(const node_t f1, const node_t f2, 
   return true;
 }
 
-void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps,
-                     vector< vector<int> >& permutations,
+void Triangulation::get_all_spirals(vector<vector<int>>& spirals, vector<jumplist_t>& jumps,
+                     vector<vector<node_t>>& permutations,
                      const bool only_special, const bool general) const
 {
   vector<node_t> node_starts;
 
   vector<int> spiral(N);
   jumplist_t  jump;
-  vector<int> permutation;
+  vector<node_t> permutation;
 
   // Prefer special nodes. TODO: Automatic renumber in order of degrees.
   for(node_t u=0;u<N;u++) if(neighbours[u].size() != 6) node_starts.push_back(u);
@@ -571,15 +571,17 @@ void Triangulation::get_all_spirals(vector< vector<int> >& spirals, vector<jumpl
 
 bool Triangulation::get_spiral(vector<int>& spiral, jumplist_t& jumps, const bool only_rarest_special, const bool general) const
 {
-  vector<int> permutation(N);
-  bool success = get_spiral(spiral,jumps,permutation,only_rarest_special,general);
+  vector<vector<node_t>> permutations;
+  bool success = get_spiral(spiral,jumps,permutations,only_rarest_special,general);
   return success;
 }
 
+
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 // special_only is a switch to search for spirals starting at non-hexagons only
-bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<int>& permutation, const bool only_rarest_special, const bool general) const
+bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<vector<node_t>>& permutations, const bool only_rarest_special, const bool general) const
 {
+  permutations.clear();
   vector<node_t> node_starts;
 
   if(only_rarest_special){
@@ -639,8 +641,9 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
         if(general_spiral{jumps_tmp,spiral_tmp} < general_spiral{jumps,spiral}){
           jumps       = jumps_tmp;
           spiral      = spiral_tmp;
-          permutation = permutation_tmp;
+          permutations.clear();
         } 
+        permutations.push_back(permutation_tmp);
       }
     }
   }
@@ -658,20 +661,21 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
 
         for(int k=0;k<2;k++){        // Looks like O(N^3), is O(N) (or O(1) if only_rarest_special is set)
           if(!get_spiral(u,v,w[k],spiral_tmp,jumps_tmp,permutation_tmp,true)){
-	    cerr << "General spiral failed -- this should never happen!\n";
-	    abort();
-	  }
+            cerr << "General spiral failed -- this should never happen!\n";
+            abort();
+          }
           found_one = true;
 
           // store the shortest / lexicographically smallest (general) spiral
           if(general_spiral{jumps_tmp,spiral_tmp} < general_spiral{jumps,spiral}){
-	    //	    cerr << general_spiral{jumps_tmp,spiral_tmp} << " < " << general_spiral{jumps,spiral} << "\n";	 
+            //    cerr << general_spiral{jumps_tmp,spiral_tmp} << " < " << general_spiral{jumps,spiral} << "\n";
             jumps       = jumps_tmp;
             spiral      = spiral_tmp;
-            permutation = permutation_tmp;
+            permutations.clear();
           } else {
-	    //	    cerr << general_spiral{jumps_tmp,spiral_tmp} << " >= " << general_spiral{jumps,spiral} << "\n";	    
-	  }
+           //    cerr << general_spiral{jumps_tmp,spiral_tmp} << " >= " << general_spiral{jumps,spiral} << "\n";    
+          }
+          permutations.push_back(permutation_tmp);
         }
       }
     }
@@ -685,7 +689,8 @@ bool Triangulation::get_spiral(vector<int> &spiral, jumplist_t &jumps, vector<in
 
 void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const
 {
-  vector< vector<int> > spirals, permutations;
+  vector<vector<int>> spirals;
+  vector<vector<node_t>> permutations;
   vector<jumplist_t>    jumps;
 
   get_all_spirals(spirals,jumps,permutations,true,true);
@@ -837,7 +842,7 @@ Triangulation Triangulation::sort_nodes() const
 }
 
 
-// call for the canonical general spiral and extract the pentagon indices
+// call for one general spiral and extract the pentagon indices
 bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
 {
   rspi.resize(12);
@@ -867,4 +872,37 @@ bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, const bool ge
 
   return true;
 }
+
+
+// permutation of vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices)
+// where permutations are as returned by T.get_spiral(J,S,perm)
+// locants are vertices that should have small vertex numbers (as far as permitted by symmetry equivalent canonical spirals)
+vector<node_t> Triangulation::vertex_numbers(vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
+  assert(is_triangulation());
+  vector<node_t> vertex_numbers(N);
+  vector<node_t> vertex_numbers_inv(N,INT_MAX);
+  for(int p=0; p<permutations.size(); p++){
+    const vector<node_t> &vertex_numbers_tmp=permutations[p];
+    // invert
+    vector<node_t> vertex_numbers_inv_tmp(N);
+    for(int i=0; i<vertex_numbers_tmp.size(); i++) vertex_numbers_inv_tmp[vertex_numbers_tmp[i]] = i;
+    // copy to vertex_numbers_inv?
+    if(locants.size()==0){
+      vertex_numbers_inv = vertex_numbers_inv_tmp;
+      break;
+    }
+    // compare two vectors, but only at chosen positions
+    for(int l=0; l<locants.size(); l++){
+      if(vertex_numbers_inv_tmp[locants[l]] > vertex_numbers_inv[locants[l]]) break;
+      if(vertex_numbers_inv_tmp[locants[l]] < vertex_numbers_inv[locants[l]]){
+        vertex_numbers_inv = vertex_numbers_inv_tmp;
+        break;
+      }
+    }
+  }
+  //invert
+  for(int i=0; i<vertex_numbers.size(); i++) vertex_numbers[vertex_numbers_inv[i]] = i;
+  return vertex_numbers; 
+}
+
 

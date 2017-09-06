@@ -63,7 +63,7 @@ public:
 
   Graph leapfrog_dual() const;
 
-  vector<int> vertex_numbers(vector<int> &perm) const;
+  vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
   
   vector<tri_t>  triangulation(int face_max=INT_MAX) const;
   vector<tri_t>  triangulation(const vector<face_t>& faces) const;

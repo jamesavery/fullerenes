@@ -46,16 +46,17 @@ public:
 
 
   // Get canonical general spiral and permutation of nodes compared to current triangulation
-  bool get_spiral(vector<int>& v, jumplist_t& j, vector<int> &permutation, const bool only_rarest_special=true, const bool general=true) const;  
+  bool get_spiral(vector<int>& v, jumplist_t& j, vector<vector<node_t>> &permutations, const bool only_rarest_special=true, const bool general=true) const;  
   // Get canonical general spiral
   bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true) const;  
 
   void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps,
-		       vector< vector<int> >& permutations,
+		       vector<vector<node_t>>& permutations,
 		       const bool only_special=false, const bool general=false) const;
 
   void symmetry_information(int N_generators, Graph& coxeter_diagram, vector<int>& coxeter_labels) const;
 
+  vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
   
   void update(bool already_oriented) {
     //    renumber(); // TODO!

@@ -30,7 +30,7 @@ struct CubicGraph : public PlanarGraph {
   // creates the (k,l)-Goldberg-Coxeter construction C_{(k^2+kl+l^2)n} of the current C_n
   CubicGraph GCtransform(const unsigned k=1, const unsigned l=0, const bool do_layout=false) const;
 
-  vector<int> vertex_numbers(const Triangulation &T, const vector<int> &perm) const;
+  vector<node_t> vertex_numbers(const Triangulation &T, const vector<vector<node_t>> &perm, const vector<node_t>& loc) const;
 
 };
 

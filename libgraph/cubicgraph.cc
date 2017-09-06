@@ -180,53 +180,69 @@ int intersection_3(vector<int> &f1, vector<int> &f2, vector<int> &f3){
 
 
 // permutation of cub vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices)
-// here T is the dual of the cubic graph
-// and perm is the permutation as returned by T.get_spiral()
-vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<int> &perm) const{
-  // cout << "permutation of vertex numbers of triangulation: " << perm << endl;
-  vector<int> perm_inv(perm.size());
-  for(int i=0; i< perm.size(); i++) perm_inv[perm[i]] = i;
-  // cout << "inverse permutation of vertex numbers of triangulation: " << perm_inv << endl;
-
+// T is the dual of the cubic graph
+// perm is the permutation as returned by T.get_spiral()
+// locants are vertices that should have small vertex numbers (as far as permitted by symmetry equivalent canonical spirals)
+vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
   vector<tri_t> tri_faces = T.compute_faces();
-  // cout << "triangles, relative to trig internal vertex numbers: " << tri_faces << endl;
-  for(int i=0; i<tri_faces.size(); i++){
-    for(int j=0; j<3; j++){
-      tri_faces[i][j] = perm_inv[tri_faces[i][j]];
-    }
-  }
-  // sort triples, first the vertices per face, then the faces
-  for(tri_t& t: tri_faces){
-    if(t[0] > t[1]) swap(t[0], t[1]);
-    if(t[1] > t[2]) swap(t[1], t[2]);
-    if(t[0] > t[1]) swap(t[0], t[1]);
-  }
-  sort(tri_faces.begin(), tri_faces.end()); 
-  // cout <<  "triangles, relative to canon vertex numbers: " << tri_faces << endl;
-  
-  // permute back
-  for(int i=0; i<tri_faces.size(); i++){
-    for(int j=0; j<3; j++){
-      tri_faces[i][j] = perm[tri_faces[i][j]];
-    }
-  }
-  // cout << "triangles, in terms of internal numbers, sorted according to canon numbers: " << tri_faces << endl;
+  vector<node_t> vertex_numbers(N);
+  vector<node_t> vertex_numbers_inv(N,INT_MAX);
 
-  // and then find the vertex in cub, which is part of faces {0,1,2},{0,1,5}, ...
-  vector<face_t> cub_faces = compute_faces_oriented();
-  // cout << "faces " << cub_faces << endl;
-  vector<int> vertex_numbers_inv(N);
-  for(int v=0; v<N; v++){
-    face_t f0 = cub_faces[tri_faces[v][0]];
-    face_t f1 = cub_faces[tri_faces[v][1]];
-    face_t f2 = cub_faces[tri_faces[v][2]];
-    vertex_numbers_inv[v] = intersection_3(f0, f1, f2);
+  for(int p=0; p<permutations.size(); p++){
+    const vector<node_t> &perm=permutations[p];
+    // cout << "permutation of vertex numbers of triangulation: " << perm << endl;
+    vector<int> perm_inv(perm.size());
+    for(int i=0; i< perm.size(); i++) perm_inv[perm[i]] = i;
+    // cout << "inverse permutation of vertex numbers of triangulation: " << perm_inv << endl;
+
+    // cout << "triangles, relative to trig internal vertex numbers: " << tri_faces << endl;
+    for(int i=0; i<tri_faces.size(); i++){
+      for(int j=0; j<3; j++){
+        tri_faces[i][j] = perm_inv[tri_faces[i][j]];
+      }
+    }
+    // sort triples, first the vertices per face, then the faces
+    for(tri_t& t: tri_faces){
+      if(t[0] > t[1]) swap(t[0], t[1]);
+      if(t[1] > t[2]) swap(t[1], t[2]);
+      if(t[0] > t[1]) swap(t[0], t[1]);
+    }
+    sort(tri_faces.begin(), tri_faces.end());
+    // cout <<  "triangles, relative to canon vertex numbers: " << tri_faces << endl;
+
+    // permute back
+    for(int i=0; i<tri_faces.size(); i++){
+      for(int j=0; j<3; j++){
+        tri_faces[i][j] = perm[tri_faces[i][j]];
+      }
+    }
+    // cout << "triangles, in terms of internal numbers, sorted according to canon numbers: " << tri_faces << endl;
+
+    // and then find the vertex in cub, which is part of faces {0,1,2},{0,1,5}, ...
+    vector<face_t> cub_faces = compute_faces_oriented();
+    // cout << "faces " << cub_faces << endl;
+    vector<int> vertex_numbers_inv_tmp(N);
+    for(int v=0; v<N; v++){
+      face_t f0 = cub_faces[tri_faces[v][0]];
+      face_t f1 = cub_faces[tri_faces[v][1]];
+      face_t f2 = cub_faces[tri_faces[v][2]];
+      vertex_numbers_inv_tmp[v] = intersection_3(f0, f1, f2);
+    }
+    // copy to vertex_numbers_inv?
+    if(locants.size()==0){
+      vertex_numbers_inv = vertex_numbers_inv_tmp;
+      break;
+    }
+    for(int l=0; l<locants.size(); l++){
+      if(vertex_numbers_inv_tmp[locants[l]] > vertex_numbers_inv[locants[l]]) break;
+      if(vertex_numbers_inv_tmp[locants[l]] < vertex_numbers_inv[locants[l]]){
+        vertex_numbers_inv = vertex_numbers_inv_tmp;
+        break;
+      }
+    }
   }
-  // cout << "permutation of cub vertex numbers inv: " << vertex_numbers_inv << endl;
-  vector<int> vertex_numbers(N);
   for(int i=0; i<vertex_numbers.size(); i++) vertex_numbers[vertex_numbers_inv[i]] = i;
   // cout << "permutation of cub vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices): " << vertex_numbers << endl;
   return vertex_numbers;
-} 
-
+}
 

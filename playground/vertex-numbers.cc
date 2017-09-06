@@ -68,9 +68,11 @@ int main(int ac, char **av)
 
   vector<int> S1;
   jumplist_t J1;
-  vector<int> permutation1;
-  T1.get_spiral(S1, J1, permutation1);
-  cout << "vertex numbers of triangulation: " << permutation1 << endl;
+  vector<node_t> locants1({2,0});
+  vector<vector<node_t>> permutations1;
+  T1.get_spiral(S1, J1, permutations1);
+  vector<node_t> vn1(T1.vertex_numbers(permutations1, locants1));
+  cout << vn1 << endl;
 
 
 // vertex numbers in the cubic graph
@@ -83,12 +85,12 @@ int main(int ac, char **av)
 
   vector<int> S2;
   jumplist_t J2;
-  vector<int> perm2;
+  vector<vector<node_t>> permutations2;
+  vector<node_t> locants2({0,2,10});
   // get spiral permutation (vertices in trig)
-  T2.get_spiral(S2, J2, perm2);
-  vector<int> vn2(FG.vertex_numbers(T2, perm2));
+  T2.get_spiral(S2, J2, permutations2);
+  vector<node_t> vn2(FG.vertex_numbers(T2, permutations2, locants2));
   cout << vn2 << endl;
-
 
 // vertex numbers in a non cubic graph
   cout << "*** LF" << endl;
@@ -99,10 +101,11 @@ int main(int ac, char **av)
   
   vector<int> S3;
   jumplist_t J3;
-  vector<int> perm3;
-  T3.get_spiral(S3, J3, perm3);
+  vector<vector<node_t>> permutations3;
+  vector<node_t> locants3({0,2});
+  T3.get_spiral(S3, J3, permutations3);
 
-  vector<int> vn3(PG.vertex_numbers(perm3));
+  vector<node_t> vn3(PG.vertex_numbers(permutations3,locants3));
   cout << vn3 << endl;
 
   return 0;

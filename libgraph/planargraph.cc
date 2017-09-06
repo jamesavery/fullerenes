@@ -940,15 +940,40 @@ vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
 
 
 // permutation of vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices)
-// where perm is the permutation as returned by PG.leapfrog_dual().get_spiral()
-vector<int> PlanarGraph::vertex_numbers(vector<int> &perm) const{
+// where permutations are as returned by PG.leapfrog_dual().get_spiral()
+// locants are vertices that should have small vertex numbers (as far as permitted by symmetry equivalent canonical spirals)
+vector<node_t> PlanarGraph::vertex_numbers(vector<vector<node_t>> &permutations, const vector<node_t> &locants) const{
   assert(!is_cubic());
-  
-  vector<int> vn;
-  for(int i=0; i<perm.size(); i++){
-    if(perm[i] < N) vn.push_back(perm[i]);
+  vector<node_t> vertex_numbers_inv(N,INT_MAX);
+  for(int p=0; p<permutations.size(); p++){
+    const vector<node_t> &perm=permutations[p];
+    vector<node_t> vertex_numbers_tmp;
+    // strip face-vertices, keep only vertex-vertices
+    for(int i=0; i<perm.size(); i++){
+      if(perm[i] < N) vertex_numbers_tmp.push_back(perm[i]);
+    }
+    assert(vertex_numbers_tmp.size() == N);
+    //invert
+    vector<node_t> vertex_numbers_inv_tmp(N);
+    for(int i=0; i<vertex_numbers_tmp.size(); i++) vertex_numbers_inv_tmp[vertex_numbers_tmp[i]] = i;
+    // copy to vertex_numbers_inv?
+    if(locants.size()==0){
+      vertex_numbers_inv = vertex_numbers_inv_tmp;
+      break;
+    }
+    // compare two vectors, but only at chosen positions
+    for(int l=0; l<locants.size(); l++){
+      if(vertex_numbers_inv_tmp[locants[l]] > vertex_numbers_inv[locants[l]]) break;
+      if(vertex_numbers_inv_tmp[locants[l]] < vertex_numbers_inv[locants[l]]){
+        vertex_numbers_inv = vertex_numbers_inv_tmp;
+        break;
+      }
+    }
   }
-  assert(vn.size() == N);
-  return vn; 
+  //invert
+  vector<node_t> vertex_numbers(N);
+  for(int i=0; i<vertex_numbers.size(); i++) vertex_numbers[vertex_numbers_inv[i]] = i;
+  return vertex_numbers; 
 }
+
 
