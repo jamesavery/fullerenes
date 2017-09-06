@@ -163,13 +163,14 @@ CubicGraph CubicGraph::GCtransform(const unsigned k, const unsigned l, const boo
   return cg;
 }
 
+// returns the intersection of three sets, assuming that it's exactly one element (aimed at one vertex shared between three faces)
 // yes, I know this is inefficient, but the vectors are short
-int intersection_3(vector<int> &a, vector<int> &b, vector<int> &c){
-  for (int i=0; i<a.size(); i++){
-    for (int j=0; j<b.size(); j++){
-      if (a[i] != b[j]) continue;
-      for (int k=0; k<c.size(); k++){
-        if (a[i] == c[k]) return a[i];
+int intersection_3(vector<int> &f1, vector<int> &f2, vector<int> &f3){
+  for (int i=0; i<f1.size(); i++){
+    for (int j=0; j<f2.size(); j++){
+      if (f1[i] != f2[j]) continue;
+      for (int k=0; k<f3.size(); k++){
+        if (f1[i] == f3[k]) return f1[i];
       }
     }
   }
@@ -227,4 +228,5 @@ vector<int> CubicGraph::vertex_numbers(const Triangulation &T, const vector<int>
   // cout << "permutation of cub vertex numbers (ie, replace v by vertex_numbers[v], to get numbered vertices): " << vertex_numbers << endl;
   return vertex_numbers;
 } 
+
 
