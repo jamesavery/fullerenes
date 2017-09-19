@@ -209,7 +209,7 @@ struct general_spiral {
   jumplist_t  jumps;
   vector<int> spiral;
 
-  bool operator<(const general_spiral &s)
+  bool operator<(const general_spiral &s) const
   {
     return jumps.size() < s.jumps.size() ||
     (jumps.size() == s.jumps.size() && jumps < s.jumps) ||

@@ -21,7 +21,7 @@ struct general_spiral {
   general_spiral(const PlanarGraph &g, bool compatibility=false);
   general_spiral(const string& name);
   
-  bool operator<(const general_spiral &s);
+  bool operator<(const general_spiral &s) const;
   friend ostream &operator<<(ostream &s, const general_spiral &GS);
 };
 
