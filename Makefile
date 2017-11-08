@@ -11,12 +11,12 @@ AR=ar
 DIRECTORIES=-DFULLERENE_ROOT=\"${PWD}\" -DFULLERENE_DATABASE=\"${PWD}/database\"
 WARNINGS=-Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
 
-#CXXFLAGS= -g -O2 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
-CXXFLAGS= -L/opt/local/lib -g3 -m64 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
-# -stdlib=libc++
-#FFLAGS= -g -O2 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' -mcmodel=medium 
-FFLAGS= -L/opt/local/lib -g3 -m64 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' -mcmodel=medium 
-LIBRARIES=-lstdc++ -lgomp -lgfortran
+#CXXFLAGS=-I/opt/local/include -L/opt/local/lib -g3 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
+CXXFLAGS=-I/opt/local/include -L/opt/local/lib -O2 -m64 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) -fno-exceptions
+#FFLAGS= -O2 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' 
+FFLAGS=-cpp -m64 -L/opt/local/lib -Wall -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' 
+LIBRARIES= -lgfortran -lstdc++ -lm
+#-lstdc++ 
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
 # you might need to change the gfortran compiler options:
 
@@ -45,7 +45,8 @@ TESTOUT=$(patsubst input/%.inp, output/%.out, $(TESTINP))
 #
 #
 fullerene: $(FOBJECTS) build/libgraph.a
-	$(F90) $(FFLAGS) $(OPTIONS) $^ $(LIBRARIES) -o $@ -lstdc++ -lgomp
+	$(F90) $(FFLAGS) $(OPTIONS) $^ $(LIBRARIES) -o $@ -lstdc++
+#-lstdc++ 
 
 #
 # ############    Definition of the subroutines    ###############

@@ -1,7 +1,7 @@
 Ih-C240 6-31G opt. geom. minimum -9144.76260 au not converged out
 xyz file written aus with name C240extfile-3D.xyz
 Spiral search activated
-&General NA=240 iwext=1, ispsearch=2, filename='C240extfile' /
+&General IP=1 NA=240 iwext=1, ispsearch=2, filename='C240extfile' /
 &Coord ICart=1 /
 &FFChoice /
 &FFParameters /

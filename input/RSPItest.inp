@@ -1,0 +1,8 @@
+GC(k,1) test
+&General NA=3080, ip=1, ispsearch=2, nosort=1, itop=1 /
+&Coord ICart=3 rspi= 341  , 477  , 480  , 631  , 1219  , 1298  , 1373  , 1377  , 1488  , 1526  , 1535  , 1539 /
+&FFChoice  /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /

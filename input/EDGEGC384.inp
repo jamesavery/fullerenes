@@ -1,0 +1,27 @@
+Ih-C20 build from connectivities between vertices (edges)
+Note last input is a zero
+&General NA=20 /
+&Coord ICart=7 /
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /
+ 1  2  3 4
+ 2 13 17 0
+ 3  5 19 0
+ 4  6 15 0
+ 5 12 15 0
+ 6  7 17 0
+ 7  8 16 0
+ 8  9 20 0
+ 9 10 11 0
+10 14 18 0
+11 12 16 0
+12 18  0 0
+13 14 19 0
+14 20  0 0
+15 16  0 0
+17 20  0 0
+18 19  0 0
+ 0

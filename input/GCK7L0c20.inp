@@ -1,7 +1,7 @@
 Coxeter fullerene with indices (k,l)=(5,3) G0=C20 (Ih), produces I-C980
 Geometry optimization using extended Wu force field
 &General ispsearch=2 /
-&Coord ICart=4  kGC=5,3 /
+&Coord ICart=4  kGC=7 /
 &FFChoice /
 &FFParameters /
 &Hamilton /

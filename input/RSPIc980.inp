@@ -1,0 +1,8 @@
+I-C980 Using Tutte embedding to produce coordinates through ring spiral indices
+&General NA=980 ispsearch=2 /
+&Coord ICart=3 rspi=1,113,120,127,134,141,358,365,372,379,386,492/
+&FFChoice Iopt=3 /
+&FFParameters /
+&Hamilton /
+&Isomers /
+&Graph /

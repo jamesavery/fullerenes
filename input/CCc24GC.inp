@@ -2,7 +2,7 @@ Cartesian coordinate input from DFT calculations
 and subsequent (3,2) Goldberg-Coxeter transformation from D6d-C24 to D6-C456
 Result written out to file C456extfile-3D.xyz
 &General NA=24, nosort=1, iwext=1, filename='C456extfile' / 
-&Coord ICart=1, IGCtrans=1, kGC=3, lGC=2 /
+&Coord ICart=1, IGCtrans=1, kGC=1,1 /
 &FFChoice Iopt=1 /
 &FFParameters /
 &Hamilton /
