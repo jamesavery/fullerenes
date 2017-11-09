@@ -198,15 +198,22 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
     graph_type = FULLERENE;
     base_face_degree = 6;
     face_degrees     = vector<int>{{5}};
+    if(suffix_segments.size()==2)
+      chemical_formula = suffix_segments[0];
   }
 
   if(suffix == "fulleroid"){
     graph_type = FULLEROID;
     vector<string> fulleroid_face_spec = find_parenthetical(suffix_segments[0],"()");
-    base_face_degree = from_string<int>(fulleroid_face_spec[2]);
-    if(base_face_degree < 3) base_face_degree = 6;
+    if(fulleroid_face_spec[2].size()==0)
+      base_face_degree = 6;
+    else{
+      base_face_degree = from_string<int>(fulleroid_face_spec[2]);
+      if(base_face_degree < 3) base_face_degree = 6;
+    }
     
     face_degrees = split<int>(fulleroid_face_spec[1],",");
+    // chemical_formula = FIXME
   }
 
   fulleroid_constructor(spiral_numbers,face_degrees,base_face_degree);
@@ -252,7 +259,7 @@ map<string,string> spiral_paper_examples{{
     {"Omnitruncated_octahedron_spiral","[4, 6,6,6, 6,4,6,4,6,4,6,4,6,4]"},
     {"Omnitruncated_octahedron_full",  "Oh-[4, 6,6,6, 6,4,6,4,6,4,6,4,6,4]-24-cage"},
     {"Tutte_graph","[CS:11, 1, 17, 1; 5, 10, 5, 5, 5, 9, 5, 4, 5, 4, 4, 5, 4, 10, 5, 5, 5, 5, 5, 10, 4, 5, 5, 4, 5]"},
-    {"Tutte_molecule","C3-[CS: 11,1,17,1; 5,10,5,5,5,9,5,4,5,4,4,5,4,10,5,5,5,5,5,10,4,5,5,4,5]-C46-cage"},
+    {"Tutte_molecule","C3–[CS: 11,1,17,1; 5,10,5,5,5,9,5,4,5,4,4,5,4,10,5,5,5,5,5,10,4,5,5,4,5]-C46-cage"},
       // Different ways of writing the Td-C100
     {"Td-C100_shortest","[2,8,9,23,24,28,29,37,41,45,46,52]-fullerene"},
     {"Td-C100_full_GS","Td-[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-C100-fullerene"},
