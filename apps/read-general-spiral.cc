@@ -32,6 +32,47 @@
 // SPIRAL_SPEC ::= (SCHEMES ':'?) List(';') of (List(',') of int)
 // CAGE_TYPE ::= List('-') of ('(' (List(',') of int) ')') | FORMULA | ("fullerene" | "fulleroid" | "cage");
 
+
+vector<string> find_parenthetical(const string& parse_str, const char parentheses[2])
+{
+  size_t start = parse_str.find(parentheses[0], 0);
+  if (start == string::npos) return vector<string>();
+  size_t end   = parse_str.find(parentheses[1], start);
+  if (end == string::npos) return vector<string>();
+  
+  return vector<string>{{parse_str.substr(0, start), parse_str.substr(start+1, end-1),
+	parse_str.substr(end+1,parse_str.size()-1)}};
+}
+
+string trim(const string& str, const string& wschars)
+{
+    size_t first = str.find_first_not_of(wschars);
+    if(first == string::npos)
+      return "";
+    size_t last = str.find_last_not_of(wschars);
+
+    return str.substr(first, (last - first + 1));
+}
+
+template <> vector<string> split(const string& parse_str, const string& delimiters, const string wschars)
+{
+  vector<string> result;
+  const char *del_pt = delimiters.c_str();
+  char s[parse_str.size()+1];
+  strncpy(s,parse_str.c_str(),parse_str.size()+1);
+  char *pt = 0;
+
+  const char *next = strtok_r(s, del_pt, &pt);
+
+  while(next != 0){
+    result.push_back(trim(next,wschars));
+    next = strtok_r(0,del_pt,&pt);
+  }
+  return result;
+}
+
+
+
 struct full_spiral_name {
   typedef enum { SS_UNSPECIFIED, CANONICAL_GENERALIZED_SPIRAL, COMPATIBILITY_CANONICAL_SPIRAL } search_scheme_t;
   typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t;
