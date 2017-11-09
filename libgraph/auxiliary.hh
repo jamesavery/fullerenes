@@ -127,16 +127,6 @@ string pad_string(const string& s, int length, char padchar = '0');
 
 string filename_extension(const string& filename);
 
-template <typename T> vector<T> split(const string& parse_str, const string& delimiters, const string wschars=" \t\r\n")
-{
-  vector<string> string_result = split<string>(parse_str,delimiters,wschars);
-  vector<T> result;
-
-  for(string s: string_result) result.push_back(from_string<T>(s));
-
-  return result;
-}
-
 
 int gcd(int a, int b);
 

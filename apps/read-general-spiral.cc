@@ -55,6 +55,16 @@ string trim(const string& str, const string& wschars)
     return str.substr(first, (last - first + 1));
 }
 
+template <typename T> vector<T> split(const string& parse_str, const string& delimiters, const string wschars=" \t\r\n")
+{
+  vector<string> string_result = split<string>(parse_str,delimiters,wschars);
+  vector<T> result;
+
+  for(string s: string_result) result.push_back(from_string<T>(s));
+
+  return result;
+}
+
 template <> vector<string> split(const string& parse_str, const string& delimiters, const string wschars)
 {
   vector<string> result;
@@ -66,7 +76,7 @@ template <> vector<string> split(const string& parse_str, const string& delimite
   const char *next = strtok_r(s, del_pt, &pt);
 
   while(next != 0){
-    result.push_back(trim(next,wschars));
+    result.push_back(trim(next,wschars)); // FIXME: what happens if no character remains?  we still want to push back an empty string.
     next = strtok_r(0,del_pt,&pt);
   }
   return result;
@@ -152,7 +162,6 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
   // cerr << "schemes=\"" << (schemes_present? schemes_and_spiral[0] : "") <<"\";\n";
   // cerr << "spiral =\"" << schemes_and_spiral[schemes_present] <<"\";\n";    
   vector<string> spiral_segments  = split<string>(schemes_and_spiral[schemes_present],";");
-      
   
   // Construction- and canonical-spiral-search-schemes are stuck inside the spiral spec
   // Graph type is in suffix, parsed later
@@ -169,7 +178,7 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
       if(s == "CS") search_scheme = COMPATIBILITY_CANONICAL_SPIRAL;
     }
   }  
-  
+
   // Get spiral numbers: Optional jumps followed by either spiral face-degree string (spiral_code) or non-base-face indices
   vector<vector<int>> spiral_numbers(spiral_segments.size());    
   for(int i=0; i<spiral_segments.size(); i++){
@@ -245,9 +254,14 @@ void full_spiral_name::fulleroid_constructor(const vector<vector<int>> &spiral_n
   if(has_jumps)
     jumps = spiral_numbers[0];
   
-  for(int i=0;i<face_degrees.size();i++)
-    for(auto ix: spiral_numbers[i+has_jumps])
+
+  for(int i=0;i<face_degrees.size();i++){
+    // cout << "i: " << i << endl;
+    for(auto ix: spiral_numbers[i+has_jumps]){
+      // cout << "ix: " << ix << endl;
       spiral_code[ix-1] = face_degrees[i]; 
+    }
+  }
 }
 
 
@@ -266,8 +280,8 @@ map<string,string> spiral_paper_examples{{
     {"Td-C100_roid_a","[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-(5)-C100-fulleroid"},
     {"Td-C100_roid_b","[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-(5)6-fulleroid"},
     {"Td-C100_roid_c","[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-(5)_6-fulleroid"},
-    {"Td-C100_roid_d","[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-(4,5)-fulleroid"},
-    {"Td-C100_roid_e","[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-(4,5,8)-fulleroid"},            
+    {"Td-C100_roid_d","[GS: 43,2; ; 1,4,5,26,27,31,32,40,43,47,48,52]-(4,5)-fulleroid"},
+    {"Td-C100_roid_e","[GS: 43,2; ; 1,4,5,26,27,31,32,40,43,47,48,52; ]-(4,5,8)-fulleroid"},            
       // Non-spiralable fullerene examples
     {"NS-T-C380","[GS: 162,2,186,3; 1,4,5,126,127,136,137,155,162,171,172,186]-C380-fullerene"},
     {"NS-D3-C384","D3-[GS:171,8,178,9; 1,3,4,5,168,169,170,178,190,191,192,194]-C384-fullerene"},
