@@ -40,8 +40,9 @@ vector<string> find_parenthetical(const string& parse_str, const char parenthese
   size_t end   = parse_str.find(parentheses[1], start);
   if (end == string::npos) return vector<string>();
   
-  return vector<string>{{parse_str.substr(0, start), parse_str.substr(start+1, end-1),
-	parse_str.substr(end+1,parse_str.size()-1)}};
+  return vector<string>{{parse_str.substr(0, start),
+                         parse_str.substr(start+1, end-start-1),
+                         parse_str.substr(end+1,parse_str.size()-end-1)}};
 }
 
 string trim(const string& str, const string& wschars)
@@ -125,7 +126,7 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
 							base_face_degree(6), face_degrees({5})
 {
   vector<string> segments = find_parenthetical(str,"[]");
-  //  cerr << "segments = " << segments << "\n";
+  // cerr << "segments = " << segments[0] << "; " << segments[1] << "; " << segments[2] << "\n";
     
   if(segments.size() != 3){
     cerr << "Error in spiral string \"" << str << "\": Number of \"[]\"-delimited segments is " << segments.size()
@@ -250,7 +251,7 @@ map<string,string> spiral_paper_examples{{
     {"Omnitruncated_octahedron_spiral","[4, 6,6,6, 6,4,6,4,6,4,6,4,6,4]"},
     {"Omnitruncated_octahedron_full",  "Oh-[4, 6,6,6, 6,4,6,4,6,4,6,4,6,4]-24-cage"},
     {"Tutte_graph","[CS:11, 1, 17, 1; 5, 10, 5, 5, 5, 9, 5, 4, 5, 4, 4, 5, 4, 10, 5, 5, 5, 5, 5, 10, 4, 5, 5, 4, 5]"},
-    {"Tutte_molecule","C3–[CS: 11,1,17,1; 5,10,5,5,5,9,5,4,5,4,4,5,4,10,5,5,5,5,5,10,4,5,5,4,5]-C46-cage"},
+    {"Tutte_molecule","C3-[CS: 11,1,17,1; 5,10,5,5,5,9,5,4,5,4,4,5,4,10,5,5,5,5,5,10,4,5,5,4,5]-C46-cage"},
       // Different ways of writing the Td-C100
     {"Td-C100_shortest","[2,8,9,23,24,28,29,37,41,45,46,52]-fullerene"},
     {"Td-C100_full_GS","Td-[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-C100-fullerene"},
