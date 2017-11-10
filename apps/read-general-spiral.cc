@@ -9,7 +9,7 @@
 // (PG-)?[SCHEMES JUMPS INDICES]-FORMULA-fullerene
 // (PG-)?[SCHEMES JUMPS INDICES_LIST]-(FACEDEGREES)BASEFACE-FORMULA-fulleroid
 //
-// 
+//
 // PG                  ::= String "-"  (* Point group *)
 // SCHEMES             ::= EMPTY | (List(',') of SEARCH_SCHEME | CONSTRUCTION_SCHEME) ":"
 // SEARCH_SCHEME       ::= "GS" | "CS" | nil      (* "General Spiral" | "Compatibility Spiral"    *)
@@ -18,7 +18,7 @@
 // SPIRAL              ::= List(',') of int
 // INDICES             ::= List(',') of int
 // INDICES_LIST        ::= List(';') of INDICES
-// 
+//
 // 0. PG is redundant information. If given, verify after construction.
 // 1. If SEARCH_SCHEME is nil, assume "GS" if first index is non-base-face, "CS" otherwise.
 // 2. If CONSTRUCTION_SCHEME is nil, assume "C".
@@ -39,7 +39,7 @@ vector<string> find_parenthetical(const string& parse_str, const char parenthese
   if (start == string::npos) return vector<string>();
   size_t end   = parse_str.find(parentheses[1], start);
   if (end == string::npos) return vector<string>();
-  
+
   return vector<string>{{parse_str.substr(0, start),
                          parse_str.substr(start+1, end-start-1),
                          parse_str.substr(end+1,parse_str.size()-end-1)}};
@@ -76,7 +76,7 @@ template <> vector<string> split(const string& parse_str, const string& delimite
   const char *next = strtok_r(s, del_pt, &pt);
 
   while(next != 0){
-    result.push_back(trim(next,wschars)); // FIXME: what happens if no character remains?  we still want to push back an empty string.
+    result.push_back(trim(next,wschars));
     next = strtok_r(0,del_pt,&pt);
   }
   return result;
@@ -91,7 +91,7 @@ struct full_spiral_name {
 
   graph_type_t          graph_type;
   search_scheme_t       search_scheme;
-  construction_scheme_t construction_scheme;  
+  construction_scheme_t construction_scheme;
 
   string point_group, chemical_formula;
   int base_face_degree;
@@ -101,8 +101,8 @@ struct full_spiral_name {
   vector<int>      spiral_code;
 
   void fulleroid_constructor(const vector<vector<int>> &spiral_numbers, vector<int> face_degrees = {3,4,5},
-			     int base_face_degree=6);  
-  
+			     int base_face_degree=6);
+
   void cage_constructor(const vector<vector<int>> &spiral_numbers);
 
   full_spiral_name(const string &str);
@@ -137,32 +137,32 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
 {
   vector<string> segments = find_parenthetical(str,"[]");
   // cerr << "segments = " << segments[0] << "; " << segments[1] << "; " << segments[2] << "\n";
-    
+
   if(segments.size() != 3){
     cerr << "Error in spiral string \"" << str << "\": Number of \"[]\"-delimited segments is " << segments.size()
 	 << ", not 3.\n";
     abort();
   }
-    
+
   const string &prefix_string = segments[0], &spiral_spec = segments[1], &suffix_string = segments[2];
 
   //------------------------------ Parse Prefix ------------------------------
   // Is the point group specified?
   if(!segments[0].empty()) point_group = trim(prefix_string,"-– \t\r\n");
   // That's all we have stuck into the prefix.
-    
+
   // ---------------------- Parse Spiral Specification -----------------------
-  // TODO: Make runlength-coding parser (a,b,c)n -> a,b,c,a,b,c,...,a,b,c, and 
+  // TODO: Make runlength-coding parser (a,b,c)n -> a,b,c,a,b,c,...,a,b,c, and
   //       parse number segments in case runlength-coding is used
   vector<string> schemes_and_spiral = split<string>(spiral_spec,":");
   assert(schemes_and_spiral.size() <= 2);
-    
+
   bool schemes_present = schemes_and_spiral.size() == 2;
 
   // cerr << "schemes=\"" << (schemes_present? schemes_and_spiral[0] : "") <<"\";\n";
-  // cerr << "spiral =\"" << schemes_and_spiral[schemes_present] <<"\";\n";    
-  vector<string> spiral_segments  = split<string>(schemes_and_spiral[schemes_present],";");
-  
+  // cerr << "spiral =\"" << schemes_and_spiral[schemes_present] <<"\";\n";
+  vector<string> spiral_segments  = split<string>(schemes_and_spiral[schemes_present]+" ",";"); // and the space is a hack for making sure that trailing semicola lead to empty arrays rather than being stripped
+
   // Construction- and canonical-spiral-search-schemes are stuck inside the spiral spec
   // Graph type is in suffix, parsed later
   if(schemes_present){
@@ -177,10 +177,10 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
       if(s == "GS") search_scheme = CANONICAL_GENERALIZED_SPIRAL;
       if(s == "CS") search_scheme = COMPATIBILITY_CANONICAL_SPIRAL;
     }
-  }  
+  }
 
   // Get spiral numbers: Optional jumps followed by either spiral face-degree string (spiral_code) or non-base-face indices
-  vector<vector<int>> spiral_numbers(spiral_segments.size());    
+  vector<vector<int>> spiral_numbers(spiral_segments.size());
   for(int i=0; i<spiral_segments.size(); i++){
     spiral_numbers[i] = split<int>(spiral_segments[i],",");
   }
@@ -196,13 +196,13 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
     if(suffix_segments.size()>=2)
       chemical_formula = suffix_segments[suffix_segments.size()-2];
     return;
-  } 
+  }
 
   if(!(suffix == "fullerene" || suffix == "fulleroid")){
     cerr << "Graph type is \""<<suffix<<"\", must be one of \"cage\", \"fullerene\", or \"fulleroid\".\n";
     abort();
   }
-    
+
   if (suffix == "fullerene"){
     graph_type = FULLERENE;
     base_face_degree = 6;
@@ -217,10 +217,10 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
     if(fulleroid_face_spec[2].size()==0)
       base_face_degree = 6;
     else{
-      base_face_degree = from_string<int>(fulleroid_face_spec[2]);
-      if(base_face_degree < 3) base_face_degree = 6;
+      base_face_degree = from_string<int>(trim(fulleroid_face_spec[2],"_"));
     }
-    
+    if(base_face_degree < 3) return;
+
     face_degrees = split<int>(fulleroid_face_spec[1],",");
     // chemical_formula = FIXME
   }
@@ -253,13 +253,11 @@ void full_spiral_name::fulleroid_constructor(const vector<vector<int>> &spiral_n
 
   if(has_jumps)
     jumps = spiral_numbers[0];
-  
+
 
   for(int i=0;i<face_degrees.size();i++){
-    // cout << "i: " << i << endl;
     for(auto ix: spiral_numbers[i+has_jumps]){
-      // cout << "ix: " << ix << endl;
-      spiral_code[ix-1] = face_degrees[i]; 
+      spiral_code[ix-1] = face_degrees[i];
     }
   }
 }
@@ -281,7 +279,7 @@ map<string,string> spiral_paper_examples{{
     {"Td-C100_roid_b","[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-(5)6-fulleroid"},
     {"Td-C100_roid_c","[GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]-(5)_6-fulleroid"},
     {"Td-C100_roid_d","[GS: 43,2; ; 1,4,5,26,27,31,32,40,43,47,48,52]-(4,5)-fulleroid"},
-    {"Td-C100_roid_e","[GS: 43,2; ; 1,4,5,26,27,31,32,40,43,47,48,52; ]-(4,5,8)-fulleroid"},            
+    {"Td-C100_roid_e","[GS: 43,2; ; 1,4,5,26,27,31,32,40,43,47,48,52; ]-(4,5,8)-fulleroid"},
       // Non-spiralable fullerene examples
     {"NS-T-C380","[GS: 162,2,186,3; 1,4,5,126,127,136,137,155,162,171,172,186]-C380-fullerene"},
     {"NS-D3-C384","D3-[GS:171,8,178,9; 1,3,4,5,168,169,170,178,190,191,192,194]-C384-fullerene"},
@@ -320,6 +318,6 @@ int main(int ac, char **av)
     cout << example.first << "_name = \"" << example.second << "\";\n";
     cout << example.first << " = " << full_spiral_name(example.second) << ";\n\n";
   }
-  
+
   return 0;
 }
