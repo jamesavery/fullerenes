@@ -33,18 +33,6 @@
 // CAGE_TYPE ::= List('-') of ('(' (List(',') of int) ')') | FORMULA | ("fullerene" | "fulleroid" | "cage");
 
 
-vector<string> find_parenthetical(const string& parse_str, const char parentheses[2])
-{
-  size_t start = parse_str.find(parentheses[0], 0);
-  if (start == string::npos) return vector<string>();
-  size_t end   = parse_str.find(parentheses[1], start);
-  if (end == string::npos) return vector<string>();
-
-  return vector<string>{{parse_str.substr(0, start),
-                         parse_str.substr(start+1, end-start-1),
-                         parse_str.substr(end+1,parse_str.size()-end-1)}};
-}
-
 string trim(const string& str, const string& wschars)
 {
     size_t first = str.find_first_not_of(wschars);
@@ -53,6 +41,18 @@ string trim(const string& str, const string& wschars)
     size_t last = str.find_last_not_of(wschars);
 
     return str.substr(first, (last - first + 1));
+}
+
+vector<string> find_parenthetical(const string& parse_str, const char parentheses[2])
+{
+  size_t start = parse_str.find(parentheses[0], 0);
+  if (start == string::npos) return vector<string>();
+  size_t end   = parse_str.find(parentheses[1], start);
+  if (end == string::npos) return vector<string>();
+
+  return vector<string>{{trim(parse_str.substr(0, start)," \t\r\n"),
+	                 trim(parse_str.substr(start+1, end-start-1)," \t\r\n"),
+	                 trim(parse_str.substr(end+1,parse_str.size()-end-1)," \t\r\n")}};
 }
 
 template <typename T> vector<T> split(const string& parse_str, const string& delimiters, const string wschars=" \t\r\n")
@@ -65,20 +65,24 @@ template <typename T> vector<T> split(const string& parse_str, const string& del
   return result;
 }
 
+// Version of split that handles empty strings ("a;;b;c;" -> {"a","","b","c",""} in stead of {"a","b"}.
 template <> vector<string> split(const string& parse_str, const string& delimiters, const string wschars)
 {
+  // Unlike Python's split(), "" splits to [] instead of [""].
+  if(parse_str.empty()) return vector<string>();
+  
   vector<string> result;
-  const char *del_pt = delimiters.c_str();
-  char s[parse_str.size()+1];
-  strncpy(s,parse_str.c_str(),parse_str.size()+1);
-  char *pt = 0;
-
-  const char *next = strtok_r(s, del_pt, &pt);
-
-  while(next != 0){
-    result.push_back(trim(next,wschars));
-    next = strtok_r(0,del_pt,&pt);
+  size_t
+    start = 0,
+    end   = parse_str.find_first_of(delimiters);
+  
+  while(end != string::npos){
+    result.push_back(trim(parse_str.substr(start,end-start),wschars));
+    start = end+1;
+    end   = parse_str.find_first_of(delimiters,start);
   }
+  result.push_back(trim(parse_str.substr(start,string::npos),wschars));  
+
   return result;
 }
 
@@ -111,7 +115,7 @@ struct full_spiral_name {
 };
 
 string full_spiral_name::search_scheme_txt[4]       = {"UNSPECIFIED","CANONICAL_GENERALIZED_SPIRAL","COMPATIBILITY_CANONICAL_SPIRAL"};
-string full_spiral_name::construction_scheme_txt[4] = {"null","CUBIC","TRIANGULATION", "LEAPFROG"};
+string full_spiral_name::construction_scheme_txt[4] = {"UNSPECIFIED","CUBIC","TRIANGULATION", "LEAPFROG"};
 string full_spiral_name::graph_type_txt[4]          = {"null","FULLERENE", "FULLEROID", "CAGE"};
 
 ostream& operator<<(ostream& s, const full_spiral_name &sn)
@@ -120,7 +124,7 @@ ostream& operator<<(ostream& s, const full_spiral_name &sn)
     << "graph_type: \""<<full_spiral_name::graph_type_txt[sn.graph_type]<<"\",\n\t"
     << "search_scheme: \""<<full_spiral_name::search_scheme_txt[sn.search_scheme]<<"\",\n\t"
     << "construction_scheme: \""<<full_spiral_name::construction_scheme_txt[sn.construction_scheme]<<"\",\n\t"
-    << "point_group: \""<<sn.point_group<<"\",\n\t"
+    << "point_group: \""<<(sn.point_group.empty()? "UNSPECIFIED" : sn.point_group) <<"\",\n\t"
     << "chemical_formula: \""<<sn.chemical_formula<<"\",\n\t"
     << "base_face_degree: "<<sn.base_face_degree<<",\n\t"
     << "face_degrees: " << sn.face_degrees << ",\n\t"
@@ -132,11 +136,11 @@ ostream& operator<<(ostream& s, const full_spiral_name &sn)
 
 
 full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search_scheme(SS_UNSPECIFIED),
-							construction_scheme(CUBIC), point_group("null"),
+							construction_scheme(CUBIC), 
 							base_face_degree(6), face_degrees({5})
 {
   vector<string> segments = find_parenthetical(str,"[]");
-  // cerr << "segments = " << segments[0] << "; " << segments[1] << "; " << segments[2] << "\n";
+  //  cerr << "segments = " << segments[0] << "; " << segments[1] << "; " << segments[2] << "\n";
 
   if(segments.size() != 3){
     cerr << "Error in spiral string \"" << str << "\": Number of \"[]\"-delimited segments is " << segments.size()
@@ -144,7 +148,7 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
     abort();
   }
 
-  const string &prefix_string = segments[0], &spiral_spec = segments[1], &suffix_string = segments[2];
+  string &prefix_string = segments[0], &spiral_spec = segments[1], &suffix_string = segments[2];
 
   //------------------------------ Parse Prefix ------------------------------
   // Is the point group specified?
@@ -161,7 +165,7 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
 
   // cerr << "schemes=\"" << (schemes_present? schemes_and_spiral[0] : "") <<"\";\n";
   // cerr << "spiral =\"" << schemes_and_spiral[schemes_present] <<"\";\n";
-  vector<string> spiral_segments  = split<string>(schemes_and_spiral[schemes_present]+" ",";"); // and the space is a hack for making sure that trailing semicola lead to empty arrays rather than being stripped
+  vector<string> spiral_segments  = split<string>(schemes_and_spiral[schemes_present],";");
 
   // Construction- and canonical-spiral-search-schemes are stuck inside the spiral spec
   // Graph type is in suffix, parsed later
@@ -186,9 +190,14 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
   }
 
   //------------------------------ Parse SUFFIX ------------------------------
+  
   vector<string> suffix_segments = split<string>(suffix_string,"-–");
+  //  cerr << "suffix_segments = " << suffix_segments << ";\n";
+
   string suffix = suffix_segments.empty()? "cage" : suffix_segments.back();
 
+  int suffix_start = !suffix_segments.empty() && suffix_segments[0].empty()? 1 : 0; // first '-' doesn't separate, it's just there to look nice
+  
   // I think this should hold in general, whether it's 'cage', 'fullerene', or 'fulleroid',
   // except in one particlar case: [...]-(f1,..,fp)-fulleroid, handled below.
   if(suffix_segments.size()>=2)
@@ -214,7 +223,7 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
 
   if(suffix == "fulleroid"){
     graph_type = FULLEROID;
-    vector<string> fulleroid_face_spec = find_parenthetical(suffix_segments[0],"()");
+    vector<string> fulleroid_face_spec = find_parenthetical(suffix_segments[suffix_start],"()");
     if(fulleroid_face_spec[2].size()==0)
       base_face_degree = 6;
     else{
@@ -226,6 +235,10 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
     if(suffix_segments.size() == 2) chemical_formula = "";
   }
 
+  // cerr << "spiral_numbers   = " << spiral_numbers << ";\n"
+  //      << "face_degrees     = " << face_degrees << ";\n"
+  //      << "base_face_degree = " << base_face_degree << ";\n\n";
+  
   fulleroid_constructor(spiral_numbers,face_degrees,base_face_degree);
 }
 
@@ -237,6 +250,13 @@ void full_spiral_name::cage_constructor(const vector<vector<int>> &spiral_number
   if(has_jumps)
     jumps = spiral_numbers[0];
   spiral_code = spiral_numbers[has_jumps];
+
+  // Set face_degrees to something sensible
+  set<int> face_degree_set;
+  for(int f: spiral_code)
+    if(f!=base_face_degree) face_degree_set.insert(f);
+
+  face_degrees = vector<int>(face_degree_set.begin(), face_degree_set.end());
 }
 
 void full_spiral_name::fulleroid_constructor(const vector<vector<int>> &spiral_numbers, vector<int> face_degrees, int base_face_degree)
