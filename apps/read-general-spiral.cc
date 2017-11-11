@@ -189,12 +189,15 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
   vector<string> suffix_segments = split<string>(suffix_string,"-–");
   string suffix = suffix_segments.empty()? "cage" : suffix_segments.back();
 
+  // I think this should hold in general, whether it's 'cage', 'fullerene', or 'fulleroid',
+  // except in one particlar case: [...]-(f1,..,fp)-fulleroid, handled below.
+  if(suffix_segments.size()>=2)
+    chemical_formula = suffix_segments[suffix_segments.size()-2];
+  
   // General cage
   if (suffix == "cage"){
     graph_type = CAGE;
     cage_constructor(spiral_numbers);
-    if(suffix_segments.size()>=2)
-      chemical_formula = suffix_segments[suffix_segments.size()-2];
     return;
   }
 
@@ -207,8 +210,6 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
     graph_type = FULLERENE;
     base_face_degree = 6;
     face_degrees     = vector<int>{{5}};
-    if(suffix_segments.size()==2)
-      chemical_formula = suffix_segments[0];
   }
 
   if(suffix == "fulleroid"){
@@ -222,7 +223,7 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
     if(base_face_degree < 3) return;
 
     face_degrees = split<int>(fulleroid_face_spec[1],",");
-    // chemical_formula = FIXME
+    if(suffix_segments.size() == 2) chemical_formula = "";
   }
 
   fulleroid_constructor(spiral_numbers,face_degrees,base_face_degree);
