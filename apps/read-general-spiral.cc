@@ -232,7 +232,7 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
     if(base_face_degree < 3) return;
 
     face_degrees = split<int>(fulleroid_face_spec[1],",");
-    if(suffix_segments.size() == 2) chemical_formula = "";
+    if(suffix_segments.size() == 3) chemical_formula = "";
   }
 
   // cerr << "spiral_numbers   = " << spiral_numbers << ";\n"
