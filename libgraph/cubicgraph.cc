@@ -126,6 +126,13 @@ CubicGraph::CubicGraph(const int n, const vector<int>& spiral_string, const jump
   *this = G;
 }
 
+CubicGraph::CubicGraph(const full_spiral_name &fsn){
+  assert(fsn.construction_scheme == full_spiral_name::CUBIC);
+  Triangulation T(fsn);
+  *this = T.dual_graph();
+}
+
+
 bool CubicGraph::get_spiral_from_cg(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, jumplist_t &jumps, const bool general) const
 {
   spiral.clear();

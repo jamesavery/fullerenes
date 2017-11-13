@@ -21,6 +21,7 @@ public:
       outer_face = find_outer_face();
     } 
   }
+  PlanarGraph(const full_spiral_name &fsn);
 
   // Assumes file is at position of a graph start
   static Graph read_hog_planarcode(FILE *planarcode_file);
@@ -56,10 +57,11 @@ public:
 
 
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
+  // the dual of the LF, ie a Triangulation is returned
+  PlanarGraph leapfrog_dual() const;
   
   size_t count_perfect_matchings() const;
 
-  Graph leapfrog_dual() const;
 
   vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
   

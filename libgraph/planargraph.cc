@@ -1,7 +1,29 @@
-#include "planargraph.hh"
 #include <queue>
-#include <list>
+
+#include "spiral.hh"
+#include "planargraph.hh"
+#include "triangulation.hh"
+#include "cubicgraph.hh"
+
 using namespace std;
+
+PlanarGraph::PlanarGraph(const full_spiral_name &fsn){
+  switch(fsn.construction_scheme){
+    case full_spiral_name::CS_NONE:
+      assert(false);
+      break;
+    case full_spiral_name::CUBIC:
+      *this = CubicGraph(fsn);
+      break;
+    case full_spiral_name::TRIANGULATION:
+      *this = Triangulation(fsn);
+      break;
+    case full_spiral_name::LEAPFROG:
+      Triangulation T(fsn);
+      *this = T.inverse_leapfrog_dual();
+      break;
+  }  
+}
 
 bool PlanarGraph::is_cubic() const {
   for(node_t u=0;u<N;u++)
@@ -234,13 +256,13 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
   }    
 }
 
-
-Graph PlanarGraph::leapfrog_dual() const
+// the dual of the LF, ie a Triangulation is returned
+PlanarGraph PlanarGraph::leapfrog_dual() const
 {
   assert(is_oriented);
   vector<face_t> faces = compute_faces_oriented();
 
-  Graph lf(N+faces.size(),true);
+  PlanarGraph lf(N+faces.size(),true);
 
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++) lf.neighbours[u] = neighbours[u];

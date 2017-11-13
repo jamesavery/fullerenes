@@ -906,4 +906,44 @@ vector<node_t> Triangulation::vertex_numbers(vector<vector<node_t>> &permutation
   return vertex_numbers; 
 }
 
+// takes a triangulation, and returns a dual of the inverse leapfrog
+// this is easy because we just remove a set of faces
+// the resulting planar graph is oriented because the input is oriented und we only remove vertices
+PlanarGraph Triangulation::inverse_leapfrog_dual() const
+{
+  assert(is_oriented);
+  PlanarGraph PG(*this);
+  set<int> face_vertices, to_do_set;
+
+  // find all vertices with degree < 6 in PG
+  for(int i=0; PG.neighbours.size(); i++){
+    if(PG.neighbours[i].size() < 6){
+      face_vertices.insert(i);
+      to_do_set.insert(i);
+    }
+  }
+
+  // ... find all face faces
+  while(to_do_set.size() != 0){
+    int u = *(to_do_set.begin());
+    to_do_set.erase(to_do_set.begin());
+
+    for(int v: PG.neighbours[u]){
+      int w = next(u,v);
+      int s = face_vertices.size();
+      face_vertices.insert(w);
+      if(face_vertices.size() != s)
+        to_do_set.insert(w);
+    }
+  }
+
+  // check number of face_vertices
+  // FIXME, optional
+
+  // remove all face_vertices, done 
+  // FIXME, how does one remove vertices, and renumber the graph afterwards?  elegantly, I mean ...
+
+  return PG;
+}
+
 
