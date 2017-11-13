@@ -1,6 +1,7 @@
 #pragma once
 
 #include "matrix.hh"
+#include "spiral.hh"
 #include "planargraph.hh"
 
 class Triangulation : public PlanarGraph {
@@ -23,6 +24,7 @@ public:
   Triangulation(const neighbours_t& neighbours, bool already_oriented = false) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
+  Triangulation(const full_spiral_name &fsn): Triangulation(fsn.spiral_code, fsn.jumps){}
 
   PlanarGraph dual_graph() const;
   vector<face_t> dual_faces() const;

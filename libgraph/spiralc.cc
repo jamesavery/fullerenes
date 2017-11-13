@@ -178,8 +178,11 @@ void full_spiral_name::cage_constructor(const vector<vector<int>> &spiral_number
   assert(spiral_numbers.size() == 1 || spiral_numbers.size() == 2);
   bool has_jumps = (spiral_numbers.size() == 2);
 
-  if(has_jumps)
-    jumps = spiral_numbers[0];
+  if(has_jumps){
+    for(int i=0; i<spiral_numbers[0].size()/2; i++){
+      jumps.push_back(make_pair(spiral_numbers[0][2*i],spiral_numbers[0][2*i+1]));
+    }
+  }
   spiral_code = spiral_numbers[has_jumps];
 
   // Set face_degrees to something sensible
@@ -203,9 +206,11 @@ void full_spiral_name::fulleroid_constructor(const vector<vector<int>> &spiral_n
 
   bool has_jumps = (spiral_numbers.size() == face_degrees.size()+1);
 
-  if(has_jumps)
-    jumps = spiral_numbers[0];
-
+  if(has_jumps){
+    for(int i=0; i<spiral_numbers[0].size()/2; i++){
+      jumps.push_back(make_pair(spiral_numbers[0][2*i],spiral_numbers[0][2*i+1]));
+    }
+  }
 
   for(int i=0;i<face_degrees.size();i++){
     for(auto ix: spiral_numbers[i+has_jumps]){

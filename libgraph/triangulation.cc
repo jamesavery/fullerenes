@@ -192,7 +192,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
       }
-      jumps.pop_front();
+      // jumps.pop_front();
+      jumps.erase(jumps.begin());
     }
 
     //       How-to: insert_edge({u,v}, succ_uv,succ_vu)

@@ -8,7 +8,6 @@
 #include <vector>
 #include <utility> //required for pair
 
-typedef list<pair<int,int> > jumplist_t;
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_layout) const {

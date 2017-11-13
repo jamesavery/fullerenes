@@ -1,8 +1,10 @@
 #ifndef FULLERENE_SYMMETRY_HH
-# define FULLERENE_SYMMETRY_HH
+#define FULLERENE_SYMMETRY_HH
 
 #include <vector>
 #include <iostream> 
+
+#include "spiral.hh"
 #include "triangulation.hh"
 
 class PointGroup {
@@ -52,8 +54,6 @@ struct Permutation : public vector<int> {
 
 class Symmetry : public Triangulation {
 public:
-  using Triangulation::jumplist_t;
-
   vector<int> S0;
   jumplist_t  J0;
   vector< Permutation > G, Gedge, Gtri;

@@ -2,14 +2,12 @@
 #define PLANARGRAPH_HH
 
 #include "graph.hh"
+#include "spiral.hh"
 
 // TODO: Separate planar cubic graph stuff away from general planar graph into CubicGraph class.
 //       Exploit duality between triangulation and cubic planar graph.
 class PlanarGraph : public Graph {
 public:
-  // TODO: Change jumplist_t to vector<pair<int,int>> - faster and easier access!
-  typedef list<pair<int,int> > jumplist_t;
-
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
 

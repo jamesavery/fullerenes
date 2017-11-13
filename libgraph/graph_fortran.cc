@@ -1,3 +1,4 @@
+#include "spiral.hh"
 #include "fullerenegraph.hh"
 #include "polyhedron.hh"
  // Exported interface
@@ -175,7 +176,7 @@ fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array
   //  cout << spiral_indices[i] << endl;
   }
 
-  list<pair<int,int> > jumps;
+  jumplist_t jumps;
   for(int i=0; i<100; ++i,++i){
     if(jumps_array[i]==0) break;
     jumps.push_back(make_pair(jumps_array[i]-1,jumps_array[i+1]));
@@ -484,7 +485,7 @@ void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jump
 //  12 will always be 12, 100 is just an arbitrary magic number
   assert((*fg)->layout2d.size() == (*fg)->N);
   vector<int> rspi_v;
-  FullereneGraph::jumplist_t jumps_v;
+  jumplist_t jumps_v;
   const bool canonical=true, general=true;
   (*fg)->get_rspi_from_fg(rspi_v, jumps_v, general, *pentagon_start);
 
@@ -493,7 +494,7 @@ void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jump
   }
   int j=0;
   std::fill(jumps_a,jumps_a+100, 0);
-  for(list<pair<int,int> >::iterator it(jumps_v.begin()); it!=jumps_v.end(); it++){
+  for(jumplist_t::iterator it(jumps_v.begin()); it!=jumps_v.end(); it++){
   	jumps_a[j++]=it->first +1;//start counting at 1
   	jumps_a[j++]=it->second;
   }

@@ -4,12 +4,38 @@
 #include <utility> //required for pair
 #include <vector>
 #include <string>
+#include <iostream>
 
-#include "planargraph.hh"
-#include "triangulation.hh"
+#include "auxiliary.hh"
+//#include "triangulation.hh"
 
 typedef pair<int,int>  jump_t;
 typedef vector<jump_t> jumplist_t;
+
+#if 1
+// TODO: Gather spiral stuff in spiral.hh
+
+struct general_spiral {
+  jumplist_t  jumps;
+  vector<int> spiral;
+
+  bool operator<(const general_spiral &s) const
+  {
+    return jumps.size() < s.jumps.size() ||
+    (jumps.size() == s.jumps.size() && jumps < s.jumps) ||
+      (jumps == s.jumps && spiral < s.spiral);
+      // The following gives spiral strings precedence over jump content (but still prefers shorter jump lists)
+      //    (jumps.size() == s.jumps.size() && spiral < s.spiral) ||
+      //      (jumps.size() == s.jumps.size() && spiral == s.spiral && jumps < s.jumps);
+  }
+  
+  friend ostream &operator<<(ostream &s, const general_spiral &GS)
+  {
+    return s << make_pair(GS.jumps,GS.spiral); 
+  }
+};
+#endif
+
 
 
 
@@ -55,7 +81,7 @@ struct full_spiral_name {
   int base_face_degree;
   vector<int> face_degrees;	// Non-base-face degrees
 
-  vector<int>      jumps;
+  jumplist_t       jumps;
   vector<int>      spiral_code;
 
   void fulleroid_constructor(const vector<vector<int>> &spiral_numbers, vector<int> face_degrees = {3,4,5},
