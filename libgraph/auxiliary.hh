@@ -202,6 +202,7 @@ public:
   }
 };
 
+#if 0
 // TODO: Gather spiral stuff in spiral.hh
 typedef list<pair<int,int> > jumplist_t;
 
@@ -224,6 +225,6 @@ struct general_spiral {
     return s << make_pair(GS.jumps,GS.spiral); 
   }
 };
-
+#endif
 
 
