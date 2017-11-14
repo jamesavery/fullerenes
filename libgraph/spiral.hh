@@ -81,8 +81,8 @@ struct full_spiral_name {
   int base_face_degree;
   vector<int> face_degrees;	// Non-base-face degrees
 
-  jumplist_t       jumps;
-  vector<int>      spiral_code;
+  jumplist_t  jumps;
+  vector<int> spiral_code;
 
   void fulleroid_constructor(const vector<vector<int>> &spiral_numbers, vector<int> face_degrees = {3,4,5},
 			     int base_face_degree=6);
@@ -103,7 +103,7 @@ struct full_spiral_name {
       << "chemical_formula: \""<<sn.chemical_formula<<"\",\n\t"
       << "base_face_degree: "<<sn.base_face_degree<<",\n\t"
       << "face_degrees: " << sn.face_degrees << ",\n\t"
-      << "jumps: " << sn.jumps << ",\n\t"
+      << "jumps: " << sn.jumps << ",\n\t" // indices start counting at 0
       << "spiral_code: " << sn.spiral_code << ",\n\t"
       << "}";
     return s;

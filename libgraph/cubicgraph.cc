@@ -128,7 +128,9 @@ CubicGraph::CubicGraph(const int n, const vector<int>& spiral_string, const jump
 
 CubicGraph::CubicGraph(const full_spiral_name &fsn){
   assert(fsn.construction_scheme == full_spiral_name::CUBIC);
+cout << "creating dual" << endl;
   Triangulation T(fsn);
+cout << "dual created" << endl;
   *this = T.dual_graph();
 }
 

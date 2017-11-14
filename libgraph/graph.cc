@@ -45,6 +45,49 @@ bool Graph::edge_exists(const edge_t& e) const
   return find(nu.begin(),nu.end(),e.second) != nu.end();
 }
 
+// remove all vertices without edges from graph
+void Graph::remove_isolated_vertices(){
+  vector<int> new_id(N);
+
+  int u_new = 0;
+  for(int u=0; u<N; u++){
+    if(!neighbours[u].empty())
+      new_id[u] = u_new++;
+  }
+cout << new_id << endl;
+
+  int N_new = u_new;
+  Graph g(N_new);
+cout << "n new: " << N_new << endl;
+  for(int u=0; u<N; u++)
+    for(int v: neighbours[u])
+      g.neighbours[new_id[u]].push_back(new_id[v]);
+
+  *this = g;
+}
+
+// completely remove all vertices in sv from the graph
+void Graph::remove_vertices(set<int> &sv){
+  const int N_naught(N);
+  for(int u: sv){
+    cout << "-- " << u << endl;
+    while(neighbours[u].size()){
+      const int v = neighbours[u][0];
+      cout << "--- " << v << endl;
+      remove_edge({u,v});
+    }
+  }
+
+  remove_isolated_vertices();
+
+  // let's see if the graph remained in a sane state
+  cerr << "N: " << N << endl;
+  if(N_naught != sv.size() + N)
+    cerr << "removed more vertices than intended" << endl;
+  assert(is_connected());
+}
+
+
 // Successor to v in oriented neigbhours of u
 node_t Graph::next(const node_t& u, const node_t& v) const
 {

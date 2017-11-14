@@ -24,7 +24,10 @@ public:
   Triangulation(const neighbours_t& neighbours, bool already_oriented = false) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
-  Triangulation(const full_spiral_name &fsn): Triangulation(fsn.spiral_code, fsn.jumps){}
+  Triangulation(const full_spiral_name &fsn): Triangulation(fsn.spiral_code, fsn.jumps){
+    assert(fsn.construction_scheme == full_spiral_name::TRIANGULATION ||
+           fsn.construction_scheme == full_spiral_name::LEAPFROG);
+  }
 
   PlanarGraph dual_graph() const;
   vector<face_t> dual_faces() const;

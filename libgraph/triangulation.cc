@@ -163,10 +163,14 @@ vector<face_t> Triangulation::dual_faces() const
 // Takes full spiral string, e.g. 566764366348665
 // where the degrees are between 3 and 8 (or anything larger, really)
 // each neighbour list is oriented CCW (and the boundary is CW)
+// the indices of the jumps start counting at 0
 Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j):
   PlanarGraph(spiral_string.size())
 {
   jumplist_t jumps = j; // we need a local copy to remove elements
+cerr << "S: " << spiral_string << endl;
+cerr << "J: " << j << endl;
+cerr << "N: " << N << endl;
 
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
@@ -232,8 +236,9 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       connect_backward(suc_uv);
     }
 
+cout << spiral_string[k] << ", " << pre_used_valencies << endl;
     if(spiral_string[k] - pre_used_valencies < 1){//the current atom is saturated (which may only happen for the last one)
-      cout << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
+      cerr << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
       abort();
     }
 
@@ -245,13 +250,13 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
   // make sure we left the spiral in a sane state
   // open_valencies must be either spiral.back() times '1' at this stage
   if(open_valencies.size() != spiral_string.back()){
-    cout << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
-    cout << "Incomplete triangulation = " << *this << "\n";
+    cerr << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
+    cerr << "Incomplete triangulation = " << *this << "\n";
     abort();
   }
   for(list<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
     if(it->second!=1){
-      cout << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
+      cerr << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
     abort();
     }
   }
@@ -268,6 +273,7 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 
   is_oriented = true;
   update(is_oriented);
+cerr << "T should be done" << endl;
 }
 
 
@@ -914,36 +920,43 @@ PlanarGraph Triangulation::inverse_leapfrog_dual() const
   assert(is_oriented);
   PlanarGraph PG(*this);
   set<int> face_vertices, to_do_set;
+cerr << "setup " << endl;
 
-  // find all vertices with degree < 6 in PG
-  for(int i=0; PG.neighbours.size(); i++){
-    if(PG.neighbours[i].size() < 6){
-      face_vertices.insert(i);
-      to_do_set.insert(i);
+  // find all vertices with degree < 6 (one could additionally find the vertices with odd degree)
+  for(int v=0; v<neighbours.size(); v++){
+    if(neighbours[v].size() < 6){
+      face_vertices.insert(v);
+      to_do_set.insert(v);
     }
   }
+cerr << "faces to remove:" << endl;
+cerr << face_vertices << endl;
+cerr << to_do_set << endl;
 
-  // ... find all face faces
+  // ... find all face vertices
   while(to_do_set.size() != 0){
-    int u = *(to_do_set.begin());
+    const int u = *(to_do_set.begin());
     to_do_set.erase(to_do_set.begin());
 
-    for(int v: PG.neighbours[u]){
-      int w = next(u,v);
-      int s = face_vertices.size();
-      face_vertices.insert(w);
+    for(int v: neighbours[u]){
+      const int w = next(u,v);
+      const int s = face_vertices.size();
+      const int x = next(w,v);
+      face_vertices.insert(x);
       if(face_vertices.size() != s)
-        to_do_set.insert(w);
+        to_do_set.insert(x);
     }
   }
+cerr << "faces to remove:" << endl;
+cerr << face_vertices << endl;
+cerr << to_do_set << endl;
 
   // check number of face_vertices
   // FIXME, optional
 
-  // remove all face_vertices, done 
-  // FIXME, how does one remove vertices, and renumber the graph afterwards?  elegantly, I mean ...
-
+  // remove all face_vertices
+cout << PG.neighbours << endl;
+  PG.remove_vertices(face_vertices);
   return PG;
 }
-
 

@@ -36,17 +36,18 @@ map<string,string> spiral_paper_examples{{
 	   "3, 8,8,8, "
 	   "4,8, 4,8, 4,8, 4,8, 4,8, 4,8, "
 	   "3,8,4,8,4, 3,8,4,8,4, 3,8,4,8,4, "
+	   "8,4,8,3, 8,4,8,3, "
 	   "8,4,3, "
-	   "8,4, 8,4, 8,4, 8,4, "
+	   "8,4, 8,4, 8,4, "
 	   "8,3"
 	"]-24-cage"},
-    {"M30L60","O-[LF,GS: 54,1,57,1,59,1; "
+    {"M30L60","O-[LF,GS: 54,1,57,1,60,1; "
 	   "3,8,8,8, "
 	   "4,8, 4,8, 4,8, 4,8, 4,8, 4,8, 4,8, "
 	   "3,8,4,8,4,8, 3,8,4,8,4,8, 3,8,4,8,4,8, "
 	   "4,8, "
 	   "3,8,4,8,4,8, 3,8,4,8,4,8, "
-	   "8,3, "
+	   "3, "
 	   "8,4,4, 8,4,4, 8,4,4, "
 	   "8,3"
 	"]-30-cage"}
@@ -58,6 +59,7 @@ int main(int ac, char **av)
   for(auto example: spiral_paper_examples){
     cout << example.first << "_name = \"" << example.second << "\";\n";
     cout << example.first << " = " << full_spiral_name(example.second) << ";\n\n";
+    cout << example.first << " = " << PlanarGraph(full_spiral_name(example.second)) << ";\n\n";
   }
 
   return 0;
