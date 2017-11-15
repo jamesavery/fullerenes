@@ -10,23 +10,21 @@ using namespace std;
 PlanarGraph::PlanarGraph(const full_spiral_name &fsn){
   switch(fsn.construction_scheme){
     case full_spiral_name::CS_NONE:
-cerr << "none" << endl;
+      // cerr << "none" << endl;
       assert(false);
       break;
     case full_spiral_name::CUBIC:
-cerr << "CUBIC" << endl;
+      // cerr << "CUBIC" << endl;
       *this = CubicGraph(fsn);
       break;
     case full_spiral_name::TRIANGULATION:
-cerr << "TRIANGULATION" << endl;
+      // cerr << "TRIANGULATION" << endl;
       *this = Triangulation(fsn);
       break;
     case full_spiral_name::LEAPFROG:
-cerr << "LEAPFROG" << endl;
+      // cerr << "LEAPFROG" << endl;
       Triangulation T(fsn);
-cerr << "T done" << endl;
       *this = T.inverse_leapfrog_dual();
-cerr << "iLFD(T) done" << endl;
       break;
   }  
 }

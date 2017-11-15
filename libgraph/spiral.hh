@@ -104,7 +104,7 @@ struct full_spiral_name {
       << "base_face_degree: "<<sn.base_face_degree<<",\n\t"
       << "face_degrees: " << sn.face_degrees << ",\n\t"
       << "jumps: " << sn.jumps << ",\n\t" // indices start counting at 0
-      << "spiral_code: " << sn.spiral_code << ",\n\t"
+      << "spiral_code: " << sn.spiral_code << ", (length: " << sn.spiral_code.size() << ") \n\t"
       << "}";
     return s;
   }

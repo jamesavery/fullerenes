@@ -119,18 +119,14 @@ CubicGraph::CubicGraph(const unsigned int index, FILE* file){
 // n is the number of vertices
 CubicGraph::CubicGraph(const int n, const vector<int>& spiral_string, const jumplist_t& jumps) : CubicGraph() {
   assert(spiral_string.size() == n/2 + 2);
-
   Triangulation dual(spiral_string,jumps);
   CubicGraph G(dual.dual_graph());
-
   *this = G;
 }
 
 CubicGraph::CubicGraph(const full_spiral_name &fsn){
   assert(fsn.construction_scheme == full_spiral_name::CUBIC);
-cout << "creating dual" << endl;
   Triangulation T(fsn);
-cout << "dual created" << endl;
   *this = T.dual_graph();
 }
 
