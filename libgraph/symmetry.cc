@@ -130,18 +130,32 @@ vector<Permutation> Symmetry::tri_permutation(const vector<Permutation>& Gf) con
   return Gtri;
 }
 
-vector<Permutation> Symmetry::edge_permutation(const vector<Permutation>& Gf) const {
-  set<edge_t> edge_set = undirected_edges();//TODO: Do this another way
-
-  vector<Permutation> Gedge(Gf.size(),Permutation(edge_set.size()));
-  IDCounter<edge_t> edge_id;
-    
-  for(auto e(edge_set.begin());e!=edge_set.end();e++) edge_id.insert(*e);
+vector<Permutation> Symmetry::edge_permutation(const vector<Permutation>& Gf) const
+{
+  vector<Permutation> Gedge(Gf.size(),Permutation(edge_id.size()));
     
   for(int j=0;j<Gf.size();j++){
-    int i=0;
-    for(auto e=edge_set.begin();e!=edge_set.end();e++,i++)
-      Gedge[j][i] = edge_id(edge_t(Gf[j][e->first],Gf[j][e->second]));
+    for(const auto &ei: edge_id){
+      edge_t e = ei.first;
+      int    i = ei.second;
+      
+      Gedge[j][i] = edge_id({Gf[j][e.first],Gf[j][e.second]});
+    }
+  }
+  return Gedge;
+}
+
+vector<Permutation> Symmetry::dedge_permutation(const vector<Permutation>& Gf) const {
+
+  vector<Permutation> Gedge(Gf.size(),Permutation(dedge_id.size()));
+    
+  for(int j=0;j<Gf.size();j++){
+    for(const auto &ei: dedge_id){
+      dedge_t e = ei.first;
+      int     i = ei.second;
+      
+      Gedge[j][i] = dedge_id({Gf[j][e.first],Gf[j][e.second]});
+    }
   }
   return Gedge;
 }
@@ -432,3 +446,4 @@ vector< pair<int,int> > Symmetry::NMR_pattern() const
   
   return NMR;
 }
+

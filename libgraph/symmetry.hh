@@ -56,12 +56,15 @@ public:
 
   vector<int> S0;
   jumplist_t  J0;
-  vector< Permutation > G, Gedge, Gtri;
+  vector< Permutation > G, Gedge, Gdedge, Gtri;
+  IDCounter<edge_t>   edge_id;
+  IDCounter<dedge_t> dedge_id;
 
   vector<Permutation> permutation_representation() const;
   vector<Permutation> tri_permutation(const vector<Permutation>& Gf)  const;
   vector<Permutation> edge_permutation(const vector<Permutation>& Gf) const;
-
+  vector<Permutation> dedge_permutation(const vector<Permutation>& Gf) const;
+  
   // Returns the involutions *except* from the identity
   vector<int>           involutions() const;
   vector<int>           fixpoints(const Permutation& pi) const;
@@ -74,20 +77,28 @@ public:
   
   PointGroup point_group() const;
 
+  void initialize(){
+    set<dedge_t> dedge_set =   directed_edges();
+    set<edge_t>   edge_set = undirected_edges(); //TODO: Do this another way
+    for(dedge_t e: dedge_set) dedge_id.insert(e);
+    for(edge_t e:   edge_set)  edge_id.insert(e);
+
+    G = permutation_representation();
+    Gedge  = edge_permutation(G);
+    Gdedge = dedge_permutation(G);
+    Gtri  = tri_permutation(G);
+  }
+  
   Symmetry(const vector<int>& spiral, const jumplist_t& jumps) : Triangulation(spiral,jumps), S0(spiral), J0(jumps)
   {
-    G = permutation_representation();
-    Gedge = edge_permutation(G);
-    Gtri  = tri_permutation(G);
+    initialize();
   }
 
   Symmetry(const Triangulation& g) : Triangulation(g)
   {
     g.get_spiral(S0,J0);
 
-    G = permutation_representation();
-    Gedge = edge_permutation(G);
-    Gtri  = tri_permutation(G);
+    initialize();
   }  
   
 };
