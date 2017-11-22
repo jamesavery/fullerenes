@@ -2,14 +2,12 @@
 #define PLANARGRAPH_HH
 
 #include "graph.hh"
+#include "spiral.hh"
 
 // TODO: Separate planar cubic graph stuff away from general planar graph into CubicGraph class.
 //       Exploit duality between triangulation and cubic planar graph.
 class PlanarGraph : public Graph {
 public:
-  // TODO: Change jumplist_t to vector<pair<int,int>> - faster and easier access!
-  typedef list<pair<int,int> > jumplist_t;
-
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
 
@@ -23,6 +21,7 @@ public:
       outer_face = find_outer_face();
     } 
   }
+  PlanarGraph(const full_spiral_name &fsn);
 
   // Assumes file is at position of a graph start
   static Graph read_hog_planarcode(FILE *planarcode_file);
@@ -58,10 +57,11 @@ public:
 
 
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
+  // the dual of the LF, ie a Triangulation is returned
+  PlanarGraph leapfrog_dual() const;
   
   size_t count_perfect_matchings() const;
 
-  Graph leapfrog_dual() const;
 
   vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
   

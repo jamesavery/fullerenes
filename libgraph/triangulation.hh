@@ -1,6 +1,7 @@
 #pragma once
 
 #include "matrix.hh"
+#include "spiral.hh"
 #include "planargraph.hh"
 
 class Triangulation : public PlanarGraph {
@@ -22,10 +23,15 @@ public:
   }
   Triangulation(const neighbours_t& neighbours, bool already_oriented = false) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
 
-  Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
+  Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
+  Triangulation(const full_spiral_name &fsn): Triangulation(fsn.spiral_code, fsn.jumps, true){} // best_effort = true
 
   PlanarGraph dual_graph() const;
   vector<face_t> dual_faces() const;
+
+  // takes a triangulation, and returns a dual of the inverse leapfrog
+  // this is cheap because we just remove a set of faces
+  PlanarGraph inverse_leapfrog_dual() const;
   
   pair<node_t,node_t> adjacent_tris(const dedge_t &e) const;
 

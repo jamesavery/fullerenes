@@ -163,10 +163,16 @@ vector<face_t> Triangulation::dual_faces() const
 // Takes full spiral string, e.g. 566764366348665
 // where the degrees are between 3 and 8 (or anything larger, really)
 // each neighbour list is oriented CCW (and the boundary is CW)
-Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j):
+// the indices of the jumps start counting at 0
+// best-effort means, additional trailing vertices in the spiral string are caught/discarded, implying that wrong spirals may not be caught
+Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t& j, const bool best_effort):
   PlanarGraph(spiral_string.size())
 {
   jumplist_t jumps = j; // we need a local copy to remove elements
+  // cerr << "best-effort: " << best_effort << endl;
+  // cerr << "S: " << spiral_string << endl;
+  // cerr << "J: " << j << endl;
+  // cerr << "N: " << N << endl;
 
   // open_valencies is a list with one entry per node that has been added to
   // the spiral but is not fully saturated yet.  The entry contains the number
@@ -180,10 +186,12 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 
   // iterate over atoms
   // k=0, k=1 have been done already
-  // omit the last one because it requires special treatment
-  for (int k=2; k<N-1; ++k){
+  int N_final;
+  if(best_effort) N_final = N;
+  else N_final = N-1; // omit the last one because it requires special treatment
+  for (int k=2; k<N_final; ++k){
     int pre_used_valencies=0;
-    // cout << "step " << k << endl;
+    // cerr << "step " << k << "/" << N-1 << endl;
 
     // should a cyclic shift be applied before adding the next atom?
     if(jumps.size() != 0 && k == jumps.front().first){
@@ -192,7 +200,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
         open_valencies.push_back(open_valencies.front());
         open_valencies.pop_front();
       }
-      jumps.pop_front();
+      // jumps.pop_front();
+      jumps.erase(jumps.begin());
     }
 
     //       How-to: insert_edge({u,v}, succ_uv,succ_vu)
@@ -204,6 +213,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       insert_edge({k, open_valencies.front().first}, suc_uv, suc_vu);
       --open_valencies.front().second;
       ++pre_used_valencies;
+      // cerr << "cf" << endl;
+      // cerr << open_valencies << endl;
     };
 
     // connect k and <last>
@@ -212,6 +223,8 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
       insert_edge({k,open_valencies.back().first}, suc_uv, suc_vu);
       --open_valencies.back().second;
       ++pre_used_valencies;
+      // cerr << "cb" << endl;
+      // cerr << open_valencies << endl;
     };
 
     connect_forward(open_valencies.back().first); // suc_uv is not a neighbour yet, but appending at the end of the list is fine
@@ -219,6 +232,10 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 
     // do the remaining connect forwards
     while(open_valencies.front().second==0){
+      if(best_effort && open_valencies.size()==2 && open_valencies.back().second==0){
+        // cerr << "leaving from rem cf" << endl;
+        break; // We're done adding vertices
+      }
       const node_t suc_vu = open_valencies.front().first;
       open_valencies.pop_front();
       connect_forward(suc_vu);
@@ -226,43 +243,65 @@ Triangulation::Triangulation(const vector<int>& spiral_string, const jumplist_t&
 
     // do the remaining connect backwards
     while(open_valencies.back().second==0){
+      if(best_effort && open_valencies.size()==2 && open_valencies.front().second==0){
+        // cerr << "leaving from rem cb" << endl;
+        break; // We're done adding vertices
+      }
       const node_t suc_uv = open_valencies.back().first;
       open_valencies.pop_back();
       connect_backward(suc_uv);
     }
 
-    if(spiral_string[k] - pre_used_valencies < 1){//the current atom is saturated (which may only happen for the last one)
-      cout << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
-      abort();
-    }
-
     // add node to spiral
     open_valencies.push_back(make_pair(k,spiral_string[k]-pre_used_valencies));
 
+    if(spiral_string[k] - pre_used_valencies < 1){//the current atom is saturated (which may only happen for the last one)
+      if(best_effort){
+        if(spiral_string[k] != pre_used_valencies){
+          cerr << spiral_string[k] << ", " << pre_used_valencies << endl;
+          cerr << "something's b0rked" << endl;
+          abort();
+        }
+        for(auto ov: open_valencies){
+          if(ov.second != 0){
+            cerr << ov << endl;
+            cerr << "something's b0rked" << endl;
+            abort();
+          }
+        }
+        break; // We're done adding vertices
+      }
+      cerr << "Cage closed but faces left (or otherwise invalid spiral)" << endl;
+      abort();
+    }
   } // iterate over atoms
 
   // make sure we left the spiral in a sane state
   // open_valencies must be either spiral.back() times '1' at this stage
-  if(open_valencies.size() != spiral_string.back()){
-    cout << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
-    cout << "Incomplete triangulation = " << *this << "\n";
-    abort();
-  }
-  for(list<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
-    if(it->second!=1){
-      cout << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
-    abort();
+  if(!best_effort){
+    if(open_valencies.size() != spiral_string.back()){
+      cerr << "Cage not closed but no faces left (or otherwise invalid spiral), wrong number of faces left" << endl;
+      cerr << "Incomplete triangulation = " << *this << "\n";
+      abort();
     }
-  }
+    for(list<pair<node_t,int> >::iterator it = open_valencies.begin(); it!=open_valencies.end(); ++it){
+      if(it->second!=1){
+        cerr << "Cage not closed but no faces left (or otherwise invalid spiral), more than one valency left for at least one face" << endl;
+      abort();
+      }
+    }
 
-  // add remaining edges, we don't care about the valency list at this stage
-  // get a vector of nodes of the final hole, for easier orientation
-  vector<node_t> last_nodes;
-  for(auto n: open_valencies) last_nodes.push_back(n.first);
-  for(int i=0; i<spiral_string.back(); ++i){
-    const node_t suc_uv=last_nodes[(i+1)%last_nodes.size()];
-    const node_t suc_vu=last_nodes[(i-1+last_nodes.size())%last_nodes.size()];
-    insert_edge({N-1, last_nodes[i]}, suc_uv, suc_vu); // suc_uv is not a neighbour (except for the last edge), but appending at the end of the list is fine
+    // add remaining edges, we don't care about the valency list at this stage
+    // get a vector of nodes of the final hole, for easier orientation
+    vector<node_t> last_nodes;
+    for(auto n: open_valencies) last_nodes.push_back(n.first);
+    for(int i=0; i<spiral_string.back(); ++i){
+      const node_t suc_uv=last_nodes[(i+1)%last_nodes.size()];
+      const node_t suc_vu=last_nodes[(i-1+last_nodes.size())%last_nodes.size()];
+      insert_edge({N-1, last_nodes[i]}, suc_uv, suc_vu); // suc_uv is not a neighbour (except for the last edge), but appending at the end of the list is fine
+    }
+  }else{
+    remove_isolated_vertices();
   }
 
   is_oriented = true;
@@ -905,4 +944,45 @@ vector<node_t> Triangulation::vertex_numbers(vector<vector<node_t>> &permutation
   return vertex_numbers; 
 }
 
+// takes a triangulation, and returns a dual of the inverse leapfrog
+// this is easy because we just remove a set of faces
+// the resulting planar graph is oriented because the input is oriented und we only remove vertices
+PlanarGraph Triangulation::inverse_leapfrog_dual() const
+{
+  assert(is_oriented);
+  PlanarGraph PG(*this);
+  set<int> face_vertices, to_do_set;
+
+  // find all vertices with degree < 6 (one could additionally find the vertices with odd degree)
+  for(int v=0; v<neighbours.size(); v++){
+    if(neighbours[v].size() < 6){
+      face_vertices.insert(v);
+      to_do_set.insert(v);
+    }
+  }
+
+  // ... find all face vertices
+  while(to_do_set.size() != 0){
+    const int u = *(to_do_set.begin());
+    to_do_set.erase(to_do_set.begin());
+
+    for(int v: neighbours[u]){
+      const int w = next(u,v);
+      const int s = face_vertices.size();
+      const int x = next(w,v);
+      face_vertices.insert(x);
+      if(face_vertices.size() != s)
+        to_do_set.insert(x);
+    }
+  }
+  // cerr << "faces to remove:" << endl;
+  // cerr << face_vertices << endl;
+
+  // check number of face_vertices
+  // FIXME, optional
+
+  // remove all face_vertices
+  PG.remove_vertices(face_vertices);
+  return PG;
+}
 

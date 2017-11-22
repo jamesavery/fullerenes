@@ -33,7 +33,7 @@ LIBRARIES+=-lgsl
 
 
 OBJECTS=main.o coord.o hamilton.o isomer.o opt.o ring.o sphere.o util.o datain.o geometry.o hueckel.o pentindex.o schlegel.o spiral.o volume.o
-GRAPHOBJECTS= graph.o cubicgraph.o layout.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o layout-optimize.o delaunay.o
+GRAPHOBJECTS= graph.o cubicgraph.o layout.o planargraph.o polyhedron.o polyhedron-optimize.o fullerenegraph.o graph_fortran.o mgmres.o geometryc.o unfold.o fold.o buckygen-wrapper.o triangulation.o symmetry.o isomerdb.o spherical-harmonic.o y3table.o layout-optimize.o delaunay.o spiralc.o
 GRAPHFOBJECTS=geometry.o force.o diag.o dddihedral.o config.o opt-standalone.o
 
 FOBJECTS=$(patsubst %.o, build/%.o, $(OBJECTS))

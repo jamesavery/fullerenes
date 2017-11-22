@@ -23,6 +23,7 @@ struct CubicGraph : public PlanarGraph {
   CubicGraph(FILE *file);
   CubicGraph(const unsigned int index, FILE *file=stdin);
   CubicGraph(const int N, const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t());
+  CubicGraph(const full_spiral_name &fsn);
 
   bool get_spiral_from_cg(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, jumplist_t &jumps, const bool general=true) const;
   bool get_spiral_from_cg(vector<int> &spiral, jumplist_t &jumps, const bool canonical=true, const bool general=true, const bool pentagon_start=true) const;

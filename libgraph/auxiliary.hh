@@ -202,28 +202,3 @@ public:
   }
 };
 
-// TODO: Gather spiral stuff in spiral.hh
-typedef list<pair<int,int> > jumplist_t;
-
-struct general_spiral {
-  jumplist_t  jumps;
-  vector<int> spiral;
-
-  bool operator<(const general_spiral &s) const
-  {
-    return jumps.size() < s.jumps.size() ||
-    (jumps.size() == s.jumps.size() && jumps < s.jumps) ||
-      (jumps == s.jumps && spiral < s.spiral);
-      // The following gives spiral strings precedence over jump content (but still prefers shorter jump lists)
-      //    (jumps.size() == s.jumps.size() && spiral < s.spiral) ||
-      //      (jumps.size() == s.jumps.size() && spiral == s.spiral && jumps < s.jumps);
-  }
-  
-  friend ostream &operator<<(ostream &s, const general_spiral &GS)
-  {
-    return s << make_pair(GS.jumps,GS.spiral); 
-  }
-};
-
-
-
