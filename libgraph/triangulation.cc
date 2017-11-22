@@ -313,7 +313,7 @@ Triangulation Triangulation::GCtransform(const unsigned k, const unsigned l) con
 {
   if(l==0) return halma_transform(k-1);
 
-  Unfolding u(*this,true);
+  Unfolding u(*this);
   Unfolding gcu(u*Eisenstein(k,l));
   Folding gcf(gcu);
   Triangulation t(gcf.fold());
