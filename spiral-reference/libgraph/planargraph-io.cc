@@ -62,20 +62,20 @@ PlanarGraph PlanarGraph::read_hog_planarcode(FILE *file)
   }
   
   // Check graph. TODO: does this belong here?
-  for(node_t u=0;u<N;u++){
-    for(auto v: g.neighbours[u]){
-      bool found_vu = false;
+  // for(node_t u=0;u<N;u++){
+  //   for(auto v: g.neighbours[u]){
+  //     bool found_vu = false;
       
-      for(node_t w: g.neighbours[v])
-        if(w == u) found_vu = true;
-      if(!found_vu){
-        fprintf(stderr,"Graph is not symmetric: (u,v) = (%d,%d) has\n",u,v);
-        cerr << "neighbours["<<u<<"] = " << g.neighbours[u] <<";\n";
-        cerr << "neighbours["<<v<<"] = " << g.neighbours[v] <<";\n";
-        abort();
-      }
-    }
-  }
+  //     for(node_t w: g.neighbours[v])
+  //       if(w == u) found_vu = true;
+  //     if(!found_vu){
+  //       fprintf(stderr,"Graph is not symmetric: (u,v) = (%d,%d) has\n",u,v);
+  //       cerr << "neighbours["<<u<<"] = " << g.neighbours[u] <<";\n";
+  //       cerr << "neighbours["<<v<<"] = " << g.neighbours[v] <<";\n";
+  //       abort();
+  //     }
+  //   }
+  //}
 
   return g;
 }
@@ -137,6 +137,7 @@ PlanarGraph PlanarGraph::from_planarcode(FILE* file, const size_t index){
   return read_hog_planarcode(file);
 }
 
+// Write House of Graphs planarcode
 bool PlanarGraph::to_planarcode(const PlanarGraph &G, FILE *file)
 {
   auto write_int = [&](uint16_t x){ fputc(x&0xff,file); if(G.N>255) fputc((x>>8)&0xff,file); };
@@ -151,4 +152,25 @@ bool PlanarGraph::to_planarcode(const PlanarGraph &G, FILE *file)
       write_int(v);
     write_int(0);
   }
+
+  return ferror(file) == 0;
+}
+
+bool PlanarGraph::to_ascii(const PlanarGraph &G, FILE *file)
+{
+  // Neighbour list is unique representation of graph that preserves orientation.
+  // N is length of list.
+  string s = to_string(G.neighbours);
+  fputs(s.c_str(),file);
+
+  return ferror(file) == 0;
+}
+
+bool PlanarGraph::to_mathematica(const PlanarGraph &G, FILE *file)
+{
+  ostringstream s;
+  s << G << "\n";
+  fputs(s.str().c_str(),file);
+
+  return ferror(file) == 0;
 }

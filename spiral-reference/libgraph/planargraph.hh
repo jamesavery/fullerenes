@@ -99,9 +99,8 @@ public:
   static bool to_file(const PlanarGraph &G, string path);
   static bool to_file(const PlanarGraph &G, FILE *file, string format);
   static bool to_ascii(const PlanarGraph &G, FILE *file);
+  static bool to_mathematica(const PlanarGraph &G, FILE *file);  
   static bool to_planarcode(const PlanarGraph &G, FILE *file);    
-  static bool to_xyz(const PlanarGraph &G, FILE *file);
-  static bool to_mol2(const PlanarGraph &G, FILE *file);
 
   static PlanarGraph read_hog_planarcode(FILE *planarcode_file);
   static vector<PlanarGraph> read_hog_planarcodes(FILE *planarcode_file);    
