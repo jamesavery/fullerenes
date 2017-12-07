@@ -9,7 +9,7 @@ int main(int ac, char **av)
 {
   if(ac<2){
     fprintf(stderr,"Syntax: %s \"spiral_code\" [graph-format]\n",av[0]);
-    fprintf(stderr,"Graph formats: %s\n",to_string(output_formats).c_str());
+    fprintf(stderr,"Graph output formats: %s\n",to_string(PlanarGraph::output_formats).c_str());
     return -1;
   }
   

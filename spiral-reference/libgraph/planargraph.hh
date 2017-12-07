@@ -85,9 +85,9 @@ public:
 
   // Graph I/O. TODO: Move to io.{hh,cc}
   // Assumes file is at position of a graph start
-  static vector<string> input_formats_txt, output_formats_txt;
-  enum {ASCII,PLANARCODE,XYZ,MOL2}    input_formats;
-  enum {ASCII,PLANARCODE,MATHEMATICA,LATEX} output_formats;  
+  static vector<string> formats,input_formats, output_formats;
+  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX} formats_t;
+  static int format_id(string id);
   
   static PlanarGraph from_file(string path);
   static PlanarGraph from_file(FILE *file, string format);
