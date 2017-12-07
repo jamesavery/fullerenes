@@ -22,10 +22,7 @@ public:
   }
   PlanarGraph(const full_spiral_name &fsn);
 
-  // Assumes file is at position of a graph start
-  static Graph read_hog_planarcode(FILE *planarcode_file);
-  static vector<Graph> read_hog_planarcodes(FILE *planarcode_file);
-  
+ 
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g), layout2d(layout) {  }
 
   
@@ -86,18 +83,28 @@ public:
 
   vector<coord3d> zero_order_geometry(double scalerad=4) const;
 
-  static CubicGraph from_file(string path);
-  static CubicGraph from_ascii(FILE *file);
-  static CubicGraph from_planarcode(FILE *file, const size_t index=0);
-  static CubicGraph from_xyz(FILE *file);
-  static CubicGraph from_mol2(FILE *file);
-
-  static CubicGraph to_file(string path);
-  static CubicGraph to_ascii(FILE *file);
-  static CubicGraph to_planarcode(FILE *file, const size_t index=0);    
-  static CubicGraph to_xyz(FILE *file);
-  static CubicGraph to_mol2(FILE *file);
+  // Graph I/O. TODO: Move to io.{hh,cc}
+  // Assumes file is at position of a graph start
+  static vector<string> input_formats_txt, output_formats_txt;
+  enum {ASCII,PLANARCODE,XYZ,MOL2}    input_formats;
+  enum {ASCII,PLANARCODE,MATHEMATICA,LATEX} output_formats;  
   
+  static PlanarGraph from_file(string path);
+  static PlanarGraph from_file(FILE *file, string format);
+  static PlanarGraph from_ascii(FILE *file);
+  static PlanarGraph from_planarcode(FILE *file, const size_t index=0);
+  static PlanarGraph from_xyz(FILE *file);
+  static PlanarGraph from_mol2(FILE *file);
+
+  static bool to_file(const PlanarGraph &G, string path);
+  static bool to_file(const PlanarGraph &G, FILE *file, string format);
+  static bool to_ascii(const PlanarGraph &G, FILE *file);
+  static bool to_planarcode(const PlanarGraph &G, FILE *file);    
+  static bool to_xyz(const PlanarGraph &G, FILE *file);
+  static bool to_mol2(const PlanarGraph &G, FILE *file);
+
+  static PlanarGraph read_hog_planarcode(FILE *planarcode_file);
+  static vector<PlanarGraph> read_hog_planarcodes(FILE *planarcode_file);    
 
   string to_latex(double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false,
 		  int edge_colour = 0x6a5acd, int path_colour = 0x6a5acd, int vertex_colour = 0x8b2500,

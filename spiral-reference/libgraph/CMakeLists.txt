@@ -2,6 +2,7 @@ add_library(libgraph
   graph.cc
   cubicgraph.cc
   planargraph.cc
+  planargraph-io.cc  
   triangulation.cc
   polyhedron.cc
   fullerenegraph.cc
