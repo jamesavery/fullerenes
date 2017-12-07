@@ -1,0 +1,13 @@
+add_library(libgraph
+  graph.cc
+  cubicgraph.cc
+  planargraph.cc
+  triangulation.cc
+  polyhedron.cc
+  fullerenegraph.cc
+  layout.cc
+  layout-optimize.cc
+  polyhedron-optimize.cc
+  geometry.cc
+  spiral.cc
+)
