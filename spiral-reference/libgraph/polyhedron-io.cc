@@ -82,7 +82,7 @@ bool Polyhedron::to_turbomole(const Polyhedron &P, FILE *file)  {
   fprintf(file,"$coord\r\n");
   for(int i=0; i<P.N; ++i){
     const coord3d p = P.points[i] * aa2bohr;
-    fprintf(file,"%.12f %.12f %.12f  c\r\n", p[0],p[1],p[2]);
+    fprintf(file,"%f %f %f  c\r\n", p[0],p[1],p[2]);
   }
   fprintf(file,"$end\r\n");
 
