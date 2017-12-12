@@ -2,10 +2,10 @@
 #include "polyhedron.hh"
 #include <stdio.h>
 
+//////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
 vector<string> PlanarGraph::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex"}};
 vector<string> PlanarGraph::input_formats{{"planarcode","xyz","mol2"}}; // TODO: Add ASCII
 vector<string> PlanarGraph::output_formats{{"ascii","planarcode"}}; // TODO: Add LaTeX, Mathematica
-
 
 int PlanarGraph::format_id(string name)
 {
@@ -13,16 +13,6 @@ int PlanarGraph::format_id(string name)
   return -1;
 }
 
-bool getline(FILE *file, string& str){
-  char *line_ptr     = 0;
-  size_t line_length = 0;
-  ssize_t error = getline(&line_ptr,&line_length,file);
-  str = string(*line_ptr,line_length);
-  free(line_ptr);
-  return error > 0;
-}
-
-//////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
 PlanarGraph PlanarGraph::from_file(FILE *file, string format)
 {
   switch(format_id(format)){
@@ -213,3 +203,15 @@ PlanarGraph PlanarGraph::from_planarcode(FILE* file, const size_t index){
   fseek(file, address+1, SEEK_SET);
   return read_hog_planarcode(file);
 }
+
+////////////////////////////// AUXILIARY //////////////////////////////
+
+bool getline(FILE *file, string& str){
+  char *line_ptr     = 0;
+  size_t line_length = 0;
+  ssize_t error = getline(&line_ptr,&line_length,file);
+  str = string(*line_ptr,line_length);
+  free(line_ptr);
+  return error > 0;
+}
+
