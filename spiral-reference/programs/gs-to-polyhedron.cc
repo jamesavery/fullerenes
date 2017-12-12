@@ -15,11 +15,15 @@ int main(int ac, char **av)
   g.layout2d = g.tutte_layout();
   Polyhedron P(g,g.zero_order_geometry());
   P.optimize();
-  
+
   cout << "spiralcode = \"" << spiral_name << "\";\n"
        << "fullname   = " << fsn << ";\n"
        << "g = " << g << ";\n"
        << "P = " << P << ";\n";
-    
+
+  const string filename("output.mol2");
+  FILE *file = fopen(filename.c_str(),"wb");
+  Polyhedron::to_mol2(P, file);
+
   return 0;
 }
