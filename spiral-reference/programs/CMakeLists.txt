@@ -1,4 +1,4 @@
-set(PROGRAMS gs-to-graph gs-to-polyhedron)
+set(PROGRAMS gs-to-graph gs-to-polyhedron graph-to-gs)
 
 foreach(program ${PROGRAMS})
   set(program_source ${program}.cc)

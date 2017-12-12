@@ -226,6 +226,7 @@ void Polyhedron::orient_neighbours()
     //    printf("Inverted normals - reversing neighbours lists.\n");
     for(node_t u=0;u<N;u++) reverse(neighbours[u].begin(), neighbours[u].end());
   }
+  is_oriented = true;
 }
 
 // Polyhedron::Polyhedron(const string& filename)

@@ -23,7 +23,7 @@ PlanarGraph PlanarGraph::from_file(FILE *file, string format)
   case MOL2:
     return Polyhedron::from_mol2(file);
   default:
-    cerr << "Input format must be one of: " << input_formats << "\n";
+    cerr << "Input format is '" << format << "'; must be one of: " << input_formats << "\n";
     abort();
   }
 }
@@ -37,7 +37,7 @@ bool PlanarGraph::to_file(const PlanarGraph &G, FILE *file, string format)
   case PLANARCODE:
     return PlanarGraph::to_planarcode(G,file);
   default:
-    cerr << "Output format must be one of: " << output_formats << "\n";
+    cerr << "Output format is '" << format << "'; must be one of: " << output_formats << "\n";
     return false;
   }
 }
@@ -206,11 +206,23 @@ PlanarGraph PlanarGraph::from_planarcode(FILE* file, const size_t index){
 
 ////////////////////////////// AUXILIARY //////////////////////////////
 
+string filename_extension(const string& filename)
+{
+  size_t i = filename.rfind(".");
+  bool found = i != string::npos;
+  if(found) 
+    return filename.substr(i+1,filename.size());
+  else 
+    return "";
+}
+
 bool getline(FILE *file, string& str){
   char *line_ptr     = 0;
   size_t line_length = 0;
   ssize_t error = getline(&line_ptr,&line_length,file);
-  str = string(*line_ptr,line_length);
+  //  fprintf(stderr,"error = %ld, line_length = %ld, line = %s\n",error,line_length,line_ptr);
+  //  str = string(line_ptr,line_length);
+  str = string(line_ptr);
   free(line_ptr);
   return error > 0;
 }

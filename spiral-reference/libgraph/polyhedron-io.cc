@@ -25,7 +25,7 @@ Polyhedron Polyhedron::from_file(FILE *file, string format)
   case MOL2:
     return Polyhedron::from_mol2(file);
   default:
-    cerr << "Input format must be one of: " << input_formats << "\n";
+    cerr << "Input format is '"<<format<<"'; must be one of: " << input_formats << "\n";
     abort();
   }
 }
@@ -45,7 +45,7 @@ bool Polyhedron::to_file(const Polyhedron &G, FILE *file, string format)
   case TURBOMOLE:
     return Polyhedron::to_turbomole(G,file);
   default:
-    cerr << "Output format must be one of: " << output_formats << "\n";
+    cerr << "Output format is '"<<format<<"'  must be one of: " << output_formats << "\n";
     return false;
   }
 }
@@ -344,13 +344,15 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
 
   // Fast forward to metadata section
   while(getline(file,line) && line.compare(0,header_marker.size(),header_marker)) ;
-  getline(file,line);
+  getline(file,line);  
   //  assert(!line.compare(0,9,"Fullerene")); // TODO: Fail gracefully if we didn't create the file.
 
   getline(file,line);
   stringstream l(line);
   l >> N;
   l >> Nedges;
+
+  //  cerr << "line="<<line<<"; N="<<N<<", Nedges="<<Nedges<<endl;
   
   // Fast forward to coordinate section
   while(getline(file,line) && line.compare(0,point_marker.size(),point_marker)) ;
@@ -367,6 +369,8 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
     if(file_ok) l >> element;
     for(int j=0;j<3 && l.good(); j++) l >> x[j];
     points.push_back(x);
+    //    cerr << i << " of " << N << ": Read line "<< line;
+    //    cerr << "Point " << x << endl;
   }
   assert(points.size() == N);         // TODO: Fail gracefully if file format error.
 
@@ -382,10 +386,14 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
     l >> eid;
     for(int j=0;j<2 && l.good(); j++) l >> u[j];
     edges.insert(edge_t(u[0]-1,u[1]-1));
+
+    //    cerr << "Edge " << i << " of " << Nedges << ": Read line "<< line <<endl;
   }
 
   if(edges.size() != Nedges){
     cerr << "MOL2 file format error: Expected "<<Nedges<<" edges, found "<<edges.size()<<".\n";
+    cerr << "edges = " << edges << ";\n";
+    abort();
   }
 
   return Polyhedron(PlanarGraph(edges), points);

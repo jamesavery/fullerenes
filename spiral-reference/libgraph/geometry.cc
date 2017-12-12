@@ -25,17 +25,6 @@ int gcd(int a, int b)
   return b;
 }
 
-string filename_extension(const string& filename)
-{
-  size_t i = filename.rfind(".");
-  bool found = i != string::npos;
-  if(found) 
-    return filename.substr(i,filename.size());
-  else 
-    return "";
-}
-
-
 
 matrix3d coord3d::outer(const coord3d& y) const
 {
