@@ -9,6 +9,7 @@ class PlanarGraph : public Graph {
 public:
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
+  typedef full_spiral_name::construction_scheme_t construction_scheme_t;
 
   // TODO: Get rid of layout_is_spherical
   PlanarGraph() {}
@@ -55,6 +56,11 @@ public:
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
   // the dual of the LF, ie a Triangulation is returned
   PlanarGraph leapfrog_dual() const;
+  // Every polyhedral graph G can be represented by a triangulation.
+  //  1. If G is a triangulation, it is G
+  //  2. If G is cubic, it is its dual
+  //  3. If G is non-cubic and non-triangulation, it is G's leapfrog dual
+  PlanarGraph enveloping_triangulation(construction_scheme_t &scheme) const;
   
   size_t count_perfect_matchings() const;
 

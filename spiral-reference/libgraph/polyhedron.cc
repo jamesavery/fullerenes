@@ -207,8 +207,13 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
 
 void Polyhedron::orient_neighbours()
 {
-  assert(layout2d.size() == N);
-  PlanarGraph::orient_neighbours();
+  // if(points.size() == N){
+  //   // TODO: Use 3D embedding to orient graph
+    
+  // } else
+    if(layout2d.size() == N) {
+    PlanarGraph::orient_neighbours();
+  }
   
   // Calculate volume
   double V=0;
@@ -226,7 +231,7 @@ void Polyhedron::orient_neighbours()
     //    printf("Inverted normals - reversing neighbours lists.\n");
     for(node_t u=0;u<N;u++) reverse(neighbours[u].begin(), neighbours[u].end());
   }
-  is_oriented = true;
+
 }
 
 // Polyhedron::Polyhedron(const string& filename)
@@ -248,6 +253,8 @@ void Polyhedron::orient_neighbours()
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) : 
   PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
+  if(!is_oriented) orient_neighbours();
+  
   if(faces.size() == 0){
     faces = compute_faces(face_max);
     assert(outer_face.size() <= face_max);
@@ -255,7 +262,7 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
     for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
   } 
 
-  if(!is_oriented) orient_neighbours();
+
 }
 
 Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 
@@ -280,8 +287,6 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
   }
   
   (*this) = Polyhedron(PlanarGraph(edges), xs);
-
-  orient_neighbours();
 }
 
 

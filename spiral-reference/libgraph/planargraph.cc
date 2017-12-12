@@ -29,6 +29,24 @@ PlanarGraph::PlanarGraph(const full_spiral_name &fsn){
   }  
 }
 
+// Every polyhedral graph G can be represented by a triangulation.
+//  1. If G is a triangulation, it is G
+//  2. If G is cubic, it is its dual
+//  3. If G is non-cubic and non-triangulation, it is G's leapfrog dual
+PlanarGraph PlanarGraph::enveloping_triangulation(construction_scheme_t &scheme) const
+{
+  if(is_triangulation()){
+    scheme = full_spiral_name::TRIANGULATION;
+    return *this;
+  } else if(is_cubic()){
+    scheme = full_spiral_name::CUBIC;
+    return dual_graph();
+  } else {
+    scheme = full_spiral_name::LEAPFROG;
+    return leapfrog_dual();
+  }
+}
+
 bool PlanarGraph::is_cubic() const {
   for(node_t u=0;u<N;u++)
     if(neighbours[u].size() != 3)
