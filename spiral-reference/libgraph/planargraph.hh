@@ -83,8 +83,7 @@ public:
 
   vector<coord3d> zero_order_geometry(double scalerad=4) const;
 
-  // Graph I/O. TODO: Move to io.{hh,cc}
-  // Assumes file is at position of a graph start
+  // PlanarGraph I/O.
   static vector<string> formats,input_formats, output_formats;
   enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX} formats_t;
   static int format_id(string id);

@@ -2,13 +2,13 @@ add_library(libgraph
   graph.cc
   cubicgraph.cc
   planargraph.cc
-  planargraph-io.cc  
   triangulation.cc
   polyhedron.cc
   fullerenegraph.cc
   layout.cc
-  layout-optimize.cc
   polyhedron-optimize.cc
   geometry.cc
   spiral.cc
+  planargraph-io.cc    
+  polyhedron-io.cc      
 )

@@ -228,3 +228,6 @@ public:
   }
 };
 
+
+// C++-style getline with posix files.
+bool getline(FILE *file, string& str);

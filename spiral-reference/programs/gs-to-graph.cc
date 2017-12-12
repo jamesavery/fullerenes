@@ -20,13 +20,7 @@ int main(int ac, char **av)
   PlanarGraph G(fn);
   
   PlanarGraph::to_file(G,stdout,output_format);
-  
-  // for(auto example: spiral_paper_examples){
-  //   string name = example.first, gs = example.second;
-  //   cout << name << "_name = \"" << gs << "\";\n";
-  //   cout << name << " = " << full_spiral_name(gs) << ";\n\n";
-  //   cout << name << " = " << PlanarGraph(full_spiral_name(gs)) << ";\n\n";
-  // }
+  printf("\n");  
 
   return 0;
 }

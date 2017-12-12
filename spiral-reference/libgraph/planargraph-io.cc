@@ -1,8 +1,10 @@
 #include "planargraph.hh"
+#include "polyhedron.hh"
+#include <stdio.h>
 
 vector<string> PlanarGraph::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex"}};
-vector<string> PlanarGraph::input_formats{{"ascii","planarcode","xyz","mol2"}};
-vector<string> PlanarGraph::output_formats{{"ascii","planarcode","latex"}};
+vector<string> PlanarGraph::input_formats{{"planarcode","xyz","mol2"}}; // TODO: Add ASCII
+vector<string> PlanarGraph::output_formats{{"ascii","planarcode"}}; // TODO: Add LaTeX, Mathematica
 
 
 int PlanarGraph::format_id(string name)
@@ -11,31 +13,65 @@ int PlanarGraph::format_id(string name)
   return -1;
 }
 
+bool getline(FILE *file, string& str){
+  char *line_ptr     = 0;
+  size_t line_length = 0;
+  ssize_t error = getline(&line_ptr,&line_length,file);
+  str = string(*line_ptr,line_length);
+  free(line_ptr);
+  return error > 0;
+}
 
-#include <stdio.h>
-#include <fstream>
+//////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
+PlanarGraph PlanarGraph::from_file(FILE *file, string format)
+{
+  switch(format_id(format)){
+  case PLANARCODE:
+    return from_planarcode(file);
+  case XYZ:
+    return Polyhedron::from_xyz(file);
+  case MOL2:
+    return Polyhedron::from_mol2(file);
+  default:
+    cerr << "Input format must be one of: " << input_formats << "\n";
+    abort();
+  }
+}
+
 
 bool PlanarGraph::to_file(const PlanarGraph &G, FILE *file, string format)
 {
   switch(format_id(format)){
   case ASCII:
-    PlanarGraph::to_ascii(G,stdout);
-    return true;
-  case MATHEMATICA:
-    // TODO: stringstream + fwrite
-    return false;
+    return PlanarGraph::to_ascii(G,file);
   case PLANARCODE:
-    PlanarGraph::to_planarcode(G,stdout);
-    return true;
-  case LATEX:
-    // TODO
-    return false;
+    return PlanarGraph::to_planarcode(G,file);
   default:
     cerr << "Output format must be one of: " << output_formats << "\n";
     return false;
   }
-
 }
+
+PlanarGraph PlanarGraph::from_file(string filename)
+{
+  FILE *file = fopen(filename.c_str(),"rb");
+  string extension = filename_extension(filename);
+  PlanarGraph G = from_file(file,extension);
+  fclose(file);
+  return G;
+}
+
+bool PlanarGraph::to_file(const PlanarGraph &G, string filename)
+{
+  FILE *file = fopen(filename.c_str(),"wb");
+  string extension = filename_extension(filename);  
+  to_file(G,file,extension);
+  fclose(file);
+}
+
+
+
+////////////////////////////// OUTPUT ROUTINES //////////////////////////////
 
 // TODO: Where does this belong?
 // Assumes file is at position of a graph start
@@ -103,39 +139,6 @@ vector<PlanarGraph> PlanarGraph::read_hog_planarcodes(FILE *file) {
   return graph_list;
 }
 
-// Parse House of Graphs planarcode (not restricted to cubic graphs)
-PlanarGraph PlanarGraph::from_planarcode(FILE* file, const size_t index){
-  const int header_size = 15;
-
-  // Get file size
-  fseek(file, 0, SEEK_END);
-  size_t file_size = ftell(file);
-
-  //find number of vertices per graph
-  //this only works for files with graphs of equal size
-  fseek(file, header_size, SEEK_SET);
-
-  //Assumes planarcode files containing only graphs of equal size
-  size_t step = 0;
-  if(index != 0){
-    Graph first(read_hog_planarcode(file));
-    step = ftell(file);
-  }
-
-  size_t address = header_size + step * index;
-
-  //check if selected graphnumber is valid
-  unsigned int graphs_per_file = (file_size - header_size ) /step;
-  if(graphs_per_file -1 < index){
-    cerr << "You asked for the " << index+1 << "th graph, but there are only "
-	 << graphs_per_file << " stored in this file." << std::endl;
-    abort();
-  }
-
-  //Find the beginning of the selected graph and read it
-  fseek(file, address+1, SEEK_SET);
-  return read_hog_planarcode(file);
-}
 
 // Write House of Graphs planarcode
 bool PlanarGraph::to_planarcode(const PlanarGraph &G, FILE *file)
@@ -173,4 +176,40 @@ bool PlanarGraph::to_mathematica(const PlanarGraph &G, FILE *file)
   fputs(s.str().c_str(),file);
 
   return ferror(file) == 0;
+}
+
+////////////////////////////// INPUT ROUTINES //////////////////////////////
+
+// Parse House of Graphs planarcode (not restricted to cubic graphs)
+PlanarGraph PlanarGraph::from_planarcode(FILE* file, const size_t index){
+  const int header_size = 15;
+
+  // Get file size
+  fseek(file, 0, SEEK_END);
+  size_t file_size = ftell(file);
+
+  //find number of vertices per graph
+  //this only works for files with graphs of equal size
+  fseek(file, header_size, SEEK_SET);
+
+  //Assumes planarcode files containing only graphs of equal size
+  size_t step = 0;
+  if(index != 0){
+    Graph first(read_hog_planarcode(file));
+    step = ftell(file);
+  }
+
+  size_t address = header_size + step * index;
+
+  //check if selected graphnumber is valid
+  unsigned int graphs_per_file = (file_size - header_size ) /step;
+  if(graphs_per_file -1 < index){
+    cerr << "You asked for the " << index+1 << "th graph, but there are only "
+	 << graphs_per_file << " stored in this file." << std::endl;
+    abort();
+  }
+
+  //Find the beginning of the selected graph and read it
+  fseek(file, address+1, SEEK_SET);
+  return read_hog_planarcode(file);
 }
