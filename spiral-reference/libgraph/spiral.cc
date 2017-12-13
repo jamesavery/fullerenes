@@ -235,6 +235,75 @@ full_spiral_name::full_spiral_name(const PlanarGraph &G, const graph_type_t grap
   jumps       = spiral.jumps;
 }
 
+template <typename T> string riffle(const vector<T>& xs, string delim, string start="", string end="")
+{
+  string s = start;
+  for(int i=0;i<xs.size();i++) s += to_string(xs[i]) + (i+1<xs.size()? delim : "");
+  return s+end;
+}
+
+template <typename T> string riffle(const vector<pair<T,T>>& xs, string delim1, string delim2, string start="", string end="")
+{
+  string s = start;
+  for(int i=0;i<xs.size();i++) s += to_string(xs[i].first) + delim1 + to_string(xs[i].second) + (i+1<xs.size()? delim2 : "");
+  return s+end;
+}
+
+string full_spiral_name::to_string(bool unpacked) const
+{
+  ostringstream s;
+  if(unpacked){
+    s << "<|\n\t"
+      << "\"graph_type\" -> \""<<full_spiral_name::graph_type_txt[graph_type]<<"\",\n\t"
+      << "\"search_scheme\" -> \""<<full_spiral_name::search_scheme_txt[search_scheme]<<"\",\n\t"
+      << "\"construction_scheme\" -> \""<<full_spiral_name::construction_scheme_txt[construction_scheme]<<"\",\n\t"
+      << "\"point_group\" -> \""<<(point_group.empty()? "UNSPECIFIED" : point_group) <<"\",\n\t"
+      << "\"chemical_formula\" -> \""<<chemical_formula<<"\",\n\t"
+      << "\"base_face_degree\" -> "<<base_face_degree<<",\n\t"
+      << "\"face_degrees\" -> " << face_degrees << ",\n\t"
+      << "\"jumps\" -> " << jumps << ",\n\t" // indices start counting at 0
+      << "\"spiral_code\" -> " << spiral_code //<< ", (length: " << spiral_code.size() << ") \n\t"
+      << "|>";
+  } else {
+    // Add point group prefix if present
+    string prefix = point_group.empty()? "" : (point_group+"-");
+
+    // Encode construction and search schemes
+    string scheme_string;
+    vector<string> schemes;
+    // Default construction_scheme is CUBIC, default search_scheme is UNSPECIFIED
+    if(construction_scheme == LEAPFROG)      schemes.push_back("LF");
+    if(construction_scheme == TRIANGULATION) schemes.push_back("T");
+    if(search_scheme == CANONICAL_GENERALIZED_SPIRAL)   schemes.push_back("GS");
+    if(search_scheme == COMPATIBILITY_CANONICAL_SPIRAL) schemes.push_back("CS");
+
+    scheme_string = riffle(schemes,",","",":");
+      
+    // Encode jumps
+    string jump_string = riffle(jumps,",",",","","; ");
+    
+    // Encode spiral
+    string spiral_string;
+    switch(graph_type){
+    case CAGE:
+      spiral_string = riffle(spiral_code,",");
+      break;
+    case FULLERENE:
+    case FULLEROID:
+      for(int i=0;i<face_degrees.size();i++){
+	vector<int> indices;	
+	int d = face_degrees[i];
+
+	for(int j=0;j<spiral_code.size();j++) if(spiral_code[j] == d) indices.push_back(j+1);
+	spiral_string += riffle(indices,",") + (i+1<face_degrees.size()? ";":"");
+      }
+      break;
+    default:
+      break;			// TODO: Error
+    }
+  }
+  return s.str();
+}
 
 #if 0
 

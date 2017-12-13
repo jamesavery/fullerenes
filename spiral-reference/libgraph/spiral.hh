@@ -92,19 +92,11 @@ struct full_spiral_name {
 
   static string search_scheme_txt[4], construction_scheme_txt[4], graph_type_txt[4];
 
+  string to_string(bool unpacked=false) const;
+  
   friend ostream& operator<<(ostream& s, const full_spiral_name &sn)
   {
-    s << "<|\n\t"
-      << "\"graph_type\" -> \""<<full_spiral_name::graph_type_txt[sn.graph_type]<<"\",\n\t"
-      << "\"search_scheme\" -> \""<<full_spiral_name::search_scheme_txt[sn.search_scheme]<<"\",\n\t"
-      << "\"construction_scheme\" -> \""<<full_spiral_name::construction_scheme_txt[sn.construction_scheme]<<"\",\n\t"
-      << "\"point_group\" -> \""<<(sn.point_group.empty()? "UNSPECIFIED" : sn.point_group) <<"\",\n\t"
-      << "\"chemical_formula\" -> \""<<sn.chemical_formula<<"\",\n\t"
-      << "\"base_face_degree\" -> "<<sn.base_face_degree<<",\n\t"
-      << "\"face_degrees\" -> " << sn.face_degrees << ",\n\t"
-      << "\"jumps\" -> " << sn.jumps << ",\n\t" // indices start counting at 0
-      << "\"spiral_code\" -> " << sn.spiral_code //<< ", (length: " << sn.spiral_code.size() << ") \n\t"
-      << "|>";
+    s << sn.to_string();
     return s;
   }
 
