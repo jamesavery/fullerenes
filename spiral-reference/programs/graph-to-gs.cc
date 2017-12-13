@@ -5,8 +5,11 @@
 int main(int ac, char **av)
 {
   if(ac<2){
-    fprintf(stderr,"Syntax: %s <graph-filename> [index]\n"
-	    "Supported graph formats: %s\n\n", av[0], to_string(PlanarGraph::input_formats).c_str());
+    fprintf(stderr,"Syntax: %s <graph-filename> [index=0] [naming_scheme=cage]\n"
+	    "Graph-file formats: %s.\n"
+    	    "Index (optional) is index into multi-graph file.\n"
+	    "Naming-scheme is one of: {cage, fulleroid, fullerene}.\n\n",
+	    av[0], to_string(PlanarGraph::input_formats).c_str());
     return -1;
   }
   
@@ -18,18 +21,9 @@ int main(int ac, char **av)
     G.orient_neighbours();
   }
 
-  full_spiral_name::construction_scheme_t graph_type;
-  
-  Triangulation T(G.enveloping_triangulation(graph_type));
-  // TODO: Add functionality to compute the full_spiral_name.
-  //       Add this method both to Triangulation and to PlanarGraph classes
-  vector<int> spiral;
-  jumplist_t jumps;
+  full_spiral_name spiral_name(G);
 
-  // TODO: Add option to specify GS or CS for canonical spiral
-  T.get_spiral(spiral,jumps);
-
-  // TODO: Output general spiral code
+  cout << spiral_name << endl;
   
   return 0;
 }

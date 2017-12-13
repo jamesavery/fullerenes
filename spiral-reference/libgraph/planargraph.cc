@@ -47,6 +47,7 @@ PlanarGraph PlanarGraph::enveloping_triangulation(construction_scheme_t &scheme)
   }
 }
 
+
 bool PlanarGraph::is_cubic() const {
   for(node_t u=0;u<N;u++)
     if(neighbours[u].size() != 3)

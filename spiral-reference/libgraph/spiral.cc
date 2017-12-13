@@ -3,8 +3,9 @@
 #include <vector>
 #include <string>
 
-// #include "triangulation.hh"
+
 #include "spiral.hh"
+#include "triangulation.hh"
 
 using namespace std;
 
@@ -219,7 +220,20 @@ void full_spiral_name::fulleroid_constructor(const vector<vector<int>> &spiral_n
   }
 }
 
+// TODO: Should it be possible to specify base_face_degree?
+full_spiral_name::full_spiral_name(const PlanarGraph &G, const graph_type_t graph_type, bool rarest_special_start) : graph_type(graph_type), search_scheme(rarest_special_start? CANONICAL_GENERALIZED_SPIRAL : COMPATIBILITY_CANONICAL_SPIRAL), base_face_degree(6)
+{
+  Triangulation T(G.enveloping_triangulation(construction_scheme));
+  general_spiral spiral = T.get_general_spiral(rarest_special_start);
 
+  // Which face degrees appear?
+  set<int> face_degree_set;
+  for(int d: spiral.spiral) if(d != base_face_degree) face_degree_set.insert(d);
+  face_degrees = vector<int>(face_degree_set.begin(), face_degree_set.end());
+
+  spiral_code = spiral.spiral;
+  jumps       = spiral.jumps;
+}
 
 
 #if 0

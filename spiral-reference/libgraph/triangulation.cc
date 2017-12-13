@@ -603,6 +603,13 @@ bool Triangulation::get_spiral(vector<int>& spiral, jumplist_t& jumps, const boo
   return success;
 }
 
+general_spiral Triangulation::get_general_spiral(const bool only_rarest_special) const
+{
+  general_spiral gs;
+  bool success = get_spiral(gs.spiral,gs.jumps,only_rarest_special,true);
+  assert(success); 		// General spirals should *always* succeed
+  return gs;
+}
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 // special_only is a switch to search for spirals starting at non-hexagons only

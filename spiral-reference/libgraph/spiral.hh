@@ -1,19 +1,17 @@
 #pragma once
 //TODO: The plan is to gather the spiral stuff here, so it's not scattered around the place.
-
+//TODO: Better name for full_spiral_name; possibly old name, spiral_nomenclature
 #include <utility> //required for pair
 #include <vector>
 #include <string>
 #include <iostream>
 
 #include "auxiliary.hh"
-//#include "triangulation.hh"
+
+class PlanarGraph;		// Circular dependence to planargraph.hh
 
 typedef pair<int,int>  jump_t;
 typedef vector<jump_t> jumplist_t;
-
-#if 1
-// TODO: Gather spiral stuff in spiral.hh
 
 struct general_spiral {
   jumplist_t  jumps;
@@ -34,7 +32,6 @@ struct general_spiral {
     return s << make_pair(GS.jumps,GS.spiral); 
   }
 };
-#endif
 
 
 
@@ -70,8 +67,8 @@ struct general_spiral {
 
 struct full_spiral_name {
   typedef enum { SS_UNSPECIFIED, CANONICAL_GENERALIZED_SPIRAL, COMPATIBILITY_CANONICAL_SPIRAL } search_scheme_t;
-  typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t;
-  typedef enum { GT_NONE, FULLERENE, FULLEROID, CAGE } graph_type_t;
+  typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t; // -> graph_type?
+  typedef enum { GT_NONE, FULLERENE, FULLEROID, CAGE } graph_type_t; // -> naming_scheme
 
   graph_type_t          graph_type;
   search_scheme_t       search_scheme;
@@ -81,6 +78,7 @@ struct full_spiral_name {
   int base_face_degree;
   vector<int> face_degrees;	// Non-base-face degrees
 
+  // TODO: Change to general_spiral everywhere?
   jumplist_t  jumps;
   vector<int> spiral_code;
 
@@ -90,6 +88,7 @@ struct full_spiral_name {
   void cage_constructor(const vector<vector<int>> &spiral_numbers);
 
   full_spiral_name(const string &str);
+  full_spiral_name(const PlanarGraph &G, const graph_type_t name_type=CAGE, bool rarest_special_start = true);
 
   static string search_scheme_txt[4], construction_scheme_txt[4], graph_type_txt[4];
 

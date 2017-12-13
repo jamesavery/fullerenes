@@ -52,7 +52,8 @@ public:
   // Get canonical general spiral and permutation of nodes compared to current triangulation
   bool get_spiral(vector<int>& v, jumplist_t& j, vector<vector<node_t>> &permutations, const bool only_rarest_special=true, const bool general=true) const;  
   // Get canonical general spiral
-  bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true) const;  
+  bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true) const;
+  general_spiral get_general_spiral(const bool rarest_start=true) const;
 
   void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps,
 		       vector<vector<node_t>>& permutations,
