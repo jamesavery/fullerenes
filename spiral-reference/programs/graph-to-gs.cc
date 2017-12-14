@@ -27,11 +27,11 @@ int main(int ac, char **av)
   }
 
   spiral_nomenclature spiral_name(G);
+  
+  if(naming_scheme == "fullerene") spiral_name.naming_scheme = spiral_nomenclature::FULLERENE;
+  if(naming_scheme == "fulleroid") spiral_name.naming_scheme = spiral_nomenclature::FULLEROID;  
 
-  if(format == "fullerene") spiral_name.naming_scheme = spiral_nomenclature::FULLERENE;
-  if(format == "fulleroid") spiral_name.naming_scheme = spiral_nomenclature::FULLEROID;  
-
-  cout << spiral_name << endl;
+  cout << spiral_name.to_string() << endl;
   
   return 0;
 }
