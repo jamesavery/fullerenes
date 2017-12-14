@@ -16,8 +16,8 @@ CubicGraph::CubicGraph(const int n, const vector<int>& spiral_string, const jump
   *this = G;
 }
 
-CubicGraph::CubicGraph(const full_spiral_name &fsn){
-  assert(fsn.construction_scheme == full_spiral_name::CUBIC);
+CubicGraph::CubicGraph(const spiral_nomenclature &fsn){
+  assert(fsn.construction_scheme == spiral_nomenclature::CUBIC);
   Triangulation T(fsn);
   *this = T.dual_graph();
 }

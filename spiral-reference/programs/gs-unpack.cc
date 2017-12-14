@@ -9,7 +9,7 @@ using namespace std;
 int main(int ac, char **av)
 {
   string spiral_name = av[1];
-  full_spiral_name fsn(spiral_name);
+  spiral_nomenclature fsn(spiral_name);
   PlanarGraph g(fsn);
 
   g.layout2d = g.tutte_layout();

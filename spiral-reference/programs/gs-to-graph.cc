@@ -16,7 +16,7 @@ int main(int ac, char **av)
   string spiral_code   = av[1];
   string output_format = ac>=3? av[2] : "ascii";
 
-  full_spiral_name fn(spiral_code);
+  spiral_nomenclature fn(spiral_code);
   PlanarGraph G(fn);
   
   PlanarGraph::to_file(G,stdout,output_format);

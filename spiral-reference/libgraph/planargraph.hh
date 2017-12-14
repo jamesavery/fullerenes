@@ -9,7 +9,7 @@ class PlanarGraph : public Graph {
 public:
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
-  typedef full_spiral_name::construction_scheme_t construction_scheme_t;
+  typedef spiral_nomenclature::construction_scheme_t construction_scheme_t;
 
   // TODO: Get rid of layout_is_spherical
   PlanarGraph() {}
@@ -21,7 +21,7 @@ public:
       outer_face = find_outer_face();
     } 
   }
-  PlanarGraph(const full_spiral_name &fsn);
+  PlanarGraph(const spiral_nomenclature &fsn);
 
  
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g), layout2d(layout) {  }

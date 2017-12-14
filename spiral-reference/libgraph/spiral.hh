@@ -1,7 +1,5 @@
 #pragma once
-//TODO: The plan is to gather the spiral stuff here, so it's not scattered around the place.
-//TODO: Better name for full_spiral_name; possibly old name, spiral_nomenclature
-#include <utility> //required for pair
+#include <utility> 
 #include <vector>
 #include <string>
 #include <iostream>
@@ -65,7 +63,7 @@ struct general_spiral {
 // CAGE_TYPE ::= List('-') of ('(' (List(',') of int) ')') | FORMULA | ("fullerene" | "fulleroid" | "cage");
 
 
-struct full_spiral_name {
+struct spiral_nomenclature {
   typedef enum { SS_UNSPECIFIED, CANONICAL_GENERALIZED_SPIRAL, COMPATIBILITY_CANONICAL_SPIRAL } search_scheme_t;
   typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t; // -> graph_type?
   typedef enum { GT_NONE, FULLERENE, FULLEROID, CAGE } graph_type_t; // -> naming_scheme
@@ -87,14 +85,14 @@ struct full_spiral_name {
 
   void cage_constructor(const vector<vector<int>> &spiral_numbers);
 
-  full_spiral_name(const string &str);
-  full_spiral_name(const PlanarGraph &G, const graph_type_t name_type=CAGE, bool rarest_special_start = true);
+  spiral_nomenclature(const string &str);
+  spiral_nomenclature(const PlanarGraph &G, const graph_type_t name_type=CAGE, bool rarest_special_start = true);
 
   static string search_scheme_txt[4], construction_scheme_txt[4], graph_type_txt[4];
 
   string to_string(bool unpacked=false) const;
   
-  friend ostream& operator<<(ostream& s, const full_spiral_name &sn)
+  friend ostream& operator<<(ostream& s, const spiral_nomenclature &sn)
   {
     s << sn.to_string();
     return s;

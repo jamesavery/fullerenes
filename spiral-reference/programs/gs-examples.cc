@@ -59,8 +59,8 @@ int main(int ac, char **av)
   for(auto example: spiral_paper_examples){
     string name = example.first, gs = example.second;
     cout << name << "_name = \"" << gs << "\";\n";
-    cout << name << " = " << full_spiral_name(gs) << ";\n\n";
-    cout << name << " = " << PlanarGraph(full_spiral_name(gs)) << ";\n\n";
+    cout << name << " = " << spiral_nomenclature(gs) << ";\n\n";
+    cout << name << " = " << PlanarGraph(spiral_nomenclature(gs)) << ";\n\n";
   }
 
   return 0;

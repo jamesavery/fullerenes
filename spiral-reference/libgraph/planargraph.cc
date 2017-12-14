@@ -7,21 +7,21 @@
 
 using namespace std;
 
-PlanarGraph::PlanarGraph(const full_spiral_name &fsn){
+PlanarGraph::PlanarGraph(const spiral_nomenclature &fsn){
   switch(fsn.construction_scheme){
-    case full_spiral_name::CS_NONE:
+    case spiral_nomenclature::CS_NONE:
       // cerr << "none" << endl;
       assert(false);
       break;
-    case full_spiral_name::CUBIC:
+    case spiral_nomenclature::CUBIC:
       // cerr << "CUBIC" << endl;
       *this = CubicGraph(fsn);
       break;
-    case full_spiral_name::TRIANGULATION:
+    case spiral_nomenclature::TRIANGULATION:
       // cerr << "TRIANGULATION" << endl;
       *this = Triangulation(fsn);
       break;
-    case full_spiral_name::LEAPFROG:
+    case spiral_nomenclature::LEAPFROG:
       // cerr << "LEAPFROG" << endl;
       Triangulation T(fsn);
       *this = T.inverse_leapfrog_dual();
@@ -36,13 +36,13 @@ PlanarGraph::PlanarGraph(const full_spiral_name &fsn){
 PlanarGraph PlanarGraph::enveloping_triangulation(construction_scheme_t &scheme) const
 {
   if(is_triangulation()){
-    scheme = full_spiral_name::TRIANGULATION;
+    scheme = spiral_nomenclature::TRIANGULATION;
     return *this;
   } else if(is_cubic()){
-    scheme = full_spiral_name::CUBIC;
+    scheme = spiral_nomenclature::CUBIC;
     return dual_graph();
   } else {
-    scheme = full_spiral_name::LEAPFROG;
+    scheme = spiral_nomenclature::LEAPFROG;
     return leapfrog_dual();
   }
 }

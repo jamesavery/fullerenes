@@ -1,4 +1,3 @@
-
 #include <utility>
 #include <vector>
 #include <string>
@@ -63,11 +62,11 @@ template <> vector<string> split(const string& parse_str, const string& delimite
 }
 
 
-string full_spiral_name::search_scheme_txt[4]       = {"UNSPECIFIED","CANONICAL_GENERALIZED_SPIRAL","COMPATIBILITY_CANONICAL_SPIRAL"};
-string full_spiral_name::construction_scheme_txt[4] = {"UNSPECIFIED","CUBIC","TRIANGULATION", "LEAPFROG"};
-string full_spiral_name::graph_type_txt[4]          = {"null","FULLERENE", "FULLEROID", "CAGE"};
+string spiral_nomenclature::search_scheme_txt[4]       = {"UNSPECIFIED","CANONICAL_GENERALIZED_SPIRAL","COMPATIBILITY_CANONICAL_SPIRAL"};
+string spiral_nomenclature::construction_scheme_txt[4] = {"UNSPECIFIED","CUBIC","TRIANGULATION", "LEAPFROG"};
+string spiral_nomenclature::graph_type_txt[4]          = {"null","FULLERENE", "FULLEROID", "CAGE"};
 
-full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search_scheme(SS_UNSPECIFIED),
+spiral_nomenclature::spiral_nomenclature(const string &str) : graph_type(CAGE), search_scheme(SS_UNSPECIFIED),
 							construction_scheme(CUBIC), 
 							base_face_degree(6), face_degrees({5})
 {
@@ -174,7 +173,7 @@ full_spiral_name::full_spiral_name(const string &str) : graph_type(CAGE), search
   fulleroid_constructor(spiral_numbers,face_degrees,base_face_degree);
 }
 
-void full_spiral_name::cage_constructor(const vector<vector<int>> &spiral_numbers)
+void spiral_nomenclature::cage_constructor(const vector<vector<int>> &spiral_numbers)
 {
   assert(spiral_numbers.size() == 1 || spiral_numbers.size() == 2);
   bool has_jumps = (spiral_numbers.size() == 2);
@@ -194,7 +193,7 @@ void full_spiral_name::cage_constructor(const vector<vector<int>> &spiral_number
   face_degrees = vector<int>(face_degree_set.begin(), face_degree_set.end());
 }
 
-void full_spiral_name::fulleroid_constructor(const vector<vector<int>> &spiral_numbers, vector<int> face_degrees, int base_face_degree)
+void spiral_nomenclature::fulleroid_constructor(const vector<vector<int>> &spiral_numbers, vector<int> face_degrees, int base_face_degree)
 {
   assert(spiral_numbers.size() ==  face_degrees.size() || spiral_numbers.size() == face_degrees.size()+1);
 
@@ -221,7 +220,7 @@ void full_spiral_name::fulleroid_constructor(const vector<vector<int>> &spiral_n
 }
 
 // TODO: Should it be possible to specify base_face_degree?
-full_spiral_name::full_spiral_name(const PlanarGraph &G, const graph_type_t graph_type, bool rarest_special_start) : graph_type(graph_type), search_scheme(rarest_special_start? CANONICAL_GENERALIZED_SPIRAL : COMPATIBILITY_CANONICAL_SPIRAL), base_face_degree(6)
+spiral_nomenclature::spiral_nomenclature(const PlanarGraph &G, const graph_type_t graph_type, bool rarest_special_start) : graph_type(graph_type), search_scheme(rarest_special_start? CANONICAL_GENERALIZED_SPIRAL : COMPATIBILITY_CANONICAL_SPIRAL), base_face_degree(6)
 {
   Triangulation T(G.enveloping_triangulation(construction_scheme));
   general_spiral spiral = T.get_general_spiral(rarest_special_start);
@@ -235,28 +234,28 @@ full_spiral_name::full_spiral_name(const PlanarGraph &G, const graph_type_t grap
   jumps       = spiral.jumps;
 }
 
-template <typename T> string riffle(const vector<T>& xs, string delim, string start="", string end="")
+template <typename T> string riffle(const vector<T>& xs, string delim, string end_if_nonempty="")
 {
-  string s = start;
-  for(int i=0;i<xs.size();i++) s += to_string(xs[i]) + (i+1<xs.size()? delim : "");
-  return s+end;
+  string s;
+  for(int i=0;i<xs.size();i++) s += to_string(xs[i]) + (i+1<xs.size()? delim : end_if_nonempty);
+  return s;
 }
 
-template <typename T> string riffle(const vector<pair<T,T>>& xs, string delim1, string delim2, string start="", string end="")
+template <typename T> string riffle(const vector<pair<T,T>>& xs, string delim1, string delim2, string end_if_nonempty="")
 {
-  string s = start;
-  for(int i=0;i<xs.size();i++) s += to_string(xs[i].first) + delim1 + to_string(xs[i].second) + (i+1<xs.size()? delim2 : "");
-  return s+end;
+  string s;
+  for(int i=0;i<xs.size();i++) s += to_string(xs[i].first) + delim1 + to_string(xs[i].second) + (i+1<xs.size()? delim2 : end_if_nonempty);
+  return s;
 }
 
-string full_spiral_name::to_string(bool unpacked) const
+string spiral_nomenclature::to_string(bool unpacked) const
 {
-  ostringstream s;
   if(unpacked){
+    ostringstream s;
     s << "<|\n\t"
-      << "\"graph_type\" -> \""<<full_spiral_name::graph_type_txt[graph_type]<<"\",\n\t"
-      << "\"search_scheme\" -> \""<<full_spiral_name::search_scheme_txt[search_scheme]<<"\",\n\t"
-      << "\"construction_scheme\" -> \""<<full_spiral_name::construction_scheme_txt[construction_scheme]<<"\",\n\t"
+      << "\"graph_type\" -> \""<<spiral_nomenclature::graph_type_txt[graph_type]<<"\",\n\t"
+      << "\"search_scheme\" -> \""<<spiral_nomenclature::search_scheme_txt[search_scheme]<<"\",\n\t"
+      << "\"construction_scheme\" -> \""<<spiral_nomenclature::construction_scheme_txt[construction_scheme]<<"\",\n\t"
       << "\"point_group\" -> \""<<(point_group.empty()? "UNSPECIFIED" : point_group) <<"\",\n\t"
       << "\"chemical_formula\" -> \""<<chemical_formula<<"\",\n\t"
       << "\"base_face_degree\" -> "<<base_face_degree<<",\n\t"
@@ -264,6 +263,7 @@ string full_spiral_name::to_string(bool unpacked) const
       << "\"jumps\" -> " << jumps << ",\n\t" // indices start counting at 0
       << "\"spiral_code\" -> " << spiral_code //<< ", (length: " << spiral_code.size() << ") \n\t"
       << "|>";
+    return s.str();
   } else {
     // Add point group prefix if present
     string prefix = point_group.empty()? "" : (point_group+"-");
@@ -277,18 +277,20 @@ string full_spiral_name::to_string(bool unpacked) const
     if(search_scheme == CANONICAL_GENERALIZED_SPIRAL)   schemes.push_back("GS");
     if(search_scheme == COMPATIBILITY_CANONICAL_SPIRAL) schemes.push_back("CS");
 
-    scheme_string = riffle(schemes,",","",":");
+    scheme_string = riffle(schemes,",",":");
       
     // Encode jumps
-    string jump_string = riffle(jumps,",",",","","; ");
+    string jump_string = riffle(jumps,",",",","; ");
     
-    // Encode spiral
-    string spiral_string;
+    // Encode spiral and determine suffix
+    string spiral_string, suffix;
     switch(graph_type){
     case CAGE:
       spiral_string = riffle(spiral_code,",");
+      suffix        = "cage";
       break;
     case FULLERENE:
+      suffix = "fullerene";
     case FULLEROID:
       for(int i=0;i<face_degrees.size();i++){
 	vector<int> indices;	
@@ -297,99 +299,16 @@ string full_spiral_name::to_string(bool unpacked) const
 	for(int j=0;j<spiral_code.size();j++) if(spiral_code[j] == d) indices.push_back(j+1);
 	spiral_string += riffle(indices,",") + (i+1<face_degrees.size()? ";":"");
       }
+      if(suffix.empty()) suffix = "("+riffle(face_degrees,",") + ")-fulleroid"; // TODO: non-6 base face
       break;
     default:
       break;			// TODO: Error
     }
+
+    if(!chemical_formula.empty()) suffix = chemical_formula + "-"+suffix;
+    
+    return prefix + "[" + scheme_string + jump_string + spiral_string + "]-" + suffix;    
   }
-  return s.str();
-}
-
-#if 0
-
-bool operator<(const general_spiral &s) const
-{
-  return jumps.size() < s.jumps.size() ||
-	(jumps.size() == s.jumps.size() && jumps < s.jumps) ||
-        (jumps == s.jumps && spiral < s.spiral);
-}
-
-
-ostream &operator<<(ostream &s, const general_spiral &GS)
-{
-  return s << make_pair(GS.jumps,GS.spiral); 
-}
-
-
-spiral_nomenclature::spiral_nomenclature(const PlanarGraph &g, const string& atom="",
-					 bool compatibility=false) : atom(atom), graph(g),cs(compatibility) {
-  if(g.is_triangulation()){
-    graph_type     = TRIANGULATION;
-    is_a_fullerene = g.dual_graph().is_a_fullerene();
-    triangulation  = g;
-  } else if(g.is_cubic()){
-    graph_type     = CUBIC;
-    triangulation  = g.dual_graph();
-    is_a_fullerene = g.is_a_fullerene();
-  } else {
-    graph_type     = GENERAL;
-    triangulation  = g.leapfrog_dual();
-    is_a_fullerene = false;
-  }
-
-  permutation.resize(triangulation.N);
-  bool spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,!cs);
-  assert(spiral_success);
-
-  // Find spiral order with respect to triangulation vertices
-  permutation.resize(triangulation.N);
-  spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,permutation,!cs);
-}
-
-template <typename T> vector<T> read_list
-spiral_nomenclature::spiral_nomenclature(const string& name)
-{
-  // Grammar for nomenclature as described in spiral paper:
-  // 
-  // MOLECULE_NAME   ::= (POINTGROUP '-')? POLYHEDRON_NAME '-' FORMULA '-' SUFFIX
-  // POLYHEDRON_NAME ::= '[' METHOD_SPEC? (JUMP+';')? SPIRAL ']'
-  //                 |   '[' METHOD_SPEC? (JUMP+';')? PI     ']'
-  //                 |   '[' METHOD_SPEC? (JUMP+';')? FI     "]-(" FACE_SIZES ")" BASE_FACE
-  //
-  // METHOD_SPEC     ::= ("D"|"LF"|"CS"|"GS")+ ':' 
-  // SUFFIX          ::= 'cage' | 'fullerene' | 'fulleroid'
-  // SPIRAL          ::= NUMBER_LIST
-  // PI              ::= NUMBER_LIST
-  // FI              ::= NUMBER_LISTS
-  // NUMBER_LIST     ::= number (',' number)*
-  // NUMBER_LISTS    ::= NUMBER_LIST (';' NUMBER_LIST)*
-  // FORMULA         ::= string
-  // POINTGROUP      ::= string
-
-  // Simplified grammar which accepts the above + some more:
-  //
-  // SEPARATOR  ::= " []-"
-  // POLYHEDRON_NAME ::= '[' METHOD_SPEC? NUMBER_LISTS ']'
-  //                 |   '[' METHOD_SPEC? NUMBER_LISTS "]-(" NUMBER_LIST ")" number
-  //
-  // FI              ::= NUMBER_LIST (';' NUMBER_LIST)*
-  // FORMULA         ::= string
-  // POINTGROUP      ::= string
   
-  // The grammar is so simple that we'll just brutally parse by hand.
-
-  for(int i=0;i<name.size();i++){
-  }
-
 }
 
-friend ostream& operator<<(ostream &s, const spiral_nomenclature &n){
-  string graph_type_string[3] = {"","D,","LF,"};
-  s << "["<<graph_type_string[n.graph_type] <<(n.compatibility?"CS":"GS") << ": "
-    << (n.GS.jumps.empty()? "": (jumps_to_string(n.GS.jumps)+"; "))
-    << (n.is_a_fullerene? spiral_to_rspi_string(n.GS.spiral) : spiral_to_string(n.GS.spiral))
-    << "]-" <<n.atom<< n.graph.N <<"-" << (n.is_a_fullerene? "fullerene" : "cage");
-  return s;
-}
-
-#endif
