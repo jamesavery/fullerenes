@@ -65,10 +65,10 @@ struct general_spiral {
 
 struct spiral_nomenclature {
   typedef enum { SS_UNSPECIFIED, CANONICAL_GENERALIZED_SPIRAL, COMPATIBILITY_CANONICAL_SPIRAL } search_scheme_t;
-  typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t; // -> graph_type?
-  typedef enum { GT_NONE, FULLERENE, FULLEROID, CAGE } graph_type_t; // -> naming_scheme
+  typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t; // -> naming_scheme?
+  typedef enum { GT_NONE, FULLERENE, FULLEROID, CAGE } naming_scheme_t; // -> naming_scheme
 
-  graph_type_t          graph_type;
+  naming_scheme_t          naming_scheme;
   search_scheme_t       search_scheme;
   construction_scheme_t construction_scheme;
 
@@ -86,9 +86,9 @@ struct spiral_nomenclature {
   void cage_constructor(const vector<vector<int>> &spiral_numbers);
 
   spiral_nomenclature(const string &str);
-  spiral_nomenclature(const PlanarGraph &G, const graph_type_t name_type=CAGE, bool rarest_special_start = true);
+  spiral_nomenclature(const PlanarGraph &G, const naming_scheme_t name_type=CAGE, bool rarest_special_start = true);
 
-  static string search_scheme_txt[4], construction_scheme_txt[4], graph_type_txt[4];
+  static string search_scheme_txt[4], construction_scheme_txt[4], naming_scheme_txt[4];
 
   string to_string(bool unpacked=false) const;
   

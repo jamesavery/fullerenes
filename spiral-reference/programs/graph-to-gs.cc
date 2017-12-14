@@ -28,8 +28,8 @@ int main(int ac, char **av)
 
   spiral_nomenclature spiral_name(G);
 
-  if(format == "fullerene") spiral_name.graph_type = spiral_nomenclature::FULLERENE;
-  if(format == "fulleroid") spiral_name.graph_type = spiral_nomenclature::FULLEROID;  
+  if(format == "fullerene") spiral_name.naming_scheme = spiral_nomenclature::FULLERENE;
+  if(format == "fulleroid") spiral_name.naming_scheme = spiral_nomenclature::FULLEROID;  
 
   cout << spiral_name << endl;
   

@@ -64,9 +64,9 @@ template <> vector<string> split(const string& parse_str, const string& delimite
 
 string spiral_nomenclature::search_scheme_txt[4]       = {"UNSPECIFIED","CANONICAL_GENERALIZED_SPIRAL","COMPATIBILITY_CANONICAL_SPIRAL"};
 string spiral_nomenclature::construction_scheme_txt[4] = {"UNSPECIFIED","CUBIC","TRIANGULATION", "LEAPFROG"};
-string spiral_nomenclature::graph_type_txt[4]          = {"null","FULLERENE", "FULLEROID", "CAGE"};
+string spiral_nomenclature::naming_scheme_txt[4]          = {"null","FULLERENE", "FULLEROID", "CAGE"};
 
-spiral_nomenclature::spiral_nomenclature(const string &str) : graph_type(CAGE), search_scheme(SS_UNSPECIFIED),
+spiral_nomenclature::spiral_nomenclature(const string &str) : naming_scheme(CAGE), search_scheme(SS_UNSPECIFIED),
 							construction_scheme(CUBIC), 
 							base_face_degree(6), face_degrees({5})
 {
@@ -136,7 +136,7 @@ spiral_nomenclature::spiral_nomenclature(const string &str) : graph_type(CAGE), 
   
   // General cage
   if (suffix == "cage"){
-    graph_type = CAGE;
+    naming_scheme = CAGE;
     cage_constructor(spiral_numbers);
     return;
   }
@@ -147,13 +147,13 @@ spiral_nomenclature::spiral_nomenclature(const string &str) : graph_type(CAGE), 
   }
 
   if (suffix == "fullerene"){
-    graph_type = FULLERENE;
+    naming_scheme = FULLERENE;
     base_face_degree = 6;
     face_degrees     = vector<int>{{5}};
   }
 
   if(suffix == "fulleroid"){
-    graph_type = FULLEROID;
+    naming_scheme = FULLEROID;
     vector<string> fulleroid_face_spec = find_parenthetical(suffix_segments[suffix_start],"()");
     if(fulleroid_face_spec[2].size()==0)
       base_face_degree = 6;
@@ -220,7 +220,7 @@ void spiral_nomenclature::fulleroid_constructor(const vector<vector<int>> &spira
 }
 
 // TODO: Should it be possible to specify base_face_degree?
-spiral_nomenclature::spiral_nomenclature(const PlanarGraph &G, const graph_type_t graph_type, bool rarest_special_start) : graph_type(graph_type), search_scheme(rarest_special_start? CANONICAL_GENERALIZED_SPIRAL : COMPATIBILITY_CANONICAL_SPIRAL), base_face_degree(6)
+spiral_nomenclature::spiral_nomenclature(const PlanarGraph &G, const naming_scheme_t naming_scheme, bool rarest_special_start) : naming_scheme(naming_scheme), search_scheme(rarest_special_start? CANONICAL_GENERALIZED_SPIRAL : COMPATIBILITY_CANONICAL_SPIRAL), base_face_degree(6)
 {
   Triangulation T(G.enveloping_triangulation(construction_scheme));
   general_spiral spiral = T.get_general_spiral(rarest_special_start);
@@ -253,7 +253,7 @@ string spiral_nomenclature::to_string(bool unpacked) const
   if(unpacked){
     ostringstream s;
     s << "<|\n\t"
-      << "\"graph_type\" -> \""<<spiral_nomenclature::graph_type_txt[graph_type]<<"\",\n\t"
+      << "\"naming_scheme\" -> \""<<spiral_nomenclature::naming_scheme_txt[naming_scheme]<<"\",\n\t"
       << "\"search_scheme\" -> \""<<spiral_nomenclature::search_scheme_txt[search_scheme]<<"\",\n\t"
       << "\"construction_scheme\" -> \""<<spiral_nomenclature::construction_scheme_txt[construction_scheme]<<"\",\n\t"
       << "\"point_group\" -> \""<<(point_group.empty()? "UNSPECIFIED" : point_group) <<"\",\n\t"
@@ -284,7 +284,7 @@ string spiral_nomenclature::to_string(bool unpacked) const
     
     // Encode spiral and determine suffix
     string spiral_string, suffix;
-    switch(graph_type){
+    switch(naming_scheme){
     case CAGE:
       spiral_string = riffle(spiral_code,",");
       suffix        = "cage";
