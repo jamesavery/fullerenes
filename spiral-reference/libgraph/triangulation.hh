@@ -28,8 +28,8 @@ public:
   PlanarGraph dual_graph() const;
   vector<face_t> dual_faces() const;
 
-  // takes a triangulation, and returns a dual of the inverse leapfrog
-  // this is cheap because we just remove a set of faces
+  // takes a triangulation, and returns the dual of the inverse leapfrog
+  // this is cheap because we just remove a set of vertices
   PlanarGraph inverse_leapfrog_dual() const;
   
   pair<node_t,node_t> adjacent_tris(const dedge_t &e) const;

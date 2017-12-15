@@ -1,6 +1,8 @@
-#include "polyhedron.hh"
 #include <iomanip>
 #include <limits>
+
+#include "triangulation.hh"
+#include "polyhedron.hh"
 
 double Polyhedron::diameter() const {
   double dmax = -INFINITY;
@@ -13,26 +15,26 @@ double Polyhedron::diameter() const {
 };
 
 double Polyhedron::surface_area() const {
-  double A = 0;  
+  double A = 0;
 
-  // vector<tri_t> tris(triangulation(faces)); 
-  
+  // vector<tri_t> tris(triangulation(faces));
+ 
   // for(size_t i=0;i<tris.size();i++){
   //   const tri_t& tri(tris[i]);
   //   Tri3D T(points[tri[0]],points[tri[1]],points[tri[2]]);
   //   A += T.area();
-  // } 
+  // }
   // return A;
 
-  vector<tri_t> tris(centroid_triangulation(faces)); 
+  vector<tri_t> tris(centroid_triangulation(faces));
   vector<coord3d> centroid_points(points.begin(),points.end());
-  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));  
-  
+  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points)); 
+ 
   for(size_t i=0;i<tris.size();i++){
     const tri_t& tri(tris[i]);
     Tri3D T(centroid_points[tri[0]],centroid_points[tri[1]],centroid_points[tri[2]]);
     A += T.area();
-  } 
+  }
   return A;
 }
 
@@ -42,7 +44,7 @@ double Polyhedron::volume_tetra() const {
   for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
 
   double V = 0,Vm=0,Vp=0;
-  
+ 
   // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
   coord3d zero(0,0,0);
   for(size_t i=0;i<tris.size();i++){
@@ -84,10 +86,10 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   list<node_t> work_queue;
   srandom(42); // Seed random numbers with constant for reproducible behaviour
 
-  // 1. Create initial tetrahedron. 
+  // 1. Create initial tetrahedron.
   // 1.1 Find 4 non-coplanar points
   Tri3D T(points,tri_t(0,1,2));
-  
+ 
   for(node_t u=3;u<N;u++) work_queue.push_front(u);
 
   // Get the point furthest from the (0,1,2)-plane
@@ -112,10 +114,10 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   work_queue.erase(v);
 
   for(triit t(output.begin());t!=output.end();t++){
-    // Make sure all faces point away from the centroid. 
-    if(!Tri3D(points,*t).back_face(c)) t->flip(); 
+    // Make sure all faces point away from the centroid.
+    if(!Tri3D(points,*t).back_face(c)) t->flip();
   }
-    
+   
 
 
   // 2. For each remaining vertex u
@@ -265,7 +267,7 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
 
 }
 
-Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 
+Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
 {
   double bondlength = INFINITY;
 
@@ -275,7 +277,7 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
       if(d < bondlength) bondlength = d;
     }
   }
-     
+
   set<edge_t> edges;
   for(int i=0;i<xs.size();i++){
     for(int j=i+1;j<xs.size();j++){
@@ -285,7 +287,7 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
       }
     }
   }
-  
+
   (*this) = Polyhedron(PlanarGraph(edges), xs);
 }
 
@@ -313,16 +315,16 @@ matrix3d Polyhedron::principal_axes() const
   pair<coord3d,matrix3d> ES(I.eigensystem());
 
   matrix3d Id;
-  Id(0,0) = 1; 
-  Id(1,1) = 1; 
-  Id(2,2) = 1; 
+  Id(0,0) = 1;
+  Id(1,1) = 1;
+  Id(2,2) = 1;
 
-  for(int i=0;i<3;i++) 
+  for(int i=0;i<3;i++)
     if(std::isnan(ES.first[i])){
       cerr << "Warning: Inertial frame returned NaN. Setting inertial frame transformation to identity.\n";
       return Id;
     }
-  
+
   if((ES.second*ES.second.transpose() - Id).norm() > 1e-2){
     cerr << "Warning: Inertial frame transform is not unitary. Setting inertial frame transformation to identity.\n";
     return Id;
@@ -348,7 +350,7 @@ coord3d Polyhedron::width_height_depth() const {
 
 
 
-Polyhedron Polyhedron::dual(int Fmax) const 
+Polyhedron Polyhedron::dual(int Fmax) const
 {
   PlanarGraph d(dual_graph(Fmax));
 
@@ -359,7 +361,7 @@ Polyhedron Polyhedron::dual(int Fmax) const
     for(int i=0;i<f.size();i++) avg += points[f[i]];
     coordinates[u] = avg/double(f.size());
   }
-  
+
   return Polyhedron(d,coordinates);
 }
 
@@ -372,8 +374,38 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     bool optimize_angles = false;
     return optimize_other(optimize_angles);
   }else{
-    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra, other cubic graphs and triangulations." << endl;
-    return false;
+     Triangulation LFD = leapfrog_dual();
+
+    // inverse_tranges for faster lookup:
+    // indices in 'triangles' at which there are triangles containing this vertex
+    vector<vector<int>> inverse_triangle_list(LFD.N);
+    for (int i=0; i<LFD.triangles.size(); i++){
+      const tri_t& tri = LFD.triangles[i];
+      inverse_triangle_list[tri[0]].push_back(i);
+      inverse_triangle_list[tri[1]].push_back(i);
+      inverse_triangle_list[tri[2]].push_back(i);
+    }
+
+    // generate and optimise LF of initial polyhedron
+    PlanarGraph LF = LFD.dual_graph();
+    LF.layout2d = LF.tutte_layout();
+    Polyhedron P(LF,LF.zero_order_geometry());
+    bool optimize_angles = true;
+    bool opt_success = P.optimize_other(optimize_angles);
+
+    // for each face in LF which corresponds to a vertex in the initial graph,
+    // find the average coordinates of all vertices (ie the face centre)
+    for (int i=0; i<N; i++){
+      const int face_size(inverse_triangle_list[i].size());
+      coord3d face_centre;
+      for (int j=0; j<face_size; j++){
+        face_centre += P.points[inverse_triangle_list[i][j]];
+      }
+      face_centre /= face_size;
+      points[i] = face_centre;
+    }
+    
+    return opt_success;
   }
 }
 

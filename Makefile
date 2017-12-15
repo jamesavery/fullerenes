@@ -5,7 +5,7 @@ VERSION_NUMBER=4.5
 
 #CXX=clang++
 CXX=g++
-F90=gfortran-6
+F90=gfortran
 AR=ar
 
 DIRECTORIES=-DFULLERENE_ROOT=\"${PWD}\" -DFULLERENE_DATABASE=\"${PWD}/database\"

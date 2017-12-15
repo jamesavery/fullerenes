@@ -285,7 +285,7 @@ PlanarGraph PlanarGraph::leapfrog_dual() const
   assert(is_oriented);
   vector<face_t> faces = compute_faces_oriented();
 
-  PlanarGraph lf(N+faces.size(),true);
+  PlanarGraph lf(Graph(N+faces.size(),true));
 
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++) lf.neighbours[u] = neighbours[u];
