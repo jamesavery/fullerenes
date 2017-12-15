@@ -23,7 +23,7 @@ Polyhedron Polyhedron::from_file(FILE *file, string format)
   case XYZ:
     return from_xyz(file);
   case MOL2:
-    return Polyhedron::from_mol2(file);
+    return from_mol2(file);
   default:
     cerr << "Input format is '"<<format<<"'; must be one of: " << input_formats << "\n";
     abort();
@@ -339,7 +339,6 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
 
   int N, Nedges;
   vector<coord3d> points;
-  set<edge_t>     edges;
   string line;
 
   // Fast forward to metadata section
@@ -352,6 +351,8 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   l >> N;
   l >> Nedges;
 
+  Graph G(N);
+  
   //  cerr << "line="<<line<<"; N="<<N<<", Nedges="<<Nedges<<endl;
   
   // Fast forward to coordinate section
@@ -374,10 +375,12 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   }
   assert(points.size() == N);         // TODO: Fail gracefully if file format error.
 
+
   // Fast forward to edge section
   while(getline(file,line) && line.compare(0,edge_marker.size(),edge_marker)) ;  
 
-  for(int i=0;i<Nedges && file_ok;i++){
+  int i=0;
+  for(;i<Nedges && file_ok;i++){
     getline(file,line);
     file_ok = (ferror(file) == 0);
     stringstream l(line);
@@ -385,16 +388,19 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
 
     l >> eid;
     for(int j=0;j<2 && l.good(); j++) l >> u[j];
-    edges.insert(edge_t(u[0]-1,u[1]-1));
+    G.insert_edge(edge_t(u[0]-1,u[1]-1));
 
     //    cerr << "Edge " << i << " of " << Nedges << ": Read line "<< line <<endl;
   }
 
-  if(edges.size() != Nedges){
-    cerr << "MOL2 file format error: Expected "<<Nedges<<" edges, found "<<edges.size()<<".\n";
-    cerr << "edges = " << edges << ";\n";
-    abort();
-  }
-
-  return Polyhedron(PlanarGraph(edges), points);
+  Polyhedron P;  
+  P.N = G.N;
+  P.neighbours = G.neighbours;
+  P.points = points;
+  P.layout2d = P.tutte_layout();
+  P.orient_neighbours();
+  P.faces = P.compute_faces();
+  //  cout << "faces = " << P.faces << "\n";
+  
+  return P;
 }

@@ -319,7 +319,7 @@ vector<face_t> PlanarGraph::compute_faces(unsigned int Nmax, bool planar_layout)
   
   // TODO: This should never be used
   cerr << " Non-oriented face computation (loop search). This is not reliable!\n";
-  // abort();
+  abort();
   cerr << "This shouldn't happen but we'll accept it for now." << endl;
   set<edge_t> edge_set = undirected_edges();
   set<face_t> faces;

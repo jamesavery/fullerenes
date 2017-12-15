@@ -114,6 +114,7 @@ node_t Graph::prev_on_face(const node_t &u, const node_t &v) const
   return prev(u,v);
 }
 
+// TODO: Seems to not work
 bool Graph::is_consistently_oriented() const 
 {
   map<dedge_t,bool> seen_dedge;

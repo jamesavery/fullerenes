@@ -1,4 +1,4 @@
-set(PROGRAMS gs-to-graph gs-to-polyhedron graph-to-gs gs-examples)
+set(PROGRAMS gs-to-graph gs-to-polyhedron graph-to-gs gs-examples planarcodes-to-gs)
 
 foreach(program ${PROGRAMS})
   set(program_source ${program}.cc)

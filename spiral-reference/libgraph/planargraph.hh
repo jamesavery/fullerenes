@@ -94,8 +94,8 @@ public:
   enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX} formats_t;
   static int format_id(string id);
   
-  static PlanarGraph from_file(string path);
-  static PlanarGraph from_file(FILE *file, string format);
+  static PlanarGraph from_file(string path, int index=0);
+  static PlanarGraph from_file(FILE *file, string format, int index=0);
   static PlanarGraph from_ascii(FILE *file);
   static PlanarGraph from_planarcode(FILE *file, const size_t index=0);
   static PlanarGraph from_xyz(FILE *file);
@@ -108,7 +108,8 @@ public:
   static bool to_planarcode(const PlanarGraph &G, FILE *file);    
 
   static PlanarGraph read_hog_planarcode(FILE *planarcode_file);
-  static vector<PlanarGraph> read_hog_planarcodes(FILE *planarcode_file);    
+  static vector<PlanarGraph> read_hog_planarcodes(FILE *planarcode_file);
+  static bool read_hog_metadata(FILE *file, size_t &graph_count, size_t &graph_size);
 
   string to_latex(double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false,
 		  int edge_colour = 0x6a5acd, int path_colour = 0x6a5acd, int vertex_colour = 0x8b2500,

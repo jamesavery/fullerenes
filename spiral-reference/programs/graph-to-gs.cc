@@ -14,17 +14,16 @@ int main(int ac, char **av)
   }
 
   string filename = av[1];
-  string format   = ac>2? av[2] : "mol2";
+  string format   = ac>2? av[2] : filename_extension(filename);
   int index       = ac>3? strtol(av[3],0,0) : 0;
   string naming_scheme = ac>4? av[4] : "cage";
 
-  PlanarGraph G = PlanarGraph::from_file(filename);
-
+  FILE *file = fopen(filename.c_str(),"rb");
+  PlanarGraph G = PlanarGraph::from_file(file,format,index);
+  fclose(file);
+  
   // TODO: Hack. Make sure the orientation is already present after reading from_file()
-  if(!G.is_oriented){
-    G.layout2d = G.tutte_layout();
-    G.orient_neighbours();
-  }
+  assert(G.is_oriented);
 
   spiral_nomenclature spiral_name(G);
   

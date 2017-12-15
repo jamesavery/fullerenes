@@ -207,15 +207,63 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   return Polyhedron(g,remaining_points,3,faces);
 }
 
+struct sort_ccw_coord3d {
+  const vector<coord3d> &points;
+  coord3d X, Y, n;
+
+  // Points are only neighbour displacements from origin-node
+  sort_ccw_coord3d(const vector<coord3d>& points)
+    : points(points) {
+
+    // TODO: More numerically robust method    
+    coord3d xc(0,0,0);
+    for(const coord3d &p: points) xc += p;
+    xc /= points.size();
+
+    n = /*x0*/-xc; n /= n.norm();	//
+
+    coord3d x1 = points[0] /* - x0*/;
+    X = x1 - n*x1.dot(n); X /= X.norm();
+    Y = n.cross(x1);
+  }
+
+  bool operator()(const node_t& s, const node_t& t) const {
+    coord3d xs(points[s]/*-x0*/), xt(points[t]/*-x0*/);
+    coord2d Xs(X.dot(xs), Y.dot(xs)), Xt(X.dot(xt), Y.dot(xt));
+
+    double angs = atan2(Xs.first,Xs.second), angt = atan2(Xt.first,Xt.second);
+    return angs <= angt;
+  } 
+};
+
+
 void Polyhedron::orient_neighbours()
 {
-  // if(points.size() == N){
-  //   // TODO: Use 3D embedding to orient graph
-    
-  // } else
-    if(layout2d.size() == N) {
+  if(layout2d.size() == N) {
     PlanarGraph::orient_neighbours();
-  }
+  } else if(points.size() == N){
+
+    // Orient neighbours locally (CW or CCW depending on luck)
+    for(node_t u=0;u<N;u++){
+      vector<node_t> &ns(neighbours[u]);
+      vector<coord3d> neighbour_points(ns.size());
+      const coord3d &x0 = points[u];
+
+      for(int i=0;i<ns.size();i++) points[i] = neighbour_points[ns[i]] - x0;
+      sort_ccw_coord3d CCW(points);
+
+      sort(ns.begin(),ns.end(),CCW);
+    }
+
+    // Choose that first node is correct, then flip to consistency
+    // TODO: How? For now, cheat slowly.
+    if(is_consistently_oriented())
+      is_oriented = true;
+    else {
+      layout2d = tutte_layout();
+      PlanarGraph::orient_neighbours();
+    }
+  } 
   
   // Calculate volume
   double V=0;

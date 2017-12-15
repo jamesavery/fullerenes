@@ -13,11 +13,11 @@ int PlanarGraph::format_id(string name)
   return -1;
 }
 
-PlanarGraph PlanarGraph::from_file(FILE *file, string format)
+PlanarGraph PlanarGraph::from_file(FILE *file, string format, int index)
 {
   switch(format_id(format)){
   case PLANARCODE:
-    return from_planarcode(file);
+    return from_planarcode(file,index);
   case XYZ:
     return Polyhedron::from_xyz(file);
   case MOL2:
@@ -42,7 +42,7 @@ bool PlanarGraph::to_file(const PlanarGraph &G, FILE *file, string format)
   }
 }
 
-PlanarGraph PlanarGraph::from_file(string filename)
+PlanarGraph PlanarGraph::from_file(string filename, int index)
 {
   FILE *file = fopen(filename.c_str(),"rb");
   string extension = filename_extension(filename);
@@ -74,10 +74,10 @@ PlanarGraph PlanarGraph::read_hog_planarcode(FILE *file)
     if(number_length==2) x |= (fgetc(file) << 8);
     return x;
   };
-  
+
   N = read_int();
   if(N == 0){ number_length=2; N = read_int(); }
-
+  
   Graph g(N,true);
   for(node_t u=0; u<N && !feof(file); ++u){
     int v=0;
@@ -104,6 +104,31 @@ PlanarGraph PlanarGraph::read_hog_planarcode(FILE *file)
   //}
 
   return g;
+}
+
+
+bool PlanarGraph::read_hog_metadata(FILE *file, size_t &graph_count, size_t &graph_size)
+{
+  const int header_size = 15;
+
+  // Get file size
+  size_t file_pos  = ftell(file);
+  fseek(file, 0, SEEK_END);
+  size_t file_size = ftell(file);
+
+  //find number of vertices per graph
+  //this only works for files with graphs of equal size
+  fseek(file, header_size, SEEK_SET);
+  
+  //Assumes planarcode files containing only graphs of equal size
+  Graph first(read_hog_planarcode(file));
+  graph_size = ftell(file)-header_size;
+
+  //check if selected graphnumber is valid
+  graph_count = (file_size - header_size ) / graph_size;
+  fseek(file,file_pos,SEEK_SET); // Back to where we started
+
+  return (ferror(file) == 0);
 }
 
 
@@ -174,33 +199,19 @@ bool PlanarGraph::to_mathematica(const PlanarGraph &G, FILE *file)
 PlanarGraph PlanarGraph::from_planarcode(FILE* file, const size_t index){
   const int header_size = 15;
 
-  // Get file size
-  fseek(file, 0, SEEK_END);
-  size_t file_size = ftell(file);
+  size_t graph_count = 0, graph_size = 0;
+  read_hog_metadata(file,graph_count,graph_size);
 
-  //find number of vertices per graph
-  //this only works for files with graphs of equal size
-  fseek(file, header_size, SEEK_SET);
-
-  //Assumes planarcode files containing only graphs of equal size
-  size_t step = 0;
-  if(index != 0){
-    Graph first(read_hog_planarcode(file));
-    step = ftell(file);
-  }
-
-  size_t address = header_size + step * index;
-
+  size_t address = header_size + graph_size * index;
   //check if selected graphnumber is valid
-  unsigned int graphs_per_file = (file_size - header_size ) /step;
-  if(graphs_per_file -1 < index){
-    cerr << "You asked for the " << index+1 << "th graph, but there are only "
-	 << graphs_per_file << " stored in this file." << std::endl;
+  if(graph_count-1 < index){
+    cerr << "You asked for the " << index+1 << (index==0?"st":(index==1?"nd":"th"))<<" graph, but there "
+	 <<(graph_count==1?"is":"are")<<" only"
+	 << graph_count << " stored in this file." << std::endl;
     abort();
   }
-
   //Find the beginning of the selected graph and read it
-  fseek(file, address+1, SEEK_SET);
+  fseek(file, address, SEEK_SET);
   return read_hog_planarcode(file);
 }
 
