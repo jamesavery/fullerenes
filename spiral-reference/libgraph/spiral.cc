@@ -241,13 +241,6 @@ template <typename T> string riffle(const vector<T>& xs, string delim, string en
   return s;
 }
 
-template <typename T> string riffle(const vector<pair<T,T>>& xs, string delim1, string delim2, string end_if_nonempty="")
-{
-  string s;
-  for(int i=0;i<xs.size();i++) s += to_string(xs[i].first) + delim1 + to_string(xs[i].second) + (i+1<xs.size()? delim2 : end_if_nonempty);
-  return s;
-}
-
 string spiral_nomenclature::to_string(bool unpacked) const
 {
   if(unpacked){
@@ -280,7 +273,12 @@ string spiral_nomenclature::to_string(bool unpacked) const
     scheme_string = riffle(schemes,",",":");
       
     // Encode jumps
-    string jump_string = riffle(jumps,",",",","; ");
+    vector<int> jumps_plus_one(jumps.size()*2);
+    for(int i=0;i<jumps.size();i++){
+      jumps_plus_one[2*i]   = jumps[i].first+1;
+      jumps_plus_one[2*i+1] = jumps[i].second;
+    }
+    string jump_string = riffle(jumps_plus_one,",","; ");
     
     // Encode spiral and determine suffix
     string spiral_string, suffix;

@@ -31,7 +31,9 @@ int main(int ac, char **av)
     if(naming_scheme == "fullerene") spiral_name.naming_scheme = spiral_nomenclature::FULLERENE;
     if(naming_scheme == "fulleroid") spiral_name.naming_scheme = spiral_nomenclature::FULLEROID;  
 
-    cout << spiral_name.to_string() << endl;
+    string spiral_code = spiral_name.to_string();
+    cout << spiral_code << endl;
+    cerr << "Graph " << i << " is of length " << spiral_code.size() << ".\n";
   }
   
   return 0;
