@@ -450,7 +450,7 @@ bool Polyhedron::optimize(int opt_method, double ftol)
         face_centre += P.points[inverse_triangle_list[i][j]];
       }
       face_centre /= face_size;
-      points[i] = face_centre;
+      points[i] = face_centre/sqrt(3);
     }
     
     return opt_success;
