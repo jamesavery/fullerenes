@@ -7,26 +7,44 @@
 
 using namespace std;
 
-PlanarGraph::PlanarGraph(const full_spiral_name &fsn){
+PlanarGraph::PlanarGraph(const spiral_nomenclature &fsn){
   switch(fsn.construction_scheme){
-    case full_spiral_name::CS_NONE:
+    case spiral_nomenclature::CS_NONE:
       // cerr << "none" << endl;
       assert(false);
       break;
-    case full_spiral_name::CUBIC:
+    case spiral_nomenclature::CUBIC:
       // cerr << "CUBIC" << endl;
       *this = CubicGraph(fsn);
       break;
-    case full_spiral_name::TRIANGULATION:
+    case spiral_nomenclature::TRIANGULATION:
       // cerr << "TRIANGULATION" << endl;
       *this = Triangulation(fsn);
       break;
-    case full_spiral_name::LEAPFROG:
+    case spiral_nomenclature::LEAPFROG:
       // cerr << "LEAPFROG" << endl;
       Triangulation T(fsn);
       *this = T.inverse_leapfrog_dual();
       break;
   }  
+}
+
+// Every polyhedral graph G can be represented by a triangulation.
+//  1. If G is a triangulation, it is G
+//  2. If G is cubic, it is its dual
+//  3. If G is non-cubic and non-triangulation, it is G's leapfrog dual
+PlanarGraph PlanarGraph::enveloping_triangulation(construction_scheme_t &scheme) const
+{
+  if(is_triangulation()){
+    scheme = spiral_nomenclature::TRIANGULATION;
+    return *this;
+  } else if(is_cubic()){
+    scheme = spiral_nomenclature::CUBIC;
+    return dual_graph();
+  } else {
+    scheme = spiral_nomenclature::LEAPFROG;
+    return leapfrog_dual();
+  }
 }
 
 bool PlanarGraph::is_cubic() const {
@@ -266,7 +284,7 @@ PlanarGraph PlanarGraph::leapfrog_dual() const
   assert(is_oriented);
   vector<face_t> faces = compute_faces_oriented();
 
-  PlanarGraph lf(N+faces.size(),true);
+  PlanarGraph lf(Graph(N+faces.size(),true));
 
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++) lf.neighbours[u] = neighbours[u];
@@ -823,72 +841,6 @@ vector<coord3d> PlanarGraph::zero_order_geometry(double scalerad) const
   return coordinates;
 }
 
-// TODO: Where does this belong?
-// Assumes file is at position of a graph start
-Graph PlanarGraph::read_hog_planarcode(FILE *planarcode_file)
-{
-  // Read the number N of vertices per graph.
-  int number_length=1, N=0;
-  fread(reinterpret_cast<unsigned char*>(&N), 1, 1, planarcode_file);
-  if(N == 0){
-    fread(reinterpret_cast<unsigned char*>(&N), 2, 1, planarcode_file);
-    number_length=2;
-  }
-  
-  Graph g(N,true);
-  for(node_t u=0; u<N && !feof(planarcode_file); ++u){
-    int v=0;
-    do{
-      int n_read = fread(reinterpret_cast<char*>(&v), number_length, 1, planarcode_file);
-      if(n_read != 1 && !feof(planarcode_file)){
-        perror("Error reading HoG PlanarCode file: ");
-        abort();
-      }
-      if(v!=0) g.neighbours[u].push_back(v-1); // In oriented order
-    } while(v!=0 && !feof(planarcode_file));
-  }
-  // Check graph
-  for(node_t u=0;u<N;u++){
-    for(auto v: g.neighbours[u]){
-      bool found_vu = false;
-      
-      for(node_t w: g.neighbours[v])
-        if(w == u) found_vu = true;
-      if(!found_vu){
-        fprintf(stderr,"Graph is not symmetric: (u,v) = (%d,%d) has\n",u,v);
-        cerr << "neighbours["<<u<<"] = " << g.neighbours[u] <<";\n";
-        cerr << "neighbours["<<v<<"] = " << g.neighbours[v] <<";\n";
-        abort();
-      }
-    }
-  }
-
-  return g;
-}
-
-// TODO: Read only a range
-vector<Graph> PlanarGraph::read_hog_planarcodes(FILE *planarcode_file) {
-  const int header_size = 15;
-  vector<Graph> graph_list;
-
-  //the actual parsing of the selected graph:
-  //go to the beginning of the selected graph
-  fseek(planarcode_file,  header_size, SEEK_SET);
-
-  //  int i = 1;
-  while(!feof(planarcode_file)){
-    //    cerr << "Reading graph " << (i++) << ".\n";
-    Graph g = read_hog_planarcode(planarcode_file);
-    //    cerr << "Got graph on " << g.N << " vertices.\n";
-    if(g.N != 0){
-      graph_list.push_back(g);
-    }
-  }
-    
-  return graph_list;
-}
-
- 
  
 // In an oriented planar graph, the directed edge starting in the smallest node
 // is a unique representation of the face.

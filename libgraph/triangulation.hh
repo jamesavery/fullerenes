@@ -24,7 +24,7 @@ public:
   Triangulation(const neighbours_t& neighbours, bool already_oriented = false) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
-  Triangulation(const full_spiral_name &fsn): Triangulation(fsn.spiral_code, fsn.jumps, true){} // best_effort = true
+  Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral_code, fsn.jumps, true){} // best_effort = true
 
   PlanarGraph dual_graph() const;
   vector<face_t> dual_faces() const;
@@ -54,7 +54,8 @@ public:
   // Get canonical general spiral and permutation of nodes compared to current triangulation
   bool get_spiral(vector<int>& v, jumplist_t& j, vector<vector<node_t>> &permutations, const bool only_rarest_special=true, const bool general=true) const;  
   // Get canonical general spiral
-  bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true) const;  
+  bool get_spiral(vector<int>& v, jumplist_t& j, const bool rarest_start=true, const bool general=true) const;
+  general_spiral get_general_spiral(const bool rarest_start=true) const;
 
   void get_all_spirals(vector< vector<int> >& spirals, vector<jumplist_t>& jumps,
 		       vector<vector<node_t>>& permutations,

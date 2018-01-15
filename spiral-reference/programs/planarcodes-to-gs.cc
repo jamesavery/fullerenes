@@ -20,9 +20,10 @@ int main(int ac, char **av)
   size_t graph_count=0, graph_size=0;
   PlanarGraph::read_hog_metadata(file,graph_count,graph_size);
 
-  cerr << "Reading " << graph_count << " planarcode graphs from " << filename << ".\n";
-  fseek(file,15,SEEK_SET);  
-  for(size_t i=0;i<graph_count;i++){
+  cerr << "Reading approx. " << graph_count << " planarcode graphs from " << filename << ".\n";
+  fseek(file,15,SEEK_SET);
+  size_t i=0;
+  for(;!feof(file);i++){
     PlanarGraph G = PlanarGraph::read_hog_planarcode(file);
     assert(G.is_oriented);
     
@@ -35,6 +36,6 @@ int main(int ac, char **av)
     cout << spiral_code << endl;
     cerr << "Graph " << i << " is of length " << spiral_code.size() << ".\n";
   }
-  
+  cerr << "Read " << i << " graphs in total.\n";
   return 0;
 }

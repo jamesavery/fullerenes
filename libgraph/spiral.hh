@@ -1,19 +1,15 @@
 #pragma once
-//TODO: The plan is to gather the spiral stuff here, so it's not scattered around the place.
-
-#include <utility> //required for pair
+#include <utility> 
 #include <vector>
 #include <string>
 #include <iostream>
 
 #include "auxiliary.hh"
-//#include "triangulation.hh"
+
+class PlanarGraph;		// Circular dependence to planargraph.hh
 
 typedef pair<int,int>  jump_t;
 typedef vector<jump_t> jumplist_t;
-
-#if 1
-// TODO: Gather spiral stuff in spiral.hh
 
 struct general_spiral {
   jumplist_t  jumps;
@@ -34,7 +30,6 @@ struct general_spiral {
     return s << make_pair(GS.jumps,GS.spiral); 
   }
 };
-#endif
 
 
 
@@ -68,12 +63,12 @@ struct general_spiral {
 // CAGE_TYPE ::= List('-') of ('(' (List(',') of int) ')') | FORMULA | ("fullerene" | "fulleroid" | "cage");
 
 
-struct full_spiral_name {
+struct spiral_nomenclature {
   typedef enum { SS_UNSPECIFIED, CANONICAL_GENERALIZED_SPIRAL, COMPATIBILITY_CANONICAL_SPIRAL } search_scheme_t;
-  typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t;
-  typedef enum { GT_NONE, FULLERENE, FULLEROID, CAGE } graph_type_t;
+  typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t; // -> naming_scheme?
+  typedef enum { GT_NONE, FULLERENE, FULLEROID, CAGE } naming_scheme_t; // -> naming_scheme
 
-  graph_type_t          graph_type;
+  naming_scheme_t          naming_scheme;
   search_scheme_t       search_scheme;
   construction_scheme_t construction_scheme;
 
@@ -81,6 +76,7 @@ struct full_spiral_name {
   int base_face_degree;
   vector<int> face_degrees;	// Non-base-face degrees
 
+  // TODO: Change to general_spiral everywhere?
   jumplist_t  jumps;
   vector<int> spiral_code;
 
@@ -89,72 +85,19 @@ struct full_spiral_name {
 
   void cage_constructor(const vector<vector<int>> &spiral_numbers);
 
-  full_spiral_name(const string &str);
+  spiral_nomenclature(const string &str);
+  spiral_nomenclature(const PlanarGraph &G, const naming_scheme_t name_type=CAGE, bool rarest_special_start = true);
 
-  static string search_scheme_txt[4], construction_scheme_txt[4], graph_type_txt[4];
+  static string search_scheme_txt[4], construction_scheme_txt[4], naming_scheme_txt[4];
 
-  friend ostream& operator<<(ostream& s, const full_spiral_name &sn)
+  string to_string(bool unpacked=false) const;
+  
+  friend ostream& operator<<(ostream& s, const spiral_nomenclature &sn)
   {
-    s << "{\n\t"
-      << "graph_type: \""<<full_spiral_name::graph_type_txt[sn.graph_type]<<"\",\n\t"
-      << "search_scheme: \""<<full_spiral_name::search_scheme_txt[sn.search_scheme]<<"\",\n\t"
-      << "construction_scheme: \""<<full_spiral_name::construction_scheme_txt[sn.construction_scheme]<<"\",\n\t"
-      << "point_group: \""<<(sn.point_group.empty()? "UNSPECIFIED" : sn.point_group) <<"\",\n\t"
-      << "chemical_formula: \""<<sn.chemical_formula<<"\",\n\t"
-      << "base_face_degree: "<<sn.base_face_degree<<",\n\t"
-      << "face_degrees: " << sn.face_degrees << ",\n\t"
-      << "jumps: " << sn.jumps << ",\n\t" // indices start counting at 0
-      << "spiral_code: " << sn.spiral_code << ", (length: " << sn.spiral_code.size() << ") \n\t"
-      << "}";
+    s << sn.to_string();
     return s;
   }
 
 };
-
-
-
-#if 0
-
-// This general spiral type can represent any polyhedral graph.
-struct general_spiral {
-  typedef enum { CUBIC, TRIANGULATION, GENERAL } spiral_type;
-
-  vector<int> spiral;  
-  jumplist_t  jumps;
-  spiral_type type;
-
-  general_spiral(const vector<int>& spiral,
-		 const jumplist_t& jumps = jumplist_t(),
-		 const polyhedron_type& type) : spiral(spiral),
-						jumps(jumps),
-						type(type) {}
-
-  general_spiral(const PlanarGraph &g, bool compatibility=false);
-  general_spiral(const string& name);
-  
-  bool operator<(const general_spiral &s) const;
-  friend ostream &operator<<(ostream &s, const general_spiral &GS);
-};
-
-
-struct spiral_nomenclature {
-  bool is_a_fullerene;
-  string atom;
-  string point_group;
-  
-  PlanarGraph   graph;
-  Triangulation triangulation;
-  bool compatibility;
-
-  general_spiral GS;
-  Permutation permutation;
-
-  spiral_nomenclature(const PlanarGraph &g, const string& atom="", bool compatibility=false);
-  spiral_nomenclature(const string& name);
-  
-  friend ostream& operator<<(ostream &s, const spiral_nomenclature &n);
-
-};
-#endif
 
 

@@ -17,3 +17,4 @@ app-*
 test-*
 play-*
 build/libgraph.so
+*~

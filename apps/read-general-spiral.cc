@@ -57,9 +57,9 @@ map<string,string> spiral_paper_examples{{
 int main(int ac, char **av)
 {
   for(auto example: spiral_paper_examples){
-    cout << example.first << "_name = \"" << example.second << "\";\n";
-    cout << example.first << " = " << full_spiral_name(example.second) << ";\n\n";
-    cout << example.first << " = " << PlanarGraph(full_spiral_name(example.second)) << ";\n\n";
+    cout << name << "_name = \"" << example.second << "\";\n";
+    cout << name << " = " << full_spiral_name(example.second) << ";\n\n";
+    cout << name << " = " << PlanarGraph(full_spiral_name(example.second)) << ";\n\n";
   }
 
   return 0;

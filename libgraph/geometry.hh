@@ -1,5 +1,4 @@
-#ifndef GEOMETRY_HH
-#define GEOMETRY_HH
+#pragma once
 
 #include <string.h>
 #include <iostream>
@@ -22,26 +21,6 @@ typedef vector< bool > edges_t;
 struct matrix3d; // required for coord3d.outer(coord3d)
 
 // TODO: geometry.hh is getting huge. Move most of the implementation to geometryc.cc
-
-// Directed edge is an ordered pair of nodes
-typedef pair<node_t,node_t> dedge_t;
-
-struct edge_t : public pair<node_t,node_t> {
-  edge_t() {}
-  edge_t(const pair<node_t,node_t>& p) : pair<node_t,node_t>(min(p.first,p.second),max(p.first,p.second)) {}
-  edge_t(const node_t u, const node_t v): pair<node_t,node_t>(min(u,v),max(u,v)) {}
-  edge_t(const int index) {
-    node_t u=0;
-    for(;u*(u-1)/2<=index;u++) ;
-    u--;
-    first = u;
-    second = index-u*(u-1)/2;
-  }
-  inline size_t index() const { 
-    const node_t v = first, u = second;
-    return u*(u-1)/2 + v; 
-  }
-};
 
 namespace std {
   template<>
@@ -624,4 +603,4 @@ private:
   vector<Eisenstein> reduce() const;
 };
 
-#endif
+

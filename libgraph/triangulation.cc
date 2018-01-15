@@ -108,7 +108,6 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
 }
 
 
-
 PlanarGraph Triangulation::dual_graph() const
 {
   IDCounter<tri_t> tri_numbers;
@@ -161,7 +160,7 @@ vector<face_t> Triangulation::dual_faces() const
 
 
 // Takes full spiral string, e.g. 566764366348665
-// where the degrees are between 3 and 8 (or anything larger, really)
+// where the degrees are 3 or larger
 // each neighbour list is oriented CCW (and the boundary is CW)
 // the indices of the jumps start counting at 0
 // best-effort means, additional trailing vertices in the spiral string are caught/discarded, implying that wrong spirals may not be caught
@@ -615,6 +614,13 @@ bool Triangulation::get_spiral(vector<int>& spiral, jumplist_t& jumps, const boo
   return success;
 }
 
+general_spiral Triangulation::get_general_spiral(const bool only_rarest_special) const
+{
+  general_spiral gs;
+  bool success = get_spiral(gs.spiral,gs.jumps,only_rarest_special,true);
+  assert(success); 		// General spirals should *always* succeed
+  return gs;
+}
 
 // perform the canonical general spiral search and the spiral and the jump positions + their length
 // special_only is a switch to search for spirals starting at non-hexagons only

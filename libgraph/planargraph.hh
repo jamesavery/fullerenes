@@ -1,5 +1,4 @@
-#ifndef PLANARGRAPH_HH
-#define PLANARGRAPH_HH
+#pragma once
 
 #include "graph.hh"
 #include "spiral.hh"
@@ -10,6 +9,7 @@ class PlanarGraph : public Graph {
 public:
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
+  typedef spiral_nomenclature::construction_scheme_t construction_scheme_t;
 
   // TODO: Get rid of layout_is_spherical
   PlanarGraph() {}
@@ -21,12 +21,9 @@ public:
       outer_face = find_outer_face();
     } 
   }
-  PlanarGraph(const full_spiral_name &fsn);
+  PlanarGraph(const spiral_nomenclature &fsn);
 
-  // Assumes file is at position of a graph start
-  static Graph read_hog_planarcode(FILE *planarcode_file);
-  static vector<Graph> read_hog_planarcodes(FILE *planarcode_file);
-  
+ 
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g), layout2d(layout) {  }
 
   
@@ -59,6 +56,11 @@ public:
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
   // the dual of the LF, ie a Triangulation is returned
   PlanarGraph leapfrog_dual() const;
+  // Every polyhedral graph G can be represented by a triangulation.
+  //  1. If G is a triangulation, it is G
+  //  2. If G is cubic, it is its dual
+  //  3. If G is non-cubic and non-triangulation, it is G's leapfrog dual
+  PlanarGraph enveloping_triangulation(construction_scheme_t &scheme) const;
   
   size_t count_perfect_matchings() const;
 
@@ -87,6 +89,28 @@ public:
 
   vector<coord3d> zero_order_geometry(double scalerad=4) const;
 
+  // PlanarGraph I/O.
+  static vector<string> formats,input_formats, output_formats;
+  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX} formats_t;
+  static int format_id(string id);
+  
+  static PlanarGraph from_file(string path, int index=0);
+  static PlanarGraph from_file(FILE *file, string format, int index=0);
+  static PlanarGraph from_ascii(FILE *file);
+  static PlanarGraph from_planarcode(FILE *file, const size_t index=0);
+  static PlanarGraph from_xyz(FILE *file);
+  static PlanarGraph from_mol2(FILE *file);
+
+  static bool to_file(const PlanarGraph &G, string path);
+  static bool to_file(const PlanarGraph &G, FILE *file, string format);
+  static bool to_ascii(const PlanarGraph &G, FILE *file);
+  static bool to_mathematica(const PlanarGraph &G, FILE *file);  
+  static bool to_planarcode(const PlanarGraph &G, FILE *file);    
+
+  static PlanarGraph read_hog_planarcode(FILE *planarcode_file);
+  static vector<PlanarGraph> read_hog_planarcodes(FILE *planarcode_file);
+  static bool read_hog_metadata(FILE *file, size_t &graph_count, size_t &graph_size);
+
   string to_latex(double w_cm = 10, double h_cm = 10, bool show_dual = false, bool number_vertices = false, bool include_latex_header = false,
 		  int edge_colour = 0x6a5acd, int path_colour = 0x6a5acd, int vertex_colour = 0x8b2500,
 		  double edge_width = 0.1,double path_width = 0.1, double vertex_diameter = 2.0,
@@ -101,4 +125,4 @@ public:
   friend ostream& operator<<(ostream& s, const PlanarGraph& g);
 };
 
-#endif
+

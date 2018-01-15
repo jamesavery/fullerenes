@@ -1,5 +1,4 @@
-#ifndef GRAPH_HH
-#define GRAPH_HH
+#pragma once
 
 #include <stdio.h>
 #include <map>
@@ -92,4 +91,4 @@ struct Graph {
   friend ostream& operator<<(ostream& s, const Graph& g);
 };
 
-#endif
+

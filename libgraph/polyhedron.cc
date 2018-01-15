@@ -1,6 +1,9 @@
-#include "polyhedron.hh"
 #include <iomanip>
 #include <limits>
+
+#include "triangulation.hh"
+#include "polyhedron.hh"
+
 
 double Polyhedron::diameter() const {
   double dmax = -INFINITY;
@@ -13,26 +16,26 @@ double Polyhedron::diameter() const {
 };
 
 double Polyhedron::surface_area() const {
-  double A = 0;  
+  double A = 0;
 
-  // vector<tri_t> tris(triangulation(faces)); 
+  // vector<tri_t> tris(triangulation(faces));
   
   // for(size_t i=0;i<tris.size();i++){
   //   const tri_t& tri(tris[i]);
   //   Tri3D T(points[tri[0]],points[tri[1]],points[tri[2]]);
   //   A += T.area();
-  // } 
+  // }
   // return A;
 
-  vector<tri_t> tris(centroid_triangulation(faces)); 
+  vector<tri_t> tris(centroid_triangulation(faces));
   vector<coord3d> centroid_points(points.begin(),points.end());
-  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));  
+  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
   
   for(size_t i=0;i<tris.size();i++){
     const tri_t& tri(tris[i]);
     Tri3D T(centroid_points[tri[0]],centroid_points[tri[1]],centroid_points[tri[2]]);
     A += T.area();
-  } 
+  }
   return A;
 }
 
@@ -42,7 +45,7 @@ double Polyhedron::volume_tetra() const {
   for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
 
   double V = 0,Vm=0,Vp=0;
-  
+
   // Now generate tetrahedra and either add or subtract volume according to which direction the face is pointing
   coord3d zero(0,0,0);
   for(size_t i=0;i<tris.size();i++){
@@ -84,7 +87,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   list<node_t> work_queue;
   srandom(42); // Seed random numbers with constant for reproducible behaviour
 
-  // 1. Create initial tetrahedron. 
+  // 1. Create initial tetrahedron.
   // 1.1 Find 4 non-coplanar points
   Tri3D T(points,tri_t(0,1,2));
   
@@ -205,79 +208,64 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
   return Polyhedron(g,remaining_points,3,faces);
 }
 
-string Polyhedron::to_latex(bool show_dual, bool number_vertices, bool include_latex_header) const 
-{
-  ostringstream s;
-  s.precision(2);
-  s << fixed;
+struct sort_ccw_coord3d {
+  const vector<coord3d> &points;
+  coord3d X, Y, n;
 
-  set<edge_t> edge_set = undirected_edges();
+  // Points are only neighbour displacements from origin-node
+  sort_ccw_coord3d(const vector<coord3d>& points)
+    : points(points) {
 
-  if(include_latex_header)
-    s << "\\documentclass{article}\n"
-         "\\usepackage{fullpage,fourier,tikz}\n"
-         "\\usetikzlibrary{calc,3d}"
-         "\\begin{document}\n"
-      "\\tikzstyle{vertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=blue!20, minimum width=3mm]\n"
-      "\\tikzstyle{dualvertex}=[circle, draw, inner sep="<<(number_vertices?"1pt":"0")<<", fill=red!40, minimum width=2mm]\n"
-      "\\tikzstyle{invisible}=[draw=none,inner sep=0,fill=none,minimum width=0pt]\n"
-      "\\tikzstyle{edge}=[line width=1mm,brown]\n"
-      "\\tikzstyle{dualedge}=[dotted,draw]\n"
-      ;
+    // TODO: More numerically robust method    
+    coord3d xc(0,0,0);
+    for(const coord3d &p: points) xc += p;
+    xc /= points.size();
 
-  s << "\\begin{tikzpicture}\n";
-  s << "\\foreach \\place/\\name/\\lbl in {";
-  for(node_t u=0;u<N;u++){
-    const coord3d& xs(points[u]);
-    s << "{(" << xs[0] << "," << xs[1] << "," << xs[2] << ")/v" << u << "/$" << u << "$}" << (u+1<N? ", ":"}\n\t");
-  }
-  s << "\\node[vertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
-  s << "\\foreach \\u/\\v in {";
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end();){
-    s << "{v"<<e->first<<"/v"<<e->second<<"}";
-    if(++e != edge_set.end()) s << ", ";
-  }
-  s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
-#if 0
-  vector<face_t> faces(compute_faces_flat(face_max));
-  for(vector<face_t>::const_iterator f(faces.begin());f!=faces.end();f++){
-    s << "\\fill[red!"<<50*(-points[(*f)[0]][0]+1)<<"]" ;
-    for(size_t i=0;i<f->size();i++){
-      coord3d xs(points[(*f)[i]]);
-      s << "(" << xs[0] << "," << xs[1] << "," << xs[2] << ") -- " << (i+1<f->size()?"":"cycle;\n");
-    }
-  }
-#endif
+    n = /*x0*/-xc; n /= n.norm();	//
 
-
-  if(show_dual){
-    PlanarGraph dual(dual_graph(face_max));        // TODO: This breaks for everything else than fullerenes
-    s << "\\foreach \\place/\\name/\\lbl in {";
-    for(node_t u=0;u<dual.N;u++){
-      const coord2d& xs(dual.layout2d[u]);
-      s << "{(" << xs.first << "," << xs.second << ")/v" << u << "/$" << u << "$}" << (u+1<dual.N? ", ":"}\n\t");
-    }    
-    s << "\\node[dualvertex] (\\name) at \\place {"<<(number_vertices?"\\lbl":"")<<"};\n";
-    s << "\\foreach \\u/\\v in {";
-    set<edge_t> dual_edges = dual.undirected_edges();
-    for(set<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end();){
-      s << "{v"<<e->first<<"/v"<<e->second<<"}";
-      if(++e != dual_edges.end()) s << ", ";
-    }
-    s << "}\n\t\\draw[dualedge] (\\u) -- (\\v);\n";
+    coord3d x1 = points[0] /* - x0*/;
+    X = x1 - n*x1.dot(n); X /= X.norm();
+    Y = n.cross(x1);
   }
 
-  s<<"\\end{tikzpicture}\n";
-  if(include_latex_header)
-    s << "\\end{document}\n";
+  bool operator()(const node_t& s, const node_t& t) const {
+    coord3d xs(points[s]/*-x0*/), xt(points[t]/*-x0*/);
+    coord2d Xs(X.dot(xs), Y.dot(xs)), Xt(X.dot(xt), Y.dot(xt));
 
-  return s.str();
-}
+    double angs = atan2(Xs.first,Xs.second), angt = atan2(Xt.first,Xt.second);
+    return angs <= angt;
+  } 
+};
+
 
 void Polyhedron::orient_neighbours()
 {
-  assert(layout2d.size() == N);
-  PlanarGraph::orient_neighbours();
+  
+  if(layout2d.size() == N) {
+    PlanarGraph::orient_neighbours();
+  } else if(points.size() == N){
+
+    // Orient neighbours locally (CW or CCW depending on luck)
+    for(node_t u=0;u<N;u++){
+      vector<node_t> &ns(neighbours[u]);
+      vector<coord3d> neighbour_points(ns.size());
+      const coord3d &x0 = points[u];
+
+      for(int i=0;i<ns.size();i++) points[i] = neighbour_points[ns[i]] - x0;
+      sort_ccw_coord3d CCW(points);
+
+      sort(ns.begin(),ns.end(),CCW);
+    }
+
+    // Choose that first node is correct, then flip to consistency
+    // TODO: How? For now, cheat slowly.
+    if(is_consistently_oriented())
+      is_oriented = true;
+    else {
+      layout2d = tutte_layout();
+      PlanarGraph::orient_neighbours();
+    }
+  } 
   
   // Calculate volume
   double V=0;
@@ -297,30 +285,11 @@ void Polyhedron::orient_neighbours()
   }
 }
 
-Polyhedron::Polyhedron(const string& filename)
-{
-  string extension = filename_extension(filename);
-  if      (extension == ".xyz") 
-    (*this) = from_xyz(filename);
-  else if (extension == ".mol2")
-    (*this) = from_mol2(filename);
-//  else if (extension == ".rspi")
-//    (*this) = from_rspi(filename);
-  else
-    cerr << "File extension " << extension << " unknown. Can't infer file format.";
-
-  orient_neighbours();
-}
-
-
 Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, const int face_max_, const vector<face_t> faces_) : 
   PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
-  // if(layout2d.size() != N){
-  //   layout2d = tutte_layout(-1,-1,-1,face_max);
-  // }
-
-//  cerr << "New polyhedron has " << N << " points. Largest face is "<<face_max<<"-gon.\n";
+  if(!is_oriented) orient_neighbours();
+  
   if(faces.size() == 0){
     faces = compute_faces(face_max);
     assert(outer_face.size() <= face_max);
@@ -353,7 +322,6 @@ Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance)
   }
   
   (*this) = Polyhedron(PlanarGraph(edges), xs);
-  
 }
 
 
@@ -419,229 +387,10 @@ coord3d Polyhedron::width_height_depth() const {
 }
 
 
-string Polyhedron::to_povray(double w_cm, double h_cm, 
-                   int line_colour, int vertex_colour, int face_colour,
-                   double line_width, double vertex_diameter, double face_opacity) const 
+
+Polyhedron Polyhedron::dual(int Fmax) const 
 {
-  //  coord3d whd(width_height_depth()); // TODO: Removed width/height -- much better to use real coordinates and handle layout in host pov file.
-
-  ostringstream s;
-  s << "#declare facecolour=color rgb <"<<((face_colour>>16)&0xff)/256.<<","<<((face_colour>>8)&0xff)/256.<<","<<(face_colour&0xff)/256.<<">;\n";
-  s << "#declare faceopacity="<<face_opacity<<";\n\n";
-
-  s << PlanarGraph(*this).to_povray(w_cm,h_cm,line_colour,vertex_colour,line_width,vertex_diameter);
-  s << "#declare layout3D=array["<<N<<"][3]" << points <<";\n\n";
-
-  s << "#declare faces   =array["<<faces.size()<<"]["<<(face_max+1)<<"]{"; 
-  for(int i=0;i<faces.size();i++) {
-    const face_t& f(faces[i]);
-    s << "{";
-    for(int j=0;j<f.size();j++) s << f[j] << ",";
-    for(int j=f.size();j<face_max;j++) s << "-1,";
-    s << "-1}" << (i+1<faces.size()? ",":"}\n\n");
-  }
-  s << "#declare facelength=array["<<faces.size()<<"]{";for(int i=0;i<faces.size();i++) s<< faces[i].size() << (i+1<faces.size()?",":"}\n\n");
-
-
-  vector<tri_t>   tris(centroid_triangulation(faces));
-  vector<int>     triface;
-  vector<coord3d> centroid_points(points.begin(),points.end());
-  vector<coord3d> trinormals(tris.size()), facenormals(faces.size()), vertexnormals(points.size()+faces.size());
-
-  for(int i=0;i<faces.size();i++)
-    centroid_points.push_back(faces[i].centroid(points));
-
-  for(int i=0;i<tris.size();i++){
-    coord3d n(Tri3D(centroid_points[tris[i][0]],centroid_points[tris[i][1]],centroid_points[tris[i][2]]).n);
-    trinormals[i] = n/n.norm();
-    for(int j=0;j<3;j++) vertexnormals[tris[i][j]] += trinormals[i];
-  }
-
-  for(int i=0;i<N;i++)
-    vertexnormals[i] /= vertexnormals[i].norm();
-
-  // Calculate volume
-  double V=0;
-  for(size_t i=0;i<tris.size();i++){
-    const face_t& t(tris[i]);
-    Tri3D T(centroid_points[t[0]],centroid_points[t[1]],centroid_points[t[2]]);
-
-    V += ((T.a).dot(T.n))*T.area()/T.n.norm();
-  }
-  s << "#declare volume="<<fabs(V)<<";\n";
-
-  if(V<0)                        // Calculated normals are pointing inwards!
-    for(int i=0;i<tris.size();i++) trinormals[i] *= -1;
-
-  for(int i=0;i<faces.size();i++) {
-    coord3d normal;
-    if(faces[i].size()>3){
-      for(int j=0;j<faces[i].size();j++){
-        triface.push_back(i);
-        normal += trinormals[triface.size()-1];
-      } 
-      facenormals[i] = normal/normal.norm();
-    } else {
-      triface.push_back(i);
-      facenormals[i] = trinormals[i];
-    }
-  }
-
-
-
-  s << "#declare Ntris = "<<tris.size()<<";\n";
-  s << "#declare tris = array["<<tris.size()<<"][3]" << tris << ";\n\n";
-  s << "#declare triface = array["<<triface.size()<<"]" << triface << ";\n\n";
-    
-  s << "#declare cpoints=array["<<centroid_points.size()<<"][3]" << centroid_points << ";\n\n"; 
-  s << "#declare vertexnormals =array["<<vertexnormals.size()<<"][3]" << vertexnormals << ";\n\n";
-  s << "#declare trinormals =array["<<tris.size()<<"][3]" << trinormals << ";\n\n";
-  s << "#declare facenormals=array["<<faces.size()<<"][3]" << facenormals << ";\n\n";
-
-  //  s << "#include \"drawpolyhedron.pov\"\n\n";
-  return s.str();
-}
-
-string Polyhedron::to_turbomole() const {
-  const double aa2bohr = 1.889716164632;
-  ostringstream s;
-  s << setprecision(8) << fixed;
-  s << "$coord" << endl;
-  for(int i=0; i<N; ++i){
-    s << setw(12) << points[i][0]*aa2bohr << "  "<< setw(12) << points[i][1]*aa2bohr << "  " << setw(12) << points[i][2]*aa2bohr << "  c" << endl;
-  }
-  s << "$end" << endl;
-
-  return s.str();
-}
-
-string Polyhedron::to_xyz() const {
-  ostringstream s;
-  s << setprecision(6) << fixed;
-  s << N << endl;
-  s << "# Created by Fullerene version " << VERSION_NUMBER << " (http://ctcp.massey.ac.nz/index.php?page=fullerenes)" << endl;
-  for(int i=0; i<N; ++i){
-    s << "C  " << setw(10) << points[i][0] << "  " << setw(10) << points[i][1] << "  " << setw(10) << points[i][2] << endl;
-  }
-  return s.str();
-}
-
-string Polyhedron::to_mol2() const {
-
-  ostringstream s;
-  s << setprecision(6);
-
-  size_t Nedges = 0;
-  for(node_t u=0;u<N;u++) Nedges += neighbours[u].size();
-  Nedges /= 2;
-
-  s << "# Created by Fullerene version " << VERSION_NUMBER << " (http://ctcp.massey.ac.nz/index.php?page=fullerenes)\n"
-    << "@<TRIPOS>MOLECULE\n"
-    << "Fullerene\n"
-    << "\t"<<N<<"\t"<<Nedges<<"\t0\t0\t0\n"
-    << "SMALL\n"
-    << "NO_CHARGES\n\n";
-
-  s << "@<TRIPOS>ATOM\n";
-  
-  for(node_t u=0; u < N; u++)
-    s << (u+1) << "\tC"<<u<<"\t" << points[u][0] << "\t" << points[u][1] << "\t" << points[u][2] << "\tC\t1\tUnk\t0\n";
-
-  s << "@<TRIPOS>BOND\n";
-  int i = 1;
-  for(node_t u=0;u<N;u++){
-    const vector<node_t> &ns(neighbours[u]);
-    for(int j=0;j<ns.size();j++)
-      if(ns[j]>=u) 
-        s << (i++) << "\t" << (u+1) << "\t" << (ns[j]+1) << "\tun\n";
-  }
-
-  return s.str();
-}
-
-// Read in .mol2 files. 
-// NB: Doesn't support full format. Can only read .mol2 files that we've written ourselves!
-Polyhedron Polyhedron::from_mol2(const string& filename)
-{
-  string 
-    header_marker = "@<TRIPOS>MOLECULE",
-    point_marker  = "@<TRIPOS>ATOM",
-    edge_marker   = "@<TRIPOS>BOND";
-
-  int N, Nedges;
-  vector<coord3d> points;
-  set<edge_t>     edges;
-  string line;
-
-  ifstream file(filename.c_str());
-
-  // Fast forward to metadata section
-  while(getline(file,line) && line.compare(0,header_marker.size(),header_marker)) ;
-  getline(file,line);
-  //  assert(!line.compare(0,9,"Fullerene")); // TODO: Fail gracefully if we didn't create the file.
-
-  getline(file,line);
-  stringstream l(line);
-  l >> N;
-  l >> Nedges;
-  
-  // Fast forward to coordinate section
-  while(getline(file,line) && line.compare(0,point_marker.size(),point_marker)) ;
-
-  for(int i=0;i<N && file.good();i++){
-    getline(file,line);
-    stringstream l(line);
-    string vid,element;
-    coord3d x;
-
-    if(file.good()) l >> vid;
-    if(file.good()) l >> element;
-    for(int j=0;j<3 && l.good(); j++) l >> x[j];
-    points.push_back(x);
-  }
-  assert(points.size() == N);         // TODO: Fail gracefully if file format error.
-
-  // Fast forward to edge section
-  while(getline(file,line) && line.compare(0,edge_marker.size(),edge_marker)) ;  
-
-  for(int i=0;i<Nedges && file.good();i++){
-    getline(file,line);
-    stringstream l(line);
-    int eid, u[2];
-
-    l >> eid;
-    for(int j=0;j<2 && l.good(); j++) l >> u[j];
-    edges.insert(edge_t(u[0]-1,u[1]-1));
-  }
-  file.close();
-
-  if(edges.size() != Nedges){
-    cerr << "MOL2 file format error in " << filename << ": Expected "<<Nedges<<" edges, found "<<edges.size()<<".\n";
-  }
-
-  return Polyhedron(PlanarGraph(edges), points);
-}
-
-
-string Polyhedron::to_cc1() const
-{
-  const int weird_constant = 2;
-  ostringstream s;
-  s << setprecision(8);
-
-  s << N << endl;
-
-  for(node_t u=0; u < N; u++){
-    s << "C\t" << u+1 << "\t" << points[u][0] << "\t" << points[u][1] << "\t" << points[u][2] << "\t" << weird_constant << "\t" << neighbours[u][0] << "\t" << neighbours[u][1] <<"\t" << neighbours[u][2] << endl;
-  }
-
-  return s.str();
-
-}
-
-Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const 
-{
-  PlanarGraph d(dual_graph(Fmax,planar_layout));
+  PlanarGraph d(dual_graph(Fmax));
 
   vector<coord3d> coordinates(d.N);
   for(node_t u=0;u<d.N;u++){
@@ -650,89 +399,57 @@ Polyhedron Polyhedron::dual(int Fmax, bool planar_layout) const
     for(int i=0;i<f.size();i++) avg += points[f[i]];
     coordinates[u] = avg/double(f.size());
   }
-  // TODO: More elegant handling of layouts, faces, etc. 
-  // TODO: Fix orientation-from-spherical-layout
-  d.layout2d = d.tutte_layout();
 
   return Polyhedron(d,coordinates);
 }
 
 bool Polyhedron::optimize(int opt_method, double ftol)
 {
-  if(is_a_fullerene()){
-    //    printf("This is a fullerene.\n");
-    const FullereneGraph g(*this, layout2d);
-    points = g.optimized_geometry(points, opt_method, ftol);
-    return true;
-  }else if(is_cubic()) {
+  if(is_cubic()) {
     bool optimize_angles = true;
     return optimize_other(optimize_angles);
-  }else if(is_triangulation()) {
+  } else if(is_triangulation()) {
     bool optimize_angles = false;
     return optimize_other(optimize_angles);
   }else{
-    cerr << "Polyhedron::optimize() currently only implemented for fullerene polyhedra, other cubic graphs and triangulations." << endl;
-    return false;
+     Triangulation LFD = leapfrog_dual();
+
+    // inverse_tranges for faster lookup:
+    // indices in 'triangles' at which there are triangles containing this vertex
+    vector<vector<int>> inverse_triangle_list(LFD.N);
+    for (int i=0; i<LFD.triangles.size(); i++){
+      const tri_t& tri = LFD.triangles[i];
+      inverse_triangle_list[tri[0]].push_back(i);
+      inverse_triangle_list[tri[1]].push_back(i);
+      inverse_triangle_list[tri[2]].push_back(i);
+    }
+
+    // generate and optimise LF of initial polyhedron
+    PlanarGraph LF = LFD.dual_graph();
+    LF.layout2d = LF.tutte_layout();
+    Polyhedron P(LF,LF.zero_order_geometry());
+    bool optimize_angles = true;
+    bool opt_success = P.optimize_other(optimize_angles);
+
+    // for each face in LF which corresponds to a vertex in the initial graph,
+    // find the average coordinates of all vertices (ie the face centre)
+    for (int i=0; i<N; i++){
+      const int face_size(inverse_triangle_list[i].size());
+      coord3d face_centre;
+      for (int j=0; j<face_size; j++){
+        face_centre += P.points[inverse_triangle_list[i][j]];
+      }
+      face_centre /= face_size;
+      points[i] = face_centre/sqrt(3);
+    }
+    
+    return opt_success;
   }
 }
 
 bool Polyhedron::is_triangulation() const {
   for(int i=0;i<faces.size();i++) if(faces[i].size()!=3) return false;
   return true;
-}
-
-// Polyhedron Polyhedron::from_rspi(const string& filename)
-// {
-//   int N, j;
-//   vector<int> spiral(N/2+2,6);
-//   ifstream file(filename.c_str());
-//   string line;
-//   getline(file,line);
-//   stringstream l(line);
-
-//   l >> N;
-//   for(int i=0;i<12 && l.good(); i++){
-//     l >> j;
-//     spiral[j-1] = 5;
-//   }
-
-//   Triangulation dual(spiral);
-//   PlanarGraph G(dual.dual_graph());
-  
-// }
-
-
-Polyhedron Polyhedron::from_xyz(const string& filename)
-{
-  ifstream file(filename.c_str());
-  int N;
-  string Nstring, comment, element,line;
-  vector<coord3d> points;
-
-  getline(file,Nstring);
-  getline(file,comment);
-  
-  N = from_string<int>(Nstring);
-
-  //  cout << "N = " << Nstring << "; comment = " << comment << endl;
-
-  for(int i=0; i < N && getline(file,line); i++){
-    stringstream l(line);
-    coord3d x;
-
-    l >> element;
-    for(int j=0;j<3 && l.good(); j++)
-      l >> x[j];
-
-    points.push_back(x);
-    //    cout << i << ": " << x << endl;
-  }
-
-  file.close();  
-
-  assert(points.size() == N);
-
-  return Polyhedron(points);
 }
 
 pair<coord3d,coord3d> Polyhedron::bounding_box() const {

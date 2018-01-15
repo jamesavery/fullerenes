@@ -134,20 +134,8 @@ string fortran_string(const char *s, int max)
 }
 
 fullerene_graph_ptr read_fullerene_graph_(const char *f_path){
-  fullerene_graph_ptr g;
-
   string path(fortran_string(f_path,50));
-
-  FILE *f = fopen(path.c_str(),"r");
-  if(!f){
-    fprintf(stderr,"Cannot open file %s for reading: ",path.c_str());
-    perror(path.c_str());
-    return NULL;
-  }
-
-  g = new FullereneGraph(f);
-  fclose(f);
-  return g;
+  return new FullereneGraph(PlanarGraph::from_file(path));
 }
 
 fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const char *f_path){
@@ -163,7 +151,7 @@ fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const c
     return NULL;
   }
 
-  g = new FullereneGraph(*index,f);
+  g = new FullereneGraph(PlanarGraph::from_planarcode(f,*index));
   fclose(f);
   return g;
 }
@@ -197,7 +185,7 @@ polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points)
   return new Polyhedron(G,vertex_points,6); 
 }
 
-polyhedron_ptr read_polyhedron_(const char *path) { return new Polyhedron(path); }
+polyhedron_ptr read_polyhedron_(const char *path) { return new Polyhedron(Polyhedron::from_file(path)); }
 
 void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 
@@ -339,9 +327,6 @@ void set_layout2d_(graph_ptr *g, const double *layout2d)
   }
   G.orient_neighbours();
 }
-
-
-
 
 
 polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }

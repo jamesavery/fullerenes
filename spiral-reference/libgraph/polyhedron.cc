@@ -28,7 +28,7 @@ double Polyhedron::surface_area() const {
 
   vector<tri_t> tris(centroid_triangulation(faces));
   vector<coord3d> centroid_points(points.begin(),points.end());
-  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points)); 
+  for(int i=0;i<faces.size();i++) centroid_points.push_back(faces[i].centroid(points));
  
   for(size_t i=0;i<tris.size();i++){
     const tri_t& tri(tris[i]);

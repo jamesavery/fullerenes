@@ -1,5 +1,4 @@
-#ifndef FULLERENE_GRAPH_HH
-#define FULLERENE_GRAPH_HH
+#pragma once
 
 #include <list>
 
@@ -13,8 +12,7 @@ public:
   FullereneGraph(const PlanarGraph& g) : CubicGraph(g,g.layout2d) { if(N>0) fullerene_check(); }
   FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
-  FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
-  FullereneGraph(const unsigned int index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
+
   FullereneGraph(const int N, const vector<int>& spiral_indices, const jumplist_t& jumps = jumplist_t()); 
 
   void fullerene_check() const
@@ -64,4 +62,4 @@ private:
   static double C20_layout2d[20][2];
 };
 
-#endif
+
