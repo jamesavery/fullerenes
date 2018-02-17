@@ -12,9 +12,9 @@ DIRECTORIES=-DFULLERENE_ROOT=\"${PWD}\" -DFULLERENE_DATABASE=\"${PWD}/database\"
 WARNINGS=-Wall -Wno-sign-compare -Wno-unused-but-set-variable -Wno-char-subscripts
 
 #CXXFLAGS=-I/opt/local/include -L/opt/local/lib -g3 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) 
-CXXFLAGS=-I/opt/local/include -L/opt/local/lib -O2 -m64 -std=c++11 -fPIC $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) -fno-exceptions
+CXXFLAGS=-I/opt/local/include -L/opt/local/lib -O2 -m64 -std=c++11 -fPIC -mcmodel=large $(WARNINGS) $(DIRECTORIES) -DVERSION_NUMBER=$(VERSION_NUMBER) -fno-exceptions 
 #FFLAGS= -O2 -Wall -cpp -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' 
-FFLAGS=-cpp -m64 -L/opt/local/lib -Wall -fPIC -D'VERSION_NUMBER="$(VERSION_NUMBER)"' 
+FFLAGS=-cpp -m64 -L/opt/local/lib -Wall -fPIC -mcmodel=large -D'VERSION_NUMBER="$(VERSION_NUMBER)"' 
 LIBRARIES= -lgfortran -lstdc++ -lm
 #-lstdc++ 
 # if your machine has enough memory, your gfortran is sufficiently new, and you need more then 5000 atoms
