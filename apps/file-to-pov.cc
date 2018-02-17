@@ -8,7 +8,7 @@ int main(int ac, char **av)
   Polyhedron P(av[1]);
   
   P.move_to_origin();
-  matrix3d If(P.inertial_frame());
+  matrix3d If(P.principal_axes());
   P.points = If*P.points;
 
   cout << P.to_povray() << endl;

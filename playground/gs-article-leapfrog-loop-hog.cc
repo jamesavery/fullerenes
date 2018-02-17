@@ -19,27 +19,27 @@ int main(int ac, char **av)
   
   vector<Graph> read_graphs(PlanarGraph::read_hog_planarcodes(file));
 
+  //  cerr << "readGraphs = " << read_graphs << ";\n";
+  
   bool read_dual = strtol(av[2],0,0);
   int  index_start = ac > 3? strtol(av[3],0,0) : 0;
   int  index_end   = ac > 4? min(strtol(av[4],0,0),long(read_graphs.size())) : read_graphs.size();
   
   vector<PlanarGraph> graphs(read_graphs.size());
+
   
   for(int i=index_start;i<index_end;i++)
-    if(read_dual) {
-      graphs[i] = PlanarGraph(read_graphs[i]).dual_graph();
-      graphs[i].layout2d = graphs[i].tutte_layout();
-      graphs[i].orient_neighbours();
-    } else 
-      graphs[i] = read_graphs[i];
+      graphs[i] = read_dual? PlanarGraph(read_graphs[i]).dual_graph() : read_graphs[i];
 
+  //  cerr << "graphs = " << graphs << ";\n";  
 
   vector<Triangulation> LFduals(graphs.size());
-
+  
   auto LF_start = clock();
   for(int i=0;i<graphs.size();i++)
     LFduals[i] = graphs[i].leapfrog_dual();
   auto LF_end = clock();
+
 
   vector<vector<int> > LFspirals(graphs.size());
   vector<jumplist_t>   LFjumps  (graphs.size());

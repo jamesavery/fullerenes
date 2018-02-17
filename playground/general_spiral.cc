@@ -79,7 +79,7 @@ int main(int ac, char **av)
   jumps.clear();
   rspi_out.clear(); 
   bool pentagon_start = false;
-  if(!fg.get_rspi_from_fg(rspi_out, jumps, true, true, pentagon_start)){
+  if(!fg.get_rspi_from_fg(rspi_out, jumps, true, pentagon_start)){
     cerr << "no spiral found, which is not possible. " << endl;
     return 1;
   }

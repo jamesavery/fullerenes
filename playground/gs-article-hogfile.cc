@@ -49,16 +49,21 @@ int main(int ac, char **av)
 
   vector<jumplist_t> all_jumps(duals.size());
 
+  int n_it = 1;
+  if(N < 200)
+    n_it = 1000;
+  
   auto wall_start = chrono::steady_clock::now();
   auto cpu_start  = clock();
-  for(int i=0;i<duals.size();i++){
-    duals[i].get_spiral(spiral,jumps,true,true,true,true);
-    all_jumps[i] = jumps;
-  }
+  for(int ii=0;ii<n_it;ii++)
+    for(int i=0;i<duals.size();i++){
+      duals[i].get_spiral(spiral,jumps,true,true);
+      all_jumps[i] = jumps;
+    }
   auto cpu_end = clock();
   auto wall_end = chrono::steady_clock::now();
-  double walltime = chrono::duration<double,std::ratio<1,1>>(wall_end-wall_start).count();
-  double cputime  = (cpu_end-cpu_start) * 1.0 / CLOCKS_PER_SEC;
+  double walltime = chrono::duration<double,std::ratio<1,1>>(wall_end-wall_start).count() / n_it;
+  double cputime  = (cpu_end-cpu_start) / (1.0 * n_it * CLOCKS_PER_SEC);
   cerr << "Computed all spirals.\n";
   cout << "Nv       = " << N << ";\n";
   cout << "Nisomers = " << duals.size() << ";\n";

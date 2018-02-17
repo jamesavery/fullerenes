@@ -24,6 +24,8 @@ int main(int ac, char **av) {
       input_jumps.push_back(make_pair(strtol(av[i],0,0)-1,strtol(av[i+1],0,0)));
   }
 
+  cerr << "General RSPI: {" << input_jumps << ", " << (RSPI+1) << "};\n";
+ 
 
   FullereneDual  g(N, RSPI, input_jumps);
   g.is_oriented = true;		// Should be there already
@@ -35,12 +37,12 @@ int main(int ac, char **av) {
   
 
   vector<coord3d>  points = F.optimized_geometry(F.zero_order_geometry());
+  points *= 2;
+  
   Polyhedron       P(F,points,6,faces);
   P.move_to_origin();
   P.align_with_axes();
-  
-
-  
+    
   vector<coord3d> dpoints(g.N);
   for(int f=0;f<faces.size();f++){
     coord3d sum{0,0,0};
@@ -82,7 +84,8 @@ int main(int ac, char **av) {
     double t     = f/double(faces.size());
     double bulge = (t-.5)*(t-.5);
     
-    spiral_centers[f] = dpoints[f]- coord3d{0,0,t*t*t*t*t*t*(xmax-xmin)/2.0};
+    spiral_centers[f] = dpoints[f]*(1+t/50)+coord3d{0,0,t*t*
+					   t*(xmax-xmin)/5.0};
   }
 
   // Now do the vertices of the faces.
@@ -169,8 +172,13 @@ int main(int ac, char **av) {
 
   {
     ofstream mol2(("output/"+basename+"-P.mol2").c_str());
+    ofstream pov(("output/"+basename+"-P.pov").c_str());
     mol2 << P.to_mol2();
     mol2.close();
+
+    pov << P.to_povray() << endl;
+    pov.close();
+    
   }
   
   return 0;

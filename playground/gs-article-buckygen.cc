@@ -39,7 +39,8 @@ int main(int ac, char **av)
   vector< vector<int> > rspis_with_jumps;
   vector< jumplist_t > all_jumps;
 
-  bool only_do_buckygen = false;  
+  bool only_do_buckygen = false;
+  bool check_spirals = true;
   auto cpu_start = clock();
   while(BuckyGen::next_fullerene(Q,G)){
     vector<int> rspi;
@@ -49,11 +50,32 @@ int main(int ac, char **av)
     i++;
     if(i%100000 == 0) cerr << "Reached isomer " << i << ".\n";
     if(!only_do_buckygen){
-      FullereneDual F(G.neighbours);
-      F.get_spiral(spiral,jumps,true,true,true,true);
+      Triangulation F(G.neighbours);
+      F.get_spiral(spiral,jumps);
+
+      if(check_spirals){
+	Triangulation T(spiral,jumps);
+	vector<int> spiral2;
+	Triangulation::jumplist_t jumps2;
+
+	T.get_spiral(spiral2,jumps2);
+
+	if(!(spiral2 == spiral && jumps2 == jumps)){
+	  cerr << "spiral1 = " << spiral << ";\n"
+	       << "spiral2 = " << spiral2 << ";\n"
+	       << "jumps1  = " << jumps << ";\n"
+	       << "jumps2  = " << jumps2 << ";\n"
+	       << "g1 = " << F << ";\n"
+	       << "g2 = " << T << ";\n";
+	  abort();
+	}
+      }
+      
       //    if(jumps.size()!=0) fprintf(stderr,"Isomer %ld has jump length %ld\n",i,jumps.size());
       if(jumps.size()!=0){
 	vector<int> rspi = rspi_from_fullerene_spiral(spiral);
+	for(auto &j: jumps) j.first++;
+	
 	cout << "(* BuckyGen isomer number " << i << " has a jump in its canonical general spiral: *)\n";
 	cout << "rspi"<<i<<" = " << rspi << "; jumps"<<i<<" = " << jumps << ";\n";
 

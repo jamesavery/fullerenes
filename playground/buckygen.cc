@@ -25,7 +25,7 @@ int main(int ac, char **av)
     i++;
     if(i%100000 == 0) fprintf(stderr,"Reached isomer %ld\n",i);
     //      G = Triangulation(G.neighbours,true);
-    //      FullereneDual(G).get_rspi(rspi,jumps,false,false);
+    //      FullereneDual(G).get_rspi(rspi,jumps,true,true);
 
     // dual = G.dual_graph();
     //    G.update_from_neighbours();

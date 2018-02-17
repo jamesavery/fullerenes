@@ -46,7 +46,7 @@ public:
 	FullereneDual gp = P.swtransform(site);
 	rspi_t        rspi;
 	Triangulation::jumplist_t    j;
-	bool success = gp.get_rspi(rspi,j,true,false,true);
+	bool success = gp.get_rspi(rspi,j,true,true);
 	assert(success);
 
 	int Spid = already_seen(rspi);

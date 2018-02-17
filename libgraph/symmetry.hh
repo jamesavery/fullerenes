@@ -1,8 +1,10 @@
 #ifndef FULLERENE_SYMMETRY_HH
-# define FULLERENE_SYMMETRY_HH
+#define FULLERENE_SYMMETRY_HH
 
 #include <vector>
 #include <iostream> 
+
+#include "spiral.hh"
 #include "triangulation.hh"
 
 class PointGroup {
@@ -36,7 +38,7 @@ public:
 
 struct Permutation : public vector<int> {
   Permutation(const vector<int>& p) : vector<int>(p){}
-  Permutation(int N) : vector<int>(N){}
+  Permutation(int N=0) : vector<int>(N){}
 
   static Permutation identity(int N);
 
@@ -52,15 +54,17 @@ struct Permutation : public vector<int> {
 
 class Symmetry : public Triangulation {
 public:
-
-
   vector<int> S0;
-  vector< Permutation > G, Gedge, Gtri;
+  jumplist_t  J0;
+  vector< Permutation > G, Gedge, Gdedge, Gtri;
+  IDCounter<edge_t>   edge_id;
+  IDCounter<dedge_t> dedge_id;
 
   vector<Permutation> permutation_representation() const;
   vector<Permutation> tri_permutation(const vector<Permutation>& Gf)  const;
   vector<Permutation> edge_permutation(const vector<Permutation>& Gf) const;
-
+  vector<Permutation> dedge_permutation(const vector<Permutation>& Gf) const;
+  
   // Returns the involutions *except* from the identity
   vector<int>           involutions() const;
   vector<int>           fixpoints(const Permutation& pi) const;
@@ -73,12 +77,29 @@ public:
   
   PointGroup point_group() const;
 
-  Symmetry(const vector<int>& spiral) : Triangulation(spiral), S0(spiral)
-  {
+  void initialize(){
+    set<dedge_t> dedge_set =   directed_edges();
+    set<edge_t>   edge_set = undirected_edges(); //TODO: Do this another way
+    for(dedge_t e: dedge_set) dedge_id.insert(e);
+    for(edge_t e:   edge_set)  edge_id.insert(e);
+
     G = permutation_representation();
-    Gedge = edge_permutation(G);
+    Gedge  = edge_permutation(G);
+    Gdedge = dedge_permutation(G);
     Gtri  = tri_permutation(G);
   }
+  
+  Symmetry(const vector<int>& spiral, const jumplist_t& jumps) : Triangulation(spiral,jumps), S0(spiral), J0(jumps)
+  {
+    initialize();
+  }
+
+  Symmetry(const Triangulation& g) : Triangulation(g)
+  {
+    g.get_spiral(S0,J0);
+
+    initialize();
+  }  
   
 };
 

@@ -10,21 +10,18 @@ struct ToleranceLess {
 
 vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned int face_max) const
 {
+  if(count_edges() == 0)       // empty graph
+    return vector<coord2d>(); // -> empty layout
+  
   if(s<0) s = 0;
-  if(t<0){
-    //    fprintf(stderr,"t = %d\n",t);
-    face_t c(shortest_cycle(s,face_max));
-    t = c[1];
-    r = c[2];
-    //    fprintf(stderr,"s,t,r ~> %d,%d,%d\n",s,t,r);
-  } else if(r < 0) {
-    //    fprintf(stderr,"r = %d\n",r);
-    face_t c(shortest_cycle(s,t,face_max));
-    r = c[2];
-    //    fprintf(stderr,"s,t,r ~> %d,%d,%d\n",s,t,r);
+  if(t<0) t = neighbours[s][0];
+
+  if(is_oriented){
+    outer_face = get_face_oriented({s,t},face_max);
+  } else {
+    if(r<0) r = next(t,s);     
+    outer_face = shortest_cycle(s,t,r,face_max);
   }
-  //  fprintf(stderr,"tutte_layout(%d,%d,%d)\n",s,t,r);
-  outer_face = shortest_cycle(s,t,r,face_max);
 
   return tutte_layout(outer_face);
 }

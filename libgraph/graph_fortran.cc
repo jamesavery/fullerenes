@@ -1,3 +1,4 @@
+#include "spiral.hh"
 #include "fullerenegraph.hh"
 #include "polyhedron.hh"
  // Exported interface
@@ -133,20 +134,8 @@ string fortran_string(const char *s, int max)
 }
 
 fullerene_graph_ptr read_fullerene_graph_(const char *f_path){
-  fullerene_graph_ptr g;
-
   string path(fortran_string(f_path,50));
-
-  FILE *f = fopen(path.c_str(),"r");
-  if(!f){
-    fprintf(stderr,"Cannot open file %s for reading: ",path.c_str());
-    perror(path.c_str());
-    return NULL;
-  }
-
-  g = new FullereneGraph(f);
-  fclose(f);
-  return g;
+  return new FullereneGraph(PlanarGraph::from_file(path));
 }
 
 fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const char *f_path){
@@ -162,7 +151,7 @@ fullerene_graph_ptr read_fullerene_graph_hog_(const unsigned int *index, const c
     return NULL;
   }
 
-  g = new FullereneGraph(*index,f);
+  g = new FullereneGraph(PlanarGraph::from_planarcode(f,*index));
   fclose(f);
   return g;
 }
@@ -175,7 +164,7 @@ fullerene_graph_ptr windup_general_(const int *n, const int spiral_indices_array
   //  cout << spiral_indices[i] << endl;
   }
 
-  list<pair<int,int> > jumps;
+  jumplist_t jumps;
   for(int i=0; i<100; ++i,++i){
     if(jumps_array[i]==0) break;
     jumps.push_back(make_pair(jumps_array[i]-1,jumps_array[i+1]));
@@ -196,7 +185,7 @@ polyhedron_ptr new_polyhedron_(const graph_ptr *g, const double *points)
   return new Polyhedron(G,vertex_points,6); 
 }
 
-polyhedron_ptr read_polyhedron_(const char *path) { return new Polyhedron(path); }
+polyhedron_ptr read_polyhedron_(const char *path) { return new Polyhedron(Polyhedron::from_file(path)); }
 
 void delete_polyhedron_(polyhedron_ptr *P){ delete *P; }
 
@@ -284,7 +273,7 @@ void all_pairs_shortest_path_(const graph_ptr *g, const int *max_depth, const in
 double get_surface_area_(const polyhedron_ptr *P){ return (*P)->surface_area(); }
 double get_volume_(const polyhedron_ptr *P){ return (*P)->volume(); }
 
-int graph_is_a_fullerene_(const graph_ptr *g){ return (*g)->is_a_fullerene(); }
+int graph_is_a_fullerene_(const graph_ptr *g){ return (*g)->is_a_fullerene(true); }
 
 double shortest_planar_distance_(const graph_ptr *g)
 {
@@ -338,9 +327,6 @@ void set_layout2d_(graph_ptr *g, const double *layout2d)
   }
   G.orient_neighbours();
 }
-
-
-
 
 
 polyhedron_ptr new_c20_(){  return new Polyhedron(Polyhedron::C20()); }
@@ -484,16 +470,16 @@ void get_general_spiral_(const fullerene_graph_ptr* fg, int rspi_a[12], int jump
 //  12 will always be 12, 100 is just an arbitrary magic number
   assert((*fg)->layout2d.size() == (*fg)->N);
   vector<int> rspi_v;
-  FullereneGraph::jumplist_t jumps_v;
+  jumplist_t jumps_v;
   const bool canonical=true, general=true;
-  (*fg)->get_rspi_from_fg(rspi_v, jumps_v, canonical, general, *pentagon_start);
+  (*fg)->get_rspi_from_fg(rspi_v, jumps_v, general, *pentagon_start);
 
   for(int i=0; i!=12; i++){
     rspi_a[i] = rspi_v[i] +1;//start counting at 1
   }
   int j=0;
   std::fill(jumps_a,jumps_a+100, 0);
-  for(list<pair<int,int> >::iterator it(jumps_v.begin()); it!=jumps_v.end(); it++){
+  for(jumplist_t::iterator it(jumps_v.begin()); it!=jumps_v.end(); it++){
   	jumps_a[j++]=it->first +1;//start counting at 1
   	jumps_a[j++]=it->second;
   }
@@ -513,7 +499,7 @@ void get_face_(const graph_ptr *g, const int *s, const int *t, const int *r, con
 void get_arc_face_(const graph_ptr *g, const int *u, const int *v, int *face, int *l)
 {
   assert((*g)->layout2d.size() == (*g)->N);
-  face_t f((*g)->get_face_oriented(*u,*v));
+  face_t f((*g)->get_face_oriented({*u,*v}));
   
   for(int i=0;i<f.size();i++) face[i] = f[i];
   *l = f.size();

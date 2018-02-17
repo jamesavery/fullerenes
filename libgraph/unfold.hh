@@ -20,10 +20,12 @@ public:
   vector< pair<Eisenstein,node_t> > outline; // Polygon outline in the Eisenstein plane. This is always initialized.
   map<node_t,int> degrees;
 
+  Unfolding(){}
+  
   // There are two ways to create an "unfolding":
   // 
   // 1. Provide a triangulation of the sphere, i.e., the dual of a planar cubic graph.
-  Unfolding(const Triangulation& dual, bool planar_layout = false) : faces(dual.triangles), triangles(dual.triangles), edgecoords(unfold(triangles)), outline(get_outline(edgecoords)) 
+  Unfolding(const Triangulation& dual) : faces(dual.triangles), triangles(dual.triangles), edgecoords(unfold(triangles)), outline(get_outline(edgecoords)) 
   {
     // If 'dual' contains separating triangles, then a planar layout is necessary
     // to compute the faces (depth-first search will detect non-existing faces)
@@ -60,6 +62,7 @@ public:
   // Preconditions: Triangles are oriented consistently, i.e. CW or CCW.
   static map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation);
 
+  
   // Compute outline in CW order of the map returned from unfold().
   static vector< pair<Eisenstein,node_t> > get_outline(const map<dedge_t,dedgecoord_t>& edgecoords);
 

@@ -145,6 +145,13 @@ public:
 
 };
 
+namespace std {
+  template<> struct hash<Eisenstein> { // Vectors of integers smaller than 32 bit
+    size_t operator()(Eisenstein const &f) const {
+      return std::hash<pair<int,int>>()(f);      
+    }
+  };
+}
 
 
 

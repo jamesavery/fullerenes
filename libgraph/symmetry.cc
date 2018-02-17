@@ -130,18 +130,32 @@ vector<Permutation> Symmetry::tri_permutation(const vector<Permutation>& Gf) con
   return Gtri;
 }
 
-vector<Permutation> Symmetry::edge_permutation(const vector<Permutation>& Gf) const {
-  set<edge_t> edge_set = undirected_edges();//TODO: Do this another way
-
-  vector<Permutation> Gedge(Gf.size(),Permutation(edge_set.size()));
-  IDCounter<edge_t> edge_id;
-    
-  for(auto e(edge_set.begin());e!=edge_set.end();e++) edge_id.insert(*e);
+vector<Permutation> Symmetry::edge_permutation(const vector<Permutation>& Gf) const
+{
+  vector<Permutation> Gedge(Gf.size(),Permutation(edge_id.size()));
     
   for(int j=0;j<Gf.size();j++){
-    int i=0;
-    for(auto e=edge_set.begin();e!=edge_set.end();e++,i++)
-      Gedge[j][i] = edge_id(edge_t(Gf[j][e->first],Gf[j][e->second]));
+    for(const auto &ei: edge_id){
+      edge_t e = ei.first;
+      int    i = ei.second;
+      
+      Gedge[j][i] = edge_id({Gf[j][e.first],Gf[j][e.second]});
+    }
+  }
+  return Gedge;
+}
+
+vector<Permutation> Symmetry::dedge_permutation(const vector<Permutation>& Gf) const {
+
+  vector<Permutation> Gedge(Gf.size(),Permutation(dedge_id.size()));
+    
+  for(int j=0;j<Gf.size();j++){
+    for(const auto &ei: dedge_id){
+      dedge_t e = ei.first;
+      int     i = ei.second;
+      
+      Gedge[j][i] = dedge_id({Gf[j][e.first],Gf[j][e.second]});
+    }
   }
   return Gedge;
 }
@@ -151,23 +165,18 @@ vector<Permutation> Symmetry::permutation_representation() const
   vector<Permutation> pi;
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t>& nu(neighbours[u]);
-    if(nu.size() == S0[0]) // u has same degree as vertex 1: possible spiral start
-      for(int i=0;i<nu.size();i++){
-	node_t v = nu[i];
-	const vector<node_t>& nv(neighbours[v]);
-	if(nv.size() == S0[1]){ // v has same degree as vertex 2: still possible spiral start
+    if(neighbours[u].size() == S0[0]) // u has same degree as vertex 1: possible spiral start
+      for(const node_t &v: neighbours[u]){
+	if(neighbours[v].size() == S0[1]){ // v has same degree as vertex 2: still possible spiral start
 	  vector<int> spiral,permutation;
 	  jumplist_t  jumps;
 
 	  node_t wCCW = next(u,v), wCW = prev(u,v);
 
-	  const vector<node_t> &nwCCW(neighbours[wCCW]), &nwCW(neighbours[wCW]);
-
-	  if(nwCCW.size() == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,false,S0))
+	  if(neighbours[wCCW].size() == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,true,S0,J0))
 	    pi.push_back(permutation);
-	  if(nwCW.size() == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,false,S0))
-	    pi.push_back(Permutation(permutation));
+	  if(neighbours[wCW ].size() == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,true,S0,J0))
+	    pi.push_back(permutation);
 	}
       }
   }	    
@@ -193,7 +202,7 @@ vector<int> Symmetry::site_symmetry_counts(const vector<Permutation>& pi) const
       orbit_length++;
     }	
     int site_order = order/orbit_length; 
-    assert(site_order <= 12);
+    assert(site_order <= 12); // Only holds for fullerenes?
     m[site_order-1]++;
   }
   return m;
@@ -437,3 +446,4 @@ vector< pair<int,int> > Symmetry::NMR_pattern() const
   
   return NMR;
 }
+

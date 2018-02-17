@@ -2,6 +2,8 @@
 #include "libgraph/polyhedron.hh"
 #include "libgraph/isomerdb.hh"
 #include "libgraph/triangulation.hh"
+#include "libgraph/fullerenegraph.hh"
+#include "libgraph/symmetry.hh"
 
 // all lists are CCW
 
@@ -241,19 +243,16 @@ Graph example7(){
 // tetrahedron
 Polyhedron Example1()
 {
-  // Works with our optimizer
-  PlanarGraph g = example1();
-  g.layout2d = g.tutte_layout();
-  Polyhedron P(g,g.zero_order_geometry(),6);
-  P.optimize();
+  // Normalized to unit edge length 
+  vector<coord3d> points{{1.05196, 1.75377, 0.513112}, {0.891458, 0.827152, 0.174592}, {0.434181, 1.14097, 1.00679}, {1.41947, 0.969106, 1.01171}};
 
-  return P;
+  return Polyhedron(example1(),points,3);
 }
 
 // truncated tetrahedron
 Polyhedron Example2()
 {
-  vector<coord3d> points{{2.23258, 1.27088, 1.35686}, {1.93473, 1.89196, 0.740234}, {1.73005, 1.99506, 1.63557}, {1.78308, 0.227817, 1.3746}, {1.11948, 1.61198, 0.}, {0.663781, 1.84211, 1.99578}, {1.11992, 0., 0.771796}, {0.251611, 1.48704, 0.293499}, {0.297776, 0.992821, 2.01007}, {0.915066, 0.102857, 1.66793}, {0.753787, 0.762954, 0.0142968}, {0., 1.6143, 1.3943}};
+  vector<coord3d> points{{2.41493, 1.37468, 1.46768}, {2.09275, 2.04649, 0.800694}, {1.87136, 2.15801, 1.76916}, {1.92872, 0.246424, 1.48687}, {1.21092, 1.74364, 0.}, {0.717997, 1.99257, 2.15879}, {1.21139, 0., 0.834834}, {0.272162, 1.6085, 0.317471}, {0.322097, 1.07391, 2.17425}, {0.989806, 0.111258, 1.80416}, {0.815354, 0.82527, 0.0154645}, {0., 1.74615, 1.50818}};
 
   return Polyhedron(example2(),points,7);
 }
@@ -261,7 +260,7 @@ Polyhedron Example2()
 // triakis tetrahedron
 Polyhedron Example3()
 {
-  vector<coord3d> points{{0., 1.44541, 1.0108}, {0.700212, 0.138249, 0.}, {1.77793, 1.19982, 0.966152}, {0.317815, 0.446968, 0.92929}, {1.19803, 0.32425, 0.907385}, {0.851496, 0.971668, 1.40765}, {0.838477, 1.04014, 0.522258}, {0.725846, 0., 1.78837}};
+  vector<coord3d> points{{0., 1.62589, 1.13702}, {0.787645, 0.155512, 0.}, {1.99993, 1.34964, 1.08679}, {0.3575, 0.50278, 1.04533}, {1.34762, 0.364738, 1.02069}, {0.957819, 1.093, 1.58342}, {0.943175, 1.17002, 0.58747}, {0.81648, 0., 2.01168}};
   
   return Polyhedron(example3(),points,3);
 }
@@ -277,7 +276,7 @@ Polyhedron Example4()
 Polyhedron Example5()
 {
   // Extracted from Mathematica's GraphPlot3D
-  vector<coord3d> points{{1.78772, 2.61595, 1.75696}, {2.56195, 2.13131, 1.2033}, {1.94714, 2.16539, 0.360628}, {1.17115, 2.65626, 0.916014}, {1.03699, 2.33375, 2.25703}, {2.70505, 1.51885, 1.88838}, {2.15292, 1.27314, 0.186658}, {0.51311, 2.09111, 0.544246}, {1.92402, 2.00134, 2.43788}, {2.79337, 1.24354, 1.01856}, {1.28856, 1.59919, 0.}, {0.423279, 2.36294, 1.41249}, {0.637782, 1.38124, 2.49494}, {2.27429, 0.57175, 2.14273}, {1.74467, 0.328324, 0.425834}, {0.0871675, 1.13635, 0.793483}, {1.49962, 1.06007, 2.6816}, {2.36759, 0.296375, 1.27945}, {0.862859, 0.660326, 0.238707}, {0., 1.41246, 1.66546}, {0.850044, 0.485334, 2.31301}, {1.6185, 0., 1.76505}, {1.00249, 0.044527, 0.915374}, {0.226174, 0.519761, 1.46912}};
+  vector<coord3d> points{{1.9049, 2.78742, 1.87212}, {2.72988, 2.27101, 1.28218}, {2.07476, 2.30732, 0.384266}, {1.24791, 2.83037, 0.976054}, {1.10496, 2.48671, 2.40496}, {2.88235, 1.6184, 2.01215}, {2.29403, 1.35658, 0.198893}, {0.546742, 2.22817, 0.579918}, {2.05013, 2.13251, 2.59767}, {2.97646, 1.32505, 1.08533}, {1.37302, 1.70401, 0.}, {0.451023, 2.51782, 1.50508}, {0.679585, 1.47177, 2.65847}, {2.42336, 0.609225, 2.28318}, {1.85902, 0.349844, 0.453745}, {0.0928809, 1.21083, 0.845492}, {1.59791, 1.12955, 2.85736}, {2.52278, 0.315801, 1.36331}, {0.919415, 0.703607, 0.254353}, {0., 1.50504, 1.77463}, {0.90576, 0.517145, 2.46462}, {1.72458, 0., 1.88074}, {1.0682, 0.0474456, 0.975372}, {0.240998, 0.553828, 1.56541}};
 
   return Polyhedron(example5(),points,4);
 }
@@ -285,7 +284,7 @@ Polyhedron Example5()
 Polyhedron Example6()
 {
     // Extracted from Mathematica's GraphPlot3D
-  vector<coord3d> points{{1.62467, 2.5837, 2.56598}, {2.79414, 2.39953, 1.73511}, {2.95009, 1.08749, 2.2223}, {1.78637, 1.25448, 3.03939}, {2.01964, 2.92525, 1.68637}, {3.17219, 1.48559, 1.41778}, {2.19241, 0.529478, 2.6359}, {1.02844, 1.94157, 2.88731}, {0.739802, 2.54613, 2.26015}, {2.42269, 2.60404, 0.919172}, {2.9296, 0.605446, 1.42089}, {1.25927, 0.540849, 2.76083}, {1.02759, 2.82887, 1.30509}, {2.69123, 1.67378, 0.506652}, {2.09066, 0.0349076, 1.71842}, {0.43165, 1.15306, 2.49559}, {0.0584776, 1.88739, 1.84951}, {1.51746, 2.56377, 0.41821}, {2.48601, 0.652223, 0.49452}, {1.04894, 0., 1.91624}, {0.245225, 2.17429, 0.997127}, {1.75773, 1.77649, 0.}, {1.78427, 0.0934925, 0.718707}, {0.278149, 0.470846, 1.70868}, {0., 1.28813, 1.14341}, {0.850026, 1.94977, 0.196111}, {1.64975, 0.762152, 0.0927389}, {0.807268, 0.12372, 1.03965}, {2.46007, 1.93508, 2.60695}, {0.653625, 0.938786, 0.401366}};
+  vector<coord3d> points{{1.72556, 2.74414, 2.72532}, {2.96765, 2.54854, 1.84286}, {3.13329, 1.15502, 2.36031}, {1.8973, 1.33239, 3.22814}, {2.14506, 3.10691, 1.79109}, {3.36918, 1.57784, 1.50582}, {2.32856, 0.562358, 2.79959}, {1.09231, 2.06214, 3.06661}, {0.785743, 2.70424, 2.40051}, {2.57314, 2.76575, 0.976252}, {3.11153, 0.643044, 1.50912}, {1.33747, 0.574436, 2.93227}, {1.09141, 3.00454, 1.38614}, {2.85836, 1.77772, 0.538115}, {2.22049, 0.0370753, 1.82513}, {0.458455, 1.22466, 2.65056}, {0.062109, 2.00459, 1.96437}, {1.6117, 2.72298, 0.444181}, {2.64039, 0.692725, 0.52523}, {1.11407, 0., 2.03524}, {0.260453, 2.30931, 1.05905}, {1.86688, 1.88681, 0.}, {1.89507, 0.0992983, 0.763338}, {0.295422, 0.500085, 1.81479}, {0., 1.36813, 1.21442}, {0.902812, 2.07085, 0.208289}, {1.75219, 0.809482, 0.0984979}, {0.857399, 0.131403, 1.10422}, {2.61284, 2.05525, 2.76884}, {0.694215, 0.997084, 0.426291}};
 
   return Polyhedron(example6(),points,4);
 }
@@ -293,9 +292,125 @@ Polyhedron Example6()
 // elongated square bipyramid
 Polyhedron Example7()
 {
-  vector<coord3d> points{{1.86326, 0.943837, 1.01121}, {1.86309, 0.000344775, 0.942934}, {1.86242, 0.0673821, 0.000117863}, {1.86215, 1.0116, 0.0669785}, {0.645347, 0.944092, 1.01077}, {0.644878, 0., 0.942999}, {0.64477, 0.0683175, 0.}, {0.645068, 1.01163, 0.0676111}, {2.50817, 0.506387, 0.504544}, {0., 0.506155, 0.505309}};
+  vector<coord3d> points{{1.9697, 0.997756, 1.06898}, {1.96952, 0.000364472, 0.996802}, {1.96881, 0.0712316, 0.000124596}, {1.96853, 1.06939, 0.0708048}, {0.682214, 0.998026, 1.06852}, {0.681719, 0., 0.99687}, {0.681605, 0.0722204, 0.}, {0.68192, 1.06942, 0.0714736}, {2.65146, 0.535316, 0.533368}, {0., 0.535071, 0.534176}};
 
   return Polyhedron(example7(),points,4);
+}
+
+// First fullerene without a pentagon-starting spiral is Td-C100
+// with classical canonical spiral [CS: 2,8,9,23,24,28,29,37,41,45,46,52]
+// and  canonical                  [GS: 43,2; 1,4,5,26,27,31,32,40,43,47,48,52]
+Graph example8_TdC100()
+{
+  vector<int> RSPI{{2,8,9,23,24,28,29,37,41,45,46,52}};
+  FullereneDual dF(100,RSPI+(-1));
+  return dF.dual_graph();
+}
+
+Polyhedron Example8_TdC100()
+{
+  FullereneGraph F(example8_TdC100());
+
+  vector<face_t>   faces  = F.compute_faces(6);
+  cerr << "facesTdC100 = " << faces << ";\n";
+  F.layout2d = F.tutte_layout(face_t{{0,71,70,9,14,63}});
+  vector<coord3d>  points = F.optimized_geometry(F.zero_order_geometry());
+
+  return Polyhedron(F,points,6,faces);
+}
+
+// Random C1-C100 fullerene 
+// with classical canonical pentagon indices [GS:  1,2,3,4,5,12,43,46,49,50,51,52]
+Graph example9_C1C100()
+{
+  vector<int> RSPI{{1,2,3,4,5,12,43,46,49,50,51,52}};
+  FullereneDual dF(100,RSPI+(-1));
+  return dF.dual_graph();
+}
+
+Polyhedron Example9_C1C100()
+{
+  FullereneGraph F(example9_C1C100());
+
+  vector<face_t>   faces  = F.compute_faces(6);
+  cerr << "facesC1C100 = " << faces << ";\n";
+  F.layout2d = F.tutte_layout(face_t{{54,98,64,88,90}});
+  vector<coord3d>  points = F.optimized_geometry(F.zero_order_geometry());
+
+  return Polyhedron(F,points,6,faces);
+}
+
+
+Graph example10_Tutte()
+{ 
+  Triangulation tutte_dual({5,10,5,5,5,9,5,4,5,4,4,5,4,10,5,5,5,5,5,10,4,5,5,4,5},jumplist_t{{10,1},{16,1}});
+  //cerr << "tuttedual = " << tutte_dual << ";\n";
+  return tutte_dual.dual_graph();
+}
+
+Polyhedron Example10_Tutte()
+{
+  PlanarGraph g(example10_Tutte());
+  g.layout2d = g.tutte_layout();
+  vector<coord3d> points = g.zero_order_geometry();
+  Polyhedron P(g,points,10,g.compute_faces());
+
+  return P;
+}
+
+//[GS: 4, 6^3,(6,4)^5]-24-cage
+Graph example11_OmniOct()
+{ 
+  Triangulation omnioct_dual({{4,6,6,6,6,4,6,4,6,4,6,4,6,4}},jumplist_t{});
+  return omnioct_dual.dual_graph();
+}
+
+//[GS: 9,3; (8, 3, 6, 3)^2, 3, 8, 3]-18-cage
+Graph example12_OmniPrism()
+{ 
+  Triangulation omniprism_dual({{8,3,6,3,8,3,6,3,3,8,3}},jumplist_t{{8,3}});
+  return omniprism_dual.dual_graph();
+}
+
+//Smallest non-spiralable polyhedral graph with faces up to hexagons
+//[GS: 18,2; 3, 6^11, 3, 6, (6, 3)^2, 6^2]-36-cage
+Graph example13_SmallestNS()
+{
+  Triangulation dual({{3,6,6,6,6,6,6,6,6,6,6,6,3,6,6,3,6,3,6,6}},jumplist_t{{17,2}});
+  return dual.dual_graph();
+}
+
+
+
+Polyhedron Example11_OmniOct()
+{
+  PlanarGraph g(example11_OmniOct());
+  g.layout2d = g.tutte_layout();
+  vector<coord3d> points = g.zero_order_geometry();
+  Polyhedron P(g,points,10,g.compute_faces());
+
+  return P;
+}
+
+Polyhedron Example12_OmniPrism()
+{
+  PlanarGraph g(example12_OmniPrism());
+  g.layout2d = g.tutte_layout();
+  vector<coord3d> points = g.zero_order_geometry();
+  Polyhedron P(g,points,10,g.compute_faces());
+
+  return P;
+}
+
+
+Polyhedron Example13_SmallestNS()
+{
+  PlanarGraph g(example13_SmallestNS());
+  g.layout2d = g.tutte_layout();
+  vector<coord3d> points = g.zero_order_geometry();
+  Polyhedron P(g,points,10,g.compute_faces());
+
+  return P;
 }
 
 
@@ -309,6 +424,12 @@ PlanarGraph ExampleGraph(int Nex)
   case 5: return example5();
   case 6: return example6();
   case 7: return example7();
+  case 8: return example8_TdC100();
+  case 9: return example9_C1C100();
+  case 10: return example10_Tutte();
+  case 11: return example11_OmniOct();
+  case 12: return example12_OmniPrism();
+  case 13: return example13_SmallestNS();
   default:
     break;
   }
@@ -326,6 +447,12 @@ Polyhedron ExamplePolyhedron(int Nex)
   case 5: return Example5();
   case 6: return Example6();
   case 7: return Example7();
+  case 8: return Example8_TdC100();
+  case 9: return Example9_C1C100();
+  case 10: return Example10_Tutte();
+  case 11: return Example11_OmniOct();
+  case 12: return Example12_OmniPrism();
+  case 13: return Example13_SmallestNS();
   default:
     break;
   }
@@ -346,26 +473,194 @@ Polyhedron LFPolyhedron(const Polyhedron& P)
   return Polyhedron(LF,points);
 }
 
+string jumps_to_string(const jumplist_t &jumps)
+{
+  string s="";
+  for(const auto &j: jumps)
+    s += to_string(j.first) +"," + to_string(j.second) + ",";
+  s.pop_back();
+
+  return s;
+}
+
+string spiral_to_string(const vector<int>& spiral)
+{
+  string s="";
+  for(int i=0;i<spiral.size();i++)
+    s += to_string(spiral[i]) + (i+1<spiral.size()? ",":"");
+  return s;
+}
+
+vector<int> spiral_to_rspi(vector<int> spiral)
+{
+  vector<int> rspi(12);
+  for(int i=0,j=0;i<spiral.size();i++) if(spiral[i] == 5) rspi[j++] = i;
+  return rspi;
+}
+
+
+string spiral_to_rspi_string(const vector<int>& spiral)
+{
+  return spiral_to_string(spiral_to_rspi(spiral)+1);
+}
+
+struct name_info {
+  enum { CUBIC, TRIANGULATION, GENERAL } graph_type;
+  bool is_a_fullerene;
+  string atom;
+  //  string point_group;
+
+  
+  PlanarGraph   graph;
+  Triangulation triangulation;
+  bool cs;
+
+  general_spiral GS;
+  Permutation permutation;
+
+  name_info(const PlanarGraph &g, const string& atom="",bool compatibility=false) : atom(atom), graph(g),cs(compatibility) {
+    if(g.is_triangulation()){
+      graph_type     = TRIANGULATION;
+      is_a_fullerene = g.dual_graph().is_a_fullerene();
+      triangulation  = g;
+    } else if(g.is_cubic()){
+      graph_type     = CUBIC;
+      triangulation  = g.dual_graph();
+      is_a_fullerene = g.is_a_fullerene();
+    } else {
+      graph_type     = GENERAL;
+      triangulation  = g.leapfrog_dual();
+      is_a_fullerene = false;
+    }
+
+    permutation.resize(triangulation.N);
+    bool spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,!cs);
+    assert(spiral_success);
+
+    // Find spiral order with respect to triangulation vertices
+    permutation.resize(triangulation.N);
+    spiral_success = triangulation.get_spiral(GS.spiral,GS.jumps,permutation,!cs);
+
+    cout << "original: " << triangulation << endl;
+
+    // See if we can reconstruct the triangulation:
+    Triangulation t(GS.spiral,GS.jumps);
+    cout << "reproduction: " << t << endl;
+    // Nope! Spiral wind-up breaks in the presence of separating triangles; needs to be made oriented.
+  }
+
+  friend ostream& operator<<(ostream &s, const name_info &n){
+    string graph_type_string[3] = {"","D,","LF,"};
+    s << "["<<graph_type_string[n.graph_type] <<(n.cs?"CS":"GS") << ": "
+      << (n.GS.jumps.empty()? "": (jumps_to_string(n.GS.jumps)+"; "))
+      << (n.is_a_fullerene? spiral_to_rspi_string(n.GS.spiral) : spiral_to_string(n.GS.spiral))
+      << "]-" <<n.atom<< n.graph.N <<"-" << (n.is_a_fullerene? "fullerene" : "cage");
+    return s;
+  }
+};
+
+#include "gs-article-fix-examples.cc"
+
 int main(int ac, char **av)
 {
   int Nex = ac>=2? strtol(av[1],0,0) : 1;
-
+  
   string basename("gs-ex-"+to_string(Nex));
 
-  PlanarGraph g = ExampleGraph(Nex);
+  PlanarGraph g  = ExampleGraph(Nex);
+  PlanarGraph dg = g.dual_graph();
+
+  ofstream goutput(("output/"+basename+"-g.m").c_str());
+  goutput << "g = " << g << ";\n"
+	  << "dg = " << dg << ";\n";
+  goutput.close();
+  
   Polyhedron  P = ExamplePolyhedron(Nex);
 
+  P.points *= 3;		// Triangle bond length is 3
+  P.move_to_origin();
+  P.align_with_axes();
+  
+  cerr << "Graph has "<<(g.has_separating_triangles()?"":"no ")<<"separating triangles.\n";
+  
   Polyhedron LFP = LFPolyhedron(P);
-    
+
   ofstream output(("output/"+basename+".m").c_str());
+  if(Nex == 1){
+    g.layout2d = g.tutte_layout();
+  } else {
+    vector<int> spiral;
+    jumplist_t  jumps;
+    Triangulation LFT = LFP;
+
+    assert(LFT.is_consistently_oriented());
+    LFT.get_spiral(spiral,jumps);
+
+    output << "LFspiral = " << spiral << ";\n"
+	   << "LFjumps  = " << jumps  << ";\n";
+
+    name_info name(g,"C");
+
+    name_info compat_name(g,"C",true);
+
+    // End at outer face, or as close to it as possible
+    vector<int> outer_faces[13] = {{0,1,2},
+				   {6, 9, 8, 11, 7, 10},
+				   {3,4,5},{0,1,2,3},{20,21,22,23},{23, 27, 29, 24},{0,3,7,4},{93,95,97,99,94},{54,98,64,88,90},{},
+				   {0, 3, 7, 14, 15, 11},{3, 12, 13, 14, 15, 10, 9, 4},{27, 31, 32, 34, 35, 28}};
+
+    face_t outer_face = outer_faces[Nex-1];
+    if(outer_face.empty())
+      g.layout2d = g.tutte_layout();
+    else 
+      g.layout2d = g.tutte_layout(outer_faces[Nex-1]);
+    
+    // Hack:
+    if(Nex==8) fix_up_TdC100_layout(g);
+    //    if(Nex==9) fix_up_C1C100_layout(g);
+    
+    vector<face_t> faces = g.compute_faces(12);
+    vector<coord2d> dglayout(faces.size()), LFlayout2d(g.layout2d);
+
+    for(int i=0;i<faces.size();i++){
+      coord2d x = faces[i].centroid(g.layout2d);
+      LFlayout2d.push_back(x);
+      dglayout[i] = x;
+    }
+    LFP.layout2d = LFlayout2d;
+    dg.layout2d  = dglayout;
+
+    output << "triangulation = "  << name.triangulation << ";\n"
+	   << "permutation   = " << name.permutation << "+1;\n"
+	   << "jumps         = " << name.GS.jumps << ";\n"
+	   << "spiral        = " << name.GS.spiral << ";\n"
+      	   << "cspermutation   = " << compat_name.permutation << "+1;\n"
+      	   << "csjumps         = " << compat_name.GS.jumps << ";\n"
+    	   << "csspiral        = " << compat_name.GS.spiral << ";\n";
+
+    if(name.is_a_fullerene) output << "rspi = " << spiral_to_rspi(name.GS.spiral) << ";\n";
+    output << "gsname = \"" << name << "\";\n";
+    output << "csname = \"" << compat_name << "\";\n";
+
+    Symmetry S(name.triangulation);
+    cerr << "groupsize = " << S.G.size() << ";\n";
+    
+  }
+  
   output << "g   = " << g << ";\n";
-  output << "LFg = " << Graph(LFP) << ";\n";
-  output.close();
+  output << "dg  = " << dg << ";\n";
+  output << "LFg = " << PlanarGraph(LFP) << ";\n";
+  output << "faces   = " << g.compute_faces() << "+1;\n"
+	 << "LFfaces = " << LFP.faces << "+1;\n";
   
   {
     ofstream mol2(("output/"+basename+"-P.mol2").c_str());
     mol2 << P.to_mol2();
     mol2.close();
+
+    ofstream pov(("output/"+basename+"-P.pov").c_str());
+    pov << P.to_povray();
+    pov.close();
   }
 
   {
@@ -374,20 +669,21 @@ int main(int ac, char **av)
     mol2.close();
   }
 
-  {
-    ofstream mol2(("output/"+basename+"-LFP.mol2").c_str());
-    LFP.optimize();
-    mol2 << LFP.to_mol2();
-    mol2.close();
-  }  
+  // {
+  //   ofstream mol2(("output/"+basename+"-LFP.mol2").c_str());
+  //   LFP.optimize();		// This doesn't really work well for some reason..?
+  //   mol2 << LFP.to_mol2();
+  //   mol2.close();
+  // }  
   
   {
     ofstream tex(("output/"+basename+"-layout.tex").c_str());
-    auto l = g.tutte_layout();
-    g.layout2d = l;
     tex << g.to_latex(10, 10, false, false, true, 0, 0, 0, 0.5, 0.5, 2);
     tex.close();
   }  
 
+  output.close();
+
+  
   return 0;
 }

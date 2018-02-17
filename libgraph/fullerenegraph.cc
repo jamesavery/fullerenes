@@ -8,7 +8,6 @@
 #include <vector>
 #include <utility> //required for pair
 
-typedef list<pair<int,int> > jumplist_t;
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_layout) const {
@@ -137,7 +136,7 @@ FullereneGraph FullereneGraph::GCtransform(const unsigned k, const unsigned l, c
 FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   PlanarGraph dualfrog(*this);
 
-  vector<face_t> faces(dualfrog.compute_faces_flat(6,planar_layout));
+  vector<face_t> faces(dualfrog.compute_faces(6,planar_layout));
 
   //  cout << "(*leapfrog*)outer_face = " << dualfrog.outer_face << ";\n";
   //  cout << "(*leapfrog*)faces      = " << faces << ";\n";
@@ -167,7 +166,7 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
 
   if(planar_layout){
     // The layout of dualfrog is not planar - faces must be computed without it
-    vector<face_t> triangles(dualfrog.compute_faces_flat(3,false));
+    vector<face_t> triangles(dualfrog.compute_faces(3,false));
     new_layout.resize(triangles.size());
 
     for(int i=0;i<triangles.size();i++){
@@ -215,7 +214,7 @@ FullereneGraph::FullereneGraph(const int n, const vector<int>& spiral_indices, c
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
 bool FullereneGraph::get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general) const
 {
-  assert(layout2d.size() != 0);
+  assert(layout2d.size()==N);
   rspi.clear();
   jumps.clear();
 
@@ -228,15 +227,15 @@ bool FullereneGraph::get_rspi_from_fg(const node_t f1, const node_t f2, const no
 
 // pentagon indices and jumps start to count at 0
 // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
-bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical, const bool general, const bool pentagon_start) const
+bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool general, const bool pentagon_start) const
 {
-  assert(layout2d.size() == N);
+  assert(layout2d.size()==N);
   rspi.clear();
   jumps.clear();
 
   FullereneDual FDual = Triangulation(this->dual_graph(6));
 
-  if(!FDual.get_rspi(rspi, jumps, canonical, general, pentagon_start)) return false;
+  if(!FDual.get_rspi(rspi, jumps, general, pentagon_start)) return false;
   assert(rspi.size()==12);
   return true;
 }
