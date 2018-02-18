@@ -1372,6 +1372,7 @@ C     Timing O(6 n_v n_f^2)
       nspiralT56=0
       nspiral66=0
       nspiralT66=0
+      nspiral5sym=0
       WRITE (Iout,600)
       IF(number_vertices.lt.100)
      1  WRITE(Iout,601) number_vertices,number_faces
@@ -1478,197 +1479,196 @@ C---- Inner loop, ensures that both 3rd faces connected to I1 and I2 are include
        do J=1,number_faces
         if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
          MPent=2
-         S(3)=J
+              S(3)=J
 C       Reset arrays
-        do k=4,number_faces
-         s(k)=0
-        enddo
-        do k=3,12
-         JP(k)=0
-        enddo
+              do k=4,number_faces
+                s(k)=0
+              enddo
+              do k=3,12
+                JP(k)=0
+              enddo
 C     See if it is a pentagon, first 12 in D are
-         if(J.le.12) then
-          JP(3)=3
-          MPent=3
-         endif
+              if(J.le.12) then
+                JP(3)=3
+                MPent=3
+              endif
 C      Now search
-          CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
-C      Check if RSPIs are in order
-         if(IER.eq.0) then
-          nspiral=nspiral+1
-          nspiral5=nspiral5+1
-          nspiralT=nspiralT+1
-C       Check if enough space
-          If(nspiral.gt.MaxSpirals) then
-           Write(Iout,626) nspiral,MaxSpirals
-           nspiral=nspiral-1
-           Go to 199
-          endif
-C       Now everything works fine
-          do k=1,12
-           SpiralT(k,nspiral)=JP(k)
+              CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
+C Check if RSPIs are in order
+              if(IER.eq.0) then
+                nspiral=nspiral+1
+                nspiral5=nspiral5+1
+                nspiralT=nspiralT+1
+C Check if enough space
+                If(nspiral.gt.MaxSpirals) then
+                  Write(Iout,626) nspiral,MaxSpirals
+                  nspiral=nspiral-1
+                  Go to 199
+                endif
+C Now everything works fine
+                do k=1,12
+                  SpiralT(k,nspiral)=JP(k)
+                enddo
+                do k=1,number_faces
+                  SpiralF(k,nspiral)=S(k)
+                enddo 
+C Delete identical spirals
+                if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
+              endif
+            endif
           enddo
-          do k=1,number_faces
-           SpiralF(k,nspiral)=S(k)
-          enddo 
-C       Delete identical spirals
-          if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
-         endif
-        endif
-       enddo
 C---- End inner loop
-       enddo
+        enddo
 C---- End outer loop
       endif
       nspiral55=nspiral
       nspiralT55=nspiralT
       if(ispsearch.eq.2.and.nspiral55.ne.0) then
-       Write(Iout,635) nspiralT55
-       go to 199
+        Write(Iout,635) nspiralT55
+        go to 199
       endif
 
 C Loop over all (5,6) fusions
 C Dito, see above
       if(IRG56.le.0) then
-       write(Iout,615)
+        write(Iout,615)
       else
-       write(Iout,612) 2*IRG56
+        write(Iout,612) 2*IRG56
       do I=1,2*IRG56
 C     Reset arrays
       if(I.le.IRG56) then
-       I1=NrC(I)
-       I2=NrD(I)
+        I1=NrC(I)
+        I2=NrD(I)
       else
-       IR=I-IRG56
-       I1=NrD(IR)
-       I2=NrC(IR)
+        IR=I-IRG56
+        I1=NrD(IR)
+        I2=NrC(IR)
       endif
-       S(1)=I1
-       S(2)=I2
+      S(1)=I1
+      S(2)=I2
       if(I1.le.12) then
-       n5=1
-       JP(1)=1
+        n5=1
+        JP(1)=1
       else
-       JP(1)=2
+        JP(1)=2
       endif
       do J=1,number_faces
-       if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
-        S(3)=J
-        MPent=1
-        do k=4,number_faces
-         s(k)=0
+        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
+          S(3)=J
+          MPent=1
+          do k=4,number_faces
+            s(k)=0
+          enddo
+          do k=2,12
+            JP(k)=0
+          enddo
+          if(J.le.12) then
+            JP(2)=3
+            MPent=2
+            endif
+            CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
+            if(IER.eq.0) then
+              if(JP(1).eq.1) nspiral5=nspiral5+1
+                nspiral=nspiral+1
+                nspiralT=nspiralT+1
+                If(nspiral.gt.MaxSpirals) then
+                  Write(Iout,627) nspiral,MaxSpirals
+                  nspiral=nspiral-1
+                  Go to 199
+                endif
+                do k=1,12
+                  SpiralT(k,nspiral)=JP(k)
+                enddo
+                do k=1,number_faces
+                  SpiralF(k,nspiral)=S(k)
+                enddo 
+                if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
+              endif
+            endif
+          enddo
         enddo
-        do k=2,12
-         JP(k)=0
-        enddo
-        if(J.le.12) then
-         JP(2)=3
-         MPent=2
-        endif
-        CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
-        if(IER.eq.0) then
-         if(JP(1).eq.1) nspiral5=nspiral5+1
-         nspiral=nspiral+1
-         nspiralT=nspiralT+1
-         If(nspiral.gt.MaxSpirals) then
-          Write(Iout,627) nspiral,MaxSpirals
-          nspiral=nspiral-1
-          Go to 199
-         endif
-         do k=1,12
-          SpiralT(k,nspiral)=JP(k)
-         enddo
-         do k=1,number_faces
-          SpiralF(k,nspiral)=S(k)
-         enddo 
-        if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
-       endif
-       endif
-      enddo
-      enddo
       endif
       nspiral56=nspiral-nspiral55
       nspiralT56=nspiralT-nspiralT55
-       nspiral5sym=0
-       do i=1,nspiral
-         if(SpiralT(1,i).eq.1) nspiral5sym=nspiral5sym+1
-       enddo
-       if(nspiral5sym.eq.0.and.ispsearch.eq.4) then
+      do i=1,nspiral
+        if(SpiralT(1,i).eq.1) nspiral5sym=nspiral5sym+1
+      enddo
+      if(nspiral5sym.eq.0.and.ispsearch.eq.4) then
         WRITE(Iout,640)
         nspiral=0
         pentagon_start = .true.
         Go to 199
-       endif
-       if(nspiral5sym.ne.0.and.ispsearch.eq.4) then
+      endif
+      if(nspiral5sym.ne.0.and.ispsearch.eq.4) then
         WRITE(Iout,641)
         J1=0
         do i=1,nspiral
-         if(SpiralT(1,i).eq.1) then
-          J1=J1+1
-          do K=1,12
-           SpiralT(K,J1)=SpiralT(K,i)
-          enddo
-         endif
+          if(SpiralT(1,i).eq.1) then
+            J1=J1+1
+            do K=1,12
+              SpiralT(K,J1)=SpiralT(K,i)
+            enddo
+          endif
         enddo
         nspiral=nspiral5sym
         Go to 199
-       endif
+      endif
       if(ispsearch.eq.2.and.nspiral56.ne.0) then
-       Write(Iout,642) nspiralT56
-       go to 199
+        Write(Iout,642) nspiralT56
+        go to 199
       endif
       
 C Loop over all (6,6) fusions
 C Dito, see above
       if(IRG66.eq.0) then
-       write(Iout,616)
+        write(Iout,616)
       else
-       write(Iout,613) 2*IRG66
-      do I=1,2*IRG66
-       if(I.le.IRG66) then
-        I1=NrE(I)
-        I2=NrF(I)
-       else
-        IR=I-IRG66
-        I1=NrF(IR)
-        I2=NrE(IR)
-       endif
-       S(1)=I1
-       S(2)=I2
-       do J=1,number_faces
-        if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
-          S(3)=J
-          MPent=0
-       do k=4,number_faces
-        s(k)=0
-       enddo
-        do k=1,12
-         JP(k)=0
+        write(Iout,613) 2*IRG66
+        do I=1,2*IRG66
+          if(I.le.IRG66) then
+            I1=NrE(I)
+            I2=NrF(I)
+          else
+            IR=I-IRG66
+            I1=NrF(IR)
+            I2=NrE(IR)
+          endif
+          S(1)=I1
+          S(2)=I2
+          do J=1,number_faces
+            if(D(I1,J).eq.1.and.D(I2,J).eq.1) then
+              S(3)=J
+              MPent=0
+              do k=4,number_faces
+               s(k)=0
+              enddo
+              do k=1,12
+                JP(k)=0
+              enddo
+              if(J.le.12) then
+                JP(1)=3
+                MPent=1
+              endif
+              CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
+              if(IER.eq.0) then
+                nspiral=nspiral+1
+                nspiralT=nspiralT+1
+                If(nspiral.gt.MaxSpirals) then
+                  Write(Iout,628) nspiral,MaxSpirals
+                  nspiral=nspiral-1
+                  Go to 199
+                endif
+                do k=1,12
+                  SpiralT(k,nspiral)=JP(k)
+                enddo
+                do k=1,number_faces
+                  SpiralF(k,nspiral)=S(k)
+                enddo 
+                if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
+              endif
+            endif
+          enddo
         enddo
-         if(J.le.12) then
-          JP(1)=3
-          MPent=1
-         endif
-       CALL spwindup(IER,number_faces,MPent,D1,S,JP,FreeRing)
-       if(IER.eq.0) then
-        nspiral=nspiral+1
-        nspiralT=nspiralT+1
-         If(nspiral.gt.MaxSpirals) then
-          Write(Iout,628) nspiral,MaxSpirals
-          nspiral=nspiral-1
-          Go to 199
-         endif
-        do k=1,12
-         SpiralT(k,nspiral)=JP(k)
-        enddo
-        do k=1,number_faces
-         SpiralF(k,nspiral)=S(k)
-        enddo 
-        if(nspiral.gt.1) Call SpiralCheck(nspiral,SpiralT)
-       endif
-      endif
-      enddo
-      enddo
       endif
       if(nspiral.eq.0) WRITE(Iout,630) nspiralT,6*number_vertices
 C---- End of search
@@ -1683,17 +1683,17 @@ C---- End of search
         write(Iout,636) (gen_rspi(Mrspi),Mrspi=1,12)
         maxgj=2
         Do MJ=1,maxgen_jumps
-         if(gen_jumps(MJ).eq.0) then
-          maxgj=MJ-1
-          go to 64
-         endif
+          if(gen_jumps(MJ).eq.0) then
+            maxgj=MJ-1
+            go to 64
+          endif
         enddo
   64    Write(Iout,637) maxgj/2
         write(Iout,638) (gen_jumps(MJ),MJ=1,maxgj)
         return
       else
         WRITE(Iout,634) nspiral,nspiralT,6*number_vertices,
-     1  nspiral5,nspiral5sym
+     1                  nspiral5,nspiral5sym
         if(iprint.ne.0) then
           Write(Iout,606)
          Do I=1,nspiral
