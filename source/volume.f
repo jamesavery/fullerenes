@@ -11,10 +11,10 @@ c      character*50 filename
       g = new_fullerene_graph(NMax,number_vertices,IDA)
       p = new_polyhedron(g,points)
       exactarea = get_surface_area(p)
-      exactvolume      = get_volume(p)
+      exactvolume = get_volume(p)
 
       hull = convex_hull(p)
-      hullarea   = get_surface_area(hull)
+      hullarea = get_surface_area(hull)
       hullvolume = get_volume(hull)
 
 C     POV-Ray output. Commented out for now.
