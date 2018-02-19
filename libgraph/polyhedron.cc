@@ -216,6 +216,7 @@ struct sort_ccw_coord3d {
 
   // Points are only neighbour displacements from origin-node
   sort_ccw_coord3d(const vector<int> ns, const vector<coord3d>& points_): points(points_) {
+cerr << "This sorting/orientation method is potentially unstable.  Be careful." << endl;
     ns_inv.resize(*max_element(ns.begin(),ns.end())+1);
     for(int i=0; i<ns.size(); i++) ns_inv[ns[i]] = i;
 
@@ -224,7 +225,8 @@ struct sort_ccw_coord3d {
     for(const coord3d &p: points) xc += p;
     xc /= points.size();
 
-    n = /*x0*/-xc; n /= n.norm();	//
+    // TODO: what about n = \sum (p-xc) cross ((p+1)-p)
+    n = /*x0*/-xc; n /= n.norm();
 
     coord3d x1 = points[0] /* - x0*/;
     X = x1 - n*x1.dot(n); X /= X.norm();
