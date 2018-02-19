@@ -214,7 +214,7 @@ vector<dedge_t> FulleroidDelaunay::delaunayify_hole(const vector<edge_t>& edges)
     debug << "Next edge to check is " << (AC+1) << ".\n";
 
     node_t A = AC.first, C = AC.second;
-    node_t B = nextCW(C,A), D = nextCW(A,C);
+    node_t B = next(C,A), D = next(A,C); // used to be nextCW
     debug << "vertices in Q: " << A << ", " << B <<", " <<  C << ", " << D << endl;
 
 	// if the edge BD already exists (which is possible if it's "on the back of
