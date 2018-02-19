@@ -1,5 +1,6 @@
 #include <iomanip>
 #include <limits>
+#include <algorithm>
 
 #include "triangulation.hh"
 #include "polyhedron.hh"
@@ -210,11 +211,13 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
 
 struct sort_ccw_coord3d {
   const vector<coord3d> &points;
+  vector<int> ns_inv;
   coord3d X, Y, n;
 
   // Points are only neighbour displacements from origin-node
-  sort_ccw_coord3d(const vector<coord3d>& points)
-    : points(points) {
+  sort_ccw_coord3d(const vector<int> ns, const vector<coord3d>& points_): points(points_) {
+    ns_inv.resize(*max_element(ns.begin(),ns.end())+1);
+    for(int i=0; i<ns.size(); i++) ns_inv[ns[i]] = i;
 
     // TODO: More numerically robust method    
     coord3d xc(0,0,0);
@@ -229,7 +232,7 @@ struct sort_ccw_coord3d {
   }
 
   bool operator()(const node_t& s, const node_t& t) const {
-    coord3d xs(points[s]/*-x0*/), xt(points[t]/*-x0*/);
+    coord3d xs(points[ns_inv[s]]/*-x0*/), xt(points[ns_inv[t]]/*-x0*/);
     coord2d Xs(X.dot(xs), Y.dot(xs)), Xt(X.dot(xt), Y.dot(xt));
 
     double angs = atan2(Xs.first,Xs.second), angt = atan2(Xt.first,Xt.second);
@@ -240,7 +243,7 @@ struct sort_ccw_coord3d {
 
 void Polyhedron::orient_neighbours()
 {
-  
+
   if(layout2d.size() == N) {
     PlanarGraph::orient_neighbours();
   } else if(points.size() == N){
@@ -251,9 +254,9 @@ void Polyhedron::orient_neighbours()
       vector<coord3d> neighbour_points(ns.size());
       const coord3d &x0 = points[u];
 
-      for(int i=0;i<ns.size();i++) points[i] = neighbour_points[ns[i]] - x0;
-      sort_ccw_coord3d CCW(points);
+      for(int i=0;i<ns.size();i++) neighbour_points[i] = points[ns[i]] - x0;
 
+      sort_ccw_coord3d CCW(ns, neighbour_points);
       sort(ns.begin(),ns.end(),CCW);
     }
 
@@ -265,8 +268,8 @@ void Polyhedron::orient_neighbours()
       layout2d = tutte_layout();
       PlanarGraph::orient_neighbours();
     }
-  } 
-  
+  }
+
   // Calculate volume
   double V=0;
   for(node_t u=0;u<N;u++){
