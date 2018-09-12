@@ -9,13 +9,15 @@ int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
 int main(int ac, char **av)
 {
   int N;
-  Triangulation::jumplist_t jumps;
+  jumplist_t jumps;
   vector<int> RSPI(12);
-  bool from_file = false;
-  if(ac==2){
-    from_file = true;
-    N = 0;
-  } else if(ac<14){
+
+//  bool from_file = false;
+//  if(ac==2){
+//    from_file = true;
+//    N = 0;
+//  } else 
+  if(ac<14){
     N = testN;
     for(int i=0;i<12;i++) RSPI[i] = testRSPI[i]-1;
   }
@@ -41,12 +43,13 @@ int main(int ac, char **av)
 
   Polyhedron P0;
   PlanarGraph g;
-  if(from_file){
-    P0 = Polyhedron(av[1]);
-    N = P0.N;
-    g = P0;
-    g.layout2d = g.tutte_layout(-1,-1,-1,8);
-  } else {
+//  if(from_file){
+//    P0 = Polyhedron(av[1]);
+//    N = P0.N;
+//    g = P0;
+//    g.layout2d = g.tutte_layout(-1,-1,-1,8);
+//  } else
+  {
     Triangulation T(spiral,jumps);
     
     g = T.dual_graph();
@@ -56,27 +59,27 @@ int main(int ac, char **av)
 
   string basename("polyhedron-"+to_string(N));
   {
-    ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
-    mol2 << P0.to_mol2();
-    mol2.close();
+    FILE *file = fopen(("output/"+basename+"-P0.mol2").c_str(),"wb");
+    Polyhedron::to_mol2(P0, file);
+    fclose(file);
   }
 
   Polyhedron P(P0);
   P.optimize();
 
   {
-    ofstream mol2(("output/"+basename+".mol2").c_str());
-    mol2 << P.to_mol2();
-    mol2.close();
+    FILE *file = fopen(("output/"+basename+"-P.mol2").c_str(),"wb");
+    Polyhedron::to_mol2(P, file);
+    fclose(file);
   }
 
   {
     P.move_to_origin();
     P.align_with_axes();
 
-    ofstream mol2(("output/"+basename+"-if.mol2").c_str());
-    mol2 << P.to_mol2();
-    mol2.close();
+    FILE *file = fopen(("output/"+basename+"-if.mol2").c_str(),"wb");
+    Polyhedron::to_mol2(P, file);
+    fclose(file);
 
     ofstream pov(("output/"+basename+"-if.pov").c_str());
     pov << P.to_povray();
@@ -95,25 +98,25 @@ int main(int ac, char **av)
   output << "P0 = " << P0 << ";\n";
   output << "P = " << P << ";\n";
 
-  Polyhedron D(P.dual(6,true));
-  D.layout2d = D.tutte_layout();
-  D.faces    = D.compute_faces(3,true);
-  D.face_max = 3;
+  // Polyhedron D(P.dual(6,true));
+  // D.layout2d = D.tutte_layout();
+  // D.faces    = D.compute_faces(3,true);
+  // D.face_max = 3;
   //   D.optimize();
-  output << "PD = " << D << ";\n";
+  // output << "PD = " << D << ";\n";
   
   output.close();
 
 
-  {
-    ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
-    mol2 << D.to_mol2();
-    mol2.close() ;
+  // {
+  //   FILE *file = fopen(("output/"+basename+"-dual.mol2").c_str(),"wb");
+  //   Polyhedron::to_mol2(D, file);
+  //   fclose(file);
 
-    ofstream pov(("output/"+basename+"-dual.pov").c_str());
-    pov << D.to_povray();
-    pov.close();
-  }
+  //   ofstream pov(("output/"+basename+"-dual.pov").c_str());
+  //   pov << D.to_povray();
+  //   pov.close();
+  // }
 
   return 0;
 }

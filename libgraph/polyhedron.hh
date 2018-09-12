@@ -37,7 +37,7 @@ struct Polyhedron : public PlanarGraph {
   matrix3d inertia_matrix() const;
   matrix3d principal_axes() const; 
 
-  void scale(const coord3d& x) {
+  void scale(const double x) {
     for(node_t u=0;u<N;u++) points[u] *= x;
   }
 
