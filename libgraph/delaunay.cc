@@ -99,7 +99,7 @@ double FulleroidDelaunay::cos_ad(const Quad& Q) const
    *  v0--- e ---
    *   \ delta
    */
-  double t_adh = tan_adh(Q);	
+  double t_adh = tan_adh(Q);    
   double c_ad = (1-t_adh*t_adh)/(1+t_adh*t_adh);
   return c_ad;
 }
@@ -124,9 +124,9 @@ double FulleroidDelaunay::flipped_length(const Quad& Q) const
   return f;
 }
 
-bool FulleroidDelaunay::is_delaunay(const Quad& Q) const
-{
+bool FulleroidDelaunay::is_delaunay(const Quad& Q) const {
   double d[4];
+  const double eps = 1e-8;
   /*   B 
    * 0/ \1
    * A-e-C
@@ -138,7 +138,7 @@ bool FulleroidDelaunay::is_delaunay(const Quad& Q) const
   double e = edge_lengths(Q.v[0],Q.v[2]);
   for(int i=0;i<4;i++) d[i] = edge_lengths(Q.v[i],Q.v[(i+1)%4]);
 
-  return cos_sin::cot(e,d[0],d[1]) + cos_sin::cot(e,d[2],d[3]) >= 0;
+  return cos_sin::cot(e,d[0],d[1]) + cos_sin::cot(e,d[2],d[3]) + eps >= 0;
 }
 
 
@@ -230,10 +230,11 @@ void FulleroidDelaunay::align_hole(vector<node_t>& hole) const
 
     for(int i=2; i< hole.size()-1; i++)
       if(find(n0.begin(), n0.end(), hole[i]) != n0.end()){
-	hole.push_back(hole[0]);
-	hole.erase(hole.begin());
-	done = false;
-	break;
+        hole.push_back(hole[0]);
+        hole.erase(hole.begin());
+        done = false;
+        cout << "rotated hole" << endl;
+        break;
       }
   }
 }
@@ -245,7 +246,7 @@ vector<double> FulleroidDelaunay::new_distances(const node_t& v, const vector<no
   const size_t n = hole.size();
   vector<double> distances(n);
   
-  cos_sin cossin_acc(1,0);		
+  cos_sin cossin_acc(1,0);
 
   double d0 = edge_lengths(v, hole[0]);    
 
@@ -321,7 +322,7 @@ void FulleroidDelaunay::remove_flat_vertex(node_t v)
   // delaunayify triangulation
   debug << "(* Delaunayifying hole.*)\n";
   vector<edge_t> indel_edges(triangle_edges);
-  for(int i=0;i<hole.size();i++) 
+  for(int i=0;i<hole.size();i++)
     indel_edges.push_back({hole[i],hole[(i+1)%hole.size()]});
   delaunayify_hole(indel_edges);
 }
@@ -331,7 +332,7 @@ void FulleroidDelaunay::remove_flat_vertices()
   MathematicaDebug debug("Delaunay",0);
   // Assumes that vertices are sorted such that hexagons appear at the
   // end. Procedure incrementally removes vertices from the back until 
-  // reaching a vertex that is not of degree 6.
+  // reaching a vertex that was not of degree 6 in the initial graph.
 
   debug << "neighbours=" << neighbours << ";\n";
   debug << "neighbourssize=" << neighbours.size() << ";\n";
