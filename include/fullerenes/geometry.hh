@@ -202,6 +202,16 @@ struct coord3d {
     return x0+dx*t;
   }
 
+  bool operator==(const coord3d& y) const {
+    return x[0] == y.x[0] && x[1] == y.x[1] && x[2] == y.x[2];
+  }  
+
+  bool operator<(const coord3d& y) const {
+    return x[0] < y.x[0] ||
+		  (x[0] == y.x[0] && (x[1] <  y.x[1]  ||
+				      (x[1] == y.x[1] && x[2] < y.x[2])));
+  }
+
   friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };

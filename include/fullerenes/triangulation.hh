@@ -82,8 +82,11 @@ public:
   }
 
   matrix<double> surface_distances() const;
+  
   matrix<int>    convex_square_surface_distances() const;
   node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
+  static vector<int> draw_path(int major, int minor);
+  static vector<int> draw_path2(int major, int minor);
 
   Triangulation sort_nodes() const;
 };
