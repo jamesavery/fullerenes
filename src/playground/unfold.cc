@@ -24,10 +24,11 @@ int main(int ac, char **av)
   Unfolding uf(dual,true);
 
   ofstream output("output/C"+to_string(N)+"-unfold.m");
-  output << "dual    = " << dual << ";\n"
-	 << "outline = " << uf.outline << ";\n"
-	 << "dedges   = " << get_keys(uf.edgecoords) << ";\n"
-	 << "dedgepos = " << get_values(uf.edgecoords) << ";\n";
+  output
+    << "dual    = " << dual << ";\n"
+    << "outline = " << uf.outline << ";\n"
+    << "dedges   = " << get_keys(uf.edgecoords) << ";\n"
+    << "dedgepos = " << get_values(uf.edgecoords) << ";\n";
   output.close();
 
   ofstream latex_output("output/C"+to_string(N)+"-unfold.tex");

@@ -45,14 +45,14 @@ public:
   map<dedge_t, S> values;
   
   const S& add_edge(const dedge_t& e, const S& v) {
-    insert_edge(e,-1,-1);
+    insert_edge(e);
     values[e] += v;
     return values[e];
   }
 
   friend ostream& operator<<(ostream& s, const SparseMatrix& A)
   {
-    set<dedge_t> edges_set = A.directed_edges();
+    vector<dedge_t> edges_set = A.directed_edges();
     vector<dedge_t> edges(edges_set.begin(),edges_set.end());
     vector<S> edge_values(edges.size());
 
@@ -184,7 +184,9 @@ int main(int ac, char **av)
        << "A1p = " << SWConnect.As[1] << ";\n"
        << "A2p = " << SWConnect.As[2] << ";\n"
        << "A3p = " << SWConnect.As[3] << ";\n"
-       << "Aps = {A0p,A1p,A2p,A3p};\n"
+       << "A4p = " << SWConnect.As[4] << ";\n"
+       << "A5p = " << SWConnect.As[5] << ";\n"
+       << "Aps = {A0p,A1p,A2p,A3p,A4p,A5p};\n"
        << "As = Table[SparseArray[Table[(Aps[[d,1,i]]+1)->Aps[[d,2,i]],{i,Length[Aps[[d,1]]]}]],{d,Length[Aps]}];\n";
 
 

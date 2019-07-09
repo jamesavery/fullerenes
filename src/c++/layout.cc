@@ -1,5 +1,5 @@
-#include "graph.hh"
-#include "cubicgraph.hh"
+#include "fullerenes/graph.hh"
+#include "fullerenes/cubicgraph.hh"
 #include <sstream>
 
 struct ToleranceLess {

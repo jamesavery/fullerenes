@@ -1,5 +1,5 @@
-#include "fullerenegraph.hh"
-#include "polyhedron.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/polyhedron.hh"
  // Exported interface
 extern "C" {
   typedef FullereneGraph* fullerene_graph_ptr;

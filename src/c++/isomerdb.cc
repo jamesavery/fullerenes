@@ -1,9 +1,10 @@
-#include "isomerdb.hh"
+#include "fullerenes/config.hh"
+#include "fullerenes/isomerdb.hh"
 // TODO: Hov! Isomer count is wrong when reading text database. Find and fix!
 
 // TODO: Make C++98 compatible to support old compilers or make optional
 
-string IsomerDB::database_path = FULLERENE_DATABASE;
+string IsomerDB::database_path = FULLERENE_DATABASE_PATH;
 
 // Metadata for Cn isomers
 vector<size_t> IsomerDB::Nisomers_data[2]                 = {

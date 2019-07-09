@@ -1,4 +1,4 @@
-#include "graph.hh"
+#include <fullerenes/graph.hh>
 
 // Returns true if edge existed prior to call, false if not
 bool Graph::remove_edge(const edge_t& e)
@@ -454,7 +454,7 @@ ostream& operator<<(ostream& s, const Graph& g)
 {
   vector<edge_t> edge_set = g.undirected_edges();
 
-  s << "Graph[Range["<<(g.N)<<"],\n\tUndirectedEdge@@#&/@" << edge_set << "]";
+  s << "Graph[Range[0,"<<(g.N-1)<<"],\n\tUndirectedEdge@@#&/@" << edge_set << "]";
 
   return s;
 }

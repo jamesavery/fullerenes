@@ -1,8 +1,9 @@
 #ifndef POLYHEDRON_HH
 #define POLYHEDRON_HH
 
-#include "planargraph.hh"
-#include "fullerenegraph.hh"
+#include <fullerenes/config.hh>
+#include <fullerenes/planargraph.hh>
+#include <fullerenes/fullerenegraph.hh>
 #include <fstream>
 #include <sstream>
 #include <list>

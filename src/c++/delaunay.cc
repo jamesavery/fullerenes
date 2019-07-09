@@ -1,5 +1,5 @@
-#include "delaunay.hh"
-#include "debug.hh"
+#include "fullerenes/delaunay.hh"
+#include "fullerenes/debug.hh"
 
 struct cos_sin: public pair<double,double> {
 

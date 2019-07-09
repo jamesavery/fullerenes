@@ -1,4 +1,5 @@
-#include "triangulation.hh"
+#include "fullerenes/triangulation.hh"
+#include "fullerenes/polyhedron.hh"
 #include <algorithm>
 
 pair<node_t,node_t> Triangulation::adjacent_tris(const edge_t& e) const
@@ -51,8 +52,10 @@ vector<tri_t> Triangulation::compute_faces() const
 
 void Triangulation::orient_neighbours()
 {
+  if(triangles.empty()) return;
+  
   map<dedge_t,node_t> next;
-
+  
   for(int i=0;i<triangles.size();i++){
     const tri_t& t(triangles[i]);
     next[dedge_t(t[0],t[1])] = t[2];
@@ -645,7 +648,25 @@ void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagra
 
 }
 
-vector<int> draw_path(int major, int minor)
+
+vector<int> Triangulation::draw_path2(int major, int minor)
+{
+  int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
+
+  vector<int> runs(minor);
+
+  for(int i=0; i<minor; i++){
+    runs[i] = slope;
+    slope_accumulator += slope_remainder;
+
+    runs[i] += (slope_accumulator >= minor);
+    slope_accumulator %= minor;
+  }
+
+  return runs;
+}
+
+vector<node_t> Triangulation::draw_path(int major, int minor)
 {
   int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
 
@@ -668,6 +689,7 @@ vector<int> draw_path(int major, int minor)
 
   return runs;
 }
+
 
 // Given start node u0 and adjacent face F_i, lay down triangles along the the straight
 // line to Eisenstein number (a,b), and report what the final node is.
@@ -715,6 +737,7 @@ node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
   return t;			// End node is upper right corner.
 }
 
+
 matrix<int> Triangulation::convex_square_surface_distances() const
 {
   matrix<int> H = matrix<int>(N,N,all_pairs_shortest_paths());
@@ -740,6 +763,9 @@ matrix<int> Triangulation::convex_square_surface_distances() const
     }
   return H;
 }
+
+
+
 
 matrix<double> Triangulation::surface_distances() const
 {
@@ -911,7 +937,7 @@ bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, bool canonica
   return true;
 }
 
-#include "polyhedron.hh"
+
 vector<coord3d> FullereneDual::optimized_geometry(const vector<coord3d>& initial_geometry) const
 {
   bool optimize_angles = false;

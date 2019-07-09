@@ -1,5 +1,5 @@
-#include "cubicgraph.hh"
-#include "triangulation.hh"
+#include "fullerenes/cubicgraph.hh"
+#include "fullerenes/triangulation.hh"
 
 #include <cstdlib>
 #include <iostream>

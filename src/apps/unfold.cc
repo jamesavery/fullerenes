@@ -791,7 +791,7 @@ int main(int ac, char **av)
 
   output << "g = "  << g << ";\n";
   output << "dg = " << dual << ";\n";
-  cout << "Need to place 2x"<<dual.edge_set.size()<<" edges.\n";
+  cout << "Need to place "<<dual.directed_edges().size()<<" edges.\n";
 
   vector<face_t> faces(dual.compute_faces_flat(3,true));
   vector<tri_t>  triangles(faces.begin(),faces.end());

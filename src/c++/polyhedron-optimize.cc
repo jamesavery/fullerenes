@@ -1,6 +1,6 @@
-#include "planargraph.hh"
-#include "polyhedron.hh"
-#include "geometry.hh"
+#include "fullerenes/planargraph.hh"
+#include "fullerenes/polyhedron.hh"
+#include "fullerenes/geometry.hh"
 
 #include "math.h"
 

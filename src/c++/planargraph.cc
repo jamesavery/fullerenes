@@ -1,4 +1,4 @@
-#include "planargraph.hh"
+#include "fullerenes/planargraph.hh"
 #include <queue>
 #include <list>
 using namespace std;
@@ -406,6 +406,7 @@ vector<tri_t> PlanarGraph::triangulation(const vector<face_t>& faces) const
 
 vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
 {
+  if(tris.empty()) return tris;
   // Check that triangles are orientable: Every edge must appear in two faces
   map<edge_t,int> edgecount;
   for(int i=0;i<tris.size();i++)
@@ -554,7 +555,7 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
 {
   vector<edge_t> edge_set = g.undirected_edges();
 
-  s << "Graph[Range["<<g.N<<"],\n\tUndirectedEdge@@#&/@{";
+  s << "Graph[Range["<<(g.N-1)<<"],\n\tUndirectedEdge@@#&/@{";
   for(vector<edge_t>::const_iterator e(edge_set.begin()); e!=edge_set.end(); ){    
     s << "{" << (e->first+1) << "," << (e->second+1) << "}";
     if(++e != edge_set.end())

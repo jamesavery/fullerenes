@@ -1,5 +1,5 @@
-#include "symmetry.hh"
-#include "auxiliary.hh"
+#include "fullerenes/symmetry.hh"
+#include "fullerenes/auxiliary.hh"
 using namespace std;
 
 //////////////////////////////////////////////////////////////////////

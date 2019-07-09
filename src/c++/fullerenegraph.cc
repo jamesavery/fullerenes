@@ -1,6 +1,6 @@
-#include "fullerenegraph.hh"
-#include "triangulation.hh"
-#include "fortran.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/triangulation.hh"
+#include "fullerenes/fortran.hh"
 
 #include <fstream>
 #include <vector>

@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <cassert>
 #include <complex>
-#include "geometry.hh"
-#include "eisenstein.hh"
+#include "fullerenes/geometry.hh"
+#include "fullerenes/eisenstein.hh"
 
 // TODO: This stuff does not belong here. Start auxiliary.cc. Also, clean up!
 

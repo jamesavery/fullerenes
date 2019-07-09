@@ -1,4 +1,5 @@
-#include "polyhedron.hh"
+#include "fullerenes/config.hh"
+#include "fullerenes/polyhedron.hh"
 #include <iomanip>
 #include <limits>
 

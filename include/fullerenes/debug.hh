@@ -1,7 +1,7 @@
 #ifndef DEBUG_HH
 #define DEBUG_HH
 
-#include "auxiliary.hh"
+#include "fullerenes/auxiliary.hh"
 
 class Debug {
 public:
