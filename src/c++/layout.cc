@@ -1,6 +1,6 @@
+#include <sstream>
 #include "fullerenes/graph.hh"
 #include "fullerenes/cubicgraph.hh"
-#include <sstream>
 
 struct ToleranceLess {
   const double tolerance;
@@ -10,21 +10,18 @@ struct ToleranceLess {
 
 vector<coord2d> PlanarGraph::tutte_layout(node_t s, node_t t, node_t r, unsigned int face_max) const
 {
+  if(count_edges() == 0)       // empty graph
+    return vector<coord2d>(); // -> empty layout
+  
   if(s<0) s = 0;
-  if(t<0){
-    //    fprintf(stderr,"t = %d\n",t);
-    face_t c(shortest_cycle(s,face_max));
-    t = c[1];
-    r = c[2];
-    //    fprintf(stderr,"s,t,r ~> %d,%d,%d\n",s,t,r);
-  } else if(r < 0) {
-    //    fprintf(stderr,"r = %d\n",r);
-    face_t c(shortest_cycle(s,t,face_max));
-    r = c[2];
-    //    fprintf(stderr,"s,t,r ~> %d,%d,%d\n",s,t,r);
+  if(t<0) t = neighbours[s][0];
+
+  if(is_oriented){
+    outer_face = get_face_oriented({s,t},face_max);
+  } else {
+    if(r<0) r = next(t,s);     
+    outer_face = shortest_cycle({s,t,r},face_max);
   }
-  //  fprintf(stderr,"tutte_layout(%d,%d,%d)\n",s,t,r);
-  outer_face = shortest_cycle(s,t,r,face_max);
 
   return tutte_layout(outer_face);
 }
@@ -258,7 +255,7 @@ vector<coord2d> PlanarGraph::tutte_layout_iterative(const face_t& outer_face, co
 vector<coord2d> PlanarGraph::spherical_projection() const
 {
   vector<node_t> outer_face(find_outer_face());
-  vector<int> vertex_depth(multiple_source_shortest_paths(outer_face,vector<bool>(N*(N-1)/2),vector<bool>(N)));
+  vector<int> vertex_depth(multiple_source_shortest_paths(outer_face));
 
   // Step 1. Sort nodes wrt. vertex depth; partition into dmax sets V[d]. 
   int dmax = 0;
@@ -381,13 +378,12 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool prin
     s << "\\node[vertex] (\\name) at \\place {"<<(print_numbers?"\\lbl":"")<<"};\n";
   }
 
-  vector<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edges = undirected_edges();
 
-  for(auto e(edge_set.begin()); e!=edge_set.end();){
+  if(!edges.empty()){
     s << "\\foreach \\u/\\v in {";
-    for(int i=0;i<100 && e!=edge_set.end();){
-      s << "{v"<<e->first<<"/v"<<e->second<<"}";
-      if(++e != edge_set.end() && i+1<100) s << ", ";
+    for(int i=0;i<edges.size();i++){
+      s << "{v"<<edges[i].first<<"/v"<<edges[i].second<<"}"<<(i+1<edges.size()?", ":"");
     }
     s << "}\n\t\\draw[edge] (\\u) -- (\\v);\n";
   }
@@ -413,9 +409,9 @@ string PlanarGraph::to_latex(double w_cm, double h_cm, bool show_dual, bool prin
     s << "\\foreach \\u/\\v in {";
 
     vector<edge_t> dual_edges = dual.undirected_edges();
-    for(auto e(dual_edges.begin()); e!=dual_edges.end();){
-      s << "{v"<<e->first<<"/v"<<e->second<<"}";
-      if(++e != dual_edges.end()) s << ", ";
+    for(int i=0;i<dual_edges.size();i++){
+      edge_t e = dual_edges[i];
+      s << "{v"<<e.first<<"/v"<<e.second<<"}" << (i+1<dual_edges.size()?", ":"");
     }
     s << "}\n\t\\draw[dualedge] (\\u) -- (\\v);\n";
   }
@@ -438,10 +434,10 @@ string PlanarGraph::to_povray(double w_cm, double h_cm,
   ostringstream s;
   s << fixed;
 
-  vector<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edges = undirected_edges();
 
   s << "#declare Nvertices="<<N<<";\n";
-  s << "#declare Nedges="<<edge_set.size()<<";\n";
+  s << "#declare Nedges="<<edges.size()<<";\n";
   s << "#declare edgecolour=color rgb <" << byte2(edge_colour)/256. << "," << byte1(edge_colour)/256. << "," << byte0(edge_colour)/256. << ">;\n";
   s << "#declare nodecolour=color rgb <" << byte2(vertex_colour)/256. << "," << byte1(vertex_colour)/256. << "," << byte0(vertex_colour)/256. << ">;\n";
   s << "#declare edgewidth="<<edge_width/10.<<";\n";
@@ -458,7 +454,7 @@ string PlanarGraph::to_povray(double w_cm, double h_cm,
     s << "#declare layout2D=array[Nvertices][2]{"; for(int i=0;i<N;i++) s<<layout2d[i]*coord2d(xscale,yscale)<<(i+1<N?",":"}\n\n");
   }
   s << "#declare edges   =array[Nedges][2]{"; 
-  for(vector<edge_t>::const_iterator e(edge_set.begin());e!=edge_set.end();){ s << *e; s <<(++e != edge_set.end()? ",":"}\n\n"); }
+  for(int i=0;i<edges.size();i++){ s << edges[i]; s <<(i+1<edges.size()? ",":"}\n\n"); }
 
   return s.str();
 }

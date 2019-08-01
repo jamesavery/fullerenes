@@ -1,5 +1,4 @@
-#ifndef GEOMETRY_HH
-#define GEOMETRY_HH
+#pragma once
 
 #include <string.h>
 #include <iostream>
@@ -23,25 +22,22 @@ struct matrix3d; // required for coord3d.outer(coord3d)
 
 // TODO: geometry.hh is getting huge. Move most of the implementation to geometryc.cc
 
-// Directed edge is an ordered pair of nodes
-typedef pair<node_t,node_t> dedge_t;
+namespace std {
+  template<>
+  struct hash<edge_t> {
+    std::size_t operator()(const edge_t &p) const {
+      std::size_t seed1(0);
+      ::hash_combine(seed1, p.first);
+      ::hash_combine(seed1, p.second);
 
-struct edge_t : public pair<node_t,node_t> {
-  edge_t() {}
-  edge_t(const pair<node_t,node_t>& p) : pair<node_t,node_t>(min(p.first,p.second),max(p.first,p.second)) {}
-  edge_t(const node_t u, const node_t v): pair<node_t,node_t>(min(u,v),max(u,v)) {}
-  edge_t(const int index) {
-    node_t u=0;
-    for(;u*(u-1)/2<=index;u++) ;
-    u--;
-    first = u;
-    second = index-u*(u-1)/2;
-  }
-  inline size_t index() const { 
-    const node_t v = first, u = second;
-    return u*(u-1)/2 + v; 
-  }
-};
+      std::size_t seed2(0);
+      ::hash_combine(seed2, p.second);
+      ::hash_combine(seed2, p.first);
+
+      return std::min(seed1, seed2);
+    }
+  };
+}
 
 
 struct coord2d : public pair<double,double> {
@@ -58,11 +54,12 @@ struct coord2d : public pair<double,double> {
   coord2d& operator*=(const coord2d& y){ first *= y.first; second *= y.second; return *this; }
   coord2d& operator*=(const double s)  { first*=s;second*=s; return *this;}
   coord2d operator-() const {coord2d y(-first,-second); return y;}
-  double dot(const coord2d& y) const { return first*y.first+second*y.second; }
 
   double operator()(int i) const { return i? second : first; }
   double& operator()(int i)      { return i? second : first; }
   
+  double dot(const coord2d& y) const { return first*y.first+second*y.second; }
+
   double line_angle(const coord2d& v) const { // CCW between two lines ([-pi;pi] where -*this is +/-pi and *this is 0 -- i.e. pi is "leftmost", -pi is "rightmost")
     double angle = fmod(atan2(first*v.second-v.first*second,first*v.first+second*v.second)+2*M_PI,2*M_PI)-M_PI;
     //    fprintf(stderr,"angle[{%f,%f},{%f,%f}] == %f\n",first,second,v.first,v.second,angle);
@@ -126,8 +123,9 @@ struct coord2d : public pair<double,double> {
 struct coord3d {
   double x[3];
 
+  coord3d() { x[0] = 0; x[1] = 0; x[2] = 0; }
   coord3d(const double y[3]) { x[0] = y[0]; x[1] = y[1]; x[2] = y[2]; }
-  explicit coord3d(const double x_=0, const double y=0, const double z=0) { x[0] = x_; x[1] = y; x[2] = z; }
+  coord3d(const double x_, const double y, const double z) { x[0] = x_; x[1] = y; x[2] = z; }
   coord3d operator/(const double s)   const { return coord3d(*this) /= s; }
   coord3d operator*(const double s)   const { return coord3d(*this) *= s; }
   coord3d operator*(const coord3d& y) const { return coord3d(*this) *= y; }
@@ -202,16 +200,6 @@ struct coord3d {
     return x0+dx*t;
   }
 
-  bool operator==(const coord3d& y) const {
-    return x[0] == y.x[0] && x[1] == y.x[1] && x[2] == y.x[2];
-  }  
-
-  bool operator<(const coord3d& y) const {
-    return x[0] < y.x[0] ||
-		  (x[0] == y.x[0] && (x[1] <  y.x[1]  ||
-				      (x[1] == y.x[1] && x[2] < y.x[2])));
-  }
-
   friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };
@@ -230,11 +218,15 @@ struct matrix2d {
   }
 };
 
+
+
 struct matrix3d {
   double values[9];
 
-  matrix3d(const double *v) { for(int i=0;i<9;i++) values[i] = v[i]; }
-  explicit matrix3d(const double r=0, const double s=0, const double t=0, const double u=0, const double v=0, const double w=0, const double x=0, const double y=0, const double z=0) : values{r,s,t,u,v,w,x,y,z} {
+//  matrix3d()                { memset(values,0,9*sizeof(double)); }
+  matrix3d(const double *v) { memcpy(values,v,9*sizeof(double)); }
+  explicit matrix3d(const double r=0, const double s=0, const double t=0, const double u=0, const double v=0, const double w=0, const double x=0, const double y=0, const double z=0) {
+    values[0]=r; values[1]=s; values[2]=t; values[3]=u; values[4]=v; values[5]=w; values[6]=x; values[7]=y; values[8]=z;
   }
 
   double& operator()(int i, int j)       { return values[i*3+j]; }
@@ -410,6 +402,19 @@ struct tri_t {
   friend ostream& operator<<(ostream& S, const tri_t& t){ S << vector<int>(t.x_,t.x_+3); return S; }
 };
 
+// TODO: Hash functions gathered in single file?
+namespace std {
+  template<> struct hash<tri_t> { // Vectors of integers smaller than 32 bit
+    size_t operator()(const tri_t &t) const {
+      size_t seed(0);
+      hash_combine(seed, t[0]);
+      hash_combine(seed, t[1]);
+      hash_combine(seed, t[2]);
+      return seed;
+    }
+  };
+}
+
 
 struct face_t : public vector<node_t> {
   face_t(const size_t size=0) : vector<node_t>(size) {}
@@ -431,7 +436,7 @@ struct face_t : public vector<node_t> {
     return c/size();
   }
   coord3d centroid(const vector<coord3d>& layout) const { 
-    coord3d c(0.0);
+    coord3d c;
     for(size_t i=0;i<size();i++) c += layout[(*this)[i]];
     return c/size();
   }
@@ -458,15 +463,42 @@ struct face_t : public vector<node_t> {
   }
   bool contains(const node_t v) const { for(int i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
 
-  face_t sorted() const {
+  // Unique representation for sets and maps.
+  // To preserve orientation: don't sort, but rotate so as to start at smallest node.
+  // NB: Not necessary because of == and < operations?
+  face_t normalized() const {
     face_t f(*this);
-    sort(f.begin(),f.end());
+
+    // Find smallest node
+    node_t i_min = 0;
+    for(int i=0;i<f.size();i++) if(f[i] < f[i_min]) i_min = i;
+    // Rotate so smallest node is first
+    rotate(f.begin(),f.begin()+i_min,f.end());
     return f;
+  }
+
+  // The directed edge with minimal start vertex gives a unique representation of an oriented face
+  dedge_t minimal_edge() const {
+    face_t f(*this);
+    
+    dedge_t e_min{f[0],f[1]};
+    for(int i=1;i<f.size();i++) if(f[i] < e_min.first) e_min = {f[i],f[(i+1)%f.size()]};
+
+    return e_min;
   }
 };
 
+namespace std {
+  template<> struct hash<face_t> { // Vectors of integers smaller than 32 bit
+    size_t operator()(face_t const &f) const {
+      u32string s(f.begin(),f.end());
+      return std::hash<u32string>()(s);      
+    }
+  };
+}
 
-typedef map<unsigned int,set<face_t> > facemap_t;
+
+typedef map<unsigned int,set<face_t> > facemap_t; // Never really used -- candidate for retirement
 
 struct Tri3D {
   coord3d a,b,c,u,v,n;
@@ -589,4 +621,4 @@ private:
   vector<Eisenstein> reduce() const;
 };
 
-#endif
+

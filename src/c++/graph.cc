@@ -1,4 +1,4 @@
-#include <fullerenes/graph.hh>
+#include "fullerenes/graph.hh"
 
 // Returns true if edge existed prior to call, false if not
 bool Graph::remove_edge(const edge_t& e)
@@ -15,6 +15,8 @@ bool Graph::remove_edge(const edge_t& e)
 }
 
 // Returns true if edge existed prior to call, false if not
+// insert v right before suc_uv in the list of neighbours of u
+// insert u right before suc_vu in the list of neighbours of v
 bool Graph::insert_edge(const dedge_t& e, const node_t suc_uv, const node_t suc_vu)
 {
   if(edge_exists(e)) return true;	// insert_edge must be idempotent
@@ -31,41 +33,59 @@ bool Graph::insert_edge(const dedge_t& e, const node_t suc_uv, const node_t suc_
 
   nu.insert(pos_uv,v);
   if(u!=v) nv.insert(pos_vu,u);
-
-  assert(nu.size() == oldsize[0]+1 && nv.size() == oldsize[1]+1);
-
-  return false;
-}
-
-// Returns true if dedge existed prior to call, false if not
-bool Graph::insert_dedge(const dedge_t& e, const node_t suc_uv)
-{
-  if(edge_exists(e)) return true;	// insert_dedge must be idempotent
-
-  const node_t u = e.first, v = e.second;
-
-  assert(u>=0 && v>=0);
-  vector<node_t> &nu(neighbours[u]);
-
-  size_t oldsize = nu.size();
   
-  vector<node_t>::iterator pos_uv = suc_uv<0? nu.end() : find(nu.begin(),nu.end(),suc_uv);
-
-  nu.insert(pos_uv,v);
-
-  assert(nu.size() == oldsize+1);
+  assert(nu.size() == oldsize[0]+1 && nv.size() == oldsize[1]+1);
 
   return false;
 }
 
 bool Graph::edge_exists(const edge_t& e) const
 {
-  assert(abs(e.first) < neighbours.size());
   const vector<node_t> &nu(neighbours[e.first]);
   return find(nu.begin(),nu.end(),e.second) != nu.end();
 }
 
-node_t Graph::next(const node_t& u, const node_t& v) const
+// remove all vertices without edges from graph
+void Graph::remove_isolated_vertices(){
+  vector<int> new_id(N);
+
+  int u_new = 0;
+  for(int u=0; u<N; u++)
+    if(!neighbours[u].empty())
+      new_id[u] = u_new++;
+
+  int N_new = u_new;
+  Graph g(N_new);
+  // cerr << "n new: " << N_new << endl;
+  for(int u=0; u<N; u++)
+    for(int v: neighbours[u])
+      g.neighbours[new_id[u]].push_back(new_id[v]);
+
+  *this = g;
+}
+
+// completely remove all vertices in sv from the graph
+void Graph::remove_vertices(set<int> &sv){
+  const int N_naught(N);
+  for(int u: sv){
+    while(neighbours[u].size()){
+      const int v = neighbours[u][0];
+      remove_edge({u,v});
+    }
+  }
+
+  remove_isolated_vertices();
+
+  // let's see if the graph remained in a sane state
+  // cerr << "N: " << N << endl;
+  if(N_naught != sv.size() + N)
+    cerr << "removed more vertices than intended" << endl;
+  assert(is_connected());
+}
+
+
+// Successor to v in oriented neigbhours of u
+node_t Graph::next(node_t u, node_t v) const
 {
   const vector<node_t>& nu(neighbours[u]);
   for(int j=0;j<nu.size(); j++) if(nu[j] == v) return nu[(j+1)%nu.size()];
@@ -73,7 +93,8 @@ node_t Graph::next(const node_t& u, const node_t& v) const
   return -1;            // u-v is not an edge in a triangulation
 }
 
-node_t Graph::prev(const node_t& u, const node_t& v) const
+// Predecessor to v in oriented neigbhours of u
+node_t Graph::prev(node_t u, node_t v) const
 {
   const vector<node_t>& nu(neighbours[u]);
   for(int j=0;j<nu.size(); j++) if(nu[j] == v) return nu[(j-1+nu.size())%nu.size()];
@@ -81,6 +102,17 @@ node_t Graph::prev(const node_t& u, const node_t& v) const
   return -1;            // u-v is not an edge in a triangulation
 }
 
+// Successor to v in face containing directed edge u->v
+node_t Graph::next_on_face(const node_t &u, const node_t &v) const
+{
+  return prev(v,u);
+}
+
+// Predecessor to v in face containing directed edge u->v
+node_t Graph::prev_on_face(const node_t &u, const node_t &v) const
+{
+  return prev(u,v);
+}
 
 bool Graph::is_consistently_oriented() const 
 {
@@ -99,7 +131,7 @@ bool Graph::is_consistently_oriented() const
     const node_t u0 = u;
     work.erase(dedge_t(u,v));
     while(v != u0){
-      node_t w = next(u,v);	// u--v--w is CW-most corner
+      node_t w = next(v,u);	// u--v--w is CW-most corner
       u = v;
       v = w;
       if(work.find(dedge_t(u,v)) == work.end()){ // We have already processed arc u->v
@@ -113,6 +145,24 @@ bool Graph::is_consistently_oriented() const
   // Every directed edge is part of exactly one face <-> orientation is consistent
   return true;
 }
+
+// TODO: Doesn't need to be planar and oriented, but is easier to write if it is. Make it work in general.
+bool Graph::has_separating_triangles() const
+{
+  assert(is_oriented);
+
+  for(node_t u=0;u<N;u++){
+    const vector<node_t> &nu(neighbours[u]);
+    
+    for(int i=0;i<nu.size();i++){
+      node_t t = nu[i];
+      node_t v = prev(u,t), w = next(u,t); // edges: u--t, u--v, u--w
+      if(edge_exists({t,w}) && edge_exists({t,v}) && edge_exists({v,w})) return true;
+    }
+  }
+  return false;
+}
+
 
 bool Graph::adjacency_is_symmetric() const
 {
@@ -129,22 +179,23 @@ bool Graph::adjacency_is_symmetric() const
   return true;
 }
 
- // TODO: Should make two functions: one that takes subgraph (empty is trivially connected) and one that works on full graph.
+// TODO: Should make two functions: one that takes subgraph (empty is trivially connected) and one that works on full graph.
 bool Graph::is_connected(const set<node_t> &subgraph) const 
 {
+  vector<int> dist(N);
   if(!subgraph.empty()){
     node_t s = *subgraph.begin();
-    const vector<int> dist(shortest_paths(s));
+    single_source_shortest_paths(s,&dist[0]);
 
-    for(set<node_t>::const_iterator u(subgraph.begin()); u!=subgraph.end();u++) 
-      if(dist[*u] == INT_MAX) return false;
+    for(node_t u: subgraph)
+      if(dist[u] == INT_MAX) return false;
 
   } else {
     node_t s = 0; // Pick a node that is part of an edge
     for(;neighbours[s].empty();s++) ;
     assert(s < N);
 
-    const vector<int> dist(shortest_paths(s));
+    single_source_shortest_paths(s,&dist[0]);
 
     for(int i=0;i<dist.size();i++) 
       if(dist[i] == INT_MAX) return false;
@@ -175,131 +226,181 @@ list< list<node_t> > Graph::connected_components() const
   return components;
 }
 
-vector<int> Graph::shortest_path(const node_t& source, const node_t& dest, const vector<int>& dist) const
+// JA: Is this used?
+// vector<int> Graph::shortest_path(node_t source, node_t dest, const vector<int>& dist) const
+// {
+//   node_t vi = source;
+//   Deque<node_t> path(N);
+
+//   for(int i=0;i<N;i++)
+//     do {
+//       path.push_back(vi);
+//       const vector<node_t>& ns(neighbours[vi]);
+//       // Find next vertex in shortest path
+//       int kmin = 0;
+//       for(int k=1, d=dist[ns[0]];k<ns.size();k++) {
+// 	//      fprintf(stderr,"node %d has distance %d\n",ns[k],dist[ns[k]]);
+// 	if(dist[ns[k]] < d){ 
+// 	  d = dist[ns[k]];
+// 	  kmin = k;
+// 	}
+//       }
+//       //    fprintf(stderr,"Choosing neighbour %d = %d\n",kmin,ns[kmin]);
+//       vi = ns[kmin];
+//     } while(vi != dest);
+//   //  cerr << face_t(path) << endl;
+//   return path;
+// }
+
+
+
+
+void Graph::single_source_shortest_paths(node_t source, int *distances, size_t max_depth) const
 {
-  // Fill in shortest paths -- move to own function.
-  node_t vi = source;
-  vector<node_t> path;
-  //  fprintf(stderr,"Shortest path %d -> %d\n",source,dest);
-  for(int i=0;i<N;i++)
-    //    fprintf(stderr,"%d: %d\n",i,dist[i]);
-
-  do {
-    path.push_back(vi);
-    const vector<node_t>& ns(neighbours[vi]);
-    // Find next vertex in shortest path
-    int kmin = 0;
-    for(int k=1, d=dist[ns[0]];k<ns.size();k++) {
-      //      fprintf(stderr,"node %d has distance %d\n",ns[k],dist[ns[k]]);
-      if(dist[ns[k]] < d){ 
-	d = dist[ns[k]];
-	kmin = k;
-      }
-    }
-    //    fprintf(stderr,"Choosing neighbour %d = %d\n",kmin,ns[kmin]);
-    vi = ns[kmin];
-  } while(vi != dest);
-  //  cerr << face_t(path) << endl;
-  return path;
-}
-
-vector<int> Graph::shortest_paths(const node_t& source, const vector<bool>& used_edges, 
-					   const vector<bool>& used_nodes, const unsigned int max_depth) const
-{
-  vector<int> distances(N,INT_MAX);
-  list<node_t> queue;    
-
+  Deque<node_t> queue(N);
+  for(int u=0;u<N;u++) distances[u] = INT_MAX;
+  
   distances[source] = 0;
   queue.push_back(source);
 
   while(!queue.empty()){
-    node_t v = queue.front(); queue.pop_front();
-      
-    const vector<node_t> &ns(neighbours[v]);
-    for(unsigned int i=0;i<ns.size();i++){
-      const edge_t edge(v,ns[i]);
-      if(!used_nodes[ns[i]] && !used_edges[edge.index()] && distances[ns[i]] == INT_MAX){
-	distances[ns[i]] = distances[v] + 1;
-	if(distances[ns[i]] < max_depth) queue.push_back(ns[i]);
+    node_t u = queue.pop_front();
+    
+    for(node_t v: neighbours[u]){
+      if(distances[v] == INT_MAX){ // Node is not previously visited
+	distances[v] = distances[u] + 1; 
+	if(distances[v] < max_depth) queue.push_back(v);
       }
     }
   }
-  return distances;
-}
-
-vector<int> Graph::shortest_paths(const node_t& source, const unsigned int max_depth) const
-{
-  vector<int> distances(N,INT_MAX);
-  list<node_t> queue;    
-
-  distances[source] = 0;
-  queue.push_back(source);
-
-  while(!queue.empty()){
-    node_t v = queue.front(); queue.pop_front();
-      
-    const vector<node_t> &ns(neighbours[v]);
-    for(unsigned int i=0;i<ns.size();i++){
-      const edge_t edge(v,ns[i]);
-      if(distances[ns[i]] == INT_MAX){
-	distances[ns[i]] = distances[v] + 1;
-	if(distances[ns[i]] < max_depth) queue.push_back(ns[i]);
-      }
-    }
-  }
-  return distances;
 }
 
 // Returns NxN matrix of shortest distances (or INT_MAX if not connected)
-vector<int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
+// N^2: allocating d
+// N*(N-1)/2 steps
+matrix<int> Graph::all_pairs_shortest_paths(const unsigned int max_depth) const
 {
-  vector<int> distances(N*N);
-  vector<bool> dummy_edges(N*(N-1)/2), dummy_nodes(N);
+  matrix<int>   d(N,N,INT_MAX);
+  Deque<node_t> queue(N);
 
   for(node_t u=0;u<N;u++){
-    const vector<int> row(shortest_paths(u,dummy_edges,dummy_nodes,max_depth));
-    memcpy(&distances[u*N],&row[0],N*sizeof(unsigned int));
+    queue.push_back(u);    	// Enqueue source u
+    d(u,u) = 0;
+
+    while(!queue.empty()){
+      node_t v = queue.pop_front();
+
+      // Process children w of node v
+      for(node_t w: neighbours[v]){
+	if(d(u,w) == INT_MAX){ // Node is not previously visited
+	  int distance = d(u,v)+1;
+	  d(u,w)  = distance;
+	  //	  d(w,u)  = distance;
+	  if(distance < max_depth) queue.push_back(w);
+	}
+      }
+    }
   }
 
-  return distances;
+  return d;
 }
 
-vector<node_t> Graph::shortest_cycle(const node_t& s, const int max_depth) const 
+// Returns MxM matrix of shortest distances between vertices in V
+// M^2 memory, O(MN) operations
+matrix<int> Graph::all_pairs_shortest_paths(const vector<node_t> &V,
+					    const unsigned int max_depth) const
 {
-  const vector<node_t> ns(neighbours[s]);
-  assert(ns.size() > 0);
+  size_t M = V.size();
+  matrix<int> D(M,M,INT_MAX);
+  vector<int> d(N);
 
+  Deque<node_t> queue(N);
+
+  for(int i=0;i<M;i++){
+    for(int j=0;j<N;j++) d[j] = INT_MAX; // Mark all nodes as unvisited    
+
+    node_t source = V[i];
+    d[source] = 0;
+    queue.push_back(source);
+
+    while(!queue.empty()){
+      node_t u = queue.pop_front();
+
+      // Process children of node u
+      for(node_t v: neighbours[u]){
+	if(d[v] == INT_MAX){ 	// Node is not previously visited
+	  d[v] = d[u]+1;
+	  if(d[v] < max_depth) queue.push_back(v);
+	}
+      }
+    }
+    // Queue is empty, now pick out nodes from V
+    for(int j=0;j<M;j++)
+      D(i,j) = d[V[j]];
+  }
+
+  return D;
+}
+
+
+vector<node_t> Graph::shortest_cycle(node_t s, const int max_depth) const 
+{
   face_t cycle;
-  int Lmax = 0;
-  for(int i=0;i<ns.size();i++){
-    face_t c(shortest_cycle(s,ns[i],max_depth));
-    if(c.size() >= Lmax){ Lmax = c.size(); cycle = c; }
+  int Lmin = INT_MAX;
+  for(node_t t: neighbours[s]){
+    face_t c(shortest_cycle({s,t},max_depth));
+    if(c.size() < Lmin){ Lmin = c.size(); cycle = c; }
   }
   return cycle;
 }
 
-vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const int max_depth) const 
-{ 
-  vector<bool> used_edges(N*(N-1)/2);
-  vector<bool> used_nodes(N);
+// Find shortest cycle s->t->r->...->s, prefix = {s,t,r,...}
+// This is the same as: Find shortest path t-*->s in G excluding edges {(s,t),(t,r),...}
+// This is the same as:
+//   1. Compute d(t,*) when excluding the edge (s,t)
+//   2. If d(t,s) == INT_MAX, there is no such cycle <= max_depth
+//   3. Otherwise, back-trace as
+vector<node_t> Graph::shortest_cycle(const vector<node_t>& prefix, const int max_depth) const 
+{
+  // Is this a valid start?
+  for(int i=0;i+1<prefix.size();i++) assert(edge_exists({prefix[i],prefix[i+1]}));
 
-  // Find shortest path t->s in G excluding edge (s,t)
-  used_edges[edge_t(s,t).index()] = true;
-  vector<int> distances(shortest_paths(t,used_edges,used_nodes,max_depth));
+  node_t s = prefix[0], t = prefix[1];  
+  
+  if(max_depth == 3){ // Triangles need special handling
+    switch(prefix.size()){
+    case 2:
+      // t must have a neighbor r that neighbours s
+      for(node_t r: neighbours[t])
+	if(edge_exists({r,s})) return {s,t,r};
+      return {};
+    case 3:
+      return prefix;		// {s,t,r} given and is a valid triangle
+    default:
+      cerr << "shortest_cycle(): Prefix " << prefix << " is not an appropriate triangle start.\n";
+      abort();
+    }
+  }
 
+  // Now we can assume max_depth >= 4
+  vector<int> distances(N);
+  Graph G(*this);		// TODO: Get rid of this copy
+  for(int i=0;i+1<prefix.size();i++)
+    G.remove_edge({prefix[i],prefix[i+1]});
+
+  G.single_source_shortest_paths(t,&distances[0],max_depth);
   // If distances[s] is uninitialized, we have failed to reach s and there is no cycle <= max_depth.
-  if(distances[s] == INT_MAX) return vector<node_t>();
+  if(distances[s] == INT_MAX) return {};
 
-  // Then reconstruct the cycle by moving backwards from s to t
+  // Otherwise reconstruct the cycle by moving backwards from s to t
   vector<node_t> cycle(distances[s]+1);
   node_t u = s, v = -1;
   for(unsigned int i=0;i<distances[s]+1;i++){
-    const vector<node_t> &ns(neighbours[u]);
     unsigned int dmin = INT_MAX;
-    for(unsigned int j=0;j<ns.size();j++)
-      if(distances[ns[j]] < dmin && (edge_t(u,ns[j]) != edge_t(s,t))){
-	dmin = distances[ns[j]];
-	v = ns[j];
+    for(node_t w: neighbours[u])
+      if(distances[w] < dmin && (edge_t(u,w) != edge_t(s,t))){
+  	dmin = distances[w];
+  	v = w;
       } 
     u = v;
     cycle[distances[s]-i] = u;
@@ -308,90 +409,29 @@ vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const int
   return cycle;
 }
 
-vector<node_t> Graph::shortest_cycle(const node_t& s, const node_t& t, const node_t& r, const int max_depth) const 
-{ 
-  //  fprintf(stderr,"3: shortest_cycle(%d,%d,%d,max_depth=%d)\n",s,t,r,max_depth);
-  assert(s >= 0 && t >= 0 && r >= 0);
-  if(max_depth == 3){		// Triangles need special handling
-    vector<node_t> cycle(3);
-    node_t p=-1,q=-1;
-    cycle[0] = s;
-    for(int i=0;i<neighbours[s].size();i++) {
-      if(neighbours[s][i] == t){ p = t; q = r; break; }
-      if(neighbours[s][i] == r){ p = r; q = t; break; }
-    }
-    bool foundq = false, founds = false;
-    if(p<0) return vector<node_t>();
-    for(int i=0;i<neighbours[p].size();i++) if(neighbours[p][i] == q) foundq = true;
-    for(int i=0;i<neighbours[q].size();i++) if(neighbours[q][i] == s) founds = true;
-    
-    if(!foundq || !founds) return vector<node_t>();
-    cycle[1] = p;
-    cycle[2] = q;
-    return cycle;
-  }
 
-  vector<bool> used_edges(N*(N-1)/2);
-  vector<bool> used_nodes(N);
-  //  fprintf(stderr,"shortest_cycle(%d,%d,%d), depth = %d\n",s,t,r,max_depth);
-  // Find shortest path r->s in G excluding edge (s,t), (t,r)
-  used_edges[edge_t(s,t).index()] = true;
-  used_edges[edge_t(t,r).index()] = true;
-
-  vector<int> distances(shortest_paths(r,used_edges,used_nodes,max_depth));
-
-  // If distances[s] is uninitialized, we have failed to reach s and there is no cycle <= max_depth.
-  if(distances[s] == INT_MAX) return vector<node_t>();
-
-  // Else reconstruct the cycle by moving backwards from s to t
-  vector<node_t> cycle(distances[s]+2);
-  node_t u = s, v = -1;
-  for(unsigned int i=0;i<distances[s]+1;i++){
-    const vector<node_t> &ns(neighbours[u]);
-    unsigned int dmin = INT_MAX;
-    for(unsigned int j=0;j<ns.size();j++)
-      if(distances[ns[j]] < dmin && (edge_t(u,ns[j]) != edge_t(s,t))){
-	dmin = distances[ns[j]];
-	v = ns[j];
-      } 
-    u = v;
-    cycle[distances[s]+1-i] = u;
-  }
-  cycle[0] = s;
-  cycle[1] = t;
-  return cycle;
-}
-
-
-vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges, 
-							   const vector<bool>& used_nodes, const unsigned int max_depth) const
+vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth) const
 {
-  vector<int> distances(N,INT_MAX);
-  list<node_t> queue;
+  vector<int>   distances(N,INT_MAX);
+  Deque<node_t> queue(N);
     
-  for(unsigned int i=0;i<sources.size();i++){
-    distances[sources[i]] = 0;
-    queue.push_back(sources[i]);
+  for(node_t s: sources){
+    distances[s] = 0;
+    queue.push_back(s);
   }
 
   while(!queue.empty()){
-    node_t v = queue.front(); queue.pop_front();
+    node_t v = queue.pop_front();
       
-    const vector<node_t> &ns(neighbours[v]);
-    for(unsigned int i=0;i<ns.size();i++){
-      const edge_t edge(v,ns[i]);
-      if(!used_nodes[ns[i]] && !used_edges[edge.index()] && distances[ns[i]] == INT_MAX){
-	distances[ns[i]] = distances[v] + 1;
-	if(distances[ns[i]] < max_depth) queue.push_back(ns[i]);
+    for(node_t w: neighbours[v]){
+      const edge_t edge(v,w);
+      if(distances[w] == INT_MAX){ // Node not previously visited
+	distances[w] = distances[v] + 1;
+	if(distances[w] < max_depth) queue.push_back(w);
       }
     }
   }
   return distances;
-}
-
-vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth) const
-{
-  return multiple_source_shortest_paths(sources,vector<bool>(N*(N-1)/2),vector<bool>(N),max_depth);
 }
 
 
@@ -402,7 +442,7 @@ int Graph::max_degree() const
   return max_d;
 }
 
-int Graph::degree(const node_t& u) const { 
+int Graph::degree(node_t u) const { 
   return neighbours[u].size(); 
 }
 
@@ -436,25 +476,35 @@ vector<edge_t> Graph::undirected_edges() const {
   for(node_t u=0;u<N;u++)
     for(int i=0;i<neighbours[u].size();i++)
       edges.insert(edge_t(u,neighbours[u][i]));
-
   return vector<edge_t>(edges.begin(),edges.end());
 }
 
 vector<dedge_t> Graph::directed_edges() const {
-  vector<dedge_t> edges;
-  edges.reserve(N*3);
+  set<dedge_t> edges;
   for(node_t u=0;u<N;u++)
     for(int i=0;i<neighbours[u].size();i++)
-      edges.push_back(dedge_t(u,neighbours[u][i]));
-  return edges;
+      edges.insert(dedge_t(u,neighbours[u][i]));
+  return vector<dedge_t>(edges.begin(),edges.end());
 }
 
+size_t Graph::count_edges() const {
+  // Don't use edge_set -- it's slow
+  size_t twoE = 0;
+  for(node_t u=0;u<N;u++)
+    twoE += neighbours[u].size();
+
+  return twoE/2;
+}
 
 ostream& operator<<(ostream& s, const Graph& g) 
 {
-  vector<edge_t> edge_set = g.undirected_edges();
+  vector<edge_t> edges = g.undirected_edges();
 
-  s << "Graph[Range[0,"<<(g.N-1)<<"],\n\tUndirectedEdge@@#&/@" << edge_set << "]";
+  s << "Graph[Range["<<(g.N)<<"],\n\tUndirectedEdge@@#&/@{";
+  for(size_t i=0;i<edges.size();i++){    
+    s << "{" << (edges[i].first+1) << "," << (edges[i].second+1) << "}" << (i+1<edges.size()? ", ":"");
+  } 
+  s << "}]";
 
   return s;
 }

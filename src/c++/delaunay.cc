@@ -178,10 +178,10 @@ vector<dedge_t> FulleroidDelaunay::delaunayify_hole(const vector<edge_t>& edges)
   int flips = 0;
   while(!S.empty()){ 
     const dedge_t AC = S.top(); S.pop(); mark[edge_t(AC)] = false;
-    debug << "Next edge to check is " << (AC+1) << ".\n";
+    debug << "Next edge to check is " << AC << ".\n";
 
     node_t A = AC.first, C = AC.second;
-    node_t B = nextCW(C,A), D = nextCW(A,C);
+    node_t B = next(C,A), D = next(A,C);
 
     Quad Q(A,B,C,D);
 

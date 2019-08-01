@@ -2,7 +2,7 @@
 # define BUCKYGEN_WRAPPER_HH
 #include <limits.h>
 #include <sys/types.h>
-#include "../libgraph/graph.hh"
+#include "fullerenes/graph.hh"
 
 
 namespace BuckyGen {

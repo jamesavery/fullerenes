@@ -3,9 +3,9 @@
 !  This module is called by most subroutines, it defines most of the        !
 !  parameters, dimensions and constants used.                               !
 !---------------------------------------------------------------------------!
-      character, parameter :: version_number="git-development-eba2d5f"
+      character, parameter :: version_number="git-development-aa459dc"
       integer,parameter :: nzeile=132 ! Maximum length of text character in a line
-      integer,parameter :: Nmax=6600 !  Change NMAX if RAM is not sufficient
+      integer,parameter :: Nmax=5000 !  Change NMAX if RAM is not sufficient
       integer,parameter :: msrs=56+1 !  Size of Schlegel output matrix
       integer,parameter :: nbardim=100+10 !Number of bars in Hamilton cycle statistics
       integer,parameter :: NmaxL=(Nmax*(Nmax-1))/2

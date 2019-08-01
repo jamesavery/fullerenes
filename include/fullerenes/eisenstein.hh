@@ -33,7 +33,6 @@ public:
     for(int i=0;i<v.size();i++) result[i] = (*this)*v[i];
     return result;
   }
-  Eisenstein operator-() const { return Eisenstein{-first,-second}; }
   Eisenstein operator+(const Eisenstein& y) const { return Eisenstein(first+y.first,second+y.second); }
   Eisenstein operator-(const Eisenstein& y) const { return Eisenstein(first-y.first,second-y.second); } 
   pair<double,double>    operator-(const pair<double,double>& y)    const { return pair<double,double>(first-y.first,second-y.second); } 
@@ -146,6 +145,13 @@ public:
 
 };
 
+namespace std {
+  template<> struct hash<Eisenstein> { // Vectors of integers smaller than 32 bit
+    size_t operator()(Eisenstein const &f) const {
+      return std::hash<pair<int,int>>()(f);      
+    }
+  };
+}
 
 
 

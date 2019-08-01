@@ -1,21 +1,18 @@
-#include "fullerenes/fullerenegraph.hh"
-#include "fullerenes/triangulation.hh"
-#include "fullerenes/fortran.hh"
-
 #include <fstream>
 #include <vector>
 #include <list>
 #include <vector>
 #include <utility> //required for pair
 
-typedef list<pair<int,int> > jumplist_t;
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/triangulation.hh"
 
 // Creates the m-point halma-fullerene from the current fullerene C_n with n(1+m)^2 vertices. (I.e. 4,9,16,25,36,... times)
 FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_layout) const {
   if(m<0) return FullereneGraph(*this);
 
-  PlanarGraph dual(dual_graph(6,planar_layout));
-  vector<face_t> triangles(dual.compute_faces_flat(3,false));
+  Triangulation dual(dual_graph(6,planar_layout),false);
+  vector<tri_t> triangles(dual.triangles);
   map<edge_t,vector<node_t> > edge_nodes;
 
   set<edge_t> edgeset_new;
@@ -31,14 +28,14 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
   // Create n new vertices for each edge
   vector<edge_t> dual_edges = dual.undirected_edges();
 
-  for(vector<edge_t>::const_iterator e(dual_edges.begin()); e!=dual_edges.end(); e++){
-    vector<node_t>& nodes(edge_nodes[*e]);
+  for(edge_t e: dual_edges){
+    vector<node_t>& nodes(edge_nodes[e]);
     for(unsigned int i=0;i<m;i++) nodes.push_back(v_new++);
 
     if(planar_layout && layout2d.size() == N)
       for(unsigned int i=0;i<m;i++){
         double lambda = (1.0+i)*(1.0/(m+1));
-        const coord2d &a(dual.layout2d[e->first]), &b(dual.layout2d[e->second]);
+        const coord2d &a(dual.layout2d[e.first]), &b(dual.layout2d[e.second]);
         new_layout.push_back(a*(1.0-lambda) + b*lambda);
       }
   }
@@ -90,7 +87,8 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
 
   //cerr << "new_layout.size() = " << new_layout.size() << endl;
 
-  PlanarGraph new_dual(Graph(edgeset_new), new_layout);
+  Triangulation new_dual(Graph(edgeset_new), false);
+  
   //cerr << "newdual.N = " << new_dual.N << endl;
 
   /*
@@ -101,9 +99,9 @@ FullereneGraph FullereneGraph::halma_fullerene(const int m, const bool planar_la
   h << "newdual = " << new_dual << endl;
   */
   
-  new_dual.layout2d = new_dual.tutte_layout(); // FIXME remove
-  PlanarGraph G(new_dual.dual_graph(3));
-  G.layout2d = G.tutte_layout(); // FIXME remove
+  //  new_dual.layout2d = new_dual.tutte_layout(); // FIXME remove
+  PlanarGraph G(new_dual.dual_graph());
+  //  G.layout2d = G.tutte_layout(); // FIXME remove
 
   /*
   h << "halma = " << G << endl;
@@ -136,13 +134,14 @@ FullereneGraph FullereneGraph::GCtransform(const unsigned k, const unsigned l, c
 FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   PlanarGraph dualfrog(*this);
 
-  vector<face_t> faces(dualfrog.compute_faces_flat(6,planar_layout));
+  vector<face_t> faces(dualfrog.compute_faces(6,planar_layout));
 
   //  cout << "(*leapfrog*)outer_face = " << dualfrog.outer_face << ";\n";
   //  cout << "(*leapfrog*)faces      = " << faces << ";\n";
 
   node_t v_new = N;
-  vector<edge_t> dual_edges = dualfrog.undirected_edges();
+  vector<edge_t> de = dualfrog.undirected_edges();
+  set<edge_t> dual_edges(de.begin(),de.end());
 
   if(planar_layout)
     dualfrog.layout2d.resize(N+faces.size());
@@ -150,14 +149,14 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
   for(size_t i=0;i<faces.size();i++){
     const face_t& f(faces[i]);
     for(size_t j=0;j<f.size();j++)
-      dual_edges.push_back(edge_t(v_new,f[j]));
+      dual_edges.insert(edge_t(v_new,f[j]));
 
     if(planar_layout)
       dualfrog.layout2d[v_new] = f.centroid(layout2d);
 
     v_new++;
   }
-  dualfrog.update_from_edgeset(set<edge_t>(dual_edges.begin(),dual_edges.end()));
+  dualfrog.update_from_edgeset(dual_edges);
 
   // Note that dualfrog is no longer planar, but is a triangulation of the sphere.
   // The dual of dualfrog becomes planar again.
@@ -166,7 +165,7 @@ FullereneGraph FullereneGraph::leapfrog_fullerene(bool planar_layout) const {
 
   if(planar_layout){
     // The layout of dualfrog is not planar - faces must be computed without it
-    vector<face_t> triangles(dualfrog.compute_faces_flat(3,false));
+    vector<face_t> triangles(dualfrog.compute_faces(3,false));
     new_layout.resize(triangles.size());
 
     for(int i=0;i<triangles.size();i++){
@@ -214,7 +213,7 @@ FullereneGraph::FullereneGraph(const int n, const vector<int>& spiral_indices, c
 // perform a general general spiral search and return 12 pentagon indices and the jump positions + their length
 bool FullereneGraph::get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general) const
 {
-  assert(layout2d.size() != 0);
+  assert(layout2d.size()==N);
   rspi.clear();
   jumps.clear();
 
@@ -227,15 +226,15 @@ bool FullereneGraph::get_rspi_from_fg(const node_t f1, const node_t f2, const no
 
 // pentagon indices and jumps start to count at 0
 // perform the canonical general general spiral search and return 12 pentagon indices and the jump positions + their length
-bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical, const bool general) const
+bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool general, const bool pentagon_start) const
 {
-  assert(layout2d.size() == N);
+  assert(layout2d.size()==N);
   rspi.clear();
   jumps.clear();
 
   FullereneDual FDual = Triangulation(this->dual_graph(6));
 
-  if(!FDual.get_rspi(rspi, jumps, canonical, false, general)) return false;
+  if(!FDual.get_rspi(rspi, jumps, general, pentagon_start)) return false;
   assert(rspi.size()==12);
   return true;
 }
@@ -301,18 +300,18 @@ extern "C" void default_force_parameters_(const int *iopt, double *parameters);
 
 vector<coord3d> FullereneGraph::optimized_geometry(const vector<coord3d>& points, int opt_method, double ftol) const
 {
-  assert(layout2d.size() == N);
+  //  assert(layout2d.size() == N);
   vector<coord3d> coordinates(points.begin(),points.end());
   vector<double> force_parameters(19);
 
   default_force_parameters_(&opt_method,&force_parameters[0]);
 
-  cout << "force parameters: " << force_parameters << endl;
-  cout << "optimization method: " << opt_method << endl;
+  // cout << "force parameters: " << force_parameters << endl;
+  // cout << "optimization method: " << opt_method << endl;
 
-  cout << "g = " << *this << ";\n";
+  // cout << "g = " << *this << ";\n";
 
-  int zero = 0, one = 1;
+  int zero = 0;
   const FullereneGraph *g = this;
   sa_optff_(&g,&N,&zero,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
 

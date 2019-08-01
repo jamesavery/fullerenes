@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <iostream>
 #include <vector>
-#include "libgraph/fullerenegraph.hh"
-#include "libgraph/isomerdb.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/isomerdb.hh"
 
 using namespace std;
 string pad_string(const string& s, int length, char padchar)

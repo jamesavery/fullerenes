@@ -1,5 +1,5 @@
-#define VERSION "1.0 - May 31 2012"
-#define SWITCHES "[-uagsh -IS#rq -odV -v]"
+char *VERSION="1.0 - May 31 2012";
+char *SWITCHES="[-uagsh -IS#rq -odV -v]";
 
 /* buckygen.c :  generate fullerenes.
 
@@ -633,7 +633,7 @@ static int marks_bent_crossing_prev[MAXE];
 #define INTSWITCH(name,var)  \
     else if (arg[j]==name) {CHECKSWITCH(name); var = getswitchvalue(arg,&j);}
 
-#define SECRET_SWITCHES "0"
+char *SECRET_SWITCHES="0";
 
 #define MAX(x,y) ((x)<(y) ? (y) : (x))
 #define MIN(x,y) ((x)>(y) ? (y) : (x))

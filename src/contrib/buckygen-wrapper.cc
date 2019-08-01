@@ -5,9 +5,9 @@
 #include <assert.h>
 #include <unistd.h>
 
-#include "../libgraph/graph.hh"
-#include "../libgraph/auxiliary.hh"
-#include "buckygen-wrapper.hh"
+#include "fullerenes/graph.hh"
+#include "fullerenes/auxiliary.hh"
+#include "fullerenes/buckygen-wrapper.hh"
 
 namespace BuckyGen {
 

@@ -5,14 +5,10 @@ enable_language(Fortran)
 
 
 add_library(fortran_config config.f)
-add_library(fortran_opt    opt-standalone.f)
+add_library(fortran_opt    opt-standalone.f geometry.f force.f dddihedral.f diag.f)
 add_library(fortran_lib
   coord.f
-  datain.f
-  dddihedral.f
-  diag.f
-  force.f
-  geometry.f
+  datain.f    
   hamilton.f
   hueckel.f
   isomer.f
@@ -37,3 +33,4 @@ set_property(TARGET fortran_opt    PROPERTY LINKER_LANGUAGE Fortran)
 set_property(TARGET fullerene_program PROPERTY LINKER_LANGUAGE Fortran)
 
 
+install(TARGETS fullerene_program DESTINATION bin)

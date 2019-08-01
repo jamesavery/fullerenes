@@ -26,16 +26,6 @@ int gcd(int a, int b)
   return b;
 }
 
-string filename_extension(const string& filename)
-{
-  size_t i = filename.rfind(".");
-  bool found = i != string::npos;
-  if(found) 
-    return filename.substr(i,filename.size());
-  else 
-    return "";
-}
-
 // vector<Eisenstein> draw_line(const Eisenstein &a, const Eisenstein &b)
 // {
 //   if(a.second == b.second)

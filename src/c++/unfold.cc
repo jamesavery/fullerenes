@@ -130,7 +130,7 @@ Unfolding Unfolding::straighten_lines() const
   vector< pair<Eisenstein,node_t> > O;
 
   for(int i=0;i<outline.size();i++)	// Find non-hexagon node outline
-    if((degrees.find(outline[i].second))->second != 6){
+    if(degrees[outline[i].second] != 6){
       Oindex.push_back(i);
       O.push_back(outline[i]);
     }
@@ -315,7 +315,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
   case 1:        // Only label non-hexagon vertices on polygon outline.
     if(label_vertices == 1)	
       for(int i=0;i<outline.size();i++) 
-	if(degrees.find(outline[i].second)->second != 6) {
+	if(degrees[outline[i].second] != 6) {
 	const Eisenstein &IJ(outline_gc[i]-gcmin);
 
 	const node_t &u(outline[i].second);

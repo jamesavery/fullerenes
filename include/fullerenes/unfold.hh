@@ -1,16 +1,12 @@
-#ifndef UNFOLD_HH
-# define UNFOLD_HH
-#include "planargraph.hh"
-#include "eisenstein.hh"
+#pragma once
+#include "fullerenes/triangulation.hh"
+#include "fullerenes/eisenstein.hh"
 
 class Unfolding {
 public:
   typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
 
-  vector<face_t> faces;		// Original triangulation. These two
-				// variables may not always be
-				// initialized, but we keep them
-  vector<tri_t>  triangles;	// around if we have them.
+  Triangulation graph;
 
   map<dedge_t,dedgecoord_t>      edgecoords; // If initialized by
 					     // outline, only outline
@@ -19,18 +15,18 @@ public:
 
 
   vector< pair<Eisenstein,node_t> > outline; // Polygon outline in the Eisenstein plane. This is always initialized.
-  map<node_t,int> degrees;
+  vector<int> degrees;
 
   // There are two ways to create an "unfolding":
   // 
   // 1. Provide a triangulation of the sphere, i.e., the dual of a planar cubic graph.
-  Unfolding(const PlanarGraph& dual, bool planar_layout = false) : faces(dual.compute_faces_flat(3,planar_layout)), triangles(faces.begin(),faces.end()), edgecoords(unfold(triangles)), outline(get_outline(edgecoords)) 
+  Unfolding(const Triangulation& graph, bool planar_layout = false) : graph(graph), degrees(graph.N) 
   {
-    // If 'dual' contains separating triangles, then a planar layout is necessary
-    // to compute the faces (depth-first search will detect non-existing faces)
-
     // Store degrees of each node
-    for(int u=0;u<dual.N;u++) degrees[u] = dual.neighbours[u].size();
+    vector<tri_t> triangles = graph.compute_faces_oriented();
+    edgecoords              = unfold(triangles);
+    outline                 = get_outline(edgecoords);
+    for(int u=0;u<graph.N;u++) degrees[u] = graph.neighbours[u].size();
   }
 
   // 2. Provide a simple polygon in the Eisenstein plane, with polygon vertices annotated with
@@ -119,5 +115,3 @@ public:
 
   PlanarGraph fold();
 };
-
-#endif

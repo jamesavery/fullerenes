@@ -1,4 +1,4 @@
-#include "libgraph/symmetry.hh"
+#include "fullerenes/symmetry.hh"
 
 #include "../apps/symmetry-examples.cc"
 

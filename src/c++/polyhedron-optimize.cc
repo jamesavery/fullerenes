@@ -1,7 +1,3 @@
-#include "fullerenes/planargraph.hh"
-#include "fullerenes/polyhedron.hh"
-#include "fullerenes/geometry.hh"
-
 #include "math.h"
 
 #ifdef HAS_GSL
@@ -9,6 +5,9 @@
 #include <gsl/gsl_multimin.h>
 #endif
 
+#include "fullerenes/planargraph.hh"
+#include "fullerenes/polyhedron.hh"
+#include "fullerenes/geometry.hh"
 using namespace std;
 
 
@@ -22,7 +21,7 @@ struct params_t
   vector<double> *force_constants_dist;
   vector<double> *force_constants_angle;
   vector<double> *force_constants_dihedral;
-  vector<edge_t> *edge_set;
+  vector<edge_t> *edges;
   bool optimize_angles;
 };
 
@@ -37,27 +36,26 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
-  vector<edge_t> &edge_set = *params.edge_set;
+  vector<edge_t> &edges = *params.edges;
 
-  assert(zero_values_dist.size() == edge_set.size());
-  assert(force_constants_dist.size() == edge_set.size());
-  assert(force_constants_angle.size() == 2*edge_set.size()); // only for cubic graphs
+  assert(zero_values_dist.size() == edges.size());
+  assert(force_constants_dist.size() == edges.size());
+  assert(force_constants_angle.size() == 2*edges.size()); // only for cubic graphs
   assert(force_constants_dihedral.size() == P.N);
 
 
   // iterate over edges
   //  V = k (r - r0)**2
   double potential_energy = 0.0;
-  int i=0;
-  vector<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
-  for(; e!=ee; e++, i++){
-    const double ax = gsl_vector_get(coordinates,3 * e->first);
-    const double ay = gsl_vector_get(coordinates,3 * e->first +1);
-    const double az = gsl_vector_get(coordinates,3 * e->first +2);
-    const double bx = gsl_vector_get(coordinates,3 * e->second);
-    const double by = gsl_vector_get(coordinates,3 * e->second +1);
-    const double bz = gsl_vector_get(coordinates,3 * e->second +2);
-    potential_energy += 0.5 * force_constants_dist[i] * pow(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[*e], 2);
+  for(int i=0; i < edges.size();i++){
+    edge_t e = edges[i];
+    const double ax = gsl_vector_get(coordinates,3 * e.first);
+    const double ay = gsl_vector_get(coordinates,3 * e.first +1);
+    const double az = gsl_vector_get(coordinates,3 * e.first +2);
+    const double bx = gsl_vector_get(coordinates,3 * e.second);
+    const double by = gsl_vector_get(coordinates,3 * e.second +1);
+    const double bz = gsl_vector_get(coordinates,3 * e.second +2);
+    potential_energy += 0.5 * force_constants_dist[i] * pow(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[e], 2);
   }
   
   
@@ -145,28 +143,28 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   vector<double> &force_constants_dist = *params.force_constants_dist;
   vector<double> &force_constants_angle = *params.force_constants_angle;
   vector<double> &force_constants_dihedral = *params.force_constants_dihedral;
-  vector<edge_t> &edge_set = *params.edge_set;
+  vector<edge_t> &edges = *params.edges;
 
-  assert(zero_values_dist.size() == edge_set.size());
-  assert(force_constants_dist.size() == edge_set.size());
-  assert(force_constants_angle.size() == 2*edge_set.size()); // only for cubic graphs
+  assert(zero_values_dist.size() == edges.size());
+  assert(force_constants_dist.size() == edges.size());
+  assert(force_constants_angle.size() == 2*edges.size()); // only for cubic graphs
   assert(force_constants_dihedral.size() == P.points.size());
 
   vector<coord3d> derivatives(P.N, coord3d(0.0,0.0,0.0));
 
-  vector<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
-  for(int i=0; e!=ee; e++, i++){
-    const double ax = gsl_vector_get(coordinates,3 * e->first);
-    const double ay = gsl_vector_get(coordinates,3 * e->first +1);
-    const double az = gsl_vector_get(coordinates,3 * e->first +2);
-    const double bx = gsl_vector_get(coordinates,3 * e->second);
-    const double by = gsl_vector_get(coordinates,3 * e->second +1);
-    const double bz = gsl_vector_get(coordinates,3 * e->second +2);
+  for(int i=0; i<edges.size(); i++){
+    edge_t e = edges[i];
+    const double ax = gsl_vector_get(coordinates,3 * e.first);
+    const double ay = gsl_vector_get(coordinates,3 * e.first +1);
+    const double az = gsl_vector_get(coordinates,3 * e.first +2);
+    const double bx = gsl_vector_get(coordinates,3 * e.second);
+    const double by = gsl_vector_get(coordinates,3 * e.second +1);
+    const double bz = gsl_vector_get(coordinates,3 * e.second +2);
     // cout << "edge: " << *e << endl;
     // cout << "ax " << ax << " ay " << ay << " az " << az << " bx " << bx << " by " << by << " bz " << bz << endl;
     // cout << "norm(" << i << "): " << coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) << endl;
-    derivatives[e->first]  += coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[*e]);
-    derivatives[e->second] -= coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[*e]);
+    derivatives[e.first]  += coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[e]);
+    derivatives[e.second] -= coord3d::dnorm(coord3d(ax,ay,az) - coord3d(bx,by,bz)) * force_constants_dist[i] * (coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) - zero_values_dist[e]);
     // cout << "dist(" << i << "): " << coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) << endl;
   }
 
@@ -291,12 +289,12 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   const int max_iterations = 10000;// FIXME final value
   
   // init values
-  vector<edge_t> edge_set = undirected_edges();
+  vector<edge_t> edges = undirected_edges();
 
-  const double default_edge_length = 1.45*1.73205;
-  if(zero_values_dist.size() != edge_set.size()){
-    for(vector<edge_t>::iterator it=edge_set.begin(), to=edge_set.end(); it!=to; it++){
-      zero_values_dist.insert(make_pair(*it, default_edge_length));
+  const double default_edge_length = 1.4;
+  if(zero_values_dist.size() != edges.size()){
+    for(edge_t e: edges){
+      zero_values_dist.insert(make_pair(e, default_edge_length));
     }
   }
 
@@ -315,9 +313,9 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
       node_t s = neighbours[u][1];
       node_t t = neighbours[u][2];
       // face sizes
-      int lA = shortest_cycle(r,u,s,fmax).size();
-      int lB = shortest_cycle(s,u,t,fmax).size();
-      int lC = shortest_cycle(t,u,r,fmax).size();
+      int lA = shortest_cycle({r,u,s},fmax).size();
+      int lB = shortest_cycle({s,u,t},fmax).size();
+      int lC = shortest_cycle({t,u,r},fmax).size();
       // bond lengths
       double ur = zero_values_dist.find(edge_t(u,r))->second;
       double us = zero_values_dist.find(edge_t(u,s))->second;
@@ -371,8 +369,8 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
 //      cout << "opt-main, r,s,t, a,lb,lc, th_0: " <<r<<" " <<s<<" " <<t<<" " << lA<<" " <<lB<<" "<<lC<<" "<<zero_values_dihedral[u] << endl;
     }
   }
-  vector<double> force_constants_dist(edge_set.size(), 500.0);
-  vector<double> force_constants_angle(2 * edge_set.size(), 200.0); // FIXME possibly change later // only for cubic graphs
+  vector<double> force_constants_dist(edges.size(), 500.0);
+  vector<double> force_constants_angle(2 * edges.size(), 200.0); // FIXME possibly change later // only for cubic graphs
   vector<double> force_constants_dihedral(N, 50.0);
 
   params_t params;
@@ -382,7 +380,7 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   params.force_constants_dist = &force_constants_dist;
   params.force_constants_angle = &force_constants_angle;
   params.force_constants_dihedral = &force_constants_dihedral;
-  params.edge_set = &edge_set;
+  params.edges = &edges;
   params.optimize_angles = optimize_angles;
   
   // Create the minimisation function block, define the different functions and parameters
@@ -395,26 +393,26 @@ bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_v
   
   // our zero-th order geometry sometimes places two vertices at exactly the same coordinates
   // solution:  displace randomly and let the FF do the rest
-  vector<edge_t>::const_iterator e=edge_set.begin(), ee=edge_set.end();
-  for(int i=0; e!=ee; e++, i++){
-    const double ax = points[e->first][0];
-    const double ay = points[e->first][1];
-    const double az = points[e->first][2];
-    const double bx = points[e->second][0];
-    const double by = points[e->second][1];
-    const double bz = points[e->second][2];
+  for(int i=0; i<edges.size(); i++){
+    edge_t e = edges[i];
+    const double ax = points[e.first][0];
+    const double ay = points[e.first][1];
+    const double az = points[e.first][2];
+    const double bx = points[e.second][0];
+    const double by = points[e.second][1];
+    const double bz = points[e.second][2];
     // cout << "edge: " << *e << endl;
     // cout << "ax " << ax << " ay " << ay << " az " << az << " bx " << bx << " by " << by << " bz " << bz << endl;
     // cout << "dist(" << i << "): " << coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) << endl;
     if(coord3d::dist(coord3d(ax,ay,az), coord3d(bx,by,bz)) < 1e-1 ){
       // cout << "short bond found ... displacing." << endl;
       const double displacement = 0.5;
-      points[e->first][0]  += displacement;
-      points[e->first][1]  += displacement;
-      points[e->first][2]  += displacement;
-      points[e->second][0] -= displacement;
-      points[e->second][1] -= displacement;
-      points[e->second][2] -= displacement;
+      points[e.first][0]  += displacement;
+      points[e.first][1]  += displacement;
+      points[e.first][2]  += displacement;
+      points[e.second][0] -= displacement;
+      points[e.second][1] -= displacement;
+      points[e.second][2] -= displacement;
     }
   }
 

@@ -1,20 +1,18 @@
-#ifndef FULLERENE_GRAPH_HH
-#define FULLERENE_GRAPH_HH
+#pragma once
 
-#include "cubicgraph.hh"
-#include "geometry.hh"
 #include <list>
+
+#include "fullerenes/spiral.hh"
+#include "fullerenes/cubicgraph.hh"
+#include "fullerenes/geometry.hh"
 
 class FullereneGraph : public CubicGraph {
 public:
-  typedef list<pair<int,int> > jumplist_t;
-  
   FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { if(N>0) fullerene_check();  }
   FullereneGraph(const PlanarGraph& g) : CubicGraph(g,g.layout2d) { if(N>0) fullerene_check(); }
   FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
-  FullereneGraph(FILE *file) : CubicGraph(file) { if(N>0) fullerene_check(); }
-  FullereneGraph(const unsigned int index, FILE *file) : CubicGraph(index, file) { if(N>0) fullerene_check(); }
+
   FullereneGraph(const int N, const vector<int>& spiral_indices, const jumplist_t& jumps = jumplist_t()); 
 
   void fullerene_check() const
@@ -37,7 +35,7 @@ public:
 
   // spiral from graph, with or without starting point
   bool get_rspi_from_fg(const node_t f1, const node_t f2, const node_t f3, vector<int> &rspi, jumplist_t &jumps, const bool general=true) const;
-  bool get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool canonical=true, const bool general=true) const;
+  bool get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, const bool general=true, const bool pentagon_start=true) const;
 
   // create a matrix that holds the topological distances between all pentagons
   vector<int> pentagon_distance_mtx() const;
@@ -64,4 +62,4 @@ private:
   static double C20_layout2d[20][2];
 };
 
-#endif
+
