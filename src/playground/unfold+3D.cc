@@ -1,8 +1,8 @@
-#include "libgraph/fullerenegraph.hh"
-#include "libgraph/polyhedron.hh"
-#include "libgraph/triangulation.hh"
-#include "libgraph/unfold.hh"
-#include "libgraph/auxiliary.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/polyhedron.hh"
+#include "fullerenes/triangulation.hh"
+#include "fullerenes/unfold.hh"
+#include "fullerenes/auxiliary.hh"
 #include <fstream>
 
 
@@ -228,7 +228,7 @@ int main(int ac, char **av)
 
 
     for(auto &p: interpolated_points[i]){
-      if(new_points[p.first] == coord3d{0,0,0}){
+      if((new_points[p.first]-coord3d{0,0,0}).norm() < 1e-8){
 	cerr << "new_points["<<p.first<<"] = " << new_points[p.first] << " or " << p.second << "\n";
       }
       new_points[p.first] = p.second;
@@ -240,18 +240,8 @@ int main(int ac, char **av)
   Polyhedron Pfolded(f,new_points);
 
   string basename("unfold+3D-"+to_string(N));  
-  {
-    ofstream mol2(("output/"+basename+".mol2").c_str());
-    mol2 << P.to_mol2();
-    mol2.close() ;
-  }
-
-  {
-    ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
-    mol2 << P.dual().to_mol2();
-    mol2.close() ;
-  }
-
+  Polyhedron::to_file(P,"output/"+basename+".mol2");
+  Polyhedron::to_file(P,"output/"+basename+"-dual.mol2");
 
   return 0;
 }
