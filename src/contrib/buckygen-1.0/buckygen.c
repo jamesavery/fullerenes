@@ -1,5 +1,5 @@
-char *VERSION="1.0 - May 31 2012";
-char *SWITCHES="[-uagsh -IS#rq -odV -v]";
+const char *VERSION="1.0 - May 31 2012";
+const char *SWITCHES="[-uagsh -IS#rq -odV -v]";
 
 /* buckygen.c :  generate fullerenes.
 
@@ -276,7 +276,7 @@ void old_splaynode(SPLAYNODE *el, int *is_new_node);
 
 /**************************Global variables********************************/
 
-static char *outfilename;  /* name of output file (NULL for stdout) */
+static const char *outfilename;  /* name of output file (NULL for stdout) */
 static FILE *outfile;      /* output file for graphs */
 static FILE *msgfile;      /* file for informational messages */
 
@@ -633,7 +633,7 @@ static int marks_bent_crossing_prev[MAXE];
 #define INTSWITCH(name,var)  \
     else if (arg[j]==name) {CHECKSWITCH(name); var = getswitchvalue(arg,&j);}
 
-char *SECRET_SWITCHES="0";
+const char *SECRET_SWITCHES="0";
 
 #define MAX(x,y) ((x)<(y) ? (y) : (x))
 #define MIN(x,y) ((x)>(y) ? (y) : (x))
@@ -14250,7 +14250,7 @@ add_rings_irreducible_ipr() {
 /***********************************************************************/
 
 static int
-getswitchvalue(char *arg, int *pj)
+getswitchvalue(const char *arg, int *pj)
 
 /* Find integer value for switch.
    arg is a pointer to a command-line argument.
@@ -14306,7 +14306,7 @@ decode_command_line(int argc, char *argv[])
 
 {
     int i,j,ares,amod;
-    char *arg,*as;
+    const char *arg,*as;
     int badargs,argsgot;
     char ok_switches[256];
 
