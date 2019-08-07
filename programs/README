@@ -1,0 +1,23 @@
+Apps are small useful auxiliary programs that are apart from the main fullerene
+program.  They can be compiled by 'make app-<name>'.
+
+
+
+convert-to-binary:  convert database (http://ctcp.massey.ac.nz/index.php?page=fullerenes) files to binary
+convert-to-csv:  convert database (http://ctcp.massey.ac.nz/index.php?page=fullerenes) files to csv
+convert-to-newbinary:  convert database (http://ctcp.massey.ac.nz/index.php?page=fullerenes) files to our new binary format
+convert-to-sqlite:  convert database (http://ctcp.massey.ac.nz/index.php?page=fullerenes) files to an sqlite database
+db-rspi:  create RSPIs for all isomers of a given size (and write them to a file in binary)
+file-to-pov:  convert xyz coordinates to pov (for subsequent rendering)
+file-to-spiral:  convert xyz cooerdinates to spiral string
+gather-metadata:  collect isomer statistics from database file
+gaudi:  create Gaudiene structures (see 10.1039/C5NR04370K)
+generate-db:  create binary database files (using buckygen)
+generate-metadata:  print isomer statistics (number and symmetry of isomers, using buckygen)
+gs-ex:  examples for general spirals
+hog-to-rspi:  convert 'planar-graph' format as found in the house of graphs collection of graphs to general spirals
+polyhedron:  create polyheron (as xyz) from spiral string
+spiral:  create graph and print layout from spiral string
+straighten:
+symmetry: print maximal point group of a polyhedron, input is the spiral string of the graph
+xyz2pov:  convert xyz coordinates to pov (for subsequent rendering)
