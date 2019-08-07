@@ -405,7 +405,11 @@ Polyhedron Polyhedron::dual(int Fmax) const
 
 bool Polyhedron::optimize(int opt_method, double ftol)
 {
-  if(is_cubic()) {
+  if(is_a_fullerene()){
+    FullereneGraph g(*this);
+    points = g.optimized_geometry(points,opt_method,ftol);
+    return true;
+  } if(is_cubic()) {
     bool optimize_angles = true;
     return optimize_other(optimize_angles);
   } else if(is_triangulation()) {

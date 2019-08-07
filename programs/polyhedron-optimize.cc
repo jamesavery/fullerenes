@@ -1,7 +1,8 @@
-#include "libgraph/fullerenegraph.hh"
-#include "libgraph/polyhedron.hh"
-#include "libgraph/triangulation.hh"
-#include "libgraph/isomerdb.hh"
+#include "fullerenes/spiral.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/polyhedron.hh"
+#include "fullerenes/triangulation.hh"
+#include "fullerenes/isomerdb.hh"
 
 int testN = 80;
 int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
@@ -9,13 +10,15 @@ int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
 int main(int ac, char **av)
 {
   int N;
-  Triangulation::jumplist_t jumps;
+  jumplist_t jumps;
   vector<int> RSPI(12);
   bool from_file = false;
-  if(ac==2){
+
+  if(ac==2){			// If only one argument is given, it is a filename to read initial polyhedron from
     from_file = true;
     N = 0;
-  } else if(ac==3) {//RSPI is quoted
+    
+  } else if(ac==3) {            // Pentagon indices in quoted string
     N = strtol(av[1],0,0);
     istringstream iss(av[2]);
     for(int i=0;i<12;i++){ iss >> RSPI[i]; RSPI[i]--; }
@@ -46,7 +49,7 @@ int main(int ac, char **av)
   Polyhedron P0;
   PlanarGraph g;
   if(from_file){
-    P0 = Polyhedron(av[1]);
+    P0 = Polyhedron::from_file(av[1]);
     N = P0.N;
     g = P0;
     g.layout2d = g.tutte_layout(-1,-1,-1,8);
@@ -59,37 +62,27 @@ int main(int ac, char **av)
   }
 
   string basename("polyhedron-"+to_string(N));
-  {
-    ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
-    mol2 << P0.to_mol2();
-    mol2.close();
-  }
+  Polyhedron::to_file(P0,"output/"+basename+"-P0.mol2");
 
+  printf("P0\n");
   Polyhedron P(P0);
+  printf("Optimizing P\n");  
   P.optimize();
+  printf("Writing P\n");
+  Polyhedron::to_file(P,"output/"+basename+".mol2");
 
-  {
-    ofstream mol2(("output/"+basename+".mol2").c_str());
-    mol2 << P.to_mol2();
-    mol2.close();
-  }
+  printf("Aligning P\n");  
+  P.move_to_origin();
+  P.align_with_axes();
 
-  {
-    P.move_to_origin();
-    P.align_with_axes();
-
-    ofstream mol2(("output/"+basename+"-if.mol2").c_str());
-    mol2 << P.to_mol2();
-    mol2.close();
-
-    ofstream pov(("output/"+basename+"-if.pov").c_str());
-    pov << P.to_povray();
-    pov.close();
-  }
+  printf("Aligning P-aligned\n");    
+  Polyhedron::to_file(P,"output/"+basename+"-if.mol2");
+  //  Polyhedron::to_file(P,"output/"+basename+"-if.pov");
 
   ofstream output(("output/"+basename+".m").c_str());
 
-  facemap_t facemap(g.compute_faces(8,true));
+  printf("Writing mathematica version of P\n");  
+  vector<face_t> facemap(g.compute_faces());
   output << "g = " << g << ";\n";
   output << "coordinates0 = " << P0.points << ";\n";
   output << "coordinates = "  << P.points << ";\n";
@@ -100,25 +93,17 @@ int main(int ac, char **av)
   output << "P0 = " << P0 << ";\n";
   output << "P = " << P << ";\n";
 
-  Polyhedron D(P.dual(6,true));
+  Polyhedron D(P.dual());
   D.layout2d = D.tutte_layout();
-  D.faces    = D.compute_faces_flat(3,true);
+  D.faces    = D.compute_faces(3,true);
   D.face_max = 3;
   D.optimize();
   output << "PD = " << D << ";\n";
   
   output.close();
 
-
-  {
-    ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
-    mol2 << D.to_mol2();
-    mol2.close() ;
-
-    ofstream pov(("output/"+basename+"-dual.pov").c_str());
-    pov << D.to_povray();
-    pov.close();
-  }
+  Polyhedron::to_file(P,"output/"+basename+"-dual.mol2");
+  //  Polyhedron::to_file(P,"output/"+basename+"-dual.pov");
 
   return 0;
 }

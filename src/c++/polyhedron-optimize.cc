@@ -1,6 +1,6 @@
 #include "math.h"
 
-#ifdef HAS_GSL
+#ifdef GSL_INCLUDE_DIR
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_multimin.h>
 #endif
@@ -11,7 +11,7 @@
 using namespace std;
 
 
-#ifdef HAS_GSL
+#ifdef GSL_INCLUDE_DIR
 
 struct params_t
 {

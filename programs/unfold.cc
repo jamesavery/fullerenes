@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <fstream>
-#include "libgraph/cubicgraph.hh"
+#include "libgraph/triangulation.hh"
 #include "libgraph/fullerenegraph.hh"
 #include "libgraph/eisenstein.hh"
 #include <vector>
@@ -341,10 +341,9 @@ set<edge_t> connect_corners(const vector<Eisenstein>& edge_coords, const IDCount
 
 PlanarGraph fold(vector< pair<Eisenstein, node_t> > &outline);
 
-PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
+PlanarGraph GCTransform(const Triangulation& dual, int K=1, int L=0)
 {
-  vector<face_t> faces(dual.compute_faces_flat(3,true));
-  vector<tri_t>  triangles(faces.begin(),faces.end());
+  vector<tri_t>  triangles(dual.compute_faces());
 
   map<dedge_t,dedgecoord_t>  dgrid(unfold(triangles));
   vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
@@ -392,10 +391,9 @@ vector< pair<Eisenstein, node_t> > GCDreduce(const vector< pair<Eisenstein, node
 }
 
 
-PlanarGraph GCTransformTCG(const PlanarGraph& dual, int K=1, int L=0)
+PlanarGraph GCTransformTCG(const Triangulation& dual, int K=1, int L=0)
 {
-  vector<face_t> faces(dual.compute_faces_flat(3,true));
-  vector<tri_t>  triangles(faces.begin(),faces.end());
+  vector<tri_t>  triangles(dual.compute_faces());
 
   map<dedge_t,dedgecoord_t>  dgrid(unfold(triangles));
   vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
@@ -517,7 +515,6 @@ vector<int> identify_nodes(const vector<pair<Eisenstein,node_t> >& outline, cons
   return same;
 }
 
-/*
 set<edge_t> connect_mathias(const vector<pair<Eisenstein,node_t> >& outline, const IDCounter<Eisenstein> &inner_nodes, const IDCounter<Eisenstein> &outer_nodes, map<dedge_t,dedgecoord_t>& reverse_arc, const Eisenstein& w)
 {
   set<edge_t> edges;
@@ -586,7 +583,7 @@ set<edge_t> connect_mathias(const vector<pair<Eisenstein,node_t> >& outline, con
   output.close();
   return edges;
 }
-*/
+
 
 
 
@@ -791,9 +788,9 @@ int main(int ac, char **av)
 
   output << "g = "  << g << ";\n";
   output << "dg = " << dual << ";\n";
-  cout << "Need to place "<<dual.directed_edges().size()<<" edges.\n";
+  cout << "Need to place 2x"<<dual.edge_set.size()<<" edges.\n";
 
-  vector<face_t> faces(dual.compute_faces_flat(3,true));
+  vector<face_t> faces(dual.compute_faces(true));
   vector<tri_t>  triangles(faces.begin(),faces.end());
 
   map<dedge_t,dedgecoord_t>         dgrid(unfold(triangles));

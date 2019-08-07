@@ -1,4 +1,4 @@
-#include "libgraph/polyhedron.hh"
+#include "fullerenes/polyhedron.hh"
 
 int main(int ac, char **av)
 {
@@ -6,7 +6,7 @@ int main(int ac, char **av)
 
   string filename = av[1];
 
-  Polyhedron P(Polyhedron::from_mol2(filename));
+  Polyhedron P(Polyhedron::from_file(filename));
 
   cout << "P = " << P << endl;
 

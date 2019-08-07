@@ -49,7 +49,8 @@ set(CMAKE_CXX_FLAGS "-std=c++11 -fPIC -O2 -m64")
 add_subdirectory(src/c++)
 add_subdirectory(src/fortran)
 add_subdirectory(src/contrib)
-add_subdirectory(src/playground)
+add_subdirectory(playground)
+add_subdirectory(programs)
 
 
 

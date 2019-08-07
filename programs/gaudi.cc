@@ -383,8 +383,9 @@ int main(int ac, char **av)
   set<edge_t> es=gct.undirected_edges();
   set<edge_t> long_edges;
   map<edge_t, double> lengths;
-  facemap_t faces=gct.compute_faces(6);
-
+  facemap_t faces;
+  vector<face_t> faces_flat=gct.compute_faces(6);
+  for(face_t &f: faces) faces[f.size()].insert(f);
 
 // find long edges
   cout << "faces-3: " << faces[3] << endl;

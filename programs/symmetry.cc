@@ -1,4 +1,5 @@
-#include "libgraph/symmetry.hh"
+#include "fullerenes/spiral.hh"
+#include "fullerenes/symmetry.hh"
 
 // struct GSpiral {
 //   PlanarGraph::jumplist_t   jumps;
@@ -12,7 +13,7 @@
 int main(int ac, char **av)
 {
   int N;
-  PlanarGraph::jumplist_t jumps;
+  jumplist_t jumps;
   vector<int> spiral;
 
   if(ac>13){

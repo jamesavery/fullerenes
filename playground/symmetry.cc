@@ -1,6 +1,6 @@
 #include "fullerenes/symmetry.hh"
 
-#include "../apps/symmetry-examples.cc"
+#include "../programs/symmetry-examples.cc"
 
 int main()
 {

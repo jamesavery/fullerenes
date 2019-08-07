@@ -269,7 +269,7 @@ template <typename T> vector<T> split(const string& parse_str, const string& del
   return result;
 }
 
-// Version of split that handles empty strings ("a;;b;c;" -> {"a","","b","c",""} in stead of {"a","b"}.
+// Version of split that handles empty strings ("a;;b;c;" -> {"a","","b","c",""} in stead of {"a","b","c"}.
 template <> vector<string> split(const string& parse_str, const string& delimiters, const string wschars);
 
 // Fast double-ended queue implemented with cyclic buffer and possibility of look-ahead and look-back

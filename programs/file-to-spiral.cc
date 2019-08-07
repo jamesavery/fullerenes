@@ -1,5 +1,5 @@
-#include <libgraph/polyhedron.hh>
-#include <libgraph/triangulation.hh>
+#include <fullerenes/polyhedron.hh>
+#include <fullerenes/triangulation.hh>
 
 vector<int> spiral_to_rspi(const vector<int>& spiral)
 {
@@ -13,7 +13,7 @@ int main(int ac, char **av)
 {
   assert(ac>=2);
 
-  Polyhedron P(av[1]);
+  Polyhedron P = Polyhedron::from_file(av[1]);
   PlanarGraph dual =  static_cast<PlanarGraph>(P).dual_graph();
   dual.layout2d = dual.tutte_layout();
   
@@ -23,9 +23,9 @@ int main(int ac, char **av)
 
   Triangulation Tdual(dual);
 
-  Triangulation::jumplist_t jumps;
+  jumplist_t jumps;
   vector<int> spiral;
-  Tdual.get_spiral(spiral, jumps, false);
+  Tdual.get_spiral(spiral, jumps);
   
   cout << "jumps = " << jumps << ";\n"
        << "spiral = " << spiral << ";\n";

@@ -1,5 +1,6 @@
 #include <limits.h>
 #include "libgraph/triangulation.hh"
+#include "libgraph/fullerenegraph.hh"
 #include "contrib/buckygen-wrapper.hh"
 
 int main(int ac, char **av)
@@ -10,26 +11,37 @@ int main(int ac, char **av)
   size_t chunk_number   = ac>=5? strtol(av[4],0,0) : 1;
   size_t chunk_index    = ac>=6? strtol(av[5],0,0) : 0;
 
+  char graph_filename[100];
+  char dual_filename[100];
+  
+  sprintf(graph_filename,"graph%03d.py",N);
+  sprintf(dual_filename, "dual%03d.py",N);  
+  
+  // ofstream
+  //   graph_output(graph_filename),
+  //   dual_output(dual_filename);
+  
   size_t i=0;
   Triangulation G;
   PlanarGraph dual;
 
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial,
-					       chunk_index,chunk_number);
-    
-
+					       chunk_index,chunk_number);    
   while(BuckyGen::next_fullerene(Q,G)){
     vector<int> rspi;
-    Triangulation::jumplist_t jumps;
+    jumplist_t jumps;
 
     i++;
     if(i%100000 == 0) fprintf(stderr,"Reached isomer %ld\n",i);
     //      G = Triangulation(G.neighbours,true);
-    //      FullereneDual(G).get_rspi(rspi,jumps,false,false);
+    //      FullereneDual(G).get_rspi(rspi,jumps,true,true);
 
-    // dual = G.dual_graph();
-    //    G.update_from_neighbours();
-    //    if(!G.is_consistently_oriented()) abort();
+    FullereneDual FG(G);
+    //    cout << FG.neighbours << "\n";
+    FullereneGraph F = FG.dual();
+    //    dual = G.dual_graph();
+    //G.update_from_neighbours();
+    //if(!G.is_consistently_oriented()) abort();
     //    PlanarGraph dual(G.dual_graph());
 
     // printf("Graph %d with %d nodes is %sconsistently oriented\n",i,G.N,G.is_consistently_oriented()?"":"not ");
@@ -37,7 +49,7 @@ int main(int ac, char **av)
   }
   BuckyGen::stop(Q);
 
-  printf("Generated %ld graphs (%d,%d)\n",i,int(G.neighbours.size()),int(dual.neighbours.size()));
+  fprintf(stderr,"Generated %ld graphs (%d,%d)\n",i,int(G.neighbours.size()),int(dual.neighbours.size()));
   
   return 0;
 }

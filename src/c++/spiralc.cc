@@ -19,7 +19,7 @@ string trim(const string& str, const string& wschars)
     return str.substr(first, (last - first + 1));
 }
 
-// Version of split that handles empty strings ("a;;b;c;" -> {"a","","b","c",""} in stead of {"a","b"}.
+// Version of split that handles empty strings ("a;;b;c;" -> {"a","","b","c",""} in stead of {"a","b","c"}.
 template <> vector<string> split(const string& parse_str, const string& delimiters, const string wschars)
 {
   // Unlike Python's split(), "" splits to [] instead of [""].

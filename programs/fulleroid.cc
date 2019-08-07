@@ -203,7 +203,7 @@ int main(int ac, char **av)
   Triangulation T(PD,true);
   vector<int> spiral;
   Triangulation::jumplist_t jumps;
-  T.get_spiral(spiral,jumps,false,true,true);
+  T.get_spiral(spiral,jumps,true,true);
 
   
   Polyhedron P  = PD.dual(3,true);

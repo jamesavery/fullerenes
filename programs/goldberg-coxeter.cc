@@ -118,7 +118,7 @@ int main(int ac, char **av)
   FullereneGraph::jumplist_t gct_jumps;
   FullereneDual Tgctdual(gctdual);
   
-  Tgctdual.get_rspi(gct_rspi,gct_jumps,false,false);
+  Tgctdual.get_rspi(gct_rspi,gct_jumps,true,true);
 
   output << "RSPI = "    << (rspi+1) << ";\n"
          << "gctRSPI = " << (gct_rspi+1) << ";\n";
