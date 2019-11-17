@@ -89,8 +89,11 @@ struct Polyhedron : public PlanarGraph {
   }
 
   Polyhedron dual(int Fmax=INT_MAX) const;
-  bool is_triangulation() const;
 
+    
+  bool is_triangulation() const;
+  bool is_invalid() const;
+  
   double  diameter() const;
   coord3d width_height_depth() const;
 
@@ -99,6 +102,8 @@ struct Polyhedron : public PlanarGraph {
   enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE} formats_t;
   static int format_id(string id);
 
+  static Polyhedron fullerene_polyhedron(FullereneGraph G);
+  
   static Polyhedron from_file(string path);
   static Polyhedron from_file(FILE *file, string format);
   static Polyhedron from_xyz(FILE *file);

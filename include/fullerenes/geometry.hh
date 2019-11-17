@@ -114,7 +114,7 @@ struct coord2d : public pair<double,double> {
     return x+coord2d(i0*2*M_PI,j0*M_PI) - y;
   }
 
-  friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << "{" << x.first << "," << x.second << "}"; return s; }
+  friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << LIST_OPEN << x.first << "," << x.second << LIST_CLOSE; return s; }
   friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; return s; }
 };
 
@@ -200,7 +200,7 @@ struct coord3d {
     return x0+dx*t;
   }
 
-  friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
+  friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << LIST_OPEN << x[0] << "," << x[1] << "," << x[2]<< LIST_CLOSE; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };
 
@@ -365,7 +365,7 @@ struct matrix3d {
   
   friend ostream& operator<<(ostream& S, const matrix3d &M)
   {
-    S << "{"; for(int i=0;i<3;i++) S << vector<double>(&M.values[i*3],&M.values[(i+1)*3]) << (i+1<3?",":"}");
+    S << LIST_OPEN; for(int i=0;i<3;i++) S << vector<double>(&M.values[i*3],&M.values[(i+1)*3]) << (i+1<3?",":LIST_CLOSE);
     return S;
   }
 };
@@ -546,7 +546,7 @@ struct Tri3D {
   coord3d centroid() const { return coord3d((a+b+c)/3.0); }
 
   friend ostream& operator<<(ostream& s, const Tri3D& T){
-    s << "{" << T.a << "," << T.b << "," << T.c << "}";
+    s << LIST_OPEN << T.a << "," << T.b << "," << T.c << LIST_CLOSE;
     return s;
   }
 };

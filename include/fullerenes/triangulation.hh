@@ -69,7 +69,7 @@ public:
 
   vector<node_t> vertex_numbers(vector<vector<node_t>> &perms, const vector<node_t> &loc) const;
   
-  void update(bool already_oriented) {
+  void update(bool already_oriented=true) {
     //    renumber(); // TODO!
     if(count_edges() > 0){
       if(already_oriented){

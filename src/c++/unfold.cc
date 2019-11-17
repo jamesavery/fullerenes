@@ -43,10 +43,9 @@ map<dedge_t,Unfolding::dedgecoord_t> Unfolding::unfold(const vector<tri_t> &tria
       nextNode[dedge_t(t[j],t[(j+1)%3])] = t[(j+2)%3];
   }
 
-  map<dedge_t,bool> dedge_done;
-  set<dedge_t, dedge_sort>   workset;
-  map<dedge_t, dedgecoord_t > dedge_position
-;
+  map<dedge_t,bool>           dedge_done;
+  set<dedge_t, dedge_sort>    workset;
+  map<dedge_t, dedgecoord_t > dedge_position;
   map<Eisenstein,node_t> grid;
   Eisenstein zero(0,0), veci(1,0), vecj(0,1);
 

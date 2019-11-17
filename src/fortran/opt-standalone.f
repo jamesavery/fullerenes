@@ -919,7 +919,8 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
       enddo
       if(Rmax.eq.0.d0.or.Rmin.eq.1.d10) then
          Print*,'**** Error in subroutine Distan'
-         stop
+         return 
+c         stop
       endif
       rms=dsqrt(Rrms/dfloat(mc))
       Return

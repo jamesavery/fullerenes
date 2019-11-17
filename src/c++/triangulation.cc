@@ -112,8 +112,9 @@ PlanarGraph Triangulation::dual_graph() const
 {
   IDCounter<tri_t> tri_numbers;
 
+  assert(triangles.size() == (N-2)*2);
   for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
-
+  
   neighbours_t A(triangles.size(),vector<node_t>(3));
 
   for(node_t U=0;U<triangles.size();U++){

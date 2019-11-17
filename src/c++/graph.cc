@@ -88,8 +88,8 @@ void Graph::remove_vertices(set<int> &sv){
 node_t Graph::next(node_t u, node_t v) const
 {
   const vector<node_t>& nu(neighbours[u]);
-  for(int j=0;j<nu.size(); j++) if(nu[j] == v) return nu[(j+1)%nu.size()];
-
+  for(int j=0;j<nu.size(); j++)
+    if(nu[j] == v) return nu[(j+1)%nu.size()];
   return -1;            // u-v is not an edge in a triangulation
 }
 
@@ -97,8 +97,8 @@ node_t Graph::next(node_t u, node_t v) const
 node_t Graph::prev(node_t u, node_t v) const
 {
   const vector<node_t>& nu(neighbours[u]);
-  for(int j=0;j<nu.size(); j++) if(nu[j] == v) return nu[(j-1+nu.size())%nu.size()];
-
+  for(int j=0;j<nu.size(); j++)
+    if(nu[j] == v) return nu[(j-1+nu.size())%nu.size()];
   return -1;            // u-v is not an edge in a triangulation
 }
 

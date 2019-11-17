@@ -403,6 +403,20 @@ Polyhedron Polyhedron::dual(int Fmax) const
   return Polyhedron(d,coordinates);
 }
 
+Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
+{
+  if(G.layout2d.empty())
+    G.layout2d       = G.tutte_layout();
+  
+  Polyhedron P(G,G.zero_order_geometry(),6);
+  P.points = G.optimized_geometry(P.points);
+
+  P.move_to_origin();		// Center of mass at (0,0,0)
+  P.align_with_axes();		// Align with principal axes
+  
+  return P;
+}
+
 bool Polyhedron::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
@@ -454,6 +468,14 @@ bool Polyhedron::optimize(int opt_method, double ftol)
 bool Polyhedron::is_triangulation() const {
   for(int i=0;i<faces.size();i++) if(faces[i].size()!=3) return false;
   return true;
+}
+
+bool Polyhedron::is_invalid() const {
+  bool has_nans = false;
+  for(auto p: points){
+    if(isnan(p[0])||isnan(p[1])||isnan(p[1])) has_nans = true;
+  }
+  return has_nans;
 }
 
 pair<coord3d,coord3d> Polyhedron::bounding_box() const {
