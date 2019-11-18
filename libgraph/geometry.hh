@@ -54,10 +54,6 @@ struct coord2d : public pair<double,double> {
   coord2d& operator*=(const coord2d& y){ first *= y.first; second *= y.second; return *this; }
   coord2d& operator*=(const double s)  { first*=s;second*=s; return *this;}
   coord2d operator-() const {coord2d y(-first,-second); return y;}
-
-  double operator()(int i) const { return i? second : first; }
-  double& operator()(int i)      { return i? second : first; }
-  
   double dot(const coord2d& y) const { return first*y.first+second*y.second; }
 
   double line_angle(const coord2d& v) const { // CCW between two lines ([-pi;pi] where -*this is +/-pi and *this is 0 -- i.e. pi is "leftmost", -pi is "rightmost")
@@ -114,7 +110,7 @@ struct coord2d : public pair<double,double> {
     return x+coord2d(i0*2*M_PI,j0*M_PI) - y;
   }
 
-  friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << LIST_OPEN << x.first << "," << x.second << LIST_CLOSE; return s; }
+  friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << "{" << x.first << "," << x.second << "}"; return s; }
   friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; return s; }
 };
 
@@ -200,22 +196,8 @@ struct coord3d {
     return x0+dx*t;
   }
 
-  friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << LIST_OPEN << x[0] << "," << x[1] << "," << x[2]<< LIST_CLOSE; return s; }
+  friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << "{" << x[0] << "," << x[1] << "," << x[2]<< "}"; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
-};
-
-struct matrix2d {
-  double values[4];
-  matrix2d(const double *v) { for(int i=0;i<4;i++) values[i] = v[i]; }
-  explicit matrix2d(const double r=0, const double s=0, const double t=0, const double u=0) : values{r,s,t,u} { }
-  double& operator()(int i, int j)      { return values[i*2+j]; }
-  double operator()(int i, int j) const { return values[i*2+j]; }
-
-  coord2d operator*(const coord2d& x){ return {values[0*2+0]*x(0) + values[1*2+0]*x(1), values[0*2+1]*x(0)+values[1*2+1]*x(1)}; }
-  static matrix2d rotation(double th){ 
-    return matrix2d{cos(th),-sin(th),
-	            sin(th), cos(th)};
-  }
 };
 
 
@@ -330,7 +312,6 @@ struct matrix3d {
     return t - coord3d(xc,xc,xc);
   }
   
-
   coord3d eigenvector(const double lambda) const {
     const matrix3d &M(*this);
     coord3d x;
@@ -392,7 +373,7 @@ struct matrix3d {
   
   friend ostream& operator<<(ostream& S, const matrix3d &M)
   {
-    S << LIST_OPEN; for(int i=0;i<3;i++) S << vector<double>(&M.values[i*3],&M.values[(i+1)*3]) << (i+1<3?",":LIST_CLOSE);
+    S << "{"; for(int i=0;i<3;i++) S << vector<double>(&M.values[i*3],&M.values[(i+1)*3]) << (i+1<3?",":"}");
     return S;
   }
 };
@@ -573,7 +554,7 @@ struct Tri3D {
   coord3d centroid() const { return coord3d((a+b+c)/3.0); }
 
   friend ostream& operator<<(ostream& s, const Tri3D& T){
-    s << LIST_OPEN << T.a << "," << T.b << "," << T.c << LIST_CLOSE;
+    s << "{" << T.a << "," << T.b << "," << T.c << "}";
     return s;
   }
 };
@@ -640,7 +621,7 @@ public:
   double winding_number(const Eisenstein& x) const;
   bool point_inside(const Eisenstein& x) const;
 
-  vector<Eisenstein> allpoints() const;
+  set<Eisenstein> allpoints() const;
   vector<Eisenstein> controlpoints() const;
 
   friend ostream& operator<<(ostream& S, const polygon& P);
