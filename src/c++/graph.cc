@@ -111,7 +111,7 @@ node_t Graph::next_on_face(const node_t &u, const node_t &v) const
 // Predecessor to v in face containing directed edge u->v
 node_t Graph::prev_on_face(const node_t &u, const node_t &v) const
 {
-  return prev(u,v);
+  return next(v,u);
 }
 
 bool Graph::is_consistently_oriented() const 
