@@ -92,7 +92,10 @@ int main(int ac, char **av)
   output << "P0 = " << P0 << ";\n";
   output << "P = " << P << ";\n";
 
-  Polyhedron D(P.dual(6));
+  Polyhedron D = P.dual();
+
+  Polyhedron::to_file(D,"output/"+basename+"-dual.mol2");
+  
   D.layout2d = D.tutte_layout();
   D.faces    = D.compute_faces(3,true);
   D.face_max = 3;
@@ -101,14 +104,12 @@ int main(int ac, char **av)
   
   output.close();
 
-
-  {
-    Polyhedron::to_file(D,"output/"+basename+"-dual.mol2");
-
-    ofstream pov(("output/"+basename+"-dual.pov").c_str());
-    pov << D.to_povray();
-    pov.close();
-  }
-
+  cout << "graph  = "<<g.neighbours << "\n";
+  cout << "faces  = "<<P.compute_faces()<<"\n";  
+  cout << "P0 = "<<P0.points << "\n";
+  cout << "P  = "<<P.points << "\n";  
+  // cout << "dual_graph = "   <<  D.neighbours << "\n";
+  // cout << "dual_3Dpoints = "<< D.points << "\n";
+  // cout << "dual_faces    = "<< D.compute_faces()<<"\n";  
   return 0;
 }

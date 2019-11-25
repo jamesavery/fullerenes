@@ -63,7 +63,7 @@ int main(int ac, char **av)
 
   size_t M = Ps.size();
   
-  vector<size_t> neighbours(M*N*3), next_on_face(M*N*3),
+  vector<size_t> neighbours(M*N*3), next_on_face(M*N*3),prev_on_face(M*N*3),
                  face_right(M*N*3), neighbours_shape{{M,N,3}}, points_shape{{M,N,3}};
   vector<double> points_start(M*N*3), points_opt(M*N*3);
 
@@ -74,6 +74,7 @@ int main(int ac, char **av)
 	node_t v = Ps[i].neighbours[u][j];
 	neighbours[index]   = v;
 	next_on_face[index] = Ps[i].next_on_face(u,v);
+	prev_on_face[index] = Ps[i].prev_on_face(u,v);	
 	points_start[index] = P0s[i].points[u][j];
 	points_opt[index]   = Ps[i].points[u][j];
 	face_right[index]   = face_size(Ps[i],u,v);
@@ -84,8 +85,9 @@ int main(int ac, char **av)
   cerr << "neighbours_shape = " << neighbours_shape << ";\n";
   
   cerr << "rspi       = array(" << all_rspi << ").reshape(rspi_shape);\n\n";  
-  cerr << "neighbours   = array(" << neighbours << ").reshape(neighbours_shape);\n\n;";
-  cerr << "next_on_face = array(" << next_on_face << ").reshape(neighbours_shape);\n\n";    
+  cerr << "neighbours   = array(" << neighbours << ").reshape(neighbours_shape);\n\n";
+  cerr << "next_on_face = array(" << next_on_face << ").reshape(neighbours_shape);\n\n";
+  cerr << "prev_on_face = array(" << prev_on_face << ").reshape(neighbours_shape);\n\n";
   cerr << "face_right   = array(" << face_right << ").reshape(neighbours_shape);\n\n"; 
   cerr << "points_start = array(" << points_start << ").reshape(neighbours_shape);\n\n";
   cerr << "points_opt   = array(" << points_opt << ").reshape(neighbours_shape);\n\n";   
