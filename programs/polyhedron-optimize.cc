@@ -20,8 +20,11 @@ int main(int ac, char **av)
     
   } else if(ac==3) {            // Pentagon indices in quoted string
     N = strtol(av[1],0,0);
+    int n = strlen(av[2]);
+    for(int i=0;i<n;i++) if(av[2][i] == ',') av[2][i] = ' ';
     istringstream iss(av[2]);
     for(int i=0;i<12;i++){ iss >> RSPI[i]; RSPI[i]--; }
+    cout << "RSPI = " << RSPI << endl;
   } else if(ac<14){
     N = testN;
     for(int i=0;i<12;i++) RSPI[i] = testRSPI[i]-1;
