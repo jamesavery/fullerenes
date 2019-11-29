@@ -462,7 +462,7 @@ C     Kamada-Kawai embedding
         J1=(J+1)/2
         if(MDist(I1,J1).le.0) then
          Print*,I1,J1,MDist(I1,J1)
-         stop
+         return
         endif
         DD=dfloat(MDist(I1,J1))
          px=p(I)-p(J)
@@ -920,7 +920,7 @@ C     from adjacancy matrix IDA and cartesian coordinates Dist
       if(Rmax.eq.0.d0.or.Rmin.eq.1.d10) then
          Print*,'**** Error in subroutine Distan'
          return 
-c         stop
+c         return
       endif
       rms=dsqrt(Rrms/dfloat(mc))
       Return
@@ -2334,7 +2334,7 @@ c copy hessian to the other half
       if(AN.gt.Huge) then
         Print*,'**** Severe Error, check coordinates'
         ier=1
-        stop
+        return
       endif
       return
       END
