@@ -7,4 +7,5 @@ add_executable(polyhedron-optimize polyhedron-optimize.cc)
 add_executable(fullerene-polyhedron fullerene-polyhedron.cc)
 add_executable(fullerene-isomers-polyhedra fullerene-isomers-polyhedra-bg.cc)
 add_executable(polyhedra-buster polyhedra-buster.cc)
+add_executable(kegle kegle.cc)
 
