@@ -29,9 +29,11 @@ struct dendrogram_t {
   vector<int> class_tree, levels;
 };
 
-int bitcount16(uint16_t x)
+int bitcount14(uint16_t v)
 {
-  return 0;			// Tag fra bit-twiddling hacks 
+  // From Bit-twiddling Hacks for counting up to 14 bits on 64bit archs.
+  // Use 24-, 32-, or 64-bit version for larger sizes.
+  return (v * 0x200040008001ULL & 0x111111111111111ULL) % 0xf;
 }
 
 dendrogram_t hierarchical_clustering(const matrix<int>& P, int K)
@@ -57,7 +59,7 @@ dendrogram_t hierarchical_clustering(const matrix<int>& P, int K)
     // Count equivalence classes
     uint16_t class_ids = 0;
     for(int i=0;i<12;i++) class_ids |= (1<<class_tree[i]);
-    k = bitcount16(class_ids);
+    k = bitcount14(class_ids);
     
     // Update distance matrix
     for(int i=0;i<12;i++){
