@@ -24,26 +24,72 @@ int max_length(const matrix<int>& P)
 	max_length = P[i,j];
   return max_length;
 }
-#if 0
+
+struct dendrogram_t {
+  vector<int> class_tree, levels;
+};
+
+int bitcount16(uint16_t x)
+{
+  return 0;			// Tag fra bit-twiddling hacks 
+}
+
+dendrogram_t hierarchical_clustering(const matrix<int>& P, int K)
+{
+  matrix<int> dist = P;
+  vector<int> class_tree({0,1,2,3,4,5,6,7,8,9,10,11}),
+              levels(12);
+
+  int k=0;
+  while(k<K){
+    int min_length = INT_MAX, A=-1,B=-1;
+
+    // Find smallest distance between clusters
+    for(int i=0;i<12;i++)
+      for(int j=i;j<12;j++)
+	if( dist[i,j] <  min_length)
+	  min_length = dist[i,j], A = i, B = j;
+
+    // Merge equivalence classes
+    class_tree[max(A,B)] = min(A,B);
+    levels[k] = dist[A,B];
+
+    // Count equivalence classes
+    uint16_t class_ids = 0;
+    for(int i=0;i<12;i++) class_ids |= (1<<class_tree[i]);
+    k = bitcount16(class_ids);
+    
+    // Update distance matrix
+    for(int i=0;i<12;i++){
+      dist[max(A,i),min(A,i)] = max(dist[A,i],dist[B,i]);
+      dist[max(B,i),min(B,i)] = max(dist[A,i],dist[B,i]);
+    }
+  }
+  return {class_tree,levels};
+}
+
 pair<bool,pair<int,int> > cluster_sizes(const matrix<int>& P, int d, int D)
 {
   int mx_length = max_length(P);
   int Ad=0, AD=0, Bd=0, BD=0;
 
-  for(int j=0;j<12;j++){
-    Ad += (P[A,j]<=d);		// Hvor mange femkanter er indenfor radius d fra A
-    AD += (P[A,j]<=D);		// Ditto D
+  for(int A=0;A<12;A++)
+	for(int B=B+1;B<12;B++) if(P[A,B] == mx_length) {
+		  for(int j=0;j<12;j++){
+    			Ad += (P[A,j]<=d);		// Hvor mange femkanter er indenfor radius d fra A
+ 			AD += (P[A,j]<=D);		// Ditto D
     
-    Bd += (P[B,j]<=d);		// Osv.
-    BD += (P[B,j]<=D);        
-  }
+    			Bd += (P[B,j]<=d);		// Osv.
+    			BD += (P[B,j]<=D);        
+  		}
 
-  if(Ad+BD == 12) return {true,{Ad,BD}};
-  if(AD+Bd == 12) return {true,{AD,Bd}};  
-  
+  		if(Ad+BD == 12){ printf("A %d\n",mx_length); return {true,{Ad,BD}}; }
+  		if(AD+Bd == 12){ printf("B %d\n",mx_length); return {true,{AD,Bd}}; }
+ 	}
+ 
   return {false,{0,0}};
 }
-#endif
+
 
 int main(int ac, char **argv)
 {
@@ -68,8 +114,8 @@ int main(int ac, char **argv)
     i++;
 
     if(i%100000 == 0) cerr << "isomer "<< i << endl;
-    
-#if 0
+
+#if 0    
     auto C = cluster_sizes(pentagon_distance(dualG), 2, 4);
     if(C.first){
       cout << "C"<<i<<" = " << C.second<< ";\n";
