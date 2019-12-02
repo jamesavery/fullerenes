@@ -75,19 +75,26 @@ pair<bool,pair<int,int> > cluster_sizes(const matrix<int>& P, int d, int D)
   int mx_length = max_length(P);
   int Ad=0, AD=0, Bd=0, BD=0;
 
-  for(int A=0;A<12;A++)
-	for(int B=B+1;B<12;B++) if(P[A,B] == mx_length) {
-		  for(int j=0;j<12;j++){
-    			Ad += (P[A,j]<=d);		// Hvor mange femkanter er indenfor radius d fra A
- 			AD += (P[A,j]<=D);		// Ditto D
-    
-    			Bd += (P[B,j]<=d);		// Osv.
-    			BD += (P[B,j]<=D);        
-  		}
+  for(int A=0;A<12;A++) {
+    for(int B=A+1;B<12;B++) {
+      if(P[A,B] == mx_length) {
+          for(int j=0;j<12;j++) {
+              Ad += (P[A,j]<=d);		// Hvor mange femkanter er indenfor radius d fra A
+              AD += (P[A,j]<=D);		// Ditto D
+        
+              Bd += (P[B,j]<=d);		// Osv.
+              BD += (P[B,j]<=D);        
+          }
 
-  		if(Ad+BD == 12){ printf("A %d\n",mx_length); return {true,{Ad,BD}}; }
-  		if(AD+Bd == 12){ printf("B %d\n",mx_length); return {true,{AD,Bd}}; }
- 	}
+          if(Ad+BD == 12) { 
+            printf("A %d\n",mx_length); return {true,{Ad,BD}}; 
+          }
+          if(AD+Bd == 12) { 
+            printf("B %d\n",mx_length); return {true,{AD,Bd}}; 
+          }
+      }
+    }
+  }
  
   return {false,{0,0}};
 }
@@ -95,45 +102,45 @@ pair<bool,pair<int,int> > cluster_sizes(const matrix<int>& P, int d, int D)
 
 int main(int ac, char **argv)
 {
-  int N                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
-  
-  if(ac<2 || N<20 || N==22 || N&1){
-    fprintf(stderr,"Syntax: %s <N:int> [output_dir] [IPR:0|1] [only_nontrivial:0|1]\n",argv[0]);
+  int N = ac>=2? strtol(argv[1], 0, 0): 0; // Argument 1: Number of vertices N
+
+  if(ac<2 || N<20 || N==22 || N&1 || ac == 6){
+    fprintf(stderr,"Syntax: %s <N:int> [output_dir] [IPR:0|1] [only_nontrivial:0|1] [chunk_index] [chunck_count]\n",argv[0]);
     return -1;
   }
 
   string output_dir   = ac>=3? argv[2] : "output";    // Argument 2: directory to output files to
   int IPR             = ac>=4? strtol(argv[3],0,0):0; // Argument 3: Only generate IPR fullerenes?
   int only_nontrivial = ac>=5? strtol(argv[4],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
-  
+  int chunkstart      = ac>=6? strtol(argv[5],0,0):0; // Argument 5: Chunk index
+  int chunkcount      = ac>=7? strtol(argv[6],0,0):1; // Argument 6: Chunk count
+
   ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
 
   int i=0;  
   Triangulation dualG;
-  BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
+  BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial,chunkstart,chunkcount);
 
   while(BuckyGen::next_fullerene(Q,dualG)){ // Generate all appropriate C_N isomer duals 
     i++;
 
     if(i%100000 == 0) cerr << "isomer "<< i << endl;
 
-#if 0    
     auto C = cluster_sizes(pentagon_distance(dualG), 2, 4);
     if(C.first){
-      cout << "C"<<i<<" = " << C.second<< ";\n";
+        cout << "C"<<i<<" = " << C.second<< ";\n";
       
-    // if(0)
-    //   if(max_length(pentagon_distance(dualG)) >= 10){
-      //	cout << i << endl;
+        // if(0)
+        //   if(max_length(pentagon_distance(dualG)) >= 10){
+          //	cout << i << endl;
 	
-	dualG.update();		            // Update metadata
-	FullereneGraph G = dualG.dual_graph();  // Construct fullerene graph
-	vector<int> RSPI;
-	jumplist_t jumps;
-	G.get_rspi_from_fg(RSPI,jumps);
-	cout << i << ", RSPI="<<(RSPI+1) << ", jumps="<<jumps<<endl;
+        dualG.update();		            // Update metadata
+        FullereneGraph G = dualG.dual_graph();  // Construct fullerene graph
+        vector<int> RSPI;
+        jumplist_t jumps;
+        G.get_rspi_from_fg(RSPI,jumps);
+        cout << i << ", RSPI="<<(RSPI+1) << ", jumps="<<jumps<<endl;
       }
-#endif
   }
   cout << i << " graphs.\n";
   failures.close();
