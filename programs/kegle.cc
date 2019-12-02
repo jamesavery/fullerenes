@@ -42,8 +42,8 @@ dendrogram_t hierarchical_clustering(const matrix<int>& P, int K)
   vector<int> class_tree({0,1,2,3,4,5,6,7,8,9,10,11}),
               levels(12);
 
-  int k=0;
-  while(k<K){
+  int k=12;
+  while(K<k){
     int min_length = INT_MAX, A=-1,B=-1;
 
     // Find smallest distance between clusters
