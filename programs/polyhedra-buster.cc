@@ -89,8 +89,8 @@ int main(int ac, char **av)
   cerr << "next_on_face = array(" << next_on_face << ").reshape(neighbours_shape);\n\n";
   cerr << "prev_on_face = array(" << prev_on_face << ").reshape(neighbours_shape);\n\n";
   cerr << "face_right   = array(" << face_right << ").reshape(neighbours_shape);\n\n"; 
-  cerr << "points_start = array(" << points_start << ").reshape(neighbours_shape);\n\n";
-  cerr << "points_opt   = array(" << points_opt << ").reshape(neighbours_shape);\n\n";   
+  cerr << "points_start = array(" << points_start << ").reshape(points_shape);\n\n";
+  cerr << "points_opt   = array(" << points_opt << ").reshape(points_shape);\n\n";   
   
   return 0;
 }
