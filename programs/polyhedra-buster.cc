@@ -62,12 +62,17 @@ int main(int ac, char **av)
   }
 
   size_t M = Ps.size();
+  size_t Nfaces = N/2+2;
   
   vector<size_t> neighbours(M*N*3), next_on_face(M*N*3),prev_on_face(M*N*3),
                  face_right(M*N*3), neighbours_shape{{M,N,3}}, points_shape{{M,N,3}};
   vector<double> points_start(M*N*3), points_opt(M*N*3);
-
-  for(int i=0;i<M;i++)
+  vector<vector<face_t>>
+    pentagons(M,vector<face_t>(12)),
+    hexagons (M,vector<face_t>(Nfaces-12));
+  
+  for(int i=0;i<M;i++){
+    // Everything with neighbours-shape
     for(node_t u=0;u<N;u++)
       for(int j=0;j<3;j++){
 	size_t index = i*N*3 + u*3 + j;
@@ -80,12 +85,21 @@ int main(int ac, char **av)
 	face_right[index]   = face_size(Ps[i],u,v);
       }
 
+    // Faces
+    vector<face_t> faces = Ps[i].compute_faces_oriented();
+
+    for(int j=0,npent=0,nhex=0;j<Nfaces;j++)
+      if      (faces[j].size() == 5) pentagons[i][npent++] = faces[j];
+      else if (faces[j].size() == 6) hexagons [i][nhex++]  = faces[j];
+  }
   cerr << "from numpy import array\n\n";
   cerr << "rspi_shape = " << vector<size_t>{{M,12}} << ";\n";
   cerr << "neighbours_shape = " << neighbours_shape << ";\n";
   
   cerr << "rspi       = array(" << all_rspi << ").reshape(rspi_shape);\n\n";  
   cerr << "neighbours   = array(" << neighbours << ").reshape(neighbours_shape);\n\n";
+  cerr << "pentagons    = array(" << pentagons  << ");\n\n";
+  cerr << "hexagons     = array(" << hexagons   << ");\n\n";  
   cerr << "next_on_face = array(" << next_on_face << ").reshape(neighbours_shape);\n\n";
   cerr << "prev_on_face = array(" << prev_on_face << ").reshape(neighbours_shape);\n\n";
   cerr << "face_right   = array(" << face_right << ").reshape(neighbours_shape);\n\n"; 
