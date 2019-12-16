@@ -5,20 +5,21 @@
 
 #include <iostream>
 
-  struct dendrogram_node {
-    uint16_t distance;
-    uint8_t left, right;
+struct dendrogram_node {
+  uint16_t distance;
+  uint8_t left, right;
 
-    friend ostream &operator<<(ostream &s, const dendrogram_node &n) {
-      s << vector<int>{n.distance,n.left,n.right};
-      return s;
-    }
-  };
+  friend ostream &operator<<(ostream &s, const dendrogram_node &n) {
+    s << vector<int>{n.distance,n.left,n.right};
+    return s;
+  }
+};
 
 struct dendrogram: public vector<dendrogram_node> {
   dendrogram(int capacity=12) { reserve(capacity); }
   void merge(const dendrogram_node& n) { push_back(n); }
 };
+
 
 
 // TODO:
@@ -69,10 +70,10 @@ dendrogram hierarchical_clustering(const matrix<uint8_t>& P)
     // 2. Reduce dimension: Swap N-1'th row/col into position B.
     //    dist[B,:] = dist[-1,:]
     //    dist[:,B] = dist[:,-1]
-    for(uint8_t i=0;i<N;i++) row[i] = (i!=B)? dist(N-1,i) : 0;     
-    swap(order[B], order[N-1]);
+    for(uint8_t i=0;i<N;i++) row[i] = (i!=B)? dist(N-h-1,i) : 0;     
+    swap(order[B], order[N-h-1]);
 
-    for(uint8_t i=0;i<N-1;i++){
+    for(uint8_t i=0;i<N-h-1;i++){
       dist(B,i) = row[i];
       dist(i,B) = row[i];
     }    
@@ -82,22 +83,25 @@ dendrogram hierarchical_clustering(const matrix<uint8_t>& P)
   return class_tree;
 }
 
+matrix<uint8_t> dist1d(vector<int> data)
+{
+  int n = data.size();
+  matrix<uint8_t> dist(n,n);
+  for(int i=0;i<n;i++)
+    for(int j=0;j<n;j++)
+      dist(i,j) = abs(data[i]-data[j]);
+  return dist;
+}
 
 int main()
 {
-  vector<int> names{{7, 10, 20, 28, 35}};  
-  matrix<uint8_t> P{5,5,
-                    {0, 3, 13, 21, 28,
-                     3, 0, 10, 18, 25,
-  		     13, 10, 0, 8, 15,
-  		     21, 18, 8, 0, 7,
-  		     28, 25, 15, 7, 0}};
-  // vector<int> names{{1,2,5,10}};  
-  // matrix<uint8_t> P{4,4,
-  //        {0,1,4,9,
-  // 	  1,0,3,8,
-  // 	  4,3,0,5,
-  // 	  9,8,5,0}};
+  //  vector<int> names{{7, 10, 20, 28, 35}};
+  vector<int> names{{20, 7, 28, 35, 10}};  
+  //vector<int> names{{1,2,5,10}};
+  //  vector<int> names{{12, 20, 9, 13, 17, 13, 1, 5, 8, 3, 15, 17}};
+  matrix<uint8_t> P(dist1d(names));
+  
+
     
   dendrogram clusters = hierarchical_clustering(P);
   for(int i=0;i<5;i++){
