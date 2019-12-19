@@ -4,4 +4,4 @@ add_executable(playground-symmetry symmetry.cc)
 add_executable(read_polyhedron read_polyhedron.cc)
 add_executable(unfold unfold.cc)
 add_executable(unfold+3D unfold+3D.cc)
-
+add_executable(clustering clustering.cc)
