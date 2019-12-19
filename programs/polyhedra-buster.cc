@@ -92,9 +92,10 @@ int main(int ac, char **av)
       if      (faces[j].size() == 5) pentagons[i][npent++] = faces[j];
       else if (faces[j].size() == 6) hexagons [i][nhex++]  = faces[j];
   }
-  cerr << "from numpy import array\n\n";
+  cerr << "from numpy import array, nan\n\n";
   cerr << "rspi_shape = " << vector<size_t>{{M,12}} << ";\n";
   cerr << "neighbours_shape = " << neighbours_shape << ";\n";
+  cerr << "points_shape     = " << points_shape << ";\n";  
   
   cerr << "rspi       = array(" << all_rspi << ").reshape(rspi_shape);\n\n";  
   cerr << "neighbours   = array(" << neighbours << ").reshape(neighbours_shape);\n\n";
