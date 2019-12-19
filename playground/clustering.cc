@@ -28,24 +28,37 @@ struct dendrogram: public vector<dendrogram_node> {
 dendrogram hierarchical_clustering(const matrix<uint8_t>& P)
 {
   size_t N = P.n;    
-  matrix<uint16_t> dist = P;
+  matrix<uint8_t> dist = P;
   dendrogram class_tree(N-1);
 
-  vector<uint8_t> order(N), row(N);
+  uint8_t order[N], row[N];
   for(int i=0;i<N;i++) order[i] = i;
 
   for(int h=0;h<=N-2;h++){
-    uint16_t min_length = 1<<15;
-    uint8_t A=-1,B=-1;
+    int min_length = 0xffff;
+
+    //uint8_t min_length = 0xff;
+    int A=-1,B=-1;
 
     // Find smallest distance between clusters
     for(uint8_t i=0;i<N-h;i++)
       for(uint8_t j=i+1;j<N-h;j++)
 	if(dist(i,j) != 0 && dist(i,j) <  min_length)
 	  min_length = dist(i,j), A = i, B = j;
+    
+    /* 
+    assert(A < B);
+    assert(A != 0xff);
+    assert(B != 0xff);
+
+    for(int i=0;i<N-h;i++)
+	for(int j=0;j<N-h;j++)
+          if(dist(i,j) != dist(j,i)) abort();
+
     // A = min(A,B), B = max(A,B) per konstruktion
-    //    cout << "dist"<<h<<" = " << dist <<";\n";
-    //    printf("# merge (%d,%d) at %d\n",A,B,dist(A,B));
+    cout << "dist"<<h<<" = " << dist <<";\n";
+    printf("# merge (%d,%d) at %d\n",A,B,dist(A,B));
+    */
     
     // Merge equivalence classes
     class_tree.merge({dist(A,B),order[A],order[B]});
@@ -56,7 +69,7 @@ dendrogram hierarchical_clustering(const matrix<uint8_t>& P)
     //        dist[:,A] = maximum( dist[:,A], dist[:,B] )
     //
     // Copy
-    for(uint8_t i=0;i<N;i++) row[i] = (i!=A && i!=B)? max(dist(A,i),dist(B,i)) : 0; 
+    for(uint8_t i=0;i<N;i++) row[i] = (i==A || i==B)? 0 : max(dist(A,i),dist(B,i)); 
     // Update
     for(uint8_t i=0;i<N;i++){
       dist(A,i) = row[i];
@@ -67,9 +80,7 @@ dendrogram hierarchical_clustering(const matrix<uint8_t>& P)
     //    cout << "dist"<<h<<"b = " << dist <<";\n";
 
     
-    // 2. Reduce dimension: Swap N-1'th row/col into position B.
-    //    dist[B,:] = dist[-1,:]
-    //    dist[:,B] = dist[:,-1]
+    // 2. Reduce dimension: Swap last row/col into position B.
     for(uint8_t i=0;i<N;i++) row[i] = (i!=B)? dist(N-h-1,i) : 0;     
     swap(order[B], order[N-h-1]);
 
@@ -96,15 +107,18 @@ matrix<uint8_t> dist1d(vector<int> data)
 int main()
 {
   //  vector<int> names{{7, 10, 20, 28, 35}};
-  vector<int> names{{20, 7, 28, 35, 10}};  
+  //vector<int> names{{35, 20, 7, 28, 10}};  
   //vector<int> names{{1,2,5,10}};
-  //  vector<int> names{{12, 20, 9, 13, 17, 13, 1, 5, 8, 3, 15, 17}};
+  vector<int> names{{12, 20, 9, 13, 17, 14, 1, 5, 8, 3, 16, 18}};
   matrix<uint8_t> P(dist1d(names));
   
-
+  dendrogram clusters;
+  for(int i=0;i<1000000;i++)
+    clusters = hierarchical_clustering(P);
     
-  dendrogram clusters = hierarchical_clustering(P);
-  for(int i=0;i<5;i++){
+  cout << "clusters_raw = " << clusters << ";\n";
+  cout << "names = " << names << ";\n";
+  for(int i=0;i<clusters.size();i++){
     clusters[i].left  = names[clusters[i].left];
     clusters[i].right = names[clusters[i].right];
   }
