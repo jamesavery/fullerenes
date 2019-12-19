@@ -5,6 +5,7 @@
 #include "fullerenes/spiral.hh"
 #include "fullerenes/cubicgraph.hh"
 #include "fullerenes/geometry.hh"
+#include "fullerenes/triangulation.hh"
 
 class FullereneGraph : public CubicGraph {
 public:
@@ -14,7 +15,10 @@ public:
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
 
   FullereneGraph(const int N, const vector<int>& spiral_indices, const jumplist_t& jumps = jumplist_t()); 
-
+  FullereneGraph(const spiral_nomenclature &fsn){
+    *this =  Triangulation(fsn).dual_graph();
+  } 
+  
   void fullerene_check() const
   {
     if(!is_a_fullerene()){

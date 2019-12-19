@@ -1,5 +1,4 @@
-#ifndef BUCKYGEN_WRAPPER_HH
-# define BUCKYGEN_WRAPPER_HH
+#pragma once
 #include <limits.h>
 #include <sys/types.h>
 #include "fullerenes/graph.hh"
@@ -22,4 +21,4 @@ namespace BuckyGen {
   bool next_fullerene(const buckygen_queue& Q, Graph& G);
 }
 
-#endif
+
