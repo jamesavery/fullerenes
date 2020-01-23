@@ -97,134 +97,134 @@ struct dendrogram: public vector<dendrogram_node> {
     const int N = edges.size()+1;
     
     bitset             visited = 0;
-//     vector<bitset>     clusters(k);
-//     static_stack<node> work_stack(N);
+    vector<bitset>     clusters(k);
+    static_stack<node> work_stack(N);
 
-//     csr_adjacency graph = sparse_graph(k);
-//     // cout << "\ndendrogram = " << *this << ";\n";
-//     // cout << "\ngraph = {" << graph.neighbours << "," << graph.row_starts << "};\n";
-//     // For each cluster
-//     for(int c=0;c<k;c++){
+    csr_adjacency graph = sparse_graph(k);
+    // cout << "\ndendrogram = " << *this << ";\n";
+    // cout << "\ngraph = {" << graph.neighbours << "," << graph.row_starts << "};\n";
+    // For each cluster
+    for(int c=0;c<k;c++){
 
-//       // 1. Let u be the smallest node that has not yet been visited 
-//       node u=0;
-//       for(;u<N;u++) if(~visited & (1<<u)) break;
-//       work_stack.push(u);
+      // 1. Let u be the smallest node that has not yet been visited 
+      node u=0;
+      for(;u<N;u++) if(~visited & (1<<u)) break;
+      work_stack.push(u);
       
-//       // 2. Depth first traversal of component c
-//       while(!work_stack.empty()){
-// 	u = work_stack.pop();
-// 	visited     |= (1<<u);	// Mark u as visited
-// 	clusters[c] |= (1<<u);	// Output u to current cluster
+      // 2. Depth first traversal of component c
+      while(!work_stack.empty()){
+	u = work_stack.pop();
+	visited     |= (1<<u);	// Mark u as visited
+	clusters[c] |= (1<<u);	// Output u to current cluster
 
-// 	int n_v = graph.n_neighbours(u);
-// 	for(int i=0;i<n_v;i++){
-// 	  node v = graph(u,i);
-// 	  if(~visited & (1<<v)) work_stack.push(v);
-// 	}
-//       }
-//     }
-//     return clusters;    
-//   }
-// };
+	int n_v = graph.n_neighbours(u);
+	for(int i=0;i<n_v;i++){
+	  node v = graph(u,i);
+	  if(~visited & (1<<v)) work_stack.push(v);
+	}
+      }
+    }
+    return clusters;    
+  }
+};
 
 
 
-// // TODO:
-// //  1. Færdiggør debugging
-// //  2. Halver memory-footprint med pakket symmetrisk matrix
-// dendrogram hierarchical_clustering(const matrix<uint8_t>& P)
-// {
-//   size_t N = P.n;    
-//   matrix<uint8_t> dist = P;
-//   dendrogram class_tree(N-1);
+// TODO:
+//  1. Færdiggør debugging
+//  2. Halver memory-footprint med pakket symmetrisk matrix
+dendrogram hierarchical_clustering(const matrix<uint8_t>& P)
+{
+  size_t N = P.n;    
+  matrix<uint8_t> dist = P;
+  dendrogram class_tree(N-1);
 
-//   uint8_t order[N], row[N];
-//   for(int i=0;i<N;i++) order[i] = i;
+  uint8_t order[N], row[N];
+  for(int i=0;i<N;i++) order[i] = i;
 
-//   for(int h=0;h<=N-2;h++){
-//     int min_length = 0xffff;
+  for(int h=0;h<=N-2;h++){
+    int min_length = 0xffff;
 
-//     //uint8_t min_length = 0xff;
-//     int A=-1,B=-1;
+    //uint8_t min_length = 0xff;
+    int A=-1,B=-1;
 
-//     // Find smallest distance between clusters
-//     for(uint8_t i=0;i<N-h;i++)
-//       for(uint8_t j=i+1;j<N-h;j++)
-// 	if(dist(i,j) != 0 && dist(i,j) <  min_length)
-// 	  min_length = dist(i,j), A = i, B = j;
+    // Find smallest distance between clusters
+    for(uint8_t i=0;i<N-h;i++)
+      for(uint8_t j=i+1;j<N-h;j++)
+	if(dist(i,j) != 0 && dist(i,j) <  min_length)
+	  min_length = dist(i,j), A = i, B = j;
     
-//     /* 
-//     assert(A < B);
-//     assert(A != 0xff);
-//     assert(B != 0xff);
+    /* 
+    assert(A < B);
+    assert(A != 0xff);
+    assert(B != 0xff);
 
-//     for(int i=0;i<N-h;i++)
-// 	for(int j=0;j<N-h;j++)
-//           if(dist(i,j) != dist(j,i)) abort();
+    for(int i=0;i<N-h;i++)
+	for(int j=0;j<N-h;j++)
+          if(dist(i,j) != dist(j,i)) abort();
 
-//     // A = min(A,B), B = max(A,B) per konstruktion
-//     cout << "dist"<<h<<" = " << dist <<";\n";
-//     */
-//     //    printf("# merge (%d,%d) at %d\n",A,B,dist(A,B));
-
-    
-//     // Merge equivalence classes
-//     class_tree.merge({dist(A,B),order[A],order[B]});
-    
-//     // Update distance matrix.
-    
-//     // 1. Set dist[A,:] = maximum( dist[A,:], dist[B,:] )
-//     //        dist[:,A] = maximum( dist[:,A], dist[:,B] )
-//     //
-//     // Copy
-//     for(uint8_t i=0;i<N;i++) row[i] = (i==A || i==B)? 0 : max(dist(A,i),dist(B,i)); 
-//     // Update
-//     for(uint8_t i=0;i<N;i++){
-//       dist(A,i) = row[i];
-//       dist(i,A) = row[i];
-//       dist(B,i) = row[i];
-//       dist(i,B) = row[i];
-//     }
-//     //    cout << "dist"<<h<<"b = " << dist <<";\n";
+    // A = min(A,B), B = max(A,B) per konstruktion
+    cout << "dist"<<h<<" = " << dist <<";\n";
+    */
+    //    printf("# merge (%d,%d) at %d\n",A,B,dist(A,B));
 
     
-//     // 2. Reduce dimension: Swap last row/col into position B.
-//     for(uint8_t i=0;i<N;i++) row[i] = (i!=B)? dist(N-h-1,i) : 0;     
-//     swap(order[B], order[N-h-1]);
+    // Merge equivalence classes
+    class_tree.merge({dist(A,B),order[A],order[B]});
+    
+    // Update distance matrix.
+    
+    // 1. Set dist[A,:] = maximum( dist[A,:], dist[B,:] )
+    //        dist[:,A] = maximum( dist[:,A], dist[:,B] )
+    //
+    // Copy
+    for(uint8_t i=0;i<N;i++) row[i] = (i==A || i==B)? 0 : max(dist(A,i),dist(B,i)); 
+    // Update
+    for(uint8_t i=0;i<N;i++){
+      dist(A,i) = row[i];
+      dist(i,A) = row[i];
+      dist(B,i) = row[i];
+      dist(i,B) = row[i];
+    }
+    //    cout << "dist"<<h<<"b = " << dist <<";\n";
 
-//     for(uint8_t i=0;i<N-h-1;i++){
-//       dist(B,i) = row[i];
-//       dist(i,B) = row[i];
-//     }    
-//     //    cout << "dist"<<h<<"c = " << dist <<";\n";    
+    
+    // 2. Reduce dimension: Swap last row/col into position B.
+    for(uint8_t i=0;i<N;i++) row[i] = (i!=B)? dist(N-h-1,i) : 0;     
+    swap(order[B], order[N-h-1]);
 
-//   }
-//   return class_tree;
-// }
+    for(uint8_t i=0;i<N-h-1;i++){
+      dist(B,i) = row[i];
+      dist(i,B) = row[i];
+    }    
+    //    cout << "dist"<<h<<"c = " << dist <<";\n";    
 
-// matrix<uint8_t> dist1d(vector<int> data)
-// {
-//   int n = data.size();
-//   matrix<uint8_t> dist(n,n);
-//   for(int i=0;i<n;i++)
-//     for(int j=0;j<n;j++)
-//       dist(i,j) = abs(data[i]-data[j]);
-//   return dist;
-// }
+  }
+  return class_tree;
+}
 
-// int main()
-// {
-//   //vector<int> names{{7, 10, 20, 28, 35}};
-//   //vector<int> names{{35, 20, 7, 28, 10}};  
-//   //vector<int> names{{1,2,5,10}};
-//   vector<int> names{{12, 20, 9, 13, 17, 14, 1, 5, 8, 3, 16, 18}};
-//   matrix<uint8_t> P(dist1d(names));
+matrix<uint8_t> dist1d(vector<int> data)
+{
+  int n = data.size();
+  matrix<uint8_t> dist(n,n);
+  for(int i=0;i<n;i++)
+    for(int j=0;j<n;j++)
+      dist(i,j) = abs(data[i]-data[j]);
+  return dist;
+}
+
+int main()
+{
+  //vector<int> names{{7, 10, 20, 28, 35}};
+  //vector<int> names{{35, 20, 7, 28, 10}};  
+  //vector<int> names{{1,2,5,10}};
+  vector<int> names{{12, 20, 9, 13, 17, 14, 1, 5, 8, 3, 16, 18}};
+  matrix<uint8_t> P(dist1d(names));
   
-//   dendrogram clusters;
-//   vector<dendrogram::bitset> Cs;  
-//   for(int i=0;i<1000000;i++){
-//     clusters = hierarchical_clustering(P);
+  dendrogram clusters;
+  vector<dendrogram::bitset> Cs;  
+  for(int i=0;i<1000000;i++){
+    clusters = hierarchical_clustering(P);
     Cs = clusters.cluster_classes(2);
     //  if(i%100000==0) cout << Cs << endl;
     
