@@ -396,7 +396,7 @@ Polyhedron Polyhedron::dual(int Fmax) const
   for(node_t u=0;u<d.N;u++){
     const face_t& f = faces[u];
     coord3d avg;
-    for(int i=0;i<f.size();i++) avg += points[f[i]];
+    for(auto v: f) avg += points[v];
     coordinates[u] = avg/double(f.size());
   }
  

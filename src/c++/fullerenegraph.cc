@@ -241,27 +241,8 @@ bool FullereneGraph::get_rspi_from_fg(vector<int> &rspi, jumplist_t &jumps, cons
 
 
 // create a matrix that holds the topological distances between all pentagons
-vector<int> FullereneGraph::pentagon_distance_mtx() const{
-
-  PlanarGraph dual(dual_graph(6));
-
-  vector<int> pentagons;
-  for(int i=0; i<dual.N; i++) if(dual.neighbours[i].size() == 5) pentagons.push_back(i);
-
-  // I know the following line is very wasteful but it's good enough
-  vector<int> all_distances = dual.all_pairs_shortest_paths(INT_MAX);
-  vector<int> mtx_vec(144,0);
-
-  //cout << "pentagon distances: " << endl;
-  for(int i=0; i!=12; ++i){
-    for(int j=0; j!=12; ++j){
-      mtx_vec[12*i+j] = all_distances[dual.N * pentagons[i] + pentagons[j]];
-    }
-  }
-
-//  cout << pentagon_distance_mtx << endl;
-
-  return mtx_vec;
+matrix<int> FullereneGraph::pentagon_distance_mtx() const {
+  return Triangulation(dual_graph()).pentagon_distance_mtx();
 }
 
 vector<coord3d> FullereneGraph::zero_order_geometry(double scalerad) const
