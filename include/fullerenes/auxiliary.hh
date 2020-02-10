@@ -9,8 +9,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#define LIST_OPEN "["
-#define LIST_CLOSE "]"
+extern char LIST_OPEN;
+extern char LIST_CLOSE;
 
 using namespace std;
 

@@ -1,5 +1,8 @@
 #include "fullerenes/graph.hh"
 
+char LIST_OPEN='[';
+char LIST_CLOSE=']';
+
 // Returns true if edge existed prior to call, false if not
 bool Graph::remove_edge(const edge_t& e)
 {
