@@ -110,8 +110,8 @@ bool Polyhedron::to_gaussian(const Polyhedron &P, FILE *file, string header)  {
   // Connectivity section
   for(node_t u=0; u<P.N;u++){
     auto nu = P.neighbours[u];
-    fprintf(file,"%d ",u);
-    for(auto v: nu) fprintf(file,"%d ",v);
+    fprintf(file,"%d ",u+1);
+    for(auto v: nu) fprintf(file,"%d ",v+1);
     fprintf(file,"\n");
   }
 
