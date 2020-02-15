@@ -48,7 +48,7 @@ int main(int ac, char **av)
     P.points = g.optimized_geometry(P.points);
     bool has_nans = false;
     for(auto p: P.points){
-      if(isnan(p[0])||isnan(p[1])||isnan(p[1])) has_nans = true;
+      if(std::isnan(p[0])||std::isnan(p[1])||std::isnan(p[1])) has_nans = true;
     }
     if(has_nans){
       failures << i << ":" << (RSPI+1) << endl;
