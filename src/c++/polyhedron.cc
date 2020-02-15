@@ -473,7 +473,7 @@ bool Polyhedron::is_triangulation() const {
 bool Polyhedron::is_invalid() const {
   bool has_nans = false;
   for(auto p: points){
-    if(isnan(p[0])||isnan(p[1])||isnan(p[1])) has_nans = true;
+    if(std::isnan(p[0])||std::isnan(p[1])||std::isnan(p[1])) has_nans = true;
   }
   return has_nans;
 }
