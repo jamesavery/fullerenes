@@ -98,8 +98,8 @@ struct Polyhedron : public PlanarGraph {
   coord3d width_height_depth() const;
 
   // Graph I/O. TODO: Move to io.{hh,cc}
-  static vector<string> formats,input_formats, output_formats;
-  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE} formats_t;
+  static vector<string> formats,format_alias, input_formats, output_formats;
+  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE,GAUSSIAN} formats_t;
   static int format_id(string id);
 
   static Polyhedron fullerene_polyhedron(FullereneGraph G);
@@ -113,10 +113,10 @@ struct Polyhedron : public PlanarGraph {
   static bool to_file(const Polyhedron &G, FILE *file, string format);
   static bool to_ascii(const Polyhedron &G, FILE *file);
   static bool to_turbomole(const Polyhedron &G, FILE *file);  
+  static bool to_gaussian(const Polyhedron &P, FILE *file, string header="");
   static bool to_xyz(const Polyhedron &G, FILE *file);
   static bool to_mol2(const Polyhedron &G, FILE *file);
   static bool to_cc1(const Polyhedron &G, FILE *file);      
-  
 			      
   string to_latex(bool show_dual = false, bool number_vertices = false, bool include_latex_header = false) const;
   string to_povray(double w_cm = -1, double h_cm = 10, 
