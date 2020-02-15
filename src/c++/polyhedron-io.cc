@@ -100,11 +100,20 @@ bool Polyhedron::to_gaussian(const Polyhedron &P, FILE *file, string header)  {
 
   fprintf(file,"%s",header.c_str());
 
-  for(int i=0; i<P.N; ++i){
-    const coord3d p = P.points[i];
+  // Atom section
+  for(node_t u=0; u<P.N; u++){
+    const coord3d p = P.points[u];
     fprintf(file," C %f %f %f\n", p[0],p[1],p[2]);
   }
-  fprintf(file,"\n\n");
+  fprintf(file,"\n");
+
+  // Connectivity section
+  for(node_t u=0; u<P.N;u++){
+    auto nu = P.neighbours[u];
+    fprintf(file,"%d ",u);
+    for(auto v: nu) fprintf(file,"%d ",v);
+    fprintf(file,"\n");
+  }
 
   return true;			// TODO: Check file status
 }
