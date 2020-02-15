@@ -761,6 +761,8 @@ void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagra
 
 vector<int> draw_path(int major, int minor)
 {
+  if(minor == 0) return {{major}};
+
   int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
 
   vector<int> paths(minor+1,0), runs(minor);
@@ -782,6 +784,9 @@ vector<int> draw_path(int major, int minor)
 
   return runs;
 }
+
+
+
 
 // Given start node u0 and adjacent face F_i, lay down triangles along the the straight
 // line to Eisenstein number (a,b), and report what the final node is.
@@ -809,8 +814,12 @@ node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
   s = next(q,r);        // (0,1)
   t = next(s,r);        // (1,1)
 
-  if(a==1 && b==1) return t;
-
+  // Special cases for axis-aligned paths
+  if(a==0 && b==0) return q;
+  if(a==0){ for(int i=0;i<b;i++) go_north(); return r; }  
+  if(b==0){ for(int i=0;i<a;i++) go_east();  return s; }
+      
+  // Otherwise, draw the line
   vector<int> runlengths = draw_path(max(a,b), min(a,b));
 
   for(int i=0;i<runlengths.size();i++){
@@ -821,7 +830,6 @@ node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
       if(i+1<runlengths.size()) go_north();
     } else {                        // b is major axis
       for(int j=0;j<L-1;j++)    go_north();
-
       if(i+1<runlengths.size()) go_east();
     }
   }
@@ -829,91 +837,230 @@ node_t Triangulation::end_of_the_line(node_t u0, int i, int a, int b) const
   return t;                        // End node is upper right corner.
 }
 
-matrix<int> Triangulation::convex_square_surface_distances(const vector<node_t> V) const
+// Returns:
+// For each run-length, returns the following:
+// t0--t1--t2--t3  -> [r0,t0, r1,t1, r2,t2, r3,t3] 
+// | \ |  \ | \ |
+// r0--r1--r2--r3
+// The complete result is a vector of these vertex sequences.
+// They are connected as follows when a>b
+//        tt0--tt1-- ...
+//          | \ |
+// t0--t1--t2--t3--- ...
+// | \ |  \ | \ |
+// r0--r1--r2--r3
+// I.e., always sharing an edge to the north, and when a<b
+//     .. ..
+//     | \ |
+// s---t---tt
+// | \ | \ | 
+// s---t---tt
+// | \ |
+// s---t
+// i.e., always sharing an edge to the East.
+//   s---t
+//  / \ /
+// q---r
+vector<vector<node_t>> Triangulation::quads_of_the_line(node_t u0, int i, int a, int b) const
 {
-#define DONT_USE_BMIN 1
-  if(!V.empty()){
+  node_t q,r,s,t;                // Current square
+
+  auto go_north = [&](){
+    const node_t S(s), T(t); // From old square
+    q = S; r = T; s = next(S,T); t = next(s,r);
+  };
+
+  auto go_east = [&](){
+    const node_t R(r), T(t); // From old square
+    q = R; s = T; r = next(s,q); t = next(s,r);
+  };
+
+  // Square one
+  q = u0;                         // (0,0)
+  r = neighbours[u0][i];          // (1,0)
+  s = next(q,r);                  // (0,1)
+  t = next(s,r);                  // (1,1)
+
+  // Otherwise, draw the line
+  vector<int>            runlengths = draw_path(max(a,b), min(a,b));
+  vector<vector<node_t>> quad_runs(runlengths.size());
+  
+  for(int i=0;i<runlengths.size();i++){
+    int L = runlengths[i];
+    vector<node_t> quad_run(2*L+2);
     
-    vector<int> V_inverse(N,-1);
-    for(int i=0;i<V.size();i++){
-      node_t     u = V[i];
-      V_inverse[u] = i;
+    if(a>=b){                        // a is major axis
+      quad_run[0] = q; quad_run[1] = s;
+      quad_run[2] = r; quad_run[3] = t;
+      for(int j=0;j<L-1;j++)    {
+	go_east();
+	quad_run[2*(j+2)+0] = r;
+	quad_run[2*(j+2)+1] = t;
+      }
+
+      quad_runs[i] = quad_run;      
+      go_north();
+
+    } else {                        // b is major axis
+      quad_run[0] = q; quad_run[2] = s; 
+      quad_run[1] = r; quad_run[3] = t;
+      for(int j=0;j<L-1;j++) {
+	go_north();
+	quad_run[2*(j+2)+0] = s;
+	quad_run[2*(j+2)+1] = t;	
+      }
+
+      quad_runs[i] = quad_run;      
+      go_east();
     }
+  }
 
-    matrix<int> H = matrix<int>(V.size(),V.size(),all_pairs_shortest_paths(V));
-    int M = *max_element(H.begin(),H.end());      // M is upper bound to path length. TODO: M[v]
-    
-    for(int i=0;i<H.size();i++) H[i] *= H[i]; // Work with square distances, which are all integers
+  //  {
+    //    node_t t = end_of_the_line(u0,i,a,b);
+    //    printf("quads_of_the_line(%d,%d,(%d,%d)) -> %d: ",u0,i,a,b,t);
+    //    cout << quad_runs << endl;
+  //  }
+  return quad_runs;                        // End node is upper right corner.
+}
 
-    for(node_t u: V){
-      for(int i=0;i<neighbours[u].size();i++){
+matrix<int> Triangulation::pentagon_distance_mtx() const {
+  vector<int> pentagon_indices(12);
+  for(int u=0, i=0;u<N;u++) if(neighbours[u].size() == 5) pentagon_indices[i++] = u;  
+  return all_pairs_shortest_paths(pentagon_indices);
+}
 
-	for(int a=1; a<M; a++){	
-#if DONT_USE_BMIN	
-	  for(int b=1; a*a + a*b + b*b < M*M; b++){
-#else
-          // 3/4 M^2 <= a^2+ab+b^2 < M^2
- 	  int bmin = max(1,(int)floor((-a+sqrt(3*M*M-3*a*a))/2));
-	  int bmax = ceil((-a+sqrt(4*M*M-3*a*a))/2)-1;
-	  //	  printf("bmin,bmax = %d,%d\n",bmin,bmax);
-	  for(int b=bmin; b<bmax; b++){	  
-#endif	   
-	    const node_t v = end_of_the_line(u,i,a,b);
+// TODO: Do we need to do Dijkstra on sqrt(H) after all?
+matrix<Triangulation::simple_geodesic>
+Triangulation::simple_geodesics(vector<node_t> nodes,
+				bool calculate_self_geodesics) const
+{
+  if(nodes.empty()){
+    nodes.resize(N);
+    for(int i=0;i<N;i++) nodes[i] = i;
+  }
 
-	    if(V_inverse[v] != -1){ // Endpoint v is in V
-	      int U = V_inverse[u], V = V_inverse[v];
-	      H(U,V) = min(H(U,V), a*a + a*b + b*b);
+  vector<int> nodes_inverse(N,-1);
+  for(node_t U=0;U<nodes.size();U++){
+    node_t     u = nodes[U];
+    nodes_inverse[u] = U;
+  }
+
+  // Initialize H to graph distances, which are upper bound to surface distances,
+  matrix<int>             H(nodes.size(),nodes.size(),all_pairs_shortest_paths(nodes));
+  matrix<simple_geodesic> G(nodes.size(),nodes.size());
+
+  vector<int> M(nodes.size(),0);	// M[u] = max_v(d_g(u,v)) is upper bound to surface distance from u
+  for(node_t U=0; U<nodes.size();U++)
+    for(node_t V=0;V<nodes.size();V++){
+      M[U]   = max(M[U], H(U,V));
+      H(U,V) = INT_MAX;
+    }
+  //  for(int i=0;i<H.size();i++) H[i] *= H[i];     // Work with square distances, which are all integers
+
+  if(calculate_self_geodesics) for(node_t U=0;U<nodes.size();U++){
+      H(U,U) = INT_MAX; // Initialize diagonal to infinity -- we want shortest self-geodesics, i.e. circling 2pi of curvature
+      M[U] *= 2;        // To capture self-geodesics, we need to look twice as far (there and back again)
+    }
+  //  cout << "M = " << M << endl;
+
+  for(node_t u: nodes){
+    for(int i=0;i<neighbours[u].size();i++){
+      node_t U  = nodes_inverse[u];
+
+      for(int a=1; a<M[U]; a++){	
+	for(int b=0; a*a + a*b + b*b < M[U]*M[U]; b++){
+	  const node_t v = end_of_the_line(u,i,a,b);
+
+	  if(nodes_inverse[v] != -1){ // Endpoint v is in nodes
+	    node_t V = nodes_inverse[v];
+	    int d_sqr = a*a + a*b + b*b;
+	    if(d_sqr < H(U,V)){
+	      //	      cout << u << "->" << vector<int>{{a,b,d_sqr}} << "->" << v <<endl;
+	      H(U,V) = d_sqr;
+	      G(U,V) = simple_geodesic(a,b,i);
 	    }
 	  }
-        }
+	}
       }
     }
-    return H;
-  } else {
-    matrix<int> H = matrix<int>(N,N,all_pairs_shortest_paths());
-    //    cout << "H = " << H << endl;
-    int M = *max_element(H.begin(),H.end());      // M is upper bound to path length
-    
-    for(node_t u=0;u<N;u++)
-      for(int i=0;i<neighbours[u].size();i++){
-	
-	// Note: All Eisenstein numbers of the form (a,0) or (0,b) yield same lengths
-	//       as graph distance, and are hence covered by initial step. So start from 1.
-	//       M is upper bound for distance, so only need to do a^2+ab+b^2 strictly less than M.
-	//       Experimental: 3*M/4 is *lower* bound for distance.
-	for(int a=1; a<M;a++){
-#if DONT_USE_BMIN	
-	  for(int b=1; a*a + a*b + b*b < M*M; b++){
-#else
-          // 3/4 M^2 <= a^2+ab+b^2 < M^2
-	  int bmin = floor((-a+sqrt(3*M*M-3*a*a))/2);
-	  int bmax = ceil((-a+sqrt(4*M*M-3*a*a))/2)-1;
-	  for(int b=bmin; b<bmax; b++){	  
-#endif	   
-	    const node_t v = end_of_the_line(u,i,a,b);
-
-	    // printf("min(H(%d,%d),|(%d,%d)|^2)  = min(%d,%d)\n",
-	    //          u,v,a,b,H(u,v), a*a+a*b+b*b);
-	    H(u,v) = min(H(u,v), a*a + a*b + b*b);
-	  }
-      }
-    }
-    return H;
   }
+  //  cout << "Hend = " << H << endl;    
+  return G;
+}
+
+matrix<int> Triangulation::simple_square_surface_distances(vector<node_t> nodes,
+							   bool calculate_self_geodesics) const
+{
+  if(nodes.empty()){ nodes.resize(N); for(int i=0;i<N;i++) nodes[i] = i;  } // If no node list is given, calculate all distances
+  
+  vector<int> nodes_inverse(N,-1);
+  for(int i=0;i<nodes.size();i++){
+    node_t     u = nodes[i];
+    nodes_inverse[u] = i;
+  }
+  //  cout << "nodes = " << nodes << endl;
+  //  cout << "nodes_inverse = " << nodes_inverse << endl;  
+  
+
+  // Initialize H to graph distances, which are upper bound to surface distances:
+  // 3/4 d_g^2 <= d_surface^2 <= d_g^2
+  matrix<int>             H(nodes.size(),nodes.size(),all_pairs_shortest_paths(nodes));
+
+  // M[u] = max_v(d_g(u,v)) is upper bound to surface distance from u  
+  vector<int> M(nodes.size(),0);	// M[u] = max_v(d_g(u,v)) is upper bound to surface distance from u
+  for(node_t U=0; U<nodes.size();U++)
+    for(node_t V=0;V<nodes.size();V++)
+      M[U] = max(M[U], H(U,V));
+
+  //  cout << "M = " << M << endl;
+
+  // Work with square distances, which are all integers  
+  for(int i=0;i<H.size();i++) H[i] *= H[i];     
+
+  //  cout << "H = " << H << endl;
+
+  if(calculate_self_geodesics) for(node_t U=0;U<nodes.size();U++){
+      H(U,U) = INT_MAX; // Initialize diagonal to infinity -- we want shortest self-geodesics, i.e. circling 2pi of curvature
+      M[U] *= 2;        // To capture self-geodesics, we need to look twice as far (there and back again)
+    }  
+
+  // Note: All Eisenstein numbers of the form (a,0) or (0,b) yield same lengths
+  //       as graph distance, and are hence covered by initial step. So start from 1.
+  //       M is upper bound for distance, so only need to do a^2+ab+b^2 strictly less than M.
+  for(node_t u: nodes){
+    node_t U = nodes_inverse[u];
+    const int Mu = M[U];
+    
+    for(int i=0;i<neighbours[u].size();i++)
+      for(int a=1; a<Mu; a++)
+	for(int b=1; a*a + a*b + b*b < Mu*Mu; b++){
+	  const node_t v = end_of_the_line(u,i,a,b);
+
+	  if(nodes_inverse[v] != -1){ // Endpoint v is in nodes
+	    node_t V = nodes_inverse[v];
+	    int d_sqr = a*a + a*b + b*b;
+	    H(U,V) = min(H(U,V),d_sqr);
+	  }
+	}
+  }
+  
+  return H;
 }
 
 
 
-matrix<double> Triangulation::surface_distances() const
+matrix<double> Triangulation::surface_distances(vector<node_t> nodes,
+						bool calculate_self_geodesics) const
 {
-  matrix<double> H(convex_square_surface_distances());
+  matrix<double> H(simple_square_surface_distances(nodes,calculate_self_geodesics));
   for(int i=0;i<N*N;i++) H[i] = sqrt(H[i]);
 
-  bool nonconvex = false;
-  for(node_t u=0;u<N;u++) if(neighbours[u].size() > 6) nonconvex = true;
+  return H.APSP();
+  // bool nonconvex = false;
+  // for(node_t u=0;u<N;u++) if(neighbours[u].size() > 6) nonconvex = true;
 
-  if(nonconvex) return H.APSP();
-  else return H;
+  // if(nonconvex) return H.APSP();
+  // else return H;
 }
 
 Triangulation Triangulation::sort_nodes() const
@@ -924,7 +1071,7 @@ Triangulation Triangulation::sort_nodes() const
 
   sort(degrees.begin(), degrees.end());
 
-  cout << "degrees = " << degrees << endl;
+  //  cout << "degrees = " << degrees << endl;
 
   vector<int> newname(N);
   for(int u=0;u<N;u++) newname[degrees[u].second] = u;

@@ -72,7 +72,7 @@ bool Polyhedron::to_file(const Polyhedron &G, string filename)
 
 ////////////////////////////// OUTPUT ROUTINES //////////////////////////////
 bool Polyhedron::to_ascii(const Polyhedron &P, FILE *file)  {
-  string s = "{" + to_string(P.neighbours) + "," + to_string(P.points) + "," + to_string(P.faces) + "}";
+  string s = LIST_OPEN + to_string(P.neighbours) + "," + to_string(P.points) + "," + to_string(P.faces) + LIST_CLOSE;
   fputs(s.c_str(),file);
   return ferror(file) == 0;
 }

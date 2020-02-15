@@ -82,9 +82,30 @@ public:
     }
   }
 
-  matrix<double> surface_distances() const;
-  matrix<int>    convex_square_surface_distances(const vector<node_t> only_nodes = {}) const;
+  struct simple_geodesic {
+    Eisenstein g;
+    int axis;
+
+    simple_geodesic(int a, int b=0, int axis=0) : g(a,b), axis(axis) {}
+  };
+
+  struct geodesic {
+    vector<Eisenstein> g;
+    double d;
+    int axis;
+  };
+  
+  matrix<int>    pentagon_distance_mtx() const;
+
+
+  matrix<int>              simple_square_surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=true) const;
+  matrix<double>           surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=true) const;
+  
+  matrix<geodesic>         surface_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=true) const;    
+  matrix<simple_geodesic>  simple_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=true) const;
+  
   node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
+  vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;  
 
   Triangulation sort_nodes() const;
 };

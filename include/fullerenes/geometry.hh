@@ -392,7 +392,7 @@ struct matrix3d {
   
   friend ostream& operator<<(ostream& S, const matrix3d &M)
   {
-    S << LIST_OPEN; for(int i=0;i<3;i++) S << vector<double>(&M.values[i*3],&M.values[(i+1)*3]) << (i+1<3?",":LIST_CLOSE);
+    S << LIST_OPEN; for(int i=0;i<3;i++) S << vector<double>(&M.values[i*3],&M.values[(i+1)*3]) << (i+1<3?',':LIST_CLOSE);
     return S;
   }
 };

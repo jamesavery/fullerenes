@@ -280,122 +280,199 @@ auto pentagon_geodesics(const Triangulation& G)
   return G.simple_geodesics(pentagon_indices,true);
 }
 
+vector<vector<tri_t> > tri_runs(const Triangulation& dG, const node_t u,const Triangulation::simple_geodesic geo)
+{
+  vector<vector<node_t>> quad_runs = dG.quads_of_the_line(u,geo.axis,geo.g.first, geo.g.second);
+  vector<vector<tri_t>>  tri_runs;
+  
+  for(auto run: quad_runs){
+    int n = run.size()/2;	// Number of columns 
+    vector<tri_t> tri_run((n-1)*2);
+
+    // Iterate over quads      
+    //   s---t
+    //  / \ /
+    // q---r      
+    for(int i=0;i+1<n;i++){
+      node_t q = run[i*2+0], s = run[i*2+1], r = run[i*2+2], t = run[i*2+3];
+      tri_run[i*2  ] = {q,r,s};
+      tri_run[i*2+1] = {s,r,t};
+    }
+    tri_runs.push_back(tri_run);
+  }
+  return tri_runs;
+}
+
+vector< pair<dedge_t,float> > crossings(const Triangulation& dG, const node_t u, const Triangulation::simple_geodesic geo)
+{
+  vector<pair<dedge_t,float>> result;  
+  vector<vector<node_t>> quad_runs = dG.quads_of_the_line(u,geo.axis,geo.g.first, geo.g.second);
+
+  int a = geo.g.first, b = geo.g.second, axis = geo.axis;
+  int minor = min(a,b), major = max(a,b);
+  int Nruns = quad_runs.size();
+
+  // No matter what, we start in node u. 
+  node_t q = u, r = dG.neighbours[u][geo.axis];
+  result.push_back({{q,r},0});
+  
+  // Deal with degenerate case first
+  // 1. Edge-aligned path
+  if(minor == 0){
+    assert(quad_runs.size()==1);
+    auto run = quad_runs[0];
+    int    n = run.size()/2;
+    
+    for(int i=0;i+1<n;i++){
+      node_t q = run[i*2+0], r = run[i*2+2];
+
+      result.push_back( {{q,r},1} );
+    }
+    return result;
+  }
+  // 2. Diagonal path
+  if(minor == major){
+    for(int I=0,J=0;J<Nruns;I++,J++){
+      auto run = quad_runs[I];
+      //      cerr << "run size:" << (run.size()/2-1) << endl;
+      node_t q = run[0], s = run[1], r = run[2], t = run[3];
+   
+      result.push_back( {{s,r},0.5} );       // s-r crossed half-way
+      result.push_back( {{r,t},  1} );       //   t hit spot-on
+    }
+    return result;
+  }
+
+  // Everything else is a line that 
+  //  - In the final run:  ends in the upper right corner of the final quad
+  //  - In previous runs:  crossing the upper edge (s--t) in the final quad
+  for(int I=0, J=0;J<Nruns;J++){
+    auto     run = quad_runs[J];
+    int        n = run.size()/2-1; // Number of quads in Ith run 
+    float lambda = 0;
+    
+    // Iterate over quads      
+    //   s---t
+    //  / \ /
+    // q---r
+
+    // Point on line-segment (x0,y0) + \lambda (x1,y1) determined by
+    //     \lambda = -(a*x0 - b*y0) / (a*x1 - b*y1)    
+    auto intersect = [&](int x0,int y0,int x1,int y1) -> float
+      { return (minor*x0 - major*y0)/float(minor*(x0-x1)-major*(y0-y1)); };
+
+    // For each quad in the run, the positions in the Eisenstein-strip of the vertices are:
+    // q: (I,J) r: (I+1,J), s: (I,J+1), t: (I+1,J+1)
+    for(int i=0;i<n;i++,I++){
+      node_t q = run[i*2+0], s = run[i*2+1], r = run[i*2+2], t = run[i*2+3];
+
+      // Which edges are crossed, and where?
+      
+      // 1. Edge s,r is always crossed
+      lambda = intersect(/*s*/I,J+1, /*r*/I+1,J); 
+      result.push_back( {{s,r}, lambda} );
+      
+      if(i+1<n){
+	// If this is not the final quad of the run, we exit to the East:
+	// 2. Edge r,t
+	lambda = intersect(/*r*/I+1,J, /*t*/I+1,J+1);
+	result.push_back( {{r,t}, lambda} );
+      } else // If this is the final quad of the run, we	
+	if(I+1<Nruns){ // Exit to the north, if this is not the final run
+	  // 3a. Edge s,t
+	  lambda = intersect(/*s*/I,J+1, /*t*/I+1,J+1);
+	  result.push_back( {{s,t}, lambda} );	  
+	} else        // Hit the NE corner, if this is the final run
+	  // 3b. Vertecx t
+	  result.push_back({{r,t},1});	  
+    }
+  }
+
+  return result;
+}
+
+
+vector<coord3d> line_points(const vector<pair<dedge_t,float>> &crossings, const vector<coord3d> &points)
+{
+  vector<coord3d> result(crossings.size());
+  
+  for(int i=0;i<crossings.size();i++){
+    auto c = crossings[i];
+    node_t s = c.first.first, t = c.first.second;
+    float lambda = c.second;
+
+    coord3d x0 = points[s], x1 = points[t];
+    result[i] = x0+(x1-x0)*lambda;
+  }
+  return result;
+}
+
 
 int main(int ac, char **argv)
 {
-  int N                = ac>1? strtol(argv[1],0,0) : 20;     // Argument 1: Number of vertices N
+  int N                = ac>=2? strtol(argv[1],0,0) : 20;     // Argument 1: Number of vertices N
   
   if(N<20 || N==22 || N&1){
     fprintf(stderr,"Syntax: %s <N:int> [output_dir] [IPR:0|1] [only_nontrivial:0|1]\n",argv[0]);
     return -1;
   } 
-
-  string output_dir   = ac>=3? argv[2] : "output";    // Argument 2: directory to output files to
-  int IPR             = ac>=4? strtol(argv[3],0,0):0; // Argument 3: Only generate IPR fullerenes?
-  int only_nontrivial = ac>=5? strtol(argv[4],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
+ 
+  int pick_number     = ac>=3? strtol(argv[2],0,0) : 1;
   
+  string output_dir   = ac>=4? argv[3] : "output";    // Argument 2: directory to output files to
+  int IPR             = ac>=5? strtol(argv[4],0,0):0; // Argument 3: Only generate IPR fullerenes?
+  int only_nontrivial = ac>=6? strtol(argv[5],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
+
   ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
 
   int i=0;  
   FullereneDual dualG;
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
-
-  while(BuckyGen::next_fullerene(Q,dualG)){ // Generate all appropriate C_N isomer duals 
-    i++;
-
-    //    if(i%100000 == 0)
+  while(BuckyGen::next_fullerene(Q,dualG)) if((++i) == pick_number) {      
       cerr << "isomer "<< i << endl;
-    //    dualG.update();		            // Update metadata
-
-    auto Ds = pentagon_surface_distance(dualG); //
-    auto Gs = pentagon_geodesics(dualG);
-
-    cout << "Ds = " << Ds << endl;
-
-    // cout << "Gs = [";
-    // for(int i=0;i<12;i++){
-    //   cout << "[";
-    //   for(int j=0;j<12;j++)
-    // 	cout << make_pair(Gs(i,j).g,Gs(i,j).axis) << (j+1<Gs.n? ", ":"]\n");
-    // }
-    // cout << "]\n";
-
-    for(int i=0;i<12;i++){
-      Eisenstein g(Gs(i,i).g);
-      int axis = Gs(i,i).axis;
-      cout << i<<"-"<<i<<" shortest self-geodesic: " << make_pair(g,axis) << "\n";
-      cout << "\t Path: " << dualG.quads_of_the_line(i,axis,g.first,g.second) << endl;
-    }
-    
-    //auto Dg = pentagon_graph_distance(dualG);
-
-    auto D = Ds;
-    auto hierarchy = clustering::hierarchical_clustering(D); 
-    auto Cs        = hierarchy.cluster_classes(2);
-    auto Dc        = clustering::cluster_distances(Cs,D);
-    auto Dc_min = Dc.first, Dc_max = Dc.second;
-    cout << "Ds = " << Ds << endl;
-    cout << "Dc_min = " << Dc_min << "\nDc_max = " << Dc_max << "\n\n";
-
-    
-    // // bool is_nanotube(const Triangulation &G)
-    // // Rules:
-    // //        1. Two pentagon clusters, each with 6 pentagons (caps, Gauss curvature 2pi each)
-    // //        2. The two clusters are further away from each other than their own diameter (e.g.: at least 1*, 3/2*, 2* - which?)
-    // if(clustering::popcount(Cs[0]) == 6 && clustering::popcount(Cs[1]) == 6 &&
-    //    Dc_min(0,1) >= 1.5*Dc_max(0,0) &&
-    //    Dc_min(0,1) >= 1.5*Dc_max(1,1)) {
+      dualG.update();
       
-    //   cout << "Isomer " << i << " is a nanotube of sorts: ";
-    //   general_spiral spiral = dualG.get_rspi();
-    //   cout << (spiral.spiral+1) << endl;
-    // }
+      Polyhedron P  = Polyhedron::fullerene_polyhedron(dualG.dual_graph());
+      Polyhedron dP = P.dual();
 
-    // bool is_nanocone(int p, int q, const Triangulation& G)
-    // Rules:
-    //         1. Two pentagon clusters, one with p pentagons and one with q, p<q
-    //         2. Pointy:    p-cluster has smaller diameter than q-cluster
-    // Either
-    //         3a. Elongated: inter-cluster distance (min) is greater than diameter of q-cluster
-    // or
-    //         3b. Diameters of clusters constrained instead
-    int p = clustering::popcount(Cs[0]), q = clustering::popcount(Cs[1]);
-    int p_cluster = 0, q_cluster = 1;
-    if(p>q){
-      swap(p,q);
-      swap(p_cluster, q_cluster);
-    }
-    
-    if(clustering::popcount(Cs[0]) == 6 && clustering::popcount(Cs[1]) == 6 &&
-       Dc_min(0,1) >= 1.5*Dc_max(0,0) &&
-       Dc_min(0,1) >= 1.5*Dc_max(1,1)) {
+      Polyhedron::to_file(P, "output/P.mol2");
+      Polyhedron::to_file(dP,"output/dP.mol2");      
       
-      cout << "Isomer " << i << " is a nanotube of sorts: ";
-      general_spiral spiral = dualG.get_rspi();
-      cout << (spiral.spiral+1) << endl;
-    }
-    
-    
-#if 0
-
-    //    auto C = cluster_sizes(pentagon_distance(dualG), 2, 4);
-    if(C.first){
-      cout << "C"<<i<<" = " << C.second<< ";\n";
-      
-      // if(0)
-      //   if(max_length(pentagon_distance(dualG)) >= 10){
-      //	cout << i << endl;
+      ofstream output_file("output/geodesics.m");
+      LIST_OPEN = '{'; LIST_CLOSE = '}';
+      output_file << "neighbours = " << dP.neighbours << "+1;\n"
+      		  << "faces      = " << dP.faces      << "+1;\n"
+		  << "points     = " << dP.points     << ";\n";
+   
+      dualG = FullereneDual(dP);
 	
-      dualG.update();		            // Update metadata
-      FullereneGraph G = dualG.dual_graph();  // Construct fullerene graph
-      vector<int> RSPI;
-      jumplist_t jumps;
-      G.get_rspi_from_fg(RSPI,jumps);
-      cout << i << ", RSPI="<<(RSPI+1) << ", jumps="<<jumps<<endl;
-    }
-#endif
+      auto Ds = pentagon_surface_distance(dualG); //
+      auto Gs = pentagon_geodesics(dualG);
+      
+      output_file << "Ds = " << Ds << ";\n";
+      
+      for(int i=0;i<12;i++){
+      	Eisenstein g(Gs(i,i).g);
+      	int axis = Gs(i,i).axis;
+      	cout << make_pair(i,i) << " shortest self-geodesic";
+      	if(g != Eisenstein{0,0}){
+      	  cout << ": " << make_pair(g,axis) << "\n";
+          cout << "\t Path: " << dualG.quads_of_the_line(i,axis,g.first,g.second) << endl;										 
+      	} else {
+      	  cout << " passes through cone-point.\n"; 
+      	}
+      }
+
+      //      Gs(0,0).g = {3,2};
+      auto crossings00 = crossings(dualG,0,Gs(0,0));
+      auto run00       = tri_runs(dualG,0,Gs(0,0));
+      auto linepts3D00 = line_points(crossings00,dP.points);
+      output_file << "geodesic00 = " <<Gs(0,0).g << ";\n";
+      output_file << "run00 = " << run00 << "+1;\n";
+      output_file << "crossings00 = " << crossings00 << ";\n";
+      output_file << "linepts3D00 = " << linepts3D00 << ";\n";      
+      
   }
-  cout << i << " graphs.\n";
   failures.close();
   
   return 0;

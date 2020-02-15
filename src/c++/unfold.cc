@@ -26,15 +26,6 @@ struct dedge_sort : public std::binary_function<dedge_t, dedge_t, bool>
 // more compact unfoldings (i.e. with more interior points).
 map<dedge_t,Unfolding::dedgecoord_t> Unfolding::unfold(const vector<tri_t> &triangulation)
 {
-#define set_dedge(u,v,ux,vx) {	          \
-  dedge_t uv(u,v), vu(v,u);               \
-  dedge_done[uv] = true;                  \
-  workset.erase(uv);                      \
-  dedge_position[vu] = make_pair(vx,ux);  \
-  if(!dedge_done[vu])                     \
-    workset.insert(vu);			  \
-}
-
   // A single directed edge uniquely defines the third node in the oriented triangle
   map<dedge_t,node_t> nextNode;
   for(int i=0;i<triangulation.size();i++){
@@ -49,9 +40,19 @@ map<dedge_t,Unfolding::dedgecoord_t> Unfolding::unfold(const vector<tri_t> &tria
   map<Eisenstein,node_t> grid;
   Eisenstein zero(0,0), veci(1,0), vecj(0,1);
 
+  auto set_dedge = [&](node_t u,node_t v, Eisenstein ux, Eisenstein vx) {	          
+    dedge_t uv(u,v), vu(v,u);               
+    dedge_done[uv] = true;                  
+    workset.erase(uv);                      
+    dedge_position[vu] = make_pair(vx,ux);  
+    if(!dedge_done[vu])                     
+      workset.insert(vu);			  
+  };
+
+  
   // 1. Place first triangle. 
   tri_t t(triangulation[0]);
-
+  
   set_dedge(t[0],t[1],zero,veci);
   set_dedge(t[1],t[2],veci,veci-vecj);
   set_dedge(t[2],t[0],veci-vecj,zero);
