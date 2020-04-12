@@ -88,8 +88,8 @@ struct Polyhedron : public PlanarGraph {
     return s;
   }
 
-  Polyhedron dual(int Fmax=INT_MAX) const;
-
+  Polyhedron dual() const;
+  Polyhedron leapfrog_dual() const;
     
   bool is_triangulation() const;
   bool is_invalid() const;
@@ -99,7 +99,7 @@ struct Polyhedron : public PlanarGraph {
 
   // Graph I/O. TODO: Move to io.{hh,cc}
   static vector<string> formats,format_alias, input_formats, output_formats;
-  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE,GAUSSIAN} formats_t;
+  enum {ASCII,PLANARCODE,XYZ,MOL2,MATHEMATICA,LATEX,CC1,TURBOMOLE,GAUSSIAN,WAVEFRONT_OBJ,SPIRAL} formats_t;
   static int format_id(string id);
 
   static Polyhedron fullerene_polyhedron(FullereneGraph G);
@@ -112,6 +112,7 @@ struct Polyhedron : public PlanarGraph {
   static bool to_file(const Polyhedron &G, string path);
   static bool to_file(const Polyhedron &G, FILE *file, string format);
   static bool to_ascii(const Polyhedron &G, FILE *file);
+  static bool to_wavefront_obj(const Polyhedron &G, FILE *file);
   static bool to_turbomole(const Polyhedron &G, FILE *file);  
   static bool to_gaussian(const Polyhedron &P, FILE *file, string header="");
   static bool to_xyz(const Polyhedron &G, FILE *file);

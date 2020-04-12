@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <fstream>
-#include "libgraph/cubicgraph.hh"
-#include "libgraph/fullerenegraph.hh"
-#include "libgraph/eisenstein.hh"
+#include "fullerenes/cubicgraph.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/eisenstein.hh"
 #include <vector>
 
 using namespace std;
@@ -343,7 +343,7 @@ PlanarGraph fold(vector< pair<Eisenstein, node_t> > &outline);
 
 PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
 {
-  vector<face_t> faces(dual.compute_faces_flat(3,true));
+  vector<face_t> faces(dual.compute_faces());
   vector<tri_t>  triangles(faces.begin(),faces.end());
 
   map<dedge_t,dedgecoord_t>  dgrid(unfold(triangles));
@@ -394,7 +394,7 @@ vector< pair<Eisenstein, node_t> > GCDreduce(const vector< pair<Eisenstein, node
 
 PlanarGraph GCTransformTCG(const PlanarGraph& dual, int K=1, int L=0)
 {
-  vector<face_t> faces(dual.compute_faces_flat(3,true));
+  vector<face_t> faces(dual.compute_faces());
   vector<tri_t>  triangles(faces.begin(),faces.end());
 
   map<dedge_t,dedgecoord_t>  dgrid(unfold(triangles));
@@ -793,7 +793,7 @@ int main(int ac, char **av)
   output << "dg = " << dual << ";\n";
   cout << "Need to place "<<dual.directed_edges().size()<<" edges.\n";
 
-  vector<face_t> faces(dual.compute_faces_flat(3,true));
+  vector<face_t> faces(dual.compute_faces());
   vector<tri_t>  triangles(faces.begin(),faces.end());
 
   map<dedge_t,dedgecoord_t>         dgrid(unfold(triangles));

@@ -6,6 +6,14 @@
 #include <iostream>
 #include <array>
 
+namespace clustering {
+  constexpr int n_nodes_max=16;
+  constexpr int distance_max=65535;  
+  typedef uint16_t  distance_t;
+  typedef uint16_t  csr_offset_t; 	// Up to 2^16-1 edges  
+  typedef uint8_t   node_t;	
+  typedef uint16_t  bitset_t;   	
+  
 template <typename t> struct static_stack: public vector<t> {
   int i;
 
@@ -27,18 +35,17 @@ template <typename t> struct static_stack: public vector<t> {
 };
 
 struct csr_adjacency {
-  typedef uint16_t   node;	// Up to 2^8-1  nodes
-  typedef uint16_t  offset_t; 	// Up to 2^16-1 edges
-  vector<offset_t> row_starts;
-  vector<node>     neighbours;
 
-  int  n_neighbours(node u)            const { return row_starts[u+1]-row_starts[u]; }
-  const node operator()(node u, int i) const { return neighbours[row_starts[u]+i];   }
-  node& operator()(node u, int i)            { return neighbours[row_starts[u]+i];   }
+  vector<csr_offset_t> row_starts;
+  vector<node_t>       neighbours;
+
+  int  n_neighbours(node_t u)            const { return row_starts[u+1]-row_starts[u]; }
+  const node_t operator()(node_t u, int i) const { return neighbours[row_starts[u]+i];   }
+  node_t& operator()(node_t u, int i)            { return neighbours[row_starts[u]+i];   }
   
   csr_adjacency(int n_nodes, int n_edges) : row_starts(n_nodes+1,0), neighbours(n_edges) {}
-  csr_adjacency(int n_nodes, const vector<pair<node,node>> &edges) : row_starts(n_nodes+1), neighbours(2*edges.size()) {
-    node counts[n_nodes];
+  csr_adjacency(int n_nodes, const vector<pair<node_t,node_t>> &edges) : row_starts(n_nodes+1), neighbours(2*edges.size()) {
+    node_t counts[n_nodes];
 
     // Count how many neighbours each node has
     for(int i=0;i<n_nodes;i++) counts[i] = 0;    
@@ -53,7 +60,7 @@ struct csr_adjacency {
 
     // Fill in neighbour lists
     for(auto &e: edges){
-      node u = e.first, v = e.second;
+      node_t u = e.first, v = e.second;
       neighbours[row_starts[u]+(--counts[u])] = v;
       neighbours[row_starts[v]+(--counts[v])] = u;      
     }
@@ -73,8 +80,7 @@ struct dendrogram_node {
 
 struct dendrogram: public vector<dendrogram_node> {
   // Max 16 elements - increase size to accommodate more elements
-  typedef uint16_t bitset;
-  typedef uint16_t  node;
+
   
   dendrogram(int capacity=12)          { reserve(capacity); }
   void merge(const dendrogram_node& n) { push_back({n.distance, min(n.left,n.right), max(n.left,n.right)}); }
@@ -84,7 +90,7 @@ struct dendrogram: public vector<dendrogram_node> {
     const vector<dendrogram_node> &dendro_edges(*this);
     const int N = dendro_edges.size()+1;
 
-    vector<pair<node,node>> edges(N-k);
+    vector<pair<node_t,node_t>> edges(N-k);
     for(int i=0;i<N-k; i++) edges[i] = make_pair(dendro_edges[i].left,dendro_edges[i].right);
 
     return csr_adjacency(N,edges);
@@ -92,13 +98,13 @@ struct dendrogram: public vector<dendrogram_node> {
   
   // Separate into the two classes of the most distant clusters.
   // 1-bits represent the class containing first left element, 0-bits the one that doesn't
-  vector<bitset> cluster_classes(int k) const {
+  vector<bitset_t> cluster_classes(int k) const {
     const vector<dendrogram_node> &edges(*this);
     const int N = edges.size()+1;
     
-    bitset             visited = 0;
-    vector<bitset>     clusters(k);
-    static_stack<node> work_stack(N);
+    bitset_t             visited = 0;
+    vector<bitset_t>     clusters(k);
+    static_stack<node_t> work_stack(N);
 
     csr_adjacency graph = sparse_graph(k);
     // cout << "\ndendrogram = " << *this << ";\n";
@@ -107,7 +113,7 @@ struct dendrogram: public vector<dendrogram_node> {
     for(int c=0;c<k;c++){
 
       // 1. Let u be the smallest node that has not yet been visited 
-      node u=0;
+      node_t u=0;
       for(;u<N;u++) if(~visited & (1<<u)) break;
       work_stack.push(u);
       
@@ -119,7 +125,7 @@ struct dendrogram: public vector<dendrogram_node> {
 
 	int n_v = graph.n_neighbours(u);
 	for(int i=0;i<n_v;i++){
-	  node v = graph(u,i);
+	  node_t v = graph(u,i);
 	  if(~visited & (1<<v)) work_stack.push(v);
 	}
       }
@@ -128,12 +134,42 @@ struct dendrogram: public vector<dendrogram_node> {
   }
 };
 
+pair<matrix<distance_t>,matrix<distance_t>>
+cluster_distances(const vector<bitset_t> &clusters,
+		  const matrix<distance_t> &P)
+{
+  int k = clusters.size();
+  int n = P.n;
+  matrix<distance_t> min_dist(k,k), max_dist(k,k);
+
+  for(int c1=0;c1<k;c1++)
+    for(int c2=c1;c2<k;c2++){
+      bitset_t   C1 = clusters[c1], C2 = clusters[c2];      
+      distance_t mn = distance_max, mx = 0;
+
+      // For each pair
+      for(int i=0;i<n;i++)
+	if(C1 & (1<<i))
+	  for(int j=0;j<n;j++)
+	    if(C2 & (1<<j)) {
+	      mn = min(mn, P(i,j));
+	      mx = max(mx, P(i,j));
+	    }
+
+      min_dist(c1,c2) = mn;
+      min_dist(c2,c1) = mn;
+      max_dist(c1,c2) = mx;
+      max_dist(c2,c1) = mx;      
+    }
+  return make_pair(min_dist,max_dist);
+}
+  
 
 
 // TODO:
 //  1. Færdiggør debugging
 //  2. Halver memory-footprint med pakket symmetrisk matrix
-dendrogram hierarchical_clustering(const matrix<uint8_t>& P)
+dendrogram hierarchical_clustering(const matrix<distance_t>& P)
 {
   size_t N = P.n;    
   matrix<uint8_t> dist = P;
@@ -212,9 +248,11 @@ matrix<uint8_t> dist1d(vector<int> data)
       dist(i,j) = abs(data[i]-data[j]);
   return dist;
 }
+}
 
 int main()
 {
+  using namespace clustering;
   //vector<int> names{{7, 10, 20, 28, 35}};
   //vector<int> names{{35, 20, 7, 28, 10}};  
   //vector<int> names{{1,2,5,10}};
@@ -222,30 +260,40 @@ int main()
   matrix<uint8_t> P(dist1d(names));
   
   dendrogram clusters;
-  vector<dendrogram::bitset> Cs;  
-  for(int i=0;i<1000000;i++){
-    clusters = hierarchical_clustering(P);
-    Cs = clusters.cluster_classes(2);
-    //  if(i%100000==0) cout << Cs << endl;
+  vector<bitset_t> Cs;  
+  //  for(int i=0;i<1000000;i++){
+  clusters = hierarchical_clustering(P);
+  //    Cs = clusters.cluster_classes(2);
+  //  if(i%100000==0) cout << Cs << endl;
     
-  }
+  //  }
 
-  Cs = clusters.cluster_classes(2);
+  Cs = clusters.cluster_classes(3);
   
   cout << "clusters_raw = " << clusters << ";\n";
   cout << "names = " << names << ";\n";
 
-  printf("Two clusters at distance %d:\n",clusters[clusters.size()-1].distance);
+  printf("Two clusters at distance %d:\n",clusters[clusters.size()-2].distance);
 
 
   for(auto c: Cs){
-    printf("%x\n",c);
+    printf("\n%x: ",c);
+    for(int i=0;i<P.n;i++) if(c & (1<<i)) printf("%d ",names[i]);
   }
+  printf("\n");
 
   for(int i=0;i<clusters.size();i++){
     clusters[i].left  = names[clusters[i].left];
     clusters[i].right = names[clusters[i].right];
   }
+
+  printf("Distances:\n");
+  auto Dc = cluster_distances(Cs,P);
+
+  cout << "Dmin = " << Dc.first  << endl;
+  cout << "Dmxa = " << Dc.second << endl;  
   
   return 0;
 }
+
+

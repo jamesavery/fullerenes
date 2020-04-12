@@ -7,12 +7,12 @@
 
 int main(int ac, char **argv)
 {
-  int N                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
   
-  if(ac<3 || N<20 || N==22 || N&1){
+  if(ac<3){
     fprintf(stderr,"Syntax: %s <N:int> [output_dir] [IPR:0|1] [only_nontrivial:0|1]\n",argv[0]);
     return -1;
   }
+  int N                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
 
   string output_dir   = ac>=3? argv[2] : "output";    // Argument 2: directory to output files to
   int IPR             = ac>=4? strtol(argv[3],0,0):0; // Argument 3: Only generate IPR fullerenes?

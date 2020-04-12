@@ -1,7 +1,7 @@
-#include "libgraph/fullerenegraph.hh"
-#include "libgraph/polyhedron.hh"
-#include "libgraph/triangulation.hh"
-#include "libgraph/isomerdb.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/polyhedron.hh"
+#include "fullerenes/triangulation.hh"
+#include "fullerenes/isomerdb.hh"
 
 int testN = 80;
 int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
@@ -125,28 +125,26 @@ Deltahedron halma_triangulation(const Deltahedron &P, int m=1) {
 int main(int ac, char **av)
 {
   int N;
-  Triangulation::jumplist_t jumps;
+  jumplist_t jumps;
   vector<int> RSPI(12);
   bool from_file = false;
-  if(ac==2){
+
+  if(ac==2){			// If only one argument is given, it is a filename to read initial polyhedron from
     from_file = true;
     N = 0;
-  } else if(ac==3) {//RSPI is quoted
+    
+  } else if(ac==3) {            // Pentagon indices in quoted string
     N = strtol(av[1],0,0);
+    int n = strlen(av[2]);
+    for(int i=0;i<n;i++) if(av[2][i] == ',') av[2][i] = ' ';
     istringstream iss(av[2]);
     for(int i=0;i<12;i++){ iss >> RSPI[i]; RSPI[i]--; }
-  } else if(ac<14){
-    N = testN;
-    for(int i=0;i<12;i++) RSPI[i] = testRSPI[i]-1;
-  }
-  if(ac>=14) {
-    N = strtol(av[1],0,0);
-    for(int i=0;i<12;i++) RSPI[i] = strtol(av[i+2],0,0)-1;
-  } 
-  if(ac>14){			// General RSPI: RSPI followed by jumps.
-    for(int i=14;i<ac;i+=2)
-      jumps.push_back(make_pair(strtol(av[i],0,0)-1,strtol(av[i+1],0,0)));
-  }
+    cout << "RSPI = " << RSPI << endl;
+  } else 
+    if(ac>=14) {
+      N = strtol(av[1],0,0);
+      for(int i=0;i<12;i++) RSPI[i] = strtol(av[i+2],0,0)-1;
+    } 
 
   // int isomer_number = ac>=3? strtol(av[2],0,0) : 1;
   // bool IPR = ac>=4? strtol(av[3],0,0) : false;
@@ -164,7 +162,7 @@ int main(int ac, char **av)
   Polyhedron P0;
   PlanarGraph g;
   if(from_file){
-    P0 = Polyhedron(av[1]);
+    P0 = Polyhedron::from_file(av[1]);
     N = P0.N;
     g = P0;
     g.layout2d = g.tutte_layout(-1,-1,-1,8);
@@ -177,54 +175,45 @@ int main(int ac, char **av)
   }
 
   string basename("polyhedron-"+to_string(N));
-  {
-    ofstream mol2(("output/"+basename+"-P0.mol2").c_str());
-    mol2 << P0.to_mol2();
-    mol2.close();
-  }
+  Polyhedron::to_file(P0,"output/"+basename+"-P0.mol2");
 
   Polyhedron P(P0);
   P.optimize();
 
-  {
-    ofstream mol2(("output/"+basename+".mol2").c_str());
-    mol2 << P.to_mol2();
-    mol2.close();
-  }
+  Polyhedron::to_file(P,"output/"+basename+".mol2");
 
   {
     P.move_to_origin();
     matrix3d If(P.principal_axes());
     P.points = If*P.points;
 
-    ofstream mol2(("output/"+basename+"-if.mol2").c_str());
-    mol2 << P.to_mol2();
-    mol2.close();
+    Polyhedron::to_file(P,"output/"+basename+"-if.mol2");
 
-    ofstream pov(("output/"+basename+"-if.pov").c_str());
-    pov << P.to_povray();
-    pov.close();
+
+    // ofstream pov(("output/"+basename+"-if.pov").c_str());
+    // pov << P.to_povray();
+    // pov.close();
   }
 
-  ofstream output(("output/"+basename+".m").c_str());
+  // ofstream output(("output/"+basename+".m").c_str());
 
-  facemap_t facemap(g.compute_faces(8,true));
-  output << "g = " << g << ";\n";
-  output << "coordinates0 = " << P0.points << ";\n";
-  output << "coordinates = "  << P.points << ";\n";
-  output << "pentagons = " << facemap[5] << ";\n"
-  	  << "hexagons  = " << facemap[6] << ";\n"
-  	  << "RSPI = " << RSPI << ";\n";
+  // facemap_t facemap(g.compute_faces(8,true));
+  // output << "g = " << g << ";\n";
+  // output << "coordinates0 = " << P0.points << ";\n";
+  // output << "coordinates = "  << P.points << ";\n";
+  // output << "pentagons = " << facemap[5] << ";\n"
+  // 	  << "hexagons  = " << facemap[6] << ";\n"
+  // 	  << "RSPI = " << RSPI << ";\n";
 
-  output << "P0 = " << P0 << ";\n";
-  output << "P = " << P << ";\n";
+  // output << "P0 = " << P0 << ";\n";
+  // output << "P = " << P << ";\n";
 
-  Polyhedron D(P.dual(6,true));
-  D.layout2d = D.tutte_layout();
-  D.faces    = D.compute_faces_flat(3,true);
-  D.face_max = 3;
-  //   D.optimize();
-  output << "PD = " << D << ";\n";
+  Polyhedron D(P.dual());
+  // D.layout2d = D.tutte_layout();
+  // D.faces    = D.compute_faces_flat(3,true);
+  // D.face_max = 3;
+  // //   D.optimize();
+  // output << "PD = " << D << ";\n";
 
   Deltahedron DD{D,D.points};
   DD.smooth(.8);
@@ -238,7 +227,8 @@ int main(int ac, char **av)
 
   Polyhedron  PHD(HD.g,HD.points,3,HD.faces());  
   //  Polyhedron  PHD2(HD2.g,HD2.points,3,HD2.faces());
-  Polyhedron  PH(PHD.dual(3,false));
+  Polyhedron  PH(PHD.dual());
+
   //  Polyhedron  PH2(PHD2.dual(3,false));
   PH.optimize();
   //  PH2.optimize();
@@ -246,48 +236,33 @@ int main(int ac, char **av)
 		  
   // output << "PHD  = " << PHD << ";\n";
   // output << "PHD2 = " << PHD2 << ";\n";
-  output << "PH  = " << PH << ";\n";
-  output << "DDg = " << DD.g << ";\n"
-	 << "DDpoints = " << DD.points << ";\n"
-	 << "DDfaces  = " << (DD.g.triangles+1) << ";\n";
+  // output << "PH  = " << PH << ";\n";
+  // output << "DDg = " << DD.g << ";\n"
+  // 	 << "DDpoints = " << DD.points << ";\n"
+  // 	 << "DDfaces  = " << (DD.g.triangles+1) << ";\n";
 
-  output << "HDg = " << HD.g << ";\n"
-	 << "HDpoints = " << HD.points << ";\n"
-	 << "HDfaces  = " << (HD.g.triangles+1) << ";\n";
+  // output << "HDg = " << HD.g << ";\n"
+  // 	 << "HDpoints = " << HD.points << ";\n"
+  // 	 << "HDfaces  = " << (HD.g.triangles+1) << ";\n";
   
   // output << "HD2g = " << HD2.g << ";\n"
   // 	 << "HD2points = " << HD2.points << ";\n"
   // 	 << "HD2faces  = " << (HD2.g.triangles+1) << ";\n";
 
-  output.close();
+  //  output.close();
   
 
-  {
-    ofstream mol2(("output/"+basename+"-dual.mol2").c_str());
-    mol2 << D.to_mol2();
-    mol2.close() ;
+  Polyhedron::to_file(D,"output/"+basename+"-dual.mol2");
+  //    Polyhedron::to_file(D,"output/"+basename+"-dual.pov");
 
-    ofstream pov(("output/"+basename+"-dual.pov").c_str());
-    pov << D.to_povray();
-    pov.close();
-  }
-
-  {
-    ofstream mol2(("output/"+basename+"-halma.mol2").c_str());
-    mol2 << PH.to_mol2();
-    mol2.close() ;
-  }
+  Polyhedron::to_file(PH,"output/"+basename+"-halma.mol2");
   // {
   //   ofstream mol2(("output/"+basename+"-halma2.mol2").c_str());
   //   mol2 << PH2.to_mol2();
   //   mol2.close() ;
   // }
 
-  {
-    ofstream mol2(("output/"+basename+"-dual-halma.mol2").c_str());
-    mol2 << PHD.to_mol2();
-    mol2.close() ;
-  }
+  Polyhedron::to_file(PHD,"output/"+basename+"-dual-halma.mol2");
   // {
   //   ofstream mol2(("output/"+basename+"-dual-halma2.mol2").c_str());
   //   mol2 << PHD2.to_mol2();

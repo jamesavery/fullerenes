@@ -146,15 +146,15 @@ vector<Eisenstein> polygon::reduce() const {
 vector<Eisenstein> polygon::allpoints() const {
   scanline S = scanConvert();
 
-  set<Eisenstein> points;
+  vector<Eisenstein> points;
   for(int i=0;i<S.xs.size();i++)
     for(int j=0;j<S.xs[i].size()/2;j++){
       int start = S.xs[i][2*j], end = S.xs[i][2*j+1];
       for(int x=start;x<=end;x++)
-	points.insert(Eisenstein(x,i+S.minY));
+	points.push_back(Eisenstein(x,i+S.minY));
     }
 
-  return vector<Eisenstein>(points.begin(),points.end());
+  return points;
 }
 
 vector<Eisenstein> polygon::controlpoints() const {
@@ -170,35 +170,41 @@ vector<Eisenstein> polygon::controlpoints() const {
 
 polygon::scanline polygon::scanConvert() const {
   int minY=INT_MAX, maxY=INT_MIN;
-  for(int i=0;i<reduced_outline.size();i++) {
-    if(reduced_outline[i].second < minY) minY = reduced_outline[i].second;
-    if(reduced_outline[i].second > maxY) maxY = reduced_outline[i].second;
+  for(auto xy: reduced_outline) {
+    int y = xy.second;
+    minY = min(minY,y);
+    maxY = max(maxY,y);
   }
     
   scanline S;
   S.minY = minY;
   S.xs = vector<vector<int> >(maxY-minY+1);
 
-  for(int i=0;i<reduced_outline.size();i++){ 
-    vector<Eisenstein> segment(draw_line(reduced_outline[i],reduced_outline[(i+1)%reduced_outline.size()]));
+  for(int i=0;i<reduced_outline.size();i++){
+    auto edge_start = reduced_outline[i], edge_end = reduced_outline[(i+1)%reduced_outline.size()];
+    
+    vector<Eisenstein> segment = draw_line(edge_start,edge_end);
+    int x0 = segment[0].first, y0 = segment[0].second;
 
-    if(peak(i,true) || (saddle(i,true) && turn_direction(i,true) == -1)) // If peak or left-turning saddle
+    // If peak or left-turning saddle include point twice.
+    if(peak(i,true) || (saddle(i,true) && turn_direction(i,true) == -1)) 
       {
-	int loc = segment[0].second-minY;
-	assert(loc >= 0 && loc<S.xs.size());
-	S.xs[segment[0].second-minY].push_back(segment[0].first);          // include point twice.
+	int y = y0-minY;
+	assert(y >= 0 && y<S.xs.size());
+	S.xs[y].push_back(x0);          
       }
 
+    // Add each edge segment x-position to corresponding y-position (not in order)
     for(int j=1;j<segment.size();j++){
-      const Eisenstein& xy(segment[j]);
-      int loc = xy.second-minY;
-      assert(loc >= 0 && loc<S.xs.size());
-      S.xs[xy.second-minY].push_back(xy.first);
+      int x = segment[j].first, y = segment[j].second-minY;
+      assert(y >= 0 && y<S.xs.size());
+      S.xs[y].push_back(x);
     }
   }
 
-  for(int i=0;i<S.xs.size();i++)
-    sort(S.xs[i].begin(),S.xs[i].end());
+  // Finally, sort xs for each y-position
+  for(int y=0;y<S.xs.size();y++)
+    sort(S.xs[y].begin(),S.xs[y].end());
 
   return S;
 }
@@ -224,7 +230,16 @@ bool polygon::point_inside(const Eisenstein& x) const
 {
   return winding_number(x) != 0;
 }
-  
+
+polygon polygon::operator*(Eisenstein x) const
+{
+  return polygon(outline*x);
+}
+
+polygon polygon::operator+(Eisenstein x) const
+{
+  return polygon(outline+x);
+}
 
 ostream& operator<<(ostream& S, const polygon& P)
 {

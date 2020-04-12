@@ -107,7 +107,7 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
   return triangles;
 }
 
-
+// TODO: Factor out tri_numbers to do only once?
 PlanarGraph Triangulation::dual_graph() const
 {
   IDCounter<tri_t> tri_numbers;
@@ -141,7 +141,7 @@ PlanarGraph Triangulation::dual_graph() const
 };
 
 
-vector<face_t> Triangulation::dual_faces() const
+vector<face_t> Triangulation::cubic_faces() const
 {
   vector<face_t> dfaces(N);
 
@@ -152,7 +152,7 @@ vector<face_t> Triangulation::dual_faces() const
     const vector<node_t> &nu(neighbours[u]);
     face_t f(nu.size());
     for(int i=0;i<nu.size();i++){
-      node_t v=nu[i], w = next_on_face(u,v);
+      node_t v=nu[i], w = nu[(i+1)%nu.size()]; // next_on_face(u,v);
       f[i] = tri_numbers(tri_t(u,v,w).sorted());
     }
     dfaces[u] = f;
@@ -929,6 +929,7 @@ matrix<int> Triangulation::pentagon_distance_mtx() const {
   return all_pairs_shortest_paths(pentagon_indices);
 }
 
+
 // TODO: Do we need to do Dijkstra on sqrt(H) after all?
 matrix<Triangulation::simple_geodesic>
 Triangulation::simple_geodesics(vector<node_t> nodes,
@@ -961,6 +962,10 @@ Triangulation::simple_geodesics(vector<node_t> nodes,
       H(U,U) = INT_MAX; // Initialize diagonal to infinity -- we want shortest self-geodesics, i.e. circling 2pi of curvature
       M[U] *= 2;        // To capture self-geodesics, we need to look twice as far (there and back again)
     }
+
+  // Work with square distances, which are all integers (after setting M)
+  for(int i=0;i<H.size();i++) H[i] *= H[i];     
+  
   //  cout << "M = " << M << endl;
 
   for(node_t u: nodes){
@@ -1005,6 +1010,7 @@ matrix<int> Triangulation::simple_square_surface_distances(vector<node_t> nodes,
   // Initialize H to graph distances, which are upper bound to surface distances:
   // 3/4 d_g^2 <= d_surface^2 <= d_g^2
   matrix<int>             H(nodes.size(),nodes.size(),all_pairs_shortest_paths(nodes));
+
 
   // M[u] = max_v(d_g(u,v)) is upper bound to surface distance from u  
   vector<int> M(nodes.size(),0);	// M[u] = max_v(d_g(u,v)) is upper bound to surface distance from u
@@ -1053,9 +1059,11 @@ matrix<double> Triangulation::surface_distances(vector<node_t> nodes,
 						bool calculate_self_geodesics) const
 {
   matrix<double> H(simple_square_surface_distances(nodes,calculate_self_geodesics));
-  for(int i=0;i<N*N;i++) H[i] = sqrt(H[i]);
+  for(int i=0;i<H.size();i++) H[i] = sqrt(H[i]);
 
-  return H.APSP();
+  auto D = H.APSP(false);
+  for(int i=0;i<D.size();i++) D[i] *= D[i];  
+  return D;
   // bool nonconvex = false;
   // for(node_t u=0;u<N;u++) if(neighbours[u].size() > 6) nonconvex = true;
 

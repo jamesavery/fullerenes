@@ -5,12 +5,16 @@
 #include "fullerenes/matrix.hh"
 #include "fullerenes/spiral.hh"
 #include "fullerenes/planargraph.hh"
+#include "fullerenes/planargraph.hh"
 
+// TODO: Easy correspondence between cubic and dual 
+//  1. Triangle numbers correspond to cubic nodes
+//  2. 
 class Triangulation : public PlanarGraph {
 public:
   typedef function<bool(Triangulation)> predicate_t;
 
-  vector<tri_t> triangles;	// Faces
+  vector<tri_t> triangles;	// Faces 
 
   // Operations:
   //  1. Orient triangulation
@@ -31,8 +35,20 @@ public:
   Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral_code, fsn.jumps, true){} // best_effort = true
 
   PlanarGraph dual_graph() const;
-  vector<face_t> dual_faces() const;
+  vector<face_t> cubic_faces() const;
 
+  size_t max_degree() const {
+    size_t max_degree = 0;
+    for(auto &nu: neighbours) max_degree = max(max_degree, nu.size());
+    return max_degree;
+  }
+
+  vector<uint8_t> n_degrees() const {
+    vector<uint8_t> n_degrees(max_degree(),0);
+    for(auto &nu: neighbours) n_degrees[nu.size()-1]++;
+    return n_degrees;
+  }
+  
   // takes a triangulation, and returns a dual of the inverse leapfrog
   // this is cheap because we just remove a set of faces
   PlanarGraph inverse_leapfrog_dual() const;
@@ -98,11 +114,11 @@ public:
   matrix<int>    pentagon_distance_mtx() const;
 
 
-  matrix<int>              simple_square_surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=true) const;
-  matrix<double>           surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=true) const;
+  matrix<int>              simple_square_surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
+  matrix<double>           surface_distances(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
   
-  matrix<geodesic>         surface_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=true) const;    
-  matrix<simple_geodesic>  simple_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=true) const;
+  matrix<geodesic>         surface_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;    
+  matrix<simple_geodesic>  simple_geodesics(vector<node_t> only_nodes = {},bool calculate_self_geodesics=false) const;
   
   node_t         end_of_the_line(node_t u0, int i, int a, int b) const;
   vector<vector<node_t>> quads_of_the_line(node_t u0, int i, int a, int b) const;  
@@ -134,3 +150,45 @@ public:
 };
 
 
+class CubicPair {
+  Triangulation T;
+  PlanarGraph   G;
+  IDCounter<tri_t> triangle_id;  
+  vector<vector<dedge_t>> CtoD, DtoC;
+  
+  int face_start(const face_t &f){
+    node_t m, i_m;
+    for(int i=0, m=INT_MAX; i<f.size(); i++) if(f[i] < m){ i_m = i; m = f[i]; }
+    return i_m;
+  }
+    
+  CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<dedge_t>(3)), DtoC(T.N)
+  {
+    for(const auto &t: T.triangles) triangle_id.insert(t.sorted());
+  
+    for(node_t u=0;u<T.N;u++){
+      const auto& nu = T.neighbours[u];
+      DtoC[u].resize(nu.size()); 
+
+      // For each directed edge v->u
+      for(int i=0;i<nu.size();i++){
+
+	node_t v = nu[i];
+	node_t s = nu[(i+1)%nu.size()];           // u->v->s is triangle associated with u->v
+	node_t t = nu[(i+nu.size()-1)%nu.size()]; // v->u->t is triangle associated with v->u
+
+	tri_t t1 = {u,v,s}, t2 = {v,u,t};
+	
+	// dedges get a unique number: id(u,i) = row_offset[u]+i
+	node_t U   = triangle_id(t1.sorted()), V = triangle_id(t2.sorted());
+	node_t i_V = G.dedge_ix(U,V), i_U = G.dedge_ix(V,U);
+	node_t i_v = T.dedge_ix(u,v), i_u = T.dedge_ix(v,u);
+	
+	CtoD[U][i_V] = {u,i_v};
+	CtoD[V][i_U] = {v,i_u};
+	DtoC[u][i_v] = {U,i_V};
+	DtoC[v][i_u] = {V,i_U};
+      }
+    }
+  }
+};

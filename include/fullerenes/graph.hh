@@ -39,16 +39,18 @@ struct Graph {
     update_from_edgeset(edge_set);
   }
 
+
   bool insert_edge(const dedge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
   bool remove_edge(const edge_t& e);
   bool edge_exists(const edge_t& e) const;
   void remove_isolated_vertices();
   void remove_vertices(set<int> &sv);
 
+  int  dedge_ix(node_t u, node_t v) const;  
   node_t next(node_t u, node_t v) const;
   node_t prev(node_t u, node_t v) const;
-  node_t next_on_face(const node_t &u, const node_t &v) const;
-  node_t prev_on_face(const node_t &u, const node_t &v) const;
+  node_t next_on_face(node_t u, node_t v) const;
+  node_t prev_on_face(node_t u, node_t v) const;
 
   bool is_consistently_oriented() const;
   bool adjacency_is_symmetric() const;
@@ -60,7 +62,7 @@ struct Graph {
   matrix<int> all_pairs_shortest_paths(const vector<node_t>& V,
 				       const unsigned int max_depth = INT_MAX) const;
   matrix<int> all_pairs_shortest_paths(const unsigned int max_depth = INT_MAX) const;
-  list< list<node_t> > connected_components() const;
+  vector<vector<node_t> > connected_components() const;
   
   // Find shortest cycle of the form s->...->s
   vector<node_t> shortest_cycle(node_t s, const int max_depth) const;

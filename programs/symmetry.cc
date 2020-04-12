@@ -1,28 +1,18 @@
 #include "fullerenes/spiral.hh"
 #include "fullerenes/symmetry.hh"
 
-// struct GSpiral {
-//   PlanarGraph::jumplist_t   jumps;
-//   vector<int>  spiral;
-//   GSpiral(const PlanarGraph::jumplist_t& jumps = PlanarGraph::jumplist_t(), 
-// 	  const vector<int>& spiral = vector<int>()) : jumps(jumps), spiral(spiral) {}
-// };
-
 #include "symmetry-examples.cc"
 
-int main(int ac, char **av)
+int main(int argc, char **argv)
 {
   int N;
   jumplist_t jumps;
   vector<int> spiral;
 
-  if(ac>13){
-    N = strtol(av[1],0,0);
-    spiral = vector<int>(N/2+2,6);
-    for(int i=0;i<12;i++) spiral[strtol(av[i+2],0,0)-1] = 5;    
-  } else if(ac>1){
-    string sym = av[1];
-    int number = ac>2? strtol(av[2],0,0) : 0;
+  // Parse command line
+  if(argc==3){		// Two arguments: Symmetry name and example number
+    string sym = argv[1];
+    int number = argc>2? strtol(argv[2],0,0) : 0;
     
     cout << "sym = " << sym << "; number = " << number << endl;
 
@@ -30,25 +20,30 @@ int main(int ac, char **av)
     N = e.N;
     spiral = vector<int>(N/2+2,6);
     for(int i=0;i<12;i++) spiral[e.RSPI[i]-1] = 5;
-  } else {
-    N = 20;
-    spiral = vector<int>(12,5);
+  } else if(argc==14){		// 13 arguments: N and 12 pentagon indices (starting from 1)
+    N = strtol(argv[1],0,0);
+    spiral = vector<int>(N/2+2,6);
+    for(int i=0;i<12;i++) spiral[strtol(argv[i+2],0,0)-1] = 5;    
+  }  else {
+    fprintf(stderr,"Usage:\n"
+	    "\t%s <Symmetry name> <example number>                 (See symmetry-examples.cc)\n"
+	    "\t%s <N> <12 pentagon indices separated by spaces>\n",
+	    argv[0],argv[0]);
+    return -1;
   }
-
-  cout << "n = " << N << ";\n"
+  
+  cout << "N = " << N << ";\n"
        << "spiral = " << spiral << ";\n";
 
+  // Compute symmetry-information
   Symmetry g(spiral);
 
-  printf("Gorder=%d\n",int(g.G.size()));
-  vector<int> involutions = g.involutions();
-  printf("Ninvolutions=%d\n",int(involutions.size()));
-  
-  cout << "g = " << g << ";\n";
-  // cout << "permutations = " << g.G << ";\n";
-  // cout << "permutations = " << g.Gtri << ";\n";
-  // cout << "permutations = " << g.Gedge << ";\n";
+  printf("Symmetry-group order=%d\n",int(g.G.size()));
 
+  vector<int> involutions = g.involutions();
+  printf("Number of involutions=%d\n",int(involutions.size()));
+  
+  cout << "g = " << g.neighbours << ";\n";
 
   vector<int> 
     mF = g.site_symmetry_counts(g.G),

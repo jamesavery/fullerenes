@@ -122,6 +122,7 @@ struct spiral_nomenclature {
     return s;
   }
 
+  
 };
 
 

@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <fstream>
-#include "libgraph/triangulation.hh"
-#include "libgraph/fullerenegraph.hh"
-#include "libgraph/eisenstein.hh"
+#include "fullerenes/triangulation.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/eisenstein.hh"
 #include <vector>
 
 using namespace std;

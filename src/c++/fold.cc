@@ -7,52 +7,79 @@
 /************************************************************/ 
 
 
+// TODO: Use Eisenstein layout to insert arcs correctly oriented directly
+//       Replace omega by i_omega={0,1,2}
+//
+//       u--v--w places n[v][i_omega] = w, n[v][i_omega+3] = u, so
+//       u--v    places n[u][i_omega] = v, n[v][i_omega+3] = u
+// HOW TO IMPLEMENT:
+//       void connect_xxx(Graph &n, int i_omega)
+//       Fill in n
+
+
+// connect_cross connects edges in split triangles
+// (for outline segments that do not align with Eisenstein grid)
 vector<edge_t> Folding::connect_cross(const Eisenstein& w)
 {
   vector<edge_t> edges;
 
   // Register reverse arcs
   map<dedge_t,dedgecoord_t> reverse_arc;
-  vector< pair<Eisenstein,Eisenstein> > EC, ECp;
+  vector< pair<Eisenstein,Eisenstein> > EC, ECp; // Split edge Eisenstein coordinates 
 
+  Eisenstein xu, xv;
+  node_t u,v;
   for(int i=0;i<outline.size();i++){
-    const Eisenstein xu(outline[i].first), xv(outline[(i+1)%outline.size()].first);
-    const node_t u(outline[i].second), v(outline[(i+1)%outline.size()].second);
-    reverse_arc[dedge_t(v,u)] = dedgecoord_t(xu,xv);
+    tie(xu,u) = outline[i];
+    tie(xv,v) = outline[(i+1) % outline.size()];
+
+    reverse_arc[{v,u}] = {xu*w, xv*w}; // Rotated coordinates of arc v->u
   }
 
-  Eisenstein iw(w.invertn());
+  Eisenstein iw = w.invertn();
   for(int i=0;i<outline.size();i++){
-    Eisenstein X0(outline[i].first*w), X1(outline[(i+1)%outline.size()].first*w);
-    node_t     U(outline[i].second), V(outline[(i+1)%outline.size()].second);
-    dedgecoord_t Xuv(X0,X1), Xvu(reverse_arc[dedge_t(U,V)]);
-    Xvu.first  = Xvu.first *w;
-    Xvu.second = Xvu.second*w;
+    tie(xu,u) = outline[i];
+    tie(xv,v) = outline[(i+1) % outline.size()];
 
-    Eisenstein x0,x0p,T;
-    Unfolding::transform_line(Xuv,Xvu, x0,x0p, T);
+    // First get the coordinates of arc u->v and the reverse v->u
+    dedgecoord_t Xuv = {xu*w,xv*w}, Xvu = reverse_arc[{u,v}];
 
-    vector<Eisenstein> segment(polygon::draw_line(X0,X1)), 
-      revsegment(polygon::draw_line(X1,X0));
+    // What the affine transform that takes the line segment Xuv into Xvu?
+    Eisenstein
+      xu0,			// Coord of u in u->v
+      xu1,			// Coord of u in v->u
+      T;			// Rotation transform
+    Unfolding::transform_line(Xuv,Xvu, xu0,xu1, T);
+
+    // Alongside u->v, rasterize u->v line segment forwards and backwards
+    vector<Eisenstein> segment   (polygon::draw_line(xu*w,xv*w)), 
+                       revsegment(polygon::draw_line(xv*w,xu*v));
     reverse(revsegment.begin(),revsegment.end());
     assert(segment.size() == revsegment.size());
 
+    // Go through the nodes of the line segments rasterized back and forth along u->v
     for(int j=0;j<segment.size();j++){
       const Eisenstein& x(segment[j]), y(revsegment[j]);
+      // Forward rasterization rounds to the right, backwards to the left.
+      // So when x != y, we have a split triangle and an edge that needs to be connected across the boundary 
       if(x != y){
-	Eisenstein xp((x-x0)*T+x0p);
-	Eisenstein yp((y-x0)*T+x0p);
+	Eisenstein xp((x-xu0)*T+xu1); // Rotate and translate from u->v to v->u coords
+	Eisenstein yp((y-xu0)*T+xu1); // Rotate and translate from u->v to v->u coords
+
+	// Connect untransformed u to transformed v
 	node_t u = grid(x*iw), v = grid(yp*iw);
-	assert(u>=0 && v>=0);
 	edges.push_back(edge_t(u,v));
-	
-	EC.push_back(make_pair(x,y));
-	ECp.push_back(make_pair(xp,yp));
+
+	// Debugging
+	assert(u>=0 && v>=0);	
+	EC.push_back({x,y});
+	ECp.push_back({xp,yp});
       }
       
     }
   }
 
+  // Debugging
   polygon P(w*get_keys(outline));
   if(debug_flags & WRITE_FILE)
     debug_file
@@ -65,26 +92,33 @@ vector<edge_t> Folding::connect_cross(const Eisenstein& w)
   return edges;
 }
 
+// connect_polygon connects all the inner edges in the outline polygon
+// by exact scan-conversion and rasterization
 vector<edge_t> Folding::connect_polygon(const Eisenstein& w)
 {
+  vector<edge_t> edges;  
   Eisenstein iw(w.invertn());
   vector<Eisenstein> outline_coords(w*get_keys(outline));
   polygon P(outline_coords);
-  polygon::scanline S(P.scanConvert());
   
-  vector<edge_t> edges;
-  for(int i=0;i<S.xs.size();i++){
-    for(int j=0;j<S.xs[i].size()/2;j++){
-      int start = S.xs[i][2*j], end = S.xs[i][2*j+1];
-      for(int x=start;x<end;x++){
-	node_t u = grid(Eisenstein(x,i+S.minY)*iw), v = grid(Eisenstein(x+1,i+S.minY)*iw);
-	if(u>=0 && v>=0) edges.push_back(edge_t(u,v));
-      }
+  polygon::scanline S(P.scanConvert());
+
+  for(int y=0;y<S.xs.size();y++){        // For each y..
+    for(int j=0;j<S.xs[y].size()/2;j++){ // ..go through each inner interval
+      int x_start = S.xs[y][2*j], x_end = S.xs[y][2*j+1];
+
+      for(int x=x_start;x<x_end;x++){
+	node_t u = grid(Eisenstein(x,y+S.minY)), v = grid(Eisenstein(x+1,y+S.minY)*iw);
+	edges.push_back({u,v});
+
+	assert(u>=0 && v>=0);
+      }      
     }
   }
   return edges;
 }
 
+// The inner edges and the cross-outline edges are all the edges
 vector<edge_t> Folding::connect(const Eisenstein& w)
 {
   vector<edge_t> 
@@ -99,14 +133,19 @@ vector<edge_t> Folding::connect(const Eisenstein& w)
 }
 
 
+// The whole outline is connected into a triangulation / cubic graph dual
+// by rotating 0, 60, and 120 degrees and "drawing" the horizontal edges
 vector<edge_t> Folding::connect()
 {
+  Eisenstein I = {1,0}, CW = {1,-1}, CCW = {0,1};
+  
   vector<edge_t> 
-    e(connect(Eisenstein(1,0))),
-    eCW(connect(Eisenstein(1,-1))),
-    eCCW(connect(Eisenstein(0,1))), edges;
+    e(connect(I)),
+    eCW(connect(CW)),
+    eCCW(connect(CCW)), edges;
   
   copy(e.begin(),   e.end(),back_inserter(edges));
+
   if(!(debug_flags & DONT_ROTATE)){
     copy(eCW.begin(), eCW.end(),back_inserter(edges));
     copy(eCCW.begin(),eCCW.end(),back_inserter(edges));
@@ -116,64 +155,77 @@ vector<edge_t> Folding::connect()
 }
 
 
+// TODO: Shouldn't this do the 3 rotations?
 vector<int> Folding::identify_nodes() const
 {
+  node_t u, v, U, V;
+  Eisenstein xu, xv, XU, XV;  
   set<edge_t> same_as;
 
-  // Register reverse arcs
   map<dedge_t,dedgecoord_t> reverse_arc;
 
-  for(int i=0;i<outline.size();i++){
-    const Eisenstein xu(outline[i].first), xv(outline[(i+1)%outline.size()].first);
-    const node_t u(outline[i].second), v(outline[(i+1)%outline.size()].second);
-    reverse_arc[dedge_t(v,u)] = dedgecoord_t(xu,xv);
-  }
 
-  for(int i=0;i<outline.size();i++){
-    Eisenstein X0(outline[i].first), X1(outline[(i+1)%outline.size()].first);
-    node_t     U(outline[i].second), V(outline[(i+1)%outline.size()].second);
-    dedgecoord_t Xuv(X0,X1), Xvu(reverse_arc[dedge_t(U,V)]);
-    Xvu.first  = Xvu.first ;
-    Xvu.second = Xvu.second;
+  Eisenstein I = {1,0}, CW = {1,-1}, CCW = {0,1};
+  Eisenstein omegas[3] = {I,CW,CW};
 
-    Eisenstein x0,x0p,T;
-    Unfolding::transform_line(Xuv,Xvu, x0,x0p, T);
+  for(int i_omega=0;i_omega<3;i_omega++){
+    Eisenstein omega = omegas[i_omega], omega_inv = omega.invertn();
+    
+    // Register reverse arcs
+    for(int i=0;i<outline.size();i++){
+      tie(xu,u) = outline[i];
+      tie(xv,v) = outline[(i+1) % outline.size()];
 
-    //TODO: Handle horizontal lines.
-    vector<Eisenstein> segment(polygon::draw_line(X0,X1)), 
-      revsegment(polygon::draw_line(X1,X0));
-    reverse(revsegment.begin(),revsegment.end());
-    assert(segment.size() == revsegment.size());
+      reverse_arc[{v,u}] = {xu*omega,xv*omega}; 
+    }
 
-    for(int j=0;j<segment.size();j++){
-      const Eisenstein& x(segment[j]), y(revsegment[j]);
-      if(x == y){
-	Eisenstein xp((x-x0)*T+x0p);
-	node_t u = grid(x), v = grid(xp);
-	assert(u>=0 && v>=0);
-	same_as.insert(edge_t(u,v));
+    // For each segment U->V of the outline, find the reverse one, and identify
+    // the nodes on the path that are *not* on split triangles
+    for(int i=0;i<outline.size();i++){
+      tie(XU,U) = outline[i];
+      tie(XV,V) = outline[(i+1) % outline.size()];
+
+      dedgecoord_t XUV(XU*omega,XV*omega), XVU(reverse_arc[{U,V}]);
+
+      Eisenstein x0,x0p,T;
+      Unfolding::transform_line(XUV,XVU, x0,x0p, T);
+
+      //TODO: Handle horizontal lines. (?)
+      vector<Eisenstein> segment(polygon::draw_line(XU,XV)), 
+	revsegment(polygon::draw_line(XV,XU));
+      reverse(revsegment.begin(),revsegment.end());
+      assert(segment.size() == revsegment.size());
+
+      // 
+      for(int j=0;j<segment.size();j++){
+	const Eisenstein& x(segment[j]), y(revsegment[j]);
+	if(x == y){
+	  Eisenstein xp = (x-x0)*T+x0p;
+	  node_t u = grid(x*omega_inv), v = grid(xp*omega_inv);
+	  same_as.insert({u,v});
+
+	  assert(u>=0 && v>=0);	
+	}
       }
     }
   }
-
-
   // Find connected components
   vector<int> same(grid.size());
   for(int i=0;i<grid.size();i++) same[i] = i;
 
   Graph S(same_as);
-  list< list<node_t> > components(S.connected_components());
+  vector<vector<node_t> > components(S.connected_components());
 
-  for(list< list<node_t> >::const_iterator s(components.begin()); s!=components.end(); s++){
-    node_t canonical = *s->begin();
+  for(auto& c: components){
+    node_t canonical = *min_element(c.begin(),c.end());
 
-    for(list<node_t>::const_iterator t(s->begin()); t!=s->end(); t++){
-      same[*t] = canonical;
-    }
+    for(auto t: c) same[t] = canonical;
   }
+
 
   if(debug_flags&WRITE_FILE) 
     debug_file << "samecomponents = " << components << ";\n";
+
 
   return same;
 }
@@ -233,10 +285,17 @@ PlanarGraph Folding::fold()
 
 vector<node_t> Folding::outline_nodes() const
 {
+  node_t u, outline_N=0;
+  Eisenstein xu;
+  
   vector<node_t> same_nodes(identify_nodes());
   vector<node_t> outline_newnames(outline.size());
-  int outline_N=0;
-  for(int i=0;i<outline.size();i++){ outline_newnames[i] = grid(outline[i].first); outline_N = max(outline_N,outline[i].second+1); }
+
+  for(int i=0;i<outline.size();i++){
+    tie(xu,u) = outline[i];
+    outline_newnames[i] = grid(xu);
+    outline_N = max(outline_N,u+1);
+  }
   
   vector<node_t> new_nodenames(outline_N,-1);
   for(int i=0;i<outline.size();i++){

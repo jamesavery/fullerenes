@@ -7,6 +7,7 @@
 class Triangulation;
 
 // Cubic planar graphs (cubic polyhedral graphs)
+// TODO: Make this more useful, merge cubic-specific stuff from planargraph, make triangulation dual produce cubicgraph
 struct CubicGraph : public PlanarGraph {
 
   CubicGraph() {}

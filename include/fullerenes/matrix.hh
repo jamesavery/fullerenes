@@ -32,19 +32,41 @@ public:
     for(int i=0;i<A.m;i++)
       for(int j=0;j<B.n;j++){
 	T x = infty_value;
-	for(int k=0;k<A.n;k++) x = min(x, T(A[i*A.n+k]+B[k*B.n+j]));
-	x = min(x,infty_value);
+	for(int k=0;k<A.n;k++) x = std::min(x, T(A[i*A.n+k]+B[k*B.n+j]));
+	x = std::min(x,infty_value);
 	C[i*C.n+j] = x;
       }
     return C;    
   }
 
-  matrix APSP() const {
-    int count = ceil(log2(m));
-    matrix A(*this);
-    for(int i=0;i<count;i++) A = minplus_multiply(A,A);
-    
-    return A;
+  matrix APSP(bool zero_diagonal=true) const {
+
+    if(zero_diagonal){
+      // When A(i,i) = 0, any path of length < m is included in the set
+      // of paths of length m (as we can prefix with i->i->...->i).
+      // Hence, we only need to calculate A^(2^n), with log2(m) matrix muls.
+      int count = ceil(log2(m));
+      matrix A(*this);
+      for(int i=0;i<count;i++) A = minplus_multiply(A,A);
+      
+      return A;
+    } else {
+      // When we want non-trivial self-paths (A(i,i) > 0), we need all terms
+      // in the Kleene sum, except for the identity.
+      matrix A(*this), Ak(*this), S(*this);
+      for(int i=0;i<m;i++){
+	Ak = minplus_multiply(Ak,A);
+	S  = min(S,Ak);
+      }
+      return S;
+    }
+  }
+
+  static matrix min(const matrix& A, const matrix& B)
+  {
+    matrix C(A.m,A.n);
+    for(int i=0;i<A.size();i++) C[i] = std::min(A[i],B[i]);
+    return C;
   }
 
   matrix operator*(const matrix& B)

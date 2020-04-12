@@ -3,13 +3,14 @@
 #include <stdio.h>
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
-vector<string> PlanarGraph::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex"}};
-vector<string> PlanarGraph::input_formats{{"planarcode","xyz","mol2"}}; // TODO: Add ASCII
-vector<string> PlanarGraph::output_formats{{"ascii","planarcode"}}; // TODO: Add LaTeX, Mathematica
-
+vector<string> PlanarGraph::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","spiral"}};
+vector<string> PlanarGraph::input_formats{{"planarcode","xyz","mol2","spiral"}}; // TODO: Add ASCII
+vector<string> PlanarGraph::output_formats{{"ascii","planarcode","spiral"}}; // TODO: Add LaTeX, Mathematica
+ 
 int PlanarGraph::format_id(string name)
 {
-  for(int i=0;i<formats.size();i++) if(name == formats[i]) return i;
+  cout << "input_formats = " << input_formats << endl;
+  for(int i=0;i<formats.size();i++) if(name == formats[i]) return i; else cout << "Format is not " << formats[i] << endl;
   return -1;
 }
 
@@ -22,6 +23,8 @@ PlanarGraph PlanarGraph::from_file(FILE *file, string format, int index)
     return Polyhedron::from_xyz(file);
   case MOL2:
     return Polyhedron::from_mol2(file);
+  case SPIRAL:
+    return from_spiral(file, index); 
   default:
     cerr << "Input format is '" << format << "'; must be one of: " << input_formats << "\n";
     abort();
@@ -63,6 +66,17 @@ bool PlanarGraph::to_file(const PlanarGraph &G, string filename)
 
 
 ////////////////////////////// OUTPUT ROUTINES //////////////////////////////
+bool PlanarGraph::to_spiral(const PlanarGraph &P, FILE *file)  {
+  // TODO: Make general! Autodetect fullerene, triangulation, cubic, etc.
+  // TODO: Move to to_file, add as parameter.
+  auto naming_scheme = spiral_nomenclature::FULLERENE;
+  auto construction_scheme = spiral_nomenclature::CUBIC;
+  spiral_nomenclature name(P,naming_scheme,construction_scheme);  
+  string s = name.to_string()+"\n";
+  fputs(s.c_str(),file);
+  return ferror(file) == 0;
+}
+
 
 // TODO: Where does this belong?
 // Assumes file is at position of a graph start
@@ -195,6 +209,28 @@ bool PlanarGraph::to_mathematica(const PlanarGraph &G, FILE *file)
 }
 
 ////////////////////////////// INPUT ROUTINES //////////////////////////////
+
+PlanarGraph PlanarGraph::from_spiral(FILE *f, const size_t index)  {
+  // TODO: Make general! Autodetect fullerene, triangulation, cubic, etc.
+  // TODO: Move to to_file, add as parameter.
+  auto naming_scheme = spiral_nomenclature::FULLERENE;
+  auto construction_scheme = spiral_nomenclature::CUBIC;
+  char line[0x1000], *result;
+  printf("from_spiral()\n");
+  for(int i=0;i<=index;i++){
+    result = fgets(line,0x1000,f);
+    if(!result){
+      perror("fgets");
+      return {};
+    } else {
+      printf("result: %s, line: %s\n",result,line);
+    }
+  }
+  
+  spiral_nomenclature name(line);  
+  return FullereneGraph(name).halma_fullerene(1);
+}
+
 
 // Parse House of Graphs planarcode (not restricted to cubic graphs)
 PlanarGraph PlanarGraph::from_planarcode(FILE* file, const size_t index){

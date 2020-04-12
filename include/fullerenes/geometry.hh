@@ -628,7 +628,9 @@ public:
     vector< vector<int> > xs;
   };
 
-
+  polygon operator*(Eisenstein x) const;
+  polygon operator+(Eisenstein x) const;
+  
   static vector<Eisenstein> draw_line(const Eisenstein& x0,const Eisenstein& x1); 
   scanline scanConvert() const;  
 

@@ -250,6 +250,104 @@ namespace clustering {
   }
 }
 
+matrix<double> self_distances(const Triangulation &G, const vector<node_t> &nodes)
+{
+  vector<int> nodes_inverse(G.N,-1);
+  for(node_t U=0;U<nodes.size();U++){
+    node_t     u = nodes[U];
+    nodes_inverse[u] = U;
+  }
+
+  // Initialize H to graph distances, which are upper bound to surface distances,
+  matrix<int>          Dg(nodes.size(),nodes.size(),G.all_pairs_shortest_paths(nodes));
+  vector<double>       D(nodes.size());
+  vector<int>          M(nodes.size(),0);// M[u] = max_v(d_g(u,v)) is upper bound to surface distance from u
+
+  for(node_t U=0; U<nodes.size();U++){
+    D[U] = FLOAT_MAX;
+    for(node_t V=0;V<nodes.size();V++){
+      M[U]   = max(M[U], 2*Dg(U,V));
+    }
+
+    for(node_t u:nodes){
+      node_T U = nodes_inverse[u];
+
+      // We want to explore all triangular slices with (1,0) along each edge of u
+      for(int axis=0;axis<neighbours[u].size();axis++){
+	int a = 0, b = 1, c = 1, d = M[U];
+
+	// The simple geodesics correspond to the coprime pairs (a,b), a>=b.
+	// Since the graph diameter M is an upper bound to shortest path length,
+	// shortest geodesics must also have a^2 + ab + b^2 <= M^2.
+	// We generate the coprime pairs obeying this inequality as the M-Farey sequence,
+	// and treat (a,0) separately
+	while(c <= M[U]){
+	  // For each coprime pair (a,b) we get geodesics from u to v=end_of_theline(u,axis,(a,b)*n) for n = 1 until ||(a,b)*n||<=M
+	  // BUT: if deg(v) != 6, there is a split, as the line can be continued in multiple ways. For deg(v)=5, it splits in two
+	  auto simple_path = draw_path(a,b);
+
+	  stack<pair<dedge_t,Eisenstein>> workset;
+	  workset.push({{u,axis},{a,b}});
+	  while(!workset.empty()){                                //   y---z     s---v
+	    auto uxab = workset.pop();                            //  / \ / ... / \ /
+	    dedge_t sv = end_of_the_line(uxab.first,uxab.second); // u---x     t---r  
+	    Eisenstein dut = uwab.second
+	      
+	      switch(G.degree(v)){
+	      case 5:
+		workset.push({v,CW(wv,3)});
+		workset.push({v,CCW(wv,3)});	
+	      case 6:
+		workset.push({v,CW(wv,3)/*How do we get the right axis?*/})
+	      case 7:
+		workset.push({v,CW(wv,3)});
+		workset.push({v,CCW(wv,3)});
+	      default:
+		fprintf(stderr,"Geodesics not implemented for degree-%d curvature",G.degree(v));
+		abort();
+	      }
+	    }
+
+	  // Generate next (a,b).
+	  // TODO: Since we generate (a,b) in order of ascending fraction a/b, we can do some
+	  // dynamic programming to reduce the run-time by a full order (floor(a/b)=1, floor(a/b)=2,...)
+	  int k = (Nmax+b) / d;
+	  int a_next = c, b_next = d, c = k*c - a, d = k*d - b;
+	  a = a_next, b = b_next;
+	}
+      }
+    }
+    
+  for(node_t u: nodes){
+    for(int i=0;i<neighbours[u].size();i++){
+      node_t U  = nodes_inverse[u];
+
+      for(int a=1; a<M[U]; a++){	
+	for(int b=0; a*a + a*b + b*b < M[U]*M[U]; b++){
+	  int d = gcd(a,b);
+	  int ad = a/d, bd = b/d;
+
+	  node_t w = u;
+	  for(int i=0;i<d;i++){
+	    const node_t v = end_of_the_line(w,i,ad,bd);
+
+	  if(nodes_inverse[v] == u){ // Endpoint v is in nodes
+
+	    if(d_sqr < H(U,V)){
+	      //	      cout << u << "->" << vector<int>{{a,b,d_sqr}} << "->" << v <<endl;
+	      H(U,V) = d_sqr;
+	      G(U,V) = simple_geodesic(a,b,i);
+	    }
+	  }
+	}
+      }
+    }
+  }
+  //  cout << "Hend = " << H << endl;    
+  return G;
+  
+}
+
 // Graph distance:
 //  Square of all-pairs shortest paths matrix between pentagon nodes.
 //  (Squared in order to be comparable to the surface distance matrix, which tracks the square distances as integers)
@@ -269,7 +367,12 @@ matrix<int> pentagon_surface_distance(const Triangulation& G)
   vector<int> pentagon_indices(12);
   for(int u=0, i=0;u<G.N;u++) if(G.neighbours[u].size() == 5) pentagon_indices[i++] = u;
 								
-  return G.simple_square_surface_distances(pentagon_indices);
+  auto Hsqr = G.simple_square_surface_distances(pentagon_indices,true);
+  cerr << "Hsqr = " << Hsqr << ";\n";  
+  auto H    = G.surface_distances(pentagon_indices,true);
+  cerr << "H    = " << H << ";\n";
+
+  return H;
 }
 
 auto pentagon_geodesics(const Triangulation& G)
@@ -443,34 +546,34 @@ int main(int ac, char **argv)
       output_file << "neighbours = " << dP.neighbours << "+1;\n"
       		  << "faces      = " << dP.faces      << "+1;\n"
 		  << "points     = " << dP.points     << ";\n";
-   
+
       dualG = FullereneDual(dP);
-	
-      auto Ds = pentagon_surface_distance(dualG); //
-      auto Gs = pentagon_geodesics(dualG);
-      
+
+      auto Ds = pentagon_surface_distance(dualG); 
+      //      auto Gs = pentagon_geodesics(dualG);
+
       output_file << "Ds = " << Ds << ";\n";
       
-      for(int i=0;i<12;i++){
-      	Eisenstein g(Gs(i,i).g);
-      	int axis = Gs(i,i).axis;
-      	cout << make_pair(i,i) << " shortest self-geodesic";
-      	if(g != Eisenstein{0,0}){
-      	  cout << ": " << make_pair(g,axis) << "\n";
-          cout << "\t Path: " << dualG.quads_of_the_line(i,axis,g.first,g.second) << endl;										 
-      	} else {
-      	  cout << " passes through cone-point.\n"; 
-      	}
-      }
+      // for(int i=0;i<12;i++){
+      // 	Eisenstein g(Gs(i,i).g);
+      // 	int axis = Gs(i,i).axis;
+      // 	cout << make_pair(i,i) << " shortest self-geodesic";
+      // 	if(g != Eisenstein{0,0}){
+      // 	  cout << ": " << make_pair(g,axis) << "\n";
+      //     cout << "\t Path: " << dualG.quads_of_the_line(i,axis,g.first,g.second) << endl;										 
+      // 	} else {
+      // 	  cout << " passes through cone-point.\n"; 
+      // 	}
+      // }
 
-      //      Gs(0,0).g = {3,2};
-      auto crossings00 = crossings(dualG,0,Gs(0,0));
-      auto run00       = tri_runs(dualG,0,Gs(0,0));
-      auto linepts3D00 = line_points(crossings00,dP.points);
-      output_file << "geodesic00 = " <<Gs(0,0).g << ";\n";
-      output_file << "run00 = " << run00 << "+1;\n";
-      output_file << "crossings00 = " << crossings00 << ";\n";
-      output_file << "linepts3D00 = " << linepts3D00 << ";\n";      
+      // //      Gs(0,0).g = {3,2};
+      // auto crossings00 = crossings(dualG,0,Gs(0,0));
+      // auto run00       = tri_runs(dualG,0,Gs(0,0));
+      // auto linepts3D00 = line_points(crossings00,dP.points);
+      // output_file << "geodesic00 = " <<Gs(0,0).g << ";\n";
+      // output_file << "run00 = " << run00 << "+1;\n";
+      // output_file << "crossings00 = " << crossings00 << ";\n";
+      // output_file << "linepts3D00 = " << linepts3D00 << ";\n";      
       
   }
   failures.close();

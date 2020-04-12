@@ -933,7 +933,7 @@ c         return
      1 d_hhh,d_hhp,d_hpp,d_ppp,nd_hhh,nd_hhp,nd_hpp,nd_ppp)
       use config
       IMPLICIT REAL*8 (A-H,O-Z)
-      PARAMETER (ITMAX=99999,EPS=1.d-9)
+      PARAMETER (ITMAX=20000,EPS=1.d-9)
       Real*8 p(N*3),g(N*3),h(N*3),xi(N*3)
       Real*8 pcom(N*3),xicom(N*3)
       real*8 force(ffmaxdim)

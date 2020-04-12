@@ -86,33 +86,40 @@ void Graph::remove_vertices(set<int> &sv){
   assert(is_connected());
 }
 
+int  Graph::dedge_ix(node_t u, node_t v) const
+{
+  const vector<node_t>& nu(neighbours[u]);
+  for(int j=0;j<nu.size(); j++)
+    if(nu[j] == v) return j;
+  return -1;            // u-v is not an edge in a triangulation  
+}
 
 // Successor to v in oriented neigbhours of u
 node_t Graph::next(node_t u, node_t v) const
 {
-  const vector<node_t>& nu(neighbours[u]);
-  for(int j=0;j<nu.size(); j++)
-    if(nu[j] == v) return nu[(j+1)%nu.size()];
-  return -1;            // u-v is not an edge in a triangulation
+  const auto &nu(neighbours[u]);
+  int j = dedge_ix(u,v);
+  if(j>=0) return nu[(j+1)%nu.size()];
+  else return -1;
 }
 
 // Predecessor to v in oriented neigbhours of u
 node_t Graph::prev(node_t u, node_t v) const
 {
-  const vector<node_t>& nu(neighbours[u]);
-  for(int j=0;j<nu.size(); j++)
-    if(nu[j] == v) return nu[(j-1+nu.size())%nu.size()];
+  const auto &nu(neighbours[u]);  
+  int j = dedge_ix(u,v);
+  if(j>=0) nu[(j-1+nu.size())%nu.size()];
   return -1;            // u-v is not an edge in a triangulation
 }
 
 // Successor to v in face containing directed edge u->v
-node_t Graph::next_on_face(const node_t &u, const node_t &v) const
+node_t Graph::next_on_face(node_t u, node_t v) const
 {
   return prev(v,u);
 }
 
 // Predecessor to v in face containing directed edge u->v
-node_t Graph::prev_on_face(const node_t &u, const node_t &v) const
+node_t Graph::prev_on_face(node_t u, node_t v) const
 {
   return next(v,u);
 }
@@ -207,55 +214,30 @@ bool Graph::is_connected(const set<node_t> &subgraph) const
   return true;
 }
 
-list< list<node_t> > Graph::connected_components() const 
+vector<vector<node_t>> Graph::connected_components() const 
 {
   vector<bool> done(N);
 
-  list<list<node_t> > components;
+  vector<vector<node_t>> components;
   for(node_t u=0;u<N;u++)
     if(!done[u]){
-      list<node_t> component;
+      vector<node_t> component;
   
       done[u] = true;
       component.push_back(u);
-      list<node_t> q(neighbours[u].begin(),neighbours[u].end());
-      while(!q.empty()){
-	node_t v = q.back(); q.pop_back(); done[v] = true;
+      list<node_t> Q(neighbours[u].begin(),neighbours[u].end());
+
+      while(!Q.empty()){
+	node_t v = Q.back(); Q.pop_back(); done[v] = true;
 	component.push_back(v);
-	for(int i=0;i<neighbours[v].size();i++) if(!done[neighbours[v][i]]) q.push_back(neighbours[v][i]);
+	
+	for(int i=0;i<neighbours[v].size();i++)
+	  if(!done[neighbours[v][i]]) Q.push_back(neighbours[v][i]);
       }
       components.push_back(component);
     }
   return components;
 }
-
-// JA: Is this used?
-// vector<int> Graph::shortest_path(node_t source, node_t dest, const vector<int>& dist) const
-// {
-//   node_t vi = source;
-//   Deque<node_t> path(N);
-
-//   for(int i=0;i<N;i++)
-//     do {
-//       path.push_back(vi);
-//       const vector<node_t>& ns(neighbours[vi]);
-//       // Find next vertex in shortest path
-//       int kmin = 0;
-//       for(int k=1, d=dist[ns[0]];k<ns.size();k++) {
-// 	//      fprintf(stderr,"node %d has distance %d\n",ns[k],dist[ns[k]]);
-// 	if(dist[ns[k]] < d){ 
-// 	  d = dist[ns[k]];
-// 	  kmin = k;
-// 	}
-//       }
-//       //    fprintf(stderr,"Choosing neighbour %d = %d\n",kmin,ns[kmin]);
-//       vi = ns[kmin];
-//     } while(vi != dest);
-//   //  cerr << face_t(path) << endl;
-//   return path;
-// }
-
-
 
 
 void Graph::single_source_shortest_paths(node_t source, int *distances, size_t max_depth) const

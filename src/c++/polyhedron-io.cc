@@ -1,10 +1,10 @@
 #include "fullerenes/polyhedron.hh"
 
 //////////////////////////// FORMAT MULTIPLEXING ////////////////////////////
-vector<string> Polyhedron::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian"}};
-vector<string> Polyhedron::format_alias{{"txt","ply","xyz","mol2","m","tex","cc1","turbomole","com"}};
-vector<string> Polyhedron::input_formats{{"xyz","mol2"}}; // TODO: "ascii","planarcode",
-vector<string> Polyhedron::output_formats{{"ascii","xyz","mol2","cc1","turbomole","gaussian"}};
+vector<string> Polyhedron::formats{{"ascii","planarcode","xyz","mol2","mathematica","latex","cc1","turbomole","gaussian","wavefront","spiral"}};
+vector<string> Polyhedron::format_alias{{"txt","ply","xyz","mol2","m","tex","cc1","turbomole","com","obj","rspi"}};
+vector<string> Polyhedron::input_formats{{"xyz","mol2"}}; // TODO: "ascii","planarcode","obj"
+vector<string> Polyhedron::output_formats{{"ascii","xyz","mol2","cc1","turbomole","gaussian","spiral"}};
 
 int Polyhedron::format_id(string name)
 {
@@ -16,8 +16,8 @@ int Polyhedron::format_id(string name)
 Polyhedron Polyhedron::from_file(FILE *file, string format)
 {
   switch(format_id(format)){
-  // case ASCII:
-  //   return from_ascii(file);
+    // case ASCII:
+    //   return from_ascii(file);
     //  case PLANARCODE:
     // PlanarGraph G = PlanarGraph::from_planarcode(file);
     // COMPUTE EMBEDDING
@@ -26,9 +26,20 @@ Polyhedron Polyhedron::from_file(FILE *file, string format)
     return from_xyz(file);
   case MOL2:
     return from_mol2(file);
-  default:
-    cerr << "Input format is '"<<format<<"'; must be one of: " << input_formats << "\n";
-    abort();
+  default: {
+    PlanarGraph G = PlanarGraph::from_file(file,format);
+
+    if(!G.N){    
+      cerr << "Input format is '"<<format<<"'; must be one of: " << input_formats << " or " << PlanarGraph::input_formats << "\n";
+      abort();
+    } else {
+      G.layout2d = G.tutte_layout();
+      Polyhedron P(G,G.zero_order_geometry(),6);
+      P.optimize();
+
+      return P;
+    }
+  }
   }
 }
 
@@ -48,6 +59,10 @@ bool Polyhedron::to_file(const Polyhedron &G, FILE *file, string format)
     return Polyhedron::to_turbomole(G,file);
   case GAUSSIAN:
     return Polyhedron::to_gaussian(G,file);
+  case WAVEFRONT_OBJ:
+    return Polyhedron::to_wavefront_obj(G,file);
+  case SPIRAL:
+    return PlanarGraph::to_spiral(G,file);    
   default:
     cerr << "Output format is '"<<format<<"'  must be one of: " << output_formats << "\n";
     return false;
@@ -95,8 +110,17 @@ bool Polyhedron::to_turbomole(const Polyhedron &P, FILE *file)  {
 }
 
 bool Polyhedron::to_gaussian(const Polyhedron &P, FILE *file, string header)  {
-  if(header.empty())
-      header ="\nGeometry for C" + to_string(P.N) + " fullerene\n\n0 1\n";
+  
+  
+  if(header.empty()){
+    // TODO: Make general! Autodetect fullerene, triangulation, cubic, etc.
+    // TODO: Move to to_file, add as parameter.
+    auto naming_scheme = spiral_nomenclature::FULLERENE;
+    auto construction_scheme = spiral_nomenclature::CUBIC;
+    spiral_nomenclature name(P,naming_scheme,construction_scheme);
+    
+    header ="\nGeometry for C" + to_string(P.N) + " fullerene " + name.to_string() + "\n\n0 1\n";
+  }
 
   fprintf(file,"%s",header.c_str());
 
@@ -110,7 +134,7 @@ bool Polyhedron::to_gaussian(const Polyhedron &P, FILE *file, string header)  {
   // Connectivity section
   for(node_t u=0; u<P.N;u++){
     auto nu = P.neighbours[u];
-    for(auto v: nu) fprintf(file,"%d %d \n",u+1, v+1);
+    for(auto v: nu) fprintf(file,"%d %d B\n",u+1, v+1);
   }
 
   return true;			// TODO: Check file status
@@ -124,6 +148,30 @@ bool Polyhedron::to_xyz(const Polyhedron &P, FILE *file) {
     fprintf(file,"C  %f  %f  %f\r\n",p[0],p[1],p[2]);
   }
   return true;
+}
+
+bool Polyhedron::to_wavefront_obj(const Polyhedron &P, FILE *file)
+{
+  fprintf(file,"# Vertices:\n");    
+  for(auto p: P.points)
+    fprintf(file,"v %f %f %f\n",p[0],p[1],p[2]);
+
+  for(auto f: P.faces){
+    fprintf(file,"f ");
+    for(auto v: f) fprintf(file,"%d ",v);
+    fprintf(file,"\n");
+  }
+  // fprintf(file,"# Pentagons:\n"
+  // 	       "g pentagons\n");
+  // for(auto f: P.faces)
+  //   if(f.size()==5)
+  //     fprintf(file,"f %d %d %d %d %d\n",f[0]+1,f[1]+1,f[2]+1,f[3]+1,f[4]+1);
+
+  // fprintf(file,"# Hexagons:\n"
+  // 	       "g hexagons\n");
+  // for(auto f: P.faces)
+  //   if(f.size()==6)
+  //     fprintf(file,"f %d %d %d %d %d %d\n",f[0]+1,f[1]+1,f[2]+1,f[3]+1,f[4]+1,f[5]+1);  
 }
 
 bool Polyhedron::to_mol2(const Polyhedron &P, FILE *file)

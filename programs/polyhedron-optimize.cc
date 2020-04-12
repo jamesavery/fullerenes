@@ -4,9 +4,6 @@
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/isomerdb.hh"
 
-int testN = 80;
-int testRSPI[12] = {1,2,3,4,5,6,37,38,39,40,41,42};
-
 int main(int ac, char **av)
 {
   int N;
@@ -25,18 +22,12 @@ int main(int ac, char **av)
     istringstream iss(av[2]);
     for(int i=0;i<12;i++){ iss >> RSPI[i]; RSPI[i]--; }
     cout << "RSPI = " << RSPI << endl;
-  } else if(ac<14){
-    N = testN;
-    for(int i=0;i<12;i++) RSPI[i] = testRSPI[i]-1;
-  }
+  } else 
   if(ac>=14) {
     N = strtol(av[1],0,0);
     for(int i=0;i<12;i++) RSPI[i] = strtol(av[i+2],0,0)-1;
   } 
-  if(ac>14){			// General RSPI: RSPI followed by jumps.
-    for(int i=14;i<ac;i+=2)
-      jumps.push_back(make_pair(strtol(av[i],0,0)-1,strtol(av[i+1],0,0)));
-  }
+
 
   // int isomer_number = ac>=3? strtol(av[2],0,0) : 1;
   // bool IPR = ac>=4? strtol(av[3],0,0) : false;
@@ -58,7 +49,6 @@ int main(int ac, char **av)
     g.layout2d = g.tutte_layout(-1,-1,-1,8);
   } else {
     Triangulation T(spiral,jumps);
-    
     g = T.dual_graph();
     g.layout2d = g.tutte_layout();
     P0 = Polyhedron(g,g.zero_order_geometry(),6);
@@ -80,6 +70,7 @@ int main(int ac, char **av)
 
   printf("Aligning P-aligned\n");    
   Polyhedron::to_file(P,"output/"+basename+"-if.mol2");
+  Polyhedron::to_file(P,"output/"+basename+"-if.xyz");
   //  Polyhedron::to_file(P,"output/"+basename+"-if.pov");
 
   ofstream output(("output/"+basename+".m").c_str());

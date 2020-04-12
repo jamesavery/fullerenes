@@ -388,9 +388,9 @@ coord3d Polyhedron::width_height_depth() const {
 
 
 
-Polyhedron Polyhedron::dual(int Fmax) const 
+Polyhedron Polyhedron::dual() const 
 {
-  PlanarGraph d(dual_graph(Fmax));
+  PlanarGraph d(dual_graph());
 
   vector<coord3d> coordinates(d.N);
   for(node_t u=0;u<d.N;u++){
@@ -401,6 +401,54 @@ Polyhedron Polyhedron::dual(int Fmax) const
   }
  
   return Polyhedron(d,coordinates);
+}
+
+
+Polyhedron Polyhedron::leapfrog_dual() const 
+{
+  assert(is_oriented);
+  size_t Nf = faces.size();
+  
+  Polyhedron Plf(Graph(N+Nf,true));
+  Plf.points.reserve(N+Nf);
+   
+  // Start with all the existing nodes
+  for(node_t u=0;u<N;u++){
+    Plf.neighbours[u] = neighbours[u];
+    Plf.points[u]     = points[u];
+  }
+
+  // The result is a deltahedron: a polyhedron consisting of
+  // only triangles. The first Nv points are the original vertices,
+  // the last Nf are the midpoints of the original faces.
+  int n_tris = 0;
+  for(auto f: faces) n_tris += f.size();
+  Plf.faces = vector<face_t>(n_tris);
+
+  // Now connect new face-center nodes in oriented order
+  for(int i=0;i<faces.size();i++){
+    const face_t &f  = faces[i];
+    node_t c = N+i;                // Face-center node
+    
+    // cerr << "new node " << c << " at face " << f << "\n";
+    coord3d xc = {0,0,0};
+    size_t   d = f.size();
+    for(int j=0;j<d;j++){
+      node_t u = f[j], v = f[(j+1)%f.size()];
+
+      // Center node position is middle of face
+      xc += points[u]/d;
+
+      // Add edge mumble mumble
+      Plf.insert_edge(dedge_t{v,c},u,-1);
+
+      // Add triangle
+      Plf.faces[c] = tri_t{u,v,c};
+    }
+    Plf.points[c] = xc;
+  }
+
+  return Plf;
 }
 
 Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)

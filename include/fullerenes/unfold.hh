@@ -33,15 +33,20 @@ public:
   //    the corresponding node numbers.
   Unfolding(const vector< pair<Eisenstein,node_t> > &outline) : outline(outline) {
     // Calculate degrees of each node and store directed edge coordinates.
+    Eisenstein x, y;
+    node_t u,v;
+    
     polygon P(get_keys(outline));
     for(int i=0;i<outline.size();i++){
-      const pair<Eisenstein,node_t> &ux(outline[i]), &vy(outline[(i+1)%outline.size()]);
+      tie(x,u) = outline[i];
+      tie(y,v) = outline[(i+1)%outline.size()];
+
 
       Eisenstein unit(1,0);
       for(int j=0;j<6;j++,unit = unit.nextCW())
-	if(P.point_inside(ux.first+unit)) degrees[ux.second]++;
+	if(P.point_inside(x+unit)) degrees[u]++;
 	
-      edgecoords[dedge_t(ux.second,vy.second)] = dedgecoord_t(ux.first,vy.first);
+      edgecoords[dedge_t(u,v)] = {x,y};
     }
   }
 

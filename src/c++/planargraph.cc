@@ -192,10 +192,12 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     //    cerr << "faces      = " << compute_faces_oriented(Fmax) << ";\n";
     
     PlanarGraph dual(face_numbers.size());
-    
+
+    dedge_t e_f;
+    node_t  i_f;
     for(const auto &ei: face_numbers){
-      // e_f is minimal directed edge representation of face f, i_f is its face number.
-      dedge_t e_f = ei.first; node_t i_f = ei.second;
+      // e_f is minimal directed edge representation of face f, i_f is its face number.      
+      tie(e_f,i_f) = ei;
       // cerr << "Processing face " << i_f << ": " << e_f << " -> " << get_face_oriented(e_f,Fmax) << ";\n";
       
       // Now iterate along face f's directed edges in CCW order:
@@ -869,7 +871,7 @@ dedge_t PlanarGraph::get_face_representation(dedge_t e, int Fmax) const
   node_t u = e.first, v = e.second;
 
   while(v!=e.first){
-    node_t w = prev(v,u);        // Previous neighbour in v following u in CCW (corner u-v-w in face)
+    node_t w = next_on_face(u,v);
     u=v; v=w; 
 
     if(u<e_min.first) e_min = {u,v};
