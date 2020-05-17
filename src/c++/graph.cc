@@ -90,7 +90,7 @@ int  Graph::dedge_ix(node_t u, node_t v) const
 {
   const vector<node_t>& nu(neighbours[u]);
   for(int j=0;j<nu.size(); j++)
-    if(nu[j] == v) return j;
+    if(nu[j] == v) return j; 
   return -1;            // u-v is not an edge in a triangulation  
 }
 
@@ -108,7 +108,7 @@ node_t Graph::prev(node_t u, node_t v) const
 {
   const auto &nu(neighbours[u]);  
   int j = dedge_ix(u,v);
-  if(j>=0) nu[(j-1+nu.size())%nu.size()];
+  if(j>=0) return nu[(j-1+nu.size())%nu.size()];
   return -1;            // u-v is not an edge in a triangulation
 }
 
