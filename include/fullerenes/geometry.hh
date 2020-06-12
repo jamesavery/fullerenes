@@ -631,7 +631,7 @@ public:
   polygon operator*(Eisenstein x) const;
   polygon operator+(Eisenstein x) const;
   
-  static vector<Eisenstein> draw_line(const Eisenstein& x0,const Eisenstein& x1); 
+  static vector<Eisenstein> draw_line(const Eisenstein& x0,const Eisenstein& x1);
   scanline scanConvert() const;  
 
   pair<int,int> slope(int i,bool reduced=false) const;
@@ -641,7 +641,9 @@ public:
 
   double winding_number(const Eisenstein& x) const;
   bool point_inside(const Eisenstein& x) const;
-
+  bool point_on_periphery(const Eisenstein& x) const;
+  bool point_included(const Eisenstein& x) const; // Inside or on periphery
+  
   vector<Eisenstein> allpoints() const;
   vector<Eisenstein> controlpoints() const;
 

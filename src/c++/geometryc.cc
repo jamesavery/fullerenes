@@ -210,10 +210,10 @@ polygon::scanline polygon::scanConvert() const {
 }
 
 //TODO: Efficient integer-based winding number -> exact instead of floating point
-double polygon::winding_number(const Eisenstein& xy0) const {
+double polygon::winding_number(const Eisenstein& x) const {
   int x1, y1, x2, y2;
   
-  vector<Eisenstein> Cp = reduced_outline-xy0;
+  vector<Eisenstein> Cp = reduced_outline-x;
 
   double wn = 0;
   for(int i=0;i<Cp.size();i++){
@@ -222,15 +222,46 @@ double polygon::winding_number(const Eisenstein& xy0) const {
     
     //    double theta = atan2(x1,y1) - atan2(x0,y0);
     double theta = atan2(x1*y2-x2*y1, x1*x2+y1*y2);
+    
     wn += theta;
   }
   wn /= 2*M_PI;
+
+  //  printf("Winding number around (%d,%d) is %g\n",x.first,x.second,wn);    
   return wn;
 }
 
+#define numerical_tolerance 1e-10
+
 bool polygon::point_inside(const Eisenstein& x) const 
 {
-  return fabs(winding_number(x)) < 1e-10;
+  return fabs(winding_number(x)) > numerical_tolerance;
+}
+
+bool polygon::point_on_periphery(const Eisenstein& x) const 
+{
+  int x1,y1,x2,y2;
+  vector<Eisenstein> Cp = reduced_outline-x;
+
+  //  cout << "Point " <<x << " is...\n";
+  for(int i=0;i<Cp.size();i++){
+    tie(x1,y1) = Cp[i];
+    tie(x2,y2) = Cp[(i+1)%Cp.size()];
+ 
+    bool colinear = fabs(x1*y2-x2*y1) < numerical_tolerance;
+    bool included = (sgn(x1)*sgn(x2) <= 0) && (sgn(y1)*sgn(y2)<=0);
+
+
+    // printf("%s included in [%d,%d] -> [%d,%d] (colinear: %d, included:%d)\n",colinear && included? "indeed":"not", x1,y1,x2,y2,colinear,included);
+    
+    if(colinear && included) return true;
+  }
+  return false;
+}
+
+bool polygon::point_included(const Eisenstein& x) const
+{
+  return point_on_periphery(x) || point_inside(x);
 }
 
 polygon polygon::operator*(Eisenstein x) const
