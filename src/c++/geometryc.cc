@@ -31,34 +31,34 @@ int gcd(int a, int b)
 //   if(a.second == b.second)
 // }
 
-vector<Eisenstein> polygon::draw_line(const Eisenstein& x0, const Eisenstein& x1)
+vector<Eisenstein> polygon::draw_line(const Eisenstein& xy0, const Eisenstein& xy1)
 {
   vector<Eisenstein> result;
 
-  Eisenstein D(x1-x0);
+  Eisenstein D(xy1-xy0);
   int Dx = D.first, Dy = D.second;
   int sx = sgn(Dx), sy = sgn(Dy);
-  Eisenstein xy(x0);
+  Eisenstein xy(xy0);
 
-  // Invariant: (x-x0)*Dy >= (y-y0)*Dx
+  // Invariant: (x-xy0)*Dy >= (y-y0)*Dx
   // Or:         sx*i*Dy  >= sy*j*Dx
   // Or:         sx*i*Dy - sy*j*Dx >= 0
 
   if(sx == 0){
-    while(xy.second-sy != x1.second){ result.push_back(xy); xy.second += sy; }
+    while(xy.second-sy != xy1.second){ result.push_back(xy); xy.second += sy; }
     return result;
   }
   if(sy == 0){
-    //      while(xy.first-sx != x1.first){ result.push_back(xy); xy.first += sx; }
-    result.push_back(x0);
-    result.push_back(x1);
+    //      while(xy.first-sx != xy1.first){ result.push_back(xy); xy.first += sx; }
+    result.push_back(xy0);
+    result.push_back(xy1);
     return result;
   }
 
   int threshold = 0, t0 = sx*sy>0? 0 : -abs(Dy)+1;
   
   if(abs(Dx) > abs(Dy)){	// X-major
-    for(xy = x0; xy.first-sx != x1.first; xy.first += sx, threshold += sx*Dy){
+    for(xy = xy0; xy.first-sx != xy1.first; xy.first += sx, threshold += sx*Dy){
       while(sx*sy*threshold >= t0){
 	result.push_back(xy);
 	xy.second += sy;
@@ -66,7 +66,7 @@ vector<Eisenstein> polygon::draw_line(const Eisenstein& x0, const Eisenstein& x1
       }
     }
   } else {			// Y-major
-    for(xy = x0; xy.second-sy != x1.second; xy.second += sy, threshold -= sy*Dx){
+    for(xy = xy0; xy.second-sy != xy1.second; xy.second += sy, threshold -= sy*Dx){
       while(sx*sy*threshold < t0){
 	xy.first  += sx;
 	threshold += sx*Dy;
@@ -209,17 +209,19 @@ polygon::scanline polygon::scanConvert() const {
   return S;
 }
 
-// http://www.softsurfer.com/Archive/algorithm_0103/algorithm_0103.htm#Winding%20Number
-// TODO: This seems to fail when compiled with -std=c++0x and -O0!
-double polygon::winding_number(const Eisenstein& x) const {
-  vector<Eisenstein> Cp(reduced_outline.size());
-  for(int i=0;i<reduced_outline.size();i++)
-    Cp[i] = reduced_outline[i]-x;
+//TODO: Efficient integer-based winding number -> exact instead of floating point
+double polygon::winding_number(const Eisenstein& xy0) const {
+  int x1, y1, x2, y2;
+  
+  vector<Eisenstein> Cp = reduced_outline-xy0;
 
   double wn = 0;
   for(int i=0;i<Cp.size();i++){
-    Eisenstein segment = Cp[(i+1)%Cp.size()] - Cp[i];
-    double theta = atan2(segment.second,segment.first);
+    tie(x1,y1) = Cp[i];
+    tie(x2,y2) = Cp[(i+1)%Cp.size()];
+    
+    //    double theta = atan2(x1,y1) - atan2(x0,y0);
+    double theta = atan2(x1*y2-x2*y1, x1*x2+y1*y2);
     wn += theta;
   }
   wn /= 2*M_PI;
@@ -228,7 +230,7 @@ double polygon::winding_number(const Eisenstein& x) const {
 
 bool polygon::point_inside(const Eisenstein& x) const 
 {
-  return winding_number(x) != 0;
+  return fabs(winding_number(x)) < 1e-10;
 }
 
 polygon polygon::operator*(Eisenstein x) const
@@ -513,13 +515,13 @@ double coord3d::ideal_dihedral(const int A, const int B, const int C, const doub
                        - ur_2*((rs_2 + tr_2 - st_2)*st_2 + ut_2*(rs_2 - tr_2 + st_2) + us_2*(-rs_2 + tr_2 + st_2)))
                        / (pow(ur_2,2) + pow(us_2 - rs_2,2) - 2*ur_2*(us_2 + rs_2)));
 
-//    cout << "bx,by,bz: " << bx<<" " <<by<<" "<<bz << endl;
-//    cout << "cx,cy,cz: " << cx<<" " <<cy<<" "<<cz << endl;
-//    cout << "dx,dy,dz: " << dx<<" " <<dy<<" "<<dz << endl;
+   // cout << "bx,by,bz: " << bx<<" " <<by<<" "<<bz << endl;
+   // cout << "cx,cy,cz: " << cx<<" " <<cy<<" "<<cz << endl;
+   // cout << "dx,dy,dz: " << dx<<" " <<dy<<" "<<dz << endl;
 
     return coord3d::dihedral(coord3d(bx,by,bz), coord3d(cx,cy,cz), coord3d(dx,dy,dz));
   } else {
-	// planar or negative curvature
+    //    cout << "planar or negative curvature\n";
     // in the case of negative curvature the adjacent faces cannot be planar
     // and the dihedral cannot be calculated (but 0 is a plausible value)
     return 0.0;
