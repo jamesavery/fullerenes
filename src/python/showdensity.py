@@ -10,6 +10,7 @@ Nx, Ny, Nz = C['Ngrid'];
 scalar_field = np.minimum(C['data'],1)
 scalar_field[Nx//2:,:,:] = 0;
 
+
 vol = Volume(scalar_field)
 vol.color(["green", "pink", "blue"])
 vol.alpha([0, 0.1, 0.1, 0.1, 0.15])
