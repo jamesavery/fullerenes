@@ -33,4 +33,5 @@ hexagons  = Mesh([Xi,c60.hexagons],c='o',alpha=1)
 #pentagons.phong()
 #hexagons.phong()
 
+#show([vol,pentagons,hexagons])
 show([[vol,pentagons,hexagons]+spheres, [lego,pentagons,hexagons]+spheres], N=2, azimuth=10)

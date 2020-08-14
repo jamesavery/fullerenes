@@ -42,38 +42,37 @@ public:
   Eisenstein& operator+=(const Eisenstein& y) { first += y.first; second += y.second; return *this; }
   Eisenstein& operator-=(const Eisenstein& y) { first -= y.first; second -= y.second; return *this; }
 
-  bool isUnit() const {
-    Eisenstein unit(1,0);
-    for(int i=0;i<6;i++,unit = unit.nextCW()) if((*this) == unit) return true;
-    return false;
-  }
+  static Eisenstein unit[7];
+  
+  bool isUnit() const { return norm2() == 1;  }
 
   // invertn(a,b) * (a,b) == norm2() (1,0)
   Eisenstein invertn() const { return Eisenstein((first+second), -second); }
   Eisenstein GCtransform(int k, int l) const {  return Eisenstein(k,l) * (*this);  }
   Eisenstein affine(const Eisenstein& x0, const Eisenstein w) const {
+    Eisenstein x(*this);
     //    cout << x0 << " + " << w << " * " << *this << " = " << (x0+(w*(*this))) <<endl;
-    return x0+(w*(*this));
+    return x0+w*x;
   }
   //  
   // (-1,1)   \ /  (0,1)
   // (-1,0)  --x-- (1,0)
   // ( 0,-1)  / \  (1,-1)
   // 
-  Eisenstein nextCW() const { return (*this) * Eisenstein(1,-1); }
-  Eisenstein nextCCW() const { return (*this) * Eisenstein(0,1); }
-  Eisenstein transpose() const { return Eisenstein(second,first); }
-  Eisenstein conj() const { return Eisenstein(first,-second); }
+  Eisenstein nextCW()    const { return (*this) * Eisenstein(1,-1); }
+  Eisenstein nextCCW()   const { return (*this) * Eisenstein(0,1);  }
+  Eisenstein transpose() const { return Eisenstein(second,first);   }
+  Eisenstein conj()      const { return Eisenstein(first,-second);  }
 
   int unit_angle() const {
     assert(norm2() == 1);
     switch(first*10+second){
-    case  1*10 + 0: return 0;
-    case  0*10 + 1: return 1;
-    case -1*10 + 1: return 2;
-    case -1*10 + 0: return 3;
+    case  1*10 + 0: return 0;	
+    case  0*10 + 1: return 1;	
+    case -1*10 + 1: return 2;	
+    case -1*10 + 0: return 3;  	
     case  0*10 - 1: return 4;
-    case  1*10 - 1: return 5;
+    case  1*10 - 1: return 5;	
     default:
       abort();
     }
@@ -149,7 +148,8 @@ public:
 namespace std {
   template<> struct hash<Eisenstein> { // Vectors of integers smaller than 32 bit
     size_t operator()(Eisenstein const &f) const {
-      return std::hash<pair<int,int>>()(f);      
+      uint64_t combined_int = (f.first<<32) + f.second;
+      return std::hash<uint64_t>()(combined_int);      
     }
   };
 }

@@ -29,14 +29,15 @@ public:
     orient_triangulation(triangles);
     orient_neighbours();
   }
-  Triangulation(const neighbours_t& neighbours, bool already_oriented = false) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
+  Triangulation(const neighbours_t& neighbours, bool already_oriented = true) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
   Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral_code, fsn.jumps, true){} // best_effort = true
 
   PlanarGraph dual_graph() const;
   vector<face_t> cubic_faces() const;
-
+  unordered_map<dedge_t,dedge_t> arc_translation(const PlanarGraph& cubic) const;
+  
   size_t max_degree() const {
     size_t max_degree = 0;
     for(auto &nu: neighbours) max_degree = max(max_degree, nu.size());

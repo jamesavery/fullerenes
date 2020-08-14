@@ -27,7 +27,7 @@ public:
   PlanarGraph(const Graph& g, const vector<coord2d>& layout) : Graph(g), layout2d(layout) {  }
 
   
-  bool is_a_fullerene(bool verbose=false) const; // TODO: Do something better with output
+  bool is_a_fullerene(bool verbose=true) const; // TODO: Do something better with output
   bool is_cubic() const;
   bool is_triangulation() const;
 

@@ -173,6 +173,13 @@ template <typename T> vector<T> operator+(const vector<T>& xs, const T& x)
   return ys;
 }
 
+template <typename T> vector<T> operator-(const vector<T>& xs, const T& x)
+{
+  vector<T> ys(xs.size());
+  for(int i=0;i<xs.size();i++) ys[i] = xs[i] - x;
+  return ys;
+}
+
 template <typename T> vector<T> operator+(const vector<T>& xs, const vector<T>& ys)
 {
   vector<T> result(xs.size());
@@ -193,6 +200,19 @@ template <typename T> vector< vector<T> > operator+(const vector< vector<T> >& x
   vector< vector<T> > ys(xs.size());
   for(int i=0;i<xs.size();i++) ys[i] = xs[i] + x;
   return ys;
+}
+
+template <typename T> T sum(const vector<T>& xs)
+{
+  T sum = 0;
+  for(const auto &x: xs) sum += x;
+  return sum;
+}
+
+template <typename T> T mean(const vector<T>& xs)
+{
+  T sum = sum(xs);
+  return sum/xs.size();
 }
 
 template<typename T> void hash_combine(size_t &seed, T const &key) {

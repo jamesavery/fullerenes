@@ -161,6 +161,8 @@ bool Polyhedron::to_wavefront_obj(const Polyhedron &P, FILE *file)
     for(auto v: f) fprintf(file,"%d ",v);
     fprintf(file,"\n");
   }
+
+  return true;
   // fprintf(file,"# Pentagons:\n"
   // 	       "g pentagons\n");
   // for(auto f: P.faces)
