@@ -71,7 +71,7 @@ int main(int ac, char **av)
     
     for(int i=0;i<12;i++){ spiral[RSPI[i]] = 5; all_rspi.push_back(RSPI[i]+1); }
     Triangulation T(spiral,jumps);
-    T = T.sort_nodes();		// Move pentagons to dual node id 0,...,11.
+    //    T = T.sort_nodes();		// Move pentagons to dual node id 0,...,11.
     
     string filename;
     stringstream s(filename);
@@ -86,7 +86,8 @@ int main(int ac, char **av)
 
     Ps.push_back(P);
     Ts.push_back(T);
-    Tlf.push_back(T.leapfrog_dual());
+
+    Tlf.push_back(g.leapfrog_dual());
   }
 
   size_t M = Ps.size();
@@ -169,17 +170,17 @@ int main(int ac, char **av)
    
     for(int j=0;j<Ts.size();j++){
       int u_max, mx;
-      tie(u_max,mx) = middle_hexagon(Ts[j]);
-      dedge_t first_arc = {u_max, Ts[j].neighbours[u_max][0]};    
+      tie(u_max,mx) = middle_hexagon(Tlf[j]);
+      dedge_t first_arc = {u_max, Tlf[j].neighbours[u_max][0]};    
       
       Unfolding uf(Tlf[j],first_arc);
       Arcs[j]   = get_keys(uf.arc_coords);
       Arcpos[j] = get_values(uf.arc_coords);
       Tripos[j] = uf.tri_coords();
     }
-    cerr << "unfolding_arcs   = " << Arcs << ";\n";
-    cerr << "unfolding_arcpos = " << Arcpos << ";\n";
-    cerr << "unfolding_tripos = " << Tripos << ";\n";
+    cerr << "lf_unfolding_arcs   = " << Arcs << ";\n";
+    cerr << "lf_unfolding_arcpos = " << Arcpos << ";\n";
+    cerr << "lf_unfolding_tripos = " << Tripos << ";\n";
   }
   
   return 0;
