@@ -202,6 +202,19 @@ template <typename T> vector< vector<T> > operator+(const vector< vector<T> >& x
   return ys;
 }
 
+template <typename T> T sum(const vector<T>& xs)
+{
+  T sum = 0;
+  for(const auto &x: xs) sum += x;
+  return sum;
+}
+
+template <typename T> T mean(const vector<T>& xs)
+{
+  T sum = sum(xs);
+  return sum/xs.size();
+}
+
 template<typename T> void hash_combine(size_t &seed, T const &key) {
   hash<T> hasher;
   seed ^= hasher(key) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
