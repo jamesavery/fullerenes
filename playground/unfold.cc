@@ -13,7 +13,8 @@ int main(int ac, char **av)
   FullereneGraph G(N,spiral);
   G.layout2d = G.tutte_layout();
   
-  PlanarGraph dual(G.dual_graph());
+  //  PlanarGraph dual(G.dual_graph());
+  Triangulation dual(G.leapfrog_dual());
   dual.layout2d = dual.tutte_layout();
   cout << "dual = " << dual << ";\n";
 

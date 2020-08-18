@@ -11,9 +11,12 @@
 
 pair<int,int> middle_hexagon(const Triangulation &dual)
 {
+  vector<int> pentagons(12);
+  for(node_t u=0,p=0;u<dual.N;u++) if(dual.neighbours[u].size()==5) pentagons[p++] = u;
+  
   matrix<int> D(12, dual.N);
   for(node_t p=0;p<12;p++)
-    dual.single_source_shortest_paths(p,&(D[p*dual.N]));
+    dual.single_source_shortest_paths(pentagons[p],&(D[p*dual.N]));
   
   vector<int> Dmin{&D[0], &D[dual.N]};
   for(node_t u=0;u<dual.N;u++) 
@@ -53,8 +56,9 @@ int main(int ac, char **av)
   string RSPIline;  
   FILE *RSPIfile = fopen(RSPIfilename,"r");
 
-  vector<Triangulation>   Ts;
+  vector<Triangulation>   Ts, Tlf;
   vector<Polyhedron> P0s, Ps;
+  
 
   vector<int> all_rspi;
   
@@ -82,7 +86,7 @@ int main(int ac, char **av)
 
     Ps.push_back(P);
     Ts.push_back(T);
-
+    Tlf.push_back(T.leapfrog_dual());
   }
 
   size_t M = Ps.size();
@@ -119,6 +123,7 @@ int main(int ac, char **av)
     vector<face_t> faces = Ts[i].cubic_faces();
 
     triangles[i] = Ts[i].compute_faces();
+
     for(node_t f=0,npent=0,nhex=0;f<Nfaces;f++){
       auto nf = Ts[i].neighbours[f];
 
@@ -139,8 +144,6 @@ int main(int ac, char **av)
   cerr << "dual_neighbours_shape = " << dual_neighbours_shape << ";\n";
   cerr << "triangles_shape = " << triangles_shape << ";\n";    
 
-  
-  
   cerr << "rspi         = array(" << all_rspi << ").reshape(rspi_shape);\n\n";
   cerr << "# Cubic graph, its faces, and 3D embedding\n";
   cerr << "cubic_neighbours  = array(" << neighbours << ").reshape(neighbours_shape);\n\n";
@@ -169,7 +172,7 @@ int main(int ac, char **av)
       tie(u_max,mx) = middle_hexagon(Ts[j]);
       dedge_t first_arc = {u_max, Ts[j].neighbours[u_max][0]};    
       
-      Unfolding uf(Ts[j],first_arc);
+      Unfolding uf(Tlf[j],first_arc);
       Arcs[j]   = get_keys(uf.arc_coords);
       Arcpos[j] = get_values(uf.arc_coords);
       Tripos[j] = uf.tri_coords();

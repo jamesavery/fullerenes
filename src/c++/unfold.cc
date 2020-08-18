@@ -6,7 +6,6 @@
 /************************************************************/ 
 
 
-
 // This function unfolds a triangulation and lays it out on an equilateral
 // triangular grid, such that if one were to cut along the outline
 // and glue together the nodes with the same labels, one would obtain
@@ -464,6 +463,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
       int i=0;
       for(const auto& uv_ij: arc_coords){
 	const arc_t& uv(uv_ij.first);
+
 	const dedgecoord_t& ij(uv_ij.second);
 
 	node_t u = uv.first;
@@ -495,4 +495,53 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
   return latexfile.str();
 }
 
+
+
+static vector<Unfolding> generate_all_unfoldings(const Triangulation& graph)
+{
+  vector<dedge_t> workset;
+
+
+}
+
+
+struct unfolding_parent_state {
+ map<dedge_t,bool> arc_seen;
+ vector<dedge_t>   arc_boundary;
+ int level;
+};
+
+unfolding_parent_state place_triangle(const Triangulation& G, const dedge_t arc, const unfolding_parent_state &S)
+{
+  unfolding_parent_state Snext;
+  node_t u = arc.first, v = arc.second, w = G.next_on_face(u,v);
+
+  Snext.level    = S.level + 1;
+  Snext.arc_seen = S.arc_seen;
+  Snext.arc_seen[{u,v}] = true;
+  Snext.arc_seen[{v,w}] = true;
+  Snext.arc_seen[{w,u}] = true;
+
+  Snext.arc_boundary.reserve(S.arc_boundary.size()); // Memory need for new boundary will be abound the same
+  for(const dedge_t& arc: S.arc_boundary){	     // Update boundary
+    // 3 cases:
+    // 1: Neither u->w or v->w are on the boundary => u->v is replaced by u->w->v
+    // 2: u->v->w is a boundary segment            => u->v->w is replaced by u->w
+    // 3: u->v and v->w exist separately on the B  => u->v is replaced by u->w
+    
+  }
+  
+}
+
+void generate_unfolding_subtree(const Triangulation& G, const unfolding_parent_state &S, vector<vector<dedge_t>> arc_boundaries)
+{
+  if(S.level == G.N){ // If we have placed all N triangles, the unfolding is complete, and we can add it to our results
+    arc_boundaries.push_back(S.arc_boundary);
+    return;
+  } else	      // Otherwise, recursively proceed through each unproccessed arc on the outline:
+    for(dedge_t arc: S.arc_boundary) if(!S.arc_seen.at(arc)) {
+      unfolding_parent_state Snext = place_triangle(G,arc,S); 
+      generate_unfolding_subtree(G,Snext,arc_boundaries);
+    }
+}
 

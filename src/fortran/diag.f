@@ -114,7 +114,7 @@ c borrowed and modified from numerical recipes
         endif
 15    continue
       return
-      END
+      end
 
 c tridiagonal matrix from real symmetric matrix
 c borrowed from numerical recipes
@@ -194,7 +194,7 @@ C     np: dimension of array
 23      continue
 24    continue
       return
-      END
+      end
 
 c eigenvectors and eigenvalues from tridiagonal matrix
 c borrowed from numerical recipes
@@ -263,4 +263,4 @@ c	   corresponding to d(k)
         endif
 15    continue
       return
-      END
+      end
