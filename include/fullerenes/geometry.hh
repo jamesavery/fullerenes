@@ -206,16 +206,24 @@ struct coord3d {
 };
 
 struct matrix2d {
-  double values[4];
-  matrix2d(const double *v) { for(int i=0;i<4;i++) values[i] = v[i]; }
-  explicit matrix2d(const double r=0, const double s=0, const double t=0, const double u=0) : values{r,s,t,u} { }
-  double& operator()(int i, int j)      { return values[i*2+j]; }
-  double operator()(int i, int j) const { return values[i*2+j]; }
+  double A[4];
+  matrix2d(const double *v) { for(int i=0;i<4;i++) A[i] = v[i]; }
+  explicit matrix2d(const double r=0, const double s=0, const double t=0, const double u=0) : A{r,s,t,u} { }
+  double& operator()(int i, int j)      { return A[i*2+j]; }
+  double operator()(int i, int j) const { return A[i*2+j]; }
 
-  coord2d operator*(const coord2d& x){ return {values[0*2+0]*x(0) + values[1*2+0]*x(1), values[0*2+1]*x(0)+values[1*2+1]*x(1)}; }
-  static matrix2d rotation(double th){ 
-    return matrix2d{cos(th),-sin(th),
-	            sin(th), cos(th)};
+  //  coord2d operator*(const coord2d& x){ return {A[0*2+0]*x(0) + A[1*2+0]*x(1), A[0*2+1]*x(0)+A[1*2+1]*x(1)}; }
+  coord2d  operator*(const coord2d& x) const { return {A[0*2+0]*x(0)+A[0*2+1]*x(1),
+						      A[1*2+0]*x(0)+A[1*2+1]*x(1)}; }
+  matrix2d operator*(const matrix2d& B) const {
+    return matrix2d(A[0*2+0]*B(0,0) + A[0*2+1]*B(1,0), A[0*2+0]*B(0,1) + A[0*2+1]*B(1,1),
+		    A[1*2+0]*B(0,0) + A[1*2+1]*B(1,0), A[1*2+0]*B(0,1) + A[1*2+1]*B(1,1));
+  }
+  
+  static matrix2d rotation(double th){
+    double s = sin(th), c = cos(th);
+    return matrix2d{c,-s,
+	            s, c};
   }
 };
 

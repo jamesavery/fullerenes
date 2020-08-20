@@ -7,3 +7,6 @@ add_executable(unfold+3D unfold+3D.cc)
 add_executable(clustering clustering.cc)
 add_executable(coprimes coprimes.cc)
 add_executable(eisenstein-polygon eisenstein-polygon.cc)
+add_executable(eisenstein-polygon2 eisenstein-polygon2.cc)
+add_executable(ideal_dihedral ideal_dihedral.cc)
+

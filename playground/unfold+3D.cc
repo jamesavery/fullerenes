@@ -175,8 +175,8 @@ int main(int ac, char **av)
   ofstream output("output/C"+to_string(N)+"-unfold.m");
   output << "dual    = " << dual << ";\n"
 	 << "outline = " << uf.outline << ";\n"
-	 << "dedges   = " << get_keys(uf.edgecoords) << ";\n"
-	 << "dedgepos = " << get_values(uf.edgecoords) << ";\n";
+	 << "dedges   = " << get_keys(uf.arc_coords) << ";\n"
+	 << "dedgepos = " << get_values(uf.arc_coords) << ";\n";
   output.close();
 
   vector<tri_t> triangles = Tris(dual);
@@ -190,8 +190,8 @@ int main(int ac, char **av)
 
   output << "dual    = " << dual << ";\n"
 	 << "outline = " << UF.outline << ";\n"
-	 << "dedges   = " << get_keys(UF.edgecoords) << ";\n"
-	 << "dedgepos = " << get_values(UF.edgecoords) << ";\n"
+	 << "dedges   = " << get_keys(UF.arc_coords) << ";\n"
+	 << "dedgepos = " << get_values(UF.arc_coords) << ";\n"
 	 << "folded   = " << f << ";\n";
 
   output.close();

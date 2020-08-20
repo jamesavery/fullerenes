@@ -6,16 +6,6 @@
 /************************************************************/ 
 
 
-struct dedge_sort : public std::binary_function<dedge_t, dedge_t, bool>
-{
-    bool operator()(const dedge_t &x, const dedge_t &y) const
-    {   
-      int maxx = max(x.first,x.second), maxy = max(y.first,y.second);
-      return maxx < maxy || (maxx == maxy && min(x.first,x.second) < min(y.first,y.second));
-    }
-};
-
-
 // This function unfolds a triangulation and lays it out on an equilateral
 // triangular grid, such that if one were to cut along the outline
 // and glue together the nodes with the same labels, one would obtain
@@ -24,69 +14,194 @@ struct dedge_sort : public std::binary_function<dedge_t, dedge_t, bool>
 // Preconditions: Triangles are oriented consistently, i.e. CW or CCW.
 // TODO: A more intricate directed edge selection scheme could lead to
 // more compact unfoldings (i.e. with more interior points).
-map<dedge_t,Unfolding::dedgecoord_t> Unfolding::unfold(const vector<tri_t> &triangulation)
+void Unfolding::unfold(const Triangulation& T, dedge_t first_arc)
 {
-  // A single directed edge uniquely defines the third node in the oriented triangle
-  map<dedge_t,node_t> nextNode;
-  for(int i=0;i<triangulation.size();i++){
-    const tri_t &t(triangulation[i]);
-    for(int j=0;j<3;j++)
-      nextNode[dedge_t(t[j],t[(j+1)%3])] = t[(j+2)%3];
-  }
+  size_t Nf = T.N, N = 2*(Nf-2);
 
-  map<dedge_t,bool>           dedge_done;
-  set<dedge_t, dedge_sort>    workset;
-  map<dedge_t, dedgecoord_t > dedge_position;
-  map<Eisenstein,node_t> grid;
+  Deque<arc_t> arc_queue(6*N);  
+  // auto stay_close_to_center =
+  //   [&](arc_t uv, arc_t st) {
+  //     Eisenstein ux, vx, sx, tx;
+  //     tie(ux,vx) = arc_coords.at({uv.second,uv.first});
+  //     tie(sx,tx) = arc_coords.at({st.second,st.first});
+
+  //     if(ux.norm2() + vx.norm2() < sx.norm2() + tx.norm2()) return true;
+  //     if(ux.norm2() + vx.norm2() > sx.norm2() + tx.norm2()) return false;
+  //     return uv < st;
+  //   };
+  // std::set<arc_t, decltype(stay_close_to_center)> arc_queue(stay_close_to_center);
+
+  vector<bool> tri_done(N);
+  vector<bool> face_done(Nf);
+
   Eisenstein zero(0,0), veci(1,0), vecj(0,1);
 
-  auto set_dedge = [&](node_t u,node_t v, Eisenstein ux, Eisenstein vx) {	          
-    dedge_t uv(u,v), vu(v,u);               
-    dedge_done[uv] = true;                  
-    workset.erase(uv);                      
-    dedge_position[vu] = make_pair(vx,ux);  
-    if(!dedge_done[vu])                     
-      workset.insert(vu);			  
+  // Initialize helper structures
+  for(int U=0;U<N;U++){
+    const tri_t &t = T.triangles[U];
+
+    for(int i=0;i<3;i++){
+      node_t u = t[i], v = t[(i+1)%3];
+      arc_to_tri_id[{u,v}] = U;
+    }
+  }  
+  
+  auto place_triangle = [&](arc_t uv, Eisenstein ux, Eisenstein vx) {
+    node_t u=uv.first, v = uv.second,  w = T.next_on_face(u,v);
+    if(w<0){
+      cerr << tri_t{u,v} << " is not part of a triangle in " << T << endl;
+      abort();
+    }
+    
+    Eisenstein wx = ux + (vx-ux).nextCCW();
+
+    //    cout << "# Attempting to place " << vector<node_t>{{u,v,w}} << " at " << vector<Eisenstein>{{ux,vx,wx}} << endl;
+    size_t uv_tri_id = arc_to_tri_id.at(arc_t{u,v});
+    
+    if(!tri_done[uv_tri_id]){
+	tri_done[uv_tri_id] = true;
+	
+	arc_coords[{u,v}] = {ux,vx};
+	arc_coords[{v,w}] = {vx,wx};
+	arc_coords[{w,u}] = {wx,ux};
+	//	cout << "   Success.\n";//, arc_coords = " << get_keys(arc_coords) << " |-> " << get_values(arc_coords) <<".\n";
+
+	if(!tri_done[arc_to_tri_id.at({v,u})]) arc_queue.push_back({v,u});//arc_queue.insert({v,u});//
+	if(!tri_done[arc_to_tri_id.at({u,w})]) arc_queue.push_back({u,w});//arc_queue.insert({u,w});//
+	if(!tri_done[arc_to_tri_id.at({w,v})]) arc_queue.push_back({w,v});//arc_queue.insert({w,v});//
+	//	cout << "   Queueing " << tri_t{w,v,u} << " -> " << arc_queue << endl;
+    } else {
+      //      cout << "   ALREADY PLACED, MAN!\n";
+    }
   };
 
   
-  // 1. Place first triangle. 
-  tri_t t(triangulation[0]);
-  
-  set_dedge(t[0],t[1],zero,veci);
-  set_dedge(t[1],t[2],veci,veci-vecj);
-  set_dedge(t[2],t[0],veci-vecj,zero);
+  // 1. Place first triangle.
+  // If no first arc is given, take first arc emanating from node 0
+  if(first_arc==arc_t{0,0}) first_arc = {0,T.neighbours[0][0]};
+
+  place_triangle(first_arc,zero,veci);
 
   // 2. Keep placing every unplaced triangle that is connected to the boundary
   //    of the already placed triangles until we are done.
-  while(!workset.empty()){
-    dedge_t uv(*workset.rbegin()); // Next placeable directed edge 
-    // set_triangle(uv)
-    node_t u(uv.first), v(uv.second), w(nextNode[uv]);
+  int i=0;
+  while(!arc_queue.empty()){
+    //    cout << "Next element from queue " << arc_queue << " is ";
+    arc_t uv = arc_queue.pop_front(); // Next placeable directed edge
+    //arc_t uv = *arc_queue.begin(); arc_queue.erase(uv); // Next placeable directed edge
+    //    cout << uv << endl;
+    
+    node_t u(uv.first), v(uv.second), w(T.next_on_face(u,v));
 
-    dedgecoord_t uvpos(dedge_position[uv]);
-    Eisenstein ux(uvpos.first), vx(uvpos.second), wx(ux+(vx-ux).nextCW());
+    Eisenstein ux, vx;
+    tie(vx,ux) = arc_coords.at({v,u});
 
-    set_dedge(u,v,ux,vx);
-    set_dedge(v,w,vx,wx);
-    set_dedge(w,u,wx,ux);
+    place_triangle(uv,ux,vx);
+    // cout << "arcs"<<i << " = array(" << get_keys(arc_coords) << ");\n";
+    // cout << "arcpos"<<(i++) << " = array(" << get_values(arc_coords) << ");\n";    
   }
-  return dedge_position;
+  if(arc_coords.size() != N*3){
+    cerr << "Number of arcs placed is " << arc_coords.size() << " != " << (3*N) << ": Incomplete unfolding.\n";
+    abort();
+  }
 }
 
 
+map<dedge_t,Unfolding::dedgecoord_t> Unfolding::unfold(const Triangulation& G, const polygon& outline, const tri_t T0)
+{
+  map<arc_t, dedgecoord_t > arc_coords;
+  std::stack<arc_t> workset;
+  map<arc_t,bool> seen;	// TODO: flat array, neighbours-shape
+
+  node_t u,v;
+  Eisenstein xu, xv, xw, direction;
+
+  // TODO: Use scanconverted polygon to test in constant time for whether a point is inside the polygon
+  //    polygon::scanline S[3] = {outline.scanConvert(), (outline*CCW).scanConvert(), (outline*CW).scanConvert()};
+   
+
+  // The idea is simply to fill out the polygon from known positions. I.e., start with one triangle placed
+  // explicitly, then grow the nfolding from the perimeter, but only placing triangles that are on the interior
+  // of the polygon.
+  // This is done in the following way:
+  //  A workset 'W' of keeps track of arcs on the perimeter where the corresponding triangle can be placed.
+  //  A rasterization 'S' of the polygon lets us look up in constant time whether an arc is on the inside of the polygon
+  //  A boolean map 'seen' keeps track of which arcs we have already processed.
+  //
+  // An arc u->v is ready to be processed and placed into the work-set iff
+  //  1. We have placed the reverse arc v->u (so its position is well-defined)
+  //  2. !seen[{u->v}], i.e., we have not already placed v->u
+  //  3. v->u is an internal edge to the polygon
+
+  auto triangle_is_internal = [&](node_t u, node_t v) -> bool {
+    //    printf("triangle_is_internal(%d,%d)",u,v);
+    Eisenstein xu, xv, xw, direction;      
+    tie(xv,xu) = arc_coords[{v,u}];      // Arc v->u has already been placed if u->v is in workset, giving us two coordinates
+    direction = xv - xu;                 // Direction of arc u->v
+    xw        = xu + direction.nextCW(); // The final coordinate of the triangle is found by turning one step CW
+
+    //    cout << " - " << vector<Eisenstein>{{xu,xv,xw}} << " - ";
+    bool internal= outline.point_included(xu) & outline.point_included(xv) & outline.point_included(xw);
+    //    printf(" = %d\n",internal);
+    return internal;
+  };
+    
+  auto arc_can_be_processed = [&](node_t u, node_t v) -> bool {
+    return !seen[{u,v}] && triangle_is_internal(u,v);
+  };
+    
+  auto place_triangle = [&](const tri_t &T, const Eisenstein position[3]) {
+
+    cout << "Placing triangle " << T << " at " << vector<Eisenstein>{{position[0],position[1],position[2]}} << endl;
+    for(int i=0;i<3;i++) seen[{T[i],T[(i+1)%3]}] = true;
+    
+    for(int i=0;i<3;i++){
+      node_t      u = T[i],         v = T[(i+1)%3];
+      Eisenstein xu = position[i], xv = position[(i+1)%3]; // Fix coordinates of each arc 
+
+      arc_coords[{u,v}] = {xu,xv}; // Fix coordinates of each arc 
+
+      if(arc_can_be_processed(v,u)) workset.push({v,u});             // ...and stack reverse arc on workset if it is to be processed
+    }
+  };
+    
+
+  // Now the algorithm becomes simply:
+    // 1. Place the first triangle T0
+    Eisenstein pos[3] = {outline.reduced_outline[0],outline.reduced_outline[0]+Eisenstein{0,1}, outline.reduced_outline[0]+Eisenstein{1,0}};
+    place_triangle(T0,pos);
+
+    // 2. Place the rest of the triangles
+    while(!workset.empty()){
+      tie(u,v) = workset.top(); workset.pop();
+      if(arc_can_be_processed(u,v)){
+	node_t w = G.next(u,v);
+	
+	tie(xv,xu) = arc_coords[{v,u}]; // Arc v->u has already been placed if u->v is in workset
+	
+	Eisenstein direction = xv - xu; // Direction of arc u->v
+	assert(direction.norm2() == 1);		      
+	
+	Eisenstein xuvw[3] = {xu, xv, xu + direction.nextCW()};
+	place_triangle({u,v,w}, xuvw);
+      }
+    }
+    //    cout << "Done!\n";
+    return arc_coords;    
+}
+
 // Given the output of unfold(), this function efficiently computes the polygon outlining
 // the unfolded triangulation and returns it in clockwise order.
-vector< pair<Eisenstein,node_t> > Unfolding::get_outline(const map<dedge_t,Unfolding::dedgecoord_t>& edgecoords)
+vector< pair<Eisenstein,node_t> > Unfolding::get_outline(const map<arc_t,Unfolding::dedgecoord_t>& arc_coords)
 {
   map<Eisenstein,node_t>    label;
   map<Eisenstein,Eisenstein> next;
 
   // Collect the directed edges u->v whose positions do not coincide with the reverse edge v->u. 
   // These form the outline of the polygon. 
-  for(map<dedge_t,dedgecoord_t>::const_iterator i(edgecoords.begin()); i!= edgecoords.end(); i++){
-    const dedge_t &uv(i->first), vu(uv.second,uv.first);
-    const dedgecoord_t &uvpos(i->second), vupos(edgecoords.find(vu)->second);
+  for(map<arc_t,dedgecoord_t>::const_iterator i(arc_coords.begin()); i!= arc_coords.end(); i++){
+    const arc_t &uv(i->first), vu(uv.second,uv.first);
+    const dedgecoord_t &uvpos(i->second), vupos(arc_coords.find(vu)->second);
 
     if(uvpos != make_pair(vupos.second,vupos.first)){
       next[uvpos.first]   = uvpos.second; 
@@ -111,7 +226,8 @@ vector< pair<Eisenstein,node_t> > Unfolding::get_outline(const map<dedge_t,Unfol
   return outline;
 }
 
-void Unfolding::transform_line(const Unfolding::dedgecoord_t& l1, const Unfolding::dedgecoord_t& l2, Eisenstein& x0, Eisenstein& x0p, Eisenstein& w)
+void Unfolding::transform_line(const Unfolding::dedgecoord_t& l1, const Unfolding::dedgecoord_t& l2,
+			       Eisenstein& x0, Eisenstein& x0p, Eisenstein& w)
 {
   Eisenstein Duv(l1.second-l1.first), Dvu(l2.first-l2.second), Tuvvu((Duv.invertn()*Dvu)/Dvu.norm2());
 
@@ -120,6 +236,7 @@ void Unfolding::transform_line(const Unfolding::dedgecoord_t& l1, const Unfoldin
   w   = Tuvvu;
 }
 
+// TODO: Preserve the graph!
 #include <unistd.h>
 Unfolding Unfolding::straighten_lines() const 
 // ASSUMES: that nodes 1-12 are pentagons. 
@@ -127,7 +244,7 @@ Unfolding Unfolding::straighten_lines() const
 // TODO:    Work out how to do this for negative-curvature graphs.
 {
   vector< int > Oindex;
-  vector< pair<Eisenstein,node_t> > O;
+  vector< pair<Eisenstein,node_t> > O;  // Straightened outline
 
   for(int i=0;i<outline.size();i++)	// Find non-hexagon node outline
     if(degrees[outline[i].second] != 6){
@@ -137,19 +254,19 @@ Unfolding Unfolding::straighten_lines() const
   
   // Directed graph defined by non-hexagon node outline
   vector<bool> A(12*12,false);	// Always at most 12 nodes of degree 5 or less
-  set<dedge_t> workset;
+  set<arc_t> workset;
 
   // Arc annotations
-  map<dedge_t,pair<int,int> > UVindex;
-  map<dedge_t,dedgecoord_t> XUV;
-  map<dedge_t,dedgecoord_t> XUv;
-  map<dedge_t,dedgecoord_t> XVu;
+  map<arc_t,pair<int,int> > UVindex;
+  map<arc_t,dedgecoord_t> XUV;
+  map<arc_t,dedgecoord_t> XUv;
+  map<arc_t,dedgecoord_t> XVu;
 
   for(int i=0;i<O.size();i++){
     int j = (i+1)%O.size();
     int i1 = (Oindex[i]+1)%outline.size(), j1 = (Oindex[j]-1+outline.size())%outline.size();
 
-    dedge_t UV(O[i].second,O[j].second);
+    arc_t UV(O[i].second,O[j].second);
 
     workset.insert(UV);
     A[UV.first*12+UV.second] = true;
@@ -162,8 +279,7 @@ Unfolding Unfolding::straighten_lines() const
     XVu[UV] = dedgecoord_t(Vx,ux);
   }
 
-  // Now repeatedly eliminate dedges by the following rules:
-  cerr << "workset = " << workset << ";\n";
+  // Now repeatedly eliminate arcs by the following rules:
   while(!workset.empty()){
     
     fprintf(stderr,"Step 1\n");
@@ -177,8 +293,8 @@ Unfolding Unfolding::straighten_lines() const
 	  A[U*12+V] = false;
 	  A[V*12+U] = false;
 
-	  workset.erase(dedge_t(U,V));
-	  workset.erase(dedge_t(V,U));
+	  workset.erase(arc_t(U,V));
+	  workset.erase(arc_t(V,U));
 	}
     
     fprintf(stderr,"\nStep 2\n");
@@ -186,47 +302,58 @@ Unfolding Unfolding::straighten_lines() const
 
     // 2. When this step is reached, edges in workset are part of cycles of length >=3 and must be reduced. 
     // 2.1 Find first length-3 segment U->V->W
-    dedge_t UV(*workset.begin());
+    arc_t UV(*workset.begin());
     node_t U(UV.first), V(UV.second), W;
     for(W=0;W<12;W++) if(A[V*12+W]) break; 
     if(W==12){
-      assert(workset.empty());
+      if(!workset.empty())
+	fprintf(stderr,"straighten_lines: workset not empty, but no arcs to process.\n");
+	
       break;
     }
 
     // 2.2 Transform W
-    dedge_t VW(V,W);
-    fprintf(stderr,"%d->%d->%d at ",U,V,W); cerr << UVindex[UV] << " and " << UVindex[VW] << endl;
-    Eisenstein x0, x0p, omega;
+    if(U != W){    
+      arc_t VW(V,W);
+      fprintf(stderr,"%d->%d->%d at ",U,V,W); cerr << UVindex[UV] << " and " << UVindex[VW] << endl;
+      Eisenstein x0, x0p, omega;
+      
+      transform_line(XUv[VW], reverse(XVu[UV]), x0, x0p, omega);
+      cerr << "XUV = " << XUV[UV] << "; XWv = " << XUv[VW] << "; XUv = " << XVu[UV] << ";\n";
+      Eisenstein Wxp = XUV[VW].second,  Wx((Wxp-x0)*omega+x0p);
+      cerr << "Wxp = " << Wxp << "; Wx = " << Wx << endl;
 
-    transform_line(XUv[VW], reverse(XVu[UV]), x0, x0p, omega);
-    cout << "XUV = " << XUV[UV] << "; XWv = " << XUv[VW] << "; XUv = " << XVu[UV] << ";\n";
-    Eisenstein Wxp = XUV[VW].second,  Wx((Wxp-x0)*omega+x0p);
-    cout << "Wxp = " << Wxp << "; Wx = " << Wx << endl;
 
+      // 2.3 Create annotation for new U->W arc
+      arc_t UW(U,W);
+      dedgecoord_t Wuxp(XVu[VW]), Wux(dedgecoord_t((Wuxp.first-x0)*omega+x0p, (Wuxp.second-x0)*omega+x0p));
+      XUV[UW] = dedgecoord_t(XUV[UV].first,Wx);
+      XUv[UW] = XUv[UV];
+      XVu[UW] = Wux;
 
-    // 2.3 Create annotation for new U->W arc
-    dedge_t UW(U,W);
-    dedgecoord_t Wuxp(XVu[VW]), Wux(dedgecoord_t((Wuxp.first-x0)*omega+x0p, (Wuxp.second-x0)*omega+x0p));
-    XUV[UW] = dedgecoord_t(XUV[UV].first,Wx);
-    XUv[UW] = XUv[UV];
-    XVu[UW] = Wux;
+      // 2.4 Replace U->V by U->W->V in new outline O
+      int Uindex(UVindex[UV].first);
+      O.insert(O.begin()+Uindex+1, make_pair(Wx,W));
 
-    // 2.4 Replace U->V by U->W->V in new outline O
-    int Uindex(UVindex[UV].first);
-    O.insert(O.begin()+Uindex+1, make_pair(Wx,W));
+      // 2.5 Remove U->V and V->W from workset
+      fprintf(stderr,"Removing %d->%d and %d->%d\n",U,V,V,W);
+      A[U*12+V] = false;
+      A[V*12+W] = false;
+      workset.erase(UV);
+      workset.erase(VW);
 
-    // 2.5 Remove U->V and V->W from workset
-    fprintf(stderr,"Removing %d->%d and %d->%d\n",U,V,V,W);
-    A[U*12+V] = false;
-    A[V*12+W] = false;
-    workset.erase(UV);
-    workset.erase(VW);
+      // 2.6 Add U->W to workset
 
-    // 2.6 Add U->W to workset
-    fprintf(stderr,"Adding %d->%d\n",U,W);
-    A[U*12+W] = true;
-    workset.insert(UW);
+      fprintf(stderr,"Adding %d->%d\n",U,W);
+      A[U*12+W] = true;
+      workset.insert(UW);
+    } else {
+      fprintf(stderr,"Not implemented yet: %d->%d->%d\n",U,V,W);
+      A[U*12+V] = false;
+      A[V*12+W] = false;
+      workset.erase({U,V});
+      workset.erase({V,W});      
+    }
   }
   
   return Unfolding(O);
@@ -265,7 +392,7 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
 ";
 
   vector<Eisenstein> outline_gc(outline.size());
-  for(int i=0;i<outline.size();i++) outline_gc[i] = outline[i].first.GCtransform(K,L);
+  for(int i=0;i<outline.size();i++) outline_gc[i] = outline[i].first * Eisenstein{K,L};
 
   // Extract (I,J)-bounds
   int imin = INT_MAX, imax = INT_MIN, jmin = INT_MAX, jmax = INT_MIN;
@@ -334,14 +461,16 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
   case 3: // Label all original vertices, including internal ones
     {
       int i=0;
-      for(map<dedge_t,dedgecoord_t>::const_iterator it(edgecoords.begin()); it!=edgecoords.end(); i++){
-	const dedge_t& uv(it->first);
-	const dedgecoord_t& ij(it->second);
+      for(const auto& uv_ij: arc_coords){
+	const arc_t& uv(uv_ij.first);
 
-	node_t u(uv.first);
-	Eisenstein IJ(ij.first.GCtransform(K,L)-gcmin);
+	const dedgecoord_t& ij(uv_ij.second);
 
-	latexfile << "{(" << IJ.first << "," << IJ.second << ")/"<<i<<"/"<<u<<(++it != edgecoords.end()? "},":"}");
+	node_t u = uv.first;
+	Eisenstein I = ij.first;
+	Eisenstein IJ(I*Eisenstein{K,L}-gcmin);
+
+	//	latexfile << "{(" << IJ.first << "," << IJ.second << ")/"<<i<<"/"<<u<<(++it != arc_coords.end()? "},":"}");
       }
     }
     break;
@@ -366,4 +495,53 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
   return latexfile.str();
 }
 
+
+
+static vector<Unfolding> generate_all_unfoldings(const Triangulation& graph)
+{
+  vector<dedge_t> workset;
+
+
+}
+
+
+struct unfolding_parent_state {
+ map<dedge_t,bool> arc_seen;
+ vector<dedge_t>   arc_boundary;
+ int level;
+};
+
+unfolding_parent_state place_triangle(const Triangulation& G, const dedge_t arc, const unfolding_parent_state &S)
+{
+  unfolding_parent_state Snext;
+  node_t u = arc.first, v = arc.second, w = G.next_on_face(u,v);
+
+  Snext.level    = S.level + 1;
+  Snext.arc_seen = S.arc_seen;
+  Snext.arc_seen[{u,v}] = true;
+  Snext.arc_seen[{v,w}] = true;
+  Snext.arc_seen[{w,u}] = true;
+
+  Snext.arc_boundary.reserve(S.arc_boundary.size()); // Memory need for new boundary will be abound the same
+  for(const dedge_t& arc: S.arc_boundary){	     // Update boundary
+    // 3 cases:
+    // 1: Neither u->w or v->w are on the boundary => u->v is replaced by u->w->v
+    // 2: u->v->w is a boundary segment            => u->v->w is replaced by u->w
+    // 3: u->v and v->w exist separately on the B  => u->v is replaced by u->w
+    
+  }
+  
+}
+
+void generate_unfolding_subtree(const Triangulation& G, const unfolding_parent_state &S, vector<vector<dedge_t>> arc_boundaries)
+{
+  if(S.level == G.N){ // If we have placed all N triangles, the unfolding is complete, and we can add it to our results
+    arc_boundaries.push_back(S.arc_boundary);
+    return;
+  } else	      // Otherwise, recursively proceed through each unproccessed arc on the outline:
+    for(dedge_t arc: S.arc_boundary) if(!S.arc_seen.at(arc)) {
+      unfolding_parent_state Snext = place_triangle(G,arc,S); 
+      generate_unfolding_subtree(G,Snext,arc_boundaries);
+    }
+}
 

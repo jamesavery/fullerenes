@@ -177,6 +177,7 @@ bool PlanarGraph::is_cut_vertex(const node_t v) const {
 }
 
 
+
 PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
 {
   if(is_oriented){

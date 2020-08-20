@@ -95,12 +95,6 @@ def barycentric(XY,xy1,xy2,xy3):
     T = np.array([xy1-xy3,xy2-xy3]).T
     r = XY-xy3
     shape = (2,)+XY.shape[:2]
-    # print("XY:",XY.shape)
-    # print("xy1:",xy1)
-    # print("xy2:",xy2)
-    # print("xy3:",xy3)            
-    # print("T:",T.shape)
-    # print("r:",r.shape)    
     
     return la.solve(T,r.reshape(-1,2).T).reshape(shape)
 

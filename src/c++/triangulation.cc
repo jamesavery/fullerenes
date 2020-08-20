@@ -1112,11 +1112,9 @@ Triangulation Triangulation::sort_nodes() const
 {
   vector< pair<int,int> > degrees(N);
 
-  for(int u=0;u<N;u++) degrees[u] = make_pair(neighbours[u].size(), u);
+  for(int u=0;u<N;u++) degrees[u] = make_pair(degree(u), u);
 
   sort(degrees.begin(), degrees.end());
-
-  //  cout << "degrees = " << degrees << endl;
 
   vector<int> newname(N);
   for(int u=0;u<N;u++) newname[degrees[u].second] = u;
