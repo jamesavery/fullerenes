@@ -215,16 +215,17 @@ PlanarGraph PlanarGraph::from_spiral(FILE *f, const size_t index)  {
   // TODO: Move to to_file, add as parameter.
   auto naming_scheme = spiral_nomenclature::FULLERENE;
   auto construction_scheme = spiral_nomenclature::CUBIC;
-  char line[0x1000], *result;
+  string line;
+  bool read_ok;
   printf("from_spiral()\n");
   for(int i=0;i<=index;i++){
-    result = fgets(line,0x1000,f);
-    if(!result){
-      perror("fgets");
+    read_ok = getline(f,line);
+    if(!read_ok){
+      perror("getline");
       return {};
-    } else {
-      printf("result: %s, line: %s\n",result,line);
-    }
+    } // else {
+    //   printf("result: %s, line: %s\n",read_ok,line);
+    // }
   }
   
   spiral_nomenclature name(line);  

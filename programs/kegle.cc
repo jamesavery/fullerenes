@@ -320,11 +320,11 @@ int main(int ac, char **argv)
     // }
     // cout << "]\n";
 
-    for(int i=0;i<12;i++){
-      Eisenstein g(Gs(i,i).g);
-      int axis = Gs(i,i).axis;
-      cout << i<<"-"<<i<<" shortest self-geodesic: " << make_pair(g,axis) << "\n";
-      cout << "\t Path: " << dualG.quads_of_the_line(i,axis,g.first,g.second) << endl;
+    for(int j=0;j<12;j++){
+      Eisenstein g(Gs(j,j).g);
+      int axis = Gs(j,j).axis;
+      cout << j<<"-"<<j<<" shortest self-geodesic: " << make_pair(g,axis) << "\n";
+      cout << "\t Path: " << dualG.quads_of_the_line(j,axis,g.first,g.second) << endl;
     }
     
     //auto Dg = pentagon_graph_distance(dualG);

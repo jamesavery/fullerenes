@@ -92,6 +92,12 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
 
       if(!dedge_done[uv]){
         node_t w = next_on_face(u,v);
+	if(w==-1){
+	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
+	  printf("\tneibhours[%d] = ",u); cout << neighbours[u] << endl;
+	  printf("\tneibhours[%d] = ",v); cout << neighbours[v] << endl;	  
+	  assert(w != -1);
+	}
 
         if(!dedge_done[{v,w}] && !dedge_done[{w,u}]){
 
@@ -107,14 +113,45 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
   return triangles;
 }
 
+// TODO: dedge_t -> arc_t everywhere
+//       dedge   -> arc   everywhere
+unordered_map<dedge_t,dedge_t> Triangulation::arc_translation(const PlanarGraph& cubic) const
+{
+  // TODO: Common metadata, calculate once
+  IDCounter<tri_t> tri_numbers;
+  unordered_map<dedge_t,dedge_t> arc_translate(triangles.size()*3);
+
+  //assert(triangles.size() == (N-2)*2);
+  if(triangles.size() != (N-2)*2){
+    cout << "triangles = " << triangles << endl;
+    assert(triangles.size() == (N-2)*2);
+  }
+  
+  // Dual arcs
+  for(node_t u=0;u<N;u++)
+    for(node_t v: neighbours[u]){
+      node_t wa = next_on_face(u,v), wb = next_on_face(v,u);
+      tri_t  Ta = {u,v,wa}, Tb = {v,u,wb};
+      node_t  a = tri_numbers(Ta.sorted()), b = tri_numbers(Tb.sorted());
+
+      arc_translate[{u,v}] = {a,b};
+    }
+  return arc_translate;
+}
+
+
 // TODO: Factor out tri_numbers to do only once?
 PlanarGraph Triangulation::dual_graph() const
 {
   IDCounter<tri_t> tri_numbers;
 
-  assert(triangles.size() == (N-2)*2);
+  //assert(triangles.size() == (N-2)*2);
+  if(triangles.size() != (N-2)*2){
+    cout << "triangles = " << triangles << endl;
+    assert(triangles.size() == (N-2)*2);
+  }
   for(int i=0;i<triangles.size();i++) tri_numbers.insert(triangles[i].sorted());
-  
+
   neighbours_t A(triangles.size(),vector<node_t>(3));
 
   for(node_t U=0;U<triangles.size();U++){

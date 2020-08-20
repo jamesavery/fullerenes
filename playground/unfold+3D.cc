@@ -170,7 +170,7 @@ int main(int ac, char **av)
   dual = dual.sort_nodes();
   
   dual.layout2d = dual.tutte_layout();
-  Unfolding uf(dual,true);
+  Unfolding uf(dual);
 
   ofstream output("output/C"+to_string(N)+"-unfold.m");
   output << "dual    = " << dual << ";\n"
