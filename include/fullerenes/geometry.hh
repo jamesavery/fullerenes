@@ -95,7 +95,8 @@ struct coord2d : public pair<double,double> {
     return point_angle(y+dy[imin],false);
   }
   
-  double norm() const { return sqrt(first*first+second*second); }
+  double norm()  const { return sqrt(norm2()); }
+  double norm2() const { return first*first+second*second; }  
   // d/dx_i ||x|| = x_i/||x||.
   static coord2d dnorm(const coord2d& x){ return x/x.norm(); }
 

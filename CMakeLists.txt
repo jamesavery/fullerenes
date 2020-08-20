@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(FULLERENE_DATABASE_PATH ${CMAKE_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
 set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
 
+set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
 find_package(LAPACK)
 find_package(GSL)
@@ -44,7 +45,8 @@ include_directories(${CMAKE_BINARY_DIR}/include/)
 
 # Fortran compiler flags
 set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O2 -m64 -mcmodel=large")
-set(CMAKE_CXX_FLAGS "-std=c++11 -fPIC -O2 -m64")
+# C++ compiler flags
+set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O2 -m64")
 
 add_subdirectory(src/c++)
 add_subdirectory(src/fortran)
