@@ -268,10 +268,9 @@ vector<coord2d> PlanarGraph::spherical_projection() const
   // Step 2. Calculate the centroid for vertices grouped by vertex depth.
   vector<coord2d> centroids(dmax+1);
   for(unsigned int d=0;d<=dmax;d++){
-    const list<node_t>& Vd(V[d]);
-    coord2d c(0);
-    for(list<node_t>::const_iterator u(Vd.begin());u!=Vd.end();u++)
-      c += layout2d[*u];
+    coord2d c = {0,0};
+
+    for(node_t u: V[d])  c += layout2d[u];
     centroids[d] = c/V[d].size();
   }
 
@@ -284,12 +283,9 @@ vector<coord2d> PlanarGraph::spherical_projection() const
   vector< coord2d > spherical_layout(N);
   for(unsigned int d=0;d<=dmax;d++){
     double phi = dtheta*(d+0.5);
-    const list<node_t>& Vd(V[d]);
-    const coord2d& centroid(centroids[d]);
 
-    for(list<node_t>::const_iterator ui(Vd.begin());ui!=Vd.end();ui++){
-      const node_t u(*ui);
-      coord2d xy(layout2d[u]-centroid);
+    for(node_t u: V[d]){
+      coord2d xy(layout2d[u]-centroids[d]);
       double theta = atan2(xy.first,xy.second);
 
       spherical_layout[u] = coord2d(theta,phi);
