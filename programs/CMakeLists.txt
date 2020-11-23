@@ -12,6 +12,6 @@ add_executable(fullerene-isomers-polyhedra fullerene-isomers-polyhedra.cc)
 add_executable(polyhedra-buster polyhedra-buster.cc)
 add_executable(filter-nanocones filter-nanocones.cc)
 add_executable(kegle kegle.cc)
-add_executable(density density.cc)
+# add_executable(density density.cc)
 # add_executable(geodesics geodesics.cc)
 
