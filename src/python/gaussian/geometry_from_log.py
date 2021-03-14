@@ -2,11 +2,23 @@
 import sys, re, numpy as np
 
 pattern_start = "orientation:\s*-*\s*Center\s*Atomic\s*Atomic\s*Coordinates\s*\(Angstroms\)\s*Number\s*Number\s*Type\s*X\s*Y\s*Z\s*-*"
-pattern_end = "\s+-+\s+"
+pattern_end = "\s+---+\s+"
 
-def read_geometry(txt):
+elements = np.array([
+    "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P",
+    "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn",
+    "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru",
+    "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce",
+    "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf",
+    "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn",
+    "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm",
+    "Md", "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg", "Cn", "Uut",
+    "Fl", "Uup", "Lv", "Uus", "Uuo"
+],dtype=np.str)
+
+def read_log_geometry(txt):
     pattern = re.compile("Normal termination of Gaussian")
-    if bool(re.search(pattern,txt)) == False:
+    if bool(re.search(pattern,txt)) == False: # Abnormal termination
         atoms, all_geometries = read_geometries(txt)
         if len(all_geometries)>0:
             return atoms, all_geometries[-1]
@@ -31,30 +43,30 @@ def read_geometry(txt):
     geometry = np.fromstring(tmp,sep=',').reshape(-1,3)
     return atoms, geometry
 
-def read_geometries(txt, pattern_start=pattern_start, pattern_end=pattern_end):
+def read_log_geometries(txt, pattern_start=pattern_start, pattern_end=pattern_end):
     geometries = re.split(pattern_start,txt)[1:]
     geometries_array = []
     for geometry in geometries:
-        tmp = re.split(pattern_end,geometry)[0]
-        tmp = re.sub("[0-9]+\s+[0-9]+\s+0\s+","",tmp)
-        tmp_np = np.fromstring(tmp,sep=' ').reshape(-1,3)
-        geometries_array.append(tmp_np)
-
-    #TODO: Extract from logfile
-    atoms = ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'H', 'Cl', 'Cl', 'Cl', 'H', 'Cl', 'Cl', 'Cl', 'H', 'Cl', 'Cl', 'Cl', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H']
+        lines = re.split(pattern_end,geometry)[0].split('\n')
         
-    return atoms, np.array(geometries_array)
+        CAT = np.array([l.split()[:3] for l in lines],dtype=int)
+        XYZ = np.array([l.split()[3:] for l in lines],dtype=float)
+        
+        geometries_array += [XYZ]
+
+    atom_numbers = CAT[:,1]
+    atom_names   = elements[atomic_numbers]
+    return atom_names, np.array(geometries_array)
 
 
-def write_geometry(X,atoms,frozen=None):
-    # TODO: Handle frozen atoms
+def write_geometry(X,atoms,frozen=[]):
     frozen_flat = [""] * len(X)
     for i in frozen:
         frozen_flat[i-1] = " -1 "
         
     output = ""
     for ((x,y,z), a,f) in zip(X,atoms,frozen_flat):
-        output += " {:s} {s:} {:16.16f} {:16.16f} {:16.16f}\n".format(a,f,x,y,z)
+        output += " {:s} {:s} {:16.16f} {:16.16f} {:16.16f}\n".format(a,f,x,y,z)
 
     return output
 
@@ -71,7 +83,7 @@ default_options = {
        };
 
 
-def write_gaussian_input(calculation_name, X,atoms, tasks=['opt'],frozen=None,options=default_options):
+def write_gaussian_input(calculation_name, X,atoms, tasks=['opt'],frozen=[],options=default_options):
     link0_section = f"%nprocshared={options['nprocs']}\r\n%mem={options['mem']}GB"
     
     route_section = f"# {options['model']} {options['route_extra']}"
@@ -91,7 +103,7 @@ def write_gaussian_input(calculation_name, X,atoms, tasks=['opt'],frozen=None,op
 
 if __name__ == "__main__":
     input_text = sys.stdin.read()
-    atoms, coordinates = read_geometry(input_text)
+    atoms, coordinates = read_log_geometry(input_text)
     print(write_gaussian_input("Precursor folding", coordinates,atoms, ['opt']), file=sys.stdout)
 
 
