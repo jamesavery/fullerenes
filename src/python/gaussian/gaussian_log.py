@@ -13,6 +13,9 @@ elements = np.array([           # Translate from atomic number to element name
     "Fl", "Uup", "Lv", "Uus", "Uuo"
 ],dtype=np.str)
 
+element_Z = {};
+for Z in range(len(elements)): element_Z[elements[Z]] = Z+1;
+
 # READ GEOMETRY AND OPTIMIZATION STEPS FROM GAUSSIAN16 LOG FILE
 pattern_start = "orientation:\s*-*\s*Center\s*Atomic\s*Atomic\s*Coordinates\s*\(Angstroms\)\s*Number\s*Number\s*Type\s*X\s*Y\s*Z\s*-*"
 pattern_end = "\s+---+\s+"
@@ -29,13 +32,13 @@ def read_log_inputgeometry(txt):
     lines = input_geometry_txt.split("\n")
     N = len(lines)    
     
-    atom_names  = []
+    atom_names   = []
+    atom_numbers = []
     atom_coords = ""
     frozen      = np.zeros(N,dtype=bool)
 
     for i in range(N):
         l = lines[i]
-        print(i,l)        
         split_line = l.split()
         
         if(len(split_line)==4):
@@ -46,10 +49,11 @@ def read_log_inputgeometry(txt):
         else:
             print(f"Wrong length {len(split_line)} of line {split_line}")
             
-        atom_names  += [a]
+        atom_names   += [a]
+        atom_numbers += [element_Z[a]]
         atom_coords += f"{x} {y} {z} "
-        
-    return atom_names, np.fromstring(atom_coords,dtype=np.float,sep=' ').reshape(N,3), frozen
+
+    return atom_names, atom_numbers, np.fromstring(atom_coords,dtype=np.float,sep=' ').reshape(N,3), frozen
 
 def read_log_geometry(txt):
     pattern = re.compile("Normal termination of Gaussian")
