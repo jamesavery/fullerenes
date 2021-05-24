@@ -16,10 +16,14 @@ typedef uint16_t node_t; // NB: Increase to int32 to do more than 65k atoms
 
 inline void print_real(real_t a)
 {
-    cout << a << "\n";
+    printf("%.16e \n",a);
 }
 
-inline uint8_t sum(array<uint8_t,3> a){
+inline uint8_t sum(const array<uint8_t,3>& a){
+    return a[0] + a[1] + a[2];
+}
+
+inline real_t sum(const coord3d& a){
     return a[0] + a[1] + a[2];
 }
 
@@ -31,7 +35,9 @@ class FullereneForcefieldEnergy
 {
 public:
     const CubicArcs<N> neighbours; //Bookkeeping array for storing the indices of neighbour nodes: b,c,d
+    
     array<coord3d, N> X; // Current nucleus positions
+    array<coord3d, N> X_temp; // Temporary positions to be evaluated
 
     const array<uint8_t, N * 3> face_right; //Faces to the right of the edges ab, ac, ad
     const array<node_t, N * 3> next_on_face, prev_on_face; //Next node on the face to the left of the edges ab, ac, ad
@@ -51,6 +57,86 @@ public:
 
     FullereneForcefieldEnergy(const CubicArcs<N> &neighbours, const array<coord3d, N> &X, const array<uint8_t, N * 3> &face_right, const array<node_t, N * 3> &next_on_face, const array<node_t, N * 3> &prev_on_face) : 
         neighbours(neighbours), X(X), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
+
+    inline void parallel_add(array<coord3d,N>& array1, array<coord3d,N>& array2, array<coord3d,N>& result){
+        for (node_t a = 0; a < N; a++)
+        {
+            result[a] = array1[a] + array2[a];
+        }
+    }
+
+
+    //Parallelizable copying,  a = b;
+    template <typename T>
+    static inline void parallel_copy(array<T,N>& a, array<T,N>& b){
+        for (node_t i = 0; i < N; i++)
+        {
+            a[i]= b[i];
+        }
+    }
+
+    //Parallelizable reduction function.
+    static inline real_t reduce(array<coord3d,N>& array){
+        real_t total = 0.0;
+        for (node_t a = 0; a < N; a++)
+        {
+            total += sum(array[a]);
+        }
+        return total;
+    }
+
+    static inline real_t reduce(array<real_t,N>& array){
+        real_t total = 0.0;
+        for (node_t a = 0; a < N; a++)
+        {
+            total += array[a];
+        }
+        
+    }
+
+    static inline void normalize(array<coord3d,N>& array){
+        real_t euclidean_norm = norm(array);
+        for (node_t a = 0; a < N; a++)
+        {
+            array[a] = array[a] / euclidean_norm;
+        }
+        
+    }
+
+    //Parallelizable scalar-multiplication reduction function.
+    static inline real_t multiply_reduce(array<coord3d,N>& array, real_t scalar){
+        real_t total = 0.0;
+        for (node_t a = 0; a < N; a++)
+        {
+            total += sum(array[a] * scalar);
+        }
+        return total;
+    }
+    
+    
+    static inline real_t multiply_reduce(array<coord3d,N>& array1, array<coord3d,N>& array2){
+        real_t total = 0.0;        
+        for (node_t a = 0; a < N; a++)
+        {
+            total += dot(array1[a],array2[a]);
+        }
+        return total;
+    }
+
+    //Parallelizable euclidean norm function.
+    static inline real_t norm(array<coord3d,N>& array){
+        return sqrt(array_dot(array,array));
+    }
+
+    static inline real_t array_dot(array<coord3d,N>& array1, array<coord3d,N>& array2){
+        real_t result = 0.0;
+        for (node_t a = 0; a < N; a++)
+        {
+            result += dot(array1[a],array2[a]);
+        }
+        return result;
+        
+    }
 
     //Computes gradient related to stretch term.
     static inline coord3d bond_gradient(const real_t force_const, const real_t r0, const real_t rab, const coord3d ab_hat){
@@ -78,7 +164,7 @@ public:
     }
 
     //Computes gradient related to dihedral/out-of-plane term.
-    static inline coord3d dihedral_gradient(const real_t force_const, const real_t rab, const real_t dih0, const coord3d &ab_hat, const coord3d &ab, const coord3d &ac, const coord3d &ad)
+    static inline pair<coord3d, real_t> dihedral_gradient(const real_t force_const, const real_t rab, const real_t dih0, const coord3d &ab_hat, const coord3d &ab, const coord3d &ac, const coord3d &ad)
     {
         coord3d bc = ac - ab;
         coord3d cd = ad - ac;
@@ -105,7 +191,7 @@ public:
 
         coord3d d_dih_a = cross(bc_hat, nbcd) / (sin_b * rab) - (ba_hat * cos_beta) / rab + (cot_b * cos_beta) / (sin_b * rab) * (bc_hat - ba_hat * cos_b);
 
-        return force_const * (cos_beta - dih0) * d_dih_a;
+        return {force_const * (cos_beta - dih0) * d_dih_a, cos_beta};
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbam, namp
@@ -216,9 +302,68 @@ public:
         return force_const * (cos_beta - dih0) * d_dih_p;
     }
 
-    array<coord3d,N> gradient()
+    static inline real_t harmonic_energy(real_t param, real_t param0){
+        return 0.5*(param-param0)*(param-param0);
+    }
+
+    real_t energy(array<coord3d,N>& X){
+        array<real_t,N> energy_array;
+
+        for (node_t a = 0; a < N; a++)
+        {   
+            real_t node_bond_energy = 0.0;
+            real_t node_bend_energy = 0.0;
+            real_t node_dihedral_energy = 0.0;
+
+             //Fetching neighbour indices.
+            array<node_t, 3> na = {neighbours[a * 3], neighbours[a * 3 + 1], neighbours[a * 3 + 2]}; // Neighbours b,c,d to a
+
+            //Fetching current node coordinate.
+            coord3d Xa = X[a];
+
+            //Fetching face information to the left and right of the edges: ab, ac, ad.
+            array<uint8_t, 3> f_r = {face_right[a * 3] - 5, face_right[a * 3 + 1] - 5, face_right[a * 3 + 2] - 5};
+            array<uint8_t, 3> f_l = {face_right[a * 3 + 2] - 5, face_right[a * 3] - 5, face_right[a * 3 + 1] - 5};
+
+            //Fetching coordinates for neighbour nodes b,c,d.
+            array<coord3d, 3> Xbcd = {X[na[0]], X[na[1]], X[na[2]]};
+
+            array<real_t,3> rab;
+            array<coord3d,3> abs;
+            array<coord3d,3> ab_hats;
+
+            for (size_t i = 0; i < 3; i++)
+            {
+                tie(rab[i],abs[i]) = split_norm(Xbcd[i] - Xa);
+
+                ab_hats[i] = abs[i] / rab[i];
+            }
+            for (size_t j = 0; j < 3; j++)
+            {
+                real_t r0 = optimal_bond_lengths[ f_l[j] + f_r[j] ];
+                real_t ang0 = optimal_corner_cos_angles[ f_r[j] ];
+                real_t dih0 = optimal_dih_cos_angles[ f_l[0] + f_l[1] + f_l[2]];
+                real_t bond_fc = bond_forces[ f_l[j] + f_r[j] ];
+                real_t ang_fc = angle_forces[ f_l[j] ];
+                real_t dih_fc = dih_forces[ f_l[0] + f_l[1] + f_l[2] ];
+
+                real_t cos_dih_angle;
+                coord3d null;
+                tie(null, cos_dih_angle) = dihedral_gradient(dih_fc, rab[j], dih0, ab_hats[j], abs[j], abs[(j+1)%3], abs[(j+2)%3]);
+                
+                node_bond_energy += bond_fc * harmonic_energy(rab[j],r0);
+                node_bend_energy += ang_fc * harmonic_energy(dot(ab_hats[j],ab_hats[(j+1)%3]), ang0);
+                node_dihedral_energy += dih_fc * harmonic_energy(cos_dih_angle,dih0);
+            }
+            //All bond energies are computed twice, (node a computes ab and node b computes ba) , hence the factor 0.5;
+            energy_array[a] = node_bond_energy*0.5 + node_bend_energy + node_dihedral_energy;
+        }
+        
+        return reduce(energy_array);
+    }
+
+    void gradient(array<coord3d,N>& X,array<coord3d,N>& gradient)
     {
-        array<coord3d,N> gradient;
         for (node_t a = 0; a < N; a++) 
         {   
             //Fetching neighbour indices.
@@ -253,7 +398,7 @@ public:
             array<coord3d, 3> abs, bps, bms, ab_hats, bp_hats, bm_hats;
 
             coord3d node_gradient = {0,0,0};
-
+            
             for (size_t i = 0; i < 3; i++)
             {
                 tie(rab[i], abs[i]) = split_norm(Xbcd[i] - Xa);
@@ -283,7 +428,10 @@ public:
                 //Computation of gradient terms.
                 coord3d bond_grad = bond_gradient(bond_fc, r0, rab[j], ab_hats[j]);
                 coord3d angle_grad = angle_gradient(ang_fc, rab[j], rab[(j+1)%3], ang0, ab_hats[j], ab_hats[(j+1)%3]);
-                coord3d dihedral_grad = dihedral_gradient(dih_fc, rab[j], dih0, ab_hats[j], abs[j], abs[(j+1)%3], abs[(j+2)%3]);
+                
+                real_t cos_beta; coord3d dihedral_grad;
+
+                tie(dihedral_grad, cos_beta) = dihedral_gradient(dih_fc, rab[j], dih0, ab_hats[j], abs[j], abs[(j+1)%3], abs[(j+2)%3]);
 
                 coord3d outer_ang_grad_m = outer_angle_gradient(out_ang_fc_m, outer_ang0_m, rab[j], ab_hats[j], bms[j]);
                 coord3d outer_ang_grad_p = outer_angle_gradient(out_ang_fc_p, outer_ang0_p, rab[j], ab_hats[j], bps[j]);
@@ -291,14 +439,146 @@ public:
                 coord3d outer_dihedral_a_grad = outer_dih_a_gradient(out_dih_fc, outer_dih0, rab[j], abs[j], bms[j], bps[j], ab_hats[j], bp_hats[j], bm_hats[j]);
                 coord3d outer_dihedral_m_grad = outer_dih_m_gradient(out_dih_fc, outer_dih0, rab[j], abs[j], bms[j], bps[j], ab_hats[j], bp_hats[j], bm_hats[j]);
                 coord3d outer_dihedral_p_grad = outer_dih_p_gradient(out_dih_fc, outer_dih0, rab[j], abs[j], bms[j], bps[j], ab_hats[j], bp_hats[j], bm_hats[j]);
-
+                
                 node_gradient = node_gradient + bond_grad + angle_grad + dihedral_grad + outer_ang_grad_m + outer_ang_grad_p + outer_dihedral_a_grad + outer_dihedral_m_grad + outer_dihedral_p_grad; 
 
             }
-            gradient[a] = gradient[a] + node_gradient;
+            gradient[a] = node_gradient;
         }
-        return gradient;
     }
+
+    void bisection_search(array<coord3d,N>& X, array<coord3d,N>& direction, array<coord3d,N>& fc, real_t a, real_t b, real_t eps, size_t max_iter){
+        size_t count = 0;
+        size_t nBrack = 0;
+        real_t sum = -1;
+        real_t dfc = 0.0;
+        real_t coefficient = 0.0;
+
+        array<coord3d,N> temp_coords;
+        array<coord3d,N> temp_direction;
+
+        //Copy coordinates into temporary coordinates.
+        parallel_copy(temp_coords, X);
+
+        for (node_t a = 0; a < N; a++)
+        {
+            dfc -= dot(direction[a],direction[a]);
+        }
+
+        while (sum < 0)
+        {   
+            if (nBrack == 0)
+            {
+                coefficient = 0.0;
+            } else
+            {
+                coefficient = b;
+                b *= 1.5;
+            }
+            coefficient = b - coefficient;
+            
+           
+            nBrack ++;
+            for (node_t a = 0; a < N; a++)
+            {
+                temp_coords[a] = temp_coords[a] + coefficient*direction[a];
+            }
+            gradient(temp_coords,temp_direction);
+
+            sum = multiply_reduce(temp_direction,direction);
+        }
+        
+        while (abs(dfc) > eps)
+        {   
+            parallel_copy(temp_coords,X);
+            count++;
+            real_t c = (a+b)/2;
+
+            for (node_t i = 0; i < N; i++)
+            {   
+                temp_coords[i] = temp_coords[i] + c*direction[i];
+            }
+            gradient(temp_coords,fc);
+            dfc = multiply_reduce(fc,direction);
+            
+            if (count > max_iter){ break;}
+            if (dfc < 0){a = c;} else{b = c;}
+        }
+        parallel_copy(X, temp_coords);
+        for (node_t i = 0; i < N; i++)
+        {
+            fc[i]= -fc[i];
+        }
+        
+    }
+
+
+    void conjugate_gradient(){
+        size_t iter_count = 0;
+        size_t max_iter = N*10;
+        real_t beta = 0.0;
+        real_t dnorm = 1.0;
+
+        array<coord3d, N> delta_x0;
+        array<coord3d, N> delta_x1;
+        array<coord3d, N> direction;
+
+        gradient(X, direction);
+        dnorm = norm(direction);
+
+        for (node_t a = 0; a < N; a++)
+        {   
+            direction[a] = -direction[a]/dnorm;
+        }
+
+        parallel_copy(X_temp,X);
+        parallel_copy(delta_x0, direction);
+
+        
+        while (dnorm > 1e-7)
+        {   
+            iter_count++;
+            beta = 0.0;
+            bisection_search(X_temp, direction,delta_x1,0,1e-5,1e-10,N);
+            
+            //Polak Ribiere method
+            for (node_t a = 0; a < N; a++)
+            {
+                beta += dot(delta_x1[a], (delta_x1[a] - delta_x0[a]));
+            }
+
+            beta /= array_dot(delta_x0,delta_x0);
+
+
+            if (energy(X_temp) > energy(X))
+            {
+                parallel_copy(X_temp, X);
+                parallel_copy(delta_x1, delta_x0);
+                beta = 0.0;
+            }
+            else
+            {
+                parallel_copy(X, X_temp);
+                parallel_copy(delta_x0,delta_x1);
+            }
+
+
+            for (node_t a = 0; a < N; a++)
+            {
+                direction[a] = delta_x1[a] + beta*direction[a];
+            }
+            normalize(direction);
+            
+            dnorm = norm(delta_x1);
+
+            if (iter_count > N*10)
+            {
+                return;
+            }
+        }
+        
+    }
+
 };
 
 int main()
@@ -312,12 +592,32 @@ int main()
     array<uint8_t, size*3> face_right   = {6,6,5,6,6,5,6,6,5,6,6,5,6,6,5,6,5,6,5,6,6,6,5,6,5,6,6,6,5,6,5,6,6,6,5,6,6,5,6,5,6,6,6,5,6,6,5,6,5,6,6,6,5,6,5,6,6,6,5,6,6,6,5,6,6,5,5,6,6,6,5,6,5,6,6,6,6,5,5,6,6,6,5,6,5,6,6,6,6,5,5,6,6,6,5,6,5,6,6,6,6,5,5,6,6,6,5,6,5,6,6,6,6,5,6,5,6,5,6,6,5,6,6,6,5,6,6,6,5,6,6,5,5,6,6,6,6,5,6,6,5,5,6,6,6,6,5,6,6,5,5,6,6,6,6,5,6,6,5,5,6,6,6,6,5,6,5,6,5,6,6,6,5,6,6,5,6,6,5,6};
     array<coord3d, size> X = {2.82489,8.43261e-17,14.2017,8.0219,0.604118,12.0396,10.4266,6.01981,8.04461,4.53413,6.64511,12.0396,1.41245,2.44643,14.2017,3.29447,11.5801,8.04461,-3.29447,11.5801,8.04461,-4.53413,6.64511,12.0396,-1.41245,2.44643,14.2017,12.299,7.10085,2.82489,9.58483,10.4795,-2.82489,4.63059,13.4256,2.82489,11.6759,-2.93695,8.04461,13.9422,-2.70257,2.82489,13.8679,3.06098,-2.82489,1.41245,-2.44643,14.2017,3.48777,-7.24923,12.0396,8.38143,-8.64315,8.04461,-2.82489,5.87089e-16,14.2017,-1.41245,-2.44643,14.2017,-10.4266,6.01981,8.04461,-8.0219,0.604118,12.0396,-4.63059,13.4256,2.82489,-9.58483,10.4795,-2.82489,-12.299,7.10085,2.82489,2.39962e-16,14.2017,-2.82489,8.97979,8.0197,-8.04461,3.58009,7.20408,-12.0396,1.07573e-16,12.0396,-8.04461,11.4352,3.76688,-8.04461,12.299,-7.10085,-2.82489,10.4266,-6.01981,-8.04461,8.02896,-0.501593,-12.0396,9.31158,-10.723,2.82489,-2.56576e-15,-12.0396,8.04461,-2.91345e-15,-14.2017,2.82489,4.28306,-13.5404,-2.82489,-3.48777,-7.24923,12.0396,-11.6759,-2.93695,8.04461,-8.38143,-8.64315,8.04461,-13.8679,3.06098,-2.82489,-13.9422,-2.70257,2.82489,-8.97979,8.0197,-8.04461,-11.4352,3.76688,-8.04461,-3.58009,7.20408,-12.0396,1.33536,2.48934,-14.2017,-1.33536,2.48934,-14.2017,2.82351,-0.088213,-14.2017,4.44887,-6.70249,-12.0396,1.48815,-2.40113,-14.2017,2.45537,-11.7866,-8.04461,-4.28306,-13.5404,-2.82489,-2.45537,-11.7866,-8.04461,-9.31158,-10.723,2.82489,-12.299,-7.10085,-2.82489,-8.02896,-0.501593,-12.0396,-10.4266,-6.01981,-8.04461,-2.82351,-0.088213,-14.2017,-1.48815,-2.40113,-14.2017,-4.44887,-6.70249,-12.0396};
 
+    //Gradient container
+    array<coord3d,size> grad;
+
     //Test gradient computation
     FullereneForcefieldEnergy<60> forcefield = FullereneForcefieldEnergy<60>(cubic_neighbours, X, face_right, next_on_face, prev_on_face);
-    array<coord3d, size> result = forcefield.gradient();
+    
+    forcefield.gradient(X,grad);
+    write_to_file<size>(grad);
+
+    
+    forcefield.gradient(X,grad);
+
+
+
     for (size_t i = 0; i < size; i++)
     {
-        print_coord(result[i]);
+        //print_coord(grad[i]);
+    }
+    
+    //print_real(forcefield.norm(grad));
+    forcefield.conjugate_gradient();
+    write_to_file<size>(forcefield.X);
+
+    for (size_t i = 0; i < size; i++)
+    {
+        //print_coord(forcefield.X[i]);
     }
     
     
