@@ -17,6 +17,11 @@ inline coord3d operator/(const coord3d& a, const real_t s)  { return a*(1/s); }
 inline real_t  dot(const coord3d& a,  const coord3d& b) { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
 inline real_t norm(const coord3d& a)                    { return sqrt(dot(a,a)); }
 
+inline coord3d unit_vector(const coord3d& a){
+  real_t r = 1.0/sqrt(dot(a,a));
+  return (a*r);
+}
+
 inline coord3d cross(const coord3d& a, const coord3d& b){ return {a[1]*b[2]-a[2]*b[1],
 							   -a[0]*b[2]+a[2]*b[0],
 							   a[0]*b[1]-a[1]*b[0]}; }
@@ -28,13 +33,13 @@ inline coord3d outer_dot(const coord3d& a, const coord3d& b, const coord3d& c){
 }
 
 // 
-inline pair<real_t, coord3d> split_norm(const coord3d& a){
-  real_t r = sqrt(dot(a,a));
-  return {r, {a[0], a[1], a[2]}};
+inline tuple<real_t, coord3d, coord3d> split_norm(const coord3d& a){
+  real_t r = 1.0/sqrt(dot(a,a));
+  return {r, a, a*r};
 }
 
 inline real_t bond_length(const coord3d& ab){
-    return sqrt(dot(ab,ab));
+    return 1.0/sqrt(dot(ab,ab));
 }
 
 inline void print_coord(const coord3d& ab){
