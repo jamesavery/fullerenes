@@ -16,10 +16,45 @@ typedef array<real_t, 3> coord3d;
 typedef uint16_t node_t; // NB: Increase to int32 to do more than 65k atoms
 
 
-template <typename T, size_t N> inline T sum(const array<T,N>& a){
-  T result= 0;			// Default value initializer must be 0
-  for(size_t i=0;i<N;i++) result += a[i];
+// TODO: Move MxN array operations to somewhere sensible + make nicer
+template <typename T, size_t N> inline T sum(const array<T,N>& A){
+  T result=0;			// T default value must be 0
+  for(size_t i=0;i<N;i++) result += A[i];
   return result;
+}
+
+template <typename T, size_t N> inline T dot(const array<T,N>& A, const array<T,N>& B){
+  T result= 0;			// T default value must be 0
+  for(size_t i=0;i<N;i++) result += A[i]*B[i];
+  return result;
+}
+
+
+template <typename T, size_t N> inline T norm(const array<T,N>& A){
+  return sqrt(dot(A,A));
+}
+
+template <typename T, size_t M, size_t N> T flatten_dot(const array<array<T,N>,M>& A, const array<array<T,N>,M>& B)
+{
+  T result=0;
+  for(size_t i=0;i<M;i++)
+    for(size_t j=0;j<N;j++) result += A[i][j] * B[i][j];
+  return result;
+}
+
+
+template <typename T, size_t M, size_t N> 
+array<array<T,N>,M>& operator*=(array<array<T,N>,M>& A, const real_t& s){
+  for(size_t i=0;i<M;i++)
+    for(size_t j=0;j<N;j++) A[i][j] *= s;
+  return A;
+}
+
+template <typename T, size_t M, size_t N> 
+array<array<T,N>,M>& operator/=(array<array<T,N>,M>& A, const real_t& s){
+  for(size_t i=0;i<M;i++)
+    for(size_t j=0;j<N;j++) A[i][j] /= s;
+  return A;
 }
 
 
@@ -55,13 +90,6 @@ public:
     FullereneForcefield(const CubicArcs<N> &neighbours, const array<coord3d, N> &X, const array<uint8_t, N * 3> &face_right, const array<node_t, N * 3> &next_on_face, const array<node_t, N * 3> &prev_on_face) : 
         neighbours(neighbours), X(X), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 
-    inline void parallel_add(array<coord3d,N>& array1, array<coord3d,N>& array2, array<coord3d,N>& result){
-        for (node_t a = 0; a < N; a++)
-        {
-            result[a] = array1[a] + array2[a];
-        }
-    }
-
 
     //Parallelizable copying,  a = b;
     template <typename T>
@@ -70,26 +98,6 @@ public:
         {
             a[i]= b[i];
         }
-    }
-
-
-    static inline void normalize(array<coord3d,N>& array){
-        real_t euclidean_norm = norm(array);
-        for (node_t a = 0; a < N; a++)
-        {
-            array[a] = array[a] / euclidean_norm;
-        }
-        
-    }
-
-    //Parallelizable scalar-multiplication reduction function.
-    static inline real_t multiply_reduce(array<coord3d,N>& array, real_t scalar){
-        real_t total = 0.0;
-        for (node_t a = 0; a < N; a++)
-        {
-            total += sum(array[a] * scalar);
-        }
-        return total;
     }
     
     
@@ -100,21 +108,6 @@ public:
             total += dot(array1[a],array2[a]);
         }
         return total;
-    }
-
-    //Parallelizable euclidean norm function.
-    static inline real_t norm(array<coord3d,N>& array){
-        return sqrt(array_dot(array,array));
-    }
-
-    static inline real_t array_dot(array<coord3d,N>& array1, array<coord3d,N>& array2){
-        real_t result = 0.0;
-        for (node_t a = 0; a < N; a++)
-        {
-            result += dot(array1[a],array2[a]);
-        }
-        return result;
-        
     }
 
     //Computes gradient related to stretch term.
@@ -422,6 +415,22 @@ public:
     }
 
 
+
+    //Parallelizable euclidean norm function.
+    static inline real_t norm(array<coord3d,N>& array){
+        return sqrt(array_dot(array,array));
+    }
+
+    static inline real_t array_dot(array<coord3d,N>& array1, array<coord3d,N>& array2){
+        real_t result = 0.0;
+        for (node_t a = 0; a < N; a++)
+        {
+            result += dot(array1[a],array2[a]);
+        }
+        return result;
+        
+    }
+  
     void conjugate_gradient(){
         size_t iter_count = 0;
         size_t max_iter = N*10;
@@ -434,10 +443,8 @@ public:
 
         gradient(X, direction);
         dnorm = norm(direction);
-        for (node_t a = 0; a < N; a++)
-        {   
-            direction[a] = -direction[a]/dnorm;
-        }
+	direction *= -1/dnorm;
+
         parallel_copy(X_temp,X);
         parallel_copy(delta_x0, direction);
         while (dnorm > 1e-7)
@@ -466,63 +473,14 @@ public:
             {
                 direction[a] = delta_x1[a] + beta*direction[a];
             }
-            normalize(direction);
+            dnorm = norm(direction);
+	    direction *= 1/dnorm;
+
             dnorm = norm(delta_x1);
             if (iter_count > N*10){return;}
             iter_count++;
         }   
     }
-
-    void conjugate_gradient2(){
-        size_t iter_count = 0;
-        size_t max_iter = N*10;
-        real_t beta = 0.0;
-        real_t dnorm = 1.0;
-
-        array<coord3d, N> delta_x0;
-        array<coord3d, N> delta_x1;
-        array<coord3d, N> direction;
-
-        gradient(X, direction);
-        dnorm = norm(direction);
-        for (node_t a = 0; a < N; a++)
-        {   
-            direction[a] = -direction[a]/dnorm;
-        }
-        parallel_copy(X_temp,X);
-        parallel_copy(delta_x0, direction);
-        while (dnorm > 1e-7)
-        {   
-            beta = 0.0;
-            bisection_search(X_temp, direction,delta_x1,0,1e-5,1e-10,N);
-            //Polak Ribiere method
-            for (node_t a = 0; a < N; a++)
-            {
-                beta += dot(delta_x1[a], (delta_x1[a] - delta_x0[a]));
-            }
-            beta /= array_dot(delta_x0,delta_x0);
-        
-            if (energy(X_temp) > energy(X))
-            {
-                parallel_copy(X_temp, X);
-                parallel_copy(delta_x1, delta_x0);
-                beta = 0.0;
-            }
-            else
-            {   
-                parallel_copy(X, X_temp);
-                parallel_copy(delta_x0,delta_x1);
-            }
-            for (node_t a = 0; a < N; a++)
-            {
-                direction[a] = delta_x1[a] + beta*direction[a];
-            }
-            normalize(direction);
-            dnorm = norm(delta_x1);
-            if (iter_count > N*10){return;}
-            iter_count++;
-        }   
-    }  
 };
 
 int main()
@@ -559,7 +517,7 @@ int main()
     forcefield.conjugate_gradient();
     auto end = chrono::system_clock::now();
     cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
-    printf("%.16g\n",forcefield.energy(forcefield.X));
+    printf("%.16g\n",double(forcefield.energy(forcefield.X)));
     
     //write_to_file<size>(forcefield.X);
 
