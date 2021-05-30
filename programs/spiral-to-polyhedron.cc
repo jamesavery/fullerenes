@@ -15,11 +15,8 @@ int main(int ac, char **av)
   g.layout2d = g.tutte_layout();
   Polyhedron P(g,g.zero_order_geometry());
   P.optimize();
-  
-  cout << "spiralcode = \"" << spiral_name << "\";\n"
-       << "fullname   = " << fsn << ";\n"
-       << "g = " << g << ";\n"
-       << "P = " << P << ";\n";
+
+  Polyhedron::to_file(P,av[2]);
     
   return 0;
 }

@@ -214,6 +214,7 @@ bool Graph::is_connected(const set<node_t> &subgraph) const
   return true;
 }
 
+#include <queue>
 vector<vector<node_t>> Graph::connected_components() const 
 {
   vector<bool> done(N);
@@ -225,15 +226,20 @@ vector<vector<node_t>> Graph::connected_components() const
   
       done[u] = true;
       component.push_back(u);
-      list<node_t> Q(neighbours[u].begin(),neighbours[u].end());
+      queue<node_t> Q;
+      for(auto v: neighbours[u]) Q.push(v);
 
       while(!Q.empty()){
-	node_t v = Q.back(); Q.pop_back(); done[v] = true;
-	component.push_back(v);
-	
-	for(int i=0;i<neighbours[v].size();i++)
-	  if(!done[neighbours[v][i]]) Q.push_back(neighbours[v][i]);
+	node_t v = Q.front(); Q.pop();
+	if(!done[v]){
+	  done[v] = true;
+	  component.push_back(v);
+	  
+	  for(int i=0;i<neighbours[v].size();i++)
+	    if(!done[neighbours[v][i]]) Q.push(neighbours[v][i]);
+	}
       }
+      sort(component.begin(), component.end());
       components.push_back(component);
     }
   return components;
