@@ -3,6 +3,7 @@
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/spiral.hh"
 #include "fullerenes/polyhedron.hh"
+#include "fullerenes/symmetry.hh"
 
 using namespace std;
 
@@ -63,12 +64,19 @@ int main(int ac, char **av)
     // }
 
     if(df == 5) pentagons[p++] = faces[f];
-    if(df == 6) pentagons[h++] = faces[f];    
+    if(df == 6) hexagons[h++] = faces[f];    
   }
+
+
+  //  Symmetry S(fsn.spiral_code);
+  Symmetry S(t);
   
   cerr << "from numpy import array, nan\n\n";
   cerr << "name = \"" << spiral_name <<"\";\n";
-
+  cerr << "# Symmetry information\n";
+  //  cerr << "point_group = " << S.point_group() << "\n;";
+  cerr << "equivalent_nodes = " << S.equivalence_classes(S.Gtri) << ";\n";
+  cerr << "equivalent_faces = " << S.equivalence_classes(S.G) << ";\n";  
   cerr << "# Cubic graph, its faces, 3D embedding, and 2D Tutte-embedding\n";
   cerr << "cubic_neighbours  = array(" << g.neighbours << ");\n\n";
   cerr << "pentagons    = array(" << pentagons  << ");\n\n"; // TODO
@@ -84,7 +92,8 @@ int main(int ac, char **av)
   //  cerr << "next_on_tri       = array(" << next_on_tri << ");\n\n";  
   cerr << "triangles         = array(" << t.compute_faces() << ");\n\n";
   cerr << "# prev_on_tri is the same as next_on_tri\n";
-  
+
+
     
   return 0;
 }

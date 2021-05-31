@@ -447,3 +447,13 @@ vector< pair<int,int> > Symmetry::NMR_pattern() const
   return NMR;
 }
 
+
+vector<vector<node_t>> Symmetry::equivalence_classes(const vector<Permutation>& G) {
+  size_t N = G[0].size();
+  Graph E(N);
+
+  for(auto &pi: G)
+    for(node_t u=0;u<N;u++) E.insert_edge({u,pi[u]});
+
+  return E.connected_components();
+}
