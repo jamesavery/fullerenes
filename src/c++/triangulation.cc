@@ -1127,6 +1127,12 @@ Triangulation Triangulation::sort_nodes() const
   return Triangulation(new_neighbours);
 }
 
+spiral_nomenclature FullereneDual::name(bool rarest_start) const
+{
+  return spiral_nomenclature(*this, spiral_nomenclature::FULLERENE,
+			     spiral_nomenclature::CUBIC,
+			     rarest_start);  
+}
 
 // call for one general spiral and extract the pentagon indices
 bool FullereneDual::get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& rspi, jumplist_t& jumps, const bool general) const
