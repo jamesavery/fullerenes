@@ -79,6 +79,8 @@ public:
 
         inline real_t bond_length() const {return 1/r_rab;}
         inline real_t angle()       const {return dot(ab_hat,ac_hat);}
+        //Returns the inner dihedral angle for the current arc. Used here only for energy calculation, 
+        //otherwise embedded in dihedral computation because the planes and angles that make up the dihedral angle computation are required for derivative computation.
         inline real_t dihedral()    const 
         { 
             coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
@@ -92,22 +94,22 @@ public:
         //Computes gradient related to bending term. ~24 FLOPs
         inline coord3d inner_angle_gradient() const
         {
-            real_t cos_angle = angle();
-            coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab;
-            return f_inner_angle * harmonic_energy_gradient(angle0, cos_angle, grad);
+            real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
+            coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
+            return f_inner_angle * harmonic_energy_gradient(angle0, cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
         }
         //Computes gradient related to bending of outer angles. ~20 FLOPs
         inline coord3d outer_angle_gradient_m() const
         {
-            real_t cos_angle = -dot(ab_hat, bm_hat);
-            coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab;
-            return f_outer_angle_m * harmonic_energy_gradient(outer_angle_m0,cos_angle,grad);
+            real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
+            coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
+            return f_outer_angle_m * harmonic_energy_gradient(outer_angle_m0,cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
         }
         inline coord3d outer_angle_gradient_p() const
         {
-            real_t cos_angle = -dot(ab_hat, bp_hat);
-            coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab;
-            return f_outer_angle_p * harmonic_energy_gradient(outer_angle_p0,cos_angle,grad);
+            real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
+            coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
+            return f_outer_angle_p * harmonic_energy_gradient(outer_angle_p0,cos_angle,grad); //Harmonic Energy Gradient: Eq. 28 multiplied by harmonic term.
         }
         // Chain rule terms for dihedral calculation
         //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
@@ -117,29 +119,32 @@ public:
             tie(nabc, cos_b, r_sin_b) = dihedral_terms(ba_hat, bc_hat);
             tie(nbcd, cos_c, r_sin_c) = dihedral_terms(-bc_hat, cd_hat);
 
-            real_t cos_beta = dot(nabc, nbcd);
-            //This term is cos(b)/sin(b)^2
-            real_t cot_b = cos_b * r_sin_b * r_sin_b;
+            real_t cos_beta = dot(nabc, nbcd); //Inner dihedral angle from planes abc,bcd.
+            
+            real_t cot_b = cos_b * r_sin_b * r_sin_b; //cos(b)/sin(b)^2
 
+            //Derivative w.r.t. inner dihedral angle F and G in Eq. 26
             coord3d grad = cross(bc_hat, nbcd) * r_sin_b * r_rab - ba_hat * cos_beta * r_rab + (cot_b * cos_beta * r_rab) * (bc_hat - ba_hat * cos_b);
 
-            return f_inner_dihedral * harmonic_energy_gradient(inner_dih0, cos_beta, grad);
+            return f_inner_dihedral * harmonic_energy_gradient(inner_dih0, cos_beta, grad); //Eq. 26.
         }
 
-        //Computes gradient from dihedral angles constituted by the planes nbam, namp ~162 FLOPs
+        //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
         inline coord3d outer_a_dihedral_gradient() const
         {
             coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
             tie(nbam_hat, cos_a, r_sin_a) = dihedral_terms(ab_hat, am_hat);
             tie(namp_hat, cos_m, r_sin_m) = dihedral_terms(-am_hat, mp_hat);
             
-            real_t cos_beta = dot(nbam_hat, namp_hat);
+            real_t cos_beta = dot(nbam_hat, namp_hat); //Outer Dihedral angle bam, amp
             real_t cot_a = cos_a * r_sin_a * r_sin_a;
             real_t cot_m = cos_m * r_sin_m * r_sin_m;
 
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 31.
             coord3d grad = cross(mp_hat,nbam_hat)*r_ram*r_sin_m - (cross(namp_hat,ab_hat)*r_ram + cross(am_hat,namp_hat)*r_rab)*r_sin_a +
                             cos_beta*(ab_hat*r_rab + r_ram * (2*am_hat + cot_m*(mp_hat+cos_m*am_hat)) - cot_a*(r_ram*(ab_hat - am_hat*cos_a) + r_rab*(am_hat-ab_hat*cos_a)));
             
+            //Eq. 31 multiplied by harmonic term.
             return f_outer_dihedral * harmonic_energy_gradient(outer_dih0, cos_beta, grad);
         }
 
@@ -151,10 +156,13 @@ public:
             tie(nmpa_hat, cos_p, r_sin_p) = dihedral_terms(-mp_hat, pa_hat);
             
             //Cosine to the outer dihedral angle constituted by the planes bmp and mpa
-            real_t cos_beta = dot(nbmp_hat, nmpa_hat);
+            real_t cos_beta = dot(nbmp_hat, nmpa_hat); //Outer dihedral angle bmp,mpa.
             real_t cot_p = cos_p * r_sin_p * r_sin_p;
             
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 32.
             coord3d grad = r_rap * (cot_p*cos_beta * (-mp_hat - pa_hat*cos_p) - cross(nbmp_hat, mp_hat)*r_sin_p - pa_hat*cos_beta );
+
+            //Eq. 32 multiplied by harmonic term.
             return f_outer_dihedral * harmonic_energy_gradient(outer_dih0, cos_beta, grad);
         }
 
@@ -164,25 +172,29 @@ public:
             coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
             tie(npam_hat, cos_a, r_sin_a) = dihedral_terms(ap_hat, am_hat);
             tie(nbpa_hat, cos_p, r_sin_p) = dihedral_terms(pb_hat, -ap_hat);
-            real_t cos_beta = dot(nbpa_hat, npam_hat);
+            real_t cos_beta = dot(nbpa_hat, npam_hat); //Outer dihedral angle bpa, pam.
             real_t cot_p = cos_p * r_sin_p * r_sin_p;
             real_t cot_a = cos_a * r_sin_a * r_sin_a;
 
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 33.
             coord3d grad = cross(npam_hat,pb_hat)*r_rap*r_sin_p - (cross(am_hat,nbpa_hat)*r_rap + cross(nbpa_hat,ap_hat)*r_ram)*r_sin_a +
                             cos_beta*(am_hat*r_ram + r_rap * (2*ap_hat + cot_p*(pb_hat+cos_p*ap_hat)) - cot_a*(r_rap*(am_hat - ap_hat*cos_a) + r_ram*(ap_hat-am_hat*cos_a)));
             
+            //Eq. 33 multiplied by harmonic term.
             return f_outer_dihedral * harmonic_energy_gradient(outer_dih0, cos_beta, grad);
         }
         // Internal coordinate gradients
         inline coord3d bond_length_gradient() const { return - f_bond * harmonic_energy_gradient(r0,bond_length(),ab_hat);}
+        //Sum of angular gradient components.
         inline coord3d angle_gradient()       const { return inner_angle_gradient() + outer_angle_gradient_p() + outer_angle_gradient_m();}
+        //Sum of inner and outer dihedral gradient components.
         inline coord3d dihedral_gradient()    const { return inner_dihedral_gradient() + outer_a_dihedral_gradient() + outer_m_dihedral_gradient() + outer_p_dihedral_gradient();}
         //inline coord3d flatness()             const { return ;  }   
         
 
-
+        //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
         inline real_t energy() const {return 0.5*f_bond *harmonic_energy(bond_length(),r0)+f_inner_angle* harmonic_energy(angle(),angle0)+f_inner_dihedral* harmonic_energy(dihedral(),inner_dih0);}
-
+        //Sum of bond, angular and dihedral gradient components.
         inline coord3d gradient() const{return bond_length_gradient() + angle_gradient() + dihedral_gradient();}
 
 
@@ -234,13 +246,6 @@ public:
 
     FullereneForcefield(const CubicArcs<N> &neighbours, const array<coord3d, N> &X, const array<uint8_t, N * 3> &face_right, const array<node_t, N * 3> &next_on_face, const array<node_t, N * 3> &prev_on_face) : 
         neighbours(neighbours), X(X), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
-
-    inline void parallel_add(array<coord3d,N>& array1, array<coord3d,N>& array2, array<coord3d,N>& result){
-        for (node_t a = 0; a < N; a++)
-        {
-            result[a] = array1[a] + array2[a];
-        }
-    }
 
 
     //Parallelizable copying,  a = b;
@@ -612,7 +617,7 @@ public:
         while (dnorm > 1e-5)
         {   
             beta = 0.0;
-            energy_evals += golden_section_search(X_temp, direction, delta_x1, 0, 1, 1e-5);
+            energy_evals += golden_section_search(X_temp, direction, delta_x1, 0, 1, 1e-10);
             gradient_evals++;
             //gradient_evals += bisection_search(X_temp, direction, delta_x1,0,1e-5,1e-10,N);
             //Polak Ribiere method
@@ -657,12 +662,12 @@ public:
 
 int main()
 {
-    const size_t size = 60;
+    const size_t size = 960;
     //Gradient container
     array<coord3d,size> grad;
 
     //Test gradient computation
-    FullereneForcefield<size> forcefield = FullereneForcefield<size>(cubic_neighbours_60, X_60, face_right_60, next_on_face_60, prev_on_face_60);
+    FullereneForcefield<size> forcefield = FullereneForcefield<size>(cubic_neighbours_960, X_960, face_right_960, next_on_face_960, prev_on_face_960);
     
     
 
