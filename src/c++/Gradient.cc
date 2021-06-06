@@ -612,7 +612,7 @@ public:
         while (dnorm > 1e-5)
         {   
             beta = 0.0;
-            energy_evals += golden_section_search(X_temp, direction, delta_x1, 0, 1, 1e-10);
+            energy_evals += golden_section_search(X_temp, direction, delta_x1, 0, 1, 1e-5);
             gradient_evals++;
             //gradient_evals += bisection_search(X_temp, direction, delta_x1,0,1e-5,1e-10,N);
             //Polak Ribiere method
