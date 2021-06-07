@@ -11,9 +11,15 @@ using namespace std::literals;
 #include <tuple>
 
 #include "coord3d.cc"
+#include "C960ih.cc"
+#include "C60ih.cc"
+
+typedef uint16_t node_t; 
+template <int N>
+using CubicArcs = array<node_t, N * 3>;
 
 typedef array<real_t, 3> coord3d;
-typedef uint16_t node_t; // NB: Increase to int32 to do more than 65k atoms
+// NB: Increase to int32 to do more than 65k atoms
 
 inline void print_real(real_t a)
 {
@@ -28,8 +34,7 @@ inline real_t sum(const coord3d& a){
     return a[0] + a[1] + a[2];
 }
 
-template <int N>
-using CubicArcs = array<node_t, N * 3>;
+
 
 template <int N>
 class FullereneForcefield
@@ -56,16 +61,191 @@ public:
     const array<real_t, 2> angle_forces = {100.0, 100.0}; 
     const array<real_t, 3> bond_forces = {260.0, 390.0, 450.0}; 
     const array<real_t, 4> dih_forces = {35.0, 65.0, 85.0, 270.0}; 
+    struct ArcData
+    {
+        static inline real_t harmonic_energy(const real_t p0, const real_t p){
+            return 0.5*(p-p0)*(p-p0);
+        }
+        static inline coord3d  harmonic_energy_gradient(const real_t p0, const real_t p, const coord3d gradp){
+            return (p-p0)*gradp;     
+        }
+         //Helper Function for dihedral calculation.
+        inline tuple<coord3d, real_t, real_t> dihedral_terms(const coord3d& ba_hat, const coord3d& bc_hat) const{
+            real_t cos_b = dot(ba_hat,bc_hat);
+            real_t r_sin_b = 1.0/sqrt(1 - cos_b*cos_b);
+            coord3d nabc = cross(ba_hat, bc_hat) * r_sin_b;
+            return {nabc,cos_b,r_sin_b};
+        }
+
+        inline real_t bond_length() const {return 1/r_rab;}
+        inline real_t angle()       const {return dot(ab_hat,ac_hat);}
+        //Returns the inner dihedral angle for the current arc. Used here only for energy calculation, 
+        //otherwise embedded in dihedral computation because the planes and angles that make up the dihedral angle computation are required for derivative computation.
+        inline real_t dihedral()    const 
+        { 
+            coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
+            tie(nabc, cos_b, r_sin_b) = dihedral_terms(ba_hat, bc_hat);
+            tie(nbcd, cos_c, r_sin_c) = dihedral_terms(-bc_hat, cd_hat);
+
+            return dot(nabc, nbcd);
+        }
+        
+        // Chain rule terms for angle calculation
+        //Computes gradient related to bending term. ~24 FLOPs
+        inline coord3d inner_angle_gradient() const
+        {
+            real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
+            coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
+            return f_inner_angle * harmonic_energy_gradient(angle0, cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
+        }
+        //Computes gradient related to bending of outer angles. ~20 FLOPs
+        inline coord3d outer_angle_gradient_m() const
+        {
+            real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
+            coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
+            return f_outer_angle_m * harmonic_energy_gradient(outer_angle_m0,cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
+        }
+        inline coord3d outer_angle_gradient_p() const
+        {
+            real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
+            coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
+            return f_outer_angle_p * harmonic_energy_gradient(outer_angle_p0,cos_angle,grad); //Harmonic Energy Gradient: Eq. 28 multiplied by harmonic term.
+        }
+        // Chain rule terms for dihedral calculation
+        //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
+        inline coord3d inner_dihedral_gradient() const
+        {
+            coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
+            tie(nabc, cos_b, r_sin_b) = dihedral_terms(ba_hat, bc_hat);
+            tie(nbcd, cos_c, r_sin_c) = dihedral_terms(-bc_hat, cd_hat);
+
+            real_t cos_beta = dot(nabc, nbcd); //Inner dihedral angle from planes abc,bcd.
+            
+            real_t cot_b = cos_b * r_sin_b * r_sin_b; //cos(b)/sin(b)^2
+
+            //Derivative w.r.t. inner dihedral angle F and G in Eq. 26
+            coord3d grad = cross(bc_hat, nbcd) * r_sin_b * r_rab - ba_hat * cos_beta * r_rab + (cot_b * cos_beta * r_rab) * (bc_hat - ba_hat * cos_b);
+
+            return f_inner_dihedral * harmonic_energy_gradient(inner_dih0, cos_beta, grad); //Eq. 26.
+        }
+
+        //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
+        inline coord3d outer_a_dihedral_gradient() const
+        {
+            coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
+            tie(nbam_hat, cos_a, r_sin_a) = dihedral_terms(ab_hat, am_hat);
+            tie(namp_hat, cos_m, r_sin_m) = dihedral_terms(-am_hat, mp_hat);
+            
+            real_t cos_beta = dot(nbam_hat, namp_hat); //Outer Dihedral angle bam, amp
+            real_t cot_a = cos_a * r_sin_a * r_sin_a;
+            real_t cot_m = cos_m * r_sin_m * r_sin_m;
+
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 31.
+            coord3d grad = cross(mp_hat,nbam_hat)*r_ram*r_sin_m - (cross(namp_hat,ab_hat)*r_ram + cross(am_hat,namp_hat)*r_rab)*r_sin_a +
+                            cos_beta*(ab_hat*r_rab + r_ram * (2*am_hat + cot_m*(mp_hat+cos_m*am_hat)) - cot_a*(r_ram*(ab_hat - am_hat*cos_a) + r_rab*(am_hat-ab_hat*cos_a)));
+            
+            //Eq. 31 multiplied by harmonic term.
+            return f_outer_dihedral * harmonic_energy_gradient(outer_dih0, cos_beta, grad);
+        }
+
+        //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
+        inline coord3d outer_m_dihedral_gradient() const
+        {
+            coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
+            tie(nbmp_hat, cos_m, r_sin_m) = dihedral_terms(mb_hat, mp_hat);
+            tie(nmpa_hat, cos_p, r_sin_p) = dihedral_terms(-mp_hat, pa_hat);
+            
+            //Cosine to the outer dihedral angle constituted by the planes bmp and mpa
+            real_t cos_beta = dot(nbmp_hat, nmpa_hat); //Outer dihedral angle bmp,mpa.
+            real_t cot_p = cos_p * r_sin_p * r_sin_p;
+            
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 32.
+            coord3d grad = r_rap * (cot_p*cos_beta * (-mp_hat - pa_hat*cos_p) - cross(nbmp_hat, mp_hat)*r_sin_p - pa_hat*cos_beta );
+
+            //Eq. 32 multiplied by harmonic term.
+            return f_outer_dihedral * harmonic_energy_gradient(outer_dih0, cos_beta, grad);
+        }
+
+        //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
+        inline coord3d outer_p_dihedral_gradient() const
+        {
+            coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
+            tie(npam_hat, cos_a, r_sin_a) = dihedral_terms(ap_hat, am_hat);
+            tie(nbpa_hat, cos_p, r_sin_p) = dihedral_terms(pb_hat, -ap_hat);
+            real_t cos_beta = dot(nbpa_hat, npam_hat); //Outer dihedral angle bpa, pam.
+            real_t cot_p = cos_p * r_sin_p * r_sin_p;
+            real_t cot_a = cos_a * r_sin_a * r_sin_a;
+
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 33.
+            coord3d grad = cross(npam_hat,pb_hat)*r_rap*r_sin_p - (cross(am_hat,nbpa_hat)*r_rap + cross(nbpa_hat,ap_hat)*r_ram)*r_sin_a +
+                            cos_beta*(am_hat*r_ram + r_rap * (2*ap_hat + cot_p*(pb_hat+cos_p*ap_hat)) - cot_a*(r_rap*(am_hat - ap_hat*cos_a) + r_ram*(ap_hat-am_hat*cos_a)));
+            
+            //Eq. 33 multiplied by harmonic term.
+            return f_outer_dihedral * harmonic_energy_gradient(outer_dih0, cos_beta, grad);
+        }
+        // Internal coordinate gradients
+        inline coord3d bond_length_gradient() const { return - f_bond * harmonic_energy_gradient(r0,bond_length(),ab_hat);}
+        //Sum of angular gradient components.
+        inline coord3d angle_gradient()       const { return inner_angle_gradient() + outer_angle_gradient_p() + outer_angle_gradient_m();}
+        //Sum of inner and outer dihedral gradient components.
+        inline coord3d dihedral_gradient()    const { return inner_dihedral_gradient() + outer_a_dihedral_gradient() + outer_m_dihedral_gradient() + outer_p_dihedral_gradient();}
+        //inline coord3d flatness()             const { return ;  }   
+        
+
+        //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
+        inline real_t energy() const {return 0.5*f_bond *harmonic_energy(bond_length(),r0)+f_inner_angle* harmonic_energy(angle(),angle0)+f_inner_dihedral* harmonic_energy(dihedral(),inner_dih0);}
+        //Sum of bond, angular and dihedral gradient components.
+        inline coord3d gradient() const{return bond_length_gradient() + angle_gradient() + dihedral_gradient();}
+
+
+        //Force constants for all paremeters.
+        real_t  
+            f_outer_dihedral,
+            f_inner_dihedral,
+            f_inner_angle,
+            f_outer_angle_p,
+            f_outer_angle_m,
+            f_bond;
+        
+        //Residual lengths of arcs ab, ac, am, ap.
+        real_t
+            r_rab,
+            r_rac,
+            r_ram,
+            r_rap;
+
+        //Equillibrium parameters.
+        real_t
+            r0,
+            angle0,
+            outer_angle_m0,
+            outer_angle_p0,
+            inner_dih0,
+            outer_dih0;
+
+        /*
+        All normalized arcs required to perform energy & gradient calculations.
+        Note that all these arcs are cyclical the arc ab becomes: ab->ac->ad,  the arc ac becomes: ac->ad->ab , the arc bc becomes: bc->cd->db (For iterations 0, 1, 2)
+        As such the naming convention here is related to the arcs as they are used in the 0th iteration. */
+        coord3d 
+            ab_hat,
+            ac_hat,
+            ad_hat,
+            am_hat,
+            ap_hat,
+            ba_hat,
+            bc_hat,
+            bp_hat,
+            bm_hat,
+            cd_hat,
+            mp_hat,
+            mb_hat,
+            pa_hat,
+            pb_hat;
+        };
 
     FullereneForcefield(const CubicArcs<N> &neighbours, const array<coord3d, N> &X, const array<uint8_t, N * 3> &face_right, const array<node_t, N * 3> &next_on_face, const array<node_t, N * 3> &prev_on_face) : 
         neighbours(neighbours), X(X), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
-
-    inline void parallel_add(array<coord3d,N>& array1, array<coord3d,N>& array2, array<coord3d,N>& result){
-        for (node_t a = 0; a < N; a++)
-        {
-            result[a] = array1[a] + array2[a];
-        }
-    }
 
 
     //Parallelizable copying,  a = b;
@@ -139,108 +319,11 @@ public:
         return result;
         
     }
-
-    //Computes gradient related to stretch term.
-    static inline coord3d bond_gradient(const real_t force_const, const real_t r0, const real_t rab, const coord3d ab_hat){
-        return - force_const * (rab - r0) * ab_hat;
-    }
-
-    //Computes gradient related to bending term.
-    static inline coord3d angle_gradient(const real_t force_const, const real_t ang0, const real_t r_rab, const real_t r_rac, const coord3d &ab_hat, const coord3d &ac_hat)
-    {   
-        real_t cos_angle = dot(ab_hat, ac_hat);
-        coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab;
-        return force_const * (cos_angle - ang0) * grad;
-    }
-
-    //Computes gradient related to bending of angles.
-    static inline coord3d outer_angle_gradient(const real_t force_const, const real_t ang0, const real_t r_rab, coord3d &ab_hat, const coord3d& bp_hat)
-    {   
-        real_t cos_angle = -dot(ab_hat, bp_hat);
-        coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab;
-        return force_const * (cos_angle - ang0) * grad;
-    }
-    
-    //Helper Function for dihedral calculation.
-    static inline tuple<coord3d, real_t, real_t> dihedral_terms(const coord3d& ba_hat, const coord3d& bc_hat){
-        real_t cos_b = dot(ba_hat,bc_hat);
-        real_t r_sin_b = 1.0/sqrt(1 - cos_b*cos_b);
-        coord3d nabc = cross(ba_hat, bc_hat) * r_sin_b;
-        return {nabc,cos_b,r_sin_b};
-    }
-
-    //Computes gradient related to dihedral/out-of-plane term.
-    static inline pair<coord3d, real_t> dihedral_gradient(const real_t force_const, const real_t dih0, const real_t r_rab, const coord3d& ba_hat, const coord3d& bc_hat, const coord3d& cd_hat)
-    {
-        coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
-        tie(nabc, cos_b, r_sin_b) = dihedral_terms(ba_hat, bc_hat);
-        tie(nbcd, cos_c, r_sin_c) = dihedral_terms(-bc_hat, cd_hat);
-
-        real_t cos_beta = dot(nabc, nbcd);
-        real_t cot_b = cos_b * r_sin_b * r_sin_b;
-
-        coord3d d_dih_a = cross(bc_hat, nbcd) * r_sin_b * r_rab - ba_hat * cos_beta * r_rab + (cot_b * cos_beta * r_rab) * (bc_hat - ba_hat * cos_b);
-
-        return {force_const * (cos_beta - dih0) * d_dih_a, cos_beta};
-    }
-    
-    //Computes gradient from dihedral angles constituted by the planes nbam, namp
-    static inline coord3d outer_dih_a_gradient(const real_t force_const, const real_t dih0, const real_t r_rab, const real_t r_ram, const coord3d& ab_hat, const coord3d  am_hat, const coord3d mp_hat)//const real_t force_const, const real_t dih0, const real_t rab, const coord3d &ab, const coord3d &bm, const coord3d &bp, coord3d &ab_hat, coord3d &bp_hat, coord3d &bm_hat)
-    {   
-        coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
-        tie(nbam_hat, cos_a, r_sin_a) = dihedral_terms(ab_hat, am_hat);
-        tie(namp_hat, cos_m, r_sin_m) = dihedral_terms(-am_hat, mp_hat);
-        
-        real_t cos_beta = dot(nbam_hat, namp_hat);
-        real_t cot_a = cos_a * r_sin_a * r_sin_a;
-        real_t cot_m = cos_m * r_sin_m * r_sin_m;
-
-        coord3d d_dih = cross(mp_hat,nbam_hat)*r_ram*r_sin_m - (cross(namp_hat,ab_hat)*r_ram + cross(am_hat,namp_hat)*r_rab)*r_sin_a +
-                        cos_beta*(ab_hat*r_rab + r_ram * (2*am_hat + cot_m*(mp_hat+cos_m*am_hat)) - cot_a*(r_ram*(ab_hat - am_hat*cos_a) + r_rab*(am_hat-ab_hat*cos_a)));
-        
-        return force_const * (cos_beta - dih0) * d_dih;     
-    }
-    
-    //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa
-    static inline coord3d outer_dih_m_gradient(const real_t force_const, const real_t dih0, const real_t r_rpa, const coord3d& mb_hat, const coord3d& mp_hat, const coord3d& pa_hat)
-    {
-        coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
-        tie(nbmp_hat, cos_m, r_sin_m) = dihedral_terms(mb_hat, mp_hat);
-        tie(nmpa_hat, cos_p, r_sin_p) = dihedral_terms(-mp_hat, pa_hat);
-        
-        real_t cos_beta = dot(nbmp_hat, nmpa_hat);
-        real_t cot_p = cos_p * r_sin_p * r_sin_p;
-        
-        coord3d d_dih_m = r_rpa * (cot_p*cos_beta * (-mp_hat - pa_hat*cos_p) - cross(nbmp_hat, mp_hat)*r_sin_p - pa_hat*cos_beta );
-        return force_const * (cos_beta - dih0) * d_dih_m;
-    }
-    
-    //Computes gradient from dihedral angles constituted by the planes nbpa, npam
-    static inline coord3d outer_dih_p_gradient(const real_t force_const, const real_t dih0, const real_t r_ram, const real_t r_rpa, const coord3d& ap_hat, const coord3d& am_hat, const coord3d& pb_hat)
-    {
-        coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
-        tie(npam_hat, cos_a, r_sin_a) = dihedral_terms(ap_hat, am_hat);
-        tie(nbpa_hat, cos_p, r_sin_p) = dihedral_terms(pb_hat, -ap_hat);
-        real_t cos_beta = dot(nbpa_hat, npam_hat);
-        real_t cot_p = cos_p * r_sin_p * r_sin_p;
-        real_t cot_a = cos_a * r_sin_a * r_sin_a;
-
-        coord3d d_dih = cross(npam_hat,pb_hat)*r_rpa*r_sin_p - (cross(am_hat,nbpa_hat)*r_rpa + cross(nbpa_hat,ap_hat)*r_ram)*r_sin_a +
-                        cos_beta*(am_hat*r_ram + r_rpa * (2*ap_hat + cot_p*(pb_hat+cos_p*ap_hat)) - cot_a*(r_rpa*(am_hat - ap_hat*cos_a) + r_ram*(ap_hat-am_hat*cos_a)));
-        
-        return force_const * (cos_beta - dih0) * d_dih;
-    }
-
-    static inline real_t harmonic_energy(real_t param, real_t param0){
-        return 0.5*(param-param0)*(param-param0);
-    }
-
+    //~393*N FLOPs
     real_t energy(array<coord3d,N>& X){
         for (node_t a = 0; a < N; a++)
         {   
-            real_t node_bond_energy = 0.0;
-            real_t node_bend_energy = 0.0;
-            real_t node_dihedral_energy = 0.0;
+            real_t node_energy = 0.0;
 
              //Fetching neighbour indices.
             array<node_t, 3> na = {neighbours[a * 3], neighbours[a * 3 + 1], neighbours[a * 3 + 2]}; // Neighbours b,c,d to a
@@ -259,38 +342,39 @@ public:
             array<coord3d,3> abs;
             array<coord3d,3> ab_hats;
 
-            for (size_t i = 0; i < 3; i++)
+            for (size_t i = 0; i < 3; i++)// 30 FLOPs
             {
-                tie(r_rab[i],abs[i],ab_hats[i]) = split_norm(Xbcd[i] - Xa);
+                tie(r_rab[i],abs[i],ab_hats[i]) = split_norm(Xbcd[i] - Xa); //10 FLOPs
             }
-            for (size_t j = 0; j < 3; j++)
-            {
-                real_t r0 = optimal_bond_lengths[ f_l[j] + f_r[j] ];
-                real_t ang0 = optimal_corner_cos_angles[ f_r[j] ];
-                real_t dih0 = optimal_dih_cos_angles[ f_l[0] + f_l[1] + f_l[2]];
-                real_t bond_fc = bond_forces[ f_l[j] + f_r[j] ];
-                real_t ang_fc = angle_forces[ f_l[j] ];
-                real_t dih_fc = dih_forces[ f_l[0] + f_l[1] + f_l[2] ];
-
-                real_t cos_dih_angle, r_rbc, r_rcd;
-                coord3d null, bc, bc_hat, cd, cd_hat;
-
-                tie(null, cos_dih_angle) = dihedral_gradient(dih_fc, dih0, r_rab[j], -ab_hats[j], unit_vector(abs[(j+1)%3] - abs[j]), unit_vector(abs[(j+2)%3] - abs[(j+1)%3]));
-
-                node_bond_energy += bond_fc * harmonic_energy(1.0/r_rab[j],r0);
-                node_bend_energy += ang_fc * harmonic_energy(dot(ab_hats[j],ab_hats[(j+1)%3]), ang0);
-                node_dihedral_energy += dih_fc * harmonic_energy(cos_dih_angle,dih0);
+            for (size_t j = 0; j < 3; j++)// 121*3 = 363 FLOPs
+            {   
+                ArcData arc;
+                arc.r0 = optimal_bond_lengths[ f_l[j] + f_r[j] ];
+                arc.angle0 = optimal_corner_cos_angles[ f_r[j] ];
+                arc.inner_dih0 = optimal_dih_cos_angles[ f_l[0] + f_l[1] + f_l[2]];
+                arc.f_bond = bond_forces[ f_l[j] + f_r[j] ];
+                arc.f_inner_angle = angle_forces[ f_l[j] ];
+                arc.f_inner_dihedral = dih_forces[ f_l[0] + f_l[1] + f_l[2] ];
+                
+                arc.ab_hat = ab_hats[j];
+                arc.ba_hat = -ab_hats[j];
+                arc.ac_hat = ab_hats[(j+1)%3];
+                arc.bc_hat = unit_vector(abs[(j+1)%3] - abs[j]);
+                arc.cd_hat = unit_vector(abs[(j+2)%3] - abs[(j+1)%3]);
+                arc.r_rab = r_rab[j];
+                
+                node_energy += arc.energy();
             }
             //All bond energies are computed twice, (node a computes ab and node b computes ba) , hence the factor 0.5;
-            energy_array[a] = node_bond_energy*0.5 + node_bend_energy + node_dihedral_energy;
+            energy_array[a] = node_energy;
         }
 
         return reduce(energy_array);
     }
 
+    //~1914 * N -FLOPs
     void gradient(array<coord3d,N>& X,array<coord3d,N>& gradient)
     {   
-        #pragma acc parallel loop
         for (node_t a = 0; a < N; a++) 
         {   
             //Fetching neighbour indices.
@@ -330,61 +414,124 @@ public:
 
             coord3d node_gradient = {0,0,0};
             
-            for (size_t i = 0; i < 3; i++)
+            for (size_t i = 0; i < 3; i++) // 90 FLOPs
             {
-                tie(r_rab[i], abs[i], ab_hats[i]) = split_norm(Xbcd[i] - Xa);
+                tie(r_rab[i], abs[i], ab_hats[i]) = split_norm(Xbcd[i] - Xa); // 10 FLOPs
                 tie(r_rbm[i], bms[i], bm_hats[i]) = split_norm(Xbm[i] - Xbcd[i]);
                 tie(r_rbp[i], bps[i], bp_hats[i]) = split_norm(Xbp[i] - Xbcd[i]);
             }
-            for (size_t j = 0; j < 3; j++)
-            {   
+            for (size_t j = 0; j < 3; j++) // 608*3 = 1824 FLOPs
+            {       
+                ArcData arc;
                 //Indexing of 'Equillibrium' parameters and related force constants, through face information.
-                real_t r0 = optimal_bond_lengths[ f_l[j] + f_r[j] ];
-                real_t ang0 = optimal_corner_cos_angles[ f_r[j] ];
-                real_t dih0 = optimal_dih_cos_angles[ f_l[0] + f_l[1] + f_l[2]];
-                real_t outer_ang0_m = optimal_corner_cos_angles[ f_l[j] ];
-                real_t outer_ang0_p = optimal_corner_cos_angles[ f_r[j] ];
-                real_t outer_dih0 = optimal_dih_cos_angles[ dihedral_face_sum_bcd[j] ];
-                real_t bond_fc = bond_forces[ f_l[j] + f_r[j] ];
-                real_t ang_fc = angle_forces[ f_l[j] ];
-                real_t dih_fc = dih_forces[ f_l[0] + f_l[1] + f_l[2] ];
-                real_t out_ang_fc_m = angle_forces[ f_r[j] ];
-                real_t out_ang_fc_p = angle_forces[ f_l[j] ];
-                real_t out_dih_fc = dih_forces[ dihedral_face_sum_bcd[j] ];
+                arc.r0 = optimal_bond_lengths[ f_l[j] + f_r[j] ];
+                arc.angle0 = optimal_corner_cos_angles[ f_r[j] ];
+                arc.inner_dih0 = optimal_dih_cos_angles[ f_l[0] + f_l[1] + f_l[2]];
+                arc.outer_angle_m0 = optimal_corner_cos_angles[ f_l[j] ];
+                arc.outer_angle_p0 = optimal_corner_cos_angles[ f_r[j] ];
+                arc.outer_dih0 = optimal_dih_cos_angles[ dihedral_face_sum_bcd[j] ];
 
-                //Computation of gradient terms.
-                coord3d bond_grad = bond_gradient(bond_fc, r0, 1.0/r_rab[j], ab_hats[j]);
-                coord3d angle_grad = angle_gradient(ang_fc, ang0, r_rab[j], r_rab[(j+1)%3], ab_hats[j], ab_hats[(j+1)%3]);
-                
-                real_t cos_beta; coord3d dihedral_grad;
+                arc.f_bond = bond_forces[ f_l[j] + f_r[j] ];
+                arc.f_inner_angle = angle_forces[ f_l[j] ];
+                arc.f_inner_dihedral = dih_forces[ f_l[0] + f_l[1] + f_l[2] ];
+                arc.f_outer_angle_m = angle_forces[ f_r[j] ];
+                arc.f_outer_angle_p = angle_forces[ f_l[j] ];
+                arc.f_outer_dihedral = dih_forces[ dihedral_face_sum_bcd[j] ];
 
-                tie(dihedral_grad, cos_beta) = dihedral_gradient(dih_fc, dih0, r_rab[j], -ab_hats[j], unit_vector(abs[(j+1)%3] - abs[j]), unit_vector(abs[(j+2)%3] - abs[(j+1)%3]));
-
-                coord3d outer_ang_grad_m = outer_angle_gradient(out_ang_fc_m, outer_ang0_m, r_rab[j], ab_hats[j], bm_hats[j]);
-                coord3d outer_ang_grad_p = outer_angle_gradient(out_ang_fc_p, outer_ang0_p, r_rab[j], ab_hats[j], bp_hats[j]);
-                
                 //Compute relevant dihedral vectors.
-                tie(r_ram, am, am_hat) = split_norm(bms[j] + abs[j]);
-                tie(r_rmp, mp, mp_hat) = split_norm(bps[j] - bms[j]);
-                tie(r_rap, ap, ap_hat) = split_norm(bps[j] + abs[j]);
+                tie(r_ram, am, am_hat) = split_norm(bms[j] + abs[j]); //10 FLOPs
+                tie(r_rmp, mp, mp_hat) = split_norm(bps[j] - bms[j]); //10 FLOPs
+                tie(r_rap, ap, ap_hat) = split_norm(bps[j] + abs[j]); //10 FLOPs
 
-                coord3d outer_dihedral_a_grad = outer_dih_a_gradient(out_dih_fc, outer_dih0, r_rab[j], r_ram, ab_hats[j], am_hat, mp_hat);
-                coord3d outer_dihedral_m_grad = outer_dih_m_gradient(out_dih_fc, outer_dih0, r_rap, -bm_hats[j], mp_hat, -ap_hat);
-                coord3d outer_dihedral_p_grad = outer_dih_p_gradient(out_dih_fc, outer_dih0, r_ram, r_rap, ap_hat, am_hat, -bp_hats[j]);
+                arc.ab_hat = ab_hats[j];
+                arc.ac_hat = ab_hats[(j+1)%3];
+                arc.ad_hat = ab_hats[(j+2)%3];
+                arc.am_hat = am_hat;
+                arc.ap_hat = ap_hat;
+                arc.ba_hat = -ab_hats[j];
+                arc.bc_hat = unit_vector(abs[(j+1)%3] - abs[j]);
+                arc.bp_hat = bp_hats[j];
+                arc.bm_hat = bm_hats[j];
+                arc.cd_hat = unit_vector(abs[(j+2)%3] - abs[(j+1)%3]);
+                arc.mp_hat = mp_hat;
+                arc.mb_hat = -bm_hats[j];
+                arc.pa_hat = -ap_hat;
+                arc.pb_hat = -bp_hats[j];
+
+                arc.r_rab = r_rab[j];
+                arc.r_rac = r_rab[(j+1)%3];
+                arc.r_ram = r_ram;
+                arc.r_rap = r_rap;
                 
-                node_gradient = node_gradient + bond_grad + angle_grad + dihedral_grad + outer_ang_grad_m + outer_ang_grad_p + outer_dihedral_a_grad + outer_dihedral_m_grad + outer_dihedral_p_grad; 
+                node_gradient = node_gradient + arc.gradient(); 
 
             }
+
             gradient[a] = node_gradient;
         }
     }
 
-    void bisection_search(array<coord3d,N>& X, array<coord3d,N>& direction, array<coord3d,N>& fc, real_t a, real_t b, real_t eps, size_t max_iter){
+    size_t golden_section_search(array<coord3d,N>& X, array<coord3d,N>& direction, array<coord3d,N>& new_direction, real_t a, real_t b, real_t tol){
+        real_t tau = (sqrt(5) - 1) / 2;
+        
+        //Actual coordinates resulting from each traversal 
+        array<coord3d,N> X1, X2;
+        //Line search x - values;
+        real_t x1,  x2;
+        x1 = (a + (1 - tau) * (b - a));
+        x2 = (a + tau * (b - a));
+        for (node_t a = 0; a < N; a++)
+        {
+            X1[a] = X[a] + x1 * direction[a];
+            X2[a] = X[a] + x2 * direction[a];
+        }
+        real_t f1 = energy(X1);
+        real_t f2 = energy(X2);
+        size_t evals = 2;
+
+        while (abs(b - a) > tol){
+            evals++;
+            if (f1 > f2){
+                a = x1;
+                x1 = x2;
+                f1 = f2;
+                x2 = a + tau * (b - a);
+                for (node_t a = 0; a < N; a++)
+                {
+                    X2[a] = X[a] + x2 * direction[a];
+                }
+                f2 = energy(X2);
+            }else
+            {
+                b = x2;
+                x2 = x1;
+                f2 = f1;
+                x1 = a + (1 - tau) * (b - a);
+                for (node_t a = 0; a < N; a++){
+                    X1[a] = X[a] + x1 * direction[a];
+                }
+                f1 = energy(X1);
+            }
+        }
+        //Line search coefficient
+        real_t alfa = (a+b)/2;
+
+        for (node_t a = 0; a < N; a++)
+        {
+            X[a] = X[a] + alfa*direction[a];
+        }
+        gradient(X,new_direction);
+        for (node_t a = 0; a < N; a++){ new_direction[a] = -new_direction[a];}
+        return evals;
+    }
+
+    size_t bisection_search(array<coord3d,N>& X, array<coord3d,N>& direction, array<coord3d,N>& fc, real_t a, real_t b, real_t eps, size_t max_iter){
         size_t count = 0;
         size_t nBrack = 0;
         real_t sum = -1;
         real_t dfc = 0.0;
         real_t coefficient = 0.0;
+        size_t gradient_evals = 0;
 
         array<coord3d,N> temp_coords;
         array<coord3d,N> temp_direction;
@@ -416,7 +563,7 @@ public:
                 temp_coords[a] = temp_coords[a] + coefficient*direction[a];
             }
             gradient(temp_coords,temp_direction);
-
+            gradient_evals++;
             sum = multiply_reduce(temp_direction,direction);
         }
         
@@ -431,6 +578,7 @@ public:
                 temp_coords[i] = temp_coords[i] + c*direction[i];
             }
             gradient(temp_coords,fc);
+            gradient_evals++;
             dfc = multiply_reduce(fc,direction);
             
             if (count > max_iter){ break;}
@@ -441,7 +589,7 @@ public:
         {
             fc[i]= -fc[i];
         }
-        
+        return gradient_evals;
     }
 
 
@@ -450,12 +598,15 @@ public:
         size_t max_iter = N*10;
         real_t beta = 0.0;
         real_t dnorm = 1.0;
+        size_t gradient_evals = 0;
+        size_t energy_evals = 0;
 
         array<coord3d, N> delta_x0;
         array<coord3d, N> delta_x1;
         array<coord3d, N> direction;
 
         gradient(X, direction);
+        gradient_evals ++;
         dnorm = norm(direction);
         for (node_t a = 0; a < N; a++)
         {   
@@ -463,10 +614,12 @@ public:
         }
         parallel_copy(X_temp,X);
         parallel_copy(delta_x0, direction);
-        while (dnorm > 1e-7)
+        while (dnorm > 1e-5)
         {   
             beta = 0.0;
-            bisection_search(X_temp, direction,delta_x1,0,1e-5,1e-10,N);
+            energy_evals += golden_section_search(X_temp, direction, delta_x1, 0, 1, 1e-10);
+            gradient_evals++;
+            //gradient_evals += bisection_search(X_temp, direction, delta_x1,0,1e-5,1e-10,N);
             //Polak Ribiere method
             for (node_t a = 0; a < N; a++)
             {
@@ -491,54 +644,49 @@ public:
             }
             normalize(direction);
             dnorm = norm(delta_x1);
-            if (iter_count > N*10){return;}
+            print_real(dnorm);
+            if (iter_count > N*10)
+            {
+                cout << "Conjugated Gradient Terminated Due to Max Iterations :" << N*10 << "\n";
+                cout << "Gradient Evaluations: " << gradient_evals << "\n";
+                cout << "Energy Evaluations: " << energy_evals << "\n";
+                return;
+            }
             iter_count++;
-        }   
+        }
+        cout << "Conjugated Gradient Finished in "<< iter_count << " iterations\n";
+        cout << "Gradient Evaluations: " << gradient_evals << "\n";
+        cout << "Energy Evaluations: " << energy_evals << "\n";
     }
 };
 
 int main()
 {
-    const int size = 60;
-
-    //Data necessary to compute gradients for the C60ih Fullerene
-    CubicArcs<size> cubic_neighbours  = {4,15,1,0,12,2,1,9,3,2,5,4,3,8,0,3,11,6,5,22,7,6,20,8,7,18,4,2,14,10,9,26,11,10,25,5,1,17,13,12,30,14,13,29,9,0,19,16,15,34,17,16,33,12,8,21,19,18,37,15,7,24,21,20,38,18,6,25,23,22,42,24,23,40,20,11,28,22,10,29,27,26,45,28,27,44,25,14,32,26,13,33,31,30,48,32,31,47,29,17,36,30,16,37,35,34,51,36,35,50,33,19,39,34,21,41,39,38,53,37,24,43,41,40,54,38,23,44,43,42,55,40,28,46,42,27,47,46,45,57,44,32,49,45,31,50,49,48,58,47,36,52,48,35,53,52,51,59,50,39,54,51,41,56,53,43,57,56,55,59,54,46,58,55,49,59,57,52,56,58};    
-    array<node_t, size*3> next_on_face = {8,16,2,15,13,3,12,10,4,9,6,0,5,18,1,2,25,7,11,23,8,22,21,4,20,19,3,1,29,11,14,27,5,26,22,3,0,33,14,17,31,9,30,26,2,4,37,17,19,35,12,34,30,1,7,38,15,21,34,0,6,40,18,24,39,8,5,28,24,25,43,20,42,41,7,10,44,6,9,32,28,29,46,25,45,42,11,13,47,10,12,36,32,33,49,29,48,45,14,16,50,13,15,39,36,37,52,33,51,48,17,18,53,16,20,54,37,41,51,19,23,55,38,43,53,21,22,46,40,44,56,24,27,57,23,26,49,44,47,55,28,31,58,27,30,52,47,50,57,32,35,59,31,34,54,50,53,58,36,38,56,35,40,59,39,42,58,54,57,52,41,45,59,43,48,56,46,51,55,49};
-    array<node_t, size*3> prev_on_face = {3,19,12,4,17,9,0,14,5,1,11,8,2,7,15,4,10,22,3,25,20,5,24,18,6,21,0,3,13,26,2,29,25,9,28,6,2,16,30,1,33,29,12,32,10,1,18,34,0,37,33,15,36,13,4,20,37,8,39,16,8,23,38,7,41,19,7,11,42,6,44,40,22,43,21,5,27,23,11,14,45,10,47,44,26,46,22,9,31,27,14,17,48,13,50,47,30,49,26,12,35,31,17,19,51,16,53,50,34,52,30,15,38,35,18,40,53,21,54,34,20,42,54,24,56,39,24,28,55,23,57,41,25,45,43,28,32,57,27,58,42,29,48,46,32,36,58,31,59,45,33,51,49,36,39,59,35,56,48,37,41,52,38,55,51,40,46,59,43,58,53,44,49,56,47,52,55,50,54,57};
-    array<uint8_t, size*3> face_right   = {6,6,5,6,6,5,6,6,5,6,6,5,6,6,5,6,5,6,5,6,6,6,5,6,5,6,6,6,5,6,5,6,6,6,5,6,6,5,6,5,6,6,6,5,6,6,5,6,5,6,6,6,5,6,5,6,6,6,5,6,6,6,5,6,6,5,5,6,6,6,5,6,5,6,6,6,6,5,5,6,6,6,5,6,5,6,6,6,6,5,5,6,6,6,5,6,5,6,6,6,6,5,5,6,6,6,5,6,5,6,6,6,6,5,6,5,6,5,6,6,5,6,6,6,5,6,6,6,5,6,6,5,5,6,6,6,6,5,6,6,5,5,6,6,6,6,5,6,6,5,5,6,6,6,6,5,6,6,5,5,6,6,6,6,5,6,5,6,5,6,6,6,5,6,6,5,6,6,5,6};
-    array<coord3d, size> X = {2.82489,8.43261e-17,14.2017,8.0219,0.604118,12.0396,10.4266,6.01981,8.04461,4.53413,6.64511,12.0396,1.41245,2.44643,14.2017,3.29447,11.5801,8.04461,-3.29447,11.5801,8.04461,-4.53413,6.64511,12.0396,-1.41245,2.44643,14.2017,12.299,7.10085,2.82489,9.58483,10.4795,-2.82489,4.63059,13.4256,2.82489,11.6759,-2.93695,8.04461,13.9422,-2.70257,2.82489,13.8679,3.06098,-2.82489,1.41245,-2.44643,14.2017,3.48777,-7.24923,12.0396,8.38143,-8.64315,8.04461,-2.82489,5.87089e-16,14.2017,-1.41245,-2.44643,14.2017,-10.4266,6.01981,8.04461,-8.0219,0.604118,12.0396,-4.63059,13.4256,2.82489,-9.58483,10.4795,-2.82489,-12.299,7.10085,2.82489,2.39962e-16,14.2017,-2.82489,8.97979,8.0197,-8.04461,3.58009,7.20408,-12.0396,1.07573e-16,12.0396,-8.04461,11.4352,3.76688,-8.04461,12.299,-7.10085,-2.82489,10.4266,-6.01981,-8.04461,8.02896,-0.501593,-12.0396,9.31158,-10.723,2.82489,-2.56576e-15,-12.0396,8.04461,-2.91345e-15,-14.2017,2.82489,4.28306,-13.5404,-2.82489,-3.48777,-7.24923,12.0396,-11.6759,-2.93695,8.04461,-8.38143,-8.64315,8.04461,-13.8679,3.06098,-2.82489,-13.9422,-2.70257,2.82489,-8.97979,8.0197,-8.04461,-11.4352,3.76688,-8.04461,-3.58009,7.20408,-12.0396,1.33536,2.48934,-14.2017,-1.33536,2.48934,-14.2017,2.82351,-0.088213,-14.2017,4.44887,-6.70249,-12.0396,1.48815,-2.40113,-14.2017,2.45537,-11.7866,-8.04461,-4.28306,-13.5404,-2.82489,-2.45537,-11.7866,-8.04461,-9.31158,-10.723,2.82489,-12.299,-7.10085,-2.82489,-8.02896,-0.501593,-12.0396,-10.4266,-6.01981,-8.04461,-2.82351,-0.088213,-14.2017,-1.48815,-2.40113,-14.2017,-4.44887,-6.70249,-12.0396};
-
+    const size_t size = 960;
     //Gradient container
     array<coord3d,size> grad;
 
     //Test gradient computation
-    FullereneForcefield<60> forcefield = FullereneForcefield<60>(cubic_neighbours, X, face_right, next_on_face, prev_on_face);
+    FullereneForcefield<size> forcefield = FullereneForcefield<size>(cubic_neighbours_960, X_960, face_right_960, next_on_face_960, prev_on_face_960);
     
     
-    forcefield.gradient(X,grad);
 
 
-
-    for (size_t i = 0; i < size; i++)
-    {
-        //print_coord(grad[i]);
-    }
-    
-    //print_real(forcefield.norm(grad));
-    
-    forcefield.X = X;
 
     auto start = chrono::system_clock::now();
     forcefield.conjugate_gradient();
     auto end = chrono::system_clock::now();
     cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
     print_real(forcefield.energy(forcefield.X));
+
+    forcefield.gradient(forcefield.X,grad);
+
     
     //write_to_file<size>(forcefield.X);
 
     for (size_t i = 0; i < size; i++)
     {
-        print_coord(forcefield.X[i]);
+        //print_coord(grad[i]);
     }
     
     
