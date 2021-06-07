@@ -11,8 +11,6 @@ using namespace std::literals;
 #include <tuple>
 
 #include "coord3d.cc"
-#include "C960ih.cc"
-#include "C60ih.cc"
 
 typedef uint16_t node_t; 
 template <int N>
@@ -21,17 +19,19 @@ using CubicArcs = array<node_t, N * 3>;
 typedef array<real_t, 3> coord3d;
 // NB: Increase to int32 to do more than 65k atoms
 
-inline void print_real(real_t a)
-{
-    printf("%.16e \n",a);
+
+template <typename T, size_t N> 
+inline T sum(const array<T,N>& a){
+  T result = 0;
+  for(size_t i=0;i<N;i++) result += a[i];
+  return result;
 }
 
-inline uint8_t sum(const array<uint8_t,3>& a){
-    return a[0] + a[1] + a[2];
-}
-
-inline real_t sum(const coord3d& a){
-    return a[0] + a[1] + a[2];
+template <typename T, size_t N> 
+inline T dot(const array<T,N>& a, const array<T,N>& b){
+  T result = 0;
+  for(size_t i=0;i<N;i++) result += a[i];
+  return result;
 }
 
 
@@ -244,7 +244,10 @@ public:
             pb_hat;
         };
 
-    FullereneForcefield(const CubicArcs<N> &neighbours, const array<coord3d, N> &X, const array<uint8_t, N * 3> &face_right, const array<node_t, N * 3> &next_on_face, const array<node_t, N * 3> &prev_on_face) : 
+    FullereneForcefield(const CubicArcs<N> &neighbours, const array<coord3d, N> &X,
+			const array<uint8_t, N * 3> &face_right,
+			const array<node_t, N * 3> &next_on_face,
+			const array<node_t, N * 3> &prev_on_face) : 
         neighbours(neighbours), X(X), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 
 
@@ -644,7 +647,7 @@ public:
             }
             normalize(direction);
             dnorm = norm(delta_x1);
-            print_real(dnorm);
+            printf("dnorm = %g\n",dnorm);
             if (iter_count > N*10)
             {
                 cout << "Conjugated Gradient Terminated Due to Max Iterations :" << N*10 << "\n";
