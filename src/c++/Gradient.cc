@@ -54,7 +54,7 @@ public:
         {   
             real_t r_rmp;
             coord3d ap, am, ab, ac, ad, mp;
-
+            //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
             tie(r_rab, ab, ab_hat) = split_norm(X[neighbours[a*3 + j]] - X[a]);
             tie(r_rac, ac, ac_hat) = split_norm(X[neighbours[a*3 + (j+1)%3]] - X[a]);
             tie(r_rad, ad, ad_hat) = split_norm(X[neighbours[a*3 + (j+2)%3]] - X[a]);
@@ -66,6 +66,7 @@ public:
             bc_hat = unit_vector(ac - ab);
             cd_hat = unit_vector(ad - ac);
 
+            //Compute inverses of some arcs, these are subject to be omitted if the equations are adapted appropriately with inversion of signs.
             ba_hat = -ab_hat;
             mb_hat = -bm_hat;
             pa_hat = -ap_hat;
@@ -77,6 +78,7 @@ public:
             uint8_t face_sum = face_right[a * 3] - 5 + face_right[a * 3 + 1] - 5 + face_right[a * 3 + 2] - 5;
             uint8_t dihedral_face_sum = face_right[neighbours[a*3 + j] * 3]-5 + face_right[neighbours[a*3 + j] * 3 + 1]-5 +  face_right[neighbours[a*3 + j] * 3 + 2]-5;
 
+            //Load equillibirium distance, angles and dihedral angles from face information.
             r0 = optimal_bond_lengths[ f_l + f_r ];
             angle0 = optimal_corner_cos_angles[ f_r ];
             inner_dih0 = optimal_dih_cos_angles[ face_sum ];
@@ -84,6 +86,7 @@ public:
             outer_angle_p0 = optimal_corner_cos_angles[ f_r ];
             outer_dih0 = optimal_dih_cos_angles[ dihedral_face_sum ];
 
+            //Load force constants from neighbouring face information.
             f_bond = bond_forces[ f_l + f_r ];
             f_inner_angle = angle_forces[ f_l ];
             f_inner_dihedral = dih_forces[ face_sum];
