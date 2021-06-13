@@ -13,7 +13,10 @@ inline coord3d operator*(const real_t s, const coord3d& a)  { return a*s; }
 inline coord3d operator*(const coord3d& a, const coord3d& b) { return {a[0]*b[0], a[1]*b[1], a[2]*b[2]};}
 inline coord3d operator/(const real_t s, const coord3d& a)  { return a*(1/s); }
 inline coord3d operator/(const coord3d& a, const real_t s)  { return a*(1/s); }
+inline void operator+=(coord3d& a, const coord3d b) {a = a + b;}
+inline void operator/=(coord3d& a, const real_t s) {a = a / s;}
 
+//5 FLOPs
 inline real_t  dot(const coord3d& a,  const coord3d& b) { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
 inline real_t norm(const coord3d& a)                    { return sqrt(dot(a,a)); }
 
@@ -22,6 +25,7 @@ inline coord3d unit_vector(const coord3d& a){
   return (a*r);
 }
 
+//10 FLOPs
 inline coord3d cross(const coord3d& a, const coord3d& b){ return {a[1]*b[2]-a[2]*b[1],
 							   -a[0]*b[2]+a[2]*b[0],
 							   a[0]*b[1]-a[1]*b[0]}; }
@@ -32,7 +36,7 @@ inline coord3d outer_dot(const coord3d& a, const coord3d& b, const coord3d& c){
 	  a[2]*(b[0]*c[0] + b[1]*c[1] + b[2]*c[2])};
 }
 
-// 
+//7 FLOPs
 inline tuple<real_t, coord3d, coord3d> split_norm(const coord3d& a){
   real_t r = 1.0/sqrt(dot(a,a));
   return {r, a, a*r};
