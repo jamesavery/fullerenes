@@ -1,16 +1,16 @@
-CXXFLAGS += -march=native -O3 -Wall -shared -fPIC -fopenmp -ffast-math 
+CXXFLAGS += -march=native -O3 -Wall -shared -fPIC -fopenmp -ffast-math  -I../include
 PYBIND_FLAGS += $(shell python3 -m pybind11 --include) 
 PYBIND_SUFFIX = $(shell python3-config --extension-suffix)
 
 
-forcefield$(PYBIND_SUFFIX): forcefield-pybind.cc forcefield2.o 
+forcefield$(PYBIND_SUFFIX): forcefield-pybind.cc libfullerenes.so
 	$(CXX) $(CXXFLAGS) $(PYBIND_FLAGS) $^ -o forcefield$(PYBIND_SUFFIX)
 
 all: forcefield$(PYBIND_SUFFIX)
 
 
 clean:
-	rm -f *.o forcefield$(PYBIND_SUFFIX) *~ \#*\# *.so
+	rm -f *.o forcefield$(PYBIND_SUFFIX) *~ \#*\# 
 
 
 

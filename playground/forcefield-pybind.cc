@@ -1,3 +1,10 @@
+// TODO:
+// 1. Data til .py-filer
+// 2. Flere pybind bindings
+// 3. Brugerprogram, som læser spiral ind, optimerer, og skriver til .mol2
+// 4. Python-binding, som tager spiral-navn og starter det hele op
+// 5. Python-kode, som sammenligner iterationer fra reference-implementering + optimeret
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/numpy.h>
@@ -16,17 +23,17 @@ namespace python_api {
     return static_cast<T*>(A_info.ptr);
   }
   
-  FullereneForcefield forcefield(np_array<int>&    neighbours,
-				 np_array<real_t>& X0,
+  FullereneForcefield forcefield(np_array<int>&     neighbours,
+				 np_array<real_t>&  X0,
 				 np_array<uint8_t>& face_right,
-				 np_array<int>& next_on_face,
-				 np_array<int>& prev_on_face)
+				 np_array<int>&     next_on_face,
+				 np_array<int>&     prev_on_face)
   {
     auto X_info = X0.request();
     assert(X_info.shape.size() == 2 && X_info.shape[1] == 3);
 
     size_t   N     = X_info.shape[0];
-    coord3d *X_ptr = static_cast<coord3d*>(X_info.ptr);
+    Coord3d *X_ptr = static_cast<Coord3d*>(X_info.ptr);
     
     return FullereneForcefield(N,
 			       ptr(neighbours), X_ptr,
@@ -40,4 +47,6 @@ namespace python_api {
 PYBIND11_MODULE(forcefield, m) {
     m.doc() = "Example Python Module in C++"; // optional module docstring
 
+    m.def("new_forcefield", &new_fullereneforcefield);
+    m.def("del_forcefield", &destroy_fullereneforcefield);    
 }
