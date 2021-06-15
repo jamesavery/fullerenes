@@ -169,7 +169,7 @@ template <typename T> vector<T> operator*(const vector<T>& xs, const T& x)
 template <typename T> vector<T> operator+(const vector<T>& xs, const T& x)
 {
   vector<T> ys(xs.size());
-  for(int i=0;i<xs.size();i++) ys[i] = xs[i] + x;
+  for(size_t i=0;i<xs.size();i++) ys[i] = xs[i] + x;
   return ys;
 }
 
@@ -198,7 +198,7 @@ template <typename T> vector<T> operator-(const vector<T>& xs, const vector<T>& 
 template <typename T> vector< vector<T> > operator+(const vector< vector<T> >& xs, const T& x)
 {
   vector< vector<T> > ys(xs.size());
-  for(int i=0;i<xs.size();i++) ys[i] = xs[i] + x;
+  for(size_t i=0;i<xs.size();i++) ys[i] = xs[i] + x;
   return ys;
 }
 
