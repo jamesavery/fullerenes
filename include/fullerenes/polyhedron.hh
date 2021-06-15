@@ -68,7 +68,7 @@ struct Polyhedron : public PlanarGraph {
 
   static vector<coord3d> polar_mapping(const vector<coord2d>& angles) {
     vector<coord3d> surface(angles.size());
-    for(node_t u=0;u<surface.size();u++){
+    for(size_t u=0;u<surface.size();u++){
       const double &theta = angles[u].first, &phi = angles[u].second;
       surface[u] = coord3d(cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi));
     }

@@ -158,8 +158,8 @@ class CubicPair {
   vector<vector<dedge_t>> CtoD, DtoC;
   
   int face_start(const face_t &f){
-    node_t m, i_m;
-    for(int i=0, m=INT_MAX; i<f.size(); i++) if(f[i] < m){ i_m = i; m = f[i]; }
+    node_t i_m = 0;
+    for(int i=0, m=INT_MAX; i<int(f.size()); i++) if(f[i] < m){ i_m = i; m = f[i]; }
     return i_m;
   }
     
@@ -172,7 +172,7 @@ class CubicPair {
       DtoC[u].resize(nu.size()); 
 
       // For each directed edge v->u
-      for(int i=0;i<nu.size();i++){
+      for(size_t i=0;i<nu.size();i++){
 
 	node_t v = nu[i];
 	node_t s = nu[(i+1)%nu.size()];           // u->v->s is triangle associated with u->v

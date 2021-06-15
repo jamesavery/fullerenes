@@ -30,7 +30,7 @@ public:
   }
   vector<Eisenstein> operator*(const vector<Eisenstein>& v) const {
     vector<Eisenstein> result(v.size());
-    for(int i=0;i<v.size();i++) result[i] = (*this)*v[i];
+    for(size_t i=0;i<v.size();i++) result[i] = (*this)*v[i];
     return result;
   }
   Eisenstein operator+(const Eisenstein& y) const { return Eisenstein(first+y.first,second+y.second); }
@@ -116,7 +116,7 @@ public:
   static pair<double,double> average(const vector<Eisenstein>& xs)
   {
     complex<double> avg(0,0);
-    for(int i=0;i<xs.size();i++) avg += complex<double>(xs[i].first,xs[i].second);
+    for(size_t i=0;i<xs.size();i++) avg += complex<double>(xs[i].first,xs[i].second);
     avg /= xs.size(); 
     return make_pair(avg.real(),avg.imag());
   }
@@ -133,7 +133,7 @@ public:
     if(xs.empty()) return Eisenstein(1,0);
 
     Eisenstein d(xs[0]);
-    for(int i=1;i<xs.size();i++) d = gcd(xs[i],d);
+    for(size_t i=1;i<xs.size();i++) d = gcd(xs[i],d);
     return d;
   }
 
@@ -148,7 +148,7 @@ public:
 namespace std {
   template<> struct hash<Eisenstein> { // Vectors of integers smaller than 32 bit
     size_t operator()(Eisenstein const &f) const {
-      uint64_t combined_int = (f.first<<32) + f.second;
+      uint64_t combined_int = (uint64_t(f.first)<<32) + f.second;
       return std::hash<uint64_t>()(combined_int);      
     }
   };
