@@ -30,12 +30,13 @@ template <int N>
 class FullereneForcefield
 {
 public:
-    const CubicArcs<N> neighbours; //Bookkeeping array for storing the indices of neighbour nodes: b,c,d
-    array<coord3d, N> X_temp; // Temporary positions to be evaluated
-    array<coord3d, N> X; // Current nucleus positions
+    const node_t* neighbours; //Bookkeeping array for storing the indices of neighbour nodes: b,c,d
+    coord3d* X_temp; // Temporary positions to be evaluated
+    coord3d* X; // Current nucleus positions
 
-    const array<uint8_t, N * 3> face_right; //Faces to the right of the edges ab, ac, ad
-    const array<node_t, N * 3> next_on_face, prev_on_face; //Next node on the face to the left of the edges ab, ac, ad
+    const uint8_t* face_right; //Faces to the right of the edges ab, ac, ad
+    const node_t* next_on_face; const node_t* prev_on_face; //Next node on the face to the left of the edges ab, ac, ad
+
     struct ArcData
     {   
         //All parameter arrays are indexed by a binary sum, 0,1,2,3,4,...
@@ -50,7 +51,7 @@ public:
         const array<real_t, 3> bond_forces = {260.0, 390.0, 450.0}; 
         const array<real_t, 4> dih_forces = {35.0, 65.0, 85.0, 270.0}; 
 
-        ArcData(const node_t a, const uint8_t j, const CubicArcs<N> &neighbours, const array<coord3d, N> &X, const array<uint8_t, N * 3> &face_right, const array<node_t, N * 3> &next_on_face, const array<node_t, N * 3> &prev_on_face)
+        ArcData(const node_t a, const uint8_t j, const node_t* neighbours, const coord3d* X, const uint8_t* face_right, const node_t* next_on_face, const node_t* prev_on_face)
         {   
             real_t r_rmp;
             coord3d ap, am, ab, ac, ad, mp;
@@ -282,13 +283,16 @@ public:
             pb_hat;
     };
 
-    FullereneForcefield(const CubicArcs<N> &neighbours, const array<coord3d, N> &X, const array<uint8_t, N * 3> &face_right, const array<node_t, N * 3> &next_on_face, const array<node_t, N * 3> &prev_on_face) : 
-        neighbours(neighbours), X(X), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
+    FullereneForcefield(const node_t* neighbours, coord3d* X, const uint8_t* face_right, const node_t* next_on_face, const node_t* prev_on_face) : 
+        neighbours(neighbours), X(X), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {
+            X_temp = new coord3d[N];
+
+        }
 
 
     //Parallelizable copying,  a = b;
     template <typename T>
-    static inline void parallel_copy(array<T,N>& a, array<T,N>& b){
+    static inline void parallel_copy(T* a, T* b){
         for (node_t i = 0; i < N; i++)
         {
             a[i]= b[i];
@@ -297,8 +301,16 @@ public:
        
     
     //~393*N FLOPs
-    real_t energy(array<coord3d,N>& X){
+    real_t energy(coord3d* X){
         real_t energy = 0.0;
+        //#pragma omp parallel for  reduction (+:energy)
+        #pragma acc parallel loop reduction (+:energy)  copyin(face_right[:3*N]) //, face_right[:3*N], next_on_face[:3*N], prev_on_face[:3*N])
+        for (size_t i = 0; i < N; i++)
+        {
+            printf("%d, %d, %d \n", face_right[i*3], face_right[i*3 + 1], face_right[i*3+ 2]);
+        }
+        exit(0);
+
         for (node_t a = 0; a < N; a++)
         {   
             for (size_t j = 0; j < 3; j++)
@@ -307,15 +319,19 @@ public:
                 energy += arc.energy();
             }
         }
+        #pragma acc wait
         return energy;
     }
 
     //~1914 * N -FLOPs
-    void gradient(array<coord3d,N>& X,array<coord3d,N>& gradient)
+    void gradient(coord3d* X,coord3d* gradient)
     {   
+        //#pragma acc parallel loop copyin(X[:N], neighbours[:3*N], face_right[:3*N], next_on_face[:3*N], prev_on_face[:3*N]) copy(gradient[:N])
+        //#pragma omp parallel for
         for (node_t a = 0; a < N; a++) 
         {       
             coord3d node_gradient = {0,0,0};
+            
             for (size_t j = 0; j < 3; j++)
             {       
                 ArcData arc = ArcData(a,j,neighbours,X,face_right,next_on_face,prev_on_face);
@@ -323,13 +339,13 @@ public:
             }
             gradient[a] = node_gradient;
         }
+        //#pragma acc wait
     }
 
-    size_t golden_section_search(array<coord3d,N>& X, array<coord3d,N>& direction, array<coord3d,N>& new_direction, real_t a, real_t b, real_t tol){
+    size_t golden_section_search(coord3d* X, coord3d* direction, coord3d* new_direction,coord3d* X1, coord3d* X2, real_t a, real_t b, real_t tol){
         real_t tau = (sqrt(5) - 1) / 2;
         
         //Actual coordinates resulting from each traversal 
-        array<coord3d,N> X1, X2;
         //Line search x - values;
         real_t x1,  x2, dfc;
         x1 = (a + (1 - tau) * (b - a));
@@ -384,17 +400,21 @@ public:
         size_t iter_count = 0;
         size_t max_iter = N*10;
         real_t beta = 0.0;
-        real_t dnorm = 0;
-        real_t r0_norm;
+        real_t dnorm = 0.0;
+        real_t r0_norm = 0.0;
         real_t direction_norm = 0.0;
         size_t gradient_evals = 0;
         size_t energy_evals = 0;
 
-        array<coord3d, N> delta_x0;
-        array<coord3d, N> delta_x1;
-        array<coord3d, N> direction;
-
+        coord3d* delta_x0 = new coord3d[60];
+        coord3d* delta_x1 = new coord3d[60];
+        coord3d* direction = new coord3d[60];
+        coord3d* X1 = new coord3d[60]; // Trial coordinates.
+        coord3d* X2 = new coord3d[60]; // Trial coordinates.
+        //if (X[0][0] > 0) { X[1][1] = 0;}
         gradient(X, direction);
+        //if (direction[0][0] > 0) { direction[1][1] = 0;}
+        
         gradient_evals ++;
         for (node_t a = 0; a < N; a++)
         {
@@ -408,10 +428,12 @@ public:
         }
         parallel_copy(X_temp,X);
         parallel_copy(delta_x0, direction);
+
+        
         while (dnorm > 1e-5)
         {   
-            beta = 0.0; direction_norm = 0.0; dnorm=0;
-            energy_evals += golden_section_search(X_temp, direction, delta_x1, 0, 1, 1e-10);
+            beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
+            energy_evals += golden_section_search(X_temp,direction, delta_x1, X1, X2, 0, 1, 1e-10);
             gradient_evals++;
             //gradient_evals += bisection_search(X_temp, direction, delta_x1,0,1e-5,1e-10,N);
             //Polak Ribiere method
@@ -453,16 +475,17 @@ public:
                 direction[a] /= direction_norm;
             }
             
-            print_real(dnorm);
+            //print_real(dnorm);
             if (iter_count > N*10)
             {
                 cout << "Conjugated Gradient Terminated Due to Max Iterations :" << N*10 << "\n";
                 cout << "Gradient Evaluations: " << gradient_evals << "\n";
                 cout << "Energy Evaluations: " << energy_evals << "\n";
-                return;
+                break;
             }
             iter_count++;
         }
+        
         cout << "Conjugated Gradient Finished in "<< iter_count << " iterations\n";
         cout << "Gradient Evaluations: " << gradient_evals << "\n";
         cout << "Energy Evaluations: " << energy_evals << "\n";
@@ -473,7 +496,6 @@ int main()
 {
     const size_t size = 60;
     //Gradient container
-    array<coord3d,size> grad;
 
     //Test gradient computation
     FullereneForcefield<size> forcefield = FullereneForcefield<size>(cubic_neighbours_60, X_60, face_right_60, next_on_face_60, prev_on_face_60);
@@ -484,15 +506,8 @@ int main()
     cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
     print_real(forcefield.energy(forcefield.X));
 
-    forcefield.gradient(X_60,grad);
+    //forcefield.gradient(X_60,grad);
 
-    
-    //write_to_file<size>(forcefield.X);
-
-    for (size_t i = 0; i < size; i++)
-    {
-        print_coord(grad[i]);
-    }
     
     
 }
