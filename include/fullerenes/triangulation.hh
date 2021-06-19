@@ -148,6 +148,8 @@ public:
 
   static vector<general_spiral> isomer_search(const Triangulation::predicate_t& predicate, size_t N, size_t print_step=0,
 					      bool IPR=false, bool only_nontrivial_symmetry=false, size_t N_chunks=1, size_t chunk_index=0);
+
+  spiral_nomenclature name(bool rarest_start=true) const;  
 };
 
 
