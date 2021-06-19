@@ -21,12 +21,24 @@ int face_size(const Graph &g, node_t u, node_t v)
 }
 
 
-int main(int ac, char **av)
+int main(int ac, cha
+	 r **av)
 {
   string spiral_name = av[1];
   spiral_nomenclature fsn(spiral_name);
   Triangulation t(fsn);
   //  t = t.sort_nodes();
+
+  if(ac>3){
+    int k = strtol(av[2],0,0),
+        l = strtol(av[3],0,0);
+
+    t = t.GCtransform(k,l);
+    general_spiral spiral = t.get_general_spiral();
+    fsn.jumps  = spiral.jumps;	// TODO: general_spiral in spiral_nomenclature
+    fsn.spiral = spiral.spiral;
+  }
+  
   
   PlanarGraph   g = t.dual_graph();
   g.layout2d = g.tutte_layout();
