@@ -18,8 +18,6 @@ using namespace std::literals;
 namespace cg = cooperative_groups;
 
 typedef uint16_t node_t; 
-typedef float3 coord3d;
-
 
 __device__ __host__ struct BookkeepingData{
     const node_t* neighbours;
@@ -49,7 +47,7 @@ __device__ struct ArcData{
     //PPP = 0, {HPP, PHP, PPH} = 1, {PHH, HPH, HHP} = 2, {HHH} = 3
     const real_t optimal_corner_cos_angles[2] = {-0.3090169944, -0.5};//{cos(M_PI * 108.0 / 180.0), cos(M_PI * 120.0 / 180.0)}; 
     const real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
-    const real_t optimal_dih_cos_angles[4] = {0.511161369, 0.6543772853, -0.3342353205, 1}; //{cos(0.652358), cos(0.509674), cos(0.417884), cos(0)}; 
+    const real_t optimal_dih_cos_angles[4] = {0.79465455715, 0.87290360705, 0.91394971663, 1};  //{cos(0.652358), cos(0.509674), cos(0.417884), cos(0)}; 
 
     const real_t angle_forces[2] = {100.0, 100.0}; 
     const real_t bond_forces[3] = {260.0, 390.0, 450.0}; 
@@ -415,7 +413,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     X_temp[node_id] = X[node_id];
     delta_x0[node_id] = direction[node_id];
 
-    for (node_t i = 0; i < (node_t)2.6*N; i++)
+    for (node_t i = 0; i < (node_t)4*N; i++)
     {   
         beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
         cg::sync(block);
@@ -426,7 +424,11 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         //Polak Ribiere method
         local_reduction[node_id] = dot(delta_x0[node_id], delta_x0[node_id]); reduction(local_reduction, N, node_id, cg::this_thread_block()); r0_norm = local_reduction[0];
         local_reduction[node_id] = dot(delta_x1[node_id], (delta_x1[node_id] - delta_x0[node_id])); reduction(local_reduction, N, node_id, cg::this_thread_block()); beta = local_reduction[0] / r0_norm;
-
+        if (threadIdx.x == 0)
+        {
+            /* code */
+        //printf("%.16e \n", beta);
+        }
     
         if (energy(X_temp, node_id, local_bookkeeping, local_reduction, N) > energy(X, node_id, local_bookkeeping, local_reduction, N))
         {   
@@ -450,7 +452,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         //Normalize gradient.
         direction[node_id] /= direction_norm;
         if (tid == 0) {
-            //printf("Norm: %e \n ", dnorm);
+            printf("Norm: %.16e \n ", dnorm);
         }
         
         if (iter_count > N*10)
@@ -477,7 +479,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
 
 int main(){
 
-    size_t N = 60;
+    size_t N = 960;
 
     size_t* d_N;
 
@@ -511,11 +513,11 @@ int main(){
     cudaMalloc(&d_face_right, sizeof(uint8_t)*3*N);
     cudaMalloc(&d_N, sizeof(size_t)); cudaMemcpy(d_N, &N, sizeof(size_t), cudaMemcpyHostToDevice);
 
-    cudaMemcpy(d_X, &X_60, sizeof(real_t)*3*N , cudaMemcpyHostToDevice);
-    cudaMemcpy(d_neighbours, &cubic_neighbours_60, sizeof(node_t)*3*N, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_next_on_face, &next_on_face_60, sizeof(node_t)*3*N, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_prev_on_face, &prev_on_face_60, sizeof(node_t)*3*N, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_face_right, &face_right_60, sizeof(uint8_t)*3*N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_X, &X_960, sizeof(real_t)*3*N , cudaMemcpyHostToDevice);
+    cudaMemcpy(d_neighbours, &cubic_neighbours_960, sizeof(node_t)*3*N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_next_on_face, &next_on_face_960, sizeof(node_t)*3*N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_prev_on_face, &prev_on_face_960, sizeof(node_t)*3*N, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_face_right, &face_right_960, sizeof(uint8_t)*3*N, cudaMemcpyHostToDevice);
 
     DevicePointers dpointers = DevicePointers::DevicePointers(d_X, d_X_temp, d_X1, d_X2, d_delta_x0, d_delta_x1, d_direction);
     BookkeepingData bpointers = BookkeepingData::BookkeepingData(d_neighbours, d_face_right, d_next_on_face, d_prev_on_face);
@@ -543,6 +545,7 @@ int main(){
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
     getLastCudaError("Failed to launch kernel: ");
     cudaMemcpy(h_X, d_X, sizeof(real_t)*3*N, cudaMemcpyDeviceToHost);
+
 
 
 

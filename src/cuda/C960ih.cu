@@ -1,6 +1,7 @@
 #pragma once;
 
-typedef double real_t;
+typedef float real_t;
+typedef uint16_t node_t; 
 
 const int size_960 = 960;
 const int elements_960 = 960*3;

@@ -18,7 +18,7 @@ using namespace std::literals;
 namespace cg = cooperative_groups;
 
 typedef uint16_t node_t; 
-typedef float3 coord3d;
+
 
 
 //All parameter arrays are indexed by a binary sum, 0,1,2,3,4,...
@@ -27,7 +27,7 @@ typedef float3 coord3d;
 //PPP = 0, {HPP, PHP, PPH} = 1, {PHH, HPH, HHP} = 2, {HHH} = 3
 __constant__ real_t optimal_corner_cos_angles[2] = {-0.3090169944, -0.5}; 
 __constant__ real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
-__constant__ real_t optimal_dih_cos_angles[4] = {0.511161369, 0.6543772853, -0.3342353205, 1}; 
+__constant__ real_t optimal_dih_cos_angles[4] = {0.79465455715, 0.87290360705, 0.91394971663, 1}; 
 
 __constant__ real_t angle_forces[2] = {100.0, 100.0}; 
 __constant__ real_t bond_forces[3] = {260.0, 390.0, 450.0}; 
@@ -109,6 +109,7 @@ __device__ struct ArcData{
         pa_hat = -ap_hat;
         pb_hat = -bp_hat;
     }
+    //3 FLOPs
     __device__ real_t harmonic_energy(const real_t p0, const real_t p) const{
         return 0.5*(p-p0)*(p-p0);
     }
@@ -120,7 +121,7 @@ __device__ struct ArcData{
     __device__ real_t angle() const {return dot(ab_hat,ac_hat);}
     //Returns the inner dihedral angle for the current arc. Used here only for energy calculation, 
     //otherwise embedded in dihedral computation because the planes and angles that make up the dihedral angle computation are required for derivative computation.
-    __device__ __forceinline__ real_t dihedral() const 
+    __device__ __forceinline__ real_t dihedral() const //48 FLOPs
     { 
         coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
         cos_b = dot(ba_hat,bc_hat); r_sin_b = rsqrt(1 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
@@ -328,7 +329,10 @@ __device__ void golden_section_search(coord3d* X, coord3d* direction, coord3d* n
 
     real_t f1 = energy(X1, node_id, dat, constants, reduction_array, N);
     real_t f2 = energy(X2, node_id, dat, constants, reduction_array, N);
-
+    if (threadIdx.x == 0)
+    {
+        printf("%.16e \n", f1);
+    }
     for (uint8_t i = 0; i < 40; i++){
         if (f1 > f2){
             a = x1;
@@ -352,8 +356,7 @@ __device__ void golden_section_search(coord3d* X, coord3d* direction, coord3d* n
     //Line search coefficient
     real_t alfa = (a+b)/2;
     X[node_id] = X[node_id] + alfa*direction[node_id];
-    new_direction[node_id] = gradient(X,node_id,dat, constants);
-    new_direction[node_id] = -new_direction[node_id];
+    new_direction[node_id] = -gradient(X,node_id,dat, constants);
 }
 
 __device__ Constants compute_constants(BookkeepingData &dat, node_t node_id){
@@ -391,7 +394,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     real_t __shared__ reduction_array[1024];
 
     size_t iter_count = 0;
-    size_t max_iter = N*10;
+    size_t max_iter = N*4;
     real_t beta = 0.0;
     real_t dnorm = 0;
     real_t r0_norm;
@@ -411,8 +414,8 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     coord3d* X_temp = &d_X_temp[offset];
     coord3d* X1 = &d_X1[offset];
     coord3d* X2 = &d_X2[offset];
-    coord3d* delta_x0 = &d_delta_x0[offset];
     coord3d* delta_x1 = &d_delta_x1[offset];
+    coord3d* delta_x0 = &d_delta_x0[offset];
     coord3d* direction = &d_direction[offset];
     
     const node_t* neighbours = &d_neighbours[3*offset];
@@ -428,27 +431,35 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
 
     cg::sync(block);
     direction[node_id] = gradient(X, node_id ,local_bookkeeping, constants);
-    
     gradient_evals ++;
     
-    
     local_reduction[node_id] = dot(direction[node_id],direction[node_id]);
+    
     reduction(local_reduction, N, node_id, cg::this_thread_block());
     dnorm = sqrtf(local_reduction[0]);
     direction[node_id] = -direction[node_id]/dnorm;
     
+    if (threadIdx.x == 0)
+    {
+        print_coord(direction[0]);
+    }
+
     X_temp[node_id] = X[node_id];
     delta_x0[node_id] = direction[node_id];
 
-    for (node_t i = 0; i < (node_t)2.6*N; i++)
+    for (node_t i = 0; i < (node_t)4*N; i++)
     {   
         beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
         cg::sync(block);
         golden_section_search(X_temp, direction, delta_x1, X1, X2,local_reduction, 0, 1, node_id, N, local_bookkeeping, constants);
         __threadfence();
+
         gradient_evals++;
         energy_evals += 42;
         //Polak Ribiere method
+        
+        
+
         local_reduction[node_id] = dot(delta_x0[node_id], delta_x0[node_id]); reduction(local_reduction, N, node_id, cg::this_thread_block()); r0_norm = local_reduction[0];
         local_reduction[node_id] = dot(delta_x1[node_id], (delta_x1[node_id] - delta_x0[node_id])); reduction(local_reduction, N, node_id, cg::this_thread_block()); beta = local_reduction[0] / r0_norm;
 
@@ -475,7 +486,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         //Normalize gradient.
         direction[node_id] /= direction_norm;
         if (tid == 0) {
-            //printf("Norm: %e \n ", dnorm);
+            //printf("Norm: %.16e \n ", dnorm);
         }
         
         if (iter_count > N*10)

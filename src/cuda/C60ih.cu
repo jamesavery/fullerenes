@@ -1,6 +1,6 @@
 #pragma once;
 
-typedef double real_t;
+typedef float real_t;
 typedef uint16_t node_t; 
 
 
