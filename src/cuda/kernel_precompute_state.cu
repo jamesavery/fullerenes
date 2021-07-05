@@ -34,37 +34,7 @@ __constant__ real_t bond_forces[3] = {260.0, 390.0, 450.0};
 __constant__ real_t dih_forces[4] = {35.0, 65.0, 85.0, 270.0}; 
 
 
-__device__ __host__ struct BookkeepingData{
-    const node_t* neighbours;
-    const uint8_t* face_right;
-    const node_t* next_on_face;
-    const node_t* prev_on_face;
-    __device__ __host__ BookkeepingData (const node_t* neighbours, const uint8_t* face_right, const node_t* next_on_face, const node_t* prev_on_face) : 
-        neighbours(neighbours), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
-};
 
-__device__ struct Constants{
-    const real_t* f_bond;
-    const real_t* f_inner_angle;
-    const real_t* f_inner_dihedral;
-    const real_t* f_outer_angle_m;
-    const real_t* f_outer_angle_p;
-    const real_t* f_outer_dihedral;
-
-    const real_t* r0;
-    const real_t* angle0;
-    const real_t* outer_angle_m0;
-    const real_t* outer_angle_p0;
-    const real_t* inner_dih0;
-    const real_t* outer_dih0;
-
-    __device__ Constants(){}
-    __device__ Constants(const real_t* f_bond, const real_t* f_inner_angle, const real_t* f_inner_dihedral, const real_t* f_outer_angle_m, const real_t* f_outer_angle_p, const real_t* f_outer_dihedral,
-                            const real_t* r0, const real_t* angle0, const real_t* outer_angle_m0, const real_t* outer_angle_p0, const real_t* inner_dih0, const real_t* outer_dih0): f_bond(f_bond), f_inner_angle(f_inner_angle),
-                            f_inner_dihedral(f_inner_dihedral), f_outer_angle_m(f_outer_angle_m), f_outer_angle_p(f_outer_angle_p), f_outer_dihedral(f_outer_dihedral), r0(r0), angle0(angle0), outer_angle_m0(outer_angle_m0), outer_angle_p0(outer_angle_p0),
-                            inner_dih0(inner_dih0), outer_dih0(outer_dih0) {}
-
-};
 
 struct DevicePointers{
     coord3d* X;
@@ -360,7 +330,7 @@ __device__ void golden_section_search(coord3d* X, coord3d* direction, coord3d* n
 }
 
 __device__ Constants compute_constants(BookkeepingData &dat, node_t node_id){
-    real_t* r0 = new real_t[3]; real_t* angle0 = new real_t[3]; real_t* inner_dih0 = new real_t[3]; real_t* outer_angle_m0 = new real_t[3]; real_t* outer_angle_p0 = new real_t[3]; real_t* outer_dih0 = new real_t[3];
+    real_t r0[3]; real_t* angle0 = new real_t[3]; real_t* inner_dih0 = new real_t[3]; real_t* outer_angle_m0 = new real_t[3]; real_t* outer_angle_p0 = new real_t[3]; real_t* outer_dih0 = new real_t[3];
     real_t* f_bond = new real_t[3]; real_t* f_inner_angle = new real_t[3]; real_t* f_inner_dihedral = new real_t[3]; real_t* f_outer_angle_m = new real_t[3]; real_t* f_outer_angle_p = new real_t[3]; real_t* f_outer_dihedral = new real_t[3];
 
     for (uint8_t j = 0; j < 3; j++) {
@@ -386,7 +356,6 @@ __device__ Constants compute_constants(BookkeepingData &dat, node_t node_id){
         f_outer_angle_p[j] = angle_forces[ f_l ];
         f_outer_dihedral[j] = dih_forces[ dihedral_face_sum];
     }
-
     return Constants::Constants(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0);
 }
 
