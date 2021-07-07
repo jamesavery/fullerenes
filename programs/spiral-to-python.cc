@@ -26,14 +26,23 @@ int main(int ac, char **av)
   string spiral_name = av[1];
   spiral_nomenclature fsn(spiral_name);
   Triangulation t(fsn);
-  //  t = t.sort_nodes();
+  PlanarGraph  g = t.dual_graph();
   
-  PlanarGraph   g = t.dual_graph();
+  int n_leapfrogs = 0;
+  if(ac>2) n_leapfrogs = strtol(av[2],0,0);
+  for(int i=0;i<n_leapfrogs;i++){ // Only for fullerenes right now. TODO: Fix implementation for general cubics
+    t = g.leapfrog_dual();
+    g = t.dual_graph();
+  }
+  fsn = FullereneDual(t).name();
+
+
+
   g.layout2d = g.tutte_layout();
   Polyhedron P0(g,g.zero_order_geometry());
   Polyhedron P = P0;
-  P.optimize();
-
+  P.optimize();  
+  
   int N = g.N, Nf = t.N;
   
   vector<face_t> pentagons(12), hexagons(Nf-12);
@@ -68,11 +77,11 @@ int main(int ac, char **av)
   }
 
 
-  //  Symmetry S(fsn.spiral_code);
-  Symmetry S(t);
+  Symmetry S(fsn.spiral_code);
+  //  Symmetry S(t);
   
   cerr << "from numpy import array, nan\n\n";
-  cerr << "name = \"" << spiral_name <<"\";\n";
+  cerr << "name = \"C"<<N<<"-" << fsn <<"\";\n";
   cerr << "# Symmetry information\n";
   //  cerr << "point_group = " << S.point_group() << "\n;";
   cerr << "equivalent_nodes = " << S.equivalence_classes(S.Gtri) << ";\n";
@@ -88,7 +97,7 @@ int main(int ac, char **av)
   cerr << "points_opt   = array(" << P.points << ");\n\n";   
   cerr << "tutte_layout = array(" << g.layout2d << ");\n\n";
   cerr << "# Dual graph and its faces\n";
-  cerr << "dual_neighbours   = array(" << t.neighbours << ");\n\n";
+  cerr << "dual_neighbours   = " << t.neighbours << ";\n\n";
   //  cerr << "next_on_tri       = array(" << next_on_tri << ");\n\n";  
   cerr << "triangles         = array(" << t.compute_faces() << ");\n\n";
   cerr << "# prev_on_tri is the same as next_on_tri\n";
