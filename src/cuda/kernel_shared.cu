@@ -442,6 +442,21 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     }
 }
 
+size_t computeBatchSize(size_t N){
+    cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties,0);
+
+    /** Compiling with --maxrregcount=64   is necessary to easily (singular blocks / fullerene) parallelize fullerenes of size 20-1024 !**/
+    int fullerenes_per_block;
+    
+    /** Needs 3 storage arrays for coordinates and 1 for reductions **/
+    int sharedMemoryPerBlock = sizeof(coord3d)* 3 * (N + 1) + sizeof(real_t)*N;
+
+    /** Calculates maximum number of resident fullerenes on a single Streaming Multiprocessor, multiply with multi processor count to get total batch size**/
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&fullerenes_per_block, conjugate_gradient, N, sharedMemoryPerBlock);
+
+    return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
+}
 
 void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
     bool concurrent_kernels = false;

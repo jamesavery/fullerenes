@@ -22,20 +22,8 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    cudaDeviceProp properties;
-    cudaGetDeviceProperties(&properties,0);
     size_t N = 60;
-
-    /** Compiling with --maxrregcount=64   is necessary to easily (singular blocks / fullerene) parallelize fullerenes of size 20-1024 !**/
-    int fullerenes_per_block;
-    
-    /** Needs 3 storage arrays for coordinates and 1 for reductions **/
-    int sharedMemoryPerBlock = sizeof(coord3d)* 3 * (N + 1) + sizeof(real_t)*N;
-
-    /** Calculates maximum number of resident fullerenes on a single Streaming Multiprocessor, multiply with multi processor count to get total batch size**/
-    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&fullerenes_per_block, conjugate_gradient, N, sharedMemoryPerBlock);
-
-    size_t batch_size = properties.multiProcessorCount*fullerenes_per_block;
+    size_t batch_size = computeBatchSize(N);
     printf("Solving %d fullerenes of size: %d \n", batch_size, N);
 
     /** Generates a synthetic load from a single set of fullerene pointers **/
