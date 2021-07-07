@@ -33,7 +33,7 @@ public:
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
   Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral_code, fsn.jumps, true){} // best_effort = true
-
+  
   PlanarGraph dual_graph() const;
   vector<face_t> cubic_faces() const;
   unordered_map<dedge_t,dedge_t> arc_translation(const PlanarGraph& cubic) const;
@@ -146,6 +146,8 @@ public:
   bool get_rspi(vector<int>& r, jumplist_t& j, const bool general=true, const bool pentagon_start=true) const;
   general_spiral get_rspi(const bool rarest_start=true) const; // TODO: Replace above by this simplified API
 
+  spiral_nomenclature name(bool rarest_start=true) const;
+  
   static vector<general_spiral> isomer_search(const Triangulation::predicate_t& predicate, size_t N, size_t print_step=0,
 					      bool IPR=false, bool only_nontrivial_symmetry=false, size_t N_chunks=1, size_t chunk_index=0);
 };
