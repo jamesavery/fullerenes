@@ -183,13 +183,13 @@ struct coord3d {
 
   friend vector<coord3d> &operator-=(vector<coord3d>& xs, const coord3d& y)
   {
-    for(int i=0;i<xs.size();i++) xs[i] -= y;
+    for(size_t i=0;i<xs.size();i++) xs[i] -= y;
     return xs;
   }
 
   friend vector<coord3d> &operator*=(vector<coord3d>& xs, const double& y)
   {
-    for(int i=0;i<xs.size();i++) xs[i] *= y;
+    for(size_t i=0;i<xs.size();i++) xs[i] *= y;
     return xs;
   }
 
@@ -295,7 +295,7 @@ struct matrix3d {
     const matrix3d &A(*this);
     vector<coord3d> ys(xs.size());
 
-    for(int i=0;i<xs.size();i++) ys[i] = A*xs[i];
+    for(size_t i=0;i<xs.size();i++) ys[i] = A*xs[i];
     return ys;
   }
 
@@ -481,11 +481,11 @@ struct face_t : public vector<node_t> {
   // TODO: This seems to fail when compiled with -std=c++0x and -O0!
   double winding_number(const vector<coord2d>& layout, const coord2d& x) const {
     vector<coord2d> Cp(size());
-    for(int i=0;i<size();i++)
+    for(size_t i=0;i<size();i++)
       Cp[i] = layout[(*this)[i]]-x;
 
     double wn = 0;
-    for(int i=0;i<size();i++){
+    for(size_t i=0;i<size();i++){
       coord2d segment = Cp[(i+1)%size()] - Cp[i];
       double theta = atan2(segment.second,segment.first);
       wn += theta;
@@ -497,7 +497,7 @@ struct face_t : public vector<node_t> {
   bool point_inside(const vector<coord2d>& layout, const coord2d& x) const {
     return winding_number(layout,x) != 0;
   }
-  bool contains(const node_t v) const { for(int i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
+  bool contains(const node_t v) const { for(size_t i=0;i<size();i++) if(v == (*this)[i]) return true; return false; }
 
   // Unique representation for sets and maps.
   // To preserve orientation: don't sort, but rotate so as to start at smallest node.
@@ -507,7 +507,7 @@ struct face_t : public vector<node_t> {
 
     // Find smallest node
     node_t i_min = 0;
-    for(int i=0;i<f.size();i++) if(f[i] < f[i_min]) i_min = i;
+    for(size_t i=0;i<f.size();i++) if(f[i] < f[i_min]) i_min = i;
     // Rotate so smallest node is first
     rotate(f.begin(),f.begin()+i_min,f.end());
     return f;
@@ -518,7 +518,7 @@ struct face_t : public vector<node_t> {
     face_t f(*this);
     
     dedge_t e_min{f[0],f[1]};
-    for(int i=1;i<f.size();i++) if(f[i] < e_min.first) e_min = {f[i],f[(i+1)%f.size()]};
+    for(size_t i=1;i<f.size();i++) if(f[i] < e_min.first) e_min = {f[i],f[(i+1)%f.size()]};
 
     return e_min;
   }

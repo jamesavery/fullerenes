@@ -448,7 +448,7 @@ vector< pair<int,int> > Symmetry::NMR_pattern() const
 }
 
 
-vector<vector<node_t>> Symmetry::equivalence_classes(const vector<Permutation>& G) {
+vector<vector<node_t>> Symmetry::equivalence_classes(const vector<Permutation>& G) const {
   size_t N = G[0].size();
   Graph E(N);
 

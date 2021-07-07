@@ -77,7 +77,8 @@ public:
   vector< pair<int,int> > NMR_pattern() const;
   
   PointGroup point_group() const;
-
+  vector<vector<node_t>> equivalence_classes(const vector<Permutation>& G) const;
+  
   void initialize(){
     vector<dedge_t>   dedge_set =   directed_edges();
     vector<edge_t> edge_set = undirected_edges(); //TODO: Do this another way

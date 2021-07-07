@@ -26,23 +26,25 @@ int main(int ac, char **av)
   string spiral_name = av[1];
   spiral_nomenclature fsn(spiral_name);
   Triangulation t(fsn);
-  PlanarGraph  g = t.dual_graph();
-  
-  int n_leapfrogs = 0;
-  if(ac>2) n_leapfrogs = strtol(av[2],0,0);
-  for(int i=0;i<n_leapfrogs;i++){ // Only for fullerenes right now. TODO: Fix implementation for general cubics
-    t = g.leapfrog_dual();
-    g = t.dual_graph();
+  //  t = t.sort_nodes();
+
+  if(ac>3){
+    int k = strtol(av[2],0,0),
+        l = strtol(av[3],0,0);
+
+    t = t.GCtransform(k,l);
+    general_spiral spiral = t.get_general_spiral();
+    fsn.jumps  = spiral.jumps;	// TODO: general_spiral in spiral_nomenclature
+    fsn.spiral_code = spiral.spiral;
   }
-  fsn = FullereneDual(t).name();
-
-
-
+  
+  
+  PlanarGraph   g = t.dual_graph();
   g.layout2d = g.tutte_layout();
   Polyhedron P0(g,g.zero_order_geometry());
   Polyhedron P = P0;
-  P.optimize();  
-  
+  P.optimize();
+
   int N = g.N, Nf = t.N;
   
   vector<face_t> pentagons(12), hexagons(Nf-12);

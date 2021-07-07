@@ -21,11 +21,6 @@ using CubicArcs = array<node_t, N * 3>;
 typedef array<real_t, 3> coord3d;
 // NB: Increase to int32 to do more than 65k atoms
 
-inline void print_real(real_t a)
-{
-    printf("%.16e \n",a);
-}
-
 template <int N>
 class FullereneForcefield
 {
@@ -243,7 +238,6 @@ public:
         real_t
             r_rab,
             r_rac,
-            r_rad,
             r_ram,
             r_rap;
 
@@ -255,12 +249,6 @@ public:
             outer_angle_p0,
             inner_dih0,
             outer_dih0;
-
-        //Base Arcs,
-        coord3d
-            ab,
-            ac,
-            ad;
 
         /*
         All normalized arcs required to perform energy & gradient calculations.
