@@ -54,6 +54,15 @@ add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(programs)
 
+# TODO: Add OpenMP Isomerspace implementation, choose at runtime if both openmp and cuda present. OpenACC too?
+include(CheckLanguage)
+check_language(CUDA)
+
+if(DEFINED CMAKE_CUDA_COMPILER)
+  add_subdirectory(src/cuda)
+endif()
+
+
 
 
 
