@@ -6,9 +6,6 @@
 #include <assert.h>
 namespace cg = cooperative_groups;
 
-typedef device_real_t real_t;
-typedef device_node_t node_t;
-
 
 template <typename T>
 void copy_and_append(T* memory, const T* fullerene, size_t N){

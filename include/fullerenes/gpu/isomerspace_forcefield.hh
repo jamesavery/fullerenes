@@ -1,10 +1,9 @@
 #pragma once
 #include <inttypes.h>
 
-typedef float    device_real_t;
-typedef uint16_t device_node_t; 
-
 namespace IsomerspaceForcefield {
+  typedef float    device_real_t;
+  typedef uint16_t device_node_t;
   
   size_t computeBatchSize(size_t N);
   

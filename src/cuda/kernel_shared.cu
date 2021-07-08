@@ -1,4 +1,4 @@
-#include "kernel_shared.h"
+#include "fullerenes/gpu/isomerspace_forcefield.hh"
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include <cuda.h>
@@ -9,11 +9,11 @@
 #include <fstream>
 #include <chrono>
 
+namespace IsomerspaceForcefield {
+
 typedef device_real_t real_t;
 typedef device_node_t node_t;
 
-namespace IsomerspaceForcefield {
-  
 #include "C60ih.cu"
 #include "coord3d.cu"
 #include "helper_functions.cu"

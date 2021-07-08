@@ -1,9 +1,12 @@
 #include <stdio.h>
-#include "kernel_shared.h"
+#include "fullerenes/gpu/isomerspace_forcefield.hh"
+using namespace IsomerspaceForcefield;
+
+typedef device_real_t real_t;
+typedef device_node_t node_t;
+
 #include "helper_functions.cu"
 #include "C60ih.cu"
-
-using namespace IsomerspaceForcefield;
 
 int main(){
 
