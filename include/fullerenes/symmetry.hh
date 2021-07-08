@@ -72,8 +72,6 @@ public:
   vector< vector<int> > multiplication_table() const ;
   bool                  reverses_orientation(const Permutation& pi) const;
 
-  static vector<vector<node_t>>   equivalence_classes(const vector<Permutation>& G);
-  
   vector< pair<int,int> > NMR_pattern() const;
   
   PointGroup point_group() const;

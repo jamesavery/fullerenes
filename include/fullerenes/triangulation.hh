@@ -146,8 +146,6 @@ public:
   bool get_rspi(vector<int>& r, jumplist_t& j, const bool general=true, const bool pentagon_start=true) const;
   general_spiral get_rspi(const bool rarest_start=true) const; // TODO: Replace above by this simplified API
 
-  spiral_nomenclature name(bool rarest_start=true) const;
-  
   static vector<general_spiral> isomer_search(const Triangulation::predicate_t& predicate, size_t N, size_t print_step=0,
 					      bool IPR=false, bool only_nontrivial_symmetry=false, size_t N_chunks=1, size_t chunk_index=0);
 
