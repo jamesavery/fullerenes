@@ -1,72 +1,75 @@
 #pragma once
 typedef float3 coord3d;
 
+#define INLINE __device__ __forceinline__
 
-__device__ __forceinline__ float3 operator-(const float3& a)                  { return make_float3(-a.x, -a.y, -a.z);  }
-__device__ __forceinline__ float3 operator-(const float3& a, const float3& b){ return make_float3(a.x-b.x, a.y-b.y, a.z-b.z);  }
-__device__ __forceinline__ float3 operator+(const float3& a, const float3& b){ return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);  }
-__device__ __forceinline__ float3 operator*(const float3& a, const float s)  { return make_float3(a.x*s, a.y*s, a.z*s);  }
-__device__ __forceinline__ float3 operator*(const float s, const float3& a)  { return a*s; }
-__device__ __forceinline__ float3 operator*(const float3& a, const float3& b) { return make_float3(a.x*b.x, a.y*b.y, a.z*b.z);}
-__device__ __forceinline__ float3 operator/(const float s, const float3& a)  { return a*(1/s); }
-__device__ __forceinline__ float3 operator/(const float3& a, const float s)  { return a*(1/s); }
-__device__ __forceinline__ void operator+=(float3& a, const float3 b) {a = a + b;}
-__device__ __forceinline__ void operator/=(float3& a, const float b) {a = a / b;}
+INLINE float3 operator-(const float3& a)                 { return make_float3(-a.x, -a.y, -a.z);  }
+INLINE float3 operator-(const float3& a, const float3& b){ return make_float3(a.x-b.x, a.y-b.y, a.z-b.z);  }
+INLINE float3 operator+(const float3& a, const float3& b){ return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);  }
+INLINE float3 operator*(const float3& a, const float s)  { return make_float3(a.x*s, a.y*s, a.z*s);  }
+INLINE float3 operator*(const float s, const float3& a)  { return a*s; }
+INLINE float3 operator*(const float3& a, const float3& b) { return make_float3(a.x*b.x, a.y*b.y, a.z*b.z);}
+INLINE float3 operator/(const float s, const float3& a)  { return a*(1/s); }
+INLINE float3 operator/(const float3& a, const float s)  { return a*(1/s); }
+INLINE void operator+=(float3& a, const float3 b) {a = a + b;}
+INLINE void operator/=(float3& a, const float b) {a = a / b;}
 
-__device__ __forceinline__ void set(float3& a, const uint8_t j, float b){
-  switch (j)
-  {
-  case 0:
-    a.x = b;
-    break;
-  case 1:
-    a.y = b;
-    break;
-  case 2:
-    a.z = b;
-    break;
-  default:
-    break;
-  }
+INLINE void set(float3& a, const uint8_t j, float b){
+  ((float*)&a)[j] = b; 
+  /* switch (j) */
+  /* { */
+  /* case 0: */
+  /*   a.x = b; */
+  /*   break; */
+  /* case 1: */
+  /*   a.y = b; */
+  /*   break; */
+  /* case 2: */
+  /*   a.z = b; */
+  /*   break; */
+  /* default: */
+  /*   break; */
+  /* } */
 }
 
-__device__ __forceinline__ float get(const float3& a, const uint8_t j){
-  switch (j)
-  {
-  case 0:
-    return a.x;
-  case 1:
-    return a.y;
-  case 2:
-    return a.z;
-  default:
-    break;
-  }
+INLINE float get(const float3& a, const uint8_t j){
+  return ((const float*)&a)[j]; 
+  /* switch (j) */
+  /* { */
+  /* case 0: */
+  /*   return a.x; */
+  /* case 1: */
+  /*   return a.y; */
+  /* case 2: */
+  /*   return a.z; */
+  /* default: */
+  /*   return 0; */
+  /* } */
 }
 //5 FLOPs
-__device__ __forceinline__  float  dot(const float3& a,  const float3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+INLINE  float  dot(const float3& a,  const float3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 
 //6 FLOPs
-__device__ __forceinline__  float norm(const float3& a)                    { return sqrt(dot(a,a)); }
+INLINE  float norm(const float3& a)                    { return sqrt(dot(a,a)); }
 
 //7 FLOPs
-__device__ __forceinline__  float3 unit_vector(const float3& a){
+INLINE  float3 unit_vector(const float3& a){
   float r = rsqrt(dot(a,a));
   return (a*r);
 }
 //10 FLOPs
-__device__ __forceinline__  float3 cross(const float3& a, const float3& b){ return make_float3(a.y*b.z-a.z*b.y,
+INLINE  float3 cross(const float3& a, const float3& b){ return make_float3(a.y*b.z-a.z*b.y,
 							   -a.x*b.z+a.z*b.x,
 							   a.x*b.y-a.y*b.x); }
 // $(a \otimes b) \cdot c$
-__device__ __forceinline__  float3 outer_dot(const float3& a, const float3& b, const float3& c){
+INLINE  float3 outer_dot(const float3& a, const float3& b, const float3& c){
   return make_float3(a.x*(b.x*c.x + b.y*c.y + b.z*c.z), 
   a.y*(b.x*c.x + b.y*c.y + b.z*c.z), 
   a.z*(b.x*c.x + b.y*c.y + b.z*c.z));
 }
 
 //6 FLOPs
-__device__ __forceinline__  float bond_length(const float3& ab){
+INLINE  float bond_length(const float3& ab){
     return rsqrtf(dot(ab,ab));
 }
 
@@ -85,18 +88,18 @@ void write_to_file(const array<double3,N>& a){
 }*/
 
 
-__device__ __forceinline__ double3 operator-(const double3& a)                  { return make_double3(-a.x, -a.y, -a.z);  }
-__device__ __forceinline__ double3 operator-(const double3& a, const double3& b){ return make_double3(a.x-b.x, a.y-b.y, a.z-b.z);  }
-__device__ __forceinline__ double3 operator+(const double3& a, const double3& b){ return make_double3(a.x+b.x, a.y+b.y, a.z+b.z);  }
-__device__ __forceinline__ double3 operator*(const double3& a, const double s)  { return make_double3(a.x*s, a.y*s, a.z*s);  }
-__device__ __forceinline__ double3 operator*(const double s, const double3& a)  { return a*s; }
-__device__ __forceinline__ double3 operator*(const double3& a, const double3& b) { return make_double3(a.x*b.x, a.y*b.y, a.z*b.z);}
-__device__ __forceinline__ double3 operator/(const double s, const double3& a)  { return a*(1/s); }
-__device__ __forceinline__ double3 operator/(const double3& a, const double s)  { return a*(1/s); }
-__device__ __forceinline__ void operator+=(double3& a, const double3 b) {a = a + b;}
-__device__ __forceinline__ void operator/=(double3& a, const double b) {a = a / b;}
+INLINE double3 operator-(const double3& a)                  { return make_double3(-a.x, -a.y, -a.z);  }
+INLINE double3 operator-(const double3& a, const double3& b){ return make_double3(a.x-b.x, a.y-b.y, a.z-b.z);  }
+INLINE double3 operator+(const double3& a, const double3& b){ return make_double3(a.x+b.x, a.y+b.y, a.z+b.z);  }
+INLINE double3 operator*(const double3& a, const double s)  { return make_double3(a.x*s, a.y*s, a.z*s);  }
+INLINE double3 operator*(const double s, const double3& a)  { return a*s; }
+INLINE double3 operator*(const double3& a, const double3& b) { return make_double3(a.x*b.x, a.y*b.y, a.z*b.z);}
+INLINE double3 operator/(const double s, const double3& a)  { return a*(1/s); }
+INLINE double3 operator/(const double3& a, const double s)  { return a*(1/s); }
+INLINE void operator+=(double3& a, const double3 b) {a = a + b;}
+INLINE void operator/=(double3& a, const double b) {a = a / b;}
 
-__device__ __forceinline__ void set(double3& a, const uint8_t j, double b){
+INLINE void set(double3& a, const uint8_t j, double b){
   switch (j)
   {
   case 0:
@@ -113,44 +116,45 @@ __device__ __forceinline__ void set(double3& a, const uint8_t j, double b){
   }
 }
 
-__device__ __forceinline__ double get(const double3& a, const uint8_t j){
-  switch (j)
-  {
-  case 0:
-    return a.x;
-  case 1:
-    return a.y;
-  case 2:
-    return a.z;
-  default:
-    break;
-  }
+INLINE double get(const double3& a, const uint8_t j){
+  return ((const double*)&a)[j];
+  /* switch (j) */
+  /* { */
+  /* case 0: */
+  /*   return a.x; */
+  /* case 1: */
+  /*   return a.y; */
+  /* case 2: */
+  /*   return a.z; */
+  /* default: */
+  /*   break; */
+  /* } */
 }
 
 //5 FLOPs
-__device__ __forceinline__  double  dot(const double3& a,  const double3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+INLINE  double  dot(const double3& a,  const double3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 
 //6 FLOPs
-__device__ __forceinline__  double norm(const double3& a)                    { return sqrt(dot(a,a)); }
+INLINE  double norm(const double3& a)                    { return sqrt(dot(a,a)); }
 
 //7 FLOPs
-__device__ __forceinline__  double3 unit_vector(const double3& a){
+INLINE  double3 unit_vector(const double3& a){
   double r = rsqrt(dot(a,a));
   return (a*r);
 }
 //10 FLOPs
-__device__ __forceinline__  double3 cross(const double3& a, const double3& b){ return make_double3(a.y*b.z-a.z*b.y,
+INLINE  double3 cross(const double3& a, const double3& b){ return make_double3(a.y*b.z-a.z*b.y,
 							   -a.x*b.z+a.z*b.x,
 							   a.x*b.y-a.y*b.x); }
 // $(a \otimes b) \cdot c$
-__device__ __forceinline__  double3 outer_dot(const double3& a, const double3& b, const double3& c){
+INLINE  double3 outer_dot(const double3& a, const double3& b, const double3& c){
   return make_double3(a.x*(b.x*c.x + b.y*c.y + b.z*c.z), 
   a.y*(b.x*c.x + b.y*c.y + b.z*c.z), 
   a.z*(b.x*c.x + b.y*c.y + b.z*c.z));
 }
 
 //6 FLOPs
-__device__ __forceinline__  double bond_length(const double3& ab){
+INLINE  double bond_length(const double3& ab){
     return rsqrtf(dot(ab,ab));
 }
 

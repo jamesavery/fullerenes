@@ -1,4 +1,6 @@
-#include "kernel_shared.cu"
+#include <stdio.h>
+#include "kernel_shared.h"
+#include "helper_functions.cu"
 #include "C60ih.cu"
 
 int main(){
@@ -24,7 +26,7 @@ int main(){
     **/
     size_t N = 60;
     size_t batch_size = computeBatchSize(N);
-    printf("Solving %d fullerenes of size: %d \n", batch_size, N);
+    printf("Solving %ld fullerenes of size: %ld \n", batch_size, N);
 
     /** Generates a synthetic load from a single set of fullerene pointers **/
     real_t* synth_X = reinterpret_cast<real_t*>(synthetic_array<real_t>(N, batch_size, &X[0]));
