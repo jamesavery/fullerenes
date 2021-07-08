@@ -4,10 +4,11 @@
 #include <cuda.h>
 #include "device_launch_parameters.h"
 #include <stdio.h>
-#include <helper_cuda.h>
+#include <helper_cuda.h>  // TODO: Get rid of this (not in nvcc std include dirs)
 #include <iostream>
 #include <fstream>
 #include <chrono>
+//#include "C170ih.cu"
 #include "C60ih.cu"
 #include "coord3d.cu"
 #include "helper_functions.cu"
@@ -224,7 +225,7 @@ __device__ coord3d gradient(const coord3d* __restrict__ X, const node_t node_id,
     coord3d grad = {0.0, 0.0, 0.0};
 
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData::ArcData(node_id, j, X, dat);
+        ArcData arc = ArcData(node_id, j, X, dat);
         grad += arc.gradient(constants);
     }
     return grad;
@@ -235,7 +236,7 @@ __device__ real_t energy(const coord3d* __restrict__ X, const node_t node_id, co
 
     //(71 + 124) * 3 * N  = 585*N FLOPs
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData::ArcData(node_id, j, X, dat);
+        ArcData arc = ArcData(node_id, j, X, dat);
         arc_energy += arc.energy(constants);
     }
     cg::sync(cg::this_thread_block());
@@ -250,7 +251,7 @@ __device__ void golden_section_search(coord3d* __restrict__ X, coord3d& directio
     //Actual coordinates resulting from each traversal 
     //Line search x - values;
     real_t a = 0.0; real_t b = 1.0;
-    real_t x1,  x2, dfc;
+    real_t x1,  x2;/* , dfc; */	/* TODO: dfc is not used: should it be? */
 
 
     x1 = (a + (1 - tau) * (b - a));
@@ -348,7 +349,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
 
     
     //Pre-compute force constants and store in registers.
-    BookkeepingData bookit = BookkeepingData::BookkeepingData(&d_neighbours[3*offset],&d_face_right[3*offset],&d_next_on_face[3*offset],&d_prev_on_face[3*offset]);
+    BookkeepingData bookit = BookkeepingData(&d_neighbours[3*offset],&d_face_right[3*offset],&d_next_on_face[3*offset],&d_prev_on_face[3*offset]);
     Constants constants = compute_constants(bookit, node_id);
 
     //Load constant bookkeeping data into registers.
@@ -356,7 +357,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     const uint8_t face_right[3] = {d_face_right[3*(offset+node_id)],d_face_right[3*(offset+node_id) + 1],d_face_right[3*(offset+node_id) + 2]};;
     const node_t next_on_face[3] = {d_next_on_face[3*(offset+node_id)],d_next_on_face[3*(offset+node_id) + 1],d_next_on_face[3*(offset+node_id) + 2]};
     const node_t prev_on_face[3] = {d_prev_on_face[3*(offset+node_id)],d_prev_on_face[3*(offset+node_id) + 1],d_prev_on_face[3*(offset+node_id) + 2]};
-    BookkeepingData bookkeeping = BookkeepingData::BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
+    BookkeepingData bookkeeping = BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
 
     cg::sync(grid);
     direction = gradient(X, node_id ,bookkeeping, constants);
@@ -461,8 +462,8 @@ size_t computeBatchSize(size_t N){
 void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
     bool concurrent_kernels = false;
     bool single_block_fullerenes = true;
-    dim3 dimBlock = dim3::dim3(N, 1, 1);
-    dim3 dimGrid = dim3::dim3(batch_size, 1, 1);
+    dim3 dimBlock = dim3(N, 1, 1);
+    dim3 dimGrid  = dim3(batch_size, 1, 1);
 
     /*
     cudaDeviceProp GPU_properties;
@@ -504,9 +505,10 @@ void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, no
     coord3d* d_X;
     coord3d* d_X_temp;
     coord3d* d_X2;
-    coord3d* d_delta_x0;
-    coord3d* d_delta_x1;
-    coord3d* d_direction;
+    /* TODO: These are not used: they be? */
+    /* coord3d* d_delta_x0; */
+    /* coord3d* d_delta_x1; */
+    /* coord3d* d_direction; */
 
     node_t* d_neighbours;
     uint8_t* d_face_right;
@@ -514,26 +516,26 @@ void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, no
     node_t* d_prev_on_face;
     real_t* d_gdata;
 
-    cudaError_t error;
-    error = cudaMalloc(&d_X, sizeof(coord3d)*N*batch_size);
-    error = cudaMalloc(&d_X_temp, sizeof(coord3d)*N*batch_size);
-    error = cudaMalloc(&d_X2, sizeof(coord3d)*N*batch_size);
+    /* cudaError_t error; */ /* error was never read */
+    cudaMalloc(&d_X, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&d_X_temp, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&d_X2, sizeof(coord3d)*N*batch_size);
     
-    error = cudaMalloc(&d_neighbours, sizeof(node_t)*3*N*batch_size);
-    error = cudaMalloc(&d_next_on_face, sizeof(node_t)*3*N*batch_size);
-    error = cudaMalloc(&d_prev_on_face, sizeof(node_t)*3*N*batch_size);
-    error = cudaMalloc(&d_face_right, sizeof(uint8_t)*3*N*batch_size);
-    error = cudaMalloc(&d_gdata, sizeof(real_t)*dimGrid.x);
-    error = cudaMalloc(&d_N, sizeof(size_t)); cudaMemcpy(d_N, &N, sizeof(size_t), cudaMemcpyHostToDevice);
-    error = cudaMalloc(&d_single_block_fullerenes, sizeof(bool)); cudaMemcpy(d_single_block_fullerenes, &single_block_fullerenes, sizeof(bool), cudaMemcpyHostToDevice);
+    cudaMalloc(&d_neighbours, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&d_next_on_face, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&d_prev_on_face, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&d_face_right, sizeof(uint8_t)*3*N*batch_size);
+    cudaMalloc(&d_gdata, sizeof(real_t)*dimGrid.x);
+    cudaMalloc(&d_N, sizeof(size_t)); cudaMemcpy(d_N, &N, sizeof(size_t), cudaMemcpyHostToDevice);
+    cudaMalloc(&d_single_block_fullerenes, sizeof(bool)); cudaMemcpy(d_single_block_fullerenes, &single_block_fullerenes, sizeof(bool), cudaMemcpyHostToDevice);
 
     getLastCudaError("One or more Mallocs Failed! \n");
 
-    error = cudaMemcpy(d_X, h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
-    error = cudaMemcpy(d_neighbours, h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    error = cudaMemcpy(d_next_on_face, h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    error = cudaMemcpy(d_prev_on_face, h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    error = cudaMemcpy(d_face_right, h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_X, h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
+    cudaMemcpy(d_neighbours, h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_next_on_face, h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_prev_on_face, h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_face_right, h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
 
     getLastCudaError("Memcpy Failed! \n");
 
