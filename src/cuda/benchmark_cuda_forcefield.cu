@@ -3,6 +3,8 @@
 #include "helper_functions.cu"
 #include "C60ih.cu"
 
+using namespace IsomerspaceForcefield;
+
 int main(){
 
     /**
@@ -35,5 +37,5 @@ int main(){
     node_t* synth_prev_on_face = reinterpret_cast<node_t*>(synthetic_array<node_t>(N, batch_size, &prev_on_face[0]));
     uint8_t* synth_face_right = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_size, &face_right[0]));
 
-    callKernelSingleBlockFullerenes(synth_X,synth_cubic_neighbours,synth_next_on_face,synth_prev_on_face,synth_face_right,N,batch_size);
+    OptimizeBatch(synth_X,synth_cubic_neighbours,synth_next_on_face,synth_prev_on_face,synth_face_right,N,batch_size);
 }

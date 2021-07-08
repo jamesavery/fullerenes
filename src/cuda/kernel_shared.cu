@@ -8,7 +8,12 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
-//#include "C170ih.cu"
+
+typedef device_real_t real_t;
+typedef device_node_t node_t;
+
+namespace IsomerspaceForcefield {
+  
 #include "C60ih.cu"
 #include "coord3d.cu"
 #include "helper_functions.cu"
@@ -16,9 +21,9 @@
 using namespace std::literals;
 namespace cg = cooperative_groups;
 
-typedef uint16_t node_t; 
 
-__device__ struct ArcData{
+
+struct ArcData{
     //124 FLOPs;
     __device__ ArcData(const node_t a, const uint8_t j, const coord3d* __restrict__ X, const BookkeepingData& bdat){   
         this->j = j;   
@@ -51,47 +56,47 @@ __device__ struct ArcData{
     }
 
     //3 FLOPs
-    __device__ real_t harmonic_energy(const real_t p0, const real_t p) const{
+    INLINE real_t harmonic_energy(const real_t p0, const real_t p) const{
         return (real_t)0.5*(p-p0)*(p-p0);
     }
     //4 FLOPs
-    __device__ coord3d  harmonic_energy_gradient(const real_t p0, const real_t p, const coord3d gradp) const{
+    INLINE coord3d  harmonic_energy_gradient(const real_t p0, const real_t p, const coord3d gradp) const{
         return (p-p0)*gradp;     
     }
 
     //1 FLOP
-    __device__ real_t bond() const {return (real_t)1.0/r_rab;}
+    INLINE real_t bond() const {return (real_t)1.0/r_rab;}
 
     //5 FLOPs
-    __device__ real_t angle() const {return dot(ab_hat,ac_hat);}
+    INLINE real_t angle() const {return dot(ab_hat,ac_hat);}
 
     //Returns the inner dihedral angle for the current arc. Used here only for energy calculation, 
     //otherwise embedded in dihedral computation because the planes and angles that make up the dihedral angle computation are required for derivative computation.
     //50 FLOPs
-    __device__ real_t dihedral() const 
+    INLINE real_t dihedral() const 
     { 
         coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
-        cos_b = dot(ba_hat,bc_hat); r_sin_b = rsqrt((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
+        cos_b = dot(ba_hat,bc_hat);  r_sin_b = rsqrt((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
         cos_c = dot(-bc_hat,cd_hat); r_sin_c = rsqrt((real_t)1.0 - cos_c*cos_c); nbcd = cross(-bc_hat,cd_hat) * r_sin_c;
         return dot(nabc, nbcd);
     }
     
     // Chain rule terms for angle calculation
     //Computes gradient related to bending term. ~24 FLOPs
-    __device__ coord3d inner_angle_gradient(const Constants& c) const
+    INLINE coord3d inner_angle_gradient(const Constants& c) const
     {   
         real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
         coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
         return get(c.f_inner_angle,j) * harmonic_energy_gradient(get(c.angle0,j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
     }
     //Computes gradient related to bending of outer angles. ~20 FLOPs
-    __device__ coord3d outer_angle_gradient_m(const Constants& c) const
+    INLINE coord3d outer_angle_gradient_m(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
         coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
         return get(c.f_outer_angle_m,j) * harmonic_energy_gradient(get(c.outer_angle_m0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
     }
-    __device__ coord3d outer_angle_gradient_p(const Constants& c) const
+    INLINE coord3d outer_angle_gradient_p(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
         coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
@@ -99,7 +104,7 @@ __device__ struct ArcData{
     }
     // Chain rule terms for dihedral calculation
     //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
-    __device__ coord3d inner_dihedral_gradient(const Constants& c) const
+    INLINE coord3d inner_dihedral_gradient(const Constants& c) const
     {
         coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
         cos_b = dot(ba_hat,bc_hat); r_sin_b = rsqrtf((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
@@ -115,7 +120,7 @@ __device__ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
-    __device__ coord3d outer_a_dihedral_gradient(const Constants& c) const
+    INLINE coord3d outer_a_dihedral_gradient(const Constants& c) const
     {
         coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
 
@@ -135,7 +140,7 @@ __device__ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
-    __device__ coord3d outer_m_dihedral_gradient(const Constants& c) const
+    INLINE coord3d outer_m_dihedral_gradient(const Constants& c) const
     {
         coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
         cos_m = dot(mb_hat,mp_hat); r_sin_m = rsqrtf((real_t)1.0 - cos_m*cos_m); nbmp_hat = cross(mb_hat,mp_hat) * r_sin_m;
@@ -153,7 +158,7 @@ __device__ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
-    __device__ coord3d outer_p_dihedral_gradient(const Constants& c) const
+    INLINE coord3d outer_p_dihedral_gradient(const Constants& c) const
     {
         coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
         cos_a = dot(ap_hat,am_hat); r_sin_a = rsqrtf((real_t)1.0 - cos_a*cos_a); npam_hat = cross(ap_hat,am_hat) * r_sin_a;
@@ -171,18 +176,18 @@ __device__ struct ArcData{
         return get(c.f_outer_dihedral,j) * harmonic_energy_gradient(get(c.outer_dih0,j), cos_beta, grad);
     }
     // Internal coordinate gradients
-    __device__ coord3d bond_length_gradient(const Constants& c) const { return - get(c.f_bond,j) * harmonic_energy_gradient(get(c.r0,j),bond(),ab_hat);}
+    INLINE coord3d bond_length_gradient(const Constants& c) const { return - get(c.f_bond,j) * harmonic_energy_gradient(get(c.r0,j),bond(),ab_hat);}
     //Sum of angular gradient components.
-    __device__ coord3d angle_gradient(const Constants& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
+    INLINE coord3d angle_gradient(const Constants& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
     //Sum of inner and outer dihedral gradient components.
-    __device__ coord3d dihedral_gradient(const Constants& c) const { return inner_dihedral_gradient(c) + outer_a_dihedral_gradient(c) + outer_m_dihedral_gradient(c) + outer_p_dihedral_gradient(c);}
+    INLINE coord3d dihedral_gradient(const Constants& c) const { return inner_dihedral_gradient(c) + outer_a_dihedral_gradient(c) + outer_m_dihedral_gradient(c) + outer_p_dihedral_gradient(c);}
     //coord3d flatness()             const { return ;  }   
     
     //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
     //71 FLOPs
-    __device__ real_t energy(const Constants& c) const {return (real_t)0.5 *get(c.f_bond,j) *harmonic_energy(bond(),get(c.r0,j))+ get(c.f_inner_angle,j)* harmonic_energy(angle(),get(c.angle0,j)) + get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),get(c.inner_dih0,j));}
+    INLINE real_t energy(const Constants& c) const {return (real_t)0.5 *get(c.f_bond,j) *harmonic_energy(bond(),get(c.r0,j))+ get(c.f_inner_angle,j)* harmonic_energy(angle(),get(c.angle0,j)) + get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),get(c.inner_dih0,j));}
     //Sum of bond, angular and dihedral gradient components.
-    __device__ coord3d gradient(const Constants& c) const{return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);}
+    INLINE coord3d gradient(const Constants& c) const{return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);}
     
     uint8_t j;
 
@@ -459,7 +464,7 @@ size_t computeBatchSize(size_t N){
     return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
 }
 
-void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
+void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
     bool concurrent_kernels = false;
     bool single_block_fullerenes = true;
     dim3 dimBlock = dim3(N, 1, 1);
@@ -601,4 +606,4 @@ void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, no
 
 }
 
-
+};

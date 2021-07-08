@@ -6,6 +6,10 @@
 #include <assert.h>
 namespace cg = cooperative_groups;
 
+typedef device_real_t real_t;
+typedef device_node_t node_t;
+
+
 template <typename T>
 void copy_and_append(T* memory, const T* fullerene, size_t N){
     for (size_t i = 0; i < N; i++)
@@ -57,7 +61,7 @@ __constant__ real_t dih_forces[4] = {35.0, 65.0, 85.0, 270.0};
 
 
 
-__device__ __host__ struct BookkeepingData{
+struct BookkeepingData{
     const node_t* neighbours;
     const uint8_t* face_right;
     const node_t* next_on_face;
@@ -66,7 +70,7 @@ __device__ __host__ struct BookkeepingData{
         neighbours(neighbours), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 };
 
-__device__ struct Constants{
+struct Constants{
     const coord3d f_bond;
     const coord3d f_inner_angle;
     const coord3d f_inner_dihedral;
