@@ -436,16 +436,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         }
         
     }
-    
-    cg::sync(grid);
-    real_t test = energy(X_temp, node_id, bookkeeping, constants, smem, gdata, N, single_block_fullerenes);
-    cg::sync(grid);
-    
-    if ((node_id == 0))
-    {
-        //printf("Energy at end %e \n", test);
-        /* code */
-    }
+    d_X[offset + threadIdx.x] = X[threadIdx.x];
 }
 
 size_t computeBatchSize(size_t N){
