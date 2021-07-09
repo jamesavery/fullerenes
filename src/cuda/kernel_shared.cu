@@ -598,11 +598,13 @@ void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_fa
 
     cudaDeviceSynchronize();
     auto end = std::chrono::system_clock::now();
-
-
+    getLastCudaError("Failed to launch kernel: ");
+    
+    cudaMemcpy(h_X, d_X, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
+    getLastCudaError("Failed to copy back: ");
     
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
-    getLastCudaError("Failed to launch kernel: ");
+
 
 }
 
