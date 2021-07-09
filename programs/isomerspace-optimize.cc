@@ -51,13 +51,13 @@ int main(int ac, char **argv)
   G.neighbours = vector<vector<node_t>>(N,vector<node_t>(3));
   vector<coord3d> points(N);
   
-  size_t I=0,			// Isomer number
+  size_t I=0,			// Global isomer number at start of batch
          i=0;			// Isomer number within current batch
   bool more_to_do = true;
   while(more_to_do){
     // Fill in a batch
-    for(i=0; (i<batch_size) && more_to_do; i++, I++){
-      //      printf("i=%ld, I=%ld\n",i,I);
+    for(i=0; (i<batch_size) && more_to_do; i++){
+      //      printf("i=%ld, I=%ld, isomer_numer=%ld\n",i,I,I+i);
       more_to_do &= BuckyGen::next_fullerene(Q,dualG);
       if(!more_to_do) break;
       
@@ -76,6 +76,10 @@ int main(int ac, char **argv)
       	  face_right  [arc_index] = face_size(G,u,v);
       	  X           [arc_index] = X0[u][j];	  
       	}
+
+      Polyhedron P0(G,X0);
+      string filename = output_dir+"/P0-C"+to_string(N)+"-"+to_string(I+i);
+      Polyhedron::to_file(P0,filename+".mol2");      
     }
 
     size_t this_batch_size = i;
@@ -92,11 +96,12 @@ int main(int ac, char **argv)
       }
 
       Polyhedron P(G,points);
-      string filename = output_dir+"/C"+to_string(N)+"-"+to_string(I);        
+      string filename = output_dir+"/P-C"+to_string(N)+"-"+to_string(I+i);
       Polyhedron::to_file(P,filename+".mol2");
     }
     // Output molecular geometry files
-    
+
+    I += this_batch_size;
   }
   failures.close();
   
