@@ -5,7 +5,7 @@ set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --u
 
 add_library(cuda_lib SHARED kernel_shared.cu)
 
-add_executable(benchmark_cuda_forcefield benchmark_cuda_forcefield.cu kernel_shared.h)
+add_executable(benchmark_cuda_forcefield benchmark_cuda_forcefield.cu)
 target_link_libraries(benchmark_cuda_forcefield cuda_lib)
 
 
