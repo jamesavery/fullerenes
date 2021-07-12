@@ -4,7 +4,8 @@
 #include <cuda.h>
 #include "device_launch_parameters.h"
 #include <stdio.h>
-#include <helper_cuda.h>  // TODO: Get rid of this (not in nvcc std include dirs)
+#//include <helper_cuda.h>  // TODO: Get rid of this (not in nvcc std include dirs)
+#define getLastCudaError(x) 
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -143,7 +144,7 @@ struct ArcData{
     INLINE coord3d outer_m_dihedral_gradient(const Constants& c) const
     {
         coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
-        cos_m = dot(mb_hat,mp_hat); r_sin_m = rsqrtf((real_t)1.0 - cos_m*cos_m); nbmp_hat = cross(mb_hat,mp_hat) * r_sin_m;
+        cos_m = dot(mb_hat,mp_hat);  r_sin_m = rsqrtf((real_t)1.0 - cos_m*cos_m); nbmp_hat = cross(mb_hat,mp_hat) * r_sin_m;
         cos_p = dot(-mp_hat,pa_hat); r_sin_p = rsqrtf((real_t)1.0 - cos_p*cos_p); nmpa_hat = cross(-mp_hat,pa_hat) * r_sin_p;
         
         //Cosine to the outer dihedral angle constituted by the planes bmp and mpa
@@ -161,7 +162,7 @@ struct ArcData{
     INLINE coord3d outer_p_dihedral_gradient(const Constants& c) const
     {
         coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
-        cos_a = dot(ap_hat,am_hat); r_sin_a = rsqrtf((real_t)1.0 - cos_a*cos_a); npam_hat = cross(ap_hat,am_hat) * r_sin_a;
+        cos_a = dot(ap_hat,am_hat);  r_sin_a = rsqrtf((real_t)1.0 - cos_a*cos_a); npam_hat = cross(ap_hat,am_hat)  * r_sin_a;
         cos_p = dot(pb_hat,-ap_hat); r_sin_p = rsqrtf((real_t)1.0 - cos_p*cos_p); nbpa_hat = cross(pb_hat,-ap_hat) * r_sin_p;
 
         real_t cos_beta = dot(nbpa_hat, npam_hat); //Outer dihedral angle bpa, pam.
@@ -551,7 +552,9 @@ void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_fa
         (void*)&N,
         (void*)&single_block_fullerenes
         };
-        checkCudaErrors(cudaLaunchCooperativeKernel((void*)conjugate_gradient, dimGrid, dimBlock, kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, NULL));
+        //checkCudaErrors(
+	cudaLaunchCooperativeKernel((void*)conjugate_gradient, dimGrid, dimBlock, kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, NULL);
+	//);
     } 
     
     
