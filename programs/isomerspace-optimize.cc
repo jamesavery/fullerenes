@@ -1,9 +1,12 @@
 #include <limits.h>
+#include <chrono>
+#include <iostream>
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
 
-#include <iostream>
+using namespace std;
+using namespace std::chrono;
 
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 
@@ -43,6 +46,7 @@ int main(int ac, char **argv)
   device_node_t   cubic_graph[batch_size*3*N], next_on_face[batch_size*3*N], prev_on_face[batch_size*3*N];
   uint8_t         face_right[batch_size*3*N]; // TODO: Reduce to 1 bit/arc 
   device_real_t            X[batch_size*3*N];
+
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
 
   FullereneDual dualG;
@@ -54,17 +58,36 @@ int main(int ac, char **argv)
   size_t I=0,			// Global isomer number at start of batch
          i=0;			// Isomer number within current batch
   bool more_to_do = true;
+  auto T0 = system_clock::now();
+  auto
+    Tgen    = system_clock::now()-T0,
+    Tupdate = system_clock::now()-T0,
+    Tdual   = system_clock::now()-T0,    
+    Ttutte  = system_clock::now()-T0,
+    TX0     = system_clock::now()-T0,
+    Tcopy   = system_clock::now()-T0,
+    Topt    = system_clock::now()-T0;
+
   while(more_to_do){
     // Fill in a batch
+    printf("Generating isomer bond graphs and initial geometries\n");
     for(i=0; (i<batch_size) && more_to_do; i++){
       //      printf("i=%ld, I=%ld, isomer_numer=%ld\n",i,I,I+i);
+      auto t0 = system_clock::now();            
       more_to_do &= BuckyGen::next_fullerene(Q,dualG);
       if(!more_to_do) break;
-      
+
+      auto t1= system_clock::now(); Tgen += t1-t0;
+
       dualG.update();   		        // Update triangles
+      auto t2= system_clock::now(); Tupdate += t2-t1;
+      
       FullereneGraph   G = dualG.dual_graph();  // Construct fullerene graph
-      G.layout2d         = G.tutte_layout();      
+      auto t3= system_clock::now(); Tdual += t3-t2;
+      G.layout2d         = G.tutte_layout();
+      auto t4= system_clock::now(); Ttutte += t4-t3;
       vector<coord3d> X0 = G.zero_order_geometry(); // TODO: Faster, better X0
+      auto t5= system_clock::now(); TX0    += t5-t4;
 
       for(node_t u=0;u<N;u++)
       	for(int j=0;j<3;j++){
@@ -76,26 +99,46 @@ int main(int ac, char **argv)
       	  face_right  [arc_index] = face_size(G,u,v);
       	  X           [arc_index] = X0[u][j];	  
       	}
-
+      auto t6= system_clock::now(); Tcopy += t6-t5;
       Polyhedron P0(G,X0);
       string filename = output_dir+"/P0-C"+to_string(N)+"-"+to_string(I+i);
       Polyhedron::to_file(P0,filename+".mol2");      
     }
 
     size_t this_batch_size = i;
-
+    printf("Optimizing %ld C%d fullerenes, isomer [%ld;%ld]\n",this_batch_size,N,I,I+this_batch_size-1);
+    auto t0 = system_clock::now();
     IsomerspaceForcefield::OptimizeBatch(X,cubic_graph, next_on_face, prev_on_face, face_right,
     					 N,this_batch_size);
-
+    Topt += system_clock::now()-t0;
+    
     // Now do something with the optimized geometries
     for(size_t i=0;i<this_batch_size;i++){
       for(node_t u=0;u<N;u++){
-	size_t node_ix = i*3*N + u*3;
-	G.neighbours[u] = {cubic_graph[node_ix], cubic_graph[node_ix+1], cubic_graph[node_ix+2]};
-	points[u]       = {X[node_ix], X[node_ix+1], X[node_ix+2]};
+	size_t node_ix = i*3*N + u*3;	
+	for(int j=0;j<3;j++) {
+	  G.neighbours[u][j] = cubic_graph[node_ix+j];
+	  points[u][j]       = double(X[node_ix+j]);
+	}
+	// // if(u<3)
+	// //   printf("%sisomer %ld: node %d at %g\t %g\t %g\n",
+	// // 	 u==0?"\n":"",
+	// // 	 i, u,
+	// // 	 points[u][0],points[u][1],points[u][2]);
+
       }
 
       Polyhedron P(G,points);
+
+      for(node_t u=0;u<P.N;u++)
+	for(node_t v=u+1;v<P.N;v++) {
+	  float bond_length = (P.points[u]-P.points[v]).norm();
+
+	  if(bond_length < 1)
+	    printf("Abnormally short length of bond %d-%d: %g\n",u,v,bond_length);	  
+	}
+
+      
       string filename = output_dir+"/P-C"+to_string(N)+"-"+to_string(I+i);
       Polyhedron::to_file(P,filename+".mol2");
     }
@@ -104,6 +147,15 @@ int main(int ac, char **argv)
     I += this_batch_size;
   }
   failures.close();
+
+  cout << "Time spent on non:\n"
+    "\tGenerating graphs = " << (Tgen/1ms)    << " ms\n"
+    "\tUpdating metadata = " << (Tupdate/1ms) << " ms\n"
+    "\tDualizing         = " << (Tdual/1ms)   << " ms\n"
+    "\tTutte embedding   = " << (Ttutte/1ms)  << " ms\n"
+    "\tInitial geometry  = " << (TX0/1ms)     << " ms\n"
+    "\tCopying to buffer = " << (Tcopy/1ms)   << " ms\n"
+    "\tFF Optimization   = " << (Topt/1ms)    << " ms\n";
   
   return 0;
 }
