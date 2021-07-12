@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.1)
 project(Fullerenes)
 
@@ -9,7 +10,8 @@ set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
 find_package(LAPACK)
 find_package(GSL)
-
+include(CheckLanguage)
+check_language(CUDA)
 # Get the current working branch
 execute_process(
   COMMAND git rev-parse --abbrev-ref HEAD
@@ -55,11 +57,10 @@ add_subdirectory(playground)
 add_subdirectory(programs)
 
 # TODO: Add OpenMP Isomerspace implementation, choose at runtime if both openmp and cuda present. OpenACC too?
-include(CheckLanguage)
-check_language(CUDA)
+
 
 if(DEFINED CMAKE_CUDA_COMPILER)
-  set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=128 --expt-relaxed-constexpr -O3 -gencode=arch=compute_61,code=compute_61 -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
+  set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=128 --expt-relaxed-constexpr -O3 -gencode=arch=compute_61,code=compute_61 -I /opt/nvidia/hpc_sdk/Linux_x86_64/21.2/cuda/11.0/targets/x86_64-linux/include/ -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
   )
   
   add_subdirectory(src/cuda)
