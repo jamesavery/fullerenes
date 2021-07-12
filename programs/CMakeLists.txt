@@ -17,7 +17,7 @@ add_executable(kegle kegle.cc)
 # add_executable(rspilist-to-python-and-mol2 rspilist-to-python-and-mol2.cc)
 # add_executable(geodesics geodesics.cc)
 
-if(DEFINED CMAKE_CUDA_COMPILER)
+if(CMAKE_CUDA_COMPILER)
   add_executable(isomerspace-optimize isomerspace-optimize.cc)
   target_link_libraries(isomerspace-optimize cuda_lib)
 endif()
