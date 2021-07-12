@@ -1,13 +1,20 @@
-
+#include "fullerenes/gpu/isomerspace_forcefield.hh"
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include <cuda.h>
 #include "device_launch_parameters.h"
 #include <stdio.h>
-#include <helper_cuda.h>
+#//include <helper_cuda.h>  // TODO: Get rid of this (not in nvcc std include dirs)
+#define getLastCudaError(x) 
 #include <iostream>
 #include <fstream>
 #include <chrono>
+
+namespace IsomerspaceForcefield {
+
+typedef device_real_t real_t;
+typedef device_node_t node_t;
+
 #include "C60ih.cu"
 #include "coord3d.cu"
 #include "helper_functions.cu"
@@ -15,9 +22,9 @@
 using namespace std::literals;
 namespace cg = cooperative_groups;
 
-typedef uint16_t node_t; 
 
-__device__ struct ArcData{
+
+struct ArcData{
     //124 FLOPs;
     __device__ ArcData(const node_t a, const uint8_t j, const coord3d* __restrict__ X, const BookkeepingData& bdat){   
         this->j = j;   
@@ -50,47 +57,47 @@ __device__ struct ArcData{
     }
 
     //3 FLOPs
-    __device__ real_t harmonic_energy(const real_t p0, const real_t p) const{
+    INLINE real_t harmonic_energy(const real_t p0, const real_t p) const{
         return (real_t)0.5*(p-p0)*(p-p0);
     }
     //4 FLOPs
-    __device__ coord3d  harmonic_energy_gradient(const real_t p0, const real_t p, const coord3d gradp) const{
+    INLINE coord3d  harmonic_energy_gradient(const real_t p0, const real_t p, const coord3d gradp) const{
         return (p-p0)*gradp;     
     }
 
     //1 FLOP
-    __device__ real_t bond() const {return (real_t)1.0/r_rab;}
+    INLINE real_t bond() const {return (real_t)1.0/r_rab;}
 
     //5 FLOPs
-    __device__ real_t angle() const {return dot(ab_hat,ac_hat);}
+    INLINE real_t angle() const {return dot(ab_hat,ac_hat);}
 
     //Returns the inner dihedral angle for the current arc. Used here only for energy calculation, 
     //otherwise embedded in dihedral computation because the planes and angles that make up the dihedral angle computation are required for derivative computation.
     //50 FLOPs
-    __device__ real_t dihedral() const 
+    INLINE real_t dihedral() const 
     { 
         coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
-        cos_b = dot(ba_hat,bc_hat); r_sin_b = rsqrt((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
+        cos_b = dot(ba_hat,bc_hat);  r_sin_b = rsqrt((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
         cos_c = dot(-bc_hat,cd_hat); r_sin_c = rsqrt((real_t)1.0 - cos_c*cos_c); nbcd = cross(-bc_hat,cd_hat) * r_sin_c;
         return dot(nabc, nbcd);
     }
     
     // Chain rule terms for angle calculation
     //Computes gradient related to bending term. ~24 FLOPs
-    __device__ coord3d inner_angle_gradient(const Constants& c) const
+    INLINE coord3d inner_angle_gradient(const Constants& c) const
     {   
         real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
         coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
         return get(c.f_inner_angle,j) * harmonic_energy_gradient(get(c.angle0,j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
     }
     //Computes gradient related to bending of outer angles. ~20 FLOPs
-    __device__ coord3d outer_angle_gradient_m(const Constants& c) const
+    INLINE coord3d outer_angle_gradient_m(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
         coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
         return get(c.f_outer_angle_m,j) * harmonic_energy_gradient(get(c.outer_angle_m0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
     }
-    __device__ coord3d outer_angle_gradient_p(const Constants& c) const
+    INLINE coord3d outer_angle_gradient_p(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
         coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
@@ -98,7 +105,7 @@ __device__ struct ArcData{
     }
     // Chain rule terms for dihedral calculation
     //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
-    __device__ coord3d inner_dihedral_gradient(const Constants& c) const
+    INLINE coord3d inner_dihedral_gradient(const Constants& c) const
     {
         coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
         cos_b = dot(ba_hat,bc_hat); r_sin_b = rsqrtf((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
@@ -114,7 +121,7 @@ __device__ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
-    __device__ coord3d outer_a_dihedral_gradient(const Constants& c) const
+    INLINE coord3d outer_a_dihedral_gradient(const Constants& c) const
     {
         coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
 
@@ -134,10 +141,10 @@ __device__ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
-    __device__ coord3d outer_m_dihedral_gradient(const Constants& c) const
+    INLINE coord3d outer_m_dihedral_gradient(const Constants& c) const
     {
         coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
-        cos_m = dot(mb_hat,mp_hat); r_sin_m = rsqrtf((real_t)1.0 - cos_m*cos_m); nbmp_hat = cross(mb_hat,mp_hat) * r_sin_m;
+        cos_m = dot(mb_hat,mp_hat);  r_sin_m = rsqrtf((real_t)1.0 - cos_m*cos_m); nbmp_hat = cross(mb_hat,mp_hat) * r_sin_m;
         cos_p = dot(-mp_hat,pa_hat); r_sin_p = rsqrtf((real_t)1.0 - cos_p*cos_p); nmpa_hat = cross(-mp_hat,pa_hat) * r_sin_p;
         
         //Cosine to the outer dihedral angle constituted by the planes bmp and mpa
@@ -152,10 +159,10 @@ __device__ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
-    __device__ coord3d outer_p_dihedral_gradient(const Constants& c) const
+    INLINE coord3d outer_p_dihedral_gradient(const Constants& c) const
     {
         coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
-        cos_a = dot(ap_hat,am_hat); r_sin_a = rsqrtf((real_t)1.0 - cos_a*cos_a); npam_hat = cross(ap_hat,am_hat) * r_sin_a;
+        cos_a = dot(ap_hat,am_hat);  r_sin_a = rsqrtf((real_t)1.0 - cos_a*cos_a); npam_hat = cross(ap_hat,am_hat)  * r_sin_a;
         cos_p = dot(pb_hat,-ap_hat); r_sin_p = rsqrtf((real_t)1.0 - cos_p*cos_p); nbpa_hat = cross(pb_hat,-ap_hat) * r_sin_p;
 
         real_t cos_beta = dot(nbpa_hat, npam_hat); //Outer dihedral angle bpa, pam.
@@ -170,18 +177,18 @@ __device__ struct ArcData{
         return get(c.f_outer_dihedral,j) * harmonic_energy_gradient(get(c.outer_dih0,j), cos_beta, grad);
     }
     // Internal coordinate gradients
-    __device__ coord3d bond_length_gradient(const Constants& c) const { return - get(c.f_bond,j) * harmonic_energy_gradient(get(c.r0,j),bond(),ab_hat);}
+    INLINE coord3d bond_length_gradient(const Constants& c) const { return - get(c.f_bond,j) * harmonic_energy_gradient(get(c.r0,j),bond(),ab_hat);}
     //Sum of angular gradient components.
-    __device__ coord3d angle_gradient(const Constants& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
+    INLINE coord3d angle_gradient(const Constants& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
     //Sum of inner and outer dihedral gradient components.
-    __device__ coord3d dihedral_gradient(const Constants& c) const { return inner_dihedral_gradient(c) + outer_a_dihedral_gradient(c) + outer_m_dihedral_gradient(c) + outer_p_dihedral_gradient(c);}
+    INLINE coord3d dihedral_gradient(const Constants& c) const { return inner_dihedral_gradient(c) + outer_a_dihedral_gradient(c) + outer_m_dihedral_gradient(c) + outer_p_dihedral_gradient(c);}
     //coord3d flatness()             const { return ;  }   
     
     //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
     //71 FLOPs
-    __device__ real_t energy(const Constants& c) const {return (real_t)0.5 *get(c.f_bond,j) *harmonic_energy(bond(),get(c.r0,j))+ get(c.f_inner_angle,j)* harmonic_energy(angle(),get(c.angle0,j)) + get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),get(c.inner_dih0,j));}
+    INLINE real_t energy(const Constants& c) const {return (real_t)0.5 *get(c.f_bond,j) *harmonic_energy(bond(),get(c.r0,j))+ get(c.f_inner_angle,j)* harmonic_energy(angle(),get(c.angle0,j)) + get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),get(c.inner_dih0,j));}
     //Sum of bond, angular and dihedral gradient components.
-    __device__ coord3d gradient(const Constants& c) const{return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);}
+    INLINE coord3d gradient(const Constants& c) const{return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);}
     
     uint8_t j;
 
@@ -224,7 +231,7 @@ __device__ coord3d gradient(const coord3d* __restrict__ X, const node_t node_id,
     coord3d grad = {0.0, 0.0, 0.0};
 
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData::ArcData(node_id, j, X, dat);
+        ArcData arc = ArcData(node_id, j, X, dat);
         grad += arc.gradient(constants);
     }
     return grad;
@@ -235,7 +242,7 @@ __device__ real_t energy(const coord3d* __restrict__ X, const node_t node_id, co
 
     //(71 + 124) * 3 * N  = 585*N FLOPs
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData::ArcData(node_id, j, X, dat);
+        ArcData arc = ArcData(node_id, j, X, dat);
         arc_energy += arc.energy(constants);
     }
     cg::sync(cg::this_thread_block());
@@ -250,7 +257,7 @@ __device__ void golden_section_search(coord3d* __restrict__ X, coord3d& directio
     //Actual coordinates resulting from each traversal 
     //Line search x - values;
     real_t a = 0.0; real_t b = 1.0;
-    real_t x1,  x2, dfc;
+    real_t x1,  x2;/* , dfc; */	/* TODO: dfc is not used: should it be? */
 
 
     x1 = (a + (1 - tau) * (b - a));
@@ -348,7 +355,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
 
     
     //Pre-compute force constants and store in registers.
-    BookkeepingData bookit = BookkeepingData::BookkeepingData(&d_neighbours[3*offset],&d_face_right[3*offset],&d_next_on_face[3*offset],&d_prev_on_face[3*offset]);
+    BookkeepingData bookit = BookkeepingData(&d_neighbours[3*offset],&d_face_right[3*offset],&d_next_on_face[3*offset],&d_prev_on_face[3*offset]);
     Constants constants = compute_constants(bookit, node_id);
 
     //Load constant bookkeeping data into registers.
@@ -356,7 +363,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     const uint8_t face_right[3] = {d_face_right[3*(offset+node_id)],d_face_right[3*(offset+node_id) + 1],d_face_right[3*(offset+node_id) + 2]};;
     const node_t next_on_face[3] = {d_next_on_face[3*(offset+node_id)],d_next_on_face[3*(offset+node_id) + 1],d_next_on_face[3*(offset+node_id) + 2]};
     const node_t prev_on_face[3] = {d_prev_on_face[3*(offset+node_id)],d_prev_on_face[3*(offset+node_id) + 1],d_prev_on_face[3*(offset+node_id) + 2]};
-    BookkeepingData bookkeeping = BookkeepingData::BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
+    BookkeepingData bookkeeping = BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
 
     cg::sync(grid);
     direction = gradient(X, node_id ,bookkeeping, constants);
@@ -430,16 +437,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         }
         
     }
-    
-    cg::sync(grid);
-    real_t test = energy(X_temp, node_id, bookkeeping, constants, smem, gdata, N, single_block_fullerenes);
-    cg::sync(grid);
-    
-    if ((node_id == 0))
-    {
-        //printf("Energy at end %e \n", test);
-        /* code */
-    }
+    d_X[offset + threadIdx.x] = X[threadIdx.x];
 }
 
 size_t computeBatchSize(size_t N){
@@ -458,11 +456,11 @@ size_t computeBatchSize(size_t N){
     return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
 }
 
-void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
+void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
     bool concurrent_kernels = false;
     bool single_block_fullerenes = true;
-    dim3 dimBlock = dim3::dim3(N, 1, 1);
-    dim3 dimGrid = dim3::dim3(batch_size, 1, 1);
+    dim3 dimBlock = dim3(N, 1, 1);
+    dim3 dimGrid  = dim3(batch_size, 1, 1);
 
     /*
     cudaDeviceProp GPU_properties;
@@ -504,9 +502,10 @@ void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, no
     coord3d* d_X;
     coord3d* d_X_temp;
     coord3d* d_X2;
-    coord3d* d_delta_x0;
-    coord3d* d_delta_x1;
-    coord3d* d_direction;
+    /* TODO: These are not used: they be? */
+    /* coord3d* d_delta_x0; */
+    /* coord3d* d_delta_x1; */
+    /* coord3d* d_direction; */
 
     node_t* d_neighbours;
     uint8_t* d_face_right;
@@ -514,26 +513,26 @@ void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, no
     node_t* d_prev_on_face;
     real_t* d_gdata;
 
-    cudaError_t error;
-    error = cudaMalloc(&d_X, sizeof(coord3d)*N*batch_size);
-    error = cudaMalloc(&d_X_temp, sizeof(coord3d)*N*batch_size);
-    error = cudaMalloc(&d_X2, sizeof(coord3d)*N*batch_size);
+    /* cudaError_t error; */ /* error was never read */
+    cudaMalloc(&d_X, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&d_X_temp, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&d_X2, sizeof(coord3d)*N*batch_size);
     
-    error = cudaMalloc(&d_neighbours, sizeof(node_t)*3*N*batch_size);
-    error = cudaMalloc(&d_next_on_face, sizeof(node_t)*3*N*batch_size);
-    error = cudaMalloc(&d_prev_on_face, sizeof(node_t)*3*N*batch_size);
-    error = cudaMalloc(&d_face_right, sizeof(uint8_t)*3*N*batch_size);
-    error = cudaMalloc(&d_gdata, sizeof(real_t)*dimGrid.x);
-    error = cudaMalloc(&d_N, sizeof(size_t)); cudaMemcpy(d_N, &N, sizeof(size_t), cudaMemcpyHostToDevice);
-    error = cudaMalloc(&d_single_block_fullerenes, sizeof(bool)); cudaMemcpy(d_single_block_fullerenes, &single_block_fullerenes, sizeof(bool), cudaMemcpyHostToDevice);
+    cudaMalloc(&d_neighbours, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&d_next_on_face, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&d_prev_on_face, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&d_face_right, sizeof(uint8_t)*3*N*batch_size);
+    cudaMalloc(&d_gdata, sizeof(real_t)*dimGrid.x);
+    cudaMalloc(&d_N, sizeof(size_t)); cudaMemcpy(d_N, &N, sizeof(size_t), cudaMemcpyHostToDevice);
+    cudaMalloc(&d_single_block_fullerenes, sizeof(bool)); cudaMemcpy(d_single_block_fullerenes, &single_block_fullerenes, sizeof(bool), cudaMemcpyHostToDevice);
 
     getLastCudaError("One or more Mallocs Failed! \n");
 
-    error = cudaMemcpy(d_X, h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
-    error = cudaMemcpy(d_neighbours, h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    error = cudaMemcpy(d_next_on_face, h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    error = cudaMemcpy(d_prev_on_face, h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    error = cudaMemcpy(d_face_right, h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_X, h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
+    cudaMemcpy(d_neighbours, h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_next_on_face, h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_prev_on_face, h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_face_right, h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
 
     getLastCudaError("Memcpy Failed! \n");
 
@@ -553,7 +552,9 @@ void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, no
         (void*)&N,
         (void*)&single_block_fullerenes
         };
-        checkCudaErrors(cudaLaunchCooperativeKernel((void*)conjugate_gradient, dimGrid, dimBlock, kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, NULL));
+        //checkCudaErrors(
+	cudaLaunchCooperativeKernel((void*)conjugate_gradient, dimGrid, dimBlock, kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, NULL);
+	//);
     } 
     
     
@@ -591,12 +592,14 @@ void callKernelSingleBlockFullerenes(real_t* h_X, node_t* h_cubic_neighbours, no
 
     cudaDeviceSynchronize();
     auto end = std::chrono::system_clock::now();
-
-
+    getLastCudaError("Failed to launch kernel: ");
+    
+    cudaMemcpy(h_X, d_X, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
+    getLastCudaError("Failed to copy back: ");
     
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
-    getLastCudaError("Failed to launch kernel: ");
+
 
 }
 
-
+};

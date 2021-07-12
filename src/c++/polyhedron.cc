@@ -231,41 +231,53 @@ struct sort_ccw_coord3d {
   bool operator()(const node_t& s, const node_t& t) const {
     coord3d xs(points[s]/*-x0*/), xt(points[t]/*-x0*/);
     coord2d Xs(X.dot(xs), Y.dot(xs)), Xt(X.dot(xt), Y.dot(xt));
-
+    
     double angs = atan2(Xs.first,Xs.second), angt = atan2(Xt.first,Xt.second);
     return angs <= angt;
   } 
 };
 
 
+
 void Polyhedron::orient_neighbours()
 {
   
-  if(layout2d.size() == N) {
-    PlanarGraph::orient_neighbours();
-  } else if(points.size() == N){
+  if(layout2d.size() != N)
+    layout2d = tutte_layout();
+  PlanarGraph::orient_neighbours();
 
-    // Orient neighbours locally (CW or CCW depending on luck)
-    for(node_t u=0;u<N;u++){
-      vector<node_t> &ns(neighbours[u]);
-      vector<coord3d> neighbour_points(ns.size());
-      const coord3d &x0 = points[u];
+  // TODO: Sort this out
+  //  else if(points.size() == N){
+  // Orient neighbours locally (CW or CCW depending on luck)
+  // for(node_t u=0;u<N;u++){
+  //   vector<node_t> &ns(neighbours[u]);
+  //   size_t degree = ns.size();
+      
+  //   int ns_index[degree];
+  //   for(int i=0;i<degree;i++) ns_index[i] = i;
+				     
+  //   vector<coord3d> neighbour_points(degree);
+  //   const coord3d &x0 = points[u];
 
-      for(int i=0;i<ns.size();i++) points[i] = neighbour_points[ns[i]] - x0;
-      sort_ccw_coord3d CCW(points);
+  //   for(int i=0;i<degree;i++) neighbour_points[i] = points[ns[i]] - x0;
+  //   sort_ccw_coord3d CCW(neighbour_points);
 
-      sort(ns.begin(),ns.end(),CCW);
-    }
+  //   sort(ns_index,ns_index+degree,CCW);
+  //   vector<node_t> ns_sorted(degree);
+  //   for(int i=0;i<degree;i++) ns_sorted[i] = ns[ns_index[i]];
+  //   ns = ns_sorted;
+  // }
 
-    // Choose that first node is correct, then flip to consistency
-    // TODO: How? For now, cheat slowly.
-    if(is_consistently_oriented())
-      is_oriented = true;
-    else {
-      layout2d = tutte_layout();
-      PlanarGraph::orient_neighbours();
-    }
-  } 
+
+  // // Choose that first node is correct, then flip to consistency
+  // // TODO: How? For now, cheat slowly.
+  // if(is_consistently_oriented())
+  //   is_oriented = true;
+  // else {
+  //   layout2d = tutte_layout();
+  //   PlanarGraph::orient_neighbours();
+  // }
+  //}
   
   // Calculate volume
   double V=0;
@@ -289,6 +301,8 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
   PlanarGraph(G), face_max(face_max_), points(points_), faces(faces_)
 {
   if(!is_oriented) orient_neighbours();
+
+  //  for(node_t u=0;u<N;u++) points[u] = points_[u];
   
   if(faces.size() == 0){
     faces = compute_faces(face_max);
@@ -517,6 +531,8 @@ bool Polyhedron::is_triangulation() const {
   for(int i=0;i<faces.size();i++) if(faces[i].size()!=3) return false;
   return true;
 }
+
+// TODO: Add function for checking if forcefield convergence is achieved
 
 bool Polyhedron::is_invalid() const {
   bool has_nans = false;

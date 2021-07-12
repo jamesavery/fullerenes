@@ -6,6 +6,7 @@
 #include <assert.h>
 namespace cg = cooperative_groups;
 
+
 template <typename T>
 void copy_and_append(T* memory, const T* fullerene, size_t N){
     for (size_t i = 0; i < N; i++)
@@ -32,7 +33,7 @@ T* synthetic_array(size_t N, const size_t num_molecules, const T* fullerene){
 
 __device__ void align16(coord3d* input, coord3d_a* output, size_t N){
     cg::sync(cg::this_grid());
-    size_t tid = threadIdx.x;
+    /* size_t tid = threadIdx.x; */ /* TODO: tid is not used - should it be? */
     for (size_t i = 0; i < N; i++)
     {
         output[i] = {input[i].x, input[i].y, input[i].z, 0};
@@ -57,7 +58,7 @@ __constant__ real_t dih_forces[4] = {35.0, 65.0, 85.0, 270.0};
 
 
 
-__device__ __host__ struct BookkeepingData{
+struct BookkeepingData{
     const node_t* neighbours;
     const uint8_t* face_right;
     const node_t* next_on_face;
@@ -66,7 +67,7 @@ __device__ __host__ struct BookkeepingData{
         neighbours(neighbours), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 };
 
-__device__ struct Constants{
+struct Constants{
     const coord3d f_bond;
     const coord3d f_inner_angle;
     const coord3d f_inner_dihedral;
@@ -117,7 +118,7 @@ __device__ Constants compute_constants(BookkeepingData &dat, node_t node_id){
         set(f_outer_dihedral,j,dih_forces[ dihedral_face_sum]);
         
     }
-    return Constants::Constants(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0);
+    return Constants(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0);
 }
 
 //Reduction method for single block fullerenes.

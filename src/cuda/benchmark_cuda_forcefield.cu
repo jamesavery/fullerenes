@@ -1,4 +1,11 @@
-#include "kernel_shared.cu"
+#include <stdio.h>
+#include "fullerenes/gpu/isomerspace_forcefield.hh"
+using namespace IsomerspaceForcefield;
+
+typedef device_real_t real_t;
+typedef device_node_t node_t;
+
+#include "helper_functions.cu"
 #include "C60ih.cu"
 
 int main(){
@@ -24,7 +31,7 @@ int main(){
     **/
     size_t N = 60;
     size_t batch_size = computeBatchSize(N);
-    printf("Solving %d fullerenes of size: %d \n", batch_size, N);
+    printf("Solving %ld fullerenes of size: %ld \n", batch_size, N);
 
     /** Generates a synthetic load from a single set of fullerene pointers **/
     real_t* synth_X = reinterpret_cast<real_t*>(synthetic_array<real_t>(N, batch_size, &X[0]));
@@ -33,5 +40,5 @@ int main(){
     node_t* synth_prev_on_face = reinterpret_cast<node_t*>(synthetic_array<node_t>(N, batch_size, &prev_on_face[0]));
     uint8_t* synth_face_right = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_size, &face_right[0]));
 
-    callKernelSingleBlockFullerenes(synth_X,synth_cubic_neighbours,synth_next_on_face,synth_prev_on_face,synth_face_right,N,batch_size);
+    OptimizeBatch(synth_X,synth_cubic_neighbours,synth_next_on_face,synth_prev_on_face,synth_face_right,N,batch_size);
 }

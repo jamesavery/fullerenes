@@ -1129,7 +1129,7 @@ Triangulation Triangulation::sort_nodes() const
 
 spiral_nomenclature FullereneDual::name(bool rarest_start) const
 {
-  return spiral_nomenclature(*this, spiral_nomenclature::FULLERENE,
+  return spiral_nomenclature(dual_graph(), spiral_nomenclature::FULLERENE,
 			     spiral_nomenclature::CUBIC,
 			     rarest_start);  
 }

@@ -16,34 +16,36 @@ __device__ __forceinline__ void operator+=(float4& a, const float4 b) {a = a + b
 __device__ __forceinline__ void operator/=(float4& a, const float b) {a = a / b;}
 
 __device__ __forceinline__ void set(float4& a, const uint8_t j, float b){
-  switch (j)
-  {
-  case 0:
-    a.x = b;
-    break;
-  case 1:
-    a.y = b;
-    break;
-  case 2:
-    a.z = b;
-    break;
-  default:
-    break;
-  }
+  ((float*)&a)[j] = b;
+  /* switch (j) */
+  /* { */
+  /* case 0: */
+  /*   a.x = b; */
+  /*   break; */
+  /* case 1: */
+  /*   a.y = b; */
+  /*   break; */
+  /* case 2: */
+  /*   a.z = b; */
+  /*   break; */
+  /* default: */
+  /*   break; */
+  /* } */
 }
 
 __device__ __forceinline__ float get(const float4& a, const uint8_t j){
-  switch (j)
-  {
-  case 0:
-    return a.x;
-  case 1:
-    return a.y;
-  case 2:
-    return a.z;
-  default:
-    break;
-  }
+  return ((const float*)&a)[j];
+  /* switch (j) */
+  /* { */
+  /* case 0: */
+  /*   return a.x; */
+  /* case 1: */
+  /*   return a.y; */
+  /* case 2: */
+  /*   return a.z; */
+  /* default: */
+  /*   break; */
+  /* } */
 }
 //5 FLOPs
 __device__ __forceinline__  float  dot(const float4& a,  const float4& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }

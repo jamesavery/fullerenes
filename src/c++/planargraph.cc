@@ -299,19 +299,18 @@ PlanarGraph PlanarGraph::leapfrog_dual() const
 {
   assert(is_oriented);
   vector<face_t> faces = compute_faces_oriented();
+  size_t Nf = faces.size();  
 
-  PlanarGraph lf(Graph(N+faces.size(),true));
+  PlanarGraph lf(Graph(N+Nf,true));
 
   // Start with all the existing nodes
   for(node_t u=0;u<N;u++) lf.neighbours[u] = neighbours[u];
 
   // Now connect new face-center nodes in oriented order
-  for(int i=0;i<faces.size();i++){
+  for(int i=0;i<Nf;i++){
     const face_t &f  = faces[i];
     node_t c = N+i;                // Face-center node
 
-    // cerr << "new node " << c << " at face " << f << "\n";
-    
     for(int j=0;j<f.size();j++){
       node_t u = f[j], v = f[(j+1)%f.size()];
 
