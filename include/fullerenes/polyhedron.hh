@@ -90,7 +90,8 @@ struct Polyhedron : public PlanarGraph {
 
   Polyhedron dual() const;
   Polyhedron leapfrog_dual() const;
-    
+
+  // TODO: Add check if force-field is converged
   bool is_triangulation() const;
   bool is_invalid() const;
   
