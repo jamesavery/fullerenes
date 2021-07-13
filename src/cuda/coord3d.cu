@@ -1,8 +1,13 @@
 #pragma once
+
 typedef float3 coord3d;
+typedef float real_t;
+typedef uint16_t node_t;
+typedef float4 coord3d_a;
 
-#define INLINE __device__ __forceinline__
+#define INLINE __device__ __host__ __forceinline__
 
+INLINE float3 coord3d_a_to_coord3d(const float4& b) { make_float3(b.x, b.y, b.z);}
 INLINE float3 operator-(const float3& a)                 { return make_float3(-a.x, -a.y, -a.z);  }
 INLINE float3 operator-(const float3& a, const float3& b){ return make_float3(a.x-b.x, a.y-b.y, a.z-b.z);  }
 INLINE float3 operator+(const float3& a, const float3& b){ return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);  }
@@ -11,7 +16,7 @@ INLINE float3 operator*(const float s, const float3& a)  { return a*s; }
 INLINE float3 operator*(const float3& a, const float3& b) { return make_float3(a.x*b.x, a.y*b.y, a.z*b.z);}
 INLINE float3 operator/(const float s, const float3& a)  { return a*(1/s); }
 INLINE float3 operator/(const float3& a, const float s)  { return a*(1/s); }
-INLINE void operator+=(float3& a, const float3 b) {a = a + b;}
+INLINE void operator+=(float3& a, const float3& b) {a = a + b;}
 INLINE void operator/=(float3& a, const float b) {a = a / b;}
 
 INLINE void set(float3& a, const uint8_t j, float b){

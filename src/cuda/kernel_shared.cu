@@ -137,7 +137,7 @@ struct ArcData{
                         cos_beta*(ab_hat*r_rab + r_ram * ((real_t)2.0*am_hat + cot_m*(mp_hat+cos_m*am_hat)) - cot_a*(r_ram*(ab_hat - am_hat*cos_a) + r_rab*(am_hat-ab_hat*cos_a)));
         
         //Eq. 31 multiplied by harmonic term.
-        return get(c.f_outer_dihedral,j) * harmonic_energy_gradient(get(c.outer_dih0,j), cos_beta, grad);
+        return get(c.f_outer_dihedral,j) * harmonic_energy_gradient(get(c.outer_dih0_a,j), cos_beta, grad);
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
@@ -155,7 +155,7 @@ struct ArcData{
         coord3d grad = r_rap * (cot_p*cos_beta * (-mp_hat - pa_hat*cos_p) - cross(nbmp_hat, mp_hat)*r_sin_p - pa_hat*cos_beta );
 
         //Eq. 32 multiplied by harmonic term.
-        return get(c.f_outer_dihedral,j) * harmonic_energy_gradient(get(c.outer_dih0,j), cos_beta, grad);
+        return get(c.f_outer_dihedral,j) * harmonic_energy_gradient(get(c.outer_dih0_m,j), cos_beta, grad);
     }
 
     //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
@@ -174,7 +174,7 @@ struct ArcData{
                         cos_beta*(am_hat*r_ram + r_rap * ((real_t)2.0*ap_hat + cot_p*(pb_hat+cos_p*ap_hat)) - cot_a*(r_rap*(am_hat - ap_hat*cos_a) + r_ram*(ap_hat-am_hat*cos_a)));
         
         //Eq. 33 multiplied by harmonic term.
-        return get(c.f_outer_dihedral,j) * harmonic_energy_gradient(get(c.outer_dih0,j), cos_beta, grad);
+        return get(c.f_outer_dihedral,j) * harmonic_energy_gradient(get(c.outer_dih0_p,j), cos_beta, grad);
     }
     // Internal coordinate gradients
     INLINE coord3d bond_length_gradient(const Constants& c) const { return - get(c.f_bond,j) * harmonic_energy_gradient(get(c.r0,j),bond(),ab_hat);}
@@ -307,7 +307,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     
 
     cg::grid_group grid = cg::this_grid();
-    
+    cg::thread_block block = cg::this_thread_block();
 
     coord3d* sX;
     coord3d* sX_temp;
@@ -318,7 +318,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     size_t offset;
 
     size_t iter_count = 0;
-    size_t max_iter = N*2.6;
+    size_t max_iter = N*3;
     size_t gradient_evals = 0;
     size_t energy_evals = 0;
     
@@ -381,61 +381,46 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     for (size_t i = 0; i < max_iter; i++)
     {   
         beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
-        cg::sync(grid);
-        if (single_block_fullerenes){golden_section_search(X, direction, delta_x1, X_temp, X2, smem, gdata, node_id, N, bookkeeping, constants, cg::this_thread_block(), single_block_fullerenes);} 
-        else { golden_section_search(X, direction, delta_x1, X_temp, X2, smem, gdata, node_id, N, bookkeeping, constants, cg::this_grid(), single_block_fullerenes);}
+        cg::sync(block);
+        if (single_block_fullerenes){golden_section_search(X, direction, delta_x1, X_temp, X2, smem, gdata, node_id, N, bookkeeping, constants, block, single_block_fullerenes);} 
+        else { golden_section_search(X, direction, delta_x1, X_temp, X2, smem, gdata, node_id, N, bookkeeping, constants, grid, single_block_fullerenes);}
         
         
-        cg::sync(grid);
+        cg::sync(block);
 
         gradient_evals++;
-        energy_evals += 42;
+        energy_evals += 22;
         //Polak Ribiere method
         
         smem[threadIdx.x] = dot(delta_x0, delta_x0); reduction(smem,gdata,N,single_block_fullerenes); r0_norm = smem[0];
-        cg::sync(grid);
+        cg::sync(block);
         smem[threadIdx.x] = dot(delta_x1, (delta_x1 - delta_x0)); reduction(smem,gdata,N,single_block_fullerenes); beta = smem[0] / r0_norm;
-        cg::sync(grid);
+        cg::sync(block);
         real_t E1 = energy(X_temp, node_id, bookkeeping, constants, smem, gdata, N, single_block_fullerenes);
-        cg::sync(grid);
+        cg::sync(block);
         real_t E2 = energy(X, node_id, bookkeeping, constants, smem, gdata, N, single_block_fullerenes);
-        cg::sync(grid);
+        cg::sync(block);
         if (E1> E2)
         {   
-            cg::sync(grid);
             X_temp[node_id] =  X[node_id];
             delta_x1 =  delta_x0;
             beta = 0.0;
         }
         else
         {   
-            cg::sync(grid);
             X[node_id] = X_temp[node_id];
             delta_x0 = delta_x1;
         }
         direction = delta_x1 + beta*direction;
         //Calculate gradient and residual gradient norms..
-        cg::sync(grid);
-        smem[threadIdx.x] = dot(direction,direction); 
-        cg::sync(grid);
-        reduction(smem,gdata,N,single_block_fullerenes); 
-        cg::sync(grid);
-        direction_norm = sqrtf(smem[0]);
-        cg::sync(grid);
-        smem[threadIdx.x] = dot(delta_x1,delta_x1); 
-        cg::sync(grid);
-        reduction(smem,gdata,N,single_block_fullerenes);
-        cg::sync(grid);
-        dnorm = sqrtf(smem[0]);
-        cg::sync(grid);
+        cg::sync(block);
+        smem[threadIdx.x] = dot(direction,direction); reduction(smem,gdata,N,single_block_fullerenes); direction_norm = sqrtf(smem[0]);
+        cg::sync(block);
+        smem[threadIdx.x] = dot(delta_x1,delta_x1); reduction(smem,gdata,N,single_block_fullerenes);dnorm = sqrtf(smem[0]);
+        cg::sync(block);
         //Normalize gradient.
         direction /= direction_norm;
         iter_count++;
-        if ( (threadIdx.x + blockDim.x*blockIdx.x) == 0 )
-        {
-            //printf("%e \n", dnorm);
-        }
-        
     }
     d_X[offset + threadIdx.x] = X[threadIdx.x];
 }
@@ -461,39 +446,6 @@ void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_fa
     bool single_block_fullerenes = true;
     dim3 dimBlock = dim3(N, 1, 1);
     dim3 dimGrid  = dim3(batch_size, 1, 1);
-
-    /*
-    cudaDeviceProp GPU_properties;
-    cudaGetDeviceProperties(&GPU_properties,0);
-    bool use_L1_cache = (GPU_properties.sharedMemPerBlock > (sharedMemoryPerBlock ) && (maxActiveBlocks > 0) );
-    std::cout << use_L1_cache << "\n";
-    bool single_block_fullerenes = maxActiveBlocks > 0;
-    size_t batch_size = maxActiveBlocks*GPU_properties.multiProcessorCount;
-    dim3 dimBlock, dimGrid;
-    
-    
-    if (!concurrent_kernels)
-    {
-        
-        
-    } else
-    {
-        size_t blocksize = optimize_block_size(N,GPU_properties,conjugate_gradient);
-        dimBlock = dim3::dim3(blocksize, 1, 1);
-        dimGrid = dim3::dim3(ceil(N/blocksize), 1, 1);
-        batch_size = floor((GPU_properties.maxThreadsPerBlock*GPU_properties.multiProcessorCount)/(dimBlock.x*dimGrid.x) );
-
-        GPU_properties.asyncEngineCount;
-        
-    }
-
-    if (!use_L1_cache) {sharedMemoryPerBlock = sizeof(real_t)*dimBlock.x*2;}
-    std::cout << dimBlock.x << "\n";
-    std::cout << dimGrid.x << "\n";
-
-
-    */
-
 
     size_t* d_N;
     bool* d_single_block_fullerenes;
@@ -598,8 +550,10 @@ void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_fa
     getLastCudaError("Failed to copy back: ");
     
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
+    std::cout << "Estimated Performance " << ((real_t)(411*N*batch_size*3*N*22  + 2106*N*batch_size*3*N)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "FLOP/s \n";
 
-
+    cudaFree(d_X); cudaFree(d_X2); cudaFree(d_neighbours); cudaFree(d_next_on_face); cudaFree(d_prev_on_face);
+    cudaFree(d_X_temp); cudaFree(d_face_right); cudaFree(d_gdata); 
 }
 
 };
