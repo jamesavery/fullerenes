@@ -12,6 +12,7 @@ find_package(LAPACK)
 find_package(GSL)
 include(CheckLanguage)
 check_language(CUDA)
+
 # Get the current working branch
 execute_process(
   COMMAND git rev-parse --abbrev-ref HEAD
