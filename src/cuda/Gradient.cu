@@ -11,6 +11,7 @@ using namespace std::literals;
 namespace IsomerspaceForcefield {
 
 #include "coord3d.cu"
+#include "helper_functions.cu"
 typedef uint16_t node_t;
 
 
@@ -19,9 +20,7 @@ typedef uint16_t node_t;
 // NB: Increase to int32 to do more than 65k atoms
 
 //Convert neighbouring face information into a unique linear index.
-inline uint8_t face_index(const uint8_t f1, const uint8_t f2, const uint8_t f3){
-    return f1*4 + f2*2 + f3;
-}
+
 
 
 inline void print_real(real_t a)
@@ -402,7 +401,7 @@ public:
     }
 
 
-    void conjugate_gradient(){
+    void conjugate_gradient(size_t MaxIter){
         size_t iter_count = 0;
         size_t max_iter = N*3;
         real_t beta = 0.0;
@@ -436,7 +435,7 @@ public:
         parallel_copy(delta_x0, direction);
 
         
-        for (node_t i = 0; i < max_iter; i++)
+        for (node_t i = 0; i < MaxIter; i++)
         {   
             beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
             energy_evals += golden_section_search(X_temp,direction, delta_x1, X1, X2, 0, 1, 1e-10);
@@ -492,14 +491,15 @@ size_t computeBatchSize(size_t N){
     return (size_t)1;
 }
 
-void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){  
+void OptimizeBatch(DevicePointers& p, real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size, const size_t MaxIter){  
     //Test gradient computation
     FullereneForcefield forcefield = FullereneForcefield(h_cubic_neighbours, reinterpret_cast<coord3d*>(h_X), h_face_right, h_next_on_face, h_prev_on_face, N);
 
     auto start = chrono::system_clock::now();
-    forcefield.conjugate_gradient();
+    forcefield.conjugate_gradient(MaxIter);
     auto end = chrono::system_clock::now();
     cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
+    cout << "Estimated Performance " << ((real_t)(411*N*batch_size*MaxIter*22  + 2106*N*batch_size*MaxIter)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "FLOP/s \n";
 }
 
 };

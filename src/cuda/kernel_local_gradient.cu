@@ -294,7 +294,7 @@ __device__ real_t energy(const coord3d* X, const node_t node_id, const Bookkeepi
 
     cg::sync(cg::this_thread_block());
     reduction_array[threadIdx.x] = node_energy;
-    reduction(reduction_array, N);
+    reduction(reduction_array);
     return reduction_array[0];
 }
 
@@ -344,11 +344,13 @@ __device__ void golden_section_search(coord3d* X, coord3d& direction, coord3d& n
     new_direction = -gradient(X1,node_id,dat);
 }
 
-__global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X1, coord3d* d_X2, node_t* d_neighbours, node_t* d_next_on_face, node_t* d_prev_on_face, uint8_t* d_face_right, size_t N){
+__global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X1, coord3d* d_X2, node_t* d_neighbours, node_t* d_next_on_face, node_t* d_prev_on_face, uint8_t* d_face_right, size_t N, size_t MaxIter){
     extern __shared__ real_t reduction_array[];
+    coord3d delta_x0;
+    coord3d delta_x1;
+    coord3d direction;
 
     size_t iter_count = 0;
-    size_t max_iter = N*3;
     real_t beta = 0.0;
     real_t dnorm = 0;
     real_t r0_norm;
@@ -366,9 +368,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     coord3d* X_temp = &d_X_temp[offset];
     coord3d* X1 = &d_X1[offset];
     coord3d* X2 = &d_X2[offset];
-    coord3d delta_x0;
-    coord3d delta_x1;
-    coord3d direction;
+    
     
     const node_t* neighbours = &d_neighbours[3*offset];
     const uint8_t* face_right = &d_face_right[3*offset];
@@ -382,14 +382,14 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     
     
     reduction_array[threadIdx.x] = dot(direction,direction);
-    reduction(reduction_array, N);
+    reduction(reduction_array);
     dnorm = sqrtf(reduction_array[0]);
     direction = -direction/dnorm;
     
     X_temp[node_id] = X[node_id];
     delta_x0 = direction;
 
-    for (node_t i = 0; i < max_iter; i++)
+    for (node_t i = 0; i < MaxIter; i++)
     {   
         beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
         cg::sync(block);
@@ -398,9 +398,9 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         gradient_evals++;
         energy_evals += 22;
         //Polak Ribiere method
-        reduction_array[threadIdx.x] = dot(delta_x0, delta_x0); reduction(reduction_array, N); r0_norm = reduction_array[0];
+        reduction_array[threadIdx.x] = dot(delta_x0, delta_x0); reduction(reduction_array); r0_norm = reduction_array[0];
         cg::sync(block);
-        reduction_array[threadIdx.x] = dot(delta_x1, (delta_x1 - delta_x0)); reduction(reduction_array, N); beta = reduction_array[0] / r0_norm;
+        reduction_array[threadIdx.x] = dot(delta_x1, (delta_x1 - delta_x0)); reduction(reduction_array); beta = reduction_array[0] / r0_norm;
         cg::sync(block);
         if (energy(X_temp, node_id, local_bookkeeping, reduction_array, N) > energy(X, node_id, local_bookkeeping, reduction_array, N))
         {   
@@ -418,9 +418,9 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
 
         //Calculate gradient and residual gradient norms..
         cg::sync(block);
-        reduction_array[threadIdx.x] = dot(direction,direction); reduction(reduction_array, N); direction_norm = sqrtf(reduction_array[0]);
+        reduction_array[threadIdx.x] = dot(direction,direction); reduction(reduction_array); direction_norm = sqrtf(reduction_array[0]);
         cg::sync(block);
-        reduction_array[threadIdx.x] = dot(delta_x1,delta_x1); reduction(reduction_array, N); dnorm = sqrtf(reduction_array[0]);
+        reduction_array[threadIdx.x] = dot(delta_x1,delta_x1); reduction(reduction_array); dnorm = sqrtf(reduction_array[0]);
         cg::sync(block);
         //Normalize gradient.
         direction /= direction_norm;
@@ -445,7 +445,7 @@ size_t computeBatchSize(size_t N){
     return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
 }
 
-void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
+void OptimizeBatch(DevicePointers& p, real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size, const size_t MaxIter){
     bool concurrent_kernels = false;
     bool single_block_fullerenes = true;
     dim3 dimBlock = dim3(N, 1, 1);
@@ -502,6 +502,7 @@ void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_fa
         (void*)&d_prev_on_face,
         (void*)&d_face_right,
         (void*)&N,
+        (void*)&MaxIter
         };
         cudaLaunchCooperativeKernel((void*)conjugate_gradient, dimGrid, dimBlock, kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, NULL);
     } 
@@ -513,7 +514,7 @@ void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_fa
 
     
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
-    std::cout << "Estimated Performance " << ((real_t)(411*N*batch_size*3*N*22  + 2106*N*batch_size*3*N)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "FLOP/s \n";
+    std::cout << "Estimated Performance " << ((real_t)(411*N*batch_size*MaxIter*22  + 2106*N*batch_size*MaxIter)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "FLOP/s \n";
 
 
 

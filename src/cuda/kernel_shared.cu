@@ -300,25 +300,19 @@ __device__ void golden_section_search(coord3d* __restrict__ X, coord3d& directio
     X1[node_id] = X[node_id] + alfa*direction;
     cg::sync(sync_group);
     new_direction = -gradient(X1,node_id,dat, constants);
+    
 }
 
-__global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X2, const node_t* d_neighbours, const node_t* d_next_on_face, const node_t* d_prev_on_face, const uint8_t* d_face_right, real_t* gdata, const size_t N, const bool single_block_fullerenes){
+__global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X2, const node_t* d_neighbours, const node_t* d_next_on_face, const node_t* d_prev_on_face, const uint8_t* d_face_right, real_t* gdata, const size_t N, const bool single_block_fullerenes, const size_t MaxIter){
     extern __shared__ real_t smem[];
     
 
     cg::grid_group grid = cg::this_grid();
     cg::thread_block block = cg::this_thread_block();
 
-    coord3d* sX;
-    coord3d* sX_temp;
-    coord3d* sX2;
-
     coord3d delta_x0, delta_x1, direction;
     node_t node_id;
     size_t offset;
-
-    size_t iter_count = 0;
-    size_t max_iter = N*3;
     size_t gradient_evals = 0;
     size_t energy_evals = 0;
     
@@ -342,9 +336,9 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     
     if (single_block_fullerenes)
     {
-        sX =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 1];
-        sX_temp =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 2 + N];
-        sX2 =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3)+ 3 +2*N];  
+        coord3d* sX =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 1];
+        coord3d* sX_temp =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 2 + N];
+        coord3d* sX2 =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3)+ 3 +2*N];  
         sX[node_id] = X[node_id];
         sX_temp[node_id] = sX[node_id];
 
@@ -378,7 +372,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
 
     delta_x0 = direction;
     
-    for (size_t i = 0; i < max_iter; i++)
+    for (size_t i = 0; i < MaxIter; i++)
     {   
         beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
         cg::sync(block);
@@ -420,11 +414,19 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         cg::sync(block);
         //Normalize gradient.
         direction /= direction_norm;
-        iter_count++;
     }
     d_X[offset + threadIdx.x] = X[threadIdx.x];
+
+    //Check convergence using bond lengths:
+    real_t AvgBondLength = AverageBondLength(smem,X,neighbours,node_id,N);
+    if (threadIdx.x == 0)
+    {
+        //printf("Avg Bond Length: %e \n", AvgBondLength);
+    }
+    
 }
 
+    
 size_t computeBatchSize(size_t N){
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
@@ -441,119 +443,64 @@ size_t computeBatchSize(size_t N){
     return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
 }
 
-void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
-    bool concurrent_kernels = false;
+void AllocateDevicePointers(DevicePointers& p, size_t N, size_t batch_size){
+    cudaMalloc(&p.d_X, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&p.d_X_temp, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&p.d_X2, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&p.d_neighbours, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&p.d_next_on_face, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&p.d_prev_on_face, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&p.d_face_right, sizeof(uint8_t)*3*N*batch_size);
+    cudaMalloc(&p.d_gdata, sizeof(real_t)*batch_size);
+}
+
+void FreePointers(DevicePointers& p){
+    cudaFree(p.d_X);
+    cudaFree(p.d_X_temp);
+    cudaFree(p.d_X2);
+    cudaFree(p.d_neighbours);
+    cudaFree(p.d_next_on_face);
+    cudaFree(p.d_prev_on_face);
+    cudaFree(p.d_face_right);
+    cudaFree(p.d_gdata);
+    cudaDeviceReset();
+}
+
+void OptimizeBatch(DevicePointers& p, real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size, const size_t MaxIter){
     bool single_block_fullerenes = true;
-    dim3 dimBlock = dim3(N, 1, 1);
-    dim3 dimGrid  = dim3(batch_size, 1, 1);
-
-    size_t* d_N;
-    bool* d_single_block_fullerenes;
-
-
-    coord3d* d_X;
-    coord3d* d_X_temp;
-    coord3d* d_X2;
-    /* TODO: These are not used: they be? */
-    /* coord3d* d_delta_x0; */
-    /* coord3d* d_delta_x1; */
-    /* coord3d* d_direction; */
-
-    node_t* d_neighbours;
-    uint8_t* d_face_right;
-    node_t* d_next_on_face;
-    node_t* d_prev_on_face;
-    real_t* d_gdata;
-
-    /* cudaError_t error; */ /* error was never read */
-    cudaMalloc(&d_X, sizeof(coord3d)*N*batch_size);
-    cudaMalloc(&d_X_temp, sizeof(coord3d)*N*batch_size);
-    cudaMalloc(&d_X2, sizeof(coord3d)*N*batch_size);
-    
-    cudaMalloc(&d_neighbours, sizeof(node_t)*3*N*batch_size);
-    cudaMalloc(&d_next_on_face, sizeof(node_t)*3*N*batch_size);
-    cudaMalloc(&d_prev_on_face, sizeof(node_t)*3*N*batch_size);
-    cudaMalloc(&d_face_right, sizeof(uint8_t)*3*N*batch_size);
-    cudaMalloc(&d_gdata, sizeof(real_t)*dimGrid.x);
-    cudaMalloc(&d_N, sizeof(size_t)); cudaMemcpy(d_N, &N, sizeof(size_t), cudaMemcpyHostToDevice);
-    cudaMalloc(&d_single_block_fullerenes, sizeof(bool)); cudaMemcpy(d_single_block_fullerenes, &single_block_fullerenes, sizeof(bool), cudaMemcpyHostToDevice);
 
     getLastCudaError("One or more Mallocs Failed! \n");
-
-    cudaMemcpy(d_X, h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
-    cudaMemcpy(d_neighbours, h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_next_on_face, h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_prev_on_face, h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_face_right, h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-
+    cudaMemcpy(p.d_X, h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
+    cudaMemcpy(p.d_neighbours, h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.d_next_on_face, h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.d_prev_on_face, h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.d_face_right, h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
     getLastCudaError("Memcpy Failed! \n");
-
     auto start = std::chrono::system_clock::now();
-    
-    if (!concurrent_kernels)
-    {
-        void* kernelArgs[] = {
-        (void*)&d_X,
-        (void*)&d_X_temp,
-        (void*)&d_X2,
-        (void*)&d_neighbours,
-        (void*)&d_next_on_face,
-        (void*)&d_prev_on_face,
-        (void*)&d_face_right,
-        (void*)&d_gdata,
-        (void*)&N,
-        (void*)&single_block_fullerenes
-        };
-        //checkCudaErrors(
-	cudaLaunchCooperativeKernel((void*)conjugate_gradient, dimGrid, dimBlock, kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, NULL);
-	//);
-    } 
-    
-    
-    /*
-    else
-    {   
-        cudaStream_t stream[batch_size];
-        for (size_t i = 0; i < batch_size; i++)
-        {
-            cudaStreamCreate(&stream[i]);
-        }
-        
-        for (size_t i = 0; i < 16; i++)
-        {   
-            d_X = &d_X[i*N]; d_X_temp = &d_X_temp[i*N]; d_X2 = &d_X2[i*N]; d_neighbours = &d_neighbours[i*N*3]; d_next_on_face = &d_next_on_face[i*N*3]; d_prev_on_face = &d_prev_on_face[i*N*3];
-            d_face_right = &d_face_right[i*N*3]; d_gdata = &d_gdata[i];
+    void* kernelArgs[] = {
+    (void*)&(p.d_X),
+    (void*)&(p.d_X_temp),
+    (void*)&(p.d_X2),
+    (void*)&(p.d_neighbours),
+    (void*)&(p.d_next_on_face),
+    (void*)&(p.d_prev_on_face),
+    (void*)&(p.d_face_right),
+    (void*)&(p.d_gdata),
+    (void*)&N,
+    (void*)&single_block_fullerenes,
+    (void*)&MaxIter
+    };
 
-            void* kernelArgs[] = {
-            (void*)&d_X,
-            (void*)&d_X_temp,
-            (void*)&d_X2,
-            (void*)&d_neighbours,
-            (void*)&d_next_on_face,
-            (void*)&d_prev_on_face,
-            (void*)&d_face_right,
-            (void*)&d_gdata,
-            (void*)&N,
-            (void*)&single_block_fullerenes
-        };
-            checkCudaErrors(cudaLaunchCooperativeKernel((void*)conjugate_gradient, dimGrid, dimBlock, kernelArgs, sharedMemoryPerBlock, stream[i]));
-        }
-    }
-    */
-
-
+    cudaLaunchCooperativeKernel((void*)conjugate_gradient, dim3(batch_size, 1, 1), dim3(N, 1, 1), kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, NULL);
     cudaDeviceSynchronize();
     auto end = std::chrono::system_clock::now();
     getLastCudaError("Failed to launch kernel: ");
     
-    cudaMemcpy(h_X, d_X, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_X, p.d_X, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
     getLastCudaError("Failed to copy back: ");
     
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
-    std::cout << "Estimated Performance " << ((real_t)(411*N*batch_size*3*N*22  + 2106*N*batch_size*3*N)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "FLOP/s \n";
-
-    cudaFree(d_X); cudaFree(d_X2); cudaFree(d_neighbours); cudaFree(d_next_on_face); cudaFree(d_prev_on_face);
-    cudaFree(d_X_temp); cudaFree(d_face_right); cudaFree(d_gdata); 
+    std::cout << "Estimated Performance " << ((real_t)(411*N*batch_size*MaxIter*22  + 2106*N*batch_size*MaxIter)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "FLOP/s \n";
 }
 
 };

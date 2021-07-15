@@ -33,10 +33,8 @@ T* synthetic_array(size_t N, const size_t num_molecules, const T* fullerene){
 
 __device__ void align16(coord3d* input, coord3d_a* output, size_t N){
     cg::sync(cg::this_grid());
-    size_t tid = threadIdx.x;
-    output[tid] = {input[tid].x, input[tid].y, input[tid].z, 0};
+    output[threadIdx.x] = {input[threadIdx.x].x, input[threadIdx.x].y, input[threadIdx.x].z, 0};
     cg::sync(cg::this_grid());
-    
 }
 
 template <typename T>
@@ -49,7 +47,7 @@ __device__ void pointerswap(T **r, T **s)
 }
 
 
-//All parameter arrays are indexed by a binary sum, 0,1,2,3,4,...
+
 //Pentagons = 0
 //Hexagons = 1
 //PPP = 0, {HPP, PHP, PPH} = 1, {PHH, HPH, HHP} = 2, {HHH} = 3
@@ -69,6 +67,8 @@ __device__ __host__ struct BookkeepingData{
     __device__ __host__ BookkeepingData (const node_t* neighbours, const uint8_t* face_right, const node_t* next_on_face, const node_t* prev_on_face) : 
         neighbours(neighbours), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 };
+
+
 
 
 
@@ -130,13 +130,13 @@ __device__ struct ArcConstants{
 
 };
 
-__device__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
+__device__ __host__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
     return f1*4 + f2*2 + f3;
 }
 
 __device__ Constants compute_constants(BookkeepingData &dat, node_t node_id){
-    coord3d r0 ; coord3d angle0 ; coord3d inner_dih0 ; coord3d outer_angle_m0 ; coord3d outer_angle_p0 ; coord3d outer_dih0_a; coord3d outer_dih0_m; coord3d outer_dih0_p;
-    coord3d f_bond ; coord3d f_inner_angle ; coord3d f_inner_dihedral ; coord3d f_outer_angle_m ; coord3d f_outer_angle_p ; coord3d f_outer_dihedral ;
+    coord3d r0, angle0, inner_dih0, outer_angle_m0, outer_angle_p0, outer_dih0_a, outer_dih0_m, outer_dih0_p;
+    coord3d f_bond, f_inner_angle, f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral ;
     
     for (uint8_t j = 0; j < 3; j++) {
         uint8_t f_r = dat.face_right[node_id * 3 + j] - 5;
@@ -206,7 +206,7 @@ __device__ ArcConstants compute_arc_constants(BookkeepingData &dat, node_t node_
 
 
 //Reduction method for single block fullerenes.
-__device__ void reduction(real_t *sdata, const node_t N){
+__device__ void reduction(real_t *sdata){
 
     cg::thread_block block = cg::this_thread_block();
     cg::sync(block);
@@ -297,3 +297,15 @@ size_t optimize_block_size(size_t N, cudaDeviceProp prop, T kernel){
 }
 
 
+__device__ real_t AverageBondLength(real_t* smem,const coord3d* X, const node_t* neighbours,const node_t node_id, const size_t N){
+    real_t node_average_bond_length = 0.0;
+    for (size_t i = 0; i < 3; i++)
+    {
+        node_average_bond_length += non_resciprocal_bond_length(X[node_id] - X[neighbours[i]]);
+    }
+    node_average_bond_length /= (real_t)3.0;
+    cg::sync(cg::this_thread_block());
+    smem[threadIdx.x] = node_average_bond_length;
+    reduction(smem);
+    return smem[0]/(real_t)N;
+}

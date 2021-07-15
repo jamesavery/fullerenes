@@ -445,7 +445,10 @@ size_t computeBatchSize(size_t N){
     return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
 }
 
-void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
+
+
+
+void OptimizeBatch(DevicePointers& p, real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size, const size_t MaxIter){
     bool concurrent_kernels = false;
     bool single_block_fullerenes = true;
     dim3 dimBlock = dim3(N, 1, 1);
@@ -499,7 +502,8 @@ void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_fa
         (void*)&d_face_right,
         (void*)&d_gdata,
         (void*)&N,
-        (void*)&single_block_fullerenes
+        (void*)&single_block_fullerenes,
+        (void*)&MaxIter
     };
 
     auto start = std::chrono::system_clock::now();
@@ -508,12 +512,16 @@ void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_fa
     cudaMemcpy(h_X, d_X_in, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
     auto end = std::chrono::system_clock::now();
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
-    std::cout << "Estimated Performance " << ((real_t)(411*N*batch_size*3*N*22  + 2106*N*batch_size*3*N)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "FLOP/s \n";
+    std::cout << "Estimated Performance " << ((real_t)(411*N*batch_size*MaxIter*22  + 2106*N*batch_size*MaxIter)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "FLOP/s \n";
    
     cudaFree(d_X_in); cudaFree(d_X); cudaFree(d_X2); cudaFree(d_neighbours); cudaFree(d_next_on_face); cudaFree(d_prev_on_face);
     cudaFree(d_X_temp); cudaFree(d_face_right); cudaFree(d_gdata); 
 
 
 }
+
+void FreePointers(DevicePointers& p){}
+
+void AllocateDevicePointers(DevicePointers& p, size_t N, size_t batch_size)
 
 };

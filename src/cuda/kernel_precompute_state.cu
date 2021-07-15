@@ -267,7 +267,7 @@ __device__ real_t energy(const coord3d* __restrict__ X, const node_t node_id, co
     cg::sync(cg::this_thread_block());
     reduction_array[threadIdx.x] = arc_energy;
     // (/N // 32) * log2(32) = N//32  * 5 FLOPs 
-    reduction(reduction_array, N); 
+    reduction(reduction_array); 
     return reduction_array[0];
 }
 
@@ -358,7 +358,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     
     
     reduction_array[threadIdx.x] = dot(direction,direction);
-    reduction(reduction_array, N);
+    reduction(reduction_array);
     dnorm = sqrtf(reduction_array[0]);
     direction = -direction/dnorm;
     
@@ -374,9 +374,9 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         gradient_evals++;
         energy_evals += 22;
         //Polak Ribiere method
-        reduction_array[threadIdx.x] = dot(delta_x0, delta_x0); cg::sync(grid); reduction(reduction_array, N); cg::sync(grid); r0_norm = reduction_array[0];
+        reduction_array[threadIdx.x] = dot(delta_x0, delta_x0); cg::sync(grid); reduction(reduction_array); cg::sync(grid); r0_norm = reduction_array[0];
         cg::sync(grid);
-        reduction_array[threadIdx.x] = dot(delta_x1, (delta_x1 - delta_x0));cg::sync(grid); reduction(reduction_array, N); cg::sync(grid); beta = reduction_array[0] / r0_norm;
+        reduction_array[threadIdx.x] = dot(delta_x1, (delta_x1 - delta_x0));cg::sync(grid); reduction(reduction_array); cg::sync(grid); beta = reduction_array[0] / r0_norm;
         cg::sync(grid);
         if (energy(X_temp, node_id, bookkeeping, constants, reduction_array, N) > energy(X, node_id, bookkeeping, constants, reduction_array, N))
         {   
@@ -394,9 +394,9 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
 
         //Calculate gradient and residual gradient norms..
         cg::sync(grid);
-        reduction_array[threadIdx.x] = dot(direction,direction); cg::sync(grid); reduction(reduction_array, N); cg::sync(grid); direction_norm = sqrtf(reduction_array[0]);
+        reduction_array[threadIdx.x] = dot(direction,direction); cg::sync(grid); reduction(reduction_array); cg::sync(grid); direction_norm = sqrtf(reduction_array[0]);
         cg::sync(grid);
-        reduction_array[threadIdx.x] = dot(delta_x1,delta_x1); cg::sync(grid); reduction(reduction_array, N); cg::sync(grid); dnorm = sqrtf(reduction_array[0]);
+        reduction_array[threadIdx.x] = dot(delta_x1,delta_x1); cg::sync(grid); reduction(reduction_array); cg::sync(grid); dnorm = sqrtf(reduction_array[0]);
         cg::sync(grid);
         //Normalize gradient.
         direction /= direction_norm;
@@ -421,7 +421,7 @@ size_t computeBatchSize(size_t N){
     return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
 }
 
-void OptimizeBatch(real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size){
+void OptimizeBatch(DevicePointers& p,real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size, const size_t MaxIter){
     bool concurrent_kernels = false;
     bool single_block_fullerenes = true;
     dim3 dimBlock = dim3(N, 1, 1);

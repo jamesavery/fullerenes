@@ -21,35 +21,10 @@ INLINE void operator/=(float3& a, const float b) {a = a / b;}
 
 INLINE void set(float3& a, const uint8_t j, float b){
   ((float*)&a)[j] = b; 
-  /* switch (j) */
-  /* { */
-  /* case 0: */
-  /*   a.x = b; */
-  /*   break; */
-  /* case 1: */
-  /*   a.y = b; */
-  /*   break; */
-  /* case 2: */
-  /*   a.z = b; */
-  /*   break; */
-  /* default: */
-  /*   break; */
-  /* } */
 }
 
 INLINE float get(const float3& a, const uint8_t j){
   return ((const float*)&a)[j]; 
-  /* switch (j) */
-  /* { */
-  /* case 0: */
-  /*   return a.x; */
-  /* case 1: */
-  /*   return a.y; */
-  /* case 2: */
-  /*   return a.z; */
-  /* default: */
-  /*   return 0; */
-  /* } */
 }
 //5 FLOPs
 INLINE  float  dot(const float3& a,  const float3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
@@ -78,19 +53,15 @@ INLINE  float bond_length(const float3& ab){
     return rsqrtf(dot(ab,ab));
 }
 
+INLINE float non_resciprocal_bond_length(const float3& ab){
+    return sqrtf(dot(ab,ab));
+}
+
 __host__ __device__ void print_coord(const float3& ab){
 
     printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
-    //cout<< "[" << ab.x << ", " << ab.y << ", " << ab.z << "]\n" ;
 }
-/*
-template <int N>
-void write_to_file(const array<double3,N>& a){
-    FILE* pFile;
-    pFile = fopen("test.bin","wb");
-    fwrite(&a, sizeof(float), N*3, pFile);
-    fclose(pFile);
-}*/
+
 
 
 INLINE double3 operator-(const double3& a)                  { return make_double3(-a.x, -a.y, -a.z);  }
@@ -105,35 +76,11 @@ INLINE void operator+=(double3& a, const double3 b) {a = a + b;}
 INLINE void operator/=(double3& a, const double b) {a = a / b;}
 
 INLINE void set(double3& a, const uint8_t j, double b){
-  switch (j)
-  {
-  case 0:
-    a.x = b;
-    break;
-  case 1:
-    a.y = b;
-    break;
-  case 2:
-    a.z = b;
-    break;
-  default:
-    break;
-  }
+  ((double*)&a)[j] = b; 
 }
 
 INLINE double get(const double3& a, const uint8_t j){
   return ((const double*)&a)[j];
-  /* switch (j) */
-  /* { */
-  /* case 0: */
-  /*   return a.x; */
-  /* case 1: */
-  /*   return a.y; */
-  /* case 2: */
-  /*   return a.z; */
-  /* default: */
-  /*   break; */
-  /* } */
 }
 
 //5 FLOPs
@@ -166,14 +113,4 @@ INLINE  double bond_length(const double3& ab){
 __host__ __device__ void print_coord(const double3& ab){
 
     printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
-    //cout<< "[" << ab.x << ", " << ab.y << ", " << ab.z << "]\n" ;
 }
-
-/*
-template <int N>
-void write_to_file(const array<double3,N>& a){
-    FILE* pFile;
-    pFile = fopen("test.bin","wb");
-    fwrite(&a, sizeof(real_t), N*3, pFile);
-    fclose(pFile);
-}*/
