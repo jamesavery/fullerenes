@@ -32,12 +32,16 @@ int main(int ac, char **argv)
     return -1;
   }
   int N                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
-
+    for (size_t k = 64; k < 257; k+=2)
+    {
+        N = k;
+    
+    
   string output_dir   = ac>=3? argv[2] : "output";    // Argument 2: directory to output files to
   int IPR             = ac>=4? strtol(argv[3],0,0):0; // Argument 3: Only generate IPR fullerenes?
   int only_nontrivial = ac>=5? strtol(argv[4],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
   
-  ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
+  //ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
 
   size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
   using IsomerspaceForcefield::device_real_t;
@@ -68,15 +72,15 @@ int main(int ac, char **argv)
     Tcopy   = system_clock::now()-T0,
     Topt    = system_clock::now()-T0;
 
-
   device_real_t* d_X; device_real_t* d_X_temp; device_real_t* d_X2; device_node_t* d_neighbours; device_node_t* d_prev_on_face; device_node_t* d_next_on_face; uint8_t* d_face_right; device_real_t* d_gdata;
   IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata);
 
 
   IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
+    
   while(more_to_do){
     // Fill in a batch
-    printf("Generating isomer bond graphs and initial geometries\n");
+    //printf("Generating isomer bond graphs and initial geometries\n");
     for(i=0; (i<batch_size) && more_to_do; i++){
       //      printf("i=%ld, I=%ld, isomer_numer=%ld\n",i,I,I+i);
       auto t0 = system_clock::now();            
@@ -112,12 +116,13 @@ int main(int ac, char **argv)
     }
 
     size_t this_batch_size = i;
-    printf("Optimizing %ld C%d fullerenes, isomer [%ld;%ld]\n",this_batch_size,N,I,I+this_batch_size-1);
+    //printf("Optimizing %ld C%d fullerenes, isomer [%ld;%ld]\n",this_batch_size,N,I,I+this_batch_size-1);
     auto t0 = system_clock::now();
-    IsomerspaceForcefield::OptimizeBatch(d_pointers,X,cubic_graph, next_on_face, prev_on_face, face_right,
-    					 N,this_batch_size,N*3);
+    IsomerspaceForcefield::OptimizeBatch(d_pointers, X,cubic_graph, next_on_face, prev_on_face, face_right,
+    					 N,this_batch_size,N*10);
     Topt += system_clock::now()-t0;
-    
+    std::cout << N << ", " << this_batch_size << ", " << (float)(std::chrono::duration_cast<std::chrono::microseconds>(Topt)).count()/1e6 << "\n";
+    break;
     // Now do something with the optimized geometries
     for(size_t i=0;i<this_batch_size;i++){
       for(node_t u=0;u<N;u++){
@@ -133,35 +138,13 @@ int main(int ac, char **argv)
 	// // 	 points[u][0],points[u][1],points[u][2]);
 
       }
-
-      Polyhedron P(G,points);
-
-      for(node_t u=0;u<P.N;u++)
-	for(node_t v=u+1;v<P.N;v++) {
-	  float bond_length = (P.points[u]-P.points[v]).norm();
-
-	  if(bond_length < 1)
-	    printf("Abnormally short length of bond %d-%d: %g\n",u,v,bond_length);	  
-	}
-
-      
-      string filename = output_dir+"/P-C"+to_string(N)+"-"+to_string(I+i);
-      Polyhedron::to_file(P,filename+".mol2");
-    }
-    // Output molecular geometry files
+    
 
     I += this_batch_size;
   }
-  failures.close();
+  }
   IsomerspaceForcefield::FreePointers(d_pointers);
-  cout << "Time spent on non:\n"
-    "\tGenerating graphs = " << (Tgen/1ms)    << " ms\n"
-    "\tUpdating metadata = " << (Tupdate/1ms) << " ms\n"
-    "\tDualizing         = " << (Tdual/1ms)   << " ms\n"
-    "\tTutte embedding   = " << (Ttutte/1ms)  << " ms\n"
-    "\tInitial geometry  = " << (TX0/1ms)     << " ms\n"
-    "\tCopying to buffer = " << (Tcopy/1ms)   << " ms\n"
-    "\tFF Optimization   = " << (Topt/1ms)    << " ms\n";
+}
   
   return 0;
 }
