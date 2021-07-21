@@ -1,8 +1,7 @@
 #include "kernel_shared.cu"
 #include "coord3d.cu"
-#include "C512ih.cu"
-typedef float real_t;
-typedef float3 coord3d;
+#include "C60ihs.cu"
+
 typedef uint16_t node_t;
 
 int main(){
@@ -26,7 +25,7 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    const size_t N = 512;
+    const size_t N = 60;
 
     size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
     
@@ -42,9 +41,11 @@ int main(){
     
     real_t* d_X; real_t* d_X_temp; real_t* d_X2; node_t* d_neighbours; node_t* d_prev_on_face; node_t* d_next_on_face; uint8_t* d_face_right; real_t* d_gdata;
     IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata);
-
+    IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(synth_X, synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
 
     IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
-    IsomerspaceForcefield::OptimizeBatch(d_pointers,synth_X,synth_cubic_neighbours,synth_next_on_face,synth_prev_on_face,synth_face_right,N,batch_size,N*10);
+    IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,N,batch_size,N*10);
+    IsomerspaceForcefield::PrintProperties(d_pointers, h_pointers, N, batch_size, 0);
+    
     IsomerspaceForcefield::FreePointers(d_pointers);
 }

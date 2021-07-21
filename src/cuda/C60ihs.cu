@@ -1,4 +1,5 @@
-#pragma once
+
+#include "coord3d.cu"
 
 typedef float real_t;
 typedef uint16_t node_t; 

@@ -110,6 +110,10 @@ INLINE  double bond_length(const double3& ab){
     return rsqrtf(dot(ab,ab));
 }
 
+INLINE double non_resciprocal_bond_length(const double3& ab){
+    return sqrtf(dot(ab,ab));
+}
+
 __host__ __device__ void print_coord(const double3& ab){
 
     printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);

@@ -36,7 +36,7 @@ struct ArcData{
 
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
         ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;
-        ac = (X[bdat.neighbours[(j+1)%3]] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac;
+        ac = (X[bdat.neighbours[(j+1)%3]] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac; rab = non_resciprocal_bond_length(ab);
         ad = (X[bdat.neighbours[(j+2)%3]] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
         
         coord3d bp = (X[bdat.next_on_face[j]] - X_b); bp_hat = unit_vector(bp);
@@ -194,6 +194,7 @@ struct ArcData{
 
     //Residual lengths of arcs ab, ac, am, ap.
     real_t
+        rab,
         r_rab,
         r_rac,
         r_rad,

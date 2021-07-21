@@ -71,7 +71,7 @@ int main(int ac, char **argv)
 
   device_real_t* d_X; device_real_t* d_X_temp; device_real_t* d_X2; device_node_t* d_neighbours; device_node_t* d_prev_on_face; device_node_t* d_next_on_face; uint8_t* d_face_right; device_real_t* d_gdata;
   IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata);
-
+  IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(X,cubic_graph,next_on_face,prev_on_face,face_right);
 
   IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
   while(more_to_do){
@@ -114,8 +114,9 @@ int main(int ac, char **argv)
     size_t this_batch_size = i;
     printf("Optimizing %ld C%d fullerenes, isomer [%ld;%ld]\n",this_batch_size,N,I,I+this_batch_size-1);
     auto t0 = system_clock::now();
-    IsomerspaceForcefield::OptimizeBatch(d_pointers,X,cubic_graph, next_on_face, prev_on_face, face_right,
-    					 N,this_batch_size,N*3);
+    IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,
+    					 N,this_batch_size,N*10);
+    IsomerspaceForcefield::CheckBatch(d_pointers, h_pointers,N,this_batch_size);
     Topt += system_clock::now()-t0;
     
     // Now do something with the optimized geometries

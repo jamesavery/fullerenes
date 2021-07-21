@@ -4,7 +4,6 @@
 #include <cuda.h>
 #include "device_launch_parameters.h"
 #include <stdio.h>
-#//include <helper_cuda.h>  // TODO: Get rid of this (not in nvcc std include dirs)
 #define getLastCudaError(x) 
 #include <iostream>
 #include <fstream>
@@ -15,13 +14,14 @@ namespace IsomerspaceForcefield {
 typedef device_real_t real_t;
 typedef device_node_t node_t;
 
-#include "C60ih.cu"
 #include "coord3d.cu"
 #include "helper_functions.cu"
+
 
 using namespace std::literals;
 namespace cg = cooperative_groups;
 
+struct DevicePointers; struct HostPointers;
 
 
 struct ArcData{
@@ -35,7 +35,7 @@ struct ArcData{
         //printf("Index: %d \n", a*3 + j);
 
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
-        ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;
+        ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab; rab = non_resciprocal_bond_length(ab);
         ac = (X[bdat.neighbours[(j+1)%3]] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac;
         ad = (X[bdat.neighbours[(j+2)%3]] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
         
@@ -66,7 +66,7 @@ struct ArcData{
     }
 
     //1 FLOP
-    INLINE real_t bond() const {return (real_t)1.0/r_rab;}
+    INLINE real_t bond() const {return (real_t)rab;}
 
     //5 FLOPs
     INLINE real_t angle() const {return dot(ab_hat,ac_hat);}
@@ -184,16 +184,21 @@ struct ArcData{
     INLINE coord3d dihedral_gradient(const Constants& c) const { return inner_dihedral_gradient(c) + outer_a_dihedral_gradient(c) + outer_m_dihedral_gradient(c) + outer_p_dihedral_gradient(c);}
     //coord3d flatness()             const { return ;  }   
     
+    INLINE real_t bond_energy(const Constants& c) const {return (real_t)0.5 *get(c.f_bond,j) *harmonic_energy(bond(),get(c.r0,j));}
+    INLINE real_t bend_energy(const Constants& c) const {return get(c.f_inner_angle,j)* harmonic_energy(angle(),get(c.angle0,j));}
+    INLINE real_t dihedral_energy(const Constants& c) const {return get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),get(c.inner_dih0,j));}
     //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
     //71 FLOPs
-    INLINE real_t energy(const Constants& c) const {return (real_t)0.5 *get(c.f_bond,j) *harmonic_energy(bond(),get(c.r0,j))+ get(c.f_inner_angle,j)* harmonic_energy(angle(),get(c.angle0,j)) + get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),get(c.inner_dih0,j));}
+    INLINE real_t energy(const Constants& c) const {return bond_energy(c) + bend_energy(c) + dihedral_energy(c); }
     //Sum of bond, angular and dihedral gradient components.
     INLINE coord3d gradient(const Constants& c) const{return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);}
+
     
     uint8_t j;
 
     //Residual lengths of arcs ab, ac, am, ap.
     real_t
+        rab,
         r_rab,
         r_rac,
         r_rad,
@@ -303,7 +308,7 @@ __device__ void golden_section_search(coord3d* __restrict__ X, coord3d& directio
     
 }
 
-__global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X2, const node_t* d_neighbours, const node_t* d_next_on_face, const node_t* d_prev_on_face, const uint8_t* d_face_right, real_t* gdata, const size_t N, const bool single_block_fullerenes, const size_t MaxIter){
+__global__ void conjugate_gradient(DevicePointers p, const size_t N, const bool single_block_fullerenes, const size_t MaxIter){
     extern __shared__ real_t smem[];
     
 
@@ -330,33 +335,33 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         offset = 0;
     }
     
-    coord3d* X = &d_X[offset];
-    coord3d* X_temp = &d_X_temp[offset];
-    coord3d* X2 = &d_X2[offset];
+    coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
+    coord3d* X1 = &reinterpret_cast<coord3d*>(p.X1)[offset];
+    coord3d* X2 = &reinterpret_cast<coord3d*>(p.X2)[offset];
     
     if (single_block_fullerenes)
     {
         coord3d* sX =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 1];
-        coord3d* sX_temp =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 2 + N];
+        coord3d* sX1 =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 2 + N];
         coord3d* sX2 =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3)+ 3 +2*N];  
         sX[node_id] = X[node_id];
-        sX_temp[node_id] = sX[node_id];
+        sX1[node_id] = sX[node_id];
 
-        X = &sX[0]; X_temp = &sX_temp[0]; X2 = &sX2[0];
+        X = &sX[0]; X1 = &sX1[0]; X2 = &sX2[0];
     } else {
-        X_temp[node_id] = X[node_id];
+        X1[node_id] = X[node_id];
     }
 
     
     //Pre-compute force constants and store in registers.
-    BookkeepingData bookit = BookkeepingData(&d_neighbours[3*offset],&d_face_right[3*offset],&d_next_on_face[3*offset],&d_prev_on_face[3*offset]);
+    BookkeepingData bookit = BookkeepingData(&p.neighbours[3*offset],&p.face_right[3*offset],&p.next_on_face[3*offset],&p.prev_on_face[3*offset]);
     Constants constants = compute_constants(bookit, node_id);
 
     //Load constant bookkeeping data into registers.
-    const node_t neighbours[3] = {d_neighbours[3*(offset+node_id)],d_neighbours[3*(offset+node_id) + 1],d_neighbours[3*(offset+node_id) + 2]};
-    const uint8_t face_right[3] = {d_face_right[3*(offset+node_id)],d_face_right[3*(offset+node_id) + 1],d_face_right[3*(offset+node_id) + 2]};;
-    const node_t next_on_face[3] = {d_next_on_face[3*(offset+node_id)],d_next_on_face[3*(offset+node_id) + 1],d_next_on_face[3*(offset+node_id) + 2]};
-    const node_t prev_on_face[3] = {d_prev_on_face[3*(offset+node_id)],d_prev_on_face[3*(offset+node_id) + 1],d_prev_on_face[3*(offset+node_id) + 2]};
+    const node_t neighbours[3] = {p.neighbours[3*(offset+node_id)],p.neighbours[3*(offset+node_id) + 1],p.neighbours[3*(offset+node_id) + 2]};
+    const uint8_t face_right[3] = {p.face_right[3*(offset+node_id)],p.face_right[3*(offset+node_id) + 1],p.face_right[3*(offset+node_id) + 2]};;
+    const node_t next_on_face[3] = {p.next_on_face[3*(offset+node_id)],p.next_on_face[3*(offset+node_id) + 1],p.next_on_face[3*(offset+node_id) + 2]};
+    const node_t prev_on_face[3] = {p.prev_on_face[3*(offset+node_id)],p.prev_on_face[3*(offset+node_id) + 1],p.prev_on_face[3*(offset+node_id) + 2]};
     BookkeepingData bookkeeping = BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
 
     cg::sync(grid);
@@ -365,7 +370,7 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     
     smem[threadIdx.x] = dot(direction,direction);
 
-    reduction(smem,gdata,N,single_block_fullerenes);
+    reduction(smem,p.gdata,N,single_block_fullerenes);
     dnorm = sqrtf(smem[0]);
     direction = -direction/dnorm;
     
@@ -376,8 +381,8 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
     {   
         beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
         cg::sync(block);
-        if (single_block_fullerenes){golden_section_search(X, direction, delta_x1, X_temp, X2, smem, gdata, node_id, N, bookkeeping, constants, block, single_block_fullerenes);} 
-        else { golden_section_search(X, direction, delta_x1, X_temp, X2, smem, gdata, node_id, N, bookkeeping, constants, grid, single_block_fullerenes);}
+        if (single_block_fullerenes){golden_section_search(X, direction, delta_x1, X1, X2, smem, p.gdata, node_id, N, bookkeeping, constants, block, single_block_fullerenes);} 
+        else { golden_section_search(X, direction, delta_x1, X1, X2, smem, p.gdata, node_id, N, bookkeeping, constants, grid, single_block_fullerenes);}
         
         
         cg::sync(block);
@@ -386,46 +391,112 @@ __global__ void conjugate_gradient(coord3d* d_X, coord3d* d_X_temp, coord3d* d_X
         energy_evals += 22;
         //Polak Ribiere method
         
-        smem[threadIdx.x] = dot(delta_x0, delta_x0); reduction(smem,gdata,N,single_block_fullerenes); r0_norm = smem[0];
+        smem[threadIdx.x] = dot(delta_x0, delta_x0); reduction(smem,p.gdata,N,single_block_fullerenes); r0_norm = smem[0];
         cg::sync(block);
-        smem[threadIdx.x] = dot(delta_x1, (delta_x1 - delta_x0)); reduction(smem,gdata,N,single_block_fullerenes); beta = smem[0] / r0_norm;
+        smem[threadIdx.x] = dot(delta_x1, (delta_x1 - delta_x0)); reduction(smem,p.gdata,N,single_block_fullerenes); beta = smem[0] / r0_norm;
         cg::sync(block);
-        real_t E1 = energy(X_temp, node_id, bookkeeping, constants, smem, gdata, N, single_block_fullerenes);
+        real_t E1 = energy(X1, node_id, bookkeeping, constants, smem, p.gdata, N, single_block_fullerenes);
         cg::sync(block);
-        real_t E2 = energy(X, node_id, bookkeeping, constants, smem, gdata, N, single_block_fullerenes);
+        real_t E2 = energy(X, node_id, bookkeeping, constants, smem, p.gdata, N, single_block_fullerenes);
         cg::sync(block);
         if (E1> E2)
         {   
-            X_temp[node_id] =  X[node_id];
+            X1[node_id] =  X[node_id];
             delta_x1 =  delta_x0;
             beta = 0.0;
         }
         else
         {   
-            X[node_id] = X_temp[node_id];
+            X[node_id] = X1[node_id];
             delta_x0 = delta_x1;
         }
         direction = delta_x1 + beta*direction;
         //Calculate gradient and residual gradient norms..
         cg::sync(block);
-        smem[threadIdx.x] = dot(direction,direction); reduction(smem,gdata,N,single_block_fullerenes); direction_norm = sqrtf(smem[0]);
+        smem[threadIdx.x] = dot(direction,direction); reduction(smem,p.gdata,N,single_block_fullerenes); direction_norm = sqrtf(smem[0]);
         cg::sync(block);
-        smem[threadIdx.x] = dot(delta_x1,delta_x1); reduction(smem,gdata,N,single_block_fullerenes);dnorm = sqrtf(smem[0]);
+        smem[threadIdx.x] = dot(delta_x1,delta_x1); reduction(smem,p.gdata,N,single_block_fullerenes);dnorm = sqrtf(smem[0]);
         cg::sync(block);
         //Normalize gradient.
         direction /= direction_norm;
     }
-    d_X[offset + threadIdx.x] = X[threadIdx.x];
+    reinterpret_cast<coord3d*>(p.X)[offset + threadIdx.x] = X[threadIdx.x];
 
     //Check convergence using bond lengths:
     real_t AvgBondLength = AverageBondLength(smem,X,neighbours,node_id,N);
     if (threadIdx.x == 0)
-    {
+    {   
         //printf("Avg Bond Length: %e \n", AvgBondLength);
     }
     
 }
 
+__global__ void FullereneProperties(DevicePointers p){
+    extern __shared__ coord3d sdata[];
+    size_t offset = blockIdx.x * blockDim.x;
+    coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
+
+
+    BookkeepingData bookit = BookkeepingData(&p.neighbours[3*(offset)],&p.face_right[3*(offset)],&p.next_on_face[3*(offset)],&p.prev_on_face[3*(offset)]);
+    Constants constants = compute_constants(bookit,threadIdx.x);
+    BookkeepingData bdat = BookkeepingData(&p.neighbours[3*(offset + threadIdx.x)],&p.face_right[3*(offset + threadIdx.x)],&p.next_on_face[3*(offset + threadIdx.x)],&p.prev_on_face[3*(offset + threadIdx.x)]);
+
+    //Use X1 buffer as storage array.
+    coord3d* NodeEnergyCoord = &reinterpret_cast<coord3d*>(p.X1)[offset];
+    real_t NodeEnergy = (real_t)0.0; real_t NodeBond_Error = (real_t)0.0; real_t NodeAngle_Error = (real_t)0.0; real_t NodeDihedral_Error = (real_t)0.0;
+    real_t ArcEnergy = (real_t)0.0; real_t ArcBond_Error = (real_t)0.0; real_t ArcAngle_Error = (real_t)0.0; real_t ArcDihedral_Error = (real_t)0.0;
+    
+    
+    for (uint8_t j = 0; j < 3; j++)
+    {
+        ArcData arc = ArcData(threadIdx.x, j, X, bdat);
+        ArcEnergy = arc.dihedral_energy(constants);
+        ArcBond_Error = abs(abs(arc.rab - get(constants.r0,j))/get(constants.r0,j));
+        ArcAngle_Error =  abs(abs(arc.angle() - get(constants.angle0,j))/get(constants.angle0,j));
+        ArcDihedral_Error = abs(abs(arc.dihedral() - get(constants.inner_dih0,j))/get(constants.inner_dih0,j));
+
+        NodeEnergy += ArcEnergy; NodeBond_Error += ArcBond_Error; NodeAngle_Error += ArcAngle_Error; NodeDihedral_Error += ArcDihedral_Error;
+        reinterpret_cast<real_t*>(NodeEnergyCoord)[threadIdx.x*3 + j] =  ArcEnergy;
+        sdata[threadIdx.x*3 + j] = arc.gradient(constants);
+    }
+    real_t Energy = energy(X,threadIdx.x,bdat,constants,reinterpret_cast<real_t*>(sdata),p.gdata,blockDim.x,true);
+    reinterpret_cast<real_t*>(sdata)[threadIdx.x] = NodeDihedral_Error/3.0; reduction(reinterpret_cast<real_t*>(sdata)); real_t AvgDihedralErr = reinterpret_cast<real_t*>(sdata)[0]/blockDim.x; cg::sync(cg::this_thread_block());
+    reinterpret_cast<real_t*>(sdata)[threadIdx.x] = NodeAngle_Error/3.0; reduction(reinterpret_cast<real_t*>(sdata)); real_t AvgAngleErr = reinterpret_cast<real_t*>(sdata)[0]/blockDim.x; cg::sync(cg::this_thread_block());
+    reinterpret_cast<real_t*>(sdata)[threadIdx.x] = NodeBond_Error/3.0 ; reduction(reinterpret_cast<real_t*>(sdata)); real_t AvgBondErr = reinterpret_cast<real_t*>(sdata)[0]/blockDim.x; cg::sync(cg::this_thread_block());
+    /*
+    if ((threadIdx.x + blockIdx.x * blockDim.x)== 0)
+    {
+        printf("Average Node Energy: "); print(Energy/blockDim.x); 
+        printf("Average Bond Error: "); print(AvgBondErr);
+        printf("Average Angle Error: "); print(AvgAngleErr);
+        printf("Average Dihedral Error: "); print(AvgDihedralErr);
+    }*/
+
+    //Check convergence via gradient:
+    reinterpret_cast<real_t*>(sdata)[threadIdx.x] = dot(gradient(X,threadIdx.x, bdat, constants),gradient(X,threadIdx.x, bdat, constants)); reduction(reinterpret_cast<real_t*>(sdata)); real_t GradSum = sqrt(reinterpret_cast<real_t*>(sdata)[0])/blockDim.x; cg::sync(cg::this_thread_block());
+
+    if (threadIdx.x == 0){
+    if (AvgBondErr < 5e-2)
+    {
+        p.gdata[blockIdx.x] = (real_t)1.0;
+    } else
+    {
+       p.gdata[blockIdx.x] = (real_t)0.0;
+    }}
+    cg::sync(cg::this_grid());
+    real_t Success = 0;
+    if ((threadIdx.x + blockIdx.x * blockDim.x) == 0)
+    {
+        for (size_t i = 0; i < gridDim.x; i++)
+        {
+            Success += p.gdata[i];
+        }
+    }
+    
+    if( (threadIdx.x + blockIdx.x * blockDim.x)== 0){
+        printf("%d", (size_t)Success); printf("/ %d Fullerenes Converged in Batch \n", gridDim.x);
+    }   
+}
     
 size_t computeBatchSize(size_t N){
     cudaDeviceProp properties;
@@ -444,48 +515,55 @@ size_t computeBatchSize(size_t N){
 }
 
 void AllocateDevicePointers(DevicePointers& p, size_t N, size_t batch_size){
-    cudaMalloc(&p.d_X, sizeof(coord3d)*N*batch_size);
-    cudaMalloc(&p.d_X_temp, sizeof(coord3d)*N*batch_size);
-    cudaMalloc(&p.d_X2, sizeof(coord3d)*N*batch_size);
-    cudaMalloc(&p.d_neighbours, sizeof(node_t)*3*N*batch_size);
-    cudaMalloc(&p.d_next_on_face, sizeof(node_t)*3*N*batch_size);
-    cudaMalloc(&p.d_prev_on_face, sizeof(node_t)*3*N*batch_size);
-    cudaMalloc(&p.d_face_right, sizeof(uint8_t)*3*N*batch_size);
-    cudaMalloc(&p.d_gdata, sizeof(real_t)*batch_size);
+    cudaMalloc(&p.X, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&p.X1, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&p.X2, sizeof(coord3d)*N*batch_size);
+    cudaMalloc(&p.neighbours, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&p.next_on_face, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&p.prev_on_face, sizeof(node_t)*3*N*batch_size);
+    cudaMalloc(&p.face_right, sizeof(uint8_t)*3*N*batch_size);
+    cudaMalloc(&p.gdata, sizeof(real_t)*batch_size);
 }
 
 void FreePointers(DevicePointers& p){
-    cudaFree(p.d_X);
-    cudaFree(p.d_X_temp);
-    cudaFree(p.d_X2);
-    cudaFree(p.d_neighbours);
-    cudaFree(p.d_next_on_face);
-    cudaFree(p.d_prev_on_face);
-    cudaFree(p.d_face_right);
-    cudaFree(p.d_gdata);
+    cudaFree(p.X);
+    cudaFree(p.X1);
+    cudaFree(p.X2);
+    cudaFree(p.neighbours);
+    cudaFree(p.next_on_face);
+    cudaFree(p.prev_on_face);
+    cudaFree(p.face_right);
+    cudaFree(p.gdata);
     cudaDeviceReset();
 }
 
-void OptimizeBatch(DevicePointers& p, real_t* h_X, node_t* h_cubic_neighbours, node_t* h_next_on_face, node_t* h_prev_on_face, uint8_t* h_face_right, const size_t N, const size_t batch_size, const size_t MaxIter){
+void CopyToDevice(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size){
+    cudaMemcpy(p.X, h.h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
+    cudaMemcpy(p.neighbours, h.h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.next_on_face, h.h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.prev_on_face, h.h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.face_right, h.h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+}
+
+void CheckBatch(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size){
+    CopyToDevice(p,h,N,batch_size);
+    void* kernelArgs[] = {(void*)&p};
+    cudaLaunchCooperativeKernel((void*)FullereneProperties, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+}
+
+void OptimizeBatch(DevicePointers& p, HostPointers& h, const size_t N, const size_t batch_size, const size_t MaxIter){
     bool single_block_fullerenes = true;
 
     getLastCudaError("One or more Mallocs Failed! \n");
-    cudaMemcpy(p.d_X, h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
-    cudaMemcpy(p.d_neighbours, h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(p.d_next_on_face, h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(p.d_prev_on_face, h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(p.d_face_right, h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.X, h.h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
+    cudaMemcpy(p.neighbours, h.h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.next_on_face, h.h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.prev_on_face, h.h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.face_right, h.h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
     getLastCudaError("Memcpy Failed! \n");
     auto start = std::chrono::system_clock::now();
     void* kernelArgs[] = {
-    (void*)&(p.d_X),
-    (void*)&(p.d_X_temp),
-    (void*)&(p.d_X2),
-    (void*)&(p.d_neighbours),
-    (void*)&(p.d_next_on_face),
-    (void*)&(p.d_prev_on_face),
-    (void*)&(p.d_face_right),
-    (void*)&(p.d_gdata),
+    (void*)&p,
     (void*)&N,
     (void*)&single_block_fullerenes,
     (void*)&MaxIter
@@ -496,7 +574,7 @@ void OptimizeBatch(DevicePointers& p, real_t* h_X, node_t* h_cubic_neighbours, n
     auto end = std::chrono::system_clock::now();
     getLastCudaError("Failed to launch kernel: ");
     
-    cudaMemcpy(h_X, p.d_X, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
+    cudaMemcpy(h.h_X, p.X, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
     getLastCudaError("Failed to copy back: ");
     
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;

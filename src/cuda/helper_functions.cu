@@ -134,7 +134,7 @@ __device__ __host__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
     return f1*4 + f2*2 + f3;
 }
 
-__device__ Constants compute_constants(BookkeepingData &dat, node_t node_id){
+__device__ Constants compute_constants(BookkeepingData& dat, node_t node_id){
     coord3d r0, angle0, inner_dih0, outer_angle_m0, outer_angle_p0, outer_dih0_a, outer_dih0_m, outer_dih0_p;
     coord3d f_bond, f_inner_angle, f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral ;
     
@@ -148,7 +148,7 @@ __device__ Constants compute_constants(BookkeepingData &dat, node_t node_id){
         //Load equillibirium distance, angles and dihedral angles from face information.
         set(r0,j,optimal_bond_lengths[ f_l + f_r ]);
         set(angle0,j,optimal_corner_cos_angles[ f_r ]);
-        set(inner_dih0,j,optimal_dih_cos_angles[ face_sum ]);
+        set(inner_dih0,j,optimal_dih_cos_angles[ face_index(dat.face_right[node_id * 3 + j] - 5, dat.face_right[node_id * 3 + (1+j)%3] - 5 , dat.face_right[node_id * 3 + (2+j)%3] - 5) ]);
         set(outer_angle_m0,j,optimal_corner_cos_angles[ f_l ]);
         set(outer_angle_p0,j,optimal_corner_cos_angles[ f_r ]);
 
@@ -308,4 +308,61 @@ __device__ real_t AverageBondLength(real_t* smem,const coord3d* X, const node_t*
     smem[threadIdx.x] = node_average_bond_length;
     reduction(smem);
     return smem[0]/(real_t)N;
+}
+
+__device__ void print(coord3d& ab){
+    printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
+}
+
+__device__ void print(real_t a){
+    printf("[%.16e]\n", a);
+}
+
+__device__ void print(ushort3& a){
+    printf("[%d, %d, %d]\n",a.x,a.y,a.z);
+}
+
+__device__ void print(uchar3& a){
+    printf("[%d, %d, %d]\n",a.x,a.y,a.z);
+}
+
+__device__ void print(uint3& a){
+    printf("[%d, %d, %d]\n",a.x,a.y,a.z);
+}
+
+
+template <typename T>
+__device__ void sequential_print(T* Data){
+    for (size_t i = 0; i < blockDim.x; i++)
+    {
+        if (threadIdx.x == i)
+        {
+            print(Data[i]);
+        }
+        cg::sync(cg::this_thread_block());
+    }
+}
+
+template <typename T>
+__device__ void sequential_print(T Data){
+    for (size_t i = 0; i < blockDim.x; i++)
+    {
+        if (threadIdx.x == i)
+        {
+            print(Data);
+        }
+        cg::sync(cg::this_thread_block());
+    }
+}
+
+template <typename T>
+__device__ void sequential_print(T* Data, size_t N){
+    for (size_t i = 0; i < N; i++)
+    {
+        if (threadIdx.x == i)
+        {
+            print(Data[i]);
+        }
+        cg::sync(cg::this_thread_block());
+    }
 }
