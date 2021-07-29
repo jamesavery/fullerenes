@@ -1,6 +1,8 @@
 #include "kernel_shared.cu"
 #include "coord3d.cu"
-#include "C60ihs.cu"
+#include "C60ih.cu"
+
+
 
 typedef uint16_t node_t;
 
@@ -44,8 +46,8 @@ int main(){
     IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(synth_X, synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
 
     IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
-    IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,N,batch_size,N*10);
-    IsomerspaceForcefield::PrintProperties(d_pointers, h_pointers, N, batch_size, 0);
+    IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,N,batch_size,1);
+    IsomerspaceForcefield::CheckBatch(d_pointers, h_pointers, N, batch_size);
     
     IsomerspaceForcefield::FreePointers(d_pointers);
 }
