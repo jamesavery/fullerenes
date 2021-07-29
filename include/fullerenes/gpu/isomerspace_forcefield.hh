@@ -2,7 +2,7 @@
 #include <inttypes.h>
 
 namespace IsomerspaceForcefield {
-  typedef float    device_real_t;
+  typedef float device_real_t;
   typedef uint16_t device_node_t;
 
 

@@ -1,11 +1,143 @@
 #pragma once
 
 typedef float3 coord3d;
+
+
 typedef float real_t;
+
 typedef uint16_t node_t;
 typedef float4 coord3d_a;
 
-#define INLINE __device__ __host__ __forceinline__
+
+#define INLINE __device__ __forceinline__
+/** HALF OPERATIONS **/
+
+__device__ __host__ __builtin_align__(8) struct half4
+{
+  __half2 x;
+  __half2 y;
+};
+
+
+
+__device__ __forceinline__ half4 coord3d_to_fp16(const float3& b) { return {{__float2half(b.x) , __float2half(b.y)}, { __float2half(b.z), __double2half(0.0)}};}
+__device__ __forceinline__ coord3d fp16_to_coord3d(const half4& b) { return {__half2float(b.x.x), __half2float(b.x.y), __half2float(b.y.x)};}
+__device__ __forceinline__ half4 operator-(const half4& a)                 { return {__hneg2(a.x), __hneg2(a.y)};  }
+__device__ __forceinline__ half4 operator-(const half4& a, const half4& b){ return { __hsub2(a.x,b.x),__hsub2(a.y,b.y)};  }
+__device__ __forceinline__ half4 operator+(const half4& a, const half4& b){ return { __hadd2(a.x,b.x), __hadd2(a.y,b.y)};  }
+__device__ __forceinline__ half4 operator*(const half4& a, const half s)  { return { __hmul2(a.x,make_half2(s,s)), __hmul2(a.y, make_half2(s,s)) };  }
+__device__ __forceinline__ half4 operator*(const half s, const half4& a)  { return a*s; }
+__device__ __forceinline__ half4 operator*(const half4& a, const half4& b) { return {__hmul2(a.x,b.x), __hmul2(a.y,b.y)};}
+__device__ __forceinline__ half4 operator/(const half s, const half4& a)  { return {__h2div(a.x,make_half2(s,s)), __h2div(a.y,make_half2(s,s))}; }
+__device__ __forceinline__ half4 operator/(const half4& a, const half s)  { return {__h2div(make_half2(s,s),a.x), __h2div(make_half2(s,s),a.y)}; }
+__device__ __forceinline__ void operator+=(half4& a, const half4& b) {a = a + b;}
+__device__ __forceinline__ void operator/=(half4& a, const half b) {a = a / b;}
+
+__device__ __forceinline__ void set(half4& a, const uint8_t j, half b){
+  ((half*)&a)[j] = b; 
+}
+
+__device__ __forceinline__ half get(const half4& a, const uint8_t j){
+  return ((const half*)&a)[j]; 
+}
+//5 FLOPs
+__device__ __forceinline__  half  dot(const half4& a,  const half4& b) { half2 temp = __hfma2(a.x,b.x,__hmul2(a.y,b.y)); return __hadd(temp.x,temp.y); }
+
+//6 FLOPs
+__device__ __forceinline__  half norm(const half4& a)                    { return hsqrt(dot(a,a)); }
+
+//7 FLOPs
+__device__ __forceinline__  half4 unit_vector(const half4& a){
+  half r = hrsqrt(dot(a,a));
+  return (a*r);
+}
+//10 FLOPs
+__device__ __forceinline__  half4 cross(const half4& a, const half4& b){ return { {(a.x).y * (b.y).x-(a.y).x*(b.x).y,
+							   -(a.x).x* (b.y).x+(a.y).x*(b.x).x},{
+							   (a.x).x*(b.x).y-(a.x).y* (b.x).x, (a.y).y}}; }
+// $(a \otimes b) \cdot c$
+
+//6 FLOPs
+__device__ __forceinline__  half bond_length(const half4& ab){
+    return hrsqrt(dot(ab,ab));
+}
+
+__device__ __forceinline__ half non_resciprocal_bond_length(const half4& ab){
+    return hsqrt(dot(ab,ab));
+}
+
+__host__ __device__ void print_coord(const half4& ab){
+
+    printf("[%.16e, %.16e, %.16e]\n",__half2float((ab.x).x),__half2float((ab.x).y),__half2float((ab.y).x));
+}
+
+
+/** 16BFLOAT OPERATIONS **/
+
+#if defined(__CUDACC__) && (__CUDA_ARCH__ >= 800 || !defined(__CUDA_ARCH__))
+
+typedef __nv_bfloat16 bhalf;
+typedef __nv_bfloat162 bhalf2;
+__device__ __host__ __builtin_align__(8) struct bhalf4
+{
+  bhalf2 x;
+  bhalf2 y;
+};
+
+
+
+__device__ __forceinline__ bhalf4 coord3d_to_bfp16(const float3& b) { return {{	__float2bfloat16(b.x) , 	__float2bfloat16(b.y)}, { 	__float2bfloat16(b.z), __double2bfloat16(0.0)}};}
+__device__ __forceinline__ coord3d bfp16_to_coord3d(const bhalf4& b) { return {		__bfloat162float(b.x.x), 		__bfloat162float(b.x.y), 		__bfloat162float(b.y.x)};}
+__device__ __forceinline__ bhalf4 operator-(const bhalf4& a)                 { return {__hneg2(a.x), __hneg2(a.y)};  }
+__device__ __forceinline__ bhalf4 operator-(const bhalf4& a, const bhalf4& b){ return { __hsub2(a.x,b.x),__hsub2(a.y,b.y)};  }
+__device__ __forceinline__ bhalf4 operator+(const bhalf4& a, const bhalf4& b){ return { __hadd2(a.x,b.x), __hadd2(a.y,b.y)};  }
+__device__ __forceinline__ bhalf4 operator*(const bhalf4& a, const bhalf s)  { return { __hmul2(a.x,{s,s}), __hmul2(a.y, {s,s}) };  }
+__device__ __forceinline__ bhalf4 operator*(const bhalf s, const bhalf4& a)  { return a*s; }
+__device__ __forceinline__ bhalf4 operator*(const bhalf4& a, const bhalf4& b) { return {__hmul2(a.x,b.x), __hmul2(a.y,b.y)};}
+__device__ __forceinline__ bhalf4 operator/(const bhalf s, const bhalf4& a)  { return {__h2div(a.x,{s,s}), __h2div(a.y,{s,s})}; }
+__device__ __forceinline__ bhalf4 operator/(const bhalf4& a, const bhalf s)  { return {__h2div({s,s},a.x), __h2div({s,s},a.y)}; }
+__device__ __forceinline__ void operator+=(bhalf4& a, const bhalf4& b) {a = a + b;}
+__device__ __forceinline__ void operator/=(bhalf4& a, const bhalf b) {a = a / b;}
+
+__device__ __forceinline__ void set(bhalf4& a, const uint8_t j, bhalf b){
+  ((bhalf*)&a)[j] = b; 
+}
+
+__device__ __forceinline__ bhalf get(const bhalf4& a, const uint8_t j){
+  return ((const bhalf*)&a)[j]; 
+}
+//5 FLOPs
+__device__ __forceinline__  bhalf  dot(const bhalf4& a,  const bhalf4& b) { bhalf2 temp = __hfma2(a.x,b.x,__hmul2(a.y,b.y)); return __hadd(temp.x,temp.y); }
+
+//6 FLOPs
+__device__ __forceinline__  bhalf norm(const bhalf4& a)                    { return hsqrt(dot(a,a)); }
+
+//7 FLOPs
+__device__ __forceinline__  bhalf4 unit_vector(const bhalf4& a){
+  bhalf r = hrsqrt(dot(a,a));
+  return (a*r);
+}
+//10 FLOPs
+__device__ __forceinline__  bhalf4 cross(const bhalf4& a, const bhalf4& b){ return { {(a.x).y * (b.y).x-(a.y).x*(b.x).y,
+							   -(a.x).x* (b.y).x+(a.y).x*(b.x).x},{
+							   (a.x).x*(b.x).y-(a.x).y* (b.x).x, (a.y).y}}; }
+// $(a \otimes b) \cdot c$
+
+//6 FLOPs
+__device__ __forceinline__  bhalf bond_length(const bhalf4& ab){
+    return hrsqrt(dot(ab,ab));
+}
+
+__device__ __forceinline__ bhalf non_resciprocal_bond_length(const bhalf4& ab){
+    return hsqrt(dot(ab,ab));
+}
+
+__host__ __device__ void print_coord(const bhalf4& ab){
+
+    printf("[%.16e, %.16e, %.16e]\n",__bfloat162float((ab.x).x),__bfloat162float((ab.x).y),__bfloat162float((ab.y).x));
+}
+#endif
+/** FLOAT OPERATIONS **/
 
 INLINE float3 coord3d_a_to_coord3d(const float4& b) { make_float3(b.x, b.y, b.z);}
 INLINE float3 operator-(const float3& a)                 { return make_float3(-a.x, -a.y, -a.z);  }

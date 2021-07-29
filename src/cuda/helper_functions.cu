@@ -5,6 +5,7 @@
 #include "cuda_runtime.h"
 #include <assert.h>
 
+
 namespace cg = cooperative_groups;
 
 template <typename T>
@@ -71,26 +72,26 @@ __device__ __host__ struct BookkeepingData{
 
 
 
-
+template <typename T>
 __device__ struct Constants{
-    const coord3d f_bond;
-    const coord3d f_inner_angle;
-    const coord3d f_inner_dihedral;
-    const coord3d f_outer_angle_m;
-    const coord3d f_outer_angle_p;
-    const coord3d f_outer_dihedral;
+    const T f_bond;
+    const T f_inner_angle;
+    const T f_inner_dihedral;
+    const T f_outer_angle_m;
+    const T f_outer_angle_p;
+    const T f_outer_dihedral;
 
-    const coord3d r0;
-    const coord3d angle0;
-    const coord3d outer_angle_m0;
-    const coord3d outer_angle_p0;
-    const coord3d inner_dih0;
-    const coord3d outer_dih0_a;
-    const coord3d outer_dih0_m;
-    const coord3d outer_dih0_p;
+    const T r0;
+    const T angle0;
+    const T outer_angle_m0;
+    const T outer_angle_p0;
+    const T inner_dih0;
+    const T outer_dih0_a;
+    const T outer_dih0_m;
+    const T outer_dih0_p;
     
-    __device__ Constants(const coord3d f_bond, const coord3d f_inner_angle, const coord3d f_inner_dihedral, const coord3d f_outer_angle_m, const coord3d f_outer_angle_p, const coord3d f_outer_dihedral,
-                            const coord3d r0, const coord3d angle0, const coord3d outer_angle_m0, const coord3d outer_angle_p0, const coord3d inner_dih0, const coord3d outer_dih0_a, const coord3d outer_dih0_m, const coord3d outer_dih0_p): f_bond(f_bond), f_inner_angle(f_inner_angle),
+    __device__ Constants(const T f_bond, const T f_inner_angle, const T f_inner_dihedral, const T f_outer_angle_m, const T f_outer_angle_p, const T f_outer_dihedral,
+                            const T r0, const T angle0, const T outer_angle_m0, const T outer_angle_p0, const T inner_dih0, const T outer_dih0_a, const T outer_dih0_m, const T outer_dih0_p): f_bond(f_bond), f_inner_angle(f_inner_angle),
                             f_inner_dihedral(f_inner_dihedral), f_outer_angle_m(f_outer_angle_m), f_outer_angle_p(f_outer_angle_p), f_outer_dihedral(f_outer_dihedral), r0(r0), angle0(angle0), outer_angle_m0(outer_angle_m0), outer_angle_p0(outer_angle_p0),
                             inner_dih0(inner_dih0), outer_dih0_a(outer_dih0_a), outer_dih0_m(outer_dih0_m), outer_dih0_p(outer_dih0_p) {}
 
@@ -133,10 +134,10 @@ __device__ struct ArcConstants{
 __device__ __host__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
     return f1*4 + f2*2 + f3;
 }
-
-__device__ Constants compute_constants(BookkeepingData& dat, node_t node_id){
-    coord3d r0, angle0, inner_dih0, outer_angle_m0, outer_angle_p0, outer_dih0_a, outer_dih0_m, outer_dih0_p;
-    coord3d f_bond, f_inner_angle, f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral ;
+template <typename T>
+__device__ Constants<T> compute_constants(BookkeepingData& dat, node_t node_id){
+    T r0, angle0, inner_dih0, outer_angle_m0, outer_angle_p0, outer_dih0_a, outer_dih0_m, outer_dih0_p;
+    T f_bond, f_inner_angle, f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral ;
     
     for (uint8_t j = 0; j < 3; j++) {
         uint8_t f_r = dat.face_right[node_id * 3 + j] - 5;
@@ -169,7 +170,7 @@ __device__ Constants compute_constants(BookkeepingData& dat, node_t node_id){
         set(f_outer_angle_p,j,angle_forces[ f_r ]);
         set(f_outer_dihedral,j,dih_forces[ dihedral_face_sum]);
     }
-    return Constants(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0_a, outer_dih0_m, outer_dih0_p);
+    return Constants<T>(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0_a, outer_dih0_m, outer_dih0_p);
 }
 
 __device__ ArcConstants compute_arc_constants(BookkeepingData &dat, node_t node_id, uint8_t j){
@@ -215,6 +216,26 @@ __device__ void reduction(real_t *sdata){
     cg::sync(block);
 
     real_t beta = 0.0;
+    if (block.thread_rank() == 0) {
+        beta  = 0;
+        for (uint16_t i = 0; i < block.size(); i += tile32.size()) {
+            beta  += sdata[i];
+        }
+        sdata[0] = beta;
+    }
+    cg::sync(block);
+}
+
+
+__device__ void reduction(half *sdata){
+
+    cg::thread_block block = cg::this_thread_block();
+    cg::sync(block);
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
+    sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<half>());
+    cg::sync(block);
+
+    half beta = 0.0;
     if (block.thread_rank() == 0) {
         beta  = 0;
         for (uint16_t i = 0; i < block.size(); i += tile32.size()) {
@@ -310,23 +331,30 @@ __device__ real_t AverageBondLength(real_t* smem,const coord3d* X, const node_t*
     return smem[0]/(real_t)N;
 }
 
-__device__ void print(coord3d& ab){
+__device__ void print(const coord3d& ab){
     printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
+}
+__device__ void print(const half4& ab){
+    print_coord(ab);
+}
+
+__device__ void print(const half2& ab){
+    printf("[%.16e, %.16e] \n", __half2float(ab.x), __half2float(ab.y));
 }
 
 __device__ void print(real_t a){
     printf("[%.16e]\n", a);
 }
 
-__device__ void print(ushort3& a){
+__device__ void print(const ushort3& a){
     printf("[%d, %d, %d]\n",a.x,a.y,a.z);
 }
 
-__device__ void print(uchar3& a){
+__device__ void print(const uchar3& a){
     printf("[%d, %d, %d]\n",a.x,a.y,a.z);
 }
 
-__device__ void print(uint3& a){
+__device__ void print(const uint3& a){
     printf("[%d, %d, %d]\n",a.x,a.y,a.z);
 }
 
