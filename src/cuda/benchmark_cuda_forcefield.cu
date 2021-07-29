@@ -3,7 +3,6 @@
 #include "C60ih.cu"
 
 
-
 typedef uint16_t node_t;
 
 int main(){
@@ -50,11 +49,16 @@ int main(){
     
     real_t* d_X; real_t* d_X_temp; real_t* d_X2; node_t* d_neighbours; node_t* d_prev_on_face; node_t* d_next_on_face; uint8_t* d_face_right; real_t* d_gdata; real_t* d_bonds; real_t* d_angles; real_t* d_dihedrals; real_t* d_angle_0; real_t* d_bond_0; real_t* d_dihedral_0; real_t* d_gradients;
     IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata,d_bonds,d_angles,d_dihedrals,d_bond_0,d_angle_0,d_dihedral_0,d_gradients);
-    IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(synth_X, synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right, bonds, angles, dihedrals, bond_0, angle_0, dihedral_0, gradients);
-
+    IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(synth_X, synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
     IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
     IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,N,batch_size,N*10);
     IsomerspaceForcefield::CheckBatch(d_pointers, h_pointers, N, batch_size);
-    
+    IsomerspaceForcefield::InternalCoordinates(d_pointers,h_pointers,N,batch_size,bonds,angles,dihedrals);
+    IsomerspaceForcefield::HarmonicConstants(d_pointers,h_pointers,N,batch_size,bond_0,angle_0,dihedral_0);
+    IsomerspaceForcefield::Gradients(d_pointers,h_pointers,N,batch_size,gradients);
     IsomerspaceForcefield::FreePointers(d_pointers);
+
+    IsomerspaceForcefield::print_array(angles,N,0);
+
+
 }

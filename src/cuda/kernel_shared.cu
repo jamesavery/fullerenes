@@ -524,9 +524,9 @@ __global__ void kernel_HarmonicConstants(DevicePointers p){
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
     for (uint8_t j = 0; j < 3; j++)
     {   
-        p.bonds[tid*3 + j] = get(constants.r0,j);
-        p.angles[tid*3 + j] = get(constants.angle0,j);
-        p.dihedrals[tid*3 + j] = get(constants.inner_dih0,j);
+        p.bond_0[tid*3 + j] = get(constants.r0,j);
+        p.angle_0[tid*3 + j] = get(constants.angle0,j);
+        p.dihedral_0[tid*3 + j] = get(constants.inner_dih0,j);
     }
 }
 
@@ -617,18 +617,28 @@ void InternalCoordinates(DevicePointers& p, const HostPointers& h, const size_t 
     CopyToDevice(p,h,N,batch_size);
     void* kernelArgs[] = {(void*)&p};
     cudaLaunchCooperativeKernel((void*)kernel_InternalCoordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+    cudaDeviceSynchronize();
+    cudaMemcpy(bonds, p.bonds, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
+    cudaMemcpy(angles, p.angles, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
+    cudaMemcpy(dihedrals, p.dihedrals, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
 }
 
 void HarmonicConstants(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, real_t* bond_0, real_t* angle_0, real_t* dihedral_0){
     CopyToDevice(p,h,N,batch_size);
     void* kernelArgs[] = {(void*)&p};
     cudaLaunchCooperativeKernel((void*)kernel_HarmonicConstants, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+    cudaDeviceSynchronize();
+    cudaMemcpy(bond_0, p.bond_0, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
+    cudaMemcpy(angle_0, p.angle_0, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
+    cudaMemcpy(dihedral_0, p.dihedral_0, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
 }
 
 void Gradients(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, real_t* gradients){
     CopyToDevice(p,h,N,batch_size);
     void* kernelArgs[] = {(void*)&p};
     cudaLaunchCooperativeKernel((void*)kernel_Gradients, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+    cudaDeviceSynchronize();
+    cudaMemcpy(gradients, p.gradients, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
 }
 
 void OptimizeBatch(DevicePointers& p, HostPointers& h, const size_t N, const size_t batch_size, const size_t MaxIter){

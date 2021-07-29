@@ -5,7 +5,7 @@
 #include "cuda_runtime.h"
 #include <assert.h>
 
-
+#define __HD__ __device__ __host__ 
 namespace cg = cooperative_groups;
 
 template <typename T>
@@ -331,7 +331,7 @@ __device__ real_t AverageBondLength(real_t* smem,const coord3d* X, const node_t*
     return smem[0]/(real_t)N;
 }
 
-__device__ void print(const coord3d& ab){
+__HD__ void print(const coord3d& ab){
     printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
 }
 __device__ void print(const half4& ab){
@@ -342,7 +342,7 @@ __device__ void print(const half2& ab){
     printf("[%.16e, %.16e] \n", __half2float(ab.x), __half2float(ab.y));
 }
 
-__device__ void print(real_t a){
+__HD__ void print(real_t a){
     printf("[%.16e]\n", a);
 }
 
@@ -360,36 +360,48 @@ __device__ void print(const uint3& a){
 
 
 template <typename T>
-__device__ void sequential_print(T* Data){
+__device__ void sequential_print(T* data){
     for (size_t i = 0; i < blockDim.x; i++)
     {
         if (threadIdx.x == i)
         {
-            print(Data[i]);
+            print(data[i]);
         }
         cg::sync(cg::this_thread_block());
     }
 }
 
 template <typename T>
-__device__ void sequential_print(T Data){
+__device__ void sequential_print(T data, size_t fullerene_id){
+    if (blockIdx.x == fullerene_id)
+    {
     for (size_t i = 0; i < blockDim.x; i++)
     {
         if (threadIdx.x == i)
         {
-            print(Data);
+            print(data);
         }
         cg::sync(cg::this_thread_block());
+    }
     }
 }
 
 template <typename T>
-__device__ void sequential_print(T* Data, size_t N){
+__host__ void print_array(T* data, size_t N, size_t fullerene_id){
+    for (size_t i = 0; i < N; i++)
+    {
+        print(data[fullerene_id + i]);
+    }
+    
+}
+
+template <typename T>
+__device__ void sequential_print(T* data, size_t N){
     for (size_t i = 0; i < N; i++)
     {
         if (threadIdx.x == i)
         {
-            print(Data[i]);
+            print(data[i]);
         }
         cg::sync(cg::this_thread_block());
     }
