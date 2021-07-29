@@ -496,6 +496,54 @@ __global__ void FullereneProperties(DevicePointers p){
         printf("%d", (size_t)Success); printf("/ %d Fullerenes Converged in Batch \n", gridDim.x);
     }   
 }
+
+__global__ void kernel_InternalCoordinates(DevicePointers p){
+    size_t offset = blockIdx.x * blockDim.x;
+    coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
+    BookkeepingData bookit = BookkeepingData(&p.neighbours[3*(offset)],&p.face_right[3*(offset)],&p.next_on_face[3*(offset)],&p.prev_on_face[3*(offset)]);
+    Constants<coord3d> constants = compute_constants<coord3d>(bookit,threadIdx.x);
+    BookkeepingData bdat = BookkeepingData(&p.neighbours[3*(offset + threadIdx.x)],&p.face_right[3*(offset + threadIdx.x)],&p.next_on_face[3*(offset + threadIdx.x)],&p.prev_on_face[3*(offset + threadIdx.x)]);
+
+    size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
+    for (uint8_t j = 0; j < 3; j++)
+    {   
+        ArcData arc = ArcData(threadIdx.x, j, X, bdat);
+        p.bonds[tid*3 + j] = arc.bond();
+        p.angles[tid*3 + j] = arc.angle();
+        p.dihedrals[tid*3 + j] = arc.dihedral();
+    }
+}
+
+__global__ void kernel_HarmonicConstants(DevicePointers p){
+    size_t offset = blockIdx.x * blockDim.x;
+    coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
+    BookkeepingData bookit = BookkeepingData(&p.neighbours[3*(offset)],&p.face_right[3*(offset)],&p.next_on_face[3*(offset)],&p.prev_on_face[3*(offset)]);
+    Constants<coord3d> constants = compute_constants<coord3d>(bookit,threadIdx.x);
+    BookkeepingData bdat = BookkeepingData(&p.neighbours[3*(offset + threadIdx.x)],&p.face_right[3*(offset + threadIdx.x)],&p.next_on_face[3*(offset + threadIdx.x)],&p.prev_on_face[3*(offset + threadIdx.x)]);
+
+    size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
+    for (uint8_t j = 0; j < 3; j++)
+    {   
+        p.bonds[tid*3 + j] = get(constants.r0,j);
+        p.angles[tid*3 + j] = get(constants.angle0,j);
+        p.dihedrals[tid*3 + j] = get(constants.inner_dih0,j);
+    }
+}
+
+__global__ void kernel_Gradients(DevicePointers p){
+    size_t offset = blockIdx.x * blockDim.x;
+    coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
+    BookkeepingData bookit = BookkeepingData(&p.neighbours[3*(offset)],&p.face_right[3*(offset)],&p.next_on_face[3*(offset)],&p.prev_on_face[3*(offset)]);
+    Constants<coord3d> constants = compute_constants<coord3d>(bookit,threadIdx.x);
+    BookkeepingData bdat = BookkeepingData(&p.neighbours[3*(offset + threadIdx.x)],&p.face_right[3*(offset + threadIdx.x)],&p.next_on_face[3*(offset + threadIdx.x)],&p.prev_on_face[3*(offset + threadIdx.x)]);
+
+    size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
+    for (uint8_t j = 0; j < 3; j++)
+    {   
+        ArcData arc = ArcData(threadIdx.x, j, X, bdat);
+        reinterpret_cast<coord3d*>(p.gradients)[tid*3] += gradient(X,threadIdx.x, bdat, constants);
+    }
+}
     
 size_t computeBatchSize(size_t N){
     cudaDeviceProp properties;
@@ -522,6 +570,13 @@ void AllocateDevicePointers(DevicePointers& p, size_t N, size_t batch_size){
     cudaMalloc(&p.prev_on_face, sizeof(node_t)*3*N*batch_size);
     cudaMalloc(&p.face_right, sizeof(uint8_t)*3*N*batch_size);
     cudaMalloc(&p.gdata, sizeof(real_t)*batch_size);
+    cudaMalloc(&p.bonds, sizeof(real_t)*3*N*batch_size);
+    cudaMalloc(&p.angles, sizeof(real_t)*3*N*batch_size);
+    cudaMalloc(&p.dihedrals, sizeof(real_t)*3*N*batch_size);
+    cudaMalloc(&p.bond_0, sizeof(real_t)*3*N*batch_size);
+    cudaMalloc(&p.angle_0, sizeof(real_t)*3*N*batch_size);
+    cudaMalloc(&p.dihedral_0, sizeof(real_t)*3*N*batch_size);
+    cudaMalloc(&p.gradients, sizeof(real_t)*3*N*batch_size);
 }
 
 void FreePointers(DevicePointers& p){
@@ -533,6 +588,14 @@ void FreePointers(DevicePointers& p){
     cudaFree(p.prev_on_face);
     cudaFree(p.face_right);
     cudaFree(p.gdata);
+    cudaFree(p.bonds);
+    cudaFree(p.angles);
+    cudaFree(p.dihedrals);
+    cudaFree(p.bond_0);
+    cudaFree(p.angle_0);
+    cudaFree(p.dihedral_0);
+    cudaFree(p.gradients);
+    
     cudaDeviceReset();
 }
 
@@ -548,6 +611,24 @@ void CheckBatch(DevicePointers& p, const HostPointers& h, const size_t N, const 
     CopyToDevice(p,h,N,batch_size);
     void* kernelArgs[] = {(void*)&p};
     cudaLaunchCooperativeKernel((void*)FullereneProperties, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+}
+
+void InternalCoordinates(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, real_t* bonds, real_t* angles, real_t* dihedrals){
+    CopyToDevice(p,h,N,batch_size);
+    void* kernelArgs[] = {(void*)&p};
+    cudaLaunchCooperativeKernel((void*)kernel_InternalCoordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+}
+
+void HarmonicConstants(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, real_t* bond_0, real_t* angle_0, real_t* dihedral_0){
+    CopyToDevice(p,h,N,batch_size);
+    void* kernelArgs[] = {(void*)&p};
+    cudaLaunchCooperativeKernel((void*)kernel_HarmonicConstants, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+}
+
+void Gradients(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, real_t* gradients){
+    CopyToDevice(p,h,N,batch_size);
+    void* kernelArgs[] = {(void*)&p};
+    cudaLaunchCooperativeKernel((void*)kernel_Gradients, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
 }
 
 void OptimizeBatch(DevicePointers& p, HostPointers& h, const size_t N, const size_t batch_size, const size_t MaxIter){
