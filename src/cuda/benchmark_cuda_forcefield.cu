@@ -1,12 +1,8 @@
-#include <stdio.h>
-#include "fullerenes/gpu/isomerspace_forcefield.hh"
-using namespace IsomerspaceForcefield;
+#include "kernel_shared.cu"
+#include "coord3d.cu"
+#include "C60ihs.cu"
 
-typedef device_real_t real_t;
-typedef device_node_t node_t;
-
-#include "helper_functions.cu"
-#include "C60ih.cu"
+typedef uint16_t node_t;
 
 int main(){
 
@@ -29,16 +25,27 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    size_t N = 60;
-    size_t batch_size = computeBatchSize(N);
-    printf("Solving %ld fullerenes of size: %ld \n", batch_size, N);
+    const size_t N = 60;
+
+    size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
+    
+    printf("Solving %d fullerenes of size: %d \n", batch_size, N);
 
     /** Generates a synthetic load from a single set of fullerene pointers **/
-    real_t* synth_X = reinterpret_cast<real_t*>(synthetic_array<real_t>(N, batch_size, &X[0]));
-    node_t* synth_cubic_neighbours = reinterpret_cast<node_t*>(synthetic_array<node_t>(N, batch_size, &cubic_neighbours[0]));
-    node_t* synth_next_on_face = reinterpret_cast<node_t*>(synthetic_array<node_t>(N, batch_size, &next_on_face[0]));
-    node_t* synth_prev_on_face = reinterpret_cast<node_t*>(synthetic_array<node_t>(N, batch_size, &prev_on_face[0]));
-    uint8_t* synth_face_right = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_size, &face_right[0]));
+    real_t* synth_X = reinterpret_cast<real_t*>(IsomerspaceForcefield::synthetic_array<real_t>(N, batch_size, &X[0]));
+    node_t* synth_cubic_neighbours = reinterpret_cast<node_t*>(IsomerspaceForcefield::synthetic_array<node_t>(N, batch_size, &cubic_neighbours[0]));
+    node_t* synth_next_on_face = reinterpret_cast<node_t*>(IsomerspaceForcefield::synthetic_array<node_t>(N, batch_size, &next_on_face[0]));
+    node_t* synth_prev_on_face = reinterpret_cast<node_t*>(IsomerspaceForcefield::synthetic_array<node_t>(N, batch_size, &prev_on_face[0]));
+    uint8_t* synth_face_right = reinterpret_cast<uint8_t*>(IsomerspaceForcefield::synthetic_array<uint8_t>(N, batch_size, &face_right[0]));
+    
+    
+    real_t* d_X; real_t* d_X_temp; real_t* d_X2; node_t* d_neighbours; node_t* d_prev_on_face; node_t* d_next_on_face; uint8_t* d_face_right; real_t* d_gdata;
+    IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata);
+    IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(synth_X, synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
 
-    OptimizeBatch(synth_X,synth_cubic_neighbours,synth_next_on_face,synth_prev_on_face,synth_face_right,N,batch_size);
+    IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
+    IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,N,batch_size,N*10);
+    IsomerspaceForcefield::PrintProperties(d_pointers, h_pointers, N, batch_size, 0);
+    
+    IsomerspaceForcefield::FreePointers(d_pointers);
 }
