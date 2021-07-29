@@ -541,7 +541,7 @@ __global__ void kernel_Gradients(DevicePointers p){
     for (uint8_t j = 0; j < 3; j++)
     {   
         ArcData arc = ArcData(threadIdx.x, j, X, bdat);
-        reinterpret_cast<coord3d*>(p.gradients)[tid*3] += gradient(X,threadIdx.x, bdat, constants);
+        reinterpret_cast<coord3d*>(p.gradients)[tid] += gradient(X,threadIdx.x, bdat, constants);
     }
 }
     

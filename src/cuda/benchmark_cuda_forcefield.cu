@@ -58,7 +58,7 @@ int main(){
     IsomerspaceForcefield::Gradients(d_pointers,h_pointers,N,batch_size,gradients);
     IsomerspaceForcefield::FreePointers(d_pointers);
 
-    IsomerspaceForcefield::print_array(angles,N,0);
+    IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(gradients),N,0);
 
 
 }
