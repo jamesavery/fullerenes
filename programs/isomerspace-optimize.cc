@@ -166,8 +166,8 @@ int main(int ac, char **argv)
     "\tTutte embedding   = " << (Ttutte/1ms)  << " ms\n"
     "\tInitial geometry  = " << (TX0/1ms)     << " ms\n"
     "\tCopying to buffer = " << (Tcopy/1ms)   << " ms\n"
-    "\tFF Optimization   = " << (Topt/1ms)    << " ms\n";
-    "\tFF Optimization   = " << (Topt/1ms)    << " ms\n";
+    "\tFF Optimization   = " << (Topt/1ms)    << " ms\n"
+    "\tFF Convergence Check   = " << (Tcheck/1ms)    << " ms\n";
   
   return 0;
 }
