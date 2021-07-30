@@ -167,7 +167,6 @@ int main(int ac, char **argv)
     "\tInitial geometry  = " << (TX0/1ms)     << " ms\n"
     "\tCopying to buffer = " << (Tcopy/1ms)   << " ms\n"
     "\tFF Optimization   = " << (Topt/1ms)    << " ms\n";
-    "\tFF Optimization   = " << (Topt/1ms)    << " ms\n";
   
   return 0;
 }
