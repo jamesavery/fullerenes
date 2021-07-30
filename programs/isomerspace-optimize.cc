@@ -46,6 +46,7 @@ int main(int ac, char **argv)
   device_node_t   cubic_graph[batch_size*3*N], next_on_face[batch_size*3*N], prev_on_face[batch_size*3*N];
   uint8_t         face_right[batch_size*3*N]; // TODO: Reduce to 1 bit/arc 
   device_real_t            X[batch_size*3*N];
+  device_real_t   bonds[batch_size*3*N], angles[batch_size*3*N], dihedrals[batch_size*3*N], bond_0[batch_size*3*N], angle_0[batch_size*3*N], dihedral_0[batch_size*3*N], gradients[batch_size*3*N];
 
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
 
@@ -66,11 +67,12 @@ int main(int ac, char **argv)
     Ttutte  = system_clock::now()-T0,
     TX0     = system_clock::now()-T0,
     Tcopy   = system_clock::now()-T0,
-    Topt    = system_clock::now()-T0;
+    Topt    = system_clock::now()-T0,
+    Tcheck  = system_clock::now()-T0;
 
 
-  device_real_t* d_X; device_real_t* d_X_temp; device_real_t* d_X2; device_node_t* d_neighbours; device_node_t* d_prev_on_face; device_node_t* d_next_on_face; uint8_t* d_face_right; device_real_t* d_gdata;
-  IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata);
+  device_real_t* d_X; device_real_t* d_X_temp; device_real_t* d_X2; device_node_t* d_neighbours; device_node_t* d_prev_on_face; device_node_t* d_next_on_face; uint8_t* d_face_right; device_real_t* d_gdata; device_real_t* d_bonds; device_real_t* d_angles;device_real_t* d_dihedrals; device_real_t* d_bond_0; device_real_t* d_angle_0; device_real_t* d_dihedral_0; device_real_t* d_gradients;
+  IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata, d_bonds, d_angles, d_dihedrals, d_bond_0, d_angle_0, d_dihedral_0, d_gradients);
   IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(X,cubic_graph,next_on_face,prev_on_face,face_right);
 
   IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
@@ -116,9 +118,11 @@ int main(int ac, char **argv)
     auto t0 = system_clock::now();
     IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,
     					 N,this_batch_size,N*10);
-    IsomerspaceForcefield::CheckBatch(d_pointers, h_pointers,N,this_batch_size);
     Topt += system_clock::now()-t0;
-    
+    auto t6 = system_clock::now();
+    IsomerspaceForcefield::CheckBatch(d_pointers, h_pointers,N,this_batch_size);
+    IsomerspaceForcefield::InternalCoordinates(d_pointers, h_pointers, N, this_batch_size, bonds,angles,dihedrals);
+    Tcheck += system_clock::now()-t6;
     // Now do something with the optimized geometries
     for(size_t i=0;i<this_batch_size;i++){
       for(node_t u=0;u<N;u++){
@@ -162,6 +166,7 @@ int main(int ac, char **argv)
     "\tTutte embedding   = " << (Ttutte/1ms)  << " ms\n"
     "\tInitial geometry  = " << (TX0/1ms)     << " ms\n"
     "\tCopying to buffer = " << (Tcopy/1ms)   << " ms\n"
+    "\tFF Optimization   = " << (Topt/1ms)    << " ms\n";
     "\tFF Optimization   = " << (Topt/1ms)    << " ms\n";
   
   return 0;
