@@ -346,6 +346,14 @@ __HD__ void print(real_t a){
     printf("[%.16e]\n", a);
 }
 
+__HD__ void print(bool b){
+    printf("[%d]\n",int(b));
+}
+
+__HD__ void print(int a){
+    printf("[%d]\n",a);
+}
+
 __device__ void print(const ushort3& a){
     printf("[%d, %d, %d]\n",a.x,a.y,a.z);
 }

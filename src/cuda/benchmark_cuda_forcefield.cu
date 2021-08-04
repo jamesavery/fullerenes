@@ -1,6 +1,6 @@
-#include "kernel_shared.cu"
+#include "kernel_concurrent.cu"
 #include "coord3d.cu"
-#include "C60ih.cu"
+#include "C512ih.cu"
 
 
 typedef uint16_t node_t;
@@ -26,7 +26,7 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    const size_t N = 60;
+    const size_t N = 512;
 
     size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
     
@@ -53,12 +53,12 @@ int main(){
     IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
     IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,N,batch_size,N*10);
     IsomerspaceForcefield::CheckBatch(d_pointers, h_pointers, N, batch_size);
-    IsomerspaceForcefield::InternalCoordinates(d_pointers,h_pointers,N,batch_size,bonds,angles,dihedrals);
-    IsomerspaceForcefield::HarmonicConstants(d_pointers,h_pointers,N,batch_size,bond_0,angle_0,dihedral_0);
-    IsomerspaceForcefield::Gradients(d_pointers,h_pointers,N,batch_size,gradients);
+    //IsomerspaceForcefield::InternalCoordinates(d_pointers,h_pointers,N,batch_size,bonds,angles,dihedrals);
+    //IsomerspaceForcefield::HarmonicConstants(d_pointers,h_pointers,N,batch_size,bond_0,angle_0,dihedral_0);
+    //IsomerspaceForcefield::Gradients(d_pointers,h_pointers,N,batch_size,gradients);
     IsomerspaceForcefield::FreePointers(d_pointers);
 
-    IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(gradients),N,0);
+    //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(synth_X),N,0);
 
 
 }

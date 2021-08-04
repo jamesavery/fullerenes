@@ -22,6 +22,8 @@ struct DevicePointers {
 	device_real_t* angle_0;
 	device_real_t* dihedral_0;
 	device_real_t* gradients;
+
+	DevicePointers(){}
 	
 	DevicePointers(device_real_t* X, device_real_t* X_temp, device_real_t* X2, device_node_t* neighbours, device_node_t* next_on_face, device_node_t* prev_on_face, uint8_t* face_right, device_real_t* gdata,
 					device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals,	device_real_t* bond_0, device_real_t* angle_0, device_real_t* dihedral_0, device_real_t* gradients) : 
