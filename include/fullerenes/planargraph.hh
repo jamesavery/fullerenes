@@ -53,6 +53,20 @@ public:
   face_t find_outer_face() const;
 
 
+  int face_size(node_t u, node_t v) const 
+  {
+    int d = 1;
+    node_t u0 = u;
+    while(v != u0){
+      node_t w = v;
+      v = next_on_face(u,v);
+      u = w;
+      d++;
+    }
+    return d;
+  }
+
+
   PlanarGraph dual_graph(unsigned int Fmax=INT_MAX, bool planar_layout=true) const;
   // the dual of the LF, ie a Triangulation is returned
   PlanarGraph leapfrog_dual() const;
