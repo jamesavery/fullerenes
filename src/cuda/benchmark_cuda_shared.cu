@@ -1,21 +1,9 @@
-#include "kernel_clean.cu"
+#include "kernel_shared.cu"
 #include "coord3d.cu"
 #include "C680ih.cu"
 
 
 typedef uint16_t node_t;
-constexpr
-int minpow2(int v)
-{
-  v--;
-  v |= v >> 1;
-  v |= v >> 2;
-  v |= v >> 4;
-  v |= v >> 8;
-  v |= v >> 16;
-  v++;
-  return v;
-}
 
 int main(){
 
@@ -39,11 +27,10 @@ int main(){
      * 
     **/
     const size_t N = 680;
-    const int Block_Size_Pow2 = minpow2((int)N);
 
-    size_t batch_size = IsomerspaceForcefield::computeBatchSize<Block_Size_Pow2>(N);
+    size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
     
-    printf("Solving %d fullerenes of size: %d \n", (int)batch_size, (int)N);
+    printf("Solving %d fullerenes of size: %d \n", batch_size, N);
 
     /** Generates a synthetic load from a single set of fullerene pointers **/
     real_t* synth_X = reinterpret_cast<real_t*>(IsomerspaceForcefield::synthetic_array<real_t>(N, batch_size, &X[0]));
@@ -64,14 +51,14 @@ int main(){
     IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata,d_bonds,d_angles,d_dihedrals,d_bond_0,d_angle_0,d_dihedral_0,d_gradients);
     IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(synth_X, synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
     IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
-    IsomerspaceForcefield::OptimizeBatch<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,N*5);
-    IsomerspaceForcefield::CheckBatch<Block_Size_Pow2>(d_pointers, h_pointers, N, batch_size);
-    IsomerspaceForcefield::InternalCoordinates<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,bonds,angles,dihedrals);
-    IsomerspaceForcefield::HarmonicConstants<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,bond_0,angle_0,dihedral_0);
-    IsomerspaceForcefield::Gradients<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,gradients);
+    IsomerspaceForcefield::OptimizeBatch(d_pointers,h_pointers,N,batch_size,N*5);
+    IsomerspaceForcefield::CheckBatch(d_pointers, h_pointers, N, batch_size);
+    //IsomerspaceForcefield::InternalCoordinates(d_pointers,h_pointers,N,batch_size,bonds,angles,dihedrals);
+    //IsomerspaceForcefield::HarmonicConstants(d_pointers,h_pointers,N,batch_size,bond_0,angle_0,dihedral_0);
+    //IsomerspaceForcefield::Gradients(d_pointers,h_pointers,N,batch_size,gradients);
     IsomerspaceForcefield::FreePointers(d_pointers);
 
-    //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(bonds),N,0);
+    //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(synth_X),N,0);
 
 
 }

@@ -4,7 +4,6 @@
 #include <cuda.h>
 #include "device_launch_parameters.h"
 #include <stdio.h>
-#//include <helper_cuda.h>  // TODO: Get rid of this (not in nvcc std include dirs)
 #define getLastCudaError(x) 
 #include <iostream>
 #include <fstream>
@@ -26,7 +25,26 @@ namespace cg = cooperative_groups;
 
 struct DevicePointers; struct HostPointers;
 
+/** This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions**/
+template <int Block_Size_Pow_2>
+struct ForceField{
+    coord3d new_direction,              //d_i+1 In conjugated gradient algorithm  Buster p. 36
+            direction;                  //d_0 In conjugated gradient algorithm Buster p. 36
 
+    const BookkeepingData bdat;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
+    const Constants<coord3d> constants; //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
+
+    cg::thread_group group_handle = cg::this_thread_block(); //Synchronization handle may be changed to grid-wide synchronization 
+    node_t node_id; //In case the code needs to be turned into grid-sized fullerenes. Parallel lockstep implementation of this is nontrivial to optimize in terms of blocksizes.
+    real_t* sdata;  //Pointer to start of L1 cache array, used exclusively for reduction.
+
+    __device__ ForceField(  const BookkeepingData &b,
+                            const Constants<coord3d> &c, 
+                            real_t* sdata,
+                            node_t node_id): bdat(b), constants(c), sdata(sdata), node_id(node_id) {}
+
+
+//Container for all energy and gradient evaluations with respect to an arc, eg. AB, AC or AD.
 struct ArcData{
     //124 FLOPs;
     __device__ ArcData(const node_t a, const uint8_t j, const coord3d* __restrict__ X, const BookkeepingData& bdat){   
@@ -235,204 +253,131 @@ struct ArcData{
         pb_hat;
 };
 
-__device__ coord3d gradient(const coord3d* __restrict__ X, const node_t node_id, const BookkeepingData &dat, const Constants<coord3d> &constants) {
+
+INLINE coord3d gradient(coord3d* X) const {
+    cg::sync(group_handle);
     coord3d grad = {0.0, 0.0, 0.0};
 
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData(node_id, j, X, dat);
+        ArcData arc = ArcData(node_id, j, X, bdat);
         grad += arc.gradient(constants);
     }
     return grad;
 }
 
-__device__ real_t energy(const coord3d* __restrict__ X, const node_t node_id, const BookkeepingData &dat, const Constants<coord3d> &constants, real_t* __restrict__ reduction_array, real_t* __restrict__ gdata, const node_t N, bool single_block_fullerenes) {
+INLINE real_t energy(coord3d* X) const {
+    cg::sync(group_handle);
     real_t arc_energy = (real_t)0.0;
 
     //(71 + 124) * 3 * N  = 585*N FLOPs
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData(node_id, j, X, dat);
+        ArcData arc = ArcData(node_id, j, X, bdat);
         arc_energy += arc.energy(constants);
     }
-    cg::sync(cg::this_thread_block());
-    reduction_array[threadIdx.x] = arc_energy;
-    // (/N // 32) * log2(32) = N//32  * 5 FLOPs 
-    reduction(reduction_array,gdata, N, single_block_fullerenes); 
-     return reduction_array[0];
+    
+    return reduction<Block_Size_Pow_2>(sdata, arc_energy);;
+
 }
 
-__device__ size_t golden_section_search(coord3d* __restrict__ X, coord3d& direction, coord3d& new_direction,coord3d* __restrict__ X1, coord3d* __restrict__ X2, real_t* __restrict__ reduction_array, real_t* __restrict__ gdata, const node_t node_id, const node_t N, const BookkeepingData& dat, const Constants<coord3d>& constants, cg::thread_group sync_group, bool single_block_fullerenes){
-    real_t tau = (sqrtf(5) - 1) / 2;
+INLINE real_t GSS(coord3d* X, coord3d* X1, coord3d* X2){
+    constexpr real_t tau = (real_t)0.6180339887;
     //Actual coordinates resulting from each traversal 
     //Line search x - values;
     real_t a = 0.0; real_t b = 1.0;
-    real_t x1,  x2;/* , dfc; */ /* TODO: dfc is not used: should it be? */
-
-
+    real_t x1,  x2;
     x1 = (a + (1 - tau) * (b - a));
     x2 = (a + tau * (b - a));
-
     X1[node_id] = X[node_id] + x1 * direction;
     X2[node_id] = X[node_id] + x2 * direction;
-
-
-    cg::sync(sync_group);
-
-    real_t f_a = energy(X1, node_id, dat, constants, reduction_array, gdata, N, single_block_fullerenes);
-    real_t f_b = energy(X2, node_id, dat, constants, reduction_array, gdata, N, single_block_fullerenes);
+    real_t f1 = energy(X1);
+    real_t f2 = energy(X2);
 
     for (uint8_t i = 0; i < 20; i++){
-        if (f_a > f_b){
+        if (f1 > f2){
             a = x1;
             x1 = x2;
-            f_a = f_b;
+            f1 = f2;
             x2 = a + tau * (b - a);
-            cg::sync(sync_group);
             X2[node_id] = X[node_id] + x2 * direction;
-            cg::sync(sync_group);
-            f_b = energy(X2, node_id, dat, constants, reduction_array, gdata, N, single_block_fullerenes);
+            f2 = energy(X2);
         }else
         {
             b = x2;
             x2 = x1;
-            f_b = f_a;
+            f2 = f1;
             x1 = a + (1 - tau) * (b - a);
-            cg::sync(sync_group);
             X1[node_id] = X[node_id] + x1 * direction;
-            cg::sync(sync_group);
-            f_a = energy(X1, node_id, dat, constants, reduction_array, gdata, N, single_block_fullerenes);
+            f1 = energy(X1);
         }
     }
     //Line search coefficient
-    real_t alfa = (a+b)/2;
-    cg::sync(sync_group);
-    X1[node_id] = X[node_id] + alfa*direction;
-    cg::sync(sync_group);
-    new_direction = -gradient(X1,node_id,dat, constants);
-
-    return 22;
+    real_t alpha = (a+b)/2;
+    return alpha;
 }
 
-__device__ size_t brents_method(coord3d* __restrict__ X, coord3d& direction, coord3d& new_direction,coord3d* __restrict__ X1, coord3d* __restrict__ X2, real_t* __restrict__ reduction_array, real_t* __restrict__ gdata, const node_t node_id, const node_t N, const BookkeepingData& dat, const Constants<coord3d>& constants, cg::thread_group sync_group, bool single_block_fullerenes){
-    real_t a,b,s,d;
-    a = (real_t)0.0; b = (real_t)1.0;
-    X1[node_id] = X[node_id] + a * direction;
-    X2[node_id] = X[node_id] + b * direction;
-
-
-    cg::sync(sync_group);
-
-    real_t f_a = energy(X1, node_id, dat, constants, reduction_array, gdata, N, single_block_fullerenes);
-    real_t f_b = energy(X2, node_id, dat, constants, reduction_array, gdata, N, single_block_fullerenes);
-
-    if (f_a < f_b)
-    {
-       swap(a,b);
-    }
-
-    real_t c = a; real_t f_c = f_a;
-    bool flag = true;
-    int Iterations = 0;
-    cg::sync(sync_group);
-    while (abs(b-a) > (real_t)5e-2)
+INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
+{
+    real_t alpha, beta, direction_norm, r0_norm;
+    coord3d r0;
+    direction = -gradient(X); 
+    direction_norm = sqrtf(reduction<Block_Size_Pow_2>(sdata, dot(direction,direction)));
+    direction = direction/direction_norm;
+    r0 = direction;
+    
+    for (size_t i = 0; i < MaxIter; i++)
     {   
-        Iterations++;
-
-        /** Inverse quadratic interpolation **/
-        if ( (f_a != f_c) && (f_b != f_c) )
-        {
-            s = a*f_a*f_c / ((f_a - f_b)*(f_a - f_c)) + b * f_a * f_c / ((f_b-f_a)*(f_b-f_c)) + c*f_a*f_b/((f_c-f_a)*(f_c-f_b));
-        }else /** Secant Method **/
-        {
-            s = b - f_b*(b-a)/(f_b-f_a);
+        beta = 0.0; direction_norm = 0.0; r0_norm = 0.0;
+        alpha = GSS(X,X1,X2);
+        X1[node_id] = X[node_id] + alpha * direction;
+        new_direction = -gradient(X1);
+        //Polak Ribiere method
+        r0_norm = reduction<Block_Size_Pow_2>(sdata, dot(r0, r0));
+        beta = reduction<Block_Size_Pow_2>(sdata, dot(new_direction, (new_direction - r0))) / r0_norm;
+    
+        if (energy(X1) > energy(X))
+        {   
+            X1[node_id] =  X[node_id];
+            new_direction =  r0;
+            beta = 0.0;
         }
-        
-        bool condition_1 = !(s > ((3*a + b)/4) && s < b);
-        bool condition_2 = flag && (abs(s-b) >= abs(b-c)/2);
-        bool condition_3 = !flag && (abs(s-b) >= abs(c-d)/2);
-        bool condition_4 = flag && (abs(b-c) < (real_t)1e-3);
-        bool condition_5 = !flag && (abs(c-d) < (real_t)1e-3);
-
-        if (condition_1 || condition_2 || condition_3 || condition_4 || condition_5)
-        {
-            s = (a+b) / 2; /** Bisection Method **/
-            flag = true;
-        }else
-        {
-            flag = false;
+        else
+        {   
+            X[node_id] = X1[node_id];
+            r0 = new_direction;
         }
-        cg::sync(sync_group);
-        X1[node_id] = X[node_id] + s * direction;
-        cg::sync(sync_group);
-        real_t f_s = energy(X1, node_id, dat, constants, reduction_array, gdata, N, single_block_fullerenes);
+        direction = new_direction + beta*direction;
+        //Calculate gradient and residual gradient norms..
+        cg::sync(group_handle);
+        direction_norm = sqrtf(reduction<Block_Size_Pow_2>(sdata, dot(direction,direction)));
+        //Normalize gradient.
+        direction /= direction_norm;
+    }   
+}  
+};
 
-        d = c;
-        c = b; f_c = f_b;
-        if (f_a*f_s < 0)
-        {
-            b = s; f_b = f_s;
-        }else
-        {
-            a = s; f_a = f_s;
-        }
-        if (abs(f_a) < abs(f_b))
-        {
-            swap(a,b); swap(f_a,f_b);
-        }
-    }
-    real_t alfa = s;
-    cg::sync(sync_group);
-    X1[node_id] = X[node_id] + alfa*direction;
-    cg::sync(sync_group);
-    new_direction = -gradient(X1,node_id,dat, constants);
-
-    return Iterations + 2;
-}
-
-
-__global__ void conjugate_gradient(DevicePointers p, const size_t N, const bool single_block_fullerenes, const size_t MaxIter){
+template <int Block_Size_Pow_2>
+__global__ void kernel_OptimizeBatch(DevicePointers p, const size_t N, const size_t MaxIter){
     extern __shared__ real_t smem[];
     
-
     cg::grid_group grid = cg::this_grid();
     cg::thread_block block = cg::this_thread_block();
 
-    coord3d delta_x0, delta_x1, direction;
-    node_t node_id;
-    size_t offset;
-    size_t gradient_evals = 0;
-    size_t energy_evals = 0;
-    
-    real_t beta, dnorm, r0_norm, direction_norm;
-    beta = dnorm = r0_norm = direction_norm = 0.0;
+    node_t node_id = threadIdx.x;
+    size_t offset = blockIdx.x * blockDim.x;
 
-    //If fullerenes are localized to individual blocks then use block threadIdx else use grid ID and use 1 grid per fullerene with concurrent launches.
-    //If fullerenes are localized to individual blocks then use block size to determine pointer in array, else assume concurrent kernel launches with pointers to individual fullerenes.
-    if (single_block_fullerenes){
-        node_id = threadIdx.x;
-        offset = blockIdx.x * blockDim.x;
-    } else
-    {
-        node_id = blockDim.x * blockIdx.x + threadIdx.x;
-        offset = 0;
-    }
-    
     coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
     coord3d* X1 = &reinterpret_cast<coord3d*>(p.X1)[offset];
     coord3d* X2 = &reinterpret_cast<coord3d*>(p.X2)[offset];
     
-    if (single_block_fullerenes)
-    {
-        coord3d* sX =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 1];
-        coord3d* sX1 =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3) + 2 + N];
-        coord3d* sX2 =&reinterpret_cast<coord3d*>(smem)[(int)ceil(N/3)+ 3 +2*N];  
-        sX[node_id] = X[node_id];
-        sX1[node_id] = sX[node_id];
+    coord3d* sX =&reinterpret_cast<coord3d*>(smem)[(int)ceilf(Block_Size_Pow_2/3)+ 1 ];
+    coord3d* sX1 =&reinterpret_cast<coord3d*>(smem)[(int)ceilf(Block_Size_Pow_2/3)+ 2 + N];
+    coord3d* sX2 =&reinterpret_cast<coord3d*>(smem)[(int)ceilf(Block_Size_Pow_2/3)+ 3 + 2*N];  
+    
+    cg::sync(grid);
 
-        X = &sX[0]; X1 = &sX1[0]; X2 = &sX2[0];
-    } else {
-        X1[node_id] = X[node_id];
-    }
-
+    sX[node_id] = X[node_id];
+    sX1[node_id] = sX[node_id];
+    X = &sX[0]; X1 = &sX1[0]; X2 = &sX2[0];
     
     //Pre-compute force constants and store in registers.
     BookkeepingData bookit = BookkeepingData(&p.neighbours[3*offset],&p.face_right[3*offset],&p.next_on_face[3*offset],&p.prev_on_face[3*offset]);
@@ -445,76 +390,18 @@ __global__ void conjugate_gradient(DevicePointers p, const size_t N, const bool 
     const node_t prev_on_face[3] = {p.prev_on_face[3*(offset+node_id)],p.prev_on_face[3*(offset+node_id) + 1],p.prev_on_face[3*(offset+node_id) + 2]};
     BookkeepingData bookkeeping = BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
 
-    cg::sync(block);
-    
-    direction = gradient(X, node_id ,bookkeeping, constants);
-    gradient_evals ++;
-    
-    smem[threadIdx.x] = dot(direction,direction);
-    real_t old_dnorm;
-    
-    reduction(smem,p.gdata,N,single_block_fullerenes);
-    dnorm = sqrtf(smem[0]);
-    direction = -direction/dnorm;
-    delta_x0 = direction;
-    cg::sync(block);
-    int counter = 0;
-    for (size_t i = 0; i < MaxIter; i++)
-    {   
-        counter++;
-        beta = 0.0; direction_norm = 0.0; dnorm=0.0; r0_norm = 0.0;
-        cg::sync(block);
-        if (single_block_fullerenes){energy_evals += brents_method(X, direction, delta_x1, X1, X2, smem, p.gdata, node_id, N, bookkeeping, constants, block, single_block_fullerenes);} 
-        else {energy_evals += brents_method(X, direction, delta_x1, X1, X2, smem, p.gdata, node_id, N, bookkeeping, constants, grid, single_block_fullerenes);}
-        
-        cg::sync(block);
+    cg::sync(grid);
 
-        gradient_evals++;
-        //Polak Ribiere method
-        
-        smem[threadIdx.x] = dot(delta_x0, delta_x0); reduction(smem,p.gdata,N,single_block_fullerenes); r0_norm = smem[0];
-        cg::sync(block);
-        smem[threadIdx.x] = dot(delta_x1, (delta_x1 - delta_x0)); reduction(smem,p.gdata,N,single_block_fullerenes); beta = smem[0] / r0_norm;
-        cg::sync(block);
-        real_t E1 = energy(X1, node_id, bookkeeping, constants, smem, p.gdata, N, single_block_fullerenes);
-        cg::sync(block);
-        real_t E2 = energy(X, node_id, bookkeeping, constants, smem, p.gdata, N, single_block_fullerenes);
-        cg::sync(block);
-        if (E1> E2)
-        {   
-            X1[node_id] =  X[node_id];
-            delta_x1 =  delta_x0;
-            beta = 0.0;
-        }
-        else
-        {   
-            X[node_id] = X1[node_id];
-            delta_x0 = delta_x1;
-        }
-        direction = delta_x1 + beta*direction;
-        //Calculate gradient and residual gradient norms..
-        cg::sync(block);
-        smem[threadIdx.x] = dot(direction,direction); reduction(smem,p.gdata,N,single_block_fullerenes); direction_norm = sqrtf(smem[0]);
-        cg::sync(block);
-        smem[threadIdx.x] = dot(delta_x1,delta_x1); reduction(smem,p.gdata,N,single_block_fullerenes);dnorm = sqrtf(smem[0]);
-        cg::sync(block);
-        //Normalize gradient.
-        direction /= direction_norm;
-        if (counter%10 == 0){
+    /** Create forcefield struct and use optimization algorithm to optimize the fullerene **/
+    ForceField<Block_Size_Pow_2> FF = ForceField<Block_Size_Pow_2>(bookkeeping, constants, smem, node_id);
+    FF.CG(X,X1,X2,MaxIter);
 
-        if (abs(dnorm - old_dnorm) < (real_t)1e-5)
-        {
-            break;
-        } 
-            old_dnorm = dnorm;
-        }
-        
-    }
-    
+    /** Copy data back from L1 cache to VRAM **/    
     reinterpret_cast<coord3d*>(p.X)[offset + threadIdx.x] = X[threadIdx.x];
 }
 
-__global__ void FullereneProperties(DevicePointers p, int* converged){
+template <int Block_Size_Pow_2>
+__global__ void FullereneProperties(DevicePointers p){
     extern __shared__ coord3d sdata[];
     size_t offset = blockIdx.x * blockDim.x;
     coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
@@ -529,35 +416,45 @@ __global__ void FullereneProperties(DevicePointers p, int* converged){
     real_t NodeEnergy = (real_t)0.0; real_t NodeBond_Error = (real_t)0.0; real_t NodeAngle_Error = (real_t)0.0; real_t NodeDihedral_Error = (real_t)0.0;
     real_t ArcEnergy = (real_t)0.0; real_t ArcBond_Error = (real_t)0.0; real_t ArcAngle_Error = (real_t)0.0; real_t ArcDihedral_Error = (real_t)0.0;
     
+    ForceField<Block_Size_Pow_2> FF = ForceField<Block_Size_Pow_2>(bdat, constants, reinterpret_cast<real_t*>(sdata), threadIdx.x);
     
     for (uint8_t j = 0; j < 3; j++)
     {
-        ArcData arc = ArcData(threadIdx.x, j, X, bdat);
+        auto arc = ForceField<Block_Size_Pow_2>::ArcData(threadIdx.x, j, X, bdat);
         ArcEnergy = arc.dihedral_energy(constants);
         ArcBond_Error = abs(abs(arc.rab - get(constants.r0,j))/get(constants.r0,j));
         ArcAngle_Error =  abs(abs(arc.angle() - get(constants.angle0,j))/get(constants.angle0,j));
         ArcDihedral_Error = abs(abs(arc.dihedral() - get(constants.inner_dih0,j))/get(constants.inner_dih0,j));
 
-        NodeAngle_Error += ArcAngle_Error;
-        NodeBond_Error += ArcBond_Error;
-        NodeDihedral_Error += ArcDihedral_Error;
+        NodeEnergy += ArcEnergy; NodeBond_Error += ArcBond_Error; NodeAngle_Error += ArcAngle_Error; NodeDihedral_Error += ArcDihedral_Error;
+        reinterpret_cast<real_t*>(NodeEnergyCoord)[threadIdx.x*3 + j] =  ArcEnergy;
+        sdata[threadIdx.x*3 + j] = arc.gradient(constants);
     }
-   
-    real_t Energy = energy(X,threadIdx.x,bdat,constants,reinterpret_cast<real_t*>(sdata),p.gdata,blockDim.x,true);
+    real_t Energy = FF.energy(X);
     reinterpret_cast<real_t*>(sdata)[threadIdx.x] = NodeDihedral_Error/3.0; reduction(reinterpret_cast<real_t*>(sdata)); real_t AvgDihedralErr = reinterpret_cast<real_t*>(sdata)[0]/blockDim.x; cg::sync(cg::this_thread_block());
     reinterpret_cast<real_t*>(sdata)[threadIdx.x] = NodeAngle_Error/3.0; reduction(reinterpret_cast<real_t*>(sdata)); real_t AvgAngleErr = reinterpret_cast<real_t*>(sdata)[0]/blockDim.x; cg::sync(cg::this_thread_block());
     reinterpret_cast<real_t*>(sdata)[threadIdx.x] = NodeBond_Error/3.0 ; reduction(reinterpret_cast<real_t*>(sdata)); real_t AvgBondErr = reinterpret_cast<real_t*>(sdata)[0]/blockDim.x; cg::sync(cg::this_thread_block());
+    /*
+    if ((threadIdx.x + blockIdx.x * blockDim.x)== 0)
+    {
+        printf("Average Node Energy: "); print(Energy/blockDim.x); 
+        printf("Average Bond Error: "); print(AvgBondErr);
+        printf("Average Angle Error: "); print(AvgAngleErr);
+        printf("Average Dihedral Error: "); print(AvgDihedralErr);
+    }*/
+
+    //Check convergence via gradient:
+    reinterpret_cast<real_t*>(sdata)[threadIdx.x] = dot(FF.gradient(X),FF.gradient(X)); reduction(reinterpret_cast<real_t*>(sdata)); real_t GradSum = sqrt(reinterpret_cast<real_t*>(sdata)[0])/blockDim.x; cg::sync(cg::this_thread_block());
 
     if (threadIdx.x == 0){
     if (AvgBondErr < 5e-2)
     {
-        converged[0] = 1;
+        p.gdata[blockIdx.x] = (real_t)1.0;
     } else
     {
-        converged[0] = 0;
+       p.gdata[blockIdx.x] = (real_t)0.0;
     }}
-    
-    cg::sync(cg::this_thread_block());
+    cg::sync(cg::this_grid());
     real_t Success = 0;
     if ((threadIdx.x + blockIdx.x * blockDim.x) == 0)
     {
@@ -566,8 +463,13 @@ __global__ void FullereneProperties(DevicePointers p, int* converged){
             Success += p.gdata[i];
         }
     }
+    
+    if( (threadIdx.x + blockIdx.x * blockDim.x)== 0){
+        printf("%d", (int)Success); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);
+    }   
 }
 
+template <int Block_Size_Pow_2>
 __global__ void kernel_InternalCoordinates(DevicePointers p){
     size_t offset = blockIdx.x * blockDim.x;
     coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
@@ -578,16 +480,15 @@ __global__ void kernel_InternalCoordinates(DevicePointers p){
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
     for (uint8_t j = 0; j < 3; j++)
     {   
-        ArcData arc = ArcData(threadIdx.x, j, X, bdat);
+        auto arc = ForceField<Block_Size_Pow_2>::ArcData(threadIdx.x, j, X, bdat);
         p.bonds[tid*3 + j] = arc.bond();
         p.angles[tid*3 + j] = arc.angle();
         p.dihedrals[tid*3 + j] = arc.dihedral();
     }
 }
-
+template <int Block_Size_Pow_2>
 __global__ void kernel_HarmonicConstants(DevicePointers p){
     size_t offset = blockIdx.x * blockDim.x;
-    coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
     BookkeepingData bookit = BookkeepingData(&p.neighbours[3*(offset)],&p.face_right[3*(offset)],&p.next_on_face[3*(offset)],&p.prev_on_face[3*(offset)]);
     Constants<coord3d> constants = compute_constants<coord3d>(bookit,threadIdx.x);
     BookkeepingData bdat = BookkeepingData(&p.neighbours[3*(offset + threadIdx.x)],&p.face_right[3*(offset + threadIdx.x)],&p.next_on_face[3*(offset + threadIdx.x)],&p.prev_on_face[3*(offset + threadIdx.x)]);
@@ -601,35 +502,39 @@ __global__ void kernel_HarmonicConstants(DevicePointers p){
     }
 }
 
+template <int Block_Size_Pow_2>
 __global__ void kernel_Gradients(DevicePointers p){
+    __shared__ real_t sdata[1024];
     size_t offset = blockIdx.x * blockDim.x;
     coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
     BookkeepingData bookit = BookkeepingData(&p.neighbours[3*(offset)],&p.face_right[3*(offset)],&p.next_on_face[3*(offset)],&p.prev_on_face[3*(offset)]);
     Constants<coord3d> constants = compute_constants<coord3d>(bookit,threadIdx.x);
     BookkeepingData bdat = BookkeepingData(&p.neighbours[3*(offset + threadIdx.x)],&p.face_right[3*(offset + threadIdx.x)],&p.next_on_face[3*(offset + threadIdx.x)],&p.prev_on_face[3*(offset + threadIdx.x)]);
 
+    ForceField<Block_Size_Pow_2> FF = ForceField<Block_Size_Pow_2>(bdat, constants, sdata, threadIdx.x);
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
     for (uint8_t j = 0; j < 3; j++)
     {   
-        ArcData arc = ArcData(threadIdx.x, j, X, bdat);
-        reinterpret_cast<coord3d*>(p.gradients)[tid] += gradient(X,threadIdx.x, bdat, constants);
+        auto arc = ForceField<Block_Size_Pow_2>::ArcData(threadIdx.x, j, X, bdat);
+        reinterpret_cast<coord3d*>(p.gradients)[tid] += FF.gradient(X);
     }
 }
 
-
+template <int Block_Size_Pow_2>    
 size_t computeBatchSize(size_t N){
     cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties,0);
-    assert(properties.concurrentKernels == true);    
-    return (size_t)(128*5);
-}
 
-void CopyToDevice(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size){
-    cudaMemcpy(p.X, h.h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
-    cudaMemcpy(p.neighbours, h.h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(p.next_on_face, h.h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(p.prev_on_face, h.h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
-    cudaMemcpy(p.face_right, h.h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    /** Compiling with --maxrregcount=64   is necessary to easily (singular blocks / fullerene) parallelize fullerenes of size 20-1024 !**/
+    int fullerenes_per_block;
+    
+    /** Needs 3 storage arrays for coordinates and 1 for reductions **/
+    int sharedMemoryPerBlock = sizeof(coord3d)* 3 * (Block_Size_Pow_2 + 1) + sizeof(real_t)*N;
+
+    /** Calculates maximum number of resident fullerenes on a single Streaming Multiprocessor, multiply with multi processor count to get total batch size**/
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&fullerenes_per_block, kernel_OptimizeBatch<Block_Size_Pow_2>, N, sharedMemoryPerBlock);
+
+    return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
 }
 
 void AllocateDevicePointers(DevicePointers& p, size_t N, size_t batch_size){
@@ -669,225 +574,79 @@ void FreePointers(DevicePointers& p){
     
     cudaDeviceReset();
 }
-DevicePointers* ConcurrentKernelLaunch(DevicePointers& p, const HostPointers& h, void* kernel, const size_t N, const size_t batch_size, const size_t MaxIter){
-    cudaDeviceProp properties;
-    cudaGetDeviceProperties(&properties,0);
-    assert(properties.concurrentKernels == true);  
 
-    CopyToDevice(p,h,N,batch_size);
-
-    bool single_block_fullerenes = true;
-    cudaStream_t stream[128];
-    for (size_t i = 0; i < 128; i++)
-    {
-        cudaStreamCreateWithFlags(&stream[i],cudaStreamNonBlocking);
-    }
-    
-    DevicePointers stream_pointers[batch_size];
-
-    real_t* dc_X[batch_size];
-    real_t* dc_X1[batch_size]; 
-    real_t* dc_X2[batch_size]; 
-    node_t* dc_neighbours[batch_size]; 
-    node_t* dc_next_on_face[batch_size]; 
-    node_t* dc_prev_on_face[batch_size]; 
-    uint8_t* dc_face_right[batch_size]; 
-    real_t* dc_gdata[batch_size];
-
-    real_t* dc_bonds[batch_size];
-    real_t* dc_angles[batch_size];
-    real_t* dc_dihedrals[batch_size];
-    real_t* dc_bond_0[batch_size];
-    real_t* dc_angle_0[batch_size];
-    real_t* dc_dihedral_0[batch_size];
-    real_t* dc_gradients[batch_size];
-
-    for (size_t i = 0; i < batch_size; i++)
-    {
-        dc_X[i] = &p.X[i*N*3]; dc_X1[i] = &p.X1[i*N*3]; dc_X2[i] = &p.X2[i*N*3]; dc_neighbours[i] = &p.neighbours[i*N*3]; dc_next_on_face[i] = &p.next_on_face[i*N*3]; dc_prev_on_face[i] = &p.prev_on_face[i*N*3];
-        dc_face_right[i] = &p.face_right[i*N*3]; dc_gdata[i] = &p.gdata[i]; dc_bonds[i] = &p.bonds[i*N*3]; dc_angles[i] = &p.angles[i*N*3]; dc_dihedrals[i] = &p.dihedrals[i*N*3]; dc_bond_0[i] = &p.bond_0[i*N*3]; dc_dihedral_0[i] = &p.dihedral_0[i*N*3]; dc_gradients[i] = &p.gradients[i*N*3];
-
-        stream_pointers[i] = DevicePointers(dc_X[i],dc_X1[i],dc_X2[i], dc_neighbours[i], dc_next_on_face[i], dc_prev_on_face[i], dc_face_right[i], dc_gdata[i], dc_bonds[i], dc_angles[i], dc_dihedrals[i], dc_bond_0[i], dc_angle_0[i], dc_dihedral_0[i], dc_gradients[i]);
-    }
-    
-    for (size_t i = 0; i < batch_size; i++)
-    {   
-        void* kernelArgs[] = {
-        (void*)&stream_pointers[i],
-        (void*)&N,
-        (void*)&single_block_fullerenes,
-        (void*)&MaxIter
-        };
-        cudaLaunchCooperativeKernel((void*)kernel, dim3(1, 1, 1), dim3(N, 1, 1), kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, stream[i%128]);
-    }
-
-    cudaDeviceSynchronize();
-    return stream_pointers;
+void CopyToDevice(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size){
+    cudaMemcpy(p.X, h.h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
+    cudaMemcpy(p.neighbours, h.h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.next_on_face, h.h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.prev_on_face, h.h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.face_right, h.h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
 }
 
+template <int Block_Size_Pow_2>
 void CheckBatch(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size){
-    int converged[batch_size];
-    for (size_t i = 0; i < batch_size; i++)
-    {
-        converged[i] = 0;
-    }
-    
     CopyToDevice(p,h,N,batch_size);
-    cudaStream_t stream[128];
-    for (size_t i = 0; i < 128; i++)
-    {
-        cudaStreamCreateWithFlags(&stream[i],cudaStreamNonBlocking);
-    }
-    
-    DevicePointers stream_pointers[batch_size];
-
-    real_t* dc_X[batch_size];
-    real_t* dc_X1[batch_size]; 
-    real_t* dc_X2[batch_size]; 
-    node_t* dc_neighbours[batch_size]; 
-    node_t* dc_next_on_face[batch_size]; 
-    node_t* dc_prev_on_face[batch_size]; 
-    uint8_t* dc_face_right[batch_size]; 
-    real_t* dc_gdata[batch_size];
-
-    real_t* dc_bonds[batch_size];
-    real_t* dc_angles[batch_size];
-    real_t* dc_dihedrals[batch_size];
-    real_t* dc_bond_0[batch_size];
-    real_t* dc_angle_0[batch_size];
-    real_t* dc_dihedral_0[batch_size];
-    real_t* dc_gradients[batch_size];
-
-    for (size_t i = 0; i < batch_size; i++)
-    {
-        dc_X[i] = &p.X[i*N*3]; dc_X1[i] = &p.X1[i*N*3]; dc_X2[i] = &p.X2[i*N*3]; dc_neighbours[i] = &p.neighbours[i*N*3]; dc_next_on_face[i] = &p.next_on_face[i*N*3]; dc_prev_on_face[i] = &p.prev_on_face[i*N*3];
-        dc_face_right[i] = &p.face_right[i*N*3]; dc_gdata[i] = &p.gdata[i]; dc_bonds[i] = &p.bonds[i*N*3]; dc_angles[i] = &p.angles[i*N*3]; dc_dihedrals[i] = &p.dihedrals[i*N*3]; dc_bond_0[i] = &p.bond_0[i*N*3]; dc_dihedral_0[i] = &p.dihedral_0[i*N*3]; dc_gradients[i] = &p.gradients[i*N*3];
-
-        stream_pointers[i] = DevicePointers(dc_X[i],dc_X1[i],dc_X2[i], dc_neighbours[i], dc_next_on_face[i], dc_prev_on_face[i], dc_face_right[i], dc_gdata[i], dc_bonds[i], dc_angles[i], dc_dihedrals[i], dc_bond_0[i], dc_angle_0[i], dc_dihedral_0[i], dc_gradients[i]);
-    }
-    
-    int* d_converged;
-    int* dc_converged[batch_size];
-    cudaMalloc(&d_converged,sizeof(int)*batch_size);
-    for (size_t i = 0; i < batch_size; i++)
-    {   
-        dc_converged[i] = &d_converged[i];
-        void* kernelArgs[] = {(void*)&stream_pointers[i], (void*)&dc_converged[i]};
-        cudaLaunchCooperativeKernel((void*)FullereneProperties, dim3(1, 1, 1), dim3(N, 1, 1), kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, stream[i%128]);
-    }
-    cudaDeviceSynchronize();
-    for (size_t i = 0; i < batch_size; i++)
-    {
-        cudaMemcpy(&converged[i],dc_converged[i],sizeof(int), cudaMemcpyDeviceToHost);
-    }
-    
-    size_t num_success = 0;
-    for (size_t i = 0; i < batch_size; i++)
-    {
-        num_success += converged[i];
-    }
-    
-    printf("%d / %d Converged in batch\n", num_success, batch_size );
+    void* kernelArgs[] = {(void*)&p};
+    cudaLaunchCooperativeKernel((void*)FullereneProperties<Block_Size_Pow_2>, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
 }
 
+template <int Block_Size_Pow_2>
 void InternalCoordinates(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, real_t* bonds, real_t* angles, real_t* dihedrals){
     CopyToDevice(p,h,N,batch_size);
     void* kernelArgs[] = {(void*)&p};
-    cudaLaunchCooperativeKernel((void*)kernel_InternalCoordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+    cudaLaunchCooperativeKernel((void*)kernel_InternalCoordinates<Block_Size_Pow_2>, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
     cudaDeviceSynchronize();
     cudaMemcpy(bonds, p.bonds, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
     cudaMemcpy(angles, p.angles, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
     cudaMemcpy(dihedrals, p.dihedrals, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
 }
 
+template <int Block_Size_Pow_2>
 void HarmonicConstants(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, real_t* bond_0, real_t* angle_0, real_t* dihedral_0){
     CopyToDevice(p,h,N,batch_size);
     void* kernelArgs[] = {(void*)&p};
-    cudaLaunchCooperativeKernel((void*)kernel_HarmonicConstants, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+    cudaLaunchCooperativeKernel((void*)kernel_HarmonicConstants<Block_Size_Pow_2>, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
     cudaDeviceSynchronize();
     cudaMemcpy(bond_0, p.bond_0, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
     cudaMemcpy(angle_0, p.angle_0, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
     cudaMemcpy(dihedral_0, p.dihedral_0, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
 }
 
+template <int Block_Size_Pow_2>
 void Gradients(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, real_t* gradients){
     CopyToDevice(p,h,N,batch_size);
     void* kernelArgs[] = {(void*)&p};
-    DevicePointers* stream_pointers = ConcurrentKernelLaunch(p,h, (void*)kernel_Gradients,N, batch_size, 0);
-    for (size_t i = 0; i < batch_size; i++)
-    {
-        cudaMemcpyAsync(&gradients[i*3*N], stream_pointers[i].gradients, sizeof(coord3d)*N, cudaMemcpyDeviceToHost);
-    }
+    cudaLaunchCooperativeKernel((void*)kernel_Gradients<Block_Size_Pow_2>, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(coord3d)*3*N, NULL);
+    cudaDeviceSynchronize();
+    cudaMemcpy(gradients, p.gradients, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
 }
 
-
-
+template <int Block_Size_Pow_2>
 void OptimizeBatch(DevicePointers& p, HostPointers& h, const size_t N, const size_t batch_size, const size_t MaxIter){
+    getLastCudaError("One or more Mallocs Failed! \n");
+    cudaMemcpy(p.X, h.h_X, sizeof(coord3d)*N*batch_size , cudaMemcpyHostToDevice);
+    cudaMemcpy(p.neighbours, h.h_cubic_neighbours, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.next_on_face, h.h_next_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.prev_on_face, h.h_prev_on_face, sizeof(node_t)*3*N*batch_size, cudaMemcpyHostToDevice);
+    cudaMemcpy(p.face_right, h.h_face_right, sizeof(uint8_t)*3*N*batch_size, cudaMemcpyHostToDevice);
     getLastCudaError("Memcpy Failed! \n");
-
     auto start = std::chrono::system_clock::now();
-    
-    CopyToDevice(p,h,N,batch_size);
+    void* kernelArgs[] = {
+    (void*)&p,
+    (void*)&N,
+    (void*)&MaxIter
+    };
 
-    bool single_block_fullerenes = true;
-    cudaStream_t stream[128];
-    for (size_t i = 0; i < 128; i++)
-    {
-        cudaStreamCreateWithFlags(&stream[i],cudaStreamNonBlocking);
-    }
-    
-    DevicePointers stream_pointers[batch_size];
-
-    real_t* dc_X[batch_size];
-    real_t* dc_X1[batch_size]; 
-    real_t* dc_X2[batch_size]; 
-    node_t* dc_neighbours[batch_size]; 
-    node_t* dc_next_on_face[batch_size]; 
-    node_t* dc_prev_on_face[batch_size]; 
-    uint8_t* dc_face_right[batch_size]; 
-    real_t* dc_gdata[batch_size];
-
-    real_t* dc_bonds[batch_size];
-    real_t* dc_angles[batch_size];
-    real_t* dc_dihedrals[batch_size];
-    real_t* dc_bond_0[batch_size];
-    real_t* dc_angle_0[batch_size];
-    real_t* dc_dihedral_0[batch_size];
-    real_t* dc_gradients[batch_size];
-
-    for (size_t i = 0; i < batch_size; i++)
-    {
-        dc_X[i] = &p.X[i*N*3]; dc_X1[i] = &p.X1[i*N*3]; dc_X2[i] = &p.X2[i*N*3]; dc_neighbours[i] = &p.neighbours[i*N*3]; dc_next_on_face[i] = &p.next_on_face[i*N*3]; dc_prev_on_face[i] = &p.prev_on_face[i*N*3];
-        dc_face_right[i] = &p.face_right[i*N*3]; dc_gdata[i] = &p.gdata[i]; dc_bonds[i] = &p.bonds[i*N*3]; dc_angles[i] = &p.angles[i*N*3]; dc_dihedrals[i] = &p.dihedrals[i*N*3]; dc_bond_0[i] = &p.bond_0[i*N*3]; dc_dihedral_0[i] = &p.dihedral_0[i*N*3]; dc_gradients[i] = &p.gradients[i*N*3];
-
-        stream_pointers[i] = DevicePointers(dc_X[i],dc_X1[i],dc_X2[i], dc_neighbours[i], dc_next_on_face[i], dc_prev_on_face[i], dc_face_right[i], dc_gdata[i], dc_bonds[i], dc_angles[i], dc_dihedrals[i], dc_bond_0[i], dc_angle_0[i], dc_dihedral_0[i], dc_gradients[i]);
-    }
-    
-    for (size_t i = 0; i < batch_size; i++)
-    {   
-        void* kernelArgs[] = {
-        (void*)&stream_pointers[i],
-        (void*)&N,
-        (void*)&single_block_fullerenes,
-        (void*)&MaxIter
-        };
-        cudaLaunchCooperativeKernel((void*)conjugate_gradient, dim3(1, 1, 1), dim3(N, 1, 1), kernelArgs, sizeof(coord3d)*3*(N+1) + sizeof(real_t)*N, stream[i%128]);
-    }
-
+    cudaLaunchCooperativeKernel((void*)kernel_OptimizeBatch<Block_Size_Pow_2>, dim3(batch_size, 1, 1), dim3(N, 1, 1), kernelArgs, sizeof(coord3d)*3*(Block_Size_Pow_2+1) + sizeof(real_t)*N, NULL);
     cudaDeviceSynchronize();
-
     auto end = std::chrono::system_clock::now();
     getLastCudaError("Failed to launch kernel: ");
-    for (size_t i = 0; i < batch_size; i++)
-    {
-        cudaMemcpyAsync(&h.h_X[i*3*N], stream_pointers[i].X, sizeof(coord3d)*N, cudaMemcpyDeviceToHost);
-    }
     
-    cudaDeviceSynchronize();
+    cudaMemcpy(h.h_X, p.X, sizeof(coord3d)*N*batch_size , cudaMemcpyDeviceToHost);
     getLastCudaError("Failed to copy back: ");
     
     std::cout << "Elapsed time: " << (end-start)/ 1ms << "ms\n" ;
     std::cout << "Estimated Performance " << ((real_t)(batch_size)/(std::chrono::duration_cast<std::chrono::microseconds>(end-start)).count()) * 1.0e6 << "Fullerenes/s \n";
 }
-
 };
+

@@ -121,7 +121,7 @@ int main(int ac, char **argv)
     Topt += system_clock::now()-t0;
     auto t6 = system_clock::now();
     IsomerspaceForcefield::CheckBatch(d_pointers, h_pointers,N,this_batch_size);
-    IsomerspaceForcefield::InternalCoordinates(d_pointers, h_pointers, N, this_batch_size, bonds,angles,dihedrals);
+    //IsomerspaceForcefield::InternalCoordinates(d_pointers, h_pointers, N, this_batch_size, bonds,angles,dihedrals);
     Tcheck += system_clock::now()-t6;
     // Now do something with the optimized geometries
     for(size_t i=0;i<this_batch_size;i++){

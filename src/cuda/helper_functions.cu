@@ -60,20 +60,22 @@ __constant__ real_t angle_forces[2] = {207.924,216.787};
 __constant__ real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
 __constant__ real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
 
-__device__ __host__ struct BookkeepingData{
+struct BookkeepingData{
     const node_t* neighbours;
     const uint8_t* face_right;
     const node_t* next_on_face;
     const node_t* prev_on_face;
-    __device__ __host__ BookkeepingData (const node_t* neighbours, const uint8_t* face_right, const node_t* next_on_face, const node_t* prev_on_face) : 
+    __device__ BookkeepingData(const node_t* neighbours, const uint8_t* face_right, const node_t* next_on_face, const node_t* prev_on_face) : 
         neighbours(neighbours), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
+
+    __device__ BookkeepingData(const BookkeepingData &b1): neighbours(b1.neighbours), face_right(b1.face_right), next_on_face(b1.next_on_face), prev_on_face(b1.prev_on_face){}
 };
 
 
 
 
 template <typename T>
-__device__ struct Constants{
+struct Constants{
     const T f_bond;
     const T f_inner_angle;
     const T f_inner_dihedral;
@@ -95,9 +97,14 @@ __device__ struct Constants{
                             f_inner_dihedral(f_inner_dihedral), f_outer_angle_m(f_outer_angle_m), f_outer_angle_p(f_outer_angle_p), f_outer_dihedral(f_outer_dihedral), r0(r0), angle0(angle0), outer_angle_m0(outer_angle_m0), outer_angle_p0(outer_angle_p0),
                             inner_dih0(inner_dih0), outer_dih0_a(outer_dih0_a), outer_dih0_m(outer_dih0_m), outer_dih0_p(outer_dih0_p) {}
 
+
+    __device__ Constants(const Constants<T> &c1):   f_bond(c1.f_bond), f_inner_angle(c1.f_inner_angle), f_inner_dihedral(c1.f_inner_dihedral), f_outer_angle_m(c1.f_outer_angle_m), f_outer_angle_p(c1.f_outer_angle_p), f_outer_dihedral(c1.f_outer_dihedral),
+                                                    r0(c1.r0), angle0(c1.angle0), outer_angle_m0(c1.outer_angle_m0), outer_angle_p0(c1.outer_angle_p0), inner_dih0(c1.inner_dih0), outer_dih0_a(c1.outer_dih0_a), outer_dih0_m(c1.outer_dih0_m), outer_dih0_p(c1.outer_dih0_p){
+        
+    }
 };
 
-__device__ struct EnergyConstants{
+struct EnergyConstants{
     const coord3d f_bond;
     const coord3d f_inner_angle;
     const coord3d f_inner_dihedral;
@@ -109,7 +116,7 @@ __device__ struct EnergyConstants{
                             f_inner_dihedral(f_inner_dihedral),r0(r0), angle0(angle0), inner_dih0(inner_dih0) {}
 };
 
-__device__ struct ArcConstants{
+struct ArcConstants{
     const real_t f_bond;
     const real_t f_inner_angle;
     const real_t f_inner_dihedral;
@@ -207,7 +214,7 @@ __device__ ArcConstants compute_arc_constants(BookkeepingData &dat, node_t node_
 
 
 //Reduction method for single block fullerenes.
-__device__ void reduction(real_t *sdata){
+__device__ real_t reduction(real_t *sdata){
 
     cg::thread_block block = cg::this_thread_block();
     cg::sync(block);
@@ -224,10 +231,31 @@ __device__ void reduction(real_t *sdata){
         sdata[0] = beta;
     }
     cg::sync(block);
+    return sdata[0];
 }
 
+template <int Block_Size_Pow_2>
+__device__ real_t reduction(real_t* sdata, const real_t data){
+    sdata[threadIdx.x] = data;
+    cg::thread_block block = cg::this_thread_block();
+    cg::sync(block);
+    
+    if((Block_Size_Pow_2 > 512)){if (threadIdx.x < 512){sdata[threadIdx.x] += sdata[threadIdx.x + 512];} cg::sync(block);}
+    if((Block_Size_Pow_2 > 256)){if (threadIdx.x < 256){sdata[threadIdx.x] += sdata[threadIdx.x + 256];} cg::sync(block);}
+    if((Block_Size_Pow_2 > 128)){if (threadIdx.x < 128){sdata[threadIdx.x] += sdata[threadIdx.x + 128];} cg::sync(block);}
+    if((Block_Size_Pow_2 > 64)){if (threadIdx.x < 64){sdata[threadIdx.x] += sdata[threadIdx.x + 64];} cg::sync(block);}
+    if(threadIdx.x < 32){
+    if((Block_Size_Pow_2 > 32)){if (threadIdx.x < 32){sdata[threadIdx.x] += sdata[threadIdx.x + 32];} __syncwarp();}
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
+    sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<real_t>());
+    }
+    cg::sync(block);
+    real_t sum = sdata[0];
+    cg::sync(block);
+    return sum;
+}
 
-__device__ void reduction(half *sdata){
+__device__ half reduction(half *sdata){
 
     cg::thread_block block = cg::this_thread_block();
     cg::sync(block);
@@ -244,6 +272,7 @@ __device__ void reduction(half *sdata){
         sdata[0] = beta;
     }
     cg::sync(block);
+    return sdata[0];
 }
 
 //Multi purpose reduction algorithm (Small or Large fullerenes).
@@ -414,3 +443,11 @@ __device__ void sequential_print(T* data, size_t N){
         cg::sync(cg::this_thread_block());
     }
 }
+
+template <typename T>
+__HD__ void swap(T& a, T& b){
+    T temp = a;
+    a = b;
+    b = temp;
+}
+
