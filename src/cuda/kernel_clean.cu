@@ -28,8 +28,8 @@ struct DevicePointers; struct HostPointers;
 /** This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions**/
 template <int Block_Size_Pow_2>
 struct ForceField{
-    coord3d new_direction,              //d_i+1 In conjugated gradient algorithm  Buster p. 36
-            direction;                  //d_0 In conjugated gradient algorithm Buster p. 36
+    coord3d r1,              //d_i+1 In conjugated gradient algorithm  Buster p. 36
+            r0;                  //d_0 In conjugated gradient algorithm Buster p. 36
 
     const BookkeepingData bdat;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
     const Constants<coord3d> constants; //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
@@ -56,8 +56,8 @@ struct ArcData{
         //printf("Index: %d \n", a*3 + j);
 
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
-        ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab; rab = non_resciprocal_bond_length(ab);
-        ac = (X[bdat.neighbours[(j+1)%3]] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac;
+        ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;
+        ac = (X[bdat.neighbours[(j+1)%3]] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac; //rab = non_resciprocal_bond_length(ab);
         ad = (X[bdat.neighbours[(j+2)%3]] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
         
         coord3d bp = (X[bdat.next_on_face[j]] - X_b); bp_hat = unit_vector(bp);
@@ -87,7 +87,9 @@ struct ArcData{
     }
 
     //1 FLOP
-    INLINE real_t bond() const {return (real_t)rab;}
+    
+    INLINE real_t bond() const {return (real_t)1.0/r_rab;}
+    //INLINE real_t bond() const {return (real_t)1.0/r_rab;}
 
     //5 FLOPs
     INLINE real_t angle() const {return dot(ab_hat,ac_hat);}
@@ -217,9 +219,8 @@ struct ArcData{
     
     uint8_t j;
 
-    //Residual lengths of arcs ab, ac, am, ap.
+    //Reciprocal lengths of arcs ab, ac, am, ap.
     real_t
-        rab,
         r_rab,
         r_rac,
         r_rad,
@@ -262,6 +263,7 @@ INLINE coord3d gradient(coord3d* X) const {
         ArcData arc = ArcData(node_id, j, X, bdat);
         grad += arc.gradient(constants);
     }
+
     return grad;
 }
 
@@ -279,16 +281,16 @@ INLINE real_t energy(coord3d* X) const {
 
 }
 
-INLINE real_t GSS(coord3d* X, coord3d* X1, coord3d* X2){
+INLINE real_t GSS(coord3d* X, const coord3d& r0, coord3d* X1, coord3d* X2){
     constexpr real_t tau = (real_t)0.6180339887;
-    //Actual coordinates resulting from each traversal 
     //Line search x - values;
     real_t a = 0.0; real_t b = 1.0;
     real_t x1,  x2;
     x1 = (a + (1 - tau) * (b - a));
     x2 = (a + tau * (b - a));
-    X1[node_id] = X[node_id] + x1 * direction;
-    X2[node_id] = X[node_id] + x2 * direction;
+    //Actual coordinates resulting from each traversal 
+    X1[node_id] = X[node_id] + x1 * r0;
+    X2[node_id] = X[node_id] + x2 * r0;
     real_t f1 = energy(X1);
     real_t f2 = energy(X2);
 
@@ -298,7 +300,7 @@ INLINE real_t GSS(coord3d* X, coord3d* X1, coord3d* X2){
             x1 = x2;
             f1 = f2;
             x2 = a + tau * (b - a);
-            X2[node_id] = X[node_id] + x2 * direction;
+            X2[node_id] = X[node_id] + x2 * r0;
             f2 = energy(X2);
         }else
         {
@@ -306,7 +308,7 @@ INLINE real_t GSS(coord3d* X, coord3d* X1, coord3d* X2){
             x2 = x1;
             f2 = f1;
             x1 = a + (1 - tau) * (b - a);
-            X1[node_id] = X[node_id] + x1 * direction;
+            X1[node_id] = X[node_id] + x1 * r0;
             f1 = energy(X1);
         }
     }
@@ -317,62 +319,59 @@ INLINE real_t GSS(coord3d* X, coord3d* X1, coord3d* X2){
 
 INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
 {
-    real_t alpha, beta, direction_norm, r0_norm;
-    coord3d r0;
-    direction = -gradient(X); 
-    direction_norm = sqrtf(reduction<Block_Size_Pow_2>(sdata, dot(direction,direction)));
-    direction = direction/direction_norm;
-    r0 = direction;
-    
+    real_t alpha, beta, g0_norm2, s_norm;
+    coord3d g0,g1,s;
+    g0 = gradient(X); 
+    s = -g0;
+    s_norm = sqrt(reduction<Block_Size_Pow_2>(sdata, dot(s,s)));
+    s /= s_norm; 
     for (size_t i = 0; i < MaxIter; i++)
     {   
-        beta = 0.0; direction_norm = 0.0; r0_norm = 0.0;
-        alpha = GSS(X,X1,X2);
-        X1[node_id] = X[node_id] + alpha * direction;
-        new_direction = -gradient(X1);
+        alpha = GSS(X,s,X1,X2);
+        X1[node_id] = X[node_id] + alpha * s;
+        g1 = gradient(X1);
         //Polak Ribiere method
-        r0_norm = reduction<Block_Size_Pow_2>(sdata, dot(r0, r0));
-        beta = reduction<Block_Size_Pow_2>(sdata, dot(new_direction, (new_direction - r0))) / r0_norm;
-    
+        g0_norm2 = reduction<Block_Size_Pow_2>(sdata, dot(g0, g0));
+        beta = max(reduction<Block_Size_Pow_2>(sdata, dot(g1, (g1 - g0))) / g0_norm2,(real_t)0.0);
+        s = -g1 + beta*s;
+        
         if (energy(X1) > energy(X))
         {   
             X1[node_id] =  X[node_id];
-            new_direction =  r0;
+            g1 =  g0;
             beta = 0.0;
         }
         else
         {   
             X[node_id] = X1[node_id];
-            r0 = new_direction;
+            g0 = g1;
         }
-        direction = new_direction + beta*direction;
-        //Calculate gradient and residual gradient norms..
-        cg::sync(group_handle);
-        direction_norm = sqrtf(reduction<Block_Size_Pow_2>(sdata, dot(direction,direction)));
-        //Normalize gradient.
-        direction /= direction_norm;
+        s_norm = sqrt(reduction<Block_Size_Pow_2>(sdata, dot(s,s)));
+        s /= s_norm; 
     }   
-}  
+} 
+
+
 };
 
 template <int Block_Size_Pow_2>
 __global__ void kernel_OptimizeBatch(DevicePointers p, const size_t N, const size_t MaxIter){
     extern __shared__ real_t smem[];
-    
+    real_t* base_pointer = smem + Block_Size_Pow_2;
     cg::grid_group grid = cg::this_grid();
     cg::thread_block block = cg::this_thread_block();
 
     node_t node_id = threadIdx.x;
     size_t offset = blockIdx.x * blockDim.x;
 
-    coord3d* X = &reinterpret_cast<coord3d*>(p.X)[offset];
-    coord3d* X1 = &reinterpret_cast<coord3d*>(p.X1)[offset];
-    coord3d* X2 = &reinterpret_cast<coord3d*>(p.X2)[offset];
+    coord3d* X = reinterpret_cast<coord3d*>(p.X+3*offset);
+    coord3d* X1 = reinterpret_cast<coord3d*>(p.X1+3*offset);
+    coord3d* X2 = reinterpret_cast<coord3d*>(p.X2+3*offset);
     
-    coord3d* sX =&reinterpret_cast<coord3d*>(smem)[(int)ceilf(Block_Size_Pow_2/3)+ 1 ];
-    coord3d* sX1 =&reinterpret_cast<coord3d*>(smem)[(int)ceilf(Block_Size_Pow_2/3)+ 2 + N];
-    coord3d* sX2 =&reinterpret_cast<coord3d*>(smem)[(int)ceilf(Block_Size_Pow_2/3)+ 3 + 2*N];  
-    
+    coord3d* sX = reinterpret_cast<coord3d*>(base_pointer);
+    coord3d* sX1 =reinterpret_cast<coord3d*>(base_pointer+3*N);
+    coord3d* sX2 =reinterpret_cast<coord3d*>(base_pointer+6*N);  
+
     cg::sync(grid);
 
     sX[node_id] = X[node_id];
@@ -389,6 +388,8 @@ __global__ void kernel_OptimizeBatch(DevicePointers p, const size_t N, const siz
     const node_t next_on_face[3] = {p.next_on_face[3*(offset+node_id)],p.next_on_face[3*(offset+node_id) + 1],p.next_on_face[3*(offset+node_id) + 2]};
     const node_t prev_on_face[3] = {p.prev_on_face[3*(offset+node_id)],p.prev_on_face[3*(offset+node_id) + 1],p.prev_on_face[3*(offset+node_id) + 2]};
     BookkeepingData bookkeeping = BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
+
+
 
     cg::sync(grid);
 
@@ -422,7 +423,8 @@ __global__ void FullereneProperties(DevicePointers p){
     {
         auto arc = ForceField<Block_Size_Pow_2>::ArcData(threadIdx.x, j, X, bdat);
         ArcEnergy = arc.dihedral_energy(constants);
-        ArcBond_Error = abs(abs(arc.rab - get(constants.r0,j))/get(constants.r0,j));
+
+        ArcBond_Error = abs(abs(1.0/arc.r_rab - get(constants.r0,j))/get(constants.r0,j));
         ArcAngle_Error =  abs(abs(arc.angle() - get(constants.angle0,j))/get(constants.angle0,j));
         ArcDihedral_Error = abs(abs(arc.dihedral() - get(constants.inner_dih0,j))/get(constants.inner_dih0,j));
 
@@ -526,15 +528,15 @@ size_t computeBatchSize(size_t N){
     cudaGetDeviceProperties(&properties,0);
 
     /** Compiling with --maxrregcount=64   is necessary to easily (singular blocks / fullerene) parallelize fullerenes of size 20-1024 !**/
-    int fullerenes_per_block;
+    int fullerenes_per_SM;
     
     /** Needs 3 storage arrays for coordinates and 1 for reductions **/
     int sharedMemoryPerBlock = sizeof(coord3d)* 3 * (Block_Size_Pow_2 + 1) + sizeof(real_t)*N;
 
     /** Calculates maximum number of resident fullerenes on a single Streaming Multiprocessor, multiply with multi processor count to get total batch size**/
-    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&fullerenes_per_block, kernel_OptimizeBatch<Block_Size_Pow_2>, N, sharedMemoryPerBlock);
+    cudaOccupancyMaxActiveBlocksPerMultiprocessor(&fullerenes_per_SM, kernel_OptimizeBatch<Block_Size_Pow_2>, N, sharedMemoryPerBlock);
 
-    return (size_t)(properties.multiProcessorCount*fullerenes_per_block);
+    return (size_t)(properties.multiProcessorCount*fullerenes_per_SM);
 }
 
 void AllocateDevicePointers(DevicePointers& p, size_t N, size_t batch_size){
