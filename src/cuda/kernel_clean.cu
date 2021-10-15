@@ -57,7 +57,7 @@ struct ArcData{
 
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
         ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;
-        ac = (X[bdat.neighbours[(j+1)%3]] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac; //rab = non_resciprocal_bond_length(ab);
+        ac = (X[bdat.neighbours[(j+1)%3]] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac;
         ad = (X[bdat.neighbours[(j+2)%3]] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
         
         coord3d bp = (X[bdat.next_on_face[j]] - X_b); bp_hat = unit_vector(bp);
@@ -87,9 +87,7 @@ struct ArcData{
     }
 
     //1 FLOP
-    
     INLINE real_t bond() const {return (real_t)1.0/r_rab;}
-    //INLINE real_t bond() const {return (real_t)1.0/r_rab;}
 
     //5 FLOPs
     INLINE real_t angle() const {return dot(ab_hat,ac_hat);}
@@ -258,7 +256,7 @@ struct ArcData{
 INLINE coord3d gradient(coord3d* X) const {
     cg::sync(group_handle);
     coord3d grad = {0.0, 0.0, 0.0};
-
+    
     for (uint8_t j = 0; j < 3; j++ ){
         ArcData arc = ArcData(node_id, j, X, bdat);
         grad += arc.gradient(constants);
@@ -312,6 +310,7 @@ INLINE real_t GSS(coord3d* X, const coord3d& r0, coord3d* X1, coord3d* X2){
             f1 = energy(X1);
         }
     }
+    if (f1 > energy(X)) {return (real_t)0.0;}
     //Line search coefficient
     real_t alpha = (a+b)/2;
     return alpha;
@@ -328,24 +327,15 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
     for (size_t i = 0; i < MaxIter; i++)
     {   
         alpha = GSS(X,s,X1,X2);
-        X1[node_id] = X[node_id] + alpha * s;
+        if (alpha > (real_t)0.0){X1[node_id] = X[node_id] + alpha * s;}
         g1 = gradient(X1);
         //Polak Ribiere method
         g0_norm2 = reduction<Block_Size_Pow_2>(sdata, dot(g0, g0));
         beta = max(reduction<Block_Size_Pow_2>(sdata, dot(g1, (g1 - g0))) / g0_norm2,(real_t)0.0);
         s = -g1 + beta*s;
-        
-        if (energy(X1) > energy(X))
-        {   
-            X1[node_id] =  X[node_id];
-            g1 =  g0;
-            beta = 0.0;
-        }
-        else
-        {   
-            X[node_id] = X1[node_id];
-            g0 = g1;
-        }
+
+        if (alpha > (real_t)0.0){X[node_id] = X1[node_id];}
+        g0 = g1;
         s_norm = sqrt(reduction<Block_Size_Pow_2>(sdata, dot(s,s)));
         s /= s_norm; 
     }   

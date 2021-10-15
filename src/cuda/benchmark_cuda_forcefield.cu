@@ -1,6 +1,6 @@
 #include "kernel_clean.cu"
 #include "coord3d.cu"
-#include "C512ih.cu"
+#include "C256ih.cu"
 
 
 typedef uint16_t node_t;
@@ -38,7 +38,7 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    const size_t N = 512;
+    const size_t N = 256;
     const int Block_Size_Pow2 = minpow2((int)N);
 
     size_t batch_size = IsomerspaceForcefield::computeBatchSize<Block_Size_Pow2>(N);
