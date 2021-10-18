@@ -4,10 +4,12 @@
 #include <cooperative_groups/reduce.h>
 #include "cuda_runtime.h"
 #include <assert.h>
+#include<iostream>
+#include <fstream>
 
 #define __HD__ __device__ __host__ 
 namespace cg = cooperative_groups;
-
+typedef IsomerspaceForcefield::real_t real_t;
 template <typename T>
 void copy_and_append(T* memory, const T* fullerene, size_t N){
     for (size_t i = 0; i < N; i++)
@@ -52,9 +54,9 @@ __device__ void pointerswap(T **r, T **s)
 //Pentagons = 0
 //Hexagons = 1
 //PPP = 0, {HPP, PHP, PPH} = 1, {PHH, HPH, HHP} = 2, {HHH} = 3
-__constant__ real_t optimal_corner_cos_angles[2] = {-0.3090169944, -0.5}; 
+__constant__ real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
 __constant__ real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
-__constant__ real_t optimal_dih_cos_angles[8] = {0.79465455715, 0.87290360705, 0.87290360705, 0.9410338473, 0.816287936, 0.913965949, 0.913965949, 1}; 
+__constant__ real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
 
 __constant__ real_t angle_forces[2] = {207.924,216.787}; 
 __constant__ real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
@@ -145,36 +147,52 @@ template <typename T>
 __device__ Constants<T> compute_constants(BookkeepingData& dat, node_t node_id){
     T r0, angle0, inner_dih0, outer_angle_m0, outer_angle_p0, outer_dih0_a, outer_dih0_m, outer_dih0_p;
     T f_bond, f_inner_angle, f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral ;
-    
+//       m    p
+//    f5_|   |_f4
+//   p   c    b  m
+//       \f1/
+//     f2 a f3
+//        |
+//        d
+//      m/\p
+//       f6
+
     for (uint8_t j = 0; j < 3; j++) {
-        uint8_t f_r = dat.face_right[node_id * 3 + j] - 5;
-        uint8_t f_l = dat.face_right[node_id * 3 + (2 + j)%3] - 5;
+        uint8_t F1 = dat.face_right[node_id * 3 + j] - 5;
+        uint8_t F3 = dat.face_right[node_id * 3 + (2 + j)%3] - 5;
+
+        uint8_t f_r_neighbour = dat.face_right[dat.neighbours[node_id * 3 + j]*3 ] - 5;
+        uint8_t f_l_neighbour = dat.face_right[dat.neighbours[node_id * 3 + j]*3 + 1 ] - 5;
+        uint8_t f_m_neighbour = dat.face_right[dat.neighbours[node_id * 3 + j]*3 + 2] - 5;
+        uint8_t F4 = f_r_neighbour + f_l_neighbour + f_m_neighbour - F1 - F3 ;
+
 
         uint8_t face_sum = dat.face_right[node_id * 3] - 5 + dat.face_right[node_id * 3 + 1] - 5 + dat.face_right[node_id * 3 + 2] - 5;
         uint8_t dihedral_face_sum = dat.face_right[dat.neighbours[node_id * 3 + j] * 3]-5 + dat.face_right[dat.neighbours[node_id * 3 + j] * 3 + 1]-5 +  dat.face_right[dat.neighbours[node_id * 3 + j] * 3 + 2]-5;
 
         //Load equillibirium distance, angles and dihedral angles from face information.
-        set(r0,j,optimal_bond_lengths[ f_l + f_r ]);
-        set(angle0,j,optimal_corner_cos_angles[ f_r ]);
+        set(r0,j,optimal_bond_lengths[ F3 + F1 ]);
+        set(angle0,j,optimal_corner_cos_angles[ F1 ]);
         set(inner_dih0,j,optimal_dih_cos_angles[ face_index(dat.face_right[node_id * 3 + j] - 5, dat.face_right[node_id * 3 + (1+j)%3] - 5 , dat.face_right[node_id * 3 + (2+j)%3] - 5) ]);
-        set(outer_angle_m0,j,optimal_corner_cos_angles[ f_l ]);
-        set(outer_angle_p0,j,optimal_corner_cos_angles[ f_r ]);
+        set(outer_angle_m0,j,optimal_corner_cos_angles[ F3 ]);
+        set(outer_angle_p0,j,optimal_corner_cos_angles[ F1 ]);
+        
 
-
-        uint8_t dihedral_index_a = face_index(f_l,dat.face_right[node_id * 3 + (1 + j)%3] - 5,f_r);
-        uint8_t dihedral_index_m =  face_index(dat.face_right[node_id * 3 + (1 + j)%3] - 5, f_r, f_l);
-        uint8_t dihedral_index_p = face_index(f_r,f_l, dat.face_right[node_id * 3 + (1 + j)%3] - 5);
+        
+        uint8_t dihedral_index_a = face_index(F3,F4,F1);
+        uint8_t dihedral_index_m =  face_index(F4, F1, F3);
+        uint8_t dihedral_index_p = face_index(F1,F3, F4);
 
         set(outer_dih0_a,j,optimal_dih_cos_angles[dihedral_index_a]  );
         set(outer_dih0_m,j,optimal_dih_cos_angles[dihedral_index_m]  );
         set(outer_dih0_p,j,optimal_dih_cos_angles[dihedral_index_p]  );
 
         //Load force constants from neighbouring face information.
-        set(f_bond,j,bond_forces[ f_l + f_r ]);
-        set(f_inner_angle,j,angle_forces[ f_r ]);
+        set(f_bond,j,bond_forces[ F3 + F1 ]);
+        set(f_inner_angle,j,angle_forces[ F1 ]);
         set(f_inner_dihedral,j,dih_forces[ face_sum]);
-        set(f_outer_angle_m,j,angle_forces[ f_l ]);
-        set(f_outer_angle_p,j,angle_forces[ f_r ]);
+        set(f_outer_angle_m,j,angle_forces[ F3 ]);
+        set(f_outer_angle_p,j,angle_forces[ F1 ]);
         set(f_outer_dihedral,j,dih_forces[ dihedral_face_sum]);
     }
     return Constants<T>(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0_a, outer_dih0_m, outer_dih0_p);
@@ -253,6 +271,27 @@ __device__ real_t reduction(real_t* sdata, const real_t data){
     real_t sum = sdata[0];
     cg::sync(block);
     return sum;
+}
+
+template <int Block_Size_Pow_2>
+__device__ real_t reduction_max(real_t* sdata, const real_t data){
+    sdata[threadIdx.x] = data;
+    cg::thread_block block = cg::this_thread_block();
+    cg::sync(block);
+    
+    if((Block_Size_Pow_2 > 512)){if (threadIdx.x < 512){sdata[threadIdx.x] = max(sdata[threadIdx.x + 512],sdata[threadIdx.x]);} cg::sync(block);}
+    if((Block_Size_Pow_2 > 256)){if (threadIdx.x < 256){sdata[threadIdx.x] = max(sdata[threadIdx.x + 256],sdata[threadIdx.x]);} cg::sync(block);}
+    if((Block_Size_Pow_2 > 128)){if (threadIdx.x < 128){sdata[threadIdx.x] = max(sdata[threadIdx.x + 128],sdata[threadIdx.x]);} cg::sync(block);}
+    if((Block_Size_Pow_2 > 64)){if (threadIdx.x < 64){sdata[threadIdx.x] = max(sdata[threadIdx.x + 64],sdata[threadIdx.x]);} cg::sync(block);}
+    if(threadIdx.x < 32){
+    if((Block_Size_Pow_2 > 32)){if (threadIdx.x < 32){sdata[threadIdx.x] = max(sdata[threadIdx.x + 32],sdata[threadIdx.x]);} __syncwarp();}
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
+    sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::greater<real_t>()); 
+    }
+    cg::sync(block);
+    real_t max = sdata[0];
+    cg::sync(block);
+    return max;
 }
 
 __device__ half reduction(half *sdata){
@@ -361,7 +400,7 @@ __device__ real_t AverageBondLength(real_t* smem,const coord3d* X, const node_t*
 }
 
 __HD__ void print(const coord3d& ab){
-    printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
+    printf("[%.8e, %.8e, %.8e]\n",ab.x,ab.y,ab.z);
 }
 __device__ void print(const half4& ab){
     print_coord(ab);
@@ -395,6 +434,12 @@ __device__ void print(const uint3& a){
     printf("[%d, %d, %d]\n",a.x,a.y,a.z);
 }
 
+template <typename T>
+__device__ void print_single(T data){
+    if (threadIdx.x + blockIdx.x == 0) {
+        print(data);
+    }
+}
 
 template <typename T>
 __device__ void sequential_print(T* data){
@@ -429,18 +474,31 @@ __host__ void print_array(T* data, size_t N, size_t fullerene_id){
     {
         print(data[fullerene_id + i]);
     }
-    
 }
 
 template <typename T>
-__device__ void sequential_print(T* data, size_t N){
-    for (size_t i = 0; i < N; i++)
+__host__ void to_file(std::string filename,T* data, size_t N, size_t fullerene_id){
+    T* pointer =  data + N * fullerene_id;
+    std::fstream myFile (filename, std::fstream::out | std::fstream::in | std::fstream::trunc | std::fstream::binary );
+
+    myFile.write(reinterpret_cast<const char*>(pointer), sizeof(T)*N);
+    if(!myFile)
+      std::cout<<"error";
+    myFile.close();
+}
+
+template <typename T>
+__device__ void sequential_print(T* data, size_t fullerene_id){
+    if (blockIdx.x == fullerene_id)
+    {
+    for (size_t i = 0; i < blockDim.x; i++)
     {
         if (threadIdx.x == i)
         {
             print(data[i]);
         }
         cg::sync(cg::this_thread_block());
+    }
     }
 }
 

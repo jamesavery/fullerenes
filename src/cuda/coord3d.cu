@@ -1,9 +1,8 @@
 #pragma once
+#include "fullerenes/gpu/isomerspace_forcefield.hh"
+
 
 typedef float3 coord3d;
-
-
-typedef float real_t;
 
 typedef uint16_t node_t;
 typedef float4 coord3d_a;
@@ -164,9 +163,11 @@ INLINE  float  dot(const float3& a,  const float3& b) { return a.x*b.x + a.y*b.y
 //6 FLOPs
 INLINE  float norm(const float3& a)                    { return sqrt(dot(a,a)); }
 
+INLINE float sum(const float3& a) {return a.x + a.y + a.z;}
+
 //7 FLOPs
 INLINE  float3 unit_vector(const float3& a){
-  float r = rsqrt(dot(a,a));
+  float r = (float)1.0/sqrt(dot(a,a));
   return (a*r);
 }
 //10 FLOPs
@@ -182,11 +183,11 @@ INLINE  float3 outer_dot(const float3& a, const float3& b, const float3& c){
 
 //6 FLOPs
 INLINE  float bond_length(const float3& ab){
-    return rsqrtf(dot(ab,ab));
+    return (float)1.0/sqrtf(dot(ab,ab));
 }
 
 INLINE float non_resciprocal_bond_length(const float3& ab){
-    return sqrtf(dot(ab,ab));
+    return sqrt(dot(ab,ab));
 }
 
 __host__ __device__ void print_coord(const float3& ab){
@@ -221,10 +222,11 @@ INLINE  double  dot(const double3& a,  const double3& b) { return a.x*b.x + a.y*
 //6 FLOPs
 INLINE  double norm(const double3& a)                    { return sqrt(dot(a,a)); }
 
+INLINE double sum(const double3& a) {return a.x + a.y + a.z;}
 //7 FLOPs
 INLINE  double3 unit_vector(const double3& a){
-  double r = rsqrt(dot(a,a));
-  return (a*r);
+  double r = sqrt(dot(a,a));
+  return (a/r);
 }
 //10 FLOPs
 INLINE  double3 cross(const double3& a, const double3& b){ return make_double3(a.y*b.z-a.z*b.y,
@@ -239,11 +241,11 @@ INLINE  double3 outer_dot(const double3& a, const double3& b, const double3& c){
 
 //6 FLOPs
 INLINE  double bond_length(const double3& ab){
-    return rsqrtf(dot(ab,ab));
+    return 1.0/sqrt(dot(ab,ab));
 }
 
 INLINE double non_resciprocal_bond_length(const double3& ab){
-    return sqrtf(dot(ab,ab));
+    return sqrt(dot(ab,ab));
 }
 
 __host__ __device__ void print_coord(const double3& ab){

@@ -1,6 +1,7 @@
-#include "kernel_shared.cu"
+#include "Gradient.cu"
 #include "coord3d.cu"
-#include "C680ih.cu"
+#include "C60ih.cu"
+#include "fullerenes/gpu/isomerspace_forcefield.hh"
 
 
 typedef uint16_t node_t;
@@ -26,7 +27,7 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    const size_t N = 680;
+    const size_t N = 60;
 
     size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
     

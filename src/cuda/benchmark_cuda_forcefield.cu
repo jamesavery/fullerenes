@@ -1,8 +1,9 @@
 #include "kernel_clean.cu"
 #include "coord3d.cu"
-#include "C256ih.cu"
+#include "C512ih.cu"
+#include "fullerenes/gpu/isomerspace_forcefield.hh"
 
-
+typedef IsomerspaceForcefield::device_real_t real_t;
 typedef uint16_t node_t;
 constexpr
 int minpow2(int v)
@@ -38,7 +39,7 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    const size_t N = 256;
+    const size_t N = 512;
     const int Block_Size_Pow2 = minpow2((int)N);
 
     size_t batch_size = IsomerspaceForcefield::computeBatchSize<Block_Size_Pow2>(N);
@@ -46,6 +47,7 @@ int main(){
     printf("Solving %d fullerenes of size: %d \n", (int)batch_size, (int)N);
 
     /** Generates a synthetic load from a single set of fullerene pointers **/
+
     real_t* synth_X = reinterpret_cast<real_t*>(IsomerspaceForcefield::synthetic_array<real_t>(N, batch_size, &X[0]));
     node_t* synth_cubic_neighbours = reinterpret_cast<node_t*>(IsomerspaceForcefield::synthetic_array<node_t>(N, batch_size, &cubic_neighbours[0]));
     node_t* synth_next_on_face = reinterpret_cast<node_t*>(IsomerspaceForcefield::synthetic_array<node_t>(N, batch_size, &next_on_face[0]));
@@ -54,22 +56,57 @@ int main(){
     
     real_t* bonds = new real_t[batch_size*N*3];
     real_t* angles = new real_t[batch_size*N*3];
+    real_t* outer_angles_m = new real_t[batch_size*N*3];
+    real_t* outer_angles_p = new real_t[batch_size*N*3];
     real_t* dihedrals = new real_t[batch_size*N*3];
-    real_t* bond_0 = new real_t[batch_size*N*3];
-    real_t* angle_0 = new real_t[batch_size*N*3];
-    real_t* dihedral_0 = new real_t[batch_size*N*3];
+    real_t* outer_dihedrals_a = new real_t[batch_size*N*3];
+    real_t* outer_dihedrals_m = new real_t[batch_size*N*3];
+    real_t* outer_dihedrals_p = new real_t[batch_size*N*3];
+    real_t* bonds_0 = new real_t[batch_size*N*3];
+    real_t* angles_0 = new real_t[batch_size*N*3];
+    real_t* outer_angles_m0 = new real_t[batch_size*N*3];
+    real_t* outer_angles_p0 = new real_t[batch_size*N*3];
+    real_t* dihedrals_0 = new real_t[batch_size*N*3];
+    real_t* outer_dihedrals_a0 = new real_t[batch_size*N*3];
+    real_t* outer_dihedrals_m0 = new real_t[batch_size*N*3];
+    real_t* outer_dihedrals_p0 = new real_t[batch_size*N*3];
     real_t* gradients =  new real_t[batch_size*N*3];
+
+    real_t* d_X; real_t* d_X_temp; real_t* d_X2; node_t* d_neighbours; node_t* d_prev_on_face; node_t* d_next_on_face; uint8_t* d_face_right; real_t* d_gdata; real_t* d_bonds; real_t* d_angles; real_t* d_dihedrals; real_t* d_gradients;
+    real_t* d_outer_angles_m; real_t* d_outer_angles_p; real_t* d_outer_dihedrals_a; real_t* d_outer_dihedrals_m; real_t* d_outer_dihedrals_p;
+    real_t* d_bonds_0; real_t* d_angles_0; real_t* d_outer_angles_m0; real_t* d_outer_angles_p0; real_t* d_dihedrals_0; real_t* d_outer_dihedrals_a0; real_t* d_outer_dihedrals_m0; real_t* d_outer_dihedrals_p0;
     
-    real_t* d_X; real_t* d_X_temp; real_t* d_X2; node_t* d_neighbours; node_t* d_prev_on_face; node_t* d_next_on_face; uint8_t* d_face_right; real_t* d_gdata; real_t* d_bonds; real_t* d_angles; real_t* d_dihedrals; real_t* d_angle_0; real_t* d_bond_0; real_t* d_dihedral_0; real_t* d_gradients;
-    IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata,d_bonds,d_angles,d_dihedrals,d_bond_0,d_angle_0,d_dihedral_0,d_gradients);
+    IsomerspaceForcefield::CoordinatePointers h_coordinates = IsomerspaceForcefield::CoordinatePointers(bonds,angles,outer_angles_m,outer_angles_p,dihedrals,outer_dihedrals_a,outer_dihedrals_m,outer_dihedrals_p);
+    IsomerspaceForcefield::CoordinatePointers d_coordinates = IsomerspaceForcefield::CoordinatePointers(d_bonds, d_angles, d_outer_angles_m, d_outer_angles_p, d_dihedrals, d_outer_dihedrals_a, d_outer_dihedrals_m, d_outer_dihedrals_p);
+
+    IsomerspaceForcefield::HarmonicConstantPointers  h_constants = IsomerspaceForcefield::HarmonicConstantPointers(bonds_0, angles_0, outer_angles_m0, outer_angles_p0, dihedrals_0, outer_dihedrals_a0, outer_dihedrals_m0, outer_dihedrals_p0);
+    IsomerspaceForcefield::HarmonicConstantPointers  d_constants = IsomerspaceForcefield::HarmonicConstantPointers(d_bonds_0, d_angles_0, d_outer_angles_m0, d_outer_angles_p0, d_dihedrals_0, d_outer_dihedrals_a0, d_outer_dihedrals_m0, d_outer_dihedrals_p0);
+
+    IsomerspaceForcefield::DevicePointers d_pointers = IsomerspaceForcefield::DevicePointers(d_X,d_X_temp,d_X2,d_neighbours,d_prev_on_face, d_next_on_face, d_face_right, d_gdata,d_gradients);
     IsomerspaceForcefield::HostPointers h_pointers = IsomerspaceForcefield::HostPointers(synth_X, synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
-    IsomerspaceForcefield::AllocateDevicePointers(d_pointers, N, batch_size);
-    IsomerspaceForcefield::OptimizeBatch<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,N*5);
+    IsomerspaceForcefield::AllocateDevicePointers(d_pointers, d_coordinates, d_constants, N, batch_size);
     IsomerspaceForcefield::CheckBatch<Block_Size_Pow2>(d_pointers, h_pointers, N, batch_size);
-    IsomerspaceForcefield::InternalCoordinates<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,bonds,angles,dihedrals);
-    IsomerspaceForcefield::HarmonicConstants<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,bond_0,angle_0,dihedral_0);
+    IsomerspaceForcefield::OptimizeBatch<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,N*4);
+    IsomerspaceForcefield::CheckBatch<Block_Size_Pow2>(d_pointers, h_pointers, N, batch_size);
+    IsomerspaceForcefield::InternalCoordinates<Block_Size_Pow2>(d_pointers,h_pointers,h_coordinates,d_coordinates,N,batch_size,bonds,angles,dihedrals);
+    IsomerspaceForcefield::HarmonicConstants<Block_Size_Pow2>(d_pointers,h_pointers,h_constants,d_constants,N,batch_size);
     IsomerspaceForcefield::Gradients<Block_Size_Pow2>(d_pointers,h_pointers,N,batch_size,gradients);
-    IsomerspaceForcefield::FreePointers(d_pointers);
+    IsomerspaceForcefield::FreePointers(d_pointers, d_coordinates, d_constants);
+    
+    
+    IsomerspaceForcefield::to_file("Bonds0.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(bonds_0),N,0);
+    IsomerspaceForcefield::to_file("Bonds.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(bonds),N,0);
+    IsomerspaceForcefield::to_file("Angles0.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(angles_0),N,0);
+    IsomerspaceForcefield::to_file("Outer_Angles_m0.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(outer_angles_m0),N,0);
+    IsomerspaceForcefield::to_file("Outer_Angles_p0.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(outer_angles_p0),N,0);
+    IsomerspaceForcefield::to_file("Angles.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(angles),N,0);
+    IsomerspaceForcefield::to_file("Dihedrals0.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(dihedrals_0),N,0);
+    IsomerspaceForcefield::to_file("Outer_Dihedrals_a0.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(outer_dihedrals_a0),N,0);
+    IsomerspaceForcefield::to_file("Outer_Dihedrals_m0.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(outer_dihedrals_m0),N,0);
+    IsomerspaceForcefield::to_file("Outer_Dihedrals_p0.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(outer_dihedrals_p0),N,0);
+    IsomerspaceForcefield::to_file("Dihedrals.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(dihedrals),N,0);
+    IsomerspaceForcefield::to_file("Gradients.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(gradients),N,0);
+    IsomerspaceForcefield::to_file("X.bin",reinterpret_cast<IsomerspaceForcefield::coord3d*>(h_pointers.h_X),N,0);
 
     //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(bonds),N,0);
 
