@@ -106,7 +106,7 @@ int main(int ac, char **argv)
     size_t this_batch_size = i;
     printf("Optimizing %ld C%d fullerenes, isomer [%ld;%ld]\n",this_batch_size,N,I,I+this_batch_size-1);
     auto t0 = system_clock::now();
-    isomer_batch.optimize_batch(N*3);
+    isomer_batch.optimize_batch(N*5);
     Topt += system_clock::now()-t0;
     auto t6 = system_clock::now();
     isomer_batch.check_batch();

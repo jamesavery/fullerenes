@@ -60,9 +60,16 @@ __constant__ device_real_t optimal_corner_cos_angles[2] = {-0.30901699437494734,
 __constant__ device_real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
 __constant__ device_real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
 
+#if SEMINARIO_FORCE_CONSTANTS==1
 __constant__ device_real_t angle_forces[2] = {207.924,216.787}; 
 __constant__ device_real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
 __constant__ device_real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
+#else
+__constant__ device_real_t angle_forces[2] = {100.0,100.0}; 
+__constant__ device_real_t bond_forces[3] = {260.0,390.0,450.0}; 
+__constant__ device_real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
+#endif
+
 
 struct BookkeepingData{
     const device_node_t* neighbours;
@@ -502,13 +509,13 @@ __device__ void sequential_print(T* data, size_t fullerene_id){
     }
     }
 }
-/*
+
 template <typename T>
-__HD__ void swap(T& a, T& b){
+__HD__ void swap_reals(T& a, T& b){
     T temp = a;
     a = b;
     b = temp;
-}*/
+}
 
 void printLastCudaError(std::string message = ""){
     cudaError_t error = cudaGetLastError();

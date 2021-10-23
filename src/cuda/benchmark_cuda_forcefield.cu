@@ -54,7 +54,7 @@ int main(){
     uint8_t* synth_face_right = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_size, &face_right[0]));
 
 
-    IsomerspaceForcefield::DeviceGraph graph = IsomerspaceForcefield::DeviceGraph(batch_size, synth_X,synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
+    IsomerspaceForcefield::DeviceGraph graph = IsomerspaceForcefield::DeviceGraph(N,batch_size, synth_X,synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
     IsomerspaceForcefield kernel = IsomerspaceForcefield(N);
 
     kernel.insert_isomer_batch(graph);

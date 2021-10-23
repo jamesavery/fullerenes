@@ -23,7 +23,7 @@ void IsomerspaceForcefield::InternalCoordinates::allocate(const size_t N, const 
         cudaMalloc(&this->outer_dihedrals_a, bytes);
         cudaMalloc(&this->outer_dihedrals_m, bytes);
         cudaMalloc(&this->outer_dihedrals_p, bytes);
-        printLastCudaError("Allocating Coordinates Device");
+        printLastCudaError("Failed to allocate Internal Coordinates on device: ");
         this->allocated = true;
     }
     else{
@@ -43,7 +43,7 @@ void IsomerspaceForcefield::InternalCoordinates::free()
         cudaFree(this->outer_dihedrals_a);
         cudaFree(this->outer_dihedrals_m);
         cudaFree(this->outer_dihedrals_p);
-        printLastCudaError("Failed to free Coordinates Device");
+        printLastCudaError("Failed to free Coordinates Device :");
         this->allocated = false;
     }
 }
@@ -79,7 +79,21 @@ void IsomerspaceForcefield::DeviceGraph::allocate(const size_t N, const size_t b
         cudaMalloc(&this->next_on_face, sizeof(device_node_t)*3*N*batch_size);
         cudaMalloc(&this->prev_on_face, sizeof(device_node_t)*3*N*batch_size);
         cudaMalloc(&this->face_right, sizeof(uint8_t)*3*N*batch_size);
-        printLastCudaError("Failed to allocated device graph");
+        printLastCudaError("Failed to allocated device graph :");
+        this->allocated = true;
+    }
+}
+
+void IsomerspaceForcefield::DeviceGraph::allocate_host(const size_t N, const size_t batch_size){
+    if (!allocated)
+    {   
+        this->N = N;
+        this->batch_size = batch_size;
+        X = new device_real_t[3*N*batch_size];
+        neighbours = new device_node_t[3*N*batch_size];
+        next_on_face = new device_node_t[3*N*batch_size];
+        prev_on_face = new device_node_t[3*N*batch_size];
+        face_right = new uint8_t[3*N*batch_size];
         this->allocated = true;
     }
 }
@@ -93,19 +107,36 @@ void IsomerspaceForcefield::DeviceGraph::free()
         cudaFree(this->next_on_face);
         cudaFree(this->prev_on_face);
         cudaFree(this->face_right);
-        printLastCudaError("Failed to free device graph");
+        printLastCudaError("Failed to free device graph :");
         this->allocated = false;
     }
 }
 
-void IsomerspaceForcefield::DeviceGraph::copy(const IsomerspaceForcefield::DeviceGraph& G){
-    printLastCudaError("Failed to copy DeviceGraph");
+void IsomerspaceForcefield::DeviceGraph::free_host()
+{   
+    if (allocated)
+    {
+        delete X;
+        delete neighbours;
+        delete next_on_face;
+        delete prev_on_face;
+        delete face_right;
+        printLastCudaError("Failed to free device graph :");
+        this->allocated = false;
+    }
+}
+
+
+
+
+void IsomerspaceForcefield::DeviceGraph::copy_to_gpu(const IsomerspaceForcefield::DeviceGraph& G){
     cudaMemcpy(X, G.X, sizeof(device_coord3d)*N*G.batch_size , cudaMemcpyHostToDevice);
     cudaMemcpy(neighbours, G.neighbours, sizeof(device_node_t)*3*N*G.batch_size, cudaMemcpyHostToDevice);
     cudaMemcpy(next_on_face, G.next_on_face, sizeof(device_node_t)*3*N*G.batch_size, cudaMemcpyHostToDevice);
     cudaMemcpy(prev_on_face, G.prev_on_face, sizeof(device_node_t)*3*N*G.batch_size, cudaMemcpyHostToDevice);
     cudaMemcpy(face_right, G.face_right, sizeof(uint8_t)*3*N*G.batch_size, cudaMemcpyHostToDevice);
-    printLastCudaError("Failed to copy DeviceGraph");
+    printLastCudaError("Failed to copy DeviceGraph :");
 }
+
 
 

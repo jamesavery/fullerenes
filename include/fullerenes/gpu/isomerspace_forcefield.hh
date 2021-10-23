@@ -6,6 +6,8 @@
 #define GPU_REAL float       
 #define GPU_REAL3 float3
 #define Block_Size_Pow_2 256
+#define SEMINARIO_FORCE_CONSTANTS 1
+#define USE_MAX_NORM 1
 
   
 
@@ -18,8 +20,8 @@ public:
   
 struct DeviceGraph{
   bool allocated = false;
-  size_t N = 0;
   size_t batch_size = 0;
+  size_t N = 0;
 
   device_real_t* X;
   device_node_t* neighbours;
@@ -28,12 +30,15 @@ struct DeviceGraph{
   uint8_t* face_right;
 
   DeviceGraph(){}
-  DeviceGraph(size_t batch_size ,device_real_t* X, device_node_t* neighbours, device_node_t* next_on_face, device_node_t* prev_on_face, uint8_t* face_right): batch_size(batch_size), X(X), neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face), face_right(face_right){}
-  void copy(const FullereneGraph& G, const device_real_t* X);
-  void copy(const DeviceGraph& G);
+  DeviceGraph(size_t N, size_t batch_size ,device_real_t* X, device_node_t* neighbours, device_node_t* next_on_face, device_node_t* prev_on_face, uint8_t* face_right): N(N), batch_size(batch_size), X(X), neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face), face_right(face_right){}
+  DeviceGraph(const DeviceGraph& G):N(G.N), batch_size(G.batch_size), X(G.X), neighbours(G.neighbours), next_on_face(G.next_on_face), prev_on_face(G.prev_on_face), face_right(G.face_right){}
+  
+  void copy_to_gpu(const DeviceGraph& G);
 
   void allocate(const size_t N, const size_t batch_size);
+  void allocate_host(const size_t N, const size_t batch_size);
   void free();
+  void free_host();
 }; 
 
 
@@ -85,6 +90,7 @@ private:
   device_real_t* global_reduction_array;
 
   DeviceGraph d_graph;
+  DeviceGraph h_graph;
   InternalCoordinates d_coords;
   
 };

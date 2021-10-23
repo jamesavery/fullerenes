@@ -318,12 +318,18 @@ INLINE real_t energy(coord3d* X) const {
 
 }
 
+INLINE real_t gradnorm(coord3d* X, coord3d& d)const {
+    real_t gradsum = reduction(sdata, dot(-gradient(X),d));
+    return gradsum;
+}
+
 //Bracketing method designed to find upper bound for linesearch method that matches 
 //reference python implementation by Buster.
 INLINE real_t FindLineSearchBound(coord3d* X, coord3d& r0, coord3d* X1){
     real_t bound = 1e-5;
     bool negative_grad = true;
-    while (negative_grad)
+    size_t iter = 0;
+    while (negative_grad && iter < 30)
     {   
         bound *= (real_t)1.5;
         X1[node_id] = X[node_id] + bound * r0;
@@ -344,16 +350,19 @@ INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
     X1[node_id] = X[node_id] + a * r0;
     X2[node_id] = X[node_id] + b * r0;
 
-    real_t f_a = energy(X1);
-    real_t f_b = energy(X2);
+    real_t f_a = gradnorm(X1,r0);
+    real_t f_b = gradnorm(X2,r0);
 
-    if (f_a < f_b){swap(a,b);}
+    if (f_a*f_b > 0)
+    {
+        return b;
+    }
+    if (abs(f_a) < abs(f_b)){swap_reals(a,b); swap_reals(f_a,f_b);}
 
     real_t c = a; real_t f_c = f_a;
     bool flag = true;
-    int Iterations = 0;
 
-    for (uint8_t i = 0; i < 15; i++)
+    for (uint8_t i = 0; i < 30; i++)
     {   
         /** Inverse quadratic interpolation **/
         if ( (f_a != f_c) && (f_b != f_c) )
@@ -380,7 +389,7 @@ INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
         }
 
         X1[node_id] = X[node_id] + s * r0;
-        real_t f_s = energy(X1);
+        real_t f_s = gradnorm(X1,r0);
         d = c;
         c = b; f_c = f_b;
         if (f_a*f_s < 0)
@@ -392,10 +401,10 @@ INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
         }
         if (abs(f_a) < abs(f_b))
         {
-            swap(a,b); swap(f_a,f_b);
+            swap_reals(a,b); swap_reals(f_a,f_b);
         }
     }
-    real_t alpha = s;
+    real_t alpha = b;
 
     return alpha;
 }
@@ -448,8 +457,11 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
     g0 = gradient(X); 
     s = -g0;
     //Normalize To match reference python implementation by Buster.
-
-    s_norm = sqrt(reduction(sdata, dot(s,s)));
+    #if USE_MAX_NORM==1
+        s_norm = reduction_max(sdata, max(max(s.x,s.y),s.z));
+    #else
+        s_norm = sqrt(reduction(sdata, dot(s,s)));
+    #endif
     s /= s_norm;
 
     for (size_t i = 0; i < MaxIter; i++)
@@ -465,11 +477,12 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
         s = -g1 + beta*s;
         g0 = g1;
         //Normalize Search Direction using MaxNorm or 2Norm
-        //s_norm = reduction_max(sdata, max(max(s.x,s.y),s.z));
-        s_norm = sqrt(reduction(sdata, dot(s,s)));
+        #if USE_MAX_NORM==1
+            s_norm = reduction_max(sdata, max(max(s.x,s.y),s.z));
+        #else
+            s_norm = sqrt(reduction(sdata, dot(s,s)));
+        #endif
         s /= s_norm;
-        if (s_norm < 1e-7*blockDim.x){break;} //Prevents eventual divide by zero.
-        
     }   
 } 
 
@@ -576,6 +589,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
         NodeTotAngleError += ArcBond_Error; NodeTotDihedralError += ArcDihedral_Error; NodeTotBondError += ArcBond_Error;
     }
     device_real_t Energy = FF.energy(X);
+    device_real_t GradNorm = reduction(smem,dot(FF.gradient(X),FF.gradient(X)))/(device_real_t)blockDim.x;
     device_real_t MaxBond_Error =  reduction_max(reinterpret_cast<device_real_t*>(smem), NodeBond_Error);
     device_real_t MaxAngle_Error =  reduction_max(reinterpret_cast<device_real_t*>(smem), NodeAngle_Error);
     device_real_t MaxDihedral_Error =  reduction_max(reinterpret_cast<device_real_t*>(smem), NodeDihedral_Error);
@@ -585,7 +599,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
     
     if (threadIdx.x == 0){
 
-    if ((MaxBond_Error < 1e-1) && (MaxAngle_Error < 1e-1) && (MaxDihedral_Error < 1e-1) && (MaxBond_Error > 0.0) && (MaxAngle_Error > 0.0) && (MaxDihedral_Error > 0.0))
+    if ((MaxBond_Error < 1e-1) && (MaxAngle_Error < 1.9e-1) && (MaxDihedral_Error < 1e-1) && (MaxBond_Error > 0.0) && (MaxAngle_Error > 0.0) && (MaxDihedral_Error > 0.0))
     {   
         global_reduction_array[blockIdx.x] = (device_real_t)1.0;
 
@@ -593,7 +607,14 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
     {
         global_reduction_array[blockIdx.x] = (device_real_t)0.0;
     }}
-    if(threadIdx.x + blockIdx.x == 0){printf("                    Error Summary                     \n====================================================\n Dihedral Max/RMS: \t%e | %e\n AngleMaxErr Max/RMS: \t%e | %e \n BondMaxErr Max/RMS: \t%e | %e \n \t\t   \t\t\t\t \n Energy/mol: \t\t%e   \t\t \n====================================================\n\n", MaxDihedral_Error, RMS_Dihedral_Error, MaxAngle_Error, RMS_Angle_Error, MaxBond_Error, RMS_Bond_Error, Energy/blockDim.x);}
+    
+    for (size_t i = 0; i < gridDim.x; i++)
+    {
+        cg::sync(grid);
+        if(blockIdx.x == i && threadIdx.x == 0 && global_reduction_array[i]<0.5){printf("                    Error Summary                     \n====================================================\n Dihedral Max/RMS: \t%e | %e\n AngleMaxErr Max/RMS: \t%e | %e \n BondMaxErr Max/RMS: \t%e | %e \n \t\t   \t\t\t\t \n Energy/ Grad: \t\t%e | %e  \t\t \n====================================================\n\n", MaxDihedral_Error, RMS_Dihedral_Error, MaxAngle_Error, RMS_Angle_Error, MaxBond_Error, RMS_Bond_Error, Energy/blockDim.x, GradNorm);}
+    }
+    
+    
     
 
     
@@ -673,9 +694,9 @@ void IsomerspaceForcefield::get_internal_coordinates(device_real_t* bonds, devic
 }
 
 void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
-    printLastCudaError("Memcpy Failed! \n");
-    
+    d_graph.copy_to_gpu(h_graph);
 
+    printLastCudaError("Memcpy Failed! \n");
     auto start = std::chrono::system_clock::now();
     void* kernelArgs[] = {(void*)&d_graph,(void*)&N,(void*)&MaxIter};
     
@@ -688,42 +709,25 @@ void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
 }
 
 void IsomerspaceForcefield::insert_isomer_batch(const DeviceGraph& G){
-    if (batch_capacity >= G.batch_size)
-    {
-        d_graph.copy(G);
-        batch_capacity =- G.batch_size;
-        batch_size += G.batch_size;
-    }
+    h_graph = G;
+    batch_size += G.batch_size;
 }
-/*
+
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
-    device_node_t neighbours[3*N], next_on_face[3*N], prev_on_face[3*N];
-    uint8_t face_right[3*N];
-    device_real_t X[3*N];
-
-    for (device_node_t u = 0; u < N; u++)
-    {
-        for (int j = 0; j < 3; j++)
-        {
-            device_node_t v = G.neighbours[u][j];
-            size_t arc_index = u*3 + j;
-            neighbours  [arc_index] = v;
-            next_on_face[arc_index] = G.next_on_face(u,v);
-            prev_on_face[arc_index] = G.prev_on_face(u,v);
-            face_right  [arc_index] = G.face_size(u,v);
-            X           [arc_index] = X0[u][j];
-        }   
-    }
-
     size_t offset = batch_size*3*N;
-    cudaMemcpyAsync(d_graph.X + offset,              X,              sizeof(device_coord3d)*N,   cudaMemcpyHostToDevice);
-    cudaMemcpyAsync(d_graph.neighbours + offset,     neighbours,     sizeof(device_node_t)*3*N,    cudaMemcpyHostToDevice);
-    cudaMemcpyAsync(d_graph.next_on_face + offset,   next_on_face,   sizeof(device_node_t)*3*N,    cudaMemcpyHostToDevice);
-    cudaMemcpyAsync(d_graph.prev_on_face + offset,   prev_on_face,   sizeof(device_node_t)*3*N,    cudaMemcpyHostToDevice);
-    cudaMemcpyAsync(d_graph.face_right + offset,     face_right,     sizeof(uint8_t)*3*N,          cudaMemcpyHostToDevice);
-    
+    for (device_node_t u = 0; u < N; u++){
+        for (int j = 0; j < 3; j++){
+            device_node_t v = G.neighbours[u][j];
+            size_t arc_index = u*3 + j + offset;
+            h_graph.neighbours  [arc_index] = v;
+            h_graph.next_on_face[arc_index] = G.next_on_face(u,v);
+            h_graph.prev_on_face[arc_index] = G.prev_on_face(u,v);
+            h_graph.face_right  [arc_index] = G.face_size(u,v);
+            h_graph.X           [arc_index] = X0[u][j];
+        }   
+    }   
     batch_size++;
-}*/
+}
 
 IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
 {
@@ -732,6 +736,7 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
     this->N = N;
     d_coords.allocate(N,batch_capacity);
     d_graph.allocate(N,batch_capacity);
+    h_graph.allocate_host(N,batch_capacity);
     cudaMalloc(&global_reduction_array, sizeof(device_real_t)*N*batch_capacity);
     printLastCudaError("Kernel class instansiation failed!");
 }
@@ -741,6 +746,7 @@ IsomerspaceForcefield::~IsomerspaceForcefield()
     //Destructors of member objects ensures that cudaFree and free is called respectively on all allocated arrays.
     d_graph.free();
     d_coords.free();
+    h_graph.free_host();
     cudaDeviceReset();
 }
 
