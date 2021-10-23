@@ -51,9 +51,9 @@ struct ForceField{
 struct ArcData{
     //124 FLOPs;
 
-    __device__ ArcData(const node_t a, const uint8_t j, const coord3d* __restrict__ X, const BookkeepingData& bdat){   
+    __device__ ArcData(const uint8_t j, const coord3d* __restrict__ X, const BookkeepingData& bdat){   
         this->j = j;   
-
+        node_t a = threadIdx.x;
         real_t r_rmp;
         coord3d ap, am, ab, ac, ad, mp;
         coord3d X_a = X[a]; coord3d X_b = X[bdat.neighbours[j]];
@@ -297,7 +297,7 @@ INLINE coord3d gradient(coord3d* X) const {
     coord3d grad = {0.0, 0.0, 0.0};
 
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData(node_id, j, X, bdat);
+        ArcData arc = ArcData(j, X, bdat);
         grad += arc.gradient(constants);
         //set(grad,j,d_get(constants.f_outer_dihedral,j));
     }
@@ -311,7 +311,7 @@ INLINE real_t energy(coord3d* X) const {
 
     //(71 + 124) * 3 * N  = 585*N FLOPs
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData(node_id, j, X, bdat);
+        ArcData arc = ArcData(j, X, bdat);
         arc_energy += arc.energy(constants);
     }
     return reduction(sdata, arc_energy);;
@@ -567,7 +567,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
     device_real_t NodeTotBondError = 0.0, NodeTotAngleError= 0.0, NodeTotDihedralError = 0.0;
     for (uint8_t j = 0; j < 3; j++)
     {
-        auto arc = ForceField::ArcData(threadIdx.x, j, X, bookkeeping);
+        auto arc = ForceField::ArcData(j, X, bookkeeping);
         ArcEnergy = arc.dihedral_energy(constants);
         ArcBond_Error = abs(abs(arc.bond() - d_get(constants.r0,j))/d_get(constants.r0,j));
         ArcAngle_Error =  abs(abs(arc.angle() - d_get(constants.angle0,j))/d_get(constants.angle0,j));
@@ -591,9 +591,9 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
 
     } else
     {
-        if(threadIdx.x + blockIdx.x == 0){printf("                    Error Summary                     \n====================================================\n Dihedral Max/RMS: \t%e | %e\n AngleMaxErr Max/RMS: \t%e | %e \n BondMaxErr Max/RMS: \t%e | %e \n \t\t   \t\t\t\t \n Energy/mol: \t\t%e   \t\t \n====================================================\n\n", MaxDihedral_Error, RMS_Dihedral_Error, MaxAngle_Error, RMS_Angle_Error, MaxBond_Error, RMS_Bond_Error, Energy/blockDim.x);}
         global_reduction_array[blockIdx.x] = (device_real_t)0.0;
     }}
+    if(threadIdx.x + blockIdx.x == 0){printf("                    Error Summary                     \n====================================================\n Dihedral Max/RMS: \t%e | %e\n AngleMaxErr Max/RMS: \t%e | %e \n BondMaxErr Max/RMS: \t%e | %e \n \t\t   \t\t\t\t \n Energy/mol: \t\t%e   \t\t \n====================================================\n\n", MaxDihedral_Error, RMS_Dihedral_Error, MaxAngle_Error, RMS_Angle_Error, MaxBond_Error, RMS_Bond_Error, Energy/blockDim.x);}
     
 
     
@@ -623,7 +623,7 @@ __global__ void kernel_internal_coordinates(IsomerspaceForcefield::DeviceGraph p
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
     for (uint8_t j = 0; j < 3; j++)
     {   
-        auto arc = ForceField::ArcData(threadIdx.x, j, X, bdat);
+        auto arc = ForceField::ArcData(j, X, bdat);
         c.bonds[tid*3 + j] = arc.bond();
         c.angles[tid*3 + j] = arc.angle();
         c.outer_angles_m[tid*3 + j] = arc.outer_angle_m();
@@ -695,7 +695,7 @@ void IsomerspaceForcefield::insert_isomer_batch(const DeviceGraph& G){
         batch_size += G.batch_size;
     }
 }
-
+/*
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
     device_node_t neighbours[3*N], next_on_face[3*N], prev_on_face[3*N];
     uint8_t face_right[3*N];
@@ -723,7 +723,7 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
     cudaMemcpyAsync(d_graph.face_right + offset,     face_right,     sizeof(uint8_t)*3*N,          cudaMemcpyHostToDevice);
     
     batch_size++;
-}
+}*/
 
 IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
 {
