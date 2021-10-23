@@ -71,15 +71,19 @@ __constant__ device_real_t dih_forces[4] = {35.0,65.0,85.0,270.0};
 #endif
 
 
-struct BookkeepingData{
-    const device_node_t* neighbours;
-    const uint8_t* face_right;
-    const device_node_t* next_on_face;
-    const device_node_t* prev_on_face;
-    __device__ BookkeepingData(const device_node_t* neighbours, const uint8_t* face_right, const device_node_t* next_on_face, const device_node_t* prev_on_face) : 
-        neighbours(neighbours), face_right(face_right), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
+struct NodeGraph{
+    const device_node3 neighbours;
+    const device_node3 next_on_face;
+    const device_node3 prev_on_face;
+    __device__ NodeGraph(const device_node3& neighbours, const device_node3& next_on_face, const device_node3& prev_on_face) : 
+        neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 
-    __device__ BookkeepingData(const BookkeepingData &b1): neighbours(b1.neighbours), face_right(b1.face_right), next_on_face(b1.next_on_face), prev_on_face(b1.prev_on_face){}
+
+    __device__ NodeGraph(const IsomerspaceForcefield::DeviceGraph& G):  neighbours(make_uint3(G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
+                                                                        next_on_face(make_uint3(G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
+                                                                        prev_on_face(make_uint3(G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])){
+
+    }
 };
 
 
@@ -113,40 +117,6 @@ struct Constants{
                                                     r0(c1.r0), angle0(c1.angle0), outer_angle_m0(c1.outer_angle_m0), outer_angle_p0(c1.outer_angle_p0), inner_dih0(c1.inner_dih0), outer_dih0_a(c1.outer_dih0_a), outer_dih0_m(c1.outer_dih0_m), outer_dih0_p(c1.outer_dih0_p){
         
     }
-};
-
-struct EnergyConstants{
-    const device_coord3d f_bond;
-    const device_coord3d f_inner_angle;
-    const device_coord3d f_inner_dihedral;
-
-    const device_coord3d r0;
-    const device_coord3d angle0;
-    const device_coord3d inner_dih0;
-    __device__ EnergyConstants(const device_coord3d f_bond, const device_coord3d f_inner_angle, const device_coord3d f_inner_dihedral, const device_coord3d r0, const device_coord3d angle0, const device_coord3d inner_dih0): f_bond(f_bond), f_inner_angle(f_inner_angle),
-                            f_inner_dihedral(f_inner_dihedral),r0(r0), angle0(angle0), inner_dih0(inner_dih0) {}
-};
-
-struct ArcConstants{
-    const device_real_t f_bond;
-    const device_real_t f_inner_angle;
-    const device_real_t f_inner_dihedral;
-    const device_real_t f_outer_angle_m;
-    const device_real_t f_outer_angle_p;
-    const device_real_t f_outer_dihedral;
-
-    const device_real_t r0;
-    const device_real_t angle0;
-    const device_real_t outer_angle_m0;
-    const device_real_t outer_angle_p0;
-    const device_real_t inner_dih0;
-    const device_real_t outer_dih0;
-    
-    __device__ ArcConstants(const device_real_t f_bond, const device_real_t f_inner_angle, const device_real_t f_inner_dihedral, const device_real_t f_outer_angle_m, const device_real_t f_outer_angle_p, const device_real_t f_outer_dihedral,
-                            const device_real_t r0, const device_real_t angle0, const device_real_t outer_angle_m0, const device_real_t outer_angle_p0, const device_real_t inner_dih0, const device_real_t outer_dih0): f_bond(f_bond), f_inner_angle(f_inner_angle),
-                            f_inner_dihedral(f_inner_dihedral), f_outer_angle_m(f_outer_angle_m), f_outer_angle_p(f_outer_angle_p), f_outer_dihedral(f_outer_dihedral), r0(r0), angle0(angle0), outer_angle_m0(outer_angle_m0), outer_angle_p0(outer_angle_p0),
-                            inner_dih0(inner_dih0), outer_dih0(outer_dih0) {}
-
 };
 
 __device__ __host__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
@@ -211,62 +181,6 @@ __device__ Constants<T> compute_constants(IsomerspaceForcefield::DeviceGraph& gr
     }
     return Constants<T>(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0_a, outer_dih0_m, outer_dih0_p);
 }
-
-__device__ ArcConstants compute_arc_constants(BookkeepingData &dat, device_node_t node_id, uint8_t j){
-    device_real_t r0 ; device_real_t angle0 ; device_real_t inner_dih0 ; device_real_t outer_angle_m0 ; device_real_t outer_angle_p0 ; device_real_t outer_dih0 ;
-    device_real_t f_bond ; device_real_t f_inner_angle ; device_real_t f_inner_dihedral ; device_real_t f_outer_angle_m ; device_real_t f_outer_angle_p ; device_real_t f_outer_dihedral ;
-    
-    
-
-    uint8_t f_r = dat.face_right[node_id * 3 + j] - 5;
-    uint8_t f_l = dat.face_right[node_id * 3 + (2 + j)%3] - 5;
-
-    uint8_t face_sum = dat.face_right[node_id * 3] - 5 + dat.face_right[node_id * 3 + 1] - 5 + dat.face_right[node_id * 3 + 2] - 5;
-    uint8_t dihedral_face_sum = dat.face_right[dat.neighbours[node_id * 3 + j] * 3]-5 + dat.face_right[dat.neighbours[node_id * 3 + j] * 3 + 1]-5 +  dat.face_right[dat.neighbours[node_id * 3 + j] * 3 + 2]-5;
-
-    //Load equillibirium distance, angles and dihedral angles from face information.
-    r0 = optimal_bond_lengths[ f_l + f_r ];
-    angle0 = optimal_corner_cos_angles[ f_r ];
-    inner_dih0 = optimal_dih_cos_angles[ face_sum ];
-    outer_angle_m0 = optimal_corner_cos_angles[ f_l ];
-    outer_angle_p0 = optimal_corner_cos_angles[ f_r ];
-    outer_dih0 = optimal_dih_cos_angles[ dihedral_face_sum ];
-
-    //Load force constants from neighbouring face information.
-    f_bond = bond_forces[ f_l + f_r ];
-    f_inner_angle = angle_forces[ f_l ];
-    f_inner_dihedral = dih_forces[ face_sum];
-    f_outer_angle_m = angle_forces[ f_r ];
-    f_outer_angle_p = angle_forces[ f_l ];
-    f_outer_dihedral = dih_forces[ dihedral_face_sum];
-        
-
-    return ArcConstants(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0);
-}
-
-
-//Reduction method for single block fullerenes.
-/*
-__device__ device_real_t reduction(device_real_t *sdata){
-
-    cg::thread_block block = cg::this_thread_block();
-    cg::sync(block);
-    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
-    sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<device_real_t>());
-    cg::sync(block);
-
-    device_real_t beta = 0.0;
-    if (block.thread_rank() == 0) {
-        beta  = 0;
-        for (uint16_t i = 0; i < block.size(); i += tile32.size()) {
-            beta  += sdata[i];
-        }
-        sdata[0] = beta;
-    }
-    cg::sync(block);
-    return sdata[0];
-}*/
-
 
 __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
     sdata[threadIdx.x] = data;
@@ -379,38 +293,6 @@ __device__ void reduction(device_real_t *sdata, device_real_t *gdata, const devi
         if (block.thread_rank() == 0) {sdata[0] = gdata[0];}
         cg::sync(grid);
     }
-}
-
-template < class T >
-size_t optimize_block_size(size_t N, cudaDeviceProp prop, T kernel){
-    int maxActiveBlocks;
-    size_t best_size = prop.warpSize;
-    size_t min_waste = prop.maxThreadsPerMultiProcessor;
-    for (size_t blocksize = prop.warpSize*2; blocksize < prop.maxThreadsPerBlock; blocksize +=prop.warpSize)
-    {
-        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&maxActiveBlocks, kernel, (int)blocksize, (size_t)(sizeof(device_real_t)*blocksize));
-        size_t wasted_threads = N % blocksize  +  blocksize*maxActiveBlocks % prop.maxThreadsPerMultiProcessor;
-
-        if (wasted_threads < min_waste)
-        {
-            min_waste = wasted_threads;
-            best_size = blocksize;
-        }
-    }
-    return best_size;
-}
-
-
-__device__ device_real_t AverageBondLength(device_real_t* smem,const device_coord3d* X, const device_node_t* neighbours,const device_node_t node_id, const size_t N){
-    device_real_t node_average_bond_length = 0.0;
-    for (size_t i = 0; i < 3; i++)
-    {
-        node_average_bond_length += non_resciprocal_bond_length(X[node_id] - X[neighbours[i]]);
-    }
-    node_average_bond_length /= (device_real_t)3.0;
-
-    
-    return reduction(smem, node_average_bond_length)/(device_real_t)N;
 }
 
 __HD__ void print(const device_coord3d& ab){

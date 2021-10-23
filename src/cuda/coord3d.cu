@@ -146,11 +146,11 @@ INLINE float3 operator/(const float3& a, const float s)  { return a*(1/s); }
 INLINE void operator+=(float3& a, const float3& b) {a = a + b;}
 INLINE void operator/=(float3& a, const float b) {a = a / b;}
 
-INLINE void d_set(float3& a, const uint8_t j, float b){
+INLINE void d_set(float3& a, const u_char j, float b){
   ((float*)&a)[j] = b; 
 }
 
-INLINE float d_get(const float3& a, const uint8_t j){
+INLINE float d_get(const float3& a, const u_char j){
   return ((const float*)&a)[j]; 
 }
 //5 FLOPs
@@ -204,11 +204,11 @@ INLINE double3 operator/(const double3& a, const double s)  { return a*(1/s); }
 INLINE void operator+=(double3& a, const double3 b) {a = a + b;}
 INLINE void operator/=(double3& a, const double b) {a = a / b;}
 
-INLINE void d_set(double3& a, const uint8_t j, double b){
+INLINE void d_set(double3& a, const u_char j, double b){
   ((double*)&a)[j] = b; 
 }
 
-INLINE double d_get(const double3& a, const uint8_t j){
+INLINE double d_get(const double3& a, const u_char j){
   return ((const double*)&a)[j];
 }
 
@@ -247,4 +247,16 @@ INLINE double non_resciprocal_bond_length(const double3& ab){
 __host__ __device__ void print_coord(const double3& ab){
 
     printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
+}
+
+INLINE uint8_t d_get(const uint3& a, const u_char j){
+  switch (j)
+  {
+  case 0:
+    return a.x;
+  case 1:
+    return a.y;
+  case 2:
+    return a.z;
+  }
 }

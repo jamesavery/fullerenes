@@ -13,10 +13,14 @@
 #include <cuda_bf16.h>
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 
+#define BLOCK_SYNC cg::sync(cg::this_thread_block())
+#define GRID_SYNC cg::sync(cg::this_grid())
 
 typedef IsomerspaceForcefield::device_real_t device_real_t;
 typedef IsomerspaceForcefield::device_node_t device_node_t;
 typedef GPU_REAL3 device_coord3d;
+typedef GPU_NODE3 device_node3;
+
 
 #include "coord3d.cu"
 #include "helper_functions.cu"
@@ -28,44 +32,44 @@ namespace cg = cooperative_groups;
 /** This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions**/
 struct ForceField{
     typedef device_coord3d coord3d;
+    typedef device_node3 node3;
     typedef device_node_t node_t;
     typedef device_real_t real_t;
 
-    coord3d r1,              //d_i+1 In conjugated gradient algorithm  Buster p. 36
-            r0;                  //d_0 In conjugated gradient algorithm Buster p. 36
 
-    const BookkeepingData bdat;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
+    coord3d r1,                         //d_i+1 In conjugated gradient algorithm  Buster p. 36
+            r0;                         //d_0 In conjugated gradient algorithm Buster p. 36
+
+    const NodeGraph node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
     const Constants<coord3d> constants; //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
 
-    cg::thread_group group_handle = cg::this_thread_block(); //Synchronization handle may be changed to grid-wide synchronization 
-    node_t node_id; //In case the code needs to be turned into grid-sized fullerenes. Parallel lockstep implementation of this is nontrivial to optimize in terms of blocksizes.
-    real_t* sdata;  //Pointer to start of L1 cache array, used exclusively for reduction.
+    size_t node_id = threadIdx.x;
+    real_t* sdata;                      //Pointer to start of L1 cache array, used exclusively for reduction.
 
-    __device__ ForceField(  const BookkeepingData &b,
+    __device__ ForceField(  const NodeGraph &G,
                             const Constants<coord3d> &c, 
-                            real_t* sdata,
-                            node_t node_id): bdat(b), constants(c), sdata(sdata), node_id(node_id) {}
+                            real_t* sdata): node_graph(G), constants(c), sdata(sdata) {}
 
 
 //Container for all energy and gradient evaluations with respect to an arc, eg. AB, AC or AD.
 struct ArcData{
     //124 FLOPs;
 
-    __device__ ArcData(const uint8_t j, const coord3d* __restrict__ X, const BookkeepingData& bdat){   
+    __device__ ArcData(const u_char j, const coord3d* __restrict__ X, const NodeGraph& G){   
         this->j = j;   
         node_t a = threadIdx.x;
         real_t r_rmp;
         coord3d ap, am, ab, ac, ad, mp;
-        coord3d X_a = X[a]; coord3d X_b = X[bdat.neighbours[j]];
+        coord3d X_a = X[a]; coord3d X_b = X[d_get(G.neighbours,j)];
         //printf("Index: %d \n", a*3 + j);
 
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
         ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;
-        ac = (X[bdat.neighbours[(j+1)%3]] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac; rab = non_resciprocal_bond_length(ab);
-        ad = (X[bdat.neighbours[(j+2)%3]] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
+        ac = (X[d_get(G.neighbours,(j+1)%3)] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac; rab = non_resciprocal_bond_length(ab);
+        ad = (X[d_get(G.neighbours,(j+2)%3)] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
         
-        coord3d bp = (X[bdat.next_on_face[j]] - X_b); bp_hat = unit_vector(bp);
-        coord3d bm = (X[bdat.prev_on_face[j]] - X_b); bm_hat = unit_vector(bm);
+        coord3d bp = (X[d_get(G.next_on_face,j)] - X_b); bp_hat = unit_vector(bp);
+        coord3d bm = (X[d_get(G.prev_on_face,j)] - X_b); bm_hat = unit_vector(bm);
 
         ap = bp + ab; r_rap = bond_length(ap); ap_hat = r_rap * ap;
         am = bm + ab; r_ram = bond_length(am); am_hat = r_ram * am;
@@ -293,25 +297,24 @@ struct ArcData{
 
 
 INLINE coord3d gradient(coord3d* X) const {
-    cg::sync(group_handle);
+    BLOCK_SYNC;
     coord3d grad = {0.0, 0.0, 0.0};
 
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData(j, X, bdat);
+        ArcData arc = ArcData(j, X, node_graph);
         grad += arc.gradient(constants);
-        //set(grad,j,d_get(constants.f_outer_dihedral,j));
     }
 
     return grad;
 }
 
 INLINE real_t energy(coord3d* X) const {
-    cg::sync(group_handle);
+    BLOCK_SYNC;
     real_t arc_energy = (real_t)0.0;
 
     //(71 + 124) * 3 * N  = 585*N FLOPs
     for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData(j, X, bdat);
+        ArcData arc = ArcData(j, X, node_graph);
         arc_energy += arc.energy(constants);
     }
     return reduction(sdata, arc_energy);;
@@ -319,8 +322,7 @@ INLINE real_t energy(coord3d* X) const {
 }
 
 INLINE real_t gradnorm(coord3d* X, coord3d& d)const {
-    real_t gradsum = reduction(sdata, dot(-gradient(X),d));
-    return gradsum;
+    return reduction(sdata, dot(-gradient(X),d));
 }
 
 //Bracketing method designed to find upper bound for linesearch method that matches 
@@ -404,13 +406,11 @@ INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
             swap_reals(a,b); swap_reals(f_a,f_b);
         }
     }
-    real_t alpha = b;
-
-    return alpha;
+    return b;
 }
 
 //Golden Section Search, using fixed iterations.
-INLINE real_t GSS(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
+INLINE real_t GSS(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2) const{
     constexpr real_t tau = (real_t)0.6180339887;
     //Line search x - values;
     real_t a = 0.0; real_t b = (real_t)1.0;
@@ -426,7 +426,7 @@ INLINE real_t GSS(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
     real_t f1 = energy(X1);
     real_t f2 = energy(X2);
 
-    for (uint8_t i = 0; i < 30; i++){
+    for (uint8_t i = 0; i < 20; i++){
         if (f1 > f2){
             a = x1;
             x1 = x2;
@@ -489,88 +489,66 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
 
 };
 
-__global__ void kernel_optimize_batch(IsomerspaceForcefield::DeviceGraph graph, const size_t N, const size_t MaxIter){
-    
+__global__ void kernel_optimize_batch(IsomerspaceForcefield::DeviceGraph G, const size_t max_iter){
+    typedef device_coord3d coord3d;
     extern __shared__ device_real_t smem[];
-    device_real_t* base_pointer = smem + Block_Size_Pow_2;
-    cg::grid_group grid = cg::this_grid();
-    cg::thread_block block = cg::this_thread_block();
     clear_cache(smem,Block_Size_Pow_2);
-
-    device_node_t node_id = threadIdx.x;
-    size_t offset = blockIdx.x * blockDim.x;
     
-    device_coord3d* X = reinterpret_cast<device_coord3d*>(graph.X+3*offset);
+    device_real_t* base_pointer = smem + Block_Size_Pow_2;
+    size_t offset               = blockIdx.x * blockDim.x;
+    size_t node_id              = threadIdx.x;
+    size_t N                    = blockDim.x;
+    
+    //Set VRAM pointer to start of each fullerene, as opposed to at the start of the isomerbatch.
+    coord3d* X = reinterpret_cast<coord3d*>(G.X+3*offset);
 
-    device_coord3d* sX = reinterpret_cast<device_coord3d*>(base_pointer);
-    device_coord3d* X1 =reinterpret_cast<device_coord3d*>(base_pointer+3*N);
-    device_coord3d* X2 =reinterpret_cast<device_coord3d*>(base_pointer+6*N);  
+    //Assign a section of L1 cache to each set of cartesian coordinates X, X1 and X2.
+    coord3d* sX =reinterpret_cast<coord3d*>(base_pointer);
+    coord3d* X1 =reinterpret_cast<coord3d*>(base_pointer+3*N);
+    coord3d* X2 =reinterpret_cast<coord3d*>(base_pointer+6*N);  
 
-    cg::sync(block);
+                                
+    sX[node_id] = X[node_id];   //Copy cartesian coordinates from DRAM to L1 Cache.
+    X           = &sX[0];       //Switch coordinate pointer from DRAM to L1 Cache.
 
-    sX[node_id] = X[node_id];
-    X = &sX[0];
-
-    cg::sync(block);
     //Pre-compute force constants and store in registers.
-    Constants<device_coord3d> constants = compute_constants<device_coord3d>(graph);
-
-    //Load constant bookkeeping data into registers.
-    const device_node_t neighbours[3] = {graph.neighbours[3*(offset+node_id)],graph.neighbours[3*(offset+node_id) + 1],graph.neighbours[3*(offset+node_id) + 2]};
-    const uint8_t face_right[3] = {graph.face_right[3*(offset+node_id)],graph.face_right[3*(offset+node_id) + 1],graph.face_right[3*(offset+node_id) + 2]};;
-    const device_node_t next_on_face[3] = {graph.next_on_face[3*(offset+node_id)],graph.next_on_face[3*(offset+node_id) + 1],graph.next_on_face[3*(offset+node_id) + 2]};
-    const device_node_t prev_on_face[3] = {graph.prev_on_face[3*(offset+node_id)],graph.prev_on_face[3*(offset+node_id) + 1],graph.prev_on_face[3*(offset+node_id) + 2]};
-    BookkeepingData bookkeeping = BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
-
-
-
-
-    cg::sync(block);
+    Constants<coord3d> constants = compute_constants<coord3d>(G);
+    NodeGraph nodeG = NodeGraph(G);
+    //NodeGraph bookkeeping = NodeGraph(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
 
     //Create forcefield struct and use optimization algorithm to optimize the fullerene 
-    ForceField FF = ForceField(bookkeeping, constants, smem, node_id);
-    FF.CG(X,X1,X2,MaxIter);
-    cg::sync(block);
-    
-    // Copy data back from L1 cache to VRAM 
-    reinterpret_cast<device_coord3d*>(graph.X)[offset + threadIdx.x]= X[threadIdx.x];   
+    ForceField FF = ForceField(nodeG, constants, smem);
+    FF.CG(X,X1,X2,max_iter);
+    BLOCK_SYNC;
+    //Copy data back from L1 cache to VRAM 
+    reinterpret_cast<coord3d*>(G.X)[offset + threadIdx.x]= X[threadIdx.x];   
 }
 
 
 
-__global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_real_t* global_reduction_array){
+__global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph G, device_real_t* global_reduction_array){
     extern __shared__ device_real_t smem[];
 
     device_real_t* base_pointer = smem + Block_Size_Pow_2;
-    cg::grid_group grid = cg::this_grid();
-    cg::thread_block block = cg::this_thread_block();
     clear_cache(smem,Block_Size_Pow_2);
 
     device_node_t node_id = threadIdx.x;
     size_t offset = blockIdx.x * blockDim.x;
     size_t N = blockDim.x;
 
-    device_coord3d* X = reinterpret_cast<device_coord3d*>(p.X+3*offset);
-    device_coord3d* sX = reinterpret_cast<device_coord3d*>(base_pointer);
-
-    cg::sync(block);
+    device_coord3d* X   = reinterpret_cast<device_coord3d*>(G.X+3*offset);
+    device_coord3d* sX  = reinterpret_cast<device_coord3d*>(base_pointer);
 
     sX[node_id] = X[node_id];
-    X = &sX[0];
+    X           = &sX[0];
 
-    cg::sync(grid);
     //Pre-compute force constants and store in registers.
 
-    Constants<device_coord3d> constants = compute_constants<device_coord3d>(p);
+    Constants<device_coord3d> constants = compute_constants<device_coord3d>(G);
+    NodeGraph node_graph                = NodeGraph(G);
 
     //Load constant bookkeeping data into registers.
-    const device_node_t neighbours[3] = {p.neighbours[3*(offset+node_id)],p.neighbours[3*(offset+node_id) + 1],p.neighbours[3*(offset+node_id) + 2]};
-    const uint8_t face_right[3] = {p.face_right[3*(offset+node_id)],p.face_right[3*(offset+node_id) + 1],p.face_right[3*(offset+node_id) + 2]};;
-    const device_node_t next_on_face[3] = {p.next_on_face[3*(offset+node_id)],p.next_on_face[3*(offset+node_id) + 1],p.next_on_face[3*(offset+node_id) + 2]};
-    const device_node_t prev_on_face[3] = {p.prev_on_face[3*(offset+node_id)],p.prev_on_face[3*(offset+node_id) + 1],p.prev_on_face[3*(offset+node_id) + 2]};
-    BookkeepingData bookkeeping = BookkeepingData(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
-
-    ForceField FF = ForceField(bookkeeping, constants, smem, node_id);
+    ForceField FF = ForceField(node_graph, constants, smem);
 
    
     //Use X1 buffer as storage array.
@@ -579,7 +557,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
     device_real_t NodeTotBondError = 0.0, NodeTotAngleError= 0.0, NodeTotDihedralError = 0.0;
     for (uint8_t j = 0; j < 3; j++)
     {
-        auto arc = ForceField::ArcData(j, X, bookkeeping);
+        auto arc = ForceField::ArcData(j, X, node_graph);
         ArcEnergy = arc.dihedral_energy(constants);
         ArcBond_Error = abs(abs(arc.bond() - d_get(constants.r0,j))/d_get(constants.r0,j));
         ArcAngle_Error =  abs(abs(arc.angle() - d_get(constants.angle0,j))/d_get(constants.angle0,j));
@@ -608,18 +586,12 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
     }}
     
     for (size_t i = 0; i < gridDim.x; i++)
-    {
-        cg::sync(grid);
-        if(blockIdx.x == i && threadIdx.x == 0 && global_reduction_array[i]<0.5){printf("                    Error Summary                     \n====================================================\n Dihedral Max/RMS: \t%e | %e\n AngleMaxErr Max/RMS: \t%e | %e \n BondMaxErr Max/RMS: \t%e | %e \n \t\t   \t\t\t\t \n Energy/ Grad: \t\t%e | %e  \t\t \n====================================================\n\n", MaxDihedral_Error, RMS_Dihedral_Error, MaxAngle_Error, RMS_Angle_Error, MaxBond_Error, RMS_Bond_Error, Energy/blockDim.x, GradNorm);}
-    }
+        GRID_SYNC;
+        if(blockIdx.x == 0 && threadIdx.x == 0 && global_reduction_array[0]<0.5){printf("                    Error Summary                     \n====================================================\n Dihedral Max/RMS: \t%e | %e\n AngleMaxErr Max/RMS: \t%e | %e \n BondMaxErr Max/RMS: \t%e | %e \n \t\t   \t\t\t\t \n Energy/ Grad: \t\t%e | %e  \t\t \n====================================================\n\n", MaxDihedral_Error, RMS_Dihedral_Error, MaxAngle_Error, RMS_Angle_Error, MaxBond_Error, RMS_Bond_Error, Energy/blockDim.x, GradNorm);}
     
     
     
-
-    
-   
-
-    cg::sync(cg::this_grid());
+    GRID_SYNC;
     device_real_t Success = 0;
     if ((threadIdx.x + blockIdx.x * blockDim.x) == 0)
     {
@@ -628,7 +600,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
             Success += global_reduction_array[i];
         }
     }
-    cg::sync(cg::this_grid());
+    GRID_SYNC;
     if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)Success); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
 
 }
@@ -637,12 +609,15 @@ __global__ void kernel_internal_coordinates(IsomerspaceForcefield::DeviceGraph p
     size_t offset = blockIdx.x * blockDim.x;
     device_coord3d* X = &reinterpret_cast<device_coord3d*>(p.X)[offset];
     Constants<device_coord3d> constants = compute_constants<device_coord3d>(p);
-    BookkeepingData bdat = BookkeepingData(&p.neighbours[3*(offset + threadIdx.x)],&p.face_right[3*(offset + threadIdx.x)],&p.next_on_face[3*(offset + threadIdx.x)],&p.prev_on_face[3*(offset + threadIdx.x)]);
+    const device_node3 neighbours = make_uint3(p.neighbours[3*(offset+threadIdx.x)],p.neighbours[3*(offset+threadIdx.x) + 1],p.neighbours[3*(offset+threadIdx.x) + 2]);
+    const device_node3 next_on_face = make_uint3(p.next_on_face[3*(offset+threadIdx.x)],p.next_on_face[3*(offset+threadIdx.x) + 1],p.next_on_face[3*(offset+threadIdx.x) + 2]);
+    const device_node3 prev_on_face = make_uint3(p.prev_on_face[3*(offset+threadIdx.x)],p.prev_on_face[3*(offset+threadIdx.x) + 1],p.prev_on_face[3*(offset+threadIdx.x) + 2]);
+    NodeGraph node_graph = NodeGraph(neighbours,next_on_face,prev_on_face);
 
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
     for (uint8_t j = 0; j < 3; j++)
     {   
-        auto arc = ForceField::ArcData(j, X, bdat);
+        auto arc = ForceField::ArcData(j, X, node_graph);
         c.bonds[tid*3 + j] = arc.bond();
         c.angles[tid*3 + j] = arc.angle();
         c.outer_angles_m[tid*3 + j] = arc.outer_angle_m();
@@ -696,7 +671,7 @@ void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
 
     printLastCudaError("Memcpy Failed! \n");
     auto start = std::chrono::system_clock::now();
-    void* kernelArgs[] = {(void*)&d_graph,(void*)&N,(void*)&MaxIter};
+    void* kernelArgs[] = {(void*)&d_graph,(void*)&MaxIter};
     
     cudaLaunchCooperativeKernel((void*)kernel_optimize_batch, dim3(batch_size, 1, 1), dim3(N, 1, 1), kernelArgs, sizeof(device_coord3d)* 3 * N + sizeof(device_real_t)*Block_Size_Pow_2);
     cudaDeviceSynchronize();
