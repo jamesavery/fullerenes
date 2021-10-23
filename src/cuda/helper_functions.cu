@@ -154,7 +154,13 @@ __device__ __host__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
 }
 
 template <typename T>
-__device__ Constants<T> compute_constants(IsomerspaceForcefield::DeviceGraph& dat){
+__device__ Constants<T> compute_constants(IsomerspaceForcefield::DeviceGraph& graph){
+    size_t offset = blockDim.x*blockIdx.x;
+    device_node_t* neighbours = graph.neighbours + offset*3;
+    device_node_t* next_on_face = graph.next_on_face + offset*3; 
+    device_node_t* prev_on_face = graph.prev_on_face + offset*3; 
+    uint8_t* face_right = graph.face_right + offset*3;
+
     T r0, angle0, inner_dih0, outer_angle_m0, outer_angle_p0, outer_dih0_a, outer_dih0_m, outer_dih0_p;
     T f_bond, f_inner_angle, f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral ;
 //       m    p
@@ -168,22 +174,22 @@ __device__ Constants<T> compute_constants(IsomerspaceForcefield::DeviceGraph& da
 //       f6
 
     for (uint8_t j = 0; j < 3; j++) {
-        uint8_t F1 = dat.face_right[threadIdx.x * 3 + j] - 5;
-        uint8_t F3 = dat.face_right[threadIdx.x * 3 + (2 + j)%3] - 5;
+        uint8_t F1 = face_right[threadIdx.x * 3 + j] - 5;
+        uint8_t F3 = face_right[threadIdx.x * 3 + (2 + j)%3] - 5;
 
-        uint8_t f_r_neighbour = dat.face_right[dat.neighbours[threadIdx.x * 3 + j]*3 ] - 5;
-        uint8_t f_l_neighbour = dat.face_right[dat.neighbours[threadIdx.x * 3 + j]*3 + 1 ] - 5;
-        uint8_t f_m_neighbour = dat.face_right[dat.neighbours[threadIdx.x * 3 + j]*3 + 2] - 5;
+        uint8_t f_r_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 ] - 5;
+        uint8_t f_l_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 + 1 ] - 5;
+        uint8_t f_m_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 + 2] - 5;
         uint8_t F4 = f_r_neighbour + f_l_neighbour + f_m_neighbour - F1 - F3 ;
 
 
-        uint8_t face_sum = dat.face_right[threadIdx.x * 3] - 5 + dat.face_right[threadIdx.x * 3 + 1] - 5 + dat.face_right[threadIdx.x * 3 + 2] - 5;
-        uint8_t dihedral_face_sum = dat.face_right[dat.neighbours[threadIdx.x * 3 + j] * 3]-5 + dat.face_right[dat.neighbours[threadIdx.x * 3 + j] * 3 + 1]-5 +  dat.face_right[dat.neighbours[threadIdx.x * 3 + j] * 3 + 2]-5;
+        uint8_t face_sum = face_right[threadIdx.x * 3] - 5 + face_right[threadIdx.x * 3 + 1] - 5 + face_right[threadIdx.x * 3 + 2] - 5;
+        uint8_t dihedral_face_sum = face_right[neighbours[threadIdx.x * 3 + j] * 3]-5 + face_right[neighbours[threadIdx.x * 3 + j] * 3 + 1]-5 +  face_right[neighbours[threadIdx.x * 3 + j] * 3 + 2]-5;
 
         //Load equillibirium distance, angles and dihedral angles from face information.
         d_set(r0,j,optimal_bond_lengths[ F3 + F1 ]);
         d_set(angle0,j,optimal_corner_cos_angles[ F1 ]);
-        d_set(inner_dih0,j,optimal_dih_cos_angles[ face_index(dat.face_right[threadIdx.x * 3 + j] - 5, dat.face_right[threadIdx.x * 3 + (1+j)%3] - 5 , dat.face_right[threadIdx.x * 3 + (2+j)%3] - 5) ]);
+        d_set(inner_dih0,j,optimal_dih_cos_angles[ face_index(face_right[threadIdx.x * 3 + j] - 5, face_right[threadIdx.x * 3 + (1+j)%3] - 5 , face_right[threadIdx.x * 3 + (2+j)%3] - 5) ]);
         d_set(outer_angle_m0,j,optimal_corner_cos_angles[ F3 ]);
         d_set(outer_angle_p0,j,optimal_corner_cos_angles[ F1 ]);
         
