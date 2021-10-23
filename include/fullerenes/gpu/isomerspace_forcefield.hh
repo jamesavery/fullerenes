@@ -1,89 +1,92 @@
 #pragma once
 #include <inttypes.h>
+#include <string>
+#include <fullerenes/fullerenegraph.hh> 
+
+#define GPU_REAL float       
+#define GPU_REAL3 float3
+#define Block_Size_Pow_2 256
+
+  
 
 
-namespace IsomerspaceForcefield {
-  typedef float device_real_t;
+class IsomerspaceForcefield {
+public:
+  typedef GPU_REAL device_real_t;
   typedef uint16_t device_node_t;
+  
+  
+struct DeviceGraph{
+  bool allocated = false;
+  size_t N = 0;
+  size_t batch_size = 0;
 
-struct CoordinatePointers {
-	device_real_t* bonds;
-	device_real_t* angles;
-	device_real_t* outer_angles_m;
-	device_real_t* outer_angles_p;
-	device_real_t* dihedrals;
-	device_real_t* outer_dihedrals_a;
-	device_real_t* outer_dihedrals_m;
-	device_real_t* outer_dihedrals_p;
+  device_real_t* X;
+  device_node_t* neighbours;
+  device_node_t* next_on_face;
+  device_node_t* prev_on_face;
+  uint8_t* face_right;
 
-	CoordinatePointers(){}
-	CoordinatePointers(device_real_t* bonds, device_real_t* angles, device_real_t* outer_angles_m, device_real_t* outer_angles_p , device_real_t* dihedrals, device_real_t* outer_dihedrals_a, device_real_t* outer_dihedrals_m, device_real_t* outer_dihedrals_p) : 
-        bonds(bonds), angles(angles), outer_angles_m(outer_angles_m), outer_angles_p(outer_angles_p), dihedrals(dihedrals), outer_dihedrals_a(outer_dihedrals_a), outer_dihedrals_m(outer_dihedrals_m), outer_dihedrals_p(outer_dihedrals_p){}
-};
+  DeviceGraph(){}
+  DeviceGraph(size_t batch_size ,device_real_t* X, device_node_t* neighbours, device_node_t* next_on_face, device_node_t* prev_on_face, uint8_t* face_right): batch_size(batch_size), X(X), neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face), face_right(face_right){}
+  void copy(const FullereneGraph& G, const device_real_t* X);
+  void copy(const DeviceGraph& G);
 
-struct HarmonicConstantPointers {
-	device_real_t* bonds_0;
-	device_real_t* angles_0;
-	device_real_t* outer_angles_m0;
-	device_real_t* outer_angles_p0;
-	device_real_t* dihedrals_0;
-	device_real_t* outer_dihedrals_a0;
-	device_real_t* outer_dihedrals_m0;
-	device_real_t* outer_dihedrals_p0;
+  void allocate(const size_t N, const size_t batch_size);
+  void free();
+}; 
 
-	HarmonicConstantPointers(){}
 
-	HarmonicConstantPointers(device_real_t* bonds_0, device_real_t* angles_0, device_real_t* outer_angles_m0, device_real_t* outer_angles_p0 , device_real_t* dihedrals_0, device_real_t* outer_dihedrals_a0, device_real_t* outer_dihedrals_m0, device_real_t* outer_dihedrals_p0) : 
-        bonds_0(bonds_0), angles_0(angles_0), outer_angles_m0(outer_angles_m0), outer_angles_p0(outer_angles_p0), dihedrals_0(dihedrals_0), outer_dihedrals_a0(outer_dihedrals_a0), outer_dihedrals_m0(outer_dihedrals_m0), outer_dihedrals_p0(outer_dihedrals_p0){}
-};
 
-struct DevicePointers {
-	device_real_t* X;
-    device_real_t* X1;
-    device_real_t* X2;
-    device_node_t* neighbours; 
-    device_node_t* next_on_face;
-    device_node_t* prev_on_face;
-    uint8_t* face_right;
-    device_real_t* gdata;
-	device_real_t* gradients;
+struct InternalCoordinates{
+  bool allocated = false;
+  size_t N = 0;
+  size_t batch_size = 0;
 
-	DevicePointers(){}
-	DevicePointers(device_real_t* X, device_real_t* X_temp, device_real_t* X2, device_node_t* neighbours, device_node_t* next_on_face, device_node_t* prev_on_face, uint8_t* face_right, device_real_t* gdata, device_real_t* gradients) : 
-        X(X), X1(X1), X2(X2), neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face), face_right(face_right), gdata(gdata),  gradients(gradients){}
+  device_real_t* bonds;
+  device_real_t* angles;
+  device_real_t* dihedrals;
+  device_real_t* outer_angles_m;
+  device_real_t* outer_angles_p;
+  device_real_t* outer_dihedrals_a;
+  device_real_t* outer_dihedrals_m;
+  device_real_t* outer_dihedrals_p;
+
+  InternalCoordinates(){}
+
+  void allocate(const size_t N,const size_t batch_size);
+
+  void free();
+  static void to_file(const InternalCoordinates& coords, size_t ID_in_batch, std::string fullerene_name);
 
 };
 
-struct HostPointers
-{
-	device_real_t* h_X;
-	device_node_t* h_cubic_neighbours;
-	device_node_t* h_next_on_face;
-	device_node_t* h_prev_on_face;
-	uint8_t* h_face_right;
 
-	HostPointers(device_real_t* h_X,
-		       device_node_t* h_cubic_neighbours,
-		       device_node_t* h_next_on_face,
-		       device_node_t* h_prev_on_face, uint8_t* h_face_right
-		      ) : h_X(h_X), h_cubic_neighbours(h_cubic_neighbours), h_next_on_face(h_next_on_face), h_prev_on_face(h_prev_on_face), h_face_right(h_face_right) {}
+
+
+  static size_t get_batch_capacity(const size_t N);
+  
+  void insert_isomer(const FullereneGraph& G,  const vector<coord3d> &X0);
+  void insert_isomer_batch(const DeviceGraph& G);
+  
+  void optimize_batch(size_t maxIter);
+  void check_batch();
+  void get_cartesian_coordinates(device_real_t* X);
+  void get_internal_coordinates(device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals);
+  void clear_batch(){batch_size = 0;}
+  IsomerspaceForcefield(const size_t N);
+  ~IsomerspaceForcefield();
+
+
+private:
+  size_t N = 0;
+  size_t batch_capacity = 0;
+  size_t batch_size = 0;
+  device_real_t* global_reduction_array;
+
+  DeviceGraph d_graph;
+  InternalCoordinates d_coords;
+  
 };
 
 
-void OptimizeBatch(
-				DevicePointers& d_pointers,
-			   HostPointers& h_pointers,
-		       const size_t N,
-		       const size_t batch_size,
-			   const size_t MaxIter);
-
-size_t computeBatchSize(size_t N);
-
-void AllocateDevicePointers(DevicePointers& p, size_t N, size_t batch_size);
-void FreePointers(DevicePointers& p);
-void CheckBatch(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size);
-void Gradients(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, device_real_t* gradients);
-void InternalCoordinates(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, device_real_t* bonds,device_real_t* angles,device_real_t* dihedrals);
-void HarmonicConstants(DevicePointers& p, const HostPointers& h, const size_t N, const size_t batch_size, device_real_t* bond_0, device_real_t* angle_0, device_real_t* dihedral_0);
-
-};
