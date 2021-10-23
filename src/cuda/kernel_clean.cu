@@ -513,8 +513,7 @@ __global__ void kernel_optimize_batch(IsomerspaceForcefield::DeviceGraph graph, 
 
     cg::sync(block);
     //Pre-compute force constants and store in registers.
-    BookkeepingData bookit = BookkeepingData(&graph.neighbours[3*offset],&graph.face_right[3*offset],&graph.next_on_face[3*offset],&graph.prev_on_face[3*offset]);
-    Constants<device_coord3d> constants = compute_constants<device_coord3d>(bookit, node_id);
+    Constants<device_coord3d> constants = compute_constants<device_coord3d>(graph);
 
     //Load constant bookkeeping data into registers.
     const device_node_t neighbours[3] = {graph.neighbours[3*(offset+node_id)],graph.neighbours[3*(offset+node_id) + 1],graph.neighbours[3*(offset+node_id) + 2]};
@@ -561,8 +560,8 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
 
     cg::sync(grid);
     //Pre-compute force constants and store in registers.
-    BookkeepingData bookit = BookkeepingData(&p.neighbours[3*offset],&p.face_right[3*offset],&p.next_on_face[3*offset],&p.prev_on_face[3*offset]);
-    Constants<device_coord3d> constants = compute_constants<device_coord3d>(bookit, node_id);
+
+    Constants<device_coord3d> constants = compute_constants<device_coord3d>(p);
 
     //Load constant bookkeeping data into registers.
     const device_node_t neighbours[3] = {p.neighbours[3*(offset+node_id)],p.neighbours[3*(offset+node_id) + 1],p.neighbours[3*(offset+node_id) + 2]};
@@ -637,8 +636,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph p, device_
 __global__ void kernel_internal_coordinates(IsomerspaceForcefield::DeviceGraph p, IsomerspaceForcefield::InternalCoordinates c){
     size_t offset = blockIdx.x * blockDim.x;
     device_coord3d* X = &reinterpret_cast<device_coord3d*>(p.X)[offset];
-    BookkeepingData bookit = BookkeepingData(&p.neighbours[3*(offset)],&p.face_right[3*(offset)],&p.next_on_face[3*(offset)],&p.prev_on_face[3*(offset)]);
-    Constants<device_coord3d> constants = compute_constants<device_coord3d>(bookit,threadIdx.x);
+    Constants<device_coord3d> constants = compute_constants<device_coord3d>(p);
     BookkeepingData bdat = BookkeepingData(&p.neighbours[3*(offset + threadIdx.x)],&p.face_right[3*(offset + threadIdx.x)],&p.next_on_face[3*(offset + threadIdx.x)],&p.prev_on_face[3*(offset + threadIdx.x)]);
 
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
