@@ -23,9 +23,8 @@ typedef GPU_NODE3 device_node3;
 
 
 #include "coord3d.cu"
-#include "helper_functions.cu"
-#include "data_structs.cu"
-
+#include "auxiliary_cuda_functions.cu"
+#include "forcefield_structs.cu"
 using namespace std::literals;
 namespace cg = cooperative_groups;
 
@@ -662,7 +661,6 @@ void IsomerspaceForcefield::insert_isomer_batch(const DeviceGraph& G){
     batch_size += G.batch_size;
 }
 
-/*
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
     size_t offset = batch_size*3*N;
     for (device_node_t u = 0; u < N; u++){
@@ -677,7 +675,7 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
         }   
     }   
     batch_size++;
-}*/
+}
 
 IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
 {
@@ -699,6 +697,3 @@ IsomerspaceForcefield::~IsomerspaceForcefield()
     h_graph.free_host();
     cudaDeviceReset();
 }
-
-
-

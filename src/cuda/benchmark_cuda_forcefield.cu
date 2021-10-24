@@ -1,4 +1,4 @@
-#include "kernel_clean.cu"
+#include "isomerspace_forcefield.cu"
 #include "coord3d.cu"
 #include "C60ih.cu"
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
