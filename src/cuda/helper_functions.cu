@@ -86,101 +86,81 @@ struct NodeGraph{
     }
 };
 
-
-
-
-template <typename T>
 struct Constants{
-    const T f_bond;
-    const T f_inner_angle;
-    const T f_inner_dihedral;
-    const T f_outer_angle_m;
-    const T f_outer_angle_p;
-    const T f_outer_dihedral;
+    device_coord3d f_bond;
+    device_coord3d f_inner_angle;
+    device_coord3d f_inner_dihedral;
+    device_coord3d f_outer_angle_m;
+    device_coord3d f_outer_angle_p;
+    device_coord3d f_outer_dihedral;
 
-    const T r0;
-    const T angle0;
-    const T outer_angle_m0;
-    const T outer_angle_p0;
-    const T inner_dih0;
-    const T outer_dih0_a;
-    const T outer_dih0_m;
-    const T outer_dih0_p;
+    device_coord3d r0;
+    device_coord3d angle0;
+    device_coord3d outer_angle_m0;
+    device_coord3d outer_angle_p0;
+    device_coord3d inner_dih0;
+    device_coord3d outer_dih0_a;
+    device_coord3d outer_dih0_m;
+    device_coord3d outer_dih0_p;
     
-    __device__ Constants(const T f_bond, const T f_inner_angle, const T f_inner_dihedral, const T f_outer_angle_m, const T f_outer_angle_p, const T f_outer_dihedral,
-                            const T r0, const T angle0, const T outer_angle_m0, const T outer_angle_p0, const T inner_dih0, const T outer_dih0_a, const T outer_dih0_m, const T outer_dih0_p): f_bond(f_bond), f_inner_angle(f_inner_angle),
-                            f_inner_dihedral(f_inner_dihedral), f_outer_angle_m(f_outer_angle_m), f_outer_angle_p(f_outer_angle_p), f_outer_dihedral(f_outer_dihedral), r0(r0), angle0(angle0), outer_angle_m0(outer_angle_m0), outer_angle_p0(outer_angle_p0),
-                            inner_dih0(inner_dih0), outer_dih0_a(outer_dih0_a), outer_dih0_m(outer_dih0_m), outer_dih0_p(outer_dih0_p) {}
-
-
-    __device__ Constants(const Constants<T> &c1):   f_bond(c1.f_bond), f_inner_angle(c1.f_inner_angle), f_inner_dihedral(c1.f_inner_dihedral), f_outer_angle_m(c1.f_outer_angle_m), f_outer_angle_p(c1.f_outer_angle_p), f_outer_dihedral(c1.f_outer_dihedral),
-                                                    r0(c1.r0), angle0(c1.angle0), outer_angle_m0(c1.outer_angle_m0), outer_angle_p0(c1.outer_angle_p0), inner_dih0(c1.inner_dih0), outer_dih0_a(c1.outer_dih0_a), outer_dih0_m(c1.outer_dih0_m), outer_dih0_p(c1.outer_dih0_p){
-        
+    __device__ __host__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
+        return f1*4 + f2*2 + f3;
     }
+
+    __device__ Constants(const IsomerspaceForcefield::DeviceGraph& G){
+        size_t offset = blockDim.x*blockIdx.x;
+        device_node_t* neighbours = G.neighbours + offset*3;
+        device_node_t* next_on_face = G.next_on_face + offset*3; 
+        device_node_t* prev_on_face = G.prev_on_face + offset*3; 
+        uint8_t* face_right = G.face_right + offset*3;
+        //       m    p
+        //    f5_|   |_f4
+        //   p   c    b  m
+        //       \f1/
+        //     f2 a f3
+        //        |
+        //        d
+        //      m/\p
+        //       f6
+
+        for (uint8_t j = 0; j < 3; j++) {
+            uint8_t F1 = face_right[threadIdx.x * 3 + j] - 5;
+            uint8_t F3 = face_right[threadIdx.x * 3 + (2 + j)%3] - 5;
+
+            uint8_t f_r_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 ] - 5;
+            uint8_t f_l_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 + 1 ] - 5;
+            uint8_t f_m_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 + 2] - 5;
+            uint8_t F4 = f_r_neighbour + f_l_neighbour + f_m_neighbour - F1 - F3 ;
+
+
+            uint8_t face_sum = face_right[threadIdx.x * 3] - 5 + face_right[threadIdx.x * 3 + 1] - 5 + face_right[threadIdx.x * 3 + 2] - 5;
+            uint8_t dihedral_face_sum = face_right[neighbours[threadIdx.x * 3 + j] * 3]-5 + face_right[neighbours[threadIdx.x * 3 + j] * 3 + 1]-5 +  face_right[neighbours[threadIdx.x * 3 + j] * 3 + 2]-5;
+
+            //Load equillibirium distance, angles and dihedral angles from face information.
+            d_set(r0,j,optimal_bond_lengths[ F3 + F1 ]);
+            d_set(angle0,j,optimal_corner_cos_angles[ F1 ]);
+            d_set(inner_dih0,j,optimal_dih_cos_angles[ face_index(face_right[threadIdx.x * 3 + j] - 5, face_right[threadIdx.x * 3 + (1+j)%3] - 5 , face_right[threadIdx.x * 3 + (2+j)%3] - 5) ]);
+            d_set(outer_angle_m0,j,optimal_corner_cos_angles[ F3 ]);
+            d_set(outer_angle_p0,j,optimal_corner_cos_angles[ F1 ]);
+            
+            uint8_t dihedral_index_a = face_index(F3,F4,F1);
+            uint8_t dihedral_index_m =  face_index(F4, F1, F3);
+            uint8_t dihedral_index_p = face_index(F1,F3, F4);
+
+            d_set(outer_dih0_a,j,optimal_dih_cos_angles[dihedral_index_a]  );
+            d_set(outer_dih0_m,j,optimal_dih_cos_angles[dihedral_index_m]  );
+            d_set(outer_dih0_p,j,optimal_dih_cos_angles[dihedral_index_p]  );
+
+            //Load force constants from neighbouring face information.
+            d_set(f_bond,j,bond_forces[ F3 + F1 ]);
+            d_set(f_inner_angle,j,angle_forces[ F1 ]);
+            d_set(f_inner_dihedral,j,dih_forces[ face_sum]);
+            d_set(f_outer_angle_m,j,angle_forces[ F3 ]);
+            d_set(f_outer_angle_p,j,angle_forces[ F1 ]);
+            d_set(f_outer_dihedral,j,dih_forces[ dihedral_face_sum]);
+        }
+    }   
 };
-
-__device__ __host__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
-    return f1*4 + f2*2 + f3;
-}
-
-template <typename T>
-__device__ Constants<T> compute_constants(IsomerspaceForcefield::DeviceGraph& graph){
-    size_t offset = blockDim.x*blockIdx.x;
-    device_node_t* neighbours = graph.neighbours + offset*3;
-    device_node_t* next_on_face = graph.next_on_face + offset*3; 
-    device_node_t* prev_on_face = graph.prev_on_face + offset*3; 
-    uint8_t* face_right = graph.face_right + offset*3;
-
-    T r0, angle0, inner_dih0, outer_angle_m0, outer_angle_p0, outer_dih0_a, outer_dih0_m, outer_dih0_p;
-    T f_bond, f_inner_angle, f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral ;
-//       m    p
-//    f5_|   |_f4
-//   p   c    b  m
-//       \f1/
-//     f2 a f3
-//        |
-//        d
-//      m/\p
-//       f6
-
-    for (uint8_t j = 0; j < 3; j++) {
-        uint8_t F1 = face_right[threadIdx.x * 3 + j] - 5;
-        uint8_t F3 = face_right[threadIdx.x * 3 + (2 + j)%3] - 5;
-
-        uint8_t f_r_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 ] - 5;
-        uint8_t f_l_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 + 1 ] - 5;
-        uint8_t f_m_neighbour = face_right[neighbours[threadIdx.x * 3 + j]*3 + 2] - 5;
-        uint8_t F4 = f_r_neighbour + f_l_neighbour + f_m_neighbour - F1 - F3 ;
-
-
-        uint8_t face_sum = face_right[threadIdx.x * 3] - 5 + face_right[threadIdx.x * 3 + 1] - 5 + face_right[threadIdx.x * 3 + 2] - 5;
-        uint8_t dihedral_face_sum = face_right[neighbours[threadIdx.x * 3 + j] * 3]-5 + face_right[neighbours[threadIdx.x * 3 + j] * 3 + 1]-5 +  face_right[neighbours[threadIdx.x * 3 + j] * 3 + 2]-5;
-
-        //Load equillibirium distance, angles and dihedral angles from face information.
-        d_set(r0,j,optimal_bond_lengths[ F3 + F1 ]);
-        d_set(angle0,j,optimal_corner_cos_angles[ F1 ]);
-        d_set(inner_dih0,j,optimal_dih_cos_angles[ face_index(face_right[threadIdx.x * 3 + j] - 5, face_right[threadIdx.x * 3 + (1+j)%3] - 5 , face_right[threadIdx.x * 3 + (2+j)%3] - 5) ]);
-        d_set(outer_angle_m0,j,optimal_corner_cos_angles[ F3 ]);
-        d_set(outer_angle_p0,j,optimal_corner_cos_angles[ F1 ]);
-        
-        uint8_t dihedral_index_a = face_index(F3,F4,F1);
-        uint8_t dihedral_index_m =  face_index(F4, F1, F3);
-        uint8_t dihedral_index_p = face_index(F1,F3, F4);
-
-        d_set(outer_dih0_a,j,optimal_dih_cos_angles[dihedral_index_a]  );
-        d_set(outer_dih0_m,j,optimal_dih_cos_angles[dihedral_index_m]  );
-        d_set(outer_dih0_p,j,optimal_dih_cos_angles[dihedral_index_p]  );
-
-        //Load force constants from neighbouring face information.
-        d_set(f_bond,j,bond_forces[ F3 + F1 ]);
-        d_set(f_inner_angle,j,angle_forces[ F1 ]);
-        d_set(f_inner_dihedral,j,dih_forces[ face_sum]);
-        d_set(f_outer_angle_m,j,angle_forces[ F3 ]);
-        d_set(f_outer_angle_p,j,angle_forces[ F1 ]);
-        d_set(f_outer_dihedral,j,dih_forces[ dihedral_face_sum]);
-    }
-    return Constants<T>(f_bond,f_inner_angle,f_inner_dihedral, f_outer_angle_m, f_outer_angle_p, f_outer_dihedral, r0, angle0, outer_angle_m0, outer_angle_p0, inner_dih0, outer_dih0_a, outer_dih0_m, outer_dih0_p);
-}
 
 __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
     sdata[threadIdx.x] = data;

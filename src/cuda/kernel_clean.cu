@@ -41,13 +41,13 @@ struct ForceField{
             r0;                         //d_0 In conjugated gradient algorithm Buster p. 36
 
     const NodeGraph node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
-    const Constants<coord3d> constants; //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
+    const Constants constants; //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
 
     size_t node_id = threadIdx.x;
     real_t* sdata;                      //Pointer to start of L1 cache array, used exclusively for reduction.
 
     __device__ ForceField(  const NodeGraph &G,
-                            const Constants<coord3d> &c, 
+                            const Constants &c, 
                             real_t* sdata): node_graph(G), constants(c), sdata(sdata) {}
 
 
@@ -146,20 +146,20 @@ struct ArcData{
     
     // Chain rule terms for angle calculation
     //Computes gradient related to bending term. ~24 FLOPs
-    INLINE coord3d inner_angle_gradient(const Constants<coord3d>& c) const
+    INLINE coord3d inner_angle_gradient(const Constants& c) const
     {   
         real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
         coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
         return d_get(c.f_inner_angle,j) * harmonic_energy_gradient(d_get(c.angle0,j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
     }
     //Computes gradient related to bending of outer angles. ~20 FLOPs
-    INLINE coord3d outer_angle_gradient_m(const Constants<coord3d>& c) const
+    INLINE coord3d outer_angle_gradient_m(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
         coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
         return d_get(c.f_outer_angle_m,j) * harmonic_energy_gradient(d_get(c.outer_angle_m0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
     }
-    INLINE coord3d outer_angle_gradient_p(const Constants<coord3d>& c) const
+    INLINE coord3d outer_angle_gradient_p(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
         coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
@@ -167,7 +167,7 @@ struct ArcData{
     }
     // Chain rule terms for dihedral calculation
     //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
-    INLINE coord3d inner_dihedral_gradient(const Constants<coord3d>& c) const
+    INLINE coord3d inner_dihedral_gradient(const Constants& c) const
     {
         coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
         cos_b = dot(ba_hat,bc_hat); r_sin_b = (real_t)1.0/sqrt((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
@@ -183,7 +183,7 @@ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
-    INLINE coord3d outer_dihedral_gradient_a(const Constants<coord3d>& c) const
+    INLINE coord3d outer_dihedral_gradient_a(const Constants& c) const
     {
         coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
 
@@ -204,7 +204,7 @@ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
-    INLINE coord3d outer_dihedral_gradient_m(const Constants<coord3d>& c) const
+    INLINE coord3d outer_dihedral_gradient_m(const Constants& c) const
     {
         coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
         cos_m = dot(mb_hat,mp_hat);  r_sin_m = (real_t)1.0/sqrt((real_t)1.0 - cos_m*cos_m); nbmp_hat = cross(mb_hat,mp_hat) * r_sin_m;
@@ -222,7 +222,7 @@ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
-    INLINE coord3d outer_dihedral_gradient_p(const Constants<coord3d>& c) const
+    INLINE coord3d outer_dihedral_gradient_p(const Constants& c) const
     {
         coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
         cos_a = dot(ap_hat,am_hat);  r_sin_a = (real_t)1.0/sqrt((real_t)1.0 - cos_a*cos_a); npam_hat = cross(ap_hat,am_hat)  * r_sin_a;
@@ -240,21 +240,21 @@ struct ArcData{
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_p,j), cos_beta, grad);
     }
     // Internal coordinate gradients
-    INLINE coord3d bond_length_gradient(const Constants<coord3d>& c) const { return d_get(c.f_bond,j) * harmonic_energy_gradient(bond(),d_get(c.r0,j),ab_hat);}
+    INLINE coord3d bond_length_gradient(const Constants& c) const { return d_get(c.f_bond,j) * harmonic_energy_gradient(bond(),d_get(c.r0,j),ab_hat);}
     //Sum of angular gradient components.
-    INLINE coord3d angle_gradient(const Constants<coord3d>& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
+    INLINE coord3d angle_gradient(const Constants& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
     //Sum of inner and outer dihedral gradient components.
-    INLINE coord3d dihedral_gradient(const Constants<coord3d>& c) const { return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);}
+    INLINE coord3d dihedral_gradient(const Constants& c) const { return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);}
     //coord3d flatness()             const { return ;  }   
     
-    INLINE real_t bond_energy(const Constants<coord3d>& c) const {return (real_t)0.5 *d_get(c.f_bond,j) *harmonic_energy(bond(),d_get(c.r0,j));}
-    INLINE real_t bend_energy(const Constants<coord3d>& c) const {return d_get(c.f_inner_angle,j)* harmonic_energy(angle(),d_get(c.angle0,j));}
-    INLINE real_t dihedral_energy(const Constants<coord3d>& c) const {return d_get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),d_get(c.inner_dih0,j));}
+    INLINE real_t bond_energy(const Constants& c) const {return (real_t)0.5 *d_get(c.f_bond,j) *harmonic_energy(bond(),d_get(c.r0,j));}
+    INLINE real_t bend_energy(const Constants& c) const {return d_get(c.f_inner_angle,j)* harmonic_energy(angle(),d_get(c.angle0,j));}
+    INLINE real_t dihedral_energy(const Constants& c) const {return d_get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),d_get(c.inner_dih0,j));}
     //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
     //71 FLOPs
-    INLINE real_t energy(const Constants<coord3d>& c) const {return bond_energy(c) + bend_energy(c) + dihedral_energy(c); }
+    INLINE real_t energy(const Constants& c) const {return bond_energy(c) + bend_energy(c) + dihedral_energy(c); }
     //Sum of bond, angular and dihedral gradient components.
-    INLINE coord3d gradient(const Constants<coord3d>& c) const{return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);}
+    INLINE coord3d gradient(const Constants& c) const{return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);}
 
     
     uint8_t j;
@@ -512,8 +512,8 @@ __global__ void kernel_optimize_batch(IsomerspaceForcefield::DeviceGraph G, cons
     X           = &sX[0];       //Switch coordinate pointer from DRAM to L1 Cache.
 
     //Pre-compute force constants and store in registers.
-    Constants<coord3d> constants = compute_constants<coord3d>(G);
-    NodeGraph nodeG = NodeGraph(G);
+    Constants constants = Constants(G);
+    NodeGraph nodeG     = NodeGraph(G);
     //NodeGraph bookkeeping = NodeGraph(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
 
     //Create forcefield struct and use optimization algorithm to optimize the fullerene 
@@ -542,90 +542,66 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::DeviceGraph G, device_
     sX[node_id] = X[node_id];
     X           = &sX[0];
 
-    //Pre-compute force constants and store in registers.
+    Constants constants     = Constants(G);
+    NodeGraph node_graph    = NodeGraph(G);
+    ForceField FF           = ForceField(node_graph, constants, smem);
 
-    Constants<device_coord3d> constants = compute_constants<device_coord3d>(G);
-    NodeGraph node_graph                = NodeGraph(G);
+    device_real_t NodeEnergy = 0.0,         NodeBond_Error = 0.0,     NodeAngle_Error = 0.0,    NodeDihedral_Error = 0.0;
+    device_real_t ArcEnergy  = 0.0,         ArcBond_Error = 0.0,      ArcAngle_Error = 0.0,     ArcDihedral_Error = 0.0;
+    device_real_t NodeTotBondError = 0.0,   NodeTotAngleError = 0.0,  NodeTotDihedralError = 0.0;
+    GRID_SYNC;
 
-    //Load constant bookkeeping data into registers.
-    ForceField FF = ForceField(node_graph, constants, smem);
-
-   
-    //Use X1 buffer as storage array.
-    device_real_t NodeEnergy = (device_real_t)0.0; device_real_t NodeBond_Error = (device_real_t)0.0; device_real_t NodeAngle_Error = (device_real_t)0.0; device_real_t NodeDihedral_Error = (device_real_t)0.0;
-    device_real_t ArcEnergy = (device_real_t)0.0; device_real_t ArcBond_Error = (device_real_t)0.0; device_real_t ArcAngle_Error = (device_real_t)0.0; device_real_t ArcDihedral_Error = (device_real_t)0.0;
-    device_real_t NodeTotBondError = 0.0, NodeTotAngleError= 0.0, NodeTotDihedralError = 0.0;
-    for (uint8_t j = 0; j < 3; j++)
-    {
-        auto arc = ForceField::ArcData(j, X, node_graph);
-        ArcEnergy = arc.dihedral_energy(constants);
-        ArcBond_Error = abs(abs(arc.bond() - d_get(constants.r0,j))/d_get(constants.r0,j));
-        ArcAngle_Error =  abs(abs(arc.angle() - d_get(constants.angle0,j))/d_get(constants.angle0,j));
-        ArcDihedral_Error = abs(abs(arc.dihedral() - d_get(constants.inner_dih0,j))/d_get(constants.inner_dih0,j));
+    for (uint8_t j = 0; j < 3; j++){
+        auto arc            = ForceField::ArcData(j, X, node_graph);
+        ArcEnergy           = arc.dihedral_energy(constants);
+        ArcBond_Error       = abs(abs(arc.bond()      - d_get(constants.r0,j))          /d_get(constants.r0,j));
+        ArcAngle_Error      = abs(abs(arc.angle()     - d_get(constants.angle0,j))      /d_get(constants.angle0,j));
+        ArcDihedral_Error   = abs(abs(arc.dihedral()  - d_get(constants.inner_dih0,j))  /d_get(constants.inner_dih0,j));
         NodeEnergy += ArcEnergy; NodeBond_Error = max(ArcBond_Error,NodeBond_Error); NodeAngle_Error = max(ArcAngle_Error,NodeAngle_Error); NodeDihedral_Error = max(ArcDihedral_Error,NodeDihedral_Error);
         NodeTotAngleError += ArcBond_Error; NodeTotDihedralError += ArcDihedral_Error; NodeTotBondError += ArcBond_Error;
     }
-    device_real_t Energy = FF.energy(X);
-    device_real_t GradNorm = reduction(smem,dot(FF.gradient(X),FF.gradient(X)))/(device_real_t)blockDim.x;
-    device_real_t MaxBond_Error =  reduction_max(reinterpret_cast<device_real_t*>(smem), NodeBond_Error);
-    device_real_t MaxAngle_Error =  reduction_max(reinterpret_cast<device_real_t*>(smem), NodeAngle_Error);
-    device_real_t MaxDihedral_Error =  reduction_max(reinterpret_cast<device_real_t*>(smem), NodeDihedral_Error);
-    device_real_t RMS_Bond_Error = sqrt(reduction(reinterpret_cast<device_real_t*>(smem), NodeTotBondError*NodeTotBondError)/blockDim.x);
-    device_real_t RMS_Angle_Error = sqrt(reduction(reinterpret_cast<device_real_t*>(smem), NodeTotAngleError*NodeTotAngleError)/blockDim.x);
-    device_real_t RMS_Dihedral_Error = sqrt(reduction(reinterpret_cast<device_real_t*>(smem), NodeTotDihedralError*NodeTotDihedralError)/blockDim.x);
+    device_real_t Energy                = FF.energy(X);
+    device_real_t GradNorm              = reduction(smem,dot(FF.gradient(X),FF.gradient(X)))/(device_real_t)blockDim.x;
+    device_real_t MaxBond_Error         = reduction_max(reinterpret_cast<device_real_t*>(smem), NodeBond_Error);
+    device_real_t MaxAngle_Error        = reduction_max(reinterpret_cast<device_real_t*>(smem), NodeAngle_Error);
+    device_real_t MaxDihedral_Error     = reduction_max(reinterpret_cast<device_real_t*>(smem), NodeDihedral_Error);
+    device_real_t RMS_Bond_Error        = sqrt(reduction(reinterpret_cast<device_real_t*>(smem),NodeTotBondError*NodeTotBondError)/blockDim.x);
+    device_real_t RMS_Angle_Error       = sqrt(reduction(reinterpret_cast<device_real_t*>(smem),NodeTotAngleError*NodeTotAngleError)/blockDim.x);
+    device_real_t RMS_Dihedral_Error    = sqrt(reduction(reinterpret_cast<device_real_t*>(smem),NodeTotDihedralError*NodeTotDihedralError)/blockDim.x);
     
-    if (threadIdx.x == 0){
-
-    if ((MaxBond_Error < 1e-1) && (MaxAngle_Error < 1.9e-1) && (MaxDihedral_Error < 1e-1) && (MaxBond_Error > 0.0) && (MaxAngle_Error > 0.0) && (MaxDihedral_Error > 0.0))
-    {   
-        global_reduction_array[blockIdx.x] = (device_real_t)1.0;
-
-    } else
-    {
-        global_reduction_array[blockIdx.x] = (device_real_t)0.0;
-    }}
+    bool converged                      = (MaxBond_Error < 1e-1) && (MaxAngle_Error < 1.9e-1) && (MaxDihedral_Error < 1e-1) && (MaxBond_Error > 0.0) && (MaxAngle_Error > 0.0) && (MaxDihedral_Error > 0.0);
+    global_reduction_array[blockIdx.x]  = (device_real_t)converged;
     
-    for (size_t i = 0; i < gridDim.x; i++)
+    for (size_t i = 0; i < gridDim.x; i++){
         GRID_SYNC;
         if(blockIdx.x == 0 && threadIdx.x == 0 && global_reduction_array[0]<0.5){printf("                    Error Summary                     \n====================================================\n Dihedral Max/RMS: \t%e | %e\n AngleMaxErr Max/RMS: \t%e | %e \n BondMaxErr Max/RMS: \t%e | %e \n \t\t   \t\t\t\t \n Energy/ Grad: \t\t%e | %e  \t\t \n====================================================\n\n", MaxDihedral_Error, RMS_Dihedral_Error, MaxAngle_Error, RMS_Angle_Error, MaxBond_Error, RMS_Bond_Error, Energy/blockDim.x, GradNorm);}
-    
-    
-    
+    }
     GRID_SYNC;
-    device_real_t Success = 0;
+    device_real_t num_of_success = 0;
     if ((threadIdx.x + blockIdx.x * blockDim.x) == 0)
     {
         for (size_t i = 0; i < gridDim.x; i++)
         {
-            Success += global_reduction_array[i];
+            num_of_success += global_reduction_array[i];
         }
     }
     GRID_SYNC;
-    if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)Success); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
-
+    if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)num_of_success); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
 }
 
-__global__ void kernel_internal_coordinates(IsomerspaceForcefield::DeviceGraph p, IsomerspaceForcefield::InternalCoordinates c){
+__global__ void kernel_internal_coordinates(IsomerspaceForcefield::DeviceGraph G, IsomerspaceForcefield::InternalCoordinates c){
     size_t offset = blockIdx.x * blockDim.x;
-    device_coord3d* X = &reinterpret_cast<device_coord3d*>(p.X)[offset];
-    Constants<device_coord3d> constants = compute_constants<device_coord3d>(p);
-    const device_node3 neighbours = make_uint3(p.neighbours[3*(offset+threadIdx.x)],p.neighbours[3*(offset+threadIdx.x) + 1],p.neighbours[3*(offset+threadIdx.x) + 2]);
-    const device_node3 next_on_face = make_uint3(p.next_on_face[3*(offset+threadIdx.x)],p.next_on_face[3*(offset+threadIdx.x) + 1],p.next_on_face[3*(offset+threadIdx.x) + 2]);
-    const device_node3 prev_on_face = make_uint3(p.prev_on_face[3*(offset+threadIdx.x)],p.prev_on_face[3*(offset+threadIdx.x) + 1],p.prev_on_face[3*(offset+threadIdx.x) + 2]);
-    NodeGraph node_graph = NodeGraph(neighbours,next_on_face,prev_on_face);
+    device_coord3d* X                       = &reinterpret_cast<device_coord3d*>(G.X)[offset];
+    Constants constants     = Constants(G);
+    NodeGraph node_graph    = NodeGraph(G);
 
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
     for (uint8_t j = 0; j < 3; j++)
     {   
-        auto arc = ForceField::ArcData(j, X, node_graph);
-        c.bonds[tid*3 + j] = arc.bond();
-        c.angles[tid*3 + j] = arc.angle();
-        c.outer_angles_m[tid*3 + j] = arc.outer_angle_m();
-        c.outer_angles_p[tid*3 + j] = arc.outer_angle_p();
-        c.dihedrals[tid*3 + j] = arc.dihedral();
-        c.outer_dihedrals_a[tid*3 + j] = arc.outer_dihedral_a();
-        c.outer_dihedrals_m[tid*3 + j] = arc.outer_dihedral_m();
-        c.outer_dihedrals_p[tid*3 + j] = arc.outer_dihedral_p();
+        auto arc                = ForceField::ArcData(j, X, node_graph);
+        c.bonds[tid*3 + j]      = arc.bond();
+        c.angles[tid*3 + j]     = arc.angle();
+        c.dihedrals[tid*3 + j]  = arc.dihedral();
     }
 }
 
@@ -686,6 +662,7 @@ void IsomerspaceForcefield::insert_isomer_batch(const DeviceGraph& G){
     batch_size += G.batch_size;
 }
 
+/*
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
     size_t offset = batch_size*3*N;
     for (device_node_t u = 0; u < N; u++){
@@ -700,7 +677,7 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
         }   
     }   
     batch_size++;
-}
+}*/
 
 IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
 {
