@@ -249,14 +249,6 @@ __host__ __device__ void print_coord(const double3& ab){
     printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
 }
 
-INLINE uint8_t d_get(const uint3& a, const u_char j){
-  switch (j)
-  {
-  case 0:
-    return a.x;
-  case 1:
-    return a.y;
-  case 2:
-    return a.z;
-  }
+INLINE device_node_t d_get(const device_node3& a, const uint8_t j){
+  return ((const device_node_t*)&a)[j];
 }

@@ -49,25 +49,68 @@ __device__ void pointerswap(T **r, T **s)
     return;
 }
 
-__device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
-    sdata[threadIdx.x] = data;
-    cg::thread_block block = cg::this_thread_block();
-    cg::sync(block);
-    
-    if((Block_Size_Pow_2 > 512)){if (threadIdx.x < 512){sdata[threadIdx.x] += sdata[threadIdx.x + 512];} cg::sync(block);}
-    if((Block_Size_Pow_2 > 256)){if (threadIdx.x < 256){sdata[threadIdx.x] += sdata[threadIdx.x + 256];} cg::sync(block);}
-    if((Block_Size_Pow_2 > 128)){if (threadIdx.x < 128){sdata[threadIdx.x] += sdata[threadIdx.x + 128];} cg::sync(block);}
-    if((Block_Size_Pow_2 > 64)){if (threadIdx.x < 64){sdata[threadIdx.x] += sdata[threadIdx.x + 64];} cg::sync(block);}
-    if(threadIdx.x < 32){
-    if((Block_Size_Pow_2 > 32)){if (threadIdx.x < 32){sdata[threadIdx.x] += sdata[threadIdx.x + 32];} __syncwarp();}
-    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
-    sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<device_real_t>());
+#if REDUCTION_METHOD==0
+    __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
+        sdata[threadIdx.x] = data;
+        BLOCK_SYNC;
+        
+        if((Block_Size_Pow_2 > 512)){if (threadIdx.x < 512){sdata[threadIdx.x] += sdata[threadIdx.x + 512];} BLOCK_SYNC;}
+        if((Block_Size_Pow_2 > 256)){if (threadIdx.x < 256){sdata[threadIdx.x] += sdata[threadIdx.x + 256];} BLOCK_SYNC;}
+        if((Block_Size_Pow_2 > 128)){if (threadIdx.x < 128){sdata[threadIdx.x] += sdata[threadIdx.x + 128];} BLOCK_SYNC;}
+        if((Block_Size_Pow_2 > 64)){if (threadIdx.x < 64){sdata[threadIdx.x] += sdata[threadIdx.x + 64];} BLOCK_SYNC;}
+        if(threadIdx.x < 32){
+        if((Block_Size_Pow_2 > 32)){if (threadIdx.x < 32){sdata[threadIdx.x] += sdata[threadIdx.x + 32];} __syncwarp();}
+        cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<device_real_t>());
+        }
+        BLOCK_SYNC;
+        device_real_t sum = sdata[0];
+        BLOCK_SYNC;
+        return sum;
     }
-    cg::sync(block);
-    device_real_t sum = sdata[0];
-    cg::sync(block);
-    return sum;
-}
+#elif REDUCTION_METHOD==1
+    __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
+        sdata[threadIdx.x] = data;
+        BLOCK_SYNC;
+        
+        if (threadIdx.x < 512){sdata[threadIdx.x] += sdata[threadIdx.x + 512];} BLOCK_SYNC;
+        if (threadIdx.x < 256){sdata[threadIdx.x] += sdata[threadIdx.x + 256];} BLOCK_SYNC;
+        if (threadIdx.x < 128){sdata[threadIdx.x] += sdata[threadIdx.x + 128];} BLOCK_SYNC;
+        if (threadIdx.x < 64){sdata[threadIdx.x] += sdata[threadIdx.x + 64];} BLOCK_SYNC;
+        if(threadIdx.x < 32){
+        if (threadIdx.x < 32){sdata[threadIdx.x] += sdata[threadIdx.x + 32];} __syncwarp();
+        cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<device_real_t>());
+        }
+        BLOCK_SYNC;
+        device_real_t sum = sdata[0];
+        BLOCK_SYNC;
+        return sum;
+    }
+#elif REDUCTION_METHOD==2
+    __device__ device_real_t reduction(device_real_t *sdata, const device_real_t data){
+        sdata[threadIdx.x] = data;
+        cg::thread_block block = cg::this_thread_block();
+        BLOCK_SYNC;
+        cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
+        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<device_real_t>());
+        BLOCK_SYNC;
+
+        device_real_t beta = 0.0;
+        if (block.thread_rank() == 0) {
+            beta  = 0;
+            for (uint16_t i = 0; i < block.size(); i += tile32.size()) {
+                beta  += sdata[i];
+            }
+            sdata[0] = beta;
+        }
+        BLOCK_SYNC;
+        device_real_t sum = sdata[0];
+        BLOCK_SYNC;
+        return sum;
+    }
+#endif
+
 
 
 __device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t data){
@@ -240,7 +283,7 @@ __host__ void print_array(T* data, size_t N, size_t fullerene_id){
 }
 
 template <typename T>
-__host__ void toBinary(std::string filename,T* data, size_t N, size_t fullerene_id){
+__host__ void to_binary(std::string filename,T* data, size_t N, size_t fullerene_id){
     T* pointer =  data + N * fullerene_id;
     std::fstream myFile (filename, std::fstream::out | std::fstream::in | std::fstream::trunc | std::fstream::binary );
 
@@ -282,10 +325,10 @@ void printLastCudaError(std::string message = ""){
 }
 
 __device__ void clear_cache(device_real_t* sdata, size_t N){
-    cg::sync(cg::this_thread_block());
+    BLOCK_SYNC;
     for (size_t index = threadIdx.x; index < N; index+=blockDim.x)
     {
-        sdata[index] = 0;
+        sdata[index] = (device_real_t)0.0;
     }
-    cg::sync(cg::this_thread_block());
+    BLOCK_SYNC;
 }
