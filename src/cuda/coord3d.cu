@@ -4,7 +4,7 @@
 typedef float4 coord3d_a;
 
 
-#define INLINE __device__ __forceinline__
+
 /** HALF OPERATIONS **/
 
 __device__ __host__ __builtin_align__(8) struct half4

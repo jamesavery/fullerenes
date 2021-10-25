@@ -58,7 +58,7 @@ int main(){
 
     kernel.insert_isomer_batch(graph);
     kernel.optimize_batch(0);
-    //kernel.check_batch();
+    kernel.check_batch();
     kernel.to_file(0);
     //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(kernel.h_graph.X),N,0);
 
