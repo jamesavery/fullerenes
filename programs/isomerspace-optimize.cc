@@ -112,6 +112,7 @@ int main(int ac, char **argv)
     isomer_batch.check_batch();
     Tcheck += system_clock::now()-t6;
     isomer_batch.get_cartesian_coordinates(X);
+    isomer_batch.batch_statistics_to_file();
     isomer_batch.clear_batch();
 
     // Now do something with the optimized geometries
@@ -128,8 +129,9 @@ int main(int ac, char **argv)
     }
 
     // Output molecular geometry files
-    break;
+    
     I += this_batch_size;
+    if (I > 10000){break;}
   }
   failures.close();
   cout << "Time spent on non:\n"

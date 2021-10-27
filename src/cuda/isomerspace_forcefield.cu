@@ -360,10 +360,10 @@ INLINE real_t Bisection(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
 //Brents Method for line-search using fixed number of iterations.
 INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
     real_t a,b,s,d;
-    a = (real_t)0.0; b = (real_t)1.0; 
+    a = (real_t)0.0; //b = (real_t)1.0; 
 
     //To match python reference implementation by Buster.
-    //b = FindLineSearchBound(X,r0,X1);
+    b = FindLineSearchBound(X,r0,X1);
 
     X1[node_id] = X[node_id] + a * r0;
     X2[node_id] = X[node_id] + b * r0;
@@ -480,7 +480,7 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
 
     for (size_t i = 0; i < MaxIter; i++)
     {   
-        alpha = GSS(X,s,X1,X2);
+        alpha = LINESEARCH_METHOD(X,s,X1,X2);
         if (alpha > (real_t)0.0){X1[node_id] = X[node_id] + alpha * s;}
         g1 = gradient(X1);
         //Polak Ribiere method
@@ -700,8 +700,6 @@ void IsomerspaceForcefield::get_internal_coordinates(device_real_t* bonds, devic
 }
 
 void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
-    d_graph.copy_to_gpu(h_graph);
-
     printLastCudaError("Memcpy Failed! \n");
     auto start = std::chrono::system_clock::now();
     void* kernelArgs[] = {(void*)&d_graph,(void*)&MaxIter};
@@ -717,22 +715,29 @@ void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
 void IsomerspaceForcefield::insert_isomer_batch(const IsomerspaceGraph& G){
     h_graph = G;
     batch_size += G.batch_size;
+    GenericStruct::copy(d_graph,h_graph);
+
 }
 
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
-    size_t offset = batch_size*3*N;
-    for (device_node_t u = 0; u < N; u++){
-        for (int j = 0; j < 3; j++){
-            device_node_t v = G.neighbours[u][j];
-            size_t arc_index = u*3 + j + offset;
-            h_graph.neighbours  [arc_index] = v;
-            h_graph.next_on_face[arc_index] = G.next_on_face(u,v);
-            h_graph.prev_on_face[arc_index] = G.prev_on_face(u,v);
-            h_graph.face_right  [arc_index] = G.face_size(u,v);
-            h_graph.X           [arc_index] = X0[u][j];
+    if (batch_size < batch_capacity){
+        size_t offset = batch_size*3*N;
+        for (device_node_t u = 0; u < N; u++){
+            for (int j = 0; j < 3; j++){
+                device_node_t v = G.neighbours[u][j];
+                size_t arc_index = u*3 + j + offset;
+                h_graph.neighbours  [arc_index] = v;
+                h_graph.next_on_face[arc_index] = G.next_on_face(u,v);
+                h_graph.prev_on_face[arc_index] = G.prev_on_face(u,v);
+                h_graph.face_right  [arc_index] = G.face_size(u,v);
+                h_graph.X           [arc_index] = X0[u][j];
+            }   
         }   
-    }   
-    batch_size++;
+        batch_size++;
+    }
+    if (batch_size == batch_capacity){
+        GenericStruct::copy(d_graph,h_graph);
+    }
 }
 
 
@@ -744,14 +749,14 @@ void IsomerspaceForcefield::to_file(size_t fullereneID){
 
     device_real_t Xbuffer[3*N];
     cudaMemcpy(Xbuffer,             d_graph.X + offset,                     sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    to_binary("X_" + ID + ".bin",                 Xbuffer,              3*N);
+    to_binary("X_" + ID + ".bin",                 Xbuffer,              sizeof(device_coord3d)*N);
     
     for (size_t i = 0; i < d_coords.pointers.size(); i++){
-        cudaMemcpy(*get<1>(h_coords.pointers[i]),      *get<1>(d_coords.pointers[i]) + offset,    get<2>(d_coords.pointers[i])*3*N,      cudaMemcpyDeviceToHost);
-        cudaMemcpy(*get<1>(h_harmonics.pointers[i]),   *get<1>(d_harmonics.pointers[i]) + offset, get<2>(d_harmonics.pointers[i])*3*N,   cudaMemcpyDeviceToHost);
+        cudaMemcpy(*get<1>(h_coords.pointers[i]),      *get<1>(d_coords.pointers[i]) + offset,    get<2>(d_coords.pointers[i])*N,      cudaMemcpyDeviceToHost);
+        cudaMemcpy(*get<1>(h_harmonics.pointers[i]),   *get<1>(d_harmonics.pointers[i]) + offset, get<2>(d_harmonics.pointers[i])*N,   cudaMemcpyDeviceToHost);
     
-        to_binary(get<0>(h_coords.pointers[i]) + "_" + ID + ".bin",        *get<1>(h_coords.pointers[i]),     get<2>(d_coords.pointers[i])*3*N);
-        to_binary(get<0>(h_harmonics.pointers[i]) + "0_" + ID + ".bin",    *get<1>(h_harmonics.pointers[i]),  get<2>(d_harmonics.pointers[i])*3*N);
+        to_binary(get<0>(h_coords.pointers[i]) + "_" + ID + ".bin",        *get<1>(h_coords.pointers[i]) + offset,     get<2>(d_coords.pointers[i])*N);
+        to_binary(get<0>(h_harmonics.pointers[i]) + "0_" + ID + ".bin",    *get<1>(h_harmonics.pointers[i]) + offset,  get<2>(d_harmonics.pointers[i])*N);
     }
     printLastCudaError("To file failed");
 }
@@ -762,7 +767,7 @@ void IsomerspaceForcefield::batch_statistics_to_file(){
 
     for (size_t i = 0; i < d_stats.pointers.size(); i++){
         cudaMemcpy(*get<1>(h_stats.pointers[i]),      *get<1>(d_stats.pointers[i]),    get<2>(d_stats.pointers[i])*batch_size,      cudaMemcpyDeviceToHost);
-        to_binary(get<0>(h_stats.pointers[i]) + "_" + std::to_string(isomer_number) + ".bin",        *get<1>(h_stats.pointers[i]),     get<2>(h_stats.pointers[i])*batch_size);
+        to_binary("output/" + get<0>(h_stats.pointers[i]) + "_" + std::to_string(isomer_number) + ".bin",        *get<1>(h_stats.pointers[i]),     get<2>(h_stats.pointers[i])*batch_size);
     }
 
 }

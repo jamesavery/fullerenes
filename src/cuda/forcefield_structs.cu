@@ -14,7 +14,7 @@ void IsomerspaceForcefield::GenericStruct::allocate(IsomerspaceForcefield::Gener
         G.buffer_type = buffer_type;
         G.batch_size  = batch_size; 
         G.N           = N; 
-        size_t num_elements = 3*N*batch_size;
+        size_t num_elements = N*batch_size;
         if (buffer_type == device_buffer){
             for (size_t i = 0; i < G.pointers.size(); i++) {
                 cudaMalloc(get<1>(G.pointers[i]), num_elements* get<2>(G.pointers[i])); 
@@ -44,12 +44,12 @@ void IsomerspaceForcefield::GenericStruct::free(IsomerspaceForcefield::GenericSt
         G.allocated = false;
     }
 }
-void IsomerspaceForcefield::IsomerspaceGraph::copy_to_gpu(const IsomerspaceForcefield::IsomerspaceGraph& G){
-    for (size_t i = 0; i < G.pointers.size(); i++)
+void IsomerspaceForcefield::GenericStruct::copy(IsomerspaceForcefield::GenericStruct& destination, const IsomerspaceForcefield::GenericStruct& source){
+    for (size_t i = 0; i < destination.pointers.size(); i++)
     {
-        cudaMemcpy(*(get<1>(this->pointers[i])) , *(get<1>(G.pointers[i])), get<2>(G.pointers[i])*3*G.N*G.batch_size, cudaMemcpyHostToDevice);
+        cudaMemcpy(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*source.N*source.batch_size, cudaMemcpyKind((source.buffer_type+1) + (source.buffer_type + destination.buffer_type)/2));
     }
-    printLastCudaError("Failed to copy IsomerspaceGraph");
+    printLastCudaError("Failed to copy struct");
 }
 
 

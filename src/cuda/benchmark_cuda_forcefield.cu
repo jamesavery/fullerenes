@@ -1,6 +1,6 @@
 #include "isomerspace_forcefield.cu"
 #include "coord3d.cu"
-#include "C512ih.cu"
+#include "C60ih.cu"
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 
 #include <unistd.h>
@@ -38,7 +38,7 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    const size_t N = 512;
+    const size_t N = 60;
 
 
     //size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
@@ -54,15 +54,13 @@ int main(){
     uint8_t* synth_face_right             = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_size, &face_right[0]));
 
     IsomerspaceForcefield::IsomerspaceGraph graph = IsomerspaceForcefield::IsomerspaceGraph(synth_X,synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
-    graph.N = N; graph.batch_size = batch_size;
+    graph.N = N; graph.batch_size = batch_size; graph.buffer_type = IsomerspaceForcefield::host_buffer;
     IsomerspaceForcefield kernel = IsomerspaceForcefield(N);
 
     kernel.insert_isomer_batch(graph);
-    kernel.optimize_batch(N*5);
+    kernel.optimize_batch(N*3);
     kernel.check_batch();
     kernel.to_file(0);
     kernel.batch_statistics_to_file();
     //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(kernel.h_graph.X),N,0);
-
-
 }

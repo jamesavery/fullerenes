@@ -11,7 +11,7 @@
 #define SEMINARIO_FORCE_CONSTANTS 1
 #define USE_MAX_NORM 0
 #define REDUCTION_METHOD 0
-
+#define LINESEARCH_METHOD Bisection
   
 
 
@@ -30,6 +30,7 @@ public:
     std::vector<std::tuple<std::string,void**,size_t>> pointers;
     static void allocate(GenericStruct& G,const size_t N,const size_t batch_size, const BufferType buffer_type);
     static void free(GenericStruct& G);
+    static void copy(GenericStruct& target, const GenericStruct& source);
     void set_pointers(std::vector<std::tuple<std::string,void**,size_t>> &pointers){this->pointers = pointers;}
   };
 
@@ -63,9 +64,9 @@ public:
     uint8_t* face_right;          //Face size list.
 
     //Since we are dealing with data of non-uniform types we must encapsulate this information if we are to iterate over the pointers for allocation, deallocation and copying.
-    std::vector<std::tuple<std::string,void**,size_t>> pointers = {{"X",(void**)&X,sizeof(device_real_t)}, {"neighbours",(void**)&neighbours, sizeof(device_node_t)}, 
-                                                                  {"next_on_face", (void**)&next_on_face, sizeof(device_node_t)}, {"prev_on_face", (void**)&prev_on_face, sizeof(device_node_t)},  
-                                                                  {"face_right", (void**)&face_right, sizeof(uint8_t)}};
+    std::vector<std::tuple<std::string,void**,size_t>> pointers = {{"X",(void**)&X,sizeof(device_real_t)*3}, {"neighbours",(void**)&neighbours, sizeof(device_node_t)*3}, 
+                                                                  {"next_on_face", (void**)&next_on_face, sizeof(device_node_t)*3}, {"prev_on_face", (void**)&prev_on_face, sizeof(device_node_t)*3},  
+                                                                  {"face_right", (void**)&face_right, sizeof(uint8_t)*3}};
 
     
     IsomerspaceGraph(){set_pointers(pointers);}
@@ -85,7 +86,7 @@ public:
     device_real_t* outer_dihedrals_m;
     device_real_t* outer_dihedrals_p;
 
-    size_t s = sizeof(device_real_t);
+    size_t s = sizeof(device_real_t)*3;
     std::vector<std::tuple<std::string,void**,size_t>> pointers = {{"bonds", (void**)&bonds, s}, {"angles", (void**)&angles, s}, {"dihedrals", (void**)&dihedrals, s}, {"outer_angles_m", (void**)&outer_angles_m, s}, 
                                                                     {"outer_angles_p", (void**)&outer_angles_p, s}, {"outer_dihedrals_a", (void**)&outer_dihedrals_a, s}, {"outer_dihedrals_m", (void**)&outer_dihedrals_m, s}, 
                                                                     {"outer_dihedrals_p", (void**)&outer_dihedrals_p, s}};
@@ -104,7 +105,7 @@ public:
   void get_cartesian_coordinates(device_real_t* X);                                                     //Populate target buffer (CPU) with cartesian coordiantes from isomers on GPU.
   void get_internal_coordinates(device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals); //Populate target buffers (CPU) with internal coordinates from isomers on GPU.
   
-  void clear_batch(){batch_size = 0;} //Clears batch, this is required after every batch is finished, effectively resets the position of pointer to GPU memory
+  void clear_batch(){isomer_number+=batch_size; batch_size=0;} //Clears batch, this is required after every batch is finished, effectively resets the position of pointer to GPU memory
   void to_file(size_t ID_in_batch);   //Reads and dumps all graph information, cartesian coordinates and harmonic constants to files.
   void batch_statistics_to_file();
 
