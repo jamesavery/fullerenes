@@ -128,7 +128,7 @@ int main(int ac, char **argv)
     }
 
     // Output molecular geometry files
-
+    break;
     I += this_batch_size;
   }
   failures.close();

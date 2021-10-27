@@ -7,7 +7,7 @@
 #define GPU_REAL3 float3
 #define GPU_NODE3 ushort3
 #define MAKE_NODE3 make_ushort3
-#define Block_Size_Pow_2 512
+#define Block_Size_Pow_2 256
 #define SEMINARIO_FORCE_CONSTANTS 1
 #define USE_MAX_NORM 0
 #define REDUCTION_METHOD 0

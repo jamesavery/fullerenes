@@ -282,8 +282,9 @@ __device__ void clear_cache(device_real_t* sdata, size_t N){
     }
     BLOCK_SYNC
 }
-__device__ device_real_t global_reduction(device_real_t *sdata, device_real_t *gdata, device_real_t data){
+__device__ device_real_t global_reduction(device_real_t *sdata, device_real_t *gdata, device_real_t data, bool mask = true){
     GRID_SYNC
+    if(!mask){data = (device_real_t)0.0;}
     device_real_t block_sum    = reduction(sdata,data);
     if(threadIdx.x == 0){gdata[blockIdx.x] = block_sum;}
     GRID_SYNC

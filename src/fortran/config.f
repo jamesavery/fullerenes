@@ -3,7 +3,7 @@
 !  This module is called by most subroutines, it defines most of the        !
 !  parameters, dimensions and constants used.                               !
 !---------------------------------------------------------------------------!
-      character, parameter :: version_number="git-development-af2cd84"
+      character, parameter :: version_number="git-development-3fa665a"
       integer,parameter :: nzeile=132 ! Maximum length of text character in a line
       integer,parameter :: Nmax=5000 !  Change NMAX if RAM is not sufficient
       integer,parameter :: msrs=56+1 !  Size of Schlegel output matrix

@@ -567,7 +567,7 @@ __global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerspaceGraph 
 }
 
 
-__global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, device_real_t* global_reduction_array){
+__global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, IsomerspaceForcefield::IsomerspaceStats stats, device_real_t* global_reduction_array){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     real_t* base_pointer = smem + Block_Size_Pow_2;
@@ -576,12 +576,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, de
     node_t node_id          = threadIdx.x;
     size_t offset           = blockIdx.x * blockDim.x;
     size_t N                = blockDim.x;
-
-    coord3d* X   = reinterpret_cast<coord3d*>(G.X+3*offset);
-    coord3d* sX  = reinterpret_cast<coord3d*>(base_pointer);
-
-    sX[node_id] = X[node_id];
-    X           = &sX[0];
+    coord3d* X              = reinterpret_cast<coord3d*>(G.X + offset*3);
 
     Constants constants     = Constants(G);
     NodeGraph node_graph    = NodeGraph(G);
@@ -603,54 +598,36 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, de
     real_t NodeTotAngleError       = sum(NodeAngle_Errors);
     real_t NodeTotDihedralError    = sum(NodeDihedral_Errors);
 
+
     NodeGradNorm                 = dot(FF.gradient(X), FF.gradient(X));
-    real_t Energy                = FF.energy(X);
-    real_t GradNorm              = reduction(smem,dot(FF.gradient(X),FF.gradient(X)));
-    real_t MaxBond_Error         = reduction_max(smem, max(max(NodeBond_Errors.x, NodeBond_Errors.y), NodeBond_Errors.z));
-    real_t MaxAngle_Error        = reduction_max(smem, max(max(NodeAngle_Errors.x, NodeAngle_Errors.y), NodeAngle_Errors.z));
-    real_t MaxDihedral_Error     = reduction_max(smem, max(max(NodeDihedral_Errors.x, NodeDihedral_Errors.y), NodeDihedral_Errors.z));
-    real_t RMS_Bond_Error        = sqrt(reduction(smem,NodeTotBondError*NodeTotBondError)/blockDim.x);
-    real_t RMS_Angle_Error       = sqrt(reduction(smem,NodeTotAngleError*NodeTotAngleError)/blockDim.x);
-    real_t RMS_Dihedral_Error    = sqrt(reduction(smem,NodeTotDihedralError*NodeTotDihedralError)/blockDim.x);
+    real_t MaxBond_Error         = reduction_max(smem, max(NodeBond_Errors));
+    real_t MaxAngle_Error        = reduction_max(smem, max(NodeAngle_Errors));
+    real_t MaxDihedral_Error     = reduction_max(smem, max(NodeDihedral_Errors));
     
-    bool not_nan                        = (MaxBond_Error > 0.0) && (MaxAngle_Error > 0.0) && (MaxDihedral_Error > 0.0);
-    bool converged                      = (MaxBond_Error < 1e-1) && (MaxAngle_Error < 1.9e-1) && (MaxDihedral_Error < 1e-1) && not_nan;
+    bool not_nan                        = (!isnan(NodeGradNorm));
+    bool converged                      = (NodeGradNorm/blockDim.x < 1e-1) && not_nan;
+    bool optimized                      = (MaxBond_Error < 1e-1) && (MaxAngle_Error < 1.5e-1) && (MaxDihedral_Error < 1e-1) && converged;
     global_reduction_array[blockIdx.x]  = (real_t)converged;
     
-    for (size_t i = 0; i < gridDim.x; i++){
-        //GRID_SYNC
-        //if(blockIdx.x == 0 && threadIdx.x == 0 && global_reduction_array[0]<0.5){printf("                    Error Summary                     \n====================================================\n Dihedral Max/RMS: \t%e | %e\n AngleMaxErr Max/RMS: \t%e | %e \n BondMaxErr Max/RMS: \t%e | %e \n \t\t   \t\t\t\t \n Energy/ Grad: \t\t%e | %e  \t\t \n====================================================\n\n", MaxDihedral_Error, RMS_Dihedral_Error, MaxAngle_Error, RMS_Angle_Error, MaxBond_Error, RMS_Bond_Error, Energy/blockDim.x, GradNorm/blockDim.x);}
-    }
-
     
+    real_t num_converged    = global_reduction(smem,global_reduction_array,converged,threadIdx.x==0);
+    real_t num_nonnans      = global_reduction(smem,global_reduction_array,not_nan,threadIdx.x==0);
+    real_t num_optimized    = global_reduction(smem,global_reduction_array,optimized,threadIdx.x==0);
     
-    GRID_SYNC
-    real_t num_of_success = 0;
-    if ((threadIdx.x + blockIdx.x * blockDim.x) == 0)
-    {
-        for (size_t i = 0; i < gridDim.x; i++)
-        {
-            num_of_success += global_reduction_array[i];
-        }
-    }
-    GRID_SYNC
+    real_t Batch_Mean_Bond              = global_reduction(smem,global_reduction_array,NodeTotBondError, converged) /(blockDim.x*num_converged*3);
+    real_t Batch_Mean_Angle             = global_reduction(smem,global_reduction_array,NodeTotAngleError, converged)/(blockDim.x*num_converged*3);
+    real_t Batch_Mean_Dihedral          = global_reduction(smem,global_reduction_array,NodeTotDihedralError, converged)/(blockDim.x*num_converged*3);
 
+    real_t Batch_Mean_Bond_STD          = sqrt(global_reduction(smem,global_reduction_array,dot(NodeBond_Errors,NodeBond_Errors),converged)/(blockDim.x*num_converged*3) - Batch_Mean_Bond*Batch_Mean_Bond);
+    real_t Batch_Mean_Angle_STD         = sqrt(global_reduction(smem,global_reduction_array,dot(NodeAngle_Errors,NodeAngle_Errors),converged)/(blockDim.x*num_converged*3) - Batch_Mean_Angle*Batch_Mean_Angle);
+    real_t Batch_Mean_Dihedral_STD      = sqrt(global_reduction(smem,global_reduction_array,dot(NodeDihedral_Errors,NodeDihedral_Errors),converged)/(blockDim.x*num_converged*3) - Batch_Mean_Dihedral*Batch_Mean_Dihedral);
 
-    if (!not_nan){NodeTotBondError = 0.0; NodeTotAngleError = 0.0; NodeTotDihedralError = 0.0; Energy = 0.0; GradNorm = 0.0;}
-    
-    real_t Batch_Mean_Bond              = global_reduction(smem,global_reduction_array,NodeTotBondError)/(blockDim.x*gridDim.x*3);
-    real_t Batch_Mean_Angle             = global_reduction(smem,global_reduction_array,NodeTotAngleError)/(blockDim.x*gridDim.x*3);
-    real_t Batch_Mean_Dihedral          = global_reduction(smem,global_reduction_array,NodeTotDihedralError)/(blockDim.x*gridDim.x*3);
-
-    real_t Batch_Mean_Bond_STD          = sqrt(global_reduction(smem,global_reduction_array,dot(NodeBond_Errors,NodeBond_Errors))/(blockDim.x*gridDim.x*3) - Batch_Mean_Bond*Batch_Mean_Bond);
-    real_t Batch_Mean_Angle_STD         = sqrt(global_reduction(smem,global_reduction_array,dot(NodeAngle_Errors,NodeAngle_Errors))/(blockDim.x*gridDim.x*3) - Batch_Mean_Angle*Batch_Mean_Angle);
-    real_t Batch_Mean_Dihedral_STD      = sqrt(global_reduction(smem,global_reduction_array,dot(NodeDihedral_Errors,NodeDihedral_Errors))/(blockDim.x*gridDim.x*3) - Batch_Mean_Dihedral*Batch_Mean_Dihedral);
-
-    real_t Batch_Mean_Energy_Per_Node   = global_reduction(smem, global_reduction_array, NodeEnergy)/(gridDim.x*blockDim.x);
-    real_t Batch_Mean_Gradient_Per_Node = global_reduction(smem, global_reduction_array, NodeGradNorm)/(gridDim.x*blockDim.x);
+    real_t Batch_Mean_Energy_Per_Node   = global_reduction(smem, global_reduction_array, NodeEnergy,converged)/(num_converged*blockDim.x);
+    real_t Batch_Mean_Gradient_Per_Node = global_reduction(smem, global_reduction_array, NodeGradNorm,converged)/(num_converged*blockDim.x);
     
     if(threadIdx.x + blockIdx.x == 0){printf("\t\t    Mean Relative Err|  STD\n====================================================\n Bond: \t\t\t%e | %e\n Angle: \t\t%e | %e \n Dihedral: \t\t%e | %e \n \t\t   \t\t\t\t \n Energy/ Grad: \t\t%e | %e  \t\t \n====================================================\n\n", Batch_Mean_Bond, Batch_Mean_Bond_STD, Batch_Mean_Angle, Batch_Mean_Angle_STD, Batch_Mean_Dihedral, Batch_Mean_Dihedral_STD, Batch_Mean_Energy_Per_Node, Batch_Mean_Gradient_Per_Node);}
-    if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)num_of_success); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
+    if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
+    if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)num_optimized); printf("/ %d Fullerenes Optimized within error threshold in Batch \n", (int)gridDim.x);}
 }
 
 __global__ void kernel_internal_coordinates(IsomerspaceForcefield::IsomerspaceGraph G, IsomerspaceForcefield::InternalCoordinates c, IsomerspaceForcefield::InternalCoordinates c0){
@@ -686,8 +663,11 @@ __global__ void kernel_internal_coordinates(IsomerspaceForcefield::IsomerspaceGr
 
 
 void IsomerspaceForcefield::check_batch(){
-    void* kernelArgs[] = {(void*)&d_graph, (void*)&global_reduction_array};
-    cudaLaunchCooperativeKernel((void*)kernel_check_batch, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2);
+    void* kernelArgs1[] = {(void*)&d_graph, (void*)&d_stats};
+    void* kernelArgs2[] = {(void*)&d_graph, (void*)&d_stats, (void*)&global_reduction_array};
+    cudaLaunchCooperativeKernel((void*)kernel_batch_statistics, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes);
+    cudaDeviceSynchronize();
+    cudaLaunchCooperativeKernel((void*)kernel_check_batch,      dim3(batch_size,1,1), dim3(N,1,1), kernelArgs2, shared_memory_bytes);
     cudaDeviceSynchronize();
 }
 
@@ -738,7 +718,7 @@ void IsomerspaceForcefield::insert_isomer_batch(const IsomerspaceGraph& G){
     h_graph = G;
     batch_size += G.batch_size;
 }
-/*
+
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
     size_t offset = batch_size*3*N;
     for (device_node_t u = 0; u < N; u++){
@@ -754,7 +734,7 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
     }   
     batch_size++;
 }
-*/
+
 
 void IsomerspaceForcefield::to_file(size_t fullereneID){
     void* kernelArgs[] = {(void*)&d_graph, (void*)&d_coords, (void*)&d_harmonics};
@@ -814,8 +794,10 @@ IsomerspaceForcefield::~IsomerspaceForcefield()
     GenericStruct::free(d_coords);
     GenericStruct::free(d_harmonics);
     GenericStruct::free(d_stats);
+    GenericStruct::free(h_coords);
+    GenericStruct::free(h_harmonics);
     GenericStruct::free(h_stats);
     GenericStruct::free(h_graph);
     //Destroys cuda context. It is possible that this function call is sufficient for avoiding memory leaks, in addition to freeing the host_graph.
-    //cudaDeviceReset();
+    cudaDeviceReset();
 }
