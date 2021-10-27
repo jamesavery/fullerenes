@@ -480,7 +480,7 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
 
     for (size_t i = 0; i < MaxIter; i++)
     {   
-        alpha = Bisection(X,s,X1,X2);
+        alpha = GSS(X,s,X1,X2);
         if (alpha > (real_t)0.0){X1[node_id] = X[node_id] + alpha * s;}
         g1 = gradient(X1);
         //Polak Ribiere method
@@ -536,6 +536,35 @@ __global__ void kernel_optimize_batch(IsomerspaceForcefield::IsomerspaceGraph G,
     reinterpret_cast<coord3d*>(G.X)[offset + threadIdx.x]= X[threadIdx.x];   
 }
 
+__global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerspaceGraph G, IsomerspaceForcefield::IsomerspaceStats stats){
+
+    DEVICE_TYPEDEFS
+    extern __shared__ real_t smem[];
+    size_t offset = blockIdx.x * blockDim.x;
+    Constants constants     = Constants(G);
+    NodeGraph node_graph    = NodeGraph(G);
+    ForceField FF           = ForceField(node_graph, constants, smem);
+    coord3d* X              = reinterpret_cast<coord3d*>(G.X+offset*3);
+
+    coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
+    GRID_SYNC
+    for (uint8_t j = 0; j < 3; j++){
+        auto arc            = ForceField::ArcData(j, X, node_graph);
+        d_set(rel_bond_err,      j, abs(abs(arc.bond()       - d_get(constants.r0,j))        /d_get(constants.r0,j)));
+        d_set(rel_angle_err,     j, abs(abs(arc.angle()      - d_get(constants.angle0,j))    /d_get(constants.angle0,j)));
+        d_set(rel_dihedral_err,  j, abs(abs(arc.dihedral()   - d_get(constants.inner_dih0,j))/d_get(constants.inner_dih0,j)));
+    }
+
+    stats.bond_max[blockIdx.x]         = reduction_max(smem, max(rel_bond_err));
+    stats.angle_max[blockIdx.x]        = reduction_max(smem, max(rel_angle_err));
+    stats.dihedral_max[blockIdx.x]     = reduction_max(smem, max(rel_dihedral_err));
+    stats.bond_rms[blockIdx.x]         = sqrt(reduction(smem,dot(rel_bond_err,rel_bond_err))/blockDim.x);
+    stats.angle_rms[blockIdx.x]        = sqrt(reduction(smem,dot(rel_angle_err,rel_angle_err))/blockDim.x);
+    stats.dihedral_rms[blockIdx.x]     = sqrt(reduction(smem,dot(rel_dihedral_err,rel_dihedral_err))/blockDim.x);
+    stats.bond_mean[blockIdx.x]        = reduction(smem,sum(rel_bond_err))/blockDim.x;
+    stats.angle_mean[blockIdx.x]       = reduction(smem,sum(rel_angle_err))/blockDim.x;
+    stats.dihedral_mean[blockIdx.x]    = reduction(smem,sum(rel_dihedral_err))/blockDim.x;
+}
 
 
 __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, device_real_t* global_reduction_array){
@@ -594,6 +623,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, de
     }
 
     
+    
     GRID_SYNC
     real_t num_of_success = 0;
     if ((threadIdx.x + blockIdx.x * blockDim.x) == 0)
@@ -607,6 +637,7 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, de
 
 
     if (!not_nan){NodeTotBondError = 0.0; NodeTotAngleError = 0.0; NodeTotDihedralError = 0.0; Energy = 0.0; GradNorm = 0.0;}
+    
     real_t Batch_Mean_Bond              = global_reduction(smem,global_reduction_array,NodeTotBondError)/(blockDim.x*gridDim.x*3);
     real_t Batch_Mean_Angle             = global_reduction(smem,global_reduction_array,NodeTotAngleError)/(blockDim.x*gridDim.x*3);
     real_t Batch_Mean_Dihedral          = global_reduction(smem,global_reduction_array,NodeTotDihedralError)/(blockDim.x*gridDim.x*3);
@@ -682,7 +713,7 @@ void IsomerspaceForcefield::get_cartesian_coordinates(device_real_t* X){
 
 void IsomerspaceForcefield::get_internal_coordinates(device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals){
     void* kernelArgs[] = {(void*)&d_graph, (void*)&d_coords};
-    cudaLaunchCooperativeKernel((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2);
+    cudaLaunchCooperativeKernel((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
     cudaMemcpy(bonds,       d_coords.bonds,     sizeof(device_coord3d)*N*batch_size, cudaMemcpyDeviceToHost);
     cudaMemcpy(angles,      d_coords.angles,    sizeof(device_coord3d)*N*batch_size, cudaMemcpyDeviceToHost);
     cudaMemcpy(dihedrals,   d_coords.dihedrals, sizeof(device_coord3d)*N*batch_size, cudaMemcpyDeviceToHost);
@@ -695,7 +726,7 @@ void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
     auto start = std::chrono::system_clock::now();
     void* kernelArgs[] = {(void*)&d_graph,(void*)&MaxIter};
     
-    cudaLaunchCooperativeKernel((void*)kernel_optimize_batch, dim3(batch_size, 1, 1), dim3(N, 1, 1), kernelArgs, sizeof(device_coord3d)* 3 * N + sizeof(device_real_t)*Block_Size_Pow_2);
+    cudaLaunchCooperativeKernel((void*)kernel_optimize_batch, dim3(batch_size, 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
     cudaDeviceSynchronize();
     auto end = std::chrono::system_clock::now();
     printLastCudaError("Kernel launch failed: ");
@@ -707,7 +738,7 @@ void IsomerspaceForcefield::insert_isomer_batch(const IsomerspaceGraph& G){
     h_graph = G;
     batch_size += G.batch_size;
 }
-
+/*
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
     size_t offset = batch_size*3*N;
     for (device_node_t u = 0; u < N; u++){
@@ -723,57 +754,37 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
     }   
     batch_size++;
 }
-
+*/
 
 void IsomerspaceForcefield::to_file(size_t fullereneID){
-    device_real_t bonds[3*N],   angles[3*N], dihedrals[3*N],  outer_angles_m[3*N],  outer_angles_p[3*N],    outer_dihedrals_a[3*N], outer_dihedrals_m[3*N], outer_dihedrals_p[3*N];
-    device_real_t bonds0[3*N],  angles0[3*N],dihedrals0[3*N], outer_angles_m0[3*N], outer_angles_p0[3*N],   outer_dihedrals_a0[3*N],outer_dihedrals_m0[3*N],outer_dihedrals_p0[3*N];
-    device_real_t Xbuffer[3*N];
     void* kernelArgs[] = {(void*)&d_graph, (void*)&d_coords, (void*)&d_harmonics};
-    cudaLaunchCooperativeKernel((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2);
-    size_t offset = fullereneID*N*3;
+    cudaLaunchCooperativeKernel((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
+    std::string ID  = std::to_string(fullereneID);
+    size_t offset   = fullereneID*N*3;
 
+    device_real_t Xbuffer[3*N];
     cudaMemcpy(Xbuffer,             d_graph.X + offset,                     sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
+    to_binary("X_" + ID + ".bin",                 Xbuffer,              3*N);
+    
+    for (size_t i = 0; i < d_coords.pointers.size(); i++){
+        cudaMemcpy(*get<1>(h_coords.pointers[i]),      *get<1>(d_coords.pointers[i]) + offset,    get<2>(d_coords.pointers[i])*3*N,      cudaMemcpyDeviceToHost);
+        cudaMemcpy(*get<1>(h_harmonics.pointers[i]),   *get<1>(d_harmonics.pointers[i]) + offset, get<2>(d_harmonics.pointers[i])*3*N,   cudaMemcpyDeviceToHost);
+    
+        to_binary(get<0>(h_coords.pointers[i]) + "_" + ID + ".bin",        *get<1>(h_coords.pointers[i]),     get<2>(d_coords.pointers[i])*3*N);
+        to_binary(get<0>(h_harmonics.pointers[i]) + "0_" + ID + ".bin",    *get<1>(h_harmonics.pointers[i]),  get<2>(d_harmonics.pointers[i])*3*N);
+    }
+    printLastCudaError("To file failed");
+}
 
-    cudaMemcpy(bonds,               d_coords.bonds + offset,                sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(angles,              d_coords.angles + offset,               sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_angles_m,      d_coords.outer_angles_m + offset,       sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_angles_p,      d_coords.outer_angles_p + offset,       sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(dihedrals,           d_coords.dihedrals + offset,            sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_dihedrals_a,   d_coords.outer_dihedrals_a + offset,    sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_dihedrals_m,   d_coords.outer_dihedrals_m + offset,    sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_dihedrals_p,   d_coords.outer_dihedrals_p + offset,    sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
+void IsomerspaceForcefield::batch_statistics_to_file(){
+    void* kernel_args[] = {(void*)&d_graph, (void*)&d_stats};
+    cudaLaunchCooperativeKernel((void*)kernel_batch_statistics, dim3(batch_size, 1, 1), dim3(N, 1, 1), kernel_args, shared_memory_bytes);
 
-    cudaMemcpy(bonds0,              d_harmonics.bonds + offset,             sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(angles0,             d_harmonics.angles + offset,            sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_angles_m0,     d_harmonics.outer_angles_m + offset,    sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_angles_p0,     d_harmonics.outer_angles_p + offset,    sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(dihedrals0,          d_harmonics.dihedrals + offset,         sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_dihedrals_a0,  d_harmonics.outer_dihedrals_a + offset, sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_dihedrals_m0,  d_harmonics.outer_dihedrals_m + offset, sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
-    cudaMemcpy(outer_dihedrals_p0,  d_harmonics.outer_dihedrals_p + offset, sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
+    for (size_t i = 0; i < d_stats.pointers.size(); i++){
+        cudaMemcpy(*get<1>(h_stats.pointers[i]),      *get<1>(d_stats.pointers[i]),    get<2>(d_stats.pointers[i])*batch_size,      cudaMemcpyDeviceToHost);
+        to_binary(get<0>(h_stats.pointers[i]) + "_" + std::to_string(isomer_number) + ".bin",        *get<1>(h_stats.pointers[i]),     get<2>(h_stats.pointers[i])*batch_size);
+    }
 
-    std::string ID = std::to_string(fullereneID);
-
-    to_binary("X_" + ID + ".bin",                 Xbuffer,              3*N,fullereneID);
-
-    to_binary("Bonds_" + ID + ".bin",             bonds,                3*N,fullereneID);
-    to_binary("Angles_" + ID + ".bin",            angles,               3*N,fullereneID);
-    to_binary("Outer_Angles_m_" + ID + ".bin",    outer_angles_m,       3*N,fullereneID);
-    to_binary("Outer_Angles_p_" + ID + ".bin",    outer_angles_p,       3*N,fullereneID);
-    to_binary("Dihedrals_" + ID + ".bin",         dihedrals,            3*N,fullereneID);
-    to_binary("Outer_Dihedrals_a_" + ID + ".bin", outer_dihedrals_a,    3*N,fullereneID);
-    to_binary("Outer_Dihedrals_m_" + ID + ".bin", outer_dihedrals_m,    3*N,fullereneID);
-    to_binary("Outer_Dihedrals_p_" + ID + ".bin", outer_dihedrals_p,    3*N,fullereneID);
-
-    to_binary("Bonds0_" + ID + ".bin",             bonds0,              3*N,fullereneID);
-    to_binary("Angles0_" + ID + ".bin",            angles0,             3*N,fullereneID);
-    to_binary("Outer_Angles_m0_" + ID + ".bin",    outer_angles_m0,     3*N,fullereneID);
-    to_binary("Outer_Angles_p0_" + ID + ".bin",    outer_angles_p0,     3*N,fullereneID);
-    to_binary("Dihedrals0_" + ID + ".bin",         dihedrals0,          3*N,fullereneID);
-    to_binary("Outer_Dihedrals_a0_" + ID + ".bin", outer_dihedrals_a0,  3*N,fullereneID);
-    to_binary("Outer_Dihedrals_m0_" + ID + ".bin", outer_dihedrals_m0,  3*N,fullereneID);
-    to_binary("Outer_Dihedrals_p0_" + ID + ".bin", outer_dihedrals_p0,  3*N,fullereneID);
 }
 
 
@@ -782,20 +793,29 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
     this->batch_capacity = get_batch_capacity((size_t)N);
     std::cout << "\nIsomerspace Capacity: " << this->batch_capacity << "\n";
     this->N = N;
-    d_coords.allocate(N,batch_capacity);
-    d_harmonics.allocate(N,batch_capacity);
-    d_graph.allocate(N,batch_capacity);
-    h_graph.allocate_host(N,batch_capacity);
+    this->shared_memory_bytes = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
+    GenericStruct::allocate(d_coords,      N,  batch_capacity, device_buffer);
+    GenericStruct::allocate(d_harmonics,   N,  batch_capacity, device_buffer);
+    GenericStruct::allocate(d_graph,       N,  batch_capacity, device_buffer);
+    GenericStruct::allocate(h_graph,       N,  batch_capacity, host_buffer);
+    GenericStruct::allocate(h_coords,      N,  1,              host_buffer);
+    GenericStruct::allocate(h_harmonics,   N,  1,              host_buffer);
+    GenericStruct::allocate(d_stats,       1,  batch_capacity, device_buffer);
+    GenericStruct::allocate(h_stats,       1,  batch_capacity, host_buffer);
+
     cudaMalloc(&global_reduction_array, sizeof(device_real_t)*N*batch_capacity);
     printLastCudaError("Kernel class instansiation failed!");
 }
 
 IsomerspaceForcefield::~IsomerspaceForcefield()
 {   
-    //Frees allocated pointers.
-    d_graph.free();
-    d_coords.free();
-    d_harmonics.free();
-    h_graph.free_host();
-    cudaDeviceReset();
+    //Frees allocated pointers. Memory leaks bad. 
+    GenericStruct::free(d_graph);
+    GenericStruct::free(d_coords);
+    GenericStruct::free(d_harmonics);
+    GenericStruct::free(d_stats);
+    GenericStruct::free(h_stats);
+    GenericStruct::free(h_graph);
+    //Destroys cuda context. It is possible that this function call is sufficient for avoiding memory leaks, in addition to freeing the host_graph.
+    //cudaDeviceReset();
 }

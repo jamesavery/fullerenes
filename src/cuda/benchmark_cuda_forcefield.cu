@@ -53,13 +53,15 @@ int main(){
     device_node_t* synth_prev_on_face     = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_size, &prev_on_face[0]));
     uint8_t* synth_face_right             = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_size, &face_right[0]));
 
-    IsomerspaceForcefield::IsomerspaceGraph graph = IsomerspaceForcefield::IsomerspaceGraph(N,batch_size, synth_X,synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
+    IsomerspaceForcefield::IsomerspaceGraph graph = IsomerspaceForcefield::IsomerspaceGraph(synth_X,synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
+    graph.N = N; graph.batch_size = batch_size;
     IsomerspaceForcefield kernel = IsomerspaceForcefield(N);
 
     kernel.insert_isomer_batch(graph);
-    kernel.optimize_batch(0);
+    kernel.optimize_batch(N*5);
     kernel.check_batch();
     kernel.to_file(0);
+    kernel.batch_statistics_to_file();
     //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(kernel.h_graph.X),N,0);
 
 

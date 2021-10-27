@@ -161,6 +161,8 @@ INLINE  float norm(const float3& a)                    { return sqrt(dot(a,a)); 
 
 INLINE float sum(const float3& a) {return a.x + a.y + a.z;}
 
+INLINE float max(const float3& a) {return max(max(a.x,a.y),a.z);}
+
 //7 FLOPs
 INLINE  float3 unit_vector(const float3& a){
   float r = (float)1.0/sqrt(dot(a,a));
@@ -219,6 +221,9 @@ INLINE  double  dot(const double3& a,  const double3& b) { return a.x*b.x + a.y*
 INLINE  double norm(const double3& a)                    { return sqrt(dot(a,a)); }
 
 INLINE double sum(const double3& a) {return a.x + a.y + a.z;}
+
+INLINE double max(const double3& a) {return max(max(a.x,a.y),a.z);}
+
 //7 FLOPs
 INLINE  double3 unit_vector(const double3& a){
   double r = sqrt(dot(a,a));

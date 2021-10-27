@@ -233,11 +233,11 @@ __host__ void print_array(T* data, size_t N, size_t fullerene_id){
 }
 
 template <typename T>
-__host__ void to_binary(std::string filename,T* data, size_t N, size_t fullerene_id){
-    T* pointer =  data + N * fullerene_id;
+__host__ void to_binary(std::string filename,T* data, size_t bytes){
+    T* pointer =  data;
     std::fstream myFile (filename, std::fstream::out | std::fstream::in | std::fstream::trunc | std::fstream::binary );
 
-    myFile.write(reinterpret_cast<const char*>(pointer), sizeof(T)*N);
+    myFile.write(reinterpret_cast<const char*>(pointer), bytes);
     if(!myFile)
       std::cout<<"error";
     myFile.close();
