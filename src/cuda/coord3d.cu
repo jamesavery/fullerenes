@@ -1,14 +1,10 @@
 #pragma once
-#include "fullerenes/gpu/isomerspace_forcefield.hh"
 
 
-typedef float3 coord3d;
-
-typedef uint16_t node_t;
 typedef float4 coord3d_a;
 
 
-#define INLINE __device__ __forceinline__
+
 /** HALF OPERATIONS **/
 
 __device__ __host__ __builtin_align__(8) struct half4
@@ -32,11 +28,11 @@ __device__ __forceinline__ half4 operator/(const half4& a, const half s)  { retu
 __device__ __forceinline__ void operator+=(half4& a, const half4& b) {a = a + b;}
 __device__ __forceinline__ void operator/=(half4& a, const half b) {a = a / b;}
 
-__device__ __forceinline__ void set(half4& a, const uint8_t j, half b){
+__device__ __forceinline__ void d_set(half4& a, const uint8_t j, half b){
   ((half*)&a)[j] = b; 
 }
 
-__device__ __forceinline__ half get(const half4& a, const uint8_t j){
+__device__ __forceinline__ half d_get(const half4& a, const uint8_t j){
   return ((const half*)&a)[j]; 
 }
 //5 FLOPs
@@ -98,11 +94,11 @@ __device__ __forceinline__ bhalf4 operator/(const bhalf4& a, const bhalf s)  { r
 __device__ __forceinline__ void operator+=(bhalf4& a, const bhalf4& b) {a = a + b;}
 __device__ __forceinline__ void operator/=(bhalf4& a, const bhalf b) {a = a / b;}
 
-__device__ __forceinline__ void set(bhalf4& a, const uint8_t j, bhalf b){
+__device__ __forceinline__ void d_set(bhalf4& a, const uint8_t j, bhalf b){
   ((bhalf*)&a)[j] = b; 
 }
 
-__device__ __forceinline__ bhalf get(const bhalf4& a, const uint8_t j){
+__device__ __forceinline__ bhalf d_get(const bhalf4& a, const uint8_t j){
   return ((const bhalf*)&a)[j]; 
 }
 //5 FLOPs
@@ -150,11 +146,11 @@ INLINE float3 operator/(const float3& a, const float s)  { return a*(1/s); }
 INLINE void operator+=(float3& a, const float3& b) {a = a + b;}
 INLINE void operator/=(float3& a, const float b) {a = a / b;}
 
-INLINE void set(float3& a, const uint8_t j, float b){
+INLINE void d_set(float3& a, const u_char j, float b){
   ((float*)&a)[j] = b; 
 }
 
-INLINE float get(const float3& a, const uint8_t j){
+INLINE float d_get(const float3& a, const u_char j){
   return ((const float*)&a)[j]; 
 }
 //5 FLOPs
@@ -164,6 +160,8 @@ INLINE  float  dot(const float3& a,  const float3& b) { return a.x*b.x + a.y*b.y
 INLINE  float norm(const float3& a)                    { return sqrt(dot(a,a)); }
 
 INLINE float sum(const float3& a) {return a.x + a.y + a.z;}
+
+INLINE float max(const float3& a) {return max(max(a.x,a.y),a.z);}
 
 //7 FLOPs
 INLINE  float3 unit_vector(const float3& a){
@@ -208,11 +206,11 @@ INLINE double3 operator/(const double3& a, const double s)  { return a*(1/s); }
 INLINE void operator+=(double3& a, const double3 b) {a = a + b;}
 INLINE void operator/=(double3& a, const double b) {a = a / b;}
 
-INLINE void set(double3& a, const uint8_t j, double b){
+INLINE void d_set(double3& a, const u_char j, double b){
   ((double*)&a)[j] = b; 
 }
 
-INLINE double get(const double3& a, const uint8_t j){
+INLINE double d_get(const double3& a, const u_char j){
   return ((const double*)&a)[j];
 }
 
@@ -223,6 +221,9 @@ INLINE  double  dot(const double3& a,  const double3& b) { return a.x*b.x + a.y*
 INLINE  double norm(const double3& a)                    { return sqrt(dot(a,a)); }
 
 INLINE double sum(const double3& a) {return a.x + a.y + a.z;}
+
+INLINE double max(const double3& a) {return max(max(a.x,a.y),a.z);}
+
 //7 FLOPs
 INLINE  double3 unit_vector(const double3& a){
   double r = sqrt(dot(a,a));
@@ -251,4 +252,8 @@ INLINE double non_resciprocal_bond_length(const double3& ab){
 __host__ __device__ void print_coord(const double3& ab){
 
     printf("[%.16e, %.16e, %.16e]\n",ab.x,ab.y,ab.z);
+}
+
+INLINE device_node_t d_get(const device_node3& a, const uint8_t j){
+  return ((const device_node_t*)&a)[j];
 }

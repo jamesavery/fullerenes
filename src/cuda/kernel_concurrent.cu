@@ -314,7 +314,7 @@ __device__ size_t golden_section_search(coord3d* __restrict__ X, coord3d& direct
 
 __device__ size_t brents_method(coord3d* __restrict__ X, coord3d& direction, coord3d& new_direction,coord3d* __restrict__ X1, coord3d* __restrict__ X2, real_t* __restrict__ reduction_array, real_t* __restrict__ gdata, const node_t node_id, const node_t N, const BookkeepingData& dat, const Constants<coord3d>& constants, cg::thread_group sync_group, bool single_block_fullerenes){
     real_t a,b,s,d;
-    a = (real_t)0.0; b = (real_t)1.0;
+    a = (real_t)0.0; b = (real_t)20;
     X1[node_id] = X[node_id] + a * direction;
     X2[node_id] = X[node_id] + b * direction;
 
@@ -333,7 +333,7 @@ __device__ size_t brents_method(coord3d* __restrict__ X, coord3d& direction, coo
     bool flag = true;
     int Iterations = 0;
     cg::sync(sync_group);
-    while (abs(b-a) > (real_t)5e-2)
+    while (abs(b-a) > (real_t)5e-10)
     {   
         Iterations++;
 

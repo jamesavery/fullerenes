@@ -10,12 +10,9 @@ using namespace std::literals;
 
 namespace IsomerspaceForcefield {
 
-#include "coord3d.cu"
+#include "coord3d.cc"
 #include "helper_functions.cu"
 typedef uint16_t node_t;
-
-
-
 
 // NB: Increase to int32 to do more than 65k atoms
 
