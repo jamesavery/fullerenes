@@ -26,11 +26,11 @@ int main(int ac, char **av)
   string spiral_name = av[1];
   spiral_nomenclature fsn(spiral_name);
   Triangulation t(fsn);
-  //  t = t.sort_nodes();
+  t = t.sort_nodes();
 
   if(ac>3){
     int k = strtol(av[2],0,0),
-        l = strtol(av[3],0,0);
+      l = strtol(av[3],0,0);
 
     t = t.GCtransform(k,l);
     general_spiral spiral = t.get_general_spiral();
@@ -62,32 +62,45 @@ int main(int ac, char **av)
     }
   }
 
-  vector<face_t> faces = g.compute_faces_oriented(6);
+  vector<face_t> faces = t.cubic_faces(); 
   vector<int> degrees(Nf);
+
   
   for(int f=0,p=0,h=0;f<Nf;f++){
     int df = faces[f].size(), dd = t.neighbours[f].size();
-    // if(df != dd){
-    //   printf("Face %d has size %ld, but dual node %d has degree %d\n",
-    // 	     f,faces[f].size(),
-    // 	     f,t.degree(f));
-    //   abort();
-    // }
+    if(f<12) assert(dd==5);
 
     if(df == 5) pentagons[p++] = faces[f];
     if(df == 6) hexagons[h++] = faces[f];    
   }
 
+  // Dual node coordinates
+  vector<coord3d> dual_coords(Nf);
+  
+  assert(t.triangles.size() == N);
 
-  Symmetry S(fsn.spiral_code);
+  for(node_t u=0;u<N;u++){
+    tri_t triangle = t.triangles[u];    
+    coord3d triangle_center = P.points[u];
+    
+    for(int i=0;i<3;i++)
+      dual_coords[triangle[i]] += triangle_center;
+  }
+  for(node_t f=0;f<Nf;f++)
+    dual_coords[f] /= t.degree(f);
+
+  Polyhedron T(t,dual_coords);
+  Polyhedron::to_file(T,"dual.mol2");  
+  
+  //Symmetry S(fsn.spiral_code);
   //  Symmetry S(t);
   
   cerr << "from numpy import array, nan\n\n";
-  cerr << "name = \"C"<<N<<"-" << fsn <<"\";\n";
-  cerr << "# Symmetry information\n";
+  cerr << "name = \"" << fsn <<"\";\n";
+  //cerr << "# Symmetry information\n";
   //  cerr << "point_group = " << S.point_group() << "\n;";
-  cerr << "equivalent_nodes = " << S.equivalence_classes(S.Gtri) << ";\n";
-  cerr << "equivalent_faces = " << S.equivalence_classes(S.G) << ";\n";  
+  //cerr << "equivalent_nodes = " << S.equivalence_classes(S.Gtri) << ";\n";
+  //cerr << "equivalent_faces = " << S.equivalence_classes(S.G) << ";\n";  
   cerr << "# Cubic graph, its faces, 3D embedding, and 2D Tutte-embedding\n";
   cerr << "cubic_neighbours  = array(" << g.neighbours << ");\n\n";
   cerr << "pentagons    = array(" << pentagons  << ");\n\n"; // TODO
@@ -102,6 +115,7 @@ int main(int ac, char **av)
   cerr << "dual_neighbours   = " << t.neighbours << ";\n\n";
   //  cerr << "next_on_tri       = array(" << next_on_tri << ");\n\n";  
   cerr << "triangles         = array(" << t.compute_faces() << ");\n\n";
+  cerr << "dual_points     = array(" << dual_coords << ");\n\n";  
   cerr << "# prev_on_tri is the same as next_on_tri\n";
 
 
