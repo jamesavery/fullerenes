@@ -321,7 +321,7 @@ INLINE real_t gradnorm(coord3d* X, coord3d& d)const {
 
 //Bracketing method designed to find upper bound for linesearch method that matches 
 //reference python implementation by Buster.
-INLINE real_t FindLineSearchBound(coord3d* X, coord3d& r0, coord3d* X1){
+INLINE real_t FindLineSearchBound(coord3d* X, coord3d& r0, coord3d* X1) const{
     real_t bound = 1e-5;
     bool negative_grad = true;
     size_t iter = 0;
@@ -358,12 +358,12 @@ INLINE real_t Bisection(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
 }
 
 //Brents Method for line-search using fixed number of iterations.
-INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
+INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2)const{
     real_t a,b,s,d;
     a = (real_t)0.0; //b = (real_t)1.0; 
 
     //To match python reference implementation by Buster.
-    b = FindLineSearchBound(X,r0,X1);
+    b = (real_t)1.0;//FindLineSearchBound(X,r0,X1);
 
     X1[node_id] = X[node_id] + a * r0;
     X2[node_id] = X[node_id] + b * r0;
@@ -405,7 +405,6 @@ INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
         {
             flag = false;
         }
-
         X1[node_id] = X[node_id] + s * r0;
         real_t f_s = gradnorm(X1,r0);
         d = c;
@@ -440,7 +439,7 @@ INLINE real_t GSS(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2) const{
     real_t f1 = energy(X1);
     real_t f2 = energy(X2);
 
-    for (uint8_t i = 0; i < 30; i++){
+    for (uint8_t i = 0; i < 50; i++){
         if (f1 > f2){
             a = x1;
             x1 = x2;
@@ -687,7 +686,7 @@ size_t IsomerspaceForcefield::get_batch_capacity(size_t N){
     return (size_t)(properties.multiProcessorCount*fullerenes_per_SM);
 }
 
-void IsomerspaceForcefield::get_cartesian_coordinates(device_real_t* X){
+void IsomerspaceForcefield::get_cartesian_coordinates(device_real_t* X) const{
     cudaMemcpy(X, d_graph.X, sizeof(device_coord3d)*N*batch_size, cudaMemcpyDeviceToHost);
 }
 
@@ -740,7 +739,6 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
     }
 }
 
-
 void IsomerspaceForcefield::to_file(size_t fullereneID){
     void* kernelArgs[] = {(void*)&d_graph, (void*)&d_coords, (void*)&d_harmonics};
     cudaLaunchCooperativeKernel((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
@@ -779,6 +777,14 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
     std::cout << "\nIsomerspace Capacity: " << this->batch_capacity << "\n";
     this->N = N;
     this->shared_memory_bytes = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
+    
+    cudaStream_t streams[128];
+    for (size_t i = 0; i < 128; i++)
+    {
+        cudaStreamCreateWithFlags(&streams[i],cudaStreamNonBlocking);
+    }
+    this->cuda_streams = &streams[0];
+
     GenericStruct::allocate(d_coords,      N,  batch_capacity, device_buffer);
     GenericStruct::allocate(d_harmonics,   N,  batch_capacity, device_buffer);
     GenericStruct::allocate(d_graph,       N,  batch_capacity, device_buffer);

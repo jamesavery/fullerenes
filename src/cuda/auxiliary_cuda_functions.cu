@@ -1,5 +1,4 @@
 #include "coord3d.cu"
-#include "coord3d_aligned.cu"
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include "cuda_runtime.h"
@@ -34,11 +33,6 @@ T* synthetic_array(size_t N, const size_t num_molecules, const T* fullerene){
 }
 
 
-__device__ void align16(device_coord3d* input, coord3d_a* output, size_t N){
-    cg::sync(cg::this_grid());
-    output[threadIdx.x] = {input[threadIdx.x].x, input[threadIdx.x].y, input[threadIdx.x].z, 0};
-    cg::sync(cg::this_grid());
-}
 
 template <typename T>
 __device__ void pointerswap(T **r, T **s)
@@ -295,7 +289,7 @@ __device__ device_real_t global_reduction(device_real_t *sdata, device_real_t *g
         if (gridDim.x > 128 && threadIdx.x == 0 && ((blockIdx.x + 128) < gridDim.x))    {if (blockIdx.x < 128)  {gdata[blockIdx.x]  += gdata[blockIdx.x + 128];}} GRID_SYNC
         if (gridDim.x > 64 && threadIdx.x == 0 && ((blockIdx.x + 64) < gridDim.x))     {if (blockIdx.x < 64)   {gdata[blockIdx.x]  += gdata[blockIdx.x + 64];}} GRID_SYNC
         if (gridDim.x > 32 && threadIdx.x == 0 && ((blockIdx.x + 32) < gridDim.x))     {if (blockIdx.x < 32)   {gdata[blockIdx.x]  += gdata[blockIdx.x + 32];}} GRID_SYNC
-        if (threadIdx.x < 32)
+        if (threadIdx.x < 32 && blockIdx.x == 0)
         {
             cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
             gdata[threadIdx.x] = cg::reduce(tile32, gdata[threadIdx.x], cg::plus<device_real_t>()); 
