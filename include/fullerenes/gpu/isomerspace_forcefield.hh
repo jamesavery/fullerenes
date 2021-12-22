@@ -11,7 +11,7 @@
 #define SEMINARIO_FORCE_CONSTANTS 1
 #define USE_MAX_NORM 0
 #define REDUCTION_METHOD 0
-#define LINESEARCH_METHOD Bisection
+#define LINESEARCH_METHOD GSS
   
 
 
@@ -51,8 +51,12 @@ public:
     std::vector<std::tuple<std::string,void**,size_t>> pointers =   {{"bond_rms",(void**)&bond_rms, s}, {"angle_rms",(void**)&angle_rms, s}, {"dihedral_rms",(void**)&dihedral_rms ,s}, 
                                                                     {"bond_mean", (void**)&bond_mean, s}, {"angle_mean", (void**)&angle_mean, s}, {"dihedral_mean",(void**)&dihedral_mean, s}, 
                                                                     {"bond_max", (void**)&bond_max, s}, {"angle_max", (void**)&angle_max, s}, {"dihedral_max", (void**)&dihedral_max, s}};
-
+    IsomerspaceStats( device_real_t* bond_rms, device_real_t* angle_rms, device_real_t* dihedral_rms,
+                      device_real_t* bond_mean, device_real_t* angle_mean, device_real_t* dihedral_mean,
+                      device_real_t* bond_max, device_real_t* angle_max, device_real_t* dihedral_max): bond_rms(bond_rms), angle_rms(angle_rms), dihedral_rms(dihedral_rms), bond_mean(bond_mean), angle_mean(angle_mean), dihedral_mean(dihedral_mean), bond_max(bond_max), angle_max(angle_max), dihedral_max(dihedral_max){}
+    IsomerspaceStats operator[] (size_t i){return IsomerspaceStats(&bond_rms[i], &angle_rms[i], &dihedral_rms[i], &bond_mean[i], &angle_mean[i], &dihedral_mean[i], &bond_max[i], &angle_max[i], &dihedral_max[i]);}
     IsomerspaceStats(){set_pointers(pointers);}
+
   };
   
   
@@ -71,10 +75,9 @@ public:
     
     IsomerspaceGraph(){set_pointers(pointers);}
     IsomerspaceGraph(device_real_t* X, device_node_t* neighbours, device_node_t* next_on_face, device_node_t* prev_on_face, uint8_t* face_right): X(X), neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face), face_right(face_right){}
+    IsomerspaceGraph operator[] (size_t i){return IsomerspaceGraph(&X[i], &neighbours[i], &next_on_face[i], &prev_on_face[i], &face_right[i]);}
     void copy_to_gpu(const IsomerspaceGraph& G);
   }; 
-
-
 
   struct InternalCoordinates : GenericStruct{
     device_real_t* bonds;             
@@ -91,6 +94,8 @@ public:
                                                                     {"outer_angles_p", (void**)&outer_angles_p, s}, {"outer_dihedrals_a", (void**)&outer_dihedrals_a, s}, {"outer_dihedrals_m", (void**)&outer_dihedrals_m, s}, 
                                                                     {"outer_dihedrals_p", (void**)&outer_dihedrals_p, s}};
     InternalCoordinates(){set_pointers(pointers);}
+
+    
   };
 
   static size_t get_batch_capacity(const size_t N); //Uses Cuda API calls to determine the amount of fullerenes of a given size N, that can be optimized simultaneously.
@@ -102,7 +107,7 @@ public:
   void optimize_batch(size_t maxIter);  //Performs Conjugate Gradient Forcefield optimization on a fullerene isomer batch.
   void check_batch();                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
   
-  void get_cartesian_coordinates(device_real_t* X);                                                     //Populate target buffer (CPU) with cartesian coordiantes from isomers on GPU.
+  void get_cartesian_coordinates(device_real_t* X) const;                                               //Populate target buffer (CPU) with cartesian coordiantes from isomers on GPU.
   void get_internal_coordinates(device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals); //Populate target buffers (CPU) with internal coordinates from isomers on GPU.
   
   void clear_batch(){isomer_number+=batch_size; batch_size=0;} //Clears batch, this is required after every batch is finished, effectively resets the position of pointer to GPU memory
@@ -122,6 +127,7 @@ protected:
   size_t isomer_number = 0;               //Isomer number of the first fullerene in batch.
   device_real_t* global_reduction_array;  //Array used to communicate across blocks.
 
+  void* cuda_streams;
 
   IsomerspaceGraph d_graph;         //GPU container for graph information and X0.                 Dimensions: N x M x 3
   IsomerspaceGraph h_graph;         //Host buffer for graph information and X0.                   Dimensions: N x M x 3

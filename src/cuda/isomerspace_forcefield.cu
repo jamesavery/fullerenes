@@ -439,7 +439,7 @@ INLINE real_t GSS(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2) const{
     real_t f1 = energy(X1);
     real_t f2 = energy(X2);
 
-    for (uint8_t i = 0; i < 50; i++){
+    for (uint8_t i = 0; i < 30; i++){
         if (f1 > f2){
             a = x1;
             x1 = x2;
