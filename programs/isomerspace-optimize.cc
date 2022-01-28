@@ -38,8 +38,8 @@ int main(int ac, char **argv)
   int only_nontrivial = ac>=5? strtol(argv[4],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
   
   ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
-
-  size_t batch_size = IsomerspaceForcefield::get_batch_capacity(N);
+  IsomerspaceForcefield isomer_batch = IsomerspaceForcefield(N);
+  size_t batch_size = isomer_batch.get_batch_capacity(N);
   typedef IsomerspaceForcefield::device_real_t device_real_t;
   typedef IsomerspaceForcefield::device_node_t device_node_t;
 
@@ -71,8 +71,6 @@ int main(int ac, char **argv)
     Topt    = system_clock::now()-T0,
     Tcheck  = system_clock::now()-T0;
 
-
-  IsomerspaceForcefield isomer_batch = IsomerspaceForcefield(N);
   vector<Polyhedron> batch_polyhedra(batch_size);
 
   while(more_to_do){

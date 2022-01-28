@@ -11,7 +11,7 @@
 #define SEMINARIO_FORCE_CONSTANTS 1
 #define USE_MAX_NORM 0
 #define REDUCTION_METHOD 0
-#define LINESEARCH_METHOD Bisection
+#define LINESEARCH_METHOD GSS
   
 
 
@@ -19,7 +19,7 @@ class IsomerspaceForcefield {
 public:
   typedef GPU_REAL device_real_t;
   typedef uint16_t device_node_t;
-  enum BufferType {host_buffer, device_buffer};
+  enum BufferType {HOST_BUFFER, DEVICE_BUFFER};
 
   struct GenericStruct{
     bool allocated = false;
@@ -93,16 +93,17 @@ public:
     InternalCoordinates(){set_pointers(pointers);}
   };
 
-  static size_t get_batch_capacity(const size_t N); //Uses Cuda API calls to determine the amount of fullerenes of a given size N, that can be optimized simultaneously.
+  size_t get_batch_capacity(const size_t N); //Uses Cuda API calls to determine the amount of fullerenes of a given size N, that can be optimized simultaneously.
   size_t get_batch_size()const{return batch_size;}
   void insert_isomer(const FullereneGraph& G,  const vector<coord3d> &X0);  //Essentially adapter pattern converting FullereneGraph objects into 1D arrays and inserting them into an IsomerspaceGraph. 
+  void insert_isomer(const device_real_t* X0, const device_node_t* cubic_neighbours, const device_node_t* next_on_face, const device_node_t* prev_on_face, const uint8_t* face_right);
   void insert_isomer_batch(const IsomerspaceGraph& G);                      //Inserts an entire batch, used at the moment for inserting synthetic loads, 
                                                                             //could be used in the future for more efficient transfer from CPU to GPU.
   
   void optimize_batch(size_t maxIter);  //Performs Conjugate Gradient Forcefield optimization on a fullerene isomer batch.
   void check_batch();                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
   
-  void get_cartesian_coordinates(device_real_t* X);                                                     //Populate target buffer (CPU) with cartesian coordiantes from isomers on GPU.
+  void get_cartesian_coordinates(device_real_t* X) const;                                                     //Populate target buffer (CPU) with cartesian coordiantes from isomers on GPU.
   void get_internal_coordinates(device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals); //Populate target buffers (CPU) with internal coordinates from isomers on GPU.
   
   void clear_batch(){isomer_number+=batch_size; batch_size=0;} //Clears batch, this is required after every batch is finished, effectively resets the position of pointer to GPU memory
@@ -121,18 +122,21 @@ protected:
   size_t shared_memory_bytes = 0;         //Amount of L1 cache to allocate per block.
   size_t isomer_number = 0;               //Isomer number of the first fullerene in batch.
   device_real_t* global_reduction_array;  //Array used to communicate across blocks.
+  void* cuda_streams;
+  int device_count;
+  int* device_capacities;
+  int* batch_sizes;
 
+  IsomerspaceGraph* d_graph;         //GPU container for graph information and X0.                 Dimensions: N x M x 3
+  IsomerspaceGraph* h_graph;         //Host buffer for graph information and X0.                   Dimensions: N x M x 3
 
-  IsomerspaceGraph d_graph;         //GPU container for graph information and X0.                 Dimensions: N x M x 3
-  IsomerspaceGraph h_graph;         //Host buffer for graph information and X0.                   Dimensions: N x M x 3
+  InternalCoordinates* d_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
+  InternalCoordinates* h_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
+  InternalCoordinates* d_harmonics;  //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
+  InternalCoordinates* h_harmonics;  //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
 
-  InternalCoordinates d_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
-  InternalCoordinates h_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
-  InternalCoordinates d_harmonics;  //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
-  InternalCoordinates h_harmonics;  //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
-
-  IsomerspaceStats d_stats;         //GPU buffers containing statistical batch information.       Dimensions: 1 x M x 1
-  IsomerspaceStats h_stats;         //Host buffers containing statistical batch information.      Dimensions: 1 x M x 1      
+  IsomerspaceStats* d_stats;         //GPU buffers containing statistical batch information.       Dimensions: 1 x M x 1
+  IsomerspaceStats* h_stats;         //Host buffers containing statistical batch information.      Dimensions: 1 x M x 1      
 };
 
 

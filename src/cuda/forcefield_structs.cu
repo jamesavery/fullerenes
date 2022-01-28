@@ -15,7 +15,7 @@ void IsomerspaceForcefield::GenericStruct::allocate(IsomerspaceForcefield::Gener
         G.batch_size  = batch_size; 
         G.N           = N; 
         size_t num_elements = N*batch_size;
-        if (buffer_type == device_buffer){
+        if (buffer_type == DEVICE_BUFFER){
             for (size_t i = 0; i < G.pointers.size(); i++) {
                 cudaMalloc(get<1>(G.pointers[i]), num_elements* get<2>(G.pointers[i])); 
             }
@@ -31,7 +31,7 @@ void IsomerspaceForcefield::GenericStruct::allocate(IsomerspaceForcefield::Gener
 
 void IsomerspaceForcefield::GenericStruct::free(IsomerspaceForcefield::GenericStruct& G){
     if(G.allocated){
-        if (G.buffer_type == device_buffer){    
+        if (G.buffer_type == DEVICE_BUFFER){    
             for (size_t i = 0; i < G.pointers.size(); i++) {
                 cudaFree(*get<1>(G.pointers[i]));
             }
