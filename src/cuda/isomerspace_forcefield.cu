@@ -500,7 +500,7 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
 } 
 };
 
-__global__ void kernel_optimize_batch(IsomerspaceForcefield::IsomerspaceGraph G, const size_t max_iter){
+__global__ void kernel_optimize_batch(IsomerspaceForcefield::IsomerspaceGraph G, const size_t iterations, int* iteration_counts){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -529,10 +529,11 @@ __global__ void kernel_optimize_batch(IsomerspaceForcefield::IsomerspaceGraph G,
 
     //Create forcefield struct and use optimization algorithm to optimize the fullerene 
     ForceField FF = ForceField(nodeG, constants, smem);
-    FF.CG(X,X1,X2,max_iter);
+    FF.CG(X,X1,X2,iterations);
     BLOCK_SYNC
     //Copy data back from L1 cache to VRAM 
-    reinterpret_cast<coord3d*>(G.X)[offset + threadIdx.x]= X[threadIdx.x];   
+    reinterpret_cast<coord3d*>(G.X)[offset + threadIdx.x]= X[threadIdx.x];
+    if (threadIdx.x == 0) {iteration_counts[blockIdx.x] += iterations;}
 }
 
 __global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerspaceGraph G, IsomerspaceForcefield::IsomerspaceStats stats){
@@ -566,7 +567,7 @@ __global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerspaceGraph 
 }
 
 
-__global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, IsomerspaceForcefield::IsomerspaceStats stats, device_real_t* global_reduction_array){
+__global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, IsomerspaceForcefield::IsomerspaceStats stats, device_real_t* global_reduction_array, int* iteration_counts, IsomerspaceForcefield::IsomerStatus* isomer_statuses){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     real_t* base_pointer = smem + Block_Size_Pow_2;
@@ -623,6 +624,19 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, Is
 
     real_t Batch_Mean_Energy_Per_Node   = global_reduction(smem, global_reduction_array, NodeEnergy,converged)/(num_converged*blockDim.x);
     real_t Batch_Mean_Gradient_Per_Node = global_reduction(smem, global_reduction_array, NodeGradNorm,converged)/(num_converged*blockDim.x);
+
+    if (threadIdx.x == 0 && optimized)
+    {
+        isomer_statuses[blockIdx.x] = IsomerspaceForcefield::CONVERGED;
+    } else if (threadIdx.x == 0 && iteration_counts[blockIdx.x] < 10*N)
+    {
+        isomer_statuses[blockIdx.x] = IsomerspaceForcefield::NOT_CONVERGED;
+    } else if (threadIdx.x == 0) 
+    {
+        isomer_statuses[blockIdx.x] = IsomerspaceForcefield::FAILED;
+    }
+    
+    
     
     if(threadIdx.x + blockIdx.x == 0){printf("\t\t    Mean Relative Err|  STD\n====================================================\n Bond: \t\t\t%e | %e\n Angle: \t\t%e | %e \n Dihedral: \t\t%e | %e \n \t\t   \t\t\t\t \n Energy/ Grad: \t\t%e | %e  \t\t \n====================================================\n\n", Batch_Mean_Bond, Batch_Mean_Bond_STD, Batch_Mean_Angle, Batch_Mean_Angle_STD, Batch_Mean_Dihedral, Batch_Mean_Dihedral_STD, Batch_Mean_Energy_Per_Node, Batch_Mean_Gradient_Per_Node);}
     if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
@@ -660,6 +674,10 @@ __global__ void kernel_internal_coordinates(IsomerspaceForcefield::IsomerspaceGr
     }
 }
 
+__global__ void kernel_initialise(int* iteration_count){
+    if (threadIdx.x == 0) {iteration_count[blockIdx.x] = 0;}
+}
+
 
 void IsomerspaceForcefield::check_batch(){
     for (size_t i = 0; i < device_count; i++){
@@ -671,10 +689,32 @@ void IsomerspaceForcefield::check_batch(){
     for (size_t i = 0; i < device_count; i++)
     {   
         cudaSetDevice(i);
-        void* kernelArgs2[] = {(void*)&d_graph[i], (void*)&d_stats[i], (void*)&global_reduction_arrays[i]};
+        void* kernelArgs2[] = {(void*)&d_graph[i], (void*)&d_stats[i], (void*)&global_reduction_arrays[i], (void*)&iteration_counts[i], (void*)&d_isomer_statuses[i]};
         cudaLaunchCooperativeKernel((void*)kernel_check_batch,      dim3(batch_sizes[i],1,1), dim3(N,1,1), kernelArgs2, shared_memory_bytes);
     }
     cudaDeviceSynchronize();
+
+    batch_size = 0;
+
+    for (size_t i = 0; i < device_count; i++)
+    {
+        int push_idx_counter = 0;
+        int num_of_not_converged_isomers = 0;
+        cudaMemcpy(h_isomer_statuses[i], d_isomer_statuses[i], sizeof(IsomerStatus)*batch_sizes[i], cudaMemcpyDeviceToHost);
+        for (int j = 0; j < batch_sizes[i]; j++)
+        {   
+            num_of_not_converged_isomers += (int)(h_isomer_statuses[i][j] == NOT_CONVERGED);
+            if (h_isomer_statuses[i][j] != NOT_CONVERGED)
+            {   
+                push_indices[i][push_idx_counter] = j;
+                push_idx_counter++;
+            }
+            
+        }
+        push_index_counter[i] = 0;
+        batch_sizes[i] = num_of_not_converged_isomers;
+        batch_size += num_of_not_converged_isomers;
+    }
 }
 
 size_t IsomerspaceForcefield::get_batch_capacity(size_t N){
@@ -692,10 +732,11 @@ size_t IsomerspaceForcefield::get_batch_capacity(size_t N){
         /** Calculates maximum number of resident fullerenes on a single Streaming Multiprocessor, multiply with multi processor count to d_get total batch size**/
         cudaOccupancyMaxActiveBlocksPerMultiprocessor(&fullerenes_per_SM, kernel_optimize_batch, N, sharedMemoryPerBlock);
         this->device_capacities[i] = properties.multiProcessorCount*fullerenes_per_SM;
-        this->batch_sizes[i] = 0;
         total_capacity += properties.multiProcessorCount*fullerenes_per_SM;
-
     }
+
+    
+    
     
     return (size_t)total_capacity;
 }
@@ -718,9 +759,9 @@ void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
     for (size_t i = 0; i < device_count; i++)
     {
         cudaSetDevice(i);
-        void* kernelArgs[] = {(void*)&d_graph[i],(void*)&MaxIter};
-        std::cout << "Device " << i << " launching with " << batch_sizes[i] << " blocks \n";
-        cudaLaunchCooperativeKernel((void*)kernel_optimize_batch, dim3(batch_sizes[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
+        void* kernelArgs[] = {(void*)&d_graph[i],(void*)&MaxIter, (void*)&iteration_counts[i]};
+        std::cout << "Device " << i << " launching with " << device_capacities[i] << " blocks \n";
+        cudaLaunchCooperativeKernel((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
     }
     
 
@@ -738,9 +779,8 @@ void IsomerspaceForcefield::insert_isomer_batch(const IsomerspaceGraph& G){
     {
         GenericStruct::copy(d_graph[i],h_graph[i]);
     }
-    
-
 }
+
 /*
 
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
@@ -776,23 +816,24 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
 void IsomerspaceForcefield::insert_isomer(const device_real_t* X0, const device_node_t* cubic_neighbours, const device_node_t* next_on_face, const device_node_t* prev_on_face, const uint8_t* face_right){
     for (size_t i = 0; i < this->device_count; i++)
     {   
-        if (this->device_capacities[i] > 0){
-            size_t offset = batch_sizes[i]*3*N;
+
+        if (batch_sizes[i] < device_capacities[i]){
+            size_t offset = push_indices[i][push_index_counter[i]]*3*N;
 
             for (size_t j = 0; j < N*3; j++)
             {
-                h_graph[i].neighbours[offset + j] = cubic_neighbours[j];
+                h_graph[i].neighbours[offset + j]   = cubic_neighbours[j];
                 h_graph[i].next_on_face[offset + j] = next_on_face[j];
                 h_graph[i].prev_on_face[offset + j] = prev_on_face[j];
                 h_graph[i].face_right[offset + j]   = face_right[j];
-                h_graph[i].X[offset + j]           = X0[j];
+                h_graph[i].X[offset + j]            = X0[j];
             }
             
             batch_size++;
             batch_sizes[i]++;
-            device_capacities[i]--;
+            push_index_counter[i]++;
 
-            if(device_capacities[i] == 0){
+            if(batch_sizes[i] == device_capacities[i]){
                 GenericStruct::copy(d_graph[i],h_graph[i]);
             }
             break;
@@ -836,6 +877,11 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
 {   
     cudaGetDeviceCount(&this->device_count);
     this->global_reduction_arrays = new device_real_t*[device_count];
+    this->iteration_counts = new int*[device_count];
+    this->d_isomer_statuses = new IsomerStatus*[device_count];
+    this->h_isomer_statuses = new IsomerStatus*[device_count];
+    this->push_indices = new int*[device_count];
+    this->push_index_counter = new int[device_count];
     this->batch_sizes = new int[device_count];
     this->device_capacities = new int[device_count];
     this->batch_capacity = get_batch_capacity((size_t)N);
@@ -869,9 +915,25 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
         GenericStruct::allocate(h_harmonics[i],   N,  1,                    HOST_BUFFER);
         GenericStruct::allocate(d_stats[i],       1,  device_capacities[i], DEVICE_BUFFER);
         GenericStruct::allocate(h_stats[i],       1,  device_capacities[i], HOST_BUFFER);
-        cudaMalloc(&global_reduction_arrays[i], sizeof(device_real_t)*N*batch_capacity);
+        
+        cudaMalloc(&global_reduction_arrays[i], sizeof(device_real_t)*N*device_capacities[i]);
+        cudaMalloc(&iteration_counts[i],        sizeof(int)*N*device_capacities[i]);
+        cudaMalloc(&d_isomer_statuses[i],         sizeof(IsomerStatus)*N*device_capacities[i]);
+        h_isomer_statuses[i] = new IsomerStatus[device_capacities[i]];
+        push_indices[i] = new int[device_capacities[i]];
+        push_index_counter[i] = 0;
+
+        batch_sizes[i] = 0;
+        for (size_t j = 0; j < device_capacities[i]; j++)
+        {
+            this-> push_indices[i][j] = j;
+        }
+
+        void* kernelArgs[] = {(void*)&iteration_counts[i]};
+        cudaLaunchCooperativeKernel((void*)kernel_initialise, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, 0);
     }
-    
+
+    cudaDeviceSynchronize();    
     printLastCudaError("Kernel class instansiation failed!");
 }
 
@@ -889,7 +951,15 @@ IsomerspaceForcefield::~IsomerspaceForcefield()
         GenericStruct::free(h_harmonics[i]);
         GenericStruct::free(h_stats[i]);
         GenericStruct::free(h_graph[i]);
+
+        cudaFree(global_reduction_arrays[i]);
+        cudaFree(iteration_counts[i]);
+        cudaFree(d_isomer_statuses[i]);
+        free(h_isomer_statuses[i]);
+        free(push_indices[i]);
+
     }
+
     //Destroys cuda context. It is possible that this function call is sufficient for avoiding memory leaks, in addition to freeing the host_graph.
     cudaDeviceReset();
 }

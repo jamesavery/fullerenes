@@ -19,7 +19,8 @@ class IsomerspaceForcefield {
 public:
   typedef GPU_REAL device_real_t;
   typedef uint16_t device_node_t;
-  enum BufferType {HOST_BUFFER, DEVICE_BUFFER};
+  enum BufferType   {HOST_BUFFER, DEVICE_BUFFER};
+  enum IsomerStatus {CONVERGED, NOT_CONVERGED, FAILED};
 
   struct GenericStruct{
     bool allocated = false;
@@ -121,11 +122,19 @@ protected:
   size_t batch_size = 0;                  //Current number of fullerenes copied to GPU.
   size_t shared_memory_bytes = 0;         //Amount of L1 cache to allocate per block.
   size_t isomer_number = 0;               //Isomer number of the first fullerene in batch.
-  device_real_t** global_reduction_arrays;  //Array used to communicate across blocks.
+
   void* cuda_streams;
   int device_count;
   int* device_capacities;
   int* batch_sizes;
+
+  device_real_t** global_reduction_arrays;  //Array used to communicate across blocks.
+  IsomerStatus** d_isomer_statuses;         //Isomer convergence statuses. 
+  IsomerStatus** h_isomer_statuses;         //Isomer convergence statuses. 
+  int** iteration_counts;                   //Keeps track of how many iteration of CG each isomer on the devices has been optimized for. This information is necessary to deem something FAILED.
+  int** pop_indices;
+  int** push_indices;     
+  int* push_index_counter;
 
   IsomerspaceGraph* d_graph;         //GPU container for graph information and X0.                 Dimensions: N x M x 3
   IsomerspaceGraph* h_graph;         //Host buffer for graph information and X0.                   Dimensions: N x M x 3
