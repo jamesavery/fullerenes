@@ -724,15 +724,18 @@ size_t IsomerspaceForcefield::get_batch_capacity(size_t N){
     int fullerenes_per_SM;
     int sharedMemoryPerBlock = sizeof(device_coord3d)* 3 * N + sizeof(device_real_t)*Block_Size_Pow_2;
     cudaGetDeviceCount(&device_count);
+    printf("Found %d CUDA devices.\n",device_count);
     for (size_t i = 0; i < device_count; i++)
     {
-        cudaGetDeviceProperties(&properties,1);
+        cudaGetDeviceProperties(&properties,i);
         /** Compiling with --maxrregcount=64   is necessary to easily (singular blocks / fullerene) parallelize fullerenes of size 20-1024 !**/
         /** Needs 3 storage arrays for coordinates and 1 for reductions **/
         /** Calculates maximum number of resident fullerenes on a single Streaming Multiprocessor, multiply with multi processor count to d_get total batch size**/
-        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&fullerenes_per_SM, kernel_optimize_batch, N, sharedMemoryPerBlock);
+        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&fullerenes_per_SM, kernel_optimize_batch, N, sharedMemoryPerBlock); // How many threads per block
         this->device_capacities[i] = properties.multiProcessorCount*fullerenes_per_SM;
         total_capacity += properties.multiProcessorCount*fullerenes_per_SM;
+
+	printf("Device %d: number of SM is %d; fullerenes_per_SM for N=%d is %d.\n",int(i),int(properties.multiProcessorCount), N, fullerenes_per_SM);
     }
 
     
