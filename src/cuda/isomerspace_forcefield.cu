@@ -782,14 +782,15 @@ void IsomerspaceForcefield::insert_isomer_batch(const IsomerspaceGraph& G){
     }
 }
 
-/*
+
 
 void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<coord3d> &X0){
 
     for (size_t i = 0; i < this->device_count; i++)
     {   
-        if (this->device_capacities[i] > 0){
-            size_t offset = batch_size*3*N;
+        if (batch_sizes[i] < device_capacities[i]){
+            size_t offset = push_indices[i][push_index_counter[i]]*3*N;
+            
             for (device_node_t u = 0; u < N; u++){
                 for (int j = 0; j < 3; j++){
                     device_node_t v = G.neighbours[u][j];
@@ -802,9 +803,10 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
                 }   
             }   
             batch_size++;
-            device_capacities[i]--;
+            batch_sizes[i]++;
+            push_index_counter[i]++;
 
-            if(device_capacities[i] == 0){
+            if(batch_sizes[i] == device_capacities[i]){
                 GenericStruct::copy(d_graph[i],h_graph[i]);
             }
             break;
@@ -812,12 +814,11 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
     }
 }
 
-*/
+
 
 void IsomerspaceForcefield::insert_isomer(const device_real_t* X0, const device_node_t* cubic_neighbours, const device_node_t* next_on_face, const device_node_t* prev_on_face, const uint8_t* face_right){
     for (size_t i = 0; i < this->device_count; i++)
     {   
-
         if (batch_sizes[i] < device_capacities[i]){
             size_t offset = push_indices[i][push_index_counter[i]]*3*N;
 
