@@ -121,7 +121,7 @@ protected:
   size_t batch_size = 0;                  //Current number of fullerenes copied to GPU.
   size_t shared_memory_bytes = 0;         //Amount of L1 cache to allocate per block.
   size_t isomer_number = 0;               //Isomer number of the first fullerene in batch.
-  device_real_t* global_reduction_array;  //Array used to communicate across blocks.
+  device_real_t** global_reduction_arrays;  //Array used to communicate across blocks.
   void* cuda_streams;
   int device_count;
   int* device_capacities;

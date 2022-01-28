@@ -662,11 +662,18 @@ __global__ void kernel_internal_coordinates(IsomerspaceForcefield::IsomerspaceGr
 
 
 void IsomerspaceForcefield::check_batch(){
-    void* kernelArgs1[] = {(void*)&d_graph, (void*)&d_stats};
-    void* kernelArgs2[] = {(void*)&d_graph, (void*)&d_stats, (void*)&global_reduction_array};
-    cudaLaunchCooperativeKernel((void*)kernel_batch_statistics, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes);
+    for (size_t i = 0; i < device_count; i++){
+        cudaSetDevice(i);
+        void* kernelArgs1[] = {(void*)&d_graph[i], (void*)&d_stats[i]};
+        cudaLaunchCooperativeKernel((void*)kernel_batch_statistics, dim3(batch_sizes[i],1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes);
+    }
     cudaDeviceSynchronize();
-    cudaLaunchCooperativeKernel((void*)kernel_check_batch,      dim3(batch_size,1,1), dim3(N,1,1), kernelArgs2, shared_memory_bytes);
+    for (size_t i = 0; i < device_count; i++)
+    {   
+        cudaSetDevice(i);
+        void* kernelArgs2[] = {(void*)&d_graph[i], (void*)&d_stats[i], (void*)&global_reduction_arrays[i]};
+        cudaLaunchCooperativeKernel((void*)kernel_check_batch,      dim3(batch_sizes[i],1,1), dim3(N,1,1), kernelArgs2, shared_memory_bytes);
+    }
     cudaDeviceSynchronize();
 }
 
@@ -828,6 +835,7 @@ void IsomerspaceForcefield::batch_statistics_to_file(){
 IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
 {   
     cudaGetDeviceCount(&this->device_count);
+    this->global_reduction_arrays = new device_real_t*[device_count];
     this->batch_sizes = new int[device_count];
     this->device_capacities = new int[device_count];
     this->batch_capacity = get_batch_capacity((size_t)N);
@@ -861,9 +869,9 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
         GenericStruct::allocate(h_harmonics[i],   N,  1,                    HOST_BUFFER);
         GenericStruct::allocate(d_stats[i],       1,  device_capacities[i], DEVICE_BUFFER);
         GenericStruct::allocate(h_stats[i],       1,  device_capacities[i], HOST_BUFFER);
+        cudaMalloc(&global_reduction_arrays[i], sizeof(device_real_t)*N*batch_capacity);
     }
     
-    cudaMalloc(&global_reduction_array, sizeof(device_real_t)*N*batch_capacity);
     printLastCudaError("Kernel class instansiation failed!");
 }
 
