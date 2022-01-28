@@ -136,6 +136,8 @@ protected:
   int** push_indices;     
   int* push_index_counter;
 
+  
+  IsomerspaceGraph* out_queue;
   IsomerspaceGraph* d_graph;         //GPU container for graph information and X0.                 Dimensions: N x M x 3
   IsomerspaceGraph* h_graph;         //Host buffer for graph information and X0.                   Dimensions: N x M x 3
 

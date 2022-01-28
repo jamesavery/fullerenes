@@ -69,6 +69,10 @@ int main(){
 
     kernel.optimize_batch(N*3);
     kernel.check_batch();
+    kernel.optimize_batch(N*1);
+    kernel.check_batch();
+    kernel.optimize_batch(N*1);
+    kernel.check_batch();
     //kernel.to_file(0);
     //kernel.batch_statistics_to_file();
     //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(kernel.h_graph.X),N,0);

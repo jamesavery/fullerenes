@@ -600,12 +600,13 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, Is
 
 
     NodeGradNorm                 = dot(FF.gradient(X), FF.gradient(X));
+
     real_t MaxBond_Error         = reduction_max(smem, max(NodeBond_Errors));
     real_t MaxAngle_Error        = reduction_max(smem, max(NodeAngle_Errors));
     real_t MaxDihedral_Error     = reduction_max(smem, max(NodeDihedral_Errors));
-    
+
     bool not_nan                        = (!isnan(NodeGradNorm));
-    bool converged                      = (NodeGradNorm/blockDim.x < 1e-1) && not_nan;
+    bool converged                      = (reduction(smem,NodeGradNorm)/blockDim.x < 1e-2) && not_nan;
     bool optimized                      = (MaxBond_Error < 1e-1) && (MaxAngle_Error < 1.5e-1) && (MaxDihedral_Error < 1e-1) && converged;
     global_reduction_array[blockIdx.x]  = (real_t)converged;
     
@@ -614,16 +615,16 @@ __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, Is
     real_t num_nonnans      = global_reduction(smem,global_reduction_array,not_nan,threadIdx.x==0);
     real_t num_optimized    = global_reduction(smem,global_reduction_array,optimized,threadIdx.x==0);
     
-    real_t Batch_Mean_Bond              = global_reduction(smem,global_reduction_array,NodeTotBondError, converged) /(blockDim.x*num_converged*3);
-    real_t Batch_Mean_Angle             = global_reduction(smem,global_reduction_array,NodeTotAngleError, converged)/(blockDim.x*num_converged*3);
-    real_t Batch_Mean_Dihedral          = global_reduction(smem,global_reduction_array,NodeTotDihedralError, converged)/(blockDim.x*num_converged*3);
+    real_t Batch_Mean_Bond              = global_reduction(smem,global_reduction_array,NodeTotBondError, not_nan) /(blockDim.x*num_nonnans*3);
+    real_t Batch_Mean_Angle             = global_reduction(smem,global_reduction_array,NodeTotAngleError, not_nan)/(blockDim.x*num_nonnans*3);
+    real_t Batch_Mean_Dihedral          = global_reduction(smem,global_reduction_array,NodeTotDihedralError, not_nan)/(blockDim.x*num_nonnans*3);
 
-    real_t Batch_Mean_Bond_STD          = sqrt(global_reduction(smem,global_reduction_array,dot(NodeBond_Errors,NodeBond_Errors),converged)/(blockDim.x*num_converged*3) - Batch_Mean_Bond*Batch_Mean_Bond);
-    real_t Batch_Mean_Angle_STD         = sqrt(global_reduction(smem,global_reduction_array,dot(NodeAngle_Errors,NodeAngle_Errors),converged)/(blockDim.x*num_converged*3) - Batch_Mean_Angle*Batch_Mean_Angle);
-    real_t Batch_Mean_Dihedral_STD      = sqrt(global_reduction(smem,global_reduction_array,dot(NodeDihedral_Errors,NodeDihedral_Errors),converged)/(blockDim.x*num_converged*3) - Batch_Mean_Dihedral*Batch_Mean_Dihedral);
+    real_t Batch_Mean_Bond_STD          = sqrt(global_reduction(smem,global_reduction_array,dot(NodeBond_Errors,NodeBond_Errors),not_nan)/(blockDim.x*num_nonnans*3) - Batch_Mean_Bond*Batch_Mean_Bond);
+    real_t Batch_Mean_Angle_STD         = sqrt(global_reduction(smem,global_reduction_array,dot(NodeAngle_Errors,NodeAngle_Errors),not_nan)/(blockDim.x*num_nonnans*3) - Batch_Mean_Angle*Batch_Mean_Angle);
+    real_t Batch_Mean_Dihedral_STD      = sqrt(global_reduction(smem,global_reduction_array,dot(NodeDihedral_Errors,NodeDihedral_Errors),not_nan)/(blockDim.x*num_nonnans*3) - Batch_Mean_Dihedral*Batch_Mean_Dihedral);
 
-    real_t Batch_Mean_Energy_Per_Node   = global_reduction(smem, global_reduction_array, NodeEnergy,converged)/(num_converged*blockDim.x);
-    real_t Batch_Mean_Gradient_Per_Node = global_reduction(smem, global_reduction_array, NodeGradNorm,converged)/(num_converged*blockDim.x);
+    real_t Batch_Mean_Energy_Per_Node   = global_reduction(smem, global_reduction_array, NodeEnergy,not_nan)/(num_nonnans*blockDim.x);
+    real_t Batch_Mean_Gradient_Per_Node = global_reduction(smem, global_reduction_array, NodeGradNorm,not_nan)/(num_nonnans*blockDim.x);
 
     if (threadIdx.x == 0 && optimized)
     {
@@ -862,8 +863,12 @@ void IsomerspaceForcefield::to_file(size_t fullereneID){
 }
 
 void IsomerspaceForcefield::batch_statistics_to_file(){
-    void* kernel_args[] = {(void*)&d_graph, (void*)&d_stats};
-    cudaLaunchCooperativeKernel((void*)kernel_batch_statistics, dim3(batch_size, 1, 1), dim3(N, 1, 1), kernel_args, shared_memory_bytes);
+    for (size_t i = 0; i < device_count; i++)
+    {
+        void* kernel_args[] = {(void*)&d_graph[i], (void*)&d_stats[i]};
+        cudaLaunchCooperativeKernel((void*)kernel_batch_statistics, dim3(batch_sizes[i], 1, 1), dim3(N, 1, 1), kernel_args, shared_memory_bytes);
+    }
+    
 
     for (size_t i = 0; i < d_stats[0].pointers.size(); i++){
         cudaMemcpy(*get<1>(h_stats[0].pointers[i]),      *get<1>(d_stats[0].pointers[i]),    get<2>(d_stats[0].pointers[i])*batch_size,      cudaMemcpyDeviceToHost);
