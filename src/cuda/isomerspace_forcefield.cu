@@ -570,10 +570,9 @@ __global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerspaceGraph 
 __global__ void kernel_check_batch(IsomerspaceForcefield::IsomerspaceGraph G, IsomerspaceForcefield::IsomerspaceStats stats, device_real_t* global_reduction_array, int* iteration_counts, IsomerspaceForcefield::IsomerStatus* isomer_statuses){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
-    real_t* base_pointer = smem + Block_Size_Pow_2;
     clear_cache(smem,Block_Size_Pow_2);
 
-    node_t node_id          = threadIdx.x;
+    //    node_t node_id          = threadIdx.x; // Needed if we go to large molecules ( > 1 block)
     size_t offset           = blockIdx.x * blockDim.x;
     size_t N                = blockDim.x;
     coord3d* X              = reinterpret_cast<coord3d*>(G.X + offset*3);

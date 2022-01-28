@@ -111,8 +111,6 @@ struct Constants{
         //Set pointers to start of fullerene.
         size_t offset = blockDim.x*blockIdx.x;
         device_node_t* neighbours = G.neighbours + offset*3;
-        device_node_t* next_on_face = G.next_on_face + offset*3; 
-        device_node_t* prev_on_face = G.prev_on_face + offset*3; 
         uint8_t* face_right = G.face_right + offset*3;
 
         //       m    p
