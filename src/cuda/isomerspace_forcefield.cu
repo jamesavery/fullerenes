@@ -763,8 +763,8 @@ void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
     {
         cudaSetDevice(i);
         void* kernelArgs[] = {(void*)&d_graph[i],(void*)&MaxIter, (void*)&iteration_counts[i]};
-        std::cout << "Device " << i << " launching with " << device_capacities[i] << " blocks \n";
-        safeCudaKernelCall((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
+        std::cout << "Device " << i << " launching with " << batch_sizes[i] << " blocks \n";
+        safeCudaKernelCall((void*)kernel_optimize_batch, dim3(batch_sizes[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
     }
     
 
@@ -846,8 +846,12 @@ void IsomerspaceForcefield::insert_isomer(const device_real_t* X0, const device_
 }
 
 void IsomerspaceForcefield::to_file(size_t fullereneID){
-    void* kernelArgs[] = {(void*)&d_graph[0], (void*)&d_coords[0], (void*)&d_harmonics[0]};
-    safeCudaKernelCall((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
+    for (size_t i = 0; i < device_count; i++)
+    {
+        void* kernelArgs[] = {(void*)&d_graph[i], (void*)&d_coords[i], (void*)&d_harmonics[i]};
+        safeCudaKernelCall((void*)kernel_internal_coordinates, dim3(batch_sizes[i],1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
+    }
+    
     std::string ID  = std::to_string(fullereneID);
     size_t offset   = fullereneID*N;
 
@@ -870,14 +874,12 @@ void IsomerspaceForcefield::batch_statistics_to_file(){
     {
         void* kernel_args[] = {(void*)&d_graph[i], (void*)&d_stats[i]};
         safeCudaKernelCall((void*)kernel_batch_statistics, dim3(batch_sizes[i], 1, 1), dim3(N, 1, 1), kernel_args, shared_memory_bytes);
+        
+        GenericStruct::copy(h_stats[i],d_stats[i],batch_sizes[i])
+        for (size_t i = 0; i < d_stats[0].pointers.size(); i++){
+            to_binary("output/" + get<0>(h_stats[0].pointers[i]) + "_" + std::to_string(isomer_number) + ".bin",        *get<1>(h_stats[0].pointers[i]),     get<2>(h_stats[0].pointers[i])*batch_size);
+        }
     }
-    
-
-    for (size_t i = 0; i < d_stats[0].pointers.size(); i++){
-        cudaMemcpy(*get<1>(h_stats[0].pointers[i]),      *get<1>(d_stats[0].pointers[i]),    get<2>(d_stats[0].pointers[i])*batch_size,      cudaMemcpyDeviceToHost);
-        to_binary("output/" + get<0>(h_stats[0].pointers[i]) + "_" + std::to_string(isomer_number) + ".bin",        *get<1>(h_stats[0].pointers[i]),     get<2>(h_stats[0].pointers[i])*batch_size);
-    }
-
 }
 
 
