@@ -683,14 +683,14 @@ void IsomerspaceForcefield::check_batch(){
     for (size_t i = 0; i < device_count; i++){
         cudaSetDevice(i);
         void* kernelArgs1[] = {(void*)&d_graph[i], (void*)&d_stats[i]};
-        cudaLaunchCooperativeKernel((void*)kernel_batch_statistics, dim3(batch_sizes[i],1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes);
+        safeCudaKernelCall((void*)kernel_batch_statistics, dim3(batch_sizes[i],1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes);
     }
     cudaDeviceSynchronize();
     for (size_t i = 0; i < device_count; i++)
     {   
         cudaSetDevice(i);
         void* kernelArgs2[] = {(void*)&d_graph[i], (void*)&d_stats[i], (void*)&global_reduction_arrays[i], (void*)&iteration_counts[i], (void*)&d_isomer_statuses[i]};
-        cudaLaunchCooperativeKernel((void*)kernel_check_batch,      dim3(batch_sizes[i],1,1), dim3(N,1,1), kernelArgs2, shared_memory_bytes);
+        safeCudaKernelCall((void*)kernel_check_batch,      dim3(batch_sizes[i],1,1), dim3(N,1,1), kernelArgs2, shared_memory_bytes);
     }
     cudaDeviceSynchronize();
 
