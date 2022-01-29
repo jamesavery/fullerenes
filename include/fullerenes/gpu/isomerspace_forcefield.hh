@@ -31,7 +31,7 @@ public:
     std::vector<std::tuple<std::string,void**,size_t>> pointers;
     static void allocate(GenericStruct& G,const size_t N,const size_t batch_size, const BufferType buffer_type);
     static void free(GenericStruct& G);
-    static void copy(GenericStruct& target, const GenericStruct& source);
+    static void copy(GenericStruct& target, const GenericStruct& source, const size_t num_isomers);
     void set_pointers(std::vector<std::tuple<std::string,void**,size_t>> &pointers){this->pointers = pointers;}
   };
 

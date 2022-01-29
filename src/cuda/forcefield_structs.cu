@@ -44,10 +44,15 @@ void IsomerspaceForcefield::GenericStruct::free(IsomerspaceForcefield::GenericSt
         G.allocated = false;
     }
 }
-void IsomerspaceForcefield::GenericStruct::copy(IsomerspaceForcefield::GenericStruct& destination, const IsomerspaceForcefield::GenericStruct& source){
+void IsomerspaceForcefield::GenericStruct::copy(IsomerspaceForcefield::GenericStruct& destination, const IsomerspaceForcefield::GenericStruct& source, const size_t num_isomers){
+    if(num_isomers > 0){
     for (size_t i = 0; i < destination.pointers.size(); i++)
     {
-        cudaMemcpy(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*source.N*source.batch_size, cudaMemcpyKind((source.buffer_type+1) + (source.buffer_type + destination.buffer_type)/2));
+        cudaMemcpy(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*source.N*num_isomers, cudaMemcpyKind((source.buffer_type+1) + (source.buffer_type + destination.buffer_type)/2));
+    }
+    }
+    else{
+        std::cout << "WARNING: Call to copy made for 0 isomers.";
     }
     printLastCudaError("Failed to copy struct");
 }

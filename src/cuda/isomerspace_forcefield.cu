@@ -780,7 +780,7 @@ void IsomerspaceForcefield::insert_isomer_batch(const IsomerspaceGraph& G){
     batch_size += G.batch_size;
     for (size_t i = 0; i < this->device_count; i++)
     {
-        GenericStruct::copy(d_graph[i],h_graph[i]);
+        GenericStruct::copy(d_graph[i],h_graph[i],batch_sizes[i]);
     }
 }
 
@@ -809,7 +809,7 @@ void IsomerspaceForcefield::insert_isomer(const FullereneGraph& G, const vector<
             push_index_counter[i]++;
 
             if(batch_sizes[i] == device_capacities[i]){
-                GenericStruct::copy(d_graph[i],h_graph[i]);
+                GenericStruct::copy(d_graph[i],h_graph[i],batch_sizes[i]);
             }
             break;
         }
@@ -826,11 +826,11 @@ void IsomerspaceForcefield::insert_isomer(const device_real_t* X0, const device_
 
             for (size_t j = 0; j < N*3; j++)
             {
-                h_graph[i].neighbours[offset + j]   = cubic_neighbours[j];
-                h_graph[i].next_on_face[offset + j] = next_on_face[j];
-                h_graph[i].prev_on_face[offset + j] = prev_on_face[j];
-                h_graph[i].face_right[offset + j]   = face_right[j];
-                h_graph[i].X[offset + j]            = X0[j];
+                h_graph[i].neighbours   [offset + j] = cubic_neighbours[j];
+                h_graph[i].next_on_face [offset + j] = next_on_face[j];
+                h_graph[i].prev_on_face [offset + j] = prev_on_face[j];
+                h_graph[i].face_right   [offset + j] = face_right[j];
+                h_graph[i].X            [offset + j] = X0[j];
             }
             
             batch_size++;
@@ -838,7 +838,7 @@ void IsomerspaceForcefield::insert_isomer(const device_real_t* X0, const device_
             push_index_counter[i]++;
 
             if(batch_sizes[i] == device_capacities[i]){
-                GenericStruct::copy(d_graph[i],h_graph[i]);
+                GenericStruct::copy(d_graph[i],h_graph[i],batch_sizes[i]);
             }
             break;
         }
@@ -849,18 +849,18 @@ void IsomerspaceForcefield::to_file(size_t fullereneID){
     void* kernelArgs[] = {(void*)&d_graph[0], (void*)&d_coords[0], (void*)&d_harmonics[0]};
     cudaLaunchCooperativeKernel((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
     std::string ID  = std::to_string(fullereneID);
-    size_t offset   = fullereneID*N*3;
+    size_t offset   = fullereneID*N;
 
     device_real_t Xbuffer[3*N];
     cudaMemcpy(Xbuffer,             d_graph[0].X + offset,                     sizeof(device_coord3d)*N, cudaMemcpyDeviceToHost);
     to_binary("X_" + ID + ".bin",                 Xbuffer,              sizeof(device_coord3d)*N);
     
     for (size_t i = 0; i < d_coords[0].pointers.size(); i++){
-        cudaMemcpy(*get<1>(h_coords[0].pointers[i]),      *get<1>(d_coords[0].pointers[i]) + offset,    get<2>(d_coords[0].pointers[i])*N,      cudaMemcpyDeviceToHost);
-        cudaMemcpy(*get<1>(h_harmonics[0].pointers[i]),   *get<1>(d_harmonics[0].pointers[i]) + offset, get<2>(d_harmonics[0].pointers[i])*N,   cudaMemcpyDeviceToHost);
+        cudaMemcpy(*get<1>(h_coords[0].pointers[i]),      (void*)((char*)*get<1>(d_coords[0].pointers[i]) + get<2>(d_coords[0].pointers[i])*offset),    get<2>(d_coords[0].pointers[i])*N,      cudaMemcpyDeviceToHost);
+        cudaMemcpy(*get<1>(h_harmonics[0].pointers[i]),   (void*)((char*)*get<1>(d_harmonics[0].pointers[i]) + get<2>(d_harmonics[0].pointers[i])*offset),   cudaMemcpyDeviceToHost);
     
-        to_binary(get<0>(h_coords[0].pointers[i]) + "_" + ID + ".bin",        *get<1>(h_coords[0].pointers[i]) + offset,     get<2>(d_coords[0].pointers[i])*N);
-        to_binary(get<0>(h_harmonics[0].pointers[i]) + "0_" + ID + ".bin",    *get<1>(h_harmonics[0].pointers[i]) + offset,  get<2>(d_harmonics[0].pointers[i])*N);
+        to_binary(get<0>(h_coords[0].pointers[i]) + "_" + ID + ".bin",        (void*)((char*)*get<1>(d_coords[0].pointers[i]) + get<2>(d_coords[0].pointers[i])*offset),     get<2>(d_coords[0].pointers[i])*N);
+        to_binary(get<0>(h_harmonics[0].pointers[i]) + "0_" + ID + ".bin",    (void*)((char*)*get<1>(d_harmonics[0].pointers[i]) + get<2>(d_harmonics[0].pointers[i])*offset),  get<2>(d_harmonics[0].pointers[i])*N);
     }
     printLastCudaError("To file failed");
 }
