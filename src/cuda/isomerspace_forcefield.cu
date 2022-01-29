@@ -857,7 +857,7 @@ void IsomerspaceForcefield::to_file(size_t fullereneID){
     
     for (size_t i = 0; i < d_coords[0].pointers.size(); i++){
         cudaMemcpy(*get<1>(h_coords[0].pointers[i]),      (void*)((char*)*get<1>(d_coords[0].pointers[i]) + get<2>(d_coords[0].pointers[i])*offset),    get<2>(d_coords[0].pointers[i])*N,      cudaMemcpyDeviceToHost);
-        cudaMemcpy(*get<1>(h_harmonics[0].pointers[i]),   (void*)((char*)*get<1>(d_harmonics[0].pointers[i]) + get<2>(d_harmonics[0].pointers[i])*offset),   cudaMemcpyDeviceToHost);
+        cudaMemcpy(*get<1>(h_harmonics[0].pointers[i]),   (void*)((char*)*get<1>(d_harmonics[0].pointers[i]) + get<2>(d_harmonics[0].pointers[i])*offset), get<2>(d_coords[0].pointers[i])*N,   cudaMemcpyDeviceToHost);
     
         to_binary(get<0>(h_coords[0].pointers[i]) + "_" + ID + ".bin",        (void*)((char*)*get<1>(d_coords[0].pointers[i]) + get<2>(d_coords[0].pointers[i])*offset),     get<2>(d_coords[0].pointers[i])*N);
         to_binary(get<0>(h_harmonics[0].pointers[i]) + "0_" + ID + ".bin",    (void*)((char*)*get<1>(d_harmonics[0].pointers[i]) + get<2>(d_harmonics[0].pointers[i])*offset),  get<2>(d_harmonics[0].pointers[i])*N);
