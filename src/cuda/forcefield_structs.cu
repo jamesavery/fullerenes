@@ -52,7 +52,7 @@ void IsomerspaceForcefield::GenericStruct::copy(IsomerspaceForcefield::GenericSt
     }
     }
     else{
-        std::cout << "WARNING: Call to copy made for 0 isomers.";
+        std::cout << "WARNING: Call to copy made for 0 isomers \n";
     }
     printLastCudaError("Failed to copy struct");
 }

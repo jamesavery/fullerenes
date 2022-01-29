@@ -750,7 +750,7 @@ void IsomerspaceForcefield::get_cartesian_coordinates(device_real_t* X) const{
 
 void IsomerspaceForcefield::get_internal_coordinates(device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals){
     void* kernelArgs[] = {(void*)&d_graph, (void*)&d_coords};
-    cudaLaunchCooperativeKernel((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
+    safeCudaKernelCall((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
     cudaMemcpy(bonds,       d_coords[0].bonds,     sizeof(device_coord3d)*N*batch_size, cudaMemcpyDeviceToHost);
     cudaMemcpy(angles,      d_coords[0].angles,    sizeof(device_coord3d)*N*batch_size, cudaMemcpyDeviceToHost);
     cudaMemcpy(dihedrals,   d_coords[0].dihedrals, sizeof(device_coord3d)*N*batch_size, cudaMemcpyDeviceToHost);
@@ -764,7 +764,7 @@ void IsomerspaceForcefield::optimize_batch(const size_t MaxIter){
         cudaSetDevice(i);
         void* kernelArgs[] = {(void*)&d_graph[i],(void*)&MaxIter, (void*)&iteration_counts[i]};
         std::cout << "Device " << i << " launching with " << device_capacities[i] << " blocks \n";
-        cudaLaunchCooperativeKernel((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
+        safeCudaKernelCall((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
     }
     
 
@@ -847,7 +847,7 @@ void IsomerspaceForcefield::insert_isomer(const device_real_t* X0, const device_
 
 void IsomerspaceForcefield::to_file(size_t fullereneID){
     void* kernelArgs[] = {(void*)&d_graph[0], (void*)&d_coords[0], (void*)&d_harmonics[0]};
-    cudaLaunchCooperativeKernel((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
+    safeCudaKernelCall((void*)kernel_internal_coordinates, dim3(batch_size,1,1), dim3(N,1,1), kernelArgs, shared_memory_bytes);
     std::string ID  = std::to_string(fullereneID);
     size_t offset   = fullereneID*N;
 
@@ -869,7 +869,7 @@ void IsomerspaceForcefield::batch_statistics_to_file(){
     for (size_t i = 0; i < device_count; i++)
     {
         void* kernel_args[] = {(void*)&d_graph[i], (void*)&d_stats[i]};
-        cudaLaunchCooperativeKernel((void*)kernel_batch_statistics, dim3(batch_sizes[i], 1, 1), dim3(N, 1, 1), kernel_args, shared_memory_bytes);
+        safeCudaKernelCall((void*)kernel_batch_statistics, dim3(batch_sizes[i], 1, 1), dim3(N, 1, 1), kernel_args, shared_memory_bytes);
     }
     
 
@@ -938,7 +938,7 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N)
         }
 
         void* kernelArgs[] = {(void*)&iteration_counts[i]};
-        cudaLaunchCooperativeKernel((void*)kernel_initialise, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, 0);
+        safeCudaKernelCall((void*)kernel_initialise, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, 0);
     }
 
     cudaDeviceSynchronize();    
