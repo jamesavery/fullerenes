@@ -93,7 +93,7 @@ int main(int ac, char **argv)
       auto t4= system_clock::now(); Ttutte += t4-t3;
       vector<coord3d> X0 = G.zero_order_geometry(); // TODO: Faster, better X0
       auto t5= system_clock::now(); TX0    += t5-t4;
-      isomer_batch.insert_isomer(G,X0);
+      isomer_batch.insert_isomer(G,X0,I+i);
       auto t6= system_clock::now(); Tcopy += t6-t5;
       Polyhedron P0(G,X0);
       string filename = output_dir+"/P0-C"+to_string(N)+"-"+to_string(I+i);
