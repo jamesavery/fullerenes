@@ -4,6 +4,7 @@
 #include <queue>
 #include <map>
 #include <fullerenes/fullerenegraph.hh> 
+#include <fullerenes/polyhedron.hh>
 
 #define GPU_REAL float       
 #define GPU_REAL3 float3
