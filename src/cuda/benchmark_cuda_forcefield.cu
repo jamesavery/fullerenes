@@ -47,17 +47,18 @@ int main(){
     printf("Solving %d fullerenes of size: %d \n", (int)batch_capacity, (int)N);
 
     /** Generates a synthetic load from a single set of fullerene pointers **/
-
     device_real_t* synth_X                = reinterpret_cast<device_real_t*>(synthetic_array<device_real_t>(N, batch_capacity, &X[0]));
     device_node_t* synth_cubic_neighbours = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_capacity, &cubic_neighbours[0]));
     device_node_t* synth_next_on_face     = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_capacity, &next_on_face[0]));
     device_node_t* synth_prev_on_face     = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_capacity, &prev_on_face[0]));
     uint8_t* synth_face_right             = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_capacity, &face_right[0]));
 
+
+
     for (size_t i = 0; i < batch_capacity; i++)
     {
       int offset = i*N*3;
-      kernel.insert_isomer(synth_X + offset, synth_cubic_neighbours + offset, synth_next_on_face + offset, synth_prev_on_face + offset, synth_face_right + offset);
+      kernel.insert_isomer(synth_X + offset, synth_cubic_neighbours + offset, synth_next_on_face + offset, synth_prev_on_face + offset, synth_face_right + offset, i);
       
     }
     
@@ -71,9 +72,10 @@ int main(){
     kernel.check_batch();
     kernel.optimize_batch(N*1);
     kernel.check_batch();
-    kernel.optimize_batch(N*1);
-    kernel.check_batch();
     //kernel.to_file(0);
     //kernel.batch_statistics_to_file();
-    //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(kernel.h_graph.X),N,0);
+    for (auto i : kernel.isomer_energies){
+        std::cout << i.first << " | " << i.second << "\n";
+    }
+    
 }
