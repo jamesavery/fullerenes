@@ -146,6 +146,7 @@ public:
   void clear_batch(){isomer_number+=batch_size; batch_size=0;} //Clears batch, this is required after every batch is finished, effectively resets the position of pointer to GPU memory
   void to_file(size_t ID_in_batch);   //Reads and dumps all graph information, cartesian coordinates and harmonic constants to files.
   void batch_statistics_to_file();
+  void IO();
 
   IsomerspaceForcefield(const size_t N); //Simple constructor allocates memory for structs on device and host call this once at the beginning of program, 
                                           //also serves to initialize the cuda default context, which would otherwise be destroyed and recreated every time memory is freed and reallocated.
@@ -178,8 +179,8 @@ protected:
   IsomerBatch* h_output_buffer;   //Host-side buffer containing finished isomers.
   IsomerBatch* h_input_buffer;    
 
-  IsomerBatch* d_graph;           //GPU container for graph information and X0.                 Dimensions: N x M x 3
-  IsomerBatch* h_graph;           //Host buffer for graph information and X0.                   Dimensions: N x M x 3
+  IsomerBatch* d_batch;           //GPU container for graph information and X0.                 Dimensions: N x M x 3
+  IsomerBatch* h_batch;           //Host buffer for graph information and X0.                   Dimensions: N x M x 3
 
   InternalCoordinates* d_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
   InternalCoordinates* h_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
