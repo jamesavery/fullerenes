@@ -15,7 +15,7 @@ void IsomerspaceForcefield::GenericStruct::allocate(IsomerspaceForcefield::Gener
         G.batch_size  = batch_size; 
         G.N           = N; 
         size_t num_elements = N*batch_size;
-        if (buffer_type == device_buffer){
+        if (buffer_type == DEVICE_BUFFER){
             for (size_t i = 0; i < G.pointers.size(); i++) {
                 cudaMalloc(get<1>(G.pointers[i]), num_elements* get<2>(G.pointers[i])); 
             }
@@ -31,7 +31,7 @@ void IsomerspaceForcefield::GenericStruct::allocate(IsomerspaceForcefield::Gener
 
 void IsomerspaceForcefield::GenericStruct::free(IsomerspaceForcefield::GenericStruct& G){
     if(G.allocated){
-        if (G.buffer_type == device_buffer){    
+        if (G.buffer_type == DEVICE_BUFFER){    
             for (size_t i = 0; i < G.pointers.size(); i++) {
                 cudaFree(*get<1>(G.pointers[i]));
             }
@@ -44,14 +44,24 @@ void IsomerspaceForcefield::GenericStruct::free(IsomerspaceForcefield::GenericSt
         G.allocated = false;
     }
 }
+
 void IsomerspaceForcefield::GenericStruct::copy(IsomerspaceForcefield::GenericStruct& destination, const IsomerspaceForcefield::GenericStruct& source){
+    if(source.batch_size > 0){
     for (size_t i = 0; i < destination.pointers.size(); i++)
     {
-        cudaMemcpy(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*source.N*source.batch_size, cudaMemcpyKind((source.buffer_type+1) + (source.buffer_type + destination.buffer_type)/2));
+        cudaMemcpy(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*source.N*source.batch_size, cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type));
+    }
+    }
+    else{
+        std::cout << "WARNING: Call to copy made for 0 isomers \n";
     }
     printLastCudaError("Failed to copy struct");
 }
 
+void operator <<= (IsomerspaceForcefield::IsomerBatch& a, const IsomerspaceForcefield::IsomerBatch& b){
+    IsomerspaceForcefield::GenericStruct::copy(a,b);
+    IsomerspaceForcefield::GenericStruct::copy(a.stats,b.stats);
+}
 
 //Pentagons = 0
 //Hexagons = 1
@@ -79,7 +89,7 @@ struct NodeGraph{
         neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 
 
-    __device__ NodeGraph(const IsomerspaceForcefield::IsomerspaceGraph& G):  neighbours(MAKE_NODE3(G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
+    __device__ NodeGraph(const IsomerspaceForcefield::IsomerBatch& G):  neighbours(MAKE_NODE3(G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
                                                                         next_on_face(MAKE_NODE3(G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
                                                                         prev_on_face(MAKE_NODE3(G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])){
 
@@ -107,12 +117,10 @@ struct Constants{
         return f1*4 + f2*2 + f3;
     }
 
-    __device__ Constants(const IsomerspaceForcefield::IsomerspaceGraph& G){
+    __device__ Constants(const IsomerspaceForcefield::IsomerBatch& G){
         //Set pointers to start of fullerene.
         size_t offset = blockDim.x*blockIdx.x;
         device_node_t* neighbours = G.neighbours + offset*3;
-        device_node_t* next_on_face = G.next_on_face + offset*3; 
-        device_node_t* prev_on_face = G.prev_on_face + offset*3; 
         uint8_t* face_right = G.face_right + offset*3;
 
         //       m    p

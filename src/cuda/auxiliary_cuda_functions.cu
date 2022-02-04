@@ -43,6 +43,21 @@ __device__ void pointerswap(T **r, T **s)
     return;
 }
 
+
+__host__ cudaError_t safeCudaKernelCall(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem){
+    if (gridDim.x > 0 && gridDim.y > 0 && gridDim.z > 0 && blockDim.x > 0 && blockDim.y > 0 && blockDim.z > 0)
+    {
+        return cudaLaunchCooperativeKernel(func,gridDim,blockDim,args,sharedMem);
+    }
+    else
+    {
+        std::cout << "WARNING: Attempted to launch kernel with 1 or more dimensions <= 0 \n";
+        return cudaErrorInvalidValue;
+    }
+    
+}
+
+
 #if REDUCTION_METHOD==0
     __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
         sdata[threadIdx.x] = data;

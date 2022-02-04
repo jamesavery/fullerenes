@@ -134,7 +134,7 @@ __host__ __device__ void print_coord(const bhalf4& ab){
 #endif
 /** FLOAT OPERATIONS **/
 
-INLINE float3 coord3d_a_to_coord3d(const float4& b) { make_float3(b.x, b.y, b.z);}
+INLINE float3 coord3d_a_to_coord3d(const float4& b) { return make_float3(b.x, b.y, b.z); }
 INLINE float3 operator-(const float3& a)                 { return make_float3(-a.x, -a.y, -a.z);  }
 INLINE float3 operator-(const float3& a, const float3& b){ return make_float3(a.x-b.x, a.y-b.y, a.z-b.z);  }
 INLINE float3 operator+(const float3& a, const float3& b){ return make_float3(a.x+b.x, a.y+b.y, a.z+b.z);  }
