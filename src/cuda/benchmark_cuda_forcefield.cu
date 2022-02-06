@@ -58,7 +58,7 @@ int main(){
     for (size_t i = 0; i < batch_capacity; i++)
     {
       int offset = i*N*3;
-      kernel.insert_isomer(synth_X + offset, synth_cubic_neighbours + offset, synth_next_on_face + offset, synth_prev_on_face + offset, synth_face_right + offset, i);
+      //kernel.insert_isomer(synth_X + offset, synth_cubic_neighbours + offset, synth_next_on_face + offset, synth_prev_on_face + offset, synth_face_right + offset, i);
       
     }
     
@@ -75,7 +75,9 @@ int main(){
     //kernel.to_file(0);
     //kernel.batch_statistics_to_file();
     for (auto i : kernel.isomer_energies){
-        std::cout << i.first << " | " << i.second << "\n";
+      device_real_t energy; IsomerspaceForcefield::IsomerStatus status; size_t iterations;
+      std::cout << i.first << energy << status << iterations << std::endl;
+
     }
     
 }
