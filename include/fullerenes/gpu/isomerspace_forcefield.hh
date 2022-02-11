@@ -23,7 +23,7 @@ public:
   typedef GPU_REAL device_real_t;
   typedef uint16_t device_node_t;
   enum BufferType   {HOST_BUFFER, DEVICE_BUFFER};
-  enum IsomerStatus {CONVERGED, NOT_CONVERGED, FAILED};
+  enum IsomerStatus {CONVERGED, FAILED, NOT_CONVERGED, EMPTY};
 
   struct GenericStruct{
     bool allocated = false;
@@ -109,8 +109,6 @@ public:
     void copy_to_gpu(const IsomerBatch& G);
   }; 
 
-
-
   struct InternalCoordinates : GenericStruct{
     device_real_t* bonds;             
     device_real_t* angles;
@@ -128,11 +126,13 @@ public:
     
     static void copy(InternalCoordinates& target, const InternalCoordinates& source);
     InternalCoordinates(){set_pointers(pointers);}
+
+    
   };
 
   size_t get_batch_capacity(const size_t N); //Uses Cuda API calls to determine the amount of fullerenes of a given size N, that can be optimized simultaneously.
   size_t get_batch_size()const{return batch_size;}
-  void insert_isomer(const FullereneGraph& G,  const vector<coord3d> &X0, const size_t ID);  //Essentially adapter pattern converting FullereneGraph objects into 1D arrays and inserting them into an IsomerBatch. 
+  void insert_isomer(const Polyhedron& P, const size_t ID);  //Essentially adapter pattern converting FullereneGraph objects into 1D arrays and inserting them into an IsomerBatch. 
   void insert_isomer(const device_real_t* X0, const device_node_t* cubic_neighbours, const device_node_t* next_on_face, const device_node_t* prev_on_face, const uint8_t* face_right, const size_t ID);
   void insert_isomer_batch(const IsomerBatch& G);                      //Inserts an entire batch, used at the moment for inserting synthetic loads, 
                                                                             //could be used in the future for more efficient transfer from CPU to GPU.
@@ -143,23 +143,28 @@ public:
   void get_cartesian_coordinates(device_real_t* X) const;                                                     //Populate target buffer (CPU) with cartesian coordiantes from isomers on GPU.
   void get_internal_coordinates(device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals); //Populate target buffers (CPU) with internal coordinates from isomers on GPU.
   
-  void clear_batch(){isomer_number+=batch_size; batch_size=0;} //Clears batch, this is required after every batch is finished, effectively resets the position of pointer to GPU memory
+  void clear_batch(){batch_size=0;} //Clears batch, this is required after every batch is finished, effectively resets the position of pointer to GPU memory
   void to_file(size_t ID_in_batch);   //Reads and dumps all graph information, cartesian coordinates and harmonic constants to files.
   void batch_statistics_to_file();
+  size_t get_converged_count()const{return converged_count;};
+  size_t get_failed_count()const{return failed_count;}
+  void IO();
 
   IsomerspaceForcefield(const size_t N); //Simple constructor allocates memory for structs on device and host call this once at the beginning of program, 
                                           //also serves to initialize the cuda default context, which would otherwise be destroyed and recreated every time memory is freed and reallocated.
   ~IsomerspaceForcefield();              //Destructor, calls free and delete on GPU and CPU buffers respectively.
 
-  std::map<device_node_t, device_real_t> isomer_energies;
+  std::map<device_node_t,std::tuple< device_real_t, IsomerStatus, size_t>> isomer_energies;
   std::queue<std::pair<device_node_t, Polyhedron>> output_queue;
+  std::queue<std::pair<device_node_t, Polyhedron>> insert_queue;
 
 protected:
   size_t N = 0;                           //Size of each isomer, #of carbon atoms.
   size_t batch_capacity = 0;              //Number of fullerenes that will fit on the GPU concurrently.
   size_t batch_size = 0;                  //Current number of fullerenes copied to GPU.
   size_t shared_memory_bytes = 0;         //Amount of L1 cache to allocate per block.
-  size_t isomer_number = 0;               //Isomer number of the first fullerene in batch.
+  size_t converged_count = 0;             //Total number of converged isomers optimized by this object.
+  size_t failed_count = 0;                //Total number of failed isomers optimized by this object.
 
   void* cuda_streams;
   int device_count;
@@ -169,7 +174,6 @@ protected:
 
   int** pop_indices;
   std::queue<int>* push_queues;
-  std::queue<std::pair<device_node_t, Polyhedron>> insert_queue;
 
   int* push_index_counter;
 
@@ -178,8 +182,8 @@ protected:
   IsomerBatch* h_output_buffer;   //Host-side buffer containing finished isomers.
   IsomerBatch* h_input_buffer;    
 
-  IsomerBatch* d_graph;           //GPU container for graph information and X0.                 Dimensions: N x M x 3
-  IsomerBatch* h_graph;           //Host buffer for graph information and X0.                   Dimensions: N x M x 3
+  IsomerBatch* d_batch;           //GPU container for graph information and X0.                 Dimensions: N x M x 3
+  IsomerBatch* h_batch;           //Host buffer for graph information and X0.                   Dimensions: N x M x 3
 
   InternalCoordinates* d_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
   InternalCoordinates* h_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
