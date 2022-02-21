@@ -1,6 +1,5 @@
 #include "isomerspace_forcefield.cu"
 #include "coord3d.cu"
-#include "C60ih.cu"
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 
 #include <unistd.h>
@@ -38,29 +37,33 @@ int main(){
      * However the API call cudaOccupancyMaxActiveBlocksPerMultiprocessor() should be used.
      * 
     **/
-    const size_t N = 60;
+    const size_t N = 256;
 
 
     //size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
-    size_t batch_size = IsomerspaceForcefield::get_batch_capacity(N);
-    printf("Solving %d fullerenes of size: %d \n", (int)batch_size, (int)N);
-
-    /** Generates a synthetic load from a single set of fullerene pointers **/
-
-    device_real_t* synth_X                = reinterpret_cast<device_real_t*>(synthetic_array<device_real_t>(N, batch_size, &X[0]));
-    device_node_t* synth_cubic_neighbours = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_size, &cubic_neighbours[0]));
-    device_node_t* synth_next_on_face     = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_size, &next_on_face[0]));
-    device_node_t* synth_prev_on_face     = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_size, &prev_on_face[0]));
-    uint8_t* synth_face_right             = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_size, &face_right[0]));
-
-    IsomerspaceForcefield::IsomerspaceGraph graph = IsomerspaceForcefield::IsomerspaceGraph(synth_X,synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
-    graph.N = N; graph.batch_size = batch_size; graph.buffer_type = IsomerspaceForcefield::host_buffer;
     IsomerspaceForcefield kernel = IsomerspaceForcefield(N);
+    size_t batch_capacity = kernel.get_batch_capacity();
+    printf("Solving %d fullerenes of size: %d \n", (int)batch_capacity, (int)N);
 
-    kernel.insert_isomer_batch(graph);
+    //TODO find a better way to make a batch of fullerenes and benchmark the optimizer. Or simply use isomerspace-optimize.
+
+    for (size_t i = 0; i < batch_capacity; i++)
+    {
+      int offset = i*N*3;
+      //kernel.insert_isomer(synth_X + offset, synth_cubic_neighbours + offset, synth_next_on_face + offset, synth_prev_on_face + offset, synth_face_right + offset, i);
+      
+    }
+    
+
+    //IsomerspaceForcefield::IsomerspaceGraph graph = IsomerspaceForcefield::IsomerspaceGraph(synth_X,synth_cubic_neighbours, synth_next_on_face, synth_prev_on_face, synth_face_right);
+    //graph.N = N; graph.batch_size = batch_size; graph.buffer_type = IsomerspaceForcefield::HOST_BUFFER;
+    
+
+
     kernel.optimize_batch(N*3);
     kernel.check_batch();
-    kernel.to_file(0);
-    kernel.batch_statistics_to_file();
-    //IsomerspaceForcefield::print_array(reinterpret_cast<IsomerspaceForcefield::coord3d*>(kernel.h_graph.X),N,0);
+    kernel.optimize_batch(N*1);
+    kernel.check_batch();
+    //kernel.to_file(0);
+    //kernel.batch_statistics_to_file();
 }

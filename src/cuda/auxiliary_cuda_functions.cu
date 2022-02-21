@@ -1,3 +1,4 @@
+#pragma once
 #include "coord3d.cu"
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
@@ -6,6 +7,8 @@
 #include<iostream>
 #include <fstream>
 
+#ifndef AUXILIARY_CUDA_FUN
+#define AUXILIARY_CUDA_FUN
 #define __HD__ __device__ __host__ 
 namespace cg = cooperative_groups;
 
@@ -42,6 +45,21 @@ __device__ void pointerswap(T **r, T **s)
     *s = pSwap;
     return;
 }
+
+
+__host__ cudaError_t safeCudaKernelCall(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem){
+    if (gridDim.x > 0 && gridDim.y > 0 && gridDim.z > 0 && blockDim.x > 0 && blockDim.y > 0 && blockDim.z > 0)
+    {
+        return cudaLaunchCooperativeKernel(func,gridDim,blockDim,args,sharedMem);
+    }
+    else
+    {
+        std::cout << "WARNING: Attempted to launch kernel with 1 or more dimensions <= 0 \n";
+        return cudaErrorInvalidValue;
+    }
+    
+}
+
 
 #if REDUCTION_METHOD==0
     __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
@@ -150,40 +168,47 @@ __device__ half reduction(half *sdata){
 
 
 __HD__ void print(const device_coord3d& ab){
-    printf("[%.8e, %.8e, %.8e]\n",ab.x,ab.y,ab.z);
+    printf("[%.6f,%.6f,%.6f]",ab.x,ab.y,ab.z);
 }
 __device__ void print(const half4& ab){
     print_coord(ab);
 }
 
 __device__ void print(const half2& ab){
-    printf("[%.16e, %.16e] \n", __half2float(ab.x), __half2float(ab.y));
+    printf("[%.16e,%.16e] \n", __half2float(ab.x), __half2float(ab.y));
 }
 
 __HD__ void print(device_real_t a){
-    printf("[%.16e]\n", a);
+    printf("[%.16e]", a);
 }
 
 __HD__ void print(bool b){
-    printf("[%d]\n",int(b));
+    printf("[%d]",int(b));
 }
 
 __HD__ void print(int a){
-    printf("[%d]\n",a);
+    printf("[%d]",a);
+}
+
+__device__ void print(const char* a){
+    printf(a);
 }
 
 __device__ void print(const ushort3& a){
-    printf("[%d, %d, %d]\n",a.x,a.y,a.z);
+    printf("[%d,%d,%d]",a.x,a.y,a.z);
 }
 
 __device__ void print(const uchar3& a){
-    printf("[%d, %d, %d]\n",a.x,a.y,a.z);
+    printf("[%d,%d,%d]",a.x,a.y,a.z);
 }
 
 __device__ void print(const uint3& a){
-    printf("[%d, %d, %d]\n",a.x,a.y,a.z);
+    printf("[%d,%d,%d]",a.x,a.y,a.z);
 }
 
+__device__ void print(const device_coord2d& a){
+    printf("[%.6f,%.6f]",a.x,a.y);
+}
 template <typename T>
 __device__ void print_single(T data){
     if (threadIdx.x + blockIdx.x == 0) {
@@ -197,7 +222,7 @@ __device__ void sequential_print(T* data){
     {
         if (threadIdx.x == i)
         {
-            print(data[i]);
+            print(data[i]); printf(",");
         }
         cg::sync(cg::this_thread_block());
     }
@@ -207,14 +232,23 @@ template <typename T>
 __device__ void sequential_print(T data, size_t fullerene_id){
     if (blockIdx.x == fullerene_id)
     {
+    if (threadIdx.x == 0) printf("[");
+    cg::sync(cg::this_thread_block());
     for (size_t i = 0; i < blockDim.x; i++)
     {
         if (threadIdx.x == i)
-        {
-            print(data);
+        {   
+            if (i != blockDim.x-1)
+            {
+                print(data); printf(",");
+            } else{
+                print(data);
+            }
         }
         cg::sync(cg::this_thread_block());
     }
+    if (threadIdx.x == 0) printf("]\n");
+    cg::sync(cg::this_thread_block());
     }
 }
 
@@ -241,14 +275,25 @@ template <typename T>
 __device__ void sequential_print(T* data, size_t fullerene_id){
     if (blockIdx.x == fullerene_id)
     {
+    if (threadIdx.x == 0) printf("[");
+    cg::sync(cg::this_thread_block());
     for (size_t i = 0; i < blockDim.x; i++)
-    {
-        if (threadIdx.x == i)
-        {
-            print(data[i]);
+    {   
+
+            if (threadIdx.x == i)
+            {
+            if (i != blockDim.x-1)
+            {
+                print(data[i]); printf(",");
+            } else{
+                print(data[i]);
+            }
+
         }
         cg::sync(cg::this_thread_block());
     }
+    if(threadIdx.x == 0) printf("]\n");
+    cg::sync(cg::this_thread_block());
     }
 }
 
@@ -300,3 +345,5 @@ __device__ device_real_t global_reduction(device_real_t *sdata, device_real_t *g
     GRID_SYNC
     return sum;
 }
+
+#endif

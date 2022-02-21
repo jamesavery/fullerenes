@@ -1,57 +1,12 @@
 #pragma once
 #include "coord3d.cu"
-#include "fullerenes/gpu/isomerspace_forcefield.hh"
+#include "fullerenes/gpu/isomerspace_kernel.hh"
 #include <exception>
 
-
-typedef IsomerspaceForcefield::device_real_t device_real_t;
-typedef IsomerspaceForcefield::device_node_t device_node_t;
+typedef IsomerspaceKernel<Polyhedron>::device_real_t device_real_t;
+typedef IsomerspaceKernel<Polyhedron>::device_node_t device_node_t;
 typedef GPU_REAL3 device_coord3d;
 typedef GPU_NODE3 device_node3;
-
-void IsomerspaceForcefield::GenericStruct::allocate(IsomerspaceForcefield::GenericStruct& G, size_t N, const size_t batch_size, const BufferType buffer_type){
-    if((!G.allocated)){
-        G.buffer_type = buffer_type;
-        G.batch_size  = batch_size; 
-        G.N           = N; 
-        size_t num_elements = N*batch_size;
-        if (buffer_type == device_buffer){
-            for (size_t i = 0; i < G.pointers.size(); i++) {
-                cudaMalloc(get<1>(G.pointers[i]), num_elements* get<2>(G.pointers[i])); 
-            }
-            printLastCudaError("Failed to allocate device struct");
-        }else{
-            for (size_t i = 0; i < G.pointers.size(); i++) {
-                *get<1>(G.pointers[i])= malloc(num_elements* get<2>(G.pointers[i])); 
-            }
-        }        
-        G.allocated = true;
-    }
-}
-
-void IsomerspaceForcefield::GenericStruct::free(IsomerspaceForcefield::GenericStruct& G){
-    if(G.allocated){
-        if (G.buffer_type == device_buffer){    
-            for (size_t i = 0; i < G.pointers.size(); i++) {
-                cudaFree(*get<1>(G.pointers[i]));
-            }
-            printLastCudaError("Failed to free device struct"); 
-        } else{
-            for (size_t i = 0; i < G.pointers.size(); i++) {
-                std::free(*get<1>(G.pointers[i])); 
-            }
-        }
-        G.allocated = false;
-    }
-}
-void IsomerspaceForcefield::GenericStruct::copy(IsomerspaceForcefield::GenericStruct& destination, const IsomerspaceForcefield::GenericStruct& source){
-    for (size_t i = 0; i < destination.pointers.size(); i++)
-    {
-        cudaMemcpy(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*source.N*source.batch_size, cudaMemcpyKind((source.buffer_type+1) + (source.buffer_type + destination.buffer_type)/2));
-    }
-    printLastCudaError("Failed to copy struct");
-}
-
 
 //Pentagons = 0
 //Hexagons = 1
@@ -79,7 +34,7 @@ struct NodeGraph{
         neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 
 
-    __device__ NodeGraph(const IsomerspaceForcefield::IsomerspaceGraph& G):  neighbours(MAKE_NODE3(G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
+    __device__ NodeGraph(const IsomerspaceForcefield::IsomerBatch& G):  neighbours(MAKE_NODE3(G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
                                                                         next_on_face(MAKE_NODE3(G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
                                                                         prev_on_face(MAKE_NODE3(G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])){
 
@@ -107,12 +62,10 @@ struct Constants{
         return f1*4 + f2*2 + f3;
     }
 
-    __device__ Constants(const IsomerspaceForcefield::IsomerspaceGraph& G){
+    __device__ Constants(const IsomerspaceForcefield::IsomerBatch& G){
         //Set pointers to start of fullerene.
         size_t offset = blockDim.x*blockIdx.x;
         device_node_t* neighbours = G.neighbours + offset*3;
-        device_node_t* next_on_face = G.next_on_face + offset*3; 
-        device_node_t* prev_on_face = G.prev_on_face + offset*3; 
         uint8_t* face_right = G.face_right + offset*3;
 
         //       m    p

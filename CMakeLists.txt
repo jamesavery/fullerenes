@@ -49,7 +49,7 @@ include_directories(${CMAKE_BINARY_DIR}/include/)
 # Fortran compiler flags
 set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O2 -m64 -mcmodel=medium")
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O2 -m64")
+set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O2 -m64 -pthread")
 
 add_subdirectory(src/c++)
 add_subdirectory(src/fortran)
@@ -62,7 +62,8 @@ add_subdirectory(programs)
 
 if(CMAKE_CUDA_COMPILER)
   message("CUDA found: " ${CMAKE_CUDA_COMPILER} ".")
-  set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=64 --resource-usage -Xptxas -O3 --expt-relaxed-constexpr -O3 -gencode=arch=compute_61,code=compute_61 -I /opt/nvidia/hpc_sdk/Linux_x86_64/21.2/cuda/11.0/targets/x86_64-linux/include/ -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
+#set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=64 --resource-usage -Xptxas --expt-relaxed-constexpr -I /opt/nvidia/hpc_sdk/Linux_x86_64/21.2/cuda/11.0/targets/x86_64-linux/include/ -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
+  set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=64 --resource-usage -gencode=arch=compute_60,code=compute_60 -I /opt/nvidia/hpc_sdk/Linux_x86_64/21.2/cuda/11.0/targets/x86_64-linux/include/ -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
   )
   
   add_subdirectory(src/cuda)
