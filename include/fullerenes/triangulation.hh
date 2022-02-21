@@ -36,7 +36,7 @@ public:
   
   PlanarGraph dual_graph() const;
   vector<face_t> cubic_faces() const;
-  unordered_map<dedge_t,dedge_t> arc_translation(const PlanarGraph& cubic) const;
+  unordered_map<dedge_t,dedge_t> arc_translation() const;
   
   size_t max_degree() const {
     size_t max_degree = 0;
