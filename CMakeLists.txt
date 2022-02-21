@@ -49,7 +49,7 @@ include_directories(${CMAKE_BINARY_DIR}/include/)
 # Fortran compiler flags
 set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O2 -m64 -mcmodel=medium")
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O2 -m64")
+set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O2 -m64 -pthread")
 
 add_subdirectory(src/c++)
 add_subdirectory(src/fortran)
