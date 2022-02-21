@@ -78,10 +78,14 @@ public:
   vector<vector<node_t>> equivalence_classes(const vector<Permutation>& G) const;
   
   void initialize(){
-    vector<dedge_t>   dedge_set =   directed_edges();
-    vector<edge_t> edge_set = undirected_edges(); //TODO: Do this another way
-    for(dedge_t e: dedge_set) dedge_id.insert(e);
-    for(edge_t e:   edge_set)  edge_id.insert(e);
+    for(node_t u=0;u<N;u++){
+      const vector<node_t> &nu = neighbours[u];
+      for(int i=0;i<nu.size();i++){
+	const node_t v = nu[i];
+	dedge_id.insert({u,v});
+	edge_id.insert(edge_t{u,v});
+      }
+    }
 
     G = permutation_representation();
     Gedge  = edge_permutation(G);

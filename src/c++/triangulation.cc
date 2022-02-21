@@ -55,6 +55,7 @@ vector<tri_t> Triangulation::compute_faces() const
 }
 
 
+
 void Triangulation::orient_neighbours()
 {
   map<dedge_t,node_t> next;
@@ -113,15 +114,80 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
   return triangles;
 }
 
+/*
+// Build precalculated lookup tables
+//   1. cubic arc -> dual arc   (transverse arc a,i -> u,j)     : Nx3     node_t,uint8_t 
+//   2. dual arc  -> cubic arc  (transverse arc u,j -> a,i)     : NfxFmax node_t,uint8_t 
+//
+// TODO: * Resolve function overlap with cubic_faces() and translate_arcs. This produces faster data structures.
+//       * Gather precalculated tables into one data structure (separate from graph itself)
+void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_graph,
+					  vector<pair<node_t,uint8_t>>& carc_to_darc,
+					  vector<pair<node_t,uint8_t>>& darc_to_carc,
+					  vector<uint8_t>&              degrees,
+					  int Fmax = 6
+					  ) const
+{
+  size_t Nf = N;		// To remind ourselves that this is the number of faces
+  size_t Nc = 2*(N-2);		// This function assumes the triangulation is the dual of a cubic graph 
+
+  assert(triangles.size() == Nc); // Make sure triangles array is initialized before calling
+  assert(is_oriented());	  // We don't bother with non-oriented surfaces
+
+  if(Fmax<1) Fmax = max_degree(); // Calculate fmax
+  
+  carc_to_darc.resize(Nc*3);
+  darc_to_carc.resize(Nf*Fmax);
+  darc_to_cnode.resize(Nf*Fmax);
+  degrees.resize(Nf);
+  
+  IDCounter tid(triangles);	  // Look up cubic node id by triangle  
+  
+  for(node_t u=0;u<Nf;u++){
+    const vector<node_t>& nu(neighbours[u]);
+    degrees[u] = nu.size();
+    
+    for(int j=0;j<nu.size();j++){
+      const node_t& v  = nu[j];    // Process triangulation arc f->g
+        node_t wa = next_on_face(u,v); // Third triangle node in CW direction
+        node_t wb = next_on_face(v,u); // Third triangle node in CCW direction
+
+	// If either hl or hr fails, triangulation data is corrupted.
+	if((wa<0) || (wb<0)){
+	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
+	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",v,u,u,v);
+	  printf("\tneibhours[%d] = ",u); cout << neighbours[u] << endl;
+	  printf("\tneibhours[%d] = ",v); cout << neighbours[v] << endl;	  
+	  assert((wa<0) || (wb<0));
+	}
+
+	tri_t t1 = {u,g,CW}, t2 = {g,u,CCW};
+
+	node_t a = tid(t1.sorted()), b = tid(t2.sorted);
+	
+	darc_to_cnode[u*Fmax + j] = u; // Triangle/cubic node defined by {u,g,CW}
+
+	// The transverse arc to u->g in the cubic graph is u->v.
+	// Now we want to find the index i such that v = cubic_graph.neighbours[u][i].
+	int i = cubic_graph.dedge_ix({u,v});
+	darc_to_carc[u*Fmax + j] = {a,i};
+	carc_to_darc[a*3    + i] = {u,j};
+      }
+    }
+  }
+}
+*/
+
 // TODO: dedge_t -> arc_t everywhere
 //       dedge   -> arc   everywhere
-unordered_map<dedge_t,dedge_t> Triangulation::arc_translation(const PlanarGraph& cubic) const
+//       cubic nodes: a,b,c,...
+//       dual  nodes: u,v,w,...
+unordered_map<dedge_t,dedge_t> Triangulation::arc_translation() const
 {
   // TODO: Common metadata, calculate once
   IDCounter<tri_t> tri_numbers;
   unordered_map<dedge_t,dedge_t> arc_translate(triangles.size()*3);
 
-  //assert(triangles.size() == (N-2)*2);
   if(triangles.size() != (N-2)*2){
     cout << "triangles = " << triangles << endl;
     assert(triangles.size() == (N-2)*2);
@@ -1116,8 +1182,14 @@ Triangulation Triangulation::sort_nodes() const
 
   sort(degrees.begin(), degrees.end());
 
-  vector<int> newname(N);
-  for(int u=0;u<N;u++) newname[degrees[u].second] = u;
+  vector<int> newname(N), oldname(N);
+
+  int degree, u_old;
+  for(node_t u_new=0;u_new<N;u_new++){
+    tie(degree,u_old) = degrees[u_new];
+    newname[u_old] = u_new;
+    oldname[u_new] = u_old;
+  }
 
   neighbours_t new_neighbours(N);
   for(int u=0;u<N;u++)

@@ -26,11 +26,11 @@ int main(int ac, char **av)
   string spiral_name = av[1];
   spiral_nomenclature fsn(spiral_name);
   Triangulation t(fsn);
-  t = t.sort_nodes();
+  //  t = t.sort_nodes();
 
   if(ac>3){
     int k = strtol(av[2],0,0),
-      l = strtol(av[3],0,0);
+        l = strtol(av[3],0,0);
 
     t = t.GCtransform(k,l);
     general_spiral spiral = t.get_general_spiral();
@@ -68,7 +68,7 @@ int main(int ac, char **av)
   
   for(int f=0,p=0,h=0;f<Nf;f++){
     int df = faces[f].size(), dd = t.neighbours[f].size();
-    if(f<12) assert(dd==5);
+    //    if(f<12) assert(dd==5); // NEJ! MUST BE IN SPIRAL ORDER, OR SYMMETRY CALC BREAKS
 
     if(df == 5) pentagons[p++] = faces[f];
     if(df == 6) hexagons[h++] = faces[f];    
@@ -92,15 +92,16 @@ int main(int ac, char **av)
   Polyhedron T(t,dual_coords);
   Polyhedron::to_file(T,"dual.mol2");  
   
-  //Symmetry S(fsn.spiral_code);
-  //  Symmetry S(t);
+  //  Symmetry S(fsn.spiral_code);
+  Symmetry S(t);
   
   cerr << "from numpy import array, nan\n\n";
   cerr << "name = \"" << fsn <<"\";\n";
-  //cerr << "# Symmetry information\n";
-  //  cerr << "point_group = " << S.point_group() << "\n;";
-  //cerr << "equivalent_nodes = " << S.equivalence_classes(S.Gtri) << ";\n";
-  //cerr << "equivalent_faces = " << S.equivalence_classes(S.G) << ";\n";  
+  cerr << "# Symmetry information\n";
+  cerr << "point_group = \"" << S.point_group() << "\";\n";
+  cerr << "equivalent_nodes = " << S.equivalence_classes(S.Gtri) << ";\n";
+  cerr << "equivalent_faces = " << S.equivalence_classes(S.G) << ";\n";
+  //  cerr << "equivalent_edges = " << S.equivalence_classes(S.Gedge) << ";\n";    // TODO: Needs to be arcs in correct order
   cerr << "# Cubic graph, its faces, 3D embedding, and 2D Tutte-embedding\n";
   cerr << "cubic_neighbours  = array(" << g.neighbours << ");\n\n";
   cerr << "pentagons    = array(" << pentagons  << ");\n\n"; // TODO
@@ -114,7 +115,7 @@ int main(int ac, char **av)
   cerr << "# Dual graph and its faces\n";
   cerr << "dual_neighbours   = " << t.neighbours << ";\n\n";
   //  cerr << "next_on_tri       = array(" << next_on_tri << ");\n\n";  
-  cerr << "triangles         = array(" << t.compute_faces() << ");\n\n";
+  cerr << "triangles         = array(" << t.triangles << ");\n\n";
   cerr << "dual_points     = array(" << dual_coords << ");\n\n";  
   cerr << "# prev_on_tri is the same as next_on_tri\n";
 
