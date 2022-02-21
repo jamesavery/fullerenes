@@ -1,3 +1,4 @@
+#include <sys/stat.h>
 #include <limits.h>
 #include <chrono>
 #include <iostream>
@@ -31,6 +32,9 @@ int main(int ac, char **argv)
   int IPR               = ac>=4? strtol(argv[3],0,0):0; // Argument 3: Only generate IPR fullerenes?
   int only_nontrivial   = ac>=5? strtol(argv[4],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
   int n_best_candidates = ac>=6? strtol(argv[5],0,0):100; // Argument 5: How many best fullerne candidates do you want to store? 
+
+  // Make sure output directory exists
+  mkdir(output_dir.c_str(),0777);
   
   ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
   IsomerspaceForcefield ff_kernel = IsomerspaceForcefield(N);
