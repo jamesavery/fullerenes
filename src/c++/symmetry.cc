@@ -116,17 +116,36 @@ Permutation Permutation::operator*(const Permutation& q) const {
 //		  SYMMETRY-DETECTION IMPLEMENTATION
 //////////////////////////////////////////////////////////////////////
 vector<Permutation> Symmetry::tri_permutation(const vector<Permutation>& Gf) const {
+  assert(triangles.size() == (N-2)*2); // Triangulation is cubic dual
   vector<Permutation> Gtri(Gf.size(),Permutation(triangles.size()));
   IDCounter<tri_t> tri_id;
     
   for(int i=0;i<triangles.size();i++) tri_id.insert(triangles[i].sorted());
     
-  for(int j=0;j<Gf.size();j++)
+  for(int j=0;j<Gf.size();j++){
+    const Permutation& pi = Gf[j];    
     for(int i=0;i<triangles.size();i++){
-      const tri_t &t(triangles[i]);
-      tri_t tp(Gf[j][t[0]],Gf[j][t[1]],Gf[j][t[2]]);
-      Gtri[j][i] = tri_id(tp.sorted());
+      const tri_t &t  = triangles[i];
+      const tri_t &tp = {pi[t[0]], pi[t[1]], pi[t[2]]}; 
+      
+      int tp_id = tri_id(tp.sorted());
+
+      Gtri[j][i] = tp_id;
+
+      if(tp_id < 0){
+	cout << "SYMMETRY OPERATION DOES NOT MAP TRIANGLE TO EXISTING TRIANGLE.\n";
+	cout << "tp_id = " << tp_id << endl;
+	cout << "pi["<<j<<"] = " << pi << endl;
+	cout << "t = " << t <<endl;
+	cout << "tp = " << tp << endl;
+	cout << "tp.sorted() = " << tp.sorted() << endl;
+
+	cout << "triangles = " << triangles << endl;
+	
+	assert(tp_id >= 0);
+      }
     }
+  }
   return Gtri;
 }
 
@@ -165,21 +184,32 @@ vector<Permutation> Symmetry::permutation_representation() const
   vector<Permutation> pi;
 
   for(node_t u=0;u<N;u++){
-    if(neighbours[u].size() == S0[0]) // u has same degree as vertex 1: possible spiral start
+    if(degree(u) == S0[0]) // u has same degree as vertex 1: possible spiral start
       for(const node_t &v: neighbours[u]){
-	if(neighbours[v].size() == S0[1]){ // v has same degree as vertex 2: still possible spiral start
+	if(degree(v) == S0[1]){ // v has same degree as vertex 2: still possible spiral start
 	  vector<int> spiral,permutation;
 	  jumplist_t  jumps;
 
 	  node_t wCCW = next(u,v), wCW = prev(u,v);
 
-	  if(neighbours[wCCW].size() == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,true,S0,J0))
+	  if(degree(wCCW) == S0[2] && get_spiral_implementation(u,v,wCCW,spiral,jumps,permutation,true,S0,J0)){
+	    // cout << "Found CCW symmetry:\n"
+	    // 	 << S0     << " = \n"
+	    // 	 << spiral << "\n"
+	    // 	 << "pi = " << permutation << "\n";
 	    pi.push_back(permutation);
-	  if(neighbours[wCW ].size() == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,true,S0,J0))
+	  }
+	  if(degree(wCW)  == S0[2] && get_spiral_implementation(u,v,wCW,spiral,jumps,permutation,true,S0,J0)){
+	    // cout << "Found CW symmetry:\n"
+	    // 	 << S0     << " = \n"
+	    // 	 << spiral << "\n"
+	    // 	 << "pi = " << permutation << "\n";
+	    
 	    pi.push_back(permutation);
+	  }
 	}
       }
-  }	    
+  }
   return pi;
 }
 
@@ -197,6 +227,7 @@ vector<int> Symmetry::site_symmetry_counts(const vector<Permutation>& pi) const
     for(int j=1;j<order;j++){ 
       int I = pi[j][i];
       assert(I<M);
+      assert(I>0);
       if(seen[I]) continue;
       seen[I] = true;
       orbit_length++;
