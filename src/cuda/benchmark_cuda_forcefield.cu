@@ -1,6 +1,5 @@
 #include "isomerspace_forcefield.cu"
 #include "coord3d.cu"
-#include "C256ih.cu"
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 
 #include <unistd.h>
@@ -43,17 +42,10 @@ int main(){
 
     //size_t batch_size = IsomerspaceForcefield::computeBatchSize(N);
     IsomerspaceForcefield kernel = IsomerspaceForcefield(N);
-    size_t batch_capacity = kernel.get_batch_capacity(N);
+    size_t batch_capacity = kernel.get_batch_capacity();
     printf("Solving %d fullerenes of size: %d \n", (int)batch_capacity, (int)N);
 
-    /** Generates a synthetic load from a single set of fullerene pointers **/
-    device_real_t* synth_X                = reinterpret_cast<device_real_t*>(synthetic_array<device_real_t>(N, batch_capacity, &X[0]));
-    device_node_t* synth_cubic_neighbours = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_capacity, &cubic_neighbours[0]));
-    device_node_t* synth_next_on_face     = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_capacity, &next_on_face[0]));
-    device_node_t* synth_prev_on_face     = reinterpret_cast<device_node_t*>(synthetic_array<device_node_t>(N, batch_capacity, &prev_on_face[0]));
-    uint8_t* synth_face_right             = reinterpret_cast<uint8_t*>(synthetic_array<uint8_t>(N, batch_capacity, &face_right[0]));
-
-
+    //TODO find a better way to make a batch of fullerenes and benchmark the optimizer. Or simply use isomerspace-optimize.
 
     for (size_t i = 0; i < batch_capacity; i++)
     {
@@ -74,10 +66,4 @@ int main(){
     kernel.check_batch();
     //kernel.to_file(0);
     //kernel.batch_statistics_to_file();
-    for (auto i : kernel.isomer_energies){
-      device_real_t energy; IsomerspaceForcefield::IsomerStatus status; size_t iterations;
-      std::cout << i.first << energy << status << iterations << std::endl;
-
-    }
-    
 }
