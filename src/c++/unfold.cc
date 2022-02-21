@@ -121,7 +121,7 @@ map<dedge_t,Unfolding::dedgecoord_t> Unfolding::unfold(const Triangulation& G, c
    
 
   // The idea is simply to fill out the polygon from known positions. I.e., start with one triangle placed
-  // explicitly, then grow the nfolding from the perimeter, but only placing triangles that are on the interior
+  // explicitly, then grow the unfolding from the perimeter, but only placing triangles that are on the interior
   // of the polygon.
   // This is done in the following way:
   //  A workset 'W' of keeps track of arcs on the perimeter where the corresponding triangle can be placed.
