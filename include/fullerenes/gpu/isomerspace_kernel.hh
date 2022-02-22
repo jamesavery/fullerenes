@@ -5,6 +5,10 @@
 #include <map>
 #include <fullerenes/fullerenegraph.hh> 
 #include <fullerenes/polyhedron.hh>
+#include "cu_array.hh"
+#include "gpudatastruct.hh"
+#include <cuda_runtime.h>
+#include <tuple>
 
 #define GPU_REAL float       
 #define GPU_REAL3 float3
@@ -18,6 +22,7 @@
 #define REDUCTION_METHOD 0
 #define LINESEARCH_METHOD GSS
   
+enum IsomerStatus {CONVERGED, FAILED, NOT_CONVERGED, EMPTY};
 
 template <typename T>
 class IsomerspaceKernel {
@@ -25,20 +30,33 @@ public:
   typedef GPU_REAL device_real_t;
   typedef uint16_t device_node_t;
   
-  enum IsomerStatus {CONVERGED, FAILED, NOT_CONVERGED, EMPTY};
+  struct FullereneBatch : GPUDataStruct
+  {
+    device_node_t* neighbours;
+    device_real_t* X;
+    device_real_t* XYS;
 
+    IsomerStatus* statuses;
+    size_t* IDs;
+    size_t* iterations;
+
+    FullereneBatch(){
+      pointers =   {{"neighbours",(void**)&neighbours, sizeof(device_node_t)*3, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"XYS", (void**)&XYS, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+    }
+  };
+
+  
   size_t get_batch_size()const{return batch_size;}
-  void insert_isomer(const T& P, const size_t ID) {insert_queue.push({ID,P});};  //Pushes P to insert_queue. 
+  void insert_isomer(const T& P, const size_t ID) {insert_queue.push({ID,P});}  //Pushes P to insert_queue. 
   void output_isomer(const size_t idx);                      //Pops the idx'th fullerene from the IsomerBatch to the output_queue.
   
   size_t get_queue_size()const{return insert_queue.size();}
-    
-  void clear_batch(){batch_size=0;} //Clears batch, this is required after every batch is finished, effectively resets the position of pointer to GPU memory
 
   size_t get_batch_capacity();          //Uses Cuda API calls to determine the amount of fullerenes of a given size N, that can be optimized simultaneously.
-  virtual void check_batch() {};                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
-  virtual void update_batch() {};
-  virtual void eject_isomer(size_t i, size_t idx) {};
+  
+  virtual void check_batch() {}                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
+  virtual void update_batch() {}
+  virtual void eject_isomer(size_t i, size_t idx) {}
 
   IsomerspaceKernel(const size_t N, void* kernel); //Simple constructor allocates memory for structs on device and host call this once at the beginning of program, 
                                           //also serves to initialize the cuda default context, which would otherwise be destroyed and recreated every time memory is freed and reallocated.
@@ -57,6 +75,9 @@ protected:
   void* cuda_streams;
   int device_count;
 
+  //h_buffer and d_buffer are mirrors and reflect what will be computed, d_input_batch and d_output_batch exist for linking kernels together in a pipeline. 
+  FullereneBatch h_buffer, d_buffer, d_input_batch, d_output_batch;
+
   //The reason why these are vectors is that we might have mutliple devices (GPUs).
   std::vector<int> device_capacities;
   std::vector<int> batch_sizes;
@@ -65,3 +86,4 @@ protected:
 };
 
 
+ 
