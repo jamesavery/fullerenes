@@ -508,7 +508,7 @@ __global__ void kernel_optimize_batch(IsomerspaceForcefield::IsomerBatch G, cons
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
     
-    if (G.stats.isomer_statuses[blockIdx.x] == IsomerspaceKernel<Polyhedron>::NOT_CONVERGED)
+    if (G.stats.isomer_statuses[blockIdx.x] == NOT_CONVERGED)
     {
         real_t* base_pointer        = smem + Block_Size_Pow_2;
         size_t offset               = blockIdx.x * blockDim.x;
@@ -527,7 +527,9 @@ __global__ void kernel_optimize_batch(IsomerspaceForcefield::IsomerBatch G, cons
         sX[node_id] = X[node_id];   //Copy cartesian coordinates from DRAM to L1 Cache.
         X           = &sX[0];       //Switch coordinate pointer from DRAM to L1 Cache.
 
+
         //Pre-compute force constants and store in registers.
+
         Constants constants = Constants(G);
         NodeGraph nodeG     = NodeGraph(G);
         //NodeGraph bookkeeping = NodeGraph(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
@@ -581,12 +583,12 @@ __global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerBatch G, de
     //real_t num_converged    = global_reduction(smem,global_reduction_array,converged,(threadIdx.x==0) && (G.stats.isomer_statuses[blockIdx.x] == IsomerspaceForcefield::NOT_CONVERGED));
     //if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
 
-    if(threadIdx.x == 0 && G.stats.isomer_statuses[blockIdx.x] != IsomerspaceKernel<Polyhedron>::EMPTY){
+    if(threadIdx.x == 0 && G.stats.isomer_statuses[blockIdx.x] != EMPTY){
         if (converged)
         {
-            G.stats.isomer_statuses[blockIdx.x] = IsomerspaceKernel<Polyhedron>::CONVERGED;
+            G.stats.isomer_statuses[blockIdx.x] = CONVERGED;
         } else if (G.stats.iteration_counts[blockIdx.x] >= 10*blockDim.x) {
-            G.stats.isomer_statuses[blockIdx.x] = IsomerspaceKernel<Polyhedron>::FAILED;
+            G.stats.isomer_statuses[blockIdx.x] = FAILED;
         }
     }
 }
@@ -684,7 +686,6 @@ void IsomerspaceForcefield::optimize_batch(const size_t iterations){
 
 IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel::IsomerspaceKernel(N, (void*)kernel_optimize_batch){  
     this->shared_memory_bytes   = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
-
     std::cout << "\nForcefield Capacity: " << this->batch_capacity << "\n";
     
     d_harmonics     = std::vector<InternalCoordinates>(device_count);
@@ -697,14 +698,14 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel
     for (size_t i = 0; i < device_count; i++)
     {   
         cudaSetDevice(i);
-        GPUDataStruct::allocate(d_coords[i],        N,  device_capacities[i], GPUDataStruct::DEVICE_BUFFER);
-        GPUDataStruct::allocate(d_harmonics[i],     N,  device_capacities[i], GPUDataStruct::DEVICE_BUFFER);
-        GPUDataStruct::allocate(d_batch[i],         N,  device_capacities[i], GPUDataStruct::DEVICE_BUFFER);
-        GPUDataStruct::allocate(d_batch[i].stats,   1,  device_capacities[i], GPUDataStruct::DEVICE_BUFFER);
-        GPUDataStruct::allocate(h_batch[i],         N,  device_capacities[i], GPUDataStruct::HOST_BUFFER);
-        GPUDataStruct::allocate(h_batch[i].stats,   1,  device_capacities[i], GPUDataStruct::HOST_BUFFER);
-        GPUDataStruct::allocate(h_coords[i],        N,  1,                    GPUDataStruct::HOST_BUFFER);
-        GPUDataStruct::allocate(h_harmonics[i],     N,  1,                    GPUDataStruct::HOST_BUFFER);
+        GPUDataStruct::allocate(d_coords[i],        N,  device_capacities[i], DEVICE_BUFFER);
+        GPUDataStruct::allocate(d_harmonics[i],     N,  device_capacities[i], DEVICE_BUFFER);
+        GPUDataStruct::allocate(d_batch[i],         N,  device_capacities[i], DEVICE_BUFFER);
+        GPUDataStruct::allocate(d_batch[i].stats,   1,  device_capacities[i], DEVICE_BUFFER);
+        GPUDataStruct::allocate(h_batch[i],         N,  device_capacities[i], HOST_BUFFER);
+        GPUDataStruct::allocate(h_batch[i].stats,   1,  device_capacities[i], HOST_BUFFER);
+        GPUDataStruct::allocate(h_coords[i],        N,  1,                    HOST_BUFFER);
+        GPUDataStruct::allocate(h_harmonics[i],     N,  1,                    HOST_BUFFER);
 
         for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].stats.isomer_statuses[j] = EMPTY;
     }
