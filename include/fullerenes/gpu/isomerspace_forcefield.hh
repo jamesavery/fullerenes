@@ -33,12 +33,12 @@ public:
     size_t s = sizeof(device_real_t);
     
     IsomerBatchStats(){
-      pointers =   {{"bond_rms",(void**)&bond_rms, s}, {"angle_rms",(void**)&angle_rms, s}, {"dihedral_rms",(void**)&dihedral_rms ,s}, 
-                    {"bond_mean", (void**)&bond_mean, s}, {"angle_mean", (void**)&angle_mean, s}, {"dihedral_mean",(void**)&dihedral_mean, s}, 
-                    {"bond_max", (void**)&bond_max, s}, {"angle_max", (void**)&angle_max, s}, {"dihedral_max", (void**)&dihedral_max, s},
-                    {"energy", (void**)&energy, s}, {"grad_norm", (void**)&grad_norm, s}, 
-                    {"iteration_counts", (void**)&iteration_counts, sizeof(size_t)}, {"isomer_statuses", (void**)&isomer_statuses, sizeof(IsomerStatus)},
-                    {"isomer_IDs", (void**)&isomer_IDs, sizeof(size_t)}};
+      pointers =   {{"bond_rms",(void**)&bond_rms,s,false}, {"angle_rms",(void**)&angle_rms,s,false}, {"dihedral_rms",(void**)&dihedral_rms,s,false}, 
+                    {"bond_mean", (void**)&bond_mean,s,false}, {"angle_mean", (void**)&angle_mean,s,false}, {"dihedral_mean",(void**)&dihedral_mean,s,false}, 
+                    {"bond_max", (void**)&bond_max,s,false}, {"angle_max", (void**)&angle_max,s,false}, {"dihedral_max", (void**)&dihedral_max,s,false},
+                    {"energy", (void**)&energy,s,false}, {"grad_norm", (void**)&grad_norm,s,false}, 
+                    {"iteration_counts", (void**)&iteration_counts, sizeof(size_t), false}, {"isomer_statuses", (void**)&isomer_statuses, sizeof(IsomerStatus),false},
+                    {"isomer_IDs", (void**)&isomer_IDs, sizeof(size_t), false}};
     }
   };
   
@@ -52,9 +52,9 @@ public:
     IsomerBatchStats stats;       //Stats about this batch.
 
     IsomerBatch(){
-        pointers = {{"X",(void**)&X,sizeof(device_real_t)*3}, {"neighbours",(void**)&neighbours, sizeof(device_node_t)*3}, 
-                    {"next_on_face", (void**)&next_on_face, sizeof(device_node_t)*3}, {"prev_on_face", (void**)&prev_on_face, sizeof(device_node_t)*3},  
-                    {"face_right", (void**)&face_right, sizeof(uint8_t)*3}};
+        pointers = {{"X",(void**)&X,sizeof(device_real_t)*3,true}, {"neighbours",(void**)&neighbours, sizeof(device_node_t)*3,true}, 
+                    {"next_on_face", (void**)&next_on_face, sizeof(device_node_t)*3,true}, {"prev_on_face", (void**)&prev_on_face, sizeof(device_node_t)*3,true},  
+                    {"face_right", (void**)&face_right, sizeof(uint8_t)*3,true}};
     }
   }; 
 
@@ -71,9 +71,9 @@ public:
     size_t s = sizeof(device_real_t)*3;
 
     InternalCoordinates(){
-      pointers = {{"bonds", (void**)&bonds, s}, {"angles", (void**)&angles, s}, {"dihedrals", (void**)&dihedrals, s}, {"outer_angles_m", (void**)&outer_angles_m, s}, 
-                  {"outer_angles_p", (void**)&outer_angles_p, s}, {"outer_dihedrals_a", (void**)&outer_dihedrals_a, s}, {"outer_dihedrals_m", (void**)&outer_dihedrals_m, s}, 
-                  {"outer_dihedrals_p", (void**)&outer_dihedrals_p, s}};
+      pointers = {{"bonds", (void**)&bonds, s,true}, {"angles", (void**)&angles, s,true}, {"dihedrals", (void**)&dihedrals, s,true}, {"outer_angles_m", (void**)&outer_angles_m, s,true}, 
+                  {"outer_angles_p", (void**)&outer_angles_p, s,true}, {"outer_dihedrals_a", (void**)&outer_dihedrals_a, s,true}, {"outer_dihedrals_m", (void**)&outer_dihedrals_m, s,true}, 
+                  {"outer_dihedrals_p", (void**)&outer_dihedrals_p, s,true}};
     }
   };
   

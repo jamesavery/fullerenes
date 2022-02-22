@@ -12,10 +12,10 @@ public:
         uint8_t*      Nface; //Face type of the outer face (for fullerenes Either 5 or 6);
 
         IsomerBatchStats(){
-            pointers = {{"iteration_counts", (void**)&iteration_counts, sizeof(size_t)}, 
-                        {"isomer_statuses", (void**)&isomer_statuses, sizeof(IsomerStatus)}, 
-                        {"isomer_IDs", (void**)&isomer_IDs, sizeof(size_t)},
-                        {"Nface", (void**)&Nface, sizeof(uint8_t)}};
+            pointers = {{"iteration_counts", (void**)&iteration_counts, sizeof(size_t),false}, 
+                        {"isomer_statuses", (void**)&isomer_statuses, sizeof(IsomerStatus),false}, 
+                        {"isomer_IDs", (void**)&isomer_IDs, sizeof(size_t),false},
+                        {"Nface", (void**)&Nface, sizeof(uint8_t),false}};
         }
     };
 
@@ -27,8 +27,8 @@ public:
         IsomerBatchStats stats;
 
         IsomerBatch(){
-            pointers =  {{"xys",(void**)&xys,sizeof(device_real_t)*2}, {"neighbours",(void**)&neighbours, sizeof(device_node_t)*3}, 
-                        {"outer_face", (void**)&outer_face, sizeof(device_node_t)*1}};
+            pointers =  {{"xys",(void**)&xys,sizeof(device_real_t)*2,true}, {"neighbours",(void**)&neighbours, sizeof(device_node_t)*3,true}, 
+                        {"outer_face", (void**)&outer_face, sizeof(device_node_t)*1,true}};
         }
     };
 
