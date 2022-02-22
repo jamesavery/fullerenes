@@ -34,7 +34,7 @@ void kernel_tutte_layout(IsomerspaceTutte::IsomerBatch G, const size_t iteration
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
 
-    if (G.stats.isomer_statuses[blockIdx.x] == IsomerspaceKernel<FullereneGraph>::NOT_CONVERGED)
+    if (G.stats.isomer_statuses[blockIdx.x] == NOT_CONVERGED)
     {
     size_t offset = blockIdx.x * blockDim.x;
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
@@ -84,7 +84,7 @@ void kernel_tutte_layout(IsomerspaceTutte::IsomerBatch G, const size_t iteration
     }
     BLOCK_SYNC
     (reinterpret_cast<coord2d*>(G.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
-    G.stats.isomer_statuses[blockIdx.x] = IsomerspaceKernel<FullereneGraph>::CONVERGED;
+    G.stats.isomer_statuses[blockIdx.x] = CONVERGED;
     }
 }
 
@@ -141,10 +141,10 @@ IsomerspaceTutte::IsomerspaceTutte(const size_t N) : IsomerspaceKernel::Isomersp
     for (size_t i = 0; i < device_count; i++)
     {
         cudaSetDevice(i);
-        GPUDataStruct::allocate(d_batch[i]         , N, device_capacities[i], GPUDataStruct::DEVICE_BUFFER);
-        GPUDataStruct::allocate(d_batch[i].stats   , 1, device_capacities[i], GPUDataStruct::DEVICE_BUFFER);
-        GPUDataStruct::allocate(h_batch[i]         , N, device_capacities[i], GPUDataStruct::HOST_BUFFER);
-        GPUDataStruct::allocate(h_batch[i].stats   , 1, device_capacities[i], GPUDataStruct::HOST_BUFFER);
+        GPUDataStruct::allocate(d_batch[i]         , N, device_capacities[i], DEVICE_BUFFER);
+        GPUDataStruct::allocate(d_batch[i].stats   , 1, device_capacities[i], DEVICE_BUFFER);
+        GPUDataStruct::allocate(h_batch[i]         , N, device_capacities[i], HOST_BUFFER);
+        GPUDataStruct::allocate(h_batch[i].stats   , 1, device_capacities[i], HOST_BUFFER);
         
         for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].stats.isomer_statuses[j] = EMPTY;
     }

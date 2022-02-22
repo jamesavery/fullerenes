@@ -194,7 +194,7 @@ __device__ void print(const char* a){
     printf(a);
 }
 
-__device__ void print(const ushort3& a){
+__device__ void print(const device_node3& a){
     printf("[%d,%d,%d]",a.x,a.y,a.z);
 }
 

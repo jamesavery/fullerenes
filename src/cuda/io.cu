@@ -3,21 +3,22 @@
 #include "fullerenes/gpu/isomerspace_tutte.hh"
 #include "auxiliary_cuda_functions.cu"
 #include "fullerenes/gpu/gpudatastruct.hh"
-
+#include "fullerenes/gpu/isomerspace_kernel.hh"
 
 void GPUDataStruct::allocate(GPUDataStruct& G, size_t N, const size_t batch_size, const BufferType buffer_type){
     if((!G.allocated)){
         G.buffer_type = buffer_type;
         G.batch_size  = batch_size; 
         G.N           = N; 
-        size_t num_elements = N*batch_size;
         if (buffer_type == DEVICE_BUFFER){
             for (size_t i = 0; i < G.pointers.size(); i++) {
+                size_t num_elements = get<3>(G.pointers[i]) ?  N*batch_size : batch_size;
                 cudaMalloc(get<1>(G.pointers[i]), num_elements* get<2>(G.pointers[i])); 
             }
             printLastCudaError("Failed to allocate device struct");
         }else{
             for (size_t i = 0; i < G.pointers.size(); i++) {
+                size_t num_elements = get<3>(G.pointers[i]) ?  N*batch_size : batch_size;
                 *get<1>(G.pointers[i])= malloc(num_elements* get<2>(G.pointers[i])); 
             }
         }        
@@ -45,7 +46,8 @@ void GPUDataStruct::copy(GPUDataStruct& destination, const GPUDataStruct& source
     if(source.batch_size > 0){
     for (size_t i = 0; i < destination.pointers.size(); i++)
     {
-        cudaMemcpy(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*source.N*source.batch_size, cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type));
+        size_t num_elements = get<3>(destination.pointers[i]) ?  destination.N*destination.batch_size : destination.batch_size;
+        cudaMemcpy(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*num_elements, cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type));
     }
     }
     else{
@@ -176,8 +178,6 @@ void IsomerspaceForcefield::update_batch(){
                     h_batch[i].X           [arc_index] = P.points[u][j];
                 }   
             }
-            
-
 
             stats.iteration_counts[idx]   = 0;
             stats.isomer_statuses[idx]    = NOT_CONVERGED;

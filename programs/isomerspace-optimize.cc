@@ -101,7 +101,6 @@ int main(int ac, char **argv)
     auto t3 = system_clock::now(); Tcheck += t3-t2;
     tutte_kernel.update_batch();
     Tcopy += system_clock::now() - t3;
-
     while (!tutte_kernel.output_queue.empty())
     {
 
@@ -115,7 +114,7 @@ int main(int ac, char **argv)
       Polyhedron P0(G,X0);
       ff_kernel.insert_isomer(P0,ID);
       string filename = output_dir+"/P0-C"+to_string(N)+"-"+to_string(ID);
-      Polyhedron::to_file(P0,filename+".mol2");  
+      //Polyhedron::to_file(P0,filename+".mol2");  
       tutte_kernel.output_queue.pop();
     }
     
@@ -125,17 +124,22 @@ int main(int ac, char **argv)
       ff_kernel.update_batch();
     }
     auto t5 = system_clock::now(); Tcopy += t5-t4;
+    while (ff_kernel.get_queue_size() > ff_batch_size*2){
+    auto t5 = system_clock::now();
     ff_kernel.optimize_batch(N*1);
     auto t6 = system_clock::now();Topt += t6-t5;
+
     ff_kernel.check_batch();
     auto t7 = system_clock::now();Tcheck += t7-t6;
     ff_kernel.update_batch();
     auto t8 = system_clock::now(); Tcopy += t8-t7;
+    }
     // Now do something with the optimized geometries
     more_to_do &= (ff_kernel.get_batch_size() > 0) || (tutte_kernel.get_batch_size() > 0) || more_to_generate;
-    
+
     while (!ff_kernel.output_queue.empty())
     {
+      /*
       size_t ID = ff_kernel.output_queue.front().first;
       Polyhedron Popt = ff_kernel.output_queue.front().second;
       double V = Popt.volume();
@@ -144,13 +148,15 @@ int main(int ac, char **argv)
         if(max_volume_fullerenes.size() == n_best_candidates) { (max_volume_fullerenes.erase(max_volume_fullerenes.begin())); }
         max_volume_fullerenes.insert({V,ID});
       }
-      
-      Polyhedron::to_file(Popt,output_dir+"/P-C"+to_string(N)+"-"+to_string(ID)+".mol2");
+      */
+      //Polyhedron::to_file(Popt,output_dir+"/P-C"+to_string(N)+"-"+to_string(ID)+".mol2");
       ff_kernel.output_queue.pop();
     }
+
     // Output molecular geometry files
     progress_bar.update_progress((float)(ff_kernel.get_converged_count() + ff_kernel.get_failed_count())/(float)num_fullerenes.find(N)->second, "F: " + to_string(ff_kernel.get_failed_count()) + "  S: " + to_string(ff_kernel.get_converged_count()));
     if (I > 20000){break;}
+
   }
   
   for (auto it = max_volume_fullerenes.begin(); it != max_volume_fullerenes.end(); it++)
