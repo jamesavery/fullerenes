@@ -79,9 +79,6 @@ struct NodeGraph{
     device_node3 next_on_face;
     device_node3 prev_on_face;
 
-    __device__ NodeGraph(const device_node3& neighbours, const device_node3& next_on_face, const device_node3& prev_on_face) : 
-        neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
-
     __device__ NodeGraph(const IsomerspaceForcefield::IsomerBatch& G){
         const DeviceFullereneGraph FG(&G.neighbours[blockIdx.x*blockDim.x*3]);
         this->neighbours   = {FG.neighbours[threadIdx.x*3], FG.neighbours[threadIdx.x*3 + 1], FG.neighbours[threadIdx.x*3 + 2]};
