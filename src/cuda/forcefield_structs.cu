@@ -71,6 +71,21 @@ struct DeviceFullereneGraph{
         return d;
     }
 
+    __device__ device_node_t* get_face_oriented(device_node_t u, device_node_t v) const{
+        int i = 0;
+        device_node_t f[6];
+        device_node_t u_temp = u;
+        while (v!=u_temp)
+        {   
+            device_node_t w = next_on_face(u,v);
+            f[i] = v;
+            u = v;
+            v = w;
+            i++;
+        }   
+        return f;
+    }
+
 };
 
 
