@@ -82,17 +82,11 @@ struct NodeGraph{
     __device__ NodeGraph(const device_node3& neighbours, const device_node3& next_on_face, const device_node3& prev_on_face) : 
         neighbours(neighbours), next_on_face(next_on_face), prev_on_face(prev_on_face) {}
 
-
-    /*__device__ NodeGraph(const IsomerspaceForcefield::IsomerBatch& G):  neighbours(MAKE_NODE3(G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.neighbours[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
-                                                                        next_on_face(MAKE_NODE3(G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.next_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])),
-                                                                        prev_on_face(MAKE_NODE3(G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3],G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1],G.prev_on_face[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2])){}
-    */
-    
     __device__ NodeGraph(const IsomerspaceForcefield::IsomerBatch& G){
         const DeviceFullereneGraph FG(&G.neighbours[blockIdx.x*blockDim.x*3]);
         this->neighbours   = {FG.neighbours[threadIdx.x*3], FG.neighbours[threadIdx.x*3 + 1], FG.neighbours[threadIdx.x*3 + 2]};
-        this->next_on_face = {FG.next_on_face(threadIdx.x, d_get(neighbours,0)), FG.next_on_face(threadIdx.x, d_get(neighbours,1)), FG.next_on_face(threadIdx.x ,d_get(neighbours,0))};
-        this->next_on_face = {FG.prev_on_face(threadIdx.x, d_get(neighbours,0)), FG.prev_on_face(threadIdx.x, d_get(neighbours,1)), FG.prev_on_face(threadIdx.x ,d_get(neighbours,0))};
+        this->next_on_face = {FG.next_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.neighbours[threadIdx.x*3 + 2])};
+        this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.neighbours[threadIdx.x*3 + 2])};
     }
 };
 
@@ -119,11 +113,8 @@ struct Constants{
 
     __device__ Constants(const IsomerspaceForcefield::IsomerBatch& G){
         //Set pointers to start of fullerene.
-        size_t offset = blockDim.x*blockIdx.x;
-        uint8_t* face_right = G.face_right + offset*3;
         const DeviceFullereneGraph FG(&G.neighbours[blockIdx.x*blockDim.x*3]);
         device_node3 neighbours = {FG.neighbours[threadIdx.x*3], FG.neighbours[threadIdx.x*3 + 1], FG.neighbours[threadIdx.x*3 + 2]};
-
         //       m    p
         //    f5_|   |_f4
         //   p   c    b  m
@@ -136,27 +127,16 @@ struct Constants{
 
         for (uint8_t j = 0; j < 3; j++) {
             //Faces to the right of arcs ab, ac and ad.
-
-            //sequential_print((int)face_right[threadIdx.x * 3 + j],0);
-            //sequential_print((int)FG.face_size(threadIdx.x, d_get(neighbours, j)),0);
             
-
             uint8_t F1 = FG.face_size(threadIdx.x, d_get(neighbours, j)) - 5;
             uint8_t F2 = FG.face_size(threadIdx.x, d_get(neighbours, (j+1)%3)) -5;
             uint8_t F3 = FG.face_size(threadIdx.x, d_get(neighbours, (j+2)%3)) -5;
             
-            /*uint8_t F1 = face_right[threadIdx.x * 3 + j] - 5;
-            uint8_t F2 = face_right[threadIdx.x * 3 + (1+ j)%3] - 5;
-            uint8_t F3 = face_right[threadIdx.x * 3 + (2 + j)%3] - 5; */
             //The faces to the right of the arcs ab, bm and bp in no particular order, from this we can deduce F4.
             uint8_t neighbour_F1 = FG.face_size(d_get(neighbours, j), FG.neighbours[d_get(neighbours, j)*3] ) -5;
             uint8_t neighbour_F2 = FG.face_size(d_get(neighbours, j), FG.neighbours[d_get(neighbours, j)*3 + 1] ) -5;
             uint8_t neighbour_F3 = FG.face_size(d_get(neighbours, j), FG.neighbours[d_get(neighbours, j)*3 + 2] ) -5;
-            /*
-            uint8_t neighbour_F1 = face_right[neighbours[threadIdx.x * 3 + j]*3 ] - 5;
-            uint8_t neighbour_F2 = face_right[neighbours[threadIdx.x * 3 + j]*3 + 1 ] - 5;
-            uint8_t neighbour_F3 = face_right[neighbours[threadIdx.x * 3 + j]*3 + 2] - 5;*/
-            
+
             uint8_t F4 = neighbour_F1 + neighbour_F2 + neighbour_F3 - F1 - F3 ;
             
             //Load equillibirium distance, angles and dihedral angles from face information.

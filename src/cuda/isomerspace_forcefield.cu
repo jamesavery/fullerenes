@@ -532,7 +532,6 @@ __global__ void kernel_optimize_batch(IsomerspaceForcefield::IsomerBatch G, cons
 
         Constants constants = Constants(G);
         NodeGraph nodeG     = NodeGraph(G);
-        //NodeGraph bookkeeping = NodeGraph(&neighbours[0],&face_right[0],&next_on_face[0],&prev_on_face[0]);   
 
         //Create forcefield struct and use optimization algorithm to optimize the fullerene 
         ForceField FF = ForceField(nodeG, constants, smem);
@@ -551,7 +550,7 @@ __global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerBatch G, de
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-
+    if (G.stats.isomer_statuses[blockIdx.x] == NOT_CONVERGED){
     size_t offset = blockIdx.x * blockDim.x;
     Constants constants     = Constants(G);
     NodeGraph node_graph    = NodeGraph(G);
@@ -559,7 +558,7 @@ __global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerBatch G, de
     coord3d* X              = reinterpret_cast<coord3d*>(G.X+offset*3);
 
     coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
-    GRID_SYNC
+    BLOCK_SYNC
     for (uint8_t j = 0; j < 3; j++){
         auto arc            = ForceField::ArcData(j, X, node_graph);
         d_set(rel_bond_err,      j, abs(abs(arc.bond()       - d_get(constants.r0,j))        /d_get(constants.r0,j)));
@@ -590,6 +589,7 @@ __global__ void kernel_batch_statistics(IsomerspaceForcefield::IsomerBatch G, de
         } else if (G.stats.iteration_counts[blockIdx.x] >= 10*blockDim.x) {
             G.stats.isomer_statuses[blockIdx.x] = FAILED;
         }
+    }
     }
 }
 
