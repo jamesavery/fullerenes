@@ -39,8 +39,8 @@ public:
   size_t get_batch_capacity();          //Uses Cuda API calls to determine the amount of fullerenes of a given size N, that can be optimized simultaneously.
   
   virtual void check_batch() {}                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
-  virtual void update_batch() {}
-  virtual void eject_isomer(size_t i, size_t idx) {}
+  virtual void update_batch();
+  void eject_isomer(size_t i, size_t idx);
 
   IsomerspaceKernel(const size_t N, void* kernel); //Simple constructor allocates memory for structs on device and host call this once at the beginning of program, 
                                           //also serves to initialize the cuda default context, which would otherwise be destroyed and recreated every time memory is freed and reallocated.
@@ -54,6 +54,8 @@ protected:
   size_t batch_capacity = 0;              //Number of fullerenes that will fit on the GPU concurrently.
   size_t batch_size = 0;                  //Current number of fullerenes copied to GPU.
   size_t shared_memory_bytes = 0;         //Amount of L1 cache to allocate per block.
+  size_t converged_count = 0;             //Total number of converged isomers optimized by this object.
+  size_t failed_count = 0;                //Total number of failed isomers optimized by this object.   
   
   void* kernel_pointer;
   void* cuda_streams;

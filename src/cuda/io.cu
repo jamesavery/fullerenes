@@ -60,58 +60,46 @@ void operator <<= (GPUDataStruct& destination, const GPUDataStruct& source){
     GPUDataStruct::copy(destination, source);
 }
 
-void operator <<= (IsomerBatch& a, const IsomerBatch& b){
-    GPUDataStruct::copy(a,b);
-}
-
-void IsomerspaceTutte::eject_isomer(size_t i, size_t idx){
-    size_t n_offset  = idx*3*N;      //neighbour offset
-    size_t c_offset  = idx*2*N;      //coords offset
-    size_t f_offset  = idx*N;    //outer_face offset
-    IsomerBatch B = h_batch[i];
-    neighbours_t neighbours(N); std::vector<coord2d> xys(N);
-    for (size_t j = 0; j < N; j++) {
-        neighbours[j]       = std::vector<node_t>(B.neighbours + n_offset + j*3, B.neighbours + n_offset + j*3 + 3);
-        xys[j]   = {reinterpret_cast<GPU_REAL2*>(B.xys + c_offset)[j].x,reinterpret_cast<GPU_REAL2*>(B.xys + c_offset)[j].y};
-                            
-    }
-    FullereneGraph P = FullereneGraph(Graph(neighbours,true));
-    P.layout2d       = xys;
-    output_queue.push({B.IDs[idx],P});
-    B.statuses[idx]==CONVERGED ? converged_count++ : failed_count++;
-}
-
-void IsomerspaceForcefield::eject_isomer(size_t i, size_t idx){
-    IsomerBatch B = h_batch[i];
-    size_t offset   = idx*3*N;
-    neighbours_t output(N); std::vector<coord3d> output_X(N);
+template<typename T>
+void IsomerspaceKernel<T>::eject_isomer(size_t i, size_t idx){
+    IsomerBatch B    = h_batch[i];
+    size_t offset    = idx*3*N;
+    size_t c_offset  = idx*2*N;
+    neighbours_t output(N); std::vector<coord3d> output_X(N); std::vector<coord2d> xys(N);
     for (size_t j = 0; j < N; j++) {
         output[j] = std::vector<node_t>(B.neighbours + offset + j*3, B.neighbours + offset + j*3 + 3);
+        xys[j]      = {reinterpret_cast<device_coord2d*>(B.xys + c_offset)[j].x,reinterpret_cast<device_coord2d*>(B.xys + c_offset)[j].y};
         output_X[j] = {B.X[offset + j*3], B.X[offset + j*3 + 1], B.X[offset + j*3 + 2]};
     }
     Polyhedron P = Polyhedron(FullereneGraph(Graph(output,true)), output_X);
+    P.layout2d = xys;
     output_queue.push({B.IDs[idx],P});
     B.statuses[idx]==CONVERGED ? converged_count++ : failed_count++;
 }
 
-void IsomerspaceTutte::update_batch(){
+template<typename T>
+void IsomerspaceKernel<T>::update_batch(){
     while (batch_size < batch_capacity && !insert_queue.empty()){
         for (size_t i = 0; i < this->device_count; i++)
         if (batch_sizes[i] < device_capacities[i]){
             IsomerBatch B = h_batch[i];
             size_t idx       = index_queue[i].front();
-            size_t n_offset  = idx*3*N;      //neighbour offset
-            size_t f_offset  = idx*N;    //outer_face offset
+            size_t offset  = idx*3*N;      //neighbour offset
             if ((B.statuses[idx] == CONVERGED) || (B.statuses[idx]==FAILED))
             {
                 eject_isomer(i,idx);
             }
 
             size_t ID        = insert_queue.front().first;
-            FullereneGraph P = insert_queue.front().second;
+            Polyhedron P     = insert_queue.front().second;
 
             for (device_node_t u = 0; u < N; u++){
-                for (int j = 0; j < 3; j++) B.neighbours[u*3 + j + n_offset]     = P.neighbours[u][j];
+                for (int j = 0; j < 3; j++){
+                    device_node_t v = P.neighbours[u][j];
+                    size_t arc_index = u*3 + j + offset;
+                    B.neighbours  [arc_index] = v;
+                    B.X           [arc_index] = !P.points.empty() ? P.points[u][j] : 0.0;
+                }   
             }
 
             B.iterations[idx]   = 0;
@@ -133,55 +121,6 @@ void IsomerspaceTutte::update_batch(){
                 eject_isomer(i,j);
                 h_batch[i].statuses[j] = EMPTY;
             }
-        }
-        
-    }
-}
-
-void IsomerspaceForcefield::update_batch(){
-    while (batch_size < batch_capacity && !insert_queue.empty()){
-        for (size_t i = 0; i < this->device_count; i++)
-        if (batch_sizes[i] < device_capacities[i]){
-            IsomerBatch B   = h_batch[i];
-            size_t idx      = index_queue[i].front();
-            size_t offset   = idx*3*N;
-            if ((B.statuses[idx] == CONVERGED) || (B.statuses[idx]==FAILED))
-            {
-                eject_isomer(i,idx);
-            }
-            
-            size_t ID       = insert_queue.front().first;
-            Polyhedron P    = insert_queue.front().second;
-
-            for (device_node_t u = 0; u < N; u++){
-                for (int j = 0; j < 3; j++){
-                    device_node_t v = P.neighbours[u][j];
-                    size_t arc_index = u*3 + j + offset;
-                    B.neighbours  [arc_index] = v;
-                    B.X           [arc_index] = P.points[u][j];
-                }   
-            }
-
-            B.iterations[idx]   = 0;
-            B.statuses[idx]    = NOT_CONVERGED;
-            B.IDs[idx]         = ID;
-            
-            batch_size++;
-            batch_sizes[i]++;
-            insert_queue.pop();
-            index_queue[i].pop();
-            break;
-        }
-    }
-    if (insert_queue.empty()){
-        for (size_t i = 0; i < device_count; i++){
-        IsomerBatch B = h_batch[i];
-        for (size_t j = 0; j < device_capacities[i]; j++){   
-            if ((B.statuses[j] == CONVERGED) || (B.statuses[j]==FAILED)){
-                eject_isomer(i,j);
-                B.statuses[j] = EMPTY;
-            }
-        }
         }
     }
 }

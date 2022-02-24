@@ -25,20 +25,13 @@ public:
 
     device_real_t* energy;
     device_real_t* grad_norm;
-
-    size_t*       iteration_counts;
-    IsomerStatus* isomer_statuses;
-    size_t*       isomer_IDs;
-
     size_t s = sizeof(device_real_t);
     
     IsomerBatchStats(){
       pointers =   {{"bond_rms",(void**)&bond_rms,s,false}, {"angle_rms",(void**)&angle_rms,s,false}, {"dihedral_rms",(void**)&dihedral_rms,s,false}, 
                     {"bond_mean", (void**)&bond_mean,s,false}, {"angle_mean", (void**)&angle_mean,s,false}, {"dihedral_mean",(void**)&dihedral_mean,s,false}, 
                     {"bond_max", (void**)&bond_max,s,false}, {"angle_max", (void**)&angle_max,s,false}, {"dihedral_max", (void**)&dihedral_max,s,false},
-                    {"energy", (void**)&energy,s,false}, {"grad_norm", (void**)&grad_norm,s,false}, 
-                    {"iteration_counts", (void**)&iteration_counts, sizeof(size_t), false}, {"isomer_statuses", (void**)&isomer_statuses, sizeof(IsomerStatus),false},
-                    {"isomer_IDs", (void**)&isomer_IDs, sizeof(size_t), false}};
+                    {"energy", (void**)&energy,s,false}, {"grad_norm", (void**)&grad_norm,s,false}};
     }
   };
 
@@ -63,8 +56,6 @@ public:
   
   void check_batch();                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
   void optimize_batch(const size_t iterations);
-  void update_batch();
-  void eject_isomer(size_t i, size_t idx);
 
   void get_cartesian_coordinates(device_real_t* X) const;                                                     //Populate target buffer (CPU) with cartesian coordiantes from isomers on GPU.
   void get_internal_coordinates(device_real_t* bonds, device_real_t* angles, device_real_t* dihedrals); //Populate target buffers (CPU) with internal coordinates from isomers on GPU.
@@ -80,9 +71,6 @@ public:
 
 
 protected:
-  size_t converged_count = 0;             //Total number of converged isomers optimized by this object.
-  size_t failed_count = 0;                //Total number of failed isomers optimized by this object.   
-
   std::vector<InternalCoordinates> d_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
   std::vector<InternalCoordinates> h_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
   std::vector<InternalCoordinates> d_harmonics;  //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
