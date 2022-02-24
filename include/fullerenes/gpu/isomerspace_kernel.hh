@@ -21,30 +21,14 @@
 #define USE_MAX_NORM 0
 #define REDUCTION_METHOD 0
 #define LINESEARCH_METHOD GSS
-  
-enum IsomerStatus {CONVERGED, FAILED, NOT_CONVERGED, EMPTY};
+
+#include "isomer_batch.hh"
 
 template <typename T>
 class IsomerspaceKernel {
 public:
   typedef GPU_REAL device_real_t;
   typedef uint16_t device_node_t;
-  
-  struct FullereneBatch : GPUDataStruct
-  {
-    device_node_t* neighbours;
-    device_real_t* X;
-    device_real_t* XYS;
-
-    IsomerStatus* statuses;
-    size_t* IDs;
-    size_t* iterations;
-
-    FullereneBatch(){
-      pointers =   {{"neighbours",(void**)&neighbours, sizeof(device_node_t)*3, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"XYS", (void**)&XYS, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
-    }
-  };
-
   
   size_t get_batch_size()const{return batch_size;}
   void insert_isomer(const T& P, const size_t ID) {insert_queue.push({ID,P});}  //Pushes P to insert_queue. 
@@ -76,7 +60,7 @@ protected:
   int device_count;
 
   //h_buffer and d_buffer are mirrors and reflect what will be computed, d_input_batch and d_output_batch exist for linking kernels together in a pipeline. 
-  FullereneBatch h_buffer, d_buffer, d_input_batch, d_output_batch;
+  std::vector<IsomerBatch> h_batch, d_batch, d_input_batch, d_output_batch;
 
   //The reason why these are vectors is that we might have mutliple devices (GPUs).
   std::vector<int> device_capacities;

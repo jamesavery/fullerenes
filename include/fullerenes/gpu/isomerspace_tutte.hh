@@ -5,32 +5,6 @@
 class IsomerspaceTutte : public IsomerspaceKernel<FullereneGraph>
 {
 public:
-    struct IsomerBatchStats : GPUDataStruct{
-        size_t*       iteration_counts;
-        IsomerStatus* isomer_statuses;
-        size_t*       isomer_IDs;
-        uint8_t*      Nface; //Face type of the outer face (for fullerenes Either 5 or 6);
-
-        IsomerBatchStats(){
-            pointers = {{"iteration_counts", (void**)&iteration_counts, sizeof(size_t),false}, 
-                        {"isomer_statuses", (void**)&isomer_statuses, sizeof(IsomerStatus),false}, 
-                        {"isomer_IDs", (void**)&isomer_IDs, sizeof(size_t),false},
-                        {"Nface", (void**)&Nface, sizeof(uint8_t),false}};
-        }
-    };
-
-    struct IsomerBatch : GPUDataStruct{
-        device_real_t* xys;        //Nx2xBatchSize     
-        device_node_t* outer_face; //(5-6)xBatchSize : Size of this array is variable since the individual vectors are of unknown size (5 or 6 for fullerenes though)
-        device_node_t* neighbours; //Nx3xBatchSize
-
-        IsomerBatchStats stats;
-
-        IsomerBatch(){
-            pointers =  {{"xys",(void**)&xys,sizeof(device_real_t)*2,true}, {"neighbours",(void**)&neighbours, sizeof(device_node_t)*3,true}, 
-                        {"outer_face", (void**)&outer_face, sizeof(device_node_t)*1,true}};
-        }
-    };
 
     void tutte_layout();
     void update_batch();
