@@ -29,14 +29,15 @@ typedef GPU_NODE3 device_node3;
 #include "io.cu"
 
 __global__
-void kernel_tutte_layout(IsomerspaceTutte::IsomerBatch G, const size_t iterations){
+void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
     DEVICE_TYPEDEFS
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
 
-    if (G.stats.isomer_statuses[blockIdx.x] == NOT_CONVERGED)
+    if (G.statuses[blockIdx.x] == NOT_CONVERGED)
     {
     size_t offset = blockIdx.x * blockDim.x;
+    DeviceFullereneGraph FG(&G.neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2d* xys        = reinterpret_cast<coord2d*>(base_pointer);
     coord2d* newxys     = reinterpret_cast<coord2d*>(base_pointer) + blockDim.x;
@@ -45,9 +46,8 @@ void kernel_tutte_layout(IsomerspaceTutte::IsomerBatch G, const size_t iteration
     node3 ns            = (reinterpret_cast<node3*>(G.neighbours) + offset)[threadIdx.x];
     xys[threadIdx.x]    = {real_t(0.0), real_t(0.0)};
     node_t outer_face   = 0;
-    uint8_t Nface = G.stats.Nface[blockIdx.x];
-    if(threadIdx.x < Nface) outer_face = (reinterpret_cast<node_t*>(G.outer_face)+ offset)[threadIdx.x];    
-
+    uint8_t Nface = FG.face_size(0,FG.neighbours[0]);
+    if(threadIdx.x < Nface) outer_face = FG.get_face_oriented(0,FG.neighbours[0])[threadIdx.x];    
     reinterpret_cast<bool*>(sharedmem)[threadIdx.x] =  false; BLOCK_SYNC
     if(threadIdx.x < Nface) reinterpret_cast<bool*>(sharedmem)[outer_face] =  true; BLOCK_SYNC
     bool fixed = reinterpret_cast<bool*>(sharedmem)[threadIdx.x];
@@ -84,7 +84,7 @@ void kernel_tutte_layout(IsomerspaceTutte::IsomerBatch G, const size_t iteration
     }
     BLOCK_SYNC
     (reinterpret_cast<coord2d*>(G.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
-    G.stats.isomer_statuses[blockIdx.x] = CONVERGED;
+    G.statuses[blockIdx.x] = CONVERGED;
     }
 }
 
@@ -114,7 +114,7 @@ void IsomerspaceTutte::check_batch(){
         int num_of_not_converged_isomers = 0;
         h_batch[i] <<= d_batch[i];
         
-        IsomerStatus* statuses = h_batch[i].stats.isomer_statuses;
+        IsomerStatus* statuses = h_batch[i].statuses;
         for (int j = 0; j < device_capacities[i]; j++)
         {   
             num_of_not_converged_isomers += (int)(statuses[j] == NOT_CONVERGED);
@@ -142,11 +142,9 @@ IsomerspaceTutte::IsomerspaceTutte(const size_t N) : IsomerspaceKernel::Isomersp
     {
         cudaSetDevice(i);
         GPUDataStruct::allocate(d_batch[i]         , N, device_capacities[i], DEVICE_BUFFER);
-        GPUDataStruct::allocate(d_batch[i].stats   , 1, device_capacities[i], DEVICE_BUFFER);
         GPUDataStruct::allocate(h_batch[i]         , N, device_capacities[i], HOST_BUFFER);
-        GPUDataStruct::allocate(h_batch[i].stats   , 1, device_capacities[i], HOST_BUFFER);
         
-        for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].stats.isomer_statuses[j] = EMPTY;
+        for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = EMPTY;
     }
     printLastCudaError("Tutte kernel class instansiation failed!");
 }
@@ -158,8 +156,6 @@ IsomerspaceTutte::~IsomerspaceTutte(){
         cudaSetDevice(i);
         GPUDataStruct::free(d_batch[i]);
         GPUDataStruct::free(h_batch[i]);
-        GPUDataStruct::free(d_batch[i].stats);
-        GPUDataStruct::free(h_batch[i].stats);
     }
     //Destroys cuda context. It is possible that this function call is sufficient for avoiding memory leaks, in addition to freeing the host_graph.
 }

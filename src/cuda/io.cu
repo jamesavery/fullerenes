@@ -66,26 +66,25 @@ void operator <<= (IsomerspaceForcefield::IsomerBatch& a, const IsomerspaceForce
     GPUDataStruct::copy(a.stats,b.stats);
 }
 
-void operator <<= (IsomerspaceTutte::IsomerBatch& a, const IsomerspaceTutte::IsomerBatch& b){
+void operator <<= (IsomerBatch& a, const IsomerBatch& b){
     GPUDataStruct::copy(a,b);
-    GPUDataStruct::copy(a.stats,b.stats);
 }
 
 void IsomerspaceTutte::eject_isomer(size_t i, size_t idx){
     size_t n_offset  = idx*3*N;      //neighbour offset
     size_t c_offset  = idx*2*N;      //coords offset
     size_t f_offset  = idx*N;    //outer_face offset
-    IsomerBatchStats stats = h_batch[i].stats;
+    IsomerBatch B = h_batch[i];
     neighbours_t neighbours(N); std::vector<coord2d> xys(N);
     for (size_t j = 0; j < N; j++) {
-        neighbours[j]       = std::vector<node_t>(h_batch[i].neighbours + n_offset + j*3, h_batch[i].neighbours + n_offset + j*3 + 3);
-        xys[j]   = {reinterpret_cast<GPU_REAL2*>(h_batch[i].xys + c_offset)[j].x,reinterpret_cast<GPU_REAL2*>(h_batch[i].xys + c_offset)[j].y};
+        neighbours[j]       = std::vector<node_t>(B.neighbours + n_offset + j*3, B.neighbours + n_offset + j*3 + 3);
+        xys[j]   = {reinterpret_cast<GPU_REAL2*>(B.xys + c_offset)[j].x,reinterpret_cast<GPU_REAL2*>(B.xys + c_offset)[j].y};
                             
     }
     FullereneGraph P = FullereneGraph(Graph(neighbours,true));
     P.layout2d       = xys;
-    output_queue.push({stats.isomer_IDs[idx],P});
-    stats.isomer_statuses[idx]==CONVERGED ? converged_count++ : failed_count++;
+    output_queue.push({B.IDs[idx],P});
+    B.statuses[idx]==CONVERGED ? converged_count++ : failed_count++;
 }
 
 void IsomerspaceForcefield::eject_isomer(size_t i, size_t idx){
@@ -105,32 +104,25 @@ void IsomerspaceTutte::update_batch(){
     while (batch_size < batch_capacity && !insert_queue.empty()){
         for (size_t i = 0; i < this->device_count; i++)
         if (batch_sizes[i] < device_capacities[i]){
-            IsomerBatchStats stats = h_batch[i].stats;
+            IsomerBatch B = h_batch[i];
             size_t idx       = index_queue[i].front();
             size_t n_offset  = idx*3*N;      //neighbour offset
             size_t f_offset  = idx*N;    //outer_face offset
-            if ((stats.isomer_statuses[idx] == CONVERGED) || (stats.isomer_statuses[idx]==FAILED))
+            if ((B.statuses[idx] == CONVERGED) || (B.statuses[idx]==FAILED))
             {
                 eject_isomer(i,idx);
             }
 
             size_t ID        = insert_queue.front().first;
             FullereneGraph P = insert_queue.front().second;
-            P.outer_face     = P.get_face_oriented({0,P.neighbours[0][0]}, INT32_MAX);
 
             for (device_node_t u = 0; u < N; u++){
-                for (int j = 0; j < 3; j++) h_batch[i].neighbours[u*3 + j + n_offset]     = P.neighbours[u][j];
+                for (int j = 0; j < 3; j++) B.neighbours[u*3 + j + n_offset]     = P.neighbours[u][j];
             }
-            for (device_node_t u = 0; u < P.outer_face.size(); u++) {
-                h_batch[i].outer_face[u + f_offset] = P.outer_face[u]; 
-            }
-            //TODO: Construct polyhedrons from neighbour list and coordinates and store that along with convergence status in an output_queue instead.
-            //This is currently what happens to all isomers that are finished, we simply store their ID and energy.
 
-            stats.iteration_counts[idx]   = 0;
-            stats.isomer_statuses[idx]    = NOT_CONVERGED;
-            stats.isomer_IDs[idx]         = ID;
-            stats.Nface[idx]              = P.outer_face.size();
+            B.iterations[idx]   = 0;
+            B.statuses[idx]    = NOT_CONVERGED;
+            B.IDs[idx]         = ID;
             
             batch_size++;
             batch_sizes[i]++;
@@ -143,9 +135,9 @@ void IsomerspaceTutte::update_batch(){
     if (insert_queue.empty()){
         for (size_t i = 0; i < device_count; i++)
         for (size_t j = 0; j < device_capacities[i]; j++){   
-            if ((h_batch[i].stats.isomer_statuses[j] == CONVERGED) || (h_batch[i].stats.isomer_statuses[j]==FAILED)){
+            if ((h_batch[i].statuses[j] == CONVERGED) || (h_batch[i].statuses[j]==FAILED)){
                 eject_isomer(i,j);
-                h_batch[i].stats.isomer_statuses[j] = EMPTY;
+                h_batch[i].statuses[j] = EMPTY;
             }
         }
         
