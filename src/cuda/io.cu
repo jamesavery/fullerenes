@@ -60,12 +60,6 @@ void operator <<= (GPUDataStruct& destination, const GPUDataStruct& source){
     GPUDataStruct::copy(destination, source);
 }
 
-
-void operator <<= (IsomerspaceForcefield::IsomerBatch& a, const IsomerspaceForcefield::IsomerBatch& b){
-    GPUDataStruct::copy(a,b);
-    GPUDataStruct::copy(a.stats,b.stats);
-}
-
 void operator <<= (IsomerBatch& a, const IsomerBatch& b){
     GPUDataStruct::copy(a,b);
 }
@@ -88,16 +82,16 @@ void IsomerspaceTutte::eject_isomer(size_t i, size_t idx){
 }
 
 void IsomerspaceForcefield::eject_isomer(size_t i, size_t idx){
-    IsomerBatchStats stats = h_batch[i].stats;
+    IsomerBatch B = h_batch[i];
     size_t offset   = idx*3*N;
     neighbours_t output(N); std::vector<coord3d> output_X(N);
     for (size_t j = 0; j < N; j++) {
-        output[j] = std::vector<node_t>(h_batch[i].neighbours + offset + j*3, h_batch[i].neighbours + offset + j*3 + 3);
-        output_X[j] = {h_batch[i].X[offset + j*3], h_batch[i].X[offset + j*3 + 1], h_batch[i].X[offset + j*3 + 2]};
+        output[j] = std::vector<node_t>(B.neighbours + offset + j*3, B.neighbours + offset + j*3 + 3);
+        output_X[j] = {B.X[offset + j*3], B.X[offset + j*3 + 1], B.X[offset + j*3 + 2]};
     }
     Polyhedron P = Polyhedron(FullereneGraph(Graph(output,true)), output_X);
-    output_queue.push({stats.isomer_IDs[idx],P});
-    stats.isomer_statuses[idx]==CONVERGED ? converged_count++ : failed_count++;
+    output_queue.push({B.IDs[idx],P});
+    B.statuses[idx]==CONVERGED ? converged_count++ : failed_count++;
 }
 
 void IsomerspaceTutte::update_batch(){
@@ -148,10 +142,10 @@ void IsomerspaceForcefield::update_batch(){
     while (batch_size < batch_capacity && !insert_queue.empty()){
         for (size_t i = 0; i < this->device_count; i++)
         if (batch_sizes[i] < device_capacities[i]){
-            IsomerBatchStats stats = h_batch[i].stats;
+            IsomerBatch B   = h_batch[i];
             size_t idx      = index_queue[i].front();
             size_t offset   = idx*3*N;
-            if ((stats.isomer_statuses[idx] == CONVERGED) || (stats.isomer_statuses[idx]==FAILED))
+            if ((B.statuses[idx] == CONVERGED) || (B.statuses[idx]==FAILED))
             {
                 eject_isomer(i,idx);
             }
@@ -163,17 +157,14 @@ void IsomerspaceForcefield::update_batch(){
                 for (int j = 0; j < 3; j++){
                     device_node_t v = P.neighbours[u][j];
                     size_t arc_index = u*3 + j + offset;
-                    h_batch[i].neighbours  [arc_index] = v;
-                    h_batch[i].next_on_face[arc_index] = P.next_on_face(u,v);
-                    h_batch[i].prev_on_face[arc_index] = P.prev_on_face(u,v);
-                    h_batch[i].face_right  [arc_index] = P.face_size(u,v);
-                    h_batch[i].X           [arc_index] = P.points[u][j];
+                    B.neighbours  [arc_index] = v;
+                    B.X           [arc_index] = P.points[u][j];
                 }   
             }
 
-            stats.iteration_counts[idx]   = 0;
-            stats.isomer_statuses[idx]    = NOT_CONVERGED;
-            stats.isomer_IDs[idx]         = ID;
+            B.iterations[idx]   = 0;
+            B.statuses[idx]    = NOT_CONVERGED;
+            B.IDs[idx]         = ID;
             
             batch_size++;
             batch_sizes[i]++;
@@ -184,11 +175,11 @@ void IsomerspaceForcefield::update_batch(){
     }
     if (insert_queue.empty()){
         for (size_t i = 0; i < device_count; i++){
-        IsomerBatchStats stats = h_batch[i].stats;
+        IsomerBatch B = h_batch[i];
         for (size_t j = 0; j < device_capacities[i]; j++){   
-            if ((stats.isomer_statuses[j] == CONVERGED) || (stats.isomer_statuses[j]==FAILED)){
+            if ((B.statuses[j] == CONVERGED) || (B.statuses[j]==FAILED)){
                 eject_isomer(i,j);
-                stats.isomer_statuses[j] = EMPTY;
+                B.statuses[j] = EMPTY;
             }
         }
         }

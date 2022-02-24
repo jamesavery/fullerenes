@@ -18,10 +18,6 @@ protected:
     size_t converged_count = 0;             //Total number of converged isomers optimized by this object.
     size_t failed_count = 0;                //Total number of failed isomers optimized by this object.  
     const size_t TUTTE_MAX_ITERATION = 1000;
-
-    std::vector<IsomerBatch> d_batch;
-    std::vector<IsomerBatch> h_batch;
-
 };
 
 

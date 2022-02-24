@@ -41,22 +41,6 @@ public:
                     {"isomer_IDs", (void**)&isomer_IDs, sizeof(size_t), false}};
     }
   };
-  
-  struct IsomerBatch : GPUDataStruct{
-    device_real_t* X;             //Cartesian coordinates.
-    device_node_t* neighbours;    //Cubic neighbour list.
-    device_node_t* next_on_face;  //Next node on face / counter-clockwise direction
-    device_node_t* prev_on_face;  //Prev node on face / clockwise direction
-    uint8_t* face_right;          //Face size list.
-
-    IsomerBatchStats stats;       //Stats about this batch.
-
-    IsomerBatch(){
-        pointers = {{"X",(void**)&X,sizeof(device_real_t)*3,true}, {"neighbours",(void**)&neighbours, sizeof(device_node_t)*3,true}, 
-                    {"next_on_face", (void**)&next_on_face, sizeof(device_node_t)*3,true}, {"prev_on_face", (void**)&prev_on_face, sizeof(device_node_t)*3,true},  
-                    {"face_right", (void**)&face_right, sizeof(uint8_t)*3,true}};
-    }
-  }; 
 
   struct InternalCoordinates : GPUDataStruct{
     device_real_t* bonds;             
@@ -99,8 +83,6 @@ protected:
   size_t converged_count = 0;             //Total number of converged isomers optimized by this object.
   size_t failed_count = 0;                //Total number of failed isomers optimized by this object.   
 
-  std::vector<IsomerBatch> d_batch;           //GPU container for graph information and X0.                 Dimensions: N x M x 3
-  std::vector<IsomerBatch> h_batch;           //Host buffer for graph information and X0.                   Dimensions: N x M x 3
   std::vector<InternalCoordinates> d_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
   std::vector<InternalCoordinates> h_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
   std::vector<InternalCoordinates> d_harmonics;  //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
