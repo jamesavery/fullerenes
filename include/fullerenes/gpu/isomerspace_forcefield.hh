@@ -8,7 +8,7 @@
 #include <fullerenes/polyhedron.hh>
 #include "gpudatastruct.hh"
 
-class IsomerspaceForcefield: public IsomerspaceKernel<Polyhedron> {
+class IsomerspaceForcefield: public IsomerspaceKernel {
 public:
   struct IsomerBatchStats : GPUDataStruct{
     device_real_t* bond_rms;

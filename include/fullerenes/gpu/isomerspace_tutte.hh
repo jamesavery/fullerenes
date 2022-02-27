@@ -1,8 +1,7 @@
 #pragma once
 #include "isomerspace_kernel.hh"
-#include "gpudatastruct.hh"
 
-class IsomerspaceTutte : public IsomerspaceKernel<FullereneGraph>
+class IsomerspaceTutte : public IsomerspaceKernel
 {
 public:
 
