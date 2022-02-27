@@ -19,5 +19,7 @@ add_executable(kegle kegle.cc)
 
 if(CMAKE_CUDA_COMPILER)
   add_executable(isomerspace-optimize isomerspace-optimize.cc)
+  add_executable(isomerspace-optimize-pipe isomerspace-optimize-pipe.cc)
   target_link_libraries(isomerspace-optimize cuda_lib)
+  target_link_libraries(isomerspace-optimize-pipe cuda_lib)
 endif()
