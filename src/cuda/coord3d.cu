@@ -30,7 +30,9 @@ INLINE half4 operator*(const half4& a, const half4& b) { return {__hmul2(a.x,b.x
 INLINE half4 operator/(const half s, const half4& a)  { return {__h2div(a.x,make_half2(s,s)), __h2div(a.y,make_half2(s,s))}; }
 INLINE half4 operator/(const half4& a, const half s)  { return {__h2div(make_half2(s,s),a.x), __h2div(make_half2(s,s),a.y)}; }
 INLINE void operator+=(half4& a, const half4& b) {a = a + b;}
+INLINE void operator-=(half4& a, const half4& b) {a = a - b;}
 INLINE void operator/=(half4& a, const half b) {a = a / b;}
+INLINE void operator*=(half4& a, const half b) {a = a * b;}
 
 INLINE void d_set(half4& a, const uint8_t j, half b){
   ((half*)&a)[j] = b; 
@@ -96,7 +98,9 @@ INLINE bhalf4 operator*(const bhalf4& a, const bhalf4& b) { return {__hmul2(a.x,
 INLINE bhalf4 operator/(const bhalf s, const bhalf4& a)  { return {__h2div(a.x,{s,s}), __h2div(a.y,{s,s})}; }
 INLINE bhalf4 operator/(const bhalf4& a, const bhalf s)  { return {__h2div({s,s},a.x), __h2div({s,s},a.y)}; }
 INLINE void operator+=(bhalf4& a, const bhalf4& b) {a = a + b;}
+INLINE void operator-=(bhalf4& a, const bhalf4& b) {a = a - b;}
 INLINE void operator/=(bhalf4& a, const bhalf b) {a = a / b;}
+INLINE void operator*=(bhalf4& a, const bhalf b) {a = a * b;}
 
 INLINE void d_set(bhalf4& a, const uint8_t j, bhalf b){
   ((bhalf*)&a)[j] = b; 
@@ -148,7 +152,9 @@ INLINE float3 operator*(const float3& a, const float3& b) { return make_float3(a
 INLINE float3 operator/(const float s, const float3& a)  { return a*(1/s); }
 INLINE float3 operator/(const float3& a, const float s)  { return a*(1/s); }
 INLINE void operator+=(float3& a, const float3& b) {a = a + b;}
+INLINE void operator-=(float3& a, const float3& b) {a = a - b;}
 INLINE void operator/=(float3& a, const float b) {a = a / b;}
+INLINE void operator*=(float3& a, const float b) {a = a * b;}
 
 INLINE void d_set(float3& a, const u_char j, float b){
   ((float*)&a)[j] = b; 
@@ -208,7 +214,9 @@ INLINE double3 operator*(const double3& a, const double3& b) { return make_doubl
 INLINE double3 operator/(const double s, const double3& a)  { return a*(1/s); }
 INLINE double3 operator/(const double3& a, const double s)  { return a*(1/s); }
 INLINE void operator+=(double3& a, const double3 b) {a = a + b;}
+INLINE void operator-=(double3& a, const double3 b) {a = a - b;}
 INLINE void operator/=(double3& a, const double b) {a = a / b;}
+INLINE void operator*=(double3& a, const double b) {a = a * b;}
 
 INLINE void d_set(double3& a, const u_char j, double b){
   ((double*)&a)[j] = b; 
