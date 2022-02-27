@@ -17,8 +17,8 @@
 #define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t;
 #define INLINE __device__ __forceinline__
 
-typedef IsomerspaceKernel<Polyhedron>::device_real_t device_real_t;
-typedef IsomerspaceKernel<Polyhedron>::device_node_t device_node_t;
+typedef IsomerspaceKernel::device_real_t device_real_t;
+typedef IsomerspaceKernel::device_node_t device_node_t;
 typedef GPU_REAL3 device_coord3d;
 typedef GPU_REAL2 device_coord2d;
 typedef GPU_NODE3 device_node3;
@@ -30,6 +30,7 @@ typedef GPU_NODE3 device_node3;
 #include "forcefield_structs.cu"
 #include "io.cu"
 #include "isomerspace_tutte.cu"
+#include "isomerspace_X0.cu"
 using namespace std::literals;
 namespace cg = cooperative_groups;
 
@@ -666,16 +667,14 @@ void IsomerspaceForcefield::get_internal_coordinates(device_real_t* bonds, devic
 
 void IsomerspaceForcefield::optimize_batch(const size_t iterations){
     printLastCudaError("Memcpy Failed! \n");
+    cudaDeviceSynchronize();
     auto start = std::chrono::system_clock::now();
-    for (size_t i = 0; i < device_count; i++) {cudaSetDevice(i); d_batch[i] <<= h_batch[i];}
     for (size_t i = 0; i < device_count; i++)
     {
         cudaSetDevice(i);
         void* kernelArgs[] = {(void*)&d_batch[i],(void*)&iterations};
         safeCudaKernelCall((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
-    }
-    for (size_t i = 0; i < device_count; i++) {cudaSetDevice(i); h_batch[i] <<= d_batch[i];}
-        
+    }   
     cudaDeviceSynchronize();
     auto end = std::chrono::system_clock::now();
     printLastCudaError("Optimize kernel launch failed: ");
@@ -690,8 +689,6 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel
     
     d_harmonics     = std::vector<InternalCoordinates>(device_count);
     d_coords        = std::vector<InternalCoordinates>(device_count);
-    d_batch         = std::vector<IsomerBatch>(device_count);
-    h_batch         = std::vector<IsomerBatch>(device_count);
     h_coords        = std::vector<InternalCoordinates>(device_count);
     h_harmonics     = std::vector<InternalCoordinates>(device_count);
     
@@ -700,29 +697,19 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel
         cudaSetDevice(i);
         GPUDataStruct::allocate(d_coords[i],        N,  device_capacities[i], DEVICE_BUFFER);
         GPUDataStruct::allocate(d_harmonics[i],     N,  device_capacities[i], DEVICE_BUFFER);
-        GPUDataStruct::allocate(d_batch[i],         N,  device_capacities[i], DEVICE_BUFFER);
-        GPUDataStruct::allocate(h_batch[i],         N,  device_capacities[i], HOST_BUFFER);
         GPUDataStruct::allocate(h_coords[i],        N,  1,                    HOST_BUFFER);
         GPUDataStruct::allocate(h_harmonics[i],     N,  1,                    HOST_BUFFER);
-
-        for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = EMPTY;
     }
     printLastCudaError("Forcefield kernel class instansiation failed!");
 }
 
 IsomerspaceForcefield::~IsomerspaceForcefield()
 {   
-    //Frees allocated pointers. Memory leaks bad. 
     for (size_t i = 0; i < device_count; i++)
     {
-        cudaSetDevice(i);
-        GPUDataStruct::free(d_batch[i]);
-        GPUDataStruct::free(d_coords[i]);
-        GPUDataStruct::free(d_harmonics[i]);
         GPUDataStruct::free(h_coords[i]);
         GPUDataStruct::free(h_harmonics[i]);
-        GPUDataStruct::free(h_batch[i]);
     }
     //Destroys cuda context. It is possible that this function call is sufficient for avoiding memory leaks, in addition to freeing the host_graph.
-    cudaDeviceReset();
+    printLastCudaError("Failed in IsomerspaceKernel destruction");
 }
