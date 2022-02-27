@@ -3,8 +3,8 @@
 #include "fullerenes/gpu/isomerspace_kernel.hh"
 #include <exception>
 
-typedef IsomerspaceKernel<Polyhedron>::device_real_t device_real_t;
-typedef IsomerspaceKernel<Polyhedron>::device_node_t device_node_t;
+typedef IsomerspaceKernel::device_real_t device_real_t;
+typedef IsomerspaceKernel::device_node_t device_node_t;
 typedef GPU_REAL3 device_coord3d;
 typedef GPU_NODE3 device_node3;
 
@@ -24,6 +24,64 @@ __constant__ device_real_t angle_forces[2] = {100.0,100.0};
 __constant__ device_real_t bond_forces[3] = {260.0,390.0,450.0}; 
 __constant__ device_real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
 #endif
+
+
+template <typename T>
+struct CuDeque
+{
+private:
+
+    device_node_t front, back, q_size, capacity;
+    T* array;
+
+public:
+    __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), front(0), back(0), q_size(0), capacity(capacity) {}
+    
+    __device__ device_node_t size(){return q_size;}
+
+    __device__ bool empty(){
+        return q_size == 0;
+    }
+
+    __device__ bool full(){
+        return q_size == capacity;
+    }
+    
+    __device__ T pop_front(){
+        if (!empty()){
+            T return_val = array[front];
+            front = (front + 1) % capacity ;
+            q_size--;
+            return return_val;
+        }
+        assert(false);        
+    }
+
+    __device__ T pop_back(){
+        if (!empty())
+        {
+            T return_val = array[back];
+            back = back > 0 ? back-1 : capacity-1;
+            q_size--;
+            return return_val;
+        }
+        assert(false);
+    }
+
+    __device__ void push_back(T val){
+        assert(!full());
+        back = (back + 1) % capacity;
+        array[back] = val;
+        q_size++;
+    }
+
+    __device__ void push_front(T val){
+        assert(!full());
+        front = front > 0 ? front-1 : capacity-1;
+        array[front] = val;
+        q_size++;
+    }
+};
 
 
 
