@@ -122,7 +122,13 @@ __host__ cudaError_t safeCudaKernelCall(const void* func, dim3 gridDim, dim3 blo
     }
 #endif
 
-
+__device__ device_node_t max(const device_node_t a, const device_node_t b){
+    if (a > b){
+        return a;
+    }else {
+        return b;
+    }
+}
 
 __device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t data){
     sdata[threadIdx.x] = data;
@@ -140,6 +146,26 @@ __device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t
     }
     cg::sync(block);
     device_real_t max = sdata[0];
+    cg::sync(block);
+    return max;
+}
+
+__device__ device_node_t reduction_max(device_node_t* sdata, const device_node_t data){
+    sdata[threadIdx.x] = data;
+    cg::thread_block block = cg::this_thread_block();
+    cg::sync(block);
+    
+    if((Block_Size_Pow_2 > 512)){if (threadIdx.x < 512){sdata[threadIdx.x] = max(sdata[threadIdx.x + 512],sdata[threadIdx.x]);} cg::sync(block);}
+    if((Block_Size_Pow_2 > 256)){if (threadIdx.x < 256){sdata[threadIdx.x] = max(sdata[threadIdx.x + 256],sdata[threadIdx.x]);} cg::sync(block);}
+    if((Block_Size_Pow_2 > 128)){if (threadIdx.x < 128){sdata[threadIdx.x] = max(sdata[threadIdx.x + 128],sdata[threadIdx.x]);} cg::sync(block);}
+    if((Block_Size_Pow_2 > 64)){if (threadIdx.x < 64){sdata[threadIdx.x] = max(sdata[threadIdx.x + 64],sdata[threadIdx.x]);} cg::sync(block);}
+    if(threadIdx.x < 32){
+    if((Block_Size_Pow_2 > 32)){if (threadIdx.x < 32){sdata[threadIdx.x] = max(sdata[threadIdx.x + 32],sdata[threadIdx.x]);} __syncwarp();}
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
+    sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::greater<device_node_t>()); 
+    }
+    cg::sync(block);
+    device_node_t max = sdata[0];
     cg::sync(block);
     return max;
 }
