@@ -18,8 +18,8 @@
 #define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t;
 #define INLINE __device__ __forceinline__
 
-typedef IsomerspaceKernel<FullereneGraph>::device_real_t device_real_t;
-typedef IsomerspaceKernel<FullereneGraph>::device_node_t device_node_t;
+typedef IsomerspaceKernel::device_real_t device_real_t;
+typedef IsomerspaceKernel::device_node_t device_node_t;
 typedef GPU_REAL3 device_coord3d;
 typedef GPU_REAL2 device_coord2d;
 typedef GPU_NODE3 device_node3;
@@ -132,30 +132,8 @@ void IsomerspaceTutte::check_batch(){
 
 IsomerspaceTutte::IsomerspaceTutte(const size_t N) : IsomerspaceKernel::IsomerspaceKernel(N, (void*)kernel_tutte_layout){
     this->shared_memory_bytes = sizeof(device_coord2d)*N*2 + sizeof(device_real_t)*Block_Size_Pow_2;
-
-    std::cout << "\nTutte Capacity: " << this->batch_capacity << "\n";
-
-    d_batch = std::vector<IsomerBatch>(device_count);
-    h_batch = std::vector<IsomerBatch>(device_count);
-
-    for (size_t i = 0; i < device_count; i++)
-    {
-        cudaSetDevice(i);
-        GPUDataStruct::allocate(d_batch[i]         , N, device_capacities[i], DEVICE_BUFFER);
-        GPUDataStruct::allocate(h_batch[i]         , N, device_capacities[i], HOST_BUFFER);
-        
-        for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = EMPTY;
-    }
+    std::cout << "Tutte Capacity: " << this->batch_capacity << "\n";
     printLastCudaError("Tutte kernel class instansiation failed!");
 }
 
-IsomerspaceTutte::~IsomerspaceTutte(){
-    //Frees allocated pointers. Memory leaks bad. 
-    for (size_t i = 0; i < device_count; i++)
-    {
-        cudaSetDevice(i);
-        GPUDataStruct::free(d_batch[i]);
-        GPUDataStruct::free(h_batch[i]);
-    }
-    //Destroys cuda context. It is possible that this function call is sufficient for avoiding memory leaks, in addition to freeing the host_graph.
-}
+IsomerspaceTutte::~IsomerspaceTutte(){}
