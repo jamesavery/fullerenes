@@ -49,7 +49,7 @@ public:
       for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = EMPTY;
     }    
   }
-  virtual void check_batch() {}                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
+  virtual void check_batch(size_t steps) {}                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
   virtual void update_batch();
   void output_isomer(size_t i, size_t idx);
   void insert_isomer(size_t i, size_t idx);
@@ -57,6 +57,7 @@ public:
   void output_batch_to_queue();
   void insert_queued_isomers();
 
+  void copy_metadata();
   static void kernel_to_kernel_copy(IsomerspaceKernel& source, IsomerspaceKernel& destination);
 
 

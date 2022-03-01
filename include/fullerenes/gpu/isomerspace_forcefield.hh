@@ -54,7 +54,7 @@ public:
     }
   };
   
-  void check_batch();                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
+  void check_batch(size_t max_iterations);                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
   void optimize_batch(const size_t iterations);
 
   void get_cartesian_coordinates(device_real_t* X) const;                                                     //Populate target buffer (CPU) with cartesian coordiantes from isomers on GPU.
