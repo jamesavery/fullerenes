@@ -39,6 +39,7 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& G, device_node_t
     BLOCK_SYNC
     device_node_t distance = distances[threadIdx.x];
     BLOCK_SYNC
+
     return distance;
 }
 
@@ -51,26 +52,26 @@ device_coord2d spherical_projection(const IsomerBatch& G, device_node_t* sdata){
 
     node_t distance =  multiple_source_shortest_paths(G,reinterpret_cast<node_t*>(sdata));
     BLOCK_SYNC
-    clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); BLOCK_SYNC
+    clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); 
     node_t d_max = reduction_max(sdata, distance); BLOCK_SYNC
 
-    clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); BLOCK_SYNC
-    atomicAdd_block(&reinterpret_cast<real_t*>(sdata)[distance],real_t(1.0)); BLOCK_SYNC
+    clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); 
+    atomicAdd_block(&reinterpret_cast<real_t*>(sdata)[distance],real_t(1.0)); 
+    BLOCK_SYNC
     node_t num_of_same_dist = node_t(reinterpret_cast<real_t*>(sdata)[distance]); 
     BLOCK_SYNC
     reinterpret_cast<coord2d*>(sdata)[distance] = {real_t(0.0),real_t(0.0)};
     BLOCK_SYNC
     coord2d xys = reinterpret_cast<coord2d*>(G.xys)[blockIdx.x*blockDim.x + threadIdx.x]; BLOCK_SYNC
-    atomicAdd_block(&reinterpret_cast<real_t*>(sdata)[distance*2], xys.x); BLOCK_SYNC
+    atomicAdd_block(&reinterpret_cast<real_t*>(sdata)[distance*2], xys.x); 
     atomicAdd_block(&reinterpret_cast<real_t*>(sdata)[distance*2+1], xys.y); BLOCK_SYNC
-    coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / num_of_same_dist; BLOCK_SYNC   
-    coord2d xy = xys - centroid; BLOCK_SYNC
-    real_t dtheta = real_t(M_PI)/real_t(d_max+1); BLOCK_SYNC
-    real_t phi = dtheta*(distance + real_t(0.5)); BLOCK_SYNC
-    real_t theta = atan2f(xy.x, xy.y); BLOCK_SYNC
-    coord2d spherical_layout = {theta, phi}; BLOCK_SYNC
-    /*
-    */
+    coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / num_of_same_dist;    
+    coord2d xy = xys - centroid;
+    real_t dtheta = real_t(M_PI)/real_t(d_max+1); 
+    real_t phi = dtheta*(distance + real_t(0.5)); 
+    real_t theta = atan2(xy.x, xy.y); 
+    coord2d spherical_layout = {theta, phi};
+
     return spherical_layout;
 }
 
@@ -81,37 +82,34 @@ void kernel_zero_order_geometry(IsomerBatch G, device_real_t scalerad){
     typedef device_coord3d coord3d;
 
     extern __shared__  device_real_t sdata[];
-    clear_cache(sdata, Block_Size_Pow_2);BLOCK_SYNC
+    clear_cache(sdata, Block_Size_Pow_2);
     if (G.statuses[blockIdx.x] == NOT_CONVERGED)
     {
-    NodeGraph node_graph = NodeGraph(G); BLOCK_SYNC
-    coord2d angles = spherical_projection(G,reinterpret_cast<device_node_t*>(sdata));BLOCK_SYNC
-    real_t theta = angles.x; real_t phi = angles.y;BLOCK_SYNC
-    real_t x = cosf(theta)*sinf(phi), y = sinf(theta)*sinf(phi), z = cosf(phi);BLOCK_SYNC
-    coord3d coordinate = {x, y ,z};BLOCK_SYNC
+    NodeGraph node_graph = NodeGraph(G); 
+    coord2d angles = spherical_projection(G,reinterpret_cast<device_node_t*>(sdata));
+    real_t theta = angles.x; real_t phi = angles.y;
+    real_t x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
+    coord3d coordinate = {x, y ,z};
 
-    clear_cache(sdata, Block_Size_Pow_2);BLOCK_SYNC
-    x = reduction(sdata, coordinate.x); y = reduction(sdata, coordinate.y); z = reduction(sdata,coordinate.z);BLOCK_SYNC
+    clear_cache(sdata, Block_Size_Pow_2);
+    x = reduction(sdata, coordinate.x); y = reduction(sdata, coordinate.y); z = reduction(sdata,coordinate.z);
     coord3d cm = {x, y, z};
-    cm /= blockDim.x;BLOCK_SYNC
-    coordinate -= cm;BLOCK_SYNC
+    cm /= blockDim.x;
+    coordinate -= cm;
 
-    real_t Ravg = real_t(0.0);BLOCK_SYNC
-    clear_cache(sdata, Block_Size_Pow_2);BLOCK_SYNC
-    real_t* base_pointer = sdata + Block_Size_Pow_2; BLOCK_SYNC
-    coord3d* X = reinterpret_cast<coord3d*>(base_pointer);BLOCK_SYNC
+    real_t Ravg = real_t(0.0);
+    clear_cache(sdata, Block_Size_Pow_2);
+    real_t* base_pointer = sdata + Block_Size_Pow_2; 
+    coord3d* X = reinterpret_cast<coord3d*>(base_pointer);
     X[threadIdx.x] = coordinate;
     BLOCK_SYNC
-    real_t local_Ravg = real_t(0.0);BLOCK_SYNC
+    real_t local_Ravg = real_t(0.0);
     for (uint8_t i = 0; i < 3; i++) local_Ravg += norm(X[threadIdx.x] - X[d_get(node_graph.neighbours,i)]);
-    BLOCK_SYNC
+
     Ravg = reduction(sdata, local_Ravg);
     Ravg /= real_t(3*blockDim.x);
-
-    BLOCK_SYNC
     coordinate *= scalerad*1.5/Ravg;
-    reinterpret_cast<coord3d*>(G.X)[blockDim.x*blockIdx.x + threadIdx.x] = coordinate;BLOCK_SYNC
-    BLOCK_SYNC
+    reinterpret_cast<coord3d*>(G.X)[blockDim.x*blockIdx.x + threadIdx.x] = coordinate;
     G.statuses[blockIdx.x] = CONVERGED;
     }
     
