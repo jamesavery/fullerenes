@@ -52,7 +52,7 @@ void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
     if(threadIdx.x < Nface) reinterpret_cast<bool*>(sharedmem)[outer_face] =  true; BLOCK_SYNC
     bool fixed = reinterpret_cast<bool*>(sharedmem)[threadIdx.x];
 
-    if(threadIdx.x < Nface) xys[outer_face] = {sinf(threadIdx.x*2*real_t(M_PI)/double(Nface)),cosf(threadIdx.x*2*real_t(M_PI)/double(Nface))};
+    if(threadIdx.x < Nface) xys[outer_face] = {sin(threadIdx.x*2*real_t(M_PI)/double(Nface)),cos(threadIdx.x*2*real_t(M_PI)/double(Nface))};
     BLOCK_SYNC
     bool converged          = false;
     real_t max_change       = real_t(0.0);
