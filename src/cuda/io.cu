@@ -70,24 +70,26 @@ void clear_convergence_status(IsomerBatch G){
 
 __global__
 void input_type_conversion(IsomerBatch G){
-    node_t input_neighbours[3]  = {reinterpret_cast<node_t*>(G.neighbours)[(threadIdx.x* + blockDim.x*blockIdx.x)*3], reinterpret_cast<node_t*>(G.neighbours)[(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 1], reinterpret_cast<node_t*>(G.neighbours)[(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 2]};
-    double input_coordianates[3]= {reinterpret_cast<double*>(G.X)[(threadIdx.x* + blockDim.x*blockIdx.x)*3], reinterpret_cast<double*>(G.X)[(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 1], reinterpret_cast<double*>(G.X)[(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 2]};
-    double input_xys[2]         = {reinterpret_cast<double*>(G.xys)[(threadIdx.x* + blockDim.x*blockIdx.x)*2], reinterpret_cast<double*>(G.xys)[(threadIdx.x* + blockDim.x*blockIdx.x)*2 + 1]};
+    node_t input_neighbours[3]  = {reinterpret_cast<node_t*>(G.neighbours)[(threadIdx.x* + blockDim.x*blockIdx.x)*3],   reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 1], reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 2]};
+    //double input_coordianates[3]= {reinterpret_cast<double*>(G.X)[(threadIdx.x* + blockDim.x*blockIdx.x)*3],            reinterpret_cast<double*>(G.X)          [(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 1], reinterpret_cast<double*>(G.X)          [(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 2]};
+    //double input_xys[2]         = {reinterpret_cast<double*>(G.xys)[(threadIdx.x* + blockDim.x*blockIdx.x)*2],          reinterpret_cast<double*>(G.xys)        [(threadIdx.x* + blockDim.x*blockIdx.x)*2 + 1]};
     cg::sync(cg::this_grid());
-    reinterpret_cast<device_node3*>(G.neighbours)[(threadIdx.x + blockDim.x*blockIdx.x)] = {input_neighbours[0], input_neighbours[1], input_neighbours[2]};
-    reinterpret_cast<device_coord3d*>(G.X)[(threadIdx.x + blockDim.x*blockIdx.x)] = {input_coordianates[0], input_coordianates[1], input_coordianates[2]};
-    reinterpret_cast<device_coord2d*>(G.xys)[(threadIdx.x + blockDim.x*blockIdx.x)] = {input_xys[0], input_xys[1]};
+    //reinterpret_cast<device_node3*>(G.neighbours)[(threadIdx.x + blockDim.x*blockIdx.x)] = {input_neighbours[0], input_neighbours[1], input_neighbours[2]};
+    //reinterpret_cast<device_coord3d*>(G.X)       [(threadIdx.x + blockDim.x*blockIdx.x)] = {input_coordianates[0], input_coordianates[1], input_coordianates[2]};
+    //reinterpret_cast<device_coord2d*>(G.xys)     [(threadIdx.x + blockDim.x*blockIdx.x)] = {input_xys[0], input_xys[1]};
+
+    sequential_print(reinterpret_cast<device_node3*>(G.neighbours)[blockDim.x*blockIdx.x + threadIdx.x], 0 ) ;
 }
 
 __global__
 void output_type_conversion(IsomerBatch G){
-    device_node3 output_neighbours = reinterpret_cast<device_node3*>(G.neighbours)[threadIdx.x + blockDim.x*blockIdx.x];
-    device_coord3d output_coordinates = reinterpret_cast<device_coord3d*>(G.X)[threadIdx.x + blockDim.x*blockIdx.x];
-    device_coord2d output_xys = reinterpret_cast<device_coord2d*>(G.xys)[threadIdx.x + blockDim.x*blockIdx.x];
-    cg:.sync(cg::this_grid());
-    reinterpret_cast<node_t*>(G.neighbours)[(threadIdx.x + blockDim.x*blockIdx.x)*3] = output_neighbours.x; reinterpret_cast<node_t*>(G.neighbours)[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1] = output_neighbours.y; reinterpret_cast<node_t*>(G.neighbours)[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2] = output_neighbours.z;
-    reinterpret_cast<double*>(G.X)[(threadIdx.x + blockDim.x*blockIdx.x)*3] = output_coordinates.x; reinterpret_cast<double*>(G.X)[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1] = output_coordinates.y; reinterpret_cast<double*>(G.X)[(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2] = output_coordinates.z;
-    reinterpret_cast<double*>(G.xys)[(threadIdx.x + blockDim.x*blockIdx.x)*2] = output_xys.x; reinterpret_cast<double*>(G.xys)[(threadIdx.x + blockDim.x*blockIdx.x)*2 + 1] = output_xys.y;
+    device_node3 output_neighbours      = reinterpret_cast<device_node3*>  (G.neighbours)   [threadIdx.x + blockDim.x*blockIdx.x];
+    device_coord3d output_coordinates   = reinterpret_cast<device_coord3d*>(G.X)            [threadIdx.x + blockDim.x*blockIdx.x];
+    device_coord2d output_xys           = reinterpret_cast<device_coord2d*>(G.xys)          [threadIdx.x + blockDim.x*blockIdx.x];
+    cg:sync(cg::this_grid());
+    reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3] = output_neighbours.x;    reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1] = output_neighbours.y;    reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2] = output_neighbours.z;
+    reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3] = output_coordinates.x;   reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1] = output_coordinates.y;   reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2] = output_coordinates.z;
+    reinterpret_cast<double*>(G.xys)        [(threadIdx.x + blockDim.x*blockIdx.x)*2] = output_xys.x;           reinterpret_cast<double*>(G.xys)        [(threadIdx.x + blockDim.x*blockIdx.x)*2 + 1] = output_xys.y;
 }
 
 void IsomerspaceKernel::kernel_to_kernel_copy(IsomerspaceKernel& S, IsomerspaceKernel& D){
@@ -105,13 +107,24 @@ void IsomerspaceKernel::kernel_to_kernel_copy(IsomerspaceKernel& S, IsomerspaceK
     for (size_t i = 0; i < S.get_device_count(); i++){cudaSetDevice(i); D.d_batch[i] <<= S.d_batch[i];}
     //for (size_t i = 0; i < S.get_device_count(); i++){cudaSetDevice(i); D.h_batch[i] <<= D.d_batch[i];}
     //for (size_t i = 0; i < S.get_device_capacity(0); i++){cout << D.h_batch[0].statuses[i] << ", " << std::flush;}
-}   
+}
+
+void IsomerspaceKernel::copy_metadata(){
+    for (size_t i = 0; i < device_count; i++)
+    {
+        cudaSetDevice(i);
+        cudaMemcpy(d_batch[i].statuses,     h_batch[i].statuses,    sizeof(IsomerStatus)* device_capacities[i], cudaMemcpyHostToDevice);
+        cudaMemcpy(d_batch[i].iterations,   h_batch[i].iterations,  sizeof(size_t)* device_capacities[i],       cudaMemcpyHostToDevice);
+        cudaMemcpy(d_batch[i].IDs,          h_batch[i].IDs,         sizeof(size_t)* device_capacities[i],       cudaMemcpyHostToDevice);
+    }
+}
 
 void IsomerspaceKernel::output_isomer(size_t i, size_t idx){
     IsomerBatch B    = h_batch[i];
     size_t offset    = idx*3*N;
     size_t c_offset  = idx*2*N;
     neighbours_t output(N); std::vector<coord3d> output_X(N); std::vector<coord2d> xys(N);
+
     for (size_t j = 0; j < N; j++) {
         output[j] = std::vector<node_t>(B.neighbours + offset + j*3, B.neighbours + offset + j*3 + 3);
         xys[j]      = {reinterpret_cast<device_coord2d*>(B.xys + c_offset)[j].x,reinterpret_cast<device_coord2d*>(B.xys + c_offset)[j].y};
@@ -127,15 +140,19 @@ void IsomerspaceKernel::insert_isomer(size_t i, size_t idx){
 
     IsomerBatch B = h_batch[i];
     assert(!insert_queue.empty());
+    cudaSetDevice(i);
     size_t ID        = insert_queue.front().first;
     Polyhedron P     = insert_queue.front().second;
     size_t offset  = idx*3*N;
 
+    //cudaMemcpy(&d_batch[i].neighbours[offset], P.neighbours[0].data(), sizeof(node_t)*3*N, cudaMemcpyHostToDevice);
+    //cudaMemcpy(&d_batch[i].X[offset], &P.points[0][0], sizeof(double)*3*N, cudaMemcpyHostToDevice);
+    //cudaMemcpy(&d_batch[i].xys[offset], &P.layout2d[0], sizeof(coord2d)*N, cudaMemcpyHostToDevice);
+    
     for (device_node_t u = 0; u < N; u++){
         for (int j = 0; j < 3; j++){
             device_node_t v = P.neighbours[u][j];
             size_t arc_index = u*3 + j + offset;
-            
             
             B.neighbours  [arc_index]    = v;
             B.X           [arc_index]    = !P.points.empty() ? P.points[u][j] : 0.0;
@@ -143,7 +160,7 @@ void IsomerspaceKernel::insert_isomer(size_t i, size_t idx){
         B.xys         [u*2 + idx*2*N] = !P.layout2d.empty() ? P.layout2d[u].first : 0.0;
         B.xys         [u*2 + idx*2*N + 1] = !P.layout2d.empty() ? P.layout2d[u].second : 0.0;
     }
-
+    
     B.iterations[idx]   = 0;
     B.statuses[idx]    = NOT_CONVERGED;
     B.IDs[idx]         = ID;
@@ -182,6 +199,7 @@ void IsomerspaceKernel::update_batch(){
             }
         }
     }
+    for(size_t i = 0; i < device_count; i++) d_batch[i] <<= h_batch[i];
 }
 
 void IsomerspaceKernel::output_batch_to_queue(){
@@ -199,5 +217,9 @@ void IsomerspaceKernel::output_batch_to_queue(){
 void IsomerspaceKernel::insert_queued_isomers(){
     for (size_t i = 0; i < device_count; i++)
     for (size_t j = 0; j < device_capacities[i]; j++) if(!insert_queue.empty()) insert_isomer(i,j);
-    for(size_t i = 0; i < device_count; i++) {cudaSetDevice(i); d_batch[i] <<= h_batch[i];}
+    printLastCudaError("Failed to insert isomers: ");
+    for (size_t i = 0; i < device_count; i++) d_batch[i] <<= h_batch[i];
+    
+    //copy_metadata();
+    //for(size_t i = 0; i < device_count; i++) {void* kargs[] = {(void*)&d_batch[i]}; safeCudaKernelCall((void*)input_type_conversion, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kargs, 0);}
 }
