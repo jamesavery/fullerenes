@@ -546,7 +546,7 @@ __global__ void kernel_optimize_batch(IsomerBatch G, const size_t iterations){
     }    
 }
 
-__global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_reduction_array){
+__global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_reduction_array, size_t max_iterations){
 
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
@@ -587,7 +587,7 @@ __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_red
         if (converged)
         {
             G.statuses[blockIdx.x] = CONVERGED;
-        } else if (G.iterations[blockIdx.x] >= 10*blockDim.x) {
+        } else if (G.iterations[blockIdx.x] >= max_iterations) {
             G.statuses[blockIdx.x] = FAILED;
         }
     }
@@ -625,10 +625,10 @@ __global__ void kernel_internal_coordinates(IsomerBatch G, IsomerspaceForcefield
     }
 }
 
-void IsomerspaceForcefield::check_batch(){
+void IsomerspaceForcefield::check_batch(size_t max_iterations){
     for (size_t i = 0; i < device_count; i++){
         cudaSetDevice(i);
-        void* kernelArgs1[] = {(void*)&d_batch[i], (void*)&global_reduction_arrays[i]};
+        void* kernelArgs1[] = {(void*)&d_batch[i], (void*)&global_reduction_arrays[i], (void*)&max_iterations};
         safeCudaKernelCall((void*)kernel_batch_statistics, dim3(device_capacities[i],1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes);
     }
     cudaDeviceSynchronize();
