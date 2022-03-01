@@ -201,19 +201,19 @@ __device__ void print(const half4& ab){
 }
 
 __device__ void print(const half2& ab){
-    printf("[%.16e,%.16e] \n", __half2float(ab.x), __half2float(ab.y));
+    printf("[%.6f,%.6f] \n", __half2float(ab.x), __half2float(ab.y));
 }
 
 __HD__ void print(device_real_t a){
-    printf("[%.16e]", a);
+    printf("%.6f", a);
 }
 
 __HD__ void print(bool b){
-    printf("[%d]",int(b));
+    printf("%d",int(b));
 }
 
 __HD__ void print(int a){
-    printf("[%d]",a);
+    printf("%d",a);
 }
 
 __device__ void print(const char* a){
