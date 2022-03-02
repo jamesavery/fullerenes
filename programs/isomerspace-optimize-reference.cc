@@ -164,7 +164,7 @@ int main(int ac, char **argv)
     }
 
     // Output molecular geometry files
-    progress_bar.update_progress((float)(ff_kernel.get_converged_count() + ff_kernel.get_failed_count())/(float)num_fullerenes.find(N)->second, "F: " + to_string(ff_kernel.get_failed_count()) + "  S: " + to_string(ff_kernel.get_converged_count()));
+    //progress_bar.update_progress((float)(ff_kernel.get_converged_count() + ff_kernel.get_failed_count())/(float)num_fullerenes.find(N)->second, "F: " + to_string(ff_kernel.get_failed_count()) + "  S: " + to_string(ff_kernel.get_converged_count()));
     if (I > 20000){break;}
   }
   

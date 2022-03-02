@@ -117,18 +117,12 @@ int main(int ac, char **argv)
       auto t0 = system_clock::now();
       FullereneGraph G(tutte_kernel.output_queue.front().second);
       size_t ID = tutte_kernel.output_queue.front().first;
-
-      vector<coord3d> X0 = G.zero_order_geometry(); // TODO: Faster, better X0
-      //auto t5= system_clock::now(); TX0     += t5-t4;
-      Polyhedron P0(G,X0);
-      ff_kernel.insert_isomer(P0,ID);
-      //auto t6 = system_clock::now(); Tcopy += t6 -t5;
-      //X0_kernel.insert_isomer(Polyhedron(G), tutte_kernel.output_queue.front().first);
-      //Tcopy += system_clock::now() - t0;
+      X0_kernel.insert_isomer(Polyhedron(G), tutte_kernel.output_queue.front().first);
+      Tcopy += system_clock::now() - t0;
       tutte_kernel.output_queue.pop();
     }
 
-    /*
+    
     auto t4 = system_clock::now();
     if (X0_kernel.get_batch_size()==0)
     {
@@ -140,16 +134,16 @@ int main(int ac, char **argv)
     X0_kernel.check_batch();
     X0_kernel.update_batch();
     Tcopy += system_clock::now() - t6;
-    */
-   /*
-    while(!X0_kernel.output_queue.empty()){
-      //auto t0 = system_clock::now();
-      //Polyhedron P(X0_kernel.output_queue.front().second);
-      //ff_kernel.insert_isomer(P, X0_kernel.output_queue.front().first);
-      //X0_kernel.output_queue.pop();
-      //Tcopy += system_clock::now() - t0;
-    }*/
     
+   
+    while(!X0_kernel.output_queue.empty()){
+      auto t0 = system_clock::now();
+      Polyhedron P(X0_kernel.output_queue.front().second);
+      ff_kernel.insert_isomer(P, X0_kernel.output_queue.front().first);
+      X0_kernel.output_queue.pop();
+      Tcopy += system_clock::now() - t0;
+    }
+
     auto t7 = system_clock::now();
     if(ff_kernel.get_batch_size() == 0){
       ff_kernel.update_batch();
@@ -189,7 +183,7 @@ int main(int ac, char **argv)
     }
 
     // Output molecular geometry files
-    progress_bar.update_progress((float)(ff_kernel.get_converged_count() + ff_kernel.get_failed_count())/(float)num_fullerenes.find(N)->second, "F: " + to_string(ff_kernel.get_failed_count()) + "  S: " + to_string(ff_kernel.get_converged_count()));
+    //progress_bar.update_progress((float)(ff_kernel.get_converged_count() + ff_kernel.get_failed_count())/(float)num_fullerenes.find(N)->second, "F: " + to_string(ff_kernel.get_failed_count()) + "  S: " + to_string(ff_kernel.get_converged_count()));
     if (I > 20000){break;} 
   }
   
