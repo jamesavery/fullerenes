@@ -10,6 +10,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/gpu/isomerspace_X0.hh"
 #include "fullerenes/gpu/isomerspace_tutte.hh"
+#include "fullerenes/gpu/isomerspace_forcefield.hh"
 #include "numeric"
 
 using namespace std;
@@ -47,8 +48,12 @@ int main(int ac, char **argv)
     int only_nontrivial   = ac>=5? strtol(argv[4],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
     int n_best_candidates = ac>=6? strtol(argv[5],0,0):100; // Argument 5: How many best fullerne candidates do you want to store? 
 
-    IsomerspaceX0 X0_kernel   = IsomerspaceX0(N);
-    IsomerspaceTutte tutte_kernel   = IsomerspaceTutte(N);
+    IsomerspaceX0 X0_kernel                 = IsomerspaceX0(N);
+    IsomerspaceX0 X0_kernel_pipe            = IsomerspaceX0(N);
+    IsomerspaceForcefield ff_kernel         = IsomerspaceForcefield(N);
+    IsomerspaceForcefield ff_kernel_pipe    = IsomerspaceForcefield(N);
+    IsomerspaceTutte tutte_kernel           = IsomerspaceTutte(N);
+    IsomerspaceTutte tutte_kernel_pipe      = IsomerspaceTutte(N);
     FullereneDual dualG;
     BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
     size_t I = 0;
@@ -64,9 +69,7 @@ int main(int ac, char **argv)
         FullereneGraph   G = dualG.dual_graph();  // Construct fullerene graph
         
         tutte_kernel.insert_isomer(G,I);
-        G.layout2d = G.tutte_layout();
-        vector<coord3d> X0 = G.zero_order_geometry();
-        fullerene_graphs.push(Polyhedron(G,X0));
+        tutte_kernel_pipe.insert_isomer(G,I);
     }
     tutte_kernel.update_batch();
     while (tutte_kernel.get_batch_size()!=0 || !tutte_kernel.insert_queue.empty())
@@ -89,22 +92,49 @@ int main(int ac, char **argv)
         X0_kernel.update_batch();
     }
 
+    while (!X0_kernel.output_queue.empty())
+    {
+        ff_kernel.insert_isomer(X0_kernel.output_queue.front().second, X0_kernel.output_queue.front().first);
+        X0_kernel.output_queue.pop();
+    }
+    
+    while (ff_kernel.get_batch_size()!=0 || !ff_kernel.insert_queue.empty())
+    {
+        ff_kernel.optimize_batch(N*10);
+        ff_kernel.check_batch(N*10);
+        ff_kernel.update_batch();
+    }
     
 
-    while (!X0_kernel.output_queue.empty())
+    cout << "Starting pipeline" << std::endl;
+    while (tutte_kernel_pipe.get_batch_size()!=0 || !tutte_kernel_pipe.insert_queue.empty())
     {   
-        if(!is_equal(fullerene_graphs.front().points, X0_kernel.output_queue.front().second.points)){
-            cout << "Isomer " << X0_kernel.output_queue.front().first << " Failed" << std::endl;
+        tutte_kernel_pipe.clear_batch();
+        tutte_kernel_pipe.insert_queued_isomers();
+        tutte_kernel_pipe.tutte_layout();
+        IsomerspaceKernel::kernel_to_kernel_copy(tutte_kernel_pipe,X0_kernel_pipe);
+        X0_kernel_pipe.zero_order_geometry();
+        IsomerspaceKernel::kernel_to_kernel_copy(X0_kernel_pipe,ff_kernel_pipe);
+        ff_kernel_pipe.optimize_batch(N*10);
+        ff_kernel_pipe.check_batch(N*10);
+        ff_kernel_pipe.output_batch_to_queue();
+    }
+    
+
+    while (!ff_kernel.output_queue.empty())
+    {   
+        if(!is_equal(ff_kernel_pipe.output_queue.front().second.points, ff_kernel.output_queue.front().second.points)){
+            cout << "Isomer " << ff_kernel.output_queue.front().first << " Failed" << std::endl;
             //cout << fullerene_graphs.front().points << std::endl;
-            //cout << X0_kernel.output_queue.front().second.points << std::endl;
+            //cout << ff_kernel.output_queue.front().second.points << std::endl;
             //cout << fullerene_graphs.front().multiple_source_shortest_paths(fullerene_graphs.front().find_outer_face()) << std::endl;
             //cout << fullerene_graphs.front().spherical_projection() << std::endl;
             assert(false);
         }
-        cout << "Isomer: " << X0_kernel.output_queue.front().first << " Succeeded" << std::endl;
+        cout << "Isomer: " << ff_kernel.output_queue.front().first << " Succeeded" << std::endl;
         
         
-        X0_kernel.output_queue.pop(); fullerene_graphs.pop();
+        ff_kernel.output_queue.pop(); ff_kernel_pipe.output_queue.pop();
     }
 
 }
