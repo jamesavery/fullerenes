@@ -56,6 +56,7 @@ add_subdirectory(src/fortran)
 add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(programs)
+add_subdirectory(tests)
 
 # TODO: Add OpenMP Isomerspace implementation, choose at runtime if both openmp and cuda present. OpenACC too?
 

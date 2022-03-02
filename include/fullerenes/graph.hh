@@ -1,5 +1,20 @@
 #pragma once
 
+// TODO FOR SIMPLIFIED & MORE EFFICIENT IMPLEMENTATION:
+//  * neighbours_t for CubicGraph is new sparse_matrix datatype whose data is a flat N*d_max neighbours array + Nx1 degrees array
+//    This allows dynamic insertion and deletion of edges/arcs without reallocation. Maybe add "compactify()" for when no more dynamic operations are needed.
+//  * memory can be allocated at construction + freed at destruction ( bool owns_memory == true )
+//    or can be a view of memory allocated elsewhere by passing a pointer at construction ( owns_memory == false)
+//  * clean up interface (not everything is needed)
+//  * layout2d() should no longer be a part of PlanarGraph - separate out
+//  * dedge_t -> arc_t
+//  * add more efficient interface that exploits arc representations of the form (u,i) instead of (u,v) (with v = neighbours[u][i])
+//  * remove dependency on hashes (Use N*3 tables instead). arc2cubic (tri), arc2dual, carc2darc, etc.
+//  * simplify computation of dual
+//  * simplify Halma + GC
+//  * make simple dynamic array class to replace std::vector (as std::vector doesn't allow initialization from existing memory -> no zero-copy init).
+//    => this will let us put a Graph/FullereneGraph/CubicGraph/etc. view on existing flat-memory representation with no overhead.
+
 #include <stdio.h>
 #include <map>
 #include <vector>
@@ -21,7 +36,7 @@ struct Graph {
   int N;
   neighbours_t neighbours;
   bool is_oriented;
-
+  
   Graph(size_t N=0, bool is_oriented=false) : N(N), neighbours(N), is_oriented(is_oriented) {}
   Graph(const set<edge_t>& edge_set) : is_oriented(false) {
     update_from_edgeset(edge_set);
