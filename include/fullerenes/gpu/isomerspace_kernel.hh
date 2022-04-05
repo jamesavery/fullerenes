@@ -15,7 +15,7 @@
 #define GPU_REAL2 float2
 #define GPU_NODE2 ushort2
 #define GPU_NODE3 ushort3
-#define NODE_MAX INT16_MAX
+#define NODE_MAX UINT16_MAX
 #define MAKE_NODE3 make_ushort3
 #define Block_Size_Pow_2 256
 #define SEMINARIO_FORCE_CONSTANTS 1
@@ -78,7 +78,9 @@ protected:
   size_t failed_count = 0;                //Total number of failed isomers optimized by this object.   
   
   void* kernel_pointer;
-  void* cuda_streams;
+  cudaStream_t main_stream;
+  cudaStream_t copy_to_host_stream;
+
   int device_count;
 
   //h_buffer and d_buffer are mirrors and reflect what will be computed, d_input_batch and d_output_batch exist for linking kernels together in a pipeline. 
