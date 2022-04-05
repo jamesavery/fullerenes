@@ -355,6 +355,16 @@ void printLastCudaError(std::string message = ""){
     }
 }
 
+__device__ void ordered_atomic_add(device_real_t* data, device_real_t element){
+    for (size_t i = 0; i < blockDim.x; i++)
+    {
+        BLOCK_SYNC
+        if(threadIdx.x == i){
+            *data += element;
+        }
+    }
+}
+
 __device__ void clear_cache(device_real_t* sdata, size_t N){
     BLOCK_SYNC
     for (size_t index = threadIdx.x; index < N; index+=blockDim.x)

@@ -53,24 +53,25 @@ device_coord2d spherical_projection(const IsomerBatch& G, device_node_t* sdata){
     node_t distance =  multiple_source_shortest_paths(G,reinterpret_cast<node_t*>(sdata));
     BLOCK_SYNC
     clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); 
-    node_t d_max = reduction_max(sdata, distance); BLOCK_SYNC
+    node_t d_max = reduction_max(sdata, distance);
 
     clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); 
-    atomicAdd_block(&reinterpret_cast<real_t*>(sdata)[distance],real_t(1.0)); 
+    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance],real_t(1.0)); 
     BLOCK_SYNC
     node_t num_of_same_dist = node_t(reinterpret_cast<real_t*>(sdata)[distance]); 
     BLOCK_SYNC
-    reinterpret_cast<coord2d*>(sdata)[distance] = {real_t(0.0),real_t(0.0)};
+    clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2);
     BLOCK_SYNC
     coord2d xys = reinterpret_cast<coord2d*>(G.xys)[blockIdx.x*blockDim.x + threadIdx.x]; BLOCK_SYNC
-    atomicAdd_block(&reinterpret_cast<real_t*>(sdata)[distance*2], xys.x); 
-    atomicAdd_block(&reinterpret_cast<real_t*>(sdata)[distance*2+1], xys.y); BLOCK_SYNC
-    coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / num_of_same_dist;    
+    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2], xys.x); 
+    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2+1], xys.y); BLOCK_SYNC
+    coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / num_of_same_dist; BLOCK_SYNC    
     coord2d xy = xys - centroid;
     real_t dtheta = real_t(M_PI)/real_t(d_max+1); 
     real_t phi = dtheta*(distance + real_t(0.5)); 
     real_t theta = atan2(xy.x, xy.y); 
     coord2d spherical_layout = {theta, phi};
+    
 
     return spherical_layout;
 }
@@ -105,14 +106,13 @@ void kernel_zero_order_geometry(IsomerBatch G, device_real_t scalerad){
     BLOCK_SYNC
     real_t local_Ravg = real_t(0.0);
     for (uint8_t i = 0; i < 3; i++) local_Ravg += norm(X[threadIdx.x] - X[d_get(node_graph.neighbours,i)]);
-
+    
     Ravg = reduction(sdata, local_Ravg);
     Ravg /= real_t(3*blockDim.x);
     coordinate *= scalerad*1.5/Ravg;
     reinterpret_cast<coord3d*>(G.X)[blockDim.x*blockIdx.x + threadIdx.x] = coordinate;
     G.statuses[blockIdx.x] = CONVERGED;
     }
-    
 }
 void IsomerspaceX0::check_batch(){
     batch_size = 0;
