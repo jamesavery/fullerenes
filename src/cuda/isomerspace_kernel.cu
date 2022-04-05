@@ -1,5 +1,6 @@
 #pragma once
 #include "fullerenes/gpu/isomerspace_kernel.hh"
+#include "io.cu"
 #include "cuda_runtime.h"
 #include "cuda.h"
 #include "cuda_runtime_api.h"
@@ -32,6 +33,10 @@ IsomerspaceKernel::IsomerspaceKernel(const size_t N, void* kernel){
     this->N                 = N;
     batch_capacity          = get_batch_capacity();    
     index_queue             = std::vector<std::queue<int>>(device_count);
+    
+    //Create 2 streams that have no implicit synchronization with the default stream.
+    cudaStreamCreateWithFlags(&main_stream, cudaStreamNonBlocking);
+    cudaStreamCreateWithFlags(&copy_to_host_stream, cudaStreamNonBlocking);
 
     d_batch = std::vector<IsomerBatch>(device_count);
     h_batch = std::vector<IsomerBatch>(device_count);
@@ -46,6 +51,8 @@ IsomerspaceKernel::IsomerspaceKernel(const size_t N, void* kernel){
         batch_sizes[i] = 0;
         for (size_t j = 0; j < device_capacities[i]; j++) index_queue[i].push(j);
         for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = EMPTY;
+
+        d_batch[i] <<= h_batch[i];
     }
 }
 
