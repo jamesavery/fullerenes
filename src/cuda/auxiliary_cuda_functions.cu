@@ -224,14 +224,6 @@ __device__ void print(const device_node3& a){
     printf("[%d,%d,%d]",a.x,a.y,a.z);
 }
 
-__device__ void print(const uchar3& a){
-    printf("[%d,%d,%d]",a.x,a.y,a.z);
-}
-
-__device__ void print(const uint3& a){
-    printf("[%d,%d,%d]",a.x,a.y,a.z);
-}
-
 __device__ void print(const device_coord2d& a){
     printf("[%.6f,%.6f]",a.x,a.y);
 }
@@ -321,6 +313,30 @@ __device__ void sequential_print(T* data, size_t fullerene_id){
     if(threadIdx.x == 0) printf("]\n");
     cg::sync(cg::this_thread_block());
     }
+}
+
+template <typename T>
+__device__ void grid_print(T data){
+
+    if (threadIdx.x + blockIdx.x == 0) printf("[");
+    cg::sync(cg::this_grid());
+    for (size_t i = 0; i < gridDim.x; i++)
+    {   
+            if(threadIdx.x == 0){
+            if (blockIdx.x == i)
+            {
+            if (i != gridDim.x-1)
+            {
+                print(data); printf(",");
+            } else{
+                print(data);
+            }}
+
+        }
+        cg::sync(cg::this_grid());
+    }
+    if(threadIdx.x + blockIdx.x == 0) printf("]\n");
+    cg::sync(cg::this_grid());
 }
 
 template <typename T>
