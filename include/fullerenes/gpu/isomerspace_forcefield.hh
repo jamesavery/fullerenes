@@ -53,7 +53,17 @@ public:
                   {"outer_dihedrals_p", (void**)&outer_dihedrals_p, s,true}};
     }
   };
+
+  struct SharedQueue
+  {
+    IsomerBatch data;
+    size_t q_size, capacity, front, back;
+
+    SharedQueue(const size_t N, const size_t capacity): q_size(0), capacity(capacity), front(0), back(0) {GPUDataStruct::allocate(this->data,N,capacity,DEVICE_BUFFER);}
+  };
   
+  void push_batch_from_kernel(const IsomerspaceKernel& input_kernel);
+  void update_device_batches();
   void check_batch(size_t max_iterations);                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
   void optimize_batch(const size_t iterations);
 
@@ -71,6 +81,7 @@ public:
 
 
 protected:
+  std::vector<IsomerBatch> d_queues;
   std::vector<InternalCoordinates> d_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
   std::vector<InternalCoordinates> h_coords;     //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
   std::vector<InternalCoordinates> d_harmonics;  //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3

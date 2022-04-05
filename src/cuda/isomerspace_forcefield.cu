@@ -508,7 +508,6 @@ __global__ void kernel_optimize_batch(IsomerBatch G, const size_t iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    
     if (G.statuses[blockIdx.x] == NOT_CONVERGED)
     {
         real_t* base_pointer        = smem + Block_Size_Pow_2;
@@ -544,6 +543,7 @@ __global__ void kernel_optimize_batch(IsomerBatch G, const size_t iterations){
 
         if (threadIdx.x == 0) {G.iterations[blockIdx.x] += iterations;}
     }    
+
 }
 
 __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_reduction_array, size_t max_iterations){
@@ -592,6 +592,7 @@ __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_red
         }
     }
     }
+    
 }
 
 __global__ void kernel_internal_coordinates(IsomerBatch G, IsomerspaceForcefield::InternalCoordinates c, IsomerspaceForcefield::InternalCoordinates c0){
@@ -626,13 +627,12 @@ __global__ void kernel_internal_coordinates(IsomerBatch G, IsomerspaceForcefield
 }
 
 void IsomerspaceForcefield::check_batch(size_t max_iterations){
+    cudaDeviceSynchronize();
     for (size_t i = 0; i < device_count; i++){
         cudaSetDevice(i);
         void* kernelArgs1[] = {(void*)&d_batch[i], (void*)&global_reduction_arrays[i], (void*)&max_iterations};
         safeCudaKernelCall((void*)kernel_batch_statistics, dim3(device_capacities[i],1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes);
     }
-    cudaDeviceSynchronize();
-
     batch_size = 0;
     for (size_t i = 0; i < device_count; i++)
     {
@@ -675,13 +675,9 @@ void IsomerspaceForcefield::optimize_batch(const size_t iterations){
         void* kernelArgs[] = {(void*)&d_batch[i],(void*)&iterations};
         safeCudaKernelCall((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
     }   
-    cudaDeviceSynchronize();
     auto end = std::chrono::system_clock::now();
     printLastCudaError("Optimize kernel launch failed: ");
 }
-
-
-
 
 IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel::IsomerspaceKernel(N, (void*)kernel_optimize_batch){  
     this->shared_memory_bytes   = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
@@ -691,22 +687,29 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel
     d_coords        = std::vector<InternalCoordinates>(device_count);
     h_coords        = std::vector<InternalCoordinates>(device_count);
     h_harmonics     = std::vector<InternalCoordinates>(device_count);
+    d_queues        = std::vector<IsomerBatch>(device_count);
     
     for (size_t i = 0; i < device_count; i++)
     {   
         cudaSetDevice(i);
-        GPUDataStruct::allocate(d_coords[i],        N,  device_capacities[i], DEVICE_BUFFER);
-        GPUDataStruct::allocate(d_harmonics[i],     N,  device_capacities[i], DEVICE_BUFFER);
-        GPUDataStruct::allocate(h_coords[i],        N,  1,                    HOST_BUFFER);
-        GPUDataStruct::allocate(h_harmonics[i],     N,  1,                    HOST_BUFFER);
+        GPUDataStruct::allocate(d_queues[i],        N,  device_capacities[i]*5, DEVICE_BUFFER);
+        GPUDataStruct::allocate(d_coords[i],        N,  device_capacities[i],   DEVICE_BUFFER);
+        GPUDataStruct::allocate(d_harmonics[i],     N,  device_capacities[i],   DEVICE_BUFFER);
+        GPUDataStruct::allocate(h_coords[i],        N,  1,                      HOST_BUFFER);
+        GPUDataStruct::allocate(h_harmonics[i],     N,  1,                      HOST_BUFFER);
+        
+        void* kernelArgs[] = {(void*)&d_queues[i]};
+        safeCudaKernelCall((void*)kernel_initialize_queue, dim3(device_capacities[i],1,1), dim3(N,1,1), kernelArgs, 0);
     }
+
+
     printLastCudaError("Forcefield kernel class instansiation failed!");
 }
 
 IsomerspaceForcefield::~IsomerspaceForcefield()
 {   
     for (size_t i = 0; i < device_count; i++)
-    {
+    {   
         GPUDataStruct::free(h_coords[i]);
         GPUDataStruct::free(h_harmonics[i]);
     }
