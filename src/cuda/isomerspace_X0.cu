@@ -139,17 +139,14 @@ void IsomerspaceX0::check_batch(){
 void IsomerspaceX0::zero_order_geometry(device_real_t scalerad){
     printLastCudaError("Memcpy Failed! \n");
     auto start = std::chrono::system_clock::now();
-    //for (size_t i = 0; i < device_count; i++) {cudaSetDevice(i); d_batch[i] <<= h_batch[i];}
-    cudaDeviceSynchronize();
+    synchronize();
     for (size_t i = 0; i < device_count; i++)
     {
         cudaSetDevice(i);
         void* kernelArgs[] = {(void*)&d_batch[i], (void*)&scalerad};
-        safeCudaKernelCall((void*)kernel_zero_order_geometry, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
+        safeCudaKernelCall((void*)kernel_zero_order_geometry, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes, main_stream[i]);
     }
-    //for (size_t i = 0; i < device_count; i++) {cudaSetDevice(i); h_batch[i] <<= d_batch[i];}
-        
-    cudaDeviceSynchronize();
+    synchronize();
     
     auto end = std::chrono::system_clock::now();
     printLastCudaError("IsomerspaceX0 kernel launch failed: ");
