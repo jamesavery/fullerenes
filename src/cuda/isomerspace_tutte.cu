@@ -46,14 +46,17 @@ void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
 
     node3 ns            = (reinterpret_cast<node3*>(G.neighbours) + offset)[threadIdx.x];
     xys[threadIdx.x]    = {real_t(0.0), real_t(0.0)};
-    node_t outer_face   = 0;
-    uint8_t Nface = FG.face_size(0,FG.neighbours[0]);
-    if(threadIdx.x < Nface) outer_face = FG.get_face_oriented(0,FG.neighbours[0])[threadIdx.x];    
-    reinterpret_cast<bool*>(sharedmem)[threadIdx.x] =  false; BLOCK_SYNC
-    if(threadIdx.x < Nface) reinterpret_cast<bool*>(sharedmem)[outer_face] =  true; BLOCK_SYNC
+    device_node_t outer_face[6];
+    device_node_t outer_face_vertex   = 0;
+    uint8_t Nface = FG.get_face_oriented(0,FG.neighbours[0], outer_face);    
+    reinterpret_cast<bool*>(sharedmem)[threadIdx.x] =  false; BLOCK_SYNC;
+    if(threadIdx.x < Nface){
+      outer_face_vertex = outer_face[threadIdx.x];
+      reinterpret_cast<bool*>(sharedmem)[outer_face_vertex] =  true; BLOCK_SYNC;
+    }
     bool fixed = reinterpret_cast<bool*>(sharedmem)[threadIdx.x];
 
-    if(threadIdx.x < Nface) xys[outer_face] = {sin(threadIdx.x*2*real_t(M_PI)/double(Nface)),cos(threadIdx.x*2*real_t(M_PI)/double(Nface))};
+    if(threadIdx.x < Nface) xys[outer_face_vertex] = {sin(threadIdx.x*2*real_t(M_PI)/double(Nface)),cos(threadIdx.x*2*real_t(M_PI)/double(Nface))};
     BLOCK_SYNC
     bool converged          = false;
     real_t max_change       = real_t(0.0);
