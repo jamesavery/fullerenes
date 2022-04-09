@@ -3,12 +3,12 @@
 
 #define coord2d device_coord2d
 
-INLINE coord2d operator-(const coord2d& a)                 { return make_coord2d(-a.x, -a.y);  }
-INLINE coord2d operator-(const coord2d& a, const coord2d& b){ return make_coord2d(a.x-b.x, a.y-b.y);  }
-INLINE coord2d operator+(const coord2d& a, const coord2d& b){ return make_coord2d(a.x+b.x, a.y+b.y);  }
-INLINE coord2d operator*(const coord2d& a, const double s)  { return make_coord2d(a.x*s, a.y*s);  }
+INLINE coord2d operator-(const coord2d& a)                 { return {-a.x, -a.y};  }
+INLINE coord2d operator-(const coord2d& a, const coord2d& b){ return {a.x-b.x, a.y-b.y};  }
+INLINE coord2d operator+(const coord2d& a, const coord2d& b){ return {a.x+b.x, a.y+b.y};  }
+INLINE coord2d operator*(const coord2d& a, const double s)  { return {a.x*s, a.y*s};  }
 INLINE coord2d operator*(const double s, const coord2d& a)  { return a*s; }
-INLINE coord2d operator*(const coord2d& a, const coord2d& b) { return make_coord2d(a.x*b.x, a.y*b.y);}
+INLINE coord2d operator*(const coord2d& a, const coord2d& b) { return {a.x*b.x, a.y*b.y};}
 INLINE coord2d operator/(const double s, const coord2d& a)  { return a*(1/s); }
 INLINE coord2d operator/(const coord2d& a, const double s)  { return a*(1/s); }
 INLINE void operator+=(coord2d& a, const coord2d& b) {a = a + b;}
