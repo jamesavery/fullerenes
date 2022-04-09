@@ -47,10 +47,10 @@ __device__ void pointerswap(T **r, T **s)
 }
 
 
-__host__ cudaError_t safeCudaKernelCall(const void* func, dim3 gridDim, dim3 blockDim, void** args, size_t sharedMem){
-    if (gridDim.x > 0 && gridDim.y > 0 && gridDim.z > 0 && blockDim.x > 0 && blockDim.y > 0 && blockDim.z > 0)
+__host__ cudaError_t safeCudaKernelCall(const void* func, const dim3 gridDim, const dim3 blockDim, void** args, const size_t sharedMem, const cudaStream_t stream = NULL){
+    if (gridDim.x > 0 && gridDim.y == 1 && gridDim.z == 1 && blockDim.x > 0 && blockDim.y == 1 && blockDim.z == 1)
     {
-        return cudaLaunchCooperativeKernel(func,gridDim,blockDim,args,sharedMem);
+        return cudaLaunchCooperativeKernel(func,gridDim,blockDim,args,sharedMem,stream);
     }
     else
     {
@@ -58,6 +58,20 @@ __host__ cudaError_t safeCudaKernelCall(const void* func, dim3 gridDim, dim3 blo
         return cudaErrorInvalidValue;
     }
     
+}
+
+template <typename T>
+__global__ void kernel_fill_array(T* cu_array, size_t size, T fillvalue){
+    auto tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if(tid < size) cu_array[tid] = fillvalue;
+
+}
+
+template <typename T>
+__host__ cudaError_t fillCuArray(T* cu_array, size_t size, T fillvalue) {
+    size_t Nblocks = size / 64 + 1;
+    kernel_fill_array<<<dim3(Nblocks, 1, 1), dim3(64, 1, 1)>>>(cu_array, size, fillvalue);
+    return cudaDeviceSynchronize();
 }
 
 
@@ -352,6 +366,7 @@ void printLastCudaError(std::string message = ""){
         std::cout << "\n" << message << " :\t";
         std::cout << cudaGetErrorString(error);
         printf("\n");
+        assert(false);
     }
 }
 
