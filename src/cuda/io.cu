@@ -92,7 +92,7 @@ void output_type_conversion(IsomerBatch G){
     device_node3 output_neighbours      = reinterpret_cast<device_node3*>  (G.neighbours)   [threadIdx.x + blockDim.x*blockIdx.x];
     device_coord3d output_coordinates   = reinterpret_cast<device_coord3d*>(G.X)            [threadIdx.x + blockDim.x*blockIdx.x];
     device_coord2d output_xys           = reinterpret_cast<device_coord2d*>(G.xys)          [threadIdx.x + blockDim.x*blockIdx.x];
-    cg:sync(cg::this_grid());
+    cg::sync(cg::this_grid());
     reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3] = output_neighbours.x;    reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1] = output_neighbours.y;    reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2] = output_neighbours.z;
     reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3] = output_coordinates.x;   reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1] = output_coordinates.y;   reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2] = output_coordinates.z;
     reinterpret_cast<double*>(G.xys)        [(threadIdx.x + blockDim.x*blockIdx.x)*2] = output_xys.x;           reinterpret_cast<double*>(G.xys)        [(threadIdx.x + blockDim.x*blockIdx.x)*2 + 1] = output_xys.y;
