@@ -49,7 +49,7 @@ int main(){
 
     for (size_t i = 0; i < batch_capacity; i++)
     {
-      int offset = i*N*3;
+      //      int offset = i*N*3;
       //kernel.insert_isomer(synth_X + offset, synth_cubic_neighbours + offset, synth_next_on_face + offset, synth_prev_on_face + offset, synth_face_right + offset, i);
       
     }

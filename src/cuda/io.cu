@@ -70,14 +70,15 @@ void clear_convergence_status(IsomerBatch G){
 }
 
 __global__
-void input_type_conversion(IsomerBatch G){
+void input_type_conversion(IsomerBatch G){ // TODO: Write nicer.
     node_t input_neighbours[3]  = {reinterpret_cast<node_t*>(G.neighbours)[(threadIdx.x* + blockDim.x*blockIdx.x)*3],   reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 1], reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 2]};
     double input_coordianates[3]= {reinterpret_cast<double*>(G.X)[(threadIdx.x* + blockDim.x*blockIdx.x)*3],            reinterpret_cast<double*>(G.X)          [(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 1], reinterpret_cast<double*>(G.X)          [(threadIdx.x* + blockDim.x*blockIdx.x)*3 + 2]};
     double input_xys[2]         = {reinterpret_cast<double*>(G.xys)[(threadIdx.x* + blockDim.x*blockIdx.x)*2],          reinterpret_cast<double*>(G.xys)        [(threadIdx.x* + blockDim.x*blockIdx.x)*2 + 1]};
     cg::sync(cg::this_grid());
-    reinterpret_cast<device_node3*>(G.neighbours)[(threadIdx.x + blockDim.x*blockIdx.x)] = {input_neighbours[0], input_neighbours[1], input_neighbours[2]};
-    reinterpret_cast<device_coord3d*>(G.X)       [(threadIdx.x + blockDim.x*blockIdx.x)] = {input_coordianates[0], input_coordianates[1], input_coordianates[2]};
-    reinterpret_cast<device_coord2d*>(G.xys)     [(threadIdx.x + blockDim.x*blockIdx.x)] = {input_xys[0], input_xys[1]};
+    size_t index = threadIdx.x + blockDim.x*blockIdx.x;
+    reinterpret_cast<device_node3*>(G.neighbours)[index] = {device_node_t(input_neighbours[0]), device_node_t(input_neighbours[1]), device_node_t(input_neighbours[2])};
+    reinterpret_cast<device_coord3d*>(G.X)       [index] = {device_real_t(input_coordianates[0]), device_real_t(input_coordianates[1]), device_real_t(input_coordianates[2])};
+    reinterpret_cast<device_coord2d*>(G.xys)     [index] = {device_real_t(input_xys[0]), device_real_t(input_xys[1])}; 
 
     sequential_print(reinterpret_cast<device_node3*>(G.neighbours)[blockDim.x*blockIdx.x + threadIdx.x], 0 ) ;
 }
@@ -87,7 +88,7 @@ void output_type_conversion(IsomerBatch G){
     device_node3 output_neighbours      = reinterpret_cast<device_node3*>  (G.neighbours)   [threadIdx.x + blockDim.x*blockIdx.x];
     device_coord3d output_coordinates   = reinterpret_cast<device_coord3d*>(G.X)            [threadIdx.x + blockDim.x*blockIdx.x];
     device_coord2d output_xys           = reinterpret_cast<device_coord2d*>(G.xys)          [threadIdx.x + blockDim.x*blockIdx.x];
-    cg:sync(cg::this_grid());
+    cg::sync(cg::this_grid());
     reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3] = output_neighbours.x;    reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1] = output_neighbours.y;    reinterpret_cast<node_t*>(G.neighbours) [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2] = output_neighbours.z;
     reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3] = output_coordinates.x;   reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 1] = output_coordinates.y;   reinterpret_cast<double*>(G.X)          [(threadIdx.x + blockDim.x*blockIdx.x)*3 + 2] = output_coordinates.z;
     reinterpret_cast<double*>(G.xys)        [(threadIdx.x + blockDim.x*blockIdx.x)*2] = output_xys.x;           reinterpret_cast<double*>(G.xys)        [(threadIdx.x + blockDim.x*blockIdx.x)*2 + 1] = output_xys.y;
@@ -296,7 +297,7 @@ void IsomerspaceKernel::update_batch(){
         if (batch_sizes[i] < device_capacities[i]){
             IsomerBatch B = h_batch[i];
             size_t idx       = index_queue[i].front();
-            size_t offset  = idx*3*N;      //neighbour offset
+	    //            size_t offset  = idx*3*N;      //neighbour offset; TODO: DENNE BRUGES ALDRIG. Er det med vilje?
 
             if ((B.statuses[idx] == CONVERGED) || (B.statuses[idx]==FAILED))
             {
