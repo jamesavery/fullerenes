@@ -64,6 +64,7 @@ public:
   
   void push_batch_from_kernel(const IsomerspaceKernel& input_kernel);
   void update_device_batches();
+  void move_to_output_buffer();
   void check_batch(size_t max_iterations);                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
   void optimize_batch(const size_t iterations);
 
