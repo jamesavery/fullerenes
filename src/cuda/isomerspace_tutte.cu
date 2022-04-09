@@ -13,9 +13,9 @@
 #include "fullerenes/gpu/isomerspace_tutte.hh"
 
 
+
 #define BLOCK_SYNC cg::sync(cg::this_thread_block());
 #define GRID_SYNC cg::sync(cg::this_grid());
-#define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t;
 #define INLINE __device__ __forceinline__
 
 typedef IsomerspaceKernel::device_real_t device_real_t;
@@ -27,6 +27,7 @@ typedef GPU_NODE3 device_node3;
 #include "coord2d.cu"
 #include "auxiliary_cuda_functions.cu"
 #include "io.cu"
+
 
 __global__
 void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
