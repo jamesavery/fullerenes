@@ -54,7 +54,7 @@ public:
             q_size--;
             return return_val;
         }
-        assert(false);        
+        assert(false);
     }
 
     __device__ T pop_back(){
@@ -90,22 +90,20 @@ struct DeviceFullereneGraph{
     __device__ DeviceFullereneGraph(const device_node_t* neighbours) : neighbours(neighbours) {}
 
     __device__ device_node_t dedge_ix(const device_node_t u, const device_node_t v) const{
-        for (uint8_t j = 0; j < 3; j++){
+        for (uint8_t j = 0; j < 3; j++)
             if (neighbours[u*3 + j] == v) return j;
-        }
+
         assert(false);
     }
 
     __device__ device_node_t next(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
-        if(j>=0) return neighbours[u*3 + ((j+1)%3)];
-        assert(false);
+        return neighbours[u*3 + ((j+1)%3)];
     }
     
     __device__ device_node_t prev(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
-        if(j>=0) return neighbours[u*3 + ((j+2)%3)];
-        assert(false);
+        return neighbours[u*3 + ((j+2)%3)];
     }
     
     __device__ device_node_t next_on_face(const device_node_t u, const device_node_t v) const{
