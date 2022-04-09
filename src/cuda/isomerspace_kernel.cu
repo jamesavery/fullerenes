@@ -24,6 +24,16 @@ size_t IsomerspaceKernel::get_batch_capacity(){
     return (size_t)total_capacity;
 }
 
+void IsomerspaceKernel::synchronize(){
+    for (size_t i = 0; i < device_count; i++)
+    {
+        cudaSetDevice(i);
+        cudaDeviceSynchronize();
+        cudaStreamSynchronize(main_stream[i]); cudaStreamSynchronize(copy_stream[i]);
+    }
+    printLastCudaError("Stream synchronization failed: ");
+}
+
 IsomerspaceKernel::IsomerspaceKernel(const size_t N, void* kernel){
     cudaGetDeviceCount(&this->device_count);
     kernel_pointer          = kernel;
@@ -35,24 +45,29 @@ IsomerspaceKernel::IsomerspaceKernel(const size_t N, void* kernel){
     index_queue             = std::vector<std::queue<int>>(device_count);
     
     //Create 2 streams that have no implicit synchronization with the default stream.
-    cudaStreamCreateWithFlags(&main_stream, cudaStreamNonBlocking);
-    cudaStreamCreateWithFlags(&copy_to_host_stream, cudaStreamNonBlocking);
 
-    d_batch = std::vector<IsomerBatch>(device_count);
-    h_batch = std::vector<IsomerBatch>(device_count);
+    d_batch        = std::vector<IsomerBatch>(device_count);
+    h_batch        = std::vector<IsomerBatch>(device_count);
+    d_output_batch = std::vector<IsomerBatch>(device_count);
+    main_stream    = std::vector<cudaStream_t>(device_count);
+    copy_stream    = std::vector<cudaStream_t>(device_count);
 
     for (size_t i = 0; i < device_count; i++)
     {
         cudaSetDevice(i);
+        cudaStreamCreateWithFlags(&main_stream[i], cudaStreamNonBlocking);
+        cudaStreamCreateWithFlags(&copy_stream[i], cudaStreamNonBlocking);
+        GPUDataStruct::allocate(d_output_batch[i]  , N, device_capacities[i], DEVICE_BUFFER);
         GPUDataStruct::allocate(d_batch[i]         , N, device_capacities[i], DEVICE_BUFFER);
         GPUDataStruct::allocate(h_batch[i]         , N, device_capacities[i], HOST_BUFFER);
+
+        std::fill(h_batch[i].statuses, h_batch[i].statuses + h_batch[i].isomer_capacity, EMPTY);
+        fillCuArray(d_output_batch[i].statuses, d_output_batch[i].isomer_capacity, EMPTY);
 
         cudaMalloc(&global_reduction_arrays[i], sizeof(device_real_t)*N*device_capacities[i]);
         batch_sizes[i] = 0;
         for (size_t j = 0; j < device_capacities[i]; j++) index_queue[i].push(j);
         for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = EMPTY;
-
-        d_batch[i] <<= h_batch[i];
     }
 }
 
@@ -60,7 +75,6 @@ IsomerspaceKernel::~IsomerspaceKernel(){
     for (size_t i = 0; i < device_count; i++)
     {
         cudaSetDevice(i);
-        GPUDataStruct::free(h_batch[i]);
         cudaDeviceReset();
     }
 }
