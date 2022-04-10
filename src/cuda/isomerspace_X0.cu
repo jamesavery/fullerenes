@@ -13,6 +13,8 @@ typedef IsomerspaceKernel::device_node_t device_node_t;
 __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& G, device_node_t* distances){
     typedef device_node_t node_t;
+    typedef device_coord2d coord2d;
+    
     DeviceFullereneGraph FG = DeviceFullereneGraph(&G.neighbours[blockIdx.x*blockDim.x*3]);
     node_t outer_face[6];
     uint8_t Nface = FG.get_face_oriented(0, FG.neighbours[0],outer_face);

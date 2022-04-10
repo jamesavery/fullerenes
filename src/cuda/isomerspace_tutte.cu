@@ -32,6 +32,7 @@ typedef GPU_NODE3 device_node3;
 __global__
 void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
     DEVICE_TYPEDEFS
+    typedef device_coord2d coord2d;
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
 
@@ -52,8 +53,9 @@ void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
     reinterpret_cast<bool*>(sharedmem)[threadIdx.x] =  false; BLOCK_SYNC;
     if(threadIdx.x < Nface){
       outer_face_vertex = outer_face[threadIdx.x];
-      reinterpret_cast<bool*>(sharedmem)[outer_face_vertex] =  true; BLOCK_SYNC;
+      reinterpret_cast<bool*>(sharedmem)[outer_face_vertex] =  true; 
     }
+    BLOCK_SYNC;
     bool fixed = reinterpret_cast<bool*>(sharedmem)[threadIdx.x];
 
     if(threadIdx.x < Nface) xys[outer_face_vertex] = {sin(threadIdx.x*2*real_t(M_PI)/double(Nface)),cos(threadIdx.x*2*real_t(M_PI)/double(Nface))};

@@ -15,4 +15,3 @@ protected:
     const size_t TUTTE_MAX_ITERATION = 1000;
 };
 
-

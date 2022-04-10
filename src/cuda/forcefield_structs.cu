@@ -142,7 +142,7 @@ struct DeviceFullereneGraph{
             v = w;
         }
 	if(i>=f_max) assert(false);
-        else return i;
+        else return i + 1;
     }
 
 };
@@ -230,6 +230,5 @@ struct Constants{
         }
     }   
 };
-
 
 

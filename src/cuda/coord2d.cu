@@ -1,19 +1,21 @@
 #define INLINE __device__ __forceinline__
 #include <inttypes.h>
 
-#define coord2d device_coord2d
+INLINE device_coord2d operator-(const device_coord2d& a)                 { return {-a.x, -a.y};  }
+INLINE device_coord2d operator-(const device_coord2d& a, const device_coord2d& b){ return {a.x-b.x, a.y-b.y};  }
+INLINE device_coord2d operator+(const device_coord2d& a, const device_coord2d& b){ return {a.x+b.x, a.y+b.y};  }
+INLINE device_coord2d operator*(const device_coord2d& a, const device_real_t s)  { return {a.x*s, a.y*s};  }
+INLINE device_coord2d operator*(const device_real_t s, const device_coord2d& a)  { return a*s; }
+INLINE device_coord2d operator*(const device_coord2d& a, const device_coord2d& b) { return {a.x*b.x, a.y*b.y};}
+INLINE device_coord2d operator/(const device_real_t s, const device_coord2d& a)  { return a*(1/s); }
+INLINE device_coord2d operator/(const device_coord2d& a, const device_real_t s)  { return a*(1/s); }
+INLINE void operator+=(device_coord2d& a, const device_coord2d& b) {a = a + b;}
+INLINE void operator/=(device_coord2d& a, const device_real_t b) {a = a / b;}
 
-INLINE coord2d operator-(const coord2d& a)                 { return {-a.x, -a.y};  }
-INLINE coord2d operator-(const coord2d& a, const coord2d& b){ return {a.x-b.x, a.y-b.y};  }
-INLINE coord2d operator+(const coord2d& a, const coord2d& b){ return {a.x+b.x, a.y+b.y};  }
-INLINE coord2d operator*(const coord2d& a, const double s)  { return {a.x*s, a.y*s};  }
-INLINE coord2d operator*(const double s, const coord2d& a)  { return a*s; }
-INLINE coord2d operator*(const coord2d& a, const coord2d& b) { return {a.x*b.x, a.y*b.y};}
-INLINE coord2d operator/(const double s, const coord2d& a)  { return a*(1/s); }
-INLINE coord2d operator/(const coord2d& a, const double s)  { return a*(1/s); }
-INLINE void operator+=(coord2d& a, const coord2d& b) {a = a + b;}
-INLINE void operator/=(coord2d& a, const double b) {a = a / b;}
+INLINE  device_real_t  dot(const device_coord2d& a,  const device_coord2d& b) { return a.x*b.x + a.y*b.y; }
+INLINE  device_real_t norm(const device_coord2d& a)                    { return sqrt(dot(a,a)); }
+INLINE device_real_t sum(const device_coord2d& a) {return a.x + a.y;}
+INLINE device_real_t d_get(const device_coord2d& a, const uint8_t j){
+  return ((const device_real_t*)&a)[j]; 
+}
 
-INLINE  double  dot(const coord2d& a,  const coord2d& b) { return a.x*b.x + a.y*b.y; }
-INLINE  double norm(const coord2d& a)                    { return sqrt(dot(a,a)); }
-INLINE double sum(const coord2d& a) {return a.x + a.y;}

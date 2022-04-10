@@ -89,4 +89,3 @@ protected:
   std::vector<InternalCoordinates> h_harmonics;  //Provided for diagnostic purposes.                           Dimensions: N x 1 x 3
 };
 
-

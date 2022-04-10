@@ -4,7 +4,7 @@
 #include <cooperative_groups/reduce.h>
 #include "cuda_runtime.h"
 #include <assert.h>
-#include<iostream>
+#include <iostream>
 #include <fstream>
 
 #ifndef AUXILIARY_CUDA_FUN
