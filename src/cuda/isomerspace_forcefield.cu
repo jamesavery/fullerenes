@@ -587,7 +587,7 @@ __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_red
         if (converged)
         {
             G.statuses[blockIdx.x] = CONVERGED;
-        } else if (G.iterations[blockIdx.x] >= max_iterations) {
+        } else if (G.iterations[blockIdx.x] >= max_iterations || isnan(grad_norm)) {
             G.statuses[blockIdx.x] = FAILED;
         }
     }
@@ -627,12 +627,12 @@ __global__ void kernel_internal_coordinates(IsomerBatch G, IsomerspaceForcefield
 }
 
 void IsomerspaceForcefield::check_batch(size_t max_iterations){
-    cudaDeviceSynchronize();
     for (size_t i = 0; i < device_count; i++){
         cudaSetDevice(i);
         void* kernelArgs1[] = {(void*)&d_batch[i], (void*)&global_reduction_arrays[i], (void*)&max_iterations};
-        safeCudaKernelCall((void*)kernel_batch_statistics, dim3(device_capacities[i],1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes);
+        safeCudaKernelCall((void*)kernel_batch_statistics, dim3(device_capacities[i],1,1), dim3(N,1,1), kernelArgs1, shared_memory_bytes, main_stream[i]);
     }
+    if (queue_mode == HOST_QUEUE) {
     batch_size = 0;
     for (size_t i = 0; i < device_count; i++)
     {
@@ -651,6 +651,7 @@ void IsomerspaceForcefield::check_batch(size_t max_iterations){
         batch_sizes[i] = num_of_not_converged_isomers;
         batch_size += num_of_not_converged_isomers;
     }
+    }
 }
 
 void IsomerspaceForcefield::get_cartesian_coordinates(device_real_t* X) const{
@@ -667,13 +668,12 @@ void IsomerspaceForcefield::get_internal_coordinates(device_real_t* bonds, devic
 
 void IsomerspaceForcefield::optimize_batch(const size_t iterations){
     printLastCudaError("Memcpy Failed! \n");
-    cudaDeviceSynchronize();
     auto start = std::chrono::system_clock::now();
     for (size_t i = 0; i < device_count; i++)
     {
         cudaSetDevice(i);
         void* kernelArgs[] = {(void*)&d_batch[i],(void*)&iterations};
-        safeCudaKernelCall((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes);
+        safeCudaKernelCall((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes, main_stream[i]);
     }   
     auto end = std::chrono::system_clock::now();
     printLastCudaError("Optimize kernel launch failed: ");
@@ -692,7 +692,7 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel
     for (size_t i = 0; i < device_count; i++)
     {   
         cudaSetDevice(i);
-        GPUDataStruct::allocate(d_queues[i],        N,  device_capacities[i]*5, DEVICE_BUFFER);
+        GPUDataStruct::allocate(d_queues[i],        N,  device_capacities[i]*10, DEVICE_BUFFER);
         GPUDataStruct::allocate(d_coords[i],        N,  device_capacities[i],   DEVICE_BUFFER);
         GPUDataStruct::allocate(d_harmonics[i],     N,  device_capacities[i],   DEVICE_BUFFER);
         GPUDataStruct::allocate(h_coords[i],        N,  1,                      HOST_BUFFER);
@@ -708,11 +708,5 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel
 
 IsomerspaceForcefield::~IsomerspaceForcefield()
 {   
-    for (size_t i = 0; i < device_count; i++)
-    {   
-        GPUDataStruct::free(h_coords[i]);
-        GPUDataStruct::free(h_harmonics[i]);
-    }
-    //Destroys cuda context. It is possible that this function call is sufficient for avoiding memory leaks, in addition to freeing the host_graph.
-    printLastCudaError("Failed in IsomerspaceKernel destruction");
+    printLastCudaError("Failed in IsomerspaceForcefield destruction");
 }

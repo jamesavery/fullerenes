@@ -54,7 +54,7 @@ public:
             q_size--;
             return return_val;
         }
-        assert(false);        
+        assert(false);
     }
 
     __device__ T pop_back(){
@@ -90,22 +90,21 @@ struct DeviceFullereneGraph{
     __device__ DeviceFullereneGraph(const device_node_t* neighbours) : neighbours(neighbours) {}
 
     __device__ device_node_t dedge_ix(const device_node_t u, const device_node_t v) const{
-        for (uint8_t j = 0; j < 3; j++){
+        for (uint8_t j = 0; j < 3; j++)
             if (neighbours[u*3 + j] == v) return j;
-        }
+
         assert(false);
+	return 0;		// Make compiler happy
     }
 
     __device__ device_node_t next(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
-        if(j>=0) return neighbours[u*3 + ((j+1)%3)];
-        assert(false);
+        return neighbours[u*3 + ((j+1)%3)];
     }
     
     __device__ device_node_t prev(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
-        if(j>=0) return neighbours[u*3 + ((j+2)%3)];
-        assert(false);
+        return neighbours[u*3 + ((j+2)%3)];
     }
     
     __device__ device_node_t next_on_face(const device_node_t u, const device_node_t v) const{
@@ -129,19 +128,21 @@ struct DeviceFullereneGraph{
         return d;
     }
 
-    __device__ device_node_t* get_face_oriented(device_node_t u, device_node_t v) const{
+  __device__ uint8_t get_face_oriented(device_node_t u, device_node_t v, device_node_t *f) const{
+        constexpr int f_max = 6;
         int i = 0;
-        device_node_t f[6]; f[0] = u;
+	f[0] = u;
         device_node_t u_temp = u;
-        while (v!=u_temp)
+        while (v!=u_temp && i<f_max)
         {   
             i++;
             device_node_t w = next_on_face(u,v);
             f[i] = v;
             u = v;
             v = w;
-        }   
-        return f;
+        }
+	if(i>=f_max) assert(false);
+        else return i + 1;
     }
 
 };
@@ -229,6 +230,5 @@ struct Constants{
         }
     }   
 };
-
 
 

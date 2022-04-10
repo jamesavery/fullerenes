@@ -70,6 +70,7 @@ int main(int ac, char **argv)
   auto
     Tgen    = system_clock::now()-T0,
     Tupdate = system_clock::now()-T0,
+    Tqueue  = system_clock::now()-T0,
     Tdual   = system_clock::now()-T0,    
     Ttutte  = system_clock::now()-T0,
     TX0     = system_clock::now()-T0,
@@ -80,48 +81,83 @@ int main(int ac, char **argv)
 
   while(more_to_do){
     // Fill in a batch
-    tutte_kernel.clear_batch();
-
-    for (I; (tutte_kernel.get_queue_size() < tutte_batch_size * 2 ) && more_to_generate; I++)
+    auto produce_and_insert = [&](size_t N){
+      for (int i = 0; i < N; i++){
+        more_to_generate &= BuckyGen::next_fullerene(Q,dualG);
+        if (!more_to_generate){break;}
+        dualG.update();
+        FullereneGraph G = dualG.dual_graph();
+        tutte_kernel.insert_isomer(G,I);
+        I++;
+      }
+    };
+    while ((tutte_kernel.get_queue_size() < ff_batch_size * 8 ) && more_to_generate)
     {
-      auto t0 = system_clock::now();            
-      more_to_generate &= BuckyGen::next_fullerene(Q,dualG);
-      if (!more_to_generate){break;}
-      auto t1= system_clock::now(); Tgen    += t1-t0;
-      dualG.update();   		        // Update triangles
-      auto t2= system_clock::now(); Tupdate += t2-t1; //This won't work for asynchronous execution
-      FullereneGraph   G = dualG.dual_graph();  // Construct fullerene graph
-      auto t3= system_clock::now(); Tdual   += t3-t2; //This won't work for asynchronous execution
-      tutte_kernel.insert_isomer(G,I);
-      auto t4 = system_clock::now(); Tcopy += t4-t3; 
+      auto t0 = system_clock::now();          
+      produce_and_insert(1);  
+      auto t4 = system_clock::now(); Tgen += t4-t0; 
     }
+    while (tutte_kernel.get_queue_size() > 0)
+    {
+      auto t0 = system_clock::now(); 
+      tutte_kernel.insert_queued_isomers();
+      auto t1 = system_clock::now(); Tcopy += t1 - t0;
+      tutte_kernel.tutte_layout();
+      auto t2 = system_clock::now(); Ttutte += t2-t1;
+      IsomerspaceKernel::kernel_to_kernel_copy(tutte_kernel, X0_kernel);
+      auto t3 = system_clock::now(); Tcopy += t3-t2;
+      X0_kernel.zero_order_geometry(); 
+      auto t4 = system_clock::now(); TX0 += t4-t3;
+      ff_kernel.push_batch_from_kernel(X0_kernel);
+      auto t5 = system_clock::now(); Tcopy += t5-t4;
+    }
+    
+    int new_finished = 0;
+    
+    std::future<void> handle = std::async(std::launch::async,produce_and_insert, ff_batch_size * 8  - tutte_kernel.get_queue_size());
+    while ( ff_kernel.get_device_queue_size() > ff_batch_size)
+    {
+      int finished = ff_kernel.get_failed_count() + ff_kernel.get_converged_count(); 
+      auto t0 = system_clock::now();
+      ff_kernel.update_device_batches();
+      auto t1 = system_clock::now(); Tqueue += t1 - t0;
+      ff_kernel.optimize_batch(N*1);
+      ff_kernel.output_batch_to_queue();
+      new_finished = ff_kernel.get_failed_count() + ff_kernel.get_converged_count() - finished;
+      auto t2 = system_clock::now(); Topt += t2 - t1;
+      ff_kernel.check_batch(N*50);
+      auto t3 = system_clock::now(); Tcheck += t3 - t2;
+      ff_kernel.move_to_output_buffer(); 
+      Tcopy += system_clock::now() - t3;
+    }
+    handle.wait();
 
-    auto t0 = system_clock::now(); 
-    tutte_kernel.insert_queued_isomers();
-    auto t1 = system_clock::now(); Tcopy += t1 - t0;
-    tutte_kernel.tutte_layout();
-    auto t2 = system_clock::now(); Ttutte += t2-t1;
-    IsomerspaceKernel::kernel_to_kernel_copy(tutte_kernel, X0_kernel);
-    auto t3 = system_clock::now(); Tcopy += t3-t2;
-    X0_kernel.zero_order_geometry();
-    auto t4 = system_clock::now(); TX0 += t4-t3;
-    IsomerspaceKernel::kernel_to_kernel_copy(X0_kernel, ff_kernel);
-    auto t5 = system_clock::now(); Tcopy += t5-t4;
-    ff_kernel.optimize_batch(N*7);
-    auto t6 = system_clock::now(); Topt += t6 - t5;
-    ff_kernel.check_batch(N*7);
-    auto t7 = system_clock::now(); Tcheck += t7 - t6;
+    if (!more_to_generate && tutte_kernel.get_queue_size() == 0){
     ff_kernel.output_batch_to_queue();
-    Tcopy += system_clock::now() - t7;
+    while (ff_kernel.get_device_queue_size() > 0)
+    {
+      ff_kernel.update_device_batches();
+      auto t0 = system_clock::now();
+      ff_kernel.optimize_batch(N*1);
+      auto t1 = system_clock::now(); Topt += t1 - t0;
+      ff_kernel.check_batch(N*50);
+      auto t2 = system_clock::now(); Tcheck += t2 - t1;
+      ff_kernel.move_to_output_buffer();
+      ff_kernel.output_batch_to_queue();
+      Tcopy += system_clock::now() - t2; 
+
+    }
+    } 
+
     more_to_do &= (more_to_generate || (!tutte_kernel.insert_queue.empty()) );
 
     while (!ff_kernel.output_queue.empty())
     {
       auto t0 = system_clock::now();
-      Polyhedron Popt(ff_kernel.output_queue.front().second);
-      size_t ID = ff_kernel.output_queue.front().first;
+      //Polyhedron Popt(ff_kernel.output_queue.front().second);
+      //size_t ID = ff_kernel.output_queue.front().first;
 
-      Polyhedron::to_file(Popt,output_dir+"/P-C"+to_string(N)+"-"+to_string(ID)+".mol2");
+      //Polyhedron::to_file(Popt,output_dir+"/P-C"+to_string(N)+"-"+to_string(ID)+".mol2");
       ff_kernel.output_queue.pop();
       Tfile += system_clock::now() - t0;
     }
@@ -150,6 +186,7 @@ int main(int ac, char **argv)
   cout << "Time spent on non:\n"
     "\tTotal Time                     = " << (Ttot/1ms)       << " ms\n"
     "\tTime Unaccounted For           = " << (Ttot-Tsum)/1ms  << " ms\n"
+    "\tDevice queue                   = " << (Tqueue)/1ms     << " ms\n"
     "\tFile Output                    = " << (Tfile/1ms)      << " ms\n"
     "\tGenerating graphs              = " << (Tgen/1ms)       << " ms\n"
     "\tUpdating metadata              = " << (Tupdate/1ms)    << " ms\n"

@@ -9,8 +9,10 @@ enum BufferType   {HOST_BUFFER, DEVICE_BUFFER};
 
 struct GPUDataStruct{
     bool allocated = false;
-    size_t N = 0;
-    size_t batch_size = 0;
+    size_t n_isomers        = 0;
+    size_t n_atoms          = 0;
+    size_t isomer_capacity  = 0;
+
     BufferType buffer_type;
     GPUDataStruct(){}
     std::vector<std::tuple<std::string,void**,size_t,bool>> pointers;

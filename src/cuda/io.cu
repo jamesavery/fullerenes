@@ -5,23 +5,24 @@
 #include "fullerenes/gpu/gpudatastruct.hh"
 #include "fullerenes/gpu/isomerspace_kernel.hh"
 
-void GPUDataStruct::allocate(GPUDataStruct& G, size_t N, const size_t batch_size, const BufferType buffer_type){
+void GPUDataStruct::allocate(GPUDataStruct& G, const size_t n_atoms, const size_t n_isomers, const BufferType buffer_type){
     if((!G.allocated)){
         G.buffer_type = buffer_type;
-        G.batch_size  = batch_size; 
-        G.N           = N; 
+        G.n_atoms = n_atoms; 
+        G.isomer_capacity = n_isomers;
         if (buffer_type == DEVICE_BUFFER){
             for (size_t i = 0; i < G.pointers.size(); i++) {
-                size_t num_elements = get<3>(G.pointers[i]) ?  N*batch_size : batch_size;
+                size_t num_elements = get<3>(G.pointers[i]) ? n_isomers * n_atoms: n_isomers;
                 cudaMalloc(get<1>(G.pointers[i]), num_elements* get<2>(G.pointers[i])); 
             }
-            printLastCudaError("Failed to allocate device struct");
         }else{
             for (size_t i = 0; i < G.pointers.size(); i++) {
-                size_t num_elements = get<3>(G.pointers[i]) ?  N*batch_size : batch_size;
-                *get<1>(G.pointers[i])= malloc(num_elements* get<2>(G.pointers[i])); 
+                size_t num_elements = get<3>(G.pointers[i]) ? n_isomers * n_atoms: n_isomers;
+                //For asynchronous memory transfers host memory must be pinned. 
+                cudaMallocHost(get<1>(G.pointers[i]), num_elements* get<2>(G.pointers[i]));
             }
         }        
+        printLastCudaError("Failed to allocate struct");
         G.allocated = true;
     }
 }
@@ -32,29 +33,23 @@ void GPUDataStruct::free(GPUDataStruct& G){
             for (size_t i = 0; i < G.pointers.size(); i++) {
                 cudaFree(*get<1>(G.pointers[i]));
             }
-            printLastCudaError("Failed to free device struct"); 
         } else{
             for (size_t i = 0; i < G.pointers.size(); i++) {
-                std::free(*get<1>(G.pointers[i])); 
+                cudaFreeHost(*get<1>(G.pointers[i])); 
             }
         }
+        printLastCudaError("Failed to free struct"); 
         G.allocated = false;
     }
 }
 
 void GPUDataStruct::copy(GPUDataStruct& destination, const GPUDataStruct& source, const cudaStream_t stream){
-    if(source.batch_size > 0){
     for (size_t i = 0; i < source.pointers.size(); i++)
     {
-        size_t num_elements = get<3>(source.pointers[i]) ?  source.N*source.batch_size : source.batch_size;
+        size_t num_elements = get<3>(source.pointers[i]) ?  source.n_atoms * source.isomer_capacity : source.isomer_capacity;
         cudaMemcpyAsync(*(get<1>(destination.pointers[i])) , *(get<1>(source.pointers[i])), get<2>(source.pointers[i])*num_elements, cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type), stream);
     }
-    destination.N = source.N;
-    destination.batch_size = source.batch_size;
-    }
-    else{
-        std::cout << "WARNING: Call to copy made for 0 isomers \n";
-    }
+    destination.n_isomers = source.n_isomers;
     printLastCudaError("Failed to copy struct");
 }
 
@@ -103,7 +98,7 @@ __global__
 void kernel_update_queue(IsomerBatch G, IsomerBatch queue_batch){
     
     extern __shared__ size_t queue_indices[];
-    if ((threadIdx.x + blockIdx.x) == 0) {num_queue_requests = 0; queue_capacity = queue_batch.batch_size;}
+    if ((threadIdx.x + blockIdx.x) == 0) {num_queue_requests = 0; queue_capacity = queue_batch.isomer_capacity;}
     GRID_SYNC
     if (G.statuses[blockIdx.x] != NOT_CONVERGED){
         if(threadIdx.x == 0){
@@ -130,6 +125,7 @@ void kernel_update_queue(IsomerBatch G, IsomerBatch queue_batch){
         bool enough_left_in_queue = queue_size >= num_queue_requests;
         queue_size -= enough_left_in_queue ? num_queue_requests : queue_size;
         queue_front = enough_left_in_queue ? (queue_back - queue_size + queue_capacity) % queue_capacity : queue_back;
+        //printf("Queue stats: %d, %d, %d \n", queue_front, queue_back, queue_size);
     }
 }
 
@@ -137,16 +133,16 @@ __global__
 void kernel_initialize_queue(IsomerBatch queue_batch){
     if ((threadIdx.x + blockIdx.x) == 0)
     {
-        queue_size = 0; queue_back = 0; queue_capacity = queue_batch.batch_size; queue_front = 0;
+        queue_size = 0; queue_back = 0; queue_capacity = queue_batch.isomer_capacity; queue_front = 0;
     }
     
-    for (size_t tid = blockDim.x * blockIdx.x + threadIdx.x; tid < queue_batch.batch_size*queue_batch.N; tid+=blockDim.x*gridDim.x)
+    for (size_t tid = blockDim.x * blockIdx.x + threadIdx.x; tid < queue_batch.isomer_capacity*queue_batch.n_atoms; tid+=blockDim.x*gridDim.x)
     {
         reinterpret_cast<device_coord3d*>(queue_batch.X)[tid]           = (device_coord3d){0.0,0.0,0.0};
         reinterpret_cast<device_node3*>(queue_batch.neighbours)[tid]    = (device_node3){0,0,0};
         reinterpret_cast<device_coord2d*>(queue_batch.xys)[tid]         = (device_coord2d){0.0,0.0};
     }
-    for (size_t tid = blockDim.x * blockIdx.x + threadIdx.x; tid < queue_batch.batch_size; tid+=blockDim.x*gridDim.x)
+    for (size_t tid = blockDim.x * blockIdx.x + threadIdx.x; tid < queue_batch.isomer_capacity; tid+=blockDim.x*gridDim.x)
     {
         queue_batch.statuses[tid] = EMPTY;
         queue_batch.iterations[tid] = 0;
@@ -160,7 +156,8 @@ void kernel_push_batch(IsomerBatch input_batch, IsomerBatch queue_batch, device_
     clear_cache(sdata, Block_Size_Pow_2 );
     size_t insert_size = size_t(global_reduction(sdata,global_reduction_array, device_real_t((input_batch.statuses[blockIdx.x] == NOT_CONVERGED) && (threadIdx.x == 0))));
     //Since queue is statically allocated, it needs to break if you try to exceed capacity.
-    assert((queue_size + insert_size) < queue_capacity);
+    assert((queue_size + insert_size) <= queue_capacity);
+
     size_t queue_idx = (queue_back + blockIdx.x) % queue_capacity;
     reinterpret_cast<device_coord3d*>(queue_batch.X)[queue_idx*blockDim.x + threadIdx.x]        = reinterpret_cast<device_coord3d*>(input_batch.X)[blockIdx.x*blockDim.x + threadIdx.x];
     reinterpret_cast<device_node3*>(queue_batch.neighbours)[queue_idx*blockDim.x + threadIdx.x] = reinterpret_cast<device_node3*>(input_batch.neighbours)[blockIdx.x*blockDim.x + threadIdx.x];
@@ -170,12 +167,14 @@ void kernel_push_batch(IsomerBatch input_batch, IsomerBatch queue_batch, device_
         queue_batch.iterations[queue_idx]   = 0;
         queue_batch.statuses[queue_idx]     = input_batch.statuses[blockIdx.x];
     }
+    GRID_SYNC
     if ((threadIdx.x + blockIdx.x) == 0) {
         queue_size += insert_size; queue_back = (queue_back + insert_size) % queue_capacity;
     }
 }
 
 void IsomerspaceForcefield::push_batch_from_kernel(const IsomerspaceKernel& input_kernel){
+    synchronize();
     for (size_t i = 0; i < device_count; i++)
     {
         void* kernel_args_1[] = {(void*)&input_kernel.d_batch[i]};
@@ -184,33 +183,52 @@ void IsomerspaceForcefield::push_batch_from_kernel(const IsomerspaceKernel& inpu
         safeCudaKernelCall((void*)kernel_push_batch,dim3(device_capacities[i], 1, 1), dim3(N,1,1), kernel_args_2, sizeof(device_real_t)*(N + Block_Size_Pow_2));
     }
     printLastCudaError("Pushing batch to queue Failed: ");
+    for(size_t i = 0; i < device_count; i++) device_queue_size += input_kernel.d_batch[i].n_isomers;
+    synchronize();
 }
 
 void IsomerspaceForcefield::update_device_batches(){
+    synchronize();
     for (size_t i = 0; i < device_count; i++)
     {
+        cudaStreamSynchronize(copy_stream[i]);
         void* kernelArgs[] = {(void*)&d_batch[i], &d_queues[i]};
         safeCudaKernelCall((void*)kernel_update_queue, dim3(device_capacities[i], 1, 1), dim3(N,1,1), kernelArgs, sizeof(size_t));
     }
-    cudaDeviceSynchronize();
+    synchronize();
     printLastCudaError("Update device batch from queue Failed: ");
+}
+
+void IsomerspaceForcefield::move_to_output_buffer(){
+    for (size_t i = 0; i < device_count; i++)
+    {
+        //Wait for GPU kernels to finish before moving data to second buffer.
+        cudaStreamSynchronize(main_stream[i]);
+        //Double buffering to allow for asynchronous GPU -> CPU copying, host data reodering and GPU execution.
+        cudaSetDevice(i); GPUDataStruct::copy(d_output_batch[i], d_batch[i], copy_stream[i]);
+    }
+    printLastCudaError("Moving data to output buffer failed: ");
 }
 
 
 
 void IsomerspaceKernel::kernel_to_kernel_copy(IsomerspaceKernel& S, IsomerspaceKernel& D){
+    //Wait for all previous kernel operations to finish before copying batches between kernels.
+    S.synchronize(); D.synchronize();
     for (size_t i = 0; i < S.get_device_count(); i++)
     {
         cudaSetDevice(i);
         void* kernelArgs[] = {(void*)&S.d_batch[i]};
+        //Convergence is kernel dependent, i.e. X0 may have converged but we need to clear this when we transfer the batch to the forcefield kernel.
         safeCudaKernelCall((void*)clear_convergence_status, dim3(S.get_device_capacity(i), 1, 1), dim3(S.get_isomer_size(), 1, 1), kernelArgs, 0);
     }
     D.batch_size = S.batch_size;
     D.batch_sizes = S.batch_sizes;
-    cudaDeviceSynchronize();
     printLastCudaError("Kernel to kernel copy failed: ");
 
     for (size_t i = 0; i < S.get_device_count(); i++){cudaSetDevice(i); D.d_batch[i] <<= S.d_batch[i];}
+    //Wait for transfer to finish
+    S.synchronize(); D.synchronize();
 }
 
 void IsomerspaceKernel::copy_metadata(){
@@ -224,7 +242,7 @@ void IsomerspaceKernel::copy_metadata(){
 }
 
 void IsomerspaceKernel::output_isomer(size_t i, size_t idx){
-    IsomerBatch B    = h_batch[i];
+    IsomerBatch& B   = h_batch[i];
     size_t offset    = idx*3*N;
     size_t c_offset  = idx*2*N;
     neighbours_t output(N); std::vector<coord3d> output_X(N); std::vector<coord2d> xys(N);
@@ -234,19 +252,20 @@ void IsomerspaceKernel::output_isomer(size_t i, size_t idx){
         xys[j]      = {reinterpret_cast<device_coord2d*>(B.xys + c_offset)[j].x,reinterpret_cast<device_coord2d*>(B.xys + c_offset)[j].y};
         output_X[j] = {B.X[offset + j*3], B.X[offset + j*3 + 1], B.X[offset + j*3 + 2]};
     }
-    Polyhedron P = Polyhedron(FullereneGraph(Graph(output,true)), output_X);
+    Polyhedron P(FullereneGraph(Graph(output,true)), output_X);
     P.layout2d = xys;
     output_queue.push({B.IDs[idx],P});
     B.statuses[idx]==CONVERGED ? converged_count++ : failed_count++;
+    B.n_isomers--; if(queue_mode == DEVICE_QUEUE) device_queue_size--;
 }
 
 void IsomerspaceKernel::insert_isomer(size_t i, size_t idx){
 
-    IsomerBatch B = h_batch[i];
+    IsomerBatch& B = h_batch[i];
     assert(!insert_queue.empty());
     cudaSetDevice(i);
     size_t ID        = insert_queue.front().first;
-    Polyhedron P     = insert_queue.front().second;
+    Polyhedron &P     = insert_queue.front().second;
     size_t offset  = idx*3*N;
     
     for (device_node_t u = 0; u < N; u++){
@@ -267,6 +286,7 @@ void IsomerspaceKernel::insert_isomer(size_t i, size_t idx){
     
     batch_size++;
     batch_sizes[i]++;
+    B.n_isomers++;
     insert_queue.pop();
 }
 
@@ -303,22 +323,31 @@ void IsomerspaceKernel::update_batch(){
 }
 
 void IsomerspaceKernel::output_batch_to_queue(){
-    for(size_t i = 0; i < device_count; i++) {cudaSetDevice(i); h_batch[i] <<= d_batch[i];}
+    
+    for(size_t i = 0; i < device_count; i++) {
+        cudaSetDevice(i); 
+        //This copy operation depends on output residing in the output batch
+        GPUDataStruct::copy(h_batch[i],d_output_batch[i],copy_stream[i]); 
+        //We need to wait for all queued copy stream operations to finish before reading from the host memory. 
+        cudaStreamSynchronize(copy_stream[i]);
+    }
+    
     for (size_t i = 0; i < device_count; i++)
-        for (size_t j = 0; j < device_capacities[i]; j++){   
-            if ((h_batch[i].statuses[j] == CONVERGED) || (h_batch[i].statuses[j]==FAILED)){
-                output_isomer(i,j);
-                h_batch[i].statuses[j] = EMPTY;
-            }
+    for (size_t j = 0; j < device_capacities[i]; j++){   
+        if ((h_batch[i].statuses[j] == CONVERGED) || (h_batch[i].statuses[j]==FAILED)){
+            output_isomer(i,j);
+            h_batch[i].statuses[j] = EMPTY;
         }
+    }
 }
 
 void IsomerspaceKernel::insert_queued_isomers(){
-    for (size_t i = 0; i < device_count; i++)
-    for (size_t j = 0; j < device_capacities[i]; j++) if(!insert_queue.empty()) insert_isomer(i,j); else h_batch[i].statuses[j] = EMPTY;
-    printLastCudaError("Failed to insert isomers: ");
+    batch_size = 0;
+    batch_sizes = {};
+    for (size_t i = 0; i < device_count; i++) {
+        h_batch[i].n_isomers = 0;
+        for (size_t j = 0; j < device_capacities[i]; j++) if(!insert_queue.empty()) insert_isomer(i,j); else h_batch[i].statuses[j] = EMPTY;
+            printLastCudaError("Failed to insert isomers: ");
+    }
     for (size_t i = 0; i < device_count; i++) d_batch[i] <<= h_batch[i];
-    
-    //copy_metadata();
-    //for(size_t i = 0; i < device_count; i++) {void* kargs[] = {(void*)&d_batch[i]}; safeCudaKernelCall((void*)input_type_conversion, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kargs, 0);}
 }
