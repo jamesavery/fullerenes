@@ -90,7 +90,7 @@ struct spiral_nomenclature {
   typedef enum { CS_NONE, CUBIC, TRIANGULATION, LEAPFROG } construction_scheme_t; // -> naming_scheme?
   typedef enum { GT_NONE, FULLERENE, FULLEROID, CAGE } naming_scheme_t; // -> naming_scheme
 
-  naming_scheme_t          naming_scheme;
+  naming_scheme_t       naming_scheme;
   search_scheme_t       search_scheme;
   construction_scheme_t construction_scheme;
 
