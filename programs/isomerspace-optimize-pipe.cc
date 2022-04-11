@@ -91,12 +91,11 @@ int main(int ac, char **argv)
         I++;
       }
     };
-    while ((tutte_kernel.get_queue_size() < ff_batch_size * 8 ) && more_to_generate)
-    {
-      auto t0 = system_clock::now();          
-      produce_and_insert(1);  
-      auto t4 = system_clock::now(); Tgen += t4-t0; 
-    }
+
+    auto t0 = system_clock::now();          
+    produce_and_insert(ff_batch_size*8 - tutte_kernel.get_queue_size());  
+    auto t4 = system_clock::now(); Tgen += t4-t0; 
+
     while (tutte_kernel.get_queue_size() > 0)
     {
       auto t0 = system_clock::now(); 
@@ -113,8 +112,9 @@ int main(int ac, char **argv)
     }
     
     int new_finished = 0;
-    
-    std::future<void> handle = std::async(std::launch::async,produce_and_insert, ff_batch_size * 8  - tutte_kernel.get_queue_size());
+
+    auto handle = std::async(std::launch::async , produce_and_insert, min(num_fullerenes.find(N)->second - I,ff_batch_size*8 - tutte_kernel.get_queue_size()) );
+    //std::future<void> handle = std::async(std::launch::async,produce_and_insert, 1);
     while ( ff_kernel.get_device_queue_size() > ff_batch_size)
     {
       int finished = ff_kernel.get_failed_count() + ff_kernel.get_converged_count(); 
@@ -131,7 +131,6 @@ int main(int ac, char **argv)
       Tcopy += system_clock::now() - t3;
     }
     handle.wait();
-
     if (!more_to_generate && tutte_kernel.get_queue_size() == 0){
     ff_kernel.output_batch_to_queue();
     while (ff_kernel.get_device_queue_size() > 0)
@@ -167,7 +166,7 @@ int main(int ac, char **argv)
     */
     // Output molecular geometry files
     progress_bar.update_progress((float)(ff_kernel.get_converged_count() + ff_kernel.get_failed_count())/(float)num_fullerenes.find(N)->second, "F: " + to_string(ff_kernel.get_failed_count()) + "  S: " + to_string(ff_kernel.get_converged_count()));
-    if (I > 20000){break;} 
+    if (I > 160000){break;} 
     //break;
     iterator++;
 
