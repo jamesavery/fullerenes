@@ -184,38 +184,11 @@ __device__ device_node_t reduction_max(device_node_t* sdata, const device_node_t
     return max;
 }
 
-__device__ half reduction(half *sdata){
-
-    cg::thread_block block = cg::this_thread_block();
-    cg::sync(block);
-    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
-    sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<half>());
-    cg::sync(block);
-
-    half beta = 0.0;
-    if (block.thread_rank() == 0) {
-        beta  = 0;
-        for (uint16_t i = 0; i < block.size(); i += tile32.size()) {
-            beta  += sdata[i];
-        }
-        sdata[0] = beta;
-    }
-    cg::sync(block);
-    return sdata[0];
-}
-
 
 
 
 __HD__ void print(const device_coord3d& ab){
     printf("[%.6f,%.6f,%.6f]",ab.x,ab.y,ab.z);
-}
-__device__ void print(const half4& ab){
-    print_coord(ab);
-}
-
-__device__ void print(const half2& ab){
-    printf("[%.6f,%.6f] \n", __half2float(ab.x), __half2float(ab.y));
 }
 
 __HD__ void print(device_real_t a){
