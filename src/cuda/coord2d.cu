@@ -1,6 +1,3 @@
-#define INLINE __device__ __forceinline__
-#include <inttypes.h>
-
 INLINE device_coord2d operator-(const device_coord2d& a)                 { return {-a.x, -a.y};  }
 INLINE device_coord2d operator-(const device_coord2d& a, const device_coord2d& b){ return {a.x-b.x, a.y-b.y};  }
 INLINE device_coord2d operator+(const device_coord2d& a, const device_coord2d& b){ return {a.x+b.x, a.y+b.y};  }
