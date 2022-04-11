@@ -96,27 +96,26 @@ __device__ unsigned int queue_front = 0, queue_back = 0, queue_capacity = 0, que
 
 __global__
 void kernel_update_queue(IsomerBatch G, IsomerBatch queue_batch){
-    
-    extern __shared__ size_t queue_indices[];
+    __shared__ size_t queue_index;
     if ((threadIdx.x + blockIdx.x) == 0) {num_queue_requests = 0; queue_capacity = queue_batch.isomer_capacity;}
     GRID_SYNC
     if (G.statuses[blockIdx.x] != NOT_CONVERGED){
         if(threadIdx.x == 0){
-            queue_indices[0] = atomicAdd(&queue_front, 1);
-            queue_indices[0] = queue_indices[0] % queue_capacity;
+            queue_index = atomicAdd(&queue_front, 1);
+            queue_index = queue_index % queue_capacity;
             atomicAdd(&num_queue_requests, 1);
         } 
         cg::sync(cg::this_thread_block());
-        assert(queue_indices[0] < queue_capacity);
-        size_t queue_idx    = queue_indices[0]*blockDim.x+threadIdx.x;
-        size_t global_idx   = blockDim.x*blockIdx.x + threadIdx.x;
-        reinterpret_cast<device_coord3d*>(G.X)[global_idx]           = reinterpret_cast<device_coord3d*>(queue_batch.X)[queue_idx];  
-        reinterpret_cast<device_node3*>(G.neighbours)[global_idx]    = reinterpret_cast<device_node3*>(queue_batch.neighbours)[queue_idx];  
+        assert(queue_index < queue_capacity);
+        size_t queue_array_idx    = queue_index*blockDim.x+threadIdx.x;
+        size_t global_idx         = blockDim.x*blockIdx.x + threadIdx.x;
+        reinterpret_cast<device_coord3d*>(G.X)[global_idx]           = reinterpret_cast<device_coord3d*>(queue_batch.X)[queue_array_idx];  
+        reinterpret_cast<device_node3*>(G.neighbours)[global_idx]    = reinterpret_cast<device_node3*>(queue_batch.neighbours)[queue_array_idx];  
         if (threadIdx.x == 0){
-            G.IDs[blockIdx.x] = queue_batch.IDs[queue_indices[0]];
+            G.IDs[blockIdx.x] = queue_batch.IDs[queue_index];
             G.iterations[blockIdx.x] = 0;
-            G.statuses[blockIdx.x] = queue_batch.statuses[queue_indices[0]];
-            queue_batch.statuses[queue_indices[0]] = EMPTY;
+            G.statuses[blockIdx.x] = queue_batch.statuses[queue_index];
+            queue_batch.statuses[queue_index] = EMPTY;
         }
     }
     GRID_SYNC
@@ -125,7 +124,6 @@ void kernel_update_queue(IsomerBatch G, IsomerBatch queue_batch){
         bool enough_left_in_queue = queue_size >= num_queue_requests;
         queue_size -= enough_left_in_queue ? num_queue_requests : queue_size;
         queue_front = enough_left_in_queue ? (queue_back - queue_size + queue_capacity) % queue_capacity : queue_back;
-        //printf("Queue stats: %d, %d, %d \n", queue_front, queue_back, queue_size);
     }
 }
 

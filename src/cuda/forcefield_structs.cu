@@ -9,7 +9,6 @@ typedef GPU_NODE3 device_node3;
 
 //Pentagons = 0
 //Hexagons = 1
-//PPP = 0, {HPP, PHP, PPH} = 1, {PHH, HPH, HHP} = 2, {HHH} = 3
 __constant__ device_real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
 __constant__ device_real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
 __constant__ device_real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
@@ -54,6 +53,7 @@ public:
             return return_val;
         }
         assert(false);
+        return T(); //Compiler wants a return statement
     }
 
     __device__ T pop_back(){
@@ -65,6 +65,7 @@ public:
             return return_val;
         }
         assert(false);
+        return T(); //Compiler wants a return statement
     }
 
     __device__ void push_back(T val){
@@ -130,9 +131,8 @@ struct DeviceFullereneGraph{
   __device__ uint8_t get_face_oriented(device_node_t u, device_node_t v, device_node_t *f) const{
         constexpr int f_max = 6;
         int i = 0;
-	f[0] = u;
-        device_node_t u_temp = u;
-        while (v!=u_temp && i<f_max)
+	    f[0] = u;
+        while (v!=f[0] && i<f_max)
         {   
             i++;
             device_node_t w = next_on_face(u,v);
@@ -140,9 +140,11 @@ struct DeviceFullereneGraph{
             u = v;
             v = w;
         }
-	if(i>=f_max) assert(false);
+        if(i>=f_max) {assert(false); return 0;} //Compiler wants a return statement
         else return i + 1;
-    }
+
+      }
+    
 
 };
 
