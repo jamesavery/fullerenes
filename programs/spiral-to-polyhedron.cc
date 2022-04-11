@@ -15,8 +15,9 @@ int main(int ac, char **av)
   g.layout2d = g.tutte_layout();
   Polyhedron P(g,g.zero_order_geometry());
   P.optimize();
+  Polyhedron::to_file(P,av[2]);  
 
-  Polyhedron::to_file(P,av[2]);
+
     
   return 0;
 }
