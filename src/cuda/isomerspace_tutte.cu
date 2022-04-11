@@ -8,8 +8,6 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
-#include <cuda_fp16.h>
-#include <cuda_bf16.h>
 #include "fullerenes/gpu/isomerspace_tutte.hh"
 
 
@@ -24,9 +22,7 @@ typedef GPU_REAL3 device_coord3d;
 typedef GPU_REAL2 device_coord2d;
 typedef GPU_NODE3 device_node3;
 
-#include "coord2d.cu"
-#include "auxiliary_cuda_functions.cu"
-#include "io.cu"
+#include "coord2d.cuh"
 
 
 __global__

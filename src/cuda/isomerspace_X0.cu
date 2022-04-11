@@ -2,8 +2,6 @@
 #include <cuda_runtime_api.h>
 #include <cuda.h>
 #include "fullerenes/gpu/isomerspace_kernel.hh"
-#include "auxiliary_cuda_functions.cu"
-#include "forcefield_structs.cu"
 #include "fullerenes/gpu/isomerspace_X0.hh"
 
 typedef IsomerspaceKernel::device_real_t device_real_t;

@@ -1,5 +1,4 @@
 #pragma once
-#include "coord3d.cu"
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include "cuda_runtime.h"

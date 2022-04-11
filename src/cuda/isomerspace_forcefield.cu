@@ -1,14 +1,6 @@
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include <cuda.h>
-#include "device_launch_parameters.h"
-#include <stdio.h>
-#define getLastCudaError(x) 
-#include <iostream>
-#include <fstream>
-#include <chrono>
-#include <cuda_fp16.h>
-#include <cuda_bf16.h>
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 
 #define BLOCK_SYNC cg::sync(cg::this_thread_block());
@@ -24,10 +16,10 @@ typedef GPU_NODE3 device_node3;
 
 
 #include "isomerspace_kernel.cu"
-#include "coord3d.cu"
-#include "auxiliary_cuda_functions.cu"
+#include "coord3d.cuh"
+#include "auxiliary_cuda_functions.cuh"
 #include "forcefield_structs.cu"
-#include "io.cu"
+#include "io.cuh"
 #include "isomerspace_tutte.cu"
 #include "isomerspace_X0.cu"
 using namespace std::literals;
@@ -61,7 +53,6 @@ struct ArcData{
         real_t r_rmp;
         coord3d ap, am, ab, ac, ad, mp;
         coord3d X_a = X[a]; coord3d X_b = X[d_get(G.neighbours,j)];
-        //printf("Index: %d \n", a*3 + j);
 
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
         ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;

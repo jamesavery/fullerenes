@@ -1,7 +1,6 @@
 #pragma once
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 #include "fullerenes/gpu/isomerspace_tutte.hh"
-#include "auxiliary_cuda_functions.cu"
 #include "fullerenes/gpu/gpudatastruct.hh"
 #include "fullerenes/gpu/isomerspace_kernel.hh"
 

@@ -1,5 +1,4 @@
 #pragma once
-#include "coord3d.cu"
 #include "fullerenes/gpu/isomerspace_kernel.hh"
 #include <exception>
 

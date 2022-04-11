@@ -1,5 +1,5 @@
 #include "isomerspace_forcefield.cu"
-#include "coord3d.cu"
+#include "coord3d.cuh"
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 
 #include <unistd.h>

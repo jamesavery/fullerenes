@@ -1,8 +1,8 @@
 #pragma once
 #include "fullerenes/gpu/isomerspace_kernel.hh"
-#include "io.cu"
 #include "cuda_runtime.h"
 #include "cuda.h"
+#include "auxiliary_cuda_functions.cuh"
 #include "cuda_runtime_api.h"
 
 size_t IsomerspaceKernel::get_batch_capacity(){
