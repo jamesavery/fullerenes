@@ -267,6 +267,10 @@ void IsomerspaceKernel::insert_isomer(size_t i, size_t idx){
     cudaSetDevice(i);
     size_t ID        = insert_queue.front().first;
     Polyhedron &P     = insert_queue.front().second;
+
+    bool is_points_empty    = P.points.empty();
+    bool is_layout2d_empty  = P.layout2d.empty();
+
     size_t offset  = idx*3*N;
     
     for (device_node_t u = 0; u < N; u++){
@@ -275,10 +279,12 @@ void IsomerspaceKernel::insert_isomer(size_t i, size_t idx){
             size_t arc_index = u*3 + j + offset;
             
             B.neighbours  [arc_index]    = v;
-            B.X           [arc_index]    = !P.points.empty() ? P.points[u][j] : 0.0;
+            if(!is_points_empty){ B.X           [arc_index] = P.points[u][j];}
         }   
-        B.xys         [u*2 + idx*2*N] = !P.layout2d.empty() ? P.layout2d[u].first : 0.0;
-        B.xys         [u*2 + idx*2*N + 1] = !P.layout2d.empty() ? P.layout2d[u].second : 0.0;
+        if(!is_layout2d_empty){
+        B.xys         [u*2 + idx*2*N] = P.layout2d[u].first;
+        B.xys         [u*2 + idx*2*N + 1] = P.layout2d[u].second;
+        }
     }
     
     B.iterations[idx]   = 0;
