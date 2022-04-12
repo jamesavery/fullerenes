@@ -177,8 +177,8 @@ void IsomerspaceForcefield::push_batch_from_kernel(const IsomerspaceKernel& inpu
     {
         void* kernel_args_1[] = {(void*)&input_kernel.d_batch[i]};
         void* kernel_args_2[] = {(void*)&input_kernel.d_batch[i], &d_queues[i], &global_reduction_arrays[i]};
-        safeCudaKernelCall((void*)clear_convergence_status, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernel_args_1, 0);
-        safeCudaKernelCall((void*)kernel_push_batch,dim3(device_capacities[i], 1, 1), dim3(N,1,1), kernel_args_2, sizeof(device_real_t)*(N + Block_Size_Pow_2));
+        safeCudaKernelCall((void*)clear_convergence_status, dim3(input_kernel.get_device_capacity(i), 1, 1), dim3(N, 1, 1), kernel_args_1, 0);
+        safeCudaKernelCall((void*)kernel_push_batch,dim3(input_kernel.get_device_capacity(i), 1, 1), dim3(N,1,1), kernel_args_2, sizeof(device_real_t)*(N + Block_Size_Pow_2));
     }
     printLastCudaError("Pushing batch to queue Failed: ");
     for(size_t i = 0; i < device_count; i++) device_queue_size += input_kernel.d_batch[i].n_isomers;

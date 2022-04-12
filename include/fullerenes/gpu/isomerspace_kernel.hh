@@ -41,7 +41,7 @@ public:
   size_t get_queue_size()const{return insert_queue.size();}
   size_t get_device_queue_size()const{return device_queue_size;}
   size_t get_batch_capacity();          //Uses Cuda API calls to determine the amount of fullerenes of a given size N, that can be optimized simultaneously.
-  size_t get_device_capacity(size_t i) {return device_capacities[i];}
+  size_t get_device_capacity(size_t i)const {return device_capacities[i];}
   size_t get_isomer_size() {return N;}
   size_t get_device_count() {return device_count;}
   
