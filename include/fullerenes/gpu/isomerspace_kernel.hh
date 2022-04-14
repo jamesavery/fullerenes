@@ -1,4 +1,7 @@
 #pragma once
+#ifndef ISOMERKERNEL_HEADER
+#define ISOMERKERNEL_HEADER
+
 #include <inttypes.h>
 #include <string>
 #include <queue>
@@ -71,8 +74,8 @@ public:
                                           //also serves to initialize the cuda default context, which would otherwise be destroyed and recreated every time memory is freed and reallocated.
   ~IsomerspaceKernel();                   //Destructor, calls free and delete on GPU and CPU buffers respectively.
 
-  std::queue<std::pair<device_node_t, Polyhedron>> output_queue;
-  std::queue<std::pair<device_node_t, Polyhedron>> insert_queue;
+  std::queue<std::pair<size_t, Polyhedron>> output_queue;
+  std::queue<std::pair<size_t, Polyhedron>> insert_queue;
   std::vector<IsomerBatch> h_batch, d_batch, d_output_batch;
 
 protected:
@@ -100,5 +103,5 @@ protected:
   std::vector<std::queue<int>> index_queue;             //Contains indices for valid parts of GPU memory to push new fullerenes to.
 };
 
-
+#endif
  
