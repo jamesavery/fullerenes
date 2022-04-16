@@ -10,8 +10,6 @@
 #include <chrono>
 #include "fullerenes/gpu/isomerspace_tutte.hh"
 
-
-
 #define BLOCK_SYNC cg::sync(cg::this_thread_block());
 #define GRID_SYNC cg::sync(cg::this_grid());
 #define INLINE __device__ __forceinline__
@@ -23,7 +21,6 @@ typedef GPU_REAL2 device_coord2d;
 typedef GPU_NODE3 device_node3;
 
 #include "coord2d.cuh"
-
 
 __global__
 void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
