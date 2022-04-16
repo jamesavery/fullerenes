@@ -1,4 +1,6 @@
-#pragma once
+#ifndef AUXILIARY_CUDA_FUN
+#define AUXILIARY_CUDA_FUN
+
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include "cuda_runtime.h"
@@ -6,8 +8,6 @@
 #include <iostream>
 #include <fstream>
 
-#ifndef AUXILIARY_CUDA_FUN
-#define AUXILIARY_CUDA_FUN
 #define __HD__ __device__ __host__ 
 namespace cg = cooperative_groups;
 
