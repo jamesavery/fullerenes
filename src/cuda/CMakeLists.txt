@@ -2,8 +2,9 @@ enable_language(CXX CUDA)
 
 add_library(cuda_lib SHARED isomerspace_forcefield.cu)
 
+#set_target_properties(cuda_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+#set_target_properties(cuda_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+#set_target_properties(cuda_lib PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 add_executable(benchmark_cuda_forcefield benchmark_cuda_forcefield.cu)
 target_link_libraries(benchmark_cuda_forcefield cuda_lib fortran_opt fullerenes)
-
-
 
