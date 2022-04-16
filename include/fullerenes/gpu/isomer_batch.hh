@@ -4,8 +4,6 @@ enum IsomerStatus {CONVERGED, FAILED, NOT_CONVERGED, EMPTY};
 
 struct IsomerBatch : GPUDataStruct
 {
-    typedef GPU_REAL device_real_t;
-    typedef uint16_t device_node_t;
 
     device_node_t* neighbours;
     device_real_t* X;

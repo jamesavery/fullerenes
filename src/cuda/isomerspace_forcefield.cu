@@ -6,17 +6,6 @@
 #include "reductions.cu"
 #include "misc_cuda.cu"
 
-#define BLOCK_SYNC cg::sync(cg::this_thread_block());
-#define GRID_SYNC cg::sync(cg::this_grid());
-#define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t;
-#define INLINE __device__ __forceinline__
-
-typedef IsomerspaceKernel::device_real_t device_real_t;
-typedef IsomerspaceKernel::device_node_t device_node_t;
-typedef GPU_REAL3 device_coord3d;
-typedef GPU_REAL2 device_coord2d;
-typedef GPU_NODE3 device_node3;
-
 #include "isomerspace_kernel.cu"
 #include "coord3d.cuh"
 #include "forcefield_structs.cu"

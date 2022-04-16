@@ -19,9 +19,6 @@
 class IsomerspaceKernel {
 public:
   enum QueueMode {HOST_QUEUE, DEVICE_QUEUE};
-
-  typedef GPU_REAL device_real_t;
-  typedef uint16_t device_node_t;
   
   size_t get_batch_size()const{return batch_size;}
   void insert_isomer(const Polyhedron& P, const size_t ID) {insert_queue.push({ID,P});}  //Pushes P to insert_queue. 

@@ -4,14 +4,9 @@
 #include "fullerenes/gpu/isomerspace_kernel.hh"
 #include "fullerenes/gpu/isomerspace_X0.hh"
 
-typedef IsomerspaceKernel::device_real_t device_real_t;
-typedef IsomerspaceKernel::device_node_t device_node_t;
-#define BLOCK_SYNC cg::sync(cg::this_thread_block());
-
 __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& G, device_node_t* distances){
-    typedef device_node_t node_t;
-    typedef device_coord2d coord2d;
+    DEVICE_TYPEDEFS
     
     DeviceFullereneGraph FG = DeviceFullereneGraph(&G.neighbours[blockIdx.x*blockDim.x*3]);
     node_t outer_face[6];
@@ -46,9 +41,7 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& G, device_node_t
 
 __device__
 device_coord2d spherical_projection(const IsomerBatch& G, device_node_t* sdata){
-    typedef device_node_t node_t;
-    typedef device_real_t real_t;
-    typedef device_coord2d coord2d;
+    DEVICE_TYPEDEFS
 
     node_t distance =  multiple_source_shortest_paths(G,reinterpret_cast<node_t*>(sdata));
     BLOCK_SYNC

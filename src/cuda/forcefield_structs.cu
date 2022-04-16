@@ -2,11 +2,6 @@
 #include "fullerenes/gpu/isomerspace_kernel.hh"
 #include <exception>
 
-typedef IsomerspaceKernel::device_real_t device_real_t;
-typedef IsomerspaceKernel::device_node_t device_node_t;
-typedef GPU_REAL3 device_coord3d;
-typedef GPU_NODE3 device_node3;
-
 //Pentagons = 0
 //Hexagons = 1
 __constant__ device_real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 

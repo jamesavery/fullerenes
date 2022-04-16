@@ -6,12 +6,12 @@
 #include "cuda_runtime.h"
 namespace cg = cooperative_groups;
 
-__device__ GPU_REAL reduction(GPU_REAL* sdata, const GPU_REAL data);
+__device__ device_real_t reduction(device_real_t* sdata, const device_real_t data);
 
-__device__ GPU_REAL reduction_max(GPU_REAL* sdata, const GPU_REAL data);
+__device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t data);
 
-__device__ GPU_NODE reduction_max(GPU_NODE* sdata, const GPU_NODE data);
+__device__ device_node_t reduction_max(device_node_t* sdata, const device_node_t data);
 
-__device__ GPU_REAL global_reduction(GPU_REAL* sdata, GPU_REAL* gdata, GPU_REAL data, bool mask = true);
+__device__ device_real_t global_reduction(device_real_t* sdata, device_real_t* gdata, device_real_t data, bool mask = true);
 
 #endif
