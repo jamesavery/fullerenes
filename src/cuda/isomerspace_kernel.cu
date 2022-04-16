@@ -2,8 +2,8 @@
 #include "fullerenes/gpu/isomerspace_kernel.hh"
 #include "cuda_runtime.h"
 #include "cuda.h"
-#include "auxiliary_cuda_functions.cuh"
 #include "cuda_runtime_api.h"
+
 
 size_t IsomerspaceKernel::get_batch_capacity(){
     cudaDeviceProp properties;
@@ -21,6 +21,7 @@ size_t IsomerspaceKernel::get_batch_capacity(){
         this->device_capacities[i] = properties.multiProcessorCount*fullerenes_per_SM;
         total_capacity += properties.multiProcessorCount*fullerenes_per_SM;
     }
+    printLastCudaError("Failed to get capacity");
     return (size_t)total_capacity;
 }
 
@@ -43,7 +44,6 @@ IsomerspaceKernel::IsomerspaceKernel(const size_t N, void* kernel){
     this->N                 = N;
     batch_capacity          = get_batch_capacity();    
     index_queue             = std::vector<std::queue<int>>(device_count);
-    
     //Create 2 streams that have no implicit synchronization with the default stream.
 
     d_batch        = std::vector<IsomerBatch>(device_count);
@@ -62,7 +62,7 @@ IsomerspaceKernel::IsomerspaceKernel(const size_t N, void* kernel){
         GPUDataStruct::allocate(h_batch[i]         , N, device_capacities[i], HOST_BUFFER);
 
         std::fill(h_batch[i].statuses, h_batch[i].statuses + h_batch[i].isomer_capacity, EMPTY);
-        fillCuArray(d_output_batch[i].statuses, d_output_batch[i].isomer_capacity, EMPTY);
+        fill_cu_array(d_output_batch[i].statuses, d_output_batch[i].isomer_capacity, EMPTY);
 
         cudaMalloc(&global_reduction_arrays[i], sizeof(device_real_t)*N*device_capacities[i]);
         batch_sizes[i] = 0;

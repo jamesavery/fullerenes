@@ -2,6 +2,9 @@
 #include <cuda_runtime_api.h>
 #include <cuda.h>
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
+#include "fullerenes/gpu/cuda_definitions.h"
+#include "reductions.cu"
+#include "misc_cuda.cu"
 
 #define BLOCK_SYNC cg::sync(cg::this_thread_block());
 #define GRID_SYNC cg::sync(cg::this_grid());
@@ -14,10 +17,8 @@ typedef GPU_REAL3 device_coord3d;
 typedef GPU_REAL2 device_coord2d;
 typedef GPU_NODE3 device_node3;
 
-
 #include "isomerspace_kernel.cu"
 #include "coord3d.cuh"
-#include "auxiliary_cuda_functions.cuh"
 #include "forcefield_structs.cu"
 #include "io.cuh"
 #include "isomerspace_tutte.cu"
@@ -532,7 +533,7 @@ __global__ void kernel_optimize_batch(IsomerBatch G, const size_t iterations){
         reinterpret_cast<coord3d*>(G.X)[offset + threadIdx.x]= X[threadIdx.x];
 
         if (threadIdx.x == 0) {G.iterations[blockIdx.x] += iterations;}
-    }    
+    } 
 
 }
 
@@ -696,7 +697,4 @@ IsomerspaceForcefield::IsomerspaceForcefield(const size_t N) : IsomerspaceKernel
     printLastCudaError("Forcefield kernel class instansiation failed!");
 }
 
-IsomerspaceForcefield::~IsomerspaceForcefield()
-{   
-    printLastCudaError("Failed in IsomerspaceForcefield destruction");
-}
+IsomerspaceForcefield::~IsomerspaceForcefield(){}
