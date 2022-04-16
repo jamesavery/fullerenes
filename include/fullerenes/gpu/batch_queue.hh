@@ -10,8 +10,7 @@ public:
     cudaError_t refill_batch(IsomerBatch& target, const cudaStream_t stream = NULL);
     cudaError_t insert(const IsomerBatch& input_batch);
     cudaError_t insert(const Polyhedron& isomer);
-    cudaError_t insert(const FullereneGraph& isomer);
-    cudaError_t insert(const FullereneDual& isomer);
+
 
     struct Properties{
         IsomerBatch batch;
