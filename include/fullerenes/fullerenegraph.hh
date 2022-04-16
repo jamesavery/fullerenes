@@ -10,7 +10,6 @@
 class FullereneGraph : public CubicGraph {
 public:
   FullereneGraph(const Graph& g, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { if(N>0) fullerene_check();  }
-  FullereneGraph(const Graph& g, const bool ISOLEMNLY_SWEAR_I_AM_A_FULLERENE=false, const vector<coord2d>& layout = vector<coord2d>()) : CubicGraph(g,layout) { if(!ISOLEMNLY_SWEAR_I_AM_A_FULLERENE && N>0) fullerene_check();  }
   FullereneGraph(const PlanarGraph& g) : CubicGraph(g,g.layout2d) { if(N>0) fullerene_check(); }
   FullereneGraph(const set<edge_t>& edges=set<edge_t>(), const vector<coord2d>& layout = vector<coord2d>()) 
     : CubicGraph(Graph(edges),layout) { if(N>0) fullerene_check(); }
