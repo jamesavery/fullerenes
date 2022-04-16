@@ -4,6 +4,42 @@
 #include "fullerenes/gpu/gpudatastruct.hh"
 #include "fullerenes/gpu/isomerspace_kernel.hh"
 
+GPUDataStruct::GPUDataStruct(size_t n_atoms, size_t n_isomers, BufferType buffer_type){
+    this->buffer_type = buffer_type;
+    this->n_atoms     = n_atoms;
+    this->n_isomers   = n_isomers;
+    if (buffer_type == DEVICE_BUFFER){
+        for (size_t i = 0; i < pointers.size(); i++) {
+            size_t num_elements = get<3>(pointers[i]) ? n_isomers * n_atoms: n_isomers;
+            cudaMalloc(get<1>(pointers[i]), num_elements* get<2>(pointers[i])); 
+        }
+    } else if(buffer_type == HOST_BUFFER){
+        for (size_t i = 0; i < pointers.size(); i++) {
+            size_t num_elements = get<3>(pointers[i]) ? n_isomers * n_atoms: n_isomers;
+            //For asynchronous memory transfers host memory must be pinned. 
+            cudaMallocHost(get<1>(pointers[i]), num_elements* get<2>(pointers[i]));
+        }
+    }
+    printLastCudaError("Failed to construct GPUDataStruct");
+    allocated = true;
+    
+}
+
+GPUDataStruct::~GPUDataStruct(){
+    if(allocated){
+        if (buffer_type == DEVICE_BUFFER){    
+            for (size_t i = 0; i < pointers.size(); i++) {
+                cudaFree(*get<1>(pointers[i]));
+            }
+        } else{
+            for (size_t i = 0; i < pointers.size(); i++) {
+                cudaFreeHost(*get<1>(pointers[i])); 
+            }
+        }
+        allocated = false;
+    }
+}
+
 void GPUDataStruct::allocate(GPUDataStruct& G, const size_t n_atoms, const size_t n_isomers, const BufferType buffer_type){
     if((!G.allocated)){
         G.buffer_type = buffer_type;
@@ -23,22 +59,6 @@ void GPUDataStruct::allocate(GPUDataStruct& G, const size_t n_atoms, const size_
         }        
         printLastCudaError("Failed to allocate struct");
         G.allocated = true;
-    }
-}
-
-void GPUDataStruct::free(GPUDataStruct& G){
-    if(G.allocated){
-        if (G.buffer_type == DEVICE_BUFFER){    
-            for (size_t i = 0; i < G.pointers.size(); i++) {
-                cudaFree(*get<1>(G.pointers[i]));
-            }
-        } else{
-            for (size_t i = 0; i < G.pointers.size(); i++) {
-                cudaFreeHost(*get<1>(G.pointers[i])); 
-            }
-        }
-        printLastCudaError("Failed to free struct"); 
-        G.allocated = false;
     }
 }
 
@@ -78,8 +98,6 @@ void input_type_conversion(IsomerBatch G){ // TODO: Write nicer.
     reinterpret_cast<device_node3*>(G.neighbours)[index] = {device_node_t(input_neighbours[0]), device_node_t(input_neighbours[1]), device_node_t(input_neighbours[2])};
     reinterpret_cast<device_coord3d*>(G.X)       [index] = {device_real_t(input_coordianates[0]), device_real_t(input_coordianates[1]), device_real_t(input_coordianates[2])};
     reinterpret_cast<device_coord2d*>(G.xys)     [index] = {device_real_t(input_xys[0]), device_real_t(input_xys[1])}; 
-
-    sequential_print(reinterpret_cast<device_node3*>(G.neighbours)[blockDim.x*blockIdx.x + threadIdx.x], 0 ) ;
 }
 
 __global__
