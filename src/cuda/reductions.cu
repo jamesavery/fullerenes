@@ -1,6 +1,12 @@
 #include "fullerenes/gpu/reductions.cuh"
 
-
+__device__ device_node_t max(const device_node_t a, const device_node_t b){
+    if (a > b){
+        return a;
+    }else {
+        return b;
+    }
+}
 
 #if REDUCTION_METHOD==0
     __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
