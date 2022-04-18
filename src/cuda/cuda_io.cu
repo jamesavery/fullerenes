@@ -4,12 +4,10 @@
 namespace cuda_io{
 
     cudaError_t output_to_queue(std::queue<std::pair<Polyhedron, size_t>>& queue, IsomerBatch& batch, const bool copy_2d_layout){
-        static IsomerBatch
         //Batch needs to exist on the host. For performance reasons we don't want to create a new batch here and copy to that, cudaMalloc is expensive.
         if (batch.buffer_type != HOST_BUFFER) assert(false); 
 
         size_t N = batch.n_atoms;
-
         for (size_t isomer_idx = 0; isomer_idx < batch.isomer_capacity; isomer_idx++){   
             //Only insert the isomer if it has finished (either CONVERGED or FAILED)
             if(!(batch.statuses[isomer_idx] == CONVERGED || batch.statuses[isomer_idx] == FAILED)) continue;
