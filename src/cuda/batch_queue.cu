@@ -43,7 +43,6 @@ __global__ void __refill_batch(IsomerBatch b, IsomerBatch q_b, BatchQueue::Queue
         bool enough_left_in_queue = *queue.size >= *queue.requests;
         *queue.size -= enough_left_in_queue ? *queue.requests : *queue.size;
         *queue.front = enough_left_in_queue ? (*queue.back - *queue.size + *queue.capacity) % *queue.capacity : *queue.back;
-        printf("Isomers remaining: %d", *queue.size);
     }
 }
 
@@ -85,7 +84,6 @@ cudaError_t BatchQueue::to_device(const cudaStream_t stream){
 
 cudaError_t BatchQueue::refill_batch(IsomerBatch& batch, const cudaStream_t stream){
     static LaunchDims dims((void*)__refill_batch, N, 0);
-    std::cout<< "Launch params" << dims.get_grid().x << std::endl;
     to_device(stream);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props};
     is_host_updated = false;
