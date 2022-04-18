@@ -648,14 +648,13 @@ void IsomerspaceForcefield::get_internal_coordinates(device_real_t* bonds, devic
 
 void IsomerspaceForcefield::optimize_batch(const size_t iterations){
     printLastCudaError("Memcpy Failed! \n");
-    auto start = std::chrono::system_clock::now();
+    static LaunchDims dims((void*)kernel_optimize_batch, N, shared_memory_bytes);
     for (size_t i = 0; i < device_count; i++)
     {
         cudaSetDevice(i);
         void* kernelArgs[] = {(void*)&d_batch[i],(void*)&iterations};
-        safeCudaKernelCall((void*)kernel_optimize_batch, dim3(device_capacities[i], 1, 1), dim3(N, 1, 1), kernelArgs, shared_memory_bytes, main_stream[i]);
+        safeCudaKernelCall((void*)kernel_optimize_batch, dims.get_grid(), dims.get_block(), kernelArgs, shared_memory_bytes, main_stream[i]);
     }   
-    auto end = std::chrono::system_clock::now();
     printLastCudaError("Optimize kernel launch failed: ");
 }
 
