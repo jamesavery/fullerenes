@@ -62,6 +62,15 @@ void GPUDataStruct::allocate(GPUDataStruct& G, const size_t n_atoms, const size_
     }
 }
 
+void GPUDataStruct::initialize(GPUDataStruct& G){
+    if(G.buffer_type == DEVICE_BUFFER){
+        for (size_t i = 0; i < G.pointers.size(); i++) {
+            size_t num_elements = get<3>(G.pointers[i]) ? G.isomer_capacity * G.n_atoms: G.isomer_capacity;
+            fill_cu_array<char>((char*)*get<1>(G.pointers[i]), num_elements*get<2>(G.pointers[i]), 0);
+        }
+    }
+}
+
 void GPUDataStruct::copy(GPUDataStruct& destination, const GPUDataStruct& source, const cudaStream_t stream){
     for (size_t i = 0; i < source.pointers.size(); i++)
     {
