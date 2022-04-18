@@ -1,6 +1,8 @@
+#ifndef ISOMERBATCH_STRUCT
+#define ISOMERBATCH_STRUCT
 #include "gpudatastruct.hh"
 
-enum IsomerStatus {CONVERGED, FAILED, NOT_CONVERGED, EMPTY};
+enum IsomerStatus {EMPTY, CONVERGED, FAILED, NOT_CONVERGED};
 
 struct IsomerBatch : GPUDataStruct
 {
@@ -14,11 +16,14 @@ struct IsomerBatch : GPUDataStruct
     size_t* iterations;
 
     IsomerBatch(){
-      pointers =   {{"neighbours",(void**)&neighbours, sizeof(node_t)*3, true}, {"X", (void**)&X, sizeof(double)*3, true}, {"xys", (void**)&xys, sizeof(double)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+      pointers =   {{"neighbours",(void**)&neighbours, sizeof(device_node_t)*3, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
     }
 
     IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type) {
-      pointers =   {{"neighbours",(void**)&neighbours, sizeof(node_t)*3, true}, {"X", (void**)&X, sizeof(double)*3, true}, {"xys", (void**)&xys, sizeof(double)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+      pointers =   {{"neighbours",(void**)&neighbours, sizeof(device_node_t)*3, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
       allocate(*this,n_atoms, n_isomers, buffer_type);
+      initialize(*this);
     }
 };
+
+#endif
