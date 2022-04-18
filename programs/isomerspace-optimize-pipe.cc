@@ -78,19 +78,19 @@ int main(int ac, char **argv)
     Topt    = system_clock::now()-T0,
     Tcheck  = system_clock::now()-T0,
     Tfile   = system_clock::now()-T0;
-
+  auto produce_and_insert = [&](size_t N){
+    for (int i = 0; i < N; i++){
+      more_to_generate &= BuckyGen::next_fullerene(Q,dualG);
+      if (!more_to_generate){break;}
+      dualG.update();
+      FullereneGraph G = dualG.dual_graph();
+      tutte_kernel.insert_isomer(G,I);
+      I++;
+    }
+  };
   while(more_to_do){
     // Fill in a batch
-    auto produce_and_insert = [&](size_t N){
-      for (int i = 0; i < N; i++){
-        more_to_generate &= BuckyGen::next_fullerene(Q,dualG);
-        if (!more_to_generate){break;}
-        dualG.update();
-        FullereneGraph G = dualG.dual_graph();
-        tutte_kernel.insert_isomer(G,I);
-        I++;
-      }
-    };
+    
 
     auto t0 = system_clock::now();          
     produce_and_insert(ff_batch_size*8 - tutte_kernel.get_queue_size());  
