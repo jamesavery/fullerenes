@@ -482,12 +482,13 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
 } 
 };
 
-__device__ void check_batch(IsomerBatch &B, device_real_t* global_reduction_array, const size_t max_iterations){
+__device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    if (B.statuses[blockIdx.x] == NOT_CONVERGED){
-    size_t offset = blockIdx.x * blockDim.x;
+    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx++){
+    if (B.statuses[isomer_idx] == NOT_CONVERGED){
+    size_t offset = isomer_idx * blockDim.x;
     Constants constants     = Constants(B);
     NodeGraph node_graph    = NodeGraph(B);
     ForceField FF           = ForceField(node_graph, constants, smem);
@@ -515,16 +516,16 @@ __device__ void check_batch(IsomerBatch &B, device_real_t* global_reduction_arra
     real_t energy           = FF.energy(X); 
     
     bool converged = (grad_norm < 1e-2) && !isnan(grad_norm);
-    //real_t num_converged    = global_reduction(smem,global_reduction_array,converged,(threadIdx.x==0) && (B.statuses[blockIdx.x] == IsomerspaceForcefield::NOT_CONVERGED));
-    //if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
+    //if(threadIdx.x + isomer_idx == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
 
-    if(threadIdx.x == 0 && B.statuses[blockIdx.x] != EMPTY){
+    if(threadIdx.x == 0 && B.statuses[isomer_idx] != EMPTY){
         if (converged)
         {
-            B.statuses[blockIdx.x] = CONVERGED;
-        } else if (B.iterations[blockIdx.x] >= max_iterations || isnan(grad_norm)) {
-            B.statuses[blockIdx.x] = FAILED;
+            B.statuses[isomer_idx] = CONVERGED;
+        } else if (B.iterations[isomer_idx] >= max_iterations || isnan(grad_norm)) {
+            B.statuses[isomer_idx] = FAILED;
         }
+    }
     }
     }
     
@@ -534,10 +535,11 @@ __global__ void __optimize_batch(IsomerBatch B, const size_t iterations, const s
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    if (B.statuses[blockIdx.x] == NOT_CONVERGED)
+    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx += gridDim.x){
+    if (B.statuses[isomer_idx] == NOT_CONVERGED)
     {
         real_t* base_pointer        = smem + Block_Size_Pow_2;
-        size_t offset               = blockIdx.x * blockDim.x;
+        size_t offset               = isomer_idx * blockDim.x;
         size_t node_id              = threadIdx.x;
         size_t N                    = blockDim.x;
         
@@ -555,7 +557,6 @@ __global__ void __optimize_batch(IsomerBatch B, const size_t iterations, const s
 
 
         //Pre-compute force constants and store in registers.
-
         Constants constants = Constants(B);
         NodeGraph nodeG     = NodeGraph(B);
 
@@ -567,10 +568,11 @@ __global__ void __optimize_batch(IsomerBatch B, const size_t iterations, const s
         //Copy data back from L1 cache to DRAM 
         reinterpret_cast<coord3d*>(B.X)[offset + threadIdx.x]= X[threadIdx.x];
 
-        if (threadIdx.x == 0) {B.iterations[blockIdx.x] += iterations;}
+        if (threadIdx.x == 0) {B.iterations[isomer_idx] += iterations;}
     }
     //Check the convergence of isomers and assign status accordingly.
-    //check_batch(B, g_array, max_iterations)
+    check_batch(B, max_iterations);
+    }
 }
 
 
