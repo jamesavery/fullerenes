@@ -5,6 +5,7 @@ namespace cuda_io{
 
     cudaError_t output_to_queue(std::queue<std::pair<Polyhedron, size_t>>& queue, IsomerBatch& batch, const bool copy_2d_layout){
         //Batch needs to exist on the host. For performance reasons we don't want to create a new batch here and copy to that, cudaMalloc is expensive.
+        printLastCudaError();
         if (batch.buffer_type != HOST_BUFFER) assert(false); 
 
         size_t N = batch.n_atoms;

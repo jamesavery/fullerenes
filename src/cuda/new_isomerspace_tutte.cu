@@ -13,21 +13,22 @@ namespace isomerspace_tutte{
 #include "forcefield_structs.cu"
 
 __global__
-void __tutte_layout(IsomerBatch G, const size_t iterations){
+void __tutte_layout(IsomerBatch B, const size_t iterations){
     DEVICE_TYPEDEFS
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
 
-    if (G.statuses[blockIdx.x] == NOT_CONVERGED)
+    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x)
     {
+    if (B.statuses[blockIdx.x] == NOT_CONVERGED){
     size_t offset = blockIdx.x * blockDim.x;
-    DeviceFullereneGraph FG(&G.neighbours[offset*3]); 
+    DeviceFullereneGraph FG(&B.neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2d* xys        = reinterpret_cast<coord2d*>(base_pointer);
     coord2d* newxys     = reinterpret_cast<coord2d*>(base_pointer) + blockDim.x;
 
 
-    node3 ns            = (reinterpret_cast<node3*>(G.neighbours) + offset)[threadIdx.x];
+    node3 ns            = (reinterpret_cast<node3*>(B.neighbours) + offset)[threadIdx.x];
     xys[threadIdx.x]    = {real_t(0.0), real_t(0.0)};
     device_node_t outer_face[6];
     device_node_t outer_face_vertex   = 0;
@@ -71,8 +72,9 @@ void __tutte_layout(IsomerBatch G, const size_t iterations){
         xys[threadIdx.x] = newxys[threadIdx.x];
     }
     BLOCK_SYNC
-    (reinterpret_cast<coord2d*>(G.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
-    G.statuses[blockIdx.x] = CONVERGED;
+    (reinterpret_cast<coord2d*>(B.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
+    B.statuses[blockIdx.x] = CONVERGED;
+    }
     }
 }
 

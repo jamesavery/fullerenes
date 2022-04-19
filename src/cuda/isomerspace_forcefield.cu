@@ -510,8 +510,8 @@ __global__ void kernel_optimize_batch(IsomerBatch G, const size_t iterations){
 
         //Pre-compute force constants and store in registers.
 
-        Constants constants = Constants(G);
-        NodeGraph nodeG     = NodeGraph(G);
+        Constants constants = Constants(G, blockIdx.x);
+        NodeGraph nodeG     = NodeGraph(G, blockIdx.x);
 
         //Create forcefield struct and use optimization algorithm to optimize the fullerene 
         ForceField FF = ForceField(nodeG, constants, smem);
@@ -533,8 +533,8 @@ __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_red
     clear_cache(smem,Block_Size_Pow_2);
     if (G.statuses[blockIdx.x] == NOT_CONVERGED){
     size_t offset = blockIdx.x * blockDim.x;
-    Constants constants     = Constants(G);
-    NodeGraph node_graph    = NodeGraph(G);
+    Constants constants     = Constants(G, blockIdx.x);
+    NodeGraph node_graph    = NodeGraph(G, blockIdx.x);
     ForceField FF           = ForceField(node_graph, constants, smem);
     coord3d* X              = reinterpret_cast<coord3d*>(G.X+offset*3);
 
@@ -579,8 +579,8 @@ __global__ void kernel_internal_coordinates(IsomerBatch G, IsomerspaceForcefield
     DEVICE_TYPEDEFS
     size_t offset = blockIdx.x * blockDim.x;
     coord3d* X       = &reinterpret_cast<coord3d*>(G.X)[offset];
-    NodeGraph node_graph    = NodeGraph(G);
-    Constants constants     = Constants(G);
+    NodeGraph node_graph    = NodeGraph(G, blockIdx.x);
+    Constants constants     = Constants(G, blockIdx.x);
 
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
     for (uint8_t j = 0; j < 3; j++)

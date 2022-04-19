@@ -149,8 +149,8 @@ struct NodeGraph{
     device_node3 next_on_face;
     device_node3 prev_on_face;
 
-    __device__ NodeGraph(const IsomerBatch& G){
-        const DeviceFullereneGraph FG(&G.neighbours[blockIdx.x*blockDim.x*3]);
+    __device__ NodeGraph(const IsomerBatch& G, const size_t isomer_idx){
+        const DeviceFullereneGraph FG(&G.neighbours[isomer_idx*blockDim.x*3]);
         this->neighbours   = {FG.neighbours[threadIdx.x*3], FG.neighbours[threadIdx.x*3 + 1], FG.neighbours[threadIdx.x*3 + 2]};
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.neighbours[threadIdx.x*3 + 2])};
@@ -178,9 +178,9 @@ struct Constants{
         return f1*4 + f2*2 + f3;
     }
 
-    __device__ Constants(const IsomerBatch& G){
+    __device__ Constants(const IsomerBatch& G, const size_t isomer_idx){
         //Set pointers to start of fullerene.
-        const DeviceFullereneGraph FG(&G.neighbours[blockIdx.x*blockDim.x*3]);
+        const DeviceFullereneGraph FG(&G.neighbours[isomer_idx*blockDim.x*3]);
         device_node3 neighbours = {FG.neighbours[threadIdx.x*3], FG.neighbours[threadIdx.x*3 + 1], FG.neighbours[threadIdx.x*3 + 2]};
         //       m    p
         //    f5_|   |_f4

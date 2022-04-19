@@ -13,10 +13,10 @@ namespace isomerspace_X0{
 #include "forcefield_structs.cu"
 
 __device__
-device_node_t multiple_source_shortest_paths(const IsomerBatch& G, device_node_t* distances){
+device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){
     DEVICE_TYPEDEFS
     
-    DeviceFullereneGraph FG = DeviceFullereneGraph(&G.neighbours[blockIdx.x*blockDim.x*3]);
+    DeviceFullereneGraph FG = DeviceFullereneGraph(&B.neighbours[isomer_idx*blockDim.x*3]);
     node_t outer_face[6];
     uint8_t Nface = FG.get_face_oriented(0, FG.neighbours[0],outer_face);
     distances[threadIdx.x] = node_t(NODE_MAX);    
@@ -42,16 +42,15 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& G, device_node_t
     BLOCK_SYNC
     device_node_t distance = distances[threadIdx.x];
     BLOCK_SYNC
-
     return distance;
 }
 
 
 __device__
-device_coord2d spherical_projection(const IsomerBatch& G, device_node_t* sdata){
+device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, const size_t isomer_idx){
     DEVICE_TYPEDEFS
 
-    node_t distance =  multiple_source_shortest_paths(G,reinterpret_cast<node_t*>(sdata));
+    node_t distance =  multiple_source_shortest_paths(B,reinterpret_cast<node_t*>(sdata), isomer_idx);
     BLOCK_SYNC
     clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); 
     node_t d_max = reduction_max(sdata, distance);
@@ -63,7 +62,7 @@ device_coord2d spherical_projection(const IsomerBatch& G, device_node_t* sdata){
     BLOCK_SYNC
     clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2);
     BLOCK_SYNC
-    coord2d xys = reinterpret_cast<coord2d*>(G.xys)[blockIdx.x*blockDim.x + threadIdx.x]; BLOCK_SYNC
+    coord2d xys = reinterpret_cast<coord2d*>(B.xys)[isomer_idx*blockDim.x + threadIdx.x]; BLOCK_SYNC
     ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2], xys.x); 
     ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2+1], xys.y); BLOCK_SYNC
     coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / num_of_same_dist; BLOCK_SYNC    
@@ -78,17 +77,14 @@ device_coord2d spherical_projection(const IsomerBatch& G, device_node_t* sdata){
 }
 
 __global__
-void __zero_order_geometry(IsomerBatch G, device_real_t scalerad){
-    typedef device_real_t real_t;
-    typedef device_coord2d coord2d;
-    typedef device_coord3d coord3d;
-
+void __zero_order_geometry(IsomerBatch B, device_real_t scalerad){
+    DEVICE_TYPEDEFS
     extern __shared__  device_real_t sdata[];
     clear_cache(sdata, Block_Size_Pow_2);
-    if (G.statuses[blockIdx.x] == NOT_CONVERGED)
-    {
-    NodeGraph node_graph = NodeGraph(G); 
-    coord2d angles = spherical_projection(G,reinterpret_cast<device_node_t*>(sdata));
+    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
+    if (B.statuses[isomer_idx] == NOT_CONVERGED){
+    NodeGraph node_graph = NodeGraph(B, isomer_idx); 
+    coord2d angles = spherical_projection(B,reinterpret_cast<device_node_t*>(sdata), isomer_idx);
     real_t theta = angles.x; real_t phi = angles.y;
     real_t x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
     coord3d coordinate = {x, y ,z};
@@ -111,9 +107,9 @@ void __zero_order_geometry(IsomerBatch G, device_real_t scalerad){
     Ravg = reduction(sdata, local_Ravg);
     Ravg /= real_t(3*blockDim.x);
     coordinate *= scalerad*1.5/Ravg;
-    reinterpret_cast<coord3d*>(G.X)[blockDim.x*blockIdx.x + threadIdx.x] = coordinate;
-    G.statuses[blockIdx.x] = CONVERGED;
-    }
+    reinterpret_cast<coord3d*>(B.X)[blockDim.x*isomer_idx + threadIdx.x] = coordinate;
+    B.statuses[isomer_idx] = CONVERGED;
+    }}
 }
 
 cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const cudaStream_t stream){

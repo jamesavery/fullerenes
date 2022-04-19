@@ -486,11 +486,11 @@ __device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx++){
+    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
     if (B.statuses[isomer_idx] == NOT_CONVERGED){
     size_t offset = isomer_idx * blockDim.x;
-    Constants constants     = Constants(B);
-    NodeGraph node_graph    = NodeGraph(B);
+    Constants constants     = Constants(B, isomer_idx);
+    NodeGraph node_graph    = NodeGraph(B, isomer_idx);
     ForceField FF           = ForceField(node_graph, constants, smem);
     coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);
 
@@ -557,8 +557,8 @@ __global__ void __optimize_batch(IsomerBatch B, const size_t iterations, const s
 
 
         //Pre-compute force constants and store in registers.
-        Constants constants = Constants(B);
-        NodeGraph nodeG     = NodeGraph(B);
+        Constants constants = Constants(B, isomer_idx);
+        NodeGraph nodeG     = NodeGraph(B, isomer_idx);
 
         //Create forcefield struct and use optimization algorithm to optimize the fullerene 
         ForceField FF = ForceField(nodeG, constants, smem);

@@ -79,7 +79,7 @@ void kernel_zero_order_geometry(IsomerBatch G, device_real_t scalerad){
     clear_cache(sdata, Block_Size_Pow_2);
     if (G.statuses[blockIdx.x] == NOT_CONVERGED)
     {
-    NodeGraph node_graph = NodeGraph(G); 
+    NodeGraph node_graph = NodeGraph(G, blockIdx.x); 
     coord2d angles = spherical_projection(G,reinterpret_cast<device_node_t*>(sdata));
     real_t theta = angles.x; real_t phi = angles.y;
     real_t x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);

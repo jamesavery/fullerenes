@@ -16,8 +16,8 @@ __global__ void __refill_batch(IsomerBatch b, IsomerBatch q_b, BatchQueue::Queue
     __shared__ size_t queue_index;
     if ((threadIdx.x + blockIdx.x) == 0) {*queue.requests = 0; *queue.capacity = q_b.isomer_capacity;}
     GRID_SYNC
-    for (int i = 0; i < b.isomer_capacity; i++){
-    if (b.statuses[blockIdx.x] != NOT_CONVERGED){
+    for (int isomer_idx = 0; isomer_idx < b.isomer_capacity; isomer_idx+= gridDim.x){
+    if (b.statuses[isomer_idx] != NOT_CONVERGED){
         if(threadIdx.x == 0){
             queue_index = atomicAdd(queue.front, 1);
             queue_index = queue_index % *queue.capacity;
@@ -26,13 +26,13 @@ __global__ void __refill_batch(IsomerBatch b, IsomerBatch q_b, BatchQueue::Queue
         cg::sync(cg::this_thread_block());
         assert(queue_index < *queue.capacity);
         size_t queue_array_idx    = queue_index*blockDim.x+threadIdx.x;
-        size_t global_idx         = blockDim.x*blockIdx.x + threadIdx.x;
+        size_t global_idx         = blockDim.x*isomer_idx + threadIdx.x;
         reinterpret_cast<device_coord3d*>(b.X)[global_idx]           = reinterpret_cast<device_coord3d*>(q_b.X)[queue_array_idx];  
         reinterpret_cast<device_node3*>(b.neighbours)[global_idx]    = reinterpret_cast<device_node3*>(q_b.neighbours)[queue_array_idx];  
         if (threadIdx.x == 0){
-            b.IDs[blockIdx.x] = q_b.IDs[queue_index];
-            b.iterations[blockIdx.x] = 0;
-            b.statuses[blockIdx.x] = q_b.statuses[queue_index];
+            b.IDs[isomer_idx] = q_b.IDs[queue_index];
+            b.iterations[isomer_idx] = 0;
+            b.statuses[isomer_idx] = q_b.statuses[queue_index];
             q_b.statuses[queue_index] = EMPTY;
         }
     }
