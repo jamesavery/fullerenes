@@ -11,13 +11,13 @@ namespace cuda_io{
 #include "cuda_io.cu"
 #include "fullerenes/gpu/batch_queue.hh"
 namespace cuda_io{
-__global__ void __refill_batch(IsomerBatch b, IsomerBatch q_b, BatchQueue::QueueProperties queue){
+__global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, BatchQueue::QueueProperties queue){
 
     __shared__ size_t queue_index;
-    if ((threadIdx.x + blockIdx.x) == 0) {*queue.requests = 0; *queue.capacity = q_b.isomer_capacity;}
+    if ((threadIdx.x + blockIdx.x) == 0) {*queue.requests = 0; *queue.capacity = Q_B.isomer_capacity;}
     GRID_SYNC
-    for (int isomer_idx = blockIdx.x; isomer_idx < b.isomer_capacity; isomer_idx+= gridDim.x){
-    if (b.statuses[isomer_idx] != NOT_CONVERGED){
+    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
+    if (B.statuses[isomer_idx] != NOT_CONVERGED){
         if(threadIdx.x == 0){
             queue_index = atomicAdd(queue.front, 1);
             queue_index = queue_index % *queue.capacity;
@@ -27,13 +27,13 @@ __global__ void __refill_batch(IsomerBatch b, IsomerBatch q_b, BatchQueue::Queue
         assert(queue_index < *queue.capacity);
         size_t queue_array_idx    = queue_index*blockDim.x+threadIdx.x;
         size_t global_idx         = blockDim.x*isomer_idx + threadIdx.x;
-        reinterpret_cast<device_coord3d*>(b.X)[global_idx]           = reinterpret_cast<device_coord3d*>(q_b.X)[queue_array_idx];  
-        reinterpret_cast<device_node3*>(b.neighbours)[global_idx]    = reinterpret_cast<device_node3*>(q_b.neighbours)[queue_array_idx];  
+        reinterpret_cast<device_coord3d*>(B.X)[global_idx]           = reinterpret_cast<device_coord3d*>(Q_B.X)[queue_array_idx];  
+        reinterpret_cast<device_node3*>(B.neighbours)[global_idx]    = reinterpret_cast<device_node3*>(Q_B.neighbours)[queue_array_idx];  
         if (threadIdx.x == 0){
-            b.IDs[isomer_idx] = q_b.IDs[queue_index];
-            b.iterations[isomer_idx] = 0;
-            b.statuses[isomer_idx] = q_b.statuses[queue_index];
-            q_b.statuses[queue_index] = EMPTY;
+            B.IDs[isomer_idx] = Q_B.IDs[queue_index];
+            B.iterations[isomer_idx] = 0;
+            B.statuses[isomer_idx] = Q_B.statuses[queue_index];
+            Q_B.statuses[queue_index] = EMPTY;
         }
     }
     }
@@ -43,6 +43,23 @@ __global__ void __refill_batch(IsomerBatch b, IsomerBatch q_b, BatchQueue::Queue
         bool enough_left_in_queue = *queue.size >= *queue.requests;
         *queue.size -= enough_left_in_queue ? *queue.requests : *queue.size;
         *queue.front = enough_left_in_queue ? (*queue.back - *queue.size + *queue.capacity) % *queue.capacity : *queue.back;
+    }
+}
+
+__global__ void insert_batch_(IsomerBatch B, IsomerBatch Q_B, BatchQueue::QueueProperties queue){
+    extern __shared__ device_real_t sdata[];
+    size_t queue_idx = (*queue.back + blockIdx.x) % *queue.capacity;
+    reinterpret_cast<device_coord3d*>(Q_B.X)[queue_idx*blockDim.x + threadIdx.x]        = reinterpret_cast<device_coord3d*>(B.X)[blockIdx.x*blockDim.x + threadIdx.x];
+    reinterpret_cast<device_node3*>(Q_B.neighbours)[queue_idx*blockDim.x + threadIdx.x] = reinterpret_cast<device_node3*>(B.neighbours)[blockIdx.x*blockDim.x + threadIdx.x];
+    if (threadIdx.x == 0)
+    {
+        Q_B.IDs[queue_idx]          = B.IDs[blockIdx.x];
+        Q_B.iterations[queue_idx]   = 0;
+        Q_B.statuses[queue_idx]     = B.statuses[blockIdx.x];
+    }
+    GRID_SYNC
+    if ((threadIdx.x + blockIdx.x) == 0) {
+        queue.size += B.isomer_capacity; *queue.back = (*queue.back + B.isomer_capacity) % *queue.capacity;
     }
 }
 
@@ -83,11 +100,11 @@ cudaError_t BatchQueue::to_device(const cudaStream_t stream){
 }
 
 cudaError_t BatchQueue::refill_batch(IsomerBatch& batch, const cudaStream_t stream){
-    static LaunchDims dims((void*)__refill_batch, N, 0);
+    static LaunchDims dims((void*)refill_batch_, N, 0);
     to_device(stream);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props};
     is_host_updated = false;
-    cudaError_t error = safeCudaKernelCall((void*)__refill_batch, dims.get_grid(), dims.get_block(), kargs, 0, stream);
+    cudaError_t error = safeCudaKernelCall((void*)refill_batch_, dims.get_grid(), dims.get_block(), kargs, 0, stream);
     printLastCudaError("Refill failed");
     return error;
 }
