@@ -11,13 +11,13 @@ namespace isomerspace_tutte{
 #include "coord3d.cuh"
 #include "coord2d.cuh"
 #include "forcefield_structs.cu"
+#include "print_functions.cu"
 
 __global__
 void __tutte_layout(IsomerBatch B, const size_t iterations){
     DEVICE_TYPEDEFS
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
-
     for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
     if (B.statuses[isomer_idx] == NOT_CONVERGED){
     size_t offset = isomer_idx * blockDim.x;
