@@ -14,11 +14,7 @@
 
 __global__
 void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
-    typedef device_coord2d coord2d;
-    typedef device_real_t real_t;
-    typedef device_node_t node_t;
-    typedef device_node3 node3;
-
+    DEVICE_TYPEDEFS
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
 
