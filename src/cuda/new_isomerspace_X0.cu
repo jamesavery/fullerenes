@@ -77,7 +77,7 @@ device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, 
 }
 
 __global__
-void __zero_order_geometry(IsomerBatch B, device_real_t scalerad){
+void zero_order_geometry_(IsomerBatch B, device_real_t scalerad){
     DEVICE_TYPEDEFS
     extern __shared__  device_real_t sdata[];
     clear_cache(sdata, Block_Size_Pow_2);
@@ -114,10 +114,10 @@ void __zero_order_geometry(IsomerBatch B, device_real_t scalerad){
 
 cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const cudaStream_t stream){
     size_t smem =  sizeof(device_coord3d)*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)__zero_order_geometry, B.n_atoms, smem);
-    dims.update_dims((void*)__zero_order_geometry, B.n_atoms, smem);
+    static LaunchDims dims((void*)zero_order_geometry_, B.n_atoms, smem);
+    dims.update_dims((void*)zero_order_geometry_, B.n_atoms, smem);
     void* kargs[]{(void*)&B, (void*)&scalerad};
-    return safeCudaKernelCall((void*)__zero_order_geometry, dims.get_grid(), dims.get_block(), kargs, smem, stream);
+    return safeCudaKernelCall((void*)zero_order_geometry_, dims.get_grid(), dims.get_block(), kargs, smem, stream);
 }
 
 }}

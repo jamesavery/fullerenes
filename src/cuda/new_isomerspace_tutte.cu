@@ -14,7 +14,7 @@ namespace isomerspace_tutte{
 #include "print_functions.cu"
 
 __global__
-void __tutte_layout(IsomerBatch B, const size_t iterations){
+void tutte_layout_(IsomerBatch B, const size_t iterations){
     DEVICE_TYPEDEFS
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
@@ -79,10 +79,10 @@ void __tutte_layout(IsomerBatch B, const size_t iterations){
 
 cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const cudaStream_t stream){
     size_t smem = sizeof(device_coord2d)*B.n_atoms*2 + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)__tutte_layout, B.n_atoms, smem);
-    dims.update_dims((void*)__tutte_layout, B.n_atoms, smem);
+    static LaunchDims dims((void*)tutte_layout_, B.n_atoms, smem);
+    dims.update_dims((void*)tutte_layout_, B.n_atoms, smem);
     void* kargs[]{(void*)&B,(void*)&max_iterations};
-    return safeCudaKernelCall((void*)__tutte_layout, dims.get_grid(), dims.get_block(), kargs, smem, stream);  
+    return safeCudaKernelCall((void*)tutte_layout_, dims.get_grid(), dims.get_block(), kargs, smem, stream);  
 }
 
 }}

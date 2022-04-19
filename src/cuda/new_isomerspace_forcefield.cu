@@ -531,7 +531,7 @@ __device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     
 }
 
-__global__ void __optimize_batch(IsomerBatch B, const size_t iterations, const size_t max_iterations){
+__global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -578,10 +578,10 @@ __global__ void __optimize_batch(IsomerBatch B, const size_t iterations, const s
 
 cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const cudaStream_t stream){
     size_t smem = sizeof(device_coord3d)*3*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)__optimize_batch, B.n_atoms, smem);
-    dims.update_dims((void*)__optimize_batch, B.n_atoms, smem);
+    static LaunchDims dims((void*)optimize_batch_, B.n_atoms, smem);
+    dims.update_dims((void*)optimize_batch_, B.n_atoms, smem);
     void* kargs[]{(void*)&B, (void*)&iterations, (void*)&max_iterations};
-    return safeCudaKernelCall((void*)__optimize_batch, dims.get_grid(), dims.get_block(), kargs, smem, stream);
+    return safeCudaKernelCall((void*)optimize_batch_, dims.get_grid(), dims.get_block(), kargs, smem, stream);
 }
 
 }}
