@@ -18,10 +18,9 @@ void __tutte_layout(IsomerBatch B, const size_t iterations){
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
 
-    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x)
-    {
-    if (B.statuses[blockIdx.x] == NOT_CONVERGED){
-    size_t offset = blockIdx.x * blockDim.x;
+    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
+    if (B.statuses[isomer_idx] == NOT_CONVERGED){
+    size_t offset = isomer_idx * blockDim.x;
     DeviceFullereneGraph FG(&B.neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2d* xys        = reinterpret_cast<coord2d*>(base_pointer);
@@ -73,7 +72,7 @@ void __tutte_layout(IsomerBatch B, const size_t iterations){
     }
     BLOCK_SYNC
     (reinterpret_cast<coord2d*>(B.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
-    B.statuses[blockIdx.x] = CONVERGED;
+    B.statuses[isomer_idx] = CONVERGED;
     }
     }
 }
