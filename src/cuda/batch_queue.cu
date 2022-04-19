@@ -16,7 +16,7 @@ __global__ void __refill_batch(IsomerBatch b, IsomerBatch q_b, BatchQueue::Queue
     __shared__ size_t queue_index;
     if ((threadIdx.x + blockIdx.x) == 0) {*queue.requests = 0; *queue.capacity = q_b.isomer_capacity;}
     GRID_SYNC
-    for (int isomer_idx = 0; isomer_idx < b.isomer_capacity; isomer_idx+= gridDim.x){
+    for (int isomer_idx = blockIdx.x; isomer_idx < b.isomer_capacity; isomer_idx+= gridDim.x){
     if (b.statuses[isomer_idx] != NOT_CONVERGED){
         if(threadIdx.x == 0){
             queue_index = atomicAdd(queue.front, 1);
@@ -95,6 +95,12 @@ cudaError_t BatchQueue::refill_batch(IsomerBatch& batch, const cudaStream_t stre
 cudaError_t BatchQueue::insert(IsomerBatch& input_batch, const cudaStream_t stream, const bool insert_2d){
     reset_convergence_statuses(input_batch, stream);   
     input_batch.buffer_type == DEVICE_BUFFER ? to_device(stream) : to_host(stream); 
+    if (*props.capacity < (*props.size + input_batch.isomer_capacity))
+    {
+        *props.capacity += input_batch.isomer_capacity;
+        resize(host_batch, *props.capacity, stream);
+        resize(device_batch, *props.capacity, stream);
+    }
     if (input_batch.buffer_type == DEVICE_BUFFER){
         for (size_t i = 0; i < input_batch.pointers.size(); i++)
         {
