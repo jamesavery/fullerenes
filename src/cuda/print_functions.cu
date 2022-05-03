@@ -19,6 +19,10 @@ __device__ void print(int a){
     printf("%d",a);
 }
 
+__device__ void print(size_t a){
+    printf("%u",a);
+}
+
 __device__ void print(const char* a){
     printf(a);
 }
@@ -34,6 +38,30 @@ template <typename T>
 __device__ void print_single(T data){
     if (threadIdx.x + blockIdx.x == 0) {
         print(data);
+    }
+}
+
+template <typename T>
+__device__ void sequential_print(T data, size_t fullerene_id){
+    if (blockIdx.x == fullerene_id)
+    {
+    if (threadIdx.x == 0) printf("[");
+    cg::sync(cg::this_thread_block());
+    for (size_t i = 0; i < blockDim.x; i++)
+    {
+        if (threadIdx.x == i)
+        {   
+            if (i != blockDim.x-1)
+            {
+                print(data); printf(",");
+            } else{
+                print(data);
+            }
+        }
+        cg::sync(cg::this_thread_block());
+    }
+    if (threadIdx.x == 0) printf("]\n");
+    cg::sync(cg::this_thread_block());
     }
 }
 
