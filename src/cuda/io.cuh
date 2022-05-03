@@ -66,7 +66,12 @@ void GPUDataStruct::initialize(GPUDataStruct& G){
     if(G.buffer_type == DEVICE_BUFFER){
         for (size_t i = 0; i < G.pointers.size(); i++) {
             size_t num_elements = get<3>(G.pointers[i]) ? G.isomer_capacity * G.n_atoms: G.isomer_capacity;
-            fill_cu_array<char>((char*)*get<1>(G.pointers[i]), num_elements*get<2>(G.pointers[i]), 0);
+            cudaMemset(*get<1>(G.pointers[i]),0,num_elements*get<2>(G.pointers[i]));
+        }
+    } else {
+        for (size_t i = 0; i < G.pointers.size(); i++) {
+            size_t num_elements = get<3>(G.pointers[i]) ? G.isomer_capacity * G.n_atoms: G.isomer_capacity;
+            memset(*get<1>(G.pointers[i]),0, num_elements*get<2>(G.pointers[i]));
         }
     }
 }
