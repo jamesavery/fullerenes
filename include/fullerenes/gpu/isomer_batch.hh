@@ -3,6 +3,7 @@
 #include "gpudatastruct.hh"
 
 enum IsomerStatus {EMPTY, CONVERGED, FAILED, NOT_CONVERGED};
+enum class LaunchPolicy {SYNC, ASYNC};
 
 struct IsomerBatch : GPUDataStruct
 {
