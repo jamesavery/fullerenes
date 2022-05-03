@@ -2,6 +2,7 @@
 #include <cooperative_groups.h>
 #include "iostream"
 #include "assert.h"
+#include "fullerenes/gpu/cuda_execution.hh"
 
 namespace cg = cooperative_groups;
 
@@ -67,72 +68,93 @@ cudaError_t fill_cu_array(T* cu_array, size_t size, T fill_value) {
     return cudaDeviceSynchronize();
 }
 
+
 //Container for launch dimensions on all devices, can be stored statically in a function.
 struct LaunchDims
 {   
     //Figures out which device is being used and gets the appropriate grid dimensions.
     dim3 get_grid(){
         int device_id; cudaGetDevice(&device_id);
-        return grid_dims[device_id];
+        return m_grid_dims[device_id];
     }
 
     //Figures out which device is being used and gets the appropriate block dimensions.
     dim3 get_block(){
         int device_id; cudaGetDevice(&device_id);
-        return block_dims[device_id];
+        return m_block_dims[device_id];
     }
 
     //Allocates memory according to device count and computes all launch dimensions for all devices.
-    LaunchDims(const void* kernel, const int __block_size, const size_t __smem = 0) {
-        cudaGetDeviceCount(&device_count);
-        block_dims.resize(device_count);
-        grid_dims.resize(device_count);
-        SMs.resize(device_count);
+    LaunchDims(const void* kernel, const int block_size_, const size_t smem_ = 0, const int num_tasks = -1) {
+        cudaGetDeviceCount(&m_device_count);
+        m_block_dims.resize(m_device_count);
+        m_grid_dims.resize(m_device_count);
+        m_properties.resize(m_device_count);
         //Fetch the multiprocessor count for each device.
-        for (size_t i = 0; i < device_count; i++) {
-            cudaDeviceProp prop; cudaGetDeviceProperties(&prop, i);
-            SMs[i] = prop.multiProcessorCount;
+        for (size_t i = 0; i < m_device_count; i++) {
+            cudaGetDeviceProperties(&m_properties[i], i);
         }
         
-        update_dims(kernel, __block_size, __smem);
+        update_dims(kernel, block_size_, smem_, num_tasks);
     }
 
     //Only recomputes dimensions if a new block size or new amount of dynamic shared memory is specified.
-    cudaError_t update_dims(const void* kernel, const int __block_size, const size_t __smem = 0){
-        if(__block_size == block_size && __smem == smem) return cudaSuccess;
-        block_size = __block_size; smem = __smem;
+    cudaError_t update_dims(const void* kernel, const int block_size_, const size_t smem_ = 0, const int num_tasks = -1){
+        if(block_size_ == m_block_size && smem_ == m_smem) return cudaSuccess;
+        m_block_size = block_size_; m_smem = smem_;
         int current_device; cudaGetDevice(&current_device);
         int temp_int; //CUDA api is pretty particular about integer types
-        for (size_t i = 0; i < device_count; i++)
+        for (size_t i = 0; i < m_device_count; i++)
         {   
             cudaSetDevice(i);
-            cudaOccupancyMaxActiveBlocksPerMultiprocessor(&temp_int,kernel,block_size,smem);
-            grid_dims[i].x = temp_int * SMs[i];
-            block_dims[i].x = block_size;
+            cudaOccupancyMaxActiveBlocksPerMultiprocessor(&temp_int,kernel,m_block_size,m_smem);
+            int SMs = m_properties[i].multiProcessorCount;
+            if( num_tasks == -1) {m_grid_dims[i].x = temp_int * SMs;}
+            else{ 
+                int num_blocks = 0;
+                int best_blocks = temp_int*SMs;
+                int best_remainder = temp_int*SMs;
+                for (num_blocks = temp_int*SMs; num_blocks >= SMs ; num_blocks -= 1)
+                {    
+                    int remainder = (num_tasks / num_blocks + (num_tasks % num_blocks != 0)) * num_blocks - num_tasks;
+                    if (remainder < best_remainder) {
+                        best_blocks = num_blocks; 
+                        best_remainder = remainder;}
+                    if (best_remainder == 0) break;
+                }
+                m_grid_dims[i].x = best_blocks;
+            }
+            m_block_dims[i].x = m_block_size;
         }
         cudaSetDevice(current_device);
         cudaDeviceSynchronize();
         return cudaGetLastError();
     }
 
-    private:
-        int block_size{};
-        size_t smem{};
-        int device_count{};
-        std::vector<int> SMs;
-        std::vector<dim3> grid_dims;
-        std::vector<dim3> block_dims;
+private:
+
+    int m_block_size{};
+    int m_smem{};
+    int m_device_count{};
+    int m_num_tasks{};
+    std::vector<cudaDeviceProp> m_properties;
+    std::vector<dim3> m_grid_dims;
+    std::vector<dim3> m_block_dims;
 };
 
 __global__
-void __reset_convergence_status(IsomerBatch B){
-    if (threadIdx.x == 0) B.statuses[blockIdx.x] = B.statuses[blockIdx.x] != EMPTY ? NOT_CONVERGED : EMPTY;
-    if (threadIdx.x == 0) B.iterations[blockIdx.x] = 0;
+void reset_convergence_status_(IsomerBatch B){
+    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x)
+    {
+        if (threadIdx.x == 0) B.statuses[isomer_idx] = B.statuses[isomer_idx] != EMPTY ? NOT_CONVERGED : EMPTY;
+        if (threadIdx.x == 0) B.iterations[isomer_idx] = 0;
+    }
+    
 }
 
-cudaError_t reset_convergence_statuses(IsomerBatch& B, const cudaStream_t stream){
-    static LaunchDims dims((void*)__reset_convergence_status, B.n_atoms);
+cudaError_t reset_convergence_statuses(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+    static LaunchDims dims((void*)reset_convergence_status_, B.n_atoms);
     void* kargs[]{(void*)&B};
-    return cudaLaunchCooperativeKernel((void*)__reset_convergence_status, dims.get_grid(), dims.get_block(), kargs, 0, stream);
+    return cudaLaunchCooperativeKernel((void*)reset_convergence_status_, dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
 }
 
