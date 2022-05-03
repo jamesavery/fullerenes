@@ -1,6 +1,8 @@
 #include <cuda.h>
 #include "fullerenes/gpu/kernels.hh"
+#include "fullerenes/gpu/cuda_execution.hh"
 namespace gpu_kernels{
+
 namespace isomerspace_X0{
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
@@ -11,6 +13,8 @@ namespace isomerspace_X0{
 #include "coord3d.cuh"
 #include "coord2d.cuh"
 #include "forcefield_structs.cu"
+#include "print_functions.cu"
+
 
 __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){
@@ -77,12 +81,13 @@ device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, 
 }
 
 __global__
-void zero_order_geometry_(IsomerBatch B, device_real_t scalerad){
+void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
     DEVICE_TYPEDEFS
+    
     extern __shared__  device_real_t sdata[];
     clear_cache(sdata, Block_Size_Pow_2);
-    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
-    if (B.statuses[isomer_idx] == NOT_CONVERGED){
+    size_t isomer_idx = blockIdx.x + offset;
+    if (isomer_idx < B.isomer_capacity && B.statuses[isomer_idx] != EMPTY){
     NodeGraph node_graph = NodeGraph(B, isomer_idx); 
     coord2d angles = spherical_projection(B,reinterpret_cast<device_node_t*>(sdata), isomer_idx);
     real_t theta = angles.x; real_t phi = angles.y;
@@ -94,7 +99,6 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad){
     coord3d cm = {x, y, z};
     cm /= blockDim.x;
     coordinate -= cm;
-
     real_t Ravg = real_t(0.0);
     clear_cache(sdata, Block_Size_Pow_2);
     real_t* base_pointer = sdata + Block_Size_Pow_2; 
@@ -102,22 +106,47 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad){
     X[threadIdx.x] = coordinate;
     BLOCK_SYNC
     real_t local_Ravg = real_t(0.0);
-    for (uint8_t i = 0; i < 3; i++) local_Ravg += norm(X[threadIdx.x] - X[d_get(node_graph.neighbours,i)]);
-    
+    for (uint8_t i = 0; i < 3; i++) {local_Ravg += norm(X[threadIdx.x] - X[d_get(node_graph.neighbours,i)]);}
     Ravg = reduction(sdata, local_Ravg);
     Ravg /= real_t(3*blockDim.x);
     coordinate *= scalerad*1.5/Ravg;
     reinterpret_cast<coord3d*>(B.X)[blockDim.x*isomer_idx + threadIdx.x] = coordinate;
     B.statuses[isomer_idx] = CONVERGED;
-    }}
+    }
 }
 
-cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const cudaStream_t stream){
+float kernel_time = 0.0;
+float time_spent(){
+    return kernel_time;
+}
+
+cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
+    static bool first_call = true;
+    static cudaEvent_t start, stop;
+    float single_kernel_time = 0.0;
+    if(first_call) {cudaEventCreate(&start); cudaEventCreate(&stop);}
+    cudaEventElapsedTime(&single_kernel_time, start, stop);
+    kernel_time += single_kernel_time;
+
+    if (policy == LaunchPolicy::SYNC) ctx.wait();
+    cudaSetDevice(ctx.get_device_id());
     size_t smem =  sizeof(device_coord3d)*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)zero_order_geometry_, B.n_atoms, smem);
-    dims.update_dims((void*)zero_order_geometry_, B.n_atoms, smem);
-    void* kargs[]{(void*)&B, (void*)&scalerad};
-    return safeCudaKernelCall((void*)zero_order_geometry_, dims.get_grid(), dims.get_block(), kargs, smem, stream);
+    static LaunchDims dims((void*)zero_order_geometry_, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)zero_order_geometry_, B.n_atoms, smem, B.isomer_capacity);
+    cudaError_t error;
+
+    cudaEventRecord(start, ctx.stream);
+    for (int i = 0; i < B.isomer_capacity + (dims.get_grid().x - B.isomer_capacity % dims.get_grid().x ); i += dims.get_grid().x)
+    {
+        void* kargs[]{(void*)&B, (void*)&scalerad, (void*)&i};
+        error = safeCudaKernelCall((void*)zero_order_geometry_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    }
+    cudaEventRecord(stop, ctx.stream);
+    
+    if (policy == LaunchPolicy::SYNC) ctx.wait();
+    printLastCudaError("Zero order geometry:");
+    first_call = false;
+    return error;
 }
 
 }}

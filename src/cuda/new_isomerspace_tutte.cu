@@ -18,8 +18,8 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     DEVICE_TYPEDEFS
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
-    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
-    if (B.statuses[isomer_idx] == NOT_CONVERGED){
+    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
+    if (B.statuses[isomer_idx] != EMPTY){
     size_t offset = isomer_idx * blockDim.x;
     DeviceFullereneGraph FG(&B.neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
@@ -45,7 +45,6 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     bool converged          = false;
     real_t max_change       = real_t(0.0);
     if(fixed) newxys[threadIdx.x] = xys[threadIdx.x];
-
     for (size_t i = 0; i < iterations && !converged; i++)
     {   
         max_change = real_t(0.0);
@@ -77,12 +76,33 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     }
 }
 
-cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const cudaStream_t stream){
+float kernel_time = 0.0;
+float time_spent(){
+    return kernel_time;
+}
+
+cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
+    static bool first_call = true;
+    static cudaEvent_t start, stop;
+    float single_kernel_time = 0.0;
+    if(first_call) {cudaEventCreate(&start); cudaEventCreate(&stop);}
+    cudaEventElapsedTime(&single_kernel_time, start, stop);
+    kernel_time += single_kernel_time;
+
+    if(policy == LaunchPolicy::SYNC) ctx.wait();
     size_t smem = sizeof(device_coord2d)*B.n_atoms*2 + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)tutte_layout_, B.n_atoms, smem);
-    dims.update_dims((void*)tutte_layout_, B.n_atoms, smem);
+    static LaunchDims dims((void*)tutte_layout_, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)tutte_layout_, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B,(void*)&max_iterations};
-    return safeCudaKernelCall((void*)tutte_layout_, dims.get_grid(), dims.get_block(), kargs, smem, stream);  
+
+    cudaEventRecord(start, ctx.stream);
+    cudaError_t error = safeCudaKernelCall((void*)tutte_layout_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);  
+    cudaEventRecord(stop, ctx.stream);
+    
+    if(policy == LaunchPolicy::SYNC) ctx.wait();
+    printLastCudaError("Tutte: ");
+    first_call = false;
+    return error;
 }
 
 }}

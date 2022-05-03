@@ -466,7 +466,7 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
         g1 = gradient(X1);
         //Polak Ribiere method
         g0_norm2 = reduction(sdata, dot(g0, g0));
-        beta = max(reduction(sdata, dot(g1, (g1 - g0))) / g0_norm2,(real_t)0.0);
+        beta = d_max(reduction(sdata, dot(g1, (g1 - g0))) / g0_norm2,(real_t)0.0);
 
         if (alpha > (real_t)0.0){X[node_id] = X1[node_id];}else{ g1 = g0; beta = (real_t) 0.0;}
         s = -g1 + beta*s;
@@ -486,7 +486,7 @@ __device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
+    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
     if (B.statuses[isomer_idx] == NOT_CONVERGED){
     size_t offset = isomer_idx * blockDim.x;
     Constants constants     = Constants(B, isomer_idx);
@@ -535,7 +535,7 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx += gridDim.x){
+    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx += gridDim.x){
     if (B.statuses[isomer_idx] == NOT_CONVERGED)
     {
         real_t* base_pointer        = smem + Block_Size_Pow_2;
@@ -576,12 +576,41 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
 }
 
 
-cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const cudaStream_t stream){
+
+int optimal_batch_size(const int N, const int device_id) {
+    static size_t smem = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
+    static LaunchDims dims((void*)optimize_batch_, N, smem);
+    return dims.get_grid().x;
+}
+
+float kernel_time = 0.0;
+float time_spent(){
+    return kernel_time;
+}
+
+cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
+    static bool first_call = true;
+    static cudaEvent_t start, stop;
+    float single_kernel_time = 0.0;
+    if(first_call) {cudaEventCreate(&start); cudaEventCreate(&stop);}
+    cudaEventElapsedTime(&single_kernel_time, start, stop);
+    kernel_time += single_kernel_time;
+
+    if(policy == LaunchPolicy::SYNC) ctx.wait();
     size_t smem = sizeof(device_coord3d)*3*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimize_batch_, B.n_atoms, smem);
-    dims.update_dims((void*)optimize_batch_, B.n_atoms, smem);
+    static LaunchDims dims((void*)optimize_batch_, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)optimize_batch_, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&iterations, (void*)&max_iterations};
-    return safeCudaKernelCall((void*)optimize_batch_, dims.get_grid(), dims.get_block(), kargs, smem, stream);
+
+    cudaEventRecord(start, ctx.stream);
+    auto error = safeCudaKernelCall((void*)optimize_batch_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    cudaEventRecord(stop, ctx.stream);
+    
+    if(policy == LaunchPolicy::SYNC) ctx.wait();
+    printLastCudaError("Forcefield: ");
+
+    first_call = false;
+    return error;
 }
 
 }}
