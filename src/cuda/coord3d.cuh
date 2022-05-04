@@ -28,7 +28,7 @@ INLINE  device_real_t norm(const device_coord3d& a)                    { return 
 
 INLINE device_real_t sum(const device_coord3d& a) {return a.x + a.y + a.z;}
 
-INLINE device_real_t max(const device_coord3d& a) {return max(max(a.x,a.y),a.z);}
+INLINE device_real_t max(const device_coord3d& a) {return d_max(d_max(a.x,a.y),a.z);}
 
 //7 FLOPs
 INLINE  device_coord3d unit_vector(const device_coord3d& a){
