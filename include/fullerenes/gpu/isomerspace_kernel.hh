@@ -48,7 +48,7 @@ public:
 
   void output_batch_to_queue();
   void insert_queued_isomers();
-
+  void set_all_converged();
   void copy_metadata();
   static void kernel_to_kernel_copy(IsomerspaceKernel& source, IsomerspaceKernel& destination);
 

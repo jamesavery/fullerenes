@@ -141,6 +141,7 @@ void kernel_update_queue(IsomerBatch G, IsomerBatch queue_batch){
         assert(queue_index < queue_capacity);
         size_t queue_array_idx    = queue_index*blockDim.x+threadIdx.x;
         size_t global_idx         = blockDim.x*blockIdx.x + threadIdx.x;
+        reinterpret_cast<device_coord2d*>(G.xys)[global_idx]         = reinterpret_cast<device_coord2d*>(queue_batch.xys)[queue_array_idx];  
         reinterpret_cast<device_coord3d*>(G.X)[global_idx]           = reinterpret_cast<device_coord3d*>(queue_batch.X)[queue_array_idx];  
         reinterpret_cast<device_node3*>(G.neighbours)[global_idx]    = reinterpret_cast<device_node3*>(queue_batch.neighbours)[queue_array_idx];  
         if (threadIdx.x == 0){
@@ -189,6 +190,7 @@ void kernel_push_batch(IsomerBatch input_batch, IsomerBatch queue_batch, device_
     assert((queue_size + insert_size) <= queue_capacity);
 
     size_t queue_idx = (queue_back + blockIdx.x) % queue_capacity;
+    reinterpret_cast<device_coord2d*>(queue_batch.xys)[queue_idx*blockDim.x + threadIdx.x]      = reinterpret_cast<device_coord2d*>(input_batch.xys)[blockIdx.x*blockDim.x + threadIdx.x];
     reinterpret_cast<device_coord3d*>(queue_batch.X)[queue_idx*blockDim.x + threadIdx.x]        = reinterpret_cast<device_coord3d*>(input_batch.X)[blockIdx.x*blockDim.x + threadIdx.x];
     reinterpret_cast<device_node3*>(queue_batch.neighbours)[queue_idx*blockDim.x + threadIdx.x] = reinterpret_cast<device_node3*>(input_batch.neighbours)[blockIdx.x*blockDim.x + threadIdx.x];
     if (threadIdx.x == 0)
@@ -356,6 +358,21 @@ void IsomerspaceKernel::update_batch(){
         }
     }
     for(size_t i = 0; i < device_count; i++) d_batch[i] <<= h_batch[i];
+}
+
+void IsomerspaceKernel::set_all_converged(){
+    for (size_t i = 0; i < device_count; i++)
+    {
+        cudaSetDevice(i);
+
+        cudaMemcpy(h_batch[i].statuses, d_batch[i].statuses, sizeof(IsomerStatus)*device_capacities[i], cudaMemcpyDeviceToHost);
+        for (size_t j = 0; j < device_capacities[i]; j++)
+        {
+            h_batch[i].statuses[j] = (h_batch[i].statuses[j] != EMPTY)  ? CONVERGED : EMPTY;
+        }
+        cudaMemcpy(d_batch[i].statuses, h_batch[i].statuses, sizeof(IsomerStatus)*device_capacities[i], cudaMemcpyHostToDevice);
+    }
+    
 }
 
 void IsomerspaceKernel::output_batch_to_queue(){
