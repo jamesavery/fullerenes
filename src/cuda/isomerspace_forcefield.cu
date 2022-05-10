@@ -467,7 +467,7 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
         g1 = gradient(X1);
         //Polak Ribiere method
         g0_norm2 = reduction(sdata, dot(g0, g0));
-        beta = max(reduction(sdata, dot(g1, (g1 - g0))) / g0_norm2,(real_t)0.0);
+        beta = d_max(reduction(sdata, dot(g1, (g1 - g0))) / g0_norm2,(real_t)0.0);
 
         if (alpha > (real_t)0.0){X[node_id] = X1[node_id];}else{ g1 = g0; beta = (real_t) 0.0;}
         s = -g1 + beta*s;

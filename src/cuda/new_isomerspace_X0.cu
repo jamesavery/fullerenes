@@ -121,20 +121,28 @@ float time_spent(){
 }
 
 cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
+    //Need a way of telling whether the kernel has been called previously.
     static bool first_call = true;
     static cudaEvent_t start, stop;
     float single_kernel_time = 0.0;
+    //Construct events only once
     if(first_call) {cudaEventCreate(&start); cudaEventCreate(&stop);}
+
+    //Records time from previous kernel call
     cudaEventElapsedTime(&single_kernel_time, start, stop);
     kernel_time += single_kernel_time;
 
+    //If launch ploicy is synchronous then wait.
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     cudaSetDevice(ctx.get_device_id());
     size_t smem =  sizeof(device_coord3d)*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
+    
+    //Compute best grid dimensions once.
     static LaunchDims dims((void*)zero_order_geometry_, B.n_atoms, smem, B.isomer_capacity);
     dims.update_dims((void*)zero_order_geometry_, B.n_atoms, smem, B.isomer_capacity);
     cudaError_t error;
 
+    //Note: some memory bug exists when using grid-stride for loops inside the kernel launches
     cudaEventRecord(start, ctx.stream);
     for (int i = 0; i < B.isomer_capacity + (dims.get_grid().x - B.isomer_capacity % dims.get_grid().x ); i += dims.get_grid().x)
     {
