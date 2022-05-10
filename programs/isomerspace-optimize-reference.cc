@@ -51,8 +51,7 @@ int main(int ac, char **argv)
   int device0 = 0;
   LaunchCtx ctx0(device0);
 
-  std::queue<std::pair<Polyhedron,size_t>> output_queue;
-
+  std::queue<std::tuple<Polyhedron,size_t,IsomerStatus>> output_queue;
 
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
   ProgressBar progress_bar = ProgressBar('#',30);
@@ -62,7 +61,11 @@ int main(int ac, char **argv)
   G.neighbours = vector<vector<node_t>>(N,vector<node_t>(3));
   
   int I=0;			// Global isomer number at start of batch
-  int num_finished = 0;
+
+  int num_finished = 0,
+      num_converged = 0,
+      num_failed =0;
+
   bool more_to_generate = true;
 
   auto T0 = system_clock::now();
@@ -76,7 +79,8 @@ int main(int ac, char **argv)
     Tcopy   = system_clock::now()-T0,
     Topt    = system_clock::now()-T0,
     Tfile   = system_clock::now()-T0,
-    Toutq   = system_clock::now()-T0;
+    Toutq   = system_clock::now()-T0,
+    Tinq    = system_clock::now()-T0;
 
   auto generate = [&](int N){
     for(int i = 0; i < N; ++i){
@@ -90,7 +94,7 @@ int main(int ac, char **argv)
       PlanarGraph G = dualG.dual_graph();
       auto T4 = system_clock::now(); Tdual += T4 - T3;
       Q0.insert(G, I, LaunchCtx(), LaunchPolicy::SYNC, false);
-      Toutq += system_clock::now() - T4;
+      Tinq += system_clock::now() - T4;
       ++I;
     }
   };
@@ -137,32 +141,45 @@ int main(int ac, char **argv)
       }
       while(Q1.get_size() > 0){
         Q1.refill_batch(batch2);
-        isomerspace_forcefield::optimize_batch(batch2,N*5,N*5);
+        isomerspace_forcefield::optimize_batch(batch2,N*50,N*50);
         cuda_io::copy(outbatch, batch2);
-        cuda_io::output_to_queue(output_queue,outbatch,true);
+        cuda_io::output_to_queue(output_queue,outbatch,false);
+        cout << "Optimized: " <<output_queue.size() << endl;
       }
     }
     while(output_queue.size()){
       ++num_finished;
+      if(get<2>(output_queue.front()) == CONVERGED ){
+        ++num_converged;
+      } else if (get<2>(output_queue.front()) == FAILED)
+      {
+        ++num_failed;
+      }
+      
       output_queue.pop();
     }
-    progress_bar.update_progress((float)num_finished/(float)num_fullerenes.find(N)->second);
-    if (num_finished > 320000) break;
+    //progress_bar.update_progress((float)num_finished/(float)num_fullerenes.find(N)->second);
+    progress_bar.update_progress((float)num_finished/(float)num_fullerenes.find(N)->second, "F: " + to_string(num_failed) + "  S: " + to_string(num_converged));
+
+
+    if (num_finished > 100000) break;
   }
+  cout << endl << "Finished " << num_finished << ", " << not_async_count << ", " << num_failed << ", " << num_converged << endl;
   auto Ttot = system_clock::now() - T0;
   Topt   = (1ms*int(isomerspace_forcefield::time_spent()));
   Ttutte = (1ms*int(isomerspace_tutte::time_spent()));
   TX0    = (1ms*int(isomerspace_X0::time_spent()));
-  auto Tsum = Tgen + Tupdate + Tdual + Ttutte + TX0 + Tcopy + Topt + Tfile + Toutq;
+  auto Tsum = Tgen + Tupdate + Tdual + Ttutte + TX0 + Tcopy + Topt + Tfile + Toutq + Tinq;
   std::cout << std::endl;
-  std::cout << " Async efficiency: " << (float)(num_finished-not_async_count ) / (float)num_finished << std::endl;
+
   failures.close();
   cout << "\n";
   cout << "Time spent on non:\n"
     "\tTotal Time                     = " << (Ttot/1ms)       << " ms\n"
     "\tTime Unaccounted For           = " << (Ttot-Tsum)/1ms  << " ms\n"
     "\tDevice queue                   = " << (Tqueue)/1ms     << " ms\n"
-    "\tHost-Device type conversion    = " << (Toutq)/1ms      << " ms\n"
+    "\tHost-Device input conversion   = " << (Tinq)/1ms      << " ms\n"
+    "\tHost-Device output conversion  = " << (Toutq)/1ms      << " ms\n"
     "\tFile Output                    = " << (Tfile/1ms)      << " ms\n"
     "\tGenerating graphs              = " << (Tgen/1ms)       << " ms\n"
     "\tUpdating metadata              = " << (Tupdate/1ms)    << " ms\n"
