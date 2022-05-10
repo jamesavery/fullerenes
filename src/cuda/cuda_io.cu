@@ -3,7 +3,7 @@
 
 namespace cuda_io{
 
-    cudaError_t output_to_queue(std::queue<std::pair<Polyhedron, size_t>>& queue, IsomerBatch& batch, const bool copy_2d_layout){
+    cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch& batch, const bool copy_2d_layout){
         //Batch needs to exist on the host. For performance reasons we don't want to create a new batch here and copy to that, cudaMalloc is expensive.
         printLastCudaError();
         if (batch.buffer_type != HOST_BUFFER) assert(false); 
@@ -14,30 +14,35 @@ namespace cuda_io{
             if(!(batch.statuses[isomer_idx] == CONVERGED || batch.statuses[isomer_idx] == FAILED)) continue;
             
             //Graphs always have a neighbour array.
-            neighbours_t out_neighbours(N); 
+            neighbours_t out_neighbours(N);
+ 
             std::vector<coord2d> output_2D;
 
             for (size_t i = 0; i < N; i++){
                 //Fill in cubic neighbours
                 out_neighbours[i] = {batch.neighbours[isomer_idx*N*3 + i*3], batch.neighbours[isomer_idx*N*3 + i*3 + 1], batch.neighbours[isomer_idx*N*3 + i*3 + 2]};
+                
+            }
+
+            std::vector<coord3d> output_X(N);
+            for (size_t i = 0; i < N; i++){
+                for (int j = 0; j < 3; ++j){
+                    output_X[i][j] = batch.X[isomer_idx*N*3 + i*3 + j];
+                }
             }
 
             //If 2D layout is true, allocate memory and copy 2D layout. If this is not needed disable it for performance gains.
             if (copy_2d_layout){
                 output_2D = std::vector<coord2d>(N);
                 for (size_t i = 0; i < N; i++){
-                    output_2D[i] = {batch.xys[isomer_idx*N + i*2], batch.xys[isomer_idx*N + i*2 + 1]};
+                    output_2D[i] = {batch.xys[isomer_idx*N*2 + i*2], batch.xys[isomer_idx*N*2 + i*2 + 1]};
                 }
+                Polyhedron P(FullereneGraph(Graph(out_neighbours, true)),output_X);
+                P.layout2d = output_2D;
+                queue.push({P,batch.IDs[isomer_idx], batch.statuses[isomer_idx]});    
+            }else{
+                queue.push({Polyhedron(Graph(out_neighbours, true),output_X),batch.IDs[isomer_idx], batch.statuses[isomer_idx]});
             }
-            //If T is of type Polyhedron, copy 3D geometry, construct Polyhedron object and insert in queue.
-            //if(std::is_same<Polyhedron,T>::value) {
-            std::vector<coord3d> output_X(N);
-            for (size_t i = 0; i < N; i++){
-                output_X[i] = {batch.X[isomer_idx*N + i*3], batch.X[isomer_idx + i*3 + 1], batch.X[isomer_idx + i*3 + 2]};
-            }
-            queue.push({Polyhedron(PlanarGraph(out_neighbours, output_2D),output_X),batch.IDs[isomer_idx]});
-            
-            
         }
         return cudaGetLastError();
     }

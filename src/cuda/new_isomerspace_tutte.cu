@@ -21,6 +21,7 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
     if (B.statuses[isomer_idx] != EMPTY){
     size_t offset = isomer_idx * blockDim.x;
+
     DeviceFullereneGraph FG(&B.neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2d* xys        = reinterpret_cast<coord2d*>(base_pointer);
