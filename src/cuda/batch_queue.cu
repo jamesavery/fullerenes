@@ -158,7 +158,7 @@ cudaError_t BatchQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, c
         IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type);
         //Copy contents of old batch into newly allocated memory.
         copy(temp_batch,batch,ctx,policy,{0, batch.isomer_capacity- *props.front}, {*props.front,batch.isomer_capacity});
-        copy(temp_batch,batch,ctx,policy,{batch.isomer_capacity- *props.front, batch.isomer_capacity},{0,*props.back});
+        copy(temp_batch,batch,ctx,policy,{batch.isomer_capacity- *props.front, batch.isomer_capacity - *props.front + *props.back},{0,*props.back});
         for (int i = 0; i < batch.pointers.size(); i++)
         {
             void* temp_ptr = *get<1>(batch.pointers[i]);
@@ -230,10 +230,17 @@ cudaError_t BatchQueue::insert(const PlanarGraph& in, const size_t ID, const Lau
 
     //Extract the graph information (neighbours) from the PlanarGraph object and insert it at the appropriate location in the queue.
     size_t offset = *props.back * N;
-    for(int i = 0; i < in.neighbours.size(); i++){
-        reinterpret_cast<device_node3*>  (host_batch.neighbours)[offset +i]             = casting_node3(in.neighbours[i]);
-        if(insert_2d)   reinterpret_cast<device_coord2d*>(host_batch.xys)[offset + i]   = casting_coord2d(in.layout2d[i]);
+
+    for(node_t u=0;u<N;u++){
+        for(int j=0;j<3;j++)
+            host_batch.neighbours[3*(offset+u)+j] = in.neighbours[u][j];
+
+        if(insert_2d){
+            host_batch.xys[2*(offset+u) + 0] = in.layout2d[u].first;
+            host_batch.xys[2*(offset+u) + 1] = in.layout2d[u].second; 
+        }
     }
+
 
     //Assign metadata.
     host_batch.statuses[*props.back] = NOT_CONVERGED;
