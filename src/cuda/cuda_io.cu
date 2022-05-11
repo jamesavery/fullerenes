@@ -56,7 +56,7 @@ namespace cuda_io{
                         const std::pair<int,int>& rhs_range //Optional: provide a range of indices to copy from similar to slices in numpy eg. {0,5} = [0:5]
                         ){
         //Iterate over the data fields of the IsomerBatch (pseudo reflection) and copy the contents of each using the provided stream.
-        if(policy == LaunchPolicy::SYNC) ctx.wait();
+        if(policy == LaunchPolicy::SYNC) {ctx.wait();}
         for (size_t i = 0; i < source.pointers.size(); i++)
         {
 
@@ -70,7 +70,7 @@ namespace cuda_io{
         }
         destination.n_isomers = source.n_isomers;
         printLastCudaError("Failed to copy struct");
-        if(policy == LaunchPolicy::SYNC) ctx.wait();
+        if(policy == LaunchPolicy::SYNC) {ctx.wait();}
         return cudaGetLastError();
     }
 
@@ -98,5 +98,90 @@ namespace cuda_io{
         batch.isomer_capacity = temp_batch.isomer_capacity;
         return cudaGetLastError();
     }
+
 }
+
+
+bool IsomerBatch::operator==(const IsomerBatch& b){
+    bool passed = true;
+    
+    if (! (buffer_type == b.buffer_type && isomer_capacity == b.isomer_capacity && n_atoms == b.n_atoms) ) {
+        return false;
+    }else if(buffer_type == HOST_BUFFER){
+        for(int i = 0; i < isomer_capacity; ++i){
+            passed &= statuses[i] == b.statuses[i];
+            passed &= IDs[i] == b.IDs[i];
+            passed &= iterations[i] = b.iterations[i];
+        }
+        for(int i = 0; i < isomer_capacity * n_atoms * 3; ++i){
+            passed &= X[i] == b.X[i];
+            passed &= xys[i] == b.xys[i];
+            passed &= neighbours[i] == b.neighbours[i];
+        }
+        return passed;
+    } else{
+        std::cout << "== operator only supported for HOST_BUFFER" << std::endl;
+        return false;
+    }
+    return false;
+}
+
+
+
+std::ostream& operator << (std::ostream& os, const IsomerBatch& a){
+    os << "Batch Dimensions: (" << a.isomer_capacity << ", " << a.n_atoms << ")\n";
+    os << "ID List: " << "\n[";
+    for (size_t i = 0; i < a.isomer_capacity - 1; i++){os << a.IDs[i] << ", ";}
+    os << a.IDs[a.isomer_capacity-1] << "]\n"; 
+    
+    os << "Status List: " << "\n[";
+    for (size_t i = 0; i < a.isomer_capacity - 1; i++){os << a.statuses[i] << ", ";}
+    os << a.statuses[a.isomer_capacity-1] << "]\n"; 
+
+    os << "X Lists: " << "\n[";
+    for (size_t i = 0; i < a.isomer_capacity; i++){
+        os << "[";
+        for (size_t j = 0; j < a.n_atoms*3 - 1; j++)
+        {
+            os << a.X[i*a.n_atoms*3 + j] << ", ";
+        }
+        if(i != (a.isomer_capacity - 1)) {
+            os << a.X[(i+1)*a.n_atoms*3 - 1] << "], ";
+        } else{
+            os << a.X[(i+1)*a.n_atoms*3 - 1] << "]]\n";
+        }
+    }
+
+    os << "2D Layouts: " << "\n[";
+    for (size_t i = 0; i < a.isomer_capacity; i++){
+        os << "[";
+        for (size_t j = 0; j < a.n_atoms*2 - 1; j++)
+        {
+            os << a.xys[i*a.n_atoms*2 + j] << ", ";
+        }
+        if(i != (a.isomer_capacity - 1)) {
+            os << a.xys[(i+1)*a.n_atoms*2 - 1] << "], ";
+        } else{
+            os << a.xys[(i+1)*a.n_atoms*2 - 1] << "]]\n";
+        }
+    }
+
+    os << "Neighbour Lists: " << "\n[";
+    for (size_t i = 0; i < a.isomer_capacity; i++){
+        os << "[";
+        for (size_t j = 0; j < a.n_atoms*3 - 1; j++)
+        {
+            os << a.neighbours[i*a.n_atoms*3 + j] << ", ";
+        }
+        if(i != (a.isomer_capacity - 1)) {
+            os << a.neighbours[(i+1)*a.n_atoms*3 - 1] << "], ";
+        } else{
+            os << a.neighbours[(i+1)*a.n_atoms*3 - 1] << "]]\n";
+        }
+    }
+
+
+    return os;
+}
+
  

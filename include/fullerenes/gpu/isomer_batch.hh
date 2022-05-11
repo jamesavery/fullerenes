@@ -25,6 +25,10 @@ struct IsomerBatch : GPUDataStruct
       allocate(*this,n_atoms, n_isomers, buffer_type);
       initialize(*this);
     }
+
+    bool operator==(const IsomerBatch& b);
+    bool operator!=(const IsomerBatch& b) {return !(*this == b);}
+    friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a);
 };
 
 #endif
