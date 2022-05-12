@@ -42,7 +42,7 @@ LaunchCtx::LaunchCtx(){
     cudaStream_t* stream_ptr = &stream;
     m_unique_stream_idx = int(-1);
     m_device_id = 0;
-    if(default_ctx_created) m_all_streams.insert({m_unique_stream_idx,&stream_ptr});
+    if(!default_ctx_created) m_all_streams.insert({m_unique_stream_idx,&stream_ptr});
     default_ctx_created = true;
 }
 
