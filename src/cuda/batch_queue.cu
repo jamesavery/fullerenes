@@ -38,9 +38,10 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, BatchQueue::QueueP
         *queue.requests = 0;}
     GRID_SYNC
     //Grid stride for loop, allows for handling of any batch size.
-    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
-
+    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity + gridDim.x - B.isomer_capacity%gridDim.x; isomer_idx+= gridDim.x){
+    GRID_SYNC
     //Checks if the isomer owned by a given block is finished or empty, if it is we want to replace it with a new one.
+    if (isomer_idx < B.isomer_capacity)
     if (B.statuses[isomer_idx] != NOT_CONVERGED){
         if(threadIdx.x == 0){
             //Increment front counter atomically and calculate queue index. 
