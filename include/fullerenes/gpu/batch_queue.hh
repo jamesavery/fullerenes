@@ -2,11 +2,11 @@
 #include "cuda_execution.hh"
 
 namespace cuda_io{
-struct BatchQueue
+struct IsomerQueue
 {    
 public:
-    BatchQueue(const size_t N);
-    ~BatchQueue();
+    IsomerQueue(const size_t N);
+    ~IsomerQueue();
 
     //Queries about whether the queue is empty.
     bool is_empty() const {return *props.size == 0;};

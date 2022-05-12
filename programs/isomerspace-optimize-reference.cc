@@ -39,14 +39,14 @@ int main(int ac, char **argv)
   
   ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
 
-  auto batch_size = isomerspace_forcefield::optimal_batch_size(N,0)*4;
+  auto batch_size = isomerspace_forcefield::optimal_batch_size(N,0) * 4;
   IsomerBatch batch0(N,batch_size,DEVICE_BUFFER);
   IsomerBatch batch1(N,batch_size,DEVICE_BUFFER);
   IsomerBatch batch2(N,batch_size,DEVICE_BUFFER);
   IsomerBatch outbatch(N,batch_size,HOST_BUFFER);
 
-  cuda_io::BatchQueue Q0 = cuda_io::BatchQueue(N);
-  cuda_io::BatchQueue Q1 = cuda_io::BatchQueue(N);
+  cuda_io::IsomerQueue Q0 = cuda_io::IsomerQueue(N);
+  cuda_io::IsomerQueue Q1 = cuda_io::IsomerQueue(N);
 
   int device0 = 0;
   LaunchCtx ctx0(device0);
@@ -117,20 +117,19 @@ int main(int ac, char **argv)
       cuda_io::reset_convergence_statuses(batch1);
       Q1.insert(batch1);
     }
-
     auto generate_handle = std::async(std::launch::async,generate, max(0,2*(int)batch1.isomer_capacity - (int)Q0.get_size()));
     while (Q1.get_size() > batch2.isomer_capacity)
     {
-      Q1.refill_batch(batch2,ctx0,LaunchPolicy::ASYNC);
-      isomerspace_forcefield::optimize_batch(batch2,N*1,N*50,ctx0,LaunchPolicy::ASYNC);
+      Q1.refill_batch(batch2, ctx0, LaunchPolicy::ASYNC);
+      isomerspace_forcefield::optimize_batch(batch2,N*1,N*50, ctx0, LaunchPolicy::ASYNC);
       auto T1 = system_clock::now();
-      cuda_io::output_to_queue(output_queue,outbatch,true);
+      cuda_io::output_to_queue(output_queue,outbatch,false);
       Toutq += system_clock::now() - T1;
-      cuda_io::copy(outbatch, batch2,ctx0,LaunchPolicy::SYNC);
+      cuda_io::copy(outbatch, batch2, ctx0, LaunchPolicy::SYNC);
     }
     generate_handle.wait();
-
     if (!more_to_generate ){
+      cuda_io::output_to_queue(output_queue,outbatch,false);
       while(Q0.get_size() > 0){
         Q0.refill_batch(batch0);
         isomerspace_tutte::tutte_layout(batch0);
@@ -144,10 +143,10 @@ int main(int ac, char **argv)
         isomerspace_forcefield::optimize_batch(batch2,N*50,N*50);
         cuda_io::copy(outbatch, batch2);
         cuda_io::output_to_queue(output_queue,outbatch,false);
-        cout << "Optimized: " <<output_queue.size() << endl;
+
       }
     }
-    while(output_queue.size()){
+    while(!output_queue.empty()){
       ++num_finished;
       if(get<2>(output_queue.front()) == CONVERGED ){
         ++num_converged;
@@ -162,7 +161,7 @@ int main(int ac, char **argv)
     progress_bar.update_progress((float)num_finished/(float)num_fullerenes.find(N)->second, "F: " + to_string(num_failed) + "  S: " + to_string(num_converged));
 
 
-    if (num_finished > 100000) break;
+    if (num_finished > 400000) break;
   }
   cout << endl << "Finished " << num_finished << ", " << not_async_count << ", " << num_failed << ", " << num_converged << endl;
   auto Ttot = system_clock::now() - T0;
@@ -178,7 +177,7 @@ int main(int ac, char **argv)
     "\tTotal Time                     = " << (Ttot/1ms)       << " ms\n"
     "\tTime Unaccounted For           = " << (Ttot-Tsum)/1ms  << " ms\n"
     "\tDevice queue                   = " << (Tqueue)/1ms     << " ms\n"
-    "\tHost-Device input conversion   = " << (Tinq)/1ms      << " ms\n"
+    "\tHost-Device input conversion   = " << (Tinq)/1ms       << " ms\n"
     "\tHost-Device output conversion  = " << (Toutq)/1ms      << " ms\n"
     "\tFile Output                    = " << (Tfile/1ms)      << " ms\n"
     "\tGenerating graphs              = " << (Tgen/1ms)       << " ms\n"
