@@ -536,6 +536,7 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx += gridDim.x){
+    BLOCK_SYNC
     if (B.statuses[isomer_idx] == NOT_CONVERGED)
     {
         real_t* base_pointer        = smem + Block_Size_Pow_2;
@@ -571,6 +572,7 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
         if (threadIdx.x == 0) {B.iterations[isomer_idx] += iterations;}
     }
     //Check the convergence of isomers and assign status accordingly.
+    BLOCK_SYNC
     check_batch(B, max_iterations);
     }
 }
