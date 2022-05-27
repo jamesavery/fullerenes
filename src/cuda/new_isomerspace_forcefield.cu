@@ -1,5 +1,6 @@
 #include <cuda.h>
 #include "fullerenes/gpu/kernels.hh"
+#include "fullerenes/gpu/cu_array.hh"
 
 
 namespace gpu_kernels{
@@ -7,15 +8,16 @@ namespace isomerspace_forcefield{
 
 #include "cuda_runtime.h"
 #include "cooperative_groups.h"
-
 #include <cuda_runtime_api.h>
 #include "fullerenes/gpu/cuda_definitions.h"
 #include "misc_cuda.cu"
 #include "reductions.cu"
 #include "coord3d.cuh"
 #include "forcefield_structs.cu"
+#include "print_functions.cu"
 
 // This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions
+template <ForcefieldType T>
 struct ForceField{
     DEVICE_TYPEDEFS
 
@@ -33,6 +35,7 @@ struct ForceField{
                             real_t* sdata): node_graph(G), constants(c), sdata(sdata) {}
 
 
+                            
 //Container for all energy and gradient evaluations with respect to an arc, eg. AB, AC or AD.
 struct ArcData{
     //124 FLOPs;
@@ -42,7 +45,7 @@ struct ArcData{
         node_t a = threadIdx.x;
         real_t r_rmp;
         coord3d ap, am, ab, ac, ad, mp;
-        coord3d X_a = X[a]; coord3d X_b = X[d_get(G.neighbours,j)];
+        coord3d X_a = X[a], X_b = X[d_get(G.neighbours,j)];
 
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
         ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;
@@ -129,113 +132,286 @@ struct ArcData{
     //Computes gradient related to bending term. ~24 FLOPs
     INLINE coord3d inner_angle_gradient(const Constants& c) const
     {   
-        real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
-        coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
-        return d_get(c.f_inner_angle,j) * harmonic_energy_gradient(d_get(c.angle0,j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
+        if (d_get(c.f_inner_angle,j) > (real_t)0.){
+            real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
+            coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
+            return d_get(c.f_inner_angle,j) * harmonic_energy_gradient(d_get(c.angle0,j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
+        } else return {0,0,0};
     }
     //Computes gradient related to bending of outer angles. ~20 FLOPs
     INLINE coord3d outer_angle_gradient_m(const Constants& c) const
     {
-        real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
-        coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
-        return d_get(c.f_outer_angle_m,j) * harmonic_energy_gradient(d_get(c.outer_angle_m0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
+        if (d_get(c.f_outer_angle_m,j) > (real_t)0.){
+            real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
+            coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
+            return d_get(c.f_outer_angle_m,j) * harmonic_energy_gradient(d_get(c.outer_angle_m0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
+        } else return {0,0,0};
     }
     INLINE coord3d outer_angle_gradient_p(const Constants& c) const
-    {
-        real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
-        coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
-        return d_get(c.f_outer_angle_p,j) * harmonic_energy_gradient(d_get(c.outer_angle_p0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 28 multiplied by harmonic term.
+    {   
+        if (d_get(c.f_outer_angle_p,j) > (real_t)0.){
+            real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
+            coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
+            return d_get(c.f_outer_angle_p,j) * harmonic_energy_gradient(d_get(c.outer_angle_p0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 28 multiplied by harmonic term.
+        } else return {0,0,0};
     }
     // Chain rule terms for dihedral calculation
     //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
     INLINE coord3d inner_dihedral_gradient(const Constants& c) const
     {
-        coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
-        cos_b = dot(ba_hat,bc_hat); r_sin_b = (real_t)1.0/sqrt((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
-        cos_c = dot(-bc_hat,cd_hat); r_sin_c = (real_t)1.0/sqrt((real_t)1.0 - cos_c*cos_c); nbcd = cross(-bc_hat,cd_hat) * r_sin_c;
+        if (d_get(c.f_inner_dihedral,j) > (real_t)0.){
+            coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
+            cos_b = dot(ba_hat,bc_hat); r_sin_b = (real_t)1.0/sqrt((real_t)1.0 - cos_b*cos_b); nabc = cross(ba_hat, bc_hat) * r_sin_b;
+            cos_c = dot(-bc_hat,cd_hat); r_sin_c = (real_t)1.0/sqrt((real_t)1.0 - cos_c*cos_c); nbcd = cross(-bc_hat,cd_hat) * r_sin_c;
 
-        real_t cos_beta = dot(nabc, nbcd); //Inner dihedral angle from planes abc,bcd.
-        real_t cot_b = cos_b * r_sin_b * r_sin_b; //cos(b)/sin(b)^2
+            real_t cos_beta = dot(nabc, nbcd); //Inner dihedral angle from planes abc,bcd.
+            real_t cot_b = cos_b * r_sin_b * r_sin_b; //cos(b)/sin(b)^2
 
-        //Derivative w.r.t. inner dihedral angle F and G in Eq. 26
-        coord3d grad = cross(bc_hat, nbcd) * r_sin_b * r_rab - ba_hat * cos_beta * r_rab + (cot_b * cos_beta * r_rab) * (bc_hat - ba_hat * cos_b);
-
-        return d_get(c.f_inner_dihedral,j) * harmonic_energy_gradient(d_get(c.inner_dih0,j), cos_beta, grad); //Eq. 26.
+            //Derivative w.r.t. inner dihedral angle F and G in Eq. 26
+            coord3d grad = cross(bc_hat, nbcd) * r_sin_b * r_rab - ba_hat * cos_beta * r_rab + (cot_b * cos_beta * r_rab) * (bc_hat - ba_hat * cos_b);
+            return d_get(c.f_inner_dihedral,j) * harmonic_energy_gradient(d_get(c.inner_dih0,j), cos_beta, grad); //Eq. 26.
+        }else return {0,0,0};
     }
 
     //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
     INLINE coord3d outer_dihedral_gradient_a(const Constants& c) const
     {
-        coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
+        if (d_get(c.f_outer_dihedral,j) > (real_t)0.){
+            coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
 
-        cos_a = dot(ab_hat,am_hat); r_sin_a = (real_t)1.0/sqrt((real_t)1.0 - cos_a*cos_a); nbam_hat = cross(ab_hat,am_hat) * r_sin_a;
-        cos_m = dot(-am_hat,mp_hat); r_sin_m = (real_t)1.0/sqrt((real_t)1.0 - cos_m*cos_m); namp_hat = cross(-am_hat,mp_hat) * r_sin_m;
-        
-        real_t cos_beta = dot(nbam_hat, namp_hat); //Outer Dihedral angle bam, amp
-        real_t cot_a = cos_a * r_sin_a * r_sin_a;
-        real_t cot_m = cos_m * r_sin_m * r_sin_m;
+            cos_a = dot(ab_hat,am_hat); r_sin_a = (real_t)1.0/sqrt((real_t)1.0 - cos_a*cos_a); nbam_hat = cross(ab_hat,am_hat) * r_sin_a;
+            cos_m = dot(-am_hat,mp_hat); r_sin_m = (real_t)1.0/sqrt((real_t)1.0 - cos_m*cos_m); namp_hat = cross(-am_hat,mp_hat) * r_sin_m;
+            
+            real_t cos_beta = dot(nbam_hat, namp_hat); //Outer Dihedral angle bam, amp
+            real_t cot_a = cos_a * r_sin_a * r_sin_a;
+            real_t cot_m = cos_m * r_sin_m * r_sin_m;
 
-        //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 31.
-        coord3d grad = cross(mp_hat,nbam_hat)*r_ram*r_sin_m - (cross(namp_hat,ab_hat)*r_ram + cross(am_hat,namp_hat)*r_rab)*r_sin_a +
-                        cos_beta*(ab_hat*r_rab + r_ram * ((real_t)2.0*am_hat + cot_m*(mp_hat+cos_m*am_hat)) - cot_a*(r_ram*(ab_hat - am_hat*cos_a) + r_rab*(am_hat-ab_hat*cos_a)));
-        
-        //Eq. 31 multiplied by harmonic term.
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 31.
+            coord3d grad = cross(mp_hat,nbam_hat)*r_ram*r_sin_m - (cross(namp_hat,ab_hat)*r_ram + cross(am_hat,namp_hat)*r_rab)*r_sin_a +
+                            cos_beta*(ab_hat*r_rab + r_ram * ((real_t)2.0*am_hat + cot_m*(mp_hat+cos_m*am_hat)) - cot_a*(r_ram*(ab_hat - am_hat*cos_a) + r_rab*(am_hat-ab_hat*cos_a)));
+            
+            //Eq. 31 multiplied by harmonic term.
 
-        return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_a,j), cos_beta, grad);
+            return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_a,j), cos_beta, grad);
+        } else return {0,0,0};
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
     INLINE coord3d outer_dihedral_gradient_m(const Constants& c) const
     {
-        coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
-        cos_m = dot(mb_hat,mp_hat);  r_sin_m = (real_t)1.0/sqrt((real_t)1.0 - cos_m*cos_m); nbmp_hat = cross(mb_hat,mp_hat) * r_sin_m;
-        cos_p = dot(-mp_hat,pa_hat); r_sin_p = (real_t)1.0/sqrt((real_t)1.0 - cos_p*cos_p); nmpa_hat = cross(-mp_hat,pa_hat) * r_sin_p;
-        
-        //Cosine to the outer dihedral angle constituted by the planes bmp and mpa
-        real_t cos_beta = dot(nbmp_hat, nmpa_hat); //Outer dihedral angle bmp,mpa.
-        real_t cot_p = cos_p * r_sin_p * r_sin_p;
-        
-        //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 32.
-        coord3d grad = r_rap * (cot_p*cos_beta * (-mp_hat - pa_hat*cos_p) - cross(nbmp_hat, mp_hat)*r_sin_p - pa_hat*cos_beta );
+        if (d_get(c.f_outer_dihedral,j) > (real_t)0.){
+            coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
+            cos_m = dot(mb_hat,mp_hat);  r_sin_m = (real_t)1.0/sqrt((real_t)1.0 - cos_m*cos_m); nbmp_hat = cross(mb_hat,mp_hat) * r_sin_m;
+            cos_p = dot(-mp_hat,pa_hat); r_sin_p = (real_t)1.0/sqrt((real_t)1.0 - cos_p*cos_p); nmpa_hat = cross(-mp_hat,pa_hat) * r_sin_p;
+            
+            //Cosine to the outer dihedral angle constituted by the planes bmp and mpa
+            real_t cos_beta = dot(nbmp_hat, nmpa_hat); //Outer dihedral angle bmp,mpa.
+            real_t cot_p = cos_p * r_sin_p * r_sin_p;
+            
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 32.
+            coord3d grad = r_rap * (cot_p*cos_beta * (-mp_hat - pa_hat*cos_p) - cross(nbmp_hat, mp_hat)*r_sin_p - pa_hat*cos_beta );
 
-        //Eq. 32 multiplied by harmonic term.
-        return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_m,j), cos_beta, grad);
+            //Eq. 32 multiplied by harmonic term.
+            return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_m,j), cos_beta, grad);
+        } else return {0,0,0};
     }
 
     //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
     INLINE coord3d outer_dihedral_gradient_p(const Constants& c) const
     {
-        coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
-        cos_a = dot(ap_hat,am_hat);  r_sin_a = (real_t)1.0/sqrt((real_t)1.0 - cos_a*cos_a); npam_hat = cross(ap_hat,am_hat)  * r_sin_a;
-        cos_p = dot(pb_hat,-ap_hat); r_sin_p = (real_t)1.0/sqrt((real_t)1.0 - cos_p*cos_p); nbpa_hat = cross(pb_hat,-ap_hat) * r_sin_p;
+        if (d_get(c.f_outer_dihedral,j) > (real_t)0.){
+            coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
+            cos_a = dot(ap_hat,am_hat);  r_sin_a = (real_t)1.0/sqrt((real_t)1.0 - cos_a*cos_a); npam_hat = cross(ap_hat,am_hat)  * r_sin_a;
+            cos_p = dot(pb_hat,-ap_hat); r_sin_p = (real_t)1.0/sqrt((real_t)1.0 - cos_p*cos_p); nbpa_hat = cross(pb_hat,-ap_hat) * r_sin_p;
 
-        real_t cos_beta = dot(nbpa_hat, npam_hat); //Outer dihedral angle bpa, pam.
-        real_t cot_p = cos_p * r_sin_p * r_sin_p;
-        real_t cot_a = cos_a * r_sin_a * r_sin_a;
+            real_t cos_beta = dot(nbpa_hat, npam_hat); //Outer dihedral angle bpa, pam.
+            real_t cot_p = cos_p * r_sin_p * r_sin_p;
+            real_t cot_a = cos_a * r_sin_a * r_sin_a;
 
-        //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 33.
-        coord3d grad = cross(npam_hat,pb_hat)*r_rap*r_sin_p - (cross(am_hat,nbpa_hat)*r_rap + cross(nbpa_hat,ap_hat)*r_ram)*r_sin_a +
-                        cos_beta*(am_hat*r_ram + r_rap * ((real_t)2.0*ap_hat + cot_p*(pb_hat+cos_p*ap_hat)) - cot_a*(r_rap*(am_hat - ap_hat*cos_a) + r_ram*(ap_hat-am_hat*cos_a)));
+            //Derivative w.r.t. outer dihedral angle, factorized version of Eq. 33.
+            coord3d grad = cross(npam_hat,pb_hat)*r_rap*r_sin_p - (cross(am_hat,nbpa_hat)*r_rap + cross(nbpa_hat,ap_hat)*r_ram)*r_sin_a +
+                            cos_beta*(am_hat*r_ram + r_rap * ((real_t)2.0*ap_hat + cot_p*(pb_hat+cos_p*ap_hat)) - cot_a*(r_rap*(am_hat - ap_hat*cos_a) + r_ram*(ap_hat-am_hat*cos_a)));
+            
+            //Eq. 33 multiplied by harmonic term.
+            return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_p,j), cos_beta, grad);
+        } else return {0,0,0};
+    }
+
+    //Assumes A is symmetric, and uses closed form 3x3 derivation
+    INLINE coord3d face_norm_fast() const {
+        //Notation exactly matches that of work of Deledalle, Denis, Tabti, Tupin : https://hal.archives-ouvertes.fr/hal-01501221/document
+        //Note that explicit casting to real_t of all literals is necessary to avoid implicit conversion to double and double precision math.
+        real_t a(A[0].x), b(A[1].y), c(A[2].z), d(A[0].y), e(A[1].z), f(A[0].z);
+        auto [lambda_1, lambda_2, lambda_3] = eigen_values_2();
         
-        //Eq. 33 multiplied by harmonic term.
-        return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_p,j), cos_beta, grad);
+        if (abs(lambda_1) <= abs(lambda_2) && abs(lambda_1) <= abs(lambda_3)) {
+            real_t m = (d*(c - lambda_1 ) - e * f) / ( f*(b-lambda_1) - d*e  );
+            return {(lambda_1 - c - e*m)/f , m, (real_t)1.0};
+        } else if (abs(lambda_2) <= abs(lambda_1) && abs(lambda_2 ) <= abs(lambda_3)) {
+            real_t m = (d*(c - lambda_2 ) - e * f) / ( f*(b-lambda_2) - d*e  );
+            return {(lambda_2 - c - e*m)/f , m, (real_t)1.0};
+        } else {
+            real_t m = (d*(c - lambda_3 ) - e * f) / ( f*(b-lambda_3) - d*e  );
+            return {(lambda_3 - c - e*m)/f , m, (real_t)1.0};
+        }
+    }
+
+    //Assumes A 3x3 is symmetric and solves the sytem in closed form
+    INLINE coord3d eigen_values() const{
+        real_t a(A[0].x), b(A[1].y), c(A[2].z), d(A[0].y), e(A[1].z), f(A[0].z);
+        real_t x1 = a*a + b*b + c*c - a*b - a*c - b*c + 3 * (d*d + f*f + e*e);
+        real_t x2 = -((real_t)2.*a - b - c)*((real_t)2.*b - a - c)*((real_t)2.*c - a - b) + (real_t)9.*(((real_t)2.*c -a - b)*d*d +((real_t)2.*b - a -c)*f*f + ((real_t)2.*a -b -c)*e*e) - (real_t)54. *(d*e*f);
+        real_t phi = (real_t)M_PI/(real_t)2.;
+        if (x2 > 1e-12) {phi = atanf((float) (sqrtf( (real_t)4.*x1*x1*x1 - x2*x2 )/x2 ));}
+        else if (x2 < 1e-12) {phi = atanf((float) (sqrtf( (real_t)4.*x1*x1*x1 - x2*x2 )/x2 ) + (real_t)M_PI);}
+
+        //Compute all the eigenvalues, find the one with smallest absolute size and return the corresponding eigenvector.
+        real_t lambda_1 = (a + b + c - (real_t)2.0 * sqrtf(x1) * cosf((float)(phi/(real_t)3.0)   ) ) / (real_t)3.0;
+        real_t lambda_2 = (a + b + c + (real_t)2.0 * sqrtf(x1) * cosf((float)((phi - (real_t)M_PI)/(real_t)3.0)) ) / (real_t)3.0;
+        real_t lambda_3 = (a + b + c + (real_t)2.0 * sqrtf(x1) * cosf((float)((phi + (real_t)M_PI)/(real_t)3.0)) ) / (real_t)3.0;
+        
+        return {lambda_1, lambda_2, lambda_3};
+    }
+
+    INLINE coord3d eigen_values_2() const{
+        real_t a(A[0].x), b(A[0].y), c(A[0].z), d(A[1].y), e(A[1].z), f(A[2].z);
+        
+        real_t
+            A_ = (real_t)-1.0,
+            B_ = a+d+f,
+            C_ = b*b + c*c - a*d + e*e - a*f - d*f,
+            D_ = -c*c*d + (real_t)2.*b*c*e - a*e*e - b*b*f + a*d*f;
+
+        real_t
+            p  = ((real_t)3.*A_*C_ - B_*B_)/((real_t)3.*A_*A_),
+            q  = ((real_t)2.*B_*B_*B_ - (real_t)9.*A_*B_*C_ + (real_t)27.*A_*A_*D_)/((real_t)27.*A_*A_*A_),
+            xc = B_/((real_t)3.*A_);
+
+        if(abs(p) < 1e-6){
+            return {-cbrt(q), -cbrt(q), -cbrt(q)};
+        } else if (abs(q) < 1e-6){
+            real_t val = d_max((real_t)0., sqrt(-p));
+            return {val, val, val};
+        } else {
+            // François Viète's solution to cubic polynomials with three real roots. 
+            real_t K = (real_t)2.*sqrt(-p/(real_t)3.), 
+                        theta0 = ( (real_t)1./(real_t)3.)*acos(((real_t)3.*q)/((real_t)2.*p)*sqrt((real_t)-3./p));
+            coord3d t = K*cos3(theta0-coord3d{0,1,2}*(real_t)2.*(real_t)M_PI/(real_t)3.);
+            return t - xc;
+        }
+    }
+
+    INLINE coord3d eigen_vector(const real_t lambda) const{
+        coord3d x;
+  
+        // using the first two eqs
+        // [ a_12 * a_23 - a_13 * (a_22 - r) ]
+        // [ a_12 * a_13 - a_23 * (a_11 - r) ]
+        // [ (a_11 - r) * (a_22 - r) - a_12^2 ]
+        x = {A[0].y*A[1].z - A[0].z*(A[1].y-lambda),
+            A[0].y*A[0].z - A[1].z*(A[0].x-lambda),
+            (A[0].x-lambda)*(A[1].y-lambda) - A[0].y*A[0].y };
+            
+        if (norm(x) / (A[0].x + A[1].y + A[2].z) > 1.e-12) // not zero-ish
+        return x/norm(x);
+    
+        // using the first+last eqs
+        // [ a_12 * (a_33 - r) - a_13 * a_23 ]
+        // [ a_13^2 - (a_11 - r) * (a_33 - r) ]
+        // [ a_23 * (a_11 - r) - a_12 * a_13 ]
+        x = { A[0].y*(A[2].z-lambda) - A[0].z*A[1].z,
+                    A[0].z*A[0].z - (A[0].x-lambda)*(A[2].z-lambda),
+                    A[1].z*(A[0].x-lambda) - A[0].y*A[0].z };
+        if (norm(x) / (A[0].x + A[1].y + A[2].z) > 1.e-12) // not zero-ish
+        return x/norm(x);
+    
+        // using the last two eqs
+        // [ a_23^2 - (a_22 - r) * (a_33 - r) ]
+        // [ a_12 * (a_33 - r) - a_13 * a_23 ]
+        // [ a_13 * (a_22 - r) - a_12 * a_23 ]
+        x = { A[1].z*A[1].z - (A[1].y-lambda)*(A[2].z-lambda),
+                    A[0].y*(A[2].z-lambda) - A[0].z*A[1].z,
+                    A[0].z*(A[1].y-lambda) - A[0].y*A[1].z };
+        if (norm(x) / (A[0].x + A[1].y + A[2].z) > 1.e-12) // not zero-ish
+        return x/norm(x);
+    
+        return {0,0,0};
+    }
+
+    INLINE real_t flatness_energy(const Constants& c) const{
+        if (d_get(c.f_flat,j) > (real_t)0.){
+            coord3d lambdas = eigen_values();
+            real_t minimum_lambda = min(min(lambdas.x, lambdas.y),lambdas.z);
+            real_t real_lambda = isnan(minimum_lambda) ? 0.0 : minimum_lambda; 
+            return d_get(c.f_flat,j)*harmonic_energy(minimum_lambda, (real_t)0.0);
+        } else return (real_t)0.;
+    }
+
+    INLINE coord3d flatness_gradient(const Constants& c) const {
+        if (d_get(c.f_flat,j) > (real_t)0.){
+            coord3d lambdas = eigen_values_2();
+            real_t lambda = min(lambdas.x, min(lambdas.y, lambdas.z));
+            coord3d n = eigen_vector(lambda);
+            
+            //Take the dot product between the face-normal and the {X[a] -> face_centroid}  arc.
+            //This is a measure of how close they are to being parallel the vectors are.
+            real_t Xn = dot(face_offset, n);
+            
+            return d_get(c.f_flat,j) * (real_t)2.0*Xn*n;
+        } else return {0,0,0};
     }
     // Internal coordinate gradients
-    INLINE coord3d bond_length_gradient(const Constants& c) const { return d_get(c.f_bond,j) * harmonic_energy_gradient(bond(),d_get(c.r0,j),ab_hat);}
+    INLINE coord3d bond_length_gradient(const Constants& c) const {
+        if(d_get(c.f_bond,j) > (real_t)0.) { 
+            return d_get(c.f_bond,j) * harmonic_energy_gradient(bond(),d_get(c.r0,j),ab_hat); 
+        } else return {0,0,0};
+    }
     //Sum of angular gradient components.
     INLINE coord3d angle_gradient(const Constants& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
     //Sum of inner and outer dihedral gradient components.
-    INLINE coord3d dihedral_gradient(const Constants& c) const { return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);}
-    //coord3d flatness()             const { return ;  }   
+    INLINE coord3d dihedral_gradient(const Constants& c) const { 
+        switch (T)
+        {
+        case BUSTER:
+            return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);
+        case WIRZ:
+            return inner_dihedral_gradient(c);
+        default:
+            return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);
+        }
+        return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);
+    }
     
-    INLINE real_t bond_energy(const Constants& c) const {return (real_t)0.5 *d_get(c.f_bond,j) *harmonic_energy(bond(),d_get(c.r0,j));}
-    INLINE real_t bend_energy(const Constants& c) const {return d_get(c.f_inner_angle,j)* harmonic_energy(angle(),d_get(c.angle0,j));}
-    INLINE real_t dihedral_energy(const Constants& c) const {return d_get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),d_get(c.inner_dih0,j));}
+    INLINE real_t bond_energy(const Constants& c) const {
+        if(d_get(c.f_bond,j) > (real_t)0.){ 
+            return (real_t)0.5 *d_get(c.f_bond,j) *harmonic_energy(bond(),d_get(c.r0,j));
+        } else return (real_t)0.;
+    }
+    INLINE real_t bend_energy(const Constants& c) const {
+        if(d_get(c.f_inner_angle,j)> (real_t)0.) {
+            return d_get(c.f_inner_angle,j)* harmonic_energy(angle(),d_get(c.angle0,j));
+        } else return (real_t)0.;
+    }
+    INLINE real_t dihedral_energy(const Constants& c) const {
+        if(d_get(c.f_inner_dihedral,j) > (real_t)0.){
+            return d_get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),d_get(c.inner_dih0,j));
+        } else return (real_t)0.;
+    }
     //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
     //71 FLOPs
-    INLINE real_t energy(const Constants& c) const {return bond_energy(c) + bend_energy(c) + dihedral_energy(c); }
+    INLINE real_t energy(const Constants& c) const {
+        return bond_energy(c) + bend_energy(c) + dihedral_energy(c);// + flatness_energy(c);
+    }
     //Sum of bond, angular and dihedral gradient components.
-    INLINE coord3d gradient(const Constants& c) const{return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);}
+    INLINE coord3d gradient(const Constants& c) const{
+        switch (T)
+        {
+        case FLATNESS_ENABLED:
+            return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c) + flatness_gradient(c);
+        default:
+            return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);
+        }
+    }
 
 
     //Reciprocal lengths of arcs ab, ac, am, ap.
@@ -271,6 +447,13 @@ struct ArcData{
         mb_hat,
         pa_hat,
         pb_hat;
+
+    coord3d
+        face_center, //Center of the face to the left of the arc a->b, a->b, a->c
+        face_offset; //Difference between the node coordinates X and the face-center coordinates face_center
+    
+    coord3d A[3];
+    
 };
 
 
@@ -293,8 +476,7 @@ INLINE real_t energy(coord3d* X) const {
         ArcData arc = ArcData(j, X, node_graph);
         arc_energy += arc.energy(constants);
     }
-    return reduction(sdata, arc_energy);;
-
+    return reduction(sdata, arc_energy);
 }
 
 INLINE real_t gradnorm(coord3d* X, coord3d& d)const {
@@ -345,7 +527,7 @@ INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2)con
     a = (real_t)0.0; //b = (real_t)1.0; 
 
     //To match python reference implementation by Buster.
-    b = (real_t)1.0;//FindLineSearchBound(X,r0,X1);
+    b = FindLineSearchBound(X,r0,X1);
 
     X1[node_id] = X[node_id] + a * r0;
     X2[node_id] = X[node_id] + b * r0;
@@ -421,7 +603,7 @@ INLINE real_t GSS(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2) const{
     real_t f1 = energy(X1);
     real_t f2 = energy(X2);
 
-    for (uint8_t i = 0; i < 20; i++){
+    for (uint8_t i = 0; i < 30; i++){
         if (f1 > f2){
             a = x1;
             x1 = x2;
@@ -482,6 +664,7 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
 } 
 };
 
+template <ForcefieldType T>
 __device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
@@ -491,13 +674,13 @@ __device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     size_t offset = isomer_idx * blockDim.x;
     Constants constants     = Constants(B, isomer_idx);
     NodeGraph node_graph    = NodeGraph(B, isomer_idx);
-    ForceField FF           = ForceField(node_graph, constants, smem);
+    ForceField FF           = ForceField<T>(node_graph, constants, smem);
     coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);
 
     coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
     BLOCK_SYNC
     for (uint8_t j = 0; j < 3; j++){
-        auto arc            = ForceField::ArcData(j, X, node_graph);
+        auto arc            = ForceField<T>::ArcData(j, X, node_graph);
         d_set(rel_bond_err,      j, abs(abs(arc.bond()       - d_get(constants.r0,j))        /d_get(constants.r0,j)));
         d_set(rel_angle_err,     j, abs(abs(arc.angle()      - d_get(constants.angle0,j))    /d_get(constants.angle0,j)));
         d_set(rel_dihedral_err,  j, abs(abs(arc.dihedral()   - d_get(constants.inner_dih0,j))/d_get(constants.inner_dih0,j)));
@@ -513,6 +696,8 @@ __device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     real_t angle_mean       = reduction(smem,sum(rel_angle_err))/blockDim.x;
     real_t dihedral_mean    = reduction(smem,sum(rel_dihedral_err))/blockDim.x;
     real_t grad_norm        = sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X))))/blockDim.x;
+    real_t grad_rms         = sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X)))/blockDim.x);
+    real_t grad_max         = reduction_max(smem, sqrt(dot(FF.gradient(X), FF.gradient(X)))     );
     real_t energy           = FF.energy(X); 
     
     bool converged = (grad_norm < 1e-2) && !isnan(grad_norm);
@@ -530,7 +715,7 @@ __device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     }
     
 }
-
+template <ForcefieldType T>
 __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
@@ -562,7 +747,7 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
         NodeGraph nodeG     = NodeGraph(B, isomer_idx);
 
         //Create forcefield struct and use optimization algorithm to optimize the fullerene 
-        ForceField FF = ForceField(nodeG, constants, smem);
+        ForceField FF = ForceField<T>(nodeG, constants, smem);
         FF.CG(X,X1,X2,iterations);
         BLOCK_SYNC
         
@@ -573,15 +758,57 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
     }
     //Check the convergence of isomers and assign status accordingly.
     BLOCK_SYNC
-    check_batch(B, max_iterations);
+    check_batch<T>(B, max_iterations);
     }
 }
 
+#define GET_STAT(fun_1, fun_2, param_fun, equillibrium_param, err_fun) \
+    __global__ void fun_1(const IsomerBatch B, CuArray<device_real_t> bond_rms){\
+        DEVICE_TYPEDEFS\
+        extern __shared__ real_t smem[];\
+        clear_cache(smem,Block_Size_Pow_2);\
+        for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){\
+        if(B.statuses[isomer_idx] != EMPTY){\
+            coord3d rel_err;\
+            size_t offset = isomer_idx * blockDim.x;  \
+            Constants constants     = Constants(B, isomer_idx);\
+            NodeGraph node_graph    = NodeGraph(B, isomer_idx);\
+            ForceField FF           = ForceField<FORCEFIELD_VERSION>(node_graph, constants, smem);\
+            coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
+            for (uint8_t j = 0; j < 3; j++){\
+                auto arc            = ForceField<FORCEFIELD_VERSION>::ArcData(j, X, node_graph);\
+                d_set(rel_err,      j, abs(abs(param_fun       - d_get(equillibrium_param,j))        /d_get(equillibrium_param,j)));\
+            }\
+            bond_rms.data[isomer_idx]         = err_fun;\
+        }}\
+    }\
+    cudaError_t fun_2(const IsomerBatch& B, CuArray<device_real_t>& bond_rms){\
+        cudaDeviceSynchronize();\
+        size_t smem = sizeof(device_real_t)*(Block_Size_Pow_2 + B.n_atoms);\
+        static LaunchDims dims((void*)fun_1, B.n_atoms, smem, B.isomer_capacity);\
+        dims.update_dims((void*)fun_1, B.n_atoms, smem, B.isomer_capacity);\
+        void* kargs[]{(void*)&B, (void*)&bond_rms};\
+        auto error = safeCudaKernelCall((void*)fun_1, dims.get_grid(), dims.get_block(), kargs, smem);\
+        cudaDeviceSynchronize();\
+        return error;\
+    }
+
+GET_STAT(get_bond_rms_,get_bond_rms, arc.bond(), constants.r0, sqrt(reduction(smem,dot(rel_err,rel_err))/blockDim.x))
+GET_STAT(get_bond_max_,get_bond_max, arc.bond(), constants.r0, reduction_max(smem, max(rel_err)))
+GET_STAT(get_angle_rms_,get_angle_rms, arc.angle(), constants.angle0, sqrt(reduction(smem,dot(rel_err,rel_err))/blockDim.x);)
+GET_STAT(get_angle_max_,get_angle_max, arc.angle(), constants.angle0, reduction_max(smem, max(rel_err)))
+GET_STAT(get_dihedral_rms_,get_dihedral_rms, arc.dihedral(), constants.inner_dih0, sqrt(reduction(smem,dot(rel_err,rel_err))/blockDim.x);)
+GET_STAT(get_dihedral_max_,get_dihedral_max, arc.dihedral(), constants.inner_dih0, reduction_max(smem, max(rel_err)))
+GET_STAT(get_energies_,get_energies, arc.dihedral(), constants.inner_dih0, FF.energy(X))
+GET_STAT(get_gradient_norm_,get_gradient_norm, arc.dihedral(), constants.inner_dih0, sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X))))/blockDim.x)
+GET_STAT(get_gradient_rms_,get_gradient_rms, arc.dihedral(), constants.inner_dih0, sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X)))/blockDim.x))
+GET_STAT(get_gradient_max_,get_gradient_max, arc.dihedral(), constants.inner_dih0, reduction_max(smem, sqrt(dot(FF.gradient(X), FF.gradient(X)))     ))
 
 
 int optimal_batch_size(const int N, const int device_id) {
     static size_t smem = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimize_batch_, N, smem);
+    static LaunchDims dims((void*)optimize_batch_<FORCEFIELD_VERSION>, N, smem);
+    dims.update_dims((void*)optimize_batch_<FORCEFIELD_VERSION>, N, smem);
     return dims.get_grid().x;
 }
 
@@ -589,6 +816,8 @@ float kernel_time = 0.0;
 float time_spent(){
     return kernel_time;
 }
+
+
 
 cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
     static bool first_call = true;
@@ -600,12 +829,12 @@ cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t
 
     if(policy == LaunchPolicy::SYNC) ctx.wait();
     size_t smem = sizeof(device_coord3d)*3*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimize_batch_, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)optimize_batch_, B.n_atoms, smem, B.isomer_capacity);
+    static LaunchDims dims((void*)optimize_batch_<FORCEFIELD_VERSION>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)optimize_batch_<FORCEFIELD_VERSION>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&iterations, (void*)&max_iterations};
 
     cudaEventRecord(start, ctx.stream);
-    auto error = safeCudaKernelCall((void*)optimize_batch_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    auto error = safeCudaKernelCall((void*)optimize_batch_<FORCEFIELD_VERSION>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     cudaEventRecord(stop, ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) ctx.wait();
