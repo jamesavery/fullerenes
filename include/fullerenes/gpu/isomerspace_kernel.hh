@@ -10,7 +10,6 @@
 #include <map>
 #include <fullerenes/fullerenegraph.hh> 
 #include <fullerenes/polyhedron.hh>
-#include "cu_array.hh"
 #include "gpudatastruct.hh"
 #include <cuda_runtime.h>
 #include <tuple>
