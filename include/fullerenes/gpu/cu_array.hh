@@ -1,23 +1,35 @@
-#include "gpudatastruct.hh"
+#pragma once
+#include "cuda_runtime.h"
+#include "cuda.h"
+#include "cuda_runtime_api.h"
+#include <ostream>
 
 template <typename T>
 struct CuArray
 {
 public:
-    size_t N = 0;
-    size_t Nisomers = 0;
-    BufferType buffer_type;
+    CuArray();
+    CuArray(const size_t size);
+
+    ~CuArray();
+    
+    void resize(const size_t capacity);
+
+    //Unsafe indexing
+    T& operator[] (const size_t i);
+
+    size_t size();
+
+    //Safe indexing with bounds check.
+    T& at(const size_t i);
 
     T* data;
-    
-    CuArray(){}
-    CuArray(T* pointer, size_t stride){
-        this->data = pointer;
-        this->stride = stride;
-    }
-    CuArray(const size_t N, const size_t Nisomers, const BufferType buffer_type);
-    ~CuArray();
-    T* operator[] (const size_t i) {
-        return data + i*N;
-    }
+    size_t size_ = 0;
+private:
+    int* flag;
+    size_t capacity_ = 0;
 };
+
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const CuArray<T>& input);
+
