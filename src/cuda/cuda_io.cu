@@ -100,7 +100,7 @@ namespace cuda_io{
     }
 
     template <typename T>
-    std::tuple<int,float> compare_isomer_meta(T* a, T* b, int n_isomers, int n_elements_per_isomers){
+    std::tuple<int,device_real_t> compare_isomer_meta(T* a, T* b, int n_isomers, int n_elements_per_isomers){
         int n_correct = 0;
 
         for (size_t i = 0; i < n_isomers; ++i){
@@ -112,18 +112,18 @@ namespace cuda_io{
                 }
             }
         }
-        return {n_correct, (float)(100*n_correct)/(float)(n_isomers*n_elements_per_isomers)};
+        return {n_correct, (device_real_t)(100*n_correct)/(device_real_t)(n_isomers*n_elements_per_isomers)};
     }
 
-    std::tuple<int, float, float> compare_isomer_arrays(float* a, float* b, int n_isomers, int n_elements_per_isomer, float rtol = 0.0, bool verbose = false){
-        float average_rdifference = 0.0f;
+    std::tuple<int, device_real_t, device_real_t> compare_isomer_arrays(device_real_t* a, device_real_t* b, int n_isomers, int n_elements_per_isomer, device_real_t rtol = 0.0, bool verbose = false){
+        device_real_t average_rdifference = 0.0f;
         int n_correct = 0;
         std::string fail_string{"\nFailed in: ["};
         for (int i = 0; i < n_isomers; ++i){
             bool isomer_passed = true;
             for (int j = 0; j < n_elements_per_isomer; ++j){   
                 auto idx = i*n_elements_per_isomer + j;
-                float rdiff = std::abs((a[idx] - b[idx])/a[idx]);
+                device_real_t rdiff = std::abs((a[idx] - b[idx])/a[idx]);
                 if(rdiff <= rtol || a[idx] == b[idx] || (std::isnan(a[idx]) && std::isnan(b[idx])) || (std::isinf(a[idx]) && std::isinf(b[idx])) ){
                     ++n_correct;
                 } else{
@@ -134,7 +134,7 @@ namespace cuda_io{
             if(!isomer_passed && verbose) fail_string += to_string(i) + ", ";
         }
         if (n_correct < (n_isomers*n_elements_per_isomer) && verbose) {std::cout << fail_string << std::endl;}
-        return {n_correct, (float)(100*n_correct) / (float)(n_isomers*n_elements_per_isomer), average_rdifference / (float)(n_correct*n_elements_per_isomer)};
+        return {n_correct, (device_real_t)(100*n_correct) / (device_real_t)(n_isomers*n_elements_per_isomer), average_rdifference / (device_real_t)(n_correct*n_elements_per_isomer)};
     }
 
     void is_close(const IsomerBatch& a, const IsomerBatch& b, device_real_t tol, bool verbose){
@@ -183,19 +183,28 @@ namespace cuda_io{
         for (int i = 0; i < batch.isomer_capacity; i++){
             index_map.insert({batch.IDs[i], i});
         }
+        std::vector<int> lookup_table(batch.isomer_capacity);
+        int k = 0;
+        for (auto it = index_map.begin(); it != index_map.end(); it++)
+        {   
+            lookup_table[k] = it->second;
+            k++;
+        }
+        
+
         for (int i = 0; i < batch.isomer_capacity; i++){
-            auto offset = index_map.at(i) * batch.n_atoms*3;
+            auto offset = lookup_table.at(i) * batch.n_atoms*3;
             for (int j = 0; j < batch.n_atoms * 3; j++){
                 temp.X[i*batch.n_atoms*3 + j] = batch.X[offset + j];
                 temp.neighbours[i*batch.n_atoms*3 + j] = batch.neighbours[offset + j];
             }
-            offset = index_map.at(i) * batch.n_atoms*2;
+            offset = lookup_table.at(i) * batch.n_atoms*2;
             for (size_t j = 0; j < batch.n_atoms*2; j++){
                 temp.xys[i*batch.n_atoms*2 + j] = batch.xys[offset +j];
             }
-            temp.statuses[i] = batch.statuses[index_map.at(i)];
-            temp.iterations[i] = batch.iterations[index_map.at(i)];
-            temp.IDs[i] = batch.IDs[index_map.at(i)];
+            temp.statuses[i] = batch.statuses[lookup_table.at(i)];
+            temp.iterations[i] = batch.iterations[lookup_table.at(i)];
+            temp.IDs[i] = batch.IDs[lookup_table.at(i)];
         }
         copy(batch,temp);   
     }
@@ -205,7 +214,7 @@ namespace cuda_io{
 
 bool IsomerBatch::operator==(const IsomerBatch& b){
     bool passed = true;
-    auto float_equals = [](const float a, const float b){
+    auto device_real_t_equals = [](const device_real_t a, const device_real_t b){
         return (a == b) || (std::isnan(a) && std::isnan(b)) || (std::isinf(a) && std::isinf(b));
     };
     
@@ -220,11 +229,11 @@ bool IsomerBatch::operator==(const IsomerBatch& b){
             passed &= iterations[i] == b.iterations[i];
         }
         for(int i = 0; i < isomer_capacity * n_atoms * 3; ++i){
-            passed &= float_equals(X[i],b.X[i]);
+            passed &= device_real_t_equals(X[i],b.X[i]);
             passed &= neighbours[i] == b.neighbours[i];
         }
         for(int i = 0; i < isomer_capacity * n_atoms * 2; ++i){
-            passed &= float_equals(xys[i],b.xys[i]);}
+            passed &= device_real_t_equals(xys[i],b.xys[i]);}
         return passed;
     } else{
         std::cout << "== operator only supported for HOST_BUFFER" << std::endl;
