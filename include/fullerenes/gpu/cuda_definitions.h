@@ -7,15 +7,16 @@
 #define BLOCK_SYNC cg::sync(cg::this_thread_block());
 #define GRID_SYNC cg::sync(cg::this_grid());
 #define INLINE __device__ __forceinline__
-#define sin sinf		// change to sin for double precision, sinl for long double
-#define cos cosf 		// change to cos for double precision, cosl for long double
+#define sin sin		// change to sin for double precision, sinl for long double
+#define cos cos 		// change to cos for double precision, cosl for long double
 #define NODE_MAX UINT16_MAX
 #define MAKE_NODE3 make_ushort3
 #define Block_Size_Pow_2 256
-#define SEMINARIO_FORCE_CONSTANTS 1
+#define SEMINARIO_FORCE_CONSTANTS 0
 #define USE_MAX_NORM 0
 #define REDUCTION_METHOD 0
 #define LINESEARCH_METHOD GSS
+#define FORCEFIELD_VERSION BUSTER
 typedef float device_real_t;
 typedef uint16_t device_node_t;
 typedef float3 device_coord3d;
