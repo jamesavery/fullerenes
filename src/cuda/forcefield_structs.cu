@@ -12,11 +12,14 @@ __constant__ device_real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.87
 __constant__ device_real_t angle_forces[2] = {207.924,216.787}; 
 __constant__ device_real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
 __constant__ device_real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
+__constant__ device_real_t flat_forces[3] = {0., 0., 0.};
 #else
 __constant__ device_real_t angle_forces[2] = {100.0,100.0}; 
 __constant__ device_real_t bond_forces[3] = {260.0,390.0,450.0}; 
 __constant__ device_real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
+__constant__ device_real_t flat_forces[3] = {0., 0., 0.};
 #endif
+
 
 
 template <typename T>
@@ -148,12 +151,17 @@ struct NodeGraph{
     device_node3 neighbours;
     device_node3 next_on_face;
     device_node3 prev_on_face;
-
+    device_node_t face_neighbours[18]; //Shape 3 x dmax , face associated with the arc a -> b , face associated with the arc a -> c, face associated with the arc a -> d
+    device_node3 face_sizes;
     __device__ NodeGraph(const IsomerBatch& G, const size_t isomer_idx){
         const DeviceFullereneGraph FG(&G.neighbours[isomer_idx*blockDim.x*3]);
         this->neighbours   = {FG.neighbours[threadIdx.x*3], FG.neighbours[threadIdx.x*3 + 1], FG.neighbours[threadIdx.x*3 + 2]};
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.neighbours[threadIdx.x*3 + 2])};
+        FG.get_face_oriented(threadIdx.x, d_get(neighbours,0), &face_neighbours[0]);
+        FG.get_face_oriented(threadIdx.x, d_get(neighbours,1), &face_neighbours[6]);
+        FG.get_face_oriented(threadIdx.x, d_get(neighbours,2), &face_neighbours[12]);
+        face_sizes = {FG.face_size(threadIdx.x,d_get(neighbours,0)), FG.face_size(threadIdx.x,d_get(neighbours,1)), FG.face_size(threadIdx.x,d_get(neighbours,2))};
     }
 };
 
@@ -164,6 +172,7 @@ struct Constants{
     device_coord3d f_outer_angle_m;
     device_coord3d f_outer_angle_p;
     device_coord3d f_outer_dihedral;
+    device_coord3d f_flat;
 
     device_coord3d r0;
     device_coord3d angle0;
@@ -223,6 +232,9 @@ struct Constants{
             d_set(f_outer_angle_m,  j,  angle_forces[F3]);
             d_set(f_outer_angle_p,  j,  angle_forces[F1]);
             d_set(f_outer_dihedral, j,  dih_forces[F1 + F3 + F4]);
+            
+            //This one is arbitrary at the moment.
+            d_set(f_flat, j, flat_forces[F3 + F1]);
         }
     }   
 };
