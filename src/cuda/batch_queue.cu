@@ -142,6 +142,7 @@ cudaError_t IsomerQueue::to_device(const LaunchCtx& ctx){
 cudaError_t IsomerQueue::refill_batch(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     static LaunchDims dims((void*)refill_batch_, N, 0, batch.isomer_capacity);
+    dims.update_dims((void*)refill_batch_, N, 0, batch.isomer_capacity);
     to_device(ctx);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props};
     is_host_updated = false;
@@ -233,9 +234,9 @@ cudaError_t IsomerQueue::insert(const PlanarGraph& in, const size_t ID, const La
     size_t offset = *props.back * N;
 
     for(node_t u=0;u<N;u++){
-        for(int j=0;j<3;j++)
+        for(int j=0;j<3;j++){
             host_batch.neighbours[3*(offset+u)+j] = in.neighbours[u][j];
-
+        }
         if(insert_2d){
             host_batch.xys[2*(offset+u) + 0] = in.layout2d[u].first;
             host_batch.xys[2*(offset+u) + 1] = in.layout2d[u].second; 
