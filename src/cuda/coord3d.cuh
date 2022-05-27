@@ -2,6 +2,12 @@
 #define DEVICE_COORD3D
 INLINE device_coord3d operator-(const device_coord3d& a)                 { return {-a.x, -a.y, -a.z};  }
 INLINE device_coord3d operator-(const device_coord3d& a, const device_coord3d& b){ return {a.x-b.x, a.y-b.y, a.z-b.z};  }
+
+INLINE device_coord3d operator-(const device_real_t a, const device_coord3d& b){ return {a - b.x, a - b.y, a - b.z};  }
+INLINE device_coord3d operator-(const device_coord3d& a, const device_real_t b){ return {a.x - b, a.y - b, a.z - b};  }
+INLINE device_coord3d operator+(const device_coord3d& a, const device_real_t b){ return {a.x + b, a.y +b, a.z + b};}
+INLINE device_coord3d operator+(const device_real_t a, const device_coord3d& b){ return b + a;}
+
 INLINE device_coord3d operator+(const device_coord3d& a, const device_coord3d& b){ return {a.x+b.x, a.y+b.y, a.z+b.z};  }
 INLINE device_coord3d operator*(const device_coord3d& a, const device_real_t s)  { return {a.x*s, a.y*s, a.z*s};  }
 INLINE device_coord3d operator*(const device_real_t s, const device_coord3d& a)  { return a*s; }
@@ -12,6 +18,11 @@ INLINE void operator+=(device_coord3d& a, const device_coord3d& b) {a = a + b;}
 INLINE void operator-=(device_coord3d& a, const device_coord3d& b) {a = a - b;}
 INLINE void operator/=(device_coord3d& a, const device_real_t b) {a = a / b;}
 INLINE void operator*=(device_coord3d& a, const device_real_t b) {a = a * b;}
+
+
+INLINE device_coord3d cos3(const device_coord3d& a){
+  return {cos((double)a.x), cos((double)a.y), cos((double)a.z)};
+}
 
 INLINE void d_set(device_coord3d& a, const u_char j, device_real_t b){
   ((device_real_t*)&a)[j] = b; 
