@@ -20,9 +20,9 @@ __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){
     DEVICE_TYPEDEFS
     
-    DeviceFullereneGraph FG = DeviceFullereneGraph(&B.neighbours[isomer_idx*blockDim.x*3]);
+    DeviceFullereneGraph FG = DeviceFullereneGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
     node_t outer_face[6];
-    uint8_t Nface = FG.get_face_oriented(0, FG.neighbours[0],outer_face);
+    uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
     distances[threadIdx.x] = node_t(NODE_MAX);    
     BLOCK_SYNC
     if (threadIdx.x < Nface)  distances[outer_face[threadIdx.x]] = 0;
@@ -35,7 +35,7 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t
             node_t v = queue.pop_front();
             for (size_t i = 0; i < 3; i++)
             {   
-                node_t w = FG.neighbours[v*3 + i];
+                node_t w = FG.cubic_neighbours[v*3 + i];
                 if(distances[w] == NODE_MAX) {
                 distances[w] = distances[v]+1;
                 queue.push_back(w);
@@ -106,7 +106,7 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
     X[threadIdx.x] = coordinate;
     BLOCK_SYNC
     real_t local_Ravg = real_t(0.0);
-    for (uint8_t i = 0; i < 3; i++) {local_Ravg += norm(X[threadIdx.x] - X[d_get(node_graph.neighbours,i)]);}
+    for (uint8_t i = 0; i < 3; i++) {local_Ravg += norm(X[threadIdx.x] - X[d_get(node_graph.cubic_neighbours,i)]);}
     Ravg = reduction(sdata, local_Ravg);
     Ravg /= real_t(3*blockDim.x);
     coordinate *= scalerad*1.5/Ravg;

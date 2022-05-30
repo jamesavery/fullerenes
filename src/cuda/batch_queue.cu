@@ -57,7 +57,7 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
         size_t queue_array_idx    = queue_index*blockDim.x+threadIdx.x;
         size_t global_idx         = blockDim.x*isomer_idx + threadIdx.x;
         reinterpret_cast<device_coord3d*>(B.X)[global_idx]           = reinterpret_cast<device_coord3d*>(Q_B.X)[queue_array_idx];  
-        reinterpret_cast<device_node3*>(B.neighbours)[global_idx]    = reinterpret_cast<device_node3*>(Q_B.neighbours)[queue_array_idx];  
+        reinterpret_cast<device_node3*>(B.cubic_neighbours)[global_idx]    = reinterpret_cast<device_node3*>(Q_B.cubic_neighbours)[queue_array_idx];  
         if (threadIdx.x == 0){
             B.IDs[isomer_idx] = Q_B.IDs[queue_index];
             B.iterations[isomer_idx] = 0;
@@ -84,7 +84,7 @@ __global__ void insert_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
     for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x){
     size_t queue_idx = (*queue.back + isomer_idx) % *queue.capacity;
     reinterpret_cast<device_coord3d*>(Q_B.X)[queue_idx*blockDim.x + threadIdx.x]        = reinterpret_cast<device_coord3d*>(B.X)[isomer_idx*blockDim.x + threadIdx.x];
-    reinterpret_cast<device_node3*>(Q_B.neighbours)[queue_idx*blockDim.x + threadIdx.x] = reinterpret_cast<device_node3*>(B.neighbours)[isomer_idx*blockDim.x + threadIdx.x];
+    reinterpret_cast<device_node3*>(Q_B.cubic_neighbours)[queue_idx*blockDim.x + threadIdx.x] = reinterpret_cast<device_node3*>(B.cubic_neighbours)[isomer_idx*blockDim.x + threadIdx.x];
     if (threadIdx.x == 0)
     {
         Q_B.IDs[queue_idx]          = B.IDs[isomer_idx];
@@ -123,7 +123,7 @@ IsomerQueue::~IsomerQueue(){
 //Copies data to host if data is not up to date on host
 cudaError_t IsomerQueue::to_host(const LaunchCtx& ctx){
     if(!is_host_updated){
-        copy(host_batch, device_batch, ctx);
+        cuda_io::copy(host_batch, device_batch, ctx);
         is_host_updated = true;
     }
     return cudaGetLastError();
@@ -132,7 +132,7 @@ cudaError_t IsomerQueue::to_host(const LaunchCtx& ctx){
 //Copies data to device if data is not up to date on device
 cudaError_t IsomerQueue::to_device(const LaunchCtx& ctx){
     if(!is_device_updated){
-        copy(device_batch, host_batch, ctx);
+        cuda_io::copy(device_batch, host_batch, ctx);
         is_device_updated = true;
     }
     return cudaGetLastError();
@@ -159,8 +159,8 @@ cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, 
         //Construct a tempory batch: allocates the needed amount of memory.
         IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type);
         //Copy contents of old batch into newly allocated memory.
-        copy(temp_batch,batch,ctx,policy,{0, batch.isomer_capacity- *props.front}, {*props.front,batch.isomer_capacity});
-        copy(temp_batch,batch,ctx,policy,{batch.isomer_capacity- *props.front, batch.isomer_capacity - *props.front + *props.back},{0,*props.back});
+        cuda_io::copy(temp_batch,batch,ctx,policy,{0, batch.isomer_capacity- *props.front}, {*props.front,batch.isomer_capacity});
+        cuda_io::copy(temp_batch,batch,ctx,policy,{batch.isomer_capacity- *props.front, batch.isomer_capacity - *props.front + *props.back},{0,*props.back});
         for (int i = 0; i < batch.pointers.size(); i++)
         {
             void* temp_ptr = *get<1>(batch.pointers[i]);
@@ -235,7 +235,7 @@ cudaError_t IsomerQueue::insert(const PlanarGraph& in, const size_t ID, const La
 
     for(node_t u=0;u<N;u++){
         for(int j=0;j<3;j++){
-            host_batch.neighbours[3*(offset+u)+j] = in.neighbours[u][j];
+            host_batch.cubic_neighbours[3*(offset+u)+j] = in.neighbours[u][j];
         }
         if(insert_2d){
             host_batch.xys[2*(offset+u) + 0] = in.layout2d[u].first;
@@ -274,7 +274,7 @@ cudaError_t IsomerQueue::insert(const Polyhedron& in, const size_t ID, const Lau
     //Extract the graph information (neighbours) from the PlanarGraph object and insert it at the appropriate location in the queue.
     size_t offset = *props.back * N;
     for(int i = 0; i < in.neighbours.size(); i++){
-        if(!in.neighbours.empty())              reinterpret_cast<device_node3*>  (host_batch.neighbours)[offset +i]  = casting_node3(in.neighbours[i]);
+        if(!in.neighbours.empty())              reinterpret_cast<device_node3*>  (host_batch.cubic_neighbours)[offset +i]  = casting_node3(in.neighbours[i]);
         if(!in.points.empty())                  reinterpret_cast<device_coord3d*>(host_batch.X)[offset + i]          = casting_coord3d(in.points[i]);
         if(!in.layout2d.empty() && insert_2d)   reinterpret_cast<device_coord2d*>(host_batch.xys)[offset + i]        = casting_coord2d(in.layout2d[i]);
     }

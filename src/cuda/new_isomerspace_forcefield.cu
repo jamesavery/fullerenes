@@ -45,12 +45,12 @@ struct ArcData{
         node_t a = threadIdx.x;
         real_t r_rmp;
         coord3d ap, am, ab, ac, ad, mp;
-        coord3d X_a = X[a], X_b = X[d_get(G.neighbours,j)];
+        coord3d X_a = X[a], X_b = X[d_get(G.cubic_neighbours,j)];
 
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
         ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;
-        ac = (X[d_get(G.neighbours,(j+1)%3)] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac; rab = non_resciprocal_bond_length(ab);
-        ad = (X[d_get(G.neighbours,(j+2)%3)] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
+        ac = (X[d_get(G.cubic_neighbours,(j+1)%3)] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac; rab = non_resciprocal_bond_length(ab);
+        ad = (X[d_get(G.cubic_neighbours,(j+2)%3)] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
         
         coord3d bp = (X[d_get(G.next_on_face,j)] - X_b); bp_hat = unit_vector(bp);
         coord3d bm = (X[d_get(G.prev_on_face,j)] - X_b); bm_hat = unit_vector(bm);
@@ -761,6 +761,14 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
     check_batch<T>(B, max_iterations);
     }
 }
+
+__global__ void diagnostic_function(IsomerBatch B, CuArray<device_real_t> ouput){
+    auto offset = blockIdx.x * blockDim.x;
+    DeviceFullereneGraph DG(B.cubic_neighbours + offset*3);
+
+
+}
+
 
 #define GET_STAT(fun_1, fun_2, param_fun, equillibrium_param, err_fun) \
     __global__ void fun_1(const IsomerBatch B, CuArray<device_real_t> bond_rms){\

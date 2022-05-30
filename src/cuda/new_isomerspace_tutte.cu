@@ -22,17 +22,17 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     if (B.statuses[isomer_idx] != EMPTY){
     size_t offset = isomer_idx * blockDim.x;
 
-    DeviceFullereneGraph FG(&B.neighbours[offset*3]); 
+    DeviceFullereneGraph FG(&B.cubic_neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2d* xys        = reinterpret_cast<coord2d*>(base_pointer);
     coord2d* newxys     = reinterpret_cast<coord2d*>(base_pointer) + blockDim.x;
 
 
-    node3 ns            = (reinterpret_cast<node3*>(B.neighbours) + offset)[threadIdx.x];
+    node3 ns            = (reinterpret_cast<node3*>(B.cubic_neighbours) + offset)[threadIdx.x];
     xys[threadIdx.x]    = {real_t(0.0), real_t(0.0)};
     device_node_t outer_face[6];
     device_node_t outer_face_vertex   = 0;
-    uint8_t Nface = FG.get_face_oriented(0,FG.neighbours[0], outer_face);    
+    uint8_t Nface = FG.get_face_oriented(0,FG.cubic_neighbours[0], outer_face);    
     reinterpret_cast<bool*>(sharedmem)[threadIdx.x] =  false; BLOCK_SYNC;
     if(threadIdx.x < Nface){
       outer_face_vertex = outer_face[threadIdx.x];
@@ -41,7 +41,7 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     BLOCK_SYNC;
     bool fixed = reinterpret_cast<bool*>(sharedmem)[threadIdx.x];
 
-    if(threadIdx.x < Nface) xys[outer_face_vertex] = {sin(threadIdx.x*2*real_t(M_PI)/double(Nface)),cos(threadIdx.x*2*real_t(M_PI)/double(Nface))};
+    if(threadIdx.x < Nface) xys[outer_face_vertex] = {sin(threadIdx.x*(real_t)2.0*real_t(M_PI)/double(Nface)),cos(threadIdx.x*(real_t)2.0*real_t(M_PI)/double(Nface))};
     BLOCK_SYNC
     bool converged          = false;
     real_t max_change       = real_t(0.0);

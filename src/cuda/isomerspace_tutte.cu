@@ -21,17 +21,17 @@ void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
     if (G.statuses[blockIdx.x] == NOT_CONVERGED)
     {
     size_t offset = blockIdx.x * blockDim.x;
-    DeviceFullereneGraph FG(&G.neighbours[offset*3]); 
+    DeviceFullereneGraph FG(&G.cubic_neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2d* xys        = reinterpret_cast<coord2d*>(base_pointer);
     coord2d* newxys     = reinterpret_cast<coord2d*>(base_pointer) + blockDim.x;
 
 
-    node3 ns            = (reinterpret_cast<node3*>(G.neighbours) + offset)[threadIdx.x];
+    node3 ns            = (reinterpret_cast<node3*>(G.cubic_neighbours) + offset)[threadIdx.x];
     xys[threadIdx.x]    = {real_t(0.0), real_t(0.0)};
     device_node_t outer_face[6];
     device_node_t outer_face_vertex   = 0;
-    uint8_t Nface = FG.get_face_oriented(0,FG.neighbours[0], outer_face);    
+    uint8_t Nface = FG.get_face_oriented(0,FG.cubic_neighbours[0], outer_face);    
     reinterpret_cast<bool*>(sharedmem)[threadIdx.x] =  false; BLOCK_SYNC;
     if(threadIdx.x < Nface){
       outer_face_vertex = outer_face[threadIdx.x];
