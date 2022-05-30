@@ -84,12 +84,12 @@ public:
 
 
 struct DeviceFullereneGraph{
-    const device_node_t* neighbours;
-    __device__ DeviceFullereneGraph(const device_node_t* neighbours) : neighbours(neighbours) {}
+    const device_node_t* cubic_neighbours;
+    __device__ DeviceFullereneGraph(const device_node_t* cubic_neighbours) : cubic_neighbours(cubic_neighbours) {}
 
     __device__ device_node_t dedge_ix(const device_node_t u, const device_node_t v) const{
         for (uint8_t j = 0; j < 3; j++)
-            if (neighbours[u*3 + j] == v) return j;
+            if (cubic_neighbours[u*3 + j] == v) return j;
 
         assert(false);
 	return 0;		// Make compiler happy
@@ -97,12 +97,12 @@ struct DeviceFullereneGraph{
 
     __device__ device_node_t next(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
-        return neighbours[u*3 + ((j+1)%3)];
+        return cubic_neighbours[u*3 + ((j+1)%3)];
     }
     
     __device__ device_node_t prev(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
-        return neighbours[u*3 + ((j+2)%3)];
+        return cubic_neighbours[u*3 + ((j+2)%3)];
     }
     
     __device__ device_node_t next_on_face(const device_node_t u, const device_node_t v) const{
@@ -126,7 +126,7 @@ struct DeviceFullereneGraph{
         return d;
     }
 
-  __device__ uint8_t get_face_oriented(device_node_t u, device_node_t v, device_node_t *f) const{
+    __device__ uint8_t get_face_oriented(device_node_t u, device_node_t v, device_node_t *f) const{
         constexpr int f_max = 6;
         int i = 0;
 	    f[0] = u;
@@ -140,28 +140,42 @@ struct DeviceFullereneGraph{
         }
         if(i>=f_max) {assert(false); return 0;} //Compiler wants a return statement
         else return i + 1;
+    }   
 
-      }
+    __device__ device_node2 get_face_representation(device_node_t u, device_node_t v) const{
+        constexpr int f_max =6;
+        int i = 0;
+        auto start_node = u;
+        device_node2 min_edge = {u,v};
+        while (v!= start_node && i < f_max){
+            device_node_t w = next_on_face(u, v);
+            u = v; v = w;
+            if(u < min_edge.x) min_edge = {u,v};
+            ++i;
+        }
+        assert(next_on_face(u,v) == start_node);
+        return min_edge;
+    }
     
-
+    
 };
 
 
 struct NodeGraph{
-    device_node3 neighbours;
+    device_node3 cubic_neighbours;
     device_node3 next_on_face;
     device_node3 prev_on_face;
     device_node_t face_neighbours[18]; //Shape 3 x dmax , face associated with the arc a -> b , face associated with the arc a -> c, face associated with the arc a -> d
     device_node3 face_sizes;
     __device__ NodeGraph(const IsomerBatch& G, const size_t isomer_idx){
-        const DeviceFullereneGraph FG(&G.neighbours[isomer_idx*blockDim.x*3]);
-        this->neighbours   = {FG.neighbours[threadIdx.x*3], FG.neighbours[threadIdx.x*3 + 1], FG.neighbours[threadIdx.x*3 + 2]};
-        this->next_on_face = {FG.next_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.neighbours[threadIdx.x*3 + 2])};
-        this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.neighbours[threadIdx.x*3 + 2])};
-        FG.get_face_oriented(threadIdx.x, d_get(neighbours,0), &face_neighbours[0]);
-        FG.get_face_oriented(threadIdx.x, d_get(neighbours,1), &face_neighbours[6]);
-        FG.get_face_oriented(threadIdx.x, d_get(neighbours,2), &face_neighbours[12]);
-        face_sizes = {FG.face_size(threadIdx.x,d_get(neighbours,0)), FG.face_size(threadIdx.x,d_get(neighbours,1)), FG.face_size(threadIdx.x,d_get(neighbours,2))};
+        const DeviceFullereneGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+        this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
+        this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
+        this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
+        FG.get_face_oriented(threadIdx.x, d_get(cubic_neighbours,0), &face_neighbours[0]);
+        FG.get_face_oriented(threadIdx.x, d_get(cubic_neighbours,1), &face_neighbours[6]);
+        FG.get_face_oriented(threadIdx.x, d_get(cubic_neighbours,2), &face_neighbours[12]);
+        face_sizes = {FG.face_size(threadIdx.x,d_get(cubic_neighbours,0)), FG.face_size(threadIdx.x,d_get(cubic_neighbours,1)), FG.face_size(threadIdx.x,d_get(cubic_neighbours,2))};
     }
 };
 
@@ -189,8 +203,8 @@ struct Constants{
 
     __device__ Constants(const IsomerBatch& G, const size_t isomer_idx){
         //Set pointers to start of fullerene.
-        const DeviceFullereneGraph FG(&G.neighbours[isomer_idx*blockDim.x*3]);
-        device_node3 neighbours = {FG.neighbours[threadIdx.x*3], FG.neighbours[threadIdx.x*3 + 1], FG.neighbours[threadIdx.x*3 + 2]};
+        const DeviceFullereneGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+        device_node3 cubic_neighbours = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         //       m    p
         //    f5_|   |_f4
         //   p   c    b  m
@@ -204,14 +218,14 @@ struct Constants{
         for (uint8_t j = 0; j < 3; j++) {
             //Faces to the right of arcs ab, ac and ad.
             
-            uint8_t F1 = FG.face_size(threadIdx.x, d_get(neighbours, j)) - 5;
-            uint8_t F2 = FG.face_size(threadIdx.x, d_get(neighbours, (j+1)%3)) -5;
-            uint8_t F3 = FG.face_size(threadIdx.x, d_get(neighbours, (j+2)%3)) -5;
+            uint8_t F1 = FG.face_size(threadIdx.x, d_get(cubic_neighbours, j)) - 5;
+            uint8_t F2 = FG.face_size(threadIdx.x, d_get(cubic_neighbours, (j+1)%3)) -5;
+            uint8_t F3 = FG.face_size(threadIdx.x, d_get(cubic_neighbours, (j+2)%3)) -5;
             
             //The faces to the right of the arcs ab, bm and bp in no particular order, from this we can deduce F4.
-            uint8_t neighbour_F1 = FG.face_size(d_get(neighbours, j), FG.neighbours[d_get(neighbours, j)*3] ) -5;
-            uint8_t neighbour_F2 = FG.face_size(d_get(neighbours, j), FG.neighbours[d_get(neighbours, j)*3 + 1] ) -5;
-            uint8_t neighbour_F3 = FG.face_size(d_get(neighbours, j), FG.neighbours[d_get(neighbours, j)*3 + 2] ) -5;
+            uint8_t neighbour_F1 = FG.face_size(d_get(cubic_neighbours, j), FG.cubic_neighbours[d_get(cubic_neighbours, j)*3] ) -5;
+            uint8_t neighbour_F2 = FG.face_size(d_get(cubic_neighbours, j), FG.cubic_neighbours[d_get(cubic_neighbours, j)*3 + 1] ) -5;
+            uint8_t neighbour_F3 = FG.face_size(d_get(cubic_neighbours, j), FG.cubic_neighbours[d_get(cubic_neighbours, j)*3 + 2] ) -5;
 
             uint8_t F4 = neighbour_F1 + neighbour_F2 + neighbour_F3 - F1 - F3 ;
             
