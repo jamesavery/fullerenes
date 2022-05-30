@@ -8,7 +8,8 @@ enum class LaunchPolicy {SYNC, ASYNC};
 struct IsomerBatch : GPUDataStruct
 {
 
-    device_node_t* neighbours;
+    device_node_t* cubic_neighbours;
+    device_node_t* dual_neighbours;
     device_real_t* X;
     device_real_t* xys;
 
@@ -17,14 +18,10 @@ struct IsomerBatch : GPUDataStruct
     size_t* iterations;
 
     IsomerBatch(){
-      pointers =   {{"neighbours",(void**)&neighbours, sizeof(device_node_t)*3, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+      pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
     }
 
-    IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type) {
-      pointers =   {{"neighbours",(void**)&neighbours, sizeof(device_node_t)*3, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
-      allocate(*this,n_atoms, n_isomers, buffer_type);
-      initialize(*this);
-    }
+    IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type);
 
     bool operator==(const IsomerBatch& b);
     bool operator!=(const IsomerBatch& b) {return !(*this == b);}

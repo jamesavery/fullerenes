@@ -1,7 +1,8 @@
 #include "fullerenes/gpu/cuda_io.hh"
 #include "type_traits"
-
 namespace cuda_io{
+
+    
 
     cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch& batch, const bool copy_2d_layout){
         //Batch needs to exist on the host. For performance reasons we don't want to create a new batch here and copy to that, cudaMalloc is expensive.
@@ -19,8 +20,8 @@ namespace cuda_io{
             std::vector<coord2d> output_2D;
 
             for (size_t i = 0; i < N; i++){
-                //Fill in cubic neighbours
-                out_neighbours[i] = {batch.neighbours[isomer_idx*N*3 + i*3], batch.neighbours[isomer_idx*N*3 + i*3 + 1], batch.neighbours[isomer_idx*N*3 + i*3 + 2]};
+                //Fill in cubic cubic_neighbours
+                out_neighbours[i] = {batch.cubic_neighbours[isomer_idx*N*3 + i*3], batch.cubic_neighbours[isomer_idx*N*3 + i*3 + 1], batch.cubic_neighbours[isomer_idx*N*3 + i*3 + 2]};
                 
             }
 
@@ -55,21 +56,22 @@ namespace cuda_io{
                         const std::pair<int,int>& lhs_range, //Optional: provide a range of indices to assign similar to slices in numpy eg. {0,5} = [0:5]
                         const std::pair<int,int>& rhs_range //Optional: provide a range of indices to copy from similar to slices in numpy eg. {0,5} = [0:5]
                         ){
+        assert(lhs_range.second - lhs_range.first == rhs_range.second - rhs_range.first);
+        if ( lhs_range.second > -1 && lhs_range.first > -1 ) assert(source.isomer_capacity <= destination.isomer_capacity);
+
         //Iterate over the data fields of the IsomerBatch (pseudo reflection) and copy the contents of each using the provided stream.
         if(policy == LaunchPolicy::SYNC) {ctx.wait();}
         for (size_t i = 0; i < source.pointers.size(); i++)
         {
-
-            int num_isomers = (lhs_range.second > -1 && lhs_range.first > -1) ? lhs_range.second - lhs_range.first : destination.isomer_capacity;
-            int num_elements = get<3>(source.pointers[i]) ?  source.n_atoms * num_isomers : num_isomers;
-            int lhs_offset = lhs_range.first > 0 ? lhs_range.first * max((size_t)1, source.n_atoms*get<3>(source.pointers[i])) * get<2>(source.pointers[i]) : 0;
-            int rhs_offset = rhs_range.first > 0 ? rhs_range.first * max((size_t)1, source.n_atoms*get<3>(source.pointers[i])) * get<2>(source.pointers[i]) : 0;
+            int num_isomers = (lhs_range.second > -1 && lhs_range.first > -1) ? lhs_range.second - lhs_range.first : source.isomer_capacity;
+            int lhs_offset = lhs_range.first > 0 ? lhs_range.first * get<2>(source.pointers[i]) : 0;
+            int rhs_offset = rhs_range.first > 0 ? rhs_range.first * get<2>(source.pointers[i]) : 0;
             char* lhs_ptr = (char*)(*(get<1>(destination.pointers[i])));
             char* rhs_ptr = (char*)(*(get<1>(source.pointers[i])));
-            cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, get<2>(source.pointers[i])*num_elements, cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type), ctx.stream);
+            cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type), ctx.stream);
         }
         destination.n_isomers = source.n_isomers;
-        printLastCudaError("Failed to copy struct");
+        printLastCudaError("cuda_io::Failed to copy struct");
         if(policy == LaunchPolicy::SYNC) {ctx.wait();}
         return cudaGetLastError();
     }
@@ -85,7 +87,7 @@ namespace cuda_io{
         //Construct a tempory batch: allocates the needed amount of memory.
         IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type);
         //Copy contents of old batch into newly allocated memory.
-        IsomerBatch::copy(temp_batch, batch, ctx.stream);
+        cuda_io::copy(temp_batch, batch, ctx);
         for (int i = 0; i < batch.pointers.size(); i++)
         {
             void* temp_ptr = *get<1>(batch.pointers[i]);
@@ -144,17 +146,17 @@ namespace cuda_io{
         }{
             auto [n_correct_X,          accuracy0, avg_diff0] = compare_isomer_arrays(a.X, b.X, a.isomer_capacity, a.n_atoms*3, tol, verbose);
             auto [n_correct_xys,        accuracy1, avg_diff1] = compare_isomer_arrays(a.xys, b.xys, a.isomer_capacity, a.n_atoms*2, tol, verbose);
-            auto [n_correct_neighbours, accuracy2] = compare_isomer_meta(a.neighbours, b.neighbours, a.isomer_capacity, a.n_atoms*3);
+            auto [n_correct_neighbours, accuracy2] = compare_isomer_meta(a.cubic_neighbours, b.cubic_neighbours, a.isomer_capacity, a.n_atoms*3);
             auto [n_correct_IDs,        accuracy3] = compare_isomer_meta(a.IDs, b.IDs, a.isomer_capacity, 1);
             auto [n_correct_statuses,   accuracy4] = compare_isomer_meta(a.statuses, b.statuses, a.isomer_capacity, 1);
             auto [n_correct_iterations, accuracy5] = compare_isomer_meta(a.iterations, b.iterations, a.isomer_capacity, 1);
             
-            std::cout << "X          | " << n_correct_X << "/" << a.isomer_capacity*a.n_atoms*3 << " | Acc:" << accuracy0 << "%\t | Avg Diff: " << avg_diff0 << "\n";
-            std::cout << "xys        | " << n_correct_xys << "/" << a.isomer_capacity*a.n_atoms*2 << " | Acc:" << accuracy1 << "%\t | Avg Diff: " << avg_diff1 << "\n";
-            std::cout << "neighbours | " << n_correct_neighbours << "/" << a.isomer_capacity*a.n_atoms*3 << " | Acc:" << accuracy2 << "%\t\n";
-            std::cout << "IDs        | " << n_correct_IDs << "/" << a.isomer_capacity << " | Acc:" << accuracy3 << "%\t\n";
-            std::cout << "statuses   | " << n_correct_statuses << "/" << a.isomer_capacity << " | Acc:" << accuracy4 << "%\t\n";
-            std::cout << "iterations | " << n_correct_iterations << "/" << a.isomer_capacity << " | Acc:" << accuracy5 << "%\t\n";
+            std::cout << "X                 | " << n_correct_X << "/" << a.isomer_capacity*a.n_atoms*3 << " | Acc:" << accuracy0 << "%\t | Avg Diff: " << avg_diff0 << "\n";
+            std::cout << "xys               | " << n_correct_xys << "/" << a.isomer_capacity*a.n_atoms*2 << " | Acc:" << accuracy1 << "%\t | Avg Diff: " << avg_diff1 << "\n";
+            std::cout << "cubic_neighbours  | " << n_correct_neighbours << "/" << a.isomer_capacity*a.n_atoms*3 << " | Acc:" << accuracy2 << "%\t\n";
+            std::cout << "IDs               | " << n_correct_IDs << "/" << a.isomer_capacity << " | Acc:" << accuracy3 << "%\t\n";
+            std::cout << "statuses          | " << n_correct_statuses << "/" << a.isomer_capacity << " | Acc:" << accuracy4 << "%\t\n";
+            std::cout << "iterations        | " << n_correct_iterations << "/" << a.isomer_capacity << " | Acc:" << accuracy5 << "%\t\n";
             
         }
     }
@@ -196,7 +198,7 @@ namespace cuda_io{
             auto offset = lookup_table.at(i) * batch.n_atoms*3;
             for (int j = 0; j < batch.n_atoms * 3; j++){
                 temp.X[i*batch.n_atoms*3 + j] = batch.X[offset + j];
-                temp.neighbours[i*batch.n_atoms*3 + j] = batch.neighbours[offset + j];
+                temp.cubic_neighbours[i*batch.n_atoms*3 + j] = batch.cubic_neighbours[offset + j];
             }
             offset = lookup_table.at(i) * batch.n_atoms*2;
             for (size_t j = 0; j < batch.n_atoms*2; j++){
@@ -230,7 +232,7 @@ bool IsomerBatch::operator==(const IsomerBatch& b){
         }
         for(int i = 0; i < isomer_capacity * n_atoms * 3; ++i){
             passed &= device_real_t_equals(X[i],b.X[i]);
-            passed &= neighbours[i] == b.neighbours[i];
+            passed &= cubic_neighbours[i] == b.cubic_neighbours[i];
         }
         for(int i = 0; i < isomer_capacity * n_atoms * 2; ++i){
             passed &= device_real_t_equals(xys[i],b.xys[i]);}
@@ -287,12 +289,12 @@ std::ostream& operator << (std::ostream& os, const IsomerBatch& a){
         os << "[";
         for (size_t j = 0; j < a.n_atoms*3 - 1; j++)
         {
-            os << a.neighbours[i*a.n_atoms*3 + j] << ", ";
+            os << a.cubic_neighbours[i*a.n_atoms*3 + j] << ", ";
         }
         if(i != (a.isomer_capacity - 1)) {
-            os << a.neighbours[(i+1)*a.n_atoms*3 - 1] << "], ";
+            os << a.cubic_neighbours[(i+1)*a.n_atoms*3 - 1] << "], ";
         } else{
-            os << a.neighbours[(i+1)*a.n_atoms*3 - 1] << "]]\n";
+            os << a.cubic_neighbours[(i+1)*a.n_atoms*3 - 1] << "]]\n";
         }
     }
 
