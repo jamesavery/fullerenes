@@ -156,10 +156,84 @@ struct DeviceFullereneGraph{
         assert(next_on_face(u,v) == start_node);
         return min_edge;
     }
-    
-    
 };
 
+struct DeviceFullereneDual{
+    const device_node_t* dual_neighbours;                   //Nf x 6
+    const uint8_t* face_degrees;                            //Nf x 1
+
+    __device__ DeviceFullereneDual(const device_node_t* dual_neighbours, const uint8_t* face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
+
+    __device__ device_node_t dedge_ix(const device_node_t u, const device_node_t v) const{
+        for (uint8_t j = 0; j < face_degrees[u]; j++){
+            if (dual_neighbours[u*6 + j] == v) return j;
+        }
+
+        assert(false);
+	    return 0;		// Make compiler happy
+    }
+
+    __device__ device_node_t next(const device_node_t u, const device_node_t v) const{
+        device_node_t j = dedge_ix(u,v);
+        return dual_neighbours[u*6 + ((j+1)%face_degrees[u])];
+    }
+    
+    __device__ device_node_t prev(const device_node_t u, const device_node_t v) const{
+        device_node_t j = dedge_ix(u,v);
+        return dual_neighbours[u*6 + ((j-1+face_degrees[u])%face_degrees[u])];
+    }
+
+    __device__ device_node_t next_on_face(const device_node_t u, const device_node_t v) const{
+        return prev(v,u);
+    }
+
+    __device__ device_node_t prev_on_face(const device_node_t u, const device_node_t v) const{
+        return next(v,u);
+    }
+
+    __device__ device_node2 get_cannonical_triangle_arc(const device_node_t u, const device_node_t v) const{
+        //In a triangle u, v, w there are only 3 possible representative arcs, the cannonical arc is chosen as the one with the smalles source node.
+        device_node2 min_edge = {u,v};
+        device_node_t w = next(u,v);
+        if (v < u && v < w) min_edge = {v, w};
+        if (w < u && w < v) min_edge = {w, u};
+        return min_edge;
+    }
+
+    __device__ void compute_triangle_numbers(const device_node_t u, device_node_t* triangle_numbers, device_node_t* smem){
+        int represent_count = 0;
+        if(u < (blockDim.x / 2 +2) ){
+        for (int i = 0; i < face_degrees[u]; ++i){
+            device_node2 cannon_arc = get_cannonical_triangle_arc(u,dual_neighbours[u*6 + i]);
+            if (cannon_arc.x == u) {represent_count++;}
+        }
+
+        smem[u] = represent_count;
+        }
+        //exclusive_scan(smem, represent_count);
+        //if (u < blockDim.x/2 + 2){
+        //    for (size_t i = 0; i < represent_count; i++){
+        //        triangle_numbers[u*6 + i] = smem[u] + i ;
+        //    }
+        //}
+    }
+
+    __device__ void compute_cubic_layout(const device_node_t u, const device_node_t* triangle_numbers, device_node_t* cubic_neighbours){
+        if (threadIdx.x < blockDim.x / 2 +2){
+        for (int i = 0; i < face_degrees[u]; ++i){
+            device_node2 cannon_arc = get_cannonical_triangle_arc(u,dual_neighbours[u*6 + i]);
+            if (cannon_arc.x == u) {
+                device_node_t v(dual_neighbours[u*6 + i]);
+                device_node_t w = prev(u,v);
+                device_node2 edge_b = get_cannonical_triangle_arc(v, u); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 0] = triangle_numbers[edge_b.x * 6 + dedge_ix(edge_b.x, edge_b.y)];
+                device_node2 edge_c = get_cannonical_triangle_arc(w, v); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 1] = triangle_numbers[edge_c.x * 6 + dedge_ix(edge_c.x, edge_c.y)];
+                device_node2 edge_d = get_cannonical_triangle_arc(u, w); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 2] = triangle_numbers[edge_d.x * 6 + dedge_ix(edge_d.x, edge_d.y)];
+            };
+        }
+        }
+    }
+
+};
 
 struct NodeGraph{
     device_node3 cubic_neighbours;
