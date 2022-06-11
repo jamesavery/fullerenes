@@ -40,4 +40,11 @@ namespace gpu_kernels{
         //Computes tutte embedding for an entire batch of fullernes.
         cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations = 1000, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
+
+    namespace isomerspace_dual{
+        //Returns total time spent in kernel in milliseconds. First call is not timed as that would require synchronous execution.
+        float time_spent(); 
+        //Computes the cubic neighbour list from the dual neighbour list
+        cudaError_t cubic_layout(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+    }
 }
