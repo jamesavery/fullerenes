@@ -130,3 +130,20 @@ __device__ device_real_t global_reduction(device_real_t *sdata, device_real_t *g
     GRID_SYNC
     return sum;
 }
+
+__device__ void exclusive_scan(device_node_t* sdata,const device_node_t data, const int size = blockDim.x){
+    sdata[threadIdx.x] = data;
+    BLOCK_SYNC
+    if (threadIdx.x == 0){
+        auto temp = 0;
+        auto temp2 = 0;
+        for (size_t i = 1; i < size; i++)
+        {   
+            temp2 = sdata[i];
+            sdata[i] = sdata[i - 1] + temp;
+            temp = temp2;
+        }
+        sdata[0] = 0;
+    }
+    BLOCK_SYNC
+}
