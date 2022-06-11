@@ -4,7 +4,6 @@
 #include <cuda.h>
 #include "device_launch_parameters.h"
 #include <stdio.h>
-#define getLastCudaError(x) 
 #include <iostream>
 #include <fstream>
 #include <chrono>
