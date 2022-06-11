@@ -25,9 +25,11 @@ static auto casting_coord2d = [](coord2d in){return device_coord2d{static_cast<d
 
 
 __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue){
+    DEVICE_TYPEDEFS
 
     //Create a shared queue index among all threads in a block. 
     __shared__ size_t queue_index;
+    auto Nf = B.n_faces; // Number of faces
 
     //Store a copy of the front before incrementing the counters, 
     //This is to allow for unordered incrementing of the queue counters avoiding the use of mutexes or similar techniques. 
@@ -56,8 +58,18 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
         //Given the queue index, copy data from the queue (container Q_B) to the target batch B.
         size_t queue_array_idx    = queue_index*blockDim.x+threadIdx.x;
         size_t global_idx         = blockDim.x*isomer_idx + threadIdx.x;
-        reinterpret_cast<device_coord3d*>(B.X)[global_idx]           = reinterpret_cast<device_coord3d*>(Q_B.X)[queue_array_idx];  
-        reinterpret_cast<device_node3*>(B.cubic_neighbours)[global_idx]    = reinterpret_cast<device_node3*>(Q_B.cubic_neighbours)[queue_array_idx];  
+        reinterpret_cast<coord3d*>(B.X)[global_idx]                 = reinterpret_cast<coord3d*>(Q_B.X)[queue_array_idx];  
+        reinterpret_cast<node3*>(B.cubic_neighbours)[global_idx]    = reinterpret_cast<node3*>(Q_B.cubic_neighbours)[queue_array_idx];
+        reinterpret_cast<coord2d*>(B.xys)[global_idx]               = reinterpret_cast<coord2d*>(Q_B.xys)[queue_array_idx];
+        
+        //Face parallel copying 
+        if (threadIdx.x < Nf){
+            size_t queue_face_idx     = queue_index* Nf + threadIdx.x; 
+            size_t output_face_idx    = isomer_idx * Nf + threadIdx.x;
+            reinterpret_cast<node6*>(B.dual_neighbours)[output_face_idx]               = reinterpret_cast<node6*>(Q_B.dual_neighbours)[queue_face_idx];  
+            reinterpret_cast<uint8_t*>(B.face_degrees)[output_face_idx]                = reinterpret_cast<uint8_t*>(Q_B.face_degrees)[queue_face_idx];  
+        }
+        //Per isomer meta data
         if (threadIdx.x == 0){
             B.IDs[isomer_idx] = Q_B.IDs[queue_index];
             B.iterations[isomer_idx] = 0;
@@ -83,8 +95,13 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
 __global__ void insert_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue){
     for (size_t isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x){
     size_t queue_idx = (*queue.back + isomer_idx) % *queue.capacity;
-    reinterpret_cast<device_coord3d*>(Q_B.X)[queue_idx*blockDim.x + threadIdx.x]        = reinterpret_cast<device_coord3d*>(B.X)[isomer_idx*blockDim.x + threadIdx.x];
+    reinterpret_cast<device_coord3d*>(Q_B.X)[queue_idx*blockDim.x + threadIdx.x]              = reinterpret_cast<device_coord3d*>(B.X)[isomer_idx*blockDim.x + threadIdx.x];
     reinterpret_cast<device_node3*>(Q_B.cubic_neighbours)[queue_idx*blockDim.x + threadIdx.x] = reinterpret_cast<device_node3*>(B.cubic_neighbours)[isomer_idx*blockDim.x + threadIdx.x];
+    auto Nf = B.n_faces;
+    if (threadIdx.x < Nf){
+        reinterpret_cast<device_node6*>(Q_B.dual_neighbours)[queue_idx*Nf + threadIdx.x] = reinterpret_cast<device_node6*>(B.dual_neighbours)[isomer_idx*Nf + threadIdx.x];
+        reinterpret_cast<uint8_t*>(Q_B.face_degrees)     [queue_idx*Nf + threadIdx.x]    = reinterpret_cast<uint8_t*>(B.face_degrees)     [isomer_idx*Nf + threadIdx.x];
+    }
     if (threadIdx.x == 0)
     {
         Q_B.IDs[queue_idx]          = B.IDs[isomer_idx];
@@ -210,6 +227,46 @@ cudaError_t IsomerQueue::insert(IsomerBatch& input_batch, const LaunchCtx& ctx, 
     if(policy == LaunchPolicy::SYNC) ctx.wait();
     printLastCudaError("Batch insertion failed");
     is_host_updated = false;
+    return cudaGetLastError();
+}
+
+cudaError_t IsomerQueue::insert(const Graph& in, const size_t ID, const LaunchCtx& ctx, const LaunchPolicy policy){
+    //Before inserting a new isomer, make sure that the host batch is up to date with the device version.
+    to_host(ctx);
+
+    //If the queue is full, double the size, same beahvior as dynamically allocated containers in the std library. 
+    if (*props.capacity == *props.size){
+        *props.capacity *= 2;
+        resize(*props.capacity, ctx, policy);
+    }
+
+    //Edge case: queue has no members 
+    if(*props.back == -1){
+        *props.front = 0;
+        *props.back = 0;
+    } else{
+    *props.back = *props.back + 1 % *props.capacity;}
+
+    //Extract the graph information (neighbours) from the PlanarGraph object and insert it at the appropriate location in the queue.
+    auto Nf = N / 2 + 2;
+    size_t offset = *props.back * N;
+    size_t face_offset = *props.back * Nf;
+    for(node_t u=0;u<in.neighbours.size();u++){
+        host_batch.face_degrees[face_offset + u] = in.neighbours[u].size();
+        for(int j=0;j<in.neighbours[u].size();j++){
+            host_batch.dual_neighbours[6*(face_offset+u)+j] = in.neighbours[u][j];
+        }
+    }
+
+
+    //Assign metadata.
+    host_batch.statuses[*props.back] = NOT_CONVERGED;
+    host_batch.IDs[*props.back] = ID;
+    host_batch.iterations[*props.back] = 0;
+    *props.size += 1;
+
+    //Since the host batch has been updated the device is no longer up to date.
+    is_device_updated = false;
     return cudaGetLastError();
 }
 
