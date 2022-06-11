@@ -20,7 +20,7 @@ __device__ void print(int a){
 }
 
 __device__ void print(size_t a){
-    printf("%u",a);
+    printf("%u",(unsigned int)a);
 }
 
 __device__ void print(const char* a){

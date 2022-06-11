@@ -765,7 +765,9 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
 __global__ void diagnostic_function(IsomerBatch B, CuArray<device_real_t> ouput){
     auto offset = blockIdx.x * blockDim.x;
     DeviceFullereneGraph DG(B.cubic_neighbours + offset*3);
+    
 
+    
 
 }
 

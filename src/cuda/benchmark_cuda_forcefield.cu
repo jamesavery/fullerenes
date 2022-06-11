@@ -60,10 +60,10 @@ int main(){
     
 
 
-    kernel.optimize_batch(N*3);
-    kernel.check_batch(N*3);
-    kernel.optimize_batch(N*1);
-    kernel.check_batch(N*3);
+    //kernel.optimize_batch(N*3);
+    //kernel.check_batch(N*3);
+    //kernel.optimize_batch(N*1);
+    //kernel.check_batch(N*3);
     //kernel.to_file(0);
     //kernel.batch_statistics_to_file();
 }

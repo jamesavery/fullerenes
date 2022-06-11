@@ -72,8 +72,8 @@ int main(int ac, char **argv){
         isomerspace_tutte::tutte_layout(d_validation);
         isomerspace_X0::zero_order_geometry(d_validation, 4.0f);
         cuda_io::reset_convergence_statuses(d_validation);
-        for (int i = 0; i < N*20; i+=20){
-            isomerspace_forcefield::optimize_batch(d_validation, 20, N*20);
+        for (int i = 0; i < N*10; i+=10){
+            isomerspace_forcefield::optimize_batch(d_validation, 10, N*10);
         }
         
         CuArray<device_real_t> bond_rms(batch_size);

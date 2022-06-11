@@ -36,8 +36,6 @@ int main(int ac, char **argv)
 
   // Make sure output directory exists
   mkdir(output_dir.c_str(),0777);
-  
-  ofstream failures((output_dir+"/failures.txt").c_str()); // output/failures.txt contains list of any fullerenes that failed optimization
 
   auto batch_size = isomerspace_forcefield::optimal_batch_size(N,0) * 4;
   IsomerBatch batch0(N,batch_size,DEVICE_BUFFER);
@@ -171,7 +169,6 @@ int main(int ac, char **argv)
   auto Tsum = Tgen + Tupdate + Tdual + Ttutte + TX0 + Tcopy + Topt + Tfile + Toutq + Tinq;
   std::cout << std::endl;
 
-  failures.close();
   cout << "\n";
   cout << "Time spent on non:\n"
     "\tTotal Time                     = " << (Ttot/1ms)       << " ms\n"
