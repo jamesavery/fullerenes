@@ -195,10 +195,15 @@ namespace cuda_io{
         
 
         for (int i = 0; i < batch.isomer_capacity; i++){
-            auto offset = lookup_table.at(i) * batch.n_atoms*3;
+            int offset      = lookup_table.at(i) * batch.n_atoms*3;
+            int face_offset = lookup_table.at(i) * batch.n_faces;
             for (int j = 0; j < batch.n_atoms * 3; j++){
                 temp.X[i*batch.n_atoms*3 + j] = batch.X[offset + j];
                 temp.cubic_neighbours[i*batch.n_atoms*3 + j] = batch.cubic_neighbours[offset + j];
+            }
+            for (int j = 0; j < batch.n_faces; ++j){
+                temp.face_degrees[i*batch.n_faces + j] = batch.face_degrees[face_offset + j];
+                for (int k = 0; k < 6; k++) temp.dual_neighbours[(i*batch.n_faces + j)*6 + k] = batch.dual_neighbours[(face_offset + j)*6 + k];
             }
             offset = lookup_table.at(i) * batch.n_atoms*2;
             for (size_t j = 0; j < batch.n_atoms*2; j++){
@@ -284,7 +289,7 @@ std::ostream& operator << (std::ostream& os, const IsomerBatch& a){
         }
     }
 
-    os << "Neighbour Lists: " << "\n[";
+    os << "Cubic Neighbour Lists: " << "\n[";
     for (size_t i = 0; i < a.isomer_capacity; i++){
         os << "[";
         for (size_t j = 0; j < a.n_atoms*3 - 1; j++)
@@ -298,6 +303,28 @@ std::ostream& operator << (std::ostream& os, const IsomerBatch& a){
         }
     }
 
+    os << "Dual Neighbour Lists: " << "\n[";
+    for (size_t i = 0; i < a.isomer_capacity; i++){
+        os << "[";
+        for (int j = 0; j  < a.n_faces; j++){
+            if (a.face_degrees[i*a.n_faces + j] <= 0) continue;
+            os << "[";
+            for (size_t k = 0; k < a.face_degrees[i*a.n_faces + j] - 1; k++)
+            {
+                os << a.dual_neighbours[(i*a.n_faces + j)*6 + k] << ",";
+            }
+            os << a.dual_neighbours[(i*a.n_faces + j)*6 + a.face_degrees[i*a.n_faces + j] - 1];
+            if (j != a.n_faces - 1)  os << "],";
+            else os << "]";
+        }
+        
+        if(i != (a.isomer_capacity - 1)) {
+
+            os << "], ";
+        } else{
+            os << "]]\n";
+        }
+    }
 
     return os;
 }
