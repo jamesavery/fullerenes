@@ -11,7 +11,8 @@ IsomerBatch::IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_typ
     this->buffer_type      = buffer_type;
     this->n_atoms          = n_atoms;
     this->isomer_capacity  = n_isomers;
-    pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*n_atoms*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t) * (n_atoms/2 +2) * 6, true}, {"X", (void**)&X, sizeof(device_real_t)*n_atoms*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*n_atoms*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+    this->n_faces          = n_atoms/2 + 2;
+    pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*n_atoms*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t) * (n_atoms/2 +2) * 6, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*(n_atoms/2 +2), true},{"X", (void**)&X, sizeof(device_real_t)*n_atoms*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*n_atoms*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
     if (buffer_type == DEVICE_BUFFER){
     for (size_t i = 0; i < pointers.size(); i++) {
         cudaMalloc(get<1>(pointers[i]), n_isomers * get<2>(pointers[i])); 
@@ -32,6 +33,7 @@ GPUDataStruct::GPUDataStruct(size_t n_atoms, size_t n_isomers, BufferType buffer
     this->buffer_type = buffer_type;
     this->n_atoms     = n_atoms;
     this->n_isomers   = n_isomers;
+    this->n_faces     = n_atoms/2 + 2;
     if (buffer_type == DEVICE_BUFFER){
         for (size_t i = 0; i < pointers.size(); i++) {
             size_t num_elements = get<3>(pointers[i]) ? n_isomers * n_atoms: n_isomers;
