@@ -11,6 +11,7 @@ struct GPUDataStruct{
     bool allocated = false;
     size_t n_isomers        = 0;
     size_t n_atoms          = 0;
+    size_t n_faces          = 0;
     size_t isomer_capacity  = 0;
 
     BufferType buffer_type;
