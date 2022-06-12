@@ -22,7 +22,7 @@ int main(int argc, char** argv){
     {   
         BuckyGen::buckygen_queue Q = BuckyGen::start(j,false,false);  
 
-        FullereneDual G;
+        FullereneDual F;
 
         auto batch_size = isomerspace_forcefield::optimal_batch_size(j);
         auto sample_size = min(batch_size*4,(int)num_fullerenes.find(j)->second);
@@ -44,31 +44,29 @@ int main(int argc, char** argv){
             Tcopy   = high_resolution_clock::now()-T0;
 
 
-
-        for (int i = 0; i < sample_size; ++i){
+        auto I = 0;
+        while (more_to_generate && I < sample_size){
                 auto T1 = high_resolution_clock::now();
+            more_to_generate &= BuckyGen::next_fullerene(Q, F);
             if (!more_to_generate){break;}
-            more_to_generate &= BuckyGen::next_fullerene(Q, G);
-            if (!more_to_generate){break;}
-                auto T2 = high_resolution_clock::now(); Tgen += T2 - T1;
-            G.update();
-                auto T3 = high_resolution_clock::now(); Tupdate += T3 - T2;
-            PlanarGraph pG = G.dual_graph();
-                auto T4 = high_resolution_clock::now(); Tdual += T4 - T3; 
-            isomer_q.insert(pG, i, LaunchCtx(), LaunchPolicy::SYNC, false);
-                auto T5 = high_resolution_clock::now(); Tcopy += T5-T4;
+                auto T2 = high_resolution_clock::now(); Tgen += T2 - T1; 
+            isomer_q.insert(Graph(F), I);
+                auto T3 = high_resolution_clock::now(); Tcopy += T3 - T2;
+            ++I;
         }
 
         isomer_q.refill_batch(batch0);
         auto T1 = high_resolution_clock::now();
+        isomerspace_dual::cubic_layout(batch0);
+        auto T2 = high_resolution_clock::now(); Tdual += T2 - T1;
         isomerspace_tutte::tutte_layout(batch0);
-        auto T2 = high_resolution_clock::now(); Ttutte += T2 - T1;
+        auto T3 = high_resolution_clock::now(); Ttutte += T3 - T2;
         isomerspace_X0::zero_order_geometry(batch0, 4.0);
-        auto T3 = high_resolution_clock::now(); TX0 += T3 - T2;
+        auto T4 = high_resolution_clock::now(); TX0 += T4 - T3;
         cuda_io::reset_convergence_statuses(batch0);
-        auto T4 = high_resolution_clock::now();
-        isomerspace_forcefield::optimize_batch(batch0,j,j);
-        auto T5 = high_resolution_clock::now(); Topt += T5 - T4;
+        auto T5 = high_resolution_clock::now();
+        isomerspace_forcefield::optimize_batch(batch0,j*4,j*4);
+        auto T6 = high_resolution_clock::now(); Topt += T6 - T5;
 
         out_file << j << ", "<< sample_size << ", " << Tgen/1us << ", " << Tupdate/1us << ", " << Tdual/1us <<", " <<  TX0/1us <<", " << Ttutte/1us<< ", " << Topt/1us << "\n";
      }
