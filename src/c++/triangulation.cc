@@ -81,6 +81,7 @@ void Triangulation::orient_neighbours()
 
 vector<tri_t> Triangulation::compute_faces_oriented() const
 {
+  //Why is this information stored in a hashmap seems like std::vector is perfectly suitable here.
   unordered_map<dedge_t,bool> dedge_done(2*count_edges());
   vector<tri_t> triangles;
   triangles.reserve(2*(N-2));        // Most common case is cubic dual, but we no longer know it for sure.
@@ -99,8 +100,10 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
 	  printf("\tneibhours[%d] = ",v); cout << neighbours[v] << endl;	  
 	  assert(w != -1);
 	}
-
-        if(!dedge_done[{v,w}] && !dedge_done[{w,u}]){
+        //Is This Condition necessary? 
+        //since every directed edge is only part of 1 triangle it ought to be sufficient
+        //to check dedge_done[{u,v}].
+        if(!dedge_done[{v,w}] && !dedge_done[{w,u}]){ 
 
           triangles.push_back(tri_t(u,v,w));
 
