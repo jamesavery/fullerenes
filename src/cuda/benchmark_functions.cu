@@ -1,0 +1,172 @@
+#include "fullerenes/gpu/benchmark_functions.hh"
+#include "chrono"
+namespace cuda_benchmark {
+    #include "reductions.cu"
+    __global__ void test_scan_V0_(const int n_times){
+        extern __shared__  device_node_t smem[];
+        auto val = 1;
+        for (int i = 0; i < n_times; i++){
+            exclusive_scan(smem, val, blockDim.x);
+        }
+    }
+    __global__ void test_scan_V1_(const int n_times){
+        unsigned int power2 = blockDim.x; // compute the next highest power of 2 of 32-bit power2
+        power2--;
+        power2 |= power2 >> 1;
+        power2 |= power2 >> 2;
+        power2 |= power2 >> 4;
+        power2 |= power2 >> 8;
+        power2 |= power2 >> 16;
+        power2++;
+        extern __shared__  device_node_t smem[];
+        auto val = 1;
+        for (int i = 0; i < n_times; i++){
+            prescan<device_node_t>(smem, val, power2);
+        }
+    }
+    __global__ void test_scan_V2_(const int n_times){
+        extern __shared__  device_node_t smem[];
+        auto val = 1;
+        for (int i = 0; i < n_times; i++){
+            ex_scan<device_node_t>(smem, val, blockDim.x);
+        }
+    }
+    __global__ void test_reduction_V0_(const int n_times){
+        extern __shared__  device_real_t shmem[];
+        for (int i = 0; i < n_times; i++){
+            reduction_V0<device_real_t>(shmem, (device_real_t)1.0);
+        }
+    }
+
+    __global__ void test_reduction_V1_(const int n_times){
+        extern __shared__  device_real_t shmem[];
+        for (int i = 0; i < n_times; i++){
+            reduction_V1<device_real_t>(shmem, (device_real_t)1.0);
+        }
+    }
+
+    __global__ void test_reduction_V2_(const int n_times){
+        extern __shared__  device_real_t shmem[];
+        for (int i = 0; i < n_times; i++){
+            reduction_V2<device_real_t>(shmem, (device_real_t)1.0);
+        }
+    }
+
+    __global__ void test_reduction_V3_(const int n_times){
+        extern __shared__  device_real_t shmem[];
+        for (int i = 0; i < n_times; i++){
+            reduction_V3<device_real_t>(shmem, (device_real_t)1.0);
+        }
+        //BLOCK_SYNC
+        //if(threadIdx.x + blockIdx.x == 0) printf("Result: %d \n", shmem[0] );
+    }
+
+    __global__ void test_reduction_V4_(const int n_times){
+        auto num_warps = (blockDim.x >> 5) + 1;
+        int pow2 = 0;
+        if (num_warps >= 2) pow2 = 1;
+        if (num_warps >= 4) pow2 = 2;
+        if (num_warps >= 8) pow2 = 3;
+        if (num_warps >= 16) pow2 = 4;
+        if (num_warps >= 32) pow2 = 5;
+
+        extern __shared__  device_real_t shmem[];
+        for (int i = 0; i < n_times; i++){
+            reduction_V4<device_real_t>(shmem, (device_real_t)1.0, num_warps, pow2);
+        }
+    }
+
+
+    std::chrono::microseconds benchmark_scan(const int n_elements, const int n_times, const int scan_version){
+
+        cudaEvent_t start, stop;
+        float single_kernel_time = 0.0;
+        cudaEventCreate(&start); cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+        int n_blocks;
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop,0);
+
+        size_t smem = sizeof(device_node_t)*n_elements*2;
+        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks, test_scan_V1_, n_elements, smem);
+        n_blocks *= prop.multiProcessorCount;
+        cudaError_t error;
+        void* kargs[]{(void*)&n_times};
+        switch (scan_version)
+        {
+        case 0:
+            error = cudaLaunchCooperativeKernel((void*)test_scan_V0_, n_blocks, n_elements, kargs, smem);  
+            break;
+        case 1:
+            error = cudaLaunchCooperativeKernel((void*)test_scan_V1_, n_blocks, n_elements, kargs, smem);  
+            break;
+        case 2:
+            error = cudaLaunchCooperativeKernel((void*)test_scan_V2_, n_blocks, n_elements, kargs, smem);  
+        default:
+            break;
+        }
+
+        cudaEventRecord(stop);
+        cudaDeviceSynchronize();
+        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        
+
+        return 1us* ((int) (single_kernel_time * 1000.0));
+    }
+
+    size_t n_blocks(const int n_elements){
+        int n_blocks;   
+        size_t smem = sizeof(device_real_t)*(n_elements*2 + 32);
+        cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks, test_reduction_V0_, n_elements, smem);
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop,0);
+        n_blocks *= prop.multiProcessorCount;
+        return n_blocks;
+    }
+
+    std::chrono::nanoseconds benchmark_reduction(const int n_elements, const int n_times, const int scan_version){
+
+        cudaEvent_t start, stop;
+        float single_kernel_time = 0.0;
+        cudaEventCreate(&start); cudaEventCreate(&stop);
+        cudaEventRecord(start, 0);
+       
+
+        size_t smem = sizeof(device_real_t)*(n_elements*4 + 32);
+        int M = n_blocks(n_elements);
+        cudaError_t error;
+        void* kargs[]{(void*)&n_times};
+        switch (scan_version)
+        {
+        case 0:
+            error = cudaLaunchCooperativeKernel((void*)test_reduction_V0_, M, n_elements, kargs, smem);  
+            break;
+        case 1:
+            error = cudaLaunchCooperativeKernel((void*)test_reduction_V1_, M, n_elements, kargs, smem);  
+            break;
+        case 2:
+            error = cudaLaunchCooperativeKernel((void*)test_reduction_V2_, M, n_elements, kargs, smem);
+            break;  
+        case 3:
+            error = cudaLaunchCooperativeKernel((void*)test_reduction_V3_, M, n_elements, kargs, smem);  
+            break;
+        case 4:
+            error = cudaLaunchCooperativeKernel((void*)test_reduction_V4_, M, n_elements, kargs, smem);  
+            break;
+        default:
+            break;
+        }
+
+        cudaEventRecord(stop);
+        cudaDeviceSynchronize();
+        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        
+
+        return 1ns* ((int) (single_kernel_time * 1e6));
+    }
+
+
+
+
+
+}
