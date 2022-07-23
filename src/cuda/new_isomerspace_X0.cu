@@ -14,6 +14,7 @@ namespace isomerspace_X0{
 #include "coord2d.cuh"
 #include "forcefield_structs.cu"
 #include "print_functions.cu"
+#include "chrono"
 
 
 __device__
@@ -21,7 +22,7 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t
     DEVICE_TYPEDEFS
     
     DeviceFullereneGraph FG = DeviceFullereneGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
-    node_t outer_face[6];
+    node_t outer_face[6]; memset(outer_face, 0, sizeof(node_t)*6); //Do not rely on uninitialized memory it will only be zero on first touch.
     uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
     distances[threadIdx.x] = node_t(NODE_MAX);    
     BLOCK_SYNC
@@ -116,8 +117,8 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
 }
 
 float kernel_time = 0.0;
-float time_spent(){
-    return kernel_time;
+std::chrono::microseconds time_spent(){
+    return std::chrono::microseconds((int) (kernel_time * 1000.f));
 }
 
 cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
@@ -128,12 +129,14 @@ cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, co
     //Construct events only once
     if(first_call) {cudaEventCreate(&start); cudaEventCreate(&stop);}
 
-    //Records time from previous kernel call
-    cudaEventElapsedTime(&single_kernel_time, start, stop);
-    kernel_time += single_kernel_time;
 
     //If launch ploicy is synchronous then wait.
-    if (policy == LaunchPolicy::SYNC) ctx.wait();
+    if(policy == LaunchPolicy::SYNC) {ctx.wait();}
+    else if(policy == LaunchPolicy::ASYNC){
+        //Records time from previous kernel call
+        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        kernel_time += single_kernel_time;
+    }
     cudaSetDevice(ctx.get_device_id());
     size_t smem =  sizeof(device_coord3d)*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
     
@@ -151,7 +154,11 @@ cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, co
     }
     cudaEventRecord(stop, ctx.stream);
     
-    if (policy == LaunchPolicy::SYNC) ctx.wait();
+    if(policy == LaunchPolicy::SYNC) {
+        ctx.wait();
+        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        kernel_time += single_kernel_time;
+    }
     printLastCudaError("Zero order geometry:");
     first_call = false;
     return error;

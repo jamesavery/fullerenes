@@ -12,6 +12,7 @@ namespace isomerspace_tutte{
 #include "coord2d.cuh"
 #include "forcefield_structs.cu"
 #include "print_functions.cu"
+#include "chrono"
 
 __global__
 void tutte_layout_(IsomerBatch B, const size_t iterations){
@@ -78,8 +79,8 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
 }
 
 float kernel_time = 0.0;
-float time_spent(){
-    return kernel_time;
+std::chrono::microseconds time_spent(){
+    return std::chrono::microseconds((int) (kernel_time*1000.f));
 }
 
 cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
@@ -87,10 +88,14 @@ cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const Laun
     static cudaEvent_t start, stop;
     float single_kernel_time = 0.0;
     if(first_call) {cudaEventCreate(&start); cudaEventCreate(&stop);}
-    cudaEventElapsedTime(&single_kernel_time, start, stop);
-    kernel_time += single_kernel_time;
 
-    if(policy == LaunchPolicy::SYNC) ctx.wait();
+    //If launch ploicy is synchronous then wait.
+    if(policy == LaunchPolicy::SYNC){ ctx.wait();}
+    else if(policy == LaunchPolicy::ASYNC){
+        //Records time from previous kernel call
+        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        kernel_time += single_kernel_time;
+    }
     size_t smem = sizeof(device_coord2d)*B.n_atoms*2 + sizeof(device_real_t)*Block_Size_Pow_2;
     static LaunchDims dims((void*)tutte_layout_, B.n_atoms, smem, B.isomer_capacity);
     dims.update_dims((void*)tutte_layout_, B.n_atoms, smem, B.isomer_capacity);
@@ -100,7 +105,11 @@ cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const Laun
     cudaError_t error = safeCudaKernelCall((void*)tutte_layout_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);  
     cudaEventRecord(stop, ctx.stream);
     
-    if(policy == LaunchPolicy::SYNC) ctx.wait();
+    if(policy == LaunchPolicy::SYNC) {
+        ctx.wait();
+        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        kernel_time += single_kernel_time;
+    }
     printLastCudaError("Tutte: ");
     first_call = false;
     return error;
