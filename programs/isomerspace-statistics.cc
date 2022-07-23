@@ -64,7 +64,10 @@ int main(int ac, char **argv){
                 ID_queue.pop();
             }
             ++I;
-            progress_bar.update_progress((float)I/(float)num_fullerenes.find(N)->second, "F: " + to_string(I) + "  S: " + to_string(BQ.get_size()));
+            if(I % 10000 == 0){
+                progress_bar.update_progress((float)I/(float)num_fullerenes.find(N)->second, "F: " + to_string(I) + "  S: " + to_string(BQ.get_size()));
+            }
+                
             if(ID_queue.empty()) break;
         }
 

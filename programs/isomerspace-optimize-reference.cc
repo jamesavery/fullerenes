@@ -54,7 +54,7 @@ int main(int ac, char **argv)
   BuckyGen::buckygen_queue Q = BuckyGen::start(N,IPR,only_nontrivial);  
   ProgressBar progress_bar = ProgressBar('#',30);
   FullereneDual dualG;
-  FullereneGraph G;
+  Graph G;
   G.N = N;
   G.neighbours = vector<vector<node_t>>(N,vector<node_t>(3));
   
@@ -84,15 +84,11 @@ int main(int ac, char **argv)
     for(int i = 0; i < N; ++i){
       auto T1 = system_clock::now();
       if (!more_to_generate){break;}
-      more_to_generate &= BuckyGen::next_fullerene(Q,dualG);
+      more_to_generate &= BuckyGen::next_fullerene(Q,G);
       if (!more_to_generate){break;}
       auto T2 = system_clock::now(); Tgen += T2 - T1;
-      dualG.update();
-      auto T3 = system_clock::now(); Tupdate += T3 - T2;
-      PlanarGraph G = dualG.dual_graph();
-      auto T4 = system_clock::now(); Tdual += T4 - T3;
-      Q0.insert(G, I, LaunchCtx(), LaunchPolicy::SYNC, false);
-      Tinq += system_clock::now() - T4;
+      Q0.insert(G, I);
+      Tinq += system_clock::now() - T2;
       ++I;
     }
   };
@@ -109,6 +105,7 @@ int main(int ac, char **argv)
       auto T1 = system_clock::now();
       Q0.refill_batch(batch0); 
       auto T2 = system_clock::now(); Tqueue += T2-T1;
+      isomerspace_dual::cubic_layout(batch0);
       isomerspace_tutte::tutte_layout(batch0);
       isomerspace_X0::zero_order_geometry(batch0,4.0);
       cuda_io::copy(batch1, batch0);
@@ -130,6 +127,7 @@ int main(int ac, char **argv)
       cuda_io::output_to_queue(output_queue,outbatch,false);
       while(Q0.get_size() > 0){
         Q0.refill_batch(batch0);
+        isomerspace_dual::cubic_layout(batch0);
         isomerspace_tutte::tutte_layout(batch0);
         isomerspace_X0::zero_order_geometry(batch0, 4.0);
         cuda_io::copy(batch1, batch0);
@@ -138,8 +136,9 @@ int main(int ac, char **argv)
       }
       while(Q1.get_size() > 0){
         Q1.refill_batch(batch2);
-        isomerspace_forcefield::optimize_batch(batch2,N*50,N*50);
+        isomerspace_forcefield::optimize_batch(batch2,N*5,N*5);
         cuda_io::copy(outbatch, batch2);
+
         cuda_io::output_to_queue(output_queue,outbatch,false);
 
       }
@@ -163,9 +162,10 @@ int main(int ac, char **argv)
   }
   cout << endl << "Finished " << num_finished << ", " << not_async_count << ", " << num_failed << ", " << num_converged << endl;
   auto Ttot = system_clock::now() - T0;
-  Topt   = (1ms*int(isomerspace_forcefield::time_spent()));
-  Ttutte = (1ms*int(isomerspace_tutte::time_spent()));
-  TX0    = (1ms*int(isomerspace_X0::time_spent()));
+  Topt   = isomerspace_forcefield::time_spent();
+  Ttutte = isomerspace_tutte::time_spent();
+  TX0    = isomerspace_X0::time_spent();
+  Tdual  = isomerspace_dual::time_spent();
   auto Tsum = Tgen + Tupdate + Tdual + Ttutte + TX0 + Tcopy + Topt + Tfile + Toutq + Tinq;
   std::cout << std::endl;
 
