@@ -21,7 +21,7 @@ int main(int ac, char **argv){
     IsomerBatch h_validation(N, batch_size, HOST_BUFFER);
     IsomerBatch h_test(N, batch_size, HOST_BUFFER);
 
-    FullereneDual FD;
+    Graph G;
     bool more_to_generate = true;
     
 
@@ -33,23 +33,22 @@ int main(int ac, char **argv){
 
     while(more_to_generate && I < batch_size)
     {
-        more_to_generate &= BuckyGen::next_fullerene(Q,FD);
+        more_to_generate &= BuckyGen::next_fullerene(Q,G);
         if(!more_to_generate)break;
-        FD.update();
-        PlanarGraph G = FD.dual_graph();
         //G.neighbours = {{4,15,1},{0,12,2},{1,9,3},{2,5,4},{3,8,0},{3,11,6},{5,22,7},{6,20,8},{7,18,4},{2,14,10},{9,26,11},{10,25,5},{1,17,13},{12,30,14},{13,29,9},{0,19,16},{15,34,17},{16,33,12},{8,21,19},{18,37,15},{7,24,21},{20,38,18},{6,25,23},{22,42,24},{23,40,20},{11,28,22},{10,29,27},{26,45,28},{27,44,25},{14,32,26},{13,33,31},{30,48,32},{31,47,29},{17,36,30},{16,37,35},{34,51,36},{35,50,33},{19,39,34},{21,41,39},{38,53,37},{24,43,41},{40,54,38},{23,44,43},{42,55,40},{28,46,42},{27,47,46},{45,57,44},{32,49,45},{31,50,49},{48,58,47},{36,52,48},{35,53,52},{51,59,50},{39,54,51},{41,56,53},{43,57,56},{55,59,54},{46,58,55},{49,59,57},{52,56,58}};
-        BQ.insert(G,I, LaunchCtx(), LaunchPolicy::SYNC, false);
-        BQ2.insert(G,I, LaunchCtx(), LaunchPolicy::SYNC, false);
+        BQ.insert(G,I);
+        BQ2.insert(G,I);
         ++I;
     }
 
     
     //cuda_io::copy(d_validation, BQ.host_batch);                         cuda_io::copy(d_test, BQ2.host_batch);
     BQ.refill_batch(d_validation);                                      BQ2.refill_batch(d_test);
+    isomerspace_dual::cubic_layout(d_validation);                      isomerspace_dual::cubic_layout(d_test);  
     isomerspace_tutte::tutte_layout(d_validation);                      isomerspace_tutte::tutte_layout(d_test);  
     isomerspace_X0::zero_order_geometry(d_validation, 4.0f);            isomerspace_X0::zero_order_geometry(d_test, 4.0f);
     cuda_io::reset_convergence_statuses(d_validation);                  cuda_io::reset_convergence_statuses(d_test);
-    isomerspace_forcefield::optimize_batch(d_validation, N*10, N*10);   isomerspace_forcefield::optimize_batch(d_test, N*10, N*10);
+    isomerspace_forcefield::optimize_batch(d_validation, N*4, N*4);   isomerspace_forcefield::optimize_batch(d_test, N*4, N*4);
     
     
     cuda_io::copy(h_validation, d_validation); cuda_io::copy(h_test, d_test);
