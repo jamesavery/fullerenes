@@ -1,4 +1,8 @@
 #include "fullerenes/gpu/reductions.cuh"
+#include "print_functions.cu"
+#define NUM_BANKS 32 
+#define LOG_NUM_BANKS 5
+#define CONFLICT_FREE_OFFSET(n) ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
 
 template <typename T>
 __device__ __forceinline__ T d_max(const T& a, const T& b){
@@ -130,6 +134,124 @@ __device__ device_real_t global_reduction(device_real_t *sdata, device_real_t *g
     GRID_SYNC
     return sum;
 }
+template <typename T>
+__inline__ __device__ T warpReduceSum(T val) {
+#pragma unroll
+  for (int offset = warpSize/2; offset > 0; offset >>= 1) 
+    val += __shfl_down_sync(-1, val, offset);
+  return val;
+}
+
+template <typename T>
+__device__ void reduction_V0(T* sdata, const T data){
+    sdata[threadIdx.x] = data;
+    BLOCK_SYNC
+    if (threadIdx.x){
+        T result = (device_real_t)0.0;
+        for(int i = 0; i < blockDim.x; ++i){
+            result += sdata[i];
+        }
+        sdata[0] = result;
+    }
+    BLOCK_SYNC
+}
+
+template <typename T>
+__device__ void reduction_V1(T* sdata, const T data){
+    sdata[threadIdx.x] = data;
+    BLOCK_SYNC
+    for (unsigned int s=1; s < blockDim.x; s *= 2) { 
+        int index = 2 * s * threadIdx.x;
+        if (index < blockDim.x) { sdata[index] += sdata[index + s];}
+        BLOCK_SYNC
+    }
+}
+
+template <typename T>
+__device__ void reduction_V2(T* sdata, const T data){
+    sdata[threadIdx.x] = data;
+    BLOCK_SYNC
+    if(blockDim.x > 512){if (threadIdx.x < 512){sdata[threadIdx.x] += sdata[threadIdx.x + 512];} BLOCK_SYNC}
+    if(blockDim.x > 256){if (threadIdx.x < 256){sdata[threadIdx.x] += sdata[threadIdx.x + 256];} BLOCK_SYNC}
+    if(blockDim.x > 128){if (threadIdx.x < 128){sdata[threadIdx.x] += sdata[threadIdx.x + 128];} BLOCK_SYNC}
+    if(blockDim.x > 64){if (threadIdx.x < 64){sdata[threadIdx.x] += sdata[threadIdx.x + 64];} BLOCK_SYNC}
+    if(threadIdx.x < 32){
+    if((Block_Size_Pow_2 > 32)){if (threadIdx.x < 32){sdata[threadIdx.x] += sdata[threadIdx.x + 32];} __syncwarp();}
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+    sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<T>());
+    }
+    BLOCK_SYNC
+}
+
+template <typename T>
+__device__ void reduction_V3(T* sdata, const T data = (T)0){
+    auto num_warps = (blockDim.x >> 5) + 1;
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+    sdata[threadIdx.x] = data;
+    auto warpid = threadIdx.x >> 5;
+    auto laneid = threadIdx.x & 31;
+    __syncwarp();
+    auto val = sdata[threadIdx.x];
+    T temp = cg::reduce(tile32, val, cg::plus<T>());
+    if (num_warps > 1){
+    if (laneid == 0) sdata[warpid + blockDim.x] = temp;
+    BLOCK_SYNC
+    if (warpid == 0) {
+        val = sdata[laneid + blockDim.x];
+        temp = cg::reduce(cg::tiled_partition<32>(cg::this_thread_block()), val, cg::plus<T>());
+    }
+
+    }
+    if (threadIdx.x == 0) sdata[0] = temp;
+    BLOCK_SYNC
+}
+
+
+template <typename T>
+__device__ void reduction_V4(T* sdata, const T data, unsigned int n_warps, int warp_switch){
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+    sdata[threadIdx.x] = data;
+    auto warpid = threadIdx.x >> 5;
+    auto laneid = threadIdx.x & 31;
+    __syncwarp();
+    auto val = sdata[threadIdx.x];
+    T temp = cg::reduce(tile32, val, cg::plus<T>());
+    if (n_warps > 1){
+    if (laneid == 0) sdata[warpid + blockDim.x] = temp;
+    BLOCK_SYNC
+    if (warpid == 0) {
+        switch (warp_switch)
+        {
+        case 1:
+            temp = cg::reduce(cg::tiled_partition<2>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        case 2:
+            temp = cg::reduce(cg::tiled_partition<4>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        case 3:
+            temp = cg::reduce(cg::tiled_partition<8>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        case 4:
+            temp = cg::reduce(cg::tiled_partition<16>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        case 5:
+            temp = cg::reduce(cg::tiled_partition<32>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        
+        default:
+            break;
+        }
+        
+    }
+
+    }
+    if (threadIdx.x == 0) sdata[0] = temp;
+    BLOCK_SYNC
+}
+
+
+
+
 
 __device__ void exclusive_scan(device_node_t* sdata,const device_node_t data, const int size = blockDim.x){
     sdata[threadIdx.x] = data;
@@ -146,4 +268,131 @@ __device__ void exclusive_scan(device_node_t* sdata,const device_node_t data, co
         sdata[0] = 0;
     }
     BLOCK_SYNC
+}
+
+template <typename T>
+__device__ void prescan(T *sdata, const T data, int n)
+{
+  int thid = threadIdx.x;
+  int offset = 1;
+  if(threadIdx.x < n) sdata[thid] = data;
+  #pragma unroll
+  for (int d = n>>1; d > 0; d >>= 1)                    // build sum in place up the tree
+  {
+    __syncthreads();
+    if (thid < d)
+    {
+      int ai = offset*(2*thid+1)-1;
+      int bi = offset*(2*thid+2)-1;
+      sdata[bi] += sdata[ai];
+    }
+    offset *= 2;
+  }
+     if (thid==0) { sdata[n - 1] = 0;}
+  
+  #pragma unroll
+  for (int d = 1; d < n; d *= 2) // traverse down tree & build scan
+    {
+      offset >>= 1;
+      __syncthreads();
+      if (thid < d)
+      {
+         int ai = offset*(2*thid+1)-1;
+         int bi = offset*(2*thid+2)-1;
+         T t = sdata[ai];
+         sdata[ai] = sdata[bi];
+         sdata[bi] += t;
+      }
+    }
+  __syncthreads();
+}
+
+template <typename T>
+__device__ void ex_scan(T* sdata, const T data, int n){
+    auto warpid = threadIdx.x >> 5;
+    auto lane = threadIdx.x & 31;
+
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+
+    auto result = cg::inclusive_scan(tile32, data);
+
+    if (lane == 31){
+        sdata[n+1 + warpid] = result;
+    }
+
+    __syncthreads();
+    if (warpid == 0){
+        auto val = cg::inclusive_scan(tile32, sdata[n+1 + lane]);
+        sdata[n+1 + lane] = val;
+    }
+    __syncthreads();
+    if (warpid == 0)
+    {
+        sdata[threadIdx.x + 1] = result;
+    } else{
+        if (threadIdx.x < n) {
+        sdata[threadIdx.x + 1] =  sdata[n+1 + warpid-1] + result;}
+        
+    }
+    if (threadIdx.x == 0){
+        sdata[0] == 0;
+    }
+    __syncthreads();
+}
+
+template <typename T>
+__device__ void prescan_noconflict(T *sdata, const T data, int n)
+{
+    auto thid = threadIdx.x;
+    int ai = thid;
+    int bi = thid + (n/2);
+    int bankOffsetA = CONFLICT_FREE_OFFSET(ai);
+    int bankOffsetB = CONFLICT_FREE_OFFSET(bi);
+    auto temp_a = sdata[ai];
+    auto temp_b = sdata[bi];
+
+    sdata[ai + bankOffsetA] = temp_a;
+    sdata[bi + bankOffsetB] = temp_b;
+    int offset = 1;
+    if(thid < n) sdata[thid] = data;
+
+    for (int d = n>>1; d > 0; d >>= 1)                    // build sum in place up the tree
+    {
+        __syncthreads();
+        if (thid < d)
+        {
+        int ai = offset*(2*thid+1)-1;
+        int bi = offset*(2*thid+2)-1;
+        ai += CONFLICT_FREE_OFFSET(ai);
+        bi += CONFLICT_FREE_OFFSET(bi);
+        sdata[bi] += sdata[ai];
+        }
+        offset *= 2;
+    }
+    if (thid==0) { sdata[n - 1 + CONFLICT_FREE_OFFSET(n - 1)] = 0;}
+     for (int d = 1; d < n; d *= 2) // traverse down tree & build scan
+        {
+        offset >>= 1;
+        __syncthreads();
+        if (thid < d)
+        {
+            int ai = offset*(2*thid+1)-1;
+            int bi = offset*(2*thid+2)-1;
+            ai += CONFLICT_FREE_OFFSET(ai);
+            bi += CONFLICT_FREE_OFFSET(bi);
+            T t = sdata[ai];
+            sdata[ai] = sdata[bi];
+            sdata[bi] += t;
+        }
+    }
+
+    __syncthreads();
+    temp_a = sdata[ai + bankOffsetA];
+    temp_b = sdata[bi + bankOffsetB];
+    __syncthreads();
+    sdata[ai] = temp_a;
+    sdata[bi] = temp_b;
+    __syncthreads();
+
+
 }
