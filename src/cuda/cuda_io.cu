@@ -57,7 +57,7 @@ namespace cuda_io{
                         const std::pair<int,int>& rhs_range //Optional: provide a range of indices to copy from similar to slices in numpy eg. {0,5} = [0:5]
                         ){
         assert(lhs_range.second - lhs_range.first == rhs_range.second - rhs_range.first);
-        if ( lhs_range.second > -1 && lhs_range.first > -1 ) assert(source.isomer_capacity <= destination.isomer_capacity);
+        if ( lhs_range.second == -1 && lhs_range.first == -1 ) assert(source.isomer_capacity <= destination.isomer_capacity);
 
         //Iterate over the data fields of the IsomerBatch (pseudo reflection) and copy the contents of each using the provided stream.
         if(policy == LaunchPolicy::SYNC) {ctx.wait();}
@@ -87,7 +87,11 @@ namespace cuda_io{
         //Construct a tempory batch: allocates the needed amount of memory.
         IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type);
         //Copy contents of old batch into newly allocated memory.
-        cuda_io::copy(temp_batch, batch, ctx);
+        if (new_capacity < batch.isomer_capacity){
+            cuda_io::copy(temp_batch, batch, ctx, LaunchPolicy::SYNC, {0,new_capacity}, {0,new_capacity});
+        } else{
+            cuda_io::copy(temp_batch, batch, ctx);
+        }
         for (int i = 0; i < batch.pointers.size(); i++)
         {
             void* temp_ptr = *get<1>(batch.pointers[i]);
@@ -117,26 +121,36 @@ namespace cuda_io{
         return {n_correct, (device_real_t)(100*n_correct)/(device_real_t)(n_isomers*n_elements_per_isomers)};
     }
 
-    std::tuple<int, device_real_t, device_real_t> compare_isomer_arrays(device_real_t* a, device_real_t* b, int n_isomers, int n_elements_per_isomer, device_real_t rtol = 0.0, bool verbose = false){
-        device_real_t average_rdifference = 0.0f;
+    std::tuple<int, device_real_t, device_real_t> compare_isomer_arrays(device_real_t* a, device_real_t* b, int n_isomers, int n_elements_per_isomer, device_real_t rtol, bool verbose, device_real_t zero_threshold){
+        device_real_t average_rdifference = (device_real_t)0.0;
+        device_real_t average_adifference = (device_real_t)0.0;
         int n_correct = 0;
+        int n_valid = 0;
         std::string fail_string{"\nFailed in: ["};
         for (int i = 0; i < n_isomers; ++i){
             bool isomer_passed = true;
             for (int j = 0; j < n_elements_per_isomer; ++j){   
                 auto idx = i*n_elements_per_isomer + j;
-                device_real_t rdiff = std::abs((a[idx] - b[idx])/a[idx]);
+                device_real_t rdiff = std::abs((a[idx] - b[idx])/(b[idx] + (std::abs(b[idx]) < zero_threshold) ));
+                device_real_t adiff = std::abs(a[idx] - b[idx]);
+                bool is_invalid = (std::isnan(a[idx]) || std::isnan(b[idx])) || (std::isinf(a[idx]) || std::isinf(b[idx]));
                 if(rdiff <= rtol || a[idx] == b[idx] || (std::isnan(a[idx]) && std::isnan(b[idx])) || (std::isinf(a[idx]) && std::isinf(b[idx])) ){
                     ++n_correct;
                 } else{
                     isomer_passed = false;
                 }
-                average_rdifference += rdiff;
+                if (!is_invalid)
+                {
+                    average_rdifference += rdiff;
+                    average_adifference += adiff;
+                    ++n_valid;
+                }
+                
             }
             if(!isomer_passed && verbose) fail_string += to_string(i) + ", ";
         }
         if (n_correct < (n_isomers*n_elements_per_isomer) && verbose) {std::cout << fail_string << std::endl;}
-        return {n_correct, (device_real_t)(100*n_correct) / (device_real_t)(n_isomers*n_elements_per_isomer), average_rdifference / (device_real_t)(n_correct*n_elements_per_isomer)};
+        return {n_correct, average_adifference / (device_real_t)(n_valid), average_rdifference / (device_real_t)(n_valid)};
     }
 
     void is_close(const IsomerBatch& a, const IsomerBatch& b, device_real_t tol, bool verbose){
