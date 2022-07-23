@@ -3,6 +3,7 @@
 
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 #include "cuda_runtime.h"
 #include <assert.h>
 #include <iostream>

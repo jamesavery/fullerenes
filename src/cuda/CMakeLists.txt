@@ -1,6 +1,6 @@
 enable_language(CXX CUDA)
 
-add_library(cuda_lib SHARED isomerspace_forcefield.cu new_isomerspace_forcefield.cu new_isomerspace_tutte.cu new_isomerspace_X0.cu isomerspace_dualize.cu batch_queue.cu cu_array.cu)
+add_library(cuda_lib SHARED isomerspace_forcefield.cu new_isomerspace_forcefield.cu new_isomerspace_tutte.cu new_isomerspace_X0.cu isomerspace_dualize.cu batch_queue.cu cu_array.cu benchmark_functions.cu)
 
 #set_target_properties(cuda_lib PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 #set_target_properties(cuda_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
