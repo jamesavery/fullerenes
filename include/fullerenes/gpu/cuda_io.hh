@@ -12,4 +12,8 @@ namespace cuda_io{
     int num_converged(const IsomerBatch& batch);
     int num_failed(const IsomerBatch& batch);
     void sort(IsomerBatch& batch);
+    template <typename T>  
+    T mean(std::vector<T>& input);
+    std::chrono::nanoseconds sdev(std::vector<std::chrono::nanoseconds>& input);
+
 }
