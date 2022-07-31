@@ -153,6 +153,7 @@ void reset_convergence_status_(IsomerBatch B){
 }
 
 cudaError_t reset_convergence_statuses(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+    cudaSetDevice(ctx.get_device_id());
     static LaunchDims dims((void*)reset_convergence_status_, B.n_atoms);
     void* kargs[]{(void*)&B};
     return cudaLaunchCooperativeKernel((void*)reset_convergence_status_, dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);

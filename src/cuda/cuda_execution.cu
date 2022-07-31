@@ -50,6 +50,7 @@ LaunchCtx::LaunchCtx(int device){
     cudaGetDeviceCount(&m_device_count);
     if (m_device_count < device) {std::cout << "Error: requested device was not found" << std::endl; return;}
     int temp_device; cudaGetDevice(&temp_device);
+    m_device_id = device;
     cudaSetDevice(device);
     cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
     cudaStream_t* stream_ptr = &stream;
