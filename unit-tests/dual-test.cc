@@ -1,4 +1,4 @@
-
+#include "filesystem"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 
@@ -26,17 +26,34 @@ int main(int argc, char** argv){
         IsomerBatch h_validation(N,batch_size,HOST_BUFFER);
         IsomerBatch d_test(N,batch_size,DEVICE_BUFFER);
         IsomerBatch d_validation(N,batch_size,DEVICE_BUFFER);
-        FullereneDual F;
-        auto I = 0;
-        while(more_to_do && I < batch_size){
+        FullereneDual G;
+        auto Nf = N/2 +2;
 
-            more_to_do &= BuckyGen::next_fullerene(bucky_queue,F);
-            if(!more_to_do)break;
-            test_queue.insert(Graph(F),I);
-            F.update();
-            auto FD = F.dual_graph();
+        std::string path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
+        auto fsize = std::filesystem::file_size(path);
+        auto n_samples = fsize / (Nf * 6 * sizeof(device_node_t));
+        ifstream in_file(path,std::ios::binary);
+        std::vector<device_node_t> dual_neighbours(n_samples * Nf * 6);
+        in_file.read((char*)dual_neighbours.data(),n_samples * Nf * 6 * sizeof(device_node_t));
+
+        G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
+        G.neighbours.resize(Nf);
+        G.N = Nf;
+
+        for (size_t I = 0; I < n_samples; I++)
+        {
+            for (size_t j = 0; j < Nf; j++)
+            {
+                G.neighbours[j].clear();
+                for (size_t k = 0; k < 6; k++) {
+                    auto u = dual_neighbours[I*Nf*6 + j*6 +k];
+                    if(u != UINT16_MAX) G.neighbours[j].push_back(u);
+                }
+            }
+            test_queue.insert(Graph(G),I);
+            G.update();
+            auto FD = G.dual_graph();
             validation_queue.insert(FD,I, LaunchCtx(), LaunchPolicy::SYNC, false);
-            ++I;
         }
         //std::cout << F.neighbours << "\n";
         test_queue.refill_batch(d_test);                        validation_queue.refill_batch(d_validation);
