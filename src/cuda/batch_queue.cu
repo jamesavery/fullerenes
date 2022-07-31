@@ -90,6 +90,74 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
     }
 }
 
+__global__ void push_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue){
+    DEVICE_TYPEDEFS
+
+    //Create a shared queue index among all threads in a block. 
+    __shared__ size_t queue_index;
+    auto Nf = B.n_faces; // Number of faces
+
+    //Store a copy of the front before incrementing the counters, 
+    //This is to allow for unordered incrementing of the queue counters avoiding the use of mutexes or similar techniques. 
+    auto old_back = *queue.back;
+
+    //Reset the queue requests at each call to this function.
+    if ((threadIdx.x + blockIdx.x) == 0) {
+        *queue.requests = 0;}
+    GRID_SYNC
+    //Grid stride for loop, allows for handling of any batch size.
+    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity + gridDim.x - B.isomer_capacity%gridDim.x; isomer_idx+= gridDim.x){
+    GRID_SYNC
+    //Checks if the isomer owned by a given block is finished or empty, if it is we want to replace it with a new one.
+    if (isomer_idx < B.isomer_capacity)
+    if (B.statuses[isomer_idx] != NOT_CONVERGED){
+        if(threadIdx.x == 0){
+            //Increment front counter atomically and calculate queue index. 
+            queue_index = atomicAdd(queue.back, 1);
+            queue_index = queue_index % *queue.capacity;
+            //Increment number of queue requests.
+            atomicAdd(queue.requests, 1);
+        } 
+        cg::sync(cg::this_thread_block());
+        assert(queue_index < *queue.capacity);
+
+        //Given the queue index, copy data from the queue (container Q_B) to the target batch B.
+        size_t queue_array_idx    = queue_index*blockDim.x+threadIdx.x;
+        size_t global_idx         = blockDim.x*isomer_idx + threadIdx.x;
+        reinterpret_cast<coord3d*>(Q_B.X)[queue_array_idx]              = reinterpret_cast<coord3d*>(B.X)[global_idx];
+        reinterpret_cast<node3*>(Q_B.cubic_neighbours)[queue_array_idx] = reinterpret_cast<node3*>(B.cubic_neighbours)[global_idx];
+        reinterpret_cast<coord2d*>(Q_B.xys)[queue_array_idx]            = reinterpret_cast<coord2d*>(B.xys)[global_idx];
+        
+        //Face parallel copying 
+        if (threadIdx.x < Nf){
+            size_t queue_face_idx     = queue_index* Nf + threadIdx.x; 
+            size_t output_face_idx    = isomer_idx * Nf + threadIdx.x;
+            reinterpret_cast<node6*>(Q_B.dual_neighbours)[queue_face_idx] = reinterpret_cast<node6*>(B.dual_neighbours)[output_face_idx];
+            reinterpret_cast<uint8_t*>(Q_B.face_degrees)[queue_face_idx]  = reinterpret_cast<uint8_t*>(B.face_degrees)[output_face_idx];  
+        }
+        //Per isomer meta data
+        if (threadIdx.x == 0){
+            Q_B.IDs[queue_index] = B.IDs[isomer_idx];
+            Q_B.iterations[queue_index] = 0;
+            Q_B.statuses[queue_index] = Q_B.statuses[isomer_idx];
+            B.statuses[isomer_idx] = EMPTY;
+        }
+    }
+    }
+    GRID_SYNC
+    if ((threadIdx.x + blockIdx.x) == 0) {
+        
+        if (*queue.size == 0) {*queue.front = 0; *queue.back = *queue.requests-1;} else{
+            //Here we correct the front index by considering, what the front was at the start, how many requests were made and, what the capacity of the queue is.
+            *queue.back = (old_back + *queue.requests) % *queue.capacity;
+        }
+        //Pushing to queue simply increases the size by the number of push requests.
+        *queue.size += *queue.requests;
+    }
+}
+
+
+
 //This function simply copys data to the end of the batch, could be achieved with the cuda_io::copy() function using ranges.
 //TODO: delete this function and replace with a copy call.
 __global__ void insert_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue){
@@ -175,6 +243,23 @@ cudaError_t IsomerQueue::refill_batch(IsomerBatch& batch, const LaunchCtx& ctx, 
     return error;
 }
 
+//Kernel wrapper for push_ function
+cudaError_t IsomerQueue::push(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
+    cudaSetDevice(m_device);
+    if (policy == LaunchPolicy::SYNC) ctx.wait();
+    static LaunchDims dims((void*)push_, N, 0, batch.isomer_capacity);
+    dims.update_dims((void*)push_, N, 0, batch.isomer_capacity);
+    to_host(ctx);
+    to_device(ctx);
+    if(*props.size < batch.isomer_capacity) resize(*props.capacity+batch.isomer_capacity, ctx, policy);
+    void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props};
+    cudaError_t error = safeCudaKernelCall((void*)push_, dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
+    is_host_updated = false;
+    if (policy == LaunchPolicy::SYNC) ctx.wait();
+    printLastCudaError("Refill failed");
+    return error;
+}
+
 //Resizes the underlying containers (host and device batches) and updates the queue counters accordingly
 cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
@@ -205,6 +290,7 @@ cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, 
         *props.front = 0;
         *props.back  = *props.size - 1;
     }
+    *props.capacity = new_capacity;
     return cudaGetLastError();
 }
 
@@ -245,8 +331,7 @@ cudaError_t IsomerQueue::insert(const Graph& in, const size_t ID, const LaunchCt
 
     //If the queue is full, double the size, same beahvior as dynamically allocated containers in the std library. 
     if (*props.capacity == *props.size){
-        *props.capacity *= 2;
-        resize(*props.capacity, ctx, policy);
+        resize(*props.capacity * 2, ctx, policy);
     }
 
     //Edge case: queue has no members 
@@ -286,8 +371,7 @@ cudaError_t IsomerQueue::insert(const PlanarGraph& in, const size_t ID, const La
 
     //If the queue is full, double the size, same beahvior as dynamically allocated containers in the std library. 
     if (*props.capacity == *props.size){
-        *props.capacity *= 2;
-        resize(*props.capacity, ctx, policy);
+        resize(*props.capacity * 2, ctx, policy);
     }
 
     //Edge case: queue has no members 
@@ -329,8 +413,7 @@ cudaError_t IsomerQueue::insert(const Polyhedron& in, const size_t ID, const Lau
 
     //If the queue is full, double the size, same beahvior as dynamically allocated containers in the std library. 
     if (*props.capacity == *props.size){
-        *props.capacity *= 2;
-        resize(*props.capacity, ctx, policy);
+        resize(*props.capacity * 2, ctx, policy);
     }
     //Edge case: queue has no members 
     if(*props.back == -1){
