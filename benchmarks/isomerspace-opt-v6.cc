@@ -41,13 +41,10 @@ int main(int argc, char** argv){
         }else{
             sample_size = batch_size*4;
         }
-        
-        std::queue<std::tuple<Polyhedron,size_t,IsomerStatus>> poly_queue;
+
         std::cout << N << endl;
         IsomerBatch batch0(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch batch1(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch batch2(N,sample_size,DEVICE_BUFFER, 1);
-        IsomerBatch batch3(N,sample_size,DEVICE_BUFFER, 1);
+        IsomerBatch batch1(N,sample_size,DEVICE_BUFFER, 1);
         cuda_io::IsomerQueue Isomer_Q(N, 0);
         cuda_io::IsomerQueue Isomer_Q2(N, 1);
         LaunchCtx insert_ctx = LaunchCtx(0);
@@ -99,37 +96,35 @@ int main(int argc, char** argv){
                 Isomer_Q.insert(G,i, insert_ctx, LaunchPolicy::ASYNC);
                 Isomer_Q2.insert(G,i,insert2_ctx, LaunchPolicy::ASYNC);
             }
-            Isomer_Q.refill_batch(batch0, insert_ctx, LaunchPolicy::ASYNC);
-            Isomer_Q2.refill_batch(batch2, insert2_ctx, LaunchPolicy::ASYNC);
             insert_ctx.wait(); insert2_ctx.wait();
         }; 
         
         generate_isomers();
-        cuda_io::copy(batch1, batch0, insert_ctx, LaunchPolicy::SYNC);
-        cuda_io::copy(batch3, batch2, insert2_ctx, LaunchPolicy::SYNC);
+        Isomer_Q.refill_batch(batch0, insert_ctx, LaunchPolicy::SYNC);
+        Isomer_Q2.refill_batch(batch1, insert2_ctx, LaunchPolicy::SYNC);
 
         for (size_t l = 0; l < N_runs; l++)
         {
 
             auto generate_handle = std::async(std::launch::async, generate_isomers);
             auto T2 = high_resolution_clock::now(); 
-                isomerspace_dual::cubic_layout(batch1, device0, LaunchPolicy::ASYNC);                   isomerspace_dual::cubic_layout(batch3, device1, LaunchPolicy::ASYNC);
-                isomerspace_tutte::tutte_layout(batch1, 10000000, device0, LaunchPolicy::ASYNC);        isomerspace_tutte::tutte_layout(batch3, 10000000, device1, LaunchPolicy::ASYNC);
-                isomerspace_X0::zero_order_geometry(batch1, 4.0, device0, LaunchPolicy::ASYNC);         isomerspace_X0::zero_order_geometry(batch3, 4.0, device1, LaunchPolicy::ASYNC);
-                cuda_io::reset_convergence_statuses(batch1, device0, LaunchPolicy::ASYNC);              cuda_io::reset_convergence_statuses(batch3, device1, LaunchPolicy::ASYNC);                    
-                isomerspace_forcefield::optimize_batch(batch1,N*4,N*4, device0, LaunchPolicy::ASYNC);   isomerspace_forcefield::optimize_batch(batch3,N*4,N*4, device1, LaunchPolicy::ASYNC);
+                isomerspace_dual::cubic_layout(batch0, device0, LaunchPolicy::ASYNC);                   isomerspace_dual::cubic_layout(batch1, device1, LaunchPolicy::ASYNC);
+                isomerspace_tutte::tutte_layout(batch0, 10000000, device0, LaunchPolicy::ASYNC);        isomerspace_tutte::tutte_layout(batch1, 10000000, device1, LaunchPolicy::ASYNC);
+                isomerspace_X0::zero_order_geometry(batch0, 4.0, device0, LaunchPolicy::ASYNC);         isomerspace_X0::zero_order_geometry(batch1, 4.0, device1, LaunchPolicy::ASYNC);
+                cuda_io::reset_convergence_statuses(batch0, device0, LaunchPolicy::ASYNC);              cuda_io::reset_convergence_statuses(batch1, device1, LaunchPolicy::ASYNC);                    
+                isomerspace_forcefield::optimize_batch(batch0,N*4,N*4, device0, LaunchPolicy::ASYNC);   isomerspace_forcefield::optimize_batch(batch1,N*4,N*4, device1, LaunchPolicy::ASYNC);
                 device0.wait(); device1.wait();
             auto T3 = high_resolution_clock::now(); T_par[l] += ( T3 - T2);
                 generate_handle.wait(); 
-                cuda_io::copy(batch1, batch0, device0, LaunchPolicy::ASYNC);
-                cuda_io::copy(batch3, batch2, device1, LaunchPolicy::ASYNC);
+                Isomer_Q.refill_batch(batch0, device0, LaunchPolicy::ASYNC);
+                Isomer_Q2.refill_batch(batch1, device1, LaunchPolicy::ASYNC);
                 device0.wait(); device1.wait();
             auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);
 
         }
         using namespace cuda_io;
-        out_file << N << ", "<< sample_size*2 << ", " << mean(T_seq) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
-        out_file_std << N << ", "<< sample_size*2 << ", " << sdev(T_seq) /1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";
+        out_file << N << ", "<< min(sample_size*2, n_fullerenes) << ", " << mean(T_seq) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
+        out_file_std << N << ", "<< min(sample_size*2, n_fullerenes) << ", " << sdev(T_seq) /1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";
      }
 
 }
