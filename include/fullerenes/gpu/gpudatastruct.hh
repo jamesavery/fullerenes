@@ -17,7 +17,7 @@ struct GPUDataStruct{
     BufferType buffer_type;
     GPUDataStruct(){}
     GPUDataStruct(size_t n_atoms, size_t n_isomers, BufferType buffer_type);
-    ~GPUDataStruct();
+    virtual ~GPUDataStruct();
     std::vector<std::tuple<std::string,void**,size_t,bool>> pointers;
     static void allocate(GPUDataStruct& G,const size_t N,const size_t batch_size, const BufferType buffer_type);
     static void copy(GPUDataStruct& destination, const GPUDataStruct& source, cudaStream_t stream = NULL);

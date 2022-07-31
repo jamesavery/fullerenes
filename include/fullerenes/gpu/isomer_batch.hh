@@ -23,11 +23,16 @@ struct IsomerBatch : GPUDataStruct
       pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
     }
 
-    IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type);
+    void operator=(const IsomerBatch &);
 
+    ~IsomerBatch() override;
+    IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type, int device  = 0);
+    int get_device_id() const {return m_device;}
     bool operator==(const IsomerBatch& b);
     bool operator!=(const IsomerBatch& b) {return !(*this == b);}
     friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a);
+  private:
+    int m_device = 0;
 };
 
 #endif

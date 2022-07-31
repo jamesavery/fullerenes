@@ -16,7 +16,7 @@ namespace cuda_io{
             
             //Graphs always have a neighbour array.
             neighbours_t out_neighbours(N);
- 
+
             std::vector<coord2d> output_2D;
 
             for (size_t i = 0; i < N; i++){
@@ -47,8 +47,7 @@ namespace cuda_io{
         }
         return cudaGetLastError();
     }
-
-
+    
     cudaError_t copy(   IsomerBatch& destination, //Copy data to this batch
                         const IsomerBatch& source, //Copy data from this batch
                         const LaunchCtx& ctx, //Optional: specify which launch context to perform the copy operation in.
@@ -59,8 +58,12 @@ namespace cuda_io{
         assert(lhs_range.second - lhs_range.first == rhs_range.second - rhs_range.first);
         if ( lhs_range.second == -1 && lhs_range.first == -1 ) assert(source.isomer_capacity <= destination.isomer_capacity);
 
+        if(source.buffer_type == DEVICE_BUFFER) {cudaSetDevice(source.get_device_id()); }
+        else{ cudaSetDevice(destination.get_device_id());}
+        
         //Iterate over the data fields of the IsomerBatch (pseudo reflection) and copy the contents of each using the provided stream.
         if(policy == LaunchPolicy::SYNC) {ctx.wait();}
+        
         for (size_t i = 0; i < source.pointers.size(); i++)
         {
             int num_isomers = (lhs_range.second > -1 && lhs_range.first > -1) ? lhs_range.second - lhs_range.first : source.isomer_capacity;
@@ -68,7 +71,12 @@ namespace cuda_io{
             int rhs_offset = rhs_range.first > 0 ? rhs_range.first * get<2>(source.pointers[i]) : 0;
             char* lhs_ptr = (char*)(*(get<1>(destination.pointers[i])));
             char* rhs_ptr = (char*)(*(get<1>(source.pointers[i])));
-            cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type), ctx.stream);
+
+            if( (source.get_device_id() != destination.get_device_id()) && ( (destination.buffer_type==DEVICE_BUFFER) && (source.buffer_type == DEVICE_BUFFER))){
+                cudaMemcpyPeerAsync(lhs_ptr + lhs_offset, destination.get_device_id(), rhs_ptr + rhs_offset, source.get_device_id(), num_isomers * get<2>(source.pointers[i]));
+            } else{
+                cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type), ctx.stream);
+            }
         }
         destination.n_isomers = source.n_isomers;
         printLastCudaError("cuda_io::Failed to copy struct");
@@ -77,6 +85,7 @@ namespace cuda_io{
     }
 
     cudaError_t free(IsomerBatch& batch){
+        cudaSetDevice(batch.get_device_id());
         for (int i = 0; i < batch.pointers.size(); i++){
             if(batch.buffer_type == DEVICE_BUFFER) {cudaFree(*get<1>(batch.pointers[i]));} else {cudaFreeHost(*get<1>(batch.pointers[i]));}
         }
@@ -84,8 +93,9 @@ namespace cuda_io{
     }
     
     cudaError_t resize(IsomerBatch& batch, const size_t new_capacity, const LaunchCtx& ctx, const LaunchPolicy policy, int front, int back){
+        cudaSetDevice(batch.get_device_id());
         //Construct a tempory batch: allocates the needed amount of memory.
-        IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type);
+        IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type, batch.get_device_id());
         //Copy contents of old batch into newly allocated memory.
         if (new_capacity < batch.isomer_capacity){
             cuda_io::copy(temp_batch, batch, ctx, LaunchPolicy::SYNC, {0,new_capacity}, {0,new_capacity});
@@ -230,6 +240,20 @@ namespace cuda_io{
         copy(batch,temp);   
     }
 
+    template <typename T>
+    T mean(std::vector<T>& input){
+    T result = std::reduce(input.begin(), input.end());
+    return result/input.size();
+    }
+    //Standard deviation of a time vector. Used in benchmarking.
+    std::chrono::nanoseconds sdev(std::vector<std::chrono::nanoseconds>& input){
+    auto mean_ = mean(input);
+    chrono::nanoseconds result = std::chrono::nanoseconds(0);
+    for (int i = 0; i < input.size(); i++){
+            result += (input[i] - mean_) *  (input[i] - mean_).count();
+    }
+    return std::chrono::nanoseconds((int)std::sqrt( (result / input.size()).count()));
+    }
 }
 
 
@@ -342,5 +366,7 @@ std::ostream& operator << (std::ostream& os, const IsomerBatch& a){
 
     return os;
 }
+
+
 
  

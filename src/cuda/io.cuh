@@ -3,21 +3,23 @@
 #include "fullerenes/gpu/isomerspace_tutte.hh"
 #include "fullerenes/gpu/gpudatastruct.hh"
 #include "fullerenes/gpu/isomerspace_kernel.hh"
+#include "fullerenes/gpu/cuda_io.hh"
 
 
 
-
-IsomerBatch::IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type){
+IsomerBatch::IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type, int device){
     this->buffer_type      = buffer_type;
     this->n_atoms          = n_atoms;
     this->isomer_capacity  = n_isomers;
     this->n_faces          = n_atoms/2 + 2;
+    this->m_device         = device;
     pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*n_atoms*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t) * (n_atoms/2 +2) * 6, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*(n_atoms/2 +2), true},{"X", (void**)&X, sizeof(device_real_t)*n_atoms*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*n_atoms*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
     if (buffer_type == DEVICE_BUFFER){
-    for (size_t i = 0; i < pointers.size(); i++) {
-        cudaMalloc(get<1>(pointers[i]), n_isomers * get<2>(pointers[i])); 
-        cudaMemset(*get<1>(pointers[i]),0,n_isomers*get<2>(pointers[i]));
-    }
+        cudaSetDevice(m_device);
+        for (size_t i = 0; i < pointers.size(); i++) {
+            cudaMalloc(get<1>(pointers[i]), n_isomers * get<2>(pointers[i])); 
+            cudaMemset(*get<1>(pointers[i]),0,n_isomers*get<2>(pointers[i]));
+        }
     } else if(buffer_type == HOST_BUFFER){
         for (size_t i = 0; i < pointers.size(); i++) {
             //For asynchronous memory transfers host memory must be pinned. 
@@ -28,6 +30,49 @@ IsomerBatch::IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_typ
     printLastCudaError("Failed to construct IsomerBatch");
     allocated = true;
 }
+
+void IsomerBatch::operator=(const IsomerBatch& input){
+    cudaSetDevice(input.get_device_id());
+    //Construct a tempory batch: allocates the needed amount of memory.
+    this->m_device = input.m_device;
+    this->buffer_type = input.buffer_type;
+    this->isomer_capacity = input.isomer_capacity;
+    this->n_atoms = input.n_atoms;
+    this->n_faces = input.n_faces;
+
+    //Copy contents of old batch into newly allocated memory.
+    if (buffer_type == DEVICE_BUFFER){
+        for (size_t i = 0; i < pointers.size(); i++) {
+            cudaMalloc(get<1>(pointers[i]), isomer_capacity * get<2>(pointers[i])); 
+        }
+    } else if(buffer_type == HOST_BUFFER){
+        for (size_t i = 0; i < pointers.size(); i++) {
+            //For asynchronous memory transfers host memory must be pinned. 
+            cudaMallocHost(get<1>(pointers[i]), isomer_capacity * get<2>(pointers[i]));
+        }
+    }
+    cuda_io::copy(*this, input);
+}
+
+
+IsomerBatch::~IsomerBatch(){
+    if (allocated == true);
+    {
+    if (buffer_type == DEVICE_BUFFER){    
+        cudaSetDevice(m_device);
+        for (size_t i = 0; i < pointers.size(); i++) {
+            cudaFree(*get<1>(pointers[i]));
+        }
+    } else{
+        for (size_t i = 0; i < pointers.size(); i++) {
+            cudaFreeHost(*get<1>(pointers[i])); 
+        }
+    }
+    }
+    allocated = false;
+}
+
+
 
 GPUDataStruct::GPUDataStruct(size_t n_atoms, size_t n_isomers, BufferType buffer_type){
     this->buffer_type = buffer_type;
