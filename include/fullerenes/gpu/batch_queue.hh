@@ -5,9 +5,9 @@ namespace cuda_io{
 struct IsomerQueue
 {    
 public:
-    IsomerQueue(const size_t N);
+    IsomerQueue(const size_t N, int device = 0);
     ~IsomerQueue();
-
+    int m_device = 0;
     //Queries about whether the queue is empty.
     bool is_empty() const {return *props.size == 0;};
 

@@ -116,7 +116,8 @@ __global__ void insert_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
 }
 
 //Allocate managed (unified) memory for queue counters.
-IsomerQueue::IsomerQueue(const size_t N): N(N){
+IsomerQueue::IsomerQueue(const size_t N, int device): N(N), m_device(device){
+    cudaSetDevice(device);
     cudaMallocManaged(&props.back,    sizeof(size_t));
     cudaMallocManaged(&props.front,   sizeof(size_t));
     cudaMallocManaged(&props.capacity,sizeof(size_t));
@@ -126,10 +127,12 @@ IsomerQueue::IsomerQueue(const size_t N): N(N){
     *props.front = -1;
     *props.back = -1;
     *props.size = 0;
+    device_batch = IsomerBatch(N,1,DEVICE_BUFFER,m_device);
 }
 
 //Free counters
 IsomerQueue::~IsomerQueue(){
+    cudaSetDevice(m_device);
     cudaFree(props.back);
     cudaFree(props.front);
     cudaFree(props.capacity);
@@ -140,6 +143,7 @@ IsomerQueue::~IsomerQueue(){
 //Copies data to host if data is not up to date on host
 cudaError_t IsomerQueue::to_host(const LaunchCtx& ctx){
     if(!is_host_updated){
+        cudaSetDevice(m_device);
         cuda_io::copy(host_batch, device_batch, ctx);
         is_host_updated = true;
     }
@@ -149,6 +153,7 @@ cudaError_t IsomerQueue::to_host(const LaunchCtx& ctx){
 //Copies data to device if data is not up to date on device
 cudaError_t IsomerQueue::to_device(const LaunchCtx& ctx){
     if(!is_device_updated){
+        cudaSetDevice(m_device);
         cuda_io::copy(device_batch, host_batch, ctx);
         is_device_updated = true;
     }
@@ -157,6 +162,7 @@ cudaError_t IsomerQueue::to_device(const LaunchCtx& ctx){
 
 //Kernel wrapper for refill_batch_ function
 cudaError_t IsomerQueue::refill_batch(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
+    cudaSetDevice(m_device);
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     static LaunchDims dims((void*)refill_batch_, N, 0, batch.isomer_capacity);
     dims.update_dims((void*)refill_batch_, N, 0, batch.isomer_capacity);
@@ -171,10 +177,11 @@ cudaError_t IsomerQueue::refill_batch(IsomerBatch& batch, const LaunchCtx& ctx, 
 
 //Resizes the underlying containers (host and device batches) and updates the queue counters accordingly
 cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, const LaunchPolicy policy){
+    cudaSetDevice(m_device);
     //Lambda function because it is only called in here and avoids duplication of code because these transformations need to be applied to both host and device batches.
     auto queue_resize_batch = [&](IsomerBatch& batch){
         //Construct a tempory batch: allocates the needed amount of memory.
-        IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type);
+        IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type, batch.get_device_id());
         //Copy contents of old batch into newly allocated memory.
         cuda_io::copy(temp_batch,batch,ctx,policy,{0, batch.isomer_capacity- *props.front}, {*props.front,batch.isomer_capacity});
         cuda_io::copy(temp_batch,batch,ctx,policy,{batch.isomer_capacity- *props.front, batch.isomer_capacity - *props.front + *props.back},{0,*props.back});
@@ -203,6 +210,7 @@ cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, 
 
 //Inserts entire IsomerBatch in the queue.
 cudaError_t IsomerQueue::insert(IsomerBatch& input_batch, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d){
+    cudaSetDevice(m_device);
     //Wait for all processes on the stream to finish if policy is synchronous otherwise just proceed.
     if(policy == LaunchPolicy::SYNC) ctx.wait(); 
 
@@ -231,6 +239,7 @@ cudaError_t IsomerQueue::insert(IsomerBatch& input_batch, const LaunchCtx& ctx, 
 }
 
 cudaError_t IsomerQueue::insert(const Graph& in, const size_t ID, const LaunchCtx& ctx, const LaunchPolicy policy){
+    cudaSetDevice(m_device);
     //Before inserting a new isomer, make sure that the host batch is up to date with the device version.
     to_host(ctx);
 
@@ -271,6 +280,7 @@ cudaError_t IsomerQueue::insert(const Graph& in, const size_t ID, const LaunchCt
 }
 
 cudaError_t IsomerQueue::insert(const PlanarGraph& in, const size_t ID, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d){
+    cudaSetDevice(m_device);
     //Before inserting a new isomer, make sure that the host batch is up to date with the device version.
     to_host(ctx);
 
@@ -313,6 +323,7 @@ cudaError_t IsomerQueue::insert(const PlanarGraph& in, const size_t ID, const La
 }
 
 cudaError_t IsomerQueue::insert(const Polyhedron& in, const size_t ID, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d){
+    cudaSetDevice(m_device);
     //Before inserting a new isomer, make sure that the host batch is up to date with the device version.
     to_host(ctx);
 
