@@ -1,5 +1,6 @@
 #include "fullerenes/gpu/cuda_io.hh"
 #include "type_traits"
+#include <numeric>
 namespace cuda_io{
 
     

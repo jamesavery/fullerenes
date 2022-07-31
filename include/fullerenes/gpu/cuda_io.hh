@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include "isomerspace_kernel.hh"
 #include "cuda_execution.hh"
+#include <chrono>
 
 namespace cuda_io{
     cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch& batch, const bool copy_2d_layout = true);
