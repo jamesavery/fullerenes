@@ -17,10 +17,13 @@ using namespace chrono_literals;
 
 int main(int argc, char** argv){
     const size_t N_limit                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
-    
+    auto N_runs = 10;
+
     ofstream out_file("IsomerspaceOpt_V1_" + to_string(N_limit) + ".txt");
+    ofstream out_file_std("IsomerspaceOpt_V1_STD_" + to_string(N_limit) + ".txt");
     for (size_t N = 20; N < N_limit+1; N+=2)
     {   
+        if (N == 22) continue;
         BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
         auto sample_size = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)num_fullerenes.find(N)->second);
         
@@ -28,58 +31,59 @@ int main(int argc, char** argv){
         cuda_io::IsomerQueue isomer_q(N);
         //Pre allocate the device queue such that it doesn't happen during benchmarking
         isomer_q.resize(2*sample_size);
+        auto Nf = N/2 + 2;
         FullereneDual G;
-        
+        G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
+        G.N = Nf;
         bool more_to_generate = true;
 
         auto T0 = high_resolution_clock::now();
         auto
 
-            T_seq    = high_resolution_clock::now()-T0,
-            T_par    = high_resolution_clock::now()-T0,
-            T_io    = high_resolution_clock::now()-T0;
-
-        auto path = "isomerspace_samples/" + to_string(N) + "_seed_42";
+            T_seq    = std::vector<std::chrono::nanoseconds>(N_runs),
+            T_par    = std::vector<std::chrono::nanoseconds>(N_runs),
+            T_io     = std::vector<std::chrono::nanoseconds>(N_runs);
+        
+        auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
         auto fsize = std::filesystem::file_size(path);
         std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
-        isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), fsize);
-        auto available_samples = fsize / (N*3*sizeof(device_node_t));
+        auto available_samples = fsize / (Nf*6*sizeof(device_node_t));
+        isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), Nf*6*sizeof(device_node_t)*available_samples);
 
         std::vector<int> random_IDs(available_samples);
         std::iota(random_IDs.begin(), random_IDs.end(), 0);
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
-        std::vector<int> sorted_IDs(random_IDs.begin(), random_IDs.begin()+sample_size);
-
-        for (int i = 0; i < sample_size; ++i){
-            more_to_generate &= BuckyGen::next_fullerene(Q,G);
-                if(!more_to_generate)break;
-                    auto Tstart = high_resolution_clock::now(); 
-                G.update();
-                PlanarGraph pG = G.dual_graph();
-                    auto T1 = high_resolution_clock::now(); T_seq += T1 - Tstart; 
-                for(int j = 0; j < N; j++){
-                    for (int k = 0; k < 3; k++){
-                        pG.neighbours[j][k] = input_buffer[N*sorted_IDs[i]*3 + j*3+k];
+        std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
+        for (int l = 0; l < N_runs; l++){
+            for (int i = 0; i < sample_size; ++i){
+                    for (size_t j = 0; j < Nf; j++){
+                        G.neighbours[j].clear();
+                        for (size_t k = 0; k < 6; k++) {
+                            auto u = input_buffer[id_subset[i]*Nf*6 + j*6 +k];
+                            if(u != UINT16_MAX) G.neighbours[j].push_back(u);
+                        }
                     }
-                }   
-                    auto T2 = high_resolution_clock::now();
-                pG.layout2d  = pG.tutte_layout();
-                    auto T3 = high_resolution_clock::now(); 
-                Polyhedron P(pG);
-                    auto T4 = high_resolution_clock::now(); T_io += T4 - T3;
-                P.points    = P.zero_order_geometry();
-                    auto T5 = high_resolution_clock::now(); 
-                isomer_q.insert(P,i,LaunchCtx(),LaunchPolicy::SYNC);
-                    auto T6 = high_resolution_clock::now(); T_seq += T6 - T1;
+                        auto Tstart = high_resolution_clock::now(); 
+                    G.update();
+                    PlanarGraph pG = G.dual_graph();
+                    pG.layout2d  = pG.tutte_layout();
+                        auto T3 = high_resolution_clock::now(); T_seq[l] += T3 - Tstart;
+                    Polyhedron P(pG);
+                        auto T4 = high_resolution_clock::now(); T_io[l] += T4 - T3;
+                    P.points    = P.zero_order_geometry();
+                        auto T5 = high_resolution_clock::now(); T_seq[l] += T5 - T4;
+                    isomer_q.insert(P,i,LaunchCtx(),LaunchPolicy::SYNC);
+                        auto T6 = high_resolution_clock::now(); T_io[l] += T6 - T5;
+            }
+            auto T1 = high_resolution_clock::now();
+                isomer_q.refill_batch(batch0);
+                gpu_kernels::isomerspace_forcefield::optimize_batch(batch0,N*4,N*4);
+            T_par[l] += high_resolution_clock::now() - T1;
         }
-        auto T1 = high_resolution_clock::now();
-            isomer_q.refill_batch(batch0);
-        auto T2 = high_resolution_clock::now(); T_io += T2 - T1;
-            gpu_kernels::isomerspace_forcefield::optimize_batch(batch0,N*4,N*4);
-        T_par += high_resolution_clock::now() - T1;
-
-        out_file << N << ", "<< sample_size << ", " << T_seq/1ns << ", " << T_par/1ns << ", " << T_io/1ns<< "\n";
+        using namespace cuda_io;
+        out_file << N << ", "<< sample_size << ", " << mean(T_seq)/1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns<< "\n";
+        out_file_std << N << ", "<< sample_size << ", " << sdev(T_seq)/1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns<< "\n";
      }
 
 }

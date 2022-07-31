@@ -2,6 +2,9 @@
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/gpu/kernels.hh"
+
 #include <chrono>
 #include <fstream>
 #include "filesystem"
@@ -13,116 +16,73 @@ using namespace chrono_literals;
 
 int main(int argc, char** argv){
     const size_t N_limit                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
-    
+    auto N_runs = 5;
     ofstream out_file("SeqBenchmark_" + to_string(N_limit) + ".txt");
     ofstream out_std("SeqBenchmark_STD_" + to_string(N_limit) + ".txt");
     out_file << "Generate, Samples, Update, Dual, Tutte, X0, Optimize \n";
     for (size_t N = 20; N < N_limit+1; N+=2)
     {   
+        if(N == 22) continue;
         BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
-        auto sample_size = min(100,(int)num_fullerenes.find(N)->second);
+        
+        auto sample_size = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)num_fullerenes.find(N)->second);
 
         FullereneDual G;
         
         bool more_to_generate = true;
 
-        auto T0 = high_resolution_clock::now();
-        auto
-
-            Tgen_mean    = high_resolution_clock::now()-T0,
-            Tgen_std    = high_resolution_clock::now()-T0,
-            Tupdate_mean = high_resolution_clock::now()-T0,
-            Tupdate_std = high_resolution_clock::now()-T0,
-            Tdual_mean   = high_resolution_clock::now()-T0,
-            Tdual_std   = high_resolution_clock::now()-T0,    
-            Ttutte_mean  = high_resolution_clock::now()-T0,
-            Ttutte_std  = high_resolution_clock::now()-T0,
-            TX0_mean     = high_resolution_clock::now()-T0,
-            TX0_std     = high_resolution_clock::now()-T0,
-            Topt_mean    = high_resolution_clock::now()-T0,
-            Topt_std    = high_resolution_clock::now()-T0,
-            Tpoly_mean    = high_resolution_clock::now()-T0,
-            Tpoly_std    = high_resolution_clock::now()-T0;
-
         std::vector<std::chrono::nanoseconds> 
-            T_gens(100),
-            T_duals(100),
-            T_tuttes(100),
-            T_X0s(100),
-            T_opts(100),
-            T_polys(100);
-        auto path = "isomerspace_samples/" + to_string(N) + "_seed_42";
+            T_gens(N_runs,chrono::nanoseconds(0)),
+            T_duals(N_runs,chrono::nanoseconds(0)),
+            T_tuttes(N_runs,chrono::nanoseconds(0)),
+            T_X0s(N_runs,chrono::nanoseconds(0)),
+            T_opts(N_runs,chrono::nanoseconds(0)),
+            T_polys(N_runs,chrono::nanoseconds(0));
+        
+        auto Nf = N /2 + 2;
+        G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
+        G.N = Nf;
+
+        auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
         auto fsize = std::filesystem::file_size(path);
         std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
-        isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), fsize);
-        auto available_samples = fsize / (N*3*sizeof(device_node_t));
+        auto available_samples = fsize / (Nf*6*sizeof(device_node_t));
+        isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), Nf*6*available_samples*sizeof(device_node_t));
 
         std::vector<int> random_IDs(available_samples);
         std::iota(random_IDs.begin(), random_IDs.end(), 0);
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
-        std::vector<int> sorted_IDs(random_IDs.begin(), random_IDs.begin()+sample_size);
-        std::sort(sorted_IDs.begin(), sorted_IDs.end());
+        std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
 
-        for (int i = 0; i < sample_size; ++i){
-            more_to_generate &= BuckyGen::next_fullerene(Q,G);
-                if(!more_to_generate)break;
-                    auto T2 = high_resolution_clock::now(); 
+        for (int l = 0; l < N_runs; l++){
+            for (int i = 0; i < sample_size; ++i){
+                for (size_t j = 0; j < Nf; j++){
+                    G.neighbours[j].clear();
+                    for (size_t k = 0; k < 6; k++) {
+                        auto u = input_buffer[id_subset[i]*Nf*6 + j*6 +k];
+                        if(u != UINT16_MAX) G.neighbours[j].push_back(u);
+                    }
+                }
+                    auto T1 = high_resolution_clock::now(); 
                 G.update();
                 PlanarGraph pG = G.dual_graph();
-                    auto T4 = high_resolution_clock::now(); T_duals[i] = T4 - T2; 
-                for(int j = 0; j < N; j++){
-                    for (int k = 0; k < 3; k++){
-                        pG.neighbours[j][k] = input_buffer[N*sorted_IDs[i]*3 + j*3+k];
-                    }
-                }   
-                    auto T5 = high_resolution_clock::now();
+                    auto T2 = high_resolution_clock::now(); T_duals[l] += T2 - T1; 
                 Polyhedron P(pG);
-                    auto T6 = high_resolution_clock::now(); T_polys[i] = T6 - T5;
+                    auto T3 = high_resolution_clock::now(); T_polys[l] += T3 - T2;
 
 
                 P.layout2d  = P.tutte_layout();
-                    auto T7 = high_resolution_clock::now(); T_tuttes[i] = T7 - T6;
+                    auto T4 = high_resolution_clock::now(); T_tuttes[l] += T4 - T3;
                 P.points    = P.zero_order_geometry();
-                    auto T8 = high_resolution_clock::now(); T_X0s[i] = T8 - T7;
+                    auto T5 = high_resolution_clock::now(); T_X0s[l] += T5 - T4;
                 P.optimize();
-                    auto T9 = high_resolution_clock::now(); T_opts[i] = T9 - T8;
-
+                    auto T6 = high_resolution_clock::now(); T_opts[l] += T6 - T5;
+            }
         }
-
-        auto mean = [&](std::vector<std::chrono::nanoseconds> &input){
-            auto result = std::chrono::nanoseconds(0);
-            for (int i = 0; i < input.size(); i++){
-                result += input[i];
-            }
-            return result / input.size();
-        };
-
-        auto standard_deviation = [&](std::vector<std::chrono::nanoseconds> &input){
-            auto mean_ = mean(input);
-            auto result = std::chrono::nanoseconds(0);
-            for (int i = 0; i < input.size(); i++){
-                result += (input[i] - mean_) *  (input[i] - mean_).count();
-            }
-            return std::chrono::nanoseconds((int)std::sqrt( (result / input.size()).count()));
-        };
-
-        Tgen_mean = mean(T_gens);
-        Tgen_std = standard_deviation(T_gens);
-        Tdual_mean = mean(T_duals);
-        Tdual_std = standard_deviation(T_duals);
-        Ttutte_mean = mean(T_tuttes);
-        Ttutte_std = standard_deviation(T_tuttes);
-        TX0_mean = mean(T_X0s);
-        TX0_std = standard_deviation(T_X0s);
-        Topt_mean = mean(T_opts);
-        Topt_std = standard_deviation(T_opts);
-        Tpoly_mean = mean(T_polys);
-        Tpoly_std = standard_deviation(T_polys);
-
-
-        out_file << N << ", "<< sample_size << ", " << Tgen_mean/1ns << ", "  << Tdual_mean/1ns <<", " <<  TX0_mean/1ns <<", " << Ttutte_mean/1ns<< ", " << Topt_mean/1ns << ", "<< Tpoly_mean/1ns << "\n";
-        out_std << N << ", "<< sample_size << ", " << Tgen_std/1ns << ", "  << Tdual_std/1ns <<", " <<  TX0_std/1ns <<", " << Ttutte_std/1ns<< ", " << Topt_std/1ns <<  ", " << Tpoly_std/1ns<<"\n";
+        using namespace cuda_io;
+        out_file << N << ", "<< sample_size << ", " << mean(T_gens)/1ns << ", "  << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns << ", "<< mean(T_polys)/1ns << "\n";
+        out_std << N << ", "<< sample_size << ", " << sdev(T_gens)/1ns << ", "  << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns <<  ", " << sdev(T_polys)/1ns<<"\n";
      }
 
 }

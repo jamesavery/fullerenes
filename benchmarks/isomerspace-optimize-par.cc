@@ -20,18 +20,32 @@ int main(int argc, char** argv){
 
     size_t N_start                = argc > 1 ? strtol(argv[1],0,0) : (size_t)20;     // Argument 1: Number of vertices N
     size_t N_limit                = argc > 2 ? strtol(argv[2],0,0) : N_start;     // Argument 1: Number of vertices N
-    
+    auto N_runs = 10;
     ofstream out_file("ParBenchmark_" + to_string(N_limit) + ".txt");
     ofstream out_std("ParBenchmark_STD_" + to_string(N_limit) + ".txt");
     out_file << "Generate, Samples, Update, Dual, Tutte, X0, Optimize \n";
     for (size_t N = N_start; N < N_limit+1; N+=2)
     {   
+        if(N == 22) continue;
         BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
 
-        FullereneDual F;
+        Graph G;
 
         auto batch_size = isomerspace_forcefield::optimal_batch_size(N);
-        auto sample_size = min(batch_size*1,(int)num_fullerenes.find(N)->second);
+        auto n_fullerenes = (int)num_fullerenes.find(N)->second;
+        auto sample_size = min(batch_size*1,n_fullerenes);
+        if (n_fullerenes < batch_size){
+            sample_size = n_fullerenes;
+        } else if (n_fullerenes < batch_size*2){
+            sample_size = batch_size;
+        }else if (n_fullerenes < batch_size*3){
+            sample_size = batch_size*2;
+        }else if (n_fullerenes < batch_size*4){
+            sample_size = batch_size*3;
+        }else{
+            sample_size = batch_size*4;
+        }
+        
         if (N == 22) continue;
         std::cout << sample_size << endl;
         IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
@@ -40,109 +54,60 @@ int main(int argc, char** argv){
         cuda_io::IsomerQueue isomer_q(N);
         cuda_io::IsomerQueue isomer_q_cubic(N);
         bool more_to_generate = true;
-
-        auto T0 = high_resolution_clock::now();
-        auto
-
-            Tgen_mean    = high_resolution_clock::now()-T0,
-            Tgen_std    = high_resolution_clock::now()-T0,
-            Tupdate_mean = high_resolution_clock::now()-T0,
-            Tupdate_std = high_resolution_clock::now()-T0,
-            Tdual_mean   = high_resolution_clock::now()-T0,
-            Tdual_std   = high_resolution_clock::now()-T0,    
-            Ttutte_mean  = high_resolution_clock::now()-T0,
-            Ttutte_std  = high_resolution_clock::now()-T0,
-            TX0_mean     = high_resolution_clock::now()-T0,
-            TX0_std     = high_resolution_clock::now()-T0,
-            Topt_mean    = high_resolution_clock::now()-T0,
-            Topt_std    = high_resolution_clock::now()-T0;
         
         std::vector<std::chrono::nanoseconds> 
-            T_gens(10),
-            T_duals(10),
-            T_tuttes(10),
-            T_X0s(10),
-            T_opts(10);
+            T_gens(N_runs),
+            T_duals(N_runs),
+            T_tuttes(N_runs),
+            T_X0s(N_runs),
+            T_opts(N_runs);
 
-        auto path = "isomerspace_samples/" + to_string(N) + "_seed_42";
+        auto Nf = N/2 + 2;
+        G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
+        G.N = Nf;
+
+        auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
         auto fsize = std::filesystem::file_size(path);
         std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
-        isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), fsize);
-        auto available_samples = fsize / (N*3*sizeof(device_node_t));
+        auto available_samples = fsize / (Nf*6*sizeof(device_node_t));
+        isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), Nf*6*sizeof(device_node_t)*available_samples);
 
         std::vector<int> random_IDs(available_samples);
         std::iota(random_IDs.begin(), random_IDs.end(), 0);
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
-        std::vector<int> IDs(random_IDs.begin(), random_IDs.begin()+sample_size*T_gens.size());
+        std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
 
-        auto I = 0;
-        while (more_to_generate && I < sample_size*T_gens.size()){
-                auto T1 = high_resolution_clock::now();
-            more_to_generate &= BuckyGen::next_fullerene(Q, F);
-            if (!more_to_generate){break;}
-                auto T2 = high_resolution_clock::now(); T_gens[I / sample_size] += T2 - T1; 
-            isomer_q.insert(Graph(F), I);
-            PlanarGraph PG(F);
-            PG.neighbours = std::vector(N, std::vector<node_t>(3));
-                auto T3 = high_resolution_clock::now(); 
-                for(int j = 0; j < N; j++){
-                    for (int k = 0; k < 3; k++){
-                        PG.neighbours[j][k] = input_buffer[N*IDs[I]*3 + j*3+k];
+
+        for (size_t l = 0; l < N_runs; l++)
+        {   
+            for (int i = 0; i < sample_size; i++){
+                for (size_t j = 0; j < Nf; j++){
+                    G.neighbours[j].clear();
+                    for (size_t k = 0; k < 6; k++) {
+                        auto u = input_buffer[id_subset[i]*Nf*6 + j*6 +k];
+                        if(u != UINT16_MAX) G.neighbours[j].push_back(u);
                     }
-                } 
-            isomer_q_cubic.insert(PG,I,LaunchCtx(),LaunchPolicy::SYNC,false);
-            ++I;
-        }
-
-        auto mean = [&](std::vector<std::chrono::nanoseconds> &input){
-            auto size = min((int)input.size() , (int)num_fullerenes.find(N)->second/sample_size + 1);
-            auto result = std::chrono::nanoseconds(0);
-            for (int i = 0; i < size; i++){
-                result += input[i];
+                }
+                isomer_q.insert(G, i);
             }
-            return result / size;
-        };
-
-        auto standard_deviation = [&](std::vector<std::chrono::nanoseconds> &input){
-            auto size = min((int)input.size() , (int)num_fullerenes.find(N)->second/sample_size + 1);
-            auto mean_ = mean(input);
-            auto result = std::chrono::nanoseconds(0);
-            for (int i = 0; i < size; i++){
-                result += (input[i] - mean_) *  (input[i] - mean_).count();
-            }
-            return std::chrono::nanoseconds((int)std::sqrt( (result / size).count()));
-        };
-        for (size_t i = 0; i < T_gens.size(); i++)
-        {
             isomer_q.refill_batch(batch0);
-            isomer_q_cubic.refill_batch(batch1);
             auto TDual = isomerspace_dual::time_spent();
             isomerspace_dual::cubic_layout(batch0);
-            auto TTutte = isomerspace_tutte::time_spent(); T_duals[i] = isomerspace_dual::time_spent() - TDual;
-            isomerspace_tutte::tutte_layout(batch1);
-            auto TX0 = isomerspace_X0::time_spent(); T_tuttes[i] = isomerspace_tutte::time_spent() - TTutte;
-            isomerspace_X0::zero_order_geometry(batch1, 4.0);
-            T_X0s[i] = isomerspace_X0::time_spent() - TX0;
-            cuda_io::reset_convergence_statuses(batch1);
+            auto TTutte = isomerspace_tutte::time_spent(); T_duals[l] += isomerspace_dual::time_spent() - TDual;
+            isomerspace_tutte::tutte_layout(batch0);
+            auto TX0 = isomerspace_X0::time_spent(); T_tuttes[l] += isomerspace_tutte::time_spent() - TTutte;
+            isomerspace_X0::zero_order_geometry(batch0, 4.0);
+            T_X0s[l] += isomerspace_X0::time_spent() - TX0;
+            cuda_io::reset_convergence_statuses(batch0);
             auto TFF = isomerspace_forcefield::time_spent();
-            isomerspace_forcefield::optimize_batch(batch1,N*4,N*4);
-            T_opts[i] = isomerspace_forcefield::time_spent() - TFF;
+            isomerspace_forcefield::optimize_batch(batch0,N*4,N*4);
+            T_opts[l] += isomerspace_forcefield::time_spent() - TFF;
         }
+        using namespace cuda_io;
 
-        Tgen_mean = mean(T_gens);
-        Tgen_std = standard_deviation(T_gens);
-        Tdual_mean = mean(T_duals);
-        Tdual_std = standard_deviation(T_duals);
-        Ttutte_mean = mean(T_tuttes);
-        Ttutte_std = standard_deviation(T_tuttes);
-        TX0_mean = mean(T_X0s);
-        TX0_std = standard_deviation(T_X0s);
-        Topt_mean = mean(T_opts);
-        Topt_std = standard_deviation(T_opts);
-
-        out_file << N << ", "<< sample_size << ", " << Tgen_mean/1ns << ", " << Tdual_mean/1ns <<", " <<  TX0_mean/1ns <<", " << Ttutte_mean/1ns<< ", " << Topt_mean/1ns << "\n";
-        out_std << N << ", "<< sample_size << ", " << Tgen_std/1ns << ", "  << Tdual_std/1ns <<", " <<  TX0_std/1ns <<", " << Ttutte_std/1ns<< ", " << Topt_std/1ns << "\n";
+        out_file << N << ", "<< sample_size << ", " << mean(T_gens)/1ns << ", " << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns << "\n";
+        out_std << N << ", "<< sample_size << ", " << sdev(T_gens)/1ns << ", " << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns << "\n";
      }
 
 }
