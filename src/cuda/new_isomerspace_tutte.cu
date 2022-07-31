@@ -84,16 +84,18 @@ std::chrono::microseconds time_spent(){
 }
 
 cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
-    static bool first_call = true;
-    static cudaEvent_t start, stop;
+    cudaSetDevice(ctx.get_device_id());
+    static std::vector<bool> first_call(16, true);
+    static cudaEvent_t start[16], stop[16];
     float single_kernel_time = 0.0;
-    if(first_call) {cudaEventCreate(&start); cudaEventCreate(&stop);}
+    auto dev = ctx.get_device_id();
+    if(first_call[dev]) {cudaEventCreate(&start[dev]); cudaEventCreate(&stop[dev]);}
 
     //If launch ploicy is synchronous then wait.
     if(policy == LaunchPolicy::SYNC){ ctx.wait();}
-    else if(policy == LaunchPolicy::ASYNC){
+    else if(policy == LaunchPolicy::ASYNC && !first_call[dev]){
         //Records time from previous kernel call
-        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
         kernel_time += single_kernel_time;
     }
     size_t smem = sizeof(device_coord2d)*B.n_atoms*2 + sizeof(device_real_t)*Block_Size_Pow_2;
@@ -101,17 +103,17 @@ cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const Laun
     dims.update_dims((void*)tutte_layout_, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B,(void*)&max_iterations};
 
-    cudaEventRecord(start, ctx.stream);
+    cudaEventRecord(start[dev], ctx.stream);
     cudaError_t error = safeCudaKernelCall((void*)tutte_layout_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);  
-    cudaEventRecord(stop, ctx.stream);
+    cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
         ctx.wait();
-        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
         kernel_time += single_kernel_time;
     }
     printLastCudaError("Tutte: ");
-    first_call = false;
+    first_call[dev] = false;
     return error;
 }
 

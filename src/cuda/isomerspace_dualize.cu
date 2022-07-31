@@ -94,14 +94,16 @@ std::chrono::microseconds time_spent(){
 }
 
 cudaError_t cubic_layout(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
-    static bool first_call = true;
-    static cudaEvent_t start, stop;
+    cudaSetDevice(ctx.get_device_id());
+    static std::vector<bool> first_call(16, true);
+    static cudaEvent_t start[16], stop[16];
     float single_kernel_time = 0.0;
-    if(first_call) {cudaEventCreate(&start); cudaEventCreate(&stop);}
+    auto dev = ctx.get_device_id();
+    if(first_call[dev]) {cudaEventCreate(&start[dev]); cudaEventCreate(&stop[dev]);}
 
     if(policy == LaunchPolicy::SYNC) {ctx.wait();}
-    else if(policy == LaunchPolicy::ASYNC){
-        cudaEventElapsedTime(&single_kernel_time, start, stop);
+    else if(policy == LaunchPolicy::ASYNC && !first_call[dev]){
+        cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
         kernel_time += single_kernel_time;
     }
 
@@ -110,17 +112,17 @@ cudaError_t cubic_layout(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolic
     dims.update_dims((void*)cubic_layout_, B.n_atoms, smem, B.isomer_capacity);
     cudaError_t error;
     void* kargs[]{(void*)&B};
-    cudaEventRecord(start, ctx.stream);
+    cudaEventRecord(start[dev], ctx.stream);
     error = safeCudaKernelCall((void*)cubic_layout_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);  
-    cudaEventRecord(stop, ctx.stream);
+    cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
         ctx.wait();
-        cudaEventElapsedTime(&single_kernel_time, start, stop);
+        cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
         kernel_time += single_kernel_time;
     }
     printLastCudaError("Cubic Layout: ");
-    first_call = false;
+    first_call[dev] = false;
     return error;
 }
 
