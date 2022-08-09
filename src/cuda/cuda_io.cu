@@ -12,8 +12,8 @@ namespace cuda_io{
 
         size_t N = batch.n_atoms;
         for (size_t isomer_idx = 0; isomer_idx < batch.isomer_capacity; isomer_idx++){   
-            //Only insert the isomer if it has finished (either CONVERGED or FAILED)
-            if(!(batch.statuses[isomer_idx] == CONVERGED || batch.statuses[isomer_idx] == FAILED)) continue;
+            //Only insert the isomer if it has finished (either IsomerStatus::CONVERGED or IsomerStatus::FAILED)
+            if(!(batch.statuses[isomer_idx] == IsomerStatus::CONVERGED || batch.statuses[isomer_idx] == IsomerStatus::FAILED)) continue;
             
             //Graphs always have a neighbour array.
             neighbours_t out_neighbours(N);
@@ -74,7 +74,7 @@ namespace cuda_io{
             char* rhs_ptr = (char*)(*(get<1>(source.pointers[i])));
 
             if( (source.get_device_id() != destination.get_device_id()) && ( (destination.buffer_type==DEVICE_BUFFER) && (source.buffer_type == DEVICE_BUFFER))){
-                cudaMemcpyPeerAsync(lhs_ptr + lhs_offset, destination.get_device_id(), rhs_ptr + rhs_offset, source.get_device_id(), num_isomers * get<2>(source.pointers[i]));
+                cudaMemcpyPeerAsync(lhs_ptr + lhs_offset, destination.get_device_id(), rhs_ptr + rhs_offset, source.get_device_id(), num_isomers * get<2>(source.pointers[i]), ctx.stream);
             } else{
                 cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type), ctx.stream);
             }
@@ -186,59 +186,106 @@ namespace cuda_io{
         }
     }
 
-    int num_converged(const IsomerBatch& batch){
-        int res = 0;
-        for (size_t i = 0; i < batch.isomer_capacity; i++)
-        {
-            if(batch.statuses[i] == CONVERGED) ++res;
+    int count_batch_status(const IsomerBatch& input, const IsomerStatus status){
+        auto fun = [&](const IsomerBatch& batch){
+            int res = 0;
+            for (size_t i = 0; i < batch.isomer_capacity; i++)
+            {
+                if(batch.statuses[i] == status) ++res;
+            }
+            return res;
+        }; 
+        if (input.buffer_type == DEVICE_BUFFER){
+            IsomerBatch temp(input.n_atoms, input.isomer_capacity, HOST_BUFFER);
+            cuda_io::copy(temp, input);
+            return fun(temp);
+        } else if(input.buffer_type == HOST_BUFFER){
+            return fun(input);
         }
-        return res;
+        return 0;
     }
 
-    int num_failed(const IsomerBatch& batch){
-        int res = 0;
-        for (size_t i = 0; i < batch.isomer_capacity; i++)
-        {
-            if(batch.statuses[i] == FAILED) ++res;
+    double average_iterations(const IsomerBatch& input){
+        auto fun = [](const IsomerBatch& batch){
+            u_int64_t result = 0;
+            auto non_empty_isomers = 0;
+            for (size_t i = 0; i < batch.isomer_capacity; i++) {
+                result += batch.statuses[i] != IsomerStatus::EMPTY ? batch.iterations[i] : 0;
+                if(batch.statuses[i] != IsomerStatus::EMPTY) ++non_empty_isomers;
+            }
+            return (double)result / (double)non_empty_isomers;
+        };
+        if (input.buffer_type == DEVICE_BUFFER){
+            IsomerBatch temp(input.n_atoms, input.isomer_capacity, HOST_BUFFER);
+            cuda_io::copy(temp, input);
+            return fun(temp);
+        } else if(input.buffer_type == HOST_BUFFER){
+            return fun(input);
         }
-        return res;
+        return 0;
     }
 
-    void sort(IsomerBatch& batch){
-        std::map<int,int> index_map{};
-        IsomerBatch temp(batch.n_atoms, batch.isomer_capacity, HOST_BUFFER);
-        for (int i = 0; i < batch.isomer_capacity; i++){
-            index_map.insert({batch.IDs[i], i});
-        }
-        std::vector<int> lookup_table(batch.isomer_capacity);
-        int k = 0;
-        for (auto it = index_map.begin(); it != index_map.end(); it++)
-        {   
-            lookup_table[k] = it->second;
-            k++;
-        }
-        
+    
+    //Sorts the batch by whatever metadata key you pass, and if the key is identical for two isomers they are sorted by ID.
+    void sort(IsomerBatch& input_batch, const BatchMember key, const SortOrder order){
+        IsomerBatch temp(input_batch.n_atoms, input_batch.isomer_capacity, HOST_BUFFER);
 
-        for (int i = 0; i < batch.isomer_capacity; i++){
-            int offset      = lookup_table.at(i) * batch.n_atoms*3;
-            int face_offset = lookup_table.at(i) * batch.n_faces;
-            for (int j = 0; j < batch.n_atoms * 3; j++){
-                temp.X[i*batch.n_atoms*3 + j] = batch.X[offset + j];
-                temp.cubic_neighbours[i*batch.n_atoms*3 + j] = batch.cubic_neighbours[offset + j];
+        auto sort_fun = [&](IsomerBatch& batch){
+            std::map<int,int> index_map{};
+            std::vector<int> lookup_indices(batch.isomer_capacity);
+            std::iota(lookup_indices.begin(), lookup_indices.end(),0);
+            switch (key)
+            {
+            case IDS:
+                if (order == ASCENDING) std::sort(lookup_indices.begin(), lookup_indices.end(), [&](int a, int b) -> bool {return batch.IDs[a] < batch.IDs[b];});
+                else if (order == DESCENDING) std::sort(lookup_indices.begin(), lookup_indices.end(), [&](int a, int b) -> bool {return batch.IDs[a] > batch.IDs[b];});
+                break;
+
+            case ITERATIONS:
+                if (order == ASCENDING) std::sort(lookup_indices.begin(), lookup_indices.end(), [&](int a, int b) -> bool {return batch.iterations[a] == batch.iterations[b] ? batch.IDs[a] < batch.IDs[b] : batch.iterations[a] < batch.iterations[b];});
+                if (order == DESCENDING) std::sort(lookup_indices.begin(), lookup_indices.end(), [&](int a, int b) -> bool {return batch.iterations[a] == batch.iterations[b] ? batch.IDs[a] > batch.IDs[b] : batch.iterations[a] > batch.iterations[b];});
+                break;
+
+            case STATUSES:
+                if (order == ASCENDING) std::sort(lookup_indices.begin(), lookup_indices.end(), [&](int a, int b) -> bool {return batch.statuses[a] == batch.statuses[b] ? batch.IDs[a] < batch.IDs[b] : batch.statuses[a] < batch.statuses[b];});
+                if (order == DESCENDING) std::sort(lookup_indices.begin(), lookup_indices.end(), [&](int a, int b) -> bool {return batch.statuses[a] == batch.statuses[b] ? batch.IDs[a] > batch.IDs[b] : batch.statuses[a] > batch.statuses[b];});
+                break;
+
+            default:
+                if (order == ASCENDING) std::sort(lookup_indices.begin(), lookup_indices.end(), [&](int a, int b) -> bool {return batch.IDs[a] < batch.IDs[b];});
+                if (order == DESCENDING) std::sort(lookup_indices.begin(), lookup_indices.end(), [&](int a, int b) -> bool {return batch.IDs[a] > batch.IDs[b];});
+                break;
             }
-            for (int j = 0; j < batch.n_faces; ++j){
-                temp.face_degrees[i*batch.n_faces + j] = batch.face_degrees[face_offset + j];
-                for (int k = 0; k < 6; k++) temp.dual_neighbours[(i*batch.n_faces + j)*6 + k] = batch.dual_neighbours[(face_offset + j)*6 + k];
+
+            for (int i = 0; i < batch.isomer_capacity; i++){
+                int offset      = lookup_indices[i] * batch.n_atoms*3;
+                int face_offset = lookup_indices[i] * batch.n_faces;
+                for (int j = 0; j < batch.n_atoms * 3; j++){
+                    temp.X[i*batch.n_atoms*3 + j] = batch.X[offset + j];
+                    temp.cubic_neighbours[i*batch.n_atoms*3 + j] = batch.cubic_neighbours[offset + j];
+                }
+                for (int j = 0; j < batch.n_faces; ++j){
+                    temp.face_degrees[i*batch.n_faces + j] = batch.face_degrees[face_offset + j];
+                    for (int k = 0; k < 6; k++) temp.dual_neighbours[(i*batch.n_faces + j)*6 + k] = batch.dual_neighbours[(face_offset + j)*6 + k];
+                }
+                offset = lookup_indices[i] * batch.n_atoms*2;
+                for (size_t j = 0; j < batch.n_atoms*2; j++){
+                    temp.xys[i*batch.n_atoms*2 + j] = batch.xys[offset +j];
+                }
+                temp.statuses[i] = batch.statuses[lookup_indices[i]];
+                temp.iterations[i] = batch.iterations[lookup_indices[i]];
+                temp.IDs[i] = batch.IDs[lookup_indices[i]];
             }
-            offset = lookup_table.at(i) * batch.n_atoms*2;
-            for (size_t j = 0; j < batch.n_atoms*2; j++){
-                temp.xys[i*batch.n_atoms*2 + j] = batch.xys[offset +j];
-            }
-            temp.statuses[i] = batch.statuses[lookup_table.at(i)];
-            temp.iterations[i] = batch.iterations[lookup_table.at(i)];
-            temp.IDs[i] = batch.IDs[lookup_table.at(i)];
+        };
+        if (input_batch.buffer_type == DEVICE_BUFFER){
+            IsomerBatch temp2(input_batch.n_atoms, input_batch.isomer_capacity, HOST_BUFFER);
+            copy(temp2, input_batch);
+            sort_fun(temp2);
+
+        } else if(input_batch.buffer_type == HOST_BUFFER){
+            sort_fun(input_batch);
         }
-        copy(batch,temp);   
+        copy(input_batch,temp);   
     }
 
     template <typename T>
@@ -255,6 +302,95 @@ namespace cuda_io{
     }
     return std::chrono::nanoseconds((int)std::sqrt( (result / input.size()).count()));
     }
+
+}
+
+void IsomerBatch::shrink_to_fit(){
+    auto first_empty = -1;
+    auto sort_fun = [&](IsomerBatch& batch){
+        cuda_io::sort(batch, STATUSES, DESCENDING);
+        for (size_t i = 0; i < batch.isomer_capacity; i++){
+            if (batch.statuses[i] == IsomerStatus::EMPTY){
+                first_empty = i; break;
+            }
+        }
+        if(first_empty == -1) first_empty = batch.isomer_capacity;
+    };
+
+
+    if (buffer_type == DEVICE_BUFFER){
+        IsomerBatch temp(n_atoms, isomer_capacity, HOST_BUFFER);
+        cuda_io::copy(temp, *this);
+        sort_fun(temp);
+        cuda_io::copy(*this, temp);
+        cuda_io::resize(*this, first_empty);
+    } else if (buffer_type == HOST_BUFFER){
+        sort_fun(*this);
+        cuda_io::resize(*this, first_empty);
+    }
+    
+}
+
+std::optional<Polyhedron> IsomerBatch::get_isomer(const size_t index) const {
+    auto N = n_atoms;
+    neighbours_t out_neighbours(N);
+    if (index > isomer_capacity){
+        std::cout << "Index out of range";
+        return std::nullopt;
+    }
+    std::vector<coord2d> output_2D;
+
+    for (size_t i = 0; i < N; i++){
+        //Fill in cubic cubic_neighbours
+        out_neighbours[i] = {cubic_neighbours[index*N*3 + i*3], cubic_neighbours[index*N*3 + i*3 + 1], cubic_neighbours[index*N*3 + i*3 + 2]};
+        
+    }
+
+    std::vector<coord3d> output_X(N);
+    for (size_t i = 0; i < N; i++){
+        for (int j = 0; j < 3; ++j){
+            output_X[i][j] = X[index*N*3 + i*3 + j];
+        }
+    }
+    return Polyhedron(Graph(out_neighbours, true),output_X);
+}
+
+
+std::optional<Polyhedron> IsomerBatch::get_isomer_by_id(const size_t ID) const {
+    auto N = n_atoms;
+    neighbours_t out_neighbours(N);
+    int index = -1;
+    for (size_t i = 0; i < isomer_capacity; i++) {if(IDs[i] == ID) index = i;}
+    if (index == -1) {
+        std::cout << "ID not in batch." << endl;
+        return std::nullopt;
+    }
+
+
+    std::vector<coord2d> output_2D;
+
+    for (size_t i = 0; i < N; i++){
+        //Fill in cubic cubic_neighbours
+        out_neighbours[i] = {cubic_neighbours[index*N*3 + i*3], cubic_neighbours[index*N*3 + i*3 + 1], cubic_neighbours[index*N*3 + i*3 + 2]};
+        
+    }
+
+    std::vector<coord3d> output_X(N);
+    for (size_t i = 0; i < N; i++){
+        for (int j = 0; j < 3; ++j){
+            output_X[i][j] = X[index*N*3 + i*3 + j];
+        }
+    }
+    return Polyhedron(Graph(out_neighbours, true),output_X);
+}
+
+std::vector<size_t> IsomerBatch::find_ids(const IsomerStatus status){
+    std::vector<size_t> result;
+    for (size_t i = 0; i < isomer_capacity; i++){
+        if(statuses[i] == status) result.push_back(IDs[i]);
+    }
+    std::sort(result.begin(), result.end());
+    return result;
 }
 
 
@@ -270,16 +406,20 @@ bool IsomerBatch::operator==(const IsomerBatch& b){
     }else if(buffer_type == HOST_BUFFER){
 
         for(int i = 0; i < isomer_capacity; ++i){
-            passed &= statuses[i] == b.statuses[i];
-            passed &= IDs[i] == b.IDs[i];
-            passed &= iterations[i] == b.iterations[i];
+            passed = passed && statuses[i] == b.statuses[i];
+            passed = passed && IDs[i] == b.IDs[i];
+            passed = passed && iterations[i] == b.iterations[i];
         }
         for(int i = 0; i < isomer_capacity * n_atoms * 3; ++i){
-            passed &= device_real_t_equals(X[i],b.X[i]);
-            passed &= cubic_neighbours[i] == b.cubic_neighbours[i];
+            passed = passed && device_real_t_equals(X[i],b.X[i]);
+            passed = passed && cubic_neighbours[i] == b.cubic_neighbours[i];
         }
         for(int i = 0; i < isomer_capacity * n_atoms * 2; ++i){
-            passed &= device_real_t_equals(xys[i],b.xys[i]);}
+            passed = passed && device_real_t_equals(xys[i],b.xys[i]);}
+
+        //for(int i = 0; i < isomer_capacity * (n_atoms/2 + 1)*6; ++i){
+        //    passed = passed && dual_neighbours[i] == b.dual_neighbours[i];
+        //}
         return passed;
     } else{
         std::cout << "== operator only supported for HOST_BUFFER" << std::endl;
@@ -287,82 +427,194 @@ bool IsomerBatch::operator==(const IsomerBatch& b){
     }
     return false;
 }
-
-
-
-std::ostream& operator << (std::ostream& os, const IsomerBatch& a){
-    os << "Batch Dimensions: (" << a.isomer_capacity << ", " << a.n_atoms << ")\n";
-    os << "ID List: " << "\n[";
-    for (size_t i = 0; i < a.isomer_capacity - 1; i++){os << a.IDs[i] << ", ";}
-    os << a.IDs[a.isomer_capacity-1] << "]\n"; 
-    
-    os << "Status List: " << "\n[";
-    for (size_t i = 0; i < a.isomer_capacity - 1; i++){os << a.statuses[i] << ", ";}
-    os << a.statuses[a.isomer_capacity-1] << "]\n"; 
-
-    os << "X Lists: " << "\n[";
-    for (size_t i = 0; i < a.isomer_capacity; i++){
-        os << "[";
-        for (size_t j = 0; j < a.n_atoms*3 - 1; j++)
+void IsomerBatch::print(const BatchMember param, const std::pair<int,int>& range){
+    auto print_fun = [&](const IsomerBatch& a){
+        std::ostream& os = std::cout;
+        auto start = range.first < 0 ? 0 : range.first;
+        auto end = range.second < 0 ? a.isomer_capacity : range.second;
+        switch (param)
         {
-            os << a.X[i*a.n_atoms*3 + j] << ", ";
-        }
-        if(i != (a.isomer_capacity - 1)) {
-            os << a.X[(i+1)*a.n_atoms*3 - 1] << "], ";
-        } else{
-            os << a.X[(i+1)*a.n_atoms*3 - 1] << "]]\n";
-        }
-    }
-
-    os << "2D Layouts: " << "\n[";
-    for (size_t i = 0; i < a.isomer_capacity; i++){
-        os << "[";
-        for (size_t j = 0; j < a.n_atoms*2 - 1; j++)
-        {
-            os << a.xys[i*a.n_atoms*2 + j] << ", ";
-        }
-        if(i != (a.isomer_capacity - 1)) {
-            os << a.xys[(i+1)*a.n_atoms*2 - 1] << "], ";
-        } else{
-            os << a.xys[(i+1)*a.n_atoms*2 - 1] << "]]\n";
-        }
-    }
-
-    os << "Cubic Neighbour Lists: " << "\n[";
-    for (size_t i = 0; i < a.isomer_capacity; i++){
-        os << "[";
-        for (size_t j = 0; j < a.n_atoms*3 - 1; j++)
-        {
-            os << a.cubic_neighbours[i*a.n_atoms*3 + j] << ", ";
-        }
-        if(i != (a.isomer_capacity - 1)) {
-            os << a.cubic_neighbours[(i+1)*a.n_atoms*3 - 1] << "], ";
-        } else{
-            os << a.cubic_neighbours[(i+1)*a.n_atoms*3 - 1] << "]]\n";
-        }
-    }
-
-    os << "Dual Neighbour Lists: " << "\n[";
-    for (size_t i = 0; i < a.isomer_capacity; i++){
-        os << "[";
-        for (int j = 0; j  < a.n_faces; j++){
-            if (a.face_degrees[i*a.n_faces + j] <= 0) continue;
-            os << "[";
-            for (size_t k = 0; k < a.face_degrees[i*a.n_faces + j] - 1; k++)
-            {
-                os << a.dual_neighbours[(i*a.n_faces + j)*6 + k] << ",";
+        case IDS:
+            os << "ID List: " << "\n[";
+            for (int i = start; i < end - 1; i++){os << a.IDs[i] << ", ";}
+            os << a.IDs[end-1] << "]\n"; 
+            break;
+        case STATUSES:
+            os << "Status List: " << "\n[";
+            for (int i = start; i < end - 1; i++){os << static_cast<int>(a.statuses[i]) << ", ";}
+            os << static_cast<int>(a.statuses[end-1]) << "]\n"; 
+            break;
+        case ITERATIONS:
+            os << "Iteration List: " << "\n[";
+            for (int i = start; i < end - 1; i++){os << static_cast<int>(a.iterations[i]) << ", ";}
+            os << a.iterations[end-1] << "]\n"; 
+            break;
+        case COORDS3D:
+            os << "X Lists: " << "\n[";
+            for (int i = start; i < end; i++){
+                os << "[";
+                for (int j = 0; j < a.n_atoms*3 - 1; j++)
+                {
+                    os << a.X[i*a.n_atoms*3 + j] << ", ";
+                }
+                if(i != (end - 1)) {
+                    os << a.X[(i+1)*a.n_atoms*3 - 1] << "], ";
+                } else{
+                    os << a.X[(i+1)*a.n_atoms*3 - 1] << "]]\n";
+                }
             }
-            os << a.dual_neighbours[(i*a.n_faces + j)*6 + a.face_degrees[i*a.n_faces + j] - 1];
-            if (j != a.n_faces - 1)  os << "],";
-            else os << "]";
-        }
-        
-        if(i != (a.isomer_capacity - 1)) {
+            break;
+        case COORDS2D:
+            os << "2D Layouts: " << "\n[";
+            for (int i = start; i < end; i++){
+                os << "[";
+                for (int j = 0; j < a.n_atoms*2 - 1; j++)
+                {
+                    os << a.xys[i*a.n_atoms*2 + j] << ", ";
+                }
+                if(i != (end - 1)) {
+                    os << a.xys[(i+1)*a.n_atoms*2 - 1] << "], ";
+                } else{
+                    os << a.xys[(i+1)*a.n_atoms*2 - 1] << "]]\n";
+                }
+            }
+            break;
+        case CUBIC_NEIGHBOURS:
+            os << "Cubic Neighbour Lists: " << "\n[";
+            for (int i = start; i < end; i++){
+                os << "[";
+                for (int j = 0; j < a.n_atoms*3 - 1; j++)
+                {
+                    os << a.cubic_neighbours[i*a.n_atoms*3 + j] << ", ";
+                }
+                if(i != (end - 1)) {
+                    os << a.cubic_neighbours[(i+1)*a.n_atoms*3 - 1] << "], ";
+                } else{
+                    os << a.cubic_neighbours[(i+1)*a.n_atoms*3 - 1] << "]]\n";
+                }
+            }
+            break;
+        case DUAL_NEIGHBOURS:
+            os << "Dual Neighbour Lists: " << "\n[";
+            for (int i = start; i < end; i++){
+                os << "[";
+                for (int j = 0; j  < a.n_faces; j++){
+                    if (a.face_degrees[i*a.n_faces + j] <= 0) continue;
+                    os << "[";
+                    for (int k = 0; k < a.face_degrees[i*a.n_faces + j] - 1; k++)
+                    {
+                        os << a.dual_neighbours[(i*a.n_faces + j)*6 + k] << ",";
+                    }
+                    os << a.dual_neighbours[(i*a.n_faces + j)*6 + a.face_degrees[i*a.n_faces + j] - 1];
+                    if (j != a.n_faces - 1)  os << "],";
+                    else os << "]";
+                }
+                
+                if(i != (end - 1)) {
 
-            os << "], ";
-        } else{
-            os << "]]\n";
+                    os << "], ";
+                } else{
+                    os << "]]\n";
+                }
+            }
+            break;
+
+        default:
+            break;
         }
+    };
+    if(buffer_type == DEVICE_BUFFER){
+        IsomerBatch temp(n_atoms, isomer_capacity, HOST_BUFFER);
+        cuda_io::copy(temp, *this);
+        print_fun(temp);
+    } else if(buffer_type == HOST_BUFFER){
+        print_fun(*this);
+    }
+}
+
+std::ostream& operator << (std::ostream& os, const IsomerBatch& input){
+    auto print_fun = [&](const IsomerBatch& a){
+        os << "Batch Dimensions: (" << a.isomer_capacity << ", " << a.n_atoms << ")\n";
+        os << "ID List: " << "\n[";
+        for (size_t i = 0; i < a.isomer_capacity - 1; i++){os << a.IDs[i] << ", ";}
+        os << a.IDs[a.isomer_capacity-1] << "]\n"; 
+        
+        os << "Status List: " << "\n[";
+        for (size_t i = 0; i < a.isomer_capacity - 1; i++){os << static_cast<int>(a.statuses[i]) << ", ";}
+        os << static_cast<int>(a.statuses[a.isomer_capacity-1]) << "]\n"; 
+        if (a.verbose){
+            os << "X Lists: " << "\n[";
+            for (size_t i = 0; i < a.isomer_capacity; i++){
+                os << "[";
+                for (size_t j = 0; j < a.n_atoms*3 - 1; j++)
+                {
+                    os << a.X[i*a.n_atoms*3 + j] << ", ";
+                }
+                if(i != (a.isomer_capacity - 1)) {
+                    os << a.X[(i+1)*a.n_atoms*3 - 1] << "], ";
+                } else{
+                    os << a.X[(i+1)*a.n_atoms*3 - 1] << "]]\n";
+                }
+            }
+
+            os << "2D Layouts: " << "\n[";
+            for (size_t i = 0; i < a.isomer_capacity; i++){
+                os << "[";
+                for (size_t j = 0; j < a.n_atoms*2 - 1; j++)
+                {
+                    os << a.xys[i*a.n_atoms*2 + j] << ", ";
+                }
+                if(i != (a.isomer_capacity - 1)) {
+                    os << a.xys[(i+1)*a.n_atoms*2 - 1] << "], ";
+                } else{
+                    os << a.xys[(i+1)*a.n_atoms*2 - 1] << "]]\n";
+                }
+            }
+
+            os << "Cubic Neighbour Lists: " << "\n[";
+            for (size_t i = 0; i < a.isomer_capacity; i++){
+                os << "[";
+                for (size_t j = 0; j < a.n_atoms*3 - 1; j++)
+                {
+                    os << a.cubic_neighbours[i*a.n_atoms*3 + j] << ", ";
+                }
+                if(i != (a.isomer_capacity - 1)) {
+                    os << a.cubic_neighbours[(i+1)*a.n_atoms*3 - 1] << "], ";
+                } else{
+                    os << a.cubic_neighbours[(i+1)*a.n_atoms*3 - 1] << "]]\n";
+                }
+            }
+
+            os << "Dual Neighbour Lists: " << "\n[";
+            for (size_t i = 0; i < a.isomer_capacity; i++){
+                os << "[";
+                for (int j = 0; j  < a.n_faces; j++){
+                    if (a.face_degrees[i*a.n_faces + j] <= 0) continue;
+                    os << "[";
+                    for (size_t k = 0; k < a.face_degrees[i*a.n_faces + j] - 1; k++)
+                    {
+                        os << a.dual_neighbours[(i*a.n_faces + j)*6 + k] << ",";
+                    }
+                    os << a.dual_neighbours[(i*a.n_faces + j)*6 + a.face_degrees[i*a.n_faces + j] - 1];
+                    if (j != a.n_faces - 1)  os << "],";
+                    else os << "]";
+                }
+                
+                if(i != (a.isomer_capacity - 1)) {
+
+                    os << "], ";
+                } else{
+                    os << "]]\n";
+                }
+            }
+        }
+    };
+    if (input.buffer_type == DEVICE_BUFFER){
+        IsomerBatch output(input.n_atoms, input.isomer_capacity, HOST_BUFFER);
+        cuda_io::copy(output, input);
+        print_fun(output);
+    }else{
+        print_fun(input);
     }
 
     return os;
