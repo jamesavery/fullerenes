@@ -341,6 +341,78 @@ __device__ void ex_scan(T* sdata, const T data, int n){
 }
 
 template <typename T>
+__device__ void in_scan(T* sdata, const T data, int n){
+    auto warpid = threadIdx.x >> 5;
+    auto lane = threadIdx.x & 31;
+
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+
+    auto result = cg::inclusive_scan(tile32, data);
+
+    if (lane == 31){
+        sdata[n+1 + warpid] = result;
+    }
+
+    __syncthreads();
+    if (warpid == 0){
+        auto val = cg::inclusive_scan(tile32, sdata[n+1 + lane]);
+        sdata[n+1 + lane] = val;
+    }
+    __syncthreads();
+    if (warpid == 0)
+    {
+        sdata[threadIdx.x] = result;
+    } else{
+        if (threadIdx.x < n) {
+        sdata[threadIdx.x] =  sdata[n+1 + warpid-1] + result;}
+        
+    }
+    __syncthreads();
+}
+
+
+//WARNING: this function is intended to solve a specific problem efficiently using block scans.
+//It does not work if the number of blocks is larger than blocksize^2.
+template <typename T>
+__device__ __forceinline__ void grid_ex_scan(T* g_out, T* sdata, T data, int n){
+    auto gid = blockDim.x * blockIdx.x + threadIdx.x;
+    auto n_blocks_needed = (n + blockDim.x - 1) / blockDim.x;  //Fast ceiling integer division.
+    g_out[blockIdx.x] = data;
+    T result = 0;
+    GRID_SYNC
+    assert(n_blocks_needed <= gridDim.x);
+    if (gid < n){
+        sdata[threadIdx.x] = g_out[gid];
+    } else{ sdata[threadIdx.x] = 0;}
+    if(blockIdx.x < n_blocks_needed) {
+        in_scan<T>(sdata, sdata[threadIdx.x], blockDim.x); //First compute individual block inclusive scans.
+        result = sdata[threadIdx.x]; //Store this result for later
+    }
+    GRID_SYNC
+    if (threadIdx.x == 0 && blockIdx.x < n_blocks_needed) g_out[blockIdx.x] = sdata[blockDim.x - 1]; 
+    GRID_SYNC
+    if (blockIdx.x == 0){
+        in_scan<T>(sdata, g_out[threadIdx.x],n_blocks_needed); //Now reduce the ends of each scan in a second inclusive scan.
+        g_out[threadIdx.x + 1] = sdata[threadIdx.x];  
+    }
+
+    GRID_SYNC
+    T pre_sum = 0;
+    if(blockIdx.x < n_blocks_needed) pre_sum = g_out[blockIdx.x];
+    GRID_SYNC
+    if(blockIdx.x == 0){
+        if (threadIdx.x==0) g_out[0] = 0;
+        g_out[gid + 1] = result; //Adding the initial scan results to the scan of the block-ends gives us our final scanned array.
+    }
+    else if(blockIdx.x < n_blocks_needed){
+        g_out[gid + 1] = result + pre_sum; //Adding the initial scan results to the scan of the block-ends gives us our final scanned array.
+    }
+    GRID_SYNC
+}
+
+
+
+template <typename T>
 __device__ void prescan_noconflict(T *sdata, const T data, int n)
 {
     auto thid = threadIdx.x;
