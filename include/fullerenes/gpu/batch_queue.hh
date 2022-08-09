@@ -1,6 +1,6 @@
 #include "isomerspace_kernel.hh"
 #include "cuda_execution.hh"
-
+#include "fullerenes/gpu/cu_array.hh"
 namespace cuda_io{
 struct IsomerQueue
 {    
@@ -12,11 +12,11 @@ public:
     bool is_empty() const {return *props.size == 0;};
 
     //Primitive getter functions.
-    int get_size() const {return *props.size;};
-    int get_front() const {return *props.front;};
-    int get_back() const {return *props.back;};
-    int get_capacity() const {return *props.capacity;};
-    int get_requests() const {return *props.requests;};
+    int get_size() const;
+    int get_front() const;
+    int get_back() const;
+    int get_capacity() const;
+    int get_requests() const;
 
     /** Refill batch 
      * @param target Batch to inspect and fill new isomers into in-place.
@@ -59,10 +59,19 @@ public:
     IsomerBatch device_batch = IsomerBatch(N,1,DEVICE_BUFFER);
     IsomerBatch host_batch   = IsomerBatch(N,1,HOST_BUFFER);
 
+    friend std::ostream& operator<<(std::ostream& os, const IsomerQueue& a);
+
 private:
     bool is_mirrored_on_device = false;
     QueueProperties props;
 
+    //A pointer to a pointer to a piece of memory reserved for performing the scan operation in the refill function.
+    int* g_scan_array{};
+    
+    //While we wish to allow the user to enqueue queue operations on any cuda stream, we simultaneously wish to ensure ordering of all queue operations.
+    //Therefore we place an event in every stream after each kernel launch or memcopy and wait for any previous event launched on the queue.
+    cudaEvent_t latest_operation;
+    
     //Need to keep track of where the updated version of the batch exists, if we manipulate the host batch, the device is no longer up to date and vice versa.
     bool is_host_updated = false, is_device_updated = false;
 
