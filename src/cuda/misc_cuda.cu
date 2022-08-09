@@ -146,7 +146,7 @@ __global__
 void reset_convergence_status_(IsomerBatch B){
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x)
     {
-        if (threadIdx.x == 0) B.statuses[isomer_idx] = B.statuses[isomer_idx] != EMPTY ? NOT_CONVERGED : EMPTY;
+        if (threadIdx.x == 0) B.statuses[isomer_idx] = B.statuses[isomer_idx] != IsomerStatus::EMPTY ? IsomerStatus::NOT_CONVERGED : IsomerStatus::EMPTY;
         if (threadIdx.x == 0) B.iterations[isomer_idx] = 0;
     }
     
@@ -155,7 +155,12 @@ void reset_convergence_status_(IsomerBatch B){
 cudaError_t reset_convergence_statuses(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(ctx.get_device_id());
     static LaunchDims dims((void*)reset_convergence_status_, B.n_atoms);
+    dims.update_dims((void*)reset_convergence_status_,B.n_atoms,0,B.isomer_capacity);
+    if(policy == LaunchPolicy::SYNC) ctx.wait();
     void* kargs[]{(void*)&B};
-    return cudaLaunchCooperativeKernel((void*)reset_convergence_status_, dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
+    cudaLaunchCooperativeKernel((void*)reset_convergence_status_, dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
+    if(policy == LaunchPolicy::SYNC) ctx.wait();
+    
+    return cudaGetLastError();
 }
 
