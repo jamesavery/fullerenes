@@ -15,16 +15,27 @@ namespace gpu_kernels{
         cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
         //Stat functions:
-        cudaError_t get_bond_rms        (const IsomerBatch& B, CuArray<device_real_t>& bond_rms);
-        cudaError_t get_angle_rms       (const IsomerBatch& B, CuArray<device_real_t>& angle_rms);
-        cudaError_t get_dihedral_rms    (const IsomerBatch& B, CuArray<device_real_t>& dihedral_rms);
-        cudaError_t get_bond_max        (const IsomerBatch& B, CuArray<device_real_t>& bond_max);
-        cudaError_t get_angle_max       (const IsomerBatch& B, CuArray<device_real_t>& angle_max);    
-        cudaError_t get_dihedral_max    (const IsomerBatch& B, CuArray<device_real_t>& dihedral_max);
-        cudaError_t get_energies        (const IsomerBatch& B, CuArray<device_real_t>& energies);
-        cudaError_t get_gradient_norm   (const IsomerBatch& B, CuArray<device_real_t>& gradient_norm);
-        cudaError_t get_gradient_rms    (const IsomerBatch& B, CuArray<device_real_t>& gradient_rms);
-        cudaError_t get_gradient_max    (const IsomerBatch& B, CuArray<device_real_t>& gradient_max);
+        cudaError_t get_bonds           (const IsomerBatch& B, CuArray<device_real_t>& bonds);          //N x M x 3
+        cudaError_t get_angles          (const IsomerBatch& B, CuArray<device_real_t>& angles);         //N x M x 3
+        cudaError_t get_dihedrals       (const IsomerBatch& B, CuArray<device_real_t>& dihedrals);      //N x M x 3
+
+        cudaError_t get_energy          (const IsomerBatch& B, CuArray<device_real_t>& energy);         //M x 1
+        cudaError_t get_bond_mean       (const IsomerBatch& B, CuArray<device_real_t>& bond_mean);      //M x 1
+        cudaError_t get_angle_mean      (const IsomerBatch& B, CuArray<device_real_t>& angle_mean);     //M x 1
+        cudaError_t get_dihedral_mean   (const IsomerBatch& B, CuArray<device_real_t>& dihedral_mean);  //M x 1
+
+        cudaError_t get_bond_rms        (const IsomerBatch& B, CuArray<device_real_t>& bond_rms);       //M x 1
+        cudaError_t get_angle_rms       (const IsomerBatch& B, CuArray<device_real_t>& angle_rms);      //M x 1
+        cudaError_t get_dihedral_rms    (const IsomerBatch& B, CuArray<device_real_t>& dihedral_rms);   //M x 1
+        cudaError_t get_bond_max        (const IsomerBatch& B, CuArray<device_real_t>& bond_max);       //M x 1
+        cudaError_t get_angle_max       (const IsomerBatch& B, CuArray<device_real_t>& angle_max);      //M x 1
+        cudaError_t get_dihedral_max    (const IsomerBatch& B, CuArray<device_real_t>& dihedral_max);   //M x 1
+        cudaError_t get_energies        (const IsomerBatch& B, CuArray<device_real_t>& energies);       //M x 1
+        
+        cudaError_t get_gradient_mean   (const IsomerBatch& B, CuArray<device_real_t>& gradient_mean);  //M x 1
+        cudaError_t get_gradient_norm   (const IsomerBatch& B, CuArray<device_real_t>& gradient_norm);  //M x 1
+        cudaError_t get_gradient_rms    (const IsomerBatch& B, CuArray<device_real_t>& gradient_rms);   //M x 1
+        cudaError_t get_gradient_max    (const IsomerBatch& B, CuArray<device_real_t>& gradient_max);   //M x 1
 
     }
 
