@@ -32,6 +32,14 @@ int LaunchCtx::get_stream_count(){
     return m_all_streams.size();
 }
 
+void LaunchCtx::clear_allocations(){
+    for (int i = 0; i < get_device_count(); ++i){
+        cudaSetDevice(i);
+        cudaDeviceSynchronize();
+        cudaDeviceReset();
+    }
+}
+
 LaunchCtx::LaunchCtx(){
     cudaGetDeviceCount(&m_device_count);
     if (m_device_count < 1) {
@@ -47,11 +55,13 @@ LaunchCtx::LaunchCtx(){
 }
 
 LaunchCtx::LaunchCtx(int device){
-    cudaGetDeviceCount(&m_device_count);
+    static int m_device_count = get_device_count();
+    static std::vector<bool> first_call(16, true);
     if (m_device_count < device) {std::cout << "Error: requested device was not found" << std::endl; return;}
     int temp_device; cudaGetDevice(&temp_device);
     m_device_id = device;
     cudaSetDevice(device);
+    if(first_call[device]) cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
     cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
     cudaStream_t* stream_ptr = &stream;
     m_unique_stream_idx = m_object_counter++;
