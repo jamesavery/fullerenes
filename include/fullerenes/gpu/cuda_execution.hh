@@ -20,6 +20,7 @@ class LaunchCtx
         static void wait_all();
         static int get_device_count();
         static int get_stream_count();
+        static void clear_allocations();
         cudaStream_t stream;
     private:
         //The reason for pointer-pointer semantics is that the adress of the stream may change when the stream is created or destroyed.
