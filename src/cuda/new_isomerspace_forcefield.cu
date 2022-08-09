@@ -607,8 +607,7 @@ INLINE real_t GSS(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2) const{
     return alpha;
 }
 
-INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
-{
+INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter){
     real_t alpha, beta, g0_norm2, s_norm;
     coord3d g0,g1,s;
     g0 = gradient(X);
@@ -620,9 +619,8 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
         s_norm = sqrt(reduction(sdata, dot(s,s)));
     #endif
     s /= s_norm;
-
-    for (size_t i = 0; i < MaxIter; i++)
-    {   
+    //auto step = [&](){
+    for (size_t i = 0; i < MaxIter; i++){
         alpha = LINESEARCH_METHOD(X,s,X1,X2);
         if (alpha > (real_t)0.0){X1[node_id] = X[node_id] + alpha * s;}
         g1 = gradient(X1);
@@ -640,17 +638,20 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter)
             s_norm = sqrt(reduction(sdata, dot(s,s)));
         #endif
         s /= s_norm;
-    }   
-} 
+    }
+}
+
+
 };
 
 template <ForcefieldType T>
-__device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
+__device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
-    if (B.statuses[isomer_idx] == NOT_CONVERGED){
+
+    if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
+    if (B.statuses[isomer_idx] == IsomerStatus::NOT_CONVERGED){
     size_t offset = isomer_idx * blockDim.x;
     Constants constants     = Constants(B, isomer_idx);
     NodeGraph node_graph    = NodeGraph(B, isomer_idx);
@@ -680,29 +681,28 @@ __device__ void check_batch(IsomerBatch &B, const size_t max_iterations){
     real_t grad_max         = reduction_max(smem, sqrt(dot(FF.gradient(X), FF.gradient(X)))     );
     real_t energy           = FF.energy(X); 
     
-    bool converged = (grad_norm < 1e-2) && !isnan(grad_norm);
+    bool converged = ((grad_norm < 1e-2)  && (bond_max < 0.1) && !isnan(grad_norm)) ;
     //if(threadIdx.x + isomer_idx == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
-
-    if(threadIdx.x == 0 && B.statuses[isomer_idx] != EMPTY){
+    if(threadIdx.x == 0 && B.statuses[isomer_idx] != IsomerStatus::EMPTY){
         if (converged)
         {
-            B.statuses[isomer_idx] = CONVERGED;
-        } else if (B.iterations[isomer_idx] >= max_iterations || isnan(grad_norm)) {
-            B.statuses[isomer_idx] = FAILED;
+            B.statuses[isomer_idx] = IsomerStatus::CONVERGED;
+        } else if (B.iterations[isomer_idx] >= max_iterations || isnan(grad_norm)  ) {
+            B.statuses[isomer_idx] = IsomerStatus::FAILED;
         }
-    }
-    }
-    }
-    
+       
+    }}}
 }
 template <ForcefieldType T>
 __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx += gridDim.x){
+    auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
+    for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
     BLOCK_SYNC
-    if (B.statuses[isomer_idx] == NOT_CONVERGED)
+    if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
+    if (B.statuses[isomer_idx] == IsomerStatus::NOT_CONVERGED)
     {
         real_t* base_pointer        = smem + Block_Size_Pow_2;
         size_t offset               = isomer_idx * blockDim.x;
@@ -735,10 +735,10 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
         reinterpret_cast<coord3d*>(B.X)[offset + threadIdx.x]= X[threadIdx.x];
 
         if (threadIdx.x == 0) {B.iterations[isomer_idx] += iterations;}
-    }
+    }}
     //Check the convergence of isomers and assign status accordingly.
     BLOCK_SYNC
-    check_batch<T>(B, max_iterations);
+    check_batch<T>(B, isomer_idx, max_iterations);
     }
 }
 
@@ -758,7 +758,7 @@ __global__ void diagnostic_function(IsomerBatch B, CuArray<device_real_t> ouput)
         extern __shared__ real_t smem[];\
         clear_cache(smem,Block_Size_Pow_2);\
         for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){\
-        if(B.statuses[isomer_idx] != EMPTY){\
+        if(B.statuses[isomer_idx] != IsomerStatus::EMPTY){\
             coord3d rel_err;\
             size_t offset = isomer_idx * blockDim.x;  \
             Constants constants     = Constants(B, isomer_idx);\
@@ -783,6 +783,81 @@ __global__ void diagnostic_function(IsomerBatch B, CuArray<device_real_t> ouput)
         cudaDeviceSynchronize();\
         return error;\
     }
+
+#define GET_MEAN(fun_1, fun_2, param_fun, err_fun) \
+    __global__ void fun_1(const IsomerBatch B, CuArray<device_real_t> bond_rms){\
+        DEVICE_TYPEDEFS\
+        extern __shared__ real_t smem[];\
+        clear_cache(smem,Block_Size_Pow_2);\
+        for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){\
+        if(B.statuses[isomer_idx] != IsomerStatus::EMPTY){\
+            coord3d rel_err;\
+            size_t offset = isomer_idx * blockDim.x;  \
+            Constants constants     = Constants(B, isomer_idx);\
+            NodeGraph node_graph    = NodeGraph(B, isomer_idx);\
+            ForceField FF           = ForceField<FORCEFIELD_VERSION>(node_graph, constants, smem);\
+            coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
+            for (uint8_t j = 0; j < 3; j++){\
+                auto arc            = ForceField<FORCEFIELD_VERSION>::ArcData(j, X, node_graph);\
+                d_set(rel_err,      j, abs(param_fun));\
+            }\
+            bond_rms.data[isomer_idx]         = err_fun;\
+        }}\
+    }\
+    cudaError_t fun_2(const IsomerBatch& B, CuArray<device_real_t>& bond_rms){\
+        cudaDeviceSynchronize();\
+        cudaSetDevice(B.get_device_id());\
+        size_t smem = sizeof(device_real_t)*(Block_Size_Pow_2 + B.n_atoms);\
+        static LaunchDims dims((void*)fun_1, B.n_atoms, smem, B.isomer_capacity);\
+        dims.update_dims((void*)fun_1, B.n_atoms, smem, B.isomer_capacity);\
+        void* kargs[]{(void*)&B, (void*)&bond_rms};\
+        auto error = safeCudaKernelCall((void*)fun_1, dims.get_grid(), dims.get_block(), kargs, smem);\
+        cudaDeviceSynchronize();\
+        return error;\
+    }
+
+#define GET_INTERNAL(fun_1, fun_2, param_fun) \
+    __global__ void fun_1(const IsomerBatch B, CuArray<device_real_t> bond_rms){\
+        DEVICE_TYPEDEFS\
+        extern __shared__ real_t smem[];\
+        clear_cache(smem,Block_Size_Pow_2);\
+        for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){\
+        if(B.statuses[isomer_idx] != IsomerStatus::EMPTY){\
+            coord3d rel_err;\
+            size_t offset = isomer_idx * blockDim.x;  \
+            Constants constants     = Constants(B, isomer_idx);\
+            NodeGraph node_graph    = NodeGraph(B, isomer_idx);\
+            ForceField FF           = ForceField<FORCEFIELD_VERSION>(node_graph, constants, smem);\
+            coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
+            for (uint8_t j = 0; j < 3; j++){\
+                auto arc            = ForceField<FORCEFIELD_VERSION>::ArcData(j, X, node_graph);\
+                d_set(rel_err,      j, param_fun);\
+            }\
+            reinterpret_cast<coord3d*>(bond_rms.data)[isomer_idx*B.n_atoms + threadIdx.x]         =  {rel_err.x, rel_err.y, rel_err.z};\
+        }}\
+    }\
+    cudaError_t fun_2(const IsomerBatch& B, CuArray<device_real_t>& bond_rms){\
+        cudaDeviceSynchronize();\
+        cudaSetDevice(B.get_device_id());\
+        size_t smem = sizeof(device_real_t)*(Block_Size_Pow_2 + B.n_atoms);\
+        static LaunchDims dims((void*)fun_1, B.n_atoms, smem, B.isomer_capacity);\
+        dims.update_dims((void*)fun_1, B.n_atoms, smem, B.isomer_capacity);\
+        void* kargs[]{(void*)&B, (void*)&bond_rms};\
+        auto error = safeCudaKernelCall((void*)fun_1, dims.get_grid(), dims.get_block(), kargs, smem);\
+        cudaDeviceSynchronize();\
+        return error;\
+    }
+
+GET_INTERNAL(get_bonds_,get_bonds, arc.bond())
+GET_INTERNAL(get_angles_,get_angles, arc.angle())
+GET_INTERNAL(get_dihedrals_,get_dihedrals, arc.dihedral())
+
+GET_MEAN(get_energy_, get_energy, arc.bond(), FF.energy(X)/blockDim.x)
+
+GET_MEAN(get_bond_mean_,get_bond_mean, arc.bond(), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
+GET_MEAN(get_angle_mean_,get_angle_mean, arc.angle(), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
+GET_MEAN(get_dihedral_mean_,get_dihedral_mean, arc.dihedral(), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
+GET_MEAN(get_gradient_mean_,get_gradient_mean, d_get(FF.gradient(X),j), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
 
 GET_STAT(get_bond_rms_,get_bond_rms, arc.bond(), constants.r0, sqrt(reduction(smem,dot(rel_err,rel_err))/blockDim.x))
 GET_STAT(get_bond_max_,get_bond_max, arc.bond(), constants.r0, reduction_max(smem, max(rel_err)))
