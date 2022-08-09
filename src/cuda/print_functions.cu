@@ -89,4 +89,28 @@ __device__ void grid_print(T data){
     cg::sync(cg::this_grid());
 }
 
+template <typename T>
+__device__ void grid_print(T data, bool mask){
+
+    if (threadIdx.x + blockIdx.x == 0) printf("[");
+    cg::sync(cg::this_grid());
+    for (size_t i = 0; i < gridDim.x; i++)
+    {   
+            if(threadIdx.x == 0){
+            if (blockIdx.x == i)
+            {
+            if (i != gridDim.x-1 && mask)
+            {
+                print(data); printf(",");
+            } else if(mask){
+                print(data);
+            }}
+
+        }
+        cg::sync(cg::this_grid());
+    }
+    if(threadIdx.x + blockIdx.x == 0) printf("]\n");
+    cg::sync(cg::this_grid());
+}
+
 #endif
