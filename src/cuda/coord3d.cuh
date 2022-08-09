@@ -14,12 +14,15 @@ INLINE device_coord3d operator*(const device_real_t s, const device_coord3d& a) 
 INLINE device_coord3d operator*(const device_coord3d& a, const device_coord3d& b) { return {a.x*b.x, a.y*b.y, a.z*b.z};}
 INLINE device_coord3d operator/(const device_real_t s, const device_coord3d& a)  { return a*(1/s); }
 INLINE device_coord3d operator/(const device_coord3d& a, const device_real_t s)  { return a*(1/s); }
+INLINE device_coord3d operator/(const device_coord3d& a, const device_coord3d& b)  { return {a.x/b.x, a.y/b.y, a.z/b.z}; }
+INLINE device_coord3d operator<(const device_coord3d& a, const device_real_t& b) {return {(float)(a.x < b), (float)(a.y < b), (float)(a.z <b) };}
 INLINE void operator+=(device_coord3d& a, const device_coord3d& b) {a = a + b;}
 INLINE void operator-=(device_coord3d& a, const device_coord3d& b) {a = a - b;}
 INLINE void operator/=(device_coord3d& a, const device_real_t b) {a = a / b;}
 INLINE void operator*=(device_coord3d& a, const device_real_t b) {a = a * b;}
 
 
+INLINE device_coord3d d_abs(const device_coord3d& a){ return {abs(a.x), abs(a.y), abs(a.z)};}
 INLINE device_coord3d cos3(const device_coord3d& a){
   return {cos((double)a.x), cos((double)a.y), cos((double)a.z)};
 }
