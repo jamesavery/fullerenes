@@ -20,7 +20,7 @@ using namespace gpu_kernels;
 int main(int argc, char** argv){
     const size_t N_start                = argc > 1 ? strtol(argv[1],0,0) : 20;     // Argument 1: Number of vertices N
     const size_t N_limit                = argc > 2 ? strtol(argv[2],0,0) : N_start;     // Argument 1: Number of vertices N
-    auto N_runs = 10;
+    const size_t N_runs                 = argc > 3 ? strtol(argv[3],0,0) : 10;
 
     ofstream out_file("IsomerspaceOpt_V5_" + to_string(N_limit) + ".txt");
     ofstream out_file_std("IsomerspaceOpt_V5_STD_" + to_string(N_limit) + ".txt");
@@ -30,24 +30,14 @@ int main(int argc, char** argv){
         auto batch_size = isomerspace_forcefield::optimal_batch_size(N);
         auto n_fullerenes = (int)num_fullerenes.find(N)->second;
         auto sample_size = min(batch_size*1,n_fullerenes);
-        if (n_fullerenes < batch_size){
-            sample_size = n_fullerenes;
-        } else if (n_fullerenes < batch_size*2){
-            sample_size = batch_size;
-        }else if (n_fullerenes < batch_size*3){
-            sample_size = batch_size*2;
-        }else if (n_fullerenes < batch_size*4){
-            sample_size = batch_size*3;
-        }else{
-            sample_size = batch_size*4;
-        }
         
         std::cout << N << endl;
         IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
         cuda_io::IsomerQueue Isomer_Q(N);
+        cuda_io::IsomerQueue Output_Q(N);
         //Pre allocate the device queue such that it doesn't happen during benchmarking
         Isomer_Q.resize(2*sample_size);
-     
+        Output_Q.resize(2*sample_size);
         bool more_to_generate = true;
         int N_f = N/2 + 2;
         auto T0 = high_resolution_clock::now();
@@ -91,16 +81,17 @@ int main(int argc, char** argv){
         
         generate_isomers();
         Isomer_Q.refill_batch(batch0);
-
-        for (size_t l = 0; l < N_runs; l++)
+        for (size_t l = 0; l < N_runs; ++l)
         {
+            std::cout << l << endl;
             auto generate_handle = std::async(std::launch::async, generate_isomers);
             auto T1 = high_resolution_clock::now();
                 isomerspace_dual::cubic_layout(batch0,device0,LaunchPolicy::ASYNC);
                 isomerspace_tutte::tutte_layout(batch0,10000000,device0,LaunchPolicy::ASYNC);
-                isomerspace_X0::zero_order_geometry(batch0, 4.0);
+                isomerspace_X0::zero_order_geometry(batch0, 4.0, device0, LaunchPolicy::ASYNC);
                 cuda_io::reset_convergence_statuses(batch0,device0,LaunchPolicy::ASYNC);
-                isomerspace_forcefield::optimize_batch(batch0,N*4,N*4,device0,LaunchPolicy::ASYNC);
+                isomerspace_forcefield::optimize_batch(batch0,N*1,N*4,device0,LaunchPolicy::ASYNC);
+                Output_Q.push(batch0, device0, LaunchPolicy::ASYNC);
                 device0.wait();
             auto T2 = high_resolution_clock::now(); T_par[l] += ( T2 - T1);
                 generate_handle.wait(); 
