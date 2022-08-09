@@ -145,9 +145,9 @@ int main(int ac, char **argv)
     }
     while(!output_queue.empty()){
       ++num_finished;
-      if(get<2>(output_queue.front()) == CONVERGED ){
+      if(get<2>(output_queue.front()) == IsomerStatus::CONVERGED ){
         ++num_converged;
-      } else if (get<2>(output_queue.front()) == FAILED)
+      } else if (get<2>(output_queue.front()) == IsomerStatus::FAILED)
       {
         ++num_failed;
       }
