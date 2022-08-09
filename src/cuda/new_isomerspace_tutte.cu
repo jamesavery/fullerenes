@@ -20,7 +20,7 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
-    if (B.statuses[isomer_idx] != EMPTY){
+    if (B.statuses[isomer_idx] != IsomerStatus::EMPTY){
     size_t offset = isomer_idx * blockDim.x;
 
     DeviceFullereneGraph FG(&B.cubic_neighbours[offset*3]); 
@@ -73,7 +73,7 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     }
     BLOCK_SYNC
     (reinterpret_cast<coord2d*>(B.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
-    B.statuses[isomer_idx] = CONVERGED;
+    B.statuses[isomer_idx] = IsomerStatus::CONVERGED;
     }
     }
 }

@@ -77,7 +77,7 @@ void kernel_zero_order_geometry(IsomerBatch G, device_real_t scalerad){
 
     extern __shared__  device_real_t sdata[];
     clear_cache(sdata, Block_Size_Pow_2);
-    if (G.statuses[blockIdx.x] == NOT_CONVERGED)
+    if (G.statuses[blockIdx.x] == IsomerStatus::NOT_CONVERGED)
     {
     NodeGraph node_graph = NodeGraph(G, blockIdx.x); 
     coord2d angles = spherical_projection(G,reinterpret_cast<device_node_t*>(sdata));
@@ -104,7 +104,7 @@ void kernel_zero_order_geometry(IsomerBatch G, device_real_t scalerad){
     Ravg /= real_t(3*blockDim.x);
     coordinate *= scalerad*1.5/Ravg;
     reinterpret_cast<coord3d*>(G.X)[blockDim.x*blockIdx.x + threadIdx.x] = coordinate;
-    G.statuses[blockIdx.x] = CONVERGED;
+    G.statuses[blockIdx.x] = IsomerStatus::CONVERGED;
     }
 }
 void IsomerspaceX0::check_batch(){
@@ -118,8 +118,8 @@ void IsomerspaceX0::check_batch(){
         IsomerStatus* statuses = h_batch[i].statuses;
         for (int j = 0; j < device_capacities[i]; j++)
         {   
-            num_of_not_converged_isomers += (int)(statuses[j] == NOT_CONVERGED);
-            if (statuses[j] != NOT_CONVERGED)
+            num_of_not_converged_isomers += (int)(statuses[j] == IsomerStatus::NOT_CONVERGED);
+            if (statuses[j] != IsomerStatus::NOT_CONVERGED)
             {   
                 index_queue[i].push(j);
             }

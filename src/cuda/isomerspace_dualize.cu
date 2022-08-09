@@ -33,7 +33,7 @@ void cubic_layout_(IsomerBatch B){
     device_node_t* smem = reinterpret_cast<device_node_t*>(cached_neighbours) + B.n_faces*8;
     clear_cache(reinterpret_cast<real_t*>(smem),power2);
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx += gridDim.x ){
-    if (B.statuses[isomer_idx] != EMPTY ){
+    if (B.statuses[isomer_idx] != IsomerStatus::EMPTY ){
 
     BLOCK_SYNC
     auto thid = threadIdx.x;

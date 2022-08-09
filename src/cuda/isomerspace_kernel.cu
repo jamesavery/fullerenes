@@ -61,13 +61,13 @@ IsomerspaceKernel::IsomerspaceKernel(const size_t N, void* kernel){
         GPUDataStruct::allocate(d_batch[i]         , N, device_capacities[i], DEVICE_BUFFER);
         GPUDataStruct::allocate(h_batch[i]         , N, device_capacities[i], HOST_BUFFER);
 
-        std::fill(h_batch[i].statuses, h_batch[i].statuses + h_batch[i].isomer_capacity, EMPTY);
-        fill_cu_array(d_output_batch[i].statuses, d_output_batch[i].isomer_capacity, EMPTY);
+        std::fill(h_batch[i].statuses, h_batch[i].statuses + h_batch[i].isomer_capacity, IsomerStatus::EMPTY);
+        fill_cu_array(d_output_batch[i].statuses, d_output_batch[i].isomer_capacity, IsomerStatus::EMPTY);
 
         cudaMalloc(&global_reduction_arrays[i], sizeof(device_real_t)*N*device_capacities[i]);
         batch_sizes[i] = 0;
         for (size_t j = 0; j < device_capacities[i]; j++) index_queue[i].push(j);
-        for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = EMPTY;
+        for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = IsomerStatus::EMPTY;
     }
 }
 

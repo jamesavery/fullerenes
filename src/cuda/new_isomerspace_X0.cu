@@ -88,7 +88,7 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
     extern __shared__  device_real_t sdata[];
     clear_cache(sdata, Block_Size_Pow_2);
     size_t isomer_idx = blockIdx.x + offset;
-    if (isomer_idx < B.isomer_capacity && B.statuses[isomer_idx] != EMPTY){
+    if (isomer_idx < B.isomer_capacity && B.statuses[isomer_idx] != IsomerStatus::EMPTY){
     NodeGraph node_graph = NodeGraph(B, isomer_idx); 
     coord2d angles = spherical_projection(B,reinterpret_cast<device_node_t*>(sdata), isomer_idx);
     real_t theta = angles.x; real_t phi = angles.y;
@@ -112,7 +112,7 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
     Ravg /= real_t(3*blockDim.x);
     coordinate *= scalerad*1.5/Ravg;
     reinterpret_cast<coord3d*>(B.X)[blockDim.x*isomer_idx + threadIdx.x] = coordinate;
-    B.statuses[isomer_idx] = CONVERGED;
+    B.statuses[isomer_idx] = IsomerStatus::CONVERGED;
     }
 }
 

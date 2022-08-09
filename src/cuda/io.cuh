@@ -169,7 +169,7 @@ __device__ bool within_interval(size_t x, size_t a, size_t b){
 
 __global__
 void clear_convergence_status(IsomerBatch G){
-    if (threadIdx.x == 0) G.statuses[blockIdx.x] = G.statuses[blockIdx.x] != EMPTY ? NOT_CONVERGED : EMPTY;
+    if (threadIdx.x == 0) G.statuses[blockIdx.x] = G.statuses[blockIdx.x] != IsomerStatus::EMPTY ? IsomerStatus::NOT_CONVERGED : IsomerStatus::EMPTY;
     if (threadIdx.x == 0) G.iterations[blockIdx.x] = 0;
 }
 
@@ -202,7 +202,7 @@ void kernel_update_queue(IsomerBatch G, IsomerBatch queue_batch){
     __shared__ size_t queue_index;
     if ((threadIdx.x + blockIdx.x) == 0) {num_queue_requests = 0; queue_capacity = queue_batch.isomer_capacity;}
     GRID_SYNC
-    if (G.statuses[blockIdx.x] != NOT_CONVERGED){
+    if (G.statuses[blockIdx.x] != IsomerStatus::NOT_CONVERGED){
         if(threadIdx.x == 0){
             queue_index = atomicAdd(&queue_front, 1);
             queue_index = queue_index % queue_capacity;
@@ -219,7 +219,7 @@ void kernel_update_queue(IsomerBatch G, IsomerBatch queue_batch){
             G.IDs[blockIdx.x] = queue_batch.IDs[queue_index];
             G.iterations[blockIdx.x] = 0;
             G.statuses[blockIdx.x] = queue_batch.statuses[queue_index];
-            queue_batch.statuses[queue_index] = EMPTY;
+            queue_batch.statuses[queue_index] = IsomerStatus::EMPTY;
         }
     }
     GRID_SYNC
@@ -246,7 +246,7 @@ void kernel_initialize_queue(IsomerBatch queue_batch){
     }
     for (size_t tid = blockDim.x * blockIdx.x + threadIdx.x; tid < queue_batch.isomer_capacity; tid+=blockDim.x*gridDim.x)
     {
-        queue_batch.statuses[tid] = EMPTY;
+        queue_batch.statuses[tid] = IsomerStatus::EMPTY;
         queue_batch.iterations[tid] = 0;
         queue_batch.IDs[tid] = 0;
     }
@@ -256,7 +256,7 @@ __global__
 void kernel_push_batch(IsomerBatch input_batch, IsomerBatch queue_batch, device_real_t* global_reduction_array){
     extern __shared__ device_real_t sdata[];
     clear_cache(sdata, Block_Size_Pow_2 );
-    size_t insert_size = size_t(global_reduction(sdata,global_reduction_array, device_real_t((input_batch.statuses[blockIdx.x] == NOT_CONVERGED) && (threadIdx.x == 0))));
+    size_t insert_size = size_t(global_reduction(sdata,global_reduction_array, device_real_t((input_batch.statuses[blockIdx.x] == IsomerStatus::NOT_CONVERGED) && (threadIdx.x == 0))));
     //Since queue is statically allocated, it needs to break if you try to exceed capacity.
     assert((queue_size + insert_size) <= queue_capacity);
 
@@ -358,7 +358,7 @@ void IsomerspaceKernel::output_isomer(size_t i, size_t idx){
     Polyhedron P(FullereneGraph(Graph(output,true)), output_X);
     P.layout2d = xys;
     output_queue.push({B.IDs[idx],P});
-    B.statuses[idx]==CONVERGED ? converged_count++ : failed_count++;
+    B.statuses[idx]==IsomerStatus::CONVERGED ? converged_count++ : failed_count++;
     B.n_isomers--; if(queue_mode == DEVICE_QUEUE) device_queue_size--;
 }
 
@@ -390,7 +390,7 @@ void IsomerspaceKernel::insert_isomer(size_t i, size_t idx){
     }
     
     B.iterations[idx]   = 0;
-    B.statuses[idx]    = NOT_CONVERGED;
+    B.statuses[idx]    = IsomerStatus::NOT_CONVERGED;
     B.IDs[idx]         = ID;
     
     batch_size++;
@@ -407,7 +407,7 @@ void IsomerspaceKernel::update_batch(){
             size_t idx       = index_queue[i].front();
 	    //            size_t offset  = idx*3*N;      //neighbour offset; TODO: DENNE BRUGES ALDRIG. Er det med vilje?
 
-            if ((B.statuses[idx] == CONVERGED) || (B.statuses[idx]==FAILED))
+            if ((B.statuses[idx] == IsomerStatus::CONVERGED) || (B.statuses[idx]==IsomerStatus::FAILED))
             {
                 output_isomer(i,idx);
             }
@@ -422,9 +422,9 @@ void IsomerspaceKernel::update_batch(){
     if (insert_queue.empty()){
         for (size_t i = 0; i < device_count; i++)
         for (size_t j = 0; j < device_capacities[i]; j++){   
-            if ((h_batch[i].statuses[j] == CONVERGED) || (h_batch[i].statuses[j]==FAILED)){
+            if ((h_batch[i].statuses[j] == IsomerStatus::CONVERGED) || (h_batch[i].statuses[j]==IsomerStatus::FAILED)){
                 output_isomer(i,j);
-                h_batch[i].statuses[j] = EMPTY;
+                h_batch[i].statuses[j] = IsomerStatus::EMPTY;
             }
         }
     }
@@ -439,7 +439,7 @@ void IsomerspaceKernel::set_all_converged(){
         cudaMemcpy(h_batch[i].statuses, d_batch[i].statuses, sizeof(IsomerStatus)*device_capacities[i], cudaMemcpyDeviceToHost);
         for (size_t j = 0; j < device_capacities[i]; j++)
         {
-            h_batch[i].statuses[j] = (h_batch[i].statuses[j] != EMPTY)  ? CONVERGED : EMPTY;
+            h_batch[i].statuses[j] = (h_batch[i].statuses[j] != IsomerStatus::EMPTY)  ? IsomerStatus::CONVERGED : IsomerStatus::EMPTY;
         }
         cudaMemcpy(d_batch[i].statuses, h_batch[i].statuses, sizeof(IsomerStatus)*device_capacities[i], cudaMemcpyHostToDevice);
     }
@@ -458,9 +458,9 @@ void IsomerspaceKernel::output_batch_to_queue(){
     
     for (size_t i = 0; i < device_count; i++)
     for (size_t j = 0; j < device_capacities[i]; j++){   
-        if ((h_batch[i].statuses[j] == CONVERGED) || (h_batch[i].statuses[j]==FAILED)){
+        if ((h_batch[i].statuses[j] == IsomerStatus::CONVERGED) || (h_batch[i].statuses[j]==IsomerStatus::FAILED)){
             output_isomer(i,j);
-            h_batch[i].statuses[j] = EMPTY;
+            h_batch[i].statuses[j] = IsomerStatus::EMPTY;
         }
     }
 }
@@ -470,7 +470,7 @@ void IsomerspaceKernel::insert_queued_isomers(){
     batch_sizes = {};
     for (size_t i = 0; i < device_count; i++) {
         h_batch[i].n_isomers = 0;
-        for (size_t j = 0; j < device_capacities[i]; j++) if(!insert_queue.empty()) insert_isomer(i,j); else h_batch[i].statuses[j] = EMPTY;
+        for (size_t j = 0; j < device_capacities[i]; j++) if(!insert_queue.empty()) insert_isomer(i,j); else h_batch[i].statuses[j] = IsomerStatus::EMPTY;
             printLastCudaError("Failed to insert isomers: ");
     }
     for (size_t i = 0; i < device_count; i++) d_batch[i] <<= h_batch[i];

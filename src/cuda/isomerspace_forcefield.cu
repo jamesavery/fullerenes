@@ -488,7 +488,7 @@ __global__ void kernel_optimize_batch(IsomerBatch G, const size_t iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    if (G.statuses[blockIdx.x] == NOT_CONVERGED)
+    if (G.statuses[blockIdx.x] == IsomerStatus::NOT_CONVERGED)
     {
         real_t* base_pointer        = smem + Block_Size_Pow_2;
         size_t offset               = blockIdx.x * blockDim.x;
@@ -531,7 +531,7 @@ __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_red
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
-    if (G.statuses[blockIdx.x] == NOT_CONVERGED){
+    if (G.statuses[blockIdx.x] == IsomerStatus::NOT_CONVERGED){
     size_t offset = blockIdx.x * blockDim.x;
     Constants constants     = Constants(G, blockIdx.x);
     NodeGraph node_graph    = NodeGraph(G, blockIdx.x);
@@ -560,15 +560,15 @@ __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_red
     real_t energy           = FF.energy(X); 
     
     bool converged = (grad_norm < 1e-2) && !isnan(grad_norm);
-    //real_t num_converged    = global_reduction(smem,global_reduction_array,converged,(threadIdx.x==0) && (G.statuses[blockIdx.x] == IsomerspaceForcefield::NOT_CONVERGED));
+    //real_t num_converged    = global_reduction(smem,global_reduction_array,converged,(threadIdx.x==0) && (G.statuses[blockIdx.x] == IsomerspaceForcefield::IsomerStatus::NOT_CONVERGED));
     //if(threadIdx.x + blockIdx.x == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
 
-    if(threadIdx.x == 0 && G.statuses[blockIdx.x] != EMPTY){
+    if(threadIdx.x == 0 && G.statuses[blockIdx.x] != IsomerStatus::EMPTY){
         if (converged)
         {
-            G.statuses[blockIdx.x] = CONVERGED;
+            G.statuses[blockIdx.x] = IsomerStatus::CONVERGED;
         } else if (G.iterations[blockIdx.x] >= max_iterations || isnan(grad_norm)) {
-            G.statuses[blockIdx.x] = FAILED;
+            G.statuses[blockIdx.x] = IsomerStatus::FAILED;
         }
     }
     }
@@ -622,8 +622,8 @@ void IsomerspaceForcefield::check_batch(size_t max_iterations){
         IsomerStatus* statuses = h_batch[i].statuses;
         for (int j = 0; j < device_capacities[i]; j++)
         {   
-            num_of_not_converged_isomers += (int)(statuses[j] == NOT_CONVERGED);
-            if (statuses[j] != NOT_CONVERGED)
+            num_of_not_converged_isomers += (int)(statuses[j] == IsomerStatus::NOT_CONVERGED);
+            if (statuses[j] != IsomerStatus::NOT_CONVERGED)
             {   
                 index_queue[i].push(j);
             }

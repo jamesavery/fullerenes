@@ -17,7 +17,7 @@ void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
 
-    if (G.statuses[blockIdx.x] == NOT_CONVERGED)
+    if (G.statuses[blockIdx.x] == IsomerStatus::NOT_CONVERGED)
     {
     size_t offset = blockIdx.x * blockDim.x;
     DeviceFullereneGraph FG(&G.cubic_neighbours[offset*3]); 
@@ -71,7 +71,7 @@ void kernel_tutte_layout(IsomerBatch G, const size_t iterations){
     }
     BLOCK_SYNC
     (reinterpret_cast<coord2d*>(G.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
-    G.statuses[blockIdx.x] = CONVERGED;
+    G.statuses[blockIdx.x] = IsomerStatus::CONVERGED;
     }
 }
 
@@ -104,8 +104,8 @@ void IsomerspaceTutte::check_batch(){
         IsomerStatus* statuses = h_batch[i].statuses;
         for (int j = 0; j < device_capacities[i]; j++)
         {   
-            num_of_not_converged_isomers += (int)(statuses[j] == NOT_CONVERGED);
-            if (statuses[j] != NOT_CONVERGED)
+            num_of_not_converged_isomers += (int)(statuses[j] == IsomerStatus::NOT_CONVERGED);
+            if (statuses[j] != IsomerStatus::NOT_CONVERGED)
             {   
                 index_queue[i].push(j);
             }

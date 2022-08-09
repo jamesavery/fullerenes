@@ -36,7 +36,7 @@ public:
     { 
       batch_sizes[i] = 0;
       h_batch[i].n_isomers = 0;
-      for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = EMPTY;
+      for (size_t j = 0; j < device_capacities[i]; j++) h_batch[i].statuses[j] = IsomerStatus::EMPTY;
     }    
   }
   virtual void check_batch(size_t steps) {}                   //Checks convergence properties of current batch, calculates mean and std of relative bond, angle and dihedral errors of the current batch.
