@@ -16,16 +16,6 @@ int main(int argc, char** argv){
     {    
         bool more_to_do = true;
         auto n_isomers = num_fullerenes.find(N)->second;
-        auto bucky_queue  = BuckyGen::start(N, false, false);
-        
-        auto batch_size = min((int)N_samples, (int)n_isomers);
-        cuda_io::IsomerQueue test_queue(N);
-        cuda_io::IsomerQueue validation_queue(N);
-        IsomerBatch h_test(N,batch_size,HOST_BUFFER);
-        
-        IsomerBatch h_validation(N,batch_size,HOST_BUFFER);
-        IsomerBatch d_test(N,batch_size,DEVICE_BUFFER);
-        IsomerBatch d_validation(N,batch_size,DEVICE_BUFFER);
         FullereneDual G;
         auto Nf = N/2 +2;
 
@@ -39,6 +29,16 @@ int main(int argc, char** argv){
         G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
         G.neighbours.resize(Nf);
         G.N = Nf;
+
+        auto batch_size = min((int)n_samples, (int)n_isomers);
+        cuda_io::IsomerQueue test_queue(N);
+        cuda_io::IsomerQueue validation_queue(N);
+        IsomerBatch h_test(N,batch_size,HOST_BUFFER);
+        
+        IsomerBatch h_validation(N,batch_size,HOST_BUFFER);
+        IsomerBatch d_test(N,batch_size,DEVICE_BUFFER);
+        IsomerBatch d_validation(N,batch_size,DEVICE_BUFFER);
+        
 
         for (size_t I = 0; I < n_samples; I++)
         {
@@ -60,7 +60,10 @@ int main(int argc, char** argv){
         gpu_kernels::isomerspace_dual::cubic_layout(d_test);    
 
         cuda_io::copy(h_test, d_test); cuda_io::copy(h_validation, d_validation);
-        cuda_io::sort(h_test); cuda_io::sort(h_validation);
+
+        std::cout << h_test;
+        std::cout << h_validation;
+
         if(h_test == h_validation) std::cout << "Test passed!\n";
         else std::cout << "Test Failed" << std::endl;
 

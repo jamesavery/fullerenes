@@ -89,9 +89,9 @@ int main(int ac, char **argv){
     auto not_finished = 0;
     while (!output_queue.empty()){
         auto& [molecule, id, status] = output_queue.front();
-        if (status == CONVERGED) converged++;
-        if (status == FAILED) failed++;
-        if (status == NOT_CONVERGED) not_finished++;
+        if (status == IsomerStatus::CONVERGED) converged++;
+        if (status == IsomerStatus::FAILED) failed++;
+        if (status == IsomerStatus::NOT_CONVERGED) not_finished++;
         output_queue.pop();
     }
     std::cout <<"Num converged: " << converged << std::endl;
