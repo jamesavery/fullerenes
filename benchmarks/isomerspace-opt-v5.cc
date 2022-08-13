@@ -32,12 +32,7 @@ int main(int argc, char** argv){
         auto sample_size = min(batch_size*1,n_fullerenes);
         
         std::cout << N << endl;
-        IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
-        cuda_io::IsomerQueue Isomer_Q(N);
-        cuda_io::IsomerQueue Output_Q(N);
-        //Pre allocate the device queue such that it doesn't happen during benchmarking
-        Isomer_Q.resize(2*sample_size);
-        Output_Q.resize(2*sample_size);
+        
         bool more_to_generate = true;
         int N_f = N/2 + 2;
         auto T0 = high_resolution_clock::now();
@@ -61,6 +56,14 @@ int main(int argc, char** argv){
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
         std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
 
+        for (size_t l = 0; l < N_runs; ++l)
+        {
+        IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
+        cuda_io::IsomerQueue Isomer_Q(N);
+        cuda_io::IsomerQueue Output_Q(N);
+        //Pre allocate the device queue such that it doesn't happen during benchmarking
+        Isomer_Q.resize(2*sample_size);
+        Output_Q.resize(2*sample_size);
         G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
         G.N = Nf;
         LaunchCtx insert_ctx = LaunchCtx(0);
@@ -81,16 +84,13 @@ int main(int argc, char** argv){
         
         generate_isomers();
         Isomer_Q.refill_batch(batch0);
-        for (size_t l = 0; l < N_runs; ++l)
-        {
-            std::cout << l << endl;
             auto generate_handle = std::async(std::launch::async, generate_isomers);
             auto T1 = high_resolution_clock::now();
                 isomerspace_dual::cubic_layout(batch0,device0,LaunchPolicy::ASYNC);
                 isomerspace_tutte::tutte_layout(batch0,10000000,device0,LaunchPolicy::ASYNC);
                 isomerspace_X0::zero_order_geometry(batch0, 4.0, device0, LaunchPolicy::ASYNC);
                 cuda_io::reset_convergence_statuses(batch0,device0,LaunchPolicy::ASYNC);
-                isomerspace_forcefield::optimize_batch(batch0,N*1,N*4,device0,LaunchPolicy::ASYNC);
+                isomerspace_forcefield::optimize_batch(batch0,N*5,N*5,device0,LaunchPolicy::ASYNC);
                 Output_Q.push(batch0, device0, LaunchPolicy::ASYNC);
                 device0.wait();
             auto T2 = high_resolution_clock::now(); T_par[l] += ( T2 - T1);
@@ -104,5 +104,5 @@ int main(int argc, char** argv){
         out_file << N << ", "<< sample_size << ", " << mean(T_seq) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
         out_file_std << N << ", "<< sample_size << ", " << sdev(T_seq) /1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";
      }
-
+    LaunchCtx::clear_allocations();
 }

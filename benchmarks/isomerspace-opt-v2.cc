@@ -111,12 +111,12 @@ int main(int argc, char** argv){
         }
         auto T4 = high_resolution_clock::now();
             isomer_q_opt.refill_batch(batch1);
-            gpu_kernels::isomerspace_forcefield::optimize_batch(batch1,N*4,N*4);
+            gpu_kernels::isomerspace_forcefield::optimize_batch(batch1,N*5,N*5);
         T_par[l] += (high_resolution_clock::now() - T4);
         }
         using namespace cuda_io;
         out_file << N << ", "<< sample_size << ", " << mean(T_seq)/1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
         out_file_std << N << ", "<< sample_size << ", " << sdev(T_seq)/1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";
      }
-
+LaunchCtx::clear_allocations();
 }

@@ -26,12 +26,6 @@ int main(int argc, char** argv){
         if (N == 22) continue; //No isomers in isomerspace 22;
         auto sample_size = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)num_fullerenes.find(N)->second);
         std::queue<std::tuple<Polyhedron,size_t,IsomerStatus>> poly_queue;
-
-        IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
-        IsomerBatch batch1(N,sample_size,DEVICE_BUFFER);
-        cuda_io::IsomerQueue isomer_q_tutte(N);
-        //Pre allocate the device queue such that it doesn't happen during benchmarking
-        isomer_q_tutte.resize(2*sample_size);
      
         bool more_to_generate = true;
         int N_f = N/2 + 2;
@@ -58,9 +52,19 @@ int main(int argc, char** argv){
 
         G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
         G.N = Nf;
-
+        std::cout << "Isomerspace :" << N << std::endl;
         for (size_t l = 0; l < N_runs; l++)
         {
+            IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
+            IsomerBatch batch1(N,sample_size,DEVICE_BUFFER);
+            cuda_io::IsomerQueue isomer_q_tutte(N,0);
+            cuda_io::IsomerQueue out_queue(N,0);
+            LaunchCtx default_ctx = LaunchCtx(0);
+            LaunchCtx insert_ctx = LaunchCtx(0);
+            //Pre allocate the device queue such that it doesn't happen during benchmarking
+            isomer_q_tutte.resize(2*sample_size);
+            out_queue.resize(2*sample_size);
+
             for (int i = 0; i < sample_size; ++i){
                 for (size_t j = 0; j < Nf; j++){
                     G.neighbours[j].clear();
@@ -77,15 +81,16 @@ int main(int argc, char** argv){
             auto T1 = high_resolution_clock::now();
                 isomer_q_tutte.refill_batch(batch0);
                 gpu_kernels::isomerspace_dual::cubic_layout(batch0);
-                gpu_kernels::isomerspace_tutte::tutte_layout(batch0);
+                gpu_kernels::isomerspace_tutte::tutte_layout(batch0,10000000);
                 gpu_kernels::isomerspace_X0::zero_order_geometry(batch0, 4.0);
                 cuda_io::reset_convergence_statuses(batch0);
-                gpu_kernels::isomerspace_forcefield::optimize_batch(batch0,N*4,N*4);
+                gpu_kernels::isomerspace_forcefield::optimize_batch(batch0,N*5,N*5);
+                out_queue.push(batch0);
             T_par[l] += ( high_resolution_clock::now() - T1);
         }
         using namespace cuda_io;
         out_file << N << ", "<< sample_size << ", " << mean(T_seq) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
         out_file_std << N << ", "<< sample_size << ", " << sdev(T_seq) /1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";
      }
-
+    LaunchCtx::clear_allocations();
 }
