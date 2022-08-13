@@ -76,20 +76,20 @@ int main(int argc, char** argv){
         {
         IsomerBatch batch0(N,sample_size,DEVICE_BUFFER, 0);
         IsomerBatch batch1(N,sample_size,DEVICE_BUFFER, 1);
-        cuda_io::IsomerQueue Isomer_Q(N, 0);
-        cuda_io::IsomerQueue Isomer_Q2(N, 1);
+        cuda_io::IsomerQueue In_Q0(N, 0);
+        cuda_io::IsomerQueue In_Q1(N, 1);
         cuda_io::IsomerQueue Out_Q0(N, 0);
         cuda_io::IsomerQueue Out_Q1(N, 1);
-        LaunchCtx insert_ctx = LaunchCtx(0);
-        LaunchCtx insert2_ctx = LaunchCtx(1);
+        LaunchCtx insert0_ctx = LaunchCtx(0);
+        LaunchCtx insert1_ctx = LaunchCtx(1);
         LaunchCtx device0 = LaunchCtx(0);
         LaunchCtx device1 = LaunchCtx(1);
 
         //Pre allocate the device queue such that it doesn't happen during benchmarking
-        Isomer_Q.resize(2*sample_size, insert_ctx);
-        Isomer_Q2.resize(2*sample_size, insert2_ctx);
-        Out_Q0.resize(2*sample_size, insert_ctx);
-        Out_Q1.resize(2*sample_size, insert2_ctx);
+        In_Q0.resize(2*sample_size, insert0_ctx);
+        In_Q1.resize(2*sample_size, insert1_ctx);
+        Out_Q0.resize(2*sample_size, insert0_ctx);
+        Out_Q1.resize(2*sample_size, insert1_ctx);
 
 
         auto generate_isomers = [&](){
@@ -101,34 +101,44 @@ int main(int argc, char** argv){
                         if(u != UINT16_MAX) G.neighbours[j].push_back(u);
                     }
                 }
-                Isomer_Q.insert(G,i, insert_ctx, LaunchPolicy::ASYNC);
-                Isomer_Q2.insert(G,i,insert2_ctx, LaunchPolicy::ASYNC);
+                In_Q0.insert(G,i, insert0_ctx, LaunchPolicy::ASYNC);
+                In_Q1.insert(G,i,insert1_ctx, LaunchPolicy::ASYNC);
             }
-            insert_ctx.wait(); insert2_ctx.wait();
+            insert0_ctx.wait(); insert1_ctx.wait();
         }; 
         
+        //Produce and insert the first batch 
         generate_isomers();
-        Isomer_Q.refill_batch(batch0, insert_ctx, LaunchPolicy::SYNC);
-        Isomer_Q2.refill_batch(batch1, insert2_ctx, LaunchPolicy::SYNC);
-
+        In_Q0.refill_batch(batch0, insert0_ctx, LaunchPolicy::SYNC);
+        In_Q1.refill_batch(batch1, insert1_ctx, LaunchPolicy::SYNC);
         
-
+            //Generate new isomers while processing the previous batch
             auto generate_handle = std::async(std::launch::async, generate_isomers);
             auto T2 = high_resolution_clock::now(); 
-                isomerspace_dual::cubic_layout(batch0, device0, LaunchPolicy::ASYNC);                   isomerspace_dual::cubic_layout(batch1, device1, LaunchPolicy::ASYNC);
-                isomerspace_tutte::tutte_layout(batch0, 10000000, device0, LaunchPolicy::ASYNC);        isomerspace_tutte::tutte_layout(batch1, 10000000, device1, LaunchPolicy::ASYNC);
-                isomerspace_X0::zero_order_geometry(batch0, 4.0, device0, LaunchPolicy::ASYNC);         isomerspace_X0::zero_order_geometry(batch1, 4.0, device1, LaunchPolicy::ASYNC);
-                cuda_io::reset_convergence_statuses(batch0, device0, LaunchPolicy::ASYNC);              cuda_io::reset_convergence_statuses(batch1, device1, LaunchPolicy::ASYNC);                    
-                isomerspace_forcefield::optimize_batch(batch0,N*5,N*5, device0, LaunchPolicy::ASYNC);   isomerspace_forcefield::optimize_batch(batch1,N*5,N*5, device1, LaunchPolicy::ASYNC);
-                Out_Q0.push(batch0,device0,LaunchPolicy::ASYNC); Out_Q1.push(batch1,device1,LaunchPolicy::ASYNC);
+                //Main processing
+                isomerspace_dual::cubic_layout(batch0, device0, LaunchPolicy::ASYNC);                   
+                isomerspace_dual::cubic_layout(batch1, device1, LaunchPolicy::ASYNC);
+                isomerspace_tutte::tutte_layout(batch0, 10000000, device0, LaunchPolicy::ASYNC);        
+                isomerspace_tutte::tutte_layout(batch1, 10000000, device1, LaunchPolicy::ASYNC);
+                isomerspace_X0::zero_order_geometry(batch0, 4.0, device0, LaunchPolicy::ASYNC);         
+                isomerspace_X0::zero_order_geometry(batch1, 4.0, device1, LaunchPolicy::ASYNC);
+                cuda_io::reset_convergence_statuses(batch0, device0, LaunchPolicy::ASYNC);              
+                cuda_io::reset_convergence_statuses(batch1, device1, LaunchPolicy::ASYNC);                    
+                isomerspace_forcefield::optimize_batch(batch0,N*5,N*5, device0, LaunchPolicy::ASYNC);   
+                isomerspace_forcefield::optimize_batch(batch1,N*5,N*5, device1, LaunchPolicy::ASYNC);
+                //Output finished isomers 
+                Out_Q0.push(batch0,device0,LaunchPolicy::ASYNC); 
+                Out_Q1.push(batch1,device1,LaunchPolicy::ASYNC);
                 device0.wait(); device1.wait();
             auto T3 = high_resolution_clock::now(); T_par[l] += ( T3 - T2);
+                //Wait for generation to finish, if this process is faster than GPU operations, the call returns immediately.
                 generate_handle.wait(); 
-                Isomer_Q.refill_batch(batch0, device0, LaunchPolicy::ASYNC);
-                Isomer_Q2.refill_batch(batch1, device1, LaunchPolicy::ASYNC);
+                //Refill batches with new isomers
+                In_Q0.refill_batch(batch0, device0, LaunchPolicy::ASYNC);
+                In_Q1.refill_batch(batch1, device1, LaunchPolicy::ASYNC);
                 device0.wait(); device1.wait();
             auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);
-
+            
         }
         using namespace cuda_io;
         out_file << N << ", "<< min(sample_size*2, n_fullerenes) << ", " << mean(T_seq) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
