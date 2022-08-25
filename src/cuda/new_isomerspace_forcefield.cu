@@ -322,31 +322,25 @@ struct ArcData{
                     A[0].z*(A[1].y-lambda) - A[0].y*A[1].z };
         if (norm(x) / (A[0].x + A[1].y + A[2].z) > 1.e-12) // not zero-ish
         return x/norm(x);
-    
-        return {0,0,0};
     }
 
     INLINE real_t flatness_energy(const Constants& c) const{
-        if (d_get(c.f_flat,j) > (real_t)0.){
-            coord3d lambdas = eigen_values();
-            real_t minimum_lambda = min(min(lambdas.x, lambdas.y),lambdas.z);
-            real_t real_lambda = isnan(minimum_lambda) ? 0.0 : minimum_lambda; 
-            return d_get(c.f_flat,j)*harmonic_energy(minimum_lambda, (real_t)0.0);
-        } else return (real_t)0.;
+        coord3d lambdas = eigen_values();
+        real_t minimum_lambda = d_min(d_min(lambdas.x, lambdas.y),lambdas.z);
+        real_t real_lambda = isnan(minimum_lambda) ? 0.0 : minimum_lambda; 
+        return d_get(c.f_flat,j)*harmonic_energy(minimum_lambda, (real_t)0.0);
     }
 
     INLINE coord3d flatness_gradient(const Constants& c) const {
-        if (d_get(c.f_flat,j) > (real_t)0.){
-            coord3d lambdas = eigen_values_2();
-            real_t lambda = min(lambdas.x, min(lambdas.y, lambdas.z));
-            coord3d n = eigen_vector(lambda);
-            
-            //Take the dot product between the face-normal and the {X[a] -> face_centroid}  arc.
-            //This is a measure of how close they are to being parallel the vectors are.
-            real_t Xn = dot(face_offset, n);
-            
-            return d_get(c.f_flat,j) * (real_t)2.0*Xn*n;
-        } else return {0,0,0};
+        coord3d lambdas = eigen_values_2();
+        real_t lambda = d_min(lambdas.x, d_min(lambdas.y, lambdas.z));
+        coord3d n = eigen_vector(lambda);
+        
+        //Take the dot product between the face-normal and the {X[a] -> face_centroid}  arc.
+        //This is a measure of how close they are to being parallel the vectors are.
+        real_t Xn = dot(face_offset, n);
+        
+        return d_get(c.f_flat,j) * (real_t)2.0*Xn*n;
     }
     // Internal coordinate gradients
     INLINE coord3d bond_length_gradient(const Constants& c) const {
@@ -742,13 +736,42 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
     }
 }
 
-__global__ void diagnostic_function(IsomerBatch B, CuArray<device_real_t> ouput){
-    auto offset = blockIdx.x * blockDim.x;
-    DeviceFullereneGraph DG(B.cubic_neighbours + offset*3);
-    
+__global__ void diagnostic_function(IsomerBatch B, CuArray<device_real_t> output){
+    DEVICE_TYPEDEFS
+    auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
+    for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
+    BLOCK_SYNC
+    if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
+    if (B.statuses[isomer_idx] == IsomerStatus::NOT_CONVERGED)
+    {
+        size_t offset               = isomer_idx * blockDim.x;
+        coord3d* X = reinterpret_cast<coord3d*>(B.X+3*offset);
+        Constants constants = Constants(B, isomer_idx);
+        NodeGraph nodeG     = NodeGraph(B, isomer_idx);
+        symMat3 matrix(1., 2., 3., 4. , 5., 6.);
+        coord3d lambdas = matrix.eigenvalues();
+        real_t min_lambda = d_min(lambdas.x, d_min(lambdas.y, lambdas.z));
+        reinterpret_cast<coord3d*>(output.data)[offset*3] = matrix.eigenvector(lambdas.x);
+        reinterpret_cast<coord3d*>(output.data)[offset*3 + 1] = matrix.eigenvector(lambdas.y);
+        reinterpret_cast<coord3d*>(output.data)[offset*3 + 2] = matrix.eigenvector(lambdas.z);
+    }
+    }
+    }
 
-    
+}
 
+cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output){
+    static LaunchDims dims((void*)diagnostic_function, B.n_atoms, 0 , B.isomer_capacity);
+    dims.update_dims((void*)diagnostic_function, B.n_atoms, 0, B.isomer_capacity);
+    void* kargs[]{(void*)&B, (void*)&output};
+    cudaDeviceProp props;
+    cudaGetDeviceProperties(&props,0);
+    cudaFuncSetAttribute(diagnostic_function, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
+    std::cout << "Smem Per Block" <<props.sharedMemPerBlockOptin << endl;
+    auto error = safeCudaKernelCall((void*)diagnostic_function, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
+    cudaDeviceSynchronize();
+    printLastCudaError("Test Fun Failed: ");
+    return error;
 }
 
 

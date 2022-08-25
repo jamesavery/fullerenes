@@ -26,7 +26,7 @@ size_t CuArray<T>::size(){
 }
 
 template <typename T>
-T& CuArray<T>::operator[] (const size_t i){
+__device__ __host__ T& CuArray<T>::operator[] (const size_t i){
     return data[i];
 }
 
