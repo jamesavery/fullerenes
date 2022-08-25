@@ -16,7 +16,7 @@ public:
     void resize(const size_t capacity);
 
     //Unsafe indexing
-    T& operator[] (const size_t i);
+    __device__ __host__ T& operator[] (const size_t i);
 
     size_t size();
 

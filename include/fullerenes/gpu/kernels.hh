@@ -13,7 +13,7 @@ namespace gpu_kernels{
         std::chrono::microseconds time_spent(); 
         //Uses forcefield optimization to relax the positions of atoms in all isomers of a batch.
         cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
-
+        cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output);
         //Stat functions:
         cudaError_t get_bonds           (const IsomerBatch& B, CuArray<device_real_t>& bonds);          //N x M x 3
         cudaError_t get_angles          (const IsomerBatch& B, CuArray<device_real_t>& angles);         //N x M x 3
