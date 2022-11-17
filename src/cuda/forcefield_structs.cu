@@ -1,24 +1,26 @@
 #pragma once
 #include "fullerenes/gpu/isomerspace_kernel.hh"
+#include "fullerenes/gpu/reductions.cuh"
 #include <exception>
 
 //Pentagons = 0
 //Hexagons = 1
-__constant__ device_real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
-__constant__ device_real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
-__constant__ device_real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
+constexpr __constant__ device_real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
+constexpr __constant__ device_real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
+constexpr __constant__ device_real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
 
 #if SEMINARIO_FORCE_CONSTANTS==1
-__constant__ device_real_t angle_forces[2] = {207.924,216.787}; 
-__constant__ device_real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
-__constant__ device_real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
-__constant__ device_real_t flat_forces[3] = {0., 0., 0.};
+constexpr __constant__ device_real_t angle_forces[2] = {207.924,216.787}; 
+constexpr __constant__ device_real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
+constexpr __constant__ device_real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
+constexpr __constant__ device_real_t flat_forces[3] = {0., 0., 0.};
 #else
-__constant__ device_real_t angle_forces[2] = {100.0,100.0}; 
-__constant__ device_real_t bond_forces[3] = {260.0,390.0,450.0}; 
-__constant__ device_real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
-__constant__ device_real_t flat_forces[3] = {0., 0., 0.};
+constexpr __constant__ device_real_t angle_forces[2] = {100.0,100.0}; 
+constexpr __constant__ device_real_t bond_forces[3] = {260.0,390.0,450.0}; 
+constexpr __constant__ device_real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
+constexpr __constant__ device_real_t flat_forces[3] = {0., 0., 0.};
 #endif
+
 
 
 
@@ -153,7 +155,7 @@ struct DeviceFullereneGraph{
             if(u < min_edge.x) min_edge = {u,v};
             ++i;
         }
-        assert(next_on_face(u,v) == start_node);
+        //assert(next_on_face(u,v) == start_node);
         return min_edge;
     }
 };
@@ -239,29 +241,98 @@ struct NodeGraph{
     device_node3 cubic_neighbours;
     device_node3 next_on_face;
     device_node3 prev_on_face;
-    device_node_t face_neighbours[18]; //Shape 3 x dmax , face associated with the arc a -> b , face associated with the arc a -> c, face associated with the arc a -> d
-    device_node3 face_sizes;
+    device_node_t face_nodes[6] = {UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX}; //Shape 1 x dmax , face associated with the arc a -> b , face associated with the arc a -> c, face associated with the arc a -> d
+    device_node3 face_neighbours = {UINT16_MAX, UINT16_MAX, UINT16_MAX};
+    unsigned char face_size = __UINT8_MAX__;
+    __device__ NodeGraph(const IsomerBatch& G, const size_t isomer_idx, device_real_t* sdata){
+        clear_cache(sdata,Block_Size_Pow_2);
+        device_real_t* base_ptr = sdata + Block_Size_Pow_2;
+        device_node_t* L = reinterpret_cast<device_node_t*>(base_ptr ); //N x 3 list of potential face IDs.
+        device_node_t* A = reinterpret_cast<device_node_t*>(base_ptr) + blockDim.x * 3; //Uses cache temporarily to store face neighbours. //Nf x 6 
+        const DeviceFullereneGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+        this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
+        this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
+        this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
+        int represent_count = 0;
+        device_node2 rep_edges[3] = {UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX}; 
+        //If a node is representative of the j'th face then the face representation edge will be threadIdx.x -> cubic_neighbour[j]
+        bool is_rep[3] = {false, false, false}; 
+        device_node_t edge_idx[3] = {UINT16_MAX, UINT16_MAX, UINT16_MAX};
+        for (int j = 0; j  < 3; j++){
+            rep_edges[j] = FG.get_face_representation(threadIdx.x, d_get(cubic_neighbours,j));
+            edge_idx[j] = FG.dedge_ix(rep_edges[j].x, rep_edges[j].y);
+            if(rep_edges[j].x == threadIdx.x) {++represent_count; is_rep[j] = true;}
+        }
+        ex_scan<device_node_t>(reinterpret_cast<device_node_t*>(sdata), represent_count, blockDim.x);
+        auto offset  = reinterpret_cast<device_node_t*>(sdata)[threadIdx.x];
+        int k = 0;
+        for(int j = 0; j < 3; j++){
+            if(is_rep[j]){
+                L[threadIdx.x*3 + j] = offset + k; 
+                FG.get_face_oriented(threadIdx.x,d_get(cubic_neighbours,j), &A[offset*6 + 6*k]);
+                //If the face is a pentagon assign the dummy value UINT16_MAX to the last element.
+                if(FG.face_size(threadIdx.x, d_get(cubic_neighbours,j))== 5) A[offset*6 + 6*k + 5] = UINT16_MAX;
+                ++k;
+            }
+        }
+        BLOCK_SYNC
+        face_neighbours = {L[rep_edges[0].x*3 + edge_idx[0]], L[rep_edges[1].x*3 + edge_idx[1]], L[rep_edges[2].x*3 + edge_idx[2]]};
+        if(threadIdx.x < (blockDim.x/2) + 2){
+            memcpy(&face_nodes[0], &A[threadIdx.x*6], sizeof(device_node_t)*6);
+            face_size = face_nodes[5] == UINT16_MAX ? 5 : 6;
+        }
+        BLOCK_SYNC
+    }
     __device__ NodeGraph(const IsomerBatch& G, const size_t isomer_idx){
         const DeviceFullereneGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
-        FG.get_face_oriented(threadIdx.x, d_get(cubic_neighbours,0), &face_neighbours[0]);
-        FG.get_face_oriented(threadIdx.x, d_get(cubic_neighbours,1), &face_neighbours[6]);
-        FG.get_face_oriented(threadIdx.x, d_get(cubic_neighbours,2), &face_neighbours[12]);
-        face_sizes = {FG.face_size(threadIdx.x,d_get(cubic_neighbours,0)), FG.face_size(threadIdx.x,d_get(cubic_neighbours,1)), FG.face_size(threadIdx.x,d_get(cubic_neighbours,2))};
     }
 };
 
 struct Constants{
+    #if USE_CONSTANT_INDICES
+    uchar4 i_f_bond;
+    uchar4 i_f_inner_angle;
+    uchar4 i_f_inner_dihedral;
+    uchar4 i_f_outer_angle_m;
+    uchar4 i_f_outer_angle_p;
+    uchar4 i_f_outer_dihedral;
+    uchar4 i_r0;
+    uchar4 i_angle0;
+    uchar4 i_outer_angle_m0;
+    uchar4 i_outer_angle_p0;
+    uchar4 i_inner_dih0;
+    uchar4 i_outer_dih0_a;
+    uchar4 i_outer_dih0_m;
+    uchar4 i_outer_dih0_p;
+
+    //Load force constants from neighbouring face information.
+    constexpr INLINE device_real_t r0(const uint8_t j) const {return  optimal_bond_lengths[d_get(i_f_bond, j)];}
+    constexpr INLINE device_real_t angle0(const uint8_t j)  const {return  optimal_corner_cos_angles[d_get(i_f_inner_angle, j)];}
+    constexpr INLINE device_real_t inner_dih0(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_f_inner_dihedral, j)];}
+    constexpr INLINE device_real_t outer_angle_m0(const uint8_t j) const {return  optimal_corner_cos_angles[d_get(i_f_outer_angle_m, j)];}
+    constexpr INLINE device_real_t outer_angle_p0(const uint8_t j) const {return  optimal_corner_cos_angles[d_get(i_f_outer_angle_p, j)];}
+    constexpr INLINE device_real_t outer_dih0_a(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_f_outer_dihedral, j)];}
+    constexpr INLINE device_real_t outer_dih0_m(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_r0, j)];}
+    constexpr INLINE device_real_t outer_dih0_p(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_angle0, j)];}
+    constexpr INLINE device_real_t f_bond(const uint8_t j) const {return  bond_forces[d_get(i_outer_angle_m0, j)];}
+    constexpr INLINE device_real_t f_inner_angle(const uint8_t j) const {return  angle_forces[d_get(i_outer_angle_p0, j)];}
+    constexpr INLINE device_real_t f_inner_dihedral(const uint8_t j) const {return  dih_forces[d_get(i_inner_dih0, j)];}
+    constexpr INLINE device_real_t f_outer_angle_m(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_a, j)];}
+    constexpr INLINE device_real_t f_outer_angle_p(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_m, j)];}
+    constexpr INLINE device_real_t f_outer_dihedral(const uint8_t j) const {return  dih_forces[d_get(i_outer_dih0_p, j)];}
+    constexpr INLINE device_real_t f_flat() const {return 5e2;}
+    #else
     device_coord3d f_bond;
     device_coord3d f_inner_angle;
     device_coord3d f_inner_dihedral;
     device_coord3d f_outer_angle_m;
     device_coord3d f_outer_angle_p;
     device_coord3d f_outer_dihedral;
-    device_coord3d f_flat;
-
+    device_real_t f_flat = 5e2;
+    
     device_coord3d r0;
     device_coord3d angle0;
     device_coord3d outer_angle_m0;
@@ -270,8 +341,9 @@ struct Constants{
     device_coord3d outer_dih0_a;
     device_coord3d outer_dih0_m;
     device_coord3d outer_dih0_p;
-    
-    __device__ __host__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
+    #endif
+
+    __device__ __host__ __forceinline__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
         return f1*4 + f2*2 + f3;
     }
 
@@ -288,7 +360,7 @@ struct Constants{
         //        d
         //      m/\p
         //       f6
-
+        
         for (uint8_t j = 0; j < 3; j++) {
             //Faces to the right of arcs ab, ac and ad.
             
@@ -304,6 +376,24 @@ struct Constants{
             uint8_t F4 = neighbour_F1 + neighbour_F2 + neighbour_F3 - F1 - F3 ;
             
             //Load equillibirium distance, angles and dihedral angles from face information.
+            #if USE_CONSTANT_INDICES
+            d_set(i_r0,               j,  F3 + F1);
+            d_set(i_angle0,           j,  F1);
+            d_set(i_inner_dih0,       j,  face_index(F1, F2 , F3));
+            d_set(i_outer_angle_m0,   j,  F3);
+            d_set(i_outer_angle_p0,   j,  F1);
+            d_set(i_outer_dih0_a,     j,  face_index(F3, F4, F1));
+            d_set(i_outer_dih0_m,     j,  face_index(F4, F1, F3));
+            d_set(i_outer_dih0_p,     j,  face_index(F1, F3, F4));
+            
+            //Load force constants from neighbouring face information.
+            d_set(i_f_bond,           j,  bond_forces[F3 + F1]);
+            d_set(i_f_inner_angle,    j,  angle_forces[F1]);
+            d_set(i_f_inner_dihedral, j,  dih_forces[F1 + F2 + F3]);
+            d_set(i_f_outer_angle_m,  j,  angle_forces[F3]);
+            d_set(i_f_outer_angle_p,  j,  angle_forces[F1]);
+            d_set(i_f_outer_dihedral, j,  dih_forces[F1 + F3 + F4]);
+            #else
             d_set(r0,               j,  optimal_bond_lengths[F3 + F1]);
             d_set(angle0,           j,  optimal_corner_cos_angles[F1]);
             d_set(inner_dih0,       j,  optimal_dih_cos_angles[face_index(F1, F2 , F3)]);
@@ -320,9 +410,7 @@ struct Constants{
             d_set(f_outer_angle_m,  j,  angle_forces[F3]);
             d_set(f_outer_angle_p,  j,  angle_forces[F1]);
             d_set(f_outer_dihedral, j,  dih_forces[F1 + F3 + F4]);
-            
-            //This one is arbitrary at the moment.
-            d_set(f_flat, j, flat_forces[F3 + F1]);
+            #endif
         }
     }   
 };
