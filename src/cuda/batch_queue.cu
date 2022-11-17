@@ -293,6 +293,27 @@ cudaError_t IsomerQueue::push(IsomerBatch& batch, const LaunchCtx& ctx, const La
     return error;
 }
 
+Polyhedron IsomerQueue::pop(const LaunchCtx& ctx, const LaunchPolicy policy){
+    cudaSetDevice(m_device);
+    to_host(ctx);
+    if(*props.size == 0) throw std::runtime_error("Queue is empty");
+    neighbours_t out_neighbours(N, std::vector<int>(3));
+    for(int i = 0; i < N; i++){
+        out_neighbours[i][0] = host_batch.cubic_neighbours[(*props.front)*N*3 + i*3 + 0];
+        out_neighbours[i][1] = host_batch.cubic_neighbours[(*props.front)*N*3 + i*3 + 1];
+        out_neighbours[i][2] = host_batch.cubic_neighbours[(*props.front)*N*3 + i*3 + 2];
+    }
+    std::vector<coord3d> out_coords(N);
+    for(int i = 0; i < N; i++){
+        out_coords[i][0] = host_batch.X[(*props.front)*N*3 + i*3 + 0];
+        out_coords[i][1] = host_batch.X[(*props.front)*N*3 + i*3 + 1];
+        out_coords[i][2] = host_batch.X[(*props.front)*N*3 + i*3 + 2];
+    }
+    *props.front = (*props.front + 1) % *props.capacity;
+    *props.size -= 1;
+    return Polyhedron(Graph(out_neighbours,true),out_coords);
+}
+
 //Resizes the underlying containers (host and device batches) and updates the queue counters accordingly
 cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);

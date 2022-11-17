@@ -31,6 +31,8 @@ public:
     //Push all the finished isomers from a batch into the queue.
     cudaError_t push(IsomerBatch& input_batch, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC );
 
+    Polyhedron pop(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+
     //Insert a single Polyhedron.
     cudaError_t insert(const Polyhedron& isomer, const size_t ID, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC, const bool insert_2d = true);
     
