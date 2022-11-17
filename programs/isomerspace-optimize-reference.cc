@@ -116,7 +116,7 @@ int main(int ac, char **argv)
     while (Q1.get_size() > batch2.isomer_capacity)
     {
       Q1.refill_batch(batch2, ctx0, LaunchPolicy::ASYNC);
-      isomerspace_forcefield::optimize_batch(batch2,N*1,N*50, ctx0, LaunchPolicy::ASYNC);
+      isomerspace_forcefield::optimize_batch<BUSTER>(batch2,N*1,N*50, ctx0, LaunchPolicy::ASYNC);
       auto T1 = system_clock::now();
       cuda_io::output_to_queue(output_queue,outbatch,false);
       Toutq += system_clock::now() - T1;
@@ -136,7 +136,7 @@ int main(int ac, char **argv)
       }
       while(Q1.get_size() > 0){
         Q1.refill_batch(batch2);
-        isomerspace_forcefield::optimize_batch(batch2,N*5,N*5);
+        isomerspace_forcefield::optimize_batch<BUSTER>(batch2,N*5,N*5);
         cuda_io::copy(outbatch, batch2);
 
         cuda_io::output_to_queue(output_queue,outbatch,false);
