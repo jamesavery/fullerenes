@@ -256,14 +256,14 @@ int main(int ac, char **argv){
         
         TestQ2.refill_batch(d_TestB2, test_ctx, ASYNC);
         ControlQ2.refill_batch(d_ControlB2, control_ctx, ASYNC);
-        isomerspace_forcefield::optimize_batch(d_TestB2, N, N*2,test_ctx, ASYNC);
-        isomerspace_forcefield::optimize_batch(d_ControlB2, N, N*2,control_ctx, ASYNC);
+        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N, N*2,test_ctx, ASYNC);
+        isomerspace_forcefield::optimize_batch<BUSTER>(d_ControlB2, N, N*2,control_ctx, ASYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, ASYNC);
         ControlQ2.refill_batch(d_ControlB2, control_ctx, ASYNC);
         TestQ2.insert(d_TestB, test_ctx, ASYNC);
         ControlQ2.insert(d_ControlB, control_ctx, ASYNC);
-        isomerspace_forcefield::optimize_batch(d_TestB2, N, N*2,test_ctx, ASYNC);
-        isomerspace_forcefield::optimize_batch(d_ControlB2, N, N*2,control_ctx, ASYNC);
+        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N, N*2,test_ctx, ASYNC);
+        isomerspace_forcefield::optimize_batch<BUSTER>(d_ControlB2, N, N*2,control_ctx, ASYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, ASYNC);
         ControlQ2.refill_batch(d_ControlB2, control_ctx, ASYNC);
 
@@ -324,7 +324,7 @@ int main(int ac, char **argv){
         std::cout << d_TestB2 << std::endl;
         std::cout << "===============================================================" << endl;
 
-        isomerspace_forcefield::optimize_batch(d_TestB2, N*3, N*4,test_ctx, SYNC);
+        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N*3, N*4,test_ctx, SYNC);
         std::cout<< d_TestB2 << endl;
         std::cout << "===============================================================" << endl;
 
@@ -334,9 +334,9 @@ int main(int ac, char **argv){
 
 
 
-        isomerspace_forcefield::optimize_batch(d_TestB2, N*1, N*4,test_ctx, SYNC);
+        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N*1, N*4,test_ctx, SYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, SYNC);
-        isomerspace_forcefield::optimize_batch(d_TestB2, N*4, N*4,test_ctx, SYNC);
+        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N*4, N*4,test_ctx, SYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, SYNC);
 
         std::cout << d_TestB2 << endl;

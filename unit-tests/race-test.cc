@@ -48,7 +48,7 @@ int main(int ac, char **argv){
     isomerspace_tutte::tutte_layout(d_validation);                      isomerspace_tutte::tutte_layout(d_test);  
     isomerspace_X0::zero_order_geometry(d_validation, 4.0f);            isomerspace_X0::zero_order_geometry(d_test, 4.0f);
     cuda_io::reset_convergence_statuses(d_validation);                  cuda_io::reset_convergence_statuses(d_test);
-    isomerspace_forcefield::optimize_batch(d_validation, N*4, N*4);   isomerspace_forcefield::optimize_batch(d_test, N*4, N*4);
+    isomerspace_forcefield::optimize_batch<BUSTER>(d_validation, N*4, N*4);   isomerspace_forcefield::optimize_batch<BUSTER>(d_test, N*4, N*4);
     
     
     cuda_io::copy(h_validation, d_validation); cuda_io::copy(h_test, d_test);

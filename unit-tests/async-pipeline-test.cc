@@ -95,7 +95,7 @@ int main(int ac, char **argv){
     isomerspace_X0::zero_order_geometry(d_control, 4.0);
     reset_convergence_statuses(d_control);
 
-    isomerspace_forcefield::optimize_batch(d_control, N*50, N*50);
+    isomerspace_forcefield::optimize_batch<BUSTER>(d_control, N*50, N*50);
     //===================== END of SERIAL =====================
 
     int I_async = 0;
@@ -137,7 +137,7 @@ int main(int ac, char **argv){
         bool optimize_more = true;
         auto generate_handle = std::async(std::launch::async,generate_isomers, opt_test.isomer_capacity*2);
         while(optimize_more){
-            isomerspace_forcefield::optimize_batch(opt_test,step, N*50, device0, ASYNC);
+            isomerspace_forcefield::optimize_batch<BUSTER>(opt_test,step, N*50, device0, ASYNC);
             output_queue.push(opt_test, device0, ASYNC);
             opt_queue.refill_batch(opt_test, device0, ASYNC);
             device0.wait();
@@ -152,14 +152,14 @@ int main(int ac, char **argv){
 
         if(!more_to_generate){
             while(opt_queue.get_size() > 0){
-                isomerspace_forcefield::optimize_batch(opt_test, step, N*50, device0, ASYNC);
+                isomerspace_forcefield::optimize_batch<BUSTER>(opt_test, step, N*50, device0, ASYNC);
                 output_queue.push(opt_test, device0, ASYNC);
                 device0.wait();
             
                 opt_queue.refill_batch(opt_test, device0, ASYNC);
             }
             for(int i = 0;  i <  N*50; i += step){
-                isomerspace_forcefield::optimize_batch(opt_test,step, N*50, device0, SYNC);
+                isomerspace_forcefield::optimize_batch<BUSTER>(opt_test,step, N*50, device0, SYNC);
             }
             output_queue.push(opt_test, device0, SYNC);
             more_to_do = false;
