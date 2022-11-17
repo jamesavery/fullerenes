@@ -358,7 +358,7 @@ std::optional<Polyhedron> IsomerBatch::get_isomer(const size_t index) const {
 
 std::optional<Polyhedron> IsomerBatch::get_isomer_by_id(const size_t ID) const {
     auto N = n_atoms;
-    neighbours_t out_neighbours(N);
+    neighbours_t out_neighbours(N, std::vector<int>(3, -1));
     int index = -1;
     for (size_t i = 0; i < isomer_capacity; i++) {if(IDs[i] == ID) index = i;}
     if (index == -1) {
