@@ -131,20 +131,32 @@ struct ArcData{
     {   
         real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
         coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
+        #if USE_CONSTANT_INDICES
+        return c.f_inner_angle(j) * harmonic_energy_gradient(c.angle0(j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
+        #else
         return d_get(c.f_inner_angle,j) * harmonic_energy_gradient(d_get(c.angle0,j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
+        #endif
     }
     //Computes gradient related to bending of outer angles. ~20 FLOPs
     INLINE coord3d outer_angle_gradient_m(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
         coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
+        #if USE_CONSTANT_INDICES
+        return c.f_outer_angle_m(j) * harmonic_energy_gradient(c.outer_angle_m0(j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
+        #else
         return d_get(c.f_outer_angle_m,j) * harmonic_energy_gradient(d_get(c.outer_angle_m0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
+        #endif
     }
     INLINE coord3d outer_angle_gradient_p(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
         coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
+        #if USE_CONSTANT_INDICES
+        return c.f_outer_angle_p(j) * harmonic_energy_gradient(c.outer_angle_p0(j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 28 multiplied by harmonic term.
+        #else
         return d_get(c.f_outer_angle_p,j) * harmonic_energy_gradient(d_get(c.outer_angle_p0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 28 multiplied by harmonic term.
+        #endif
     }
     // Chain rule terms for dihedral calculation
     //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
@@ -159,8 +171,11 @@ struct ArcData{
 
         //Derivative w.r.t. inner dihedral angle F and G in Eq. 26
         coord3d grad = cross(bc_hat, nbcd) * r_sin_b * r_rab - ba_hat * cos_beta * r_rab + (cot_b * cos_beta * r_rab) * (bc_hat - ba_hat * cos_b);
-
+        #if USE_CONSTANT_INDICES
+        return c.f_inner_dihedral(j) * harmonic_energy_gradient(c.inner_dih0(j), cos_beta, grad); //Eq. 26.
+        #else
         return d_get(c.f_inner_dihedral,j) * harmonic_energy_gradient(d_get(c.inner_dih0,j), cos_beta, grad); //Eq. 26.
+        #endif
     }
 
     //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
@@ -180,8 +195,11 @@ struct ArcData{
                         cos_beta*(ab_hat*r_rab + r_ram * ((real_t)2.0*am_hat + cot_m*(mp_hat+cos_m*am_hat)) - cot_a*(r_ram*(ab_hat - am_hat*cos_a) + r_rab*(am_hat-ab_hat*cos_a)));
         
         //Eq. 31 multiplied by harmonic term.
-
+        #if USE_CONSTANT_INDICES
+        return c.f_outer_dihedral(j) * harmonic_energy_gradient(c.outer_dih0_a(j), cos_beta, grad);
+        #else
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_a,j), cos_beta, grad);
+        #endif
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
@@ -199,7 +217,11 @@ struct ArcData{
         coord3d grad = r_rap * (cot_p*cos_beta * (-mp_hat - pa_hat*cos_p) - cross(nbmp_hat, mp_hat)*r_sin_p - pa_hat*cos_beta );
 
         //Eq. 32 multiplied by harmonic term.
+        #if USE_CONSTANT_INDICES
+        return c.f_outer_dihedral(j) * harmonic_energy_gradient(c.outer_dih0_m(j), cos_beta, grad);
+        #else
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_m,j), cos_beta, grad);
+        #endif
     }
 
     //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
@@ -218,19 +240,48 @@ struct ArcData{
                         cos_beta*(am_hat*r_ram + r_rap * ((real_t)2.0*ap_hat + cot_p*(pb_hat+cos_p*ap_hat)) - cot_a*(r_rap*(am_hat - ap_hat*cos_a) + r_ram*(ap_hat-am_hat*cos_a)));
         
         //Eq. 33 multiplied by harmonic term.
+        #if USE_CONSTANT_INDICES
+        return c.f_outer_dihedral(j) * harmonic_energy_gradient(c.outer_dih0_p(j), cos_beta, grad);
+        #else
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_p,j), cos_beta, grad);
+        #endif
     }
     // Internal coordinate gradients
-    INLINE coord3d bond_length_gradient(const Constants& c) const { return d_get(c.f_bond,j) * harmonic_energy_gradient(bond(),d_get(c.r0,j),ab_hat);}
+    INLINE coord3d bond_length_gradient(const Constants& c) const { 
+        #if USE_CONSTANT_INDICES
+        return c.f_bond(j) * harmonic_energy_gradient(bond(),c.r0(j),ab_hat);
+        #else
+        return d_get(c.f_bond,j) * harmonic_energy_gradient(bond(),d_get(c.r0,j),ab_hat);
+        #endif
+        }
     //Sum of angular gradient components.
     INLINE coord3d angle_gradient(const Constants& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
     //Sum of inner and outer dihedral gradient components.
     INLINE coord3d dihedral_gradient(const Constants& c) const { return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);}
     //coord3d flatness()             const { return ;  }   
     
-    INLINE real_t bond_energy(const Constants& c) const {return (real_t)0.5 *d_get(c.f_bond,j) *harmonic_energy(bond(),d_get(c.r0,j));}
-    INLINE real_t bend_energy(const Constants& c) const {return d_get(c.f_inner_angle,j)* harmonic_energy(angle(),d_get(c.angle0,j));}
-    INLINE real_t dihedral_energy(const Constants& c) const {return d_get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),d_get(c.inner_dih0,j));}
+    INLINE real_t bond_energy(const Constants& c) const {
+        #if USE_CONSTANT_INDICES
+        return (real_t)0.5 *c.f_bond(j) *harmonic_energy(bond(),c.r0(j));
+        #else
+        return (real_t)0.5 *d_get(c.f_bond,j) *harmonic_energy(bond(),d_get(c.r0,j));
+        #endif
+        }
+    INLINE real_t bend_energy(const Constants& c) const {
+        #if USE_CONSTANT_INDICES
+        return c.f_inner_angle(j)* harmonic_energy(angle(),c.angle0(j));
+        #else
+        return d_get(c.f_inner_angle,j)* harmonic_energy(angle(),d_get(c.angle0,j));
+        #endif
+        }
+    INLINE real_t dihedral_energy(const Constants& c) const {
+        #if USE_CONSTANT_INDICES
+        return c.f_inner_dihedral(j)* harmonic_energy(dihedral(),c.inner_dih0(j));
+        #else
+        return d_get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),d_get(c.inner_dih0,j));
+        #endif
+        }
+
     //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
     //71 FLOPs
     INLINE real_t energy(const Constants& c) const {return bond_energy(c) + bend_energy(c) + dihedral_energy(c); }
@@ -542,9 +593,15 @@ __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_red
     BLOCK_SYNC
     for (uint8_t j = 0; j < 3; j++){
         auto arc            = ForceField::ArcData(j, X, node_graph);
+        #if USE_CONSTANT_INDICES
+        d_set(rel_bond_err,      j, abs(abs(arc.bond()       - constants.r0(j))        /constants.r0(j)));
+        d_set(rel_angle_err,     j, abs(abs(arc.angle()      - constants.angle0(j))    /constants.angle0(j)));
+        d_set(rel_dihedral_err,  j, abs(abs(arc.dihedral()   - constants.inner_dih0(j))/constants.inner_dih0(j)));
+        #else 
         d_set(rel_bond_err,      j, abs(abs(arc.bond()       - d_get(constants.r0,j))        /d_get(constants.r0,j)));
         d_set(rel_angle_err,     j, abs(abs(arc.angle()      - d_get(constants.angle0,j))    /d_get(constants.angle0,j)));
         d_set(rel_dihedral_err,  j, abs(abs(arc.dihedral()   - d_get(constants.inner_dih0,j))/d_get(constants.inner_dih0,j)));
+        #endif
     }
 
     real_t bond_max         = reduction_max(smem, max(rel_bond_err));
@@ -594,7 +651,17 @@ __global__ void kernel_internal_coordinates(IsomerBatch G, IsomerspaceForcefield
         c.outer_dihedrals_a[tid*3 + j]  = arc.outer_dihedral_a();
         c.outer_dihedrals_m[tid*3 + j]  = arc.outer_dihedral_m();
         c.outer_dihedrals_p[tid*3 + j]  = arc.outer_dihedral_p();
-        
+        #if USE_CONSTANT_INDICES
+        c0.bonds[tid*3 + j]             = constants.r0(j);
+        c0.angles[tid*3 + j]            = constants.angle0(j);
+        c0.dihedrals[tid*3 + j]         = constants.inner_dih0(j);
+        c0.outer_angles_m[tid*3 + j]    = constants.outer_angle_m0(j);
+        c0.outer_angles_p[tid*3 + j]    = constants.outer_angle_p0(j);
+        c0.outer_dihedrals_a[tid*3 + j] = constants.outer_dih0_a(j);
+        c0.outer_dihedrals_m[tid*3 + j] = constants.outer_dih0_m(j);
+        c0.outer_dihedrals_p[tid*3 + j] = constants.outer_dih0_p(j);
+
+        #else
         c0.bonds[tid*3 + j]             = d_get(constants.r0,j);
         c0.angles[tid*3 + j]            = d_get(constants.angle0,j);
         c0.dihedrals[tid*3 + j]         = d_get(constants.inner_dih0,j);
@@ -603,6 +670,7 @@ __global__ void kernel_internal_coordinates(IsomerBatch G, IsomerspaceForcefield
         c0.outer_dihedrals_a[tid*3 + j] = d_get(constants.outer_dih0_a,j);
         c0.outer_dihedrals_m[tid*3 + j] = d_get(constants.outer_dih0_m,j);
         c0.outer_dihedrals_p[tid*3 + j] = d_get(constants.outer_dih0_p,j);
+        #endif
     }
 }
 
