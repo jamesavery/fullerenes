@@ -1,4 +1,5 @@
 #include "fullerenes/gpu/benchmark_functions.hh"
+#include "fullerenes/progress_bar.hh"
 #include "chrono"
 namespace cuda_benchmark {
     #include "reductions.cu"
@@ -49,31 +50,29 @@ namespace cuda_benchmark {
     __global__ void test_reduction_V0_(const int n_times){
         extern __shared__  device_real_t shmem[];
         for (int i = 0; i < n_times; i++){
-            reduction_V0<device_real_t>(shmem, (device_real_t)1.0);
+            reduction_V0<device_real_t>(shmem, (device_real_t)threadIdx.x);
         }
     }
 
     __global__ void test_reduction_V1_(const int n_times){
         extern __shared__  device_real_t shmem[];
         for (int i = 0; i < n_times; i++){
-            reduction_V1<device_real_t>(shmem, (device_real_t)1.0);
+            reduction_V1<device_real_t>(shmem, (device_real_t)threadIdx.x);
         }
     }
 
     __global__ void test_reduction_V2_(const int n_times){
         extern __shared__  device_real_t shmem[];
         for (int i = 0; i < n_times; i++){
-            reduction_V2<device_real_t>(shmem, (device_real_t)1.0);
+            reduction_V2<device_real_t>(shmem, (device_real_t)threadIdx.x);
         }
     }
 
     __global__ void test_reduction_V3_(const int n_times){
         extern __shared__  device_real_t shmem[];
         for (int i = 0; i < n_times; i++){
-            reduction_V3<device_real_t>(shmem, (device_real_t)1.0);
+            reduction_V3<device_real_t>(shmem, (device_real_t)threadIdx.x);
         }
-        //BLOCK_SYNC
-        //if(threadIdx.x + blockIdx.x == 0) printf("Result: %d \n", shmem[0] );
     }
 
     __global__ void test_reduction_V4_(const int n_times){
@@ -87,10 +86,48 @@ namespace cuda_benchmark {
 
         extern __shared__  device_real_t shmem[];
         for (int i = 0; i < n_times; i++){
-            reduction_V4<device_real_t>(shmem, (device_real_t)1.0, num_warps, pow2);
+            reduction_V4<device_real_t>(shmem, (device_real_t)threadIdx.x, num_warps, pow2);
         }
     }
 
+    __global__ void test_reduction_V5_(const int n_times){
+        extern __shared__  device_real_t shmem[];
+        __shared__ device_real_t result;
+        for (int i = 0; i < n_times; i++){
+            reduction_V5<device_real_t>(shmem, (device_real_t)threadIdx.x,&result);
+        }
+    }
+
+    __global__ void test_reduction_V6_(const int n_times){
+        extern __shared__  device_real_t shmem[];
+        __shared__ device_real_t result;
+        for (int i = 0; i < n_times; i++){
+            reduction_V6<device_real_t>(shmem, (device_real_t)threadIdx.x,&result);
+        }
+    }
+
+    __global__ void test_reduction_V7_(const int n_times){
+        auto num_warps = (blockDim.x >> 5) + 1;
+        int pow2 = 0;
+        if (num_warps >= 2) pow2 = 1;
+        if (num_warps >= 4) pow2 = 2;
+        if (num_warps >= 8) pow2 = 3;
+        if (num_warps >= 16) pow2 = 4;
+        if (num_warps >= 32) pow2 = 5;
+
+        extern __shared__  device_real_t shmem[];
+        __shared__ device_real_t result;
+        for (int i = 0; i < n_times; i++){
+            reduction_V7<device_real_t>(shmem, (device_real_t)threadIdx.x, &result, num_warps, pow2);
+        }
+    }
+
+    __global__ void nothing_kernel_(float* A, float* B, float* C){
+        auto tid    = blockDim.x * blockIdx.x + threadIdx.x;
+        for(int i = 0; i < 5000; i++){
+            C[tid] = B[tid] + A[tid];
+        }
+    }
 
     bool test_global_scan(const int n_elements, const int n_times){
         int n_blocks;
@@ -127,6 +164,7 @@ namespace cuda_benchmark {
         int n_blocks;
         cudaDeviceProp prop;
         cudaGetDeviceProperties(&prop,0);
+
 
         size_t smem = sizeof(device_node_t)*n_elements*2;
         cudaOccupancyMaxActiveBlocksPerMultiprocessor(&n_blocks, test_scan_V1_, n_elements, smem);
@@ -192,6 +230,15 @@ namespace cuda_benchmark {
         case 4:
             cudaLaunchCooperativeKernel((void*)test_reduction_V4_, M, n_elements, kargs, smem);  
             break;
+        case 5:
+            cudaLaunchCooperativeKernel((void*)test_reduction_V5_, M, n_elements, kargs, smem);  
+            break;
+        case 6: 
+            cudaLaunchCooperativeKernel((void*)test_reduction_V6_, M, n_elements, kargs, smem);  
+            break;
+        case 7: 
+            cudaLaunchCooperativeKernel((void*)test_reduction_V7_, M, n_elements, kargs, smem);  
+            break;
         default:
             break;
         }
@@ -204,6 +251,24 @@ namespace cuda_benchmark {
         return 1ns* ((int) (single_kernel_time * 1e6));
     }
 
+    void warmup_kernel(std::chrono::seconds warmup_time){
+        std::cout << "Warming Up... \n\n";
+        auto progress_bar = ProgressBar('#',30);
+        auto start = std::chrono::high_resolution_clock::now();
+        int nBlocks = n_blocks(128);
+        float* A; float* B; float* C;
+        cudaMalloc(&A,nBlocks*128*sizeof(float));
+        cudaMalloc(&B,nBlocks*128*sizeof(float));
+        cudaMalloc(&C,nBlocks*128*sizeof(float));
+
+        void* kargs[]{(void*)&A, (void*)&B, (void*)&C};
+        while (chrono::high_resolution_clock::now() - start < warmup_time){
+            cudaLaunchCooperativeKernel((void*)nothing_kernel_,nBlocks,128,kargs,0);
+            cudaDeviceSynchronize();
+            progress_bar.update_progress((float) ((chrono::high_resolution_clock::now() - start)/1ms) / (float)(warmup_time/1ms));
+        }
+        cudaFree(A); cudaFree(B); cudaFree(C);
+    }
 
 
 

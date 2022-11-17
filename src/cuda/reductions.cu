@@ -68,6 +68,28 @@ __device__ __forceinline__ T d_max(const T& a, const T& b){
         BLOCK_SYNC
         return sum;
     }
+#elif REDUCTION_METHOD==3
+    __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data = (device_real_t)0){
+        auto num_warps = (blockDim.x >> 5) + 1;
+        cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+        auto warpid = threadIdx.x >> 5;
+        auto laneid = threadIdx.x & 31;
+        device_real_t temp = cg::reduce(tile32, data, cg::plus<device_real_t>());
+        if (num_warps > 1){
+        sdata[warpid + blockDim.x] = temp;
+        BLOCK_SYNC
+        if (warpid == 0) {
+            auto val = sdata[laneid + blockDim.x];
+            temp = cg::reduce(tile32, val, cg::plus<device_real_t>());
+        }
+        }
+        if (threadIdx.x == 0) sdata[0] = temp;
+        BLOCK_SYNC
+        auto result = sdata[0];
+        BLOCK_SYNC
+        return result;
+    }
+
 #endif
 
 __device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t data){
@@ -187,18 +209,14 @@ template <typename T>
 __device__ void reduction_V3(T* sdata, const T data = (T)0){
     auto num_warps = (blockDim.x >> 5) + 1;
     cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
-    sdata[threadIdx.x] = data;
     auto warpid = threadIdx.x >> 5;
     auto laneid = threadIdx.x & 31;
-    __syncwarp();
-    auto val = sdata[threadIdx.x];
-    T temp = cg::reduce(tile32, val, cg::plus<T>());
+    T temp = cg::reduce(tile32, data, cg::plus<T>());
     if (num_warps > 1){
     if (laneid == 0) sdata[warpid + blockDim.x] = temp;
     BLOCK_SYNC
     if (warpid == 0) {
-        val = sdata[laneid + blockDim.x];
-        temp = cg::reduce(cg::tiled_partition<32>(cg::this_thread_block()), val, cg::plus<T>());
+        temp = cg::reduce(cg::tiled_partition<32>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
     }
 
     }
@@ -210,12 +228,9 @@ __device__ void reduction_V3(T* sdata, const T data = (T)0){
 template <typename T>
 __device__ void reduction_V4(T* sdata, const T data, unsigned int n_warps, int warp_switch){
     cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
-    sdata[threadIdx.x] = data;
     auto warpid = threadIdx.x >> 5;
     auto laneid = threadIdx.x & 31;
-    __syncwarp();
-    auto val = sdata[threadIdx.x];
-    T temp = cg::reduce(tile32, val, cg::plus<T>());
+    T temp = cg::reduce(tile32, data, cg::plus<T>());
     if (n_warps > 1){
     if (laneid == 0) sdata[warpid + blockDim.x] = temp;
     BLOCK_SYNC
@@ -249,8 +264,67 @@ __device__ void reduction_V4(T* sdata, const T data, unsigned int n_warps, int w
     BLOCK_SYNC
 }
 
+template <typename T>
+__device__ void reduction_V5(T* sdata, const T data = (T)0, T* result = nullptr){
+    *result = (T)0;
+    auto num_warps = (blockDim.x >> 5) + 1;
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+    auto warpid = threadIdx.x >> 5;
+    auto laneid = threadIdx.x & 31;
+    T temp = cg::reduce(tile32, data, cg::plus<T>());
+    if (laneid == 0) atomicAdd_block(result, temp);
+    BLOCK_SYNC
+}
 
+template <typename T>
+__device__ void reduction_V6(T* sdata, const T data = (T)0, T* result = nullptr){
+    *result = (T)0;
+    auto num_warps = (blockDim.x >> 5) + 1;
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+    auto warpid = threadIdx.x >> 5;
+    auto laneid = threadIdx.x & 31;
+    T temp = cg::reduce(tile32, data, cg::plus<T>());
+    sdata[warpid + blockDim.x] = temp;
+    BLOCK_SYNC
+    if (warpid == 0) *result = cg::reduce(tile32, sdata[threadIdx.x + blockDim.x], cg::plus<T>());
+    BLOCK_SYNC
+}
 
+template <typename T>
+__device__ void reduction_V7(T* sdata, const T data = (T)0, T* result = nullptr, unsigned int n_warps = 1, int warp_switch = 0){
+    *result = (T)0;
+    cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+    auto warpid = threadIdx.x >> 5;
+    auto laneid = threadIdx.x & 31;
+    T temp = cg::reduce(tile32, data, cg::plus<T>());
+    sdata[warpid + blockDim.x] = temp;
+    BLOCK_SYNC
+    if (warpid == 0) {
+        switch (warp_switch)
+        {
+        case 1:
+            *result = cg::reduce(cg::tiled_partition<2>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        case 2:
+            *result = cg::reduce(cg::tiled_partition<4>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        case 3:
+            *result = cg::reduce(cg::tiled_partition<8>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        case 4:
+            *result = cg::reduce(cg::tiled_partition<16>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        case 5:
+            *result = cg::reduce(cg::tiled_partition<32>(cg::this_thread_block()), sdata[laneid + blockDim.x], cg::plus<T>());
+            break;
+        
+        default:
+            break;
+        }
+        
+    }
+    BLOCK_SYNC
+}
 
 
 __device__ void exclusive_scan(device_node_t* sdata,const device_node_t data, const int size = blockDim.x){
@@ -335,7 +409,7 @@ __device__ void ex_scan(T* sdata, const T data, int n){
         
     }
     if (threadIdx.x == 0){
-        sdata[0] == 0;
+        sdata[0] == (device_node_t)0;
     }
     __syncthreads();
 }
