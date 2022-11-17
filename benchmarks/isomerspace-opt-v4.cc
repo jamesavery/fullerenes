@@ -84,7 +84,7 @@ int main(int argc, char** argv){
                 gpu_kernels::isomerspace_tutte::tutte_layout(batch0,10000000);
                 gpu_kernels::isomerspace_X0::zero_order_geometry(batch0, 4.0);
                 cuda_io::reset_convergence_statuses(batch0);
-                gpu_kernels::isomerspace_forcefield::optimize_batch(batch0,N*5,N*5);
+                gpu_kernels::isomerspace_forcefield::optimize_batch<BUSTER>(batch0,N*5,N*5);
                 out_queue.push(batch0);
             T_par[l] += ( high_resolution_clock::now() - T1);
         }

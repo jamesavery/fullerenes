@@ -138,8 +138,8 @@ int main(int ac, char** argv){
             auto generate_handle = std::async(std::launch::async,generate_isomers, opt0.isomer_capacity*2);
             while(optimize_more){
                 auto T2 = chrono::high_resolution_clock::now();
-                isomerspace_forcefield::optimize_batch(opt0,step, N*5, device0_ctx, ASYNC);
-                isomerspace_forcefield::optimize_batch(opt1,step, N*5, device1_ctx, ASYNC);
+                isomerspace_forcefield::optimize_batch<BUSTER>(opt0,step, N*5, device0_ctx, ASYNC);
+                isomerspace_forcefield::optimize_batch<BUSTER>(opt1,step, N*5, device1_ctx, ASYNC);
                 output0_queue.push(opt0, device0_ctx, ASYNC);
                 output1_queue.push(opt1, device1_ctx, ASYNC);
                 opt0_queue.refill_batch(opt0, device0_ctx, ASYNC);
@@ -159,8 +159,8 @@ int main(int ac, char** argv){
             if(more_to_generate) T_par[i] += T4 - T3;
             if(!more_to_generate){
                 while(opt0_queue.get_size() > 0){
-                    isomerspace_forcefield::optimize_batch(opt0, step, N*5, device0_ctx, ASYNC);
-                    isomerspace_forcefield::optimize_batch(opt1, step, N*5, device1_ctx, ASYNC);
+                    isomerspace_forcefield::optimize_batch<BUSTER>(opt0, step, N*5, device0_ctx, ASYNC);
+                    isomerspace_forcefield::optimize_batch<BUSTER>(opt1, step, N*5, device1_ctx, ASYNC);
                     output0_queue.push(opt0, device0_ctx, ASYNC);
                     output1_queue.push(opt1, device1_ctx, ASYNC);
                     opt0_queue.refill_batch(opt0, device0_ctx, ASYNC);
@@ -168,8 +168,8 @@ int main(int ac, char** argv){
                     device0_ctx.wait(); device1_ctx.wait();
                 }
                 for(int i = 0;  i <  N*5; i += step){
-                    isomerspace_forcefield::optimize_batch(opt0, step, N*5, device0_ctx, ASYNC);
-                    isomerspace_forcefield::optimize_batch(opt1, step, N*5, device1_ctx, ASYNC);
+                    isomerspace_forcefield::optimize_batch<BUSTER>(opt0, step, N*5, device0_ctx, ASYNC);
+                    isomerspace_forcefield::optimize_batch<BUSTER>(opt1, step, N*5, device1_ctx, ASYNC);
                 }
                 output0_queue.push(opt0, device0_ctx, ASYNC);
                 output1_queue.push(opt1, device1_ctx, ASYNC);

@@ -78,7 +78,7 @@ int main(int argc, char** argv){
             }
             auto T1 = high_resolution_clock::now();
                 isomer_q.refill_batch(batch0);
-                gpu_kernels::isomerspace_forcefield::optimize_batch(batch0,N*5,N*5);
+                gpu_kernels::isomerspace_forcefield::optimize_batch<BUSTER>(batch0,N*5,N*5);
             T_par[l] += high_resolution_clock::now() - T1;
         }
         using namespace cuda_io;

@@ -124,8 +124,8 @@ int main(int argc, char** argv){
                 isomerspace_X0::zero_order_geometry(batch1, 4.0, device1, LaunchPolicy::ASYNC);
                 cuda_io::reset_convergence_statuses(batch0, device0, LaunchPolicy::ASYNC);              
                 cuda_io::reset_convergence_statuses(batch1, device1, LaunchPolicy::ASYNC);                    
-                isomerspace_forcefield::optimize_batch(batch0,N*5,N*5, device0, LaunchPolicy::ASYNC);   
-                isomerspace_forcefield::optimize_batch(batch1,N*5,N*5, device1, LaunchPolicy::ASYNC);
+                isomerspace_forcefield::optimize_batch<BUSTER>(batch0,N*5,N*5, device0, LaunchPolicy::ASYNC);   
+                isomerspace_forcefield::optimize_batch<BUSTER>(batch1,N*5,N*5, device1, LaunchPolicy::ASYNC);
                 //Output finished isomers 
                 Out_Q0.push(batch0,device0,LaunchPolicy::ASYNC); 
                 Out_Q1.push(batch1,device1,LaunchPolicy::ASYNC);

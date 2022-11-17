@@ -90,7 +90,7 @@ int main(int argc, char** argv){
                 isomerspace_tutte::tutte_layout(batch0,10000000,device0,LaunchPolicy::ASYNC);
                 isomerspace_X0::zero_order_geometry(batch0, 4.0, device0, LaunchPolicy::ASYNC);
                 cuda_io::reset_convergence_statuses(batch0,device0,LaunchPolicy::ASYNC);
-                isomerspace_forcefield::optimize_batch(batch0,N*5,N*5,device0,LaunchPolicy::ASYNC);
+                isomerspace_forcefield::optimize_batch<BUSTER>(batch0,N*5,N*5,device0,LaunchPolicy::ASYNC);
                 Output_Q.push(batch0, device0, LaunchPolicy::ASYNC);
                 device0.wait();
             auto T2 = high_resolution_clock::now(); T_par[l] += ( T2 - T1);

@@ -11,6 +11,7 @@ using namespace chrono_literals;
 #include "fullerenes/gpu/batch_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
+#include "fullerenes/gpu/benchmark_functions.hh"
 #include "numeric"
 #include "random"
 #include "filesystem"
@@ -20,10 +21,15 @@ int main(int argc, char** argv){
 
     size_t N_start                = argc > 1 ? strtol(argv[1],0,0) : (size_t)20;     // Argument 1: Number of vertices N
     size_t N_limit                = argc > 2 ? strtol(argv[2],0,0) : N_start;     // Argument 1: Number of vertices N
-    auto N_runs = 10;
-    ofstream out_file("ParBenchmark_" + to_string(N_limit) + ".txt");
-    ofstream out_std("ParBenchmark_STD_" + to_string(N_limit) + ".txt");
+    size_t N_runs                 = argc > 3 ? strtol(argv[3],0,0) : 10;       //Number of times to run experiment
+    size_t warmup                 = argc > 4 ? strtol(argv[4],0,0) : 0;     // Argument 1: Number of vertices N
+
+    ofstream out_file   ("ParBenchmark_" + to_string(N_limit) + ".txt");
+    ofstream out_std    ("ParBenchmark_STD_" + to_string(N_limit) + ".txt");
     out_file << "Generate, Samples, Update, Dual, Tutte, X0, Optimize \n";
+
+    cuda_benchmark::warmup_kernel(warmup*1s);
+    LaunchCtx ctx(0);
     for (size_t N = N_start; N < N_limit+1; N+=2)
     {   
         if(N == 22) continue;
@@ -51,6 +57,7 @@ int main(int argc, char** argv){
         IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
         IsomerBatch batch1(N,sample_size,DEVICE_BUFFER);
         IsomerBatch h_batch(N,sample_size,HOST_BUFFER);
+        
         cuda_io::IsomerQueue isomer_q(N);
         cuda_io::IsomerQueue isomer_q_cubic(N);
         bool more_to_generate = true;
@@ -78,6 +85,7 @@ int main(int argc, char** argv){
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
         std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
 
+        
 
         for (size_t l = 0; l < N_runs; l++)
         {   
@@ -101,13 +109,15 @@ int main(int argc, char** argv){
             T_X0s[l] += isomerspace_X0::time_spent() - TX0;
             cuda_io::reset_convergence_statuses(batch0);
             auto TFF = isomerspace_forcefield::time_spent();
-            isomerspace_forcefield::optimize_batch(batch0,N*4,N*4);
+            isomerspace_forcefield::optimize_batch<BUSTER>(batch0,N*5,N*5);
             T_opts[l] += isomerspace_forcefield::time_spent() - TFF;
         }
+        CuArray<device_real_t> bond_rms(sample_size);
+        isomerspace_forcefield::get_bond_rms<BUSTER>(batch0, bond_rms); 
+        std::cout << bond_rms;
         using namespace cuda_io;
-
         out_file << N << ", "<< sample_size << ", " << mean(T_gens)/1ns << ", " << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns << "\n";
-        out_std << N << ", "<< sample_size << ", " << sdev(T_gens)/1ns << ", " << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns << "\n";
+        out_std << N << ", "<< sample_size << ", " << sdev(T_gens)/1ns << ", " << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns << "\n";        
      }
-
+    
 }
