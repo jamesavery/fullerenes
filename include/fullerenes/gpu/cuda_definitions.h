@@ -14,9 +14,10 @@
 #define Block_Size_Pow_2 256
 #define SEMINARIO_FORCE_CONSTANTS 0
 #define USE_MAX_NORM 0
-#define REDUCTION_METHOD 0
+#define REDUCTION_METHOD 3
 #define LINESEARCH_METHOD GSS
-#define FORCEFIELD_VERSION BUSTER
+#define FORCEFIELD_VERSION FLATNESS_ENABLED
+#define USE_CONSTANT_INDICES 0
 typedef float device_real_t;
 typedef uint16_t device_node_t;
 typedef float3 device_coord3d;

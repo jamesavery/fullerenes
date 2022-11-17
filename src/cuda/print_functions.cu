@@ -3,6 +3,7 @@
 
 #include "fullerenes/gpu/cuda_definitions.h"
 #include "cuda_runtime_api.h"
+
 __device__ void print(const device_coord3d& ab){
     printf("[%.6f,%.6f,%.6f]",ab.x,ab.y,ab.z);
 }
@@ -26,11 +27,17 @@ __device__ void print(size_t a){
 __device__ void print(const char* a){
     printf(a);
 }
+__device__ void print(const device_node2& a){
+    printf("[%d,%d]",a.x,a.y);
+}
 
 __device__ void print(const device_node3& a){
     printf("[%d,%d,%d]",a.x,a.y,a.z);
 }
 
+__device__ void print(const device_node6& a){
+    printf("[%d,%d,%d,%d,%d,%d]",a.b, a.c, a.d, a.e, a.f, a.g);
+}
 __device__ void print(const device_coord2d& a){
     printf("[%.6f,%.6f]",a.x,a.y);
 }
