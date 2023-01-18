@@ -5,19 +5,7 @@
 #include "fullerenes/gpu/kernels.hh"
 namespace gpu_kernels{
 namespace isomerspace_tutte{
-#include "cuda_runtime.h"
-#include <cuda_runtime_api.h>
-#include "cooperative_groups.h"
-#include "fullerenes/gpu/cuda_definitions.h"
-#include "fullerenes/gpu/isomer_batch.hh"
-#include "misc_cuda.cu"
-#include "reductions.cu"
-#include "coord3d.cuh"
-#include "coord2d.cuh"
-#include "forcefield_structs.cu"
-#include "print_functions.cu"
-#include "chrono"
-#include "launch_dims.cu"
+#include "device_includes.cu"
 
 __global__
 void tutte_layout_(IsomerBatch B, const size_t iterations){

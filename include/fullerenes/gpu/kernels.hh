@@ -1,9 +1,11 @@
 #ifndef ISOMERSPACE_KERNELS_H
 #define ISOMERSPACE_KERNELS_H
+#include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/gpu/cuda_execution.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "cuda_execution.hh"
 #include "cu_array.hh"
-#include "chrono"
+#include <chrono>
 
 enum ForcefieldType {WIRZ, BUSTER, FLATNESS_ENABLED, FLAT_BOND};
 

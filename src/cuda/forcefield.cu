@@ -12,14 +12,7 @@
 
 namespace gpu_kernels{
 namespace isomerspace_forcefield{
-
-#include "misc_cuda.cu"
-#include "coord3d.cuh"
-#include "reductions.cu"
-#include "forcefield_structs.cu"
-#include "cooperative_groups.h"
-#include "print_functions.cu"
-#include "launch_dims.cu"
+#include "device_includes.cu"
 
 // This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions
 template <ForcefieldType T>
