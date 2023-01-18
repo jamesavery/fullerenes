@@ -2,7 +2,7 @@
 #include <cooperative_groups.h>
 #include "iostream"
 #include "assert.h"
-#include "fullerenes/gpu/cuda_execution.hh"
+#include "fullerenes/gpu/launch_ctx.hh"
 
 namespace cg = cooperative_groups;
 

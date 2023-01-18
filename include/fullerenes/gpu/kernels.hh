@@ -1,9 +1,9 @@
 #ifndef ISOMERSPACE_KERNELS_H
 #define ISOMERSPACE_KERNELS_H
 #include "fullerenes/gpu/cuda_definitions.h"
-#include "fullerenes/gpu/cuda_execution.hh"
+#include "fullerenes/gpu/launch_ctx.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
-#include "cuda_execution.hh"
+#include "launch_ctx.hh"
 #include "cu_array.hh"
 #include <chrono>
 

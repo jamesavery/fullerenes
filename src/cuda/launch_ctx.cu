@@ -1,5 +1,5 @@
 #include "iostream"
-#include "fullerenes/gpu/cuda_execution.hh"
+#include "fullerenes/gpu/launch_ctx.hh"
 #include "cuda_runtime_api.h"
 
 int LaunchCtx::get_device_id() const {

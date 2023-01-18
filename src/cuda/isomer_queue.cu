@@ -7,7 +7,7 @@
 #include "chrono"
 #include <fullerenes/polyhedron.hh>
 #include "fullerenes/gpu/misc_cuda.cuh"
-#include "fullerenes/gpu/cuda_execution.hh"
+#include "fullerenes/gpu/launch_ctx.hh"
 #include "launch_dims.cu"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/cuda_io.hh"
@@ -20,7 +20,7 @@ namespace cuda_io{
 
 }
 
-#include "cuda_execution.cu"
+#include "launch_ctx.cu"
 #include "cuda_io.cu"
 #include "fullerenes/gpu/isomer_queue.hh"
 namespace cuda_io{

@@ -1,4 +1,4 @@
-#include "cuda_execution.hh"
+#include "launch_ctx.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/cu_array.hh"
 namespace cuda_io{

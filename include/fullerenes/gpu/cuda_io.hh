@@ -1,7 +1,7 @@
 #ifndef CUDA_IO_H
 #define CUDA_IO_H
 #include <cuda_runtime.h>
-#include "cuda_execution.hh"
+#include "launch_ctx.hh"
 #include <chrono>
 #include <queue>
 #include "fullerenes/gpu/isomer_batch.hh"

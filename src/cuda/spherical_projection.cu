@@ -3,7 +3,7 @@
 #include <cooperative_groups/reduce.h>
 #include <cooperative_groups/scan.h>
 #include "fullerenes/gpu/kernels.hh"
-#include "fullerenes/gpu/cuda_execution.hh"
+#include "fullerenes/gpu/launch_ctx.hh"
 namespace gpu_kernels{
 
 namespace isomerspace_X0{
