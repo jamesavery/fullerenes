@@ -1,3 +1,6 @@
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 #include "fullerenes/gpu/cu_array.hh"
 #include "cuda_runtime.h"
 #include "fullerenes/gpu/cuda_definitions.h"

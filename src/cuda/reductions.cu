@@ -3,7 +3,7 @@
 #define NUM_BANKS 32 
 #define LOG_NUM_BANKS 5
 #define CONFLICT_FREE_OFFSET(n) ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
-
+namespace cg = cooperative_groups;
 template <typename T>
 __device__ __forceinline__ T d_max(const T& a, const T& b){
     return a > b ? a : b; 

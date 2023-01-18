@@ -1,4 +1,7 @@
 #include <cuda.h>
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 #include "fullerenes/gpu/kernels.hh"
 namespace gpu_kernels{
 namespace isomerspace_tutte{
@@ -23,7 +26,7 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     if (B.statuses[isomer_idx] != IsomerStatus::EMPTY){
     size_t offset = isomer_idx * blockDim.x;
 
-    DeviceFullereneGraph FG(&B.cubic_neighbours[offset*3]); 
+    CubicGraph FG(&B.cubic_neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2d* xys        = reinterpret_cast<coord2d*>(base_pointer);
     coord2d* newxys     = reinterpret_cast<coord2d*>(base_pointer) + blockDim.x;

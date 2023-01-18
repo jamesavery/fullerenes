@@ -1,4 +1,7 @@
 #include <cuda.h>
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_execution.hh"
 namespace gpu_kernels{
@@ -21,7 +24,7 @@ __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){
     DEVICE_TYPEDEFS
     
-    DeviceFullereneGraph FG = DeviceFullereneGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
+    CubicGraph FG = CubicGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
     node_t outer_face[6]; memset(outer_face, 0, sizeof(node_t)*6); //Do not rely on uninitialized memory it will only be zero on first touch.
     uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
     distances[threadIdx.x] = node_t(NODE_MAX);    
@@ -89,7 +92,7 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
     clear_cache(sdata, Block_Size_Pow_2);
     size_t isomer_idx = blockIdx.x + offset;
     if (isomer_idx < B.isomer_capacity && B.statuses[isomer_idx] != IsomerStatus::EMPTY){
-    NodeGraph node_graph = NodeGraph(B, isomer_idx); 
+    NodeNeighbours node_graph = NodeNeighbours(B, isomer_idx); 
     coord2d angles = spherical_projection(B,reinterpret_cast<device_node_t*>(sdata), isomer_idx);
     real_t theta = angles.x; real_t phi = angles.y;
     real_t x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
@@ -112,7 +115,6 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
     Ravg /= real_t(3*blockDim.x);
     coordinate *= scalerad*1.5/Ravg;
     reinterpret_cast<coord3d*>(B.X)[blockDim.x*isomer_idx + threadIdx.x] = coordinate;
-    B.statuses[isomer_idx] = IsomerStatus::CONVERGED;
     }
 }
 

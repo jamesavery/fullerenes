@@ -1,4 +1,7 @@
 #include "fullerenes/gpu/cuda_definitions.h"
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 #include <inttypes.h>
 #include <queue>
 #include "chrono"
@@ -15,7 +18,7 @@ namespace cuda_io{
 
 #include "cuda_execution.cu"
 #include "cuda_io.cu"
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 namespace cuda_io{
 #include "print_functions.cu"
 

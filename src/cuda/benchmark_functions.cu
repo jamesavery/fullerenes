@@ -1,3 +1,7 @@
+
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "fullerenes/progress_bar.hh"
 #include "chrono"

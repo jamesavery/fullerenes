@@ -7,7 +7,7 @@
 struct Forcefield {
     
     size_t N;
-    const NodeGraph* node_graph;
+    const NodeNeighbours* node_graph;
     const Constants* constants;
 
     struct ArcData
@@ -15,7 +15,7 @@ struct Forcefield {
         unsigned char j;
         size_t node;
 
-        ArcData(const unsigned char node, const coord3d* X, const NodeGraph G){
+        ArcData(const unsigned char node, const coord3d* X, const NodeNeighbours G){
             real_t r_rmp;
             coord3d ap, am, ab, ac, ad, mp;
             coord3d X_a = X[node]; coord3d X_b = X[G.neighbours[j]];

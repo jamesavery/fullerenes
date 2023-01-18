@@ -1,4 +1,7 @@
 #include <cuda.h>
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 #include "fullerenes/gpu/kernels.hh"
 namespace gpu_kernels{
 namespace isomerspace_dual{
@@ -41,7 +44,7 @@ void cubic_layout_(IsomerBatch B){
         reinterpret_cast<node6*>(cached_neighbours)[thid] = reinterpret_cast<node6*>(B.dual_neighbours)[thid + isomer_idx*B.n_faces];
         cached_degrees[thid] = B.face_degrees[thid + isomer_idx*B.n_faces];
     }
-    DeviceFullereneDual FD(cached_neighbours, cached_degrees);
+    DualGraph FD(cached_neighbours, cached_degrees);
     device_node_t cannon_arcs[6]; memset(cannon_arcs, UINT16_MAX,sizeof(device_node_t)*6);
     int represent_count = 0;
     BLOCK_SYNC
@@ -93,7 +96,7 @@ std::chrono::microseconds time_spent(){
     return std::chrono::microseconds((int) (kernel_time*1000.f));
 }
 
-cudaError_t cubic_layout(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+cudaError_t dualize(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(ctx.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];

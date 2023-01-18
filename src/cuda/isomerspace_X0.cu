@@ -8,7 +8,7 @@ __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& G, device_node_t* distances){
     DEVICE_TYPEDEFS
     
-    DeviceFullereneGraph FG = DeviceFullereneGraph(&G.cubic_neighbours[blockIdx.x*blockDim.x*3]);
+    CubicGraph FG = CubicGraph(&G.cubic_neighbours[blockIdx.x*blockDim.x*3]);
     node_t outer_face[6];
     uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
     distances[threadIdx.x] = node_t(NODE_MAX);    
@@ -79,7 +79,7 @@ void kernel_zero_order_geometry(IsomerBatch G, device_real_t scalerad){
     clear_cache(sdata, Block_Size_Pow_2);
     if (G.statuses[blockIdx.x] == IsomerStatus::NOT_CONVERGED)
     {
-    NodeGraph node_graph = NodeGraph(G, blockIdx.x); 
+    NodeNeighbours node_graph = NodeNeighbours(G, blockIdx.x); 
     coord2d angles = spherical_projection(G,reinterpret_cast<device_node_t*>(sdata));
     real_t theta = angles.x; real_t phi = angles.y;
     real_t x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);

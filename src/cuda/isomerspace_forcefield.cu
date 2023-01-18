@@ -1,6 +1,9 @@
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include <cuda.h>
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 #include "fullerenes/gpu/isomerspace_forcefield.hh"
 #include "fullerenes/gpu/cuda_definitions.h"
 #include "reductions.cu"
@@ -22,13 +25,13 @@ struct ForceField{
     coord3d r1,                         //d_i+1 In conjugated gradient algorithm  Buster p. 36
             r0;                         //d_0 In conjugated gradient algorithm Buster p. 36
 
-    const NodeGraph node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
+    const NodeNeighbours node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
     const Constants constants;          //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
 
     size_t node_id = threadIdx.x;
     real_t* sdata;                      //Pointer to start of L1 cache array, used exclusively for reduction.
 
-    __device__ ForceField(  const NodeGraph &G,
+    __device__ ForceField(  const NodeNeighbours &G,
                             const Constants &c, 
                             real_t* sdata): node_graph(G), constants(c), sdata(sdata) {}
 
@@ -37,7 +40,7 @@ struct ForceField{
 struct ArcData{
     //124 FLOPs;
     uint8_t j;
-    __device__ ArcData(const uint8_t j, const coord3d* __restrict__ X, const NodeGraph& G){   
+    __device__ ArcData(const uint8_t j, const coord3d* __restrict__ X, const NodeNeighbours& G){   
         this->j = j;   
         node_t a = threadIdx.x;;
         real_t r_rmp;
@@ -562,7 +565,7 @@ __global__ void kernel_optimize_batch(IsomerBatch G, const size_t iterations){
         //Pre-compute force constants and store in registers.
 
         Constants constants = Constants(G, blockIdx.x);
-        NodeGraph nodeG     = NodeGraph(G, blockIdx.x);
+        NodeNeighbours nodeG     = NodeNeighbours(G, blockIdx.x);
 
         //Create forcefield struct and use optimization algorithm to optimize the fullerene 
         ForceField FF = ForceField(nodeG, constants, smem);
@@ -585,7 +588,7 @@ __global__ void kernel_batch_statistics(IsomerBatch G, device_real_t* global_red
     if (G.statuses[blockIdx.x] == IsomerStatus::NOT_CONVERGED){
     size_t offset = blockIdx.x * blockDim.x;
     Constants constants     = Constants(G, blockIdx.x);
-    NodeGraph node_graph    = NodeGraph(G, blockIdx.x);
+    NodeNeighbours node_graph    = NodeNeighbours(G, blockIdx.x);
     ForceField FF           = ForceField(node_graph, constants, smem);
     coord3d* X              = reinterpret_cast<coord3d*>(G.X+offset*3);
 
@@ -636,7 +639,7 @@ __global__ void kernel_internal_coordinates(IsomerBatch G, IsomerspaceForcefield
     DEVICE_TYPEDEFS
     size_t offset = blockIdx.x * blockDim.x;
     coord3d* X       = &reinterpret_cast<coord3d*>(G.X)[offset];
-    NodeGraph node_graph    = NodeGraph(G, blockIdx.x);
+    NodeNeighbours node_graph    = NodeNeighbours(G, blockIdx.x);
     Constants constants     = Constants(G, blockIdx.x);
 
     size_t tid = threadIdx.x + blockDim.x*blockIdx.x;
@@ -714,7 +717,7 @@ void IsomerspaceForcefield::get_internal_coordinates(device_real_t* bonds, devic
     cudaMemcpy(dihedrals,   d_coords[0].dihedrals, sizeof(device_coord3d)*N*batch_size, cudaMemcpyDeviceToHost);
 }
 
-void IsomerspaceForcefield::optimize_batch(const size_t iterations){
+void IsomerspaceForcefield::optimize(const size_t iterations){
     printLastCudaError("Memcpy Failed! \n");
     static LaunchDims dims((void*)kernel_optimize_batch, N, shared_memory_bytes);
     for (size_t i = 0; i < device_count; i++)
