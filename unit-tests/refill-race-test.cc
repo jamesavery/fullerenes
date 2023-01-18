@@ -1,7 +1,7 @@
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_io.hh"
@@ -177,10 +177,10 @@ int main(int ac, char **argv){
         TestQ.refill_batch(d_TestB, test_ctx, ASYNC);
         ControlQ.refill_batch(d_ControlB, control_ctx, ASYNC);
 
-        isomerspace_dual::cubic_layout(d_TestB, test_ctx, ASYNC);
+        isomerspace_dual::dualize(d_TestB, test_ctx, ASYNC);
         isomerspace_tutte::tutte_layout(d_TestB, 10000000, test_ctx, ASYNC);
         isomerspace_X0::zero_order_geometry(d_TestB, 4.0, test_ctx, ASYNC);
-        isomerspace_dual::cubic_layout(d_ControlB, control_ctx, ASYNC);
+        isomerspace_dual::dualize(d_ControlB, control_ctx, ASYNC);
         isomerspace_tutte::tutte_layout(d_ControlB, 10000000, control_ctx, ASYNC);
         isomerspace_X0::zero_order_geometry(d_ControlB, 4.0, control_ctx, ASYNC);
 
@@ -242,11 +242,11 @@ int main(int ac, char **argv){
         TestQ.refill_batch(d_TestB, test_ctx, ASYNC);
         ControlQ.refill_batch(d_ControlB, control_ctx, ASYNC);
 
-        isomerspace_dual::cubic_layout(d_TestB, test_ctx, ASYNC);
+        isomerspace_dual::dualize(d_TestB, test_ctx, ASYNC);
         isomerspace_tutte::tutte_layout(d_TestB, 10000000, test_ctx, ASYNC);
         isomerspace_X0::zero_order_geometry(d_TestB, 4.0, test_ctx, ASYNC);
         reset_convergence_statuses(d_TestB, test_ctx, ASYNC);
-        isomerspace_dual::cubic_layout(d_ControlB, control_ctx, ASYNC);
+        isomerspace_dual::dualize(d_ControlB, control_ctx, ASYNC);
         isomerspace_tutte::tutte_layout(d_ControlB, 10000000, control_ctx, ASYNC);
         isomerspace_X0::zero_order_geometry(d_ControlB, 4.0, control_ctx, ASYNC);
         reset_convergence_statuses(d_ControlB, control_ctx, ASYNC);
@@ -256,14 +256,14 @@ int main(int ac, char **argv){
         
         TestQ2.refill_batch(d_TestB2, test_ctx, ASYNC);
         ControlQ2.refill_batch(d_ControlB2, control_ctx, ASYNC);
-        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N, N*2,test_ctx, ASYNC);
-        isomerspace_forcefield::optimize_batch<BUSTER>(d_ControlB2, N, N*2,control_ctx, ASYNC);
+        isomerspace_forcefield::optimize<BUSTER>(d_TestB2, N, N*2,test_ctx, ASYNC);
+        isomerspace_forcefield::optimize<BUSTER>(d_ControlB2, N, N*2,control_ctx, ASYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, ASYNC);
         ControlQ2.refill_batch(d_ControlB2, control_ctx, ASYNC);
         TestQ2.insert(d_TestB, test_ctx, ASYNC);
         ControlQ2.insert(d_ControlB, control_ctx, ASYNC);
-        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N, N*2,test_ctx, ASYNC);
-        isomerspace_forcefield::optimize_batch<BUSTER>(d_ControlB2, N, N*2,control_ctx, ASYNC);
+        isomerspace_forcefield::optimize<BUSTER>(d_TestB2, N, N*2,test_ctx, ASYNC);
+        isomerspace_forcefield::optimize<BUSTER>(d_ControlB2, N, N*2,control_ctx, ASYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, ASYNC);
         ControlQ2.refill_batch(d_ControlB2, control_ctx, ASYNC);
 
@@ -309,7 +309,7 @@ int main(int ac, char **argv){
         TestQ.refill_batch(d_TestB, test_ctx, SYNC);
         std::cout << "Counters: "<< TestQ.get_front()  << " , "<< TestQ.get_back() << std::endl;
 
-        isomerspace_dual::cubic_layout(d_TestB, test_ctx, SYNC);
+        isomerspace_dual::dualize(d_TestB, test_ctx, SYNC);
         isomerspace_tutte::tutte_layout(d_TestB, 10000000, test_ctx, ASYNC);
         isomerspace_X0::zero_order_geometry(d_TestB, 4.0, test_ctx, ASYNC);
         reset_convergence_statuses(d_TestB, test_ctx, SYNC);
@@ -324,7 +324,7 @@ int main(int ac, char **argv){
         std::cout << d_TestB2 << std::endl;
         std::cout << "===============================================================" << endl;
 
-        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N*3, N*4,test_ctx, SYNC);
+        isomerspace_forcefield::optimize<BUSTER>(d_TestB2, N*3, N*4,test_ctx, SYNC);
         std::cout<< d_TestB2 << endl;
         std::cout << "===============================================================" << endl;
 
@@ -334,9 +334,9 @@ int main(int ac, char **argv){
 
 
 
-        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N*1, N*4,test_ctx, SYNC);
+        isomerspace_forcefield::optimize<BUSTER>(d_TestB2, N*1, N*4,test_ctx, SYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, SYNC);
-        isomerspace_forcefield::optimize_batch<BUSTER>(d_TestB2, N*4, N*4,test_ctx, SYNC);
+        isomerspace_forcefield::optimize<BUSTER>(d_TestB2, N*4, N*4,test_ctx, SYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, SYNC);
 
         std::cout << d_TestB2 << endl;

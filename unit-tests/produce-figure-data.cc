@@ -8,7 +8,7 @@ const std::unordered_map<size_t,size_t> num_fullerenes = {{20,1},{22,0},{24,1},{
 using namespace chrono;
 using namespace chrono_literals;
 
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/kernels.hh"
@@ -33,14 +33,14 @@ int main(int argc, char** argv){
     cuda_io::IsomerQueue Q(N);
     Q.insert(G,ID);
     Q.refill_batch(batch);
-    gpu_kernels::isomerspace_dual::cubic_layout(batch);
+    gpu_kernels::isomerspace_dual::dualize(batch);
     gpu_kernels::isomerspace_tutte::tutte_layout(batch);
     gpu_kernels::isomerspace_X0::zero_order_geometry(batch,4.);
     cuda_io::copy(h_batch,batch);
 
     //Polyhedron::to_mol2(h_batch.get_isomer_by_id(ID).value(),fopen("BEAUTIFUL_X0.mol2","w+")); 
     cuda_io::reset_convergence_statuses(batch);
-    gpu_kernels::isomerspace_forcefield::optimize_batch<BUSTER>(batch,N*1,N*5);
+    gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(batch,N*1,N*5);
     batch.print(BatchMember::COORDS3D);
     Q.insert(batch);
     Polyhedron P = Q.pop();

@@ -1,7 +1,7 @@
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_io.hh"
@@ -90,12 +90,12 @@ int main(int ac, char **argv){
     }
     //===================== SERIAL PIPELINE =====================
     cuda_io::copy(d_control,h_control);
-    isomerspace_dual::cubic_layout(d_control);
+    isomerspace_dual::dualize(d_control);
     isomerspace_tutte::tutte_layout(d_control, 1000000);
     isomerspace_X0::zero_order_geometry(d_control, 4.0);
     reset_convergence_statuses(d_control);
 
-    isomerspace_forcefield::optimize_batch<BUSTER>(d_control, N*50, N*50);
+    isomerspace_forcefield::optimize<BUSTER>(d_control, N*50, N*50);
     //===================== END of SERIAL =====================
 
     int I_async = 0;
@@ -116,7 +116,7 @@ int main(int ac, char **argv){
         }
         
         input_queue.refill_batch(input_test, insert_ctx, ASYNC);
-        isomerspace_dual::cubic_layout(input_test, insert_ctx, ASYNC);
+        isomerspace_dual::dualize(input_test, insert_ctx, ASYNC);
         isomerspace_tutte::tutte_layout(input_test, 1000000, insert_ctx, ASYNC);
         isomerspace_X0::zero_order_geometry(input_test, 4.0, insert_ctx, ASYNC);
         reset_convergence_statuses(input_test, insert_ctx, ASYNC);
@@ -137,7 +137,7 @@ int main(int ac, char **argv){
         bool optimize_more = true;
         auto generate_handle = std::async(std::launch::async,generate_isomers, opt_test.isomer_capacity*2);
         while(optimize_more){
-            isomerspace_forcefield::optimize_batch<BUSTER>(opt_test,step, N*50, device0, ASYNC);
+            isomerspace_forcefield::optimize<BUSTER>(opt_test,step, N*50, device0, ASYNC);
             output_queue.push(opt_test, device0, ASYNC);
             opt_queue.refill_batch(opt_test, device0, ASYNC);
             device0.wait();
@@ -152,14 +152,14 @@ int main(int ac, char **argv){
 
         if(!more_to_generate){
             while(opt_queue.get_size() > 0){
-                isomerspace_forcefield::optimize_batch<BUSTER>(opt_test, step, N*50, device0, ASYNC);
+                isomerspace_forcefield::optimize<BUSTER>(opt_test, step, N*50, device0, ASYNC);
                 output_queue.push(opt_test, device0, ASYNC);
                 device0.wait();
             
                 opt_queue.refill_batch(opt_test, device0, ASYNC);
             }
             for(int i = 0;  i <  N*50; i += step){
-                isomerspace_forcefield::optimize_batch<BUSTER>(opt_test,step, N*50, device0, SYNC);
+                isomerspace_forcefield::optimize<BUSTER>(opt_test,step, N*50, device0, SYNC);
             }
             output_queue.push(opt_test, device0, SYNC);
             more_to_do = false;

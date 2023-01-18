@@ -119,7 +119,7 @@ int main(int ac, char **argv)
     ff_kernel.update_batch();ff_kernel2.update_batch();
     while (ff_kernel.get_batch_size()!=0 || !ff_kernel.insert_queue.empty())
     {
-        ff_kernel.optimize_batch(10*N);ff_kernel2.optimize_batch(10*N);
+        ff_kernel.optimize(10*N);ff_kernel2.optimize(10*N);
         ff_kernel.check_batch(N*10);        ff_kernel2.check_batch(N*10);
         ff_kernel.output_batch_to_queue();        ff_kernel2.output_batch_to_queue();
     }
@@ -135,7 +135,7 @@ int main(int ac, char **argv)
         X0_kernel_pipe.zero_order_geometry();
         IsomerspaceKernel::kernel_to_kernel_copy(X0_kernel_pipe,ff_kernel_pipe);
 
-        ff_kernel_pipe.optimize_batch(10*N);
+        ff_kernel_pipe.optimize(10*N);
         ff_kernel_pipe.check_batch(N*10);
         ff_kernel_pipe.output_batch_to_queue();
     }

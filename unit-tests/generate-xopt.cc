@@ -95,7 +95,7 @@ int main(int ac, char **argv)
         {
         int finished = ff_kernel.get_failed_count() + ff_kernel.get_converged_count(); 
         ff_kernel.update_device_batches();
-        ff_kernel.optimize_batch(N*5);
+        ff_kernel.optimize(N*5);
         ff_kernel.output_batch_to_queue();
         new_finished = ff_kernel.get_failed_count() + ff_kernel.get_converged_count() - finished;
         ff_kernel.check_batch(N*5);
@@ -107,7 +107,7 @@ int main(int ac, char **argv)
         while (ff_kernel.get_device_queue_size() > 0)
         {
         ff_kernel.update_device_batches();
-        ff_kernel.optimize_batch(N*5);
+        ff_kernel.optimize(N*5);
         ff_kernel.check_batch(N*5);
         ff_kernel.move_to_output_buffer();
         ff_kernel.output_batch_to_queue();
