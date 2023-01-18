@@ -305,6 +305,60 @@ namespace cuda_io{
 
 }
 
+void IsomerBatch::append(const Graph& graph, const size_t id){
+    if (m_size == isomer_capacity) throw std::runtime_error("IsomerBatch is full");
+    auto Nf = n_atoms / 2 + 2;
+    if (graph.neighbours.size() != Nf) throw std::runtime_error("Graph has wrong number of faces");
+    if (buffer_type == DEVICE_BUFFER){
+        throw std::runtime_error("Appending to device buffer not implemented, use a host buffer instead and then copy to device buffer.");    
+    } else if (buffer_type == HOST_BUFFER){
+        size_t face_offset = m_size * Nf;
+        for(node_t u=0;u< graph.neighbours.size();u++){
+            face_degrees[face_offset + u] = graph.neighbours[u].size();
+            for(int j=0;j<graph.neighbours[u].size();j++){
+                dual_neighbours[6*(face_offset+u)+j] = graph.neighbours[u][j];
+            }
+        }
+        statuses[m_size] = IsomerStatus::NOT_CONVERGED;
+        iterations[m_size] = 0;
+        IDs[m_size] = id;
+    }
+    m_size++;
+}
+
+void IsomerBatch::append(const Polyhedron& graph, const size_t id){
+    if (m_size == isomer_capacity) throw std::runtime_error("IsomerBatch is full");
+    if (graph.neighbours.size() != n_atoms) throw std::runtime_error("Graph has wrong number of faces");
+    if (buffer_type == DEVICE_BUFFER){
+        throw std::runtime_error("Appending to device buffer not implemented, use a host buffer instead and then copy to device buffer.");    
+    } else if (buffer_type == HOST_BUFFER){
+        size_t offset = m_size * n_atoms;
+        for(node_t u=0;u< graph.neighbours.size();u++){
+            for(int j=0;j<graph.neighbours[u].size();j++){
+                cubic_neighbours[3*(offset+u)+j] = graph.neighbours[u][j];
+                X[3*(offset+u)+j] = graph.points[u][j];
+            }
+        }
+        statuses[m_size] = IsomerStatus::NOT_CONVERGED;
+        iterations[m_size] = 0;
+        IDs[m_size] = id;
+    }
+    m_size++;
+}
+
+void IsomerBatch::clear(){
+    //Set statuses to empty and iterations to 0
+    if (buffer_type == DEVICE_BUFFER){
+        cudaMemset((void*)statuses, int(IsomerStatus::EMPTY), isomer_capacity * sizeof(IsomerStatus));
+        cudaMemset((void*)iterations, 0, isomer_capacity * sizeof(size_t));
+        cudaDeviceSynchronize();
+    } else if (buffer_type == HOST_BUFFER){
+        std::fill(statuses, statuses + isomer_capacity, IsomerStatus::EMPTY);
+        std::fill(iterations, iterations + isomer_capacity, 0);
+    }
+    m_size = 0;
+}
+
 void IsomerBatch::shrink_to_fit(){
     auto first_empty = -1;
     auto sort_fun = [&](IsomerBatch& batch){
