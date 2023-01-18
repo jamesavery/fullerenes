@@ -33,18 +33,44 @@ private:
     T* array;
 
 public:
-    __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), front(0), back(0), q_size(0), capacity(capacity) {}
+    //This is a custom implementation of a deque class that is meant to be used on the device. 
+//The deque is implemented using a circular buffer in a shared memory array. 
+//The class is used to store the work queue of the thread blocks, and the class provides the
+//necessary functions to allow the work queue to be used as a work stealing queue. 
+//The class is implemented as a template class to allow the user to specify the type of data that the
+//deque will hold.
+__device__ CuDeque(T* memory, const device_node_t capacity): array(memory), front(0), back(0), q_size(0), capacity(capacity) {}
     
+    /**
+     * @brief  Returns the size of the queue. 
+     * @param  None
+     * @retval Size of the queue.
+     */
     __device__ device_node_t size(){return q_size;}
 
+    /**
+     * @brief  Returns true if the queue is empty and false otherwise. 
+     * @param  None
+     * @retval True if the queue is empty and false otherwise.
+     */
     __device__ bool empty(){
         return q_size == 0;
     }
 
+    /**
+     * @brief  Returns true if the queue is full and false otherwise. 
+     * @param  None
+     * @retval True if the queue is full and false otherwise.
+     */
     __device__ bool full(){
         return q_size == capacity;
     }
     
+    /**
+     * @brief  This function is used to pop the first element of the queue.
+     * @param  None
+     * @retval First element of the queue
+     */
     __device__ T pop_front(){
         if (!empty()){
             T return_val = array[front];
@@ -56,6 +82,11 @@ public:
         return T(); //Compiler wants a return statement
     }
 
+    /**
+     * @brief Returns the last element of the queue and removes it from the queue.
+     * @param None
+     * @return The last element of the queue
+     */
     __device__ T pop_back(){
         if (!empty())
         {
@@ -68,6 +99,9 @@ public:
         return T(); //Compiler wants a return statement
     }
 
+    /** @brief Insert a value into the back of the queue
+     *  @param val the value to insert
+     */
     __device__ void push_back(T val){
         assert(!full());
         back = (back + 1) % capacity;
@@ -75,6 +109,9 @@ public:
         q_size++;
     }
 
+    /** @brief Insert a value into the front of the queue
+     *  @param val the value to insert
+     */
     __device__ void push_front(T val){
         assert(!full());
         front = front > 0 ? front-1 : capacity-1;
@@ -85,10 +122,15 @@ public:
 
 
 
-struct DeviceFullereneGraph{
+struct CubicGraph{
     const device_node_t* cubic_neighbours;
-    __device__ DeviceFullereneGraph(const device_node_t* cubic_neighbours) : cubic_neighbours(cubic_neighbours) {}
+    __device__ CubicGraph(const device_node_t* cubic_neighbours) : cubic_neighbours(cubic_neighbours) {}
 
+    /** @brief Find the index of the neighbour v in the list of neighbours of u
+    // @param u: source node in the arc (u,v)
+    // @param v: target node in the arc (u,v)
+    // @return: index of v in the list of neighbours of u
+    */
     __device__ device_node_t dedge_ix(const device_node_t u, const device_node_t v) const{
         for (uint8_t j = 0; j < 3; j++)
             if (cubic_neighbours[u*3 + j] == v) return j;
@@ -97,24 +139,49 @@ struct DeviceFullereneGraph{
 	return 0;		// Make compiler happy
     }
 
+    /** @brief Find the next neighbour in the clockwise order around u
+    // @param u: source node in the arc (u,v)
+    // @param v: target node in the arc (u,v)
+    // @return: Next neighbour of u after v in the clockwise order
+    */
     __device__ device_node_t next(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
         return cubic_neighbours[u*3 + ((j+1)%3)];
     }
     
+    /** @brief Find the previous neighbour in the clockwise order around u
+    // @param u: source node in the arc (u,v)
+    // @param v: target node in the arc (u,v)
+    // @return: Previous neighbour of u before v in the clockwise order
+    */
     __device__ device_node_t prev(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
         return cubic_neighbours[u*3 + ((j+2)%3)];
     }
     
+    /** @brief Find the next node in the face represented by the arc (u,v)
+    // @param u: source node in the arc (u,v)
+    // @param v: target node in the arc (u,v)
+    // @return: The next node in the face
+    */
     __device__ device_node_t next_on_face(const device_node_t u, const device_node_t v) const{
         return prev(v,u);
     }
 
+    /** @brief Find the previous node in the face represented by the arc (u,v)
+    // @param u: source node in the arc (u,v)
+    // @param v: target node in the arc (u,v)
+    // @return: The previous node in the face
+    */
     __device__ device_node_t prev_on_face(const device_node_t u, const device_node_t v) const{
         return next(v,u);
     }
 
+    /** @brief Find the size of the face represented by the arc (u,v)
+    // @param u: source node in the arc (u,v)
+    // @param v: target node in the arc (u,v)
+    // @return: size of the face
+    */
     __device__ device_node_t face_size(device_node_t u, device_node_t v) const{
         device_node_t d = 1;
         device_node_t u0 = u;
@@ -160,11 +227,11 @@ struct DeviceFullereneGraph{
     }
 };
 
-struct DeviceFullereneDual{
+struct DualGraph{
     const device_node_t* dual_neighbours;                   //Nf x 6
     const uint8_t* face_degrees;                            //Nf x 1
 
-    __device__ DeviceFullereneDual(const device_node_t* dual_neighbours, const uint8_t* face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
+    __device__ DualGraph(const device_node_t* dual_neighbours, const uint8_t* face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
 
     __device__ device_node_t dedge_ix(const device_node_t u, const device_node_t v) const{
         for (uint8_t j = 0; j < face_degrees[u]; j++){
@@ -175,24 +242,55 @@ struct DeviceFullereneDual{
 	    return 0;		// Make compiler happy
     }
 
+    /**
+     * @brief returns the next node in the clockwise order around u
+     * @param v the current node around u
+     * @param u the node around which the search is performed
+     * @return the next node in the clockwise order around u
+     */
     __device__ device_node_t next(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
         return dual_neighbours[u*6 + ((j+1)%face_degrees[u])];
     }
     
+    /**
+     * @brief returns the prev node in the clockwise order around u
+     * @param v the current node around u
+     * @param u the node around which the search is performed
+     * @return the previous node in the clockwise order around u
+     */
     __device__ device_node_t prev(const device_node_t u, const device_node_t v) const{
         device_node_t j = dedge_ix(u,v);
         return dual_neighbours[u*6 + ((j-1+face_degrees[u])%face_degrees[u])];
     }
 
+    /**
+     * @brief Find the node that comes next on the face. given by the edge (u,v)
+     * @param u Source of the edge.
+     * @param v Destination node.
+     * @return The node that comes next on the face.
+     */
     __device__ device_node_t next_on_face(const device_node_t u, const device_node_t v) const{
         return prev(v,u);
     }
 
+    /**
+     * @brief Find the node that comes next on the face. given by the edge (u,v)
+     * @param u Source of the edge.
+     * @param v Destination node.
+     * @return The node that comes next on the face.
+     */
     __device__ device_node_t prev_on_face(const device_node_t u, const device_node_t v) const{
         return next(v,u);
     }
 
+    /**
+     * @brief Finds the cannonical triangle arc of the triangle (u,v,w)
+     * 
+     * @param u source node
+     * @param v target node
+     * @return cannonical triangle arc 
+     */
     __device__ device_node2 get_cannonical_triangle_arc(const device_node_t u, const device_node_t v) const{
         //In a triangle u, v, w there are only 3 possible representative arcs, the cannonical arc is chosen as the one with the smalles source node.
         device_node2 min_edge = {u,v};
@@ -202,6 +300,11 @@ struct DeviceFullereneDual{
         return min_edge;
     }
 
+    /** @brief Computes the number of triangles each node is a part of. 
+     *
+     * @param u The node for which to compute how many triangles it is representative of.
+     * @param smem A pointer to shared memory.
+     */
     __device__ void compute_triangle_numbers(const device_node_t u, device_node_t* triangle_numbers, device_node_t* smem){
         int represent_count = 0;
         if(u < (blockDim.x / 2 +2) ){
@@ -212,12 +315,6 @@ struct DeviceFullereneDual{
 
         smem[u] = represent_count;
         }
-        //exclusive_scan(smem, represent_count);
-        //if (u < blockDim.x/2 + 2){
-        //    for (size_t i = 0; i < represent_count; i++){
-        //        triangle_numbers[u*6 + i] = smem[u] + i ;
-        //    }
-        //}
     }
 
     __device__ void compute_cubic_layout(const device_node_t u, const device_node_t* triangle_numbers, device_node_t* cubic_neighbours){
@@ -237,19 +334,27 @@ struct DeviceFullereneDual{
 
 };
 
-struct NodeGraph{
+struct NodeNeighbours{
     device_node3 cubic_neighbours;
     device_node3 next_on_face;
     device_node3 prev_on_face;
     device_node_t face_nodes[6] = {UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX}; //Shape 1 x dmax , face associated with the arc a -> b , face associated with the arc a -> c, face associated with the arc a -> d
     device_node3 face_neighbours = {UINT16_MAX, UINT16_MAX, UINT16_MAX};
     unsigned char face_size = __UINT8_MAX__;
-    __device__ NodeGraph(const IsomerBatch& G, const size_t isomer_idx, device_real_t* sdata){
+    
+    /**
+     * @brief  This constructor computes the neighbours, outer neighbours, face neighbours for the first Nf threads it stores the nodes that are part of the threadIdx.x^th face.
+     * @param  G: The IsomerBatch object that contains the graph data
+     * @param  isomer_idx: The index of the isomer that the thread is a part of.
+     * @param  sdata: Pointer to shared memory.
+     * @return NodeNeighbours object.
+     */
+    __device__ NodeNeighbours(const IsomerBatch& G, const size_t isomer_idx, device_real_t* sdata){
         clear_cache(sdata,Block_Size_Pow_2);
         device_real_t* base_ptr = sdata + Block_Size_Pow_2;
         device_node_t* L = reinterpret_cast<device_node_t*>(base_ptr ); //N x 3 list of potential face IDs.
         device_node_t* A = reinterpret_cast<device_node_t*>(base_ptr) + blockDim.x * 3; //Uses cache temporarily to store face neighbours. //Nf x 6 
-        const DeviceFullereneGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+        const CubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
@@ -283,8 +388,13 @@ struct NodeGraph{
         }
         BLOCK_SYNC
     }
-    __device__ NodeGraph(const IsomerBatch& G, const size_t isomer_idx){
-        const DeviceFullereneGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+/**
+* @brief Constructor for a NodeNeighbours object, which contains the neighbours of a node in the graph and outer neighbours.
+* @param G All isomer graphs in the batch.
+* @param isomer_idx The index of the isomer to initialize based on.
+*/
+__device__ NodeNeighbours(const IsomerBatch& G, const size_t isomer_idx){
+        const CubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
@@ -331,7 +441,7 @@ struct Constants{
     device_coord3d f_outer_angle_m;
     device_coord3d f_outer_angle_p;
     device_coord3d f_outer_dihedral;
-    device_real_t f_flat = 5e2;
+    device_real_t f_flat = 1e2;
     
     device_coord3d r0;
     device_coord3d angle0;
@@ -347,7 +457,14 @@ struct Constants{
         return f1*4 + f2*2 + f3;
     }
 
-    __device__ Constants(const IsomerBatch& G, const size_t isomer_idx){
+    /**
+     * @brief Constructor for the Constants struct
+     *
+     * @param G The IsomerBatch in which the graph information is read from
+     * @param isomer_idx The index of the isomer that the current thread is a part of
+     * @return Forcefield constants for the current node in the isomer_idx^th isomer in G
+     */
+    INLINE Constants(const IsomerBatch& G, const uint32_t isomer_idx){
         //Set pointers to start of fullerene.
         const DeviceFullereneGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         device_node3 cubic_neighbours = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
