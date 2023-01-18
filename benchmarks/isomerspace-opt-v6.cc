@@ -9,7 +9,7 @@
 #include "numeric"
 #include <future>
 #include <thread>
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 
@@ -116,16 +116,16 @@ int main(int argc, char** argv){
             auto generate_handle = std::async(std::launch::async, generate_isomers);
             auto T2 = high_resolution_clock::now(); 
                 //Main processing
-                isomerspace_dual::cubic_layout(batch0, device0, LaunchPolicy::ASYNC);                   
-                isomerspace_dual::cubic_layout(batch1, device1, LaunchPolicy::ASYNC);
+                isomerspace_dual::dualize(batch0, device0, LaunchPolicy::ASYNC);                   
+                isomerspace_dual::dualize(batch1, device1, LaunchPolicy::ASYNC);
                 isomerspace_tutte::tutte_layout(batch0, 10000000, device0, LaunchPolicy::ASYNC);        
                 isomerspace_tutte::tutte_layout(batch1, 10000000, device1, LaunchPolicy::ASYNC);
                 isomerspace_X0::zero_order_geometry(batch0, 4.0, device0, LaunchPolicy::ASYNC);         
                 isomerspace_X0::zero_order_geometry(batch1, 4.0, device1, LaunchPolicy::ASYNC);
                 cuda_io::reset_convergence_statuses(batch0, device0, LaunchPolicy::ASYNC);              
                 cuda_io::reset_convergence_statuses(batch1, device1, LaunchPolicy::ASYNC);                    
-                isomerspace_forcefield::optimize_batch<BUSTER>(batch0,N*5,N*5, device0, LaunchPolicy::ASYNC);   
-                isomerspace_forcefield::optimize_batch<BUSTER>(batch1,N*5,N*5, device1, LaunchPolicy::ASYNC);
+                isomerspace_forcefield::optimize<BUSTER>(batch0,N*5,N*5, device0, LaunchPolicy::ASYNC);   
+                isomerspace_forcefield::optimize<BUSTER>(batch1,N*5,N*5, device1, LaunchPolicy::ASYNC);
                 //Output finished isomers 
                 Out_Q0.push(batch0,device0,LaunchPolicy::ASYNC); 
                 Out_Q1.push(batch1,device1,LaunchPolicy::ASYNC);

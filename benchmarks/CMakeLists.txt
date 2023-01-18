@@ -1,4 +1,5 @@
 link_libraries(fortran_opt fullerenes)
+add_executable(forcefield-stats forcefield-stats.cc)
 add_executable(fullerene-optimize-seq fullerene-optimize-seq.cc)
 add_executable(isomerspace-optimize-par isomerspace-optimize-par.cc)
 add_executable(isomerspace-opt-v0 isomerspace-opt-v0.cc)
@@ -14,6 +15,7 @@ add_executable(reduction_benchmark reduction_benchmark.cc)
 add_executable(generate_benchmark generate_benchmark.cc)
 add_executable(forcefield-opt forcefield-opt.cc)
 
+target_link_libraries(forcefield-stats cuda_lib fullerenes)
 target_link_libraries(isomerspace-optimize-par cuda_lib)
 target_link_libraries(scan_benchmark cuda_lib fullerenes)
 target_link_libraries(reduction_benchmark cuda_lib fullerenes)

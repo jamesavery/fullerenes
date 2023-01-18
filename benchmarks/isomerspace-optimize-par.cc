@@ -8,7 +8,7 @@ const std::unordered_map<size_t,size_t> num_fullerenes = {{20,1},{22,0},{24,1},{
 using namespace chrono;
 using namespace chrono_literals;
 
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
@@ -101,7 +101,7 @@ int main(int argc, char** argv){
             }
             isomer_q.refill_batch(batch0);
             auto TDual = isomerspace_dual::time_spent();
-            isomerspace_dual::cubic_layout(batch0);
+            isomerspace_dual::dualize(batch0);
             auto TTutte = isomerspace_tutte::time_spent(); T_duals[l] += isomerspace_dual::time_spent() - TDual;
             isomerspace_tutte::tutte_layout(batch0);
             auto TX0 = isomerspace_X0::time_spent(); T_tuttes[l] += isomerspace_tutte::time_spent() - TTutte;
@@ -109,11 +109,11 @@ int main(int argc, char** argv){
             T_X0s[l] += isomerspace_X0::time_spent() - TX0;
             cuda_io::reset_convergence_statuses(batch0);
             auto TFF = isomerspace_forcefield::time_spent();
-            isomerspace_forcefield::optimize_batch<BUSTER>(batch0,N*5,N*5);
+            isomerspace_forcefield::optimize<BUSTER>(batch0,N*5,N*5);
             T_opts[l] += isomerspace_forcefield::time_spent() - TFF;
         }
         CuArray<device_real_t> bond_rms(sample_size);
-        isomerspace_forcefield::get_bond_rms<BUSTER>(batch0, bond_rms); 
+        isomerspace_forcefield::get_bond_rmse<BUSTER>(batch0, bond_rms); 
         std::cout << bond_rms;
         using namespace cuda_io;
         out_file << N << ", "<< sample_size << ", " << mean(T_gens)/1ns << ", " << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns << "\n";

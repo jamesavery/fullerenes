@@ -7,7 +7,7 @@
 #include "filesystem"
 #include "random"
 #include "numeric"
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 
@@ -111,7 +111,7 @@ int main(int argc, char** argv){
         }
         auto T4 = high_resolution_clock::now();
             isomer_q_opt.refill_batch(batch1);
-            gpu_kernels::isomerspace_forcefield::optimize_batch<BUSTER>(batch1,N*5,N*5);
+            gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(batch1,N*5,N*5);
         T_par[l] += (high_resolution_clock::now() - T4);
         }
         using namespace cuda_io;

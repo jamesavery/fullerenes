@@ -1,7 +1,7 @@
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_io.hh"
@@ -108,8 +108,8 @@ int main(int ac, char** argv){
             
             input0_queue.refill_batch(input0, insert0_ctx, ASYNC);
             input1_queue.refill_batch(input1, insert1_ctx, ASYNC);
-            isomerspace_dual::cubic_layout(input0, insert0_ctx, ASYNC);
-            isomerspace_dual::cubic_layout(input1, insert1_ctx, ASYNC);
+            isomerspace_dual::dualize(input0, insert0_ctx, ASYNC);
+            isomerspace_dual::dualize(input1, insert1_ctx, ASYNC);
             isomerspace_tutte::tutte_layout(input0, 1000000, insert0_ctx, ASYNC);
             isomerspace_tutte::tutte_layout(input1, 1000000, insert1_ctx, ASYNC);
             isomerspace_X0::zero_order_geometry(input0, 4.0, insert0_ctx, ASYNC);
@@ -138,8 +138,8 @@ int main(int ac, char** argv){
             auto generate_handle = std::async(std::launch::async,generate_isomers, opt0.isomer_capacity*2);
             while(optimize_more){
                 auto T2 = chrono::high_resolution_clock::now();
-                isomerspace_forcefield::optimize_batch<BUSTER>(opt0,step, N*5, device0_ctx, ASYNC);
-                isomerspace_forcefield::optimize_batch<BUSTER>(opt1,step, N*5, device1_ctx, ASYNC);
+                isomerspace_forcefield::optimize<BUSTER>(opt0,step, N*5, device0_ctx, ASYNC);
+                isomerspace_forcefield::optimize<BUSTER>(opt1,step, N*5, device1_ctx, ASYNC);
                 output0_queue.push(opt0, device0_ctx, ASYNC);
                 output1_queue.push(opt1, device1_ctx, ASYNC);
                 opt0_queue.refill_batch(opt0, device0_ctx, ASYNC);
@@ -159,8 +159,8 @@ int main(int ac, char** argv){
             if(more_to_generate) T_par[i] += T4 - T3;
             if(!more_to_generate){
                 while(opt0_queue.get_size() > 0){
-                    isomerspace_forcefield::optimize_batch<BUSTER>(opt0, step, N*5, device0_ctx, ASYNC);
-                    isomerspace_forcefield::optimize_batch<BUSTER>(opt1, step, N*5, device1_ctx, ASYNC);
+                    isomerspace_forcefield::optimize<BUSTER>(opt0, step, N*5, device0_ctx, ASYNC);
+                    isomerspace_forcefield::optimize<BUSTER>(opt1, step, N*5, device1_ctx, ASYNC);
                     output0_queue.push(opt0, device0_ctx, ASYNC);
                     output1_queue.push(opt1, device1_ctx, ASYNC);
                     opt0_queue.refill_batch(opt0, device0_ctx, ASYNC);
@@ -168,8 +168,8 @@ int main(int ac, char** argv){
                     device0_ctx.wait(); device1_ctx.wait();
                 }
                 for(int i = 0;  i <  N*5; i += step){
-                    isomerspace_forcefield::optimize_batch<BUSTER>(opt0, step, N*5, device0_ctx, ASYNC);
-                    isomerspace_forcefield::optimize_batch<BUSTER>(opt1, step, N*5, device1_ctx, ASYNC);
+                    isomerspace_forcefield::optimize<BUSTER>(opt0, step, N*5, device0_ctx, ASYNC);
+                    isomerspace_forcefield::optimize<BUSTER>(opt1, step, N*5, device1_ctx, ASYNC);
                 }
                 output0_queue.push(opt0, device0_ctx, ASYNC);
                 output1_queue.push(opt1, device1_ctx, ASYNC);

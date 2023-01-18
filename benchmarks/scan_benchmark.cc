@@ -2,7 +2,7 @@
 #include <chrono>
 #include <fstream>
 #include <stdio.h>
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"

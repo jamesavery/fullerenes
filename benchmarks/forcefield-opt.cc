@@ -7,7 +7,7 @@
 #include "filesystem"
 #include "random"
 #include "numeric"
-#include "fullerenes/gpu/batch_queue.hh"
+#include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 
@@ -71,7 +71,7 @@ int main(int argc, char** argv){
     }
 
     isomer_q.refill_batch(batch1);
-    gpu_kernels::isomerspace_dual::cubic_layout(batch1);
+    gpu_kernels::isomerspace_dual::dualize(batch1);
     gpu_kernels::isomerspace_tutte::tutte_layout(batch1);
     gpu_kernels::isomerspace_X0::zero_order_geometry(batch1,4.0);
     cuda_io::reset_convergence_statuses(batch1);
@@ -82,8 +82,8 @@ int main(int argc, char** argv){
         //cuda_io::reset_convergence_statuses(batch0,device0);
         cuda_io::reset_convergence_statuses(batch2,device1);
         auto T1 = high_resolution_clock::now();
-            //gpu_kernels::isomerspace_forcefield::optimize_batch<BUSTER>(batch0,N*5,N*5,device0,LaunchPolicy::ASYNC);
-            gpu_kernels::isomerspace_forcefield::optimize_batch<BUSTER>(batch2,N*5,N*5,device1,LaunchPolicy::ASYNC);
+            //gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(batch0,N*5,N*5,device0,LaunchPolicy::ASYNC);
+            gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(batch2,N*5,N*5,device1,LaunchPolicy::ASYNC);
             device1.wait(); //device0.wait(); 
         T_FF[l] = high_resolution_clock::now() - T1;
         out_file << N << ", "<< sample_size << ", " << (high_resolution_clock::now()-T0)/1us << ", " << T_FF[l]/1us << "\n";
