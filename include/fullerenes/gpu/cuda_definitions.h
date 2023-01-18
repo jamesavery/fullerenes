@@ -4,6 +4,7 @@
 #include "inttypes.h"
 #include "cuda_runtime.h"
 
+
 #define BLOCK_SYNC __syncthreads();
 #define GRID_SYNC cg::sync(cg::this_grid());
 #define INLINE __device__ __forceinline__

@@ -9,6 +9,7 @@ namespace isomerspace_dual{
 #include <cuda_runtime_api.h>
 #include "cooperative_groups.h"
 #include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/gpu/isomer_batch.hh"
 #include "misc_cuda.cu"
 #include "reductions.cu"
 #include "coord3d.cuh"
@@ -16,6 +17,7 @@ namespace isomerspace_dual{
 #include "forcefield_structs.cu"
 #include "print_functions.cu"
 #include "chrono"
+#include "launch_dims.cu"
 
 __global__
 void cubic_layout_(IsomerBatch B){

@@ -1,5 +1,5 @@
-#include "isomerspace_kernel.hh"
 #include "cuda_execution.hh"
+#include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/cu_array.hh"
 namespace cuda_io{
 struct IsomerQueue
@@ -22,15 +22,18 @@ public:
      * @param target Batch to inspect and fill new isomers into in-place.
      * Checks the status of each isomer in the target batch, if the status is either of: CONVERGED / FAILED or EMPTY,
      * a new isomer will be copied from the queue if available, this happens in parallel.
-     * **/
+    * **/
     cudaError_t refill_batch(IsomerBatch& target, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     
-    //Insert an entire IsomerBatch into the queue.
+    /** Insert an entire IsomerBatch into the queue.
+     * @param input_batch Batch to insert into the queue.
+     * **/
     cudaError_t insert(IsomerBatch& input_batch, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC ,const bool insert_2d = true);
     
     //Push all the finished isomers from a batch into the queue.
     cudaError_t push(IsomerBatch& input_batch, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC );
 
+    
     Polyhedron pop(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
     //Insert a single Polyhedron.

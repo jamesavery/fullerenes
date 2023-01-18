@@ -6,12 +6,16 @@
 #include <queue>
 #include "chrono"
 #include <fullerenes/polyhedron.hh>
-#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/gpu/misc_cuda.cuh"
 #include "fullerenes/gpu/cuda_execution.hh"
+#include "launch_dims.cu"
+#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/gpu/cuda_io.hh"
+#include "isomer_batch.cu"
 #include "cub/device/device_scan.cuh"
 
 namespace cuda_io{
-    #include "misc_cuda.cu"
+    
     #include "reductions.cu"
 
 }

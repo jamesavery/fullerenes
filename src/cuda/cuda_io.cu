@@ -1,4 +1,5 @@
 #include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/gpu/misc_cuda.cuh"
 #include "type_traits"
 #include <numeric>
 namespace cuda_io{
@@ -7,7 +8,7 @@ namespace cuda_io{
 
     cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch& batch, const bool copy_2d_layout){
         //Batch needs to exist on the host. For performance reasons we don't want to create a new batch here and copy to that, cudaMalloc is expensive.
-        printLastCudaError();
+        printLastCudaError("");
         if (batch.buffer_type != HOST_BUFFER) assert(false); 
 
         size_t N = batch.n_atoms;
@@ -301,6 +302,28 @@ namespace cuda_io{
             result += (input[i] - mean_) *  (input[i] - mean_).count();
     }
     return std::chrono::nanoseconds((int)std::sqrt( (result / input.size()).count()));
+    }
+
+    __global__
+    void reset_convergence_status_(IsomerBatch B){
+        for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x)
+        {
+            if (threadIdx.x == 0) B.statuses[isomer_idx] = B.statuses[isomer_idx] != IsomerStatus::EMPTY ? IsomerStatus::NOT_CONVERGED : IsomerStatus::EMPTY;
+            if (threadIdx.x == 0) B.iterations[isomer_idx] = 0;
+        }
+        
+    }
+
+    cudaError_t reset_convergence_statuses(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+        cudaSetDevice(ctx.get_device_id());
+        static LaunchDims dims((void*)reset_convergence_status_, B.n_atoms);
+        dims.update_dims((void*)reset_convergence_status_,B.n_atoms,0,B.isomer_capacity);
+        if(policy == LaunchPolicy::SYNC) ctx.wait();
+        void* kargs[]{(void*)&B};
+        cudaLaunchCooperativeKernel((void*)reset_convergence_status_, dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
+        if(policy == LaunchPolicy::SYNC) ctx.wait();
+        
+        return cudaGetLastError();
     }
 
 }

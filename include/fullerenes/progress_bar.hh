@@ -2,6 +2,8 @@
 #include <iostream>
 #include <cmath>
 #include <iomanip>
+#include <string>
+#include <stdio.h>
 
 class ProgressBar
 {
@@ -20,7 +22,7 @@ public:
     ProgressBar(){};
     ProgressBar(char progress_symbol, int bar_length): progress_symbol(progress_symbol), bar_length(bar_length){}
     
-    void update_progress(const float progress, const string extra_string = ""){
+    void update_progress(const float progress, const std::string extra_string = ""){
         using namespace std::chrono;
 
         if(progress <= 1){
@@ -38,10 +40,10 @@ public:
             int bar_width = 70;
             int pos = bar_width * progress;
 
-            cout << "\r\033[F" << "ETA: " << ETA_h << "h  " << ETA_m << "m  " << ETA_s << "s  \t\t" << extra_string << "\n" << "[" << string(pos,'=') << string(bar_width-pos,' ') << "]" << setprecision(3)<< (progress * 100.0) << "\t%" << flush;
+            std::cout << "\r\033[F" << "ETA: " << ETA_h << "h  " << ETA_m << "m  " << ETA_s << "s  \t\t" << extra_string << "\n" << "[" << std::string(pos,'=') << std::string(bar_width-pos,' ') << "]" << std::setprecision(3)<< (progress * 100.0) << "\t%" << std::flush;
         }else
         {
-            cout << "Invalid Value provided progress cannot exceed 100%\r" << flush;
+            std::cout << "Invalid Value provided progress cannot exceed 100%\r" << std::flush;
 
         }
     }

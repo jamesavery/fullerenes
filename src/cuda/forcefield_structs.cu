@@ -1,5 +1,4 @@
 #pragma once
-#include "fullerenes/gpu/isomerspace_kernel.hh"
 #include "fullerenes/gpu/reductions.cuh"
 #include <exception>
 

@@ -1,7 +1,12 @@
 #ifndef ISOMERBATCH_STRUCT
 #define ISOMERBATCH_STRUCT
+#include "fullerenes/gpu/cuda_definitions.h"
 #include "gpudatastruct.hh"
 #include <stdint.h>
+#include <optional>
+#include <vector>
+#include "fullerenes/polyhedron.hh"
+#include "fullerenes/graph.hh"
 
 enum class IsomerStatus {EMPTY, CONVERGED, FAILED, NOT_CONVERGED};
 enum BatchMember {COORDS3D, COORDS2D, CUBIC_NEIGHBOURS, DUAL_NEIGHBOURS, FACE_DEGREES, IDS, ITERATIONS, STATUSES};
@@ -30,24 +35,30 @@ struct IsomerBatch : GPUDataStruct
 
     ~IsomerBatch() override;
     IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type, int device  = 0);
-    void set_print_simple() {verbose = false;}
-    void set_print_verbose() {verbose = true;}
+    void set_print_simple() {verbose = false;} 
+    void set_print_verbose() {verbose = true;} 
     //Prints a specific parameter from the batch
-    void print(const BatchMember param, const std::pair<int,int>& range = {-1,-1});
-    int get_device_id() const {return m_device;}
+    void print(const BatchMember param, const std::pair<int,int>& range = {-1,-1}); 
+    int get_device_id() const {return m_device;} 
+    int size() const {return m_size;}
+    int capacity() const {return isomer_capacity;}
 
-    std::optional<Polyhedron> get_isomer(const size_t index) const;
-    std::optional<Polyhedron> get_isomer_by_id(const size_t ID) const;
-    std::vector<size_t> find_ids(const IsomerStatus status);
-    void shrink_to_fit();
-
-    bool operator==(const IsomerBatch& b);
+    std::optional<Polyhedron> get_isomer(const size_t index) const; //Returns the isomer at the given index
+    std::optional<Polyhedron> get_isomer_by_id(const size_t ID) const; //Returns the isomer with the given ID
+    std::vector<size_t> find_ids(const IsomerStatus status); //Returns a vector of IDs with a given status
+    void shrink_to_fit();        
+    void append(const Graph& G, const size_t id);  //Appends a graph to the batch and increments the size
+    void append(const Polyhedron& P, const size_t id); //Appends a polyhedron to the batch and increments the size
+    void clear();                 //Clears the batch and resets the size to 0
+    bool operator==(const IsomerBatch& b); //Returns true if the two batches are equal
     bool operator!=(const IsomerBatch& b) {return !(*this == b);}
-    friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a);
+    friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a); //Prints the batch to the given stream
 
   private:
+    int m_size = 0;
     int m_device = 0;
     bool verbose = false;
+
 };
 
 #endif

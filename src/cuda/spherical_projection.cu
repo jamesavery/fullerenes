@@ -7,6 +7,7 @@
 namespace gpu_kernels{
 
 namespace isomerspace_X0{
+#include "fullerenes/gpu/isomer_batch.hh"
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
 #include "cooperative_groups.h"
@@ -18,7 +19,7 @@ namespace isomerspace_X0{
 #include "forcefield_structs.cu"
 #include "print_functions.cu"
 #include "chrono"
-
+#include "launch_dims.cu"
 
 __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){

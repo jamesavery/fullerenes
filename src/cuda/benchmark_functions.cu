@@ -5,7 +5,14 @@
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "fullerenes/progress_bar.hh"
 #include "chrono"
+#include <vector>
+#include <iostream>
+#include <iomanip>
+#include "fullerenes/polyhedron.hh"
+#include "fullerenes/gpu/misc_cuda.cuh"
 namespace cuda_benchmark {
+    #include "fullerenes/gpu/cuda_definitions.h"
+    #include "coord3d.cuh"
     #include "reductions.cu"
     __global__ void test_scan_V0_(const int n_times){
         extern __shared__  device_node_t smem[];

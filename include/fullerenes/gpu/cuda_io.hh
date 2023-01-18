@@ -1,7 +1,10 @@
+#ifndef CUDA_IO_H
+#define CUDA_IO_H
 #include <cuda_runtime.h>
-#include "isomerspace_kernel.hh"
 #include "cuda_execution.hh"
 #include <chrono>
+#include <queue>
+#include "fullerenes/gpu/isomer_batch.hh"
 
 namespace cuda_io{
     cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch& batch, const bool copy_2d_layout = true);
@@ -21,3 +24,4 @@ namespace cuda_io{
     std::chrono::nanoseconds sdev(std::vector<std::chrono::nanoseconds>& input);
 
 }
+#endif

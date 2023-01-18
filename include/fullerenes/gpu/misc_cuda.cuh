@@ -3,7 +3,10 @@
 
 #include "cuda_definitions.h"
 #include "cuda_runtime_api.h"
-#include "string"
+#include <string>
+
+template <typename T>
+__device__ __forceinline__ T d_max(const T& a, const T& b);
 
 //Sets the memory to 0. This exists because L1 cache is reused for different purposes, thus pointers alias.
 //Algorithms that depend on cache being 0 initialized to avoid bound checking must be prepared with a call to this function.
@@ -24,7 +27,6 @@ void printLastCudaError(std::string message = "");
 
 //Checks if the dimensions passed are non-zero.
 cudaError_t safeCudaKernelCall(const void* func, const dim3 gridDim, const dim3 blockDim, void** args, const size_t sharedMem, const cudaStream_t stream = NULL);
-
 //Initialization function for device arrays.
 template <typename T>
 cudaError_t fill_cu_array(T* cu_array, size_t size, T fill_value);

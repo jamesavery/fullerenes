@@ -1,10 +1,6 @@
 #ifndef CUDA_REDUCTIONS
 #define CUDA_REDUCTIONS
-#include <cooperative_groups.h>
-#include <cooperative_groups/reduce.h>
-#include <cooperative_groups/scan.h>
-#include "cuda_definitions.h"
-#include "cuda_runtime.h"
+
 namespace cg = cooperative_groups;
 
 __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data);

@@ -1,4 +1,3 @@
-#include "isomerspace_kernel.hh"
 #include "chrono"
 namespace cuda_benchmark {
     bool test_global_scan(const int n_elements, const int n_times);

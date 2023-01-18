@@ -1,22 +1,25 @@
 #include <cuda.h>
-#include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cu_array.hh"
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include <cooperative_groups/scan.h>
+#include "cuda_runtime.h"
+#include <cuda_runtime_api.h>
+#include <cuda.h>
+#include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/gpu/kernels.hh"
 
 namespace gpu_kernels{
 namespace isomerspace_forcefield{
 
-#include "cuda_runtime.h"
-#include "cooperative_groups.h"
-#include <cuda_runtime_api.h>
-#include "fullerenes/gpu/cuda_definitions.h"
 #include "misc_cuda.cu"
-#include "reductions.cu"
 #include "coord3d.cuh"
+#include "reductions.cu"
 #include "forcefield_structs.cu"
+#include "cooperative_groups.h"
 #include "print_functions.cu"
+#include "launch_dims.cu"
 
 // This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions
 template <ForcefieldType T>
