@@ -1,7 +1,9 @@
 #include <cuda.h>
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cu_array.hh"
-
+#include <cooperative_groups.h>
+#include <cooperative_groups/reduce.h>
+#include <cooperative_groups/scan.h>
 
 namespace gpu_kernels{
 namespace isomerspace_forcefield{
@@ -20,17 +22,14 @@ namespace isomerspace_forcefield{
 template <ForcefieldType T>
 struct ForceField{
     DEVICE_TYPEDEFS
-
-    coord3d r1,                         //d_i+1 In conjugated gradient algorithm  Buster p. 36
-            r0;                         //d_0 In conjugated gradient algorithm Buster p. 36
-
-    const NodeGraph node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
+    
+    const NodeNeighbours node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
     const Constants constants;          //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
 
     size_t node_id = threadIdx.x;
     real_t* sdata;                      //Pointer to start of L1 cache array, used exclusively for reduction.
 
-    __device__ ForceField(  const NodeGraph &G,
+    __device__ ForceField(  const NodeNeighbours &G,
                             const Constants &c, 
                             real_t* sdata): node_graph(G), constants(c), sdata(sdata) {}
 
@@ -45,7 +44,7 @@ struct FaceData{
     coord3d centroid;
     device_node3 face_neighbours;
     //84 + 107 FLOPS
-    INLINE FaceData(const coord3d* X, const NodeGraph& G){
+    INLINE FaceData(const coord3d* X, const NodeNeighbours& G){
         face_neighbours = G.face_neighbours;
         Xa = X[threadIdx.x];
         //There are only blockDim.x/2 + 2 faces. (Nf  =  N/2 + 1)
@@ -117,7 +116,7 @@ struct FaceData{
 struct ArcData{
     //124 FLOPs;
     uint8_t j;
-    INLINE ArcData(const uint8_t j, const coord3d* __restrict__ X, const NodeGraph& G){  
+    INLINE ArcData(const uint8_t j, const coord3d* __restrict__ X, const NodeNeighbours& G){  
         __builtin_assume(j < 3); 
         this->j = j;   
         node_t a = threadIdx.x;
@@ -330,69 +329,6 @@ struct ArcData{
         #endif
     }
 
-    //Assumes A is symmetric, and uses closed form 3x3 derivation
-    INLINE coord3d face_norm_fast() const {
-        //Notation exactly matches that of work of Deledalle, Denis, Tabti, Tupin : https://hal.archives-ouvertes.fr/hal-01501221/document
-        //Note that explicit casting to real_t of all literals is necessary to avoid implicit conversion to double and double precision math.
-        real_t a(A[0].x), b(A[1].y), c(A[2].z), d(A[0].y), e(A[1].z), f(A[0].z);
-        auto [lambda_1, lambda_2, lambda_3] = eigen_values_2();
-        
-        if (abs(lambda_1) <= abs(lambda_2) && abs(lambda_1) <= abs(lambda_3)) {
-            real_t m = (d*(c - lambda_1 ) - e * f) / ( f*(b-lambda_1) - d*e  );
-            return {(lambda_1 - c - e*m)/f , m, (real_t)1.0};
-        } else if (abs(lambda_2) <= abs(lambda_1) && abs(lambda_2 ) <= abs(lambda_3)) {
-            real_t m = (d*(c - lambda_2 ) - e * f) / ( f*(b-lambda_2) - d*e  );
-            return {(lambda_2 - c - e*m)/f , m, (real_t)1.0};
-        } else {
-            real_t m = (d*(c - lambda_3 ) - e * f) / ( f*(b-lambda_3) - d*e  );
-            return {(lambda_3 - c - e*m)/f , m, (real_t)1.0};
-        }
-    }
-
-    //Assumes A 3x3 is symmetric and solves the sytem in closed form
-    INLINE coord3d eigen_values() const{
-        real_t a(A[0].x), b(A[1].y), c(A[2].z), d(A[0].y), e(A[1].z), f(A[0].z);
-        real_t x1 = a*a + b*b + c*c - a*b - a*c - b*c + 3 * (d*d + f*f + e*e);
-        real_t x2 = -((real_t)2.*a - b - c)*((real_t)2.*b - a - c)*((real_t)2.*c - a - b) + (real_t)9.*(((real_t)2.*c -a - b)*d*d +((real_t)2.*b - a -c)*f*f + ((real_t)2.*a -b -c)*e*e) - (real_t)54. *(d*e*f);
-        real_t phi = (real_t)M_PI/(real_t)2.;
-        if (x2 > 1e-12) {phi = atanf((float) (sqrtf( (real_t)4.*x1*x1*x1 - x2*x2 )/x2 ));}
-        else if (x2 < 1e-12) {phi = atanf((float) (sqrtf( (real_t)4.*x1*x1*x1 - x2*x2 )/x2 ) + (real_t)M_PI);}
-
-        //Compute all the eigenvalues, find the one with smallest absolute size and return the corresponding eigenvector.
-        real_t lambda_1 = (a + b + c - (real_t)2.0 * sqrtf(x1) * cosf((float)( phi/(real_t)3.0)   ) ) / (real_t)3.0;
-        real_t lambda_2 = (a + b + c + (real_t)2.0 * sqrtf(x1) * cosf((float)((phi - (real_t)M_PI)/(real_t)3.0)) ) / (real_t)3.0;
-        real_t lambda_3 = (a + b + c + (real_t)2.0 * sqrtf(x1) * cosf((float)((phi + (real_t)M_PI)/(real_t)3.0)) ) / (real_t)3.0;
-        
-        return {lambda_1, lambda_2, lambda_3};
-    }
-
-    INLINE coord3d eigen_values_2() const{
-        real_t a(A[0].x), b(A[0].y), c(A[0].z), d(A[1].y), e(A[1].z), f(A[2].z);
-        
-        real_t
-            A_ = (real_t)-1.0,
-            B_ = a+d+f,
-            C_ = b*b + c*c - a*d + e*e - a*f - d*f,
-            D_ = -c*c*d + (real_t)2.*b*c*e - a*e*e - b*b*f + a*d*f;
-
-        real_t
-            p  = ((real_t)3.*A_*C_ - B_*B_)/((real_t)3.*A_*A_),
-            q  = ((real_t)2.*B_*B_*B_ - (real_t)9.*A_*B_*C_ + (real_t)27.*A_*A_*D_)/((real_t)27.*A_*A_*A_),
-            xc = B_/((real_t)3.*A_);
-
-        if(abs(p) < 1e-6){
-            return {-cbrt(q), -cbrt(q), -cbrt(q)};
-        } else if (abs(q) < 1e-6){
-            real_t val = d_max((real_t)0., sqrt(-p));
-            return {val, val, val};
-        } else {
-            // François Viète's solution to cubic polynomials with three real roots. 
-            real_t K = (real_t)2.*sqrt(-p/(real_t)3.), 
-                        theta0 = ( (real_t)1./(real_t)3.)*acos(((real_t)3.*q)/((real_t)2.*p)*sqrt((real_t)-3./p));
-            coord3d t = K*cos3(theta0-coord3d{0,1,2}*(real_t)2.*(real_t)M_PI/(real_t)3.);
-            return t - xc;
-        }
-    }
     // Internal coordinate gradients
     INLINE coord3d bond_length_gradient(const Constants& c) const {
         #if USE_CONSTANT_INDICES
@@ -758,7 +694,7 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
     if (B.statuses[isomer_idx] == IsomerStatus::NOT_CONVERGED){
     size_t offset = isomer_idx * blockDim.x;
     Constants constants     = Constants(B, isomer_idx);
-    NodeGraph node_graph    = NodeGraph(B, isomer_idx, smem);
+    NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);
     ForceField FF           = ForceField<T>(node_graph, constants, smem);
     coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);
 
@@ -804,7 +740,7 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
     }}}
 }
 template <ForcefieldType T>
-__global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
+__global__ void optimize_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -822,7 +758,7 @@ __global__ void optimize_batch_(IsomerBatch B, const size_t iterations, const si
 
         //Pre-compute force constants and store in registers.
         Constants constants = Constants(B, isomer_idx);
-        NodeGraph nodeG     = NodeGraph(B, isomer_idx, smem);
+        NodeNeighbours nodeG     = NodeNeighbours(B, isomer_idx, smem);
 
         //Set VRAM pointer to start of each fullerene, as opposed to at the start of the isomerbatch.
         coord3d* X = reinterpret_cast<coord3d*>(B.X+3*offset);
@@ -868,7 +804,7 @@ __global__ void diagnostic_function(IsomerBatch B, CuArray<device_real_t> output
         size_t offset               = isomer_idx * blockDim.x;
         coord3d* X = reinterpret_cast<coord3d*>(B.X+3*offset);
         Constants constants = Constants(B, isomer_idx);
-        NodeGraph nodeG     = NodeGraph(B, isomer_idx, sdata);
+        NodeNeighbours nodeG     = NodeNeighbours(B, isomer_idx, sdata);
         ForceField<FLATNESS_ENABLED>::FaceData face(X,nodeG);
         coord3d part1 = {face.A.a, face.A.b, face.A.c};
         coord3d part2 = {face.A.d, face.A.e, face.A.f};
@@ -902,14 +838,14 @@ cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output){
     cudaDeviceProp props;
     cudaGetDeviceProperties(&props,0);
     cudaFuncSetAttribute(diagnostic_function, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
-    cudaFuncSetAttribute(optimize_batch_<BUSTER>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
-    cudaFuncSetAttribute(optimize_batch_<FLATNESS_ENABLED>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
-    cudaFuncSetAttribute(optimize_batch_<WIRZ>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
+    cudaFuncSetAttribute(optimize_<BUSTER>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
+    cudaFuncSetAttribute(optimize_<FLATNESS_ENABLED>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
+    cudaFuncSetAttribute(optimize_<WIRZ>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
     
     std::cout << "Smem Per Block" <<props.sharedMemPerBlockOptin << endl;
-    safeCudaKernelCall((void*)optimize_batch_<BUSTER>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
-    safeCudaKernelCall((void*)optimize_batch_<FLATNESS_ENABLED>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
-    safeCudaKernelCall((void*)optimize_batch_<WIRZ>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
+    safeCudaKernelCall((void*)optimize_<BUSTER>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
+    safeCudaKernelCall((void*)optimize_<FLATNESS_ENABLED>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
+    safeCudaKernelCall((void*)optimize_<WIRZ>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
     auto error = safeCudaKernelCall((void*)diagnostic_function, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
     cudaDeviceSynchronize();
     printLastCudaError("Test Fun Failed: ");
@@ -928,7 +864,7 @@ cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output){
                     coord3d rel_err;\
                     size_t offset = isomer_idx * blockDim.x;  \
                     Constants constants     = Constants(B, isomer_idx);\
-                    NodeGraph node_graph    = NodeGraph(B, isomer_idx, smem);\
+                    NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);\
                     ForceField FF           = ForceField<T>(node_graph, constants, smem);\
                     coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
                     for (uint8_t j = 0; j < 3; j++){\
@@ -962,7 +898,7 @@ cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output){
                 coord3d rel_err;\
                 size_t offset = isomer_idx * blockDim.x;  \
                 Constants constants     = Constants(B, isomer_idx);\
-                NodeGraph node_graph    = NodeGraph(B, isomer_idx, smem);\
+                NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);\
                 ForceField FF           = ForceField<T>(node_graph, constants, smem);\
                 coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
                 for (uint8_t j = 0; j < 3; j++){\
@@ -999,7 +935,7 @@ cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output){
             coord3d rel_err;\
             size_t offset = isomer_idx * blockDim.x;  \
             Constants constants     = Constants(B, isomer_idx);\
-            NodeGraph node_graph    = NodeGraph(B, isomer_idx, smem);\
+            NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);\
             ForceField FF           = ForceField<T>(node_graph, constants, smem);\
             coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
             for (uint8_t j = 0; j < 3; j++){\
@@ -1007,6 +943,76 @@ cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output){
                 d_set(rel_err,      j, abs(param_fun));\
             }\
             bond_rms.data[isomer_idx]         = err_fun;\
+        }}\
+    }\
+    template <ForcefieldType T>\
+    cudaError_t fun_2(const IsomerBatch& B, CuArray<device_real_t>& bond_rms){\
+        cudaDeviceSynchronize();\
+        cudaSetDevice(B.get_device_id());\
+        size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;\
+        static LaunchDims dims((void*)fun_1<T>, B.n_atoms, smem, B.isomer_capacity);\
+        dims.update_dims((void*)fun_1<T>, B.n_atoms, smem, B.isomer_capacity);\
+        void* kargs[]{(void*)&B, (void*)&bond_rms};\
+        auto error = safeCudaKernelCall((void*)fun_1<T>, dims.get_grid(), dims.get_block(), kargs, smem);\
+        cudaDeviceSynchronize();\
+        return error;\
+    }
+
+#define GET_RRMSE(fun_1, fun_2, param_fun, err_fun) \
+    template <ForcefieldType T>\
+    __global__ void fun_1(const IsomerBatch B, CuArray<device_real_t> bond_rms){\
+        DEVICE_TYPEDEFS\
+        extern __shared__ real_t smem[];\
+        clear_cache(smem,Block_Size_Pow_2);\
+        for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){\
+        if(B.statuses[isomer_idx] != IsomerStatus::EMPTY){\
+            coord3d top;\
+            coord3d bot;\
+            size_t offset = isomer_idx * blockDim.x;  \
+            Constants constants     = Constants(B, isomer_idx);\
+            NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);\
+            ForceField FF           = ForceField<T>(node_graph, constants, smem);\
+            coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
+            for (uint8_t j = 0; j < 3; j++){\
+                auto arc            = ForceField<T>::ArcData(j, X, node_graph);\
+                d_set(top,      j, param_fun -  err_fun);\
+                d_set(bot,      j, err_fun);\
+            }\
+            bond_rms.data[isomer_idx]         = sqrt((reduction(smem, dot(top,top))/reduction(smem,dot(bot,bot)))/(blockDim.x*3));\
+        }}\
+    }\
+    template <ForcefieldType T>\
+    cudaError_t fun_2(const IsomerBatch& B, CuArray<device_real_t>& bond_rms){\
+        cudaDeviceSynchronize();\
+        cudaSetDevice(B.get_device_id());\
+        size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;\
+        static LaunchDims dims((void*)fun_1<T>, B.n_atoms, smem, B.isomer_capacity);\
+        dims.update_dims((void*)fun_1<T>, B.n_atoms, smem, B.isomer_capacity);\
+        void* kargs[]{(void*)&B, (void*)&bond_rms};\
+        auto error = safeCudaKernelCall((void*)fun_1<T>, dims.get_grid(), dims.get_block(), kargs, smem);\
+        cudaDeviceSynchronize();\
+        return error;\
+    }
+
+#define GET_RMSE(fun_1, fun_2, param_fun, err_fun) \
+    template <ForcefieldType T>\
+    __global__ void fun_1(const IsomerBatch B, CuArray<device_real_t> bond_rms){\
+        DEVICE_TYPEDEFS\
+        extern __shared__ real_t smem[];\
+        clear_cache(smem,Block_Size_Pow_2);\
+        for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){\
+        if(B.statuses[isomer_idx] != IsomerStatus::EMPTY){\
+            coord3d top;\
+            size_t offset = isomer_idx * blockDim.x;  \
+            Constants constants     = Constants(B, isomer_idx);\
+            NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);\
+            ForceField FF           = ForceField<T>(node_graph, constants, smem);\
+            coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
+            for (uint8_t j = 0; j < 3; j++){\
+                auto arc            = ForceField<T>::ArcData(j, X, node_graph);\
+                d_set(top,      j, param_fun - err_fun);\
+            }\
+            bond_rms.data[isomer_idx]         = sqrt(reduction(smem, dot(top,top))/(blockDim.x*3));\
         }}\
     }\
     template <ForcefieldType T>\
@@ -1032,7 +1038,7 @@ cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output){
             coord3d rel_err;\
             size_t offset = isomer_idx * blockDim.x;  \
             Constants constants     = Constants(B, isomer_idx);\
-            NodeGraph node_graph    = NodeGraph(B, isomer_idx, smem);\
+            NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);\
             ForceField FF           = ForceField<FORCEFIELD_VERSION>(node_graph, constants, smem);\
             coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
             for (uint8_t j = 0; j < 3; j++){\
@@ -1058,33 +1064,41 @@ GET_INTERNAL(get_bonds_,get_bonds, arc.bond())
 GET_INTERNAL(get_angles_,get_angles, arc.angle())
 GET_INTERNAL(get_dihedrals_,get_dihedrals, arc.dihedral())
 
+GET_RRMSE(get_bond_rrmse_,get_bond_rrmse, arc.bond(), d_get(constants.r0,j))
+GET_RRMSE(get_angle_rrmse_,get_angle_rrmse, acos(arc.angle()), acos(d_get(constants.angle0,j)))
+GET_RRMSE(get_dihedral_rrmse_,get_dihedral_rrmse, acos(arc.dihedral()), acos(d_get(constants.inner_dih0,j)))
 
-GET_STAT(get_bond_rms_,get_bond_rms, arc.bond(), constants.r0, sqrt(reduction(smem,dot(rel_err,rel_err))/blockDim.x))
+GET_RMSE(get_bond_rmse_,get_bond_rmse, arc.bond(), d_get(constants.r0,j))
+GET_RMSE(get_angle_rmse_,get_angle_rmse, acos(arc.angle()), acos(d_get(constants.angle0,j)))
+GET_RMSE(get_dihedral_rmse_,get_dihedral_rmse, acos(arc.dihedral()), acos(d_get(constants.inner_dih0,j)))
+
 GET_STAT(get_bond_max_,get_bond_max, arc.bond(), constants.r0, reduction_max(smem, max(rel_err)))
 GET_STAT(get_angle_rms_,get_angle_rms, arc.angle(), constants.angle0, sqrt(reduction(smem,dot(rel_err,rel_err))/blockDim.x);)
 GET_STAT(get_angle_max_,get_angle_max, arc.angle(), constants.angle0, reduction_max(smem, max(rel_err)))
-GET_STAT(get_dihedral_rms_,get_dihedral_rms, arc.dihedral(), constants.inner_dih0, sqrt(reduction(smem,dot(rel_err,rel_err))/blockDim.x);)
 GET_STAT(get_dihedral_max_,get_dihedral_max, arc.dihedral(), constants.inner_dih0, reduction_max(smem, max(rel_err)))
 GET_STAT(get_energies_,get_energies, arc.dihedral(), constants.inner_dih0, FF.energy(X))
 GET_STAT(get_gradient_norm_,get_gradient_norm, arc.dihedral(), constants.inner_dih0, sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X))))/blockDim.x)
 GET_STAT(get_gradient_rms_,get_gradient_rms, arc.dihedral(), constants.inner_dih0, sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X)))/blockDim.x))
 GET_STAT(get_gradient_max_,get_gradient_max, arc.dihedral(), constants.inner_dih0, reduction_max(smem, sqrt(dot(FF.gradient(X), FF.gradient(X)))     ))
 
-GET_MEAN(get_energy_, get_energy, arc.bond(), FF.energy(X)/blockDim.x)
+GET_MEAN(get_bond_mae_, get_bond_mae, abs(arc.bond() - d_get(constants.r0,j)), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
+GET_MEAN(get_angle_mae_, get_angle_mae, abs(acos(arc.angle()) - acos(d_get(constants.angle0,j))), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
+GET_MEAN(get_dihedral_mae_, get_dihedral_mae, abs(acos(arc.dihedral()) - acos(d_get(constants.inner_dih0,j))), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
 
+GET_MEAN(get_energy_, get_energy, arc.bond(), FF.energy(X)/blockDim.x)
 GET_MEAN(get_bond_mean_,get_bond_mean, arc.bond(), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
 GET_MEAN(get_angle_mean_,get_angle_mean, arc.angle(), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
 GET_MEAN(get_dihedral_mean_,get_dihedral_mean, arc.dihedral(), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
 GET_MEAN(get_gradient_mean_,get_gradient_mean, d_get(FF.gradient(X),j), reduction(smem,sum(rel_err)/3.0f)/blockDim.x)
 GET_MEAN(get_flat_mean_,get_flat_mean, d_get(FF.gradient(X),j), reduction(smem,ForceField<FORCEFIELD_VERSION>::FaceData(X, node_graph).flatness())/(blockDim.x/2 + 2 ))
-GET_MEAN(get_flat_rms_,get_flat_rms, d_get(FF.gradient(X),j), sqrt(reduction(smem,ForceField<FORCEFIELD_VERSION>::FaceData(X, node_graph).flatness() * ForceField<FORCEFIELD_VERSION>::FaceData(X, node_graph).flatness())/(blockDim.x/2 + 2 )) )
+GET_MEAN(get_flat_rmse_,get_flat_rmse, d_get(FF.gradient(X),j), sqrt(reduction(smem,ForceField<FORCEFIELD_VERSION>::FaceData(X, node_graph).flatness() * ForceField<FORCEFIELD_VERSION>::FaceData(X, node_graph).flatness())/(blockDim.x/2 + 2 )) )
 GET_MEAN(get_flat_max_,get_flat_max, d_get(FF.gradient(X),j), reduction_max(smem,ForceField<FORCEFIELD_VERSION>::FaceData(X, node_graph).flatness())   )
 
 int optimal_batch_size(const int N, const int device_id) {
     cudaSetDevice(device_id);
     static size_t smem = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimize_batch_<FORCEFIELD_VERSION>, N, smem);
-    dims.update_dims((void*)optimize_batch_<FORCEFIELD_VERSION>, N, smem);
+    static LaunchDims dims((void*)optimize_<FORCEFIELD_VERSION>, N, smem);
+    dims.update_dims((void*)optimize_<FORCEFIELD_VERSION>, N, smem);
     return dims.get_grid().x;
 }
 
@@ -1095,7 +1109,7 @@ std::chrono::microseconds time_spent(){
 
 
 template <ForcefieldType T>
-cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
+cudaError_t optimize(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(ctx.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
@@ -1112,12 +1126,12 @@ cudaError_t optimize_batch(IsomerBatch& B, const size_t iterations, const size_t
     }
 
     size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimize_batch_<T>, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)optimize_batch_<T>, B.n_atoms, smem, B.isomer_capacity);
+    static LaunchDims dims((void*)optimize_<T>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)optimize_<T>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&iterations, (void*)&max_iterations};
 
     cudaEventRecord(start[dev], ctx.stream);
-    auto error = safeCudaKernelCall((void*)optimize_batch_<T>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    auto error = safeCudaKernelCall((void*)optimize_<T>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
@@ -1134,18 +1148,24 @@ int declare_generics(){
     IsomerBatch B(20,1,DEVICE_BUFFER);
     CuArray<device_real_t> arr(1);
 
-    optimize_batch<BUSTER>(B,100,100);
+    optimize<BUSTER>(B,100,100);
     get_angle_max<BUSTER>(B,arr);
     get_bond_max<BUSTER>(B,arr);
     get_dihedral_max<BUSTER>(B,arr);
-    get_angle_rms<BUSTER>(B,arr);
-    get_bond_rms<BUSTER>(B,arr);
-    get_dihedral_rms<BUSTER>(B,arr);
+    get_angle_mae<BUSTER>(B,arr);
+    get_bond_mae<BUSTER>(B,arr);
+    get_dihedral_mae<BUSTER>(B,arr);
+    get_angle_rrmse<BUSTER>(B,arr);
+    get_bond_rrmse<BUSTER>(B,arr);
+    get_dihedral_rrmse<BUSTER>(B,arr);
+    get_angle_rmse<BUSTER>(B,arr);
+    get_bond_rmse<BUSTER>(B,arr);
+    get_dihedral_rmse<BUSTER>(B,arr);
     get_angle_mean<BUSTER>(B,arr);
     get_bond_mean<BUSTER>(B,arr);
     get_flat_mean<BUSTER>(B,arr);
     get_flat_max<BUSTER>(B,arr);
-    get_flat_rms<BUSTER>(B,arr);
+    get_flat_rmse<BUSTER>(B,arr);
     get_dihedral_mean<BUSTER>(B,arr);
     get_gradient_max<BUSTER>(B,arr);
     get_gradient_rms<BUSTER>(B,arr);
@@ -1153,57 +1173,75 @@ int declare_generics(){
     get_gradient_norm<BUSTER>(B,arr);
     get_energies<BUSTER>(B,arr);
 
-    optimize_batch<FLATNESS_ENABLED>(B,100,100);
+    optimize<FLATNESS_ENABLED>(B,100,100);
     get_angle_max<FLATNESS_ENABLED>(B,arr);
     get_bond_max<FLATNESS_ENABLED>(B,arr);
     get_dihedral_max<FLATNESS_ENABLED>(B,arr);
-    get_angle_rms<FLATNESS_ENABLED>(B,arr);
-    get_bond_rms<FLATNESS_ENABLED>(B,arr);
-    get_dihedral_rms<FLATNESS_ENABLED>(B,arr);
+    get_angle_mae<FLATNESS_ENABLED>(B,arr);
+    get_bond_mae<FLATNESS_ENABLED>(B,arr);
+    get_dihedral_mae<FLATNESS_ENABLED>(B,arr);
+    get_angle_rrmse<FLATNESS_ENABLED>(B,arr);
+    get_bond_rrmse<FLATNESS_ENABLED>(B,arr);
+    get_dihedral_rrmse<FLATNESS_ENABLED>(B,arr);
+    get_angle_rmse<FLATNESS_ENABLED>(B,arr);
+    get_bond_rmse<FLATNESS_ENABLED>(B,arr);
+    get_dihedral_rmse<FLATNESS_ENABLED>(B,arr);
     get_angle_mean<FLATNESS_ENABLED>(B,arr);
     get_bond_mean<FLATNESS_ENABLED>(B,arr);
     get_dihedral_mean<FLATNESS_ENABLED>(B,arr);
     get_flat_mean<FLATNESS_ENABLED>(B,arr);
     get_flat_max<FLATNESS_ENABLED>(B,arr);
-    get_flat_rms<FLATNESS_ENABLED>(B,arr);
+    get_flat_rmse<FLATNESS_ENABLED>(B,arr);
     get_gradient_max<FLATNESS_ENABLED>(B,arr);
     get_gradient_rms<FLATNESS_ENABLED>(B,arr);
     get_gradient_mean<FLATNESS_ENABLED>(B,arr);
     get_gradient_norm<FLATNESS_ENABLED>(B,arr);
     get_energies<FLATNESS_ENABLED>(B,arr);
 
-    optimize_batch<WIRZ>(B,100,100);
+    optimize<WIRZ>(B,100,100);
     get_angle_max<WIRZ>(B,arr);
     get_bond_max<WIRZ>(B,arr);
     get_dihedral_max<WIRZ>(B,arr);
-    get_angle_rms<WIRZ>(B,arr);
-    get_bond_rms<WIRZ>(B,arr);
-    get_dihedral_rms<WIRZ>(B,arr);
+    get_angle_mae<WIRZ>(B,arr);
+    get_bond_mae<WIRZ>(B,arr);
+    get_dihedral_mae<WIRZ>(B,arr);
+    get_angle_rrmse<WIRZ>(B,arr);
+    get_bond_rrmse<WIRZ>(B,arr);
+    get_dihedral_rrmse<WIRZ>(B,arr);
+    get_angle_rmse<WIRZ>(B,arr);
+    get_bond_rmse<WIRZ>(B,arr);
+    get_dihedral_rmse<WIRZ>(B,arr);
     get_angle_mean<WIRZ>(B,arr);
     get_bond_mean<WIRZ>(B,arr);
     get_dihedral_mean<WIRZ>(B,arr);
     get_flat_mean<WIRZ>(B,arr);
     get_flat_max<WIRZ>(B,arr);
-    get_flat_rms<WIRZ>(B,arr);
+    get_flat_rmse<WIRZ>(B,arr);
     get_gradient_max<WIRZ>(B,arr);
     get_gradient_rms<WIRZ>(B,arr);
     get_gradient_mean<WIRZ>(B,arr);
     get_gradient_norm<WIRZ>(B,arr);
     get_energies<WIRZ>(B,arr);
 
-    optimize_batch<FLAT_BOND>(B,100,100);
+    optimize<FLAT_BOND>(B,100,100);
     get_angle_max<FLAT_BOND>(B,arr);
     get_bond_max<FLAT_BOND>(B,arr);
     get_dihedral_max<FLAT_BOND>(B,arr);
-    get_angle_rms<FLAT_BOND>(B,arr);
-    get_bond_rms<FLAT_BOND>(B,arr);
-    get_dihedral_rms<FLAT_BOND>(B,arr);
+    get_angle_mae<FLAT_BOND>(B,arr);
+    get_bond_mae<FLAT_BOND>(B,arr);
+    get_dihedral_mae<FLAT_BOND>(B,arr);
+    get_angle_rrmse<FLAT_BOND>(B,arr);
+    get_bond_rrmse<FLAT_BOND>(B,arr);
+    get_dihedral_rrmse<FLAT_BOND>(B,arr);
+    get_angle_rmse<FLAT_BOND>(B,arr);
+    get_bond_rmse<FLAT_BOND>(B,arr);
+    get_dihedral_rmse<FLAT_BOND>(B,arr);
     get_angle_mean<FLAT_BOND>(B,arr);
     get_bond_mean<FLAT_BOND>(B,arr);
     get_dihedral_mean<FLAT_BOND>(B,arr);
     get_flat_mean<FLAT_BOND>(B,arr);
     get_flat_max<FLAT_BOND>(B,arr);
-    get_flat_rms<FLAT_BOND>(B,arr);
+    get_flat_rmse<FLAT_BOND>(B,arr);
     get_gradient_max<FLAT_BOND>(B,arr);
     get_gradient_rms<FLAT_BOND>(B,arr);
     get_gradient_mean<FLAT_BOND>(B,arr);
