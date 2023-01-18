@@ -152,7 +152,7 @@ int main(int ac, char **argv)
 
    while ((ff_kernel.get_queue_size() > ff_batch_size*2) || (!more_to_generate && ff_kernel.get_batch_size() >0)){
       auto t5 = system_clock::now();
-      ff_kernel.optimize_batch(N*1);
+      ff_kernel.optimize(N*1);
       auto t6 = system_clock::now();Topt += t6-t5;
 
       ff_kernel.check_batch(N*20);

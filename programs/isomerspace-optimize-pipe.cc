@@ -121,7 +121,7 @@ int main(int ac, char **argv)
       auto t0 = system_clock::now();
       ff_kernel.update_device_batches();
       auto t1 = system_clock::now(); Tqueue += t1 - t0;
-      ff_kernel.optimize_batch(N*1);
+      ff_kernel.optimize(N*1);
       ff_kernel.output_batch_to_queue();
       new_finished = ff_kernel.get_failed_count() + ff_kernel.get_converged_count() - finished;
       auto t2 = system_clock::now(); Topt += t2 - t1;
@@ -137,7 +137,7 @@ int main(int ac, char **argv)
     {
       ff_kernel.update_device_batches();
       auto t0 = system_clock::now();
-      ff_kernel.optimize_batch(N*1);
+      ff_kernel.optimize(N*1);
       auto t1 = system_clock::now(); Topt += t1 - t0;
       ff_kernel.check_batch(N*50);
       auto t2 = system_clock::now(); Tcheck += t2 - t1;
