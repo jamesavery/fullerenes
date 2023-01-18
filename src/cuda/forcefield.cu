@@ -1,12 +1,11 @@
 #include <cuda.h>
-#include "fullerenes/gpu/cu_array.hh"
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include <cooperative_groups/scan.h>
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
-#include <cuda.h>
 #include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/gpu/cu_array.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/kernels.hh"
 
@@ -67,18 +66,43 @@ struct FaceData{
         }
     }
     //3 FLOPs
+        /**
+     * Computes the harmonic energy contribution of one term.
+     *
+     * @param[in] p0 Equillibrium parameter
+     * @param[in] p Current parameter
+     * @return Hooke's law harmonic energy contribution of the term
+     */
     INLINE real_t harmonic_energy(const real_t p0, const real_t p) const{
         return (real_t)0.5*(p-p0)*(p-p0);
     }
 
+
+    /** @brief Compute the flatness of the threadIdx^th face in the isomer
+     *  @return The flatness of the threadIdx^th face in the isomer
+     */
     INLINE real_t flatness() const {return threadIdx.x < blockDim.x/2 + 2 ? lambda_f : (real_t)0.;}
 
     //4 FLOPs
+    /**
+     * Computes the harmonic energy gradient contribution of one term.
+     *
+     * @param[in] p0 Equillibrium parameter
+     * @param[in] p Current parameter
+     * @param[in] gradp Gradient of the parameter w.r.t. the particle position
+     * @return Hooke's law harmonic energy gradient contribution of the term
+     */
     INLINE coord3d  harmonic_energy_gradient(const real_t p0, const real_t p, const coord3d gradp) const{
         return (p-p0)*gradp;     
     }
 
-    //Returns 0 if the threadIdx is larger than Nf.
+
+    /**
+ * @brief Compute the flatness energy contribution of the threadIdx^th face in the isomer.
+ *
+ * @param c The forcefield constants for the threadIdx^th node.
+ * @return The flatness energy.
+ */
     INLINE real_t flatness_energy(const Constants& c) const {
         #if USE_CONSTANT_INDICES
         return c.f_flat() * harmonic_energy(flatness(),(real_t)0.);
@@ -87,7 +111,12 @@ struct FaceData{
         #endif
     }
 
-    //This function requires Nf * 2 * sizeof(coord3d) bytes of cache to be passed in
+    /**
+     * @brief Compute the gradient of the flatness w.r.t to the threadIdx^th atom in the isomer.
+     * @param c The forcefield constants for the threadIdx^th node.
+     * @param cache A pointer to a cache of minimum size Nf * 2 * sizeof(coord3d) bytes.
+     * @return The flatness energy gradient.
+     */
     INLINE coord3d flatness_gradient(const Constants& c, coord3d* cache) const {
         coord3d* centroids = reinterpret_cast<coord3d*>(cache);
         coord3d* norms = reinterpret_cast<coord3d*>(cache + blockDim.x/2 + 2);
@@ -112,6 +141,13 @@ struct FaceData{
 struct ArcData{
     //124 FLOPs;
     uint8_t j;
+    /**
+     * @brief Construct a new ArcData object
+     * @param j The index of the arc, eg. 0 for ab, 1 for ac and 2 for ad.
+     * @param X The coordinates of all nodes in the isomer.
+     * @param G The neighbour information for the threadIdx^th node.
+     * @return A new ArcData object.
+    */
     INLINE ArcData(const uint8_t j, const coord3d* __restrict__ X, const NodeNeighbours& G){  
         __builtin_assume(j < 3); 
         this->j = j;   
@@ -143,16 +179,35 @@ struct ArcData{
     }
 
     //3 FLOPs
+    /**
+     * @brief Compute the harmonic energy contribution from one parameter.
+     * @param p0 The equillibrium value of the parameter.
+     * @param p The current value of the parameter.
+    */
     INLINE real_t harmonic_energy(const real_t p0, const real_t p) const{
         return (real_t)0.5*(p-p0)*(p-p0);
     }
     //4 FLOPs
+    /**
+     * @brief Compute the harmonic energy gradient contribution from one parameter.
+     * @param p0 The equillibrium value of the parameter.
+     * @param p The current value of the parameter.
+     * @param gradp The gradient of the parameter with respect to the node position.
+    */
     INLINE coord3d  harmonic_energy_gradient(const real_t p0, const real_t p, const coord3d gradp) const{
         return (p-p0)*gradp;     
     }
     //1 FLOP
+    /**
+     * @brief Compute the bond length of the main arc ab or ac or ad. for j = 0, 1 or 2 respectively.
+     * @return The bond length.
+    */
     INLINE real_t bond() const {return rab;}
     //5 FLOPs
+    /**
+     * @brief Compute the cosine of the angle between the main arc and the next arc, (ab,ac), (ac,ad), (ad,ab). For j = 0, 1 or 2 respectively.
+     * @return The cosine of the angle.
+    */
     INLINE real_t angle() const {return dot(ab_hat,ac_hat);}
 
     INLINE real_t normalized_angle_err() const {return acos(dot(ab_hat,ac_hat));}
@@ -166,6 +221,10 @@ struct ArcData{
     //Returns the inner dihedral angle for the current arc. Used here only for energy calculation, 
     //otherwise embedded in dihedral computation because the planes and angles that make up the dihedral angle computation are required for derivative computation.
     //50 FLOPs
+    /**
+     * @brief Compute the dihedral angle between the faces (abc,bcd), (acd,bcd) and (abd,bcd). For j = 0, 1 or 2 respectively. 
+     * @return The dihedral angle.
+    */
     INLINE real_t dihedral() const 
     { 
         coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
@@ -174,6 +233,10 @@ struct ArcData{
         return dot(nabc, nbcd);
     }
     //Returns the Outer-dihedral-a wrt. current arc, only accessed diagnostically (internal coordinate).
+    /**
+     * @brief Compute the dihedral angle between the faces $(b-a-b_m, a-b_m-b_p)$, $(c-a-c_m, a-c_m-c_p)$ and $(d-a-d_m, a-d_m-d_p)$. For j = 0, 1 or 2 respectively.
+     * @return The dihedral angle.
+    */
     INLINE real_t outer_dihedral_a() const
     {
         coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
@@ -183,6 +246,10 @@ struct ArcData{
         return cos_beta;
     }
     //Returns the Outer-dihedral-m wrt. current arc, only accessed diagnostically (internal coordinate).
+    /**
+     * @brief Compute the dihedral angle between the faces $(b-b_m-b_p, b_m-b_p-a)$, $(c-c_m-c_p, c_m-c_p-a)$ and $(d-d_m-d_p, d_m-d_p-a)$. For j = 0, 1 or 2 respectively.
+     * @return The dihedral angle.
+    */
     INLINE real_t outer_dihedral_m() const
     {
         coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
@@ -193,6 +260,10 @@ struct ArcData{
         return cos_beta;    
     }
     //Returns the Outer-dihedral-p wrt. current arc, only accessed diagnostically (internal coordinate).
+    /**
+     * @brief Compute the dihedral angle between the faces $(b-b_p-a, b_p-a-b_m)$, $(c-c_p-a, c_p-a-c_m)$ and $(d-d_p-a, d_p-a-d_m)$. For j = 0, 1 or 2 respectively.
+     * @return The dihedral angle.
+    */
     INLINE real_t outer_dihedral_p() const
     {
         coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
@@ -205,6 +276,11 @@ struct ArcData{
     
     // Chain rule terms for angle calculation
     //Computes gradient related to bending term. ~24 FLOPs
+    /**
+     * @brief Compute the gradient of the bending term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the bending term.
+    */
     INLINE coord3d inner_angle_gradient(const Constants& c) const
     {   
         real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
@@ -216,6 +292,11 @@ struct ArcData{
         #endif
     }
     //Computes gradient related to bending of outer angles. ~20 FLOPs
+    /**
+     * @brief Compute the gradient of the outer angle-m term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the outer angle-m term.
+    */
     INLINE coord3d outer_angle_gradient_m(const Constants& c) const
     {
         real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
@@ -226,6 +307,12 @@ struct ArcData{
         return d_get(c.f_outer_angle_m,j) * harmonic_energy_gradient(d_get(c.outer_angle_m0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
         #endif
     }
+
+    /**
+     * @brief Compute the gradient of the outer angle-p term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the outer angle-p term.
+    */
     INLINE coord3d outer_angle_gradient_p(const Constants& c) const
     {   
         real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
@@ -238,6 +325,11 @@ struct ArcData{
     }
     // Chain rule terms for dihedral calculation
     //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
+    /**
+     * @brief Compute the gradient of the inner dihedral term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the inner dihedral term.
+    */
     INLINE coord3d inner_dihedral_gradient(const Constants& c) const
     {
         coord3d nabc, nbcd; real_t cos_b, cos_c, r_sin_b, r_sin_c;
@@ -257,6 +349,11 @@ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
+    /**
+     * @brief Compute the gradient of the outer dihedral-a term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the outer dihedral-a term.
+    */
     INLINE coord3d outer_dihedral_gradient_a(const Constants& c) const
     {
         coord3d nbam_hat, namp_hat; real_t cos_a, cos_m, r_sin_a, r_sin_m;
@@ -281,6 +378,11 @@ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
+    /**
+     * @brief Compute the gradient of the outer dihedral-m term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the outer dihedral-m term.
+    */
     INLINE coord3d outer_dihedral_gradient_m(const Constants& c) const
     {
         coord3d nbmp_hat, nmpa_hat; real_t cos_m, cos_p, r_sin_m, r_sin_p;
@@ -303,6 +405,11 @@ struct ArcData{
     }
 
     //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
+    /**
+     * @brief Compute the gradient of the outer dihedral-p term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the outer dihedral-p term.
+    */
     INLINE coord3d outer_dihedral_gradient_p(const Constants& c) const
     {
         coord3d nbpa_hat, npam_hat; real_t cos_p, cos_a, r_sin_p, r_sin_a;
@@ -326,6 +433,11 @@ struct ArcData{
     }
 
     // Internal coordinate gradients
+    /**
+     * @brief Compute the gradient of the bond length term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the bond length term.
+    */
     INLINE coord3d bond_length_gradient(const Constants& c) const {
         #if USE_CONSTANT_INDICES
         return c.f_bond(j) * harmonic_energy_gradient(bond(),c.r0(j),ab_hat); 
@@ -334,8 +446,18 @@ struct ArcData{
         #endif
     }
     //Sum of angular gradient components.
+    /**
+     * @brief Compute the sum of the gradients of the bending terms.
+     * @param c The constants for the threadIdx^th node.
+     * @return The sum of the gradients of the bending terms.
+    */
     INLINE coord3d angle_gradient(const Constants& c) const { return inner_angle_gradient(c) + outer_angle_gradient_p(c) + outer_angle_gradient_m(c);}
     //Sum of inner and outer dihedral gradient components.
+    /**
+     * @brief Compute the sum of the gradients of the dihedral terms.
+     * @param c The constants for the threadIdx^th node.
+     * @return The sum of the gradients of the dihedral terms.
+    */
     INLINE coord3d dihedral_gradient(const Constants& c) const { 
         switch (T)
         {
@@ -348,7 +470,11 @@ struct ArcData{
         }
         return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);
     }
-    
+    /**
+     * @brief Compute the energy contribution of the bond length term.
+     * @param c The constants for the threadIdx^th node.
+     * @return The energy contribution of the bond length term.
+    */
     INLINE real_t bond_energy(const Constants& c) const {
         #if USE_CONSTANT_INDICES
         return (real_t)0.5 *c.f_bond(j) *harmonic_energy(bond(),c.r0(j));
@@ -356,6 +482,11 @@ struct ArcData{
         return (real_t)0.5 *d_get(c.f_bond,j) *harmonic_energy(bond(),d_get(c.r0,j));
         #endif
     }
+    /**
+     * @brief Compute the total energy contribution of the bending terms.
+     * @param c The constants for the threadIdx^th node.
+     * @return The energy contribution of the bending terms.
+    */
     INLINE real_t bend_energy(const Constants& c) const {
         #if USE_CONSTANT_INDICES
         return c.f_inner_angle(j)* harmonic_energy(angle(),c.angle0(j));
@@ -363,6 +494,12 @@ struct ArcData{
         return d_get(c.f_inner_angle,j)* harmonic_energy(angle(),d_get(c.angle0,j));
         #endif
     }
+
+    /**
+     * @brief Compute the total energy contribution of the dihedral terms.
+     * @param c The constants for the threadIdx^th node.
+     * @return The energy contribution of the dihedral terms.
+    */
     INLINE real_t dihedral_energy(const Constants& c) const {
         #if USE_CONSTANT_INDICES
         return c.f_inner_dihedral(j)* harmonic_energy(dihedral(),c.inner_dih0(j));
@@ -372,6 +509,11 @@ struct ArcData{
     }
     //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
     //71 FLOPs
+    /**
+     * @brief Compute the total energy contribution of the bond length, bending and dihedral terms.
+     * @param c The constants for the threadIdx^th node.
+     * @return The energy contribution of the bond length, bending and dihedral terms.
+    */
     INLINE real_t energy(const Constants& c) const {
         switch (T)
         {
@@ -384,6 +526,11 @@ struct ArcData{
         }
     }
     //Sum of bond, angular and dihedral gradient components.
+    /**
+     * @brief Compute the total gradient of the bond length, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
+     * @param c The constants for the threadIdx^th node.
+     * @return The gradient of the bond length, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
+    */
     INLINE coord3d gradient(const Constants& c) const{
         switch (T)
         {
@@ -440,6 +587,11 @@ struct ArcData{
 };
 
 
+/**
+ * @brief Compute the total gradient of the bond, flatness, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
+ * @param c The constants for the threadIdx^th node.
+ * @return The gradient of the bond, flatness, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
+*/
 INLINE coord3d gradient(coord3d* X) const {
     BLOCK_SYNC
     coord3d grad = {0.0, 0.0, 0.0};
@@ -467,6 +619,11 @@ INLINE coord3d gradient(coord3d* X) const {
     }
 }
 
+/**
+ * @brief Compute the total energy of the bond, flatness, bending and dihedral terms from all nodes in the isomer.
+ * @param c The constants for the threadIdx^th node.
+ * @return Total energy.
+*/
 INLINE real_t energy(coord3d* X) const {
     BLOCK_SYNC
     real_t arc_energy = (real_t)0.0;
@@ -537,6 +694,14 @@ INLINE real_t Bisection(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
 }
 
 //Brents Method for line-search using fixed number of iterations.
+/**
+ * @brief Brent's method for line-search.
+ * @param X The coordinates of the nodes.
+ * @param r0 The direction of the line-search.
+ * @param X1 memory for storing temporary coordinates at a and s.
+ * @param X2 memory for storing temporary coordinates at b.
+ * @return The step-size s.
+*/
 INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2)const{
     real_t a,b,s,d;
     a = (real_t)0.0; //b = (real_t)1.0; 
@@ -604,6 +769,14 @@ INLINE real_t BrentsMethod(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2)con
 }
 
 //Golden Section Search, using fixed iterations.
+/**
+ * @brief Golden Section Search for line-search.
+ * @param X The coordinates of the nodes.
+ * @param r0 The direction of the line-search.
+ * @param X1 memory for storing temporary coordinates at x1.
+ * @param X2 memory for storing temporary coordinates at x2.
+ * @return The step-size alpha
+*/
 INLINE real_t GSS(coord3d* X, const coord3d& r0, coord3d* X1, coord3d* X2) const{
     constexpr real_t tau = (real_t)0.6180339887;
     //Line search x - values;
@@ -643,6 +816,13 @@ INLINE real_t GSS(coord3d* X, const coord3d& r0, coord3d* X1, coord3d* X2) const
     return alpha;
 }
 
+/**
+ * @brief Conjugate Gradient Method for energy minimization.
+ * @param X The coordinates of the nodes.
+ * @param X1 memory for storing temporary coordinates.
+ * @param X2 memory for storing temporary coordinates.
+ * @param MaxIter The maximum number of iterations.
+*/
 INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter){
     real_t alpha, beta, g0_norm2, s_norm;
     coord3d g0,g1,s;
@@ -676,10 +856,16 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter){
         s /= s_norm;
     }
 }
-
-
 };
 
+/**
+ * @brief Checks if the isomer_idx^th isomer has converged, isomer_idx is different for each block.
+ * @param B The isomer batch.
+ * @param isomer_idx The index of the isomer to check.
+ * @param max_iterations The maximum number of iterations, if the isomer has not converged after this many iterations, it is marked as failed.
+ * @tparam T The forcefield type.
+ * @return void
+*/
 template <ForcefieldType T>
 __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_t max_iterations){
     DEVICE_TYPEDEFS
@@ -735,6 +921,14 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
        
     }}}
 }
+
+/**
+ * @brief Forcefield Optimizes a batch of isomers.
+ * @param B IsomerBatch
+ * @param iterations Number of iterations to run
+ * @param max_iterations Maximum number of iterations, to compare against, isomers are marked as failed if this is exceeded.
+ * @return void
+*/
 template <ForcefieldType T>
 __global__ void optimize_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
     DEVICE_TYPEDEFS
@@ -786,67 +980,6 @@ __global__ void optimize_(IsomerBatch B, const size_t iterations, const size_t m
     }
 }
 
-__global__ void diagnostic_function(IsomerBatch B, CuArray<device_real_t> output){
-    DEVICE_TYPEDEFS
-    extern __shared__ real_t sdata[];
-    auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
-    for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
-    BLOCK_SYNC
-    if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
-    if (B.statuses[isomer_idx] == IsomerStatus::CONVERGED)
-    {   
-        auto Nf = blockDim.x/2 + 2;
-        clear_cache(sdata, blockDim.x);
-        size_t offset               = isomer_idx * blockDim.x;
-        coord3d* X = reinterpret_cast<coord3d*>(B.X+3*offset);
-        Constants constants = Constants(B, isomer_idx);
-        NodeNeighbours nodeG     = NodeNeighbours(B, isomer_idx, sdata);
-        ForceField<FLATNESS_ENABLED>::FaceData face(X,nodeG);
-        coord3d part1 = {face.A.a, face.A.b, face.A.c};
-        coord3d part2 = {face.A.d, face.A.e, face.A.f};
-        coord3d lambdas = {0., 0., 0.};
-        if (threadIdx.x  < Nf){
-            lambdas = face.lambdas;
-        }
-        auto grad = face.flatness_gradient(constants,reinterpret_cast<coord3d*>(sdata));
-        print_single("\n");
-        sequential_print(lambdas,0);
-        print_single("\n");
-        sequential_print(grad,0);
-        print_single("\n");
-        if(threadIdx.x < blockDim.x/2 + 2){
-
-        reinterpret_cast<coord3d*>(output.data)[offset*6 + threadIdx.x*2] = part1;
-        reinterpret_cast<coord3d*>(output.data)[offset*6 + threadIdx.x*2+1] = part2;
-        }
-        //reinterpret_cast<coord3d*>(output.data)[offset*3 + 1] = matrix.eigenvector(lambdas.y);
-        //reinterpret_cast<coord3d*>(output.data)[offset*3 + 2] = matrix.eigenvector(lambdas.z);
-    }
-    }
-    }
-
-}
-
-cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output){
-    static LaunchDims dims((void*)diagnostic_function, B.n_atoms, 0 , B.isomer_capacity);
-    dims.update_dims((void*)diagnostic_function, B.n_atoms, 0, B.isomer_capacity);
-    void* kargs[]{(void*)&B, (void*)&output};
-    cudaDeviceProp props;
-    cudaGetDeviceProperties(&props,0);
-    cudaFuncSetAttribute(diagnostic_function, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
-    cudaFuncSetAttribute(optimize_<BUSTER>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
-    cudaFuncSetAttribute(optimize_<FLATNESS_ENABLED>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
-    cudaFuncSetAttribute(optimize_<WIRZ>, cudaFuncAttributeMaxDynamicSharedMemorySize, 1 << 16);
-    
-    std::cout << "Smem Per Block" <<props.sharedMemPerBlockOptin << endl;
-    safeCudaKernelCall((void*)optimize_<BUSTER>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
-    safeCudaKernelCall((void*)optimize_<FLATNESS_ENABLED>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
-    safeCudaKernelCall((void*)optimize_<WIRZ>, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
-    auto error = safeCudaKernelCall((void*)diagnostic_function, dims.get_grid(), dims.get_block(), kargs, 1 << 16);
-    cudaDeviceSynchronize();
-    printLastCudaError("Test Fun Failed: ");
-    return error;
-}
 
 #if USE_CONSTANT_INDICES
     #define GET_STAT(fun_1, fun_2, param_fun, equillibrium_param, err_fun) \
