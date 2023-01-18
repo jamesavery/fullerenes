@@ -24,7 +24,7 @@ __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){
     DEVICE_TYPEDEFS
     
-    CubicGraph FG = CubicGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
+    DeviceCubicGraph FG = DeviceCubicGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
     node_t outer_face[6]; memset(outer_face, 0, sizeof(node_t)*6); //Do not rely on uninitialized memory it will only be zero on first touch.
     uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
     distances[threadIdx.x] = node_t(NODE_MAX);    

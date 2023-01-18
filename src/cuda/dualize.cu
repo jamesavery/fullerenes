@@ -44,7 +44,7 @@ void cubic_layout_(IsomerBatch B){
         reinterpret_cast<node6*>(cached_neighbours)[thid] = reinterpret_cast<node6*>(B.dual_neighbours)[thid + isomer_idx*B.n_faces];
         cached_degrees[thid] = B.face_degrees[thid + isomer_idx*B.n_faces];
     }
-    DualGraph FD(cached_neighbours, cached_degrees);
+    DeviceDualGraph FD(cached_neighbours, cached_degrees);
     device_node_t cannon_arcs[6]; memset(cannon_arcs, UINT16_MAX,sizeof(device_node_t)*6);
     int represent_count = 0;
     BLOCK_SYNC

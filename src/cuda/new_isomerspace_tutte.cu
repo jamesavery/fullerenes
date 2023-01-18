@@ -26,7 +26,7 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     if (B.statuses[isomer_idx] != IsomerStatus::EMPTY){
     size_t offset = isomer_idx * blockDim.x;
 
-    CubicGraph FG(&B.cubic_neighbours[offset*3]); 
+    DeviceCubicGraph FG(&B.cubic_neighbours[offset*3]); 
     real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2d* xys        = reinterpret_cast<coord2d*>(base_pointer);
     coord2d* newxys     = reinterpret_cast<coord2d*>(base_pointer) + blockDim.x;

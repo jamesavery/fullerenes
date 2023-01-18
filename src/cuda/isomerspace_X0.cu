@@ -8,7 +8,7 @@ __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& G, device_node_t* distances){
     DEVICE_TYPEDEFS
     
-    CubicGraph FG = CubicGraph(&G.cubic_neighbours[blockIdx.x*blockDim.x*3]);
+    DeviceCubicGraph FG = DeviceCubicGraph(&G.cubic_neighbours[blockIdx.x*blockDim.x*3]);
     node_t outer_face[6];
     uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
     distances[threadIdx.x] = node_t(NODE_MAX);    

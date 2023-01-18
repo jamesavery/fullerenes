@@ -122,9 +122,9 @@ __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), fron
 
 
 
-struct CubicGraph{
+struct DeviceCubicGraph{
     const device_node_t* cubic_neighbours;
-    __device__ CubicGraph(const device_node_t* cubic_neighbours) : cubic_neighbours(cubic_neighbours) {}
+    __device__ DeviceCubicGraph(const device_node_t* cubic_neighbours) : cubic_neighbours(cubic_neighbours) {}
 
     /** @brief Find the index of the neighbour v in the list of neighbours of u
     // @param u: source node in the arc (u,v)
@@ -227,11 +227,11 @@ struct CubicGraph{
     }
 };
 
-struct DualGraph{
+struct DeviceDualGraph{
     const device_node_t* dual_neighbours;                   //Nf x 6
     const uint8_t* face_degrees;                            //Nf x 1
 
-    __device__ DualGraph(const device_node_t* dual_neighbours, const uint8_t* face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
+    __device__ DeviceDualGraph(const device_node_t* dual_neighbours, const uint8_t* face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
 
     __device__ device_node_t dedge_ix(const device_node_t u, const device_node_t v) const{
         for (uint8_t j = 0; j < face_degrees[u]; j++){
@@ -354,7 +354,7 @@ struct NodeNeighbours{
         device_real_t* base_ptr = sdata + Block_Size_Pow_2;
         device_node_t* L = reinterpret_cast<device_node_t*>(base_ptr ); //N x 3 list of potential face IDs.
         device_node_t* A = reinterpret_cast<device_node_t*>(base_ptr) + blockDim.x * 3; //Uses cache temporarily to store face neighbours. //Nf x 6 
-        const CubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+        const DeviceCubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
@@ -394,7 +394,7 @@ struct NodeNeighbours{
 * @param isomer_idx The index of the isomer to initialize based on.
 */
 __device__ NodeNeighbours(const IsomerBatch& G, const size_t isomer_idx){
-        const CubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+        const DeviceCubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
@@ -466,7 +466,7 @@ struct Constants{
      */
     INLINE Constants(const IsomerBatch& G, const uint32_t isomer_idx){
         //Set pointers to start of fullerene.
-        const DeviceFullereneGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+        const DeviceCubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         device_node3 cubic_neighbours = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         //       m    p
         //    f5_|   |_f4
