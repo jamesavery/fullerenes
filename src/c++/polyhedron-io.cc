@@ -35,7 +35,7 @@ Polyhedron Polyhedron::from_file(FILE *file, string format)
     } else {
       G.layout2d = G.tutte_layout();
       Polyhedron P(G,G.zero_order_geometry(),6);
-      P.optimize();
+      P.optimise();
 
       return P;
     }

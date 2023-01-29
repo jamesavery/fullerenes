@@ -461,7 +461,7 @@ struct ArcData{
     INLINE coord3d dihedral_gradient(const Constants& c) const { 
         switch (T)
         {
-        case BUSTER:
+        case PEDERSEN:
             return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);
         case WIRZ:
             return inner_dihedral_gradient(c);
@@ -934,7 +934,7 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
  * @return void
 */
 template <ForcefieldType T>
-__global__ void optimize_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
+__global__ void optimise_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -968,7 +968,7 @@ __global__ void optimize_(IsomerBatch B, const size_t iterations, const size_t m
 
 
 
-        //Create forcefield struct and use optimization algorithm to optimize the fullerene 
+        //Create forcefield struct and use optimization algorithm to optimise the fullerene 
         ForceField FF = ForceField<T>(nodeG, constants, smem);
         FF.CG(X,X1,X2,iterations);
         BLOCK_SYNC
@@ -1230,8 +1230,8 @@ GET_MEAN(get_flat_max_,get_flat_max, d_get(FF.gradient(X),j), reduction_max(smem
 int optimal_batch_size(const int N, const int device_id) {
     cudaSetDevice(device_id);
     static size_t smem = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimize_<FORCEFIELD_VERSION>, N, smem);
-    dims.update_dims((void*)optimize_<FORCEFIELD_VERSION>, N, smem);
+    static LaunchDims dims((void*)optimise_<FORCEFIELD_VERSION>, N, smem);
+    dims.update_dims((void*)optimise_<FORCEFIELD_VERSION>, N, smem);
     return dims.get_grid().x;
 }
 
@@ -1242,7 +1242,7 @@ std::chrono::microseconds time_spent(){
 
 
 template <ForcefieldType T>
-cudaError_t optimize(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
+cudaError_t optimise(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
@@ -1259,12 +1259,12 @@ cudaError_t optimize(IsomerBatch& B, const size_t iterations, const size_t max_i
     }
 
     size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimize_<T>, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)optimize_<T>, B.n_atoms, smem, B.isomer_capacity);
+    static LaunchDims dims((void*)optimise_<T>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)optimise_<T>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&iterations, (void*)&max_iterations};
 
     cudaEventRecord(start[dev], ctx.stream);
-    auto error = safeCudaKernelCall((void*)optimize_<T>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    auto error = safeCudaKernelCall((void*)optimise_<T>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
@@ -1281,32 +1281,32 @@ int declare_generics(){
     IsomerBatch B(20,1,DEVICE_BUFFER);
     CuArray<device_real_t> arr(1);
 
-    optimize<BUSTER>(B,100,100);
-    get_angle_max<BUSTER>(B,arr);
-    get_bond_max<BUSTER>(B,arr);
-    get_dihedral_max<BUSTER>(B,arr);
-    get_angle_mae<BUSTER>(B,arr);
-    get_bond_mae<BUSTER>(B,arr);
-    get_dihedral_mae<BUSTER>(B,arr);
-    get_angle_rrmse<BUSTER>(B,arr);
-    get_bond_rrmse<BUSTER>(B,arr);
-    get_dihedral_rrmse<BUSTER>(B,arr);
-    get_angle_rmse<BUSTER>(B,arr);
-    get_bond_rmse<BUSTER>(B,arr);
-    get_dihedral_rmse<BUSTER>(B,arr);
-    get_angle_mean<BUSTER>(B,arr);
-    get_bond_mean<BUSTER>(B,arr);
-    get_flat_mean<BUSTER>(B,arr);
-    get_flat_max<BUSTER>(B,arr);
-    get_flat_rmse<BUSTER>(B,arr);
-    get_dihedral_mean<BUSTER>(B,arr);
-    get_gradient_max<BUSTER>(B,arr);
-    get_gradient_rms<BUSTER>(B,arr);
-    get_gradient_mean<BUSTER>(B,arr);
-    get_gradient_norm<BUSTER>(B,arr);
-    get_energies<BUSTER>(B,arr);
+    optimise<PEDERSEN>(B,100,100);
+    get_angle_max<PEDERSEN>(B,arr);
+    get_bond_max<PEDERSEN>(B,arr);
+    get_dihedral_max<PEDERSEN>(B,arr);
+    get_angle_mae<PEDERSEN>(B,arr);
+    get_bond_mae<PEDERSEN>(B,arr);
+    get_dihedral_mae<PEDERSEN>(B,arr);
+    get_angle_rrmse<PEDERSEN>(B,arr);
+    get_bond_rrmse<PEDERSEN>(B,arr);
+    get_dihedral_rrmse<PEDERSEN>(B,arr);
+    get_angle_rmse<PEDERSEN>(B,arr);
+    get_bond_rmse<PEDERSEN>(B,arr);
+    get_dihedral_rmse<PEDERSEN>(B,arr);
+    get_angle_mean<PEDERSEN>(B,arr);
+    get_bond_mean<PEDERSEN>(B,arr);
+    get_flat_mean<PEDERSEN>(B,arr);
+    get_flat_max<PEDERSEN>(B,arr);
+    get_flat_rmse<PEDERSEN>(B,arr);
+    get_dihedral_mean<PEDERSEN>(B,arr);
+    get_gradient_max<PEDERSEN>(B,arr);
+    get_gradient_rms<PEDERSEN>(B,arr);
+    get_gradient_mean<PEDERSEN>(B,arr);
+    get_gradient_norm<PEDERSEN>(B,arr);
+    get_energies<PEDERSEN>(B,arr);
 
-    optimize<FLATNESS_ENABLED>(B,100,100);
+    optimise<FLATNESS_ENABLED>(B,100,100);
     get_angle_max<FLATNESS_ENABLED>(B,arr);
     get_bond_max<FLATNESS_ENABLED>(B,arr);
     get_dihedral_max<FLATNESS_ENABLED>(B,arr);
@@ -1331,7 +1331,7 @@ int declare_generics(){
     get_gradient_norm<FLATNESS_ENABLED>(B,arr);
     get_energies<FLATNESS_ENABLED>(B,arr);
 
-    optimize<WIRZ>(B,100,100);
+    optimise<WIRZ>(B,100,100);
     get_angle_max<WIRZ>(B,arr);
     get_bond_max<WIRZ>(B,arr);
     get_dihedral_max<WIRZ>(B,arr);
@@ -1356,7 +1356,7 @@ int declare_generics(){
     get_gradient_norm<WIRZ>(B,arr);
     get_energies<WIRZ>(B,arr);
 
-    optimize<FLAT_BOND>(B,100,100);
+    optimise<FLAT_BOND>(B,100,100);
     get_angle_max<FLAT_BOND>(B,arr);
     get_bond_max<FLAT_BOND>(B,arr);
     get_dihedral_max<FLAT_BOND>(B,arr);

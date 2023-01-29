@@ -72,7 +72,7 @@ int main(int argc, char** argv){
                 Polyhedron P(pG);
                     auto T2 = high_resolution_clock::now(); T_io[l] += T2 - T1;
                 P.points    = P.zero_order_geometry();
-                P.optimize();
+                P.optimise();
                     auto T3 = high_resolution_clock::now(); T_seq[l] += T3 - T2;
 
         }}

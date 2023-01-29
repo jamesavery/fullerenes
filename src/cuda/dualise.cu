@@ -86,7 +86,7 @@ std::chrono::microseconds time_spent(){
     return std::chrono::microseconds((int) (kernel_time*1000.f));
 }
 
-cudaError_t dualize(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+cudaError_t dualise(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];

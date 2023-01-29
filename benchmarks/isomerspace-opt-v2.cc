@@ -113,7 +113,7 @@ int main(int argc, char** argv){
             auto T0 = high_resolution_clock::now();
                 Q1.refill_batch(batch1);
             auto T1 = high_resolution_clock::now(); T_io[l] += T1 - T0;
-                gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(batch1,N*0.5,N*5);
+                gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(batch1,N*0.5,N*5);
             auto T2 = high_resolution_clock::now(); T_par[l] += T2 - T1;
                 Q2.push(batch1);
             auto T3 = high_resolution_clock::now(); T_io[l] += T3 - T2;

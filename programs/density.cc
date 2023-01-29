@@ -185,7 +185,7 @@ int main(int ac, char **av)
   printf("P0\n");
   Polyhedron P(P0);
   printf("Optimizing P\n");  
-  P.optimize();
+  P.optimise();
   printf("Writing P\n");
   Polyhedron::to_file(P,"output/"+basename+".mol2");
 

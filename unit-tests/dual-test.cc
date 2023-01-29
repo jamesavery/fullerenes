@@ -57,7 +57,7 @@ int main(int argc, char** argv){
         }
         //std::cout << F.neighbours << "\n";
         test_queue.refill_batch(d_test);                        validation_queue.refill_batch(d_validation);
-        gpu_kernels::isomerspace_dual::dualize(d_test);    
+        gpu_kernels::isomerspace_dual::dualise(d_test);    
 
         cuda_io::copy(h_test, d_test); cuda_io::copy(h_validation, d_validation);
 

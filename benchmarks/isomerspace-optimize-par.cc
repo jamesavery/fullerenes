@@ -111,7 +111,7 @@ int main(int argc, char** argv){
             batch0.clear();
             isomer_q.refill_batch(batch0);
             auto TDual = isomerspace_dual::time_spent();
-            isomerspace_dual::dualize(batch0);
+            isomerspace_dual::dualise(batch0);
             auto TTutte = isomerspace_tutte::time_spent(); T_duals[l] += isomerspace_dual::time_spent() - TDual;
             isomerspace_tutte::tutte_layout(batch0);
             auto TX0 = isomerspace_X0::time_spent(); T_tuttes[l] += isomerspace_tutte::time_spent() - TTutte;
@@ -124,9 +124,9 @@ int main(int argc, char** argv){
                 cuda_io::copy(batch1, batch0);
             }
             auto TFF = high_resolution_clock::now();
-            isomerspace_forcefield::optimize<BUSTER>(batch0,N*5,N*5);
+            isomerspace_forcefield::optimise<PEDERSEN>(batch0,N*5,N*5);
             auto TFlat = high_resolution_clock::now(); T_opts[l] += TFlat - TFF;
-            isomerspace_forcefield::optimize<FLATNESS_ENABLED>(batch1,N*5,N*5);
+            isomerspace_forcefield::optimise<FLATNESS_ENABLED>(batch1,N*5,N*5);
             T_flat[l] += high_resolution_clock::now() - TFlat;
             OutQueue.push(batch2,ctx, LaunchPolicy::SYNC);
             auto T0 = high_resolution_clock::now();
@@ -136,7 +136,7 @@ int main(int argc, char** argv){
                     auto T1 = high_resolution_clock::now();
                     isomer_q_cubic.refill_batch(batch2,ctx, LaunchPolicy::SYNC);
                     auto T2 = high_resolution_clock::now(); T_io[l] += T2 - T1;
-                    isomerspace_forcefield::optimize<BUSTER>(batch2,N*0.5,N*5,ctx, LaunchPolicy::SYNC);
+                    isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*0.5,N*5,ctx, LaunchPolicy::SYNC);
                     auto T3 = high_resolution_clock::now();
                     OutQueue.push(batch2,ctx, LaunchPolicy::SYNC);
                     finished_isomers += OutQueue.get_size();
@@ -149,7 +149,7 @@ int main(int argc, char** argv){
                     auto T1 = high_resolution_clock::now();
                     isomer_q_cubic.refill_batch(batch2);
                     auto T2 = high_resolution_clock::now(); T_io[l] += T2 - T1;
-                    isomerspace_forcefield::optimize<BUSTER>(batch2,N*0.5,N*5);
+                    isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*0.5,N*5);
                     auto T3 = high_resolution_clock::now();
                     OutQueue.push(batch2);
                     j = OutQueue.get_size();

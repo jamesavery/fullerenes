@@ -52,7 +52,7 @@ int main(int ac, char** argv){
         Q0.insert(G,i);
     }
     Q0.refill_batch(b_pre);
-    gpu_kernels::isomerspace_dual::dualize(b_pre);
+    gpu_kernels::isomerspace_dual::dualise(b_pre);
     gpu_kernels::isomerspace_tutte::tutte_layout(b_pre);
     gpu_kernels::isomerspace_X0::zero_order_geometry(b_pre,4.0);
     cuda_io::reset_convergence_statuses(b_pre);
@@ -67,7 +67,7 @@ int main(int ac, char** argv){
     Q1.device_batch.print(BatchMember::STATUSES);
     b_opt.print(BatchMember::IDS);
     b_opt.print(BatchMember::STATUSES);
-    gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(b_opt,(size_t)N*3.5,(size_t)N*50);
+    gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(b_opt,(size_t)N*3.5,(size_t)N*50);
     b_opt.print(BatchMember::IDS);
     b_opt.print(BatchMember::STATUSES);
     Q2.push(b_opt);

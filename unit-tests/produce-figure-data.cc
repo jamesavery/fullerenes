@@ -33,20 +33,20 @@ int main(int argc, char** argv){
     cuda_io::IsomerQueue Q(N);
     Q.insert(G,ID);
     Q.refill_batch(batch);
-    gpu_kernels::isomerspace_dual::dualize(batch);
+    gpu_kernels::isomerspace_dual::dualise(batch);
     gpu_kernels::isomerspace_tutte::tutte_layout(batch);
     gpu_kernels::isomerspace_X0::zero_order_geometry(batch,4.);
     cuda_io::copy(h_batch,batch);
 
     //Polyhedron::to_mol2(h_batch.get_isomer_by_id(ID).value(),fopen("BEAUTIFUL_X0.mol2","w+")); 
     cuda_io::reset_convergence_statuses(batch);
-    gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(batch,N*1,N*5);
+    gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(batch,N*1,N*5);
     batch.print(BatchMember::COORDS3D);
     Q.insert(batch);
     Polyhedron P = Q.pop();
     std::cout << P.points;
     //Polyhedron::to_mol2(batch.get_isomer_by_id(ID).value(),fopen("BEAUTIFUL_N1.mol2","w+")); 
-    //gpu_kernels::isomerspace_forcefield::optimize_batch<BUSTER>(batch,N*2,N*5);
+    //gpu_kernels::isomerspace_forcefield::optimise_batch<PEDERSEN>(batch,N*2,N*5);
     //Polyhedron::to_mol2(batch.get_isomer_by_id(ID).value(),fopen("BEAUTIFUL_N3.mol2","w+")); 
     
     //batch.print(BatchMember::COORDS3D);

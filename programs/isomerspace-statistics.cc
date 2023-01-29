@@ -76,7 +76,7 @@ int main(int ac, char **argv){
         isomerspace_X0::zero_order_geometry(d_validation, 4.0f);
         cuda_io::reset_convergence_statuses(d_validation);
         for (int i = 0; i < N*10; i+=10){
-            isomerspace_forcefield::optimize<BUSTER>(d_validation, 10, N*10);
+            isomerspace_forcefield::optimise<PEDERSEN>(d_validation, 10, N*10);
         }
         
         CuArray<device_real_t> bond_rms(batch_size);
@@ -96,16 +96,16 @@ int main(int ac, char **argv){
         cuda_io::copy(h_validation, d_validation);
         cuda_io::sort(h_validation);
         cuda_io::copy(d_validation, h_validation);
-        isomerspace_forcefield::get_bond_rmse<BUSTER>(d_validation, bond_rms);
-        isomerspace_forcefield::get_angle_rmse<BUSTER>(d_validation, angle_rms);
-        isomerspace_forcefield::get_dihedral_rmse<BUSTER>(d_validation, dihedral_rms);
-        isomerspace_forcefield::get_bond_max<BUSTER>(d_validation, bond_max);
-        isomerspace_forcefield::get_angle_max<BUSTER>(d_validation, angle_max);
-        isomerspace_forcefield::get_dihedral_max<BUSTER>(d_validation, dihedral_max);
-        isomerspace_forcefield::get_energies<BUSTER>(d_validation, energies);
-        isomerspace_forcefield::get_gradient_norm<BUSTER>(d_validation, gradient_norm);
-        isomerspace_forcefield::get_gradient_rms<BUSTER>(d_validation, gradient_rms);
-        isomerspace_forcefield::get_gradient_max<BUSTER>(d_validation, gradient_max);
+        isomerspace_forcefield::get_bond_rmse<PEDERSEN>(d_validation, bond_rms);
+        isomerspace_forcefield::get_angle_rmse<PEDERSEN>(d_validation, angle_rms);
+        isomerspace_forcefield::get_dihedral_rmse<PEDERSEN>(d_validation, dihedral_rms);
+        isomerspace_forcefield::get_bond_max<PEDERSEN>(d_validation, bond_max);
+        isomerspace_forcefield::get_angle_max<PEDERSEN>(d_validation, angle_max);
+        isomerspace_forcefield::get_dihedral_max<PEDERSEN>(d_validation, dihedral_max);
+        isomerspace_forcefield::get_energies<PEDERSEN>(d_validation, energies);
+        isomerspace_forcefield::get_gradient_norm<PEDERSEN>(d_validation, gradient_norm);
+        isomerspace_forcefield::get_gradient_rms<PEDERSEN>(d_validation, gradient_rms);
+        isomerspace_forcefield::get_gradient_max<PEDERSEN>(d_validation, gradient_max);
 
         {   
             

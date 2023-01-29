@@ -23,22 +23,22 @@ int main(int argc, char** argv){
         queue1.insert(G,0);
     }
     queue1.refill_batch(batch1);
-    isomerspace_dual::dualize(batch1);
+    isomerspace_dual::dualise(batch1);
     isomerspace_tutte::tutte_layout(batch1);
     isomerspace_X0::zero_order_geometry(batch1, 4.0);
     //isomerspace_forcefield::test_fun(batch, output);
     cuda_io::reset_convergence_statuses(batch1);
     cuda_io::copy(batch2, batch1);
-    isomerspace_forcefield::optimize<BUSTER>(batch1, N*5, N*5);
-    isomerspace_forcefield::get_bond_rmse<BUSTER>(batch1, output);
+    isomerspace_forcefield::optimise<PEDERSEN>(batch1, N*5, N*5);
+    isomerspace_forcefield::get_bond_rmse<PEDERSEN>(batch1, output);
     std::cout << output << endl;
-    isomerspace_forcefield::get_angle_rmse<BUSTER>(batch1, output);
+    isomerspace_forcefield::get_angle_rmse<PEDERSEN>(batch1, output);
     std::cout << output << endl;
 
-    isomerspace_forcefield::optimize<FLATNESS_ENABLED>(batch2, N*5, N*5);
-    isomerspace_forcefield::get_bond_rmse<BUSTER>(batch2, output);
+    isomerspace_forcefield::optimise<FLATNESS_ENABLED>(batch2, N*5, N*5);
+    isomerspace_forcefield::get_bond_rmse<PEDERSEN>(batch2, output);
     std::cout << output << endl;
-    isomerspace_forcefield::get_angle_rmse<BUSTER>(batch2, output);
+    isomerspace_forcefield::get_angle_rmse<PEDERSEN>(batch2, output);
     std::cout << output << endl;
     cuda_io::copy(h_batch, batch1);
     h_batch.print(STATUSES);

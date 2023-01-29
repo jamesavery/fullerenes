@@ -84,7 +84,7 @@ int main(int argc, char** argv){
             auto T1 = high_resolution_clock::now();
                 Q0.refill_batch(batch0);
             auto T2 = high_resolution_clock::now(); T_io[l] += (T2 - T1);
-                gpu_kernels::isomerspace_dual::dualize(batch0);
+                gpu_kernels::isomerspace_dual::dualise(batch0);
                 gpu_kernels::isomerspace_tutte::tutte_layout(batch0);
                 gpu_kernels::isomerspace_X0::zero_order_geometry(batch0, 4.0);
             auto T3 = high_resolution_clock::now(); T_par[l] += (T3 - T2);
@@ -94,7 +94,7 @@ int main(int argc, char** argv){
                 auto T1 = high_resolution_clock::now();
                     Q1.refill_batch(batch1);
                 auto T2 = high_resolution_clock::now(); T_io[l] += (T2 - T1);
-                    gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(batch1,N*0.5,N*5);
+                    gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(batch1,N*0.5,N*5);
                 auto T3 = high_resolution_clock::now(); T_par[l] += (T3 - T2);
                     Q2.push(batch1);
                 auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);

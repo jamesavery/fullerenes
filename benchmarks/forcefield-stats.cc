@@ -91,7 +91,7 @@ int main(int argc, char** argv){
                     pG.layout2d  = pG.tutte_layout();
                     Polyhedron      P(pG);
                     P.points    = P.zero_order_geometry();
-                    P.optimize();
+                    P.optimise();
                     OptimisedQueue.insert(P,id_subset[i]);
                 }
 
@@ -100,7 +100,7 @@ int main(int argc, char** argv){
 
         InputQueue.refill_batch(GPUBatch);
 
-        gpu_kernels::isomerspace_dual::dualize(GPUBatch);
+        gpu_kernels::isomerspace_dual::dualise(GPUBatch);
         gpu_kernels::isomerspace_tutte::tutte_layout(GPUBatch);
         gpu_kernels::isomerspace_X0::zero_order_geometry(GPUBatch,4.0f);
         reset_convergence_statuses(GPUBatch);
@@ -109,9 +109,9 @@ int main(int argc, char** argv){
         copy(WirzBatch,GPUBatch);
         copy(FlatBatch,GPUBatch);
 
-        gpu_kernels::isomerspace_forcefield::optimize<BUSTER>(GPUBatch,N*5,N*5);
-        gpu_kernels::isomerspace_forcefield::optimize<WIRZ>(WirzBatch,N*5,N*5);
-        gpu_kernels::isomerspace_forcefield::optimize<FLATNESS_ENABLED>(FlatBatch,N*5,N*5);
+        gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(GPUBatch,N*5,N*5);
+        gpu_kernels::isomerspace_forcefield::optimise<WIRZ>(WirzBatch,N*5,N*5);
+        gpu_kernels::isomerspace_forcefield::optimise<FLATNESS_ENABLED>(FlatBatch,N*5,N*5);
 
 
         CuArray<device_real_t> RMSBonds_CUDA(max_sample_size);
@@ -132,13 +132,13 @@ int main(int argc, char** argv){
 
         CuArray<device_real_t> Energy_CUDA_WIRZ(max_sample_size);
         CuArray<device_real_t> Energy_CUDA_FLAT(max_sample_size);
-        CuArray<device_real_t> Energy_CUDA_BUSTER(max_sample_size);
+        CuArray<device_real_t> Energy_CUDA_PEDERSEN(max_sample_size);
         CuArray<device_real_t> Energy_WIRZ(max_sample_size);
 
 
-        gpu_kernels::isomerspace_forcefield::get_bond_rrmse<BUSTER>(GPUBatch,RMSBonds_CUDA);
-        gpu_kernels::isomerspace_forcefield::get_angle_rrmse<BUSTER>(GPUBatch,RMSAngles_CUDA);
-        gpu_kernels::isomerspace_forcefield::get_dihedral_rrmse<BUSTER>(GPUBatch,RMSDihedrals_CUDA);
+        gpu_kernels::isomerspace_forcefield::get_bond_rrmse<PEDERSEN>(GPUBatch,RMSBonds_CUDA);
+        gpu_kernels::isomerspace_forcefield::get_angle_rrmse<PEDERSEN>(GPUBatch,RMSAngles_CUDA);
+        gpu_kernels::isomerspace_forcefield::get_dihedral_rrmse<PEDERSEN>(GPUBatch,RMSDihedrals_CUDA);
         gpu_kernels::isomerspace_forcefield::get_flat_rmse<FLATNESS_ENABLED>(GPUBatch,RMSFlatness_CUDA);
 
         gpu_kernels::isomerspace_forcefield::get_bond_rrmse<WIRZ>(WirzBatch,RMSBonds_Wirz);
@@ -151,7 +151,7 @@ int main(int argc, char** argv){
         gpu_kernels::isomerspace_forcefield::get_dihedral_rrmse<FLATNESS_ENABLED>(FlatBatch,RMSDihedrals_Flat);
         gpu_kernels::isomerspace_forcefield::get_flat_rmse<FLATNESS_ENABLED>(FlatBatch,RMSFlatness_Flat);
 
-        gpu_kernels::isomerspace_forcefield::get_energies<WIRZ>(GPUBatch,Energy_CUDA_BUSTER);
+        gpu_kernels::isomerspace_forcefield::get_energies<WIRZ>(GPUBatch,Energy_CUDA_PEDERSEN);
         gpu_kernels::isomerspace_forcefield::get_energies<WIRZ>(WirzBatch,Energy_CUDA_WIRZ);
         gpu_kernels::isomerspace_forcefield::get_energies<WIRZ>(FlatBatch,Energy_CUDA_FLAT);
 
@@ -198,7 +198,7 @@ int main(int argc, char** argv){
                 DIHEDRALS_CUDA_Flat << RMSDihedrals_Flat[j] << ", ";
                 FLATNESS_CUDA_Flat << RMSFlatness_Flat[j] << ", ";
 
-                ENERGY_CUDA_Buster << Energy_CUDA_BUSTER[j] << ", ";
+                ENERGY_CUDA_Buster << Energy_CUDA_PEDERSEN[j] << ", ";
                 ENERGY_CUDA_Wirz << Energy_CUDA_WIRZ[j] << ", ";
                 ENERGY_CUDA_Flat << Energy_CUDA_FLAT[j] << ", ";
             }
@@ -218,7 +218,7 @@ int main(int argc, char** argv){
                 DIHEDRALS_CUDA_Flat << RMSDihedrals_Flat[j] << "\n";
                 FLATNESS_CUDA_Flat << RMSFlatness_Flat[j] << "\n";
 
-                ENERGY_CUDA_Buster << Energy_CUDA_BUSTER[j] << "\n";
+                ENERGY_CUDA_Buster << Energy_CUDA_PEDERSEN[j] << "\n";
                 ENERGY_CUDA_Wirz << Energy_CUDA_WIRZ[j] << "\n";
                 ENERGY_CUDA_Flat << Energy_CUDA_FLAT[j] << "\n";
             }
@@ -231,9 +231,9 @@ int main(int argc, char** argv){
             CuArray<device_real_t> RMSFlatness_Fortran(max_sample_size);
             CuArray<device_real_t> Energy_Fortran(max_sample_size);
             cuda_io::copy(OptimisedQueue.device_batch, OptimisedQueue.host_batch);
-            gpu_kernels::isomerspace_forcefield::get_bond_rrmse<BUSTER>(OptimisedQueue.device_batch,RMSBonds_Fortran);
-            gpu_kernels::isomerspace_forcefield::get_angle_rrmse<BUSTER>(OptimisedQueue.device_batch,RMSAngles_Fortran);
-            gpu_kernels::isomerspace_forcefield::get_dihedral_rrmse<BUSTER>(OptimisedQueue.device_batch,RMSDihedrals_Fortran);
+            gpu_kernels::isomerspace_forcefield::get_bond_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSBonds_Fortran);
+            gpu_kernels::isomerspace_forcefield::get_angle_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSAngles_Fortran);
+            gpu_kernels::isomerspace_forcefield::get_dihedral_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSDihedrals_Fortran);
             gpu_kernels::isomerspace_forcefield::get_flat_rmse<FLATNESS_ENABLED>(OptimisedQueue.device_batch,RMSFlatness_Fortran);
             gpu_kernels::isomerspace_forcefield::get_energies<WIRZ>(OptimisedQueue.device_batch,Energy_Fortran);
 

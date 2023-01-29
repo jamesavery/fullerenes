@@ -46,7 +46,7 @@ int main(int ac, char **av)
 
   cubic.layout2d = cubic.tutte_layout();
   Polyhedron P(cubic,cubic.zero_order_geometry(),6);
-  P.points = cubic.optimized_geometry(P.points);
+  P.points = cubic.optimised_geometry(P.points);
 
   tri_t T0 = {0,12,G.next(0,12)};
   

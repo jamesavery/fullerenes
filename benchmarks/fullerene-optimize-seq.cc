@@ -76,7 +76,7 @@ int main(int argc, char** argv){
                     auto T4 = high_resolution_clock::now(); T_tuttes[l] += T4 - T3;
                 P.points    = P.zero_order_geometry();
                     auto T5 = high_resolution_clock::now(); T_X0s[l] += T5 - T4;
-                P.optimize();
+                P.optimise();
                     auto T6 = high_resolution_clock::now(); T_opts[l] += T6 - T5;
             }
         }

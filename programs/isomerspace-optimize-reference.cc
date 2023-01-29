@@ -105,7 +105,7 @@ int main(int ac, char **argv)
       auto T1 = system_clock::now();
       Q0.refill_batch(batch0); 
       auto T2 = system_clock::now(); Tqueue += T2-T1;
-      isomerspace_dual::dualize(batch0);
+      isomerspace_dual::dualise(batch0);
       isomerspace_tutte::tutte_layout(batch0);
       isomerspace_X0::zero_order_geometry(batch0,4.0);
       cuda_io::copy(batch1, batch0);
@@ -116,7 +116,7 @@ int main(int ac, char **argv)
     while (Q1.get_size() > batch2.isomer_capacity)
     {
       Q1.refill_batch(batch2, ctx0, LaunchPolicy::ASYNC);
-      isomerspace_forcefield::optimize<BUSTER>(batch2,N*1,N*50, ctx0, LaunchPolicy::ASYNC);
+      isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*1,N*50, ctx0, LaunchPolicy::ASYNC);
       auto T1 = system_clock::now();
       cuda_io::output_to_queue(output_queue,outbatch,false);
       Toutq += system_clock::now() - T1;
@@ -127,7 +127,7 @@ int main(int ac, char **argv)
       cuda_io::output_to_queue(output_queue,outbatch,false);
       while(Q0.get_size() > 0){
         Q0.refill_batch(batch0);
-        isomerspace_dual::dualize(batch0);
+        isomerspace_dual::dualise(batch0);
         isomerspace_tutte::tutte_layout(batch0);
         isomerspace_X0::zero_order_geometry(batch0, 4.0);
         cuda_io::copy(batch1, batch0);
@@ -136,7 +136,7 @@ int main(int ac, char **argv)
       }
       while(Q1.get_size() > 0){
         Q1.refill_batch(batch2);
-        isomerspace_forcefield::optimize<BUSTER>(batch2,N*5,N*5);
+        isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*5,N*5);
         cuda_io::copy(outbatch, batch2);
 
         cuda_io::output_to_queue(output_queue,outbatch,false);

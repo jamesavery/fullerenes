@@ -68,7 +68,7 @@ int main(int ac, char **argv){
     cuda_io::copy(h_x0_batch, d_batch);
     cuda_io::reset_convergence_statuses(d_batch);
     
-    isomerspace_forcefield::optimize<BUSTER>(d_batch, N*5, N*5);
+    isomerspace_forcefield::optimise<PEDERSEN>(d_batch, N*5, N*5);
     cuda_io::copy(h_batch,d_batch);
     cuda_io::output_to_queue(out_queue,h_batch,true);
     cuda_io::output_to_queue(x0_out_queue, h_x0_batch, true);

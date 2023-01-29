@@ -29,7 +29,7 @@ int main(int ac, char **argv)
     dualG.update();		            // Update metadata
     FullereneGraph G = dualG.dual_graph();  // Construct fullerene graph
 
-    Polyhedron P = Polyhedron::fullerene_polyhedron(G); // Generate optimized fullerene geometry
+    Polyhedron P = Polyhedron::fullerene_polyhedron(G); // Generate optimised fullerene geometry
 
     if(P.is_invalid()){
       vector<int> RSPI;
