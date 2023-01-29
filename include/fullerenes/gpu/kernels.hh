@@ -7,7 +7,7 @@
 #include "cu_array.hh"
 #include <chrono>
 
-enum ForcefieldType {WIRZ, BUSTER, FLATNESS_ENABLED, FLAT_BOND};
+enum ForcefieldType {WIRZ, PEDERSEN, FLATNESS_ENABLED, FLAT_BOND};
 
 namespace gpu_kernels{
     namespace isomerspace_forcefield{
@@ -17,7 +17,7 @@ namespace gpu_kernels{
         std::chrono::microseconds time_spent(); 
         //Uses forcefield optimization to relax the positions of atoms in all isomers of a batch.
         template <ForcefieldType T>
-        cudaError_t optimize(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t optimise(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
         cudaError_t test_fun(IsomerBatch& B, CuArray<device_real_t>& output);
         //ForcefieldType agnostic functions since the forcefield type doesnt change the way bonds are computed
         //Retrieves all interatomic bond lengths, angles and dihedrals
@@ -80,7 +80,7 @@ namespace gpu_kernels{
         //Returns total time spent in kernel in milliseconds. First call is not timed as that would require synchronous execution.
         std::chrono::microseconds time_spent(); 
         //Computes the cubic neighbour list from the dual neighbour list
-        cudaError_t dualize(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t dualise(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
 }
 #endif
