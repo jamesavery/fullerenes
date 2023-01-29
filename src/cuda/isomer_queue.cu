@@ -279,6 +279,7 @@ cudaError_t IsomerQueue::refill_batch(IsomerBatch& batch, const LaunchCtx& ctx, 
     is_host_updated = false;
     cudaError_t error = safeCudaKernelCall((void*)refill_batch_, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     if (policy == LaunchPolicy::SYNC) ctx.wait();
+    cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
     printLastCudaError("Refill failed");
     return error;
 }
@@ -296,7 +297,10 @@ cudaError_t IsomerQueue::push(IsomerBatch& batch, const LaunchCtx& ctx, const La
     cudaError_t error = safeCudaKernelCall((void*)push_, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     is_host_updated = false;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
-    printLastCudaError("Refill failed");
+    //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
+    //cudaMemPrefetchAsync(props.back, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
+    //cudaMemPrefetchAsync(props.front, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
+    printLastCudaError("Push failed");
     return error;
 }
 
@@ -352,6 +356,8 @@ cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, 
         *props.back  = *props.size - 1;
     }
     *props.capacity = new_capacity;
+    is_host_updated = true;
+    is_device_updated = true;
     return cudaGetLastError();
 }
 
@@ -377,12 +383,14 @@ cudaError_t IsomerQueue::insert(IsomerBatch& input_batch, const LaunchCtx& ctx, 
     if (input_batch.buffer_type == DEVICE_BUFFER){
         void* kargs[]{(void*)&input_batch, (void*)&device_batch, (void*)&props};
         safeCudaKernelCall((void*)insert_batch_,dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
+        //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
     } else{
         std::cout << "Failed to insert: Batch insertion is intended for device batches only" << std::endl;
     }   
     if(policy == LaunchPolicy::SYNC) ctx.wait();
     printLastCudaError("Batch insertion failed");
     is_host_updated = false;
+    is_device_updated = true;
     return cudaGetLastError();
 }
 
@@ -498,6 +506,25 @@ cudaError_t IsomerQueue::insert(const Polyhedron& in, const size_t ID, const Lau
     *props.size += 1;
     //Since the host batch has been updated the device is no longer up to date.
     is_device_updated = false;
+    return cudaGetLastError();
+}
+
+cudaError_t IsomerQueue::clear(const LaunchCtx& ctx, const LaunchPolicy policy){
+    if (policy == LaunchPolicy::SYNC) { cudaStreamSynchronize(ctx.stream);}
+    cudaSetDevice(m_device);
+    //Before clearing the queue, make sure that the host batch is up to date with the device version.
+    //Clear the queue.
+    *props.size = 0;
+    *props.front = -1;
+    *props.back = -1;
+    //cudaMemset(host_batch.statuses, int(IsomerStatus::EMPTY), *props.capacity * sizeof(IsomerStatus));
+    //cudaMemset(host_batch.iterations, 0, *props.capacity * sizeof(size_t));
+    //cudaMemset(device_batch.statuses, int(IsomerStatus::EMPTY), *props.capacity * sizeof(IsomerStatus));
+    //cudaMemset(device_batch.iterations, 0, *props.capacity * sizeof(size_t));
+    if(policy == LaunchPolicy::SYNC){ cudaStreamSynchronize(ctx.stream); }
+    //cudaMemPrefetchAsync(props.size, sizeof(size_t), m_device, ctx.stream);
+    //cudaMemPrefetchAsync(props.front, sizeof(size_t), m_device, ctx.stream);
+    //cudaMemPrefetchAsync(props.back, sizeof(size_t), m_device, ctx.stream);
     return cudaGetLastError();
 }
 

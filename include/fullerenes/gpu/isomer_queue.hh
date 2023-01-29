@@ -47,6 +47,9 @@ public:
 
     //Resize function, called primarily internally when more space is required. Does what you think it does.
     cudaError_t resize(const size_t new_capacity,const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy = LaunchPolicy::SYNC);
+
+    //Clears the queue, resets all counters, sets all statuses to EMPTY.
+    cudaError_t clear(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     
     //Simple data structure to contain all the necessary queue counters, makes for smaller function signatures!
     struct QueueProperties
