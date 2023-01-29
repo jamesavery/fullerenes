@@ -15,7 +15,7 @@
 #define Block_Size_Pow_2 256
 #define SEMINARIO_FORCE_CONSTANTS 0
 #define USE_MAX_NORM 0
-#define REDUCTION_METHOD 3
+#define REDUCTION_METHOD 3 //0 is classical shared memory reduction 3 is warp reduction
 #define LINESEARCH_METHOD GSS
 #define FORCEFIELD_VERSION FLATNESS_ENABLED
 #define USE_CONSTANT_INDICES 0
