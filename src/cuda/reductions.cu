@@ -88,6 +88,9 @@ namespace cg = cooperative_groups;
 
 #endif
 
+//This code finds the maximum value of a set of data using a reduction algorithm.
+//The function takes as input a pointer to a shared memory array (sdata) and threadIdx.x's data (data).
+//The function returns the maximum value of the data set.
 __device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t data){
     sdata[threadIdx.x] = data;
     cg::thread_block block = cg::this_thread_block();

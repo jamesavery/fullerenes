@@ -47,26 +47,31 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
         coord2d neighbour_sum   = {real_t(0.0),real_t(0.0)};    
         for (uint8_t j = 0; j < 3; j++) neighbour_sum += xys[d_get(ns,j)];
 
+        // Calculate the new position of the point
         if(!fixed) newxys[threadIdx.x] = xys[threadIdx.x]*real_t(0.15) + (neighbour_sum/3)*real_t(0.85);
         real_t neighbour_dist = 0.0f;
 
+        // Calculate the distance between neighbours
         for (uint8_t j = 0; j < 3; j++) neighbour_dist += norm(xys[threadIdx.x] - xys[d_get(ns,j)])/3;
         
         BLOCK_SYNC
         real_t relative_change = 0.0f;
+
+        // Calculate the relative change
         if (neighbour_dist > 0.0f && !fixed){ 
             relative_change = norm(xys[threadIdx.x] - newxys[threadIdx.x])/neighbour_dist;
         }
 
+        // Reduce the relative change to find the maximum change
         real_t iteration_max = reduction_max(sharedmem, relative_change);
         if (iteration_max > max_change) max_change = iteration_max;
         converged = max_change <= 5e-4;
 
+        // Update the position of the point
         xys[threadIdx.x] = newxys[threadIdx.x];
     }
     BLOCK_SYNC
     (reinterpret_cast<coord2d*>(B.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
-    B.statuses[isomer_idx] = IsomerStatus::CONVERGED;
     }
     }
 }
@@ -77,11 +82,11 @@ std::chrono::microseconds time_spent(){
 }
 
 cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
-    cudaSetDevice(ctx.get_device_id());
+    cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
     float single_kernel_time = 0.0;
-    auto dev = ctx.get_device_id();
+    auto dev = B.get_device_id();
     if(first_call[dev]) {cudaEventCreate(&start[dev]); cudaEventCreate(&stop[dev]);}
 
     //If launch ploicy is synchronous then wait.

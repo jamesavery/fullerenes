@@ -14,7 +14,7 @@ namespace cuda_io{
         size_t N = batch.n_atoms;
         for (size_t isomer_idx = 0; isomer_idx < batch.isomer_capacity; isomer_idx++){   
             //Only insert the isomer if it has finished (either IsomerStatus::CONVERGED or IsomerStatus::FAILED)
-            if(!(batch.statuses[isomer_idx] == IsomerStatus::CONVERGED || batch.statuses[isomer_idx] == IsomerStatus::FAILED)) continue;
+            if(batch.statuses[isomer_idx] == IsomerStatus::EMPTY) continue;
             
             //Graphs always have a neighbour array.
             neighbours_t out_neighbours(N);

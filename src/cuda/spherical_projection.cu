@@ -113,13 +113,13 @@ std::chrono::microseconds time_spent(){
 }
 
 cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
-    cudaSetDevice(ctx.get_device_id());
+    cudaSetDevice(B.get_device_id());
     //Need a way of telling whether the kernel has been called previously.
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
     float single_kernel_time = 0.0;
     //Construct events only once
-    auto dev = ctx.get_device_id();
+    auto dev = B.get_device_id();
     if(first_call[dev]) {cudaEventCreate(&start[dev]); cudaEventCreate(&stop[dev]);}
 
     //If launch ploicy is synchronous then wait.
@@ -129,7 +129,6 @@ cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, co
         cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
         kernel_time += single_kernel_time;
     }
-    cudaSetDevice(ctx.get_device_id());
     size_t smem =  sizeof(device_coord3d)*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
     
     //Compute best grid dimensions once.

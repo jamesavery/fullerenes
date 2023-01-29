@@ -671,7 +671,11 @@ INLINE real_t FindLineSearchBound(coord3d* X, coord3d& r0, coord3d* X1) const{
     return bound;
 }
 
-//For compatibility with reference implementation by Buster. Warning: Extremely slow, requires a lot of gradient evaluations.
+
+// finds the minimum point of a function f(x) using the bisection method
+// X is the current point, X1 is the next point, X2 is the previous point
+// r0 is the direction of the line search
+// returns the minimum point
 INLINE real_t Bisection(coord3d* X, coord3d& r0, coord3d* X1, coord3d* X2){
     real_t dfc = 1; size_t count = 0;
     real_t c; real_t a = 0.0; real_t b = FindLineSearchBound(X,r0,X1);
@@ -1239,11 +1243,11 @@ std::chrono::microseconds time_spent(){
 
 template <ForcefieldType T>
 cudaError_t optimize(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
-    cudaSetDevice(ctx.get_device_id());
+    cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
     float single_kernel_time = 0.0;
-    auto dev = ctx.get_device_id();
+    auto dev = B.get_device_id();
     if(first_call[dev]) {cudaEventCreate(&start[dev]); cudaEventCreate(&stop[dev]);}
         
     //If launch ploicy is synchronous then wait.

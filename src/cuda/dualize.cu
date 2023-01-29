@@ -87,11 +87,11 @@ std::chrono::microseconds time_spent(){
 }
 
 cudaError_t dualize(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
-    cudaSetDevice(ctx.get_device_id());
+    cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
     float single_kernel_time = 0.0;
-    auto dev = ctx.get_device_id();
+    auto dev = B.get_device_id();
     if(first_call[dev]) {cudaEventCreate(&start[dev]); cudaEventCreate(&stop[dev]);}
 
     if(policy == LaunchPolicy::SYNC) {ctx.wait();}
