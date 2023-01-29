@@ -19,22 +19,23 @@ using namespace chrono_literals;
 using namespace gpu_kernels;
 int main(int argc, char** argv){
     const size_t N_start                = argc > 1 ? strtol(argv[1],0,0) : 20;     // Argument 1: Number of vertices N
-    const size_t N_limit                = argc > 2 ? strtol(argv[2],0,0) : N_start;     // Argument 1: Number of vertices N
+    const size_t N_limit                = argc > 2 ? strtol(argv[2],0,0) : 200;     // Argument 1: Number of vertices N
     const size_t N_runs                 = argc > 3 ? strtol(argv[3],0,0) : 10;
 
     ofstream out_file("IsomerspaceOpt_V5_" + to_string(N_limit) + ".txt");
     ofstream out_file_std("IsomerspaceOpt_V5_STD_" + to_string(N_limit) + ".txt");
+
+
     for (size_t N = N_start; N < N_limit+1; N+=2)
     {   
         if (N == 22) continue; //No isomers in isomerspace 22;
-        auto batch_size = isomerspace_forcefield::optimal_batch_size(N);
         auto n_fullerenes = (int)num_fullerenes.find(N)->second;
-        auto sample_size = min(batch_size*1,n_fullerenes);
-        
-        std::cout << N << endl;
+        auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N), n_fullerenes);
+        auto sample_size = min(isomerspace_forcefield::optimal_batch_size(N)*4, n_fullerenes);
         
         bool more_to_generate = true;
         int N_f = N/2 + 2;
+        auto I = 0;
         auto T0 = high_resolution_clock::now();
         auto
 
@@ -58,18 +59,21 @@ int main(int argc, char** argv){
 
         for (size_t l = 0; l < N_runs; ++l)
         {
-        IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
-        cuda_io::IsomerQueue Isomer_Q(N);
-        cuda_io::IsomerQueue Output_Q(N);
+        IsomerBatch B0(N,batch_size,DEVICE_BUFFER);
+        IsomerBatch B1(N,batch_size,DEVICE_BUFFER);
+        cuda_io::IsomerQueue Q0(N);
+        cuda_io::IsomerQueue Q1(N);
+        cuda_io::IsomerQueue Q2(N);
         //Pre allocate the device queue such that it doesn't happen during benchmarking
-        Isomer_Q.resize(2*sample_size);
-        Output_Q.resize(2*sample_size);
+        Q0.resize(2*sample_size);
+        Q1.resize(2*sample_size);
+        Q2.resize(2*sample_size);
         G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
         G.N = Nf;
         LaunchCtx insert_ctx = LaunchCtx(0);
         LaunchCtx device0 = LaunchCtx(0);
         auto generate_isomers = [&](){
-            for (int i = 0; i < sample_size; ++i){
+            for (int i = 0; i < batch_size; ++i){
                 for (size_t j = 0; j < Nf; j++){
                     G.neighbours[j].clear();
                     for (size_t k = 0; k < 6; k++) {
@@ -77,30 +81,50 @@ int main(int argc, char** argv){
                         if(u != UINT16_MAX) G.neighbours[j].push_back(u);
                     }
                 }
-                Isomer_Q.insert(G,i, insert_ctx, LaunchPolicy::ASYNC);
+                I++;
+                Q0.insert(G,i, insert_ctx, LaunchPolicy::ASYNC);
             }
             insert_ctx.wait();
         }; 
         
         generate_isomers();
-        Isomer_Q.refill_batch(batch0);
+        while(Q2.get_size() < sample_size){
+            Q0.refill_batch(B0);
             auto generate_handle = std::async(std::launch::async, generate_isomers);
             auto T1 = high_resolution_clock::now();
-                isomerspace_dual::dualize(batch0,device0,LaunchPolicy::ASYNC);
-                isomerspace_tutte::tutte_layout(batch0,10000000,device0,LaunchPolicy::ASYNC);
-                isomerspace_X0::zero_order_geometry(batch0, 4.0, device0, LaunchPolicy::ASYNC);
-                cuda_io::reset_convergence_statuses(batch0,device0,LaunchPolicy::ASYNC);
-                isomerspace_forcefield::optimize<BUSTER>(batch0,N*5,N*5,device0,LaunchPolicy::ASYNC);
-                Output_Q.push(batch0, device0, LaunchPolicy::ASYNC);
+                isomerspace_dual::dualize(B0,device0,LaunchPolicy::ASYNC);
+                isomerspace_tutte::tutte_layout(B0,10000000,device0,LaunchPolicy::ASYNC);
+                isomerspace_X0::zero_order_geometry(B0, 4.0, device0, LaunchPolicy::ASYNC);
                 device0.wait();
             auto T2 = high_resolution_clock::now(); T_par[l] += ( T2 - T1);
-                generate_handle.wait(); 
-                Isomer_Q.refill_batch(batch0, device0, LaunchPolicy::ASYNC);
+                Q1.insert(B0, device0, LaunchPolicy::ASYNC);
                 device0.wait();
             auto T3 = high_resolution_clock::now(); T_io[l] += (T3 - T2);
+            while(Q1.get_size() >= B1.capacity()){
+                auto T1 = high_resolution_clock::now();
+                    Q1.refill_batch(B1);
+                auto T2 = high_resolution_clock::now(); T_io[l] += (T2 - T1);
+                    isomerspace_forcefield::optimize<BUSTER>(B1,N*0.5,N*5);
+                auto T3 = high_resolution_clock::now(); T_par[l] += (T3 - T2);
+                    Q2.push(B1, device0);
+                auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);
+            }
+                generate_handle.wait(); 
+                while (I >= sample_size && Q2.get_size() < sample_size && Q0.get_size() == 0) {
+                    auto T1 = high_resolution_clock::now();
+                        Q1.refill_batch(B1);
+                    auto T2 = high_resolution_clock::now(); T_io[l] += (T2 - T1);
+                        isomerspace_forcefield::optimize<BUSTER>(B1,N*0.5,N*5);
+                    auto T3 = high_resolution_clock::now(); T_par[l] += (T3 - T2);
+                        Q2.push(B1);
+                    auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);
+                }
+        }
 
         }
         using namespace cuda_io;
+        auto total = (float)(mean(T_io)/1ns + mean(T_par)/1ns + mean(T_seq)/1ns);
+        std::cout << std::fixed << std::setprecision(2) << N << ", "<< sample_size << ", " << (mean(T_seq)/1ns)/total*100. << "%, " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us+mean(T_seq)/1us)/sample_size << "us/isomer\n";
         out_file << N << ", "<< sample_size << ", " << mean(T_seq) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
         out_file_std << N << ", "<< sample_size << ", " << sdev(T_seq) /1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";
      }

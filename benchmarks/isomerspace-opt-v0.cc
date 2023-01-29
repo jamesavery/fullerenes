@@ -16,18 +16,20 @@ using namespace chrono;
 using namespace chrono_literals;
 
 int main(int argc, char** argv){
-    const size_t N_limit                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
-    auto N_runs = 5;    
+    const size_t N_start                = argc>1 ? strtol(argv[1],0,0) : 20;                   // Argument 1: Number of vertices N
+    const size_t N_limit                = argc>2 ? strtol(argv[2],0,0) : 200;                  // Argument 1: Number of vertices N
+
+    auto N_runs = 1;    
     ofstream out_file("IsomerspaceOpt_V0_" + to_string(N_limit) + ".txt");
     ofstream out_file_std("IsomerspaceOpt_V0_STD_" + to_string(N_limit) + ".txt");
-    for (size_t N = 20; N < N_limit+1; N+=2)
+    for (size_t N = N_start; N < N_limit+1; N+=2)
     {   
         if (N == 22) continue;
-        BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
-        auto sample_size = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)num_fullerenes.find(N)->second);
-        
-        IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
+        auto sample_size = min(200,(int)num_fullerenes.find(N)->second);
+        BuckyGen::buckygen_queue  Q  = BuckyGen::start(N,false,false);
         auto Nf = N/2 + 2;
+        Graph FF;
+        FF.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
         FullereneDual G;
         G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
         G.N = Nf;
@@ -51,9 +53,11 @@ int main(int argc, char** argv){
         std::iota(random_IDs.begin(), random_IDs.end(), 0);
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
         std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
+        bool more = true;
         for (int l = 0; l < N_runs; l++){
         for (int i = 0; i < sample_size; ++i){
                 for (size_t j = 0; j < Nf; j++){
+                    if(more) more &= BuckyGen::next_fullerene(Q, FF);
                     G.neighbours[j].clear();
                     for (size_t k = 0; k < 6; k++) {
                         auto u = input_buffer[id_subset[i]*Nf*6 + j*6 +k];
@@ -73,6 +77,8 @@ int main(int argc, char** argv){
 
         }}
         using namespace cuda_io;
+        auto total = (float)(mean(T_io)/1ns + mean(T_par)/1ns + mean(T_seq)/1ns);
+        std::cout << std::fixed << std::setprecision(2) << N << ", "<< sample_size << ", " << (mean(T_seq)/1ns)/total*100. << "%, " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us+mean(T_seq)/1us)/sample_size << "us/isomer\n";
         out_file << N << ", "<< sample_size << ", " << mean(T_seq)/1ns << ", " << mean(T_par)/1ns <<  ", " << mean(T_io)/1ns << "\n";
         out_file_std << N << ", "<< sample_size << ", " << sdev(T_seq)/1ns << ", " << sdev(T_par)/1ns <<  ", " << sdev(T_io)/1ns << "\n";
      }

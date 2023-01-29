@@ -16,7 +16,7 @@ add_executable(generate_benchmark generate_benchmark.cc)
 add_executable(forcefield-opt forcefield-opt.cc)
 
 target_link_libraries(forcefield-stats cuda_lib fullerenes)
-target_link_libraries(isomerspace-optimize-par cuda_lib)
+target_link_libraries(isomerspace-optimize-par cuda_lib fullerenes)
 target_link_libraries(scan_benchmark cuda_lib fullerenes)
 target_link_libraries(reduction_benchmark cuda_lib fullerenes)
 target_link_libraries(generate_benchmark cuda_lib fullerenes)

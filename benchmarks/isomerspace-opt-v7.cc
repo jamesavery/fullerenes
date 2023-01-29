@@ -65,6 +65,7 @@ int main(int ac, char** argv){
         auto finished_fullerenes = 0;
         //ACTUAL PIPELINE CODE
         for(int i = 0; i < N_runs; i++){
+        finished_fullerenes = 0;
         LaunchCtx insert0_ctx(0);
         LaunchCtx insert1_ctx(1);
         LaunchCtx device0_ctx(0);
@@ -78,8 +79,8 @@ int main(int ac, char** argv){
         IsomerQueue output1_queue(N,1);
         input0_queue.resize(sample_size*2);
         input1_queue.resize(sample_size*2);
-        output0_queue.resize(n_samples*10);
-        output1_queue.resize(n_samples*10);
+        output0_queue.resize(sample_size);
+        output1_queue.resize(sample_size);
         opt0_queue.resize(n_samples*2);
         opt1_queue.resize(n_samples*2);
 
@@ -114,11 +115,9 @@ int main(int ac, char** argv){
             isomerspace_tutte::tutte_layout(input1, 1000000, insert1_ctx, ASYNC);
             isomerspace_X0::zero_order_geometry(input0, 4.0, insert0_ctx, ASYNC);
             isomerspace_X0::zero_order_geometry(input1, 4.0, insert1_ctx, ASYNC);
-            reset_convergence_statuses(input0, insert0_ctx, ASYNC);
-            reset_convergence_statuses(input1, insert1_ctx, ASYNC);
             insert0_ctx.wait(); insert1_ctx.wait();
             
-            return I_async < min(n_fullerenes,n_samples*10);
+            return I_async < min(size_t(ceil(n_fullerenes/2)),n_samples*10);
         };
         auto T1 = chrono::high_resolution_clock::now();
         generate_isomers(sample_size*2);
@@ -146,6 +145,9 @@ int main(int ac, char** argv){
                 opt1_queue.refill_batch(opt1, device1_ctx, ASYNC);
                 device0_ctx.wait(); device1_ctx.wait();
                 T_par[i] += chrono::high_resolution_clock::now() - T2;
+                finished_fullerenes += output0_queue.get_size() + output1_queue.get_size();
+                output0_queue.clear(device0_ctx);
+                output1_queue.clear(device1_ctx);
                 optimize_more = opt0_queue.get_size() >= opt0.isomer_capacity;
             }
             auto T3 = chrono::high_resolution_clock::now();
@@ -154,7 +156,7 @@ int main(int ac, char** argv){
             opt0_queue.insert(input0, device0_ctx, ASYNC);
             opt1_queue.insert(input1, device1_ctx, ASYNC);
             device0_ctx.wait(); device1_ctx.wait();
-            finished_fullerenes = output0_queue.get_size() + output1_queue.get_size();
+            finished_fullerenes += output0_queue.get_size() + output1_queue.get_size();
             auto T4 = chrono::high_resolution_clock::now();
             if(more_to_generate) T_par[i] += T4 - T3;
             if(!more_to_generate){
@@ -180,8 +182,17 @@ int main(int ac, char** argv){
 
         }
         }
-        out_file << N << ", "<< n_fullerenes << ", "<< finished_fullerenes << ", " << mean(T_ends) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
-        out_file_std << N << ", "<< n_fullerenes << ", "<< finished_fullerenes << ", " << sdev(T_ends) /1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";
+        if(n_fullerenes > n_samples*10){ 
+            auto total = (float)(mean(T_io)/1ns + mean(T_par)/1ns);
+            std::cout << std::fixed << std::setprecision(2) << N << ", "<< finished_fullerenes << ", " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us)/finished_fullerenes << "us/isomer\n";
+            out_file << N << ", "<< n_fullerenes << ", "<< finished_fullerenes << ", " << mean(T_ends) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
+            out_file_std << N << ", "<< n_fullerenes << ", "<< finished_fullerenes << ", " << sdev(T_ends) /1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";}
+        else{
+            auto total = (float)(mean(T_io)/1ns + mean(T_par)/1ns + mean(T_ends)/1ns);
+            std::cout << std::fixed << std::setprecision(2) << N << ", "<< n_fullerenes << ", " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us + mean(T_ends)/1us)/n_fullerenes << "us/isomer\n";
+            out_file << N << ", "<< n_fullerenes << ", "<< n_fullerenes << ", " << mean(T_ends) /1ns << ", " << mean(T_par)/1ns + mean(T_ends)/1ns << ", " << mean(T_io)/1ns << "\n";
+            out_file_std << N << ", "<< n_fullerenes << ", "<< n_fullerenes << ", " << sdev(T_ends) /1ns << ", " << sdev(T_par)/1ns + sdev(T_ends)/1ns << ", " << sdev(T_io)/1ns << "\n";}
+
         std::cout << (float)finished_fullerenes / (float)(mean(T_par)/1ms) << std::endl;
     }
     LaunchCtx::clear_allocations();
