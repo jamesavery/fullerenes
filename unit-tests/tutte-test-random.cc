@@ -18,7 +18,7 @@ int main(int argc, char** argv){
     for (size_t i = N_start; i < N_end + 1; i+=2)
     {
 
-        auto path = "isomerspace_samples/" + to_string(i) + "_seed_42";
+        auto path = "isomerspace_samples/cubic_" + to_string(i) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
         auto fsize = std::filesystem::file_size(path);
         std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
