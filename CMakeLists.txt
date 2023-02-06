@@ -47,9 +47,9 @@ include_directories(${CMAKE_BINARY_DIR}/include/)
 
 
 # Fortran compiler flags
-set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O2 -m64 -mcmodel=medium")
+set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=medium")
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O2 -m64 -pthread -I /opt/nvidia/hpc_sdk/Linux_x86_64/2022/cuda/11.8/include/")
+set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O3 -m64 -pthread -I /opt/nvidia/hpc_sdk/Linux_x86_64/2022/cuda/11.8/include/")
 
 add_subdirectory(src/c++)
 add_subdirectory(src/fortran)
