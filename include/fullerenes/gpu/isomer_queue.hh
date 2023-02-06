@@ -6,6 +6,7 @@ struct IsomerQueue
 {    
 public:
     IsomerQueue(const size_t N, int device = 0);
+    IsomerQueue();
     ~IsomerQueue();
     int m_device = 0;
     //Queries about whether the queue is empty.
@@ -68,6 +69,7 @@ public:
     IsomerBatch host_batch   = IsomerBatch(N,1,HOST_BUFFER);
 
     friend std::ostream& operator<<(std::ostream& os, const IsomerQueue& a);
+    void operator=(const IsomerQueue& other);
 
 private:
     bool is_mirrored_on_device = false;

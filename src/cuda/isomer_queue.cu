@@ -228,6 +228,24 @@ IsomerQueue::IsomerQueue(const size_t N, int device): N(N), m_device(device){
     cudaMalloc(&g_scan_array, sizeof(int)*d_props.maxBlocksPerMultiProcessor*d_props.multiProcessorCount * 2);
 }
 
+IsomerQueue::IsomerQueue(): N(20), m_device(0){
+    std::cout << "Warning: Default constructor for IsomerQueue is not recommended. Use IsomerQueue(const size_t N, int device) instead." << std::endl;
+    cudaSetDevice(m_device);
+    cudaDeviceProp d_props;
+    cudaGetDeviceProperties(&d_props, m_device);
+    cudaMallocManaged(&props.back,    sizeof(size_t));
+    cudaMallocManaged(&props.front,   sizeof(size_t));
+    cudaMallocManaged(&props.capacity,sizeof(size_t));
+    cudaMallocManaged(&props.size,    sizeof(size_t));
+    cudaMallocManaged(&props.requests,sizeof(size_t));
+    *props.capacity = 1;
+    *props.front = -1;
+    *props.back = -1;
+    *props.size = 0;
+    device_batch = IsomerBatch(N,1,DEVICE_BUFFER,m_device);
+    cudaMalloc(&g_scan_array, sizeof(int)*d_props.maxBlocksPerMultiProcessor*d_props.multiProcessorCount * 2);
+}
+
 //Free counters
 IsomerQueue::~IsomerQueue(){
     cudaSetDevice(m_device);
@@ -414,6 +432,7 @@ cudaError_t IsomerQueue::insert(const Graph& in, const size_t ID, const LaunchCt
     //Extract the graph information (neighbours) from the PlanarGraph object and insert it at the appropriate location in the queue.
     auto Nf = N / 2 + 2;
     size_t face_offset = *props.back * Nf;
+
     for(node_t u=0;u<in.neighbours.size();u++){
         host_batch.face_degrees[face_offset + u] = in.neighbours[u].size();
         for(int j=0;j<in.neighbours[u].size();j++){
@@ -535,5 +554,41 @@ std::ostream& operator << (std::ostream& os, const IsomerQueue& input){
     os << "Queue [Front, Back]   : (" << input.get_front() << " \t, " << input.get_back() << ")\n";
     return os;
 }
+
+
+
+void IsomerQueue::operator=(const IsomerQueue& other){
+    std::cout << "Copying queue from device " << other.m_device << " to device " << m_device << std::endl;
+    cudaSetDevice(m_device);
+    cudaFree(props.size);
+    cudaFree(props.capacity);
+    cudaFree(props.front);
+    cudaFree(props.back);
+    cudaFree(props.requests);
+    cudaFree(g_scan_array); 
+
+    cudaSetDevice(other.m_device);
+    cudaDeviceProp d_props;
+    cudaGetDeviceProperties(&d_props, other.m_device);
+    device_batch = other.device_batch;
+    host_batch = other.host_batch;
+    cudaMallocManaged(&props.size, sizeof(size_t));
+    cudaMallocManaged(&props.capacity, sizeof(size_t));
+    cudaMallocManaged(&props.front, sizeof(size_t));
+    cudaMallocManaged(&props.back, sizeof(size_t));
+    cudaMallocManaged(&props.requests, sizeof(size_t));
+    cudaMalloc(&g_scan_array, sizeof(int)*d_props.maxBlocksPerMultiProcessor*d_props.multiProcessorCount * 2);
+    cudaDeviceSynchronize();
+    //Copy the properties of the other queue.
+    *props.size = *other.props.size;
+    *props.capacity = *other.props.capacity;
+    *props.front = *other.props.front;
+    *props.back = *other.props.back;
+
+    is_device_updated = true;
+    is_host_updated = true;
+    m_device = other.m_device;
+}
+
 
 }
