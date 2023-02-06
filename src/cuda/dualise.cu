@@ -86,6 +86,10 @@ std::chrono::microseconds time_spent(){
     return std::chrono::microseconds((int) (kernel_time*1000.f));
 }
 
+void reset_time(){
+    kernel_time = 0.0;
+}
+
 cudaError_t dualise(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);

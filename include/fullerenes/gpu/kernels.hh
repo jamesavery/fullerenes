@@ -15,6 +15,10 @@ namespace gpu_kernels{
 
         //Returns total time spent in kernel in milliseconds. First call is not timed as that would require synchronous execution.
         std::chrono::microseconds time_spent(); 
+
+        //Resets the time spent in kernel to 0
+        void reset_time();
+
         //Uses forcefield optimization to relax the positions of atoms in all isomers of a batch.
         template <ForcefieldType T>
         cudaError_t optimise(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
@@ -65,6 +69,9 @@ namespace gpu_kernels{
     namespace isomerspace_X0{
         //Returns total time spent in kernel in milliseconds. First call is not timed as that would require synchronous execution.
         std::chrono::microseconds time_spent(); 
+
+        void reset_time(); //Resets time spent in kernel to 0.
+
         //Uses spherical projection and 'wrapping a sphere' technique to generate starting coordinates in 3D space for a batch of fullerenes.
         cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
@@ -72,6 +79,8 @@ namespace gpu_kernels{
     namespace isomerspace_tutte{
         //Returns total time spent in kernel in milliseconds. First call is not timed as that would require synchronous execution.
         std::chrono::microseconds time_spent(); 
+
+        void reset_time(); //Resets time spent in kernel to 0.
         //Computes tutte embedding for an entire batch of fullernes.
         cudaError_t tutte_layout(IsomerBatch& B, const size_t max_iterations = 10000000, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
@@ -79,6 +88,8 @@ namespace gpu_kernels{
     namespace isomerspace_dual{
         //Returns total time spent in kernel in milliseconds. First call is not timed as that would require synchronous execution.
         std::chrono::microseconds time_spent(); 
+
+        void reset_time(); //Resets time spent in kernel to 0.
         //Computes the cubic neighbour list from the dual neighbour list
         cudaError_t dualise(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
