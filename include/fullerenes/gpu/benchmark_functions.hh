@@ -1,4 +1,5 @@
 #include "chrono"
+#include "fullerenes/graph.hh"
 namespace cuda_benchmark {
     bool test_global_scan(const int n_elements, const int n_times);
     
@@ -9,4 +10,6 @@ namespace cuda_benchmark {
     size_t n_blocks(const int n_elements);
 
     void warmup_kernel(const std::chrono::seconds warmup_time);
+    
+    int random_isomer(const std::string &path, Graph& G);
 }

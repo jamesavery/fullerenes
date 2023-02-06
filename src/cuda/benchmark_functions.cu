@@ -8,6 +8,10 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
+#include <filesystem>
+#include <fstream>
+#include <numeric>
+#include <random>
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/gpu/misc_cuda.cuh"
 namespace cuda_benchmark {
@@ -267,18 +271,80 @@ namespace cuda_benchmark {
         auto progress_bar = ProgressBar('#',30);
         auto start = std::chrono::high_resolution_clock::now();
         int nBlocks = n_blocks(128);
-        float* A; float* B; float* C;
-        cudaMalloc(&A,nBlocks*128*sizeof(float));
-        cudaMalloc(&B,nBlocks*128*sizeof(float));
-        cudaMalloc(&C,nBlocks*128*sizeof(float));
-
-        void* kargs[]{(void*)&A, (void*)&B, (void*)&C};
+        
+        auto Ndevices = 0;
+        cudaGetDeviceCount(&Ndevices);
+        cudaStream_t stream[Ndevices];
+        float* A[Ndevices]; float* B[Ndevices]; float* C[Ndevices];
+        for (size_t i = 0; i < Ndevices; i++)
+        {
+            cudaSetDevice(i);
+            cudaStreamCreate(&stream[i]);
+            cudaMalloc(&A[i],nBlocks*128*sizeof(float));
+            cudaMalloc(&B[i],nBlocks*128*sizeof(float));
+            cudaMalloc(&C[i],nBlocks*128*sizeof(float));
+        }
         while (chrono::high_resolution_clock::now() - start < warmup_time){
-            cudaLaunchCooperativeKernel((void*)nothing_kernel_,nBlocks,128,kargs,0);
-            cudaDeviceSynchronize();
+            for(int i = 0; i < Ndevices; i++){
+                void* kargs[]{(void*)&A[i], (void*)&B[i], (void*)&C[i]};
+                cudaSetDevice(i);
+                cudaLaunchCooperativeKernel((void*)nothing_kernel_,nBlocks,128,kargs,0, stream[i]);
+            }
+            for(int i = 0; i < Ndevices; i++){
+                cudaSetDevice(i);
+                cudaStreamSynchronize(stream[i]);
+            }
             progress_bar.update_progress((float) ((chrono::high_resolution_clock::now() - start)/1ms) / (float)(warmup_time/1ms));
         }
-        cudaFree(A); cudaFree(B); cudaFree(C);
+        for (size_t i = 0; i < Ndevices; i++)
+        {
+            cudaFree(A[i]); cudaFree(B[i]); cudaFree(C[i]);
+        }
+        
+    }
+
+    /* @brief This function reads a file containing a list of isomers and returns a random one
+    * @param path Path to the file containing the isomers
+    * @param G Graph to be filled with the isomer
+    * @return id of the isomer within the file
+    */
+    int random_isomer(const std::string &path, Graph& G){ 
+        static std::string m_path = path;
+        static ifstream isomer_sample(path,std::ios::binary); 
+        static auto m_fsize = std::filesystem::file_size(path);
+        static int Nf = G.N;
+        static std::vector<device_node_t> input_buffer(m_fsize/sizeof(device_node_t));
+        static int available_samples = m_fsize / (Nf*6*sizeof(device_node_t));
+        static bool first = true;
+        static std::vector<int> random_IDs(available_samples);
+        static int id_counter = 0;
+
+        if(Nf != G.N || first){ //If arguments change we need to reload the file
+            m_path = path;
+            isomer_sample = ifstream(path,std::ios::binary);
+            m_fsize = std::filesystem::file_size(path);
+            Nf = G.N;
+            input_buffer = std::vector<device_node_t>(m_fsize/sizeof(device_node_t));
+            available_samples = m_fsize / (Nf*6*sizeof(device_node_t));
+            random_IDs = std::vector<int>(available_samples);
+            id_counter = 0;
+        
+            isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), m_fsize);
+            std::iota(random_IDs.begin(), random_IDs.end(), 0);
+            std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
+            first = false;
+        }
+
+        for (size_t i = 0; i < Nf; i++){
+            G.neighbours.at(i).clear();
+            for (size_t j = 0; j < 6; j++) {
+                auto u = input_buffer.at(random_IDs.at(id_counter)*Nf*6 + i*6 +j);
+                if(u != UINT16_MAX) G.neighbours.at(i).push_back(u);
+            }
+        }
+
+        id_counter = (id_counter + 1) % available_samples;
+        return random_IDs.at(id_counter);
     }
 
 
