@@ -900,18 +900,18 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
     }
 
     real_t bond_max         = reduction_max(smem, max(rel_bond_err));
-    real_t angle_max        = reduction_max(smem, max(rel_angle_err));
-    real_t dihedral_max     = reduction_max(smem, max(rel_dihedral_err));
-    real_t bond_rms         = sqrt(reduction(smem,dot(rel_bond_err,rel_bond_err))/blockDim.x);
-    real_t angle_rms        = sqrt(reduction(smem,dot(rel_angle_err,rel_angle_err))/blockDim.x);
-    real_t dihedral_rms     = sqrt(reduction(smem,dot(rel_dihedral_err,rel_dihedral_err))/blockDim.x);
-    real_t bond_mean        = reduction(smem,sum(rel_bond_err))/blockDim.x;
-    real_t angle_mean       = reduction(smem,sum(rel_angle_err))/blockDim.x;
-    real_t dihedral_mean    = reduction(smem,sum(rel_dihedral_err))/blockDim.x;
+    //real_t angle_max        = reduction_max(smem, max(rel_angle_err));
+    //real_t dihedral_max     = reduction_max(smem, max(rel_dihedral_err));
+    //real_t bond_rms         = sqrt(reduction(smem,dot(rel_bond_err,rel_bond_err))/blockDim.x);
+    //real_t angle_rms        = sqrt(reduction(smem,dot(rel_angle_err,rel_angle_err))/blockDim.x);
+    //real_t dihedral_rms     = sqrt(reduction(smem,dot(rel_dihedral_err,rel_dihedral_err))/blockDim.x);
+    //real_t bond_mean        = reduction(smem,sum(rel_bond_err))/blockDim.x;
+    //real_t angle_mean       = reduction(smem,sum(rel_angle_err))/blockDim.x;
+    //real_t dihedral_mean    = reduction(smem,sum(rel_dihedral_err))/blockDim.x;
     real_t grad_norm        = sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X))))/blockDim.x;
-    real_t grad_rms         = sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X)))/blockDim.x);
-    real_t grad_max         = reduction_max(smem, sqrt(dot(FF.gradient(X), FF.gradient(X)))     );
-    real_t energy           = FF.energy(X); 
+    //real_t grad_rms         = sqrt(reduction(smem,dot(FF.gradient(X), FF.gradient(X)))/blockDim.x);
+    //real_t grad_max         = reduction_max(smem, sqrt(dot(FF.gradient(X), FF.gradient(X)))     );
+    //real_t energy           = FF.energy(X); 
     
     bool converged = ((grad_norm < 1e-2)  && (bond_max < 0.1) && !isnan(grad_norm)) ;
     //if(threadIdx.x + isomer_idx == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
@@ -970,9 +970,14 @@ __global__ void optimise_(IsomerBatch B, const size_t iterations, const size_t m
 
         //Create forcefield struct and use optimization algorithm to optimise the fullerene 
         ForceField FF = ForceField<T>(nodeG, constants, smem);
-        FF.CG(X,X1,X2,iterations);
+        FF.CG(X,X1,X2,iterations-1);
         BLOCK_SYNC
-        
+        auto E0 = FF.energy(X);
+        FF.CG(X,X1,X2,1);
+        auto E1 = FF.energy(X);
+        if (abs(E1 - E0)/blockDim.x < 1e-5){
+            B.statuses[isomer_idx] = IsomerStatus::CONVERGED;
+        }
         //Copy data back from L1 cache to DRAM 
         reinterpret_cast<coord3d*>(B.X)[offset + threadIdx.x]= X[threadIdx.x];
 
@@ -1240,6 +1245,9 @@ std::chrono::microseconds time_spent(){
     return std::chrono::microseconds((int) (kernel_time*1000.f));
 }
 
+void reset_time(){
+    kernel_time = 0.0;
+}
 
 template <ForcefieldType T>
 cudaError_t optimise(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
