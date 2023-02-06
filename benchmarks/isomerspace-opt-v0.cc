@@ -40,7 +40,9 @@ int main(int argc, char** argv){
 
             T_seq    = std::vector<std::chrono::nanoseconds>(N_runs),
             T_par    = std::vector<std::chrono::nanoseconds>(N_runs),
-            T_io     = std::vector<std::chrono::nanoseconds>(N_runs);
+            T_io     = std::vector<std::chrono::nanoseconds>(N_runs),
+            T_opt    = std::vector<std::chrono::nanoseconds>(N_runs);
+
 
         auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
@@ -72,13 +74,16 @@ int main(int argc, char** argv){
                 Polyhedron P(pG);
                     auto T2 = high_resolution_clock::now(); T_io[l] += T2 - T1;
                 P.points    = P.zero_order_geometry();
-                P.optimise();
                     auto T3 = high_resolution_clock::now(); T_seq[l] += T3 - T2;
+                P.optimise();
+                    auto T4 = high_resolution_clock::now(); T_seq[l] += T4 - T3; T_opt[l] += T4 - T3;
 
         }}
         using namespace cuda_io;
         auto total = (float)(mean(T_io)/1ns + mean(T_par)/1ns + mean(T_seq)/1ns);
         std::cout << std::fixed << std::setprecision(2) << N << ", "<< sample_size << ", " << (mean(T_seq)/1ns)/total*100. << "%, " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us+mean(T_seq)/1us)/sample_size << "us/isomer\n";
+
+        std::cout << (mean(T_opt)/1ns)/total*100. << "%  +/-: " << (sdev(T_opt)/1ns)/total*100. << "%\n"; 
         out_file << N << ", "<< sample_size << ", " << mean(T_seq)/1ns << ", " << mean(T_par)/1ns <<  ", " << mean(T_io)/1ns << "\n";
         out_file_std << N << ", "<< sample_size << ", " << sdev(T_seq)/1ns << ", " << sdev(T_par)/1ns <<  ", " << sdev(T_io)/1ns << "\n";
      }

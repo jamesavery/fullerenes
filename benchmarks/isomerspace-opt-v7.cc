@@ -1,199 +1,196 @@
+#include <csignal>
+#include <sys/stat.h>
+#include <limits.h>
+#include <chrono>
+#include <filesystem>
+#include <iostream>
+#include <iomanip>
+#include <thread>
+#include <future>
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
+#include "fullerenes/progress_bar.hh"
+#include "fullerenes/gpu/benchmark_functions.hh"
+
+using namespace std;
+using namespace std::chrono;
 #include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/isomer_batch.hh"
-#include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_io.hh"
-#include "fullerenes/gpu/cu_array.hh"
-#include <filesystem>
-#include <numeric>
-#include <future>
-#include <random>
+#include "fullerenes/gpu/kernels.hh"
+
 const std::unordered_map<size_t,size_t> num_fullerenes = {{20,1},{22,0},{24,1},{26,1},{28,2},{30,3},{32,6},{34,6},{36,15},{38,17},{40,40},{42,45},{44,89},{46,116},{48,199},{50,271},{52,437},{54,580},{56,924},{58,1205},{60,1812},{62,2385},{64,3465},{66,4478},{68,6332},{70,8149},{72,11190},{74,14246},{76,19151},{78,24109},{80,31924},{82,39718},{84,51592},{86,63761},{88,81738},{90,99918},{92,126409},{94,153493},{96,191839},{98,231017},{100,285914},{102,341658},{104,419013},{106,497529},{108,604217},{110,713319},{112,860161},{114,1008444},{116,1207119},{118,1408553},{120,1674171},{122,1942929},{124,2295721},{126,2650866},{128,3114236},{130,3580637},{132,4182071},{134,4787715},{136,5566949},{138,6344698},{140,7341204},{142,8339033},{144,9604411},{146,10867631},{148,12469092},{150,14059174},{152,16066025},{154,18060979},{156,20558767},{158,23037594},{160,26142839},{162,29202543},{164,33022573},{166,36798433},{168,41478344},{170,46088157},{172,51809031},{174,57417264},{176,64353269},{178,71163452},{180,79538751},{182,87738311},{184,97841183},{186,107679717},{188,119761075},{190,131561744},{192,145976674},{194,159999462},{196,177175687},{198,193814658},{200,214127742},{202,233846463},{204,257815889},{206,281006325},{208,309273526},{210,336500830},{212,369580714},{214,401535955},{216,440216206},{218,477420176},{220,522599564},{222,565900181},{224,618309598},{226,668662698},{228,729414880},{230,787556069},{232,857934016},{234,925042498},{236,1006016526},{238,1083451816},{240,1176632247},{242,1265323971},{244,1372440782},{246,1474111053},{248,1596482232},{250,1712934069},{252,1852762875},{254,1985250572},{256,2144943655},{258,2295793276},{260,2477017558},{262,2648697036},{264,2854536850},{266,3048609900},{268,3282202941},{270,3501931260},{272,3765465341},{274,4014007928},{276,4311652376},{278,4591045471},{280,4926987377},{282,5241548270},{284,5618445787},{286,5972426835},{288,6395981131},{290,6791769082},{292,7267283603},{294,7710782991},{296,8241719706},{298,8738236515},{300,9332065811},{302,9884604767},{304,10548218751},{306,11164542762},{308,11902015724},{310,12588998862},{312,13410330482},{314,14171344797},{316,15085164571},{318,15930619304},{320,16942010457},{322,17880232383},{324,19002055537},{326,20037346408},{328,21280571390},{330,22426253115},{332,23796620378},{334,25063227406},{336,26577912084},{338,27970034826},{340,29642262229},{342,31177474996},{344,33014225318},{346,34705254287},{348,36728266430},{350,38580626759},{352,40806395661},{354,42842199753},{356,45278616586},{358,47513679057},{360,50189039868},{362,52628839448},{364,55562506886},{366,58236270451},{368,61437700788},{370,64363670678},{372,67868149215},{374,71052718441},{376,74884539987},{378,78364039771},{380,82532990559},{382,86329680991},{384,90881152117},{386,95001297565},{388,99963147805},{390,104453597992},{392,109837310021},{394,114722988623},{396,120585261143},{398,125873325588},{400,132247999328}};
+const std::unordered_map<size_t,size_t> num_IPR_fullerenes = {{20,0},{22,0},{24,0},{26,0},{28,0},{30,0},{32,0},{34,0},{36,0},{38,0},{40,0},{42,0},{44,0},{46,0},{48,0},{50,0},{52,0},{54,0},{56,0},{58,0},{60,1},{62,0},{64,0},{66,0},{68,0},{70,1},{72,1},{74,1},{76,2},{78,5},{80,7},{82,9},{84,24},{86,19},{88,35},{90,46},{92,86},{94,134},{96,187},{98,259},{100,450},{102,616},{104,823},{106,1233},{108,1799},{110,2355},{112,3342},{114,4468},{116,6063},{118,8148},{120,10774},{122,13977},{124,18769},{126,23589},{128,30683},{130,39393},{132,49878},{134,62372},{136,79362},{138,98541},{140,121354},{142,151201},{144,186611},{146,225245},{148,277930},{150,335569},{152,404667},{154,489646},{156,586264},{158,697720},{160,836497},{162,989495},{164,1170157},{166,1382953},{168,1628029},{170,1902265},{172,2234133},{174,2601868},{176,3024383},{178,3516365},{180,4071832},{182,4690880},{184,5424777},{186,6229550},{188,7144091},{190,8187581},{192,9364975},{194,10659863},{196,12163298},{198,13809901},{200,15655672},{202,17749388},{204,20070486},{206,22606939},{208,25536557},{210,28700677},{212,32230861},{214,36173081},{216,40536922},{218,45278722},{220,50651799},{222,56463948},{224,62887775},{226,69995887},{228,77831323},{230,86238206},{232,95758929},{234,105965373},{236,117166528},{238,129476607},{240,142960479},{242,157402781},{244,173577766},{246,190809628},{248,209715141},{250,230272559},{252,252745513},{254,276599787},{256,303235792},{258,331516984},{260,362302637},{262,395600325},{264,431894257},{266,470256444},{268,512858451},{270,557745670},{272,606668511},{274,659140287},{276,716217922},{278,776165188},{280,842498881},{282,912274540},{284,987874095},{286,1068507788},{288,1156161307},{290,1247686189},{292,1348832364},{294,1454359806},{296,1568768524},{298,1690214836},{300,1821766896},{302,1958581588},{304,2109271290},{306,2266138871},{308,2435848971},{310,2614544391},{312,2808510141},{314,3009120113},{316,3229731630},{318,3458148016},{320,3704939275},{322,3964153268},{324,4244706701},{326,4533465777},{328,4850870260},{330,5178120469},{332,5531727283},{334,5900369830},{336,6299880577},{338,6709574675},{340,7158963073},{342,7620446934},{344,8118481242},{346,8636262789},{348,9196920285},{350,9768511147},{352,10396040696},{354,11037658075},{356,11730538496},{358,12446446419},{360,13221751502},{362,14010515381},{364,14874753568},{366,15754940959},{368,16705334454},{370,17683643273},{372,18744292915},{374,19816289281},{376,20992425825},{378,22186413139},{380,23475079272},{382,24795898388},{384,26227197453},{386,27670862550},{388,29254036711},{390,30852950986},{392,32581366295},{394,34345173894},{396,36259212641},{398,38179777473},{400,40286153024}};
 using namespace gpu_kernels;
-using namespace cuda_io;
-#define SYNC LaunchPolicy::SYNC
-#define ASYNC LaunchPolicy::ASYNC
 
-int main(int ac, char** argv){
-    int N_start                 = ac > 1 ? strtol(argv[1],0,0) : 20;     // Argument 1: Number of vertices N
-    int N_end                   = ac > 2 ? strtol(argv[2],0,0) : N_start;     // Argument 1: Number of vertices N
-    auto N_runs = 3;
+int M_MAX = 1e6;
 
-    ofstream out_file("IsomerspaceOpt_V7_" + to_string(N_end) + ".txt");
-    ofstream out_file_std("IsomerspaceOpt_V7_STD_" + to_string(N_end) + ".txt");
-    for(int N = N_start; N < N_end + 1;  N+=2){
-        if(N == 22) continue;
-        auto n_fullerenes = num_fullerenes.find(N)->second;
-        Graph G;
-        auto Nf = N/2 +2;
-        G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
-        G.N = Nf;
-        auto bucky = BuckyGen::start(N, false, false);
+void signal_callback_handler(int signum)
+{
+  LaunchCtx::clear_allocations();
+  exit(signum);
+}
 
-        std::string path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
-        auto fsize = std::filesystem::file_size(path);
-        auto n_samples = fsize / (Nf * 6 * sizeof(device_node_t));
-        ifstream in_file(path,std::ios::binary);
-        std::vector<device_node_t> dual_neighbours(n_samples * Nf * 6);
-        in_file.read((char*)dual_neighbours.data(),n_samples * Nf * 6 * sizeof(device_node_t));
-        auto optimal_batch_size = isomerspace_forcefield::optimal_batch_size(N);
-        auto sample_size = min(optimal_batch_size,(int)n_samples);
-        if (n_fullerenes < optimal_batch_size*2){
-            sample_size = max((int)n_fullerenes/2,1);
-        }else if(n_fullerenes >= optimal_batch_size*8){
-            sample_size = optimal_batch_size*4;
-        }else if (n_fullerenes >= optimal_batch_size*6){
-            sample_size = optimal_batch_size*3;
-        }else if (n_fullerenes >= optimal_batch_size*4){
-            sample_size = optimal_batch_size*2;
-        } else if (n_fullerenes >= optimal_batch_size*2){
-            sample_size = optimal_batch_size;
+
+int main(int ac, char **argv)
+{
+  signal(SIGINT, signal_callback_handler);
+  if(ac<2){
+    fprintf(stderr,"Syntax: %s <N:int> [output_dir] [IPR:0|1] [only_nontrivial:0|1]\n",argv[0]);
+    return -1;
+  }
+  const size_t N_start                = ac>=2? strtol(argv[1],0,0): 20;     // Argument 1: Number of vertices N
+  const size_t N_end                  = ac>=3? strtol(argv[2],0,0): N_start; // Argument 2: Number of vertices N to end at
+
+  int IPR               = ac>=4? strtol(argv[3],0,0):0; // Argument 3: Only generate IPR fullerenes?
+  int only_nontrivial   = ac>=5? strtol(argv[4],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
+  int n_best_candidates = ac>=6? strtol(argv[5],0,0):100; // Argument 5: How many best fullerne candidates do you want to store? 
+  cuda_benchmark::warmup_kernel(200*1s);
+ofstream out_file("IsomerspaceOpt_V7_" + to_string(N_end) + ".txt");
+  int Nd = LaunchCtx::get_device_count();
+
+    for (size_t N = N_start; N <= N_end; N+=2) {
+        if (N == 22) continue; //No isomers for N=22
+
+  int n_fullerenes = IPR > 0 ? num_IPR_fullerenes.find(N)->second : num_fullerenes.find(N)->second;
+  n_fullerenes = min(n_fullerenes, M_MAX);
+  auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*8 , (int)ceil((float)n_fullerenes/(float)Nd));
+  std::cout << "N=" << N << " batch_size=" << batch_size << std::endl;
+
+
+  IsomerBatch B0s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
+  IsomerBatch B1s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
+
+  cuda_io::IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+  cuda_io::IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+  cuda_io::IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+
+  for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
+
+  LaunchCtx gen_ctxs[Nd] = {LaunchCtx(0),LaunchCtx(1)};
+  LaunchCtx opt_ctxs[Nd] = {LaunchCtx(0),LaunchCtx(1)};
+
+  BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,IPR,only_nontrivial);  
+  ProgressBar progress_bar = ProgressBar('#',30);
+  Graph G;
+  auto Nf = N/2 + 2;
+  G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
+  G.N = Nf;
+  
+  int I=0;			// Global isomer number at start of batch
+  int num_finished = 0,
+      num_converged = 0,
+      num_failed =0;
+
+  auto T0 = steady_clock::now();
+  auto
+    Tgen    = steady_clock::now()-T0,
+    Tupdate = steady_clock::now()-T0,
+    Tqueue  = steady_clock::now()-T0,
+    Tdual   = steady_clock::now()-T0,    
+    Ttutte  = steady_clock::now()-T0,
+    TX0     = steady_clock::now()-T0,
+    Tcopy   = steady_clock::now()-T0,
+    Topt    = steady_clock::now()-T0,
+    Tfile   = steady_clock::now()-T0,
+    Toutq   = steady_clock::now()-T0,
+    Tinq    = steady_clock::now()-T0,
+    Tinit_geom = steady_clock::now()-T0;
+  std::cout << "Generating " << n_fullerenes << " isomers" << std::endl;
+  auto generate_isomers = [&](int M){
+    auto T0 = steady_clock::now();
+    if(I == n_fullerenes) return false;
+    for (int i = 0; i < M; i++){
+        if (I < n_fullerenes){
+              auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
+              //BuckyGen::next_fullerene(BuckyQ, G);
+              Q0s[I%Nd].insert(G,I, gen_ctxs[I%Nd], LaunchPolicy::ASYNC);
+            I++;
         }
-
-        std::vector<int> random_IDs(n_samples);
-        std::iota(random_IDs.begin(), random_IDs.end(), 0);
-        std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
-        auto id_range_end = min((int)n_samples, sample_size);
-        std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+n_samples);
-        auto
-            T_ends    = std::vector<std::chrono::nanoseconds>(N_runs, chrono::nanoseconds(1)),
-            T_par    = std::vector<std::chrono::nanoseconds>(N_runs, chrono::nanoseconds(1)),
-            T_io     = std::vector<std::chrono::nanoseconds>(N_runs, chrono::nanoseconds(1));
-        
-        auto finished_fullerenes = 0;
-        //ACTUAL PIPELINE CODE
-        for(int i = 0; i < N_runs; i++){
-        finished_fullerenes = 0;
-        LaunchCtx insert0_ctx(0);
-        LaunchCtx insert1_ctx(1);
-        LaunchCtx device0_ctx(0);
-        LaunchCtx device1_ctx(1);
-
-        IsomerQueue input0_queue(N, 0);
-        IsomerQueue input1_queue(N, 1);
-        IsomerQueue opt0_queue(N, 0);
-        IsomerQueue opt1_queue(N, 1);
-        IsomerQueue output0_queue(N,0);
-        IsomerQueue output1_queue(N,1);
-        input0_queue.resize(sample_size*2);
-        input1_queue.resize(sample_size*2);
-        output0_queue.resize(sample_size);
-        output1_queue.resize(sample_size);
-        opt0_queue.resize(n_samples*2);
-        opt1_queue.resize(n_samples*2);
-
-        IsomerBatch input0(N, sample_size*2, DEVICE_BUFFER, 0);
-        IsomerBatch input1(N, sample_size*2, DEVICE_BUFFER, 1);
-        IsomerBatch opt0(N, sample_size, DEVICE_BUFFER, 0);
-        IsomerBatch opt1(N, sample_size, DEVICE_BUFFER, 1);
-        
-        int I_async = 0;
-        auto generate_isomers = [&](int M){
-            if(I_async == min(n_fullerenes,n_samples*10)) return false;
-            for (int i = 0; i < M; i++){
-                if (I_async < min(n_fullerenes,n_samples*10)){
-                    for (size_t j = 0; j < Nf; j++){
-                        G.neighbours[j].clear();
-                        for (size_t k = 0; k < 6; k++) {
-                            auto u = dual_neighbours[id_subset[I_async%n_samples]*Nf*6 + j*6 +k];
-                            if(u != UINT16_MAX) G.neighbours[j].push_back(u);
-                        }
-                    }
-                    input0_queue.insert(G,I_async, insert0_ctx, ASYNC);
-                    input1_queue.insert(G,I_async, insert1_ctx, ASYNC);
-                    I_async++;
-                } 
-            }
-            
-            input0_queue.refill_batch(input0, insert0_ctx, ASYNC);
-            input1_queue.refill_batch(input1, insert1_ctx, ASYNC);
-            isomerspace_dual::dualise(input0, insert0_ctx, ASYNC);
-            isomerspace_dual::dualise(input1, insert1_ctx, ASYNC);
-            isomerspace_tutte::tutte_layout(input0, 1000000, insert0_ctx, ASYNC);
-            isomerspace_tutte::tutte_layout(input1, 1000000, insert1_ctx, ASYNC);
-            isomerspace_X0::zero_order_geometry(input0, 4.0, insert0_ctx, ASYNC);
-            isomerspace_X0::zero_order_geometry(input1, 4.0, insert1_ctx, ASYNC);
-            insert0_ctx.wait(); insert1_ctx.wait();
-            
-            return I_async < min(size_t(ceil(n_fullerenes/2)),n_samples*10);
-        };
-        auto T1 = chrono::high_resolution_clock::now();
-        generate_isomers(sample_size*2);
-        
-        opt0_queue.insert(input0, device0_ctx, ASYNC);
-        opt1_queue.insert(input1, device1_ctx, ASYNC);
-        opt0_queue.refill_batch(opt0, device0_ctx, ASYNC);
-        opt1_queue.refill_batch(opt1, device1_ctx, ASYNC);
-        device0_ctx.wait(); device1_ctx.wait();
-        T_ends[i] += T1 - chrono::high_resolution_clock::now();
-        bool more_to_do = true;
-        bool more_to_generate = false;
-        auto step = max(1, (int)N/2);
-        
-        while (more_to_do){
-            bool optimise_more = true;
-            auto generate_handle = std::async(std::launch::async,generate_isomers, opt0.isomer_capacity*2);
-            while(optimise_more){
-                auto T2 = chrono::high_resolution_clock::now();
-                isomerspace_forcefield::optimise<PEDERSEN>(opt0,step, N*5, device0_ctx, ASYNC);
-                isomerspace_forcefield::optimise<PEDERSEN>(opt1,step, N*5, device1_ctx, ASYNC);
-                output0_queue.push(opt0, device0_ctx, ASYNC);
-                output1_queue.push(opt1, device1_ctx, ASYNC);
-                opt0_queue.refill_batch(opt0, device0_ctx, ASYNC);
-                opt1_queue.refill_batch(opt1, device1_ctx, ASYNC);
-                device0_ctx.wait(); device1_ctx.wait();
-                T_par[i] += chrono::high_resolution_clock::now() - T2;
-                finished_fullerenes += output0_queue.get_size() + output1_queue.get_size();
-                output0_queue.clear(device0_ctx);
-                output1_queue.clear(device1_ctx);
-                optimise_more = opt0_queue.get_size() >= opt0.isomer_capacity;
-            }
-            auto T3 = chrono::high_resolution_clock::now();
-            generate_handle.wait();
-            more_to_generate = generate_handle.get();
-            opt0_queue.insert(input0, device0_ctx, ASYNC);
-            opt1_queue.insert(input1, device1_ctx, ASYNC);
-            device0_ctx.wait(); device1_ctx.wait();
-            finished_fullerenes += output0_queue.get_size() + output1_queue.get_size();
-            auto T4 = chrono::high_resolution_clock::now();
-            if(more_to_generate) T_par[i] += T4 - T3;
-            if(!more_to_generate){
-                while(opt0_queue.get_size() > 0){
-                    isomerspace_forcefield::optimise<PEDERSEN>(opt0, step, N*5, device0_ctx, ASYNC);
-                    isomerspace_forcefield::optimise<PEDERSEN>(opt1, step, N*5, device1_ctx, ASYNC);
-                    output0_queue.push(opt0, device0_ctx, ASYNC);
-                    output1_queue.push(opt1, device1_ctx, ASYNC);
-                    opt0_queue.refill_batch(opt0, device0_ctx, ASYNC);
-                    opt1_queue.refill_batch(opt1, device1_ctx, ASYNC);
-                    device0_ctx.wait(); device1_ctx.wait();
-                }
-                for(int i = 0;  i <  N*5; i += step){
-                    isomerspace_forcefield::optimise<PEDERSEN>(opt0, step, N*5, device0_ctx, ASYNC);
-                    isomerspace_forcefield::optimise<PEDERSEN>(opt1, step, N*5, device1_ctx, ASYNC);
-                }
-                output0_queue.push(opt0, device0_ctx, ASYNC);
-                output1_queue.push(opt1, device1_ctx, ASYNC);
-                device0_ctx.wait(); device1_ctx.wait();
-                more_to_do = false;
-            }
-            T_ends[i] += chrono::high_resolution_clock::now() - T4;
-
-        }
-        }
-        if(n_fullerenes > n_samples*10){ 
-            auto total = (float)(mean(T_io)/1ns + mean(T_par)/1ns);
-            std::cout << std::fixed << std::setprecision(2) << N << ", "<< finished_fullerenes << ", " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us)/finished_fullerenes << "us/isomer\n";
-            out_file << N << ", "<< n_fullerenes << ", "<< finished_fullerenes << ", " << mean(T_ends) /1ns << ", " << mean(T_par)/1ns << ", " << mean(T_io)/1ns << "\n";
-            out_file_std << N << ", "<< n_fullerenes << ", "<< finished_fullerenes << ", " << sdev(T_ends) /1ns << ", " << sdev(T_par)/1ns << ", " << sdev(T_io)/1ns << "\n";}
-        else{
-            auto total = (float)(mean(T_io)/1ns + mean(T_par)/1ns + mean(T_ends)/1ns);
-            std::cout << std::fixed << std::setprecision(2) << N << ", "<< n_fullerenes << ", " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us + mean(T_ends)/1us)/n_fullerenes << "us/isomer\n";
-            out_file << N << ", "<< n_fullerenes << ", "<< n_fullerenes << ", " << mean(T_ends) /1ns << ", " << mean(T_par)/1ns + mean(T_ends)/1ns << ", " << mean(T_io)/1ns << "\n";
-            out_file_std << N << ", "<< n_fullerenes << ", "<< n_fullerenes << ", " << sdev(T_ends) /1ns << ", " << sdev(T_par)/1ns + sdev(T_ends)/1ns << ", " << sdev(T_io)/1ns << "\n";}
-
-        std::cout << (float)finished_fullerenes / (float)(mean(T_par)/1ms) << std::endl;
     }
-    LaunchCtx::clear_allocations();
+    gen_ctxs[0].wait(); gen_ctxs[1].wait(); 
+    return true;
+  };
+
+  auto opt_routine = [&](){
+    for (int i = 0; i < Nd; i++){
+      Q1s[i].refill_batch(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);
+      isomerspace_forcefield::optimise<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], LaunchPolicy::ASYNC);
+      Q2s[i].push(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);}
+      for (int i = 0; i < Nd; i++){
+        opt_ctxs[i].wait();
+        num_finished += Q2s[i].get_size();
+        Q2s[i].clear();
+      }
+  };
+
+  auto loop_iters = 0;
+  auto Tstart = steady_clock::now();
+  auto n0 = 0;
+    while(num_finished < n_fullerenes){
+      auto T0 = steady_clock::now();
+      for (int i = 0; i < Nd; i++){
+          if(Q0s[i].get_size() > 0){
+            Q0s[i].refill_batch(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
+            isomerspace_dual::dualise(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
+            isomerspace_tutte::tutte_layout(B0s[i], 10000000, gen_ctxs[i], LaunchPolicy::ASYNC);
+            isomerspace_X0::zero_order_geometry(B0s[i], 4.0f, gen_ctxs[i], LaunchPolicy::ASYNC);
+            Q1s[i].insert(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
+          }
+      }
+      for(int j = 0; j < Nd; j++){
+        gen_ctxs[j].wait();
+      }
+      auto T1 = steady_clock::now(); Tinit_geom += T1-T0;
+      auto handle = std::async(std::launch::async, generate_isomers, 2*batch_size);
+      auto T2 = steady_clock::now();
+      while(Q1s[0].get_size() > B1s[0].capacity() && Q1s[1].get_size() > B1s[1].capacity()){
+          opt_routine();
+      }
+      auto T3 = steady_clock::now(); Topt += T3-T2;
+      handle.wait();
+      auto T4 = steady_clock::now(); Tgen += T4-T3;
+      while(I == n_fullerenes && num_finished < n_fullerenes && Q0s[0].get_size() == 0 && Q0s[1].get_size() == 0){
+          opt_routine();
+      }
+      auto T5 = steady_clock::now(); Topt += T5-T4;
+      if(loop_iters % 3 == 0){
+        auto Titer = steady_clock::now() - Tstart;
+        Tstart = steady_clock::now();
+        auto Tff   = isomerspace_forcefield::time_spent()/Nd;
+        Tqueue = Topt - Tff;
+        Ttutte = isomerspace_tutte::time_spent()/Nd;
+        TX0    = isomerspace_X0::time_spent()/Nd;
+        Tdual  = isomerspace_dual::time_spent()/Nd;
+        auto TOverhead = Tinit_geom - Tdual - Ttutte - TX0;
+        progress_bar.update_progress((float)num_finished/(float)n_fullerenes, "Finished: " + to_string(num_finished)+ "    Pace: " + to_string((Titer/1us) / max((num_finished - n0),1)) + " us/isomer       ");
+        n0 = num_finished;
+      }
+      loop_iters++;
+    }
+    //For timing purposes, since kernels are launched asynchronously, we need to measure the time spent in the last launches.
+    isomerspace_forcefield::optimise<PEDERSEN>(B1s[0], 0, 5*N, opt_ctxs[0], LaunchPolicy::ASYNC);
+    isomerspace_tutte::tutte_layout(B1s[0], 0, opt_ctxs[0], LaunchPolicy::ASYNC);
+    isomerspace_X0::zero_order_geometry(B1s[0], 0, opt_ctxs[0], LaunchPolicy::ASYNC);
+    //=======================================================================================================================
+
+    Ttutte = isomerspace_tutte::time_spent()/Nd;
+    TX0    = isomerspace_X0::time_spent()/Nd;
+    Tdual  = isomerspace_dual::time_spent()/Nd;
+    auto Tff = isomerspace_forcefield::time_spent()/Nd;
+    Tqueue = nanoseconds(Topt/1ns - Tff/1ns);
+    auto Toverhead = nanoseconds(Tinit_geom/1ns - (Tdual/1ns + Ttutte/1ns + TX0/1ns) + Tqueue/1ns);
+    auto Tpar = nanoseconds(Ttutte/1ns + TX0/1ns + Tdual/1ns + Tff/1ns);
+    auto Ttotal = nanoseconds(Tpar/1ns + Toverhead/1ns);
+    progress_bar.update_progress((float)num_finished/(float)n_fullerenes, "Finished: " + to_string(num_finished)+ "    Pace: " + to_string((Ttotal/1us) / max((num_finished),1)) + " us/isomer       ");
+    out_file << N << ", "<< n_fullerenes << ", " << Tpar/1ns << ", " << Toverhead/1ns << ", " << Tff/1ns << ", " << Ttutte/1ns << ", " << TX0/1ns << ", " << Tdual/1ns << "\n";
+    std::cout <<  "\n\n\nOverhead: "<< Toverhead/1us  <<" us, Tff: "<< Tff/1us << " us, Topt: " << Topt/1us << " us\n\n\n\n" << std::endl;
+    std::cout << "Total time: " << Ttotal/1ms << " ms, FF: " << 100*float(Tff/1us)/float(Ttotal/1us) << "%, Tutte: " << 100*float(Ttutte/1us)/float(Ttotal/1us) << "%, X0: " << 100*float(TX0/1us)/float(Ttotal/1us) << "%, Dual: " << 100*float(Tdual/1us)/float(Ttotal/1us) << "%, Overhead: " << 100*float(Toverhead/1us)/float(Ttotal/1us) << "%\n\n";
+
+    isomerspace_forcefield::reset_time();
+    isomerspace_tutte::reset_time();
+    isomerspace_X0::reset_time();
+    isomerspace_dual::reset_time();
+}
+  return 0;
 }

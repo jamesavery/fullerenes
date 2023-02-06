@@ -25,7 +25,7 @@ int main(int argc, char** argv){
     for (size_t N = N_start; N < N_limit+1; N+=2)
     {   
         if (N == 22) continue; //No isomers in isomerspace 22;
-        auto sample_size = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0)*4,(int)num_fullerenes.find(N)->second);
+        auto sample_size = min(10000,(int)num_fullerenes.find(N)->second);
         auto M_b = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)num_fullerenes.find(N)->second);
         std::queue<std::tuple<Polyhedron,size_t,IsomerStatus>> poly_queue;
      
@@ -57,11 +57,12 @@ int main(int argc, char** argv){
         std::cout << "Isomerspace :" << N << std::endl;
         for (size_t l = 0; l < N_runs; l++)
         {
-            IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
+            IsomerBatch batch0(N,M_b,DEVICE_BUFFER);
             IsomerBatch batch1(N,M_b,DEVICE_BUFFER);
             cuda_io::IsomerQueue Q0(N,0);
             cuda_io::IsomerQueue Q1(N,0);
             cuda_io::IsomerQueue Q2(N,0);
+            auto finished_fullerenes = 0;
 
             //Pre allocate the device queue such that it doesn't happen during benchmarking
             Q0.resize(2*sample_size);
@@ -97,6 +98,8 @@ int main(int argc, char** argv){
                     gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(batch1,N*0.5,N*5);
                 auto T3 = high_resolution_clock::now(); T_par[l] += (T3 - T2);
                     Q2.push(batch1);
+                    finished_fullerenes += Q2.get_size();
+                    Q2.clear();
                 auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);
             }
         }
