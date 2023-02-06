@@ -1,6 +1,7 @@
 #include <chrono>
 #include <iostream>
 #include <cmath>
+#include <vector>
 #include <iomanip>
 #include <string>
 #include <stdio.h>
@@ -22,7 +23,7 @@ public:
     ProgressBar(){};
     ProgressBar(char progress_symbol, int bar_length): progress_symbol(progress_symbol), bar_length(bar_length){}
     
-    void update_progress(const float progress, const std::string extra_string = ""){
+    void update_progress(const float progress, const std::string extra_string = "", std::vector<std::pair<std::string, std::chrono::nanoseconds>> extra_timers = {}){
         using namespace std::chrono;
 
         if(progress <= 1){
@@ -39,8 +40,20 @@ public:
 
             int bar_width = 70;
             int pos = bar_width * progress;
-
-            std::cout << "\r\033[F" << "ETA: " << ETA_h << "h  " << ETA_m << "m  " << ETA_s << "s  \t\t" << extra_string << "\n" << "[" << std::string(pos,'=') << std::string(bar_width-pos,' ') << "]" << std::setprecision(3)<< (progress * 100.0) << "\t%" << std::flush;
+            //q: what does \r\033[F do?
+            //a: \r moves the cursor to the beginning of the line, \033[F moves the cursor up one line
+            
+            
+            std::cout << "\r\033[F" << "ETA: " << std::setw(3) << ETA_h << "h  "<< std::setw(3) << ETA_m << "m  " << std::setw(3) << ETA_s << "s  " << std::setw(30) << extra_string << "\n" << "[" << std::string(pos,'=') << std::string(bar_width-pos,' ') << "]" << std::setprecision(3)<< std::setw(7) << (progress * 100.0) 
+            << "%    \n";
+            for(auto timer : extra_timers){
+                std::cout << std::setw(10) << timer.first << ": " << std::setprecision(2) <<  std::setw(5) << (100.f*float(timer.second.count()) / float((t2-t_start).count())) << "%   \n";
+            }
+            for (size_t i = 0; i < extra_timers.size() + 1; i++)
+            {
+                std::cout<< "\033[F";
+            }
+            std::cout << std::flush;
         }else
         {
             std::cout << "Invalid Value provided progress cannot exceed 100%\r" << std::flush;
