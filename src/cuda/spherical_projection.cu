@@ -112,6 +112,10 @@ std::chrono::microseconds time_spent(){
     return std::chrono::microseconds((int) (kernel_time * 1000.f));
 }
 
+void reset_time(){
+    kernel_time = 0.0;
+}
+
 cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     //Need a way of telling whether the kernel has been called previously.

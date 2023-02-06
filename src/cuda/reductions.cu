@@ -85,6 +85,16 @@ namespace cg = cooperative_groups;
         BLOCK_SYNC
         return result;
     }
+#elif REDUCTION_METHOD==4
+    __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data = (device_real_t)0){
+        typedef cub::BlockReduce<device_real_t, 256> BlockReduce;
+        auto result = BlockReduce(reinterpret_cast<BlockReduce::TempStorage*>(sdata)).Sum(data)
+        if (threadIdx.x == 0) sdata[0] = result;
+        BLOCK_SYNC
+        result = sdata[0];
+        BLOCK_SYNC
+        return result;
+    }
 
 #endif
 
