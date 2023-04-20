@@ -497,12 +497,12 @@ string Unfolding::to_latex(int K, int L, int label_vertices,  bool draw_equilate
 
 
 
-static vector<Unfolding> generate_all_unfoldings(const Triangulation& graph)
-{
-  vector<dedge_t> workset;
+// static vector<Unfolding> generate_all_unfoldings(const Triangulation& graph)
+// {
+//   vector<dedge_t> workset;
 
-
-}
+//   return 
+// }
 
 
 struct unfolding_parent_state {
@@ -530,7 +530,7 @@ unfolding_parent_state place_triangle(const Triangulation& G, const dedge_t arc,
     // 3: u->v and v->w exist separately on the B  => u->v is replaced by u->w
     
   }
-  
+  return Snext;
 }
 
 void generate_unfolding_subtree(const Triangulation& G, const unfolding_parent_state &S, vector<vector<dedge_t>> arc_boundaries)
