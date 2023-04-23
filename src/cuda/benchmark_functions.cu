@@ -140,7 +140,7 @@ namespace cuda_benchmark {
     __global__ void nothing_kernel_(float* A, float* B, float* C){
         auto tid    = blockDim.x * blockIdx.x + threadIdx.x;
         for(int i = 0; i < 5000; i++){
-            C[tid] = B[tid] + A[tid];
+            C[tid] = (B[tid] + 3.5f*A[tid])/5.6f;
         }
     }
 
