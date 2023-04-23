@@ -2,6 +2,7 @@
 #include "cooperative_groups.h"
 #include "misc_cuda.cu"
 #include "coord3d.cuh"
+#include "matrix.cu"
 #include "sym_mat_3.cu"
 #include "coord2d.cuh"
 #include "reductions.cu"
