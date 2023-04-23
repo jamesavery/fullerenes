@@ -25,7 +25,6 @@ using namespace gpu_kernels;
 
 void signal_callback_handler(int signum)
 {
-  LaunchCtx::clear_allocations();
   exit(signum);
 }
 
@@ -94,8 +93,8 @@ int main(int ac, char **argv)
     if(I == n_fullerenes) return false;
     for (int i = 0; i < M; i++){
         if (I < n_fullerenes){
-              auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
-              //BuckyGen::next_fullerene(BuckyQ, G);
+              //auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
+              BuckyGen::next_fullerene(BuckyQ, G);
               Q0s[I%Nd].insert(G,I, gen_ctxs[I%Nd], LaunchPolicy::ASYNC);
             I++;
         }
@@ -107,7 +106,7 @@ int main(int ac, char **argv)
   auto opt_routine = [&](){
     for (int i = 0; i < Nd; i++){
       Q1s[i].refill_batch(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);
-      isomerspace_forcefield::optimise<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], LaunchPolicy::ASYNC);
+      isomerspace_forcefield::optimise<FLATNESS_ENABLED>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], LaunchPolicy::ASYNC);
       Q2s[i].push(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);}
       for (int i = 0; i < Nd; i++){
         opt_ctxs[i].wait();
@@ -125,7 +124,7 @@ int main(int ac, char **argv)
           if(Q0s[i].get_size() > 0){
             Q0s[i].refill_batch(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
             isomerspace_dual::dualise(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
-            isomerspace_tutte::tutte_layout(B0s[i], 10000000, gen_ctxs[i], LaunchPolicy::ASYNC);
+            isomerspace_tutte::tutte_layout(B0s[i], N*10, gen_ctxs[i], LaunchPolicy::ASYNC);
             isomerspace_X0::zero_order_geometry(B0s[i], 4.0f, gen_ctxs[i], LaunchPolicy::ASYNC);
             Q1s[i].insert(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
           }
