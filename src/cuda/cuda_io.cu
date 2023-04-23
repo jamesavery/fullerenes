@@ -118,7 +118,7 @@ namespace cuda_io{
     }
 
     template <typename T>
-    std::tuple<int,device_real_t> compare_isomer_meta(T* a, T* b, int n_isomers, int n_elements_per_isomers){
+    std::tuple<int,float> compare_isomer_meta(T* a, T* b, int n_isomers, int n_elements_per_isomers){
         int n_correct = 0;
 
         for (size_t i = 0; i < n_isomers; ++i){
@@ -130,12 +130,12 @@ namespace cuda_io{
                 }
             }
         }
-        return {n_correct, (device_real_t)(100*n_correct)/(device_real_t)(n_isomers*n_elements_per_isomers)};
+        return {n_correct, (float)(100*n_correct)/(float)(n_isomers*n_elements_per_isomers)};
     }
 
-    std::tuple<int, device_real_t, device_real_t> compare_isomer_arrays(device_real_t* a, device_real_t* b, int n_isomers, int n_elements_per_isomer, device_real_t rtol, bool verbose, device_real_t zero_threshold){
-        device_real_t average_rdifference = (device_real_t)0.0;
-        device_real_t average_adifference = (device_real_t)0.0;
+    std::tuple<int, float, float> compare_isomer_arrays(float* a, float* b, int n_isomers, int n_elements_per_isomer, float rtol, bool verbose, float zero_threshold){
+        float average_rdifference = (float)0.0;
+        float average_adifference = (float)0.0;
         int n_correct = 0;
         int n_valid = 0;
         std::string fail_string{"\nFailed in: ["};
@@ -143,8 +143,8 @@ namespace cuda_io{
             bool isomer_passed = true;
             for (int j = 0; j < n_elements_per_isomer; ++j){   
                 auto idx = i*n_elements_per_isomer + j;
-                device_real_t rdiff = std::abs((a[idx] - b[idx])/(b[idx] + (std::abs(b[idx]) < zero_threshold) ));
-                device_real_t adiff = std::abs(a[idx] - b[idx]);
+                float rdiff = std::abs((a[idx] - b[idx])/(b[idx] + (std::abs(b[idx]) < zero_threshold) ));
+                float adiff = std::abs(a[idx] - b[idx]);
                 bool is_invalid = (std::isnan(a[idx]) || std::isnan(b[idx])) || (std::isinf(a[idx]) || std::isinf(b[idx]));
                 if(rdiff <= rtol || a[idx] == b[idx] || (std::isnan(a[idx]) && std::isnan(b[idx])) || (std::isinf(a[idx]) && std::isinf(b[idx])) ){
                     ++n_correct;
@@ -162,10 +162,10 @@ namespace cuda_io{
             if(!isomer_passed && verbose) fail_string += to_string(i) + ", ";
         }
         if (n_correct < (n_isomers*n_elements_per_isomer) && verbose) {std::cout << fail_string << std::endl;}
-        return {n_correct, average_adifference / (device_real_t)(n_valid), average_rdifference / (device_real_t)(n_valid)};
+        return {n_correct, average_adifference / (float)(n_valid), average_rdifference / (float)(n_valid)};
     }
 
-    void is_close(const IsomerBatch& a, const IsomerBatch& b, device_real_t tol, bool verbose){
+    void is_close(const IsomerBatch& a, const IsomerBatch& b, float tol, bool verbose){
 
         if (! (a.buffer_type == b.buffer_type && a.isomer_capacity == b.isomer_capacity && a.n_atoms == b.n_atoms) ) {
             std::cout << "IsomerBatches are of different types and or dimensions \n";
@@ -304,6 +304,24 @@ namespace cuda_io{
     return std::chrono::nanoseconds((int)std::sqrt( (result / input.size()).count()));
     }
 
+    std::chrono::microseconds sdev(std::vector<std::chrono::microseconds>& input){
+    auto mean_ = mean(input);
+    chrono::microseconds result = std::chrono::microseconds(0);
+    for (int i = 0; i < input.size(); i++){
+            result += (input[i] - mean_) *  (input[i] - mean_).count();
+    }
+    return std::chrono::microseconds((int)std::sqrt( (result / input.size()).count()));
+    }
+
+    double sdev(std::vector<double>& input){
+        auto mean_ = mean(input);
+        double result = 0;
+        for (int i = 0; i < input.size(); i++){
+                result += (input[i] - mean_) *  (input[i] - mean_);
+        }
+        return std::sqrt( (result / input.size()));
+    }
+
     __global__
     void reset_convergence_status_(IsomerBatch B){
         for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x)
@@ -329,11 +347,11 @@ namespace cuda_io{
 }
 
 void IsomerBatch::append(const Graph& graph, const size_t id){
-    if (m_size == isomer_capacity) throw std::runtime_error("IsomerBatch is full");
-    auto Nf = n_atoms / 2 + 2;
-    if (graph.neighbours.size() != Nf) throw std::runtime_error("Graph has wrong number of faces");
+    if (m_size == isomer_capacity) {std::cout << "IsomerBatch is full" << std::endl; assert(false);}
+    auto Nf = this->n_atoms / 2 + 2;
+    if (graph.neighbours.size() != Nf) {std::cout << "Graph has wrong number of faces" + std::to_string(graph.neighbours.size()) + " " + std::to_string(Nf) << std::endl; assert(false);}
     if (buffer_type == DEVICE_BUFFER){
-        throw std::runtime_error("Appending to device buffer not implemented, use a host buffer instead and then copy to device buffer.");    
+        std::cout << "Appending to device buffer not implemented, use a host buffer instead and then copy to device buffer." << std::endl; assert(false);
     } else if (buffer_type == HOST_BUFFER){
         size_t face_offset = m_size * Nf;
         for(node_t u=0;u< graph.neighbours.size();u++){
@@ -346,6 +364,24 @@ void IsomerBatch::append(const Graph& graph, const size_t id){
         iterations[m_size] = 0;
         IDs[m_size] = id;
     }
+    m_size++;
+}
+
+void IsomerBatch:: append(const PlanarGraph& G, const size_t id, const bool insert_2d){ 
+    //Extract the graph information (neighbours) from the PlanarGraph object and insert it at the appropriate location in the queue.
+    size_t offset = m_size* n_atoms;
+    for(node_t u=0;u<n_atoms;u++){
+        for(int j=0;j<3;j++){
+            cubic_neighbours[3*(offset+u)+j] = G.neighbours[u][j];
+        }
+        if(insert_2d){
+            xys[2*(offset+u) + 0] = G.layout2d[u].first;
+            xys[2*(offset+u) + 1] = G.layout2d[u].second; 
+        }
+    }
+    statuses[m_size] = IsomerStatus::NOT_CONVERGED;
+    iterations[m_size] = 0;
+    IDs[m_size] = id;
     m_size++;
 }
 
@@ -473,7 +509,7 @@ std::vector<size_t> IsomerBatch::find_ids(const IsomerStatus status){
 
 bool IsomerBatch::operator==(const IsomerBatch& b){
     bool passed = true;
-    auto device_real_t_equals = [](const device_real_t a, const device_real_t b){
+    auto device_real_t_equals = [](const float a, const float b){
         return (a == b) || (std::isnan(a) && std::isnan(b)) || (std::isinf(a) && std::isinf(b));
     };
     
