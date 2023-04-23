@@ -19,6 +19,7 @@ int main(int argc, char** argv){
     const size_t N_start                = argc>1 ? strtol(argv[1],0,0) : 20;                   // Argument 1: Number of vertices N
     const size_t N_limit                = argc>2 ? strtol(argv[2],0,0) : 200;                  // Argument 1: Number of vertices N
 
+
     auto N_runs = 1;    
     ofstream out_file("IsomerspaceOpt_V0_" + to_string(N_limit) + ".txt");
     ofstream out_file_std("IsomerspaceOpt_V0_STD_" + to_string(N_limit) + ".txt");
@@ -81,11 +82,10 @@ int main(int argc, char** argv){
         }}
         using namespace cuda_io;
         auto total = (float)(mean(T_io)/1ns + mean(T_par)/1ns + mean(T_seq)/1ns);
-        std::cout << std::fixed << std::setprecision(2) << N << ", "<< sample_size << ", " << (mean(T_seq)/1ns)/total*100. << "%, " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us+mean(T_seq)/1us)/sample_size << "us/isomer\n";
-
+        std::cout << std::fixed << std::setprecision(2) << N << ", "<< sample_size << ", Seq: " << (mean(T_seq)/1ns)/total*100. << "%, " << (mean(T_par)/1ns)/total*100. << "%, " << (mean(T_io)/1ns)/total*100. << "%, " << (float)(mean(T_io)/1us+mean(T_par)/1us+mean(T_seq)/1us)/sample_size << "us/isomer\n";
         std::cout << (mean(T_opt)/1ns)/total*100. << "%  +/-: " << (sdev(T_opt)/1ns)/total*100. << "%\n"; 
         out_file << N << ", "<< sample_size << ", " << mean(T_seq)/1ns << ", " << mean(T_par)/1ns <<  ", " << mean(T_io)/1ns << "\n";
         out_file_std << N << ", "<< sample_size << ", " << sdev(T_seq)/1ns << ", " << sdev(T_par)/1ns <<  ", " << sdev(T_io)/1ns << "\n";
      }
 
-}
+ }
