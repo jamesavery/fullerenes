@@ -91,7 +91,7 @@ int main(int argc, char** argv){
             auto T3 = high_resolution_clock::now(); T_par[l] += (T3 - T2);
                 Q1.insert(batch0);
             auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);
-            while(Q2.get_size() < sample_size){
+            while(finished_fullerenes < sample_size){
                 auto T1 = high_resolution_clock::now();
                     Q1.refill_batch(batch1);
                 auto T2 = high_resolution_clock::now(); T_io[l] += (T2 - T1);
