@@ -40,6 +40,18 @@ void LaunchCtx::clear_allocations(){
     }
 }
 
+void LaunchCtx::start_timer(){
+    cudaEventRecord(m_start, stream);
+}
+
+std::chrono::nanoseconds LaunchCtx::stop_timer(){
+    float elapsed_time = 0.0f;
+    cudaEventRecord(m_stop, stream);
+    cudaEventSynchronize(m_stop);
+    cudaEventElapsedTime(&elapsed_time, m_start, m_stop); //elapsed_time is in ms
+    return std::chrono::nanoseconds((int) (elapsed_time*1e6));
+}
+
 LaunchCtx::LaunchCtx(){
     cudaGetDeviceCount(&m_device_count);
     if (m_device_count < 1) {
@@ -48,6 +60,8 @@ LaunchCtx::LaunchCtx(){
     }
     stream = cudaStream_t(NULL);
     cudaStream_t* stream_ptr = &stream;
+    cudaEventCreateWithFlags(&m_start, cudaEventBlockingSync);
+    cudaEventCreateWithFlags(&m_stop, cudaEventBlockingSync);
     m_unique_stream_idx = int(-1);
     m_device_id = 0;
     if(!default_ctx_created) m_all_streams.insert({m_unique_stream_idx,&stream_ptr});
@@ -64,6 +78,8 @@ LaunchCtx::LaunchCtx(int device){
     if(first_call[device]) cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync);
     cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
     cudaStream_t* stream_ptr = &stream;
+    cudaEventCreateWithFlags(&m_start, cudaEventBlockingSync);
+    cudaEventCreateWithFlags(&m_stop, cudaEventBlockingSync);
     m_unique_stream_idx = m_object_counter++;
     m_all_streams.insert({m_unique_stream_idx,&stream_ptr});
     cudaSetDevice(temp_device);
@@ -76,5 +92,6 @@ LaunchCtx::~LaunchCtx(){
         cudaStreamDestroy(stream);
         m_all_streams.erase(m_unique_stream_idx);
     }
+    cudaEventDestroy(m_start); cudaEventDestroy(m_stop);
 }
 
