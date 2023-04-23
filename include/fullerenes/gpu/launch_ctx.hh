@@ -1,7 +1,7 @@
 #pragma once
 #include "cuda_runtime_api.h"
 #include "unordered_map"
-
+#include "chrono"
 
 class LaunchCtx
 {
@@ -16,6 +16,8 @@ class LaunchCtx
         bool is_default_stream() const;
         //Synchronizes this stream context with the calling host thread.
         void wait() const;
+        void start_timer();
+        std::chrono::nanoseconds stop_timer();
         //Synchronizes all streams, expensive operation, don't use unless necessary.
         static void wait_all();
         static int get_device_count();
@@ -27,7 +29,9 @@ class LaunchCtx
         inline static std::unordered_map<int,cudaStream_t**> m_all_streams;
         //Increments every time a LaunchCtx is created, used as a way to uniquely identify streams, will break if more than 2147438647 streams are created.
         inline static int m_object_counter{};
-
+        
+        cudaEvent_t m_start;
+        cudaEvent_t m_stop;
         int m_device_count;
         int m_device_id{};
         int m_unique_stream_idx{};
