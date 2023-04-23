@@ -3,6 +3,7 @@
 
 #include "inttypes.h"
 #include "cuda_runtime.h"
+#include "array"
 
 
 #define BLOCK_SYNC __syncthreads();
@@ -19,12 +20,55 @@
 #define LINESEARCH_METHOD GSS
 #define FORCEFIELD_VERSION FLATNESS_ENABLED
 #define USE_CONSTANT_INDICES 0
-typedef float device_real_t;
+//Half-precision and particularly float16 currently do not seem to provide accurate enough results.
+#define FLOAT_TYPE 2 //0 is float16 , 1 is bfloat16, 2 is float, 3 is double 
+
+#if FLOAT_TYPE == 0
+    #include "cuda_fp16.h"
+    typedef __half device_real_t;
+    typedef std::array<__half,2> device_coord2d;
+    typedef std::array<__half,3> device_coord3d;
+    #define SQRT hsqrt 
+    #define RSQRT hrsqrt
+    #define ABS __habs
+    #define COS hcos
+    #define SIN hsin
+    #define ISNAN __hisnan
+#elif FLOAT_TYPE == 1
+    #include "cuda_bf16.h"
+    typedef __nv_bfloat16 device_real_t;
+    typedef std::array<__nv_bfloat16,2> device_coord2d;
+    typedef std::array<__nv_bfloat16,3> device_coord3d;
+    #define SQRT hsqrt 
+    #define RSQRT hrsqrt
+    #define ABS __habs
+    #define COS hcos
+    #define SIN hsin
+    #define ISNAN __hisnan
+#elif FLOAT_TYPE == 2
+    typedef float device_real_t;
+    typedef std::array<float,2> device_coord2d;
+    typedef std::array<float,3> device_coord3d;
+    #define SQRT sqrtf
+    #define RSQRT rsqrtf
+    #define ABS abs
+    #define COS cosf
+    #define SIN sinf
+    #define ISNAN isnan
+#elif FLOAT_TYPE == 3
+    typedef double device_real_t;
+    typedef std::array<double,2> device_coord2d;
+    typedef std::array<double,3> device_coord3d;
+    #define SQRT sqrt
+    #define RSQRT rsqrt
+    #define ABS abs
+    #define COS cos
+    #define SIN sin
+    #define ISNAN isnan
+#endif
 typedef uint16_t device_node_t;
-typedef float3 device_coord3d;
 typedef ushort3 device_node3;
 typedef ushort2 device_node2;
-typedef float2 device_coord2d;
 typedef struct device_node6
 {
     device_node_t b;
