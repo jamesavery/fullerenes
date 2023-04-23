@@ -79,19 +79,19 @@ int main(int ac, char **argv){
             isomerspace_forcefield::optimise<PEDERSEN>(d_validation, 10, N*10);
         }
         
-        CuArray<device_real_t> bond_rms(batch_size);
-        CuArray<device_real_t> angle_rms(batch_size);
-        CuArray<device_real_t> dihedral_rms(batch_size);
-        CuArray<device_real_t> bond_max(batch_size);
-        CuArray<device_real_t> angle_max(batch_size);
-        CuArray<device_real_t> dihedral_max(batch_size);
-        CuArray<device_real_t> bond_mean(batch_size);
-        CuArray<device_real_t> angle_mean(batch_size);
-        CuArray<device_real_t> dihedral_mean(batch_size);
-        CuArray<device_real_t> energies(batch_size);
-        CuArray<device_real_t> gradient_norm(batch_size);
-        CuArray<device_real_t> gradient_rms(batch_size);
-        CuArray<device_real_t> gradient_max(batch_size);
+        CuArray<float> bond_rms(batch_size);
+        CuArray<float> angle_rms(batch_size);
+        CuArray<float> dihedral_rms(batch_size);
+        CuArray<float> bond_max(batch_size);
+        CuArray<float> angle_max(batch_size);
+        CuArray<float> dihedral_max(batch_size);
+        CuArray<float> bond_mean(batch_size);
+        CuArray<float> angle_mean(batch_size);
+        CuArray<float> dihedral_mean(batch_size);
+        CuArray<float> energies(batch_size);
+        CuArray<float> gradient_norm(batch_size);
+        CuArray<float> gradient_rms(batch_size);
+        CuArray<float> gradient_max(batch_size);
 
         cuda_io::copy(h_validation, d_validation);
         cuda_io::sort(h_validation);
