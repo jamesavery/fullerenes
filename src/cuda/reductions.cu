@@ -281,7 +281,7 @@ __device__ void reduction_V5(T* sdata, const T data = (T)0, T* result = nullptr)
     auto warpid = threadIdx.x >> 5;
     auto laneid = threadIdx.x & 31;
     T temp = cg::reduce(tile32, data, cg::plus<T>());
-    if (laneid == 0) atomicAdd_block(result, temp);
+    if (laneid == 0) atomicAdd_block((float*)result, (float)temp);
     BLOCK_SYNC
 }
 

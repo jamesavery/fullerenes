@@ -18,9 +18,9 @@ struct symMat3
       C = b*b + c*c - a*d + e*e - a*f - d*f,
       D = -c*c*d + (real_t)2.f*b*c*e - a*e*e - b*b*f + a*d*f;
 
-    if(abs(D) < 1e-12){
+    if(ABS(D) < (real_t)1e-12){
       auto temp = B*B - real_t(4.f)*A*C;
-      real_t Disc = temp > (real_t)0. ? sqrt(B*B - real_t(4.f)*A*C) : 0;
+      real_t Disc = temp > (real_t)0. ? SQRT(B*B - real_t(4.f)*A*C) : (real_t)0;
 
       return {0.f, (-B-Disc)/( real_t(2.f)*A),(-B+Disc)/( real_t(2.f)*A)};
     }
@@ -33,33 +33,34 @@ struct symMat3
 
     // François Viète's solution to cubic polynomials with three real roots. 
     device_coord3d t;
-    if(abs(p) < 1e-12) {
+    if(ABS(p) < (real_t)1e-12) {
       t = {(real_t)0., (real_t)0., (real_t)0.};
       return t - xc;}
 
     //For numerical stability we must ensure that acos doesn't receive an arugment which is outside [-1,1]
-    auto frac = ( (real_t)3.f*q)/( (real_t)2.f*p)*sqrt((real_t)-3.f/p);
+    auto frac = ( (real_t)3.f*q)/( (real_t)2.f*p)*SQRT((real_t)-3.f/p);
     frac = d_max((real_t)-1.,d_min((real_t)1., frac));
 
-    real_t K = (real_t)2.f*sqrt(-p/ (real_t)3.f), 
-                  theta0 = ((real_t)1.f/ (real_t)3.f)*acos(frac);
-    for(int k=0;k<3;k++) d_set(t,k,K*cos(theta0-k* (real_t)2.f* (real_t)M_PI/ (real_t)3.f) );
+    real_t K = (real_t)2.f*SQRT(-p/ (real_t)3.f), 
+                  theta0 = ((real_t)1.f/ (real_t)3.f)*(real_t)acos((float)frac);
+    for(int k=0;k<3;k++) d_set(t,k,K*COS(theta0-(real_t)k* (real_t)2.f* (real_t)M_PI/ (real_t)3.f) );
     // lambda = t - B/(3A)
     return t - xc;
     
   }
   //Best case 25 FLOPS
   INLINE device_coord3d eigenvector(const device_real_t lambda) const{
+    DEVICE_TYPEDEFS
     // using the first two eqs
     // [ a_12 * a_23 - a_13 * (a_22 - r) ]
     // [ a_12 * a_13 - a_23 * (a_11 - r) ]
     // [ (a_11 - r) * (a_22 - r) - a_12^2 ]
-    device_real_t normx;
-    device_coord3d x = {b*e - c*(d-lambda),
+    real_t normx;
+    coord3d x = {b*e - c*(d-lambda),
                  b*c - e*(a-lambda),
                  (a-lambda)*(d-lambda) - b*b };
     normx = norm(x);
-    if (normx / (a + d + f) > 1.e-12){ // not zero-ish
+    if (normx / (a + d + f) > (real_t)1.e-6){ // not zero-ish
       return x/normx;
     }
   
@@ -71,7 +72,7 @@ struct symMat3
                  c*c - (a-lambda)*(f-lambda),
                  e*(a-lambda) - b*c };
     normx = norm(x);
-    if (normx / (a + d + f) > 1.e-12){ // not zero-ish
+    if (normx / (a + d + f) > (real_t)1.e-6){ // not zero-ish
       return x/normx;
     }
 
@@ -83,7 +84,7 @@ struct symMat3
                  b*(f-lambda) - c*e,
                  c*(d-lambda) - b*e };
     normx = norm(x);
-    if (normx / (a + d + f) > 1.e-12){ // not zero-ish
+    if (normx / (a + d + f) > (real_t)1.e-6){ // not zero-ish
       return x/normx;
     } 
     //assert(false); // Something went wrong possibly two degenerate evals.

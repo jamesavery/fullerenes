@@ -35,7 +35,7 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
     BLOCK_SYNC;
     bool fixed = reinterpret_cast<bool*>(sharedmem)[threadIdx.x];
 
-    if(threadIdx.x < Nface) xys[outer_face_vertex] = {sin(threadIdx.x*(real_t)2.0*real_t(M_PI)/double(Nface)),cos(threadIdx.x*(real_t)2.0*real_t(M_PI)/double(Nface))};
+    if(threadIdx.x < Nface) xys[outer_face_vertex] = {SIN((real_t)threadIdx.x*(real_t)2.0*real_t(M_PI)/real_t(Nface)),COS((real_t)threadIdx.x*(real_t)2.0*real_t(M_PI)/real_t(Nface))};
     BLOCK_SYNC
     bool converged          = false;
     real_t max_change       = real_t(0.0);
@@ -52,26 +52,25 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
         real_t neighbour_dist = 0.0f;
 
         // Calculate the distance between neighbours
-        for (uint8_t j = 0; j < 3; j++) neighbour_dist += norm(xys[threadIdx.x] - xys[d_get(ns,j)])/3;
+        for (uint8_t j = 0; j < 3; j++) neighbour_dist += norm(xys[threadIdx.x] - xys[d_get(ns,j)])/real_t(3);
         
         BLOCK_SYNC
         real_t relative_change = 0.0f;
 
         // Calculate the relative change
-        if (neighbour_dist > 0.0f && !fixed){ 
+        if (neighbour_dist > (real_t)0.0f && !fixed){ 
             relative_change = norm(xys[threadIdx.x] - newxys[threadIdx.x])/neighbour_dist;
         }
 
         // Reduce the relative change to find the maximum change
         real_t iteration_max = reduction_max(sharedmem, relative_change);
         if (iteration_max > max_change) max_change = iteration_max;
-        converged = max_change <= 5e-4;
-
+        converged = max_change <= (real_t)5e-4;
         // Update the position of the point
         xys[threadIdx.x] = newxys[threadIdx.x];
     }
     BLOCK_SYNC
-    (reinterpret_cast<coord2d*>(B.xys) + offset )[threadIdx.x] = xys[threadIdx.x];
+    assign((reinterpret_cast<std::array<float,2>*>(B.xys) + offset )[threadIdx.x] , xys[threadIdx.x]);
     }
     }
 }

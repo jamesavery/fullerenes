@@ -4,10 +4,10 @@
 #include "fullerenes/gpu/cuda_definitions.h"
 #include "cuda_runtime_api.h"
 
-__device__ void print(const device_coord3d& ab){
+/* __device__ void print(const device_coord3d& ab){
     printf("[%.6f,%.6f,%.6f]",ab.x,ab.y,ab.z);
 }
-
+ */
 __device__ void print(device_real_t a){
     printf("%.6f", a);
 }
@@ -27,7 +27,7 @@ __device__ void print(size_t a){
 __device__ void print(const char* a){
     printf(a);
 }
-__device__ void print(const device_node2& a){
+/* __device__ void print(const device_node2& a){
     printf("[%d,%d]",a.x,a.y);
 }
 
@@ -40,7 +40,7 @@ __device__ void print(const device_node6& a){
 }
 __device__ void print(const device_coord2d& a){
     printf("[%.6f,%.6f]",a.x,a.y);
-}
+} */
 template <typename T>
 __device__ void print_single(T data){
     if (threadIdx.x + blockIdx.x == 0) {

@@ -59,14 +59,14 @@ device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, 
     BLOCK_SYNC
     clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2);
     BLOCK_SYNC
-    coord2d xys = reinterpret_cast<coord2d*>(B.xys)[isomer_idx*blockDim.x + threadIdx.x]; BLOCK_SYNC
-    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2], xys.x); 
-    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2+1], xys.y); BLOCK_SYNC
-    coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / num_of_same_dist; BLOCK_SYNC    
+    coord2d xys; assign(xys,reinterpret_cast<std::array<float,2>*>(B.xys)[isomer_idx*blockDim.x + threadIdx.x]); BLOCK_SYNC
+    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2], xys[0]); 
+    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2+1], xys[1]); BLOCK_SYNC
+    coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / (real_t)num_of_same_dist; BLOCK_SYNC    
     coord2d xy = xys - centroid;
     real_t dtheta = real_t(M_PI)/real_t(d_max+1); 
-    real_t phi = dtheta*(distance + real_t(0.5)); 
-    real_t theta = atan2(xy.x, xy.y); 
+    real_t phi = dtheta*(real_t(distance) + real_t(0.5)); 
+    real_t theta = atan2(float(xy[0]), float(xy[1])); 
     coord2d spherical_layout = {theta, phi};
     
 
@@ -74,7 +74,7 @@ device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, 
 }
 
 __global__
-void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
+void zero_order_geometry_(IsomerBatch B, float scalerad, int offset){
     DEVICE_TYPEDEFS
     
     extern __shared__  device_real_t sdata[];
@@ -83,14 +83,14 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
     if (isomer_idx < B.isomer_capacity && B.statuses[isomer_idx] != IsomerStatus::EMPTY){
     NodeNeighbours node_graph = NodeNeighbours(B, isomer_idx); 
     coord2d angles = spherical_projection(B,reinterpret_cast<device_node_t*>(sdata), isomer_idx);
-    real_t theta = angles.x; real_t phi = angles.y;
-    real_t x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
+    real_t theta = angles[0]; real_t phi = angles[1];
+    real_t x = COS(theta)*SIN(phi), y = SIN(theta)*SIN(phi), z = COS(phi);
     coord3d coordinate = {x, y ,z};
 
     clear_cache(sdata, Block_Size_Pow_2);
-    x = reduction(sdata, coordinate.x); y = reduction(sdata, coordinate.y); z = reduction(sdata,coordinate.z);
+    x = reduction(sdata, coordinate[0]); y = reduction(sdata, coordinate[1]); z = reduction(sdata,coordinate[2]);
     coord3d cm = {x, y, z};
-    cm /= blockDim.x;
+    cm /= (real_t)blockDim.x;
     coordinate -= cm;
     real_t Ravg = real_t(0.0);
     clear_cache(sdata, Block_Size_Pow_2);
@@ -102,8 +102,8 @@ void zero_order_geometry_(IsomerBatch B, device_real_t scalerad, int offset){
     for (uint8_t i = 0; i < 3; i++) {local_Ravg += norm(X[threadIdx.x] - X[d_get(node_graph.cubic_neighbours,i)]);}
     Ravg = reduction(sdata, local_Ravg);
     Ravg /= real_t(3*blockDim.x);
-    coordinate *= scalerad*1.5/Ravg;
-    reinterpret_cast<coord3d*>(B.X)[blockDim.x*isomer_idx + threadIdx.x] = coordinate;
+    coordinate *= (real_t)scalerad*(real_t)1.5/Ravg;
+    assign(reinterpret_cast<std::array<float,3>*>(B.X)[blockDim.x*isomer_idx + threadIdx.x] , coordinate);
     }
 }
 
@@ -116,7 +116,7 @@ void reset_time(){
     kernel_time = 0.0;
 }
 
-cudaError_t zero_order_geometry(IsomerBatch& B, const device_real_t scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
+cudaError_t zero_order_geometry(IsomerBatch& B, const float scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     //Need a way of telling whether the kernel has been called previously.
     static std::vector<bool> first_call(16, true);
