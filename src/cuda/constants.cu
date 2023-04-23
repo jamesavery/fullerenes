@@ -1,19 +1,19 @@
 //Pentagons = 0
 //Hexagons = 1
-constexpr __constant__ device_real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
-constexpr __constant__ device_real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
-constexpr __constant__ device_real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
+constexpr __constant__ float optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
+constexpr __constant__ float optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
+constexpr __constant__ float optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
 
 #if SEMINARIO_FORCE_CONSTANTS==1
-constexpr __constant__ device_real_t angle_forces[2] = {207.924,216.787}; 
-constexpr __constant__ device_real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
-constexpr __constant__ device_real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
-constexpr __constant__ device_real_t flat_forces[3] = {0., 0., 0.};
+constexpr __constant__ float angle_forces[2] = {207.924,216.787}; 
+constexpr __constant__ float bond_forces[3] = {260.0, 353.377, 518.992}; 
+constexpr __constant__ float dih_forces[4] = {35.0,65.0,3.772,270.0}; 
+constexpr __constant__ float flat_forces[3] = {0., 0., 0.};
 #else
-constexpr __constant__ device_real_t angle_forces[2] = {100.0,100.0}; 
-constexpr __constant__ device_real_t bond_forces[3] = {260.0,390.0,450.0}; 
-constexpr __constant__ device_real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
-constexpr __constant__ device_real_t flat_forces[3] = {0., 0., 0.};
+constexpr __constant__ float angle_forces[2] = {100.0,100.0}; 
+constexpr __constant__ float bond_forces[3] = {260.0,390.0,450.0}; 
+constexpr __constant__ float dih_forces[4] = {35.0,65.0,85.0,270.0}; 
+constexpr __constant__ float flat_forces[3] = {0., 0., 0.};
 #endif
 
 struct Constants{

@@ -16,7 +16,7 @@ int main(int argc, char** argv){
     Graph G;
     G.N = N;
     G.neighbours = neighbours_t(N);
-    CuArray<device_real_t> output( M );
+    CuArray<float> output( M );
 
     for(int i  = 0; i < M; i++){
         BuckyGen::next_fullerene(bucky_Q, G);

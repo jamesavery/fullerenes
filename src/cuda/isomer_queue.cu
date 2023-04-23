@@ -27,9 +27,9 @@ namespace cuda_io{
 #include "print_functions.cu"
 
 //Casting functions to convert Graph objects and its' derivatives to IsomerBatch storage i.e flat memory representation.
-static auto casting_coord3d = [](coord3d in){return device_coord3d{static_cast<device_real_t>(in[0]), static_cast<device_real_t>(in[1]), static_cast<device_real_t>(in[2])};};
+static auto casting_coord3d = [](coord3d in){return device_coord3d{static_cast<float>(in[0]), static_cast<float>(in[1]), static_cast<float>(in[2])};};
 static auto casting_node3   = [](std::vector<node_t> in){return device_node3{static_cast<device_node_t>(in[0]), static_cast<device_node_t>(in[1]), static_cast<device_node_t>(in[2])};};
-static auto casting_coord2d = [](coord2d in){return device_coord2d{static_cast<device_real_t>(in.first), static_cast<device_real_t>(in.second)};};
+static auto casting_coord2d = [](coord2d in){return device_coord2d{static_cast<float>(in.first), static_cast<float>(in.second)};};
 
 
 __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){

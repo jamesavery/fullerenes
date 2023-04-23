@@ -16,8 +16,8 @@ enum class LaunchPolicy {SYNC, ASYNC};
 struct IsomerBatch : GPUDataStruct
 {
 
-    device_real_t* X;
-    device_real_t* xys;
+    float* X;
+    float* xys;
 
     device_node_t* cubic_neighbours;
     device_node_t* dual_neighbours;
@@ -28,7 +28,7 @@ struct IsomerBatch : GPUDataStruct
     IsomerStatus* statuses;
 
     IsomerBatch(){
-      pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+      pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(float)*3, true}, {"xys", (void**)&xys, sizeof(float)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
     }
 
     void operator=(const IsomerBatch &);
@@ -48,6 +48,7 @@ struct IsomerBatch : GPUDataStruct
     std::vector<size_t> find_ids(const IsomerStatus status); //Returns a vector of IDs with a given status
     void shrink_to_fit();        
     void append(const Graph& G, const size_t id);  //Appends a graph to the batch and increments the size
+    void append(const PlanarGraph& G, const size_t id, const bool copy_2d_layout = true); //Appends a planar graph to the batch and increments the size
     void append(const Polyhedron& P, const size_t id); //Appends a polyhedron to the batch and increments the size
     void clear();                 //Clears the batch and resets the size to 0
     bool operator==(const IsomerBatch& b); //Returns true if the two batches are equal

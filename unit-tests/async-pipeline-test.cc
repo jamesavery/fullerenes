@@ -172,12 +172,12 @@ int main(int ac, char **argv){
 
 
 
-    CuArray<device_real_t> control_bonds(d_control.isomer_capacity*N*3);
-    CuArray<device_real_t> control_angles(d_control.isomer_capacity*N*3);
-    CuArray<device_real_t> control_dihedrals(d_control.isomer_capacity*N*3);
-    CuArray<device_real_t> test_bonds(d_control.isomer_capacity*N*3);
-    CuArray<device_real_t> test_angles(d_control.isomer_capacity*N*3);
-    CuArray<device_real_t> test_dihedrals(d_control.isomer_capacity*N*3);
+    CuArray<float> control_bonds(d_control.isomer_capacity*N*3);
+    CuArray<float> control_angles(d_control.isomer_capacity*N*3);
+    CuArray<float> control_dihedrals(d_control.isomer_capacity*N*3);
+    CuArray<float> test_bonds(d_control.isomer_capacity*N*3);
+    CuArray<float> test_angles(d_control.isomer_capacity*N*3);
+    CuArray<float> test_dihedrals(d_control.isomer_capacity*N*3);
 
     output_queue.device_batch.shrink_to_fit();
 
@@ -191,12 +191,12 @@ int main(int ac, char **argv){
     isomerspace_forcefield::get_dihedrals(d_control, control_dihedrals);
     isomerspace_forcefield::get_dihedrals(output_queue.device_batch, test_dihedrals);
 
-    std::vector<device_real_t> rdiffs_bond(max((int)d_control.isomer_capacity,10000));
-    std::vector<device_real_t> rdiffs_angle(max((int)d_control.isomer_capacity,10000));
-    std::vector<device_real_t> rdiffs_dihedral(max((int)d_control.isomer_capacity,10000));
-    std::vector<device_real_t> adiffs_bond(max((int)d_control.isomer_capacity,10000));
-    std::vector<device_real_t> adiffs_angle(max((int)d_control.isomer_capacity,10000));
-    std::vector<device_real_t> adiffs_dihedral(max((int)d_control.isomer_capacity,10000));
+    std::vector<float> rdiffs_bond(max((int)d_control.isomer_capacity,10000));
+    std::vector<float> rdiffs_angle(max((int)d_control.isomer_capacity,10000));
+    std::vector<float> rdiffs_dihedral(max((int)d_control.isomer_capacity,10000));
+    std::vector<float> adiffs_bond(max((int)d_control.isomer_capacity,10000));
+    std::vector<float> adiffs_angle(max((int)d_control.isomer_capacity,10000));
+    std::vector<float> adiffs_dihedral(max((int)d_control.isomer_capacity,10000));
 
     cuda_io::copy(h_control, d_control);
     output_queue.host_batch.shrink_to_fit();

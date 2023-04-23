@@ -49,8 +49,8 @@ int main(int argc, char** argv){
         cuda_io::sort(h_test); cuda_io::sort(h_validation);
         //std::cout << h_test;
         //std::cout << h_validation;
-        std::vector<device_real_t> rdiffs(max_samples);
-        std::vector<device_real_t> adiffs(max_samples);
+        std::vector<float> rdiffs(max_samples);
+        std::vector<float> adiffs(max_samples);
         for (size_t j = 0; j < batch_size; j++)
         {
             auto [a, b, rdiff] = cuda_io::compare_isomer_arrays(h_test.xys + 2*i*j, h_validation.xys + 2*i*j, 1, i);
@@ -58,7 +58,7 @@ int main(int argc, char** argv){
             adiffs[j] = b;
         }
 
-        device_real_t magnitude = 0.0;
+        float magnitude = 0.0;
         for (size_t j = 0; j < batch_size*i*2; j++)
         {
             magnitude += std::abs(h_validation.xys[j]);
@@ -67,8 +67,8 @@ int main(int argc, char** argv){
         
         std::cout << "Isomerspace: " << i << " Magnitutde:" << magnitude << "\n";
 
-        std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs.begin(),rdiffs.end())/(device_real_t)batch_size << "\n";
-        std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs.begin(),adiffs.end())/(device_real_t)batch_size << "\n";
+        std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs.begin(),rdiffs.end())/(float)batch_size << "\n";
+        std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs.begin(),adiffs.end())/(float)batch_size << "\n";
 
         rel_file << batch_size << ", ";
         abs_file << batch_size << ", ";

@@ -17,8 +17,8 @@ using namespace chrono;
 using namespace chrono_literals;
 
 int main(int argc, char** argv){
-    const size_t N_limit                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
-    const int generate_cpu_stats        = strtol(argv[2],0,0);     // Argument 2: Boolean to generate CPU stats
+    const size_t N_limit                = argc>1 ? strtol(argv[1],0,0) : 200;     // Argument 1: Number of vertices N
+    const int generate_cpu_stats        = argc>2 ? strtol(argv[2],0,0) : 0;     // Argument 2: Boolean to generate CPU stats
     ofstream BONDS_CUDA_Wirz("Stats/IsomerspaceBondRMS_CUDA_Wirz" + to_string(N_limit) + ".txt");
     ofstream BONDS_CUDA_Buster("Stats/IsomerspaceBondRMS_CUDA_Buster" + to_string(N_limit) + ".txt");
     ofstream BONDS_CUDA_Flat("Stats/IsomerspaceBondRMS_CUDA_Flat" + to_string(N_limit) + ".txt");
@@ -101,7 +101,7 @@ int main(int argc, char** argv){
         InputQueue.refill_batch(GPUBatch);
 
         gpu_kernels::isomerspace_dual::dualise(GPUBatch);
-        gpu_kernels::isomerspace_tutte::tutte_layout(GPUBatch);
+        gpu_kernels::isomerspace_tutte::tutte_layout(GPUBatch, N*10);
         gpu_kernels::isomerspace_X0::zero_order_geometry(GPUBatch,4.0f);
         reset_convergence_statuses(GPUBatch);
         IsomerBatch WirzBatch(N,sample_size,DEVICE_BUFFER);
@@ -114,26 +114,26 @@ int main(int argc, char** argv){
         gpu_kernels::isomerspace_forcefield::optimise<FLATNESS_ENABLED>(FlatBatch,N*5,N*5);
 
 
-        CuArray<device_real_t> RMSBonds_CUDA(max_sample_size);
-        CuArray<device_real_t> RMSBonds_Wirz(max_sample_size);
-        CuArray<device_real_t> RMSBonds_Flat(max_sample_size);
+        CuArray<float> RMSBonds_CUDA(max_sample_size);
+        CuArray<float> RMSBonds_Wirz(max_sample_size);
+        CuArray<float> RMSBonds_Flat(max_sample_size);
 
-        CuArray<device_real_t> RMSAngles_CUDA(max_sample_size);
-        CuArray<device_real_t> RMSAngles_Wirz(max_sample_size);
-        CuArray<device_real_t> RMSAngles_Flat(max_sample_size);
+        CuArray<float> RMSAngles_CUDA(max_sample_size);
+        CuArray<float> RMSAngles_Wirz(max_sample_size);
+        CuArray<float> RMSAngles_Flat(max_sample_size);
 
-        CuArray<device_real_t> RMSDihedrals_CUDA(max_sample_size);
-        CuArray<device_real_t> RMSDihedrals_Wirz(max_sample_size);
-        CuArray<device_real_t> RMSDihedrals_Flat(max_sample_size);
+        CuArray<float> RMSDihedrals_CUDA(max_sample_size);
+        CuArray<float> RMSDihedrals_Wirz(max_sample_size);
+        CuArray<float> RMSDihedrals_Flat(max_sample_size);
 
-        CuArray<device_real_t> RMSFlatness_CUDA(max_sample_size);
-        CuArray<device_real_t> RMSFlatness_Wirz(max_sample_size);
-        CuArray<device_real_t> RMSFlatness_Flat(max_sample_size);
+        CuArray<float> RMSFlatness_CUDA(max_sample_size);
+        CuArray<float> RMSFlatness_Wirz(max_sample_size);
+        CuArray<float> RMSFlatness_Flat(max_sample_size);
 
-        CuArray<device_real_t> Energy_CUDA_WIRZ(max_sample_size);
-        CuArray<device_real_t> Energy_CUDA_FLAT(max_sample_size);
-        CuArray<device_real_t> Energy_CUDA_PEDERSEN(max_sample_size);
-        CuArray<device_real_t> Energy_WIRZ(max_sample_size);
+        CuArray<float> Energy_CUDA_WIRZ(max_sample_size);
+        CuArray<float> Energy_CUDA_FLAT(max_sample_size);
+        CuArray<float> Energy_CUDA_PEDERSEN(max_sample_size);
+        CuArray<float> Energy_WIRZ(max_sample_size);
 
 
         gpu_kernels::isomerspace_forcefield::get_bond_rrmse<PEDERSEN>(GPUBatch,RMSBonds_CUDA);
@@ -181,6 +181,7 @@ int main(int argc, char** argv){
         ENERGY_CUDA_Flat << N << ", " << sample_size << ", ";
         ENERGY_Wirz << N << ", " << sample_size << ", ";
 
+
         for (size_t j = 0; j < max_sample_size; j++){
             if (j != max_sample_size-1) {
                 BONDS_CUDA_Buster << RMSBonds_CUDA[j] << ", ";
@@ -225,11 +226,11 @@ int main(int argc, char** argv){
         }
 
         if (generate_cpu_stats > 0){
-            CuArray<device_real_t> RMSBonds_Fortran(max_sample_size);
-            CuArray<device_real_t> RMSAngles_Fortran(max_sample_size);
-            CuArray<device_real_t> RMSDihedrals_Fortran(max_sample_size);
-            CuArray<device_real_t> RMSFlatness_Fortran(max_sample_size);
-            CuArray<device_real_t> Energy_Fortran(max_sample_size);
+            CuArray<float> RMSBonds_Fortran(max_sample_size);
+            CuArray<float> RMSAngles_Fortran(max_sample_size);
+            CuArray<float> RMSDihedrals_Fortran(max_sample_size);
+            CuArray<float> RMSFlatness_Fortran(max_sample_size);
+            CuArray<float> Energy_Fortran(max_sample_size);
             cuda_io::copy(OptimisedQueue.device_batch, OptimisedQueue.host_batch);
             gpu_kernels::isomerspace_forcefield::get_bond_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSBonds_Fortran);
             gpu_kernels::isomerspace_forcefield::get_angle_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSAngles_Fortran);
