@@ -145,7 +145,7 @@ int main(int ac, char **argv)
           opt_routine();
       }
       auto T5 = steady_clock::now(); Topt += T5-T4;
-      if(loop_iters % 3 == 0){
+      if(loop_iters % 3 == 0 || num_finished == n_fullerenes){
         auto Titer = steady_clock::now() - Tstart;
         Tstart = steady_clock::now();
         auto Tff   = isomerspace_forcefield::time_spent()/Nd;
@@ -176,7 +176,7 @@ int main(int ac, char **argv)
   //std::cout << std::endl;
 
   cout << "\n\n\n\n\n\n\n\n";
-  cout << "Time spent on non:\n"
+  /* cout << "Time spent on non:\n"
     "\tTotal Time                     = " << (Ttot/1ms)       << " ms\n"
     "\tTime Unaccounted For           = " << (Ttot-Tsum)/1ms  << " ms\n"
     "\tGeometry Overhead              = " << (TgeomOverhead)/1ms << " ms\n"
@@ -186,7 +186,7 @@ int main(int ac, char **argv)
     "\tTutte embedding                = " << (Ttutte/1ms)     << " ms\n"
     "\tInitial geometry               = " << (TX0/1ms)        << " ms\n"
     "\tFF Optimization                = " << (Topt/1ms)       << " ms\n";
-  //
+   *///
 
   return 0;
 }
