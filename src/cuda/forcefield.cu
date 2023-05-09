@@ -104,11 +104,7 @@ struct FaceData{
  * @return The flatness energy.
  */
     INLINE real_t flatness_energy(const Constants& c) const {
-        #if USE_CONSTANT_INDICES
-        return c.f_flat() * harmonic_energy(flatness(),(real_t)0.);
-        #else
         return c.f_flat * harmonic_energy(flatness(),(real_t)0.);
-        #endif
     }
 
     /**
@@ -128,12 +124,7 @@ struct FaceData{
 
         coord3d grad = {(real_t)0., (real_t)0., (real_t)0.};
         for(unsigned char j = 0; j < 3; j++) grad += dot(Xa - centroids[d_get(face_neighbours,j)], norms[d_get(face_neighbours,j)]) * norms[d_get(face_neighbours,j)];
-        #if USE_CONSTANT_INDICES
-        return c.f_flat() * (real_t)2. * grad;
-        #else
         return c.f_flat * (real_t)2. * grad;
-        #endif
-
     }
 };
 
@@ -153,22 +144,23 @@ struct ArcData{
         this->j = j;   
         node_t a = threadIdx.x;
         real_t r_rmp;
-        coord3d ap, am, ab, ac, ad, mp;
+        coord3d ap, am, ab, ac, ad, mp, db, bc;
         coord3d X_a = X[a], X_b = X[d_get(G.cubic_neighbours,j)];
-
         //Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
         ab = (X_b - X_a);  r_rab = bond_length(ab); ab_hat = r_rab * ab;
         ac = (X[d_get(G.cubic_neighbours,(j+1)%3)] - X_a); r_rac = bond_length(ac); ac_hat = r_rac * ac; rab = non_resciprocal_bond_length(ab);
         ad = (X[d_get(G.cubic_neighbours,(j+2)%3)] - X_a); r_rad = bond_length(ad); ad_hat = r_rad * ad;
+        db = (X_b - X[d_get(G.cubic_neighbours,(j+2)%3)]); r_rdb = bond_length(db); db_hat = r_rdb * db;
+        coord3d bp = (X[d_get(G.next_on_face,j)] - X_b); 
+        coord3d bm = (X[d_get(G.prev_on_face,j)] - X_b); 
         
-        coord3d bp = (X[d_get(G.next_on_face,j)] - X_b); bp_hat = unit_vector(bp);
-        coord3d bm = (X[d_get(G.prev_on_face,j)] - X_b); bm_hat = unit_vector(bm);
+        r_rbp = bond_length(bp); bp_hat = bp * r_rbp;
+        r_rbm = bond_length(bm); bm_hat = bm * r_rbm;
 
         ap = bp + ab; r_rap = bond_length(ap); ap_hat = r_rap * ap;
         am = bm + ab; r_ram = bond_length(am); am_hat = r_ram * am;
         mp = bp - bm; r_rmp = bond_length(mp); mp_hat = r_rmp * mp;
-
-        bc_hat = unit_vector(ac - ab);
+        bc = ac - ab; r_rbc = bond_length(bc); bc_hat = r_rbc * bc;
         cd_hat = unit_vector(ad - ac);
 
         //Compute inverses of some arcs, these are subject to be omitted if the equations are adapted appropriately with inversion of signs.
@@ -197,6 +189,11 @@ struct ArcData{
     INLINE coord3d  harmonic_energy_gradient(const real_t p0, const real_t p, const coord3d gradp) const{
         return (p-p0)*gradp;     
     }
+
+    INLINE mat3 harmonic_energy_hessian(const real_t p0, const real_t p, const coord3d grad_a, const coord3d grad_b, const mat3& hessp) const{
+        return hessp*(p-p0) + tensor_product(grad_a,grad_b);
+    }
+
     //1 FLOP
     /**
      * @brief Compute the bond length of the main arc ab or ac or ad. for j = 0, 1 or 2 respectively.
@@ -285,32 +282,330 @@ struct ArcData{
     {   
         real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
         coord3d grad = cos_angle * (ab_hat * r_rab + ac_hat * r_rac) - ab_hat * r_rac - ac_hat* r_rab; //Derivative of inner angle: Eq. 21. 
-        #if USE_CONSTANT_INDICES
-        return c.f_inner_angle(j) * harmonic_energy_gradient(c.angle0(j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
-        #else
         return d_get(c.f_inner_angle,j) * harmonic_energy_gradient(d_get(c.angle0,j), cos_angle, grad); //Harmonic Energy Gradient: Eq. 21. multiplied by harmonic term.
-        #endif
     }
 
     INLINE mat3 inner_angle_hessian_a(const Constants& c) const{
+        real_t cos_angle = angle(); //Inner angle of arcs ab,ac.
+        coord3d grad_a = (ab_hat * angle() - ac_hat) * r_rab + (ac_hat * angle() - ab_hat) * r_rac; 
+        
         //TensorProduct[abh, 1/abn * (abh*cost - ach) + 1/acn * (ach*cost-abh)] + cost/abn * (TensorProduct[abh,abh] - IdentityMatrix[3]) - 1/acn * (TensorProduct[ach,ach] - IdentityMatrix[3])
         auto G = tensor_product(ab_hat, r_rab * (ab_hat * angle() - ac_hat) + r_rac * (ac_hat * angle() - ab_hat))
-                + angle()*r_rab * (tensor_product(ab_hat, ab_hat) - identity()) 
-                - r_rac * (tensor_product(ac_hat, ac_hat) - identity());
+                + angle()*r_rab * (tensor_product(ab_hat, ab_hat) - identity3()) 
+                - r_rac * (tensor_product(ac_hat, ac_hat) - identity3());
 
         //F := TensorProduct[ach, 1/abn * (abh*cost - ach) + 1/acn * (ach*cost-abh)] + cost/acn * (TensorProduct[ach,ach] - IdentityMatrix[3]) - 1/abn * (TensorProduct[abh,abh] - IdentityMatrix[3])
-        auto F = tensor_product(ac_hat, r_rab * (ab_hat * angle() - ac_hat) + r_rac * (ac_hat * angle() - ab_hat)) + angle()*r_rac * (tensor_product(ac_hat, ac_hat) - identity()) - r_rab * (tensor_product(ab_hat, ab_hat) - identity());
-        
+        auto F = tensor_product(ac_hat, r_rab * (ab_hat * angle() - ac_hat) + r_rac * (ac_hat * angle() - ab_hat)) + angle()*r_rac * (tensor_product(ac_hat, ac_hat) - identity3()) - r_rab * (tensor_product(ab_hat, ab_hat) - identity3());
+
         auto P1 = tensor_product(ab_hat * angle() - ac_hat, ab_hat * r_rab*r_rab);
         auto P2 = r_rab*G;
         auto P3 = tensor_product(ac_hat * angle() - ab_hat, ac_hat * r_rac*r_rac);
         auto P4 = r_rac*F;
-        return P1 + P2 + P3 + P4;
+        return d_get(c.f_inner_angle,j) * harmonic_energy_hessian(d_get(c.angle0,j), cos_angle, grad_a, grad_a, P1+P2+P3+P4); //Harmonic Energy Hessian
     }
 
-    INLINE mat3 inner_angle_hessian_b(const Constants& c) const{}
+    INLINE mat3 inner_angle_hessian_b(const Constants& c) const{
+        coord3d grad_a = (ab_hat * angle() - ac_hat) * r_rab + (ac_hat * angle() - ab_hat) * r_rac; 
+        coord3d grad_b = (ac_hat - ab_hat * angle()) * r_rab;
+        auto G = tensor_product(ab_hat, r_rab * (ac_hat - ab_hat * angle())) + angle()*r_rab * (identity3() - tensor_product(ab_hat, ab_hat));
+        auto F = tensor_product(ac_hat, r_rab * (ac_hat - ab_hat * angle())) - r_rab * (identity3() - tensor_product(ab_hat, ab_hat));
+        auto P1 = tensor_product(ab_hat * angle() - ac_hat, -ab_hat * r_rab*r_rab);
+        
+        auto P2 = r_rab*G;
+        auto P4 = r_rac*F;
+        return d_get(c.f_inner_angle,j) * harmonic_energy_hessian(d_get(c.angle0,j), angle(), grad_a, grad_b, P1+P2+P4); //Harmonic Energy Hessian
+    }
 
-    INLINE mat3 inner_angle_hessian_c(const Constants& c) const{}
+    INLINE mat3 inner_angle_hessian_c(const Constants& c) const{
+        auto grad_a = (ab_hat * angle() - ac_hat) * r_rab + (ac_hat * angle() - ab_hat) * r_rac;
+        auto grad_c = (ab_hat - angle() * ac_hat) * r_rac;
+        auto G = tensor_product(ab_hat, r_rac * (ab_hat - ac_hat * angle())) - r_rac * (identity3() - tensor_product(ac_hat, ac_hat));
+        auto F = tensor_product(ac_hat, r_rac * (ab_hat - ac_hat * angle())) + angle()*r_rac * (identity3() - tensor_product(ac_hat, ac_hat));
+        auto P2 = r_rab*G;
+        auto P3 = tensor_product(ac_hat * angle() - ab_hat, -ac_hat * r_rac*r_rac);
+        auto P4 = r_rac*F;
+        return d_get(c.f_inner_angle,j) * harmonic_energy_hessian(d_get(c.angle0,j), angle(), grad_a, grad_c, P2+P3+P4); //Harmonic Energy Hessian
+    }
+
+    INLINE mat3 outer_angle_hessian_m_a(const Constants& c) const{
+        auto cost = dot(ba_hat, bm_hat); //Compute outer angle. ab,bm
+        auto gradba = r_rab * (identity3() - tensor_product(ba_hat, ba_hat));
+        auto grad_a = (bm_hat - ba_hat * cost) * r_rab;
+        auto P1 = tensor_product(bm_hat - ba_hat * cost, -ba_hat * r_rab*r_rab);
+        auto P2 = -r_rab * (tensor_product(ba_hat, grad_a) + cost * gradba);
+        return d_get(c.f_outer_angle_m,j) * harmonic_energy_hessian(d_get(c.outer_angle_m0,j), cost, grad_a, grad_a, P1+P2); //Harmonic Energy Hessian
+    }
+
+    INLINE mat3 outer_angle_hessian_m_b(const Constants& c) const{
+        auto cost = dot(ba_hat, bm_hat); //Compute outer angle. ba,bm
+        auto gradba = r_rab * (tensor_product(ba_hat, ba_hat) - identity3());
+        auto gradbm = r_rbm * (tensor_product(bm_hat, bm_hat) - identity3());
+        auto grad_b = r_rab * (ba_hat * cost - bm_hat) + r_rbm * (bm_hat * cost - ba_hat);
+        auto grad_a = (bm_hat - ba_hat * cost) * r_rab;
+        auto P1 = tensor_product(bm_hat - ba_hat * cost, ba_hat * r_rab*r_rab);
+        auto P3 = r_rab * (gradbm - (tensor_product(ba_hat, grad_b) + cost * gradba));
+        return d_get(c.f_outer_angle_m,j) * harmonic_energy_hessian(d_get(c.outer_angle_m0,j), cost, grad_a, grad_b, P1+P3); //Harmonic Energy Hessian
+    }
+
+    INLINE mat3 outer_angle_hessian_m_m(const Constants& c) const{
+        auto cost = dot(ba_hat, bm_hat); //Compute outer angle. ba,bm
+        auto gradbm = r_rbm * (identity3() - tensor_product(bm_hat, bm_hat));
+        auto grad_a = (bm_hat - ba_hat * cost) * r_rab;
+        auto grad_m = r_rbm * (ba_hat - bm_hat * cost);
+        auto P1 = r_rab * (gradbm - tensor_product(ba_hat, grad_m));
+        return d_get(c.f_outer_angle_m,j) * harmonic_energy_hessian(d_get(c.outer_angle_m0,j), cost, grad_a, grad_m, P1); //Harmonic Energy Hessian
+    }
+
+    INLINE mat3 outer_angle_hessian_p_a(const Constants& c) const{
+        auto cost = dot(ba_hat, bp_hat); //Compute outer angle. ba,bp
+        auto gradba = r_rab * (identity3() - tensor_product(ba_hat, ba_hat));
+        auto grad_a = r_rab * (bp_hat - ba_hat * cost);
+        auto P1 = tensor_product(bp_hat - ba_hat * cost, -ba_hat * r_rab*r_rab);    
+        auto P2 = -r_rab * (tensor_product(ba_hat, grad_a) + cost * gradba);
+        return d_get(c.f_outer_angle_p,j) * harmonic_energy_hessian(d_get(c.outer_angle_p0,j), cost, grad_a, grad_a, P1+P2); //Harmonic Energy Hessian
+    }
+
+    INLINE mat3 outer_angle_hessian_p_b(const Constants& c) const{
+        auto cost = dot(ba_hat, bp_hat); //Compute outer angle. ba,bp
+        auto gradba = r_rab * (tensor_product(ba_hat, ba_hat) - identity3());
+        auto gradbp = r_rbp * (tensor_product(bp_hat, bp_hat) - identity3());
+        auto grad_b = r_rab * (ba_hat * cost - bp_hat) + r_rbp * (bp_hat * cost - ba_hat);
+        auto grad_a = r_rab * (bp_hat - ba_hat * cost);
+        auto P1 = tensor_product(bp_hat - ba_hat * cost, ba_hat * r_rab*r_rab);
+        auto P3 = r_rab * (gradbp - (tensor_product(ba_hat, grad_b) + cost * gradba));
+        return d_get(c.f_outer_angle_p,j) * harmonic_energy_hessian(d_get(c.outer_angle_p0,j), cost, grad_a, grad_b, P1 + P3); //Harmonic Energy Hessian
+    }
+
+    INLINE mat3 outer_angle_hessian_p_p(const Constants& c) const{
+        auto cost = dot(ba_hat, bp_hat); //Compute outer angle. ba,bp
+        auto gradbp = r_rbp * (identity3() - tensor_product(bp_hat, bp_hat));
+        auto grad_a = r_rab * (bp_hat - ba_hat * cost);
+        auto grad_p = r_rbp * (ba_hat - bp_hat * cost);
+        auto P1 = r_rab * (gradbp - tensor_product(ba_hat, grad_p));
+        return d_get(c.f_outer_angle_p,j) * harmonic_energy_hessian(d_get(c.outer_angle_p0,j), cost, grad_a, grad_p, P1); //Harmonic Energy Hessian
+    }   
+
+    INLINE auto dihedral_hessian_terms(const Constants& c) const{
+        auto cb_hat = -bc_hat;
+        auto cost1 = dot(ab_hat, cb_hat);
+        auto cost2 = dot(cb_hat, db_hat);
+        auto sint1 = SQRT(1 - cost1*cost1);
+        auto sint2 = SQRT(1 - cost2*cost2);
+        auto cot1 = cost1/sint1;
+        auto csc1 = device_real_t(1.)/sint1;
+        auto csc2 = device_real_t(1.)/sint2;
+        auto nabc = cross(ab_hat, cb_hat) * csc1;
+        auto nbcd = cross(db_hat, cb_hat) * csc2;
+        auto cosb = dot(nabc, nbcd);
+        auto Coeff = cosb * csc1 * r_rab;
+        auto F1 = ab_hat * sint1;
+        auto F2 = cross(cb_hat, nbcd) / cosb;
+        auto F3 = cot1 * (ab_hat * cost1 - cb_hat);
+        auto F = F1 - F2 + F3;
+        auto GradACosb = cosb * r_rab * csc1 * (ab_hat * sint1 - cross(cb_hat, nbcd) / cosb + cot1 * (ab_hat * cost1 - cb_hat)); 
+        return std::tuple{cb_hat, cost1, cost2, sint1, sint2, cot1, csc1, csc2, nabc, nbcd, cosb, Coeff, F, GradACosb};
+    }
+
+    // $\nabla_a(\nabla_a(\cos(\theta)))$
+    INLINE mat3 dihedral_hessian_a(const Constants& c) const{
+        auto [cb_hat, cost1, cost2, sint1, sint2, cot1, csc1, csc2, nabc, nbcd, cosb, Coeff, F, GradACosb] = dihedral_hessian_terms(c);
+        auto GradARab = ab_hat * r_rab * r_rab;
+        auto GradAabh = (tensor_product(ab_hat, ab_hat) - identity3()) * r_rab;
+        auto GradASint1 = -(ab_hat * cost1 - cb_hat) * cost1 * r_rab * csc1;
+        auto GradAcsc1 = -GradASint1 * csc1 * csc1;
+        auto GradAcost1 = (ab_hat * cost1 - cb_hat) * r_rab;
+        auto GradAcot1 = (sint1 * GradAcost1 - cost1 * GradASint1) * csc1 * csc1;
+        auto GradACoeff = GradACosb * r_rab * csc1 + cosb * (GradARab * csc1 + GradAcsc1 * r_rab);
+        auto GradAF1 = GradAabh * sint1 + tensor_product(ab_hat, GradASint1);
+        auto GradAF2 = tensor_product(cross(cb_hat, nbcd), -GradACosb / (cosb * cosb));
+        auto GradAF3 = tensor_product(ab_hat * cost1 - cb_hat, GradAcot1) + cot1 * (tensor_product(ab_hat, GradAcost1) + cost1 * GradAabh);
+        auto GradAF = GradAF1 - GradAF2 + GradAF3;
+        auto GradAGradCosb = tensor_product(F, GradACoeff) + Coeff * GradAF;
+        return GradAGradCosb;
+
+    }
+
+    // $\nabla_b(\nabla_a(\cos(\beta)))$
+    INLINE mat3 dihedral_hessian_b(const Constants& c) const{
+        auto [cb_hat, cost1, cost2, sint1, sint2, cot1, csc1, csc2, nabc, nbcd, cosb, Coeff, F, GradACosb] = dihedral_hessian_terms(c);
+        auto grad_b_sint1 = -((cb_hat - ab_hat*cost1)*r_rab + (ab_hat - cb_hat*cost1)*r_rbc)*cost1 * csc1;
+        auto grad_b_sint2 = -((cb_hat - db_hat*cost2)*r_rdb + (db_hat - cb_hat*cost2)*r_rbc)*cost2 * csc2;
+        auto grad_b_ab_cross_cb_dot_nbcd = (r_rbc * (cross(nbcd, ab_hat) - dot(nbcd, cross(ab_hat, cb_hat))*cb_hat) - r_rab * (cross(nbcd, cb_hat) - dot(nbcd, cross(cb_hat, ab_hat))*ab_hat)); 
+        auto grad_b_db_cross_cb_dot_nabc = (r_rbc * (cross(nabc, db_hat) - dot(nabc, cross(db_hat, cb_hat))*cb_hat) - r_rdb * (cross(nabc, cb_hat) - dot(nabc, cross(cb_hat, db_hat))*db_hat));
+        auto P1 = (grad_b_ab_cross_cb_dot_nbcd*sint1 - (dot(nbcd, cross(ab_hat, cb_hat)))*grad_b_sint1)*csc1*csc1;
+        auto P2 = (grad_b_db_cross_cb_dot_nabc*sint2 - (dot(nabc, cross(db_hat, cb_hat)))*grad_b_sint2)*csc2*csc2;
+        auto grad_b = P1 + P2;
+        auto GradBRab = -ab_hat*r_rab*r_rab;
+        auto GradBabh = (identity3() - tensor_product(ab_hat, ab_hat))*r_rab;
+        auto GradBcbh = (identity3() - tensor_product(cb_hat, cb_hat))*r_rbc;
+        auto GradBdbh = (identity3() - tensor_product(db_hat, db_hat))*r_rdb;
+        auto GradBnbcd = ((cross(db_hat, GradBcbh) - cross(cb_hat, GradBdbh))* sint2 - tensor_product(cross(db_hat,cb_hat), grad_b_sint2))*csc2*csc2;
+        auto GradBcsc1 = -grad_b_sint1 * csc1*csc1;
+        auto GradBcost1 = (cb_hat - ab_hat*cost1)*r_rab + (ab_hat - cb_hat*cost1)*r_rbc;
+        auto GradBcot1 = (sint1 * GradBcost1 - cost1 * grad_b_sint1)*csc1*csc1;
+        auto GradBCoeff = grad_b*r_rab*csc1 + cosb*(GradBRab * csc1 + GradBcsc1*r_rab);
+        auto GradBF1 = GradBabh*sint1 + tensor_product(ab_hat, grad_b_sint1);
+        auto GradBF2 = tensor_product(cross(cb_hat,nbcd), -grad_b/(cosb*cosb)) + (cross(cb_hat, GradBnbcd) - cross(nbcd, GradBcbh))/cosb;
+        auto GradBF3 = tensor_product(ab_hat*cost1-cb_hat, GradBcot1) + cot1*(tensor_product(ab_hat,GradBcost1) + cost1*GradBabh - GradBcbh);
+        auto GradBF = GradBF1 - GradBF2 + GradBF3;
+        auto GradBGradCosb = tensor_product(F, GradBCoeff) + Coeff*GradBF;
+        return GradBGradCosb;
+    }
+
+    // $\nabla_c(\nabla_a(\cos(\theta)))$
+    INLINE mat3 dihedral_hessian_c(const Constants& c) const{
+        auto [cb_hat, cost1, cost2, sint1, sint2, cot1, csc1, csc2, nabc, nbcd, cosb, Coeff, F, GradACosb] = dihedral_hessian_terms(c);
+        auto grad_c_sint1 = -(cb_hat*cost1 - ab_hat)*cost1*csc1*r_rbc;
+        auto grad_c_sint2 = -(cb_hat*cost2 - db_hat)*cost2*csc2*r_rbc;
+        auto grad_c_ab_cross_cb_dot_nabc = r_rbc * (dot(nabc, cross(db_hat, cb_hat))*cb_hat - cross(nabc, db_hat));
+        auto grad_c_db_cross_cb_dot_nbcd = r_rbc * (dot(nbcd, cross(ab_hat, cb_hat))*cb_hat - cross(nbcd, ab_hat));
+        auto P1 = (grad_c_ab_cross_cb_dot_nabc*sint2 - (dot(nabc, cross(db_hat, cb_hat)))*grad_c_sint2)*csc2*csc2;
+        auto P2 = (grad_c_db_cross_cb_dot_nbcd*sint1 - (dot(nbcd, cross(ab_hat, cb_hat)))*grad_c_sint1)*csc1*csc1;
+        auto grad_c = P1 + P2;
+
+        auto GradCcbh   = (tensor_product(cb_hat, cb_hat) - identity3())*r_rbc;
+        auto GradCcsc1  = -grad_c_sint1 * csc1*csc1;
+        auto GradCcost1 = (cb_hat*cost1 - ab_hat)*r_rbc;
+        auto GradCcot1  = (sint1 * GradCcost1 - cost1 * grad_c_sint1)*csc1*csc1;
+        auto GradCnbcd  = (cross(db_hat, GradCcbh)*sint2 - tensor_product(cross(db_hat, cb_hat), grad_c_sint2))*csc2*csc2;
+        auto GradCCoeff = grad_c * r_rab * csc1 + cosb*(GradCcsc1*r_rab);
+        auto GradCF1    = tensor_product(ab_hat, grad_c_sint1);
+        auto GradCF2    = tensor_product(cross(cb_hat, nbcd), -grad_c/(cosb*cosb)) + (cross(cb_hat, GradCnbcd) - cross(nbcd, GradCcbh))/cosb;
+        auto GradCF3    = tensor_product(ab_hat*cost1-cb_hat, GradCcot1) + cot1*(tensor_product(ab_hat,GradCcost1) - GradCcbh);
+        auto GradCF     = GradCF1 - GradCF2 + GradCF3;
+        auto GradCGradCosb = tensor_product(F, GradCCoeff) + Coeff*GradCF;
+        return GradCGradCosb;
+    }
+
+    // $\nabla_d(\nabla_a(\cos(\theta)))$
+    INLINE mat3 dihedral_hessian_d(const Constants& c) const{
+        auto [cb_hat, cost1, cost2, sint1, sint2, cot1, csc1, csc2, nabc, nbcd, cosb, Coeff, F, GradACosb] = dihedral_hessian_terms(c);
+        auto GradDSint2 = -(db_hat*cost2 - cb_hat)*cost2*csc2*r_rdb;
+        auto GradDDbCrossCbDotNabc = -r_rdb * (dot(nabc, cross(cb_hat, db_hat))*db_hat - cross(nabc, cb_hat));
+        auto grad_d = (GradDDbCrossCbDotNabc*sint2 - (dot(nabc, cross(db_hat, cb_hat)))*GradDSint2)*csc2*csc2;
+
+        auto GradDdbh = (tensor_product(db_hat, db_hat) - identity3())*r_rdb;
+        auto GradDnbcd = (-cross(cb_hat, GradDdbh)*sint2 - tensor_product(cross(db_hat, cb_hat), GradDSint2))*csc2*csc2;
+        auto GradDCoeff = grad_d * r_rab * csc1;
+        auto GradDF2 = tensor_product(cross(cb_hat, nbcd), -grad_d/(cosb*cosb)) + cross(cb_hat, GradDnbcd)/cosb;
+        auto GradDF = - GradDF2;
+        auto GradDGradCosb = tensor_product(F, GradDCoeff) + Coeff*GradDF;
+        return GradDGradCosb;
+    }
+
+    INLINE auto outer_dihedral_hessian_a_terms(const Constants& c) const{
+        auto ma_hat = -am_hat;
+        auto cosa = dot(ab_hat, am_hat);
+        auto cosm = dot(ma_hat, mp_hat);
+        auto sina = sqrt(1 - cosa*cosa);
+        auto sinm = sqrt(1 - cosm*cosm);
+        auto cota = cosa/sina;
+        auto cotm = cosm/sinm;
+        auto csca = real_t(1.)/sina;
+        auto cscm = real_t(1.)/sinm;
+        auto nbam = cross(ab_hat, am_hat)*csca;
+        auto namp = cross(ma_hat, mp_hat)*cscm;
+        auto cosb = dot(nbam, namp);
+        auto F1 = ab_hat*cosb;
+        auto F2 = cross(am_hat, namp)*csca;
+        auto F3 = am_hat*cosb;
+        auto F4 = cross(namp, ab_hat)*csca;
+        auto G1 = ab_hat*cosa * r_rab;
+        auto G2 = am_hat * r_rab;
+        auto G3 = am_hat*cosa * r_ram;
+        auto G4 = ab_hat * r_ram;
+        auto H1 = cross(mp_hat, nbam);
+        auto H2 = ma_hat*cosb*sinm;
+        auto H3 = cotm*cosb*(mp_hat - ma_hat*cosm);
+        auto C1 = cota*cosb*csca;
+        auto C2 = r_ram * cscm;
+        auto GradAcosb = (F1 - F2)*r_rab + (F3 - F4)*r_ram + C1*(G1 - G2 + G3 - G4) + C2*(H1 - H2 + H3);
+        return std::tuple(cosa, cosm, sina, sinm, cota, cotm, csca, cscm, nbam, namp, cosb, F1, F2, F3, F4, G1, G2, G3, G4, H1, H2, H3, C1, C2, GradAcosb);
+    }
+
+    INLINE mat3 outer_dihedral_hessian_a_a(const Constants& c) const{
+        auto [cosa, cosm, sina, sinm, cota, cotm, csca, cscm, nbam, namp, cosb, F1, F2, F3, F4, G1, G2, G3, G4, H1, H2, H3, C1, C2, GradAcosb] = outer_dihedral_hessian_a_terms(c);
+        auto ma_hat = -am_hat;
+
+        auto GradAcosa = (am_hat*cosa - ab_hat)*r_ram + (ab_hat*cosa - am_hat)*r_rab;
+        auto GradAsina = -cosa*csca * GradAcosa;
+        auto GradAcota = (sina * GradAcosa - cosa * GradAsina)*csca*csca;
+        auto GradAcsca = -GradAsina*csca*csca;
+        auto GradAcosm = (mp_hat - ma_hat*cosm)*r_ram;
+        auto GradAsinm = -cosm*cscm * GradAcosm;
+        auto GradAcotm = (sinm * GradAcosm - cosm * GradAsinm)*cscm*cscm;
+        auto GradAcscm = -GradAsinm*cscm*cscm;
+        
+        auto GradAab = (tensor_product(ab_hat, ab_hat) - identity3())*r_rab;
+        auto GradArabn = ab_hat*r_rab*r_rab;
+        auto GradAam = (tensor_product(am_hat, am_hat) - identity3())*r_ram;
+        auto GradAramn = am_hat*r_ram*r_ram;
+        auto GradAma = (identity3() - tensor_product(ma_hat,ma_hat))*r_ram;
+        auto GradAnbam = ((cross(ab_hat, GradAam) - cross(am_hat, GradAab))*sina  - tensor_product(cross(ab_hat, am_hat), GradAsina))*csca*csca;
+        auto GradAnamp = (( - cross(mp_hat, GradAma))*sinm - tensor_product(cross(ma_hat, mp_hat), GradAsinm))*cscm*cscm;
+        auto GradAF1 = tensor_product(ab_hat, GradAcosb) + cosb*GradAab;
+        auto GradAF2 = ((cross(am_hat, GradAnamp) - cross(namp, GradAam))*sina - tensor_product(cross(am_hat, namp), GradAsina))*csca*csca;
+        auto GradAF3 = tensor_product(am_hat, GradAcosb) + cosb*GradAam;
+        auto GradAF4 = ((cross(namp, GradAab) - cross(ab_hat, GradAnamp))*sina - tensor_product(cross(namp, ab_hat), GradAsina))*csca*csca;
+
+        auto GradAG1 = tensor_product(ab_hat, (GradAcosa*r_rab + GradArabn*cosa)) + cosa*r_rab * GradAab;
+        auto GradAG2 = tensor_product(am_hat, GradArabn) + GradAam*r_rab;
+        auto GradAG3 = tensor_product(am_hat, (GradAcosa*r_ram + GradAramn*cosa)) + cosa*r_ram * GradAam;
+        auto GradAG4 = tensor_product(ab_hat, GradAramn) + GradAab*r_ram;
+
+        auto GradAH1 = cross(mp_hat,GradAnbam);
+        auto GradAH2 = tensor_product(ma_hat, (cosb*GradAsinm + GradAcosb*sinm)) + cosb*sinm*GradAma;
+        auto GradAH3 = tensor_product(mp_hat - ma_hat*cosm, (GradAcotm*cosb + GradAcosb*cotm)) + cotm*cosb*(- (GradAma*cosm + tensor_product(ma_hat,GradAcosm)));
+
+        auto GradAC1 = GradAcota * cosb*csca + cota* (GradAcosb*csca + cosb*GradAcsca);
+        auto GradAC2 = GradAramn*cscm + GradAcscm*r_ram;
+
+        auto GradAF = r_rab * (GradAF1 - GradAF2)  + tensor_product(F1 - F2,GradArabn) + r_ram * (GradAF3 - GradAF4) + tensor_product(F3 - F4,GradAramn);
+        auto GradAG = C1 * (GradAG1 - GradAG2 + GradAG3 - GradAG4) + tensor_product(G1 - G2 + G3 - G4, GradAC1);
+        auto GradAH = C2 * (GradAH1 - GradAH2 + GradAH3) + tensor_product(H1 - H2 + H3, GradAC2);
+
+        auto GradGradAcosb = GradAF + GradAG + GradAH;
+        return GradGradAcosb;
+    }
+
+    INLINE mat3 outer_dihedral_hessian_a_b(const Constants& c) const{
+        auto [cosa, cosm, sina, sinm, cota, cotm, csca, cscm, nbam, namp, cosb, F1, F2, F3, F4, G1, G2, G3, G4, H1, H2, H3, C1, C2, GradAcosb] = outer_dihedral_hessian_a_terms(c);
+        /*         
+        GradBab := (IdentityMatrix[3] - TensorProduct[abh, abh])/abn
+        GradBrabn := -abh/abn^2
+        GradBam := {0,0,0}
+        GradBramn := {0,0,0}
+        GradBma := {0,0,0}
+        GradBmp := {0,0,0}
+        GradBsinm := {0,0,0}
+        GradBcotm := {0,0,0}
+        GradBcota := (sina * GradBcosa - cosa * GradBsina)/sina^2
+        GradBcsca := -GradBsina/(sina^2)
+        GradBcscm := {0,0,0}
+        GradBnbam := (( - CPL[amh, GradBab])*sina  - TensorProduct[Cross[abh, amh], GradBsina])/sina^2
+        GradBnamp := 0
+
+        GradBF1 := TensorProduct[abh, GradBcosb] + cosb*GradBab
+        GradBF2 := (- TensorProduct[Cross[amh, namp], GradBsina])/sina^2
+        GradBF3 := TensorProduct[amh, GradBcosb] 
+        GradBF4 := ((CPL[namp, GradBab] )*sina - TensorProduct[Cross[namp, abh], GradBsina])/sina^2
+
+        GradBG1 := TensorProduct[abh, (GradBcosa/abn + GradBrabn*cosa)] + cosa/abn * GradBab
+        GradBG2 := TensorProduct[amh, GradBrabn]
+        GradBG3 := TensorProduct[amh, (GradBcosa/amn)]
+        GradBG4 := GradBab/amn
+
+        GradBH1 := CPL[mph, GradBnbam] 
+        GradBH2 := TensorProduct[mah, GradBcosb*sinm] 
+        GradBH3 := TensorProduct[mph - mah*cosm, (GradBcosb*cotm)] + cotm*cosb*( - (TensorProduct[mah,GradBcosm]))
+
+        GradBC1 := GradBcota * cosb/sina + cota* (GradBcosb/sina + cosb*GradBcsca)
+        GradBC2 := 0 */
+
+        auto GradBab := (IdentityMatrix[3] - TensorProduct[ab_hat, ab_hat])/r_rab;
+        
+
+    }
 
     //Computes gradient related to bending of outer angles. ~20 FLOPs
     /**
@@ -322,11 +617,7 @@ struct ArcData{
     {
         real_t cos_angle = -dot(ab_hat, bm_hat); //Compute outer angle. ab,bm
         coord3d grad = (bm_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 30. Buster Thesis
-        #if USE_CONSTANT_INDICES
-        return c.f_outer_angle_m(j) * harmonic_energy_gradient(c.outer_angle_m0(j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
-        #else
         return d_get(c.f_outer_angle_m,j) * harmonic_energy_gradient(d_get(c.outer_angle_m0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 30 multiplied by harmonic term.
-        #endif
     }
 
     /**
@@ -338,11 +629,7 @@ struct ArcData{
     {   
         real_t cos_angle = -dot(ab_hat, bp_hat); //Compute outer angle. ab,bp
         coord3d grad = (bp_hat + ab_hat * cos_angle) * r_rab; //Derivative of outer angles Eq. 28. Buster Thesis
-        #if USE_CONSTANT_INDICES
-        return c.f_outer_angle_p(j) * harmonic_energy_gradient(c.outer_angle_p0(j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 28 multiplied by harmonic term.
-        #else
         return d_get(c.f_outer_angle_p,j) * harmonic_energy_gradient(d_get(c.outer_angle_p0,j),cos_angle,grad); //Harmonic Energy Gradient: Eq. 28 multiplied by harmonic term.
-        #endif
     }
     // Chain rule terms for dihedral calculation
     //Computes gradient related to dihedral/out-of-plane term. ~75 FLOPs
@@ -362,11 +649,7 @@ struct ArcData{
 
         //Derivative w.r.t. inner dihedral angle F and G in Eq. 26
         coord3d grad = cross(bc_hat, nbcd) * r_sin_b * r_rab - ba_hat * cos_beta * r_rab + (cot_b * cos_beta * r_rab) * (bc_hat - ba_hat * cos_b);
-        #if USE_CONSTANT_INDICES
-        return c.f_inner_dihedral(j) * harmonic_energy_gradient(c.inner_dih0(j), cos_beta, grad); //Eq. 26.
-        #else
         return d_get(c.f_inner_dihedral,j) * harmonic_energy_gradient(d_get(c.inner_dih0,j), cos_beta, grad); //Eq. 26.
-        #endif
     }
 
     //Computes gradient from dihedral angles constituted by the planes bam, amp ~162 FLOPs
@@ -391,11 +674,7 @@ struct ArcData{
                         cos_beta*(ab_hat*r_rab + r_ram * ((real_t)2.0*am_hat + cot_m*(mp_hat+cos_m*am_hat)) - cot_a*(r_ram*(ab_hat - am_hat*cos_a) + r_rab*(am_hat-ab_hat*cos_a)));
         
         //Eq. 31 multiplied by harmonic term.
-        #if USE_CONSTANT_INDICES
-        return c.f_outer_dihedral(j) * harmonic_energy_gradient(c.outer_dih0_a(j), cos_beta, grad);
-        #else
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_a,j), cos_beta, grad);
-        #endif
     }
 
     //Computes gradient from dihedral angles constituted by the planes nbmp, nmpa ~92 FLOPs
@@ -418,11 +697,7 @@ struct ArcData{
         coord3d grad = r_rap * (cot_p*cos_beta * (-mp_hat - pa_hat*cos_p) - cross(nbmp_hat, mp_hat)*r_sin_p - pa_hat*cos_beta );
 
         //Eq. 32 multiplied by harmonic term.
-        #if USE_CONSTANT_INDICES
-        return c.f_outer_dihedral(j) * harmonic_energy_gradient(c.outer_dih0_m(j), cos_beta, grad);
-        #else
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_m,j), cos_beta, grad);
-        #endif
     }
 
     //Computes gradient from dihedral angles constituted by the planes bpa, pam ~162 FLOPs
@@ -446,11 +721,7 @@ struct ArcData{
                         cos_beta*(am_hat*r_ram + r_rap * ((real_t)2.0*ap_hat + cot_p*(pb_hat+cos_p*ap_hat)) - cot_a*(r_rap*(am_hat - ap_hat*cos_a) + r_ram*(ap_hat-am_hat*cos_a)));
         
         //Eq. 33 multiplied by harmonic term.
-        #if USE_CONSTANT_INDICES
-        return c.f_outer_dihedral(j) * harmonic_energy_gradient(c.outer_dih0_p(j), cos_beta, grad);
-        #else
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_gradient(d_get(c.outer_dih0_p,j), cos_beta, grad);
-        #endif
     }
 
     // Internal coordinate gradients
@@ -460,11 +731,7 @@ struct ArcData{
      * @return The gradient of the bond length term.
     */
     INLINE coord3d bond_length_gradient(const Constants& c) const {
-        #if USE_CONSTANT_INDICES
-        return c.f_bond(j) * harmonic_energy_gradient(bond(),c.r0(j),ab_hat); 
-        #else
         return d_get(c.f_bond,j) * harmonic_energy_gradient(bond(),d_get(c.r0,j),ab_hat); 
-        #endif
     }
     //Sum of angular gradient components.
     /**
@@ -497,11 +764,7 @@ struct ArcData{
      * @return The energy contribution of the bond length term.
     */
     INLINE real_t bond_energy(const Constants& c) const {
-        #if USE_CONSTANT_INDICES
-        return (real_t)0.5 *c.f_bond(j) *harmonic_energy(bond(),c.r0(j));
-        #else
         return (real_t)0.5 *d_get(c.f_bond,j) *harmonic_energy(bond(),d_get(c.r0,j));
-        #endif
     }
     /**
      * @brief Compute the total energy contribution of the bending terms.
@@ -509,11 +772,7 @@ struct ArcData{
      * @return The energy contribution of the bending terms.
     */
     INLINE real_t bend_energy(const Constants& c) const {
-        #if USE_CONSTANT_INDICES
-        return c.f_inner_angle(j)* harmonic_energy(angle(),c.angle0(j));
-        #else
         return d_get(c.f_inner_angle,j)* harmonic_energy(angle(),d_get(c.angle0,j));
-        #endif
     }
 
     /**
@@ -522,11 +781,7 @@ struct ArcData{
      * @return The energy contribution of the dihedral terms.
     */
     INLINE real_t dihedral_energy(const Constants& c) const {
-        #if USE_CONSTANT_INDICES
-        return c.f_inner_dihedral(j)* harmonic_energy(dihedral(),c.inner_dih0(j));
-        #else
         return d_get(c.f_inner_dihedral,j)* harmonic_energy(dihedral(),d_get(c.inner_dih0,j));
-        #endif
     }
     //Harmonic energy contribution from bond stretching, angular bending and dihedral angle bending.
     //71 FLOPs
@@ -564,6 +819,11 @@ struct ArcData{
         return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);
     }
 
+    //Returns Gradient of the Gradient w.r.t. the coordinates of the threadIdx^th node.
+    INLINE mat3 hessian_a(const Constants& c) const {
+        return inner_angle_hessian_b(c);
+    }
+
 
     //Reciprocal lengths of arcs ab, ac, am, ap.
     real_t
@@ -572,6 +832,10 @@ struct ArcData{
         r_rac,
         r_rad,
         r_ram,
+        r_rbm,
+        r_rbp,
+        r_rbc,
+        r_rdb,
         r_rap;
 
     //Base Arcs,
@@ -594,6 +858,7 @@ struct ArcData{
         ba_hat,
         bc_hat,
         cd_hat,
+        db_hat,
         mp_hat,
         mb_hat,
         pa_hat,
@@ -606,6 +871,39 @@ struct ArcData{
     coord3d A[3];
     
 };
+
+INLINE hessian_t hessian(const coord3d* X) const {
+    BLOCK_SYNC
+    hessian_t hess(node_graph);
+    for (uint8_t j = 0; j < 1; j++ ){
+        ArcData arc = ArcData(j, X, node_graph);
+        hess.A[0] += arc.outer_dihedral_hessian_a_a(constants);
+    }
+    if(threadIdx.x + blockIdx.x == 0){
+        printf("Outer Neighbours (p, m): %d %d \n", d_get(node_graph.next_on_face,0), d_get(node_graph.prev_on_face,1));
+        printf("Node Coordinates: a, b, c, d, m, p \n");
+        auto XA = X[threadIdx.x];
+        auto XB = X[d_get(node_graph.cubic_neighbours,0)];
+        auto XC = X[d_get(node_graph.cubic_neighbours,1)];
+        auto XD = X[d_get(node_graph.cubic_neighbours,2)];
+        auto XM = X[d_get(node_graph.prev_on_face,0)];
+        auto XP = X[d_get(node_graph.next_on_face,0)];
+        printf("%f %f %f \n", XA[0], XA[1], XA[2]);
+        printf("%f %f %f \n", XB[0], XB[1], XB[2]);
+        printf("%f %f %f \n", XC[0], XC[1], XC[2]);
+        printf("%f %f %f \n", XD[0], XD[1], XD[2]);
+        printf("%f %f %f \n", XM[0], XM[1], XM[2]);
+        printf("%f %f %f \n", XP[0], XP[1], XP[2]);
+        printf("Hessian:\n");
+        for (uint8_t i = 0; i < 3; i++){
+            for (uint8_t j = 0; j < 3; j++){
+                printf("%f ", hess.A[0].A[i*3 + j]);
+            }
+            printf("\n");
+        }
+    }
+    return hess;
+}
 
 
 /**
@@ -905,7 +1203,7 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
     ForceField FF           = ForceField<T>(node_graph, constants, smem);
     coord3d* X              = reinterpret_cast<coord3d*>(smem + B.n_atoms);
     assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
-
+    
     coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
     BLOCK_SYNC
     for (uint8_t j = 0; j < 3; j++){
@@ -949,7 +1247,7 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
 }
 
 //Compute Hessians for all isomers in the batch
-/* template <ForcefieldType T> __global__ void compute_hessians(IsomerBatch B, const size_t max_iterations){
+template <ForcefieldType T> __global__ void compute_hessians_(IsomerBatch B){
     DEVICE_TYPEDEFS
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -961,12 +1259,13 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
     size_t offset = isomer_idx * blockDim.x;
     Constants constants     = Constants(B, isomer_idx);
     NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);
-    ForceField FF           = ForceField<T>(node_graph, constants, smem);
-    coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);
-    real_t* H               = B.H + offset*3*3;
-    FF.hessian(X, H);
+    ForceField<T> FF           = ForceField<T>(node_graph, constants, smem);
+    coord3d* X              = reinterpret_cast<coord3d*>(smem + B.n_atoms);
+    assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
+    FF.hessian(X);
+
     }}}
-} */
+}
 
 /**
  * @brief Forcefield Optimizes a batch of isomers.
@@ -1004,7 +1303,7 @@ __global__ void optimise_(IsomerBatch B, const size_t iterations, const size_t m
         coord3d* X1 =reinterpret_cast<coord3d*>(base_pointer+3*N);
         coord3d* X2 =reinterpret_cast<coord3d*>(base_pointer+6*N);  
 
-        assign(reinterpret_cast<std::array<float,3>*>(B.X+3*offset)[node_id],sX[node_id]); //Copy cartesian coordinates from L1 Cache to DRAM.
+        assign(sX[node_id],reinterpret_cast<std::array<float,3>*>(B.X+3*offset)[node_id]); //Copy cartesian coordinates from L1 Cache to DRAM.
         coord3d* X           = sX;       //Switch coordinate pointer from DRAM to L1 Cache.
 
         //Create forcefield struct and use optimization algorithm to optimise the fullerene 
@@ -1324,11 +1623,48 @@ cudaError_t optimise(IsomerBatch& B, const size_t iterations, const size_t max_i
     return error;
 }
 
+template <ForcefieldType T>
+cudaError_t compute_hessians(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+    cudaSetDevice(B.get_device_id());
+    static std::vector<bool> first_call(16, true);
+    static cudaEvent_t start[16], stop[16];
+    float single_kernel_time = 0.0;
+    auto dev = B.get_device_id();
+    if(first_call[dev]) {cudaEventCreate(&start[dev]); cudaEventCreate(&stop[dev]);}
+        
+    //If launch ploicy is synchronous then wait.
+    if(policy == LaunchPolicy::SYNC) {ctx.wait();}
+    else if(policy == LaunchPolicy::ASYNC && !first_call[dev]){
+        //Records time from previous kernel call
+        cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
+        kernel_time += single_kernel_time;
+    }
+
+    size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
+    static LaunchDims dims((void*)compute_hessians_<T>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)compute_hessians_<T>, B.n_atoms, smem, B.isomer_capacity);
+    void* kargs[]{(void*)&B};
+
+    cudaEventRecord(start[dev], ctx.stream);
+    auto error = safeCudaKernelCall((void*)compute_hessians_<T>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    cudaEventRecord(stop[dev], ctx.stream);
+    
+    if(policy == LaunchPolicy::SYNC) {
+        ctx.wait();
+        cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
+        kernel_time += single_kernel_time;
+    }
+    printLastCudaError("Forcefield: ");
+    first_call[dev] = false;
+    return error;
+}
+
 int declare_generics(){
     IsomerBatch B(20,1,DEVICE_BUFFER);
     CuArray<float> arr(1);
     optimise<PEDERSEN>(B,100,100);
-    get_angle_max<PEDERSEN>(B,arr);
+    compute_hessians<PEDERSEN>(B);
+    /* get_angle_max<PEDERSEN>(B,arr);
     get_bond_max<PEDERSEN>(B,arr);
     get_dihedral_max<PEDERSEN>(B,arr);
     get_angle_mae<PEDERSEN>(B,arr);
@@ -1353,6 +1689,7 @@ int declare_generics(){
     get_energies<PEDERSEN>(B,arr);
 
     optimise<FLATNESS_ENABLED>(B,100,100);
+    compute_hessians<FLATNESS_ENABLED>(B);
     get_angle_max<FLATNESS_ENABLED>(B,arr);
     get_bond_max<FLATNESS_ENABLED>(B,arr);
     get_dihedral_max<FLATNESS_ENABLED>(B,arr);
@@ -1403,6 +1740,7 @@ int declare_generics(){
     get_energies<WIRZ>(B,arr);
 
     optimise<FLAT_BOND>(B,100,100);
+    compute_hessians<FLAT_BOND>(B);
     get_angle_max<FLAT_BOND>(B,arr);
     get_bond_max<FLAT_BOND>(B,arr);
     get_dihedral_max<FLAT_BOND>(B,arr);
@@ -1426,7 +1764,7 @@ int declare_generics(){
     get_gradient_mean<FLAT_BOND>(B,arr);
     get_gradient_norm<FLAT_BOND>(B,arr);
     get_energies<FLAT_BOND>(B,arr); 
-
+ */
     return 1;
 }
 
