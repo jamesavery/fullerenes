@@ -602,8 +602,9 @@ struct ArcData{
         GradBC1 := GradBcota * cosb/sina + cota* (GradBcosb/sina + cosb*GradBcsca)
         GradBC2 := 0 */
 
-        auto GradBab := (IdentityMatrix[3] - TensorProduct[ab_hat, ab_hat])/r_rab;
-        
+        auto GradBab = (identity3() - tensor_product(ab_hat, ab_hat))*r_rab;
+        return mat3();
+
 
     }
 
@@ -1664,7 +1665,7 @@ int declare_generics(){
     CuArray<float> arr(1);
     optimise<PEDERSEN>(B,100,100);
     compute_hessians<PEDERSEN>(B);
-    /* get_angle_max<PEDERSEN>(B,arr);
+    get_angle_max<PEDERSEN>(B,arr);
     get_bond_max<PEDERSEN>(B,arr);
     get_dihedral_max<PEDERSEN>(B,arr);
     get_angle_mae<PEDERSEN>(B,arr);
@@ -1764,7 +1765,7 @@ int declare_generics(){
     get_gradient_mean<FLAT_BOND>(B,arr);
     get_gradient_norm<FLAT_BOND>(B,arr);
     get_energies<FLAT_BOND>(B,arr); 
- */
+
     return 1;
 }
 
