@@ -106,7 +106,7 @@ int main(int ac, char **argv)
   auto opt_routine = [&](){
     for (int i = 0; i < Nd; i++){
       Q1s[i].refill_batch(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);
-      isomerspace_forcefield::optimise<FLATNESS_ENABLED>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], LaunchPolicy::ASYNC);
+      isomerspace_forcefield::optimise<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], LaunchPolicy::ASYNC);
       Q2s[i].push(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);}
       for (int i = 0; i < Nd; i++){
         opt_ctxs[i].wait();
