@@ -23,6 +23,9 @@ namespace gpu_kernels{
         template <ForcefieldType T>
         cudaError_t optimise(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
         cudaError_t test_fun(IsomerBatch& B, CuArray<float>& output);
+
+        template <ForcefieldType T>
+        cudaError_t compute_hessians(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
         //ForcefieldType agnostic functions since the forcefield type doesnt change the way bonds are computed
         //Retrieves all interatomic bond lengths, angles and dihedrals
         cudaError_t get_bonds           (const IsomerBatch& B, CuArray<float>& bonds);          //N x M x 3
