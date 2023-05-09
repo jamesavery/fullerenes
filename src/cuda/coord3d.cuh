@@ -53,7 +53,7 @@ INLINE void assign(std::array<double,3>& a, const device_coord3d& b){
 }
 
 INLINE void d_set(device_coord3d& a, const u_char j, device_real_t b){
-  ((device_real_t*)&a)[j] = b; 
+  a[j] = b;
 }
 
 INLINE void d_set(uchar3& a, const u_char j, u_char b){
@@ -65,7 +65,7 @@ INLINE void d_set(uchar4& a, const u_char j, u_char b){
 }
 
 INLINE device_real_t d_get(const device_coord3d& a, const u_char j){
-  return ((const device_real_t*)&a)[j]; 
+  return a[j];
 }
 
 INLINE constexpr uint8_t d_get(const uchar3& a, const u_char j){

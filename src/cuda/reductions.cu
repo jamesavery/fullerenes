@@ -276,9 +276,7 @@ __device__ void reduction_V4(T* sdata, const T data, unsigned int n_warps, int w
 template <typename T>
 __device__ void reduction_V5(T* sdata, const T data = (T)0, T* result = nullptr){
     *result = (T)0;
-    auto num_warps = (blockDim.x >> 5) + 1;
     cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
-    auto warpid = threadIdx.x >> 5;
     auto laneid = threadIdx.x & 31;
     T temp = cg::reduce(tile32, data, cg::plus<T>());
     if (laneid == 0) atomicAdd_block((float*)result, (float)temp);
@@ -288,10 +286,8 @@ __device__ void reduction_V5(T* sdata, const T data = (T)0, T* result = nullptr)
 template <typename T>
 __device__ void reduction_V6(T* sdata, const T data = (T)0, T* result = nullptr){
     *result = (T)0;
-    auto num_warps = (blockDim.x >> 5) + 1;
     cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
     auto warpid = threadIdx.x >> 5;
-    auto laneid = threadIdx.x & 31;
     T temp = cg::reduce(tile32, data, cg::plus<T>());
     sdata[warpid + blockDim.x] = temp;
     BLOCK_SYNC

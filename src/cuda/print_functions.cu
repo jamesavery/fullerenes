@@ -27,6 +27,11 @@ __device__ void print(size_t a){
 __device__ void print(const char* a){
     printf(a);
 }
+
+__device__ void print(const device_coord3d& a, int thread_id = 0){
+    if (threadIdx.x != thread_id) return;
+    printf("[%.6f,%.6f,%.6f]\n",a[0],a[1],a[2]);
+}
 /* __device__ void print(const device_node2& a){
     printf("[%d,%d]",a.x,a.y);
 }
