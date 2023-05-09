@@ -37,6 +37,7 @@ struct IsomerBatch : GPUDataStruct
     IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type, int device  = 0);
     void set_print_simple() {verbose = false;} 
     void set_print_verbose() {verbose = true;} 
+    bool get_print_mode() const {return verbose;}
     //Prints a specific parameter from the batch
     void print(const BatchMember param, const std::pair<int,int>& range = {-1,-1}); 
     int get_device_id() const {return m_device;} 

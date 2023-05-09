@@ -65,7 +65,7 @@ namespace cuda_io{
         
         //Iterate over the data fields of the IsomerBatch (pseudo reflection) and copy the contents of each using the provided stream.
         if(policy == LaunchPolicy::SYNC) {ctx.wait();}
-        
+        source.get_print_mode() ? destination.set_print_verbose() : destination.set_print_simple();
         for (size_t i = 0; i < source.pointers.size(); i++)
         {
             int num_isomers = (lhs_range.second > -1 && lhs_range.first > -1) ? lhs_range.second - lhs_range.first : source.isomer_capacity;
