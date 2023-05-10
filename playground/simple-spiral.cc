@@ -11,22 +11,26 @@
 //     and an empty queue is never popped. Either by calling full() resp. empty()
 //     before pushing resp. popping, or by ensuring structurally that it Can Never Happen(tm).
 template <int nbits> struct packed_deque {
+private:
   static constexpr uint8_t mask[9] = {0x0,0x1,0x3,0x7,0xf,0x1f,0x3f,0x7f,0xff};
   ssize_t start, end, capacity, length;
   uint8_t *data;
 
+public:
+  // data must be preallocated memory of (capacity*nbits)/8+1 bytes.
   packed_deque(int capacity, uint8_t *data) : start(0), end(0),
 					      capacity(capacity), length(0), data(data) {
     for(ssize_t i=0;i<capacity*nbits/8+1;i++) data[i] = 0;
   }
 
   INLINE ssize_t size() const { return length; }
-  INLINE bool  full()  const { return length==capacity; }
-  INLINE bool  empty() const { return length==0; }
+  INLINE bool  full()   const { return length==capacity; }
+  INLINE bool  empty()  const { return length==0; }
 
   INLINE static ssize_t bits_index(ssize_t i){ return (i*nbits)>>3;  }
   INLINE static ssize_t bits_start(ssize_t i){ return (i*nbits)&0x7; }
 
+  // read_element(i) reads the i'th n-bit field in the flat memory, i.e. without reference to start and end.
   INLINE uint8_t read_element(const ssize_t i) const {
     constexpr uint8_t m      = mask[nbits];
     const size_t ix          = bits_index(i), shift = bits_start(i); // Byte index in memory, and bit index for start of value
@@ -36,32 +40,29 @@ template <int nbits> struct packed_deque {
     return (word >> shift) & m;
   }
 
+  // write_element(i,x) write x to the i'th n-bit field in the flat memory, i.e. without reference to start and end.  
   INLINE void write_element(const ssize_t i, const uint16_t x) {
     constexpr uint16_t m = mask[nbits];
 
     const size_t ix    = bits_index(i), shift = bits_start(i); // Byte index in memory, and bit index for start of value
+
     uint16_t *word_ptr = (uint16_t*)(data+ix);          // We need to load two bytes, as value may cross a byte boundary
+    uint16_t word = *word_ptr;   
 
-    uint16_t word = *word_ptr;     // printf("write_element(%ld,%x) at byte %ld, bit %ld\n",i,x,ix,shift);
-
-    //    printf("read word = 0x%0x\n",word);        
     word &= ~(m<<shift);     // Zero out old field
-    // printf("mask  word = 0x%0x\n",word);
-    // printf("0x%x << %ld = 0x%x\n",x,shift,(x&m)<<shift);
-    
     word |= (x&m)<<shift;    // Write x into field
-    //    printf("write word = 0x%0x\n",word);
-    *word_ptr = word;
+    *word_ptr = word;	     // Store.
   }
-  
+
   INLINE void push_back(const uint8_t& x) {
-    if(length>0) end = (end+1)%capacity;
+    if(length>0) end = (end+1)%capacity; // Whenever length<=1, we want front() == back()
+    
     write_element(end,x);
     length++;
   }
 
   INLINE void push_front(const uint8_t& x) {
-    if(length>0) start = (start+capacity-1)%capacity;
+    if(length>0) start = (start+capacity-1)%capacity; // Whenever length<=1, we want front() == back()
 
     write_element(start,x);
     length++;
@@ -73,7 +74,7 @@ template <int nbits> struct packed_deque {
   INLINE uint8_t pop_front() {
     uint8_t x = front();
     length--;
-    start = (start+1)%capacity;
+    start = (start+1)%capacity;	
     return x;
   }
 
