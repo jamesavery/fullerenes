@@ -3,8 +3,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/spiral.hh"
 
-#define INLINE
-//__attribute__((always_inline)) inline
+#define INLINE __attribute__((always_inline)) inline
 
 // Statically allocated deque with sub-byte sized data type.
 // NB: Caller is in charge of checking that a full deque is never pushed,
