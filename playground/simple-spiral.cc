@@ -117,11 +117,11 @@ bool spiral(const Triangulation& g, tri_t start_tri)
   cout << "4: boundary_code = " << boundary_code << ";\n";
 
   //  while(!boundary_code.empty()){
-  for(int i=0;i<120000000;i++){
+  for(int i=0;i<200;i++){
     uint8_t x;
     x = boundary_code.pop_back();
     boundary_code.push_front(x);
-    //    cout << "boundary_code = " << boundary_code << ";\n";
+    cout << "boundary_code = " << boundary_code << ";\n";
   }
   cout << "boundary_code = " << boundary_code << ";\n";
   
