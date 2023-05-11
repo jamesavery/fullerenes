@@ -236,18 +236,19 @@ struct hessian_t{
     device_node_t indices[9]; 
     // Each atom has 3 neighbours and 6 outer neighbours
     // We store them in the following order:
-    // b, b_p, b_m, c, c_p, c_m, d, d_p, d_m
+    // a, b, c, d, b_m, c_m, d_m, b_p, c_p, d_p
 
     INLINE hessian_t(const NodeNeighbours& G){
-        indices[0] = d_get(G.cubic_neighbours,0);
-        indices[1] = d_get(G.next_on_face,0);
-        indices[2] = d_get(G.prev_on_face,0);
-        indices[3] = d_get(G.cubic_neighbours,1);
-        indices[4] = d_get(G.next_on_face,1);
+        indices[0] = threadIdx.x;
+        indices[1] = d_get(G.cubic_neighbours,0);
+        indices[2] = d_get(G.cubic_neighbours,1);
+        indices[3] = d_get(G.cubic_neighbours,2);
+        indices[4] = d_get(G.prev_on_face,0);
         indices[5] = d_get(G.prev_on_face,1);
-        indices[6] = d_get(G.cubic_neighbours,2);
-        indices[7] = d_get(G.next_on_face,2);
-        indices[8] = d_get(G.prev_on_face,2);
+        indices[6] = d_get(G.prev_on_face,2);
+        indices[7] = d_get(G.next_on_face,0);
+        indices[8] = d_get(G.next_on_face,1);
+        indices[9] = d_get(G.next_on_face,2);
 
         #pragma unroll
         for (int i = 0; i < 9; i++)
@@ -260,7 +261,7 @@ struct hessian_t{
             A[i] = other.A[i];
         }
         #pragma unroll
-        for (int i = 0; i < 9; i++){
+        for (int i = 0; i < 10; i++){
             indices[i] = other.indices[i];
         }
     }
@@ -275,7 +276,7 @@ INLINE device_coord3d mat_vect_mult(const hessian_t& A, const device_coord3d& x,
     smem[threadIdx.x] = x;
     device_coord3d result;
     #pragma unroll
-    for (int i = 0; i < 9; i++)
+    for (int i = 0; i < 10; i++)
         result += dot(A[i], smem[A.indices[i]]);
     return result;
 }

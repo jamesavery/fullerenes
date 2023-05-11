@@ -24,7 +24,8 @@ __device__ void print(size_t a){
     printf("%u",(unsigned int)a);
 }
 
-__device__ void print(const char* a){
+__device__ void print(const char* a, int thread_id = 0){
+    if (threadIdx.x != thread_id) return;
     printf(a);
 }
 
