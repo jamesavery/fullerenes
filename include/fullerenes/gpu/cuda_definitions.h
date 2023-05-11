@@ -21,7 +21,7 @@
 #define FORCEFIELD_VERSION FLATNESS_ENABLED
 #define USE_CONSTANT_INDICES 0
 //Half-precision and particularly float16 currently do not seem to provide accurate enough results.
-#define FLOAT_TYPE 2 //0 is float16 , 1 is bfloat16, 2 is float, 3 is double 
+#define FLOAT_TYPE 3 //0 is float16 , 1 is bfloat16, 2 is float, 3 is double 
 
 #if FLOAT_TYPE == 0
     #include "cuda_fp16.h"

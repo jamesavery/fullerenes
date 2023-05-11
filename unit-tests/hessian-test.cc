@@ -9,7 +9,10 @@ const std::unordered_map<size_t,size_t> num_fullerenes = {{20,1},{22,0},{24,1},{
 
 int main(int argc, char** argv){
     const size_t N                = argc>1 ? strtol(argv[1],0,0) : 20;     // Argument 1: Number of vertices 
-
+    float reldelta                = argc>2 ? strtof(argv[2],0) : 1e-5;    // Argument 3: Relative delta
+    std::string filename          = argc>3 ? argv[2] : "hessian_validation";        // Argument 2: Filename
+    std::ofstream file(filename + "analytical.csv");
+    std::ofstream file2(filename + "numerical.csv");
     bool more_to_do = true;
     auto n_isomers = num_fullerenes.find(N)->second;
     Graph G;
@@ -33,7 +36,12 @@ int main(int argc, char** argv){
     gpu_kernels::isomerspace_tutte::tutte_layout(B1, (int)10*N);
     gpu_kernels::isomerspace_X0::zero_order_geometry(B1, 4.0);
     gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(B1, 5*N, 5*N);
-    gpu_kernels::isomerspace_forcefield::compute_hessians<PEDERSEN>(B1);
+    CuArray<device_real_t> hessians(N*3*3*10 * batch_size);
+    gpu_kernels::isomerspace_forcefield::compute_hessians<PEDERSEN>(B1, hessians);
+    file.write((char*)hessians.data, N*3*3*10* batch_size*sizeof(device_real_t));
+    gpu_kernels::isomerspace_forcefield::compute_hessians_fd<PEDERSEN>(B1, hessians, reldelta);
+    file2.write((char*)hessians.data, N*3*3*10* batch_size*sizeof(device_real_t));
+    
 
     B1.set_print_verbose();
 //    std::cout << B1 << std::endl;

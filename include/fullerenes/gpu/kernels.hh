@@ -7,7 +7,7 @@
 #include "cu_array.hh"
 #include <chrono>
 
-enum ForcefieldType {WIRZ, PEDERSEN, FLATNESS_ENABLED, FLAT_BOND};
+enum ForcefieldType {WIRZ, PEDERSEN, FLATNESS_ENABLED, FLAT_BOND, BOND, ANGLE, DIH, ANGLE_M, ANGLE_P, DIH_A, DIH_M, DIH_P};
 
 namespace gpu_kernels{
     namespace isomerspace_forcefield{
@@ -25,7 +25,10 @@ namespace gpu_kernels{
         cudaError_t test_fun(IsomerBatch& B, CuArray<float>& output);
 
         template <ForcefieldType T>
-        cudaError_t compute_hessians(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t compute_hessians(IsomerBatch& B, CuArray<double>& hessians, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        template <ForcefieldType T>
+        cudaError_t compute_hessians_fd(IsomerBatch& B, CuArray<double>& hessians, const float rel_delta = 1e-5, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+    
         //ForcefieldType agnostic functions since the forcefield type doesnt change the way bonds are computed
         //Retrieves all interatomic bond lengths, angles and dihedrals
         cudaError_t get_bonds           (const IsomerBatch& B, CuArray<float>& bonds);          //N x M x 3
