@@ -741,7 +741,7 @@ struct ArcData{
         auto GradAH = tensor_product(pmh-pah*cosp, GradAK) + K * (- GradApah * cosp - tensor_product(pah, GradAcosp));
 
         auto GradGradAcosb = GradAF - GradAG + GradAH;
-        return d_get(c.f_outer_angle_m,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradAcosb, GradGradAcosb); //Harmonic Energy Hessian
+        return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradAcosb, GradGradAcosb); //Harmonic Energy Hessian
     }
 
     INLINE mat3 outer_dihedral_hessian_m_b(const Constants& c) const{
@@ -762,7 +762,7 @@ struct ArcData{
         auto GradBK = GradBK1 * K2;
         auto GradBH = tensor_product(pmh - pah*cosp, GradBK);
         auto GradGradBcosb = GradBF - GradBG + GradBH;
-        return d_get(c.f_outer_angle_m,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradBcosb, GradGradBcosb); //Harmonic Energy Hessian
+        return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradBcosb, GradGradBcosb); //Harmonic Energy Hessian
     }
 
     INLINE mat3 outer_dihedral_hessian_m_m(const Constants& c) const {
@@ -793,7 +793,7 @@ struct ArcData{
         auto GradMK = GradMK1 * K2 + K1 * GradMK2;
         auto GradMH = tensor_product((pmh - pah*cosp), GradMK) + K * (GradMpmh - tensor_product(pah,GradMcosp));
         auto GradGradMcosb = GradMF - GradMG + GradMH;
-        return d_get(c.f_outer_angle_m,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradMcosb, GradGradMcosb); //Harmonic Energy Hessian
+        return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradMcosb, GradGradMcosb); //Harmonic Energy Hessian
     }
 
     INLINE mat3 outer_dihedral_hessian_m_p(const Constants& c) const {
@@ -827,7 +827,7 @@ struct ArcData{
         auto GradPH = tensor_product((pmh - pah*cosp), GradPK) + K * (GradPpmh - tensor_product(pah,GradPcosp) - GradPpah * cosp);
 
         auto GradGradPcosb = GradPF - GradPG + GradPH;
-        return d_get(c.f_outer_angle_m,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradPcosb, GradGradPcosb); //Harmonic Energy Hessian
+        return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradPcosb, GradGradPcosb); //Harmonic Energy Hessian
     }
     
     INLINE auto outer_dihedral_hessian_p_terms() const{
@@ -905,7 +905,7 @@ struct ArcData{
         auto GradAH4 = tensor_product(aph,GradAramn) + GradAaph*ramn;
 
         auto GradGradAcosb = C1 * (GradAF1 - GradAF2 + GradAF3) + tensor_product(F1 - F2 + F3, GradAC1) + rapn * (GradAG1 - GradAG2) + tensor_product(G1 - G2,GradArapn) + ramn * (GradAG3 - GradAG4) + tensor_product(G3 - G4,GradAramn) + C2 * (GradAH1 - GradAH2 + GradAH3 - GradAH4) + tensor_product(H1 - H2 + H3 - H4,GradAC2);
-        return d_get(c.f_outer_angle_p,j) * harmonic_energy_hessian(d_get(c.outer_dih0_p,j), cosb, GradAcosb, GradAcosb, GradGradAcosb); //Harmonic Energy Hessian
+        return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_p,j), cosb, GradAcosb, GradAcosb, GradGradAcosb); //Harmonic Energy Hessian
     }
 
     INLINE mat3 outer_dihedral_hessian_p_b(const Constants& c) const {
@@ -935,7 +935,7 @@ struct ArcData{
 
         auto GradGradBcosb = C1 * (GradBF1 - GradBF2 + GradBF3) + tensor_product(F1 - F2 + F3, GradBC1) + rapn * (GradBG1 - GradBG2) + ramn * (GradBG3 - GradBG4) + tensor_product(H1 - H2 + H3 - H4,GradBC2);
 
-        return d_get(c.f_outer_angle_p,j) * harmonic_energy_hessian(d_get(c.outer_dih0_p,j), cosb, GradAcosb, GradBcosb, GradGradBcosb); //Harmonic Energy Hessian
+        return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_p,j), cosb, GradAcosb, GradBcosb, GradGradBcosb); //Harmonic Energy Hessian
     }
 
     INLINE mat3 outer_dihedral_hessian_p_m(const Constants& c) const{
@@ -967,7 +967,7 @@ struct ArcData{
         auto GradMH4 = tensor_product(aph,GradMramn);
 
         auto GradGradMcosb = C1 * (GradMF1 - GradMF2 + GradMF3) + rapn * (GradMG1 - GradMG2) + ramn * (GradMG3 - GradMG4) + tensor_product(G3 - G4,GradMramn) + C2 * (GradMH1 - GradMH2 + GradMH3 - GradMH4) + tensor_product(H1 - H2 + H3 - H4, GradMC2);
-        return d_get(c.f_outer_angle_p,j) * harmonic_energy_hessian(d_get(c.outer_dih0_p,j), cosb, GradAcosb, GradMcosb, GradGradMcosb); //Harmonic Energy Hessian
+        return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_p,j), cosb, GradAcosb, GradMcosb, GradGradMcosb); //Harmonic Energy Hessian
     }
 
     INLINE mat3 outer_dihedral_hessian_p_p(const Constants& c) const{
@@ -1012,7 +1012,7 @@ struct ArcData{
         auto GradPH4 = GradPaph*ramn;
     
         auto GradGradPcosb = C1 * (GradPF1 - GradPF2 + GradPF3) + tensor_product(F1 - F2 + F3, GradPC1) + rapn * (GradPG1 - GradPG2) + tensor_product(G1 - G2,GradPrapn) + ramn * (GradPG3 - GradPG4) + C2 * (GradPH1 - GradPH2 + GradPH3 - GradPH4) + tensor_product(H1 - H2 + H3 - H4, GradPC2);
-        return d_get(c.f_outer_angle_p,j) * harmonic_energy_hessian(d_get(c.outer_dih0_p,j), cosb, GradAcosb, GradPcosb, GradGradPcosb); //Harmonic Energy Hessian
+        return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_p,j), cosb, GradAcosb, GradPcosb, GradGradPcosb); //Harmonic Energy Hessian
     }
 
     //Computes gradient related to bending of outer angles. ~20 FLOPs
@@ -1220,6 +1220,31 @@ struct ArcData{
         {
         case FLAT_BOND:
             return bond_length_gradient(c);
+            break;
+        case BOND:
+            return bond_length_gradient(c);
+            break;
+        case ANGLE:
+            return inner_angle_gradient(c);
+            break;
+        case DIH:
+            return inner_dihedral_gradient(c);
+            break;
+        case ANGLE_M:
+            return outer_angle_gradient_m(c);
+            break;
+        case ANGLE_P:
+            return outer_angle_gradient_p(c);
+            break;
+        case DIH_A:
+            return outer_dihedral_gradient_a(c);
+            break;
+        case DIH_M:
+            return outer_dihedral_gradient_m(c);
+            break;
+        case DIH_P:
+            return outer_dihedral_gradient_p(c);
+            break;
         default:
             return bond_length_gradient(c) + angle_gradient(c) + dihedral_gradient(c);
             break;
@@ -1228,26 +1253,202 @@ struct ArcData{
     }
 
     INLINE mat3 hessian_a(const Constants& c) const {
-        return bond_hessian_a(c) + inner_angle_hessian_a(c) + outer_angle_hessian_m_a(c) + outer_angle_hessian_p_a(c) + dihedral_hessian_a(c) + outer_dihedral_hessian_a_a(c) + outer_dihedral_hessian_m_a(c) + outer_dihedral_hessian_p_a(c);
+        switch (T)
+        {
+        case BOND:
+            return bond_hessian_a(c);
+            break;
+        case ANGLE:
+            return inner_angle_hessian_a(c);
+            break;
+        case ANGLE_M:
+            return outer_angle_hessian_m_a(c);
+            break;
+        case ANGLE_P:
+            return outer_angle_hessian_p_a(c);
+            break;
+        case DIH:
+            return dihedral_hessian_a(c);
+            break;
+        case DIH_A:
+            return outer_dihedral_hessian_a_a(c);
+            break;
+        case DIH_M:
+            return outer_dihedral_hessian_m_a(c);
+            break;
+        case DIH_P:
+            return outer_dihedral_hessian_p_a(c);
+            break;
+        default:
+            return bond_hessian_a(c) + inner_angle_hessian_a(c) + outer_angle_hessian_m_a(c) + outer_angle_hessian_p_a(c) + dihedral_hessian_a(c) + outer_dihedral_hessian_a_a(c) + outer_dihedral_hessian_m_a(c) + outer_dihedral_hessian_p_a(c);
+            break;
+        }
     }
 
     INLINE mat3 hessian_b(const Constants& c) const {
-        return bond_hessian_b(c) + inner_angle_hessian_b(c) + outer_angle_hessian_m_b(c) + outer_angle_hessian_p_b(c) + dihedral_hessian_b(c) + outer_dihedral_hessian_a_b(c) + outer_dihedral_hessian_m_b(c) + outer_dihedral_hessian_p_b(c);
+        switch (T)
+        {
+        case BOND:
+            return bond_hessian_b(c);
+            break;
+        case ANGLE:
+            return inner_angle_hessian_b(c);
+            break;
+        case ANGLE_M:
+            return outer_angle_hessian_m_b(c);
+            break;
+        case ANGLE_P:
+            return outer_angle_hessian_p_b(c);
+            break;
+        case DIH:
+            return dihedral_hessian_b(c);
+            break;
+        case DIH_A:
+            return outer_dihedral_hessian_a_b(c);
+            break;
+        case DIH_M:
+            return outer_dihedral_hessian_m_b(c);
+            break;
+        case DIH_P:
+            return outer_dihedral_hessian_p_b(c);
+            break;
+        default:
+            return bond_hessian_b(c) + inner_angle_hessian_b(c) + outer_angle_hessian_m_b(c) + outer_angle_hessian_p_b(c) + dihedral_hessian_b(c) + outer_dihedral_hessian_a_b(c) + outer_dihedral_hessian_m_b(c) + outer_dihedral_hessian_p_b(c);
+            break;
+        }
     }
 
     INLINE mat3 hessian_c(const Constants& c) const {
+        switch (T){
+        case BOND:
+            return mat3();
+            break;
+        case ANGLE:
+            return inner_angle_hessian_c(c);
+            break;
+        case ANGLE_M:
+            return mat3();
+            break;
+        case ANGLE_P:
+            return mat3();
+            break;
+        case DIH:
+            return dihedral_hessian_c(c);
+            break;
+        case DIH_A:
+            return mat3();
+            break;
+        case DIH_M:
+            return mat3();
+            break;
+        case DIH_P:
+            return mat3();
+            break;
+        default:
+            return inner_angle_hessian_c(c) + dihedral_hessian_c(c);
+            break;
+        }
         return inner_angle_hessian_c(c) + dihedral_hessian_c(c);
     }
 
     INLINE mat3 hessian_d(const Constants& c) const{
+        switch (T){
+        case BOND:
+            return mat3();
+            break;
+        case ANGLE:
+            return mat3();
+            break;
+        case ANGLE_M:
+            return mat3();
+            break;
+        case ANGLE_P:
+            return mat3();
+            break;
+        case DIH:
+            return dihedral_hessian_d(c);
+            break;
+        case DIH_A:
+            return mat3();
+            break;
+        case DIH_M:
+            return mat3();
+            break;
+        case DIH_P:
+            return mat3();
+            break;
+        default:
+            return dihedral_hessian_d(c);
+            break;
+        }
         return dihedral_hessian_d(c);
     }
 
     INLINE mat3 hessian_m(const Constants& c) const {
+        switch(T)
+        {
+        case BOND:
+            return mat3();
+            break;
+        case ANGLE:
+            return mat3();
+            break;
+        case ANGLE_M:
+            return outer_angle_hessian_m_m(c);
+            break;
+        case ANGLE_P:
+            return mat3();
+            break;
+        case DIH:
+            return mat3();
+            break;
+        case DIH_A:
+            return outer_dihedral_hessian_a_m(c);
+            break;
+        case DIH_M:
+            return outer_dihedral_hessian_m_m(c);
+            break;
+        case DIH_P:
+            return outer_dihedral_hessian_p_m(c);
+            break;
+        default:
+            return outer_angle_hessian_m_m(c) + outer_dihedral_hessian_a_m(c) + outer_dihedral_hessian_m_m(c) + outer_dihedral_hessian_p_m(c);
+            break;
+        }
         return outer_angle_hessian_m_m(c) + outer_dihedral_hessian_a_m(c) + outer_dihedral_hessian_m_m(c) + outer_dihedral_hessian_p_m(c);
     }
 
     INLINE mat3 hessian_p(const Constants& c) const {
+        switch (T)
+        {
+        case BOND:
+            return mat3();
+            break;
+        case ANGLE:
+            return mat3();
+            break;
+        case ANGLE_M:
+            return mat3();
+            break;
+        case ANGLE_P:
+            return outer_angle_hessian_p_p(c);
+            break;
+        case DIH:
+            return mat3();
+            break;
+        case DIH_A:
+            return outer_dihedral_hessian_a_p(c);
+            break;
+        case DIH_M:
+            return outer_dihedral_hessian_m_p(c);
+            break;
+        case DIH_P:
+            return outer_dihedral_hessian_p_p(c);
+            break;
+        default:
+            return outer_angle_hessian_p_p(c) + outer_dihedral_hessian_a_p(c) + outer_dihedral_hessian_m_p(c) + outer_dihedral_hessian_p_p(c);
+            break;
+        }
         return outer_angle_hessian_p_p(c) + outer_dihedral_hessian_a_p(c) + outer_dihedral_hessian_m_p(c) + outer_dihedral_hessian_p_p(c);
     }
 
@@ -2202,7 +2403,24 @@ int declare_generics(){
     CuArray<double> hessians(1);
     optimise<PEDERSEN>(B,100,100);
     compute_hessians<PEDERSEN>(B, hessians);
+    compute_hessians<BOND>(B, hessians);
+    compute_hessians<ANGLE>(B, hessians);
+    compute_hessians<ANGLE_M>(B, hessians);
+    compute_hessians<ANGLE_P>(B, hessians);
+    compute_hessians<DIH>(B, hessians);
+    compute_hessians<DIH_A>(B, hessians);
+    compute_hessians<DIH_M>(B, hessians);
+    compute_hessians<DIH_P>(B, hessians);
+
     compute_hessians_fd<PEDERSEN>(B, hessians, 0.0001);
+    compute_hessians_fd<BOND>(B, hessians,0.0001);
+    compute_hessians_fd<ANGLE>(B, hessians,0.0001);
+    compute_hessians_fd<ANGLE_M>(B, hessians,0.0001);
+    compute_hessians_fd<ANGLE_P>(B, hessians,0.0001);
+    compute_hessians_fd<DIH>(B, hessians,0.0001);
+    compute_hessians_fd<DIH_A>(B, hessians,0.0001);
+    compute_hessians_fd<DIH_M>(B, hessians,0.0001);
+    compute_hessians_fd<DIH_P>(B, hessians,0.0001);
     /* get_angle_max<PEDERSEN>(B,arr);
     get_bond_max<PEDERSEN>(B,arr);
     get_dihedral_max<PEDERSEN>(B,arr);
