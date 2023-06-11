@@ -72,11 +72,12 @@ namespace cg = cooperative_groups;
         auto laneid = threadIdx.x & 31;
         device_real_t temp = cg::reduce(tile32, data, cg::plus<device_real_t>());
         if (num_warps > 1){
-        sdata[warpid + blockDim.x] = temp;
+        //sdata[warpid + blockDim.x] = temp;
+        BLOCK_SYNC
+        if (laneid == 0) sdata[warpid] = temp;
         BLOCK_SYNC
         if (warpid == 0) {
-            auto val = sdata[laneid + blockDim.x];
-            temp = cg::reduce(tile32, val, cg::plus<device_real_t>());
+            temp = cg::reduce(tile32, sdata[laneid], cg::plus<device_real_t>());
         }
         }
         if (threadIdx.x == 0) sdata[0] = temp;
@@ -414,7 +415,7 @@ __device__ void ex_scan(T* sdata, const T data, int n){
         
     }
     if (threadIdx.x == 0){
-        sdata[0] == (device_node_t)0;
+        sdata[0] = (device_node_t)0;
     }
     __syncthreads();
 }
