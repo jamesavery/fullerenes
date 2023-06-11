@@ -31,7 +31,7 @@ int main(int ac, char **av)
    }
 
    Polyhedron P(P0);
-   P.optimize();
+   P.optimise();
 
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
@@ -61,7 +61,7 @@ int main(int ac, char **av)
 //   D.layout2d = D.tutte_layout();
 //   D.faces    = D.compute_faces_flat(3,true);
 //   D.face_max = 3;
-//   //   D.optimize();
+//   //   D.optimise();
 //   output << "PD = " << D << ";\n";
 //  
 //  output.close();

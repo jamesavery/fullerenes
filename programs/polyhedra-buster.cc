@@ -82,7 +82,7 @@ int main(int ac, char **av)
     P0s.push_back(P0);    
       
     Polyhedron P = P0;
-    P.points = g.optimized_geometry(P.points);
+    P.points = g.optimised_geometry(P.points);
 
     Ps.push_back(P);
     Ts.push_back(T);

@@ -9,4 +9,5 @@ add_executable(coprimes coprimes.cc)
 add_executable(eisenstein-polygon eisenstein-polygon.cc)
 add_executable(eisenstein-polygon2 eisenstein-polygon2.cc)
 add_executable(ideal_dihedral ideal_dihedral.cc)
-
+add_executable(GCnew GCnew.cc)
+add_executable(simple-spiral simple-spiral.cc)

@@ -1,5 +1,4 @@
 # things we never want to commit
-
 *.out
 *.log
 *.dvi
@@ -9,6 +8,7 @@
 *.o
 *.pyc
 *~
+.vscode/*
 Manual/*pdf
 config.mod
 libgraph.a
@@ -19,4 +19,5 @@ output/*
 app-*
 test-*
 play-*
-
+config.f
+config.hh

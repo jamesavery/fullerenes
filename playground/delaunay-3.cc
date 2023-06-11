@@ -26,7 +26,7 @@ Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
   g.layout2d = g.tutte_layout();
 
   vector<coord3d> points = g.zero_order_geometry();
-  points = g.optimized_geometry(points);
+  points = g.optimised_geometry(points);
 
   vector<coord3d> dual_points(dg.N);
 

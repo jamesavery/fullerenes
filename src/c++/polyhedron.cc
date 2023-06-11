@@ -471,7 +471,7 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
     G.layout2d       = G.tutte_layout();
   
   Polyhedron P(G,G.zero_order_geometry(),6);
-  P.points = G.optimized_geometry(P.points);
+  P.points = G.optimised_geometry(P.points);
 
   P.move_to_origin();		// Center of mass at (0,0,0)
   P.align_with_axes();		// Align with principal axes
@@ -479,18 +479,18 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
   return P;
 }
 
-bool Polyhedron::optimize(int opt_method, double ftol)
+bool Polyhedron::optimise(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
     FullereneGraph g(*this);
-    points = g.optimized_geometry(points,opt_method,ftol);
+    points = g.optimised_geometry(points,opt_method,ftol);
     return true;
   } if(is_cubic()) {
-    bool optimize_angles = true;
-    return optimize_other(optimize_angles);
+    bool optimise_angles = true;
+    return optimise_other(optimise_angles);
   } else if(is_triangulation()) {
-    bool optimize_angles = false;
-    return optimize_other(optimize_angles);
+    bool optimise_angles = false;
+    return optimise_other(optimise_angles);
   }else{
      Triangulation LFD = leapfrog_dual();
 
@@ -508,8 +508,8 @@ bool Polyhedron::optimize(int opt_method, double ftol)
     PlanarGraph LF = LFD.dual_graph();
     LF.layout2d = LF.tutte_layout();
     Polyhedron P(LF,LF.zero_order_geometry());
-    bool optimize_angles = true;
-    bool opt_success = P.optimize_other(optimize_angles);
+    bool optimise_angles = true;
+    bool opt_success = P.optimise_other(optimise_angles);
 
     // for each face in LF which corresponds to a vertex in the initial graph,
     // find the average coordinates of all vertices (ie the face centre)

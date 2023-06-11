@@ -14,7 +14,7 @@ Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
   g.layout2d = g.tutte_layout();
 
   vector<coord3d> points = g.zero_order_geometry();
-  points = g.optimized_geometry(points);
+  points = g.optimised_geometry(points);
 
   vector<coord3d> dual_points(dg.N);
 
@@ -84,8 +84,8 @@ int main(int ac, char **av) {
 
 
   cout << "optimizing" << endl;
-  P.optimize_other(false, edge_lengths);
-  cout << "optimized" << endl;
+  P.optimise_other(false, edge_lengths);
+  cout << "optimised" << endl;
 
 
   string mol2_name = "output/reduced-graph-C"+to_string(N)+".mol2";

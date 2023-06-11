@@ -45,7 +45,7 @@ int main(int ac, char **av)
     Polyhedron::to_file(P0,s.str()+"-P0.mol2");
       
     Polyhedron P = P0;
-    P.points = g.optimized_geometry(P.points);
+    P.points = g.optimised_geometry(P.points);
     bool has_nans = false;
     for(auto p: P.points){
       if(std::isnan(p[0])||std::isnan(p[1])||std::isnan(p[1])) has_nans = true;
@@ -66,7 +66,7 @@ int main(int ac, char **av)
     // D.layout2d = D.tutte_layout();
     // D.faces    = D.compute_faces(3,true);
     // D.face_max = 3;
-    // D.optimize();
+    // D.optimise();
 
     
   }

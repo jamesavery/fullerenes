@@ -279,7 +279,7 @@ extern "C" void sa_optff_(const FullereneGraph **graph, const int *N, const int 
                        const int *iopt,double *Dist,double *ftol,double *force);
 extern "C" void default_force_parameters_(const int *iopt, double *parameters);
 
-vector<coord3d> FullereneGraph::optimized_geometry(const vector<coord3d>& points, int opt_method, double ftol) const
+vector<coord3d> FullereneGraph::optimised_geometry(const vector<coord3d>& points, int opt_method, double ftol) const
 {
   //  assert(layout2d.size() == N);
   vector<coord3d> coordinates(points.begin(),points.end());

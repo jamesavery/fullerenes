@@ -379,7 +379,7 @@ int main(int ac, char **av)
 
   Polyhedron P(P0);
 
-  bool optimize_angles = true;
+  bool optimise_angles = true;
   set<edge_t> es=gct.undirected_edges();
   set<edge_t> long_edges;
   map<edge_t, double> lengths;
@@ -453,7 +453,7 @@ int main(int ac, char **av)
     
 
 
-// optimize cubic graph with long edges
+// optimise cubic graph with long edges
   const double normal_edge_length=1.393;
   const double long_edge_single=1.452;
   const double long_edge_triple=1.242;
@@ -468,9 +468,9 @@ int main(int ac, char **av)
   for(set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
     lengths.insert(make_pair(*it, long_edge_total));
   }
-  P.optimize_other(optimize_angles, lengths);
+  P.optimise_other(optimise_angles, lengths);
 
-  // replace long edges by C2, don't reoptimize
+  // replace long edges by C2, don't reoptimise
   for (set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
     //cout << "edge to zap: " << *it << endl;
     edge_t to_zap(*it);
