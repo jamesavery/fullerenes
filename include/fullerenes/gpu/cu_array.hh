@@ -10,7 +10,8 @@ struct CuArray
 public:
     CuArray();
     CuArray(const size_t size);
-
+    CuArray(const CuArray& other);
+    CuArray(const size_t size, const T& value);
     ~CuArray();
     
     void resize(const size_t capacity);
@@ -18,10 +19,12 @@ public:
     //Unsafe indexing
     __device__ __host__ T& operator[] (const size_t i);
 
-    size_t size();
+    //Copy assignment
+    CuArray& operator=(const CuArray& other);
 
-    //Safe indexing with bounds check.
-    T& at(const size_t i);
+    size_t size();
+    void to_device(const int device); //Forces a copy to device
+    void to_host(const int device); //Forces a copy to host
 
     T* data;
     size_t size_ = 0;
