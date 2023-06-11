@@ -2,6 +2,18 @@
 #include "fullerenes/gpu/launch_ctx.hh"
 #include "cuda_runtime_api.h"
 
+LaunchCtx& LaunchCtx::operator=(const LaunchCtx& other){
+    if (this != &other){
+        m_device_id = other.m_device_id;
+        cudaSetDevice(m_device_id);
+        cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
+        cudaEventCreateWithFlags(&m_start, cudaEventBlockingSync);
+        cudaEventCreateWithFlags(&m_stop, cudaEventBlockingSync);
+        
+    }
+    return *this;
+}
+
 int LaunchCtx::get_device_id() const {
     return m_device_id;
 }
