@@ -23,11 +23,6 @@ namespace gpu_kernels{
         template <ForcefieldType T>
         cudaError_t optimise(IsomerBatch& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
         cudaError_t test_fun(IsomerBatch& B, CuArray<float>& output);
-
-        template <ForcefieldType T>
-        cudaError_t compute_hessians(IsomerBatch& B, CuArray<double>& hessians, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
-        template <ForcefieldType T>
-        cudaError_t compute_hessians_fd(IsomerBatch& B, CuArray<double>& hessians, const float rel_delta = 1e-5, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     
         //ForcefieldType agnostic functions since the forcefield type doesnt change the way bonds are computed
         //Retrieves all interatomic bond lengths, angles and dihedrals
@@ -109,6 +104,37 @@ namespace gpu_kernels{
         void dualise_3(IsomerBatch& B);
 
         void dualise_4(IsomerBatch& B);
+    }
+
+    namespace isomerspace_eigen{
+        void eigensolve_cusolver(const IsomerBatch& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+
+        void eigensolve(const IsomerBatch& B, CuArray<device_real_t>& Q, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+    }
+
+    namespace isomerspace_hessian{
+        template <ForcefieldType T>
+        cudaError_t compute_hessians(IsomerBatch& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        template <ForcefieldType T>
+        cudaError_t compute_hessians_fd(IsomerBatch& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const float rel_delta = 1e-5, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+    }
+
+    namespace isomerspace_properties{
+
+        //Computes the volume of each molecule in the batch. See sequential code in polyhedron.cc
+        cudaError_t volume_divergences(const IsomerBatch& B, CuArray<double>& volumes, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+
+        //Computes the surface area of each molecule in the batch. See sequential code in polyhedron.cc
+        cudaError_t surface_areas(const IsomerBatch& B, CuArray<double>& surface_areas, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+
+        //Computes the best elipsoid fit for each molecule in the batch and returns the eccentricities of the ellipsoids.
+        cudaError_t eccentricities(const IsomerBatch& B, CuArray<double>& eccentricities, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+
+        //Moves coordinates to the centre of mass of the molecule and aligns the molecule to the principal axes of inertia. See sequential code in polyhedron.cc
+        cudaError_t transform_coordinates(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+
+        cudaError_t debug_function(const IsomerBatch& B, CuArray<double>& eigenvalues, CuArray<double>& eigenvectors, CuArray<double>& inertia_matrices, CuArray<double>& orthogonality, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t debug_function(const IsomerBatch& B, CuArray<float>& eigenvalues, CuArray<float>& eigenvectors, CuArray<float>& inertia_matrices, CuArray<float>& orthogonality, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
 }
 #endif
