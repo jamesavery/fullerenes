@@ -309,31 +309,35 @@ namespace cuda_benchmark {
     * @return id of the isomer within the file
     */
     int random_isomer(const std::string &path, Graph& G){ 
+        static int id_counter = 0;
         static std::string m_path = path;
         static ifstream isomer_sample(path,std::ios::binary); 
-        static auto m_fsize = std::filesystem::file_size(path);
+        static auto available_samples = std::filesystem::file_size(path) / (sizeof(device_node_t) * G.N * 6);
+        static auto m_fsize = available_samples * sizeof(device_node_t) * G.N * 6;
         static int Nf = G.N;
         static std::vector<device_node_t> input_buffer(m_fsize/sizeof(device_node_t));
-        static int available_samples = m_fsize / (Nf*6*sizeof(device_node_t));
-        static bool first = true;
+        static bool first_time = true;
         static std::vector<int> random_IDs(available_samples);
-        static int id_counter = 0;
 
-        if(Nf != G.N || first){ //If arguments change we need to reload the file
+        if (first_time || G.N != Nf || path != m_path){
+            first_time = false;
             m_path = path;
-            isomer_sample = ifstream(path,std::ios::binary);
-            m_fsize = std::filesystem::file_size(path);
+            isomer_sample.close();
+            isomer_sample.open(path,std::ios::binary);
+            available_samples = std::filesystem::file_size(path) / (sizeof(device_node_t) * G.N * 6);
             Nf = G.N;
-            input_buffer = std::vector<device_node_t>(m_fsize/sizeof(device_node_t));
-            available_samples = m_fsize / (Nf*6*sizeof(device_node_t));
-            random_IDs = std::vector<int>(available_samples);
-            id_counter = 0;
-        
+            m_fsize = available_samples * sizeof(device_node_t) * G.N * 6;
+            input_buffer.resize(m_fsize/sizeof(device_node_t));
+            random_IDs.resize(available_samples);
+
             isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), m_fsize);
             std::iota(random_IDs.begin(), random_IDs.end(), 0);
             std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
-            first = false;
+            id_counter = 0;
         }
+
+
+        
 
         for (size_t i = 0; i < Nf; i++){
             G.neighbours.at(i).clear();
