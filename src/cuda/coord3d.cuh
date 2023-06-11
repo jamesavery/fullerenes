@@ -21,75 +21,31 @@ INLINE void operator-=(device_coord3d& a, const device_coord3d& b) {a = a - b;}
 INLINE void operator/=(device_coord3d& a, const device_real_t b) {a = a / b;}
 INLINE void operator*=(device_coord3d& a, const device_real_t b) {a = a * b;}
 INLINE device_coord3d d_abs(const device_coord3d& a){ return {ABS(a[0]), ABS(a[1]), ABS(a[2])};}
+INLINE void d_swap(device_real_t& a, device_real_t& b){
+  device_real_t c = a;
+  a = b;
+  b = c;
+}
+INLINE device_coord3d d_sort(const device_coord3d& a){
+  device_coord3d b = a;
+  if(ABS(b[0]) > ABS(b[1])) d_swap(b[0], b[1]);
+  if(ABS(b[1]) > ABS(b[2])) d_swap(b[1], b[2]);
+  if(ABS(b[0]) > ABS(b[1])) d_swap(b[0], b[1]);
+  return b;
+}
+INLINE device_coord3d rsqrt3(const device_coord3d& a){
+  return {RSQRT(a[0]), RSQRT(a[1]), RSQRT(a[2])};
+}
 INLINE device_coord3d cos3(const device_coord3d& a){
-  return {cos((double)a[0]), cos((double)a[1]), cos((double)a[2])};
-}
-
-#if FLOAT_TYPE != 3
-INLINE void assign(device_coord3d& a, const std::array<double,3>& b){
-  a[0] = b[0];
-  a[1] = b[1];
-  a[2] = b[2];
-}
-#endif
-
-#if FLOAT_TYPE != 2
-INLINE void assign(device_coord3d& a, const std::array<float,3>& b){
-  a[0] = b[0];
-  a[1] = b[1];
-  a[2] = b[2];
-}
-#endif
-INLINE void assign(std::array<float,3>& a, const device_coord3d& b){
-  a[0] = b[0];
-  a[1] = b[1];
-  a[2] = b[2];
-}
-
-INLINE void assign(std::array<double,3>& a, const device_coord3d& b){
-  a[0] = b[0];
-  a[1] = b[1];
-  a[2] = b[2];
+  return {COS(a[0]), COS(a[1]), COS(a[2])};
 }
 
 INLINE void d_set(device_coord3d& a, const u_char j, device_real_t b){
   a[j] = b;
 }
 
-INLINE void d_set(uchar3& a, const u_char j, u_char b){
-  ((u_char*)&a)[j] = b; 
-}
-
-INLINE void d_set(uchar4& a, const u_char j, u_char b){
-  ((u_char*)&a)[j] = b; 
-}
-
 INLINE device_real_t d_get(const device_coord3d& a, const u_char j){
   return a[j];
-}
-
-INLINE constexpr uint8_t d_get(const uchar3& a, const u_char j){
-  switch (j)
-  {
-  case 0:
-    return a.x;
-  case 1:
-    return a.y;
-  case 2:
-    return a.z;
-  }
-}
-
-INLINE constexpr uint8_t d_get(const uchar4& a, const u_char j){
-  switch (j)
-  {
-  case 0:
-    return a.x;
-  case 1:
-    return a.y;
-  case 2:
-    return a.z;
-  }
 }
 
 //5 FLOPs
@@ -142,5 +98,68 @@ INLINE device_node_t d_get(const device_node3& a, const uint8_t j){
   __builtin_assume(j < 3);
   return ((const device_node_t*)&a)[j];
 }
+
+#if FLOAT_TYPE != 3
+INLINE void assign(device_coord3d& a, const std::array<double,3>& b){
+  a[0] = b[0];
+  a[1] = b[1];
+  a[2] = b[2];
+}
+#endif
+
+#if FLOAT_TYPE != 2
+INLINE void assign(device_coord3d& a, const std::array<float,3>& b){
+  a[0] = b[0];
+  a[1] = b[1];
+  a[2] = b[2];
+}
+#endif
+INLINE void assign(std::array<float,3>& a, const device_coord3d& b){
+  a[0] = b[0];
+  a[1] = b[1];
+  a[2] = b[2];
+}
+
+INLINE void assign(std::array<double,3>& a, const device_coord3d& b){
+  a[0] = b[0];
+  a[1] = b[1];
+  a[2] = b[2];
+}
+
+
+
+INLINE void d_set(uchar3& a, const u_char j, u_char b){
+  ((u_char*)&a)[j] = b; 
+}
+
+INLINE void d_set(uchar4& a, const u_char j, u_char b){
+  ((u_char*)&a)[j] = b; 
+}
+
+INLINE constexpr uint8_t d_get(const uchar3& a, const u_char j){
+  switch (j)
+  {
+  case 0:
+    return a.x;
+  case 1:
+    return a.y;
+  case 2:
+    return a.z;
+  }
+}
+
+INLINE constexpr uint8_t d_get(const uchar4& a, const u_char j){
+  switch (j)
+  {
+  case 0:
+    return a.x;
+  case 1:
+    return a.y;
+  case 2:
+    return a.z;
+  }
+}
+
+
 
 #endif
