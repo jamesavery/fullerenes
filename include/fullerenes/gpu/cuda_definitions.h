@@ -21,8 +21,9 @@
 #define FORCEFIELD_VERSION FLATNESS_ENABLED
 #define USE_CONSTANT_INDICES 0
 //Half-precision and particularly float16 currently do not seem to provide accurate enough results.
-#define FLOAT_TYPE 3 //0 is float16 , 1 is bfloat16, 2 is float, 3 is double 
-
+#ifndef FLOAT_TYPE
+#define FLOAT_TYPE 2
+#endif
 #if FLOAT_TYPE == 0
     #include "cuda_fp16.h"
     typedef __half device_real_t;
@@ -32,6 +33,7 @@
     #define RSQRT hrsqrt
     #define ABS __habs
     #define COS hcos
+    #define ACOS(arg) acosf((float)arg)
     #define SIN hsin
     #define ISNAN __hisnan
 #elif FLOAT_TYPE == 1
@@ -43,6 +45,7 @@
     #define RSQRT hrsqrt
     #define ABS __habs
     #define COS hcos
+    #define ACOS(arg) acosf((float)arg)
     #define SIN hsin
     #define ISNAN __hisnan
 #elif FLOAT_TYPE == 2
@@ -53,6 +56,7 @@
     #define RSQRT rsqrtf
     #define ABS abs
     #define COS cosf
+    #define ACOS(arg) acos((double)arg)
     #define SIN sinf
     #define ISNAN isnan
 #elif FLOAT_TYPE == 3
@@ -63,6 +67,7 @@
     #define RSQRT rsqrt
     #define ABS abs
     #define COS cos
+    #define ACOS acos
     #define SIN sin
     #define ISNAN isnan
 #endif
@@ -79,5 +84,6 @@ typedef struct device_node6
     device_node_t g;
 } device_node6;
 #define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6;
+
 
 #endif
