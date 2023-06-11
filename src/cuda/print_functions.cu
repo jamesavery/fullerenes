@@ -8,8 +8,9 @@
     printf("[%.6f,%.6f,%.6f]",ab.x,ab.y,ab.z);
 }
  */
-__device__ void print(device_real_t a){
-    printf("%.6f", a);
+__device__ void print(device_real_t a, int thread_id = 0){
+    if (threadIdx.x != thread_id) return;
+    printf("%.6e", a);
 }
 
 __device__ void print(bool b){
@@ -24,6 +25,10 @@ __device__ void print(size_t a){
     printf("%u",(unsigned int)a);
 }
 
+__device__ void print(uint16_t a){
+    printf("%u",(unsigned int)a);
+}
+
 __device__ void print(const char* a, int thread_id = 0){
     if (threadIdx.x != thread_id) return;
     printf(a);
@@ -31,7 +36,7 @@ __device__ void print(const char* a, int thread_id = 0){
 
 __device__ void print(const device_coord3d& a, int thread_id = 0){
     if (threadIdx.x != thread_id) return;
-    printf("[%.6f,%.6f,%.6f]\n",a[0],a[1],a[2]);
+    printf("[%.6e,%.6e,%.6e]\n",a[0],a[1],a[2]);
 }
 /* __device__ void print(const device_node2& a){
     printf("[%d,%d]",a.x,a.y);
@@ -66,9 +71,9 @@ __device__ void sequential_print(T data, size_t fullerene_id){
         {   
             if (i != blockDim.x-1)
             {
-                print(data); printf(",");
+                print(data, threadIdx.x); printf(",");
             } else{
-                print(data);
+                print(data, threadIdx.x);
             }
         }
         cg::sync(cg::this_thread_block());
