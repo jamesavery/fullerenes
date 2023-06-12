@@ -30,7 +30,6 @@ int main(int argc, char** argv){
     auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N)*8, (int)n_isomers);
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     IsomerBatch Bhost(N,batch_size,HOST_BUFFER);
-    IsomerBatch Bstart(N,batch_size,HOST_BUFFER);
     IsomerBatch Bdev(N,batch_size,DEVICE_BUFFER);
     for (size_t i = 0; i < batch_size; i++)
     {
@@ -41,59 +40,21 @@ int main(int argc, char** argv){
     dualise(Bdev);
     tutte_layout(Bdev, N*10);
     zero_order_geometry(Bdev, 4.0);
-    cuda_io::copy(Bstart, Bdev);
     optimise<PEDERSEN>(Bdev, N*5, N*5);
-    std::string Before_ = "Before_"+to_string(N);
-    std::string After_ = "After_"+to_string(N);
-    std::string Most_ = "Most_Eccentric_"+to_string(N);
-    //FILE* f = fopen((Before_ + "_Geometry.mol2").c_str(), "w");
-  //  FILE* g = fopen((After_ + "_Geometry.mol2").c_str(), "w");
     cuda_io::copy(Bhost, Bdev);
-    CuArray<float> orthogonalities(batch_size);
-    CuArray<float> eigs(batch_size*3);
-    CuArray<float> eigvecs(batch_size*9);
-    CuArray<float> inertia(batch_size*9);
-    isomerspace_properties::debug_function(Bdev, eigs, eigvecs, inertia, orthogonalities);
-
-    //isomerspace_properties::eccentricities(Bdev, ecce);
-    //isomerspace_properties::transform_coordinates(Bdev);
-    cuda_io::copy(Bhost, Bdev);
-    std::vector<int> sorted_indices(batch_size);
-    std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
-    std::sort(sorted_indices.begin(), sorted_indices.end(), [&orthogonalities](int i1, int i2) {return orthogonalities[i1] < orthogonalities[i2];});
-    ofstream badeigs("Eigenvals_" + to_string(N) + ".float32", std::ios::binary);
-    ofstream badeigvecs("Eigenvecs_" + to_string(N) + ".float32", std::ios::binary);
-    ofstream badinertia("Inertia_" + to_string(N) + ".float32", std::ios::binary);
-    ofstream optgeom("OptGeom_" + to_string(N) + ".float32", std::ios::binary);
-    ofstream graphs("Graphs_" + to_string(N) + ".uint16", std::ios::binary);
-    ofstream startgeom("StartGeom_" + to_string(N) + ".float32", std::ios::binary);
-    badeigs.write(reinterpret_cast<char*>(eigs.data), batch_size*3*sizeof(float));
-    badeigvecs.write(reinterpret_cast<char*>(eigvecs.data), batch_size*9*sizeof(float));
-    badinertia.write(reinterpret_cast<char*>(inertia.data), batch_size*9*sizeof(float));
-    optgeom.write(reinterpret_cast<char*>(Bhost.X), batch_size*N*3*sizeof(float));
-    startgeom.write(reinterpret_cast<char*>(Bstart.X), batch_size*N*3*sizeof(float));
-    graphs.write(reinterpret_cast<char*>(Bhost.cubic_neighbours), batch_size*N*3*sizeof(device_node_t));
-
-    auto P = Bhost.get_isomer(0).value();
-    P.volume_divergence();
-    CuArray<float> VD(batch_size);
-    isomerspace_properties::volume_divergences(Bdev, VD);
-    std::cout << "Volume Divergence: " << VD << std::endl;
-    std::cout << "Volume Divergence: " << P.volume_divergence() << std::endl;
-
+    
     CuArray<float> SA(batch_size);
     isomerspace_properties::surface_areas(Bdev, SA);
-    std::cout << "Surface Area: " << SA << std::endl;
-    std::cout << "Surface Area: " << P.surface_area() << std::endl;
-    
-    
-    //std::cout << "Worst ID: " << sorted_indices[batch_size-1] << std::endl;
-    //std::cout << "Wors Inertia" << std::vector<double>(inertia.data + sorted_indices[batch_size-1]*9, inertia.data + sorted_indices[batch_size-1]*9 + 9) << std::endl;
-    //std::cout << "Worst Orthogonality: " << orthogonalities[sorted_indices[batch_size-1]] << std::endl;
-    //std::sort(orthogonalities.data, orthogonalities.data+batch_size);
-    //std::cout << "Orthogonality:\n " << orthogonalities << std::endl;
-
-
-    //std::cout << eigs << std::endl;
-    //std::cout << "Indices:\n " << sorted_indices << std::endl;
+    auto tol = std::numeric_limits<float>::epsilon()*1e1;
+    for (size_t i = 0; i < batch_size; i++)
+    {
+        auto P = Bhost.get_isomer(i).value();
+        auto ref = P.surface_area();
+        auto val = SA[i];
+        if (abs(ref-val)/val > tol){
+            std::cout << "Surface area test failed for isomer " << i << " relative error = " << abs(ref-val)/val << std::endl;
+            return 1;
+        }
+    }
+    std::cout << "Surface area test passed for C" << N << std::endl;
 }
