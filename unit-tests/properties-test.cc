@@ -46,7 +46,7 @@ int main(int argc, char** argv){
     std::string Before_ = "Before_"+to_string(N);
     std::string After_ = "After_"+to_string(N);
     std::string Most_ = "Most_Eccentric_"+to_string(N);
-    FILE* f = fopen((Before_ + "_Geometry.mol2").c_str(), "w");
+    //FILE* f = fopen((Before_ + "_Geometry.mol2").c_str(), "w");
   //  FILE* g = fopen((After_ + "_Geometry.mol2").c_str(), "w");
     cuda_io::copy(Bhost, Bdev);
     CuArray<float> orthogonalities(batch_size);
@@ -54,6 +54,7 @@ int main(int argc, char** argv){
     CuArray<float> eigvecs(batch_size*9);
     CuArray<float> inertia(batch_size*9);
     isomerspace_properties::debug_function(Bdev, eigs, eigvecs, inertia, orthogonalities);
+
     //isomerspace_properties::eccentricities(Bdev, ecce);
     //isomerspace_properties::transform_coordinates(Bdev);
     cuda_io::copy(Bhost, Bdev);
@@ -73,6 +74,12 @@ int main(int argc, char** argv){
     startgeom.write(reinterpret_cast<char*>(Bstart.X), batch_size*N*3*sizeof(float));
     graphs.write(reinterpret_cast<char*>(Bhost.cubic_neighbours), batch_size*N*3*sizeof(device_node_t));
 
+    auto P = Bhost.get_isomer(0).value();
+    P.volume_divergence();
+    CuArray<float> VD(batch_size);
+    isomerspace_properties::volume_divergences(Bdev, VD);
+    std::cout << "Volume Divergence: " << VD << std::endl;
+    std::cout << "Volume Divergence: " << P.volume_divergence() << std::endl;
     
     //std::cout << "Worst ID: " << sorted_indices[batch_size-1] << std::endl;
     //std::cout << "Wors Inertia" << std::vector<double>(inertia.data + sorted_indices[batch_size-1]*9, inertia.data + sorted_indices[batch_size-1]*9 + 9) << std::endl;

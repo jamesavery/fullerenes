@@ -122,13 +122,13 @@ namespace gpu_kernels{
     namespace isomerspace_properties{
 
         //Computes the volume of each molecule in the batch. See sequential code in polyhedron.cc
-        cudaError_t volume_divergences(const IsomerBatch& B, CuArray<double>& volumes, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t volume_divergences(const IsomerBatch& B, CuArray<float>& volumes, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
         //Computes the surface area of each molecule in the batch. See sequential code in polyhedron.cc
-        cudaError_t surface_areas(const IsomerBatch& B, CuArray<double>& surface_areas, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t surface_areas(const IsomerBatch& B, CuArray<float>& surface_areas, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
         //Computes the best elipsoid fit for each molecule in the batch and returns the eccentricities of the ellipsoids.
-        cudaError_t eccentricities(const IsomerBatch& B, CuArray<double>& eccentricities, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t eccentricities(const IsomerBatch& B, CuArray<float>& eccentricities, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
         //Moves coordinates to the centre of mass of the molecule and aligns the molecule to the principal axes of inertia. See sequential code in polyhedron.cc
         cudaError_t transform_coordinates(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
