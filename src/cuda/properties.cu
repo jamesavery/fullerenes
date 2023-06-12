@@ -152,7 +152,42 @@ namespace gpu_kernels{
             }
         }
 
+        void __global__ surface_areas_(IsomerBatch B, CuArray<device_real_t> sa){
+            DEVICE_TYPEDEFS
+            typedef device_node3 tri_t;
+            extern __shared__ real_t smems[];
+            const int tid = threadIdx.x;
+            auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
+            for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
+                if (isomer_idx < B.isomer_capacity)
+                {
+                BLOCK_SYNC
+                size_t offset = isomer_idx * blockDim.x;
+                NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smems);
+                coord3d* X              = reinterpret_cast<coord3d*>(smems) + B.n_atoms;
+                assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
+                BLOCK_SYNC
+                real_t A = real_t(0.);
+                if (tid < B.n_faces) {
+                    coord3d face_center = (coord3d){0.,0.,0.};
+                    for (int i = 0; i < node_graph.face_size; i++) face_center += X[node_graph.face_nodes[i]];
+                    face_center /= node_graph.face_size; //The center of the threadIdx.x-th face.
 
+                    for (int i = 0; i < node_graph.face_size; i++){
+                        coord3d a = X[node_graph.face_nodes[i]];
+                        coord3d b = X[node_graph.face_nodes[(i+1)%node_graph.face_size]];
+                        coord3d c = face_center;
+                        coord3d u = b - a;
+                        coord3d v = c - a;
+                        coord3d n = cross(u,v);
+                        A += norm(n);
+                    }
+                }
+                auto result = reduction(smems, A)/real_t(2.0);
+                if (tid == 0) sa.data[isomer_idx] = result;
+                }
+            }
+        }
 
         void __global__ debug_function_(IsomerBatch B, CuArray<device_real_t> eigenvalues, CuArray<device_real_t> eigenvectors, CuArray<device_real_t> inertia_matrices, CuArray<device_real_t> orthogonality){
             DEVICE_TYPEDEFS
@@ -239,7 +274,20 @@ namespace gpu_kernels{
         }
 
         cudaError_t surface_areas(const IsomerBatch& B, CuArray<device_real_t>& surface_areas, const LaunchCtx& ctx, const LaunchPolicy policy){
-            return cudaSuccess;
+            cudaSetDevice(B.get_device_id());
+
+            //If launch ploicy is synchronous then wait.
+            if(policy == LaunchPolicy::SYNC) ctx.wait();
+
+            size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
+            static LaunchDims dims((void*)surface_areas_, B.n_atoms, smem, B.isomer_capacity);
+            dims.update_dims((void*)surface_areas_, B.n_atoms, smem, B.isomer_capacity);
+            void* kargs[]{(void*)&B, (void*)&surface_areas};
+            auto error = safeCudaKernelCall((void*)surface_areas_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+
+            if(policy == LaunchPolicy::SYNC) ctx.wait();
+            printLastCudaError("Calculation of Volume Divergences Failed: ");
+            return error;
         }
 
         cudaError_t volume_divergences(const IsomerBatch& B, CuArray<device_real_t>& volumes, const LaunchCtx& ctx, const LaunchPolicy policy){

@@ -80,6 +80,12 @@ int main(int argc, char** argv){
     isomerspace_properties::volume_divergences(Bdev, VD);
     std::cout << "Volume Divergence: " << VD << std::endl;
     std::cout << "Volume Divergence: " << P.volume_divergence() << std::endl;
+
+    CuArray<float> SA(batch_size);
+    isomerspace_properties::surface_areas(Bdev, SA);
+    std::cout << "Surface Area: " << SA << std::endl;
+    std::cout << "Surface Area: " << P.surface_area() << std::endl;
+    
     
     //std::cout << "Worst ID: " << sorted_indices[batch_size-1] << std::endl;
     //std::cout << "Wors Inertia" << std::vector<double>(inertia.data + sorted_indices[batch_size-1]*9, inertia.data + sorted_indices[batch_size-1]*9 + 9) << std::endl;
