@@ -59,6 +59,7 @@ int main(int argc, char** argv){
         auto val = ECC[i];
         if (abs(ref-val)/val > tol){
             std::cout << "Eccentricity test failed for isomer " << i << " relative error = " << abs(ref-val)/val << std::endl;
+            return 1;
         }
     }
     std::cout << "Eccentricity test passed for C" << N << std::endl;
