@@ -32,32 +32,13 @@ namespace gpu_kernels{
             return I;
         }
 
-        mat3 __device__ principal_axes(const device_coord3d* X){
+     
+      std::array<device_coord3d,3> __device__ principal_axes(const device_coord3d* X){
             DEVICE_TYPEDEFS
             auto I = inertia_matrix(X);
-            coord3d eigs = I.eigenvalues();
+            coord3d lambdas = I.eigenvalues();
             //Sort eigenvalues
-            eigs = d_sort(eigs);
-            mat3 P;
-            if ((ABS(eigs[0] - eigs[1]) < 1e-7) && (ABS(eigs[1] - eigs[2]) < 1e-7)){return mat3::identity();} 
-            else if (ABS(eigs[0] - eigs[1]) < 1e-7){
-                reinterpret_cast<coord3d*>(P[0])[0] = I.eigenvector(eigs[0]);
-                reinterpret_cast<coord3d*>(P[1])[0] = I.eigenvector(eigs[2]);
-                reinterpret_cast<coord3d*>(P[2])[0] = cross(reinterpret_cast<coord3d*>(P[0])[0], reinterpret_cast<coord3d*>(P[1])[0]);
-            } else {
-                reinterpret_cast<coord3d*>(P[0])[0] = I.eigenvector(eigs[0]);
-                reinterpret_cast<coord3d*>(P[1])[0] = I.eigenvector(eigs[1]);
-                reinterpret_cast<coord3d*>(P[2])[0] = cross(reinterpret_cast<coord3d*>(P[0])[0], reinterpret_cast<coord3d*>(P[1])[0]);
-            }
-            for (size_t i = 0; i < 3; i++){
-                for(size_t j = 0; j < 3; j++)
-                    if(ISNAN(P[i][j])) return mat3::identity();
-            }
-
-            //bool is_unitary = norm(P * transpose(P) - identity3()) < 1e-3;
-            //if (norm(P * transpose(P) - identity3()) > 1e-5) return mat3::identity(); //Check if P is a unitary matrix.
-
-            return P;
+            return I.eigenvectors(lambdas);
         }
 
         //Returns the best ellipsoid for the given coordinates, lambda0 = a, lambda1 = b, lambda2 = c.
@@ -83,7 +64,7 @@ namespace gpu_kernels{
                 coord3d centroid = {reduction(shared_memory, X[tid][0]), reduction(shared_memory, X[tid][1]), reduction(shared_memory, X[tid][2])};
                 X[tid] -= centroid;
                 BLOCK_SYNC
-                mat3 P = principal_axes(X);
+		mat3 P{principal_axes(X)};
                 BLOCK_SYNC
                 X[tid] = dot(P, X[tid]);
                 BLOCK_SYNC
@@ -208,29 +189,30 @@ namespace gpu_kernels{
                 auto I = inertia_matrix(X);
                 BLOCK_SYNC
                 if (tid == 0){
-                coord3d eigs = I.eigenvalues();
-                reinterpret_cast<coord3d*>(eigenvalues.data) [isomer_idx] = (coord3d){eigs[0], eigs[1], eigs[2]};
-            
-               
-                reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3] = I.eigenvector(eigs[0]);
-                reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3+1] = I.eigenvector(eigs[1]);
-                reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3+2] = I.eigenvector(eigs[2]);
-                real_t orthog = real_t(1.0);
+		  coord3d eigs = I.eigenvalues();
+		  //		  coord3d eigs{real_t(eigs64[0]),real_t(eigs64[1]),real_t(eigs64[2])};
+		  reinterpret_cast<coord3d*>(eigenvalues.data) [isomer_idx] = eigs;
+		  auto P = I.eigenvectors(eigs);
+		  reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3+0] = P[0];
+		  reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3+1] = P[1];
+		  reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3+2] = P[2];
+		
+		  real_t orthog = real_t(1.0);
 
-                if(ISNAN(eigs[0]) || ISNAN(eigs[1]) || ISNAN(eigs[2]) || ISNAN(I.a) || ISNAN(I.b) || ISNAN(I.c) || ISNAN(I.d) || ISNAN(I.e) || ISNAN(I.f)){
+		  if(ISNAN(eigs[0]) || ISNAN(eigs[1]) || ISNAN(eigs[2]) || ISNAN(I.a) || ISNAN(I.b) || ISNAN(I.c) || ISNAN(I.d) || ISNAN(I.e) || ISNAN(I.f)){
                     orthog = real_t(2.0);
-                } else if ((ABS(eigs[0]- eigs[1])/ABS(eigs[0]) < 1e-5) && (ABS(eigs[1]- eigs[2])/ABS(eigs[0]) < 1e-5)){
+		  } else if ((ABS(eigs[0]- eigs[1])/ABS(eigs[0]) < 1e-5) && (ABS(eigs[1]- eigs[2])/ABS(eigs[0]) < 1e-5)){
                     orthog = real_t(3.0);
-                } else if (ABS(eigs[0] - eigs[1])/ABS(eigs[0]) < 1e-5) {
+		  } else if (ABS(eigs[0] - eigs[1])/ABS(eigs[0]) < 1e-5) {
                     orthog = ABS(dot(I.eigenvector(eigs[0]), I.eigenvector(eigs[2])));
-                } else {
+		  } else {
                     orthog = ABS(dot(I.eigenvector(eigs[0]), I.eigenvector(eigs[1])));
-                }
+		  }
 
-                orthogonality.data[isomer_idx] = orthog;
-                reinterpret_cast<coord3d*>(inertia_matrices.data)[isomer_idx*3] = {I.a, I.b, I.c};
-                reinterpret_cast<coord3d*>(inertia_matrices.data)[isomer_idx*3+1] = {I.b, I.d, I.e};
-                reinterpret_cast<coord3d*>(inertia_matrices.data)[isomer_idx*3+2] = {I.c, I.e, I.f};
+		  orthogonality.data[isomer_idx] = orthog;
+		  reinterpret_cast<coord3d*>(inertia_matrices.data)[isomer_idx*3] = {I.a, I.b, I.c};
+		  reinterpret_cast<coord3d*>(inertia_matrices.data)[isomer_idx*3+1] = {I.b, I.d, I.e};
+		  reinterpret_cast<coord3d*>(inertia_matrices.data)[isomer_idx*3+2] = {I.c, I.e, I.f};
                 }
                 }
             }
