@@ -68,7 +68,22 @@ if(CMAKE_CUDA_COMPILER)
 #NOTE: -gencode arch argument is EXTREMELY important to get right, the program will simply crash with a cudaError: invalid device function if the architecture does not match the GPU
 set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++17 --expt-relaxed-constexpr --maxrregcount=80 -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_86,code=sm_86  -I /opt/nvidia/hpc_sdk/Linux_x86_64/2022/cuda/11.8/include/ "
 )
-  
+
+  # Optional extra CUDA libraries
+  find_library(CUSOLVER_LIBRARY cusolver HINTS ${CUDAToolkit_LIBRARaY_DIR})
+  find_library(CUSPARSE_LIBRARY cusparse HINTS ${CUDAToolkit_LIBRARY_DIR})
+  if( CUSOLVER_LIBRARY )
+    set(CMAKE_CUDA_LIBS  ${CMAKE_CUDA_LIBS} ${CUSOLVER_LIBRARY})
+    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-DCUSOLVER=1")
+    message("CUSOLVER library found: " ${CUSOLVER_LIBRARY} ".")
+  endif()
+
+  if( CUSPARSE_LIBRARY )
+    set(CMAKE_CUDA_LIBS  ${CMAKE_CUDA_LIBS} ${CUSPARSE_LIBRARY})
+    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-DCUSPARSE=1")
+    message("CUSPARSE library found: " ${CUSPARSE_LIBRARY} ".")
+  endif()
+
   add_subdirectory(src/cuda)
 endif()
 
