@@ -19,7 +19,6 @@ if(CMAKE_CUDA_COMPILER)
   add_executable(forcefield-opt forcefield-opt.cc)
   add_executable(flatness-compare flatness-compare.cc)
 
-
   target_link_libraries(isomerspace-dualisation cuda_lib fullerenes ${CMAKE_CUDA_LIBS})
   target_link_libraries(isomerspace-optimise-par cuda_lib fullerenes ${CMAKE_CUDA_LIBS})
   target_link_libraries(forcefield-stats cuda_lib fullerenes ${CMAKE_CUDA_LIBS})
