@@ -20,6 +20,12 @@ struct mat3
             A[i] = device_real_t(0.f);
     }
 
+  INLINE mat3(const std::array<device_coord3d,3> &V){
+    for(int i=0;i<3;i++)
+      for(int j=0;j<3;j++)
+	A[i*3+j] = V[i][j];
+  }
+  
     INLINE mat3(device_real_t a, device_real_t b, device_real_t c, device_real_t d, device_real_t e, device_real_t f, device_real_t g, device_real_t h, device_real_t i)
     {
         A[0] = a;
