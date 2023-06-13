@@ -8,8 +8,11 @@
 #include "fullerenes/gpu/cu_array.hh"
 #include "fullerenes/gpu/isomer_batch.hh"
 #include "fullerenes/gpu/kernels.hh"
+
+#if(CUSOLVER && CUSPARSE)
 #include <cusolverDn.h>
 #include <cusparse.h>
+#endif
 
 #define N_STREAMS 16
 
@@ -17,6 +20,7 @@ namespace gpu_kernels{
     namespace isomerspace_eigen{
         #include "device_includes.cu"
 
+#if(CUSOLVER)      
         void eigensolve_cusolver(const IsomerBatch& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             static std::vector<cusolverDnHandle_t> cusolverHs(N_STREAMS, NULL);
             static int m = B.n_atoms*3;
@@ -111,6 +115,8 @@ namespace gpu_kernels{
             std::cout << "eigensolve time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / (float)nisomers <<  " us / isomer" <<std::endl;
         
         }
+#endif // if(CUSOLVER)
+      
         void __global__ eigensolve_(const IsomerBatch B, CuArray<device_real_t> Qglobal, const CuArray<device_real_t> H, const CuArray<device_node_t> cols, CuArray<device_real_t> eigenvalues){
             DEVICE_TYPEDEFS
             extern __shared__ real_t smem[];
