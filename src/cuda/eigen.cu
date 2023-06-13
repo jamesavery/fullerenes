@@ -115,7 +115,7 @@ namespace gpu_kernels{
         struct array_wrapper{
             T* data;
             int stride;
-            array_wrapper(T* data, int stride) : data(data), stride(stride) {}
+            __device__ array_wrapper(T* data, int stride) : data(data), stride(stride) {}
             __device__ T& operator[](int i){
                 return data[i*stride];
             }
@@ -124,7 +124,7 @@ namespace gpu_kernels{
         typedef array_wrapper<device_real_t> real_wrap;
 
         //Customized diagonalization routine for symmetric tridiagonal matrices
-        void __device__ T_QTQ(const int n, const real_wrap Din, const real_wrap Lin, real_wrap Dout, real_wrap Lout, real_wrap Vout, device_real_t shift=0)
+        /* void __device__ T_QTQ(const int n, const real_wrap Din, const real_wrap Lin, real_wrap Dout, real_wrap Lout, real_wrap Vout, device_real_t shift=0)
         {
         DEVICE_TYPEDEFS
         //  QTQ_calls ++;
@@ -163,7 +163,7 @@ namespace gpu_kernels{
             v[0] -= alpha;
 
             real_t vnorm = SQRT(v[0]*v[0]+v[1]*v[1]);
-            real_t norm_inv = 1/vnorm;               /* Normalize */
+            real_t norm_inv = 1/vnorm;               //Normalize
             v[0] *= norm_inv;  v[1] *= norm_inv;
 
             Vout[2*k] = v[0]; Vout[2*k+1] = v[1];
@@ -218,7 +218,7 @@ namespace gpu_kernels{
             Lout[i] = U[i];  // First lower subdiagonal. L[k] = T(k+1,k) is element below kth diagonal element.
             }
         }
-        }
+        } */
 
 
 
