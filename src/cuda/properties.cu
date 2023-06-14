@@ -14,7 +14,7 @@ namespace gpu_kernels{
     namespace isomerspace_properties{
         #include "device_includes.cu"
         symMat3 __device__ inertia_matrix(const device_coord3d* X){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             extern __shared__ real_t smem[];
             clear_cache(smem, blockDim.x);
             int tid = threadIdx.x;
@@ -34,22 +34,21 @@ namespace gpu_kernels{
 
      
       std::array<device_coord3d,3> __device__ principal_axes(const device_coord3d* X){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             auto I = inertia_matrix(X);
-            coord3d lambdas = I.eigenvalues();
-            //Sort eigenvalues
-            return I.eigenvectors(lambdas);
+	    auto [V,lambdas] = I.eigensystem();
+	    return V;
         }
 
         //Returns the best ellipsoid for the given coordinates, lambda0 = a, lambda1 = b, lambda2 = c.
         device_coord3d __device__ best_ellipsoid (const device_coord3d* X){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             auto I = inertia_matrix(X);
             return rsqrt3(d_sort(d_abs(I.eigenvalues()))); 
         }
 
         void __global__ transform_coordinates_(IsomerBatch B){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             extern __shared__ real_t shared_memory[];
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
@@ -76,7 +75,7 @@ namespace gpu_kernels{
         }
 
         void __global__ eccentricities_(IsomerBatch B, CuArray<device_real_t> ecce){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             extern __shared__ real_t shared_memory[];
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
@@ -97,7 +96,7 @@ namespace gpu_kernels{
         }
         
         void __global__ volume_divergences_(IsomerBatch B, CuArray<device_real_t> vd){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             typedef device_node3 tri_t;
             extern __shared__ real_t smems[];
             const int tid = threadIdx.x;
@@ -134,7 +133,7 @@ namespace gpu_kernels{
         }
 
         void __global__ surface_areas_(IsomerBatch B, CuArray<device_real_t> sa){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             typedef device_node3 tri_t;
             extern __shared__ real_t smems[];
             const int tid = threadIdx.x;
@@ -171,7 +170,7 @@ namespace gpu_kernels{
         }
 
         void __global__ debug_function_(IsomerBatch B, CuArray<device_real_t> eigenvalues, CuArray<device_real_t> eigenvectors, CuArray<device_real_t> inertia_matrices, CuArray<device_real_t> orthogonality){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             extern __shared__ real_t shared_memory[];
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
@@ -189,10 +188,9 @@ namespace gpu_kernels{
                 auto I = inertia_matrix(X);
                 BLOCK_SYNC
                 if (tid == 0){
-		  coord3d eigs = I.eigenvalues();
-		  //		  coord3d eigs{real_t(eigs64[0]),real_t(eigs64[1]),real_t(eigs64[2])};
+		  auto [P,eigs] = I.eigensystem();		  
+
 		  reinterpret_cast<coord3d*>(eigenvalues.data) [isomer_idx] = eigs;
-		  auto P = I.eigenvectors(eigs);
 		  reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3+0] = P[0];
 		  reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3+1] = P[1];
 		  reinterpret_cast<coord3d*>(eigenvectors.data)[isomer_idx*3+2] = P[2];
@@ -204,9 +202,9 @@ namespace gpu_kernels{
 		  } else if ((ABS(eigs[0]- eigs[1])/ABS(eigs[0]) < 1e-5) && (ABS(eigs[1]- eigs[2])/ABS(eigs[0]) < 1e-5)){
                     orthog = real_t(3.0);
 		  } else if (ABS(eigs[0] - eigs[1])/ABS(eigs[0]) < 1e-5) {
-                    orthog = ABS(dot(I.eigenvector(eigs[0]), I.eigenvector(eigs[2])));
+                    orthog = ABS(dot(P[0], P[2]));
 		  } else {
-                    orthog = ABS(dot(I.eigenvector(eigs[0]), I.eigenvector(eigs[1])));
+                    orthog = ABS(dot(P[0], P[1]));
 		  }
 
 		  orthogonality.data[isomer_idx] = orthog;

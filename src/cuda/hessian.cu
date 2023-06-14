@@ -16,7 +16,7 @@ namespace isomerspace_hessian{
 // This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions
 template <ForcefieldType T>
 struct ForceField{
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     
     const NodeNeighbours node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
     const Constants constants;          //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
@@ -117,8 +117,9 @@ struct FaceData{
         coord3d* centroids = reinterpret_cast<coord3d*>(cache);
         coord3d* norms = reinterpret_cast<coord3d*>(cache + blockDim.x/2 + 2);
         if(threadIdx.x < blockDim.x/2 + 2){
-            centroids[threadIdx.x] = centroid;
-            norms[threadIdx.x] = A.eigenvector(lambda_f);
+	  auto lam = lambda_f;
+	  centroids[threadIdx.x] = centroid;
+	  norms[threadIdx.x] = A.eigenvector3x3(lam);
         }
         BLOCK_SYNC
 
@@ -1612,7 +1613,7 @@ INLINE real_t energy(coord3d* X) const {
 };
 
 template <ForcefieldType T> __global__ void compute_hessians_(IsomerBatch B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols){
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
     auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
@@ -1647,7 +1648,7 @@ template <ForcefieldType T> __global__ void compute_hessians_(IsomerBatch B, CuA
 }
 
 template <ForcefieldType T> __global__ void compute_hessians_fd_(IsomerBatch B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols, float reldelta){
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
     auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.

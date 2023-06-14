@@ -366,7 +366,8 @@ INLINE device_coord3d orthogonalize(const device_coord3d& v, const device_coord3
 //Each thread stores and returns up to 3 values of alpha and beta
 template <int eigenvalues_per_thread>
 INLINE sym_tridiag_t<eigenvalues_per_thread> hessian_t::lanczos_iteration(device_real_t* smem){
-    DEVICE_TYPEDEFS
+  DEVICE_TYPEDEFS;
+  
     int N = blockDim.x;
     coord3d* mat_mem = reinterpret_cast<coord3d*>(smem + N*2);
     int m = eigenvalues_per_thread * N;

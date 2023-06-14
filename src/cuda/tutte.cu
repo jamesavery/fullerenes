@@ -9,7 +9,7 @@ namespace isomerspace_tutte{
 
 __global__
 void tutte_layout_(IsomerBatch B, const size_t iterations){
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
