@@ -136,7 +136,7 @@ int main(int ac, char **argv)
         << "B1 = " << B1s[i] << "\n\n";
 
       isomerspace_forcefield::optimise<PEDERSEN>(B1s[i], ceil(0.5*N), 10*N, opt_ctxs[i], launch_policy);
-      Q2s[i].push(B1s[i], opt_ctxs[i], launch_policy);}
+      Q2s[i].push_done(B1s[i], opt_ctxs[i], launch_policy);}
       for (int d = 0; d < Nd; d++){
         opt_ctxs[d].wait();
         num_finished[OPTIMIZE] += Q2s[d].get_size() - qlen[d]; // NB: This is on purpose:optimise may leave graphs in B1.

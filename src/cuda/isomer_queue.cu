@@ -109,7 +109,7 @@ __global__ void push_all_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProp
 
     //Must ensure that all writes to queue counters from the host are visible to the device threads before reading them.
     __threadfence_system();
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     extern __shared__ int smem[];
  
     auto Nf = B.n_faces; // Number of faces

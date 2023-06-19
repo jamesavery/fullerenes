@@ -352,7 +352,7 @@ namespace gpu_kernels{
         void __device__ T_QTQ(const int n, device_real_t* D, device_real_t* L, device_real_t* U, device_real_t* Vout, device_real_t shift=0)
         {
         int tix = threadIdx.x;
-        DEVICE_TYPEDEFS
+        DEVICE_TYPEDEFS;
         extern __shared__ real_t shared[];
         //  QTQ_calls ++;
         // Unrolled
@@ -475,7 +475,7 @@ namespace gpu_kernels{
 
         //Takes a set of tridiagonal matrices and solves them
         void __global__ eigensolve_(const IsomerBatch B, CuArray<device_real_t> D_, CuArray<device_real_t> L_, CuArray<device_real_t> U_, CuArray<device_real_t> Q_, int n){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             extern __shared__ device_real_t smem[];
             device_real_t *D = smem + blockDim.x*2, *L = D + (n+1), *U = L + (n+1), *V = U + (n+1)*2;
             //Expected layout is that each thread reads the (threadIdx.x + blockIdx.x*blockDim.x)^th column of D and L, in that way reads should be coalesced.
@@ -544,7 +544,7 @@ namespace gpu_kernels{
         }
 
         void __global__ lanczos_(const IsomerBatch B, CuArray<device_real_t> Q_, CuArray<device_real_t> V_, CuArray<device_real_t> U, CuArray<device_real_t> D, const CuArray<device_real_t> H, const CuArray<device_node_t> cols, int m, int n_deflation){
-            DEVICE_TYPEDEFS
+            DEVICE_TYPEDEFS;
             extern __shared__ real_t smem[];
             int N = B.n_atoms * 3; //Number of rows in the hessian
             constexpr int M = 10*3;          //Number of columns in the hessian
