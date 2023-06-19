@@ -47,7 +47,7 @@ int main(int ac, char **argv)
   mkdir(output_dir.c_str(),0777);
   int n_fullerenes = IPR > 0 ? num_IPR_fullerenes.find(N)->second : num_fullerenes.find(N)->second;
   int Nd = LaunchCtx::get_device_count();
-  auto batch_size = isomerspace_forcefield::optimal_batch_size(N,0)*16;
+  auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes);
 
   IsomerBatch B0s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
   IsomerBatch B1s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
@@ -130,15 +130,15 @@ int main(int ac, char **argv)
     num_finished[OPT] += Q2s[i].get_size() - qsize[i];
     }
     stage_finished[OPT] = num_finished[OPT] == n_fullerenes;
-    std::cout << "Optimised: " << num_finished[OPT] << "/" << n_fullerenes << std::endl;
   };
 
   auto analyse_routine = [&](){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int i = 0; i < Nd; i++){
         Q2s[i].refill_batch(B2s[i], opt_ctxs[i], LaunchPolicy::ASYNC);
-        isomerspace_properties::eccentricities(B2s[i], eccentricity_results[i], opt_ctxs[i], LaunchPolicy::SYNC);
-        isomerspace_properties::volume_divergences(B2s[i], volume_results[i], opt_ctxs[i], LaunchPolicy::SYNC);
+        isomerspace_properties::transform_coordinates(B2s[i], opt_ctxs[i], LaunchPolicy::ASYNC);
+        isomerspace_properties::eccentricities(B2s[i], eccentricity_results[i], opt_ctxs[i], LaunchPolicy::ASYNC);
+        isomerspace_properties::volume_divergences(B2s[i], volume_results[i], opt_ctxs[i], LaunchPolicy::ASYNC);
     }
     for (int i = 0; i < Nd; i++){
         opt_ctxs[i].wait();
