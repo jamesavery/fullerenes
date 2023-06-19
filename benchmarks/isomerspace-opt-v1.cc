@@ -86,7 +86,7 @@ int main(int argc, char** argv){
             auto T1 = high_resolution_clock::now(); T_io[l] += T1 - T0;
                 gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(batch0,N*0.5,N*5);
             auto T2 = high_resolution_clock::now(); T_par[l] += T2 - T1;
-                out_queue.push(batch0);
+                out_queue.push_done(batch0);
             auto T3 = high_resolution_clock::now(); T_io[l] += T3 - T2;
             }
 

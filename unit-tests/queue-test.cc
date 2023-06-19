@@ -40,13 +40,13 @@ int main(int argc, char** argv) {
             generate_samples(batch_size*0.5);
             Q1.refill_batch(batch1);
             isomerspace_forcefield::optimise<PEDERSEN>(batch1, N*1,N*6);
-            Q2.push(batch1);
+            Q2.push_done(batch1);
         }
     }
     while(Q1.get_size()>0) {
         Q1.refill_batch(batch1);
         isomerspace_forcefield::optimise<PEDERSEN>(batch1, N*6,N*6);
-        Q2.push(batch1);
+        Q2.push_done(batch1);
     }
 
     IsomerBatch host_batch(N, Q2.get_capacity(), HOST_BUFFER);

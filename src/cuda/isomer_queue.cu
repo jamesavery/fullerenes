@@ -101,8 +101,71 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
         }
     }
 }
+__global__ void push_all_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue, int* scan_array){
+    auto num_inside_capacity = [](const int size, const int capacity, const int test_val){
+        if(size < 0 || capacity < 0 || test_val < 0) {return false;}
+        return size + test_val <= capacity;
+    };
 
-__global__ void push_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){
+    //Must ensure that all writes to queue counters from the host are visible to the device threads before reading them.
+    __threadfence_system();
+    DEVICE_TYPEDEFS
+    extern __shared__ int smem[];
+ 
+    auto Nf = B.n_faces; // Number of faces
+    auto queue_requests = 0;
+    //Grid stride for loop, allows for handling of any batch size.
+    auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
+    for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx+= gridDim.x){
+    GRID_SYNC
+    bool access_queue = false;
+    if (isomer_idx < B.isomer_capacity) access_queue = (B.statuses[isomer_idx] != IsomerStatus::EMPTY);
+    
+    grid_ex_scan<int>(scan_array, smem, (int)access_queue, min((int)B.isomer_capacity, (int)gridDim.x) + 1);
+    //Checks if the isomer owned by a given block is finished or empty, if it is we want to replace it with a new one.
+
+
+    int queue_index = *queue.back < 0 ? (scan_array[blockIdx.x] + queue_requests) : (*queue.back + 1 + queue_requests + scan_array[blockIdx.x]) % *queue.capacity;
+    access_queue &= num_inside_capacity(*queue.size, *queue.capacity, queue_requests + scan_array[blockIdx.x]);
+    if (access_queue){
+        
+        //Given the queue index, copy data from the queue (container Q_B) to the target batch B.
+        size_t queue_array_idx    = queue_index*blockDim.x+threadIdx.x;
+        size_t global_idx         = blockDim.x*isomer_idx + threadIdx.x;
+        reinterpret_cast<coord3d*>(Q_B.X)[queue_array_idx]              = reinterpret_cast<coord3d*>(B.X)[global_idx];
+        reinterpret_cast<node3*>(Q_B.cubic_neighbours)[queue_array_idx] = reinterpret_cast<node3*>(B.cubic_neighbours)[global_idx];
+        reinterpret_cast<coord2d*>(Q_B.xys)[queue_array_idx]            = reinterpret_cast<coord2d*>(B.xys)[global_idx];
+        
+        //Face parallel copying 
+        if (threadIdx.x < Nf){
+            size_t queue_face_idx     = queue_index* Nf + threadIdx.x; 
+            size_t output_face_idx    = isomer_idx * Nf + threadIdx.x;
+            reinterpret_cast<node6*>(Q_B.dual_neighbours)[queue_face_idx] = reinterpret_cast<node6*>(B.dual_neighbours)[output_face_idx];
+            reinterpret_cast<uint8_t*>(Q_B.face_degrees)[queue_face_idx]  = reinterpret_cast<uint8_t*>(B.face_degrees)[output_face_idx];  
+        }
+        //Per isomer meta data
+        if (threadIdx.x == 0){
+            Q_B.IDs[queue_index] = B.IDs[isomer_idx];
+            Q_B.iterations[queue_index] = B.iterations[isomer_idx];
+            Q_B.statuses[queue_index] = B.statuses[isomer_idx];
+            B.statuses[isomer_idx] = IsomerStatus::EMPTY;
+        }
+    }
+    queue_requests += scan_array[min((int)B.isomer_capacity, (int)gridDim.x)]; //The last element of the scanned array will tell us how many blocks, accessed the queue.
+    }
+    GRID_SYNC
+    if ((threadIdx.x + blockIdx.x) == 0) {
+        if (*queue.size == 0 && queue_requests > 0) {
+            atomicExch_system(queue.front, 0); atomicExch_system(queue.back, queue_requests-1);} 
+        else{
+            atomicExch_system(queue.back, (*queue.back + queue_requests) % *queue.capacity);
+        }
+        //Pushing to queue simply increases the size by the number of push requests.
+        atomicAdd_system(queue.size, queue_requests);
+    }
+}
+
+__global__ void push_done_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){
     auto num_inside_capacity = [](const int size, const int capacity, const int test_val){
         if(size < 0 || capacity < 0 || test_val < 0) {return false;}
         return size + test_val <= capacity;
@@ -302,17 +365,37 @@ cudaError_t IsomerQueue::refill_batch(IsomerBatch& batch, const LaunchCtx& ctx, 
     return error;
 }
 
-//Kernel wrapper for push_ function
-cudaError_t IsomerQueue::push(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
+//Kernel wrapper for push_done_ function
+cudaError_t IsomerQueue::push_done(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
     int smem_bytes = sizeof(int)*N*2;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
-    static LaunchDims dims((void*)push_, N, smem_bytes, batch.isomer_capacity);
-    dims.update_dims((void*)push_, N, smem_bytes, batch.isomer_capacity);
+    static LaunchDims dims((void*)push_done_, N, smem_bytes, batch.isomer_capacity);
+    dims.update_dims((void*)push_done_, N, smem_bytes, batch.isomer_capacity);
     to_device(ctx);
     if(*props.capacity < *props.size + batch.isomer_capacity)  resize(*props.size+batch.isomer_capacity, ctx, policy);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props, (void*)&g_scan_array};
-    cudaError_t error = safeCudaKernelCall((void*)push_, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
+    cudaError_t error = safeCudaKernelCall((void*)push_done_, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
+    is_host_updated = false;
+    if (policy == LaunchPolicy::SYNC) ctx.wait();
+    //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
+    //cudaMemPrefetchAsync(props.back, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
+    //cudaMemPrefetchAsync(props.front, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
+    printLastCudaError("Push failed");
+    return error;
+}
+
+//Kernel wrapper for push_all_ function
+cudaError_t IsomerQueue::push_all(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
+    cudaSetDevice(m_device);
+    int smem_bytes = sizeof(int)*N*2;
+    if (policy == LaunchPolicy::SYNC) ctx.wait();
+    static LaunchDims dims((void*)push_all_, N, smem_bytes, batch.isomer_capacity);
+    dims.update_dims((void*)push_all_, N, smem_bytes, batch.isomer_capacity);
+    to_device(ctx);
+    if(*props.capacity < *props.size + batch.isomer_capacity)  resize(*props.size+batch.isomer_capacity, ctx, policy);
+    void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props, (void*)&g_scan_array};
+    cudaError_t error = safeCudaKernelCall((void*)push_all_, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     is_host_updated = false;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);

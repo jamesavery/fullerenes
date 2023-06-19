@@ -116,7 +116,7 @@ ofstream out_file("IsomerspaceOpt_V7_" + to_string(N_end) + ".txt");
     for (int i = 0; i < Nd; i++){
       Q1s[i].refill_batch(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);
       isomerspace_forcefield::optimise<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], LaunchPolicy::ASYNC);
-      Q2s[i].push(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);}
+      Q2s[i].push_done(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);}
       for (int i = 0; i < Nd; i++){
         opt_ctxs[i].wait();
         num_finished += Q2s[i].get_size();

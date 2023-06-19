@@ -128,7 +128,7 @@ int main(int argc, char** argv){
             auto TFlat = high_resolution_clock::now(); T_opts[l] += TFlat - TFF;
             isomerspace_forcefield::optimise<FLATNESS_ENABLED>(batch1,N*5,N*5);
             T_flat[l] += high_resolution_clock::now() - TFlat;
-            OutQueue.push(batch2,ctx, LaunchPolicy::SYNC);
+            OutQueue.push_done(batch2,ctx, LaunchPolicy::SYNC);
             auto T0 = high_resolution_clock::now();
             auto j = isomer_q_cubic.get_size(); 
             if(n_fullerenes >= 10000){
@@ -138,7 +138,7 @@ int main(int argc, char** argv){
                     auto T2 = high_resolution_clock::now(); T_io[l] += T2 - T1;
                     isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*0.5,N*5,ctx, LaunchPolicy::SYNC);
                     auto T3 = high_resolution_clock::now();
-                    OutQueue.push(batch2,ctx, LaunchPolicy::SYNC);
+                    OutQueue.push_done(batch2,ctx, LaunchPolicy::SYNC);
                     finished_isomers += OutQueue.get_size();
                     j = isomer_q_cubic.get_size();
                     OutQueue.clear(ctx, LaunchPolicy::SYNC);
@@ -151,7 +151,7 @@ int main(int argc, char** argv){
                     auto T2 = high_resolution_clock::now(); T_io[l] += T2 - T1;
                     isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*0.5,N*5);
                     auto T3 = high_resolution_clock::now();
-                    OutQueue.push(batch2);
+                    OutQueue.push_done(batch2);
                     j = OutQueue.get_size();
                     finished_isomers += j;
                     OutQueue.clear();

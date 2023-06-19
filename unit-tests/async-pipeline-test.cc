@@ -138,7 +138,7 @@ int main(int ac, char **argv){
         auto generate_handle = std::async(std::launch::async,generate_isomers, opt_test.isomer_capacity*2);
         while(optimise_more){
             isomerspace_forcefield::optimise<PEDERSEN>(opt_test,step, N*50, device0, ASYNC);
-            output_queue.push(opt_test, device0, ASYNC);
+            output_queue.push_done(opt_test, device0, ASYNC);
             opt_queue.refill_batch(opt_test, device0, ASYNC);
             device0.wait();
             optimise_more = opt_queue.get_size() >= opt_test.isomer_capacity;
@@ -153,7 +153,7 @@ int main(int ac, char **argv){
         if(!more_to_generate){
             while(opt_queue.get_size() > 0){
                 isomerspace_forcefield::optimise<PEDERSEN>(opt_test, step, N*50, device0, ASYNC);
-                output_queue.push(opt_test, device0, ASYNC);
+                output_queue.push_done(opt_test, device0, ASYNC);
                 device0.wait();
             
                 opt_queue.refill_batch(opt_test, device0, ASYNC);
@@ -161,7 +161,7 @@ int main(int ac, char **argv){
             for(int i = 0;  i <  N*50; i += step){
                 isomerspace_forcefield::optimise<PEDERSEN>(opt_test,step, N*50, device0, SYNC);
             }
-            output_queue.push(opt_test, device0, SYNC);
+            output_queue.push_done(opt_test, device0, SYNC);
             more_to_do = false;
         }
 
