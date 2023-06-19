@@ -18,7 +18,7 @@ void cubic_layout_(IsomerBatch B){
     power2 |= power2 >> 16;
     power2++;
 
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     extern __shared__  real_t sharedmem[];
     device_node_t* triangle_numbers = reinterpret_cast<device_node_t*>(sharedmem);
     device_node_t* cached_neighbours = triangle_numbers + B.n_faces*6;
@@ -92,7 +92,7 @@ void dualise_2_(IsomerBatch B){
     power2 |= power2 >> 16;
     power2++;
  */
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     extern __shared__  real_t sharedmem[];
     device_node_t* triangle_numbers = reinterpret_cast<device_node_t*>(sharedmem);
     device_node_t* cached_neighbours = triangle_numbers + B.n_faces*6;

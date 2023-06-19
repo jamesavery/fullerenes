@@ -11,7 +11,7 @@ namespace isomerspace_X0{
 
 __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     
     DeviceCubicGraph FG = DeviceCubicGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
     node_t outer_face[6]; memset(outer_face, 0, sizeof(node_t)*6); //Do not rely on uninitialized memory it will only be zero on first touch.
@@ -45,7 +45,7 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t
 
 __device__
 device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, const size_t isomer_idx){
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
 
     node_t distance =  multiple_source_shortest_paths(B,reinterpret_cast<node_t*>(sdata), isomer_idx);
     BLOCK_SYNC
@@ -75,7 +75,7 @@ device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, 
 
 __global__
 void zero_order_geometry_(IsomerBatch B, float scalerad, int offset){
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     
     extern __shared__  device_real_t sdata[];
     clear_cache(sdata, Block_Size_Pow_2);

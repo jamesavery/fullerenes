@@ -41,7 +41,7 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
 
     //Must ensure that all writes to queue counters from the host are visible to the device threads before reading them.
     __threadfence_system();
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     extern __shared__ int smem[];
     auto Nf = B.n_faces; // Number of faces
     auto queue_requests = 0;
@@ -173,7 +173,7 @@ __global__ void push_done_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueuePro
 
     //Must ensure that all writes to queue counters from the host are visible to the device threads before reading them.
     __threadfence_system();
-    DEVICE_TYPEDEFS
+    DEVICE_TYPEDEFS;
     extern __shared__ int smem[];
  
     auto Nf = B.n_faces; // Number of faces

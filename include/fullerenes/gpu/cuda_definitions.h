@@ -83,7 +83,7 @@ typedef struct device_node6
     device_node_t f;
     device_node_t g;
 } device_node6;
-#define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6;
+#define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6
 
 
 #endif

@@ -20,6 +20,12 @@ struct mat3
             A[i] = device_real_t(0.f);
     }
 
+  INLINE mat3(const std::array<device_coord3d,3> &V){
+    for(int i=0;i<3;i++)
+      for(int j=0;j<3;j++)
+	A[i*3+j] = V[i][j];
+  }
+  
     INLINE mat3(device_real_t a, device_real_t b, device_real_t c, device_real_t d, device_real_t e, device_real_t f, device_real_t g, device_real_t h, device_real_t i)
     {
         A[0] = a;
@@ -360,7 +366,8 @@ INLINE device_coord3d orthogonalize(const device_coord3d& v, const device_coord3
 //Each thread stores and returns up to 3 values of alpha and beta
 template <int eigenvalues_per_thread>
 INLINE sym_tridiag_t<eigenvalues_per_thread> hessian_t::lanczos_iteration(device_real_t* smem){
-    DEVICE_TYPEDEFS
+  DEVICE_TYPEDEFS;
+  
     int N = blockDim.x;
     coord3d* mat_mem = reinterpret_cast<coord3d*>(smem + N*2);
     int m = eigenvalues_per_thread * N;
