@@ -25,11 +25,13 @@ public:
     size_t size();
     void to_device(const int device); //Forces a copy to device
     void to_host(const int device); //Forces a copy to host
+    void fill(const T& value);
 
     T* data;
     size_t size_ = 0;
 private:
     int* flag;
+    bool initialized_ = false;
     size_t capacity_ = 0;
 };
 
