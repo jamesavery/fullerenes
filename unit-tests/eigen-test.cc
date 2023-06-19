@@ -23,7 +23,7 @@ int main(int argc, char** argv){
 
     std::ofstream hess_analytical(filename + "_analytical.csv");
     std::ofstream hess_numerical(filename + "_numerical.csv");
-    std::ofstream hess_neighbours(filename + "_neighbours.csv");
+    std::ofstream hess_cols(filename + "_cols.csv");
     std::ofstream cubic_graph;//("C" + to_string(N) + "_CubicGraph_" + to_string(isomer_num) + ".bin");
     std::ofstream geometry;//("C" + to_string(N) + "_Geometry_" + to_string(isomer_num) + ".bin");
     if (isomer_num == -1){
@@ -39,7 +39,7 @@ int main(int argc, char** argv){
     G.neighbours.resize(Nf);
     G.N = Nf;
     PlanarGraph Pg;
-    auto batch_size = min(1, (int)n_isomers);
+    auto batch_size = min(1/*isomerspace_forcefield::optimal_batch_size(N)*4*/, (int)n_isomers);
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     IsomerBatch Bhost(N,batch_size,HOST_BUFFER);
     IsomerBatch Bdev(N,batch_size,DEVICE_BUFFER);
@@ -67,13 +67,16 @@ int main(int argc, char** argv){
     std::cout << "Optimisation time: " << std::chrono::duration_cast<std::chrono::microseconds>(T1-T0).count()/ (float)batch_size << " us/ isomer" << std::endl;
     CuArray<device_real_t> hessians(N*3*3*10 * batch_size);
     CuArray<device_node_t> cols(N*3*3*10 * batch_size);
-    CuArray<device_real_t> eigenvalues(N*3 * batch_size * 2); // For the sake of debugging we store alpha and betas in the same array
+    CuArray<device_real_t> lambda_min(N*3 * batch_size); // For the sake of debugging we store alpha and betas in the same array
+    CuArray<device_real_t> lambda_max(N*3 * batch_size); // For the sake of debugging we store alpha and betas in the same array
+
     T0 = std::chrono::steady_clock::now();
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
-    std::cout << hessians << std::endl;
+    //std::cout << hessians << std::endl;
     T1 = std::chrono::steady_clock::now();
     std::cout << "Hessian time: " << std::chrono::duration_cast<std::chrono::microseconds>(T1-T0).count()/ (float)batch_size << " us/ isomer" << std::endl;
     hess_analytical.write((char*)hessians.data, N*3*3*10* batch_size*sizeof(device_real_t));
+    hess_cols.write((char*)cols.data, N*3*3*10* batch_size*sizeof(device_node_t));
 
 
     //compute_hessians_fd<PEDERSEN>(Bdev, hessians, cols, reldelta);
@@ -81,29 +84,27 @@ int main(int argc, char** argv){
     
     //std::cout << "Eigenvalues: " << eigenvalues << std::endl;
     cuda_io::copy(Bhost, Bdev); // Copy back to host
-    auto FG = Bhost.get_isomer(0).value();
+    //auto FG = Bhost.get_isomer(0).value();
     //cubic_graph.write((char*)Bhost.cubic_neighbours, N*3*sizeof(device_node_t));
     //geometry.write((char*)Bhost.X, N*3*sizeof(device_real_t));
-    hess_neighbours << "A,B,C,D,Bm,Cm,Dm,Bp,Cp,Dp\n";
-    for (int a = 0; a < N; a++){
-        auto b = FG.neighbours[a][0]; auto c = FG.neighbours[a][1]; auto d = FG.neighbours[a][2];
-        hess_neighbours << a << ","<< b << "," << c << "," << d << "," << FG.prev_on_face(a,b) << "," << FG.prev_on_face(a,c) << "," << FG.prev_on_face(a,d) << "," << FG.next_on_face(a,b) << "," << FG.next_on_face(a,c) << "," << FG.next_on_face(a,d) << "\n";
-        //std:: cout << a*3 << ","<< b*3 << "," << c*3 << "," << d*3 << "," << 3*FG.prev_on_face(a,b) << "," << 3*FG.prev_on_face(a,c) << "," << 3*FG.prev_on_face(a,d) << "," << 3*FG.next_on_face(a,b) << "," << 3*FG.next_on_face(a,c) << "," << 3*FG.next_on_face(a,d) << "\n";
-    }
-
+    
     //eigensolve_cusolver(Bdev, hessians, cols, eigenvalues);
     auto start = std::chrono::steady_clock::now();
     //eigensolve_cusolver(Bdev, hessians, cols, eigenvalues);
     auto time = std::chrono::steady_clock::now() - start;
     //std::cout << "cuSOLVE Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
     CuArray<device_real_t> Q(N*3*N*3*batch_size);
+    spectrum_ends(Bdev, hessians, cols, lambda_min, lambda_max);
+    //eigensolve(Bdev, Q, hessians, cols, eigenvalues);
     start = std::chrono::steady_clock::now();
-    eigensolve(Bdev, Q, hessians, cols, eigenvalues);
+    spectrum_ends(Bdev, hessians, cols, lambda_min, lambda_max);
     time = std::chrono::steady_clock::now() - start;
     std::cout << "Custom Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
+
+
     std::ofstream output_tridiags("tridiags.bin", std::ios::binary);
     std::ofstream output_Q("Q.bin", std::ios::binary);
-    output_tridiags.write((char*)eigenvalues.data, N*3*2* batch_size*sizeof(device_real_t));
+    //output_tridiags.write((char*)eigenvalues.data, N*3*2* batch_size*sizeof(device_real_t));
     output_Q.write((char*)Q.data, N*3*N*3* batch_size*sizeof(device_real_t));
 
     for(int i = N*2; i < N*3; i++) {
