@@ -4,7 +4,7 @@
 #include <cooperative_groups/scan.h>
 #include "cuda_runtime.h"
 #include <cuda_runtime_api.h>
-#define FLOAT_TYPE 2
+//#define FLOAT_TYPE 2
 #include "fullerenes/gpu/cuda_definitions.h"
 #include "fullerenes/gpu/cu_array.hh"
 #include "fullerenes/gpu/isomer_batch.hh"

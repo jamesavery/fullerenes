@@ -49,10 +49,10 @@ int main(int argc, char** argv){
     //FILE* f = fopen((Before_ + "_Geometry.mol2").c_str(), "w");
   //  FILE* g = fopen((After_ + "_Geometry.mol2").c_str(), "w");
     cuda_io::copy(Bhost, Bdev);
-    CuArray<float> orthogonalities(batch_size);
-    CuArray<float> eigs(batch_size*3);
-    CuArray<float> eigvecs(batch_size*9);
-    CuArray<float> inertia(batch_size*9);
+    CuArray<device_real_t> orthogonalities(batch_size);
+    CuArray<device_real_t> eigs(batch_size*3);
+    CuArray<device_real_t> eigvecs(batch_size*9);
+    CuArray<device_real_t> inertia(batch_size*9);
     isomerspace_properties::debug_function(Bdev, eigs, eigvecs, inertia, orthogonalities);
 
     //isomerspace_properties::eccentricities(Bdev, ecce);
@@ -67,21 +67,21 @@ int main(int argc, char** argv){
     ofstream optgeom("OptGeom_" + to_string(N) + ".float32", std::ios::binary);
     ofstream graphs("Graphs_" + to_string(N) + ".uint16", std::ios::binary);
     ofstream startgeom("StartGeom_" + to_string(N) + ".float32", std::ios::binary);
-    badeigs.write(reinterpret_cast<char*>(eigs.data), batch_size*3*sizeof(float));
-    badeigvecs.write(reinterpret_cast<char*>(eigvecs.data), batch_size*9*sizeof(float));
-    badinertia.write(reinterpret_cast<char*>(inertia.data), batch_size*9*sizeof(float));
-    optgeom.write(reinterpret_cast<char*>(Bhost.X), batch_size*N*3*sizeof(float));
-    startgeom.write(reinterpret_cast<char*>(Bstart.X), batch_size*N*3*sizeof(float));
+    badeigs.write(reinterpret_cast<char*>(eigs.data), batch_size*3*sizeof(device_real_t));
+    badeigvecs.write(reinterpret_cast<char*>(eigvecs.data), batch_size*9*sizeof(device_real_t));
+    badinertia.write(reinterpret_cast<char*>(inertia.data), batch_size*9*sizeof(device_real_t));
+    optgeom.write(reinterpret_cast<char*>(Bhost.X), batch_size*N*3*sizeof(device_real_t));
+    startgeom.write(reinterpret_cast<char*>(Bstart.X), batch_size*N*3*sizeof(device_real_t));
     graphs.write(reinterpret_cast<char*>(Bhost.cubic_neighbours), batch_size*N*3*sizeof(device_node_t));
 
     auto P = Bhost.get_isomer(0).value();
     P.volume_divergence();
-    CuArray<float> VD(batch_size);
+    CuArray<device_real_t> VD(batch_size);
     isomerspace_properties::volume_divergences(Bdev, VD);
     std::cout << "Volume Divergence: " << VD << std::endl;
     std::cout << "Volume Divergence: " << P.volume_divergence() << std::endl;
 
-    CuArray<float> SA(batch_size);
+    CuArray<device_real_t> SA(batch_size);
     isomerspace_properties::surface_areas(Bdev, SA);
     std::cout << "Surface Area: " << SA << std::endl;
     std::cout << "Surface Area: " << P.surface_area() << std::endl;

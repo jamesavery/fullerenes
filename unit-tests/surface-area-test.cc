@@ -43,9 +43,9 @@ int main(int argc, char** argv){
     optimise<PEDERSEN>(Bdev, N*5, N*5);
     cuda_io::copy(Bhost, Bdev);
     
-    CuArray<float> SA(batch_size);
+    CuArray<device_real_t> SA(batch_size);
     isomerspace_properties::surface_areas(Bdev, SA);
-    auto tol = std::numeric_limits<float>::epsilon()*1e1;
+    auto tol = std::numeric_limits<device_real_t>::epsilon()*1e1;
     for (size_t i = 0; i < batch_size; i++)
     {
         auto P = Bhost.get_isomer(i).value();
