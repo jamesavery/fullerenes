@@ -31,6 +31,36 @@ void signal_callback_handler(int signum)
   exit(signum);
 }
 
+struct candidate {
+  double error;
+  vector<int> rspi;
+
+  bool operator<(const candidate &b) const { return error < b.error; }
+};
+
+
+template <typename T> struct k_smallest : public priority_queue<T> {
+public:
+  size_t k;
+  
+  k_smallest(size_t k) : k(k) {}
+
+  bool insert(const T& x){
+    if(this->size() < k || x < this->top()){
+      if(this->size() == k) this->pop();
+      this->push(x);
+      return true;
+    }
+    return false;
+  }
+
+  vector<T>& as_vector() {
+    return (*this).*&k_smallest::c;
+  }
+  
+};
+
+
 
 int main(int ac, char **argv)
 {
@@ -56,14 +86,18 @@ int main(int ac, char **argv)
   enum {GEN, GEO, OPT, PROP, NUM_STAGES} stage;  
 
   // Each stage has one on-device batch per device. TODO: Dynamic number of devices != 2.
-  IsomerBatch Bs[3][2] = {
+  IsomerBatch Bs[4][2] = {
     {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)},
     {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)},
-    {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)}
+    {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)},
+    {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)}    
   };
   
   // Final IsomerBatch on host
   IsomerBatch H2s[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
+  IsomerBatch host_opt_batch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
+    IsomerBatch host_geo_batch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
+    IsomerBatch host_prop_batch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};  
   
   //CuArray<device_real_t> Qs[Nd] = {CuArray<device_real_t>(N*3*N*3*batch_size,0), CuArray<device_real_t>(N*3*N*3*batch_size,0)};
   //CuArray<device_real_t> Hs[Nd] = {CuArray<device_real_t>(N*3* 10*3*batch_size,0), CuArray<device_real_t>(N*3* 10*3*batch_size,0)};
@@ -89,7 +123,7 @@ int main(int ac, char **argv)
 
   array<bool, NUM_STAGES> stage_finished = {false,false,false,false};
   array<int,  NUM_STAGES> num_finished = {0,0,0,0};
-  array<vector<int>, NUM_STAGES> num_finished_this_round({vector<int>(Nd),vector<int>(Nd),vector<int>(Nd),vector<int>(Nd)});
+  vector<vector<int>> num_finished_this_round({vector<int>(Nd),vector<int>(Nd),vector<int>(Nd),vector<int>(Nd)});
 
   cout << "num_finished_this_round initialized to " << num_finished_this_round[2] << "\n";
   
@@ -115,9 +149,11 @@ int main(int ac, char **argv)
     Tinq    = steady_clock::now()-T0,
     Tinit_geom = steady_clock::now()-T0;
 
+  auto loop_iters = 0;
+  auto Tstart = steady_clock::now();
+  auto n0 = 0;
 
-
-  auto policy = LaunchPolicy::SYNC;
+  auto policy = LaunchPolicy::ASYNC;
 
   auto generate_isomers = [&](int M){
     bool more_isomers = true;
@@ -132,7 +168,7 @@ int main(int ac, char **argv)
         }
     }
     gen_ctxs[0].wait(); gen_ctxs[1].wait(); 
-    num_finished[GEN] = I;\
+    num_finished[GEN] = I;
     //TODO: num_finished_this_round[GEN][d]
     stage_finished[GEN] = num_finished[GEN] == n_fullerenes;
     return true;
@@ -140,13 +176,14 @@ int main(int ac, char **argv)
 
   auto geo_routine = [&](){
     std::vector<int> qsize_geo = {Q1s[0].get_size(), Q1s[1].get_size()};
-    for (int i = 0; i < Nd; i++){
-      if(Q0s[i].get_size() > 0){
-	Q0s[i].refill_batch(Bs[GEN][i], gen_ctxs[i], policy);
-	isomerspace_dual::dualise(Bs[GEN][i], gen_ctxs[i], policy);
-	isomerspace_tutte::tutte_layout(Bs[GEN][i], N*10, gen_ctxs[i], policy);
-	isomerspace_X0::zero_order_geometry(Bs[GEN][i], 4.0f, gen_ctxs[i], policy);
-	Q1s[i].push_all(Bs[GEN][i], gen_ctxs[i], policy);
+    for (int d = 0; d < Nd; d++){
+      if(Q0s[d].get_size() > 0){
+	Q0s[d].refill_batch(Bs[GEO][d], gen_ctxs[d], policy);
+	isomerspace_dual::dualise(Bs[GEO][d], gen_ctxs[d], policy);
+	isomerspace_tutte::tutte_layout(Bs[GEO][d], N*10, gen_ctxs[d], policy);
+	isomerspace_X0::zero_order_geometry(Bs[GEO][d], 4.0f, gen_ctxs[d], policy);
+	Q1s[d].push_all(Bs[GEO][d], gen_ctxs[d], policy);
+	cuda_io::copy(host_geo_batch[d], Bs[GEO][d], gen_ctxs[d], policy);	
       }
     }
     for(int d=0; d<Nd; d++){
@@ -160,25 +197,35 @@ int main(int ac, char **argv)
   auto opt_routine = [&](){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int d = 0; d < Nd; d++){
-      Q1s[d].refill_batch(Bs[GEO][d], opt_ctxs[d], policy);
-      isomerspace_forcefield::optimise<PEDERSEN>(Bs[GEO][d], ceil(0.5*N), 5*N, opt_ctxs[d], policy);
-      Q2s[d].push_done(Bs[GEO][d], opt_ctxs[d], policy);
+      Q1s[d].refill_batch(Bs[OPT][d], opt_ctxs[d], policy);
+      isomerspace_forcefield::optimise<PEDERSEN>(Bs[OPT][d], ceil(0.5*N), 5*N, opt_ctxs[d], policy);
+      cuda_io::copy(host_opt_batch[d], Bs[OPT][d], opt_ctxs[d], policy);      
+      Q2s[d].push_done(Bs[OPT][d], opt_ctxs[d], policy);
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
       num_finished_this_round[OPT][d] = Q2s[d].get_size() - qsize[d];
       num_finished[OPT]              += num_finished_this_round[OPT][d];
+
+      // if(num_finished[OPT]>0){
+      // 	int d0 = 0, i0 = 18;
+      // 	Polyhedron P1 = host_opt_batch[d0].get_isomer(i0).value();
+      // 	Polyhedron::to_file(P1,string("isomer_X-step")+to_string(loop_iters)+"-"
+      // 			    +to_string(d0)+"_"+to_string(i0)+".mol2");
+      // }
     }
     stage_finished[OPT] = num_finished[OPT] == n_fullerenes;
   };
 
-  auto analyse_routine = [&](){
+  auto prop_routine = [&](){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
-    for (int i = 0; i < Nd; i++){
-      Q2s[i].refill_batch(Bs[OPT][i], opt_ctxs[i], policy);
-      isomerspace_properties::transform_coordinates(Bs[OPT][i], opt_ctxs[i], policy);
-      isomerspace_properties::eccentricities    (Bs[OPT][i], eccentricity_results[i], opt_ctxs[i], policy);
-      isomerspace_properties::volume_divergences(Bs[OPT][i], volume_results[i], opt_ctxs[i], policy);
+    for (int d = 0; d < Nd; d++){
+      Q2s[d].refill_batch(Bs[PROP][d], opt_ctxs[d], policy);
+      //      isomerspace_properties::transform_coordinates(Bs[PROP][d], opt_ctxs[d], policy);
+      //      isomerspace_properties::eccentricities    (Bs[PROP][d], eccentricity_results[d], opt_ctxs[d], policy);
+      //isomerspace_properties::volume_divergences(Bs[PROP][d], volume_results[d], opt_ctxs[d], policy);
+      cuda_io::copy(host_prop_batch[d], Bs[PROP][d], opt_ctxs[d], policy);      
+      Bs[PROP][d].clear(opt_ctxs[d],policy);      
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
@@ -188,9 +235,6 @@ int main(int ac, char **argv)
     stage_finished[PROP] = num_finished[PROP] == n_fullerenes;
   };
 
-  auto loop_iters = 0;
-  auto Tstart = steady_clock::now();
-  auto n0 = 0;
   while(!stage_finished[PROP] && loop_iters < 1000){
       std::cout << "Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
       std::cout << "Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
@@ -201,11 +245,12 @@ int main(int ac, char **argv)
       auto T1 = steady_clock::now(); Tinit_geom += T1-T0;
       auto handle = std::async(std::launch::async, generate_isomers, 2*batch_size);
       auto T2 = steady_clock::now();
+      
       while(Q1s[0].get_size() > Bs[GEO][0].capacity() && Q1s[1].get_size() > Bs[GEO][1].capacity()){
           opt_routine();
       }
       while(Q2s[0].get_size() > Bs[OPT][0].capacity() && Q2s[1].get_size() > Bs[OPT][1].capacity()){
-          analyse_routine();
+          prop_routine();
       }
       auto T3 = steady_clock::now(); Topt += T3-T2;
       handle.wait();
@@ -215,11 +260,52 @@ int main(int ac, char **argv)
       }
 
       while(stage_finished[GEN] && stage_finished[GEO] && stage_finished[OPT] && !stage_finished[PROP]){
-          analyse_routine();
+          prop_routine();
       }
 
       auto T5 = steady_clock::now(); Topt += T5-T4;
-      // Do stuff on CPU      
+      // Do stuff on CPU. TODO: Nicer Nd
+      vector<device_real_t> volumes_merged(sum(num_finished_this_round[PROP]));
+      vector<device_real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
+      vector<pair<int,int>> vol_nanids, ecc_nanids, opt_failed;
+    
+      int i=0;
+      for(int d=0;d<Nd;d++)
+	for(int di=0;di<num_finished_this_round[PROP][d];di++,i++){
+	  auto v = volumes_merged[i]      = volume_results[d][di];
+	  auto e = eccentricity_merged[i] = eccentricity_results[d][di];
+	  
+	  if(!isfinite(v)) vol_nanids.push_back({d,di});
+	  if(!isfinite(e) || di==0){
+	    ecc_nanids.push_back({d,di});
+	    Polyhedron P0 = host_geo_batch[d].get_isomer(di).value();
+	    Polyhedron::to_file(P0,string("failed_X0-")+to_string(d)
+				+"_"+to_string(di)+".mol2");
+
+	    Polyhedron P1 = host_opt_batch[d].get_isomer(di).value();
+	    Polyhedron P1ref = P0;
+	    P1ref.optimise();
+
+	    Polyhedron::to_file(P1,string("failed_X-")+to_string(d)+"_"+to_string(di)+".mol2");
+	    Polyhedron::to_file(P1ref,string("failed_Xref-")+to_string(d)+"_"+to_string(di)+".mol2");
+
+	    Polyhedron P2 = host_prop_batch[d].get_isomer(di).value();
+	    Polyhedron::to_file(P2,string("failed_X2-")+to_string(d)+"_"+to_string(di)+".mol2");	    
+	    }
+	  if(host_opt_batch[d].statuses[di] == IsomerStatus::FAILED){
+	    opt_failed.push_back({d,di});
+	    //	    uint16_t *g = host_geo_batch[d].cubic_neighbours;//+(di*3*N);
+	    
+	    //	    cout << vector<uint16_t>(g,g+100*3*N)<<"\n";
+	  }
+	}
+
+      cout
+	<< "opt_failed = " << opt_failed << ";\n"
+	<< "vol_nanids = " << vol_nanids << ";\n"
+	<< "ecc_nanids = " << ecc_nanids << ";\n\n";
+      
+      
       
       if(loop_iters % 3 == 0 || stage_finished[PROP]){
         auto Titer = steady_clock::now() - Tstart;
@@ -235,48 +321,7 @@ int main(int ac, char **argv)
       }
       loop_iters++;
   }
-    std::vector<int> volume_sorted_ids_0(volume_results[0].size());
-    std::vector<int> volume_sorted_ids_1(volume_results[1].size());
-    std::vector<int> eccentricity_sorted_ids_0(eccentricity_results[0].size());
-    std::vector<int> eccentricity_sorted_ids_1(eccentricity_results[1].size());
 
-    std::vector<int> vol_nanids, ecc_nanids;
-    
-    for(int i=0;i<n_fullerenes;i++){
-      if(!isfinite(volume_results[i%2][i/2]))       vol_nanids.push_back(i);
-      if(!isfinite(eccentricity_results[i%2][i/2])) ecc_nanids.push_back(i);
-    }
-    cout << "vol_nanids = " << vol_nanids << ";\n"
-	 << "ecc_nanids = " << ecc_nanids << ";\n\n";
-      
-    // std::iota(volume_sorted_ids_0.begin(), volume_sorted_ids_0.end(), 0);
-    // std::iota(volume_sorted_ids_1.begin(), volume_sorted_ids_1.end(), 0);
-    // std::iota(eccentricity_sorted_ids_0.begin(), eccentricity_sorted_ids_0.end(), 0);
-    // std::iota(eccentricity_sorted_ids_1.begin(), eccentricity_sorted_ids_1.end(), 0);
-
-    // std::sort(volume_sorted_ids_0.begin(), volume_sorted_ids_0.end(), [&](int i1, int i2) {return volume_results[0][i1] < volume_results[0][i2];});
-    // std::sort(volume_sorted_ids_1.begin(), volume_sorted_ids_1.end(), [&](int i1, int i2) {return volume_results[1][i1] < volume_results[1][i2];});
-    // std::sort(eccentricity_sorted_ids_0.begin(), eccentricity_sorted_ids_0.end(), [&](int i1, int i2) {return eccentricity_results[0][i1] < eccentricity_results[0][i2];});
-    // std::sort(eccentricity_sorted_ids_1.begin(), eccentricity_sorted_ids_1.end(), [&](int i1, int i2) {return eccentricity_results[1][i1] < eccentricity_results[1][i2];});
-
-    // std::sort(volume_results[0].data, volume_results[0].data + volume_results[0].size());
-    // std::sort(volume_results[1].data, volume_results[1].data + volume_results[1].size());
-    // std::sort(eccentricity_results[0].data, eccentricity_results[0].data + eccentricity_results[0].size());
-    // std::sort(eccentricity_results[1].data, eccentricity_results[1].data + eccentricity_results[1].size());
-
-    // std::cout << "Volumes 0: " << volume_results[0] << std::endl;
-    // std::cout << "Volumes 1: " << volume_results[1] << std::endl;
-    // std::cout << "Eccentricity 0: " << eccentricity_results[0] << std::endl;
-    // std::cout << "Eccentricity 1: " << eccentricity_results[1] << std::endl;
-
-    // cuda_io::copy(H2s[1], Bs[OPT][1]);
-    // FILE* f = fopen("OMG_SO_THIN.mol2", "w");
-    // Polyhedron::to_mol2(H2s[1].get_isomer(volume_sorted_ids_1[0]).value(), f);
-
-    //progress_bar.update_progress((float)num_finished/(float)num_fullerenes.find(N)->second);
-    
-
-  //cout << endl << "Finished: " << num_finished << "Failed: , " << num_failed << ", " << num_converged << endl;
   auto Ttot = steady_clock::now() - T0;
 
   
