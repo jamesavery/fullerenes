@@ -89,7 +89,6 @@ namespace gpu_kernels{
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC
                 auto result = best_ellipsoid(X);
-                auto P = principal_axes(X);
                 BLOCK_SYNC
                 if (tid == 0) ecce.data[isomer_idx] = result[0] / result[2];
                 }
