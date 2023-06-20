@@ -127,6 +127,7 @@ namespace gpu_kernels{
                         V += dot(a,n) / real_t(2.0);
                     }
                 }
+                clear_cache(smems, blockDim.x);
                 auto result = reduction(smems, V)/real_t(3.0);
                 if (tid == 0) vd.data[isomer_idx] = result;
                 }
@@ -164,6 +165,7 @@ namespace gpu_kernels{
                         A += norm(n);
                     }
                 }
+                clear_cache(smems, blockDim.x);
                 auto result = reduction(smems, A)/real_t(2.0);
                 if (tid == 0) sa.data[isomer_idx] = result;
                 }
