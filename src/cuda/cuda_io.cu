@@ -405,12 +405,14 @@ void IsomerBatch::append(const Polyhedron& graph, const size_t id){
     m_size++;
 }
 
-void IsomerBatch::clear(){
+void IsomerBatch::clear(const LaunchCtx& ctx, const LaunchPolicy policy){
     //Set statuses to empty and iterations to 0
     if (buffer_type == DEVICE_BUFFER){
-        cudaMemset((void*)statuses, int(IsomerStatus::EMPTY), isomer_capacity * sizeof(IsomerStatus));
-        cudaMemset((void*)iterations, 0, isomer_capacity * sizeof(size_t));
-        cudaDeviceSynchronize();
+        cudaSetDevice(ctx.get_device_id());
+        if(policy == LaunchPolicy::SYNC) ctx.wait();
+        cudaMemsetAsync((void*)statuses, int(IsomerStatus::EMPTY), isomer_capacity * sizeof(IsomerStatus), ctx.stream);
+        cudaMemsetAsync((void*)iterations, 0, isomer_capacity * sizeof(size_t), ctx.stream);
+        if(policy == LaunchPolicy::SYNC) ctx.wait();
     } else if (buffer_type == HOST_BUFFER){
         std::fill(statuses, statuses + isomer_capacity, IsomerStatus::EMPTY);
         std::fill(iterations, iterations + isomer_capacity, 0);

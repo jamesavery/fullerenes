@@ -1,6 +1,7 @@
 #ifndef ISOMERBATCH_STRUCT
 #define ISOMERBATCH_STRUCT
 #include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/gpu/launch_ctx.hh"
 #include "gpudatastruct.hh"
 #include <stdint.h>
 #include <optional>
@@ -51,7 +52,7 @@ struct IsomerBatch : GPUDataStruct
     void append(const Graph& G, const size_t id);  //Appends a graph to the batch and increments the size
     void append(const PlanarGraph& G, const size_t id, const bool copy_2d_layout = true); //Appends a planar graph to the batch and increments the size
     void append(const Polyhedron& P, const size_t id); //Appends a polyhedron to the batch and increments the size
-    void clear();                 //Clears the batch and resets the size to 0
+    void clear(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy = LaunchPolicy::SYNC);                 //Clears the batch and resets the size to 0
     bool operator==(const IsomerBatch& b); //Returns true if the two batches are equal
     bool operator!=(const IsomerBatch& b) {return !(*this == b);}
     friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a); //Prints the batch to the given stream
