@@ -55,6 +55,7 @@ namespace gpu_kernels{
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
                 if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] != IsomerStatus::EMPTY)
                 {
+                clear_cache(shared_memory, blockDim.x);
                 BLOCK_SYNC
                 size_t offset = isomer_idx * blockDim.x;
                 coord3d* X              = reinterpret_cast<coord3d*>(shared_memory) + B.n_atoms;
