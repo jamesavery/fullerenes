@@ -1,6 +1,7 @@
 #include <csignal>
 #include <sys/stat.h>
 #include <limits.h>
+#include <cmath>
 #include <chrono>
 #include <filesystem>
 #include <iostream>
@@ -14,13 +15,14 @@
 #include "fullerenes/progress_bar.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 
-using namespace std;
-using namespace std::chrono;
 #include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/isomerdb.hh"
 
+using namespace std;
+using namespace std::chrono;
+using namespace cuda_io;
 
 using namespace gpu_kernels;
 
@@ -48,25 +50,32 @@ int main(int ac, char **argv)
   mkdir(output_dir.c_str(),0777);
   int n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
 
-  int Nd = LaunchCtx::get_device_count();
-  auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
+  int    Nd = LaunchCtx::get_device_count();
+  size_t batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
-  IsomerBatch B0s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
-  IsomerBatch B1s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
-  IsomerBatch B2s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
+  enum {GEN, GEO, OPT, PROP, NUM_STAGES} stage;  
+
+  // Each stage has one on-device batch per device. TODO: Dynamic number of devices != 2.
+  IsomerBatch Bs[3][2] = {
+    {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)},
+    {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)},
+    {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)}
+  };
+  
+  // Final IsomerBatch on host
   IsomerBatch H2s[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
+  
   //CuArray<device_real_t> Qs[Nd] = {CuArray<device_real_t>(N*3*N*3*batch_size,0), CuArray<device_real_t>(N*3*N*3*batch_size,0)};
   //CuArray<device_real_t> Hs[Nd] = {CuArray<device_real_t>(N*3* 10*3*batch_size,0), CuArray<device_real_t>(N*3* 10*3*batch_size,0)};
   CuArray<device_node_t> Cols[Nd] = {CuArray<device_node_t>(N*3*3*10 * batch_size,0), CuArray<device_node_t>(N*3*3*10 * batch_size,0)};
   CuArray<device_real_t> Eigs[Nd] = {CuArray<device_real_t>(N*3 * batch_size,0), CuArray<device_real_t>(N*3 * batch_size,0)};
-  std::vector<CuArray<device_real_t>> volume_results(Nd); for (int i = 0; i < Nd; i++) volume_results[i] = CuArray<device_real_t>(batch_size,0);
-  std::vector<CuArray<device_real_t>> eccentricity_results(Nd); for (int i = 0; i < Nd; i++) eccentricity_results[i] = CuArray<device_real_t>(batch_size,0);
 
-  
+  vector<CuArray<device_real_t>> volume_results(Nd);       for(int i=0;i<Nd;i++) volume_results[i]       = CuArray<device_real_t>(batch_size,0);
+  vector<CuArray<device_real_t>> eccentricity_results(Nd); for(int i=0;i<Nd;i++) eccentricity_results[i] = CuArray<device_real_t>(batch_size,0);
 
-  cuda_io::IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-  cuda_io::IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-  cuda_io::IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+  IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+  IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+  IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
 
   for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
 
@@ -76,13 +85,16 @@ int main(int ac, char **argv)
   BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,IPR,only_nontrivial);  
   ProgressBar progress_bar = ProgressBar('#',30);
   
-  
   int I=0;			// Global isomer number at start of batch
-  enum {GEN, GEO, OPT, PROP, NUM_STAGES} stage;
-  std::array<bool, NUM_STAGES> stage_finished = {false,false,false,false};
-  std::array<int, NUM_STAGES> num_finished = {0,0,0,0};
-    int num_converged = 0,
-        num_failed =0;
+
+  array<bool, NUM_STAGES> stage_finished = {false,false,false,false};
+  array<int,  NUM_STAGES> num_finished = {0,0,0,0};
+  array<vector<int>, NUM_STAGES> num_finished_this_round({vector<int>(Nd),vector<int>(Nd),vector<int>(Nd),vector<int>(Nd)});
+
+  cout << "num_finished_this_round initialized to " << num_finished_this_round[2] << "\n";
+  
+  int num_converged = 0,
+      num_failed =0;
   Graph G;
   auto Nf = N/2 + 2;
   G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
@@ -105,7 +117,7 @@ int main(int ac, char **argv)
 
 
 
-  auto policy = LaunchPolicy::ASYNC;
+  auto policy = LaunchPolicy::SYNC;
 
   auto generate_isomers = [&](int M){
     bool more_isomers = true;
@@ -120,21 +132,42 @@ int main(int ac, char **argv)
         }
     }
     gen_ctxs[0].wait(); gen_ctxs[1].wait(); 
-    num_finished[GEN] = I;
+    num_finished[GEN] = I;\
+    //TODO: num_finished_this_round[GEN][d]
     stage_finished[GEN] = num_finished[GEN] == n_fullerenes;
     return true;
   };
 
+  auto geo_routine = [&](){
+    std::vector<int> qsize_geo = {Q1s[0].get_size(), Q1s[1].get_size()};
+    for (int i = 0; i < Nd; i++){
+      if(Q0s[i].get_size() > 0){
+	Q0s[i].refill_batch(Bs[GEN][i], gen_ctxs[i], policy);
+	isomerspace_dual::dualise(Bs[GEN][i], gen_ctxs[i], policy);
+	isomerspace_tutte::tutte_layout(Bs[GEN][i], N*10, gen_ctxs[i], policy);
+	isomerspace_X0::zero_order_geometry(Bs[GEN][i], 4.0f, gen_ctxs[i], policy);
+	Q1s[i].push_all(Bs[GEN][i], gen_ctxs[i], policy);
+      }
+    }
+    for(int d=0; d<Nd; d++){
+      gen_ctxs[d].wait();
+      num_finished_this_round[GEO][d] = Q1s[d].get_size() - qsize_geo[d];
+      num_finished[GEO]              += num_finished_this_round[GEO][d];
+    }
+    stage_finished[GEO] = num_finished[GEO] == n_fullerenes;    
+  };
+  
   auto opt_routine = [&](){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
-    for (int i = 0; i < Nd; i++){
-      Q1s[i].refill_batch(B1s[i], opt_ctxs[i], policy);
-      isomerspace_forcefield::optimise<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], policy);
-      Q2s[i].push_done(B1s[i], opt_ctxs[i], policy);
+    for (int d = 0; d < Nd; d++){
+      Q1s[d].refill_batch(Bs[GEO][d], opt_ctxs[d], policy);
+      isomerspace_forcefield::optimise<PEDERSEN>(Bs[GEO][d], ceil(0.5*N), 5*N, opt_ctxs[d], policy);
+      Q2s[d].push_done(Bs[GEO][d], opt_ctxs[d], policy);
     }
-    for (int i = 0; i < Nd; i++){
-    opt_ctxs[i].wait();
-    num_finished[OPT] += Q2s[i].get_size() - qsize[i];
+    for (int d = 0; d < Nd; d++){
+      opt_ctxs[d].wait();
+      num_finished_this_round[OPT][d] = Q2s[d].get_size() - qsize[d];
+      num_finished[OPT]              += num_finished_this_round[OPT][d];
     }
     stage_finished[OPT] = num_finished[OPT] == n_fullerenes;
   };
@@ -142,14 +175,15 @@ int main(int ac, char **argv)
   auto analyse_routine = [&](){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int i = 0; i < Nd; i++){
-        Q2s[i].refill_batch(B2s[i], opt_ctxs[i], policy);
-        isomerspace_properties::transform_coordinates(B2s[i], opt_ctxs[i], policy);
-        isomerspace_properties::eccentricities(B2s[i], eccentricity_results[i], opt_ctxs[i], policy);
-        isomerspace_properties::volume_divergences(B2s[i], volume_results[i], opt_ctxs[i], policy);
+      Q2s[i].refill_batch(Bs[OPT][i], opt_ctxs[i], policy);
+      isomerspace_properties::transform_coordinates(Bs[OPT][i], opt_ctxs[i], policy);
+      isomerspace_properties::eccentricities    (Bs[OPT][i], eccentricity_results[i], opt_ctxs[i], policy);
+      isomerspace_properties::volume_divergences(Bs[OPT][i], volume_results[i], opt_ctxs[i], policy);
     }
-    for (int i = 0; i < Nd; i++){
-        opt_ctxs[i].wait();
-        num_finished[PROP] +=  qsize[i] - Q2s[i].get_size();
+    for (int d = 0; d < Nd; d++){
+      opt_ctxs[d].wait();
+      num_finished_this_round[PROP][d] = qsize[d] - Q2s[d].get_size();
+      num_finished[PROP]              += num_finished_this_round[PROP][d];
     }
     stage_finished[PROP] = num_finished[PROP] == n_fullerenes;
   };
@@ -157,33 +191,20 @@ int main(int ac, char **argv)
   auto loop_iters = 0;
   auto Tstart = steady_clock::now();
   auto n0 = 0;
-  while(!stage_finished[PROP] && loop_iters < 100){
+  while(!stage_finished[PROP] && loop_iters < 1000){
       std::cout << "Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
       std::cout << "Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
       auto T0 = steady_clock::now();
-      std::vector<int> qsize_geo = {Q1s[0].get_size(), Q1s[1].get_size()};
-      for (int i = 0; i < Nd; i++){
-          if(Q0s[i].get_size() > 0){
-            Q0s[i].refill_batch(B0s[i], gen_ctxs[i], policy);
-            isomerspace_dual::dualise(B0s[i], gen_ctxs[i], policy);
-            isomerspace_tutte::tutte_layout(B0s[i], N*10, gen_ctxs[i], policy);
-            isomerspace_X0::zero_order_geometry(B0s[i], 4.0f, gen_ctxs[i], policy);
-            Q1s[i].push_all(B0s[i], gen_ctxs[i], policy);
-          }
-      }
-      for(int j = 0; j < Nd; j++){
-        gen_ctxs[j].wait();
-        num_finished[GEO] += Q1s[j].get_size() - qsize_geo[j];
-      }
-      stage_finished[GEO] = num_finished[GEO] == n_fullerenes;
+
+      geo_routine();
 
       auto T1 = steady_clock::now(); Tinit_geom += T1-T0;
       auto handle = std::async(std::launch::async, generate_isomers, 2*batch_size);
       auto T2 = steady_clock::now();
-      while(Q1s[0].get_size() > B1s[0].capacity() && Q1s[1].get_size() > B1s[1].capacity()){
+      while(Q1s[0].get_size() > Bs[GEO][0].capacity() && Q1s[1].get_size() > Bs[GEO][1].capacity()){
           opt_routine();
       }
-      while(Q2s[0].get_size() > B2s[0].capacity() && Q2s[1].get_size() > B2s[1].capacity()){
+      while(Q2s[0].get_size() > Bs[OPT][0].capacity() && Q2s[1].get_size() > Bs[OPT][1].capacity()){
           analyse_routine();
       }
       auto T3 = steady_clock::now(); Topt += T3-T2;
@@ -198,6 +219,8 @@ int main(int ac, char **argv)
       }
 
       auto T5 = steady_clock::now(); Topt += T5-T4;
+      // Do stuff on CPU      
+      
       if(loop_iters % 3 == 0 || stage_finished[PROP]){
         auto Titer = steady_clock::now() - Tstart;
         Tstart = steady_clock::now();
@@ -216,29 +239,39 @@ int main(int ac, char **argv)
     std::vector<int> volume_sorted_ids_1(volume_results[1].size());
     std::vector<int> eccentricity_sorted_ids_0(eccentricity_results[0].size());
     std::vector<int> eccentricity_sorted_ids_1(eccentricity_results[1].size());
-    std::iota(volume_sorted_ids_0.begin(), volume_sorted_ids_0.end(), 0);
-    std::iota(volume_sorted_ids_1.begin(), volume_sorted_ids_1.end(), 0);
-    std::iota(eccentricity_sorted_ids_0.begin(), eccentricity_sorted_ids_0.end(), 0);
-    std::iota(eccentricity_sorted_ids_1.begin(), eccentricity_sorted_ids_1.end(), 0);
 
-    std::sort(volume_sorted_ids_0.begin(), volume_sorted_ids_0.end(), [&](int i1, int i2) {return volume_results[0][i1] < volume_results[0][i2];});
-    std::sort(volume_sorted_ids_1.begin(), volume_sorted_ids_1.end(), [&](int i1, int i2) {return volume_results[1][i1] < volume_results[1][i2];});
-    std::sort(eccentricity_sorted_ids_0.begin(), eccentricity_sorted_ids_0.end(), [&](int i1, int i2) {return eccentricity_results[0][i1] < eccentricity_results[0][i2];});
-    std::sort(eccentricity_sorted_ids_1.begin(), eccentricity_sorted_ids_1.end(), [&](int i1, int i2) {return eccentricity_results[1][i1] < eccentricity_results[1][i2];});
+    std::vector<int> vol_nanids, ecc_nanids;
+    
+    for(int i=0;i<n_fullerenes;i++){
+      if(!isfinite(volume_results[i%2][i/2]))       vol_nanids.push_back(i);
+      if(!isfinite(eccentricity_results[i%2][i/2])) ecc_nanids.push_back(i);
+    }
+    cout << "vol_nanids = " << vol_nanids << ";\n"
+	 << "ecc_nanids = " << ecc_nanids << ";\n\n";
+      
+    // std::iota(volume_sorted_ids_0.begin(), volume_sorted_ids_0.end(), 0);
+    // std::iota(volume_sorted_ids_1.begin(), volume_sorted_ids_1.end(), 0);
+    // std::iota(eccentricity_sorted_ids_0.begin(), eccentricity_sorted_ids_0.end(), 0);
+    // std::iota(eccentricity_sorted_ids_1.begin(), eccentricity_sorted_ids_1.end(), 0);
 
-    std::sort(volume_results[0].data, volume_results[0].data + volume_results[0].size());
-    std::sort(volume_results[1].data, volume_results[1].data + volume_results[1].size());
-    std::sort(eccentricity_results[0].data, eccentricity_results[0].data + eccentricity_results[0].size());
-    std::sort(eccentricity_results[1].data, eccentricity_results[1].data + eccentricity_results[1].size());
+    // std::sort(volume_sorted_ids_0.begin(), volume_sorted_ids_0.end(), [&](int i1, int i2) {return volume_results[0][i1] < volume_results[0][i2];});
+    // std::sort(volume_sorted_ids_1.begin(), volume_sorted_ids_1.end(), [&](int i1, int i2) {return volume_results[1][i1] < volume_results[1][i2];});
+    // std::sort(eccentricity_sorted_ids_0.begin(), eccentricity_sorted_ids_0.end(), [&](int i1, int i2) {return eccentricity_results[0][i1] < eccentricity_results[0][i2];});
+    // std::sort(eccentricity_sorted_ids_1.begin(), eccentricity_sorted_ids_1.end(), [&](int i1, int i2) {return eccentricity_results[1][i1] < eccentricity_results[1][i2];});
 
-    std::cout << "Volumes 0: " << volume_results[0] << std::endl;
-    std::cout << "Volumes 1: " << volume_results[1] << std::endl;
-    std::cout << "Eccentricity 0: " << eccentricity_results[0] << std::endl;
-    std::cout << "Eccentricity 1: " << eccentricity_results[1] << std::endl;
+    // std::sort(volume_results[0].data, volume_results[0].data + volume_results[0].size());
+    // std::sort(volume_results[1].data, volume_results[1].data + volume_results[1].size());
+    // std::sort(eccentricity_results[0].data, eccentricity_results[0].data + eccentricity_results[0].size());
+    // std::sort(eccentricity_results[1].data, eccentricity_results[1].data + eccentricity_results[1].size());
 
-    cuda_io::copy(H2s[1], B2s[1]);
-    FILE* f = fopen("OMG_SO_SPHERICAL.mol2", "w");
-    Polyhedron::to_mol2(H2s[1].get_isomer(eccentricity_sorted_ids_1[0]).value(), f);
+    // std::cout << "Volumes 0: " << volume_results[0] << std::endl;
+    // std::cout << "Volumes 1: " << volume_results[1] << std::endl;
+    // std::cout << "Eccentricity 0: " << eccentricity_results[0] << std::endl;
+    // std::cout << "Eccentricity 1: " << eccentricity_results[1] << std::endl;
+
+    // cuda_io::copy(H2s[1], Bs[OPT][1]);
+    // FILE* f = fopen("OMG_SO_THIN.mol2", "w");
+    // Polyhedron::to_mol2(H2s[1].get_isomer(volume_sorted_ids_1[0]).value(), f);
 
     //progress_bar.update_progress((float)num_finished/(float)num_fullerenes.find(N)->second);
     
