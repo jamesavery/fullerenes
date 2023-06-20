@@ -62,9 +62,13 @@ namespace gpu_kernels{
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC
                 coord3d centroid = {reduction(shared_memory, X[tid][0]), reduction(shared_memory, X[tid][1]), reduction(shared_memory, X[tid][2])};
-                X[tid] -= centroid;
+                X[tid] -= centroid/real_t(B.n_atoms);
                 BLOCK_SYNC
-		mat3 P{principal_axes(X)};
+		            mat3 P{principal_axes(X)};
+                if (ISNAN(P[0][0]) || ISNAN(P[0][1]) || ISNAN(P[0][2]) || ISNAN(P[1][0]) || ISNAN(P[1][1]) || ISNAN(P[1][2]) || ISNAN(P[2][0]) || ISNAN(P[2][1]) || ISNAN(P[2][2])) {
+                    //assert(false);
+                    return;
+                } 
                 BLOCK_SYNC
                 X[tid] = dot(P, X[tid]);
                 BLOCK_SYNC
