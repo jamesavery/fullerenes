@@ -145,6 +145,7 @@ int main(int ac, char **argv)
         isomerspace_properties::transform_coordinates(B2s[i], opt_ctxs[i], policy);
         isomerspace_properties::eccentricities(B2s[i], eccentricity_results[i], opt_ctxs[i], policy);
         isomerspace_properties::volume_divergences(B2s[i], volume_results[i], opt_ctxs[i], policy);
+        B2s[i].clear(opt_ctxs[i], policy);
     }
     for (int i = 0; i < Nd; i++){
         opt_ctxs[i].wait();
@@ -152,7 +153,6 @@ int main(int ac, char **argv)
     }
     stage_finished[PROP] = num_finished[PROP] == n_fullerenes;
   };
-
   auto loop_iters = 0;
   auto Tstart = steady_clock::now();
   auto n0 = 0;

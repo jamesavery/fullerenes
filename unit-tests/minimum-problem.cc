@@ -35,13 +35,13 @@ int main(int ac, char **argv)
     // Make sure output directory exists
     mkdir(output_dir.c_str(),0777);
     int n_fullerenes = IPR > 0 ? num_IPR_fullerenes.find(N)->second : num_fullerenes.find(N)->second;
-    int Nd = LaunchCtx::get_device_count();
-    auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes);
+    int Nd = 1;
+    auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
-    IsomerBatch B0s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
+    IsomerBatch B0s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0)};
     std::vector<CuArray<device_real_t>> eccentricity(Nd); for (int i = 0; i < Nd; i++) eccentricity[i] = CuArray<device_real_t>(batch_size);
     std::vector<CuArray<device_real_t>> volumes(Nd); for (int i = 0; i < Nd; i++) volumes[i] = CuArray<device_real_t>(batch_size);
-    cuda_io::IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; for (int i = 0; i < Nd; i++) Q0s[i].resize(batch_size*4);
+    cuda_io::IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0)}; for (int i = 0; i < Nd; i++) Q0s[i].resize(batch_size*4);
     std::vector<LaunchCtx> gen_ctxs(Nd); for (int i = 0; i < Nd; i++) gen_ctxs[i] = LaunchCtx(i);
     auto policy = LaunchPolicy::ASYNC;
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,IPR,only_nontrivial);
@@ -62,10 +62,10 @@ int main(int ac, char **argv)
             I++;
         }
     }
-    gen_ctxs[0].wait(); gen_ctxs[1].wait(); 
+    gen_ctxs[0].wait();
     return true;
     };
-
+    IsomerBatch start_batch(N,batch_size,HOST_BUFFER,0);
 
     //Start of program
     generate_isomers(batch_size*4);
@@ -73,31 +73,50 @@ int main(int ac, char **argv)
     for (int i = 0; i < Nd; i++) gen_ctxs[i].wait();
     for (int i = 0; i < Nd; i++) {
         isomerspace_dual::dualise(B0s[i], gen_ctxs[i], policy);
-        isomerspace_tutte::tutte_layout(B0s[i], 10*N,gen_ctxs[i], policy);
+        isomerspace_tutte::tutte_layout(B0s[i],  50*N,gen_ctxs[i], policy);
         isomerspace_X0::zero_order_geometry(B0s[i], 4.0, gen_ctxs[i], policy);
-        isomerspace_forcefield::optimise<PEDERSEN>(B0s[i], 5*N, 5*N, gen_ctxs[i], policy);
-        isomerspace_properties::transform_coordinates(B0s[i], gen_ctxs[i], policy);
-        isomerspace_properties::eccentricities(B0s[i], eccentricity[i], gen_ctxs[i], policy);
-        isomerspace_properties::volume_divergences(B0s[i], volumes[i], gen_ctxs[i], policy);
+    }
+    for (int i = 0; i < Nd; i++){
+        gen_ctxs[i].wait();
+        cuda_io::copy(start_batch, B0s[i]);
     }
     for (int i = 0; i < Nd; i++) {
-        gen_ctxs[i].wait();
-        eccentricity[i].to_host(i);
-        volumes[i].to_host(i);
-        gen_ctxs[i].wait();
+        isomerspace_forcefield::optimise<PEDERSEN>(B0s[i], 5*N, 5*N, gen_ctxs[i], policy);
+        //isomerspace_properties::transform_coordinates(B0s[i], gen_ctxs[i], policy);
+        //isomerspace_properties::eccentricities(B0s[i], eccentricity[i], gen_ctxs[i], policy);
+        //isomerspace_properties::volume_divergences(B0s[i], volumes[i], gen_ctxs[i], policy);
     }
-    std::vector<int> nan_positions_0;
-    std::vector<int> nan_positions_1;
-    for (int i = 0; i < eccentricity[1].size(); i++) {
-    if (std::isnan(eccentricity[0][i])) {
-        nan_positions_0.push_back(i);
+    for (int i = 0; i < Nd; i++) gen_ctxs[i].wait();
+    IsomerBatch host_batch(N,batch_size,HOST_BUFFER,0);
+    cuda_io::copy(host_batch, B0s[0]);
+
+    //std::vector<int> nan_positions_0;
+    //for (int i = 0; i < eccentricity[0].size(); i++) {
+    //    if (std::isnan(eccentricity[0][i])) {
+    //        nan_positions_0.push_back(i);
+    //    }
+    //}
+
+    std::vector<int> failed_positions_0;
+    for (int i = 0; i < host_batch.isomer_capacity; i++) {
+        if (host_batch.statuses[i] == IsomerStatus::FAILED) {
+            failed_positions_0.push_back(i);
+        }
     }
-    if (std::isnan(eccentricity[1][i])) {
-        nan_positions_1.push_back(i);
+
+    for (int i = 0; i  < failed_positions_0.size(); i++){
+        int ID = host_batch.IDs[failed_positions_0[i]];
+        Polyhedron P = host_batch.get_isomer(failed_positions_0[i]).value();
+        Polyhedron Pstart = start_batch.get_isomer(failed_positions_0[i]).value();
+
+        Polyhedron::to_file(P, "FailedGeometry_"+to_string(ID) + ".mol2");
+        Polyhedron::to_file(Pstart, "StartGeometry_"+to_string(ID) + ".mol2");
+        Polyhedron Pref(Pstart);
+        Pref.optimise();
+        Polyhedron::to_file(Pref, "RefGeometry_"+to_string(ID) + ".mol2");
     }
-    }
-    std::cout << "Nan positions: " << nan_positions_0 << std::endl;
-    std::cout << "Nan positions: " << nan_positions_1 << std::endl;
+    //std::cout << "Nan positions: " << nan_positions_0 << std::endl;
+    std::cout << "Failed positions: " << failed_positions_0 << std::endl;
 
 
 }
