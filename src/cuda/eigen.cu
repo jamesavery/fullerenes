@@ -568,7 +568,7 @@ namespace gpu_kernels{
                 BLOCK_SYNC
                 return result;
             };
-            //Modified Gram-Schmidt
+            //Modified Gram-Schmidt, Also orthogonalizes against the deflation space
             auto MGS = [&](int index){
                 BLOCK_SYNC
                 real_t result = V[index*N];
@@ -592,7 +592,7 @@ namespace gpu_kernels{
 
             for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x){
                 V = V_.data + I * m * N + threadIdx.x;
-                Q = Q_.data + I * m * N + threadIdx.x;
+                Q = Q_.data + I * 6 * N + threadIdx.x; //6 eigenvectors per isomer (Related to 0 eigenvalues, 6 degrees of freedom)
                 //Load the hessian and cols into local memory
                 memcpy(A, &H.data[I*N*M + threadIdx.x*M], M*sizeof(real_t));
                 for (int j = 0; j < M; j++){ 
@@ -600,6 +600,9 @@ namespace gpu_kernels{
                     C[j] = cols.data[I*N*M + threadIdx.x*M + j];
                 }
 
+                for (int j = 0; j < n_deflation; j++){
+                    EQ[j] = Q[j*N];
+                }   
 
                 //Lanczos algorithm 
                 if(threadIdx.x == 0) betas[0] = real_t(0);
