@@ -108,14 +108,16 @@ int main(int ac, char **argv)
   // Final IsomerBatch on host
   IsomerBatch HBs[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
   
-  //CuArray<device_real_t> Qs[Nd] = {CuArray<device_real_t>(N*3*N*3*batch_size,0), CuArray<device_real_t>(N*3*N*3*batch_size,0)};
-  //CuArray<device_real_t> Hs[Nd] = {CuArray<device_real_t>(N*3* 10*3*batch_size,0), CuArray<device_real_t>(N*3* 10*3*batch_size,0)};
-  CuArray<device_node_t> Cols[Nd] = {CuArray<device_node_t>(N*3*3*10 * batch_size,0), CuArray<device_node_t>(N*3*3*10 * batch_size,0)};
-  CuArray<device_real_t> Eigs[Nd] = {CuArray<device_real_t>(N*3 * batch_size,0), CuArray<device_real_t>(N*3 * batch_size,0)};
+  vector<CuArray<device_real_t>> hessian_results(Nd), volume_results(Nd), eccentricity_results(Nd);
+  vector<CuArray<device_node_t>> hessian_col_results(Nd);
 
-  vector<CuArray<device_real_t>> volume_results(Nd);       for(int i=0;i<Nd;i++) volume_results[i]       = CuArray<device_real_t>(batch_size,0);
-  vector<CuArray<device_real_t>> eccentricity_results(Nd); for(int i=0;i<Nd;i++) eccentricity_results[i] = CuArray<device_real_t>(batch_size,0);
-
+  for(int d=0;d<Nd;d++){
+    hessian_results[d]      = CuArray<device_real_t>(N*3* 10*3*batch_size,0);
+    hessian_col_results[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);        
+    volume_results[d]       = CuArray<device_real_t>(batch_size,0);
+    eccentricity_results[d] = CuArray<device_real_t>(batch_size,0);
+  }
+  
   IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
   IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
   IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
@@ -222,8 +224,9 @@ int main(int ac, char **argv)
     for (int d = 0; d < Nd; d++){
       Q2s[d].refill_batch(Bs[PROP][d], opt_ctxs[d], policy);
       isomerspace_properties::transform_coordinates(Bs[PROP][d], opt_ctxs[d], policy);
-      isomerspace_properties::eccentricities    (Bs[PROP][d], eccentricity_results[d], opt_ctxs[d], policy);
-      isomerspace_properties::volume_divergences(Bs[PROP][d], volume_results[d], opt_ctxs[d], policy);
+      isomerspace_hessian   ::compute_hessians<PEDERSEN>(Bs[PROP][d], hessian_results[d], hessian_col_results[d], opt_ctxs[d], policy);
+      isomerspace_properties::eccentricities       (Bs[PROP][d], eccentricity_results[d], opt_ctxs[d], policy);
+      isomerspace_properties::volume_divergences   (Bs[PROP][d], volume_results[d], opt_ctxs[d], policy);
       cuda_io::copy(HBs[d],Bs[PROP][d],opt_ctxs[d],policy);      
       Bs[PROP][d].clear(opt_ctxs[d],policy);      
     }
