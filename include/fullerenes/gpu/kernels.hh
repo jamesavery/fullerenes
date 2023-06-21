@@ -118,9 +118,9 @@ namespace gpu_kernels{
 
     namespace isomerspace_hessian{
         template <ForcefieldType T>
-        cudaError_t compute_hessians(IsomerBatch& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t compute_hessians(const IsomerBatch& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
         template <ForcefieldType T>
-        cudaError_t compute_hessians_fd(IsomerBatch& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const float rel_delta = 1e-5, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t compute_hessians_fd(const IsomerBatch& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const float rel_delta = 1e-5, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
 
     namespace isomerspace_properties{
