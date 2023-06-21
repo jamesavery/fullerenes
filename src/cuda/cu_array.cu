@@ -87,7 +87,7 @@ std::ostream& operator<<(std::ostream& os, const CuArray<T>& input){
 
 template <typename T>
 CuArray<T>::~CuArray(){
-    cudaFree(data);
+    if(initialized_) cudaFree(data);
 }
 
 
