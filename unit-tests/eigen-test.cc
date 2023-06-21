@@ -15,11 +15,12 @@ using namespace isomerspace_X0;
 using namespace isomerspace_tutte;
 int main(int argc, char** argv){
     const size_t N                = argc>1 ? strtol(argv[1],0,0) : 60;     // Argument 1: Number of vertices 
-    float reldelta                = argc>2 ? strtof(argv[2],0) : 1e-5;    // Argument 3: Relative delta
-    int isomer_num                = argc>3 ? strtol(argv[3],0,0) : 0;     // Argument 4: Isomer number
-    std::string spiral_           = argc>4 ? argv[4] : "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";          // Argument 2: Spiral
-    std::string name_             = argc>5 ? argv[5] : "C60ih";          // Argument 2: Spiral
-    std::string filename          = argc>6 ? argv[6] : "hessian_validation";        // Argument 2: Filename
+    const size_t Mlanczos_steps   = argc>2 ? strtol(argv[2],0,0) : 40;     // Argument 2: Number of Lanczos steps
+    float reldelta                = argc>3 ? strtof(argv[3],0) : 1e-5;    // Argument 3: Relative delta
+    int isomer_num                = argc>4 ? strtol(argv[4],0,0) : 0;     // Argument 4: Isomer number
+    std::string spiral_           = argc>5 ? argv[5] : "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";          // Argument 2: Spiral
+    std::string name_             = argc>6 ? argv[6] : "C60ih";          // Argument 2: Spiral
+    std::string filename          = argc>7 ? argv[7] : "hessian_validation";        // Argument 2: Filename
 
     std::ofstream hess_analytical(filename + "_analytical.csv");
     std::ofstream hess_numerical(filename + "_numerical.csv");
@@ -39,7 +40,7 @@ int main(int argc, char** argv){
     G.neighbours.resize(Nf);
     G.N = Nf;
     PlanarGraph Pg;
-    auto batch_size = min(1/*isomerspace_forcefield::optimal_batch_size(N)*4*/, (int)n_isomers);
+    auto batch_size = min(10, (int)n_isomers);
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     IsomerBatch Bhost(N,batch_size,HOST_BUFFER);
     IsomerBatch Bdev(N,batch_size,DEVICE_BUFFER);
@@ -67,8 +68,8 @@ int main(int argc, char** argv){
     std::cout << "Optimisation time: " << std::chrono::duration_cast<std::chrono::microseconds>(T1-T0).count()/ (float)batch_size << " us/ isomer" << std::endl;
     CuArray<device_real_t> hessians(N*3*3*10 * batch_size);
     CuArray<device_node_t> cols(N*3*3*10 * batch_size);
-    CuArray<device_real_t> lambda_min(N*3 * batch_size); // For the sake of debugging we store alpha and betas in the same array
-    CuArray<device_real_t> lambda_max(N*3 * batch_size); // For the sake of debugging we store alpha and betas in the same array
+    CuArray<device_real_t> lambda_mins(batch_size); // For the sake of debugging we store alpha and betas in the same array
+    CuArray<device_real_t> lambda_maxs(batch_size); // For the sake of debugging we store alpha and betas in the same array
 
     T0 = std::chrono::steady_clock::now();
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
@@ -89,16 +90,18 @@ int main(int argc, char** argv){
     //geometry.write((char*)Bhost.X, N*3*sizeof(device_real_t));
     
     //eigensolve_cusolver(Bdev, hessians, cols, eigenvalues);
-    auto start = std::chrono::steady_clock::now();
     //eigensolve_cusolver(Bdev, hessians, cols, eigenvalues);
-    auto time = std::chrono::steady_clock::now() - start;
     //std::cout << "cuSOLVE Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
     CuArray<device_real_t> Q(N*3*N*3*batch_size);
-    spectrum_ends(Bdev, hessians, cols, lambda_min, lambda_max);
+    lambda_max(Bdev, hessians, cols, lambda_maxs);
+    auto start = std::chrono::steady_clock::now();
+    lambda_max(Bdev, hessians, cols, lambda_maxs, Mlanczos_steps);
+    auto time = std::chrono::steady_clock::now() - start;
+    std::cout << lambda_maxs << std::endl;
     //eigensolve(Bdev, Q, hessians, cols, eigenvalues);
-    start = std::chrono::steady_clock::now();
-    spectrum_ends(Bdev, hessians, cols, lambda_min, lambda_max);
-    time = std::chrono::steady_clock::now() - start;
+    //start = std::chrono::steady_clock::now();
+    //spectrum_ends(Bdev, hessians, cols, lambda_min, lambda_max);
+    //time = std::chrono::steady_clock::now() - start;
     std::cout << "Custom Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
 
 
