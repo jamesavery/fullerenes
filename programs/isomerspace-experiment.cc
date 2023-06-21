@@ -34,18 +34,18 @@ void signal_callback_handler(int signum)
 
 struct isomer_candidate {
   double value;
-  int I;
+  int id;
   vector<device_node_t> cubic_neighbours;
   vector<device_real_t> X;
 
-  isomer_candidate(double value, int I, int N, int ix, const IsomerBatch &B):
-    value(value), I(I), cubic_neighbours(3*N), X(3*N) {
+  isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B):
+    value(value), id(id), cubic_neighbours(3*N), X(3*N) {
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(device_real_t));    
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
-  friend ostream &operator<<(ostream &s, const isomer_candidate& c){ s<<c.value; return s; }
+  friend ostream &operator<<(ostream &s, const isomer_candidate& c){ s<<"("<<c.value<<","<<c.id<<")"; return s; }
 };
 
 
@@ -295,7 +295,7 @@ int main(int ac, char **argv)
 	  
 	  
 	  if(isfinite(v) && isfinite(e)){
-	    isomer_candidate C(v, I, N, di, HBs[d]);
+	    isomer_candidate C(v, id, N, di, HBs[d]);
 	    vol_min.insert(C);
 	    C.value = -v;
 	    vol_max.insert(C);
