@@ -92,9 +92,11 @@ int main(int ac, char **argv)
   int    Nd = LaunchCtx::get_device_count();
   size_t batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
-  k_smallest<isomer_candidate> vol_min(n_best_candidates), vol_max(n_best_candidates), ecc_min(n_best_candidates), ecc_max(n_best_candidates);
-  
-  
+  k_smallest<isomer_candidate>
+    vol_min(n_best_candidates), vol_max(n_best_candidates),
+    ecc_min(n_best_candidates), ecc_max(n_best_candidates),
+    lam_min(n_best_candidates), lam_max(n_best_candidates);
+
   enum {GEN, GEO, OPT, PROP, NUM_STAGES} stage;  
 
   // Each stage has one on-device batch per device. TODO: Dynamic number of devices != 2.
@@ -108,12 +110,13 @@ int main(int ac, char **argv)
   // Final IsomerBatch on host
   IsomerBatch HBs[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
   
-  vector<CuArray<device_real_t>> hessian_results(Nd), volume_results(Nd), eccentricity_results(Nd);
+  vector<CuArray<device_real_t>> hessian_results(Nd), volume_results(Nd), eccentricity_results(Nd), lambda_max_results(Nd);
   vector<CuArray<device_node_t>> hessian_col_results(Nd);
 
   for(int d=0;d<Nd;d++){
     hessian_results[d]      = CuArray<device_real_t>(N*3* 10*3*batch_size,0);
-    hessian_col_results[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);        
+    hessian_col_results[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);
+    lambda_max_results[d]   = CuArray<device_real_t>(batch_size,0);
     volume_results[d]       = CuArray<device_real_t>(batch_size,0);
     eccentricity_results[d] = CuArray<device_real_t>(batch_size,0);
   }
@@ -145,6 +148,7 @@ int main(int ac, char **argv)
   G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
   G.N = Nf;
 
+  // Hack using knowledge about range for easy binning (for now)
   auto T0 = steady_clock::now();
   auto
     Tgen    = steady_clock::now()-T0,
@@ -222,13 +226,18 @@ int main(int ac, char **argv)
   auto prop_routine = [&](){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int d = 0; d < Nd; d++){
-      Q2s[d].refill_batch(Bs[PROP][d], opt_ctxs[d], policy);
-      isomerspace_properties::transform_coordinates(Bs[PROP][d], opt_ctxs[d], policy);
-      isomerspace_hessian   ::compute_hessians<PEDERSEN>(Bs[PROP][d], hessian_results[d], hessian_col_results[d], opt_ctxs[d], policy);
-      isomerspace_properties::eccentricities       (Bs[PROP][d], eccentricity_results[d], opt_ctxs[d], policy);
-      isomerspace_properties::volume_divergences   (Bs[PROP][d], volume_results[d], opt_ctxs[d], policy);
-      cuda_io::copy(HBs[d],Bs[PROP][d],opt_ctxs[d],policy);      
-      Bs[PROP][d].clear(opt_ctxs[d],policy);      
+      auto &B   = Bs[PROP][d];
+      const auto &ctx = opt_ctxs[d];
+      
+      Q2s[d].refill_batch(B, ctx, policy);
+      isomerspace_properties::transform_coordinates(B, ctx, policy);
+      isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessian_results[d], hessian_col_results[d],    ctx, policy);
+      //@jonas: fjern '//' nedenfor for at fremprovokere crash
+      //      isomerspace_eigen     ::lambda_max(B, hessian_results[d], hessian_col_results[d], lambda_max_results[d], 40, ctx, policy);
+      isomerspace_properties::eccentricities       (B, eccentricity_results[d], ctx, policy);
+      isomerspace_properties::volume_divergences   (B, volume_results[d],       ctx, policy);
+      cuda_io::copy(HBs[d],B,ctx,policy);      
+      B.clear(ctx,policy);      
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
@@ -238,7 +247,7 @@ int main(int ac, char **argv)
     stage_finished[PROP] = num_finished[PROP] == n_fullerenes;
   };
 
-  while(!stage_finished[PROP] && loop_iters < 1000){
+  while(!stage_finished[PROP] && loop_iters < 10){
       std::cout << "Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
       std::cout << "Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
       auto T0 = steady_clock::now();
@@ -280,7 +289,8 @@ int main(int ac, char **argv)
 
 	  int id = HBs[d].IDs[di];
 	  if(!isfinite(v)) vol_nanids.push_back(id);
-	  if(!isfinite(v)) vol_nanids.push_back(id);
+	  if(!isfinite(e)) ecc_nanids.push_back(id);
+
 	  
 	  if(isfinite(v) && isfinite(e)){
 	    isomer_candidate C(v, I, N, di, HBs[d]);
@@ -299,7 +309,7 @@ int main(int ac, char **argv)
       cout << "vol_nanids = " << vol_nanids << "\n"
 	   << "ecc_nanids = " << ecc_nanids << "\n";
 
-      
+      //      cout << "lambda_maxs = " << lambda_max_results << "\n";
       
       if(loop_iters % 3 == 0 || stage_finished[PROP]){
         auto Titer = steady_clock::now() - Tstart;
