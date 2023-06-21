@@ -40,7 +40,7 @@ int main(int argc, char** argv){
     G.neighbours.resize(Nf);
     G.N = Nf;
     PlanarGraph Pg;
-    auto batch_size = min(10, (int)n_isomers);
+    auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N)*2, (int)n_isomers);
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     IsomerBatch Bhost(N,batch_size,HOST_BUFFER);
     IsomerBatch Bdev(N,batch_size,DEVICE_BUFFER);

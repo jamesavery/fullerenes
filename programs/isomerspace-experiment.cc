@@ -233,7 +233,7 @@ int main(int ac, char **argv)
       isomerspace_properties::transform_coordinates(B, ctx, policy);
       isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessian_results[d], hessian_col_results[d],    ctx, policy);
       //@jonas: fjern '//' nedenfor for at fremprovokere crash
-      //      isomerspace_eigen     ::lambda_max(B, hessian_results[d], hessian_col_results[d], lambda_max_results[d], 40, ctx, policy);
+      isomerspace_eigen     ::lambda_max(B, hessian_results[d], hessian_col_results[d], lambda_max_results[d], 40, ctx, policy);
       isomerspace_properties::eccentricities       (B, eccentricity_results[d], ctx, policy);
       isomerspace_properties::volume_divergences   (B, volume_results[d],       ctx, policy);
       cuda_io::copy(HBs[d],B,ctx,policy);      

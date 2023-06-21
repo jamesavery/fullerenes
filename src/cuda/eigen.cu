@@ -704,7 +704,7 @@ namespace gpu_kernels{
                     }
                     beta = SQRT(reduction(smem, v * v));
                     if (threadIdx.x == i) betas[i] = beta;
-                    if (i < N-1) V[(i+1)*N] = v / beta;
+                    if (i < m-1) V[(i+1)*N] = v / beta;
                     //if (i < N-1) V[(i+1)*N] = beta;
                 }
                 if (threadIdx.x < m){
@@ -903,6 +903,7 @@ namespace gpu_kernels{
             safeCudaKernelCall((void*)lanczos_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
             safeCudaKernelCall((void*)eigensolve_largest_, qr_dims.get_grid(), qr_dims.get_block(), kargs_qr, smem_qr, ctx.stream);
             if (policy == LaunchPolicy::SYNC) ctx.wait();
+            printLastCudaError("Lambda Max Failed: ");
             //std::cout << "Lambda Max: " << vector(lambda_maxs.data, lambda_maxs.data + B.isomer_capacity) << std::endl;
             /* for(int i = 0; i < B.isomer_capacity; i++){
                 std::cout << "Diagonals[" << i << vector(Ds[dev].data + i*m, Ds[dev].data + (i+1)*m) << std::endl;
