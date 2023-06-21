@@ -31,11 +31,20 @@ void signal_callback_handler(int signum)
   exit(signum);
 }
 
-struct candidate {
-  double error;
-  vector<int> rspi;
 
-  bool operator<(const candidate &b) const { return error < b.error; }
+struct isomer_candidate {
+  double value;
+  int I;
+  vector<device_node_t> cubic_neighbours;
+  vector<device_real_t> X;
+
+  isomer_candidate(double value, int I, int N, int ix, const IsomerBatch &B):
+    value(value), I(I), cubic_neighbours(3*N), X(3*N) {
+    memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
+    memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(device_real_t));    
+  }
+
+  bool operator<(const isomer_candidate &b) const { return value < b.value; }
 };
 
 
@@ -69,13 +78,13 @@ int main(int ac, char **argv)
     fprintf(stderr,"Syntax: %s <N:int> [output_dir] [IPR:0|1] [only_nontrivial:0|1]\n",argv[0]);
     return -1;
   }
-  const size_t N                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
+  const size_t N                = strtol(argv[1],0,0);   // Argument 1: Number of vertices N
 
-  string output_dir     = ac>=3? argv[2] : "output";    // Argument 2: directory to output files to
-  int IPR               = ac>=4? strtol(argv[3],0,0):0; // Argument 3: Only generate IPR fullerenes?
-  int only_nontrivial   = ac>=5? strtol(argv[4],0,0):0; // Argument 4: Only generate fullerenes with nontrivial symmetry group?
-  int n_best_candidates = ac>=6? strtol(argv[5],0,0):100; // Argument 5: How many best fullerne candidates do you want to store? 
-
+  string output_dir     = ac>=3? argv[2] : "output";     // Argument 2: directory to output files to
+  int IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
+  int only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
+  int n_best_candidates = ac>=6? strtol(argv[5],0,0):10; // Argument 5: How many best fullerne candidates do you want to store? 
+ 
   // Make sure output directory exists
   mkdir(output_dir.c_str(),0777);
   int n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
@@ -83,6 +92,9 @@ int main(int ac, char **argv)
   int    Nd = LaunchCtx::get_device_count();
   size_t batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
+  k_smallest<isomer_candidate> vol_min(n_best_candidates), vol_max(n_best_candidates), ecc_min(n_best_candidates), ecc_max(n_best_candidates);
+  
+  
   enum {GEN, GEO, OPT, PROP, NUM_STAGES} stage;  
 
   // Each stage has one on-device batch per device. TODO: Dynamic number of devices != 2.
@@ -94,10 +106,7 @@ int main(int ac, char **argv)
   };
   
   // Final IsomerBatch on host
-  IsomerBatch H2s[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
-  IsomerBatch host_opt_batch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
-    IsomerBatch host_geo_batch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
-    IsomerBatch host_prop_batch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};  
+  IsomerBatch HBs[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
   
   //CuArray<device_real_t> Qs[Nd] = {CuArray<device_real_t>(N*3*N*3*batch_size,0), CuArray<device_real_t>(N*3*N*3*batch_size,0)};
   //CuArray<device_real_t> Hs[Nd] = {CuArray<device_real_t>(N*3* 10*3*batch_size,0), CuArray<device_real_t>(N*3* 10*3*batch_size,0)};
@@ -183,7 +192,6 @@ int main(int ac, char **argv)
 	isomerspace_tutte::tutte_layout(Bs[GEO][d], N*10, gen_ctxs[d], policy);
 	isomerspace_X0::zero_order_geometry(Bs[GEO][d], 4.0f, gen_ctxs[d], policy);
 	Q1s[d].push_all(Bs[GEO][d], gen_ctxs[d], policy);
-	cuda_io::copy(host_geo_batch[d], Bs[GEO][d], gen_ctxs[d], policy);	
       }
     }
     for(int d=0; d<Nd; d++){
@@ -199,20 +207,12 @@ int main(int ac, char **argv)
     for (int d = 0; d < Nd; d++){
       Q1s[d].refill_batch(Bs[OPT][d], opt_ctxs[d], policy);
       isomerspace_forcefield::optimise<PEDERSEN>(Bs[OPT][d], ceil(0.5*N), 5*N, opt_ctxs[d], policy);
-      cuda_io::copy(host_opt_batch[d], Bs[OPT][d], opt_ctxs[d], policy);      
       Q2s[d].push_done(Bs[OPT][d], opt_ctxs[d], policy);
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
       num_finished_this_round[OPT][d] = Q2s[d].get_size() - qsize[d];
       num_finished[OPT]              += num_finished_this_round[OPT][d];
-
-      // if(num_finished[OPT]>0){
-      // 	int d0 = 0, i0 = 18;
-      // 	Polyhedron P1 = host_opt_batch[d0].get_isomer(i0).value();
-      // 	Polyhedron::to_file(P1,string("isomer_X-step")+to_string(loop_iters)+"-"
-      // 			    +to_string(d0)+"_"+to_string(i0)+".mol2");
-      // }
     }
     stage_finished[OPT] = num_finished[OPT] == n_fullerenes;
   };
@@ -221,10 +221,10 @@ int main(int ac, char **argv)
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int d = 0; d < Nd; d++){
       Q2s[d].refill_batch(Bs[PROP][d], opt_ctxs[d], policy);
-      //      isomerspace_properties::transform_coordinates(Bs[PROP][d], opt_ctxs[d], policy);
-      //      isomerspace_properties::eccentricities    (Bs[PROP][d], eccentricity_results[d], opt_ctxs[d], policy);
-      //isomerspace_properties::volume_divergences(Bs[PROP][d], volume_results[d], opt_ctxs[d], policy);
-      cuda_io::copy(host_prop_batch[d], Bs[PROP][d], opt_ctxs[d], policy);      
+      isomerspace_properties::transform_coordinates(Bs[PROP][d], opt_ctxs[d], policy);
+      isomerspace_properties::eccentricities    (Bs[PROP][d], eccentricity_results[d], opt_ctxs[d], policy);
+      isomerspace_properties::volume_divergences(Bs[PROP][d], volume_results[d], opt_ctxs[d], policy);
+      cuda_io::copy(HBs[d],Bs[PROP][d],opt_ctxs[d],policy);      
       Bs[PROP][d].clear(opt_ctxs[d],policy);      
     }
     for (int d = 0; d < Nd; d++){
@@ -267,44 +267,35 @@ int main(int ac, char **argv)
       // Do stuff on CPU. TODO: Nicer Nd
       vector<device_real_t> volumes_merged(sum(num_finished_this_round[PROP]));
       vector<device_real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
-      vector<pair<int,int>> vol_nanids, ecc_nanids, opt_failed;
+      vector<int> vol_nanids, ecc_nanids, opt_failed;
     
       int i=0;
       for(int d=0;d<Nd;d++)
 	for(int di=0;di<num_finished_this_round[PROP][d];di++,i++){
 	  auto v = volumes_merged[i]      = volume_results[d][di];
 	  auto e = eccentricity_merged[i] = eccentricity_results[d][di];
+
+	  int id = HBs[d].IDs[di];
+	  if(!isfinite(v)) vol_nanids.push_back(id);
+	  if(!isfinite(v)) vol_nanids.push_back(id);
 	  
-	  if(!isfinite(v)) vol_nanids.push_back({d,di});
-	  if(!isfinite(e) || di==0){
-	    ecc_nanids.push_back({d,di});
-	    Polyhedron P0 = host_geo_batch[d].get_isomer(di).value();
-	    Polyhedron::to_file(P0,string("failed_X0-")+to_string(d)
-				+"_"+to_string(di)+".mol2");
+	  if(isfinite(v) && isfinite(e)){
+	    isomer_candidate C(v, I, N, di, HBs[d]);
+	    vol_min.insert(C);
+	    C.value = -v;
+	    vol_max.insert(C);
+	    C.value = e;
+	    ecc_min.insert(C);
+	    C.value = -e;	    
+	    ecc_max.insert(C);
+	  } else {
 
-	    Polyhedron P1 = host_opt_batch[d].get_isomer(di).value();
-	    Polyhedron P1ref = P0;
-	    P1ref.optimise();
-
-	    Polyhedron::to_file(P1,string("failed_X-")+to_string(d)+"_"+to_string(di)+".mol2");
-	    Polyhedron::to_file(P1ref,string("failed_Xref-")+to_string(d)+"_"+to_string(di)+".mol2");
-
-	    Polyhedron P2 = host_prop_batch[d].get_isomer(di).value();
-	    Polyhedron::to_file(P2,string("failed_X2-")+to_string(d)+"_"+to_string(di)+".mol2");	    
-	    }
-	  if(host_opt_batch[d].statuses[di] == IsomerStatus::FAILED){
-	    opt_failed.push_back({d,di});
-	    //	    uint16_t *g = host_geo_batch[d].cubic_neighbours;//+(di*3*N);
-	    
-	    //	    cout << vector<uint16_t>(g,g+100*3*N)<<"\n";
 	  }
 	}
 
-      cout
-	<< "opt_failed = " << opt_failed << ";\n"
-	<< "vol_nanids = " << vol_nanids << ";\n"
-	<< "ecc_nanids = " << ecc_nanids << ";\n\n";
-      
+      cout << "vol_nanids = " << vol_nanids << "\n"
+	   << "ecc_nanids = " << ecc_nanids << "\n";
+
       
       
       if(loop_iters % 3 == 0 || stage_finished[PROP]){
