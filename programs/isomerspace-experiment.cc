@@ -45,6 +45,7 @@ struct isomer_candidate {
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
+  friend ostream &operator<<(ostream &s, const isomer_candidate& c){ s<<c.value; return s; }
 };
 
 
@@ -233,7 +234,7 @@ int main(int ac, char **argv)
       isomerspace_properties::transform_coordinates(B, ctx, policy);
       isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessian_results[d], hessian_col_results[d],    ctx, policy);
       //@jonas: fjern '//' nedenfor for at fremprovokere crash
-      //      isomerspace_eigen     ::lambda_max(B, hessian_results[d], hessian_col_results[d], lambda_max_results[d], 40, ctx, policy);
+      isomerspace_eigen     ::lambda_max(B, hessian_results[d], hessian_col_results[d], lambda_max_results[d], 40, ctx, policy);
       isomerspace_properties::eccentricities       (B, eccentricity_results[d], ctx, policy);
       isomerspace_properties::volume_divergences   (B, volume_results[d],       ctx, policy);
       cuda_io::copy(HBs[d],B,ctx,policy);      
@@ -286,11 +287,12 @@ int main(int ac, char **argv)
 	for(int di=0;di<num_finished_this_round[PROP][d];di++,i++){
 	  auto v = volumes_merged[i]      = volume_results[d][di];
 	  auto e = eccentricity_merged[i] = eccentricity_results[d][di];
-
+	  auto lam = lambda_max_results[d][di];
+	  
 	  int id = HBs[d].IDs[di];
 	  if(!isfinite(v)) vol_nanids.push_back(id);
 	  if(!isfinite(e)) ecc_nanids.push_back(id);
-
+	  
 	  
 	  if(isfinite(v) && isfinite(e)){
 	    isomer_candidate C(v, I, N, di, HBs[d]);
@@ -301,6 +303,10 @@ int main(int ac, char **argv)
 	    ecc_min.insert(C);
 	    C.value = -e;	    
 	    ecc_max.insert(C);
+	    C.value = lam;
+	    lam_min.insert(C);
+	    C.value = -lam;
+	    lam_max.insert(C);
 	  } else {
 
 	  }
@@ -309,7 +315,12 @@ int main(int ac, char **argv)
       cout << "vol_nanids = " << vol_nanids << "\n"
 	   << "ecc_nanids = " << ecc_nanids << "\n";
 
-      //      cout << "lambda_maxs = " << lambda_max_results << "\n";
+      cout << "vol_min = " << vol_min.as_vector() << "\n";
+      cout << "vol_max = " << vol_max.as_vector() << "\n";      
+      cout << "ecc_min = " << ecc_min.as_vector() << "\n";
+      cout << "ecc_max = " << ecc_max.as_vector() << "\n";      
+      cout << "lam_min = " << lam_min.as_vector() << "\n";
+      cout << "lam_max = " << lam_max.as_vector() << "\n";      
       
       if(loop_iters % 3 == 0 || stage_finished[PROP]){
         auto Titer = steady_clock::now() - Tstart;
