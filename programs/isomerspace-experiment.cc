@@ -85,7 +85,8 @@ int main(int ac, char **argv)
   int IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
   int only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
   int n_best_candidates = ac>=6? strtol(argv[5],0,0):10; // Argument 5: How many best fullerne candidates do you want to store? 
- 
+
+
   // Make sure output directory exists
   mkdir(output_dir.c_str(),0777);
   int n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
@@ -93,6 +94,8 @@ int main(int ac, char **argv)
   int    Nd = LaunchCtx::get_device_count();
   size_t batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
+  cout << "Analysing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
+  
   k_smallest<isomer_candidate>
     vol_min(n_best_candidates), vol_max(n_best_candidates),
     ecc_min(n_best_candidates), ecc_max(n_best_candidates),
@@ -322,6 +325,7 @@ int main(int ac, char **argv)
 	
 	}
 
+      
       cout << "opt_failed " << opt_failed << "\n"
 	   << "opt_not_converged = " << opt_not_converged << "\n";
 
