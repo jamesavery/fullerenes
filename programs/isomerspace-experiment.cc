@@ -34,17 +34,18 @@ void signal_callback_handler(int signum)
 
 struct isomer_candidate {
   double value;
-  int I;
+  int id;
   vector<device_node_t> cubic_neighbours;
   vector<device_real_t> X;
 
-  isomer_candidate(double value, int I, int N, int ix, const IsomerBatch &B):
-    value(value), I(I), cubic_neighbours(3*N), X(3*N) {
+  isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B):
+    value(value), id(id), cubic_neighbours(3*N), X(3*N) {
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(device_real_t));    
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
+  friend ostream &operator<<(ostream &s, const isomer_candidate& c){ s<<"("<<c.value<<","<<c.id<<")"; return s; }
 };
 
 
@@ -286,14 +287,15 @@ int main(int ac, char **argv)
 	for(int di=0;di<num_finished_this_round[PROP][d];di++,i++){
 	  auto v = volumes_merged[i]      = volume_results[d][di];
 	  auto e = eccentricity_merged[i] = eccentricity_results[d][di];
-
+	  auto lam = lambda_max_results[d][di];
+	  
 	  int id = HBs[d].IDs[di];
 	  if(!isfinite(v)) vol_nanids.push_back(id);
 	  if(!isfinite(e)) ecc_nanids.push_back(id);
-
+	  
 	  
 	  if(isfinite(v) && isfinite(e)){
-	    isomer_candidate C(v, I, N, di, HBs[d]);
+	    isomer_candidate C(v, id, N, di, HBs[d]);
 	    vol_min.insert(C);
 	    C.value = -v;
 	    vol_max.insert(C);
@@ -301,6 +303,10 @@ int main(int ac, char **argv)
 	    ecc_min.insert(C);
 	    C.value = -e;	    
 	    ecc_max.insert(C);
+	    C.value = lam;
+	    lam_min.insert(C);
+	    C.value = -lam;
+	    lam_max.insert(C);
 	  } else {
 
 	  }
@@ -309,7 +315,12 @@ int main(int ac, char **argv)
       cout << "vol_nanids = " << vol_nanids << "\n"
 	   << "ecc_nanids = " << ecc_nanids << "\n";
 
-      //      cout << "lambda_maxs = " << lambda_max_results << "\n";
+      cout << "vol_min = " << vol_min.as_vector() << "\n";
+      cout << "vol_max = " << vol_max.as_vector() << "\n";      
+      cout << "ecc_min = " << ecc_min.as_vector() << "\n";
+      cout << "ecc_max = " << ecc_max.as_vector() << "\n";      
+      cout << "lam_min = " << lam_min.as_vector() << "\n";
+      cout << "lam_max = " << lam_max.as_vector() << "\n";      
       
       if(loop_iters % 3 == 0 || stage_finished[PROP]){
         auto Titer = steady_clock::now() - Tstart;
