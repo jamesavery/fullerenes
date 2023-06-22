@@ -710,8 +710,8 @@ namespace gpu_kernels{
                     //if (i < N-1) V[(i+1)*N] = beta;
                 }
                 if (threadIdx.x < m){
-                    D.data[I*m + threadIdx.x] = ISNAN(alphas[threadIdx.x])  ? real_t(0) : alphas[threadIdx.x];
-                    U.data[I*m + threadIdx.x] = ISNAN(betas[threadIdx.x]) ? real_t(0) : betas[threadIdx.x];
+                    D.data[I*m + threadIdx.x] = alphas[threadIdx.x];
+                    U.data[I*m + threadIdx.x] = betas[threadIdx.x];
                 }
             }   
         }
