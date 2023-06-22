@@ -615,7 +615,7 @@ namespace gpu_kernels{
             smem[threadIdx.x] = real_t(0.);
             real_t local_max = real_t(0.);
             for (int i = threadIdx.x; i < n; i += blockDim.x){
-                local_max = std::max(local_max, D[i]);
+                local_max = ISNAN(D[i]) ? NAN : std::max(local_max, D[i]);
             }
             real_t max_eig = reduction_max(smem, local_max);
             if(threadIdx.x == 0){
