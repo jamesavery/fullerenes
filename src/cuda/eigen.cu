@@ -482,7 +482,7 @@ namespace gpu_kernels{
             extern __shared__ device_real_t smem[];
             device_real_t *D = smem + blockDim.x*2, *L = D + (n+1), *U = L + (n+1), *V = U + (n+1)*2;
             //Expected layout is that each thread reads the (threadIdx.x + blockIdx.x*blockDim.x)^th column of D and L, in that way reads should be coalesced.
-            for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] != IsomerStatus::EMPTY){
+            for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] == IsomerStatus::CONVERGED){
                 for(int i = threadIdx.x; i < n; i += blockDim.x){
                     D[i] = D_.data[n*I + i];
                     L[i] = L_.data[n*I + i];
@@ -551,7 +551,7 @@ namespace gpu_kernels{
             extern __shared__ device_real_t smem[];
             device_real_t *D = smem + blockDim.x*2, *L = D + (n+1), *U = L + (n+1), *V = U + (n+1)*2;
             //Expected layout is that each thread reads the (threadIdx.x + blockIdx.x*blockDim.x)^th column of D and L, in that way reads should be coalesced.
-            for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] != IsomerStatus::EMPTY){
+            for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] == IsomerStatus::CONVERGED){
                 for(int i = threadIdx.x; i < n; i += blockDim.x){
                     D[i] = D_.data[n*I + i];
                     L[i] = L_.data[n*I + i];
@@ -672,7 +672,7 @@ namespace gpu_kernels{
             curandState state;            
             curand_init(42 + threadIdx.x, 0, 0, &state);
 
-            for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] != IsomerStatus::EMPTY){
+            for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] == IsomerStatus::CONVERGED){
                 V = V_.data + I * m * N + threadIdx.x;
                 E = E_.data + I * 6 * N + threadIdx.x; //6 eigenvectors per isomer (Related to 0 eigenvalues, 6 degrees of freedom)
                 //Load the hessian and cols into local memory
@@ -840,6 +840,7 @@ namespace gpu_kernels{
                 std::sort(Lambdas.begin(), Lambdas.end());
                 std::vector<device_real_t> error(m); 
                 std::transform(Lambdas.begin(), Lambdas.end(), Ds[dev].data, error.begin(), [](device_real_t lambda, device_real_t d) { return (d - lambda) / std::abs(lambda); });
+                std::cout << Ds[dev] << std::endl;
                 std::cout << "Error: " << vector(error.data(), error.data() + m) << std::endl;
                 std::cout << "Qvects: " << vector(Qs[dev].data, Qs[dev].data + m) << std::endl;
                 std::cout << "Qhost: " << vector(Qhost.data(), Qhost.data() + m) << std::endl;
@@ -849,8 +850,8 @@ namespace gpu_kernels{
             
 
             //std::sort(lambdas.begin(), lambdas.end());
-            //ofstream eigs("eigs.float32", std::ios::binary); 
-            //eigs.write((char*)Ds[dev].data, Ds[dev].size()*sizeof(device_real_t));
+            ofstream eigs("eigs.float32", std::ios::binary); 
+            eigs.write((char*)Ds[dev].data, Ds[dev].size()*sizeof(device_real_t));
             //std::cout << lambdas << std::endl;
             //}
 
@@ -892,7 +893,6 @@ namespace gpu_kernels{
                 Vs[dev].resize(B.isomer_capacity*B.n_atoms*3*m); Vs[dev].fill(0.); Vs[dev].to_device(dev);
                 Qs[dev].resize(B.isomer_capacity*m*m); Qs[dev].fill(0.); Qs[dev].to_device(dev);
                 Es[dev].resize(B.isomer_capacity*B.n_atoms*3*6); Es[dev].fill(0.); Es[dev].to_device(dev); 
-                cudaDeviceSynchronize();
             }
             size_t smem = sizeof(device_real_t)*B.n_atoms*3*2 + m*2*sizeof(device_real_t);
             size_t smem_qr = sizeof(device_real_t)*(m+1)*6 + sizeof(device_real_t)*(64)*2;
@@ -909,12 +909,12 @@ namespace gpu_kernels{
             printLastCudaError("Lambda Max Failed: ");
             //std::cout << "Lambda Max: " << vector(lambda_maxs.data, lambda_maxs.data + B.isomer_capacity) << std::endl;
 
-            for (int i = 0; i < B.isomer_capacity; i++){
+            /* for (int i = 0; i < B.isomer_capacity; i++){
                 if (lambda_maxs[i] < numeric_limits<device_real_t>::epsilon()){
                     std::cout << "Lambda Max is zero for isomer " << i << std::endl;
                     std::cout << "Diagonals[" << i << "]" << vector(Ds[dev].data + i*m, Ds[dev].data + (i+1)*m) << std::endl;
                 }
-            }
+            } */
             /* for(int i = 0; i < B.isomer_capacity; i++){
                 std::cout << "Diagonals[" << i << vector(Ds[dev].data + i*m, Ds[dev].data + (i+1)*m) << std::endl;
             } */
