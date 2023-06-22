@@ -139,11 +139,9 @@ int main(int ac, char **argv)
   
   int I=0;			// Global isomer number at start of batch
 
-  array<bool, NUM_STAGES> stage_finished = {false,false,false,false};
-  array<int,  NUM_STAGES> num_finished = {0,0,0,0};
-  vector<vector<int>> num_finished_this_round({vector<int>(Nd),vector<int>(Nd),vector<int>(Nd),vector<int>(Nd)});
-
-  cout << "num_finished_this_round initialized to " << num_finished_this_round[2] << "\n";
+  vector<bool> stage_finished(NUM_STAGES,false);
+  vector<int> num_finished(NUM_STAGES,0);
+  vector<vector<int>> num_finished_this_round(NUM_STAGES,vector<int>(Nd));
   
   int num_converged = 0,
       num_failed =0;
@@ -254,39 +252,9 @@ int main(int ac, char **argv)
     stage_finished[PROP] = num_finished[PROP] == n_fullerenes;
   };
 
-  while(!stage_finished[PROP] && loop_iters < 10){
-      std::cout << "Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
-      std::cout << "Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
-      auto T0 = steady_clock::now();
-
-      geo_routine();
-
-      auto T1 = steady_clock::now(); Tinit_geom += T1-T0;
-      auto handle = std::async(std::launch::async, generate_isomers, 2*batch_size);
-      auto T2 = steady_clock::now();
-      
-      while(Q1s[0].get_size() > Bs[GEO][0].capacity() && Q1s[1].get_size() > Bs[GEO][1].capacity()){
-          opt_routine();
-      }
-      while(Q2s[0].get_size() > Bs[OPT][0].capacity() && Q2s[1].get_size() > Bs[OPT][1].capacity()){
-          prop_routine();
-      }
-      auto T3 = steady_clock::now(); Topt += T3-T2;
-      handle.wait();
-      auto T4 = steady_clock::now(); Tgen += T4-T3;
-      while(stage_finished[GEN] && stage_finished[GEO] && !stage_finished[OPT]){
-          opt_routine();
-      }
-
-      while(stage_finished[GEN] && stage_finished[GEO] && stage_finished[OPT] && !stage_finished[PROP]){
-          prop_routine();
-      }
-
-      
-      
-      
-      auto T5 = steady_clock::now(); Topt += T5-T4;
-      // Do stuff on CPU. TODO: Nicer Nd
+  auto stat_routine = [&](){
+    for(int d=0;d<Nd;d++) opt_ctxs[d].wait();
+    
       vector<device_real_t> volumes_merged(sum(num_finished_this_round[PROP]));
       vector<device_real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
       vector<int> opt_failed, opt_not_converged;
@@ -300,9 +268,13 @@ int main(int ac, char **argv)
 	  
 	  int id = HBs[d].IDs[di];
 	  IsomerStatus &status = HBs[d].statuses[di];
+
+	  if(status != IsomerStatus::EMPTY){
+	    num_finished_this_round[STAT][d]++;
+	    num_finished[STAT]++;
+	  }
 	  
 	  if(status == IsomerStatus::CONVERGED){
-
 	    assert(isfinite(v) && isfinite(e));
 	    
 	  
@@ -325,19 +297,52 @@ int main(int ac, char **argv)
 	
 	}
 
-      
+      cout << "num_finished_this_round = " << num_finished_this_round  << "\n";
+      cout << "num_finished            = " << num_finished  << "\n";      
       cout << "opt_failed " << opt_failed << "\n"
 	   << "opt_not_converged = " << opt_not_converged << "\n";
 
+      if(num_finished[STAT] == n_fullerenes) stage_finished[STAT] = true;
+  };
+  
+  
+  while(!stage_finished[PROP] && loop_iters < 20){
+      cout << "Start: Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
+      cout << "Start: Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
+      auto T0 = steady_clock::now();
 
-      cout << "vol_min = " << vol_min.as_vector() << "\n";
-      cout << "vol_max = " << vol_max.as_vector() << "\n";      
-      cout << "ecc_min = " << ecc_min.as_vector() << "\n";
-      cout << "ecc_max = " << ecc_max.as_vector() << "\n";      
-      cout << "lam_min = " << lam_min.as_vector() << "\n";
-      cout << "lam_max = " << lam_max.as_vector() << "\n";      
+      geo_routine();
+
       
-      if(loop_iters % 3 == 0 || stage_finished[PROP]){
+      auto T1 = steady_clock::now(); Tinit_geom += T1-T0;
+      auto handle = std::async(std::launch::async, generate_isomers, 2*batch_size);
+      auto T2 = steady_clock::now();
+      
+      while(Q1s[0].get_size() > Bs[GEO][0].capacity() && Q1s[1].get_size() > Bs[GEO][1].capacity()){
+          opt_routine();
+      }
+      if(Q2s[0].get_size() > Bs[OPT][0].capacity() && Q2s[1].get_size() > Bs[OPT][1].capacity()){
+          prop_routine();
+      }
+      auto T3 = steady_clock::now(); Topt += T3-T2;
+      stat_routine();
+      
+      handle.wait();
+      auto T4 = steady_clock::now(); Tgen += T4-T3;
+      while(stage_finished[GEN] && stage_finished[GEO] && !stage_finished[OPT]){
+          opt_routine();
+      }
+
+      if(stage_finished[GEN] && stage_finished[GEO] && stage_finished[OPT] && !stage_finished[PROP]){
+          prop_routine();
+      }
+
+      if(stage_finished[GEN] && stage_finished[GEO] && stage_finished[OPT] && stage_finished[PROP] && !stage_finished[STAT]){
+          stat_routine();
+      }      
+
+      
+      if(loop_iters % 3 == 0 || stage_finished[STAT]){
         auto Titer = steady_clock::now() - Tstart;
         Tstart = steady_clock::now();
         auto Tff   = isomerspace_forcefield::time_spent()/Nd;
@@ -350,15 +355,29 @@ int main(int ac, char **argv)
         n0 = num_finished[PROP];
       }
       loop_iters++;
+
+      cout << "End: Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
+      cout << "End: Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
+
+      auto T5 = steady_clock::now(); Topt += T5-T4;
+
+
   }
 
+  cout << "vol_min = " << vol_min.as_vector() << "\n";
+  cout << "vol_max = " << vol_max.as_vector() << "\n";      
+  cout << "ecc_min = " << ecc_min.as_vector() << "\n";
+  cout << "ecc_max = " << ecc_max.as_vector() << "\n";      
+  cout << "lam_min = " << lam_min.as_vector() << "\n";
+  cout << "lam_max = " << lam_max.as_vector() << "\n";            
+  
   auto Ttot = steady_clock::now() - T0;
 
   
   
   auto TgeomOverhead = Tinit_geom - Tdual - Ttutte - TX0;
   auto Tsum = Tgen + Tupdate + Tdual + Ttutte + TX0 + Tcopy + Topt + Tfile + Toutq + Tinq + TgeomOverhead;
-  //std::cout << std::endl;
+  //cout << std::endl;
 
   cout << "\n\n\n\n\n\n\n\n";
   /* cout << "Time spent on non:\n"
