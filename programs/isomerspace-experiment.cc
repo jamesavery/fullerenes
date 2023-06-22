@@ -98,7 +98,7 @@ int main(int ac, char **argv)
     ecc_min(n_best_candidates), ecc_max(n_best_candidates),
     lam_min(n_best_candidates), lam_max(n_best_candidates);
 
-  enum {GEN, GEO, OPT, PROP, NUM_STAGES} stage;  
+  enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage;  
 
   // Each stage has one on-device batch per device. TODO: Dynamic number of devices != 2.
   IsomerBatch Bs[4][2] = {
@@ -194,11 +194,13 @@ int main(int ac, char **argv)
     std::vector<int> qsize_geo = {Q1s[0].get_size(), Q1s[1].get_size()};
     for (int d = 0; d < Nd; d++){
       if(Q0s[d].get_size() > 0){
-	Q0s[d].refill_batch(Bs[GEO][d], gen_ctxs[d], policy);
-	isomerspace_dual::dualise(Bs[GEO][d], gen_ctxs[d], policy);
-	isomerspace_tutte::tutte_layout(Bs[GEO][d], N*10, gen_ctxs[d], policy);
-	isomerspace_X0::zero_order_geometry(Bs[GEO][d], 4.0f, gen_ctxs[d], policy);
-	Q1s[d].push_all(Bs[GEO][d], gen_ctxs[d], policy);
+	auto &B   = Bs[GEO][d];
+	
+	Q0s[d].refill_batch(B, gen_ctxs[d], policy);
+	isomerspace_dual ::dualise(B, gen_ctxs[d], policy);
+	isomerspace_tutte::tutte_layout(B, N*10, gen_ctxs[d], policy);
+	isomerspace_X0   ::zero_order_geometry(B, 4.0f, gen_ctxs[d], policy);
+	Q1s[d].push_all(B, gen_ctxs[d], policy);
       }
     }
     for(int d=0; d<Nd; d++){
@@ -212,9 +214,10 @@ int main(int ac, char **argv)
   auto opt_routine = [&](){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int d = 0; d < Nd; d++){
-      Q1s[d].refill_batch(Bs[OPT][d], opt_ctxs[d], policy);
-      isomerspace_forcefield::optimise<PEDERSEN>(Bs[OPT][d], ceil(0.5*N), 5*N, opt_ctxs[d], policy);
-      Q2s[d].push_done(Bs[OPT][d], opt_ctxs[d], policy);
+      auto &B   = Bs[OPT][d];      
+      Q1s[d].refill_batch(B, opt_ctxs[d], policy);
+      isomerspace_forcefield::optimise<PEDERSEN>(B, ceil(0.5*N), 5*N, opt_ctxs[d], policy);
+      Q2s[d].push_done(B, opt_ctxs[d], policy);
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
@@ -276,11 +279,14 @@ int main(int ac, char **argv)
           prop_routine();
       }
 
+      
+      
+      
       auto T5 = steady_clock::now(); Topt += T5-T4;
       // Do stuff on CPU. TODO: Nicer Nd
       vector<device_real_t> volumes_merged(sum(num_finished_this_round[PROP]));
       vector<device_real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
-      vector<int> vol_nanids, ecc_nanids, opt_failed;
+      vector<int> opt_failed, opt_not_converged;
     
       int i=0;
       for(int d=0;d<Nd;d++)
@@ -290,11 +296,13 @@ int main(int ac, char **argv)
 	  auto lam = lambda_max_results[d][di];
 	  
 	  int id = HBs[d].IDs[di];
-	  if(!isfinite(v)) vol_nanids.push_back(id);
-	  if(!isfinite(e)) ecc_nanids.push_back(id);
+	  IsomerStatus &status = HBs[d].statuses[di];
 	  
+	  if(status == IsomerStatus::CONVERGED){
+
+	    assert(isfinite(v) && isfinite(e));
+	    
 	  
-	  if(isfinite(v) && isfinite(e)){
 	    isomer_candidate C(v, id, N, di, HBs[d]);
 	    vol_min.insert(C);
 	    C.value = -v;
@@ -308,12 +316,15 @@ int main(int ac, char **argv)
 	    C.value = -lam;
 	    lam_max.insert(C);
 	  } else {
-
+	    if(status == IsomerStatus::NOT_CONVERGED) opt_not_converged.push_back(id);
+	    if(status == IsomerStatus::FAILED) opt_failed.push_back(id);
 	  }
+	
 	}
 
-      cout << "vol_nanids = " << vol_nanids << "\n"
-	   << "ecc_nanids = " << ecc_nanids << "\n";
+      cout << "opt_failed " << opt_failed << "\n"
+	   << "opt_not_converged = " << opt_not_converged << "\n";
+
 
       cout << "vol_min = " << vol_min.as_vector() << "\n";
       cout << "vol_max = " << vol_max.as_vector() << "\n";      
