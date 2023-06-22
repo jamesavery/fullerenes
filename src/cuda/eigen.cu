@@ -909,16 +909,6 @@ namespace gpu_kernels{
             printLastCudaError("Lambda Max Failed: ");
             //std::cout << "Lambda Max: " << vector(lambda_maxs.data, lambda_maxs.data + B.isomer_capacity) << std::endl;
 
-            /* for (int i = 0; i < B.isomer_capacity; i++){
-                if (lambda_maxs[i] < numeric_limits<device_real_t>::epsilon()){
-                    std::cout << "Lambda Max is zero for isomer " << i << std::endl;
-                    std::cout << "Diagonals[" << i << "]" << vector(Ds[dev].data + i*m, Ds[dev].data + (i+1)*m) << std::endl;
-                }
-            } */
-            /* for(int i = 0; i < B.isomer_capacity; i++){
-                std::cout << "Diagonals[" << i << vector(Ds[dev].data + i*m, Ds[dev].data + (i+1)*m) << std::endl;
-            } */
-
         }
 
 
