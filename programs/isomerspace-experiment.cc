@@ -253,7 +253,6 @@ int main(int ac, char **argv)
   };
 
   auto stat_routine = [&](){
-    for(int d=0;d<Nd;d++) opt_ctxs[d].wait();
     
       vector<device_real_t> volumes_merged(sum(num_finished_this_round[PROP]));
       vector<device_real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
@@ -299,16 +298,21 @@ int main(int ac, char **argv)
 
       cout << "num_finished_this_round = " << num_finished_this_round  << "\n";
       cout << "num_finished            = " << num_finished  << "\n";      
-      cout << "opt_failed " << opt_failed << "\n"
+      cout << "opt_failed        = " << opt_failed << "\n"
 	   << "opt_not_converged = " << opt_not_converged << "\n";
 
       if(num_finished[STAT] == n_fullerenes) stage_finished[STAT] = true;
   };
+
+  auto final_round = [&](int s){
+    bool final = !stage_finished[s];
+    for(int t=GEN;t<s;t++) final &= stage_finished[t];
+    return final;
+  };
   
-  
-  while(!stage_finished[PROP] && loop_iters < 20){
-      cout << "Start: Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
-      cout << "Start: Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
+  while(!stage_finished[PROP] && loop_iters < 100){
+      cout << loop_iters << " start: Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
+      cout << loop_iters << " start: Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
       auto T0 = steady_clock::now();
 
       geo_routine();
@@ -329,17 +333,10 @@ int main(int ac, char **argv)
       
       handle.wait();
       auto T4 = steady_clock::now(); Tgen += T4-T3;
-      while(stage_finished[GEN] && stage_finished[GEO] && !stage_finished[OPT]){
-          opt_routine();
-      }
+      while(final_round(OPT))  opt_routine();
+      if   (final_round(PROP)) prop_routine();
+      if   (final_round(STAT)) stat_routine();
 
-      if(stage_finished[GEN] && stage_finished[GEO] && stage_finished[OPT] && !stage_finished[PROP]){
-          prop_routine();
-      }
-
-      if(stage_finished[GEN] && stage_finished[GEO] && stage_finished[OPT] && stage_finished[PROP] && !stage_finished[STAT]){
-          stat_routine();
-      }      
 
       
       if(loop_iters % 3 == 0 || stage_finished[STAT]){
@@ -352,18 +349,23 @@ int main(int ac, char **argv)
         Tdual  = isomerspace_dual::time_spent()/Nd;
         auto TOverhead = Tinit_geom - Tdual - Ttutte - TX0;
         //progress_bar.update_progress((float)num_finished[PROP]/(float)num_fullerenes.find(N)->second, "Pace: " + to_string((Titer/1us) / max((num_finished[PROP] - n0),1)) + " us/isomer       ", {{"Gen          ", Tgen},{"Init Overhead", TOverhead},{"Opt          ", Topt},{"Dual         ", Tdual},{"Tutte        ", Ttutte},{"X0           ", TX0},{"FF Overhead  ", Tqueue}});
-        n0 = num_finished[PROP];
+        n0 = num_finished[STAT];
       }
       loop_iters++;
 
-      cout << "End: Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
-      cout << "End: Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
+      
+      cout << loop_iters << " end: Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
+      cout << loop_iters << " end: Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
 
       auto T5 = steady_clock::now(); Topt += T5-T4;
 
 
   }
+  cout << "Exited loop, waiting on op_ctxs.\n";
+  for(int d=0;d<Nd;d++) opt_ctxs[d].wait();
 
+  cout << "COMPLETED IN " << loop_iters << " rounds.\n";
+  cout << "num_finished            = " << num_finished  << "\n";      
   cout << "vol_min = " << vol_min.as_vector() << "\n";
   cout << "vol_max = " << vol_max.as_vector() << "\n";      
   cout << "ecc_min = " << ecc_min.as_vector() << "\n";
