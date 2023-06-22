@@ -695,6 +695,7 @@ namespace gpu_kernels{
                         //if(threadIdx.x + blockIdx.x == 0) printf("i = %d, N = %d, V[i*N] = %f\n", i, N, V[i*N]);
                     }
                     real_t v = mat_vect(V[i*N]);
+                    smem[threadIdx.x] = real_t(0); //Clear the shared memory
                     alpha = reduction(smem, v * V[i*N]);
                     if (threadIdx.x == i) alphas[i] = alpha;
                     if (i == 0){
@@ -702,6 +703,7 @@ namespace gpu_kernels{
                     } else {
                         v -= betas[i-1] * V[(i-1)*N] + alpha * V[i*N];
                     }
+                    smem[threadIdx.x] = real_t(0); //Clear the shared memory
                     beta = SQRT(reduction(smem, v * v));
                     if (threadIdx.x == i) betas[i] = beta;
                     if (i < m-1) V[(i+1)*N] = v / beta;
@@ -890,6 +892,7 @@ namespace gpu_kernels{
                 Vs[dev].resize(B.isomer_capacity*B.n_atoms*3*m); Vs[dev].fill(0.); Vs[dev].to_device(dev);
                 Qs[dev].resize(B.isomer_capacity*m*m); Qs[dev].fill(0.); Qs[dev].to_device(dev);
                 Es[dev].resize(B.isomer_capacity*B.n_atoms*3*6); Es[dev].fill(0.); Es[dev].to_device(dev); 
+                cudaDeviceSynchronize();
             }
             size_t smem = sizeof(device_real_t)*B.n_atoms*3*2 + m*2*sizeof(device_real_t);
             size_t smem_qr = sizeof(device_real_t)*(m+1)*6 + sizeof(device_real_t)*(64)*2;
@@ -905,6 +908,13 @@ namespace gpu_kernels{
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Lambda Max Failed: ");
             //std::cout << "Lambda Max: " << vector(lambda_maxs.data, lambda_maxs.data + B.isomer_capacity) << std::endl;
+
+            for (int i = 0; i < B.isomer_capacity; i++){
+                if (lambda_maxs[i] < numeric_limits<device_real_t>::epsilon()){
+                    std::cout << "Lambda Max is zero for isomer " << i << std::endl;
+                    std::cout << "Diagonals[" << i << "]" << vector(Ds[dev].data + i*m, Ds[dev].data + (i+1)*m) << std::endl;
+                }
+            }
             /* for(int i = 0; i < B.isomer_capacity; i++){
                 std::cout << "Diagonals[" << i << vector(Ds[dev].data + i*m, Ds[dev].data + (i+1)*m) << std::endl;
             } */

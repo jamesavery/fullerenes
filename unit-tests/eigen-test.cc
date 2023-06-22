@@ -1,4 +1,5 @@
 #include "filesystem"
+#include "numeric"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "fullerenes/buckygen-wrapper.hh"
@@ -40,21 +41,22 @@ int main(int argc, char** argv){
     G.neighbours.resize(Nf);
     G.N = Nf;
     PlanarGraph Pg;
-    auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N)*2, (int)n_isomers);
+    auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N)*16, (int)n_isomers);
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     IsomerBatch Bhost(N,batch_size,HOST_BUFFER);
     IsomerBatch Bdev(N,batch_size,DEVICE_BUFFER);
-    
     if (isomer_num == -1) {
         spiral_nomenclature C60name(spiral_);    
         Triangulation C60dual(C60name);
         auto C60cubic = C60dual.dual_graph();
         for(int i = 0;  i < batch_size; i++) Bhost.append(C60cubic,0, false);
     } else {
+        BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, false, false);  
         for (size_t i = 0; i < batch_size; i++)
         {
-            auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
-            Bhost.append(G,ID);
+            bool success = BuckyGen::next_fullerene(BuckyQ, G);
+            if(success) Bhost.append(G,i);
+            else break;
         }
     }
     
@@ -93,29 +95,43 @@ int main(int argc, char** argv){
     //eigensolve_cusolver(Bdev, hessians, cols, eigenvalues);
     //std::cout << "cuSOLVE Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
     CuArray<device_real_t> Q(N*3*N*3*batch_size);
-    lambda_max(Bdev, hessians, cols, lambda_maxs);
+    //lambda_max(Bdev, hessians, cols, lambda_maxs);
     auto start = std::chrono::steady_clock::now();
     lambda_max(Bdev, hessians, cols, lambda_maxs, Mlanczos_steps);
     auto time = std::chrono::steady_clock::now() - start;
-    std::cout << lambda_maxs << std::endl;
-    //eigensolve(Bdev, Q, hessians, cols, eigenvalues);
-    //start = std::chrono::steady_clock::now();
-    //spectrum_ends(Bdev, hessians, cols, lambda_min, lambda_max);
-    //time = std::chrono::steady_clock::now() - start;
-    std::cout << "Custom Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
+    //std::cout << lambda_maxs << std::endl;
+    
+        //eigensolve(Bdev, Q, hessians, cols, eigenvalues);
+        //start = std::chrono::steady_clock::now();
+        //spectrum_ends(Bdev, hessians, cols, lambda_min, lambda_max);
+        //time = std::chrono::steady_clock::now() - start;
+        std::cout << "Custom Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
 
+        // Find the 20 smallest elements in lambda_maxs
+        std::vector<device_real_t> lambda_maxs_vec(lambda_maxs.data, lambda_maxs.data + batch_size);
+        std::vector<device_real_t> smallest_40(40);
+        std::vector<size_t> smallest_40_indices(40);
+        std::vector<size_t> indices(lambda_maxs_vec.size());
+        std::iota(indices.begin(), indices.end(), 0);
+        std::sort(indices.begin(), indices.end(), [&lambda_maxs_vec](size_t i1, size_t i2) {return lambda_maxs_vec[i1] < lambda_maxs_vec[i2];});
+        for (int i = 0; i < 40; i++) {
+            smallest_40[i] = lambda_maxs_vec[indices[i]];
+            smallest_40_indices[i] = indices[i];
+        }
+        std::cout << "40 smallest lambda_maxs: " << smallest_40 << std::endl;
+        std::cout << "40 smallest indices: " << smallest_40_indices << std::endl;
 
-    std::ofstream output_tridiags("tridiags.bin", std::ios::binary);
-    std::ofstream output_Q("Q.bin", std::ios::binary);
-    //output_tridiags.write((char*)eigenvalues.data, N*3*2* batch_size*sizeof(device_real_t));
-    output_Q.write((char*)Q.data, N*3*N*3* batch_size*sizeof(device_real_t));
+        std::ofstream output_tridiags("tridiags.bin", std::ios::binary);
+        std::ofstream output_Q("Q.bin", std::ios::binary);
+        //output_tridiags.write((char*)eigenvalues.data, N*3*2* batch_size*sizeof(device_real_t));
+        output_Q.write((char*)Q.data, N*3*N*3* batch_size*sizeof(device_real_t));
 
-    for(int i = N*2; i < N*3; i++) {
-        //std::cout << "Q[" << i  << "] : " << std::vector<device_real_t>(Q.data + i*N*3, Q.data + (i+1)*N*3) << std::endl;
+        for(int i = N*2; i < N*3; i++) {
+            //std::cout << "Q[" << i  << "] : " << std::vector<device_real_t>(Q.data + i*N*3, Q.data + (i+1)*N*3) << std::endl;
+        }
+        //std::cout << "Eigenvalues: " << eigenvalues << std::endl;
+        //FILE* f = fopen((name_ + "_Geometry.mol2").c_str(), "w");
+        //FG.to_mol2(FG,f);
+
+    //    std::cout << Bdev << std::endl;
     }
-    //std::cout << "Eigenvalues: " << eigenvalues << std::endl;
-    //FILE* f = fopen((name_ + "_Geometry.mol2").c_str(), "w");
-    //FG.to_mol2(FG,f);
-
-//    std::cout << Bdev << std::endl;
-}
