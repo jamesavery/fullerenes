@@ -79,17 +79,41 @@ namespace gpu_kernels{
             
         }
 
+        void __global__ moments_of_inertia_(IsomerBatch B, CuArray<device_real_t> lambdas){
+            DEVICE_TYPEDEFS;
+            extern __shared__ real_t shared_memory[];
+            const int tid = threadIdx.x;
+            auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
+            for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
+	      //TODO: simplify
+                if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED)
+                {
+		BLOCK_SYNC;
+                size_t offset = isomer_idx * blockDim.x;
+                coord3d* X           = reinterpret_cast<coord3d*>(shared_memory) + B.n_atoms;
+                assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
+                BLOCK_SYNC;
+		auto I = inertia_matrix(X);
+		device_coord3d lams = I.eigenvalues(); 
+                BLOCK_SYNC;
+                if (tid == 0){ lambdas.data[3*isomer_idx] = lams[0];lambdas.data[3*isomer_idx+1] = lams[0];lambdas.data[3*isomer_idx+2] = lams[2]; }
+                }
+            }
+        }
+        
+      
+      
         void __global__ eccentricities_(IsomerBatch B, CuArray<device_real_t> ecce){
             DEVICE_TYPEDEFS;
             extern __shared__ real_t shared_memory[];
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
-                if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] != IsomerStatus::EMPTY)
+                if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED)
                 {
                 BLOCK_SYNC
                 size_t offset = isomer_idx * blockDim.x;
-                coord3d* X              = reinterpret_cast<coord3d*>(shared_memory) + B.n_atoms;
+                coord3d* X            = reinterpret_cast<coord3d*>(shared_memory) + B.n_atoms;
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC
                 auto result = best_ellipsoid(X);
@@ -106,7 +130,7 @@ namespace gpu_kernels{
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
-                if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] != IsomerStatus::EMPTY)
+                if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED)
                 {
                 BLOCK_SYNC
                 size_t offset = isomer_idx * blockDim.x;
@@ -256,6 +280,23 @@ namespace gpu_kernels{
 
             if(policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Calculation of Eccentricities Failed: ");
+            return error;
+        }
+
+      cudaError_t moments_of_inertia(const IsomerBatch& B, CuArray<device_real_t>& lambdas, const LaunchCtx& ctx, const LaunchPolicy policy){
+            cudaSetDevice(B.get_device_id());
+
+            //If launch ploicy is synchronous then wait.
+            if(policy == LaunchPolicy::SYNC) ctx.wait();
+
+            size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
+            static LaunchDims dims((void*)moments_of_inertia_, B.n_atoms, smem, B.isomer_capacity);
+            dims.update_dims((void*)moments_of_inertia_, B.n_atoms, smem, B.isomer_capacity);
+            void* kargs[]{(void*)&B, (void*)&lambdas};
+            auto error = safeCudaKernelCall((void*)moments_of_inertia_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+
+            if(policy == LaunchPolicy::SYNC) ctx.wait();
+            printLastCudaError("Calculation of moments of inertia Failed: ");
             return error;
         }
 
