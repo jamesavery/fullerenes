@@ -95,16 +95,32 @@ int main(int ac, char **argv)
   size_t batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
   cout << "Analysing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
+
+  // Organize all of our of computation pipeline stages and our scoresl of different results
+  typedef enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage_t;
+  typedef enum {VOLUME,ECCENTRICITY,FREQ_MIN,FREQ_MAX, INERTIA, NUM_RESULTS} results_t; // Results on which to do statistics
+  constexpr int result_sizes[NUM_RESULTS] = {1,1,1,1,3}; // How many scalars per result?
+
+  array<array<CuArray<device_real_t>,2>,NUM_RESULTS> results; // TODO: vector<Cuarray> gives linkin error -- needs fixing to allow general Nd.
+  vector<CuArray<device_real_t>> hessians(Nd);
+  vector<CuArray<device_node_t>> hessian_cols(Nd);
+
+  // Initialize unified memory result CuArray's
+  for(int d=0;d<Nd;d++){
+    hessians[d]      = CuArray<device_real_t>(N*3* 10*3*batch_size,0);
+    hessian_cols[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);
+
+    for(int r=0; r< NUM_RESULTS; r++) results[r][d] = CuArray<device_real_t>(result_sizes[r]*batch_size,0);
+  }
+
+  // We keep track of the n_best_candidates isomers with smallest resp. largest values for each result
+  vector<k_smallest<isomer_candidate>>
+    result_min(NUM_RESULTS, k_smallest<isomer_candidate>(n_best_candidates)),
+    result_max(NUM_RESULTS, k_smallest<isomer_candidate>(n_best_candidates));
+
   
-  k_smallest<isomer_candidate>
-    vol_min(n_best_candidates), vol_max(n_best_candidates),
-    ecc_min(n_best_candidates), ecc_max(n_best_candidates),
-    lam_min(n_best_candidates), lam_max(n_best_candidates);
-
-  enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage;  
-
-  // Each stage has one on-device batch per device. TODO: Dynamic number of devices != 2.
-  IsomerBatch Bs[4][2] = {
+  // Each stage has one on-device batch per device. TODO: NUM_STAGES vector<vector<IsomerBatch>>, Nd. Dynamic number of devices != 2.
+  IsomerBatch Bs[4][2] = {	
     {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)},
     {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)},
     {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)},
@@ -112,40 +128,30 @@ int main(int ac, char **argv)
   };
   
   // Final IsomerBatch on host
-  IsomerBatch HBs[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
+  IsomerBatch host_batch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
   
-  vector<CuArray<device_real_t>> hessian_results(Nd), volume_results(Nd), eccentricity_results(Nd), lambda_max_results(Nd), inertia_results(Nd);  
-  vector<CuArray<device_node_t>> hessian_col_results(Nd);
 
-  for(int d=0;d<Nd;d++){
-    hessian_results[d]      = CuArray<device_real_t>(N*3* 10*3*batch_size,0);
-    hessian_col_results[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);
-    lambda_max_results[d]   = CuArray<device_real_t>(batch_size,0);
-    volume_results[d]       = CuArray<device_real_t>(batch_size,0);
-    eccentricity_results[d] = CuArray<device_real_t>(batch_size,0);
-    inertia_results[d]      = CuArray<device_real_t>(3*batch_size,0);    
-  }
-  
+  // TODO: Organize Qs by stages together with batches.Structure nicely.
   IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
   IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
   IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
 
   for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
 
+  // TODO: Should we really have two different streams, or is one enough?
   LaunchCtx gen_ctxs[Nd] = {LaunchCtx(0),LaunchCtx(1)};
   LaunchCtx opt_ctxs[Nd] = {LaunchCtx(0),LaunchCtx(1)};
 
+  // TODO: Multi-CPU buckygen
   BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,IPR,only_nontrivial);  
   ProgressBar progress_bar = ProgressBar('#',30);
   
   int I=0;			// Global isomer number at start of batch
 
   vector<bool> stage_finished(NUM_STAGES,false);
-  vector<int> num_finished(NUM_STAGES,0);
+  vector<int>  num_finished  (NUM_STAGES,0);
   vector<vector<int>> num_finished_this_round(NUM_STAGES,vector<int>(Nd));
   
-  int num_converged = 0,
-      num_failed =0;
   Graph G;
   auto Nf = N/2 + 2;
   G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
@@ -157,6 +163,9 @@ int main(int ac, char **argv)
   vector<size_t> vol_hist(num_bins), ecc_hist(num_bins), lam_hist(num_bins);
   
   // Hack using knowledge about range for easy binning (for now)
+  //... histograms
+  
+  // TODO: Implement proper timer class with tree structure, pass as argument to kernels instead of littering program code
   auto T0 = steady_clock::now();
   auto
     Tgen    = steady_clock::now()-T0,
@@ -204,7 +213,7 @@ int main(int ac, char **argv)
 	auto &B   = Bs[GEO][d];
 	
 	Q0s[d].refill_batch(B, gen_ctxs[d], policy);
-	isomerspace_dual ::dualise(B, gen_ctxs[d], policy);
+	isomerspace_dual ::dualise     (B,       gen_ctxs[d], policy);
 	isomerspace_tutte::tutte_layout(B, N*10, gen_ctxs[d], policy);
 	isomerspace_X0   ::zero_order_geometry(B, 4.0f, gen_ctxs[d], policy);
 	Q1s[d].push_all(B, gen_ctxs[d], policy);
@@ -243,13 +252,13 @@ int main(int ac, char **argv)
       Q2s[d].refill_batch(B, ctx, policy);
       isomerspace_properties::transform_coordinates(B, ctx, policy);
       // Hessian units: kg/s^2, divide eigenvalues by carbon_mass to get 1/s^2, frequency = sqrt(lambda/m)
-      isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessian_results[d], hessian_col_results[d],    ctx, policy);
-      isomerspace_eigen     ::lambda_max(B, hessian_results[d], hessian_col_results[d], lambda_max_results[d], 40, ctx, policy);
+      isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d],    ctx, policy);
+      isomerspace_eigen     ::lambda_max(B, hessians[d], hessian_cols[d], results[FREQ_MAX][d], 40, ctx, policy);
       // Inertia is in Ångstrøm^2, multiply by carbon_mass and aangstrom_length*aangstrom_length to get SI units kg*m^2
-      isomerspace_properties::moments_of_inertia   (B, inertia_results[d], ctx, policy);      
-      isomerspace_properties::eccentricities       (B, eccentricity_results[d], ctx, policy);
-      isomerspace_properties::volume_divergences   (B, volume_results[d],       ctx, policy);
-      cuda_io::copy(HBs[d],B,ctx,policy);      
+      isomerspace_properties::moments_of_inertia   (B, results[INERTIA][d],      ctx, policy);      
+      isomerspace_properties::eccentricities       (B, results[ECCENTRICITY][d], ctx, policy);
+      isomerspace_properties::volume_divergences   (B, results[VOLUME][d],       ctx, policy);
+      cuda_io::copy(host_batch[d],B,ctx,policy);      
       B.clear(ctx,policy);      
     }
     for (int d = 0; d < Nd; d++){
@@ -262,19 +271,15 @@ int main(int ac, char **argv)
 
   auto stat_routine = [&](){
     
-      vector<device_real_t> volumes_merged(sum(num_finished_this_round[PROP]));
-      vector<device_real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
+    //      vector<device_real_t> volumes_merged(sum(num_finished_this_round[PROP]));
+    //      vector<device_real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
       vector<int> opt_failed, opt_not_converged;
     
       int i=0;
       for(int d=0;d<Nd;d++)
 	for(int di=0;di<num_finished_this_round[PROP][d];di++,i++){
-	  auto v = volumes_merged[i]      = volume_results[d][di];
-	  auto e = eccentricity_merged[i] = eccentricity_results[d][di];
-	  auto lam = lambda_max_results[d][di];
-	  
-	  int id = HBs[d].IDs[di];
-	  IsomerStatus &status = HBs[d].statuses[di];
+	  int id = host_batch[d].IDs[di];
+	  IsomerStatus &status = host_batch[d].statuses[di];
 
 	  if(status != IsomerStatus::EMPTY){
 	    num_finished_this_round[STAT][d]++;
@@ -282,21 +287,13 @@ int main(int ac, char **argv)
 	  }
 	  
 	  if(status == IsomerStatus::CONVERGED){
-	    assert(isfinite(v) && isfinite(e));
+	    isomer_candidate C(0, id, N, di, host_batch[d]);
 	    
-	  
-	    isomer_candidate C(v, id, N, di, HBs[d]);
-	    vol_min.insert(C);
-	    C.value = -v;
-	    vol_max.insert(C);
-	    C.value = e;
-	    ecc_min.insert(C);
-	    C.value = -e;	    
-	    ecc_max.insert(C);
-	    C.value = lam;
-	    lam_min.insert(C);
-	    C.value = -lam;
-	    lam_max.insert(C);
+	    for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
+		auto v = results[r][d][di];
+		C.value =  v; result_min[r].insert(C);
+		C.value = -v; result_max[r].insert(C);
+	    }
 	  } else {
 	    if(status == IsomerStatus::NOT_CONVERGED) opt_not_converged.push_back(id);
 	    if(status == IsomerStatus::FAILED) opt_failed.push_back(id);
@@ -374,12 +371,12 @@ int main(int ac, char **argv)
 
   cout << "COMPLETED IN " << loop_iters << " rounds.\n";
   cout << "num_finished            = " << num_finished  << "\n";      
-  cout << "vol_min = " << vol_min.as_vector() << "\n";
-  cout << "vol_max = " << vol_max.as_vector() << "\n";      
-  cout << "ecc_min = " << ecc_min.as_vector() << "\n";
-  cout << "ecc_max = " << ecc_max.as_vector() << "\n";      
-  cout << "lam_min = " << lam_min.as_vector() << "\n";
-  cout << "lam_max = " << lam_max.as_vector() << "\n";            
+  cout << "vol_min = " << result_min[VOLUME].as_vector() << "\n";
+  cout << "vol_max = " << result_max[VOLUME].as_vector() << "\n";      
+  cout << "ecc_min = " << result_min[ECCENTRICITY].as_vector() << "\n";
+  cout << "ecc_max = " << result_max[ECCENTRICITY].as_vector() << "\n";      
+  cout << "lam_min = " << result_min[FREQ_MAX].as_vector() << "\n";
+  cout << "lam_max = " << result_max[FREQ_MAX].as_vector() << "\n";            
   
   auto Ttot = steady_clock::now() - T0;
 
