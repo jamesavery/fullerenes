@@ -16,12 +16,12 @@ using namespace isomerspace_X0;
 using namespace isomerspace_tutte;
 int main(int argc, char** argv){
     const size_t N                = argc>1 ? strtol(argv[1],0,0) : 60;     // Argument 1: Number of vertices 
-    const size_t Mlanczos_steps   = argc>2 ? strtol(argv[2],0,0) : 40;     // Argument 2: Number of Lanczos steps
-    float reldelta                = argc>3 ? strtof(argv[3],0) : 1e-5;    // Argument 3: Relative delta
-    int isomer_num                = argc>4 ? strtol(argv[4],0,0) : 0;     // Argument 4: Isomer number
-    std::string spiral_           = argc>5 ? argv[5] : "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";          // Argument 2: Spiral
-    std::string name_             = argc>6 ? argv[6] : "C60ih";          // Argument 2: Spiral
-    std::string filename          = argc>7 ? argv[7] : "hessian_validation";        // Argument 2: Filename
+    //const size_t Mlanczos_steps   = argc>2 ? strtol(argv[2],0,0) : 40;     // Argument 2: Number of Lanczos steps
+    float reldelta                = argc>2 ? strtof(argv[2],0) : 1e-5;    // Argument 3: Relative delta
+    int isomer_num                = argc>3 ? strtol(argv[3],0,0) : 0;     // Argument 4: Isomer number
+    std::string spiral_           = argc>4 ? argv[4] : "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";          // Argument 2: Spiral
+    std::string name_             = argc>5 ? argv[5] : "C60ih";          // Argument 2: Spiral
+    std::string filename          = argc>6 ? argv[6] : "hessian_validation";        // Argument 2: Filename
 
     std::ofstream hess_analytical(filename + "_analytical.csv");
     std::ofstream hess_numerical(filename + "_numerical.csv");
@@ -41,10 +41,11 @@ int main(int argc, char** argv){
     G.neighbours.resize(Nf);
     G.N = Nf;
     PlanarGraph Pg;
-    auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N)*16, (int)n_isomers);
+    auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N)*1, (int)n_isomers);
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     IsomerBatch Bhost(N,batch_size,HOST_BUFFER);
-    IsomerBatch Bdev(N,batch_size,DEVICE_BUFFER);
+    int Nd = LaunchCtx::get_device_count();
+    IsomerBatch Bdev[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N,batch_size,DEVICE_BUFFER,1)};
     if (isomer_num == -1) {
         spiral_nomenclature C60name(spiral_);    
         Triangulation C60dual(C60name);
@@ -53,40 +54,44 @@ int main(int argc, char** argv){
     } else {
         BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, false, false);  
         for (size_t i = 0; i < batch_size; i++)
-        {
+        {   
+            int problem_isomers[3] = {66530,67259,83863}; 
             bool success = BuckyGen::next_fullerene(BuckyQ, G);
             if(success) Bhost.append(G,i);
             else break;
         }
     }
-    
-    cuda_io::copy(Bdev, Bhost);
-    if(isomer_num != -1) dualise(Bdev);
-    tutte_layout(Bdev, (int)10*N);
-    zero_order_geometry(Bdev, 4.0);
+    std::vector<LaunchCtx> ctx(Nd); for(int d = 0; d < Nd; d++) ctx[d] = LaunchCtx(d);
+    LaunchPolicy policy = LaunchPolicy::SYNC;
+    for (int d = 0; d < Nd; d++) cuda_io::copy(Bdev[d], Bhost, ctx[d], LaunchPolicy::SYNC);
+
+    if(isomer_num != -1) for (int d = 0; d < Nd; d++) dualise(Bdev[d], ctx[d], policy);
+    for (int d = 0; d < Nd; d++) tutte_layout(Bdev[d], (int)10*N, ctx[d],policy);
+    for (int d = 0; d < Nd; d++) zero_order_geometry(Bdev[d], 4.0, ctx[d], policy);
     auto T0 = std::chrono::steady_clock::now();
-    optimise<PEDERSEN>(Bdev, 5*N, 5*N);
+    for (int d = 0; d < Nd; d++) optimise<PEDERSEN>(Bdev[d], 5*N, 5*N, ctx[d], policy);
     auto T1 = std::chrono::steady_clock::now();
     std::cout << "Optimisation time: " << std::chrono::duration_cast<std::chrono::microseconds>(T1-T0).count()/ (float)batch_size << " us/ isomer" << std::endl;
-    CuArray<device_real_t> hessians(N*3*3*10 * batch_size);
-    CuArray<device_node_t> cols(N*3*3*10 * batch_size);
-    CuArray<device_real_t> lambda_mins(batch_size); // For the sake of debugging we store alpha and betas in the same array
-    CuArray<device_real_t> lambda_maxs(batch_size); // For the sake of debugging we store alpha and betas in the same array
+    std::vector<CuArray<device_real_t>> hessians(Nd);       for (int d = 0; d < Nd; d++) hessians[d] = CuArray<device_real_t>(N*3*3*10 * batch_size);
+    std::vector<CuArray<device_node_t>> cols(Nd);           for (int d = 0; d < Nd; d++) cols[d] = CuArray<device_node_t>(N*3*3*10 * batch_size);
+    std::vector<CuArray<device_real_t>> lambda_mins(Nd);    for (int d = 0; d < Nd; d++) lambda_mins[d] = CuArray<device_real_t>(batch_size); // For the sake of debugging we store alpha and betas in the same array
+    std::vector<CuArray<device_real_t>> lambda_maxs(Nd);    for (int d = 0; d < Nd; d++) lambda_maxs[d] = CuArray<device_real_t>(batch_size); // For the sake of debugging we store alpha and betas in the same array
 
     T0 = std::chrono::steady_clock::now();
-    compute_hessians<PEDERSEN>(Bdev, hessians, cols);
+    for (int d = 0; d < Nd; d++) compute_hessians<PEDERSEN>(Bdev[d], hessians[d], cols[d], ctx[d], policy);
     //std::cout << hessians << std::endl;
     T1 = std::chrono::steady_clock::now();
     std::cout << "Hessian time: " << std::chrono::duration_cast<std::chrono::microseconds>(T1-T0).count()/ (float)batch_size << " us/ isomer" << std::endl;
-    hess_analytical.write((char*)hessians.data, N*3*3*10* batch_size*sizeof(device_real_t));
-    hess_cols.write((char*)cols.data, N*3*3*10* batch_size*sizeof(device_node_t));
+    
+    hess_analytical.write((char*)hessians[0].data, N*3*3*10* batch_size*sizeof(device_real_t));
+    hess_cols.write((char*)cols[0].data, N*3*3*10* batch_size*sizeof(device_node_t));
 
 
     //compute_hessians_fd<PEDERSEN>(Bdev, hessians, cols, reldelta);
     //hess_numerical.write((char*)hessians.data, N*3*3*10* batch_size*sizeof(device_real_t));
     
     //std::cout << "Eigenvalues: " << eigenvalues << std::endl;
-    cuda_io::copy(Bhost, Bdev); // Copy back to host
+    //cuda_io::copy(Bhost, Bdev); // Copy back to host
     //auto FG = Bhost.get_isomer(0).value();
     //cubic_graph.write((char*)Bhost.cubic_neighbours, N*3*sizeof(device_node_t));
     //geometry.write((char*)Bhost.X, N*3*sizeof(device_real_t));
@@ -95,10 +100,60 @@ int main(int argc, char** argv){
     //eigensolve_cusolver(Bdev, hessians, cols, eigenvalues);
     //std::cout << "cuSOLVE Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
     CuArray<device_real_t> Q(N*3*N*3*batch_size);
+    CuArray<device_real_t> eigs(N*3*batch_size);
     //lambda_max(Bdev, hessians, cols, lambda_maxs);
     auto start = std::chrono::steady_clock::now();
-    lambda_max(Bdev, hessians, cols, lambda_maxs, Mlanczos_steps);
+    for (int d = 0; d < 1; d++) spectrum_ends(Bdev[d], hessians[d], cols[d], lambda_mins[d], lambda_maxs[d], 40,  ctx[d], policy);
+    for (int d = 0; d < Nd; d++) ctx[d].wait();
     auto time = std::chrono::steady_clock::now() - start;
+    //std::cout << "Lambda max: " << lambda_maxs[0] << std::endl;
+    //std::cout << "Lambda min: " << lambda_mins[0] << std::endl;
+
+    eigensolve(Bdev[0], Q, hessians[0], cols[0], eigs, ctx[0], LaunchPolicy::SYNC);
+    std::vector<device_real_t> min_eigs_ref(batch_size), max_eigs_ref(batch_size);
+    
+    for(int i = 0; i < batch_size; i++) {
+        std::sort(eigs.data + i*N*3, eigs.data + (i+1)*N*3);
+        min_eigs_ref[i] = eigs[i*N*3 + 6];
+        max_eigs_ref[i] = eigs[(i+1)*N*3 - 1];
+    }
+    std::vector<device_real_t> rel_err_min(batch_size), abs_err_min(batch_size), rel_err_max(batch_size), abs_err_max(batch_size), rel_err_width(batch_size), abs_err_width(batch_size);
+    std::vector<int> nan_or_inf;
+    for(int i = 0; i < batch_size; i++) {
+        if (std::isnan(lambda_mins[0][i]) || std::isinf(lambda_mins[0][i]) || std::isnan(lambda_maxs[0][i]) || std::isinf(lambda_maxs[0][i]) || std::isnan(min_eigs_ref[i]) || std::isinf(min_eigs_ref[i]) || std::isnan(max_eigs_ref[i]) || std::isinf(max_eigs_ref[i])) {
+            nan_or_inf.push_back(i);
+            continue;
+        }
+        device_real_t epsilon = numeric_limits<device_real_t>::epsilon()*1e1;
+        rel_err_min[i] = fabs(lambda_mins[0][i] - min_eigs_ref[i] + epsilon)/fabs(min_eigs_ref[i] + epsilon);
+        abs_err_min[i] = fabs(lambda_mins[0][i] - min_eigs_ref[i] + epsilon);
+        rel_err_max[i] = fabs(lambda_maxs[0][i] - max_eigs_ref[i] + epsilon)/fabs(max_eigs_ref[i] + epsilon);
+        abs_err_max[i] = fabs(lambda_maxs[0][i] - max_eigs_ref[i] + epsilon);
+        rel_err_width[i] = fabs( (lambda_maxs[0][i] - lambda_mins[0][i]) - (max_eigs_ref[i] - min_eigs_ref[i]) + epsilon)/fabs(max_eigs_ref[i] - min_eigs_ref[i] + epsilon);
+        abs_err_width[i] = fabs( (lambda_maxs[0][i] - lambda_mins[0][i]) - (max_eigs_ref[i] - min_eigs_ref[i]) + epsilon);
+    }
+
+    ofstream file("MinLambdaError_Relative.float32", ios::out | ios::binary);
+    file.write((char*)rel_err_min.data(), batch_size*sizeof(device_real_t));
+    file.close();
+    ofstream file2("MinLambdaError_Absolute.float32", ios::out | ios::binary);
+    file2.write((char*)abs_err_min.data(), batch_size*sizeof(device_real_t));
+    file2.close();
+    ofstream file3("MaxLambdaError_Relative.float32", ios::out | ios::binary);
+    file3.write((char*)rel_err_max.data(), batch_size*sizeof(device_real_t));
+    file3.close();
+    ofstream file4("MaxLambdaError_Absolute.float32", ios::out | ios::binary);
+    file4.write((char*)abs_err_max.data(), batch_size*sizeof(device_real_t));
+    file4.close();
+    ofstream file5("WidthError_Relative.float32", ios::out | ios::binary);
+    file5.write((char*)rel_err_width.data(), batch_size*sizeof(device_real_t));
+    file5.close();
+    ofstream file6("WidthError_Absolute.float32", ios::out | ios::binary);
+    file6.write((char*)abs_err_width.data(), batch_size*sizeof(device_real_t));
+    file6.close();
+
+
+    //std::cout << "Reference min eigenvalues: " << min_eigs_ref << std::endl;
     //std::cout << lambda_maxs << std::endl;
     
         //eigensolve(Bdev, Q, hessians, cols, eigenvalues);
@@ -108,7 +163,7 @@ int main(int argc, char** argv){
         std::cout << "Custom Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
 
         // Find the 20 smallest elements in lambda_maxs
-        std::vector<device_real_t> lambda_maxs_vec(lambda_maxs.data, lambda_maxs.data + batch_size);
+        /* std::vector<device_real_t> lambda_maxs_vec(lambda_maxs[0].data, lambda_maxs[0].data + batch_size);
         std::vector<device_real_t> smallest_40(40);
         std::vector<size_t> smallest_40_indices(40);
         std::vector<size_t> indices(lambda_maxs_vec.size());
@@ -120,11 +175,19 @@ int main(int argc, char** argv){
         }
         std::cout << "40 smallest lambda_maxs: " << smallest_40 << std::endl;
         std::cout << "40 smallest indices: " << smallest_40_indices << std::endl;
-
+        std::sort(indices.begin(), indices.end(), [&lambda_maxs_vec](size_t i1, size_t i2) {return lambda_maxs_vec[i1] > lambda_maxs_vec[i2];});
+        std::vector<device_real_t> largest_40(40);
+        std::vector<size_t> largest_40_indices(40);
+        for (int i = 0; i < 40; i++) {
+            largest_40[i] = lambda_maxs_vec[indices[i]];
+            largest_40_indices[i] = indices[i];
+        }
+        std::cout << "40 largest lambda_maxs: " << largest_40 << std::endl;
+        std::cout << "40 largest indices: " << largest_40_indices << std::endl;
         std::ofstream output_tridiags("tridiags.bin", std::ios::binary);
-        std::ofstream output_Q("Q.bin", std::ios::binary);
+        std::ofstream output_Q("Q.bin", std::ios::binary); */
         //output_tridiags.write((char*)eigenvalues.data, N*3*2* batch_size*sizeof(device_real_t));
-        output_Q.write((char*)Q.data, N*3*N*3* batch_size*sizeof(device_real_t));
+        //output_Q.write((char*)Q.data, N*3*N*3* batch_size*sizeof(device_real_t));
 
         for(int i = N*2; i < N*3; i++) {
             //std::cout << "Q[" << i  << "] : " << std::vector<device_real_t>(Q.data + i*N*3, Q.data + (i+1)*N*3) << std::endl;
