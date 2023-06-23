@@ -131,8 +131,10 @@ namespace gpu_kernels{
         //Computes the surface area of each molecule in the batch. See sequential code in polyhedron.cc
         cudaError_t surface_areas(const IsomerBatch& B, CuArray<device_real_t>& surface_areas, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
-        //Computes the best elipsoid fit for each molecule in the batch and returns the eccentricities of the ellipsoids.
-        cudaError_t eccentricities(const IsomerBatch& B, CuArray<device_real_t>& eccentricities, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+      //Computes the moments of inertia (eigenvalues to the moment of inertia matrix)
+      cudaError_t moments_of_inertia(const IsomerBatch& B, CuArray<device_real_t>& lambdas, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);      
+      //Computes the best elipsoid fit for each molecule in the batch and returns the eccentricities of the ellipsoids.
+      cudaError_t eccentricities(const IsomerBatch& B, CuArray<device_real_t>& eccentricities, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
         //Moves coordinates to the centre of mass of the molecule and aligns the molecule to the principal axes of inertia. See sequential code in polyhedron.cc
         cudaError_t transform_coordinates(IsomerBatch& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);

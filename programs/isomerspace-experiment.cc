@@ -114,7 +114,7 @@ int main(int ac, char **argv)
   // Final IsomerBatch on host
   IsomerBatch HBs[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
   
-  vector<CuArray<device_real_t>> hessian_results(Nd), volume_results(Nd), eccentricity_results(Nd), lambda_max_results(Nd);
+  vector<CuArray<device_real_t>> hessian_results(Nd), volume_results(Nd), eccentricity_results(Nd), lambda_max_results(Nd), inertia_results(Nd);  
   vector<CuArray<device_node_t>> hessian_col_results(Nd);
 
   for(int d=0;d<Nd;d++){
@@ -123,6 +123,7 @@ int main(int ac, char **argv)
     lambda_max_results[d]   = CuArray<device_real_t>(batch_size,0);
     volume_results[d]       = CuArray<device_real_t>(batch_size,0);
     eccentricity_results[d] = CuArray<device_real_t>(batch_size,0);
+    inertia_results[d]      = CuArray<device_real_t>(3*batch_size,0);    
   }
   
   IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
@@ -150,6 +151,11 @@ int main(int ac, char **argv)
   G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
   G.N = Nf;
 
+  constexpr device_real_t carbon_mass = 1.9944733e-26/*kg*/, aangstrom_length = 1e-10/*m*/;
+  
+  constexpr size_t num_bins = 10000;
+  vector<size_t> vol_hist(num_bins), ecc_hist(num_bins), lam_hist(num_bins);
+  
   // Hack using knowledge about range for easy binning (for now)
   auto T0 = steady_clock::now();
   auto
@@ -236,9 +242,11 @@ int main(int ac, char **argv)
       
       Q2s[d].refill_batch(B, ctx, policy);
       isomerspace_properties::transform_coordinates(B, ctx, policy);
+      // Hessian units: kg/s^2, divide eigenvalues by carbon_mass to get 1/s^2, frequency = sqrt(lambda/m)
       isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessian_results[d], hessian_col_results[d],    ctx, policy);
-      //@jonas: fjern '//' nedenfor for at fremprovokere crash
       isomerspace_eigen     ::lambda_max(B, hessian_results[d], hessian_col_results[d], lambda_max_results[d], 40, ctx, policy);
+      // Inertia is in Ångstrøm^2, multiply by carbon_mass and aangstrom_length*aangstrom_length to get SI units kg*m^2
+      isomerspace_properties::moments_of_inertia   (B, inertia_results[d], ctx, policy);      
       isomerspace_properties::eccentricities       (B, eccentricity_results[d], ctx, policy);
       isomerspace_properties::volume_divergences   (B, volume_results[d],       ctx, policy);
       cuda_io::copy(HBs[d],B,ctx,policy);      
