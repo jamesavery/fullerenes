@@ -124,6 +124,28 @@ __device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t
         return result;
 }
 
+__device__ device_real_t reduction_min(device_real_t* sdata, const device_real_t data){
+     auto num_warps = (blockDim.x >> 5) + 1;
+        cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+        auto warpid = threadIdx.x >> 5;
+        auto laneid = threadIdx.x & 31;
+        device_real_t temp = cg::reduce(tile32, data, cg::less<device_real_t>());
+        if (num_warps > 1){
+        //sdata[warpid + blockDim.x] = temp;
+        BLOCK_SYNC
+        if (laneid == 0) sdata[warpid] = temp;
+        BLOCK_SYNC
+        if (warpid == 0) {
+            temp = cg::reduce(tile32, sdata[laneid], cg::less<device_real_t>());
+        }
+        }
+        if (threadIdx.x == 0) sdata[0] = temp;
+        BLOCK_SYNC
+        auto result = sdata[0];
+        BLOCK_SYNC
+        return result;
+}
+
 __device__ device_node_t reduction_max(device_node_t* sdata, const device_node_t data){
     sdata[threadIdx.x] = data;
     cg::thread_block block = cg::this_thread_block();
