@@ -26,7 +26,7 @@ using namespace cuda_io;
 
 using namespace gpu_kernels;
 
-typedef device_real_t real_t;
+typedef device_real_t real_t;	// We'll use the device real type everywhere in this program
 
 
 void signal_callback_handler(int signum)
@@ -38,13 +38,18 @@ void signal_callback_handler(int signum)
 struct isomer_candidate {
   double value;
   int id;
-  vector<node_t> cubic_neighbours;
+  vector<device_node_t> cubic_neighbours, Hcol;
   vector<real_t> X;
+  vector<real_t> H;
+  
 
-  isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B):
-    value(value), id(id), cubic_neighbours(3*N), X(3*N) {
+  isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B,
+		   const CuArray<real_t> &Hs, const CuArray<device_node_t> &Hcols):
+    value(value), id(id), cubic_neighbours(3*N), X(3*N), H(90*N), Hcol(90*N) {
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
-    memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));    
+    memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
+    memcpy(&H[0],               Hs.data + 90*N*ix,        90*N*sizeof(real_t));
+    memcpy(&Hcol[0],            Hcols.data + 90*N*ix,     90*N*sizeof(device_node_t));
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
@@ -101,16 +106,17 @@ int main(int ac, char **argv)
 
   // Organize all of our of computation pipeline stages and our scoresl of different results
   typedef enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage_t;
-  typedef enum {VOLUME,ECCENTRICITY,FREQ_MIN,FREQ_MAX, INERTIA, NUM_RESULTS} results_t; // Results on which to do statistics
-  string result_names[NUM_RESULTS] = {"volume","eccentricity","minfreq","maxfreq","inertia"};
+  typedef enum {VOLUME,ECCENTRICITY,MIN_FREQ,MAX_FREQ, FREQ_WIDTH, INERTIA, NUM_RESULTS} results_t; // Results on which to do statistics
+  string result_names[NUM_RESULTS] = {"volume","eccentricity","minfreq","maxfreq","freqwidth","inertia"};
   string stage_names [NUM_STAGES]  = {"generate","start_geometry","optimized_geometry","properties","statistics"};
-  constexpr int result_sizes[NUM_RESULTS] = {1,1,1,1,3}; // How many scalars per result?
+  constexpr int result_sizes[NUM_RESULTS] = {1,1,1,1,1,3}; // How many scalars per result?
 
   array<array<double,2>,NUM_RESULTS> result_bounds = {{
     {0.24*pow(N,3/2.)-50,0.4*pow(N,3/2.)+50}, // Volume bounds
     {1,N/20.},                                // Eccentricity bounds
-    {0,20*33.356},                                   // Smallest frequency bounds (in cm^{-1} = teraherz*33.356)
-    {30*33.356,60*33.356},                                  // Largest frequency bounds (in cm^{-1})
+    {0,20*33.356},                            // Smallest frequency bounds (in cm^{-1} = teraherz*33.356)
+    {30*33.356,60*33.356},                    // Largest frequency bounds (in cm^{-1})
+    {30*33.356,60*33.356},                    // Bandwidth bounds (in cm^{-1})
     {0,0} // What are the inertia bounds?
     }};
   
@@ -156,6 +162,8 @@ int main(int ac, char **argv)
   IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
   IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
 
+  
+  
   for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
 
   // TODO: Should we really have two different streams, or is one enough?
@@ -273,8 +281,8 @@ int main(int ac, char **argv)
       isomerspace_properties::transform_coordinates(B, ctx, policy);
       // Hessian units: kg/s^2, divide eigenvalues by carbon_mass to get 1/s^2, frequency = sqrt(lambda/carbon_mass)
       isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d],    ctx, policy);
-      isomerspace_eigen     ::spectrum_ends(B, hessians[d], hessian_cols[d], results[FREQ_MIN][d], results[FREQ_MAX][d], 40, ctx, policy);
-      //      isomerspace_eigen     ::lambda_max(B, hessians[d], hessian_cols[d], results[FREQ_MAX][d], 40, ctx, policy);
+      isomerspace_eigen     ::spectrum_ends(B, hessians[d], hessian_cols[d], results[MIN_FREQ][d], results[MAX_FREQ][d], 40, ctx, policy);
+      //      isomerspace_eigen     ::lambda_max(B, hessians[d], hessian_cols[d], results[MAX_FREQ][d], 40, ctx, policy);
       // Inertia is in Ångstrøm^2, multiply by carbon_mass and aangstrom_length*aangstrom_length to get SI units kg*m^2
       isomerspace_properties::moments_of_inertia   (B, results[INERTIA][d],      ctx, policy);      
       isomerspace_properties::eccentricities       (B, results[ECCENTRICITY][d], ctx, policy);
@@ -341,19 +349,20 @@ int main(int ac, char **argv)
 	}
 	  
 	if(status == IsomerStatus::CONVERGED){
-	  isomer_candidate C(0, id, N, di, host_batch[d]);
+	  isomer_candidate C(0, id, N, di, host_batch[d],hessians[d],hessian_cols[d]);
 	
 	  // Convert from Hessian eigenvalues to normal mode frequencies in teraherz	    
-	  real_t min_freq = sqrt(results[FREQ_MIN][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
-	         max_freq = sqrt(results[FREQ_MAX][d][di]/carbon_mass)/(2*M_PI)*1e-12;
+	  real_t min_freq = sqrt(results[MIN_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
+	         max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
 	  
 	  // Convert frequencies from teraherz to cm^{-1} to compare with experiment
 	  min_freq *= 33.356;
 	  max_freq *= 33.356;
 		 
-	  results[FREQ_MIN][d][di] = min_freq;
-	  results[FREQ_MAX][d][di] = max_freq;
-    
+	  results[MIN_FREQ][d][di]   = min_freq;
+	  results[MAX_FREQ][d][di]   = max_freq;
+	  results[FREQ_WIDTH][d][di] = max_freq-min_freq;
+	  
 	  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
 	      auto v = results[r][d][di];
 	      if(terrible_outlier(v,r)){ v = results[r][d][di] = nan(""); terrible_outliers[r].push_back(id); } 
@@ -366,14 +375,7 @@ int main(int ac, char **argv)
 	
 	  //		result_reference[r].insert({v,id+1}); // To check that result_min and result_max actually gets k smallest & largest.
 	  
-	  real_t bandwidth = max_freq-min_freq;
-	  if(isfinite(bandwidth) && !terrible_outlier(max_freq,FREQ_MAX)){
-	    C.value =  bandwidth; bandwidth_min.insert(C);
-	    C.value = -bandwidth; bandwidth_max.insert(C);
-	  } else {
-	    if(status == IsomerStatus::NOT_CONVERGED) opt_not_converged.push_back(id);
-	    if(status == IsomerStatus::FAILED) opt_failed.push_back(id);
-	  }
+
 	}
       }
     }
@@ -459,15 +461,61 @@ int main(int ac, char **argv)
          << "   (removed " << terrible_outliers[r].size() << " outliers, please inspect and fix)\n"
 	 << result_names[r] << "_max = " << biggest << "\n\n";
   }
-  cout << "bw_min      = " << bandwidth_min.as_vector() << "\n";
-  cout << "bw_max      = " << bandwidth_max.as_vector() << "\n\n";  
 
-  
   // cout << "all_volumes = " << result_reference[VOLUME] << "\n";
   // cout << "all_eccentricity = " << result_reference[ECCENTRICITY] << "\n";  
-  //  cout << "all_maxfreq = " << result_reference[FREQ_MAX] << "\n";
-  //  cout << "all_minfreq = " << result_reference[FREQ_MIN] << "\n";
+  //  cout << "all_maxfreq = " << result_reference[MAX_FREQ] << "\n";
+  //  cout << "all_minfreq = " << result_reference[MIN_FREQ] << "\n";
 
+
+  // GATHER SELECTED CANDIDATES TO RECOMPUTE AND OUTPUT
+  auto host_graph = [](const vector<device_node_t>& device_graph){
+    const size_t N = device_graph.size()/3;
+    Graph G(N,true);
+    for(node_t u=0;u<N;u++) G.neighbours[u] = {device_graph[3*u],device_graph[3*u+1],device_graph[3*u+2]};
+    return G;
+  };
+
+  auto host_points = [](const vector<real_t> &X){
+    const size_t N = X.size()/3;
+    vector<coord3d> points(N);
+    for(node_t u=0;u<N;u++) points[u] = {X[3*u],X[3*u+1],X[3*u+2]};
+    return points;
+  };
+
+
+  mkdir(string(output_dir+"/C"+to_string(N)).c_str(), 0777);
+  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1) {
+    string result_dir = output_dir+"/C"+to_string(N)+"/"+result_names[r];
+    string min_dir    = result_dir + "/min", max_dir = result_dir+"/max", outlier_dir = result_dir + "/terrible_outliers";
+    
+    auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
+
+    mkdir(result_dir.c_str(), 0777);
+    mkdir(min_dir.c_str(), 0777);
+    mkdir(max_dir.c_str(), 0777);
+    mkdir(outlier_dir.c_str(), 0777);    
+    
+    for(size_t i=0;i<n_best_candidates;i++){
+      isomer_candidate Cmin = smallest[i], Cmax = biggest[i];
+      Polyhedron
+	Pmin(host_graph(Cmin.cubic_neighbours), host_points(Cmin.X)),
+	Pmax(host_graph(Cmax.cubic_neighbours), host_points(Cmax.X));
+
+      Polyhedron::to_file(Pmin,min_dir+"/Pmin-"+to_string(i)+".mol2");
+      Polyhedron::to_file(Pmin,min_dir+"/Pmin-"+to_string(i)+".spiral");      
+      Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".mol2");
+      Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".spiral");
+
+      
+    }
+  }
+ 
+
+
+  
+
+  // REPORTING TIMINGS
   auto Ttot = steady_clock::now() - T0;
 
   
