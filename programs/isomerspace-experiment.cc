@@ -107,7 +107,7 @@ int main(int ac, char **argv)
   constexpr int result_sizes[NUM_RESULTS] = {1,1,1,1,3}; // How many scalars per result?
 
   array<array<double,2>,NUM_RESULTS> result_bounds = {{
-    {0.24*pow(N,3/2.)-30,0.4*pow(N,3/2.)+30}, // Volume bounds
+    {0.24*pow(N,3/2.)-50,0.4*pow(N,3/2.)+50}, // Volume bounds
     {1,N/20.},                                // Eccentricity bounds
     {0,20*33.356},                                   // Smallest frequency bounds (in cm^{-1} = teraherz*33.356)
     {30*33.356,60*33.356},                                  // Largest frequency bounds (in cm^{-1})
@@ -179,8 +179,8 @@ int main(int ac, char **argv)
 
   constexpr real_t carbon_mass = 1.9944733e-26/*kg*/, aangstrom_length = 1e-10/*m*/;
   
-  constexpr size_t num_bins = 10000;
-  vector<size_t> vol_hist(num_bins), ecc_hist(num_bins), lam_hist(num_bins);
+  constexpr size_t num_bins = 1000;
+  array<array<size_t,num_bins>,NUM_RESULTS> result_histograms;
 
   // Hack using knowledge about range for easy binning (for now)
   //... histograms
@@ -452,17 +452,15 @@ int main(int ac, char **argv)
     means[r] /= num_finished[PROP];
   }
   cout << "COMPLETED IN " << loop_iters << " rounds.\n";
-  cout << "num_finished            = " << num_finished  << "\n";      
-  cout << "vol_min = " << result_min[VOLUME].as_vector() << "\n   (removed " << terrible_outliers[VOLUME].size() << " outliers)\n";
-  cout << "vol_max = " << result_max[VOLUME].as_vector() << "\n";      
-  cout << "ecc_min = " << result_min[ECCENTRICITY].as_vector() << "\n   (removed " << terrible_outliers[ECCENTRICITY].size() << " outliers)\n";
-  cout << "ecc_max = " << result_max[ECCENTRICITY].as_vector() << "\n";      
-  cout << "maxfreq_min = " << result_min[FREQ_MAX].as_vector() << "\n   (removed " << terrible_outliers[FREQ_MAX].size() << " outliers)\n";
-  cout << "maxfreq_max = " << result_max[FREQ_MAX].as_vector() << "\n";            
-  cout << "minfreq_min = " << result_min[FREQ_MIN].as_vector() << "\n   (removed " << terrible_outliers[FREQ_MIN].size() << " outliers)\n";
-  cout << "minfreq_max = " << result_max[FREQ_MIN].as_vector() << "\n";
+  cout << "num_finished            = " << num_finished  << "\n";
+  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
+    auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
+    cout << result_names[r] << "_min = " << smallest << "\n"
+         << "   (removed " << terrible_outliers[r].size() << " outliers, please inspect and fix)\n"
+	 << result_names[r] << "_max = " << biggest << "\n\n";
+  }
   cout << "bw_min      = " << bandwidth_min.as_vector() << "\n";
-  cout << "bw_max      = " << bandwidth_max.as_vector() << "\n";  
+  cout << "bw_max      = " << bandwidth_max.as_vector() << "\n\n";  
 
   
   // cout << "all_volumes = " << result_reference[VOLUME] << "\n";
