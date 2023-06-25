@@ -26,6 +26,9 @@ using namespace cuda_io;
 
 using namespace gpu_kernels;
 
+typedef device_real_t real_t;
+
+
 void signal_callback_handler(int signum)
 {
   exit(signum);
@@ -35,13 +38,13 @@ void signal_callback_handler(int signum)
 struct isomer_candidate {
   double value;
   int id;
-  vector<device_node_t> cubic_neighbours;
-  vector<device_real_t> X;
+  vector<node_t> cubic_neighbours;
+  vector<real_t> X;
 
   isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B):
     value(value), id(id), cubic_neighbours(3*N), X(3*N) {
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
-    memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(device_real_t));    
+    memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));    
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
@@ -89,35 +92,52 @@ int main(int ac, char **argv)
 
   // Make sure output directory exists
   mkdir(output_dir.c_str(),0777);
-  int n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
+  size_t n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
 
   int    Nd = LaunchCtx::get_device_count();
-  size_t batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
+  size_t batch_size = min((size_t)isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
   cout << "Analysing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
 
   // Organize all of our of computation pipeline stages and our scoresl of different results
   typedef enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage_t;
   typedef enum {VOLUME,ECCENTRICITY,FREQ_MIN,FREQ_MAX, INERTIA, NUM_RESULTS} results_t; // Results on which to do statistics
+  string result_names[NUM_RESULTS] = {"volume","eccentricity","minfreq","maxfreq","inertia"};
+  string stage_names [NUM_STAGES]  = {"generate","start_geometry","optimized_geometry","properties","statistics"};
   constexpr int result_sizes[NUM_RESULTS] = {1,1,1,1,3}; // How many scalars per result?
 
-  array<array<CuArray<device_real_t>,2>,NUM_RESULTS> results; // TODO: vector<Cuarray> gives linkin error -- needs fixing to allow general Nd.
-  vector<CuArray<device_real_t>> hessians(Nd);
+  array<array<double,2>,NUM_RESULTS> result_bounds = {{
+    {0.24*pow(N,3/2.)-30,0.4*pow(N,3/2.)+30}, // Volume bounds
+    {1,N/20.},                                // Eccentricity bounds
+    {0,20*33.356},                                   // Smallest frequency bounds (in cm^{-1} = teraherz*33.356)
+    {30*33.356,60*33.356},                                  // Largest frequency bounds (in cm^{-1})
+    {0,0} // What are the inertia bounds?
+    }};
+  
+  array<array<CuArray<real_t>,2>,NUM_RESULTS> results; // TODO: vector<Cuarray> gives linkin error -- needs fixing to allow general Nd.
+  array<long double,NUM_RESULTS> means, stdevs;
+  array<vector<size_t>,NUM_RESULTS> terrible_outliers;
+  vector<CuArray<real_t>> hessians(Nd);
   vector<CuArray<device_node_t>> hessian_cols(Nd);
-
+  array<long double,NUM_RESULTS> Ev, Ev2, K, current_mean, current_stddev;
+  size_t n_converged=0;
+  
   // Initialize unified memory result CuArray's
   for(int d=0;d<Nd;d++){
-    hessians[d]      = CuArray<device_real_t>(N*3* 10*3*batch_size,0);
+    hessians[d]      = CuArray<real_t>(N*3* 10*3*batch_size,0);
     hessian_cols[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);
 
-    for(int r=0; r< NUM_RESULTS; r++) results[r][d] = CuArray<device_real_t>(result_sizes[r]*batch_size,0);
+    for(int r=0; r< NUM_RESULTS; r++) results[r][d] = CuArray<real_t>(result_sizes[r]*batch_size,0);
   }
 
   // We keep track of the n_best_candidates isomers with smallest resp. largest values for each result
   vector<k_smallest<isomer_candidate>>
     result_min(NUM_RESULTS, k_smallest<isomer_candidate>(n_best_candidates)),
-    result_max(NUM_RESULTS, k_smallest<isomer_candidate>(n_best_candidates));
+    result_max(NUM_RESULTS, k_smallest<isomer_candidate>(n_best_candidates))
+    ;
+  k_smallest<isomer_candidate> bandwidth_min(n_best_candidates), bandwidth_max(n_best_candidates);
 
+  array<set<pair<real_t,int>>,NUM_RESULTS> result_reference;
   
   // Each stage has one on-device batch per device. TODO: NUM_STAGES vector<vector<IsomerBatch>>, Nd. Dynamic number of devices != 2.
   IsomerBatch Bs[4][2] = {	
@@ -157,11 +177,11 @@ int main(int ac, char **argv)
   G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
   G.N = Nf;
 
-  constexpr device_real_t carbon_mass = 1.9944733e-26/*kg*/, aangstrom_length = 1e-10/*m*/;
+  constexpr real_t carbon_mass = 1.9944733e-26/*kg*/, aangstrom_length = 1e-10/*m*/;
   
   constexpr size_t num_bins = 10000;
   vector<size_t> vol_hist(num_bins), ecc_hist(num_bins), lam_hist(num_bins);
-  
+
   // Hack using knowledge about range for easy binning (for now)
   //... histograms
   
@@ -251,9 +271,10 @@ int main(int ac, char **argv)
       
       Q2s[d].refill_batch(B, ctx, policy);
       isomerspace_properties::transform_coordinates(B, ctx, policy);
-      // Hessian units: kg/s^2, divide eigenvalues by carbon_mass to get 1/s^2, frequency = sqrt(lambda/m)
+      // Hessian units: kg/s^2, divide eigenvalues by carbon_mass to get 1/s^2, frequency = sqrt(lambda/carbon_mass)
       isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d],    ctx, policy);
-      //isomerspace_eigen     ::lambda_max(B, hessians[d], hessian_cols[d], results[FREQ_MAX][d], 40, ctx, policy);
+      isomerspace_eigen     ::spectrum_ends(B, hessians[d], hessian_cols[d], results[FREQ_MIN][d], results[FREQ_MAX][d], 40, ctx, policy);
+      //      isomerspace_eigen     ::lambda_max(B, hessians[d], hessian_cols[d], results[FREQ_MAX][d], 40, ctx, policy);
       // Inertia is in Ångstrøm^2, multiply by carbon_mass and aangstrom_length*aangstrom_length to get SI units kg*m^2
       isomerspace_properties::moments_of_inertia   (B, results[INERTIA][d],      ctx, policy);      
       isomerspace_properties::eccentricities       (B, results[ECCENTRICITY][d], ctx, policy);
@@ -269,44 +290,102 @@ int main(int ac, char **argv)
     stage_finished[PROP] = num_finished[PROP] == n_fullerenes;
   };
 
+  
+  auto update_mean_var = [&](real_t v, long double &Ev, long double &Ev2,  double K){
+    Ev += v - K;  Ev2 += (v - K)*(v-K);
+  };
+
+  auto terrible_outlier = [&](real_t v, int r){
+    return v<result_bounds[r][0] || v>result_bounds[r][1];
+  };
+
   auto stat_routine = [&](){
     
-    //      vector<device_real_t> volumes_merged(sum(num_finished_this_round[PROP]));
-    //      vector<device_real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
-      vector<int> opt_failed, opt_not_converged;
-    
-      int i=0;
-      for(int d=0;d<Nd;d++)
-	for(int di=0;di<num_finished_this_round[PROP][d];di++,i++){
-	  int id = host_batch[d].IDs[di];
-	  IsomerStatus &status = host_batch[d].statuses[di];
+    //      vector<real_t> volumes_merged(sum(num_finished_this_round[PROP]));
+    //      vector<real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
+    vector<int> opt_failed, opt_not_converged;
 
-	  if(status != IsomerStatus::EMPTY){
-	    num_finished_this_round[STAT][d]++;
-	    num_finished[STAT]++;
-	  }
+    int i=0;
+    for(int d=0;d<Nd;d++){
+      size_t n = num_finished_this_round[PROP][d];
+
+      // First pass of batch: Update mean and variance for all results.
+      for(int di=0;di<n;di++){
+	IsomerStatus &status = host_batch[d].statuses[di];	
+	if(status == IsomerStatus::CONVERGED){
+	  n_converged++;
+		  
+	  for(int r=0;r<NUM_RESULTS;r++){
+	    auto v = results[r][d][di];
+	    if(isfinite(v)){
+	      if(n_converged==1) K[r] = v;
+	      
+	      update_mean_var(v,Ev[r],Ev2[r],K[r]);
+	    }
+	  }	
+	}
+      }
+      for(int r=0;r<NUM_RESULTS;r++){
+	current_mean[r]   = K[r] + Ev[r]/n_converged;
+	current_stddev[r] = sqrt((Ev2[r] - Ev[r]*Ev[r] / n_converged) / (n_converged - 1.0L));	
+      }
+
+      // Now process the results 
+      for(int di=0;di<num_finished_this_round[PROP][d];di++,i++){
+	int id = host_batch[d].IDs[di];
+	IsomerStatus &status = host_batch[d].statuses[di];
+	
+	if(status != IsomerStatus::EMPTY){
+	  num_finished_this_round[STAT][d]++;
+	  num_finished[STAT]++;
+	}
 	  
-	  if(status == IsomerStatus::CONVERGED){
-	    isomer_candidate C(0, id, N, di, host_batch[d]);
-	    
-	    for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
-		auto v = results[r][d][di];
+	if(status == IsomerStatus::CONVERGED){
+	  isomer_candidate C(0, id, N, di, host_batch[d]);
+	
+	  // Convert from Hessian eigenvalues to normal mode frequencies in teraherz	    
+	  real_t min_freq = sqrt(results[FREQ_MIN][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
+	         max_freq = sqrt(results[FREQ_MAX][d][di]/carbon_mass)/(2*M_PI)*1e-12;
+	  
+	  // Convert frequencies from teraherz to cm^{-1} to compare with experiment
+	  min_freq *= 33.356;
+	  max_freq *= 33.356;
+		 
+	  results[FREQ_MIN][d][di] = min_freq;
+	  results[FREQ_MAX][d][di] = max_freq;
+    
+	  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
+	      auto v = results[r][d][di];
+	      if(terrible_outlier(v,r)){ v = results[r][d][di] = nan(""); terrible_outliers[r].push_back(id); } 
+	      if(isfinite(v)){
 		C.value =  v; result_min[r].insert(C);
 		C.value = -v; result_max[r].insert(C);
+		means[r] += v;       
+	      }
 	    }
+	
+	  //		result_reference[r].insert({v,id+1}); // To check that result_min and result_max actually gets k smallest & largest.
+	  
+	  real_t bandwidth = max_freq-min_freq;
+	  if(isfinite(bandwidth) && !terrible_outlier(max_freq,FREQ_MAX)){
+	    C.value =  bandwidth; bandwidth_min.insert(C);
+	    C.value = -bandwidth; bandwidth_max.insert(C);
 	  } else {
 	    if(status == IsomerStatus::NOT_CONVERGED) opt_not_converged.push_back(id);
 	    if(status == IsomerStatus::FAILED) opt_failed.push_back(id);
 	  }
-	
 	}
-
-      cout << "num_finished_this_round = " << num_finished_this_round  << "\n";
-      cout << "num_finished            = " << num_finished  << "\n";      
-      cout << "opt_failed        = " << opt_failed << "\n"
-	   << "opt_not_converged = " << opt_not_converged << "\n";
-
-      if(num_finished[STAT] == n_fullerenes) stage_finished[STAT] = true;
+      }
+    }
+  
+    cout << "num_finished_this_round = " << num_finished_this_round  << "\n";
+    cout << "num_finished            = " << num_finished  << "\n";      
+    cout << "opt_failed        = " << opt_failed << "\n"
+	 << "opt_not_converged = " << opt_not_converged << "\n";
+    
+    
+    
+    if(num_finished[STAT] == n_fullerenes) stage_finished[STAT] = true;
   };
 
   auto final_round = [&](int s){
@@ -369,15 +448,28 @@ int main(int ac, char **argv)
   cout << "Exited loop, waiting on op_ctxs.\n";
   for(int d=0;d<Nd;d++) opt_ctxs[d].wait();
 
+  for(int r=0;r<NUM_RESULTS;r++){
+    means[r] /= num_finished[PROP];
+  }
   cout << "COMPLETED IN " << loop_iters << " rounds.\n";
   cout << "num_finished            = " << num_finished  << "\n";      
-  cout << "vol_min = " << result_min[VOLUME].as_vector() << "\n";
+  cout << "vol_min = " << result_min[VOLUME].as_vector() << "\n   (removed " << terrible_outliers[VOLUME].size() << " outliers)\n";
   cout << "vol_max = " << result_max[VOLUME].as_vector() << "\n";      
-  cout << "ecc_min = " << result_min[ECCENTRICITY].as_vector() << "\n";
+  cout << "ecc_min = " << result_min[ECCENTRICITY].as_vector() << "\n   (removed " << terrible_outliers[ECCENTRICITY].size() << " outliers)\n";
   cout << "ecc_max = " << result_max[ECCENTRICITY].as_vector() << "\n";      
-  cout << "lam_min = " << result_min[FREQ_MAX].as_vector() << "\n";
-  cout << "lam_max = " << result_max[FREQ_MAX].as_vector() << "\n";            
+  cout << "maxfreq_min = " << result_min[FREQ_MAX].as_vector() << "\n   (removed " << terrible_outliers[FREQ_MAX].size() << " outliers)\n";
+  cout << "maxfreq_max = " << result_max[FREQ_MAX].as_vector() << "\n";            
+  cout << "minfreq_min = " << result_min[FREQ_MIN].as_vector() << "\n   (removed " << terrible_outliers[FREQ_MIN].size() << " outliers)\n";
+  cout << "minfreq_max = " << result_max[FREQ_MIN].as_vector() << "\n";
+  cout << "bw_min      = " << bandwidth_min.as_vector() << "\n";
+  cout << "bw_max      = " << bandwidth_max.as_vector() << "\n";  
+
   
+  // cout << "all_volumes = " << result_reference[VOLUME] << "\n";
+  // cout << "all_eccentricity = " << result_reference[ECCENTRICITY] << "\n";  
+  //  cout << "all_maxfreq = " << result_reference[FREQ_MAX] << "\n";
+  //  cout << "all_minfreq = " << result_reference[FREQ_MIN] << "\n";
+
   auto Ttot = steady_clock::now() - T0;
 
   
