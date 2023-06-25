@@ -227,7 +227,7 @@ std::pair<device_real_t,size_t> eigensystem_hermitian(const int n, const
 namespace gpu_kernels{
     namespace isomerspace_eigen{
         #include "device_includes.cu"
-
+        enum class EigensolveMode {NO_VECTORS, VECTORS};
 #if(CUSOLVER)      
         void eigensolve_cusolver(const IsomerBatch& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             static std::vector<cusolverDnHandle_t> cusolverHs(N_STREAMS, NULL);
@@ -545,8 +545,9 @@ namespace gpu_kernels{
                 D_.data[n*I + i] = D[i];}
         }
         }
-
-        void __global__ eigensolve_min_max_(const IsomerBatch B, CuArray<device_real_t> D_, CuArray<device_real_t> L_, CuArray<device_real_t> U_, CuArray<device_real_t> Q_, CuArray<device_real_t> EigMin_, CuArray<device_real_t> EigMax_, int n){
+        
+        template<EigensolveMode mode>
+        void __global__ eigensolve_min_max_(const IsomerBatch B, CuArray<device_real_t> D_, CuArray<device_real_t> L_, CuArray<device_real_t> U_, CuArray<device_real_t> Q_, CuArray<device_real_t> EigMin_, CuArray<device_real_t> EigMax_, CuArray<int> MinIdx_, CuArray<int> MaxIdx_, int n){
             DEVICE_TYPEDEFS;
             extern __shared__ device_real_t smem[];
             device_real_t *D = smem + blockDim.x*2, *L = D + (n+1), *U = L + (n+1), *V = U + (n+1)*2;
@@ -557,9 +558,10 @@ namespace gpu_kernels{
                     L[i] = L_.data[n*I + i];
                     U[i] = L_.data[n*I + i];
                 }
-                for (int i =  threadIdx.x; i < n; i += blockDim.x){
-                    Q_.data[n*n*I + i*(n+1)] = real_t(1.); //Set Q to the identity matrix
-                }
+                if (mode == EigensolveMode::VECTORS)
+                    for (int i =  threadIdx.x; i < n; i += blockDim.x){
+                        Q_.data[n*n*I + i*(n+1)] = real_t(1.); //Set Q to the identity matrix
+                    }
             
             BLOCK_SYNC
                 
@@ -584,7 +586,7 @@ namespace gpu_kernels{
                 while(not_done > 0){	// GPU NB: Kan erstattes med fornuftig konstant antal iterationer, f.eks. 4-5 stykker.
                 i++;   
                 T_QTQ(k+1, D,L, U, V, shift);  // 
-                //apply_all_reflections(V,k,n,Q_.data + n*n*I);
+                if(mode == EigensolveMode::VECTORS) apply_all_reflections(V,k,n,Q_.data + n*n*I);
                 
                 GR = (k>0?ABS(L[k-1]):0)+(k+1<n?ABS(L[k]):0);      
 
@@ -615,9 +617,13 @@ namespace gpu_kernels{
             smem[threadIdx.x] = real_t(0.);
             real_t local_max = real_t(0.);
             real_t local_min = numeric_limits<real_t>::max();
+            int local_min_idx = 0;
+            int local_max_idx = 0;
             for (int i = threadIdx.x; i < n; i += blockDim.x){
                 local_max = ISNAN(D[i]) ? NAN : std::max(local_max, ABS(D[i]));
                 local_min = ISNAN(D[i]) ? NAN : std::min(local_min, ABS(D[i]));
+                local_min_idx = ISNAN(D[i]) ? NAN : (local_min == ABS(D[i]) ? i : local_min_idx);
+                local_max_idx = ISNAN(D[i]) ? NAN : (local_max == ABS(D[i]) ? i : local_max_idx);
             }
             real_t max_eig = reduction_max(smem, local_max);
             smem[threadIdx.x] = numeric_limits<real_t>::max();
@@ -625,6 +631,16 @@ namespace gpu_kernels{
             if(threadIdx.x == 0){
                 EigMax_.data[I] = max_eig;
                 EigMin_.data[I] = min_eig;
+            }
+            BLOCK_SYNC
+            //Argmax and argmin
+            if (min_eig == D[local_min_idx]){
+                //If by some miracle multiple eigenvalues are exactly equal, we just pick one of them at random using atomicExch_block
+                atomicExch_block(MinIdx_.data + I, local_min_idx);
+            }
+            if (max_eig == D[local_max_idx]){
+                //If by some miracle multiple eigenvalues are exactly equal, we just pick one of them at random using atomicExch_block
+                atomicExch_block(MaxIdx_.data + I, local_max_idx);
             }
         }
         }
@@ -737,6 +753,26 @@ namespace gpu_kernels{
             }
         }
 
+        void __global__ compute_eigenvectors_ends_(const IsomerBatch B, CuArray<device_real_t> Q, CuArray<device_real_t> V, CuArray<device_real_t> Emin, CuArray<device_real_t> Emax, CuArray<int> MinIdx, CuArray<int> MaxIdx, int m){
+            DEVICE_TYPEDEFS;
+            int n = B.n_atoms * 3;
+            for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x){
+                int minidx = MinIdx.data[I];
+                int maxidx = MaxIdx.data[I];
+                real_t* emin = Emin.data + I * n;
+                real_t* emax = Emax.data + I * n;
+                real_t* v = V.data + I * m * n;
+                real_t* qmin = Q.data + I * m * m + minidx * m;
+                real_t* qmax = Q.data + I * m * m + maxidx * m;
+                emin[threadIdx.x] = real_t(0.);
+                emax[threadIdx.x] = real_t(0.);
+                for (int i = 0; i < m; i++){
+                    emin[threadIdx.x] += v[i*n + threadIdx.x] * qmin[i];
+                    emax[threadIdx.x] += v[i*n + threadIdx.x] * qmax[i];
+                }
+            }
+        }
+
         void eigensolve(const IsomerBatch& B, CuArray<device_real_t>& Q, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             cudaSetDevice(B.get_device_id());
@@ -805,6 +841,8 @@ namespace gpu_kernels{
             static std::vector<CuArray<device_real_t>> Ds(Nd); //Diagonals
             static std::vector<CuArray<device_real_t>> Vs(Nd); //Lanczos vectors
             static std::vector<CuArray<device_real_t>> Qs(Nd); //Q matrix for QR decomposition
+            static std::vector<CuArray<int>> EigMinIdxs(Nd); //Indices of the smallest eigenvalues
+            static std::vector<CuArray<int>> EigMaxIdxs(Nd); //Indices of the largest eigenvalues
             static int m_natoms = B.n_atoms;
             static int m_isomer_capacity = B.isomer_capacity;
             static int m = m_lanczos;
@@ -819,6 +857,8 @@ namespace gpu_kernels{
                 Ds[dev].resize(B.isomer_capacity*m); Ds[dev].fill(0.); Ds[dev].to_device(dev);
                 Vs[dev].resize(B.isomer_capacity*B.n_atoms*3*m); Vs[dev].fill(0.); Vs[dev].to_device(dev);
                 Qs[dev].resize(B.isomer_capacity*m*m); Qs[dev].fill(0.); Qs[dev].to_device(dev);
+                EigMinIdxs[dev].resize(B.isomer_capacity); EigMinIdxs[dev].fill(0); EigMinIdxs[dev].to_device(dev);
+                EigMaxIdxs[dev].resize(B.isomer_capacity); EigMaxIdxs[dev].fill(0); EigMaxIdxs[dev].to_device(dev);
             }
 
             
@@ -826,23 +866,83 @@ namespace gpu_kernels{
             size_t smem_qr = sizeof(device_real_t)*(m+1)*6 + sizeof(device_real_t)*(64)*2;
             //size_t smem_transform = sizeof(device_real_t)*B.n_atoms*3*2;
             static LaunchDims dims((void*)lanczos_, B.n_atoms*3, smem, B.isomer_capacity);
-            static LaunchDims qr_dims((void*)eigensolve_min_max_, 64, smem_qr, B.isomer_capacity);
+            static LaunchDims qr_dims((void*)eigensolve_min_max_<EigensolveMode::NO_VECTORS>, 64, smem_qr, B.isomer_capacity);
             //static LaunchDims transform_dims((void*)compute_eigenvectors_, B.n_atoms*3, smem_transform, B.isomer_capacity);
             dims.update_dims((void*)lanczos_, B.n_atoms*3, smem, B.isomer_capacity);
-            qr_dims.update_dims((void*)eigensolve_min_max_, 64, smem_qr, B.isomer_capacity);
+            qr_dims.update_dims((void*)eigensolve_min_max_<EigensolveMode::NO_VECTORS>, 64, smem_qr, B.isomer_capacity);
             //transform_dims.update_dims((void*)compute_eigenvectors_, B.n_atoms*3, smem_transform, B.isomer_capacity);
             
             //The hessian has 6 degrees of freedom, so in order to find the smallest eigenvalue we must find the 6 eigenvectors corresponding to these lambda=0
             int n_deflate = 0;
-            
             void* kargs[]{(void*)&B, (void*)&Vs[dev], (void*)&Ls[dev], (void*)&Ds[dev], (void*)&hessians, (void*)&cols, (void*)&m};
-            void* kargs_qr[]{(void*)&B, (void*)&Ds[dev], (void*)&Ls[dev], (void*)&Us[dev], (void*)&Qs[dev], (void*)&lambda_mins, (void*)&lambda_maxs, (void*)&m};
+            void* kargs_qr[]{(void*)&B, (void*)&Ds[dev], (void*)&Ls[dev], (void*)&Us[dev], (void*)&Qs[dev], (void*)&lambda_mins, (void*)&lambda_maxs, (void*)&EigMinIdxs[dev], (void*)&EigMaxIdxs[dev], (void*)&m};
             //void* kargs_transform[]{(void*)&B, (void*)&Ds[dev], (void*)&Qs[dev], (void*)&Vs[dev], (void*)&Es[dev], (void*)&m, (void*)&n_deflate};
             safeCudaKernelCall((void*)lanczos_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
-            safeCudaKernelCall((void*)eigensolve_min_max_, qr_dims.get_grid(), qr_dims.get_block(), kargs_qr, smem_qr, ctx.stream);
+            safeCudaKernelCall((void*)eigensolve_min_max_<EigensolveMode::NO_VECTORS>, qr_dims.get_grid(), qr_dims.get_block(), kargs_qr, smem_qr, ctx.stream);
 
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Spectrum Ends Failed: ");
         }
+
+        void spectrum_ends(const IsomerBatch& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, CuArray<device_real_t>& eigvect_mins, CuArray<device_real_t>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy){
+            if (policy == LaunchPolicy::SYNC) ctx.wait();
+            cudaSetDevice(B.get_device_id());
+            auto dev = B.get_device_id();
+            static int Nd = LaunchCtx::get_device_count();
+            static std::vector<bool> init(Nd, false);
+            if(policy == LaunchPolicy::SYNC) {ctx.wait();}
+            static std::vector<CuArray<device_real_t>> Us(Nd); //Upper diagonals
+            static std::vector<CuArray<device_real_t>> Ls(Nd); //Lower diagonals
+            static std::vector<CuArray<device_real_t>> Ds(Nd); //Diagonals
+            static std::vector<CuArray<device_real_t>> Vs(Nd); //Lanczos vectors
+            static std::vector<CuArray<device_real_t>> Qs(Nd); //Q matrix for QR decomposition
+            static std::vector<CuArray<int>> EigMinIdxs(Nd); //Indices of the smallest eigenvalues
+            static std::vector<CuArray<int>> EigMaxIdxs(Nd); //Indices of the largest eigenvalues
+            static int m_natoms = B.n_atoms;
+            static int m_isomer_capacity = B.isomer_capacity;
+            static int m = m_lanczos;
+
+            if (!init[dev] || m != m_lanczos || m_natoms != B.n_atoms || m_isomer_capacity != B.isomer_capacity){
+                init[dev] = true;
+                m_natoms = B.n_atoms;
+                m_isomer_capacity = B.isomer_capacity;
+                m = m_lanczos;
+                Us[dev].resize(B.isomer_capacity*m); Us[dev].fill(0.); Us[dev].to_device(dev);
+                Ls[dev].resize(B.isomer_capacity*m); Ls[dev].fill(0.); Ls[dev].to_device(dev);
+                Ds[dev].resize(B.isomer_capacity*m); Ds[dev].fill(0.); Ds[dev].to_device(dev);
+                Vs[dev].resize(B.isomer_capacity*B.n_atoms*3*m); Vs[dev].fill(0.); Vs[dev].to_device(dev);
+                Qs[dev].resize(B.isomer_capacity*m*m); Qs[dev].fill(0.); Qs[dev].to_device(dev);
+                EigMinIdxs[dev].resize(B.isomer_capacity); EigMinIdxs[dev].fill(0); EigMinIdxs[dev].to_device(dev);
+                EigMaxIdxs[dev].resize(B.isomer_capacity); EigMaxIdxs[dev].fill(0); EigMaxIdxs[dev].to_device(dev);
+            }
+
+            
+            size_t smem = sizeof(device_real_t)*B.n_atoms*3*2 + m*2*sizeof(device_real_t);
+            size_t smem_qr = sizeof(device_real_t)*(m+1)*6 + sizeof(device_real_t)*(64)*2;
+            size_t smem_eigs = 0;
+
+            static LaunchDims dims((void*)lanczos_, B.n_atoms*3, smem, B.isomer_capacity);
+            static LaunchDims qr_dims((void*)eigensolve_min_max_<EigensolveMode::VECTORS>, 64, smem_qr, B.isomer_capacity);
+            static LaunchDims eigs_dims((void*)compute_eigenvectors_ends_, B.n_atoms*3, smem_eigs, B.isomer_capacity);
+
+            dims.update_dims((void*)lanczos_, B.n_atoms*3, smem, B.isomer_capacity);
+            qr_dims.update_dims((void*)eigensolve_min_max_<EigensolveMode::VECTORS>, 64, smem_qr, B.isomer_capacity);
+            eigs_dims.update_dims((void*)compute_eigenvectors_ends_, B.n_atoms*3, smem_eigs, B.isomer_capacity);
+            
+            //The hessian has 6 degrees of freedom, so in order to find the smallest eigenvalue we must find the 6 eigenvectors corresponding to these lambda=0
+            int n_deflate = 0;
+            void* kargs[]{(void*)&B, (void*)&Vs[dev], (void*)&Ls[dev], (void*)&Ds[dev], (void*)&hessians, (void*)&cols, (void*)&m};
+            void* kargs_qr[]{(void*)&B, (void*)&Ds[dev], (void*)&Ls[dev], (void*)&Us[dev], (void*)&Qs[dev], (void*)&lambda_mins, (void*)&lambda_maxs, (void*)&EigMinIdxs[dev], (void*)&EigMaxIdxs[dev], (void*)&m};
+            void* kargs_eigs[]{(void*)&B, (void*)&Qs[dev], (void*)&Vs[dev], (void*)&eigvect_mins, (void*)&eigvect_maxs, (void*)&EigMinIdxs[dev], (void*)&EigMaxIdxs[dev], (void*)&m};
+            //void* kargs_transform[]{(void*)&B, (void*)&Ds[dev], (void*)&Qs[dev], (void*)&Vs[dev], (void*)&Es[dev], (void*)&m, (void*)&n_deflate};
+            safeCudaKernelCall((void*)lanczos_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            safeCudaKernelCall((void*)eigensolve_min_max_<EigensolveMode::VECTORS>, qr_dims.get_grid(), qr_dims.get_block(), kargs_qr, smem_qr, ctx.stream);
+            safeCudaKernelCall((void*)compute_eigenvectors_ends_, eigs_dims.get_grid(), eigs_dims.get_block(), kargs_eigs, smem_eigs, ctx.stream);
+
+            if (policy == LaunchPolicy::SYNC) ctx.wait();
+            printLastCudaError("Spectrum Ends Failed: ");
+        }
+
+
     }
 }
