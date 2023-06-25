@@ -253,7 +253,7 @@ int main(int ac, char **argv)
       isomerspace_properties::transform_coordinates(B, ctx, policy);
       // Hessian units: kg/s^2, divide eigenvalues by carbon_mass to get 1/s^2, frequency = sqrt(lambda/m)
       isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d],    ctx, policy);
-      isomerspace_eigen     ::lambda_max(B, hessians[d], hessian_cols[d], results[FREQ_MAX][d], 40, ctx, policy);
+      //isomerspace_eigen     ::lambda_max(B, hessians[d], hessian_cols[d], results[FREQ_MAX][d], 40, ctx, policy);
       // Inertia is in Ångstrøm^2, multiply by carbon_mass and aangstrom_length*aangstrom_length to get SI units kg*m^2
       isomerspace_properties::moments_of_inertia   (B, results[INERTIA][d],      ctx, policy);      
       isomerspace_properties::eccentricities       (B, results[ECCENTRICITY][d], ctx, policy);
