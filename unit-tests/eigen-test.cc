@@ -16,12 +16,12 @@ using namespace isomerspace_X0;
 using namespace isomerspace_tutte;
 int main(int argc, char** argv){
     const size_t N                = argc>1 ? strtol(argv[1],0,0) : 60;     // Argument 1: Number of vertices 
-    //const size_t Mlanczos_steps   = argc>2 ? strtol(argv[2],0,0) : 40;     // Argument 2: Number of Lanczos steps
-    float reldelta                = argc>2 ? strtof(argv[2],0) : 1e-5;    // Argument 3: Relative delta
-    int isomer_num                = argc>3 ? strtol(argv[3],0,0) : 0;     // Argument 4: Isomer number
-    std::string spiral_           = argc>4 ? argv[4] : "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";          // Argument 2: Spiral
-    std::string name_             = argc>5 ? argv[5] : "C60ih";          // Argument 2: Spiral
-    std::string filename          = argc>6 ? argv[6] : "hessian_validation";        // Argument 2: Filename
+    const size_t Mlanczos_steps   = argc>2 ? strtol(argv[2],0,0) : 40;     // Argument 2: Number of Lanczos steps
+    float reldelta                = argc>3 ? strtof(argv[3],0) : 1e-5;    // Argument 3: Relative delta
+    int isomer_num                = argc>4 ? strtol(argv[4],0,0) : 0;     // Argument 4: Isomer number
+    std::string spiral_           = argc>5 ? argv[5] : "C60-[1,7,9,11,13,15,18,20,22,24,26,32]-fullerene";          // Argument 2: Spiral
+    std::string name_             = argc>6 ? argv[6] : "C60ih";          // Argument 2: Spiral
+    std::string filename          = argc>7 ? argv[7] : "hessian_validation";        // Argument 2: Filename
 
     std::ofstream hess_analytical(filename + "_analytical.csv");
     std::ofstream hess_numerical(filename + "_numerical.csv");
@@ -98,9 +98,11 @@ int main(int argc, char** argv){
     //std::cout << "cuSOLVE Eigensolver took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
     CuArray<device_real_t> Q(N*3*N*3*batch_size);
     CuArray<device_real_t> eigs(N*3*batch_size);
+    CuArray<device_real_t> min_eigvects(N*3*batch_size);
+    CuArray<device_real_t> max_eigvects(N*3*batch_size);    
     //lambda_max(Bdev, hessians, cols, lambda_maxs);
     auto start = std::chrono::steady_clock::now();
-    spectrum_ends(Bdev, hessians, cols, lambda_mins, lambda_maxs, 50);
+    spectrum_ends(Bdev, hessians, cols, lambda_mins, lambda_maxs, min_eigvects, max_eigvects, 40);
     auto time = std::chrono::steady_clock::now() - start;
     std::cout << "Spectrum Ends took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
 
@@ -155,6 +157,22 @@ int main(int argc, char** argv){
     ofstream file7("Q.float32", ios::out | ios::binary);
     file7.write((char*)Q.data, Q.size()*sizeof(device_real_t));
     file7.close();
+
+    ofstream file8("MinEigVects.float32", ios::out | ios::binary);
+    file8.write((char*)min_eigvects.data, min_eigvects.size()*sizeof(device_real_t));
+    file8.close();
+
+    ofstream file9("MaxEigVects.float32", ios::out | ios::binary);
+    file9.write((char*)max_eigvects.data, max_eigvects.size()*sizeof(device_real_t));
+    file9.close();
+
+    ofstream file10("MinEigVals.float32", ios::out | ios::binary);
+    file10.write((char*)lambda_mins.data, lambda_mins.size()*sizeof(device_real_t));
+    file10.close();
+
+    ofstream file11("MaxEigVals.float32", ios::out | ios::binary);
+    file11.write((char*)lambda_maxs.data, lambda_maxs.size()*sizeof(device_real_t));
+    file11.close();
 
     //std::cout << "Reference min eigenvalues: " << min_eigs_ref << std::endl;
     //std::cout << lambda_maxs << std::endl;
