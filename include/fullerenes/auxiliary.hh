@@ -5,6 +5,7 @@
 #include <set>
 #include <map>
 #include <sstream>
+#include <algorithm>
 #include <assert.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -194,6 +195,19 @@ template <typename T> vector<T> operator-(const vector<T>& xs, const vector<T>& 
   return result;
 }
 
+template <typename T> vector<T> operator-(const vector<T>& xs)
+{
+  vector<T> result(xs.size());
+  for(int i=0;i<xs.size();i++) result[i] = -xs[i];
+  return result;
+}
+
+template <typename T> vector<T> sorted(const vector<T>& xs)
+{
+  vector<T> result(xs.begin(), xs.end());
+  std::sort(result.begin(), result.end()); 
+  return result;
+}
 
 template <typename T> vector< vector<T> > operator+(const vector< vector<T> >& xs, const T& x)
 {
