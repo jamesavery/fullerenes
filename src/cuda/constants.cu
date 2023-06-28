@@ -56,7 +56,7 @@ struct Constants{
     device_coord3d f_outer_angle_m;
     device_coord3d f_outer_angle_p;
     device_coord3d f_outer_dihedral;
-    device_real_t f_flat = 1e2;
+    device_real_t f_flat = 5e2;
     
     device_coord3d r0;
     device_coord3d angle0;
