@@ -45,11 +45,11 @@ struct isomer_candidate {
 
   isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B,
 		   const CuArray<real_t> &Hs, const CuArray<device_node_t> &Hcols):
-    value(value), id(id), cubic_neighbours(3*N), X(3*N), H(90*N), Hcol(90*N) {
+    value(value), id(id), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
-    memcpy(&H[0],               Hs.data + 90*N*ix,        90*N*sizeof(real_t));
-    memcpy(&Hcol[0],            Hcols.data + 90*N*ix,     90*N*sizeof(device_node_t));
+    //    memcpy(&H[0],               Hs.data + 90*N*ix,        90*N*sizeof(real_t));
+    //    memcpy(&Hcol[0],            Hcols.data + 90*N*ix,     90*N*sizeof(device_node_t));
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
@@ -89,10 +89,10 @@ int main(int ac, char **argv)
   }
   const size_t N                = strtol(argv[1],0,0);   // Argument 1: Number of vertices N
 
-  string output_dir     = ac>=3? argv[2] : "output";     // Argument 2: directory to output files to
+  string output_dir     = ac>=3? argv[2] : string("output/C")+to_string(N);     // Argument 2: directory to output files to
   int IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
   int only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
-  int n_best_candidates = ac>=6? strtol(argv[5],0,0):10; // Argument 5: How many best fullerne candidates do you want to store? 
+  int n_best_candidates = ac>=6? strtol(argv[5],0,0):50; // Argument 5: How many best fullerne candidates do you want to store? 
 
 
   // Make sure output directory exists
@@ -102,7 +102,7 @@ int main(int ac, char **argv)
   int    Nd = LaunchCtx::get_device_count();
   size_t batch_size = min((size_t)isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
-  cout << "Analysing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
+  cout << "Analyzing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
 
   // Organize all of our of computation pipeline stages and our scoresl of different results
   typedef enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage_t;
@@ -113,10 +113,11 @@ int main(int ac, char **argv)
 
   array<array<double,2>,NUM_RESULTS> result_bounds = {{
     {0.24*pow(N,3/2.)-50,0.4*pow(N,3/2.)+50}, // Volume bounds
-    {1,N/20.},                                // Eccentricity bounds
-    {0,20*33.356},                            // Smallest frequency bounds (in cm^{-1} = teraherz*33.356)
-    {30*33.356,60*33.356},                    // Largest frequency bounds (in cm^{-1})
-    {30*33.356,60*33.356},                    // Bandwidth bounds (in cm^{-1})
+    {1,N/10.},                                // Eccentricity bounds
+    {0,10*33.356},                            // Smallest frequency bounds (in cm^{-1} = teraherz*33.356)
+    //    {40*33.356,55*33.356},                    // Largest frequency bounds (in cm^{-1})
+    {(39+2*log(N-20))*33.356,(43+2*log(N-20))*33.356},                    // Largest frequency bounds (in cm^{-1})    
+    {40*33.356,55*33.356},                    // Bandwidth bounds (in cm^{-1})
     {0,0} // What are the inertia bounds?
     }};
   
@@ -188,7 +189,8 @@ int main(int ac, char **argv)
   constexpr real_t carbon_mass = 1.9944733e-26/*kg*/, aangstrom_length = 1e-10/*m*/;
   
   constexpr size_t num_bins = 1000;
-  array<array<size_t,num_bins>,NUM_RESULTS> result_histograms;
+  array<array<size_t,num_bins>,NUM_RESULTS> result_histograms({0});
+  vector<array<size_t,num_bins*num_bins>> result_histograms2D(NUM_RESULTS*NUM_RESULTS,{0});  
 
   // Hack using knowledge about range for easy binning (for now)
   //... histograms
@@ -258,9 +260,12 @@ int main(int ac, char **argv)
   auto opt_routine = [&](){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int d = 0; d < Nd; d++){
-      auto &B   = Bs[OPT][d];      
+      auto &B   = Bs[OPT][d];
+      auto &ctx = opt_ctxs[d];
       Q1s[d].refill_batch(B, opt_ctxs[d], policy);
-      isomerspace_forcefield::optimise<PEDERSEN>(B, ceil(0.5*N), 5*N, opt_ctxs[d], policy);
+      isomerspace_forcefield::optimise<FLATNESS_ENABLED>(B, N, 5*N, ctx, policy);
+      //      cuda_io::reset_convergence_statuses(B,  ctx, policy);
+      //      isomerspace_forcefield::optimise<PEDERSEN>(B, ceil(0.5*N), 5*N, ctx, policy);      
       Q2s[d].push_done(B, opt_ctxs[d], policy);
     }
     for (int d = 0; d < Nd; d++){
@@ -353,7 +358,7 @@ int main(int ac, char **argv)
 	
 	  // Convert from Hessian eigenvalues to normal mode frequencies in teraherz	    
 	  real_t min_freq = sqrt(results[MIN_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
-	         max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
+	    max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
 	  
 	  // Convert frequencies from teraherz to cm^{-1} to compare with experiment
 	  min_freq *= 33.356;
@@ -365,17 +370,38 @@ int main(int ac, char **argv)
 	  
 	  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
 	      auto v = results[r][d][di];
-	      if(terrible_outlier(v,r)){ v = results[r][d][di] = nan(""); terrible_outliers[r].push_back(id); } 
+	      if(terrible_outlier(v,r)){
+		v = results[r][d][di] = nan("");
+		terrible_outliers[r].push_back(id);
+		continue;
+	      } 
 	      if(isfinite(v)){
 		C.value =  v; result_min[r].insert(C);
 		C.value = -v; result_max[r].insert(C);
 		means[r] += v;       
 	      }
-	    }
-	
-	  //		result_reference[r].insert({v,id+1}); // To check that result_min and result_max actually gets k smallest & largest.
-	  
 
+	      auto vmin = result_bounds[r][0], vmax = result_bounds[r][1];
+
+	      size_t v_bin = min(num_bins-1,max(0LU,(size_t)floor(num_bins*((v-vmin)/(vmax-vmin)))));
+	      result_histograms[r][v_bin]++;
+
+	      for(int s=0;s<r;s++) if(result_sizes[s]==1){
+		  auto w = results[s][d][di];		  
+		  if(isfinite(w) && !terrible_outlier(w,s)){
+		    auto wmin = result_bounds[s][0], wmax = result_bounds[s][1];
+		    size_t w_bin = min(num_bins-1,max((size_t)0,(size_t)floor(num_bins*((w-wmin)/(wmax-wmin)))));
+
+		    result_histograms2D[(r*(r-1))/2+s][v_bin*num_bins+w_bin]++;
+		  }
+	      }
+	    }
+
+	  
+	  //		result_reference[r].insert({v,id+1}); // To check that result_min and result_max actually gets k smallest & largest.
+	} else {
+	  if(status == IsomerStatus::FAILED) opt_failed.push_back(id);
+	  if(status == IsomerStatus::NOT_CONVERGED) opt_not_converged.push_back(id);	  
 	}
       }
     }
@@ -396,7 +422,7 @@ int main(int ac, char **argv)
     return final;
   };
   
-  while(!stage_finished[PROP] && loop_iters < 100){
+  while(!stage_finished[PROP]){
       cout << loop_iters << " start: Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
       cout << loop_iters << " start: Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
       auto T0 = steady_clock::now();
@@ -484,15 +510,33 @@ int main(int ac, char **argv)
   };
 
 
-  mkdir(string(output_dir+"/C"+to_string(N)).c_str(), 0777);
+  mkdir(output_dir.c_str(), 0777);
+  FILE *f = fopen((output_dir+"/result_bounds.float64").c_str(),"wb");
+  fwrite(&result_bounds[0],sizeof(double),2*NUM_RESULTS,f);
+  fclose(f);
+
+  f = fopen((output_dir+"/result_names.string").c_str(),"w");
+  for(int r=0;r<NUM_RESULTS;r++) fprintf(f,"%s\n",result_names[r].c_str());
+  fclose(f);
+
+  
+  FILE *f_min    = fopen((output_dir+"/result_mins.float32").c_str(),"wb");
+  FILE *f_max    = fopen((output_dir+"/result_maxs.float32").c_str(),"wb");
+  FILE *f_hist   = fopen((output_dir+"/result_hists.uint64").c_str(),"wb");
+  FILE *f_hist2D = fopen((output_dir+"/result_hists2D.uint64").c_str(),"wb");        
   for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1) {
-    string result_dir = output_dir+"/C"+to_string(N)+"/"+result_names[r];
+    string result_dir = output_dir+"/"+result_names[r];
     string min_dir    = result_dir + "/min", max_dir = result_dir+"/max", outlier_dir = result_dir + "/terrible_outliers";
-    
+
+    // Output candidate isomers
     auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
 
+    fwrite(&smallest[0],sizeof(device_real_t),n_best_candidates,f_min);
+    fwrite(&biggest[0], sizeof(device_real_t),n_best_candidates,f_max);    
+    
     mkdir(result_dir.c_str(), 0777);
     mkdir(min_dir.c_str(), 0777);
+
     mkdir(max_dir.c_str(), 0777);
     mkdir(outlier_dir.c_str(), 0777);    
     
@@ -506,12 +550,20 @@ int main(int ac, char **argv)
       Polyhedron::to_file(Pmin,min_dir+"/Pmin-"+to_string(i)+".spiral");      
       Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".mol2");
       Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".spiral");
+    }
 
-      
+    // Output histograms:
+    fwrite(&result_histograms[r][0],sizeof(uint64_t),num_bins,f_hist);
+
+    for(int s=0;s<r;s++){
+      fwrite(&result_histograms2D[(r*(r-1))/2+s][0],sizeof(uint64_t),num_bins*num_bins,f_hist2D);
     }
   }
- 
 
+  fclose(f_min);
+  fclose(f_max);
+  fclose(f_hist);
+  fclose(f_hist2D);
 
   
 
