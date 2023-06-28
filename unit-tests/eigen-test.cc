@@ -65,27 +65,31 @@ int main(int argc, char** argv){
     LaunchPolicy policy = LaunchPolicy::SYNC;
     cuda_io::copy(Bdev, Bhost);
 
-    dualise(Bdev);
-    tutte_layout(Bdev, (int)10*N);
+    if(isomer_num != -1) dualise(Bdev);
+    tutte_layout(Bdev, (int)20*N);
     zero_order_geometry(Bdev, 4.0);
-    optimise<PEDERSEN>(Bdev, 5*N, 5*N);
+    optimise<PEDERSEN>(Bdev, 10*N, 10*N);
+    //isomerspace_properties::transform_coordinates(Bdev);
     CuArray<device_real_t> hessians(N*3*3*10 * batch_size);
+    CuArray<device_real_t> hessians_fd(N*3*3*10 * batch_size);
     CuArray<device_node_t> cols(N*3*3*10 * batch_size);
     CuArray<device_real_t> lambda_mins(batch_size);
     CuArray<device_real_t> lambda_maxs(batch_size);
 
     auto T0 = std::chrono::steady_clock::now();
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
+
     //std::cout << hessians << std::endl;
     auto T1 = std::chrono::steady_clock::now();
+    compute_hessians_fd<PEDERSEN>(Bdev, hessians_fd, cols, reldelta);
+
     std::cout << "Hessian time: " << std::chrono::duration_cast<std::chrono::microseconds>(T1-T0).count()/ (float)batch_size << " us/ isomer" << std::endl;
     
-    hess_analytical.write((char*)hessians.data, N*3*3*10* batch_size*sizeof(device_real_t));
-    hess_cols.write((char*)cols.data, N*3*3*10* batch_size*sizeof(device_node_t));
+    hess_analytical.write((char*)hessians.data, hessians.size()*sizeof(device_real_t));
+    hess_cols.write((char*)cols.data, cols.size()*sizeof(device_node_t));
+    hess_numerical.write((char*)hessians_fd.data, hessians_fd.size()*sizeof(device_real_t));
 
 
-    //compute_hessians_fd<PEDERSEN>(Bdev, hessians, cols, reldelta);
-    //hess_numerical.write((char*)hessians.data, N*3*3*10* batch_size*sizeof(device_real_t));
     
     //std::cout << "Eigenvalues: " << eigenvalues << std::endl;
     //cuda_io::copy(Bhost, Bdev); // Copy back to host
@@ -107,7 +111,7 @@ int main(int argc, char** argv){
     std::cout << "Spectrum Ends took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
 
     start = std::chrono::steady_clock::now();
-    eigensolve(Bdev, Q, hessians, cols, eigs);
+    //eigensolve(Bdev, Q, hessians, cols, eigs);
     ofstream eigs_out("eigs.float32", ios::binary); eigs_out.write((char*)eigs.data, N*3*batch_size*sizeof(device_real_t)); eigs_out.close();
     time = std::chrono::steady_clock::now() - start;
     std::cout << "Full eigensolve took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
@@ -134,45 +138,45 @@ int main(int argc, char** argv){
         rel_err_width[i] = fabs( (lambda_maxs[i] - lambda_mins[i]) - (max_eigs_ref[i] - min_eigs_ref[i]) + epsilon)/fabs(max_eigs_ref[i] - min_eigs_ref[i] + epsilon);
         abs_err_width[i] = fabs( (lambda_maxs[i] - lambda_mins[i]) - (max_eigs_ref[i] - min_eigs_ref[i]) + epsilon);
     }
+    
+    if (isomer_num == -1){
+        isomerspace_properties::transform_coordinates(Bdev);
+        cuda_io::copy(Bhost, Bdev); // Copy back to host
+        Polyhedron::to_file(Bhost.get_isomer(0).value(), name_ + ".mol2");
+    }
 
     ofstream file("MinLambdaError_Relative.float32", ios::out | ios::binary);
     file.write((char*)rel_err_min.data(), batch_size*sizeof(device_real_t));
-    file.close();
+
     ofstream file2("MinLambdaError_Absolute.float32", ios::out | ios::binary);
     file2.write((char*)abs_err_min.data(), batch_size*sizeof(device_real_t));
-    file2.close();
+
     ofstream file3("MaxLambdaError_Relative.float32", ios::out | ios::binary);
     file3.write((char*)rel_err_max.data(), batch_size*sizeof(device_real_t));
-    file3.close();
+
     ofstream file4("MaxLambdaError_Absolute.float32", ios::out | ios::binary);
     file4.write((char*)abs_err_max.data(), batch_size*sizeof(device_real_t));
-    file4.close();
+
     ofstream file5("WidthError_Relative.float32", ios::out | ios::binary);
     file5.write((char*)rel_err_width.data(), batch_size*sizeof(device_real_t));
-    file5.close();
+
     ofstream file6("WidthError_Absolute.float32", ios::out | ios::binary);
     file6.write((char*)abs_err_width.data(), batch_size*sizeof(device_real_t));
-    file6.close();
 
     ofstream file7("Q.float32", ios::out | ios::binary);
     file7.write((char*)Q.data, Q.size()*sizeof(device_real_t));
-    file7.close();
 
     ofstream file8("MinEigVects.float32", ios::out | ios::binary);
     file8.write((char*)min_eigvects.data, min_eigvects.size()*sizeof(device_real_t));
-    file8.close();
 
     ofstream file9("MaxEigVects.float32", ios::out | ios::binary);
     file9.write((char*)max_eigvects.data, max_eigvects.size()*sizeof(device_real_t));
-    file9.close();
 
     ofstream file10("MinEigVals.float32", ios::out | ios::binary);
     file10.write((char*)lambda_mins.data, lambda_mins.size()*sizeof(device_real_t));
-    file10.close();
 
     ofstream file11("MaxEigVals.float32", ios::out | ios::binary);
     file11.write((char*)lambda_maxs.data, lambda_maxs.size()*sizeof(device_real_t));
-    file11.close();
 
     //std::cout << "Reference min eigenvalues: " << min_eigs_ref << std::endl;
     //std::cout << lambda_maxs << std::endl;
