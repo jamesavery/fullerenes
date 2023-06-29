@@ -24,7 +24,8 @@ void cubic_layout_(IsomerBatch B){
     device_node_t* cached_neighbours = triangle_numbers + B.n_faces*6;
     uint8_t* cached_degrees = reinterpret_cast<uint8_t*>(cached_neighbours+ B.n_faces*6);
     device_node_t* smem = reinterpret_cast<device_node_t*>(cached_neighbours) + B.n_faces*8;
-    clear_cache(reinterpret_cast<real_t*>(smem),power2);
+    //clear_cache(reinterpret_cast<real_t*>(smem),power2);
+    if(threadIdx.x == 0) memset(smem, 0, power2 * sizeof(int));
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx += gridDim.x ){
     if (B.statuses[isomer_idx] != IsomerStatus::EMPTY ){
 
@@ -98,7 +99,7 @@ void dualise_2_(IsomerBatch B){
     device_node_t* cached_neighbours = triangle_numbers + B.n_faces*6;
     uint8_t* cached_degrees = reinterpret_cast<uint8_t*>(cached_neighbours+ B.n_faces*6);
     device_node_t* smem = reinterpret_cast<device_node_t*>(cached_neighbours) + B.n_faces*8;
-    clear_cache(reinterpret_cast<real_t*>(smem),B.n_faces);
+    if(threadIdx.x == 0) memset(smem, 0, B.n_faces * sizeof(int));
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx += gridDim.x ){
     if (B.statuses[isomer_idx] != IsomerStatus::EMPTY ){
 
