@@ -6,6 +6,40 @@
 namespace gpu_kernels{
 namespace isomerspace_tutte{
 #include "device_includes.cu"
+//WIP: Lets try to find some pentagon-pentagon distances
+__device__
+std::array<device_node_t, 12> multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){
+   /*  DEVICE_TYPEDEFS;
+    
+    DeviceCubicGraph FG = DeviceCubicGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
+    node_t outer_face[6]; memset(outer_face, 0, sizeof(node_t)*6); //Do not rely on uninitialized memory it will only be zero on first touch.
+    uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
+    distances[threadIdx.x] = node_t(NODE_MAX);    
+    BLOCK_SYNC
+    if (threadIdx.x < Nface)  distances[outer_face[threadIdx.x]] = 0;
+    BLOCK_SYNC
+    if (threadIdx.x == 0){
+        CuDeque<node_t> queue = CuDeque<node_t>(distances + blockDim.x, blockDim.x);
+        for (size_t i = 0; i < Nface; i++) queue.push_back(outer_face[i]);
+        while (!queue.empty())
+        {   
+            node_t v = queue.pop_front();
+            for (size_t i = 0; i < 3; i++)
+            {   
+                node_t w = FG.cubic_neighbours[v*3 + i];
+                if(distances[w] == NODE_MAX) {
+                distances[w] = distances[v]+1;
+                queue.push_back(w);
+                }
+            }
+        }
+    }
+    BLOCK_SYNC
+    device_node_t distance = distances[threadIdx.x];
+    BLOCK_SYNC
+    return distance; */
+}
+
 
 __global__
 void tutte_layout_(IsomerBatch B, const size_t iterations){
@@ -24,9 +58,18 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
 
     node3 ns            = (reinterpret_cast<node3*>(B.cubic_neighbours) + offset)[threadIdx.x];
     xys[threadIdx.x]    = {real_t(0.0), real_t(0.0)};
-    device_node_t outer_face[6];
-    device_node_t outer_face_vertex   = 0;
+    node_t outer_face[6];
+    node_t outer_face_vertex   = 0;
     uint8_t Nface = FG.get_face_oriented(0,FG.cubic_neighbours[0], outer_face);    
+    /* node_t* int_smem = reinterpret_cast<node_t*>(sharedmem);
+    uint8_t local_fsize = FG.face_size(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]);
+    node_t is_pentagon = node_t(local_fsize == uint8_t(5) ? 1 : 0);
+    ex_scan(int_smem, is_pentagon, blockDim.x);
+    if(threadIdx.x > 0 && (int_smem[threadIdx.x] == node_t(1)) && (int_smem[threadIdx.x - 1] == node_t(0))) int_smem[0] = node_t(threadIdx.x - 1);
+    BLOCK_SYNC;
+    node_t lowest_index_pentagon = int_smem[0];
+    uint8_t Nface = FG.get_face_oriented(lowest_index_pentagon, FG.cubic_neighbours[lowest_index_pentagon*3],outer_face);
+    BLOCK_SYNC; */ //This code finds the first pentagon and then uses that as the outer face. 
     reinterpret_cast<bool*>(sharedmem)[threadIdx.x] =  false; BLOCK_SYNC;
     if(threadIdx.x < Nface){
       outer_face_vertex = outer_face[threadIdx.x];
