@@ -33,7 +33,7 @@ int main(int ac, char **av)
   for(node_t u=0;u<N;u++) g.neighbours[u] = {neighbours_flat[3*u],neighbours_flat[3*u+1],neighbours_flat[3*u+2]};
   
   g.layout2d = g.tutte_layout();
-  cout << g.to_latex(10, 10) << "\n";
+  cout << g.to_latex(10, 10, true, true, true) << "\n";
     
   Polyhedron P0(g,g.zero_order_geometry(),6);
   string basename("polyhedron-"+to_string(N));
