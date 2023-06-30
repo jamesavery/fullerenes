@@ -550,6 +550,16 @@ int main(int ac, char **argv)
       Polyhedron::to_file(Pmin,min_dir+"/Pmin-"+to_string(i)+".spiral");      
       Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".mol2");
       Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".spiral");
+
+
+      {
+	vector<node_t> flat_neighbours(3*N);
+	for(node_t u=0;u<N;u++)
+	  for(int j=0;j<3;j++) flat_neighbours[3*u+j] = Pmax.neighbours[u][j];
+	FILE *f = fopen((max_dir+"/Pmax-"+to_string(i)+".uint32_t").c_str(),"wb");
+	fwrite(&flat_neighbours[0],sizeof(node_t),3*N,f);
+	fclose(f);
+      }
     }
 
     // Output histograms:
