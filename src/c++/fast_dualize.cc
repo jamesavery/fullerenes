@@ -65,7 +65,7 @@ void dualise_3(IsomerBatch& B){
             #pragma omp barrier
 
             uint16_t accumulator = 0;
-            #pragma omp simd reduction(inscan,+:accumulator)
+
             for (size_t j = 0; j < B.n_faces; ++j){
                 scan_array[j] = accumulator;
                 #pragma omp scan exclusive(accumulator)
