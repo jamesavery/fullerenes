@@ -67,8 +67,8 @@ int main(int argc, char** argv){
         
         std::cout << "Isomerspace: " << i << " Magnitutde:" << magnitude << "\n";
 
-        std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs.begin(),rdiffs.end())/(float)batch_size << "\n";
-        std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs.begin(),adiffs.end())/(float)batch_size << "\n";
+        // std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs.begin(),rdiffs.end())/(float)batch_size << "\n";
+        // std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs.begin(),adiffs.end())/(float)batch_size << "\n";
 
         rel_file << batch_size << ", ";
         abs_file << batch_size << ", ";
