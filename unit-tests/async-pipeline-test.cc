@@ -6,7 +6,6 @@
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/cu_array.hh"
-#include <filesystem>
 #include <numeric>
 #include <future>
 #include <random>
@@ -40,7 +39,7 @@ int main(int ac, char **argv){
     auto bucky = BuckyGen::start(N, false, false);
 
     std::string path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
-    auto fsize = std::filesystem::file_size(path);
+    auto fsize = file_size(path);
     auto n_samples = fsize / (Nf * 6 * sizeof(device_node_t));
     ifstream in_file(path,std::ios::binary);
     std::vector<device_node_t> dual_neighbours(n_samples * Nf * 6);
