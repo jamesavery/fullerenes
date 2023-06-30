@@ -6,6 +6,7 @@
 #include <map>
 #include <sstream>
 #include <algorithm>
+#include <sys/stat.h>
 #include <assert.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -354,3 +355,6 @@ public:
     return (s << contents);
   }
 };
+
+size_t file_size(const char *filename);
+size_t file_size(const string filename);

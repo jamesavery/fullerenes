@@ -482,3 +482,13 @@ Polyhedron Polyhedron::from_mol2(FILE *file)
   
   return P;
 }
+
+size_t file_size(const char *filename) {
+  struct stat st;
+
+  if (stat(filename, &st) == 0)
+    return st.st_size;
+
+  return -1;
+}
+size_t file_size(const string filename) { return file_size(filename.c_str()); }

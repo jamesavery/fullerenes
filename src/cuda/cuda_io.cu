@@ -291,9 +291,12 @@ namespace cuda_io{
 
     template <typename T>
     T mean(std::vector<T>& input){
-    T result = std::reduce(input.begin(), input.end());
-    return result/input.size();
+      T result = input[0];
+      for(size_t i=1;i<input.size();i++) result += input[i];
+      
+      return result/input.size();
     }
+  
     //Standard deviation of a time vector. Used in benchmarking.
     std::chrono::nanoseconds sdev(std::vector<std::chrono::nanoseconds>& input){
     auto mean_ = mean(input);
