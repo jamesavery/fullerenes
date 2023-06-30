@@ -1,5 +1,4 @@
 #include "numeric"
-#include "filesystem"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 
@@ -83,10 +82,10 @@ int main(int argc, char** argv){
     
     
 
-        std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs.begin(),rdiffs.end())/(float)batch_size << "\n";
-        std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs_ex.begin(),rdiffs_ex.end())/(float)batch_size << "\n";
-        std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs.begin(),adiffs.end())/(float)batch_size << "\n";
-        std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs_ex.begin(),adiffs_ex.end())/(float)batch_size << "\n";
+        std::cout << "Isomerspace: " << i << " RErr:" << sum(rdiffs)/(float)batch_size << "\n";
+        std::cout << "Isomerspace: " << i << " RErr:" << sum(rdiffs_ex)/(float)batch_size << "\n";
+        std::cout << "Isomerspace: " << i << " AErr:" << sum(adiffs)/(float)batch_size << "\n";
+        std::cout << "Isomerspace: " << i << " AErr:" << sum(adiffs_ex)/(float)batch_size << "\n";
 
         rel_file << batch_size << ", ";
         rel_ex_file << batch_size << ", ";
