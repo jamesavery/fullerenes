@@ -1,5 +1,4 @@
 #include "numeric"
-#include "filesystem"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 
@@ -23,7 +22,7 @@ int main(int argc, char** argv){
 
         auto path = "isomerspace_samples/" + to_string(i) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
-        auto fsize = std::filesystem::file_size(path);
+        auto fsize = file_size(path);
         std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
         isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), fsize);
         auto available_samples = fsize / (i*3*sizeof(device_node_t));
