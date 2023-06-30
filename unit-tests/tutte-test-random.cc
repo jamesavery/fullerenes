@@ -1,5 +1,4 @@
 #include "numeric"
-#include "filesystem"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 
@@ -20,7 +19,7 @@ int main(int argc, char** argv){
 
         auto path = "isomerspace_samples/cubic_" + to_string(i) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
-        auto fsize = std::filesystem::file_size(path);
+        auto fsize = file_size(path);
         std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
         isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), fsize);
         auto available_samples = fsize / (i*3*sizeof(device_node_t));
@@ -62,9 +61,9 @@ int main(int argc, char** argv){
             rdiffs[j] = rdiff;
             adiffs[j] = adiff;
         }
-        
-        std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs.begin(),rdiffs.end())/(float)batch_size << "\n";
-        std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs.begin(),adiffs.end())/(float)batch_size << "\n";
+
+	std::cout << "Isomerspace: " << i << " RErr:" << sum(rdiffs)/(float)batch_size << "\n";
+	std::cout << "Isomerspace: " << i << " AErr:" << sum(adiffs)/(float)batch_size << "\n";
 
         rel_file << batch_size << ", ";
         abs_file << batch_size << ", ";
