@@ -16,6 +16,15 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t
     DeviceCubicGraph FG = DeviceCubicGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
     node_t outer_face[6]; memset(outer_face, 0, sizeof(node_t)*6); //Do not rely on uninitialized memory it will only be zero on first touch.
     uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
+    /* uint8_t local_fsize = FG.face_size(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]);
+    node_t is_pentagon = node_t(local_fsize == uint8_t(5) ? 1 : 0);
+    node_t* sharedmem = reinterpret_cast<node_t*>(distances);
+    ex_scan(sharedmem, is_pentagon, blockDim.x);
+    if(threadIdx.x > 0 && (sharedmem[threadIdx.x] == node_t(1)) && (sharedmem[threadIdx.x - 1] == node_t(0))) sharedmem[0] = node_t(threadIdx.x - 1);
+    BLOCK_SYNC;
+    node_t lowest_index_pentagon = sharedmem[0];
+    uint8_t Nface = FG.get_face_oriented(lowest_index_pentagon, FG.cubic_neighbours[lowest_index_pentagon*3],outer_face);
+    BLOCK_SYNC; */ //This code finds the pentagon with the lowest index and uses that as the starting point for the BFS. 
     distances[threadIdx.x] = node_t(NODE_MAX);    
     BLOCK_SYNC
     if (threadIdx.x < Nface)  distances[outer_face[threadIdx.x]] = 0;
