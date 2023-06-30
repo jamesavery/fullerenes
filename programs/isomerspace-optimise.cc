@@ -159,7 +159,7 @@ int main(int ac, char **argv)
         TX0    = isomerspace_X0::time_spent()/Nd;
         Tdual  = isomerspace_dual::time_spent()/Nd;
         auto TOverhead = Tinit_geom - Tdual - Ttutte - TX0;
-        progress_bar.update_progress((float)num_finished/(float)num_fullerenes.find(N)->second, "Pace: " + to_string((Titer/1us) / max((num_finished - n0),1)) + " us/isomer       ", {{"Gen          ", Tgen},{"Init Overhead", TOverhead},{"Opt          ", Topt},{"Dual         ", Tdual},{"Tutte        ", Ttutte},{"X0           ", TX0},{"FF Overhead  ", Tqueue}});
+        progress_bar.update_progress((float)num_finished/(float)IsomerDB::number_isomers(N), "Pace: " + to_string((Titer/1us) / max((num_finished - n0),1)) + " us/isomer       ", {{"Gen          ", Tgen},{"Init Overhead", TOverhead},{"Opt          ", Topt},{"Dual         ", Tdual},{"Tutte        ", Ttutte},{"X0           ", TX0},{"FF Overhead  ", Tqueue}});
         n0 = num_finished;
       }
       loop_iters++;

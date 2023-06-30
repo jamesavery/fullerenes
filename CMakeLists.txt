@@ -49,7 +49,9 @@ include_directories(${CMAKE_BINARY_DIR}/include/)
 # Fortran compiler flags
 set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=medium")
 # C++ compiler flags
-set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O3 -m64 -pthread -fopenmp -I /opt/nvidia/hpc_sdk/Linux_x86_64/2022/cuda/11.8/include/")
+
+# TODO !!$E#Q$#!!@##!!: Why are there hardcoded include paths? This ENSURES "only works on my machine".
+set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O3 -m64 -pthread -fopenmp -I /opt/nvidia/hpc_sdk/Linux_x86_64/23.3/cuda/11.8/targets/x86_64-linux/include/")
 
 add_subdirectory(src/c++)
 add_subdirectory(src/fortran)
@@ -66,7 +68,7 @@ if(CMAKE_CUDA_COMPILER)
   message("CUDA found: " ${CMAKE_CUDA_COMPILER} ".")
 #set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=64 --resource-usage -Xptxas --expt-relaxed-constexpr -I /opt/nvidia/hpc_sdk/Linux_x86_64/21.2/cuda/11.0/targets/x86_64-linux/include/ -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
 #NOTE: -gencode arch argument is EXTREMELY important to get right, the program will simply crash with a cudaError: invalid device function if the architecture does not match the GPU
-set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++17 --use_fast_math --expt-relaxed-constexpr -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_86,code=sm_86  -I /opt/nvidia/hpc_sdk/Linux_x86_64/2022/cuda/11.8/include/ "
+set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++17 --use_fast_math --expt-relaxed-constexpr -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_86,code=sm_86  -I /opt/nvidia/hpc_sdk/Linux_x86_64/23.3/cuda/11.8/targets/x86_64-linux/include/"
 )
 set(CUDA_MAXREGCOUNT "--maxrregcount=80")
 

@@ -7,14 +7,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-size_t file_size(const char *filename) {
-  struct stat st;
-
-  if (stat(filename, &st) == 0)
-    return st.st_size;
-
-  return -1;
-}
 
 int main(int ac, char **av)
 {

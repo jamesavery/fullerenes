@@ -9,7 +9,7 @@
 #include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
-#include "fullerenes/isomerspace.hh"
+#include "fullerenes/isomerdb.hh"
 
 using namespace chrono;
 using namespace chrono_literals;
@@ -22,7 +22,7 @@ int main(int argc, char** argv){
     BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
 
     //Optimal batch size for N vertices
-    auto M_b = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)num_fullerenes.find(N)->second);
+    auto M_b = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)IsomerDB::number_isomers(N));
 
     //Number of faces for N vertices
     auto Nf = N/2 + 2;
