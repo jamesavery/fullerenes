@@ -62,5 +62,7 @@ public:
     }
     
     
-    ~ProgressBar(){};
-};
+        ~ProgressBar() {
+            std::cout << "\n" << "\r\033[K" << std::flush; //clear line
+        }
+    };
