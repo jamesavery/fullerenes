@@ -63,7 +63,11 @@ int main(int argc, char** argv){
             T_opts(N_runs),
             T_flat(N_runs),
             T_queue(N_runs),
-            T_io(N_runs);
+            T_io(N_runs),
+            T_hess(N_runs),
+            T_spectrum(N_runs),
+            T_eccentricity(N_runs),
+            T_volume(N_runs);
 
 
         auto Nf = N/2 + 2;
@@ -128,6 +132,30 @@ int main(int argc, char** argv){
             auto TFlat = high_resolution_clock::now(); T_opts[l] += TFlat - TFF;
             isomerspace_forcefield::optimise<FLATNESS_ENABLED>(batch1,N*5,N*5);
             T_flat[l] += high_resolution_clock::now() - TFlat;
+
+            CuArray<device_real_t> hessian(batch1.capacity()*N*90);
+            CuArray<device_node_t> cols(batch1.capacity()*N*90);
+            CuArray<device_real_t> min_eigs(batch1.capacity());
+            CuArray<device_real_t> max_eigs(batch1.capacity());
+            CuArray<device_real_t> eccentricities(batch1.capacity());
+            CuArray<device_real_t> volumes(batch1.capacity());
+
+            auto THess = high_resolution_clock::now();
+            isomerspace_hessian::compute_hessians<PEDERSEN>(batch1, hessian, cols);
+            T_hess[l] += high_resolution_clock::now() - THess;
+
+            auto TSpectrum = high_resolution_clock::now();
+            isomerspace_eigen::spectrum_ends(batch1, hessian, cols, min_eigs, max_eigs);
+            T_spectrum[l] += high_resolution_clock::now() - TSpectrum;
+
+            auto TEcc = high_resolution_clock::now();
+            isomerspace_properties::eccentricities(batch1, eccentricities);
+            T_eccentricity[l] += high_resolution_clock::now() - TEcc;
+
+            auto TVol = high_resolution_clock::now();
+            isomerspace_properties::volume_divergences(batch1, volumes);
+            T_volume[l] += high_resolution_clock::now() - TVol;
+
             OutQueue.push_done(batch2,ctx, LaunchPolicy::SYNC);
             auto T0 = high_resolution_clock::now();
             auto j = isomer_q_cubic.get_size(); 
@@ -166,11 +194,26 @@ int main(int argc, char** argv){
         }
         using namespace cuda_io;
         //Print out runtimes in us per isomer:
-        std::cout << N << "  Dual: " << std::fixed << std::setprecision(2) << (float)(mean(T_duals)/1us)/sample_size << "us  Tutte: " << std::fixed << std::setprecision(2) << (float)(mean(T_tuttes)/1us)/sample_size << "us  X0: " << std::fixed << std::setprecision(2) << (float)(mean(T_X0s)/1us)/sample_size << "us  Opt: " << std::fixed << std::setprecision(2) << (float)(mean(T_opts)/1us)/sample_size << "us  Flat: " << std::fixed << std::setprecision(2) << (float)(mean(T_flat)/1us)/sample_size << "us  Queue: " << std::fixed << std::setprecision(2) << (float)(mean(T_queue)/1us)/finished_isomers << "us" << std::fixed << std::setprecision(2) << "  IO: " << (float)(mean(T_io)/1us)/finished_isomers << "us" << std::endl;
+
+        //Remove the maximum and minimum values from the runtime arrays:
+        T_gens.erase(T_gens.begin()+std::distance(T_gens.begin(),std::max_element(T_gens.begin(),T_gens.end())));
+        T_duals.erase(T_duals.begin()+std::distance(T_duals.begin(),std::max_element(T_duals.begin(),T_duals.end())));
+        T_X0s.erase(T_X0s.begin()+std::distance(T_X0s.begin(),std::max_element(T_X0s.begin(),T_X0s.end())));
+        T_tuttes.erase(T_tuttes.begin()+std::distance(T_tuttes.begin(),std::max_element(T_tuttes.begin(),T_tuttes.end())));
+        T_opts.erase(T_opts.begin()+std::distance(T_opts.begin(),std::max_element(T_opts.begin(),T_opts.end())));
+        T_flat.erase(T_flat.begin()+std::distance(T_flat.begin(),std::max_element(T_flat.begin(),T_flat.end())));
+        T_queue.erase(T_queue.begin()+std::distance(T_queue.begin(),std::max_element(T_queue.begin(),T_queue.end())));
+        T_io.erase(T_io.begin()+std::distance(T_io.begin(),std::max_element(T_io.begin(),T_io.end())));
+        T_hess.erase(T_hess.begin()+std::distance(T_hess.begin(),std::max_element(T_hess.begin(),T_hess.end())));
+        T_spectrum.erase(T_spectrum.begin()+std::distance(T_spectrum.begin(),std::max_element(T_spectrum.begin(),T_spectrum.end())));
+        T_eccentricity.erase(T_eccentricity.begin()+std::distance(T_eccentricity.begin(),std::max_element(T_eccentricity.begin(),T_eccentricity.end())));
+        T_volume.erase(T_volume.begin()+std::distance(T_volume.begin(),std::max_element(T_volume.begin(),T_volume.end())));
+
 
         //Print out what fraction of the runtime that each component took:
-        out_file << N << ", "<< sample_size << ", "<< finished_isomers << ", " << mean(T_gens)/1ns << ", " << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns <<  ", " << mean(T_flat)/1ns <<  ", " << mean(T_queue)/1ns << ", " << mean(T_io)/1ns << "\n";
-        out_std << N << ", "<< sample_size << ", " << finished_isomers << ", " << sdev(T_gens)/1ns << ", " << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns << ", " << sdev(T_flat)/1ns << ", " << sdev(T_queue)/1ns << ", " << sdev(T_io)/1ns << "\n";
+        out_file << N << ", "<< sample_size << ", "<< finished_isomers << ", " << mean(T_gens)/1ns << ", " << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns <<  ", " << mean(T_flat)/1ns <<  ", " << mean(T_queue)/1ns << ", " << mean(T_io)/1ns << "," << mean(T_hess)/1ns << "," << mean(T_spectrum)/1ns << "," << mean(T_eccentricity)/1ns << "," << mean(T_volume)/1ns << "\n";
+        out_std << N << ", "<< sample_size << ", " << finished_isomers << ", " << sdev(T_gens)/1ns << ", " << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns << ", " << sdev(T_flat)/1ns << ", " << sdev(T_queue)/1ns << ", " << sdev(T_io)/1ns << "," << sdev(T_hess)/1ns << "," << sdev(T_spectrum)/1ns << "," << sdev(T_eccentricity)/1ns << "," << sdev(T_volume)/1ns << "\n";
+        std::cout << N << "  Dual: " << std::fixed << std::setprecision(2) << (float)(mean(T_duals)/1us)/sample_size << "us  Tutte: " << std::fixed << std::setprecision(2) << (float)(mean(T_tuttes)/1us)/sample_size << "us  X0: " << std::fixed << std::setprecision(2) << (float)(mean(T_X0s)/1us)/sample_size << "us  Opt: " << std::fixed << std::setprecision(2) << (float)(mean(T_opts)/1us)/sample_size << "us  Flat: " << std::fixed << std::setprecision(2) << (float)(mean(T_flat)/1us)/sample_size << "us  Queue: " << std::fixed << std::setprecision(2) << (float)(mean(T_queue)/1us)/finished_isomers << "us" << std::fixed << std::setprecision(2) << "  IO: " << (float)(mean(T_io)/1us)/finished_isomers << "us" << std::fixed << std::setprecision(2) << "  Hess: " << (float)(mean(T_hess)/1us)/sample_size << "us" << std::fixed << std::setprecision(2) << "  Spectrum: " << (float)(mean(T_spectrum)/1us)/sample_size << "us" << std::fixed << std::setprecision(2) << "  Eccentricity: " << (float)(mean(T_eccentricity)/1us)/sample_size << "us" << std::fixed << std::setprecision(2) << "  Volume: " << (float)(mean(T_volume)/1us)/sample_size << "us" << std::endl;
      }
     
 }
