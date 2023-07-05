@@ -8,7 +8,6 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
-#include <filesystem>
 #include <fstream>
 #include <numeric>
 #include <random>
@@ -312,7 +311,7 @@ namespace cuda_benchmark {
         static int id_counter = 0;
         static std::string m_path = path;
         static ifstream isomer_sample(path,std::ios::binary); 
-        static auto available_samples = std::filesystem::file_size(path) / (sizeof(device_node_t) * G.N * 6);
+        static auto available_samples = file_size(path) / (sizeof(device_node_t) * G.N * 6);
         static auto m_fsize = available_samples * sizeof(device_node_t) * G.N * 6;
         static int Nf = G.N;
         static std::vector<device_node_t> input_buffer(m_fsize/sizeof(device_node_t));
@@ -324,7 +323,7 @@ namespace cuda_benchmark {
             m_path = path;
             isomer_sample.close();
             isomer_sample.open(path,std::ios::binary);
-            available_samples = std::filesystem::file_size(path) / (sizeof(device_node_t) * G.N * 6);
+            available_samples = file_size(path) / (sizeof(device_node_t) * G.N * 6);
             Nf = G.N;
             m_fsize = available_samples * sizeof(device_node_t) * G.N * 6;
             input_buffer.resize(m_fsize/sizeof(device_node_t));

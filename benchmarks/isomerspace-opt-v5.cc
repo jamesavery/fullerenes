@@ -4,7 +4,7 @@
 #include "fullerenes/gpu/cuda_definitions.h"
 #include <chrono>
 #include <fstream>
-#include "filesystem"
+#include <iomanip> 		// Needed for std::setprecision
 #include "random"
 #include "numeric"
 #include <future>
@@ -46,7 +46,7 @@ int main(int argc, char** argv){
         Graph G;
         auto Nf = N/2 +2;
         std::string path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
-        auto fsize = std::filesystem::file_size(path);
+        auto fsize = file_size(path);
         auto n_samples = fsize / (Nf * 6 * sizeof(device_node_t));
         ifstream in_file(path,std::ios::binary);
         std::vector<device_node_t> dual_neighbours(n_samples * Nf * 6);

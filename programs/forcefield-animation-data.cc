@@ -12,10 +12,9 @@ using namespace chrono_literals;
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
+#include "fullerenes/progress_bar.hh"
 #include "numeric"
 #include "random"
-#include "filesystem"
-#include "fullerenes/progress_bar.hh"
 using namespace gpu_kernels;
 
 int main(int argc, char** argv){
@@ -39,7 +38,7 @@ int main(int argc, char** argv){
     
     auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
     ifstream isomer_sample(path,std::ios::binary);
-    auto fsize = std::filesystem::file_size(path);
+    auto fsize = file_size(path);
     std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
     auto available_samples = fsize / (Nf*6*sizeof(device_node_t));
     isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), Nf*6*sizeof(device_node_t)*available_samples);
