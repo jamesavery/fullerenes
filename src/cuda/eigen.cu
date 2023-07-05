@@ -708,7 +708,6 @@ namespace gpu_kernels{
                     if (i % 2 == 0 && i > 1){
                         V[(i-1)*N] = MGS(i-1);
                         V[i*N] = MGS(i);
-                        //if(threadIdx.x + blockIdx.x == 0) printf("i = %d, N = %d, V[i*N] = %f\n", i, N, V[i*N]);
                     }
                     real_t v = mat_vect(V[i*N]);
                     smem[threadIdx.x] = real_t(0); //Clear the shared memory
