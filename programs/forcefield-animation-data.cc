@@ -15,6 +15,7 @@ using namespace chrono_literals;
 #include "numeric"
 #include "random"
 #include "filesystem"
+#include "fullerenes/progress_bar.hh"
 using namespace gpu_kernels;
 
 int main(int argc, char** argv){
@@ -25,7 +26,7 @@ int main(int argc, char** argv){
     auto Nf = N/2 + 2;
     G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
     G.N = Nf;
-
+    ProgressBar progress_bar('=', 70);
 
     auto batch_size = isomerspace_forcefield::optimal_batch_size(N);
     auto n_fullerenes = (int)num_fullerenes.find(N)->second;
@@ -34,6 +35,7 @@ int main(int argc, char** argv){
     bool more_to_generate = true;
     ofstream out0; out0.open("AnimationCoordinates.bin", std::ios::binary);
     ofstream out1; out1.open("AnimationGraphs.bin", std::ios::binary);
+    ofstream out2; out2.open("Animation2DCoordinates.bin", std::ios::binary); //Tutte layouts
     
     auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
     ifstream isomer_sample(path,std::ios::binary);
@@ -67,18 +69,47 @@ int main(int argc, char** argv){
 
     Q0.refill_batch(batch0);
     isomerspace_dual::dualise(batch0);
-    isomerspace_tutte::tutte_layout(batch0);
+
+
+    std::cout << std::endl;
+    for (size_t i = 0; i < 500; i++)
+    {
+        isomerspace_tutte::tutte_layout(batch0, i*N/20);
+        cuda_io::copy(h_batch, batch0);
+        out2.write(reinterpret_cast<char*>(h_batch.xys), N*2*sizeof(device_real_t)*sample_size);
+        out2.flush();
+        progress_bar.update_progress((i+1)/500.f);
+    }
+
     isomerspace_X0::zero_order_geometry(batch0, 4.0);
 
     for (int i = 0; i < 100; i++){
         isomerspace_forcefield::optimise<PEDERSEN>(batch0,int(N*5/100),N*5);
         cuda_io::copy(h_batch, batch0);
-        out0.write(reinterpret_cast<char*>(h_batch.X), N*3*sizeof(float)*sample_size); 
+        out0.write(reinterpret_cast<char*>(h_batch.X), N*3*sizeof(device_real_t)*sample_size); 
         out0.flush();
+        progress_bar.update_progress((i+1)/100.f);
     }
+
+    CuArray<device_real_t> Ecc(sample_size);
+    isomerspace_properties::eccentricities(batch0, Ecc);
     out1.write(reinterpret_cast<char*>(h_batch.cubic_neighbours), N*3*sizeof(device_node_t)*sample_size);
-    
+    vector<int> fail_ids;
+    for (int i = 0; i < sample_size; i++){
+        if (h_batch.statuses[i] == IsomerStatus::FAILED){
+            fail_ids.push_back(i);
+        }
+    }
+    std::vector<int> ecc_ids(sample_size);
+    std::iota(ecc_ids.begin(), ecc_ids.end(), 0);
+    std::sort(ecc_ids.begin(), ecc_ids.end(), [&Ecc](int i1, int i2) {return Ecc[i1] < Ecc[i2];});
+
+    std::cout << "\nEccentricities ids: " << ecc_ids << std::endl;
+
+
+    std::cout <<  "\nFailed isomers: " << fail_ids << std::endl;
 
     out0.close();
     out1.close();
+    out2.close();
 }
