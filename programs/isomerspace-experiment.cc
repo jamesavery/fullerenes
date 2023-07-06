@@ -27,24 +27,46 @@ using namespace gpu_kernels;
 
 typedef device_real_t real_t;	// We'll use the device real type everywhere in this program
 
+  typedef enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage_t;
+  typedef enum {VOLUME,ECCENTRICITY,MIN_FREQ,MAX_FREQ, FREQ_WIDTH, INERTIA, NUM_RESULTS} results_t; // Results on which to do statistics
+  string result_names[NUM_RESULTS] = {"volume","eccentricity","minfreq","maxfreq","freqwidth","inertia"};
+  string stage_names [NUM_STAGES]  = {"generate","start_geometry","optimized_geometry","properties","statistics"};
+  constexpr int result_sizes[NUM_RESULTS] = {1,1,1,1,1,3}; // How many scalars per result?
+
 
 void signal_callback_handler(int signum)
 {
   exit(signum);
 }
 
+#include <sys/resource.h>
+void ensure_minimal_stacksize(rlim_t minimal_stacksize)
+{
+  struct rlimit rl;
+
+  int error = getrlimit(RLIMIT_STACK, &rl);
+  rl.rlim_cur = std::max(rl.rlim_cur,minimal_stacksize);
+  error += setrlimit(RLIMIT_STACK, &rl);
+
+  if(error<0){
+    perror("ensure_minimal_stacksize failed: ");
+    abort();
+  }
+}
+
 
 struct isomer_candidate {
-  double value;
+  device_real_t value;
   int id;
-  vector<device_node_t> cubic_neighbours, Hcol;
+  array<device_real_t,NUM_RESULTS> results;
+  
+  vector<device_node_t> cubic_neighbours/*, Hcol*/;
   vector<real_t> X;
-  vector<real_t> H;
+  //  vector<real_t> H;
   
 
-  isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B,
-		   const CuArray<real_t> &Hs, const CuArray<device_node_t> &Hcols):
-    value(value), id(id), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
+  isomer_candidate(double value, int id, array<device_real_t,NUM_RESULTS> &results,int N, int ix, const IsomerBatch &B):
+    value(value), id(id), results(results), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
     //    memcpy(&H[0],               Hs.data + 90*N*ix,        90*N*sizeof(real_t));
@@ -89,26 +111,25 @@ int main(int ac, char **argv)
   const size_t N                = strtol(argv[1],0,0);   // Argument 1: Number of vertices N
 
   string output_dir     = ac>=3? argv[2] : string("output/C")+to_string(N);     // Argument 2: directory to output files to
-  int IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
-  int only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
-  int n_best_candidates = ac>=6? strtol(argv[5],0,0):50; // Argument 5: How many best fullerne candidates do you want to store? 
+  bool IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
+  bool only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
+  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):50; // Argument 5: How many best fullerne candidates do you want to store? 
 
-
+  ensure_minimal_stacksize(N*10000000);
+  
+  
   // Make sure output directory exists
   mkdir(output_dir.c_str(),0777);
   size_t n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
+  n_best_candidates = min(n_best_candidates, n_fullerenes/4);
 
+  
   int    Nd = LaunchCtx::get_device_count();
   size_t batch_size = min((size_t)isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
   cout << "Analyzing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
 
   // Organize all of our of computation pipeline stages and our scoresl of different results
-  typedef enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage_t;
-  typedef enum {VOLUME,ECCENTRICITY,MIN_FREQ,MAX_FREQ, FREQ_WIDTH, INERTIA, NUM_RESULTS} results_t; // Results on which to do statistics
-  string result_names[NUM_RESULTS] = {"volume","eccentricity","minfreq","maxfreq","freqwidth","inertia"};
-  string stage_names [NUM_STAGES]  = {"generate","start_geometry","optimized_geometry","properties","statistics"};
-  constexpr int result_sizes[NUM_RESULTS] = {1,1,1,1,1,3}; // How many scalars per result?
 
   array<array<double,2>,NUM_RESULTS> result_bounds = {{
     {0.24*pow(N,3/2.)-50,0.4*pow(N,3/2.)+50}, // Volume bounds
@@ -176,7 +197,7 @@ int main(int ac, char **argv)
   
   int I=0;			// Global isomer number at start of batch
 
-  vector<bool> stage_finished(NUM_STAGES,false);
+  vector<bool> stage_finished(NUM_STAGES,0);
   vector<int>  num_finished  (NUM_STAGES,0);
   vector<vector<int>> num_finished_this_round(NUM_STAGES,vector<int>(Nd));
   
@@ -231,7 +252,7 @@ int main(int ac, char **argv)
     gen_ctxs[0].wait(); gen_ctxs[1].wait(); 
     num_finished[GEN] = I;
     //TODO: num_finished_this_round[GEN][d]
-    stage_finished[GEN] = num_finished[GEN] == n_fullerenes;
+    stage_finished[GEN] = num_finished[GEN] >= n_fullerenes; // TODO: 
     return true;
   };
 
@@ -240,12 +261,14 @@ int main(int ac, char **argv)
     for (int d = 0; d < Nd; d++){
       if(Q0s[d].get_size() > 0){
 	auto &B   = Bs[GEO][d];
+	auto &ctx = gen_ctxs[d];
+	device_real_t scalerad = 4;
 	
-	Q0s[d].refill_batch(B, gen_ctxs[d], policy);
-	isomerspace_dual ::dualise     (B,       gen_ctxs[d], policy);
-	isomerspace_tutte::tutte_layout(B, N*10, gen_ctxs[d], policy);
-	isomerspace_X0   ::zero_order_geometry(B, 4.0f, gen_ctxs[d], policy);
-	Q1s[d].push_all(B, gen_ctxs[d], policy);
+	Q0s[d].refill_batch(B, ctx, policy);
+	isomerspace_dual ::dualise     (B,       ctx, policy);
+	isomerspace_tutte::tutte_layout(B, N*10, ctx, policy);
+	isomerspace_X0   ::zero_order_geometry(B, scalerad, ctx, policy);
+	Q1s[d].push_all(B, ctx, policy);
       }
     }
     for(int d=0; d<Nd; d++){
@@ -253,26 +276,38 @@ int main(int ac, char **argv)
       num_finished_this_round[GEO][d] = Q1s[d].get_size() - qsize_geo[d];
       num_finished[GEO]              += num_finished_this_round[GEO][d];
     }
-    stage_finished[GEO] = num_finished[GEO] == n_fullerenes;    
+    stage_finished[GEO] = num_finished[GEO] >= n_fullerenes;    // TODO: Debug over-counting
   };
   
-  auto opt_routine = [&](){
+  auto opt_routine = [&](bool final=false){
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int d = 0; d < Nd; d++){
       auto &B   = Bs[OPT][d];
       auto &ctx = opt_ctxs[d];
       Q1s[d].refill_batch(B, opt_ctxs[d], policy);
-      isomerspace_forcefield::optimise<FLATNESS_ENABLED>(B, N, 5*N, ctx, policy);
-      //      cuda_io::reset_convergence_statuses(B,  ctx, policy);
-      //      isomerspace_forcefield::optimise<PEDERSEN>(B, ceil(0.5*N), 5*N, ctx, policy);      
-      Q2s[d].push_done(B, opt_ctxs[d], policy);
+      isomerspace_forcefield::optimise<PEDERSEN>(B, 3*N, 20*N, ctx, policy);      
+      Q2s[d].push_done(B, ctx, policy);
+      if(final) cuda_io::copy(host_batch[d],B,ctx,policy); 
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
+			
       num_finished_this_round[OPT][d] = Q2s[d].get_size() - qsize[d];
       num_finished[OPT]              += num_finished_this_round[OPT][d];
     }
-    stage_finished[OPT] = num_finished[OPT] == n_fullerenes;
+    stage_finished[OPT] = num_finished[OPT] >= n_fullerenes; // TODO: Debug over-counting
+
+    if(final){
+      for(int d=0;d<Nd;d++){
+	size_t NSTAT = int(IsomerStatus::NOT_CONVERGED)+1;
+	vector<size_t> n_states(NSTAT);
+	
+	for(size_t di=0;di<host_batch[d].isomer_capacity;di++) n_states[size_t(host_batch[d].statuses[di])]++;
+
+	cout << "Batch " << d << " has statuses: " << n_states << "; num_finished = "<<num_finished[OPT]<<"\n";
+      }
+    }
+    return true;
   };
 
   auto prop_routine = [&](){
@@ -299,7 +334,7 @@ int main(int ac, char **argv)
       num_finished_this_round[PROP][d] = qsize[d] - Q2s[d].get_size();
       num_finished[PROP]              += num_finished_this_round[PROP][d];
     }
-    stage_finished[PROP] = num_finished[PROP] == n_fullerenes;
+    stage_finished[PROP] = num_finished[PROP] >= n_fullerenes; // TODO: Debug over-counting
   };
 
   
@@ -312,7 +347,7 @@ int main(int ac, char **argv)
   };
 
   auto stat_routine = [&](){
-    
+    fprintf(stderr,"stat start\n");
     //      vector<real_t> volumes_merged(sum(num_finished_this_round[PROP]));
     //      vector<real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
     vector<int> opt_failed, opt_not_converged;
@@ -353,11 +388,11 @@ int main(int ac, char **argv)
 	}
 	  
 	if(status == IsomerStatus::CONVERGED){
-	  isomer_candidate C(0, id, N, di, host_batch[d],hessians[d],hessian_cols[d]);
-	
+	  array<device_real_t,NUM_RESULTS> R;
+	      	
 	  // Convert from Hessian eigenvalues to normal mode frequencies in teraherz	    
 	  real_t min_freq = sqrt(results[MIN_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
-	    max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
+	         max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
 	  
 	  // Convert frequencies from teraherz to cm^{-1} to compare with experiment
 	  min_freq *= 33.356;
@@ -366,6 +401,12 @@ int main(int ac, char **argv)
 	  results[MIN_FREQ][d][di]   = min_freq;
 	  results[MAX_FREQ][d][di]   = max_freq;
 	  results[FREQ_WIDTH][d][di] = max_freq-min_freq;
+
+
+	  for(int r=0;r<NUM_RESULTS;r++)
+	    if(result_sizes[r]==1) R[r] = results[r][d][di];
+	  
+	  isomer_candidate C(0, id, R, N, di, host_batch[d]);
 	  
 	  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
 	      auto v = results[r][d][di];
@@ -412,7 +453,9 @@ int main(int ac, char **argv)
     
     
     
-    if(num_finished[STAT] == n_fullerenes) stage_finished[STAT] = true;
+    if(num_finished[STAT] >= n_fullerenes) stage_finished[STAT] = true; // TODO: We're overcounting somehow, getting num_finished > n_fullerenes. DEBUG!
+
+    fprintf(stderr,"stat end\n");    
   };
 
   auto final_round = [&](int s){
@@ -444,9 +487,22 @@ int main(int ac, char **argv)
       
       handle.wait();
       auto T4 = steady_clock::now(); Tgen += T4-T3;
-      while(final_round(OPT))  opt_routine();
-      if   (final_round(PROP)) prop_routine();
-      if   (final_round(STAT)) stat_routine();
+      ssize_t final_step_max = 100, num_orphans = 0;
+      if(final_round(OPT)){
+	for(ssize_t final_step=0;final_step < final_step_max  && final_round(OPT); final_step++){
+	  fprintf(stderr,"final opt start\n");
+	  opt_routine(true);
+	  fprintf(stderr,"final opt end\n");
+	}
+	if(!stage_finished[OPT]){
+	  stage_finished[OPT] = true; // Avoid endless loop if miscounting. But also TODO: Find out why miscounting sometimes happens!
+	  num_orphans = n_fullerenes - num_finished[OPT];
+	  fprintf(stderr,"Finishing final round of optimizing, %ld isomers orphaned.\n",num_orphans);
+	}
+      }
+
+      if   (final_round(PROP)){ fprintf(stderr,"final prop start\n"); prop_routine(); fprintf(stderr,"final prop end\n"); }
+      if   (final_round(STAT)){ fprintf(stderr,"final stat start\n"); stat_routine();  fprintf(stderr,"final stat end\n"); }
 
 
       
@@ -481,11 +537,12 @@ int main(int ac, char **argv)
   cout << "COMPLETED IN " << loop_iters << " rounds.\n";
   cout << "num_finished            = " << num_finished  << "\n";
   for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
-    auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
+      auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
     cout << result_names[r] << "_min = " << smallest << "\n"
          << "   (removed " << terrible_outliers[r].size() << " outliers, please inspect and fix)\n"
 	 << result_names[r] << "_max = " << biggest << "\n\n";
   }
+  cout.flush();
 
   // cout << "all_volumes = " << result_reference[VOLUME] << "\n";
   // cout << "all_eccentricity = " << result_reference[ECCENTRICITY] << "\n";  
@@ -528,10 +585,15 @@ int main(int ac, char **argv)
     string min_dir    = result_dir + "/min", max_dir = result_dir+"/max", outlier_dir = result_dir + "/terrible_outliers";
 
     // Output candidate isomers
-    auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
-
-    fwrite(&smallest[0],sizeof(device_real_t),n_best_candidates,f_min);
-    fwrite(&biggest[0], sizeof(device_real_t),n_best_candidates,f_max);    
+    vector<isomer_candidate> smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
+    //TODO: Redundant due to writing out all results for k_smallest
+    vector<device_real_t> smallest_values(n_best_candidates), biggest_values(n_best_candidates);
+    for(size_t i=0;i<n_best_candidates;i++){
+      smallest_values[i] = smallest[i].value;
+      biggest_values [i] = biggest[i].value;
+    }
+    fwrite(&smallest_values[0],sizeof(device_real_t),n_best_candidates,f_min);
+    fwrite(&biggest_values[0], sizeof(device_real_t),n_best_candidates,f_max);    
     
     mkdir(result_dir.c_str(), 0777);
     mkdir(min_dir.c_str(), 0777);
@@ -540,6 +602,8 @@ int main(int ac, char **argv)
     mkdir(outlier_dir.c_str(), 0777);    
     
     for(size_t i=0;i<n_best_candidates;i++){
+      assert(i<smallest.size());
+      assert(i<biggest.size());
       isomer_candidate Cmin = smallest[i], Cmax = biggest[i];
       Polyhedron
 	Pmin(host_graph(Cmin.cubic_neighbours), host_points(Cmin.X)),
@@ -552,11 +616,23 @@ int main(int ac, char **argv)
 
 
       {
-	vector<node_t> flat_neighbours(3*N);
-	for(node_t u=0;u<N;u++)
-	  for(int j=0;j<3;j++) flat_neighbours[3*u+j] = Pmax.neighbours[u][j];
-	FILE *f = fopen((max_dir+"/Pmax-"+to_string(i)+".uint32_t").c_str(),"wb");
-	fwrite(&flat_neighbours[0],sizeof(node_t),3*N,f);
+	// for(node_t u=0;u<N;u++)
+	//   for(int j=0;j<3;j++) flat_neighbours[3*u+j] = Pmax.neighbours[u][j];
+	// FILE *f = fopen((max_dir+"/Pmax-"+to_string(i)+"-graph.uint32_t").c_str(),"wb");
+	// fwrite(&flat_neighbours[0],sizeof(node_t),3*N,f);
+
+	FILE *f = fopen((min_dir+"/Pmin-"+to_string(i)+"-results.float32").c_str(),"wb");
+	if(!f){
+	  perror((min_dir+"/Pmin-"+to_string(i)+"-results.float32").c_str());
+	} else 
+	  fwrite(&Cmin.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+	fclose(f);
+
+	f = fopen((max_dir+"/Pmax-"+to_string(i)+"-results.float32").c_str(),"wb");
+	if(!f){
+	  perror((max_dir+"/Pmax-"+to_string(i)+"-results.float32").c_str());
+	} else	
+	  fwrite(&Cmax.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
 	fclose(f);
       }
     }
