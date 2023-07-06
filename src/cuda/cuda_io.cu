@@ -171,14 +171,14 @@ namespace cuda_io{
             std::cout << "IsomerBatches are of different types and or dimensions \n";
         }{
             auto [n_correct_X,          accuracy0, avg_diff0] = compare_isomer_arrays(a.X, b.X, a.isomer_capacity, a.n_atoms*3, tol, verbose);
-            auto [n_correct_xys,        accuracy1, avg_diff1] = compare_isomer_arrays(a.xys, b.xys, a.isomer_capacity, a.n_atoms*2, tol, verbose);
+	    //            auto [n_correct_xys,        accuracy1, avg_diff1] = compare_isomer_arrays(a.xys, b.xys, a.isomer_capacity, a.n_atoms*2, tol, verbose);
             auto [n_correct_neighbours, accuracy2] = compare_isomer_meta(a.cubic_neighbours, b.cubic_neighbours, a.isomer_capacity, a.n_atoms*3);
             auto [n_correct_IDs,        accuracy3] = compare_isomer_meta(a.IDs, b.IDs, a.isomer_capacity, 1);
             auto [n_correct_statuses,   accuracy4] = compare_isomer_meta(a.statuses, b.statuses, a.isomer_capacity, 1);
             auto [n_correct_iterations, accuracy5] = compare_isomer_meta(a.iterations, b.iterations, a.isomer_capacity, 1);
             
             std::cout << "X                 | " << n_correct_X << "/" << a.isomer_capacity*a.n_atoms*3 << " | Acc:" << accuracy0 << "%\t | Avg Diff: " << avg_diff0 << "\n";
-            std::cout << "xys               | " << n_correct_xys << "/" << a.isomer_capacity*a.n_atoms*2 << " | Acc:" << accuracy1 << "%\t | Avg Diff: " << avg_diff1 << "\n";
+	    //            std::cout << "xys               | " << n_correct_xys << "/" << a.isomer_capacity*a.n_atoms*2 << " | Acc:" << accuracy1 << "%\t | Avg Diff: " << avg_diff1 << "\n";
             std::cout << "cubic_neighbours  | " << n_correct_neighbours << "/" << a.isomer_capacity*a.n_atoms*3 << " | Acc:" << accuracy2 << "%\t\n";
             std::cout << "IDs               | " << n_correct_IDs << "/" << a.isomer_capacity << " | Acc:" << accuracy3 << "%\t\n";
             std::cout << "statuses          | " << n_correct_statuses << "/" << a.isomer_capacity << " | Acc:" << accuracy4 << "%\t\n";
@@ -329,8 +329,8 @@ namespace cuda_io{
     void reset_convergence_status_(IsomerBatch B){
         for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x)
         {
-            if (threadIdx.x == 0) B.statuses[isomer_idx] = B.statuses[isomer_idx] != IsomerStatus::EMPTY ? IsomerStatus::NOT_CONVERGED : IsomerStatus::EMPTY;
-            if (threadIdx.x == 0) B.iterations[isomer_idx] = 0;
+	  if (threadIdx.x == 0) B.statuses[isomer_idx] = (B.statuses[isomer_idx] == IsomerStatus::EMPTY)? IsomerStatus::EMPTY : IsomerStatus::NOT_CONVERGED;
+	  if (threadIdx.x == 0) B.iterations[isomer_idx] = 0;
         }
         
     }
