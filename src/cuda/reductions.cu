@@ -5,8 +5,9 @@
 #define CONFLICT_FREE_OFFSET(n) ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
 namespace cg = cooperative_groups;
 
+template <typename T>
 #if REDUCTION_METHOD==0
-    __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
+    __device__ T reduction(T* sdata, const T data){
         sdata[threadIdx.x] = data;
         BLOCK_SYNC
         if((Block_Size_Pow_2 > 512)){if (threadIdx.x < 512){sdata[threadIdx.x] += sdata[threadIdx.x + 512];} BLOCK_SYNC}
@@ -16,15 +17,15 @@ namespace cg = cooperative_groups;
         if(threadIdx.x < 32){
         if((Block_Size_Pow_2 > 32)){if (threadIdx.x < 32){sdata[threadIdx.x] += sdata[threadIdx.x + 32];} __syncwarp();}
         cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
-        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<device_real_t>());
+        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<T>());
         }
         BLOCK_SYNC
-        device_real_t sum = sdata[0];
+        T sum = sdata[0];
         BLOCK_SYNC
         return sum;
     }
 #elif REDUCTION_METHOD==1
-    __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data){
+    __device__ T reduction(T* sdata, const T data){
         sdata[threadIdx.x] = data;
         BLOCK_SYNC
         
@@ -35,23 +36,23 @@ namespace cg = cooperative_groups;
         if(threadIdx.x < 32){
         if (threadIdx.x < 32){sdata[threadIdx.x] += sdata[threadIdx.x + 32];} __syncwarp();
         cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
-        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<device_real_t>());
+        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<T>());
         }
         BLOCK_SYNC
-        device_real_t sum = sdata[0];
+        T sum = sdata[0];
         BLOCK_SYNC
         return sum;
     }
 #elif REDUCTION_METHOD==2
-    __device__ device_real_t reduction(device_real_t *sdata, const device_real_t data){
+    __device__ T reduction(T *sdata, const T data){
         sdata[threadIdx.x] = data;
         cg::thread_block block = cg::this_thread_block();
         BLOCK_SYNC
         cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(block);
-        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<device_real_t>());
+        sdata[threadIdx.x] = cg::reduce(tile32, sdata[threadIdx.x], cg::plus<T>());
         BLOCK_SYNC
 
-        device_real_t beta = 0.0;
+        T beta = 0.0;
         if (block.thread_rank() == 0) {
             beta  = 0;
             for (uint16_t i = 0; i < block.size(); i += tile32.size()) {
@@ -60,24 +61,24 @@ namespace cg = cooperative_groups;
             sdata[0] = beta;
         }
         BLOCK_SYNC
-        device_real_t sum = sdata[0];
+        T sum = sdata[0];
         BLOCK_SYNC
         return sum;
     }
 #elif REDUCTION_METHOD==3
-    __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data = (device_real_t)0){
+    __device__ T reduction(T* sdata, const T data = (T)0){
         auto num_warps = (blockDim.x >> 5) + 1;
         cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
         auto warpid = threadIdx.x >> 5;
         auto laneid = threadIdx.x & 31;
-        device_real_t temp = cg::reduce(tile32, data, cg::plus<device_real_t>());
+        T temp = cg::reduce(tile32, data, cg::plus<T>());
         if (num_warps > 1){
         //sdata[warpid + blockDim.x] = temp;
         BLOCK_SYNC
         if (laneid == 0) sdata[warpid] = temp;
         BLOCK_SYNC
         if (warpid == 0) {
-            temp = cg::reduce(tile32, sdata[laneid], cg::plus<device_real_t>());
+            temp = cg::reduce(tile32, sdata[laneid], cg::plus<T>());
         }
         }
         if (threadIdx.x == 0) sdata[0] = temp;
@@ -87,8 +88,8 @@ namespace cg = cooperative_groups;
         return result;
     }
 #elif REDUCTION_METHOD==4
-    __device__ device_real_t reduction(device_real_t* sdata, const device_real_t data = (device_real_t)0){
-        typedef cub::BlockReduce<device_real_t, 256> BlockReduce;
+    __device__ T reduction(T* sdata, const T data = (T)0){
+        typedef cub::BlockReduce<T, 256> BlockReduce;
         auto result = BlockReduce(reinterpret_cast<BlockReduce::TempStorage*>(sdata)).Sum(data)
         if (threadIdx.x == 0) sdata[0] = result;
         BLOCK_SYNC
@@ -102,19 +103,20 @@ namespace cg = cooperative_groups;
 //This code finds the maximum value of a set of data using a reduction algorithm.
 //The function takes as input a pointer to a shared memory array (sdata) and threadIdx.x's data (data).
 //The function returns the maximum value of the data set.
-__device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t data){
+template <typename T>
+__device__ T reduction_max(T* sdata, const T data){
      auto num_warps = (blockDim.x >> 5) + 1;
         cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
         auto warpid = threadIdx.x >> 5;
         auto laneid = threadIdx.x & 31;
-        device_real_t temp = cg::reduce(tile32, data, cg::greater<device_real_t>());
+        T temp = cg::reduce(tile32, data, cg::greater<T>());
         if (num_warps > 1){
         //sdata[warpid + blockDim.x] = temp;
         BLOCK_SYNC
         if (laneid == 0) sdata[warpid] = temp;
         BLOCK_SYNC
         if (warpid == 0) {
-            temp = cg::reduce(tile32, sdata[laneid], cg::greater<device_real_t>());
+            temp = cg::reduce(tile32, sdata[laneid], cg::greater<T>());
         }
         }
         if (threadIdx.x == 0) sdata[0] = temp;
@@ -124,19 +126,20 @@ __device__ device_real_t reduction_max(device_real_t* sdata, const device_real_t
         return result;
 }
 
-__device__ device_real_t reduction_min(device_real_t* sdata, const device_real_t data){
+template <typename T>
+__device__ T reduction_min(T* sdata, const T data){
      auto num_warps = (blockDim.x >> 5) + 1;
         cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
         auto warpid = threadIdx.x >> 5;
         auto laneid = threadIdx.x & 31;
-        device_real_t temp = cg::reduce(tile32, data, cg::less<device_real_t>());
+        T temp = cg::reduce(tile32, data, cg::less<T>());
         if (num_warps > 1){
         //sdata[warpid + blockDim.x] = temp;
         BLOCK_SYNC
         if (laneid == 0) sdata[warpid] = temp;
         BLOCK_SYNC
         if (warpid == 0) {
-            temp = cg::reduce(tile32, sdata[laneid], cg::less<device_real_t>());
+            temp = cg::reduce(tile32, sdata[laneid], cg::less<T>());
         }
         }
         if (threadIdx.x == 0) sdata[0] = temp;
@@ -166,10 +169,11 @@ __device__ device_node_t reduction_max(device_node_t* sdata, const device_node_t
     return max;
 }
 
-__device__ device_real_t global_reduction(device_real_t *sdata, device_real_t *gdata, device_real_t data, bool mask){
+template <typename T>
+__device__ T global_reduction(T *sdata, T *gdata, T data, bool mask){
     GRID_SYNC
-    if(!mask){data = (device_real_t)0.0;}
-    device_real_t block_sum    = reduction(sdata,data);
+    if(!mask){data = (T)0.0;}
+    T block_sum    = reduction(sdata,data);
     if(threadIdx.x == 0){gdata[blockIdx.x] = block_sum;}
     GRID_SYNC
 
@@ -182,10 +186,10 @@ __device__ device_real_t global_reduction(device_real_t *sdata, device_real_t *g
         if (threadIdx.x < 32 && blockIdx.x == 0)
         {
             cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
-            gdata[threadIdx.x] = cg::reduce(tile32, gdata[threadIdx.x], cg::plus<device_real_t>()); 
+            gdata[threadIdx.x] = cg::reduce(tile32, gdata[threadIdx.x], cg::plus<T>()); 
         }
     GRID_SYNC
-    device_real_t sum = (device_real_t)0.0;
+    T sum = (T)0.0;
     sum = gdata[0];
     GRID_SYNC
     return sum;
