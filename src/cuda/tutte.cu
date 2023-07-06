@@ -57,7 +57,9 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
 
 
     node3 ns            = (reinterpret_cast<node3*>(B.cubic_neighbours) + offset)[threadIdx.x];
+
     xys[threadIdx.x]    = {hpreal_t(0.0), hpreal_t(0.0)};
+
     node_t outer_face[6];
     node_t outer_face_vertex   = 0;
     uint8_t Nface = FG.get_face_oriented(0,FG.cubic_neighbours[0], outer_face);    
@@ -108,7 +110,9 @@ void tutte_layout_(IsomerBatch B, const size_t iterations){
         // Reduce the relative change to find the maximum change
         hpreal_t iteration_max = reduction_max(sharedmem, relative_change);
         if (iteration_max > max_change) max_change = iteration_max;
+
         converged = max_change <= 100*numeric_limits<hpreal_t>::epsilon();
+
         // Update the position of the point
         xys[threadIdx.x] = newxys[threadIdx.x];
     }

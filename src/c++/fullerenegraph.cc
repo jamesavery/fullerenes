@@ -293,6 +293,7 @@ vector<coord3d> FullereneGraph::optimised_geometry(const vector<coord3d>& points
   // cout << "g = " << *this << ";\n";
 
   int zero = 0;
+  int one = 1;
   const FullereneGraph *g = this;
   sa_optff_(&g,&N,&zero,&zero,&opt_method,(double*)&coordinates[0],&ftol,&force_parameters[0]);
 

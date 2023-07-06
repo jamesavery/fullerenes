@@ -15,7 +15,8 @@ using namespace chrono_literals;
 
 int main(int argc, char** argv){
     const size_t N_limit                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
-    auto N_runs = 5;
+    const size_t N_runs                 = argc > 2 ? strtol(argv[2],0,0) : 10; // Argument 2: Number of runs
+    const size_t N_samples_              = argc > 3 ? strtol(argv[3],0,0) : 100; // Argument 3: Number of samples
     ofstream out_file("SeqBenchmark_" + to_string(N_limit) + ".txt");
     ofstream out_std("SeqBenchmark_STD_" + to_string(N_limit) + ".txt");
     out_file << "Generate, Samples, Update, Dual, Tutte, X0, Optimize \n";
@@ -24,7 +25,7 @@ int main(int argc, char** argv){
         if(N == 22) continue;
         BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
         
-        auto sample_size = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)num_fullerenes.find(N)->second);
+        auto N_samples = min((int)N_samples_,(int)num_fullerenes.find(N)->second);
 
         FullereneDual G;
         
@@ -52,10 +53,10 @@ int main(int argc, char** argv){
         std::vector<int> random_IDs(available_samples);
         std::iota(random_IDs.begin(), random_IDs.end(), 0);
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
-        std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
+        std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+N_samples);
 
         for (int l = 0; l < N_runs; l++){
-            for (int i = 0; i < sample_size; ++i){
+            for (int i = 0; i < N_samples; ++i){
                 for (size_t j = 0; j < Nf; j++){
                     G.neighbours[j].clear();
                     for (size_t k = 0; k < 6; k++) {
@@ -80,8 +81,8 @@ int main(int argc, char** argv){
             }
         }
         using namespace cuda_io;
-        out_file << N << ", "<< sample_size << ", " << mean(T_gens)/1ns << ", "  << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns << ", "<< mean(T_polys)/1ns << "\n";
-        out_std << N << ", "<< sample_size << ", " << sdev(T_gens)/1ns << ", "  << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns <<  ", " << sdev(T_polys)/1ns<<"\n";
+        out_file << N << ", "<< N_samples << ", " << mean(T_gens)/1ns << ", "  << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns << ", "<< mean(T_polys)/1ns << "\n";
+        out_std << N << ", "<< N_samples << ", " << sdev(T_gens)/1ns << ", "  << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns <<  ", " << sdev(T_polys)/1ns<<"\n";
      }
 
 }

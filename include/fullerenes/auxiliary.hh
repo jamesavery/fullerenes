@@ -314,7 +314,7 @@ public:
   size_t front_index, back_index;
   bool   empty() const { return front_index==back_index; }
   size_t size()  const { return back_index-front_index;  }
-  void   clear() const { front_index=back_index; }
+  void   clear() { front_index=back_index; }
   
   const T& front(size_t offset=0) const {
     assert(!empty() && (offset<size()));
