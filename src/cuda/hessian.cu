@@ -1619,7 +1619,8 @@ template <ForcefieldType T> __global__ void compute_hessians_(const IsomerBatch 
     auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
     for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
     BLOCK_SYNC
-    if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
+    if (isomer_idx < B.isomer_capacity)
+      if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED) { //Avoid illegal memory access
     size_t offset = isomer_idx * blockDim.x;
     Constants constants     = Constants(B, isomer_idx);
     NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);
@@ -1654,7 +1655,8 @@ template <ForcefieldType T> __global__ void compute_hessians_fd_(const IsomerBat
     auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
     for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
     BLOCK_SYNC
-    if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
+    if (isomer_idx < B.isomer_capacity) //Avoid illegal memory access
+      if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED) { // Only compute Hessian for valid geometries
     size_t offset = isomer_idx * blockDim.x;
     Constants constants     = Constants(B, isomer_idx);
     NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);
