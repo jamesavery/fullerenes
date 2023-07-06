@@ -50,7 +50,7 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
     for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx+= gridDim.x){
     GRID_SYNC
     bool access_queue = false;
-    if (isomer_idx < B.isomer_capacity) access_queue = B.statuses[isomer_idx] != IsomerStatus::NOT_CONVERGED;
+    if (isomer_idx < B.isomer_capacity) access_queue = (B.statuses[isomer_idx] != IsomerStatus::NOT_CONVERGED && B.statuses[isomer_idx] != IsomerStatus::PLZ_CHECK); // TODO: OK?
     
     //Perform a grid scan over the array of 0s and 1s (1 if a block needs to access the queue and 0 otherwise).
     //If the grid is larger than the batch capacity, we only want to scan over the interval [0,B.isomer_capacity-1]

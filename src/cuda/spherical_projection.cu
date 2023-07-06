@@ -53,30 +53,30 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t
 
 
 __device__
-device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, const size_t isomer_idx){
+coord2dh spherical_projection(const IsomerBatch& B, device_node_t* sdata, const size_t isomer_idx){
     DEVICE_TYPEDEFS;
 
     node_t distance =  multiple_source_shortest_paths(B,reinterpret_cast<node_t*>(sdata), isomer_idx);
     BLOCK_SYNC
-    clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); 
+    clear_cache(reinterpret_cast<hpreal_t*>(sdata), Block_Size_Pow_2); 
     node_t d_max = reduction_max(sdata, distance);
 
-    clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); 
-    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance],real_t(1.0)); 
+    clear_cache(reinterpret_cast<hpreal_t*>(sdata), Block_Size_Pow_2); 
+    ordered_atomic_add(&reinterpret_cast<hpreal_t*>(sdata)[distance],hpreal_t(1.0)); 
     BLOCK_SYNC
-    node_t num_of_same_dist = node_t(reinterpret_cast<real_t*>(sdata)[distance]); 
+    node_t num_of_same_dist = node_t(reinterpret_cast<hpreal_t*>(sdata)[distance]); 
     BLOCK_SYNC
-    clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2);
-    BLOCK_SYNC
-    coord2d xys; assign(xys,reinterpret_cast<std::array<float,2>*>(B.xys)[isomer_idx*blockDim.x + threadIdx.x]); BLOCK_SYNC
-    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2], xys[0]); 
-    ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2+1], xys[1]); BLOCK_SYNC
-    coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / (real_t)num_of_same_dist; BLOCK_SYNC    
-    coord2d xy = xys - centroid;
-    real_t dtheta = real_t(M_PI)/real_t(d_max+1); 
-    real_t phi = dtheta*(real_t(distance) + real_t(0.5)); 
-    real_t theta = atan2(float(xy[0]), float(xy[1])); 
-    coord2d spherical_layout = {theta, phi};
+    clear_cache(reinterpret_cast<hpreal_t*>(sdata), Block_Size_Pow_2);
+    BLOCK_SYNC;
+    coord2dh xys = reinterpret_cast<coord2dh*>(B.xys)[isomer_idx*blockDim.x + threadIdx.x]; BLOCK_SYNC;
+    ordered_atomic_add(&reinterpret_cast<hpreal_t*>(sdata)[distance*2], xys[0]); 
+    ordered_atomic_add(&reinterpret_cast<hpreal_t*>(sdata)[distance*2+1], xys[1]); BLOCK_SYNC
+    coord2dh centroid = reinterpret_cast<coord2dh*>(sdata)[distance] / (hpreal_t)num_of_same_dist; BLOCK_SYNC    
+    coord2dh xy = xys - centroid;
+    hpreal_t dtheta = hpreal_t(M_PI)/hpreal_t(d_max+1); 
+    hpreal_t phi = dtheta*(distance + 0.5); 
+    hpreal_t theta = atan2(xy[0],xy[1]); 
+    coord2dh spherical_layout = {theta, phi};
     
 
     return spherical_layout;
@@ -91,9 +91,9 @@ void zero_order_geometry_(IsomerBatch B, float scalerad, int offset){
     size_t isomer_idx = blockIdx.x + offset;
     if (isomer_idx < B.isomer_capacity && B.statuses[isomer_idx] != IsomerStatus::EMPTY){
     NodeNeighbours node_graph = NodeNeighbours(B, isomer_idx); 
-    coord2d angles = spherical_projection(B,reinterpret_cast<device_node_t*>(sdata), isomer_idx);
-    real_t theta = angles[0]; real_t phi = angles[1];
-    real_t x = COS(theta)*SIN(phi), y = SIN(theta)*SIN(phi), z = COS(phi);
+    coord2dh angles = spherical_projection(B,reinterpret_cast<device_node_t*>(sdata), isomer_idx);
+    hpreal_t theta = angles[0]; real_t phi = angles[1];
+    real_t x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
     coord3d coordinate = {x, y ,z};
 
     clear_cache(sdata, Block_Size_Pow_2);

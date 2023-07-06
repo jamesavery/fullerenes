@@ -48,7 +48,7 @@ struct Constants{
     constexpr INLINE device_real_t f_outer_angle_m(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_a, j)];}
     constexpr INLINE device_real_t f_outer_angle_p(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_m, j)];}
     constexpr INLINE device_real_t f_outer_dihedral(const uint8_t j) const {return  dih_forces[d_get(i_outer_dih0_p, j)];}
-    constexpr INLINE device_real_t f_flat() const {return 5e2;}
+    constexpr INLINE device_real_t f_flat() const {return 2e2;}
     #else
     device_coord3d f_bond;
     device_coord3d f_inner_angle;
@@ -56,7 +56,7 @@ struct Constants{
     device_coord3d f_outer_angle_m;
     device_coord3d f_outer_angle_p;
     device_coord3d f_outer_dihedral;
-    device_real_t f_flat = 5e2;
+    device_real_t f_flat = 2e2;
     
     device_coord3d r0;
     device_coord3d angle0;

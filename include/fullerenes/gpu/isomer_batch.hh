@@ -9,7 +9,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/graph.hh"
 
-enum class IsomerStatus {EMPTY, CONVERGED, FAILED, NOT_CONVERGED};
+enum class IsomerStatus {EMPTY, CONVERGED, PLZ_CHECK, FAILED, NOT_CONVERGED};
 enum BatchMember {COORDS3D, COORDS2D, CUBIC_NEIGHBOURS, DUAL_NEIGHBOURS, FACE_DEGREES, IDS, ITERATIONS, STATUSES};
 enum SortOrder {ASCENDING, DESCENDING};
 enum class LaunchPolicy {SYNC, ASYNC};
@@ -18,7 +18,7 @@ struct IsomerBatch : GPUDataStruct
 {
 
     float* X;
-    float* xys;
+    device_hpreal_t* xys;
 
     device_node_t* cubic_neighbours;
     device_node_t* dual_neighbours;
@@ -29,7 +29,7 @@ struct IsomerBatch : GPUDataStruct
     IsomerStatus* statuses;
 
     IsomerBatch(){
-      pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(float)*3, true}, {"xys", (void**)&xys, sizeof(float)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+      pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_hpreal_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
     }
 
     void operator=(const IsomerBatch &);
