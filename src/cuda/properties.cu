@@ -53,7 +53,7 @@ namespace gpu_kernels{
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
-                if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] != IsomerStatus::EMPTY)
+                if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED) // Only calculate properties for converged isomers!
                 {
                 clear_cache(shared_memory, blockDim.x);
                 BLOCK_SYNC
