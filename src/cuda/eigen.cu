@@ -273,7 +273,7 @@ namespace gpu_kernels{
                 initialized = true;
             }
             auto T1 = std::chrono::steady_clock::now();
-            std::cout << "Initializing the eigensolver took " << std::chrono::duration_cast<std::chrono::microseconds>(T1 - T0).count() / (float)nisomers << " us / isomer" << std::endl;
+            std::cout << "Initializing the eigensolver took " << std::chrono::duration_cast<std::chrono::microseconds>(T1 - T0).count() / (device_real_t)nisomers << " us / isomer" << std::endl;
             int counter = 0;
             //Loading the sparse hessians into dense matrices; Might be a bottleneck.
             auto start = std::chrono::steady_clock::now();
@@ -293,7 +293,7 @@ namespace gpu_kernels{
             };
             
             auto end = std::chrono::steady_clock::now();
-            std::cout << "Loading the sparse hessians into dense matrices took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / (float)nisomers << " us / isomer" << std::endl;   
+            std::cout << "Loading the sparse hessians into dense matrices took " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / (device_real_t)nisomers << " us / isomer" << std::endl;   
 
             if (policy == LaunchPolicy::SYNC){
                 ctx.wait();
@@ -320,7 +320,7 @@ namespace gpu_kernels{
                 }
             }
             end = std::chrono::steady_clock::now();
-            std::cout << "eigensolve time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / (float)nisomers <<  " us / isomer" <<std::endl;
+            std::cout << "eigensolve time: " << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / (device_real_t)nisomers <<  " us / isomer" <<std::endl;
         
         }
 #endif
