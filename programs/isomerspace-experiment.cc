@@ -58,26 +58,15 @@ void ensure_minimal_stacksize(rlim_t minimal_stacksize)
 struct isomer_candidate {
   device_real_t value;
   int id;
-<<<<<<< HEAD
-  vector<device_node_t> cubic_neighbours;
-
-  isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B):
-    value(value), id(id), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
-=======
   array<device_real_t,NUM_RESULTS> results;
   
-  vector<device_node_t> cubic_neighbours/*, Hcol*/;
+  vector<device_node_t> cubic_neighbours;
   vector<real_t> X;
-  //  vector<real_t> H;
-  
 
   isomer_candidate(double value, int id, array<device_real_t,NUM_RESULTS> &results,int N, int ix, const IsomerBatch &B):
     value(value), id(id), results(results), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
->>>>>>> d08668fb6dd0a7365c359c80bd5104f6aff8babb
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
-    //    memcpy(&H[0],               Hs.data + 90*N*ix,        90*N*sizeof(real_t));
-    //    memcpy(&Hcol[0],            Hcols.data + 90*N*ix,     90*N*sizeof(device_node_t));
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
@@ -395,13 +384,8 @@ int main(int ac, char **argv)
 	}
 	  
 	if(status == IsomerStatus::CONVERGED){
-<<<<<<< HEAD
-	  isomer_candidate C(0, id, N, di, host_batch[d]);
-	
-=======
 	  array<device_real_t,NUM_RESULTS> R;
-	      	
->>>>>>> d08668fb6dd0a7365c359c80bd5104f6aff8babb
+
 	  // Convert from Hessian eigenvalues to normal mode frequencies in teraherz	    
 	  real_t min_freq = sqrt(results[MIN_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
 	         max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
@@ -543,13 +527,21 @@ int main(int ac, char **argv)
   cout << "Exited loop, waiting on op_ctxs.\n";
   for(int d=0;d<Nd;d++) opt_ctxs[d].wait();
 
+  array<vector<isomer_candidate>,NUM_RESULTS> smallest_candidates, biggest_candidates;  
+  
   for(int r=0;r<NUM_RESULTS;r++){
     means[r] /= num_finished[PROP];
+    smallest_candidates[r] = sorted(result_min[r].as_vector());
+    biggest_candidates[r]  = sorted(result_max[r].as_vector());
   }
+
+  
+  
   cout << "COMPLETED IN " << loop_iters << " rounds.\n";
   cout << "num_finished            = " << num_finished  << "\n";
   for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
-      auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
+      auto &smallest = smallest_candidates[r], &biggest = biggest_candidates[r];      
+
     cout << result_names[r] << "_min = " << smallest << "\n"
          << "   (removed " << terrible_outliers[r].size() << " outliers, please inspect and fix)\n"
 	 << result_names[r] << "_max = " << biggest << "\n\n";
@@ -578,44 +570,40 @@ int main(int ac, char **argv)
   };
 
   // Postprocess results on GPU
+  {
+
+
   
-  size_t I=0;
-  for(int r=0;r<NUM_RESULTS;r++) if(results_sizes[r]==1){
+  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
       // Output candidate isomers
-      auto smallest = sorted(result_min[r].as_vector());
+      auto &smallest = smallest_candidates[r], &biggest = biggest_candidates[r];            
       for(int i=0;i<n_best_candidates;i++,I++){
 	isomer_candidate C = smallest[i];
 	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
-	Q3s[I%Nd].insert(P,I, opt_ctxs[I%Nd], policy);
+	Q3s[0].insert(P,C.id,IsomerStatus::CONVERGED,opt_ctxs[I%Nd], policy); // TODO: 
       }
 
-      auto biggest = sorted(result_max[r].as_vector());
       for(int i=0;i<n_best_candidates;i++,I++){
 	isomer_candidate C = biggest[i];
 	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
-	Q3s[I%Nd].insert(P,I,IsomerStatus::CONVERGED,opt_ctxs[I%Nd], policy);
+	Q3s[1].insert(P,C.id,IsomerStatus::CONVERGED,opt_ctxs[I%Nd], policy);
       }
-      assert(I < batch_size);
-      for(int d=0;d<Nd;d++){
-	opt_ctxs[d].wait();
-	auto &B   = final_batch;
-	const auto &ctx = opt_ctxs[d];
-	
-	Q3s[d].refill_batch(B, ctx, policy);
-	// TODO: Do everything in double precision for best candidates
-	// TODO: Skal alle de indsatte i batchen have status sat til converged?
-	hessians[d]      = CuArray<real_t>(N*3*10*3*batch_size,0);
-	hessian_cols[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);
-	
-	isomerspace_hessian::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d], ctx, policy);
-      }
+    }
 
-      for(int d=0;d<Nd;d++) opt_ctxs[d].wait();
-
-      
-      // TODO: Kopier ned i flad vektor, klar til at gemme skidtet
+  for(int d=0;d<Nd;d++){
+    opt_ctxs[d].wait();
+    auto &B   = final_batch[d];
+    const auto &ctx = opt_ctxs[d];
+	
+    Q3s[d].refill_batch(B, ctx, policy);
+    host_batch[d].clear(ctx,policy);	
+	
+    isomerspace_hessian::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d], ctx, policy);
+    cuda_io::copy(host_batch[d],B,ctx,policy); 	
   }
 
+  }
+  
   // GEM RESULTATER
   mkdir(output_dir.c_str(), 0777);
   FILE *f = fopen((output_dir+"/result_bounds.float64").c_str(),"wb");
@@ -629,13 +617,23 @@ int main(int ac, char **argv)
   FILE *f_min    = fopen((output_dir+"/result_mins.float32").c_str(),"wb");
   FILE *f_max    = fopen((output_dir+"/result_maxs.float32").c_str(),"wb");
   FILE *f_hist   = fopen((output_dir+"/result_hists.uint64").c_str(),"wb");
-  FILE *f_hist2D = fopen((output_dir+"/result_hists2D.uint64").c_str(),"wb");        
+  FILE *f_hist2D = fopen((output_dir+"/result_hists2D.uint64").c_str(),"wb");
+
+  // TODO: Automatiser min/max isf. at al koden er dobbelt
+  // TODO: Faktoriser ud i output_routine, så man kan lave små batch-størrelser uden at crashe (Q3s[d].is_empty loop)
   for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1) {
     string result_dir = output_dir+"/"+result_names[r];
     string min_dir    = result_dir + "/min", max_dir = result_dir+"/max", outlier_dir = result_dir + "/terrible_outliers";
+    auto &smallest = smallest_candidates[r], &biggest = biggest_candidates[r];          
+    
 
+    
     // Output candidate isomers
-    vector<isomer_candidate> smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
+    auto result_index = [&](bool big, size_t r, size_t i) 
+    {
+      return array<size_t,2>{{big,r*n_best_candidates+i}};
+    };
+    
     //TODO: Redundant due to writing out all results for k_smallest
     vector<device_real_t> smallest_values(n_best_candidates), biggest_values(n_best_candidates);
     for(size_t i=0;i<n_best_candidates;i++){
@@ -651,38 +649,56 @@ int main(int ac, char **argv)
     mkdir(max_dir.c_str(), 0777);
     mkdir(outlier_dir.c_str(), 0777);    
     
-    for(size_t i=0;i<n_best_candidates;i++){
+    for(size_t i=0;i<n_best_candidates;i++){      
       assert(i<smallest.size());
       assert(i<biggest.size());
+
+      string min_basename = min_dir+"/Pmin"+to_string(i),
+	     max_basename = max_dir+"/Pmax"+to_string(i);
+      
       isomer_candidate Cmin = smallest[i], Cmax = biggest[i];
-      Polyhedron
-	Pmin(host_graph(Cmin.cubic_neighbours), host_points(Cmin.X)),
-	Pmax(host_graph(Cmax.cubic_neighbours), host_points(Cmax.X));
+      auto [d_min,di_min] = result_index(0,r,i);
+      auto [d_max,di_max] = result_index(1,r,i);      
 
-      Polyhedron::to_file(Pmin,min_dir+"/Pmin-"+to_string(i)+".mol2");
-      Polyhedron::to_file(Pmin,min_dir+"/Pmin-"+to_string(i)+".spiral");      
-      Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".mol2");
-      Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".spiral");
+      Polyhedron Pmin = host_batch[d_min].get_isomer(di_min).value();
+      Polyhedron Pmax = host_batch[d_max].get_isomer(di_max).value();
 
+      Polyhedron::to_file(Pmin,min_basename+".mol2");
+      Polyhedron::to_file(Pmin,min_basename+".spiral");      
+      Polyhedron::to_file(Pmax,max_basename+".mol2");
+      Polyhedron::to_file(Pmax,max_basename+".spiral");
 
-      {
-	// for(node_t u=0;u<N;u++)
-	//   for(int j=0;j<3;j++) flat_neighbours[3*u+j] = Pmax.neighbours[u][j];
-	// FILE *f = fopen((max_dir+"/Pmax-"+to_string(i)+"-graph.uint32_t").c_str(),"wb");
-	// fwrite(&flat_neighbours[0],sizeof(node_t),3*N,f);
-
-	FILE *f = fopen((min_dir+"/Pmin-"+to_string(i)+"-results.float32").c_str(),"wb");
-	if(!f){
-	  perror((min_dir+"/Pmin-"+to_string(i)+"-results.float32").c_str());
-	} else 
-	  fwrite(&Cmin.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+      {// TODO: binary_write til funktion, som ogsaa tjekker for fejl + perror()'er	
+	FILE *f = fopen((min_basename+"-graph.uint16").c_str(),"wb");
+	fwrite(&host_batch[d_min].cubic_neighbours[di_min*3*N], sizeof(uint16_t), 3*N,f);
 	fclose(f);
 
-	f = fopen((max_dir+"/Pmax-"+to_string(i)+"-results.float32").c_str(),"wb");
-	if(!f){
-	  perror((max_dir+"/Pmax-"+to_string(i)+"-results.float32").c_str());
-	} else	
-	  fwrite(&Cmax.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+	f = fopen((max_basename+"-graph.uint16").c_str(),"wb");
+	fwrite(&host_batch[d_max].cubic_neighbours[di_max*3*N], sizeof(uint16_t), 3*N,f);
+	fclose(f);
+
+	f = fopen((min_basename+"-hessians.float32").c_str(),"wb");
+	fwrite(&hessians[d_min].data[di_max*3*3*10*N], sizeof(device_real_t), 3*3*10*N,f); 
+	fclose(f);
+
+	f = fopen((max_basename+"-hessians.float32").c_str(),"wb");
+	fwrite(&hessians[d_max].data[di_max*3*3*10*N], sizeof(device_real_t), 3*3*10*N,f); 
+	fclose(f);	
+
+	f = fopen((min_basename+"-hessians_col.uint16").c_str(),"wb");
+	fwrite(&hessians[d_min].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
+	fclose(f);
+
+	f = fopen((max_basename+"-hessians_col.uint16").c_str(),"wb");
+	fwrite(&hessians[d_max].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
+	fclose(f);	
+	
+	f = fopen((min_basename+"-results.float32").c_str(),"wb");
+	fwrite(&Cmin.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+	fclose(f);
+
+	f = fopen((max_basename+"-results.float32").c_str(),"wb");
+	fwrite(&Cmax.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
 	fclose(f);
       }
     }
