@@ -101,11 +101,23 @@ int main(int argc, char** argv){
     zero_order_geometry(Bdev, 4.0);
     optimise<PEDERSEN>(Bdev, 5*N, 5*N);
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
+    CuArray<device_real_t> vols(batch_size);
+    isomerspace_properties::volume_divergences(Bdev, vols);
+    //Find index of isomer with minimum volume
+    auto min_it = std::min_element(vols.data, vols.data + vols.size(), [](const auto& a, const auto& b) {
+        return std::abs(a) < std::abs(b);
+    });
+    auto min_index = std::distance(vols.begin(), min_it);
+    std::cout << "Min volume: " << vols[min_index] << std::endl;
+    std::cout << "Min volume index: " << min_index << std::endl;
+    Polyhedron P = Bhost.get_isomer(min_index).value();
+    Polyhedron::to_file(P, "MinVol.mol2");
+
 
     cuda_io::copy(Bhost, Bdev); 
+
     std::cout << vector<device_real_t>(Bhost.X, Bhost.X + N*3) << std::endl;
-    Polyhedron P = Bhost.get_isomer(0).value();
-    Polyhedron::to_file(P, "Ptesttest.mol2");
+
 
     hess_analytical.write((char*)hessians.data, hessians.size()*sizeof(device_real_t));
     hess_cols.write((char*)cols.data, cols.size()*sizeof(device_node_t));
