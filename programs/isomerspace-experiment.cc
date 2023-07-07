@@ -37,13 +37,9 @@ void signal_callback_handler(int signum)
 struct isomer_candidate {
   double value;
   int id;
-  vector<device_node_t> cubic_neighbours, Hcol;
-  vector<real_t> X;
-  vector<real_t> H;
-  
+  vector<device_node_t> cubic_neighbours;
 
-  isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B,
-		   const CuArray<real_t> &Hs, const CuArray<device_node_t> &Hcols):
+  isomer_candidate(double value, int id, int N, int ix, const IsomerBatch &B):
     value(value), id(id), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
@@ -154,14 +150,14 @@ int main(int ac, char **argv)
   };
   
   // Final IsomerBatch on host
-  IsomerBatch host_batch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
-  
+  IsomerBatch host_batch[Nd]  = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
+  IsomerBatch final_batch[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0),IsomerBatch(N,batch_size,DEVICE_BUFFER,1)};
 
   // TODO: Organize Qs by stages together with batches.Structure nicely.
-  IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-  IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-  IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-
+  IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate
+  IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // X0-generate to optimization
+  IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // optimization to properties + stat
+  IsomerQueue Q3s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // k_best result final computations
   
   
   for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
@@ -353,11 +349,11 @@ int main(int ac, char **argv)
 	}
 	  
 	if(status == IsomerStatus::CONVERGED){
-	  isomer_candidate C(0, id, N, di, host_batch[d],hessians[d],hessian_cols[d]);
+	  isomer_candidate C(0, id, N, di, host_batch[d]);
 	
 	  // Convert from Hessian eigenvalues to normal mode frequencies in teraherz	    
 	  real_t min_freq = sqrt(results[MIN_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
-	    max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
+	         max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
 	  
 	  // Convert frequencies from teraherz to cm^{-1} to compare with experiment
 	  min_freq *= 33.356;
@@ -508,7 +504,46 @@ int main(int ac, char **argv)
     return points;
   };
 
+  // Postprocess results on GPU
+  
+  size_t I=0;
+  for(int r=0;r<NUM_RESULTS;r++) if(results_sizes[r]==1){
+      // Output candidate isomers
+      auto smallest = sorted(result_min[r].as_vector());
+      for(int i=0;i<n_best_candidates;i++,I++){
+	isomer_candidate C = smallest[i];
+	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
+	Q3s[I%Nd].insert(P,I, opt_ctxs[I%Nd], policy);
+      }
 
+      auto biggest = sorted(result_max[r].as_vector());
+      for(int i=0;i<n_best_candidates;i++,I++){
+	isomer_candidate C = biggest[i];
+	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
+	Q3s[I%Nd].insert(P,I,IsomerStatus::CONVERGED,opt_ctxs[I%Nd], policy);
+      }
+      assert(I < batch_size);
+      for(int d=0;d<Nd;d++){
+	opt_ctxs[d].wait();
+	auto &B   = final_batch;
+	const auto &ctx = opt_ctxs[d];
+	
+	Q3s[d].refill_batch(B, ctx, policy);
+	// TODO: Do everything in double precision for best candidates
+	// TODO: Skal alle de indsatte i batchen have status sat til converged?
+	hessians[d]      = CuArray<real_t>(N*3*10*3*batch_size,0);
+	hessian_cols[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);
+	
+	isomerspace_hessian::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d], ctx, policy);
+      }
+
+      for(int d=0;d<Nd;d++) opt_ctxs[d].wait();
+
+      
+      // TODO: Kopier ned i flad vektor, klar til at gemme skidtet
+  }
+
+  // GEM RESULTATER
   mkdir(output_dir.c_str(), 0777);
   FILE *f = fopen((output_dir+"/result_bounds.float64").c_str(),"wb");
   fwrite(&result_bounds[0],sizeof(double),2*NUM_RESULTS,f);
@@ -517,7 +552,6 @@ int main(int ac, char **argv)
   f = fopen((output_dir+"/result_names.string").c_str(),"w");
   for(int r=0;r<NUM_RESULTS;r++) fprintf(f,"%s\n",result_names[r].c_str());
   fclose(f);
-
   
   FILE *f_min    = fopen((output_dir+"/result_mins.float32").c_str(),"wb");
   FILE *f_max    = fopen((output_dir+"/result_maxs.float32").c_str(),"wb");
@@ -526,9 +560,6 @@ int main(int ac, char **argv)
   for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1) {
     string result_dir = output_dir+"/"+result_names[r];
     string min_dir    = result_dir + "/min", max_dir = result_dir+"/max", outlier_dir = result_dir + "/terrible_outliers";
-
-    // Output candidate isomers
-    auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
 
     fwrite(&smallest[0],sizeof(device_real_t),n_best_candidates,f_min);
     fwrite(&biggest[0], sizeof(device_real_t),n_best_candidates,f_max);    
