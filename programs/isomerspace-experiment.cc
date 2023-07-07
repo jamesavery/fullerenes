@@ -685,12 +685,12 @@ int main(int ac, char **argv)
 	fwrite(&hessians[d_max].data[di_max*3*3*10*N], sizeof(device_real_t), 3*3*10*N,f); 
 	fclose(f);	
 
-	f = fopen((min_basename+"-hessians_col.uint16").c_str(),"wb");
-	fwrite(&hessians[d_min].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
+	f = fopen((min_basename+"-hessian_cols.uint16").c_str(),"wb");
+	fwrite(&hessian_cols[d_min].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
 	fclose(f);
 
-	f = fopen((max_basename+"-hessians_col.uint16").c_str(),"wb");
-	fwrite(&hessians[d_max].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
+	f = fopen((max_basename+"-hessian_cols.uint16").c_str(),"wb");
+	fwrite(&hessian_cols[d_max].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
 	fclose(f);	
 	
 	f = fopen((min_basename+"-results.float32").c_str(),"wb");
