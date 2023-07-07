@@ -16,8 +16,8 @@ enum class LaunchPolicy {SYNC, ASYNC};
 enum BufferType   {HOST_BUFFER, DEVICE_BUFFER};
 template <BufferType T>
 struct IsomerBatch
-{
-
+{ 
+    int isomer_capacity = 0;
     float* X;
     device_hpreal_t* xys;
 
@@ -35,7 +35,7 @@ struct IsomerBatch
 
     void operator=(const IsomerBatch &);
 
-    ~IsomerBatch() override;
+    ~IsomerBatch();
     IsomerBatch(size_t n_atoms, size_t n_isomers, int device  = 0);
     void set_print_simple() {verbose = false;} 
     void set_print_verbose() {verbose = true;} 
