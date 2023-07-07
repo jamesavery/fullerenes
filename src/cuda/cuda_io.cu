@@ -5,11 +5,9 @@
 namespace cuda_io{
 
     
-
-    cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch& batch, const bool copy_2d_layout){
+    template <BufferType T>
+    cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<T>& batch, const bool copy_2d_layout){
         //Batch needs to exist on the host. For performance reasons we don't want to create a new batch here and copy to that, cudaMalloc is expensive.
-        printLastCudaError("");
-        if (batch.buffer_type != HOST_BUFFER) assert(false); 
 
         size_t N = batch.n_atoms;
         for (size_t isomer_idx = 0; isomer_idx < batch.isomer_capacity; isomer_idx++){   
@@ -50,8 +48,9 @@ namespace cuda_io{
         return cudaGetLastError();
     }
     
-    cudaError_t copy(   IsomerBatch& destination, //Copy data to this batch
-                        const IsomerBatch& source, //Copy data from this batch
+    template <BufferType T, BufferType U>
+    cudaError_t copy(   IsomerBatch<T>& destination, //Copy data to this batch
+                        const IsomerBatch<U>& source, //Copy data from this batch
                         const LaunchCtx& ctx, //Optional: specify which launch context to perform the copy operation in.
                         const LaunchPolicy policy, //Optional: specifies whether to synchronize the stream before and after copying)
                         const std::pair<int,int>& lhs_range, //Optional: provide a range of indices to assign similar to slices in numpy eg. {0,5} = [0:5]
@@ -59,8 +58,8 @@ namespace cuda_io{
                         ){
         assert(lhs_range.second - lhs_range.first == rhs_range.second - rhs_range.first);
         if ( lhs_range.second == -1 && lhs_range.first == -1 ) assert(source.isomer_capacity <= destination.isomer_capacity);
-
-        if(source.buffer_type == DEVICE_BUFFER) {cudaSetDevice(source.get_device_id()); }
+        
+        if(U == DEVICE_BUFFER) {cudaSetDevice(source.get_device_id()); }
         else{ cudaSetDevice(destination.get_device_id());}
         
         //Iterate over the data fields of the IsomerBatch (pseudo reflection) and copy the contents of each using the provided stream.
@@ -74,10 +73,10 @@ namespace cuda_io{
             char* lhs_ptr = (char*)(*(get<1>(destination.pointers[i])));
             char* rhs_ptr = (char*)(*(get<1>(source.pointers[i])));
 
-            if( (source.get_device_id() != destination.get_device_id()) && ( (destination.buffer_type==DEVICE_BUFFER) && (source.buffer_type == DEVICE_BUFFER))){
+            if( (source.get_device_id() != destination.get_device_id()) && ( (T==DEVICE_BUFFER) && (U == DEVICE_BUFFER))){
                 cudaMemcpyPeerAsync(lhs_ptr + lhs_offset, destination.get_device_id(), rhs_ptr + rhs_offset, source.get_device_id(), num_isomers * get<2>(source.pointers[i]), ctx.stream);
             } else{
-                cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type), ctx.stream);
+                cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*U +  T), ctx.stream);
             }
         }
         destination.n_isomers = source.n_isomers;
@@ -86,10 +85,11 @@ namespace cuda_io{
         return cudaGetLastError();
     }
 
-    cudaError_t free(IsomerBatch& batch){
+    template <BufferType T>
+    cudaError_t free(IsomerBatch<T>& batch){
         cudaSetDevice(batch.get_device_id());
         for (int i = 0; i < batch.pointers.size(); i++){
-            if(batch.buffer_type == DEVICE_BUFFER) {cudaFree(*get<1>(batch.pointers[i]));} else {cudaFreeHost(*get<1>(batch.pointers[i]));}
+            if(T == DEVICE_BUFFER) {cudaFree(*get<1>(batch.pointers[i]));} else {cudaFreeHost(*get<1>(batch.pointers[i]));}
         }
         return cudaGetLastError();
     }

@@ -13,8 +13,9 @@ enum class IsomerStatus {EMPTY, CONVERGED, PLZ_CHECK, FAILED, NOT_CONVERGED};
 enum BatchMember {COORDS3D, COORDS2D, CUBIC_NEIGHBOURS, DUAL_NEIGHBOURS, FACE_DEGREES, IDS, ITERATIONS, STATUSES};
 enum SortOrder {ASCENDING, DESCENDING};
 enum class LaunchPolicy {SYNC, ASYNC};
-
-struct IsomerBatch : GPUDataStruct
+enum BufferType   {HOST_BUFFER, DEVICE_BUFFER};
+template <BufferType T>
+struct IsomerBatch
 {
 
     float* X;
@@ -35,7 +36,7 @@ struct IsomerBatch : GPUDataStruct
     void operator=(const IsomerBatch &);
 
     ~IsomerBatch() override;
-    IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type, int device  = 0);
+    IsomerBatch(size_t n_atoms, size_t n_isomers, int device  = 0);
     void set_print_simple() {verbose = false;} 
     void set_print_verbose() {verbose = true;} 
     bool get_print_mode() const {return verbose;}
