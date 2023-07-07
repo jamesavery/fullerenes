@@ -20,8 +20,9 @@
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/isomerdb.hh"
 
-#define STORE_EIGENSYSTEM 0
-#define STORE_HESSIAN 0
+#define STORE_HESSIAN 1
+#define STORE_EIGENSYSTEM 1
+
 
 using namespace std;
 using namespace std::chrono;
@@ -690,6 +691,12 @@ int main(int ac, char **argv)
 	fwrite(&host_batch[d_max].cubic_neighbours[di_max*3*N], sizeof(uint16_t), 3*N,f);
 	fclose(f);
 
+
+	f = fopen((max_basename+"-X.float32").c_str(),"wb");
+	fwrite(&host_batch[d_max].X[di_max*3*N], sizeof(device_real_t), 3*N,f);
+	fclose(f);
+	
+	
 	if(STORE_HESSIAN){
 	f = fopen((min_basename+"-hessians.float32").c_str(),"wb");
 	fwrite(&hessians[d_min].data[di_max*3*3*10*N], sizeof(device_real_t), 3*3*10*N,f); 
