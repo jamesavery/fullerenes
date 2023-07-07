@@ -71,6 +71,8 @@
     #define SIN sin
     #define ISNAN isnan
 #endif
+typedef device_real_t device_hpreal_t;	/* High precision real type, for when we need it regardless of speed. */
+
 typedef uint16_t device_node_t;
 typedef ushort3 device_node3;
 typedef ushort2 device_node2;
@@ -83,7 +85,7 @@ typedef struct device_node6
     device_node_t f;
     device_node_t g;
 } device_node6;
-#define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6
+#define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6; typedef device_hpreal_t hpreal_t;
 
 
 #endif

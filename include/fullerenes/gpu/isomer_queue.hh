@@ -41,7 +41,7 @@ public:
     Polyhedron pop(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
     //Insert a single Polyhedron.
-    cudaError_t insert(const Polyhedron& isomer, const size_t ID, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC, const bool insert_2d = true);
+    cudaError_t insert(const Polyhedron& isomer, const size_t ID, const IsomerStatus = IsomerStatus::NOT_CONVERGED, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC, const bool insert_2d = true);
     
     //Insert a single PlanarGraph. This function exists because Polyhedrons are expensive objects to convert to, which occurs implicitly otherwise.
     cudaError_t insert(const PlanarGraph& isomer, const size_t ID, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC, const bool insert_2d = true);

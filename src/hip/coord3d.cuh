@@ -15,7 +15,7 @@ INLINE device_coord3d operator*(const device_coord3d& a, const device_coord3d& b
 INLINE device_coord3d operator/(const device_real_t s, const device_coord3d& a)  { return a*(device_real_t(1.)/s); }
 INLINE device_coord3d operator/(const device_coord3d& a, const device_real_t s)  { return a*(device_real_t(1.)/s); }
 INLINE device_coord3d operator/(const device_coord3d& a, const device_coord3d& b)  { return {a[0]/b[0], a[1]/b[1], a[2]/b[2]}; }
-INLINE device_coord3d operator<(const device_coord3d& a, const device_real_t& b) {return {(device_real_t)(a[0] < b), (device_real_t)(a[1] < b), (device_real_t)(a[2] <b) };}
+INLINE device_coord3d operator<(const device_coord3d& a, const device_real_t& b) {return {(float)(a[0] < b), (float)(a[1] < b), (float)(a[2] <b) };}
 INLINE void operator+=(device_coord3d& a, const device_coord3d& b) {a = a + b;}
 INLINE void operator-=(device_coord3d& a, const device_coord3d& b) {a = a - b;}
 INLINE void operator/=(device_coord3d& a, const device_real_t b) {a = a / b;}

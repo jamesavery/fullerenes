@@ -30,10 +30,7 @@ int main(int argc, char** argv){
     std::ofstream hess_cols(filename + "_cols.uint16");
     std::ofstream cubic_graph;//("C" + to_string(N) + "_CubicGraph_" + to_string(isomer_num) + ".bin");
     std::ofstream geometry;//("C" + to_string(N) + "_Geometry_" + to_string(isomer_num) + ".bin");
-    if (isomer_num == -1){
-        cubic_graph = std::ofstream(name_ + "_CubicGraph.bin");
-        geometry = std::ofstream(name_ + "_Geometry.bin");
-    }
+    
 
     bool more_to_do = true;
     auto n_isomers = IsomerDB::number_isomers(N);
@@ -43,6 +40,7 @@ int main(int argc, char** argv){
     G.neighbours.resize(Nf);
     G.N = Nf;
     auto batch_size = min(2000, (int)n_isomers);
+    if (isomer_num == -1) batch_size = 1;
 
     CuArray<device_real_t> hessians(N*3*3*10 * batch_size);
     CuArray<device_real_t> hessians_fd(N*3*3*10 * batch_size);
@@ -58,13 +56,14 @@ int main(int argc, char** argv){
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     //IsomerQueue Q0(N);
     IsomerBatch Bhost(N,batch_size,HOST_BUFFER);
+
     int Nd = LaunchCtx::get_device_count();
     IsomerBatch Bdev(N,batch_size,DEVICE_BUFFER,0);
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, false, false);  
     if (isomer_num == -1) {
         spiral_nomenclature C60name(spiral_);    
         Triangulation C60dual(C60name);
-        auto C60cubic = C60dual.dual_graph();
+        PlanarGraph C60cubic = C60dual.dual_graph();
         for(int i = 0;  i < batch_size; i++) Bhost.append(C60cubic,0, false);
     } else {
         
@@ -80,7 +79,7 @@ int main(int argc, char** argv){
     LaunchCtx ctx(0);
     LaunchPolicy policy = LaunchPolicy::SYNC;
     ProgressBar progbar('=', 50);
-
+    //std::cout << vector<device_real_t>(Bhost.cubic_neighbours, Bhost.cubic_neighbours + N*3) << std::endl;
     cuda_io::copy(Bdev, Bhost);
     //cuda_io::copy(Bhost, Bdev);
     //ifstream geometry_in("X.float64", std::ios::binary); geometry_in.read((char*)Bhost.X, N*3*batch_size*sizeof(float));
@@ -102,25 +101,38 @@ int main(int argc, char** argv){
     zero_order_geometry(Bdev, 4.0);
     optimise<PEDERSEN>(Bdev, 5*N, 5*N);
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
+
+    cuda_io::copy(Bhost, Bdev); 
+    std::cout << vector<device_real_t>(Bhost.X, Bhost.X + N*3) << std::endl;
+    Polyhedron P = Bhost.get_isomer(0).value();
+    Polyhedron::to_file(P, "Ptesttest.mol2");
+
     hess_analytical.write((char*)hessians.data, hessians.size()*sizeof(device_real_t));
     hess_cols.write((char*)cols.data, cols.size()*sizeof(device_node_t));
     int lanczos_max = std::min(300, (int)N*3);
-    for (int i = 10; i < lanczos_max; i++){
+    /* for (int i = 10; i < lanczos_max; i++){
         
         spectrum_ends(Bdev, hessians, cols, lambda_mins, lambda_maxs, min_eigvects, max_eigvects, i);
         lambda_mins_file.write((char*)lambda_mins.data, lambda_mins.size()*sizeof(device_real_t));
         lambda_maxs_file.write((char*)lambda_maxs.data, lambda_maxs.size()*sizeof(device_real_t));
         progbar.update_progress((i-9)/float(lanczos_max-10));
-    }
+    } */
 
     eigensolve(Bdev, Q, hessians, cols, eigs);
     fullspectrum_file.write((char*)eigs.data, eigs.size()*sizeof(device_real_t));
     //isomerspace_properties::transform_coordinates(Bdev);
     
+    if (isomer_num == -1){
+        std::cout << eigs << endl;
+        ofstream file(spiral_ + "_hessian." + type); file.write((char*)hessians.data, 30*N*3*sizeof(device_real_t));
+        ofstream file2(spiral_ + "_cols.uint16" ); file2.write((char*)cols.data, 30*N*3*sizeof(device_node_t));
+        ofstream file3(spiral_ + "_eigs." + type); file3.write((char*)eigs.data, N*3*sizeof(device_real_t));
+        ofstream file4(spiral_ + "_eigvects." + type); file4.write((char*)Q.data, N*3*N*3*sizeof(device_real_t));
+        ofstream file5(spiral_ + "_X." + type); file5.write((char*)Bhost.X, N*3*sizeof(device_real_t));
+        ofstream file6(spiral_ + "_adjacency." + type); file6.write((char*)Bhost.cubic_neighbours, N*3*sizeof(device_node_t));
+    }
 
-
-
-    compute_hessians_fd<PEDERSEN>(Bdev, hessians_fd, cols, reldelta);
+    //compute_hessians_fd<PEDERSEN>(Bdev, hessians_fd, cols, reldelta);
 
     
     hess_analytical.write((char*)hessians.data, hessians.size()*sizeof(device_real_t));
@@ -178,12 +190,12 @@ int main(int argc, char** argv){
     if (isomer_num == -1){
         isomerspace_properties::transform_coordinates(Bdev);
         cuda_io::copy(Bhost, Bdev); // Copy back to host
-        Polyhedron::to_file(Bhost.get_isomer(0).value(), name_ + ".mol2");
+        Polyhedron::to_file(Bhost.get_isomer(0).value(), spiral_ + ".mol2");
     }
 
     
 
-    ofstream fileX("X."+ type, ios::out | ios::binary);
+    /* ofstream fileX("X."+ type, ios::out | ios::binary);
     fileX.write((char*)Bhost.X, batch_size*3*N*sizeof(float));
 
     ofstream fileA("A.uint16", ios::out | ios::binary);
@@ -220,7 +232,7 @@ int main(int argc, char** argv){
     file10.write((char*)lambda_mins.data, lambda_mins.size()*sizeof(device_real_t));
 
     ofstream file11("MaxEigVals."+ type, ios::out | ios::binary);
-    file11.write((char*)lambda_maxs.data, lambda_maxs.size()*sizeof(device_real_t));
+    file11.write((char*)lambda_maxs.data, lambda_maxs.size()*sizeof(device_real_t)); */
 
     //std::cout << "Reference min eigenvalues: " << min_eigs_ref << std::endl;
     //std::cout << lambda_maxs << std::endl;
@@ -266,5 +278,5 @@ int main(int argc, char** argv){
         //FG.to_mol2(FG,f);
 
     //    std::cout << Bdev << std::endl;
-        LaunchCtx::clear_allocations();
+        //LaunchCtx::clear_allocations();
     }

@@ -207,7 +207,7 @@ struct ArcData{
     */
     INLINE real_t angle() const {return dot(abh,ach);}
 
-    INLINE real_t normalized_angle_err() const {return acos((float)(float)dot(abh,ach));}
+    INLINE real_t normalized_angle_err() const {return acos(dot(abh,ach));}
 
     //Returns outer angle m, used only diagnostically.
     INLINE real_t outer_angle_m() const {return -dot(abh, bmh);} //Compute outer angle. ab,bm
@@ -1390,6 +1390,7 @@ struct ArcData{
         {
         case BOND:
             return mat3();
+
             break;
         case ANGLE:
             return mat3();
@@ -1836,55 +1837,73 @@ __device__ void check_batch(IsomerBatch &B, const size_t isomer_idx, const size_
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
 
-    if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
-    if (B.statuses[isomer_idx] == IsomerStatus::NOT_CONVERGED){
-    size_t offset = isomer_idx * blockDim.x;
-    Constants constants     = Constants(B, isomer_idx);
-    NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);
-    ForceField FF           = ForceField<T>(node_graph, constants, smem);
-    coord3d* X              = reinterpret_cast<coord3d*>(smem + B.n_atoms);
-    assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
+    if (isomer_idx < B.isomer_capacity){
+      
+      //Avoid illegal memory access
+      if(B.iterations[isomer_idx] >= max_iterations){ B.statuses[isomer_idx] = IsomerStatus::FAILED; /*printf("check_back() end: too many iterations. I am thread #%d\n", threadIdx.x);*/ return; } // Why doesn't this register?
+      if (B.statuses[isomer_idx] == IsomerStatus::PLZ_CHECK){  
+	size_t offset = isomer_idx * blockDim.x;
+	Constants constants        = Constants(B, isomer_idx);
+	NodeNeighbours node_graph  = NodeNeighbours(B, isomer_idx, smem);
+	ForceField FF              = ForceField<T>(node_graph, constants, smem);
+	//    coord3d* X                 = reinterpret_cast<coord3d*>(smem + B.n_atoms;)
+	coord3d* X                 = reinterpret_cast<coord3d*>(smem + Block_Size_Pow_2);
+	assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
     
-    coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
-    BLOCK_SYNC
-    for (uint8_t j = 0; j < 3; j++){
-        auto arc            = ForceField<T>::ArcData(j, X, node_graph);
-        #if USE_CONSTANT_INDICES
-        d_set(rel_bond_err,      j, ABS(ABS(arc.bond()       - constants.r0(j))        /constants.r0(j)));
-        d_set(rel_angle_err,     j, ABS(ABS(arc.angle()      - constants.angle0(j))    /constants.angle0(j)));
-        d_set(rel_dihedral_err,  j, ABS(ABS(arc.dihedral()   - constants.inner_dih0(j))/constants.inner_dih0(j)));
-        #else
-        d_set(rel_bond_err,      j, ABS(ABS(arc.bond()       - d_get(constants.r0,j))        /d_get(constants.r0,j)));
-        d_set(rel_angle_err,     j, ABS(ABS(arc.angle()      - d_get(constants.angle0,j))    /d_get(constants.angle0,j)));
-        d_set(rel_dihedral_err,  j, ABS(ABS(arc.dihedral()   - d_get(constants.inner_dih0,j))/d_get(constants.inner_dih0,j)));
-        #endif
-    }
+	coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
+	BLOCK_SYNC
+	  for (uint8_t j = 0; j < 3; j++){
+	    auto arc            = ForceField<T>::ArcData(j, X, node_graph);
+#if USE_CONSTANT_INDICES
+	    d_set(rel_bond_err,      j, ABS(ABS(arc.bond()       - constants.r0(j))        /constants.r0(j)));
+	    d_set(rel_angle_err,     j, ABS(ABS(arc.angle()      - constants.angle0(j))    /constants.angle0(j)));
+	    d_set(rel_dihedral_err,  j, ABS(ABS(arc.dihedral()   - constants.inner_dih0(j))/constants.inner_dih0(j)));
+#else
+	    d_set(rel_bond_err,      j, ABS(ABS(arc.bond()       - d_get(constants.r0,j))        /d_get(constants.r0,j)));
+	    d_set(rel_angle_err,     j, ABS(ABS(arc.angle()      - d_get(constants.angle0,j))    /d_get(constants.angle0,j)));
+	    d_set(rel_dihedral_err,  j, ABS(ABS(arc.dihedral()   - d_get(constants.inner_dih0,j))/d_get(constants.inner_dih0,j)));
+#endif
+	  }
 
-    real_t bond_max         = reduction_max(smem, max(rel_bond_err));
-    //real_t angle_max        = reduction_max(smem, max(rel_angle_err));
-    //real_t dihedral_max     = reduction_max(smem, max(rel_dihedral_err));
-    //real_t bond_rms         = SQRT(reduction(smem,dot(rel_bond_err,rel_bond_err))/(device_real_t)blockDim.x);
-    //real_t angle_rms        = SQRT(reduction(smem,dot(rel_angle_err,rel_angle_err))/(device_real_t)blockDim.x);
-    //real_t dihedral_rms     = SQRT(reduction(smem,dot(rel_dihedral_err,rel_dihedral_err))/(device_real_t)blockDim.x);
-    //real_t bond_mean        = reduction(smem,sum(rel_bond_err))/(device_real_t)blockDim.x;
-    //real_t angle_mean       = reduction(smem,sum(rel_angle_err))/(device_real_t)blockDim.x;
-    //real_t dihedral_mean    = reduction(smem,sum(rel_dihedral_err))/(device_real_t)blockDim.x;
-    real_t grad_norm        = SQRT(reduction(smem,dot(FF.gradient(X), FF.gradient(X))))/(real_t)blockDim.x;
-    //real_t grad_rms         = SQRT(reduction(smem,dot(FF.gradient(X), FF.gradient(X)))/(device_real_t)blockDim.x);
-    //real_t grad_max         = reduction_max(smem, SQRT(dot(FF.gradient(X), FF.gradient(X)))     );
-    //real_t energy           = FF.energy(X); 
-    
-    bool converged = ((grad_norm < (real_t)1e-2)  && (bond_max < (real_t)0.1) && !ISNAN(grad_norm)) ;
-    //if(threadIdx.x + isomer_idx == 0){printf("%d", (int)num_converged); printf("/ %d Fullerenes Converged in Batch \n", (int)gridDim.x);}
-    if(threadIdx.x == 0 && B.statuses[isomer_idx] != IsomerStatus::EMPTY){
-        if (converged)
-        {
-            B.statuses[isomer_idx] = IsomerStatus::CONVERGED;
-        } else if (B.iterations[isomer_idx] >= max_iterations || ISNAN(grad_norm)  ) {
-            B.statuses[isomer_idx] = IsomerStatus::FAILED;
-        }
-       
-    }}}
+	//printf("isomer %ld, node %d: rel_bond_err = (%g,%g,%g), max = %g\n",isomer_idx,threadIdx.x,rel_bond_err[0],rel_bond_err[1],rel_bond_err[2], max(rel_bond_err));
+
+	clear_cache(smem,Block_Size_Pow_2);    
+	real_t bond_max         = reduction_max(smem, max(rel_bond_err));
+	clear_cache(smem,Block_Size_Pow_2);    
+	real_t angle_max        = reduction_max(smem, max(rel_angle_err));
+	clear_cache(smem,Block_Size_Pow_2);    
+	real_t dihedral_max     = reduction_max(smem, max(rel_dihedral_err));
+	BLOCK_SYNC;
+	//real_t bond_rms         = SQRT(reduction(smem,dot(rel_bond_err,rel_bond_err))/(device_real_t)blockDim.x);
+	//real_t angle_rms        = SQRT(reduction(smem,dot(rel_angle_err,rel_angle_err))/(device_real_t)blockDim.x);
+	//real_t dihedral_rms     = SQRT(reduction(smem,dot(rel_dihedral_err,rel_dihedral_err))/(device_real_t)blockDim.x);
+	//real_t bond_mean        = reduction(smem,sum(rel_bond_err))/(device_real_t)blockDim.x;
+	//real_t angle_mean       = reduction(smem,sum(rel_angle_err))/(device_real_t)blockDim.x;
+	//real_t dihedral_mean    = reduction(smem,sum(rel_dihedral_err))/(device_real_t)blockDim.x;
+	real_t grad_norm        = 1; //SQRT(reduction(smem,dot(FF.gradient(X), FF.gradient(X))))/(real_t)blockDim.x;
+	// grad_norm er altid nan.
+	//real_t grad_rms         = SQRT(reduction(smem,dot(FF.gradient(X), FF.gradient(X)))/(device_real_t)blockDim.x);
+	//    real_t grad_max         = reduction_max(smem, SQRT(dot(FF.gradient(X), FF.gradient(X)))     );
+	//real_t energy           = FF.energy(X); 
+
+	// TODO: Kan vi faa en gradientudregning, som ikke doer?
+	//       Evt. 2 energiudregninger, ligesom der var in optimize_?
+	if(threadIdx.x == 0){ // Our thread gets the reductio result
+	  size_t iterations_done =  B.iterations[isomer_idx];	  
+	  bool converged = ((angle_max < 0.26) && (dihedral_max < 0.1) && (bond_max < 0.1)) ;
+	  bool failed    = ISNAN(bond_max) || (iterations_done > max_iterations);
+	  
+	  B.statuses[isomer_idx] = failed? IsomerStatus::FAILED :
+	    (converged? IsomerStatus::CONVERGED : IsomerStatus::NOT_CONVERGED);
+
+	  if(failed)
+	    printf("CHECK failed: isomer %ld has %ld iterations, grad_norm=%g, bond_max=%g, angle_max=%g, dihedral_max=%g\n",
+		   isomer_idx,iterations_done,grad_norm, bond_max, angle_max, dihedral_max);
+
+	}
+      }
+    }
+    //    printf("check_batch() end of function. I am thread #%d\n",threadIdx.x);
 }
 
 //Compute Hessians for all isomers in the batch
@@ -1963,55 +1982,65 @@ template <ForcefieldType T> __global__ void compute_hessians_fd_(IsomerBatch B, 
 */
 template <ForcefieldType T>
 __global__ void optimise_(IsomerBatch B, const size_t iterations, const size_t max_iterations){
-    DEVICE_TYPEDEFS;
-    extern __shared__ real_t smem[];
-    clear_cache(smem,Block_Size_Pow_2);
-    auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
-    for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
+  DEVICE_TYPEDEFS;
+  extern __shared__ real_t smem[];
+  clear_cache(smem,Block_Size_Pow_2);
+  auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
+
+  for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
     BLOCK_SYNC
-    if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
-    if (B.statuses[isomer_idx] == IsomerStatus::NOT_CONVERGED)
-    {
-        real_t* base_pointer        = smem + Block_Size_Pow_2;
-        size_t offset               = isomer_idx * B.n_atoms;
-        size_t node_id              = threadIdx.x;
-        size_t N                    = B.n_atoms;
+      if (isomer_idx < B.isomer_capacity){ //Avoid illegal memory access
+	if (B.statuses[isomer_idx] == IsomerStatus::NOT_CONVERGED)
+	  {
+	    real_t* base_pointer        = smem + Block_Size_Pow_2;
+	    size_t offset               = isomer_idx * B.n_atoms;
+	    size_t node_id              = threadIdx.x;
+	    size_t N                    = B.n_atoms;
 
 
-        //Pre-compute force constants and store in registers.
-        Constants constants = Constants(B, isomer_idx);
-        NodeNeighbours nodeG     = NodeNeighbours(B, isomer_idx, smem);
+	    //Pre-compute force constants and store in registers.
+	    Constants constants  = Constants(B, isomer_idx);
+	    NodeNeighbours nodeG = NodeNeighbours(B, isomer_idx, smem);
 
-        //Set VRAM pointer to start of each fullerene, as opposed to at the start of the isomerbatch.
+	    //Set VRAM pointer to start of each fullerene, as opposed to at the start of the isomerbatch.
 
 
-        //Assign a section of L1 cache to each set of cartesian coordinates X, X1 and X2.
-        coord3d* sX =reinterpret_cast<coord3d*>(base_pointer);
-        coord3d* X1 =reinterpret_cast<coord3d*>(base_pointer+3*N);
-        coord3d* X2 =reinterpret_cast<coord3d*>(base_pointer+6*N);  
+	    //Assign a section of L1 cache to each set of cartesian coordinates X, X1 and X2.
+	    coord3d* sX =reinterpret_cast<coord3d*>(base_pointer);
+	    coord3d* X1 =reinterpret_cast<coord3d*>(base_pointer+3*N);
+	    coord3d* X2 =reinterpret_cast<coord3d*>(base_pointer+6*N);  
+	    
+	    assign(sX[node_id],reinterpret_cast<std::array<float,3>*>(B.X+3*offset)[node_id]); //Copy cartesian coordinates from L1 Cache to DRAM.
+	    coord3d* X           = sX;       //Switch coordinate pointer from DRAM to L1 Cache.
 
-        assign(sX[node_id],reinterpret_cast<std::array<float,3>*>(B.X+3*offset)[node_id]); //Copy cartesian coordinates from L1 Cache to DRAM.
-        coord3d* X           = sX;       //Switch coordinate pointer from DRAM to L1 Cache.
+	    //Create forcefield struct and use optimization algorithm to optimise the fullerene 
+	    ForceField FF = ForceField<T>(nodeG, constants, smem);
+	    FF.CG(X,X1,X2,iterations-1);
 
-        //Create forcefield struct and use optimization algorithm to optimise the fullerene 
-        ForceField FF = ForceField<T>(nodeG, constants, smem);
-        FF.CG(X,X1,X2,iterations-1);
-        BLOCK_SYNC
-        auto E0 = FF.energy(X);
-        FF.CG(X,X1,X2,1);
-        auto E1 = FF.energy(X);
-        if (ABS(E1 - E0)/(real_t)blockDim.x < (real_t)1e-5){
-            B.statuses[isomer_idx] = IsomerStatus::CONVERGED;
-        }
-        //Copy data back from L1 cache to DRAM 
-        assign(reinterpret_cast<std::array<float,3>*>(B.X)[offset + threadIdx.x], X[threadIdx.x]);
+	    auto E0 = FF.energy(X);
+	    FF.CG(X,X1,X2,1);
+	    auto E1 = FF.energy(X);
+	    auto dE = ABS(E1 - E0)/(real_t)blockDim.x;
+	    BLOCK_SYNC;
+	    if (threadIdx.x==0 && dE < 1e-5){
+	      B.statuses[isomer_idx] = IsomerStatus::PLZ_CHECK; // Possibly converged! Only if verified in check_batch will it be affirmed.
+	      //	      B.statuses[isomer_idx] = IsomerStatus::CONVERGED; // Possibly converged! Only if verified in check_batch will it be affirmed.	      
+	    }
 
-        if (threadIdx.x == 0) {B.iterations[isomer_idx] += iterations;}
-    }}
+	    //Copy data back from L1 cache to DRAM 
+	    assign(reinterpret_cast<std::array<float,3>*>(B.X)[offset + threadIdx.x], X[threadIdx.x]);
+
+	    if (threadIdx.x == 0) {
+	      //	      printf("OPT: isomer %d has %ld iterations, adding %ld\n",isomer_idx, B.iterations[isomer_idx],iterations);
+	      B.iterations[isomer_idx] += iterations;
+	      if(B.iterations[isomer_idx] >= max_iterations) B.statuses[isomer_idx] = IsomerStatus::FAILED;
+	    }
+	  }
+      }
     //Check the convergence of isomers and assign status accordingly.
-    BLOCK_SYNC
+    BLOCK_SYNC;
     check_batch<T>(B, isomer_idx, max_iterations);
-    }
+  }
 }
 
 
