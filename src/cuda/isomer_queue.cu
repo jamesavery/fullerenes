@@ -577,7 +577,7 @@ cudaError_t IsomerQueue::insert(const PlanarGraph& in, const size_t ID, const La
     return cudaGetLastError();
 }
 
-cudaError_t IsomerQueue::insert(const Polyhedron& in, const size_t ID, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d){
+cudaError_t IsomerQueue::insert(const Polyhedron& in, const size_t ID, const IsomerStatus status, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d){
     cudaSetDevice(m_device);
     //Before inserting a new isomer, make sure that the host batch is up to date with the device version.
     to_host(ctx);
@@ -601,7 +601,7 @@ cudaError_t IsomerQueue::insert(const Polyhedron& in, const size_t ID, const Lau
         if(!in.layout2d.empty() && insert_2d)   reinterpret_cast<device_coord2d*>(host_batch.xys)[offset + i]        = casting_coord2d(in.layout2d[i]);
     }
     //Assign metadata.
-    host_batch.statuses[*props.back] = IsomerStatus::NOT_CONVERGED;
+    host_batch.statuses[*props.back] = status;
     host_batch.IDs[*props.back] = ID;
     host_batch.iterations[*props.back] = 0;
 
