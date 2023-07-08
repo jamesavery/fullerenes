@@ -114,7 +114,7 @@ int main(int ac, char **argv)
   string output_dir     = ac>=3? argv[2] : string("output/C")+to_string(N);     // Argument 2: directory to output files to
   bool IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
   bool only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
-  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):50; // Argument 5: How many best fullerne candidates do you want to store? 
+  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):20; // Argument 5: How many best fullerne candidates do you want to store? 
 
   ensure_minimal_stacksize(N*10000000);
   
@@ -180,6 +180,7 @@ int main(int ac, char **argv)
   // Final IsomerBatch on host
   IsomerBatch host_batch[Nd]  = {IsomerBatch(N,batch_size,HOST_BUFFER,0), IsomerBatch(N, batch_size, HOST_BUFFER,1)};
   IsomerBatch final_batch[Nd] = {IsomerBatch(N,final_batch_size,DEVICE_BUFFER,0),IsomerBatch(N,final_batch_size,DEVICE_BUFFER,1)};
+  IsomerBatch final_host_batch[Nd] = {IsomerBatch(N,final_batch_size,HOST_BUFFER,0),IsomerBatch(N,final_batch_size,HOST_BUFFER,1)};  
 
   // TODO: Organize Qs by stages together with batches.Structure nicely.
   IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate
@@ -584,27 +585,27 @@ int main(int ac, char **argv)
   for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
       // Output candidate isomers
       auto &smallest = smallest_candidates[r], &biggest = biggest_candidates[r];            
-      for(int i=0;i<n_best_candidates;i++,I++){
+      for(int i=0;i<n_best_candidates;i++){
 	isomer_candidate C = smallest[i];
 	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
-	Q3s[0].insert(P,C.id,IsomerStatus::CONVERGED,opt_ctxs[I%Nd], policy); // TODO: 
+	Q3s[0].insert(P,C.id,IsomerStatus::CONVERGED); 
       }
 
-      for(int i=0;i<n_best_candidates;i++,I++){
+      for(int i=0;i<n_best_candidates;i++){
 	isomer_candidate C = biggest[i];
 	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
-	Q3s[1].insert(P,C.id,IsomerStatus::CONVERGED,opt_ctxs[I%Nd], policy);
+	Q3s[1].insert(P,C.id,IsomerStatus::CONVERGED);
       }
     }
 
   if(STORE_HESSIAN){
     for(int d=0;d<Nd;d++){    
-    opt_ctxs[d].wait();
     auto &B   = final_batch[d];
     const auto &ctx = opt_ctxs[d];
-	
+    ctx.wait();
+    
     Q3s[d].refill_batch(B, ctx, policy);
-    host_batch[d].clear(ctx,policy);	
+    final_host_batch[d].clear(ctx,policy);	
 
     isomerspace_hessian::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d], ctx, policy);
 
@@ -613,9 +614,10 @@ int main(int ac, char **argv)
       lams[d] = CuArray<real_t>(3*N*final_batch_size,0);    
       isomerspace_eigen  ::eigensolve(B,Q[d],hessians[d],hessian_cols[d],lams[d],ctx,policy);
     }
-    cuda_io::copy(host_batch[d],B,ctx,policy); 	
+    cuda_io::copy(final_host_batch[d],B,ctx,policy);
+    ctx.wait();
     }}
-
+  
   }
   
   // GEM RESULTATER
@@ -674,8 +676,8 @@ int main(int ac, char **argv)
       auto [d_min,di_min] = result_index(0,r,i);
       auto [d_max,di_max] = result_index(1,r,i);      
 
-      Polyhedron Pmin = host_batch[d_min].get_isomer(di_min).value();
-      Polyhedron Pmax = host_batch[d_max].get_isomer(di_max).value();
+      Polyhedron Pmin = final_host_batch[d_min].get_isomer(di_min).value();
+      Polyhedron Pmax = final_host_batch[d_max].get_isomer(di_max).value();
 
       Polyhedron::to_file(Pmin,min_basename+".mol2");
       Polyhedron::to_file(Pmin,min_basename+".spiral");      
@@ -684,18 +686,31 @@ int main(int ac, char **argv)
 
       {// TODO: binary_write til funktion, som ogsaa tjekker for fejl + perror()'er	
 	FILE *f = fopen((min_basename+"-graph.uint16").c_str(),"wb");
-	fwrite(&host_batch[d_min].cubic_neighbours[di_min*3*N], sizeof(uint16_t), 3*N,f);
+	//	fwrite(&final_host_batch[d_min].cubic_neighbours+di_min*3*N, sizeof(device_node_t), 3*N,f);
+	fwrite(&Cmin.cubic_neighbours[0], sizeof(device_node_t), 3*N,f);
 	fclose(f);
 
 	f = fopen((max_basename+"-graph.uint16").c_str(),"wb");
-	fwrite(&host_batch[d_max].cubic_neighbours[di_max*3*N], sizeof(uint16_t), 3*N,f);
+	fwrite(&Cmax.cubic_neighbours[0], sizeof(device_node_t), 3*N,f);
 	fclose(f);
 
-
-	f = fopen((max_basename+"-X.float32").c_str(),"wb");
-	fwrite(&host_batch[d_max].X[di_max*3*N], sizeof(device_real_t), 3*N,f);
+	f = fopen((min_basename+"-PX.float32").c_str(),"wb");
+	fwrite(&Cmin.X[0], sizeof(device_real_t), 3*N,f);
 	fclose(f);
+
+	f = fopen((max_basename+"-PX.float32").c_str(),"wb");
+	fwrite(&Cmax.X[0], sizeof(device_real_t), 3*N,f);
+	fclose(f);	
+
+	f = fopen((min_basename+"-X.float32").c_str(),"wb");
+	fwrite(final_host_batch[d_min].X+di_min*3*N, sizeof(device_real_t), 3*N,f);
+	fclose(f);
+
 	
+	f = fopen((max_basename+"-X.float32").c_str(),"wb");
+	fwrite(final_host_batch[d_max].X+di_max*3*N, sizeof(device_real_t), 3*N,f);
+	fclose(f);
+
 	
 	if(STORE_HESSIAN){
 	f = fopen((min_basename+"-hessians.float32").c_str(),"wb");
