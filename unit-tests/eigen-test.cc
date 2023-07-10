@@ -103,8 +103,9 @@ int main(int argc, char** argv){
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
     CuArray<device_real_t> vols(batch_size);
     isomerspace_properties::volume_divergences(Bdev, vols);
+    std::vector<device_real_t> vols_host(vols.data, vols.data + vols.size());
     //Find index of isomer with minimum volume
-    auto min_it = std::min_element(vols.data, vols.data + vols.size(), [](const auto& a, const auto& b) {
+    auto min_it = std::min_element(vols_host.begin(), vols_host.end(), [](const auto& a, const auto& b) {
         return std::abs(a) < std::abs(b);
     });
     auto min_index = std::distance(vols.begin(), min_it);
