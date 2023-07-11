@@ -114,7 +114,7 @@ int main(int ac, char **argv)
   string output_dir     = ac>=3? argv[2] : string("output/C")+to_string(N);     // Argument 2: directory to output files to
   bool IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
   bool only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
-  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):20; // Argument 5: How many best fullerne candidates do you want to store? 
+  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):30; // Argument 5: How many best fullerne candidates do you want to store? 
 
   ensure_minimal_stacksize(N*10000000);
   
@@ -122,7 +122,7 @@ int main(int ac, char **argv)
   // Make sure output directory exists
   mkdir(output_dir.c_str(),0777);
   size_t n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
-  n_best_candidates = min(n_best_candidates, n_fullerenes/4);
+  n_best_candidates = max(size_t(1),min(n_best_candidates, n_fullerenes/4));
 
   
   int    Nd = LaunchCtx::get_device_count();
@@ -130,7 +130,7 @@ int main(int ac, char **argv)
   size_t final_batch_size = n_best_candidates*NUM_RESULTS*2/Nd+(Nd-1);
 
   cout << "Analyzing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
-
+  cout << "n_best_candidates = " << n_best_candidates << "; batch_size = " << batch_size << "; final_batch_size = " << final_batch_size <<"\n";
   // Organize all of our of computation pipeline stages and our scoresl of different results
 
   array<array<double,2>,NUM_RESULTS> result_bounds = {{
