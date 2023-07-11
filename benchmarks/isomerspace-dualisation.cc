@@ -71,13 +71,13 @@ int main(int argc, char** argv){
         auto finished_isomers = 0;
         
             finished_isomers = 0;
-            IsomerBatch HBs[Nd] = {IsomerBatch(N,mini_batch,HOST_BUFFER), IsomerBatch(N, mini_batch, HOST_BUFFER)};
-            IsomerBatch DBs[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
-            IsomerBatch TempBatch[Nd] = {IsomerBatch(N,mini_batch,DEVICE_BUFFER,0), IsomerBatch(N, mini_batch,DEVICE_BUFFER,1)};
+            IsomerBatch<HOST_BUFFER> HBs[Nd] = {IsomerBatch<HOST_BUFFER>(N,mini_batch), IsomerBatch<HOST_BUFFER>(N, mini_batch)};
+            IsomerBatch<DEVICE_BUFFER> DBs[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0), IsomerBatch<DEVICE_BUFFER>(N, batch_size,1)};
+            IsomerBatch<DEVICE_BUFFER> TempBatch[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,mini_batch,0), IsomerBatch<DEVICE_BUFFER>(N, mini_batch,1)};
             #if VALIDATION
-                IsomerBatch ValBatch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER), IsomerBatch(N, batch_size, HOST_BUFFER)};
-                IsomerBatch TestBatch[Nd] = {IsomerBatch(N,batch_size,HOST_BUFFER), IsomerBatch(N, batch_size, HOST_BUFFER)};
-                IsomerBatch TBs[Nd] = {IsomerBatch(N,mini_batch,HOST_BUFFER), IsomerBatch(N, mini_batch, HOST_BUFFER)};
+                IsomerBatch<HOST_BUFFER> ValBatch[Nd] = {IsomerBatch<HOST_BUFFER>(N,batch_size), IsomerBatch<HOST_BUFFER>(N, batch_size)};
+                IsomerBatch<HOST_BUFFER> TestBatch[Nd] = {IsomerBatch<HOST_BUFFER>(N,batch_size), IsomerBatch<HOST_BUFFER>(N, batch_size)};
+                IsomerBatch<HOST_BUFFER> TBs[Nd] = {IsomerBatch<HOST_BUFFER>(N,mini_batch), IsomerBatch<HOST_BUFFER>(N, mini_batch)};
             #endif
             cuda_io::IsomerQueue Q_test[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
             Q_test[0].resize(batch_size); Q_test[1].resize(batch_size);

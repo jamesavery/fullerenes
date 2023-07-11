@@ -57,8 +57,8 @@ ofstream out_file("IsomerspaceOpt_V7_" + to_string(N_end) + ".txt");
   std::cout << "N=" << N << " batch_size=" << batch_size << std::endl;
 
 
-  IsomerBatch B0s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
-  IsomerBatch B1s[Nd] = {IsomerBatch(N,batch_size,DEVICE_BUFFER,0), IsomerBatch(N, batch_size, DEVICE_BUFFER,1)};
+  IsomerBatch<DEVICE_BUFFER> B0s[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0), IsomerBatch<DEVICE_BUFFER>(N, batch_size,1)};
+  IsomerBatch<DEVICE_BUFFER> B1s[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0), IsomerBatch<DEVICE_BUFFER>(N, batch_size,1)};
 
   cuda_io::IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
   cuda_io::IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};

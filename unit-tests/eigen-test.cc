@@ -57,10 +57,10 @@ int main(int argc, char** argv){
     PlanarGraph Pg;
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     //IsomerQueue Q0(N);
-    IsomerBatch Bhost(N,batch_size,HOST_BUFFER);
+    IsomerBatch<HOST_BUFFER> Bhost(N,batch_size);
 
     int Nd = LaunchCtx::get_device_count();
-    IsomerBatch Bdev(N,batch_size,DEVICE_BUFFER,0);
+    IsomerBatch<DEVICE_BUFFER> Bdev(N,batch_size,0);
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, false, false);  
     if (isomer_num == -1) {
         spiral_nomenclature C60name(spiral_);    

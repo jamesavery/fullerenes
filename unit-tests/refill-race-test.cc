@@ -3,7 +3,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/isomerdb.hh"
 #include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/isomer_batch.hh"
+
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/cu_array.hh"
@@ -41,11 +41,11 @@ int main(int ac, char **argv){
     auto SEQUENTIAL_INSERT_AND_FILL_TEST = [&](){
         IsomerQueue TestQ(N,0);
         IsomerQueue ControlQ(N,0);
-        IsomerBatch d_TestB(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch d_ControlB(N,sample_size,DEVICE_BUFFER, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size, 0);
+        IsomerBatch<DEVICE_BUFFER> d_ControlB(N,sample_size, 0);
 
-        IsomerBatch h_TestB(N,sample_size,HOST_BUFFER, 0);
-        IsomerBatch h_ControlB(N,sample_size,HOST_BUFFER, 0);
+        IsomerBatch<HOST_BUFFER> h_TestB(N,sample_size);
+        IsomerBatch<HOST_BUFFER> h_ControlB(N,sample_size);
 
         LaunchCtx test_ctx(0);
         LaunchCtx control_ctx(0);
@@ -80,8 +80,8 @@ int main(int ac, char **argv){
         //Test equality.
         bool pass = h_TestB == h_ControlB;
         if (!pass) {
-            std::cout << h_TestB;
-            std::cout << h_ControlB;
+            //std::cout << h_TestB;
+            //std::cout << h_ControlB;
         }
         return pass;
     };
@@ -91,13 +91,13 @@ int main(int ac, char **argv){
         IsomerQueue TestQ2(N,0);
         IsomerQueue ControlQ(N,0);
         IsomerQueue ControlQ2(N,0);
-        IsomerBatch d_TestB(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch d_TestB2(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch d_ControlB(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch d_ControlB2(N,sample_size,DEVICE_BUFFER, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB2(N,sample_size, 0);
+        IsomerBatch<DEVICE_BUFFER> d_ControlB(N,sample_size, 0);
+        IsomerBatch<DEVICE_BUFFER> d_ControlB2(N,sample_size, 0);
 
-        IsomerBatch h_TestB(N,sample_size,HOST_BUFFER, 0);
-        IsomerBatch h_ControlB(N,sample_size,HOST_BUFFER, 0);
+        IsomerBatch<HOST_BUFFER> h_TestB(N,sample_size, 0);
+        IsomerBatch<HOST_BUFFER> h_ControlB(N,sample_size, 0);
 
         LaunchCtx test_ctx(0);
         LaunchCtx control_ctx(0);
@@ -137,7 +137,7 @@ int main(int ac, char **argv){
         //Test equality.
         bool pass = h_TestB == h_ControlB;
         if (!pass) {
-            std::cout << h_TestB;
+            //std::cout << h_TestB;
         }
         return pass;
     };
@@ -147,13 +147,13 @@ int main(int ac, char **argv){
         IsomerQueue TestQ2(N,0);
         IsomerQueue ControlQ(N,0);
         IsomerQueue ControlQ2(N,0);
-        IsomerBatch d_TestB(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch d_TestB2(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch d_ControlB(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch d_ControlB2(N,sample_size,DEVICE_BUFFER, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB2(N,sample_size, 0);
+        IsomerBatch<DEVICE_BUFFER> d_ControlB(N,sample_size, 0);
+        IsomerBatch<DEVICE_BUFFER> d_ControlB2(N,sample_size, 0);
 
-        IsomerBatch h_TestB(N,sample_size,HOST_BUFFER, 0);
-        IsomerBatch h_ControlB(N,sample_size,HOST_BUFFER, 0);
+        IsomerBatch<HOST_BUFFER> h_TestB(N,sample_size, 0);
+        IsomerBatch<HOST_BUFFER> h_ControlB(N,sample_size, 0);
 
         LaunchCtx test_ctx(0);
         LaunchCtx control_ctx(0);
@@ -200,7 +200,7 @@ int main(int ac, char **argv){
         //Test equality.
         bool pass = h_TestB == h_ControlB;
         if (!pass) {
-            std::cout << h_TestB;
+            //std::cout << h_TestB;
         }
         return pass;
     };
@@ -210,13 +210,13 @@ int main(int ac, char **argv){
         IsomerQueue TestQ2(N,0);
         IsomerQueue ControlQ(N,0);
         IsomerQueue ControlQ2(N,0);
-        IsomerBatch d_TestB(N,sample_size*2,DEVICE_BUFFER, 0);
-        IsomerBatch d_TestB2(N,sample_size,DEVICE_BUFFER, 0);
-        IsomerBatch d_ControlB(N,sample_size*2,DEVICE_BUFFER, 0);
-        IsomerBatch d_ControlB2(N,sample_size,DEVICE_BUFFER, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size*2, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB2(N,sample_size, 0);
+        IsomerBatch<DEVICE_BUFFER> d_ControlB(N,sample_size*2, 0);
+        IsomerBatch<DEVICE_BUFFER> d_ControlB2(N,sample_size, 0);
 
-        IsomerBatch h_TestB(N,sample_size,HOST_BUFFER, 0);
-        IsomerBatch h_ControlB(N,sample_size,HOST_BUFFER, 0);
+        IsomerBatch<HOST_BUFFER> h_TestB(N,sample_size, 0);
+        IsomerBatch<HOST_BUFFER> h_ControlB(N,sample_size, 0);
 
         LaunchCtx test_ctx(0);
         LaunchCtx control_ctx(0);
@@ -284,8 +284,8 @@ int main(int ac, char **argv){
     auto ORDERED_TEST = [&](){
         IsomerQueue TestQ(N,0);
         IsomerQueue TestQ2(N,0);
-        IsomerBatch d_TestB(N,sample_size*2,DEVICE_BUFFER, 0);
-        IsomerBatch d_TestB2(N,sample_size,DEVICE_BUFFER, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size*2, 0);
+        IsomerBatch<DEVICE_BUFFER> d_TestB2(N,sample_size, 0);
 
         LaunchCtx test_ctx(0);
 
@@ -315,21 +315,21 @@ int main(int ac, char **argv){
         reset_convergence_statuses(d_TestB, test_ctx, SYNC);
 
         //std::cout << d_TestB << std::endl;
-        std::cout << TestQ2.device_batch << std::endl;
+        //std::cout << TestQ2.device_batch << std::endl;
         std::cout << "===============================================================" << endl;
         TestQ2.insert(d_TestB, test_ctx, SYNC);
-        std::cout << TestQ2.device_batch << std::endl;
+        //std::cout << TestQ2.device_batch << std::endl;
         std::cout << "===============================================================" << endl;
         TestQ2.refill_batch(d_TestB2, test_ctx, SYNC);
-        std::cout << d_TestB2 << std::endl;
+        //std::cout << d_TestB2 << std::endl;
         std::cout << "===============================================================" << endl;
 
         isomerspace_forcefield::optimise<PEDERSEN>(d_TestB2, N*3, N*4,test_ctx, SYNC);
-        std::cout<< d_TestB2 << endl;
+        //std::cout<< d_TestB2 << endl;
         std::cout << "===============================================================" << endl;
 
         TestQ2.refill_batch(d_TestB2, test_ctx, SYNC);
-        std::cout<< d_TestB2 << endl;
+        //std::cout<< d_TestB2 << endl;
         std::cout << "===============================================================" << endl;
 
 
@@ -339,7 +339,7 @@ int main(int ac, char **argv){
         isomerspace_forcefield::optimise<PEDERSEN>(d_TestB2, N*4, N*4,test_ctx, SYNC);
         TestQ2.refill_batch(d_TestB2, test_ctx, SYNC);
 
-        std::cout << d_TestB2 << endl;
+        //std::cout << d_TestB2 << endl;
 
         std::vector<size_t> id_list(n_samples);
         std::iota(id_list.begin(), id_list.end(), n_samples);
