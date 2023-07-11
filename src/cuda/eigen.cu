@@ -869,7 +869,7 @@ namespace gpu_kernels{
 
             static LaunchDims dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM,T>, B.n_atoms*3, smem, B.isomer_capacity);
             static LaunchDims qr_dims((void*)eigensolve_<EigensolveMode::VECTORS,T>, 64, smem_qr, B.isomer_capacity);
-            static LaunchDims eig_dims((void*)compute_eigenvectors_, B.n_atoms*3, smem_eig, B.isomer_capacity);
+            static LaunchDims eig_dims((void*)compute_eigenvectors_<T>, B.n_atoms*3, smem_eig, B.isomer_capacity);
             dims.update_dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM,T>, B.n_atoms*3, smem, B.isomer_capacity);
             qr_dims.update_dims((void*)eigensolve_<EigensolveMode::VECTORS,T>, 64, smem_qr, B.isomer_capacity);
             eig_dims.update_dims((void*)compute_eigenvectors_<T>, B.n_atoms*3, smem_eig, B.isomer_capacity);
@@ -898,8 +898,8 @@ namespace gpu_kernels{
             printLastCudaError("Full Spectrum Eigensolver Failed : ");
         }
 
-
-        void eigensolve(const IsomerBatch& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
+        template <BufferType T>
+        void eigensolve(const IsomerBatch<T>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             cudaSetDevice(B.get_device_id());
             auto dev = B.get_device_id();
@@ -926,11 +926,11 @@ namespace gpu_kernels{
             size_t smem = sizeof(device_coord3d)*B.n_atoms*3 + sizeof(device_real_t)*Block_Size_Pow_2;
             size_t smem_qr = sizeof(device_real_t)*(B.n_atoms*3+1)*6 + sizeof(device_real_t)*(B.n_atoms*3)*2;
             size_t smem_eig = 0;
-            static LaunchDims dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM>, B.n_atoms*3, smem, B.isomer_capacity);
-            static LaunchDims qr_dims((void*)eigensolve_<EigensolveMode::NO_VECTORS>, 64, smem_qr, B.isomer_capacity);
+            static LaunchDims dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM, T>, B.n_atoms*3, smem, B.isomer_capacity);
+            static LaunchDims qr_dims((void*)eigensolve_<EigensolveMode::NO_VECTORS, T>, 64, smem_qr, B.isomer_capacity);
 
-            dims.update_dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM>, B.n_atoms*3, smem, B.isomer_capacity);
-            qr_dims.update_dims((void*)eigensolve_<EigensolveMode::NO_VECTORS>, 64, smem_qr, B.isomer_capacity);
+            dims.update_dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM, T>, B.n_atoms*3, smem, B.isomer_capacity);
+            qr_dims.update_dims((void*)eigensolve_<EigensolveMode::NO_VECTORS, T>, 64, smem_qr, B.isomer_capacity);
 
             
             //The hessian has 6 degrees of freedom, so in order to find the smallest eigenvalue we must find the 6 eigenvectors corresponding to these lambda=0
@@ -938,7 +938,7 @@ namespace gpu_kernels{
             int Nlanczos = B.n_atoms*3;
             void* kargs[]{(void*)&B, (void*)&Vs[dev], (void*)&Ls[dev], (void*)&eigenvalues, (void*)&hessians, (void*)&cols, (void*)&Nlanczos};
             void* kargs_qr[]{(void*)&B, (void*)&eigenvalues, (void*)&Ls[dev], (void*)&Us[dev], (void*)&Qs[dev], (void*)&Nlanczos};
-            safeCudaKernelCall((void*)lanczos_<EigensolveMode::FULL_SPECTRUM>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            safeCudaKernelCall((void*)lanczos_<EigensolveMode::FULL_SPECTRUM, T>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
             //ctx.wait();
             //vector<device_real_t> Qhost(B.n_atoms*3*3*B.n_atoms);
             //vector<device_real_t> Diags = vector<device_real_t>(eigenvalues.data, eigenvalues.data + B.n_atoms*3);
@@ -948,7 +948,7 @@ namespace gpu_kernels{
             //ofstream out("Qhost.float32", ios::binary); out.write((char*)Qhost.data(), Qhost.size()*sizeof(device_real_t)); out.close();
             //ofstream out2("D.float32", ios::binary); out2.write((char*)eigenvalues.data, eigenvalues.size()*sizeof(device_real_t)); out2.close();
             //ofstream out3("L.float32", ios::binary); out3.write((char*)Ls[dev].data, Ls[dev].size()*sizeof(device_real_t)); out3.close();
-            safeCudaKernelCall((void*)eigensolve_<EigensolveMode::NO_VECTORS>, qr_dims.get_grid(), qr_dims.get_block(), kargs_qr, smem_qr, ctx.stream);
+            safeCudaKernelCall((void*)eigensolve_<EigensolveMode::NO_VECTORS, T>, qr_dims.get_grid(), qr_dims.get_block(), kargs_qr, smem_qr, ctx.stream);
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Full Spectrum Eigensolver Failed : ");
         }
