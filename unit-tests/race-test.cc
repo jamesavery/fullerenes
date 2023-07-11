@@ -2,7 +2,7 @@
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/isomer_batch.hh"
+
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/cu_array.hh"
@@ -16,10 +16,10 @@ int main(int ac, char **argv){
     using namespace gpu_kernels;
     auto batch_size = min(50000, (int)n_isomers);
     BuckyGen::buckygen_queue Q = BuckyGen::start(N,false, false);
-    IsomerBatch d_validation(N, batch_size, DEVICE_BUFFER);
-    IsomerBatch d_test(N, batch_size, DEVICE_BUFFER);
-    IsomerBatch h_validation(N, batch_size, HOST_BUFFER);
-    IsomerBatch h_test(N, batch_size, HOST_BUFFER);
+    IsomerBatch<DEVICE_BUFFER>   d_validation(N, batch_size);
+    IsomerBatch<DEVICE_BUFFER>   d_test(N, batch_size);
+    IsomerBatch<HOST_BUFFER>     h_validation(N, batch_size);
+    IsomerBatch<HOST_BUFFER>     h_test(N, batch_size);
 
     Graph G;
     bool more_to_generate = true;

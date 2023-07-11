@@ -13,10 +13,15 @@ enum class IsomerStatus {EMPTY, CONVERGED, PLZ_CHECK, FAILED, NOT_CONVERGED};
 enum BatchMember {COORDS3D, COORDS2D, CUBIC_NEIGHBOURS, DUAL_NEIGHBOURS, FACE_DEGREES, IDS, ITERATIONS, STATUSES};
 enum SortOrder {ASCENDING, DESCENDING};
 enum class LaunchPolicy {SYNC, ASYNC};
-
-struct IsomerBatch : GPUDataStruct
-{
-
+enum BufferType   {HOST_BUFFER, DEVICE_BUFFER};
+template <BufferType T>
+struct IsomerBatch
+{ 
+    int isomer_capacity = 0;
+    bool allocated = false;
+    size_t n_atoms = 0;
+    size_t n_faces = 0;
+    size_t n_isomers = 0;
     float* X;
     device_hpreal_t* xys;
 
@@ -27,6 +32,7 @@ struct IsomerBatch : GPUDataStruct
     size_t* IDs;
     size_t* iterations;
     IsomerStatus* statuses;
+    std::vector<std::tuple<std::string,void**,size_t,bool>> pointers;
 
     IsomerBatch(){
       pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_hpreal_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
@@ -34,8 +40,8 @@ struct IsomerBatch : GPUDataStruct
 
     void operator=(const IsomerBatch &);
 
-    ~IsomerBatch() override;
-    IsomerBatch(size_t n_atoms, size_t n_isomers, BufferType buffer_type, int device  = 0);
+    ~IsomerBatch();
+    IsomerBatch(size_t n_atoms, size_t n_isomers, int device  = 0);
     void set_print_simple() {verbose = false;} 
     void set_print_verbose() {verbose = true;} 
     bool get_print_mode() const {return verbose;}
@@ -55,7 +61,7 @@ struct IsomerBatch : GPUDataStruct
     void clear(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy = LaunchPolicy::SYNC);                 //Clears the batch and resets the size to 0
     bool operator==(const IsomerBatch& b); //Returns true if the two batches are equal
     bool operator!=(const IsomerBatch& b) {return !(*this == b);}
-    friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a); //Prints the batch to the given stream
+    //friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a); //Prints the batch to the given stream
 
   private:
     int m_size = 0;

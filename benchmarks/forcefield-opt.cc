@@ -24,9 +24,9 @@ int main(int argc, char** argv){
     BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
     auto sample_size = min(gpu_kernels::isomerspace_forcefield::optimal_batch_size(N,0),(int)num_fullerenes.find(N)->second);
     
-    IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
-    IsomerBatch batch1(N,sample_size,DEVICE_BUFFER);
-    IsomerBatch batch2(N,sample_size,DEVICE_BUFFER, 1);
+    IsomerBatch<DEVICE_BUFFER> batch0(N,sample_size);
+    IsomerBatch<DEVICE_BUFFER> batch1(N,sample_size);
+    IsomerBatch<DEVICE_BUFFER> batch2(N,sample_size, 1);
     LaunchCtx device1(1);
     LaunchCtx device0(0);
     cuda_io::IsomerQueue isomer_q(N);

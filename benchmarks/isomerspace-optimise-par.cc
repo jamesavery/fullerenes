@@ -91,10 +91,10 @@ int main(int argc, char** argv){
         for (size_t l = 0; l < N_runs; l++)
         {   
             finished_isomers = 0;
-            IsomerBatch batch0(N,sample_size,DEVICE_BUFFER,0);
-            IsomerBatch batch1(N,sample_size,DEVICE_BUFFER,0);
-            IsomerBatch batch2(N,sample_size,DEVICE_BUFFER,0);
-            IsomerBatch h_batch(N,sample_size,HOST_BUFFER);
+            IsomerBatch<DEVICE_BUFFER> batch0(N,sample_size,0);
+            IsomerBatch<DEVICE_BUFFER> batch1(N,sample_size,0);
+            IsomerBatch<DEVICE_BUFFER> batch2(N,sample_size,0);
+            IsomerBatch<HOST_BUFFER> h_batch(N,sample_size);
             LaunchCtx ctx(0);
             cuda_io::IsomerQueue isomer_q(N,0);
             cuda_io::IsomerQueue isomer_q_cubic(N,0);

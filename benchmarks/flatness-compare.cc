@@ -47,10 +47,10 @@ int main(int argc, char** argv){
 
     
     auto finished_isomers = 0;
-    IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
-    IsomerBatch batch1(N,sample_size,DEVICE_BUFFER);
-    IsomerBatch h_batch(N,sample_size,HOST_BUFFER);
-    IsomerBatch h_batch1(N,sample_size,HOST_BUFFER);
+    IsomerBatch<DEVICE_BUFFER> batch0(N,sample_size);
+    IsomerBatch<DEVICE_BUFFER> batch1(N,sample_size);
+    IsomerBatch<HOST_BUFFER> h_batch(N,sample_size);
+    IsomerBatch<HOST_BUFFER> h_batch1(N,sample_size);
     cuda_io::IsomerQueue Q0(N);
     Q0.resize(min(n_fullerenes,sample_size));
     for (int i = 0; i < sample_size; i++){

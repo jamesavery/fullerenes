@@ -3,13 +3,21 @@
 #include "type_traits"
 #include <numeric>
 namespace cuda_io{
-
     
+    template cudaError_t output_to_queue<HOST_BUFFER>(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<HOST_BUFFER>& batch, const bool copy_2d_layout);
+    template cudaError_t reset_convergence_statuses<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
+    template double average_iterations<HOST_BUFFER>(const IsomerBatch<HOST_BUFFER>& input);
+    template double average_iterations<DEVICE_BUFFER>(const IsomerBatch<DEVICE_BUFFER>& input);
+    template void is_close<HOST_BUFFER>(const IsomerBatch<HOST_BUFFER>& a, const IsomerBatch<HOST_BUFFER>& b, float tol, bool verbose);
+    template void sort<HOST_BUFFER>(IsomerBatch<HOST_BUFFER>& input_batch, const BatchMember key, const SortOrder order);
+    template void sort<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& input_batch, const BatchMember key, const SortOrder order);
+    template int count_batch_status<HOST_BUFFER>(const IsomerBatch<HOST_BUFFER>& input, const IsomerStatus status);
+    template int count_batch_status<DEVICE_BUFFER>(const IsomerBatch<DEVICE_BUFFER>& input, const IsomerStatus status);
 
-    cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch& batch, const bool copy_2d_layout){
+
+    template <BufferType T>
+    cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<T>& batch, const bool copy_2d_layout){
         //Batch needs to exist on the host. For performance reasons we don't want to create a new batch here and copy to that, cudaMalloc is expensive.
-        printLastCudaError("");
-        if (batch.buffer_type != HOST_BUFFER) assert(false); 
 
         size_t N = batch.n_atoms;
         for (size_t isomer_idx = 0; isomer_idx < batch.isomer_capacity; isomer_idx++){   
@@ -50,8 +58,9 @@ namespace cuda_io{
         return cudaGetLastError();
     }
     
-    cudaError_t copy(   IsomerBatch& destination, //Copy data to this batch
-                        const IsomerBatch& source, //Copy data from this batch
+    template <BufferType T, BufferType U>
+    cudaError_t copy(   IsomerBatch<T>& destination, //Copy data to this batch
+                        const IsomerBatch<U>& source, //Copy data from this batch
                         const LaunchCtx& ctx, //Optional: specify which launch context to perform the copy operation in.
                         const LaunchPolicy policy, //Optional: specifies whether to synchronize the stream before and after copying)
                         const std::pair<int,int>& lhs_range, //Optional: provide a range of indices to assign similar to slices in numpy eg. {0,5} = [0:5]
@@ -59,8 +68,8 @@ namespace cuda_io{
                         ){
         assert(lhs_range.second - lhs_range.first == rhs_range.second - rhs_range.first);
         if ( lhs_range.second == -1 && lhs_range.first == -1 ) assert(source.isomer_capacity <= destination.isomer_capacity);
-
-        if(source.buffer_type == DEVICE_BUFFER) {cudaSetDevice(source.get_device_id()); }
+        
+        if(U == DEVICE_BUFFER) {cudaSetDevice(source.get_device_id()); }
         else{ cudaSetDevice(destination.get_device_id());}
         
         //Iterate over the data fields of the IsomerBatch (pseudo reflection) and copy the contents of each using the provided stream.
@@ -74,10 +83,10 @@ namespace cuda_io{
             char* lhs_ptr = (char*)(*(get<1>(destination.pointers[i])));
             char* rhs_ptr = (char*)(*(get<1>(source.pointers[i])));
 
-            if( (source.get_device_id() != destination.get_device_id()) && ( (destination.buffer_type==DEVICE_BUFFER) && (source.buffer_type == DEVICE_BUFFER))){
+            if( (source.get_device_id() != destination.get_device_id()) && ( (T==DEVICE_BUFFER) && (U == DEVICE_BUFFER))){
                 cudaMemcpyPeerAsync(lhs_ptr + lhs_offset, destination.get_device_id(), rhs_ptr + rhs_offset, source.get_device_id(), num_isomers * get<2>(source.pointers[i]), ctx.stream);
             } else{
-                cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*source.buffer_type +  destination.buffer_type), ctx.stream);
+                cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*U +  T), ctx.stream);
             }
         }
         destination.n_isomers = source.n_isomers;
@@ -86,18 +95,20 @@ namespace cuda_io{
         return cudaGetLastError();
     }
 
-    cudaError_t free(IsomerBatch& batch){
+    template <BufferType T>
+    cudaError_t free(IsomerBatch<T>& batch){
         cudaSetDevice(batch.get_device_id());
         for (int i = 0; i < batch.pointers.size(); i++){
-            if(batch.buffer_type == DEVICE_BUFFER) {cudaFree(*get<1>(batch.pointers[i]));} else {cudaFreeHost(*get<1>(batch.pointers[i]));}
+            if(T == DEVICE_BUFFER) {cudaFree(*get<1>(batch.pointers[i]));} else {cudaFreeHost(*get<1>(batch.pointers[i]));}
         }
         return cudaGetLastError();
     }
-    
-    cudaError_t resize(IsomerBatch& batch, const size_t new_capacity, const LaunchCtx& ctx, const LaunchPolicy policy, int front, int back){
+
+    template <BufferType T>    
+    cudaError_t resize(IsomerBatch<T>& batch, const size_t new_capacity, const LaunchCtx& ctx, const LaunchPolicy policy, int front, int back){
         cudaSetDevice(batch.get_device_id());
         //Construct a tempory batch: allocates the needed amount of memory.
-        IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type, batch.get_device_id());
+        IsomerBatch<T> temp_batch = IsomerBatch<T>(batch.n_atoms, new_capacity, batch.get_device_id());
         //Copy contents of old batch into newly allocated memory.
         if (new_capacity < batch.isomer_capacity){
             cuda_io::copy(temp_batch, batch, ctx, LaunchPolicy::SYNC, {0,new_capacity}, {0,new_capacity});
@@ -165,9 +176,10 @@ namespace cuda_io{
         return {n_correct, average_adifference / (float)(n_valid), average_rdifference / (float)(n_valid)};
     }
 
-    void is_close(const IsomerBatch& a, const IsomerBatch& b, float tol, bool verbose){
+    template <BufferType T>
+    void is_close(const IsomerBatch<T>& a, const IsomerBatch<T>& b, float tol, bool verbose){
 
-        if (! (a.buffer_type == b.buffer_type && a.isomer_capacity == b.isomer_capacity && a.n_atoms == b.n_atoms) ) {
+        if (! (a.isomer_capacity == b.isomer_capacity && a.n_atoms == b.n_atoms) ) {
             std::cout << "IsomerBatches are of different types and or dimensions \n";
         }{
             auto [n_correct_X,          accuracy0, avg_diff0] = compare_isomer_arrays(a.X, b.X, a.isomer_capacity, a.n_atoms*3, tol, verbose);
@@ -187,8 +199,9 @@ namespace cuda_io{
         }
     }
 
-    int count_batch_status(const IsomerBatch& input, const IsomerStatus status){
-        auto fun = [&](const IsomerBatch& batch){
+    template <BufferType T>
+    int count_batch_status(const IsomerBatch<T>& input, const IsomerStatus status){
+        auto fun = [&](const IsomerBatch<HOST_BUFFER>& batch){
             int res = 0;
             for (size_t i = 0; i < batch.isomer_capacity; i++)
             {
@@ -196,18 +209,21 @@ namespace cuda_io{
             }
             return res;
         }; 
-        if (input.buffer_type == DEVICE_BUFFER){
-            IsomerBatch temp(input.n_atoms, input.isomer_capacity, HOST_BUFFER);
+        if (T == DEVICE_BUFFER){
+            IsomerBatch<HOST_BUFFER> temp(input.n_atoms, input.isomer_capacity);
             cuda_io::copy(temp, input);
             return fun(temp);
-        } else if(input.buffer_type == HOST_BUFFER){
-            return fun(input);
+        } else if(T == HOST_BUFFER){
+            IsomerBatch<HOST_BUFFER> temp(input.n_atoms, input.isomer_capacity);
+            cuda_io::copy(temp, input);
+            return fun(temp);
         }
         return 0;
     }
 
-    double average_iterations(const IsomerBatch& input){
-        auto fun = [](const IsomerBatch& batch){
+    template <BufferType T>
+    double average_iterations(const IsomerBatch<T>& input){
+        auto fun = [](const IsomerBatch<HOST_BUFFER>& batch){
             u_int64_t result = 0;
             auto non_empty_isomers = 0;
             for (size_t i = 0; i < batch.isomer_capacity; i++) {
@@ -216,22 +232,25 @@ namespace cuda_io{
             }
             return (double)result / (double)non_empty_isomers;
         };
-        if (input.buffer_type == DEVICE_BUFFER){
-            IsomerBatch temp(input.n_atoms, input.isomer_capacity, HOST_BUFFER);
+        if (T == DEVICE_BUFFER){
+            IsomerBatch<HOST_BUFFER> temp(input.n_atoms, input.isomer_capacity);
             cuda_io::copy(temp, input);
             return fun(temp);
-        } else if(input.buffer_type == HOST_BUFFER){
-            return fun(input);
+        } else if(T == HOST_BUFFER){
+            IsomerBatch<HOST_BUFFER> temp(input.n_atoms, input.isomer_capacity);
+            cuda_io::copy(temp, input);
+            return fun(temp);
         }
         return 0;
     }
 
     
     //Sorts the batch by whatever metadata key you pass, and if the key is identical for two isomers they are sorted by ID.
-    void sort(IsomerBatch& input_batch, const BatchMember key, const SortOrder order){
-        IsomerBatch temp(input_batch.n_atoms, input_batch.isomer_capacity, HOST_BUFFER);
+    template <BufferType T>
+    void sort(IsomerBatch<T>& input_batch, const BatchMember key, const SortOrder order){
+        IsomerBatch<HOST_BUFFER> temp(input_batch.n_atoms, input_batch.isomer_capacity);
 
-        auto sort_fun = [&](IsomerBatch& batch){
+        auto sort_fun = [&](IsomerBatch<HOST_BUFFER>& batch){
             std::map<int,int> index_map{};
             std::vector<int> lookup_indices(batch.isomer_capacity);
             std::iota(lookup_indices.begin(), lookup_indices.end(),0);
@@ -278,13 +297,15 @@ namespace cuda_io{
                 temp.IDs[i] = batch.IDs[lookup_indices[i]];
             }
         };
-        if (input_batch.buffer_type == DEVICE_BUFFER){
-            IsomerBatch temp2(input_batch.n_atoms, input_batch.isomer_capacity, HOST_BUFFER);
+        if (T == DEVICE_BUFFER){
+            IsomerBatch<HOST_BUFFER> temp2(input_batch.n_atoms, input_batch.isomer_capacity);
             copy(temp2, input_batch);
             sort_fun(temp2);
 
-        } else if(input_batch.buffer_type == HOST_BUFFER){
-            sort_fun(input_batch);
+        } else if(T == HOST_BUFFER){
+            IsomerBatch<HOST_BUFFER> temp2(input_batch.n_atoms, input_batch.isomer_capacity);
+            copy(temp2, input_batch);
+            sort_fun(temp2);
         }
         copy(input_batch,temp);   
     }
@@ -326,7 +347,7 @@ namespace cuda_io{
     }
 
     __global__
-    void reset_convergence_status_(IsomerBatch B){
+    void reset_convergence_status_(IsomerBatch<DEVICE_BUFFER> B){
         for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x)
         {
 	  if (threadIdx.x == 0) B.statuses[isomer_idx] = (B.statuses[isomer_idx] == IsomerStatus::EMPTY)? IsomerStatus::EMPTY : IsomerStatus::NOT_CONVERGED;
@@ -334,8 +355,8 @@ namespace cuda_io{
         }
         
     }
-
-    cudaError_t reset_convergence_statuses(IsomerBatch& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+    template <BufferType T>
+    cudaError_t reset_convergence_statuses(IsomerBatch<T>& B, const LaunchCtx& ctx, const LaunchPolicy policy){
         cudaSetDevice(ctx.get_device_id());
         static LaunchDims dims((void*)reset_convergence_status_, B.n_atoms);
         dims.update_dims((void*)reset_convergence_status_,B.n_atoms,0,B.isomer_capacity);
@@ -349,28 +370,26 @@ namespace cuda_io{
 
 }
 
-void IsomerBatch::append(const Graph& graph, const size_t id){
+template <BufferType T>
+void IsomerBatch<T>::append(const Graph& graph, const size_t id){
     if (m_size == isomer_capacity) {std::cout << "IsomerBatch is full" << std::endl; assert(false);}
     auto Nf = this->n_atoms / 2 + 2;
     if (graph.neighbours.size() != Nf) {std::cout << "Graph has wrong number of faces" + std::to_string(graph.neighbours.size()) + " " + std::to_string(Nf) << std::endl; assert(false);}
-    if (buffer_type == DEVICE_BUFFER){
-        std::cout << "Appending to device buffer not implemented, use a host buffer instead and then copy to device buffer." << std::endl; assert(false);
-    } else if (buffer_type == HOST_BUFFER){
-        size_t face_offset = m_size * Nf;
-        for(node_t u=0;u< graph.neighbours.size();u++){
-            face_degrees[face_offset + u] = graph.neighbours[u].size();
-            for(int j=0;j<graph.neighbours[u].size();j++){
-                dual_neighbours[6*(face_offset+u)+j] = graph.neighbours[u][j];
-            }
+    size_t face_offset = m_size * Nf;
+    for(node_t u=0;u< graph.neighbours.size();u++){
+        face_degrees[face_offset + u] = graph.neighbours[u].size();
+        for(int j=0;j<graph.neighbours[u].size();j++){
+            dual_neighbours[6*(face_offset+u)+j] = graph.neighbours[u][j];
         }
-        statuses[m_size] = IsomerStatus::NOT_CONVERGED;
-        iterations[m_size] = 0;
-        IDs[m_size] = id;
     }
+    statuses[m_size] = IsomerStatus::NOT_CONVERGED;
+    iterations[m_size] = 0;
+    IDs[m_size] = id;
     m_size++;
 }
 
-void IsomerBatch:: append(const PlanarGraph& G, const size_t id, const bool insert_2d){ 
+template <BufferType T>
+void IsomerBatch<T>::append(const PlanarGraph& G, const size_t id, const bool insert_2d){ 
     //Extract the graph information (neighbours) from the PlanarGraph object and insert it at the appropriate location in the queue.
     size_t offset = m_size* n_atoms;
     for(node_t u=0;u<n_atoms;u++){
@@ -388,44 +407,43 @@ void IsomerBatch:: append(const PlanarGraph& G, const size_t id, const bool inse
     m_size++;
 }
 
-void IsomerBatch::append(const Polyhedron& graph, const size_t id){
+template <BufferType T>
+void IsomerBatch<T>::append(const Polyhedron& graph, const size_t id){
     if (m_size == isomer_capacity) throw std::runtime_error("IsomerBatch is full");
     if (graph.neighbours.size() != n_atoms) throw std::runtime_error("Graph has wrong number of faces");
-    if (buffer_type == DEVICE_BUFFER){
-        throw std::runtime_error("Appending to device buffer not implemented, use a host buffer instead and then copy to device buffer.");    
-    } else if (buffer_type == HOST_BUFFER){
-        size_t offset = m_size * n_atoms;
-        for(node_t u=0;u< graph.neighbours.size();u++){
-            for(int j=0;j<graph.neighbours[u].size();j++){
-                cubic_neighbours[3*(offset+u)+j] = graph.neighbours[u][j];
-                X[3*(offset+u)+j] = graph.points[u][j];
-            }
+    size_t offset = m_size * n_atoms;
+    for(node_t u=0;u< graph.neighbours.size();u++){
+        for(int j=0;j<graph.neighbours[u].size();j++){
+            cubic_neighbours[3*(offset+u)+j] = graph.neighbours[u][j];
+            X[3*(offset+u)+j] = graph.points[u][j];
         }
-        statuses[m_size] = IsomerStatus::NOT_CONVERGED;
-        iterations[m_size] = 0;
-        IDs[m_size] = id;
     }
+    statuses[m_size] = IsomerStatus::NOT_CONVERGED;
+    iterations[m_size] = 0;
+    IDs[m_size] = id;
     m_size++;
 }
 
-void IsomerBatch::clear(const LaunchCtx& ctx, const LaunchPolicy policy){
+template <BufferType T>
+void IsomerBatch<T>::clear(const LaunchCtx& ctx, const LaunchPolicy policy){
     //Set statuses to empty and iterations to 0
-    if (buffer_type == DEVICE_BUFFER){
+    if (T == DEVICE_BUFFER){
         cudaSetDevice(ctx.get_device_id());
         if(policy == LaunchPolicy::SYNC) ctx.wait();
         cudaMemsetAsync((void*)statuses, int(IsomerStatus::EMPTY), isomer_capacity * sizeof(IsomerStatus), ctx.stream);
         cudaMemsetAsync((void*)iterations, 0, isomer_capacity * sizeof(size_t), ctx.stream);
         if(policy == LaunchPolicy::SYNC) ctx.wait();
-    } else if (buffer_type == HOST_BUFFER){
+    } else if (T == HOST_BUFFER){
         std::fill(statuses, statuses + isomer_capacity, IsomerStatus::EMPTY);
         std::fill(iterations, iterations + isomer_capacity, 0);
     }
     m_size = 0;
 }
 
-void IsomerBatch::shrink_to_fit(){
+template <BufferType T>
+void IsomerBatch<T>::shrink_to_fit(){
     auto first_empty = -1;
-    auto sort_fun = [&](IsomerBatch& batch){
+    auto sort_fun = [&](IsomerBatch<HOST_BUFFER>& batch){
         cuda_io::sort(batch, STATUSES, DESCENDING);
         for (size_t i = 0; i < batch.isomer_capacity; i++){
             if (batch.statuses[i] == IsomerStatus::EMPTY){
@@ -436,20 +454,23 @@ void IsomerBatch::shrink_to_fit(){
     };
 
 
-    if (buffer_type == DEVICE_BUFFER){
-        IsomerBatch temp(n_atoms, isomer_capacity, HOST_BUFFER);
+    if (T == DEVICE_BUFFER){
+        IsomerBatch<HOST_BUFFER> temp(n_atoms, isomer_capacity);
         cuda_io::copy(temp, *this);
         sort_fun(temp);
         cuda_io::copy(*this, temp);
         cuda_io::resize(*this, first_empty);
-    } else if (buffer_type == HOST_BUFFER){
-        sort_fun(*this);
+    } else if (T == HOST_BUFFER){
+        IsomerBatch<HOST_BUFFER> temp(n_atoms, isomer_capacity);
+        cuda_io::copy(temp, *this);
+        sort_fun(temp);
+        cuda_io::copy(*this, temp);
         cuda_io::resize(*this, first_empty);
     }
     
 }
-
-std::optional<Polyhedron> IsomerBatch::get_isomer(const size_t index) const {
+template <BufferType T>
+std::optional<Polyhedron> IsomerBatch<T>::get_isomer(const size_t index) const {
     auto N = n_atoms;
     neighbours_t out_neighbours(N);
     if (index > isomer_capacity){
@@ -473,8 +494,8 @@ std::optional<Polyhedron> IsomerBatch::get_isomer(const size_t index) const {
     return Polyhedron(Graph(out_neighbours, true),output_X);
 }
 
-
-std::optional<Polyhedron> IsomerBatch::get_isomer_by_id(const size_t ID) const {
+template <BufferType T>
+std::optional<Polyhedron> IsomerBatch<T>::get_isomer_by_id(const size_t ID) const {
     auto N = n_atoms;
     neighbours_t out_neighbours(N, std::vector<int>(3, -1));
     int index = -1;
@@ -502,7 +523,8 @@ std::optional<Polyhedron> IsomerBatch::get_isomer_by_id(const size_t ID) const {
     return Polyhedron(Graph(out_neighbours, true),output_X);
 }
 
-std::vector<size_t> IsomerBatch::find_ids(const IsomerStatus status){
+template <BufferType T>
+std::vector<size_t> IsomerBatch<T>::find_ids(const IsomerStatus status){
     std::vector<size_t> result;
     for (size_t i = 0; i < isomer_capacity; i++){
         if(statuses[i] == status) result.push_back(IDs[i]);
@@ -511,17 +533,17 @@ std::vector<size_t> IsomerBatch::find_ids(const IsomerStatus status){
     return result;
 }
 
-
-bool IsomerBatch::operator==(const IsomerBatch& b){
+template <BufferType T>
+bool IsomerBatch<T>::operator==(const IsomerBatch<T>& b){
     bool passed = true;
     auto device_real_t_equals = [](const float a, const float b){
         return (a == b) || (std::isnan(a) && std::isnan(b)) || (std::isinf(a) && std::isinf(b));
     };
     
-    if (! (buffer_type == b.buffer_type && isomer_capacity == b.isomer_capacity && n_atoms == b.n_atoms) ) {
+    if (! (isomer_capacity == b.isomer_capacity && n_atoms == b.n_atoms) ) {
 
         return false;
-    }else if(buffer_type == HOST_BUFFER){
+    }else if(T == HOST_BUFFER){
 
         for(int i = 0; i < isomer_capacity; ++i){
             passed = passed && statuses[i] == b.statuses[i];
@@ -545,8 +567,10 @@ bool IsomerBatch::operator==(const IsomerBatch& b){
     }
     return false;
 }
-void IsomerBatch::print(const BatchMember param, const std::pair<int,int>& range){
-    auto print_fun = [&](const IsomerBatch& a){
+
+template <BufferType T>
+void IsomerBatch<T>::print(const BatchMember param, const std::pair<int,int>& range){
+    auto print_fun = [&](const IsomerBatch<HOST_BUFFER>& a){
         std::ostream& os = std::cout;
         auto start = range.first < 0 ? 0 : range.first;
         auto end = range.second < 0 ? a.isomer_capacity : range.second;
@@ -641,17 +665,20 @@ void IsomerBatch::print(const BatchMember param, const std::pair<int,int>& range
             break;
         }
     };
-    if(buffer_type == DEVICE_BUFFER){
-        IsomerBatch temp(n_atoms, isomer_capacity, HOST_BUFFER);
+    if(T == DEVICE_BUFFER){
+        IsomerBatch<HOST_BUFFER> temp(n_atoms, isomer_capacity);
         cuda_io::copy(temp, *this);
         print_fun(temp);
-    } else if(buffer_type == HOST_BUFFER){
-        print_fun(*this);
+    } else if(T == HOST_BUFFER){
+        IsomerBatch<HOST_BUFFER> temp(n_atoms, isomer_capacity);
+        cuda_io::copy(temp, *this);
+        print_fun(temp);
     }
 }
 
-std::ostream& operator << (std::ostream& os, const IsomerBatch& input){
-    auto print_fun = [&](const IsomerBatch& a){
+/* template <BufferType T>
+std::ostream& operator << (std::ostream& os, const IsomerBatch<T>& input){
+    auto print_fun = [&](const IsomerBatch<HOST_BUFFER>& a){
         os << "Batch Dimensions: (" << a.isomer_capacity << ", " << a.n_atoms << ")\n";
         os << "ID List: " << "\n[";
         for (size_t i = 0; i < a.isomer_capacity - 1; i++){os << a.IDs[i] << ", ";}
@@ -727,8 +754,8 @@ std::ostream& operator << (std::ostream& os, const IsomerBatch& input){
             }
         }
     };
-    if (input.buffer_type == DEVICE_BUFFER){
-        IsomerBatch output(input.n_atoms, input.isomer_capacity, HOST_BUFFER);
+    if (T == DEVICE_BUFFER){
+        IsomerBatch<T> output(input.n_atoms, input.isomer_capacity);
         cuda_io::copy(output, input);
         print_fun(output);
     }else{
@@ -736,8 +763,35 @@ std::ostream& operator << (std::ostream& os, const IsomerBatch& input){
     }
 
     return os;
-}
+} */
 
 
 
  
+void template_instantiaons(){
+    IsomerBatch<HOST_BUFFER> a;
+    IsomerBatch<DEVICE_BUFFER> b;
+
+    IsomerBatch<HOST_BUFFER> c(10,10);
+    IsomerBatch<DEVICE_BUFFER> d(10,10, 0);
+
+    a.set_print_simple(); b.set_print_simple();
+    a.set_print_verbose(); b.set_print_verbose();
+    a.get_print_mode(); b.get_print_mode();
+    a.print(COORDS3D); b.print(COORDS3D);
+    a.get_device_id(); b.get_device_id();
+    a.size(); b.size();
+    a.capacity(); b.capacity();
+    a.get_isomer(0); b.get_isomer(0);
+    a.get_isomer_by_id(0); b.get_isomer_by_id(0);
+    a.find_ids(IsomerStatus::CONVERGED); b.find_ids(IsomerStatus::CONVERGED);
+    a.shrink_to_fit(); b.shrink_to_fit();
+    a.append(Graph(), 0); b.append(Graph(), 0);
+    a.append(PlanarGraph(), 0); b.append(PlanarGraph(), 0);
+    a.append(Polyhedron(), 0); b.append(Polyhedron(), 0);
+    a.clear(); b.clear();
+    a == a; b == b;
+    a != a; b != b;
+    //std::cout << c << d << std::endl;
+
+}

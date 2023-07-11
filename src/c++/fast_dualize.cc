@@ -38,7 +38,12 @@ struct GraphWrapper{
     }
 
 };
-void dualise_3(IsomerBatch& B){
+
+template void dualise_3<HOST_BUFFER>(IsomerBatch<HOST_BUFFER>& B);
+template void dualise_4<HOST_BUFFER>(IsomerBatch<HOST_BUFFER>& B);
+
+template <BufferType T>
+void dualise_3(IsomerBatch<T>& B){
     std::vector<uint16_t> triangle_numbers(6*B.n_faces, UINT16_MAX);
     std::vector<uint16_t> canon_arcs(6*B.n_faces, UINT16_MAX);
     std::vector<uint16_t> n_triangles(B.n_faces, 0); //Number of triangles that each face owns.
@@ -99,7 +104,9 @@ void dualise_3(IsomerBatch& B){
         }
     }
 }
-void dualise_4(IsomerBatch& B){ //CPU Parallelised version of the CUDA kernel.
+
+template <BufferType T>
+void dualise_4(IsomerBatch<T>& B){ //CPU Parallelised version of the CUDA kernel.
     #pragma omp parallel 
     {
     std::vector<uint16_t> triangle_numbers(6*B.n_faces, UINT16_MAX);

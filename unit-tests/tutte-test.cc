@@ -24,10 +24,10 @@ int main(int argc, char** argv){
         auto batch_size = min(max_samples, (int)n_isomers);
         cuda_io::IsomerQueue test_queue(i);
         cuda_io::IsomerQueue validation_queue(i);
-        IsomerBatch h_test(i,batch_size,HOST_BUFFER);
-        IsomerBatch h_validation(i,batch_size,HOST_BUFFER);
-        IsomerBatch d_test(i,batch_size,DEVICE_BUFFER);
-        IsomerBatch d_validation(i,batch_size,DEVICE_BUFFER);
+        IsomerBatch<HOST_BUFFER> h_test(i,batch_size);
+        IsomerBatch<HOST_BUFFER> h_validation(i,batch_size);
+        IsomerBatch<DEVICE_BUFFER> d_test(i,batch_size);
+        IsomerBatch<DEVICE_BUFFER> d_validation(i,batch_size);
         FullereneDual F;
         auto I = 0;
         while(more_to_do && I < batch_size){
@@ -67,8 +67,8 @@ int main(int argc, char** argv){
         
         std::cout << "Isomerspace: " << i << " Magnitutde:" << magnitude << "\n";
 
-        // std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs.begin(),rdiffs.end())/(float)batch_size << "\n";
-        // std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs.begin(),adiffs.end())/(float)batch_size << "\n";
+        std::cout << "Isomerspace: " << i << " RErr:" << std::reduce(rdiffs.begin(),rdiffs.end())/(float)batch_size << "\n";
+        std::cout << "Isomerspace: " << i << " AErr:" << std::reduce(adiffs.begin(),adiffs.end())/(float)batch_size << "\n";
 
         rel_file << batch_size << ", ";
         abs_file << batch_size << ", ";

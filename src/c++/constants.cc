@@ -1,19 +1,28 @@
 //Pentagons = 0
 //Hexagons = 1
-constexpr __constant__ device_real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
-constexpr __constant__ device_real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
-constexpr __constant__ device_real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
+#include <array>
+#include <inttypes.h>
+#include "host-cubic-graph.cc"
+typedef float real_t;
+typedef std::array<real_t, 3> coord3d;
+typedef std::array<real_t, 2> coord2d;
+typedef std::array<unsigned char, 4> uchar4;
+
+
+constexpr real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
+constexpr real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
+constexpr real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
 
 #if SEMINARIO_FORCE_CONSTANTS==1
-constexpr __constant__ device_real_t angle_forces[2] = {207.924,216.787}; 
-constexpr __constant__ device_real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
-constexpr __constant__ device_real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
-constexpr __constant__ device_real_t flat_forces[3] = {0., 0., 0.};
+constexpr real_t angle_forces[2] = {207.924,216.787}; 
+constexpr real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
+constexpr real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
+constexpr real_t flat_forces[3] = {0., 0., 0.};
 #else
-constexpr __constant__ device_real_t angle_forces[2] = {100.0,100.0}; 
-constexpr __constant__ device_real_t bond_forces[3] = {260.0,390.0,450.0}; 
-constexpr __constant__ device_real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
-constexpr __constant__ device_real_t flat_forces[3] = {0., 0., 0.};
+constexpr real_t angle_forces[2] = {100.0,100.0}; 
+constexpr real_t bond_forces[3] = {260.0,390.0,450.0}; 
+constexpr real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
+constexpr real_t flat_forces[3] = {0., 0., 0.};
 #endif
 
 struct Constants{
@@ -34,41 +43,41 @@ struct Constants{
     uchar4 i_outer_dih0_p;
 
     //Load force constants from neighbouring face information.
-    constexpr INLINE device_real_t r0(const uint8_t j) const {return  optimal_bond_lengths[d_get(i_f_bond, j)];}
-    constexpr INLINE device_real_t angle0(const uint8_t j)  const {return  optimal_corner_cos_angles[d_get(i_f_inner_angle, j)];}
-    constexpr INLINE device_real_t inner_dih0(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_f_inner_dihedral, j)];}
-    constexpr INLINE device_real_t outer_angle_m0(const uint8_t j) const {return  optimal_corner_cos_angles[d_get(i_f_outer_angle_m, j)];}
-    constexpr INLINE device_real_t outer_angle_p0(const uint8_t j) const {return  optimal_corner_cos_angles[d_get(i_f_outer_angle_p, j)];}
-    constexpr INLINE device_real_t outer_dih0_a(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_f_outer_dihedral, j)];}
-    constexpr INLINE device_real_t outer_dih0_m(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_r0, j)];}
-    constexpr INLINE device_real_t outer_dih0_p(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_angle0, j)];}
-    constexpr INLINE device_real_t f_bond(const uint8_t j) const {return  bond_forces[d_get(i_outer_angle_m0, j)];}
-    constexpr INLINE device_real_t f_inner_angle(const uint8_t j) const {return  angle_forces[d_get(i_outer_angle_p0, j)];}
-    constexpr INLINE device_real_t f_inner_dihedral(const uint8_t j) const {return  dih_forces[d_get(i_inner_dih0, j)];}
-    constexpr INLINE device_real_t f_outer_angle_m(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_a, j)];}
-    constexpr INLINE device_real_t f_outer_angle_p(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_m, j)];}
-    constexpr INLINE device_real_t f_outer_dihedral(const uint8_t j) const {return  dih_forces[d_get(i_outer_dih0_p, j)];}
-    constexpr INLINE device_real_t f_flat() const {return 2e2;}
+    constexpr real_t r0(const uint8_t j) const {return  optimal_bond_lengths[d_get(i_f_bond, j)];}
+    constexpr real_t angle0(const uint8_t j)  const {return  optimal_corner_cos_angles[d_get(i_f_inner_angle, j)];}
+    constexpr real_t inner_dih0(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_f_inner_dihedral, j)];}
+    constexpr real_t outer_angle_m0(const uint8_t j) const {return  optimal_corner_cos_angles[d_get(i_f_outer_angle_m, j)];}
+    constexpr real_t outer_angle_p0(const uint8_t j) const {return  optimal_corner_cos_angles[d_get(i_f_outer_angle_p, j)];}
+    constexpr real_t outer_dih0_a(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_f_outer_dihedral, j)];}
+    constexpr real_t outer_dih0_m(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_r0, j)];}
+    constexpr real_t outer_dih0_p(const uint8_t j) const {return  optimal_dih_cos_angles[d_get(i_angle0, j)];}
+    constexpr real_t f_bond(const uint8_t j) const {return  bond_forces[d_get(i_outer_angle_m0, j)];}
+    constexpr real_t f_inner_angle(const uint8_t j) const {return  angle_forces[d_get(i_outer_angle_p0, j)];}
+    constexpr real_t f_inner_dihedral(const uint8_t j) const {return  dih_forces[d_get(i_inner_dih0, j)];}
+    constexpr real_t f_outer_angle_m(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_a, j)];}
+    constexpr real_t f_outer_angle_p(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_m, j)];}
+    constexpr real_t f_outer_dihedral(const uint8_t j) const {return  dih_forces[d_get(i_outer_dih0_p, j)];}
+    constexpr real_t f_flat() const {return 2e2;}
     #else
-    device_coord3d f_bond;
-    device_coord3d f_inner_angle;
-    device_coord3d f_inner_dihedral;
-    device_coord3d f_outer_angle_m;
-    device_coord3d f_outer_angle_p;
-    device_coord3d f_outer_dihedral;
-    device_real_t f_flat = 2e2;
+    coord3d f_bond;
+    coord3d f_inner_angle;
+    coord3d f_inner_dihedral;
+    coord3d f_outer_angle_m;
+    coord3d f_outer_angle_p;
+    coord3d f_outer_dihedral;
+    real_t f_flat = 2e2;
     
-    device_coord3d r0;
-    device_coord3d angle0;
-    device_coord3d outer_angle_m0;
-    device_coord3d outer_angle_p0;
-    device_coord3d inner_dih0;
-    device_coord3d outer_dih0_a;
-    device_coord3d outer_dih0_m;
-    device_coord3d outer_dih0_p;
+    coord3d r0;
+    coord3d angle0;
+    coord3d outer_angle_m0;
+    coord3d outer_angle_p0;
+    coord3d inner_dih0;
+    coord3d outer_dih0_a;
+    coord3d outer_dih0_m;
+    coord3d outer_dih0_p;
     #endif
 
-    __device__ __host__ __forceinline__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
+    uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
         return f1*4 + f2*2 + f3;
     }
 
@@ -79,10 +88,9 @@ struct Constants{
      * @param isomer_idx The index of the isomer that the current thread is a part of
      * @return Forcefield constants for the current node in the isomer_idx^th isomer in G
      */
-    template <BufferType U>
-    INLINE Constants(const IsomerBatch<U>& G, const uint32_t isomer_idx){
+    Constants(const IsomerBatch& G, const uint32_t isomer_idx, const int node_idx){
         //Set pointers to start of fullerene.
-        const DeviceCubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+        const HostCubicGraph FG(&G.cubic_neighbours[isomer_idx*G.N*3]);
         device_node3 cubic_neighbours = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         //       m    p
         //    f5_|   |_f4
