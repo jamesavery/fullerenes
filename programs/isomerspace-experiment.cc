@@ -1,3 +1,4 @@
+//TODO: Nd -> compile time from CMake, assert == device_count()
 #include <csignal>
 #include <sys/stat.h>
 #include <limits.h>
@@ -18,6 +19,10 @@
 #include "fullerenes/gpu/cuda_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/isomerdb.hh"
+
+#define STORE_HESSIAN 1
+#define STORE_EIGENSYSTEM 1
+
 
 using namespace std;
 using namespace std::chrono;
@@ -60,17 +65,13 @@ struct isomer_candidate {
   int id;
   array<device_real_t,NUM_RESULTS> results;
   
-  vector<device_node_t> cubic_neighbours/*, Hcol*/;
+  vector<device_node_t> cubic_neighbours;
   vector<real_t> X;
-  //  vector<real_t> H;
-  
 
   isomer_candidate(double value, int id, array<device_real_t,NUM_RESULTS> &results,int N, int ix, const IsomerBatch<HOST_BUFFER> &B):
     value(value), id(id), results(results), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
-    //    memcpy(&H[0],               Hs.data + 90*N*ix,        90*N*sizeof(real_t));
-    //    memcpy(&Hcol[0],            Hcols.data + 90*N*ix,     90*N*sizeof(device_node_t));
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
@@ -113,7 +114,7 @@ int main(int ac, char **argv)
   string output_dir     = ac>=3? argv[2] : string("output/C")+to_string(N);     // Argument 2: directory to output files to
   bool IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
   bool only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
-  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):50; // Argument 5: How many best fullerne candidates do you want to store? 
+  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):20; // Argument 5: How many best fullerne candidates do you want to store? 
 
   ensure_minimal_stacksize(N*10000000);
   
@@ -126,6 +127,7 @@ int main(int ac, char **argv)
   
   int    Nd = LaunchCtx::get_device_count();
   size_t batch_size = min((size_t)isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
+  size_t final_batch_size = n_best_candidates*NUM_RESULTS*2/Nd+(Nd-1);
 
   cout << "Analyzing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
 
@@ -146,6 +148,7 @@ int main(int ac, char **argv)
   array<vector<size_t>,NUM_RESULTS> terrible_outliers;
   vector<CuArray<real_t>> hessians(Nd);
   vector<CuArray<device_node_t>> hessian_cols(Nd);
+  vector<CuArray<real_t>> Q(Nd),lams(Nd);  
   array<long double,NUM_RESULTS> Ev, Ev2, K, current_mean, current_stddev;
   size_t n_converged=0;
   
@@ -175,14 +178,16 @@ int main(int ac, char **argv)
   };
   
   // Final IsomerBatch on host
+
   IsomerBatch<HOST_BUFFER> host_batch[Nd] = {IsomerBatch<HOST_BUFFER>(N,batch_size,0), IsomerBatch<HOST_BUFFER>(N, batch_size,1)};
+  IsomerBatch<DEVICE_BUFFER> final_batch[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,final_batch_size,0),IsomerBatch<DEVICE_BUFFER>(N,final_batch_size,1)};
+  IsomerBatch<HOST_BUFFER> final_host_batch[Nd] = {IsomerBatch<HOST_BUFFER>(N,final_batch_size,0),IsomerBatch<HOST_BUFFER>(N,final_batch_size,1)};  
   
-
   // TODO: Organize Qs by stages together with batches.Structure nicely.
-  IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-  IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-  IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-
+  IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate
+  IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // X0-generate to optimization
+  IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // optimization to properties + stat
+  IsomerQueue Q3s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // k_best result final computations
   
   
   for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
@@ -315,9 +320,9 @@ int main(int ac, char **argv)
     for (int d = 0; d < Nd; d++){
       auto &B   = Bs[PROP][d];
       const auto &ctx = opt_ctxs[d];
-      
+
       Q2s[d].refill_batch(B, ctx, policy);
-      isomerspace_properties::transform_coordinates(B, ctx, policy);
+     isomerspace_properties::transform_coordinates(B, ctx, policy);
       // Hessian units: kg/s^2, divide eigenvalues by carbon_mass to get 1/s^2, frequency = sqrt(lambda/carbon_mass)
       isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d],    ctx, policy);
       isomerspace_eigen     ::spectrum_ends(B, hessians[d], hessian_cols[d], results[MIN_FREQ][d], results[MAX_FREQ][d], 40, ctx, policy);
@@ -347,7 +352,7 @@ int main(int ac, char **argv)
   };
 
   auto stat_routine = [&](){
-    fprintf(stderr,"stat start\n");
+    //    fprintf(stderr,"stat start\n");
     //      vector<real_t> volumes_merged(sum(num_finished_this_round[PROP]));
     //      vector<real_t> eccentricity_merged(sum(num_finished_this_round[PROP]));
     vector<int> opt_failed, opt_not_converged;
@@ -389,7 +394,7 @@ int main(int ac, char **argv)
 	  
 	if(status == IsomerStatus::CONVERGED){
 	  array<device_real_t,NUM_RESULTS> R;
-	      	
+
 	  // Convert from Hessian eigenvalues to normal mode frequencies in teraherz	    
 	  real_t min_freq = sqrt(results[MIN_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
 	         max_freq = sqrt(results[MAX_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12;
@@ -455,7 +460,7 @@ int main(int ac, char **argv)
     
     if(num_finished[STAT] >= n_fullerenes) stage_finished[STAT] = true; // TODO: We're overcounting somehow, getting num_finished > n_fullerenes. DEBUG!
 
-    fprintf(stderr,"stat end\n");    
+    //    fprintf(stderr,"stat end\n");    
   };
 
   auto final_round = [&](int s){
@@ -531,13 +536,21 @@ int main(int ac, char **argv)
   cout << "Exited loop, waiting on op_ctxs.\n";
   for(int d=0;d<Nd;d++) opt_ctxs[d].wait();
 
+  array<vector<isomer_candidate>,NUM_RESULTS> smallest_candidates, biggest_candidates;  
+  
   for(int r=0;r<NUM_RESULTS;r++){
     means[r] /= num_finished[PROP];
+    smallest_candidates[r] = sorted(result_min[r].as_vector());
+    biggest_candidates[r]  = sorted(result_max[r].as_vector());
   }
+
+  
+  
   cout << "COMPLETED IN " << loop_iters << " rounds.\n";
   cout << "num_finished            = " << num_finished  << "\n";
   for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
-      auto smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
+      auto &smallest = smallest_candidates[r], &biggest = biggest_candidates[r];      
+
     cout << result_names[r] << "_min = " << smallest << "\n"
          << "   (removed " << terrible_outliers[r].size() << " outliers, please inspect and fix)\n"
 	 << result_names[r] << "_max = " << biggest << "\n\n";
@@ -565,7 +578,50 @@ int main(int ac, char **argv)
     return points;
   };
 
+  // Postprocess results on GPU
+  {
 
+
+  
+  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
+      // Output candidate isomers
+      auto &smallest = smallest_candidates[r], &biggest = biggest_candidates[r];            
+      for(int i=0;i<n_best_candidates;i++){
+	isomer_candidate C = smallest[i];
+	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
+	Q3s[0].insert(P,C.id,IsomerStatus::CONVERGED); 
+      }
+
+      for(int i=0;i<n_best_candidates;i++){
+	isomer_candidate C = biggest[i];
+	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
+	Q3s[1].insert(P,C.id,IsomerStatus::CONVERGED);
+      }
+    }
+
+  if(STORE_HESSIAN){
+    for(int d=0;d<Nd;d++){    
+    auto &B   = final_batch[d];
+    const auto &ctx = opt_ctxs[d];
+    ctx.wait();
+    
+    Q3s[d].refill_batch(B, ctx, policy);
+    final_host_batch[d].clear(ctx,policy);	
+
+    isomerspace_hessian::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d], ctx, policy);
+
+    if(STORE_EIGENSYSTEM){
+      Q[d]    = CuArray<real_t>(3*N*3*N*final_batch_size,0);
+      lams[d] = CuArray<real_t>(3*N*final_batch_size,0);    
+      isomerspace_eigen  ::eigensolve(B,Q[d],hessians[d],hessian_cols[d],lams[d],ctx,policy);
+    }
+    cuda_io::copy(final_host_batch[d],B,ctx,policy);
+    ctx.wait();
+    }}
+  
+  }
+  
+  // GEM RESULTATER
   mkdir(output_dir.c_str(), 0777);
   FILE *f = fopen((output_dir+"/result_bounds.float64").c_str(),"wb");
   fwrite(&result_bounds[0],sizeof(double),2*NUM_RESULTS,f);
@@ -574,18 +630,27 @@ int main(int ac, char **argv)
   f = fopen((output_dir+"/result_names.string").c_str(),"w");
   for(int r=0;r<NUM_RESULTS;r++) fprintf(f,"%s\n",result_names[r].c_str());
   fclose(f);
-
   
   FILE *f_min    = fopen((output_dir+"/result_mins.float32").c_str(),"wb");
   FILE *f_max    = fopen((output_dir+"/result_maxs.float32").c_str(),"wb");
   FILE *f_hist   = fopen((output_dir+"/result_hists.uint64").c_str(),"wb");
-  FILE *f_hist2D = fopen((output_dir+"/result_hists2D.uint64").c_str(),"wb");        
+  FILE *f_hist2D = fopen((output_dir+"/result_hists2D.uint64").c_str(),"wb");
+
+  // TODO: Automatiser min/max isf. at al koden er dobbelt
+  // TODO: Faktoriser ud i output_routine, så man kan lave små batch-størrelser uden at crashe (Q3s[d].is_empty loop)
   for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1) {
     string result_dir = output_dir+"/"+result_names[r];
     string min_dir    = result_dir + "/min", max_dir = result_dir+"/max", outlier_dir = result_dir + "/terrible_outliers";
+    auto &smallest = smallest_candidates[r], &biggest = biggest_candidates[r];          
+    
 
+    
     // Output candidate isomers
-    vector<isomer_candidate> smallest = sorted(result_min[r].as_vector()), biggest = sorted(result_max[r].as_vector());
+    auto result_index = [&](bool big, size_t r, size_t i) 
+    {
+      return array<size_t,2>{{big,r*n_best_candidates+i}};
+    };
+    
     //TODO: Redundant due to writing out all results for k_smallest
     vector<device_real_t> smallest_values(n_best_candidates), biggest_values(n_best_candidates);
     for(size_t i=0;i<n_best_candidates;i++){
@@ -601,38 +666,95 @@ int main(int ac, char **argv)
     mkdir(max_dir.c_str(), 0777);
     mkdir(outlier_dir.c_str(), 0777);    
     
-    for(size_t i=0;i<n_best_candidates;i++){
+    for(size_t i=0;i<n_best_candidates;i++){      
       assert(i<smallest.size());
       assert(i<biggest.size());
+
+      string min_basename = min_dir+"/Pmin"+to_string(i),
+	     max_basename = max_dir+"/Pmax"+to_string(i);
+      
       isomer_candidate Cmin = smallest[i], Cmax = biggest[i];
-      Polyhedron
-	Pmin(host_graph(Cmin.cubic_neighbours), host_points(Cmin.X)),
-	Pmax(host_graph(Cmax.cubic_neighbours), host_points(Cmax.X));
+      auto [d_min,di_min] = result_index(0,r,i);
+      auto [d_max,di_max] = result_index(1,r,i);      
 
-      Polyhedron::to_file(Pmin,min_dir+"/Pmin-"+to_string(i)+".mol2");
-      Polyhedron::to_file(Pmin,min_dir+"/Pmin-"+to_string(i)+".spiral");      
-      Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".mol2");
-      Polyhedron::to_file(Pmax,max_dir+"/Pmax-"+to_string(i)+".spiral");
+      Polyhedron Pmin = final_host_batch[d_min].get_isomer(di_min).value();
+      Polyhedron Pmax = final_host_batch[d_max].get_isomer(di_max).value();
 
+      Polyhedron::to_file(Pmin,min_basename+".mol2");
+      Polyhedron::to_file(Pmin,min_basename+".spiral");      
+      Polyhedron::to_file(Pmax,max_basename+".mol2");
+      Polyhedron::to_file(Pmax,max_basename+".spiral");
 
-      {
-	// for(node_t u=0;u<N;u++)
-	//   for(int j=0;j<3;j++) flat_neighbours[3*u+j] = Pmax.neighbours[u][j];
-	// FILE *f = fopen((max_dir+"/Pmax-"+to_string(i)+"-graph.uint32_t").c_str(),"wb");
-	// fwrite(&flat_neighbours[0],sizeof(node_t),3*N,f);
-
-	FILE *f = fopen((min_dir+"/Pmin-"+to_string(i)+"-results.float32").c_str(),"wb");
-	if(!f){
-	  perror((min_dir+"/Pmin-"+to_string(i)+"-results.float32").c_str());
-	} else 
-	  fwrite(&Cmin.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+      {// TODO: binary_write til funktion, som ogsaa tjekker for fejl + perror()'er	
+	FILE *f = fopen((min_basename+"-graph.uint16").c_str(),"wb");
+	//	fwrite(&final_host_batch[d_min].cubic_neighbours+di_min*3*N, sizeof(device_node_t), 3*N,f);
+	fwrite(&Cmin.cubic_neighbours[0], sizeof(device_node_t), 3*N,f);
 	fclose(f);
 
-	f = fopen((max_dir+"/Pmax-"+to_string(i)+"-results.float32").c_str(),"wb");
-	if(!f){
-	  perror((max_dir+"/Pmax-"+to_string(i)+"-results.float32").c_str());
-	} else	
-	  fwrite(&Cmax.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+	f = fopen((max_basename+"-graph.uint16").c_str(),"wb");
+	fwrite(&Cmax.cubic_neighbours[0], sizeof(device_node_t), 3*N,f);
+	fclose(f);
+
+	f = fopen((min_basename+"-PX.float32").c_str(),"wb");
+	fwrite(&Cmin.X[0], sizeof(device_real_t), 3*N,f);
+	fclose(f);
+
+	f = fopen((max_basename+"-PX.float32").c_str(),"wb");
+	fwrite(&Cmax.X[0], sizeof(device_real_t), 3*N,f);
+	fclose(f);	
+
+	f = fopen((min_basename+"-X.float32").c_str(),"wb");
+	fwrite(final_host_batch[d_min].X+di_min*3*N, sizeof(device_real_t), 3*N,f);
+	fclose(f);
+
+	
+	f = fopen((max_basename+"-X.float32").c_str(),"wb");
+	fwrite(final_host_batch[d_max].X+di_max*3*N, sizeof(device_real_t), 3*N,f);
+	fclose(f);
+
+	
+	if(STORE_HESSIAN){
+	f = fopen((min_basename+"-hessians.float32").c_str(),"wb");
+	fwrite(&hessians[d_min].data[di_max*3*3*10*N], sizeof(device_real_t), 3*3*10*N,f); 
+	fclose(f);
+
+	f = fopen((max_basename+"-hessians.float32").c_str(),"wb");
+	fwrite(&hessians[d_max].data[di_max*3*3*10*N], sizeof(device_real_t), 3*3*10*N,f); 
+	fclose(f);	
+
+	f = fopen((min_basename+"-hessian_cols.uint16").c_str(),"wb");
+	fwrite(&hessian_cols[d_min].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
+	fclose(f);
+
+	f = fopen((max_basename+"-hessian_cols.uint16").c_str(),"wb");
+	fwrite(&hessian_cols[d_max].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
+	fclose(f);	
+
+	if(STORE_EIGENSYSTEM){
+	  f = fopen((min_basename+"-hessian_Q.float32").c_str(),"wb");
+	  fwrite(&Q[d_min].data[di_max*3*N*3*N], sizeof(device_real_t), 3*N*3*N,f); 
+	  fclose(f);
+
+	  f = fopen((min_basename+"-hessian_lams.float32").c_str(),"wb");
+	  fwrite(&lams[d_min].data[di_max*3*N], sizeof(device_real_t), 3*N,f); 
+	  fclose(f);			
+
+	  f = fopen((max_basename+"-hessian_Q.float32").c_str(),"wb");
+	  fwrite(&Q[d_max].data[di_max*3*N*3*N], sizeof(device_real_t), 3*N*3*N,f); 
+	  fclose(f);
+
+	  f = fopen((max_basename+"-hessian_lams.float32").c_str(),"wb");
+	  fwrite(&lams[d_max].data[di_max*3*N], sizeof(device_real_t), 3*N,f); 
+	  fclose(f);			
+	}
+	}
+	
+	f = fopen((min_basename+"-results.float32").c_str(),"wb");
+	fwrite(&Cmin.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+	fclose(f);
+
+	f = fopen((max_basename+"-results.float32").c_str(),"wb");
+	fwrite(&Cmax.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
 	fclose(f);
       }
     }

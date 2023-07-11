@@ -118,12 +118,16 @@ namespace gpu_kernels{
         template <BufferType U>
         void eigensolve_cusolver(const IsomerBatch<U>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
-        template <BufferType U>
+        template <BufferType U>        //Compute the full spectrum and eigenvectors of the hessian matrix for a batch of fullerenes.
         void eigensolve(const IsomerBatch<U>& B, CuArray<device_real_t>& Q, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
-
-        template <BufferType U>
+        
+        template <BufferType U>        //Compute the full spectrum of the hessian matrix for a batch of fullerenes.
+        void eigensolve(const IsomerBatch<U>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);  
+      
+        template <BufferType U>         //Computes the smallest and largest eigenvalues of the hessian matrix for a batch of fullerenes.
         void spectrum_ends(const IsomerBatch<U>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, int m_lanczos=40, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
-        template <BufferType U>
+      
+        template <BufferType U>        //Computes the smallest and largest eigenvalues and corresponding eigenvectors of the hessian matrix for a batch of fullerenes.
         void spectrum_ends(const IsomerBatch<U>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, CuArray<device_real_t>& eigvect_mins, CuArray<device_real_t>& eigvect_maxs, int m_lanczos=40, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
 

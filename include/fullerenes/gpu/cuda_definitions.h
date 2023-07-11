@@ -71,6 +71,8 @@
     #define SIN sin
     #define ISNAN isnan
 #endif
+//typedef double device_hpreal_t;	/* High precision real type, for when we need it regardless of speed. */
+//#define HPREAL_DOUBLE 1
 typedef device_real_t device_hpreal_t;	/* High precision real type, for when we need it regardless of speed. */
 
 typedef uint16_t device_node_t;

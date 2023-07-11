@@ -15,6 +15,8 @@ using namespace isomerspace_forcefield;
 using namespace isomerspace_hessian;
 using namespace isomerspace_X0;
 using namespace isomerspace_tutte;
+
+constexpr device_real_t carbon_mass = 1.9944733e-26/*kg*/, aangstrom_length = 1e-10/*m*/;
 int main(int argc, char** argv){
     const size_t N                = argc>1 ? strtol(argv[1],0,0) : 60;     // Argument 1: Number of vertices 
     const size_t Mlanczos_steps   = argc>2 ? strtol(argv[2],0,0) : 40;     // Argument 2: Number of Lanczos steps
@@ -83,7 +85,7 @@ int main(int argc, char** argv){
     cuda_io::copy(Bdev, Bhost);
     //cuda_io::copy(Bhost, Bdev);
     //ifstream geometry_in("X.float64", std::ios::binary); geometry_in.read((char*)Bhost.X, N*3*batch_size*sizeof(float));
-    /* for (size_t i = 0; i < batch_size; i++)
+/*     for (size_t i = 0; i < batch_size; i++)
     {
         for (size_t j = 0; j < N; j++)
         {
@@ -99,26 +101,49 @@ int main(int argc, char** argv){
     if(isomer_num != -1) dualise(Bdev);
     tutte_layout(Bdev, (int)20*N);
     zero_order_geometry(Bdev, 4.0);
-    optimise<PEDERSEN>(Bdev, 5*N, 5*N);
+    optimise<PEDERSEN>(Bdev, 5*N, 6*N);
+    optimise<PEDERSEN>(Bdev, 1*N, 6*N);
+    isomerspace_properties::transform_coordinates(Bdev);
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
-
+    CuArray<device_real_t> vols(batch_size);
+    isomerspace_properties::eccentricities(Bdev, vols);
+    std::vector<device_real_t> vols_host(vols.data, vols.data + vols.size());
+    std::vector<device_node_t> indices(vols.size());
     cuda_io::copy(Bhost, Bdev); 
-    std::cout << vector<device_real_t>(Bhost.X, Bhost.X + N*3) << std::endl;
-    Polyhedron P = Bhost.get_isomer(0).value();
-    Polyhedron::to_file(P, "Ptesttest.mol2");
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(), [&vols_host, &Bhost](const auto& a, const auto& b) {
+        return std::abs(vols_host[a]) < std::abs(vols_host[b]) && Bhost.statuses[a] == IsomerStatus::CONVERGED;
+    });
+    auto min_index = indices[0];
+    
+    std::cout << "Min volume: " << vols[min_index] << std::endl;
+    std::cout << "Min volume index: " << min_index << std::endl;
+
+    Polyhedron P = Bhost.get_isomer(min_index).value();
+    Polyhedron::to_file(P, "MinVol.mol2");
+
+
+
+
 
     hess_analytical.write((char*)hessians.data, hessians.size()*sizeof(device_real_t));
     hess_cols.write((char*)cols.data, cols.size()*sizeof(device_node_t));
-    int lanczos_max = std::min(300, (int)N*3);
-    /* for (int i = 10; i < lanczos_max; i++){
+    int lanczos_max = std::min(300, (int)N*3 - 6);
+    //spectrum_ends(Bdev, hessians, cols, lambda_mins, lambda_maxs, min_eigvects, max_eigvects, 40);
+    for (int i = 10; i < lanczos_max; i++){
         
         spectrum_ends(Bdev, hessians, cols, lambda_mins, lambda_maxs, min_eigvects, max_eigvects, i);
         lambda_mins_file.write((char*)lambda_mins.data, lambda_mins.size()*sizeof(device_real_t));
         lambda_maxs_file.write((char*)lambda_maxs.data, lambda_maxs.size()*sizeof(device_real_t));
         progbar.update_progress((i-9)/float(lanczos_max-10));
-    } */
+    }
 
     eigensolve(Bdev, Q, hessians, cols, eigs);
+    //auto eigs_min_ecc = vector<device_real_t>(eigs.data + N*3 * min_index, eigs.data + N*3 * min_index + N*3); 
+    /* std::sort(eigs_min_ecc.begin(), eigs_min_ecc.end(), std::less<device_real_t>());
+    std::transform(eigs_min_ecc.begin(), eigs_min_ecc.end(), eigs_min_ecc.begin(), [](auto& x){return  33.356 * sqrt(x/carbon_mass)/(2*M_PI)*1e-12;   });
+    std::cout << eigs_min_ecc << std::endl; */
+    //std::cout << "From spectrum ends: " << 33.356 * sqrt(lambda_mins[min_index]/carbon_mass)/(2*M_PI)*1e-12 << std::endl;
     fullspectrum_file.write((char*)eigs.data, eigs.size()*sizeof(device_real_t));
     //isomerspace_properties::transform_coordinates(Bdev);
     
@@ -186,6 +211,10 @@ int main(int argc, char** argv){
         rel_err_width[i] = fabs( (lambda_maxs[i] - lambda_mins[i]) - (max_eigs_ref[i] - min_eigs_ref[i]) + epsilon)/fabs(max_eigs_ref[i] - min_eigs_ref[i] + epsilon);
         abs_err_width[i] = fabs( (lambda_maxs[i] - lambda_mins[i]) - (max_eigs_ref[i] - min_eigs_ref[i]) + epsilon);
     }
+    std::cout << "MinLambdaError_Relative: " << rel_err_min << std::endl;
+    std::cout << "MaxLambdaError_Relative: " << rel_err_max << std::endl;
+    //std::cout << "MinLambdaError_Absolute: " << abs_err_min << std::endl;
+
     std::cout << "Failed: " << nan_or_inf << std::endl;
     if (isomer_num == -1){
         isomerspace_properties::transform_coordinates(Bdev);
