@@ -10,7 +10,7 @@ using namespace chrono_literals;
 
 #include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/cuda_io.hh"
-#include "fullerenes/gpu/isomer_batch.hh"
+
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "numeric"
@@ -28,8 +28,8 @@ int main(int argc, char** argv){
         BuckyGen::next_fullerene(queue,G);
     }
 
-    IsomerBatch batch(N,1,DEVICE_BUFFER);
-    IsomerBatch h_batch(N,1,HOST_BUFFER);
+    IsomerBatch<DEVICE_BUFFER> batch(N,1);
+    IsomerBatch<HOST_BUFFER> h_batch(N,1);
     cuda_io::IsomerQueue Q(N);
     Q.insert(G,ID);
     Q.refill_batch(batch);

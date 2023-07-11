@@ -21,8 +21,8 @@ int main(int argc, char** argv) {
     auto Nf = N/2 + 2;
     auto ID = 0;
     Graph G(Nf);
-    IsomerBatch batch(N, batch_size, DEVICE_BUFFER);
-    IsomerBatch batch1(N, batch_size, DEVICE_BUFFER);
+    IsomerBatch<DEVICE_BUFFER> batch(N, batch_size);
+    IsomerBatch<DEVICE_BUFFER> batch1(N, batch_size);
     auto generate_samples = [&](int samples) {
         for(auto i = 0; i < samples; i++) {
             cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_" + std::to_string(N) + "_seed_42", G);
@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
         Q2.push_done(batch1);
     }
 
-    IsomerBatch host_batch(N, Q2.get_capacity(), HOST_BUFFER);
+    IsomerBatch<HOST_BUFFER> host_batch(N, Q2.get_capacity());
     cuda_io::copy(host_batch,Q2.device_batch);
     host_batch.shrink_to_fit();
     host_batch.print(BatchMember::ITERATIONS);

@@ -18,6 +18,10 @@ template <BufferType T>
 struct IsomerBatch
 { 
     int isomer_capacity = 0;
+    bool allocated = false;
+    size_t n_atoms = 0;
+    size_t n_faces = 0;
+    size_t n_isomers = 0;
     float* X;
     device_hpreal_t* xys;
 
@@ -28,6 +32,7 @@ struct IsomerBatch
     size_t* IDs;
     size_t* iterations;
     IsomerStatus* statuses;
+    std::vector<std::tuple<std::string,void**,size_t,bool>> pointers;
 
     IsomerBatch(){
       pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_hpreal_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
@@ -56,7 +61,7 @@ struct IsomerBatch
     void clear(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy = LaunchPolicy::SYNC);                 //Clears the batch and resets the size to 0
     bool operator==(const IsomerBatch& b); //Returns true if the two batches are equal
     bool operator!=(const IsomerBatch& b) {return !(*this == b);}
-    friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a); //Prints the batch to the given stream
+    //friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a); //Prints the batch to the given stream
 
   private:
     int m_size = 0;

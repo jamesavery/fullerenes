@@ -4,7 +4,7 @@
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
-#include "fullerenes/gpu/isomer_batch.hh"
+
 #include "fullerenes/gpu/isomer_queue.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/cuda_io.hh"
@@ -27,8 +27,8 @@ int main(int ac, char **argv){
         auto n_isomers = IPR ? num_IPR_fullerenes.find(N)->second : num_fullerenes.find(N)->second;
         auto batch_size = min(sample_size, (int)n_isomers);
         using namespace gpu_kernels;
-        IsomerBatch d_validation(N, batch_size, DEVICE_BUFFER);
-        IsomerBatch h_validation(N, batch_size, HOST_BUFFER);
+        IsomerBatch<DEVICE_BUFFER> d_validation(N, batch_size);
+        IsomerBatch<HOST_BUFFER> h_validation(N, batch_size);
         
         std::vector<int> random_IDs(n_isomers);
         std::iota(random_IDs.begin(), random_IDs.end(), 0);

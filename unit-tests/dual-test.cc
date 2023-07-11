@@ -32,11 +32,11 @@ int main(int argc, char** argv){
         auto batch_size = min((int)n_samples, (int)n_isomers);
         cuda_io::IsomerQueue test_queue(N);
         cuda_io::IsomerQueue validation_queue(N);
-        IsomerBatch h_test(N,batch_size,HOST_BUFFER);
+        IsomerBatch<HOST_BUFFER> h_test(N,batch_size);
         
-        IsomerBatch h_validation(N,batch_size,HOST_BUFFER);
-        IsomerBatch d_test(N,batch_size,DEVICE_BUFFER);
-        IsomerBatch d_validation(N,batch_size,DEVICE_BUFFER);
+        IsomerBatch<HOST_BUFFER> h_validation(N,batch_size);
+        IsomerBatch<DEVICE_BUFFER> d_test(N,batch_size);
+        IsomerBatch<DEVICE_BUFFER> d_validation(N,batch_size);
         
 
         for (size_t I = 0; I < n_samples; I++)
@@ -62,8 +62,6 @@ int main(int argc, char** argv){
         //cuda_io::copy(h_test, d_test); 
         cuda_io::copy(h_validation, d_validation);
         //h_test.set_print_verbose(); h_validation.set_print_verbose();
-        std::cout << h_test;
-        std::cout << h_validation;
 
         if(h_test == h_validation) std::cout << "Test passed!\n";
         else std::cout << "Test Failed" << std::endl;

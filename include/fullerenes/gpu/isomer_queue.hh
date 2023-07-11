@@ -96,5 +96,8 @@ private:
     cudaError_t to_device(const LaunchCtx& ctx = LaunchCtx());
     //Internal method for transfering all data to the host if the host is not up to date.
     cudaError_t to_host(const LaunchCtx& ctx = LaunchCtx());
+
+    template <BufferType T>
+    void resize_queue_batch(IsomerBatch<T>& batch, const size_t new_capacity, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 };
 }

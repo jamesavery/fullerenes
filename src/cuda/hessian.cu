@@ -1612,7 +1612,7 @@ INLINE real_t energy(coord3d* X) const {
 }
 };
 
-template <ForcefieldType T> __global__ void compute_hessians_(const IsomerBatch B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols){
+template <ForcefieldType T, BufferType U> __global__ void compute_hessians_(const IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols){
     DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -1648,7 +1648,7 @@ template <ForcefieldType T> __global__ void compute_hessians_(const IsomerBatch 
     }}
 }
 
-template <ForcefieldType T> __global__ void compute_hessians_fd_(const IsomerBatch B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols, float reldelta){
+template <ForcefieldType T, BufferType U> __global__ void compute_hessians_fd_(const IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols, float reldelta){
     DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -1683,8 +1683,8 @@ template <ForcefieldType T> __global__ void compute_hessians_fd_(const IsomerBat
 
 float kernel_time = 0.0;
 
-template <ForcefieldType T>
-cudaError_t compute_hessians(const IsomerBatch& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const LaunchCtx& ctx, const LaunchPolicy policy){
+template <ForcefieldType T, BufferType U>
+cudaError_t compute_hessians(const IsomerBatch<U>& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
@@ -1701,12 +1701,12 @@ cudaError_t compute_hessians(const IsomerBatch& B, CuArray<device_real_t>& hessi
     }
 
     size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)compute_hessians_<T>, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)compute_hessians_<T>, B.n_atoms, smem, B.isomer_capacity);
+    static LaunchDims dims((void*)compute_hessians_<T,U>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)compute_hessians_<T,U>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&hessians, (void*)&cols};
 
     cudaEventRecord(start[dev], ctx.stream);
-    auto error = safeCudaKernelCall((void*)compute_hessians_<T>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    auto error = safeCudaKernelCall((void*)compute_hessians_<T,U>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
@@ -1719,8 +1719,8 @@ cudaError_t compute_hessians(const IsomerBatch& B, CuArray<device_real_t>& hessi
     return error;
 }
 
-template <ForcefieldType T>
-cudaError_t compute_hessians_fd(const IsomerBatch& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const float reldelta, const LaunchCtx& ctx, const LaunchPolicy policy){
+template <ForcefieldType T, BufferType U>
+cudaError_t compute_hessians_fd(const IsomerBatch<U>& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const float reldelta, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
@@ -1737,12 +1737,12 @@ cudaError_t compute_hessians_fd(const IsomerBatch& B, CuArray<device_real_t>& he
     }
 
     size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)compute_hessians_fd_<T>, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)compute_hessians_fd_<T>, B.n_atoms, smem, B.isomer_capacity);
+    static LaunchDims dims((void*)compute_hessians_fd_<T,U>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)compute_hessians_fd_<T,U>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&hessians, (void*)&cols , (void*)&reldelta};
 
     cudaEventRecord(start[dev], ctx.stream);
-    auto error = safeCudaKernelCall((void*)compute_hessians_fd_<T>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    auto error = safeCudaKernelCall((void*)compute_hessians_fd_<T,U>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
@@ -1757,7 +1757,7 @@ cudaError_t compute_hessians_fd(const IsomerBatch& B, CuArray<device_real_t>& he
 
 
 void declaration(){
-    IsomerBatch B(20,1,DEVICE_BUFFER);
+    IsomerBatch<DEVICE_BUFFER> B(20,1);
     CuArray<float> arr(1);
     CuArray<device_real_t> hessians(1);
     CuArray<device_node_t> cols(1);

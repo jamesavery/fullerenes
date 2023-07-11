@@ -26,13 +26,18 @@ namespace cuda_io{
 namespace cuda_io{
 #include "print_functions.cu"
 
+template cudaError_t IsomerQueue::insert<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& input_batch, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d);
+template cudaError_t IsomerQueue::push_all<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t IsomerQueue::push_done<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t IsomerQueue::refill_batch<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
+
 //Casting functions to convert Graph objects and its' derivatives to IsomerBatch storage i.e flat memory representation.
 static auto casting_coord3d = [](coord3d in){return device_coord3d{static_cast<float>(in[0]), static_cast<float>(in[1]), static_cast<float>(in[2])};};
 static auto casting_node3   = [](std::vector<node_t> in){return device_node3{static_cast<device_node_t>(in[0]), static_cast<device_node_t>(in[1]), static_cast<device_node_t>(in[2])};};
 static auto casting_coord2d = [](coord2d in){return device_coord2d{static_cast<float>(in.first), static_cast<float>(in.second)};};
 
-
-__global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){
+template <BufferType T>
+__global__ void refill_batch_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){
     auto num_inside_circular_range = [](const int begin, const int end, const int test_val){
         if(begin < 0 || end < 0) {return false;}
         if (begin <= end) {return (test_val >= begin && test_val <= end);}
@@ -101,7 +106,9 @@ __global__ void refill_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::Queue
         }
     }
 }
-__global__ void push_all_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue, int* scan_array){
+
+template <BufferType T>
+__global__ void push_all_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::QueueProperties queue, int* scan_array){
     auto num_inside_capacity = [](const int size, const int capacity, const int test_val){
         if(size < 0 || capacity < 0 || test_val < 0) {return false;}
         return size + test_val <= capacity;
@@ -165,7 +172,8 @@ __global__ void push_all_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProp
     }
 }
 
-__global__ void push_done_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){
+template <BufferType T>
+__global__ void push_done_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){
     auto num_inside_capacity = [](const int size, const int capacity, const int test_val){
         if(size < 0 || capacity < 0 || test_val < 0) {return false;}
         return size + test_val <= capacity;
@@ -233,7 +241,8 @@ __global__ void push_done_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueuePro
 
 //This function simply copys data to the end of the batch, could be achieved with the cuda_io::copy() function using ranges.
 //TODO: delete this function and replace with a copy call.
-__global__ void insert_batch_(IsomerBatch B, IsomerBatch Q_B, IsomerQueue::QueueProperties queue){
+template <BufferType T>
+__global__ void insert_batch_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::QueueProperties queue){
     __threadfence_system();
     //Grid stride for loop, allows for handling of any batch size.
     auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
@@ -287,7 +296,7 @@ IsomerQueue::IsomerQueue(const size_t N, int device): N(N), m_device(device){
     *props.front = -1;
     *props.back = -1;
     *props.size = 0;
-    device_batch = IsomerBatch(N,1,DEVICE_BUFFER,m_device);
+    device_batch = IsomerBatch<DEVICE_BUFFER>(N,1,m_device);
     cudaMalloc(&g_scan_array, sizeof(int)*d_props.maxBlocksPerMultiProcessor*d_props.multiProcessorCount * 2);
 }
 
@@ -305,7 +314,7 @@ IsomerQueue::IsomerQueue(): N(20), m_device(0){
     *props.front = -1;
     *props.back = -1;
     *props.size = 0;
-    device_batch = IsomerBatch(N,1,DEVICE_BUFFER,m_device);
+    device_batch = IsomerBatch<DEVICE_BUFFER>(N,1,m_device);
     cudaMalloc(&g_scan_array, sizeof(int)*d_props.maxBlocksPerMultiProcessor*d_props.multiProcessorCount * 2);
 }
 
@@ -349,16 +358,17 @@ cudaError_t IsomerQueue::to_device(const LaunchCtx& ctx){
 }
 
 //Kernel wrapper for refill_batch_ function
-cudaError_t IsomerQueue::refill_batch(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
+template <BufferType T>
+cudaError_t IsomerQueue::refill_batch(IsomerBatch<T>& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
     int smem_bytes = sizeof(int)*N*2;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
-    static LaunchDims dims((void*)refill_batch_, N, smem_bytes, batch.isomer_capacity);
-    dims.update_dims((void*)refill_batch_, N, smem_bytes, batch.isomer_capacity);
+    static LaunchDims dims((void*)refill_batch_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
+    dims.update_dims((void*)refill_batch_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
     to_device(ctx);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props, (void*)&g_scan_array};
     is_host_updated = false;
-    cudaError_t error = safeCudaKernelCall((void*)refill_batch_, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
+    cudaError_t error = safeCudaKernelCall((void*)refill_batch_<DEVICE_BUFFER>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
     printLastCudaError("Refill failed");
@@ -366,16 +376,17 @@ cudaError_t IsomerQueue::refill_batch(IsomerBatch& batch, const LaunchCtx& ctx, 
 }
 
 //Kernel wrapper for push_done_ function
-cudaError_t IsomerQueue::push_done(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
+template <BufferType T>
+cudaError_t IsomerQueue::push_done(IsomerBatch<T>& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
     int smem_bytes = sizeof(int)*N*2;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
-    static LaunchDims dims((void*)push_done_, N, smem_bytes, batch.isomer_capacity);
-    dims.update_dims((void*)push_done_, N, smem_bytes, batch.isomer_capacity);
+    static LaunchDims dims((void*)push_done_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
+    dims.update_dims((void*)push_done_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
     to_device(ctx);
     if(*props.capacity < *props.size + batch.isomer_capacity)  resize(*props.size+batch.isomer_capacity, ctx, policy);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props, (void*)&g_scan_array};
-    cudaError_t error = safeCudaKernelCall((void*)push_done_, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
+    cudaError_t error = safeCudaKernelCall((void*)push_done_<DEVICE_BUFFER>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     is_host_updated = false;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
@@ -386,16 +397,17 @@ cudaError_t IsomerQueue::push_done(IsomerBatch& batch, const LaunchCtx& ctx, con
 }
 
 //Kernel wrapper for push_all_ function
-cudaError_t IsomerQueue::push_all(IsomerBatch& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
+template <BufferType T>
+cudaError_t IsomerQueue::push_all(IsomerBatch<T>& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
     int smem_bytes = sizeof(int)*N*2;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
-    static LaunchDims dims((void*)push_all_, N, smem_bytes, batch.isomer_capacity);
-    dims.update_dims((void*)push_all_, N, smem_bytes, batch.isomer_capacity);
+    static LaunchDims dims((void*)push_all_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
+    dims.update_dims((void*)push_all_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
     to_device(ctx);
     if(*props.capacity < *props.size + batch.isomer_capacity)  resize(*props.size+batch.isomer_capacity, ctx, policy);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props, (void*)&g_scan_array};
-    cudaError_t error = safeCudaKernelCall((void*)push_all_, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
+    cudaError_t error = safeCudaKernelCall((void*)push_all_<DEVICE_BUFFER>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     is_host_updated = false;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
@@ -426,33 +438,36 @@ Polyhedron IsomerQueue::pop(const LaunchCtx& ctx, const LaunchPolicy policy){
     return Polyhedron(Graph(out_neighbours,true),out_coords);
 }
 
+template <BufferType T>
+void IsomerQueue::resize_queue_batch(IsomerBatch<T>& batch, const size_t new_capacity, const LaunchCtx& ctx, const LaunchPolicy policy){
+    //Construct a tempory batch: allocates the needed amount of memory.
+    IsomerBatch<T> temp_batch = IsomerBatch<T>(batch.n_atoms, new_capacity, batch.get_device_id());
+    //Copy contents of old batch into newly allocated memory.
+    cuda_io::copy(temp_batch,batch,ctx,policy,{0, batch.isomer_capacity - *props.front}, {*props.front,batch.isomer_capacity});
+    cuda_io::copy(temp_batch,batch,ctx,policy,{batch.isomer_capacity- *props.front, batch.isomer_capacity - *props.front + *props.back},{0,*props.back});
+    for (int i = 0; i < batch.pointers.size(); i++)
+    {
+        void* temp_ptr = *get<1>(batch.pointers[i]);
+        printLastCudaError("Free failed");
+        //Reassign pointers of the input batch, to the new memory
+        *get<1>(batch.pointers[i]) = *get<1>(temp_batch.pointers[i]);
+        //Assign old pointers to temporary object, let destructor take care of cleanup.
+        *get<1>(temp_batch.pointers[i]) = temp_ptr;
+    }
+    batch.isomer_capacity = temp_batch.isomer_capacity;
+}
+
 //Resizes the underlying containers (host and device batches) and updates the queue counters accordingly
 cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
     //Lambda function because it is only called in here and avoids duplication of code because these transformations need to be applied to both host and device batches.
-    auto queue_resize_batch = [&](IsomerBatch& batch){
-        //Construct a tempory batch: allocates the needed amount of memory.
-        IsomerBatch temp_batch = IsomerBatch(batch.n_atoms, new_capacity, batch.buffer_type, batch.get_device_id());
-        //Copy contents of old batch into newly allocated memory.
-        cuda_io::copy(temp_batch,batch,ctx,policy,{0, batch.isomer_capacity - *props.front}, {*props.front,batch.isomer_capacity});
-        cuda_io::copy(temp_batch,batch,ctx,policy,{batch.isomer_capacity- *props.front, batch.isomer_capacity - *props.front + *props.back},{0,*props.back});
-        for (int i = 0; i < batch.pointers.size(); i++)
-        {
-            void* temp_ptr = *get<1>(batch.pointers[i]);
-            printLastCudaError("Free failed");
-            //Reassign pointers of the input batch, to the new memory
-            *get<1>(batch.pointers[i]) = *get<1>(temp_batch.pointers[i]);
-            //Assign old pointers to temporary object, let destructor take care of cleanup.
-            *get<1>(temp_batch.pointers[i]) = temp_ptr;
-        }
-        batch.isomer_capacity = temp_batch.isomer_capacity;
-    };
+
     if (*props.back >= *props.front){
         cuda_io::resize(host_batch, new_capacity, ctx, policy);
         cuda_io::resize(device_batch, new_capacity, ctx, policy);
     }else{
-        queue_resize_batch(host_batch);
-        queue_resize_batch(device_batch);
+        this->resize_queue_batch(host_batch, new_capacity, ctx, policy);
+        this->resize_queue_batch(device_batch, new_capacity, ctx, policy);
         *props.front = 0;
         *props.back  = *props.size - 1;
     }
@@ -463,17 +478,18 @@ cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, 
 }
 
 //Inserts entire IsomerBatch in the queue.
-cudaError_t IsomerQueue::insert(IsomerBatch& input_batch, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d){
+template <BufferType T>
+cudaError_t IsomerQueue::insert(IsomerBatch<T>& input_batch, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d){
     cudaSetDevice(m_device);
     //Wait for all processes on the stream to finish if policy is synchronous otherwise just proceed.
     if(policy == LaunchPolicy::SYNC) ctx.wait(); 
 
     //Static storage specifier of LaunchDims object allows us to perform the calculations on first function call,
     // and store the result for future calls. Thus avoiding having to perform this calculation outside and pass the state to the function.
-    static LaunchDims dims((void*)insert_batch_, N, 0, input_batch.isomer_capacity);
-    dims.update_dims((void*)insert_batch_, N, 0, input_batch.isomer_capacity);
+    static LaunchDims dims((void*)insert_batch_<DEVICE_BUFFER>, N, 0, input_batch.isomer_capacity);
+    dims.update_dims((void*)insert_batch_<DEVICE_BUFFER>, N, 0, input_batch.isomer_capacity);
 
-    input_batch.buffer_type == DEVICE_BUFFER ? to_device(ctx) : to_host(ctx); 
+    T == DEVICE_BUFFER ? to_device(ctx) : to_host(ctx); 
     if (*props.capacity < (*props.size + input_batch.isomer_capacity))
     {
         auto new_capacity = *props.size + input_batch.isomer_capacity;
@@ -481,9 +497,9 @@ cudaError_t IsomerQueue::insert(IsomerBatch& input_batch, const LaunchCtx& ctx, 
     }
 
     //TODO: Maybe we want to implement some inefficient way of copying a host batch to the device.
-    if (input_batch.buffer_type == DEVICE_BUFFER){
+    if (T == DEVICE_BUFFER){
         void* kargs[]{(void*)&input_batch, (void*)&device_batch, (void*)&props};
-        safeCudaKernelCall((void*)insert_batch_,dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
+        safeCudaKernelCall((void*)insert_batch_<DEVICE_BUFFER>,dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
         //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
     } else{
         std::cout << "Failed to insert: Batch insertion is intended for device batches only" << std::endl;
