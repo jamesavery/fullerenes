@@ -4,6 +4,7 @@
 #include "inttypes.h"
 #include "cuda_runtime.h"
 #include "array"
+#include "type_traits"
 
 
 #define BLOCK_SYNC __syncthreads();
@@ -88,6 +89,6 @@ typedef struct device_node6
     device_node_t g;
 } device_node6;
 #define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6; typedef device_hpreal_t hpreal_t;
-
+#define TEMPLATE_TYPEDEFS(T,K) static_assert(std::is_floating_point<T>::value, "T must be float"); static_assert(std::is_integral<K>::value, "K must be integral type"); typedef std::array<T,3> coord3d; typedef std::array<T,2> coord2d; typedef T real_t; typedef std::array<K,3> node3; typedef K node_t; typedef std::array<K,6> node6; typedef device_real_t hpreal_t;
 
 #endif
