@@ -3,8 +3,8 @@
 #include <fstream>
 #include <stdio.h>
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 using namespace cuda_benchmark;

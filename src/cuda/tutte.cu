@@ -47,21 +47,21 @@ std::array<device_node_t, 12> multiple_source_shortest_paths(const IsomerBatch<U
 template <Device U> __global__
 void tutte_layout_(IsomerBatch<U> B, const size_t iterations){
     DEVICE_TYPEDEFS;
-    extern __shared__  hpreal_t sharedmem[];
+    extern __shared__  real_t sharedmem[];
     clear_cache(sharedmem, Block_Size_Pow_2);
     for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){
     if (B.statuses[isomer_idx] != IsomerStatus::EMPTY){
     size_t offset = isomer_idx * blockDim.x;
 
     DeviceCubicGraph FG(&B.cubic_neighbours[offset*3]); 
-    hpreal_t* base_pointer        = sharedmem + Block_Size_Pow_2;
+    real_t* base_pointer        = sharedmem + Block_Size_Pow_2;
     coord2dh* xys        = reinterpret_cast<coord2dh*>(base_pointer);
     coord2dh* newxys     = reinterpret_cast<coord2dh*>(base_pointer) + blockDim.x;
 
 
     node3 ns            = (reinterpret_cast<node3*>(B.cubic_neighbours) + offset)[threadIdx.x];
 
-    xys[threadIdx.x]    = {hpreal_t(0.0), hpreal_t(0.0)};
+    xys[threadIdx.x]    = {real_t(0.0), real_t(0.0)};
 
     node_t outer_face[6];
     node_t outer_face_vertex   = 0;
@@ -83,44 +83,44 @@ void tutte_layout_(IsomerBatch<U> B, const size_t iterations){
     BLOCK_SYNC;
     bool fixed = reinterpret_cast<bool*>(sharedmem)[threadIdx.x];
 
-    if(threadIdx.x < Nface) xys[outer_face_vertex] = {SIN((hpreal_t)threadIdx.x*(hpreal_t)2.0*hpreal_t(M_PI)/hpreal_t(Nface)),COS((hpreal_t)threadIdx.x*(hpreal_t)2.0*hpreal_t(M_PI)/hpreal_t(Nface))};
+    if(threadIdx.x < Nface) xys[outer_face_vertex] = {SIN((real_t)threadIdx.x*(real_t)2.0*real_t(M_PI)/real_t(Nface)),COS((real_t)threadIdx.x*(real_t)2.0*real_t(M_PI)/real_t(Nface))};
     BLOCK_SYNC
     bool converged          = false;
-    hpreal_t max_change       = hpreal_t(0.0);
+    real_t max_change       = real_t(0.0);
     if(fixed) newxys[threadIdx.x] = xys[threadIdx.x];
     for (size_t i = 0; i < iterations && !converged; i++)
     {   
-        max_change = hpreal_t(0.0);
+        max_change = real_t(0.0);
         BLOCK_SYNC
-        coord2dh neighbour_sum   = {hpreal_t(0.0),hpreal_t(0.0)};    
+        coord2dh neighbour_sum   = {real_t(0.0),real_t(0.0)};    
         for (uint8_t j = 0; j < 3; j++) neighbour_sum += xys[d_get(ns,j)];
 
         // Calculate the new position of the point
-        if(!fixed) newxys[threadIdx.x] = xys[threadIdx.x]*hpreal_t(0.15) + (neighbour_sum/3)*hpreal_t(0.85);
-        hpreal_t neighbour_dist = 0.0f;
+        if(!fixed) newxys[threadIdx.x] = xys[threadIdx.x]*real_t(0.15) + (neighbour_sum/3)*real_t(0.85);
+        real_t neighbour_dist = 0.0f;
 
         // Calculate the distance between neighbours
-        for (uint8_t j = 0; j < 3; j++) neighbour_dist += norm(xys[threadIdx.x] - xys[d_get(ns,j)])/hpreal_t(3);
+        for (uint8_t j = 0; j < 3; j++) neighbour_dist += norm(xys[threadIdx.x] - xys[d_get(ns,j)])/real_t(3);
         
         BLOCK_SYNC
-        hpreal_t relative_change = 0.0f;
+        real_t relative_change = 0.0f;
 
         // Calculate the relative change
-        if (neighbour_dist > (hpreal_t)0.0f && !fixed){ 
+        if (neighbour_dist > (real_t)0.0f && !fixed){ 
             relative_change = norm(xys[threadIdx.x] - newxys[threadIdx.x])/neighbour_dist;
         }
 
         // Reduce the relative change to find the maximum change
-        hpreal_t iteration_max = reduction_max(sharedmem, relative_change);
+        real_t iteration_max = reduction_max(sharedmem, relative_change);
         if (iteration_max > max_change) max_change = iteration_max;
 
-        converged = max_change <= 100*numeric_limits<hpreal_t>::epsilon();
+        converged = max_change <= 100*numeric_limits<real_t>::epsilon();
 
         // Update the position of the point
         xys[threadIdx.x] = newxys[threadIdx.x];
     }
     BLOCK_SYNC;
-    (reinterpret_cast<std::array<hpreal_t,2>*>(B.xys) + offset )[threadIdx.x]  =  xys[threadIdx.x];
+    (reinterpret_cast<std::array<real_t,2>*>(B.xys) + offset )[threadIdx.x]  =  xys[threadIdx.x];
     }
     }
 }
@@ -150,7 +150,7 @@ cudaError_t tutte_layout(IsomerBatch<U>& B, const size_t max_iterations, const L
         cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
         kernel_time += single_kernel_time;
     }
-    size_t smem = sizeof(coord2dh)*B.n_atoms*2 + sizeof(device_hpreal_t)*Block_Size_Pow_2;
+    size_t smem = sizeof(coord2dh)*B.n_atoms*2 + sizeof(device_real_t)*Block_Size_Pow_2;
     static LaunchDims dims((void*)tutte_layout_<U>, B.n_atoms, smem, B.isomer_capacity);
     dims.update_dims((void*)tutte_layout_<U>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B,(void*)&max_iterations};

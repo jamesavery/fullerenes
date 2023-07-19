@@ -9,8 +9,8 @@ const std::unordered_map<size_t,size_t> num_fullerenes = {{20,1},{22,0},{24,1},{
 using namespace chrono;
 using namespace chrono_literals;
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "numeric"
@@ -79,11 +79,11 @@ int main(int argc, char** argv){
                 IsomerBatch<CPU> TestBatch[Nd] = {IsomerBatch<CPU>(N,batch_size), IsomerBatch<CPU>(N, batch_size)};
                 IsomerBatch<CPU> TBs[Nd] = {IsomerBatch<CPU>(N,mini_batch), IsomerBatch<CPU>(N, mini_batch)};
             #endif
-            cuda_io::IsomerQueue Q_test[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+            device_io::IsomerQueue Q_test[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)};
             Q_test[0].resize(batch_size); Q_test[1].resize(batch_size);
 
             #if VALIDATION
-                cuda_io::IsomerQueue Q_val[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+                device_io::IsomerQueue Q_val[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)};
                 Q_val[0].resize(batch_size); Q_val[1].resize(batch_size);
             #endif
             LaunchCtx ctxs[Nd] = {LaunchCtx(0),LaunchCtx(1)};
@@ -109,23 +109,23 @@ int main(int argc, char** argv){
                     }
                 #endif
             }
-            for (size_t i = 0; i < Nd; i++) cuda_io::copy(TempBatch[i],HBs[i]);
+            for (size_t i = 0; i < Nd; i++) device_io::copy(TempBatch[i],HBs[i]);
 
             for (size_t i = 0; i < batch_coeff; i++) {
-                for(auto j = 0; j < Nd; j++) {cuda_io::copy(TempBatch[j], HBs[j], ctxs[j], LaunchPolicy::ASYNC);Q_test[j].insert(TempBatch[j],ctxs[j],LaunchPolicy::ASYNC);} 
+                for(auto j = 0; j < Nd; j++) {device_io::copy(TempBatch[j], HBs[j], ctxs[j], LaunchPolicy::ASYNC);Q_test[j].insert(TempBatch[j],ctxs[j],LaunchPolicy::ASYNC);} 
             }
             for(auto j = 0; j < Nd; j++) ctxs[j].wait();
             #if VALIDATION    
-                for (size_t i = 0; i < Nd; i++) cuda_io::copy(TempBatch[i],TBs[i]);
+                for (size_t i = 0; i < Nd; i++) device_io::copy(TempBatch[i],TBs[i]);
 
                 for (size_t i = 0; i < batch_coeff; i++) {
-                    for(auto j = 0; j < Nd; j++) {cuda_io::copy(TempBatch[j], TBs[j], ctxs[j], LaunchPolicy::ASYNC);Q_val[j].insert(TempBatch[j],ctxs[j],LaunchPolicy::ASYNC);}
+                    for(auto j = 0; j < Nd; j++) {device_io::copy(TempBatch[j], TBs[j], ctxs[j], LaunchPolicy::ASYNC);Q_val[j].insert(TempBatch[j],ctxs[j],LaunchPolicy::ASYNC);}
                 }
             #endif
             
             //std::cout << "Queue Size: " << Q_test[0].get_size() << std::endl;
-            for (size_t i = 0; i < Nd; i++) cuda_io::copy(DBs[i],Q_test[i].device_batch);
-            for (size_t i = 0; i < Nd; i++) cuda_io::copy(Q_test[i].host_batch, Q_test[i].device_batch);
+            for (size_t i = 0; i < Nd; i++) device_io::copy(DBs[i],Q_test[i].device_batch);
+            for (size_t i = 0; i < Nd; i++) device_io::copy(Q_test[i].host_batch, Q_test[i].device_batch);
             
             
             for (size_t l = 0; l < N_runs + 1; l++){
@@ -162,14 +162,14 @@ int main(int argc, char** argv){
             //for(auto i = 0; i < Nd; i++) {ValBatch[i].set_print_verbose(); TestBatch[i].set_print_verbose();}
             //for(auto i = 0; i < Nd; i++) std::cout << ValBatch[i] << std::endl;
             //for(auto i = 0; i < Nd; i++) std::cout << TestBatch[i] << std::endl;
-                for(auto i = 0; i < Nd; i++) cuda_io::copy(ValBatch[i], Q_val[i].device_batch);
-                if (dual_version != 2) {for(auto i = 0; i < Nd; i++) cuda_io::copy(TestBatch[i], DBs[i]);}
+                for(auto i = 0; i < Nd; i++) device_io::copy(ValBatch[i], Q_val[i].device_batch);
+                if (dual_version != 2) {for(auto i = 0; i < Nd; i++) device_io::copy(TestBatch[i], DBs[i]);}
                 for(auto i = 0; i < Nd; i++) assert(ValBatch[i] == TestBatch[i]);
             #endif
 
 
 
-        using namespace cuda_io;
+        using namespace device_io;
         //Print out runtimes in us per isomer:
         std::cout << N << "  Dual: " << std::fixed << std::setprecision(2) << mean(T_duals)/float(batch_size*Ngpu) << " +- " << sdev(T_duals)/float(batch_size*Ngpu) <<  " Timing Diff: " << mean(T_timing_diff)/float(batch_size*Ngpu) << " +- " << sdev(T_timing_diff)/float(batch_size*Ngpu) << std::endl;
 

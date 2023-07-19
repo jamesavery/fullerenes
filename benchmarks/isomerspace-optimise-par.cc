@@ -9,8 +9,8 @@ const std::unordered_map<size_t,size_t> num_fullerenes = {{20,1},{22,0},{24,1},{
 using namespace chrono;
 using namespace chrono_literals;
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "numeric"
@@ -96,9 +96,9 @@ int main(int argc, char** argv){
             IsomerBatch<GPU> batch2(N,sample_size,0);
             IsomerBatch<CPU> h_batch(N,sample_size);
             LaunchCtx ctx(0);
-            cuda_io::IsomerQueue isomer_q(N,0);
-            cuda_io::IsomerQueue isomer_q_cubic(N,0);
-            cuda_io::IsomerQueue OutQueue(N,0);
+            device_io::IsomerQueue isomer_q(N,0);
+            device_io::IsomerQueue isomer_q_cubic(N,0);
+            device_io::IsomerQueue OutQueue(N,0);
             OutQueue.resize(sample_size);
             isomer_q_cubic.resize(min(n_fullerenes,10000 + sample_size));
             isomer_q.resize(min(n_fullerenes,sample_size));
@@ -122,10 +122,10 @@ int main(int argc, char** argv){
             isomerspace_X0::zero_order_geometry(batch0, 4.0);
             T_X0s[l] += isomerspace_X0::time_spent() - TX0;
 
-            cuda_io::copy(batch1, batch0);
+            device_io::copy(batch1, batch0);
             while(isomer_q_cubic.get_size() < min(n_fullerenes,10000)){
                 isomer_q_cubic.insert(batch1);
-                cuda_io::copy(batch1, batch0);
+                device_io::copy(batch1, batch0);
             }
             auto TFF = high_resolution_clock::now();
             isomerspace_forcefield::optimise<PEDERSEN>(batch0,N*5,N*5);
@@ -192,7 +192,7 @@ int main(int argc, char** argv){
             //std::cout << finished_isomers << ": " <<((high_resolution_clock::now() - Tio)/1us) << "us  " << (T_queue[l]/1us) << "us  " << (T_io[l]/1us) << "us  " << (Trefill/1us) << "us  " << (Tpush/1us) << "us  " << (Tget/1us) << "us  " << (Tclear/1us)/(float)finished_isomers << "us  " << std::endl;
 
         }
-        using namespace cuda_io;
+        using namespace device_io;
         //Print out runtimes in us per isomer:
 
         //Remove the maximum and minimum values from the runtime arrays:

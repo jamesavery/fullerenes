@@ -2,8 +2,8 @@
 #include "fullerenes/buckygen-wrapper.hh"
 
 #include "fullerenes/gpu/kernels.hh"
-#include "fullerenes/gpu/cuda_io.hh"
-#include "fullerenes/gpu/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
+#include "fullerenes/isomer_queue.hh"
 #include "fullerenes/isomerdb.hh"
 
 int main(int argc, char** argv){
@@ -30,8 +30,8 @@ int main(int argc, char** argv){
         G.N = Nf;
 
         auto batch_size = min((int)n_samples, (int)n_isomers);
-        cuda_io::IsomerQueue test_queue(N);
-        cuda_io::IsomerQueue validation_queue(N);
+        device_io::IsomerQueue test_queue(N);
+        device_io::IsomerQueue validation_queue(N);
         IsomerBatch<CPU> h_test(N,batch_size);
         
         IsomerBatch<CPU> h_validation(N,batch_size);
@@ -56,11 +56,11 @@ int main(int argc, char** argv){
         }
         //std::cout << F.neighbours << "\n";
         test_queue.refill_batch(d_test);                        validation_queue.refill_batch(d_validation);
-        cuda_io::copy(h_test, d_test);
+        device_io::copy(h_test, d_test);
         gpu_kernels::isomerspace_dual::dualise_4(h_test);    
 
-        //cuda_io::copy(h_test, d_test); 
-        cuda_io::copy(h_validation, d_validation);
+        //device_io::copy(h_test, d_test); 
+        device_io::copy(h_validation, d_validation);
         //h_test.set_print_verbose(); h_validation.set_print_verbose();
 
         if(h_test == h_validation) std::cout << "Test passed!\n";

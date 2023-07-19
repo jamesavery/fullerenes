@@ -1,5 +1,5 @@
 #include <cub/cub.cuh>
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/device_io.hh"
 
 
 namespace gpu_kernels{

@@ -15,8 +15,8 @@
 #include "fullerenes/progress_bar.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/isomerdb.hh"
 
@@ -26,7 +26,7 @@
 
 using namespace std;
 using namespace std::chrono;
-using namespace cuda_io;
+using namespace device_io;
 
 using namespace gpu_kernels;
 
@@ -184,10 +184,10 @@ int main(int ac, char **argv)
   IsomerBatch<CPU> final_host_batch[Nd] = {IsomerBatch<CPU>(N,final_batch_size,0),IsomerBatch<CPU>(N,final_batch_size,1)};  
   
   // TODO: Organize Qs by stages together with batches.Structure nicely.
-  IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate
-  IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // X0-generate to optimization
-  IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // optimization to properties + stat
-  IsomerQueue Q3s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // k_best result final computations
+  IsomerQueue Q0s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate
+  IsomerQueue Q1s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // X0-generate to optimization
+  IsomerQueue Q2s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // optimization to properties + stat
+  IsomerQueue Q3s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // k_best result final computations
   
   
   for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
@@ -292,7 +292,7 @@ int main(int ac, char **argv)
       Q1s[d].refill_batch(B, opt_ctxs[d], policy);
       isomerspace_forcefield::optimise<PEDERSEN>(B, 3*N, 20*N, ctx, policy);      
       Q2s[d].push_done(B, ctx, policy);
-      if(final) cuda_io::copy(host_batch[d],B,ctx,policy); 
+      if(final) device_io::copy(host_batch[d],B,ctx,policy); 
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
@@ -331,7 +331,7 @@ int main(int ac, char **argv)
       isomerspace_properties::moments_of_inertia   (B, results[INERTIA][d],      ctx, policy);      
       isomerspace_properties::eccentricities       (B, results[ECCENTRICITY][d], ctx, policy);
       isomerspace_properties::volume_divergences   (B, results[VOLUME][d],       ctx, policy);
-      cuda_io::copy(host_batch[d],B,ctx,policy);      
+      device_io::copy(host_batch[d],B,ctx,policy);      
       B.clear(ctx,policy);      
     }
     for (int d = 0; d < Nd; d++){
@@ -615,7 +615,7 @@ int main(int ac, char **argv)
       lams[d] = CuArray<real_t>(3*N*final_batch_size,0);    
       isomerspace_eigen  ::eigensolve(B,Q[d],hessians[d],hessian_cols[d],lams[d],ctx,policy);
     }
-    cuda_io::copy(final_host_batch[d],B,ctx,policy);
+    device_io::copy(final_host_batch[d],B,ctx,policy);
     ctx.wait();
     }}
   

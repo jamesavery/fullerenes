@@ -1,13 +1,13 @@
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
-#include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/config.h"
 #include <chrono>
 #include <fstream>
 #include "random"
 #include "numeric"
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include <stdio.h>
 
@@ -70,7 +70,7 @@ int main(int argc, char** argv){
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
         std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
 
-        using namespace cuda_io;
+        using namespace device_io;
         IsomerQueue OptimisedQueue(N,0);
         IsomerQueue InputQueue(N,0);
 
@@ -83,7 +83,7 @@ int main(int argc, char** argv){
                         if(u != UINT16_MAX) G.neighbours[j].push_back(u);
                     }
                 }
-                InputQueue.insert(Graph(G),id_subset[i]);
+		InputQueue.insert(Graph(G),id_subset[i]);
                 if(generate_cpu_stats > 0){
                     G.update();
                     PlanarGraph pG = G.dual_graph();
@@ -230,7 +230,8 @@ int main(int argc, char** argv){
             CuArray<float> RMSDihedrals_Fortran(max_sample_size);
             CuArray<float> RMSFlatness_Fortran(max_sample_size);
             CuArray<float> Energy_Fortran(max_sample_size);
-            cuda_io::copy(OptimisedQueue.device_batch, OptimisedQueue.host_batch);
+            device_io
+	      ::copy(OptimisedQueue.device_batch, OptimisedQueue.host_batch);
             gpu_kernels::isomerspace_forcefield::get_bond_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSBonds_Fortran);
             gpu_kernels::isomerspace_forcefield::get_angle_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSAngles_Fortran);
             gpu_kernels::isomerspace_forcefield::get_dihedral_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSDihedrals_Fortran);

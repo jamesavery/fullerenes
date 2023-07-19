@@ -81,7 +81,7 @@ struct DeviceDualGraph{
         if(u < (blockDim.x / 2 +2) ){
         for (int i = 0; i < face_degrees[u]; ++i){
             device_node2 cannon_arc = get_cannonical_triangle_arc(u,dual_neighbours[u*6 + i]);
-            if (cannon_arc.x == u) {represent_count++;}
+            if (cannon_arc[0] == u) {represent_count++;}
         }
 
         smem[u] = represent_count;
@@ -92,12 +92,12 @@ struct DeviceDualGraph{
         if (threadIdx.x < blockDim.x / 2 +2){
         for (int i = 0; i < face_degrees[u]; ++i){
             device_node2 cannon_arc = get_cannonical_triangle_arc(u,dual_neighbours[u*6 + i]);
-            if (cannon_arc.x == u) {
+            if (cannon_arc[0] == u) {
                 device_node_t v(dual_neighbours[u*6 + i]);
                 device_node_t w = prev(u,v);
-                device_node2 edge_b = get_cannonical_triangle_arc(v, u); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 0] = triangle_numbers[edge_b.x * 6 + dedge_ix(edge_b.x, edge_b.y)];
-                device_node2 edge_c = get_cannonical_triangle_arc(w, v); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 1] = triangle_numbers[edge_c.x * 6 + dedge_ix(edge_c.x, edge_c.y)];
-                device_node2 edge_d = get_cannonical_triangle_arc(u, w); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 2] = triangle_numbers[edge_d.x * 6 + dedge_ix(edge_d.x, edge_d.y)];
+                device_node2 edge_b = get_cannonical_triangle_arc(v, u); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 0] = triangle_numbers[edge_b[0] * 6 + dedge_ix(edge_b[0], edge_b[1])];
+                device_node2 edge_c = get_cannonical_triangle_arc(w, v); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 1] = triangle_numbers[edge_c[0] * 6 + dedge_ix(edge_c[0], edge_c[1])];
+                device_node2 edge_d = get_cannonical_triangle_arc(u, w); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 2] = triangle_numbers[edge_d[0] * 6 + dedge_ix(edge_d[0], edge_d[1])];
             };
         }
         }

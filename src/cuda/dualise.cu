@@ -44,8 +44,8 @@ void cubic_layout_(IsomerBatch<U> B){
     if(thid < B.n_faces){
         for (int i = 0; i < FD.face_degrees[thid]; ++i){
             device_node2 cannon_arc = FD.get_cannonical_triangle_arc(thid,FD.dual_neighbours[thid*6 + i]);
-            if (cannon_arc.x == thid) {
-                cannon_arcs[i] = cannon_arc.y;
+            if (cannon_arc[0] == thid) {
+                cannon_arcs[i] = cannon_arc[1];
                 represent_count++;
             }
         }
@@ -78,9 +78,9 @@ void cubic_layout_(IsomerBatch<U> B){
     auto [u, v] = representative_arc_list[thid];
     device_node_t w = FD.next(u,v);
 
-    device_node2 edge_b = FD.get_cannonical_triangle_arc(v, u); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + thid*3 + 0] = triangle_numbers[edge_b.x * 6 + FD.dedge_ix(edge_b.x, edge_b.y)];
-    device_node2 edge_c = FD.get_cannonical_triangle_arc(w, v); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + thid*3 + 1] = triangle_numbers[edge_c.x * 6 + FD.dedge_ix(edge_c.x, edge_c.y)];
-    device_node2 edge_d = FD.get_cannonical_triangle_arc(u, w); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + thid*3 + 2] = triangle_numbers[edge_d.x * 6 + FD.dedge_ix(edge_d.x, edge_d.y)];
+    device_node2 edge_b = FD.get_cannonical_triangle_arc(v, u); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + thid*3 + 0] = triangle_numbers[edge_b[0] * 6 + FD.dedge_ix(edge_b[0], edge_b[1])];
+    device_node2 edge_c = FD.get_cannonical_triangle_arc(w, v); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + thid*3 + 1] = triangle_numbers[edge_c[0] * 6 + FD.dedge_ix(edge_c[0], edge_c[1])];
+    device_node2 edge_d = FD.get_cannonical_triangle_arc(u, w); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + thid*3 + 2] = triangle_numbers[edge_d[0] * 6 + FD.dedge_ix(edge_d[0], edge_d[1])];
 
 }}}
 
@@ -119,8 +119,8 @@ void dualise_2_(IsomerBatch<U> B){
     if(thid  < B.n_faces)
     for (int i = 0; i < FD.face_degrees[thid]; ++i){
         device_node2 cannon_arc = FD.get_cannonical_triangle_arc(thid,FD.dual_neighbours[thid*6 + i]);
-        if (cannon_arc.x == thid) {
-            cannon_arcs[i] = cannon_arc.y;
+        if (cannon_arc[0] == thid) {
+            cannon_arcs[i] = cannon_arc[1];
             represent_count++;
         }
     }
@@ -150,9 +150,9 @@ void dualise_2_(IsomerBatch<U> B){
     for (auto tix = thid; tix < B.n_atoms; tix += blockDim.x){
         auto [u, v] = representative_arc_list[tix];
         device_node_t w = FD.next(u,v);
-        device_node2 edge_b = FD.get_cannonical_triangle_arc(v, u); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + tix*3 + 0] = triangle_numbers[edge_b.x * 6 + FD.dedge_ix(edge_b.x, edge_b.y)];
-        device_node2 edge_c = FD.get_cannonical_triangle_arc(w, v); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + tix*3 + 1] = triangle_numbers[edge_c.x * 6 + FD.dedge_ix(edge_c.x, edge_c.y)];
-        device_node2 edge_d = FD.get_cannonical_triangle_arc(u, w); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + tix*3 + 2] = triangle_numbers[edge_d.x * 6 + FD.dedge_ix(edge_d.x, edge_d.y)];
+        device_node2 edge_b = FD.get_cannonical_triangle_arc(v, u); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + tix*3 + 0] = triangle_numbers[edge_b[0] * 6 + FD.dedge_ix(edge_b[0], edge_b[1])];
+        device_node2 edge_c = FD.get_cannonical_triangle_arc(w, v); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + tix*3 + 1] = triangle_numbers[edge_c[0] * 6 + FD.dedge_ix(edge_c[0], edge_c[1])];
+        device_node2 edge_d = FD.get_cannonical_triangle_arc(u, w); B.cubic_neighbours[isomer_idx*B.n_atoms*3 + tix*3 + 2] = triangle_numbers[edge_d[0] * 6 + FD.dedge_ix(edge_d[0], edge_d[1])];
     }
 
 

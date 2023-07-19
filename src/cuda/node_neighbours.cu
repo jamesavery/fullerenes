@@ -30,8 +30,8 @@ struct NodeNeighbours{
         device_node_t edge_idx[3] = {UINT16_MAX, UINT16_MAX, UINT16_MAX};
         for (int j = 0; j  < 3; j++){
             rep_edges[j] = FG.get_face_representation(threadIdx.x, d_get(cubic_neighbours,j));
-            edge_idx[j] = FG.dedge_ix(rep_edges[j].x, rep_edges[j].y);
-            if(rep_edges[j].x == threadIdx.x) {++represent_count; is_rep[j] = true;}
+            edge_idx[j] = FG.dedge_ix(rep_edges[j][0], rep_edges[j][1]);
+            if(rep_edges[j][0] == threadIdx.x) {++represent_count; is_rep[j] = true;}
         }
         ex_scan<device_node_t>(reinterpret_cast<device_node_t*>(sdata), represent_count, blockDim.x);
         auto offset  = reinterpret_cast<device_node_t*>(sdata)[threadIdx.x];
@@ -46,7 +46,7 @@ struct NodeNeighbours{
             }
         }
         BLOCK_SYNC
-        face_neighbours = {L[rep_edges[0].x*3 + edge_idx[0]], L[rep_edges[1].x*3 + edge_idx[1]], L[rep_edges[2].x*3 + edge_idx[2]]};
+        face_neighbours = {L[rep_edges[0][0]*3 + edge_idx[0]], L[rep_edges[1][0]*3 + edge_idx[1]], L[rep_edges[2][0]*3 + edge_idx[2]]};
         if(threadIdx.x < (blockDim.x/2) + 2){
             memcpy(&face_nodes[0], &A[threadIdx.x*6], sizeof(device_node_t)*6);
             face_size = face_nodes[5] == UINT16_MAX ? 5 : 6;

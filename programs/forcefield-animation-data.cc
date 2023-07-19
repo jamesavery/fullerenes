@@ -8,8 +8,8 @@ const std::unordered_map<size_t,size_t> num_fullerenes = {{20,1},{22,0},{24,1},{
 using namespace chrono;
 using namespace chrono_literals;
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "fullerenes/progress_bar.hh"
@@ -53,7 +53,7 @@ int main(int argc, char** argv){
     IsomerBatch<GPU> batch0(N,sample_size);
     IsomerBatch<GPU> batch1(N,sample_size);
     IsomerBatch<CPU> h_batch(N,sample_size);
-    cuda_io::IsomerQueue Q0(N);
+    device_io::IsomerQueue Q0(N);
     Q0.resize(min(n_fullerenes,sample_size));
     for (int i = 0; i < sample_size; i++){
         for (size_t j = 0; j < Nf; j++){
@@ -74,7 +74,7 @@ int main(int argc, char** argv){
     for (size_t i = 0; i < 500; i++)
     {
         isomerspace_tutte::tutte_layout(batch0, i*N/20);
-        cuda_io::copy(h_batch, batch0);
+        device_io::copy(h_batch, batch0);
         out2.write(reinterpret_cast<char*>(h_batch.xys), N*2*sizeof(device_real_t)*sample_size);
         out2.flush();
         progress_bar.update_progress((i+1)/500.f);
@@ -84,7 +84,7 @@ int main(int argc, char** argv){
 
     for (int i = 0; i < 100; i++){
         isomerspace_forcefield::optimise<PEDERSEN>(batch0,int(N*5/100),N*5);
-        cuda_io::copy(h_batch, batch0);
+        device_io::copy(h_batch, batch0);
         out0.write(reinterpret_cast<char*>(h_batch.X), N*3*sizeof(device_real_t)*sample_size); 
         out0.flush();
         progress_bar.update_progress((i+1)/100.f);

@@ -95,7 +95,7 @@ struct DeviceCubicGraph{
         while (v!= start_node && i < f_max){
             device_node_t w = next_on_face(u, v);
             u = v; v = w;
-            if(u < min_edge.x) min_edge = {u,v};
+            if(u < min_edge[0]) min_edge = {u,v};
             ++i;
         }
         //assert(next_on_face(u,v) == start_node);

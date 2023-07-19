@@ -2,9 +2,9 @@
 #include <chrono>
 #include <fstream>
 #include <stdio.h>
-#include "fullerenes/gpu/isomer_queue.hh"
+#include "fullerenes/isomer_queue.hh"
 #include "fullerenes/polyhedron.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 using namespace cuda_benchmark;
@@ -26,7 +26,7 @@ int main(int argc, char** argv){
     ofstream out_file("scan_benchmark_" + to_string(N_start) + "_" + to_string(N_end) + ".txt");
     ofstream std_file("scan_benchmark_std_" + to_string(N_start) + "_" + to_string(N_end) + ".txt");
 
-    using namespace cuda_io;
+    using namespace device_io;
     for (int i = N_start; i < N_end + 1; i++){
         
         unsigned int actual_blocksize = max(64, ( ( (i -1) >> 5 ) + 1) * 32);

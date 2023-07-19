@@ -3,8 +3,8 @@
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/gpu/kernels.hh"
-#include "fullerenes/gpu/cuda_io.hh"
-#include "fullerenes/gpu/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
+#include "fullerenes/isomer_queue.hh"
 #include "fullerenes/progress_bar.hh"
 #include "fullerenes/isomerdb.hh"
 
@@ -82,8 +82,8 @@ int main(int argc, char** argv){
     LaunchPolicy policy = LaunchPolicy::SYNC;
     ProgressBar progbar('=', 50);
     //std::cout << vector<device_real_t>(Bhost.cubic_neighbours, Bhost.cubic_neighbours + N*3) << std::endl;
-    cuda_io::copy(Bdev, Bhost);
-    //cuda_io::copy(Bhost, Bdev);
+    device_io::copy(Bdev, Bhost);
+    //device_io::copy(Bhost, Bdev);
     //ifstream geometry_in("X.float64", std::ios::binary); geometry_in.read((char*)Bhost.X, N*3*batch_size*sizeof(float));
 /*     for (size_t i = 0; i < batch_size; i++)
     {
@@ -109,7 +109,7 @@ int main(int argc, char** argv){
     isomerspace_properties::eccentricities(Bdev, vols);
     std::vector<device_real_t> vols_host(vols.data, vols.data + vols.size());
     std::vector<device_node_t> indices(vols.size());
-    cuda_io::copy(Bhost, Bdev); 
+    device_io::copy(Bhost, Bdev); 
     std::iota(indices.begin(), indices.end(), 0);
     std::sort(indices.begin(), indices.end(), [&vols_host, &Bhost](const auto& a, const auto& b) {
         return std::abs(vols_host[a]) < std::abs(vols_host[b]) && Bhost.statuses[a] == IsomerStatus::CONVERGED;
@@ -167,7 +167,7 @@ int main(int argc, char** argv){
 
     
     //std::cout << "Eigenvalues: " << eigenvalues << std::endl;
-    //cuda_io::copy(Bhost, Bdev); // Copy back to host
+    //device_io::copy(Bhost, Bdev); // Copy back to host
     //auto FG = Bhost.get_isomer(0).value();
     //cubic_graph.write((char*)Bhost.cubic_neighbours, N*3*sizeof(device_node_t));
     //geometry.write((char*)Bhost.X, N*3*sizeof(device_real_t));
@@ -187,7 +187,7 @@ int main(int argc, char** argv){
     //ofstream eigs_out("eigs.float32", ios::binary); eigs_out.write((char*)eigs.data, N*3*batch_size*sizeof(device_real_t)); eigs_out.close();
     time = std::chrono::steady_clock::now() - start;
     std::cout << "Full eigensolve took: " << (time/1us)/(float)batch_size << " us / graph" << std::endl;
-    cuda_io::copy(Bhost, Bdev); // Copy back to host
+    device_io::copy(Bhost, Bdev); // Copy back to host
 
     std::vector<device_real_t> min_eigs_ref(batch_size), max_eigs_ref(batch_size);
     
@@ -218,7 +218,7 @@ int main(int argc, char** argv){
     std::cout << "Failed: " << nan_or_inf << std::endl;
     if (isomer_num == -1){
         isomerspace_properties::transform_coordinates(Bdev);
-        cuda_io::copy(Bhost, Bdev); // Copy back to host
+        device_io::copy(Bhost, Bdev); // Copy back to host
         Polyhedron::to_file(Bhost.get_isomer(0).value(), spiral_ + ".mol2");
     }
 

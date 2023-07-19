@@ -30,17 +30,6 @@ execute_process(
 )
 
 # C++ configure file
-configure_file(
-  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.hh.in
-  ${CMAKE_BINARY_DIR}/include/fullerenes/config.hh
-  )
-
-# Fortran configure file
-configure_file(
-  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.f.in
-  ${CMAKE_SOURCE_DIR}/src/fortran/config.f
-)
-
 
 include_directories(AFTER SYSTEM include)
 include_directories(${CMAKE_BINARY_DIR}/include/)
@@ -90,6 +79,18 @@ set(CUDA_MAXREGCOUNT "--maxrregcount=80")
 
   add_subdirectory(src/cuda)
 endif()
+
+configure_file(
+  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.hh.in
+  ${CMAKE_BINARY_DIR}/include/fullerenes/config.hh
+  )
+
+# Fortran configure file
+configure_file(
+  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.f.in
+  ${CMAKE_SOURCE_DIR}/src/fortran/config.f
+)
+
 
 add_subdirectory(src/fortran)
 add_subdirectory(src/contrib)

@@ -1,16 +1,11 @@
-#ifndef FULLERENE_CUDA_DEFINES
-#define FULLERENE_CUDA_DEFINES
+#pragma once
 
-#include "inttypes.h"
-#include "cuda_runtime.h"
-#include "array"
-
+#include <array>
+#include <inttypes.h>
 
 #define BLOCK_SYNC __syncthreads();
 #define GRID_SYNC cg::sync(cg::this_grid());
 #define INLINE __device__ __forceinline__
-#define sin sin		// change to sin for double precision, sinl for long double
-#define cos cos 		// change to cos for double precision, cosl for long double
 #define NODE_MAX UINT16_MAX
 #define MAKE_NODE3 make_ushort3
 #define Block_Size_Pow_2 256
@@ -20,7 +15,8 @@
 #define LINESEARCH_METHOD GSS
 #define FORCEFIELD_VERSION FLATNESS_ENABLED
 #define USE_CONSTANT_INDICES 0
-//Half-precision and particularly float16 currently do not seem to provide accurate enough results.
+
+
 #ifndef FLOAT_TYPE
 #define FLOAT_TYPE 2
 #endif
@@ -71,13 +67,10 @@
     #define SIN sin
     #define ISNAN isnan
 #endif
-//typedef double device_hpreal_t;	/* High precision real type, for when we need it regardless of speed. */
-//#define HPREAL_DOUBLE 1
-typedef device_real_t device_hpreal_t;	/* High precision real type, for when we need it regardless of speed. */
 
 typedef uint16_t device_node_t;
-typedef ushort3 device_node3;
-typedef ushort2 device_node2;
+typedef std::array<device_node_t,3> device_node3;
+typedef std::array<device_node_t,2> device_node2;
 typedef struct device_node6
 {
     device_node_t b;
@@ -87,7 +80,14 @@ typedef struct device_node6
     device_node_t f;
     device_node_t g;
 } device_node6;
-#define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6; typedef device_hpreal_t hpreal_t;
+#define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6; 
 
 
-#endif
+/* TODO: Get this to work in CMake again.
+#define GIT_BRANCH "@GIT_BRANCH@"
+#define GIT_COMMIT_HASH "@GIT_COMMIT_HASH@"
+#define VERSION_NUMBER "git-@GIT_BRANCH@-@GIT_COMMIT_HASH@"
+
+#define FULLERENE_DATABASE_PATH "@FULLERENE_DATABASE_PATH@"
+
+*/

@@ -1,11 +1,11 @@
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/misc_cuda.cuh"
 #include "type_traits"
 #include <numeric>
-namespace cuda_io{
+namespace device_io{
     
-    template cudaError_t output_to_queue<CPU>(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<CPU>& batch, const bool copy_2d_layout);
-    template cudaError_t reset_convergence_statuses<GPU>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
+    template void output_to_queue<CPU>(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<CPU>& batch, const bool copy_2d_layout);
+    template void reset_convergence_statuses<GPU>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
     template double average_iterations<CPU>(const IsomerBatch<CPU>& input);
     template double average_iterations<GPU>(const IsomerBatch<GPU>& input);
     template void is_close<CPU>(const IsomerBatch<CPU>& a, const IsomerBatch<CPU>& b, float tol, bool verbose);
@@ -16,7 +16,7 @@ namespace cuda_io{
 
 
     template <Device T>
-    cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<T>& batch, const bool copy_2d_layout){
+    void output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<T>& batch, const bool copy_2d_layout){
         //Batch needs to exist on the host. For performance reasons we don't want to create a new batch here and copy to that, cudaMalloc is expensive.
 
         size_t N = batch.n_atoms;
@@ -55,11 +55,10 @@ namespace cuda_io{
                 queue.push({Polyhedron(Graph(out_neighbours, true),output_X),batch.IDs[isomer_idx], batch.statuses[isomer_idx]});
             }
         }
-        return cudaGetLastError();
     }
     
     template <Device T, Device U>
-    cudaError_t copy(   IsomerBatch<T>& destination, //Copy data to this batch
+    void copy(   IsomerBatch<T>& destination, //Copy data to this batch
                         const IsomerBatch<U>& source, //Copy data from this batch
                         const LaunchCtx& ctx, //Optional: specify which launch context to perform the copy operation in.
                         const LaunchPolicy policy, //Optional: specifies whether to synchronize the stream before and after copying)
@@ -90,30 +89,28 @@ namespace cuda_io{
             }
         }
         destination.n_isomers = source.n_isomers;
-        printLastCudaError("cuda_io::Failed to copy struct");
+        printLastCudaError("device_io::Failed to copy struct");
         if(policy == LaunchPolicy::SYNC) {ctx.wait();}
-        return cudaGetLastError();
     }
 
     template <Device T>
-    cudaError_t free(IsomerBatch<T>& batch){
+    void free(IsomerBatch<T>& batch){
         cudaSetDevice(batch.get_device_id());
         for (int i = 0; i < batch.pointers.size(); i++){
             if(T == GPU) {cudaFree(*get<1>(batch.pointers[i]));} else {cudaFreeHost(*get<1>(batch.pointers[i]));}
         }
-        return cudaGetLastError();
     }
 
     template <Device T>    
-    cudaError_t resize(IsomerBatch<T>& batch, const size_t new_capacity, const LaunchCtx& ctx, const LaunchPolicy policy, int front, int back){
+    void resize(IsomerBatch<T>& batch, const size_t new_capacity, const LaunchCtx& ctx, const LaunchPolicy policy, int front, int back){
         cudaSetDevice(batch.get_device_id());
         //Construct a tempory batch: allocates the needed amount of memory.
         IsomerBatch<T> temp_batch = IsomerBatch<T>(batch.n_atoms, new_capacity, batch.get_device_id());
         //Copy contents of old batch into newly allocated memory.
         if (new_capacity < batch.isomer_capacity){
-            cuda_io::copy(temp_batch, batch, ctx, LaunchPolicy::SYNC, {0,new_capacity}, {0,new_capacity});
+            device_io::copy(temp_batch, batch, ctx, LaunchPolicy::SYNC, {0,new_capacity}, {0,new_capacity});
         } else{
-            cuda_io::copy(temp_batch, batch, ctx);
+            device_io::copy(temp_batch, batch, ctx);
         }
         for (int i = 0; i < batch.pointers.size(); i++)
         {
@@ -125,7 +122,6 @@ namespace cuda_io{
             *get<1>(temp_batch.pointers[i]) = temp_ptr;
         }
         batch.isomer_capacity = temp_batch.isomer_capacity;
-        return cudaGetLastError();
     }
 
     template <typename T>
@@ -211,11 +207,11 @@ namespace cuda_io{
         }; 
         if (T == GPU){
             IsomerBatch<CPU> temp(input.n_atoms, input.isomer_capacity);
-            cuda_io::copy(temp, input);
+            device_io::copy(temp, input);
             return fun(temp);
         } else if(T == CPU){
             IsomerBatch<CPU> temp(input.n_atoms, input.isomer_capacity);
-            cuda_io::copy(temp, input);
+            device_io::copy(temp, input);
             return fun(temp);
         }
         return 0;
@@ -234,11 +230,11 @@ namespace cuda_io{
         };
         if (T == GPU){
             IsomerBatch<CPU> temp(input.n_atoms, input.isomer_capacity);
-            cuda_io::copy(temp, input);
+            device_io::copy(temp, input);
             return fun(temp);
         } else if(T == CPU){
             IsomerBatch<CPU> temp(input.n_atoms, input.isomer_capacity);
-            cuda_io::copy(temp, input);
+            device_io::copy(temp, input);
             return fun(temp);
         }
         return 0;
@@ -356,7 +352,7 @@ namespace cuda_io{
         
     }
     template <Device T>
-    cudaError_t reset_convergence_statuses(IsomerBatch<T>& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+    void reset_convergence_statuses(IsomerBatch<T>& B, const LaunchCtx& ctx, const LaunchPolicy policy){
         cudaSetDevice(ctx.get_device_id());
         static LaunchDims dims((void*)reset_convergence_status_, B.n_atoms);
         dims.update_dims((void*)reset_convergence_status_,B.n_atoms,0,B.isomer_capacity);
@@ -365,7 +361,6 @@ namespace cuda_io{
         cudaLaunchCooperativeKernel((void*)reset_convergence_status_, dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
         if(policy == LaunchPolicy::SYNC) ctx.wait();
         
-        return cudaGetLastError();
     }
 
 }
@@ -444,7 +439,7 @@ template <Device T>
 void IsomerBatch<T>::shrink_to_fit(){
     auto first_empty = -1;
     auto sort_fun = [&](IsomerBatch<CPU>& batch){
-        cuda_io::sort(batch, STATUSES, DESCENDING);
+        device_io::sort(batch, STATUSES, DESCENDING);
         for (size_t i = 0; i < batch.isomer_capacity; i++){
             if (batch.statuses[i] == IsomerStatus::EMPTY){
                 first_empty = i; break;
@@ -456,16 +451,16 @@ void IsomerBatch<T>::shrink_to_fit(){
 
     if (T == GPU){
         IsomerBatch<CPU> temp(n_atoms, isomer_capacity);
-        cuda_io::copy(temp, *this);
+        device_io::copy(temp, *this);
         sort_fun(temp);
-        cuda_io::copy(*this, temp);
-        cuda_io::resize(*this, first_empty);
+        device_io::copy(*this, temp);
+        device_io::resize(*this, first_empty);
     } else if (T == CPU){
         IsomerBatch<CPU> temp(n_atoms, isomer_capacity);
-        cuda_io::copy(temp, *this);
+        device_io::copy(temp, *this);
         sort_fun(temp);
-        cuda_io::copy(*this, temp);
-        cuda_io::resize(*this, first_empty);
+        device_io::copy(*this, temp);
+        device_io::resize(*this, first_empty);
     }
     
 }
@@ -667,11 +662,11 @@ void IsomerBatch<T>::print(const BatchMember param, const std::pair<int,int>& ra
     };
     if(T == GPU){
         IsomerBatch<CPU> temp(n_atoms, isomer_capacity);
-        cuda_io::copy(temp, *this);
+        device_io::copy(temp, *this);
         print_fun(temp);
     } else if(T == CPU){
         IsomerBatch<CPU> temp(n_atoms, isomer_capacity);
-        cuda_io::copy(temp, *this);
+        device_io::copy(temp, *this);
         print_fun(temp);
     }
 }
@@ -756,7 +751,7 @@ std::ostream& operator << (std::ostream& os, const IsomerBatch<T>& input){
     };
     if (T == GPU){
         IsomerBatch<T> output(input.n_atoms, input.isomer_capacity);
-        cuda_io::copy(output, input);
+        device_io::copy(output, input);
         print_fun(output);
     }else{
         print_fun(input);

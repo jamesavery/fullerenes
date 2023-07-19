@@ -6,8 +6,8 @@
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/gpu/kernels.hh"
-#include "fullerenes/gpu/cuda_io.hh"
-#include "fullerenes/gpu/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
+#include "fullerenes/isomer_queue.hh"
 #include "fullerenes/isomerdb.hh"
 
 using namespace gpu_kernels;
@@ -36,12 +36,12 @@ int main(int argc, char** argv){
         auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
         Bhost.append(G,ID);
     }
-    cuda_io::copy(Bdev, Bhost);
+    device_io::copy(Bdev, Bhost);
     dualise(Bdev);
     tutte_layout(Bdev, N*10);
     zero_order_geometry(Bdev, 4.0);
     optimise<PEDERSEN>(Bdev, N*5, N*5);
-    cuda_io::copy(Bhost, Bdev);
+    device_io::copy(Bhost, Bdev);
     
     CuArray<device_real_t> ECC(batch_size);
     isomerspace_properties::eccentricities(Bdev, ECC);

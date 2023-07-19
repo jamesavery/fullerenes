@@ -3,7 +3,7 @@
 #include <cooperative_groups/scan.h>
 #include "fullerenes/gpu/cu_array.hh"
 #include "cuda_runtime.h"
-#include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/config.h"
 #include <ostream>
 #include <iostream>
 
