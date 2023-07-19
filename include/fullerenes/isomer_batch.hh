@@ -1,16 +1,14 @@
 #ifndef ISOMERBATCH_STRUCT
 #define ISOMERBATCH_STRUCT
 #include "fullerenes/config.hh"
-#ifdef CMAKE_CUDA_COMPILER
-# warning "With CUDA"
+#ifdef ENABLE_CUDA
 # include "cuda_runtime.h"
 # include "fullerenes/gpu/launch_ctx.hh"
 #else
-# warning "Without CUDA"
+# warning "Compiling isomer_batch.hh without CUDA "
 # include "fullerenes/cpu/launch_ctx.hh"
 #endif
 
-#include <stdint.h>
 #include <optional>
 #include <vector>
 #include "fullerenes/polyhedron.hh"

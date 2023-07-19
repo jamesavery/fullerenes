@@ -1,6 +1,5 @@
 #ifndef DEVICE_IO_H
 #define DEVICE_IO_H
-#include <cuda_runtime.h>
 #include <chrono>
 #include <queue>
 #include "fullerenes/isomer_batch.hh"

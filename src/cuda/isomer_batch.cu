@@ -52,6 +52,7 @@ void IsomerBatch<T>::operator=(const IsomerBatch<T>& input){
         for (size_t i = 0; i < pointers.size(); i++) {
             //For asynchronous memory transfers host memory must be pinned. 
             cudaMallocHost(get<1>(pointers[i]), isomer_capacity * get<2>(pointers[i]));
+	    //TODO: Isn't this a bug? Nothing is being copied!
         }
     }
     printLastCudaError("Failed to copy IsomerBatch");
