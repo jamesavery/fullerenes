@@ -1,3 +1,6 @@
+#include "host-cubic-graph.cc"
+
+template <typename T>
 struct NodeNeighbours{
     device_node3 cubic_neighbours;
     device_node3 next_on_face;
@@ -13,7 +16,8 @@ struct NodeNeighbours{
      * @param  sdata: Pointer to shared memory.
      * @return NodeNeighbours object.
      */
-    __device__ NodeNeighbours(const IsomerBatch& G, const size_t isomer_idx, device_real_t* sdata){
+    /* template <Device U>
+    __device__ NodeNeighbours(const IsomerBatch<U>& G, const size_t isomer_idx, device_real_t* sdata){
         clear_cache(sdata,Block_Size_Pow_2);
         device_real_t* base_ptr = sdata + Block_Size_Pow_2;
         device_node_t* L = reinterpret_cast<device_node_t*>(base_ptr ); //N x 3 list of potential face IDs.
@@ -23,7 +27,7 @@ struct NodeNeighbours{
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
         int represent_count = 0;
-        device_node2 rep_edges[3] = {UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX, UINT16_MAX}; 
+        device_node2 rep_edges[3] = {{UINT16_MAX, UINT16_MAX}, {UINT16_MAX, UINT16_MAX}, {UINT16_MAX, UINT16_MAX}}; 
         //If a node is representative of the j'th face then the face representation edge will be threadIdx.x -> cubic_neighbour[j]
         bool is_rep[3] = {false, false, false}; 
         device_node_t edge_idx[3] = {UINT16_MAX, UINT16_MAX, UINT16_MAX};
@@ -51,14 +55,15 @@ struct NodeNeighbours{
             face_size = face_nodes[5] == UINT16_MAX ? 5 : 6;
         }
         BLOCK_SYNC
-    }
+    } */
 /**
 * @brief Constructor for a NodeNeighbours object, which contains the neighbours of a node in the graph and outer neighbours.
 * @param G All isomer graphs in the batch.
 * @param isomer_idx The index of the isomer to initialize based on.
 */
-__device__ NodeNeighbours(const IsomerBatch& G, const size_t isomer_idx){
-        const DeviceCubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
+template <Device U, typename node_t>
+__device__ NodeNeighbours(const IsomerBatch<U>& G, const size_t isomer_idx){
+        const HostCubicGraph FG<node_t>(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         this->next_on_face = {FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.next_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.next_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]), FG.prev_on_face(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3 + 1]), FG.prev_on_face(threadIdx.x ,FG.cubic_neighbours[threadIdx.x*3 + 2])};

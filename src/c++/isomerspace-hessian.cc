@@ -1,18 +1,19 @@
 #include "fullerenes/gpu/cuda_definitions.h"
+#include "node-neighbours.cc"
+#include "constants.cc"
+#include "sym-mat.cc"
+#include <vector>
 
 template <ForcefieldType T>
 struct ForceField{
-    DEVICE_TYPEDEFS;
     
-    const NodeNeighbours node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
-    const Constants constants;          //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
+    const std::vector<NodeNeighbours> node_graph_arr;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
+    const std::vector<Constants> constants_arr;          //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
+    const int N;
 
-    size_t node_id = threadIdx.x;
-    real_t* sdata;                      //Pointer to start of L1 cache array, used exclusively for reduction.
 
-    __device__ ForceField(  const NodeNeighbours &G,
-                            const Constants &c, 
-                            real_t* sdata): node_graph(G), constants(c), sdata(sdata) {}
+    __device__ ForceField(  const vector<NodeNeighbours> &G,
+                            const vector<Constants> &c, const int N ): node_graph_arr(G), constants_arr(c), N(N){}
 
 
 
@@ -1549,9 +1550,11 @@ INLINE real_t energy(coord3d* X) const {
     real_t energy = (real_t)0.0;
 
     //(71 + 124) * 3 * N  = 585*N FLOPs
-    for (uint8_t j = 0; j < 3; j++ ){
-        ArcData arc = ArcData(j, X, node_graph);
-        arc_energy += arc.energy(constants);
+    for (int i = 0; i < N; i++){
+        for (uint8_t j = 0; j < 3; j++ ){
+            ArcData arc = ArcData(j, X, node_graph);
+            energy += arc.energy(constants);
+        }
     }
     switch (T)
     {
