@@ -76,7 +76,7 @@ namespace gpu_kernels{
         void reset_time(); //Resets time spent in kernel to 0.
 
         //Uses spherical projection and 'wrapping a sphere' technique to generate starting coordinates in 3D space for a batch of fullerenes.
-        template <Device U> 
+        template <Device U = GPU, typename T = float, typename K = uint16_t> 
         cudaError_t zero_order_geometry(IsomerBatch<U>& B, const float scalerad, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     }
 
