@@ -32,11 +32,11 @@ int main(int argc, char** argv){
         auto batch_size = min((int)n_samples, (int)n_isomers);
         cuda_io::IsomerQueue test_queue(N);
         cuda_io::IsomerQueue validation_queue(N);
-        IsomerBatch<HOST_BUFFER> h_test(N,batch_size);
+        IsomerBatch<CPU> h_test(N,batch_size);
         
-        IsomerBatch<HOST_BUFFER> h_validation(N,batch_size);
-        IsomerBatch<DEVICE_BUFFER> d_test(N,batch_size);
-        IsomerBatch<DEVICE_BUFFER> d_validation(N,batch_size);
+        IsomerBatch<CPU> h_validation(N,batch_size);
+        IsomerBatch<GPU> d_test(N,batch_size);
+        IsomerBatch<GPU> d_validation(N,batch_size);
         
 
         for (size_t I = 0; I < n_samples; I++)

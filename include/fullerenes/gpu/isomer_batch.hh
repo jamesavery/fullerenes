@@ -13,8 +13,8 @@ enum class IsomerStatus {EMPTY, CONVERGED, PLZ_CHECK, FAILED, NOT_CONVERGED};
 enum BatchMember {COORDS3D, COORDS2D, CUBIC_NEIGHBOURS, DUAL_NEIGHBOURS, FACE_DEGREES, IDS, ITERATIONS, STATUSES};
 enum SortOrder {ASCENDING, DESCENDING};
 enum class LaunchPolicy {SYNC, ASYNC};
-enum BufferType   {HOST_BUFFER, DEVICE_BUFFER};
-template <BufferType T>
+enum Device   {CPU, GPU};
+template <Device T>
 struct IsomerBatch
 { 
     int isomer_capacity = 0;

@@ -7,10 +7,10 @@ namespace gpu_kernels{
 namespace isomerspace_tutte{
 #include "device_includes.cu"
 
-template cudaError_t tutte_layout<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& B, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t tutte_layout<GPU>(IsomerBatch<GPU>& B, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy);
 
 //WIP: Lets try to find some pentagon-pentagon distances
-template <BufferType U> __device__
+template <Device U> __device__
 std::array<device_node_t, 12> multiple_source_shortest_paths(const IsomerBatch<U>& B, device_node_t* distances, const size_t isomer_idx){
    /*  DEVICE_TYPEDEFS;
     
@@ -44,7 +44,7 @@ std::array<device_node_t, 12> multiple_source_shortest_paths(const IsomerBatch<U
 }
 
 
-template <BufferType U> __global__
+template <Device U> __global__
 void tutte_layout_(IsomerBatch<U> B, const size_t iterations){
     DEVICE_TYPEDEFS;
     extern __shared__  hpreal_t sharedmem[];
@@ -134,7 +134,7 @@ void reset_time(){
     kernel_time = 0.0;
 }
 
-template <BufferType U>
+template <Device U>
 cudaError_t tutte_layout(IsomerBatch<U>& B, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);

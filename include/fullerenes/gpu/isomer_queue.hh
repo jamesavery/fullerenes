@@ -24,21 +24,21 @@ public:
      * Checks the status of each isomer in the target batch, if the status is either of: CONVERGED / FAILED or EMPTY,
      * a new isomer will be copied from the queue if available, this happens in parallel.
     * **/
-    template <BufferType T>
+    template <Device T>
     cudaError_t refill_batch(IsomerBatch<T>& target, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     
     /** Insert an entire IsomerBatch into the queue.
      * @param input_batch Batch to insert into the queue.
      * **/
-    template <BufferType T>
+    template <Device T>
     cudaError_t insert(IsomerBatch<T>& input_batch, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC ,const bool insert_2d = true);
     
     //Push all the finished isomers from a batch into the queue.
-    template <BufferType T>
+    template <Device T>
     cudaError_t push_done(IsomerBatch<T>& input_batch, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC );
 
     //Push all non-empty isomers from a batch into the queue.
-    template <BufferType T>
+    template <Device T>
     cudaError_t push_all(IsomerBatch<T>& input_batch, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC );
 
     
@@ -72,8 +72,8 @@ public:
     
     const size_t N;
     //The underlying data containers are buffers on the host and device side respecitvely, the queue properties essentially wrap these containers to give the functionality of a circular queue.
-    IsomerBatch<DEVICE_BUFFER> device_batch = IsomerBatch<DEVICE_BUFFER>(N,1);
-    IsomerBatch<HOST_BUFFER> host_batch   = IsomerBatch<HOST_BUFFER>(N,1);
+    IsomerBatch<GPU> device_batch = IsomerBatch<GPU>(N,1);
+    IsomerBatch<CPU> host_batch   = IsomerBatch<CPU>(N,1);
 
     friend std::ostream& operator<<(std::ostream& os, const IsomerQueue& a);
     void operator=(const IsomerQueue& other);
@@ -97,7 +97,7 @@ private:
     //Internal method for transfering all data to the host if the host is not up to date.
     cudaError_t to_host(const LaunchCtx& ctx = LaunchCtx());
 
-    template <BufferType T>
+    template <Device T>
     void resize_queue_batch(IsomerBatch<T>& batch, const size_t new_capacity, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 };
 }

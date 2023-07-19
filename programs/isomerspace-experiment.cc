@@ -68,7 +68,7 @@ struct isomer_candidate {
   vector<device_node_t> cubic_neighbours;
   vector<real_t> X;
 
-  isomer_candidate(double value, int id, array<device_real_t,NUM_RESULTS> &results,int N, int ix, const IsomerBatch<HOST_BUFFER> &B):
+  isomer_candidate(double value, int id, array<device_real_t,NUM_RESULTS> &results,int N, int ix, const IsomerBatch<CPU> &B):
     value(value), id(id), results(results), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
     memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
@@ -170,18 +170,18 @@ int main(int ac, char **argv)
   array<set<pair<real_t,int>>,NUM_RESULTS> result_reference;
   
   // Each stage has one on-device batch per device. TODO: NUM_STAGES vector<vector<IsomerBatch>>, Nd. Dynamic number of devices != 2.
-  IsomerBatch<DEVICE_BUFFER> Bs[4][2] = {	
-    {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0),IsomerBatch<DEVICE_BUFFER>(N,batch_size,1)},
-    {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0),IsomerBatch<DEVICE_BUFFER>(N,batch_size,1)},
-    {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0),IsomerBatch<DEVICE_BUFFER>(N,batch_size,1)},
-    {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0),IsomerBatch<DEVICE_BUFFER>(N,batch_size,1)}    
+  IsomerBatch<GPU> Bs[4][2] = {	
+    {IsomerBatch<GPU>(N,batch_size,0),IsomerBatch<GPU>(N,batch_size,1)},
+    {IsomerBatch<GPU>(N,batch_size,0),IsomerBatch<GPU>(N,batch_size,1)},
+    {IsomerBatch<GPU>(N,batch_size,0),IsomerBatch<GPU>(N,batch_size,1)},
+    {IsomerBatch<GPU>(N,batch_size,0),IsomerBatch<GPU>(N,batch_size,1)}    
   };
   
   // Final IsomerBatch on host
 
-  IsomerBatch<HOST_BUFFER> host_batch[Nd] = {IsomerBatch<HOST_BUFFER>(N,batch_size,0), IsomerBatch<HOST_BUFFER>(N, batch_size,1)};
-  IsomerBatch<DEVICE_BUFFER> final_batch[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,final_batch_size,0),IsomerBatch<DEVICE_BUFFER>(N,final_batch_size,1)};
-  IsomerBatch<HOST_BUFFER> final_host_batch[Nd] = {IsomerBatch<HOST_BUFFER>(N,final_batch_size,0),IsomerBatch<HOST_BUFFER>(N,final_batch_size,1)};  
+  IsomerBatch<CPU> host_batch[Nd] = {IsomerBatch<CPU>(N,batch_size,0), IsomerBatch<CPU>(N, batch_size,1)};
+  IsomerBatch<GPU> final_batch[Nd] = {IsomerBatch<GPU>(N,final_batch_size,0),IsomerBatch<GPU>(N,final_batch_size,1)};
+  IsomerBatch<CPU> final_host_batch[Nd] = {IsomerBatch<CPU>(N,final_batch_size,0),IsomerBatch<CPU>(N,final_batch_size,1)};  
   
   // TODO: Organize Qs by stages together with batches.Structure nicely.
   IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate

@@ -59,8 +59,8 @@ int main(int argc, char** argv){
 
         for (size_t l = 0; l < N_runs; ++l)
         {
-        IsomerBatch<DEVICE_BUFFER> B0(N,batch_size);
-        IsomerBatch<DEVICE_BUFFER> B1(N,batch_size);
+        IsomerBatch<GPU> B0(N,batch_size);
+        IsomerBatch<GPU> B1(N,batch_size);
         cuda_io::IsomerQueue Q0(N);
         cuda_io::IsomerQueue Q1(N);
         cuda_io::IsomerQueue Q2(N);

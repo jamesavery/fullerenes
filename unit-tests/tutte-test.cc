@@ -24,10 +24,10 @@ int main(int argc, char** argv){
         auto batch_size = min(max_samples, (int)n_isomers);
         cuda_io::IsomerQueue test_queue(i);
         cuda_io::IsomerQueue validation_queue(i);
-        IsomerBatch<HOST_BUFFER> h_test(i,batch_size);
-        IsomerBatch<HOST_BUFFER> h_validation(i,batch_size);
-        IsomerBatch<DEVICE_BUFFER> d_test(i,batch_size);
-        IsomerBatch<DEVICE_BUFFER> d_validation(i,batch_size);
+        IsomerBatch<CPU> h_test(i,batch_size);
+        IsomerBatch<CPU> h_validation(i,batch_size);
+        IsomerBatch<GPU> d_test(i,batch_size);
+        IsomerBatch<GPU> d_validation(i,batch_size);
         FullereneDual F;
         auto I = 0;
         while(more_to_do && I < batch_size){

@@ -26,10 +26,10 @@ int main(int ac, char **argv){
     auto n_isomers = num_fullerenes.find(N)->second;
     using namespace gpu_kernels;
     auto batch_size = isomerspace_forcefield::optimal_batch_size(N,0) * 4;
-    IsomerBatch<DEVICE_BUFFER> batch0(N,batch_size);
-    IsomerBatch<DEVICE_BUFFER> batch1(N,batch_size);
-    IsomerBatch<DEVICE_BUFFER> batch2(N,batch_size);
-    IsomerBatch<HOST_BUFFER> outbatch(N,batch_size);
+    IsomerBatch<GPU> batch0(N,batch_size);
+    IsomerBatch<GPU> batch1(N,batch_size);
+    IsomerBatch<GPU> batch2(N,batch_size);
+    IsomerBatch<CPU> outbatch(N,batch_size);
 
     cuda_io::IsomerQueue Q0 = cuda_io::IsomerQueue(N);
     cuda_io::IsomerQueue Q1 = cuda_io::IsomerQueue(N);

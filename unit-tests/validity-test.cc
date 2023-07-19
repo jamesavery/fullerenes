@@ -34,9 +34,9 @@ int main(int ac, char **argv){
     int N                = strtol(argv[1],0,0);     // Argument 1: Number of vertices N
     auto n_isomers = num_fullerenes.find(N)->second;
 
-    IsomerBatch<DEVICE_BUFFER> d_batch(N, n_isomers);
-    IsomerBatch<HOST_BUFFER> h_batch(N, n_isomers);
-    IsomerBatch<HOST_BUFFER> h_x0_batch(N, n_isomers);
+    IsomerBatch<GPU> d_batch(N, n_isomers);
+    IsomerBatch<CPU> h_batch(N, n_isomers);
+    IsomerBatch<CPU> h_x0_batch(N, n_isomers);
 
     BuckyGen::buckygen_queue Q = BuckyGen::start(N,false, false);
     FullereneDual FD;

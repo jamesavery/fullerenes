@@ -14,7 +14,7 @@ namespace isomerspace_forcefield{
 #include "device_includes.cu"
 
 // This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions
-template <ForcefieldType T, BufferType U>
+template <ForcefieldType T, Device U>
 struct ForceField{
     DEVICE_TYPEDEFS;
     
@@ -1831,7 +1831,7 @@ INLINE  void CG(coord3d* X, coord3d* X1, coord3d* X2, const size_t MaxIter){
  * @tparam T The forcefield type.
  * @return void
 */
-template <ForcefieldType T, BufferType U>
+template <ForcefieldType T, Device U>
 __device__ void check_batch(IsomerBatch<U> &B, const size_t isomer_idx, const size_t max_iterations){
     DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
@@ -1907,7 +1907,7 @@ __device__ void check_batch(IsomerBatch<U> &B, const size_t isomer_idx, const si
 }
 
 //Compute Hessians for all isomers in the batch
-template <ForcefieldType T, BufferType U> __global__ void compute_hessians_(IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols){
+template <ForcefieldType T, Device U> __global__ void compute_hessians_(IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols){
     DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -1942,7 +1942,7 @@ template <ForcefieldType T, BufferType U> __global__ void compute_hessians_(Isom
     }}
 }
 
-template <ForcefieldType T, BufferType U> __global__ void compute_hessians_fd_(IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols, float reldelta){
+template <ForcefieldType T, Device U> __global__ void compute_hessians_fd_(IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols, float reldelta){
     DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -1980,7 +1980,7 @@ template <ForcefieldType T, BufferType U> __global__ void compute_hessians_fd_(I
  * @param max_iterations Maximum number of iterations, to compare against, isomers are marked as failed if this is exceeded.
  * @return void
 */
-template <ForcefieldType T, BufferType U>
+template <ForcefieldType T, Device U>
 __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_t max_iterations){
   DEVICE_TYPEDEFS;
   extern __shared__ real_t smem[];
@@ -2046,7 +2046,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
 
 #if USE_CONSTANT_INDICES
     #define GET_STAT(fun_1, fun_2, param_fun, equillibrium_param, err_fun) \
-            template <ForcefieldType T, BufferType U>\
+            template <ForcefieldType T, Device U>\
             __global__ void fun_1(const IsomerBatch<U> B, CuArray<float> bond_rms){\
                 DEVICE_TYPEDEFS;\
                 extern __shared__ real_t smem[];\
@@ -2066,7 +2066,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
                     bond_rms.data[isomer_idx]         = err_fun;\
                 }}\
             }\
-            template <ForcefieldType T, BufferType U>\
+            template <ForcefieldType T, Device U>\
             cudaError_t fun_2(const IsomerBatch<U>& B, CuArray<float>& bond_rms){\
                 cudaDeviceSynchronize();\
                 cudaSetDevice(B.get_device_id());\
@@ -2080,7 +2080,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
             }
 #else
     #define GET_STAT(fun_1, fun_2, param_fun, equillibrium_param, err_fun) \
-        template <ForcefieldType T, BufferType U>\
+        template <ForcefieldType T, Device U>\
         __global__ void fun_1(const IsomerBatch<U> B, CuArray<float> bond_rms){\
             DEVICE_TYPEDEFS;\
             extern __shared__ real_t smem[];\
@@ -2100,7 +2100,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
                 bond_rms.data[isomer_idx]         = err_fun;\
             }}\
         }\
-        template <ForcefieldType T, BufferType U>\
+        template <ForcefieldType T, Device U>\
         cudaError_t fun_2(const IsomerBatch<U>& B, CuArray<float>& bond_rms){\
             cudaDeviceSynchronize();\
             cudaSetDevice(B.get_device_id());\
@@ -2117,7 +2117,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
 
 
 #define GET_MEAN(fun_1, fun_2, param_fun, err_fun) \
-    template <ForcefieldType T, BufferType U>\
+    template <ForcefieldType T, Device U>\
     __global__ void fun_1(const IsomerBatch<U> B, CuArray<float> bond_rms){\
         DEVICE_TYPEDEFS;\
         extern __shared__ real_t smem[];\
@@ -2137,7 +2137,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
             bond_rms.data[isomer_idx]         = err_fun;\
         }}\
     }\
-    template <ForcefieldType T, BufferType U>\
+    template <ForcefieldType T, Device U>\
     cudaError_t fun_2(const IsomerBatch<U>& B, CuArray<float>& bond_rms){\
         cudaDeviceSynchronize();\
         cudaSetDevice(B.get_device_id());\
@@ -2151,7 +2151,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
     }
 
 #define GET_RRMSE(fun_1, fun_2, param_fun, err_fun) \
-    template <ForcefieldType T, BufferType U>\
+    template <ForcefieldType T, Device U>\
     __global__ void fun_1(const IsomerBatch<U> B, CuArray<float> bond_rms){\
         DEVICE_TYPEDEFS;\
         extern __shared__ real_t smem[];\
@@ -2173,7 +2173,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
             bond_rms.data[isomer_idx]         = SQRT((reduction(smem, dot(top,top))/reduction(smem,dot(bot,bot)))/device_real_t(blockDim.x*3));\
         }}\
     }\
-    template <ForcefieldType T, BufferType U>\
+    template <ForcefieldType T, Device U>\
     cudaError_t fun_2(const IsomerBatch<U>& B, CuArray<float>& bond_rms){\
         cudaDeviceSynchronize();\
         cudaSetDevice(B.get_device_id());\
@@ -2187,7 +2187,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
     }
 
 #define GET_RMSE(fun_1, fun_2, param_fun, err_fun) \
-    template <ForcefieldType T, BufferType U>\
+    template <ForcefieldType T, Device U>\
     __global__ void fun_1(const IsomerBatch<U> B, CuArray<float> bond_rms){\
         DEVICE_TYPEDEFS;\
         extern __shared__ real_t smem[];\
@@ -2207,7 +2207,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
             bond_rms.data[isomer_idx]         = SQRT(reduction(smem, dot(top,top))/device_real_t(blockDim.x*3));\
         }}\
     }\
-    template <ForcefieldType T, BufferType U>\
+    template <ForcefieldType T, Device U>\
     cudaError_t fun_2(const IsomerBatch<U>& B, CuArray<float>& bond_rms){\
         cudaDeviceSynchronize();\
         cudaSetDevice(B.get_device_id());\
@@ -2221,7 +2221,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
     }
 
 #define GET_INTERNAL(fun_1, fun_2, param_fun) \
-    template <BufferType U>\
+    template <Device U>\
     __global__ void fun_1(const IsomerBatch<U> B, CuArray<float> bond_rms){\
         DEVICE_TYPEDEFS;\
         extern __shared__ real_t smem[];\
@@ -2232,16 +2232,16 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
             size_t offset = isomer_idx * blockDim.x;  \
             Constants constants     = Constants(B, isomer_idx);\
             NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);\
-            ForceField FF           = ForceField<FORCEFIELD_VERSION,DEVICE_BUFFER>(node_graph, constants, smem);\
+            ForceField FF           = ForceField<FORCEFIELD_VERSION,GPU>(node_graph, constants, smem);\
             coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
             for (uint8_t j = 0; j < 3; j++){\
-                auto arc            = ForceField<FORCEFIELD_VERSION,DEVICE_BUFFER>::ArcData(j, X, node_graph);\
+                auto arc            = ForceField<FORCEFIELD_VERSION,GPU>::ArcData(j, X, node_graph);\
                 d_set(rel_err,      j, param_fun);\
             }\
             reinterpret_cast<coord3d*>(bond_rms.data)[isomer_idx*B.n_atoms + threadIdx.x]         =  {rel_err[0], rel_err[1], rel_err[2]};\
         }}\
     }\
-    template <BufferType U>\
+    template <Device U>\
     cudaError_t fun_2(const IsomerBatch<U>& B, CuArray<float>& bond_rms){\
         cudaDeviceSynchronize();\
         cudaSetDevice(B.get_device_id());\
@@ -2284,15 +2284,15 @@ GET_MEAN(get_bond_mean_,get_bond_mean, arc.bond(), reduction(smem,sum(rel_err)/(
 GET_MEAN(get_angle_mean_,get_angle_mean, arc.angle(), reduction(smem,sum(rel_err)/(device_real_t)3.0f)/(device_real_t)blockDim.x)
 GET_MEAN(get_dihedral_mean_,get_dihedral_mean, arc.dihedral(), reduction(smem,sum(rel_err)/(device_real_t)3.0f)/(device_real_t)blockDim.x)
 GET_MEAN(get_gradient_mean_,get_gradient_mean, d_get(FF.gradient(X),j), reduction(smem,sum(rel_err)/(device_real_t)3.0f)/(device_real_t)blockDim.x)
-GET_MEAN(get_flat_mean_,get_flat_mean, d_get(FF.gradient(X),j), reduction(smem,ForceField<FORCEFIELD_VERSION,DEVICE_BUFFER>::FaceData(X, node_graph).flatness())/device_real_t(blockDim.x/2 + 2 ))
-GET_MEAN(get_flat_rmse_,get_flat_rmse, d_get(FF.gradient(X),j), SQRT(reduction(smem,ForceField<FORCEFIELD_VERSION,DEVICE_BUFFER>::FaceData(X, node_graph).flatness() * ForceField<FORCEFIELD_VERSION,DEVICE_BUFFER>::FaceData(X, node_graph).flatness())/device_real_t(blockDim.x/2 + 2 )) )
-GET_MEAN(get_flat_max_,get_flat_max, d_get(FF.gradient(X),j), reduction_max(smem,ForceField<FORCEFIELD_VERSION,DEVICE_BUFFER>::FaceData(X, node_graph).flatness())   )
+GET_MEAN(get_flat_mean_,get_flat_mean, d_get(FF.gradient(X),j), reduction(smem,ForceField<FORCEFIELD_VERSION,GPU>::FaceData(X, node_graph).flatness())/device_real_t(blockDim.x/2 + 2 ))
+GET_MEAN(get_flat_rmse_,get_flat_rmse, d_get(FF.gradient(X),j), SQRT(reduction(smem,ForceField<FORCEFIELD_VERSION,GPU>::FaceData(X, node_graph).flatness() * ForceField<FORCEFIELD_VERSION,GPU>::FaceData(X, node_graph).flatness())/device_real_t(blockDim.x/2 + 2 )) )
+GET_MEAN(get_flat_max_,get_flat_max, d_get(FF.gradient(X),j), reduction_max(smem,ForceField<FORCEFIELD_VERSION,GPU>::FaceData(X, node_graph).flatness())   )
 
 int optimal_batch_size(const int N, const int device_id) {
     cudaSetDevice(device_id);
     static size_t smem = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimise_<FORCEFIELD_VERSION,DEVICE_BUFFER>, N, smem);
-    dims.update_dims((void*)optimise_<FORCEFIELD_VERSION,DEVICE_BUFFER>, N, smem);
+    static LaunchDims dims((void*)optimise_<FORCEFIELD_VERSION,GPU>, N, smem);
+    dims.update_dims((void*)optimise_<FORCEFIELD_VERSION,GPU>, N, smem);
     return dims.get_grid().x;
 }
 
@@ -2305,7 +2305,7 @@ void reset_time(){
     kernel_time = 0.0;
 }
 
-template <ForcefieldType T, BufferType U>
+template <ForcefieldType T, Device U>
 cudaError_t optimise(IsomerBatch<U>& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
@@ -2341,7 +2341,7 @@ cudaError_t optimise(IsomerBatch<U>& B, const size_t iterations, const size_t ma
     return error;
 }
 
-template <ForcefieldType T, BufferType U>
+template <ForcefieldType T, Device U>
 cudaError_t compute_hessians(IsomerBatch<U>& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const LaunchCtx& ctx, const LaunchPolicy policy){
     std::cout << "Computing hessians\n";
     cudaSetDevice(B.get_device_id());
@@ -2378,7 +2378,7 @@ cudaError_t compute_hessians(IsomerBatch<U>& B, CuArray<device_real_t>& hessians
     return error;
 }
 
-template <ForcefieldType T, BufferType U>
+template <ForcefieldType T, Device U>
 cudaError_t compute_hessians_fd(IsomerBatch<U>& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const float reldelta, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
@@ -2415,115 +2415,115 @@ cudaError_t compute_hessians_fd(IsomerBatch<U>& B, CuArray<device_real_t>& hessi
 }
 
 int declare_generics(){
-    IsomerBatch<DEVICE_BUFFER> B(20,1);
+    IsomerBatch<GPU> B(20,1);
     CuArray<float> arr(1);
     CuArray<device_real_t> hessians(1);
     CuArray<device_node_t> cols(1);
     optimise<PEDERSEN>(B,100,100);
 
-    get_bonds<DEVICE_BUFFER>(B, arr);
-    get_angles<DEVICE_BUFFER>(B, arr);
-    get_dihedrals<DEVICE_BUFFER>(B, arr);
+    get_bonds<GPU>(B, arr);
+    get_angles<GPU>(B, arr);
+    get_dihedrals<GPU>(B, arr);
     
-    get_angle_max       <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_bond_max        <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_dihedral_max    <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_angle_mae       <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_bond_mae        <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_dihedral_mae    <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_angle_rrmse     <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_bond_rrmse      <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_dihedral_rrmse  <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_angle_rmse      <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_bond_rmse       <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_dihedral_rmse   <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_angle_mean      <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_bond_mean       <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_flat_mean       <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_flat_max        <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_flat_rmse       <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_dihedral_mean   <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_gradient_max    <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_gradient_rms    <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_gradient_mean   <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_gradient_norm   <PEDERSEN, DEVICE_BUFFER>(B,arr);
-    get_energies        <PEDERSEN, DEVICE_BUFFER>(B,arr);
+    get_angle_max       <PEDERSEN, GPU>(B,arr);
+    get_bond_max        <PEDERSEN, GPU>(B,arr);
+    get_dihedral_max    <PEDERSEN, GPU>(B,arr);
+    get_angle_mae       <PEDERSEN, GPU>(B,arr);
+    get_bond_mae        <PEDERSEN, GPU>(B,arr);
+    get_dihedral_mae    <PEDERSEN, GPU>(B,arr);
+    get_angle_rrmse     <PEDERSEN, GPU>(B,arr);
+    get_bond_rrmse      <PEDERSEN, GPU>(B,arr);
+    get_dihedral_rrmse  <PEDERSEN, GPU>(B,arr);
+    get_angle_rmse      <PEDERSEN, GPU>(B,arr);
+    get_bond_rmse       <PEDERSEN, GPU>(B,arr);
+    get_dihedral_rmse   <PEDERSEN, GPU>(B,arr);
+    get_angle_mean      <PEDERSEN, GPU>(B,arr);
+    get_bond_mean       <PEDERSEN, GPU>(B,arr);
+    get_flat_mean       <PEDERSEN, GPU>(B,arr);
+    get_flat_max        <PEDERSEN, GPU>(B,arr);
+    get_flat_rmse       <PEDERSEN, GPU>(B,arr);
+    get_dihedral_mean   <PEDERSEN, GPU>(B,arr);
+    get_gradient_max    <PEDERSEN, GPU>(B,arr);
+    get_gradient_rms    <PEDERSEN, GPU>(B,arr);
+    get_gradient_mean   <PEDERSEN, GPU>(B,arr);
+    get_gradient_norm   <PEDERSEN, GPU>(B,arr);
+    get_energies        <PEDERSEN, GPU>(B,arr);
 
-    optimise            <FLATNESS_ENABLED, DEVICE_BUFFER>(B,100,100);
-    get_angle_max       <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_bond_max        <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_dihedral_max    <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_angle_mae       <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_bond_mae        <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_dihedral_mae    <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_angle_rrmse     <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_bond_rrmse      <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_dihedral_rrmse  <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_angle_rmse      <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_bond_rmse       <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_dihedral_rmse   <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_angle_mean      <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_bond_mean       <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_dihedral_mean   <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_flat_mean       <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_flat_max        <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_flat_rmse       <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_gradient_max    <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_gradient_rms    <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_gradient_mean   <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_gradient_norm   <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
-    get_energies        <FLATNESS_ENABLED, DEVICE_BUFFER>(B,arr);
+    optimise            <FLATNESS_ENABLED, GPU>(B,100,100);
+    get_angle_max       <FLATNESS_ENABLED, GPU>(B,arr);
+    get_bond_max        <FLATNESS_ENABLED, GPU>(B,arr);
+    get_dihedral_max    <FLATNESS_ENABLED, GPU>(B,arr);
+    get_angle_mae       <FLATNESS_ENABLED, GPU>(B,arr);
+    get_bond_mae        <FLATNESS_ENABLED, GPU>(B,arr);
+    get_dihedral_mae    <FLATNESS_ENABLED, GPU>(B,arr);
+    get_angle_rrmse     <FLATNESS_ENABLED, GPU>(B,arr);
+    get_bond_rrmse      <FLATNESS_ENABLED, GPU>(B,arr);
+    get_dihedral_rrmse  <FLATNESS_ENABLED, GPU>(B,arr);
+    get_angle_rmse      <FLATNESS_ENABLED, GPU>(B,arr);
+    get_bond_rmse       <FLATNESS_ENABLED, GPU>(B,arr);
+    get_dihedral_rmse   <FLATNESS_ENABLED, GPU>(B,arr);
+    get_angle_mean      <FLATNESS_ENABLED, GPU>(B,arr);
+    get_bond_mean       <FLATNESS_ENABLED, GPU>(B,arr);
+    get_dihedral_mean   <FLATNESS_ENABLED, GPU>(B,arr);
+    get_flat_mean       <FLATNESS_ENABLED, GPU>(B,arr);
+    get_flat_max        <FLATNESS_ENABLED, GPU>(B,arr);
+    get_flat_rmse       <FLATNESS_ENABLED, GPU>(B,arr);
+    get_gradient_max    <FLATNESS_ENABLED, GPU>(B,arr);
+    get_gradient_rms    <FLATNESS_ENABLED, GPU>(B,arr);
+    get_gradient_mean   <FLATNESS_ENABLED, GPU>(B,arr);
+    get_gradient_norm   <FLATNESS_ENABLED, GPU>(B,arr);
+    get_energies        <FLATNESS_ENABLED, GPU>(B,arr);
 
-    optimise            <WIRZ, DEVICE_BUFFER>(B,100,100);
-    get_angle_max       <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_bond_max        <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_dihedral_max    <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_angle_mae       <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_bond_mae        <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_dihedral_mae    <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_angle_rrmse     <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_bond_rrmse      <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_dihedral_rrmse  <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_angle_rmse      <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_bond_rmse       <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_dihedral_rmse   <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_angle_mean      <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_bond_mean       <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_dihedral_mean   <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_flat_mean       <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_flat_max        <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_flat_rmse       <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_gradient_max    <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_gradient_rms    <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_gradient_mean   <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_gradient_norm   <WIRZ, DEVICE_BUFFER>(B,arr);
-    get_energies        <WIRZ, DEVICE_BUFFER>(B,arr);
+    optimise            <WIRZ, GPU>(B,100,100);
+    get_angle_max       <WIRZ, GPU>(B,arr);
+    get_bond_max        <WIRZ, GPU>(B,arr);
+    get_dihedral_max    <WIRZ, GPU>(B,arr);
+    get_angle_mae       <WIRZ, GPU>(B,arr);
+    get_bond_mae        <WIRZ, GPU>(B,arr);
+    get_dihedral_mae    <WIRZ, GPU>(B,arr);
+    get_angle_rrmse     <WIRZ, GPU>(B,arr);
+    get_bond_rrmse      <WIRZ, GPU>(B,arr);
+    get_dihedral_rrmse  <WIRZ, GPU>(B,arr);
+    get_angle_rmse      <WIRZ, GPU>(B,arr);
+    get_bond_rmse       <WIRZ, GPU>(B,arr);
+    get_dihedral_rmse   <WIRZ, GPU>(B,arr);
+    get_angle_mean      <WIRZ, GPU>(B,arr);
+    get_bond_mean       <WIRZ, GPU>(B,arr);
+    get_dihedral_mean   <WIRZ, GPU>(B,arr);
+    get_flat_mean       <WIRZ, GPU>(B,arr);
+    get_flat_max        <WIRZ, GPU>(B,arr);
+    get_flat_rmse       <WIRZ, GPU>(B,arr);
+    get_gradient_max    <WIRZ, GPU>(B,arr);
+    get_gradient_rms    <WIRZ, GPU>(B,arr);
+    get_gradient_mean   <WIRZ, GPU>(B,arr);
+    get_gradient_norm   <WIRZ, GPU>(B,arr);
+    get_energies        <WIRZ, GPU>(B,arr);
 
     optimise<FLAT_BOND>(B,100,100);
 
-    get_angle_max       <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_bond_max        <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_dihedral_max    <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_angle_mae       <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_bond_mae        <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_dihedral_mae    <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_angle_rrmse     <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_bond_rrmse      <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_dihedral_rrmse  <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_angle_rmse      <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_bond_rmse       <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_dihedral_rmse   <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_angle_mean      <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_bond_mean       <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_dihedral_mean   <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_flat_mean       <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_flat_max        <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_flat_rmse       <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_gradient_max    <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_gradient_rms    <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_gradient_mean   <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_gradient_norm   <FLAT_BOND, DEVICE_BUFFER>(B,arr);
-    get_energies        <FLAT_BOND, DEVICE_BUFFER>(B,arr); 
+    get_angle_max       <FLAT_BOND, GPU>(B,arr);
+    get_bond_max        <FLAT_BOND, GPU>(B,arr);
+    get_dihedral_max    <FLAT_BOND, GPU>(B,arr);
+    get_angle_mae       <FLAT_BOND, GPU>(B,arr);
+    get_bond_mae        <FLAT_BOND, GPU>(B,arr);
+    get_dihedral_mae    <FLAT_BOND, GPU>(B,arr);
+    get_angle_rrmse     <FLAT_BOND, GPU>(B,arr);
+    get_bond_rrmse      <FLAT_BOND, GPU>(B,arr);
+    get_dihedral_rrmse  <FLAT_BOND, GPU>(B,arr);
+    get_angle_rmse      <FLAT_BOND, GPU>(B,arr);
+    get_bond_rmse       <FLAT_BOND, GPU>(B,arr);
+    get_dihedral_rmse   <FLAT_BOND, GPU>(B,arr);
+    get_angle_mean      <FLAT_BOND, GPU>(B,arr);
+    get_bond_mean       <FLAT_BOND, GPU>(B,arr);
+    get_dihedral_mean   <FLAT_BOND, GPU>(B,arr);
+    get_flat_mean       <FLAT_BOND, GPU>(B,arr);
+    get_flat_max        <FLAT_BOND, GPU>(B,arr);
+    get_flat_rmse       <FLAT_BOND, GPU>(B,arr);
+    get_gradient_max    <FLAT_BOND, GPU>(B,arr);
+    get_gradient_rms    <FLAT_BOND, GPU>(B,arr);
+    get_gradient_mean   <FLAT_BOND, GPU>(B,arr);
+    get_gradient_norm   <FLAT_BOND, GPU>(B,arr);
+    get_energies        <FLAT_BOND, GPU>(B,arr); 
     return 1;
 }
 

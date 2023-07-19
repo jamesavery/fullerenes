@@ -9,9 +9,9 @@ namespace gpu_kernels{
 namespace isomerspace_X0{
 #include "device_includes.cu"
 
-template cudaError_t zero_order_geometry<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& B, const float scalerad, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t zero_order_geometry<GPU>(IsomerBatch<GPU>& B, const float scalerad, const LaunchCtx& ctx, const LaunchPolicy policy);
 
-template <BufferType U> __device__
+template <Device U> __device__
 device_node_t multiple_source_shortest_paths(const IsomerBatch<U>& B, device_node_t* distances, const size_t isomer_idx){
     DEVICE_TYPEDEFS;
     
@@ -54,7 +54,7 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch<U>& B, device_nod
 }
 
 
-template <BufferType U> __device__
+template <Device U> __device__
 coord2dh spherical_projection(const IsomerBatch<U>& B, device_node_t* sdata, const size_t isomer_idx){
     DEVICE_TYPEDEFS;
 
@@ -84,7 +84,7 @@ coord2dh spherical_projection(const IsomerBatch<U>& B, device_node_t* sdata, con
     return spherical_layout;
 }
 
-template <BufferType U> __global__
+template <Device U> __global__
 void zero_order_geometry_(IsomerBatch<U> B, float scalerad, int offset){
     DEVICE_TYPEDEFS;
     
@@ -127,7 +127,7 @@ void reset_time(){
     kernel_time = 0.0;
 }
 
-template <BufferType U>
+template <Device U>
 cudaError_t zero_order_geometry(IsomerBatch<U>& B, const float scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     //Need a way of telling whether the kernel has been called previously.

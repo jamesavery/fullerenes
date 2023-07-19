@@ -54,8 +54,8 @@ int main(int argc, char** argv){
         G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
         G.N = Nf;
         for (size_t l = 0; l < N_runs; l++){
-            IsomerBatch<DEVICE_BUFFER> batch0(N,sample_size);
-            IsomerBatch<DEVICE_BUFFER> batch1(N,M_b);
+            IsomerBatch<GPU> batch0(N,sample_size);
+            IsomerBatch<GPU> batch1(N,M_b);
             cuda_io::IsomerQueue Q0(N);
             cuda_io::IsomerQueue Q1(N);
             cuda_io::IsomerQueue Q2(N);

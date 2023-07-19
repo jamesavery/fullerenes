@@ -1612,7 +1612,7 @@ INLINE real_t energy(coord3d* X) const {
 }
 };
 
-template <ForcefieldType T, BufferType U> __global__ void compute_hessians_(const IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols){
+template <ForcefieldType T, Device U> __global__ void compute_hessians_(const IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols){
     DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -1648,7 +1648,7 @@ template <ForcefieldType T, BufferType U> __global__ void compute_hessians_(cons
     }}
 }
 
-template <ForcefieldType T, BufferType U> __global__ void compute_hessians_fd_(const IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols, float reldelta){
+template <ForcefieldType T, Device U> __global__ void compute_hessians_fd_(const IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols, float reldelta){
     DEVICE_TYPEDEFS;
     extern __shared__ real_t smem[];
     clear_cache(smem,Block_Size_Pow_2);
@@ -1683,7 +1683,7 @@ template <ForcefieldType T, BufferType U> __global__ void compute_hessians_fd_(c
 
 float kernel_time = 0.0;
 
-template <ForcefieldType T, BufferType U>
+template <ForcefieldType T, Device U>
 cudaError_t compute_hessians(const IsomerBatch<U>& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
@@ -1719,7 +1719,7 @@ cudaError_t compute_hessians(const IsomerBatch<U>& B, CuArray<device_real_t>& he
     return error;
 }
 
-template <ForcefieldType T, BufferType U>
+template <ForcefieldType T, Device U>
 cudaError_t compute_hessians_fd(const IsomerBatch<U>& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const float reldelta, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
@@ -1757,7 +1757,7 @@ cudaError_t compute_hessians_fd(const IsomerBatch<U>& B, CuArray<device_real_t>&
 
 
 void declaration(){
-    IsomerBatch<DEVICE_BUFFER> B(20,1);
+    IsomerBatch<GPU> B(20,1);
     CuArray<float> arr(1);
     CuArray<device_real_t> hessians(1);
     CuArray<device_node_t> cols(1);

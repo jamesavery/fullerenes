@@ -51,7 +51,7 @@ int main(int argc, char** argv){
         BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
         auto sample_size = min(max_sample_size,(int)num_fullerenes.find(N)->second);
         
-        IsomerBatch<DEVICE_BUFFER> batch0(N,sample_size);
+        IsomerBatch<GPU> batch0(N,sample_size);
         auto Nf = N/2 + 2;
         FullereneDual G;
         G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
@@ -74,7 +74,7 @@ int main(int argc, char** argv){
         IsomerQueue OptimisedQueue(N,0);
         IsomerQueue InputQueue(N,0);
 
-        IsomerBatch<DEVICE_BUFFER> GPUBatch(N,sample_size);
+        IsomerBatch<GPU> GPUBatch(N,sample_size);
         for (int i = 0; i < sample_size; ++i){
                 for (size_t j = 0; j < Nf; j++){
                     G.neighbours[j].clear();
@@ -103,8 +103,8 @@ int main(int argc, char** argv){
         gpu_kernels::isomerspace_tutte::tutte_layout(GPUBatch, N*10);
         gpu_kernels::isomerspace_X0::zero_order_geometry(GPUBatch,4.0f);
         reset_convergence_statuses(GPUBatch);
-        IsomerBatch<DEVICE_BUFFER> WirzBatch(N,sample_size);
-        IsomerBatch<DEVICE_BUFFER> FlatBatch(N, sample_size);
+        IsomerBatch<GPU> WirzBatch(N,sample_size);
+        IsomerBatch<GPU> FlatBatch(N, sample_size);
         copy(WirzBatch,GPUBatch);
         copy(FlatBatch,GPUBatch);
 

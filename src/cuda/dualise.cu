@@ -6,10 +6,10 @@
 namespace gpu_kernels{
 namespace isomerspace_dual{
 #include "device_includes.cu"
-template cudaError_t dualise<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
-template cudaError_t dualise_2<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t dualise<GPU>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t dualise_2<GPU>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
 
-template <BufferType U> __global__
+template <Device U> __global__
 void cubic_layout_(IsomerBatch<U> B){
     unsigned int power2 = B.n_faces; // compute the next highest power of 2 of 32-bit power2
     power2--;
@@ -84,7 +84,7 @@ void cubic_layout_(IsomerBatch<U> B){
 
 }}}
 
-template <BufferType U> __global__
+template <Device U> __global__
 void dualise_2_(IsomerBatch<U> B){
     /* unsigned int power2 = B.n_faces; // compute the next highest power of 2 of 32-bit power2
     power2--;
@@ -170,19 +170,19 @@ void reset_time(){
 int optimal_batch_size(const int N, const int device_id) {
     cudaSetDevice(device_id);
     static size_t smem = sizeof(device_coord3d)*3*N + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)cubic_layout_<DEVICE_BUFFER>, N, smem);
-    dims.update_dims((void*)cubic_layout_<DEVICE_BUFFER>, N, smem);
+    static LaunchDims dims((void*)cubic_layout_<GPU>, N, smem);
+    dims.update_dims((void*)cubic_layout_<GPU>, N, smem);
     return dims.get_grid().x;
 }
 
 int optimal_batch_size_2(const int N, const int device_id) {
     cudaSetDevice(device_id);
     static size_t smem = sizeof(node_t)*N*9;
-    static LaunchDims dims((void*)dualise_2_<DEVICE_BUFFER>, N, smem);
-    dims.update_dims((void*)dualise_2_<DEVICE_BUFFER>, N, smem);
+    static LaunchDims dims((void*)dualise_2_<GPU>, N, smem);
+    dims.update_dims((void*)dualise_2_<GPU>, N, smem);
     return dims.get_grid().x;
 }
-template <BufferType U>
+template <Device U>
 cudaError_t dualise(IsomerBatch<U>& B, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
@@ -216,7 +216,7 @@ cudaError_t dualise(IsomerBatch<U>& B, const LaunchCtx& ctx, const LaunchPolicy 
     return error;
 }
 
-template <BufferType U>
+template <Device U>
 cudaError_t dualise_2(IsomerBatch<U>& B, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
@@ -233,12 +233,12 @@ cudaError_t dualise_2(IsomerBatch<U>& B, const LaunchCtx& ctx, const LaunchPolic
 
     size_t smem = sizeof(device_node_t)*B.n_faces*9;
     int threads_rounded_to_next_multiple_of_32 = (B.n_faces + 31) & ~31;
-    static LaunchDims dims((void*)dualise_2_<DEVICE_BUFFER>, threads_rounded_to_next_multiple_of_32, smem, B.isomer_capacity);
-    dims.update_dims((void*)dualise_2_<DEVICE_BUFFER>, threads_rounded_to_next_multiple_of_32, smem, B.isomer_capacity);
+    static LaunchDims dims((void*)dualise_2_<GPU>, threads_rounded_to_next_multiple_of_32, smem, B.isomer_capacity);
+    dims.update_dims((void*)dualise_2_<GPU>, threads_rounded_to_next_multiple_of_32, smem, B.isomer_capacity);
     cudaError_t error;
     void* kargs[]{(void*)&B};
     cudaEventRecord(start[dev], ctx.stream);
-    error = safeCudaKernelCall((void*)dualise_2_<DEVICE_BUFFER>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);  
+    error = safeCudaKernelCall((void*)dualise_2_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);  
     cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {

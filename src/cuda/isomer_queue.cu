@@ -26,17 +26,17 @@ namespace cuda_io{
 namespace cuda_io{
 #include "print_functions.cu"
 
-template cudaError_t IsomerQueue::insert<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& input_batch, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d);
-template cudaError_t IsomerQueue::push_all<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
-template cudaError_t IsomerQueue::push_done<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
-template cudaError_t IsomerQueue::refill_batch<DEVICE_BUFFER>(IsomerBatch<DEVICE_BUFFER>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t IsomerQueue::insert<GPU>(IsomerBatch<GPU>& input_batch, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d);
+template cudaError_t IsomerQueue::push_all<GPU>(IsomerBatch<GPU>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t IsomerQueue::push_done<GPU>(IsomerBatch<GPU>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t IsomerQueue::refill_batch<GPU>(IsomerBatch<GPU>& batch, const LaunchCtx& ctx, const LaunchPolicy policy);
 
 //Casting functions to convert Graph objects and its' derivatives to IsomerBatch storage i.e flat memory representation.
 static auto casting_coord3d = [](coord3d in){return device_coord3d{static_cast<float>(in[0]), static_cast<float>(in[1]), static_cast<float>(in[2])};};
 static auto casting_node3   = [](std::vector<node_t> in){return device_node3{static_cast<device_node_t>(in[0]), static_cast<device_node_t>(in[1]), static_cast<device_node_t>(in[2])};};
 static auto casting_coord2d = [](coord2d in){return device_coord2d{static_cast<float>(in.first), static_cast<float>(in.second)};};
 
-template <BufferType T>
+template <Device T>
 __global__ void refill_batch_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){
     auto num_inside_circular_range = [](const int begin, const int end, const int test_val){
         if(begin < 0 || end < 0) {return false;}
@@ -107,7 +107,7 @@ __global__ void refill_batch_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue:
     }
 }
 
-template <BufferType T>
+template <Device T>
 __global__ void push_all_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::QueueProperties queue, int* scan_array){
     auto num_inside_capacity = [](const int size, const int capacity, const int test_val){
         if(size < 0 || capacity < 0 || test_val < 0) {return false;}
@@ -172,7 +172,7 @@ __global__ void push_all_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::Que
     }
 }
 
-template <BufferType T>
+template <Device T>
 __global__ void push_done_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::QueueProperties queue,  int* scan_array){
     auto num_inside_capacity = [](const int size, const int capacity, const int test_val){
         if(size < 0 || capacity < 0 || test_val < 0) {return false;}
@@ -241,7 +241,7 @@ __global__ void push_done_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::Qu
 
 //This function simply copys data to the end of the batch, could be achieved with the cuda_io::copy() function using ranges.
 //TODO: delete this function and replace with a copy call.
-template <BufferType T>
+template <Device T>
 __global__ void insert_batch_(IsomerBatch<T> B, IsomerBatch<T> Q_B, IsomerQueue::QueueProperties queue){
     __threadfence_system();
     //Grid stride for loop, allows for handling of any batch size.
@@ -296,7 +296,7 @@ IsomerQueue::IsomerQueue(const size_t N, int device): N(N), m_device(device){
     *props.front = -1;
     *props.back = -1;
     *props.size = 0;
-    device_batch = IsomerBatch<DEVICE_BUFFER>(N,1,m_device);
+    device_batch = IsomerBatch<GPU>(N,1,m_device);
     cudaMalloc(&g_scan_array, sizeof(int)*d_props.maxBlocksPerMultiProcessor*d_props.multiProcessorCount * 2);
 }
 
@@ -314,7 +314,7 @@ IsomerQueue::IsomerQueue(): N(20), m_device(0){
     *props.front = -1;
     *props.back = -1;
     *props.size = 0;
-    device_batch = IsomerBatch<DEVICE_BUFFER>(N,1,m_device);
+    device_batch = IsomerBatch<GPU>(N,1,m_device);
     cudaMalloc(&g_scan_array, sizeof(int)*d_props.maxBlocksPerMultiProcessor*d_props.multiProcessorCount * 2);
 }
 
@@ -358,17 +358,17 @@ cudaError_t IsomerQueue::to_device(const LaunchCtx& ctx){
 }
 
 //Kernel wrapper for refill_batch_ function
-template <BufferType T>
+template <Device T>
 cudaError_t IsomerQueue::refill_batch(IsomerBatch<T>& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
     int smem_bytes = sizeof(int)*N*2;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
-    static LaunchDims dims((void*)refill_batch_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
-    dims.update_dims((void*)refill_batch_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
+    static LaunchDims dims((void*)refill_batch_<GPU>, N, smem_bytes, batch.isomer_capacity);
+    dims.update_dims((void*)refill_batch_<GPU>, N, smem_bytes, batch.isomer_capacity);
     to_device(ctx);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props, (void*)&g_scan_array};
     is_host_updated = false;
-    cudaError_t error = safeCudaKernelCall((void*)refill_batch_<DEVICE_BUFFER>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
+    cudaError_t error = safeCudaKernelCall((void*)refill_batch_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
     printLastCudaError("Refill failed");
@@ -376,17 +376,17 @@ cudaError_t IsomerQueue::refill_batch(IsomerBatch<T>& batch, const LaunchCtx& ct
 }
 
 //Kernel wrapper for push_done_ function
-template <BufferType T>
+template <Device T>
 cudaError_t IsomerQueue::push_done(IsomerBatch<T>& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
     int smem_bytes = sizeof(int)*N*2;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
-    static LaunchDims dims((void*)push_done_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
-    dims.update_dims((void*)push_done_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
+    static LaunchDims dims((void*)push_done_<GPU>, N, smem_bytes, batch.isomer_capacity);
+    dims.update_dims((void*)push_done_<GPU>, N, smem_bytes, batch.isomer_capacity);
     to_device(ctx);
     if(*props.capacity < *props.size + batch.isomer_capacity)  resize(*props.size+batch.isomer_capacity, ctx, policy);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props, (void*)&g_scan_array};
-    cudaError_t error = safeCudaKernelCall((void*)push_done_<DEVICE_BUFFER>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
+    cudaError_t error = safeCudaKernelCall((void*)push_done_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     is_host_updated = false;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
@@ -397,17 +397,17 @@ cudaError_t IsomerQueue::push_done(IsomerBatch<T>& batch, const LaunchCtx& ctx, 
 }
 
 //Kernel wrapper for push_all_ function
-template <BufferType T>
+template <Device T>
 cudaError_t IsomerQueue::push_all(IsomerBatch<T>& batch, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(m_device);
     int smem_bytes = sizeof(int)*N*2;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
-    static LaunchDims dims((void*)push_all_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
-    dims.update_dims((void*)push_all_<DEVICE_BUFFER>, N, smem_bytes, batch.isomer_capacity);
+    static LaunchDims dims((void*)push_all_<GPU>, N, smem_bytes, batch.isomer_capacity);
+    dims.update_dims((void*)push_all_<GPU>, N, smem_bytes, batch.isomer_capacity);
     to_device(ctx);
     if(*props.capacity < *props.size + batch.isomer_capacity)  resize(*props.size+batch.isomer_capacity, ctx, policy);
     void* kargs[] = {(void*)&batch, (void*)&device_batch, (void*)&props, (void*)&g_scan_array};
-    cudaError_t error = safeCudaKernelCall((void*)push_all_<DEVICE_BUFFER>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
+    cudaError_t error = safeCudaKernelCall((void*)push_all_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem_bytes, ctx.stream);
     is_host_updated = false;
     if (policy == LaunchPolicy::SYNC) ctx.wait();
     //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
@@ -438,7 +438,7 @@ Polyhedron IsomerQueue::pop(const LaunchCtx& ctx, const LaunchPolicy policy){
     return Polyhedron(Graph(out_neighbours,true),out_coords);
 }
 
-template <BufferType T>
+template <Device T>
 void IsomerQueue::resize_queue_batch(IsomerBatch<T>& batch, const size_t new_capacity, const LaunchCtx& ctx, const LaunchPolicy policy){
     //Construct a tempory batch: allocates the needed amount of memory.
     IsomerBatch<T> temp_batch = IsomerBatch<T>(batch.n_atoms, new_capacity, batch.get_device_id());
@@ -478,7 +478,7 @@ cudaError_t IsomerQueue::resize(const size_t new_capacity,const LaunchCtx& ctx, 
 }
 
 //Inserts entire IsomerBatch in the queue.
-template <BufferType T>
+template <Device T>
 cudaError_t IsomerQueue::insert(IsomerBatch<T>& input_batch, const LaunchCtx& ctx, const LaunchPolicy policy, const bool insert_2d){
     cudaSetDevice(m_device);
     //Wait for all processes on the stream to finish if policy is synchronous otherwise just proceed.
@@ -486,10 +486,10 @@ cudaError_t IsomerQueue::insert(IsomerBatch<T>& input_batch, const LaunchCtx& ct
 
     //Static storage specifier of LaunchDims object allows us to perform the calculations on first function call,
     // and store the result for future calls. Thus avoiding having to perform this calculation outside and pass the state to the function.
-    static LaunchDims dims((void*)insert_batch_<DEVICE_BUFFER>, N, 0, input_batch.isomer_capacity);
-    dims.update_dims((void*)insert_batch_<DEVICE_BUFFER>, N, 0, input_batch.isomer_capacity);
+    static LaunchDims dims((void*)insert_batch_<GPU>, N, 0, input_batch.isomer_capacity);
+    dims.update_dims((void*)insert_batch_<GPU>, N, 0, input_batch.isomer_capacity);
 
-    T == DEVICE_BUFFER ? to_device(ctx) : to_host(ctx); 
+    T == GPU ? to_device(ctx) : to_host(ctx); 
     if (*props.capacity < (*props.size + input_batch.isomer_capacity))
     {
         auto new_capacity = *props.size + input_batch.isomer_capacity;
@@ -497,9 +497,9 @@ cudaError_t IsomerQueue::insert(IsomerBatch<T>& input_batch, const LaunchCtx& ct
     }
 
     //TODO: Maybe we want to implement some inefficient way of copying a host batch to the device.
-    if (T == DEVICE_BUFFER){
+    if (T == GPU){
         void* kargs[]{(void*)&input_batch, (void*)&device_batch, (void*)&props};
-        safeCudaKernelCall((void*)insert_batch_<DEVICE_BUFFER>,dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
+        safeCudaKernelCall((void*)insert_batch_<GPU>,dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
         //cudaMemPrefetchAsync(props.size, sizeof(size_t), cudaCpuDeviceId, ctx.stream);
     } else{
         std::cout << "Failed to insert: Batch insertion is intended for device batches only" << std::endl;

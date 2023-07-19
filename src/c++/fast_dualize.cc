@@ -39,10 +39,10 @@ struct GraphWrapper{
 
 };
 
-template void dualise_3<HOST_BUFFER>(IsomerBatch<HOST_BUFFER>& B);
-template void dualise_4<HOST_BUFFER>(IsomerBatch<HOST_BUFFER>& B);
+template void dualise_3<CPU>(IsomerBatch<CPU>& B);
+template void dualise_4<CPU>(IsomerBatch<CPU>& B);
 
-template <BufferType T>
+template <Device T>
 void dualise_3(IsomerBatch<T>& B){
     std::vector<uint16_t> triangle_numbers(6*B.n_faces, UINT16_MAX);
     std::vector<uint16_t> canon_arcs(6*B.n_faces, UINT16_MAX);
@@ -105,7 +105,7 @@ void dualise_3(IsomerBatch<T>& B){
     }
 }
 
-template <BufferType T>
+template <Device T>
 void dualise_4(IsomerBatch<T>& B){ //CPU Parallelised version of the CUDA kernel.
     #pragma omp parallel 
     {
