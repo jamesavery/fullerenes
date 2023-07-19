@@ -3,28 +3,26 @@
 #include <array>
 #include <inttypes.h>
 #include "host-cubic-graph.cc"
-typedef float real_t;
-typedef std::array<real_t, 3> coord3d;
-typedef std::array<real_t, 2> coord2d;
-typedef std::array<unsigned char, 4> uchar4;
 
 
-constexpr real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
-constexpr real_t optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
-constexpr real_t optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
+
+constexpr double optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 
+constexpr double optimal_bond_lengths[3] = {1.479, 1.458, 1.401}; 
+constexpr double optimal_dih_cos_angles[8] = {0.7946545571495363, 0.872903607049519, 0.872903607049519, 0.9410338472965512, 0.8162879359966257, 0.9139497166300941, 0.9139497166300941, 1.}; 
 
 #if SEMINARIO_FORCE_CONSTANTS==1
-constexpr real_t angle_forces[2] = {207.924,216.787}; 
-constexpr real_t bond_forces[3] = {260.0, 353.377, 518.992}; 
-constexpr real_t dih_forces[4] = {35.0,65.0,3.772,270.0}; 
-constexpr real_t flat_forces[3] = {0., 0., 0.};
+constexpr double angle_forces[2] = {207.924,216.787}; 
+constexpr double bond_forces[3] = {260.0, 353.377, 518.992}; 
+constexpr double dih_forces[4] = {35.0,65.0,3.772,270.0}; 
+constexpr double flat_forces[3] = {0., 0., 0.};
 #else
-constexpr real_t angle_forces[2] = {100.0,100.0}; 
-constexpr real_t bond_forces[3] = {260.0,390.0,450.0}; 
-constexpr real_t dih_forces[4] = {35.0,65.0,85.0,270.0}; 
-constexpr real_t flat_forces[3] = {0., 0., 0.};
+constexpr double angle_forces[2] = {100.0,100.0}; 
+constexpr double bond_forces[3] = {260.0,390.0,450.0}; 
+constexpr double dih_forces[4] = {35.0,65.0,85.0,270.0}; 
+constexpr double flat_forces[3] = {0., 0., 0.};
 #endif
 
+template <typename T>
 struct Constants{
     #if USE_CONSTANT_INDICES
     uchar4 i_f_bond;
