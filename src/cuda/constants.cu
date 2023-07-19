@@ -79,7 +79,7 @@ struct Constants{
      * @param isomer_idx The index of the isomer that the current thread is a part of
      * @return Forcefield constants for the current node in the isomer_idx^th isomer in G
      */
-    template <BufferType U>
+    template <Device U>
     INLINE Constants(const IsomerBatch<U>& G, const uint32_t isomer_idx){
         //Set pointers to start of fullerene.
         const DeviceCubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);

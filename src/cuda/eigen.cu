@@ -6,7 +6,7 @@
 #include <cuda_runtime_api.h>
 #include "fullerenes/gpu/cuda_definitions.h"
 #include "fullerenes/gpu/cu_array.hh"
-#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/isomer_batch.hh"
 #include "fullerenes/gpu/kernels.hh"
 
 #if(CUSOLVER)
@@ -226,9 +226,9 @@ std::pair<device_real_t,size_t> eigensystem_hermitian(const int n, const
 
 namespace gpu_kernels{
     namespace isomerspace_eigen{
-        template void spectrum_ends<DEVICE_BUFFER>(const IsomerBatch<DEVICE_BUFFER>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
-        template void spectrum_ends<DEVICE_BUFFER>(const IsomerBatch<DEVICE_BUFFER>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, CuArray<device_real_t>& eigvect_mins, CuArray<device_real_t>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
-        template void eigensolve<DEVICE_BUFFER>(const IsomerBatch<DEVICE_BUFFER>& B, CuArray<device_real_t>& Q, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template void spectrum_ends<GPU>(const IsomerBatch<GPU>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template void spectrum_ends<GPU>(const IsomerBatch<GPU>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, CuArray<device_real_t>& eigvect_mins, CuArray<device_real_t>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template void eigensolve<GPU>(const IsomerBatch<GPU>& B, CuArray<device_real_t>& Q, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
 
         #include "device_includes.cu"
         enum class EigensolveMode {NO_VECTORS, VECTORS, ENDS, FULL_SPECTRUM};
@@ -482,7 +482,7 @@ namespace gpu_kernels{
 
         //Takes a set of tridiagonal matrices and solves them
 
-        template<EigensolveMode mode, BufferType T>
+        template<EigensolveMode mode, Device T>
         void __global__ eigensolve_(const IsomerBatch<T> B, CuArray<device_real_t> D_, CuArray<device_real_t> L_, CuArray<device_real_t> U_, CuArray<device_real_t> Q_, int n){
             DEVICE_TYPEDEFS;
             extern __shared__ device_real_t smem[];
@@ -554,7 +554,7 @@ namespace gpu_kernels{
         }
         }
         
-        template<EigensolveMode mode, BufferType T>
+        template<EigensolveMode mode, Device T>
         void __global__ eigensolve_min_max_(const IsomerBatch<T> B, CuArray<device_real_t> D_, CuArray<device_real_t> L_, CuArray<device_real_t> U_, CuArray<device_real_t> Q_, CuArray<device_real_t> EigMin_, CuArray<device_real_t> EigMax_, CuArray<int> MinIdx_, CuArray<int> MaxIdx_, int n){
             DEVICE_TYPEDEFS;
             extern __shared__ device_real_t smem[];
@@ -653,7 +653,7 @@ namespace gpu_kernels{
         }
         }
 
-        template <EigensolveMode mode, BufferType T>
+        template <EigensolveMode mode, Device T>
         void __global__ lanczos_(const IsomerBatch<T> B, CuArray<device_real_t> V_, CuArray<device_real_t> U, CuArray<device_real_t> D, const CuArray<device_real_t> H, const CuArray<device_node_t> cols, int m){
             DEVICE_TYPEDEFS;
             extern __shared__ real_t smem[];
@@ -795,7 +795,7 @@ namespace gpu_kernels{
             }   
         }
         //Assumes that N = B.n_atoms * 3
-        template <BufferType T>
+        template <Device T>
         void __global__ compute_eigenvectors_(const IsomerBatch<T> B, CuArray<device_real_t> Q, CuArray<device_real_t> V, CuArray<device_real_t> E, int m){
             DEVICE_TYPEDEFS;
             int n = B.n_atoms * 3;
@@ -817,7 +817,7 @@ namespace gpu_kernels{
             }
         }
         
-        template <BufferType T>
+        template <Device T>
         void __global__ compute_eigenvectors_ends_(const IsomerBatch<T> B, CuArray<device_real_t> Q, CuArray<device_real_t> V, CuArray<device_real_t> Emin, CuArray<device_real_t> Emax, CuArray<int> MinIdx, CuArray<int> MaxIdx, int m){
             DEVICE_TYPEDEFS;
             int n = B.n_atoms * 3;
@@ -838,7 +838,7 @@ namespace gpu_kernels{
             }
         }
 
-        template <BufferType T>
+        template <Device T>
         void eigensolve(const IsomerBatch<T>& B, CuArray<device_real_t>& Q, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             cudaSetDevice(B.get_device_id());
@@ -898,7 +898,7 @@ namespace gpu_kernels{
             printLastCudaError("Full Spectrum Eigensolver Failed : ");
         }
 
-        template <BufferType T>
+        template <Device T>
         void eigensolve(const IsomerBatch<T>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             cudaSetDevice(B.get_device_id());
@@ -953,7 +953,7 @@ namespace gpu_kernels{
             printLastCudaError("Full Spectrum Eigensolver Failed : ");
         }
 
-        template <BufferType T>
+        template <Device T>
         void spectrum_ends(const IsomerBatch<T>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             cudaSetDevice(B.get_device_id());
@@ -1011,7 +1011,7 @@ namespace gpu_kernels{
             printLastCudaError("Spectrum Ends Failed: ");
         }
 
-        template <BufferType T>
+        template <Device T>
         void spectrum_ends(const IsomerBatch<T>& B, const CuArray<device_real_t>& hessians, const CuArray<device_node_t>& cols, CuArray<device_real_t>& lambda_mins, CuArray<device_real_t>& lambda_maxs, CuArray<device_real_t>& eigvect_mins, CuArray<device_real_t>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             cudaSetDevice(B.get_device_id());

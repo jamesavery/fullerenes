@@ -29,8 +29,8 @@ int main(int ac, char **argv){
         auto n_isomers = IPR ? num_IPR_fullerenes.find(N)->second : num_fullerenes.find(N)->second;
         auto batch_size = min(sample_size, (int)n_isomers);
         using namespace gpu_kernels;
-        IsomerBatch<DEVICE_BUFFER> d_validation(N, batch_size);
-        IsomerBatch<HOST_BUFFER> h_validation(N, batch_size);
+        IsomerBatch<GPU> d_validation(N, batch_size);
+        IsomerBatch<CPU> h_validation(N, batch_size);
         
         std::vector<int> random_IDs(n_isomers);
         std::iota(random_IDs.begin(), random_IDs.end(), 0);

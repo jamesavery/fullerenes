@@ -66,9 +66,9 @@ int main(int argc, char** argv){
         cuda_io::IsomerQueue Q0(N);
         cuda_io::IsomerQueue Q1(N);
         cuda_io::IsomerQueue Q2(N);
-        IsomerBatch<DEVICE_BUFFER> batch0(N,sample_size);
-        IsomerBatch<DEVICE_BUFFER> batch1(N,sample_size);
-        IsomerBatch<HOST_BUFFER> h_batch(N,sample_size);
+        IsomerBatch<GPU> batch0(N,sample_size);
+        IsomerBatch<GPU> batch1(N,sample_size);
+        IsomerBatch<CPU> h_batch(N,sample_size);
         //Pre allocate the device queue such that it doesn't happen during benchmarking
         Q0.resize(2*sample_size);
         Q1.resize(2*sample_size);

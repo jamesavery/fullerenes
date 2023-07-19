@@ -48,8 +48,8 @@ int main(int ac, char **argv)
   int Nd = LaunchCtx::get_device_count();
   auto batch_size = isomerspace_forcefield::optimal_batch_size(N,0)*16;
 
-  IsomerBatch<DEVICE_BUFFER> B0s[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0), IsomerBatch<DEVICE_BUFFER>(N, batch_size,1)};
-  IsomerBatch<DEVICE_BUFFER> B1s[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0), IsomerBatch<DEVICE_BUFFER>(N, batch_size,1)};
+  IsomerBatch<GPU> B0s[Nd] = {IsomerBatch<GPU>(N,batch_size,0), IsomerBatch<GPU>(N, batch_size,1)};
+  IsomerBatch<GPU> B1s[Nd] = {IsomerBatch<GPU>(N,batch_size,0), IsomerBatch<GPU>(N, batch_size,1)};
   CuArray<device_real_t> Qs[Nd] = {CuArray<device_real_t>(N*3*N*3*batch_size,0), CuArray<device_real_t>(N*3*N*3*batch_size,0)};
   CuArray<device_real_t> Hs[Nd] = {CuArray<device_real_t>(N*3* 10*3*batch_size,0), CuArray<device_real_t>(N*3* 10*3*batch_size,0)};
   CuArray<device_node_t> Cols[Nd] = {CuArray<device_node_t>(N*3*3*10 * batch_size,0), CuArray<device_node_t>(N*3*3*10 * batch_size,0)};

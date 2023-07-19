@@ -28,8 +28,8 @@ int main(int argc, char** argv){
         BuckyGen::next_fullerene(queue,G);
     }
 
-    IsomerBatch<DEVICE_BUFFER> batch(N,1);
-    IsomerBatch<HOST_BUFFER> h_batch(N,1);
+    IsomerBatch<GPU> batch(N,1);
+    IsomerBatch<CPU> h_batch(N,1);
     cuda_io::IsomerQueue Q(N);
     Q.insert(G,ID);
     Q.refill_batch(batch);

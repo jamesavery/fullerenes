@@ -36,7 +36,7 @@ int main(int ac, char **argv)
     int Nd = 1;
     auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
 
-    IsomerBatch<DEVICE_BUFFER> B0s[Nd] = {IsomerBatch<DEVICE_BUFFER>(N,batch_size,0)};
+    IsomerBatch<GPU> B0s[Nd] = {IsomerBatch<GPU>(N,batch_size,0)};
     std::vector<CuArray<device_real_t>> eccentricity(Nd); for (int i = 0; i < Nd; i++) eccentricity[i] = CuArray<device_real_t>(batch_size);
     std::vector<CuArray<device_real_t>> volumes(Nd); for (int i = 0; i < Nd; i++) volumes[i] = CuArray<device_real_t>(batch_size);
     cuda_io::IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0)}; for (int i = 0; i < Nd; i++) Q0s[i].resize(batch_size*4);
@@ -63,7 +63,7 @@ int main(int ac, char **argv)
     gen_ctxs[0].wait();
     return true;
     };
-    IsomerBatch<HOST_BUFFER> start_batch(N,batch_size,0);
+    IsomerBatch<CPU> start_batch(N,batch_size,0);
 
     //Start of program
     generate_isomers(batch_size*4);
@@ -85,7 +85,7 @@ int main(int ac, char **argv)
         //isomerspace_properties::volume_divergences(B0s[i], volumes[i], gen_ctxs[i], policy);
     }
     for (int i = 0; i < Nd; i++) gen_ctxs[i].wait();
-    IsomerBatch<HOST_BUFFER> host_batch(N,batch_size);
+    IsomerBatch<CPU> host_batch(N,batch_size);
     cuda_io::copy(host_batch, B0s[0]);
 
     //std::vector<int> nan_positions_0;

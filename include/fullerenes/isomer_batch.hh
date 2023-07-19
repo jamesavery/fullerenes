@@ -2,7 +2,6 @@
 #define ISOMERBATCH_STRUCT
 #include "fullerenes/gpu/cuda_definitions.h"
 #include "fullerenes/gpu/launch_ctx.hh"
-#include "gpudatastruct.hh"
 #include <stdint.h>
 #include <optional>
 #include <vector>
@@ -13,10 +12,12 @@ enum class IsomerStatus {EMPTY, CONVERGED, PLZ_CHECK, FAILED, NOT_CONVERGED};
 enum BatchMember {COORDS3D, COORDS2D, CUBIC_NEIGHBOURS, DUAL_NEIGHBOURS, FACE_DEGREES, IDS, ITERATIONS, STATUSES};
 enum SortOrder {ASCENDING, DESCENDING};
 enum class LaunchPolicy {SYNC, ASYNC};
-enum BufferType   {HOST_BUFFER, DEVICE_BUFFER};
-template <BufferType T>
+enum Device   {CPU, GPU};
+
+template <Device T>
 struct IsomerBatch
 { 
+    //template typename T::LaunchCtx LaunchCtx;
     int isomer_capacity = 0;
     bool allocated = false;
     size_t n_atoms = 0;

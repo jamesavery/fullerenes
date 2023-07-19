@@ -41,11 +41,11 @@ int main(int ac, char **argv){
     auto SEQUENTIAL_INSERT_AND_FILL_TEST = [&](){
         IsomerQueue TestQ(N,0);
         IsomerQueue ControlQ(N,0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size, 0);
-        IsomerBatch<DEVICE_BUFFER> d_ControlB(N,sample_size, 0);
+        IsomerBatch<GPU> d_TestB(N,sample_size, 0);
+        IsomerBatch<GPU> d_ControlB(N,sample_size, 0);
 
-        IsomerBatch<HOST_BUFFER> h_TestB(N,sample_size);
-        IsomerBatch<HOST_BUFFER> h_ControlB(N,sample_size);
+        IsomerBatch<CPU> h_TestB(N,sample_size);
+        IsomerBatch<CPU> h_ControlB(N,sample_size);
 
         LaunchCtx test_ctx(0);
         LaunchCtx control_ctx(0);
@@ -91,13 +91,13 @@ int main(int ac, char **argv){
         IsomerQueue TestQ2(N,0);
         IsomerQueue ControlQ(N,0);
         IsomerQueue ControlQ2(N,0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size, 0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB2(N,sample_size, 0);
-        IsomerBatch<DEVICE_BUFFER> d_ControlB(N,sample_size, 0);
-        IsomerBatch<DEVICE_BUFFER> d_ControlB2(N,sample_size, 0);
+        IsomerBatch<GPU> d_TestB(N,sample_size, 0);
+        IsomerBatch<GPU> d_TestB2(N,sample_size, 0);
+        IsomerBatch<GPU> d_ControlB(N,sample_size, 0);
+        IsomerBatch<GPU> d_ControlB2(N,sample_size, 0);
 
-        IsomerBatch<HOST_BUFFER> h_TestB(N,sample_size, 0);
-        IsomerBatch<HOST_BUFFER> h_ControlB(N,sample_size, 0);
+        IsomerBatch<CPU> h_TestB(N,sample_size, 0);
+        IsomerBatch<CPU> h_ControlB(N,sample_size, 0);
 
         LaunchCtx test_ctx(0);
         LaunchCtx control_ctx(0);
@@ -147,13 +147,13 @@ int main(int ac, char **argv){
         IsomerQueue TestQ2(N,0);
         IsomerQueue ControlQ(N,0);
         IsomerQueue ControlQ2(N,0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size, 0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB2(N,sample_size, 0);
-        IsomerBatch<DEVICE_BUFFER> d_ControlB(N,sample_size, 0);
-        IsomerBatch<DEVICE_BUFFER> d_ControlB2(N,sample_size, 0);
+        IsomerBatch<GPU> d_TestB(N,sample_size, 0);
+        IsomerBatch<GPU> d_TestB2(N,sample_size, 0);
+        IsomerBatch<GPU> d_ControlB(N,sample_size, 0);
+        IsomerBatch<GPU> d_ControlB2(N,sample_size, 0);
 
-        IsomerBatch<HOST_BUFFER> h_TestB(N,sample_size, 0);
-        IsomerBatch<HOST_BUFFER> h_ControlB(N,sample_size, 0);
+        IsomerBatch<CPU> h_TestB(N,sample_size, 0);
+        IsomerBatch<CPU> h_ControlB(N,sample_size, 0);
 
         LaunchCtx test_ctx(0);
         LaunchCtx control_ctx(0);
@@ -210,13 +210,13 @@ int main(int ac, char **argv){
         IsomerQueue TestQ2(N,0);
         IsomerQueue ControlQ(N,0);
         IsomerQueue ControlQ2(N,0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size*2, 0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB2(N,sample_size, 0);
-        IsomerBatch<DEVICE_BUFFER> d_ControlB(N,sample_size*2, 0);
-        IsomerBatch<DEVICE_BUFFER> d_ControlB2(N,sample_size, 0);
+        IsomerBatch<GPU> d_TestB(N,sample_size*2, 0);
+        IsomerBatch<GPU> d_TestB2(N,sample_size, 0);
+        IsomerBatch<GPU> d_ControlB(N,sample_size*2, 0);
+        IsomerBatch<GPU> d_ControlB2(N,sample_size, 0);
 
-        IsomerBatch<HOST_BUFFER> h_TestB(N,sample_size, 0);
-        IsomerBatch<HOST_BUFFER> h_ControlB(N,sample_size, 0);
+        IsomerBatch<CPU> h_TestB(N,sample_size, 0);
+        IsomerBatch<CPU> h_ControlB(N,sample_size, 0);
 
         LaunchCtx test_ctx(0);
         LaunchCtx control_ctx(0);
@@ -284,8 +284,8 @@ int main(int ac, char **argv){
     auto ORDERED_TEST = [&](){
         IsomerQueue TestQ(N,0);
         IsomerQueue TestQ2(N,0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB(N,sample_size*2, 0);
-        IsomerBatch<DEVICE_BUFFER> d_TestB2(N,sample_size, 0);
+        IsomerBatch<GPU> d_TestB(N,sample_size*2, 0);
+        IsomerBatch<GPU> d_TestB2(N,sample_size, 0);
 
         LaunchCtx test_ctx(0);
 

@@ -1538,32 +1538,6 @@ INLINE hessian_t hessian(coord3d* X) const {
     return hess;
 }
 
-//Uses finite difference to compute the hessian
-INLINE hessian_t fd_hessian(coord3d* X, const float reldelta = 1e-7) const{
-    hessian_t hess_fd(node_graph);
-    for (uint16_t i = 0; i < blockDim.x; i++){
-        for (uint8_t j = 0; j < 10; j++){
-            auto node = hess_fd.indices[j];
-            coord3d X0 = X[node];
-            for (uint8_t k = 0; k < 3; k++){
-                if (i == threadIdx.x){ X[node][k] = X0[k] + X0[k]*reldelta;}
-                coord3d grad_X0_p = gradient(X);
-                BLOCK_SYNC
-                if (i == threadIdx.x){ X[node][k] = X0[k] - X0[k]*reldelta;} 
-                coord3d grad_X0_m = gradient(X);
-                BLOCK_SYNC
-                if (i == threadIdx.x){ 
-                    hess_fd.A[j][0][k] = (grad_X0_p[0] - grad_X0_m[0])/(2*X0[k]*reldelta);
-                    hess_fd.A[j][1][k] = (grad_X0_p[1] - grad_X0_m[1])/(2*X0[k]*reldelta);
-                    hess_fd.A[j][2][k] = (grad_X0_p[2] - grad_X0_m[2])/(2*X0[k]*reldelta);
-                    X[node][k] = X0[k];
-                }
-                BLOCK_SYNC
-            }
-        }
-    }
-    return hess_fd;
-}
 
 /**
  * @brief Compute the total energy of the bond, flatness, bending and dihedral terms from all nodes in the isomer.
@@ -1572,7 +1546,7 @@ INLINE hessian_t fd_hessian(coord3d* X, const float reldelta = 1e-7) const{
 */
 INLINE real_t energy(coord3d* X) const {
     BLOCK_SYNC
-    real_t arc_energy = (real_t)0.0;
+    real_t energy = (real_t)0.0;
 
     //(71 + 124) * 3 * N  = 585*N FLOPs
     for (uint8_t j = 0; j < 3; j++ ){

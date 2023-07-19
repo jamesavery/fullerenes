@@ -59,7 +59,7 @@ int main(int argc, char** argv){
             cuda_io::IsomerQueue out_queue(N);
             out_queue.resize(2*sample_size);
             isomer_q.resize(2*sample_size);
-            IsomerBatch<DEVICE_BUFFER> batch0(N,M_b);
+            IsomerBatch<GPU> batch0(N,M_b);
             for (int i = 0; i < sample_size; ++i){
                 for (size_t j = 0; j < Nf; j++){
                     G.neighbours[j].clear();

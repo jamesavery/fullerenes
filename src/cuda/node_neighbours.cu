@@ -13,7 +13,7 @@ struct NodeNeighbours{
      * @param  sdata: Pointer to shared memory.
      * @return NodeNeighbours object.
      */
-    template <BufferType U>
+    template <Device U>
     __device__ NodeNeighbours(const IsomerBatch<U>& G, const size_t isomer_idx, device_real_t* sdata){
         clear_cache(sdata,Block_Size_Pow_2);
         device_real_t* base_ptr = sdata + Block_Size_Pow_2;
@@ -58,7 +58,7 @@ struct NodeNeighbours{
 * @param G All isomer graphs in the batch.
 * @param isomer_idx The index of the isomer to initialize based on.
 */
-template <BufferType U>
+template <Device U>
 __device__ NodeNeighbours(const IsomerBatch<U>& G, const size_t isomer_idx){
         const DeviceCubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
         this->cubic_neighbours   = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};

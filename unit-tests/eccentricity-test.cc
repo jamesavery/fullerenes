@@ -29,8 +29,8 @@ int main(int argc, char** argv){
     PlanarGraph Pg;
     auto batch_size = min(isomerspace_forcefield::optimal_batch_size(N)*8, (int)n_isomers);
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
-    IsomerBatch<HOST_BUFFER> Bhost(N,batch_size);
-    IsomerBatch<DEVICE_BUFFER> Bdev(N,batch_size);
+    IsomerBatch<CPU> Bhost(N,batch_size);
+    IsomerBatch<GPU> Bdev(N,batch_size);
     for (size_t i = 0; i < batch_size; i++)
     {
         auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);

@@ -61,13 +61,13 @@ int main(int ac, char **argv){
     
 
 
-    IsomerBatch<DEVICE_BUFFER> input_test(N, sample_size*2, 0);
-    IsomerBatch<HOST_BUFFER> h_input_test(N, sample_size*2, 0);
-    IsomerBatch<DEVICE_BUFFER> opt_test(N, sample_size, 0);
-    IsomerBatch<HOST_BUFFER> h_opt_test(N, sample_size, 0);
+    IsomerBatch<GPU> input_test(N, sample_size*2, 0);
+    IsomerBatch<CPU> h_input_test(N, sample_size*2, 0);
+    IsomerBatch<GPU> opt_test(N, sample_size, 0);
+    IsomerBatch<CPU> h_opt_test(N, sample_size, 0);
 
-    IsomerBatch<DEVICE_BUFFER> d_control(N,n_samples, 0);
-    IsomerBatch<HOST_BUFFER> h_control(N,n_samples, 0);
+    IsomerBatch<GPU> d_control(N,n_samples, 0);
+    IsomerBatch<CPU> h_control(N,n_samples, 0);
     
     LaunchCtx insert_ctx(0);
 
@@ -166,7 +166,7 @@ int main(int ac, char **argv){
     }
 
     copy(output_queue.host_batch , output_queue.device_batch);
-    IsomerBatch<HOST_BUFFER>& output = output_queue.host_batch;
+    IsomerBatch<CPU>& output = output_queue.host_batch;
 
 
 

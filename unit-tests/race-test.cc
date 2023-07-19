@@ -16,10 +16,10 @@ int main(int ac, char **argv){
     using namespace gpu_kernels;
     auto batch_size = min(50000, (int)n_isomers);
     BuckyGen::buckygen_queue Q = BuckyGen::start(N,false, false);
-    IsomerBatch<DEVICE_BUFFER>   d_validation(N, batch_size);
-    IsomerBatch<DEVICE_BUFFER>   d_test(N, batch_size);
-    IsomerBatch<HOST_BUFFER>     h_validation(N, batch_size);
-    IsomerBatch<HOST_BUFFER>     h_test(N, batch_size);
+    IsomerBatch<GPU>   d_validation(N, batch_size);
+    IsomerBatch<GPU>   d_test(N, batch_size);
+    IsomerBatch<CPU>     h_validation(N, batch_size);
+    IsomerBatch<CPU>     h_test(N, batch_size);
 
     Graph G;
     bool more_to_generate = true;

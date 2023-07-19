@@ -31,8 +31,8 @@ int main(int argc, char** argv){
     size_t I = 0;
 
     FullereneDual G(Nf);                                          //Graph for BuckyGen to fill
-    IsomerBatch<HOST_BUFFER> B0(N,M_b);                //Host batch     
-    IsomerBatch<DEVICE_BUFFER> B1(N,M_b);              //Device batch
+    IsomerBatch<CPU> B0(N,M_b);                //Host batch     
+    IsomerBatch<GPU> B1(N,M_b);              //Device batch
     while (more_to_do)
     {
         while (B0.size() < B0.capacity())
