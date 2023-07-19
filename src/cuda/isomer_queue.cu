@@ -9,7 +9,7 @@
 #include "fullerenes/gpu/misc_cuda.cuh"
 #include "fullerenes/gpu/launch_ctx.hh"
 #include "launch_dims.cu"
-#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/isomer_batch.hh"
 #include "fullerenes/gpu/cuda_io.hh"
 #include "isomer_batch.cu"
 #include "cub/device/device_scan.cuh"

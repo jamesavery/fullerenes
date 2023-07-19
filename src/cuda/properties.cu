@@ -7,7 +7,7 @@
 //#define FLOAT_TYPE 2
 #include "fullerenes/gpu/cuda_definitions.h"
 #include "fullerenes/gpu/cu_array.hh"
-#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/isomer_batch.hh"
 #include "fullerenes/gpu/kernels.hh"
 
 namespace gpu_kernels{

@@ -1,4 +1,4 @@
-#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/isomer_batch.hh"
 
 template<Device T>
 IsomerBatch<T>::IsomerBatch(size_t n_atoms, size_t n_isomers, int device){

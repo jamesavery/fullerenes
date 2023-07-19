@@ -1,5 +1,5 @@
 #include "hip/hip_runtime.h"
-#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/isomer_batch.hh"
 
 IsomerBatch::IsomerBatch(size_t n_atoms, size_t n_isomers, Device buffer_type, int device){
     this->buffer_type      = buffer_type;

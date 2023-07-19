@@ -4,7 +4,7 @@
 #include "launch_ctx.hh"
 #include <chrono>
 #include <queue>
-#include "fullerenes/gpu/isomer_batch.hh"
+#include "fullerenes/isomer_batch.hh"
 
 namespace cuda_io{
     template <Device T>
