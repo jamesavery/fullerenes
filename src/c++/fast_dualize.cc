@@ -1,37 +1,37 @@
 #include "vector"
 #include "fullerenes/gpu/kernels.hh"
 #include "omp.h"
-typedef std::pair<uint16_t,uint16_t> arc_t;
 namespace gpu_kernels {
     namespace isomerspace_dual{
     
-template <int MaxDegree>
+template <int MaxDegree, typename K>
 struct GraphWrapper{
-    const uint16_t* neighbours;
+    typedef std::pair<K,K> arc_t;
+    const K* neighbours;
     const uint8_t* degrees;
 
-    GraphWrapper(const uint16_t* neighbours, const uint8_t* degrees) : neighbours(neighbours), degrees(degrees) {}
+    GraphWrapper(const K* neighbours, const uint8_t* degrees) : neighbours(neighbours), degrees(degrees) {}
 
-    uint16_t dedge_ix(const uint16_t u, const uint16_t v) const{
+    K dedge_ix(const K u, const K v) const{
         for (uint8_t j = 0; j < degrees[u]; j++){
             if (neighbours[u*MaxDegree + j] == v) return j;
         }
         assert(false);
     }
 
-    uint16_t next(const uint16_t u, const uint16_t v) const{
-        uint16_t j = dedge_ix(u,v);
+    K next(const K u, const K v) const{
+        K j = dedge_ix(u,v);
         return neighbours[u*MaxDegree + ((j+1)%degrees[u])];
     }
 
-    uint16_t prev(const uint16_t u, const uint16_t v) const{
-        uint16_t j = dedge_ix(u,v);
+    K prev(const K u, const K v) const{
+        K j = dedge_ix(u,v);
         return neighbours[u*MaxDegree + ((j-1+degrees[u])%degrees[u])];
     }
 
-    arc_t canon_arc(const uint16_t u, const uint16_t v) const{
+    arc_t canon_arc(const K u, const K v) const{
         arc_t edge = {u,v};
-        uint16_t w = next(u,v);
+        K w = next(u,v);
         if (v < u && v < w) return {v,w};
         if (w < u && w < v) return {w,u};
         return edge;
@@ -39,20 +39,21 @@ struct GraphWrapper{
 
 };
 
-template void dualise_3<CPU>(IsomerBatch<CPU>& B);
-template void dualise_4<CPU>(IsomerBatch<CPU>& B);
+template void dualise_3<CPU, uint16_t>(IsomerBatch<CPU>& B);
+template void dualise_4<CPU, uint16_t>(IsomerBatch<CPU>& B);
 
-template <Device T>
+template <Device T, typename K>
 void dualise_3(IsomerBatch<T>& B){
-    std::vector<uint16_t> triangle_numbers(6*B.n_faces, UINT16_MAX);
-    std::vector<uint16_t> canon_arcs(6*B.n_faces, UINT16_MAX);
-    std::vector<uint16_t> n_triangles(B.n_faces, 0); //Number of triangles that each face owns.
-    std::vector<uint16_t> scan_array(B.n_faces, 0); //Scan array for prefix sum.
+    typedef std::pair<K,K> arc_t;
+    std::vector<K> triangle_numbers(6*B.n_faces, UINT16_MAX);
+    std::vector<K> canon_arcs(6*B.n_faces, UINT16_MAX);
+    std::vector<K> n_triangles(B.n_faces, 0); //Number of triangles that each face owns.
+    std::vector<K> scan_array(B.n_faces, 0); //Scan array for prefix sum.
     std::vector<arc_t> triangle_arcs(B.n_atoms);
     #pragma omp parallel
     {
         for (size_t i = 0; i < B.isomer_capacity; ++i){
-            GraphWrapper<6> G(B.dual_neighbours + i*B.n_faces*6, B.face_degrees + i*B.n_faces);
+            GraphWrapper<6,K> G(B.dual_neighbours + i*B.n_faces*6, B.face_degrees + i*B.n_faces);
             #pragma omp for schedule(auto)
             for (size_t j = 0; j < B.n_faces; ++j){
                 n_triangles[j] = 0;
@@ -69,7 +70,7 @@ void dualise_3(IsomerBatch<T>& B){
             }
             #pragma omp barrier
 
-            uint16_t accumulator = 0;
+            K accumulator = 0;
 
             for (size_t j = 0; j < B.n_faces; ++j){
                 scan_array[j] = accumulator;
@@ -91,9 +92,9 @@ void dualise_3(IsomerBatch<T>& B){
             #pragma omp barrier
             #pragma omp for schedule(auto)
             for (size_t j = 0; j < B.n_atoms; j++){
-                uint16_t u = triangle_arcs[j].first;
-                uint16_t v = triangle_arcs[j].second;
-                uint16_t w = G.next(u,v);
+                K u = triangle_arcs[j].first;
+                K v = triangle_arcs[j].second;
+                K w = G.next(u,v);
                 arc_t arc_a = G.canon_arc(v,u);
                 arc_t arc_b = G.canon_arc(w,v);
                 arc_t arc_c = G.canon_arc(u,w);
@@ -105,17 +106,18 @@ void dualise_3(IsomerBatch<T>& B){
     }
 }
 
-template <Device T>
+template <Device T, typename K>
 void dualise_4(IsomerBatch<T>& B){ //CPU Parallelised version of the CUDA kernel.
+    typedef std::pair<K,K> arc_t;
     #pragma omp parallel 
     {
-    std::vector<uint16_t> triangle_numbers(6*B.n_faces, UINT16_MAX);
+    std::vector<K> triangle_numbers(6*B.n_faces, UINT16_MAX);
     std::vector<arc_t> triangle_arcs(B.n_atoms);
     #pragma omp for schedule(auto)
     for (size_t i = 0; i < B.isomer_capacity; ++i){
-        GraphWrapper<6> G(B.dual_neighbours + i*B.n_faces*6, B.face_degrees + i*B.n_faces);
+        GraphWrapper<6,K> G(B.dual_neighbours + i*B.n_faces*6, B.face_degrees + i*B.n_faces);
         //#pragma omp for schedule(auto)
-        uint16_t accumulator = 0;
+        K accumulator = 0;
         for (size_t j = 0; j < B.n_faces; ++j){
             //#pragma omp simd
             for (size_t k = 0; k < G.degrees[j]; ++k){
@@ -128,9 +130,9 @@ void dualise_4(IsomerBatch<T>& B){ //CPU Parallelised version of the CUDA kernel
             }
         }
         for (int j = B.n_atoms - 1; j > -1  ; j--){
-            uint16_t u = triangle_arcs[j].first;
-            uint16_t v = triangle_arcs[j].second;
-            uint16_t w = G.next(u,v);
+            K u = triangle_arcs[j].first;
+            K v = triangle_arcs[j].second;
+            K w = G.next(u,v);
             arc_t arc_a = G.canon_arc(v,u);
             arc_t arc_b = G.canon_arc(w,v);
             arc_t arc_c = G.canon_arc(u,w);

@@ -14,9 +14,13 @@ namespace isomerspace_hessian{
 #include "device_includes.cu"
 
 // This struct was made to reduce signature cluttering of device functions, it is simply a container for default arguments which are shared between functions
-template <ForcefieldType T>
+template <ForcefieldType FFT, typename T, typename K>
 struct ForceField{
-    DEVICE_TYPEDEFS;
+    TEMPLATE_TYPEDEFS(T,K);
+    typedef Constants<T,K> Constants;
+    typedef NodeNeighbours<K> NodeNeighbours;
+    typedef symMat3<T> symMat3;
+    typedef mat3<T> mat3;
     
     const NodeNeighbours node_graph;         //Contains face-information and neighbour-information. Both of which are constant in the lifespan of this struct. 
     const Constants constants;          //Contains force-constants and equillibrium-parameters. Constant in the lifespan of this struct.
@@ -37,7 +41,7 @@ struct FaceData{
     real_t lambda_f; //Smallest eigenvalue defining the flatness of the face
     coord3d lambdas;
     coord3d centroid;
-    device_node3 face_neighbours;
+    node3 face_neighbours;
     //84 + 107 FLOPS
     INLINE FaceData(const coord3d* X, const NodeNeighbours& G){
         face_neighbours = G.face_neighbours;
@@ -47,7 +51,7 @@ struct FaceData{
             coord3d Xf[6] = {X[G.face_nodes[0]], X[G.face_nodes[1]] , X[G.face_nodes[2]] , X[G.face_nodes[3]] , X[G.face_nodes[4]] };
             //If pentagon set to 0 otherwise get the 6th node coordinates.
             if(G.face_size == 6){Xf[5] = X[G.face_nodes[5]];} else {Xf[5] = {(real_t)0., (real_t)0., (real_t)0.};}
-            centroid = (Xf[0] + Xf[1] + Xf[2] + Xf[3] + Xf[4] + Xf[5]) / (device_real_t)G.face_size;
+            centroid = (Xf[0] + Xf[1] + Xf[2] + Xf[3] + Xf[4] + Xf[5]) / (real_t)G.face_size;
             //Centralise coordinate system to centroid of the face
             Xf[0] -= centroid; Xf[1] -= centroid; Xf[2] -= centroid; Xf[3] -= centroid; Xf[4] -= centroid;  
             if(G.face_size == 6){Xf[5] -= centroid;}
@@ -57,7 +61,7 @@ struct FaceData{
                  d = Xf[0][1] * Xf[0][1] + Xf[1][1] * Xf[1][1] + Xf[2][1] * Xf[2][1] + Xf[3][1] * Xf[3][1] + Xf[4][1] * Xf[4][1] + Xf[5][1] * Xf[5][1],
                  e = Xf[0][1] * Xf[0][2] + Xf[1][1] * Xf[1][2] + Xf[2][1] * Xf[2][2] + Xf[3][1] * Xf[3][2] + Xf[4][1] * Xf[4][2] + Xf[5][1] * Xf[5][2],
                  f = Xf[0][2] * Xf[0][2] + Xf[1][2] * Xf[1][2] + Xf[2][2] * Xf[2][2] + Xf[3][2] * Xf[3][2] + Xf[4][2] * Xf[4][2] + Xf[5][2] * Xf[5][2];
-            //Xf * Xf^T In closed form.
+            //Xf * Xf^FFT In closed form.
             A = symMat3(a,b,c,d,e,f);
 
             //A is positive-semi-definite so all eigenvalues are non-negative
@@ -405,8 +409,8 @@ struct ArcData{
         real_t sint1 = SQRT(1 - cost1*cost1);
         real_t sint2 = SQRT(1 - cost2*cost2);
         real_t cot1 = cost1/sint1;
-        real_t csc1 = device_real_t(1.)/sint1;
-        real_t csc2 = device_real_t(1.)/sint2;
+        real_t csc1 = real_t(1.)/sint1;
+        real_t csc2 = real_t(1.)/sint2;
         coord3d nabc = cross(abh, cbh) * csc1;
         coord3d nbcd = cross(dbh, cbh) * csc2;
         real_t cosb = dot(nabc, nbcd);
@@ -717,14 +721,14 @@ struct ArcData{
         coord3d G = pah*cosb * rapn;
         real_t K1 = cotp*cosb;
         real_t K2 = rapn*cscp;
-        real_t K = K1 * K2;
-        coord3d H = K * (pmh - pah*cosp);
+        real_t K_ = K1 * K2;
+        coord3d H = K_ * (pmh - pah*cosp);
         coord3d GradAcosb = F - G + H;
-        return std::tuple(cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K, GradAcosb);
+        return std::tuple(cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K_, GradAcosb);
     }
 
     INLINE mat3 outer_dihedral_hessian_m_a(const Constants& c) const{
-        auto [cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K, GradAcosb] = outer_dihedral_hessian_m_terms();
+        auto [cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K_, GradAcosb] = outer_dihedral_hessian_m_terms();
         coord3d pmh = -mph;
 
         coord3d GradAcosp = (pmh - pah*cosp)*rapn;
@@ -739,14 +743,14 @@ struct ArcData{
         coord3d GradAK1 = GradAcotp * cosb + cotp * GradAcosb;
         coord3d GradAK2 = GradArpan * cscp + GradAcscp * rapn;
         coord3d GradAK = GradAK1 * K2 + K1 * GradAK2;
-        mat3 GradAH = tensor_product(pmh-pah*cosp, GradAK) + K * (- GradApah * cosp - tensor_product(pah, GradAcosp));
+        mat3 GradAH = tensor_product(pmh-pah*cosp, GradAK) + K_ * (- GradApah * cosp - tensor_product(pah, GradAcosp));
 
         mat3 GradGradAcosb = GradAF - GradAG + GradAH;
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradAcosb, GradGradAcosb); //Harmonic Energy Hessian
     }
 
     INLINE mat3 outer_dihedral_hessian_m_b(const Constants& c) const{
-        auto [cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K, GradAcosb] = outer_dihedral_hessian_m_terms();
+        auto [cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K_, GradAcosb] = outer_dihedral_hessian_m_terms();
         coord3d pmh = -mph;
 
         coord3d GradBcosm = (mph - mbh*cosm)*rbmn;
@@ -767,7 +771,7 @@ struct ArcData{
     }
 
     INLINE mat3 outer_dihedral_hessian_m_m(const Constants& c) const {
-        auto [cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K, GradAcosb] = outer_dihedral_hessian_m_terms();
+        auto [cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K_, GradAcosb] = outer_dihedral_hessian_m_terms();
         coord3d pmh = -mph;
 
         coord3d GradMcosm = (mbh*cosm - mph)*rbmn + (mph*cosm - mbh)*rmpn;
@@ -792,13 +796,13 @@ struct ArcData{
         coord3d GradMK1 = GradMcotp * cosb + cotp * GradMcosb;
         coord3d GradMK2 = GradMcscp * rapn;
         coord3d GradMK = GradMK1 * K2 + K1 * GradMK2;
-        mat3 GradMH = tensor_product((pmh - pah*cosp), GradMK) + K * (GradMpmh - tensor_product(pah,GradMcosp));
+        mat3 GradMH = tensor_product((pmh - pah*cosp), GradMK) + K_ * (GradMpmh - tensor_product(pah,GradMcosp));
         mat3 GradGradMcosb = GradMF - GradMG + GradMH;
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradMcosb, GradGradMcosb); //Harmonic Energy Hessian
     }
 
     INLINE mat3 outer_dihedral_hessian_m_p(const Constants& c) const {
-        auto [cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K, GradAcosb] = outer_dihedral_hessian_m_terms();
+        auto [cosm, cosp, sinm, sinp, cscm, cscp, cotp, cotm, nbmp, nmpa, cosb, F, G, H, K1, K2, K_, GradAcosb] = outer_dihedral_hessian_m_terms();
         coord3d pmh = -mph;
 
         coord3d GradPcosm = (mbh - mph*cosm)*rmpn;
@@ -825,7 +829,7 @@ struct ArcData{
         coord3d GradPK1 = GradPcotp * cosb + cotp * GradPcosb;
         coord3d GradPK2 = GradPrpan * cscp + GradPcscp * rapn;
         coord3d GradPK = GradPK1 * K2 + K1 * GradPK2;
-        mat3 GradPH = tensor_product((pmh - pah*cosp), GradPK) + K * (GradPpmh - tensor_product(pah,GradPcosp) - GradPpah * cosp);
+        mat3 GradPH = tensor_product((pmh - pah*cosp), GradPK) + K_ * (GradPpmh - tensor_product(pah,GradPcosp) - GradPpah * cosp);
 
         mat3 GradGradPcosb = GradPF - GradPG + GradPH;
         return d_get(c.f_outer_dihedral,j) * harmonic_energy_hessian(d_get(c.outer_dih0_m,j), cosb, GradAcosb, GradPcosb, GradGradPcosb); //Harmonic Energy Hessian
@@ -1156,7 +1160,7 @@ struct ArcData{
      * @return The sum of the gradients of the dihedral terms.
     */
     INLINE coord3d dihedral_gradient(const Constants& c) const { 
-        switch (T)
+        switch (FFT)
         {
         case PEDERSEN:
             return inner_dihedral_gradient(c) + outer_dihedral_gradient_a(c) + outer_dihedral_gradient_m(c) + outer_dihedral_gradient_p(c);
@@ -1200,7 +1204,7 @@ struct ArcData{
      * @return The energy contribution of the bond length, bending and dihedral terms.
     */
     INLINE real_t energy(const Constants& c) const {
-        switch (T)
+        switch (FFT)
         {
         case FLAT_BOND:
             return bond_energy(c);
@@ -1217,7 +1221,7 @@ struct ArcData{
      * @return The gradient of the bond length, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
     */
     INLINE coord3d gradient(const Constants& c) const{
-        switch (T)
+        switch (FFT)
         {
         case FLAT_BOND:
             return bond_length_gradient(c);
@@ -1254,7 +1258,7 @@ struct ArcData{
     }
 
     INLINE mat3 hessian_a(const Constants& c) const {
-        switch (T)
+        switch (FFT)
         {
         case BOND:
             return bond_hessian_a(c);
@@ -1287,7 +1291,7 @@ struct ArcData{
     }
 
     INLINE mat3 hessian_b(const Constants& c) const {
-        switch (T)
+        switch (FFT)
         {
         case BOND:
             return bond_hessian_b(c);
@@ -1320,7 +1324,7 @@ struct ArcData{
     }
 
     INLINE mat3 hessian_c(const Constants& c) const {
-        switch (T){
+        switch (FFT){
         case BOND:
             return mat3();
             break;
@@ -1353,7 +1357,7 @@ struct ArcData{
     }
 
     INLINE mat3 hessian_d(const Constants& c) const{
-        switch (T){
+        switch (FFT){
         case BOND:
             return mat3();
             break;
@@ -1386,7 +1390,7 @@ struct ArcData{
     }
 
     INLINE mat3 hessian_m(const Constants& c) const {
-        switch(T)
+        switch(FFT)
         {
         case BOND:
             return mat3();
@@ -1420,7 +1424,7 @@ struct ArcData{
     }
 
     INLINE mat3 hessian_p(const Constants& c) const {
-        switch (T)
+        switch (FFT)
         {
         case BOND:
             return mat3();
@@ -1517,7 +1521,7 @@ INLINE coord3d gradient(const coord3d* X) const {
         ArcData arc = ArcData(j, X, node_graph);
         grad += arc.gradient(constants);
     }
-    switch (T)
+    switch (FFT)
     {
     case FLATNESS_ENABLED: {
         FaceData face(X, node_graph);
@@ -1537,9 +1541,9 @@ INLINE coord3d gradient(const coord3d* X) const {
     }
 }
 
-INLINE hessian_t hessian(coord3d* X) const {
+INLINE hessian_t<T,K> hessian(coord3d* X) const {
     BLOCK_SYNC
-    hessian_t hess(node_graph);
+    hessian_t<T,K> hess(node_graph);
     for (uint8_t j = 0; j < 3; j++ ){
         ArcData arc = ArcData(j, X, node_graph);
         hess.A[0] += arc.hessian_a(constants);
@@ -1553,8 +1557,8 @@ INLINE hessian_t hessian(coord3d* X) const {
 }
 
 //Uses finite difference to compute the hessian
-INLINE hessian_t fd_hessian(coord3d* X, const float reldelta = 1e-7) const{
-    hessian_t hess_fd(node_graph);
+INLINE hessian_t<T,K> fd_hessian(coord3d* X, const float reldelta = 1e-7) const{
+    hessian_t<T,K> hess_fd(node_graph);
     for (uint16_t i = 0; i < blockDim.x; i++){
         for (uint8_t j = 0; j < 10; j++){
             auto node = hess_fd.indices[j];
@@ -1593,7 +1597,7 @@ INLINE real_t energy(coord3d* X) const {
         ArcData arc = ArcData(j, X, node_graph);
         arc_energy += arc.energy(constants);
     }
-    switch (T)
+    switch (FFT)
     {
     case FLATNESS_ENABLED: {
         FaceData face(X, node_graph);
@@ -1612,9 +1616,9 @@ INLINE real_t energy(coord3d* X) const {
 }
 };
 
-template <ForcefieldType T, Device U> __global__ void compute_hessians_(const IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols){
-    DEVICE_TYPEDEFS;
-    extern __shared__ real_t smem[];
+template <ForcefieldType FFT, Device U, typename T, typename K> __global__ void compute_hessians_(const IsomerBatch<U> B, CuArray<T> Hess, CuArray<K> Cols){
+    TEMPLATE_TYPEDEFS(T,K);
+    SMEM(T)
     clear_cache(smem,Block_Size_Pow_2);
     auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
     for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
@@ -1622,9 +1626,9 @@ template <ForcefieldType T, Device U> __global__ void compute_hessians_(const Is
     if (isomer_idx < B.isomer_capacity)
       if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED) { //Avoid illegal memory access
     size_t offset = isomer_idx * blockDim.x;
-    Constants constants     = Constants(B, isomer_idx);
-    NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);
-    ForceField<T> FF           = ForceField<T>(node_graph, constants, smem);
+    Constants constants     = Constants<T,K>(B, isomer_idx);
+    NodeNeighbours node_graph    = NodeNeighbours<K>(B, isomer_idx, smem);
+    ForceField<FFT,T,K> FF           = ForceField<FFT,T,K>(node_graph, constants, smem);
     coord3d* X              = reinterpret_cast<coord3d*>(smem) + B.n_atoms;
     assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
     BLOCK_SYNC
@@ -1648,9 +1652,9 @@ template <ForcefieldType T, Device U> __global__ void compute_hessians_(const Is
     }}
 }
 
-template <ForcefieldType T, Device U> __global__ void compute_hessians_fd_(const IsomerBatch<U> B, CuArray<device_real_t> Hess, CuArray<device_node_t> Cols, float reldelta){
-    DEVICE_TYPEDEFS;
-    extern __shared__ real_t smem[];
+template <ForcefieldType FFT, Device U, typename T, typename K> __global__ void compute_hessians_fd_(const IsomerBatch<U> B, CuArray<T> Hess, CuArray<K> Cols, T reldelta){
+    TEMPLATE_TYPEDEFS(T,K);
+    SMEM(T)
     clear_cache(smem,Block_Size_Pow_2);
     auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
     for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
@@ -1658,9 +1662,9 @@ template <ForcefieldType T, Device U> __global__ void compute_hessians_fd_(const
     if (isomer_idx < B.isomer_capacity) //Avoid illegal memory access
       if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED) { // Only compute Hessian for valid geometries
     size_t offset = isomer_idx * blockDim.x;
-    Constants constants     = Constants(B, isomer_idx);
-    NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smem);
-    ForceField<T> FF           = ForceField<T>(node_graph, constants, smem);
+    Constants constants     = Constants<T,K>(B, isomer_idx);
+    NodeNeighbours node_graph    = NodeNeighbours<K>(B, isomer_idx, smem);
+    ForceField<FFT,T,K> FF           = ForceField<FFT,T,K>(node_graph, constants, smem);
     coord3d* X              = reinterpret_cast<coord3d*>(smem + B.n_atoms);
     assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
     BLOCK_SYNC
@@ -1683,9 +1687,10 @@ template <ForcefieldType T, Device U> __global__ void compute_hessians_fd_(const
 
 float kernel_time = 0.0;
 
-template <ForcefieldType T, Device U>
-cudaError_t compute_hessians(const IsomerBatch<U>& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const LaunchCtx& ctx, const LaunchPolicy policy){
+template <ForcefieldType FFT, Device U, typename T, typename K>
+cudaError_t compute_hessians(const IsomerBatch<U>& B, CuArray<T>& hessians, CuArray<K>& cols, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
+    FLOAT_TYPEDEFS(T);
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
     float single_kernel_time = 0.0;
@@ -1700,13 +1705,13 @@ cudaError_t compute_hessians(const IsomerBatch<U>& B, CuArray<device_real_t>& he
         kernel_time += single_kernel_time;
     }
 
-    size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)compute_hessians_<T,U>, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)compute_hessians_<T,U>, B.n_atoms, smem, B.isomer_capacity);
+    size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(real_t)*Block_Size_Pow_2;
+    static LaunchDims dims((void*)compute_hessians_<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)compute_hessians_<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&hessians, (void*)&cols};
 
     cudaEventRecord(start[dev], ctx.stream);
-    auto error = safeCudaKernelCall((void*)compute_hessians_<T,U>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    auto error = safeCudaKernelCall((void*)compute_hessians_<FFT,U,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
@@ -1719,9 +1724,10 @@ cudaError_t compute_hessians(const IsomerBatch<U>& B, CuArray<device_real_t>& he
     return error;
 }
 
-template <ForcefieldType T, Device U>
-cudaError_t compute_hessians_fd(const IsomerBatch<U>& B, CuArray<device_real_t>& hessians, CuArray<device_node_t>& cols, const float reldelta, const LaunchCtx& ctx, const LaunchPolicy policy){
+template <ForcefieldType FFT, Device U, typename T, typename K>
+cudaError_t compute_hessians_fd(const IsomerBatch<U>& B, CuArray<T>& hessians, CuArray<K>& cols, const T reldelta, const LaunchCtx& ctx, const LaunchPolicy policy){
     cudaSetDevice(B.get_device_id());
+    FLOAT_TYPEDEFS(T);
     static std::vector<bool> first_call(16, true);
     static cudaEvent_t start[16], stop[16];
     float single_kernel_time = 0.0;
@@ -1736,13 +1742,13 @@ cudaError_t compute_hessians_fd(const IsomerBatch<U>& B, CuArray<device_real_t>&
         kernel_time += single_kernel_time;
     }
 
-    size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)compute_hessians_fd_<T,U>, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)compute_hessians_fd_<T,U>, B.n_atoms, smem, B.isomer_capacity);
+    size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(real_t)*Block_Size_Pow_2;
+    static LaunchDims dims((void*)compute_hessians_fd_<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)compute_hessians_fd_<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&hessians, (void*)&cols , (void*)&reldelta};
 
     cudaEventRecord(start[dev], ctx.stream);
-    auto error = safeCudaKernelCall((void*)compute_hessians_fd_<T,U>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    auto error = safeCudaKernelCall((void*)compute_hessians_fd_<FFT,U,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
@@ -1759,28 +1765,49 @@ cudaError_t compute_hessians_fd(const IsomerBatch<U>& B, CuArray<device_real_t>&
 void declaration(){
     IsomerBatch<GPU> B(20,1);
     CuArray<float> arr(1);
-    CuArray<device_real_t> hessians(1);
-    CuArray<device_node_t> cols(1);
+    CuArray<float> hessians(1);
+    CuArray<double> hessians_fp64(1);
+    CuArray<uint16_t> cols(1);
 
-    compute_hessians<PEDERSEN>(B, hessians, cols);
-    compute_hessians<BOND>(B, hessians, cols);
-    compute_hessians<ANGLE>(B, hessians, cols);
-    compute_hessians<ANGLE_M>(B, hessians, cols);
-    compute_hessians<ANGLE_P>(B, hessians, cols);
-    compute_hessians<DIH>(B, hessians, cols);
-    compute_hessians<DIH_A>(B, hessians, cols);
-    compute_hessians<DIH_M>(B, hessians, cols);
-    compute_hessians<DIH_P>(B, hessians, cols);
+    compute_hessians<PEDERSEN   , GPU, float, uint16_t>(B, hessians, cols);
+    compute_hessians<BOND       , GPU, float, uint16_t>(B, hessians, cols);
+    compute_hessians<ANGLE      , GPU, float, uint16_t>(B, hessians, cols);
+    compute_hessians<ANGLE_M    , GPU, float, uint16_t>(B, hessians, cols);
+    compute_hessians<ANGLE_P    , GPU, float, uint16_t>(B, hessians, cols);
+    compute_hessians<DIH        , GPU, float, uint16_t>(B, hessians, cols);
+    compute_hessians<DIH_A      , GPU, float, uint16_t>(B, hessians, cols);
+    compute_hessians<DIH_M      , GPU, float, uint16_t>(B, hessians, cols);
+    compute_hessians<DIH_P      , GPU, float, uint16_t>(B, hessians, cols);
 
-    compute_hessians_fd<PEDERSEN>(B, hessians, cols, 0.0001);
-    compute_hessians_fd<BOND>(B, hessians, cols,0.0001);
-    compute_hessians_fd<ANGLE>(B, hessians, cols,0.0001);
-    compute_hessians_fd<ANGLE_M>(B, hessians, cols,0.0001);
-    compute_hessians_fd<ANGLE_P>(B, hessians, cols,0.0001);
-    compute_hessians_fd<DIH>(B, hessians, cols,0.0001);
-    compute_hessians_fd<DIH_A>(B, hessians, cols,0.0001);
-    compute_hessians_fd<DIH_M>(B, hessians, cols,0.0001);
-    compute_hessians_fd<DIH_P>(B, hessians, cols,0.0001);
+    compute_hessians<PEDERSEN   , GPU, double, uint16_t>(B, hessians_fp64, cols);
+    compute_hessians<BOND       , GPU, double, uint16_t>(B, hessians_fp64, cols);
+    compute_hessians<ANGLE      , GPU, double, uint16_t>(B, hessians_fp64, cols);
+    compute_hessians<ANGLE_M    , GPU, double, uint16_t>(B, hessians_fp64, cols);
+    compute_hessians<ANGLE_P    , GPU, double, uint16_t>(B, hessians_fp64, cols);
+    compute_hessians<DIH        , GPU, double, uint16_t>(B, hessians_fp64, cols);
+    compute_hessians<DIH_A      , GPU, double, uint16_t>(B, hessians_fp64, cols);
+    compute_hessians<DIH_M      , GPU, double, uint16_t>(B, hessians_fp64, cols);
+    compute_hessians<DIH_P      , GPU, double, uint16_t>(B, hessians_fp64, cols);
+
+    compute_hessians_fd<PEDERSEN    ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+    compute_hessians_fd<BOND        ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+    compute_hessians_fd<ANGLE       ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+    compute_hessians_fd<ANGLE_M     ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+    compute_hessians_fd<ANGLE_P     ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+    compute_hessians_fd<DIH         ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+    compute_hessians_fd<DIH_A       ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+    compute_hessians_fd<DIH_M       ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+    compute_hessians_fd<DIH_P       ,GPU, float, uint16_t>(B, hessians, cols, float(0.0001));
+
+    compute_hessians_fd<PEDERSEN    ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
+    compute_hessians_fd<BOND        ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
+    compute_hessians_fd<ANGLE       ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
+    compute_hessians_fd<ANGLE_M     ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
+    compute_hessians_fd<ANGLE_P     ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
+    compute_hessians_fd<DIH         ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
+    compute_hessians_fd<DIH_A       ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
+    compute_hessians_fd<DIH_M       ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
+    compute_hessians_fd<DIH_P       ,GPU, double, uint16_t>(B, hessians_fp64, cols, double(0.0001));
 
 }
 

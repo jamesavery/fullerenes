@@ -105,11 +105,12 @@ template <typename T>
 //The function returns the maximum value of the data set.
 template <typename T>
 __device__ T reduction_max(T* sdata, const T data){
+    /* static_assert(std::is_constructible<T, K>::value, "T must be constructible from K"); */
      auto num_warps = (blockDim.x >> 5) + 1;
         cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
         auto warpid = threadIdx.x >> 5;
         auto laneid = threadIdx.x & 31;
-        T temp = cg::reduce(tile32, data, cg::greater<T>());
+        T temp = cg::reduce(tile32, T(data), cg::greater<T>());
         if (num_warps > 1){
         //sdata[warpid + blockDim.x] = temp;
         BLOCK_SYNC
@@ -117,6 +118,30 @@ __device__ T reduction_max(T* sdata, const T data){
         BLOCK_SYNC
         if (warpid == 0) {
             temp = cg::reduce(tile32, sdata[laneid], cg::greater<T>());
+        }
+        }
+        if (threadIdx.x == 0) sdata[0] = temp;
+        BLOCK_SYNC
+        auto result = sdata[0];
+        BLOCK_SYNC
+        return result;
+}
+
+
+__device__ double reduction_max(double* sdata, const float data){
+    /* static_assert(std::is_constructible<double, K>::value, "double must be constructible from K"); */
+     auto num_warps = (blockDim.x >> 5) + 1;
+        cg::thread_block_tile<32> tile32 = cg::tiled_partition<32>(cg::this_thread_block());
+        auto warpid = threadIdx.x >> 5;
+        auto laneid = threadIdx.x & 31;
+        double temp = cg::reduce(tile32, double(data), cg::greater<double>());
+        if (num_warps > 1){
+        //sdata[warpid + blockDim.x] = temp;
+        BLOCK_SYNC
+        if (laneid == 0) sdata[warpid] = temp;
+        BLOCK_SYNC
+        if (warpid == 0) {
+            temp = cg::reduce(tile32, sdata[laneid], cg::greater<double>());
         }
         }
         if (threadIdx.x == 0) sdata[0] = temp;

@@ -14,19 +14,21 @@ namespace gpu_kernels{
     namespace isomerspace_properties{
         #include "device_includes.cu"
 
-        template cudaError_t transform_coordinates<GPU>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
-        template cudaError_t surface_areas<GPU>(const IsomerBatch<GPU>& B, CuArray<device_real_t>& surface_areas, const LaunchCtx& ctx, const LaunchPolicy policy);
-        template cudaError_t debug_function<GPU>(const IsomerBatch<GPU>& B, CuArray<device_real_t>& eigenvalues, CuArray<device_real_t>& eigenvectors, CuArray<device_real_t>& inertia_matrices, CuArray<device_real_t>& orthogonality, const LaunchCtx& ctx, const LaunchPolicy policy);
-        template cudaError_t volume_divergences<GPU>(const IsomerBatch<GPU>& B, CuArray<device_real_t>& volumes, const LaunchCtx& ctx, const LaunchPolicy policy);
-        template cudaError_t moments_of_inertia<GPU>(const IsomerBatch<GPU>& B, CuArray<device_real_t>& lambdas, const LaunchCtx& ctx, const LaunchPolicy policy);
-        template cudaError_t eccentricities<GPU>(const IsomerBatch<GPU>& B, CuArray<device_real_t>& eccentricities, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template cudaError_t transform_coordinates<GPU,float,uint16_t>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template cudaError_t transform_coordinates<GPU,double,uint16_t>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template cudaError_t surface_areas<GPU,float,uint16_t>(const IsomerBatch<GPU>& B, CuArray<float>& surface_areas, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template cudaError_t debug_function<GPU,float,uint16_t>(const IsomerBatch<GPU>& B, CuArray<float>& eigenvalues, CuArray<float>& eigenvectors, CuArray<float>& inertia_matrices, CuArray<float>& orthogonality, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template cudaError_t volume_divergences<GPU,float,uint16_t>(const IsomerBatch<GPU>& B, CuArray<float>& volumes, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template cudaError_t moments_of_inertia<GPU,float,uint16_t>(const IsomerBatch<GPU>& B, CuArray<float>& lambdas, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template cudaError_t eccentricities<GPU,float,uint16_t>(const IsomerBatch<GPU>& B, CuArray<float>& eccentricities, const LaunchCtx& ctx, const LaunchPolicy policy);
         
-        symMat3 __device__ inertia_matrix(const device_coord3d* X){
-            DEVICE_TYPEDEFS;
-            extern __shared__ real_t smem[];
+        template <typename T>
+        symMat3<T> __device__ inertia_matrix(const std::array<T,3>* X){
+            FLOAT_TYPEDEFS(T);
+            SMEM(T);
             clear_cache(smem, blockDim.x);
             int tid = threadIdx.x;
-            symMat3 I;
+            symMat3<T> I;
             real_t diag = reduction(smem, dot(X[tid], X[tid]));
             I.a = diag;
             I.d = diag;
@@ -40,37 +42,37 @@ namespace gpu_kernels{
             return I;
         }
 
-     
-      std::array<device_coord3d,3> __device__ principal_axes(const device_coord3d* X){
-            DEVICE_TYPEDEFS;
+        template <typename T>
+        std::array<std::array<T,3>,3> __device__ principal_axes(const std::array<T,3>* X){
             auto I = inertia_matrix(X);
 	    auto [V,lambdas] = I.eigensystem();
 	    return V;
         }
 
         //Returns the best ellipsoid for the given coordinates, lambda0 = a, lambda1 = b, lambda2 = c.
-        device_coord3d __device__ best_ellipsoid (const device_coord3d* X){
-            DEVICE_TYPEDEFS;
+        template <typename T>
+        std::array<T,3> __device__ best_ellipsoid (const std::array<T,3>* X){
+            FLOAT_TYPEDEFS(T);
             auto I = inertia_matrix(X);
             return rsqrt3(d_sort(d_abs(I.eigenvalues()))); 
         }
         
-        template <Device T>
-        void __global__ transform_coordinates_(IsomerBatch<T> B){
-            DEVICE_TYPEDEFS;
-            extern __shared__ real_t shared_memory[];
+        template <Device U, typename T, typename K>
+        void __global__ transform_coordinates_(IsomerBatch<U> B){
+            TEMPLATE_TYPEDEFS(T,K);
+            SMEM(T)
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
                 if (isomer_idx < B.isomer_capacity) if(B.statuses[isomer_idx] == IsomerStatus::CONVERGED) // Only calculate properties for converged isomers!
                 {
-                clear_cache(shared_memory, blockDim.x);
+                clear_cache(smem, blockDim.x);
                 BLOCK_SYNC
                 size_t offset = isomer_idx * blockDim.x;
-                coord3d* X              = reinterpret_cast<coord3d*>(shared_memory) + B.n_atoms;
+                coord3d* X              = reinterpret_cast<coord3d*>(smem) + B.n_atoms;
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC
-                coord3d centroid = {reduction(shared_memory, X[tid][0]), reduction(shared_memory, X[tid][1]), reduction(shared_memory, X[tid][2])};
+                coord3d centroid = {reduction(smem, X[tid][0]), reduction(smem, X[tid][1]), reduction(smem, X[tid][2])};
                 X[tid] -= centroid/real_t(B.n_atoms);
                 BLOCK_SYNC
 		            mat3 P{principal_axes(X)};
@@ -88,10 +90,10 @@ namespace gpu_kernels{
             
         }
 
-        template <Device T>
-        void __global__ moments_of_inertia_(IsomerBatch<T> B, CuArray<device_real_t> lambdas){
-            DEVICE_TYPEDEFS;
-            extern __shared__ real_t shared_memory[];
+        template <Device U, typename T, typename K>
+        void __global__ moments_of_inertia_(IsomerBatch<U> B, CuArray<T> lambdas){
+            TEMPLATE_TYPEDEFS(T,K);
+            SMEM(T);
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
@@ -100,7 +102,7 @@ namespace gpu_kernels{
                 {
 		BLOCK_SYNC;
                 size_t offset = isomer_idx * blockDim.x;
-                coord3d* X           = reinterpret_cast<coord3d*>(shared_memory) + B.n_atoms;
+                coord3d* X           = reinterpret_cast<coord3d*>(smem) + B.n_atoms;
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC;
 		auto I = inertia_matrix(X);
@@ -112,10 +114,10 @@ namespace gpu_kernels{
         }
         
       
-        template <Device T>      
-        void __global__ eccentricities_(IsomerBatch<T> B, CuArray<device_real_t> ecce){
-            DEVICE_TYPEDEFS;
-            extern __shared__ real_t shared_memory[];
+        template <Device U, typename T, typename K>      
+        void __global__ eccentricities_(IsomerBatch<U> B, CuArray<T> ecce){
+            TEMPLATE_TYPEDEFS(T,K);
+            SMEM(T);
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
@@ -123,7 +125,7 @@ namespace gpu_kernels{
                 {
                 BLOCK_SYNC
                 size_t offset = isomer_idx * blockDim.x;
-                coord3d* X            = reinterpret_cast<coord3d*>(shared_memory) + B.n_atoms;
+                coord3d* X            = reinterpret_cast<coord3d*>(smem) + B.n_atoms;
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC
                 auto result = best_ellipsoid(X);
@@ -133,11 +135,11 @@ namespace gpu_kernels{
             }
         }
         
-        template <Device T>
-        void __global__ volume_divergences_(IsomerBatch<T> B, CuArray<device_real_t> vd){
-            DEVICE_TYPEDEFS;
+        template <Device U, typename T, typename K>
+        void __global__ volume_divergences_(IsomerBatch<U> B, CuArray<T> vd){
+            TEMPLATE_TYPEDEFS(T,K);
             typedef device_node3 tri_t;
-            extern __shared__ real_t smems[];
+            SMEM(T);
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
@@ -145,15 +147,15 @@ namespace gpu_kernels{
                 {
                 BLOCK_SYNC
                 size_t offset = isomer_idx * blockDim.x;
-                NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smems);
-                coord3d* X              = reinterpret_cast<coord3d*>(smems) + B.n_atoms;
+                NodeNeighbours node_graph    = NodeNeighbours<K>(B, isomer_idx, smem);
+                coord3d* X              = reinterpret_cast<coord3d*>(smem) + B.n_atoms;
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC
                 real_t V = 0.;
                 if (tid < B.n_faces) {
                     coord3d face_center = (coord3d){0.,0.,0.};
                     for (int i = 0; i < node_graph.face_size; i++) face_center += X[node_graph.face_nodes[i]];
-                    face_center /= node_graph.face_size; //The center of the threadIdx.x-th face.
+                    face_center /= real_t(node_graph.face_size); //The center of the threadIdx.x-th face.
 
                     for (int i = 0; i < node_graph.face_size; i++){
                         coord3d a = X[node_graph.face_nodes[i]];
@@ -165,18 +167,18 @@ namespace gpu_kernels{
                         V += dot(a,n) / real_t(2.0);
                     }
                 }
-                clear_cache(smems, blockDim.x);
-                auto result = reduction(smems, V)/real_t(3.0);
+                clear_cache(smem, blockDim.x);
+                auto result = reduction(smem, V)/real_t(3.0);
                 if (tid == 0) vd.data[isomer_idx] = result;
                 }
             }
         }
 
-        template <Device T>
-        void __global__ surface_areas_(IsomerBatch<T> B, CuArray<device_real_t> sa){
-            DEVICE_TYPEDEFS;
+        template <Device U, typename T, typename K>
+        void __global__ surface_areas_(IsomerBatch<U> B, CuArray<T> sa){
+            TEMPLATE_TYPEDEFS(T,K);
             typedef device_node3 tri_t;
-            extern __shared__ real_t smems[];
+            SMEM(T);
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
@@ -184,15 +186,15 @@ namespace gpu_kernels{
                 {
                 BLOCK_SYNC
                 size_t offset = isomer_idx * blockDim.x;
-                NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, smems);
-                coord3d* X              = reinterpret_cast<coord3d*>(smems) + B.n_atoms;
+                NodeNeighbours node_graph    = NodeNeighbours<K>(B, isomer_idx, smem);
+                coord3d* X              = reinterpret_cast<coord3d*>(smem) + B.n_atoms;
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC
                 real_t A = real_t(0.);
                 if (tid < B.n_faces) {
                     coord3d face_center = (coord3d){0.,0.,0.};
                     for (int i = 0; i < node_graph.face_size; i++) face_center += X[node_graph.face_nodes[i]];
-                    face_center /= node_graph.face_size; //The center of the threadIdx.x-th face.
+                    face_center /= real_t(node_graph.face_size); //The center of the threadIdx.x-th face.
 
                     for (int i = 0; i < node_graph.face_size; i++){
                         coord3d a = X[node_graph.face_nodes[i]];
@@ -204,17 +206,17 @@ namespace gpu_kernels{
                         A += norm(n);
                     }
                 }
-                clear_cache(smems, blockDim.x);
-                auto result = reduction(smems, A)/real_t(2.0);
+                clear_cache(smem, blockDim.x);
+                auto result = reduction(smem, A)/real_t(2.0);
                 if (tid == 0) sa.data[isomer_idx] = result;
                 }
             }
         }
 
-        template <Device T>
-        void __global__ debug_function_(IsomerBatch<T> B, CuArray<device_real_t> eigenvalues, CuArray<device_real_t> eigenvectors, CuArray<device_real_t> inertia_matrices, CuArray<device_real_t> orthogonality){
-            DEVICE_TYPEDEFS;
-            extern __shared__ real_t shared_memory[];
+        template <Device U, typename T, typename K>
+        void __global__ debug_function_(IsomerBatch<U> B, CuArray<T> eigenvalues, CuArray<T> eigenvectors, CuArray<T> inertia_matrices, CuArray<T> orthogonality){
+            TEMPLATE_TYPEDEFS(T,K);
+            SMEM(T);
             const int tid = threadIdx.x;
             auto limit = ((B.isomer_capacity + gridDim.x - 1) / gridDim.x ) * gridDim.x;  //Fast ceiling integer division.
             for (int isomer_idx = blockIdx.x; isomer_idx < limit; isomer_idx += gridDim.x){
@@ -223,9 +225,9 @@ namespace gpu_kernels{
                 {
                 BLOCK_SYNC
                 size_t offset = isomer_idx * blockDim.x;
-                Constants constants          = Constants(B, isomer_idx);
-                NodeNeighbours node_graph    = NodeNeighbours(B, isomer_idx, shared_memory);
-                coord3d* X              = reinterpret_cast<coord3d*>(shared_memory) + B.n_atoms;
+                Constants constants          = Constants<T,K>(B, isomer_idx);
+                NodeNeighbours node_graph    = NodeNeighbours<K>(B, isomer_idx, smem);
+                coord3d* X              = reinterpret_cast<coord3d*>(smem) + B.n_atoms;
                 assign(X[threadIdx.x],reinterpret_cast<std::array<float,3>*>(B.X+offset*3)[threadIdx.x]);
                 BLOCK_SYNC
                 auto I = inertia_matrix(X);
@@ -260,109 +262,112 @@ namespace gpu_kernels{
         }
 
 
-        template <Device T>
-        cudaError_t transform_coordinates(IsomerBatch<T>& B, const LaunchCtx& ctx, const LaunchPolicy policy){
+        template <Device U, typename T, typename K>
+        cudaError_t transform_coordinates(IsomerBatch<U>& B, const LaunchCtx& ctx, const LaunchPolicy policy){
             cudaSetDevice(B.get_device_id());
                 
             //If launch ploicy is synchronous then wait.
             if(policy == LaunchPolicy::SYNC) ctx.wait();
 
-            size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-            static LaunchDims dims((void*)transform_coordinates_<GPU>, B.n_atoms, smem, B.isomer_capacity);
-            dims.update_dims((void*)transform_coordinates_<GPU>, B.n_atoms, smem, B.isomer_capacity);
+            size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(T)*Block_Size_Pow_2;
+            static LaunchDims dims((void*)transform_coordinates_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
+            dims.update_dims((void*)transform_coordinates_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
             void* kargs[]{(void*)&B};
-            auto error = safeCudaKernelCall((void*)transform_coordinates_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            auto error = safeCudaKernelCall((void*)transform_coordinates_<GPU,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     
             if(policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Transformation of Coordinates Failed: ");
             return error;
         }
 
-        template <Device T>
-        cudaError_t eccentricities(const IsomerBatch<T>& B, CuArray<device_real_t>& eccentricities, const LaunchCtx& ctx, const LaunchPolicy policy){
+        template <Device U, typename T, typename K>
+        cudaError_t eccentricities(const IsomerBatch<U>& B, CuArray<T>& eccentricities, const LaunchCtx& ctx, const LaunchPolicy policy){
             cudaSetDevice(B.get_device_id());
 
             //If launch ploicy is synchronous then wait.
             if(policy == LaunchPolicy::SYNC) ctx.wait();
 
-            size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-            static LaunchDims dims((void*)eccentricities_<GPU>, B.n_atoms, smem, B.isomer_capacity);
-            dims.update_dims((void*)eccentricities_<GPU>, B.n_atoms, smem, B.isomer_capacity);
+            size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(T)*Block_Size_Pow_2;
+            static LaunchDims dims((void*)eccentricities_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
+            dims.update_dims((void*)eccentricities_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
             void* kargs[]{(void*)&B, (void*)&eccentricities};
-            auto error = safeCudaKernelCall((void*)eccentricities_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            auto error = safeCudaKernelCall((void*)eccentricities_<GPU,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
 
             if(policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Calculation of Eccentricities Failed: ");
             return error;
         }
 
-        template <Device T>
-        cudaError_t moments_of_inertia(const IsomerBatch<T>& B, CuArray<device_real_t>& lambdas, const LaunchCtx& ctx, const LaunchPolicy policy){
+        template <Device U, typename T, typename K>
+        cudaError_t moments_of_inertia(const IsomerBatch<U>& B, CuArray<T>& lambdas, const LaunchCtx& ctx, const LaunchPolicy policy){
             cudaSetDevice(B.get_device_id());
+            TEMPLATE_TYPEDEFS(T,K);
 
             //If launch ploicy is synchronous then wait.
             if(policy == LaunchPolicy::SYNC) ctx.wait();
 
-            size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-            static LaunchDims dims((void*)moments_of_inertia_<GPU>, B.n_atoms, smem, B.isomer_capacity);
-            dims.update_dims((void*)moments_of_inertia_<GPU>, B.n_atoms, smem, B.isomer_capacity);
+            size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(T)*Block_Size_Pow_2;
+            static LaunchDims dims((void*)moments_of_inertia_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
+            dims.update_dims((void*)moments_of_inertia_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
             void* kargs[]{(void*)&B, (void*)&lambdas};
-            auto error = safeCudaKernelCall((void*)moments_of_inertia_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            auto error = safeCudaKernelCall((void*)moments_of_inertia_<GPU,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
 
             if(policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Calculation of moments of inertia Failed: ");
             return error;
         }
 
-        template <Device T>
-        cudaError_t surface_areas(const IsomerBatch<T>& B, CuArray<device_real_t>& surface_areas, const LaunchCtx& ctx, const LaunchPolicy policy){
-            if (T == CPU) assert(false && "GPU kernel cannot be launched on a host buffer.");
+        template <Device U, typename T, typename K>
+        cudaError_t surface_areas(const IsomerBatch<U>& B, CuArray<T>& surface_areas, const LaunchCtx& ctx, const LaunchPolicy policy){
             cudaSetDevice(B.get_device_id());
+            TEMPLATE_TYPEDEFS(T,K);
 
             //If launch ploicy is synchronous then wait.
             if(policy == LaunchPolicy::SYNC) ctx.wait();
 
-            size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-            static LaunchDims dims((void*)surface_areas_<GPU>, B.n_atoms, smem, B.isomer_capacity);
-            dims.update_dims((void*)surface_areas_<GPU>, B.n_atoms, smem, B.isomer_capacity);
+            size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(T)*Block_Size_Pow_2;
+            static LaunchDims dims((void*)surface_areas_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
+            dims.update_dims((void*)surface_areas_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
             void* kargs[]{(void*)&B, (void*)&surface_areas};
-            auto error = safeCudaKernelCall((void*)surface_areas_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            auto error = safeCudaKernelCall((void*)surface_areas_<GPU,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
 
             if(policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Calculation of Volume Divergences Failed: ");
             return error;
         }
 
-        template <Device T>
-        cudaError_t volume_divergences(const IsomerBatch<T>& B, CuArray<device_real_t>& volumes, const LaunchCtx& ctx, const LaunchPolicy policy){
+        template <Device U, typename T, typename K>
+        cudaError_t volume_divergences(const IsomerBatch<U>& B, CuArray<T>& volumes, const LaunchCtx& ctx, const LaunchPolicy policy){
             cudaSetDevice(B.get_device_id());
+            TEMPLATE_TYPEDEFS(T,K);
 
             //If launch ploicy is synchronous then wait.
             if(policy == LaunchPolicy::SYNC) ctx.wait();
 
-            size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-            static LaunchDims dims((void*)volume_divergences_<GPU>, B.n_atoms, smem, B.isomer_capacity);
-            dims.update_dims((void*)volume_divergences_<GPU>, B.n_atoms, smem, B.isomer_capacity);
+            size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(T)*Block_Size_Pow_2;
+            static LaunchDims dims((void*)volume_divergences_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
+            dims.update_dims((void*)volume_divergences_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
             void* kargs[]{(void*)&B, (void*)&volumes};
-            auto error = safeCudaKernelCall((void*)volume_divergences_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            auto error = safeCudaKernelCall((void*)volume_divergences_<GPU,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
 
             if(policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Calculation of Volume Divergences Failed: ");
             return error;
         }
 
-        template <Device T>
-        cudaError_t debug_function(const IsomerBatch<T>& B, CuArray<device_real_t>& eigenvalues, CuArray<device_real_t>& eigenvectors, CuArray<device_real_t>& inertia_matrices, CuArray<device_real_t>& orthogonality, const LaunchCtx& ctx, const LaunchPolicy policy){
+        template <Device U, typename T, typename K>
+        cudaError_t debug_function(const IsomerBatch<U>& B, CuArray<T>& eigenvalues, CuArray<T>& eigenvectors, CuArray<T>& inertia_matrices, CuArray<T>& orthogonality, const LaunchCtx& ctx, const LaunchPolicy policy){
             cudaSetDevice(B.get_device_id());
+            TEMPLATE_TYPEDEFS(T,K);
 
             //If launch ploicy is synchronous then wait.
             if(policy == LaunchPolicy::SYNC) ctx.wait();
 
-            size_t smem = sizeof(device_coord3d)* (3*B.n_atoms + 4) + sizeof(device_real_t)*Block_Size_Pow_2;
-            static LaunchDims dims((void*)debug_function_<GPU>, B.n_atoms, smem, B.isomer_capacity);
-            dims.update_dims((void*)debug_function_<GPU>, B.n_atoms, smem, B.isomer_capacity);
+            size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(T)*Block_Size_Pow_2;
+            static LaunchDims dims((void*)debug_function_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
+            dims.update_dims((void*)debug_function_<GPU,T,K>, B.n_atoms, smem, B.isomer_capacity);
             void* kargs[]{(void*)&B, (void*)&eigenvalues, (void*)&eigenvectors, (void*)&inertia_matrices, (void*)&orthogonality};
-            auto error = safeCudaKernelCall((void*)debug_function_<GPU>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            auto error = safeCudaKernelCall((void*)debug_function_<GPU,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
 
             if(policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Debug Function Failed: ");

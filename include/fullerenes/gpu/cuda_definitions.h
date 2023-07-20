@@ -77,18 +77,14 @@
 typedef device_real_t device_hpreal_t;	/* High precision real type, for when we need it regardless of speed. */
 
 typedef uint16_t device_node_t;
-typedef ushort3 device_node3;
-typedef ushort2 device_node2;
-typedef struct device_node6
-{
-    device_node_t b;
-    device_node_t c;
-    device_node_t d;
-    device_node_t e;
-    device_node_t f;
-    device_node_t g;
-} device_node6;
+typedef std::array<uint16_t,3> device_node3;
+typedef std::array<uint16_t,2> device_node2;
+typedef std::array<uint16_t,6> device_node6;
 #define DEVICE_TYPEDEFS typedef device_coord3d coord3d; typedef device_coord2d coord2d; typedef device_real_t real_t; typedef device_node3 node3; typedef device_node_t node_t; typedef device_node6 node6; typedef device_hpreal_t hpreal_t;
-#define TEMPLATE_TYPEDEFS(T,K) static_assert(std::is_floating_point<T>::value, "T must be float"); static_assert(std::is_integral<K>::value, "K must be integral type"); typedef std::array<T,3> coord3d; typedef std::array<T,2> coord2d; typedef T real_t; typedef std::array<K,3> node3; typedef K node_t; typedef std::array<K,6> node6; typedef device_real_t hpreal_t;
+#define FLOAT_TYPEDEFS(T) static_assert(std::is_floating_point<T>::value, "T must be float"); typedef std::array<T,3> coord3d; typedef std::array<T,2> coord2d; typedef T real_t;
+#define INT_TYPEDEFS(K) static_assert(std::is_integral<K>::value, "K must be integral type"); typedef std::array<K,3> node3; typedef std::array<K,2> node2; typedef K node_t; typedef std::array<K,6> node6;
+#define TEMPLATE_TYPEDEFS(T,K) FLOAT_TYPEDEFS(T) INT_TYPEDEFS(K)
+#define SMEM(T) extern __shared__ unsigned char my_smem[]; T* smem = reinterpret_cast<T*>(my_smem);
+
 
 #endif

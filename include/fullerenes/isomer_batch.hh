@@ -24,7 +24,7 @@ struct IsomerBatch
     size_t n_faces = 0;
     size_t n_isomers = 0;
     float* X;
-    device_hpreal_t* xys;
+    float* xys;
 
     device_node_t* cubic_neighbours;
     device_node_t* dual_neighbours;

@@ -9,24 +9,26 @@ struct identity3
 
 
 
+template <typename T>
 struct mat3
-{
-    device_real_t A[9];
+{   
+    FLOAT_TYPEDEFS(T);
+    T A[9];
 
     INLINE mat3()
     {
         #pragma unroll
         for (int i = 0; i < 9; i++)
-            A[i] = device_real_t(0.f);
+            A[i] = T(0.f);
     }
 
-  INLINE mat3(const std::array<device_coord3d,3> &V){
+  INLINE mat3(const std::array<coord3d,3> &V){
     for(int i=0;i<3;i++)
       for(int j=0;j<3;j++)
 	A[i*3+j] = V[i][j];
   }
   
-    INLINE mat3(device_real_t a, device_real_t b, device_real_t c, device_real_t d, device_real_t e, device_real_t f, device_real_t g, device_real_t h, device_real_t i)
+    INLINE mat3(T a, T b, T c, T d, T e, T f, T g, T h, T i)
     {
         A[0] = a;
         A[1] = b;
@@ -39,9 +41,9 @@ struct mat3
         A[8] = i;
     }
 
-    INLINE device_real_t* operator[](int i) const
+    INLINE T* operator[](int i) const
     {
-        return const_cast<device_real_t*>(&A[i * 3]);
+        return const_cast<T*>(&A[i * 3]);
     }
 
     //Assignment operators
@@ -56,9 +58,9 @@ struct mat3
 
 
 
-INLINE mat3 operator*(const mat3& a, const mat3& b)
+template <typename T> INLINE mat3<T> operator*(const mat3<T>& a, const mat3<T>& b)
 {
-    mat3 result;
+    mat3<T> result;
     #pragma unroll
     for (int i = 0; i < 3; i++)
         #pragma unroll
@@ -71,9 +73,9 @@ INLINE mat3 operator*(const mat3& a, const mat3& b)
 }
 
 
-INLINE mat3 operator*(const mat3& a, device_real_t b)
+template <typename T> INLINE mat3<T> operator*(const mat3<T>& a, T b)
 {
-    mat3 result;
+    mat3<T> result;
     #pragma unroll
     for (int i = 0; i < 3; i++)
         #pragma unroll
@@ -82,55 +84,55 @@ INLINE mat3 operator*(const mat3& a, device_real_t b)
     return result;
 }
 
-INLINE mat3 operator/(const mat3& a, device_real_t b){ return a * (device_real_t(1.f) / b); }
+template <typename T> INLINE mat3<T> operator/(const mat3<T>& a, T b){ return a * (T(1.f) / b); }
 
-INLINE mat3 operator*(const mat3& a, const identity3& b){ return a; }
-INLINE mat3 operator*(const identity3& a, const mat3& b){ return b; }
-INLINE mat3 operator+(const mat3& a, const identity3& b){ 
-    mat3 result = a;
+template <typename T> INLINE mat3<T> operator*(const mat3<T>& a, const identity3& b){ return a; }
+template <typename T> INLINE mat3<T> operator*(const identity3& a, const mat3<T>& b){ return b; }
+template <typename T> INLINE mat3<T> operator+(const mat3<T>& a, const identity3& b){ 
+    mat3<T> result = a;
     #pragma unroll
     for (int i = 0; i < 3; i++)
-        result[i][i] += device_real_t(1.f);
+        result[i][i] += T(1.f);
     return result;
 }
-INLINE mat3 operator+(const identity3& a, const mat3& b){ return b + a; }
-INLINE mat3 operator-(const mat3& a, const identity3& b){ 
-    mat3 result = a;
+template <typename T> INLINE mat3<T> operator+(const identity3& a, const mat3<T>& b){ return b + a; }
+template <typename T> INLINE mat3<T> operator-(const mat3<T>& a, const identity3& b){ 
+    mat3<T> result = a;
     #pragma unroll
     for (int i = 0; i < 3; i++)
-        result[i][i] -= device_real_t(1.f);
+        result[i][i] -= T(1.f);
     return result;
 }
-INLINE mat3 operator-(const identity3& a, const mat3& b){ 
-    mat3 result = b;
+template <typename T> INLINE mat3<T> operator-(const identity3& a, const mat3<T>& b){ 
+    mat3<T> result = b;
     #pragma unroll
     for (int i = 0; i < 3; i++)
         #pragma unroll
         for (int j = 0; j < 3; j++){
-            if (i == j) result[i][j] = device_real_t(1.f) - result[i][j];
+            if (i == j) result[i][j] = T(1.f) - result[i][j];
             else result[i][j] = -result[i][j];
         }
     return result;
 }
 
-INLINE mat3 operator-(const mat3& a){ 
-    mat3 result;
+template <typename T> INLINE mat3<T> operator-(const mat3<T>& a){ 
+    mat3<T> result;
     #pragma unroll
     for (int i = 0; i < 9; i++)
         result.A[i] = -a.A[i];
     return result;
 }
-/* __device__ mat3 opeartor-(const mat3& a){ 
-    return mat3(-a[0][0], -a[0][1], -a[0][2],
+/* __device__ mat3<T> opeartor-(const mat3<T>& a){ 
+    return mat3<T>(-a[0][0], -a[0][1], -a[0][2],
                 -a[1][0], -a[1][1], -a[1][2],
                 -a[2][0], -a[2][1], -a[2][2]);
 } */
 
-INLINE mat3 operator*(device_real_t a, const mat3& b){ return b * a; }
+template <typename T> INLINE mat3<T> operator*(T a, const mat3<T>& b){ return b * a; }
 
-INLINE mat3 operator+(const mat3& a, const mat3& b)
+template <typename T> INLINE mat3<T> operator+(const mat3<T>& a, const mat3<T>& b)
 {
-    mat3 result;
+    mat3<T> result;
     #pragma unroll
     for (int i = 0; i < 3; i++)
         #pragma unroll
@@ -139,16 +141,16 @@ INLINE mat3 operator+(const mat3& a, const mat3& b)
     return result;
 }
 
-INLINE void operator+=(mat3& a, const mat3& b)
+template <typename T> INLINE void operator+=(mat3<T>& a, const mat3<T>& b)
 {
     #pragma unroll
     for (int i = 0; i < 9; i++)
         a.A[i] += b.A[i];
 }
 
-INLINE mat3 operator-(const mat3& a, const mat3& b)
+template <typename T> INLINE mat3<T> operator-(const mat3<T>& a, const mat3<T>& b)
 {
-    mat3 result;
+    mat3<T> result;
     #pragma unroll
     for (int i = 0; i < 3; i++)
         #pragma unroll
@@ -158,17 +160,17 @@ INLINE mat3 operator-(const mat3& a, const mat3& b)
 }
 
 //Computes the L2 norm of a matrix
-INLINE device_real_t norm(const mat3& a){
-    device_real_t result = device_real_t(0.f);
+template <typename T> INLINE T norm(const mat3<T>& a){
+    T result = T(0.f);
     #pragma unroll
     for (int i = 0; i < 9; i++)
         result += a.A[i] * a.A[i];
     return SQRT(result);
 } 
 
-INLINE mat3 transpose(const mat3& a)
+template <typename T> INLINE mat3<T> transpose(const mat3<T>& a)
 {
-    mat3 result;
+    mat3<T> result;
     #pragma unroll
     for (int i = 0; i < 3; i++)
         #pragma unroll
@@ -177,35 +179,35 @@ INLINE mat3 transpose(const mat3& a)
     return result;
 }
 
-INLINE device_coord3d dot(const mat3& a, const device_coord3d& b)
+template <typename T> INLINE std::array<T,3> dot(const mat3<T>& a, const std::array<T,3>& b)
 {
-    device_coord3d result;
+    std::array<T,3> result;
     #pragma unroll
     for (int i = 0; i < 3; i++){
-        ((device_real_t*)&result)[i] = device_real_t(0.f);
+        ((T*)&result)[i] = T(0.f);
         #pragma unroll
         for (int j = 0; j < 3; j++)
-            ((device_real_t*)&result)[i] += a[i][j] * ((device_real_t*)&b)[j];
+            ((T*)&result)[i] += a[i][j] * ((T*)&b)[j];
     }
     return result;
 }
 
-INLINE device_coord3d dot(const device_coord3d& a, const mat3& b)
+template <typename T> INLINE std::array<T,3> dot(const std::array<T,3>& a, const mat3<T>& b)
 {
-    device_coord3d result;
+    std::array<T,3> result;
     #pragma unroll
     for (int i = 0; i < 3; i++){
-        ((device_real_t*)&result)[i] = device_real_t(0.f);
+        ((T*)&result)[i] = T(0.f);
         #pragma unroll
         for (int j = 0; j < 3; j++)
-            ((device_real_t*)&result)[i] += ((device_real_t*)&a)[j] * b[j][i];
+            ((T*)&result)[i] += ((T*)&a)[j] * b[j][i];
     }
     return result;
 }
 
-INLINE mat3 tensor_product(const device_coord3d& a, const device_coord3d& b)
+template <typename T> INLINE mat3<T> tensor_product(const std::array<T,3>& a, const std::array<T,3>& b)
 {
-    mat3 result;
+    mat3<T> result;
     #pragma unroll
     for (int i = 0; i < 3; i++)
         #pragma unroll
@@ -215,48 +217,48 @@ INLINE mat3 tensor_product(const device_coord3d& a, const device_coord3d& b)
 }
 
 //Cross product between a vector and a dyadic tensor (c X A) https://stemandmusic.in/maths/mvt-algebra/dvCP.php
-INLINE mat3 cross(const device_coord3d& c, const mat3& A)
+template <typename T> INLINE mat3<T> cross(const std::array<T,3>& c, const mat3<T>& A)
 {
-    return mat3(A[2][0]*c[1] - A[1][0]*c[2], A[2][1]*c[1] - A[1][1]*c[2], A[2][2]*c[1] - A[1][2]*c[2],
+    return mat3<T>(A[2][0]*c[1] - A[1][0]*c[2], A[2][1]*c[1] - A[1][1]*c[2], A[2][2]*c[1] - A[1][2]*c[2],
                 A[0][0]*c[2] - A[2][0]*c[0], A[0][1]*c[2] - A[2][1]*c[0], A[0][2]*c[2] - A[2][2]*c[0],
                 A[1][0]*c[0] - A[0][0]*c[1], A[1][1]*c[0] - A[0][1]*c[1], A[1][2]*c[0] - A[0][2]*c[1]);
 }
 
 //Cross product between a dyadic tensor and a vector (A X c) https://stemandmusic.in/maths/mvt-algebra/dvCP.php
-INLINE mat3 cross(const mat3& A, const device_coord3d& c)
+template <typename T> INLINE mat3<T> cross(const mat3<T>& A, const std::array<T,3>& c)
 {
-    return mat3(A[0][1]*c[2] - A[0][2]*c[1], A[0][2]*c[0] - A[0][0]*c[2], A[0][1]*c[1] - A[0][2]*c[0],
+    return mat3<T>(A[0][1]*c[2] - A[0][2]*c[1], A[0][2]*c[0] - A[0][0]*c[2], A[0][1]*c[1] - A[0][2]*c[0],
                 A[1][1]*c[2] - A[1][2]*c[1], A[1][2]*c[0] - A[1][0]*c[2], A[1][1]*c[1] - A[1][2]*c[0],
                 A[2][1]*c[2] - A[2][2]*c[1], A[2][2]*c[0] - A[2][0]*c[2], A[2][1]*c[1] - A[2][2]*c[0]);
 }
 
-template <int elements_per_thread>
+/* template <int elements_per_thread>
 struct sym_tridiag_t{
-    device_real_t alpha[elements_per_thread];
-    device_real_t beta[elements_per_thread];
+    T alpha[elements_per_thread];
+    T beta[elements_per_thread];
 
-    INLINE sym_tridiag_t()
+    template <typename T> INLINE sym_tridiag_t()
     {
         #pragma unroll
         for (int i = 0; i < elements_per_thread; i++){
-            alpha[i] = device_real_t(0.f);
-            beta[i] = device_real_t(0.f);
+            alpha[i] = T(0.f);
+            beta[i] = T(0.f);
         }
     }
 };
 
 template <int elements_per_thread>
-INLINE void mat_mul(const sym_tridiag_t<elements_per_thread>& a, const device_coord3d b){
-    device_coord3d result;
+template <typename T> INLINE void mat_mul(const sym_tridiag_t<elements_per_thread>& a, const std::array<T,3> b){
+    std::array<T,3> result;
     #pragma unroll
     for (int i = 0; i < elements_per_thread; i++){
         result[i] = a.alpha[i] * b[i];
         if(i > 0) result[i] += a.beta[i-1] * b[i-1];
         if(i < elements_per_thread-1) result[i] += a.beta[i] * b[i+1];
     }
-}
+} */
 
-INLINE void print(const mat3& a, int thread_id = 0)
+template <typename T> INLINE void print(const mat3<T>& a, int thread_id = 0)
 {   
     if(threadIdx.x != thread_id)
         return;
@@ -272,16 +274,17 @@ INLINE void print(const mat3& a, int thread_id = 0)
     }
 }
 
-
+template <typename T, typename K>
 struct hessian_t{
+    TEMPLATE_TYPEDEFS(T,K);
     //Sparse hessian_t matrix stored in such a way that each thread owns 1 row of the matrix.
-    mat3 A[10]; // Each thread has 10*3*3 entries in the hessian_t matrix. Itself and 9 neighbours
-    device_node_t indices[10]; 
+    mat3<T> A[10]; // Each thread has 10*3*3 entries in the hessian_t matrix. Itself and 9 neighbours
+    node_t indices[10]; 
     // Each atom has 3 neighbours and 6 outer neighbours
     // We store them in the following order:
     // a, b, c, d, b_m, c_m, d_m, b_p, c_p, d_p
 
-    INLINE hessian_t(const NodeNeighbours& G){
+    INLINE hessian_t(const NodeNeighbours<K>& G){
         indices[0] = threadIdx.x;
         indices[1] = d_get(G.cubic_neighbours,0);
         indices[2] = d_get(G.cubic_neighbours,1);
@@ -295,7 +298,7 @@ struct hessian_t{
 
         #pragma unroll
         for (int i = 0; i < 10; i++)
-            A[i] = mat3();
+            A[i] = mat3<T>();
     }
 
     INLINE hessian_t(const hessian_t& other){
@@ -306,14 +309,14 @@ struct hessian_t{
         }
     }
 
-    INLINE const mat3& operator[](const int i) const { return A[i]; } 
-    INLINE mat3& operator[](const int i) { return A[i]; }
-    INLINE device_real_t power_iteration(device_coord3d* smem);
+    INLINE const mat3<T>& operator[](const int i) const { return A[i]; } 
+    INLINE mat3<T>& operator[](const int i) { return A[i]; }
+/*     INLINE T power_iteration(std::array<T,3>* smem);
     template <int eigenvalues_per_thread>
-    INLINE sym_tridiag_t<eigenvalues_per_thread> lanczos_iteration(device_real_t* smem);
-
+    INLINE sym_tridiag_t<eigenvalues_per_thread> lanczos_iteration(T* smem);
+ */
 };
-
+/* 
 INLINE device_coord3d mat_vect_mult(const hessian_t& A, const device_coord3d& x,device_coord3d* smem)
 {
     BLOCK_SYNC;
@@ -326,9 +329,9 @@ INLINE device_coord3d mat_vect_mult(const hessian_t& A, const device_coord3d& x,
     return result;
 }
 
-INLINE device_real_t hessian_t::power_iteration(device_coord3d* smem)
+INLINE T hessian_t::power_iteration(device_coord3d* smem)
 {
-    clear_cache(reinterpret_cast<device_real_t*>(smem), 3*blockDim.x);
+    clear_cache(reinterpret_cast<T*>(smem), 3*blockDim.x);
     device_coord3d b_k;
     device_coord3d b_kp1;
     curandState state;
@@ -336,27 +339,26 @@ INLINE device_real_t hessian_t::power_iteration(device_coord3d* smem)
     b_k[0] = curand_uniform(&state);
     b_k[1] = curand_uniform(&state);
     b_k[2] = curand_uniform(&state);
-    b_k = {device_real_t(threadIdx.x*3), device_real_t(threadIdx.x*3 + 1), device_real_t(threadIdx.x*3 + 2)};
-    device_real_t norm;
+    b_k = {T(threadIdx.x*3), T(threadIdx.x*3 + 1), T(threadIdx.x*3 + 2)};
+    T norm;
     for (size_t i = 0; i < 500; i++){ 
         b_kp1 =  mat_vect_mult(*this, b_k, smem + blockDim.x);
-        norm = SQRT(reduction(reinterpret_cast<device_real_t*>(smem), dot(b_kp1, b_kp1)));
+        norm = SQRT(reduction(reinterpret_cast<T*>(smem), dot(b_kp1, b_kp1)));
         b_k = b_kp1 /norm;
     }
     //Return rayleigh quotient
-    device_real_t lambda = reduction(reinterpret_cast<device_real_t*>(smem), dot(b_k, mat_vect_mult(*this, b_k, smem + blockDim.x))) / reduction(reinterpret_cast<device_real_t*>(smem), dot(b_k, b_k));
+    T lambda = reduction(reinterpret_cast<T*>(smem), dot(b_k, mat_vect_mult(*this, b_k, smem + blockDim.x))) / reduction(reinterpret_cast<T*>(smem), dot(b_k, b_k));
     auto bk_new = mat_vect_mult(*this, b_k, smem);
-    auto numerator = reduction(reinterpret_cast<device_real_t*>(smem), dot(b_k, mat_vect_mult(*this, b_k, smem + blockDim.x)));
-    clear_cache(reinterpret_cast<device_real_t*>(smem), 3*blockDim.x);
-    auto denominator = reduction(reinterpret_cast<device_real_t*>(smem), dot(b_k, b_k));
+    auto numerator = reduction(reinterpret_cast<T*>(smem), dot(b_k, mat_vect_mult(*this, b_k, smem + blockDim.x)));
+    clear_cache(reinterpret_cast<T*>(smem), 3*blockDim.x);
+    auto denominator = reduction(reinterpret_cast<T*>(smem), dot(b_k, b_k));
     return numerator/denominator;
 }
-
-INLINE device_real_t dot(const device_coord3d& v, const device_coord3d& u, device_real_t* smem){
+INLINE T dot(const device_coord3d& v, const device_coord3d& u, T* smem){
     return reduction(smem, dot(v,v));
 }
 
-INLINE device_coord3d orthogonalize(const device_coord3d& v, const device_coord3d& u, device_real_t* smem){
+INLINE device_coord3d orthogonalize(const device_coord3d& v, const device_coord3d& u, T* smem){
     return v - dot(v,u,smem) / dot(u,u,smem) * u;   
 }
 
@@ -365,7 +367,7 @@ INLINE device_coord3d orthogonalize(const device_coord3d& v, const device_coord3
 //The matrix is represented by 2 vectors: alpha and beta
 //Each thread stores and returns up to 3 values of alpha and beta
 template <int eigenvalues_per_thread>
-INLINE sym_tridiag_t<eigenvalues_per_thread> hessian_t::lanczos_iteration(device_real_t* smem){
+INLINE sym_tridiag_t<eigenvalues_per_thread> hessian_t::lanczos_iteration(T* smem){
   DEVICE_TYPEDEFS;
   
     int N = blockDim.x;
@@ -395,6 +397,7 @@ INLINE sym_tridiag_t<eigenvalues_per_thread> hessian_t::lanczos_iteration(device
     return result; 
 }
 
+ */
 
 
 #endif

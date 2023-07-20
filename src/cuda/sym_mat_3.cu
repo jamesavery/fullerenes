@@ -17,14 +17,6 @@ fp_close(scalar x, scalar y, scalar tolerance=100*std::numeric_limits<scalar>::e
 template <typename scalar> INLINE void __device__
 swap(scalar& a, scalar&b){ scalar c = a; a = b; b = c; }
 
-template <typename scalar> INLINE array<scalar,3> __device__
-cross(const array<scalar,3>& a, const array<scalar,3>& b){
-  return {a[1]*b[2]-a[2]*b[1],
-         -a[0]*b[2]+a[2]*b[0],
-	  a[0]*b[1]-a[1]*b[0]}; }
-
-template <typename scalar> INLINE scalar  __device__ 
-dot(const array<scalar,3>& a, const array<scalar,3>& b){ return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; }
 
 template <typename scalar> INLINE array<scalar,3> __device__
 dot(const array<array<scalar,3>,3>& A, const array<scalar,3>& x){
@@ -33,19 +25,6 @@ dot(const array<array<scalar,3>,3>& A, const array<scalar,3>& x){
      A[1][0]*x[0] + A[1][1]*x[1] + A[1][2]*x[2],
      A[2][0]*x[0] + A[2][1]*x[1] + A[2][2]*x[2]};
 }
-
-template <typename scalar> INLINE array<scalar,3> __device__
-operator-(const array<scalar,3>& a, const array<scalar,3>& b){ return {a[0]-b[0],a[1]-b[1],a[2]-b[2]}; }
-
-template <typename scalar> INLINE array<scalar,3> __device__
-operator+(const array<scalar,3>& a, const array<scalar,3>& b){ return {a[0]+b[0],a[1]+b[1],a[2]+b[2]}; }
-
-template <typename scalar> INLINE array<scalar,3> __device__
-operator*(const scalar& a, const array<scalar,3>& b){ return {a*b[0],a*b[1],a*b[2]}; }
-
-template <typename scalar> INLINE array<scalar,3> __device__
-operator*(const array<scalar,3>& b, const scalar& a){ return {a*b[0],a*b[1],a*b[2]}; }
-
 
 template <typename scalar>
 array<scalar,3> __device__ eig_sort(scalar l1, scalar l2, scalar l3)
@@ -56,55 +35,57 @@ array<scalar,3> __device__ eig_sort(scalar l1, scalar l2, scalar l3)
   else     return {{a,b,l3}};
 }
 
+template <typename T>
 struct symMat3
 {
-  static constexpr device_real_t epsilon = std::numeric_limits<device_real_t>::epsilon();
+  typedef T real_t;
+  typedef array<real_t,3> coord3d;
+  static constexpr real_t epsilon = std::numeric_limits<real_t>::epsilon();
   
-  device_real_t a, b, c, d, e, f;
+  real_t a, b, c, d, e, f;
   
   //[[a , b,  c]
   // [b,  d,  e]
   // [c,  e,  f]]
   INLINE symMat3(): a(0), b(0), c(0), d(0), e(0), f(0){}
-  INLINE symMat3(device_real_t a, device_real_t b, device_real_t c, device_real_t d, device_real_t e, device_real_t f) : a(a), b(b), c(c), d(d), e(e), f(f){}
+  INLINE symMat3(real_t a, real_t b, real_t c, real_t d, real_t e, real_t f) : a(a), b(b), c(c), d(d), e(e), f(f){}
   
-  INLINE device_coord3d eigenvalues() const{
-    DEVICE_TYPEDEFS;
+  INLINE coord3d eigenvalues() const{
 
       // Combined home-derived eigenvalue w/ Wikipedia method
-    long double 
+    real_t 
       A = -1.L,
       B = a+d+f,
       C = b*b + c*c - a*d + e*e - a*f - d*f,
       D = -c*c*d + 2*b*c*e - a*e*e - b*b*f + a*d*f;
 
     if(fabs(D) < 100*epsilon){			
-      long double Disc = SQRT(B*B-4*A*C); // TODO: Kahan's formula for b^2-4ac.
-      device_real_t lam1 = -0.5L*(-B-Disc), lam2 = -0.5L*(-B+Disc);
+      real_t Disc = SQRT(B*B-4*A*C); // TODO: Kahan's formula for b^2-4ac.
+      real_t lam1 = -0.5L*(-B-Disc), lam2 = -0.5L*(-B+Disc);
       return eig_sort<real_t>(0,lam1,lam2);
     }
       
-    device_real_t p1 = b*b + c*c + e*e;
+    real_t p1 = b*b + c*c + e*e;
     if(fabs(p1) < 100*epsilon)
       return eig_sort(a,d,f);
 
-    device_real_t q = (a+d+f)/3.L; // q=Tr(M)/3
-    device_real_t p2 = (a-q)*(a-q) + (d-q)*(d-q) + (f-q)*(f-q) + 2.L*p1;
-    device_real_t p = SQRT(p2/6.L);
+    real_t q = (a+d+f)/3.L; // q=Tr(M)/3
+    real_t p2 = (a-q)*(a-q) + (d-q)*(d-q) + (f-q)*(f-q) + 2.L*p1;
+    real_t p = SQRT(p2/6.L);
 
-    device_real_t detBxp3 = -c*c*(d-q) + 2*b*c*e - (a-q)*e*e - b*b*(f-q) + (a-q)*(d-q)*(f-q);
-    device_real_t r = detBxp3/(2*p*p*p);
+    real_t detBxp3 = -c*c*(d-q) + 2*b*c*e - (a-q)*e*e - b*b*(f-q) + (a-q)*(d-q)*(f-q);
+    real_t r = detBxp3/(2*p*p*p);
 
-    device_real_t phi = r <= -1? M_PI/3.L : (r >= 1? 0.L : ACOS(r)/3.L);
-    device_real_t lam1 = q + 2*p*COS(phi);
-    device_real_t lam3 = q + 2*p*COS(phi +  (2.L/3.L)*M_PI);
-    device_real_t lam2 = 3*q - lam1 - lam3;
+    real_t phi = r <= -1? M_PI/3.L : (r >= 1? 0.L : ACOS(r)/3.L);
+    real_t lam1 = q + 2*p*COS(phi);
+    real_t lam3 = q + 2*p*COS(phi +  (2.L/3.L)*M_PI);
+    real_t lam2 = 3*q - lam1 - lam3;
 
-    return {{lam1,lam2,lam3}};
+    return {lam1,lam2,lam3};
   }
 
-  device_real_t __device__
-  xTAx(const device_coord3d &x) const {
+  real_t __device__
+  xTAx(const coord3d &x) const {
     return x[0]*(a*x[0] + b*x[1] + c*x[2])
          + x[1]*(b*x[0] + d*x[1] + e*x[2])
          + x[2]*(c*x[0] + e*x[1] + f*x[2]);
@@ -113,10 +94,8 @@ struct symMat3
   
 // Compute eigenvector associated with lambda, directly from 3x3 equations.
 // NB: lambda is input/output and updated to Rayleigh quotient.  
-device_coord3d __device__
-eigenvector3x3(device_real_t &lambda) const{
-    DEVICE_TYPEDEFS;
-    
+coord3d __device__
+eigenvector3x3(real_t &lambda) const{
     array<real_t,3> xs[3];    
     int imax=0;
     real_t ns[3];
@@ -144,7 +123,7 @@ eigenvector3x3(device_real_t &lambda) const{
     for(int i=0;i<3;i++) ns[i] = dot(xs[i],xs[i]);
     for(int i=0;i<3;i++) if(ns[i]>ns[imax]) imax = i; // ns[imax] = max(ns)      
 
-    real_t n = 1.L/SQRT(ns[imax]);
+    real_t n = real_t(1.L)/sqrt(ns[imax]);
     for(int i=0;i<3;i++) xs[imax][i] *= n;
 			     
     lambda = xTAx(xs[imax]);
@@ -154,18 +133,19 @@ eigenvector3x3(device_real_t &lambda) const{
 
   // Eigenvector asssociated with lambda1 and orthogonal to v0. Calculated by deflating to 2x2 against v0.
   // NB: lambda1 is input/output and updated to with improved accuracy.
-  device_coord3d __device__
-  eigenvector2x2(const device_coord3d &v0, device_real_t &lambda1) const {
-    DEVICE_TYPEDEFS;
+
+  std::array<T,3> __device__
+  eigenvector2x2(const std::array<T,3> &v0, T &lambda1) const {
+    FLOAT_TYPEDEFS(T);
     
     // Vælg vilkårlige u og v som er orthogonale til v0:
     real_t n = (v0[0]+v0[1]+v0[2]);
 
-    device_coord3d u{1-n*v0[0],1-n*v0[1],1-n*v0[2]};  u = u*real_t(1/sqrt(dot(u,u)));
-    device_coord3d v = cross(v0,u);
+    coord3d u{1-n*v0[0],1-n*v0[1],1-n*v0[2]};  u = u*real_t(1/sqrt(dot(u,u)));
+    coord3d v = cross(v0,u);
 
     // Symmetrisk 2x2 matrix i u,v-basis
-    device_coord3d Au = dot(mat(),u), Av = dot(mat(),v); 
+    coord3d Au = dot(mat(),u), Av = dot(mat(),v); 
 
     // std::cout << "v0 = " << v0 << "\n";
     // std::cout << "dot(u,u)  = " << dot(u,u)  << ", dot(v,v)  = " << dot(v,v) << "\n";
@@ -181,7 +161,7 @@ eigenvector3x3(device_real_t &lambda) const{
 
     real_t lam = std::abs(lam1) < std::abs(lam2)? lam1 : lam2;
 
-    // std::cout << "a,b,c = "<<device_coord3d{{aa,bb,cc}} << "; {A,B,C} = " << array<long double,3>{{A,B,C}} << "\n";
+    // std::cout << "a,b,c = "<<coord3d{{aa,bb,cc}} << "; {A,B,C} = " << array<long double,3>{{A,B,C}} << "\n";
     // std::cout << "{lambda1,lam1,lam1} = "<< array<long double,3>{{lambda1,lam1,lam2}} << "\n";
     // //    real_t x[2] = {bb,lam-aa};
     real_t x[2] = {lam-cc,bb};
@@ -191,7 +171,7 @@ eigenvector3x3(device_real_t &lambda) const{
     // std::cout << "r2x2 =   " << (y[0] - lam2x2*x[0]) << ", " << (y[1]-lam2x2*x[1]) << "\n";
     // std::cout << "q2x2 =   " << (y[0]/x[0]) << ", " << (y[1]/x[1]) << "\n";
     
-    device_coord3d v1 = x[0]*u + x[1]*v;
+    coord3d v1 = x[0]*u + x[1]*v;
     v1 = v1*real_t(1/sqrt(dot(v1,v1)));
 
     lambda1 += lam;		// Update lambda1 with correction
@@ -199,12 +179,11 @@ eigenvector3x3(device_real_t &lambda) const{
   }
 
 
-  pair<array<device_coord3d,3>,device_coord3d> __device__
+  pair<array<std::array<T,3>,3>,std::array<T,3>> __device__
   eigensystem() const {  return eigensystem(eigenvalues());  }
   
-  pair<array<device_coord3d,3>,device_coord3d> __device__
-  eigensystem(const device_coord3d &lambdas_) const {
-    DEVICE_TYPEDEFS;
+  pair<array<coord3d,3>,coord3d> __device__
+  eigensystem(const coord3d &lambdas_) const {
     
     array<coord3d,3> v;
     // Compute eigenvalues using closed-form expressions
@@ -237,6 +216,6 @@ eigenvector3x3(device_real_t &lambda) const{
     return {v,lambdas};
   }
   
-  array<device_coord3d,3> __device__
-  mat() const { return {{{{a,b,c}},{{b,d,e}},{{c,e,f}}}}; }  
+  array<coord3d,3> __device__
+  mat() const { return {{{a,b,c},{b,d,e},{c,e,f}}}; }  
 };
