@@ -1,7 +1,7 @@
 if(ENABLE_CUDA)
   set(MORE_SOURCES fast_dualize.cc ) # For some reason, fast_dualize.cc includes GPU stuff. TODO: remove.
 else()
-  set(MORE_SOURCES isomer_batch.cc)  # Don't build CPU-only IsomerBatch if it needs to interact with CUDA.
+  set(MORE_SOURCES isomer_batch.cc device_io.cc)  # Don't build CPU-only IsomerBatch if it needs to interact with CUDA.
 endif()
 
 
