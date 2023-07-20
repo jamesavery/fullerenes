@@ -16,8 +16,8 @@
 using namespace std;
 using namespace std::chrono;
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 
 using namespace gpu_kernels;
@@ -57,9 +57,9 @@ int main(int ac, char **argv)
 
   
 
-  cuda_io::IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-  cuda_io::IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
-  cuda_io::IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)};
+  device_io::IsomerQueue Q0s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)};
+  device_io::IsomerQueue Q1s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)};
+  device_io::IsomerQueue Q2s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)};
 
   for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
 

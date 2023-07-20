@@ -15,8 +15,8 @@
 
 using namespace std;
 using namespace std::chrono;
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/isomerdb.hh"
 
@@ -39,7 +39,7 @@ int main(int ac, char **argv)
     IsomerBatch<GPU> B0s[Nd] = {IsomerBatch<GPU>(N,batch_size,0)};
     std::vector<CuArray<device_real_t>> eccentricity(Nd); for (int i = 0; i < Nd; i++) eccentricity[i] = CuArray<device_real_t>(batch_size);
     std::vector<CuArray<device_real_t>> volumes(Nd); for (int i = 0; i < Nd; i++) volumes[i] = CuArray<device_real_t>(batch_size);
-    cuda_io::IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0)}; for (int i = 0; i < Nd; i++) Q0s[i].resize(batch_size*4);
+    device_io::IsomerQueue Q0s[Nd] = {device_io::IsomerQueue(N,0)}; for (int i = 0; i < Nd; i++) Q0s[i].resize(batch_size*4);
     std::vector<LaunchCtx> gen_ctxs(Nd); for (int i = 0; i < Nd; i++) gen_ctxs[i] = LaunchCtx(i);
     auto policy = LaunchPolicy::ASYNC;
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,IPR,only_nontrivial);
@@ -76,7 +76,7 @@ int main(int ac, char **argv)
     }
     for (int i = 0; i < Nd; i++){
         gen_ctxs[i].wait();
-        cuda_io::copy(start_batch, B0s[i]);
+        device_io::copy(start_batch, B0s[i]);
     }
     for (int i = 0; i < Nd; i++) {
         isomerspace_forcefield::optimise<PEDERSEN>(B0s[i], 5*N, 5*N, gen_ctxs[i], policy);
@@ -86,7 +86,7 @@ int main(int ac, char **argv)
     }
     for (int i = 0; i < Nd; i++) gen_ctxs[i].wait();
     IsomerBatch<CPU> host_batch(N,batch_size);
-    cuda_io::copy(host_batch, B0s[0]);
+    device_io::copy(host_batch, B0s[0]);
 
     //std::vector<int> nan_positions_0;
     //for (int i = 0; i < eccentricity[0].size(); i++) {

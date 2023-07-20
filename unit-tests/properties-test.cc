@@ -7,8 +7,8 @@
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/gpu/kernels.hh"
-#include "fullerenes/gpu/cuda_io.hh"
-#include "fullerenes/gpu/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
+#include "fullerenes/isomer_queue.hh"
 
 using namespace gpu_kernels;
 using namespace isomerspace_dual;
@@ -37,18 +37,18 @@ int main(int argc, char** argv){
         auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
         Bhost.append(G,ID);
     }
-    cuda_io::copy(Bdev, Bhost);
+    device_io::copy(Bdev, Bhost);
     dualise(Bdev);
     tutte_layout(Bdev, N*10);
     zero_order_geometry(Bdev, 4.0);
-    cuda_io::copy(Bstart, Bdev);
+    device_io::copy(Bstart, Bdev);
     optimise<PEDERSEN>(Bdev, N*5, N*5);
     std::string Before_ = "Before_"+to_string(N);
     std::string After_ = "After_"+to_string(N);
     std::string Most_ = "Most_Eccentric_"+to_string(N);
     //FILE* f = fopen((Before_ + "_Geometry.mol2").c_str(), "w");
   //  FILE* g = fopen((After_ + "_Geometry.mol2").c_str(), "w");
-    cuda_io::copy(Bhost, Bdev);
+    device_io::copy(Bhost, Bdev);
     CuArray<device_real_t> orthogonalities(batch_size);
     CuArray<device_real_t> eigs(batch_size*3);
     CuArray<device_real_t> eigvecs(batch_size*9);
@@ -57,7 +57,7 @@ int main(int argc, char** argv){
 
     //isomerspace_properties::eccentricities(Bdev, ecce);
     //isomerspace_properties::transform_coordinates(Bdev);
-    cuda_io::copy(Bhost, Bdev);
+    device_io::copy(Bhost, Bdev);
     std::vector<int> sorted_indices(batch_size);
     std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
     std::sort(sorted_indices.begin(), sorted_indices.end(), [&orthogonalities](int i1, int i2) {return orthogonalities[i1] < orthogonalities[i2];});

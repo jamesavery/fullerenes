@@ -1,4 +1,4 @@
-if(CMAKE_CUDA_COMPILER)
+if(ENABLE_CUDA)
   find_package(CUDAToolkit REQUIRED)
   link_libraries(fortran_opt fullerenes cuda_lib ${CMAKE_CUDA_LIBS})
   add_executable(isomerspace-dualisation isomerspace-dualisation.cc)

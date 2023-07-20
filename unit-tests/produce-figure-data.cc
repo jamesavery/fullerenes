@@ -8,8 +8,8 @@
 using namespace chrono;
 using namespace chrono_literals;
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
@@ -30,16 +30,16 @@ int main(int argc, char** argv){
 
     IsomerBatch<GPU> batch(N,1);
     IsomerBatch<CPU> h_batch(N,1);
-    cuda_io::IsomerQueue Q(N);
+    device_io::IsomerQueue Q(N);
     Q.insert(G,ID);
     Q.refill_batch(batch);
     gpu_kernels::isomerspace_dual::dualise(batch);
     gpu_kernels::isomerspace_tutte::tutte_layout(batch);
     gpu_kernels::isomerspace_X0::zero_order_geometry(batch,4.);
-    cuda_io::copy(h_batch,batch);
+    device_io::copy(h_batch,batch);
 
     //Polyhedron::to_mol2(h_batch.get_isomer_by_id(ID).value(),fopen("BEAUTIFUL_X0.mol2","w+")); 
-    cuda_io::reset_convergence_statuses(batch);
+    device_io::reset_convergence_statuses(batch);
     gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(batch,N*1,N*5);
     batch.print(BatchMember::COORDS3D);
     Q.insert(batch);

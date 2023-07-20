@@ -1,7 +1,7 @@
 #ifndef MISCEllANEOUS_CUDA_FUN
 #define MISCEllANEOUS_CUDA_FUN
 
-#include "cuda_definitions.h"
+#include "fullerenes/config.h"
 #include "cuda_runtime_api.h"
 #include <string>
 

@@ -1,5 +1,5 @@
 
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.22)
 project(Fullerenes)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -10,8 +10,11 @@ set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
 find_package(LAPACK)
 find_package(GSL)
+
 include(CheckLanguage)
+include(CMakeDependentOption)
 check_language(CUDA)
+cmake_dependent_option(ENABLE_CUDA "Build CUDA GPU code" ON "CMAKE_CUDA_COMPILER" OFF)
 
 # Get the current working branch
 execute_process(
@@ -30,17 +33,6 @@ execute_process(
 )
 
 # C++ configure file
-configure_file(
-  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.hh.in
-  ${CMAKE_BINARY_DIR}/include/fullerenes/config.hh
-  )
-
-# Fortran configure file
-configure_file(
-  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.f.in
-  ${CMAKE_SOURCE_DIR}/src/fortran/config.f
-)
-
 
 include_directories(AFTER SYSTEM include)
 include_directories(${CMAKE_BINARY_DIR}/include/)
@@ -58,7 +50,7 @@ set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O3 -m64 -pthread -fopenmp")
 # TODO: Add OpenMP Isomerspace implementation, choose at runtime if both openmp and cuda present. OpenACC too?
 
 
-if(CMAKE_CUDA_COMPILER)
+if(ENABLE_CUDA)
   enable_language(CUDA)
   set(CUDA_INCLUDE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
   
@@ -90,6 +82,18 @@ set(CUDA_MAXREGCOUNT "--maxrregcount=80")
 
   add_subdirectory(src/cuda)
 endif()
+
+configure_file(
+  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.hh.in
+  ${CMAKE_BINARY_DIR}/include/fullerenes/config.hh
+  )
+
+# Fortran configure file
+configure_file(
+  ${CMAKE_SOURCE_DIR}/include/fullerenes/config.f.in
+  ${CMAKE_SOURCE_DIR}/src/fortran/config.f
+)
+
 
 add_subdirectory(src/fortran)
 add_subdirectory(src/contrib)

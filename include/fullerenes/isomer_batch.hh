@@ -1,12 +1,19 @@
 #ifndef ISOMERBATCH_STRUCT
 #define ISOMERBATCH_STRUCT
-#include "fullerenes/gpu/cuda_definitions.h"
-#include "fullerenes/gpu/launch_ctx.hh"
-#include <stdint.h>
+#include "fullerenes/config.hh"
+#ifdef ENABLE_CUDA
+# include "cuda_runtime.h"
+# include "fullerenes/gpu/launch_ctx.hh"
+#else
+# warning "Compiling isomer_batch.hh without CUDA "
+# include "fullerenes/cpu/launch_ctx.hh"
+#endif
+
 #include <optional>
 #include <vector>
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/graph.hh"
+#include "fullerenes/config.h"
 
 enum class IsomerStatus {EMPTY, CONVERGED, PLZ_CHECK, FAILED, NOT_CONVERGED};
 enum BatchMember {COORDS3D, COORDS2D, CUBIC_NEIGHBOURS, DUAL_NEIGHBOURS, FACE_DEGREES, IDS, ITERATIONS, STATUSES};
@@ -36,7 +43,7 @@ struct IsomerBatch
     std::vector<std::tuple<std::string,void**,size_t,bool>> pointers;
 
     IsomerBatch(){
-      pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_hpreal_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+      pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
     }
 
     void operator=(const IsomerBatch &);

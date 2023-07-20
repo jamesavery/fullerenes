@@ -1,7 +1,7 @@
 #ifndef CUDA_PRINT_FUNCTIONS
 #define CUDA_PRINT_FUNCTIONS
 
-#include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/config.h"
 #include "cuda_runtime_api.h"
 
 /* __device__ void print(const device_coord3d& ab){

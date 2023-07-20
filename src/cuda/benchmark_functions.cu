@@ -2,7 +2,7 @@
 #include <cooperative_groups.h>
 #include <cooperative_groups/reduce.h>
 #include <cooperative_groups/scan.h>
-#include "fullerenes/gpu/benchmark_functions.hh"
+#include "fullerenes/config.h"
 #include "fullerenes/progress_bar.hh"
 #include "chrono"
 #include <vector>
@@ -14,7 +14,6 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/gpu/misc_cuda.cuh"
 namespace cuda_benchmark {
-    #include "fullerenes/gpu/cuda_definitions.h"
     #include "coord3d.cuh"
     #include "reductions.cu"
     __global__ void test_scan_V0_(const int n_times){

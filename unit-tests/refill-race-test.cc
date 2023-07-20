@@ -2,16 +2,16 @@
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/isomerdb.hh"
-#include "fullerenes/gpu/isomer_queue.hh"
+#include "fullerenes/isomer_queue.hh"
 
 #include "fullerenes/gpu/kernels.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/cu_array.hh"
 #include <numeric>
 #include <random>
 
 using namespace gpu_kernels;
-using namespace cuda_io;
+using namespace device_io;
 #define SYNC LaunchPolicy::SYNC
 #define ASYNC LaunchPolicy::ASYNC
 

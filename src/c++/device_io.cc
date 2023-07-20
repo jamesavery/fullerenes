@@ -1,18 +1,20 @@
+//TODO: Find mere passende design til IsomerBatch, som ikke er FF-specifikt
+//TODO: Design IsomerSpace, som koordinerer IsomerBatches mv. internt og og MPI-parallelle koersler mellem compute nodes.
 #include "fullerenes/device_io.hh"
-#include "fullerenes/gpu/misc_cuda.cuh"
 #include "type_traits"
 #include <numeric>
+
 namespace device_io{
     
-    template void output_to_queue<CPU>(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<CPU>& batch, const bool copy_2d_layout);
-    template void reset_convergence_statuses<GPU>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
-    template double average_iterations<CPU>(const IsomerBatch<CPU>& input);
-    template double average_iterations<GPU>(const IsomerBatch<GPU>& input);
-    template void is_close<CPU>(const IsomerBatch<CPU>& a, const IsomerBatch<CPU>& b, float tol, bool verbose);
-    template void sort<CPU>(IsomerBatch<CPU>& input_batch, const BatchMember key, const SortOrder order);
-    template void sort<GPU>(IsomerBatch<GPU>& input_batch, const BatchMember key, const SortOrder order);
-    template int count_batch_status<CPU>(const IsomerBatch<CPU>& input, const IsomerStatus status);
-    template int count_batch_status<GPU>(const IsomerBatch<GPU>& input, const IsomerStatus status);
+  template void output_to_queue<CPU>(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<CPU>& batch, const bool copy_2d_layout);
+  template void reset_convergence_statuses<GPU>(IsomerBatch<GPU>& B, const LaunchCtx& ctx, const LaunchPolicy policy);
+  template double average_iterations<CPU>(const IsomerBatch<CPU>& input);
+  template double average_iterations<GPU>(const IsomerBatch<GPU>& input);
+  template void is_close<CPU>(const IsomerBatch<CPU>& a, const IsomerBatch<CPU>& b, float tol, bool verbose);
+  template void sort<CPU>(IsomerBatch<CPU>& input_batch, const BatchMember key, const SortOrder order);
+  template void sort<GPU>(IsomerBatch<GPU>& input_batch, const BatchMember key, const SortOrder order);
+  template int count_batch_status<CPU>(const IsomerBatch<CPU>& input, const IsomerStatus status);
+  template int count_batch_status<GPU>(const IsomerBatch<GPU>& input, const IsomerStatus status);
 
 
     template <Device T>
@@ -68,12 +70,8 @@ namespace device_io{
         assert(lhs_range.second - lhs_range.first == rhs_range.second - rhs_range.first);
         if ( lhs_range.second == -1 && lhs_range.first == -1 ) assert(source.isomer_capacity <= destination.isomer_capacity);
         
-        if(U == GPU) {cudaSetDevice(source.get_device_id()); }
-        else{ cudaSetDevice(destination.get_device_id());}
-        
-        //Iterate over the data fields of the IsomerBatch (pseudo reflection) and copy the contents of each using the provided stream.
-        if(policy == LaunchPolicy::SYNC) {ctx.wait();}
         source.get_print_mode() ? destination.set_print_verbose() : destination.set_print_simple();
+	
         for (size_t i = 0; i < source.pointers.size(); i++)
         {
             int num_isomers = (lhs_range.second > -1 && lhs_range.first > -1) ? lhs_range.second - lhs_range.first : source.isomer_capacity;
@@ -82,28 +80,19 @@ namespace device_io{
             char* lhs_ptr = (char*)(*(get<1>(destination.pointers[i])));
             char* rhs_ptr = (char*)(*(get<1>(source.pointers[i])));
 
-            if( (source.get_device_id() != destination.get_device_id()) && ( (T==GPU) && (U == GPU))){
-                cudaMemcpyPeerAsync(lhs_ptr + lhs_offset, destination.get_device_id(), rhs_ptr + rhs_offset, source.get_device_id(), num_isomers * get<2>(source.pointers[i]), ctx.stream);
-            } else{
-                cudaMemcpyAsync(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]), cudaMemcpyKind(2*U +  T), ctx.stream);
-            }
+	    memcpy(lhs_ptr + lhs_offset, rhs_ptr + rhs_offset, num_isomers * get<2>(source.pointers[i]));
         }
         destination.n_isomers = source.n_isomers;
-        printLastCudaError("device_io::Failed to copy struct");
-        if(policy == LaunchPolicy::SYNC) {ctx.wait();}
     }
 
     template <Device T>
     void free(IsomerBatch<T>& batch){
-        cudaSetDevice(batch.get_device_id());
-        for (int i = 0; i < batch.pointers.size(); i++){
-            if(T == GPU) {cudaFree(*get<1>(batch.pointers[i]));} else {cudaFreeHost(*get<1>(batch.pointers[i]));}
-        }
+        for (int i = 0; i < batch.pointers.size(); i++)
+	  free(*get<1>(batch.pointers[i]));
     }
 
     template <Device T>    
     void resize(IsomerBatch<T>& batch, const size_t new_capacity, const LaunchCtx& ctx, const LaunchPolicy policy, int front, int back){
-        cudaSetDevice(batch.get_device_id());
         //Construct a tempory batch: allocates the needed amount of memory.
         IsomerBatch<T> temp_batch = IsomerBatch<T>(batch.n_atoms, new_capacity, batch.get_device_id());
         //Copy contents of old batch into newly allocated memory.
@@ -115,7 +104,6 @@ namespace device_io{
         for (int i = 0; i < batch.pointers.size(); i++)
         {
             void* temp_ptr = *get<1>(batch.pointers[i]);
-            printLastCudaError("Free failed");
             //Reassign pointers of the input batch, to the new memory
             *get<1>(batch.pointers[i]) = *get<1>(temp_batch.pointers[i]);
             //Assign old pointers to temporary object, let destructor take care of cleanup.
@@ -342,25 +330,12 @@ namespace device_io{
         return std::sqrt( (result / input.size()));
     }
 
-    __global__
-    void reset_convergence_status_(IsomerBatch<GPU> B){
-        for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+=gridDim.x)
-        {
-	  if (threadIdx.x == 0) B.statuses[isomer_idx] = (B.statuses[isomer_idx] == IsomerStatus::EMPTY)? IsomerStatus::EMPTY : IsomerStatus::NOT_CONVERGED;
-	  if (threadIdx.x == 0) B.iterations[isomer_idx] = 0;
-        }
-        
-    }
     template <Device T>
     void reset_convergence_statuses(IsomerBatch<T>& B, const LaunchCtx& ctx, const LaunchPolicy policy){
-        cudaSetDevice(ctx.get_device_id());
-        static LaunchDims dims((void*)reset_convergence_status_, B.n_atoms);
-        dims.update_dims((void*)reset_convergence_status_,B.n_atoms,0,B.isomer_capacity);
-        if(policy == LaunchPolicy::SYNC) ctx.wait();
-        void* kargs[]{(void*)&B};
-        cudaLaunchCooperativeKernel((void*)reset_convergence_status_, dims.get_grid(), dims.get_block(), kargs, 0, ctx.stream);
-        if(policy == LaunchPolicy::SYNC) ctx.wait();
-        
+      for(size_t isomer_idx=0;isomer_idx<B.isomer_capacity;isomer_idx++){
+	B.statuses[isomer_idx]   = (B.statuses[isomer_idx] == IsomerStatus::EMPTY)? IsomerStatus::EMPTY : IsomerStatus::NOT_CONVERGED;
+	B.iterations[isomer_idx] = 0;
+      }
     }
 
 }
@@ -422,17 +397,9 @@ void IsomerBatch<T>::append(const Polyhedron& graph, const size_t id){
 template <Device T>
 void IsomerBatch<T>::clear(const LaunchCtx& ctx, const LaunchPolicy policy){
     //Set statuses to empty and iterations to 0
-    if (T == GPU){
-        cudaSetDevice(ctx.get_device_id());
-        if(policy == LaunchPolicy::SYNC) ctx.wait();
-        cudaMemsetAsync((void*)statuses, int(IsomerStatus::EMPTY), isomer_capacity * sizeof(IsomerStatus), ctx.stream);
-        cudaMemsetAsync((void*)iterations, 0, isomer_capacity * sizeof(size_t), ctx.stream);
-        if(policy == LaunchPolicy::SYNC) ctx.wait();
-    } else if (T == CPU){
-        std::fill(statuses, statuses + isomer_capacity, IsomerStatus::EMPTY);
-        std::fill(iterations, iterations + isomer_capacity, 0);
-    }
-    m_size = 0;
+  std::fill(statuses,   statuses + isomer_capacity, IsomerStatus::EMPTY);
+  std::fill(iterations, iterations + isomer_capacity, 0);
+  m_size = 0;
 }
 
 template <Device T>

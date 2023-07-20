@@ -15,8 +15,8 @@
 #include "fullerenes/progress_bar.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/isomerdb.hh"
 
@@ -26,7 +26,7 @@
 
 using namespace std;
 using namespace std::chrono;
-using namespace cuda_io;
+using namespace device_io;
 
 using namespace gpu_kernels;
 
@@ -114,7 +114,7 @@ int main(int ac, char **argv)
   string output_dir     = ac>=3? argv[2] : string("output/C")+to_string(N);     // Argument 2: directory to output files to
   bool IPR               = ac>=4? strtol(argv[3],0,0):0;  // Argument 3: Only generate IPR fullerenes?
   bool only_nontrivial   = ac>=5? strtol(argv[4],0,0):0;  // Argument 4: Only generate fullerenes with nontrivial symmetry group?
-  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):20; // Argument 5: How many best fullerne candidates do you want to store? 
+  size_t n_best_candidates = ac>=6? strtol(argv[5],0,0):30; // Argument 5: How many best fullerne candidates do you want to store? 
 
   ensure_minimal_stacksize(N*10000000);
   
@@ -122,7 +122,7 @@ int main(int ac, char **argv)
   // Make sure output directory exists
   mkdir(output_dir.c_str(),0777);
   size_t n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
-  n_best_candidates = min(n_best_candidates, n_fullerenes/4);
+  n_best_candidates = max(size_t(1),min(n_best_candidates, n_fullerenes/4));
 
   
   int    Nd = LaunchCtx::get_device_count();
@@ -130,7 +130,7 @@ int main(int ac, char **argv)
   size_t final_batch_size = n_best_candidates*NUM_RESULTS*2/Nd+(Nd-1);
 
   cout << "Analyzing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
-
+  cout << "n_best_candidates = " << n_best_candidates << "; batch_size = " << batch_size << "; final_batch_size = " << final_batch_size <<"\n";
   // Organize all of our of computation pipeline stages and our scoresl of different results
 
   array<array<double,2>,NUM_RESULTS> result_bounds = {{
@@ -184,10 +184,10 @@ int main(int ac, char **argv)
   IsomerBatch<CPU> final_host_batch[Nd] = {IsomerBatch<CPU>(N,final_batch_size,0),IsomerBatch<CPU>(N,final_batch_size,1)};  
   
   // TODO: Organize Qs by stages together with batches.Structure nicely.
-  IsomerQueue Q0s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate
-  IsomerQueue Q1s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // X0-generate to optimization
-  IsomerQueue Q2s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // optimization to properties + stat
-  IsomerQueue Q3s[Nd] = {cuda_io::IsomerQueue(N,0), cuda_io::IsomerQueue(N,1)}; // k_best result final computations
+  IsomerQueue Q0s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate
+  IsomerQueue Q1s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // X0-generate to optimization
+  IsomerQueue Q2s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // optimization to properties + stat
+  IsomerQueue Q3s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // k_best result final computations
   
   
   for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
@@ -292,7 +292,7 @@ int main(int ac, char **argv)
       Q1s[d].refill_batch(B, opt_ctxs[d], policy);
       isomerspace_forcefield::optimise<PEDERSEN>(B, 3*N, 20*N, ctx, policy);      
       Q2s[d].push_done(B, ctx, policy);
-      if(final) cuda_io::copy(host_batch[d],B,ctx,policy); 
+      if(final) device_io::copy(host_batch[d],B,ctx,policy); 
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
@@ -331,7 +331,7 @@ int main(int ac, char **argv)
       isomerspace_properties::moments_of_inertia   (B, results[INERTIA][d],      ctx, policy);      
       isomerspace_properties::eccentricities       (B, results[ECCENTRICITY][d], ctx, policy);
       isomerspace_properties::volume_divergences   (B, results[VOLUME][d],       ctx, policy);
-      cuda_io::copy(host_batch[d],B,ctx,policy);      
+      device_io::copy(host_batch[d],B,ctx,policy);      
       B.clear(ctx,policy);      
     }
     for (int d = 0; d < Nd; d++){
@@ -615,7 +615,7 @@ int main(int ac, char **argv)
       lams[d] = CuArray<real_t>(3*N*final_batch_size,0);    
       isomerspace_eigen  ::eigensolve(B,Q[d],hessians[d],hessian_cols[d],lams[d],ctx,policy);
     }
-    cuda_io::copy(final_host_batch[d],B,ctx,policy);
+    device_io::copy(final_host_batch[d],B,ctx,policy);
     ctx.wait();
     }}
   

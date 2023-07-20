@@ -4,8 +4,8 @@
 
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/isomerdb.hh"
-#include "fullerenes/gpu/cuda_io.hh"
-#include "fullerenes/gpu/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
+#include "fullerenes/isomer_queue.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 
 
@@ -15,9 +15,9 @@ int main(int argc, char** argv) {
     using namespace gpu_kernels;
     auto batch_size = 200;
     std::cout << "Batch size: " << batch_size << std::endl;
-    cuda_io::IsomerQueue Q0(N, 0); Q0.resize(5*batch_size);
-    cuda_io::IsomerQueue Q1(N, 0); 
-    cuda_io::IsomerQueue Q2(N, 0); Q2.resize(5*batch_size);
+    device_io::IsomerQueue Q0(N, 0); Q0.resize(5*batch_size);
+    device_io::IsomerQueue Q1(N, 0); 
+    device_io::IsomerQueue Q2(N, 0); Q2.resize(5*batch_size);
     auto Nf = N/2 + 2;
     auto ID = 0;
     Graph G(Nf);
@@ -50,10 +50,10 @@ int main(int argc, char** argv) {
     }
 
     IsomerBatch<CPU> host_batch(N, Q2.get_capacity());
-    cuda_io::copy(host_batch,Q2.device_batch);
+    device_io::copy(host_batch,Q2.device_batch);
     host_batch.shrink_to_fit();
     host_batch.print(BatchMember::ITERATIONS);
-    cuda_io::sort(host_batch, BatchMember::IDS, SortOrder::ASCENDING);
+    device_io::sort(host_batch, BatchMember::IDS, SortOrder::ASCENDING);
     std::vector<size_t> ids(host_batch.IDs, host_batch.IDs + host_batch.capacity());
     std::vector<size_t> id_valid(host_batch.capacity(),0);
     std::iota(id_valid.begin(), id_valid.end(), 0);

@@ -1,13 +1,13 @@
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
-#include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/config.h"
 #include <chrono>
 #include <fstream>
 #include "random"
 #include "numeric"
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/isomerdb.hh"
 
@@ -48,7 +48,7 @@ int main(int argc, char** argv){
             I++;
         }
         if (B0.size() == 0) break;
-        cuda_io::copy(B1, B0);                                      //Copy to device B1 <- B0
+        device_io::copy(B1, B0);                                      //Copy to device B1 <- B0
         isomerspace_forcefield::optimise<PEDERSEN>(B1, N*5, N*5);     //Forcefield Optimization
         B0.clear();
         //Do something with results from B1 next... (Future work)

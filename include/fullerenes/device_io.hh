@@ -1,23 +1,21 @@
-#ifndef CUDA_IO_H
-#define CUDA_IO_H
-#include <cuda_runtime.h>
-#include "launch_ctx.hh"
+#ifndef DEVICE_IO_H
+#define DEVICE_IO_H
 #include <chrono>
 #include <queue>
 #include "fullerenes/isomer_batch.hh"
 
-namespace cuda_io{
+namespace device_io{
     template <Device T>
-    cudaError_t output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<T>& batch, const bool copy_2d_layout = true);
+    void output_to_queue(std::queue<std::tuple<Polyhedron, size_t, IsomerStatus>>& queue, IsomerBatch<T>& batch, const bool copy_2d_layout = true);
     
     template <Device T, Device U>
-    cudaError_t copy(IsomerBatch<T>& target, const IsomerBatch<U>& source, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC, const std::pair<int,int>& lhs_range = {-1,-1}, const std::pair<int,int>& rhs_range = {-1,-1});
+    void copy(IsomerBatch<T>& target, const IsomerBatch<U>& source, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC, const std::pair<int,int>& lhs_range = {-1,-1}, const std::pair<int,int>& rhs_range = {-1,-1});
     
     template <Device T>
-    cudaError_t resize(IsomerBatch<T>& batch, size_t new_capacity, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC, int front = -1, int back = -1);
+    void resize(IsomerBatch<T>& batch, size_t new_capacity, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC, int front = -1, int back = -1);
     
     template <Device T>
-    cudaError_t reset_convergence_statuses(IsomerBatch<T>& batch, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+    void reset_convergence_statuses(IsomerBatch<T>& batch, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
     
     std::tuple<int, float, float> compare_isomer_arrays(float* a, float* b, int n_isomers, int n_elements_per_isomer, float rtol = 0.0, bool verbose = false, float zero_threshold = 1e-8);
     
