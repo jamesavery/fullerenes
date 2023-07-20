@@ -15,7 +15,7 @@ IsomerBatch<T>::IsomerBatch(size_t n_atoms, size_t n_isomers, int device) :
 		  {"IDs", (void**)&IDs, sizeof(size_t), false},
 		  {"iterations", (void**)&iterations, sizeof(size_t), false}};
 
-  for (auto [name, ptr,isomer_size]: pointers) {      
+  for (auto [name, ptr,isomer_size,whatisthebool]: pointers) {      
       *ptr = calloc(n_isomers, isomer_size);
       memset(*ptr,0, n_isomers*isomer_size);
     }
@@ -66,4 +66,6 @@ IsomerBatch<T>::~IsomerBatch(){
     allocated = false;
 }
 
-
+// TODO: Explicit template-instantiering skal organiseres struktureret & ikke bare i bunden af filer.
+IsomerBatch<CPU> A(0,0);
+IsomerBatch<GPU> B(0,0);
