@@ -230,7 +230,8 @@ namespace gpu_kernels{
         template void spectrum_ends<GPU, double, uint16_t>(const IsomerBatch<GPU>& B, const CuArray<double>& hessians, const CuArray<uint16_t>& cols, CuArray<double>& lambda_mins, CuArray<double>& lambda_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
         template void spectrum_ends<GPU, float, uint16_t>(const IsomerBatch<GPU>& B, const CuArray<float>& hessians, const CuArray<uint16_t>& cols, CuArray<float>& lambda_mins, CuArray<float>& lambda_maxs, CuArray<float>& eigvect_mins, CuArray<float>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
         template void spectrum_ends<GPU, double, uint16_t>(const IsomerBatch<GPU>& B, const CuArray<double>& hessians, const CuArray<uint16_t>& cols, CuArray<double>& lambda_mins, CuArray<double>& lambda_maxs, CuArray<double>& eigvect_mins, CuArray<double>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
-        template void eigensolve<GPU>(const IsomerBatch<GPU>& B, CuArray<float>& Q, const CuArray<float>& hessians, const CuArray<uint16_t>& cols, CuArray<float>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template void eigensolve<GPU, float, uint16_t>(const IsomerBatch<GPU>& B, CuArray<float>& Q, const CuArray<float>& hessians, const CuArray<uint16_t>& cols, CuArray<float>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template void eigensolve<GPU, double, uint16_t>(const IsomerBatch<GPU>& B, CuArray<double>& Q, const CuArray<double>& hessians, const CuArray<uint16_t>& cols, CuArray<double>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
 
         #include "device_includes.cu"
         enum class EigensolveMode {NO_VECTORS, VECTORS, ENDS, FULL_SPECTRUM};
