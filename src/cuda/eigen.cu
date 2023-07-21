@@ -227,7 +227,9 @@ std::pair<device_real_t,size_t> eigensystem_hermitian(const int n, const
 namespace gpu_kernels{
     namespace isomerspace_eigen{
         template void spectrum_ends<GPU, float, uint16_t>(const IsomerBatch<GPU>& B, const CuArray<float>& hessians, const CuArray<uint16_t>& cols, CuArray<float>& lambda_mins, CuArray<float>& lambda_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template void spectrum_ends<GPU, double, uint16_t>(const IsomerBatch<GPU>& B, const CuArray<double>& hessians, const CuArray<uint16_t>& cols, CuArray<double>& lambda_mins, CuArray<double>& lambda_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
         template void spectrum_ends<GPU, float, uint16_t>(const IsomerBatch<GPU>& B, const CuArray<float>& hessians, const CuArray<uint16_t>& cols, CuArray<float>& lambda_mins, CuArray<float>& lambda_maxs, CuArray<float>& eigvect_mins, CuArray<float>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template void spectrum_ends<GPU, double, uint16_t>(const IsomerBatch<GPU>& B, const CuArray<double>& hessians, const CuArray<uint16_t>& cols, CuArray<double>& lambda_mins, CuArray<double>& lambda_maxs, CuArray<double>& eigvect_mins, CuArray<double>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
         template void eigensolve<GPU>(const IsomerBatch<GPU>& B, CuArray<float>& Q, const CuArray<float>& hessians, const CuArray<uint16_t>& cols, CuArray<float>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
 
         #include "device_includes.cu"
@@ -340,27 +342,30 @@ namespace gpu_kernels{
         };
 
         typedef array_wrapper<device_real_t> real_wrap; */
-        void __device__ apply_all_reflections(const device_real_t *V, const int n, const int m, device_real_t* Q)
-        {
+        template <typename T>
+        void __device__ apply_all_reflections(const T *V, const int n, const int m, T* Q)
+        {   
+            static_assert(std::is_floating_point<T>::value, "T must be floating point");
 
             for(int k=0;k<n;k++){
-                const device_real_t &v0 = V[2*k], &v1 = V[2*k+1];      
+                const T &v0 = V[2*k], &v1 = V[2*k+1];      
                 // Udrullet:
                 //       apply_reflection(Q({k,k+2},{0,m}), v);
                 for(int l=threadIdx.x;l<m; l+=blockDim.x){
-                    device_real_t &q0 = Q[k*m+l], &q1 = Q[(k+1)*m+l];
-                    device_real_t vTA = q0*v0 + q1*v1;
+                    T &q0 = Q[k*m+l], &q1 = Q[(k+1)*m+l];
+                    T vTA = q0*v0 + q1*v1;
                     q0 -= 2*v0*vTA;
                     q1 -= 2*v1*vTA;
                 }      
             }  
         }
         //Customized diagonalization routine for symmetric tridiagonal matrices
-        void __device__ T_QTQ(const int n, device_real_t* D, device_real_t* L, device_real_t* U, device_real_t* Vout, device_real_t shift=0)
+        template <typename T>
+        void __device__ T_QTQ(const int n, T* D, T* L, T* U, T* Vout, T shift=0)
         {
         int tix = threadIdx.x;
-        DEVICE_TYPEDEFS;
-        extern __shared__ real_t shared[];
+        FLOAT_TYPEDEFS(T);
+        SMEM(T);
         //  QTQ_calls ++;
         // Unrolled
         //  real_t numerical_zero = T.max_norm()*10*std::numeric_limits<real_t>::epsilon();
@@ -369,7 +374,7 @@ namespace gpu_kernels{
         for (int i = tix; i < n; i += blockDim.x){
             local_max = std::max(local_max, ABS(D[i]) + 2*ABS(L[i]));
         }
-        real_t max_norm = reduction_max(shared, local_max);
+        real_t max_norm = reduction_max(smem, local_max);
         real_t numerical_zero = 10*std::numeric_limits<real_t>::epsilon();
         device_real_t d_n, l_n, l_nm1;
         d_n = D[n]; l_n = L[n]; l_nm1 = L[n-1];
@@ -474,9 +479,10 @@ namespace gpu_kernels{
         
         }
 
-        array<device_real_t,2> INLINE eigvalsh2x2(const array<device_real_t,4> &A){
+        template <typename T>
+        array<T,2> INLINE eigvalsh2x2(const array<T,4> &A){
             auto [a,b,c,d] = A;
-            device_real_t D = SQRT(4*b*c+(a-d)*(a-d));
+            T D = SQRT(4*b*c+(a-d)*(a-d));
             return {(a+d-D)/2, (a+d+D)/2};
         }
 
@@ -484,8 +490,8 @@ namespace gpu_kernels{
 
         template<EigensolveMode mode, Device DEV, typename T, typename K>
         void __global__ eigensolve_(const IsomerBatch<DEV> B, CuArray<T> D_, CuArray<T> L_, CuArray<T> U_, CuArray<T> Q_, int n){
-            DEVICE_TYPEDEFS;
-            extern __shared__ T smem[];
+            FLOAT_TYPEDEFS(T);
+            SMEM(T);
             T *D = smem + blockDim.x*2, *L = D + (n+1), *U = L + (n+1), *V = U + (n+1)*2;
             //Expected layout is that each thread reads the (threadIdx.x + blockIdx.x*blockDim.x)^th column of D and L, in that way reads should be coalesced.
             for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] == IsomerStatus::CONVERGED){
@@ -529,8 +535,8 @@ namespace gpu_kernels{
 
                 // Best guess to eigenvalue in position n-1,n-1.
                 if(k>0){
-                auto [l0,l1]  = eigvalsh2x2({D[k-1],L[k-1],   /* Diagonalize T[(k-1):k, (k-1):k] 2x2 submatrix */
-                                L[k-1],D[k]  });
+                    std::array<T,4> args = {D[k-1],L[k-1],L[k-1],D[k]};
+                    auto [l0,l1]  = eigvalsh2x2(args);
 
                 shift    = ABS(l0-d) < ABS(l1-d)? l0 : l1; // Pick closest eigenvalue
                 } else
@@ -556,8 +562,8 @@ namespace gpu_kernels{
         
         template<EigensolveMode mode, Device DEV, typename T, typename K>
         void __global__ eigensolve_min_max_(const IsomerBatch<DEV> B, CuArray<T> D_, CuArray<T> L_, CuArray<T> U_, CuArray<T> Q_, CuArray<T> EigMin_, CuArray<T> EigMax_, CuArray<int> MinIdx_, CuArray<int> MaxIdx_, int n){
-            DEVICE_TYPEDEFS;
-            extern __shared__ T smem[];
+            FLOAT_TYPEDEFS(T);
+            SMEM(T);
             T *D = smem + blockDim.x*2, *L = D + (n+1), *U = L + (n+1), *V = U + (n+1)*2;
             //Expected layout is that each thread reads the (threadIdx.x + blockIdx.x*blockDim.x)^th column of D and L, in that way reads should be coalesced.
             for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] == IsomerStatus::CONVERGED){
@@ -600,8 +606,9 @@ namespace gpu_kernels{
 
                 // Best guess to eigenvalue in position n-1,n-1.
                 if(k>0){
-                auto [l0,l1]  = eigvalsh2x2({D[k-1],L[k-1],   /* Diagonalize T[(k-1):k, (k-1):k] 2x2 submatrix */
-                                L[k-1],D[k]  });
+                std::array<T,4> args = {D[k-1],L[k-1],
+                            L[k-1],D[k]};
+                auto [l0,l1]  = eigvalsh2x2(args   /* Diagonalize T[(k-1):k, (k-1):k] 2x2 submatrix */);
 
                 shift    = ABS(l0-d) < ABS(l1-d)? l0 : l1; // Pick closest eigenvalue
                 } else
@@ -655,8 +662,8 @@ namespace gpu_kernels{
 
         template <EigensolveMode mode, Device DEV, typename T, typename K>
         void __global__ lanczos_(const IsomerBatch<DEV> B, CuArray<T> V_, CuArray<T> U, CuArray<T> D, const CuArray<T> H, const CuArray<K> cols, int m){
-            DEVICE_TYPEDEFS;
-            extern __shared__ real_t smem[];
+            TEMPLATE_TYPEDEFS(T,K);
+            SMEM(T);
             int N = B.n_atoms * 3; //Number of rows in the hessian
             int atom_idx = threadIdx.x/3; //Atom index
             constexpr int M = 10*3;          //Number of columns in the hessian
@@ -665,7 +672,7 @@ namespace gpu_kernels{
             real_t A[M]; //Hessian matrix, threadIdx.x'th row
             node_t C[M]; //Column indices of the threadIdx.x'th row 3-fold degenerate
             real_t* V;
-            real_t* X_ptr = B.X + N*blockIdx.x;
+            float* X_ptr = B.X + N*blockIdx.x; //WARNING float 
             real_t Z[6]; //Eigenvectors spanning the kernel of the hessian (Rotations, Translations)
             if (mode == EigensolveMode::ENDS){
                 Z[0] = real_t(threadIdx.x%3 == 0)/SQRT(B.n_atoms); Z[1] = real_t(threadIdx.x%3 == 1)/SQRT(B.n_atoms); Z[2] = real_t(threadIdx.x%3 == 2)/SQRT(B.n_atoms); // Translation eigenvectors
@@ -797,7 +804,7 @@ namespace gpu_kernels{
         //Assumes that N = B.n_atoms * 3
         template <Device DEV,typename T, typename K>
         void __global__ compute_eigenvectors_(const IsomerBatch<DEV> B, CuArray<T> Q, CuArray<T> V, CuArray<T> E, int m){
-            DEVICE_TYPEDEFS;
+            TEMPLATE_TYPEDEFS(T,K);
             int n = B.n_atoms * 3;
             for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x){
                 real_t* v = V.data + I * m * n;
@@ -819,7 +826,7 @@ namespace gpu_kernels{
         
         template <Device DEV,typename T, typename K>
         void __global__ compute_eigenvectors_ends_(const IsomerBatch<DEV> B, CuArray<T> Q, CuArray<T> V, CuArray<T> Emin, CuArray<T> Emax, CuArray<int> MinIdx, CuArray<int> MaxIdx, int m){
-            DEVICE_TYPEDEFS;
+            TEMPLATE_TYPEDEFS(T,K);
             int n = B.n_atoms * 3;
             for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x){
                 int minidx = MinIdx.data[I];
@@ -841,6 +848,7 @@ namespace gpu_kernels{
         template <Device DEV,typename T, typename K>
         void eigensolve(const IsomerBatch<DEV>& B, CuArray<T>& Q, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
+            FLOAT_TYPEDEFS(T);
             cudaSetDevice(B.get_device_id());
             auto dev = B.get_device_id();
             static int Nd = LaunchCtx::get_device_count();
@@ -863,7 +871,7 @@ namespace gpu_kernels{
                 m_isomer_capacity = B.isomer_capacity;
             }
 
-            size_t smem = sizeof(device_coord3d)*B.n_atoms*3 + sizeof(T)*Block_Size_Pow_2;
+            size_t smem = sizeof(coord3d)*B.n_atoms*3 + sizeof(T)*Block_Size_Pow_2;
             size_t smem_qr = sizeof(T)*(B.n_atoms*3+1)*6 + sizeof(T)*(B.n_atoms*3)*2;
             size_t smem_eig = 0;
 
@@ -902,6 +910,7 @@ namespace gpu_kernels{
         void eigensolve(const IsomerBatch<DEV>& B, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             cudaSetDevice(B.get_device_id());
+            FLOAT_TYPEDEFS(T);
             auto dev = B.get_device_id();
             static int Nd = LaunchCtx::get_device_count();
             static std::vector<bool> init(Nd, false);
@@ -923,7 +932,7 @@ namespace gpu_kernels{
                 m_isomer_capacity = B.isomer_capacity;
             }
 
-            size_t smem = sizeof(device_coord3d)*B.n_atoms*3 + sizeof(T)*Block_Size_Pow_2;
+            size_t smem = sizeof(coord3d)*B.n_atoms*3 + sizeof(T)*Block_Size_Pow_2;
             size_t smem_qr = sizeof(T)*(B.n_atoms*3+1)*6 + sizeof(T)*(B.n_atoms*3)*2;
             size_t smem_eig = 0;
             static LaunchDims dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM, DEV,T,K>, B.n_atoms*3, smem, B.isomer_capacity);
@@ -956,6 +965,7 @@ namespace gpu_kernels{
         template <Device DEV,typename T, typename K>
         void spectrum_ends(const IsomerBatch<DEV>& B, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& lambda_mins, CuArray<T>& lambda_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy){
             if (policy == LaunchPolicy::SYNC) ctx.wait();
+            FLOAT_TYPEDEFS(T);
             cudaSetDevice(B.get_device_id());
             auto dev = B.get_device_id();
             static int Nd = LaunchCtx::get_device_count();
