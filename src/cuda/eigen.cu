@@ -232,9 +232,10 @@ namespace gpu_kernels{
         template void spectrum_ends<GPU, double, uint16_t>(const IsomerBatch<GPU>& B, const CuArray<double>& hessians, const CuArray<uint16_t>& cols, CuArray<double>& lambda_mins, CuArray<double>& lambda_maxs, CuArray<double>& eigvect_mins, CuArray<double>& eigvect_maxs, int m_lanczos, const LaunchCtx& ctx, const LaunchPolicy policy);
         template void eigensolve<GPU, float, uint16_t>(const IsomerBatch<GPU>& B, CuArray<float>& Q, const CuArray<float>& hessians, const CuArray<uint16_t>& cols, CuArray<float>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
         template void eigensolve<GPU, double, uint16_t>(const IsomerBatch<GPU>& B, CuArray<double>& Q, const CuArray<double>& hessians, const CuArray<uint16_t>& cols, CuArray<double>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
+        template void eigensolve_special<GPU, float, uint16_t>(const IsomerBatch<GPU>& B, CuArray<float>& Q, const CuArray<float>& hessians, const CuArray<uint16_t>& cols, CuArray<float>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy);
 
         #include "device_includes.cu"
-        enum class EigensolveMode {NO_VECTORS, VECTORS, ENDS, FULL_SPECTRUM};
+        enum class EigensolveMode {NO_VECTORS, VECTORS, ENDS, FULL_SPECTRUM, FULL_SPECTRUM_MOLECULE}; 
 #if(CUSOLVER)      
         void eigensolve_cusolver(const IsomerBatch& B, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
             static std::vector<cusolverDnHandle_t> cusolverHs(N_STREAMS, NULL);
@@ -528,7 +529,7 @@ namespace gpu_kernels{
                 while(not_done > 0){	// GPU NB: Kan erstattes med fornuftig konstant antal iterationer, f.eks. 4-5 stykker.
                 i++;   
                 T_QTQ(k+1, D,L, U, V, shift);  // 
-                if(mode == EigensolveMode::VECTORS){
+                if(mode == EigensolveMode::VECTORS || mode == EigensolveMode::FULL_SPECTRUM_MOLECULE){
                     apply_all_reflections(V,k,n,Q_.data + n*n*I);
                 }
                 
@@ -557,7 +558,13 @@ namespace gpu_kernels{
             BLOCK_SYNC
             //Copy back to global memory
             for (int i = threadIdx.x; i < n; i += blockDim.x){
-                D_.data[n*I + i] = D[i];}
+                if( mode == EigensolveMode::FULL_SPECTRUM_MOLECULE){
+                    if(i < 6) {D_.data[(n+6)*I + i] = 0;}
+                    D_.data[(n+6)*I + 6 + i] = D[i];
+                } else {
+                    D_.data[n*I + i] = D[i];
+                }
+            }
         }
         }
         
@@ -675,7 +682,7 @@ namespace gpu_kernels{
             real_t* V;
             float* X_ptr = B.X + N*blockIdx.x; //WARNING float 
             real_t Z[6]; //Eigenvectors spanning the kernel of the hessian (Rotations, Translations)
-            if (mode == EigensolveMode::ENDS){
+            if (mode == EigensolveMode::ENDS || mode == EigensolveMode::FULL_SPECTRUM_MOLECULE){
                 Z[0] = real_t(threadIdx.x%3 == 0)/SQRT(B.n_atoms); Z[1] = real_t(threadIdx.x%3 == 1)/SQRT(B.n_atoms); Z[2] = real_t(threadIdx.x%3 == 2)/SQRT(B.n_atoms); // Translation eigenvectors
                 
             }
@@ -702,7 +709,7 @@ namespace gpu_kernels{
                 BLOCK_SYNC
                 real_t result = V[index*N];
                 smem[threadIdx.x] = 0;
-                if (mode == EigensolveMode::ENDS){
+                if (mode == EigensolveMode::ENDS || mode == EigensolveMode::FULL_SPECTRUM_MOLECULE){
                     #pragma unroll
                     for (int j = 0; j < 6; j++){
                         auto proj = reduction(smem, result * Z[j]) * Z[j];
@@ -724,7 +731,7 @@ namespace gpu_kernels{
 
             for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x) if(B.statuses[I] == IsomerStatus::CONVERGED){
                 V = V_.data + I * m * N + threadIdx.x;
-                if(mode == EigensolveMode::ENDS){
+                if(mode == EigensolveMode::ENDS || mode == EigensolveMode::FULL_SPECTRUM_MOLECULE){
                     X_ptr = B.X + N*I;
                     if (threadIdx.x%3 == 0) {
                         Z[3] = real_t(0.);
@@ -803,21 +810,51 @@ namespace gpu_kernels{
             }   
         }
         //Assumes that N = B.n_atoms * 3
-        template <Device DEV,typename T, typename K>
+        template <EigensolveMode mode, Device DEV,typename T, typename K>
         void __global__ compute_eigenvectors_(const IsomerBatch<DEV> B, CuArray<T> Q, CuArray<T> V, CuArray<T> E, int m){
+            int atom_idx = threadIdx.x/3; //Atom index (Integer division so the result is rounded down)
             TEMPLATE_TYPEDEFS(T,K);
+            SMEM(T);
             int n = B.n_atoms * 3;
+            int offset = 0;
+            if (mode == EigensolveMode::ENDS || mode == EigensolveMode::FULL_SPECTRUM_MOLECULE){
+                offset = 6;
+            }
             for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x){
                 real_t* v = V.data + I * m * n;
                 real_t* e = E.data + I * n * n;
                 real_t* q = Q.data + I * m * m;
-
+                if (mode == EigensolveMode::FULL_SPECTRUM_MOLECULE) {
+                    for(int i = 0; i < 3; i++){
+                        e[i*n + threadIdx.x] = real_t(threadIdx.x%3 == i)/SQRT(B.n_atoms); 
+                    }
+                    float* X_ptr = B.X + n*I; //WARNING float hardcoded here to match the type of B.X (IsomerBatch)
+                    if (threadIdx.x%3 == 0) {
+                        e[3*n + threadIdx.x] = real_t(0.);
+                        e[4*n + threadIdx.x] = -X_ptr[atom_idx*3 + 2];
+                        e[5*n + threadIdx.x] = -X_ptr[atom_idx*3 + 1];
+                    } else if (threadIdx.x%3 == 1) {
+                        e[3*n + threadIdx.x] = -X_ptr[atom_idx*3 + 2];
+                        e[4*n + threadIdx.x] = real_t(0.);
+                        e[5*n + threadIdx.x] = X_ptr[atom_idx*3 + 0];
+                    } else {
+                        e[3*n + threadIdx.x] = X_ptr[atom_idx*3 + 1];
+                        e[4*n + threadIdx.x] = X_ptr[atom_idx*3 + 0];
+                        e[5*n + threadIdx.x] = real_t(0.);
+                    }
+                        clear_cache(smem,  n + warpSize);
+                        e[3*n + threadIdx.x] /= SQRT(reduction(smem, e[3*n + threadIdx.x]*e[3*n + threadIdx.x]));
+                        clear_cache(smem,  n + warpSize);
+                        e[4*n + threadIdx.x] /= SQRT(reduction(smem, e[4*n + threadIdx.x]*e[4*n + threadIdx.x]));
+                        clear_cache(smem,  n + warpSize);
+                        e[5*n + threadIdx.x] /= SQRT(reduction(smem, e[5*n + threadIdx.x]*e[5*n + threadIdx.x]));
+                }
                 
                 if(threadIdx.x < n)
-                for (int k = 0; k < n; k++){
+                for (int k = offset; k < n; k++){
                     e = E.data + I * n * n + k * n;
                     e[threadIdx.x] = real_t(0.);
-                    q = Q.data + I * m * m + k * m;
+                    q = Q.data + I * m * m + (k-offset) * m;
                     for (int i = 0; i < m; i++){
                         e[threadIdx.x] += v[i*n + threadIdx.x] * q[i];
                     }
@@ -878,10 +915,10 @@ namespace gpu_kernels{
 
             static LaunchDims dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM,DEV,T,K>, B.n_atoms*3, smem, B.isomer_capacity);
             static LaunchDims qr_dims((void*)eigensolve_<EigensolveMode::VECTORS,DEV,T,K>, 64, smem_qr, B.isomer_capacity);
-            static LaunchDims eig_dims((void*)compute_eigenvectors_<DEV,T,K>, B.n_atoms*3, smem_eig, B.isomer_capacity);
+            static LaunchDims eig_dims((void*)compute_eigenvectors_<EigensolveMode::FULL_SPECTRUM,DEV,T,K>, B.n_atoms*3, smem_eig, B.isomer_capacity);
             dims.update_dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM,DEV,T,K>, B.n_atoms*3, smem, B.isomer_capacity);
             qr_dims.update_dims((void*)eigensolve_<EigensolveMode::VECTORS,DEV,T,K>, 64, smem_qr, B.isomer_capacity);
-            eig_dims.update_dims((void*)compute_eigenvectors_<DEV,T,K>, B.n_atoms*3, smem_eig, B.isomer_capacity);
+            eig_dims.update_dims((void*)compute_eigenvectors_<EigensolveMode::FULL_SPECTRUM,DEV,T,K>, B.n_atoms*3, smem_eig, B.isomer_capacity);
             
             //The hessian has 6 degrees of freedom, so in order to find the smallest eigenvalue we must find the 6 eigenvectors corresponding to these lambda=0
             //for (int i = 0; i <  6; i++){ 
@@ -901,7 +938,7 @@ namespace gpu_kernels{
             //ofstream out3("L.float32", ios::binary); out3.write((char*)Ls[dev].data, Ls[dev].size()*sizeof(T)); out3.close();
 
             safeCudaKernelCall((void*)eigensolve_<EigensolveMode::VECTORS,DEV,T,K>, qr_dims.get_grid(), qr_dims.get_block(), kargs_qr, smem_qr, ctx.stream);
-            safeCudaKernelCall((void*)compute_eigenvectors_<DEV,T,K>, eig_dims.get_grid(), eig_dims.get_block(), kargs_vector, smem_eig, ctx.stream);
+            safeCudaKernelCall((void*)compute_eigenvectors_<EigensolveMode::FULL_SPECTRUM,DEV,T,K>, eig_dims.get_grid(), eig_dims.get_block(), kargs_vector, smem_eig, ctx.stream);
 
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Full Spectrum Eigensolver Failed : ");
@@ -1082,6 +1119,67 @@ namespace gpu_kernels{
 
             if (policy == LaunchPolicy::SYNC) ctx.wait();
             printLastCudaError("Spectrum Ends Failed: ");
+        }
+
+        template <Device U, typename T, typename K>        //Compute the full spectrum of the hessian matrix in the special case where the hessian has 6 zero eigenvalues pertaining to the 3 translational and 3 rotational degrees of freedom.
+        void eigensolve_special(const IsomerBatch<U>& B, CuArray<T>& Q, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
+            if (policy == LaunchPolicy::SYNC) ctx.wait();
+            FLOAT_TYPEDEFS(T);
+            cudaSetDevice(B.get_device_id());
+            auto dev = B.get_device_id();
+            static int Nd = LaunchCtx::get_device_count();
+            static std::vector<bool> init(Nd, false);
+            if(policy == LaunchPolicy::SYNC) {ctx.wait();}
+            static std::vector<CuArray<T>> Us(Nd); //Upper diagonals
+            static std::vector<CuArray<T>> Ls(Nd); //Lower diagonals
+            static std::vector<CuArray<T>> Vs(Nd); //Store Lanczos vectors
+            static std::vector<CuArray<T>> Qs(Nd); //Store transformation matrices Q DEV,T,K Q^DEV,T,K = H
+            int m_natoms = B.n_atoms;
+            int m_isomer_capacity = B.isomer_capacity;
+            int n_deflation = 6;
+            int n_eigs = B.n_atoms *3;
+            if (!init[dev] || m_natoms != B.n_atoms || m_isomer_capacity != B.isomer_capacity){
+                init[dev] = true;
+                Us[dev].resize((n_eigs)*B.isomer_capacity); Us[dev].fill(0.); Us[dev].to_device(dev);
+                Ls[dev].resize((n_eigs)*B.isomer_capacity); Ls[dev].fill(0.); Ls[dev].to_device(dev);
+                Vs[dev].resize(B.isomer_capacity*(n_eigs) * n_eigs); Vs[dev].fill(0.); Vs[dev].to_device(dev);
+                Qs[dev].resize(B.isomer_capacity*(n_eigs) * n_eigs); Qs[dev].fill(0.); Qs[dev].to_device(dev);
+            }
+
+            size_t smem = sizeof(coord3d)*n_eigs + sizeof(T)*Block_Size_Pow_2;
+            size_t smem_qr = sizeof(T)*(n_eigs+1)*6 + sizeof(T)*(n_eigs)*2;
+            size_t smem_eig = sizeof(T)*n_eigs*2; //We just need enough memory to compute reductions of eigenvectors such that we can normalize them.
+
+            static LaunchDims dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, n_eigs, smem, B.isomer_capacity);
+            static LaunchDims qr_dims((void*)eigensolve_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, 64, smem_qr, B.isomer_capacity);
+            static LaunchDims eig_dims((void*)compute_eigenvectors_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, n_eigs, smem_eig, B.isomer_capacity);
+            dims.update_dims((void*)lanczos_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, n_eigs, smem, B.isomer_capacity);
+            qr_dims.update_dims((void*)eigensolve_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, 64, smem_qr, B.isomer_capacity);
+            eig_dims.update_dims((void*)compute_eigenvectors_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, n_eigs, smem_eig, B.isomer_capacity);
+            
+            //The hessian has 6 degrees of freedom, so in order to find the smallest eigenvalue we must find the 6 eigenvectors corresponding to these lambda=0
+            //for (int i = 0; i <  6; i++){ 
+            int Nlanczos = n_eigs - n_deflation;
+            void* kargs[]{(void*)&B, (void*)&Vs[dev], (void*)&Ls[dev], (void*)&eigenvalues, (void*)&hessians, (void*)&cols, (void*)&Nlanczos};
+            void* kargs_qr[]{(void*)&B, (void*)&eigenvalues, (void*)&Ls[dev], (void*)&Us[dev], (void*)&Qs[dev], (void*)&Nlanczos};
+            void* kargs_vector[]{(void*)&B, (void*)&Qs[dev], (void*)&Vs[dev], (void*)&Q, (void*)&Nlanczos};
+            safeCudaKernelCall((void*)lanczos_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+            //ctx.wait();
+            //vector<T> Qhost(B.n_atoms*3*3*B.n_atoms);
+            //vector<T> Diags = vector<T>(eigenvalues.data, eigenvalues.data + B.n_atoms*3);
+            //vector<T> OffDiags = vector<T>(Ls[dev].data, Ls[dev].data + B.n_atoms*3);
+            //vector<T> LambdaHost(B.n_atoms*3);
+            //eigensystem_hermitian(Nlanczos, Diags, OffDiags, Qhost, LambdaHost);
+            //ofstream out("Qhost.float32", ios::binary); out.write((char*)Qhost.data(), Qhost.size()*sizeof(T)); out.close();
+            //ofstream out2("D.float32", ios::binary); out2.write((char*)eigenvalues.data, eigenvalues.size()*sizeof(T)); out2.close();
+            //ofstream out3("L.float32", ios::binary); out3.write((char*)Ls[dev].data, Ls[dev].size()*sizeof(T)); out3.close();
+
+            safeCudaKernelCall((void*)eigensolve_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, qr_dims.get_grid(), qr_dims.get_block(), kargs_qr, smem_qr, ctx.stream);
+            safeCudaKernelCall((void*)compute_eigenvectors_<EigensolveMode::FULL_SPECTRUM_MOLECULE,U,T,K>, eig_dims.get_grid(), eig_dims.get_block(), kargs_vector, smem_eig, ctx.stream);
+
+            if (policy == LaunchPolicy::SYNC) ctx.wait();
+            printLastCudaError("Full Spectrum Eigensolver Failed : ");
+
         }
 
 

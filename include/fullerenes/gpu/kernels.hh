@@ -125,7 +125,11 @@ namespace gpu_kernels{
         
         template <Device U = GPU, typename T = float, typename K = uint16_t>        //Compute the full spectrum of the hessian matrix for a batch of fullerenes.
         void eigensolve(const IsomerBatch<U>& B, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);  
-      
+
+        template <Device U = GPU, typename T = float, typename K = uint16_t>        //Compute the full spectrum of the hessian matrix in the special case where the hessian has 6 zero eigenvalues pertaining to the 3 translational and 3 rotational degrees of freedom.
+        void eigensolve_special(const IsomerBatch<U>& B, CuArray<T>& Q, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        //Pizza 43 on the menu
+
         template <Device U = GPU, typename T = float, typename K = uint16_t>         //Computes the smallest and largest eigenvalues of the hessian matrix for a batch of fullerenes.
         void spectrum_ends(const IsomerBatch<U>& B, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& lambda_mins, CuArray<T>& lambda_maxs, int m_lanczos=40, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
       
