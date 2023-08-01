@@ -613,7 +613,7 @@ int main(int ac, char **argv)
     if(STORE_EIGENSYSTEM){
       Q[d]    = CuArray<real_t>(3*N*3*N*final_batch_size,0);
       lams[d] = CuArray<real_t>(3*N*final_batch_size,0);    
-      isomerspace_eigen  ::eigensolve(B,Q[d],hessians[d],hessian_cols[d],lams[d],ctx,policy);
+      isomerspace_eigen  ::eigensolve_special(B,Q[d],hessians[d],hessian_cols[d],lams[d],ctx,policy);
     }
     device_io::copy(final_host_batch[d],B,ctx,policy);
     ctx.wait();
