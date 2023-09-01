@@ -32,6 +32,7 @@ namespace gpu_kernels{
         template <Device U, typename T = float, typename K = uint16_t > cudaError_t get_bonds           (const IsomerBatch<U>& B, CuArray<T>& bonds);          //N x M x 3
         template <Device U, typename T = float, typename K = uint16_t > cudaError_t get_angles          (const IsomerBatch<U>& B, CuArray<T>& angles);         //N x M x 3
         template <Device U, typename T = float, typename K = uint16_t > cudaError_t get_dihedrals       (const IsomerBatch<U>& B, CuArray<T>& dihedrals);      //N x M x 3
+        template <ForcefieldType FFT, Device U, typename T = float, typename K = uint16_t > cudaError_t get_gradients       (const IsomerBatch<U>& B, CuArray<T>& gradients);      //N x M x 3
 
 
         //MAE = Mean Absolute Error

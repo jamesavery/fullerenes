@@ -2021,7 +2021,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
 	    FF.CG(X,X1,X2,iterations-1);
 
 	    auto E0 = FF.energy(X);
-	    FF.CG(X,X1,X2,1);
+	    FF.CG(X,X1,X2,iterations);
 	    auto E1 = FF.energy(X);
 	    auto dE = ABS(E1 - E0)/(real_t)blockDim.x;
 	    BLOCK_SYNC;
@@ -2261,9 +2261,46 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
         return error;\
     }
 
+#define GET_VAL(fun_1, fun_2, param_fun) \
+    template <ForcefieldType FFT, Device U, typename T, typename K>\
+    __global__ void fun_1(const IsomerBatch<U> B, CuArray<T> bond_rms){\
+        TEMPLATE_TYPEDEFS(T,K);\
+        SMEM(T)\
+        clear_cache(smem,Block_Size_Pow_2);\
+        for (int isomer_idx = blockIdx.x; isomer_idx < B.isomer_capacity; isomer_idx+= gridDim.x){\
+        if(B.statuses[isomer_idx] != IsomerStatus::EMPTY){\
+            coord3d rel_err;\
+            size_t offset = isomer_idx * blockDim.x;  \
+            Constants constants     = Constants<T,K>(B, isomer_idx);\
+            NodeNeighbours node_graph    = NodeNeighbours<K>(B, isomer_idx, smem);\
+            ForceField FF           = ForceField<FFT,GPU,T,K>(node_graph, constants, smem);\
+            coord3d* X              = reinterpret_cast<coord3d*>(B.X+offset*3);\
+            for (uint8_t j = 0; j < 3; j++){\
+                auto arc            = ForceField<FFT,GPU,T,K>::ArcData(j, X, node_graph);\
+                param_fun\
+            }\
+            reinterpret_cast<coord3d*>(bond_rms.data)[isomer_idx*B.n_atoms + threadIdx.x]         =  {rel_err[0], rel_err[1], rel_err[2]};\
+        }}\
+    }\
+    template <ForcefieldType FFT, Device U, typename T, typename K>\
+    cudaError_t fun_2(const IsomerBatch<U>& B, CuArray<T>& bond_rms){\
+        TEMPLATE_TYPEDEFS(T,K);\
+        cudaDeviceSynchronize();\
+        cudaSetDevice(B.get_device_id());\
+        size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(T)*Block_Size_Pow_2;\
+        static LaunchDims dims((void*)fun_1<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);\
+        dims.update_dims((void*)fun_1<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);\
+        void* kargs[]{(void*)&B, (void*)&bond_rms};\
+        auto error = safeCudaKernelCall((void*)fun_1<FFT,U,T,K>, dims.get_grid(), dims.get_block(), kargs, smem);\
+        cudaDeviceSynchronize();\
+        return error;\
+    }
+
 GET_INTERNAL(get_bonds_,get_bonds, arc.bond())
 GET_INTERNAL(get_angles_,get_angles, arc.angle())
 GET_INTERNAL(get_dihedrals_,get_dihedrals, arc.dihedral())
+
+GET_VAL(get_gradients_,get_gradients, rel_err += arc.gradient(constants);)
 
 GET_RRMSE(get_bond_rrmse_,get_bond_rrmse, arc.bond(), d_get(constants.r0,j))
 GET_RRMSE(get_angle_rrmse_,get_angle_rrmse, acos((float)arc.angle()), acos((float)d_get(constants.angle0,j)))
@@ -2365,6 +2402,7 @@ int declare_generics(){
     get_angles          <GPU, float, uint16_t>(B, arr);
     get_dihedrals       <GPU, float, uint16_t>(B, arr);
     
+    get_gradients       <PEDERSEN, GPU, float, uint16_t>(B, arr);
     optimal_batch_size  <PEDERSEN, GPU, float, uint16_t>(100,0);
     get_angle_max       <PEDERSEN, GPU, float, uint16_t>(B,arr);
     get_bond_max        <PEDERSEN, GPU, float, uint16_t>(B,arr);
@@ -2390,6 +2428,7 @@ int declare_generics(){
     get_gradient_norm   <PEDERSEN, GPU, float, uint16_t>(B,arr);
     get_energies        <PEDERSEN, GPU, float, uint16_t>(B,arr);
 
+    get_gradients       <FLATNESS_ENABLED, GPU, float, uint16_t>(B, arr);
     optimal_batch_size  <FLATNESS_ENABLED, GPU, float, uint16_t>(100,0);
     optimise            <FLATNESS_ENABLED, GPU, float, uint16_t>(B,100,100);
     get_angle_max       <FLATNESS_ENABLED, GPU, float, uint16_t>(B,arr);
@@ -2416,6 +2455,7 @@ int declare_generics(){
     get_gradient_norm   <FLATNESS_ENABLED, GPU, float, uint16_t>(B,arr);
     get_energies        <FLATNESS_ENABLED, GPU, float, uint16_t>(B,arr);
 
+    get_gradients       <WIRZ, GPU, float, uint16_t>(B, arr);
     optimal_batch_size  <WIRZ, GPU, float, uint16_t>(100,0);
     optimise            <WIRZ, GPU, float, uint16_t>(B,100,100);
     get_angle_max       <WIRZ, GPU, float, uint16_t>(B,arr);
@@ -2442,6 +2482,7 @@ int declare_generics(){
     get_gradient_norm   <WIRZ, GPU, float, uint16_t>(B,arr);
     get_energies        <WIRZ, GPU, float, uint16_t>(B,arr);
 
+    get_gradients       <FLAT_BOND, GPU, float, uint16_t>(B, arr);
     optimal_batch_size  <FLAT_BOND, GPU, float, uint16_t>(100,0);
     optimise            <FLAT_BOND, GPU, float, uint16_t>(B,100,100);
     get_angle_max       <FLAT_BOND, GPU, float, uint16_t>(B,arr);
@@ -2472,6 +2513,7 @@ int declare_generics(){
     get_angles          <GPU, double, uint16_t>(B, arr_fp64);
     get_dihedrals       <GPU, double, uint16_t>(B, arr_fp64);
     
+    get_gradients       <PEDERSEN, GPU, double, uint16_t>(B, arr_fp64);
     optimal_batch_size  <PEDERSEN, GPU, double, uint16_t>(100,0);
     get_angle_max       <PEDERSEN, GPU, double, uint16_t>(B,arr_fp64);
     get_bond_max        <PEDERSEN, GPU, double, uint16_t>(B,arr_fp64);
@@ -2497,6 +2539,7 @@ int declare_generics(){
     get_gradient_norm   <PEDERSEN, GPU, double, uint16_t>(B,arr_fp64);
     get_energies        <PEDERSEN, GPU, double, uint16_t>(B,arr_fp64);
 
+    get_gradients       <FLATNESS_ENABLED, GPU, double, uint16_t>(B, arr_fp64);
     optimal_batch_size  <FLATNESS_ENABLED, GPU, double, uint16_t>(100,0);
     optimise            <FLATNESS_ENABLED, GPU, double, uint16_t>(B,100,100);
     get_angle_max       <FLATNESS_ENABLED, GPU, double, uint16_t>(B,arr_fp64);
@@ -2523,6 +2566,7 @@ int declare_generics(){
     get_gradient_norm   <FLATNESS_ENABLED, GPU, double, uint16_t>(B,arr_fp64);
     get_energies        <FLATNESS_ENABLED, GPU, double, uint16_t>(B,arr_fp64);
 
+    get_gradients       <WIRZ, GPU, double, uint16_t>(B, arr_fp64);
     optimal_batch_size  <WIRZ, GPU, double, uint16_t>(100,0);
     optimise            <WIRZ, GPU, double, uint16_t>(B,100,100);
     get_angle_max       <WIRZ, GPU, double, uint16_t>(B,arr_fp64);
@@ -2549,6 +2593,7 @@ int declare_generics(){
     get_gradient_norm   <WIRZ, GPU, double, uint16_t>(B,arr_fp64);
     get_energies        <WIRZ, GPU, double, uint16_t>(B,arr_fp64);
 
+    get_gradients       <FLAT_BOND, GPU, double, uint16_t>(B, arr_fp64);
     optimal_batch_size  <FLAT_BOND, GPU, double, uint16_t>(100,0);
     optimise            <FLAT_BOND, GPU, double, uint16_t>(B,100,100);
     get_angle_max       <FLAT_BOND, GPU, double, uint16_t>(B,arr_fp64);
