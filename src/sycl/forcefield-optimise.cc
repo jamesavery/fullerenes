@@ -1,7 +1,7 @@
-#include "CL/sycl.hpp"
+#include <CL/sycl.hpp>
 #define USE_MAX_NORM 0
 #define SQRT cl::sycl::sqrt
-#include "forcefield_includes.cpp"
+#include "forcefield-includes.cc"
 #include "fstream"
 enum ForcefieldType
 {

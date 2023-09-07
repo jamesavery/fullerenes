@@ -4,10 +4,10 @@
 #define TEMPLATE_TYPEDEFS(T,K) FLOAT_TYPEDEFS(T) INT_TYPEDEFS(K)
 #define SEMINARIO_FORCE_CONSTANTS 0
 
-#include "coord3d.cpp"
+#include "coord3d.cc"
 #include "isomer_batch.hh"
-#include "sym_mat3.cpp"
-#include "cubic_graph.cpp"
-#include "node_neighbours.cpp"
-#include "constants.cpp"
-#include "matrix3.cpp"
+#include "sym-mat3.cc"
+#include "cubic-graph.cc"
+#include "node-neighbours.cc"
+#include "constants.cc"
+#include "matrix3.cc"

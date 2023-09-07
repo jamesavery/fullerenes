@@ -1,5 +1,5 @@
 #include <CL/sycl.hpp>
-#include "forcefield_includes.cpp"
+#include "forcefield-includes.cc"
 
 #define UINT_TYPE_MAX std::numeric_limits<UINT_TYPE>::max()
 

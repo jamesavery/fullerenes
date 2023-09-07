@@ -112,7 +112,7 @@ add_subdirectory(src/c++)
 if(ICPX_COMPILER)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   set(CMAKE_CXX_COMPILER ${ICPX_COMPILER})
-  add_subdirectory(src/sycl-src)
+  add_subdirectory(src/sycl)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
 endif()
 
