@@ -11,6 +11,15 @@ find_package(BLAS)
 find_package(LAPACK)
 find_package(GSL)
 
+find_program(ICPX_COMPILER icpx)
+
+if(ICPX_COMPILER)
+  message("Found icpx compiler: ${ICPX_COMPILER}")
+else()
+  message("Could not find icpx compiler")
+endif()
+
+
 include(CheckLanguage)
 include(CMakeDependentOption)
 check_language(CUDA)
@@ -99,6 +108,14 @@ add_subdirectory(src/fortran)
 add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(src/c++)
+
+if(ICPX_COMPILER)
+  set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+  set(CMAKE_CXX_COMPILER ${ICPX_COMPILER})
+  add_subdirectory(src/sycl-src)
+  set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
+endif()
+
 add_subdirectory(programs)
 add_subdirectory(benchmarks)
 add_subdirectory(unit-tests)
