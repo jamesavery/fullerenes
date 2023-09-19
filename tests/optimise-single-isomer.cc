@@ -20,21 +20,46 @@ int main(int argc, char** argv){
     G.neighbours.resize(Nf);
     G.N = Nf;
     PlanarGraph Pg;
-    auto batch_size = 6800;
+    auto batch_size = 1;
     //BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);  
     IsomerBatch<CPU> Bhost(N,batch_size);
     IsomerBatch<GPU> Bdev(N,batch_size);
+    BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,0,0);
     
     for (size_t i = 0; i < batch_size; i++)
     {
-        auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
+        //auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
+        auto more = BuckyGen::next_fullerene(BuckyQ, G);
+        auto ID = i;
         Bhost.append(G,ID);
     }
     
     device_io::copy(Bdev, Bhost);
     isomerspace_dual::dualise(Bdev);
-    isomerspace_tutte::tutte_layout(Bdev, (int)10*N);
+    isomerspace_tutte::tutte_layout<GPU,float>(Bdev, (int)10*N);
+    device_io::copy(Bhost, Bdev);
+    std::cout << "Initial 2D geometry:\n";
+    for (size_t i = 0; i < N; i++)
+    {
+        std::cout << i << ": ";
+        std::cout << Bhost.xys[i*2 + 0] << " ";
+        std::cout << Bhost.xys[i*2 + 1] << " ";
+        std::cout << std::endl;
+    }
+
     isomerspace_X0::zero_order_geometry(Bdev, 4.0);
+    device_io::copy(Bhost, Bdev);
+    std::cout << "Initial 3D geometry:\n";
+    for (size_t i = 0; i < N; i++)
+    {
+        std::cout << i << ": ";
+        std::cout << Bhost.X[i*3 + 0] << " ";
+        std::cout << Bhost.X[i*3 + 1] << " ";
+        std::cout << Bhost.X[i*3 + 2] << " ";
+        std::cout << std::endl;
+    }
+
+
     device_io::copy(Bhost, Bdev);
     
     //Write starting geometry to file
@@ -50,15 +75,35 @@ int main(int argc, char** argv){
 //
     //std::cout << "Gradients:\n" << gradients << std::endl;
 
-    isomerspace_forcefield::optimise<PEDERSEN>(Bdev, 3*N, 3*N);
+    isomerspace_forcefield::optimise<PEDERSEN>(Bdev, 5*N, 5*N);
+
+    CuArray<float> hessians(N*90);
+    CuArray<uint16_t> cols(N*90);
+    LaunchCtx ctx(0);
+    isomerspace_hessian::compute_hessians<PEDERSEN>(Bdev, hessians, cols, ctx, LaunchPolicy::SYNC);
+
+    std::cout << "Hessians:\n";
+    for (size_t i = 0; i < N*3; i++)
+    {   
+        std::cout << i << ": ";
+        for (size_t j = 0; j < 30; j++)
+        {
+            std::cout << hessians[i*30 + j] << ", ";
+        }
+        std::cout << std::endl;
+    }
 
 
     device_io::copy(Bhost, Bdev);
 
     std::cout << "Final geometry:\n";
-    for (size_t i = 0; i < N*3; i++)
+    for (size_t i = 0; i < N; i++)
     {
-        std::cout << Bhost.X[i] << ", ";
+        std::cout << i << ": ";
+        std::cout << Bhost.X[i*3 + 0] << " ";
+        std::cout << Bhost.X[i*3 + 1] << " ";
+        std::cout << Bhost.X[i*3 + 2] << " ";
+        std::cout << std::endl;
     }
     std::cout << std::endl;
     std::cout << "Cubic graph:\n";
