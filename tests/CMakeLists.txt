@@ -1,7 +1,7 @@
 if(ENABLE_CUDA)
   find_package(CUDAToolkit REQUIRED)
   link_libraries(fortran_opt fullerenes cuda_lib ${CMAKE_CUDA_LIBS})
-  set(EXECUTABLES
+  set(CUDA_EXECUTABLES
   batch-clear-append-test
   async-execution-test
   validity-test
@@ -26,7 +26,7 @@ if(ENABLE_CUDA)
   optimise-single-isomer
 )
 
-foreach(EXECUTABLE ${EXECUTABLES})
+foreach(EXECUTABLE ${CUDA_EXECUTABLES})
   add_executable(${EXECUTABLE} ${EXECUTABLE}.cc)
 endforeach()
 
@@ -35,7 +35,7 @@ endforeach()
     target_link_libraries(hessian-test cuda_lib fullerenes  ${CMAKE_CUDA_LIBS})
   endif()  
 
-  foreach(EXECUTABLE ${EXECUTABLES})
+  foreach(EXECUTABLE ${CUDA_EXECUTABLES})
     target_link_libraries(${EXECUTABLE} cuda_lib fullerenes  ${CMAKE_CUDA_LIBS})  
   endforeach()
   
