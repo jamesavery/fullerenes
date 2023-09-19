@@ -54,32 +54,32 @@ struct symMat3
 
       // Combined home-derived eigenvalue w/ Wikipedia method
     real_t 
-      A = -1.L,
+      A = real_t(-1.),
       B = a+d+f,
       C = b*b + c*c - a*d + e*e - a*f - d*f,
       D = -c*c*d + 2*b*c*e - a*e*e - b*b*f + a*d*f;
 
-    if(fabs(D) < 100*epsilon){			
-      real_t Disc = sqrt(B*B-4*A*C); // TODO: Kahan's formula for b^2-4ac.
-      real_t lam1 = -0.5L*(-B-Disc), lam2 = -0.5L*(-B+Disc);
+    if(fabs(D) < real_t(100)*epsilon){			
+      real_t Disc = sqrt(B*B-real_t(4.)*A*C); // TODO: Kahan's formula for b^2-4ac.
+      real_t lam1 = -real_t(0.5)*(-B-Disc), lam2 = -real_t(0.5)*(-B+Disc);
       return eig_sort<real_t>(0,lam1,lam2);
     }
       
     real_t p1 = b*b + c*c + e*e;
-    if(fabs(p1) < 100*epsilon)
+    if(fabs(p1) < real_t(100)*epsilon)
       return eig_sort(a,d,f);
 
-    real_t q = (a+d+f)/3.L; // q=Tr(M)/3
-    real_t p2 = (a-q)*(a-q) + (d-q)*(d-q) + (f-q)*(f-q) + 2.L*p1;
-    real_t p = sqrt(p2/6.L);
+    real_t q = (a+d+f)/real_t(3.); // q=Tr(M)/3
+    real_t p2 = (a-q)*(a-q) + (d-q)*(d-q) + (f-q)*(f-q) + real_t(2.)*p1;
+    real_t p = sqrt(p2/ real_t(6.));
 
     real_t detBxp3 = -c*c*(d-q) + 2*b*c*e - (a-q)*e*e - b*b*(f-q) + (a-q)*(d-q)*(f-q);
     real_t r = detBxp3/(2*p*p*p);
 
-    real_t phi = r <= -1? M_PI/3.L : (r >= 1? 0.L : acos(r)/3.L);
-    real_t lam1 = q + 2*p*cos(phi);
-    real_t lam3 = q + 2*p*cos(phi +  (2.L/3.L)*M_PI);
-    real_t lam2 = 3*q - lam1 - lam3;
+    real_t phi = r <= -1? real_t(M_PI)/real_t(3.) : (r >= 1? real_t(0.) : acos(r)/real_t(3.));
+    real_t lam1 = q + real_t(2.)*p*cos(phi);
+    real_t lam3 = q + real_t(2.)*p*cos(phi +  ( real_t(2.)/real_t(3.))*M_PI);
+    real_t lam2 = real_t(3.)*q - lam1 - lam3;
 
     return {lam1,lam2,lam3};
   }
@@ -141,7 +141,7 @@ eigenvector3x3(real_t &lambda) const{
     // Vælg vilkårlige u og v som er orthogonale til v0:
     real_t n = (v0[0]+v0[1]+v0[2]);
 
-    coord3d u{1-n*v0[0],1-n*v0[1],1-n*v0[2]};  u = u*real_t(1/sqrt(dot(u,u)));
+    coord3d u{real_t(1.)-n*v0[0],real_t(1.)-n*v0[1],real_t(1.)-n*v0[2]};  u = u*real_t(real_t(1.)/sqrt(dot(u,u)));
     coord3d v = cross(v0,u);
 
     // Symmetrisk 2x2 matrix i u,v-basis
@@ -156,8 +156,8 @@ eigenvector3x3(real_t &lambda) const{
 
     // Characteristic polynmoial is chi(l) = det(A-l*I) = (a-l)*(c-l) - b^2 = l^2 - (a+c)l +ac-b^2
     double A = 1, B = -(aa+cc), C = aa*cc-bb*bb;
-    double Disc = sqrt(B*B-4*A*C); // TODO: Kahan's formula for b^2-4ac instead of extra precision
-    double lam1 = 0.5L*(-B-Disc), lam2 = 0.5L*(-B+Disc);
+    double Disc = sqrt(B*B- real_t(4.)*A*C); // TODO: Kahan's formula for b^2-4ac instead of extra precision
+    double lam1 = real_t(0.5)*(-B-Disc), lam2 = real_t(0.5)*(-B+Disc);
 
     real_t lam = std::abs(lam1) < std::abs(lam2)? lam1 : lam2;
 
