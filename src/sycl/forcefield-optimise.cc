@@ -1,23 +1,14 @@
 #include <CL/sycl.hpp>
+#include "numeric"
+#include <vector>
+#include <tuple>
+#include <iterator>
+#include <type_traits>
+#include "fstream"
 #define USE_MAX_NORM 0
 #define SQRT cl::sycl::sqrt
+#include <fullerenes/sycl-isomer-batch.hh>
 #include "forcefield-includes.cc"
-#include "fstream"
-enum ForcefieldType
-{
-    WIRZ,
-    PEDERSEN,
-    FLATNESS_ENABLED,
-    FLAT_BOND,
-    BOND,
-    ANGLE,
-    DIH,
-    ANGLE_M,
-    ANGLE_P,
-    DIH_A,
-    DIH_M,
-    DIH_P
-};
 
 template <ForcefieldType FFT, typename T, typename K>
 struct ForceField
@@ -296,16 +287,6 @@ struct ForceField
             cos_c = dot(-bch, cdh);
             r_sin_c = sycl::rsqrt((real_t)1.0 - cos_c * cos_c);
             nbcd = cross(-bch, cdh) * r_sin_c;
-            /* if(isnan(dot(nabc,nbcd))){
-                printf("bah: %f %f %f\n", bah[0], bah[1], bah[2]);
-                printf("bch: %f %f %f\n", bch[0], bch[1], bch[2]);
-                printf("cosb: %f, cosc: %f\n", cos_b, cos_c);
-                printf("rsqrt(1 - cosb^2): %f, rsqrt(1 - cosc^2): %f\n", sycl::rsqrt((real_t)1.0 - cos_b*cos_b), sycl::rsqrt((real_t)1.0 - cos_c*cos_c));
-                printf("r_sin_b: %f, r_sin_c: %f\n", r_sin_b, r_sin_c);
-                printf("nabc: %f %f %f\n", nabc[0], nabc[1], nabc[2]);
-                printf("nbcd: %f %f %f\n", nbcd[0], nbcd[1], nbcd[2]);
-                printf("BondLength AB: %f, BondLength BC: %f\n", 1/rabn, 1/racn);
-            } */
             return dot(nabc, nbcd);
         }
         // Returns the Outer-dihedral-a wrt. current arc, only accessed diagnostically (internal coordinate).
@@ -1598,22 +1579,22 @@ struct ForceField
             ArcData arc = ArcData(cta, j, X, node_graph);
             grad += arc.gradient(constants);
         }
-        return grad;
-        // switch (FFT)
-        //{
-        // case FLATNESS_ENABLED: {
-        //     FaceData face(cta, X, node_graph);
-        //     auto face_grad = face.flatness_gradient(constants, reinterpret_cast<coord3d*>(sdata));
-        //     return grad + face_grad;
-        //     }
-        // case FLAT_BOND:{
-        //     FaceData face(cta, X, node_graph);
-        //     auto face_grad = face.flatness_gradient(constants, reinterpret_cast<coord3d*>(sdata));
-        //     return grad + face_grad;
-        //     }
-        // default:
-        //     return grad;
-        // }
+        switch (FFT)
+        {
+         case FLATNESS_ENABLED: {
+             FaceData face(cta, X, node_graph);
+             auto face_grad = face.flatness_gradient(constants, reinterpret_cast<coord3d*>(sdata));
+             return grad + face_grad;
+             }
+         case FLAT_BOND:{
+             FaceData face(cta, X, node_graph);
+             auto face_grad = face.flatness_gradient(constants, reinterpret_cast<coord3d*>(sdata));
+             return grad + face_grad;
+             }
+         default:{
+             return grad;
+            }
+         }
     }
 
     hessian_t<T, K> hessian(const sycl::local_accessor<coord3d, 1> &X) const
@@ -1821,12 +1802,12 @@ struct ForceField
 };
 
 template <ForcefieldType FFT, typename T = float, typename K = uint16_t>
-void forcefield_optimise(sycl::queue &Q, IsomerBatch<T, K> B, const int iterations, const int max_iterations)
+void forcefield_optimise(sycl::queue &Q, IsomerBatch<T, K>& B, const int iterations, const int max_iterations, const LaunchPolicy policy)
 {   
     TEMPLATE_TYPEDEFS(T, K);
     auto local_mem_bytes_required = B.N() * 3 * sizeof(coord3d) + B.N() * 2 * sizeof(T);
     assert(Q.get_device().get_info<sycl::info::device::local_mem_size>() >= local_mem_bytes_required);
-
+    if (policy == LaunchPolicy::SYNC) Q.wait_and_throw();
     Q.submit([&](sycl::handler &h)
              {
         sycl::local_accessor<T,1> sdata(B.N()*2, h);
@@ -1854,14 +1835,17 @@ void forcefield_optimise(sycl::queue &Q, IsomerBatch<T, K> B, const int iteratio
             //
             X_acc[bid*N + tid] = X[tid];
         }); });
-    
+    if (policy == LaunchPolicy::SYNC) Q.wait_and_throw();
 }
 
-int main(int argc, char const *argv[])
+template void forcefield_optimise<PEDERSEN,float,uint16_t>(sycl::queue &Q, IsomerBatch<float, uint16_t>& B, const int iterations, const int max_iterations, const LaunchPolicy policy);
+
+
+/* int main(int argc, char const *argv[])
 {   
     TEMPLATE_TYPEDEFS(float, uint16_t);
     sycl::queue Q(sycl::gpu_selector_v, sycl::property::queue::in_order());
-    /* code */
+
     int N = 200;
     int isomer_capacity = 6800;
     //int N = 20;
@@ -1902,4 +1886,4 @@ int main(int argc, char const *argv[])
     std::cout << "\n";
 
     return 0;
-}
+} */
