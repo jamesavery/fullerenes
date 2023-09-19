@@ -1842,7 +1842,6 @@ __device__ void check_batch(IsomerBatch<U> &B, const size_t isomer_idx, const si
     if (isomer_idx < B.isomer_capacity){
       
       //Avoid illegal memory access
-      if(B.iterations[isomer_idx] >= max_iterations){ B.statuses[isomer_idx] = IsomerStatus::FAILED; /*printf("check_back() end: too many iterations. I am thread #%d\n", threadIdx.x);*/ return; } // Why doesn't this register?
       if (B.statuses[isomer_idx] == IsomerStatus::PLZ_CHECK){  
 	size_t offset = isomer_idx * blockDim.x;
 	Constants constants        = Constants<T,K>(B, isomer_idx);
@@ -1894,7 +1893,6 @@ __device__ void check_batch(IsomerBatch<U> &B, const size_t isomer_idx, const si
 	  size_t iterations_done =  B.iterations[isomer_idx];	  
 	  bool converged = ((angle_max < 0.26) && (dihedral_max < 0.1) && (bond_max < 0.1)) ;
 	  bool failed    = ISNAN(bond_max) || (iterations_done > max_iterations);
-	  
 	  B.statuses[isomer_idx] = failed? IsomerStatus::FAILED :
 	    (converged? IsomerStatus::CONVERGED : IsomerStatus::NOT_CONVERGED);
 
@@ -2021,7 +2019,7 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
 	    FF.CG(X,X1,X2,iterations-1);
 
 	    auto E0 = FF.energy(X);
-	    FF.CG(X,X1,X2,iterations);
+	    FF.CG(X,X1,X2,1);
 	    auto E1 = FF.energy(X);
 	    auto dE = ABS(E1 - E0)/(real_t)blockDim.x;
 	    BLOCK_SYNC;
@@ -2036,7 +2034,6 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
 	    if (threadIdx.x == 0) {
 	      //	      printf("OPT: isomer %d has %ld iterations, adding %ld\n",isomer_idx, B.iterations[isomer_idx],iterations);
 	      B.iterations[isomer_idx] += iterations;
-	      if(B.iterations[isomer_idx] >= max_iterations) B.statuses[isomer_idx] = IsomerStatus::FAILED;
 	    }
 	  }
       }
