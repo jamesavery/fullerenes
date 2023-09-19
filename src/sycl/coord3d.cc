@@ -5,6 +5,28 @@
 #include <cmath>
 #include <inttypes.h>
 
+
+template <typename T> std::array<T,2> operator-(const std::array<T,2>& a)                 { return {-a[0], -a[1]};  }
+template <typename T> std::array<T,2> operator-(const std::array<T,2>& a, const std::array<T,2>& b){ return {a[0]-b[0], a[1]-b[1]};  }
+template <typename T> std::array<T,2> operator-(const T a, const std::array<T,2>& b){ return {a - b[0], a - b[1]};  }
+template <typename T> std::array<T,2> operator-(const std::array<T,2>& a, const T b){ return {a[0] - b, a[1] - b};  }
+template <typename T> std::array<T,2> operator+(const std::array<T,2>& a, const T b){ return {a[0] + b, a[1] +b};}
+template <typename T> std::array<T,2> operator+(const T a, const std::array<T,2>& b){ return b + a;}
+template <typename T> std::array<T,2> operator+(const std::array<T,2>& a, const std::array<T,2>& b){ return {a[0]+b[0], a[1]+b[1]};  }
+template <typename T> std::array<T,2> operator*(const std::array<T,2>& a, const T s)  { return {a[0]*s, a[1]*s};  }
+template <typename T> std::array<T,2> operator*(const T s, const std::array<T,2>& a)  { return a*s; }
+template <typename T> std::array<T,2> operator*(const std::array<T,2>& a, const std::array<T,2>& b) { return {a[0]*b[0], a[1]*b[1]};}
+template <typename T> std::array<T,2> operator/(const T s, const std::array<T,2>& a)  { return s/a[0], s/a[1]; }
+template <typename T> std::array<T,2> operator/(const std::array<T,2>& a, const T s)  { return a*(T(1.)/s); }
+template <typename T> void operator+=(std::array<T,2>& a, const std::array<T,2>& b) {a = a + b;}
+template <typename T> void operator-=(std::array<T,2>& a, const std::array<T,2>& b) {a = a - b;}
+template <typename T> void operator/=(std::array<T,2>& a, const T b) {a = a / b;}
+template <typename T> void operator*=(std::array<T,2>& a, const T b) {a = a * b;}
+
+template <typename T>  T dot(const std::array<T,2>& a,  const std::array<T,2>& b) { return a[0]*b[0] + a[1]*b[1]; }
+template <typename T>  T norm(const std::array<T,2>& a)                    { return sycl::sqrt(dot(a,a)); }
+
+
 template <typename T> std::array<T,3> operator-(const std::array<T,3>& a)                 { return {-a[0], -a[1], -a[2]};  }
 template <typename T> std::array<T,3> operator-(const std::array<T,3>& a, const std::array<T,3>& b){ return {a[0]-b[0], a[1]-b[1], a[2]-b[2]};  }
 template <typename T> std::array<T,3> operator-(const T a, const std::array<T,3>& b){ return {a - b[0], a - b[1], a - b[2]};  }
