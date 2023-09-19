@@ -1,10 +1,4 @@
 #include "CL/sycl.hpp"
-#include <iostream>
-#include "numeric"
-#include <vector>
-#include <tuple>
-#include <iterator>
-#include <type_traits>
 
 using namespace sycl;
 
