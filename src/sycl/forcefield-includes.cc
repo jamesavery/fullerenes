@@ -5,7 +5,6 @@
 #define SEMINARIO_FORCE_CONSTANTS 0
 
 #include "coord3d.cc"
-#include "isomer_batch.hh"
 #include "sym-mat3.cc"
 #include "cubic-graph.cc"
 #include "node-neighbours.cc"
