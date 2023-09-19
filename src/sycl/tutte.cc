@@ -1,5 +1,12 @@
 #include <CL/sycl.hpp>
+#include "numeric"
+#include <vector>
+#include <tuple>
+#include <iterator>
+#include <type_traits>
+#include <fullerenes/sycl-isomer-batch.hh>
 #include "forcefield-includes.cc"
+
 
 template<typename T, typename K>
 void tutte_layout(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
@@ -8,16 +15,18 @@ void tutte_layout(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchPolicy po
     Q.submit([&](handler& h) {
         auto N = batch.N();
         auto Nf = batch.Nf();
+        auto capacity = batch.capacity();
         auto max_iter = N * 10;
-        accessor<real_t, 1> xys_acc(batch.xys, h, write_only); 
-        accessor<node_t, 1> cubic_neighbours(batch.cubic_neighbours, h, read_only);
-        accessor<IsomerStatus, 1> statuses(batch.statuses, h, read_only);
+        accessor xys_acc(batch.xys, h, write_only); 
+        accessor cubic_neighbours(batch.cubic_neighbours, h, read_only);
+        accessor statuses(batch.statuses, h, read_only);
 
         local_accessor<bool, 1>     smem(N, h);
         local_accessor<coord2d, 1>  xys_smem(N, h);
         local_accessor<coord2d, 1>  newxys_smem(N, h);
 
-        h.parallel_for<class tutte>(sycl::nd_range(sycl::range(N*batch.capacity()), sycl::range(N)), [=](nd_item<1> nditem) {
+        h.parallel_for<class tutte>(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)), [=](nd_item<1> nditem) {
+
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto isomer_idx = nditem.get_group_linear_id();
@@ -32,7 +41,7 @@ void tutte_layout(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchPolicy po
 
             node_t outer_face[6];
             node_t outer_face_vertex   = 0;
-            uint8_t Nface = FG.get_face_oriented(0,FG.cubic_neighbours[0], outer_face);    
+            uint8_t Nface = FG.get_face_oriented(0,FG[0], outer_face);    
             
             smem[tid] =  false; 
             sycl::group_barrier(cta);
@@ -80,9 +89,11 @@ void tutte_layout(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchPolicy po
                 xys_smem[tid] = newxys_smem[tid];
             }
             sycl::group_barrier(cta);
-            xys_acc[tid]  =  xys_smem[tid];
+            xys_acc[isomer_idx*N + tid]  =  xys_smem[tid];
             }
         });
     });
     if(policy == LaunchPolicy::SYNC) Q.wait();
 }
+
+template void tutte_layout<float,uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
