@@ -5,6 +5,8 @@
 #include <set>
 #include <map>
 #include <sstream>
+#include <algorithm>
+#include <sys/stat.h>
 #include <assert.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -194,6 +196,19 @@ template <typename T> vector<T> operator-(const vector<T>& xs, const vector<T>& 
   return result;
 }
 
+template <typename T> vector<T> operator-(const vector<T>& xs)
+{
+  vector<T> result(xs.size());
+  for(int i=0;i<xs.size();i++) result[i] = -xs[i];
+  return result;
+}
+
+template <typename T> vector<T> sorted(const vector<T>& xs)
+{
+  vector<T> result(xs.begin(), xs.end());
+  std::sort(result.begin(), result.end()); 
+  return result;
+}
 
 template <typename T> vector< vector<T> > operator+(const vector< vector<T> >& xs, const T& x)
 {
@@ -299,7 +314,7 @@ public:
   size_t front_index, back_index;
   bool   empty() const { return front_index==back_index; }
   size_t size()  const { return back_index-front_index;  }
-  void   clear() const { front_index=back_index; }
+  void   clear()       { front_index=back_index; }
   
   const T& front(size_t offset=0) const {
     assert(!empty() && (offset<size()));
@@ -340,3 +355,6 @@ public:
     return (s << contents);
   }
 };
+
+size_t file_size(const char *filename);
+size_t file_size(const string filename);

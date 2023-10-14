@@ -16,7 +16,9 @@ constexpr __constant__ float dih_forces[4] = {35.0,65.0,85.0,270.0};
 constexpr __constant__ float flat_forces[3] = {0., 0., 0.};
 #endif
 
+template <typename T, typename K>
 struct Constants{
+    TEMPLATE_TYPEDEFS(T,K);
     #if USE_CONSTANT_INDICES
     uchar4 i_f_bond;
     uchar4 i_f_inner_angle;
@@ -48,24 +50,24 @@ struct Constants{
     constexpr INLINE device_real_t f_outer_angle_m(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_a, j)];}
     constexpr INLINE device_real_t f_outer_angle_p(const uint8_t j) const {return  angle_forces[d_get(i_outer_dih0_m, j)];}
     constexpr INLINE device_real_t f_outer_dihedral(const uint8_t j) const {return  dih_forces[d_get(i_outer_dih0_p, j)];}
-    constexpr INLINE device_real_t f_flat() const {return 5e2;}
+    constexpr INLINE device_real_t f_flat() const {return 2e2;}
     #else
-    device_coord3d f_bond;
-    device_coord3d f_inner_angle;
-    device_coord3d f_inner_dihedral;
-    device_coord3d f_outer_angle_m;
-    device_coord3d f_outer_angle_p;
-    device_coord3d f_outer_dihedral;
-    device_real_t f_flat = 1e2;
+    coord3d f_bond;
+    coord3d f_inner_angle;
+    coord3d f_inner_dihedral;
+    coord3d f_outer_angle_m;
+    coord3d f_outer_angle_p;
+    coord3d f_outer_dihedral;
+    real_t f_flat = 2e2;
     
-    device_coord3d r0;
-    device_coord3d angle0;
-    device_coord3d outer_angle_m0;
-    device_coord3d outer_angle_p0;
-    device_coord3d inner_dih0;
-    device_coord3d outer_dih0_a;
-    device_coord3d outer_dih0_m;
-    device_coord3d outer_dih0_p;
+    coord3d r0;
+    coord3d angle0;
+    coord3d outer_angle_m0;
+    coord3d outer_angle_p0;
+    coord3d inner_dih0;
+    coord3d outer_dih0_a;
+    coord3d outer_dih0_m;
+    coord3d outer_dih0_p;
     #endif
 
     __device__ __host__ __forceinline__ uint8_t face_index(uint8_t f1, uint8_t f2, uint8_t f3){
@@ -79,10 +81,11 @@ struct Constants{
      * @param isomer_idx The index of the isomer that the current thread is a part of
      * @return Forcefield constants for the current node in the isomer_idx^th isomer in G
      */
-    INLINE Constants(const IsomerBatch& G, const uint32_t isomer_idx){
+    template <Device U>
+    INLINE Constants(const IsomerBatch<U>& G, const uint32_t isomer_idx){
         //Set pointers to start of fullerene.
         const DeviceCubicGraph FG(&G.cubic_neighbours[isomer_idx*blockDim.x*3]);
-        device_node3 cubic_neighbours = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
+        node3 cubic_neighbours = {FG.cubic_neighbours[threadIdx.x*3], FG.cubic_neighbours[threadIdx.x*3 + 1], FG.cubic_neighbours[threadIdx.x*3 + 2]};
         //       m    p
         //    f5_|   |_f4
         //   p   c    b  m
@@ -126,22 +129,22 @@ struct Constants{
             d_set(i_f_outer_angle_p,  j,  angle_forces[F1]);
             d_set(i_f_outer_dihedral, j,  dih_forces[F1 + F3 + F4]);
             #else
-            d_set(r0,               j,  optimal_bond_lengths[F3 + F1]);
-            d_set(angle0,           j,  optimal_corner_cos_angles[F1]);
-            d_set(inner_dih0,       j,  optimal_dih_cos_angles[face_index(F1, F2 , F3)]);
-            d_set(outer_angle_m0,   j,  optimal_corner_cos_angles[F3]);
-            d_set(outer_angle_p0,   j,  optimal_corner_cos_angles[F1]);
-            d_set(outer_dih0_a,     j,  optimal_dih_cos_angles[face_index(F3, F4, F1)]);
-            d_set(outer_dih0_m,     j,  optimal_dih_cos_angles[face_index(F4, F1, F3)]);
-            d_set(outer_dih0_p,     j,  optimal_dih_cos_angles[face_index(F1, F3, F4)]);
+            d_set(r0,               j,  (T)optimal_bond_lengths[F3 + F1]);
+            d_set(angle0,           j,  (T)optimal_corner_cos_angles[F1]);
+            d_set(inner_dih0,       j,  (T)optimal_dih_cos_angles[face_index(F1, F2 , F3)]);
+            d_set(outer_angle_m0,   j,  (T)optimal_corner_cos_angles[F3]);
+            d_set(outer_angle_p0,   j,  (T)optimal_corner_cos_angles[F1]);
+            d_set(outer_dih0_a,     j,  (T)optimal_dih_cos_angles[face_index(F3, F4, F1)]);
+            d_set(outer_dih0_m,     j,  (T)optimal_dih_cos_angles[face_index(F4, F1, F3)]);
+            d_set(outer_dih0_p,     j,  (T)optimal_dih_cos_angles[face_index(F1, F3, F4)]);
             
             //Load force constants from neighbouring face information.
-            d_set(f_bond,           j,  bond_forces[F3 + F1]);
-            d_set(f_inner_angle,    j,  angle_forces[F1]);
-            d_set(f_inner_dihedral, j,  dih_forces[F1 + F2 + F3]);
-            d_set(f_outer_angle_m,  j,  angle_forces[F3]);
-            d_set(f_outer_angle_p,  j,  angle_forces[F1]);
-            d_set(f_outer_dihedral, j,  dih_forces[F1 + F3 + F4]);
+            d_set(f_bond,           j,  (T)bond_forces[F3 + F1]);
+            d_set(f_inner_angle,    j,  (T)angle_forces[F1]);
+            d_set(f_inner_dihedral, j,  (T)dih_forces[F1 + F2 + F3]);
+            d_set(f_outer_angle_m,  j,  (T)angle_forces[F3]);
+            d_set(f_outer_angle_p,  j,  (T)angle_forces[F1]);
+            d_set(f_outer_dihedral, j,  (T)dih_forces[F1 + F3 + F4]);
             #endif
         }
     }   

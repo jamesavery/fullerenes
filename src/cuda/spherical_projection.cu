@@ -9,13 +9,25 @@ namespace gpu_kernels{
 namespace isomerspace_X0{
 #include "device_includes.cu"
 
-__device__
-device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t* distances, const size_t isomer_idx){
-    DEVICE_TYPEDEFS
+template cudaError_t zero_order_geometry<GPU, float, uint16_t>(IsomerBatch<GPU>& B, const float scalerad, const LaunchCtx& ctx, const LaunchPolicy policy);
+template cudaError_t zero_order_geometry<GPU, double, uint16_t>(IsomerBatch<GPU>& B, const float scalerad, const LaunchCtx& ctx, const LaunchPolicy policy);
+
+template <Device U, typename T, typename K> __device__
+K multiple_source_shortest_paths(const IsomerBatch<U>& B, K* distances, const size_t isomer_idx){
+    TEMPLATE_TYPEDEFS(T,K);
     
     DeviceCubicGraph FG = DeviceCubicGraph(&B.cubic_neighbours[isomer_idx*blockDim.x*3]);
     node_t outer_face[6]; memset(outer_face, 0, sizeof(node_t)*6); //Do not rely on uninitialized memory it will only be zero on first touch.
     uint8_t Nface = FG.get_face_oriented(0, FG.cubic_neighbours[0],outer_face);
+    /* uint8_t local_fsize = FG.face_size(threadIdx.x, FG.cubic_neighbours[threadIdx.x*3]);
+    node_t is_pentagon = node_t(local_fsize == uint8_t(5) ? 1 : 0);
+    node_t* sharedmem = reinterpret_cast<node_t*>(distances);
+    ex_scan(sharedmem, is_pentagon, blockDim.x);
+    if(threadIdx.x > 0 && (sharedmem[threadIdx.x] == node_t(1)) && (sharedmem[threadIdx.x - 1] == node_t(0))) sharedmem[0] = node_t(threadIdx.x - 1);
+    BLOCK_SYNC;
+    node_t lowest_index_pentagon = sharedmem[0];
+    uint8_t Nface = FG.get_face_oriented(lowest_index_pentagon, FG.cubic_neighbours[lowest_index_pentagon*3],outer_face);
+    BLOCK_SYNC; */ //This code finds the pentagon with the lowest index and uses that as the starting point for the BFS. 
     distances[threadIdx.x] = node_t(NODE_MAX);    
     BLOCK_SYNC
     if (threadIdx.x < Nface)  distances[outer_face[threadIdx.x]] = 0;
@@ -37,17 +49,17 @@ device_node_t multiple_source_shortest_paths(const IsomerBatch& B, device_node_t
         }
     }
     BLOCK_SYNC
-    device_node_t distance = distances[threadIdx.x];
+    node_t distance = distances[threadIdx.x];
     BLOCK_SYNC
     return distance;
 }
 
 
-__device__
-device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, const size_t isomer_idx){
-    DEVICE_TYPEDEFS
+template <Device U, typename T, typename K> __device__
+std::array<T,2> spherical_projection(const IsomerBatch<U>& B, K* sdata, const size_t isomer_idx){
+    TEMPLATE_TYPEDEFS(T,K);
 
-    node_t distance =  multiple_source_shortest_paths(B,reinterpret_cast<node_t*>(sdata), isomer_idx);
+    node_t distance =  multiple_source_shortest_paths<U,T,K>(B,reinterpret_cast<node_t*>(sdata), isomer_idx);
     BLOCK_SYNC
     clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2); 
     node_t d_max = reduction_max(sdata, distance);
@@ -58,49 +70,49 @@ device_coord2d spherical_projection(const IsomerBatch& B, device_node_t* sdata, 
     node_t num_of_same_dist = node_t(reinterpret_cast<real_t*>(sdata)[distance]); 
     BLOCK_SYNC
     clear_cache(reinterpret_cast<real_t*>(sdata), Block_Size_Pow_2);
-    BLOCK_SYNC
-    coord2d xys; assign(xys,reinterpret_cast<std::array<float,2>*>(B.xys)[isomer_idx*blockDim.x + threadIdx.x]); BLOCK_SYNC
+    BLOCK_SYNC;
+    coord2d xys = reinterpret_cast<coord2d*>(B.xys)[isomer_idx*blockDim.x + threadIdx.x]; BLOCK_SYNC;
     ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2], xys[0]); 
     ordered_atomic_add(&reinterpret_cast<real_t*>(sdata)[distance*2+1], xys[1]); BLOCK_SYNC
     coord2d centroid = reinterpret_cast<coord2d*>(sdata)[distance] / (real_t)num_of_same_dist; BLOCK_SYNC    
     coord2d xy = xys - centroid;
     real_t dtheta = real_t(M_PI)/real_t(d_max+1); 
-    real_t phi = dtheta*(real_t(distance) + real_t(0.5)); 
-    real_t theta = atan2(float(xy[0]), float(xy[1])); 
+    real_t phi = dtheta*(distance + 0.5); 
+    real_t theta = atan2(xy[0],xy[1]); 
     coord2d spherical_layout = {theta, phi};
     
 
     return spherical_layout;
 }
 
-__global__
-void zero_order_geometry_(IsomerBatch B, float scalerad, int offset){
-    DEVICE_TYPEDEFS
+template <Device U, typename T, typename K> __global__
+void zero_order_geometry_(IsomerBatch<U> B, float scalerad, int offset){
+    TEMPLATE_TYPEDEFS(T,K);
+    SMEM(T);    
     
-    extern __shared__  device_real_t sdata[];
-    clear_cache(sdata, Block_Size_Pow_2);
+    clear_cache(smem, Block_Size_Pow_2);
     size_t isomer_idx = blockIdx.x + offset;
     if (isomer_idx < B.isomer_capacity && B.statuses[isomer_idx] != IsomerStatus::EMPTY){
-    NodeNeighbours node_graph = NodeNeighbours(B, isomer_idx); 
-    coord2d angles = spherical_projection(B,reinterpret_cast<device_node_t*>(sdata), isomer_idx);
+    NodeNeighbours node_graph = NodeNeighbours<K>(B, isomer_idx); 
+    coord2d angles = spherical_projection<U,T,K>(B,reinterpret_cast<device_node_t*>(smem), isomer_idx);
     real_t theta = angles[0]; real_t phi = angles[1];
-    real_t x = COS(theta)*SIN(phi), y = SIN(theta)*SIN(phi), z = COS(phi);
+    real_t x = cos(theta)*sin(phi), y = sin(theta)*sin(phi), z = cos(phi);
     coord3d coordinate = {x, y ,z};
 
-    clear_cache(sdata, Block_Size_Pow_2);
-    x = reduction(sdata, coordinate[0]); y = reduction(sdata, coordinate[1]); z = reduction(sdata,coordinate[2]);
+    clear_cache(smem, Block_Size_Pow_2);
+    x = reduction(smem, coordinate[0]); y = reduction(smem, coordinate[1]); z = reduction(smem,coordinate[2]);
     coord3d cm = {x, y, z};
     cm /= (real_t)blockDim.x;
     coordinate -= cm;
     real_t Ravg = real_t(0.0);
-    clear_cache(sdata, Block_Size_Pow_2);
-    real_t* base_pointer = sdata + Block_Size_Pow_2; 
+    clear_cache(smem, Block_Size_Pow_2);
+    real_t* base_pointer = smem + Block_Size_Pow_2; 
     coord3d* X = reinterpret_cast<coord3d*>(base_pointer);
     X[threadIdx.x] = coordinate;
     BLOCK_SYNC
     real_t local_Ravg = real_t(0.0);
     for (uint8_t i = 0; i < 3; i++) {local_Ravg += norm(X[threadIdx.x] - X[d_get(node_graph.cubic_neighbours,i)]);}
-    Ravg = reduction(sdata, local_Ravg);
+    Ravg = reduction(smem, local_Ravg);
     Ravg /= real_t(3*blockDim.x);
     coordinate *= (real_t)scalerad*(real_t)1.5/Ravg;
     assign(reinterpret_cast<std::array<float,3>*>(B.X)[blockDim.x*isomer_idx + threadIdx.x] , coordinate);
@@ -116,7 +128,9 @@ void reset_time(){
     kernel_time = 0.0;
 }
 
-cudaError_t zero_order_geometry(IsomerBatch& B, const float scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
+template <Device U, typename T, typename K>
+cudaError_t zero_order_geometry(IsomerBatch<U>& B, const float scalerad, const LaunchCtx& ctx, const LaunchPolicy policy){
+    TEMPLATE_TYPEDEFS(T,K);
     cudaSetDevice(B.get_device_id());
     //Need a way of telling whether the kernel has been called previously.
     static std::vector<bool> first_call(16, true);
@@ -133,11 +147,11 @@ cudaError_t zero_order_geometry(IsomerBatch& B, const float scalerad, const Laun
         cudaEventElapsedTime(&single_kernel_time, start[dev], stop[dev]);
         kernel_time += single_kernel_time;
     }
-    size_t smem =  sizeof(device_coord3d)*B.n_atoms + sizeof(device_real_t)*Block_Size_Pow_2;
+    size_t smem =  sizeof(coord3d)*B.n_atoms + sizeof(real_t)*Block_Size_Pow_2;
     
     //Compute best grid dimensions once.
-    static LaunchDims dims((void*)zero_order_geometry_, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)zero_order_geometry_, B.n_atoms, smem, B.isomer_capacity);
+    static LaunchDims dims((void*)zero_order_geometry_<U,T,K>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)zero_order_geometry_<U,T,K>, B.n_atoms, smem, B.isomer_capacity);
     cudaError_t error;
 
     //Note: some memory bug exists when using grid-stride for loops inside the kernel launches
@@ -145,7 +159,7 @@ cudaError_t zero_order_geometry(IsomerBatch& B, const float scalerad, const Laun
     for (int i = 0; i < B.isomer_capacity + (dims.get_grid().x - B.isomer_capacity % dims.get_grid().x ); i += dims.get_grid().x)
     {
         void* kargs[]{(void*)&B, (void*)&scalerad, (void*)&i};
-        error = safeCudaKernelCall((void*)zero_order_geometry_, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+        error = safeCudaKernelCall((void*)zero_order_geometry_<U,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     }
     cudaEventRecord(stop[dev], ctx.stream);
     

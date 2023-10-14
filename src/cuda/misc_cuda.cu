@@ -16,11 +16,12 @@ __device__ __forceinline__ T d_max(const T& a, const T& b){
  * @param sdata: pointer to the cache to be cleared
  * @param N: number of elements to clear
  */
-__device__ void clear_cache(device_real_t* sdata, size_t N){
+template <typename T>
+__device__ void clear_cache(T* sdata, size_t N){
     BLOCK_SYNC
     for (size_t index = threadIdx.x; index < N; index+=blockDim.x)
     {
-        sdata[index] = (device_real_t)0.0;
+        sdata[index] = (T)0.0;
     }
     BLOCK_SYNC
 }
@@ -45,7 +46,8 @@ __device__ void swap_reals(T& a, T& b){
 * @param data: pointer to the data to be added to
 * @param element: the element to be added    
 */
-__device__ void ordered_atomic_add(device_real_t* data, const device_real_t element){
+template <typename T> 
+__device__ void ordered_atomic_add(T* data, const T element){
     for (size_t i = 0; i < blockDim.x; i++)
     {
         BLOCK_SYNC

@@ -1,28 +1,42 @@
-link_libraries(fortran_opt fullerenes cuda_lib)
+if(ENABLE_CUDA)
+  find_package(CUDAToolkit REQUIRED)
+  link_libraries(fortran_opt fullerenes cuda_lib ${CMAKE_CUDA_LIBS})
+  set(EXECUTABLES
+  batch-clear-append-test
+  async-execution-test
+  validity-test
+  race-test
+  dual-test
+  tutte-test
+  tutte-test-random
+  X0-test
+  X0-test-random
+  refill-race-test
+  scan-test
+  async-pipeline-test
+  eigen-test
+  produce-figure-data
+  queue-test
+  properties-test
+  volume-test
+  surface-area-test
+  eccentricity-test
+  minimum-problem
+  eigensolve-special
+  optimise-single-isomer
+)
 
-if(CMAKE_CUDA_COMPILER)
-  add_executable(batch-clear-append-test batch-clear-append-test.cc)
-  add_executable(async-execution-test async-execution-test.cc)
-  add_executable(validity-test validity-test.cc)
-  add_executable(race-test race-test.cc)
-  add_executable(dual-test dual-test.cc)
-  add_executable(tutte-test tutte-test.cc)
-  add_executable(tutte-test-random tutte-test-random.cc)
-  add_executable(X0-test X0-test.cc)
-  add_executable(X0-test-random X0-test-random.cc)
-  add_executable(refill-race-test refill-race-test.cc)
-  add_executable(scan-test scan-test.cc)
-  add_executable(async-pipeline-test async-pipeline-test.cc)
-  add_executable(eigen-test eigen-test.cc)
-  add_executable(produce-figure-data produce-figure-data.cc)
-  add_executable(queue-test queue-test.cc)
-  add_executable(hessian-test hessian-test.cc)
-  target_link_libraries(batch-clear-append-test cuda_lib fullerenes)
-  target_link_libraries(refill-race-test fullerenes)
-  target_link_libraries(scan-test cuda_lib fullerenes)
-  target_link_libraries(async-pipeline-test cuda_lib fullerenes)
-  target_link_libraries(eigen-test cuda_lib fullerenes)
-  target_link_libraries(produce-figure-data cuda_lib fullerenes)
-  target_link_libraries(queue-test cuda_lib fullerenes)
+foreach(EXECUTABLE ${EXECUTABLES})
+  add_executable(${EXECUTABLE} ${EXECUTABLE}.cc)
+endforeach()
 
+  if(CUSOLVER_LIBRARY)
+    add_executable(hessian-test hessian-test.cc)
+    target_link_libraries(hessian-test cuda_lib fullerenes  ${CMAKE_CUDA_LIBS})
+  endif()  
+
+  foreach(EXECUTABLE ${EXECUTABLES})
+    target_link_libraries(${EXECUTABLE} cuda_lib fullerenes  ${CMAKE_CUDA_LIBS})  
+  endforeach()
+  
 endif()

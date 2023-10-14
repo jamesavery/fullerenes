@@ -8,13 +8,12 @@ const std::unordered_map<size_t,size_t> num_fullerenes = {{20,1},{22,0},{24,1},{
 using namespace chrono;
 using namespace chrono_literals;
 
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
 #include "numeric"
 #include "random"
-#include "filesystem"
 using namespace gpu_kernels;
 
 int main(int argc, char** argv){
@@ -36,7 +35,7 @@ int main(int argc, char** argv){
     
     auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
     ifstream isomer_sample(path,std::ios::binary);
-    auto fsize = std::filesystem::file_size(path);
+    auto fsize = file_size(path);
     std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
     auto available_samples = fsize / (Nf*6*sizeof(device_node_t));
     isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), Nf*6*sizeof(device_node_t)*available_samples);
@@ -48,11 +47,11 @@ int main(int argc, char** argv){
 
     
     auto finished_isomers = 0;
-    IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
-    IsomerBatch batch1(N,sample_size,DEVICE_BUFFER);
-    IsomerBatch h_batch(N,sample_size,HOST_BUFFER);
-    IsomerBatch h_batch1(N,sample_size,HOST_BUFFER);
-    cuda_io::IsomerQueue Q0(N);
+    IsomerBatch<GPU> batch0(N,sample_size);
+    IsomerBatch<GPU> batch1(N,sample_size);
+    IsomerBatch<CPU> h_batch(N,sample_size);
+    IsomerBatch<CPU> h_batch1(N,sample_size);
+    device_io::IsomerQueue Q0(N);
     Q0.resize(min(n_fullerenes,sample_size));
     for (int i = 0; i < sample_size; i++){
         for (size_t j = 0; j < Nf; j++){
@@ -70,7 +69,7 @@ int main(int argc, char** argv){
     
     isomerspace_tutte::tutte_layout(batch0, N*10);
     isomerspace_X0::zero_order_geometry(batch0, 4.0);
-    cuda_io::copy(batch1, batch0);
+    device_io::copy(batch1, batch0);
     
     
     for (int i = 0; i <  50; i++){
@@ -78,8 +77,8 @@ int main(int argc, char** argv){
         isomerspace_forcefield::optimise<FLATNESS_ENABLED>(batch1,N*0.1,N*5);
     }
 
-    std::cout << "Pedersen: " << cuda_io::average_iterations(batch0) << std::endl;
-    std::cout << "Flatness: " << cuda_io::average_iterations(batch1) << std::endl;
+    std::cout << "Pedersen: " << device_io::average_iterations(batch0) << std::endl;
+    std::cout << "Flatness: " << device_io::average_iterations(batch1) << std::endl;
     //Write the batch to the file
     CuArray<float> PedersenFlatness(sample_size);
     CuArray<float> FlatnessEnabledFlatness(sample_size);
@@ -88,7 +87,7 @@ int main(int argc, char** argv){
     isomerspace_forcefield::get_flat_mean<FLATNESS_ENABLED>(batch1, FlatnessEnabledFlatness);
 
     //Find the isomer with the greates difference in average flatness
-    cuda_io::copy(h_batch, batch0);
+    device_io::copy(h_batch, batch0);
     auto max_difference = 0.0;
     auto max_difference_index = 0;
     for (int i = 0; i < sample_size; i++){
@@ -108,7 +107,7 @@ int main(int argc, char** argv){
     FILE* file1 = fopen(filename1, "w");
     h_batch.print(BatchMember::STATUSES);
     Polyhedron::to_mol2(h_batch.get_isomer(max_difference_index).value(), file0);
-    cuda_io::copy(h_batch, batch1);
+    device_io::copy(h_batch, batch1);
     h_batch.print(BatchMember::STATUSES);
     Polyhedron::to_mol2(h_batch.get_isomer(max_difference_index).value(), file1);
 

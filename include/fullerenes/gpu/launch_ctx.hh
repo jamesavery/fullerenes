@@ -8,6 +8,8 @@ class LaunchCtx
     public:
         LaunchCtx();
         LaunchCtx(int device);
+
+        LaunchCtx& operator=(const LaunchCtx& other);
         ~LaunchCtx();
         int get_device_id() const;
         //Queries the stream about its' work status.

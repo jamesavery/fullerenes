@@ -763,15 +763,17 @@ C  IOP=4: Kamada-Kawai embedding using the distance matrix MDist
 C     Call format: draw_graph_with_path(filename, format (string), dimensions ((w,h) in cm), 
 C     edge_colour (x'rrggbb'), path_colour (x'rrggbb), vertex_colour (x'rrggbb), 
 C     edge_width (in mm), path_width (in mm), vertex_diameter (in mm) )
-            call draw_graph_with_path(g,filename,"tex",(/15.d0,15.d0/),
-     1           x'270470',x'bb2510',x'458b00', 0.3d0, 1.0d0, 2.5d0, 
-     2           numberham,mhamfield)
+c  TODO: make this functional again
+c$$$            call draw_graph_with_path(g,filename,"tex",(/15.d0,15.d0/),
+c$$$     1           x'270470',x'bb2510',x'458b00', 0.3d0, 1.0d0, 2.5d0, 
+c$$$     2           numberham,mhamfield)
       else
 C     Call format: draw_graph(filename, format (string),ndual (0|1), dimensions ((w,h) in cm), 
 C     edge_colour (x'rrggbb'), vertex_colour (x'rrggbb), 
 C     edge_width (in mm), vertex_diameter (in mm) )
-         call draw_graph(g,filename,"tex",ndual, nlabel_vertices,
-     1     (/15.d0,15.d0/), x'274070', x'458b00', 0.3d0, 2.5d0)
+c   TODO: make this functional again
+c$$$  call draw_graph(g,filename,"tex",ndual, nlabel_vertices,
+c$$$     1     (/15.d0,15.d0/), x'274070', x'458b00', 0.3d0, 2.5d0)
       endif
 c Output to POVRay raytracer. Commented out currently.
 c$$$      call draw_graph(g,filename, "pov",0, (/10.d0,10.d0/), 

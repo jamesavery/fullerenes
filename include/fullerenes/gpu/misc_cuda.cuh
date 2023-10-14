@@ -1,7 +1,7 @@
 #ifndef MISCEllANEOUS_CUDA_FUN
 #define MISCEllANEOUS_CUDA_FUN
 
-#include "cuda_definitions.h"
+#include "fullerenes/config.h"
 #include "cuda_runtime_api.h"
 #include <string>
 
@@ -10,7 +10,8 @@ __device__ __forceinline__ T d_max(const T& a, const T& b);
 
 //Sets the memory to 0. This exists because L1 cache is reused for different purposes, thus pointers alias.
 //Algorithms that depend on cache being 0 initialized to avoid bound checking must be prepared with a call to this function.
-__device__ void clear_cache(device_real_t* sdata, size_t N);
+template <typename T>
+__device__ void clear_cache(T* sdata, size_t N);
 
 //Swaps anything that implements the copy assignment operator.
 //TODO: Rename: name should be swap but clashes with std::swap because of using namespace std.
@@ -18,7 +19,8 @@ template <typename T>
 __device__ void swap_reals(T& real1, T& real2);
 
 //Atomically updates the data at the location *data, in order of threadIdx.x (floating point math is not associative)
-__device__ void ordered_atomic_add(device_real_t* data, const device_real_t element);
+template <typename T>
+__device__ void ordered_atomic_add(T* data, const T element);
 
 //Initializes device memory with the provided value.
 

@@ -1,14 +1,13 @@
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
-#include "fullerenes/gpu/cuda_definitions.h"
+#include "fullerenes/config.h"
 #include <chrono>
 #include <fstream>
-#include "filesystem"
 #include "random"
 #include "numeric"
-#include "fullerenes/gpu/isomer_queue.hh"
-#include "fullerenes/gpu/cuda_io.hh"
+#include "fullerenes/isomer_queue.hh"
+#include "fullerenes/device_io.hh"
 #include "fullerenes/gpu/kernels.hh"
 #include <stdio.h>
 
@@ -52,7 +51,7 @@ int main(int argc, char** argv){
         BuckyGen::buckygen_queue Q = BuckyGen::start(N,false,false);  
         auto sample_size = min(max_sample_size,(int)num_fullerenes.find(N)->second);
         
-        IsomerBatch batch0(N,sample_size,DEVICE_BUFFER);
+        IsomerBatch<GPU> batch0(N,sample_size);
         auto Nf = N/2 + 2;
         FullereneDual G;
         G.neighbours = neighbours_t(Nf, std::vector<node_t>(6));
@@ -61,7 +60,7 @@ int main(int argc, char** argv){
 
         auto path = "isomerspace_samples/dual_layout_" + to_string(N) + "_seed_42";
         ifstream isomer_sample(path,std::ios::binary);
-        auto fsize = std::filesystem::file_size(path);
+        auto fsize = file_size(path);
         std::vector<device_node_t> input_buffer(fsize/sizeof(device_node_t));
         auto available_samples = fsize / (Nf*6*sizeof(device_node_t));
         isomer_sample.read(reinterpret_cast<char*>(input_buffer.data()), Nf*6*sizeof(device_node_t)*available_samples);
@@ -71,11 +70,11 @@ int main(int argc, char** argv){
         std::shuffle(random_IDs.begin(), random_IDs.end(), std::mt19937{42});
         std::vector<int> id_subset(random_IDs.begin(), random_IDs.begin()+sample_size);
 
-        using namespace cuda_io;
+        using namespace device_io;
         IsomerQueue OptimisedQueue(N,0);
         IsomerQueue InputQueue(N,0);
 
-        IsomerBatch GPUBatch(N,sample_size,DEVICE_BUFFER);
+        IsomerBatch<GPU> GPUBatch(N,sample_size);
         for (int i = 0; i < sample_size; ++i){
                 for (size_t j = 0; j < Nf; j++){
                     G.neighbours[j].clear();
@@ -84,7 +83,7 @@ int main(int argc, char** argv){
                         if(u != UINT16_MAX) G.neighbours[j].push_back(u);
                     }
                 }
-                InputQueue.insert(Graph(G),id_subset[i]);
+		InputQueue.insert(Graph(G),id_subset[i]);
                 if(generate_cpu_stats > 0){
                     G.update();
                     PlanarGraph pG = G.dual_graph();
@@ -104,8 +103,8 @@ int main(int argc, char** argv){
         gpu_kernels::isomerspace_tutte::tutte_layout(GPUBatch, N*10);
         gpu_kernels::isomerspace_X0::zero_order_geometry(GPUBatch,4.0f);
         reset_convergence_statuses(GPUBatch);
-        IsomerBatch WirzBatch(N,sample_size,DEVICE_BUFFER);
-        IsomerBatch FlatBatch(N, sample_size, DEVICE_BUFFER);
+        IsomerBatch<GPU> WirzBatch(N,sample_size);
+        IsomerBatch<GPU> FlatBatch(N, sample_size);
         copy(WirzBatch,GPUBatch);
         copy(FlatBatch,GPUBatch);
 
@@ -231,7 +230,8 @@ int main(int argc, char** argv){
             CuArray<float> RMSDihedrals_Fortran(max_sample_size);
             CuArray<float> RMSFlatness_Fortran(max_sample_size);
             CuArray<float> Energy_Fortran(max_sample_size);
-            cuda_io::copy(OptimisedQueue.device_batch, OptimisedQueue.host_batch);
+            device_io
+	      ::copy(OptimisedQueue.device_batch, OptimisedQueue.host_batch);
             gpu_kernels::isomerspace_forcefield::get_bond_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSBonds_Fortran);
             gpu_kernels::isomerspace_forcefield::get_angle_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSAngles_Fortran);
             gpu_kernels::isomerspace_forcefield::get_dihedral_rrmse<PEDERSEN>(OptimisedQueue.device_batch,RMSDihedrals_Fortran);

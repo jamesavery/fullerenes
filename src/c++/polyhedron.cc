@@ -310,8 +310,6 @@ Polyhedron::Polyhedron(const PlanarGraph& G, const vector<coord3d>& points_, con
     face_max = 0;
     for(int i=0;i<faces.size();i++) if(faces[i].size() > face_max) face_max = faces[i].size();
   } 
-
-  if(!is_oriented) orient_neighbours();
 }
 
 Polyhedron::Polyhedron(const vector<coord3d>& xs, double tolerance) 
