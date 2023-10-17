@@ -1,7 +1,7 @@
 
 cmake_minimum_required(VERSION 3.5)
 project(Fullerenes)
-
+set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
 set(CMAKE_CXX_STANDARD 17)
 set(FULLERENE_DATABASE_PATH ${CMAKE_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
 set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
