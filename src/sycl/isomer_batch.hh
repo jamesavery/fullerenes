@@ -73,25 +73,6 @@ sycl::exception copy(T *dst, sycl::buffer<T, 1> &src)
     return sycl::exception(std::error_code());
 }
 
-template <typename T, typename Iterator>
-std::enable_if_t<std::is_same_v<typename std::iterator_traits<Iterator>::value_type, T>, sycl::exception> 
-copy(sycl::buffer<T, 1> &dst, Iterator src)
-{
-    try
-    {
-        sycl::host_accessor dst_acc(dst, sycl::write_only);
-        for (size_t i = 0; i < dst.size(); i++)
-        {
-            dst_acc[i] = src[i];
-        }
-    }
-    catch (sycl::exception e)
-    {
-        return e;
-    }
-    return sycl::exception(std::error_code());
-}
-
 template <typename T, typename K>
 struct IsomerBatch
 {
