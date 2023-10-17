@@ -4,8 +4,7 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
-#define CUDABATCH
-#include "isomer_batch.cc"
+#include <fullerenes/sycl-isomer-batch.hh>
 #include "forcefield-includes.cc"
 
 //Template specialisation for dualise
