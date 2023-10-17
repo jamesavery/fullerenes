@@ -1896,9 +1896,9 @@ __device__ void check_batch(IsomerBatch<U> &B, const size_t isomer_idx, const si
 	  B.statuses[isomer_idx] = failed? IsomerStatus::FAILED :
 	    (converged? IsomerStatus::CONVERGED : IsomerStatus::NOT_CONVERGED);
 
-	  if(failed)
-	    printf("CHECK failed: isomer %ld has %ld iterations, grad_norm=%g, bond_max=%g, angle_max=%g, dihedral_max=%g\n",
-		   isomer_idx,iterations_done,grad_norm, bond_max, angle_max, dihedral_max);
+	  //if(failed)
+	    //printf("CHECK failed: isomer %ld has %ld iterations, grad_norm=%g, bond_max=%g, angle_max=%g, dihedral_max=%g\n",
+		   //isomer_idx,iterations_done,grad_norm, bond_max, angle_max, dihedral_max);
 
 	}
       }
