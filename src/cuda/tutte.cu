@@ -122,7 +122,7 @@ void tutte_layout_(IsomerBatch<U> B, const size_t iterations){
         xys[threadIdx.x] = newxys[threadIdx.x];
     }
     BLOCK_SYNC;
-    (reinterpret_cast<std::array<real_t,2>*>(B.xys) + offset )[threadIdx.x]  =  xys[threadIdx.x];
+    (reinterpret_cast<std::array<float,2>*>(B.xys) + offset )[threadIdx.x]  =  {float(xys[threadIdx.x][0]), float(xys[threadIdx.x][1])};
     }
     }
 }

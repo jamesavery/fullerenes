@@ -1,7 +1,7 @@
 
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.5)
 project(Fullerenes)
-
+set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
 set(CMAKE_CXX_STANDARD 17)
 set(FULLERENE_DATABASE_PATH ${CMAKE_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
 set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
@@ -10,6 +10,17 @@ set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
 find_package(LAPACK)
 find_package(GSL)
+
+find_program(ICPX_COMPILER icpx)
+
+set(ICPX_TARGET_FLAG -fsycl-targets=nvptx64-nvidia-cuda,x86_64)
+set(ICPX_FLAGS "-fsycl ${ICPX_TARGET_FLAG} -Xcuda-ptxas --verbose -Xcuda-ptxas -g -Xcuda-ptxas --maxrregcount=80 -Xcuda-ptxas --device-debug -Xcuda-ptxas --generate-line-info")
+if(ICPX_COMPILER)
+  message("Found icpx compiler: ${ICPX_COMPILER}")
+else()
+  message("Could not find icpx compiler")
+endif()
+
 
 include(CheckLanguage)
 include(CMakeDependentOption)
@@ -60,7 +71,7 @@ if(ENABLE_CUDA)
 #set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=64 --resource-usage -Xptxas --expt-relaxed-constexpr -I /opt/nvidia/hpc_sdk/Linux_x86_64/21.2/cuda/11.0/targets/x86_64-linux/include/ -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
 #NOTE: -gencode arch argument is EXTREMELY important to get right, the program will simply crash with a cudaError: invalid device function if the architecture does not match the GPU
 
-set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++17 --use_fast_math --expt-relaxed-constexpr -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_86,code=sm_86  -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}"
+set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++17 --expt-relaxed-constexpr -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_86,code=sm_86  -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}"
 
 )
 set(CUDA_MAXREGCOUNT "--maxrregcount=80")
@@ -99,9 +110,18 @@ add_subdirectory(src/fortran)
 add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(src/c++)
+
+if(ICPX_COMPILER)
+  set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
+  set(CMAKE_CXX_COMPILER ${ICPX_COMPILER})
+  add_subdirectory(src/sycl)
+  add_subdirectory(tests/sycl-tests)
+  set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
+endif()
+
 add_subdirectory(programs)
 add_subdirectory(benchmarks)
-add_subdirectory(unit-tests)
+add_subdirectory(tests)
 
 
 

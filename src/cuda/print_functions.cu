@@ -71,7 +71,7 @@ __device__ void sequential_print(T data, size_t fullerene_id){
         {   
             if (i != blockDim.x-1)
             {
-                print(data, threadIdx.x); printf(",");
+                print(data, threadIdx.x); printf("\n");
             } else{
                 print(data, threadIdx.x);
             }
