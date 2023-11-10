@@ -58,7 +58,7 @@ void IsomerBatch<T>::operator=(const IsomerBatch<T>& input){
 
 template<Device T>
 IsomerBatch<T>::~IsomerBatch(){
-    if (allocated == true);
+    if (allocated == true)
     {
       for (size_t i = 0; i < pointers.size(); i++) 
 	free(*get<1>(pointers[i])); 
@@ -67,5 +67,11 @@ IsomerBatch<T>::~IsomerBatch(){
 }
 
 // TODO: Explicit template-instantiering skal organiseres struktureret & ikke bare i bunden af filer.
-IsomerBatch<CPU> A(0,0);
-IsomerBatch<GPU> B(0,0);
+void instantiate_templates(){
+  IsomerBatch<CPU> A;
+  IsomerBatch<GPU> B;  
+  IsomerBatch<CPU> C(0,0,0);
+  IsomerBatch<GPU> D(0,0,0);
+  A.~IsomerBatch();
+  B.~IsomerBatch();
+}
