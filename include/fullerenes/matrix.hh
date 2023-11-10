@@ -1,5 +1,4 @@
-#ifndef MATRIX_HH
-#define MATRIX_HH
+#pragma once
 
 #include <vector>
 #include <iostream>
@@ -112,4 +111,4 @@ public:
   }
 };
 
-#endif
+
