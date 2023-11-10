@@ -27,6 +27,7 @@ target_link_libraries(fortran_opt fortran_config)
 target_link_libraries(fortran_lib fortran_config)
 target_link_libraries(fullerene_program fortran_config fortran_opt fortran_lib fullerenes)
 
+set(CMAKE_Fortran_LINK_EXECUTABLE "")
 set_property(TARGET fortran_config PROPERTY LINKER_LANGUAGE Fortran)
 set_property(TARGET fortran_lib    PROPERTY LINKER_LANGUAGE Fortran)
 set_property(TARGET fortran_opt    PROPERTY LINKER_LANGUAGE Fortran)
