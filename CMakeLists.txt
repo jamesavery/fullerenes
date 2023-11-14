@@ -15,6 +15,7 @@ find_program(ICPX_COMPILER icpx)
 
 set(ICPX_TARGET_FLAG -fsycl-targets=nvptx64-nvidia-cuda,x86_64)
 set(ICPX_FLAGS "-fsycl ${ICPX_TARGET_FLAG} -Xcuda-ptxas --verbose -Xcuda-ptxas -g -Xcuda-ptxas --maxrregcount=80 -Xcuda-ptxas --device-debug -Xcuda-ptxas --generate-line-info")
+set(DPCPP_INCLUDE "/opt/intel/oneapi/compiler/2023.2.1/linux/include/sycl")
 if(ICPX_COMPILER)
   message("Found icpx compiler: ${ICPX_COMPILER}")
 else()
