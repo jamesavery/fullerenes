@@ -3,7 +3,7 @@ set(SYCL_EXECUTABLES
   sycl-pipeline-test
 )
 
-include_directories(/opt/intel/oneapi/compiler/2023.2.1/linux/include/sycl/CL)
+#include_directories(/opt/intel/oneapi/compiler/2023.2.1/linux/include/sycl/CL)
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   set_source_files_properties(${EXECUTABLE}.cc PROPERTIES COMPILE_FLAGS "${ICPX_FLAGS}")    
@@ -14,7 +14,7 @@ foreach(EXECUTABLE ${SYCL_EXECUTABLES})
 endforeach()
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
-  target_include_directories(${EXECUTABLE} PRIVATE "/opt/intel/oneapi/compiler/2023.2.1/linux/include/sycl" "/opt/intel/oneapi/compiler/2023.2.1/linux/include")
+  target_include_directories(${EXECUTABLE} PRIVATE DPCPP_INCLUDE)
   target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib sycl fullerenes)
   target_link_options(${EXECUTABLE} PRIVATE 
     -O4
