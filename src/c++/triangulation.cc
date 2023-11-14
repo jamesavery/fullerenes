@@ -867,7 +867,7 @@ void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagra
 
 vector<int> draw_path(int major, int minor)
 {
-  if(minor == 0) return {{major}};
+  if(minor == 0) return {1,major};
 
   int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
 

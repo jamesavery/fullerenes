@@ -20,6 +20,25 @@ typedef int node_t;
 typedef vector< vector<node_t> > neighbours_t;
 typedef vector< bool > edges_t;
 
+template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p);
+
+#define container_output(container) \
+  template <typename T> ostream& operator<<(ostream& s, const container<T>& v) \
+  { \
+  s << LIST_OPEN; \
+  for(typename container<T>::const_iterator x(v.begin());x!=v.end();){ \
+    s << *x; \
+    if(++x!=v.end()) s << ","; \
+  } \
+  s << LIST_CLOSE; \
+  return s; \
+}
+
+container_output(vector);
+container_output(list);
+container_output(set);
+
+
 // Directed edge is an ordered pair of nodes
 typedef pair<node_t,node_t> dedge_t;
 
@@ -50,21 +69,6 @@ template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T
   return s;
 }
 
-#define container_output(container) \
-  template <typename T> ostream& operator<<(ostream& s, const container<T>& v) \
-  { \
-  s << LIST_OPEN; \
-  for(typename container<T>::const_iterator x(v.begin());x!=v.end();){ \
-    s << *x; \
-    if(++x!=v.end()) s << ","; \
-  } \
-  s << LIST_CLOSE; \
-  return s; \
-}
-
-container_output(vector);
-container_output(list);
-container_output(set);
 
 // TODO: Macro instead of repeating
 template<typename K, typename V> vector<K> get_keys(const map<K,V>& m)

@@ -752,8 +752,8 @@ void template_instantiaons(){
     a.append(PlanarGraph(), 0); b.append(PlanarGraph(), 0);
     a.append(Polyhedron(), 0); b.append(Polyhedron(), 0);
     a.clear(); b.clear();
-    a == a; b == b;
-    a != a; b != b;
+    bool test = (a == a); test = (b == b);
+    test = (a != a); test = (b != b);
     //std::cout << c << d << std::endl;
 
 }

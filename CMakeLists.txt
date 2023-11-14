@@ -51,11 +51,16 @@ include_directories(${CMAKE_BINARY_DIR}/include/)
 
 
 # Fortran compiler flags
-set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=medium")
+if(DEFINED ENV{CRAYPE_VERSION})
+  message("Cray compiler environment detected")
+  set(CMAKE_Fortran_FLAGS "-f PIC -O3 -cpp")
+else()
+ set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=medium")
+endif()
+
 # C++ compiler flags
 
-
-set(CMAKE_CXX_FLAGS "-std=c++1z -fPIC -O3 -m64 -pthread -fopenmp")
+set(CMAKE_CXX_FLAGS "-std=c++17 -fPIC -O3 -m64 -pthread -fopenmp")
 
 
 

@@ -3545,8 +3545,8 @@ testcanon_first_init_other(EDGE *givenedge, int representation[], int colour[])
    be found. A better representation will be completely constructed and 
    returned in "representation".  It works pretty similar to testcanon except 
    for obviously necessary changes, so for extensive comments see testcanon */ {
-    register EDGE *run;
-    register int vertex;
+     EDGE *run;
+     int vertex;
     EDGE *temp;
     EDGE * startedge[MAXN + 1];
     int number[MAXN], i;
@@ -3612,8 +3612,8 @@ testcanon_init_other(EDGE *givenedge, int representation[], int colour[])
    be found. A better representation will be completely constructed and 
    returned in "representation".  It works pretty similar to testcanon except 
    for obviously necessary changes, so for extensive comments see testcanon */ {
-    register EDGE *run;
-    register int col, vertex;
+     EDGE *run;
+     int col, vertex;
     EDGE *temp;
     EDGE * startedge[MAXN + 1];
     int number[MAXN], i;
@@ -4335,8 +4335,8 @@ numedgeorbits(int nbtot, int nbop)
 /* return number of orbits of directed edges, under the
    orientation-preserving automorphism group (assumed computed) */
 {
-    register EDGE **nb0,**nblim,**nb;
-    register int i,j;
+     EDGE **nb0,**nblim,**nb;
+     int i,j;
 
     if (nbtot == 1)
         return ne;
@@ -4575,9 +4575,9 @@ numorbitsonface(int nbtot, int nbop, EDGE *e)
    the left of edge e, under the orientation-preserving
    automorphism group (assumed computed) */
 {
-    register EDGE **nb0,**nblim,**nb;
-    register EDGE *e1;
-    register int i,j;
+     EDGE **nb0,**nblim,**nb;
+     EDGE *e1;
+     int i,j;
 
     RESETMARKS;
 
@@ -7813,8 +7813,8 @@ make_dual(void)
    of the face boundary, and the size of the face in facesize[i], for each i.
    Returns the number of faces. */
 {
-    register int i,nf,sz;
-    register EDGE *e,*ex,*ef,*efx;
+     int i,nf,sz;
+     EDGE *e,*ex,*ef,*efx;
 
     RESETMARKS;
 
@@ -7873,8 +7873,8 @@ compute_code(unsigned char code[])
    edge is numbered 1 and the end 2.
 */
 {
-    register EDGE *run;
-    register int vertex;
+     EDGE *run;
+     int vertex;
     EDGE *temp;
     EDGE *startedge[MAXN+1];
     int number[MAXN+1], i;
@@ -7941,8 +7941,8 @@ compute_code_mirror(unsigned char code[])
    end is numbered 0.
 */
 {
-    register EDGE *run;
-    register int vertex;
+     EDGE *run;
+     int vertex;
     EDGE *temp;
     EDGE *startedge[MAXN+1];
     int number[MAXN+1], i;
@@ -8001,7 +8001,7 @@ compute_dual_code(unsigned char code[])
 /* works like compute_code -- only for the dual */
 
 {
-    register EDGE *run, *run2;
+     EDGE *run, *run2;
     EDGE *temp;
     EDGE *startedge[MAXF+1];
     int number[MAXF+1], i;
@@ -8076,7 +8076,7 @@ compute_dual_code_mirror(unsigned char code[])
 /* works like compute_code_mirror -- only for the dual */
 
 {
-    register EDGE *run, *run2;
+     EDGE *run, *run2;
     EDGE *temp;
     EDGE *startedge[MAXF+1];
     int number[MAXF+1], i;
@@ -8284,8 +8284,8 @@ write_digits(FILE *f, int doflip)
    procedure uses the internal numbering of vertices and is
    intended for debugging purposes. */
 {
-    register int i,k;
-    register EDGE *ex,*e;
+     int i,k;
+     EDGE *ex,*e;
     unsigned char code[2*MAXN+2*MAXE+9];
     int nvsize;
     int w;
@@ -8466,7 +8466,7 @@ write_code_as_sparse6(FILE *f, unsigned char code[])
    goes not use any global variables and works to 255 vertices. */
 
 {
-    register unsigned char *pin,*pout;
+     unsigned char *pin,*pout;
     unsigned char s6[20+2*MAXE+2*MAXF];
     int n,nb,i,j,lastj,x,k,r,rr,topbit;
     int loopcount;
@@ -8610,7 +8610,7 @@ write_code_as_graph6(FILE *f, unsigned char code[])
 
 {
     unsigned char g6[20+MAXF*(MAXF-1)/12];
-    register unsigned char *pin,*pout;
+     unsigned char *pin,*pout;
     int n,nlen,bodylen,i,j,org;
     static unsigned char g6bit[] = {32,16,8,4,2,1};
 

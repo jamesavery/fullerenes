@@ -907,7 +907,7 @@ face_t PlanarGraph::get_face_oriented(const dedge_t &e, int Fmax) const
 
   int i=0;
   node_t u = e.first, v=e.second;
-  face_t f = vector<int>{{u}};
+  face_t f = vector<int>{1,u};
   
   while(v!=e.first){
     node_t w = prev(v,u);        // Previous neighbour to u in v defines corner u-v-w in face

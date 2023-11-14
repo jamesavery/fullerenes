@@ -230,8 +230,9 @@ C      producing a spherical fullerene
       enddo
 
       Do J=1,number_vertices
-       IM=IAtom(J)
-       Write(IOUT,1001),J,IM,El(IM),(Dist(I,J),I=1,3)
+         IM=IAtom(J)
+c       TODO: this breaks Cray ftn 
+c       Write(IOUT,1001),J,IM,El(IM),(Dist(I,J),I=1,3)
       enddo
 
 C Write out xyz file
