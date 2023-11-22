@@ -23,7 +23,6 @@ int main(int, char**) {
   for(auto P: platform::get_platforms())
     for(auto d: P.get_devices())
       if(d.is_gpu()) cout << "\t" << d.get_info<info::device::name>() << "\n";
- 
 
   return 0;
 }
