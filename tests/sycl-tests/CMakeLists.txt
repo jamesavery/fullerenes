@@ -1,4 +1,5 @@
 set(SYCL_EXECUTABLES
+  hello-sycl
   sycl-pipeline-test
 )
 
