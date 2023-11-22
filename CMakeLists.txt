@@ -20,21 +20,34 @@ if(SYCL_LS)
   set(SYCL_DIR ${SYCL_BIN_DIR}/../)
   find_program(DPCPP_COMPILER NAMES ${SYCL_BIN_DIR}/icpx ${SYCL_BIN_DIR}/clang++)
 
-  cmake_dependent_option(ENABLE_SYCL "Build SYCL GPU code" ON "DPCPP_COMPILER" OFF)
-
+  cmake_dependent_option(ENABLE_SYCL "Build SYCL GPU code" ON "DPCPP_COMPILER" OFF)  
+  
   if(DPCPP_COMPILER)
     message("Found dpc++ compiler: ${DPCPP_COMPILER}")
   else()
     message("Could not find dpc++ compiler")
   endif()
   
-  #  set(DPCPP_TARGET_FLAGS -fsycl-targets=amdgcn-amd-amdhsa,nvptx64-nvidia-cuda,x86_64)
-  set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a")
-# '-Xcuda-ptxas --verbose -Xcuda-ptxas -g -Xcuda-ptxas --maxrregcount=80 -Xcuda-ptxas --device-debug -Xcuda-ptxas --generate-line-info' kun hvis NVIDIA target  
-  set(DPCPP_INCLUDE ${SYCL_DIR}/include)  
-  set(DPCPP_FLAGS "-fsycl ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl")
 endif()
 
+if(ENABLE_SYCL)
+  set(SYCL_TARGETS "AMD" CACHE STRING "AMD|NVIDIA|X86 (Currently only single target supported.") # TODO: Multi-target compiles.
+  message("SYCL compile enabled with ${SYCL_TARGETS} target")
+
+  
+  if(SYCL_TARGETS STREQUAL "AMD") 
+    set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a")
+  elseif(SYCL_TARGETS STREQUAL "NVIDIA")
+    set(DPCPP_TARGET_FLAGS "-fsycl-targets=nvptx64-nvidia-cuda")
+    set(DPCPP_FLAGS "${DPCPP_FLAGS} -Xcuda-ptxas --verbose -Xcuda-ptxas -g -Xcuda-ptxas --maxrregcount=80 -Xcuda-ptxas --device-debug -Xcuda-ptxas --generate-line-info")
+  elseif(SYCL_TARGETS STREQUAL "X86")
+    set(DPCPP_TARGET_FLAGS "x86_64")
+  endif()
+
+  set(DPCPP_INCLUDE ${SYCL_DIR}/include)  
+  set(DPCPP_FLAGS "${DPCPP_FLAGS} -fsycl ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl")
+
+endif()
 
 check_language(CUDA)
 cmake_dependent_option(ENABLE_CUDA "Build CUDA GPU code" ON "CMAKE_CUDA_COMPILER" OFF)
@@ -62,7 +75,7 @@ include_directories(${CMAKE_BINARY_DIR}/include/)
 
 # Fortran compiler flags
 if(DEFINED ENV{CRAYPE_VERSION})
-  message("CRAY COMPILER ENVIRONMENT DETECTED")
+  message("Cray compiler environment detected")
   set(CMAKE_Fortran_FLAGS "-fPIC -O3")
 else()
  set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=medium")
