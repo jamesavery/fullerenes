@@ -1,5 +1,7 @@
 
 cmake_minimum_required(VERSION 3.5)
+include(CheckLanguage)
+include(CMakeDependentOption)
 project(Fullerenes)
 set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
 set(CMAKE_CXX_STANDARD 17)
@@ -11,20 +13,29 @@ find_package(BLAS)
 find_package(LAPACK)
 find_package(GSL)
 
-find_program(ICPX_COMPILER icpx)
+# Can we do a SYCL?
+find_program(SYCL_LS sycl-ls)
+if(SYCL_LS)
+  get_filename_component(SYCL_BIN_DIR ${SYCL_LS} DIRECTORY)
+  set(SYCL_DIR ${SYCL_BIN_DIR}/../)
+  find_program(DPCPP_COMPILER NAMES ${SYCL_BIN_DIR}/icpx ${SYCL_BIN_DIR}/clang++)
 
-set(ICPX_TARGET_FLAG -fsycl-targets=nvptx64-nvidia-cuda,x86_64)
-set(ICPX_FLAGS "-fsycl ${ICPX_TARGET_FLAG} -Xcuda-ptxas --verbose -Xcuda-ptxas -g -Xcuda-ptxas --maxrregcount=80 -Xcuda-ptxas --device-debug -Xcuda-ptxas --generate-line-info")
-set(DPCPP_INCLUDE "/opt/intel/oneapi/compiler/2023.2.1/linux/include/sycl")
-if(ICPX_COMPILER)
-  message("Found icpx compiler: ${ICPX_COMPILER}")
-else()
-  message("Could not find icpx compiler")
+  cmake_dependent_option(ENABLE_SYCL "Build SYCL GPU code" ON "DPCPP_COMPILER" OFF)
+
+  if(DPCPP_COMPILER)
+    message("Found dpc++ compiler: ${DPCPP_COMPILER}")
+  else()
+    message("Could not find dpc++ compiler")
+  endif()
+  
+  #  set(DPCPP_TARGET_FLAGS -fsycl-targets=amdgcn-amd-amdhsa,nvptx64-nvidia-cuda,x86_64)
+  set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a")
+# '-Xcuda-ptxas --verbose -Xcuda-ptxas -g -Xcuda-ptxas --maxrregcount=80 -Xcuda-ptxas --device-debug -Xcuda-ptxas --generate-line-info' kun hvis NVIDIA target  
+  set(DPCPP_INCLUDE ${SYCL_DIR}/include)  
+  set(DPCPP_FLAGS "-fsycl ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl")
 endif()
 
 
-include(CheckLanguage)
-include(CMakeDependentOption)
 check_language(CUDA)
 cmake_dependent_option(ENABLE_CUDA "Build CUDA GPU code" ON "CMAKE_CUDA_COMPILER" OFF)
 
@@ -45,15 +56,14 @@ execute_process(
 )
 
 # C++ configure file
-
 include_directories(AFTER SYSTEM include)
 include_directories(${CMAKE_BINARY_DIR}/include/)
 
 
 # Fortran compiler flags
 if(DEFINED ENV{CRAYPE_VERSION})
-  message("Cray compiler environment detected")
-  set(CMAKE_Fortran_FLAGS "-f PIC -O3 -cpp")
+  message("CRAY COMPILER ENVIRONMENT DETECTED")
+  set(CMAKE_Fortran_FLAGS "-fPIC -O3")
 else()
  set(CMAKE_Fortran_FLAGS "-fPIC -cpp -O3 -m64 -mcmodel=medium")
 endif()
@@ -62,9 +72,6 @@ endif()
 
 set(CMAKE_CXX_FLAGS "-std=c++17 -fPIC -O3 -m64 -pthread -fopenmp")
 
-
-
-# TODO: Add OpenMP Isomerspace implementation, choose at runtime if both openmp and cuda present. OpenACC too?
 
 
 if(ENABLE_CUDA)
@@ -117,9 +124,9 @@ add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(src/c++)
 
-if(ICPX_COMPILER)
+if(DPCPP_COMPILER)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
-  set(CMAKE_CXX_COMPILER ${ICPX_COMPILER})
+  set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
   add_subdirectory(src/sycl)
   add_subdirectory(tests/sycl-tests)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
