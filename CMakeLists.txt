@@ -45,7 +45,7 @@ if(ENABLE_SYCL)
   endif()
 
   set(DPCPP_INCLUDE ${SYCL_DIR}/include)  
-  set(DPCPP_FLAGS "${DPCPP_FLAGS} -fsycl ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl")
+  set(DPCPP_FLAGS "${DPCPP_FLAGS} -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl")
 
 endif()
 
