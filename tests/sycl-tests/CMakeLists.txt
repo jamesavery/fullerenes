@@ -11,12 +11,18 @@ foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   add_executable(${EXECUTABLE} ${EXECUTABLE}.cc)
 endforeach()
 
+
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   target_include_directories(${EXECUTABLE} PRIVATE ${DPCPP_INCLUDE} ${DPCPP_INCLUDE}/sycl)
-  target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib sycl fullerenes)
+  target_compile_options(${EXECUTABLE} PRIVATE
+    -O3
+    -fsycl -fsycl-unnamed-lambda
+    "SHELL:${DPCPP_TARGET_FLAGS}"
+    )
+  target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib sycl fullerenes m)
   target_link_options(${EXECUTABLE} PRIVATE 
-    -O4
-    -fsycl
+    -O3
+    -fsycl -fsycl-unnamed-lambda
     "SHELL:${DPCPP_TARGET_FLAGS}"
     #    "SHELL:-Xcuda-ptxas --verbose"
     #    "SHELL:-Xcuda-ptxas --maxrregcount=80"
@@ -27,3 +33,4 @@ foreach(EXECUTABLE ${SYCL_EXECUTABLES})
     #    "SHELL:-Xcuda-ptxas --generate-line-info"
   )
 endforeach()
+
