@@ -1,6 +1,7 @@
 set(SYCL_EXECUTABLES
   hello-sycl
   sycl-pipeline-test
+  sycl-pipeline-herd
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})

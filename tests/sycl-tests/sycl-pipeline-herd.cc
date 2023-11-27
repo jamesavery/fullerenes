@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
 				   IPR,only_symmetric,my_chunks);
 
   IsomerBatch<device_real_t,device_node_t> batch(N, batch_size);
-  Graph G(N);
+  Triangulation G(N);
    {
     printf("Processing %ld C%ld isomers in batches of %ld\n",Nisomers,N,batch_size);  
     sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);

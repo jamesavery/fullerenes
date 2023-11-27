@@ -13,9 +13,8 @@ int main(int argc, char** argv) {
     size_t N  = argc>1 ? strtol(argv[1],0,0) : 20;
     size_t Nf = N/2 + 2;
     size_t BatchSize = argc>2 ? strtol(argv[2],0,0) : 1;
-    std::string device_type = argc>3 ? argv[3] : "cpu";
+    std::string device_type = argc>3 ? argv[3] : "gpu";
 
-    std::transform(device_type.begin(), device_type.end(), device_type.begin(), ::tolower);
     auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
 
     sycl::queue Q = sycl::queue(selector, sycl::property::queue::in_order{});
