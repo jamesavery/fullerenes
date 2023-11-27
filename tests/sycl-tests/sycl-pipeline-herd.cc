@@ -75,8 +75,10 @@ int main(int argc, char** argv) {
   auto selector = device_type == "gpu"? gpu_selector_v : cpu_selector_v;
   queue Q(selector, property::queue::in_order());  
     
-  printf("Running on device: %s\n",Q.get_device().get_info<info::device::name>().c_str());
-
+  printf("Running on device: %s with %d compute units.\n",
+          Q.get_device().get_info<info::device::name>().c_str(),
+          Q.get_device().get_info<info::device::max_compute_units>());
+            
   auto my_chunks = loadbalanced_chunks(N_chunks,n_chunks,my_node_idx);
   BuckyGen::buckyherd_queue BuckyQ(N,N_chunks,workers_per_node,
 				   IPR,only_symmetric,my_chunks);
