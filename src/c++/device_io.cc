@@ -496,7 +496,7 @@ std::vector<size_t> IsomerBatch<T>::find_ids(const IsomerStatus status){
 }
 
 template <Device T>
-bool IsomerBatch<T>::operator==(const IsomerBatch<T>& b){
+bool IsomerBatch<T>::operator==(const IsomerBatch<T>& b) const {
     bool passed = true;
     auto device_real_t_equals = [](const float a, const float b){
         return (a == b) || (std::isnan(a) && std::isnan(b)) || (std::isinf(a) && std::isinf(b));

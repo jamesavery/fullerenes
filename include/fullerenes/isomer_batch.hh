@@ -94,8 +94,8 @@ struct IsomerBatch
     void append(const PlanarGraph& G, const size_t id, const bool copy_2d_layout = true); //Appends a planar graph to the batch and increments the size
     void append(const Polyhedron& P, const size_t id); //Appends a polyhedron to the batch and increments the size
     void clear(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy = LaunchPolicy::SYNC);                 //Clears the batch and resets the size to 0
-    bool operator==(const IsomerBatch& b); //Returns true if the two batches are equal
-    bool operator!=(const IsomerBatch& b) {return !(*this == b);}
+    bool operator==(const IsomerBatch& b) const; //Returns true if the two batches are equal
+    bool operator!=(const IsomerBatch& b) const {return !(*this == b);}
     //friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a); //Prints the batch to the given stream
 
   private:
