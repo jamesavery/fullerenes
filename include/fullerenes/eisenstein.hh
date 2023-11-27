@@ -1,6 +1,7 @@
 #pragma once
 #include <assert.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <cmath>
 #include <algorithm>
 #include <vector>
