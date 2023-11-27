@@ -8,7 +8,6 @@
 #include <math.h>
 #include <sstream>
 #include <list>
-#include <complex>
 #include <algorithm>
 #include "auxiliary.hh"
 
@@ -41,7 +40,6 @@ namespace std {
 
 
 struct coord2d : public pair<double,double> {
-  coord2d(const complex<double>& x) : pair<double,double>(x.real(),x.imag()) {}
   coord2d(const pair<double,double>& x) : pair<double,double>(x) {}
   coord2d(const double x=0, const double y=0) : pair<double,double>(x,y) {}
   coord2d operator/(const double s)   const { return coord2d(first/s,second/s); }

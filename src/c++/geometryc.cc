@@ -4,7 +4,6 @@
 #include <vector>
 #include <algorithm>
 #include <cassert>
-#include <complex>
 #include "fullerenes/geometry.hh"
 #include "fullerenes/eisenstein.hh"
 
