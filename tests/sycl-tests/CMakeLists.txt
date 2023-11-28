@@ -20,15 +20,15 @@ foreach(EXECUTABLE ${SYCL_EXECUTABLES})
     "SHELL:${DPCPP_FLAGS}"
     )
   target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib sycl fullerenes m)
-  target_link_options(${EXECUTABLE} PRIVATE 
-    "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS} ${DPCPP_LINK_FLAGS}"    
-    # "SHELL:-Xcuda-ptxas --verbose"
-    # "SHELL:-Xcuda-ptxas --maxrregcount=80"
-    # "SHELL:-Xcuda-ptxas --opt-level=3"
-    # "SHELL:-Xcuda-ptxas --generate-line-info"
-    # "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
-    # "SHELL:-Xcuda-ptxas --warn-on-spills"
-    # "SHELL:-Xcuda-ptxas --generate-line-info"
+  target_link_options(${EXECUTABLE} PRIVATE     
+    "SHELL:${DPCPP_LINK_FLAGS}"
+    "SHELL:-Xcuda-ptxas --verbose"
+    "SHELL:-Xcuda-ptxas --maxrregcount=80"
+    "SHELL:-Xcuda-ptxas --opt-level=3"
+    "SHELL:-Xcuda-ptxas --generate-line-info"
+    "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
+    "SHELL:-Xcuda-ptxas --warn-on-spills"
+    "SHELL:-Xcuda-ptxas --generate-line-info"    
   )
 endforeach()
 
