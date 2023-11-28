@@ -17,6 +17,7 @@ struct GraphWrapper{
             if (neighbours[u*MaxDegree + j] == v) return j;
         }
         assert(false);
+	return -1;
     }
 
     K next(const K u, const K v) const{
