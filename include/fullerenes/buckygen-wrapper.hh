@@ -23,10 +23,14 @@ namespace BuckyGen {
 
     buckygen_queue new_worker(int worker_index);
     bool next_fullerene(Graph& G);
+
+    void stop_all() const;
     
     buckyherd_queue(size_t N, size_t Nchunks, size_t Nworkers,
 		    bool IPR, bool only_nontrivial,
-		    vector<size_t> chunks_todo = {});						  
+		    vector<size_t> chunks_todo = {});
+
+    ~buckyherd_queue(){ stop_all(); }
   };   
   
   buckygen_queue start(int N, int IPR, bool only_nontrivial = false, 

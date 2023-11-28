@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <unistd.h>
 #include <signal.h>
 #include <assert.h>
 #include <unistd.h>
@@ -39,7 +40,7 @@ void signal_finished(const buckygen_queue& Q)
 
 void stop(const buckygen_queue& Q)
 {
-  kill(Q.pid,9);
+  kill(Q.pid,SIGQUIT);
   //  msgctl(Q.qid,IPC_RMID,0);
 }
 
@@ -55,7 +56,7 @@ buckygen_queue start(int N, int IPR, bool only_nontrivial,
 
   assert(Q.qid >= 0);
 
-  if(!(Q.pid = fork())){	// Child?
+  if(!(Q.pid = fork())){	// Child
     QGlobal = Q;
     
     int  npar = 2;
@@ -70,7 +71,9 @@ buckygen_queue start(int N, int IPR, bool only_nontrivial,
     buckygen_main(npar, av);
     signal_finished(Q);
     exit(0);
-  } else {			// Parent?
+  } else {			// Parent
+    pid_t gid = getpid();        // Set group ID of child to parent PID
+    setpgid(Q.pid,gid);		// so that we can kill all children in one swoop.
     assert(Q.pid >= 0);
     return Q;
   }
@@ -141,6 +144,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
     Q.worker_index = worker_index;
     Q.chunk_number = Nchunks;	// TODO: Pick one name.
 
+    signal(SIGQUIT,SIG_IGN);
   
     // Individual stuff.
     assert(!chunks_todo.empty()); // Don't call on an empty work stack
@@ -162,6 +166,8 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
       signal_finished(Q);
       exit(0);
     } else {			// Parent process
+      pid_t gid = getpid();	// Keep track of children with group ID
+      setpgid(Q.pid,gid);	// to kill them all when parent leaves.
       assert(Q.pid >= 0);
       active_workers++;
       return Q;
@@ -230,6 +236,11 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
       }
     }
     abort();
+  }
+
+  void buckyherd_queue::stop_all() const {
+    pid_t gid = getpid();
+    kill(-gid,SIGQUIT);
   }
 
   
