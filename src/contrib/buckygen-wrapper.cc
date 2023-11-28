@@ -144,8 +144,6 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
     Q.worker_index = worker_index;
     Q.chunk_number = Nchunks;	// TODO: Pick one name.
 
-    signal(SIGQUIT,SIG_IGN);
-  
     // Individual stuff.
     assert(!chunks_todo.empty()); // Don't call on an empty work stack
     Q.chunk_index = chunks_todo.back(); chunks_todo.pop_back();
@@ -240,7 +238,9 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
 
   void buckyherd_queue::stop_all() const {
     pid_t gid = getpid();
+    sighandler_t old_handler = signal(SIGQUIT,SIG_IGN); // Protect ourselves while we kill our children
     kill(-gid,SIGQUIT);
+    signal(SIGQUIT,old_handler);                        // Restore normalcy.
   }
 
   
