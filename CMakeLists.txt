@@ -17,6 +17,13 @@ find_package(GSL)
 # Shared between CUDA and SYCL
 set(GPU_MAXREGCOUNT 80)
 
+# Do we have CUDA compilers?
+check_language(CUDA)
+cmake_dependent_option(ENABLE_CUDA "Build CUDA GPU code" ON "CMAKE_CUDA_COMPILER" OFF)
+if(CMAKE_CUDA_COMPILER)
+  set(CMAKE_CUDA_ARCHITECTURES 86 CACHE INTEGER "Architecture for your NVIDIA GPU: 50|60|70|75|80|86|89|90. See https://arnon.dk/matching-sm-architectures-arch-and-gencode-for-various-nvidia-cards/")
+endif()
+
 # Can we do a SYCL?
 find_program(SYCL_LS sycl-ls)
 if(SYCL_LS)
@@ -35,7 +42,13 @@ if(SYCL_LS)
 endif()
 
 if(ENABLE_SYCL)
-  set(SYCL_TARGETS "AMD" CACHE STRING "AMD|NVIDIA|X86 (Currently only single target supported.") # TODO: Multi-target compiles.
+  if(CMAKE_CUDA_COMPILER)
+    set(SYCL_DEFAULT_TARGET "NVIDIA")
+  else()
+    set(SYCL_DEFAULT_TARGET "AMD")
+  endif()
+  
+  set(SYCL_TARGETS ${SYCL_DEFAULT_TARGET} CACHE STRING "AMD|NVIDIA|X86 (Currently only single target supported.") # TODO: Multi-target compiles.
   message("SYCL compile enabled with ${SYCL_TARGETS} target")
 
   set(DPCPP_FLAGS "-O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
@@ -43,10 +56,17 @@ if(ENABLE_SYCL)
   if(SYCL_TARGETS STREQUAL "AMD") 
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa,x86_64 -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a -march=native")
   elseif(SYCL_TARGETS STREQUAL "NVIDIA")
-    set(PTXAS_COMPILE_FLAGS    " --verbose -g --maxrregcount=${GPU_MAXREGCOUNT} --opt-level=3 --generate-line-info --warn-on-double-precision-use --warn-on-spills ")
-    set(PTXAS_LINK_FLAGS       " --verbose --warn-on-double-precision-use --warn-on-spills --generate-line-info ")    
+    set(PTXAS_COMPILE_FLAGS    " --verbose -g --maxrregcount=${GPU_MAXREGCOUNT} --opt-level=3 --generate-line-info --warn-on-double-precision-use --warn-on-spills")
+    set(PTXAS_LINK_FLAGS
+    "SHELL:-Xcuda-ptxas --verbose"
+    "SHELL:-Xcuda-ptxas --maxrregcount=80"
+    "SHELL:-Xcuda-ptxas --opt-level=3"
+    "SHELL:-Xcuda-ptxas --generate-line-info"
+    "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
+    "SHELL:-Xcuda-ptxas --warn-on-spills"
+    "SHELL:-Xcuda-ptxas --generate-line-info")
     
-    set(DPCPP_TARGET_FLAGS "-fsycl-targets=nvptx64-nvidia-cuda,x86_64")
+    set(DPCPP_TARGET_FLAGS "-fsycl-targets=nvptx64-nvidia-cuda,x86_64 -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
     set(DPCPP_FLAGS       "${DPCPP_FLAGS} -Xcuda-ptxas '${PTXAS_COMPILE_FLAGS}'")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
@@ -58,8 +78,6 @@ if(ENABLE_SYCL)
 
 endif()
 
-check_language(CUDA)
-cmake_dependent_option(ENABLE_CUDA "Build CUDA GPU code" ON "CMAKE_CUDA_COMPILER" OFF)
 
 # Get the current working branch
 execute_process(
