@@ -69,6 +69,10 @@ int main(int argc, char** argv) {
   
   size_t n_chunks          = workers_per_node*chunks_per_worker; /* Number of chunks per compute node / program instance */
   size_t N_chunks          = N_nodes*n_chunks;                   /* Total number of work chunks */
+
+  auto my_chunks = loadbalanced_chunks(N_chunks,n_chunks,my_node_idx);
+  BuckyGen::buckyherd_queue BuckyQ(N,N_chunks,workers_per_node,
+				   IPR,only_symmetric,my_chunks);
   
   // Set up SYCL queue
   string device_type = argv[1];
@@ -77,15 +81,12 @@ int main(int argc, char** argv) {
     
   printf("Running on device: %s with %d compute units.\n",
           Q.get_device().get_info<info::device::name>().c_str(),
-          Q.get_device().get_info<info::device::max_compute_units>());
-            
-  auto my_chunks = loadbalanced_chunks(N_chunks,n_chunks,my_node_idx);
-  BuckyGen::buckyherd_queue BuckyQ(N,N_chunks,workers_per_node,
-				   IPR,only_symmetric,my_chunks);
+          Q.get_device().get_info<info::device::max_compute_units>());           
 
   IsomerBatch<device_real_t,device_node_t> batch(N, batch_size);
   Triangulation G(N);
-   {
+  
+  {
     printf("Processing %ld C%ld isomers in batches of %ld\n",Nisomers,N,batch_size);  
     sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);
     sycl::host_accessor acc_degs(batch.face_degrees, sycl::write_only);
