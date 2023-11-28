@@ -16,22 +16,19 @@ endforeach()
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   target_include_directories(${EXECUTABLE} PRIVATE ${DPCPP_INCLUDE} ${DPCPP_INCLUDE}/sycl)
   target_compile_options(${EXECUTABLE} PRIVATE
-    -O3
-    -fsycl -fsycl-unnamed-lambda
     "SHELL:${DPCPP_TARGET_FLAGS}"
+    "SHELL:${DPCPP_FLAGS}"
     )
   target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib sycl fullerenes m)
   target_link_options(${EXECUTABLE} PRIVATE 
-    -O3
-    -fsycl -fsycl-unnamed-lambda
-    "SHELL:${DPCPP_TARGET_FLAGS}"
-    #    "SHELL:-Xcuda-ptxas --verbose"
-    #    "SHELL:-Xcuda-ptxas --maxrregcount=80"
-    #    "SHELL:-Xcuda-ptxas --opt-level=3"
-    #    "SHELL:-Xcuda-ptxas --generate-line-info"
-    #    "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
-    #    "SHELL:-Xcuda-ptxas --warn-on-spills"
-    #    "SHELL:-Xcuda-ptxas --generate-line-info"
+    "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS} ${DPCPP_LINK_FLAGS}"    
+    # "SHELL:-Xcuda-ptxas --verbose"
+    # "SHELL:-Xcuda-ptxas --maxrregcount=80"
+    # "SHELL:-Xcuda-ptxas --opt-level=3"
+    # "SHELL:-Xcuda-ptxas --generate-line-info"
+    # "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
+    # "SHELL:-Xcuda-ptxas --warn-on-spills"
+    # "SHELL:-Xcuda-ptxas --generate-line-info"
   )
 endforeach()
 
