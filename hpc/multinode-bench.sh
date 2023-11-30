@@ -1,12 +1,12 @@
 #!/bin/bash -l
-#SBATCH --job-name=benchmark    # Job name
-#SBATCH --output=benchmark.o%j  # Name of stdout output file
-#SBATCH --error=benchmark.e%j   # Name of stderr error file
+#SBATCH --job-name=@JOBNAME@    # Job name
+#SBATCH --output=@JOBNAME@.o%j  # Name of stdout output file
+#SBATCH --error=@JOBNAME@.e%j   # Name of stderr error file
 #SBATCH --partition=standard-g  # Partition (queue) name
 #SBATCH --nodes=@NNODES@               # Total number of nodes 
 #SBATCH --ntasks-per-node=@NTASKSPERNODE@    # 8 MPI ranks per node, 16 total (2x8)
 #SBATCH --gpus-per-node=@NTASKSPERNODE@       # Allocate one gpu per MPI rank
-#SBATCH --cpus-per-task=4 
+#SBATCH --cpus-per-task=@CPUSPERTASK@ 
 #SBATCH --time=0-00:30:00       # Run time (d-hh:mm:ss)
 #SBATCH --account=project_465000815  # Project for billing
 #SBATCH --mail-user=avery@ece.au.dk
