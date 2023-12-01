@@ -36,7 +36,8 @@ int main(int argc, char** argv) {
     size_t NumNodes = argc>2 ? strtol(argv[2],0,0) : 2000000;
     std::string device_type = argc>3 ? argv[3] : "gpu";
     size_t Nruns = argc>4 ? strtol(argv[4],0,0) : 10;
-    auto dual_version = argc>5 ? strtol(argv[5],0,0) : 0;
+    size_t Nwarmup = argc>5 ? strtol(argv[5],0,0) : 1;
+    auto dual_version = argc>6 ? strtol(argv[6],0,0) : 0;
 
     size_t BatchSize = std::ceil((real_t)NumNodes/(real_t)N);
 
@@ -83,7 +84,7 @@ int main(int argc, char** argv) {
     vector<double> times_memcpy(Nruns); //Times in nanoseconds.
     vector<double> times_dual(Nruns); //Times in nanoseconds.
 
-    for(int i = 0; i < Nruns; i++){
+    for(int i = 0; i < Nruns + 1; i++){
         auto start = std::chrono::steady_clock::now();
         fill(batch);
         auto T0 = std::chrono::steady_clock::now(); times_generate[i] = std::chrono::duration<double, std::nano>(T0 - start).count();
@@ -100,12 +101,12 @@ int main(int argc, char** argv) {
                 dualise(Q, batch, LaunchPolicy::SYNC);
                 break;
         }
-        dualise(Q, batch, LaunchPolicy::SYNC);
-        auto T2 = std::chrono::steady_clock::now(); times_dual[i] = std::chrono::duration<double, std::nano>(T2 - T1).count();
+        if (i > 0) {auto T2 = std::chrono::steady_clock::now(); times_dual[i- 1] = std::chrono::duration<double, std::nano>(T2 - T1).count();}
     }
 
     std::cout << "N, Nf, BatchSize, device_type" << std::endl;
     std::cout << "N: " << N << ", Nf: " << Nf << ", BatchSize: " << BatchSize << ", device_type: " << device_type << "\n";
+    std::cout << "Memory copy: " << mean(times_memcpy)/BatchSize << ", " << stddev(times_memcpy)/BatchSize << " ns \n";
     std::cout << "Dual: " << mean(times_dual)/BatchSize << ", " << stddev(times_dual)/BatchSize << " ns \n";
     return 0;
 }
