@@ -169,6 +169,7 @@ if(DPCPP_COMPILER)
   set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
   add_subdirectory(src/sycl)
   add_subdirectory(tests/sycl-tests)
+  add_subdirectory(benchmarks/sycl)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
 endif()
 
