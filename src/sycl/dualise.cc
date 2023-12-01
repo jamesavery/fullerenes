@@ -28,7 +28,7 @@ struct DeviceDualGraph{
         }
 
         assert(false);
-	    return 0;		// Make compiler happy
+	return -1;		// Make compiler happy
     }
     K dedge_ix(const node2& e){ return dedge_ix(e[0], e[1]); }
 
