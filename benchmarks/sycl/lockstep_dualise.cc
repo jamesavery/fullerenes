@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
     vector<double> times_memcpy(Nruns); //Times in nanoseconds.
     vector<double> times_dual(Nruns); //Times in nanoseconds.
 
-    for(int i = 0; i < Nruns + 1; i++){
+    for(int i = 0; i < Nruns + Nwarmup; i++){
         auto start = std::chrono::steady_clock::now();
         fill(batch);
         auto T0 = std::chrono::steady_clock::now(); times_generate[i] = std::chrono::duration<double, std::nano>(T0 - start).count();
@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
                 dualise(Q, batch, LaunchPolicy::SYNC);
                 break;
         }
-        if (i > 0) {auto T2 = std::chrono::steady_clock::now(); times_dual[i- 1] = std::chrono::duration<double, std::nano>(T2 - T1).count();}
+        if (i >= Nwarmup) {auto T2 = std::chrono::steady_clock::now(); times_dual[i- Nwarmup] = std::chrono::duration<double, std::nano>(T2 - T1).count();}
     }
 
     std::cout << "N, Nf, BatchSize, device_type" << std::endl;
