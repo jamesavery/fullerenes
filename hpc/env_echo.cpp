@@ -20,7 +20,8 @@ int main(int argc, char** argv) {
         "N_TASKS",
         "MY_TASK_ID",
         "ROCR_VISIBLE_DEVICES",
-        "SLURM_PROCID"
+        "SLURM_PROCID",
+        "SLURM_JOB_ID",
     };
     for (auto& env_var : env_vars) {
         auto env_val = getenv(env_var.c_str());
