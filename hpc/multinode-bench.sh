@@ -12,6 +12,7 @@
 #SBATCH --export=ALL
 
 export SCRIPTDIR=@@SCRIPTDIR@@ # Directory of this script
+export JOBNAME=%j # Name of this job
 export RUNDIR=@@RUNDIR@@ # CWD of the job
 
 # TODO LUMI does not like this, even though it's their own example

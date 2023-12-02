@@ -16,10 +16,11 @@ n_isomer = 200
 
 # HPC parameters
 cpus_per_task = 4
-#n_gpus_to_test = [2**i for i in range(4)]
-#n_nodes_to_test = [2**i for i in range(11)]
 n_gpus_to_test = [2**i for i in range(4)]
-n_nodes_to_test = [2**i for i in range(4)]
+n_nodes_to_test = [2**i for i in range(1,8)]
+
+#n_gpus_to_test = [2**i for i in range(1)]
+#n_nodes_to_test = [2]#[2**i for i in range(1)]
 
 ###################################
 
@@ -44,7 +45,7 @@ def run_test(n_nodes, n_gpus):
                     line = line.replace(key, value)
                 fout.write(line)
     os.system(f'chmod +x {job_path}')
-    os.system(f'sbatch {job_path} ./a.out {n_isomer} {batch_size}')
+    os.system(f'sbatch {job_path} ./benchmarks/sycl/full_pipeline')
     #os.system(f"sbatch job.sh")
 
 if __name__ == '__main__':
