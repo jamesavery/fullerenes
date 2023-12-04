@@ -70,7 +70,7 @@ if(ENABLE_SYCL)
     set(DPCPP_FLAGS       "${DPCPP_FLAGS} -Xcuda-ptxas '${PTXAS_COMPILE_FLAGS}'")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
-    set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native -Xsycl-target-backend=x86_64 -mcpu=native")
+    set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native")
   endif()
 
   set(DPCPP_INCLUDE ${SYCL_DIR}/include)  
