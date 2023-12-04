@@ -178,4 +178,103 @@ void dualise(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
     if(policy == LaunchPolicy::SYNC) Q.wait();
 }
 
+int roundUp(int numToRound, int multiple) 
+{
+    assert(multiple);
+    return ((numToRound + multiple - 1) / multiple) * multiple;
+}
+
+template <typename T, typename K>
+void dualise_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
+    INT_TYPEDEFS(K);
+    constexpr int     MaxDegree = 6;
+    constexpr node_t EMPTY_NODE = std::numeric_limits<node_t>::max();
+    
+    if(policy == LaunchPolicy::SYNC) Q.wait();
+    auto subgroup_size = Q.get_device().get_info<info::device::sub_group_sizes>()[0];
+    size_t lcm = roundUp(batch.Nf(), subgroup_size);
+    Q.submit([&](handler &h) {
+        auto N = batch.N();
+        auto Nf = batch.Nf();
+        auto capacity = batch.capacity();
+	//        std::cout << "Entered dualise" << std::endl;
+
+	// auto d = Q.get_device();
+	// std::cout << "Running on " << d.get_info<info::device::name>() << "\n";
+	
+        //Create local accessors to shared memory
+        local_accessor<node_t, 1>   triangle_numbers(Nf*MaxDegree, h);
+        local_accessor<node_t, 1>   cached_neighbours(Nf*MaxDegree, h);
+        local_accessor<node_t, 1>   cached_degrees(Nf, h);
+        local_accessor<node2, 1>    arc_list(N, h);
+
+        //Create device accessors
+        accessor     cubic_neighbours_dev(batch.cubic_neighbours, h, write_only);
+        accessor     face_degrees_dev    (batch.face_degrees, h, read_only);
+        accessor     dual_neighbours_dev (batch.dual_neighbours, h, read_only);
+        /* 
+        std::cout << N * capacity << std::endl; */
+        h.parallel_for<class dualise_V1>(sycl::nd_range(sycl::range{lcm*capacity}, sycl::range{lcm}), [=](nd_item<1> nditem) {
+            auto cta = nditem.get_group();
+            node_t f = nditem.get_local_linear_id();    // Face-node index
+            auto isomer = nditem.get_group_linear_id(); // Isomer    index
+	    
+            cta.async_work_group_copy(cached_neighbours.get_pointer(), dual_neighbours_dev.get_pointer() + isomer*Nf*MaxDegree, Nf*MaxDegree);
+            cta.async_work_group_copy(cached_degrees.get_pointer(),    face_degrees_dev.get_pointer()    + isomer*Nf, Nf);
+
+            DeviceDualGraph<MaxDegree, node_t> FD(cached_neighbours.get_pointer(), cached_degrees.get_pointer());
+            node_t canon_arcs[MaxDegree]; for(size_t i=0;i<MaxDegree;i++) canon_arcs[i] = EMPTY_NODE; // JA: memset was bug: it writes byte-values, but node_t is 16/32bit.
+
+            node_t rep_count  = 0;
+            sycl::group_barrier(cta);
+
+            if (f < Nf){
+                for (node_t i = 0; i < FD.face_degrees[f]; i++){
+                    auto canon_arc = FD.get_canonical_triangle_arc(f, FD.dual_neighbours[f*MaxDegree + i]);
+                    if (canon_arc[0] == f){
+                        canon_arcs[i] = canon_arc[1];
+                        rep_count++;
+                    }
+                }
+            }
+            sycl::group_barrier(cta);
+
+            node_t scan_result = exclusive_scan_over_group(cta, rep_count, plus<node_t>{});
+
+            if (f < Nf){
+                node_t arc_count = 0;
+                for (node_t i = 0; i < FD.face_degrees[f]; i++){
+                    if(canon_arcs[i] != std::numeric_limits<node_t>::max()){
+                        triangle_numbers[f*MaxDegree + i] = scan_result + arc_count;
+                        ++arc_count;
+                    }    
+                }
+            }
+            sycl::group_barrier(cta);
+
+            if (f < Nf){
+                for (node_t i = 0; i < FD.face_degrees[f]; i++){
+                    if(canon_arcs[i] != std::numeric_limits<node_t>::max()){
+                        node_t u = triangle_numbers[f*MaxDegree + i];
+                        arc_list[u] = {f, canon_arcs[i]};
+                    }
+                }
+            }
+            sycl::group_barrier(cta);
+//          
+            for(auto tix = f; tix < N; tix += lcm){
+                auto [u, v] = arc_list[tix];
+                auto w = FD.next(u,v);
+//
+                node2 edge_b = FD.get_canonical_triangle_arc(v, u); cubic_neighbours_dev[isomer*N*3 + tix*3 + 0] = triangle_numbers[edge_b[0]*MaxDegree + FD.dedge_ix(edge_b)];
+                node2 edge_c = FD.get_canonical_triangle_arc(w, v); cubic_neighbours_dev[isomer*N*3 + tix*3 + 1] = triangle_numbers[edge_c[0]*MaxDegree + FD.dedge_ix(edge_c)];
+                node2 edge_d = FD.get_canonical_triangle_arc(u, w); cubic_neighbours_dev[isomer*N*3 + tix*3 + 2] = triangle_numbers[edge_d[0]*MaxDegree + FD.dedge_ix(edge_d)];
+            }
+        });
+    });
+
+    if(policy == LaunchPolicy::SYNC) Q.wait();
+}
+
 template void dualise<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
+template void dualise_V1<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);

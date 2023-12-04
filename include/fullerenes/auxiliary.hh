@@ -230,8 +230,8 @@ template <typename T> T sum(const vector<T>& xs)
 
 template <typename T> T mean(const vector<T>& xs)
 {
-  T sum = sum(xs);
-  return sum/xs.size();
+  T sum_ = sum(xs);
+  return sum_/xs.size();
 }
 
 template<typename T> void hash_combine(size_t &seed, T const &key) {

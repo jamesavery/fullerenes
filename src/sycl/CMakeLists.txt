@@ -5,4 +5,5 @@ set_source_files_properties(spherical-projection.cc PROPERTIES COMPILE_FLAGS "${
 set_source_files_properties(forcefield-optimise.cc PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fPIC ${DPCPP_FLAGS}")
 set_source_files_properties(sycl-isomer-batch.cc PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fPIC ${DPCPP_FLAGS}")
 set_source_files_properties(hessian.cc PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fPIC ${DPCPP_FLAGS}")
-add_library(sycl_fullerene_lib hessian.cc forcefield-optimise.cc dualise.cc tutte.cc spherical-projection.cc sycl-isomer-batch.cc)
+set_source_files_properties(nop_kernel.cc PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fPIC ${DPCPP_FLAGS}")
+add_library(sycl_fullerene_lib hessian.cc forcefield-optimise.cc dualise.cc tutte.cc spherical-projection.cc sycl-isomer-batch.cc nop_kernel.cc)
