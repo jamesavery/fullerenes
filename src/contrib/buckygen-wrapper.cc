@@ -44,7 +44,7 @@ void stop(const buckygen_queue& Q)
   sighandler_t old_handler = signal(SIGQUIT,SIG_IGN); // Protect ourselves while we kill our children
   kill(-gid,SIGQUIT);
   signal(SIGQUIT,old_handler);                        // Restore normalcy.
-  //  msgctl(Q.qid,IPC_RMID,0);
+  msgctl(Q.qid,IPC_RMID,0);			      // Kill the Sys-V IPC queue
 }
 
   
