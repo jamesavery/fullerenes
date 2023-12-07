@@ -56,7 +56,7 @@ if(ENABLE_SYCL)
   if(SYCL_TARGETS STREQUAL "AMD") 
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa,x86_64 -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a -march=native")
   elseif(SYCL_TARGETS STREQUAL "NVIDIA")
-    set(PTXAS_COMPILE_FLAGS    " --verbose -g --maxrregcount=${GPU_MAXREGCOUNT} --opt-level=3 --generate-line-info --warn-on-double-precision-use --warn-on-spills")
+    #set(PTXAS_COMPILE_FLAGS    " --verbose -g --maxrregcount=${GPU_MAXREGCOUNT} --opt-level=3 --generate-line-info --warn-on-double-precision-use --warn-on-spills")
     set(PTXAS_LINK_FLAGS
     "SHELL:-Xcuda-ptxas --verbose"
     "SHELL:-Xcuda-ptxas --maxrregcount=80"
@@ -67,7 +67,6 @@ if(ENABLE_SYCL)
     "SHELL:-Xcuda-ptxas --generate-line-info")
     
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=nvptx64-nvidia-cuda,x86_64 -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
-    set(DPCPP_FLAGS       "${DPCPP_FLAGS} -Xcuda-ptxas '${PTXAS_COMPILE_FLAGS}'")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native -Xsycl-target-backend=x86_64 -mcpu=native")
@@ -169,6 +168,7 @@ if(DPCPP_COMPILER)
   set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
   add_subdirectory(src/sycl)
   add_subdirectory(tests/sycl-tests)
+  add_subdirectory(benchmarks/sycl)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
 endif()
 

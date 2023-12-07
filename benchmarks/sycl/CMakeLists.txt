@@ -1,8 +1,8 @@
 set(SYCL_EXECUTABLES
-  hello-sycl
-  sycl-pipeline-test
-  sycl-pipeline-herd
-  sycl-pipeline-multinode
+  baseline_pipeline
+  full_pipeline
+  sequential_dualise
+  lockstep_dualise
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
@@ -19,4 +19,3 @@ foreach(EXECUTABLE ${SYCL_EXECUTABLES})
     ${PTXAS_LINK_FLAGS}
   )
 endforeach()
-
