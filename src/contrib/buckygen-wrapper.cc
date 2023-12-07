@@ -40,8 +40,11 @@ void signal_finished(const buckygen_queue& Q)
 
 void stop(const buckygen_queue& Q)
 {
-  kill(Q.pid,SIGQUIT);
-  //  msgctl(Q.qid,IPC_RMID,0);
+  pid_t gid = getpid();
+  sighandler_t old_handler = signal(SIGTERM,SIG_IGN); // Protect ourselves while we kill our children
+  killpg(gid,SIGTERM);
+  signal(SIGTERM,old_handler);                        // Restore normalcy.
+  msgctl(Q.qid,IPC_RMID,0);			      // Kill the Sys-V IPC queue
 }
 
   
@@ -72,8 +75,8 @@ buckygen_queue start(int N, int IPR, bool only_nontrivial,
     signal_finished(Q);
     exit(0);
   } else {			// Parent
-    pid_t gid = getpid();        // Set group ID of child to parent PID
-    setpgid(Q.pid,gid);		// so that we can kill all children in one swoop.
+    pid_t gid = getpid();	// Keep track of children with group ID
+    setpgid(Q.pid,gid);	// to kill them all when parent leaves.
     assert(Q.pid >= 0);
     return Q;
   }
@@ -98,11 +101,16 @@ bool push_graph(const buckygen_queue& Q)
       msg.neighbours[6*u+i] = e->end;
   }
   
-  ssize_t length = msgsnd(Q.qid,(void*)&msg,sizeof(long)+6*Q.Nvertices*sizeof(int),0); // Blocking send
-  if(length>=0) return true;
-  else {
-    fprintf(stderr,"In BuckyGen::push_graph: %s\n",strerror(errno));
-    return false;
+  int snd_result = msgsnd(Q.qid,(void*)&msg,sizeof(long)+6*Q.Nvertices*sizeof(int),0); // Blocking send
+  if(snd_result>=0) return true;
+  else if(errno == EIDRM){
+    //    fprintf(stderr,"BuckyGen::push_graph %d,%d(%s): Queue was removed by parent process - BuckyGen::stop() was called on this queue.\n",snd_result,errno,strerror(errno));
+      exit(0);
+  } else {
+    //    fprintf(stderr,"BuckyGen::push_graph %d,%d(%s): Queue is invalid. Why am I still alive?\n",
+    //	    snd_result,errno,
+    //	    strerror(errno));
+    exit(-1);
   }
 }
 
@@ -238,9 +246,9 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
 
   void buckyherd_queue::stop_all() const {
     pid_t gid = getpid();
-    sighandler_t old_handler = signal(SIGQUIT,SIG_IGN); // Protect ourselves while we kill our children
-    kill(-gid,SIGQUIT);
-    signal(SIGQUIT,old_handler);                        // Restore normalcy.
+    sighandler_t old_handler = signal(SIGTERM,SIG_IGN); // Protect ourselves while we kill our children
+    killpg(gid,SIGTERM);
+    signal(SIGTERM,old_handler);                        // Restore normalcy.
   }
 
   
