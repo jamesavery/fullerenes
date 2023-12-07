@@ -40,7 +40,10 @@ void signal_finished(const buckygen_queue& Q)
 
 void stop(const buckygen_queue& Q)
 {
-  kill(Q.pid,SIGQUIT);
+  pid_t gid = getpid();
+  sighandler_t old_handler = signal(SIGQUIT,SIG_IGN); // Protect ourselves while we kill our children
+  kill(-gid,SIGQUIT);
+  signal(SIGQUIT,old_handler);                        // Restore normalcy.
   //  msgctl(Q.qid,IPC_RMID,0);
 }
 
