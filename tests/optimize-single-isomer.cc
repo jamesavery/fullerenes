@@ -75,7 +75,7 @@ int main(int argc, char** argv){
 //
     //std::cout << "Gradients:\n" << gradients << std::endl;
 
-    isomerspace_forcefield::optimise<PEDERSEN>(Bdev, 5*N, 5*N);
+    isomerspace_forcefield::optimize<PEDERSEN>(Bdev, 5*N, 5*N);
 
     CuArray<float> hessians(N*90);
     CuArray<uint16_t> cols(N*90);

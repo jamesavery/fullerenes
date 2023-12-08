@@ -1802,7 +1802,7 @@ struct ForceField
 };
 
 template <ForcefieldType FFT, typename T = float, typename K = uint16_t>
-void forcefield_optimise(sycl::queue &Q, IsomerBatch<T, K>& B, const int iterations, const int max_iterations, const LaunchPolicy policy)
+void forcefield_optimize(sycl::queue &Q, IsomerBatch<T, K>& B, const int iterations, const int max_iterations, const LaunchPolicy policy)
 {   
     TEMPLATE_TYPEDEFS(T, K);
     auto local_mem_bytes_required = B.N() * 3 * sizeof(coord3d) + B.N() * 2 * sizeof(T);
@@ -1838,7 +1838,7 @@ void forcefield_optimise(sycl::queue &Q, IsomerBatch<T, K>& B, const int iterati
     if (policy == LaunchPolicy::SYNC) Q.wait_and_throw();
 }
 
-template void forcefield_optimise<PEDERSEN,float,uint16_t>(sycl::queue &Q, IsomerBatch<float, uint16_t>& B, const int iterations, const int max_iterations, const LaunchPolicy policy);
+template void forcefield_optimize<PEDERSEN,float,uint16_t>(sycl::queue &Q, IsomerBatch<float, uint16_t>& B, const int iterations, const int max_iterations, const LaunchPolicy policy);
 
 
 /* int main(int argc, char const *argv[])
@@ -1863,7 +1863,7 @@ template void forcefield_optimise<PEDERSEN,float,uint16_t>(sycl::queue &Q, Isome
     graph_file.read(reinterpret_cast<char *>(graph.data()), B.N() * B.capacity() * sizeof(node3));
     copy(B.X, (coord3d*)starting_geom.data());
     copy(B.cubic_neighbours, graph.data());
-    forcefield_optimise<PEDERSEN>(Q, B, 3 * N, 3 * N);
+    forcefield_optimize<PEDERSEN>(Q, B, 3 * N, 3 * N);
     Q.wait_and_throw();
     std::vector<coord3d> X(B.N() * B.capacity());
     coord3d *h_X = sycl::malloc_host<coord3d>(B.N() * B.capacity() * 3, Q);

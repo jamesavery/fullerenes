@@ -128,9 +128,9 @@ int main(int argc, char** argv){
                 device_io::copy(batch1, batch0);
             }
             auto TFF = high_resolution_clock::now();
-            isomerspace_forcefield::optimise<PEDERSEN>(batch0,N*5,N*5);
+            isomerspace_forcefield::optimize<PEDERSEN>(batch0,N*5,N*5);
             auto TFlat = high_resolution_clock::now(); T_opts[l] += TFlat - TFF;
-            isomerspace_forcefield::optimise<FLATNESS_ENABLED>(batch1,N*5,N*5);
+            isomerspace_forcefield::optimize<FLATNESS_ENABLED>(batch1,N*5,N*5);
             T_flat[l] += high_resolution_clock::now() - TFlat;
 
             CuArray<device_real_t> hessian(batch1.capacity()*N*90);
@@ -164,7 +164,7 @@ int main(int argc, char** argv){
                     auto T1 = high_resolution_clock::now();
                     isomer_q_cubic.refill_batch(batch2,ctx, LaunchPolicy::SYNC);
                     auto T2 = high_resolution_clock::now(); T_io[l] += T2 - T1;
-                    isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*0.5,N*5,ctx, LaunchPolicy::SYNC);
+                    isomerspace_forcefield::optimize<PEDERSEN>(batch2,N*0.5,N*5,ctx, LaunchPolicy::SYNC);
                     auto T3 = high_resolution_clock::now();
                     OutQueue.push_done(batch2,ctx, LaunchPolicy::SYNC);
                     finished_isomers += OutQueue.get_size();
@@ -177,7 +177,7 @@ int main(int argc, char** argv){
                     auto T1 = high_resolution_clock::now();
                     isomer_q_cubic.refill_batch(batch2);
                     auto T2 = high_resolution_clock::now(); T_io[l] += T2 - T1;
-                    isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*0.5,N*5);
+                    isomerspace_forcefield::optimize<PEDERSEN>(batch2,N*0.5,N*5);
                     auto T3 = high_resolution_clock::now();
                     OutQueue.push_done(batch2);
                     j = OutQueue.get_size();
