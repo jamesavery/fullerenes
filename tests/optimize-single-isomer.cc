@@ -35,7 +35,7 @@ int main(int argc, char** argv){
     }
     
     device_io::copy(Bdev, Bhost);
-    isomerspace_dual::dualise(Bdev);
+    isomerspace_dual::dualize(Bdev);
     isomerspace_tutte::tutte_layout<GPU,float>(Bdev, (int)10*N);
     device_io::copy(Bhost, Bdev);
     std::cout << "Initial 2D geometry:\n";
