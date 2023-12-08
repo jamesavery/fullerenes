@@ -15,30 +15,31 @@ void tutte_layout(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchPolicy po
     
     if(policy == LaunchPolicy::SYNC) Q.wait();
     Q.submit([&](handler& h) {
-        auto N = batch.N();
-        auto Nf = batch.Nf();
-        auto capacity = batch.capacity();
-        auto max_iter = N * 10;
-        accessor xys_acc(batch.xys, h, write_only); 
+        const auto N        = batch.N();
+        const auto Nf       = batch.Nf();
+        const auto capacity = batch.capacity();
+        const auto max_iter = N * 10;
+        accessor xys_acc         (batch.xys,              h, write_only); 
         accessor cubic_neighbours(batch.cubic_neighbours, h, read_only);
-        accessor statuses(batch.statuses, h, read_only);
+        accessor statuses        (batch.statuses,         h, read_only);
 
-        local_accessor<bool, 1>     smem(N, h);
-        local_accessor<coord2d, 1>  xys_smem(N, h);
+        local_accessor<bool, 1>     smem(N, h);        // TODO: More transparent name?
+        local_accessor<coord2d, 1>  xys_smem(N, h);    
         local_accessor<coord2d, 1>  newxys_smem(N, h);
 
         h.parallel_for<class tutte>(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)), [=](nd_item<1> nditem) {
-
-            auto cta = nditem.get_group();
-            auto a = nditem.get_local_linear_id();
-            auto isomer_idx = nditem.get_group_linear_id();
-
+ 
+            const auto   cta               = nditem.get_group();
+            const auto   a                 = nditem.get_local_linear_id(); // Atom  vertex index in graph
+            const auto   isomer_idx        = nditem.get_group_linear_id(); // Isomer graph index in batch
+	    const size_t isomer_offset     = isomer_idx * N * 3;
+	    const auto  &isomer_neighbours = &cubic_neighbours[isomer_offset];
+	    
             if (statuses[isomer_idx] != IsomerStatus::EMPTY){
-            size_t offset = isomer_idx * N;
 
-            DeviceCubicGraph FG(cubic_neighbours, offset*3); 
+            DeviceCubicGraph FG(cubic_neighbours, isomer_offset); 
 
-            node3 ns       = {cubic_neighbours[(a + offset)*3], cubic_neighbours[(a + offset)*3 + 1], cubic_neighbours[(a + offset)*3 + 2]};
+            node3 ns       = {isomer_neighbours[a*3], isomer_neighbours[a*3 + 1], isomer_neighbours[a*3 + 2]};
             xys_smem[a]    = {0,0};
 
             node_t outer_face[6];
