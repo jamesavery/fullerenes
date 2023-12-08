@@ -7,7 +7,7 @@
 #include <fullerenes/sycl-isomer-batch.hh>
 #include "forcefield-includes.cc"
 
-//Template specialisation for dualise
+//Template specialisation for dualize
 
 
 #define UINT_TYPE_MAX std::numeric_limits<UINT_TYPE>::max()
@@ -91,7 +91,7 @@ struct DeviceDualGraph{
     }
 };
 template <typename T, typename K>
-void dualise(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
+void dualize(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
     INT_TYPEDEFS(K);
     constexpr int     MaxDegree = 6;
     constexpr node_t EMPTY_NODE = std::numeric_limits<node_t>::max();
@@ -101,7 +101,7 @@ void dualise(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
         auto N = batch.N();
         auto Nf = batch.Nf();
         auto capacity = batch.capacity();
-	//        std::cout << "Entered dualise" << std::endl;
+	//        std::cout << "Entered dualize" << std::endl;
 
 	// auto d = Q.get_device();
 	// std::cout << "Running on " << d.get_info<info::device::name>() << "\n";
@@ -118,7 +118,7 @@ void dualise(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
         accessor     dual_neighbours_dev (batch.dual_neighbours, h, read_only);
         /* 
         std::cout << N * capacity << std::endl; */
-        h.parallel_for<class dualise>(sycl::nd_range(sycl::range{N*capacity}, sycl::range{N}), [=](nd_item<1> nditem) {
+        h.parallel_for<class dualize>(sycl::nd_range(sycl::range{N*capacity}, sycl::range{N}), [=](nd_item<1> nditem) {
             auto cta = nditem.get_group();
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
@@ -185,7 +185,7 @@ int roundUp(int numToRound, int multiple)
 }
 
 template <typename T, typename K>
-void dualise_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
+void dualize_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
     INT_TYPEDEFS(K);
     constexpr int     MaxDegree = 6;
     constexpr node_t EMPTY_NODE = std::numeric_limits<node_t>::max();
@@ -197,7 +197,7 @@ void dualise_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
         auto N = batch.N();
         auto Nf = batch.Nf();
         auto capacity = batch.capacity();
-	//        std::cout << "Entered dualise" << std::endl;
+	//        std::cout << "Entered dualize" << std::endl;
 
 	// auto d = Q.get_device();
 	// std::cout << "Running on " << d.get_info<info::device::name>() << "\n";
@@ -214,7 +214,7 @@ void dualise_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
         accessor     dual_neighbours_dev (batch.dual_neighbours, h, read_only);
         /* 
         std::cout << N * capacity << std::endl; */
-        h.parallel_for<class dualise_V1>(sycl::nd_range(sycl::range{lcm*capacity}, sycl::range{lcm}), [=](nd_item<1> nditem) {
+        h.parallel_for<class dualize_V1>(sycl::nd_range(sycl::range{lcm*capacity}, sycl::range{lcm}), [=](nd_item<1> nditem) {
             auto cta = nditem.get_group();
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
@@ -276,5 +276,5 @@ void dualise_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
     if(policy == LaunchPolicy::SYNC) Q.wait();
 }
 
-template void dualise<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
-template void dualise_V1<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
+template void dualize<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
+template void dualize_V1<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);

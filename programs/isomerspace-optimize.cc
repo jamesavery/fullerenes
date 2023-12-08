@@ -128,7 +128,7 @@ int main(int ac, char **argv)
       for (int i = 0; i < Nd; i++){
           if(Q0s[i].get_size() > 0){
             Q0s[i].refill_batch(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
-            isomerspace_dual::dualise(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
+            isomerspace_dual::dualize(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
             isomerspace_tutte::tutte_layout(B0s[i], N*10, gen_ctxs[i], LaunchPolicy::ASYNC);
             isomerspace_X0::zero_order_geometry(B0s[i], 4.0f, gen_ctxs[i], LaunchPolicy::ASYNC);
             Q1s[i].insert(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
