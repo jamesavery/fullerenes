@@ -5454,15 +5454,15 @@ find_L0_extensions_next(EDGE *startedge, EDGE *edge_ext_straight[],
             int colour_one;
             colour_one = get_colour_next_5(startedge);
 
-            int colour_one_endedge;
-            colour_one_endedge = get_colour_next_5(other_startedge);
+            int colour_one_enarc;
+            colour_one_enarc = get_colour_next_5(other_startedge);
 
             int best_colour, other_colour;
-            if(colour_one > colour_one_endedge) {
+            if(colour_one > colour_one_enarc) {
                 best_colour = colour_one;
-                other_colour = colour_one_endedge;
+                other_colour = colour_one_enarc;
             } else {
-                best_colour = colour_one_endedge;
+                best_colour = colour_one_enarc;
                 other_colour = colour_one;
             }
 
@@ -5538,15 +5538,15 @@ find_L0_extensions_prev(EDGE *startedge, EDGE *edge_ext_straight[],
             int colour_one;
             colour_one = get_colour_prev_5(startedge);
 
-            int colour_one_endedge;
-            colour_one_endedge = get_colour_prev_5(other_startedge);
+            int colour_one_enarc;
+            colour_one_enarc = get_colour_prev_5(other_startedge);
 
             int best_colour, other_colour;
-            if(colour_one > colour_one_endedge) {
+            if(colour_one > colour_one_enarc) {
                 best_colour = colour_one;
-                other_colour = colour_one_endedge;
+                other_colour = colour_one_enarc;
             } else {
-                best_colour = colour_one_endedge;
+                best_colour = colour_one_enarc;
                 other_colour = colour_one;
             }
 
@@ -6148,7 +6148,7 @@ find_bent_zero_extensions_prev(EDGE *startedge, EDGE *ext_bent_zero[],
  * 
  * Important: does NOT mark edges which would yield the same expansion.
  * It is assumed that this method is only called for direction prev, so
- * the endedge does not have to be marked (that one will have direction next).
+ * the enarc does not have to be marked (that one will have direction next).
  */
 static void
 find_bent_zero_extensions_prev_dont_mark_equivalent_expansions(EDGE *startedge, EDGE *ext_bent_zero[],
@@ -6365,7 +6365,7 @@ find_bent_extensions_next(EDGE *startedge, int min_pathlength, int bent_position
                  * Let a := bent_position and b := i - bent_position.
                  * So this gives us expansion Bab. We only have to do the marking
                  * in case a == b. If a > b, the expansion Bba starting from the
-                 * endedge in the other direction won't be accepted, so we don't
+                 * enarc in the other direction won't be accepted, so we don't
                  * have to mark it.
                  * 
                  * New:
@@ -6501,7 +6501,7 @@ find_bent_extensions_prev(EDGE *startedge, int min_pathlength, int bent_position
                  * Let a := bent_position and b := i - bent_position.
                  * So this gives us expansion Bab. We only have to do the marking
                  * in case a == b. If a > b, the expansion Bba starting from the
-                 * endedge in the other direction won't be accepted, so we don't
+                 * enarc in the other direction won't be accepted, so we don't
                  * have to mark it.
                  * 
                  * New:
@@ -7404,7 +7404,7 @@ find_extensions_fuller_ipr(int numb_total, int numb_pres, int max_pathlength_str
                     find_L1_extensions_next(e, ext_L1,
                             num_ext_L1, ext_L1_use_next, numb_total, 0);
 
-                    //Searching in one direction is sufficient, since endedge is same but in other direction
+                    //Searching in one direction is sufficient, since enarc is same but in other direction
                     find_bent_zero_extensions_prev_dont_mark_equivalent_expansions(e, ext_bent_zero,
                             num_ext_bent_zero, ext_bent_zero_use_next, numb_total, 0);
 /*
@@ -9011,11 +9011,11 @@ has_L0_reduction(EDGE *startedge, unsigned char *direction_bitvector) {
  * Returns 1 if the best reduction from startedge is as good as the cur_best.
  * Returns 2 if there is a reduction from startedge which is better than cur_best.
  *
- * If 1 is returned endedge is the edge at the other pentagon of the straightpath
+ * If 1 is returned enarc is the edge at the other pentagon of the straightpath
  * and direction_bitvector contains if a next and/or prev reductions are valid.
  */
 static int
-has_short_straight_reduction(EDGE *startedge, int pathlength_cur_best, EDGE **endedge,
+has_short_straight_reduction(EDGE *startedge, int pathlength_cur_best, EDGE **enarc,
         unsigned char *direction_bitvector) {
     EDGE *e = startedge;
     
@@ -9063,7 +9063,7 @@ has_short_straight_reduction(EDGE *startedge, int pathlength_cur_best, EDGE **en
             if(degree[startedge->next->next->end] == 6 && degree[e->next->next->end] == 6)
                 (*direction_bitvector) |= NEXT_BITVECTOR;
             if(*direction_bitvector > 0) {
-                *endedge = e;
+                *enarc = e;
                 return 1;
             } else
                 return 0;
@@ -9083,7 +9083,7 @@ has_short_straight_reduction(EDGE *startedge, int pathlength_cur_best, EDGE **en
  * Returns 1 if the best reduction from startedge is as good as the cur_best.
  * Returns 2 if there is a reduction from startedge which is better than cur_best.
  *
- * If 1 is returned endedge is the edge at the other pentagon of the straightpath
+ * If 1 is returned enarc is the edge at the other pentagon of the straightpath
  * and direction_bitvector contains if a next and/or prev reductions are valid.
  * 
  * Remark 1: this method should only be called in case the last operation was an
@@ -9092,7 +9092,7 @@ has_short_straight_reduction(EDGE *startedge, int pathlength_cur_best, EDGE **en
  * it doesn't lead to an L1 reduction.
  */
 static int
-has_short_straight_reduction_L1(EDGE *startedge, int pathlength_cur_best, EDGE **endedge,
+has_short_straight_reduction_L1(EDGE *startedge, int pathlength_cur_best, EDGE **enarc,
         unsigned char *direction_bitvector) {
     EDGE *e = startedge;
     
@@ -9120,7 +9120,7 @@ has_short_straight_reduction_L1(EDGE *startedge, int pathlength_cur_best, EDGE *
             if(degree[startedge->next->next->end] == 6 && degree[e->next->next->end] == 6)
                 (*direction_bitvector) |= NEXT_BITVECTOR;
             if(*direction_bitvector > 0) {
-                *endedge = e;
+                *enarc = e;
                 return 1;
             } else
                 return 0;
@@ -9140,11 +9140,11 @@ has_short_straight_reduction_L1(EDGE *startedge, int pathlength_cur_best, EDGE *
  * Returns 1 if the best reduction from startedge is as good as the cur_best.
  * Returns 2 if there is a reduction from startedge which is better than cur_best.
  *
- * If 1 is returned endedge is the edge at the other pentagon of the straightpath
+ * If 1 is returned enarc is the edge at the other pentagon of the straightpath
  * and direction_bitvector contains if a next and/or prev reductions are valid.
  */
 static int
-has_short_straight_reduction_ipr(EDGE *startedge, int pathlength_cur_best, EDGE **endedge,
+has_short_straight_reduction_ipr(EDGE *startedge, int pathlength_cur_best, EDGE **enarc,
         unsigned char *direction_bitvector) {
     EDGE *e = startedge;
     int v[pathlength_cur_best+1],w[pathlength_cur_best+1];
@@ -9281,7 +9281,7 @@ has_short_straight_reduction_ipr(EDGE *startedge, int pathlength_cur_best, EDGE 
         if(is_valid_reduction_b)
             (*direction_bitvector) |= NEXT_BITVECTOR;
         if(*direction_bitvector > 0) {
-            *endedge = e;
+            *enarc = e;
             return 1;
         } else
             return 0;
@@ -9301,14 +9301,14 @@ has_short_straight_reduction_ipr(EDGE *startedge, int pathlength_cur_best, EDGE 
  * Returns 1 if the best reduction from startedge is as good as the cur_best.
  * Returns 2 if there is a reduction from startedge which is better than cur_best.
  *
- * If 1 is returned endedge is the edge at the other pentagon of the straightpath
+ * If 1 is returned enarc is the edge at the other pentagon of the straightpath
  * and direction_bitvector contains if a next and/or prev reductions are valid.
  * 
  * Remark: no need to mark since faces cannot be the same: in IPR fullerenes 
  * there are no 5-cycles which lead to a valid L2 reduction.
  */
 static int
-has_short_straight_reduction_L2_ipr(EDGE *startedge, int pathlength_cur_best, EDGE **endedge,
+has_short_straight_reduction_L2_ipr(EDGE *startedge, int pathlength_cur_best, EDGE **enarc,
         unsigned char *direction_bitvector) {
     EDGE *e = startedge;
     int v[pathlength_cur_best+1],w[pathlength_cur_best+1];
@@ -9417,7 +9417,7 @@ has_short_straight_reduction_L2_ipr(EDGE *startedge, int pathlength_cur_best, ED
         if(is_valid_reduction_b)
             (*direction_bitvector) |= NEXT_BITVECTOR;
         if(*direction_bitvector > 0) {
-            *endedge = e;
+            *enarc = e;
             return 1;
         } else
             return 0;
@@ -9437,7 +9437,7 @@ has_short_straight_reduction_L2_ipr(EDGE *startedge, int pathlength_cur_best, ED
  * Returns 1 if the best reduction from startedge is as good as the cur_best.
  * Returns 2 if there is a reduction from startedge which is better than cur_best.
  *
- * If 1 is returned endedge is the edge at the other pentagon of the straightpath
+ * If 1 is returned enarc is the edge at the other pentagon of the straightpath
  * and direction_bitvector contains if a next and/or prev reductions are valid.
  * 
  * Remark: this method should only be called in case the last operation was an
@@ -9445,7 +9445,7 @@ has_short_straight_reduction_L2_ipr(EDGE *startedge, int pathlength_cur_best, ED
  */
 //Important: it is assumed that the fullerene is IPR!
 static int
-has_short_straight_reduction_L1_ipr(EDGE *startedge, int pathlength_cur_best, EDGE **endedge,
+has_short_straight_reduction_L1_ipr(EDGE *startedge, int pathlength_cur_best, EDGE **enarc,
         unsigned char *direction_bitvector) {
     
     if(degree[startedge->invers->next->next->next->end] == 5) {
@@ -9544,7 +9544,7 @@ has_short_straight_reduction_L1_ipr(EDGE *startedge, int pathlength_cur_best, ED
         if(is_valid_reduction_b)
             (*direction_bitvector) |= NEXT_BITVECTOR;
         if(*direction_bitvector > 0) {
-            *endedge = e;
+            *enarc = e;
             return 1;
         } else
             return 0;
@@ -9878,14 +9878,14 @@ search_L2_reductions_ipr() {
     DEBUGASSERT(num_L2_extensions == 0);
     RESETMARKS;
     EDGE *e, *ee;
-    EDGE *endedge;
+    EDGE *enarc;
     unsigned char direction_bitvector;
     int i, res;
     for(i = 0; i < 12; i++) {
         e = ee = firstedge[degree_5_vertices[i]];
         do {
             if(!ISMARKEDLO(e)) {
-                res = has_short_straight_reduction_L2_ipr(e, 4, &endedge,
+                res = has_short_straight_reduction_L2_ipr(e, 4, &enarc,
                         &direction_bitvector);
                 if(res == 1) {
                     add_L2_extension_to_list(e, 4, (direction_bitvector & NEXT_BITVECTOR) != 0);
@@ -9893,8 +9893,8 @@ search_L2_reductions_ipr() {
                         return;
 
                     //No need to mark e since it wont be visited anymore
-                    //Can't mark outside if, since then endedge is invalid!
-                    MARKLO(endedge);
+                    //Can't mark outside if, since then enarc is invalid!
+                    MARKLO(enarc);
                 }
             }
             e = e->next;
@@ -9924,7 +9924,7 @@ are_adjacent(int x, int y)
 /*
  * Returns 1 if there is a bent zero reduction to a smaller IPR fullerene 
  * starting from startedge with direction use_next, else returns 0.
- * If 1 is returned, endedge contains the last edge of the reduction.
+ * If 1 is returned, enarc contains the last edge of the reduction.
  * 
  * Important: it is assumed that the fullerene is IPR.
  */
@@ -9932,7 +9932,7 @@ are_adjacent(int x, int y)
  * Remark: can never occur that faces are the same, so no need to mark.
  */
 static int
-has_B10_reduction_ipr_endedge(EDGE *startedge, int use_next, EDGE **endedge) {
+has_B10_reduction_ipr_enarc(EDGE *startedge, int use_next, EDGE **enarc) {
     DEBUGASSERT(degree[startedge->end] == 6);
     
     int a, b;
@@ -9990,7 +9990,7 @@ has_B10_reduction_ipr_endedge(EDGE *startedge, int use_next, EDGE **endedge) {
     if(degree[eb->next->end] == 5 || degree[eb->next->next->end] == 5
             || degree[eb->next->next->next->end] == 5) return 0;
 
-    *endedge = e;
+    *enarc = e;
     return 1;    
 
 }
@@ -10063,15 +10063,15 @@ search_B10_reductions_ipr() {
     DEBUGASSERT(nv <= maxnv - 4 && MAX_PREV_EXTENSIONS > 0);
     DEBUGASSERT(num_B10_extensions == 0);
     DEBUGASSERT(fulleriprswitch);
-    EDGE *e, *endedge;
+    EDGE *e, *enarc;
     int i, j, k;
     for(i = 0; i < 12; i++) {
         e = firstedge[degree_5_vertices[i]];
         for(j = 0; j < 5; j++) {
             //if(degree[e->end] == 6) //Check not necessary for IPR
             for(k = 0; k < 2; k++) {
-                if(has_B10_reduction_ipr_endedge(e, k, &endedge)
-                        && !B10_is_already_in_list(e->start, endedge->start)) {
+                if(has_B10_reduction_ipr_enarc(e, k, &enarc)
+                        && !B10_is_already_in_list(e->start, enarc->start)) {
                     add_B10_extension_to_list(e, k);
                     if(num_B10_extensions == MAX_PREV_EXTENSIONS)
                         return;
@@ -10456,16 +10456,16 @@ is_L0_or_L1_reduction(EDGE *startedge) {
 /*
  * Returns 1 if there is a bent zero reduction starting from startedge with
  * direction use_next, else returns 0.
- * If 1 is returned, endedge contains the last edge of the reduction.
+ * If 1 is returned, enarc contains the last edge of the reduction.
  */
 /*
  * Remark 1: Can never occur that faces are the same, so no need to mark.
  * This is because there is only one possible 4-cycle.
- * Remark 2: Searching in one direction is sufficient, since endedge is same 
+ * Remark 2: Searching in one direction is sufficient, since enarc is same 
  * but in other direction. Using direction prev here.
  */
 static int
-has_bent_zero_reduction(EDGE *startedge, EDGE **endedge) {
+has_bent_zero_reduction(EDGE *startedge, EDGE **enarc) {
     EDGE *e = startedge;
     if(degree[e->end] == 5)
         return 0;
@@ -10482,7 +10482,7 @@ has_bent_zero_reduction(EDGE *startedge, EDGE **endedge) {
         return 0;
     else {
         //MARK_B00_NEXT(e->label);
-        *endedge = e;
+        *enarc = e;
         return 1;
     }
 
@@ -10493,17 +10493,17 @@ has_bent_zero_reduction(EDGE *startedge, EDGE **endedge) {
 /*
  * Returns 1 if there is a bent zero reduction to a smaller IPR fullerene 
  * starting from startedge with direction use_next, else returns 0.
- * If 1 is returned, endedge contains the last edge of the reduction.
+ * If 1 is returned, enarc contains the last edge of the reduction.
  * 
  * Important: it is assumed that the fullerene is IPR.
  */
 /*
  * Remark 1: Can never occur that faces are the same, so no need to mark.
- * Remark 2: Searching in one direction is sufficient, since endedge is same 
+ * Remark 2: Searching in one direction is sufficient, since enarc is same 
  * but in other direction. Using direction prev here.
  */
 static int
-has_bent_zero_reduction_ipr(EDGE *startedge, EDGE **endedge) {
+has_bent_zero_reduction_ipr(EDGE *startedge, EDGE **enarc) {
     DEBUGASSERT(degree[startedge->end] == 6);
     
     int a, b;
@@ -10540,7 +10540,7 @@ has_bent_zero_reduction_ipr(EDGE *startedge, EDGE **endedge) {
     else
         MARK_B00_NEXT(e->label);
 */
-    *endedge = e;
+    *enarc = e;
     return 1;    
 
 }
@@ -10685,12 +10685,12 @@ search_bent_zero_reductions_ipr() {
     DEBUGASSERT(nv <= maxnv - 4);
     DEBUGASSERT(num_bent_zero_extensions == 0 && MAX_PREV_EXTENSIONS > 0);
 
-    EDGE *e, *endedge;
+    EDGE *e, *enarc;
     int i, j;
     for(i = 0; i < 12; i++) {
         e = firstedge[degree_5_vertices[i]];
         for(j = 0; j < 5; j++) {
-            if(has_bent_zero_reduction_ipr(e, &endedge)) {
+            if(has_bent_zero_reduction_ipr(e, &enarc)) {
                 add_bent_zero_extension_to_list_ipr(e, 0);
 
                 if(num_bent_zero_extensions == MAX_PREV_EXTENSIONS)
@@ -10778,21 +10778,21 @@ is_best_bent_zero_reduction(EDGE *test_edge1, EDGE *test_edge2, int use_next,
         best_colour_two = colour_testedge1;
     }
 
-    //Searching in one direction is sufficient, since endedge is same but in other direction
+    //Searching in one direction is sufficient, since enarc is same but in other direction
     //Searching in direction prev here.
     int colour_tmp, colour_tmp_other;
-    EDGE *endedge;
+    EDGE *enarc;
     for(i = 0; i < 12; i++) {
         e = firstedge[degree_5_vertices[i]];
         for(j = 0; j < 5; j++) {
             if(e != forbidden_edge) {
-                //if(has_bent_zero_reduction(e, k, &endedge)) {
-                if(has_bent_zero_reduction(e, &endedge)) {
-                    colour_tmp = get_colour_next_5(endedge->invers->next);
+                //if(has_bent_zero_reduction(e, k, &enarc)) {
+                if(has_bent_zero_reduction(e, &enarc)) {
+                    colour_tmp = get_colour_next_5(enarc->invers->next);
                     if(colour_tmp > best_colour)
                         return 0;
                     //if(colour_tmp == best_colour)
-                    //    good_next[num_good_next++] = endedge;
+                    //    good_next[num_good_next++] = enarc;
 
                     colour_tmp_other = get_colour_prev_5(e->invers->prev);
                     if(colour_tmp_other > best_colour)
@@ -10804,7 +10804,7 @@ is_best_bent_zero_reduction(EDGE *test_edge1, EDGE *test_edge2, int use_next,
                         if(colour_tmp_other > best_colour_two)
                             return 0;
                         else if(colour_tmp_other == best_colour_two) {
-                            good_next_tmp[num_good_next_tmp++] = endedge;
+                            good_next_tmp[num_good_next_tmp++] = enarc;
                         }
                     }
                     if(colour_tmp_other == best_colour) {
@@ -10918,22 +10918,22 @@ is_best_bent_zero_reduction_ipr(EDGE *test_edge1, EDGE *test_edge2, int use_next
         best_colour_two = colour_testedge1;
     }
 
-    //Searching in one direction is sufficient, since endedge is same but in other direction
+    //Searching in one direction is sufficient, since enarc is same but in other direction
     //Searching in direction prev here.
     int colour_tmp, colour_tmp_other;
-    EDGE *endedge;
+    EDGE *enarc;
     for(i = 0; i < 12; i++) {
         e = firstedge[degree_5_vertices[i]];
         for(j = 0; j < 5; j++) {
             if(e != forbidden_edge) {
-                //if(has_bent_zero_reduction(e, k, &endedge)) {
-                if(has_bent_zero_reduction_ipr(e, &endedge)) {
-                    //colour_tmp = get_colour_next_5(endedge->invers->next);
-                    colour_tmp = get_colour_next_3(endedge->invers->prev->prev->invers->prev->prev);
+                //if(has_bent_zero_reduction(e, k, &enarc)) {
+                if(has_bent_zero_reduction_ipr(e, &enarc)) {
+                    //colour_tmp = get_colour_next_5(enarc->invers->next);
+                    colour_tmp = get_colour_next_3(enarc->invers->prev->prev->invers->prev->prev);
                     if(colour_tmp > best_colour)
                         return 0;
                     //if(colour_tmp == best_colour)
-                    //    good_next[num_good_next++] = endedge;
+                    //    good_next[num_good_next++] = enarc;
 
                     //colour_tmp_other = get_colour_prev_5(e->invers->prev);
                     colour_tmp_other = get_colour_prev_3(e->invers->next->next->invers->next->next);
@@ -10946,7 +10946,7 @@ is_best_bent_zero_reduction_ipr(EDGE *test_edge1, EDGE *test_edge2, int use_next
                         if(colour_tmp_other > best_colour_two)
                             return 0;
                         else if(colour_tmp_other == best_colour_two) {
-                            good_next_tmp[num_good_next_tmp++] = endedge;
+                            good_next_tmp[num_good_next_tmp++] = enarc;
                         }
                     }
                     if(colour_tmp_other == best_colour) {
@@ -11659,12 +11659,12 @@ is_best_bent_reduction(EDGE *test_edge1, EDGE *test_edge2, int bent_position, in
 static int
 has_B00_reductions() {
     EDGE *e;
-    EDGE *endedge;
+    EDGE *enarc;
     int i, j;
     for(i = 0; i < 12; i++) {
         e = firstedge[degree_5_vertices[i]];
         for(j = 0; j < 5; j++) {
-            if(has_bent_zero_reduction(e, &endedge)) {
+            if(has_bent_zero_reduction(e, &enarc)) {
                 return 1;
             }
             e = e->next;
@@ -11682,12 +11682,12 @@ has_B00_reductions() {
 static int
 has_B00_reductions_ipr() {
     EDGE *e;
-    EDGE *endedge;
+    EDGE *enarc;
     int i, j;
     for(i = 0; i < 12; i++) {
         e = firstedge[degree_5_vertices[i]];
         for(j = 0; j < 5; j++) {
-            if(has_bent_zero_reduction_ipr(e, &endedge)) {
+            if(has_bent_zero_reduction_ipr(e, &enarc)) {
                 return 1;
             }
             e = e->next;
@@ -11850,7 +11850,7 @@ is_best_straight_reduction(EDGE *test_edge1, EDGE *test_edge2, int pathlength, i
 
     RESETMARKS;
     EDGE *e, *ee;
-    EDGE *endedge;
+    EDGE *enarc;
     unsigned char direction_bitvector;
     int i, res;
     for(i = 0; i < 12; i++) {
@@ -11858,9 +11858,9 @@ is_best_straight_reduction(EDGE *test_edge1, EDGE *test_edge2, int pathlength, i
         //Not faster if using j < 5...
         do {
             if(!ISMARKEDLO(e)) {
-                //res = has_short_straight_reduction(e, pathlength, &endedge,
+                //res = has_short_straight_reduction(e, pathlength, &enarc,
                 //        &direction_bitvector);
-                res = (*proc_short_straight) (e, pathlength, &endedge,
+                res = (*proc_short_straight) (e, pathlength, &enarc,
                         &direction_bitvector);
                 if(res == 2) { //Better reduction found
                     //fprintf(stderr, "better reduction found. nv: %d, pathlen is %d and max pathlen straight: %d\n", nv, pathlength, straight_length);
@@ -11874,11 +11874,11 @@ is_best_straight_reduction(EDGE *test_edge1, EDGE *test_edge2, int pathlength, i
                             else if(colour_tmp == best_colour)
                                 good_next_tmp[num_good_next_tmp++] = e;
 
-                            colour_tmp = get_colour_next_5(endedge->next->next->invers->next);
+                            colour_tmp = get_colour_next_5(enarc->next->next->invers->next);
                             if(colour_tmp > best_colour)
                                 return 0;
                             else if(colour_tmp == best_colour)
-                                good_next_tmp[num_good_next_tmp++] = endedge;
+                                good_next_tmp[num_good_next_tmp++] = enarc;
                         }
                     }
                     if((direction_bitvector & PREV_BITVECTOR) != 0) {
@@ -11889,19 +11889,19 @@ is_best_straight_reduction(EDGE *test_edge1, EDGE *test_edge2, int pathlength, i
                             else if(colour_tmp == best_colour)
                                 good_prev_tmp[num_good_prev_tmp++] = e;
 
-                            colour_tmp = get_colour_prev_5(endedge->prev->prev->invers->prev);
+                            colour_tmp = get_colour_prev_5(enarc->prev->prev->invers->prev);
                             if(colour_tmp > best_colour)
                                 return 0;
                             else if(colour_tmp == best_colour)
-                                good_prev_tmp[num_good_prev_tmp++] = endedge;
+                                good_prev_tmp[num_good_prev_tmp++] = enarc;
                         }
                     }
                     if(nv < maxnv - 1 && num_straight_extensions < MAX_PREV_EXTENSIONS - 1)
                         add_straight_extension_to_list(e, pathlength, (direction_bitvector & NEXT_BITVECTOR) != 0);
 
                     //No need to mark e since it wont be visited anymore
-                    //Can't mark outside if, since then endedge is invalid!
-                    MARKLO(endedge);
+                    //Can't mark outside if, since then enarc is invalid!
+                    MARKLO(enarc);
                 }
             }
             e = e->next;
@@ -11984,7 +11984,7 @@ is_best_straight_reduction_ipr(EDGE *test_edge1, EDGE *test_edge2, int pathlengt
 
     RESETMARKS;
     EDGE *e, *ee;
-    EDGE *endedge;
+    EDGE *enarc;
     unsigned char direction_bitvector;
     int i, res;
     for(i = 0; i < 12; i++) {
@@ -11992,9 +11992,9 @@ is_best_straight_reduction_ipr(EDGE *test_edge1, EDGE *test_edge2, int pathlengt
         //Not faster if using j < 5...
         do {
             if(!ISMARKEDLO(e)) {
-                //res = has_short_straight_reduction(e, pathlength, &endedge,
+                //res = has_short_straight_reduction(e, pathlength, &enarc,
                 //        &direction_bitvector);
-                res = (*proc_short_straight) (e, pathlength, &endedge,
+                res = (*proc_short_straight) (e, pathlength, &enarc,
                         &direction_bitvector);
                 if(res == 2) { //Better reduction found
                     //fprintf(stderr, "better reduction found. nv: %d, pathlen is %d and max pathlen straight: %d\n", nv, pathlength, straight_length);
@@ -12011,13 +12011,13 @@ is_best_straight_reduction_ipr(EDGE *test_edge1, EDGE *test_edge2, int pathlengt
                             else if(colour_tmp == best_colour)
                                 good_next_tmp[num_good_next_tmp++] = e;
 
-                            //colour_tmp = get_colour_next_5(endedge->next->next->invers->next);
-                            //colour_tmp = get_colour_prev_5(endedge->prev->prev->invers->prev);
-                            colour_tmp = get_colour_prev_3(endedge->prev->prev->invers->prev->prev);
+                            //colour_tmp = get_colour_next_5(enarc->next->next->invers->next);
+                            //colour_tmp = get_colour_prev_5(enarc->prev->prev->invers->prev);
+                            colour_tmp = get_colour_prev_3(enarc->prev->prev->invers->prev->prev);
                             if(colour_tmp > best_colour)
                                 return 0;
                             else if(colour_tmp == best_colour)
-                                good_next_tmp[num_good_next_tmp++] = endedge;
+                                good_next_tmp[num_good_next_tmp++] = enarc;
                         }
                     }
                     if((direction_bitvector & PREV_BITVECTOR) != 0) {
@@ -12030,13 +12030,13 @@ is_best_straight_reduction_ipr(EDGE *test_edge1, EDGE *test_edge2, int pathlengt
                             else if(colour_tmp == best_colour)
                                 good_prev_tmp[num_good_prev_tmp++] = e;
 
-                            //colour_tmp = get_colour_prev_5(endedge->prev->prev->invers->prev);
-                            //colour_tmp = get_colour_next_5(endedge->next->next->invers->next);
-                            colour_tmp = get_colour_next_3(endedge->next->next->invers->next->next);
+                            //colour_tmp = get_colour_prev_5(enarc->prev->prev->invers->prev);
+                            //colour_tmp = get_colour_next_5(enarc->next->next->invers->next);
+                            colour_tmp = get_colour_next_3(enarc->next->next->invers->next->next);
                             if(colour_tmp > best_colour)
                                 return 0;
                             else if(colour_tmp == best_colour)
-                                good_prev_tmp[num_good_prev_tmp++] = endedge;
+                                good_prev_tmp[num_good_prev_tmp++] = enarc;
                         }
                     }
                     //Pathlength 4 enkel nuttig voor Lx, x >= 3
@@ -12045,8 +12045,8 @@ is_best_straight_reduction_ipr(EDGE *test_edge1, EDGE *test_edge2, int pathlengt
                         add_straight_extension_to_list(e, pathlength, (direction_bitvector & NEXT_BITVECTOR) != 0);
 
                     //No need to mark e since it wont be visited anymore
-                    //Can't mark outside if, since then endedge is invalid!
-                    MARKLO(endedge);
+                    //Can't mark outside if, since then enarc is invalid!
+                    MARKLO(enarc);
                 }
             }
             e = e->next;

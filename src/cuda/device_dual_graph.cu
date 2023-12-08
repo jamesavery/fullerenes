@@ -4,7 +4,7 @@ struct DeviceDualGraph{
 
     __device__ DeviceDualGraph(const device_node_t* dual_neighbours, const uint8_t* face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
 
-    __device__ device_node_t dedge_ix(const device_node_t u, const device_node_t v) const{
+    __device__ device_node_t arc_ix(const device_node_t u, const device_node_t v) const{
         for (uint8_t j = 0; j < face_degrees[u]; j++){
             if (dual_neighbours[u*6 + j] == v) return j;
         }
@@ -20,7 +20,7 @@ struct DeviceDualGraph{
      * @return the next node in the clockwise order around u
      */
     __device__ device_node_t next(const device_node_t u, const device_node_t v) const{
-        device_node_t j = dedge_ix(u,v);
+        device_node_t j = arc_ix(u,v);
         return dual_neighbours[u*6 + ((j+1)%face_degrees[u])];
     }
     
@@ -31,7 +31,7 @@ struct DeviceDualGraph{
      * @return the previous node in the clockwise order around u
      */
     __device__ device_node_t prev(const device_node_t u, const device_node_t v) const{
-        device_node_t j = dedge_ix(u,v);
+        device_node_t j = arc_ix(u,v);
         return dual_neighbours[u*6 + ((j-1+face_degrees[u])%face_degrees[u])];
     }
 
@@ -95,9 +95,9 @@ struct DeviceDualGraph{
             if (cannon_arc[0] == u) {
                 device_node_t v(dual_neighbours[u*6 + i]);
                 device_node_t w = prev(u,v);
-                device_node2 edge_b = get_cannonical_triangle_arc(v, u); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 0] = triangle_numbers[edge_b[0] * 6 + dedge_ix(edge_b[0], edge_b[1])];
-                device_node2 edge_c = get_cannonical_triangle_arc(w, v); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 1] = triangle_numbers[edge_c[0] * 6 + dedge_ix(edge_c[0], edge_c[1])];
-                device_node2 edge_d = get_cannonical_triangle_arc(u, w); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 2] = triangle_numbers[edge_d[0] * 6 + dedge_ix(edge_d[0], edge_d[1])];
+                device_node2 edge_b = get_cannonical_triangle_arc(v, u); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 0] = triangle_numbers[edge_b[0] * 6 + arc_ix(edge_b[0], edge_b[1])];
+                device_node2 edge_c = get_cannonical_triangle_arc(w, v); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 1] = triangle_numbers[edge_c[0] * 6 + arc_ix(edge_c[0], edge_c[1])];
+                device_node2 edge_d = get_cannonical_triangle_arc(u, w); cubic_neighbours[triangle_numbers[u*6 + i]*3 + 2] = triangle_numbers[edge_d[0] * 6 + arc_ix(edge_d[0], edge_d[1])];
             };
         }
         }

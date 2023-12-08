@@ -37,9 +37,9 @@ public:
 
   // This group of functions should be used whenever the graphs are oriented. Fmax is not necessary, just an extra back-stop.
   vector<face_t> compute_faces_oriented(int Fmax=INT_MAX) const; // TODO: This should replace the old layout-based method  
-  face_t get_face_oriented(const dedge_t &e, int Fmax=INT_MAX) const; 
-  dedge_t get_face_representation(dedge_t e, int Fmax=INT_MAX) const; 
-  vector<dedge_t> compute_face_representations(int Fmax=INT_MAX) const; // Unique representation of face in oriented planar graph
+  face_t get_face_oriented(const arc_t &e, int Fmax=INT_MAX) const; 
+  arc_t get_face_representation(arc_t e, int Fmax=INT_MAX) const; 
+  vector<arc_t> compute_face_representations(int Fmax=INT_MAX) const; // Unique representation of face in oriented planar graph
 
   // This should all be phased out. For non-oriented graphs, better to compute planar embedding and orient once and for all,
   // than to use planar layout for orientation everywhere (or better yet, make sure graph is oriented in the first place).

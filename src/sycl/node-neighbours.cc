@@ -37,7 +37,7 @@ struct NodeNeighbours{
         node_t edge_idx[3] = {UINT16_MAX, UINT16_MAX, UINT16_MAX};
         for (int j = 0; j  < 3; j++){
             rep_edges[j] = FG.get_face_representation(tid, cubic_neighbours[j]);
-            edge_idx[j] = FG.dedge_ix(rep_edges[j][0], rep_edges[j][1]);
+            edge_idx[j] = FG.arc_ix(rep_edges[j][0], rep_edges[j][1]);
             if(rep_edges[j][0] == tid) {++represent_count; is_rep[j] = true;}
         }
         //ex_scan<node_t>(reinterpret_cast<node_t*>(sdata), represent_count, bdim);

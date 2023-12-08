@@ -8,7 +8,7 @@ struct HostCubicGraph{
     // @param v: target node in the arc (u,v)
     // @return: index of v in the list of neighbours of u
     */
-    node_t dedge_ix(const node_t u, const node_t v) const{
+    node_t arc_ix(const node_t u, const node_t v) const{
         for (uint8_t j = 0; j < 3; j++)
             if (cubic_neighbours[u*3 + j] == v) return j;
 
@@ -22,7 +22,7 @@ struct HostCubicGraph{
     // @return: Next neighbour of u after v in the clockwise order
     */
     node_t next(const node_t u, const node_t v) const{
-        node_t j = dedge_ix(u,v);
+        node_t j = arc_ix(u,v);
         return cubic_neighbours[u*3 + ((j+1)%3)];
     }
     
@@ -32,7 +32,7 @@ struct HostCubicGraph{
     // @return: Previous neighbour of u before v in the clockwise order
     */
     node_t prev(const node_t u, const node_t v) const{
-        node_t j = dedge_ix(u,v);
+        node_t j = arc_ix(u,v);
         return cubic_neighbours[u*3 + ((j+2)%3)];
     }
     

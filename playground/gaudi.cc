@@ -13,7 +13,7 @@ using namespace std;
 
 PlanarGraph fold(vector< pair<Eisenstein, node_t> > &outline);
 
-typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
+typedef pair<Eisenstein,Eisenstein> arccoord_t;
 
 
 
@@ -332,8 +332,8 @@ int main(int ac, char **av)
   
   cout << "Placed " << unfld.edgecoords.size() << " edges.\n";
 
-  output << "dedges   = " << get_keys(unfld.edgecoords) << ";\n";
-  output << "dedgepos = " << get_values(unfld.edgecoords) << ";\n";
+  output << "arcs   = " << get_keys(unfld.edgecoords) << ";\n";
+  output << "arcpos = " << get_values(unfld.edgecoords) << ";\n";
   output << "outline = "  << unfld.outline << ";\n";
   output << "outlinecoords = " << get_keys(unfld.outline) << ";\n";
 

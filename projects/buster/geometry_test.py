@@ -48,7 +48,7 @@ lengths_da       = np.sum(length_gradients*CT_geometries_da[:,:,NA,:],axis=-1)
 
 ################# LENGTH-ENERGY AND DERIVATIVES ##############
 R0 = 0.5
-energies          = (1/2)*harmonic_energy(lengths,R0,from_axis=1) # 1/2 for double counting edges -> dedges
+energies          = (1/2)*harmonic_energy(lengths,R0,from_axis=1) # 1/2 for double counting edges -> arcs
 energies_gradient = array([edge_energy_gradient(g,CT_neighbours,R0) for g in CT_geometries])
 energies_da       = np.sum(energies_gradient*CT_geometries_da,axis=-1)
 

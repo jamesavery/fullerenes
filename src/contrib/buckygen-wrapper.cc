@@ -249,6 +249,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
     sighandler_t old_handler = signal(SIGTERM,SIG_IGN); // Protect ourselves while we kill our children
     killpg(gid,SIGTERM);
     signal(SIGTERM,old_handler);                        // Restore normalcy.
+    msgctl(qid,IPC_RMID,0);			      // Kill the Sys-V IPC queue    
   }
 
   

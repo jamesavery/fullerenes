@@ -93,7 +93,7 @@ vector<coord2d> uvmap(const PlanarGraph& G)
     miny = min(miny,y); maxy = max(maxy,y);
   }
   
-  // dedge -> triangle (atom)
+  // arc -> triangle (atom)
   node_t q,r,s,t;
   Eisenstein xq, xr, xs, xt;
   for(auto kv: U.arc_coords){

@@ -164,14 +164,14 @@ int main(int ac, char **av)
 
   bool do_unfolding = true;
   if(do_unfolding){
-    vector<vector<dedge_t>> Arcs(Ts.size());
-    vector<vector<Unfolding::dedgecoord_t>> Arcpos(Ts.size());
+    vector<vector<arc_t>> Arcs(Ts.size());
+    vector<vector<Unfolding::arccoord_t>> Arcpos(Ts.size());
     vector<vector<vector<Eisenstein>>> Tripos(Ts.size());    
    
     for(int j=0;j<Ts.size();j++){
       int u_max, mx;
       tie(u_max,mx) = middle_hexagon(Tlf[j]);
-      dedge_t first_arc = {u_max, Tlf[j].neighbours[u_max][0]};    
+      arc_t first_arc = {u_max, Tlf[j].neighbours[u_max][0]};    
       
       Unfolding uf(Tlf[j],first_arc);
       Arcs[j]   = get_keys(uf.arc_coords);

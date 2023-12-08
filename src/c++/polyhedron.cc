@@ -133,13 +133,13 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
 
     // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) 
     list<triit> visible;
-    map<dedge_t,bool> is_visible;
+    map<arc_t,bool> is_visible;
     coord3d centre; // Centre of visible faces
     for(triit t(output.begin());t!=output.end();t++){
       if(!Tri3D(points,*t).back_face(p)) { 
         visible.push_back(t);
         for(int i=0;i<3;i++) 
-          is_visible[dedge_t(t->u(i),t->u((i+1)%3))] = true; 
+          is_visible[arc_t(t->u(i),t->u((i+1)%3))] = true; 
         centre += t->centroid(points);
       }
     }
@@ -151,9 +151,9 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
       const tri_t& tv(**tvi);
 
       for(int j=0;j<3;j++){
-        const dedge_t e(tv[j],tv[(j+1)%3]);
+        const arc_t e(tv[j],tv[(j+1)%3]);
 
-        if( (is_visible[e] && !is_visible[dedge_t(e.second,e.first)]) || (!is_visible[e] && is_visible[dedge_t(e.second,e.first)]) )
+        if( (is_visible[e] && !is_visible[arc_t(e.second,e.first)]) || (!is_visible[e] && is_visible[arc_t(e.second,e.first)]) )
           horizon.push_back(edge_t(e));
       }
       // 2.3 Delete visible faces from output set. 
@@ -170,7 +170,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
 
       triit ti = output.insert(output.end(),t);
       //      for(int j=0;j<3;j++)
-        //        edgetri[dedge_t(t[j],t[(j+1)%3])] = ti;
+        //        edgetri[arc_t(t[j],t[(j+1)%3])] = ti;
     }
     if(output.size() > N*N*10){
       fprintf(stderr,"Something went horribly wrong in computation of convex hull:\n");
@@ -452,7 +452,7 @@ Polyhedron Polyhedron::leapfrog_dual() const
       xc += points[u]/d;
 
       // Add edge mumble mumble
-      Plf.insert_edge(dedge_t{v,c},u,-1);
+      Plf.insert_edge(arc_t{v,c},u,-1);
 
       // Add triangle
       Plf.faces[c] = tri_t{u,v,c};

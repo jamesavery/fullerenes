@@ -21,7 +21,7 @@
 // (for outline segments that do not align with Eisenstein grid)
 void Folding::connect_cross(int i_omega, neighbours_t &n)
 {
-  map<dedge_t,dedgecoord_t> reverse_arc;
+  map<arc_t,arccoord_t> reverse_arc;
   vector< pair<Eisenstein,Eisenstein> > EC, ECp; // Split edge Eisenstein coordinates 
   Eisenstein xu, xv;
   node_t u,v;
@@ -42,7 +42,7 @@ void Folding::connect_cross(int i_omega, neighbours_t &n)
     tie(xv,v) = outline[(i+1) % outline.size()];
 
     // First get the coordinates of arc u->v and the reverse v->u
-    dedgecoord_t Xuv = {xu*omega,xv*omega}, Xvu = reverse_arc[{u,v}];
+    arccoord_t Xuv = {xu*omega,xv*omega}, Xvu = reverse_arc[{u,v}];
 
     // What the affine transform that takes the line segment Xuv into Xvu?
     Eisenstein
@@ -169,7 +169,7 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
   set<edge_t> same_as;
 
   for(int i_omega=0;i_omega<3;i_omega++){
-    map<dedge_t,dedgecoord_t> reverse_arc;
+    map<arc_t,arccoord_t> reverse_arc;
     
     Eisenstein omega     = Eisenstein::unit[i_omega],
                omega_inv = Eisenstein::unit[6-i_omega];
@@ -193,7 +193,7 @@ vector<int> Folding::identify_nodes(const IDCounter<Eisenstein>& grid, const vec
       tie(XU,U) = outline[i];
       tie(XV,V) = outline[(i+1) % outline.size()];
 
-      dedgecoord_t XUV(XU*omega,XV*omega), XVU(reverse_arc[{U,V}]);
+      arccoord_t XUV(XU*omega,XV*omega), XVU(reverse_arc[{U,V}]);
 
       cout << "\noutline["<<i<<"]\n";
       cout << "{U,V} = " << make_pair(U,V) << endl;

@@ -17,7 +17,7 @@ struct DeviceCubicGraph{
     // @param v: target node in the arc (u,v)
     // @return: index of v in the list of neighbours of u
     */
-    K dedge_ix(const K u, const K v) const{
+    K arc_ix(const K u, const K v) const{
         for (uint8_t j = 0; j < 3; j++)
             if ((*this)[u*3 + j] == v) return j;
 
@@ -31,7 +31,7 @@ struct DeviceCubicGraph{
     // @return: Next neighbour of u after v in the clockwise order
     */
     K next(const K u, const K v) const{
-        K j = dedge_ix(u,v);
+        K j = arc_ix(u,v);
         return (*this)[u*3 + ((j+1)%3)];
     }
     
@@ -41,7 +41,7 @@ struct DeviceCubicGraph{
     // @return: Previous neighbour of u before v in the clockwise order
     */
     K prev(const K u, const K v) const{
-        K j = dedge_ix(u,v);
+        K j = arc_ix(u,v);
         return (*this)[u*3 + ((j+2)%3)];
     }
     

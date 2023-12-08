@@ -110,9 +110,9 @@ Deltahedron halma_triangulation(const Deltahedron &P, int m=1) {
 	node_t v(grid[edge_t(j,k)]), down(grid[edge_t(j+1,k)]), 
 	  left(grid[edge_t(j,k-1)]);
 
-	Phalma.g.insert_edge(dedge_t(v,down));
-	Phalma.g.insert_edge(dedge_t(down,left));
-	Phalma.g.insert_edge(dedge_t(left,v));
+	Phalma.g.insert_edge(arc_t(v,down));
+	Phalma.g.insert_edge(arc_t(down,left));
+	Phalma.g.insert_edge(arc_t(left,v));
       }
   }
 

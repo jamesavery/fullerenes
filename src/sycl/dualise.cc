@@ -22,7 +22,7 @@ struct DeviceDualGraph{
     
     DeviceDualGraph(const K* dual_neighbours, const K* face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
 
-    K dedge_ix(const K u, const K v) const{
+    K arc_ix(const K u, const K v) const{
         for (uint8_t j = 0; j < face_degrees[u]; j++){
             if (dual_neighbours[u*MaxDegree + j] == v) return j;
         }
@@ -30,7 +30,7 @@ struct DeviceDualGraph{
         assert(false);
 	return -1;		// Make compiler happy
     }
-    K dedge_ix(const node2& e){ return dedge_ix(e[0], e[1]); }
+    K arc_ix(const node2& e){ return arc_ix(e[0], e[1]); }
 
     /**
      * @brief returns the next node in the clockwise order around u
@@ -39,7 +39,7 @@ struct DeviceDualGraph{
      * @return the next node in the clockwise order around u
      */
     K next(const K u, const K v) const{
-        K j = dedge_ix(u,v);
+        K j = arc_ix(u,v);
         return dual_neighbours[u*MaxDegree + ((j+1)%face_degrees[u])];
     }
     
@@ -50,7 +50,7 @@ struct DeviceDualGraph{
      * @return the previous node in the clockwise order around u
      */
     K prev(const K u, const K v) const{
-        K j = dedge_ix(u,v);
+        K j = arc_ix(u,v);
         return dual_neighbours[u*MaxDegree + ((j-1+face_degrees[u])%face_degrees[u])];
     }
 
@@ -169,9 +169,9 @@ void dualise(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
             auto [u, v] = arc_list[f];
             auto w = FD.next(u,v);
 //
-            node2 edge_b = FD.get_canonical_triangle_arc(v, u); cubic_neighbours_dev[isomer*N*3 + f*3 + 0] = triangle_numbers[edge_b[0]*MaxDegree + FD.dedge_ix(edge_b)];
-            node2 edge_c = FD.get_canonical_triangle_arc(w, v); cubic_neighbours_dev[isomer*N*3 + f*3 + 1] = triangle_numbers[edge_c[0]*MaxDegree + FD.dedge_ix(edge_c)];
-            node2 edge_d = FD.get_canonical_triangle_arc(u, w); cubic_neighbours_dev[isomer*N*3 + f*3 + 2] = triangle_numbers[edge_d[0]*MaxDegree + FD.dedge_ix(edge_d)];
+            node2 edge_b = FD.get_canonical_triangle_arc(v, u); cubic_neighbours_dev[isomer*N*3 + f*3 + 0] = triangle_numbers[edge_b[0]*MaxDegree + FD.arc_ix(edge_b)];
+            node2 edge_c = FD.get_canonical_triangle_arc(w, v); cubic_neighbours_dev[isomer*N*3 + f*3 + 1] = triangle_numbers[edge_c[0]*MaxDegree + FD.arc_ix(edge_c)];
+            node2 edge_d = FD.get_canonical_triangle_arc(u, w); cubic_neighbours_dev[isomer*N*3 + f*3 + 2] = triangle_numbers[edge_d[0]*MaxDegree + FD.arc_ix(edge_d)];
         });
     });
 
@@ -266,9 +266,9 @@ void dualise_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
                 auto [u, v] = arc_list[tix];
                 auto w = FD.next(u,v);
 //
-                node2 edge_b = FD.get_canonical_triangle_arc(v, u); cubic_neighbours_dev[isomer*N*3 + tix*3 + 0] = triangle_numbers[edge_b[0]*MaxDegree + FD.dedge_ix(edge_b)];
-                node2 edge_c = FD.get_canonical_triangle_arc(w, v); cubic_neighbours_dev[isomer*N*3 + tix*3 + 1] = triangle_numbers[edge_c[0]*MaxDegree + FD.dedge_ix(edge_c)];
-                node2 edge_d = FD.get_canonical_triangle_arc(u, w); cubic_neighbours_dev[isomer*N*3 + tix*3 + 2] = triangle_numbers[edge_d[0]*MaxDegree + FD.dedge_ix(edge_d)];
+                node2 edge_b = FD.get_canonical_triangle_arc(v, u); cubic_neighbours_dev[isomer*N*3 + tix*3 + 0] = triangle_numbers[edge_b[0]*MaxDegree + FD.arc_ix(edge_b)];
+                node2 edge_c = FD.get_canonical_triangle_arc(w, v); cubic_neighbours_dev[isomer*N*3 + tix*3 + 1] = triangle_numbers[edge_c[0]*MaxDegree + FD.arc_ix(edge_c)];
+                node2 edge_d = FD.get_canonical_triangle_arc(u, w); cubic_neighbours_dev[isomer*N*3 + tix*3 + 2] = triangle_numbers[edge_d[0]*MaxDegree + FD.arc_ix(edge_d)];
             }
         });
     });

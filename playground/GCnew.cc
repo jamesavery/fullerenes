@@ -2,7 +2,7 @@
 #include <fullerenes/spiral.hh>
 #include <fullerenes/triangulation.hh>
 
-typedef dedge_t arc_t; 		// TODO: Rename centrally
+typedef arc_t arc_t; 		// TODO: Rename centrally
 
 template <typename T> T pop(vector<T> &s){
   T& x = s.back(); s.pop_back(); return x;

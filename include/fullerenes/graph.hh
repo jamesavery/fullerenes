@@ -7,7 +7,7 @@
 //    or can be a view of memory allocated elsewhere by passing a pointer at construction ( owns_memory == false)
 //  * clean up interface (not everything is needed)
 //  * layout2d() should no longer be a part of PlanarGraph - separate out
-//  * dedge_t -> arc_t
+//  * arc_t -> arc_t
 //  * add more efficient interface that exploits arc representations of the form (u,i) instead of (u,v) (with v = neighbours[u][i])
 //  * remove dependency on hashes (Use N*3 tables instead). arc2cubic (tri), arc2dual, carc2darc, etc.
 //  * simplify computation of dual
@@ -55,13 +55,13 @@ struct Graph {
   }
 
 
-  bool insert_edge(const dedge_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
+  bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
   bool remove_edge(const edge_t& e);
   bool edge_exists(const edge_t& e) const;
   void remove_isolated_vertices();
   void remove_vertices(set<int> &sv);
 
-  int  dedge_ix(node_t u, node_t v) const;  
+  int  arc_ix(node_t u, node_t v) const;  
   node_t next(node_t u, node_t v) const;
   node_t prev(node_t u, node_t v) const;
   node_t next_on_face(node_t u, node_t v) const;
@@ -100,7 +100,7 @@ struct Graph {
 
   void update_from_edgeset(const set<edge_t>& edge_set); 
   vector<edge_t>  undirected_edges() const;
-  vector<dedge_t> directed_edges()   const;
+  vector<arc_t> directed_edges()   const;
 
   size_t count_edges() const;
   

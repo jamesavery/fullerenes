@@ -40,7 +40,7 @@ container_output(set);
 
 
 // Directed edge is an ordered pair of nodes
-typedef pair<node_t,node_t> dedge_t;
+typedef pair<node_t,node_t> arc_t;
 
 struct edge_t : public pair<node_t,node_t> {
   edge_t() {}

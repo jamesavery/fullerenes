@@ -1,5 +1,4 @@
-#ifndef TOPOLOGICAL_INDICES_HH
-# define TOPOLOGICAL_INDICES_HH
+#pragma once
 
 #include <math.h>
 

@@ -55,7 +55,7 @@ public:
   bool is_delaunay(const Quad& Q) const;
   void flip(const Quad& Q);
 
-  void remove_edge(const dedge_t e){
+  void remove_edge(const arc_t e){
     Graph::remove_edge(e);
     edge_lengths(e.first,e.second)=0;
     edge_lengths(e.second,e.first)=0;
@@ -65,7 +65,7 @@ public:
   vector<double>  new_distances(const node_t& v, const vector<node_t>& hole) const;
   vector<edge_t> triangulate_hole(const vector<node_t>& hole, const vector<double>& distances);
 
-  void insert_edge(const dedge_t& uv, const node_t p, const node_t q, const double length){
+  void insert_edge(const arc_t& uv, const node_t p, const node_t q, const double length){
     node_t u=uv.first, v = uv.second;
     /* Insert v in neighbours[u] just before p, and insert u in neighbours[v] just before q:
      * 
@@ -86,7 +86,7 @@ public:
   bool is_consistent(const Quad& Q) const;
 
 
-  vector<dedge_t> delaunayify_hole(const vector<edge_t>& edges);
+  vector<arc_t> delaunayify_hole(const vector<edge_t>& edges);
 
   void remove_flat_vertices();
   void remove_flat_vertex(node_t v);
