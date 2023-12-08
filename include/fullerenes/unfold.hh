@@ -8,7 +8,6 @@ class Unfolding {
 public:
   typedef pair<Eisenstein,Eisenstein> arccoord_t;
   
-  typedef arc_t arc_t;
   typedef arccoord_t arc_coord_t;  
 
   Triangulation graph;
