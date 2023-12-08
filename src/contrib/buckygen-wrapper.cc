@@ -48,7 +48,7 @@ void stop(const buckygen_queue& Q)
 }
 
   
-buckygen_queue start(int N, int IPR, bool only_nontrivial, 
+buckygen_queue start(int N, bool IPR, bool only_nontrivial, 
 		     size_t chunk_index, size_t chunk_number)
 {
   buckygen_queue Q;
