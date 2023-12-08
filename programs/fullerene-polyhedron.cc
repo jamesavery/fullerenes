@@ -62,10 +62,10 @@ int main(int ac, char **av)
   Polyhedron::to_file(P0,"output/"+basename+"-P0.mol2");
 
   P0.points = g.zero_order_geometry();
-  P0.points = g.optimised_geometry(P0.points);
+  P0.points = g.optimized_geometry(P0.points);
 
   Polyhedron P(P0);
-  //  P.optimise();
+  //  P.optimize();
 
   Polyhedron::to_file(P,"output/"+basename+".mol2");
 
@@ -99,7 +99,7 @@ int main(int ac, char **av)
   D.layout2d = D.tutte_layout();
   D.faces    = D.compute_faces(3,true);
   D.face_max = 3;
-  //   D.optimise();
+  //   D.optimize();
   output << "PD = " << D << ";\n";
   
   output.close();

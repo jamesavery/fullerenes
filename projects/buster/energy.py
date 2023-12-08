@@ -14,7 +14,7 @@ R0 = R0_constants[face_size_left-5, face_size_right-5]; # n x d
 
 NA = np.newaxis 
 Rsqr = np.sum((points[:,NA] - points[neigbours])**2,axis=2) # n x d x 3 -> n x d
-R    = np.sqrt(Rsqr)          # Optional: optimise Rsqr instead of R
+R    = np.sqrt(Rsqr)          # Optional: optimize Rsqr instead of R
 
 # Computes displacement vectors along all edges
 #  X(nx3):          Cartesian x,y,z coordinates of all vertices

@@ -29,7 +29,7 @@ void nop_kernel(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
         accessor     statuses_dev(batch.statuses, h, read_write);
         accessor     iterations_dev(batch.iterations, h, read_write);
 
-        h.parallel_for<class dualise>(sycl::nd_range(sycl::range{N*capacity}, sycl::range{N}), [=](nd_item<1> nditem) {
+        h.parallel_for<class dualize>(sycl::nd_range(sycl::range{N*capacity}, sycl::range{N}), [=](nd_item<1> nditem) {
             auto i = nditem.get_global_id(0);
             auto bid = nditem.get_group_linear_id();
             auto cn = cubic_neighbours_dev[i];

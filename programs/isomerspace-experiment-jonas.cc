@@ -127,7 +127,7 @@ int main(int ac, char **argv)
     std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int i = 0; i < Nd; i++){
       Q1s[i].refill_batch(B1s[i], opt_ctxs[i], policy);
-      isomerspace_forcefield::optimise<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], policy);
+      isomerspace_forcefield::optimize<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], policy);
       Q2s[i].push_done(B1s[i], opt_ctxs[i], policy);
     }
     for (int i = 0; i < Nd; i++){
@@ -163,7 +163,7 @@ int main(int ac, char **argv)
       for (int i = 0; i < Nd; i++){
           if(Q0s[i].get_size() > 0){
             Q0s[i].refill_batch(B0s[i], gen_ctxs[i], policy);
-            isomerspace_dual::dualise(B0s[i], gen_ctxs[i], policy);
+            isomerspace_dual::dualize(B0s[i], gen_ctxs[i], policy);
             isomerspace_tutte::tutte_layout(B0s[i], N*10, gen_ctxs[i], policy);
             isomerspace_X0::zero_order_geometry(B0s[i], 4.0f, gen_ctxs[i], policy);
             Q1s[i].push_all(B0s[i], gen_ctxs[i], policy);

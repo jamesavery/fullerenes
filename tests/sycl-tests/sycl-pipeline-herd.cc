@@ -116,10 +116,10 @@ int main(int argc, char** argv) {
     BuckyQ.stop_all();   
   }
   printf("Processing %ld C%ld isomers\n",ii,N);          
-  printf("\tdualize\n");              dualise(Q, batch, LaunchPolicy::SYNC);
+  printf("\tdualize\n");              dualize(Q, batch, LaunchPolicy::SYNC);
   printf("\ttutte_layout\n");         tutte_layout(Q, batch, LaunchPolicy::SYNC);
   printf("\tspherical_projection\n"); spherical_projection(Q, batch, LaunchPolicy::SYNC);
-  printf("\tforcefield_optimize\n");  forcefield_optimise(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+  printf("\tforcefield_optimize\n");  forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
     
   sycl::buffer<device_real_t, 1> hessians(range<1>(N*90*batch_size));
   sycl::buffer<device_node_t, 1> cols(range<1>(N*90*batch_size));

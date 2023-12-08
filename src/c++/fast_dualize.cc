@@ -40,11 +40,11 @@ struct GraphWrapper{
 
 };
 
-template void dualise_3<CPU, uint16_t>(IsomerBatch<CPU>& B);
-template void dualise_4<CPU, uint16_t>(IsomerBatch<CPU>& B);
+template void dualize_3<CPU, uint16_t>(IsomerBatch<CPU>& B);
+template void dualize_4<CPU, uint16_t>(IsomerBatch<CPU>& B);
 
 template <Device T, typename K>
-void dualise_3(IsomerBatch<T>& B){
+void dualize_3(IsomerBatch<T>& B){
     typedef std::pair<K,K> arc_t;
     std::vector<K> triangle_numbers(6*B.n_faces, UINT16_MAX);
     std::vector<K> canon_arcs(6*B.n_faces, UINT16_MAX);
@@ -108,7 +108,7 @@ void dualise_3(IsomerBatch<T>& B){
 }
 
 template <Device T, typename K>
-void dualise_4(IsomerBatch<T>& B){ //CPU Parallelised version of the CUDA kernel.
+void dualize_4(IsomerBatch<T>& B){ //CPU Parallelised version of the CUDA kernel.
     typedef std::pair<K,K> arc_t;
     #pragma omp parallel 
     {

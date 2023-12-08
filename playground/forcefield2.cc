@@ -655,7 +655,7 @@ FullereneForcefield new_fullereneforcefield(string name)
 {
   spiral_nomenclature spiral_code(name);
   
-  // Generate dual bond graph from spiral code and dualise to get fullerene graph
+  // Generate dual bond graph from spiral code and dualize to get fullerene graph
   Triangulation dual(spiral_code);
   FullereneGraph g = dual.dual_graph();
   

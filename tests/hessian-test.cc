@@ -52,10 +52,10 @@ int main(int argc, char** argv){
     }
     
     cuda_io::copy(Bdev, Bhost);
-    if(isomer_num != -1) isomerspace_dual::dualise(Bdev);
+    if(isomer_num != -1) isomerspace_dual::dualize(Bdev);
     isomerspace_tutte::tutte_layout(Bdev, (int)10*N);
     isomerspace_X0::zero_order_geometry(Bdev, 4.0);
-    isomerspace_forcefield::optimise<PEDERSEN>(Bdev, 3*N, 3*N);
+    isomerspace_forcefield::optimize<PEDERSEN>(Bdev, 3*N, 3*N);
 
     CuArray<device_real_t> hessians(N*3*3*10 * batch_size);
     CuArray<device_node_t> cols(N*3*3*10 * batch_size);

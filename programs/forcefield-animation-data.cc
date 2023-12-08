@@ -67,7 +67,7 @@ int main(int argc, char** argv){
     }
 
     Q0.refill_batch(batch0);
-    isomerspace_dual::dualise(batch0);
+    isomerspace_dual::dualize(batch0);
 
 
     std::cout << std::endl;
@@ -83,7 +83,7 @@ int main(int argc, char** argv){
     isomerspace_X0::zero_order_geometry(batch0, 4.0);
 
     for (int i = 0; i < 100; i++){
-        isomerspace_forcefield::optimise<PEDERSEN>(batch0,int(N*5/100),N*5);
+        isomerspace_forcefield::optimize<PEDERSEN>(batch0,int(N*5/100),N*5);
         device_io::copy(h_batch, batch0);
         out0.write(reinterpret_cast<char*>(h_batch.X), N*3*sizeof(device_real_t)*sample_size); 
         out0.flush();

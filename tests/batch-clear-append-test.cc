@@ -49,7 +49,7 @@ int main(int argc, char** argv){
         }
         if (B0.size() == 0) break;
         device_io::copy(B1, B0);                                      //Copy to device B1 <- B0
-        isomerspace_forcefield::optimise<PEDERSEN>(B1, N*5, N*5);     //Forcefield Optimization
+        isomerspace_forcefield::optimize<PEDERSEN>(B1, N*5, N*5);     //Forcefield Optimization
         B0.clear();
         //Do something with results from B1 next... (Future work)
     }

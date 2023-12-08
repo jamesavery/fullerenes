@@ -23,7 +23,7 @@ if(ENABLE_CUDA)
   eccentricity-test
   minimum-problem
   eigensolve-special
-  optimise-single-isomer
+  optimize-single-isomer
 )
 
 foreach(EXECUTABLE ${CUDA_EXECUTABLES})

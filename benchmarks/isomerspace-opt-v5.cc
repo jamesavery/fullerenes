@@ -92,7 +92,7 @@ int main(int argc, char** argv){
             Q0.refill_batch(B0);
             auto generate_handle = std::async(std::launch::async, generate_isomers);
             auto T1 = high_resolution_clock::now();
-                isomerspace_dual::dualise(B0,device0,LaunchPolicy::ASYNC);
+                isomerspace_dual::dualize(B0,device0,LaunchPolicy::ASYNC);
                 isomerspace_tutte::tutte_layout(B0,10000000,device0,LaunchPolicy::ASYNC);
                 isomerspace_X0::zero_order_geometry(B0, 4.0, device0, LaunchPolicy::ASYNC);
                 device0.wait();
@@ -104,7 +104,7 @@ int main(int argc, char** argv){
                 auto T1 = high_resolution_clock::now();
                     Q1.refill_batch(B1);
                 auto T2 = high_resolution_clock::now(); T_io[l] += (T2 - T1);
-                    isomerspace_forcefield::optimise<PEDERSEN>(B1,N*0.5,N*5);
+                    isomerspace_forcefield::optimize<PEDERSEN>(B1,N*0.5,N*5);
                 auto T3 = high_resolution_clock::now(); T_par[l] += (T3 - T2);
                     Q2.push_done(B1, device0);
                 auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);
@@ -114,7 +114,7 @@ int main(int argc, char** argv){
                     auto T1 = high_resolution_clock::now();
                         Q1.refill_batch(B1);
                     auto T2 = high_resolution_clock::now(); T_io[l] += (T2 - T1);
-                        isomerspace_forcefield::optimise<PEDERSEN>(B1,N*0.5,N*5);
+                        isomerspace_forcefield::optimize<PEDERSEN>(B1,N*0.5,N*5);
                     auto T3 = high_resolution_clock::now(); T_par[l] += (T3 - T2);
                         Q2.push_done(B1);
                     auto T4 = high_resolution_clock::now(); T_io[l] += (T4 - T3);

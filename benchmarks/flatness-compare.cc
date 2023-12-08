@@ -65,7 +65,7 @@ int main(int argc, char** argv){
     }
     std::cout << G.neighbours << std::endl;
     Q0.refill_batch(batch0);
-    isomerspace_dual::dualise(batch0);
+    isomerspace_dual::dualize(batch0);
     
     isomerspace_tutte::tutte_layout(batch0, N*10);
     isomerspace_X0::zero_order_geometry(batch0, 4.0);
@@ -73,8 +73,8 @@ int main(int argc, char** argv){
     
     
     for (int i = 0; i <  50; i++){
-        isomerspace_forcefield::optimise<PEDERSEN>(batch0,N*0.1,N*5);
-        isomerspace_forcefield::optimise<FLATNESS_ENABLED>(batch1,N*0.1,N*5);
+        isomerspace_forcefield::optimize<PEDERSEN>(batch0,N*0.1,N*5);
+        isomerspace_forcefield::optimize<FLATNESS_ENABLED>(batch1,N*0.1,N*5);
     }
 
     std::cout << "Pedersen: " << device_io::average_iterations(batch0) << std::endl;

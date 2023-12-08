@@ -114,7 +114,7 @@ ofstream out_file("IsomerspaceOpt_V7_" + to_string(N_end) + ".txt");
   auto opt_routine = [&](){
     for (int i = 0; i < Nd; i++){
       Q1s[i].refill_batch(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);
-      isomerspace_forcefield::optimise<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], LaunchPolicy::ASYNC);
+      isomerspace_forcefield::optimize<PEDERSEN>(B1s[i], ceil(0.5*N), 5*N, opt_ctxs[i], LaunchPolicy::ASYNC);
       Q2s[i].push_done(B1s[i], opt_ctxs[i], LaunchPolicy::ASYNC);}
       for (int i = 0; i < Nd; i++){
         opt_ctxs[i].wait();
@@ -131,7 +131,7 @@ ofstream out_file("IsomerspaceOpt_V7_" + to_string(N_end) + ".txt");
       for (int i = 0; i < Nd; i++){
           if(Q0s[i].get_size() > 0){
             Q0s[i].refill_batch(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
-            isomerspace_dual::dualise(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
+            isomerspace_dual::dualize(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
             isomerspace_tutte::tutte_layout(B0s[i], 10000000, gen_ctxs[i], LaunchPolicy::ASYNC);
             isomerspace_X0::zero_order_geometry(B0s[i], 4.0f, gen_ctxs[i], LaunchPolicy::ASYNC);
             Q1s[i].insert(B0s[i], gen_ctxs[i], LaunchPolicy::ASYNC);
@@ -168,7 +168,7 @@ ofstream out_file("IsomerspaceOpt_V7_" + to_string(N_end) + ".txt");
       loop_iters++;
     }
     //For timing purposes, since kernels are launched asynchronously, we need to measure the time spent in the last launches.
-    isomerspace_forcefield::optimise<PEDERSEN>(B1s[0], 0, 5*N, opt_ctxs[0], LaunchPolicy::ASYNC);
+    isomerspace_forcefield::optimize<PEDERSEN>(B1s[0], 0, 5*N, opt_ctxs[0], LaunchPolicy::ASYNC);
     isomerspace_tutte::tutte_layout(B1s[0], 0, opt_ctxs[0], LaunchPolicy::ASYNC);
     isomerspace_X0::zero_order_geometry(B1s[0], 0, opt_ctxs[0], LaunchPolicy::ASYNC);
     //=======================================================================================================================

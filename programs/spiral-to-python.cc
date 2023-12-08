@@ -43,7 +43,7 @@ int main(int ac, char **av)
   g.layout2d = g.tutte_layout();
   Polyhedron P0(g,g.zero_order_geometry());
   Polyhedron P = P0;
-  P.optimise();
+  P.optimize();
 
   int N = g.N, Nf = t.N;
   

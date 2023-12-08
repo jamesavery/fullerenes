@@ -123,7 +123,7 @@ We also thank Prof. Ottorino Ori (Zagreb) and Jan Goedgebeur (Gent) for fruitful
  \begin{figure}[htbp]
 	\centering
   		 \includegraphics[width=0.6\textwidth]{C2160.png}
-     \caption{Force-field optimised structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
+     \caption{Force-field optimized structure of $I_h$-\C{2160} viewed with VMD \cite{vmd}.}
      \label{pic:Finalgraph}
  \end{figure}
 
@@ -202,7 +202,7 @@ much improved algorithms compared to the older versions. The reason for using tw
 that PS is good in old-fashioned Fortran, JA is good in C++ (and LW is doing both).  Furthermore, some of the original routines used were available 
 in Fortran only. Some standard routines from Mathematical Recipes were modified for the purpose of matrix diagonalization 
 and geometry optimization. Version 4.3 included the Hessian of the force field, although 
-we have not yet optimised the force constants to match experimental or calculated vibrational frequencies.
+we have not yet optimized the force constants to match experimental or calculated vibrational frequencies.
 4.4 introduced a search algorithm for neighbourhood RSPIs, the Szeged index, pentagon arm indices as further topological descriptors,
 and new (conjectured) upper and lower bound for Hamiltonian cycles in fullerenes.
 The Tutte embedding algorithm has also been made much faster and the fullerene database has been transformed into a more compact and efficient version.
@@ -219,7 +219,7 @@ Not implemented yet is:
 close packing of ellipsoids;
 \item The Goldberg-Coxeter ($T^\mathrm{GC}_{k,l}$[\C{n}]) transformation for fullerenes
 other than \C{20};
-\item Symmetrization of optimised coordinates to point group symmetry (or a chosen
+\item Symmetrization of optimized coordinates to point group symmetry (or a chosen
 lower symmetry) and symmetry labels for H\"uckel orbital energies and vibrational frequencies;
 \item Extension to non-classical fullerenes of genus~0 (heptagons and squares); 
 \item Extension to non-regular fullerenes of genus~1;
@@ -344,7 +344,7 @@ the canonical fullerene number as defined in the book ``Atlas of Fullerenes'' by
 (e.g. input file \filename{DBc66.inp}). Information of vertex connections (edges) can also be used as input 
 (input files \filename{EDGEc20.inp} and \filename{EDGEc60.inp}).
 The program prints internal coordinates in form of a $Z$-Matrix (distances, angles and dihedrals).
-For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimised
+For this the atoms are rearranged (permuted) such that the distances are smallest. Note that this works well for optimized
 coordinates, e.g. cartesian coordinates obtained from a force-field optimization.
 
 In addition to the ring spiral algorithm by Fowler and Manolopoulos we
@@ -370,7 +370,7 @@ AME algorithm fails or you cannot find the required $P$-type eigenvectors, you s
 use our Tutte embedding algorithm, which (to our opinion) is less troublesome and
 may be used as the standard method to construct 3D structures.  The disadvantage
 of this algorithm is, however, that the structure could be far off from a force-field
-optimised global minimum for a fullerene, and the force-field optimization might
+optimized global minimum for a fullerene, and the force-field optimization might
 end up in a heavily distorted unreasonable 3D local minimum (for strategies to avoid
 this see the input section).
 
@@ -632,7 +632,7 @@ Hamiltonian cycles exist for all fullerene isomers up to \C{102} and for all IPR
 
 %Force-field optimization
 \subsection{Force-field optimization}
-The fullerene structure can be optimised by force fields using a Fletcher-Reeves-Polak-Ribiere geometry optimization \cite{NumRec}
+The fullerene structure can be optimized by force fields using a Fletcher-Reeves-Polak-Ribiere geometry optimization \cite{NumRec}
 with analytical gradients (Subroutine \funname{OptFF} \cite{NumericalRecipes}). In the current version the harmonic oscillator
 force field (\acr{HOFF}) is implemented, which considers both bond lengths and angles only in an harmonic oscillator approximation \cite{Wu87}: 
 \begin{multline}
@@ -725,7 +725,7 @@ Subroutine \funname{SpiralSearch} uses the ring-spiral algorithm of Fowler and M
 for the search of a ring spiral if, for the input, cartesian coordinates or vertex connections (adjacencies) were chosen, or if the
 initial fullerene structure was modified. It produces the canonical ring-spiral pentagon indices
 if the fullerene contains a face spiral, and fails if it does not (as for the two examples shown in 
-Figure \ref{pic:C380andC384}). Note that considerable improvements were made to optimise the ring spiral search algorithm, and if 
+Figure \ref{pic:C380andC384}). Note that considerable improvements were made to optimize the ring spiral search algorithm, and if 
 \paramname{ispsearch}=2 is chosen it counts all possible ring spirals (this is computationally more expensive). 
 The number of spirals in the output agree with the examples given by Yoshida and Fowler.\cite{Yoshida97a} 
 A more general ring-spiral algorithm is currently in preparation.
@@ -934,7 +934,7 @@ including and the non-spirable fullerenes \C{380} (\filename{RSPIc380.inp}) and 
 \item[7:] All files starting with \filename{READ} uses an external \filename{.xyz} file to read in in cartesian coordinates, e.g. \filename{READxyz.inp}.
 \end{enumerate}
 Many more examples can be found. The cartesian coordinates used in the input files are mostly singlet electronic state 
-B3LYP aug-cc-pVDZ optimised up to \C{60}, cc-pVDZ up to \C{180}, and 6-31G for the rest. 
+B3LYP aug-cc-pVDZ optimized up to \C{60}, cc-pVDZ up to \C{180}, and 6-31G for the rest. 
 For some of the fullerenes listed, the singlet state chosen may not be the electronic ground state.
 Many definitions depend on the use of {\AA}ngstr{\o}ms for distances, so please use this unit throughout. 
 A typical input is in \textit{Namelist format}, or if additional data are required in \textit{free format}, and reads like this:
@@ -1179,7 +1179,7 @@ ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR,
 \paragraph{Option description:}
 \begin{description}
 \item[{Iopt}]  Flag for force-field optimization (Default: 0)\\
-  If \paramname{Iopt} = 1  then fullerene is optimised using the force field method of Wu et al. \cite{Wu87} within a 
+  If \paramname{Iopt} = 1  then fullerene is optimized using the force field method of Wu et al. \cite{Wu87} within a 
   Fletcher-Reeves-Polak-Ribiere algorithm to find the minimum structure. 
   There are more sophisticated force fields available \cite{Ceulemans,Hands04},
   e.g. \textit{Avogadro} has a more sophisticated force-field which you can use, but the Wu force field does the 
@@ -1187,7 +1187,7 @@ ExtWuR66, ExtWuA5, ExtWuA6, ExtWuDppp, ExtWuDhpp, ExtWuDhhp, ExtWuDhhh, ExtWufR,
   A converged energy $E$ much greater than zero (i.e. $E$>0.5) implies that the set distances and angles in the Wu force field cannot be
   reached for all atoms and rings.
 
-  If \paramname{Iopt} = 2  Preoptimise with input force field, then optimise with standard Wu force field. This is especially useful for the \paramname{fcoulomb} input (see below).
+  If \paramname{Iopt} = 2  Preoptimize with input force field, then optimize with standard Wu force field. This is especially useful for the \paramname{fcoulomb} input (see below).
 
   \paramname{Iopt} = 3 triggers an extension of the Wu force field.  In addition to Wu (two different bond types
   and two angle types) there is a third bond type and four types of dihedral angles.  If \paramname{Iopt} = 3 is
@@ -1210,7 +1210,7 @@ angles WufA6 (see paper by Wu et al. for details \cite{Wu87}). Defaults: \paramn
 If $\paramname{fCoulomb} > 0.0$, then add an additional repulsive Coulomb force from the barycenter to all atoms (Default:  \paramname{fCoulomb} = 0.d0).
 This is extremely useful for an initial geometry optimization to keep the fullerene cage convex if for example the Tutte construction leads to not
 a good guess of the initial structure. In such cases, $\paramname{fCoulomb} = 100.0$ is a good choice. Note that some fullerene structures
-are difficult to optimise if the start is bad, and one needs to play with the \paramname{fCoulomb} parameter (see for example {RSPIc380.inp}).
+are difficult to optimize if the start is bad, and one needs to play with the \paramname{fCoulomb} parameter (see for example {RSPIc380.inp}).
 \end{description}
 
 

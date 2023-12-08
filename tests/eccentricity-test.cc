@@ -37,10 +37,10 @@ int main(int argc, char** argv){
         Bhost.append(G,ID);
     }
     device_io::copy(Bdev, Bhost);
-    dualise(Bdev);
+    dualize(Bdev);
     tutte_layout(Bdev, N*10);
     zero_order_geometry(Bdev, 4.0);
-    optimise<PEDERSEN>(Bdev, N*5, N*5);
+    optimize<PEDERSEN>(Bdev, N*5, N*5);
     device_io::copy(Bhost, Bdev);
     
     CuArray<device_real_t> ECC(batch_size);

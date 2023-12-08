@@ -44,11 +44,11 @@ int main(int ac, char **argv){
     
     //device_io::copy(d_validation, BQ.host_batch);                         device_io::copy(d_test, BQ2.host_batch);
     BQ.refill_batch(d_validation);                                      BQ2.refill_batch(d_test);
-    isomerspace_dual::dualise(d_validation);                      isomerspace_dual::dualise(d_test);  
+    isomerspace_dual::dualize(d_validation);                      isomerspace_dual::dualize(d_test);  
     isomerspace_tutte::tutte_layout(d_validation);                      isomerspace_tutte::tutte_layout(d_test);  
     isomerspace_X0::zero_order_geometry(d_validation, 4.0f);            isomerspace_X0::zero_order_geometry(d_test, 4.0f);
     device_io::reset_convergence_statuses(d_validation);                  device_io::reset_convergence_statuses(d_test);
-    isomerspace_forcefield::optimise<PEDERSEN>(d_validation, N*4, N*4);   isomerspace_forcefield::optimise<PEDERSEN>(d_test, N*4, N*4);
+    isomerspace_forcefield::optimize<PEDERSEN>(d_validation, N*4, N*4);   isomerspace_forcefield::optimize<PEDERSEN>(d_test, N*4, N*4);
     
     
     device_io::copy(h_validation, d_validation); device_io::copy(h_test, d_test);

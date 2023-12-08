@@ -178,7 +178,7 @@ int main(int ac, char **av)
   Polyhedron::to_file(P0,"output/"+basename+"-P0.mol2");
 
   Polyhedron P(P0);
-  P.optimise();
+  P.optimize();
 
   Polyhedron::to_file(P,"output/"+basename+".mol2");
 
@@ -212,7 +212,7 @@ int main(int ac, char **av)
   // D.layout2d = D.tutte_layout();
   // D.faces    = D.compute_faces_flat(3,true);
   // D.face_max = 3;
-  // //   D.optimise();
+  // //   D.optimize();
   // output << "PD = " << D << ";\n";
 
   Deltahedron DD{D,D.points};
@@ -230,9 +230,9 @@ int main(int ac, char **av)
   Polyhedron  PH(PHD.dual());
 
   //  Polyhedron  PH2(PHD2.dual(3,false));
-  PH.optimise();
-  //  PH2.optimise();
-  //  PHD.optimise();
+  PH.optimize();
+  //  PH2.optimize();
+  //  PHD.optimize();
 		  
   // output << "PHD  = " << PHD << ";\n";
   // output << "PHD2 = " << PHD2 << ";\n";

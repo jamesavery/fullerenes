@@ -98,11 +98,11 @@ int main(int argc, char** argv){
     ofstream fullspectrum_file("spectrum." + type, std::ios::binary);
     ofstream lambda_mins_file("spectrum_mins." + type, std::ios::binary);
     ofstream lambda_maxs_file("spectrum_maxs." + type, std::ios::binary);
-    if(isomer_num != -1) dualise(Bdev);
+    if(isomer_num != -1) dualize(Bdev);
     tutte_layout(Bdev, (int)20*N);
     zero_order_geometry(Bdev, 4.0);
-    optimise<PEDERSEN>(Bdev, 5*N, 6*N);
-    optimise<PEDERSEN>(Bdev, 1*N, 6*N);
+    optimize<PEDERSEN>(Bdev, 5*N, 6*N);
+    optimize<PEDERSEN>(Bdev, 1*N, 6*N);
     isomerspace_properties::transform_coordinates(Bdev);
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
     CuArray<device_real_t> vols(batch_size);

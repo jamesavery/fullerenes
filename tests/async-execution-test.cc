@@ -64,7 +64,7 @@ int main(int ac, char **argv){
 
       Q0.refill_batch(batch0); 
 
-      isomerspace_dual::dualise(batch0);
+      isomerspace_dual::dualize(batch0);
       isomerspace_tutte::tutte_layout(batch0);
       isomerspace_X0::zero_order_geometry(batch0,4.0);
       device_io::copy(batch1, batch0);
@@ -77,7 +77,7 @@ int main(int ac, char **argv){
     {
       std::cout << Q1.get_size() << endl;
       Q1.refill_batch(batch2, ctx0, LaunchPolicy::ASYNC);
-      isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*5,N*50, ctx0, LaunchPolicy::ASYNC);
+      isomerspace_forcefield::optimize<PEDERSEN>(batch2,N*5,N*50, ctx0, LaunchPolicy::ASYNC);
       device_io::output_to_queue(output_queue,outbatch,false);
       device_io::copy(outbatch, batch2, ctx0, LaunchPolicy::SYNC);
     }

@@ -135,16 +135,16 @@ int main(int argc, char** argv){
                 switch (dual_version)
                 {
                 case 0:
-                    for (size_t i = 0; i < Ngpu; i++) isomerspace_dual::dualise(DBs[(i+1)%Nd], ctxs[(i+1)%Nd], LaunchPolicy::ASYNC);
+                    for (size_t i = 0; i < Ngpu; i++) isomerspace_dual::dualize(DBs[(i+1)%Nd], ctxs[(i+1)%Nd], LaunchPolicy::ASYNC);
                     break;
                 case 1:
-                    for (size_t i = 0; i < Ngpu; i++) isomerspace_dual::dualise_2(DBs[(i+1)%Nd], ctxs[(i+1)%Nd], LaunchPolicy::ASYNC);
+                    for (size_t i = 0; i < Ngpu; i++) isomerspace_dual::dualize_2(DBs[(i+1)%Nd], ctxs[(i+1)%Nd], LaunchPolicy::ASYNC);
                     break;
                 case 2:
-                    for (size_t i = 0; i < Ngpu; i++) isomerspace_dual::dualise_3(Q_test[(i+1)%Nd].host_batch);
+                    for (size_t i = 0; i < Ngpu; i++) isomerspace_dual::dualize_3(Q_test[(i+1)%Nd].host_batch);
                     break;
                 case 3:
-                    for (size_t i = 0; i < Ngpu; i++) isomerspace_dual::dualise_4(Q_test[(i+1)%Nd].host_batch);
+                    for (size_t i = 0; i < Ngpu; i++) isomerspace_dual::dualize_4(Q_test[(i+1)%Nd].host_batch);
                     break;
                 default:
                     break;

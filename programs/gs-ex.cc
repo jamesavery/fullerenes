@@ -297,7 +297,7 @@ int main(int ac, char **av)
   Polyhedron P(P0);
 
   printf("Optimizing polyhedron.\n");
-  P.optimise();
+  P.optimize();
 
   P.move_to_origin();
   P.align_with_axes();

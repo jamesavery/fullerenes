@@ -41,7 +41,7 @@ vector<Entry> FullereneSelect::get_fullerenes(int max_results, int iso_start, in
 vector<double> FullereneSelect::get_coordinates(const FullereneGraph &g, int opt_method, double tolerance) const
 {
   vector<coord3d> geom0 = g.zero_order_geometry();
-  vector<coord3d> geom  = g.optimised_geometry(geom0,opt_method,tolerance);
+  vector<coord3d> geom  = g.optimized_geometry(geom0,opt_method,tolerance);
   vector<double>  coords(db.N*3);
   for(int i=0;i<db.N;i++){
     coords[i*3+0] = geom[i].x[0];

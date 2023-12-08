@@ -45,7 +45,7 @@ int main(int ac, char **av)
     latex.close();
   }
 
-  g.optimise_layout(10, 10, 10);
+  g.optimize_layout(10, 10, 10);
   cout << g.layout2d << endl;
   {
     ofstream latex(("output/test-layout-10-10-10.tex"));
@@ -53,7 +53,7 @@ int main(int ac, char **av)
     latex.close();
   }
 
-  g.optimise_layout(10, 10, 20);
+  g.optimize_layout(10, 10, 20);
   cout << g.layout2d << endl;
   {
     ofstream latex(("output/test-layout-10-10-20.tex"));
@@ -61,7 +61,7 @@ int main(int ac, char **av)
     latex.close();
   }
 
-  g.optimise_layout(10, 10, 30);
+  g.optimize_layout(10, 10, 30);
   cout << g.layout2d << endl;
   {
     ofstream latex(("output/test-layout-10-10-30.tex"));
@@ -69,7 +69,7 @@ int main(int ac, char **av)
     latex.close();
   }
 
-  g.optimise_layout(10, 10, 50);
+  g.optimize_layout(10, 10, 50);
   cout << g.layout2d << endl;
   {
     ofstream latex(("output/test-layout-10-10-50.tex"));
@@ -77,7 +77,7 @@ int main(int ac, char **av)
     latex.close();
   }
 
-  g.optimise_layout(10, 10, 100);
+  g.optimize_layout(10, 10, 100);
   cout << g.layout2d << endl;
   {
     ofstream latex(("output/test-layout-10-10-100.tex"));

@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
             ID++;
         }
         Q0.refill_batch(batch);
-        isomerspace_dual::dualise(batch);
+        isomerspace_dual::dualize(batch);
         isomerspace_tutte::tutte_layout(batch);
         isomerspace_X0::zero_order_geometry(batch, 4.0);
         Q1.insert(batch);
@@ -39,13 +39,13 @@ int main(int argc, char** argv) {
         for(int i = 0; i < iters; i++) {
             generate_samples(batch_size*0.5);
             Q1.refill_batch(batch1);
-            isomerspace_forcefield::optimise<PEDERSEN>(batch1, N*1,N*6);
+            isomerspace_forcefield::optimize<PEDERSEN>(batch1, N*1,N*6);
             Q2.push_done(batch1);
         }
     }
     while(Q1.get_size()>0) {
         Q1.refill_batch(batch1);
-        isomerspace_forcefield::optimise<PEDERSEN>(batch1, N*6,N*6);
+        isomerspace_forcefield::optimize<PEDERSEN>(batch1, N*6,N*6);
         Q2.push_done(batch1);
     }
 
