@@ -512,10 +512,10 @@ struct face_t : public vector<node_t> {
   }
 
   // The directed edge with minimal start vertex gives a unique representation of an oriented face
-  dedge_t minimal_edge() const {
+  arc_t minimal_edge() const {
     face_t f(*this);
     
-    dedge_t e_min{f[0],f[1]};
+    arc_t e_min{f[0],f[1]};
     for(size_t i=1;i<f.size();i++) if(f[i] < e_min.first) e_min = {f[i],f[(i+1)%f.size()]};
 
     return e_min;

@@ -38,11 +38,11 @@ int main(int argc, char** argv){
         Bhost.append(G,ID);
     }
     device_io::copy(Bdev, Bhost);
-    dualise(Bdev);
+    dualize(Bdev);
     tutte_layout(Bdev, N*10);
     zero_order_geometry(Bdev, 4.0);
     device_io::copy(Bstart, Bdev);
-    optimise<PEDERSEN>(Bdev, N*5, N*5);
+    optimize<PEDERSEN>(Bdev, N*5, N*5);
     std::string Before_ = "Before_"+to_string(N);
     std::string After_ = "After_"+to_string(N);
     std::string Most_ = "Most_Eccentric_"+to_string(N);

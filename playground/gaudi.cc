@@ -13,7 +13,7 @@ using namespace std;
 
 PlanarGraph fold(vector< pair<Eisenstein, node_t> > &outline);
 
-typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
+typedef pair<Eisenstein,Eisenstein> arccoord_t;
 
 
 
@@ -332,8 +332,8 @@ int main(int ac, char **av)
   
   cout << "Placed " << unfld.edgecoords.size() << " edges.\n";
 
-  output << "dedges   = " << get_keys(unfld.edgecoords) << ";\n";
-  output << "dedgepos = " << get_values(unfld.edgecoords) << ";\n";
+  output << "arcs   = " << get_keys(unfld.edgecoords) << ";\n";
+  output << "arcpos = " << get_values(unfld.edgecoords) << ";\n";
   output << "outline = "  << unfld.outline << ";\n";
   output << "outlinecoords = " << get_keys(unfld.outline) << ";\n";
 
@@ -372,7 +372,7 @@ int main(int ac, char **av)
 
   Polyhedron P(P0);
 
-  bool optimise_angles = true;
+  bool optimize_angles = true;
   set<edge_t> es=gct.undirected_edges();
   set<edge_t> long_edges;
   map<edge_t, double> lengths;
@@ -445,7 +445,7 @@ int main(int ac, char **av)
     
 
 
-// optimise cubic graph with long edges
+// optimize cubic graph with long edges
   const double normal_edge_length=1.393;
   const double long_edge_single=1.452;
   const double long_edge_triple=1.242;
@@ -456,14 +456,14 @@ int main(int ac, char **av)
   for(set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
     lengths.insert(make_pair(*it, long_edge_total));
   }
-  P.optimise_other(optimise_angles, lengths);
+  P.optimize_other(optimize_angles, lengths);
   {
     ofstream mol2(("output/"+basename+".mol2").c_str());
     mol2 << P.to_turbomole();
     mol2.close();
   }
 
-// replace long edges, don't reoptimise
+// replace long edges, don't reoptimize
   for (set<edge_t>::iterator it=long_edges.begin(), to=long_edges.end(); it!=to; it++){
     //cout << "edge to zap: " << *it << endl;
     edge_t to_zap(*it);

@@ -1,6 +1,6 @@
 D5h-C150 Leap frog from D5h-C50 nanotube through ring spiral indices
-For this case the molecule is preoptimised after the Tutte embedding with the Wu FF plus an additional
-repulsive potential specified by fcoulomb and then optimised with the normal force field. 
+For this case the molecule is preoptimized after the Tutte embedding with the Wu FF plus an additional
+repulsive potential specified by fcoulomb and then optimized with the normal force field. 
 If preoptimization is not done, the structure is not good and heavily distorted.
 &General NA=50, iwext=1 /
 &Coord ICart=3 leap=1 scalerad=6. rspi=1, 2, 3, 4, 5, 6, 22, 23, 24, 25, 26, 27/

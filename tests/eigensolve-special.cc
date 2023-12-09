@@ -57,11 +57,11 @@ int main(int argc, char** argv){
     LaunchCtx ctx(0);
     LaunchPolicy policy = LaunchPolicy::SYNC;
     
-    dualise(Bdev);
+    dualize(Bdev);
     tutte_layout(Bdev, (int)20*N);
     zero_order_geometry(Bdev, 4.0);
-    optimise<PEDERSEN>(Bdev, 5*N, 6*N);
-    optimise<PEDERSEN>(Bdev, 1*N, 6*N);
+    optimize<PEDERSEN>(Bdev, 5*N, 6*N);
+    optimize<PEDERSEN>(Bdev, 1*N, 6*N);
     isomerspace_properties::transform_coordinates(Bdev);
     compute_hessians<PEDERSEN>(Bdev, hessians, cols);
 

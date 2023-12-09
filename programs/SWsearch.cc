@@ -20,9 +20,9 @@ template <typename S> class SparseMatrix: public Graph {
 public:
   using Graph::Graph;
   
-  map<dedge_t, S> values;
+  map<arc_t, S> values;
   
-  const S& add_edge(const dedge_t& e, const S& v) {
+  const S& add_edge(const arc_t& e, const S& v) {
     insert_edge(e);
     values[e] += v;
     return values[e];
@@ -30,8 +30,8 @@ public:
 
   friend ostream& operator<<(ostream& s, const SparseMatrix& A)
   {
-    vector<dedge_t> edges_set = A.directed_edges();
-    vector<dedge_t> edges(edges_set.begin(),edges_set.end());
+    vector<arc_t> edges_set = A.directed_edges();
+    vector<arc_t> edges(edges_set.begin(),edges_set.end());
     vector<S> edge_values(edges.size());
 
     for(int i=0;i<edges.size();i++){

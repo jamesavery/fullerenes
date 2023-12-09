@@ -57,7 +57,7 @@ int main(int argc, char** argv){
         //std::cout << F.neighbours << "\n";
         test_queue.refill_batch(d_test);                        validation_queue.refill_batch(d_validation);
         device_io::copy(h_test, d_test);
-        gpu_kernels::isomerspace_dual::dualise_4(h_test);    
+        gpu_kernels::isomerspace_dual::dualize_4(h_test);    
 
         //device_io::copy(h_test, d_test); 
         device_io::copy(h_validation, d_validation);

@@ -34,7 +34,7 @@ vector<size_t> loadbalanced_chunks(size_t N_chunks, size_t n_chunks, size_t my_n
 {
   vector<size_t> all_chunks(N_chunks), my_chunks(n_chunks);
   for(size_t i=0;i<N_chunks;i++) all_chunks[i] = i;  
-  auto rng = std::default_random_engine(42); // Deterministic randomness - we need all compute nodes to agree on shuffle.
+  auto rng = std::default_random_engine(seed); // Deterministic randomness - we need all compute nodes to agree on shuffle.
   shuffle(all_chunks.begin(),all_chunks.end(),rng);
   for(size_t i=0;i<n_chunks;i++) my_chunks[i] = all_chunks[my_node_idx*n_chunks + i];
   
@@ -85,93 +85,47 @@ int main(int argc, char** argv) {
 
   IsomerBatch<device_real_t,device_node_t> batch(N, batch_size);
   Triangulation G(N);
-  
+
+  size_t ii = 0;      
   {
-    printf("Processing %ld C%ld isomers in batches of %ld\n",Nisomers,N,batch_size);  
+    printf("Gathering %ld C%ld isomers\n",batch_size,N);  
     sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);
     sycl::host_accessor acc_degs(batch.face_degrees, sycl::write_only);
     sycl::host_accessor acc_status (batch.statuses, sycl::write_only);
-    for (size_t ii = 0; ii < batch_size; ii++)
-    {
+    for (; ii < batch_size; ii++)
+      {
         auto more = BuckyQ.next_fullerene(G);
         if(!more) break;
 
         for (size_t j = 0; j < Nf; j++)
-        {
+	  {
             for(size_t k = 0; k < G.neighbours[j].size(); k++)
-            {
+	      {
                 acc_dual[ii*Nf*6 + j*6 + k] = G.neighbours[j][k];
-            } 
+	      } 
             if(G.neighbours[j].size() == 5){
-                acc_dual[ii*Nf*6 + j*6 + 5] = std::numeric_limits<device_node_t>::max();
-                acc_degs[ii*Nf + j] = 5;
+	      acc_dual[ii*Nf*6 + j*6 + 5] = std::numeric_limits<device_node_t>::max();
+	      acc_degs[ii*Nf + j] = 5;
             } else {
-                acc_degs[ii*Nf + j] = 6;
+	      acc_degs[ii*Nf + j] = 6;
             }   
 
-        }
+	  }
         acc_status[ii] = IsomerStatus::NOT_CONVERGED;
-    }
-    }
-    
-    dualise(Q, batch, LaunchPolicy::SYNC);
-    tutte_layout(Q, batch, LaunchPolicy::SYNC);
-    spherical_projection(Q, batch, LaunchPolicy::SYNC);
-    forcefield_optimise(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
-
-    sycl::buffer<device_real_t, 1> hessians(range<1>(N*90*batch_size));
-    sycl::buffer<device_node_t, 1> cols(range<1>(N*90*batch_size));
-    compute_hessians(Q, batch, hessians, cols, LaunchPolicy::SYNC);
-
-  
-#if 0
-  {			   
-    IsomerBatch<device_real_t,device_node_t> batch(N, batch_size);
-    Triangulation g(N);
-
-    host_accessor acc_dual  (batch.dual_neighbours, write_only);
-    host_accessor acc_degs  (batch.face_degrees,    write_only);
-    host_accessor acc_status(batch.statuses,        write_only);
-    
-    sycl::buffer<device_real_t, 1> hessians(range<1>(N*90*batch_size));
-    sycl::buffer<device_node_t, 1> cols(range<1>(N*90*batch_size));
-        
-    size_t ii = 0;
-    bool more;
-    printf("Processing %ld C%ld isomers in batches of %ld\n",Nisomers,N,batch_size);
-
-    while((more = BuckyQ.next_fullerene(g))){
-        printf("ii=%ld\n",ii);
-        cout << g << "\n";
-        /* TODO: De-hackify */
-           for (size_t j = 0; j < Nf; j++)
-        {
-            for(size_t k = 0; k < g.neighbours[j].size(); k++)
-            {
-                acc_dual[ii*Nf*6 + j*6 + k] = g.neighbours[j][k];
-            } 
-            if(g.neighbours[j].size() == 5){
-                acc_dual[ii*Nf*6 + j*6 + 5] = std::numeric_limits<device_node_t>::max();
-                acc_degs[ii*Nf + j] = 5;
-            } else {
-                acc_degs[ii*Nf + j] = 6;
-            }   
-        }
-        acc_status[ii] = IsomerStatus::NOT_CONVERGED;
-        if(++ii == batch_size || !more){
-            printf("Gathered %ld isomers, processing...\n",ii);
-            dualise(Q, batch, LaunchPolicy::SYNC);
-            //tutte_layout(Q, batch, LaunchPolicy::SYNC);
-            //spherical_projection(Q, batch, LaunchPolicy::SYNC);
-            //forcefield_optimise(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
-            //compute_hessians(Q, batch, hessians, cols, LaunchPolicy::SYNC);
-            ii = 0;
-            printf("Done.\n");
-        }    
-
-    }
+      }
+    BuckyQ.stop_all();   
   }
-#endif  
+  printf("Processing %ld C%ld isomers\n",ii,N);          
+  printf("\tdualize\n");              dualize(Q, batch, LaunchPolicy::SYNC);
+  printf("\ttutte_layout\n");         tutte_layout(Q, batch, LaunchPolicy::SYNC);
+  printf("\tspherical_projection\n"); spherical_projection(Q, batch, LaunchPolicy::SYNC);
+  printf("\tforcefield_optimize\n");  forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+    
+  sycl::buffer<device_real_t, 1> hessians(range<1>(N*90*batch_size));
+  sycl::buffer<device_node_t, 1> cols(range<1>(N*90*batch_size));
+  printf("\tcompute_hessians\n"); compute_hessians(Q, batch, hessians, cols, LaunchPolicy::SYNC);
+  
   return 0;
+  
 }
     

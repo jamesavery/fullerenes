@@ -164,16 +164,16 @@ vector<Permutation> Symmetry::edge_permutation(const vector<Permutation>& Gf) co
   return Gedge;
 }
 
-vector<Permutation> Symmetry::dedge_permutation(const vector<Permutation>& Gf) const {
+vector<Permutation> Symmetry::arc_permutation(const vector<Permutation>& Gf) const {
 
-  vector<Permutation> Gedge(Gf.size(),Permutation(dedge_id.size()));
+  vector<Permutation> Gedge(Gf.size(),Permutation(arc_id.size()));
     
   for(int j=0;j<Gf.size();j++){
-    for(const auto &ei: dedge_id){
-      dedge_t e = ei.first;
+    for(const auto &ei: arc_id){
+      arc_t e = ei.first;
       int     i = ei.second;
       
-      Gedge[j][i] = dedge_id({Gf[j][e.first],Gf[j][e.second]});
+      Gedge[j][i] = arc_id({Gf[j][e.first],Gf[j][e.second]});
     }
   }
   return Gedge;

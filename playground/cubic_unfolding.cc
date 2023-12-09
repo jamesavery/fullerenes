@@ -3,13 +3,13 @@
 #include <stack>
 #include <queue>
 
-struct sort_by_radius : public std::binary_function<dedge_t, dedge_t, bool>
+struct sort_by_radius : public std::binary_function<arc_t, arc_t, bool>
 {
   const vector<coord2d> &node_layout;
   
   sort_by_radius(const vector<coord2d> &node_layout) : node_layout(node_layout) {  }
   
-  bool operator()(const dedge_t &uv, const dedge_t &st) const
+  bool operator()(const arc_t &uv, const arc_t &st) const
   {
     node_t u,v, s,t;
     tie(u,v) = uv;
@@ -52,11 +52,11 @@ bool circles_disjoint(coord2d x1, double r1, coord2d x2, double r2)
 }
 
 class CubicUnfolding {
-  typedef dedge_t arc_t;
-  typedef pair<coord2d,coord2d> dedgecoord_t;
+  typedef arc_t arc_t;
+  typedef pair<coord2d,coord2d> arccoord_t;
 
   FullereneGraph graph;
-  map<arc_t,dedgecoord_t> edgecoords;
+  map<arc_t,arccoord_t> edgecoords;
 
   map<arc_t, int> arc_to_face_id;	       // Each arc belongs to a unique face. This maps each arc to the face_id of this face.
 

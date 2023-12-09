@@ -51,10 +51,10 @@ int main(int argc, char** argv) {
     }
     }
     
-    dualise(Q, batch, LaunchPolicy::SYNC);
+    dualize(Q, batch, LaunchPolicy::SYNC);
     tutte_layout(Q, batch, LaunchPolicy::SYNC);
     spherical_projection(Q, batch, LaunchPolicy::SYNC);
-    forcefield_optimise(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+    forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
 
     sycl::buffer<real_t, 1> hessians(range<1>(N*90*BatchSize));
     sycl::buffer<node_t, 1> cols(range<1>(N*90*BatchSize));

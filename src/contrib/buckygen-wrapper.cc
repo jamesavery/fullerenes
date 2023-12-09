@@ -48,7 +48,7 @@ void stop(const buckygen_queue& Q)
 }
 
   
-buckygen_queue start(int N, int IPR, bool only_nontrivial, 
+buckygen_queue start(int N, bool IPR, bool only_nontrivial, 
 		     size_t chunk_index, size_t chunk_number)
 {
   buckygen_queue Q;
@@ -249,6 +249,7 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
     sighandler_t old_handler = signal(SIGTERM,SIG_IGN); // Protect ourselves while we kill our children
     killpg(gid,SIGTERM);
     signal(SIGTERM,old_handler);                        // Restore normalcy.
+    msgctl(qid,IPC_RMID,0);			      // Kill the Sys-V IPC queue    
   }
 
   

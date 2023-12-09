@@ -92,13 +92,13 @@ int main(int argc, char** argv) {
         auto T1 = std::chrono::steady_clock::now(); times_memcpy[i] = std::chrono::duration<double, std::nano>(T1 - T0).count();
         switch(dual_version){
             case 0:
-                dualise(Q, batch, LaunchPolicy::SYNC);
+                dualize(Q, batch, LaunchPolicy::SYNC);
                 break;
             case 1:
-                dualise_V1(Q, batch, LaunchPolicy::SYNC);
+                dualize_V1(Q, batch, LaunchPolicy::SYNC);
                 break;
             default:
-                dualise(Q, batch, LaunchPolicy::SYNC);
+                dualize(Q, batch, LaunchPolicy::SYNC);
                 break;
         }
         if (i >= Nwarmup) {auto T2 = std::chrono::steady_clock::now(); times_dual[i- Nwarmup] = std::chrono::duration<double, std::nano>(T2 - T1).count();}

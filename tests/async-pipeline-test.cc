@@ -89,12 +89,12 @@ int main(int ac, char **argv){
     }
     //===================== SERIAL PIPELINE =====================
     device_io::copy(d_control,h_control);
-    isomerspace_dual::dualise(d_control);
+    isomerspace_dual::dualize(d_control);
     isomerspace_tutte::tutte_layout(d_control, 1000000);
     isomerspace_X0::zero_order_geometry(d_control, 4.0);
     reset_convergence_statuses(d_control);
 
-    isomerspace_forcefield::optimise<PEDERSEN>(d_control, N*50, N*50);
+    isomerspace_forcefield::optimize<PEDERSEN>(d_control, N*50, N*50);
     //===================== END of SERIAL =====================
 
     int I_async = 0;
@@ -115,7 +115,7 @@ int main(int ac, char **argv){
         }
         
         input_queue.refill_batch(input_test, insert_ctx, ASYNC);
-        isomerspace_dual::dualise(input_test, insert_ctx, ASYNC);
+        isomerspace_dual::dualize(input_test, insert_ctx, ASYNC);
         isomerspace_tutte::tutte_layout(input_test, 1000000, insert_ctx, ASYNC);
         isomerspace_X0::zero_order_geometry(input_test, 4.0, insert_ctx, ASYNC);
         reset_convergence_statuses(input_test, insert_ctx, ASYNC);
@@ -133,14 +133,14 @@ int main(int ac, char **argv){
     bool more_to_generate = false;
     auto step = max(1, (int)N/10);
     while (more_to_do){
-        bool optimise_more = true;
+        bool optimize_more = true;
         auto generate_handle = std::async(std::launch::async,generate_isomers, opt_test.isomer_capacity*2);
-        while(optimise_more){
-            isomerspace_forcefield::optimise<PEDERSEN>(opt_test,step, N*50, device0, ASYNC);
+        while(optimize_more){
+            isomerspace_forcefield::optimize<PEDERSEN>(opt_test,step, N*50, device0, ASYNC);
             output_queue.push_done(opt_test, device0, ASYNC);
             opt_queue.refill_batch(opt_test, device0, ASYNC);
             device0.wait();
-            optimise_more = opt_queue.get_size() >= opt_test.isomer_capacity;
+            optimize_more = opt_queue.get_size() >= opt_test.isomer_capacity;
         }
         device0.wait();
         //device_io::copy(h_opt_test, opt_test);
@@ -151,14 +151,14 @@ int main(int ac, char **argv){
 
         if(!more_to_generate){
             while(opt_queue.get_size() > 0){
-                isomerspace_forcefield::optimise<PEDERSEN>(opt_test, step, N*50, device0, ASYNC);
+                isomerspace_forcefield::optimize<PEDERSEN>(opt_test, step, N*50, device0, ASYNC);
                 output_queue.push_done(opt_test, device0, ASYNC);
                 device0.wait();
             
                 opt_queue.refill_batch(opt_test, device0, ASYNC);
             }
             for(int i = 0;  i <  N*50; i += step){
-                isomerspace_forcefield::optimise<PEDERSEN>(opt_test,step, N*50, device0, SYNC);
+                isomerspace_forcefield::optimize<PEDERSEN>(opt_test,step, N*50, device0, SYNC);
             }
             output_queue.push_done(opt_test, device0, SYNC);
             more_to_do = false;

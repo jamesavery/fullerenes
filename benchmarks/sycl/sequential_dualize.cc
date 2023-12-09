@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
     
     IsomerBatch<real_t,node_t> batch(N, BatchSize);
     Graph G(N);
-    auto fill_and_dualise = [&](IsomerBatch<real_t,node_t>& batch, double& filltime, double& dualtime)
+    auto fill_and_dualize = [&](IsomerBatch<real_t,node_t>& batch, double& filltime, double& dualtime)
     {
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, 0, 0);
 
@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
 
     for(int i = 0; i < Nruns; i++){
         auto start = std::chrono::steady_clock::now();
-        fill_and_dualise(batch, not_used, times_dual[i]);
+        fill_and_dualize(batch, not_used, times_dual[i]);
         auto T0 = std::chrono::steady_clock::now();
     }
 

@@ -286,11 +286,11 @@ matrix<double> self_distances(const Triangulation &G, const vector<node_t> &node
 	  // BUT: if deg(v) != 6, there is a split, as the line can be continued in multiple ways. For deg(v)=5, it splits in two
 	  auto simple_path = draw_path(a,b);
 
-	  stack<pair<dedge_t,Eisenstein>> workset;
+	  stack<pair<arc_t,Eisenstein>> workset;
 	  workset.push({{u,axis},{a,b}});
 	  while(!workset.empty()){                                //   y---z     s---v
 	    auto uxab = workset.pop();                            //  / \ / ... / \ /
-	    dedge_t sv = end_of_the_line(uxab.first,uxab.second); // u---x     t---r  
+	    arc_t sv = end_of_the_line(uxab.first,uxab.second); // u---x     t---r  
 	    Eisenstein dut = uwab.second
 	      
 	      switch(G.degree(v)){
@@ -406,9 +406,9 @@ vector<vector<tri_t> > tri_runs(const Triangulation& dG, const node_t u,const Tr
   return tri_runs;
 }
 
-vector< pair<dedge_t,float> > crossings(const Triangulation& dG, const node_t u, const Triangulation::simple_geodesic geo)
+vector< pair<arc_t,float> > crossings(const Triangulation& dG, const node_t u, const Triangulation::simple_geodesic geo)
 {
-  vector<pair<dedge_t,float>> result;  
+  vector<pair<arc_t,float>> result;  
   vector<vector<node_t>> quad_runs = dG.quads_of_the_line(u,geo.axis,geo.g.first, geo.g.second);
 
   int a = geo.g.first, b = geo.g.second, axis = geo.axis;
@@ -495,7 +495,7 @@ vector< pair<dedge_t,float> > crossings(const Triangulation& dG, const node_t u,
 }
 
 
-vector<coord3d> line_points(const vector<pair<dedge_t,float>> &crossings, const vector<coord3d> &points)
+vector<coord3d> line_points(const vector<pair<arc_t,float>> &crossings, const vector<coord3d> &points)
 {
   vector<coord3d> result(crossings.size());
   

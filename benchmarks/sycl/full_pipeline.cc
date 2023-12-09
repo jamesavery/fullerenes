@@ -105,13 +105,13 @@ int main(int argc, char** argv) {
     auto T0 = std::chrono::steady_clock::now(); times_generate = std::chrono::duration<double, std::nano>(T0 - start).count();
     nop_kernel(Q, batch, LaunchPolicy::SYNC);
     auto T1 = std::chrono::steady_clock::now(); times_memcpy = std::chrono::duration<double, std::nano>(T1 - T0).count();
-    dualise_V1(Q, batch, LaunchPolicy::SYNC);
+    dualize_V1(Q, batch, LaunchPolicy::SYNC);
     auto T2 = std::chrono::steady_clock::now(); times_dual = std::chrono::duration<double, std::nano>(T2 - T1).count();
     tutte_layout(Q, batch, LaunchPolicy::SYNC);
     auto T3 = std::chrono::steady_clock::now(); times_tutte = std::chrono::duration<double, std::nano>(T3 - T2).count();
     spherical_projection(Q, batch, LaunchPolicy::SYNC);
     auto T4 = std::chrono::steady_clock::now(); times_project = std::chrono::duration<double, std::nano>(T4 - T3).count();
-    forcefield_optimise(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+    forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
     auto T5 = std::chrono::steady_clock::now(); times_opt = std::chrono::duration<double, std::nano>(T5 - T4).count();
 
     myfile << "N, Nf, BatchSize, JOBID, NTASKS, TASK_ID, FILL_ME_UP_SCOTTY, MEMCPY, DUAL, TUTTE, PROJECT, OPT\n" << 

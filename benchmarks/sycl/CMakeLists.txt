@@ -1,8 +1,8 @@
 set(SYCL_EXECUTABLES
   baseline_pipeline
   full_pipeline
-  sequential_dualise
-  lockstep_dualise
+  sequential_dualize
+  lockstep_dualize
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})

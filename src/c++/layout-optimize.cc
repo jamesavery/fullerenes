@@ -339,7 +339,7 @@ void layout_pot_grad(const gsl_vector* coordinates, void* parameters, double* po
 
 
 
-bool PlanarGraph::optimise_layout(const double zv_dist_inp, const double k_dist_inp, const double k_angle_inp, const double k_area_inp)
+bool PlanarGraph::optimize_layout(const double zv_dist_inp, const double k_dist_inp, const double k_angle_inp, const double k_area_inp)
 {
 //  cout << "entering opt layout" << endl;
 
@@ -424,7 +424,7 @@ bool PlanarGraph::optimise_layout(const double zv_dist_inp, const double k_dist_
 }
 
 #else
-bool PlanarGraph::optimise_layout(const double a, const double b, const double c, const double d){
+bool PlanarGraph::optimize_layout(const double a, const double b, const double c, const double d){
   cerr << "Optimizing layouts is only available through GSL." << endl;
   return 0;
 }

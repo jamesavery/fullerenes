@@ -101,10 +101,10 @@ int main(int argc, char** argv) {
     }
     }
     
-    dualise(Q, batch, LaunchPolicy::SYNC);
+    dualize(Q, batch, LaunchPolicy::SYNC);
     tutte_layout(Q, batch, LaunchPolicy::SYNC);
     spherical_projection(Q, batch, LaunchPolicy::SYNC);
-    forcefield_optimise(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+    forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
 
     sycl::buffer<device_real_t, 1> hessians(range<1>(N*90*batch_size));
     sycl::buffer<device_node_t, 1> cols(range<1>(N*90*batch_size));
@@ -147,10 +147,10 @@ int main(int argc, char** argv) {
         acc_status[ii] = IsomerStatus::NOT_CONVERGED;
         if(++ii == batch_size || !more){
             printf("Gathered %ld isomers, processing...\n",ii);
-            dualise(Q, batch, LaunchPolicy::SYNC);
+            dualize(Q, batch, LaunchPolicy::SYNC);
             //tutte_layout(Q, batch, LaunchPolicy::SYNC);
             //spherical_projection(Q, batch, LaunchPolicy::SYNC);
-            //forcefield_optimise(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+            //forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
             //compute_hessians(Q, batch, hessians, cols, LaunchPolicy::SYNC);
             ii = 0;
             printf("Done.\n");

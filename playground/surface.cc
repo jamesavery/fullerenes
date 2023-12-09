@@ -96,19 +96,19 @@ node_t end_of_the_line(const Triangulation& G, node_t u0, int i, int a, int b)
 
   auto go_north = [&](){ 
     const node_t S(s), T(t); // From old square
-    q = S; r = T; s = G.nextCCW(dedge_t(S,T)); t = G.nextCCW(dedge_t(s,r)); 
+    q = S; r = T; s = G.nextCCW(arc_t(S,T)); t = G.nextCCW(arc_t(s,r)); 
   };
   
   auto go_east = [&](){
     const node_t R(r), T(t); // From old square
-    q = R; s = T; r = G.nextCCW(dedge_t(s,q)); t = G.nextCCW(dedge_t(s,r)); 
+    q = R; s = T; r = G.nextCCW(arc_t(s,q)); t = G.nextCCW(arc_t(s,r)); 
   };
 
   // Square one
   q = u0; 			// (0,0)
   r = G.neighbours[u0][i];	// (1,0)
-  s = G.nextCCW(dedge_t(q,r));	// (0,1)
-  t = G.nextCCW(dedge_t(s,r));	// (1,1)
+  s = G.nextCCW(arc_t(q,r));	// (0,1)
+  t = G.nextCCW(arc_t(s,r));	// (1,1)
 
   vector<int> runlengths = draw_path(max(a,b), min(a,b));
 

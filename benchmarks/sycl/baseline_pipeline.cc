@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
     
     IsomerBatch<real_t,node_t> batch(N, BatchSize);
     Graph G(N);
-    auto fill_and_dualise = [&](IsomerBatch<real_t,node_t>& batch, double& filltime, double& dualtime)
+    auto fill_and_dualize = [&](IsomerBatch<real_t,node_t>& batch, double& filltime, double& dualtime)
     {
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, 0, 0);
 
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 
     for(int i = 0; i < Nruns; i++){
         auto start = std::chrono::steady_clock::now();
-        fill_and_dualise(batch, times_generate[i], times_dual[i]);
+        fill_and_dualize(batch, times_generate[i], times_dual[i]);
         auto T0 = std::chrono::steady_clock::now();
         nop_kernel(Q, batch, LaunchPolicy::SYNC);
         auto T1 = std::chrono::steady_clock::now(); times_memcpy[i] = std::chrono::duration<double, std::nano>(T1 - T0).count();
@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
         auto T2 = std::chrono::steady_clock::now(); times_tutte[i] = std::chrono::duration<double, std::nano>(T2 - T1).count();
         spherical_projection(Q, batch, LaunchPolicy::SYNC);
         auto T3 = std::chrono::steady_clock::now(); times_project[i] = std::chrono::duration<double, std::nano>(T3 - T2).count();
-        forcefield_optimise(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+        forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
         auto T4 = std::chrono::steady_clock::now(); times_opt[i] = std::chrono::duration<double, std::nano>(T4 - T3).count();
         
 

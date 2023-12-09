@@ -33,7 +33,7 @@ namespace BuckyGen {
     ~buckyherd_queue(){ stop_all(); }
   };   
   
-  buckygen_queue start(int N, int IPR, bool only_nontrivial = false, 
+  buckygen_queue start(int N, bool IPR, bool only_nontrivial = false, 
 		       size_t chunk_index=0, size_t chunk_number=1);
 
   

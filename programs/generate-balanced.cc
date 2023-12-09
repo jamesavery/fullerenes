@@ -66,26 +66,26 @@ int main(int ac, char **av)
   BuckyGen::buckygen_queue BQ = BuckyGen::start(N,IPR,only_symmetric);
   Triangulation g;
   
-  size_t cnt = 0;
-  after_time = steady_clock::now();
-  while(BuckyGen::next_fullerene(BQ,g) && (cnt < M) && (ii<m)){
+  size_t isomer_ix = 0;
+  after_time = steady_clock::now(); // In case isomer 0 is among the selected samples.
+  while( BuckyGen::next_fullerene(BQ,g) && (isomer_ix < M) && (ii<m)){
     before_time = steady_clock::now();
 
     size_t next_sample = sample_ix[ii];
-    //    fprintf(stderr,"cnt=%ld ii=%ld next_sample=%ld\n",cnt,ii,next_sample);
-    if(cnt == next_sample){
+    //    fprintf(stderr,"isomer_ix=%ld ii=%ld next_sample=%ld\n",isomer_ix,ii,next_sample);
+    if(isomer_ix == next_sample){
       buckygen_time += before_time-after_time; // Tid som det har taget at vente at buckygen har genereret g
-      process_graph(g, cnt);
+      process_graph(g, isomer_ix);
       ii++;
     }
-    cnt++;
+    isomer_ix++;
     after_time = steady_clock::now();
   }
   //  fprintf(stderr,"Done processing, stopping BuckyGen queue.\n");
   BuckyGen::stop(BQ);
   
   printf("Processed %ld out of %ld C%d-graphs in %gms (%gus/graph, %gns/vertex)\n",
-	 ii,cnt,N,
+	 ii,isomer_ix,N,
 	 buckygen_time.count(),1000*buckygen_time.count()/m,1000000*buckygen_time.count()/(m*N));
 
   

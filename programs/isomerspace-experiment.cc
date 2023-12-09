@@ -270,7 +270,7 @@ int main(int ac, char **argv)
 	device_real_t scalerad = 4;
 	
 	Q0s[d].refill_batch(B, ctx, policy);
-	isomerspace_dual ::dualise     (B,       ctx, policy);
+	isomerspace_dual ::dualize     (B,       ctx, policy);
 	isomerspace_tutte::tutte_layout(B, N*10, ctx, policy);
 	isomerspace_X0   ::zero_order_geometry(B, scalerad, ctx, policy);
 	Q1s[d].push_all(B, ctx, policy);
@@ -290,7 +290,7 @@ int main(int ac, char **argv)
       auto &B   = Bs[OPT][d];
       auto &ctx = opt_ctxs[d];
       Q1s[d].refill_batch(B, opt_ctxs[d], policy);
-      isomerspace_forcefield::optimise<PEDERSEN>(B, 3*N, 20*N, ctx, policy);      
+      isomerspace_forcefield::optimize<PEDERSEN>(B, 3*N, 20*N, ctx, policy);      
       Q2s[d].push_done(B, ctx, policy);
       if(final) device_io::copy(host_batch[d],B,ctx,policy); 
     }

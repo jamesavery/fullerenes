@@ -22,7 +22,7 @@ struct params_t
   vector<double> *force_constants_angle;
   vector<double> *force_constants_dihedral;
   vector<edge_t> *edges;
-  bool optimise_angles;
+  bool optimize_angles;
 };
 
 double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
@@ -61,7 +61,7 @@ double polyhedron_pot(const gsl_vector* coordinates, void* parameters)
   
   // it->first is the face size
   // iterate over faces of equal size
-  if(params.optimise_angles){
+  if(params.optimize_angles){
     for(int i=0;i<P.faces.size();i++){
       const face_t &f(P.faces[i]);
       const int face_size = f.size();
@@ -169,7 +169,7 @@ void polyhedron_grad(const gsl_vector* coordinates, void* parameters, gsl_vector
   }
 
   //iterate over all faces
-  if(params.optimise_angles){
+  if(params.optimize_angles){
     for(int i=0;i<P.faces.size();i++){
       const face_t &f(P.faces[i]);
       const int face_size = f.size();
@@ -274,7 +274,7 @@ void polyhedron_pot_grad(const gsl_vector* coordinates, void* parameters, double
 }
 
 
-bool Polyhedron::optimise_other(bool optimise_angles, map<edge_t, double> zero_values_dist)
+bool Polyhedron::optimize_other(bool optimize_angles, map<edge_t, double> zero_values_dist)
 {
   //cout << "entering opt other" << endl;
 
@@ -381,7 +381,7 @@ bool Polyhedron::optimise_other(bool optimise_angles, map<edge_t, double> zero_v
   params.force_constants_angle = &force_constants_angle;
   params.force_constants_dihedral = &force_constants_dihedral;
   params.edges = &edges;
-  params.optimise_angles = optimise_angles;
+  params.optimize_angles = optimize_angles;
   
   // Create the minimisation function block, define the different functions and parameters
   gsl_multimin_function_fdf potential_function;
@@ -458,7 +458,7 @@ bool Polyhedron::optimise_other(bool optimise_angles, map<edge_t, double> zero_v
 }
 
 #else
-bool Polyhedron::optimise_other(bool, map<edge_t, double>)
+bool Polyhedron::optimize_other(bool, map<edge_t, double>)
 {
   cerr << "Optimizing other polyhedra than fullerenes is only available through GSL." << endl;
   return 0;

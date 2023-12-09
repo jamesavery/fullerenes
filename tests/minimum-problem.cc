@@ -70,7 +70,7 @@ int main(int ac, char **argv)
     for (int i = 0; i < Nd; i++) Q0s[i].refill_batch(B0s[i]);
     for (int i = 0; i < Nd; i++) gen_ctxs[i].wait();
     for (int i = 0; i < Nd; i++) {
-        isomerspace_dual::dualise(B0s[i], gen_ctxs[i], policy);
+        isomerspace_dual::dualize(B0s[i], gen_ctxs[i], policy);
         isomerspace_tutte::tutte_layout(B0s[i],  50*N,gen_ctxs[i], policy);
         isomerspace_X0::zero_order_geometry(B0s[i], 4.0, gen_ctxs[i], policy);
     }
@@ -79,7 +79,7 @@ int main(int ac, char **argv)
         device_io::copy(start_batch, B0s[i]);
     }
     for (int i = 0; i < Nd; i++) {
-        isomerspace_forcefield::optimise<PEDERSEN>(B0s[i], 5*N, 5*N, gen_ctxs[i], policy);
+        isomerspace_forcefield::optimize<PEDERSEN>(B0s[i], 5*N, 5*N, gen_ctxs[i], policy);
         //isomerspace_properties::transform_coordinates(B0s[i], gen_ctxs[i], policy);
         //isomerspace_properties::eccentricities(B0s[i], eccentricity[i], gen_ctxs[i], policy);
         //isomerspace_properties::volume_divergences(B0s[i], volumes[i], gen_ctxs[i], policy);
@@ -110,7 +110,7 @@ int main(int ac, char **argv)
         Polyhedron::to_file(P, "FailedGeometry_"+to_string(ID) + ".mol2");
         Polyhedron::to_file(Pstart, "StartGeometry_"+to_string(ID) + ".mol2");
         Polyhedron Pref(Pstart);
-        Pref.optimise();
+        Pref.optimize();
         Polyhedron::to_file(Pref, "RefGeometry_"+to_string(ID) + ".mol2");
     }
     //std::cout << "Nan positions: " << nan_positions_0 << std::endl;

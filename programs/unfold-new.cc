@@ -8,7 +8,7 @@
 using namespace std;
 
 
-typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
+typedef pair<Eisenstein,Eisenstein> arccoord_t;
 
 int right_of(const pair<Eisenstein,Eisenstein>& line, const Eisenstein& x)
 {
@@ -59,9 +59,9 @@ int peak(const Eisenstein& a,const Eisenstein& b,const Eisenstein& c)
   return sgn((b.second - a.second)*(c.second - a.second));
 }
 
-struct dedge_sort : public std::binary_function<dedge_t, dedge_t, bool>
+struct arc_sort : public std::binary_function<arc_t, arc_t, bool>
 {
-    bool operator()(const dedge_t &x, const dedge_t &y) const
+    bool operator()(const arc_t &x, const arc_t &y) const
     {   
       int maxx = max(x.first,x.second), maxy = max(y.first,y.second);
       return maxx < maxy || (maxx == maxy && min(x.first,x.second) < min(y.first,y.second));
@@ -93,28 +93,28 @@ struct sort_ccw_eisenstein {
 // Preconditions: Triangles are oriented consistently, i.e. CW or CCW.
 // TODO: A more intricate directed edge selection scheme could lead to
 // more compact unfoldings (i.e. with more interior points).
-map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation)
+map<arc_t,arccoord_t> unfold(const vector<tri_t> &triangulation)
 {
-#define set_dedge(u,v,ux,vx) {	          \
-  dedge_t uv(u,v), vu(v,u);               \
-  dedge_done[uv] = true;                  \
+#define set_arc(u,v,ux,vx) {	          \
+  arc_t uv(u,v), vu(v,u);               \
+  arc_done[uv] = true;                  \
   workset.erase(uv);                      \
-  dedge_position[vu] = make_pair(vx,ux);  \
-  if(!dedge_done[vu])                     \
+  arc_position[vu] = make_pair(vx,ux);  \
+  if(!arc_done[vu])                     \
     workset.insert(vu);			  \
 }
 
   // A single directed edge uniquely defines the third node in the oriented triangle
-  map<dedge_t,node_t> nextNode;
+  map<arc_t,node_t> nextNode;
   for(int i=0;i<triangulation.size();i++){
     const tri_t &t(triangulation[i]);
     for(int j=0;j<3;j++)
-      nextNode[dedge_t(t[j],t[(j+1)%3])] = t[(j+2)%3];
+      nextNode[arc_t(t[j],t[(j+1)%3])] = t[(j+2)%3];
   }
 
-  map<dedge_t,bool> dedge_done;
-  set<dedge_t, dedge_sort>   workset;
-  map<dedge_t, dedgecoord_t > dedge_position
+  map<arc_t,bool> arc_done;
+  set<arc_t, arc_sort>   workset;
+  map<arc_t, arccoord_t > arc_position
 ;
   map<Eisenstein,node_t> grid;
   Eisenstein zero(0,0), veci(1,0), vecj(0,1);
@@ -122,39 +122,39 @@ map<dedge_t,dedgecoord_t> unfold(const vector<tri_t> &triangulation)
   // 1. Place first triangle. 
   tri_t t(triangulation[0]);
 
-  set_dedge(t[0],t[1],zero,veci);
-  set_dedge(t[1],t[2],veci,veci-vecj);
-  set_dedge(t[2],t[0],veci-vecj,zero);
+  set_arc(t[0],t[1],zero,veci);
+  set_arc(t[1],t[2],veci,veci-vecj);
+  set_arc(t[2],t[0],veci-vecj,zero);
 
   while(!workset.empty()){
-    dedge_t uv(*workset.rbegin()); // Next placeable directed edge 
+    arc_t uv(*workset.rbegin()); // Next placeable directed edge 
     // set_triangle(uv)
     node_t u(uv.first), v(uv.second), w(nextNode[uv]);
 
-    dedgecoord_t uvpos(dedge_position[uv]);
+    arccoord_t uvpos(arc_position[uv]);
     Eisenstein ux(uvpos.first), vx(uvpos.second), wx(ux+(vx-ux).nextCW());
 
-    set_dedge(u,v,ux,vx);
-    set_dedge(v,w,vx,wx);
-    set_dedge(w,u,wx,ux);
+    set_arc(u,v,ux,vx);
+    set_arc(v,w,vx,wx);
+    set_arc(w,u,wx,ux);
 
   }
-  return dedge_position;
+  return arc_position;
 }
 
 
 // Given the output of unfold(), this function efficiently computes the polygon outlining
 // the unfolded triangulation and returns it in clockwise order. 
-vector< pair<Eisenstein,node_t> > get_outline(const map<dedge_t,dedgecoord_t>& edgecoords)
+vector< pair<Eisenstein,node_t> > get_outline(const map<arc_t,arccoord_t>& edgecoords)
 {
   map<Eisenstein,node_t>    label;
   map<Eisenstein,Eisenstein> next;
 
   // Collect the directed edges u->v whose positions do not coincide with the reverse edge v->u. 
   // These form the outline of the polygon. 
-  for(map<dedge_t,dedgecoord_t>::const_iterator i(edgecoords.begin()); i!= edgecoords.end(); i++){
-    const dedge_t &uv(i->first), vu(uv.second,uv.first);
-    const dedgecoord_t &uvpos(i->second), vupos(edgecoords.find(vu)->second);
+  for(map<arc_t,arccoord_t>::const_iterator i(edgecoords.begin()); i!= edgecoords.end(); i++){
+    const arc_t &uv(i->first), vu(uv.second,uv.first);
+    const arccoord_t &uvpos(i->second), vupos(edgecoords.find(vu)->second);
 
     if(uvpos != make_pair(vupos.second,vupos.first)){
       next[uvpos.first]   = uvpos.second; 
@@ -181,7 +181,7 @@ vector< pair<Eisenstein,node_t> > get_outline(const map<dedge_t,dedgecoord_t>& e
 
 
 // (Not finished) Output a LaTeX/TiKZ figure of the unfolded triangulation, optionally GC(K,L)-transformed.
-void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > &outline, const map<dedge_t,dedgecoord_t> &dedge_positions, int K=1, int L=0,
+void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > &outline, const map<arc_t,arccoord_t> &arc_positions, int K=1, int L=0,
 		    bool equilateralp=false, int label_vertices=1, bool include_headers=false)
 {
   if(include_headers)
@@ -284,7 +284,7 @@ void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > 
   case 2: // Label all original vertices, including internal ones
     {
       int i=0;
-      for(map<dedge_t,dedgecoord_t>::const_iterator it(dedge_positions.begin()); it!=dedge_positions.end(); i++){
+      for(map<arc_t,arccoord_t>::const_iterator it(arc_positions.begin()); it!=arc_positions.end(); i++){
 	node_t u(it->first.first);
 	Eisenstein ij(it->second.first.GCtransform(K,L)-gcmin);
 
@@ -292,7 +292,7 @@ void latex_GCunfold(ostream& latexfile, const vector< pair<Eisenstein,node_t> > 
 	if(equilateralp) x = ij.coord();
 	else             x = coord2d(ij.first,ij.second);
 
-	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(++it != dedge_positions.end()? "},":"}");
+	latexfile << "{(" << x.first << "," << x.second << ")/"<<i<<"/"<<u<<(++it != arc_positions.end()? "},":"}");
       }
     }
     break;
@@ -346,7 +346,7 @@ PlanarGraph GCTransform(const PlanarGraph& dual, int K=1, int L=0)
   vector<face_t> faces(dual.compute_faces());
   vector<tri_t>  triangles(faces.begin(),faces.end());
 
-  map<dedge_t,dedgecoord_t>  dgrid(unfold(triangles));
+  map<arc_t,arccoord_t>  dgrid(unfold(triangles));
   vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
 
   for(int i=0;i<outline.size();i++) 
@@ -397,7 +397,7 @@ PlanarGraph GCTransformTCG(const PlanarGraph& dual, int K=1, int L=0)
   vector<face_t> faces(dual.compute_faces());
   vector<tri_t>  triangles(faces.begin(),faces.end());
 
-  map<dedge_t,dedgecoord_t>  dgrid(unfold(triangles));
+  map<arc_t,arccoord_t>  dgrid(unfold(triangles));
   vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
 
   cout << "outline = " << outline << endl;
@@ -412,7 +412,7 @@ PlanarGraph GCTransformTCG(const PlanarGraph& dual, int K=1, int L=0)
   return fold(reduced_outline);
 }
 
-int gridnode(const dedgecoord_t& xuv,  const Eisenstein& x, const IDCounter<Eisenstein>& grid, const Eisenstein& xu, const Eisenstein& Tuvvu)
+int gridnode(const arccoord_t& xuv,  const Eisenstein& x, const IDCounter<Eisenstein>& grid, const Eisenstein& xu, const Eisenstein& Tuvvu)
 {
   switch(right_of(xuv,x)){
   case 1:
@@ -426,7 +426,7 @@ int gridnode(const dedgecoord_t& xuv,  const Eisenstein& x, const IDCounter<Eise
 
 
 set<edge_t> connect_edge(const vector< pair<Eisenstein,node_t> >& outline, const Eisenstein& w, 
-			  map<dedge_t,dedgecoord_t>& reverse, 
+			  map<arc_t,arccoord_t>& reverse, 
 			  const IDCounter<Eisenstein> &grid,const IDCounter<Eisenstein> &inner_nodes, const IDCounter<Eisenstein> &outer_nodes)
 {
   set<edge_t> edges;
@@ -450,7 +450,7 @@ set<edge_t> connect_edge(const vector< pair<Eisenstein,node_t> >& outline, const
   return edges;
 }
 
-void transform_line(const dedgecoord_t& l1, const dedgecoord_t& l2, Eisenstein& x0, Eisenstein& x0p, Eisenstein& w)
+void transform_line(const arccoord_t& l1, const arccoord_t& l2, Eisenstein& x0, Eisenstein& x0p, Eisenstein& w)
 {
   Eisenstein Duv(l1.second-l1.first), Dvu(l2.first-l2.second), Tuvvu((Duv.invertn()*Dvu)/Dvu.norm2());
 
@@ -467,18 +467,18 @@ Eisenstein tfm(const Eisenstein& x, const Eisenstein& x0, const Eisenstein& w, c
 // set<edge_t> connect_outline(const vector< pair<Eisenstein,node_t> >& outline, 
 // 			    const IDCounter<Eisenstein> &inner_nodes, const IDCounter<Eisenstein>& outer_nodes)
 // {
-//   map<dedge_t,dedgecoord_t>& reverse;
+//   map<arc_t,arccoord_t>& reverse;
 //   for(int i=0;i<outline.size();i++){
 //     const Eisenstein xu(outline[i].first), xv(outline[(i+1)%outline.size()].first);
 //     const node_t u(outline[i].second), v(outline[(i+1)%outline.size()].second);
-//     reverse[dedge_t(v,u)] = dedgecoord_t(xu,xv);
+//     reverse[arc_t(v,u)] = arccoord_t(xu,xv);
 //   }
 
   
   
 // }
 
-vector<int> identify_nodes(const vector<pair<Eisenstein,node_t> >& outline, const IDCounter<Eisenstein>& outer_nodes, map<dedge_t,dedgecoord_t>& reverse_arc)
+vector<int> identify_nodes(const vector<pair<Eisenstein,node_t> >& outline, const IDCounter<Eisenstein>& outer_nodes, map<arc_t,arccoord_t>& reverse_arc)
 {
   vector<int> same(outer_nodes.size(),-1);
   set<edge_t> same_as;
@@ -487,7 +487,7 @@ vector<int> identify_nodes(const vector<pair<Eisenstein,node_t> >& outline, cons
     node_t U = outline[i].second,  V = outline[(i+1)%outline.size()].second;
     Eisenstein X0 = outline[i].first, X1 = outline[(i+1)%outline.size()].first;
 
-    dedgecoord_t Xuv(X0,X1), Xvu(reverse_arc[dedge_t(U,V)]);
+    arccoord_t Xuv(X0,X1), Xvu(reverse_arc[arc_t(U,V)]);
     Eisenstein x0,x0p,T;
 
     transform_line(Xuv,Xvu, x0,x0p, T);
@@ -518,7 +518,7 @@ vector<int> identify_nodes(const vector<pair<Eisenstein,node_t> >& outline, cons
 }
 
 /*
-set<edge_t> connect_mathias(const vector<pair<Eisenstein,node_t> >& outline, const IDCounter<Eisenstein> &inner_nodes, const IDCounter<Eisenstein> &outer_nodes, map<dedge_t,dedgecoord_t>& reverse_arc, const Eisenstein& w)
+set<edge_t> connect_mathias(const vector<pair<Eisenstein,node_t> >& outline, const IDCounter<Eisenstein> &inner_nodes, const IDCounter<Eisenstein> &outer_nodes, map<arc_t,arccoord_t>& reverse_arc, const Eisenstein& w)
 {
   set<edge_t> edges;
   vector<Eisenstein> outline_coords(w*get_keys(outline));
@@ -539,7 +539,7 @@ set<edge_t> connect_mathias(const vector<pair<Eisenstein,node_t> >& outline, con
     vector<Eisenstein> xs(e.innerEdgePoints[i].begin(),e.innerEdgePoints[i].end());
     Eisenstein X1 = outline_coords[i], X0 = outline_coords[(i+1)%outline_coords.size()];
     node_t      U = lavpaenere[X0*iw], V = lavpaenere[X1*iw];
-    dedgecoord_t Xuv(X0,X1), Xvu(reverse_arc[dedge_t(U,V)]);
+    arccoord_t Xuv(X0,X1), Xvu(reverse_arc[arc_t(U,V)]);
     Xvu.first  = Xvu.first *w;
     Xvu.second = Xvu.second*w;
 
@@ -624,11 +624,11 @@ PlanarGraph fold(vector< pair<Eisenstein, node_t> > &outline)
   }
 
   // Register reverse arcs
-  map<dedge_t,dedgecoord_t> reverse;
+  map<arc_t,arccoord_t> reverse;
   for(int i=0;i<outline.size();i++){
     const Eisenstein xu(outline[i].first), xv(outline[(i+1)%outline.size()].first);
     const node_t u(outline[i].second), v(outline[(i+1)%outline.size()].second);
-    reverse[dedge_t(v,u)] = dedgecoord_t(xu,xv);
+    reverse[arc_t(v,u)] = arccoord_t(xu,xv);
   }
   // Register node union
   IDCounter<Eisenstein> grid;
@@ -796,12 +796,12 @@ int main(int ac, char **av)
   vector<face_t> faces(dual.compute_faces());
   vector<tri_t>  triangles(faces.begin(),faces.end());
 
-  map<dedge_t,dedgecoord_t>         dgrid(unfold(triangles));
+  map<arc_t,arccoord_t>         dgrid(unfold(triangles));
 
   cout << "Placed " << dgrid.size() << " edges.\n";
 
-  output << "dedges   = " << get_keys(dgrid) << ";\n";
-  output << "dedgepos = " << get_values(dgrid) << ";\n";
+  output << "arcs   = " << get_keys(dgrid) << ";\n";
+  output << "arcpos = " << get_values(dgrid) << ";\n";
 
   vector< pair<Eisenstein,node_t> > outline(get_outline(dgrid));
   output << "outline = " << outline << ";\n";

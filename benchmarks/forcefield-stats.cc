@@ -90,7 +90,7 @@ int main(int argc, char** argv){
                     pG.layout2d  = pG.tutte_layout();
                     Polyhedron      P(pG);
                     P.points    = P.zero_order_geometry();
-                    P.optimise();
+                    P.optimize();
                     OptimisedQueue.insert(P,id_subset[i]);
                 }
 
@@ -99,7 +99,7 @@ int main(int argc, char** argv){
 
         InputQueue.refill_batch(GPUBatch);
 
-        gpu_kernels::isomerspace_dual::dualise(GPUBatch);
+        gpu_kernels::isomerspace_dual::dualize(GPUBatch);
         gpu_kernels::isomerspace_tutte::tutte_layout(GPUBatch, N*10);
         gpu_kernels::isomerspace_X0::zero_order_geometry(GPUBatch,4.0f);
         reset_convergence_statuses(GPUBatch);
@@ -108,9 +108,9 @@ int main(int argc, char** argv){
         copy(WirzBatch,GPUBatch);
         copy(FlatBatch,GPUBatch);
 
-        gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(GPUBatch,N*5,N*5);
-        gpu_kernels::isomerspace_forcefield::optimise<WIRZ>(WirzBatch,N*5,N*5);
-        gpu_kernels::isomerspace_forcefield::optimise<FLATNESS_ENABLED>(FlatBatch,N*5,N*5);
+        gpu_kernels::isomerspace_forcefield::optimize<PEDERSEN>(GPUBatch,N*5,N*5);
+        gpu_kernels::isomerspace_forcefield::optimize<WIRZ>(WirzBatch,N*5,N*5);
+        gpu_kernels::isomerspace_forcefield::optimize<FLATNESS_ENABLED>(FlatBatch,N*5,N*5);
 
 
         CuArray<float> RMSBonds_CUDA(max_sample_size);

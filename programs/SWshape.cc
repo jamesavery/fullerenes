@@ -29,17 +29,17 @@ template <typename S> class SparseMatrix: public Graph {
 public:
   using Graph::Graph;
   
-  map<dedge_t, S> values;
+  map<arc_t, S> values;
   
-  const S& add_edge(const dedge_t& uv, const S& x) {
-    insert_dedge(uv,-1);
+  const S& add_edge(const arc_t& uv, const S& x) {
+    insert_arc(uv,-1);
     values[uv] += x;
     return values[uv];
   }
 
   friend ostream& operator<<(ostream& s, const SparseMatrix& A)
   {
-    vector<dedge_t> edges = A.directed_edges();
+    vector<arc_t> edges = A.directed_edges();
     vector<S> edge_values(edges.size());
 
     for(int i=0;i<edges.size();i++){
@@ -56,8 +56,8 @@ class SWshape {
 public:
   size_t N, Nisomers;
   typedef struct { int d, p, v; } d_swsite_t;
-  map< dedge_t, d_swsite_t > Breduced;
-  vector<dedge_t> spanning_tree;
+  map< arc_t, d_swsite_t > Breduced;
+  vector<arc_t> spanning_tree;
   
   SWshape(const string ncfile_path){
     int ncid, varid, dimid, rv;
@@ -71,19 +71,19 @@ public:
     rv = nc_inq_dimid(ncid,"Nisomers",&dimid);
     rv = nc_inq_dimlen(ncid,dimid,&Nisomers);
 
-    rv = nc_inq_dimid(ncid,"B_dedge",&dimid);
+    rv = nc_inq_dimid(ncid,"B_arc",&dimid);
     rv = nc_inq_dimlen(ncid,dimid,&dim);
-    vector<dedge_t>    Bkeys(dim);    
+    vector<arc_t>    Bkeys(dim);    
     vector<d_swsite_t> Bvalues(dim);
 
-    rv = nc_inq_varid(ncid,"B_dedge",&varid);
+    rv = nc_inq_varid(ncid,"B_arc",&varid);
     rv = nc_get_var_int(ncid,varid,(int*)&Bkeys[0]);
     rv = nc_inq_varid(ncid,"B_values",&varid);
     rv = nc_get_var_int(ncid,varid,(int*)&Bvalues[0]);
 
     rv = nc_inq_dimid(ncid,"tree",&dimid);
     rv = nc_inq_dimlen(ncid,dimid,&dim);
-    spanning_tree = vector<dedge_t>(dim);
+    spanning_tree = vector<arc_t>(dim);
 
     rv = nc_inq_varid(ncid,"tree",&varid);
     rv = nc_get_var_int(ncid,varid,(int*)&spanning_tree[0]);

@@ -76,7 +76,7 @@ int main(int ac, char **argv){
         isomerspace_X0::zero_order_geometry(d_validation, 4.0f);
         device_io::reset_convergence_statuses(d_validation);
         for (int i = 0; i < N*10; i+=10){
-            isomerspace_forcefield::optimise<PEDERSEN>(d_validation, 10, N*10);
+            isomerspace_forcefield::optimize<PEDERSEN>(d_validation, 10, N*10);
         }
         
         CuArray<float> bond_rms(batch_size);

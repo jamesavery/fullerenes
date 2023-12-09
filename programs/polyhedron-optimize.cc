@@ -60,7 +60,7 @@ int main(int ac, char **av)
   printf("P0\n");
   Polyhedron P(P0);
   printf("Optimizing P\n");  
-  P.optimise();
+  P.optimize();
   printf("Writing P\n");
   Polyhedron::to_file(P,"output/"+basename+".mol2");
 
@@ -91,7 +91,7 @@ int main(int ac, char **av)
   D.layout2d = D.tutte_layout();
   D.faces    = D.compute_faces(3,true);
   D.face_max = 3;
-  D.optimise();
+  D.optimize();
   output << "PD = " << D << ";\n";
   
   output.close();
