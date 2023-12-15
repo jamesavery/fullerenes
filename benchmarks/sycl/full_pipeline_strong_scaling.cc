@@ -45,8 +45,11 @@ int main(int argc, char** argv) {
     typedef float real_t;
     typedef uint16_t node_t;
 
-    size_t N        = argc>1 ? strtol(argv[1],0,0) : 200;  // Full isomerspace to process
-    size_t N_chunks = argc>2 ? strtol(argv[2],0,0) : 32*3; // Total number of work chunks. Should be final/max N_TASKS times 3 to not be dominated by buckygen overhead.
+    size_t N                 = argc>1? stoi(argv[1]) : 200;  // Full isomerspace to process
+    size_t N_TASKS_MAX       = argc>2? stoi(argv[2]) : 8; // Total number of work chunks. Should be final/max N_TASKS times 3 to not be dominated by buckygen overhead.
+    size_t workers_per_task  = argc>3x? stoi(argv[3]) : 3; // How many parallel buckygens are there in the buckyherd_queue?
+    size_t chunks_per_worker = argc>4? stoi(argv[4]) : 1; // How many work chunks should each worker get on average?
+
     size_t NisomersInIsomerspace = IsomerDB::number_isomers(N);
 
     // We get N_TASKS from environment. Why? Because.
@@ -73,8 +76,10 @@ int main(int argc, char** argv) {
 				   false,false,my_chunks);
 
     size_t isomers_in_queue = 0;
-    std::vector<node_t> dual_neighbours(IsomerPerNodeEstimate*1.5*Nf*6);
-    std::vector<node_t> face_degrees(IsomerPerNodeEstimate*1.5*Nf); //We do not know a priori how many isomers our buckygen queue will generate so we reserve space for 1.5 times the number of isomers we want to generate.
+    std::vector<node_t> dual_neighbours;
+    std::vector<node_t> face_degrees; //We do not know a priori how many isomers our buckygen queue will generate so we reserve space for 1.5 times the number of isomers we want to generate.
+    dual_neighbours.reserve(IsomerPerNodeEstimate*Nf*6);
+    face_degrees.reserve(IsomerPerNodeEstimate*Nf);
     
     Graph G(N);
 
@@ -92,8 +97,8 @@ int main(int argc, char** argv) {
     auto generate_and_fill = [&](IsomerBatch<real_t, node_t>& batch){
         auto isomer_idx = 0;
         sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);
-        sycl::host_accessor acc_degs(batch.face_degrees, sycl::write_only);
-        sycl::host_accessor acc_status (batch.statuses, sycl::write_only);
+        sycl::host_accessor acc_degs(batch.face_degrees,    sycl::write_only);
+        sycl::host_accessor acc_status (batch.statuses,     sycl::write_only);
         while (more && isomer_idx < BatchSize)
         {
             more &= BuckyQ.next_fullerene(G);
