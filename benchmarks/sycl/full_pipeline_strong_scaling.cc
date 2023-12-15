@@ -77,11 +77,6 @@ int main(int argc, char** argv) {
 				   false,false,my_chunks);
 
     size_t isomers_in_queue = 0;
-    std::vector<node_t> dual_neighbours;
-    std::vector<node_t> face_degrees; //We do not know a priori how many isomers our buckygen queue will generate so we reserve space for 1.5 times the number of isomers we want to generate.
-    dual_neighbours.reserve(IsomerPerNodeEstimate*Nf*6);
-    face_degrees.reserve(IsomerPerNodeEstimate*Nf);
-    
     Graph G(N);
 
     bool more = true;
