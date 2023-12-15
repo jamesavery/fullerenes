@@ -40,7 +40,7 @@ public:
   
   size_t max_degree() const {
     size_t max_degree = 0;
-    for(auto &nu: neighbours) max_degree = ::max(max_degree, nu.size());
+    for(auto &nu: neighbours) max_degree = std::max(max_degree, nu.size());
     return max_degree;
   }
 
