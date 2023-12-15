@@ -1,6 +1,7 @@
 set(SYCL_EXECUTABLES
   baseline_pipeline
   full_pipeline
+  full_pipeline_strong_scaling  
   sequential_dualize
   lockstep_dualize
 )
