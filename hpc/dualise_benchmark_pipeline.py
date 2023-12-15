@@ -17,14 +17,14 @@ n_isomer = 200
 # HPC parameters
 cpus_per_task = 4
 n_gpus_to_test = [2**i for i in range(4)]
-n_nodes_to_test = [2**i for i in range(1,8)]
+n_nodes_to_test = [] # [2**i for i in range(1,8)]
 
 #n_gpus_to_test = [2**i for i in range(1)]
 #n_nodes_to_test = [2]#[2**i for i in range(1)]
 
 ###################################
 
-def run_test(n_nodes, n_gpus):
+def run_test(n_nodes, n_gpus, n_atoms=100):
     # Run the test
     jobname = f"test_{n_nodes}_{n_gpus}"
     sed_lut = {
@@ -45,20 +45,25 @@ def run_test(n_nodes, n_gpus):
                     line = line.replace(key, value)
                 fout.write(line)
     os.system(f'chmod +x {job_path}')
-    os.system(f'sbatch {job_path} ./benchmarks/sycl/full_pipeline')
+    os.system(f'sbatch {job_path} ./benchmarks/sycl/full_pipeline {n_atoms}')
     #os.system(f"sbatch job.sh")
 
 if __name__ == '__main__':
     # Create directories
     os.system(f'mkdir -p {gen_dir}')
     os.system(f'mkdir -p {output_dir}')
+    #get N from command line
+    import sys
+    n_atoms = 100
+    if len(sys.argv) > 1:
+        n_atoms = int(sys.argv[1])
 
     # Run single node scaling
     for n_gpus in n_gpus_to_test:
         n_nodes = 1
-        run_test(n_nodes, n_gpus)
+        run_test(n_nodes, n_gpus, n_atoms=n_atoms)
 
     # Run multi node scaling
     for n_nodes in n_nodes_to_test:
         n_gpus = n_gpus_to_test[-1]
-        run_test(n_nodes, n_gpus)
+        run_test(n_nodes, n_gpus, n_atoms=n_atoms)
