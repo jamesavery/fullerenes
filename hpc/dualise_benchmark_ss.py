@@ -10,17 +10,15 @@ run_dir = f'{base_dir}/../build'
 gen_dir = f'{run_dir}/gen'
 output_dir = f'{run_dir}/output'
 
-# Program parameters
-batch_size = 1000
-n_isomer = 200
 
 # HPC parameters
 cpus_per_task = 4
-n_gpus_to_test = [2**i for i in range(4)]
-n_nodes_to_test = [] # [2**i for i in range(1,8)]
+n_gpus_to_test  = [2**i for i in range(4)]
+n_nodes_to_test = [2**i for i in range(1,8)]
 
+# Program parameters
 N_TASKS_MAX = n_gpus_to_test[-1] if (len(n_nodes_to_test)==0) else n_gpus_to_test[-1]*n_nodes_to_test[-1]
-workers_per_task=1              # Increase for more buckyherd parallelism, but more IPC overhead
+workers_per_task=3              # Increase for more buckyherd parallelism, but more IPC overhead
 max_chunks_per_worker=1         # Increase for better load balancing, but more buckygen overhead
 N_chunks = N_TASKS_MAX*workers_per_task*max_chunks_per_worker
 
@@ -50,7 +48,7 @@ def run_test(n_nodes, n_gpus, n_atoms=100):
                     line = line.replace(key, value)
                 fout.write(line)
     os.system(f'chmod +x {job_path}')
-    os.system(f'sbatch {job_path} ./benchmarks/sycl/full_pipeline_strong_scaling {n_atoms} {N_TASKS_MAX} {workers_per_task} {chunks_per_worker}')
+    os.system(f'sbatch {job_path} ./benchmarks/sycl/full_pipeline_strong_scaling {n_atoms} {N_TASKS_MAX} {workers_per_task} {max_chunks_per_worker}')
     #os.system(f"sbatch job.sh")
 
 if __name__ == '__main__':
