@@ -7,7 +7,7 @@
 #SBATCH --ntasks-per-node=@@NTASKSPERNODE@@    # 8 MPI ranks per node, 16 total (2x8)
 #SBATCH --gpus-per-node=@@NTASKSPERNODE@@       # Allocate one gpu per MPI rank
 #SBATCH --cpus-per-task=@@CPUSPERTASK@@
-#SBATCH --time=0-00:30:00       # Run time (d-hh:mm:ss)
+#SBATCH --time=0-15:00:00       # Run time (d-hh:mm:ss)
 #SBATCH --account=project_465000815  # Project for billing
 #SBATCH --export=ALL
 
