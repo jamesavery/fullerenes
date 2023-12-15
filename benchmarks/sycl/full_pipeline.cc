@@ -115,17 +115,17 @@ int main(int argc, char** argv) {
     while(more){
         auto T1 = std::chrono::steady_clock::now();
         generate_and_fill(batch);
-        auto T2 = std::chrono::steady_clock::now(); times_generate = std::chrono::duration<double, std::nano>(T2 - T1).count();
+        auto T2 = std::chrono::steady_clock::now(); times_generate += std::chrono::duration<double, std::nano>(T2 - T1).count();
         nop_kernel(Q, batch, LaunchPolicy::SYNC);
-        auto T3 = std::chrono::steady_clock::now(); times_memcpy = std::chrono::duration<double, std::nano>(T3 - T2).count();
+        auto T3 = std::chrono::steady_clock::now(); times_memcpy += std::chrono::duration<double, std::nano>(T3 - T2).count();
         dualize_V1(Q, batch, LaunchPolicy::SYNC);
-        auto T4 = std::chrono::steady_clock::now(); times_dual = std::chrono::duration<double, std::nano>(T4 - T3).count();
+        auto T4 = std::chrono::steady_clock::now(); times_dual += std::chrono::duration<double, std::nano>(T4 - T3).count();
         tutte_layout(Q, batch, LaunchPolicy::SYNC);
-        auto T5 = std::chrono::steady_clock::now(); times_tutte = std::chrono::duration<double, std::nano>(T5 - T4).count();
+        auto T5 = std::chrono::steady_clock::now(); times_tutte += std::chrono::duration<double, std::nano>(T5 - T4).count();
         spherical_projection(Q, batch, LaunchPolicy::SYNC);
-        auto T6 = std::chrono::steady_clock::now(); times_project = std::chrono::duration<double, std::nano>(T6 - T5).count();
+        auto T6 = std::chrono::steady_clock::now(); times_project += std::chrono::duration<double, std::nano>(T6 - T5).count();
         forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
-        auto T7 = std::chrono::steady_clock::now(); times_opt = std::chrono::duration<double, std::nano>(T7 - T6).count();
+        auto T7 = std::chrono::steady_clock::now(); times_opt += std::chrono::duration<double, std::nano>(T7 - T6).count();
     }
 
     myfile << "N, Nf, BatchSize, JOBID, NTASKS, TASK_ID, FILL_ME_UP_SCOTTY, MEMCPY, DUAL, TUTTE, PROJECT, OPT\n" << 
