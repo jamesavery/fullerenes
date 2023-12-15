@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
 
     size_t N                 = argc>1? stoi(argv[1]) : 200;  // Full isomerspace to process
     size_t N_TASKS_MAX       = argc>2? stoi(argv[2]) : 8; // Total number of work chunks. Should be final/max N_TASKS times 3 to not be dominated by buckygen overhead.
-    size_t workers_per_task  = argc>3x? stoi(argv[3]) : 3; // How many parallel buckygens are there in the buckyherd_queue?
+    size_t workers_per_task  = argc>3? stoi(argv[3]) : 3; // How many parallel buckygens are there in the buckyherd_queue?
     size_t chunks_per_worker = argc>4? stoi(argv[4]) : 1; // How many work chunks should each worker get on average?
 
     size_t NisomersInIsomerspace = IsomerDB::number_isomers(N);
@@ -69,10 +69,11 @@ int main(int argc, char** argv) {
     sycl::queue Q = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order{});
 
     // Now we make the total N_chunks a fixed parameter and vary n_chunks, the number of chunks per task (GCD).
-    size_t n_chunks          = N_chunks/N_TASKS;    /* Number of chunks per compute node / program instance */ //////3
+    size_t N_chunks = N_TASKS_MAX * workers_per_task * chunks_per_worker; 
+    size_t n_chunks = N_chunks/N_TASKS;    /* Number of chunks per compute node / program instance */ //////3
     
     auto my_chunks = loadbalanced_chunks(N_chunks,n_chunks,MY_TASK_ID);
-    BuckyGen::buckyherd_queue BuckyQ(N,N_chunks,3,
+    BuckyGen::buckyherd_queue BuckyQ(N,N_chunks,workers_per_task,
 				   false,false,my_chunks);
 
     size_t isomers_in_queue = 0;
