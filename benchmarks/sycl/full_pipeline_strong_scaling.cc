@@ -60,10 +60,10 @@ int main(int argc, char** argv) {
     size_t MY_TASK_ID         = MY_TASK_ID_str? std::stoi(MY_TASK_ID_str) : 0;
 							 
     auto IsomerPerNodeEstimate = NisomersInIsomerspace/N_TASKS;
-    auto BatchSize = std::min<int>(IsomerPerNodeEstimate, 10000);
+    auto BatchSize = std::min<int>(IsomerPerNodeEstimate, (1<<17));
 
     size_t Nf = N/2 + 2;
-    std::string filename = "output/full_pipeline_" + std::string(getenv("SLURM_JOB_ID")) + "_" + std::string(getenv("MY_TASK_ID")) + "_" + std::string(getenv("N_TASKS")) + ".csv";
+    std::string filename = "output/full_pipeline_" + std::string(getenv("SLURM_JOB_ID")) + "_" + to_string(MY_TASK_ID) + "_" + to_string(N_TASKS) + ".csv";
     ofstream myfile(filename); 
 
     sycl::queue Q = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order{});
@@ -137,6 +137,6 @@ int main(int argc, char** argv) {
     }
 
     myfile << "N, Nf, BatchSize, JOBID, NTASKS, TASK_ID, FILL_ME_UP_SCOTTY, MEMCPY, DUAL, TUTTE, PROJECT, OPT\n" << 
-    N << ", " << Nf << ", " << isomers_in_queue << ", " << getenv("SLURM_JOB_ID") << ", " << getenv("N_TASKS") << ", " << getenv("MY_TASK_ID") << ", " << times_generate/isomers_in_queue << ", " << times_memcpy/isomers_in_queue << ", " << times_dual/isomers_in_queue << ", " << times_tutte/isomers_in_queue << ", " << times_project/isomers_in_queue << ", " << times_opt/isomers_in_queue << "\n";
+    N << ", " << Nf << ", " << isomers_in_queue << ", " << getenv("SLURM_JOB_ID") << ", " << N_TASKS << ", " << MY_TASK_ID << ", " << times_generate/isomers_in_queue << ", " << times_memcpy/isomers_in_queue << ", " << times_dual/isomers_in_queue << ", " << times_tutte/isomers_in_queue << ", " << times_project/isomers_in_queue << ", " << times_opt/isomers_in_queue << "\n";
     return 0;
 }
