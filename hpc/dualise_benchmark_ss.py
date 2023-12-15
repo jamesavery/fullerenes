@@ -19,13 +19,10 @@ cpus_per_task = 4
 n_gpus_to_test = [2**i for i in range(4)]
 n_nodes_to_test = [] # [2**i for i in range(1,8)]
 
+N_TASKS_MAX = n_gpus_to_test[-1] if (len(n_nodes_to_test)==0) else n_gpus_to_test[-1]*n_nodes_to_test[-1]
 workers_per_task=1              # Increase for more buckyherd parallelism, but more IPC overhead
 max_chunks_per_worker=1         # Increase for better load balancing, but more buckygen overhead
-
-if(len(n_nodes_to_test)>1):
-    N_chunks = n_gpus_to_test[-1]*n_nodes_to_test[-1]*workers_per_task*max_chunks_per_worker
-else:
-    N_chunks = n_gpus_to_test[-1]*workers_per_task*max_chunks_per_worker
+N_chunks = N_TASKS_MAX*workers_per_task*max_chunks_per_worker
 
 #n_gpus_to_test = [2**i for i in range(1)]
 #n_nodes_to_test = [2]#[2**i for i in range(1)]
@@ -53,7 +50,7 @@ def run_test(n_nodes, n_gpus, n_atoms=100):
                     line = line.replace(key, value)
                 fout.write(line)
     os.system(f'chmod +x {job_path}')
-    os.system(f'sbatch {job_path} ./benchmarks/sycl/full_pipeline_strong_scaling {n_atoms} {N_chunks} {workers_per_task}')
+    os.system(f'sbatch {job_path} ./benchmarks/sycl/full_pipeline_strong_scaling {n_atoms} {N_TASKS_MAX} {workers_per_task} {chunks_per_worker}')
     #os.system(f"sbatch job.sh")
 
 if __name__ == '__main__':
