@@ -173,6 +173,15 @@ void lanczos_(sycl::queue& Q, const IsomerBatch<T,K>& B, buffer<T>& V_, buffer<T
             real_t* V = V_acc.get_pointer() + bid * m * N + tid;
             real_t* X_ptr = B_acc.get_pointer() + N*bid; 
 
+            auto LCG = [&](const unsigned long seed){
+                //Parameters from Numerical Recipes, Knuth and H. W. Lewis
+                unsigned long a = 1664525;
+                unsigned long c = 1013904223;
+                unsigned long m = 4294967296;
+                unsigned long x = seed;
+                return (a*x + c) % m;
+            };
+
             auto mat_vect = [&](const real_t x){
                 real_t result = real_t(0);
                 smem[tid] = x;
@@ -241,10 +250,7 @@ void lanczos_(sycl::queue& Q, const IsomerBatch<T,K>& B, buffer<T>& V_, buffer<T
             #include <chrono>
 
             // Generate a random number between 0 and 99
-            unsigned short lfsr = tid;
-            unsigned bit  = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5) ) & 1;
-            lfsr =  (lfsr >> 1) | (bit << 15);
-            V[0*N] = real_t(lfsr);
+            V[0*N] = real_t(LCG(tid)); //Seed the random number generator with the thread id
             V[0*N] /= sycl::sqrt(reduce_over_group(cta, V[0*N] * V[0*N]));
             V[0*N] = MGS(0);
             for (int i = 0; i < m; i++){
@@ -276,11 +282,17 @@ void lanczos_(sycl::queue& Q, const IsomerBatch<T,K>& B, buffer<T>& V_, buffer<T
 //void eigensolve(const IsomerBatch<T,K>& B, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
 
 template <EigensolveMode mode, typename T, typename K>
-void eigensolve_(sycl::queue& Q, const IsomerBatch<T,K>, buffer<T>& D_, buffer<T>& L_, buffer<T>& U_, buffer<T>& Q_, int n){
+void eigensolve_(sycl::queue& Q, const IsomerBatch<T,K>, int n){
     TEMPLATE_TYPEDEFS(T,K);
     auto Natoms = B.N();
     auto capacity = B.capacity();
     auto N = Natoms*3;
+    //Buffers required: buffer<T>& D_, buffer<T>& L_, buffer<T>& U_, buffer<T>& Q_, 
+    static std::vector<sycl::buffer<T>> D_buffers;
+    static std::vector<sycl::buffer<T>> L_buffers;
+    static std::vector<sycl::buffer<T>> U_buffers;
+    static std::vector<sycl::buffer<T>> Q_buffers;
+
 
     //Allocate memory for the Lanczos vectors
     
