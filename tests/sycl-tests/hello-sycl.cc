@@ -35,9 +35,43 @@ int main(int, char**) {
   for(auto Q: gpu_queues){
     Q.submit([&](handler &h) {
       h.parallel_for(1024, [=](id<1> idx) {
-	  
+        
       });      
     });
+
+    Q.wait();
+
+    Q.submit([&](handler &h) {
+      h.parallel_for(nd_range(range{1024*10}, range{1024}), [=](nd_item<1> idx) {
+        //Print group size
+        if (idx.get_local_id(0) == 0) {
+          sycl::_V1::ext::oneapi::experimental::printf("Group size: %d\n", idx.get_local_range(0));
+        }
+      });      
+    });
+
+    //Throws compilation error: (Must specify both a global and local range for nd_range)
+    /* Q.submit([&](handler &h) {
+      h.parallel_for(nd_range(range{1024*10}), [=](nd_item<1> idx) {
+        //Print group size
+        if (idx.get_local_id(0) == 0) {
+          sycl::_V1::ext::oneapi::experimental::printf("Group size: %d\n", idx.get_local_range(0));
+        }
+      });      
+    }); */
+
+    Q.wait();
+    Q.submit([&](handler &h) {
+      h.parallel_for_work_group(range{1024*10}, [=](group<1> g) {
+        //Print group size
+        if (g.get_local_id(0) == 0) {
+          sycl::_V1::ext::oneapi::experimental::printf("Group size: %d\n", g.get_local_range(0));
+        }
+      });
+    });
+    Q.wait();
+
+
   }
   
   
