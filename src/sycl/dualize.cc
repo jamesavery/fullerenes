@@ -116,12 +116,14 @@ void dualize(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
         accessor     cubic_neighbours_dev(batch.cubic_neighbours, h, write_only);
         accessor     face_degrees_dev    (batch.face_degrees, h, read_only);
         accessor     dual_neighbours_dev (batch.dual_neighbours, h, read_only);
+        accessor     statuses_dev        (batch.statuses, h, read_only);
         /* 
         std::cout << N * capacity << std::endl; */
         h.parallel_for<class dualize>(sycl::nd_range(sycl::range{N*capacity}, sycl::range{N}), [=](nd_item<1> nditem) {
             auto cta = nditem.get_group();
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
+            if(statuses_dev[isomer] != IsomerStatus::NOT_CONVERGED) return;
 	    
             cta.async_work_group_copy(cached_neighbours.get_pointer(), dual_neighbours_dev.get_pointer() + isomer*Nf*MaxDegree, Nf*MaxDegree);
             cta.async_work_group_copy(cached_degrees.get_pointer(),    face_degrees_dev.get_pointer()    + isomer*Nf, Nf);
@@ -212,12 +214,14 @@ void dualize_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
         accessor     cubic_neighbours_dev(batch.cubic_neighbours, h, write_only);
         accessor     face_degrees_dev    (batch.face_degrees, h, read_only);
         accessor     dual_neighbours_dev (batch.dual_neighbours, h, read_only);
+        accessor     statuses_dev        (batch.statuses, h, read_only);
         /* 
         std::cout << N * capacity << std::endl; */
         h.parallel_for<class dualize_V1>(sycl::nd_range(sycl::range{lcm*capacity}, sycl::range{lcm}), [=](nd_item<1> nditem) {
             auto cta = nditem.get_group();
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
+            if(statuses_dev[isomer] != IsomerStatus::NOT_CONVERGED) return;
 	    
             cta.async_work_group_copy(cached_neighbours.get_pointer(), dual_neighbours_dev.get_pointer() + isomer*Nf*MaxDegree, Nf*MaxDegree);
             cta.async_work_group_copy(cached_degrees.get_pointer(),    face_degrees_dev.get_pointer()    + isomer*Nf, Nf);
