@@ -32,34 +32,22 @@ using namespace std;
 #include "auxiliary.hh"
 #include "matrix.hh"
 
+// TODO: public Views::sparsity<node_t>
 struct Graph {
-  int N;
+  node_t N;
   neighbours_t neighbours;
-  bool is_oriented;
+  bool is_oriented; //TODO: We're going to assume that G is always oriented
   
-  Graph(size_t N=0, bool is_oriented=false) : N(N), neighbours(N), is_oriented(is_oriented) {}
-  Graph(const set<edge_t>& edge_set) : is_oriented(false) {
-    update_from_edgeset(edge_set);
-  }
-  Graph(const neighbours_t& neighbours, bool is_oriented=false) : N(neighbours.size()), neighbours(neighbours), is_oriented(is_oriented) { }
-  Graph(const unsigned int N, const vector<int>& adjacency, bool is_oriented=false) : N(N), neighbours(N), is_oriented(is_oriented) {
-    assert(adjacency.size() == N*N);
-    set<edge_t> edge_set;
-
-    for(unsigned int i=0;i<N;i++)
-      for(unsigned int j=i+1;j<N;j++){
-	if(adjacency[i*N+j]) edge_set.insert(edge_t(i,j));
-      }
-
-    update_from_edgeset(edge_set);
-  }
-
-
+  Graph(const neighbours_t& neighbours, bool is_oriented=true) :
+    N(neighbours.N()),
+    neighbours(neighbours),
+    is_oriented(is_oriented) { }
+  // TODO: Use rectangular_sparsity data layout. Assert capacity bounds. 
   bool insert_edge(const arc_t& e, const node_t suc_uv=-1, const node_t suc_vu=-1);
   bool remove_edge(const edge_t& e);
-  bool edge_exists(const edge_t& e) const;
   void remove_isolated_vertices();
   void remove_vertices(set<int> &sv);
+  bool edge_exists(const edge_t& e) const;
 
   int  arc_ix(node_t u, node_t v) const;  
   node_t next(node_t u, node_t v) const;
@@ -85,9 +73,6 @@ struct Graph {
   vector<node_t> shortest_cycle(const vector<node_t> &prefix, const int max_depth) const;
   vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const unsigned int max_depth=INT_MAX) const;
 
-  // vector<int> multiple_source_shortest_paths(const vector<node_t>& sources, const vector<bool>& used_edges, 
-  //						      const vector<bool>& used_nodes, const unsigned int max_depth=INT_MAX) const;
-
   int hamiltonian_count() const;
   int hamiltonian_count(node_t current_node, vector<bool>& used_edges, vector<bool>& used_nodes, vector<node_t>& path, const vector<int>& distances) const;
 
@@ -100,7 +85,7 @@ struct Graph {
 
   void update_from_edgeset(const set<edge_t>& edge_set); 
   vector<edge_t>  undirected_edges() const;
-  vector<arc_t> directed_edges()   const;
+  vector<arc_t>   directed_edges()   const;
 
   size_t count_edges() const;
   

@@ -4,7 +4,7 @@ include(CheckLanguage)
 include(CMakeDependentOption)
 project(Fullerenes)
 set(CMAKE_GENERATOR "Unix Makefiles" CACHE INTERNAL "" FORCE)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(FULLERENE_DATABASE_PATH ${CMAKE_SOURCE_DIR}/database/ CACHE PATH "Path to fullerene database root")
 set(FORTRAN_NMAX 5000 CACHE STRING "Maximum vertex count for Fortran routines using statically allocated memory")
@@ -123,7 +123,7 @@ if(ENABLE_CUDA)
 #set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=64 --resource-usage -Xptxas --expt-relaxed-constexpr -I /opt/nvidia/hpc_sdk/Linux_x86_64/21.2/cuda/11.0/targets/x86_64-linux/include/ -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
 #NOTE: -gencode arch argument is EXTREMELY important to get right, the program will simply crash with a cudaError: invalid device function if the architecture does not match the GPU
 
-set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++${CMAKE_CXX_STADARD} --expt-relaxed-constexpr -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_${CMAKE_CUDA_ARCHITECTURES},code=sm_${CMAKE_CUDA_ARCHITECTURES}  -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}"
+set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++${CMAKE_CXX_STANDARD} --expt-relaxed-constexpr -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_${CMAKE_CUDA_ARCHITECTURES},code=sm_${CMAKE_CUDA_ARCHITECTURES}  -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}"
 
 )
 set(CUDA_MAXREGCOUNT "--maxrregcount=80")

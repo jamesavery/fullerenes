@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <unordered_map>
 #include <unordered_set>
+#include <fullerenes/sparse_matrix.hh>
 
 extern char LIST_OPEN;
 extern char LIST_CLOSE;
@@ -17,27 +18,7 @@ extern char LIST_CLOSE;
 using namespace std;
 
 typedef int node_t;
-typedef vector< vector<node_t> > neighbours_t;
-typedef vector< bool > edges_t;
-
-template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p);
-
-#define container_output(container) \
-  template <typename T> ostream& operator<<(ostream& s, const container<T>& v) \
-  { \
-  s << LIST_OPEN; \
-  for(typename container<T>::const_iterator x(v.begin());x!=v.end();){ \
-    s << *x; \
-    if(++x!=v.end()) s << ","; \
-  } \
-  s << LIST_CLOSE; \
-  return s; \
-}
-
-container_output(vector);
-container_output(list);
-container_output(set);
-
+typedef Views::sparsity<node_t> neighbours_t;
 
 // Directed edge is an ordered pair of nodes
 typedef pair<node_t,node_t> arc_t;
@@ -58,6 +39,27 @@ struct edge_t : public pair<node_t,node_t> {
     return u*(u-1)/2 + v; 
   }
 };
+
+
+template <typename S, typename T> ostream& operator<<(ostream& s, const pair<S,T>& p);
+
+#define container_output(container) \
+  template <typename T> ostream& operator<<(ostream& s, const container<T>& v) \
+  { \
+  s << LIST_OPEN; \
+  for(typename container<T>::const_iterator x(v.begin());x!=v.end();){ \
+    s << *x; \
+    if(++x!=v.end()) s << ","; \
+  } \
+  s << LIST_CLOSE; \
+  return s; \
+}
+
+container_output(vector);
+container_output(list);
+container_output(set);
+
+
 
 
 

@@ -95,22 +95,21 @@ int  Graph::arc_ix(node_t u, node_t v) const
 }
 
 // Successor to v in oriented neigbhours of u
-node_t Graph::next(node_t u, node_t v) const
-{
-  const auto &nu(neighbours[u]);
-  int j = arc_ix(u,v);
-  if(j>=0) return nu[(j+1)%nu.size()];
-  else return -1;
+
+node_t Graph::next(node_t u, node_t v) const {
+  const auto ru = neighbours[u];
+  int  j   = arc_index(u,v);
+  if(j>=0) return ru[(j+1)%ru.size()];
+  else return -1;		// u-v is not an edge in this graph
 }
 
 // Predecessor to v in oriented neigbhours of u
-node_t Graph::prev(node_t u, node_t v) const
-{
-  const auto &nu(neighbours[u]);  
-  int j = arc_ix(u,v);
-  if(j>=0) return nu[(j-1+nu.size())%nu.size()];
-  return -1;            // u-v is not an edge in a triangulation
-}
+node_t Graph::prev(node_t u, node_t v) const {
+  const auto ru = neighbours[u];
+  int  j   = arc_index(u,v);
+  if(j>=0) return ru[(j+ru.size()-1)%ru.size()];
+  else return -1;		// u-v is not an edge in this graph
+}  
 
 // Successor to v in face containing directed edge u->v
 node_t Graph::next_on_face(node_t u, node_t v) const

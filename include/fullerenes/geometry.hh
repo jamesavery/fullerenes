@@ -13,10 +13,6 @@
 
 using namespace std;
 
-typedef int node_t;
-typedef vector< vector<node_t> > neighbours_t;
-typedef vector< bool > edges_t;
-
 struct matrix3d; // required for coord3d.outer(coord3d)
 
 // TODO: geometry.hh is getting huge. Move most of the implementation to geometryc.cc
