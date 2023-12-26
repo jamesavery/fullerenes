@@ -97,8 +97,8 @@ namespace Views {
     span<node_t>       row(node_t u)       { return {&values[row_start[u]], row_nnz[u]}; };
     span<const node_t> row(node_t u) const { return {&values[row_start[u]], row_nnz[u]}; };  
 
-    span<node_t> operator[](node_t u)       { return row(u); }
-    span<node_t> operator[](node_t u) const { return row(u); }    
+    span<node_t>       operator[](node_t u)       { return row(u); }
+    span<const node_t> operator[](node_t u) const { return row(u); }    
     
     
     node_t N() const { return row_start.size(); }
