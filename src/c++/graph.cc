@@ -38,8 +38,8 @@ bool Graph::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu
 
 bool Graph::edge_exists(const edge_t& e) const
 {
-  const vector<node_t> &nu(neighbours[e.first]);
-  return find(nu.begin(),nu.end(),e.second) != nu.end();
+  auto [u,v] = e;
+  return neighbours.arc_exists(u,v) && neighbours.arc_exists(v,u);
 }
 
 // remove all vertices without edges from graph
