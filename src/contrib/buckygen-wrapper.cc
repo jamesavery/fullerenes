@@ -126,13 +126,13 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
     fprintf(stderr,"In BuckyGen::next_fullerene: %s\n",strerror(errno));
     return false;
   } else if(msg.mtype == GRAPH_READY) {	// Completed graph
-    G.N = Q.Nvertices;
-    G.neighbours.resize(G.N);
-
-    for(int u=0;u<Q.Nvertices;u++){
-      G.neighbours[u].clear();
-      for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
-	G.neighbours[u].push_back(msg.neighbours[u*6+i]);
+    assert(G.N == Q.Nvertices);
+    
+    for(int u=0, uv=0;u<Q.Nvertices;u++){
+      G.neighbours.row_start[u] = uv;
+      for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++, uv++)
+	G.neighbours.values[uv] = msg.neighbours[u*6+i];
+      G.neighbours.row_nnz[u] = uv-G.neighbours.row_start[u];
     }
 
     return true;
@@ -220,13 +220,13 @@ bool next_fullerene(const buckygen_queue& Q, Graph& G)
 	fprintf(stderr,"In BuckyHerd::next_fullerene: %s\n",strerror(errno));
 	return false;
       } else if(msg.mtype == GRAPH_READY) {	// Completed graph
-	G.N = H.Nvertices;
-	G.neighbours.resize(G.N);
-	
-	for(int u=0;u<H.Nvertices;u++){
-	  G.neighbours[u].clear();
-	  for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++)
-	    G.neighbours[u].push_back(msg.neighbours[u*6+i]);
+	assert(G.N == H.Nvertices);
+    
+	for(int u=0, uv=0;u<H.Nvertices;u++){
+	  G.neighbours.row_start[u] = uv;
+	  for(int i=0; 6>i && (msg.neighbours[u*6+i] != -1); i++, uv++)
+	    G.neighbours.values[uv] = msg.neighbours[u*6+i];
+	  G.neighbours.row_nnz[u] = uv-G.neighbours.row_start[u];
 	}
 	
 	return true;
