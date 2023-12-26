@@ -3,19 +3,22 @@
 
 using std::span;
 
+typedef int8_t nnz_t;
+
 // We mostly work with light-weight classes that don't themselves allocate memory.
 // The following allocator classes make the allocation and object lifetime convienient.
 namespace Allocators {
   template <typename node_t>
   struct sparsity {
-    // We include both row_start and row_end, as we allow for fewer actual nonzeros than the capacity,
+    // We include both row_start and row_nnz, as we allow for fewer actual nonzeros than the capacity,
     // in order to enable dynamic updating within the bounds of a maximum degree.
-    // If the sparsity pattern is compressed, then row_end[i] == row_start[i+1].
-    vector<node_t> values, row_start, row_end;
+    // If the sparsity pattern is compressed, then row_nnz[u] == row_start[u+1]-row_start[u].
+    vector<node_t> values, row_start;
+    vector<nnz_t>  row_nnz;
     constexpr static node_t EMPTY_NODE = -1;
   
     sparsity(size_t N=0/*number of rows*/,
-	     size_t nnz=0/*total number of nonzeros*/) : values(nnz,EMPTY_NODE), row_start(N), row_end(N) {}
+	     size_t M=0/*total number of nonzeros*/) : values(M,EMPTY_NODE), row_start(N), row_nnz(N) {}
   };
 
   // The special case of rectangular sparse matrices (same number of nonzeros for every row).
@@ -24,10 +27,10 @@ namespace Allocators {
     using parent = sparsity<node_t>;
     using parent::values;
     using parent::row_start;
-    using parent::row_end;
+    using parent::row_nnz;
     
     rectangular_sparsity(size_t N=0,  size_t d_max=3) : sparsity<node_t>(N*d_max) {
-      for(size_t i=0;i<N;i++){ row_start[i] = d_max*i; row_end[i] = d_max*i; }
+      for(size_t i=0;i<N;i++){ row_start[i] = d_max*i; row_nnz[i] = 0; }
     }
 
     rectangular_sparsity(const vector<vector<node_t>>& xs) : rectangular_sparsity(xs.size(),size_max(xs)) { }
@@ -41,23 +44,49 @@ namespace Allocators {
   };
 }
 
+// TODO: Could code our way out of optionally not needing needing to store row_start and row_nnz:
+// row_start: if omitted, assume constant nnz/row:
+//            assert(M%N==0); m = M/N; row_start[u] = u*m; row_nnz[u] = m;
+// row_nnz:   if omitted, assume compressed form:
+//            row_nnz[u] = row_start[u+1]-row_start[u]:
+// Since this is a view, we cannot allocate this would need to be implicitly used 
 namespace Views {   
 
   template <typename node_t>
   struct sparsity {
-    span<node_t> values, row_start, row_end;
+    span<node_t> values, row_start;
+    span<nnz_t>  row_nnz;
     constexpr static node_t EMPTY_NODE = -1;
-    
-    sparsity(Allocators::sparsity<node_t> &G):
-      values(G.values), row_start(G.row_start), row_end(G.row_end) {}
 
+    sparsity(Allocators::sparsity<node_t> &G):
+      values(G.values), row_start(G.row_start), row_nnz(G.row_nnz) {}
+
+    sparsity(node_t N,                      /* number of rows */
+	     node_t M,                      /* total number of nonzeros */
+	     const node_t *values_ptr,  
+	     const node_t *row_start_ptr, 
+	     const nnz_t  *row_nnz_ptr,
+	     bool regular    = false, /* Implicitly defined row_start */
+	     bool compressed = false  /* Implicitly defined row_nnz   */):  
+      values(values_ptr, M), row_start(row_start_ptr,N), row_nnz(row_nnz_ptr,N) {
+
+      if(regular){   // Constant row-capacity. row_start is implicitly defined.
+	assert(M%N == 0);
+	node_t m = M/N;
+	for(node_t u=0;u<N;u++) row_start[u] = u*m;
+      }
+      if(compressed)  // Row sizes implicitly defined by capacity: row_nnz[u] = row_start[u+1]-row_start[u]. 
+	for(node_t u=0;u<N;u++) row_nnz[u] = ((u+1<N)? row_start[u+1] : M) - row_start[u];
+      
+    }
+      
     Allocators::sparsity<node_t> compress() const {
       Allocators::sparsity C(N(), number_nonzeros());
       node_t offset = 0;
       for(node_t u=0;u<N();u++){
 	size_t row_size = row(u).size();
 	C.row_start[u]  = offset;
-	C.row_end[u]    = offset + row_size;
+	C.row_nnz[u]    = row_size;
 	
 	for(int i=0;i<row_size;i++) C.values[offset+i] = values[row_start[u]+i];
 	offset         += row_size;
@@ -65,8 +94,8 @@ namespace Views {
       return C;
     }
     
-    span<node_t>       row(node_t u)       { return {&values[row_start[u]], &values[row_end[u]]}; };
-    span<const node_t> row(node_t u) const { return {&values[row_start[u]], &values[row_end[u]]}; };  
+    span<node_t>       row(node_t u)       { return {&values[row_start[u]], row_nnz[u]}; };
+    span<const node_t> row(node_t u) const { return {&values[row_start[u]], row_nnz[u]}; };  
 
     span<node_t> operator[](node_t u)       { return row(u); }
     span<node_t> operator[](node_t u) const { return row(u); }    
@@ -80,13 +109,14 @@ namespace Views {
       for(node_t u: values) nnz += (u!=EMPTY_NODE);
       return nnz;
     }
+
     // Maximum number of nonzeros in row u
     node_t capacity(node_t u) const {
       if(u+1<N()) return row_start[u+1]-row_start[u];
       else        return values.size() -row_start[u];
     }
     
-    node_t arc_index(node_t u, node_t v) const {
+    nnz_t arc_index(node_t u, node_t v) const {
       auto ru = row(u);
       for(int i=0;i<ru.size();i++) if(ru[i]==v) return i;
       return EMPTY_NODE; // u-v is not an edge in this graph
@@ -95,6 +125,15 @@ namespace Views {
     bool arc_exists(node_t u, node_t v) const {
       return (arc_index(u,v)>=0);
     }
+
+    bool remove_arc(node_t u, node_t v) {
+      nnz_t i = arc_index(u,v), m = row_nnz[u];
+      if(i<0) return false; 	// This arc does not exist
+      auto r = row(u);
+      for(;i+1<m;i++) r[i] = r[i+1]; // Shift rest of neighbours left, and 
+      row_nnz[u]--;		     // now there is one fewer neighbours.
+    }
+    
     
     bool is_symmetric() const {
       for(node_t u=0;u<N();u++)

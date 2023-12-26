@@ -6,15 +6,8 @@ char LIST_CLOSE=']';
 // Returns true if edge existed prior to call, false if not
 bool Graph::remove_edge(const edge_t& e)
 {
-  node_t u = e.first, v = e.second;
-  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
-
-  bool value = false;
-
-  for(int i=0;i<nu.size();i++) if(nu[i] == v){ nu.erase(nu.begin()+i); value = true; break; }
-  for(int i=0;i<nv.size();i++) if(nv[i] == u){ nv.erase(nv.begin()+i); value = true; break; }
-
-  return value;
+  auto [u,v] = e;		
+  return neighbours.remove_arc(u,v) && neighbours.remove_arc(v,u);
 }
 
 // Returns true if edge existed prior to call, false if not
