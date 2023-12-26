@@ -1,7 +1,9 @@
 #pragma once
 #include <span>
+#include <vector>
 
 using std::span;
+using std::vector;
 
 typedef int8_t nnz_t;
 

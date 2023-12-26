@@ -418,9 +418,9 @@ vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources,
 
 int Graph::max_degree() const
 {
-  int max_d = 0;
-  for(node_t u=0;u<N;u++) if(neighbours[u].size() > max_d) max_d = neighbours[u].size();
-  return max_d;
+  size_t max_deg = 0;
+  for(node_t u=0;u<N;u++) max_deg = max(max_deg,neighbours[u].size());
+  return max_deg;
 }
 
 int Graph::degree(node_t u) const { 

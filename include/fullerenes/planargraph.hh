@@ -5,14 +5,14 @@
 
 // TODO: Separate planar cubic graph stuff away from general planar graph into CubicGraph class.
 //       Exploit duality between triangulation and cubic planar graph.
+//       
 class PlanarGraph : public Graph {
 public:
   mutable face_t outer_face;
   vector<coord2d> layout2d; 	// If graph is planar, we can associate a 2D layout
   typedef spiral_nomenclature::construction_scheme_t construction_scheme_t;
 
-  // TODO: Get rid of layout_is_spherical
-  PlanarGraph() {}
+  //PlanarGraph() {} // TODO: Does it make sense to have a default constructor for a span-view?
   PlanarGraph(const PlanarGraph& g) : Graph(g), layout2d(g.layout2d) {  }
   PlanarGraph(const Graph& g, const node_t s=-1, const node_t t=0, const node_t r=0) : Graph(g)
   {
