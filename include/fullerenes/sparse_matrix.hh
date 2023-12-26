@@ -133,7 +133,25 @@ namespace Views {
       for(;i+1<m;i++) r[i] = r[i+1]; // Shift rest of neighbours left, and 
       row_nnz[u]--;		     // now there is one fewer neighbours.
     }
-    
+
+    bool insert_arc(node_t u, node_t v, node_t suc_uv=-1) {
+      if(arc_exists(u,v)) return true;	// insert_arc must be idempotent
+
+      assert(u>=0 && v>=0);	// Only attempt to insert valid arc.
+
+      nnz_t wi = suc_uv>=0? arc_index(u,suc_uv) : row_nnz[u]-1, // Find the successor to the new arc.
+	     m = row_nnz[u];					// Get old length of row.
+      
+      if(wi<0 || m >= capacity(u)) return false; // Successor not found, or no space to insert new arc.
+
+      // From this point we know that u->v can be inserted.
+      row_nnz[u]++;                             // Increase length of row u, such that
+      auto r = row(u);                          // call to row(u) already uses updated value for row_nnz[u].
+      for(int i=wi;i<m;i++) r[i+1] = r[i];	// Shift rest of neighbours right, and
+      r[wi] = v;				// place v in successor's old spot.
+
+      return true;
+    }
     
     bool is_symmetric() const {
       for(node_t u=0;u<N();u++)

@@ -7,32 +7,33 @@ char LIST_CLOSE=']';
 bool Graph::remove_edge(const edge_t& e)
 {
   auto [u,v] = e;		
-  return neighbours.remove_arc(u,v) && neighbours.remove_arc(v,u);
+  bool success_uv = neighbours.remove_arc(u,v);
+  bool success_vu = neighbours.remove_arc(v,u);
+
+  if(success_uv ^ success_vu){
+    cerr << "Corrupt graph: only half of edge ("<<u<<","<<v<<") could be removed.\n";
+    abort();
+  }
+  
+  return success_uv && success_vu;
 }
 
 // Returns true if edge existed prior to call, false if not
 // insert v right before suc_uv in the list of neighbours of u
 // insert u right before suc_vu in the list of neighbours of v
+// NB: arc_t type is intended, as order matters due to successors.
 bool Graph::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu)
 {
-  if(edge_exists(e)) return true;	// insert_edge must be idempotent
+  auto [u,v] = e;		
+  bool success_uv = neighbours.insert_arc(u,v, suc_uv);
+  bool success_vu = neighbours.insert_arc(v,u, suc_vu);
 
-  const node_t u = e.first, v = e.second;
-
-  assert(u>=0 && v>=0);
-  vector<node_t> &nu(neighbours[u]), &nv(neighbours[v]);
-
-  size_t oldsize[2] = {nu.size(),nv.size()};
+  if(success_uv ^ success_vu){
+    cerr << "Corrupt graph: only half of edge ("<<u<<","<<v<<") could be inserted.\n";
+    abort();
+  }
   
-  vector<node_t>::iterator pos_uv = suc_uv<0? nu.end() : find(nu.begin(),nu.end(),suc_uv);
-  vector<node_t>::iterator pos_vu = suc_vu<0? nv.end() : find(nv.begin(),nv.end(),suc_vu);
-
-  nu.insert(pos_uv,v);
-  if(u!=v) nv.insert(pos_vu,u);
-  
-  assert(nu.size() == oldsize[0]+1 && nv.size() == oldsize[1]+1);
-
-  return false;
+  return success_uv && success_vu;
 }
 
 bool Graph::edge_exists(const edge_t& e) const
