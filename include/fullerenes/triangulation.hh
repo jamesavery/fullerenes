@@ -23,8 +23,9 @@ public:
   //  4. Spirals (constructor + all_spirals + canonical_spiral)
   //  5. Embed in 2D
   //  6. Embed in 3D
-  Triangulation(int N) : PlanarGraph(Graph(N,true)) {}
-  Triangulation(const Graph& g = Graph(), bool already_oriented = false) : PlanarGraph(g) { update(already_oriented); }
+
+  //Triangulation(int N) : PlanarGraph(Graph(N,true)) {} // TODO: Memory needs to come from somewhere
+  Triangulation(const Graph& g, bool already_oriented = false) : PlanarGraph(g) { update(already_oriented); }
   Triangulation(const Graph& g, const vector<tri_t>& tris) : PlanarGraph(g), triangles(tris) { 
     orient_triangulation(triangles);
     orient_neighbours();
@@ -38,15 +39,9 @@ public:
   vector<face_t> cubic_faces() const;
   unordered_map<arc_t,arc_t> arc_translation() const;
   
-  size_t max_degree() const {
-    size_t max_degree = 0;
-    for(auto &nu: neighbours) max_degree = std::max(max_degree, nu.size());
-    return max_degree;
-  }
-
   vector<uint8_t> n_degrees() const {
     vector<uint8_t> n_degrees(max_degree(),0);
-    for(auto &nu: neighbours) n_degrees[nu.size()-1]++;
+    for(node_t u=0;u<N;u++) n_degrees[neighbours[u].size()-1]++;
     return n_degrees;
   }
   
@@ -134,13 +129,15 @@ public:
   // 2. Construct with buckygen
   // 3. Spiral+gen. spiral special case
   // 4. Embed-in-3D special case
-  FullereneDual(const Triangulation& g = Triangulation()) : Triangulation(g) {}
-  FullereneDual(const int N, const general_spiral& rspi) : FullereneDual(N,rspi.spiral,rspi.jumps) {}
-  FullereneDual(const int N, const vector<int>& rspi, const jumplist_t& jumps = jumplist_t()) {
-    vector<int> spiral(N/2+2,6);
-    for(int i: rspi) spiral[i] = 5;
-    *this = Triangulation(spiral,jumps);
-  }
+
+  // TODO: Think through how constructors should work, now that Graph is a span-view without its own memory.
+  // FullereneDual(const Triangulation& g = Triangulation()) : Triangulation(g) {}
+  // FullereneDual(const int N, const general_spiral& rspi) : FullereneDual(N,rspi.spiral,rspi.jumps) {}
+  // FullereneDual(const int N, const vector<int>& rspi, const jumplist_t& jumps = jumplist_t()) {
+  //   vector<int> spiral(N/2+2,6);
+  //   for(int i: rspi) spiral[i] = 5;
+  //   *this = Triangulation(spiral,jumps);
+  // }
   
   bool get_rspi(const node_t f1, const node_t f2, const node_t f3, vector<int>& r, jumplist_t& j, const bool general=true) const;
   bool get_rspi(vector<int>& r, jumplist_t& j, const bool general=true, const bool pentagon_start=true) const;
@@ -152,46 +149,63 @@ public:
   spiral_nomenclature name(bool rarest_start=true) const;  
 };
 
+// CubicPair:
+// Nx3 cubic PlanarGraph G
+// Nx3 cubic face_id cubic arc (canonical face arc) to triangulation vertex id
+// Nx3 cubic arc_map cubic arc to triangulation arc
 
-class CubicPair {
-  Triangulation T;
-  PlanarGraph   G;
-  IDCounter<tri_t> triangle_id;  
-  vector<vector<arc_t>> CtoD, DtoC;
+// N x ragged   Triangulation T
+// --||--       face_id triangulation arc (canonical face arc) to cubic vertex id
+// --||--       arc_map triangulation arc to cubic arc
+// --||--       cubic faces (cubic faces[u] = face_id[u->v] for v in neighbours[u], where u is a triangulation vertex
+
+
+// Parallel construction from pure triangulation graph (without triangles):
+//
+//  1. For each triangulation vertex u (corresponding to face u in cubic):
+//  1.i For each incident triangle u->v_i->w=next_on_face(u,v_i): if(u<v_i && u<w) then i_own[u]++ and tris_i_own[u][i] = 1 else 0
+//  2. prefix sum i_own -> id_offsets
+//  3. For each u:
+//  3.i   for i: u->v_i: if(tris_i_own[u][i]) tris_i_own[u][i] = id_offsets[u]+i
+//  3.ii  for i: u->v_i: tris[tris_i_own[u][i]] 
+
+// class CubicPair {
+//   CubicSurface  G;
+//   Triangulation T;
   
-  int face_start(const face_t &f){
-    node_t i_m = 0;
-    for(int i=0, m=INT_MAX; i<int(f.size()); i++) if(f[i] < m){ i_m = i; m = f[i]; }
-    return i_m;
-  }
+//   int face_start(const face_t &f){
+//     node_t i_m = 0;
+//     for(int i=0, m=INT_MAX; i<int(f.size()); i++) if(f[i] < m){ i_m = i; m = f[i]; }
+//     return i_m;
+//   }
     
-  CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<arc_t>(3)), DtoC(T.N)
-  {
-    for(const auto &t: T.triangles) triangle_id.insert(t.sorted());
+//   CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<arc_t>(3)), DtoC(T.N)
+//   {
+//     for(const auto &t: T.triangles) triangle_id.insert(t.sorted());
   
-    for(node_t u=0;u<T.N;u++){
-      const auto& nu = T.neighbours[u];
-      DtoC[u].resize(nu.size()); 
+//     for(node_t u=0;u<T.N;u++){
+//       const auto& nu = T.neighbours[u];
+//       DtoC[u].resize(nu.size()); 
 
-      // For each directed edge v->u
-      for(size_t i=0;i<nu.size();i++){
+//       // For each directed edge v->u
+//       for(size_t i=0;i<nu.size();i++){
 
-	node_t v = nu[i];
-	node_t s = nu[(i+1)%nu.size()];           // u->v->s is triangle associated with u->v
-	node_t t = nu[(i+nu.size()-1)%nu.size()]; // v->u->t is triangle associated with v->u
+// 	node_t v = nu[i];
+// 	node_t s = nu[(i+1)%nu.size()];           // u->v->s is triangle associated with u->v
+// 	node_t t = nu[(i+nu.size()-1)%nu.size()]; // v->u->t is triangle associated with v->u
 
-	tri_t t1 = {u,v,s}, t2 = {v,u,t};
+// 	tri_t t1 = {u,v,s}, t2 = {v,u,t};
 	
-	// arcs get a unique number: id(u,i) = row_offset[u]+i
-	node_t U   = triangle_id(t1.sorted()), V = triangle_id(t2.sorted());
-	node_t i_V = G.arc_ix(U,V), i_U = G.arc_ix(V,U);
-	node_t i_v = T.arc_ix(u,v), i_u = T.arc_ix(v,u);
+// 	// arcs get a unique number: id(u,i) = row_offset[u]+i
+// 	node_t U   = triangle_id(t1.sorted()), V = triangle_id(t2.sorted());
+// 	node_t i_V = G.arc_ix(U,V), i_U = G.arc_ix(V,U);
+// 	node_t i_v = T.arc_ix(u,v), i_u = T.arc_ix(v,u);
 	
-	CtoD[U][i_V] = {u,i_v};
-	CtoD[V][i_U] = {v,i_u};
-	DtoC[u][i_v] = {U,i_V};
-	DtoC[v][i_u] = {V,i_U};
-      }
-    }
-  }
-};
+// 	CtoD[U][i_V] = {u,i_v};
+// 	CtoD[V][i_U] = {v,i_u};
+// 	DtoC[u][i_v] = {U,i_V};
+// 	DtoC[v][i_u] = {V,i_U};
+//       }
+//     }
+//   }
+// };

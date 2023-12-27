@@ -9,18 +9,18 @@
 
 // the jumps start at 0
 // n is the number of vertices
-CubicGraph::CubicGraph(const int n, const vector<int>& spiral_string, const jumplist_t& jumps) : CubicGraph() {
-  assert(spiral_string.size() == n/2 + 2);
-  Triangulation dual(spiral_string,jumps);
-  CubicGraph G(dual.dual_graph());
-  *this = G;
-}
+// CubicGraph::CubicGraph(const int n, const vector<int>& spiral_string, const jumplist_t& jumps) : CubicGraph() {
+//   assert(spiral_string.size() == n/2 + 2);
+//   Triangulation dual(spiral_string,jumps);
+//   CubicGraph G(dual.dual_graph());
+//   *this = G;
+// }
 
-CubicGraph::CubicGraph(const spiral_nomenclature &fsn){
-  assert(fsn.construction_scheme == spiral_nomenclature::CUBIC);
-  Triangulation T(fsn);
-  *this = T.dual_graph();
-}
+// CubicGraph::CubicGraph(const spiral_nomenclature &fsn){
+//   assert(fsn.construction_scheme == spiral_nomenclature::CUBIC);
+//   Triangulation T(fsn);
+//   *this = T.dual_graph();
+// }
 
 
 bool CubicGraph::get_spiral_from_cg(const node_t f1, const node_t f2, const node_t f3, vector<int> &spiral, jumplist_t &jumps, const bool general) const

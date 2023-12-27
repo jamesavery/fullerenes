@@ -42,7 +42,7 @@ bool Graph::edge_exists(const edge_t& e) const
   return neighbours.arc_exists(u,v) && neighbours.arc_exists(v,u);
 }
 
-// remove all vertices without edges from graph
+// // remove all vertices without edges from graph
 // void Graph::remove_isolated_vertices(){
 //   int new_id[N];
 
@@ -61,7 +61,7 @@ bool Graph::edge_exists(const edge_t& e) const
 //   *this = g;
 // }
 
-// completely remove all vertices in sv from the graph
+// // completely remove all vertices in sv from the graph
 // void Graph::remove_vertices(set<int> &sv){
 //   const int N_naught(N);
 //   for(int u: sv){
@@ -82,22 +82,22 @@ bool Graph::edge_exists(const edge_t& e) const
 
 int  Graph::arc_ix(node_t u, node_t v) const
 {
-  return neighbours.arc_index(u,v); // TODO: Simply make Graph a subclass of Views::sparsity.
+  return neighbours.arc_index(u,v); // TODO: Graph should just inherit from View::sparsity<node_t>.
 }
 
 // Successor to v in oriented neigbhours of u
 
 node_t Graph::next(node_t u, node_t v) const {
-  const auto ru = neighbours[u];
-  int  j   = arc_index(u,v);
+  const auto& ru = neighbours[u];
+  int  j   = arc_ix(u,v);
   if(j>=0) return ru[(j+1)%ru.size()];
   else return -1;		// u-v is not an edge in this graph
 }
 
 // Predecessor to v in oriented neigbhours of u
 node_t Graph::prev(node_t u, node_t v) const {
-  const auto ru = neighbours[u];
-  int  j   = arc_index(u,v);
+  const auto& ru = neighbours[u];
+  int  j   = arc_ix(u,v);
   if(j>=0) return ru[(j+ru.size()-1)%ru.size()];
   else return -1;		// u-v is not an edge in this graph
 }  
@@ -152,7 +152,7 @@ bool Graph::has_separating_triangles() const
   assert(is_oriented);
 
   for(node_t u=0;u<N;u++){
-    const vector<node_t> &nu(neighbours[u]);
+    const auto &nu = neighbours[u];
     
     for(int i=0;i<nu.size();i++){
       node_t t = nu[i];
@@ -167,9 +167,9 @@ bool Graph::has_separating_triangles() const
 bool Graph::adjacency_is_symmetric() const
 {
   for(node_t u=0;u<N;u++){
-    const vector<node_t> &nu = neighbours[u];
+    const auto &nu = neighbours[u];
     for(int i=0;i<nu.size();i++){
-      const vector<node_t> &nv = neighbours[nu[i]];
+      const auto &nv = neighbours[nu[i]];
 
       bool symmetric = false;
       for(int j=0;j<nv.size();j++) if(nv[j] == u) symmetric = true;
@@ -418,39 +418,39 @@ vector<int> Graph::multiple_source_shortest_paths(const vector<node_t>& sources,
 
 int Graph::max_degree() const
 {
-  int max_d = 0;
-  for(node_t u=0;u<N;u++) if(neighbours[u].size() > max_d) max_d = neighbours[u].size();
-  return max_d;
+  size_t max_deg = 0;
+  for(node_t u=0;u<N;u++) max_deg = max(max_deg,neighbours[u].size());
+  return max_deg;
 }
 
 int Graph::degree(node_t u) const { 
   return neighbours[u].size(); 
 }
 
-void Graph::update_from_edgeset(const set<edge_t>& edge_set) 
-{
-  // Instantiate auxiliary data strutures: sparse adjacency matrix and edge existence map.
-  map<node_t,set<node_t> > ns;
-  //  fprintf(stderr,"Initializing edge map.\n");
+// void Graph::update_from_edgeset(const set<edge_t>& edge_set) 
+// {
+//   // Instantiate auxiliary data strutures: sparse adjacency matrix and edge existence map.
+//   map<node_t,set<node_t> > ns;
+//   //  fprintf(stderr,"Initializing edge map.\n");
 
-  // Update node count
-  N = 0;
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    N = max(N,max(e->first,e->second)+1);
-  }
+//   // Update node count
+//   N = 0;
+//   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+//     N = max(N,max(e->first,e->second)+1);
+//   }
 
-  neighbours.resize(N);
+//   neighbours.resize(N);
 
-  for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
-    ns[e->first].insert(e->second);
-    ns[e->second].insert(e->first);
-  }
+//   for(set<edge_t>::const_iterator e(edge_set.begin()); e!= edge_set.end(); e++){
+//     ns[e->first].insert(e->second);
+//     ns[e->second].insert(e->first);
+//   }
 
-  //  fprintf(stderr,"Initializing adjacencies\n");
-  for(int u=0;u<N;u++)
-    neighbours[u] = vector<node_t>(ns[u].begin(),ns[u].end());
+//   //  fprintf(stderr,"Initializing adjacencies\n");
+//   for(int u=0;u<N;u++)
+//     neighbours[u] = vector<node_t>(ns[u].begin(),ns[u].end());
 
-}
+// }
 
 vector<edge_t> Graph::undirected_edges() const {
   set<edge_t> edges;
