@@ -152,6 +152,7 @@ namespace Views {
 
       return true;
     }
+
     
     bool is_symmetric() const {
       for(node_t u=0;u<N();u++)

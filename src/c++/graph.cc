@@ -43,49 +43,46 @@ bool Graph::edge_exists(const edge_t& e) const
 }
 
 // remove all vertices without edges from graph
-void Graph::remove_isolated_vertices(){
-  vector<int> new_id(N);
+// void Graph::remove_isolated_vertices(){
+//   int new_id[N];
 
-  int u_new = 0;
-  for(int u=0; u<N; u++)
-    if(!neighbours[u].empty())
-      new_id[u] = u_new++;
+//   int u_new = 0;
+//   for(int u=0; u<N; u++)
+//     if(!neighbours[u].empty())
+//       new_id[u] = u_new++;
 
-  int N_new = u_new;
-  Graph g(N_new);
-  // cerr << "n new: " << N_new << endl;
-  for(int u=0; u<N; u++)
-    for(int v: neighbours[u])
-      g.neighbours[new_id[u]].push_back(new_id[v]);
+//   int N_new = u_new;
+//   Graph g(N_new);
+//   // cerr << "n new: " << N_new << endl;
+//   for(int u=0; u<N; u++)
+//     for(int v: neighbours[u])
+//       g.neighbours[new_id[u]].push_back(new_id[v]);
 
-  *this = g;
-}
+//   *this = g;
+// }
 
 // completely remove all vertices in sv from the graph
-void Graph::remove_vertices(set<int> &sv){
-  const int N_naught(N);
-  for(int u: sv){
-    while(neighbours[u].size()){
-      const int v = neighbours[u][0];
-      remove_edge({u,v});
-    }
-  }
+// void Graph::remove_vertices(set<int> &sv){
+//   const int N_naught(N);
+//   for(int u: sv){
+//     while(neighbours[u].size()){
+//       const int v = neighbours[u][0];
+//       remove_edge({u,v});
+//     }
+//   }
 
-  remove_isolated_vertices();
+//   remove_isolated_vertices();
 
-  // let's see if the graph remained in a sane state
-  // cerr << "N: " << N << endl;
-  if(N_naught != sv.size() + N)
-    cerr << "removed more vertices than intended" << endl;
-  assert(is_connected());
-}
+//   // let's see if the graph remained in a sane state
+//   // cerr << "N: " << N << endl;
+//   if(N_naught != sv.size() + N)
+//     cerr << "removed more vertices than intended" << endl;
+//   assert(is_connected());
+// }
 
 int  Graph::arc_ix(node_t u, node_t v) const
 {
-  const vector<node_t>& nu(neighbours[u]);
-  for(int j=0;j<nu.size(); j++)
-    if(nu[j] == v) return j; 
-  return -1;            // u-v is not an edge in a triangulation  
+  return neighbours.arc_index(u,v); // TODO: Simply make Graph a subclass of Views::sparsity.
 }
 
 // Successor to v in oriented neigbhours of u
