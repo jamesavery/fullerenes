@@ -21,7 +21,7 @@ int main(int ac, char **av)
   P.optimize();
   Polyhedron::to_file(P,av[2]);  
 
-  cout <<  P.to_povray() << "\n";
+  //  cout <<  P.to_povray() << "\n";
 
     
   return 0;
