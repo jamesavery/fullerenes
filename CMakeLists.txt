@@ -163,7 +163,7 @@ add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(src/c++)
 
-if(DPCPP_COMPILER)
+if(ENABLE_SYCL)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
   add_subdirectory(src/sycl)
