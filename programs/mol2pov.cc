@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <fstream>
 #include <vector>
-#include "libgraph/cubicgraph.hh"
-#include "libgraph/fullerenegraph.hh"
-#include "libgraph/polyhedron.hh"
+#include "fullerenes/cubicgraph.hh"
+#include "fullerenes/fullerenegraph.hh"
+#include "fullerenes/polyhedron.hh"
 
 int main(int ac, char **av)
 {
@@ -16,10 +16,10 @@ int main(int ac, char **av)
   for(int i=1;i<ac;i++){
     string filename(av[i]);
     string outname(filename.substr(0,filename.rfind("."))+".pov");
-    //  cerr << "Reading from: " << filename << endl
-    //       << "Writing to:   " << outname  << endl;
+    cerr << "Reading from: " << filename << endl
+         << "Writing to:   " << outname  << endl;
 
-    Polyhedron P(filename);
+    Polyhedron P = Polyhedron::from_file(filename);
 
     double min_diameter = 4, max_diameter = 30, diameter = P.diameter();
     double width = 2.5*diameter/min_diameter;
