@@ -5,7 +5,7 @@ int main(int ac, char **av)
 {
   assert(ac>=2);
 
-  Polyhedron P(av[1]);
+  Polyhedron P = Polyhedron::from_file(av[1]);
   
   P.move_to_origin();
   matrix3d If(P.principal_axes());
