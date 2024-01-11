@@ -37,9 +37,9 @@ public:
 
   // This group of functions should be used whenever the graphs are oriented. Fmax is not necessary, just an extra back-stop.
   vector<face_t> compute_faces_oriented(int Fmax=INT_MAX) const; // TODO: This should replace the old layout-based method  
-  face_t get_face_oriented(const dedge_t &e, int Fmax=INT_MAX) const; 
-  dedge_t get_face_representation(dedge_t e, int Fmax=INT_MAX) const; 
-  vector<dedge_t> compute_face_representations(int Fmax=INT_MAX) const; // Unique representation of face in oriented planar graph
+  face_t get_face_oriented(const arc_t &e, int Fmax=INT_MAX) const; 
+  arc_t get_face_representation(arc_t e, int Fmax=INT_MAX) const; 
+  vector<arc_t> compute_face_representations(int Fmax=INT_MAX) const; // Unique representation of face in oriented planar graph
 
   // This should all be phased out. For non-oriented graphs, better to compute planar embedding and orient once and for all,
   // than to use planar layout for orientation everywhere (or better yet, make sure graph is oriented in the first place).
@@ -93,7 +93,7 @@ public:
   vector<coord2d> tutte_layout_iterative(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> tutte_layout_direct(const face_t& outer_face, const vector<coord2d>& outer_coords) const;
   vector<coord2d> spherical_projection() const;
-  bool optimise_layout(const double zv_dist=0.2, const double k_dist=10.0, const double k_angle=10.0, const double k_area=10.0);
+  bool optimize_layout(const double zv_dist=0.2, const double k_dist=10.0, const double k_angle=10.0, const double k_area=10.0);
 
   vector<double> edge_lengths() const;
   coord2d width_height() const;

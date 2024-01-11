@@ -20,7 +20,7 @@ bool Graph::remove_edge(const edge_t& e)
 // Returns true if edge existed prior to call, false if not
 // insert v right before suc_uv in the list of neighbours of u
 // insert u right before suc_vu in the list of neighbours of v
-bool Graph::insert_edge(const dedge_t& e, const node_t suc_uv, const node_t suc_vu)
+bool Graph::insert_edge(const arc_t& e, const node_t suc_uv, const node_t suc_vu)
 {
   if(edge_exists(e)) return true;	// insert_edge must be idempotent
 
@@ -86,7 +86,7 @@ void Graph::remove_vertices(set<int> &sv){
   assert(is_connected());
 }
 
-int  Graph::dedge_ix(node_t u, node_t v) const
+int  Graph::arc_ix(node_t u, node_t v) const
 {
   const vector<node_t>& nu(neighbours[u]);
   for(int j=0;j<nu.size(); j++)
@@ -98,7 +98,7 @@ int  Graph::dedge_ix(node_t u, node_t v) const
 node_t Graph::next(node_t u, node_t v) const
 {
   const auto &nu(neighbours[u]);
-  int j = dedge_ix(u,v);
+  int j = arc_ix(u,v);
   if(j>=0) return nu[(j+1)%nu.size()];
   else return -1;
 }
@@ -107,7 +107,7 @@ node_t Graph::next(node_t u, node_t v) const
 node_t Graph::prev(node_t u, node_t v) const
 {
   const auto &nu(neighbours[u]);  
-  int j = dedge_ix(u,v);
+  int j = arc_ix(u,v);
   if(j>=0) return nu[(j-1+nu.size())%nu.size()];
   return -1;            // u-v is not an edge in a triangulation
 }
@@ -126,30 +126,30 @@ node_t Graph::prev_on_face(node_t u, node_t v) const
 
 bool Graph::is_consistently_oriented() const 
 {
-  map<dedge_t,bool> seen_dedge;
+  map<arc_t,bool> seen_arc;
 
-  set<dedge_t> work;
+  set<arc_t> work;
   for(node_t u=0;u<N;u++)
     for(auto v: neighbours[u])
       work.insert({u,v});
 
   while(!work.empty()){
-    const dedge_t e = *work.begin();
+    const arc_t e = *work.begin();
     node_t u(e.first), v(e.second);
 
     // Process CW face starting in u->v
     const node_t u0 = u;
-    work.erase(dedge_t(u,v));
+    work.erase(arc_t(u,v));
     while(v != u0){
       node_t w = next(v,u);	// u--v--w is CW-most corner
       u = v;
       v = w;
-      if(work.find(dedge_t(u,v)) == work.end()){ // We have already processed arc u->v
-	//	cerr << "Directed edge " << dedge_t(u,v) << " is part of two faces.\n";
+      if(work.find(arc_t(u,v)) == work.end()){ // We have already processed arc u->v
+	//	cerr << "Directed edge " << arc_t(u,v) << " is part of two faces.\n";
 	return false;
       }
 
-      work.erase(dedge_t(u,v));
+      work.erase(arc_t(u,v));
     }
   }
   // Every directed edge is part of exactly one face <-> orientation is consistent
@@ -470,12 +470,12 @@ vector<edge_t> Graph::undirected_edges() const {
   return vector<edge_t>(edges.begin(),edges.end());
 }
 
-vector<dedge_t> Graph::directed_edges() const {
-  set<dedge_t> edges;
+vector<arc_t> Graph::directed_edges() const {
+  set<arc_t> edges;
   for(node_t u=0;u<N;u++)
     for(int i=0;i<neighbours[u].size();i++)
-      edges.insert(dedge_t(u,neighbours[u][i]));
-  return vector<dedge_t>(edges.begin(),edges.end());
+      edges.insert(arc_t(u,neighbours[u][i]));
+  return vector<arc_t>(edges.begin(),edges.end());
 }
 
 size_t Graph::count_edges() const {

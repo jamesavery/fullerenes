@@ -3,7 +3,7 @@
 #include "fullerenes/unfold.hh"
 #include "fullerenes/buckygen-wrapper.hh"
 
-pair<node_t,node_t> Triangulation::adjacent_tris(const dedge_t& e) const
+pair<node_t,node_t> Triangulation::adjacent_tris(const arc_t& e) const
 {
   node_t u  = e.first, v = e.second;
   node_t w1=-1, w2=-1;
@@ -58,20 +58,20 @@ vector<tri_t> Triangulation::compute_faces() const
 
 void Triangulation::orient_neighbours()
 {
-  map<dedge_t,node_t> next;
+  map<arc_t,node_t> next;
 
   for(int i=0;i<triangles.size();i++){
     const tri_t& t(triangles[i]);
-    next[dedge_t(t[0],t[1])] = t[2];
-    next[dedge_t(t[1],t[2])] = t[0];
-    next[dedge_t(t[2],t[0])] = t[1];
+    next[arc_t(t[0],t[1])] = t[2];
+    next[arc_t(t[1],t[2])] = t[0];
+    next[arc_t(t[2],t[0])] = t[1];
   }
   for(node_t u=0;u<N;u++){
     int d = neighbours[u].size();
 
     node_t v = neighbours[u][0];
     for(int i=1;i<d;i++){
-      node_t w = next[dedge_t(u,v)];
+      node_t w = next[arc_t(u,v)];
       neighbours[u][i] = w;
       v = w;
     }
@@ -82,7 +82,7 @@ void Triangulation::orient_neighbours()
 vector<tri_t> Triangulation::compute_faces_oriented() const
 {
   //Why is this information stored in a hashmap seems like std::vector is perfectly suitable here.
-  unordered_map<dedge_t,bool> dedge_done(2*count_edges());
+  unordered_map<arc_t,bool> arc_done(2*count_edges());
   vector<tri_t> triangles;
   triangles.reserve(2*(N-2));        // Most common case is cubic dual, but we no longer know it for sure.
 
@@ -90,9 +90,9 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
     const vector<node_t>& nu(neighbours[u]);
     for(int i=0;i<nu.size();i++){
       const node_t& v(nu[i]);    // Process directed edge u->v
-      const dedge_t uv(u,v);
+      const arc_t uv(u,v);
 
-      if(!dedge_done[uv]){
+      if(!arc_done[uv]){
         node_t w = next_on_face(u,v);
 	if(w==-1){
 	  printf("next_on_face(%d,%d) = prev(%d,%d) = -1\n",u,v,v,u);
@@ -102,14 +102,14 @@ vector<tri_t> Triangulation::compute_faces_oriented() const
 	}
         //Is This Condition necessary? 
         //since every directed edge is only part of 1 triangle it ought to be sufficient
-        //to check dedge_done[{u,v}].
-        if(!dedge_done[{v,w}] && !dedge_done[{w,u}]){ 
+        //to check arc_done[{u,v}].
+        if(!arc_done[{v,w}] && !arc_done[{w,u}]){ 
 
           triangles.push_back(tri_t(u,v,w));
 
-          dedge_done[{u,v}] = true;
-          dedge_done[{v,w}] = true;
-          dedge_done[{w,u}] = true;
+          arc_done[{u,v}] = true;
+          arc_done[{v,w}] = true;
+          arc_done[{w,u}] = true;
         }
       }
     }
@@ -172,7 +172,7 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
 
 	// The transverse arc to u->g in the cubic graph is u->v.
 	// Now we want to find the index i such that v = cubic_graph.neighbours[u][i].
-	int i = cubic_graph.dedge_ix({u,v});
+	int i = cubic_graph.arc_ix({u,v});
 	darc_to_carc[u*Fmax + j] = {a,i};
 	carc_to_darc[a*3    + i] = {u,j};
       }
@@ -181,15 +181,15 @@ void Triangulation::compute_lookup_tables(const PlanarGraph&            cubic_gr
 }
 */
 
-// TODO: dedge_t -> arc_t everywhere
-//       dedge   -> arc   everywhere
+// TODO: arc_t -> arc_t everywhere
+//       arc   -> arc   everywhere
 //       cubic nodes: a,b,c,...
 //       dual  nodes: u,v,w,...
-unordered_map<dedge_t,dedge_t> Triangulation::arc_translation() const
+unordered_map<arc_t,arc_t> Triangulation::arc_translation() const
 {
   // TODO: Common metadata, calculate once
   IDCounter<tri_t> tri_numbers;
-  unordered_map<dedge_t,dedge_t> arc_translate(triangles.size()*3);
+  unordered_map<arc_t,arc_t> arc_translate(triangles.size()*3);
 
   if(triangles.size() != (N-2)*2){
     cout << "triangles = " << triangles << endl;
@@ -867,7 +867,7 @@ void Triangulation::symmetry_information(int N_generators, Graph& coxeter_diagra
 
 vector<int> draw_path(int major, int minor)
 {
-  if(minor == 0) return {{major}};
+  if(minor == 0) return {1,major};
 
   int slope = major/minor, slope_remainder = major%minor, slope_accumulator = 0;
 

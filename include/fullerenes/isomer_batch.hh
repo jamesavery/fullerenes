@@ -1,5 +1,5 @@
-#ifndef ISOMERBATCH_STRUCT
-#define ISOMERBATCH_STRUCT
+#pragma once
+
 #include "fullerenes/config.hh"
 #ifdef ENABLE_CUDA
 # include "cuda_runtime.h"
@@ -42,14 +42,41 @@ struct IsomerBatch
     IsomerStatus* statuses;
     std::vector<std::tuple<std::string,void**,size_t,bool>> pointers;
 
-    IsomerBatch(){
-      pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+  IsomerBatch(){
+    pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(device_node_t)*3, true}, {"dual_neighbours", (void**)&dual_neighbours, sizeof(device_node_t)*4, true}, {"face_degrees", (void**)&face_degrees, sizeof(uint8_t)*1, true}, {"X", (void**)&X, sizeof(device_real_t)*3, true}, {"xys", (void**)&xys, sizeof(device_real_t)*2, true}, {"statuses", (void**)&statuses, sizeof(IsomerStatus), false}, {"IDs", (void**)&IDs, sizeof(size_t), false}, {"iterations", (void**)&iterations, sizeof(size_t), false}};
+  }
+
+  IsomerBatch(size_t n_atoms, size_t n_isomers, int device  = 0) :
+    n_atoms(n_atoms), isomer_capacity(n_isomers), n_faces(n_atoms/2+2), m_device(device) {
+    typedef device_node_t node_t;
+  
+    pointers =   {{"cubic_neighbours",(void**)&cubic_neighbours, sizeof(node_t)*n_atoms*3,true},
+		  {"dual_neighbours", (void**)&dual_neighbours,
+		   sizeof(node_t)*(n_atoms/2 +2) * 6, true},
+		  {"face_degrees", (void**)&face_degrees,sizeof(uint8_t)*(n_atoms/2 +2),true},
+		  {"X", (void**)&X, sizeof(device_real_t)*n_atoms*3, true},
+		  {"xys", (void**)&xys, sizeof(device_real_t)*n_atoms*2, true},
+		  {"statuses", (void**)&statuses, sizeof(IsomerStatus), false},
+		  {"IDs", (void**)&IDs, sizeof(size_t), false},
+		  {"iterations", (void**)&iterations, sizeof(size_t), false}};
+
+    for (auto [name, ptr,isomer_size,whatisthebool]: pointers) {      
+      *ptr = calloc(n_isomers, isomer_size);
+      memset(*ptr,0, n_isomers*isomer_size);
     }
+    allocated = true;
+  }
+  
 
-    void operator=(const IsomerBatch &);
-
-    ~IsomerBatch();
-    IsomerBatch(size_t n_atoms, size_t n_isomers, int device  = 0);
+  void operator=(const IsomerBatch &);
+  
+  ~IsomerBatch(){
+    if (allocated == true)
+      for (size_t i = 0; i < pointers.size(); i++) 
+	free(*get<1>(pointers[i])); 
+    allocated = false;
+  }
+      
     void set_print_simple() {verbose = false;} 
     void set_print_verbose() {verbose = true;} 
     bool get_print_mode() const {return verbose;}
@@ -67,8 +94,8 @@ struct IsomerBatch
     void append(const PlanarGraph& G, const size_t id, const bool copy_2d_layout = true); //Appends a planar graph to the batch and increments the size
     void append(const Polyhedron& P, const size_t id); //Appends a polyhedron to the batch and increments the size
     void clear(const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy = LaunchPolicy::SYNC);                 //Clears the batch and resets the size to 0
-    bool operator==(const IsomerBatch& b); //Returns true if the two batches are equal
-    bool operator!=(const IsomerBatch& b) {return !(*this == b);}
+    bool operator==(const IsomerBatch& b) const; //Returns true if the two batches are equal
+    bool operator!=(const IsomerBatch& b) const {return !(*this == b);}
     //friend std::ostream& operator<<(std::ostream& os, const IsomerBatch& a); //Prints the batch to the given stream
 
   private:
@@ -78,4 +105,4 @@ struct IsomerBatch
 
 };
 
-#endif
+

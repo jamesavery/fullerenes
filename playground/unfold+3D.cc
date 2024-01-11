@@ -15,7 +15,7 @@ Polyhedron fullerene_dual_polyhedron(const Triangulation& dg)
   g.layout2d = g.tutte_layout();
 
   vector<coord3d> points = g.zero_order_geometry();
-  points = g.optimised_geometry(points);
+  points = g.optimized_geometry(points);
 
   vector<coord3d> dual_points(dg.N);
 
@@ -175,8 +175,8 @@ int main(int ac, char **av)
   ofstream output("output/C"+to_string(N)+"-unfold.m");
   output << "dual    = " << dual << ";\n"
 	 << "outline = " << uf.outline << ";\n"
-	 << "dedges   = " << get_keys(uf.arc_coords) << ";\n"
-	 << "dedgepos = " << get_values(uf.arc_coords) << ";\n";
+	 << "arcs   = " << get_keys(uf.arc_coords) << ";\n"
+	 << "arcpos = " << get_values(uf.arc_coords) << ";\n";
   output.close();
 
   vector<tri_t> triangles = Tris(dual);
@@ -190,8 +190,8 @@ int main(int ac, char **av)
 
   output << "dual    = " << dual << ";\n"
 	 << "outline = " << UF.outline << ";\n"
-	 << "dedges   = " << get_keys(UF.arc_coords) << ";\n"
-	 << "dedgepos = " << get_values(UF.arc_coords) << ";\n"
+	 << "arcs   = " << get_keys(UF.arc_coords) << ";\n"
+	 << "arcpos = " << get_values(UF.arc_coords) << ";\n"
 	 << "folded   = " << f << ";\n";
 
   output.close();

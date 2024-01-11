@@ -55,14 +55,14 @@ class Symmetry : public Triangulation {
 public:
   vector<int> S0;
   jumplist_t  J0;
-  vector< Permutation > G, Gedge, Gdedge, Gtri;
+  vector< Permutation > G, Gedge, Garc, Gtri;
   IDCounter<edge_t>   edge_id;
-  IDCounter<dedge_t> dedge_id;
+  IDCounter<arc_t> arc_id;
 
   vector<Permutation> permutation_representation() const;
   vector<Permutation> tri_permutation(const vector<Permutation>& Gf)  const;
   vector<Permutation> edge_permutation(const vector<Permutation>& Gf) const;
-  vector<Permutation> dedge_permutation(const vector<Permutation>& Gf) const;
+  vector<Permutation> arc_permutation(const vector<Permutation>& Gf) const;
   
   // Returns the involutions *except* from the identity
   vector<int>           involutions() const;
@@ -82,14 +82,14 @@ public:
       const vector<node_t> &nu = neighbours[u];
       for(int i=0;i<nu.size();i++){
 	const node_t v = nu[i];
-	dedge_id.insert({u,v});
+	arc_id.insert({u,v});
 	edge_id.insert(edge_t{u,v});
       }
     }
 
     G = permutation_representation();
     Gedge  = edge_permutation(G);
-    Gdedge = dedge_permutation(G);
+    Garc = arc_permutation(G);
     Gtri  = tri_permutation(G);
   }
   

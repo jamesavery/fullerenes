@@ -22,7 +22,7 @@ namespace gpu_kernels{
         //Uses forcefield optimization to relax the positions of atoms in all isomers of a batch.
         
         template <ForcefieldType FFT = PEDERSEN, Device U = GPU, typename T = float, typename K = uint16_t>
-        cudaError_t optimise(IsomerBatch<U>& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t optimize(IsomerBatch<U>& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
         template <Device U>
         cudaError_t test_fun(IsomerBatch<U>& B, CuArray<float>& output);
@@ -105,16 +105,16 @@ namespace gpu_kernels{
         void reset_time(); //Resets time spent in kernel to 0.
         //Computes the cubic neighbour list from the dual neighbour list
         template <Device U = GPU, typename K = uint16_t>
-        cudaError_t dualise(IsomerBatch<U>& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t dualize(IsomerBatch<U>& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
         template <Device U = GPU, typename K = uint16_t>
-        cudaError_t dualise_2(IsomerBatch<U>& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
+        cudaError_t dualize_2(IsomerBatch<U>& B, const LaunchCtx& ctx = LaunchCtx(), const LaunchPolicy policy = LaunchPolicy::SYNC);
 
         template <Device U = GPU, typename K = uint16_t>
-        void dualise_3(IsomerBatch<U>& B);
+        void dualize_3(IsomerBatch<U>& B);
 
         template <Device U = GPU, typename K = uint16_t>
-        void dualise_4(IsomerBatch<U>& B);
+        void dualize_4(IsomerBatch<U>& B);
     }
 
     namespace isomerspace_eigen{

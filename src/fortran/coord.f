@@ -21,8 +21,9 @@ C     Take the mirror image
       endif
 
       Do J=1,number_vertices
-        IM=IAtom(J)
-        if(Iprint.ne.0) Write(IOUT,1002),J,IM,El(IM),(Dist(I,J),I=1,3)
+         IM=IAtom(J)
+c       TODO: this breaks Cray ftn          
+c        if(Iprint.ne.0) Write(IOUT,1002),J,IM,El(IM),(Dist(I,J),I=1,3)
         AnumX=AnumX+Dist(1,J)
         AnumY=AnumY+Dist(2,J)
         AnumZ=AnumZ+Dist(3,J)
@@ -44,8 +45,9 @@ C     Convert to internal coordinates
        IM=IAtom(J)
          Do I=1,3
           Dist(I,J)=Dist(I,J)-DistCM(I)
-         enddo
-       Write(IOUT,1002),J,IM,El(IM),(Dist(I,J),I=1,3)
+       enddo
+c       TODO: this breaks Cray ftn        
+c       Write(IOUT,1002),J,IM,El(IM),(Dist(I,J),I=1,3)
       enddo
 
 C     Calculate distance part of moment of inertia

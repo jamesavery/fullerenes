@@ -166,18 +166,18 @@ bool FulleroidDelaunay::is_consistent(const Quad& Q) const {
 
 
 #include <stack>
-vector<dedge_t> FulleroidDelaunay::delaunayify_hole(const vector<edge_t>& edges)
+vector<arc_t> FulleroidDelaunay::delaunayify_hole(const vector<edge_t>& edges)
 {
   Debug debug("Delaunay",Debug::INFO1);
-  vector<dedge_t> new_edges(edges.begin(), edges.end());
-  stack<dedge_t,vector<dedge_t> >  S(new_edges);
+  vector<arc_t> new_edges(edges.begin(), edges.end());
+  stack<arc_t,vector<arc_t> >  S(new_edges);
 
   map<edge_t,bool> mark;
   for(auto e: new_edges) mark[edge_t(e)] = true;
 
   int flips = 0;
   while(!S.empty()){ 
-    const dedge_t AC = S.top(); S.pop(); mark[edge_t(AC)] = false;
+    const arc_t AC = S.top(); S.pop(); mark[edge_t(AC)] = false;
     debug << "Next edge to check is " << AC << ".\n";
 
     node_t A = AC.first, C = AC.second;
@@ -193,13 +193,13 @@ vector<dedge_t> FulleroidDelaunay::delaunayify_hole(const vector<edge_t>& edges)
 
       flip(Q);
     
-      if(!mark[{A,B}]){ S.push(dedge_t({A,B})); mark[{A,B}] = true; }
-      if(!mark[{B,C}]){ S.push(dedge_t({B,C})); mark[{B,C}] = true; }
-      if(!mark[{C,D}]){ S.push(dedge_t({C,D})); mark[{C,D}] = true; }
-      if(!mark[{D,A}]){ S.push(dedge_t({D,A})); mark[{D,A}] = true; }
+      if(!mark[{A,B}]){ S.push(arc_t({A,B})); mark[{A,B}] = true; }
+      if(!mark[{B,C}]){ S.push(arc_t({B,C})); mark[{B,C}] = true; }
+      if(!mark[{C,D}]){ S.push(arc_t({C,D})); mark[{C,D}] = true; }
+      if(!mark[{D,A}]){ S.push(arc_t({D,A})); mark[{D,A}] = true; }
 
-      new_edges.erase(find(new_edges.begin(),new_edges.end(), dedge_t(A,C)));
-      new_edges.push_back(dedge_t(B,D));
+      new_edges.erase(find(new_edges.begin(),new_edges.end(), arc_t(A,C)));
+      new_edges.push_back(arc_t(B,D));
       
       flips++;
     } else{ debug << (Q.to_vector()+1) << " is delaunay, all good." << endl; }

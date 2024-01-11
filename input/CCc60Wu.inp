@@ -1,4 +1,4 @@
-C60 Geometry optimised and frequency analysis for Wu force field
+C60 Geometry optimized and frequency analysis for Wu force field
 &General NA=60 /
 &Coord ICart=1 /
 &FFChoice Iopt=1 ihessian=1 iprinth=1/

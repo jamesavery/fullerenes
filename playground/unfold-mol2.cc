@@ -23,8 +23,8 @@ int main(int ac, char **av)
     << "triangles = " << dual.triangles << ";\n"
     << "P         = " << P << ";\n"
     << "PD        = " << dP << ";\n"
-    << "dedges    = " << get_keys(uf.edgecoords) << ";\n"
-    << "dedgepos  = " << get_values(uf.edgecoords) << ";\n";
+    << "arcs    = " << get_keys(uf.edgecoords) << ";\n"
+    << "arcpos  = " << get_values(uf.edgecoords) << ";\n";
   output.close();
 
   ofstream latex_output("output/C"+to_string(P.N)+"-unfold.tex");
@@ -37,8 +37,8 @@ int main(int ac, char **av)
 
   // output << "dual    = " << dual << ";\n"
   // 	 << "outline = " << UF.outline << ";\n"
-  // 	 << "dedges   = " << get_keys(UF.edgecoords) << ";\n"
-  // 	 << "dedgepos = " << get_values(UF.edgecoords) << ";\n";
+  // 	 << "arcs   = " << get_keys(UF.edgecoords) << ";\n"
+  // 	 << "arcpos = " << get_values(UF.edgecoords) << ";\n";
 
   // output.close();
 

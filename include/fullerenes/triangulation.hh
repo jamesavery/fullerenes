@@ -36,11 +36,11 @@ public:
   
   PlanarGraph dual_graph() const;
   vector<face_t> cubic_faces() const;
-  unordered_map<dedge_t,dedge_t> arc_translation() const;
+  unordered_map<arc_t,arc_t> arc_translation() const;
   
   size_t max_degree() const {
     size_t max_degree = 0;
-    for(auto &nu: neighbours) max_degree = max(max_degree, nu.size());
+    for(auto &nu: neighbours) max_degree = std::max(max_degree, nu.size());
     return max_degree;
   }
 
@@ -54,7 +54,7 @@ public:
   // this is cheap because we just remove a set of faces
   PlanarGraph inverse_leapfrog_dual() const;
   
-  pair<node_t,node_t> adjacent_tris(const dedge_t &e) const;
+  pair<node_t,node_t> adjacent_tris(const arc_t &e) const;
 
   vector<tri_t> compute_faces() const;          // Returns non-oriented triangles
   vector<tri_t> compute_faces_oriented() const; // Compute oriented triangles given oriented neighbours
@@ -157,7 +157,7 @@ class CubicPair {
   Triangulation T;
   PlanarGraph   G;
   IDCounter<tri_t> triangle_id;  
-  vector<vector<dedge_t>> CtoD, DtoC;
+  vector<vector<arc_t>> CtoD, DtoC;
   
   int face_start(const face_t &f){
     node_t i_m = 0;
@@ -165,7 +165,7 @@ class CubicPair {
     return i_m;
   }
     
-  CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<dedge_t>(3)), DtoC(T.N)
+  CubicPair(const Triangulation &T) : G(T.dual_graph()), CtoD(G.N,vector<arc_t>(3)), DtoC(T.N)
   {
     for(const auto &t: T.triangles) triangle_id.insert(t.sorted());
   
@@ -182,10 +182,10 @@ class CubicPair {
 
 	tri_t t1 = {u,v,s}, t2 = {v,u,t};
 	
-	// dedges get a unique number: id(u,i) = row_offset[u]+i
+	// arcs get a unique number: id(u,i) = row_offset[u]+i
 	node_t U   = triangle_id(t1.sorted()), V = triangle_id(t2.sorted());
-	node_t i_V = G.dedge_ix(U,V), i_U = G.dedge_ix(V,U);
-	node_t i_v = T.dedge_ix(u,v), i_u = T.dedge_ix(v,u);
+	node_t i_V = G.arc_ix(U,V), i_U = G.arc_ix(V,U);
+	node_t i_v = T.arc_ix(u,v), i_u = T.arc_ix(v,u);
 	
 	CtoD[U][i_V] = {u,i_v};
 	CtoD[V][i_U] = {v,i_u};

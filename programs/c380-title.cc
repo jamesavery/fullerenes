@@ -120,7 +120,7 @@ int main(int ac, char **av)
     }
     
     Polyhedron P(P0);
-    P.optimise();
+    P.optimize();
     
     output << "coordinates0 = " << P0.points << ";\n";
     output << "coordinates = "  << P.points << ";\n";

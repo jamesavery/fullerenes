@@ -1842,7 +1842,6 @@ __device__ void check_batch(IsomerBatch<U> &B, const size_t isomer_idx, const si
     if (isomer_idx < B.isomer_capacity){
       
       //Avoid illegal memory access
-      if(B.iterations[isomer_idx] >= max_iterations){ B.statuses[isomer_idx] = IsomerStatus::FAILED; /*printf("check_back() end: too many iterations. I am thread #%d\n", threadIdx.x);*/ return; } // Why doesn't this register?
       if (B.statuses[isomer_idx] == IsomerStatus::PLZ_CHECK){  
 	size_t offset = isomer_idx * blockDim.x;
 	Constants constants        = Constants<T,K>(B, isomer_idx);
@@ -1894,13 +1893,12 @@ __device__ void check_batch(IsomerBatch<U> &B, const size_t isomer_idx, const si
 	  size_t iterations_done =  B.iterations[isomer_idx];	  
 	  bool converged = ((angle_max < 0.26) && (dihedral_max < 0.1) && (bond_max < 0.1)) ;
 	  bool failed    = ISNAN(bond_max) || (iterations_done > max_iterations);
-	  
 	  B.statuses[isomer_idx] = failed? IsomerStatus::FAILED :
 	    (converged? IsomerStatus::CONVERGED : IsomerStatus::NOT_CONVERGED);
 
-	  if(failed)
-	    printf("CHECK failed: isomer %ld has %ld iterations, grad_norm=%g, bond_max=%g, angle_max=%g, dihedral_max=%g\n",
-		   isomer_idx,iterations_done,grad_norm, bond_max, angle_max, dihedral_max);
+	  //if(failed)
+	    //printf("CHECK failed: isomer %ld has %ld iterations, grad_norm=%g, bond_max=%g, angle_max=%g, dihedral_max=%g\n",
+		   //isomer_idx,iterations_done,grad_norm, bond_max, angle_max, dihedral_max);
 
 	}
       }
@@ -1984,7 +1982,7 @@ __global__ void compute_hessians_fd_(IsomerBatch<U> B, CuArray<T> Hess, CuArray<
  * @return void
 */
 template <ForcefieldType FFT, Device U, typename T, typename K>
-__global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_t max_iterations){
+__global__ void optimize_(IsomerBatch<U> B, const size_t iterations, const size_t max_iterations){
   TEMPLATE_TYPEDEFS(T,K);
   SMEM(T);
   clear_cache(smem,Block_Size_Pow_2);
@@ -2016,12 +2014,12 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
 	    assign(sX[node_id],reinterpret_cast<std::array<float,3>*>(B.X+3*offset)[node_id]); //Copy cartesian coordinates from L1 Cache to DRAM.
 	    coord3d* X           = sX;       //Switch coordinate pointer from DRAM to L1 Cache.
 
-	    //Create forcefield struct and use optimization algorithm to optimise the fullerene 
+	    //Create forcefield struct and use optimization algorithm to optimize the fullerene 
 	    ForceField FF = ForceField<FFT,U,T,K>(nodeG, constants, smem);
 	    FF.CG(X,X1,X2,iterations-1);
 
 	    auto E0 = FF.energy(X);
-	    FF.CG(X,X1,X2,iterations);
+	    FF.CG(X,X1,X2,1);
 	    auto E1 = FF.energy(X);
 	    auto dE = ABS(E1 - E0)/(real_t)blockDim.x;
 	    BLOCK_SYNC;
@@ -2036,7 +2034,6 @@ __global__ void optimise_(IsomerBatch<U> B, const size_t iterations, const size_
 	    if (threadIdx.x == 0) {
 	      //	      printf("OPT: isomer %d has %ld iterations, adding %ld\n",isomer_idx, B.iterations[isomer_idx],iterations);
 	      B.iterations[isomer_idx] += iterations;
-	      if(B.iterations[isomer_idx] >= max_iterations) B.statuses[isomer_idx] = IsomerStatus::FAILED;
 	    }
 	  }
       }
@@ -2337,8 +2334,8 @@ int optimal_batch_size(const int N, const int device_id) {
     FLOAT_TYPEDEFS(T);
     cudaSetDevice(device_id);
     static size_t smem = sizeof(coord3d)*3*N + sizeof(T)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimise_<FORCEFIELD_VERSION,GPU,T,K>, N, smem);
-    dims.update_dims((void*)optimise_<FORCEFIELD_VERSION,GPU,T,K>, N, smem);
+    static LaunchDims dims((void*)optimize_<FORCEFIELD_VERSION,GPU,T,K>, N, smem);
+    dims.update_dims((void*)optimize_<FORCEFIELD_VERSION,GPU,T,K>, N, smem);
     return dims.get_grid().x;
 }
 
@@ -2352,7 +2349,7 @@ void reset_time(){
 }
 
 template <ForcefieldType FFT, Device U, typename T, typename K>
-cudaError_t optimise(IsomerBatch<U>& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
+cudaError_t optimize(IsomerBatch<U>& B, const size_t iterations, const size_t max_iterations, const LaunchCtx& ctx, const LaunchPolicy policy){
     TEMPLATE_TYPEDEFS(T,K);
     cudaSetDevice(B.get_device_id());
     static std::vector<bool> first_call(16, true);
@@ -2370,12 +2367,12 @@ cudaError_t optimise(IsomerBatch<U>& B, const size_t iterations, const size_t ma
     }
 
     size_t smem = sizeof(coord3d)* (3*B.n_atoms + 4) + sizeof(real_t)*Block_Size_Pow_2;
-    static LaunchDims dims((void*)optimise_<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);
-    dims.update_dims((void*)optimise_<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);
+    static LaunchDims dims((void*)optimize_<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);
+    dims.update_dims((void*)optimize_<FFT,U,T,K>, B.n_atoms, smem, B.isomer_capacity);
     void* kargs[]{(void*)&B, (void*)&iterations, (void*)&max_iterations};
 
     cudaEventRecord(start[dev], ctx.stream);
-    auto error = safeCudaKernelCall((void*)optimise_<FFT,U,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
+    auto error = safeCudaKernelCall((void*)optimize_<FFT,U,T,K>, dims.get_grid(), dims.get_block(), kargs, smem, ctx.stream);
     cudaEventRecord(stop[dev], ctx.stream);
     
     if(policy == LaunchPolicy::SYNC) {
@@ -2395,8 +2392,8 @@ int declare_generics(){
     CuArray<double> arr_fp64(1);
     CuArray<float> hessians(1);
     CuArray<device_node_t> cols(1);
-    optimise<PEDERSEN, GPU>(B,100,100);
-    optimise<PEDERSEN, GPU, double, uint16_t>(B,100,100);
+    optimize<PEDERSEN, GPU>(B,100,100);
+    optimize<PEDERSEN, GPU, double, uint16_t>(B,100,100);
 
     get_bonds           <GPU, float, uint16_t>(B, arr);
     get_angles          <GPU, float, uint16_t>(B, arr);
@@ -2430,7 +2427,7 @@ int declare_generics(){
 
     get_gradients       <FLATNESS_ENABLED, GPU, float, uint16_t>(B, arr);
     optimal_batch_size  <FLATNESS_ENABLED, GPU, float, uint16_t>(100,0);
-    optimise            <FLATNESS_ENABLED, GPU, float, uint16_t>(B,100,100);
+    optimize            <FLATNESS_ENABLED, GPU, float, uint16_t>(B,100,100);
     get_angle_max       <FLATNESS_ENABLED, GPU, float, uint16_t>(B,arr);
     get_bond_max        <FLATNESS_ENABLED, GPU, float, uint16_t>(B,arr);
     get_dihedral_max    <FLATNESS_ENABLED, GPU, float, uint16_t>(B,arr);
@@ -2457,7 +2454,7 @@ int declare_generics(){
 
     get_gradients       <WIRZ, GPU, float, uint16_t>(B, arr);
     optimal_batch_size  <WIRZ, GPU, float, uint16_t>(100,0);
-    optimise            <WIRZ, GPU, float, uint16_t>(B,100,100);
+    optimize            <WIRZ, GPU, float, uint16_t>(B,100,100);
     get_angle_max       <WIRZ, GPU, float, uint16_t>(B,arr);
     get_bond_max        <WIRZ, GPU, float, uint16_t>(B,arr);
     get_dihedral_max    <WIRZ, GPU, float, uint16_t>(B,arr);
@@ -2484,7 +2481,7 @@ int declare_generics(){
 
     get_gradients       <FLAT_BOND, GPU, float, uint16_t>(B, arr);
     optimal_batch_size  <FLAT_BOND, GPU, float, uint16_t>(100,0);
-    optimise            <FLAT_BOND, GPU, float, uint16_t>(B,100,100);
+    optimize            <FLAT_BOND, GPU, float, uint16_t>(B,100,100);
     get_angle_max       <FLAT_BOND, GPU, float, uint16_t>(B,arr);
     get_bond_max        <FLAT_BOND, GPU, float, uint16_t>(B,arr);
     get_dihedral_max    <FLAT_BOND, GPU, float, uint16_t>(B,arr);
@@ -2541,7 +2538,7 @@ int declare_generics(){
 
     get_gradients       <FLATNESS_ENABLED, GPU, double, uint16_t>(B, arr_fp64);
     optimal_batch_size  <FLATNESS_ENABLED, GPU, double, uint16_t>(100,0);
-    optimise            <FLATNESS_ENABLED, GPU, double, uint16_t>(B,100,100);
+    optimize            <FLATNESS_ENABLED, GPU, double, uint16_t>(B,100,100);
     get_angle_max       <FLATNESS_ENABLED, GPU, double, uint16_t>(B,arr_fp64);
     get_bond_max        <FLATNESS_ENABLED, GPU, double, uint16_t>(B,arr_fp64);
     get_dihedral_max    <FLATNESS_ENABLED, GPU, double, uint16_t>(B,arr_fp64);
@@ -2568,7 +2565,7 @@ int declare_generics(){
 
     get_gradients       <WIRZ, GPU, double, uint16_t>(B, arr_fp64);
     optimal_batch_size  <WIRZ, GPU, double, uint16_t>(100,0);
-    optimise            <WIRZ, GPU, double, uint16_t>(B,100,100);
+    optimize            <WIRZ, GPU, double, uint16_t>(B,100,100);
     get_angle_max       <WIRZ, GPU, double, uint16_t>(B,arr_fp64);
     get_bond_max        <WIRZ, GPU, double, uint16_t>(B,arr_fp64);
     get_dihedral_max    <WIRZ, GPU, double, uint16_t>(B,arr_fp64);
@@ -2595,7 +2592,7 @@ int declare_generics(){
 
     get_gradients       <FLAT_BOND, GPU, double, uint16_t>(B, arr_fp64);
     optimal_batch_size  <FLAT_BOND, GPU, double, uint16_t>(100,0);
-    optimise            <FLAT_BOND, GPU, double, uint16_t>(B,100,100);
+    optimize            <FLAT_BOND, GPU, double, uint16_t>(B,100,100);
     get_angle_max       <FLAT_BOND, GPU, double, uint16_t>(B,arr_fp64);
     get_bond_max        <FLAT_BOND, GPU, double, uint16_t>(B,arr_fp64);
     get_dihedral_max    <FLAT_BOND, GPU, double, uint16_t>(B,arr_fp64);

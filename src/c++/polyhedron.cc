@@ -133,13 +133,13 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
 
     // 2.1 Find all faces visible from p ( (f.centroid() - p).dot(f.n) > 0 ) 
     list<triit> visible;
-    map<dedge_t,bool> is_visible;
+    map<arc_t,bool> is_visible;
     coord3d centre; // Centre of visible faces
     for(triit t(output.begin());t!=output.end();t++){
       if(!Tri3D(points,*t).back_face(p)) { 
         visible.push_back(t);
         for(int i=0;i<3;i++) 
-          is_visible[dedge_t(t->u(i),t->u((i+1)%3))] = true; 
+          is_visible[arc_t(t->u(i),t->u((i+1)%3))] = true; 
         centre += t->centroid(points);
       }
     }
@@ -151,9 +151,9 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
       const tri_t& tv(**tvi);
 
       for(int j=0;j<3;j++){
-        const dedge_t e(tv[j],tv[(j+1)%3]);
+        const arc_t e(tv[j],tv[(j+1)%3]);
 
-        if( (is_visible[e] && !is_visible[dedge_t(e.second,e.first)]) || (!is_visible[e] && is_visible[dedge_t(e.second,e.first)]) )
+        if( (is_visible[e] && !is_visible[arc_t(e.second,e.first)]) || (!is_visible[e] && is_visible[arc_t(e.second,e.first)]) )
           horizon.push_back(edge_t(e));
       }
       // 2.3 Delete visible faces from output set. 
@@ -170,7 +170,7 @@ Polyhedron Polyhedron::incremental_convex_hull() const {
 
       triit ti = output.insert(output.end(),t);
       //      for(int j=0;j<3;j++)
-        //        edgetri[dedge_t(t[j],t[(j+1)%3])] = ti;
+        //        edgetri[arc_t(t[j],t[(j+1)%3])] = ti;
     }
     if(output.size() > N*N*10){
       fprintf(stderr,"Something went horribly wrong in computation of convex hull:\n");
@@ -452,7 +452,7 @@ Polyhedron Polyhedron::leapfrog_dual() const
       xc += points[u]/d;
 
       // Add edge mumble mumble
-      Plf.insert_edge(dedge_t{v,c},u,-1);
+      Plf.insert_edge(arc_t{v,c},u,-1);
 
       // Add triangle
       Plf.faces[c] = tri_t{u,v,c};
@@ -469,7 +469,7 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
     G.layout2d       = G.tutte_layout();
   
   Polyhedron P(G,G.zero_order_geometry(),6);
-  P.points = G.optimised_geometry(P.points);
+  P.points = G.optimized_geometry(P.points);
 
   P.move_to_origin();		// Center of mass at (0,0,0)
   P.align_with_axes();		// Align with principal axes
@@ -477,18 +477,18 @@ Polyhedron Polyhedron::fullerene_polyhedron(FullereneGraph G)
   return P;
 }
 
-bool Polyhedron::optimise(int opt_method, double ftol)
+bool Polyhedron::optimize(int opt_method, double ftol)
 {
   if(is_a_fullerene()){
     FullereneGraph g(*this);
-    points = g.optimised_geometry(points,opt_method,ftol);
+    points = g.optimized_geometry(points,opt_method,ftol);
     return true;
   } if(is_cubic()) {
-    bool optimise_angles = true;
-    return optimise_other(optimise_angles);
+    bool optimize_angles = true;
+    return optimize_other(optimize_angles);
   } else if(is_triangulation()) {
-    bool optimise_angles = false;
-    return optimise_other(optimise_angles);
+    bool optimize_angles = false;
+    return optimize_other(optimize_angles);
   }else{
      Triangulation LFD = leapfrog_dual();
 
@@ -502,12 +502,12 @@ bool Polyhedron::optimise(int opt_method, double ftol)
       inverse_triangle_list[tri[2]].push_back(i);
     }
 
-    // generate and optimise LF of initial polyhedron
+    // generate and optimize LF of initial polyhedron
     PlanarGraph LF = LFD.dual_graph();
     LF.layout2d = LF.tutte_layout();
     Polyhedron P(LF,LF.zero_order_geometry());
-    bool optimise_angles = true;
-    bool opt_success = P.optimise_other(optimise_angles);
+    bool optimize_angles = true;
+    bool opt_success = P.optimize_other(optimize_angles);
 
     // for each face in LF which corresponds to a vertex in the initial graph,
     // find the average coordinates of all vertices (ie the face centre)

@@ -183,8 +183,8 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
   if(is_oriented){
 
     // Each directed edge uniquely identifies a face
-    vector<dedge_t>            face_reps = compute_face_representations(Fmax);
-    unordered_map<dedge_t,int> face_numbers(face_reps.size());
+    vector<arc_t>            face_reps = compute_face_representations(Fmax);
+    unordered_map<arc_t,int> face_numbers(face_reps.size());
     for(int i=0;i<face_reps.size();i++) face_numbers[face_reps[i]] = i;
 
     // cerr << "face_reps  = " << face_reps << ";\n";
@@ -194,7 +194,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     
     PlanarGraph dual(face_numbers.size());
 
-    dedge_t e_f;
+    arc_t e_f;
     node_t  i_f;
     for(const auto &ei: face_numbers){
       // e_f is minimal directed edge representation of face f, i_f is its face number.      
@@ -206,8 +206,8 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
       node_t u=e_f.first, v=e_f.second, w=-1, i=0;
       do {
         // e_g is MDE-representation of opposite face along edge e_f
-        dedge_t e_g = get_face_representation({v,u},Fmax);
-        // cerr << "Processing face: " << dedge_t{u,v} << " -> " << get_face_oriented({u,v},Fmax)<<" "
+        arc_t e_g = get_face_representation({v,u},Fmax);
+        // cerr << "Processing face: " << arc_t{u,v} << " -> " << get_face_oriented({u,v},Fmax)<<" "
         //      << " opposite " << e_g << " -> " << get_face_oriented(e_g,Fmax) << ";\n";
         dual.neighbours[i_f].push_back(face_numbers[e_g]);
 
@@ -222,7 +222,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
       dual.layout2d = vector<coord2d>(face_numbers.size());
 
       for(const auto &ei: face_numbers){
-        dedge_t e_f = ei.first; node_t i_f = ei.second;
+        arc_t e_f = ei.first; node_t i_f = ei.second;
         face_t f = get_face_oriented(e_f,Fmax);
         
         dual.layout2d[i_f] = f.centroid(layout2d);
@@ -314,7 +314,7 @@ PlanarGraph PlanarGraph::leapfrog_dual() const
     for(int j=0;j<f.size();j++){
       node_t u = f[j], v = f[(j+1)%f.size()];
 
-      lf.insert_edge(dedge_t{v,c},u,-1);
+      lf.insert_edge(arc_t{v,c},u,-1);
     }
   }
 
@@ -423,7 +423,7 @@ vector<face_t> PlanarGraph::compute_faces_layout_oriented() const
 {
   assert(layout2d.size() == N);
   //  cout << "Computing faces using 2D orientation." << endl;
-  set<dedge_t> workset;
+  set<arc_t> workset;
   vector<edge_t> edges = undirected_edges();
 
   vector<face_t> faces;
@@ -431,8 +431,8 @@ vector<face_t> PlanarGraph::compute_faces_layout_oriented() const
   
   for(edge_t e: edges){
     const node_t s = e.first, t = e.second;
-    workset.insert(dedge_t(s,t));
-    workset.insert(dedge_t(t,s));
+    workset.insert(arc_t(s,t));
+    workset.insert(arc_t(t,s));
   }
 
   // If layout is planar, outer face must exist and be ordered CW,
@@ -460,17 +460,17 @@ vector<face_t> PlanarGraph::compute_faces_layout_oriented() const
     for(unsigned int i=0;i<outer_face.size();i++){
       const node_t u = outer_face[i], v = outer_face[(i+1)%outer_face.size()];
       //    printf("Removing directed edge (%d,%d)\n",u,v);
-      workset.erase(dedge_t(u,v));
+      workset.erase(arc_t(u,v));
     }
 
   // Now visit every other edge once in each direction.
   while(!workset.empty()){
-    dedge_t e = *workset.begin();
+    arc_t e = *workset.begin();
     face_t face(get_face_layout_oriented(e.first,e.second));
     face_set.insert(face);
 
     for(int i=0;i<face.size();i++)
-      workset.erase(dedge_t(face[i],face[(i+1)%face.size()]));
+      workset.erase(arc_t(face[i],face[(i+1)%face.size()]));
   }
 
   copy(face_set.begin(), face_set.end(), std::back_inserter(faces));
@@ -582,9 +582,9 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
 
   // Now, pick an orientation for triangle 0. We choose the one it
   // already has. This determines the orientation of the remaining triangles!
-  map<dedge_t,bool> done;
+  map<arc_t,bool> done;
   for(int i=0;i<3;i++){
-    done[dedge_t(tris[0][i],tris[0][(i+1)%3])] = true;
+    done[arc_t(tris[0][i],tris[0][(i+1)%3])] = true;
   }
 
   queue<int> workset;
@@ -597,7 +597,7 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
 
     // Is this triangle connected to any already processed triangle?
     bool seen = false, rev_seen = false;
-    for(int j=0;j<3;j++){  seen |= done[dedge_t(t[j],t[(j+1)%3])]; rev_seen |= done[dedge_t(t[(j+1)%3],t[j])]; }
+    for(int j=0;j<3;j++){  seen |= done[arc_t(t[j],t[(j+1)%3])]; rev_seen |= done[arc_t(t[(j+1)%3],t[j])]; }
     if(!seen && !rev_seen) {
       workset.push(i);
       continue;
@@ -607,9 +607,9 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
       node_t u = t[2]; t[2] = t[1]; t[1] = u;
     }
 
-    done[dedge_t(t[0],t[1])] = true;
-    done[dedge_t(t[1],t[2])] = true;
-    done[dedge_t(t[2],t[0])] = true;
+    done[arc_t(t[0],t[1])] = true;
+    done[arc_t(t[1],t[2])] = true;
+    done[arc_t(t[2],t[0])] = true;
   }
   // Check consistency of orientation. It is consistent if and only if
   // each edge has been used exactly once in each direction.
@@ -617,11 +617,11 @@ vector<tri_t>& PlanarGraph::orient_triangulation(vector<tri_t>& tris) const
   vector<edge_t> edges = undirected_edges();
 
   for(edge_t e: edges){
-    if(!done[dedge_t(e.first,e.second)]){
+    if(!done[arc_t(e.first,e.second)]){
       fprintf(stderr,"A: Directed edge %d->%d is missing: triangulation is not consistently oriented.\n",e.first,e.second);
       consistent = false;
     }
-    if(!done[dedge_t(e.second,e.first)]){
+    if(!done[arc_t(e.second,e.first)]){
       fprintf(stderr,"B: Directed edge %d->%d is missing: triangulation is not consistently oriented.\n",e.second,e.first);
       consistent = false;
     }
@@ -740,8 +740,8 @@ ostream& operator<<(ostream& s, const PlanarGraph& g)
 //                       COMBINATORIAL PROPERTIES
 // **********************************************************************
 
-void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces,
-                   map<dedge_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const dedge_t& e)
+void perfmatch_dfs(map<arc_t,int>& faceEdge, const vector<face_t>& faces,
+                   map<arc_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const arc_t& e)
 {
   int frev = faceEdge[reverse(e)];
   if(visited[frev]) return;
@@ -749,7 +749,7 @@ void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces,
 
   const face_t &f(faces[frev]);
   for(int i=0;i<f.size();i++)
-    perfmatch_dfs(faceEdge,faces,matrix,faceSum,visited,dedge_t(f[i],f[(i+1)%f.size()]));
+    perfmatch_dfs(faceEdge,faces,matrix,faceSum,visited,arc_t(f[i],f[(i+1)%f.size()]));
 
   // NB: How to handle outer face?
   if(!faceSum[frev]) { //not odd sum of CW edges
@@ -789,12 +789,12 @@ double lu_det(const vector<double> &A, int N)
 
 size_t PlanarGraph::count_perfect_matchings() const
 {
-  map<dedge_t,int> faceEdge;
+  map<arc_t,int> faceEdge;
   assert(is_oriented);
   vector<face_t> faces(compute_faces());
   vector<bool> faceSum(faces.size()), visited(faces.size());
 
-  map<dedge_t,int> A;
+  map<arc_t,int> A;
   vector<edge_t> edges = undirected_edges();
   for(edge_t e: edges){
     A[e] = 1;
@@ -804,7 +804,7 @@ size_t PlanarGraph::count_perfect_matchings() const
   for(int i=0;i<faces.size();i++){
     const face_t &f(faces[i]);
     for(int j=0;j<f.size();j++){
-      const dedge_t e(f[j],f[(j+1)%f.size()]);
+      const arc_t e(f[j],f[(j+1)%f.size()]);
       faceEdge[e] = i;
       if(A[e] == 1) faceSum[i] = !faceSum[i];
     }
@@ -813,7 +813,7 @@ size_t PlanarGraph::count_perfect_matchings() const
   perfmatch_dfs(faceEdge,faces,A,faceSum,visited,edges[0]);
 
   vector<double> Af(N*N);
-  for(map<dedge_t,int>::const_iterator a(A.begin()); a!=A.end(); a++)
+  for(map<arc_t,int>::const_iterator a(A.begin()); a!=A.end(); a++)
     Af[a->first.first*N+a->first.second] = a->second;
 
   return round(sqrtl(fabs(lu_det(Af,N))));
@@ -861,13 +861,13 @@ vector<coord3d> PlanarGraph::zero_order_geometry(double scalerad) const
  
 // In an oriented planar graph, the directed edge starting in the smallest node
 // is a unique representation of the face.
-dedge_t PlanarGraph::get_face_representation(dedge_t e, int Fmax) const
+arc_t PlanarGraph::get_face_representation(arc_t e, int Fmax) const
 {
   assert(is_oriented);
 
 
   int i=0;  
-  dedge_t e_min = e;
+  arc_t e_min = e;
   node_t u = e.first, v = e.second;
 
   while(v!=e.first){
@@ -884,11 +884,11 @@ dedge_t PlanarGraph::get_face_representation(dedge_t e, int Fmax) const
 
 // In an oriented planar graph, the directed edge starting in the smallest node
 // is a unique representation of the face.
-vector<dedge_t> PlanarGraph::compute_face_representations(int Fmax) const
+vector<arc_t> PlanarGraph::compute_face_representations(int Fmax) const
 {
   assert(is_oriented);
 
-  unordered_set<dedge_t> faces(2*count_edges());
+  unordered_set<arc_t> faces(2*count_edges());
   
   for(node_t u=0;u<N;u++)
     for(node_t v: neighbours[u]){
@@ -897,17 +897,17 @@ vector<dedge_t> PlanarGraph::compute_face_representations(int Fmax) const
       faces.insert(get_face_representation({u,v},Fmax));
     }
 
-  return vector<dedge_t>(faces.begin(),faces.end());
+  return vector<arc_t>(faces.begin(),faces.end());
 }
 
 
-face_t PlanarGraph::get_face_oriented(const dedge_t &e, int Fmax) const
+face_t PlanarGraph::get_face_oriented(const arc_t &e, int Fmax) const
 {
   assert(is_oriented);
 
   int i=0;
   node_t u = e.first, v=e.second;
-  face_t f = vector<int>{{u}};
+  face_t f = vector<int>{1,u};
   
   while(v!=e.first){
     node_t w = prev(v,u);        // Previous neighbour to u in v defines corner u-v-w in face
@@ -922,7 +922,7 @@ face_t PlanarGraph::get_face_oriented(const dedge_t &e, int Fmax) const
 
 vector<face_t> PlanarGraph::compute_faces_oriented(int Fmax) const
 {
-  vector<dedge_t> face_representations = compute_face_representations(Fmax);
+  vector<arc_t> face_representations = compute_face_representations(Fmax);
 
   vector<face_t> faces(face_representations.size());
   for(int i=0;i<face_representations.size();i++) faces[i] = get_face_oriented(face_representations[i],Fmax);

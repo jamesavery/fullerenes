@@ -502,7 +502,7 @@ namespace gpu_kernels{
                     L[i] = L_.data[n*I + i];
                     U[i] = L_.data[n*I + i];
                 }
-                for (int i =  threadIdx.x; i < n; i += blockDim.x){
+                for (int i = threadIdx.x; i < n; i += blockDim.x){
                     Q_.data[n*n*I + i*(n+1)] = real_t(1.); //Set Q to the identity matrix
                 }
             

@@ -143,7 +143,7 @@ spiral_nomenclature::spiral_nomenclature(const string &str) : naming_scheme(CAGE
   if (suffix == "fullerene"){
     naming_scheme = FULLERENE;
     base_face_degree = 6;
-    face_degrees     = vector<int>{{5}};
+    face_degrees     = vector<int>(1,5);
   }
 
   if(suffix == "fulleroid"){

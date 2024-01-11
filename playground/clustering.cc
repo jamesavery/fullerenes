@@ -152,8 +152,8 @@ cluster_distances(const vector<bitset_t> &clusters,
 	if(C1 & (1<<i))
 	  for(int j=0;j<n;j++)
 	    if(C2 & (1<<j)) {
-	      mn = min(mn, P(i,j));
-	      mx = max(mx, P(i,j));
+	      mn = ::min(mn, P(i,j));
+	      mx = ::max(mx, P(i,j));
 	    }
 
       min_dist(c1,c2) = mn;

@@ -70,7 +70,7 @@ int main(int argc, char** argv){
     }
 
     isomer_q.refill_batch(batch1);
-    gpu_kernels::isomerspace_dual::dualise(batch1);
+    gpu_kernels::isomerspace_dual::dualize(batch1);
     gpu_kernels::isomerspace_tutte::tutte_layout(batch1);
     gpu_kernels::isomerspace_X0::zero_order_geometry(batch1,4.0);
     device_io::reset_convergence_statuses(batch1);
@@ -81,8 +81,8 @@ int main(int argc, char** argv){
         //device_io::reset_convergence_statuses(batch0,device0);
         device_io::reset_convergence_statuses(batch2,device1);
         auto T1 = high_resolution_clock::now();
-            //gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(batch0,N*5,N*5,device0,LaunchPolicy::ASYNC);
-            gpu_kernels::isomerspace_forcefield::optimise<PEDERSEN>(batch2,N*5,N*5,device1,LaunchPolicy::ASYNC);
+            //gpu_kernels::isomerspace_forcefield::optimize<PEDERSEN>(batch0,N*5,N*5,device0,LaunchPolicy::ASYNC);
+            gpu_kernels::isomerspace_forcefield::optimize<PEDERSEN>(batch2,N*5,N*5,device1,LaunchPolicy::ASYNC);
             device1.wait(); //device0.wait(); 
         T_FF[l] = high_resolution_clock::now() - T1;
         out_file << N << ", "<< sample_size << ", " << (high_resolution_clock::now()-T0)/1us << ", " << T_FF[l]/1us << "\n";

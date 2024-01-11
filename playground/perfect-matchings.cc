@@ -16,8 +16,8 @@ string pad_string(const string& s, int length, char padchar)
 
 int64_t det(vector< vector<int> > A, int n);
 double lu_det(const vector<double> &A, int N);
-void perfmatch_dfs(map<dedge_t,int>& faceEdge, const vector<face_t>& faces, 
-		   map<dedge_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const dedge_t& e);
+void perfmatch_dfs(map<arc_t,int>& faceEdge, const vector<face_t>& faces, 
+		   map<arc_t,int>& matrix, vector<bool>& faceSum, vector<bool>& visited, const arc_t& e);
 
 
 int main(int ac, char **av)

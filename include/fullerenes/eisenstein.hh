@@ -1,10 +1,9 @@
-#ifndef EISENSTEIN_HH
-# define EISENSTEIN_HH
-
+#pragma once
 #include <assert.h>
 #include <stdlib.h>
+#include <inttypes.h>
+#include <cmath>
 #include <algorithm>
-#include <complex>
 #include <vector>
 
 using namespace std;
@@ -102,10 +101,10 @@ public:
     // Naive, possibly non-robust algorithm
     Eisenstein z(*this * y.invertn());
 
-    complex<double> zf(z.first,z.second);
-    zf /= y.norm2();
+    double re = z.first, im = z.second;
+    re /= y.norm2(); im /= y.norm2();
 
-    return Eisenstein(round(zf.real()),round(zf.imag()));
+    return Eisenstein(round(re),round(im));
   }
 
   Eisenstein mod(const Eisenstein& y) const {
@@ -115,10 +114,11 @@ public:
 
   static pair<double,double> average(const vector<Eisenstein>& xs)
   {
-    complex<double> avg(0,0);
-    for(size_t i=0;i<xs.size();i++) avg += complex<double>(xs[i].first,xs[i].second);
-    avg /= xs.size(); 
-    return make_pair(avg.real(),avg.imag());
+    double re = 0, im = 0;
+    for(size_t i=0;i<xs.size();i++){ re += xs[i].first; im += xs[i].second; }
+    re /= xs.size(); im /= xs.size();
+    
+    return {re,im};
   }
 
   static Eisenstein gcd(Eisenstein a, Eisenstein b)  {
@@ -156,4 +156,4 @@ namespace std {
 
 
 
-#endif
+

@@ -33,7 +33,7 @@ struct NodeNeighbours{
         device_node_t edge_idx[3] = {UINT16_MAX, UINT16_MAX, UINT16_MAX};
         for (int j = 0; j  < 3; j++){
             rep_edges[j] = FG.get_face_representation(threadIdx.x, d_get(cubic_neighbours,j));
-            edge_idx[j] = FG.dedge_ix(rep_edges[j].x, rep_edges[j].y);
+            edge_idx[j] = FG.arc_ix(rep_edges[j].x, rep_edges[j].y);
             if(rep_edges[j].x == threadIdx.x) {++represent_count; is_rep[j] = true;}
         }
         ex_scan<device_node_t>(reinterpret_cast<device_node_t*>(sdata), represent_count, blockDim.x);

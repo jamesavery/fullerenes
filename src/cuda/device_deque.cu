@@ -3,7 +3,7 @@ struct CuDeque
 {
 private:
 
-    device_node_t front, back, q_size, capacity;
+    int front, back, q_size, capacity;
     T* array;
 
 public:
@@ -13,14 +13,14 @@ public:
 //necessary functions to allow the work queue to be used as a work stealing queue. 
 //The class is implemented as a template class to allow the user to specify the type of data that the
 //deque will hold.
-__device__ CuDeque(T* memory, const device_node_t capacity): array(memory), front(0), back(0), q_size(0), capacity(capacity) {}
+__device__ CuDeque(T* memory, const int capacity): array(memory), front(-1), back(0), q_size(0), capacity(capacity) {}
     
     /**
      * @brief  Returns the size of the queue. 
      * @param  None
      * @retval Size of the queue.
      */
-    __device__ device_node_t size(){return q_size;}
+    __device__ int size(){return q_size;}
 
     /**
      * @brief  Returns true if the queue is empty and false otherwise. 
@@ -28,7 +28,7 @@ __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), fron
      * @retval True if the queue is empty and false otherwise.
      */
     __device__ bool empty(){
-        return q_size == 0;
+        return (front == -1);
     }
 
     /**
@@ -37,7 +37,7 @@ __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), fron
      * @retval True if the queue is full and false otherwise.
      */
     __device__ bool full(){
-        return q_size == capacity;
+        return (front == 0 && back == capacity-1) || (front == back+1);
     }
     
     /**
@@ -46,14 +46,16 @@ __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), fron
      * @retval First element of the queue
      */
     __device__ T pop_front(){
-        if (!empty()){
-            T return_val = array[front];
-            front = (front + 1) % capacity ;
-            q_size--;
-            return return_val;
-        }
-        assert(false);
-        return T(); //Compiler wants a return statement
+        if (empty()){ assert(false); return T();} 
+        T return_val = array[front];
+        if(front == back) {
+            front = -1;
+            back = -1;
+        } 
+        else if (front == capacity-1) front = 0;
+        else front = front+1;
+        q_size--;
+        return return_val;
     }
 
     /**
@@ -62,15 +64,16 @@ __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), fron
      * @return The last element of the queue
      */
     __device__ T pop_back(){
-        if (!empty())
-        {
-            T return_val = array[back];
-            back = back > 0 ? back-1 : capacity-1;
-            q_size--;
-            return return_val;
-        }
-        assert(false);
-        return T(); //Compiler wants a return statement
+        if (empty()){ assert(false); return T();}
+        T return_val = array[back];
+        if(front == back) {
+            front = -1;
+            back = -1;
+        } 
+        else if (back == 0) back = capacity-1;
+        else back = back-1;
+        q_size--;
+        return return_val;
     }
 
     /** @brief Insert a value into the back of the queue
@@ -78,7 +81,12 @@ __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), fron
      */
     __device__ void push_back(T val){
         assert(!full());
-        back = (back + 1) % capacity;
+        if (front == -1) {
+            front = 0;
+            back = 0;
+        }
+        else if (back == capacity-1) back = 0;
+        else back = back+1;
         array[back] = val;
         q_size++;
     }
@@ -88,7 +96,12 @@ __device__ CuDeque(T* memory, const device_node_t capacity): array(memory), fron
      */
     __device__ void push_front(T val){
         assert(!full());
-        front = front > 0 ? front-1 : capacity-1;
+        if (front == -1) {
+            front = 0;
+            back = 0;
+        }
+        else if (front == 0) front = capacity-1;
+        else front = front-1;
         array[front] = val;
         q_size++;
     }

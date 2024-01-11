@@ -8,7 +8,6 @@
 #include <math.h>
 #include <sstream>
 #include <list>
-#include <complex>
 #include <algorithm>
 #include "auxiliary.hh"
 
@@ -41,7 +40,6 @@ namespace std {
 
 
 struct coord2d : public pair<double,double> {
-  coord2d(const complex<double>& x) : pair<double,double>(x.real(),x.imag()) {}
   coord2d(const pair<double,double>& x) : pair<double,double>(x) {}
   coord2d(const double x=0, const double y=0) : pair<double,double>(x,y) {}
   coord2d operator/(const double s)   const { return coord2d(first/s,second/s); }
@@ -514,10 +512,10 @@ struct face_t : public vector<node_t> {
   }
 
   // The directed edge with minimal start vertex gives a unique representation of an oriented face
-  dedge_t minimal_edge() const {
+  arc_t minimal_edge() const {
     face_t f(*this);
     
-    dedge_t e_min{f[0],f[1]};
+    arc_t e_min{f[0],f[1]};
     for(size_t i=1;i<f.size();i++) if(f[i] < e_min.first) e_min = {f[i],f[(i+1)%f.size()]};
 
     return e_min;

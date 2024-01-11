@@ -144,7 +144,7 @@ int main(int ac, char **av)
     mol2.close();
   }
 
-  PD.optimise(4);
+  PD.optimize(4);
 
   {
     ofstream mol2(("output/"+basename+"-step0.5.mol2").c_str());
@@ -162,8 +162,8 @@ int main(int ac, char **av)
       // 	mol2 << PD.to_mol2();
       // 	mol2.close();
       // }
-      // PD.optimise(4);
-      // PD.optimise(3);
+      // PD.optimize(4);
+      // PD.optimize(3);
       // {
       // 	ofstream mol2(("output/"+basename+"-step"+to_string(p+1)+".5.mol2").c_str());
       // 	mol2 << PD.to_mol2();
@@ -179,8 +179,8 @@ int main(int ac, char **av)
     mol2 << PD.to_mol2();
     mol2.close();
   }
-  PD.optimise(4);
-  PD.optimise(3);
+  PD.optimize(4);
+  PD.optimize(3);
   {
     ofstream mol2(("output/"+basename+"-step12.5.mol2").c_str());
     mol2 << PD.to_mol2();
@@ -217,8 +217,8 @@ int main(int ac, char **av)
     mol2.close();
   }
 
-  P.optimise(4);
-  P.optimise(3);
+  P.optimize(4);
+  P.optimize(3);
 
   
   

@@ -6,10 +6,9 @@
 
 class Unfolding {
 public:
-  typedef pair<Eisenstein,Eisenstein> dedgecoord_t;
+  typedef pair<Eisenstein,Eisenstein> arccoord_t;
   
-  typedef dedge_t arc_t;
-  typedef dedgecoord_t arc_coord_t;  
+  typedef arccoord_t arc_coord_t;  
 
   Triangulation graph;
 
@@ -98,11 +97,11 @@ public:
   // again the original fullerene dual.
   //
   // Preconditions: Triangles are oriented consistently, i.e. CW or CCW.
-  void unfold(const Triangulation& G, const dedge_t first_arc={0,0});
-  map<arc_t,dedgecoord_t> unfold(const Triangulation& G, const polygon& outline, const tri_t T0);
+  void unfold(const Triangulation& G, const arc_t first_arc={0,0});
+  map<arc_t,arccoord_t> unfold(const Triangulation& G, const polygon& outline, const tri_t T0);
   
   // Compute outline in CW order of the map returned from unfold().
-  static vector< pair<Eisenstein,node_t> > get_outline(const map<arc_t,dedgecoord_t>& arc_coords);
+  static vector< pair<Eisenstein,node_t> > get_outline(const map<arc_t,arccoord_t>& arc_coords);
 
   // Simple transformations in the Eisenstein plane.
   Unfolding& operator *= (const Eisenstein& y){ for(int i=0;i<outline.size();i++) outline[i].first *= y; return *this;  }
@@ -114,7 +113,7 @@ public:
   // Unfolding& operator /= (const Eisenstein& y){ for(int i=0;i<outline.size();i++) outline[i].first /= y; return *this;  }
   // Unfolding operator/(const Eisenstein& y) const { Unfolding U(outline); return (U /= y); }
 
-  static void transform_line(const dedgecoord_t& l1, const dedgecoord_t& l2, Eisenstein& x0, Eisenstein& x0p, Eisenstein& w);
+  static void transform_line(const arccoord_t& l1, const arccoord_t& l2, Eisenstein& x0, Eisenstein& x0p, Eisenstein& w);
 
 
 
@@ -128,7 +127,7 @@ public:
 
 class Folding {
 public:
-  typedef Unfolding::dedgecoord_t dedgecoord_t;
+  typedef Unfolding::arccoord_t arccoord_t;
 
   const polygon P;
 
@@ -149,7 +148,7 @@ public:
     node_t u,v;
     Eisenstein xu, xv;
 
-    // First transfer grid from unfolding's dedge-coordinate grid
+    // First transfer grid from unfolding's arc-coordinate grid
     for(auto kv: U.arc_coords){
       tie(u,v)   = kv.first;
       tie(xu,xv) = kv.second;
