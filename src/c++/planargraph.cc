@@ -80,7 +80,7 @@ bool PlanarGraph::is_a_fullerene(bool verbose) const {
     return false;
   }
 
-  vector<face_t> faces(compute_faces(6,true));
+  vector<face_t> faces(compute_faces_oriented());
   int n_faces = faces.size();
   int n_edges = count_edges();
   
@@ -107,7 +107,10 @@ bool PlanarGraph::is_a_fullerene(bool verbose) const {
   }
   
   if(Np != 12){
-    if(verbose) fprintf(stdout,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",Np);
+    if(verbose){
+      fprintf(stdout,"Graph is not fullerene: wrong number of pentagons: %d != 12\n",Np);
+      cout << "faces = " << faces << "\n";
+    }
     return false;
   }
 
@@ -907,7 +910,7 @@ face_t PlanarGraph::get_face_oriented(const arc_t &e, int Fmax) const
 
   int i=0;
   node_t u = e.first, v=e.second;
-  face_t f = vector<int>{1,u};
+  face_t f = vector<int>(1,u);
   
   while(v!=e.first){
     node_t w = prev(v,u);        // Previous neighbour to u in v defines corner u-v-w in face
