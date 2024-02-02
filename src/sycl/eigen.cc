@@ -278,6 +278,60 @@ void lanczos_(sycl::queue& Q, const IsomerBatch<T,K>& B, buffer<T>& V_, buffer<T
     });
 }
 
+
+template <EigensolveMode mode, Device DEV,typename T, typename K>
+void compute_eigenvectors_(sycl::queue& ctx, const IsomerBatch<T,K>& B, const sycl::buffer<T>& Q, sycl::buffer<T>& V, sycl::buffer<T>& E, int m){
+    int atom_idx = threadIdx.x/3; //Atom index (Integer division so the result is rounded down)
+    TEMPLATE_TYPEDEFS(T,K);
+    SMEM(T);
+    int n = B.n_atoms * 3;
+    int offset = 0;
+    if (mode == EigensolveMode::ENDS || mode == EigensolveMode::FULL_SPECTRUM_MOLECULE){
+        offset = 6;
+    }
+    for (int I = blockIdx.x; I < B.isomer_capacity; I += gridDim.x){
+        real_t* v = V.data + I * m * n;
+        real_t* e = E.data + I * n * n;
+        real_t* q = Q.data + I * m * m;
+        if (mode == EigensolveMode::FULL_SPECTRUM_MOLECULE) {
+            for(int i = 0; i < 3; i++){
+                e[i*n + threadIdx.x] = real_t(threadIdx.x%3 == i)/SQRT(B.n_atoms); 
+            }
+            float* X_ptr = B.X + n*I; //WARNING float hardcoded here to match the type of B.X (IsomerBatch)
+            if (threadIdx.x%3 == 0) {
+                e[3*n + threadIdx.x] = real_t(0.);
+                e[4*n + threadIdx.x] = -X_ptr[atom_idx*3 + 2];
+                e[5*n + threadIdx.x] = -X_ptr[atom_idx*3 + 1];
+            } else if (threadIdx.x%3 == 1) {
+                e[3*n + threadIdx.x] = -X_ptr[atom_idx*3 + 2];
+                e[4*n + threadIdx.x] = real_t(0.);
+                e[5*n + threadIdx.x] = X_ptr[atom_idx*3 + 0];
+            } else {
+                e[3*n + threadIdx.x] = X_ptr[atom_idx*3 + 1];
+                e[4*n + threadIdx.x] = X_ptr[atom_idx*3 + 0];
+                e[5*n + threadIdx.x] = real_t(0.);
+            }
+                clear_cache(smem,  n + warpSize);
+                e[3*n + threadIdx.x] /= SQRT(reduction(smem, e[3*n + threadIdx.x]*e[3*n + threadIdx.x]));
+                clear_cache(smem,  n + warpSize);
+                e[4*n + threadIdx.x] /= SQRT(reduction(smem, e[4*n + threadIdx.x]*e[4*n + threadIdx.x]));
+                clear_cache(smem,  n + warpSize);
+                e[5*n + threadIdx.x] /= SQRT(reduction(smem, e[5*n + threadIdx.x]*e[5*n + threadIdx.x]));
+        }
+        
+        if(threadIdx.x < n)
+        for (int k = offset; k < n; k++){
+            e = E.data + I * n * n + k * n;
+            e[threadIdx.x] = real_t(0.);
+            q = Q.data + I * m * m + (k-offset) * m;
+            for (int i = 0; i < m; i++){
+                e[threadIdx.x] += v[i*n + threadIdx.x] * q[i];
+            }
+        }
+    }
+}
+
+
 //template <typename T, typename K>
 //void eigensolve(const IsomerBatch<T,K>& B, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
 
@@ -315,9 +369,9 @@ void eigensolve_(sycl::queue& Q, const IsomerBatch<T,K>, int n){
             auto bdim = nditem.get_local_range();
 
             for (int i = tid; i < n; i += bdim){
-                D[i]         = D_acc[bid*n + i];
-                L[i]    = L_acc[bid*n + i];
-                U[i]    = L_acc[bid*n + i];
+                D[i]        = D_acc[bid*n + i];
+                L[i]        = L_acc[bid*n + i];
+                U[i]        = L_acc[bid*n + i];
                 Q_acc[bid*n*n + i*(n+1)] = 1; //Identity matrix
             }
             sycl::group_barrier(cta);
@@ -372,18 +426,54 @@ template <typename T, typename K>
 void eigensolve(sycl::queue& ctx, const IsomerBatch<T,K> B, sycl::buffer<T>& Q, const sycl::buffer<T>& hessians, const sycl::buffer<K>& cols, const sycl::buffer<T>& eigenvalues){
     auto Natoms = B.N();
     auto capacity = B.capacity();
+    auto platform = ctx.get_device().get_platform();
+    static std::vector<std::pair<sycl::device, int>> devices;
+    static std::vector<sycl::buffer<T>> Q_buffers;
+    static std::vector<sycl::buffer<T>> D_buffers;
+    static std::vector<sycl::buffer<T>> L_buffers;
+    static std::vector<sycl::buffer<T>> U_buffers;
+    static std::vector<sycl::buffer<T>> V_buffers;
+
+    int index = 0;
+    bool found = false;
+    for(auto& pair : devices){
+        if(pair.first == ctx.get_device()){
+            index = pair.second;
+            found = true;
+            break;
+        }
+    }
+    if(!found){
+        devices.push_back({ctx.get_device(), devices.size()});
+        index = devices.size()-1;
+        Q_buffers.push_back(sycl::buffer<T>(range<1>(Natoms*3*capacity)));
+        D_buffers.push_back(sycl::buffer<T>(range<1>(Natoms*3*capacity)));
+        L_buffers.push_back(sycl::buffer<T>(range<1>(Natoms*3*capacity)));
+        U_buffers.push_back(sycl::buffer<T>(range<1>(Natoms*3*capacity)));
+        V_buffers.push_back(sycl::buffer<T>(range<1>(Natoms*3*capacity)));
+    }
+
+
     auto N = Natoms*3;
     auto m = 2*N;
     auto n = N;
     auto mode = EigensolveMode::VECTORS;
     auto policy = LaunchPolicy::SYNC;
-    auto Q_ = Q;
-    auto D_ = eigenvalues;
-    auto L_ = eigenvalues;
-    auto U_ = eigenvalues;
-    lanczos_<mode>(ctx, B, Q_, U_, D_, hessians, cols, m);
-    eigensolve_<mode>(ctx, B, D_, L_, U_, Q_, n);
+    auto Q_ = Q_buffers[index];
+    auto D_ = D_buffers[index];
+    auto L_ = L_buffers[index];
+    auto U_ = U_buffers[index];
+
+    int Nlanczos = Natoms * 3;
+
+
+
+    lanczos_<mode>(ctx, B, V_, L_, eigenvalues, hessians, cols, Nlanczos);  
+    //void* kargs_qr[]{(void*)&B, (void*)&eigenvalues, (void*)&Ls[dev], (void*)&Us[dev], (void*)&Qs[dev], (void*)&Nlanczos};
+    eigensolve_<mode>(ctx, B, eigenvalues, L_, U_, Q_, Nlanczos);
+    //void* kargs_vector[]{(void*)&B, (void*)&Qs[dev], (void*)&Vs[dev], (void*)&Q, (void*)&Nlanczos};
+    compute_eigenvectors_<mode>(ctx, B, Q_, V_, Q, Nlanczos);
 }
 
 
-
+ 
