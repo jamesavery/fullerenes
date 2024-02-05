@@ -174,7 +174,7 @@ void spherical_projection(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchP
         local_accessor<coord3d, 1>  xyz_smem(N, h);
 
 
-        h.parallel_for<class tutte>(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)), [=](nd_item<1> nditem) {
+        h.parallel_for(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)), [=](nd_item<1> nditem) {
 
 
             auto cta = nditem.get_group();
@@ -229,3 +229,4 @@ void spherical_projection(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchP
 }
 
 template void spherical_projection<float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
+//template void spherical_projection<double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);

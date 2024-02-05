@@ -1817,7 +1817,7 @@ void forcefield_optimize(sycl::queue &Q, IsomerBatch<T, K>& B, const int iterati
         sycl::accessor X_acc(B.X, h);
         sycl::accessor cubic_neighbours_acc(B.cubic_neighbours, h, sycl::read_only);
         auto N = B.N();
-        h.parallel_for<class optimize>(sycl::nd_range(sycl::range{B.N()*B.capacity()}, sycl::range{B.N()}), [=](sycl::nd_item<1> nditem) {
+        h.parallel_for(sycl::nd_range(sycl::range{B.N()*B.capacity()}, sycl::range{B.N()}), [=](sycl::nd_item<1> nditem) {
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
@@ -1839,7 +1839,7 @@ void forcefield_optimize(sycl::queue &Q, IsomerBatch<T, K>& B, const int iterati
 }
 
 template void forcefield_optimize<PEDERSEN,float,uint16_t>(sycl::queue &Q, IsomerBatch<float, uint16_t>& B, const int iterations, const int max_iterations, const LaunchPolicy policy);
-
+template void forcefield_optimize<PEDERSEN,double,uint16_t>(sycl::queue &Q, IsomerBatch<double, uint16_t>& B, const int iterations, const int max_iterations, const LaunchPolicy policy);
 
 /* int main(int argc, char const *argv[])
 {   

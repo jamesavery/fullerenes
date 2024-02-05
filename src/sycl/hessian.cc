@@ -1668,7 +1668,7 @@ void compute_hessians(sycl::queue& Q, IsomerBatch<T,K>& B, sycl::buffer<T,1>& he
 
         auto N = B.N();
         auto capacity = B.capacity();
-        h.parallel_for<class compute_hessians>(sycl::nd_range(sycl::range{capacity*N}, sycl::range{N}), [=](sycl::nd_item<1> nditem){
+        h.parallel_for(sycl::nd_range(sycl::range{capacity*N}, sycl::range{N}), [=](sycl::nd_item<1> nditem){
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
@@ -1697,3 +1697,4 @@ void compute_hessians(sycl::queue& Q, IsomerBatch<T,K>& B, sycl::buffer<T,1>& he
 
 
 template void compute_hessians<PEDERSEN, float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& B, sycl::buffer<float,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
+template void compute_hessians<PEDERSEN, double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& B, sycl::buffer<double,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
