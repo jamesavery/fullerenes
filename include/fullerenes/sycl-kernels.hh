@@ -1,6 +1,6 @@
 #pragma once
-
 #include <fullerenes/sycl-isomer-batch.hh>
+
 
 template <typename T = float, typename K = uint16_t>
 void dualize(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy);
@@ -23,3 +23,5 @@ void compute_hessians(sycl::queue&Q, IsomerBatch<T,K>& batch, sycl::buffer<T,1>&
 template <typename T = float, typename K = uint16_t>
 void nop_kernel(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy);
 
+template <EigensolveMode mode, typename T, typename K>
+void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessians, sycl::buffer<K,1>& cols, sycl::buffer<T,1>& eigenvalues);
