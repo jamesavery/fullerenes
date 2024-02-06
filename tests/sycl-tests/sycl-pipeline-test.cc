@@ -58,9 +58,9 @@ int main(int argc, char** argv) {
 
     sycl::buffer<real_t, 1> hessians(range<1>(N*90*BatchSize));
     sycl::buffer<node_t, 1> cols(range<1>(N*90*BatchSize));
+    sycl::buffer<real_t, 1> eigenvalues(range<1>(N*3*BatchSize));
     compute_hessians(Q, batch, hessians, cols, LaunchPolicy::SYNC);
-
-    
+    eigensolve<EigensolveMode::FULL_SPECTRUM>(Q, batch, hessians, cols, eigenvalues);
 
     #if PRINT_CHECK
     std::cout << "Output Cubic Graph:" << std::endl;
@@ -119,6 +119,19 @@ int main(int argc, char** argv) {
                 }
                 std::cout << std::endl;
             }
+        }
+    }
+    
+    {   
+        std::cout << "Output Eigenvalues:" << std::endl;
+        sycl::host_accessor acc_eigenvalues(eigenvalues, sycl::read_only);
+        for (size_t ii = 0; ii < BatchSize; ii++)
+        {
+            for (size_t i = 0; i < N*3; i++)
+            {
+                    std::cout << acc_eigenvalues[ii*N*3 + i] << ", ";
+            }
+            std::cout << std::endl;
         }
     }
     #endif
