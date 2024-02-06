@@ -12,6 +12,15 @@
 using namespace sycl;
 enum ForcefieldType {WIRZ, PEDERSEN, FLATNESS_ENABLED, FLAT_BOND, BOND, ANGLE, DIH, ANGLE_M, ANGLE_P, DIH_A, DIH_M, DIH_P};
 
+enum class EigensolveMode 
+{   
+    FULL_SPECTRUM,          //Compute all eigenvalues
+    ENDS,                   //Compute the smallest and largest non-zero eigenvalues
+    FULL_SPECTRUM_VECTORS,  //Compute all eigenvalues and eigenvectors
+    ENDS_VECTORS,            //Compute the smallest and largest (non-zero) eigenvalues and corresponding eigenvectors
+    SPECIAL                 //Compute the 6 eigenvectors corresponding to the 6 degrees of freedom (3 translations and 3 rotations)
+};
+
 enum class LaunchPolicy
 {
     ASYNC,
