@@ -58,7 +58,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, const sycl::local_accessor<T,1>& D,
     sycl::group_barrier(cta);
     if(tix == 0)
         for(int k=0;k<n-1;k++){
-            if (ABS(L[k]) > numerical_zero){
+            if (sycl::abs(L[k]) > numerical_zero){
             a[0] = D[k]; a[1] = L[k];       // a = T[k:k+2,k] is the vector of nonzeros in kth subdiagonal column.
             
             real_t anorm = SQRT(a[0]*a[0] + a[1]*a[1]); 
