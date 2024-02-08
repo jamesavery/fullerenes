@@ -53,14 +53,14 @@ int main(int argc, char** argv) {
     isomerspace_hessian::compute_hessians(batch, hessians, cols);
     isomerspace_eigen::eigensolve(batch, Qmat, hessians, cols, eigenvalues);
     
-    std::cout << "Eigenvalues: " << std::endl;
+    /* std::cout << "Eigenvalues: " << std::endl;
     for (size_t i = 0; i < BatchSize; i++)
     {
         for (size_t j = 0; j < N*3; j++)
         {
-            std::cout << eigenvalues[i*N*3 + j] << " ";
+            std::cout << eigenvalues[i*N*3 + j] << ", ";
         }
         std::cout << std::endl;
-    }
+    } */
 
 }   
