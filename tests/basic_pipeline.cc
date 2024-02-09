@@ -46,12 +46,15 @@ int main(int argc, char** argv) {
     CuArray<uint16_t> cols(N*90*BatchSize);
     CuArray<float> eigenvalues(N*3*BatchSize);
     CuArray<float> Qmat (N*3*N*3*BatchSize);
+    CuArray<float> lambda_mins(BatchSize);
+    CuArray<float> lambda_maxs(BatchSize);
     isomerspace_dual::dualize(batch);
     isomerspace_tutte::tutte_layout(batch);
     isomerspace_X0::zero_order_geometry(batch,4.0);
     isomerspace_forcefield::optimize(batch, 5*N, 5*N);
     isomerspace_hessian::compute_hessians(batch, hessians, cols);
     isomerspace_eigen::eigensolve(batch, Qmat, hessians, cols, eigenvalues);
+    isomerspace_eigen::spectrum_ends(batch, hessians, cols, lambda_mins, lambda_maxs, 50);
     
     /* std::cout << "Eigenvalues: " << std::endl;
     for (size_t i = 0; i < BatchSize; i++)
