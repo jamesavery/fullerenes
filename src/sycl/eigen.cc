@@ -163,6 +163,10 @@ std::vector<sycl::device> get_devices(){
     return devices;
 }
 
+template <EigensolveMode mode, typename T, typename K> class Lanczos {};
+template <EigensolveMode mode, typename T, typename K> class QR {};
+template <EigensolveMode mode, typename T, typename K> class Vectors {};
+template <EigensolveMode mode, typename T, typename K> class Reduction {};
 
 template <typename T, typename K>
 struct EigenBuffers{
@@ -279,7 +283,7 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
         local_accessor<T,1> smem(range<1>(Natoms*3), h);
         local_accessor<T,1> betas(range<1>(Natoms*3), h);
         local_accessor<T,1> alphas(range<1>(Natoms*3), h);
-        h.parallel_for(sycl::nd_range(sycl::range{Natoms*3*capacity}, sycl::range{Natoms*3}), [=](nd_item<1> nditem){
+        h.parallel_for<Lanczos<mode,T,K>>(sycl::nd_range(sycl::range{Natoms*3*capacity}, sycl::range{Natoms*3}), [=](nd_item<1> nditem){
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
@@ -406,7 +410,7 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
         accessor Eig_acc(eigenvalues, h, write_only);
         accessor Idx_acc(buffers.endsIdxBuffers[index], h, write_only);
 
-        h.parallel_for(sycl::nd_range(sycl::range{capacity*64}, sycl::range{64}), [=](sycl::nd_item<1> nditem){
+        h.parallel_for<QR<mode,T,K>>(sycl::nd_range(sycl::range{capacity*64}, sycl::range{64}), [=](sycl::nd_item<1> nditem){
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
             auto cta = nditem.get_group();
@@ -488,7 +492,7 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
         accessor E_acc(eigenvectors, h, write_only);
         accessor X_acc(B.X, h, read_only);
         accessor Idx_acc(buffers.endsIdxBuffers[index], h, read_only);
-        h.parallel_for(sycl::nd_range(sycl::range{capacity*Natoms*3}, sycl::range{Natoms*3}), [=](sycl::nd_item<1> nditem){
+        h.parallel_for<Vectors<mode,T,K>>(sycl::nd_range(sycl::range{capacity*Natoms*3}, sycl::range{Natoms*3}), [=](sycl::nd_item<1> nditem){
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
             auto cta = nditem.get_group();
