@@ -5,6 +5,7 @@
 #include <iterator>
 #include <type_traits>
 #include <array>
+#include <fullerenes/buckygen-wrapper.hh>
 #define FLOAT_TYPEDEFS(T) static_assert(std::is_floating_point<T>::value, "T must be float"); typedef std::array<T,3> coord3d; typedef std::array<T,2> coord2d; typedef T real_t;
 #define INT_TYPEDEFS(K) static_assert(std::is_integral<K>::value, "K must be integral type"); typedef std::array<K,3> node3; typedef std::array<K,2> node2; typedef K node_t; typedef std::array<K,6> node6;
 #define TEMPLATE_TYPEDEFS(T,K) FLOAT_TYPEDEFS(T) INT_TYPEDEFS(K)
@@ -123,15 +124,6 @@ struct IsomerBatch
                                                         iterations        (range<1>(n_isomers)), 
                                                         statuses          (range<1>(n_isomers))
         {   
-            //X                 = buffer<coord3d, 1>( range<1>(n_isomers * n_atoms));
-            //xys               = buffer<coord2d, 1>( range<1>(n_isomers * n_atoms));
-            //cubic_neighbours  = buffer<K, 1>( range<1>(n_isomers * n_atoms * 3));
-            //dual_neighbours   = buffer<K, 1>( range<1>(6 * n_isomers * n_faces));
-            //face_degrees      = buffer<K, 1>( range<1>(n_isomers * n_faces));
-            //IDs               = buffer<size_t, 1>( range<1>(n_isomers));
-            //iterations        = buffer<size_t, 1>( range<1>(n_isomers));
-            //statuses          = buffer<IsomerStatus, 1>( range<1>(n_isomers));
-
             sycl::host_accessor X_acc(X, no_init);
             sycl::host_accessor xys_acc(xys, no_init);
             sycl::host_accessor cubic_neighbours_acc(cubic_neighbours, no_init);
@@ -204,3 +196,42 @@ void copy(IsomerBatch<T,K>& dst, const IsomerBatch<T,K>& src){
     copy(dst.IDs, src.IDs);
 }
 
+template <typename T, typename K>
+void fill(IsomerBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
+  int N = B.N();
+  int Nf = B.Nf();
+  int N_graphs = B.capacity();
+  auto face_degrees_acc = host_accessor(B.face_degrees);
+  auto dual_neighbours_acc = host_accessor(B.dual_neighbours);
+  auto statuses_acc = host_accessor(B.statuses);
+  BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,false, false, mytask_id, ntasks);
+  Graph G;
+
+  G.neighbours = neighbours_t(Nf, std::vector<node_t>(6,-1));
+  G.N = Nf;
+  int num_generated = 0;
+  for (int i = 0; i < N_graphs; ++i) {
+    bool more_isomers = BuckyGen::next_fullerene(BuckyQ, G);
+    if (!more_isomers) break;
+    num_generated++;
+    statuses_acc[i] = IsomerStatus::NOT_CONVERGED;
+    for(int j = 0; j < Nf; j++) {
+      face_degrees_acc[i*Nf + j] = G.neighbours[j].size();
+      for(int k = 0; k < G.neighbours[j].size(); k++) 
+        dual_neighbours_acc[i*Nf*6 + j*6 + k] = G.neighbours[j][k];
+
+    }
+  }
+  BuckyGen::stop(BuckyQ);
+  if (num_generated < N_graphs) 
+    for (int i = num_generated; i < N_graphs; ++i) {
+      statuses_acc[i] = IsomerStatus::NOT_CONVERGED;
+      //Repeat the same graphs as already generated.
+      for(int j = 0; j < Nf; j++) {
+        face_degrees_acc[i*Nf + j] = face_degrees_acc[(i%num_generated)*Nf + j];
+        for(int k = 0; k < 6; k++) 
+          dual_neighbours_acc[i*Nf*6 + j*6 + k] = dual_neighbours_acc[(i%num_generated)*Nf*6 + j*6 + k];
+
+      }
+    }
+}
