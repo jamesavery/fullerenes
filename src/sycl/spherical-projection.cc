@@ -208,9 +208,9 @@ void spherical_projection(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchP
             real_t theta = sycl::atan2(xy[0],xy[1]);
             coord2d spherical_coords = {theta, phi};
             coord3d xyz = {cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi)};
-            real_t xsum = sycl::reduce_over_group(cta, xyz[0], plus<real_t>{});
-            real_t ysum = sycl::reduce_over_group(cta, xyz[1], plus<real_t>{});
-            real_t zsum = sycl::reduce_over_group(cta, xyz[2], plus<real_t>{});
+            real_t xsum = sycl::reduce_over_group(cta, xyz[0], sycl::plus<real_t>{});
+            real_t ysum = sycl::reduce_over_group(cta, xyz[1], sycl::plus<real_t>{});
+            real_t zsum = sycl::reduce_over_group(cta, xyz[2], sycl::plus<real_t>{});
             coord3d cm = {xsum/real_t(N), ysum/real_t(N), zsum/real_t(N)};
 
             xyz -= cm;
@@ -219,7 +219,7 @@ void spherical_projection(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchP
             sycl::group_barrier(cta);
             real_t local_Ravg = 0.0;
             for (size_t i = 0; i < 3; i++){ local_Ravg += norm(xyz_smem[tid] - xyz_smem[neighbours[i]]); }
-            Ravg = sycl::reduce_over_group(cta, local_Ravg, plus<real_t>{})/real_t(3*N);
+            Ravg = sycl::reduce_over_group(cta, local_Ravg, sycl::plus<real_t>{})/real_t(3*N);
             xyz *= scalerad*real_t(1.5)/Ravg;
             xyz_acc[isomer_idx*N + tid] = xyz;
             } 

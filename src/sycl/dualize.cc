@@ -145,7 +145,7 @@ void dualize(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
             }
             sycl::group_barrier(cta);
 
-            node_t scan_result = exclusive_scan_over_group(cta, rep_count, plus<node_t>{});
+            node_t scan_result = exclusive_scan_over_group(cta, rep_count, sycl::plus<node_t>{});
 
             if (f < Nf){
                 node_t arc_count = 0;
@@ -243,7 +243,7 @@ void dualize_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy polic
             }
             sycl::group_barrier(cta);
 
-            node_t scan_result = exclusive_scan_over_group(cta, rep_count, plus<node_t>{});
+            node_t scan_result = exclusive_scan_over_group(cta, rep_count, sycl::plus<node_t>{});
 
             if (f < Nf){
                 node_t arc_count = 0;
