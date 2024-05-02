@@ -1686,11 +1686,32 @@ void compute_hessians(sycl::queue& Q, IsomerBatch<T,K>& B, sycl::buffer<T,1>& he
             for (size_t j = 0; j < 10; j++) //cols / 3
             {   
                 for (size_t k = 0; k < 3; k++)
-                {
+                {   
                     cols_acc[toff + i*n_cols + j*3 + k] = hessian.indices[j]*3 + k;
                     hess_acc[toff + i*n_cols + j*3 + k] = hessian.A[j][i][k];
                 }    
             }
+            group_barrier(cta);
+            //Enforce symmetry
+
+            for(int ii = tid; ii < n_cols*n_rows; ii += N){
+                int i = ii / n_cols;
+                int jj = ii % n_cols;
+                int j = cols_acc[bid*hess_stride + i*n_cols + jj];
+                int ix = 0;
+                
+                if(i < j){
+                    while (ix < n_cols && cols_acc[bid*hess_stride + j*n_cols + ix] != i) {ix++;}
+                    int jx = cols_acc[bid*hess_stride + j*n_cols + ix];
+
+                    T val = 0.5*(hess_acc[bid*hess_stride + i*n_cols + jj] + hess_acc[bid*hess_stride + j*n_cols + ix]);
+                    hess_acc[bid*hess_stride + i*n_cols + jj] = val;
+                    hess_acc[bid*hess_stride + j*n_cols + ix] = val;
+                }
+            }
+
+            //Enforce symmetry
+
         });
     });
 }
