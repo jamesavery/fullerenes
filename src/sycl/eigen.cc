@@ -1,6 +1,8 @@
 #include <fullerenes/sycl-isomer-batch.hh>
 #include "forcefield-includes.cc"
 #include <array>
+#include "sycl/sycl.hpp"
+#include <oneapi/dpl/random>
 using namespace sycl;
 
 template <typename T>
@@ -233,7 +235,7 @@ struct EigenBuffers{
 
 
 /* 
-    * @brief: Multi-purpose eigensolver for the Hessian matrix of a batch of isomers.
+    * @brief: Multi-purpose eigensolver for the batch of Hessian matrices derived from the batch of isomers.
     * @param mode: EigensolveMode, the mode of the eigensolver.
     * @param B: IsomerBatch<T,K>, the batch of isomers.
     * @param hessians: sycl::buffer<T,1>, the buffer containing the hessians.
@@ -366,13 +368,15 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
             }
             sycl::group_barrier(cta);
 
-            // Generate a random number between 0 and 99
-            V[0*N] =  real_t(LCG(tid)); //Seed the random number generator with the thread id
+            // Generate random starting vector
+            oneapi::dpl::uniform_real_distribution<T> distr(0.0, 1.0);            
+            oneapi::dpl::minstd_rand engine(42, tid);
+
+            V[0*N] =  distr(engine); //Seed the random number generator with the thread id
             V[0*N] /= sqrt(reduce_over_group(cta, V[0*N] * V[0*N], sycl::plus<real_t>{}));
             V[0*N] = MGS(0);
             for (int i = 0; i < nLanczos; i++){
-                if (i % 2 == 0 && i > 1){
-                    V[(i-1)*N] = MGS(i-1);
+                if (i > 1){
                     V[i*N] = MGS(i);
                 }
                 real_t v = mat_vect(V[i*N]);
@@ -447,7 +451,7 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
                 
                     if(GR <= std::numeric_limits<real_t>::epsilon()*real_t(10.)) not_done--; // Do one (or optionally more) steps after reaching tolerance, to get all off-diagonals below.
                                                     // GPU NB: Se GPU NB ovenfor.
-                    if(i>5){
+                    if(i>10){
                         //printf("%dth run: Cannot converge eigenvalue %d to tolerance " G " using machine precision %g (d=%g, shift=%g, G=%g)\n" "D[k] = %g, L[k-1] = %g, L[k] = %g\n", nth_time,k,tolerance, std::numeric_limits<real_t>::epsilon(),d,shift,GR, D[k], (k>0)?L[k-1]:0, (k+1<n)?L[k]:0);
                         auto max_error = std::max(std::numeric_limits<real_t>::epsilon()*real_t(10.),GR);
                         break;
@@ -508,7 +512,7 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
             for(int i = 0; i < 3; i++){
                 e[i*n + tid] = real_t(tid%3 == i)/sqrt(Natoms); 
             }
-            coord3d* X_ptr = X_acc.get_pointer() + n*bid;
+            coord3d* X_ptr = X_acc.get_pointer() + Natoms*bid;
             if (tid%3 == 0) {
                 e[3*n + tid] = real_t(0.);
                 e[4*n + tid] = -X_ptr[atom_idx][2];
@@ -560,4 +564,9 @@ template void eigensolve<EigensolveMode::FULL_SPECTRUM, float, uint16_t>(sycl::q
 template void eigensolve<EigensolveMode::ENDS, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);
 template void eigensolve<EigensolveMode::ENDS_VECTORS, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);
 template void eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);
+
+template void eigensolve<EigensolveMode::FULL_SPECTRUM, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);
+template void eigensolve<EigensolveMode::ENDS, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);
+template void eigensolve<EigensolveMode::ENDS_VECTORS, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);
+template void eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);
 //template void eigensolve<EigensolveMode::FULL_SPECTRUM, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);
