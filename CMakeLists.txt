@@ -59,20 +59,21 @@ if(ENABLE_SYCL)
     #set(PTXAS_COMPILE_FLAGS    " --verbose -g --maxrregcount=${GPU_MAXREGCOUNT} --opt-level=3 --generate-line-info --warn-on-double-precision-use --warn-on-spills")
     set(PTXAS_LINK_FLAGS
     "SHELL:-Xcuda-ptxas --verbose"
-    "SHELL:-Xcuda-ptxas --maxrregcount=80"
+    "SHELL:-Xcuda-ptxas --maxrregcount=255"
     "SHELL:-Xcuda-ptxas --opt-level=3"
     "SHELL:-Xcuda-ptxas --generate-line-info"
     "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
     "SHELL:-Xcuda-ptxas --warn-on-spills"
-    "SHELL:-Xcuda-ptxas --generate-line-info")
+    )
     
-    set(DPCPP_TARGET_FLAGS "-fsycl-targets=nvptx64-nvidia-cuda,x86_64 -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
+    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native")
   endif()
 
-  set(DPCPP_INCLUDE ${SYCL_DIR}/include)  
+  set(DPCPP_INCLUDE ${SYCL_DIR}include)
+  message("Using SYCL include path: ${DPCPP_INCLUDE}")  
   set(DPCPP_FLAGS "${DPCPP_FLAGS} -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS} -I${DPCPP_INCLUDE} -I${DPCPP_INCLUDE}/sycl")
 
 endif()
@@ -123,7 +124,11 @@ if(ENABLE_CUDA)
 #set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--restrict --fmad true --ftz true  --use_fast_math --maxrregcount=64 --resource-usage -Xptxas --expt-relaxed-constexpr -I /opt/nvidia/hpc_sdk/Linux_x86_64/21.2/cuda/11.0/targets/x86_64-linux/include/ -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/../../../../../examples/OpenACC/SDK/include/"
 #NOTE: -gencode arch argument is EXTREMELY important to get right, the program will simply crash with a cudaError: invalid device function if the architecture does not match the GPU
 
+<<<<<<< HEAD
 set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++${CMAKE_CXX_STANDARD} --expt-relaxed-constexpr -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_${CMAKE_CUDA_ARCHITECTURES},code=sm_${CMAKE_CUDA_ARCHITECTURES}  -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}"
+=======
+set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "--std c++17 --expt-relaxed-constexpr -lineinfo -Xptxas -O3,-v --resource-usage -gencode arch=compute_${CMAKE_CUDA_ARCHITECTURES},code=sm_${CMAKE_CUDA_ARCHITECTURES}  -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}"
+>>>>>>> origin/temp_fix_CUDA
 
 )
 set(CUDA_MAXREGCOUNT "--maxrregcount=80")
@@ -163,7 +168,7 @@ add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(src/c++)
 
-if(DPCPP_COMPILER)
+if(ENABLE_SYCL)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
   add_subdirectory(src/sycl)

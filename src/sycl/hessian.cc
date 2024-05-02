@@ -1668,7 +1668,7 @@ void compute_hessians(sycl::queue& Q, IsomerBatch<T,K>& B, sycl::buffer<T,1>& he
 
         auto N = B.N();
         auto capacity = B.capacity();
-        h.parallel_for<class compute_hessians>(sycl::nd_range(sycl::range{capacity*N}, sycl::range{N}), [=](sycl::nd_item<1> nditem){
+        h.parallel_for(sycl::nd_range(sycl::range{capacity*N}, sycl::range{N}), [=](sycl::nd_item<1> nditem){
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
@@ -1686,14 +1686,36 @@ void compute_hessians(sycl::queue& Q, IsomerBatch<T,K>& B, sycl::buffer<T,1>& he
             for (size_t j = 0; j < 10; j++) //cols / 3
             {   
                 for (size_t k = 0; k < 3; k++)
-                {
+                {   
                     cols_acc[toff + i*n_cols + j*3 + k] = hessian.indices[j]*3 + k;
                     hess_acc[toff + i*n_cols + j*3 + k] = hessian.A[j][i][k];
                 }    
             }
+            group_barrier(cta);
+            //Enforce symmetry
+
+            for(int ii = tid; ii < n_cols*n_rows; ii += N){
+                int i = ii / n_cols;
+                int jj = ii % n_cols;
+                int j = cols_acc[bid*hess_stride + i*n_cols + jj];
+                int ix = 0;
+                
+                if(i < j){
+                    while (ix < n_cols && cols_acc[bid*hess_stride + j*n_cols + ix] != i) {ix++;}
+                    int jx = cols_acc[bid*hess_stride + j*n_cols + ix];
+
+                    T val = 0.5*(hess_acc[bid*hess_stride + i*n_cols + jj] + hess_acc[bid*hess_stride + j*n_cols + ix]);
+                    hess_acc[bid*hess_stride + i*n_cols + jj] = val;
+                    hess_acc[bid*hess_stride + j*n_cols + ix] = val;
+                }
+            }
+
+            //Enforce symmetry
+
         });
     });
 }
 
 
 template void compute_hessians<PEDERSEN, float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& B, sycl::buffer<float,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
+template void compute_hessians<PEDERSEN, double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& B, sycl::buffer<double,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);

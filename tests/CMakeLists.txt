@@ -24,6 +24,7 @@ if(ENABLE_CUDA)
   minimum-problem
   eigensolve-special
   optimize-single-isomer
+  basic_pipeline
 )
 
 foreach(EXECUTABLE ${CUDA_EXECUTABLES})

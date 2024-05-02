@@ -120,6 +120,7 @@ namespace cuda_benchmark {
     }
 
     __global__ void test_reduction_V7_(const int n_times){
+        extern __shared__  device_real_t shmem[];
         auto num_warps = (blockDim.x >> 5) + 1;
         int pow2 = 0;
         if (num_warps >= 2) pow2 = 1;
@@ -127,12 +128,29 @@ namespace cuda_benchmark {
         if (num_warps >= 8) pow2 = 3;
         if (num_warps >= 16) pow2 = 4;
         if (num_warps >= 32) pow2 = 5;
-
-        extern __shared__  device_real_t shmem[];
         __shared__ device_real_t result;
         for (int i = 0; i < n_times; i++){
-            reduction_V7<device_real_t>(shmem, (device_real_t)threadIdx.x, &result, num_warps, pow2);
+            reduction_V7<device_real_t>(shmem, (device_real_t)threadIdx.x, &result, pow2);
         }
+    }
+    template <int N>
+    __global__ void test_reduction_V8_(const int n_times){
+        extern __shared__  device_real_t shmem[];
+        auto thread_block_tile = cooperative_groups::tiled_partition<N>(cooperative_groups::this_thread_block());
+        for (int i = 0; i < n_times; i++){
+            cooperative_groups::reduce(thread_block_tile, (device_real_t)threadIdx.x, cooperative_groups::plus<device_real_t>());
+        }
+    }
+
+    __global__ void test_reduction_default_(const int n_times){
+        extern __shared__  device_real_t shmem[];
+        shmem[threadIdx.x] = 0;
+        device_real_t result = 0;
+        for (int i = 0; i < n_times; i++){
+            result += reduction<device_real_t>(shmem, (device_real_t)threadIdx.x);
+        }
+        if (threadIdx.x == 0 && blockIdx.x == 0) printf("Result: %f\n", result);
+
     }
 
     __global__ void nothing_kernel_(device_real_t* A, device_real_t* B, device_real_t* C){
@@ -215,42 +233,47 @@ namespace cuda_benchmark {
         return n_blocks;
     }
 
-    std::chrono::nanoseconds benchmark_reduction(const int n_elements, const int n_times, const int scan_version){
-
+    std::chrono::nanoseconds benchmark_reduction(const int N, const int n_times, const int scan_version){
         cudaEvent_t start, stop;
         float single_kernel_time = 0.0;
         cudaEventCreate(&start); cudaEventCreate(&stop);
         cudaEventRecord(start, 0);
        
 
-        size_t smem = sizeof(device_real_t)*(n_elements*4 + 32);
-        int M = n_blocks(n_elements);
+        size_t smem = sizeof(device_real_t)*(N*4 + 32);
+        int M = n_blocks(N);
         void* kargs[]{(void*)&n_times};
         switch (scan_version)
         {
         case 0:
-            cudaLaunchCooperativeKernel((void*)test_reduction_V0_, M, n_elements, kargs, smem);  
+            cudaLaunchCooperativeKernel((void*)test_reduction_V0_, M, N, kargs, smem);  
             break;
         case 1:
-            cudaLaunchCooperativeKernel((void*)test_reduction_V1_, M, n_elements, kargs, smem);  
+            cudaLaunchCooperativeKernel((void*)test_reduction_V1_, M, N, kargs, smem);  
             break;
         case 2:
-            cudaLaunchCooperativeKernel((void*)test_reduction_V2_, M, n_elements, kargs, smem);
+            cudaLaunchCooperativeKernel((void*)test_reduction_V2_, M, N, kargs, smem);
             break;  
         case 3:
-            cudaLaunchCooperativeKernel((void*)test_reduction_V3_, M, n_elements, kargs, smem);  
+            cudaLaunchCooperativeKernel((void*)test_reduction_V3_, M, N, kargs, smem);  
             break;
         case 4:
-            cudaLaunchCooperativeKernel((void*)test_reduction_V4_, M, n_elements, kargs, smem);  
+            cudaLaunchCooperativeKernel((void*)test_reduction_V4_, M, N, kargs, smem);  
             break;
         case 5:
-            cudaLaunchCooperativeKernel((void*)test_reduction_V5_, M, n_elements, kargs, smem);  
+            cudaLaunchCooperativeKernel((void*)test_reduction_V5_, M, N, kargs, smem);  
             break;
         case 6: 
-            cudaLaunchCooperativeKernel((void*)test_reduction_V6_, M, n_elements, kargs, smem);  
+            cudaLaunchCooperativeKernel((void*)test_reduction_V6_, M, N, kargs, smem);  
             break;
         case 7: 
-            cudaLaunchCooperativeKernel((void*)test_reduction_V7_, M, n_elements, kargs, smem);  
+            cudaLaunchCooperativeKernel((void*)test_reduction_V7_, M, N, kargs, smem);  
+            break;
+        case 8:
+            //cudaLaunchCooperativeKernel((void*)test_reduction_V8_<512>, M, N, kargs, smem);
+            break;
+        case 9:
+            cudaLaunchCooperativeKernel((void*)test_reduction_default_, M, N, kargs, smem);  
             break;
         default:
             break;
