@@ -28,7 +28,7 @@ void apply_all_reflections(const group<1> &cta,
         }      
     }  
 }
-
+//TODO everywhere: Handle the case when number of threads less than dimension with bdim?
 template <typename T>
 void T_QTQ(group<1>& cta, 
             const int n, 
@@ -162,7 +162,7 @@ std::array<T,2> eigvalsh2x2(const std::array<T,4> &A){
 template <typename T>
 T max_norm(const group<1>& cta, 
            const local_accessor<T,1>& A, const int m, const int n)
-{//TODO: Regular segmented reduce -> m*n parallel
+{//TODO: Implement regular segmented reduce -> m*n parallel
   T mx = 0;
   int j = cta.get_local_id(0);
   for(int i=0;i<m;i++){ 	
@@ -213,16 +213,20 @@ void QHQ(const group<1>& cta,
 
 // sum(2*v[i]*A[j,k]*v[k],k) = 2*v[i]*sum(A[j,k]*v[k],k)
 template <typename T>
-void reflect_region(/*in/out*/local_accessor<T,1> &A,
-    int N, int i0, int j0, int m, int n, const T &v_i, int cols,
-    local_accessor<T,1>& vHA)
+void reflect_region(group<1>& cta,
+    /*in/out*/local_accessor<T,1> &A,int N, /* Matrix top transform */
+    int i0, int j0, int m, int n,           /* Region of A to transform */
+    const T &v_i,                           /* Thread's element of the reflection vector v*/
+    int cols,                               /* Left- or right-reflection (COLS or ROWS) */
+    /*workmem*/local_accessor<T,1>& vHA)    /* Length-n working memory for v^H A[region] */           
 {
+    // TODO: Implement segmented sum to get full m*n parallelism.
     int stride[2] = {N * (!cols) + 1 * cols, N * cols + 1 * (!cols)};
 
     int i_tid = cta.get_local_id(0);
-    for (int j = 0; j < n; j++) // TODO: Implement segmented sum
+    for (int j = 0; j < n; j++) 
     {
-        size_t IJ = (i + i0) * stride[0] + (j + j0) * stride[1];
+        size_t IJ = (i_tid + i0) * stride[0] + (j + j0) * stride[1];
         T vAij = v_i*A[IJ];
         T sum = reduce_over_group(cta, vAij, plus<T>());
         vHA[j] = sum;
