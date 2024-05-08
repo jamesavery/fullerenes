@@ -8,61 +8,61 @@ using namespace sycl;
 /* JA: Muy complicado. Få Jonas-tutorial om hvorfor. */
 typedef multi_ptr_t multi_ptr<T, access::address_space::global_space, access::decorated::legacy>;
 
-template <typename T>
+template <typename real_t>
 void apply_all_reflections(const group<1> &cta, 
-                           const local_accessor<T,1>& V, const int n, const int m,                            
+                           const local_accessor<real_t,1>& V, const int n, const int m,                            
                            multi_ptr_t& Q)
 {   
-    static_assert(std::is_floating_point<T>::value, "T must be floating point");
+    static_assert(std::is_floating_point<real_t>::value, "real_t must be floating point");
     auto tid = cta.get_local_linear_id();
     auto bdim = cta.get_local_linear_range();
     for(int k=0;k<n;k++){
-        const T &v0 = V[2*k], &v1 = V[2*k+1];      
+        const real_t &v0 = V[2*k], &v1 = V[2*k+1];      
         // Udrullet:
         //       apply_reflection(Q({k,k+2},{0,m}), v);
         for(int l=tid;l<m; l+=bdim){
-            T &q0 = Q[k*m+l], &q1 = Q[(k+1)*m+l];
-            T vTA = q0*v0 + q1*v1;
+            real_t &q0 = Q[k*m+l], &q1 = Q[(k+1)*m+l];
+            real_t vTA = q0*v0 + q1*v1;
             q0 -= 2*v0*vTA;
             q1 -= 2*v1*vTA;
         }      
     }  
 }
 //TODO everywhere: Handle the case when number of threads less than dimension with bdim?
-template <typename T>
+template <typename real_t>
 void T_QTQ(group<1>& cta, 
             const int n, 
-            const local_accessor<T,1>& D, const local_accessor<T,1>& L, const local_accessor<T,1>& U,
-            const local_accessor<T,1>& Vout, T shift=0)
+            const local_accessor<real_t,1>& D, const local_accessor<real_t,1>& L, const local_accessor<real_t,1>& U,
+            const local_accessor<real_t,1>& Vout, real_t shift=0)
 {
     int tix  = cta.get_local_linear_id();
     int bdim = cta.get_local_linear_range();
-    FLOAT_TYPEDEFS(T);
+    FLOAT_TYPEDEFS(real_t);
 
     //  QTQ_calls ++;
     // Unrolled
-    //  T numerical_zero = T.max_norm()*10*std::numeric_limits<T>::epsilon();
+    //  real_t numerical_zero = real_t.max_norm()*10*std::numeric_limits<real_t>::epsilon();
     // specialized max_norm = max(sum(abs(A),axis=1)) for tridiagonal matrix. 
-    T local_max = T(0.);
+    real_t local_max = real_t(0.);
     for (int i = tix; i < n; i += bdim){
         local_max = std::max(local_max, abs(D[i]) + 2*abs(L[i]));
     }
-    T max_norm = reduce_over_group(cta, local_max, maximum<T>());
-    T numerical_zero = 10*std::numeric_limits<T>::epsilon();
-    T d_n, l_n, l_nm1;
+    real_t max_norm = reduce_over_group(cta, local_max, maximum<real_t>());
+    real_t numerical_zero = 10*std::numeric_limits<real_t>::epsilon();
+    real_t d_n, l_n, l_nm1;
     d_n = D[n]; l_n = L[n]; l_nm1 = L[n-1];
     group_barrier(cta);
-    //T a[2], v[2], D[n+1], L[n+1], U[2*(n+1)];
-    T a[2], v[2];//, D[n+1], L[n+1], U[2*(n+1)];
+    //real_t a[2], v[2], D[n+1], L[n+1], U[2*(n+1)];
+    real_t a[2], v[2];//, D[n+1], L[n+1], U[2*(n+1)];
     for(int k = tix; k < n + 1; k += bdim){
         D[k] -= shift;
-        U[n+1 + k] = T(0.);
+        U[n+1 + k] = real_t(0.);
         if(k < n-1){
             U[k] = L[k];
-            Vout[2*k] = T(0.); Vout[2*k+1] = T(0.);
+            Vout[2*k] = real_t(0.); Vout[2*k+1] = real_t(0.);
         } else {
-            L[k] = T(0.);
-            U[k] = T(0.);
+            L[k] = real_t(0.);
+            U[k] = real_t(0.);
         }
     }
 
@@ -72,16 +72,15 @@ void T_QTQ(group<1>& cta,
             if (abs(L[k]) > numerical_zero){
             a[0] = D[k]; a[1] = L[k];       // a = T[k:k+2,k] is the vector of nonzeros in kth subdiagonal column.
             
-            T anorm = sqrt(a[0]*a[0] + a[1]*a[1]); 
+            real_t anorm = sqrt(a[0]*a[0] + a[1]*a[1]); 
 
             // // Udrullet
             // //    reflection_vector(a,anorm,v);
             v[0] = D[k]; v[1] = L[k];
-            T alpha = -copysign(anorm,a[0]); // Koster ingenting
+            real_t alpha = -copysign(anorm,a[0]); // Koster ingenting
             v[0] -= alpha;
 
-            T vnorm = sqrt(v[0]*v[0]+v[1]*v[1]);
-            T norm_inv = T(1.)/vnorm;               //Normalize
+            real_t norm_inv = rsqrt(v[0]*v[0]+v[1]*v[1]);
             v[0] *= norm_inv;  v[1] *= norm_inv;
 
             Vout[2*k] = v[0]; Vout[2*k+1] = v[1];
@@ -94,43 +93,44 @@ void T_QTQ(group<1>& cta,
                             U[(n+1)+k]*v[0] + U[k+1]*v[1]}; // T(k,k+2)*v[0] + T(k+1,k+2)*v[1]
 
         
-            D[k]     -= T(2.)*v[0]*vTA[0];
-            L[k]     -= T(2.)*v[1]*vTA[0];
-            U[k]     -= T(2.)*v[0]*vTA[1];
-            D[k+1]     -= T(2.)*v[1]*vTA[1];
-            U[(n+1)+k] -= T(2.)*v[0]*vTA[2];
-            U[k+1]     -= T(2.)*v[1]*vTA[2];
+        // TODO: When code works, change real_t(2.) to 2, etc., everywhere.
+            D[k]     -= real_t(2.)*v[0]*vTA[0];
+            L[k]     -= real_t(2.)*v[1]*vTA[0];
+            U[k]     -= real_t(2.)*v[0]*vTA[1];
+            D[k+1]     -= real_t(2.)*v[1]*vTA[1];
+            U[(n+1)+k] -= real_t(2.)*v[0]*vTA[2];
+            U[k+1]     -= real_t(2.)*v[1]*vTA[2];
             }
         }
 
     if(tix == 0)
     { // Transform from the right = transform columns of the transpose.
         int k = 0;
-        const T *v = &Vout[0];
-        T   vTA[2] = {D[ k ]*v[0] + U[  k  ]*v[1],  // T(k,k  )*v[0] + T(k,  k+1)*v[1]
+        const real_t *v = &Vout[0];
+        real_t   vTA[2] = {D[ k ]*v[0] + U[  k  ]*v[1],  // T(k,k  )*v[0] + T(k,  k+1)*v[1]
                     0        + D[ k+1 ]*v[1]}; // T(k+1,k)*v[0] + T(k+1,k+1)*v[1]. Lower subdiagonal is zero at this stage.
         
-        D[k]       -= T(2.)*v[0]*vTA[0]; // T(k,k)     -= 2*v[0]*vTA[0]
-        U[k]       -= T(2.)*v[1]*vTA[0]; // T(k,k+1)   -= 2*v[1]*vTA[0]
-        L[k]       -= T(2.)*v[0]*vTA[1]; // T(k+1,k)   -= 2*v[0]*vTA[1]
-        D[k+1]     -= T(2.)*v[1]*vTA[1]; // T(k+1,k+1) -= 2*v[1]*vTA[1]        
+        D[k]       -= real_t(2.)*v[0]*vTA[0]; // T(k,k)     -= 2*v[0]*vTA[0]
+        U[k]       -= real_t(2.)*v[1]*vTA[0]; // T(k,k+1)   -= 2*v[1]*vTA[0]
+        L[k]       -= real_t(2.)*v[0]*vTA[1]; // T(k+1,k)   -= 2*v[0]*vTA[1]
+        D[k+1]     -= real_t(2.)*v[1]*vTA[1]; // T(k+1,k+1) -= 2*v[1]*vTA[1]        
     }
     group_barrier(cta);
 
 
     if(tix == 0){
         for(int k=1;k<n-1;k++){
-            const T *v = &Vout[2*k];
+            const real_t *v = &Vout[2*k];
             coord3d vTA = {U[k-1]*v[0] + U[(n+1)+k-1]*v[1], // T(k-1,k)*v[0] + T(k-1,k+1)*v[1]  
                             D[ k ]*v[0] + U[  k  ]*v[1],     // T(k,k  )*v[0] + T(k,  k+1)*v[1]
                             L[ k ]*v[0] + D[ k+1 ]*v[1]};    // T(k+1,k)*v[0] + T(k+1,k+1)*v[1]. Lower subdiagonal is zero at this stage
 
-            U[k-1]     -= T(2.)*v[0]*vTA[0];     // T(k-1,k)   -= 2*v[0]*vTA[0]
-            U[(n+1)+(k-1)] -= T(2.)*v[1]*vTA[0]; // T(k-1,k+1) -= 2*v[1]*vTA[0]
-            U[k]       -= T(2.)*v[1]*vTA[1];     // T(k,  k+1)   -= 2*v[1]*vTA[1]
-            D[k]       -= T(2.)*v[0]*vTA[1];     // T(k,  k)     -= 2*v[0]*vTA[1]
-            L[k]       -= T(2.)*v[0]*vTA[2];     // T(k+1,k)   -= 2*v[0]*vTA[2]
-            D[k+1]     -= T(2.)*v[1]*vTA[2];     // T(k+1,k+1) -= 2*v[1]*vTA[2]        
+            U[k-1]     -= real_t(2.)*v[0]*vTA[0];     // T(k-1,k)   -= 2*v[0]*vTA[0]
+            U[(n+1)+(k-1)] -= real_t(2.)*v[1]*vTA[0]; // T(k-1,k+1) -= 2*v[1]*vTA[0]
+            U[k]       -= real_t(2.)*v[1]*vTA[1];     // T(k,  k+1)   -= 2*v[1]*vTA[1]
+            D[k]       -= real_t(2.)*v[0]*vTA[1];     // T(k,  k)     -= 2*v[0]*vTA[1]
+            L[k]       -= real_t(2.)*v[0]*vTA[2];     // T(k+1,k)   -= 2*v[0]*vTA[2]
+            D[k+1]     -= real_t(2.)*v[1]*vTA[2];     // T(k+1,k+1) -= 2*v[1]*vTA[2]        
         }
     }
 
@@ -152,73 +152,74 @@ void T_QTQ(group<1>& cta,
 }
 
 
-template <typename T>
-std::array<T,2> eigvalsh2x2(const std::array<T,4> &A){
+template <typename real_t>
+std::array<real_t,2> eigvalsh2x2(const std::array<real_t,4> &A){
     auto [a,b,c,d] = A;
-    T D = sqrt(4*b*c+(a-d)*(a-d));
+    real_t D = sqrt(4*b*c+(a-d)*(a-d));
     return {(a+d-D)/2, (a+d+D)/2};
 }
 
-template <typename T>
-T max_norm(const group<1>& cta, 
-           const local_accessor<T,1>& A, const int m, const int n)
+template <typename real_t>
+real_t max_norm(const group<1>& cta, 
+               const local_accessor<real_t,1>& A, const int m, const int n)
 {//TODO: Implement regular segmented reduce -> m*n parallel
-  T mx = 0;
+  real_t mx = 0;
   int j = cta.get_local_id(0);
   for(int i=0;i<m;i++){ 	
-    T row_norm = reduce_over_group(cta, abs(A[i*n+j]), plus<T>());
+    real_t row_norm = reduce_over_group(cta, abs(A[i*n+j]), plus<real_t>());
     mx = max(mx,row_norm);
   }
   return mx;  
 }
 
-template <typename T>
-T reflection_vector(const group<1>& cta,
-                    const T& a_i,const T& anorm)
+template <typename real_t>
+real_t reflection_vector(const group<1>& cta,
+                         const real_t& a_i,const real_t& anorm)
 {
     int i_tid = cta.get_local_id(0);
-    T alpha = -copysign(anorm,a_i);
-    T v_i = a_i + (i_tid==0)*alpha; // TODO: Check fortegn 
-    T vnorm = sqrt(reduce_over_group(cta, v_i*v_i, plus<T>()));
+    real_t alpha = -copysign(anorm,a_i);
+    real_t v_i = a_i + (i_tid==0)*alpha; // TODO: Check fortegn 
+    real_t vnorm = sqrt(reduce_over_group(cta, v_i*v_i, plus<real_t>()));
     return v_i / vnorm;
 }
 
 /* TODO: Kan jeg håndtere a[0] =~= 0 mere robust? Kan jeg inkludere pivots? */
 /* Note: Restricted to real matrix A, redo for complex. */
-template <typename T>
+template <typename real_t>
 void QHQ(const group<1>& cta, 
-         /*in/out*/local_accessor<T,1>& A, int n, 
-         /*in/out*/local_accessor<T,1>& Q,
-         /*workmem*/local_accessor<T,1>& vHA_wm)
+         /*in/out*/local_accessor<real_t,1>& A, int n, 
+         /*in/out*/local_accessor<real_t,1>& Q,         
+         /*workmem*/local_accessor<real_t,1>& vHA_wm,
+         bool compute_eigenvectors=true)
 {
-  T numerical_zero = max_norm(A,n,n)*10*std::numeric_limits<T>::epsilon();
+  real_t numerical_zero = max_norm(A,n,n)*10*std::numeric_limits<real_t>::epsilon();
   
   int j_tid = cta.get_local_id(0);
   for(int k=0;k<n-1;k++){ // Sequential loop
     int l = n-(k+1);		                   /* length of kth postdiagonal row a */
-    T a_i   = j_tid<l? A[k*n+(k+1)+j_tid] : 0; /* a = A[k,(k+1):n], kth postdiagonal row. */
-    T anorm = sqrt(reduce_over_group(cta, a_i*a_i, plus<T>())); /* Norm of a */
+    real_t a_i   = j_tid<l? A[k*n+(k+1)+j_tid] : 0; /* a = A[k,(k+1):n], kth postdiagonal row. */
+    real_t anorm = sqrt(reduce_over_group(cta, a_i*a_i, plus<real_t>())); /* Norm of a */
 
     if(anorm < numerical_zero) continue; /* Already eliminated, don't divide by 0 */
 
-    T v_i =  reflection_vector(cta, a_i, anorm);    /* Vector definining elimination operations */
+    real_t v_i =  reflection_vector(cta, a_i, anorm);    /* Vector definining elimination operations */
     
     reflect_region(cta,A,n,/* reg. start:*/k+1,k, /* reg. size:*/l,l+1, v_i,2, ROWS, vHA_wm);
     reflect_region(cta,A,n,/* reg. start:*/k+1,k, /* reg. size:*/l,l+1, v_i,2, COLS, vHA_wm);
 
-    if(Q != 0) reflect_region(cta,Q,n, k+1,0, l,n, v_i, sigma, ROWS, vHA_wm); 
+    if(compute_eigenvectors) reflect_region(cta,Q,n, k+1,0, l,n, v_i, sigma, ROWS, vHA_wm); 
   }
 }
 
 
 // sum(2*v[i]*A[j,k]*v[k],k) = 2*v[i]*sum(A[j,k]*v[k],k)
-template <typename T>
+template <typename real_t>
 void reflect_region(group<1>& cta,
-    /*in/out*/local_accessor<T,1> &A,int N, /* Matrix top transform */
+    /*in/out*/local_accessor<real_t,1> &A,int N, /* Matrix top transform */
     int i0, int j0, int m, int n,           /* Region of A to transform */
-    const T &v_i,                           /* Thread's element of the reflection vector v*/
+    const real_t &v_i,                           /* Thread's element of the reflection vector v*/
     int cols,                               /* Left- or right-reflection (COLS or ROWS) */
-    /*workmem*/local_accessor<T,1>& vHA)    /* Length-n working memory for v^H A[region] */           
+    /*workmem*/local_accessor<real_t,1>& vHA)    /* Length-n working memory for v^H A[region] */           
 {
     // TODO: Implement segmented sum to get full m*n parallelism.
     int stride[2] = {N * (!cols) + 1 * cols, N * cols + 1 * (!cols)};
@@ -227,8 +228,8 @@ void reflect_region(group<1>& cta,
     for (int j = 0; j < n; j++) 
     {
         size_t IJ = (i_tid + i0) * stride[0] + (j + j0) * stride[1];
-        T vAij = v_i*A[IJ];
-        T sum = reduce_over_group(cta, vAij, plus<T>());
+        real_t vAij = v_i*A[IJ];
+        real_t sum = reduce_over_group(cta, vAij, plus<real_t>());
         vHA[j] = sum;
     }
 
@@ -238,3 +239,5 @@ void reflect_region(group<1>& cta,
         A[IJ] -= 2 * v_i * vHA[j];
     }
 }
+
+
