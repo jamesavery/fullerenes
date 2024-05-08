@@ -813,7 +813,7 @@ c     1 ' The displacements of ',I4,' atoms were damped.')
       IMPLICIT REAL*8 (A-H,O-Z)
       REAL*8 p(NMAX*3),pcom(NMAX*3),xicom(NMAX*3),xi(NMAX*3)
       real*8 force(ffmaxdim)
-      integer iout(0)
+      integer iout
       integer e_hh(2,3*number_vertices/2), e_hp(2,3*number_vertices/2),
      1  e_pp(2,3*number_vertices/2)
       integer a_h(3,3*number_vertices-60), a_p(3,60)
