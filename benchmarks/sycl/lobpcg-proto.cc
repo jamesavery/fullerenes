@@ -224,6 +224,82 @@ void lanczos(sycl::group<1>& cta, const local_accessor<T,1>& A, T* X, T* alphas,
         if ((i < N-1) && (tid  < N)) V[(i+1)*N] = v / beta;
     } 
 }
+/* 
+template <typename real_t>
+void reflect_region(group<1>& cta,
+    local_accessor<real_t,1> &A,int N,           // Matrix top transform
+    int i0, int j0, int m, int n,                // Region of A to transform
+    const real_t &v_i,                           // Thread's element of the reflection vector v
+    int cols,                                    // Left- or right-reflection (COLS or ROWS)
+    local_accessor<real_t,1>& vHA)               // Length-n working memory for v^H A[region] 
+{
+    // TODO: Implement segmented sum to get full m*n parallelism.
+    int stride[2] = {N * (!cols) + 1 * cols, N * cols + 1 * (!cols)};
+
+    int i_tid = cta.get_local_id(0);
+    for (int j = 0; j < n; j++) 
+    {
+        size_t IJ = (i_tid + i0) * stride[0] + (j + j0) * stride[1];
+        real_t vAij = v_i*A[IJ];
+        real_t sum = reduce_over_group(cta, vAij, plus<real_t>());
+        vHA[j] = sum;
+    }
+
+    for (size_t j = 0; j < n; j++) // A += -2*outer(v,vTA)
+    {
+        size_t IJ = (i_tid + i0) * stride[0] + (j + j0) * stride[1];
+        A[IJ] -= 2 * v_i * vHA[j];
+    }
+}
+
+template <typename real_t>
+real_t max_norm(const group<1>& cta, 
+               const local_accessor<real_t,1>& A, const int m, const int n)
+{//TODO: Implement regular segmented reduce -> m*n parallel
+  real_t mx = 0;
+  int j = cta.get_local_id(0);
+  for(int i=0;i<m;i++){ 	
+    real_t row_norm = reduce_over_group(cta, abs(A[i*n+j]), plus<real_t>());
+    mx = max(mx,row_norm);
+  }
+  return mx;  
+}
+template <typename real_t>
+real_t reflection_vector(const group<1>& cta,
+                         const real_t& a_i,const real_t& anorm)
+{
+    int i_tid = cta.get_local_id(0);
+    real_t alpha = -copysign(anorm,a_i);
+    real_t v_i = a_i + (i_tid==0)*alpha; // TODO: Check fortegn 
+    real_t vnorm = sqrt(reduce_over_group(cta, v_i*v_i, plus<real_t>()));
+    return v_i / vnorm;
+}
+template <typename real_t>
+void QHQ(const group<1>& cta,
+        local_accessor<real_t,1>& A, int n, //in/out
+        local_accessor<real_t,1>& Q,        //in/out
+        local_accessor<real_t,1>& vHA_wm,   //workmem
+         bool compute_eigenvectors=true)
+{
+  real_t numerical_zero = max_norm(A,n,n)*10*std::numeric_limits<real_t>::epsilon();
+  
+  int j_tid = cta.get_local_id(0);
+  for(int k=0;k<n-1;k++){ // Sequential loop
+    int l = n-(k+1);		                                                //length of kth postdiagonal row a
+    real_t a_i   = j_tid<l? A[k*n+(k+1)+j_tid] : 0;                         //a = A[k,(k+1):n], kth postdiagonal row.
+    real_t anorm = sqrt(reduce_over_group(cta, a_i*a_i, plus<real_t>()));   //Norm of a
+
+    if(anorm < numerical_zero) continue;                                    //Already eliminated, don't divide by 0
+
+    real_t v_i =  reflection_vector(cta, a_i, anorm);                       //Vector definining elimination operations
+    
+    reflect_region(cta,A,n,k+1,k,l,l+1, v_i,2, ROWS, vHA_wm);
+    reflect_region(cta,A,n,k+1,k,l,l+1, v_i,2, COLS, vHA_wm);
+
+    if(compute_eigenvectors) reflect_region(cta,Q,n, k+1,0, l,n, v_i, sigma, ROWS, vHA_wm); 
+  }
+} */
+
 template <typename T, int N>
 void diagonalize(sycl::group<1>& cta, T* U, T* L, T* D, T* V, T* Q){
     auto tid = cta.get_local_linear_id();
