@@ -5,6 +5,7 @@ set(SYCL_EXECUTABLES
   sycl-pipeline-multinode
   eigen-test-sycl
   dual-test-sycl
+  dual-validation-sycl
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
