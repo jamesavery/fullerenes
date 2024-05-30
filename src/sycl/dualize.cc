@@ -5,6 +5,8 @@
 #include <oneapi/dpl/numeric>
 #include "numeric"
 #include <vector>
+#include <iostream>
+#include <fstream>
 #include <tuple>
 #include <iterator>
 #include <type_traits>
@@ -365,12 +367,24 @@ template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep2 {};
 template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep3 {};
 
 template<int MaxDegIn, int MaxDegOut, typename K>
-void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>& Deg_in, sycl::buffer<K,1>& G_out, sycl::buffer<K,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy){
+void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>& Deg_in, sycl::buffer<K,1>& G_out, sycl::buffer<K,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate){
     INT_TYPEDEFS(K);
     if(policy == LaunchPolicy::SYNC) Q.wait();
     sycl::device d = Q.get_device();
     auto exec_pol = oneapi::dpl::execution::make_device_policy(d);
 
+    auto output_buf_to_file = [&](sycl::buffer<K,1>& buf, std::string filename){
+        std::vector<K> data(buf.get_count());
+        Q.wait();
+        std::ofstream file(filename);
+        host_accessor acc(buf, read_only);
+        for(int i = 0; i < buf.get_count(); i++){
+            data[i] = acc[i];
+        }
+        file.write((char*)data.data(), data.size()*sizeof(K));
+    };
+
+    if(output_intermediate) output_buf_to_file(G_in, "G_in_N=" + std::to_string(Nin) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(MaxDegIn) + "_.uint16");
     //Find maximum workgroup size
     auto max_workgroup_size = d.get_info<sycl::info::device::max_work_group_size>();
     static DualWorkingBuffers<K> buffers(Nin, Nout, MaxDegIn, d);
@@ -409,6 +423,11 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
             }
         });
     });
+    if (output_intermediate){
+        output_buf_to_file(buffers.cannon_ixs[idx], "cannon_ixs_N=" + std::to_string(Nout) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(MaxDegIn) + "_.uint16");
+        output_buf_to_file(buffers.rep_count[idx], "rep_count_N=" + std::to_string(Nout) + "_dim_" + std::to_string(Nin) + "_.uint16");
+    }
+
 
     oneapi::dpl::exclusive_scan(
             exec_pol,
@@ -416,6 +435,8 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
             oneapi::dpl::end(buffers.scan_array[idx]),
             oneapi::dpl::begin(buffers.scan_array[idx]),
             0);
+
+    if(output_intermediate) output_buf_to_file(buffers.scan_array[idx], "scan_array_N=" + std::to_string(Nout) + "_dim_" + std::to_string(Nin) + "_.uint16");
 
     Q.submit([&](handler &h) {
         accessor G_in_acc   (G_in,   h, read_only);
@@ -444,6 +465,11 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
             }
         });
     });
+    if(output_intermediate){
+        output_buf_to_file(buffers.triangle_numbers[idx], "triangle_numbers_N=" + std::to_string(Nout) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(MaxDegIn) + "_.uint16");
+        output_buf_to_file(buffers.arc_list[idx], "arc_list_N=" + std::to_string(Nout) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(2) + "_.uint16");
+    }
+
     
     Q.submit([&](handler &h) {
         accessor G_in_acc   (G_in,   h, read_only);
@@ -471,6 +497,8 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
             }
         });
     });
+
+    if(output_intermediate) output_buf_to_file(G_out, "G_out_N=" + std::to_string(Nout) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(MaxDegOut) + "_.uint16");
     
     if(policy == LaunchPolicy::SYNC) Q.wait();
 
@@ -480,5 +508,5 @@ template void dualize<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>
 template void dualize_V1<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
 template void dualize<double,uint16_t>(sycl::queue&Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);
 template void dualize_V1<double,uint16_t>(sycl::queue&Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);
-template void dualize_general<6, 3, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy);
-template void dualize_general<3, 6, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy);
+template void dualize_general<6, 3, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate);
+template void dualize_general<3, 6, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate);

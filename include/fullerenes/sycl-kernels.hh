@@ -9,7 +9,7 @@ template <typename T = float, typename K = uint16_t>
 void dualize_V1(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy);
 
 template <int MaxDegIn, int MaxDegOut, typename K = uint16_t>
-void dualize_general(sycl::queue&Q, sycl::buffer<K>& G_in, sycl::buffer<K>& Deg_in, sycl::buffer<K>& G_out, sycl::buffer<K>& Deg_out, int Nin, int Nout, LaunchPolicy policy);
+void dualize_general(sycl::queue&Q, sycl::buffer<K>& G_in, sycl::buffer<K>& Deg_in, sycl::buffer<K>& G_out, sycl::buffer<K>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate = false);
 
 template <typename T = float, typename K = uint16_t>
 void tutte_layout(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy);
