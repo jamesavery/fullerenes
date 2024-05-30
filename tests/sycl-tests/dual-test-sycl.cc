@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    dualize_general<6, 3>(Q, batch.dual_neighbours, batch.face_degrees, batch.cubic_neighbours, cubic_degrees, Nf, N, LaunchPolicy::SYNC);  
+    dualize_general<6, 3>(Q, batch.dual_neighbours, batch.face_degrees, batch.cubic_neighbours, cubic_degrees, Nf, N, LaunchPolicy::SYNC, true);  
     {
         auto cubic_neighbours_acc = batch.cubic_neighbours.get_access<sycl::access::mode::read>();
         auto cubic_degrees_acc = cubic_degrees.get_access<sycl::access::mode::read>();
