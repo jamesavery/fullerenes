@@ -20,7 +20,7 @@ int main(int argc, char** argv){
 
     auto mean = [&](std::vector<std::chrono::nanoseconds> &input, const int samples){
             auto result = std::chrono::nanoseconds(0);
-            for (int i = 0; i < samples; i++){
+            for (int i = 0; i < input.size(); i++){
                 result += input[i];
             }
             return result / samples;
@@ -29,7 +29,7 @@ int main(int argc, char** argv){
     auto standard_deviation = [&](std::vector<std::chrono::nanoseconds> &input, const int samples){
         auto mean_ = mean(input, samples);
         auto result = std::chrono::nanoseconds(0);
-        for (int i = 0; i < samples; i++){
+        for (int i = 0; i < input.size(); i++){
             result += (input[i] - mean_) *  (input[i] - mean_).count();
         }
         return std::chrono::nanoseconds((int)std::sqrt( (result / samples).count()));
@@ -43,7 +43,9 @@ int main(int argc, char** argv){
             T_warp_manual(n_samples),
             T_warp_atomic(n_samples),
             T_warp_other_out(n_samples),
-            T_warp_other_full(n_samples);
+            T_warp_other_full(n_samples),
+            T_cuda_builtin(n_samples),
+            T_default(n_samples);
 
     ofstream out_file("reduction_benchmark_" + to_string(N_start) + "_" + to_string(N_end) + ".txt");
     ofstream std_file("reduction_benchmark_std_" + to_string(N_start) + "_" + to_string(N_end) + ".txt");
@@ -61,9 +63,11 @@ int main(int argc, char** argv){
             T_warp_atomic[j] = benchmark_reduction(i,N_iter,5);
             T_warp_other_out[j] = benchmark_reduction(i,N_iter,6);
             T_warp_other_full[j] = benchmark_reduction(i,N_iter,7);
+            T_cuda_builtin[j] = benchmark_reduction(i,N_iter,8);
+            T_default[j] = benchmark_reduction(i,N_iter,9);
         };
-        out_file <<  i << "," << N_blocks << "," << mean(T_seq,n_samples)/1ns <<  "," << mean(T_interleave,n_samples)/1ns << "," << mean(T_noconfl,n_samples)/1ns << "," << mean(T_warp,n_samples)/1ns << "," << mean(T_warp_manual,n_samples)/1ns << "," << mean(T_warp_atomic,n_samples)/1ns << "," << mean(T_warp_other_out,n_samples)/1ns << "," << mean(T_warp_other_full,n_samples)/1ns << "\n";
-        std_file <<  i << "," << N_blocks << "," << standard_deviation(T_seq,n_samples)/1ns <<  "," << standard_deviation(T_interleave,n_samples)/1ns << "," << standard_deviation(T_noconfl,n_samples)/1ns << "," << standard_deviation(T_warp,n_samples)/1ns << "," << standard_deviation(T_warp_manual,n_samples)/1ns << "," << standard_deviation(T_warp_atomic, n_samples)/1ns << "," << standard_deviation(T_warp_other_out,n_samples)/1ns << "," << standard_deviation(T_warp_other_full,n_samples)/1ns <<"\n";
+        std::cout <<  i << "," << N_blocks << "," << (mean(T_seq,n_samples)/1ns)/float(N_iter*N_blocks) <<  "," << (mean(T_interleave,n_samples)/1ns)/float(N_iter*N_blocks) << "," << (mean(T_noconfl,n_samples)/1ns)/float(N_iter*N_blocks) << "," << (mean(T_warp,n_samples)/1ns)/float(N_iter*N_blocks) << "," << (mean(T_warp_manual,n_samples)/1ns)/float(N_iter*N_blocks) << "," << (mean(T_warp_atomic,n_samples)/1ns)/float(N_iter*N_blocks) << "," << (mean(T_warp_other_out,n_samples)/1ns)/float(N_iter*N_blocks) << "," << (mean(T_warp_other_full,n_samples)/1ns)/float(N_iter*N_blocks) << "," << (mean(T_cuda_builtin,n_samples)/1ns)/float(N_iter*N_blocks) << "," << (mean(T_default,n_samples)/1ns)/float(N_iter*N_blocks) << "\n";
+        std::cout <<  i << "," << N_blocks << "," << standard_deviation(T_seq,n_samples)/1ns <<  "," << standard_deviation(T_interleave,n_samples)/1ns << "," << standard_deviation(T_noconfl,n_samples)/1ns << "," << standard_deviation(T_warp,n_samples)/1ns << "," << standard_deviation(T_warp_manual,n_samples)/1ns << "," << standard_deviation(T_warp_atomic, n_samples)/1ns << "," << standard_deviation(T_warp_other_out,n_samples)/1ns << "," << standard_deviation(T_warp_other_full,n_samples)/1ns <<"\n";
     }
 
 }
