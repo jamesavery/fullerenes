@@ -365,9 +365,14 @@ struct DualWorkingBuffers{
 template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep1 {};
 template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep2 {};
 template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep3 {};
+template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep4 {};
+template <typename K, int MaxDegIn, int MaxDegOut> class VisDualizeGeneralStep1 {};
+template <typename K, int MaxDegIn, int MaxDegOut> class VisDualizeGeneralStep2 {};
+template <typename K, int MaxDegIn, int MaxDegOut> class VisDualizeGeneralStep3 {};
+template <typename K, int MaxDegIn, int MaxDegOut> class VisDualizeGeneralStep4 {};
 
 template<int MaxDegIn, int MaxDegOut, typename K>
-void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>& Deg_in, sycl::buffer<K,1>& G_out, sycl::buffer<K,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate){
+void dualize_general_for_visualization(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>& Deg_in, sycl::buffer<K,1>& G_out, sycl::buffer<K,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate){
     INT_TYPEDEFS(K);
     if(policy == LaunchPolicy::SYNC) Q.wait();
     sycl::device d = Q.get_device();
@@ -389,6 +394,9 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
     auto max_workgroup_size = d.get_info<sycl::info::device::max_work_group_size>();
     static DualWorkingBuffers<K> buffers(Nin, Nout, MaxDegIn, d);
     buffers.update(Nin, Nout, MaxDegIn, d);
+    sycl::buffer<K,1> face_list(Nout*MaxDegOut); //List of original vertices comprising each face
+    sycl::buffer<K,1> neighbouring_output_faces(MaxDegIn*Nin); //List of faces that each vertex is a part of
+
     auto idx = buffers.get_device_index(d);
     size_t workgroup_size1 = std::min((int)max_workgroup_size, Nin);
     size_t workgroup_size2 = std::min((int)max_workgroup_size, Nout);
@@ -406,7 +414,7 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
         accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
 
         
-        h.parallel_for<DualizeGeneralStep1<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+        h.parallel_for<VisDualizeGeneralStep1<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
             auto thid = nditem.get_global_linear_id();
             DeviceDualGraph<MaxDegIn, K> FD(G_in_acc.get_pointer(), Deg_in_acc.get_pointer());
             K rep_count = 0;
@@ -449,7 +457,7 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
         accessor triangle_numbers_acc   (buffers.triangle_numbers[idx], h, read_write);
         accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
 
-        h.parallel_for<DualizeGeneralStep2<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+        h.parallel_for<VisDualizeGeneralStep2<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
             auto idx = nditem.get_global_linear_id();
             DeviceDualGraph<MaxDegIn, K> FD(G_in_acc.get_pointer(), Deg_in_acc.get_pointer());
             if (idx < Nin){
@@ -478,6 +486,154 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
         accessor Deg_out_acc(Deg_out, h, write_only);
         accessor triangle_numbers_acc   (buffers.triangle_numbers[idx], h, read_write);
         accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
+        accessor face_list_acc (face_list, h, write_only);
+
+        h.parallel_for<VisDualizeGeneralStep3<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size2}, range{workgroup_size2}), [=](nd_item<1> nditem) {
+            auto tidx = nditem.get_global_linear_id();
+            DeviceDualGraph<MaxDegIn, K> FD(G_in_acc.get_pointer(), Deg_in_acc.get_pointer());
+            if (tidx < Nout){
+            K u = arc_list_acc[tidx*2 + 0]; K v = arc_list_acc[tidx*2 + 1];
+            auto n_count = 0;
+            auto u0 = u;
+            node2 edge = FD.get_canonical_arc(v, u); G_out_acc[tidx*MaxDegOut] = triangle_numbers_acc[edge[0]*MaxDegIn + FD.arc_ix(edge)];
+            face_list_acc[tidx*MaxDegOut] = u;
+            face_list_acc[tidx*MaxDegOut + 1] = v;
+            while(v != u0 && n_count < MaxDegOut){
+                ++n_count;
+                auto w = FD.next_on_face(u,v);
+                if(w != u0) face_list_acc[tidx*MaxDegOut + n_count + 1] = w;
+                u = v; v = w;
+                edge = FD.get_canonical_arc(v, u); G_out_acc[tidx*MaxDegOut + n_count] = triangle_numbers_acc[edge[0]*MaxDegIn + FD.arc_ix(edge)];
+            }
+            Deg_out_acc[tidx] = n_count+1;
+            }
+        });
+    });
+    if(output_intermediate){ 
+    Q.submit([&](handler &h) {
+        accessor G_in_acc   (G_in,   h, read_only);
+        accessor Deg_in_acc (Deg_in, h, read_only);
+        accessor G_out_acc  (G_out,  h, write_only);
+        accessor Deg_out_acc(Deg_out, h, write_only);
+        accessor triangle_numbers_acc           (buffers.triangle_numbers[idx], h, read_write);
+        accessor arc_list_acc                   (buffers.arc_list[idx], h, read_write);
+        accessor neighbouring_output_faces_acc  (neighbouring_output_faces, h, write_only);
+
+        h.parallel_for<VisDualizeGeneralStep4<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+            auto tidx = nditem.get_global_linear_id();
+            DeviceDualGraph<MaxDegIn, K> FD(G_in_acc.get_pointer(), Deg_in_acc.get_pointer());
+            if (tidx < Nin){
+                K u = tidx;
+                for (int i = 0; i < FD.face_degrees[u]; i++){
+                    auto v = FD.dual_neighbours[u*MaxDegIn + i];
+                    auto arc = FD.get_canonical_arc(u,v);
+                    auto triangle_id = triangle_numbers_acc[arc[0]*MaxDegIn + FD.arc_ix(arc)];
+                    neighbouring_output_faces_acc[u*MaxDegIn + i] = triangle_id;
+                }
+            }
+        });
+    });
+    }
+
+    if(output_intermediate) {
+        output_buf_to_file(G_out, "G_out_N=" + std::to_string(Nout) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(MaxDegOut) + "_.uint16");
+        output_buf_to_file(Deg_out, "Deg_out_N=" + std::to_string(Nout) + "_dim_" + std::to_string(Nout) + "_.uint16");
+        output_buf_to_file(face_list, "face_list_N=" + std::to_string(Nout) + "_dims_" + std::to_string(Nout) + "_X_" + std::to_string(MaxDegOut) + "_.uint16");
+        output_buf_to_file(neighbouring_output_faces, "neighbouring_output_faces_N=" + std::to_string(Nin) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(MaxDegIn) + "_.uint16");
+    }
+    
+    if(policy == LaunchPolicy::SYNC) Q.wait();
+}
+
+template<int MaxDegIn, int MaxDegOut, typename K>
+void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>& Deg_in, sycl::buffer<K,1>& G_out, sycl::buffer<K,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy){
+    INT_TYPEDEFS(K);
+    if(policy == LaunchPolicy::SYNC) Q.wait();
+    sycl::device d = Q.get_device();
+    auto exec_pol = oneapi::dpl::execution::make_device_policy(d);
+
+    //Find maximum workgroup size
+    auto max_workgroup_size = d.get_info<sycl::info::device::max_work_group_size>();
+    static DualWorkingBuffers<K> buffers(Nin, Nout, MaxDegIn, d);
+    buffers.update(Nin, Nout, MaxDegIn, d);
+
+    auto idx = buffers.get_device_index(d);
+    size_t workgroup_size1 = std::min((int)max_workgroup_size, Nin);
+    size_t workgroup_size2 = std::min((int)max_workgroup_size, Nout);
+    size_t grid_size1 = roundUp(Nin, workgroup_size1);
+    size_t grid_size2 = roundUp(Nout, workgroup_size2);
+    Q.submit([&](handler &h) {
+        accessor G_in_acc   (G_in,   h, read_only);
+        accessor Deg_in_acc (Deg_in, h, read_only);
+        accessor G_out_acc  (G_out,  h, write_only);
+        accessor Deg_out_acc(Deg_out, h, write_only);
+        accessor cannon_ixs_acc         (buffers.cannon_ixs[idx], h, read_write);
+        accessor rep_count_acc          (buffers.rep_count[idx], h, read_write);
+        accessor scan_array_acc         (buffers.scan_array[idx], h, read_write);
+        accessor triangle_numbers_acc   (buffers.triangle_numbers[idx], h, read_write);
+        accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
+
+        
+        h.parallel_for<DualizeGeneralStep1<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+            auto thid = nditem.get_global_linear_id();
+            DeviceDualGraph<MaxDegIn, K> FD(G_in_acc.get_pointer(), Deg_in_acc.get_pointer());
+            K rep_count = 0;
+            if (thid < Nin){
+                for (int i = 0; i < FD.face_degrees[thid]; i++){
+                    auto canon_arc = FD.get_canonical_arc(thid, FD.dual_neighbours[thid*MaxDegIn + i]);
+                    if (canon_arc[0] == thid){
+                        cannon_ixs_acc[thid*MaxDegIn + rep_count] = i;
+                        ++rep_count;
+                    }
+                }
+                rep_count_acc[thid] = rep_count;
+                scan_array_acc[thid] = rep_count;
+            }
+        });
+    });
+
+    oneapi::dpl::exclusive_scan(
+            exec_pol,
+            oneapi::dpl::begin(buffers.scan_array[idx]),
+            oneapi::dpl::end(buffers.scan_array[idx]),
+            oneapi::dpl::begin(buffers.scan_array[idx]),
+            0);
+
+    Q.submit([&](handler &h) {
+        accessor G_in_acc   (G_in,   h, read_only);
+        accessor Deg_in_acc (Deg_in, h, read_only);
+        accessor G_out_acc  (G_out,  h, write_only);
+        accessor Deg_out_acc(Deg_out, h, write_only);
+        accessor cannon_ixs_acc         (buffers.cannon_ixs[idx], h, read_only);
+        accessor rep_count_acc          (buffers.rep_count[idx], h, read_only);
+        accessor scan_array_acc         (buffers.scan_array[idx], h, read_only);
+        accessor triangle_numbers_acc   (buffers.triangle_numbers[idx], h, read_write);
+        accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
+
+        h.parallel_for<DualizeGeneralStep2<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+            auto idx = nditem.get_global_linear_id();
+            DeviceDualGraph<MaxDegIn, K> FD(G_in_acc.get_pointer(), Deg_in_acc.get_pointer());
+            if (idx < Nin){
+            K rep_count = rep_count_acc[idx];
+            K scan_result = scan_array_acc[idx];
+            for (int ii = 0; ii < rep_count; ii++){
+                K i = cannon_ixs_acc[idx*MaxDegIn + ii];
+                K triangle_id = scan_result + ii;
+                triangle_numbers_acc[idx*MaxDegIn + i] = triangle_id;
+                arc_list_acc[triangle_id*2 + 0] = idx;
+                arc_list_acc[triangle_id*2 + 1] = FD.dual_neighbours[idx*MaxDegIn + i];
+            }
+            }
+        });
+    });
+    
+    Q.submit([&](handler &h) {
+        accessor G_in_acc   (G_in,   h, read_only);
+        accessor Deg_in_acc (Deg_in, h, read_only);
+        accessor G_out_acc  (G_out,  h, write_only);
+        accessor Deg_out_acc(Deg_out, h, write_only);
+        accessor triangle_numbers_acc   (buffers.triangle_numbers[idx], h, read_write);
+        accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
 
         h.parallel_for<DualizeGeneralStep3<K,MaxDegIn, MaxDegOut>>(nd_range(range{grid_size2}, range{workgroup_size2}), [=](nd_item<1> nditem) {
             auto tidx = nditem.get_global_linear_id();
@@ -497,8 +653,6 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
             }
         });
     });
-
-    if(output_intermediate) output_buf_to_file(G_out, "G_out_N=" + std::to_string(Nout) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(MaxDegOut) + "_.uint16");
     
     if(policy == LaunchPolicy::SYNC) Q.wait();
 
@@ -508,5 +662,7 @@ template void dualize<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>
 template void dualize_V1<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
 template void dualize<double,uint16_t>(sycl::queue&Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);
 template void dualize_V1<double,uint16_t>(sycl::queue&Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);
-template void dualize_general<6, 3, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate);
-template void dualize_general<3, 6, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate);
+template void dualize_general<6, 3, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy);
+template void dualize_general<3, 6, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy);
+template void dualize_general_for_visualization<6, 3, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate);
+template void dualize_general_for_visualization<3, 6, uint16_t>(sycl::queue&Q, sycl::buffer<uint16_t,1>& G_in, sycl::buffer<uint16_t,1>& Deg_in, sycl::buffer<uint16_t,1>& G_out, sycl::buffer<uint16_t,1>& Deg_out, int Nin, int Nout, LaunchPolicy policy, bool output_intermediate);

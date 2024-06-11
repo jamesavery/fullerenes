@@ -58,6 +58,20 @@ int main(int argc, char** argv) {
     
     IsomerBatch<real_t,node_t> batch(N, BatchSize);
     fill(batch);
+/*     dualize(Q, batch, LaunchPolicy::SYNC);
+    tutte_layout(Q, batch, LaunchPolicy::SYNC);
+    {
+        host_accessor positions_acc(batch.xys, read_only);
+        std::vector<std::array<real_t, 2>> positions(N);
+        for (int i = 0; i < N; i++) {
+            positions[i] = positions_acc[i];
+        }
+        ofstream myfile("tutte_embedding_N=" + std::to_string(N) + "_dims_" + std::to_string(N) + "_X_2" ".xyz");
+        myfile.write((char*)&positions , N * sizeof(std::array<real_t, 2>));
+    }
+ */
+    
+
     sycl::buffer<uint16_t, 1> cubic_degrees(N); //Will be filled with 3s if working correctly
     {
         auto dual_neighbours_acc = batch.dual_neighbours.get_access<sycl::access::mode::read>();
@@ -71,7 +85,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    dualize_general<6, 3>(Q, batch.dual_neighbours, batch.face_degrees, batch.cubic_neighbours, cubic_degrees, Nf, N, LaunchPolicy::SYNC, true);  
+    dualize_general<6, 3>(Q, batch.dual_neighbours, batch.face_degrees, batch.cubic_neighbours, cubic_degrees, Nf, N, LaunchPolicy::SYNC);  
     {
         auto cubic_neighbours_acc = batch.cubic_neighbours.get_access<sycl::access::mode::read>();
         auto cubic_degrees_acc = cubic_degrees.get_access<sycl::access::mode::read>();
