@@ -174,14 +174,14 @@ void spiral_nomenclature::cage_constructor(const vector<vector<int>> &spiral_num
 
   if(has_jumps){
     for(int i=0; i<spiral_numbers[0].size()/2; i++){
-      jumps.push_back(make_pair(spiral_numbers[0][2*i]-1,spiral_numbers[0][2*i+1])); // -1 because indices start counting at 0
+      spiral.jumps.push_back(make_pair(spiral_numbers[0][2*i]-1,spiral_numbers[0][2*i+1])); // -1 because indices start counting at 0
     }
   }
-  spiral_code = spiral_numbers[has_jumps];
+  spiral.spiral_code = spiral_numbers[has_jumps];
 
   // Set face_degrees to something sensible
   set<int> face_degree_set;
-  for(int f: spiral_code)
+  for(int f: spiral.spiral_code)
     if(f!=base_face_degree) face_degree_set.insert(f);
 
   face_degrees = vector<int>(face_degree_set.begin(), face_degree_set.end());
@@ -196,19 +196,19 @@ void spiral_nomenclature::fulleroid_constructor(const vector<vector<int>> &spira
     for(const auto &ix: v)
       max_index = max(ix,max_index);
 
-  spiral_code = vector<int>(2*max_index,6);
+  spiral.spiral_code = vector<int>(2*max_index,6);
 
   bool has_jumps = (spiral_numbers.size() == face_degrees.size()+1);
 
   if(has_jumps){
     for(int i=0; i<spiral_numbers[0].size()/2; i++){
-      jumps.push_back(make_pair(spiral_numbers[0][2*i]-1,spiral_numbers[0][2*i+1])); // -1 because indices start counting at 0
+      spiral.jumps.push_back(make_pair(spiral_numbers[0][2*i]-1,spiral_numbers[0][2*i+1])); // -1 because indices start counting at 0
     }
   }
 
   for(int i=0;i<face_degrees.size();i++){
     for(auto ix: spiral_numbers[i+has_jumps]){
-      spiral_code[ix-1] = face_degrees[i];
+      spiral.spiral_code[ix-1] = face_degrees[i];
     }
   }
 }
@@ -227,15 +227,12 @@ spiral_nomenclature::spiral_nomenclature(const PlanarGraph &G, const naming_sche
   else
     T = G.enveloping_triangulation(static_cast<const construction_scheme_t>(construction_scheme)); // This *reads* from construction_scheme
   
-  general_spiral spiral = T.get_general_spiral(rarest_special_start);
+  spiral = T.get_general_spiral(rarest_special_start);
 
   // Which face degrees appear?
   set<int> face_degree_set;
-  for(int d: spiral.spiral) if(d != base_face_degree) face_degree_set.insert(d);
+  for(int d: spiral.spiral_code) if(d != base_face_degree) face_degree_set.insert(d);
   face_degrees = vector<int>(face_degree_set.begin(), face_degree_set.end());
-
-  spiral_code = spiral.spiral;
-  jumps       = spiral.jumps;
 }
 
 template <typename T> string riffle(const vector<T>& xs, string delim, string end_if_nonempty="")
@@ -257,8 +254,8 @@ string spiral_nomenclature::to_string(bool unpacked) const
       << "\"chemical_formula\" -> \""<<chemical_formula<<"\",\n\t"
       << "\"base_face_degree\" -> "<<base_face_degree<<",\n\t"
       << "\"face_degrees\" -> " << face_degrees << ",\n\t"
-      << "\"jumps\" -> " << jumps << ",\n\t" // indices start counting at 0
-      << "\"spiral_code\" -> " << spiral_code //<< ", (length: " << spiral_code.size() << ") \n\t"
+      << "\"jumps\" -> " << spiral.jumps << ",\n\t" // indices start counting at 0
+      << "\"spiral_code\" -> " << spiral.spiral_code //<< ", (length: " << spiral_code.size() << ") \n\t"
       << "|>";
     return s.str();
   } else {
@@ -277,10 +274,10 @@ string spiral_nomenclature::to_string(bool unpacked) const
     scheme_string = riffle(schemes,",",":");
       
     // Encode jumps
-    vector<int> jumps_plus_one(jumps.size()*2);
-    for(int i=0;i<jumps.size();i++){
-      jumps_plus_one[2*i]   = jumps[i].first+1;
-      jumps_plus_one[2*i+1] = jumps[i].second;
+    vector<int> jumps_plus_one(spiral.jumps.size()*2);
+    for(int i=0;i<spiral.jumps.size();i++){
+      jumps_plus_one[2*i]   = spiral.jumps[i].first+1;
+      jumps_plus_one[2*i+1] = spiral.jumps[i].second;
     }
     string jump_string = riffle(jumps_plus_one,",","; ");
     
@@ -288,7 +285,7 @@ string spiral_nomenclature::to_string(bool unpacked) const
     string spiral_string, suffix;
     switch(naming_scheme){
     case CAGE:
-      spiral_string = riffle(spiral_code,",");
+      spiral_string = riffle(spiral.spiral_code,",");
       suffix        = "cage";
       break;
     case FULLERENE:
@@ -298,7 +295,7 @@ string spiral_nomenclature::to_string(bool unpacked) const
 	vector<int> indices;	
 	int d = face_degrees[i];
 
-	for(int j=0;j<spiral_code.size();j++) if(spiral_code[j] == d) indices.push_back(j+1);
+	for(int j=0;j<spiral.spiral_code.size();j++) if(spiral.spiral_code[j] == d) indices.push_back(j+1);
 	spiral_string += riffle(indices,",") + (i+1<face_degrees.size()? ";":"");
       }
       if(suffix.empty()) suffix = "("+riffle(face_degrees,",") + ")-fulleroid"; // TODO: non-6 base face

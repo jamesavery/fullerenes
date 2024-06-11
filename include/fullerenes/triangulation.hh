@@ -32,7 +32,7 @@ public:
   Triangulation(const neighbours_t& neighbours, bool already_oriented = true) : PlanarGraph(Graph(neighbours)) { update(already_oriented); }
 
   Triangulation(const vector<int>& spiral_string, const jumplist_t& jumps = jumplist_t(), const bool best_effort=false); // and the opposite of 'best-effort' is 'fast and robust'
-  Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral_code, fsn.jumps, true){} // best_effort = true
+  Triangulation(const spiral_nomenclature &fsn): Triangulation(fsn.spiral.spiral_code, fsn.spiral.jumps, true){} // best_effort = true
   
   PlanarGraph dual_graph() const;
   vector<face_t> cubic_faces() const;
@@ -135,7 +135,7 @@ public:
   // 3. Spiral+gen. spiral special case
   // 4. Embed-in-3D special case
   FullereneDual(const Triangulation& g = Triangulation()) : Triangulation(g) {}
-  FullereneDual(const int N, const general_spiral& rspi) : FullereneDual(N,rspi.spiral,rspi.jumps) {}
+  FullereneDual(const int N, const general_spiral& rspi) : FullereneDual(N,rspi.spiral_code,rspi.jumps) {}
   FullereneDual(const int N, const vector<int>& rspi, const jumplist_t& jumps = jumplist_t()) {
     vector<int> spiral(N/2+2,6);
     for(int i: rspi) spiral[i] = 5;

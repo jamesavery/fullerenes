@@ -19,7 +19,8 @@ int main(int argc, char** argv) {
     typedef uint16_t node_t;
 
     size_t N = args.natoms;
-    size_t BatchSize = args.nisomers == 0 ? IsomerDB::number_isomers(N) : args.nisomers;
+    size_t Nisomers = IsomerDB::number_isomers(N);
+    size_t BatchSize = (args.nisomers == 0 || args.nisomers > Nisomers)? Nisomers : args.nisomers;
     std::string device_type = args.device_type;
     size_t device_id = args.device_id;
 
@@ -46,8 +47,12 @@ int main(int argc, char** argv) {
     sycl::buffer<node_t,1> Deg_in(sycl::range<1>(Nf*1));
     sycl::buffer<node_t,1> G_out(sycl::range<1>(N*3));
     sycl::buffer<node_t,1> Deg_out(sycl::range<1>(N*1));
+    sycl::buffer<node_t,1> G_back(sycl::range<1>(Nf*6));
+    sycl::buffer<node_t,1> Deg_back(sycl::range<1>(Nf*1));
+
     neighbours_t input_neighbours(Nf);
     neighbours_t output_neighbours(N);
+    neighbours_t back_neighbours(Nf);      
 
     for (size_t i = 0; i < BatchSize; i++) {
         {
@@ -76,18 +81,43 @@ int main(int argc, char** argv) {
                 output_neighbours[j] = {G_out_acc[j*3], G_out_acc[j*3 + 1], G_out_acc[j*3 + 2]};
             }
         }        
-        PlanarGraph pg(input_neighbours);
-        PlanarGraph pg_dual(output_neighbours);
-        spiral_nomenclature Sin(pg, spiral_nomenclature::CAGE, spiral_nomenclature::TRIANGULATION);
-        spiral_nomenclature Sout(pg_dual, spiral_nomenclature::CAGE, spiral_nomenclature::CUBIC);
-        std::string true_false = (Sin.to_string() == Sout.to_string()) ? "True" : "False";
-        std::cout << "Isomer " << i << " Is isomorphic: " << true_false << std::endl;
-        if (Sin.to_string() != Sout.to_string()) {
-            std::cout << "Input: " << Sin.to_string() << std::endl;
-            std::cout << "Output: " << Sout.to_string() << std::endl;
+
+        dualize_general<3,6>(Q, G_out, Deg_out, G_back, Deg_back, N, Nf, LaunchPolicy::SYNC);
+        {
+            host_accessor G_back_acc(G_back, read_only);
+            host_accessor Deg_back_acc(Deg_back, read_write);            
+            for (size_t j = 0; j < Nf; j++){
+                if (Deg_back_acc[j] == 6){
+                    back_neighbours[j] = {G_back_acc[j*6], G_back_acc[j*6 + 1], G_back_acc[j*6 + 2], G_back_acc[j*6 + 3], G_back_acc[j*6 + 4], G_back_acc[j*6 + 5]};
+                } else {
+                    back_neighbours[j] = {G_back_acc[j*6], G_back_acc[j*6 + 1], G_back_acc[j*6 + 2], G_back_acc[j*6 + 3], G_back_acc[j*6 + 4]};
+                }
+            }
+        }
+        Triangulation pg(input_neighbours, true);
+        PlanarGraph   pg_dref(pg.dual_graph());
+        PlanarGraph   pg_dual(Graph(output_neighbours, true));
+        Triangulation pg_back(back_neighbours, true);        
+
+        spiral_nomenclature Sin(pg,       spiral_nomenclature::FULLERENE, spiral_nomenclature::TRIANGULATION, true);
+        spiral_nomenclature Sout(pg_dual, spiral_nomenclature::FULLERENE, spiral_nomenclature::CUBIC, true);
+        spiral_nomenclature Sref(pg_dref, spiral_nomenclature::FULLERENE, spiral_nomenclature::CUBIC, true);        
+        spiral_nomenclature Sback(pg_back,spiral_nomenclature::FULLERENE, spiral_nomenclature::TRIANGULATION, true);
+        
+        bool validates_all_checks = (Sout.spiral == Sref.spiral) 
+                                 && (Sin.spiral  == Sback.spiral);
+
+        //std::cout << "Isomer " << i << " Is isomorphic: " << (validates_all_checks? "True":"False") << std::endl;
+        if (!validates_all_checks) {
+                     std::cout << "Input:  " << Sin.spiral  << std::endl;
+            std::cout << "Output: " << Sout.spiral << std::endl;
+            std::cout << "Ref:    " << Sref.spiral << std::endl;            
             std::cerr << "Isomer " << i << " failed" << std::endl;
         }
+        if(i % 1000 == 999) {
+            std::cout << (i+1) << " isomers passed isomorphism check.\n";
+        }    
     }
-
+    std::cout << "All " << BatchSize << " isomers passed isomorphism check.\n";
 
 }

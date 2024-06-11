@@ -13,13 +13,13 @@ typedef vector<jump_t> jumplist_t;
 
 struct general_spiral {
   jumplist_t  jumps;
-  vector<int> spiral;
+  vector<int> spiral_code;
 
   bool operator<(const general_spiral &s) const
   {
     return jumps.size() < s.jumps.size() ||
     (jumps.size() == s.jumps.size() && jumps < s.jumps) ||
-      (jumps == s.jumps && spiral < s.spiral);
+      (jumps == s.jumps && spiral_code < s.spiral_code);
       // The following gives spiral strings precedence over jump content (but still prefers shorter jump lists)
       //    (jumps.size() == s.jumps.size() && spiral < s.spiral) ||
       //      (jumps.size() == s.jumps.size() && spiral == s.spiral && jumps < s.jumps);
@@ -27,12 +27,12 @@ struct general_spiral {
 
   bool operator==(const general_spiral &s) const
   {
-    return jumps == s.jumps && spiral == s.spiral;
+    return jumps == s.jumps && spiral_code == s.spiral_code;
   }
   
   friend ostream &operator<<(ostream &s, const general_spiral &GS)
   {
-    return s << make_pair(GS.jumps,GS.spiral); 
+    return s << make_pair(GS.jumps,GS.spiral_code); 
   }
   
 };
@@ -46,7 +46,7 @@ namespace std {
 	hash_combine(seed,j.first);
 	hash_combine(seed,j.second);
       }
-      for(const auto &d: S.spiral)
+      for(const auto &d: S.spiral_code)
 	hash_combine(seed,d);
 
       return seed;
@@ -99,9 +99,8 @@ struct spiral_nomenclature {
   vector<int> face_degrees;	// Non-base-face degrees
 
   // TODO: Change to general_spiral everywhere?
-  jumplist_t  jumps;
-  vector<int> spiral_code;
-
+  general_spiral spiral;
+  
   void fulleroid_constructor(const vector<vector<int>> &spiral_numbers, vector<int> face_degrees = {3,4,5},
 			     int base_face_degree=6);
 

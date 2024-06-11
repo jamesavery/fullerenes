@@ -201,7 +201,7 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
     node_t  i_f;
     for(const auto &ei: face_numbers){
       // e_f is minimal directed edge representation of face f, i_f is its face number.      
-      tie(e_f,i_f) = ei;
+      auto [e_f,i_f] = ei;
       // cerr << "Processing face " << i_f << ": " << e_f << " -> " << get_face_oriented(e_f,Fmax) << ";\n";
       
       // Now iterate along face f's directed edges in CCW order:
@@ -210,8 +210,6 @@ PlanarGraph PlanarGraph::dual_graph(unsigned int Fmax, bool planar_layout) const
       do {
         // e_g is MDE-representation of opposite face along edge e_f
         arc_t e_g = get_face_representation({v,u},Fmax);
-        // cerr << "Processing face: " << arc_t{u,v} << " -> " << get_face_oriented({u,v},Fmax)<<" "
-        //      << " opposite " << e_g << " -> " << get_face_oriented(e_g,Fmax) << ";\n";
         dual.neighbours[i_f].push_back(face_numbers[e_g]);
 
         w = prev(v,u); u = v; v = w; // CCW node neighbour order + CCW face order

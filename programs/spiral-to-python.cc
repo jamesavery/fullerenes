@@ -34,8 +34,7 @@ int main(int ac, char **av)
 
     t = t.GCtransform(k,l);
     general_spiral spiral = t.get_general_spiral();
-    fsn.jumps  = spiral.jumps;	// TODO: general_spiral in spiral_nomenclature
-    fsn.spiral_code = spiral.spiral;
+    fsn.spiral  = spiral;	// TODO: general_spiral in spiral_nomenclature
   }
   
   

@@ -372,7 +372,7 @@ int main(int ac, char **argv)
       
       cout << "Isomer " << i << " is a nanotube of sorts: ";
       general_spiral spiral = dualG.get_rspi();
-      cout << (spiral.spiral+1) << endl;
+      cout << (spiral.spiral_code+1) << endl;
     }
     
     

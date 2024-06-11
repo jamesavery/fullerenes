@@ -725,7 +725,7 @@ bool Triangulation::get_spiral(vector<int>& spiral, jumplist_t& jumps, const boo
 general_spiral Triangulation::get_general_spiral(const bool only_rarest_special) const
 {
   general_spiral gs;
-  bool success = get_spiral(gs.spiral,gs.jumps,only_rarest_special,true);
+  bool success = get_spiral(gs.spiral_code,gs.jumps,only_rarest_special,true);
   assert(success); 		// General spirals should *always* succeed
   return gs;
 }
@@ -1243,7 +1243,7 @@ bool FullereneDual::get_rspi(vector<int>& rspi, jumplist_t& jumps, const bool ge
 general_spiral FullereneDual::get_rspi(const bool rarest_start) const
 {
   general_spiral S;
-  get_rspi(S.spiral,S.jumps,true,rarest_start);
+  get_rspi(S.spiral_code,S.jumps,true,rarest_start);
   return S;
 }
 
