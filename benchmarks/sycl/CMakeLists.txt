@@ -7,6 +7,7 @@ set(SYCL_EXECUTABLES
   matmul
   lobpcg-proto
   segmented_reduce
+  general_dualize
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
