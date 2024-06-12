@@ -354,11 +354,11 @@ struct DualWorkingBuffers{
         auto idx = get_device_index(device);
         if(idx == -1){
             append_buffers(Nin, Nout, MaxDegree, device);
-            std::cout << "Appended buffers for device " << device.get_info<sycl::info::device::name>() << " ID: " << devices.size() - 1 << "\n";
+            //std::cout << "Appended buffers for device " << device.get_info<sycl::info::device::name>() << " ID: " << devices.size() - 1 << "\n";
         }
         else if (Nin != dims[idx][0] || Nout != dims[idx][1] || MaxDegree != dims[idx][2]){
             resize(Nin, Nout, MaxDegree, idx);
-            std::cout << "Resized buffers for device " << device.get_info<sycl::info::device::name>() << " ID: " << idx << "\n";
+            //std::cout << "Resized buffers for device " << device.get_info<sycl::info::device::name>() << " ID: " << idx << "\n";
         }
     }
 };
@@ -591,7 +591,6 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
             }
         });
     });
-
     oneapi::dpl::exclusive_scan(
             exec_pol,
             oneapi::dpl::begin(buffers.scan_array[idx]),
