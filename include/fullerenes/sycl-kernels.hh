@@ -1,6 +1,9 @@
 #pragma once
 #include <fullerenes/sycl-isomer-batch.hh>
+#include <fullerenes/sycl-wrappers.hh>
 
+template <typename T = float, typename K = uint16_t>
+void dualize(QueueWrapper& Q, FullereneIsomer<T,K>& isomer, const LaunchPolicy policy);
 
 template <typename T = float, typename K = uint16_t>
 void dualize(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy);

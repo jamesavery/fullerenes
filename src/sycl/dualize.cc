@@ -11,6 +11,7 @@
 #include <iterator>
 #include <type_traits>
 #include <fullerenes/sycl-isomer-batch.hh>
+#include <fullerenes/sycl-wrappers.hh>
 #include "forcefield-includes.cc"
 
 //Template specialisation for dualize
@@ -366,6 +367,11 @@ template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep1 {};
 template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep2 {};
 template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep3 {};
 template <typename K, int MaxDegIn, int MaxDegOut> class DualizeGeneralStep4 {};
+
+template <typename K, int MaxDegIn, int MaxDegOut> class DualizeIsomerStep1 {};
+template <typename K, int MaxDegIn, int MaxDegOut> class DualizeIsomerStep2 {};
+template <typename K, int MaxDegIn, int MaxDegOut> class DualizeIsomerStep3 {};
+
 template <typename K, int MaxDegIn, int MaxDegOut> class VisDualizeGeneralStep1 {};
 template <typename K, int MaxDegIn, int MaxDegOut> class VisDualizeGeneralStep2 {};
 template <typename K, int MaxDegIn, int MaxDegOut> class VisDualizeGeneralStep3 {};
@@ -388,7 +394,6 @@ void dualize_general_for_visualization(sycl::queue& Q, sycl::buffer<K,1>& G_in, 
         }
         file.write((char*)data.data(), data.size()*sizeof(K));
     };
-
     if(output_intermediate) output_buf_to_file(G_in, "G_in_N=" + std::to_string(Nin) + "_dims_" + std::to_string(Nin) + "_X_" + std::to_string(MaxDegIn) + "_.uint16");
     //Find maximum workgroup size
     auto max_workgroup_size = d.get_info<sycl::info::device::max_work_group_size>();
@@ -656,6 +661,119 @@ void dualize_general(sycl::queue& Q, sycl::buffer<K,1>& G_in, sycl::buffer<K,1>&
     if(policy == LaunchPolicy::SYNC) Q.wait();
 
 }
+
+template <typename T, typename K>
+void dualize(QueueWrapper& Qwrapper, FullereneIsomer<T,K>& isomer, const LaunchPolicy policy){
+    INT_TYPEDEFS(K);
+    auto& Q = *static_cast<sycl::queue*>(Qwrapper.queue_);
+    if(policy == LaunchPolicy::SYNC) Q.wait();
+    sycl::device d = Q.get_device();
+    std::cout << "Running on " << d.get_info<sycl::info::device::name>() << "\n";
+    auto exec_pol = oneapi::dpl::execution::make_device_policy(d);
+
+    //Find maximum workgroup size
+    auto max_workgroup_size = d.get_info<sycl::info::device::max_work_group_size>();
+    static DualWorkingBuffers<K> buffers(isomer.Nf_, isomer.N_, 6, d);
+    buffers.update(isomer.Nf_, isomer.N_, 6, d);
+    size_t Nin = isomer.Nf_;
+    size_t Nout = isomer.N_;
+    auto Gin = isomer.A_dual_.data();
+    auto Deg_in = isomer.deg_.data();
+    auto Gout = isomer.A_cubic_.data();
+
+    auto idx = buffers.get_device_index(d);
+    size_t workgroup_size1 = std::min(max_workgroup_size, Nin);
+    size_t workgroup_size2 = std::min(max_workgroup_size, Nout);
+    size_t grid_size1 = roundUp(Nin, workgroup_size1);
+    size_t grid_size2 = roundUp(Nout, workgroup_size2);
+    Q.submit([&](handler &h) {
+        accessor cannon_ixs_acc         (buffers.cannon_ixs[idx], h, read_write);
+        accessor rep_count_acc          (buffers.rep_count[idx], h, read_write);
+        accessor scan_array_acc         (buffers.scan_array[idx], h, read_write);
+        accessor triangle_numbers_acc   (buffers.triangle_numbers[idx], h, read_write);
+        accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
+
+        
+        h.parallel_for<DualizeIsomerStep1<K,6, 3>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+            auto thid = nditem.get_global_linear_id();
+            DeviceDualGraph<6, K> FD(Gin, Deg_in);
+            K rep_count = 0;
+            if (thid < Nin){
+                for (int i = 0; i < FD.face_degrees[thid]; i++){
+                    auto canon_arc = FD.get_canonical_arc(thid, FD.dual_neighbours[thid*6 + i]);
+                    if (canon_arc[0] == thid){
+                        cannon_ixs_acc[thid*6 + rep_count] = i;
+                        ++rep_count;
+                    }
+                }
+                rep_count_acc[thid] = rep_count;
+                scan_array_acc[thid] = rep_count;
+            }
+        });
+    });
+    oneapi::dpl::exclusive_scan(
+            exec_pol,
+            oneapi::dpl::begin(buffers.scan_array[idx]),
+            oneapi::dpl::end(buffers.scan_array[idx]),
+            oneapi::dpl::begin(buffers.scan_array[idx]),
+            0);
+
+    Q.submit([&](handler &h) {
+        accessor cannon_ixs_acc         (buffers.cannon_ixs[idx], h, read_only);
+        accessor rep_count_acc          (buffers.rep_count[idx], h, read_only);
+        accessor scan_array_acc         (buffers.scan_array[idx], h, read_only);
+        accessor triangle_numbers_acc   (buffers.triangle_numbers[idx], h, read_write);
+        accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
+
+        h.parallel_for<DualizeIsomerStep2<K,6, 3>>(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+            auto idx = nditem.get_global_linear_id();
+            DeviceDualGraph<6, K> FD(Gin, Deg_in);
+            if (idx < Nin){
+            K rep_count = rep_count_acc[idx];
+            K scan_result = scan_array_acc[idx];
+            for (int ii = 0; ii < rep_count; ii++){
+                K i = cannon_ixs_acc[idx*6 + ii];
+                K triangle_id = scan_result + ii;
+                triangle_numbers_acc[idx*6 + i] = triangle_id;
+                arc_list_acc[triangle_id*2 + 0] = idx;
+                arc_list_acc[triangle_id*2 + 1] = FD.dual_neighbours[idx*6 + i];
+            }
+            }
+        });
+    });
+    
+    Q.submit([&](handler &h) {
+        accessor triangle_numbers_acc   (buffers.triangle_numbers[idx], h, read_write);
+        accessor arc_list_acc           (buffers.arc_list[idx], h, read_write);
+
+        h.parallel_for<DualizeIsomerStep3<K,6, 3>>(nd_range(range{grid_size2}, range{workgroup_size2}), [=](nd_item<1> nditem) {
+            auto tidx = nditem.get_global_linear_id();
+            DeviceDualGraph<6, K> FD(Gin, Deg_in);
+            if (tidx < Nout){
+            K u = arc_list_acc[tidx*2 + 0]; K v = arc_list_acc[tidx*2 + 1];
+            auto n_count = 0;
+            auto u0 = u;
+            node2 edge = FD.get_canonical_arc(v, u); Gout[tidx*3] = triangle_numbers_acc[edge[0]*6 + FD.arc_ix(edge)];
+            while(v != u0 && n_count < 3){
+                ++n_count;
+                auto w = FD.next_on_face(u,v);
+                u = v; v = w;
+                edge = FD.get_canonical_arc(v, u); Gout[tidx*3 + n_count] = triangle_numbers_acc[edge[0]*6 + FD.arc_ix(edge)];
+            }
+            }
+        });
+    });
+    
+    if(policy == LaunchPolicy::SYNC) Q.wait();
+}
+
+template void dualize<float,uint16_t>(QueueWrapper& Q, FullereneIsomer<float,uint16_t>& isomer, const LaunchPolicy policy);
+//template void dualize<double,uint16_t>(QueueWrapper& Q, FullereneIsomer<double,uint16_t>& isomer, const LaunchPolicy policy);
+//template void dualize<float,uint32_t>(QueueWrapper& Q, FullereneIsomer<float,uint32_t>& isomer, const LaunchPolicy policy);
+//template void dualize<double,uint32_t>(QueueWrapper& Q, FullereneIsomer<double,uint32_t>& isomer, const LaunchPolicy policy);
+//template void dualize<float, uint8_t>(QueueWrapper& Q, FullereneIsomer<float, uint8_t>& isomer, const LaunchPolicy policy);
+//template void dualize<double, uint8_t>(QueueWrapper& Q, FullereneIsomer<double, uint8_t>& isomer, const LaunchPolicy policy);
+
 
 template void dualize<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
 template void dualize_V1<float,uint16_t>(sycl::queue&Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
