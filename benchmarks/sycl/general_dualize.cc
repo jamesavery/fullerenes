@@ -28,25 +28,11 @@ int main(int argc, char** argv) {
     size_t device_id = args.device_id;
     bool print_out = false;
 
-
     size_t Nf = N/2 + 2;
 
 
-    auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
-
-    std::vector<sycl::device> devices;
-    for (auto &device : sycl::device::get_devices())
-    {
-        if (device_type == "cpu" && device.is_cpu())
-        {
-            devices.push_back(device);
-        }
-        else if (device_type == "gpu" && device.is_gpu())
-        {
-            devices.push_back(device);
-        }
-    }
-    sycl::queue Q = sycl::queue(devices[device_id], sycl::property::queue::in_order{});
+    
+/* 
     std::vector<Triangulation> Ts;
     Ts.push_back(Triangulation(spiral_nomenclature("C21888-[3300,3494,4574,4792,8540,8740,9990,10096,10295,10395,10491,10942]-fullerene")));
     Ts.push_back(Triangulation(spiral_nomenclature("C24192-[2052,3078,3087,4251,9613,10261,10900,10912,11644,11948,12044,12056]-fullerene")));
@@ -113,8 +99,8 @@ int main(int argc, char** argv) {
 
 
         PlanarGraph G_star(Graph(neighbours,true));
-        spiral_nomenclature refSpiral(Gref, spiral_nomenclature::CAGE, spiral_nomenclature::CUBIC);
-        spiral_nomenclature outputSpiral(G_star, spiral_nomenclature::CAGE, spiral_nomenclature::CUBIC);
+        spiral_nomenclature refSpiral(Gref, spiral_nomenclature::FULLERENE, spiral_nomenclature::CUBIC);
+        spiral_nomenclature outputSpiral(G_star, spiral_nomenclature::FULLERENE, spiral_nomenclature::CUBIC);
         auto is_isomorphic = (refSpiral.spiral.spiral_code == outputSpiral.spiral.spiral_code) ? "Yes" : "No";
         std::cout << "Are G* and reference G* isomorphic? : " << is_isomorphic << std::endl;
         std::cout << "Triangulation Specialized Reference Routine: " << ElapsedRefMicro << " µs, General Lockstep Implementation: " << ElapsedMicro << " µs" << std::endl;
@@ -146,15 +132,30 @@ int main(int argc, char** argv) {
         }
 
         PlanarGraph G_star2(Graph(neighbours2,true));
-        spiral_nomenclature refSpiral2(Gref2, spiral_nomenclature::CAGE, spiral_nomenclature::TRIANGULATION);
-        spiral_nomenclature outputSpiral2(G_star2, spiral_nomenclature::CAGE, spiral_nomenclature::TRIANGULATION);
+        spiral_nomenclature refSpiral2(Gref2, spiral_nomenclature::FULLERENE, spiral_nomenclature::TRIANGULATION);
+        spiral_nomenclature outputSpiral2(G_star2, spiral_nomenclature::FULLERENE, spiral_nomenclature::TRIANGULATION);
         auto is_isomorphic2 = (refSpiral2.spiral.spiral_code == outputSpiral2.spiral.spiral_code) ? "Yes" : "No";
         std::cout << "Are G** and reference G** isomorphic? : " << is_isomorphic2 << std::endl;
         std::cout << "General Reference Routine: " << ElapsedRefMicro2 << " µs, General Lockstep Implementation: " << ElapsedMicroSeconds1 << " µs" << std::endl;
         std::cout << "Speedup: " << (double)ElapsedRefMicro2/ElapsedMicroSeconds1 << std::endl;
         std::cout << "=====================================================================================================" << std::endl;
 
-    }
+    } */
+    //QueueWrapper Q(device_id, device_type == "GPU" ? DeviceType::GPU : DeviceType::CPU);
+    /* 
+    
+    BuckyGen::next_fullerene(BQ, Gr);
+    std::cout << "Gr has " << Gr.neighbours.size() << " vertices" << std::endl;
+ */
+    //BuckyGen::buckygen_queue BQ = BuckyGen::start(20, false, false);
+    QueueWrapper Q(device_id, device_type == "gpu" ? DeviceType::GPU : DeviceType::CPU);
+    //DeviceWrapper D = Q.get_device();
+    //Graph Gr(neighbours_t(Nf), true);
+    //FullereneIsomer<float,uint16_t> isomer(Gr, false, false);
+    //std::cout << "Device : " << D.get_name() <<  " Compute Units: " << D.get_property(DeviceProperty::MAX_COMPUTE_UNITS) << " Max Work Group Size: " << D.get_property(DeviceProperty::MAX_WORK_GROUP_SIZE) << std::endl;
+
+    //std::cout <<  "Device : " << Q.get_device().get_name() << std::endl;
+ //   dualize(QQ,isomer,LaunchPolicy::SYNC);
     
 
 
