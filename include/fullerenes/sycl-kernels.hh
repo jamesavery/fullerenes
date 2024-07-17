@@ -3,7 +3,13 @@
 #include <fullerenes/sycl-wrappers.hh>
 
 template <typename T = float, typename K = uint16_t>
-void dualize(QueueWrapper& Q, FullereneIsomer<T,K>& isomer, const LaunchPolicy policy);
+void dualize_batch(SyclQueue& Q_, FullereneBatch<T,K>& batch);
+
+template <typename T = float, typename K = uint16_t>
+void dualize(SyclQueue& Q, FullereneBatch<T,K>& isomer, const LaunchPolicy policy);
+
+template <typename T = float, typename K = uint16_t>
+void dualize(SyclQueue& Q, Fullerene<T,K>& isomer, const LaunchPolicy policy);
 
 template <typename T = float, typename K = uint16_t>
 void dualize(sycl::queue&Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy);

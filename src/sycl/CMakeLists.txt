@@ -7,6 +7,7 @@ list(APPEND SYCL_LIBRARY_SOURCES
   hessian
   eigen
   sycl-util-impl
+  primitives
 )
 
 list(APPEND SYCL_SOURCE_CUSTOM_FLAGS 
@@ -18,6 +19,7 @@ list(APPEND SYCL_SOURCE_CUSTOM_FLAGS
 "-Xcuda-ptxas --maxrregcount=255"     # hessian.cc
 "-Xcuda-ptxas --maxrregcount=255"     # eigen.cc
 "-Xcuda-ptxas --maxrregcount=40"    # sycl-util-impl.cc
+"-Xcuda-ptxas --maxrregcount=40 -ltbb"    # primitives.cc
 )
 
 
@@ -31,7 +33,7 @@ foreach(SYCL_SOURCE FLAGS IN ZIP_LISTS SYCL_LIBRARY_SOURCES SYCL_SOURCE_CUSTOM_F
     target_link_libraries(${SYCL_SOURCE}_lib ${DPCPP_FLAGS} ${FLAGS})
 endforeach()
 
-target_link_libraries(sycl_fullerene_lib forcefield-optimize_lib dualize_lib tutte_lib spherical-projection_lib sycl-isomer-batch_lib hessian_lib eigen_lib sycl-util-impl_lib)
+target_link_libraries(sycl_fullerene_lib forcefield-optimize_lib dualize_lib tutte_lib spherical-projection_lib sycl-isomer-batch_lib hessian_lib eigen_lib sycl-util-impl_lib primitives_lib)
 
 #add_library(sycl_fullerene_lib hessian.cc forcefield-optimize.cc dualize.cc tutte.cc spherical-projection.cc sycl-isomer-batch.cc nop_kernel.cc eigen.cc)
 

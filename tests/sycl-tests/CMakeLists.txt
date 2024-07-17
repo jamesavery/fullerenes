@@ -1,11 +1,12 @@
 set(SYCL_EXECUTABLES
-  hello-sycl
-  sycl-pipeline-test
-  sycl-pipeline-herd
-  sycl-pipeline-multinode
-  eigen-test-sycl
-  dual-test-sycl
-  dual-validation-sycl
+  #hello-sycl
+  #sycl-pipeline-test
+  #sycl-pipeline-herd
+  #sycl-pipeline-multinode
+  #eigen-test-sycl
+  #dual-test-sycl
+  #dual-validation-sycl
+  sycl-interface-test
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
@@ -15,6 +16,6 @@ endforeach()
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   add_executable(${EXECUTABLE} ${EXECUTABLE}.cc)  
   target_include_directories(${EXECUTABLE} PRIVATE ${DPCPP_INCLUDE} ${DPCPP_INCLUDE}/sycl)
-  target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib sycl fullerenes)
+  target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib dualize_lib sycl fullerenes)
 endforeach()
 

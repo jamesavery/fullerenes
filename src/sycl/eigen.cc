@@ -35,7 +35,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, const sycl::local_accessor<T,1>& D,
     // specialized max_norm = max(sum(abs(A),axis=1)) for tridiagonal matrix. 
     real_t local_max = real_t(0.);
     for (int i = tix; i < n; i += bdim){
-        local_max = std::max(local_max, abs(D[i]) + 2*abs(L[i]));
+        local_max = std::max(local_max, sycl::abs(D[i]) + 2*sycl::abs(L[i]));
     }
     real_t max_norm = reduce_over_group(cta, local_max, sycl::maximum<real_t>());
     real_t numerical_zero = 10*std::numeric_limits<real_t>::epsilon();
@@ -67,7 +67,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, const sycl::local_accessor<T,1>& D,
             // // Udrullet
             // //    reflection_vector(a,anorm,v);
             v[0] = D[k]; v[1] = L[k];
-            real_t alpha = -copysign(anorm,a[0]); // Koster ingenting
+            real_t alpha = -sycl::copysign(anorm,a[0]); // Koster ingenting
             v[0] -= alpha;
 
             real_t vnorm = sqrt(v[0]*v[0]+v[1]*v[1]);
@@ -433,7 +433,7 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
                 real_t shift = d;
 
                 int i = 0;
-                real_t GR = (k>0?abs(L[k-1]):0)+abs(L[k]);
+                real_t GR = (k>0?sycl::abs(L[k-1]):0)+sycl::abs(L[k]);
                 int not_done = 1;
                 while (not_done > 0){
                     i++;
@@ -441,7 +441,7 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
                     if(mode == EigensolveMode::FULL_SPECTRUM_VECTORS || mode == EigensolveMode::ENDS_VECTORS){
                         apply_all_reflections(cta, V,k,n,Q_acc.get_pointer() + n*n*bid);
                     }
-                    GR = (k>0?abs(L[k-1]):0)+(k+1<n?abs(L[k]):0);
+                    GR = (k>0?sycl::abs(L[k-1]):0)+(k+1<n?sycl::abs(L[k]):0);
 
                     if(k>0){
                         std::array<T,4> args = {D[k-1], L[k-1], L[k-1], D[k]};
@@ -473,11 +473,11 @@ void eigensolve(sycl::queue& ctx, IsomerBatch<T,K> B, sycl::buffer<T,1>& hessian
                 int local_min_idx = 0;
                 int local_max_idx = 0;
                 for (int i = tid; i < n; i += bdim){
-                    local_max = isnan(D[i]) ? NAN : std::max(local_max, abs(D[i]));
-                    local_min = isnan(D[i]) ? NAN : std::min(local_min, abs(D[i]));
+                    local_max = isnan(D[i]) ? NAN : std::max(local_max, sycl::abs(D[i]));
+                    local_min = isnan(D[i]) ? NAN : std::min(local_min, sycl::abs(D[i]));
                     if (mode == EigensolveMode::ENDS_VECTORS){
-                    local_min_idx = isnan(D[i]) ? NAN : (local_min == abs(D[i]) ? i : local_min_idx);
-                    local_max_idx = isnan(D[i]) ? NAN : (local_max == abs(D[i]) ? i : local_max_idx);
+                    local_min_idx = isnan(D[i]) ? NAN : (local_min == sycl::abs(D[i]) ? i : local_min_idx);
+                    local_max_idx = isnan(D[i]) ? NAN : (local_max == sycl::abs(D[i]) ? i : local_max_idx);
                     }
                 }
                 real_t max_eig = reduce_over_group(cta, local_max, sycl::maximum<real_t>{});

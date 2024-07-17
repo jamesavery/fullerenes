@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <fstream>
 #include <fullerenes/triangulation.hh>
+#include <unistd.h>
+#include <sys/wait.h>
 using namespace sycl;
     // Function to parse command line arguments
 
@@ -148,7 +150,17 @@ int main(int argc, char** argv) {
     std::cout << "Gr has " << Gr.neighbours.size() << " vertices" << std::endl;
  */
     //BuckyGen::buckygen_queue BQ = BuckyGen::start(20, false, false);
-    QueueWrapper Q(device_id, device_type == "gpu" ? DeviceType::GPU : DeviceType::CPU);
+    pid_t pid = fork();
+    if(pid == 0) {
+        std::cout << "Child Process" << std::endl;
+        return 0;
+    } else {
+        std::cout << "Parent Process" << std::endl;
+        sleep(5);
+        std::cout << "Done Waiting" << std::endl;
+    }
+
+    SyclContext ctx = SyclContext();
     //DeviceWrapper D = Q.get_device();
     //Graph Gr(neighbours_t(Nf), true);
     //FullereneIsomer<float,uint16_t> isomer(Gr, false, false);
@@ -158,5 +170,5 @@ int main(int argc, char** argv) {
  //   dualize(QQ,isomer,LaunchPolicy::SYNC);
     
 
-
+    waitpid(pid, NULL, 0);
 }

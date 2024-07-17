@@ -66,7 +66,7 @@ if(ENABLE_SYCL)
     "SHELL:-Xcuda-ptxas --warn-on-spills"
     )
     
-    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
+    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -Xcuda-ptxas --verbose -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native")
@@ -118,6 +118,15 @@ if(ENABLE_CUDA)
   enable_language(CUDA)
   set(CUDA_INCLUDE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
   
+  #find_library(CURAND_LIB curand.so HINTS /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/math_libs/12.3/targets/x86_64-linux/)
+  find_path(CURAND_INCLUDE_DIR NAMES curand.h PATHS /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/math_libs/12.3/targets/x86_64-linux/include)
+
+  if(NOT CURAND_INCLUDE_DIR)
+    message(FATAL_ERROR "Could not find curand.h")
+  endif()
+
+  # Include the directory containing curand.h
+  include_directories(${CURAND_INCLUDE_DIR})
   message("CUDA include path at:" ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
   message("CUDA found: " ${CMAKE_CUDA_COMPILER} ".")
@@ -169,7 +178,6 @@ if(ENABLE_SYCL)
   set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
   add_subdirectory(src/sycl)
   add_subdirectory(tests/sycl-tests)
-  add_subdirectory(playground/sycl)  
   add_subdirectory(benchmarks/sycl)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
 endif()

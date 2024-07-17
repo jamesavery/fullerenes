@@ -46,7 +46,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, T* D, T* L, T* U, T* Vout, T shift=
     // specialized max_norm = max(sum(abs(A),axis=1)) for tridiagonal matrix. 
     real_t local_max = real_t(0.);
     for (int i = tix; i < n; i += bdim){
-        local_max = std::max(local_max, abs(D[i]) + 2*abs(L[i]));
+        local_max = std::max(local_max, sycl::abs(D[i]) + 2*sycl::abs(L[i]));
     }
     real_t max_norm = reduce_over_group(cta, local_max, sycl::maximum<real_t>());
     real_t numerical_zero = 10*std::numeric_limits<real_t>::epsilon();
@@ -78,7 +78,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, T* D, T* L, T* U, T* Vout, T shift=
             // // Udrullet
             // //    reflection_vector(a,anorm,v);
             v[0] = D[k]; v[1] = L[k];
-            real_t alpha = -copysign(anorm,a[0]); // Koster ingenting
+            real_t alpha = -sycl::copysign(anorm,a[0]); // Koster ingenting
             v[0] -= alpha;
 
             real_t vnorm = sqrt(v[0]*v[0]+v[1]*v[1]);
@@ -269,7 +269,7 @@ real_t reflection_vector(const group<1>& cta,
                          const real_t& a_i,const real_t& anorm)
 {
     int i_tid = cta.get_local_id(0);
-    real_t alpha = -copysign(anorm,a_i);
+    real_t alpha = -sycl::copysign(anorm,a_i);
     real_t v_i = a_i + (i_tid==0)*alpha; // TODO: Check fortegn 
     real_t vnorm = sqrt(reduce_over_group(cta, v_i*v_i, plus<real_t>()));
     return v_i / vnorm;
@@ -320,13 +320,13 @@ void diagonalize(sycl::group<1>& cta, T* U, T* L, T* D, T* V, T* Q){
         T shift = d;
 
         int i = 0;
-        T GR = (k>0?abs(L[k-1]):0)+abs(L[k]);
+        T GR = (k>0?sycl::abs(L[k-1]):0)+sycl::abs(L[k]);
         int not_done = 1;
         while (not_done > 0){
             i++;
             T_QTQ(cta, k+1, D, L, U, V, shift);
             apply_all_reflections(cta, V,k,N,Q);
-            GR = (k>0?abs(L[k-1]):0)+(k+1<N?abs(L[k]):0);
+            GR = (k>0?sycl::abs(L[k-1]):0)+(k+1<N?sycl::abs(L[k]):0);
 
             if(k>0){
                 std::array<T,4> args = {D[k-1], L[k-1], L[k-1], D[k]};
@@ -696,7 +696,7 @@ void LOBPCG(sycl::queue &ctx, sycl::buffer<T, 1> &A, sycl::buffer<K, 1> &cols, i
                 
                 for(int i = 0; i < BlockVectors; i++) blockR[i*m + tid] = blockAX[i*m + tid] - lambdas[i] * blockX[i*m + tid];
                 //Convergence Check
-                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
+                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(sycl::abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
                 if(tid == 0) sycl::ext::oneapi::experimental::printf("Iteration %d\n", iter);
                 for(int i = 0; i < BlockVectors; i++){if(tid == 0) sycl::ext::oneapi::experimental::printf("Unorthogonalized BlockR[%d][%d] = %f\n", i, 0, blockR[i*m + 0]);}
                 //Print ResidualNorms
