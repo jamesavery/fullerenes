@@ -449,8 +449,6 @@ void SyclContext::queue_push_back(Device dev, bool in_order) {
         : sycl::queue(DEVICE_CAST(device_arrays[(int)dev.second], dev.first));
 }
 
-SyclQueue::SyclQueue(std::unique_ptr<SyclQueueImpl>&& impl) : impl_(std::move(impl)), in_order_(impl->get_queue().is_in_order()) {}
-
 SyclQueue::SyclQueue() : device_({0, DeviceType::CPU}), in_order_(true) {
     impl_ = std::make_unique<SyclQueueImpl>(device_, in_order_);
 }
@@ -465,12 +463,16 @@ void SyclQueue::wait() const {impl_->wait();}
 void SyclQueue::wait_and_throw() const {impl_->wait_and_throw();}
 
 
-
+template struct SyclVector<int8_t>;
+template struct SyclVector<int16_t>;
+template struct SyclVector<int32_t>;
+template struct SyclVector<int64_t>;
+template struct SyclVector<uint8_t>;
+template struct SyclVector<uint16_t>;
+template struct SyclVector<uint32_t>;
+template struct SyclVector<uint64_t>;
 template struct SyclVector<float>;
 template struct SyclVector<double>;
-template struct SyclVector<uint16_t>;
-template struct SyclVector<int>;
-template struct SyclVector<size_t>;
 template struct SyclVector<std::byte>;
 template struct SyclVector<StatusFlag>;
 
