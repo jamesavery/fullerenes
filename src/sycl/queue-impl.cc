@@ -15,8 +15,6 @@ struct SyclQueueImpl : public sycl::queue{
                 sycl::device::get_devices(sycl::info::device_type::accelerator) };
 
     SyclQueueImpl(Device dev, bool in_order) : sycl::queue( device_arrays.at((int)dev.second).at(dev.first), in_order ? sycl::property::queue::in_order{} : sycl::property_list{}) {}
-
-    operator SyclQueue() {return SyclQueue(std::make_unique<SyclQueueImpl>(std::move(*this)));}
 };
 
 struct DeviceImpl : public sycl::device{
