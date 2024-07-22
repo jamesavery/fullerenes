@@ -3,6 +3,8 @@
 #include <array>
 #include <span>
 #include <memory>
+#include <execution>
+#include <numeric>
 #include "graph.hh"
 #include "polyhedron.hh"
 
@@ -504,32 +506,47 @@ struct Plus{
     constexpr T operator()(T x, T y) const noexcept { return x + y;}
 };
 
-struct Minus{
+struct Max{
     template <typename T>
-    constexpr T operator()(T x, T y) const noexcept { return x - y;}
+    constexpr T operator()(T x, T y) const noexcept { return x > y ? x : y;}
 };
 
-#define COMMA ,
+struct Min{
+    template <typename T>
+    constexpr T operator()(T x, T y) const noexcept { return x < y ? x : y;}
+};
 
-#define DECLARE_FUNCS(templates, returntype, funcname, sig_args, call_args) \
-    templates returntype funcname(SyclQueue& Q, T* begin, T* end, T* store, sig_args);\
-    templates returntype funcname(SyclQueue& Q, const SyclVector<T> &vec, SyclVector<T> &result, sig_args);\
-    templates returntype funcname(SyclQueue& Q, const Span<T> vec, const Span<T> result, sig_args);\
-
-#define DECLARE_OR_DEFINE_ALL_FUNCS(definemode)\
-        definemode(template <typename T COMMA typename BinaryOp>, void, exclusive_scan, T init COMMA BinaryOp op, init COMMA op)\
-        definemode(template <typename T COMMA typename BinaryOp>, void, inclusive_scan, T init COMMA BinaryOp op, init COMMA op)\
-        definemode(template <typename T COMMA typename BinaryOp COMMA typename UnaryOp>, void, transform_exclusive_scan, T init COMMA BinaryOp op COMMA UnaryOp f, init COMMA op COMMA f)\
-        definemode(template <typename T COMMA typename BinaryOp COMMA typename UnaryOp>, void, transform_inclusive_scan, T init COMMA BinaryOp op COMMA UnaryOp f, init COMMA op COMMA f)\
-        definemode(template <typename T COMMA typename UnaryOp>, void, transform, UnaryOp f, f)\
-        definemode(template <typename T COMMA typename BinaryOp>, T, reduce, T init COMMA BinaryOp op, init COMMA op)\
-        definemode(template <typename T COMMA typename BinaryOp COMMA typename UnaryOp>, T, transform_reduce, T init COMMA BinaryOp op COMMA UnaryOp f, init COMMA op COMMA f)\
-        //definemode(template <typename T>, void, fill, Policy policy = Policy::SYNC)\
-        //definemode(template <typename T>, void, unique, Policy policy = Policy::SYNC)\
-        //definemode(template <typename T>, void, sort, Policy policy = Policy::SYNC)\
-        //definemode(template <typename T>, void, reverse, Policy policy = Policy::SYNC)
-namespace primitives{
-    DECLARE_OR_DEFINE_ALL_FUNCS(DECLARE_FUNCS)
+template <typename Func, typename... Args>
+auto execute_with_policy(SyclQueue& Q, const Policy policy, Func&& func, Args&&... args){
+    if(policy == Policy::SYNC){
+        func(std::forward<Args>(args)...);
+        Q.wait();
+    } else {
+        func(std::forward<Args>(args)...);
+    }
 }
 
+namespace primitives{
 
+    template <typename T, typename QueueType, template<typename> class ContainerType, typename BinaryOp = Plus>
+    __attribute__((noinline)) void exclusive_scan(QueueType& Q, ContainerType<T>& in_vec, ContainerType<T>& out_vec, T init = T{}, BinaryOp op = BinaryOp{});
+
+    template <typename T, typename QueueType, template<typename> class ContainerType, typename BinaryOp = Plus>
+    __attribute__((noinline)) void inclusive_scan(QueueType& Q, ContainerType<T>& in_vec, ContainerType<T>& out_vec, T init = T{}, BinaryOp op = BinaryOp{});
+
+    template <typename T, typename QueueType, template<typename> class ContainerType, typename BinaryOp = Plus, typename UnaryOp = Identity>
+    __attribute__((noinline)) void transform_exclusive_scan(QueueType& Q, ContainerType<T>& in_vec, ContainerType<T>& out_vec, T init = T{}, BinaryOp op = BinaryOp{}, UnaryOp f = UnaryOp{});
+
+    template <typename T, typename QueueType, template<typename> class ContainerType, typename BinaryOp = Plus, typename UnaryOp = Identity>
+    __attribute__((noinline)) void transform_inclusive_scan(QueueType& Q, ContainerType<T>& in_vec, ContainerType<T>& out_vec, T init = T{}, BinaryOp op = BinaryOp{}, UnaryOp f = UnaryOp{});
+
+    template <typename T, typename QueueType, template<typename> class ContainerType, typename UnaryOp = Identity>
+    __attribute__((noinline)) void transform(QueueType& Q, ContainerType<T>& in_vec, ContainerType<T>& out_vec, UnaryOp f = UnaryOp{});
+
+    template <typename T, typename QueueType, template<typename> class ContainerType, typename BinaryOp = Plus>
+    __attribute__((noinline)) T reduce(QueueType& Q, ContainerType<T>& in_vec, T init = T{}, BinaryOp op = BinaryOp{});
+
+    template <typename T, typename QueueType, template<typename> class ContainerType, typename BinaryOp = Plus, typename UnaryOp = Identity>
+    __attribute__((noinline)) T transform_reduce(QueueType& Q, ContainerType<T>& in_vec, T init = T{}, BinaryOp op = BinaryOp{}, UnaryOp f = UnaryOp{});
+
+}
