@@ -14310,9 +14310,9 @@ decode_command_line(int argc, char *argv[])
     int badargs,argsgot;
     char ok_switches[256];
 
-    for (i = 0; i < argc ; ++i) fprintf(stderr,"%s ",argv[i]);
+    /* for (i = 0; i < argc ; ++i) fprintf(stderr,"%s ",argv[i]);
     fprintf(stderr,"\n");
-
+ */
     cmdname = argv[0];
 
     for (i = 0; i < 256; ++i) ok_switches[i] = 0;
