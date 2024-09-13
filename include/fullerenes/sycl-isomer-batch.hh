@@ -1,3 +1,4 @@
+#pragma once
 #include <CL/sycl.hpp>
 #include <numeric>
 #include <vector>
@@ -11,7 +12,7 @@
 #define TEMPLATE_TYPEDEFS(T,K) FLOAT_TYPEDEFS(T) INT_TYPEDEFS(K)
 
 using namespace sycl;
-enum ForcefieldType {WIRZ, PEDERSEN, FLATNESS_ENABLED, FLAT_BOND, BOND, ANGLE, DIH, ANGLE_M, ANGLE_P, DIH_A, DIH_M, DIH_P};
+enum ForcefieldType : uint8_t {WIRZ, PEDERSEN, FLATNESS_ENABLED, FLAT_BOND, BOND, ANGLE, DIH, ANGLE_M, ANGLE_P, DIH_A, DIH_M, DIH_P};
 
 enum class EigensolveMode 
 {   
