@@ -7,19 +7,19 @@
 namespace BuckyGen {
   
   typedef struct {
-    pid_t pid;
-    int   qid;
-    int   Nvertices;
-    int   chunk_index, worker_index, chunk_number;
+    pid_t pid{};
+    int   qid{};
+    int   Nvertices{};
+    int   chunk_index{}, worker_index{}, chunk_number{};
   } buckygen_queue;
 
   struct buckyherd_queue {
-    int qid;
-    size_t N, Nvertices, Nchunks, Nworkers, active_workers;
-    bool IPR, only_nontrivial;
-    vector<size_t> chunks_todo, chunks_done;
-    vector<buckygen_queue>  worker_processes;
-    size_t free_cpu_cores;
+    int qid{};
+    size_t N{}, Nvertices{}, Nchunks{}, Nworkers{}, active_workers{};
+    bool IPR{}, only_nontrivial{};
+    vector<size_t> chunks_todo{}, chunks_done{};
+    vector<buckygen_queue>  worker_processes{};
+    size_t free_cpu_cores{};
 
     buckygen_queue new_worker(int worker_index);
     bool next_fullerene(Graph& G);
