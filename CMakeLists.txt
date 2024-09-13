@@ -13,6 +13,11 @@ set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
 find_package(LAPACK)
 find_package(GSL)
+find_package(GTest REQUIRED)
+
+
+enable_testing()
+include_directories(${GTEST_INCLUDE_DIRS})
 
 # Shared between CUDA and SYCL
 set(GPU_MAXREGCOUNT 80)
@@ -51,7 +56,7 @@ if(ENABLE_SYCL)
   set(SYCL_TARGETS ${SYCL_DEFAULT_TARGET} CACHE STRING "AMD|NVIDIA|X86 (Currently only single target supported.") # TODO: Multi-target compiles.
   message("SYCL compile enabled with ${SYCL_TARGETS} target")
 
-  set(DPCPP_FLAGS "-O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
+  set(DPCPP_FLAGS "-Wno-pass-failed -Wno-unused-local-typedef -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wall -O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
   
   if(SYCL_TARGETS STREQUAL "AMD") 
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa,x86_64 -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a -march=native")
