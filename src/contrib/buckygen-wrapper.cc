@@ -30,11 +30,14 @@ enum { INVALID,GRAPH_READY,WORKER_FINISHED } msg_type;
   
 void signal_finished(const buckygen_queue& Q)
 {
-  struct { long mtype; int worker_index[1];  } msg;
+  struct { long mtype; int worker_index;  } msg;
+  memset(&msg,0,sizeof(msg));
   msg.mtype = WORKER_FINISHED;
-  msg.worker_index[0] = Q.worker_index;
+  msg.worker_index = Q.worker_index;
 
-  msgsnd(Q.qid,(void*)&msg,sizeof(msg),0);
+  msgsnd(Q.qid,
+        (void*)&msg,
+        sizeof(msg),0);
 }
 
 
@@ -93,7 +96,7 @@ bool push_graph(const buckygen_queue& Q)
   } msg;
 
   msg.mtype = GRAPH_READY;
-  memset(msg.neighbours,-1,6*nv*sizeof(int));
+  memset(msg.neighbours,-1, 6*MAXN*sizeof(int));
 
   for(int u=0;u<nv;u++){
     EDGE *e(firstedge[u]);
