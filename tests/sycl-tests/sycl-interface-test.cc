@@ -1,69 +1,53 @@
 #include <iostream>
 #include <numeric>
 #include <algorithm>
-#include <fullerenes/sycl-wrappers.hh>
 #include <fullerenes/buckygen-wrapper.hh>
-#include <fullerenes/sycl-kernels.hh>
-
-#include <unistd.h>
+#include <fullerenes/sycl-headers/sycl-wrappers.hh>
+#include <fullerenes/sycl-headers/sycl-kernels.hh>
+#include <fullerenes/isomerdb.hh>
 #include <sys/types.h>
 
+
 int main(int argc, char** argv) {
-    constexpr int N = 20;
+    constexpr int N = 30;
     BuckyGen::buckygen_queue BQ = BuckyGen::start(N, false, false);
     Graph G(neighbours_t(N/2 + 2));
 
+    auto n_isomers = IsomerDB::number_isomers(N);
+    FullereneBatch<float, uint16_t> batch(N, n_isomers);
+    FullereneQueue<float, uint16_t> FQ(N, n_isomers);
+    
     BuckyGen::next_fullerene(BQ, G);
 
-    FullereneBatch<float, uint16_t> batch(N, 1);
-    batch.push_back(G);
+    //std::cout << "Verify Equality of first isomer: " << std::boolalpha << (batch[0] == FQ[0]) << std::endl;
+
+    
+    std::cout << "Number of isomers: " << n_isomers << std::endl;
+    batch.resize(n_isomers);
+    std::for_each(batch.begin(), batch.end(), 
+                [&, i = 0] (auto fullerene) mutable {
+                BuckyGen::next_fullerene(BQ, G);
+                batch.push_back(G, i++); });
+   
+    
     ConditionFunctor c1(StatusFlag::CONVERGED_2D, StatusFlag::EMPTY | StatusFlag::CONVERGED_3D);
-    
-
-    
-    std::cout << "Batch Dual Graph: " << batch.d_.A_dual_ << std::endl;
-
-    
-    
 
 
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <device_type>" << std::endl;
-        return 1;
-    }
-    DeviceType type;
-    if (std::string(argv[1]) == "cpu") { type = DeviceType::CPU; 
-        std::cout << "Device type is CPU" << std::endl;
-    } else if (std::string(argv[1]) == "gpu") { type = DeviceType::GPU;
-        std::cout << "Device type is GPU" << std::endl;
-    } else if (std::string(argv[1]) == "accelerator") { type = DeviceType::ACCELERATOR;
-        std::cout << "Device type is Accelerator" << std::endl;
-    } else {
-        std::cerr << "Invalid device type" << std::endl;
-        return 1;
-    }
-
-    SyclContext ctx = SyclContext();
-    Device device(0, type);
-    std::cout << ctx.device_get_name(device) << std::endl;
+    Device device = Device::get_devices(DeviceType::GPU)[0];
+    std::cout << device.get_name() << std::endl;
     SyclQueue Q(device, true);
-    auto fullerene = batch[0];
     
-
-    dualize(Q, fullerene, LaunchPolicy::SYNC);
+    DualizeFunctor<float, uint16_t> dualize;
+    auto batchview = FullereneBatchView(batch);
     
+    dualize(Q, batch[1], LaunchPolicy::ASYNC);
+    //std::for_each_n(batchview.begin() + 1, 2, [&](auto fullerene){dualize(Q, fullerene, LaunchPolicy::ASYNC);} );
 
-    std::cout << "Batch Cubic Graph: " << batch.d_.A_cubic_ << std::endl;
-
-    /* std::iota(vec.begin(), vec.end(), 0);
-    std::transform(vec.begin(), vec.end(), vec.begin(), [](int x){return x*x;});
-    for(auto val : vec){
-        std::cout << val << std::endl;
-    } */
-
-    std::cout << "Device has " << ctx.device_get_property(device, DeviceProperty::MAX_COMPUTE_UNITS) << " compute units\n";
-    std::cout << "Device has " << ctx.device_get_property(device, DeviceProperty::MAX_WORK_GROUP_SIZE) << " max work group size\n";
-    std::cout << "Device has " << ctx.device_get_property(device, DeviceProperty::MAX_CLOCK_FREQUENCY) << " max clock frequency\n";
+    push(Q, FQ, batch, ConditionFunctor(StatusFlag::CUBIC_INITIALIZED));
+    push(Q, batch, FQ, ConditionFunctor(0, StatusFlag::CUBIC_INITIALIZED));
+    //std::cout << "Device has " << device.get_property(DeviceProperty::MAX_COMPUTE_UNITS) << " compute units\n";
+    //std::cout << "Device has " << device.get_property(DeviceProperty::MAX_WORK_GROUP_SIZE) << " max work group size\n";
+    //std::cout << "Device has " << device.get_property(DeviceProperty::MAX_CLOCK_FREQUENCY) << " max clock frequency\n";
 
     
     return 0;
