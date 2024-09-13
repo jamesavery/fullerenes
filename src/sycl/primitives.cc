@@ -1,136 +1,367 @@
 
-#ifdef __INTEL_LLVM_COMPILER_FIX_THE_ONEAPI_DPL_INCLUDES_ // When the oneDPL is fixed, we can change this to "__INTEL_LLVM_COMPILER"
+#if __INTEL_LLVM_COMPILER > 20240000
+    #define ONEDPL_USE_PREDEFINED_POLICIES 0
     #include <oneapi/dpl/algorithm>
     #include <oneapi/dpl/execution>
     #include <oneapi/dpl/iterator>
     #include <oneapi/dpl/numeric>
 #endif
-#include "primitives.hh"
-#include <fullerenes/sycl-wrappers.hh>
-    
+
+#include <fullerenes/sycl-headers/sycl-span.hh>
+#include <fullerenes/sycl-headers/sycl-vector.hh>
+#include <fullerenes/sycl-headers/sycl-device-queue.hh>
+#include <fullerenes/sycl-headers/sycl-parallel-primitives.hh>
+#include <fullerenes/sycl-headers/sycl-status-enum.hh>
+#include <execution>
+#include "queue-impl.cc"    
+
+namespace primitives{
 
 
-#ifdef __INTEL_LLVM_COMPILER_FIX_THE_ONEAPI_DPL_INCLUDES_
-#define DEFINE_FUNCS(templates, returntype, funcname, post_args) \
-    templates returntype funcname(SyclQueue& queue, T* begin, T* end, T* result, post_args){\
-        auto& Q = queue.impl_->get_queue();\
-        auto policy = oneapi::dpl::execution::make_device_policy(Q.get_device());\
-        return oneapi::dpl::funcname(policy, begin, end, result, post_args);\
-    }\
-    templates returntype funcname(SyclQueue& queue, const SyclVector<T>& vec, SyclVector<T>& result, post_args){\
-        assert(vec.capacity() == result.capacity());\
-        return funcname(queue, vec.data(), vec.data() + vec.capacity(), result.data(), post_args);\
-    }\
-    templates returntype funcname(SyclQueue& queue, const Span<T> vec, const Span<T> result, post_args){\
-        assert(vec.size() == result.size());\
-        return funcname(queue, vec.data(), vec.data() + vec.size(), result.data(), post_args);\
-    }\
-    templates returntype funcname(SyclQueue& queue, SyclVector<T>& vec, post_args){\
-        return funcname(queue, vec.data(), vec.data() + vec.size(), vec.data(), post_args);\
-    }\
-    templates returntype funcname(SyclQueue& queue, Span<T> vec, post_args){\
-        return funcname(queue, vec.data(), vec.data() + vec.size(), vec.data(), post_args);\
+#if __INTEL_LLVM_COMPILER > 20240000
+    #define BEGIN(x) (static_cast< std::decay_t<decltype(x[0])>* >(x.begin()))
+    #define END(x) (static_cast< std::decay_t<decltype(x[0])>* >(x.end()))
+
+    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp>
+    void inline exclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init, BinaryOp op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::exclusive_scan(policy, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), init, op);
     }
+
+    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp>
+    void inline inclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init, BinaryOp op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::inclusive_scan(policy, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), op, init);
+    }
+
+    template <typename InputContainer, typename Init, typename BinaryOp>
+    auto inline reduce(SyclQueue& Q, InputContainer&& vec, Init init, BinaryOp op) -> decltype(init) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        return oneapi::dpl::reduce(policy, BEGIN(vec), END(vec), init, op);
+    }
+
+    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp, typename UnaryOp>
+    void inline transform_inclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init, BinaryOp binary_op, UnaryOp unary_op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::transform_inclusive_scan(policy, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), binary_op, unary_op, init);
+    }
+
+    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename Init, typename ReduceOp, typename TransformOp>
+    void inline transform_inclusive_scan(SyclQueue& Q, InputContainer1&& vec1, InputContainer2&& vec2, OutputContainer&& out_vec, Init init, ReduceOp reduce_op, TransformOp transform_op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::transform_inclusive_scan(policy, BEGIN(vec1), END(vec1), BEGIN(vec2), BEGIN(out_vec), reduce_op, transform_op, init);
+    }
+
+    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp, typename UnaryOp>
+    void inline transform_exclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init, BinaryOp binary_op, UnaryOp unary_op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::transform_exclusive_scan(policy, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), init, binary_op, unary_op);
+    }
+
+    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename Init, typename ReduceOp, typename TransformOp>
+    void inline transform_exclusive_scan(SyclQueue& Q, InputContainer1&& vec1, InputContainer2&& vec2, OutputContainer&& out_vec, Init init, ReduceOp reduce_op, TransformOp transform_op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::transform_exclusive_scan(policy, BEGIN(vec1), END(vec1), BEGIN(vec2), BEGIN(out_vec), init, reduce_op, transform_op);
+    }
+
+    template <typename InputContainer, typename OutputContainer, typename UnaryOp>
+    void inline transform(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, UnaryOp unary_op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::transform(policy, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), unary_op);
+    }
+
+    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename BinaryOp>
+    void inline transform(SyclQueue& Q, InputContainer1&& vec1, InputContainer2&& vec2, OutputContainer&& out_vec, BinaryOp binary_op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::transform(policy, BEGIN(vec1), END(vec1), BEGIN(vec2), BEGIN(out_vec), binary_op);
+    }
+
+    template <typename InputContainer, typename Init, typename BinaryOp, typename UnaryOp>
+    auto inline transform_reduce(SyclQueue& Q, InputContainer&& vec, Init init, BinaryOp binary_op, UnaryOp unary_op) -> decltype(init) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        return oneapi::dpl::transform_reduce(policy, BEGIN(vec), END(vec), init, binary_op, unary_op);
+    }
+
+    template <typename InputContainer1, typename InputContainer2, typename Init, typename ReduceOp, typename TransformOp>
+    auto inline transform_reduce(SyclQueue& Q, InputContainer1&& vec1, InputContainer2&& vec2, Init init, ReduceOp reduce_op, TransformOp transform_op) -> decltype(init) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        return oneapi::dpl::transform_reduce(policy, BEGIN(vec1), END(vec1), BEGIN(vec2), init, reduce_op, transform_op);
+    }
+
+    //any_of
+    template <typename InputContainer, typename Predicate>
+    bool inline any_of(SyclQueue& Q, InputContainer&& vec, Predicate pred) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        return oneapi::dpl::any_of(policy, BEGIN(vec), END(vec), pred);
+    }
+
+    //all_of
+    template <typename InputContainer, typename Predicate>
+    bool inline all_of(SyclQueue& Q, InputContainer&& vec, Predicate pred) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        return oneapi::dpl::all_of(policy, BEGIN(vec), END(vec), pred);
+    }
+
+    //none_of
+    template <typename InputContainer, typename Predicate>
+    bool inline none_of(SyclQueue& Q, InputContainer&& vec, Predicate pred) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        return oneapi::dpl::none_of(policy, BEGIN(vec), END(vec), pred);
+    }
+
+    //for_each
+    template <typename InputContainer, typename Function>
+    void inline for_each(SyclQueue& Q, InputContainer&& vec, Function func) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::for_each(policy, BEGIN(vec), END(vec), func);
+    }
+
+    //for_each_n
+    template <typename InputContainer, typename Function>
+    void inline for_each_n(SyclQueue& Q, InputContainer&& vec, size_t n, Function func) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::for_each_n(policy, BEGIN(vec), n, func);
+    }
+
+    //count
+    template <typename InputContainer, typename T>
+    size_t inline count(SyclQueue& Q, InputContainer&& vec, T value) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        return oneapi::dpl::count(policy, BEGIN(vec), END(vec), value);
+    }
+
+    //count_if
+    template <typename InputContainer, typename Predicate>
+    size_t inline count_if(SyclQueue& Q, InputContainer&& vec, Predicate pred) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        return oneapi::dpl::count_if(policy, BEGIN(vec), END(vec), pred);
+    }
+
+    //copy
+    template <typename InputContainer, typename OutputContainer>
+    void inline copy(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::copy(policy, BEGIN(in_vec), END(in_vec), BEGIN(out_vec));
+    }
+
+    //copy_if
+    template <typename InputContainer, typename OutputContainer, typename Predicate>
+    void inline copy_if(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Predicate unary_op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::copy_if(policy, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), unary_op);
+    }
+
+    //copy_n
+    template <typename InputContainer, typename OutputContainer>
+    void inline copy_n(SyclQueue& Q, InputContainer&& in_vec, size_t n, OutputContainer&& out_vec) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::copy_n(policy, BEGIN(in_vec), n, BEGIN(out_vec));
+    }
+
+    //fill
+    template <typename InputContainer, typename T>
+    void inline fill(SyclQueue& Q, InputContainer&& vec, T value) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::fill(policy, BEGIN(vec), END(vec), value);
+    }
+
+    //sort
+    template <typename InputContainer, typename BinaryPredicate>
+    void inline sort(SyclQueue& Q, InputContainer&& vec, BinaryPredicate binary_op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::sort(policy, BEGIN(vec), END(vec), binary_op);
+    }
+
+    //iota
+    template <typename InputContainer, typename T>
+    void inline iota(SyclQueue& Q, InputContainer&& vec, T value) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        auto begin = BEGIN(vec);
+        oneapi::dpl::for_each(policy, BEGIN(vec), END(vec), [begin, value](auto& x) { auto index = &x - begin; x = value + index; });
+    }
+
+    //OneAPI Algorithms
+
+    //inclusive_scan_by_segment
+    template <typename InputKeys, typename InputValues, typename OutputValues, typename BinaryPredicate, typename BinaryOp>
+    void inline inclusive_scan_by_segment(SyclQueue& Q, InputKeys&& keys, InputValues&& values, OutputValues&& out_values, BinaryPredicate pred, BinaryOp op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::inclusive_scan_by_segment(policy, BEGIN(keys), END(keys), BEGIN(values), BEGIN(out_values), pred, op);
+    }
+
+    //exclusive_scan_by_segment
+    template <typename InputKeys, typename InputValues, typename OutputValues, typename BinaryPredicate, typename BinaryOp>
+    void inline exclusive_scan_by_segment(SyclQueue& Q, InputKeys&& keys, InputValues&& values, OutputValues&& out_values, BinaryPredicate pred, BinaryOp op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::exclusive_scan_by_segment(policy, BEGIN(keys), END(keys), BEGIN(values), BEGIN(out_values), pred, op);
+    }
+
+    //reduce_by_segment
+    template <typename InputKeys, typename InputValues, typename OutputKeys, typename OutputValues, typename BinaryPredicate, typename BinaryOp>
+    void inline reduce_by_segment(SyclQueue& Q, InputKeys&& keys, InputValues&& values, OutputKeys&& out_keys, OutputValues&& out_values, BinaryPredicate pred, BinaryOp op) {
+        auto policy = oneapi::dpl::execution::make_device_policy((*Q));
+        oneapi::dpl::reduce_by_segment(policy, BEGIN(keys), END(keys), BEGIN(values), BEGIN(out_keys), BEGIN(out_values), pred, op);
+    }
+
+    //histogram
+
+
 #else
-#define DEFINE_FUNCS(templates, returntype, funcname, post_args, call_args) \
-    templates returntype funcname(SyclQueue& queue, T* begin, T* end, T* result, post_args){\
-        if constexpr (std::is_void_v<returntype>){\
-            std::funcname(std::execution::par_unseq, begin, end, result, call_args);\
-        }else{\
-            return std::funcname(std::execution::par_unseq, begin, end, result, call_args);}\
-    }\
-    templates returntype funcname(SyclQueue& queue, const SyclVector<T>& vec, SyclVector<T>& result, post_args){\
-        assert(vec.capacity() == result.capacity());\
-        if constexpr (std::is_void_v<returntype>){\
-            funcname(queue, vec.data(), vec.data() + vec.capacity(), result.data(), call_args);\
-        }else{\
-            return funcname(queue, vec.data(), vec.data() + vec.capacity(), result.data(), call_args);}\
-    }\
-    templates returntype funcname(SyclQueue& queue, const Span<T> vec, const Span<T> result, post_args){\
-        assert(vec.size() == result.size());\
-        if constexpr (std::is_void_v<returntype>){\
-            funcname(queue, vec.data(), vec.data() + vec.size(), result.data(), call_args);\
-        }else{\
-            return funcname(queue, vec.data(), vec.data() + vec.size(), result.data(), call_args);}\
-    }\
-    templates returntype funcname(SyclQueue& queue, SyclVector<T>& vec, post_args){\
-        if constexpr (std::is_void_v<returntype>){\
-            funcname(queue, vec.data(), vec.data() + vec.size(), vec.data(), call_args);\
-        }else{\
-            return funcname(queue, vec.data(), vec.data() + vec.size(), vec.data(), call_args);}\
-    }\
-    templates returntype funcname(SyclQueue& queue, Span<T> vec, post_args){\
-        if constexpr (std::is_void_v<returntype>){\
-            funcname(queue, vec.data(), vec.data() + vec.size(), vec.data(), call_args);\
-        }else{\
-            return funcname(queue, vec.data(), vec.data() + vec.size(), vec.data(), call_args);}\
+
+    //Lets define a SFINAE helper to check if the type can be called with T1 and T2
+    #define BEGIN(x) (static_cast< std::decay_t<decltype(x[0])>* >(x.begin()))
+    #define END(x) (static_cast< std::decay_t<decltype(x[0])>* >(x.end()))
+
+    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp>
+    void inline exclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init, BinaryOp op) {
+        Q.wait();
+        std::exclusive_scan(std::execution::par_unseq, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), init, op);
+    }
+
+    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp>
+    void inline inclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init, BinaryOp op) {
+        Q.wait();
+        std::inclusive_scan(std::execution::par_unseq, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), op, init);
+    }
+
+    template <typename InputContainer, typename Init, typename BinaryOp>
+    auto inline reduce(SyclQueue& Q, InputContainer&& vec, Init init, BinaryOp op) -> decltype(init) {
+        Q.wait();
+        return std::reduce(std::execution::par_unseq, BEGIN(vec), END(vec), init, op);
+    }
+
+    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp, typename UnaryOp>
+    void inline transform_inclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init, BinaryOp binary_op, UnaryOp unary_op) {
+        Q.wait();
+        std::transform_inclusive_scan(std::execution::par_unseq, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), binary_op, unary_op, init);
+    }
+
+    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename Init, typename ReduceOp, typename TransformOp>
+    void inline transform_inclusive_scan(SyclQueue& Q, InputContainer1&& vec1, InputContainer2&& vec2, OutputContainer&& out_vec, Init init, ReduceOp reduce_op, TransformOp transform_op) {
+        Q.wait();
+        std::transform_inclusive_scan(std::execution::par_unseq, BEGIN(vec1), END(vec1), BEGIN(vec2), BEGIN(out_vec), reduce_op, transform_op, init);
+    }
+
+    template <typename InputContainer, typename OutputContainer, typename Init, typename BinaryOp, typename UnaryOp>
+    void inline transform_exclusive_scan(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Init init, BinaryOp binary_op, UnaryOp unary_op) {
+        Q.wait();
+        std::transform_exclusive_scan(std::execution::par_unseq, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), init, binary_op, unary_op);
+    }
+
+    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename Init, typename ReduceOp, typename TransformOp>
+    void inline transform_exclusive_scan(SyclQueue& Q, InputContainer1&& vec1, InputContainer2&& vec2, OutputContainer&& out_vec, Init init, ReduceOp reduce_op, TransformOp transform_op) {
+        Q.wait();
+        std::transform_exclusive_scan(std::execution::par_unseq, BEGIN(vec1), END(vec1), BEGIN(vec2), BEGIN(out_vec), init, reduce_op, transform_op);
+    }
+
+    template <typename InputContainer, typename OutputContainer, typename UnaryOp>
+    void inline transform(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, UnaryOp unary_op) {
+        Q.wait();
+        std::transform(std::execution::par_unseq, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), unary_op);
+    }
+
+    template <typename InputContainer1, typename InputContainer2, typename OutputContainer, typename BinaryOp>
+    void inline transform(SyclQueue& Q, InputContainer1&& vec1, InputContainer2&& vec2, OutputContainer&& out_vec, BinaryOp binary_op) {
+        Q.wait();
+        std::transform(std::execution::par_unseq, BEGIN(vec1), END(vec1), BEGIN(vec2), BEGIN(out_vec), binary_op);
+    }
+
+    template <typename InputContainer, typename Init, typename BinaryOp, typename UnaryOp>
+    auto inline transform_reduce(SyclQueue& Q, InputContainer&& vec, Init init, BinaryOp binary_op, UnaryOp unary_op) -> decltype(init) {
+        Q.wait();
+        return std::transform_reduce(std::execution::par_unseq, BEGIN(vec), END(vec), init, binary_op, unary_op);
+    }
+
+    template <typename InputContainer1, typename InputContainer2, typename Init, typename ReduceOp, typename TransformOp>
+    auto inline transform_reduce(SyclQueue& Q, InputContainer1&& vec1, InputContainer2&& vec2, Init init, ReduceOp reduce_op, TransformOp transform_op) -> decltype(init) {
+        Q.wait();
+        return std::transform_reduce(std::execution::par_unseq, BEGIN(vec1), END(vec1), BEGIN(vec2), init, reduce_op, transform_op);
+    }
+
+    //any_of
+    template <typename InputContainer, typename Predicate>
+    bool inline any_of(SyclQueue& Q, InputContainer&& vec, Predicate pred) {
+        Q.wait();
+        return std::any_of(std::execution::par_unseq, BEGIN(vec), END(vec), pred);
+    }
+
+    //all_of
+    template <typename InputContainer, typename Predicate>
+    bool inline all_of(SyclQueue& Q, InputContainer&& vec, Predicate pred) {
+        Q.wait();
+        return std::all_of(std::execution::par_unseq, BEGIN(vec), END(vec), pred);
+    }
+
+    //none_of
+    template <typename InputContainer, typename Predicate>
+    bool inline none_of(SyclQueue& Q, InputContainer&& vec, Predicate pred) {
+        Q.wait();
+        return std::none_of(std::execution::par_unseq, BEGIN(vec), END(vec), pred);
+    }
+
+    //for_each
+    template <typename InputContainer, typename Function>
+    void inline for_each(SyclQueue& Q, InputContainer&& vec, Function func) {
+        Q.wait();
+        std::for_each(std::execution::par_unseq, BEGIN(vec), END(vec), func);
+    }
+
+    //for_each_n
+    template <typename InputContainer, typename Function>
+    void inline for_each_n(SyclQueue& Q, InputContainer&& vec, size_t n, Function func) {
+        Q.wait();
+        std::for_each_n(std::execution::par_unseq, BEGIN(vec), n, func);
+    }
+
+    //count
+    template <typename InputContainer, typename T>
+    size_t inline count(SyclQueue& Q, InputContainer&& vec, T value) {
+        Q.wait();
+        return std::count(std::execution::par_unseq, BEGIN(vec), END(vec), value);
+    }
+
+    //count_if
+    template <typename InputContainer, typename Predicate>
+    size_t inline count_if(SyclQueue& Q, InputContainer&& vec, Predicate pred) {
+        Q.wait();
+        return std::count_if(std::execution::par_unseq, BEGIN(vec), END(vec), pred);
+    }
+
+    //copy
+    template <typename InputContainer, typename OutputContainer>
+    void inline copy(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec) {
+        Q.wait();
+        std::copy(std::execution::par_unseq, BEGIN(in_vec), END(in_vec), BEGIN(out_vec));
+    }
+
+    //copy_if
+    template <typename InputContainer, typename OutputContainer, typename Predicate>
+    void inline copy_if(SyclQueue& Q, InputContainer&& in_vec, OutputContainer&& out_vec, Predicate unary_op) {
+        Q.wait();
+        std::copy_if(std::execution::par_unseq, BEGIN(in_vec), END(in_vec), BEGIN(out_vec), unary_op);
+    }
+
+    //copy_n
+    template <typename InputContainer, typename OutputContainer>
+    void inline copy_n(SyclQueue& Q, InputContainer&& in_vec, size_t n, OutputContainer&& out_vec) {
+        Q.wait();
+        std::copy_n(std::execution::par_unseq, BEGIN(in_vec), n, BEGIN(out_vec));
+    }
+
+    //fill
+    template <typename InputContainer, typename T>
+    void inline fill(SyclQueue& Q, InputContainer&& vec, T value) {
+        Q.wait();
+        std::fill(std::execution::par_unseq, BEGIN(vec), END(vec), value);
+    }
+
+    //sort
+    template <typename InputContainer, typename BinaryPredicate>
+    void inline sort(SyclQueue& Q, InputContainer&& vec, BinaryPredicate binary_op) {
+        Q.wait();
+        std::sort(std::execution::par_unseq, BEGIN(vec), END(vec), binary_op);
     }
 #endif
 
-
-
-
-
-namespace primitives{
-    DECLARE_OR_DEFINE_ALL_FUNCS(DEFINE_FUNCS)
-
-    template <typename B>
-    constexpr void my_assert() { 
-        static_assert(false, "oh no");
-    }
-
-    template<typename Element1, typename Element2>
-    void iterateWithTwoElements(Element1, Element2, std::tuple<>) {}
-    template<typename Element1, typename Element2, typename... Pack3>
-    auto iterateWithTwoElements(Element1, Element2, std::tuple<Pack3...> pack3) {
-        return std::make_tuple( 
-        [](auto... args) 
-        { 
-            return exclusive_scan<Element1, Element2, Pack3>(args...); 
-        }...);
-    }
-    template<typename Element1, typename... Pack2, typename... Pack3>
-    void iterateWithElement(Element1, std::tuple<Pack2...> pack2, std::tuple<Pack3...> pack3) {
-        ([&](auto& elem2){
-            iterateWithTwoElements(Element1{}, elem2, pack3);
-        }(std::get<Pack2>(pack2)), ...);
-    }
-    template<typename... Pack2, typename... Pack3>
-    void iteratePacks(std::tuple<>, std::tuple<Pack2...>, std::tuple<Pack3...>) {}
-
-    template<typename Head1, typename... Tail1, typename... Pack2, typename... Pack3>
-    void iteratePacks(std::tuple<Head1, Tail1...> pack1, std::tuple<Pack2...> pack2, std::tuple<Pack3...> pack3) {
-        iterateWithElement(std::get<0>(pack1), pack2, pack3);
-        iteratePacks(std::tuple<Tail1...>{}, pack2, pack3);
-    }
-
-    
-    std::tuple<unsigned short, int, float, double, uint16_t, uint32_t> pack1;
-    std::tuple<Plus, Minus> pack2;
-    std::tuple<Square, Identity> pack3;
-    //template void iteratePacks(decltype(pack1), decltype(pack2), decltype(pack3));
 }
 
-#define TEMPLATE_INSTANTIATION(T, BINARY_OP, UNARY_OP) \
-    template T primitives::reduce<T, BINARY_OP>(sycl::queue&, const sycl::span<T>, BINARY_OP); \
-    template T primitives::reduce<T, BINARY_OP>(sycl::queue&, const SyclVector<T>&, BINARY_OP); \
-    template void primitives::transform<T, UNARY_OP>(sycl::queue&, SyclVector<T>&, UNARY_OP); \
-    template void primitives::transform_reduce<T, BINARY_OP, UNARY_OP>(sycl::queue&, sycl::span<T>, BINARY_OP, UNARY_OP); \
-    template void primitives::transform_reduce<T, BINARY_OP, UNARY_OP>(sycl::queue&, SyclVector<T>&, BINARY_OP, UNARY_OP); \
-    template void primitives::transform<T, UNARY_OP>(sycl::queue&, sycl::span<T>, UNARY_OP); \
-    template void primitives::exclusive_scan<T, BINARY_OP>(sycl::queue&, sycl::span<T>, BINARY_OP); \
-    template void primitives::exclusive_scan<T, BINARY_OP>(sycl::queue&, SyclVector<T>&, BINARY_OP); \
-    template void primitives::inclusive_scan<T, BINARY_OP>(sycl::queue&, sycl::span<T>, BINARY_OP); \
-    template void primitives::inclusive_scan<T, BINARY_OP>(sycl::queue&, SyclVector<T>&, BINARY_OP); \
-    template void primitives::transform_exclusive_scan<T, BINARY_OP, UNARY_OP>(sycl::queue&, T*, T*, T*, T, BINARY_OP, UNARY_OP);
-
-
-//TEMPLATE_INSTANTIATION(uint16_t, std::plus<uint16_t>, ConditionFunctor)
-
-template void primitives::exclusive_scan(SyclQueue&, uint16_t*, uint16_t*, uint16_t*, uint16_t, Plus);
-template void primitives::exclusive_scan(SyclQueue&, const SyclVector<uint16_t>&, SyclVector<uint16_t>&, uint16_t, Plus);
-template void primitives::exclusive_scan(SyclQueue&, const Span<uint16_t>, const Span<uint16_t>, uint16_t, Plus);
-
-template void primitives::exclusive_scan(SyclQueue&, uint16_t*, uint16_t*, uint16_t*, uint16_t, sycl::plus<uint16_t>);
-template void primitives::exclusive_scan(SyclQueue&, const SyclVector<uint16_t>&, SyclVector<uint16_t>&, uint16_t, sycl::plus<uint16_t>);
-template void primitives::exclusive_scan(SyclQueue&, const Span<uint16_t>, const Span<uint16_t>, uint16_t, sycl::plus<uint16_t>);
