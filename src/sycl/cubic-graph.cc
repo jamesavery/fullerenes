@@ -1,16 +1,18 @@
 #include <array>
-
+using namespace sycl;
 template <typename K>
 struct DeviceCubicGraph{
     static_assert(std::is_integral<K>::value, "K must be integral");
-    const accessor<K, 1, access::mode::read> cubic_neighbours;
-    const size_t offset;
+    //const accessor<K, 1, access::mode::read> cubic_neighbours;
+    //const size_t offset;
+    const K* cubic_neighbours;
 
     inline K operator[](const K i) const{
-        return cubic_neighbours[i + offset];
+        return cubic_neighbours[i];
     }
 
-    DeviceCubicGraph(const accessor<K, 1, access::mode::read> cubic_neighbours, size_t offset) : cubic_neighbours(cubic_neighbours), offset(offset) {}
+    DeviceCubicGraph(const accessor<K, 1, access::mode::read> cubic_neighbours, size_t offset) : cubic_neighbours(cubic_neighbours.get_pointer() + offset) {}
+    DeviceCubicGraph(const K* cubic_neighbours, size_t offset = 0) : cubic_neighbours(cubic_neighbours + offset) {}
 
     /** @brief Find the index of the neighbour v in the list of neighbours of u
     // @param u: source node in the arc (u,v)
