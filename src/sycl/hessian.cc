@@ -7,7 +7,8 @@
 #include "fstream"
 #define USE_MAX_NORM 0
 #define SQRT cl::sycl::sqrt
-#include <fullerenes/sycl-isomer-batch.hh>
+#include <fullerenes/sycl-headers/hessian-kernel.hh>
+#include "queue-impl.cc"
 #include "forcefield-includes.cc"
 
 template <ForcefieldType FFT, typename T, typename K>
@@ -47,7 +48,7 @@ struct ForceField
         node_t node_id;
         sycl::group<1> cta;
         // 84 + 107 FLOPS
-        FaceData(const sycl::group<1> &cta, const sycl::local_accessor<coord3d, 1> &X, const NodeNeighbours<K> &G) : cta(cta)
+        FaceData(const sycl::group<1> &cta, const Span<coord3d> X, const NodeNeighbours<K> &G) : cta(cta)
         {
             node_id = cta.get_local_linear_id();
             N = cta.get_local_linear_range();
@@ -172,11 +173,10 @@ struct ForceField
          * @param G The neighbour information for the threadIdx^th node.
          * @return A new ArcData object.
          */
-        ArcData(const sycl::group<1> &cta, const int j, const sycl::local_accessor<coord3d, 1> &X, const NodeNeighbours<K> &G)
+        ArcData(node_t a, const int j, const Span<coord3d> X, const NodeNeighbours<K> &G)
         {
             __builtin_assume(j < 3);
             this->j = j;
-            node_t a = cta.get_local_linear_id();
             coord3d ap, am, ab, ac, ad, mp, db, bc;
             coord3d X_a = X[a], X_b = X[d_get(G.cubic_neighbours, j)];
             // Compute the arcs ab, ac, ad, bp, bm, ap, am, mp, bc and cd
@@ -1570,13 +1570,13 @@ struct ForceField
      * @param c The constants for the threadIdx^th node.
      * @return The gradient of the bond, flatness, bending and dihedral terms w.r.t. the coordinates of the threadIdx^th node.
      */
-    coord3d gradient(const sycl::local_accessor<coord3d, 1> &X) const
+    coord3d gradient(const Span<coord3d> X) const
     {
         sycl::group_barrier(cta);
         coord3d grad = {0.0, 0.0, 0.0};
         for (int j = 0; j < 3; j++)
         {
-            ArcData arc = ArcData(cta, j, X, node_graph);
+            ArcData arc = ArcData(cta.get_local_linear_id(), j, X, node_graph);
             grad += arc.gradient(constants);
         }
         switch (FFT)
@@ -1597,13 +1597,13 @@ struct ForceField
          }
     }
 
-    hessian_t<T, K> hessian(const sycl::local_accessor<coord3d, 1> &X) const
+    hessian_t<T, K> hessian(const Span<coord3d> X) const
     {
         sycl::group_barrier(cta);
-        hessian_t<T, K> hess(cta, node_graph);
+        hessian_t<T, K> hess(node_graph, node_id);
         for (int j = 0; j < 3; j++)
         {
-            ArcData arc = ArcData(cta, j, X, node_graph);
+            ArcData arc = ArcData(cta.get_local_linear_id(), j, X, node_graph);
             hess.A[0] += arc.hessian_a(constants);
             hess.A[1 + j] += arc.hessian_b(constants);
             hess.A[1 + (j + 1) % 3] += arc.hessian_c(constants);
@@ -1615,9 +1615,9 @@ struct ForceField
     }
 
     // Uses finite difference to compute the hessian
-    hessian_t<T, K> fd_hessian(const sycl::local_accessor<coord3d, 1> &X, const float reldelta = 1e-7) const
+    hessian_t<T, K> fd_hessian(const Span<coord3d> X, const float reldelta = 1e-7) const
     {
-        hessian_t<T, K> hess_fd(node_graph);
+        hessian_t<T, K> hess_fd(node_graph, node_id);
         for (uint16_t i = 0; i < N; i++)
         {
             for (int j = 0; j < 10; j++)
@@ -1651,33 +1651,180 @@ struct ForceField
         }
         return hess_fd;
     }
+
+    /**
+     * @brief Compute the total energy of the bond, flatness, bending and dihedral terms from all nodes in the isomer.
+     * @param c The constants for the threadIdx^th node.
+     * @return Total energy.
+     */
+    real_t energy(const Span<coord3d> X) const
+    {
+        sycl::group_barrier(cta);
+        real_t arc_energy = (real_t)0.0;
+
+        //(71 + 124) * 3 * N  = 585*N FLOPs
+        for (uint8_t j = 0; j < 3; j++)
+        {
+            ArcData arc = ArcData(cta.get_local_linear_id(), j, X, node_graph);
+            arc_energy += arc.energy(constants);
+        }
+        return sycl::reduce_over_group(cta, arc_energy, sycl::plus<real_t>{});
+
+        // switch (FFT)
+        //{
+        // case FLATNESS_ENABLED: {
+        //     FaceData face(cta, X, node_graph);
+        //     return reduce_over_group(cta, arc_energy + face.flatness_energy(constants), sycl::plus<real_t>{});
+        //     }
+        // case FLAT_BOND: {
+        //     FaceData face(cta, X, node_graph);
+        //     return reduce_over_group(cta, arc_energy + face.flatness_energy(constants), sycl::plus<real_t>{});
+        //     }
+        // default:
+        //     return reduce_over_group(cta, arc_energy, sycl::plus<real_t>{});
+        // }
+    }
+
+    // Golden Section Search, using fixed iterations.
+    /**
+     * @brief Golden Section Search for line-search.
+     * @param X The coordinates of the nodes.
+     * @param r0 The direction of the line-search.
+     * @param X1 memory for storing temporary coordinates at x1.
+     * @param X2 memory for storing temporary coordinates at x2.
+     * @return The step-size alpha
+     */
+    real_t GSS(const Span<coord3d> X, const coord3d &r0, const Span<coord3d> X1, const Span<coord3d> X2) const
+    {
+        const real_t tau = (real_t)0.6180339887;
+        // Line search x - values;
+        real_t a = 0.0;
+        real_t b = (real_t)1.0;
+
+        real_t x1, x2;
+        x1 = (a + ((real_t)1. - tau) * (b - a));
+        x2 = (a + tau * (b - a));
+        // Actual coordinates resulting from each traversal
+        X1[node_id] = X[node_id] + x1 * r0;
+        X2[node_id] = X[node_id] + x2 * r0;
+
+        real_t f1 = energy(X1);
+        real_t f2 = energy(X2);
+
+        for (int i = 0; i < 20; i++)
+        {
+            if (f1 > f2)
+            {
+                a = x1;
+                x1 = x2;
+                f1 = f2;
+                x2 = a + tau * (b - a);
+                X2[node_id] = X[node_id] + x2 * r0;
+                f2 = energy(X2);
+            }
+            else
+            {
+                b = x2;
+                x2 = x1;
+                f2 = f1;
+                x1 = a + ((real_t)1.0 - tau) * (b - a);
+                X1[node_id] = X[node_id] + x1 * r0;
+                f1 = energy(X1);
+            }
+        }
+        if (f1 > energy(X))
+        {
+            return (real_t)0.0;
+        }
+        // Line search coefficient
+        real_t alpha = (a + b) / (real_t)2.0;
+        return alpha;
+    }
+
+    /**
+     * @brief Conjugate Gradient Method for energy minimization.
+     * @param X The coordinates of the nodes.
+     * @param X1 memory for storing temporary coordinates.
+     * @param X2 memory for storing temporary coordinates.
+     * @param MaxIter The maximum number of iterations.
+     */
+    void CG(const Span<coord3d> X, const Span<coord3d> X1, const Span<coord3d> X2, const size_t MaxIter)
+    {
+        real_t alpha, beta, g0_norm2, s_norm;
+        coord3d g0, g1, s;
+        g0 = gradient(X);
+        s = -g0;
+
+        // Normalize To match reference python implementation by Buster.
+        s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
+        // s_norm = SQRT(reduction(sdata, dot(s,s)));
+        s /= s_norm;
+
+        sycl::group_barrier(cta);
+        for (size_t i = 0; i < MaxIter; i++)
+        {
+            alpha = GSS(X, s, X1, X2);
+
+            if (alpha > (real_t)0.0)
+            {
+                X1[node_id] = X[node_id] + alpha * s;
+            }
+            g1 = gradient(X1);
+
+            // Polak Ribiere method
+            g0_norm2 = sycl::reduce_over_group(cta, dot(g0, g0), sycl::plus<real_t>{});
+            beta = sycl::max(sycl::reduce_over_group(cta, dot(g1, (g1 - g0)), sycl::plus<real_t>{}) / g0_norm2, (real_t)0.0);
+
+            if (alpha > (real_t)0.0)
+            {
+                X[node_id] = X1[node_id];
+            }
+            else
+            {
+                g1 = g0;
+                beta = (real_t)0.0;
+            }
+
+            s = -g1 + beta * s;
+            g0 = g1;
+// Normalize Search Direction using MaxNorm or 2Norm
+#if USE_MAX_NORM == 1
+            s_norm = sycl::reduce_over_group(cta, sycl::max(sycl::max(s.x, s.y), s.z), sycl::greater<real_t>{});
+#else
+            s_norm = SQRT(sycl::reduce_over_group(cta, dot(s, s), sycl::plus<real_t>{}));
+#endif
+            s /= s_norm;
+
+            // if (node_id == 0) printf("s_norm = %f\n", s_norm);
+            // printf("s = (%f, %f, %f)\n", s[0], s[1], s[2]);
+        }
+    }
 };
 
-template <ForcefieldType FFT, typename T = float, typename K = uint16_t>
-void compute_hessians(sycl::queue& Q, IsomerBatch<T,K>& B, sycl::buffer<T,1>& hess, sycl::buffer<K,1>& cols, const LaunchPolicy policy){
+template <ForcefieldType FFT, typename T, typename K>
+SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess, Span<K> cols){
     TEMPLATE_TYPEDEFS(T,K);
-    if(policy == LaunchPolicy::SYNC) Q.wait_and_throw();
-    Q.submit([&](sycl::handler& h){
-        sycl::accessor hess_acc(hess, h, sycl::write_only);
-        sycl::accessor cols_acc(cols, h, sycl::write_only);
-        sycl::accessor X_acc(B.X, h, sycl::read_only);
-        sycl::accessor cubic_neighbours_acc(B.cubic_neighbours, h, sycl::read_only);
+    if (hess.size() < 90*B.N_*B.size() || cols.size() < 90*B.N_*B.size()) throw std::runtime_error("compute_hessians: hess and cols buffers must be of size >= 90*N*size");
+    SyclEventImpl hessians_finished = Q->submit([&](sycl::handler& h){
+        auto X_acc = B.d_.X_cubic_.template as_span<coord3d>();
+        auto cubic_neighbours_acc = B.d_.A_cubic_;
 
-        sycl::local_accessor<coord3d, 1> X(B.N(),h);
-        sycl::local_accessor<real_t, 1> sdata(3*B.N(),h);
+        sycl::local_accessor<coord3d, 1> X(B.N_,h);
+        sycl::local_accessor<real_t, 1> sdata(3*B.N_,h);
 
-        auto N = B.N();
-        auto capacity = B.capacity();
-        h.parallel_for(sycl::nd_range(sycl::range{capacity*N}, sycl::range{N}), [=](sycl::nd_item<1> nditem){
+        auto N = B.N_;
+        auto size = B.size();
+        h.parallel_for(sycl::nd_range(sycl::range{size*N}, sycl::range{N}), [=](sycl::nd_item<1> nditem){
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
+            if (!(B[bid].m_.flags_.get() & StatusFlag::CUBIC_INITIALIZED)) return; //Skip if cubic graph is not initialized
 
-            Constants<T,K> constants (cubic_neighbours_acc, cta);
-            NodeNeighbours nodeG(cubic_neighbours_acc, cta);
+            Constants<T,K> constants (cubic_neighbours_acc.data(), K(tid));
+            NodeNeighbours nodeG(cubic_neighbours_acc.data(), K(tid));
             X[tid] = X_acc[bid*N + tid];
             ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, sdata.get_pointer());
-            auto hessian = FF.hessian(X);
+            auto hessian = FF.hessian(Span<coord3d>(X.get_pointer(), N));
             int n_cols = 10*3;
             int n_rows = N*3;
             int hess_stride = n_cols*n_rows;
@@ -1687,35 +1834,54 @@ void compute_hessians(sycl::queue& Q, IsomerBatch<T,K>& B, sycl::buffer<T,1>& he
             {   
                 for (size_t k = 0; k < 3; k++)
                 {   
-                    cols_acc[toff + i*n_cols + j*3 + k] = hessian.indices[j]*3 + k;
-                    hess_acc[toff + i*n_cols + j*3 + k] = hessian.A[j][i][k];
+                    cols[toff + i*n_cols + j*3 + k] = hessian.indices[j]*3 + k;
+                    hess[toff + i*n_cols + j*3 + k] = hessian.A[j][i][k];
                 }    
             }
-            group_barrier(cta);
+            sycl::group_barrier(cta);
             //Enforce symmetry
 
             for(int ii = tid; ii < n_cols*n_rows; ii += N){
                 int i = ii / n_cols;
                 int jj = ii % n_cols;
-                int j = cols_acc[bid*hess_stride + i*n_cols + jj];
+                int j = cols[bid*hess_stride + i*n_cols + jj];
                 int ix = 0;
                 
                 if(i < j){
-                    while (ix < n_cols && cols_acc[bid*hess_stride + j*n_cols + ix] != i) {ix++;}
-                    int jx = cols_acc[bid*hess_stride + j*n_cols + ix];
+                    while (ix < n_cols && cols[bid*hess_stride + j*n_cols + ix] != i) {ix++;}
+                    int jx = cols[bid*hess_stride + j*n_cols + ix];
 
-                    T val = 0.5*(hess_acc[bid*hess_stride + i*n_cols + jj] + hess_acc[bid*hess_stride + j*n_cols + ix]);
-                    hess_acc[bid*hess_stride + i*n_cols + jj] = val;
-                    hess_acc[bid*hess_stride + j*n_cols + ix] = val;
+                    T val = 0.5*(hess[bid*hess_stride + i*n_cols + jj] + hess[bid*hess_stride + j*n_cols + ix]);
+                    hess[bid*hess_stride + i*n_cols + jj] = val;
+                    hess[bid*hess_stride + j*n_cols + ix] = val;
                 }
             }
 
-            //Enforce symmetry
-
         });
     });
+    return SyclEvent(std::move(hessians_finished));
 }
 
+template <ForcefieldType FFT, typename T, typename K>
+template <typename... Data>
+SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess, Span<K> cols, Data&&... data){
+    return compute_hessians<FFT, T, K>(Q, B, hess, cols);
+}
 
-template void compute_hessians<PEDERSEN, float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& B, sycl::buffer<float,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
-template void compute_hessians<PEDERSEN, double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& B, sycl::buffer<double,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
+template <ForcefieldType FFT, typename T, typename K>
+template <typename... Data>
+SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> B, Span<T> hess, Span<K> cols, Data&&... data){
+    //TODO: Implement compute for single isomer
+    throw std::logic_error("HessianFunctor::compute not implemented for single isomer");
+}
+
+template struct HessianFunctor<PEDERSEN, float, uint16_t>;
+template struct HessianFunctor<PEDERSEN, double, uint16_t>;
+template struct HessianFunctor<PEDERSEN, float, uint32_t>;
+template struct HessianFunctor<PEDERSEN, double, uint32_t>;
+
+template SyclEvent HessianFunctor<PEDERSEN, float, uint16_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint16_t> B, Span<float> hess, Span<uint16_t> cols, Span<uint16_t>& indices);
+template SyclEvent HessianFunctor<PEDERSEN, float, uint16_t>::compute(SyclQueue& Q, Fullerene<float,uint16_t> B, Span<float> hess, Span<uint16_t> cols, Span<uint16_t>& indices);
+
+/* template void compute_hessians<PEDERSEN, float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& B, sycl::buffer<float,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
+template void compute_hessians<PEDERSEN, double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& B, sycl::buffer<double,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy); */
