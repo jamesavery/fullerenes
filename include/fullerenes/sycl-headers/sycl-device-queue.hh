@@ -1,6 +1,8 @@
 #pragma once
 #include <memory>
 #include <vector>
+#include <string>
+#include <algorithm>
 
 
 enum class Policy
@@ -38,6 +40,21 @@ struct Device{
     Device() = default;
 
     Device(size_t idx, DeviceType type) : idx(idx), type(type) {}
+
+    Device(std::string type) {
+        std::transform(type.begin(), type.end(), type.begin(), ::tolower);
+        if(type == "cpu") {
+            *this = get_devices(DeviceType::CPU).at(0);
+        } else if(type == "gpu") {
+            *this = get_devices(DeviceType::GPU).at(0);
+        } else if(type == "accelerator") {
+            *this = get_devices(DeviceType::ACCELERATOR).at(0);
+        } else {
+            throw std::runtime_error("Invalid device type");
+        }
+    }
+
+    Device(const char* type) : Device(std::string(type)) {}
 
     inline static std::vector<Device> cpus_ =         get_devices(DeviceType::CPU);
     inline static std::vector<Device> gpus_ =         get_devices(DeviceType::GPU);
