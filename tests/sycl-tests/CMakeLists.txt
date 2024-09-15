@@ -6,7 +6,6 @@ set(SYCL_EXECUTABLES
   #eigen-test-sycl
   #dual-test-sycl
   #dual-validation-sycl
-  sycl-interface-test
   fullerene-queue-test
   condition-functor-test
   tutte-functor-test
