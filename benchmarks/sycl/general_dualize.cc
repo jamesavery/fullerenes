@@ -1,7 +1,7 @@
 #include <fullerenes/graph.hh>
 #include <fullerenes/planargraph.hh>
 #include <fullerenes/spiral.hh>
-#include <fullerenes/sycl-kernels.hh>
+#include <fullerenes/sycl-headers/all-kernels.hh>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/argparser.hh>
@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
         std::cout << "Done Waiting" << std::endl;
     }
 
-    SyclContext ctx = SyclContext();
+    
     //DeviceWrapper D = Q.get_device();
     //Graph Gr(neighbours_t(Nf), true);
     //FullereneIsomer<float,uint16_t> isomer(Gr, false, false);
