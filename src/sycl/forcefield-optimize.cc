@@ -2045,10 +2045,14 @@ SyclEvent ForcefieldOptimizeFunctor<FFT,T,K>::compute(SyclQueue& Q, FullereneBat
 
 
 template SyclEvent ForcefieldOptimizeFunctor<PEDERSEN, float, uint16_t>::compute(SyclQueue&, FullereneBatchView<float,uint16_t>, size_t, size_t, Span<uint16_t>&, Span<std::array<float,3>>&, Span<std::array<float,3>>&, Span<std::array<float,3>>&, Span<std::array<float,3>>&, Span<std::array<float,3>>&);
+template SyclEvent ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>::compute(SyclQueue&, FullereneBatchView<double,uint16_t>, size_t, size_t, Span<uint16_t>&, Span<std::array<double,3>>&, Span<std::array<double,3>>&, Span<std::array<double,3>>&, Span<std::array<double,3>>&, Span<std::array<double,3>>&);
 template SyclEvent ForcefieldOptimizeFunctor<PEDERSEN, float, uint16_t>::compute(SyclQueue&, Fullerene<float,uint16_t>, size_t, size_t, Span<uint16_t>&, Span<std::array<float,3>>&, Span<std::array<float,3>>&, Span<std::array<float,3>>&, Span<std::array<float,3>>&, Span<std::array<float,3>>&);
+template SyclEvent ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>::compute(SyclQueue&, Fullerene<double,uint16_t>, size_t, size_t, Span<uint16_t>&, Span<std::array<double,3>>&, Span<std::array<double,3>>&, Span<std::array<double,3>>&, Span<std::array<double,3>>&, Span<std::array<double,3>>&);
+
 
 
 template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint16_t>;
+template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>;
 //template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint32_t>;   
 //template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>;
 //template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint32_t>;
