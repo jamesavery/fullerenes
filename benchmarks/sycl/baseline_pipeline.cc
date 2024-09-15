@@ -1,6 +1,6 @@
 #include <fullerenes/graph.hh>
 #include "fullerenes/polyhedron.hh"
-#include <fullerenes/sycl-kernels.hh>
+#include <fullerenes/sycl-headers/all-kernels.hh>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <string>
@@ -40,44 +40,29 @@ int main(int argc, char** argv) {
 
     size_t BatchSize = std::ceil((real_t)NumNodes/(real_t)N);
 
-    auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
+    //auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
+    auto device = Device(device_type);
 
-    sycl::queue Q = sycl::queue(selector, sycl::property::queue::in_order{});
+    //sycl::queue Q = sycl::queue(selector, sycl::property::queue::in_order{});
+    SyclQueue Q(device);
     
-    IsomerBatch<real_t,node_t> batch(N, BatchSize);
+    FullereneBatch<real_t,node_t> batch(N, BatchSize);
     Graph G(N);
-    auto fill_and_dualize = [&](IsomerBatch<real_t,node_t>& batch, double& filltime, double& dualtime)
+    auto fill_and_dualize = [&](FullereneBatch<real_t,node_t>& batch, double& filltime, double& dualtime)
     {
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, 0, 0);
 
-    sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);
-    sycl::host_accessor acc_cubic(batch.cubic_neighbours, sycl::write_only);
-    sycl::host_accessor acc_degs(batch.face_degrees, sycl::write_only);
-    sycl::host_accessor acc_status (batch.statuses, sycl::write_only);
     double ftime = 0; double dtime = 0;
     for (size_t ii = 0; ii < BatchSize; ii++)
     {   
         auto start = std::chrono::steady_clock::now();
         auto more = BuckyGen::next_fullerene(BuckyQ, G);
-        for (size_t j = 0; j < Nf; j++)
-        {
-            for(size_t k = 0; k < G.neighbours[j].size(); k++)
-            {
-                acc_dual[ii*Nf*6 + j*6 + k] = G.neighbours[j][k];
-            } 
-            if(G.neighbours[j].size() == 5){
-                acc_dual[ii*Nf*6 + j*6 + 5] = std::numeric_limits<node_t>::max();
-                acc_degs[ii*Nf + j] = 5;
-            } else {
-                acc_degs[ii*Nf + j] = 6;
-            }   
-
-        }
+        batch.push_back(G, ii);
         FullereneDual FD(G);
         auto T0 = std::chrono::steady_clock::now(); ftime += std::chrono::duration<double, std::nano>(T0 - start).count();
         FD.update();
         PlanarGraph pG = FD.dual_graph();
-
+        auto acc_cubic = batch.d_.A_cubic_;
         for (size_t j = 0; j < N; j++){
             for (size_t k = 0; k < 3; k++)
             {
@@ -89,7 +74,7 @@ int main(int argc, char** argv) {
         if(!more) break;
 
         
-        acc_status[ii] = IsomerStatus::NOT_CONVERGED;
+        batch.m_.flags_[ii] |= StatusFlag::CUBIC_INITIALIZED;
     }
     filltime = ftime;
     dualtime = dtime;
@@ -103,17 +88,22 @@ int main(int argc, char** argv) {
     vector<double> times_project(Nruns); //Times in nanoseconds.
     vector<double> times_opt(Nruns); //Times in nanoseconds.
 
+    TutteFunctor<real_t,node_t> tutte_layout;
+    SphericalProjectionFunctor<real_t,node_t> spherical_projection;
+    ForcefieldOptimizeFunctor<PEDERSEN,real_t,node_t> forcefield_optimize;
+
+
     for(int i = 0; i < Nruns; i++){
         auto start = std::chrono::steady_clock::now();
         fill_and_dualize(batch, times_generate[i], times_dual[i]);
         auto T0 = std::chrono::steady_clock::now();
-        nop_kernel(Q, batch, LaunchPolicy::SYNC);
+        //nop_kernel(Q, batch, LaunchPolicy::SYNC);
         auto T1 = std::chrono::steady_clock::now(); times_memcpy[i] = std::chrono::duration<double, std::nano>(T1 - T0).count();
         tutte_layout(Q, batch, LaunchPolicy::SYNC);
         auto T2 = std::chrono::steady_clock::now(); times_tutte[i] = std::chrono::duration<double, std::nano>(T2 - T1).count();
         spherical_projection(Q, batch, LaunchPolicy::SYNC);
         auto T3 = std::chrono::steady_clock::now(); times_project[i] = std::chrono::duration<double, std::nano>(T3 - T2).count();
-        forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+        forcefield_optimize(Q, batch, LaunchPolicy::SYNC, 5*N, 5*N);
         auto T4 = std::chrono::steady_clock::now(); times_opt[i] = std::chrono::duration<double, std::nano>(T4 - T3).count();
         
 

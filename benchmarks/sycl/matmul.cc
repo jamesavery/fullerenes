@@ -38,7 +38,7 @@ void load_B(int tid, int i, int j, int N, int K, int TILE_N, int TILE_K, const s
 
 int main(int argc, char** argv){
     using namespace sycl;
-    using use = ext::intel::experimental::matrix::use;
+    //using use = ext::intel::experimental::matrix::use;
     using layout = ext::oneapi::experimental::matrix::layout;
     using bfloat16 = ext::oneapi::bfloat16;
     using float16 = sycl::float16;
@@ -90,23 +90,6 @@ int main(int argc, char** argv){
     sycl::buffer<half, 1> B_buf(B.data(), range<1>(N*K*Nmatrices));
     sycl::buffer<float, 1> C_buf(C.data(), range<1>(M*N*Nmatrices));
 
-    /* Q.submit([&](sycl::handler& h){
-        auto Aacc = A_buf.get_access<sycl::access::mode::read>(h);
-        auto Bacc = B_buf.get_access<sycl::access::mode::read>(h);
-        auto Cacc = C_buf.get_access<sycl::access::mode::write>(h);
-        auto Colsacc = Cols_buf.get_access<sycl::access::mode::read>(h);
-        h.parallel_for<class matmul>(range<1>(N*N*Nmatrices), [=](sycl::id<1> item){
-            int i = item[0]/N;
-            int j = item[0]%N;
-            float sum = 0;
-            for (int k = 0; k < numcols; k++){
-                sum += Aacc[i*numcols + k]*Bacc[Colsacc[i*numcols + k]*N + j];
-            }
-            Cacc[item] = sum;
-        });
-    });
-
-    Q.wait(); */
 
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
     Q.submit([&](sycl::handler& h){
@@ -119,6 +102,7 @@ int main(int argc, char** argv){
         auto localC = local_accessor<float, 1>(TILE_M*TILE_N, h);
 
         h.parallel_for<class matmul2>(nd_range<1>(BDIM*Nmatrices, BDIM), [=](sycl::nd_item<1> item){
+            /* 
             auto cta = item.get_group();
             int bid = item.get_group_linear_id();
             int tid = cta.get_local_linear_id();
@@ -135,7 +119,7 @@ int main(int argc, char** argv){
             sycl::sub_group sg = item.get_sub_group();
             joint_matrix<sycl::sub_group, half, use::a, 16, 16, layout::row_major> sub_a;
             joint_matrix<sycl::sub_group, half, use::b, 16, 16, layout::row_major> sub_b;
-            joint_matrix<sycl::sub_group, float, use::accumulator, 16, 16> sub_c;
+            joint_matrix<sycl::sub_group, float, use::accumulator, 16, 16> sub_c; */
 
             /* auto load_Asparse = [&](int i, int j){
                 memset(localA.get_pointer(), 0, TILE_M*TILE_K*sizeof(half));
@@ -149,7 +133,7 @@ int main(int argc, char** argv){
                     if (c >= 0 && c < TILE_K)
                         localA[row*TILE_K + c] = A_ptr[idx];
                 }
-            }; */
+            }; 
 
             auto load_A = [&](int i, int j){
                 int offset = i*K + j;
@@ -162,6 +146,7 @@ int main(int argc, char** argv){
                 }
             };
 
+            
             auto load_B = [&](int i, int j){
                 int offset = i*N + j;
                 auto limit = sycl::min(TILE_N*TILE_K, sycl::max(N*K - offset, 0));
@@ -206,7 +191,7 @@ int main(int argc, char** argv){
                             {   
                                 joint_matrix_load(sg, sub_a, localA.get_pointer() + cr*TILE_K*16 + ii*16, TILE_K);
                                 joint_matrix_load(sg, sub_b, localB.get_pointer() + cc*16 + ii*TILE_N*16, TILE_N);
-                                sub_c = joint_matrix_mad(sg, sub_a, sub_b, sub_c);
+                                //sub_c = joint_matrix_mad(sg, sub_a, sub_b, sub_c);
                             }
                             joint_matrix_store(sg, sub_c, localC.get_pointer() + cr*TILE_N*16 + cc*16, TILE_N, layout::row_major);
                         }
@@ -219,7 +204,7 @@ int main(int argc, char** argv){
             //Cacc[item] = sum;
     }
             //Cacc[Boffset + item.get_local_linear_id()] = 2;
-            
+            */
         });
     });
     Q.wait();

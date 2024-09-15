@@ -1,5 +1,5 @@
 #include <fullerenes/graph.hh>
-#include <fullerenes/sycl-kernels.hh>
+#include <fullerenes/sycl-headers/all-kernels.hh>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/isomerdb.hh>
@@ -66,7 +66,8 @@ int main(int argc, char** argv) {
     std::string filename = "output/full_pipeline_" + std::string(getenv("SLURM_JOB_ID")) + "_" + to_string(MY_TASK_ID) + "_" + to_string(N_TASKS) + ".csv";
     ofstream myfile(filename); 
 
-    sycl::queue Q = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order{});
+    //sycl::queue Q = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order{});
+    SyclQueue Q("gpu");
 
     // Now we make the total N_chunks a fixed parameter and vary n_chunks, the number of chunks per task (GCD).
     size_t N_chunks = N_TASKS_MAX * workers_per_task * chunks_per_worker; 
@@ -87,14 +88,14 @@ int main(int argc, char** argv) {
     double times_tutte; //Times in nanoseconds.
     double times_project; //Times in nanoseconds.
     double times_opt; //Times in nanoseconds.
-    IsomerBatch<real_t,node_t> batch(N, BatchSize);
+    FullereneBatch<real_t,node_t> batch(N, BatchSize);
 
 
-    auto generate_and_fill = [&](IsomerBatch<real_t, node_t>& batch){
+    auto generate_and_fill = [&](FullereneBatch<real_t, node_t>& batch){
         auto isomer_idx = 0;
-        sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);
-        sycl::host_accessor acc_degs(batch.face_degrees,    sycl::write_only);
-        sycl::host_accessor acc_status (batch.statuses,     sycl::write_only);
+        auto acc_dual = batch.d_.A_dual_;
+        auto acc_degs = batch.d_.deg_;
+        auto acc_status  = batch.m_.flags_;
         while (more && isomer_idx < BatchSize)
         {
             more &= BuckyQ.next_fullerene(G);
@@ -113,18 +114,24 @@ int main(int argc, char** argv) {
                 }   
 
             }
-            acc_status[isomer_idx] = IsomerStatus::NOT_CONVERGED;
+            acc_status[isomer_idx] = StatusFlag::DUAL_INITIALIZED;
             isomer_idx++;
             isomers_in_queue++;
         }
     };
+
+    DualizeFunctor<real_t, node_t> dualize_V1;
+    TutteFunctor<real_t, node_t> tutte_layout;
+    SphericalProjectionFunctor<real_t, node_t> spherical_projection;
+    ForcefieldOptimizeFunctor<PEDERSEN, real_t, node_t> forcefield_optimize;
+
 
 
     while(more){
         auto T1 = std::chrono::steady_clock::now();
         generate_and_fill(batch);
         auto T2 = std::chrono::steady_clock::now(); times_generate = std::chrono::duration<double, std::nano>(T2 - T1).count();
-        nop_kernel(Q, batch, LaunchPolicy::SYNC);
+        //nop_kernel(Q, batch, LaunchPolicy::SYNC);
         auto T3 = std::chrono::steady_clock::now(); times_memcpy = std::chrono::duration<double, std::nano>(T3 - T2).count();
         dualize_V1(Q, batch, LaunchPolicy::SYNC);
         auto T4 = std::chrono::steady_clock::now(); times_dual = std::chrono::duration<double, std::nano>(T4 - T3).count();
@@ -132,7 +139,7 @@ int main(int argc, char** argv) {
         auto T5 = std::chrono::steady_clock::now(); times_tutte = std::chrono::duration<double, std::nano>(T5 - T4).count();
         spherical_projection(Q, batch, LaunchPolicy::SYNC);
         auto T6 = std::chrono::steady_clock::now(); times_project = std::chrono::duration<double, std::nano>(T6 - T5).count();
-        forcefield_optimize(Q, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+        forcefield_optimize(Q, batch, LaunchPolicy::SYNC, 5*N, 5*N);
         auto T7 = std::chrono::steady_clock::now(); times_opt = std::chrono::duration<double, std::nano>(T7 - T6).count();
     }
 

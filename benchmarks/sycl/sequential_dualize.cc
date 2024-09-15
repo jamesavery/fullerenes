@@ -1,6 +1,6 @@
 #include <fullerenes/graph.hh>
 #include "fullerenes/polyhedron.hh"
-#include <fullerenes/sycl-kernels.hh>
+#include <fullerenes/sycl-headers/all-kernels.hh>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <string>
@@ -40,20 +40,20 @@ int main(int argc, char** argv) {
 
     size_t BatchSize = std::ceil((real_t)NumNodes/(real_t)N);
 
-    auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
+    //auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
 
-    sycl::queue Q = sycl::queue(selector, sycl::property::queue::in_order{});
+    SyclQueue Q(device_type);   
     
-    IsomerBatch<real_t,node_t> batch(N, BatchSize);
+    FullereneBatch<real_t,node_t> batch(N, BatchSize);
     Graph G(N);
-    auto fill_and_dualize = [&](IsomerBatch<real_t,node_t>& batch, double& filltime, double& dualtime)
+    auto fill_and_dualize = [&](FullereneBatch<real_t,node_t>& batch, double& filltime, double& dualtime)
     {
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, 0, 0);
 
-    sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);
-    sycl::host_accessor acc_cubic(batch.cubic_neighbours, sycl::write_only);
-    sycl::host_accessor acc_degs(batch.face_degrees, sycl::write_only);
-    sycl::host_accessor acc_status (batch.statuses, sycl::write_only);
+    auto acc_dual = batch.d_.A_dual_;
+    auto acc_cubic = batch.d_.A_cubic_;
+    auto acc_degs = batch.d_.deg_;
+    auto acc_status = batch.m_.flags_;
     double ftime = 0; double dtime = 0;
     for (size_t ii = 0; ii < BatchSize; ii++)
     {   
@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
         if(!more) break;
 
         
-        acc_status[ii] = IsomerStatus::NOT_CONVERGED;
+        acc_status[ii] = StatusFlag::DUAL_INITIALIZED;
     }
     filltime = ftime;
     dualtime = dtime;

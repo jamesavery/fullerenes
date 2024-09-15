@@ -283,8 +283,8 @@ struct hessian_t{
     // We store them in the following order:
     // a, b, c, d, b_m, c_m, d_m, b_p, c_p, d_p
 
-    hessian_t(const sycl::group<1>& cta, const NodeNeighbours<K>& G){
-        indices[0] = cta.get_local_linear_id();
+    hessian_t(const NodeNeighbours<K>& G, const K tid){
+        indices[0] = tid;
         indices[1] = d_get(G.cubic_neighbours,0);
         indices[2] = d_get(G.cubic_neighbours,1);
         indices[3] = d_get(G.cubic_neighbours,2);

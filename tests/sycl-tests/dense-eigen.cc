@@ -77,7 +77,7 @@ void T_QTQ(group<1>& cta,
             // // Udrullet
             // //    reflection_vector(a,anorm,v);
             v[0] = D[k]; v[1] = L[k];
-            real_t alpha = -copysign(anorm,a[0]); // Koster ingenting
+            real_t alpha = -sycl::copysign(anorm,a[0]); // Koster ingenting
             v[0] -= alpha;
 
             real_t norm_inv = rsqrt(v[0]*v[0]+v[1]*v[1]);
@@ -177,7 +177,7 @@ real_t reflection_vector(const group<1>& cta,
                          const real_t& a_i,const real_t& anorm)
 {
     int i_tid = cta.get_local_id(0);
-    real_t alpha = -copysign(anorm,a_i);
+    real_t alpha = -sycl::copysign(anorm,a_i);
     real_t v_i = a_i + (i_tid==0)*alpha; // TODO: Check fortegn 
     real_t vnorm = sqrt(reduce_over_group(cta, v_i*v_i, plus<real_t>()));
     return v_i / vnorm;

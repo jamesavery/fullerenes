@@ -24,6 +24,16 @@ template <typename T> void operator-=(std::array<T,2>& a, const std::array<T,2>&
 template <typename T> void operator/=(std::array<T,2>& a, const T b) {a = a / b;}
 template <typename T> void operator*=(std::array<T,2>& a, const T b) {a = a * b;}
 
+template <typename T> std::ostream& operator<<(std::ostream& os, const std::array<T,2>& a){
+  os << "[" << a[0] << ", " << a[1] << "]";
+  return os;
+}
+
+template <typename T> std::ostream& operator<<(std::ostream& os, const std::array<T,3>& a){
+  os << "[" << a[0] << ", " << a[1] << ", " << a[2] << "]";
+  return os;
+}
+
 template <typename T>  T dot(const std::array<T,2>& a,  const std::array<T,2>& b) { return a[0]*b[0] + a[1]*b[1]; }
 template <typename T>  T norm(const std::array<T,2>& a)                    { return sycl::sqrt(dot(a,a)); }
 

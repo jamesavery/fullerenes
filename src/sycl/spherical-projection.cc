@@ -4,10 +4,11 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
-#include <fullerenes/sycl-isomer-batch.hh>
-namespace spp {
-    #include "forcefield-includes.cc"
-}
+#include <fullerenes/sycl-headers/spherical-projection-kernel.hh>
+#include "kernel.cc"
+#include "primitives.cc"
+#include "forcefield-includes.cc"
+
 using namespace sycl;
 template <typename T>
 struct CuDeque
@@ -119,13 +120,12 @@ CuDeque(const local_accessor<T,1> memory, const int capacity): array(memory), fr
 };
 
 template <typename K>
-K multiple_source_shortest_paths(const sycl::group<1>& cta, const accessor<K,1,access::mode::read>& cubic_neighbours,const local_accessor<int,1>& distances, const local_accessor<K,1>& smem){
+K multiple_source_shortest_paths(const sycl::group<1>& cta, const K* cubic_neighbours,const local_accessor<int,1>& distances, const local_accessor<K,1>& smem){
     INT_TYPEDEFS(K);
-    using namespace spp;
     auto N = cta.get_local_linear_range();
     auto tid = cta.get_local_linear_id();
     auto isomer_idx = cta.get_group_linear_id();
-    DeviceCubicGraph FG(cubic_neighbours, isomer_idx*3*N);
+    DeviceCubicGraph FG(cubic_neighbours);
     node_t outer_face[6]; memset(outer_face, 0, 6*sizeof(node_t));
     uint8_t Nface = FG.get_face_oriented(0,FG[0], outer_face);
     distances[tid] = std::numeric_limits<K>::max();
@@ -153,20 +153,14 @@ K multiple_source_shortest_paths(const sycl::group<1>& cta, const accessor<K,1,a
 }
 
 template<typename T, typename K>
-void spherical_projection(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchPolicy policy){
-    using namespace spp;
+SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
     TEMPLATE_TYPEDEFS(T,K);
     constexpr real_t scalerad = 4.0;
-    if(policy == LaunchPolicy::SYNC) Q.wait();
-    Q.submit([&](handler& h) {
-        auto N = batch.N();
-        auto Nf = batch.Nf();
+    SyclEventImpl projection_done = Q->submit([&](handler& h) {
+        auto N = batch.N_;
+        auto Nf = batch.Nf_;
         auto capacity = batch.capacity();
         auto max_iter = N * 10;
-        accessor xys_acc(batch.xys, h, read_only); 
-        accessor cubic_neighbours(batch.cubic_neighbours, h, read_only);
-        accessor statuses(batch.statuses, h, read_only);
-        accessor xyz_acc(batch.X, h, write_only);
 
         local_accessor<node_t, 1>   work_queue_memory(N*2, h);
         local_accessor<int, 1>      smem(N, h); //Has to be int for atomic operations
@@ -175,17 +169,20 @@ void spherical_projection(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchP
 
 
         h.parallel_for(sycl::nd_range(sycl::range(N*capacity), sycl::range(N)), [=](nd_item<1> nditem) {
-
-
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto isomer_idx = nditem.get_group_linear_id();
+            Fullerene<T,K> full = batch[isomer_idx];
+            auto cubic_neighbours = full.d_.A_cubic_;
+            auto xys_acc = full.d_.X_cubic_.template as_span<std::array<T,2>>();
+            auto xyz_acc = full.d_.X_cubic_.template as_span<std::array<T,3>>();
+
             if(isomer_idx >= capacity) assert(false);
-            if (statuses[isomer_idx] != IsomerStatus::EMPTY){
+            if ( *(full.m_.flags_) & StatusFlag::CUBIC_INITIALIZED){
             atomic_coordinate_memory[tid] = {0.0, 0.0};
-            NodeNeighbours node_graph(cubic_neighbours, cta);
+            NodeNeighbours node_graph(cubic_neighbours.data(), (K)tid);
             node3 neighbours = node_graph.cubic_neighbours;
-            node_t distance = multiple_source_shortest_paths<K>(cta, cubic_neighbours, smem, work_queue_memory);
+            node_t distance = multiple_source_shortest_paths<K>(cta, cubic_neighbours.data(), smem, work_queue_memory);
             node_t d_max = reduce_over_group(cta, distance, maximum<node_t>{});
             smem[tid] = 0;
             sycl::group_barrier(cta);
@@ -194,7 +191,7 @@ void spherical_projection(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchP
             sycl::group_barrier(cta);
             node_t num_same_dist = smem[distance];
             sycl::group_barrier(cta);
-            coord2d xys = xys_acc[isomer_idx*N + tid];
+            coord2d xys = xys_acc[tid];
             sycl::atomic_ref<real_t, sycl::memory_order::relaxed, sycl::memory_scope::work_group> atomic_coord_x(atomic_coordinate_memory[distance][0]);
             sycl::atomic_ref<real_t, sycl::memory_order::relaxed, sycl::memory_scope::work_group> atomic_coord_y(atomic_coordinate_memory[distance][1]);
             atomic_coord_x.fetch_add(xys[0]);
@@ -221,12 +218,125 @@ void spherical_projection(sycl::queue& Q, IsomerBatch<T,K>& batch, const LaunchP
             for (size_t i = 0; i < 3; i++){ local_Ravg += norm(xyz_smem[tid] - xyz_smem[neighbours[i]]); }
             Ravg = sycl::reduce_over_group(cta, local_Ravg, sycl::plus<real_t>{})/real_t(3*N);
             xyz *= scalerad*real_t(1.5)/Ravg;
-            xyz_acc[isomer_idx*N + tid] = xyz;
+            xyz_acc[tid] = xyz;
             } 
         });
     });
-    if(policy == LaunchPolicy::SYNC) Q.wait();
+    return SyclEvent(std::move(projection_done));
 }
 
-template void spherical_projection<float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
+template <typename K>
+void multiple_source_shortest_paths(const Span<std::array<K,3>> neighbours, const vector<K>& sources, Span<K> distances, const unsigned int max_depth = INT_MAX)
+{
+    Deque<K> queue(neighbours.size());
+        
+    for(K s: sources){
+        distances[s] = 0;
+        queue.push_back(s);
+    }
+
+    while(!queue.empty()){
+        K v = queue.pop_front();
+        for(K w: neighbours[v]){
+            const edge_t edge(v,w);
+            if(distances[w] == std::numeric_limits<K>::max()){ // Node not previously visited
+                distances[w] = distances[v] + 1;
+                if(distances[w] < max_depth) queue.push_back(w);
+            }
+        }
+    }
+}
+
+template<typename T, typename K>
+SyclEvent spherical_projection_impl( SyclQueue& Q,
+                                Span<std::array<T,2>> xys,
+                                Span<std::array<T,3>> X,
+                                Span<K> cubic_neighbours,
+                                Span<K> distances,
+                                Span<K> reduce_in,
+                                Span<K> reduce_out,
+                                Span<K> output_keys,
+                                Span<std::array<T,2>> sorted_xys)
+{
+    //MSSPs
+    auto N = X.size();
+    primitives::fill(Q, distances, std::numeric_limits<K>::max());
+    DeviceCubicGraph FG(cubic_neighbours.data());
+    vector<K> outer_face(6);
+    FG.get_face_oriented(0, FG[0], outer_face.data());
+    multiple_source_shortest_paths(cubic_neighbours.template as_span<std::array<K,3>>(), outer_face, distances);
+
+    //Compute maximum topological distance
+    K d_max = primitives::reduce(Q, distances, K{0}, Max{});
+    //Count number of nodes at each distance
+    primitives::copy(Q, xys.subspan(0,N), sorted_xys);
+    primitives::iota(Q, reduce_in.subspan(0, N), K{0});
+    primitives::sort(Q, reduce_in.subspan(0, N), [distances](K a, K b){return distances[a] < distances[b];}); 
+    primitives::transform(Q, reduce_in.subspan(0, N), sorted_xys, [xys](K idx){return xys[idx];});
+    primitives::transform(Q, reduce_in.subspan(0, N), reduce_out, [distances](K idx){return distances[idx];});
+    auto summed_coordinates = reduce_in.template as_span<std::array<T,2>>().subspan(0, d_max + 1);
+    primitives::reduce_by_segment(Q, reduce_out.subspan(0,N), sorted_xys, output_keys, summed_coordinates, Equal{}, [](std::array<T,2> a, std::array<T,2> b){return a + b;});
+    primitives::fill(Q, sorted_xys.template as_span<K>().subspan(0, N), K{1});
+    //Compute number of nodes at each distance and store in sorted_xys at indices N to  N + d_max + 1
+    auto num_nodes_at_distance = sorted_xys.subspan(N, d_max + 1).template as_span<K>().subspan(0, d_max + 1);
+    primitives::reduce_by_segment(Q, reduce_out.subspan(0,N), sorted_xys.template as_span<K>(), output_keys, num_nodes_at_distance);
+    //Compute the centroid of the nodes at each distance
+    auto centroids = reduce_out.template as_span<std::array<T,2>>().subspan(0, d_max + 1);
+    primitives::transform(Q, summed_coordinates, num_nodes_at_distance, centroids, [](std::array<T,2> a, K b){return a/T(b);});
+    //Shift the coordinates of the nodes at each distance by the centroid
+    primitives::transform(Q, xys.subspan(0,N), distances, sorted_xys, [centroids](std::array<T,2> a, K b){return a - centroids[b];});
+    //Compute the spherical coordinates of the nodes at each distance
+    primitives::transform(Q, sorted_xys.subspan(0,N), distances, X, [d_max](std::array<T,2> xy, K dist){
+        T dtheta = T(M_PI)/T(d_max+1);
+        T phi = dtheta*(dist+0.5);
+        T theta = sycl::atan2(xy[0],xy[1]);
+        return std::array<T,3>{cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi)};
+    });
+    //Compute center of mass
+    std::array<T,3> cm = primitives::reduce(Q, X, std::array<T,3>{0.0, 0.0, 0.0}, [](std::array<T,3> a, std::array<T,3> b){return a + b;});
+    cm /= T(N);
+    //Shift the coordinates by the center of mass
+    primitives::transform(Q, X, X, [cm](std::array<T,3> a){return a - cm;});
+    //Compute the average distance between nodes
+    T Ravg = primitives::transform_reduce(Q, X, cubic_neighbours.template as_span<std::array<K,3>>(), T{0.0}, Plus{}, [X](std::array<T,3> a, std::array<K,3> neighbours){
+        T local_Ravg = 0.0;
+        for (size_t i = 0; i < 3; i++){ local_Ravg += norm(a - X[neighbours[i]]); }
+        return local_Ravg;
+    }) / T(3*N);
+    //Scale the coordinates
+    T scalerad = 4.0;
+    primitives::transform(Q, X, X, [scalerad, Ravg](std::array<T,3> a){return a*scalerad*T(1.5)/Ravg;});
+    auto ret_event = Q.get_event();
+    return ret_event;
+}
+
+template <typename T, typename K>
+template <typename... Data>
+SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, Data&&... data){
+    if (fullerene.m_.flags_.get() & (int)StatusFlag::CUBIC_INITIALIZED){
+        return spherical_projection_impl<T,K>(Q,
+                                    fullerene.d_.X_cubic_.template as_span<std::array<T,2>>(),
+                                    fullerene.d_.X_cubic_.template as_span<std::array<T,3>>(),
+                                    fullerene.d_.A_cubic_,
+                                    std::forward<Data>(data)...);
+    } else return Q.get_event();
+}
+
+template <typename T, typename K>
+template <typename... Data>
+SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch, Data&&... data){
+    return spherical_projection<T,K>(Q, batch);
+}
+
+template SyclEvent SphericalProjectionFunctor<float,uint16_t>::compute(SyclQueue& Q, Fullerene<float,uint16_t> fullerene, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<std::array<float,2>>&);
+template SyclEvent SphericalProjectionFunctor<float,uint16_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint16_t> batch, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<std::array<float,2>>&);
+template SyclEvent SphericalProjectionFunctor<float,uint32_t>::compute(SyclQueue& Q, Fullerene<float,uint32_t> fullerene, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<std::array<float,2>>&);
+template SyclEvent SphericalProjectionFunctor<float,uint32_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint32_t> batch, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<std::array<float,2>>&);
+
+template struct SphericalProjectionFunctor<float,uint16_t>;
+template struct SphericalProjectionFunctor<float,uint32_t>;
+//template struct SphericalProjectionFunctor<double,uint16_t>;
+//template struct SphericalProjectionFunctor<double,uint32_t>;
+
+//template void spherical_projection<float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
 //template void spherical_projection<double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);

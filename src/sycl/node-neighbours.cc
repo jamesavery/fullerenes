@@ -10,23 +10,18 @@ struct NodeNeighbours{
     std::array<K,3> face_neighbours;
     K face_size = UINT16_MAX;
     
-    /**
-     * @brief  This constructor computes the neighbours, outer neighbours, face neighbours for the first Nf threads it stores the nodes that are part of the threadIdx.x^th face.
-     * @param  G: The IsomerBatch object that contains the graph data
-     * @param  isomer_idx: The index of the isomer that the thread is a part of.
-     * @param  sdata: Pointer to shared memory.
-     * @return NodeNeighbours object.
-     */
-    NodeNeighbours(cl::sycl::group<1> cta, const sycl::accessor<K, 1, access::mode::read>& cubic_neighbours_acc, K* sdata){
+
+
+    NodeNeighbours(sycl::group<1> cta, const K* cubic_neighbours_acc, K* sdata){
         INT_TYPEDEFS(K);
         face_nodes.fill(UINT16_MAX);
         face_neighbours.fill(UINT16_MAX);
         auto tid = cta.get_local_linear_id();
-        auto isomer_idx = cta.get_group_linear_id();
+
         auto bdim = cta.get_local_linear_range();
         node_t* L = reinterpret_cast<node_t*>(sdata); //N x 3 list of potential face IDs.
         node_t* A = reinterpret_cast<node_t*>(sdata) + bdim * 3; //Uses cache temporarily to store face neighbours. //Nf x 6 
-        const DeviceCubicGraph FG(cubic_neighbours_acc, isomer_idx*bdim*3);
+        const DeviceCubicGraph FG(cubic_neighbours_acc);
         this->cubic_neighbours   = {FG[tid*3], FG[tid*3 + 1], FG[tid*3 + 2]};
         this->next_on_face = {FG.next_on_face(tid, cubic_neighbours[tid*3]), FG.next_on_face(tid, cubic_neighbours[tid*3 + 1]), FG.next_on_face(tid ,cubic_neighbours[tid*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(tid, cubic_neighbours[tid*3]), FG.prev_on_face(tid, cubic_neighbours[tid*3 + 1]), FG.prev_on_face(tid ,cubic_neighbours[tid*3 + 2])};
@@ -60,19 +55,31 @@ struct NodeNeighbours{
         }
         sycl::group_barrier(cta);
     }
-/**
-* @brief Constructor for a NodeNeighbours object, which contains the neighbours of a node in the graph and outer neighbours.
-* @param G All isomer graphs in the batch.
-* @param isomer_idx The index of the isomer to initialize based on.
-*/
 
-NodeNeighbours(const sycl::accessor<K, 1, access::mode::read>& cubic_neighbours_acc, sycl::group<1>& cta){
-        int tid = cta.get_local_linear_id();
-        int isomer_idx = cta.get_group_linear_id();
-        int blockDim = cta.get_local_linear_range();
-        const DeviceCubicGraph FG(cubic_neighbours_acc, isomer_idx*blockDim*3);
+    /**
+     * @brief  This constructor computes the neighbours, outer neighbours, face neighbours for the first Nf threads it stores the nodes that are part of the threadIdx.x^th face.
+     * @param  G: The IsomerBatch object that contains the graph data
+     * @param  isomer_idx: The index of the isomer that the thread is a part of.
+     * @param  sdata: Pointer to shared memory.
+     * @return NodeNeighbours object.
+     */
+    NodeNeighbours(sycl::group<1> cta, const sycl::accessor<K, 1, access::mode::read>& cubic_neighbours_acc, K* sdata) : 
+        NodeNeighbours(cta, cubic_neighbours_acc.get_pointer() + cta.get_group_linear_id()*cta.get_local_linear_range()*3, sdata){} 
+
+    NodeNeighbours(const K* cubic_neighbours_acc, K tid){
+        const DeviceCubicGraph FG(cubic_neighbours_acc);
         this->cubic_neighbours   = {FG[tid*3], FG[tid*3 + 1], FG[tid*3 + 2]};
         this->next_on_face = {FG.next_on_face(tid, FG[tid*3]), FG.next_on_face(tid, FG[tid*3 + 1]), FG.next_on_face(tid ,FG[tid*3 + 2])};
         this->prev_on_face = {FG.prev_on_face(tid, FG[tid*3]), FG.prev_on_face(tid, FG[tid*3 + 1]), FG.prev_on_face(tid ,FG[tid*3 + 2])};
     }
+
+
+
+    /**
+    * @brief Constructor for a NodeNeighbours object, which contains the neighbours of a node in the graph and outer neighbours.
+    * @param G All isomer graphs in the batch.
+    * @param isomer_idx The index of the isomer to initialize based on.
+    */
+    NodeNeighbours(const sycl::accessor<K, 1, access::mode::read>& cubic_neighbours_acc, sycl::group<1>& cta) : 
+        NodeNeighbours(cubic_neighbours_acc.get_pointer() + cta.get_group_linear_id()*cta.get_local_linear_range()*3, cta.get_group_linear_id()){}
 };

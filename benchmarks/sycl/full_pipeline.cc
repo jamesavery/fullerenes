@@ -1,8 +1,9 @@
 #include <fullerenes/graph.hh>
-#include <fullerenes/sycl-kernels.hh>
+#include <fullerenes/sycl-headers/all-kernels.hh>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/isomerdb.hh>
+#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 #include <string>
 #include <algorithm>
 #include <random>
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
     //std::string filename = "output/full_pipeline_" + std::string(getenv("SLURM_JOB_ID")) + "_" + std::string(getenv("MY_TASK_ID")) + "_" + std::string(getenv("N_TASKS")) + ".csv";
     //ofstream myfile(filename); 
 
-    sycl::queue Q = sycl::queue(sycl::gpu_selector_v, sycl::property::queue::in_order{});
+    SyclQueue Q("gpu");
 
     //size_t n_chunks          = 6; /* Number of chunks per compute node / program instance */ //////3
     //size_t N_chunks          = std::stoi(getenv("N_TASKS"))*n_chunks;                   /* Total number of work chunks */ //
@@ -84,12 +85,12 @@ int main(int argc, char** argv) {
     double times_spectral = 0.; //Times in nanoseconds.
     double times_spectral_vectors = 0.; //Times in nanoseconds.
 
-    IsomerBatch<real_t,node_t> batch(N, BatchSize);
-    sycl::buffer<real_t, 1> hessian_buffer(BatchSize*N*90);
-    sycl::buffer<node_t, 1> cols_buffer(BatchSize*N*90);
-    sycl::buffer<real_t, 1> spectral_ends_buffer(BatchSize*2);
-    sycl::buffer<real_t, 1> spectral_buffer(BatchSize*N*3);
-    sycl::buffer<real_t, 1> spectral_vectors_buffer(BatchSize*N*3*N*3);
+    FullereneBatch<real_t,node_t> batch(N, BatchSize);
+    SyclVector<float> hessian_buffer(BatchSize*N*90);
+    SyclVector<uint16_t> cols_buffer(BatchSize*N*90);
+    SyclVector<float> spectral_ends_buffer(BatchSize*2);
+    SyclVector<float> spectral_buffer(BatchSize*N*3);
+    SyclVector<float> spectral_vectors_buffer(BatchSize*N*3*N*3);
 
 
   /*   auto generate_and_fill = [&](IsomerBatch<real_t, node_t>& batch){
@@ -120,12 +121,21 @@ int main(int argc, char** argv) {
             isomers_in_queue++;
         }
     }; */
+
+    DualizeFunctor<real_t,node_t> dualize_V1;
+    TutteFunctor<real_t,node_t> tutte_layout;
+    SphericalProjectionFunctor<real_t,node_t> spherical_projection;
+    ForcefieldOptimizeFunctor<PEDERSEN,real_t,node_t> forcefield_optimize;
+    HessianFunctor<PEDERSEN,real_t,node_t> compute_hessians;
+    EigenFunctor<EigensolveMode::ENDS, real_t, node_t> eigensolve_ends;
+    EigenFunctor<EigensolveMode::FULL_SPECTRUM, real_t, node_t> eigensolve_full;
+
     auto Nruns = 10;
     fill(batch);
     for(size_t i = 0; i < Nruns; i++){
         auto T1 = std::chrono::steady_clock::now(); times_generate += std::chrono::duration<double, std::nano>(T1 - T1).count();
         auto T2 = std::chrono::steady_clock::now(); times_generate += std::chrono::duration<double, std::nano>(T2 - T1).count();
-        nop_kernel(Q, batch, LaunchPolicy::SYNC);
+        //nop_kernel(Q, batch, LaunchPolicy::SYNC);
         auto T3 = std::chrono::steady_clock::now(); times_memcpy += std::chrono::duration<double, std::nano>(T3 - T2).count();
         dualize_V1(Q, batch, LaunchPolicy::SYNC);
         auto T4 = std::chrono::steady_clock::now(); times_dual += std::chrono::duration<double, std::nano>(T4 - T3).count();
@@ -133,13 +143,13 @@ int main(int argc, char** argv) {
         auto T5 = std::chrono::steady_clock::now(); times_tutte += std::chrono::duration<double, std::nano>(T5 - T4).count();
         spherical_projection(Q, batch, LaunchPolicy::SYNC);
         auto T6 = std::chrono::steady_clock::now(); times_project += std::chrono::duration<double, std::nano>(T6 - T5).count();
-        forcefield_optimize(Q, batch, 4*N, 4*N, LaunchPolicy::SYNC);
+        forcefield_optimize(Q, batch, LaunchPolicy::SYNC, 4*N, 4*N);
         auto T7 = std::chrono::steady_clock::now(); times_opt += std::chrono::duration<double, std::nano>(T7 - T6).count();
-        compute_hessians(Q, batch, hessian_buffer, cols_buffer, LaunchPolicy::SYNC);
+        compute_hessians(Q, batch,LaunchPolicy::SYNC, hessian_buffer, cols_buffer);
         auto T8 = std::chrono::steady_clock::now(); times_hessian += std::chrono::duration<double, std::nano>(T8 - T7).count();
-        eigensolve<EigensolveMode::ENDS>(Q, batch, hessian_buffer, cols_buffer, spectral_ends_buffer, LaunchPolicy::SYNC, 40);
+        eigensolve_ends(Q, batch, LaunchPolicy::SYNC, hessian_buffer, cols_buffer, 40, spectral_ends_buffer, spectral_buffer);
         auto T9 = std::chrono::steady_clock::now(); times_spectral_ends += std::chrono::duration<double, std::nano>(T9 - T8).count();
-        eigensolve<EigensolveMode::FULL_SPECTRUM>(Q, batch, hessian_buffer, cols_buffer, spectral_buffer, LaunchPolicy::SYNC);
+        eigensolve_full(Q, batch, LaunchPolicy::SYNC, hessian_buffer, cols_buffer, 0, spectral_ends_buffer, spectral_buffer);
         auto T10 = std::chrono::steady_clock::now(); times_spectral += std::chrono::duration<double, std::nano>(T10 - T9).count();
         //eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS>(Q, batch, hessian_buffer, cols_buffer, spectral_buffer, LaunchPolicy::SYNC, 40, spectral_vectors_buffer);
         auto T11 = std::chrono::steady_clock::now(); times_spectral_vectors += std::chrono::duration<double, std::nano>(T11 - T10).count();

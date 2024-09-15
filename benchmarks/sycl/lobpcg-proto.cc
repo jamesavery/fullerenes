@@ -5,7 +5,8 @@
 #include <oneapi/dpl/random>
 #include <oneapi/dpl/iterator>
 #include <fullerenes/graph.hh>
-#include <fullerenes/sycl-kernels.hh>
+#include <fullerenes/sycl-headers/all-kernels.hh>
+#include <../src/sycl/queue-impl.cc>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/argparser.hh>
@@ -46,7 +47,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, T* D, T* L, T* U, T* Vout, T shift=
     // specialized max_norm = max(sum(abs(A),axis=1)) for tridiagonal matrix. 
     real_t local_max = real_t(0.);
     for (int i = tix; i < n; i += bdim){
-        local_max = std::max(local_max, abs(D[i]) + 2*abs(L[i]));
+        local_max = std::max(local_max, sycl::abs(D[i]) + 2*sycl::abs(L[i]));
     }
     real_t max_norm = reduce_over_group(cta, local_max, sycl::maximum<real_t>());
     real_t numerical_zero = 10*std::numeric_limits<real_t>::epsilon();
@@ -78,7 +79,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, T* D, T* L, T* U, T* Vout, T shift=
             // // Udrullet
             // //    reflection_vector(a,anorm,v);
             v[0] = D[k]; v[1] = L[k];
-            real_t alpha = -copysign(anorm,a[0]); // Koster ingenting
+            real_t alpha = -sycl::copysign(anorm,a[0]); // Koster ingenting
             v[0] -= alpha;
 
             real_t vnorm = sqrt(v[0]*v[0]+v[1]*v[1]);
@@ -269,7 +270,7 @@ real_t reflection_vector(const group<1>& cta,
                          const real_t& a_i,const real_t& anorm)
 {
     int i_tid = cta.get_local_id(0);
-    real_t alpha = -copysign(anorm,a_i);
+    real_t alpha = -sycl::copysign(anorm,a_i);
     real_t v_i = a_i + (i_tid==0)*alpha; // TODO: Check fortegn 
     real_t vnorm = sqrt(reduce_over_group(cta, v_i*v_i, plus<real_t>()));
     return v_i / vnorm;
@@ -320,13 +321,13 @@ void diagonalize(sycl::group<1>& cta, T* U, T* L, T* D, T* V, T* Q){
         T shift = d;
 
         int i = 0;
-        T GR = (k>0?abs(L[k-1]):0)+abs(L[k]);
+        T GR = (k>0?sycl::abs(L[k-1]):0)+sycl::abs(L[k]);
         int not_done = 1;
         while (not_done > 0){
             i++;
             T_QTQ(cta, k+1, D, L, U, V, shift);
             apply_all_reflections(cta, V,k,N,Q);
-            GR = (k>0?abs(L[k-1]):0)+(k+1<N?abs(L[k]):0);
+            GR = (k>0?sycl::abs(L[k-1]):0)+(k+1<N?sycl::abs(L[k]):0);
 
             if(k>0){
                 std::array<T,4> args = {D[k-1], L[k-1], L[k-1], D[k]};
@@ -591,7 +592,7 @@ void update_vectors(sycl::group<1>& cta, global_ptr<T> X, global_ptr<T> R, globa
 }
 
 template <typename T, typename K, int BlockVectors, int NZ>
-void LOBPCG(sycl::queue &ctx, sycl::buffer<T, 1> &A, sycl::buffer<K, 1> &cols, int m, size_t maxiters){
+void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
     sycl::buffer<T, 1> S(BlockVectors*9 * m);
     sycl::buffer<T, 1> X0(BlockVectors * m);
     sycl::buffer<T, 1> LastEigVects(BlockVectors * BlockVectors*3);
@@ -600,12 +601,12 @@ void LOBPCG(sycl::queue &ctx, sycl::buffer<T, 1> &A, sycl::buffer<K, 1> &cols, i
     sycl::buffer<int, 1> indices(BlockVectors);
     constexpr T tol = 1e-6;
     //
-    ctx.submit([&](sycl::handler& h){
+    ctx -> submit([&](sycl::handler& h){
         using TupleType = typename std::iterator_traits<oneapi::dpl::zip_iterator<T*, int*>>::value_type;
         constexpr auto bytes = sycl::ext::oneapi::experimental::default_sorter<>::memory_required<TupleType>(sycl::memory_scope::work_group, BlockVectors*3);
 
-        auto A_acc = sycl::accessor<T, 1, sycl::access::mode::read>(A, h);
-        auto cols_acc = sycl::accessor<K, 1, sycl::access::mode::read>(cols, h);
+        auto A_acc = A;
+        auto cols_acc = cols;
         auto S_acc = sycl::accessor<T, 1, sycl::access::mode::write>(S, h);
         auto X0_acc = sycl::accessor<T, 1, sycl::access::mode::write>(X0, h);
         auto LastEigVects_acc = sycl::accessor<T, 1, sycl::access::mode::write>(LastEigVects, h);
@@ -696,7 +697,7 @@ void LOBPCG(sycl::queue &ctx, sycl::buffer<T, 1> &A, sycl::buffer<K, 1> &cols, i
                 
                 for(int i = 0; i < BlockVectors; i++) blockR[i*m + tid] = blockAX[i*m + tid] - lambdas[i] * blockX[i*m + tid];
                 //Convergence Check
-                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
+                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(sycl::abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
                 if(tid == 0) sycl::ext::oneapi::experimental::printf("Iteration %d\n", iter);
                 for(int i = 0; i < BlockVectors; i++){if(tid == 0) sycl::ext::oneapi::experimental::printf("Unorthogonalized BlockR[%d][%d] = %f\n", i, 0, blockR[i*m + 0]);}
                 //Print ResidualNorms
@@ -830,37 +831,45 @@ int main(int argc, char** argv){
     size_t BatchSize = args.nisomers;
     std::string device_type = args.device_type;
     size_t maxiter = args.nlanczos;
-    auto queue = sycl::queue(sycl::gpu_selector_v);
+    auto queue = SyclQueue(device_type);
 
-    IsomerBatch<float, uint16_t> batch(N, BatchSize);
+    FullereneBatch<float, uint16_t> batch(N, BatchSize);
+    DualizeFunctor<float, uint16_t> dualize;
+    TutteFunctor<float, uint16_t> tutte_layout;
+    SphericalProjectionFunctor<float, uint16_t> spherical_projection;
+    ForcefieldOptimizeFunctor<PEDERSEN, float, uint16_t> forcefield_optimize;
+    ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t> forcefield_optimize_double;
+
+    HessianFunctor<PEDERSEN, float, uint16_t> compute_hessians;
+    HessianFunctor<PEDERSEN, double, uint16_t> compute_hessians_double;
     fill(batch);
     dualize(queue, batch, LaunchPolicy::SYNC);
     tutte_layout(queue, batch, LaunchPolicy::SYNC);
     spherical_projection(queue, batch, LaunchPolicy::SYNC);
-    IsomerBatch<double, uint16_t> batch_double(N, BatchSize);
+    FullereneBatch<double, uint16_t> batch_double(N, BatchSize);
     {
-        auto batch_acc_X = host_accessor(batch.X, read_only);
-        auto batch_double_acc_X = host_accessor(batch_double.X, write_only);
-        auto batch_acc_cubic_neighbours = host_accessor(batch.cubic_neighbours, read_only);
-        auto batch_double_acc_cubic_neighbours = host_accessor(batch_double.cubic_neighbours, write_only);
+        auto batch_acc_X = batch.d_.X_cubic_;
+        auto batch_double_acc_X = batch_double.d_.X_cubic_;
+        auto batch_acc_cubic_neighbours = batch.d_.A_cubic_;
+        auto batch_double_acc_cubic_neighbours = batch_double.d_.A_cubic_;
 
         for(int i = 0; i < N*BatchSize; i++){
             for(int j = 0; j < 3; j++){
-                batch_double_acc_X[i][j] = batch_acc_X[i][j];
+                batch_double_acc_X[i*3 + j] = batch_acc_X[i*3 + j];
                 batch_double_acc_cubic_neighbours[i*3 + j] = batch_acc_cubic_neighbours[i*3 + j];
             }
         }
     }
-    forcefield_optimize(queue, batch_double, 5*N, 5*N, LaunchPolicy::SYNC);
-    forcefield_optimize(queue, batch, 5*N, 5*N, LaunchPolicy::SYNC);
+    forcefield_optimize_double(queue, batch_double, LaunchPolicy::SYNC, 5*N, 5*N);
+    forcefield_optimize(queue, batch, LaunchPolicy::SYNC, 5*N, 5*N);
     
 
-    sycl::buffer<float, 1> hessians(range<1>(N*90*BatchSize));
-    sycl::buffer<double, 1> hessians_double(range<1>(N*90*BatchSize));
-    sycl::buffer<uint16_t, 1> cols(range<1>(N*90*BatchSize));
+    SyclVector<float> hessians((N*90*BatchSize));
+    SyclVector<double> hessians_double((N*90*BatchSize));
+    SyclVector<uint16_t> cols((N*90*BatchSize));
 
-    compute_hessians(queue, batch_double, hessians_double, cols, LaunchPolicy::SYNC);
-    compute_hessians(queue, batch, hessians, cols, LaunchPolicy::SYNC);
+    compute_hessians_double(queue, batch_double, LaunchPolicy::SYNC, hessians_double, cols);
+    compute_hessians(queue, batch, LaunchPolicy::SYNC, hessians, cols);
 
 
 

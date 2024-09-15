@@ -13,6 +13,11 @@ set(BLA_VENDOR Intel10_64lp_seq)
 find_package(BLAS)
 find_package(LAPACK)
 find_package(GSL)
+find_package(GTest REQUIRED)
+
+
+enable_testing()
+include_directories(${GTEST_INCLUDE_DIRS})
 
 # Shared between CUDA and SYCL
 set(GPU_MAXREGCOUNT 80)
@@ -51,7 +56,7 @@ if(ENABLE_SYCL)
   set(SYCL_TARGETS ${SYCL_DEFAULT_TARGET} CACHE STRING "AMD|NVIDIA|X86 (Currently only single target supported.") # TODO: Multi-target compiles.
   message("SYCL compile enabled with ${SYCL_TARGETS} target")
 
-  set(DPCPP_FLAGS "-O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
+  set(DPCPP_FLAGS "-Wno-pass-failed -Wno-unused-local-typedef -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wall -O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
   
   if(SYCL_TARGETS STREQUAL "AMD") 
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa,x86_64 -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a -march=native")
@@ -66,7 +71,7 @@ if(ENABLE_SYCL)
     "SHELL:-Xcuda-ptxas --warn-on-spills"
     )
     
-    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
+    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -Xcuda-ptxas --verbose -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native")
@@ -118,6 +123,15 @@ if(ENABLE_CUDA)
   enable_language(CUDA)
   set(CUDA_INCLUDE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
   
+  #find_library(CURAND_LIB curand.so HINTS /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/math_libs/12.3/targets/x86_64-linux/)
+  find_path(CURAND_INCLUDE_DIR NAMES curand.h PATHS /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/math_libs/12.3/targets/x86_64-linux/include)
+
+  if(NOT CURAND_INCLUDE_DIR)
+    message(FATAL_ERROR "Could not find curand.h")
+  endif()
+
+  # Include the directory containing curand.h
+  include_directories(${CURAND_INCLUDE_DIR})
   message("CUDA include path at:" ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
   message("CUDA found: " ${CMAKE_CUDA_COMPILER} ".")
@@ -169,7 +183,6 @@ if(ENABLE_SYCL)
   set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
   add_subdirectory(src/sycl)
   add_subdirectory(tests/sycl-tests)
-  add_subdirectory(playground/sycl)  
   add_subdirectory(benchmarks/sycl)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
 endif()

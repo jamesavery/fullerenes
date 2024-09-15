@@ -1,5 +1,5 @@
 #include <fullerenes/graph.hh>
-#include <fullerenes/sycl-kernels.hh>
+#include <fullerenes/sycl-headers/all-kernels.hh>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <string>
@@ -42,19 +42,19 @@ int main(int argc, char** argv) {
     size_t BatchSize = std::ceil((real_t)NumNodes/(real_t)N);
 
 
-    auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
+    //auto selector =  device_type == "cpu" ? sycl::cpu_selector_v : sycl::gpu_selector_v;
 
-    sycl::queue Q = sycl::queue(selector, sycl::property::queue::in_order{});
+    SyclQueue Q(device_type);
     
-    IsomerBatch<real_t,node_t> batch(N, BatchSize);
+    FullereneBatch<real_t,node_t> batch(N, BatchSize);
     Graph G(N);
-    auto fill = [&](IsomerBatch<real_t,node_t>& batch)
+    auto fill = [&](FullereneBatch<real_t,node_t>& batch)
     {
     BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N, 0, 0);
 
-    sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);
-    sycl::host_accessor acc_degs(batch.face_degrees, sycl::write_only);
-    sycl::host_accessor acc_status (batch.statuses, sycl::write_only);
+    auto acc_dual = batch.d_.A_dual_;
+    auto acc_degs = batch.d_.deg_;
+    auto acc_status = batch.m_.flags_;
     for (size_t ii = 0; ii < BatchSize; ii++)
     {
         auto more = BuckyGen::next_fullerene(BuckyQ, G);
@@ -84,18 +84,17 @@ int main(int argc, char** argv) {
     vector<double> times_memcpy(Nruns); //Times in nanoseconds.
     vector<double> times_dual(Nruns); //Times in nanoseconds.
 
+    DualizeFunctor<real_t, node_t> dualize;
+
     for(int i = 0; i < Nruns + Nwarmup; i++){
         auto start = std::chrono::steady_clock::now();
         fill(batch);
         auto T0 = std::chrono::steady_clock::now(); times_generate[i] = std::chrono::duration<double, std::nano>(T0 - start).count();
-        nop_kernel(Q, batch, LaunchPolicy::SYNC);
+        //nop_kernel(Q, batch, LaunchPolicy::SYNC);
         auto T1 = std::chrono::steady_clock::now(); times_memcpy[i] = std::chrono::duration<double, std::nano>(T1 - T0).count();
         switch(dual_version){
             case 0:
                 dualize(Q, batch, LaunchPolicy::SYNC);
-                break;
-            case 1:
-                dualize_V1(Q, batch, LaunchPolicy::SYNC);
                 break;
             default:
                 dualize(Q, batch, LaunchPolicy::SYNC);
