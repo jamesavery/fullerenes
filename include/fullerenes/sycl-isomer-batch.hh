@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <array>
 #include <fullerenes/buckygen-wrapper.hh>
+#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 #define FLOAT_TYPEDEFS(T) static_assert(std::is_floating_point<T>::value, "T must be float"); typedef std::array<T,3> coord3d; typedef std::array<T,2> coord2d; typedef T real_t;
 #define INT_TYPEDEFS(K) static_assert(std::is_integral<K>::value, "K must be integral type"); typedef std::array<K,3> node3; typedef std::array<K,2> node2; typedef K node_t; typedef std::array<K,6> node6;
 #define TEMPLATE_TYPEDEFS(T,K) FLOAT_TYPEDEFS(T) INT_TYPEDEFS(K)
@@ -198,13 +199,13 @@ void copy(IsomerBatch<T,K>& dst, const IsomerBatch<T,K>& src){
 }
 
 template <typename T, typename K>
-void fill(IsomerBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
-  int N = B.N();
-  int Nf = B.Nf();
+void fill(FullereneBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
+  int N = B.N_;
+  int Nf = B.Nf_;
   int N_graphs = B.capacity();
-  auto face_degrees_acc = host_accessor(B.face_degrees);
-  auto dual_neighbours_acc = host_accessor(B.dual_neighbours);
-  auto statuses_acc = host_accessor(B.statuses);
+  auto face_degrees_acc = B.d_.deg_;
+  auto dual_neighbours_acc = B.d_.A_cubic_;
+  auto statuses_acc = B.m_.flags_;
   BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,false, false, mytask_id, ntasks);
   Graph G;
 
@@ -215,7 +216,7 @@ void fill(IsomerBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
     bool more_isomers = BuckyGen::next_fullerene(BuckyQ, G);
     if (!more_isomers) break;
     num_generated++;
-    statuses_acc[i] = IsomerStatus::NOT_CONVERGED;
+    statuses_acc[i] = StatusFlag::DUAL_INITIALIZED;
     for(int j = 0; j < Nf; j++) {
       face_degrees_acc[i*Nf + j] = G.neighbours[j].size();
       for(int k = 0; k < G.neighbours[j].size(); k++) 
@@ -226,7 +227,7 @@ void fill(IsomerBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
   BuckyGen::stop(BuckyQ);
   if (num_generated < N_graphs) 
     for (int i = num_generated; i < N_graphs; ++i) {
-      statuses_acc[i] = IsomerStatus::NOT_CONVERGED;
+      statuses_acc[i] = StatusFlag::DUAL_INITIALIZED;
       //Repeat the same graphs as already generated.
       for(int j = 0; j < Nf; j++) {
         face_degrees_acc[i*Nf + j] = face_degrees_acc[(i%num_generated)*Nf + j];
