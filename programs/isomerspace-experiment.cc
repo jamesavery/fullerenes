@@ -14,10 +14,8 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/progress_bar.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
-
-#include "fullerenes/isomer_queue.hh"
-#include "fullerenes/device_io.hh"
-#include "fullerenes/gpu/kernels.hh"
+#include <fullerenes/sycl-headers/all-kernels.hh>
+#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 #include "fullerenes/isomerdb.hh"
 
 #define STORE_HESSIAN 1
@@ -26,11 +24,9 @@
 
 using namespace std;
 using namespace std::chrono;
-using namespace device_io;
 
-using namespace gpu_kernels;
 
-typedef device_real_t real_t;	// We'll use the device real type everywhere in this program
+typedef float real_t;	// We'll use the device real type everywhere in this program
 
   typedef enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage_t;
   typedef enum {VOLUME,ECCENTRICITY,MIN_FREQ,MAX_FREQ, FREQ_WIDTH, INERTIA, NUM_RESULTS} results_t; // Results on which to do statistics
@@ -61,16 +57,16 @@ void ensure_minimal_stacksize(rlim_t minimal_stacksize)
 
 
 struct isomer_candidate {
-  device_real_t value;
+  float value;
   int id;
-  array<device_real_t,NUM_RESULTS> results;
+  array<float,NUM_RESULTS> results;
   
-  vector<device_node_t> cubic_neighbours;
+  vector<uint16_t> cubic_neighbours;
   vector<real_t> X;
 
-  isomer_candidate(double value, int id, array<device_real_t,NUM_RESULTS> &results,int N, int ix, const IsomerBatch<CPU> &B):
+  isomer_candidate(double value, int id, array<float,NUM_RESULTS> &results,int N, int ix, const IsomerBatch<CPU> &B):
     value(value), id(id), results(results), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
-    memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(device_node_t));
+    memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(uint16_t));
     memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
   }
 
@@ -125,7 +121,7 @@ int main(int ac, char **argv)
   n_best_candidates = max(size_t(1),min(n_best_candidates, n_fullerenes/4));
 
   
-  int    Nd = LaunchCtx::get_device_count();
+  int    Nd = Device::get_devices(DeviceType::GPU).size(); // Number of devices
   size_t batch_size = min((size_t)isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
   size_t final_batch_size = n_best_candidates*NUM_RESULTS*2/Nd+(Nd-1);
 
@@ -170,11 +166,12 @@ int main(int ac, char **argv)
   array<set<pair<real_t,int>>,NUM_RESULTS> result_reference;
   
   // Each stage has one on-device batch per device. TODO: NUM_STAGES vector<vector<IsomerBatch>>, Nd. Dynamic number of devices != 2.
-  IsomerBatch<GPU> Bs[4][2] = {	
-    {IsomerBatch<GPU>(N,batch_size,0),IsomerBatch<GPU>(N,batch_size,1)},
-    {IsomerBatch<GPU>(N,batch_size,0),IsomerBatch<GPU>(N,batch_size,1)},
-    {IsomerBatch<GPU>(N,batch_size,0),IsomerBatch<GPU>(N,batch_size,1)},
-    {IsomerBatch<GPU>(N,batch_size,0),IsomerBatch<GPU>(N,batch_size,1)}    
+  std::array<std::array<FullereneBatch<real_t, uint16_t,2>,NUM_STAGES> Bs;
+  FullereneBatch Bs[4][2] = {	
+    {FullereneBatch<(N,batch_size),FullereneBatch(N,batch_size)},
+    {FullereneBatch<(N,batch_size),FullereneBatch(N,batch_size)},
+    {FullereneBatch<(N,batch_size),FullereneBatch(N,batch_size)},
+    {FullereneBatch<(N,batch_size),FullereneBatch(N,batch_size)}    
   };
   
   // Final IsomerBatch on host
