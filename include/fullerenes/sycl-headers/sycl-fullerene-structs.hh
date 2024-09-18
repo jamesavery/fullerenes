@@ -56,6 +56,7 @@ struct FullereneBatch
 
     void push_back(const Graph &G, const int ID = -1);
     void push_back(const neighbours_t &neighbours, bool is_cubic = false, const int ID = -1);
+    void push_back(const PlanarGraph &G, const int ID = -1);
     void push_back(const Polyhedron &P, const int ID = -1);
     void push_back(const Fullerene<T, K> &fullerene, const int ID = -1);
     void resize(size_t new_capacity);

@@ -240,6 +240,9 @@ template <typename T, typename K>
 void FullereneBatch<T,K>::push_back(const Graph& G, const int ID) {push_back(G.neighbours, false, ID);}
 
 template <typename T, typename K>
+void FullereneBatch<T,K>::push_back(const PlanarGraph& G, const int ID) {push_back(G.neighbours, true, ID);}
+
+template <typename T, typename K>
 void FullereneBatch<T,K>::push_back(const Polyhedron& P, const int ID) {
     push_back(P.neighbours, true, ID);
     //If floating point types are not the same, we need to convert
