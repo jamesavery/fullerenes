@@ -232,6 +232,11 @@ struct KernelFunctor{
     }
 
     template <typename... Args>
+    inline constexpr auto to_tuple_batch(size_t N, Args&&... args) const {
+        return static_cast<const KernelImpl*>(this)->to_tuple_batch(N, std::forward<Args>(args)...);
+    }
+
+    template <typename... Args>
     void initialize(Args&&... args) {
         if (initialized) return;
         auto pair_tuple = to_tuple(0, std::forward<Args>(args)...);
@@ -247,10 +252,17 @@ struct KernelFunctor{
         initialized = true;
     }
     
-    template <typename... Args>
+    template <bool is_batch, typename... Args>
     inline constexpr auto allocate_and_return_tuple(SyclQueue& Q, size_t launch_idx, size_t N, size_t batch_size, Args&&... args) {
         initialize(std::forward<Args>(args)...);
-        auto pair_tuple = to_tuple(N, std::forward<Args>(args)...);
+        using TupleType = typename std::conditional_t<is_batch, decltype(to_tuple_batch(N, std::forward<Args>(args)...)), decltype(to_tuple(N, std::forward<Args>(args)...))>;
+        TupleType pair_tuple = [this, N](auto&&... args) -> TupleType {
+            if constexpr (is_batch) {
+                return to_tuple_batch(N, args...);
+            }else{
+                return to_tuple(N, args...);
+            }
+        }(std::forward<Args>(args)...);
 
         std::apply([&](auto&... pairs) {
             auto allocate_and_check_capacity = [&](auto& array_of_vectors, size_t capacity) {
@@ -283,7 +295,7 @@ struct KernelFunctor{
                     isomer_function(out_of_order_queue, isomer, data_tuple);
                 }, std::ref(out_of_order_queue), std::ref(this)); */
                 
-                auto data_tuple = allocate_and_return_tuple(out_of_order_queue, circular_ix, isomer.N_, 1, std::forward<Args>(args)...);
+                auto data_tuple = allocate_and_return_tuple<false>(out_of_order_queue, circular_ix, isomer.N_, 1, std::forward<Args>(args)...);
                 isomer_function(out_of_order_queue, isomer, data_tuple).wait();
                 //auto data_tuple = allocate_and_return_tuple(out_of_order_queue, circular_ix, batch.N_);
                 //mutexes_[{out_of_order_queue, circular_ix}] = isomer_function(out_of_order_queue, isomer, data_tuple);
@@ -295,7 +307,7 @@ struct KernelFunctor{
                 fut.wait();
             }); */
         }else{
-            auto batch_data = allocate_and_return_tuple(Q, 0, batch.N_, batch.size(), std::forward<Args>(args)...);
+            auto batch_data = allocate_and_return_tuple<true>(Q, 0, batch.N_, batch.size(), std::forward<Args>(args)...);
             batch_function(Q, batch, batch_data);
         }
     }
@@ -306,12 +318,12 @@ struct KernelFunctor{
     auto operator() (SyclQueue& Q, FullereneBatchView<T,K> batch, LaunchPolicy policy, Args&&... args) {
         if (policy == LaunchPolicy::SYNC) Q.wait();
         dispatch_kernel(Q, batch, LaunchPolicy::SYNC, 
-            [this, &args...](SyclQueue& Q, FullereneBatchView<T,K> batch, decltype(allocate_and_return_tuple(Q, 0, batch.N_, 1, std::forward<Args>(args)...))& data)  {
+            [this, &args...](SyclQueue& Q, FullereneBatchView<T,K> batch, decltype(allocate_and_return_tuple<true>(Q, 0, batch.N_, 1, std::forward<Args>(args)...))& data)  {
                 std::apply([&](auto&... data_) {
                     static_cast<KernelImpl*>(this)->compute(Q, batch, std::forward<Args>(args)..., data_...);
                 }, data);
             }, 
-            [this, &args...](SyclQueue& Q, Fullerene<T,K> isomer, decltype(allocate_and_return_tuple(Q, 0, batch.N_, 1, std::forward<Args>(args)...))& data) {
+            [this, &args...](SyclQueue& Q, Fullerene<T,K> isomer, decltype(allocate_and_return_tuple<false>(Q, 0, batch.N_, 1, std::forward<Args>(args)...))& data) {
                 return std::apply([&](auto&... data_) {
                     return static_cast<KernelImpl*>(this)->compute(Q, isomer, std::forward<Args>(args)..., data_...);
                 }, data);
@@ -329,7 +341,7 @@ struct KernelFunctor{
         if (policy == LaunchPolicy::SYNC) Q.wait();
         auto ret_val = std::apply([&](auto&&... data) {
             return static_cast<KernelImpl*>(this)->compute(Q, isomer, std::forward<Args>(args)..., data...);
-        }, allocate_and_return_tuple(Q, 0, isomer.N_, 1, std::forward<Args>(args)...));
+        }, allocate_and_return_tuple<false>(Q, 0, isomer.N_, 1, std::forward<Args>(args)...));
         if (policy == LaunchPolicy::SYNC) Q.wait();
         return ret_val;
     }
