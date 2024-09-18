@@ -1,6 +1,6 @@
 list(APPEND SYCL_LIBRARY_SOURCES
-  forcefield-optimize
   dualize
+  forcefield-optimize
   tutte
   spherical-projection
   sycl-isomer-batch
@@ -11,8 +11,8 @@ list(APPEND SYCL_LIBRARY_SOURCES
 )
 
 list(APPEND SYCL_SOURCE_CUSTOM_FLAGS 
-"-Xcuda-ptxas --maxrregcount=80"    # forcefield-optimize.cc
 "-Xcuda-ptxas --maxrregcount=40"    # dualize.cc
+"-Xcuda-ptxas --maxrregcount=80"    # forcefield-optimize.cc
 "-Xcuda-ptxas --maxrregcount=40"    # tutte.cc
 "-Xcuda-ptxas --maxrregcount=40"    # spherical-projection.cc
 "-Xcuda-ptxas --maxrregcount=40"    # sycl-isomer-batch.cc
