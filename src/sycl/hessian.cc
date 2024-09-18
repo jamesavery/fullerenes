@@ -1863,14 +1863,12 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
 }
 
 template <ForcefieldType FFT, typename T, typename K>
-template <typename... Data>
-SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess, Span<K> cols, Data&&... data){
+SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess, Span<K> cols){
     return compute_hessians<FFT, T, K>(Q, B, hess, cols);
 }
 
 template <ForcefieldType FFT, typename T, typename K>
-template <typename... Data>
-SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> B, Span<T> hess, Span<K> cols, Data&&... data){
+SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> B, Span<T> hess, Span<K> cols, Span<K> indices){
     //TODO: Implement compute for single isomer
     throw std::logic_error("HessianFunctor::compute not implemented for single isomer");
 }
@@ -1879,11 +1877,6 @@ template struct HessianFunctor<PEDERSEN, float, uint16_t>;
 template struct HessianFunctor<PEDERSEN, double, uint16_t>;
 template struct HessianFunctor<PEDERSEN, float, uint32_t>;
 template struct HessianFunctor<PEDERSEN, double, uint32_t>;
-
-template SyclEvent HessianFunctor<PEDERSEN, float, uint16_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint16_t> B, Span<float> hess, Span<uint16_t> cols, Span<uint16_t>& indices);
-template SyclEvent HessianFunctor<PEDERSEN, double, uint16_t>::compute(SyclQueue& Q, FullereneBatchView<double,uint16_t> B, Span<double> hess, Span<uint16_t> cols, Span<uint16_t>& indices);
-template SyclEvent HessianFunctor<PEDERSEN, float, uint16_t>::compute(SyclQueue& Q, Fullerene<float,uint16_t> B, Span<float> hess, Span<uint16_t> cols, Span<uint16_t>& indices);
-template SyclEvent HessianFunctor<PEDERSEN, double, uint16_t>::compute(SyclQueue& Q, Fullerene<double,uint16_t> B, Span<double> hess, Span<uint16_t> cols, Span<uint16_t>& indices);
 
 /* template void compute_hessians<PEDERSEN, float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& B, sycl::buffer<float,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
 template void compute_hessians<PEDERSEN, double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& B, sycl::buffer<double,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy); */

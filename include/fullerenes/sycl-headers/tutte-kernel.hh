@@ -3,10 +3,8 @@
 
 template <typename T, typename K>
 struct TutteFunctor : public KernelFunctor<TutteFunctor<T,K>> {
-    template <typename... Data>
-    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Data&&... data);
-    template <typename... Data>
-    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch, Data&&... data);
+    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<std::array<T,2>> newxys, Span<bool> fixed, Span<T> max_change);
+    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch);
 
     mutable FunctorArrays<std::array<T,2>> newxys_;
     mutable FunctorArrays<bool> fixed_;
@@ -17,5 +15,9 @@ struct TutteFunctor : public KernelFunctor<TutteFunctor<T,K>> {
                 std::make_pair(std::ref(newxys_),    N), 
                 std::make_pair(std::ref(fixed_),     N), 
                 std::make_pair(std::ref(max_change_),N));
+    }
+
+    inline constexpr auto to_tuple_batch(size_t N) const {
+        return std::make_tuple();
     }
 };

@@ -259,34 +259,29 @@ void DualizeFunctor<T,K>::operator()(SyclQueue& Q, FullereneBatchView<T,K> batch
 } */
 
 template <typename T, typename K>
-template <typename... Data>
-SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, Data&&... data){
+SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> cannon_ixs, Span<K> rep_count, Span<K> scan_array, Span<K> triangle_numbers, Span<K> arc_list){
     if (fullerene.m_.flags_.get() & (int)StatusFlag::CUBIC_INITIALIZED) return SyclEvent(); //Job already done
     if (! (fullerene.m_.flags_.get() & (int)StatusFlag::DUAL_INITIALIZED)) return SyclEvent(); //If the dual graph is not initialized, we cannot proceed.
-    auto done_event =  [&](auto&&... data) -> SyclEvent {
-        return dualize_general_impl<T,K,6,3>(  Q,
+    auto done_event = dualize_general_impl<T,K,6,3>(  Q,
                                         fullerene.d_.A_dual_,
                                         fullerene.d_.deg_,
                                         fullerene.d_.A_cubic_,
                                         Span<K>(),
-                                        std::forward<Data>(data)...,
+                                        cannon_ixs,
+                                        rep_count,
+                                        scan_array,
+                                        triangle_numbers,
+                                        arc_list,
                                         fullerene.Nf_,
                                         fullerene.N_);
-    }(std::forward<Data>(data)...);
     fullerene.m_.flags_.get() |= (int)StatusFlag::CUBIC_INITIALIZED;
     return done_event;
 }
 
 template <typename T, typename K>
-template <typename... Data>
-SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch, Data&&... data){
+SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch){
     return dualize_batch_impl<T,K>(Q, batch);
 }
-
-template SyclEvent DualizeFunctor<float,uint16_t>::compute(SyclQueue&, FullereneBatchView<float,uint16_t>, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&);
-template SyclEvent DualizeFunctor<float,uint16_t>::compute(SyclQueue&, Fullerene<float, uint16_t>, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&);
-template SyclEvent DualizeFunctor<float,uint32_t>::compute(SyclQueue&, FullereneBatchView<float,uint32_t>, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&);
-template SyclEvent DualizeFunctor<float,uint32_t>::compute(SyclQueue&, Fullerene<float, uint32_t>, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&);
 
 template struct DualizeFunctor<float,uint16_t>;
 template struct DualizeFunctor<float,uint32_t>;

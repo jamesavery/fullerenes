@@ -256,7 +256,6 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                             size_t _nLanczos, 
                             Span<T> eigenvalues, 
                             Span<T> eigenvectors,
-                            Span<K> indices_,
                             Span<T> off_diagonal,
                             Span<T> qmat,
                             Span<T> lanczos,
@@ -580,26 +579,24 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
 }
 
 template <EigensolveMode mode, typename T, typename K>
-template <typename... Data>
 SyclEvent EigenFunctor<mode, T, K>::compute(SyclQueue& Q, FullereneBatchView<T,K> B, 
                             Span<T> hessians,
                             Span<K> cols,
                             size_t _nLanczos,
                             Span<T> eigenvalues,
                             Span<T> eigenvectors,
-                            Data&&... data){
-    return eigensolve<mode>(Q, B, hessians, cols, _nLanczos, eigenvalues, eigenvectors, std::forward<Data>(data)...);
+                            Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx){
+    return eigensolve<mode>(Q, B, hessians, cols, _nLanczos, eigenvalues, eigenvectors, off_diagonal, qmat, lanczos, diag, ends_idx);
 }
 
 template <EigensolveMode mode, typename T, typename K>
-template <typename... Data>
 SyclEvent EigenFunctor<mode, T, K>::compute(SyclQueue& Q, Fullerene<T,K> B, 
                             Span<T> hessians,
                             Span<K> cols,
                             size_t _nLanczos,
                             Span<T> eigenvalues,
                             Span<T> eigenvectors,
-                            Data&&... data){
+                            Span<K> indices, Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx){
     throw std::logic_error("Not implemented");
 }
     
@@ -607,110 +604,6 @@ template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM, float, uint16_t>;
 template struct EigenFunctor<EigensolveMode::ENDS, float, uint16_t>;
 template struct EigenFunctor<EigensolveMode::ENDS_VECTORS, float, uint16_t>;
 template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>;
-
-template SyclEvent EigenFunctor<EigensolveMode::FULL_SPECTRUM, float, uint16_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint16_t> B, 
-                            Span<float> hessians,
-                            Span<uint16_t> cols,
-                            size_t _nLanczos,
-                            Span<float> eigenvalues,
-                            Span<float> eigenvectors,
-                            Span<uint16_t>& indices,
-                            Span<float>& off_diagonal,
-                            Span<float>& diag,
-                            Span<float>& qmat,
-                            Span<float>& lanczos,
-                            Span<uint16_t>& ends_idx);
-
-template SyclEvent EigenFunctor<EigensolveMode::FULL_SPECTRUM, float, uint16_t>::compute(SyclQueue& Q, Fullerene<float,uint16_t> B, 
-                            Span<float> hessians,
-                            Span<uint16_t> cols,
-                            size_t _nLanczos,
-                            Span<float> eigenvalues,
-                            Span<float> eigenvectors,
-                            Span<uint16_t>& indices,
-                            Span<float>& off_diagonal,
-                            Span<float>& diag,
-                            Span<float>& qmat,
-                            Span<float>& lanczos,
-                            Span<uint16_t>& ends_idx);
-
-template SyclEvent EigenFunctor<EigensolveMode::ENDS, float, uint16_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint16_t> B,
-                            Span<float> hessians,
-                            Span<uint16_t> cols,
-                            size_t _nLanczos,
-                            Span<float> eigenvalues,
-                            Span<float> eigenvectors,
-                            Span<uint16_t>& indices,
-                            Span<float>& off_diagonal,
-                            Span<float>& diag,
-                            Span<float>& qmat,
-                            Span<float>& lanczos,
-                            Span<uint16_t>& ends_idx);
-
-template SyclEvent EigenFunctor<EigensolveMode::ENDS, float, uint16_t>::compute(SyclQueue& Q, Fullerene<float,uint16_t> B,
-                            Span<float> hessians,
-                            Span<uint16_t> cols,
-                            size_t _nLanczos,
-                            Span<float> eigenvalues,
-                            Span<float> eigenvectors,
-                            Span<uint16_t>& indices,
-                            Span<float>& off_diagonal,
-                            Span<float>& diag,
-                            Span<float>& qmat,
-                            Span<float>& lanczos,
-                            Span<uint16_t>& ends_idx);
-
-template SyclEvent EigenFunctor<EigensolveMode::ENDS_VECTORS, float, uint16_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint16_t> B,
-                            Span<float> hessians,
-                            Span<uint16_t> cols,
-                            size_t _nLanczos,
-                            Span<float> eigenvalues,
-                            Span<float> eigenvectors,
-                            Span<uint16_t>& indices,
-                            Span<float>& off_diagonal,
-                            Span<float>& diag,
-                            Span<float>& qmat,
-                            Span<float>& lanczos,
-                            Span<uint16_t>& ends_idx);
-
-template SyclEvent EigenFunctor<EigensolveMode::ENDS_VECTORS, float, uint16_t>::compute(SyclQueue& Q, Fullerene<float,uint16_t> B,
-                            Span<float> hessians,
-                            Span<uint16_t> cols,
-                            size_t _nLanczos,
-                            Span<float> eigenvalues,
-                            Span<float> eigenvectors,
-                            Span<uint16_t>& indices,
-                            Span<float>& off_diagonal,
-                            Span<float>& diag,
-                            Span<float>& qmat,
-                            Span<float>& lanczos,
-                            Span<uint16_t>& ends_idx);
-
-template SyclEvent EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint16_t> B,
-                            Span<float> hessians,
-                            Span<uint16_t> cols,
-                            size_t _nLanczos,
-                            Span<float> eigenvalues,
-                            Span<float> eigenvectors,
-                            Span<uint16_t>& indices,
-                            Span<float>& off_diagonal,
-                            Span<float>& diag,
-                            Span<float>& qmat,
-                            Span<float>& lanczos,
-                            Span<uint16_t>& ends_idx);
-
-template SyclEvent EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>::compute(SyclQueue& Q, Fullerene<float,uint16_t> B,
-                            Span<float> hessians,
-                            Span<uint16_t> cols,
-                            size_t _nLanczos,
-                            Span<float> eigenvalues,
-                            Span<float> eigenvectors,
-                            Span<uint16_t>& indices,
-                            Span<float>& off_diagonal,
-                            Span<float>& diag,
-                            Span<float>& qmat,
-                            Span<float>& lanczos,
-                            Span<uint16_t>& ends_idx);
 
 /* template void eigensolve<EigensolveMode::FULL_SPECTRUM, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);
 template void eigensolve<EigensolveMode::ENDS, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);

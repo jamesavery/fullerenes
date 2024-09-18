@@ -311,27 +311,29 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
 }
 
 template <typename T, typename K>
-template <typename... Data>
-SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, Data&&... data){
+SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene
+                                                    , Span<K> topological_distances,
+                                                    Span<K> reduce_in,
+                                                    Span<K> reduce_out,
+                                                    Span<K> output_keys,
+                                                    Span<std::array<T,2>> sorted_xys){
     if (fullerene.m_.flags_.get() & (int)StatusFlag::CUBIC_INITIALIZED){
         return spherical_projection_impl<T,K>(Q,
                                     fullerene.d_.X_cubic_.template as_span<std::array<T,2>>(),
                                     fullerene.d_.X_cubic_.template as_span<std::array<T,3>>(),
                                     fullerene.d_.A_cubic_,
-                                    std::forward<Data>(data)...);
+                                    topological_distances,
+                                    reduce_in,
+                                    reduce_out,
+                                    output_keys,
+                                    sorted_xys);
     } else return Q.get_event();
 }
 
 template <typename T, typename K>
-template <typename... Data>
-SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch, Data&&... data){
+SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch){
     return spherical_projection<T,K>(Q, batch);
 }
-
-template SyclEvent SphericalProjectionFunctor<float,uint16_t>::compute(SyclQueue& Q, Fullerene<float,uint16_t> fullerene, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<std::array<float,2>>&);
-template SyclEvent SphericalProjectionFunctor<float,uint16_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint16_t> batch, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<uint16_t>&, Span<std::array<float,2>>&);
-template SyclEvent SphericalProjectionFunctor<float,uint32_t>::compute(SyclQueue& Q, Fullerene<float,uint32_t> fullerene, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<std::array<float,2>>&);
-template SyclEvent SphericalProjectionFunctor<float,uint32_t>::compute(SyclQueue& Q, FullereneBatchView<float,uint32_t> batch, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<uint32_t>&, Span<std::array<float,2>>&);
 
 template struct SphericalProjectionFunctor<float,uint16_t>;
 template struct SphericalProjectionFunctor<float,uint32_t>;

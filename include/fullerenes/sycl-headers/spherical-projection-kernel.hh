@@ -3,10 +3,9 @@
 
 template <typename T, typename K>
 struct SphericalProjectionFunctor : public KernelFunctor<SphericalProjectionFunctor<T,K>> {
-    template <typename... Data>
-    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Data&&... data);
-    template <typename... Data>
-    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch, Data&&... data);
+    
+    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> topological_distances_, Span<K> reduce_in_, Span<K> reduce_out_, Span<K> output_keys_, Span<std::array<T,2>> sorted_xys_);
+    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch);
 
     mutable FunctorArrays<K> topological_distances_;
     mutable FunctorArrays<K> reduce_in_;
@@ -21,5 +20,9 @@ struct SphericalProjectionFunctor : public KernelFunctor<SphericalProjectionFunc
                 std::make_pair(std::ref(reduce_out_),N * 4),
                 std::make_pair(std::ref(output_keys_), N),
                 std::make_pair(std::ref(sorted_xys_), N));
+    }
+
+    inline constexpr auto to_tuple_batch(size_t N) const {
+        return std::make_tuple();
     }
 };

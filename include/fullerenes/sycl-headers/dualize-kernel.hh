@@ -3,10 +3,8 @@
 
 template <typename T, typename K>
 struct DualizeFunctor : public KernelFunctor<DualizeFunctor<T,K>> {
-    template <typename... Data>
-    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Data&&... data);
-    template <typename... Data>
-    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch, Data&&... data);
+    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> cannon_ixs, Span<K> rep_count, Span<K> scan_array, Span<K> triangle_numbers, Span<K> arc_list);
+    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch);
 
     mutable FunctorArrays<K> cannon_ixs_;
     mutable FunctorArrays<K> rep_count_;
@@ -25,4 +23,6 @@ struct DualizeFunctor : public KernelFunctor<DualizeFunctor<T,K>> {
                 std::make_pair(std::ref(triangle_numbers_), Nin*MaxDegree),
                 std::make_pair(std::ref(arc_list_),         Nout*2 ));
     }
+
+    inline constexpr auto to_tuple_batch(size_t N) const {return std::make_tuple();}
 };

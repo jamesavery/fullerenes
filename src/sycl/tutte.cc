@@ -189,28 +189,26 @@ void TutteFunctor<T,K>::operator() (SyclQueue& Q, FullereneBatchView<T,K> batch,
 } */
 
 template <typename T, typename K>
-template <typename... Data>
-SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, Data&&... data){
+SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, 
+                                    Span<std::array<T,2>> newxys,
+                                    Span<bool> fixed,
+                                    Span<T> max_change){
     if (! (fullerene.m_.flags_.get() & (int)StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
     auto ret_val = tutte_isomer_impl(  Q, 
                         fullerene.d_.A_cubic_, 
                         fullerene.d_.X_cubic_.template as_span<std::array<T,2>>(), 
-                        std::forward<Data>(data)...,
+                        newxys,
+                        fixed,
+                        max_change,
                         fullerene.N_);
     fullerene.m_.flags_ |= StatusFlag::CONVERGED_2D;
     return ret_val;
 }
 
 template <typename T, typename K>
-template <typename... Data>
-SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch, Data&&... data){
+SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch){
     return tutte_batch_impl(Q, batch);
 }
-
-template SyclEvent TutteFunctor<float,uint16_t>::compute(SyclQueue&, Fullerene<float,uint16_t>, Span<std::array<float,2>>&, Span<bool>&, Span<float>&);
-template SyclEvent TutteFunctor<float,uint16_t>::compute(SyclQueue&, FullereneBatchView<float,uint16_t>, Span<std::array<float,2>>&, Span<bool>&, Span<float>&);
-template SyclEvent TutteFunctor<float,uint32_t>::compute(SyclQueue&, Fullerene<float,uint32_t>, Span<std::array<float,2>>&, Span<bool>&, Span<float>&);
-template SyclEvent TutteFunctor<float,uint32_t>::compute(SyclQueue&, FullereneBatchView<float,uint32_t>, Span<std::array<float,2>>&, Span<bool>&, Span<float>&);
 
 template struct TutteFunctor<float,uint16_t>;
 template struct TutteFunctor<float,uint32_t>;

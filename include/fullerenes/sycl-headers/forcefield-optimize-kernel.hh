@@ -3,13 +3,8 @@
 
 template <ForcefieldType FFT, typename T, typename K>
 struct ForcefieldOptimizeFunctor: public KernelFunctor<ForcefieldOptimizeFunctor<FFT,T,K>> {
-    //void operator()(SyclQueue& Q, Fullerene<T,K> fullerene, const int iterations, const int max_iterations, LaunchPolicy policy);
-    //void operator()(SyclQueue& Q, FullereneBatchView<T,K> batch, const int iterations, const int max_iterations, LaunchPolicy policy);
-    template <typename... Data>
-    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, size_t iterations, size_t max_iterations, Data&&... data);
-
-    template <typename... Data>
-    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch, size_t iterations, size_t max_iterations, Data&&... data);
+    SyclEvent compute(SyclQueue& Q, Fullerene<T,K> fullerene, size_t iterations, size_t max_iterations, Span<K> indices, Span<std::array<T,3>> X1, Span<std::array<T,3>> X2, Span<std::array<T,3>> g0, Span<std::array<T,3>> g1, Span<std::array<T,3>> s);
+    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T,K> batch, size_t iterations, size_t max_iterations);
 
 
     mutable FunctorArrays<K> indices_;
@@ -28,5 +23,9 @@ struct ForcefieldOptimizeFunctor: public KernelFunctor<ForcefieldOptimizeFunctor
                 std::make_pair(std::ref(g1_), N),
                 std::make_pair(std::ref(s_), N)
                 );
+    }
+
+    inline constexpr auto to_tuple_batch(size_t N, size_t iterations, size_t max_iterations) const {
+        return std::make_tuple();
     }
 };
