@@ -20,6 +20,7 @@ struct Span
     inline constexpr Span(T *begin, T *end) : data_(begin), size_(std::distance(begin, end)) {}
     inline constexpr Span(const Span<T> &other) = default;
     inline constexpr Span(Span<T> &&other) = default;
+    inline constexpr Span(T& value) : data_(&value), size_(1) {}
     
     template <typename U>
     inline constexpr Span<U> as_span() const {
