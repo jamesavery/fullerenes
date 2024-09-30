@@ -6,6 +6,33 @@
 #include <future>
 using uint16_t = unsigned short;
 
+template <template <typename...> class Template, typename T>
+struct is_specialization_of : std::false_type {};
+
+template <template <typename...> class Template, typename... Args>
+struct is_specialization_of<Template, Template<Args...>> : std::true_type {};
+
+template <typename T>
+auto partition_vector(size_t ix, size_t batch_size, const T& value) {
+    if constexpr (is_specialization_of<SyclVector, T>::value || is_specialization_of<Span, T>::value) {
+        auto size = value.size();
+        if (size % batch_size != 0) {
+            throw std::runtime_error("The size of the SyclVector is not divisible by the batch size");
+        }
+        auto size_per_isomer = size / batch_size;
+        auto modified = Span(value.begin() + ix*size_per_isomer, value.begin() + (ix+1)*size_per_isomer);
+        return modified;
+    } else {
+        return value;  // Leave other types unchanged
+    }
+}
+
+// Function to modify the parameter pack
+template <typename... Args>
+auto prepare_execution_arguments(size_t ix, size_t batch_size, const Args&... args) {
+    return std::make_tuple(partition_vector(ix, batch_size, args)...);  // Apply the modification to each argument
+}
+
 template <typename T>
 using ArrayOfSyclVectors = std::array<std::vector<std::vector<SyclVector<T>>>, (size_t)DeviceType::NUM_DEV_TYPES>;
 
@@ -276,8 +303,9 @@ struct KernelFunctor{
         }, pair_tuple);
     }
 
-    template <typename T, typename K, typename BatchFunction, typename IsomerFunction, typename... Args>
-    void dispatch_kernel(SyclQueue& Q, FullereneBatchView<T,K> batch, LaunchPolicy policy, BatchFunction&& batch_function, IsomerFunction&& isomer_function, Args&&... args) {
+    template <typename T, typename K, typename... Args>
+    auto operator() (SyclQueue& Q, FullereneBatchView<T,K> batch, LaunchPolicy policy, Args&&... args) {
+        if (policy == LaunchPolicy::SYNC) Q.wait();
         auto max_concurrent_launches = static_cast<KernelImpl*>(this)->get_max_concurrent_launches(Q, batch.N_, std::forward<Args>(args)...);
         mutexes_[Q].resize(std::min((size_t)batch.size(), max_concurrent_launches));
         futures_[Q].resize(std::min((size_t)batch.size(), max_concurrent_launches));
@@ -285,6 +313,7 @@ struct KernelFunctor{
         if (batch.size() == 0) {return;}
         if (batch.N_ > Q.device_.get_property(DeviceProperty::MAX_WORK_GROUP_SIZE)){
             SyclQueue out_of_order_queue(Q.device_, false);
+            auto full_ix = 0;
             std::for_each(batch.begin(), batch.end(), [&](auto isomer) {
                 auto circular_ix = (this->dispatch_counters_[out_of_order_queue]++) % std::min((size_t)batch.size(), max_concurrent_launches);
                 //Mutex ensures that no two try to resize the same vector at the same time, nor use the same memory for different isomers
@@ -296,10 +325,15 @@ struct KernelFunctor{
                 }, std::ref(out_of_order_queue), std::ref(this)); */
                 
                 auto data_tuple = allocate_and_return_tuple<false>(out_of_order_queue, circular_ix, isomer.N_, 1, std::forward<Args>(args)...);
-                isomer_function(out_of_order_queue, isomer, data_tuple).wait();
+                auto prepared_args = prepare_execution_arguments(full_ix, batch.size(), std::forward<Args>(args)...);
+                std::apply([&](auto&&... args) {
+                    static_cast<KernelImpl*>(this)->compute(out_of_order_queue, isomer, std::forward<decltype(args)>(args)...);
+                }, std::tuple_cat(prepared_args, data_tuple));
+                //isomer_function(out_of_order_queue, isomer, std::tuple_cat(data_tuple, prepared_args));
                 //auto data_tuple = allocate_and_return_tuple(out_of_order_queue, circular_ix, batch.N_);
                 //mutexes_[{out_of_order_queue, circular_ix}] = isomer_function(out_of_order_queue, isomer, data_tuple);
                 //mutexes_[{out_of_order_queue, circular_ix}].unlock();
+                full_ix++;
             });
             //Enqueue all the events in the input queue, this way asynchronicity is preserved
             //When the caller waits for the input queue, it will wait for all the out_of_order_queue events
@@ -308,26 +342,11 @@ struct KernelFunctor{
             }); */
         }else{
             auto batch_data = allocate_and_return_tuple<true>(Q, 0, batch.N_, batch.size(), std::forward<Args>(args)...);
-            batch_function(Q, batch, batch_data);
+            //batch_function(Q, batch, batch_data);
+            std::apply([&](auto&&... data) {
+                static_cast<KernelImpl*>(this)->compute(Q, batch, std::forward<Args>(args)..., std::forward<decltype(data)>(data)...);
+            }, batch_data);
         }
-    }
-
-
-
-    template <typename T, typename K, typename... Args>
-    auto operator() (SyclQueue& Q, FullereneBatchView<T,K> batch, LaunchPolicy policy, Args&&... args) {
-        if (policy == LaunchPolicy::SYNC) Q.wait();
-        dispatch_kernel(Q, batch, LaunchPolicy::SYNC, 
-            [this, &args...](SyclQueue& Q, FullereneBatchView<T,K> batch, decltype(allocate_and_return_tuple<true>(Q, 0, batch.N_, 1, std::forward<Args>(args)...))& data)  {
-                std::apply([&](auto&... data_) {
-                    static_cast<KernelImpl*>(this)->compute(Q, batch, std::forward<Args>(args)..., data_...);
-                }, data);
-            }, 
-            [this, &args...](SyclQueue& Q, Fullerene<T,K> isomer, decltype(allocate_and_return_tuple<false>(Q, 0, batch.N_, 1, std::forward<Args>(args)...))& data) {
-                return std::apply([&](auto&... data_) {
-                    return static_cast<KernelImpl*>(this)->compute(Q, isomer, std::forward<Args>(args)..., data_...);
-                }, data);
-            }, std::forward<Args>(args)...);
         if (policy == LaunchPolicy::SYNC) Q.wait();
     }
 
