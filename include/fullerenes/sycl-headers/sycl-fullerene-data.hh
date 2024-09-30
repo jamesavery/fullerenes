@@ -9,9 +9,9 @@ struct FullereneDataMembers{
     mutable Container<T> X_dual_;  // 3D Embedding of the Dual Graph {Nf * 6}
     mutable Container<K> A_cubic_; // Adjacency Matrix (Cubic) {N * 3}
     mutable Container<K> A_dual_;  // Adjacency Matrix (Dual) {Nf * 6}
-    mutable Container<K> faces_;   // Atom indices of the faces {Nf * 6}
+    mutable Container<K> faces_cubic_;   // Atom indices of the hexagons/pentagons {Nf * 6}
+    mutable Container<K> faces_dual_;    // "Face-indices" of the triangles {N * 3}
     mutable Container<K> deg_;     // Vertex degrees in the dual graph, face degrees in the cubic graph, face degrees in the dual graph is always 3 (it is a triangulation)
-    // Container<K> quad_edge_;   //Quad edge representation of the mapping between the cubic and dual graphs {Nf * 6}
 
     FullereneDataMembers() = default;
     ~FullereneDataMembers() = default;
@@ -24,11 +24,24 @@ struct FullereneDataMembers{
         return compute_equality(std::make_pair(to_tuple(), other.to_tuple()));
     }
 
-    inline constexpr auto to_tuple() const { return std::make_tuple(std::ref(X_cubic_), std::ref(X_dual_), std::ref(A_cubic_), std::ref(A_dual_), std::ref(faces_), std::ref(deg_)); }
+    inline constexpr auto to_tuple() const 
+        { return std::make_tuple(std::ref(X_cubic_), 
+            std::ref(X_dual_), 
+            std::ref(A_cubic_), 
+            std::ref(A_dual_), 
+            std::ref(faces_cubic_), 
+            std::ref(faces_dual_),
+            std::ref(deg_)); }
     
     static inline constexpr auto get_size_factors(int N, int capacity) { 
             int Nf = N/2 + 2;
-            return std::array{(int)N*3*capacity, (int)Nf*3*capacity, (int)N*3*capacity, (int)Nf*6*capacity, (int)Nf*6*capacity, (int)Nf*capacity};
+            return std::array{(int)N*3*capacity,    //X_cubic_ 
+                            (int)Nf*3*capacity,     //X_dual_
+                            (int)N*3*capacity,      //A_cubic_
+                            (int)Nf*6*capacity,     //A_dual_
+                            (int)Nf*6*capacity,     //faces_cubic_
+                            (int)N*3*capacity,      //faces_dual_
+                            (int)Nf*capacity};      //deg_
     }
 };
 
