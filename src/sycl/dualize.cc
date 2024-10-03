@@ -178,6 +178,8 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
     auto deg =       batch.d_.deg_;
     auto A_cubic =   batch.d_.A_cubic_;
     auto statuses =  batch.m_.flags_;
+    auto faces_cubic = batch.d_.faces_cubic_;
+    auto faces_dual = batch.d_.faces_dual_;
 
     SyclEventImpl cubic_graph_event = Q->submit([&](handler &h) {
         //Create local accessors to shared memory
@@ -241,10 +243,98 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             node2 edge_c = FD.get_canonical_triangle_arc(w, v); A_cubic[isomer*N*3 + f*3 + 1] = triangle_numbers[edge_c[0]*MaxDegree + FD.arc_ix(edge_c)];
             node2 edge_d = FD.get_canonical_triangle_arc(u, w); A_cubic[isomer*N*3 + f*3 + 2] = triangle_numbers[edge_d[0]*MaxDegree + FD.arc_ix(edge_d)];
 
+            //Fill faces_cubic
+            if (f < Nf){
+                for (int i = 0; i < FD.face_degrees[f]; i++){
+                    auto arc = FD.get_canonical_triangle_arc(f, FD.dual_neighbours[f*MaxDegree + i]);
+                    faces_cubic[isomer*Nf*MaxDegree + f*MaxDegree + i] = triangle_numbers[arc[0]*MaxDegree + FD.arc_ix(arc)];
+                }
+            }
+
+            //Fill faces_dual
+            faces_dual.template as_span<std::array<node_t,3>>()[isomer*N + f] = {u,v,w};
+
             if (f == 0) statuses[isomer] |= (int)StatusFlag::CUBIC_INITIALIZED;
         });
     });
     return SyclEvent(std::move(cubic_graph_event));
+}
+
+template <typename T, typename K>
+SyclEvent prepare_fullerene_graph(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> cannon_ixs, Span<K> rep_count, Span<K> scan_array, Span<K> triangle_numbers, Span<K> arc_list){
+    auto max_workgroup_size = Q->get_device().get_info<sycl::info::device::max_work_group_size>();
+    int Nin = fullerene.Nf_;
+    int Nout = fullerene.N_;
+    size_t workgroup_size1 = std::min((int)max_workgroup_size, Nin);
+    size_t workgroup_size2 = std::min((int)max_workgroup_size, Nout);
+    size_t grid_size1 = roundUp(Nin, workgroup_size1);
+    size_t grid_size2 = roundUp(Nout, workgroup_size2);
+    if (cannon_ixs.size() < Nin*6 ||
+        rep_count.size() < Nin ||
+        scan_array.size() < Nin ||
+        triangle_numbers.size() < Nin*6 ||
+        arc_list.size() < Nout*2){
+        throw std::runtime_error("Insufficient memory for dualization");
+    }
+    //primitives::transform_exclusive_scan(Q, 
+
+    auto work_distribution = Q -> parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+        auto thid = nditem.get_global_linear_id();
+        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_.data(), fullerene.d_.deg_.data());
+        K local_rep_count = 0;
+        if (thid < Nin){
+            for (int i = 0; i < FD.face_degrees[thid]; i++){
+                auto canon_arc = FD.get_canonical_arc(thid, FD.dual_neighbours[thid*6 + i]);
+                if (canon_arc[0] == thid){
+                    cannon_ixs[thid*6 + local_rep_count] = i;
+                    ++local_rep_count;
+                }
+            }
+            rep_count[thid] = local_rep_count;
+        }
+    });
+
+    work_distribution.wait();
+    primitives::exclusive_scan(Q, rep_count, scan_array, K(0), Plus{});
+
+    auto arc_list_event = Q -> parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
+        auto idx = nditem.get_global_linear_id();
+        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_.data(), fullerene.d_.deg_.data());
+        if (idx < Nin){
+        K rep_count_local = rep_count[idx];
+        K scan_result = scan_array[idx];
+        for (int ii = 0; ii < rep_count_local; ii++){
+            auto i = cannon_ixs[idx*6 + ii];
+            auto triangle_id = scan_result + ii;
+            triangle_numbers[idx*6 + i] = triangle_id;
+            arc_list.template as_span<std::array<K,2>>()[triangle_id] = {(K)idx, FD.dual_neighbours[idx*6 + i]};
+        }
+        }
+    });
+    
+    SyclEventImpl fill_graph_event = Q -> parallel_for(nd_range(range{grid_size2}, range{workgroup_size2}), [=](nd_item<1> nditem) {
+        auto tidx = nditem.get_global_linear_id();
+        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_.data(), fullerene.d_.deg_.data());
+        if (tidx < Nout){
+            auto [u, v] = arc_list.template as_span<std::array<K,2>>()[tidx];
+            auto w = FD.next(u,v);
+            auto edge_b = FD.get_canonical_triangle_arc(v, u); fullerene.d_.A_cubic_[tidx*3 + 0] = triangle_numbers[edge_b[0]*6 + FD.arc_ix(edge_b)];
+            auto edge_c = FD.get_canonical_triangle_arc(w, v); fullerene.d_.A_cubic_[tidx*3 + 1] = triangle_numbers[edge_c[0]*6 + FD.arc_ix(edge_c)];
+            auto edge_d = FD.get_canonical_triangle_arc(u, w); fullerene.d_.A_cubic_[tidx*3 + 2] = triangle_numbers[edge_d[0]*6 + FD.arc_ix(edge_d)];
+
+            fullerene.d_.faces_dual_.template as_span<std::array<K,3>>() [tidx] = {u,v,w};
+        }
+
+        if (tidx < Nin){
+            for (int i = 0; i < FD.face_degrees[tidx]; i++){
+                auto arc = FD.get_canonical_triangle_arc(tidx, FD.dual_neighbours[tidx*6 + i]);
+                fullerene.d_.faces_cubic_[tidx*6 + i] = triangle_numbers[arc[0]*6 + FD.arc_ix(arc)];
+            }
+        }
+        
+    });
+    return SyclEvent(std::move(fill_graph_event));
+
 }
 
 
@@ -262,18 +352,13 @@ template <typename T, typename K>
 SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> cannon_ixs, Span<K> rep_count, Span<K> scan_array, Span<K> triangle_numbers, Span<K> arc_list){
     if (fullerene.m_.flags_.get() & (int)StatusFlag::CUBIC_INITIALIZED) return SyclEvent(); //Job already done
     if (! (fullerene.m_.flags_.get() & (int)StatusFlag::DUAL_INITIALIZED)) return SyclEvent(); //If the dual graph is not initialized, we cannot proceed.
-    auto done_event = dualize_general_impl<T,K,6,3>(  Q,
-                                        fullerene.d_.A_dual_,
-                                        fullerene.d_.deg_,
-                                        fullerene.d_.A_cubic_,
-                                        Span<K>(),
-                                        cannon_ixs,
-                                        rep_count,
-                                        scan_array,
-                                        triangle_numbers,
-                                        arc_list,
-                                        fullerene.Nf_,
-                                        fullerene.N_);
+    auto done_event = prepare_fullerene_graph(  Q,
+                                                fullerene,
+                                                cannon_ixs,
+                                                rep_count,
+                                                scan_array,
+                                                triangle_numbers,
+                                                arc_list);
     fullerene.m_.flags_.get() |= (int)StatusFlag::CUBIC_INITIALIZED;
     return done_event;
 }
@@ -281,6 +366,7 @@ SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, S
 template <typename T, typename K>
 SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T,K> batch){
     return dualize_batch_impl<T,K>(Q, batch);
+
 }
 
 template struct DualizeFunctor<float,uint16_t>;
