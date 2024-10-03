@@ -6,3 +6,4 @@
 #include <fullerenes/sycl-headers/forcefield-optimize-kernel.hh>
 #include <fullerenes/sycl-headers/hessian-kernel.hh>
 #include <fullerenes/sycl-headers/eigen-kernels.hh>
+#include <fullerenes/sycl-headers/geometry-kernels.hh>
