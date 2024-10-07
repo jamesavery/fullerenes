@@ -64,6 +64,7 @@ SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, 
         cgh.parallel_for<struct EccentricityFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::group<1> cta){
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
+            if (batch[bid].m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return;
             auto X = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>();
             auto I = inertia_matrix(cta, X);
             auto [V,lambdas] = I.eigensystem();
@@ -77,6 +78,7 @@ SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, 
 
 template <typename T, typename K>
 SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_ellipticity, Span<K> indices){
+    if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
     auto N = fullerene.N_;
     auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
     auto I = inertia_matrix(Q, X);
@@ -96,6 +98,7 @@ SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> ba
         cgh.parallel_for<struct InertiaFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::group<1> cta){
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
+            if (batch[bid].m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return;
             auto X = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>();
             auto I = inertia_matrix(cta, X);
             if (tid == 0) out_inertia[bid] = I.eigenvalues();
@@ -107,6 +110,7 @@ SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> ba
 
 template <typename T, typename K>
 SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<std::array<T,3>> out_inertia, Span<K> indices){
+    if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
     auto N = fullerene.N_;
     auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
     auto I = inertia_matrix(Q, X);
@@ -123,6 +127,7 @@ SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, FullereneBatch
         cgh.parallel_for<struct TransformCoordinatesFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::group<1> cta){
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
+            if (batch[bid].m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return;
             auto X = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>();
             auto P = principal_axes(cta, X);
             if (isnan(P[0][0]) || isnan(P[0][1]) || isnan(P[0][2]) || isnan(P[1][0]) || isnan(P[1][1]) || isnan(P[1][2]) || isnan(P[2][0]) || isnan(P[2][1]) || isnan(P[2][2])) {
@@ -152,27 +157,29 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K
         auto Nf = batch.Nf_;
         auto X_smem = sycl::local_accessor<std::array<T,3>, 1>(N, cgh);
         auto smem = sycl::local_accessor<K, 1>(N*3 + Nf * 6, cgh);
-        cgh.parallel_for<struct SurfaceAreaFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::group<1> cta){
+        cgh.parallel_for<struct SurfaceAreaFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*Nf), sycl::range<1>(Nf)), [=](sycl::group<1> cta){
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
-            X_smem[tid] = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>()[tid];
-            auto node_graph = NodeNeighbours<K>(cta, batch[bid].d_.A_cubic_.data(), smem.get_pointer());
+            if (batch[bid].m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return;
+            for (int i = tid; i < N; i += cta.get_local_range(0)) X_smem[i] = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>()[i];
             sycl::group_barrier(cta);
             T A = 0;
-            if (tid < Nf){
-                coord3d face_center = {0,0,0};
-                for (int i = 0; i < node_graph.face_size; i++) face_center += X_smem[node_graph.face_nodes[i]];
-                face_center /= T(node_graph.face_size);
-                for (int i = 0; i < node_graph.face_size; i++){
-                    auto a = X_smem[node_graph.face_nodes[i]];
-                    auto b = X_smem[node_graph.face_nodes[(i+1)%node_graph.face_size]];
-                    auto c = face_center;
-                    auto u = b - a;
-                    auto v = c - a;
-                    auto n = cross(u,v);
-                    A += norm(n);
-                }
+            coord3d face_center = {0,0,0};
+            auto fullerene = batch[bid];
+            auto face_size = fullerene.d_.deg_[tid];
+            auto face = fullerene.d_.faces_cubic_[tid];
+            for (int i = 0; i < face_size; i++) face_center += X_smem[face[i]];
+            face_center /= T(face_size);
+            for (int i = 0; i < face_size; i++){
+                auto a = X_smem[face[i]];
+                auto b = X_smem[face[(i+1)%face_size]];
+                auto c = face_center;
+                auto u = b - a;
+                auto v = c - a;
+                auto n = cross(u,v);
+                A += norm(n);
             }
+            
             auto result = sycl::reduce_over_group(cta, A, sycl::plus<T>()) / T(2);
             if (tid == 0) out_surface_area[bid] = result;
         });
@@ -183,6 +190,7 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K
 
 template <typename T, typename K>
 SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_surface_area, Span<K> indices){
+    if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
     auto N = fullerene.N_;
     auto Nf = fullerene.Nf_;
     //TODO: Implement this
@@ -218,26 +226,28 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> bat
         auto Nf = batch.Nf_;
         auto X_smem = sycl::local_accessor<std::array<T,3>, 1>(N, cgh);
         auto smem = sycl::local_accessor<K, 1>(N*3 + Nf * 6, cgh);
-        cgh.parallel_for<struct VolumeFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::group<1> cta){
+        cgh.parallel_for<struct VolumeFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*Nf), sycl::range<1>(Nf)), [=](sycl::group<1> cta){
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
-            X_smem[tid] = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>()[tid];
-            auto node_graph = NodeNeighbours<K>(cta, batch[bid].d_.A_cubic_.data(), smem.get_pointer());
+            auto fullerene = batch[bid];
+            if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return;
+            for (int i = tid; i < N; i += cta.get_local_range(0)) X_smem[i] = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>()[i];
+            //auto node_graph = NodeNeighbours<K>(cta, fullerene.d_.A_cubic_.data(), smem.get_pointer());
             sycl::group_barrier(cta);
             T V = 0;
-            if (tid < Nf){
-                coord3d face_center = {0,0,0};
-                for (int i = 0; i < node_graph.face_size; i++) face_center += X_smem[node_graph.face_nodes[i]];
-                face_center /= T(node_graph.face_size);
-                for (int i = 0; i < node_graph.face_size; i++){
-                    auto a = X_smem[node_graph.face_nodes[i]];
-                    auto b = X_smem[node_graph.face_nodes[(i+1)%node_graph.face_size]];
-                    auto c = face_center;
-                    auto u = b - a;
-                    auto v = c - a;
-                    auto n = cross(u,v);
-                    V += dot(a, n) / T(2);
-                }
+            coord3d face_center = {0,0,0};
+            auto face = fullerene.d_.faces_cubic_[tid];
+            auto face_size = fullerene.d_.deg_[tid];
+            for (int i = 0; i < face_size; i++) face_center += X_smem[face[i]];
+            face_center /= T(face_size);
+            for (int i = 0; i < face_size; i++){
+                auto a = X_smem[face[i]];
+                auto b = X_smem[face[(i+1)%face_size]];
+                auto c = face_center;
+                auto u = b - a;
+                auto v = c - a;
+                auto n = cross(u,v);
+                V += dot(a, n) / T(2);
             }
             auto result = sycl::reduce_over_group(cta, V, sycl::plus<T>()) / T(3);
             if (tid == 0) out_volume[bid] = result;
@@ -247,8 +257,25 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> bat
     return ret_val;
 }
 
-template struct EccentricityFunctor<float, int>;
-template struct InertiaFunctor<float, int>;
-template struct TransformCoordinatesFunctor<float, int>;
-template struct SurfaceAreaFunctor<float, int>;
-template struct VolumeFunctor<float, int>;
+template <typename T, typename K>
+SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_volume, Span<K> indices, Span<T> volume_contributions){
+    if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
+    auto N = fullerene.N_;
+    auto Nf = fullerene.Nf_;
+    auto X = fullerene.d_.X_cubic_;
+
+    T V = 0;
+    primitives::iota(Q, indices, 0);
+    /* primitives::transform(Q, indices, volume_contributions, [Nf, X](auto i){
+        std::array<T,3> face_center = {0,0,0};
+        for (int i = 0; i < Nf; i++) face_center += X[i];
+
+    }); */
+    
+}
+
+template struct EccentricityFunctor<float, uint16_t>;
+template struct InertiaFunctor<float, uint16_t>;
+template struct TransformCoordinatesFunctor<float, uint16_t>;
+template struct SurfaceAreaFunctor<float, uint16_t>;
+template struct VolumeFunctor<float, uint16_t>;
