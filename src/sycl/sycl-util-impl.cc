@@ -22,6 +22,17 @@ constexpr std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<U>& 
     return os;
 }
 
+template <typename U, size_t N>
+constexpr std::ostream& operator<<(std::ostream& os, const std::array<U,N>& arr) {
+    os << "[";
+    for (size_t i = 0; i < N; i++) {
+        os << arr[i];
+        if(i < N - 1) os << ", ";
+    }
+    os << "]";
+    return os;
+}
+
 template <typename T>
 SyclVector<T>::SyclVector(size_t size) : size_(size), capacity_(size) {
     data_ = sycl::malloc_shared<T>(size, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
@@ -68,7 +79,7 @@ void SyclVector<T>::resize(size_t new_size, T val){
 }
 
 template <typename T>
-void SyclVector<T>::resize(size_t new_size, T val, size_t front, size_t back, size_t seg_size){
+void SyclVector<T>::resize(size_t new_size, size_t front, size_t back, size_t seg_size){
     if(new_size > capacity_){
         T* new_data = sycl::malloc_shared<T>(new_size, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
         memset(new_data, 0, new_size*sizeof(T));
@@ -176,7 +187,7 @@ FullereneBatch<T,K>::FullereneBatch() : N_(0), Nf_(0), capacity_(0), size_(0) {}
 
 template <size_t N, typename... Args, std::size_t... I>
 void resize_all(std::array<int,N>&& sizes, std::tuple<Args...>&& args, std::index_sequence<I...>){
-    (std::get<I>(args).resize(sizes[I], 0  ), ...);
+    (std::get<I>(args).resize(sizes[I], typename std::decay_t<decltype(std::get<I>(args))>::value_type{}), ...);
 }
 
 template <typename T, typename K>
@@ -203,7 +214,7 @@ void FullereneQueue<T,K>::resize(size_t new_capacity) {
     if(new_capacity <= capacity_) return;
     capacity_ = new_capacity;
     auto resize_all_circularly = [&]<std::size_t... I>(std::index_sequence<I...>, auto&& tup, auto&& size_factors){
-        (std::get<I>(tup).resize(size_factors[I]*new_capacity, 0, size_factors[I]*front_, size_factors[I]*back_, size_factors[I]), ...);
+        (std::get<I>(tup).resize(size_factors[I]*new_capacity, size_factors[I]*front_, size_factors[I]*back_, size_factors[I]), ...);
     };
     resize_all_circularly(std::make_index_sequence<std::tuple_size_v<decltype(d_.to_tuple())>>{}, d_.to_tuple(), d_.get_size_factors(N_, 1));
     resize_all_circularly(std::make_index_sequence<std::tuple_size_v<decltype(m_.to_tuple())>>{}, m_.to_tuple(), m_.get_size_factors(1));       
@@ -226,8 +237,8 @@ void FullereneBatch<T,K>::push_back(const neighbours_t& neighbours, bool is_cubi
     for(size_t i = 0; i < N; i++){
         if(!is_cubic) d_.deg_[i + size_*Nf_] = neighbours[i].size();
         for(size_t j = 0; j < neighbours[i].size(); j++){
-            if(is_cubic){d_.A_cubic_[i*3 + j + size_*N_*3] = neighbours[i][j];}
-            else{d_.A_dual_[i*6 + j + size_*Nf_*6] = neighbours[i][j];}
+            if(is_cubic){d_.A_cubic_[i + size_ * N][j] = neighbours[i][j];}
+            else{d_.A_dual_[i + size_*Nf_][j] = neighbours[i][j];}
         }
     }
     m_.ID_[size_] = ID;
@@ -250,10 +261,10 @@ void FullereneBatch<T,K>::push_back(const Polyhedron& P, const int ID) {
         
     for(size_t i = 0; i < N_; i++){
         for(size_t j = 0; j < 3; j++){
-            d_.X_cubic_[i*3 + j + (size_-1)*N_*3] = P.points[i][j];
+            d_.X_cubic_[i + (size_-1)*N_][j] = P.points[i][j];
         }
     } //Otherwise a contiguous memory copy will do
-    } else{ memcpy(d_.X_cubic_.data() + (size_-1)*N_*3, P.points.data(), N_*3*sizeof(T));}
+    } else{ memcpy(d_.X_cubic_.data() + (size_-1)*N_, P.points.data(), N_*sizeof(std::array<T,3>));}
     m_.flags_[(size_-1)] |= StatusFlag::CONVERGED_3D;
     std::cout << "Pushed Polyhedron with ID: " << ID << std::endl;
     std::cout << "Pushed Polyhedron with flags: " << m_.flags_[(size_-1)] << std::endl;
@@ -296,7 +307,7 @@ if(dst_batch.N_ != src_batch.N_ || src_batch.Nf_ != dst_batch.Nf_) throw std::ru
     auto& indices = dst_is_queue ? src_batch.m_.valid_indices_ : dst_batch.m_.valid_indices_;
     auto& flags = dst_is_queue ? src_batch.m_.flags_ : dst_batch.m_.flags_;
     using int_t = std::decay_t<decltype(*indices.begin())>;
-    using float_t = std::decay_t<decltype(*src_batch.d_.X_cubic_.begin())>;
+    using float_t = std::decay_t<decltype(src_batch.d_.X_cubic_[0][0])>;
     int_t init = 0;
     std::transform_exclusive_scan(std::execution::par_unseq,
         flags.begin(), flags.end(),
@@ -377,6 +388,8 @@ template struct SyclVector<std::array<float,2>>;
 template struct SyclVector<std::array<float,3>>;
 template struct SyclVector<std::array<uint16_t,3>>;
 template struct SyclVector<std::array<uint32_t,3>>;
+template struct SyclVector<std::array<uint16_t,6>>;
+template struct SyclVector<std::array<uint32_t,6>>;
 //template struct SyclVector<NodeNeighbours<uint16_t>>;
 //template struct SyclVector<NodeNeighbours<uint32_t>>;
 //template struct SyclVector<Constants<float,uint16_t>>;
@@ -400,6 +413,8 @@ template struct Span<std::array<float,2>>;
 template struct Span<std::array<float,3>>;
 template struct Span<std::array<uint16_t,3>>;
 template struct Span<std::array<uint32_t,3>>;
+template struct Span<std::array<uint16_t,6>>;
+template struct Span<std::array<uint32_t,6>>;
 //template struct Span<NodeNeighbours<uint16_t>>;
 //template struct Span<NodeNeighbours<uint32_t>>;
 //template struct Span<Constants<float,uint16_t>>;
@@ -434,6 +449,8 @@ template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<
 template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<float,3>>& vec);
 template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<uint16_t,3>>& vec);
 template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<uint32_t,3>>& vec);
+template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<uint16_t,6>>& vec);
+template std::ostream& operator<<(std::ostream& os, const SyclVector<std::array<uint32_t,6>>& vec);
 
 
 template std::ostream& operator<<(std::ostream& os, const Span<float>& vec);
@@ -451,6 +468,8 @@ template std::ostream& operator<<(std::ostream& os, const Span<std::array<float,
 template std::ostream& operator<<(std::ostream& os, const Span<std::array<float,3>>& vec);
 template std::ostream& operator<<(std::ostream& os, const Span<std::array<uint16_t,3>>& vec);
 template std::ostream& operator<<(std::ostream& os, const Span<std::array<uint32_t,3>>& vec);
+template std::ostream& operator<<(std::ostream& os, const Span<std::array<uint16_t,6>>& vec);
+template std::ostream& operator<<(std::ostream& os, const Span<std::array<uint32_t,6>>& vec);
 
 template std::ostream& operator<<(std::ostream& os, const Fullerene<float,uint16_t>& vec);
 template std::ostream& operator<<(std::ostream& os, const Fullerene<double,uint16_t>& vec);

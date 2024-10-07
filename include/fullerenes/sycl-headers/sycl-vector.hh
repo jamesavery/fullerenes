@@ -16,7 +16,7 @@ struct SyclVector
 
     void resize(size_t new_size);
     void resize(size_t new_size, T value);
-    void resize(size_t new_size, T value, size_t front, size_t back, size_t seg_size);
+    void resize(size_t new_size, size_t front, size_t back, size_t seg_size);
 
     void reserve(size_t new_capacity);
 
