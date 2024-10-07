@@ -48,10 +48,13 @@ struct SurfaceAreaFunctor : public KernelFunctor<SurfaceAreaFunctor<T, K>> {
 template<typename T, typename K>
 struct VolumeFunctor : public KernelFunctor<VolumeFunctor<T, K>> {
     SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> out_volume);
-    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<T> out_volume, Span<K> indices_);
+    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<T> out_volume, Span<K> indices_, Span<T> volume_contributions_);
 
     mutable FunctorArrays<K> indices_;
+    mutable FunctorArrays<T> volume_contributions_;
 
-    inline constexpr auto to_tuple(size_t N, Span<T> out_volume) const {       return std::make_tuple(std::make_pair(std::ref(indices_), N));}
+    inline constexpr auto to_tuple(size_t N, Span<T> out_volume) const {
+        auto Nf = N/2 + 2;
+        return std::make_tuple(std::make_pair(std::ref(indices_), Nf), std::make_pair(std::ref(volume_contributions_), Nf));}
     inline constexpr auto to_tuple_batch(size_t N, Span<T> out_volume) const { return std::make_tuple();}
 };
