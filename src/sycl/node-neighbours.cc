@@ -12,7 +12,7 @@ struct NodeNeighbours{
     
 
 
-    NodeNeighbours(sycl::group<1> cta, const K* cubic_neighbours_acc, K* sdata){
+    /* NodeNeighbours(sycl::group<1> cta, const Span<std::array<K,3>> cubic_neighbours_acc, K* sdata){
         INT_TYPEDEFS(K);
         face_nodes.fill(UINT16_MAX);
         face_neighbours.fill(UINT16_MAX);
@@ -36,7 +36,7 @@ struct NodeNeighbours{
             if(rep_edges[j][0] == tid) {++represent_count; is_rep[j] = true;}
         }
         //ex_scan<node_t>(reinterpret_cast<node_t*>(sdata), represent_count, bdim);
-        auto offset  = sycl::exclusive_scan_over_group(cta, represent_count, sycl::plus<node_t>{});  //reinterpret_cast<node_t*>(sdata)[tid];
+        auto offset  = sycl::exclusive_scan_over_group(cta, (K)represent_count, sycl::plus<node_t>{});  //reinterpret_cast<node_t*>(sdata)[tid];
         int k = 0;
         for(int j = 0; j < 3; j++){
             if(is_rep[j]){
@@ -54,7 +54,7 @@ struct NodeNeighbours{
             face_size = face_nodes[5] == UINT16_MAX ? 5 : 6;
         }
         sycl::group_barrier(cta);
-    }
+    } */
 
     /**
      * @brief  This constructor computes the neighbours, outer neighbours, face neighbours for the first Nf threads it stores the nodes that are part of the threadIdx.x^th face.
@@ -63,23 +63,11 @@ struct NodeNeighbours{
      * @param  sdata: Pointer to shared memory.
      * @return NodeNeighbours object.
      */
-    NodeNeighbours(sycl::group<1> cta, const sycl::accessor<K, 1, access::mode::read>& cubic_neighbours_acc, K* sdata) : 
-        NodeNeighbours(cta, cubic_neighbours_acc.get_pointer() + cta.get_group_linear_id()*cta.get_local_linear_range()*3, sdata){} 
 
-    NodeNeighbours(const K* cubic_neighbours_acc, K tid){
+    NodeNeighbours(const Span<std::array<K,3>> cubic_neighbours_acc, K tid){
         const DeviceCubicGraph FG(cubic_neighbours_acc);
-        this->cubic_neighbours   = {FG[tid*3], FG[tid*3 + 1], FG[tid*3 + 2]};
-        this->next_on_face = {FG.next_on_face(tid, FG[tid*3]), FG.next_on_face(tid, FG[tid*3 + 1]), FG.next_on_face(tid ,FG[tid*3 + 2])};
-        this->prev_on_face = {FG.prev_on_face(tid, FG[tid*3]), FG.prev_on_face(tid, FG[tid*3 + 1]), FG.prev_on_face(tid ,FG[tid*3 + 2])};
+        this->cubic_neighbours   = {FG[tid][0], FG[tid][1], FG[tid][2]};
+        this->next_on_face = {FG.next_on_face(tid, FG[tid][0]), FG.next_on_face(tid, FG[tid][1]), FG.next_on_face(tid ,FG[tid][2])};
+        this->prev_on_face = {FG.prev_on_face(tid, FG[tid][0]), FG.prev_on_face(tid, FG[tid][1]), FG.prev_on_face(tid ,FG[tid][2])};
     }
-
-
-
-    /**
-    * @brief Constructor for a NodeNeighbours object, which contains the neighbours of a node in the graph and outer neighbours.
-    * @param G All isomer graphs in the batch.
-    * @param isomer_idx The index of the isomer to initialize based on.
-    */
-    NodeNeighbours(const sycl::accessor<K, 1, access::mode::read>& cubic_neighbours_acc, sycl::group<1>& cta) : 
-        NodeNeighbours(cubic_neighbours_acc.get_pointer() + cta.get_group_linear_id()*cta.get_local_linear_range()*3, cta.get_group_linear_id()){}
 };
