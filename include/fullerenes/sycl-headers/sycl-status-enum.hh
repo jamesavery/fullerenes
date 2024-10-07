@@ -55,22 +55,48 @@ struct StatusFlag
     operator StatusEnum() const { return static_cast<StatusEnum>(flag_); }
 
     template <typename T>
-    bool operator==(T flag) const { return flag_ == static_cast<int>(flag); }
+    inline constexpr bool operator==(T flag) const { return flag_ == static_cast<int>(flag); }
 
     template <typename T>
-    bool operator!=(T flag) const { return flag_ != static_cast<int>(flag); }
+    inline constexpr bool operator!=(T flag) const { return flag_ != static_cast<int>(flag); }
 
     template <typename T>
-    bool operator<(T flag) const { return flag_ < static_cast<int>(flag); }
+    inline constexpr bool operator<(T flag) const { return flag_ < static_cast<int>(flag); }
 
     template <typename T>
-    bool operator>(T flag) const { return flag_ > static_cast<int>(flag); }
+    inline constexpr bool operator>(T flag) const { return flag_ > static_cast<int>(flag); }
 
     template <typename T>
-    bool operator<=(T flag) const { return flag_ <= static_cast<int>(flag); }
+    inline constexpr bool operator<=(T flag) const { return flag_ <= static_cast<int>(flag); }
 
     template <typename T>
-    bool operator>=(T flag) const { return flag_ >= static_cast<int>(flag); }
+    inline constexpr bool operator>=(T flag) const { return flag_ >= static_cast<int>(flag); }
+
+    template <typename T>
+    inline constexpr bool operator&&(T flag) const { return flag_ && static_cast<int>(flag); }
+
+    template <typename T>
+    inline constexpr bool operator||(T flag) const { return flag_ || static_cast<int>(flag); }
+
+    template <typename T>
+    inline constexpr bool operator!() const { return !flag_; }
+
+    template <typename T>
+    inline constexpr bool is_set(T flag) const { return flag_ & static_cast<int>(flag); }
+
+    template <typename T>
+    inline constexpr bool is_not_set(T flag) const { return !(flag_ & static_cast<int>(flag)); }
+
+    template <typename T>
+    inline constexpr void set(T flag) { flag_ |= static_cast<int>(flag); }
+
+    template <typename T>
+    inline constexpr void unset(T flag) { flag_ &= ~static_cast<int>(flag); }
+
+    template <typename T>
+    inline constexpr void toggle(T flag) { flag_ ^= static_cast<int>(flag); }
+
+    inline constexpr void clear() { flag_ = 0; }
     
     friend std::ostream& operator<<(std::ostream& os, const StatusFlag& flag) { return os << flag.flag_; }
 
