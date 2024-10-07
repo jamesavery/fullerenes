@@ -63,10 +63,10 @@ int main(int argc, char** argv) {
         {
             for(size_t k = 0; k < G.neighbours[j].size(); k++)
             {
-                acc_dual[ii*Nf*6 + j*6 + k] = G.neighbours[j][k];
+                acc_dual[ii*Nf + j][k] = G.neighbours[j][k];
             } 
             if(G.neighbours[j].size() == 5){
-                acc_dual[ii*Nf*6 + j*6 + 5] = std::numeric_limits<node_t>::max();
+                acc_dual[ii*Nf + j][5] = std::numeric_limits<node_t>::max();
                 acc_degs[ii*Nf + j] = 5;
             } else {
                 acc_degs[ii*Nf + j] = 6;
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
         for (size_t j = 0; j < N; j++){
             for (size_t k = 0; k < 3; k++)
             {
-                acc_cubic[ii*N*3 + j*3 + k] = pG.neighbours[j][k];
+                acc_cubic[ii*N + j][k] = pG.neighbours[j][k];
             }
             
         }

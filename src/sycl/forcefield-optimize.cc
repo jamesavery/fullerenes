@@ -1831,8 +1831,8 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
 
 //          Create an accessor to the neighbourlist offset by the block id.
 //
-            Constants<T,K>      constants(cubic_neighbours_acc.data(), tid);
-            NodeNeighbours<K>   nodeG(cubic_neighbours_acc.data(), tid);
+            Constants<T,K>      constants(cubic_neighbours_acc, tid);
+            NodeNeighbours<K>   nodeG(cubic_neighbours_acc, tid);
             
             X[tid] = X_acc[tid];
             sycl::group_barrier(cta);
@@ -1854,7 +1854,7 @@ struct ForceFieldEnergyKernel {};
 template <ForcefieldType FFT, typename T, typename K>
 SyclEvent forcefield_optimize_impl(SyclQueue& Q, 
                                             const Span<std::array<T, 3>> X,
-                                            const Span<K> A,
+                                            const Span<std::array<K, 3>> A,
                                             const Span<K> indices, 
                                             const Span<std::array<T, 3>> X1,
                                             const Span<std::array<T, 3>> X2,
@@ -1879,8 +1879,8 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q,
 
     auto energy = [&] (Span<coord3d> X){
         T result = primitives::transform_reduce(Q, indices, T{0}, Plus{}, [=](K i) {
-            NodeNeighbours<K> node_graph(A.data(), i);
-            Constants<T,K> constants(A.data(), i);
+            NodeNeighbours<K> node_graph(A, i);
+            Constants<T,K> constants(A, i);
             T result = 0;
             for (int j = 0; j < 3; j++)
             {
@@ -1896,8 +1896,8 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q,
         Q->submit([&](sycl::handler &h){
             h.parallel_for<ForceFieldGradientKernel<FFT,T,K>>(sycl::range<1>(N), [=](sycl::id<1> i){
                 K idx = i;
-                NodeNeighbours<K> node_graphs(A.data(), idx);
-                Constants<T,K> constants(A.data(), idx);
+                NodeNeighbours<K> node_graphs(A, idx);
+                Constants<T,K> constants(A, idx);
                 coord3d result = {0,0,0};
                 for (int j = 0; j < 3; j++)
                 {

@@ -120,14 +120,14 @@ CuDeque(const local_accessor<T,1> memory, const int capacity): array(memory), fr
 };
 
 template <typename K>
-K multiple_source_shortest_paths(const sycl::group<1>& cta, const K* cubic_neighbours,const local_accessor<int,1>& distances, const local_accessor<K,1>& smem){
+K multiple_source_shortest_paths(const sycl::group<1>& cta, const Span<std::array<K,3>> cubic_neighbours,const local_accessor<int,1>& distances, const local_accessor<K,1>& smem){
     INT_TYPEDEFS(K);
     auto N = cta.get_local_linear_range();
     auto tid = cta.get_local_linear_id();
     auto isomer_idx = cta.get_group_linear_id();
     DeviceCubicGraph FG(cubic_neighbours);
-    node_t outer_face[6]; memset(outer_face, 0, 6*sizeof(node_t));
-    uint8_t Nface = FG.get_face_oriented(0,FG[0], outer_face);
+    std::array<K,6> outer_face; memset(outer_face.data(), 0, 6*sizeof(node_t));
+    uint8_t Nface = FG.get_face_oriented(0,FG[0][0], outer_face);
     distances[tid] = std::numeric_limits<K>::max();
     sycl::group_barrier(cta);
     if(tid < Nface) distances[outer_face[tid]] = 0;
@@ -138,7 +138,7 @@ K multiple_source_shortest_paths(const sycl::group<1>& cta, const K* cubic_neigh
         while(!work_queue.empty()){
             auto v = work_queue.pop_front();
             for (size_t i = 0; i < 3; i++){
-                auto w = FG[v*3 + i];
+                auto w = FG[v][i];
                 if(distances[w] == std::numeric_limits<K>::max()){
                     distances[w] = distances[v] + 1;
                     work_queue.push_back(w);
@@ -180,9 +180,9 @@ SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
             if(isomer_idx >= capacity) assert(false);
             if ( *(full.m_.flags_) & StatusFlag::CUBIC_INITIALIZED){
             atomic_coordinate_memory[tid] = {0.0, 0.0};
-            NodeNeighbours node_graph(cubic_neighbours.data(), (K)tid);
+            NodeNeighbours node_graph(cubic_neighbours, (K)tid);
             node3 neighbours = node_graph.cubic_neighbours;
-            node_t distance = multiple_source_shortest_paths<K>(cta, cubic_neighbours.data(), smem, work_queue_memory);
+            node_t distance = multiple_source_shortest_paths(cta, cubic_neighbours, smem, work_queue_memory);
             node_t d_max = reduce_over_group(cta, distance, maximum<node_t>{});
             smem[tid] = 0;
             sycl::group_barrier(cta);
@@ -226,7 +226,7 @@ SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
 }
 
 template <typename K>
-void multiple_source_shortest_paths(const Span<std::array<K,3>> neighbours, const vector<K>& sources, Span<K> distances, const unsigned int max_depth = INT_MAX)
+void multiple_source_shortest_paths(const Span<std::array<K,3>> neighbours, const std::vector<K>& sources, Span<K> distances, const unsigned int max_depth = INT_MAX)
 {
     Deque<K> queue(neighbours.size());
         
@@ -251,7 +251,7 @@ template<typename T, typename K>
 SyclEvent spherical_projection_impl( SyclQueue& Q,
                                 Span<std::array<T,2>> xys,
                                 Span<std::array<T,3>> X,
-                                Span<K> cubic_neighbours,
+                                Span<std::array<K,3>> cubic_neighbours,
                                 Span<K> distances,
                                 Span<K> reduce_in,
                                 Span<K> reduce_out,
@@ -261,10 +261,11 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
     //MSSPs
     auto N = X.size();
     primitives::fill(Q, distances, std::numeric_limits<K>::max());
-    DeviceCubicGraph FG(cubic_neighbours.data());
-    vector<K> outer_face(6);
-    FG.get_face_oriented(0, FG[0], outer_face.data());
-    multiple_source_shortest_paths(cubic_neighbours.template as_span<std::array<K,3>>(), outer_face, distances);
+    DeviceCubicGraph FG(cubic_neighbours);
+    std::array<K,6> outer_face;
+    auto face_size = FG.get_face_oriented(0, FG[0][0], outer_face);
+
+    multiple_source_shortest_paths(cubic_neighbours, std::vector<K>(outer_face.data(), outer_face.data() + face_size), distances);
 
     //Compute maximum topological distance
     K d_max = primitives::reduce(Q, distances, K{0}, Max{});
@@ -320,7 +321,7 @@ SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> 
     if (fullerene.m_.flags_.get() & (int)StatusFlag::CUBIC_INITIALIZED){
         return spherical_projection_impl<T,K>(Q,
                                     fullerene.d_.X_cubic_.template as_span<std::array<T,2>>(),
-                                    fullerene.d_.X_cubic_.template as_span<std::array<T,3>>(),
+                                    fullerene.d_.X_cubic_,
                                     fullerene.d_.A_cubic_,
                                     topological_distances,
                                     reduce_in,

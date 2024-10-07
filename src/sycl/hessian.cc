@@ -1806,7 +1806,7 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
     TEMPLATE_TYPEDEFS(T,K);
     if (hess.size() < 90*B.N_*B.size() || cols.size() < 90*B.N_*B.size()) throw std::runtime_error("compute_hessians: hess and cols buffers must be of size >= 90*N*size");
     SyclEventImpl hessians_finished = Q->submit([&](sycl::handler& h){
-        auto X_acc = B.d_.X_cubic_.template as_span<coord3d>();
+        auto X_acc = B.d_.X_cubic_;
         auto cubic_neighbours_acc = B.d_.A_cubic_;
 
         sycl::local_accessor<coord3d, 1> X(B.N_,h);
@@ -1820,8 +1820,8 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
             auto bid = nditem.get_group_linear_id();
             if (!(B[bid].m_.flags_.get() & StatusFlag::CUBIC_INITIALIZED)) return; //Skip if cubic graph is not initialized
 
-            Constants<T,K> constants (cubic_neighbours_acc.data(), K(tid));
-            NodeNeighbours nodeG(cubic_neighbours_acc.data(), K(tid));
+            Constants<T,K> constants (cubic_neighbours_acc, K(tid));
+            NodeNeighbours nodeG(cubic_neighbours_acc, K(tid));
             X[tid] = X_acc[bid*N + tid];
             ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, sdata.get_pointer());
             auto hessian = FF.hessian(Span<coord3d>(X.get_pointer(), N));

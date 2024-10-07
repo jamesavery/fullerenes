@@ -5,14 +5,13 @@ struct DeviceCubicGraph{
     static_assert(std::is_integral<K>::value, "K must be integral");
     //const accessor<K, 1, access::mode::read> cubic_neighbours;
     //const size_t offset;
-    const K* cubic_neighbours;
+    const Span<std::array<K,3>> cubic_neighbours;
 
-    inline K operator[](const K i) const{
+    inline std::array<K,3> operator[](const K i) const{
         return cubic_neighbours[i];
     }
 
-    DeviceCubicGraph(const accessor<K, 1, access::mode::read> cubic_neighbours, size_t offset) : cubic_neighbours(cubic_neighbours.get_pointer() + offset) {}
-    DeviceCubicGraph(const K* cubic_neighbours, size_t offset = 0) : cubic_neighbours(cubic_neighbours + offset) {}
+    DeviceCubicGraph(const Span<std::array<K,3>> cubic_neighbours) : cubic_neighbours(cubic_neighbours) {}
 
     /** @brief Find the index of the neighbour v in the list of neighbours of u
     // @param u: source node in the arc (u,v)
@@ -21,7 +20,7 @@ struct DeviceCubicGraph{
     */
     K arc_ix(const K u, const K v) const{
         for (uint8_t j = 0; j < 3; j++)
-            if ((*this)[u*3 + j] == v) return j;
+            if ((*this)[u][j] == v) return j;
 
         assert(false);
 	return 0;		// Make compiler happy
@@ -34,7 +33,7 @@ struct DeviceCubicGraph{
     */
     K next(const K u, const K v) const{
         K j = arc_ix(u,v);
-        return (*this)[u*3 + ((j+1)%3)];
+        return (*this)[u][((j+1)%3)];
     }
     
     /** @brief Find the previous neighbour in the clockwise order around u
@@ -44,7 +43,7 @@ struct DeviceCubicGraph{
     */
     K prev(const K u, const K v) const{
         K j = arc_ix(u,v);
-        return (*this)[u*3 + ((j+2)%3)];
+        return (*this)[u] [((j+2)%3)];
     }
     
     /** @brief Find the next node in the face represented by the arc (u,v)
@@ -83,7 +82,7 @@ struct DeviceCubicGraph{
         return d;
     }
 
-    uint8_t get_face_oriented(K u, K v, K *f) const{
+    uint8_t get_face_oriented(K u, K v, std::array<K,6>& f) const{
         constexpr int f_max = 6;
         int i = 0;
 	    f[0] = u;

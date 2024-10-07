@@ -5,12 +5,12 @@
 
 template <template<typename> class Container, typename T, typename K>
 struct FullereneDataMembers{
-    mutable Container<T> X_cubic_; // 3D Embedding of the Cubic Graph {N * 3}
-    mutable Container<T> X_dual_;  // 3D Embedding of the Dual Graph {Nf * 6}
-    mutable Container<K> A_cubic_; // Adjacency Matrix (Cubic) {N * 3}
-    mutable Container<K> A_dual_;  // Adjacency Matrix (Dual) {Nf * 6}
-    mutable Container<K> faces_cubic_;   // Atom indices of the hexagons/pentagons {Nf * 6}
-    mutable Container<K> faces_dual_;    // "Face-indices" of the triangles {N * 3}
+    mutable Container<std::array<T,3>> X_cubic_; // 3D Embedding of the Cubic Graph {N * 3}
+    mutable Container<std::array<T,3>> X_dual_;  // 3D Embedding of the Dual Graph {Nf * 6}
+    mutable Container<std::array<K,3>> A_cubic_; // Adjacency Matrix (Cubic) {N * 3}
+    mutable Container<std::array<K,6>> A_dual_;  // Adjacency Matrix (Dual) {Nf * 6}
+    mutable Container<std::array<K,6>> faces_cubic_;   // Atom indices of the hexagons/pentagons {Nf * 6}
+    mutable Container<std::array<K,3>> faces_dual_;    // "Face-indices" of the triangles {N * 3}
     mutable Container<K> deg_;     // Vertex degrees in the dual graph, face degrees in the cubic graph, face degrees in the dual graph is always 3 (it is a triangulation)
 
     FullereneDataMembers() = default;
@@ -35,12 +35,12 @@ struct FullereneDataMembers{
     
     static inline constexpr auto get_size_factors(int N, int capacity) { 
             int Nf = N/2 + 2;
-            return std::array{(int)N*3*capacity,    //X_cubic_ 
-                            (int)Nf*3*capacity,     //X_dual_
-                            (int)N*3*capacity,      //A_cubic_
-                            (int)Nf*6*capacity,     //A_dual_
-                            (int)Nf*6*capacity,     //faces_cubic_
-                            (int)N*3*capacity,      //faces_dual_
+            return std::array{(int)N*capacity,    //X_cubic_ 
+                            (int)Nf*capacity,     //X_dual_
+                            (int)N*capacity,      //A_cubic_
+                            (int)Nf*capacity,     //A_dual_
+                            (int)Nf*capacity,     //faces_cubic_
+                            (int)N*capacity,      //faces_dual_
                             (int)Nf*capacity};      //deg_
     }
 };

@@ -204,7 +204,7 @@ void fill(FullereneBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
   int Nf = B.Nf_;
   int N_graphs = B.capacity();
   auto face_degrees_acc = B.d_.deg_;
-  auto dual_neighbours_acc = B.d_.A_cubic_;
+  auto dual_neighbours_acc = B.d_.A_dual_;
   auto statuses_acc = B.m_.flags_;
   BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,false, false, mytask_id, ntasks);
   Graph G;
@@ -220,7 +220,7 @@ void fill(FullereneBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
     for(int j = 0; j < Nf; j++) {
       face_degrees_acc[i*Nf + j] = G.neighbours[j].size();
       for(int k = 0; k < G.neighbours[j].size(); k++) 
-        dual_neighbours_acc[i*Nf*6 + j*6 + k] = G.neighbours[j][k];
+        dual_neighbours_acc[i*Nf + j][k] = G.neighbours[j][k];
 
     }
   }
@@ -232,7 +232,7 @@ void fill(FullereneBatch<T,K>& B, int mytask_id = 0, int ntasks = 1) {
       for(int j = 0; j < Nf; j++) {
         face_degrees_acc[i*Nf + j] = face_degrees_acc[(i%num_generated)*Nf + j];
         for(int k = 0; k < 6; k++) 
-          dual_neighbours_acc[i*Nf*6 + j*6 + k] = dual_neighbours_acc[(i%num_generated)*Nf*6 + j*6 + k];
+          dual_neighbours_acc[i*Nf + j][k] = dual_neighbours_acc[(i%num_generated)*Nf + j][k];
 
       }
     }

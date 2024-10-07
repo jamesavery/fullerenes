@@ -17,14 +17,14 @@ struct DeviceDualGraph{
     //Check that K is integral
     INT_TYPEDEFS(K);
     
-    const K* dual_neighbours;                          //(Nf x MaxDegree)
-    const K* face_degrees;                            //(Nf x 1)
+    const Span<std::array<K,MaxDegree>> dual_neighbours;                          //(Nf x MaxDegree)
+    const Span<K> face_degrees;                            //(Nf x 1)
     
-    DeviceDualGraph(const K* dual_neighbours, const K* face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
+    DeviceDualGraph(const Span<std::array<K,MaxDegree>> dual_neighbours, const Span<K> face_degrees) : dual_neighbours(dual_neighbours), face_degrees(face_degrees) {}
 
     K arc_ix(const K u, const K v) const{
         for (uint8_t j = 0; j < face_degrees[u]; j++){
-            if (dual_neighbours[u*MaxDegree + j] == v) return j;
+            if (dual_neighbours[u][j] == v) return j;
         }
 
         assert(false);
@@ -34,12 +34,12 @@ struct DeviceDualGraph{
 
     K next(const K u, const K v) const{
         K j = arc_ix(u,v);
-        return dual_neighbours[u*MaxDegree + ((j+1)%face_degrees[u])];
+        return dual_neighbours[u][((j+1)%face_degrees[u])];
     }
     
     K prev(const K u, const K v) const{
         K j = arc_ix(u,v);
-        return dual_neighbours[u*MaxDegree + ((j-1+face_degrees[u])%face_degrees[u])];
+        return dual_neighbours[u][((j-1+face_degrees[u])%face_degrees[u])];
     }
 
     K next_on_face(const K u, const K v) const{
@@ -183,8 +183,8 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
 
     SyclEventImpl cubic_graph_event = Q->submit([&](handler &h) {
         //Create local accessors to shared memory
-        local_accessor<node_t, 1>   triangle_numbers(Nf*MaxDegree, h);
-        local_accessor<node_t, 1>   cached_neighbours(Nf*MaxDegree, h);
+        local_accessor<std::array<K,MaxDegree>, 1>   triangle_numbers(Nf, h);
+        local_accessor<std::array<K,MaxDegree>, 1>   cached_neighbours(Nf, h);
         local_accessor<node_t, 1>   cached_degrees(Nf, h);
         local_accessor<node2, 1>    arc_list(N, h);
 
@@ -193,20 +193,24 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
             if(all_set(statuses[isomer], (int)StatusFlag::CUBIC_INITIALIZED)) return;
-            sycl::decorated_local_ptr<node_t> cached_neighbours_ptr(cached_neighbours);
-            cta.async_work_group_copy(local_ptr<K>(cached_neighbours),    global_ptr<K>(A_dual.begin() + isomer*Nf*MaxDegree), Nf*MaxDegree);
-            cta.async_work_group_copy(local_ptr<K>(cached_degrees),       global_ptr<K>(deg.begin()    + isomer*Nf), Nf);
+            //cta.async_work_group_copy(local_ptr<K>(cached_neighbours),    global_ptr<K>(A_dual.begin() + isomer*Nf*MaxDegree), Nf*MaxDegree);
+            //cta.async_work_group_copy(local_ptr<K>(cached_degrees),       global_ptr<K>(deg.begin()    + isomer*Nf), Nf);
+            if ( f < Nf){
+                cached_neighbours[f] = A_dual[isomer*Nf + f];
+                cached_degrees[f] = deg[isomer*Nf + f];
+            }
 
-            DeviceDualGraph<MaxDegree, node_t> FD(cached_neighbours.get_pointer(), cached_degrees.get_pointer());
+            DeviceDualGraph<MaxDegree, node_t> FD(Span<std::array<K,MaxDegree>>(cached_neighbours.get_pointer(),Nf), Span<K>(cached_degrees.get_pointer(),Nf));
 
             node_t canon_arcs[MaxDegree]; for(size_t i=0;i<MaxDegree;i++) canon_arcs[i] = EMPTY_NODE; // JA: memset was bug: it writes byte-values, but node_t is 16/32bit.
 
             node_t rep_count  = 0;
             sycl::group_barrier(cta);
 
+
             if (f < Nf){
                 for (node_t i = 0; i < FD.face_degrees[f]; i++){
-                    auto canon_arc = FD.get_canonical_triangle_arc(f, FD.dual_neighbours[f*MaxDegree + i]);
+                    auto canon_arc = FD.get_canonical_triangle_arc(f, FD.dual_neighbours[f][i]);
                     if (canon_arc[0] == f){
                         canon_arcs[i] = canon_arc[1];
                         rep_count++;
@@ -214,14 +218,13 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
                 }
             }
             sycl::group_barrier(cta);
-
             node_t scan_result = exclusive_scan_over_group(cta, rep_count, sycl::plus<node_t>{});
 
             if (f < Nf){
                 node_t arc_count = 0;
                 for (node_t i = 0; i < FD.face_degrees[f]; i++){
                     if(canon_arcs[i] != std::numeric_limits<node_t>::max()){
-                        triangle_numbers[f*MaxDegree + i] = scan_result + arc_count;
+                        triangle_numbers[f][i] = scan_result + arc_count;
                         ++arc_count;
                     }    
                 }
@@ -231,7 +234,7 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             if (f < Nf){
                 for (node_t i = 0; i < FD.face_degrees[f]; i++){
                     if(canon_arcs[i] != std::numeric_limits<node_t>::max()){
-                        node_t u = triangle_numbers[f*MaxDegree + i];
+                        node_t u = triangle_numbers[f][i];
                         arc_list[u] = {f, canon_arcs[i]};
                     }
                 }
@@ -239,20 +242,20 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             sycl::group_barrier(cta);
             auto [u, v] = arc_list[f];
             auto w = FD.next(u,v);
-            node2 edge_b = FD.get_canonical_triangle_arc(v, u); A_cubic[isomer*N*3 + f*3 + 0] = triangle_numbers[edge_b[0]*MaxDegree + FD.arc_ix(edge_b)];
-            node2 edge_c = FD.get_canonical_triangle_arc(w, v); A_cubic[isomer*N*3 + f*3 + 1] = triangle_numbers[edge_c[0]*MaxDegree + FD.arc_ix(edge_c)];
-            node2 edge_d = FD.get_canonical_triangle_arc(u, w); A_cubic[isomer*N*3 + f*3 + 2] = triangle_numbers[edge_d[0]*MaxDegree + FD.arc_ix(edge_d)];
+            node2 edge_b = FD.get_canonical_triangle_arc(v, u); A_cubic[isomer*N + f][0] = triangle_numbers[edge_b[0]][FD.arc_ix(edge_b)];
+            node2 edge_c = FD.get_canonical_triangle_arc(w, v); A_cubic[isomer*N + f][1] = triangle_numbers[edge_c[0]][FD.arc_ix(edge_c)];
+            node2 edge_d = FD.get_canonical_triangle_arc(u, w); A_cubic[isomer*N + f][2] = triangle_numbers[edge_d[0]][FD.arc_ix(edge_d)];
 
             //Fill faces_cubic
             if (f < Nf){
                 for (int i = 0; i < FD.face_degrees[f]; i++){
-                    auto arc = FD.get_canonical_triangle_arc(f, FD.dual_neighbours[f*MaxDegree + i]);
-                    faces_cubic[isomer*Nf*MaxDegree + f*MaxDegree + i] = triangle_numbers[arc[0]*MaxDegree + FD.arc_ix(arc)];
+                    auto arc = FD.get_canonical_triangle_arc(f, FD.dual_neighbours[f][i]);
+                    faces_cubic[isomer*Nf + f][i] = triangle_numbers[arc[0]][FD.arc_ix(arc)];
                 }
             }
 
             //Fill faces_dual
-            faces_dual.template as_span<std::array<node_t,3>>()[isomer*N + f] = {u,v,w};
+            faces_dual[isomer*N + f] = {u,v,w};
 
             if (f == 0) statuses[isomer] |= (int)StatusFlag::CUBIC_INITIALIZED;
         });
@@ -280,11 +283,11 @@ SyclEvent prepare_fullerene_graph(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K
 
     auto work_distribution = Q -> parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
         auto thid = nditem.get_global_linear_id();
-        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_.data(), fullerene.d_.deg_.data());
+        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_, fullerene.d_.deg_);
         K local_rep_count = 0;
         if (thid < Nin){
             for (int i = 0; i < FD.face_degrees[thid]; i++){
-                auto canon_arc = FD.get_canonical_arc(thid, FD.dual_neighbours[thid*6 + i]);
+                auto canon_arc = FD.get_canonical_arc(thid, FD.dual_neighbours[thid][i]);
                 if (canon_arc[0] == thid){
                     cannon_ixs[thid*6 + local_rep_count] = i;
                     ++local_rep_count;
@@ -299,7 +302,7 @@ SyclEvent prepare_fullerene_graph(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K
 
     auto arc_list_event = Q -> parallel_for(nd_range(range{grid_size1}, range{workgroup_size1}), [=](nd_item<1> nditem) {
         auto idx = nditem.get_global_linear_id();
-        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_.data(), fullerene.d_.deg_.data());
+        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_, fullerene.d_.deg_);
         if (idx < Nin){
         K rep_count_local = rep_count[idx];
         K scan_result = scan_array[idx];
@@ -307,28 +310,28 @@ SyclEvent prepare_fullerene_graph(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K
             auto i = cannon_ixs[idx*6 + ii];
             auto triangle_id = scan_result + ii;
             triangle_numbers[idx*6 + i] = triangle_id;
-            arc_list.template as_span<std::array<K,2>>()[triangle_id] = {(K)idx, FD.dual_neighbours[idx*6 + i]};
+            arc_list.template as_span<std::array<K,2>>()[triangle_id] = {(K)idx, FD.dual_neighbours[idx][i]};
         }
         }
     });
     
-    SyclEventImpl fill_graph_event = Q -> parallel_for(nd_range(range{grid_size2}, range{workgroup_size2}), [=](nd_item<1> nditem) {
+    SyclEventImpl fill_graph_event = Q -> parallel_for(nd_range(range{grid_size2}, range{workgroup_size2}), arc_list_event, [=](nd_item<1> nditem) {
         auto tidx = nditem.get_global_linear_id();
-        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_.data(), fullerene.d_.deg_.data());
+        DeviceDualGraph<6, K> FD(fullerene.d_.A_dual_, fullerene.d_.deg_);
         if (tidx < Nout){
             auto [u, v] = arc_list.template as_span<std::array<K,2>>()[tidx];
             auto w = FD.next(u,v);
-            auto edge_b = FD.get_canonical_triangle_arc(v, u); fullerene.d_.A_cubic_[tidx*3 + 0] = triangle_numbers[edge_b[0]*6 + FD.arc_ix(edge_b)];
-            auto edge_c = FD.get_canonical_triangle_arc(w, v); fullerene.d_.A_cubic_[tidx*3 + 1] = triangle_numbers[edge_c[0]*6 + FD.arc_ix(edge_c)];
-            auto edge_d = FD.get_canonical_triangle_arc(u, w); fullerene.d_.A_cubic_[tidx*3 + 2] = triangle_numbers[edge_d[0]*6 + FD.arc_ix(edge_d)];
+            auto edge_b = FD.get_canonical_triangle_arc(v, u); fullerene.d_.A_cubic_[tidx][0] = triangle_numbers[edge_b[0]*6 + FD.arc_ix(edge_b)];
+            auto edge_c = FD.get_canonical_triangle_arc(w, v); fullerene.d_.A_cubic_[tidx][1] = triangle_numbers[edge_c[0]*6 + FD.arc_ix(edge_c)];
+            auto edge_d = FD.get_canonical_triangle_arc(u, w); fullerene.d_.A_cubic_[tidx][2] = triangle_numbers[edge_d[0]*6 + FD.arc_ix(edge_d)];
 
             fullerene.d_.faces_dual_.template as_span<std::array<K,3>>() [tidx] = {u,v,w};
         }
 
         if (tidx < Nin){
             for (int i = 0; i < FD.face_degrees[tidx]; i++){
-                auto arc = FD.get_canonical_triangle_arc(tidx, FD.dual_neighbours[tidx*6 + i]);
-                fullerene.d_.faces_cubic_[tidx*6 + i] = triangle_numbers[arc[0]*6 + FD.arc_ix(arc)];
+                auto arc = FD.get_canonical_triangle_arc(tidx, FD.dual_neighbours[tidx][i]);
+                fullerene.d_.faces_cubic_[tidx][i] = triangle_numbers[arc[0]*6 + FD.arc_ix(arc)];
             }
         }
         

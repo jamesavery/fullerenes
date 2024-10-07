@@ -104,10 +104,10 @@ int main(int argc, char** argv) {
             {
                 for(size_t k = 0; k < G.neighbours[j].size(); k++)
                 {
-                    acc_dual[isomer_idx*Nf*6 + j*6 + k] = G.neighbours[j][k];
+                    acc_dual[isomer_idx*Nf + j][k] = G.neighbours[j][k];
                 } 
                 if(G.neighbours[j].size() == 5){
-                    acc_dual[isomer_idx*Nf*6 + j*6 + 5] = std::numeric_limits<node_t>::max();
+                    acc_dual[isomer_idx*Nf + j][5] = std::numeric_limits<node_t>::max();
                     acc_degs[isomer_idx*Nf + j] = 5;
                 } else {
                     acc_degs[isomer_idx*Nf + j] = 6;

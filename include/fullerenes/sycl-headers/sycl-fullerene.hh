@@ -19,7 +19,7 @@ struct Fullerene
         ConditionFunctor cond(StatusFlag::CUBIC_INITIALIZED);
         bool is_cubic = cond(m_.flags_.get());
         Graph G(neighbours_t(is_cubic ? N_ : Nf_));
-        auto& A = is_cubic ? d_.A_cubic_ : d_.A_dual_;
+        auto A = is_cubic ? d_.A_cubic_.template as_span<K>() : d_.A_dual_.template as_span<K>();
         auto count = is_cubic ? N_ : Nf_;
         for (size_t i = 0; i < count; i++) {
             auto degree = is_cubic ? 3 : d_.deg_[i];
@@ -43,8 +43,8 @@ struct Fullerene
         auto& A = d_.A_cubic_;
         for (size_t i = 0; i < N_; i++) {
             for (size_t j = 0; j < 3; j++) {
-                neighbours[i].push_back(A[i * 3 + j]);
-                points[i][j] = d_.X_cubic_[i * 3 + j];
+                neighbours[i].push_back(A[i][j]);
+                points[i][j] = d_.X_cubic_[i][j];
             }
         }
         return Polyhedron(PlanarGraph(Graph(neighbours,true)), points);
@@ -62,7 +62,7 @@ struct Fullerene
         if (this->N_ == 0 || this->Nf_ == 0) {throw std::invalid_argument("Fullerenes are non-owning, cannot assign to an uninitialized fullerene");}
         if (G.neighbours.size() != N_ && G.neighbours.size() != Nf_) {throw std::invalid_argument("Graph has incompatible number of vertices: " + std::to_string(G.neighbours.size()) + " vs N: " + std::to_string(N_) + " or Nf: " + std::to_string(Nf_));}
         bool is_cubic = G.neighbours.size() == N_ && G.neighbours[0].size() == 3;
-        auto& A = is_cubic ? d_.A_cubic_ : d_.A_dual_;
+        auto A = is_cubic ? d_.A_cubic_.template as_span<K>() : d_.A_dual_.template as_span<K>();
         auto count = is_cubic ? N_ : Nf_;
         for (size_t i = 0; i < count; i++) {
             auto degree = is_cubic ? 3 : G.neighbours[i].size();

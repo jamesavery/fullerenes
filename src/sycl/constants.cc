@@ -127,7 +127,7 @@ struct Constants{
 
 
         const DeviceCubicGraph<K> FG(cubic_neighbours);
-        node3 neighbours = {FG[idx*3], FG[idx*3 + 1], FG[idx*3 + 2]};
+        node3 neighbours = {FG[idx][0], FG[idx][1], FG[idx][2]};
         //       m    p
         //    f5_|   |_f4
         //   p   c    b  m
@@ -146,9 +146,9 @@ struct Constants{
             int F3 = FG.face_size(idx, neighbours[(j+2)%3]) -5;
             
             //The faces to the right of the arcs ab, bm and bp in no particular order, from this we can deduce F4.
-            int neighbour_F1 = FG.face_size(neighbours[j], FG[neighbours[j]*3] ) -    5;
-            int neighbour_F2 = FG.face_size(neighbours[j], FG[neighbours[j]*3 + 1] ) -5;
-            int neighbour_F3 = FG.face_size(neighbours[j], FG[neighbours[j]*3 + 2] ) -5;
+            int neighbour_F1 = FG.face_size(neighbours[j], FG[neighbours[j]][0] ) -5;
+            int neighbour_F2 = FG.face_size(neighbours[j], FG[neighbours[j]][1] ) -5;
+            int neighbour_F3 = FG.face_size(neighbours[j], FG[neighbours[j]][2] ) -5;
 
             int F4 = (neighbour_F1 + neighbour_F2 + neighbour_F3 - F1 - F3) ;
             

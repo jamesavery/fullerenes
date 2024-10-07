@@ -855,8 +855,8 @@ int main(int argc, char** argv){
 
         for(int i = 0; i < N*BatchSize; i++){
             for(int j = 0; j < 3; j++){
-                batch_double_acc_X[i*3 + j] = batch_acc_X[i*3 + j];
-                batch_double_acc_cubic_neighbours[i*3 + j] = batch_acc_cubic_neighbours[i*3 + j];
+                batch_double_acc_X[i][j] = batch_acc_X[i][j];
+                batch_double_acc_cubic_neighbours[i][j] = batch_acc_cubic_neighbours[i][j];
             }
         }
     }

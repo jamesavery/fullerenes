@@ -18,7 +18,8 @@
 template <typename T, typename K> struct TutteKernel_1 {};
 
 template <typename T, typename K>
-SyclEvent tutte_isomer_impl( SyclQueue& Q, Span<K> cubic_neighbours,
+SyclEvent tutte_isomer_impl( SyclQueue& Q, 
+                        Span<std::array<K,3>> cubic_neighbours,
                         Span<std::array<T,2>> xys,
                         Span<std::array<T,2>> newxys,
                         Span<bool> fixed,
@@ -33,9 +34,9 @@ SyclEvent tutte_isomer_impl( SyclQueue& Q, Span<K> cubic_neighbours,
 
     Q->submit([&](handler& h) { h.parallel_for<TutteKernel_1<T,K>> ( config1.isomer_nd_range(6) , [=](nd_item<1> nditem){
             auto tid = nditem.get_global_linear_id();
-            DeviceCubicGraph FG(cubic_neighbours.data());
-            K outer_face[6];
-            uint8_t Nface = FG.get_face_oriented(0, FG[0], outer_face);
+            DeviceCubicGraph FG(cubic_neighbours);
+            std::array<K, 6> outer_face;
+            uint8_t Nface = FG.get_face_oriented(0, FG[0][0], outer_face);
             if(tid < Nface){ fixed[outer_face[tid]] = true;}
             T phase = M_PI*2/Nface;
             if(tid < Nface) xys[outer_face[tid]] = {sycl::sin(tid*phase), sycl::cos(tid*phase)};
@@ -98,14 +99,14 @@ SyclEvent tutte_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
 	    
             if (statuses[isomer_idx] & StatusFlag::CUBIC_INITIALIZED){
 
-            DeviceCubicGraph FG(isomer_neighbours.data()); 
+            DeviceCubicGraph FG(isomer_neighbours); 
 
-            node3 ns       = {isomer_neighbours[a*3], isomer_neighbours[a*3 + 1], isomer_neighbours[a*3 + 2]};
+            node3 ns       = FG[a];
             xys_smem[a]    = {0,0};
 
-            node_t outer_face[6];
+            std::array<node_t, 6> outer_face;
             node_t outer_face_vertex   = 0;
-            uint8_t Nface = FG.get_face_oriented(0,FG[0], outer_face);    
+            uint8_t Nface = FG.get_face_oriented(0,FG[0][0], outer_face);    
             
             smem[a] =  false; 
             sycl::group_barrier(cta);
