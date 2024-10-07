@@ -239,21 +239,25 @@ TEST_P(FunctorTests, AllTestsInOne) {
     }
     */
 
-/* 
+
     {
         auto batch1 = bigbatch;
         auto batch2 = bigbatch;
         DualizeFunctor<T, K> dualize;
         TutteFunctor<T, K> tutte;
         SphericalProjectionFunctor<T, K> spherical_projection;
+        ForcefieldOptimizeFunctor<PEDERSEN, T, K> forcefield_optimize;
         SyclQueue Q(Device::get_devices(DeviceType::GPU).at(0), true);
         dualize(Q, batch1, LaunchPolicy::SYNC);
         tutte(Q, batch1, LaunchPolicy::SYNC);
         spherical_projection(Q, batch1, LaunchPolicy::SYNC);
+        //forcefield_optimize(Q, batch1, LaunchPolicy::SYNC, 5*N, 5*N);
+
         std::for_each(batch2.begin(), batch2.end(), [&](auto fullerene) {
             dualize(Q, fullerene, LaunchPolicy::SYNC);
             tutte(Q, fullerene, LaunchPolicy::SYNC);
             spherical_projection(Q, fullerene, LaunchPolicy::SYNC);
+            //forcefield_optimize(Q, fullerene, LaunchPolicy::SYNC, 5*N, 5*N);
         });
         ASSERT_TRUE(float_spans_equal(((Span<std::array<float,3>>)(batch1.d_.X_cubic_)).template as_span<float>(), ((Span<std::array<float,3>>)(batch2.d_.X_cubic_)).template as_span<float>() ) );
 
@@ -262,7 +266,7 @@ TEST_P(FunctorTests, AllTestsInOne) {
         //std::cout << batch2[0].d_.faces_dual_.subspan(0, 30) << std::endl;
         //std::cout << batch1[0].d_.faces_cubic_.subspan(0, 30) << std::endl;
     } 
-    */
+   
 }
 
 /*

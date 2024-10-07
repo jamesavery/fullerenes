@@ -2050,6 +2050,5 @@ SyclEvent ForcefieldOptimizeFunctor<FFT,T,K>::compute(SyclQueue& Q, FullereneBat
 
 template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint16_t>;
 template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>;
-//template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint32_t>;   
-//template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint16_t>;
-//template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint32_t>;
+template struct ForcefieldOptimizeFunctor<PEDERSEN, float, uint32_t>;   
+template struct ForcefieldOptimizeFunctor<PEDERSEN, double, uint32_t>;
