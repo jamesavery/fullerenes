@@ -193,29 +193,31 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullere
     if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
     auto N = fullerene.N_;
     auto Nf = fullerene.Nf_;
-    //TODO: Implement this
+    if (indices.size() != Nf) throw std::runtime_error("Indices size must be equal to the number of faces");
 
-    /* auto X_smem = sycl::local_accessor<std::array<T,3>, 1>(N);
-    auto smem = sycl::local_accessor<K, 1>(N*3 + Nf * 6);
-    auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
-    auto node_graph = NodeNeighbours<T,K>(fullerene.d_.A_cubic_.data());
-    T A = 0;
-    for (int i = 0; i < Nf; i++){
+    primitives::iota(Q, indices, 0);
+    auto result = primitives::transform_reduce(Q, indices, T(0), Plus{}, [Nf, fullerene](auto tid){
+        T A = 0;
         std::array<T,3> face_center = {0,0,0};
-        for (int i = 0; i < node_graph.face_size; i++) face_center += X[node_graph.face_nodes[i]];
-        face_center /= node_graph.face_size;
-        for (int i = 0; i < node_graph.face_size; i++){
-            auto a = X[node_graph.face_nodes[i]];
-            auto b = X[node_graph.face_nodes[(i+1)%node_graph.face_size]];
+        auto face = fullerene.d_.faces_cubic_[tid];
+        auto face_size = fullerene.d_.deg_[tid];
+        for (int i = 0; i < face_size; i++) face_center += fullerene.d_.X_cubic_[face[i]];
+        face_center /= T(face_size);
+        for (int i = 0; i < face_size; i++){
+            auto a = fullerene.d_.X_cubic_[face[i]];
+            auto b = fullerene.d_.X_cubic_[face[(i+1)%face_size]];
             auto c = face_center;
             auto u = b - a;
             auto v = c - a;
             auto n = cross(u,v);
             A += norm(n);
         }
-    }
-    out_surface_area[0] = A / T(2);
-    return Q.get_event(); */
+        return A / T(2);
+    });
+    Q -> single_task([=](){
+        out_surface_area[0] = result;
+    });
+    return Q.get_event();
 }
 
 template <typename T, typename K>
