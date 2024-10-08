@@ -185,27 +185,53 @@ TEST_P(FunctorTests, AllTestsInOne) {
         SurfaceAreaFunctor<T, uint16_t> surface_area;
         
         SyclQueue Q(Device::get_devices(DeviceType::GPU).at(0), true);
-        dualize(Q, batch1, LaunchPolicy::SYNC);
-        tutte(Q, batch1, LaunchPolicy::SYNC);
-        spherical_projection(Q, batch1, LaunchPolicy::SYNC);
-        forcefield_optimize(Q, batch1, LaunchPolicy::SYNC, 5*N, 5*N);
+        
         SyclVector<T> batch1_eigenvalues(batch.size()*2);
         SyclVector<T> batch1_hessians(batch.size()*N*90);
         SyclVector<uint16_t> batch1_cols(batch.size()*N*90);
+        SyclVector<T> batch2_eigenvalues(batch.size()*2);
+        SyclVector<T> batch2_hessians(batch.size()*N*90);
+        SyclVector<uint16_t> batch2_cols(batch.size()*N*90);
         SyclVector<T> batch1_eigenvectors;
         SyclVector<T> batch1_eccentricities(batch.size());
         SyclVector<T> batch1_volumes(batch.size());
         SyclVector<T> batch1_surface_areas(batch.size());
+        SyclVector<T> batch2_eigenvectors;
+        SyclVector<T> batch2_eccentricities(batch.size());
+        SyclVector<T> batch2_volumes(batch.size());
+        SyclVector<T> batch2_surface_areas(batch.size());
+
+        dualize(Q, batch1, LaunchPolicy::SYNC);
+        tutte(Q, batch1, LaunchPolicy::SYNC);
+        spherical_projection(Q, batch1, LaunchPolicy::SYNC);
+        forcefield_optimize(Q, batch1, LaunchPolicy::SYNC, 5*N, 5*N);
         hessian(Q, batch1, LaunchPolicy::SYNC, batch1_hessians, batch1_cols);
         eigen(Q, batch1, LaunchPolicy::SYNC, batch1_hessians, batch1_cols, 50, batch1_eigenvalues, batch1_eigenvectors);
         eccentricity(Q, batch1, LaunchPolicy::SYNC, batch1_eccentricities);
         volume(Q, batch1, LaunchPolicy::SYNC, batch1_volumes);
         surface_area(Q, batch1, LaunchPolicy::SYNC, batch1_surface_areas);
-        auto polyhedron = (Polyhedron)batch1[0];
-        ASSERT_EQ(batch1_eigenvalues.operator Span<float>().subspan(0,2), batch1_eigenvalues.operator Span<float>().subspan(2,2));
-        ASSERT_FLOAT_EQ(polyhedron.volume_divergence(), batch1_volumes[0]);
-        ASSERT_FLOAT_EQ(polyhedron.surface_area(), batch1_surface_areas[0]);
+        std::for_each(batch2.begin(), batch2.end(), [&](auto fullerene) {
+            dualize(Q, fullerene, LaunchPolicy::SYNC);
+            tutte(Q, fullerene, LaunchPolicy::SYNC);
+            spherical_projection(Q, fullerene, LaunchPolicy::SYNC);
+            forcefield_optimize(Q, fullerene, LaunchPolicy::SYNC, 5*N, 5*N);
+            //hessian(Q, fullerene, LaunchPolicy::SYNC, batch2_hessians, batch2_cols);
+            //eigen(Q, fullerene, LaunchPolicy::SYNC, batch2_hessians, batch2_cols, 50, batch2_eigenvalues, batch2_eigenvectors);
+            eccentricity(Q, fullerene, LaunchPolicy::SYNC, batch2_eccentricities);
+            volume(Q, fullerene, LaunchPolicy::SYNC, batch2_volumes);
+            surface_area(Q, fullerene, LaunchPolicy::SYNC, batch2_surface_areas);
+        });
 
+
+        auto pol1 = (Polyhedron)batch1[0];
+        auto pol2 = (Polyhedron)batch2[0];
+        ASSERT_EQ(batch1_eigenvalues.operator Span<float>().subspan(0,2), batch1_eigenvalues.operator Span<float>().subspan(2,2));
+        
+        ASSERT_FLOAT_EQ(pol1.volume_divergence(), batch1_volumes[0]);
+        ASSERT_FLOAT_EQ(pol1.surface_area(), batch1_surface_areas[0]);
+
+        ASSERT_FLOAT_EQ(pol2.volume_divergence(), batch2_volumes[0]);
+        ASSERT_FLOAT_EQ(pol2.surface_area(), batch2_surface_areas[0]);
     }
     /* 
 
