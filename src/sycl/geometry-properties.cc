@@ -77,7 +77,7 @@ SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, 
 }
 
 template <typename T, typename K>
-SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_ellipticity, Span<K> indices){
+SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_ellipticity){
     if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
     auto N = fullerene.N_;
     auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
@@ -109,7 +109,7 @@ SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> ba
 }
 
 template <typename T, typename K>
-SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<std::array<T,3>> out_inertia, Span<K> indices){
+SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<std::array<T,3>> out_inertia){
     if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
     auto N = fullerene.N_;
     auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
@@ -141,7 +141,7 @@ SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, FullereneBatch
 }
 
 template <typename T, typename K>
-SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<K> indices){
+SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene){
     auto N = fullerene.N_;
     auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
     auto P = principal_axes(Q, X);
@@ -260,20 +260,38 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> bat
 }
 
 template <typename T, typename K>
-SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_volume, Span<K> indices, Span<T> volume_contributions){
+SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_volume, Span<K> indices){
     if (fullerene.m_.flags_.get().is_not_set(StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
     auto N = fullerene.N_;
     auto Nf = fullerene.Nf_;
     auto X = fullerene.d_.X_cubic_;
 
     T V = 0;
-    primitives::iota(Q, indices, 0);
-    /* primitives::transform(Q, indices, volume_contributions, [Nf, X](auto i){
-        std::array<T,3> face_center = {0,0,0};
-        for (int i = 0; i < Nf; i++) face_center += X[i];
+    if (indices.size() != Nf) throw std::runtime_error("Indices size must be equal to the number of faces");
 
-    }); */
-    
+    primitives::iota(Q, indices, 0);
+    auto result = primitives::transform_reduce(Q, indices, T(0), Plus{}, [Nf, fullerene](auto tid){
+        T V = 0;
+        std::array<T,3> face_center = {0,0,0};
+        auto face = fullerene.d_.faces_cubic_[tid];
+        auto face_size = fullerene.d_.deg_[tid];
+        for (int i = 0; i < face_size; i++) face_center += fullerene.d_.X_cubic_[face[i]];
+        face_center /= T(face_size);
+        for (int i = 0; i < face_size; i++){
+            auto a = fullerene.d_.X_cubic_[face[i]];
+            auto b = fullerene.d_.X_cubic_[face[(i+1)%face_size]];
+            auto c = face_center;
+            auto u = b - a;
+            auto v = c - a;
+            auto n = cross(u,v);
+            V += dot(a, n) / T(2);
+        }
+        return V / T(3);
+    });
+    Q -> single_task([=](){
+        out_volume[0] = result;
+    });
+    return Q.get_event();
 }
 
 template struct EccentricityFunctor<float, uint16_t>;

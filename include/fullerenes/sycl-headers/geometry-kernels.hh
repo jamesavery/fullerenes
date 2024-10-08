@@ -4,33 +4,28 @@
 template<typename T, typename K>
 struct EccentricityFunctor : public KernelFunctor<EccentricityFunctor<T, K>> {
     SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> out_ellipticity);
-    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<T> out_ellipticity, Span<K> indices_);
+    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<T> out_ellipticity);
 
-    mutable FunctorArrays<K> indices_;
 
-    inline constexpr auto to_tuple(size_t N, Span<T> out_ellipticity) const {       return std::make_tuple(std::make_pair(std::ref(indices_), N));}
+    inline constexpr auto to_tuple(size_t N, Span<T> out_ellipticity) const {       return std::make_tuple();}
     inline constexpr auto to_tuple_batch(size_t N, Span<T> out_ellipticity) const { return std::make_tuple();}
 };
 
 template<typename T, typename K>
 struct InertiaFunctor : public KernelFunctor<InertiaFunctor<T, K>> {
     SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<std::array<T,3>> out_inertia);
-    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<std::array<T,3>> out_inertia, Span<K> indices_);
+    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<std::array<T,3>> out_inertia);
 
-    mutable FunctorArrays<K> indices_;
-
-    inline constexpr auto to_tuple(size_t N, Span<std::array<T,3>> out_inertia) const {       return std::make_tuple(std::make_pair(std::ref(indices_), N));}
+    inline constexpr auto to_tuple(size_t N, Span<std::array<T,3>> out_inertia) const {       return std::make_tuple();}
     inline constexpr auto to_tuple_batch(size_t N, Span<std::array<T,3>> out_inertia) const { return std::make_tuple();}
 };
 
 template<typename T, typename K>
 struct TransformCoordinatesFunctor : public KernelFunctor<TransformCoordinatesFunctor<T, K>> {
     SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch);
-    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<K> indices_);
+    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch);
 
-    mutable FunctorArrays<K> indices_;
-
-    inline constexpr auto to_tuple(size_t N ) const {       return std::make_tuple(std::make_pair(std::ref(indices_), N));}
+    inline constexpr auto to_tuple(size_t N ) const {       return std::make_tuple();}
     inline constexpr auto to_tuple_batch(size_t N) const { return std::make_tuple();}
 };
 
@@ -41,20 +36,21 @@ struct SurfaceAreaFunctor : public KernelFunctor<SurfaceAreaFunctor<T, K>> {
 
     mutable FunctorArrays<K> indices_;
 
-    inline constexpr auto to_tuple(size_t N, Span<T> out_surface_area) const {       return std::make_tuple(std::make_pair(std::ref(indices_), N));}
+    inline constexpr auto to_tuple(size_t N, Span<T> out_surface_area) const {
+        auto Nf = N/2 + 2;       
+        return std::make_tuple(std::make_pair(std::ref(indices_), Nf));}
     inline constexpr auto to_tuple_batch(size_t N, Span<T> out_surface_area) const { return std::make_tuple();}
 };
 
 template<typename T, typename K>
 struct VolumeFunctor : public KernelFunctor<VolumeFunctor<T, K>> {
     SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> out_volume);
-    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<T> out_volume, Span<K> indices_, Span<T> volume_contributions_);
+    SyclEvent compute(SyclQueue& Q, Fullerene<T, K> batch, Span<T> out_volume, Span<K> indices_);
 
     mutable FunctorArrays<K> indices_;
-    mutable FunctorArrays<T> volume_contributions_;
 
     inline constexpr auto to_tuple(size_t N, Span<T> out_volume) const {
         auto Nf = N/2 + 2;
-        return std::make_tuple(std::make_pair(std::ref(indices_), Nf), std::make_pair(std::ref(volume_contributions_), Nf));}
+        return std::make_tuple(std::make_pair(std::ref(indices_), Nf));}
     inline constexpr auto to_tuple_batch(size_t N, Span<T> out_volume) const { return std::make_tuple();}
 };
