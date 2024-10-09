@@ -242,7 +242,7 @@ void FullereneBatch<T,K>::push_back(const neighbours_t& neighbours, bool is_cubi
         }
     }
     m_.ID_[size_] = ID;
-    m_.flags_[size_] = is_cubic ? StatusFlag::CUBIC_INITIALIZED : StatusFlag::DUAL_INITIALIZED;
+    m_.flags_[size_] = is_cubic ? StatusFlag::FULLERENEGRAPH_PREPARED : StatusFlag::DUAL_INITIALIZED;
     m_.iterations_[size_] = 0;
     size_++;
 }

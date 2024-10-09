@@ -1818,7 +1818,7 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
-            if (!(B[bid].m_.flags_.get() & StatusFlag::CUBIC_INITIALIZED)) return; //Skip if cubic graph is not initialized
+            if (!(B[bid].m_.flags_.get() & StatusFlag::FULLERENEGRAPH_PREPARED)) return; //Skip if cubic graph is not initialized
 
             Constants<T,K> constants (cubic_neighbours_acc, K(tid));
             NodeNeighbours nodeG(cubic_neighbours_acc, K(tid));

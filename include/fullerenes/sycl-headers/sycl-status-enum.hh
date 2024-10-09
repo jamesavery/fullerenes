@@ -5,14 +5,15 @@
 
 enum class StatusEnum
 {
-    EMPTY = 1 << 0,            // 0000 0001
-    CONVERGED_2D = 1 << 1,     // 0000 0010
-    CONVERGED_3D = 1 << 2,     // 0000 0100
-    PLZ_CHECK = 1 << 3,        // 0000 1000
-    FAILED_2D = 1 << 4,        // 0001 0000
-    FAILED_3D = 1 << 5,        // 0010 0000
-    DUAL_INITIALIZED = 1 << 6, // 0100 0000
-    CUBIC_INITIALIZED = 1 << 7 // 1000 0000
+    EMPTY = 1 << 0,                     // 0000 0000 0001
+    CONVERGED_2D = 1 << 1,              // 0000 0000 0010
+    CONVERGED_3D = 1 << 2,              // 0000 0000 0100
+    PLZ_CHECK = 1 << 3,                 // 0000 0000 1000
+    FAILED_2D = 1 << 4,                 // 0000 0001 0000
+    FAILED_3D = 1 << 5,                 // 0000 0010 0000
+    DUAL_INITIALIZED = 1 << 6,          // 0000 0100 0000
+    FULLERENEGRAPH_PREPARED = 1 << 7,   // 0000 1000 0000
+    NOT_CONVERGED = 1 << 8,             // 0001 0000 0000
 };
 
 struct StatusFlag

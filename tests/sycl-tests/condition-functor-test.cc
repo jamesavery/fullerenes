@@ -19,8 +19,8 @@ TEST_F(StatusEnumTest, EmptyFlag)
 TEST_F(StatusEnumTest, CombineFlags)
 {
     flag = StatusFlag::CONVERGED_2D;
-    flag |= StatusFlag::CUBIC_INITIALIZED;
-    EXPECT_EQ(flag, (int)StatusEnum::CONVERGED_2D | (int)StatusEnum::CUBIC_INITIALIZED);
+    flag |= StatusFlag::FULLERENEGRAPH_PREPARED;
+    EXPECT_EQ(flag, (int)StatusEnum::CONVERGED_2D | (int)StatusEnum::FULLERENEGRAPH_PREPARED);
 }
 
 TEST_F(StatusEnumTest, TestSingleFlag)
@@ -39,8 +39,8 @@ TEST_F(StatusEnumTest, TestSingleNotFlag)
 
 TEST_F(StatusEnumTest, TestMultipleAndFlags)
 {
-    ConditionFunctor functor(StatusFlag::CONVERGED_3D | StatusFlag::CUBIC_INITIALIZED);
-    flag = StatusFlag::CONVERGED_3D | StatusFlag::CUBIC_INITIALIZED;
+    ConditionFunctor functor(StatusFlag::CONVERGED_3D | StatusFlag::FULLERENEGRAPH_PREPARED);
+    flag = StatusFlag::CONVERGED_3D | StatusFlag::FULLERENEGRAPH_PREPARED;
     EXPECT_EQ(functor(flag), true);
     flag = StatusFlag::DUAL_INITIALIZED;
     EXPECT_EQ(functor(flag), false);
@@ -48,10 +48,10 @@ TEST_F(StatusEnumTest, TestMultipleAndFlags)
 
 TEST_F(StatusEnumTest, TestMultipleOrFlags)
 {
-    ConditionFunctor functor(0,0, StatusFlag::CONVERGED_2D | StatusFlag::CUBIC_INITIALIZED);
+    ConditionFunctor functor(0,0, StatusFlag::CONVERGED_2D | StatusFlag::FULLERENEGRAPH_PREPARED);
     flag = StatusFlag::CONVERGED_2D;
     EXPECT_EQ(functor(flag), true);
-    flag = StatusFlag::CUBIC_INITIALIZED | StatusFlag::CONVERGED_2D;
+    flag = StatusFlag::FULLERENEGRAPH_PREPARED | StatusFlag::CONVERGED_2D;
     EXPECT_EQ(functor(flag), true);
 }
 

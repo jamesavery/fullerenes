@@ -97,7 +97,7 @@ SyclEvent tutte_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             const auto& isomer_neighbours  = fullerene.d_.A_cubic_;
             auto xys_acc                  = fullerene.d_.X_cubic_.template as_span<coord2d>();
 	    
-            if (statuses[isomer_idx] & StatusFlag::CUBIC_INITIALIZED){
+            if (statuses[isomer_idx] & StatusFlag::FULLERENEGRAPH_PREPARED){
 
             DeviceCubicGraph FG(isomer_neighbours); 
 
@@ -194,7 +194,7 @@ SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene,
                                     Span<std::array<T,2>> newxys,
                                     Span<bool> fixed,
                                     Span<T> max_change){
-    if (! (fullerene.m_.flags_.get() & (int)StatusFlag::CUBIC_INITIALIZED)) return SyclEvent();
+    if (! (fullerene.m_.flags_.get() & (int)StatusFlag::FULLERENEGRAPH_PREPARED)) return SyclEvent();
     auto ret_val = tutte_isomer_impl(  Q, 
                         fullerene.d_.A_cubic_, 
                         fullerene.d_.X_cubic_.template as_span<std::array<T,2>>(), 
