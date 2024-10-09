@@ -5,6 +5,17 @@ template<EigensolveMode mode, typename T, typename K>
 struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
     SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> hessian, Span<K> cols, size_t n_lanczos, Span<T> eigenvalues, Span<T> eigenvectors, 
                         Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx);
+    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> hessian, Span<K> cols, Span<T> eigenvalues, Span<T> eigenvectors, 
+                        Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx) {
+                            return compute(Q, batch, hessian, cols, 40, eigenvalues, eigenvectors, off_diagonal, qmat, lanczos, diag, ends_idx);
+                        }
+
+    template<EigensolveMode M = mode, typename std::enable_if<M == EigensolveMode::ENDS, int>::type = 0>
+    SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> hessian, Span<K> cols, size_t n_lanczos, Span<T> eigenvalues, 
+                        Span<K> indices, Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx) {
+                            return compute(Q, batch, hessian, cols, n_lanczos, eigenvalues, Span<T>(), off_diagonal, qmat, lanczos, diag, ends_idx);
+                        }
+
     SyclEvent compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> hessian, Span<K> cols, size_t n_lanczos, Span<T> eigenvalues, Span<T> eigenvectors,
                         Span<K> indices, Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx);
 
