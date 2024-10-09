@@ -87,6 +87,7 @@ struct FullereneBatch
     constexpr inline auto begin() const { return FullereneBatchView<T,K>(*this).begin(); }
     constexpr inline auto end() const { return FullereneBatchView<T,K>(*this).end(); }
 
+    constexpr inline void clear() { size_ = 0; }
     FullereneDataMembers<SyclVector, T, K> d_;
     FullereneMetaMembers<SyclVector, K> m_;
 
@@ -189,17 +190,16 @@ struct FullereneQueue : public FullereneBatch<T,K>
         return (FullereneBatchView<T, K>(*this, 0, this->capacity()))[batch_ix(index)];
     }
 
-    void push_back(const Graph &G, const int ID = -1) {
-        if (N_ == 0 || Nf_ == 0) { 
-            bool is_cubic = G.neighbours[0].size() == 3;
-            N_ = is_cubic ? G.N : (G.N - 2) * 2;
-            Nf_ = is_cubic ? G.N/2 + 2 : G.N;
-        }
-        if (size_ == 0) {front_ = 0; back_ = 0;}
-        if (size_ == capacity_) {resize(capacity_ == 0 ? 1 : capacity_ * 2);}
-        back_ = (back_ + 1) % capacity_;
-        size_++;
-        (*this)[size_ - 1] = std::tuple{std::ref(G), ID};
+    void push_back(const Graph &G, const int ID = -1, const StatusEnum status = StatusEnum(0)) {
+        queue_prepare_push_back(G.neighbours);
+        (*this)[size_ - 1] = static_cast<std::tuple<std::reference_wrapper<const Graph>, size_t>>(std::tuple{std::ref(G), ID});
+        (*this)[size_ - 1].m_.flags_.get() |= status;
+    }
+    
+    void push_back(const Polyhedron& P, const int ID = -1, const StatusEnum status = StatusEnum(0)){
+        queue_prepare_push_back(P.neighbours);
+        (*this)[size_ - 1] = static_cast<std::tuple<std::reference_wrapper<const Polyhedron>, size_t>>(std::tuple{std::ref(P), ID});
+        (*this)[size_ - 1].m_.flags_.get() |= status;
     }
     
     int batch_ix(int index) const { return (front_ + index) % capacity_;}
@@ -218,6 +218,19 @@ struct FullereneQueue : public FullereneBatch<T,K>
 private:
     int front_ = -1;    // Index of the first isomer in the queue {1}
     int back_ = -1;     // Index of the last isomer in the queue {1}
+
+    void queue_prepare_push_back(const neighbours_t &neighbours) {
+        if (N_ == 0 || Nf_ == 0) { 
+            auto N = neighbours.size();
+            bool is_cubic = neighbours[0].size() == 3;
+            N_ = is_cubic ? N : (N - 2) * 2;
+            Nf_ = is_cubic ? N/2 + 2 : N;
+        }
+        if (size_ == 0) {front_ = 0; back_ = 0;}
+        if (size_ == capacity_) {resize(capacity_ == 0 ? 1 : capacity_ * 2);}
+        back_ = (back_ + 1) % capacity_;
+        size_++;
+    }
 };
 
 template <typename T = float, typename K = uint16_t>
