@@ -1,4 +1,3 @@
-#include <fullerenes/sycl-headers/sycl-wrappers.hh>
 #include <fullerenes/sycl-headers/all-kernels.hh>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/isomerdb.hh>

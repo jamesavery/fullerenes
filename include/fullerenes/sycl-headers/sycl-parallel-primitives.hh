@@ -1,6 +1,7 @@
 #pragma once 
 #include <cmath>
 #include <numeric>
+struct SyclQueue; //Forward declaration
 //Unary Operators
 struct Identity{
     template <typename T>

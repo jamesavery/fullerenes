@@ -3,6 +3,7 @@
 #include <fullerenes/polyhedron.hh>
 #include <fullerenes/sycl-headers/sycl-status-enum.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene-misc-tuple-fun.hh>
+#include <fullerenes/sycl-headers/sycl-fullerene-data.hh>
 #include <fullerenes/sycl-headers/reference-wrapper.hh>
 
 

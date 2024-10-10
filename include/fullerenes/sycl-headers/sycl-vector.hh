@@ -1,6 +1,6 @@
 #pragma once
 #include <cassert>
-
+#include <fullerenes/sycl-headers/sycl-span.hh>
 template <typename T>
 struct SyclVector
 {   
