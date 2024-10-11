@@ -3,7 +3,6 @@ list(APPEND SYCL_LIBRARY_SOURCES
   forcefield-optimize
   tutte
   spherical-projection
-  sycl-isomer-batch
   hessian
   eigen
   sycl-util-impl
@@ -16,7 +15,6 @@ list(APPEND SYCL_SOURCE_CUSTOM_FLAGS
 "-Xcuda-ptxas --maxrregcount=80"    # forcefield-optimize.cc
 "-Xcuda-ptxas --maxrregcount=40"    # tutte.cc
 "-Xcuda-ptxas --maxrregcount=40"    # spherical-projection.cc
-"-Xcuda-ptxas --maxrregcount=40"    # sycl-isomer-batch.cc
 "-Xcuda-ptxas --maxrregcount=255"     # hessian.cc
 "-Xcuda-ptxas --maxrregcount=255"     # eigen.cc
 "-Xcuda-ptxas --maxrregcount=40"    # sycl-util-impl.cc
@@ -40,11 +38,10 @@ target_link_libraries(
   forcefield-optimize_lib 
   dualize_lib tutte_lib 
   spherical-projection_lib 
-  sycl-isomer-batch_lib 
   hessian_lib eigen_lib 
   sycl-util-impl_lib 
   primitives-instantiations_lib 
   geometry-properties_lib)
 
-#add_library(sycl_fullerene_lib hessian.cc forcefield-optimize.cc dualize.cc tutte.cc spherical-projection.cc sycl-isomer-batch.cc nop_kernel.cc eigen.cc)
+#add_library(sycl_fullerene_lib hessian.cc forcefield-optimize.cc dualize.cc tutte.cc spherical-projection.cc nop_kernel.cc eigen.cc)
 
