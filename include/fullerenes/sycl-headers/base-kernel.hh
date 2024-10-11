@@ -1,9 +1,12 @@
 #pragma once
-#include <fullerenes/sycl-isomer-batch.hh>
+//#include <fullerenes/sycl-isomer-batch.hh>
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
+#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
+#include <fullerenes/sycl-headers/sycl-vector.hh>
+#include <fullerenes/sycl-headers/sycl-span.hh>
+#include <fullerenes/sycl-headers/misc-enums.hh>
 #include <thread>
 #include <future>
-using uint16_t = unsigned short;
 
 template <template <typename...> class Template, typename T>
 struct is_specialization_of : std::false_type {};
