@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
                 }   
 
             }
-            acc_status[isomer_idx] = StatusFlag::DUAL_INITIALIZED;
+            acc_status[isomer_idx] = StatusEnum::DUAL_INITIALIZED;
             isomer_idx++;
             isomers_in_queue++;
         }

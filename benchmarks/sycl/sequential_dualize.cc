@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
         if(!more) break;
 
         
-        acc_status[ii] = StatusFlag::DUAL_INITIALIZED;
+        acc_status[ii] = StatusEnum::DUAL_INITIALIZED;
     }
     filltime = ftime;
     dualtime = dtime;

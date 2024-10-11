@@ -178,7 +178,7 @@ SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
             auto xyz_acc = full.d_.X_cubic_.template as_span<std::array<T,3>>();
 
             if(isomer_idx >= capacity) assert(false);
-            if ( *(full.m_.flags_) & StatusFlag::FULLERENEGRAPH_PREPARED){
+            if ( *(full.m_.flags_) & StatusEnum::FULLERENEGRAPH_PREPARED){
             atomic_coordinate_memory[tid] = {0.0, 0.0};
             NodeNeighbours node_graph(cubic_neighbours, (K)tid);
             node3 neighbours = node_graph.cubic_neighbours;
@@ -318,7 +318,7 @@ SyclEvent SphericalProjectionFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> 
                                                     Span<K> reduce_out,
                                                     Span<K> output_keys,
                                                     Span<std::array<T,2>> sorted_xys){
-    if (fullerene.m_.flags_.get() & (int)StatusFlag::FULLERENEGRAPH_PREPARED){
+    if (fullerene.m_.flags_.get() & (int)StatusEnum::FULLERENEGRAPH_PREPARED){
         return spherical_projection_impl<T,K>(Q,
                                     fullerene.d_.X_cubic_.template as_span<std::array<T,2>>(),
                                     fullerene.d_.X_cubic_,

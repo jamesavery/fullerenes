@@ -17,7 +17,7 @@ struct Fullerene
         : d_(data), m_(meta), N_(N), Nf_(Nf) {}
 
     explicit operator Graph() const {
-        ConditionFunctor cond(StatusFlag::FULLERENEGRAPH_PREPARED);
+        ConditionFunctor cond(StatusEnum::FULLERENEGRAPH_PREPARED);
         bool is_cubic = cond(m_.flags_.get());
         Graph G(neighbours_t(is_cubic ? N_ : Nf_));
         auto A = is_cubic ? d_.A_cubic_.template as_span<K>() : d_.A_dual_.template as_span<K>();
@@ -34,8 +34,8 @@ struct Fullerene
     explicit operator Polyhedron() const {
         using namespace condition_detail;
         if (N_ == 0 || Nf_ == 0) {throw std::invalid_argument("Fullerenes are non-owning, cannot convert to Polyhedron without initializing the fullerene");}
-        ConditionFunctor cubic_and_3d(StatusFlag::FULLERENEGRAPH_PREPARED | StatusFlag::CONVERGED_3D);
-        bool is_polyhedron = (int)(m_.flags_.get()) & (int)(StatusFlag::FULLERENEGRAPH_PREPARED);
+        ConditionFunctor cubic_and_3d(StatusEnum::FULLERENEGRAPH_PREPARED | StatusEnum::CONVERGED_3D);
+        bool is_polyhedron = (int)(m_.flags_.get()) & (int)(StatusEnum::FULLERENEGRAPH_PREPARED);
         if (!is_polyhedron) {throw std::invalid_argument("Fullerene is not a valid polyhedron, Flag: " + std::to_string(m_.flags_.get()));}
         Polyhedron P;
         using points_t = decltype(P.points);
@@ -72,7 +72,7 @@ struct Fullerene
                 A[i * (is_cubic ? 3 : 6) + j] = G.neighbours[i][j];
             }
         }
-        m_.flags_.get() |= (is_cubic ? StatusFlag::FULLERENEGRAPH_PREPARED : StatusFlag::DUAL_INITIALIZED);
+        m_.flags_.get() |= (is_cubic ? StatusEnum::FULLERENEGRAPH_PREPARED : StatusEnum::DUAL_INITIALIZED);
         return *this;
     }
 

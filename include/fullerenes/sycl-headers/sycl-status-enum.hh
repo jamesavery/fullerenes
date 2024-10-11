@@ -18,7 +18,6 @@ enum class StatusEnum
 
 struct StatusFlag
 {
-    using enum StatusEnum;
 
     StatusFlag() : flag_(0) {}
     StatusFlag(const StatusFlag& flag) = default;

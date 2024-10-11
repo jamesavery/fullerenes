@@ -211,7 +211,7 @@ TEST_P(FullereneQueueTest, PushQueueToBatch) {
         queue2.push_back(G);
     }
     SyclQueue Q;
-    QueueUtil::push(Q, batch, queue2, ConditionFunctor(0, StatusFlag::DUAL_INITIALIZED));
+    QueueUtil::push(Q, batch, queue2, ConditionFunctor(0, StatusEnum::DUAL_INITIALIZED));
     EXPECT_EQ(queue2.size(), 2);
     EXPECT_EQ(batch.size(), 3);
     for (int i = 0; i < 3; i++) {
@@ -240,12 +240,12 @@ TEST_P(FullereneQueueTest, QueueManipulation) {
     EXPECT_EQ(queue.back_index(), 4);
 
     SyclQueue Q;
-    QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusFlag::DUAL_INITIALIZED));
+    QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::DUAL_INITIALIZED));
     EXPECT_EQ(queue.size(), 5);
     EXPECT_EQ(queue.front_index(), 0);
     EXPECT_EQ(queue.back_index(), 4);
 
-    QueueUtil::push(Q, batch, queue, ConditionFunctor(0, StatusFlag::DUAL_INITIALIZED));
+    QueueUtil::push(Q, batch, queue, ConditionFunctor(0, StatusEnum::DUAL_INITIALIZED));
     EXPECT_EQ(queue.size(), 2);
     EXPECT_EQ(queue.front_index(), 3);
     EXPECT_EQ(queue.back_index(), 4);
@@ -289,7 +289,7 @@ TEST_P(FullereneQueueTest, QueueManipulation) {
         EXPECT_EQ(queue[i].m_.ID_.get(), expected_queue_IDs_2[i]);
     }
 
-    QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusFlag::DUAL_INITIALIZED));
+    QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::DUAL_INITIALIZED));
 
     EXPECT_EQ(queue.size(), 12);
     EXPECT_EQ(queue.front_index(), 0);
@@ -319,7 +319,7 @@ TEST_P(FullereneTest, DeletingFullereneDoesNotInvalidateBatch) {
     auto ptr = batch.d_.A_cubic_.data();
     {
         Fullerene fullerene = batch[0];
-        fullerene.m_.flags_ = StatusFlag::DUAL_INITIALIZED;
+        fullerene.m_.flags_ = StatusEnum::DUAL_INITIALIZED;
     }
     EXPECT_EQ(batch.size(), 1);
     EXPECT_EQ(batch.d_.A_cubic_.data(), ptr);

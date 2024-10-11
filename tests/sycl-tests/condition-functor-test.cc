@@ -18,15 +18,15 @@ TEST_F(StatusEnumTest, EmptyFlag)
 
 TEST_F(StatusEnumTest, CombineFlags)
 {
-    flag = StatusFlag::CONVERGED_2D;
-    flag |= StatusFlag::FULLERENEGRAPH_PREPARED;
+    flag = StatusEnum::CONVERGED_2D;
+    flag |= StatusEnum::FULLERENEGRAPH_PREPARED;
     EXPECT_EQ(flag, (int)StatusEnum::CONVERGED_2D | (int)StatusEnum::FULLERENEGRAPH_PREPARED);
 }
 
 TEST_F(StatusEnumTest, TestSingleFlag)
 {   
-    ConditionFunctor functor(StatusFlag::CONVERGED_2D);
-    flag = StatusFlag::CONVERGED_2D;
+    ConditionFunctor functor(StatusEnum::CONVERGED_2D);
+    flag = StatusEnum::CONVERGED_2D;
     EXPECT_EQ(functor(flag), true);
 }
 
@@ -39,19 +39,19 @@ TEST_F(StatusEnumTest, TestSingleNotFlag)
 
 TEST_F(StatusEnumTest, TestMultipleAndFlags)
 {
-    ConditionFunctor functor(StatusFlag::CONVERGED_3D | StatusFlag::FULLERENEGRAPH_PREPARED);
-    flag = StatusFlag::CONVERGED_3D | StatusFlag::FULLERENEGRAPH_PREPARED;
+    ConditionFunctor functor(StatusEnum::CONVERGED_3D | StatusEnum::FULLERENEGRAPH_PREPARED);
+    flag = StatusEnum::CONVERGED_3D | StatusEnum::FULLERENEGRAPH_PREPARED;
     EXPECT_EQ(functor(flag), true);
-    flag = StatusFlag::DUAL_INITIALIZED;
+    flag = StatusEnum::DUAL_INITIALIZED;
     EXPECT_EQ(functor(flag), false);
 }
 
 TEST_F(StatusEnumTest, TestMultipleOrFlags)
 {
-    ConditionFunctor functor(0,0, StatusFlag::CONVERGED_2D | StatusFlag::FULLERENEGRAPH_PREPARED);
-    flag = StatusFlag::CONVERGED_2D;
+    ConditionFunctor functor(0,0, StatusEnum::CONVERGED_2D | StatusEnum::FULLERENEGRAPH_PREPARED);
+    flag = StatusEnum::CONVERGED_2D;
     EXPECT_EQ(functor(flag), true);
-    flag = StatusFlag::FULLERENEGRAPH_PREPARED | StatusFlag::CONVERGED_2D;
+    flag = StatusEnum::FULLERENEGRAPH_PREPARED | StatusEnum::CONVERGED_2D;
     EXPECT_EQ(functor(flag), true);
 }
 

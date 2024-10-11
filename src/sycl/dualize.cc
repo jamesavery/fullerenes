@@ -192,7 +192,7 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             auto cta = nditem.get_group();
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
-            if(all_set(statuses[isomer], (int)StatusFlag::FULLERENEGRAPH_PREPARED)) return;
+            if(all_set(statuses[isomer], (int)StatusEnum::FULLERENEGRAPH_PREPARED)) return;
             //cta.async_work_group_copy(local_ptr<K>(cached_neighbours),    global_ptr<K>(A_dual.begin() + isomer*Nf*MaxDegree), Nf*MaxDegree);
             //cta.async_work_group_copy(local_ptr<K>(cached_degrees),       global_ptr<K>(deg.begin()    + isomer*Nf), Nf);
             if ( f < Nf){
@@ -257,7 +257,7 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             //Fill faces_dual
             faces_dual[isomer*N + f] = {u,v,w};
 
-            if (f == 0) statuses[isomer] |= (int)StatusFlag::FULLERENEGRAPH_PREPARED;
+            if (f == 0) statuses[isomer] |= (int)StatusEnum::FULLERENEGRAPH_PREPARED;
         });
     });
     return SyclEvent(std::move(cubic_graph_event));
@@ -353,8 +353,8 @@ void DualizeFunctor<T,K>::operator()(SyclQueue& Q, FullereneBatchView<T,K> batch
 
 template <typename T, typename K>
 SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> cannon_ixs, Span<K> rep_count, Span<K> scan_array, Span<K> triangle_numbers, Span<K> arc_list){
-    if (fullerene.m_.flags_.get() & (int)StatusFlag::FULLERENEGRAPH_PREPARED) return SyclEvent(); //Job already done
-    if (! (fullerene.m_.flags_.get() & (int)StatusFlag::DUAL_INITIALIZED)) return SyclEvent(); //If the dual graph is not initialized, we cannot proceed.
+    if (fullerene.m_.flags_.get() & (int)StatusEnum::FULLERENEGRAPH_PREPARED) return SyclEvent(); //Job already done
+    if (! (fullerene.m_.flags_.get() & (int)StatusEnum::DUAL_INITIALIZED)) return SyclEvent(); //If the dual graph is not initialized, we cannot proceed.
     auto done_event = prepare_fullerene_graph(  Q,
                                                 fullerene,
                                                 cannon_ixs,
@@ -362,7 +362,7 @@ SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, S
                                                 scan_array,
                                                 triangle_numbers,
                                                 arc_list);
-    fullerene.m_.flags_.get() |= (int)StatusFlag::FULLERENEGRAPH_PREPARED;
+    fullerene.m_.flags_.get() |= (int)StatusEnum::FULLERENEGRAPH_PREPARED;
     return done_event;
 }
 

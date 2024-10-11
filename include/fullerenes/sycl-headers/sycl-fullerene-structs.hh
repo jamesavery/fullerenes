@@ -154,7 +154,7 @@ private:
 };
 
 // FullereneQueue and FullereneBatch are functionally the we use the type system to express intent and to prevent misuse,
-// FullereneQueues have the additional property that their non-StatusFlag::EMPTY isomers are contiguously stored in memory
+// FullereneQueues have the additional property that their non-StatusEnum::EMPTY isomers are contiguously stored in memory
 using namespace condition_detail;
 template <typename T = float, typename K = uint16_t>
 struct FullereneQueue : public FullereneBatch<T,K>

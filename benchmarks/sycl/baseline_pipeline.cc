@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
         if(!more) break;
 
         
-        batch.m_.flags_[ii] |= StatusFlag::FULLERENEGRAPH_PREPARED;
+        batch.m_.flags_[ii] |= StatusEnum::FULLERENEGRAPH_PREPARED;
     }
     BuckyGen::stop(BuckyQ);
     filltime = ftime;

@@ -244,7 +244,7 @@ void FullereneBatch<T,K>::push_back(const neighbours_t& neighbours, bool is_cubi
         }
     }
     m_.ID_[size_] = ID;
-    m_.flags_[size_] = is_cubic ? StatusFlag::FULLERENEGRAPH_PREPARED : StatusFlag::DUAL_INITIALIZED;
+    m_.flags_[size_] = is_cubic ? StatusEnum::FULLERENEGRAPH_PREPARED : StatusEnum::DUAL_INITIALIZED;
     m_.iterations_[size_] = 0;
     size_++;
 }
@@ -267,7 +267,7 @@ void FullereneBatch<T,K>::push_back(const Polyhedron& P, const int ID) {
         }
     } //Otherwise a contiguous memory copy will do
     } else{ memcpy(d_.X_cubic_.data() + (size_-1)*N_, P.points.data(), N_*sizeof(std::array<T,3>));}
-    m_.flags_[(size_-1)] |= StatusFlag::CONVERGED_3D;
+    m_.flags_[(size_-1)] |= StatusEnum::CONVERGED_3D;
     std::cout << "Pushed Polyhedron with ID: " << ID << std::endl;
     std::cout << "Pushed Polyhedron with flags: " << m_.flags_[(size_-1)] << std::endl;
 }
