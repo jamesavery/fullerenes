@@ -113,7 +113,7 @@ struct coord2d : public pair<double,double> {
     return x+coord2d(i0*2*M_PI,j0*M_PI) - y;
   }
 
-  friend ostream& operator<<(ostream &s, const coord2d& x){ s << fixed << LIST_OPEN << x.first << "," << x.second << LIST_CLOSE; return s; }
+  friend ostream& operator<<(ostream &s, const coord2d& x){ s << std::fixed << LIST_OPEN << x.first << "," << x.second << LIST_CLOSE; return s; }
   friend istream& operator>>(istream &s, coord2d& x){ s >> x.first; s >> x.second; return s; }
 };
 
@@ -199,7 +199,7 @@ struct coord3d {
     return x0+dx*t;
   }
 
-  friend ostream& operator<<(ostream &s, const coord3d& x){ s << fixed << LIST_OPEN << x[0] << "," << x[1] << "," << x[2]<< LIST_CLOSE; return s; }
+  friend ostream& operator<<(ostream &s, const coord3d& x){ s << std::fixed << LIST_OPEN << x[0] << "," << x[1] << "," << x[2]<< LIST_CLOSE; return s; }
   friend istream& operator>>(istream &s, coord3d& x){ for(int i=0;i<3;i++){ s >> x[i]; } return s; }
 };
 
@@ -317,7 +317,7 @@ struct matrix3d {
 
     if(D==0){			// Second order equation. TODO: FP comparison
       long double Disc = sqrtl(B*B-4*A*C);
-      cout << "D = " << Disc << endl;
+      cout << "D = " << Disc << std::endl;
       return coord3d(0,(-B-Disc)/(2.L*A),(-B+Disc)/(2.L*A));
     }
 
@@ -372,7 +372,7 @@ struct matrix3d {
     if (x.norm() / (M(0,0) + M(1,1) + M(2,2)) > 1.e-12) // not zero-ish
       return x/x.norm();
   
-    cerr << "something is very wrong, possibly two degenerate evals" << endl;
+    cerr << "something is very wrong, possibly two degenerate evals" << std::endl;
     return coord3d();
   }
 
