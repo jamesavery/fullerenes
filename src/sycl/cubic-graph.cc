@@ -1,4 +1,5 @@
 #include <array>
+#include <fullerenes/sycl-headers/sycl-span.hh>
 using namespace sycl;
 template <typename K>
 struct DeviceCubicGraph{
