@@ -1,5 +1,4 @@
 #pragma once
-//#include <fullerenes/sycl-isomer-batch.hh>
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 #include <fullerenes/sycl-headers/sycl-vector.hh>
