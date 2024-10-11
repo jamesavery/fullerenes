@@ -9,7 +9,6 @@
 #define SQRT cl::sycl::sqrt
 #include <fullerenes/sycl-headers/forcefield-optimize-kernel.hh>
 #include "primitives.cc"
-#include <fullerenes/sycl-isomer-batch.hh>
 #include "forcefield-includes.cc"
 #include "kernel.cc"
 
