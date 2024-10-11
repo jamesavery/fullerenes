@@ -44,8 +44,8 @@ typedef pair<node_t,node_t> arc_t;
 
 struct edge_t : public pair<node_t,node_t> {
   edge_t() {}
-  edge_t(const pair<node_t,node_t>& p) : pair<node_t,node_t>(min(p.first,p.second),max(p.first,p.second)) {}
-  edge_t(const node_t u, const node_t v): pair<node_t,node_t>(min(u,v),max(u,v)) {}
+  edge_t(const pair<node_t,node_t>& p) : pair<node_t,node_t>(std::min(p.first,p.second),std::max(p.first,p.second)) {}
+  edge_t(const node_t u, const node_t v): pair<node_t,node_t>(std::min(u,v),std::max(u,v)) {}
   edge_t(const int index) {
     node_t u=0;
     for(;u*(u-1)/2<=index;u++) ;
