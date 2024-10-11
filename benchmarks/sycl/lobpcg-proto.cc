@@ -10,6 +10,7 @@
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/argparser.hh>
+#include <fullerenes/sycl-headers/fill.hh>
 #define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
 template <typename T, typename K, int BlockVectors, int NZ> class LOBPCGg {};
 

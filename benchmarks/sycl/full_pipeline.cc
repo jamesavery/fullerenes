@@ -7,7 +7,7 @@
 #include <string>
 #include <algorithm>
 #include <random>
-using namespace sycl;
+#include <fullerenes/sycl-headers/fill.hh>
 
 template<typename T>
 T stddev(const std::vector<T>& data)

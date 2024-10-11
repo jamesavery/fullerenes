@@ -6,7 +6,6 @@
 #include <string>
 #include <algorithm>
 #include <random>
-using namespace sycl;
 
 template<typename T>
 T stddev(const std::vector<T>& data)

@@ -5,7 +5,6 @@
 #include <fullerenes/buckygen-wrapper.hh>
 #include <string>
 #include <algorithm>
-using namespace sycl;
 
 template<typename T>
 T stddev(const std::vector<T>& data)

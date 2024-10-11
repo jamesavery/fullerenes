@@ -11,7 +11,6 @@
 #include <fullerenes/triangulation.hh>
 #include <unistd.h>
 #include <sys/wait.h>
-using namespace sycl;
     // Function to parse command line arguments
 
 int main(int argc, char** argv) {
