@@ -58,7 +58,7 @@ struct DispatchCounters : public std::array<std::vector<DefaultInitAtomic<int>>,
         return this->at((size_t)device.type).at(device.idx);
     }    
     auto& operator[](SyclQueue& Q) {
-        return this->at((size_t)Q.device_.type).at(Q.device_.idx);
+        return this->at((size_t)Q.device().type).at(Q.device().idx);
     }
 };
 
@@ -68,7 +68,7 @@ struct FunctorArrays : public ArrayOfSyclVectors<T> {
         return this->at((size_t)device.type).at(device.idx);
     }
     auto& operator[](const SyclQueue& Q) {
-        return (*this)[Q.device_];
+        return (*this)[Q.device()];
     }
 
     auto& operator[](const DeviceType device_type) {
@@ -80,7 +80,7 @@ struct FunctorArrays : public ArrayOfSyclVectors<T> {
     }
     Span<T> operator[](const std::pair<SyclQueue&, size_t> ix_tuple) {
         auto& [Q, ix] = ix_tuple;
-        return (*this)[std::pair<Device,size_t>{Q.device_, ix}];
+        return (*this)[std::pair<Device,size_t>{Q.device(), ix}];
     }
 };
 
@@ -167,11 +167,11 @@ struct AOVOV : public std::array<std::vector<std::vector<T>>, (size_t)DeviceType
     }    
     auto& operator[](std::pair<SyclQueue&, size_t> ix_tuple) {
         auto& [Q, ix] = ix_tuple;
-        return this->at((size_t)Q.device_.type).at(Q.device_.idx).at(ix);
+        return this->at((size_t)Q.device().type).at(Q.device().idx).at(ix);
     }
 
     auto& operator[](SyclQueue& Q) {
-        return this->at((size_t)Q.device_.type).at(Q.device_.idx);
+        return this->at((size_t)Q.device().type).at(Q.device().idx);
     }
 
     auto& operator[](Device device) {
@@ -193,11 +193,11 @@ struct FunctorMutexes : public std::array<std::vector<MutexVector>, (size_t)Devi
     }    
     auto& operator[](std::pair<SyclQueue&, size_t> ix_tuple) {
         auto& [Q, ix] = ix_tuple;
-        return this->at((size_t)Q.device_.type).at(Q.device_.idx).at(ix);
+        return this->at((size_t)Q.device().type).at(Q.device().idx).at(ix);
     }
 
     auto& operator[](SyclQueue& Q) {
-        return this->at((size_t)Q.device_.type).at(Q.device_.idx);
+        return this->at((size_t)Q.device().type).at(Q.device().idx);
     }
 
     auto& operator[](Device device) {
@@ -242,8 +242,8 @@ struct KernelFunctor{
     //Default implementation of get_max_concurrent_launches, can be overridden by each functor.
     template <typename... Args>
     inline constexpr size_t get_max_concurrent_launches(SyclQueue& Q, size_t N, Args&&... args) const {
-        size_t max_cus = Q.device_.get_property(DeviceProperty::MAX_COMPUTE_UNITS);
-        size_t max_wg_size = Q.device_.get_property(DeviceProperty::MAX_WORK_GROUP_SIZE);
+        size_t max_cus = Q.device().get_property(DeviceProperty::MAX_COMPUTE_UNITS);
+        size_t max_wg_size = Q.device().get_property(DeviceProperty::MAX_WORK_GROUP_SIZE);
         size_t num_wgs_per_N = (N + max_wg_size - 1) / max_wg_size;
         if (num_wgs_per_N > max_cus) return 1;
         return max_cus / num_wgs_per_N;
@@ -312,8 +312,8 @@ struct KernelFunctor{
         futures_[Q].resize(std::min((size_t)batch.size(), max_concurrent_launches));
 
         if (batch.size() == 0) {return;}
-        if (batch.N_ > Q.device_.get_property(DeviceProperty::MAX_WORK_GROUP_SIZE)){
-            SyclQueue out_of_order_queue(Q.device_, false);
+        if (batch.N_ > Q.device().get_property(DeviceProperty::MAX_WORK_GROUP_SIZE)){
+            SyclQueue out_of_order_queue(Q.device(), false);
             auto full_ix = 0;
             std::for_each(batch.begin(), batch.end(), [&](auto isomer) {
                 auto circular_ix = (this->dispatch_counters_[out_of_order_queue]++) % std::min((size_t)batch.size(), max_concurrent_launches);
