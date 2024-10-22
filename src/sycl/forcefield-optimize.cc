@@ -1861,7 +1861,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
             auto E1 = FF.energy(Span<coord3d>(X.get_pointer(), N));
             FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), std::min(size_t(1),iterations));
             auto E2 = FF.energy(Span<coord3d>(X.get_pointer(), N));
-            if (std::abs(E1 - E2) < std::numeric_limits<T>::epsilon()*1e1) check_convergence = true;
+            if (std::abs(E1 - E2)/N < std::numeric_limits<T>::epsilon()*1e2) /* ~1e-5 for float, ~2e-14 for double */ check_convergence = true;
             //
             if (check_convergence) convergence_check();
             if (tid == 0) B.m_.iterations_[bid] += iterations;
@@ -2048,7 +2048,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
     auto E1 = energy(X);
     CG(X, X1, X2, std::min(size_t(1),iterations));
     auto E2 = energy(X);
-    if (std::abs(E1 - E2) < std::numeric_limits<T>::epsilon()*1e1) check_convergence = true;
+    if (std::abs(E1 - E2)/N < std::numeric_limits<T>::epsilon()*1e2) check_convergence = true;
     if (check_convergence) convergence_check();
     fullerene.m_.iterations_ += iterations;
 
