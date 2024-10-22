@@ -55,7 +55,7 @@ struct FullereneBatch
     FullereneBatch(size_t N, int capacity);
 
     void push_back(const Graph &G, const int ID = -1);
-    void push_back(const neighbours_t &neighbours, bool is_cubic = false, const int ID = -1);
+    void push_back(const neighbours_t &neighbours, const int ID = -1);
     void push_back(const PlanarGraph &G, const int ID = -1);
     void push_back(const Polyhedron &P, const int ID = -1);
     void push_back(const Fullerene<T, K> &fullerene, const int ID = -1);
@@ -102,7 +102,7 @@ protected:
     int capacity_ = 0; // Maximum number of isomers in the batch {1}
     int size_ = 0;     // Number of isomers in the batch {1}
 
-    void prepare_for_push_back(const neighbours_t &neighbours, bool is_cubic);
+    void prepare_for_push_back(const neighbours_t &neighbours);
 };
 
 template <typename T = float, typename K = uint16_t>
@@ -226,9 +226,6 @@ private:
             N_ = is_cubic ? N : (N - 2) * 2;
             Nf_ = is_cubic ? N/2 + 2 : N;
         }
-        if (size_ == 0) {front_ = 0; back_ = 0;}
-        if (size_ == capacity_) {resize(capacity_ == 0 ? 1 : capacity_ * 2);}
-        back_ = (back_ + 1) % capacity_;
         size_++;
     }
 };

@@ -220,11 +220,12 @@ void FullereneQueue<T,K>::resize(size_t new_capacity) {
     };
     resize_all_circularly(std::make_index_sequence<std::tuple_size_v<decltype(d_.to_tuple())>>{}, d_.to_tuple(), d_.get_size_factors(N_, 1));
     resize_all_circularly(std::make_index_sequence<std::tuple_size_v<decltype(m_.to_tuple())>>{}, m_.to_tuple(), m_.get_size_factors(1));       
-    front_ = 0;
-    back_ = size_ - 1;
+    front_  = size_ > 0 ? 0 : -1;
+    back_   = size_ - 1;
 }
 template <typename T, typename K>
-void FullereneBatch<T,K>::prepare_for_push_back(const neighbours_t& neighbours, bool is_cubic){
+void FullereneBatch<T,K>::prepare_for_push_back(const neighbours_t& neighbours){
+    bool is_cubic = neighbours.at(0).size() == 3;
     if(N_ == 0 || Nf_ == 0) {
         if(is_cubic) {N_ = neighbours.size(); Nf_ = N_/2 + 2;}
         else{ Nf_ = neighbours.size(); N_ = 2*Nf_ - 4;}
@@ -233,43 +234,25 @@ void FullereneBatch<T,K>::prepare_for_push_back(const neighbours_t& neighbours, 
 }
 
 template <typename T, typename K>
-void FullereneBatch<T,K>::push_back(const neighbours_t& neighbours, bool is_cubic, const int ID) {
-    prepare_for_push_back(neighbours, is_cubic);
-    size_t N = is_cubic ? N_ : Nf_;
-    for(size_t i = 0; i < N; i++){
-        if(!is_cubic) d_.deg_[i + size_*Nf_] = neighbours[i].size();
-        for(size_t j = 0; j < neighbours[i].size(); j++){
-            if(is_cubic){d_.A_cubic_[i + size_ * N][j] = neighbours[i][j];}
-            else{d_.A_dual_[i + size_*Nf_][j] = neighbours[i][j];}
-        }
-    }
-    m_.ID_[size_] = ID;
-    m_.flags_[size_] = is_cubic ? StatusEnum::FULLERENEGRAPH_PREPARED : StatusEnum::DUAL_INITIALIZED;
-    m_.iterations_[size_] = 0;
-    size_++;
+void FullereneBatch<T,K>::push_back(const neighbours_t& neighbours, const int ID) {
+    prepare_for_push_back(neighbours);
+    (*this)[size_++] = std::make_tuple(std::cref(neighbours), ID);
 }
 
 template <typename T, typename K>
-void FullereneBatch<T,K>::push_back(const Graph& G, const int ID) {push_back(G.neighbours, false, ID);}
+void FullereneBatch<T,K>::push_back(const Graph& G, const int ID) {
+    push_back(G.neighbours, ID);
+}
 
 template <typename T, typename K>
-void FullereneBatch<T,K>::push_back(const PlanarGraph& G, const int ID) {push_back(G.neighbours, true, ID);}
+void FullereneBatch<T,K>::push_back(const PlanarGraph& G, const int ID) {
+    push_back(G.neighbours, ID);
+}
 
 template <typename T, typename K>
 void FullereneBatch<T,K>::push_back(const Polyhedron& P, const int ID) {
-    push_back(P.neighbours, true, ID);
-    //If floating point types are not the same, we need to convert
-    if(!std::is_same<T, decltype(P.points[0][0])>::value){
-        
-    for(size_t i = 0; i < N_; i++){
-        for(size_t j = 0; j < 3; j++){
-            d_.X_cubic_[i + (size_-1)*N_][j] = P.points[i][j];
-        }
-    } //Otherwise a contiguous memory copy will do
-    } else{ memcpy(d_.X_cubic_.data() + (size_-1)*N_, P.points.data(), N_*sizeof(std::array<T,3>));}
-    m_.flags_[(size_-1)] |= StatusEnum::CONVERGED_3D;
-    std::cout << "Pushed Polyhedron with ID: " << ID << std::endl;
-    std::cout << "Pushed Polyhedron with flags: " << m_.flags_[(size_-1)] << std::endl;
+    prepare_for_push_back(P.neighbours);
+    (*this)[size_++] = std::tuple<std::reference_wrapper<const Polyhedron>, size_t>(std::cref(P), static_cast<size_t>(ID));
 }
 
 //Parameter pack expanded copy function
