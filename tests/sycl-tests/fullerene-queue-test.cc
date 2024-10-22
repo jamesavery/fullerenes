@@ -211,7 +211,9 @@ TEST_P(FullereneQueueTest, PushQueueToBatch) {
     for (int i = 0; i < 5; i++) {
         queue2.push_back(G);
     }
-    SyclQueue Q;
+    EXPECT_EQ(queue2.size(), 5);
+    EXPECT_EQ(queue2.front_index(), 0);
+    EXPECT_EQ(queue2.back_index(), 4);
     QueueUtil::push(Q, batch, queue2, ConditionFunctor(0, StatusEnum::DUAL_INITIALIZED));
     EXPECT_EQ(queue2.size(), 2);
     EXPECT_EQ(batch.size(), 3);
