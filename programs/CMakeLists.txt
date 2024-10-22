@@ -30,7 +30,11 @@ if(ENABLE_CUDA)
   add_executable(isomerspace-optimize isomerspace-optimize.cc)
   #add_executable(isomerspace-herd isomerspace-herd.cc) THIS FILE HAS NOT BEEN COMMITTED
   #add_executable(isomerspace-experiment-jonas isomerspace-experiment-jonas.cc)
-  #add_executable(isomerspace-experiment isomerspace-experiment.cc)
+  add_executable(isomerspace-experiment isomerspace-experiment.cc)
+
+  #target_link_options(isomerspace-experiment PRIVATE "")
+  message("SYCL_FULLERENE_LIBS: " ${SYCL_FULLERENE_LIBS})
+  target_link_libraries(isomerspace-experiment ${SYCL_FULLERENE_LIBS} sycl)
   target_link_libraries(isomerspace-optimize cuda_lib ${CMAKE_CUDA_LIBS})
   #target_link_libraries(isomerspace-herd cuda_lib ${CMAKE_CUDA_LIBS})
   #target_link_libraries(isomerspace-experiment-jonas cuda_lib ${CMAKE_CUDA_LIBS})

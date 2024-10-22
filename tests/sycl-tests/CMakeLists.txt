@@ -19,7 +19,7 @@ endforeach()
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   add_executable(${EXECUTABLE} ${EXECUTABLE}.cc)  
   target_include_directories(${EXECUTABLE} PRIVATE ${DPCPP_INCLUDE} ${DPCPP_INCLUDE}/sycl)
-  target_link_libraries(${EXECUTABLE} PRIVATE sycl_fullerene_lib dualize_lib sycl fullerenes ${GTEST_LIBRARIES})
+  target_link_libraries(${EXECUTABLE} PRIVATE ${SYCL_FULLERENE_LIBS} dualize_lib sycl fullerenes ${GTEST_LIBRARIES})
 endforeach()
 
 

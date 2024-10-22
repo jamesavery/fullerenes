@@ -17,7 +17,7 @@ list(APPEND SYCL_SOURCE_CUSTOM_FLAGS
 "-Xcuda-ptxas --maxrregcount=40"    # spherical-projection.cc
 "-Xcuda-ptxas --maxrregcount=255"     # hessian.cc
 "-Xcuda-ptxas --maxrregcount=255"     # eigen.cc
-"-Xcuda-ptxas --maxrregcount=40"    # sycl-util-impl.cc
+"-Xcuda-ptxas --maxrregcount=40 -ltbb"   # sycl-util-impl.cc
 "-Xcuda-ptxas --maxrregcount=40 -ltbb"    # primitives.cc
 "-Xcuda-ptxas --maxrregcount=40"    # geometry-properties.cc
 )
@@ -25,23 +25,33 @@ list(APPEND SYCL_SOURCE_CUSTOM_FLAGS
 
 add_library(sycl_fullerene_lib SHARED nop_kernel.cc)
 set_target_properties(sycl_fullerene_lib PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS}")
-target_link_libraries(sycl_fullerene_lib ${DPCPP_FLAGS})
+target_link_libraries(sycl_fullerene_lib PRIVATE ${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS})
 
 foreach(SYCL_SOURCE FLAGS IN ZIP_LISTS SYCL_LIBRARY_SOURCES SYCL_SOURCE_CUSTOM_FLAGS)
     add_library(${SYCL_SOURCE}_lib SHARED ${SYCL_SOURCE}.cc)
     set_target_properties(${SYCL_SOURCE}_lib PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS} ${FLAGS}")
-    target_link_libraries(${SYCL_SOURCE}_lib ${DPCPP_FLAGS} ${FLAGS})
+    target_link_libraries(${SYCL_SOURCE}_lib PRIVATE ${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS} ${FLAGS})
 endforeach()
 
 target_link_libraries(
   sycl_fullerene_lib 
+  PRIVATE forcefield-optimize_lib 
+  PRIVATE dualize_lib tutte_lib 
+  PRIVATE spherical-projection_lib 
+  PRIVATE hessian_lib eigen_lib 
+  PRIVATE sycl-util-impl_lib 
+  PRIVATE primitives-instantiations_lib 
+  PRIVATE geometry-properties_lib)
+
+set(SYCL_FULLERENE_LIBS ${SYCL_FULLERENE_LIBS} 
+  sycl_fullerene_lib 
   forcefield-optimize_lib 
-  dualize_lib tutte_lib 
+  dualize_lib 
+  tutte_lib 
   spherical-projection_lib 
-  hessian_lib eigen_lib 
+  hessian_lib 
+  eigen_lib 
   sycl-util-impl_lib 
   primitives-instantiations_lib 
-  geometry-properties_lib)
-
-#add_library(sycl_fullerene_lib hessian.cc forcefield-optimize.cc dualize.cc tutte.cc spherical-projection.cc nop_kernel.cc eigen.cc)
-
+  geometry-properties_lib
+  CACHE STRING "SYCL_FULLERENE_LIBS")
