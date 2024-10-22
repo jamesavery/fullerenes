@@ -9,6 +9,7 @@
 #include <thread>
 #include <numeric>
 #include <future>
+#include <queue>
 #include "fullerenes/buckygen-wrapper.hh"
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
@@ -27,6 +28,7 @@ using namespace std::chrono;
 
 
 typedef float real_t;	// We'll use the device real type everywhere in this program
+typedef uint16_t device_node_t;
 
   typedef enum {GEN, GEO, OPT, PROP, STAT, NUM_STAGES} stage_t;
   typedef enum {VOLUME,ECCENTRICITY,MIN_FREQ,MAX_FREQ, FREQ_WIDTH, INERTIA, NUM_RESULTS} results_t; // Results on which to do statistics
@@ -64,10 +66,13 @@ struct isomer_candidate {
   vector<uint16_t> cubic_neighbours;
   vector<real_t> X;
 
-  isomer_candidate(double value, int id, array<float,NUM_RESULTS> &results,int N, int ix, const IsomerBatch<CPU> &B):
-    value(value), id(id), results(results), cubic_neighbours(3*N),X(3*N)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
-    memcpy(&cubic_neighbours[0],B.cubic_neighbours+3*N*ix,3*N*sizeof(uint16_t));
-    memcpy(&X[0],               B.X+3*N*ix,               3*N*sizeof(real_t));
+  isomer_candidate(double value, int id, array<float,NUM_RESULTS> &results, Fullerene<real_t, device_node_t> fullerene):
+    value(value), id(id), results(results), cubic_neighbours(3*fullerene.N_),X(3*fullerene.N_)/*, H(90*N), Hcol(90*N)*/ { // Det tager 50% ekstra tid at gemme Hessian'en
+    auto X = fullerene.d_.X_cubic_.template as_span<real_t>();
+    auto A = fullerene.d_.A_cubic_.template as_span<device_node_t>();
+    auto N = fullerene.N_;
+    memcpy(&cubic_neighbours[0], A.data(), A.size_bytes());
+    memcpy(&X[0],                X.data(), X.size_bytes());
   }
 
   bool operator<(const isomer_candidate &b) const { return value < b.value; }
@@ -75,7 +80,7 @@ struct isomer_candidate {
 };
 
 
-template <typename T> struct k_smallest : public priority_queue<T> {
+template <typename T> struct k_smallest : public std::priority_queue<T> {
 public:
   size_t k;
   
@@ -118,11 +123,12 @@ int main(int ac, char **argv)
   // Make sure output directory exists
   mkdir(output_dir.c_str(),0777);
   size_t n_fullerenes = IsomerDB::number_isomers(N,only_nontrivial?"Nontrivial":"Any",IPR);
-  n_best_candidates = max(size_t(1),min(n_best_candidates, n_fullerenes/4));
+  n_best_candidates = std::max(size_t(1),std::min(n_best_candidates, n_fullerenes/4));
 
   
   int    Nd = Device::get_devices(DeviceType::GPU).size(); // Number of devices
-  size_t batch_size = min((size_t)isomerspace_forcefield::optimal_batch_size(N,0)*16, n_fullerenes/Nd);
+  vector<Device> devices = Device::get_devices(DeviceType::GPU);
+  size_t batch_size = std::min((size_t)(devices[0].get_property(DeviceProperty::MAX_COMPUTE_UNITS)*10), (size_t)(n_fullerenes/Nd));
   size_t final_batch_size = n_best_candidates*NUM_RESULTS*2/Nd+(Nd-1);
 
   cout << "Analyzing C"<<N<< " isomer space with " << n_fullerenes << " isomers.\n";
@@ -139,21 +145,23 @@ int main(int ac, char **argv)
     {0,0} // What are the inertia bounds?
     }};
   
-  array<array<CuArray<real_t>,2>,NUM_RESULTS> results; // TODO: vector<Cuarray> gives linkin error -- needs fixing to allow general Nd.
+  array<vector<SyclVector<real_t>>,NUM_RESULTS> results; // TODO: vector<Cuarray> gives linkin error -- needs fixing to allow general Nd.
   array<long double,NUM_RESULTS> means, stdevs;
   array<vector<size_t>,NUM_RESULTS> terrible_outliers;
-  vector<CuArray<real_t>> hessians(Nd);
-  vector<CuArray<device_node_t>> hessian_cols(Nd);
-  vector<CuArray<real_t>> Q(Nd),lams(Nd);  
+  vector<SyclVector<real_t>> hessians(Nd);
+  vector<SyclVector<device_node_t>> hessian_cols(Nd);
+  vector<SyclVector<real_t>> Q(Nd),lams(Nd); 
+  vector<SyclVector<real_t>> intermediate_spectrum_ends(Nd);
   array<long double,NUM_RESULTS> Ev, Ev2, K, current_mean, current_stddev;
   size_t n_converged=0;
-  
+  for(int r=0; r< NUM_RESULTS; r++) results[r].resize(Nd);
   // Initialize unified memory result CuArray's
   for(int d=0;d<Nd;d++){
-    hessians[d]      = CuArray<real_t>(N*3* 10*3*batch_size,0);
-    hessian_cols[d]  = CuArray<device_node_t>(N*3* 10*3*batch_size,0);
+    hessians[d]      = SyclVector<real_t>(N*3* 10*3*batch_size,0);
+    hessian_cols[d]  = SyclVector<device_node_t>(N*3* 10*3*batch_size,0);
+    intermediate_spectrum_ends[d] = SyclVector<real_t>(2*batch_size,0);
 
-    for(int r=0; r< NUM_RESULTS; r++) results[r][d] = CuArray<real_t>(result_sizes[r]*batch_size,0);
+    for(int r=0; r< NUM_RESULTS; r++) results[r][d] = SyclVector<real_t>(result_sizes[r]*batch_size,0);
   }
 
   // We keep track of the n_best_candidates isomers with smallest resp. largest values for each result
@@ -166,32 +174,45 @@ int main(int ac, char **argv)
   array<set<pair<real_t,int>>,NUM_RESULTS> result_reference;
   
   // Each stage has one on-device batch per device. TODO: NUM_STAGES vector<vector<IsomerBatch>>, Nd. Dynamic number of devices != 2.
-  std::array<std::array<FullereneBatch<real_t, uint16_t,2>,NUM_STAGES> Bs;
-  FullereneBatch Bs[4][2] = {	
-    {FullereneBatch<(N,batch_size),FullereneBatch(N,batch_size)},
-    {FullereneBatch<(N,batch_size),FullereneBatch(N,batch_size)},
-    {FullereneBatch<(N,batch_size),FullereneBatch(N,batch_size)},
-    {FullereneBatch<(N,batch_size),FullereneBatch(N,batch_size)}    
-  };
-  
+  //std::array<std::vector<FullereneBatch<real_t, uint16_t,2>,NUM_STAGES> Bs;
+  std::array<std::vector<FullereneBatch<real_t, device_node_t>>,4> Bs;
+  for (int i = 0; i < 4; i++) {
+    Bs[i].resize(Nd);
+    for (int j = 0; j < Nd; j++) {
+      Bs[i][j] = FullereneBatch<real_t, device_node_t>(N,batch_size);
+    }
+  }
   // Final IsomerBatch on host
 
-  IsomerBatch<CPU> host_batch[Nd] = {IsomerBatch<CPU>(N,batch_size,0), IsomerBatch<CPU>(N, batch_size,1)};
-  IsomerBatch<GPU> final_batch[Nd] = {IsomerBatch<GPU>(N,final_batch_size,0),IsomerBatch<GPU>(N,final_batch_size,1)};
-  IsomerBatch<CPU> final_host_batch[Nd] = {IsomerBatch<CPU>(N,final_batch_size,0),IsomerBatch<CPU>(N,final_batch_size,1)};  
+  vector<FullereneBatch<real_t, device_node_t>> host_batch(Nd, FullereneBatch<real_t, device_node_t>(N,batch_size));
+  vector<FullereneBatch<real_t, device_node_t>> final_batch(Nd, FullereneBatch<real_t, device_node_t>(N,final_batch_size));
+  vector<FullereneBatch<real_t, device_node_t>> final_host_batch(Nd, FullereneBatch<real_t, device_node_t>(N,final_batch_size));
   
   // TODO: Organize Qs by stages together with batches.Structure nicely.
-  IsomerQueue Q0s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // Graph-generate to X0-generate
-  IsomerQueue Q1s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // X0-generate to optimization
-  IsomerQueue Q2s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // optimization to properties + stat
-  IsomerQueue Q3s[Nd] = {device_io::IsomerQueue(N,0), device_io::IsomerQueue(N,1)}; // k_best result final computations
+  vector<FullereneQueue<real_t, device_node_t>> Q0s(Nd, FullereneQueue(N,batch_size*4)); // Graph-generate to X0-generate
+  vector<FullereneQueue<real_t, device_node_t>> Q1s(Nd, FullereneQueue(N,batch_size*4)); // X0-generate to optimization
+  vector<FullereneQueue<real_t, device_node_t>> Q2s(Nd, FullereneQueue(N,batch_size*4)); // optimization to properties + stat
+  vector<FullereneQueue<real_t, device_node_t>> Q3s(Nd, FullereneQueue(N,batch_size*4)); // k_best result final computations
+
+  DualizeFunctor<real_t, device_node_t> dualize;
+  TutteFunctor<real_t, device_node_t> tutte;
+  SphericalProjectionFunctor<real_t, device_node_t> spherical_projection;
+  ForcefieldOptimizeFunctor<PEDERSEN, real_t, device_node_t> forcefield_optimize;
+  HessianFunctor<PEDERSEN, real_t, device_node_t> compute_hessian;
+  EigenFunctor<EigensolveMode::ENDS, real_t, device_node_t> spectrum_ends;
+  EccentricityFunctor<real_t, device_node_t> eccentricity;
+  VolumeFunctor<real_t, device_node_t> volume;
+  SurfaceAreaFunctor<real_t, device_node_t> surface_area;
+  InertiaFunctor<real_t, device_node_t> inertia;
+  TransformCoordinatesFunctor<real_t, device_node_t> transform_coordinates;
   
   
-  for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
+  //for (int i = 0; i < Nd; i++) {Q0s[i].resize(batch_size*4); Q1s[i].resize(batch_size*4); Q2s[i].resize(batch_size*4);}
 
   // TODO: Should we really have two different streams, or is one enough?
-  LaunchCtx gen_ctxs[Nd] = {LaunchCtx(0),LaunchCtx(1)};
-  LaunchCtx opt_ctxs[Nd] = {LaunchCtx(0),LaunchCtx(1)};
+  //std::cout << sizeof(SyclQueue) << std::endl;
+  vector<SyclQueue> gen_ctxs; std::generate_n(std::back_inserter(gen_ctxs),Nd,[&,i = 0]() mutable {return SyclQueue(devices[ i++ % devices.size() ],true);});
+  vector<SyclQueue> opt_ctxs; std::generate_n(std::back_inserter(opt_ctxs),Nd,[&,i = 0]() mutable {return SyclQueue(devices[ i++ % devices.size() ],true);});
 
   // TODO: Multi-CPU buckygen
   BuckyGen::buckygen_queue BuckyQ = BuckyGen::start(N,IPR,only_nontrivial);  
@@ -237,21 +258,19 @@ int main(int ac, char **argv)
   auto Tstart = steady_clock::now();
   auto n0 = 0;
 
-  auto policy = LaunchPolicy::ASYNC;
+  auto policy = LaunchPolicy::SYNC;
 
   auto generate_isomers = [&](int M){
     bool more_isomers = true;
     if(I == n_fullerenes) return false;
     for (int i = 0; i < M; i++){
         if (more_isomers){
-            //auto ID = cuda_benchmark::random_isomer("isomerspace_samples/dual_layout_"+to_string(N)+"_seed_42", G);
             more_isomers = BuckyGen::next_fullerene(BuckyQ, G);
             if (!more_isomers) break;
-            Q0s[I%Nd].insert(G,I, gen_ctxs[I%Nd], policy);
+            Q0s[I%Nd].push_back(G,I);
             I++;
         }
     }
-    gen_ctxs[0].wait(); gen_ctxs[1].wait(); 
     num_finished[GEN] = I;
     //TODO: num_finished_this_round[GEN][d]
     stage_finished[GEN] = num_finished[GEN] >= n_fullerenes; // TODO: 
@@ -259,42 +278,48 @@ int main(int ac, char **argv)
   };
 
   auto geo_routine = [&](){
-    std::vector<int> qsize_geo = {Q1s[0].get_size(), Q1s[1].get_size()};
+    std::vector<int> qsize_geo; std::for_each(Q1s.begin(),Q1s.end(),[&](auto &Q){qsize_geo.push_back(Q.size());});
     for (int d = 0; d < Nd; d++){
-      if(Q0s[d].get_size() > 0){
+      if(Q0s[d].size() > 0){
 	auto &B   = Bs[GEO][d];
 	auto &ctx = gen_ctxs[d];
-	device_real_t scalerad = 4;
-	
-	Q0s[d].refill_batch(B, ctx, policy);
-	isomerspace_dual ::dualize     (B,       ctx, policy);
-	isomerspace_tutte::tutte_layout(B, N*10, ctx, policy);
-	isomerspace_X0   ::zero_order_geometry(B, scalerad, ctx, policy);
-	Q1s[d].push_all(B, ctx, policy);
+	real_t scalerad = 4;
+  QueueUtil::push(ctx, B, Q0s[d], ConditionFunctor(0, 0, StatusEnum::EMPTY | StatusEnum::CONVERGED_2D | StatusEnum::FAILED_2D) );
+	//Q0s[d].refill_batch(B, ctx, policy);
+	dualize(ctx, B, policy);
+	tutte(ctx, B, policy);
+	spherical_projection(ctx, B, policy);
+  QueueUtil::push(ctx, Q1s[d], B, ConditionFunctor(0, 0, StatusEnum::CONVERGED_2D | StatusEnum::FAILED_2D | StatusEnum::NOT_CONVERGED) ); //Push all to next stage
+	//Q1s[d].push_all(B, ctx, policy);
       }
     }
     for(int d=0; d<Nd; d++){
       gen_ctxs[d].wait();
-      num_finished_this_round[GEO][d] = Q1s[d].get_size() - qsize_geo[d];
+      num_finished_this_round[GEO][d] = Q1s[d].size() - qsize_geo[d];
       num_finished[GEO]              += num_finished_this_round[GEO][d];
     }
     stage_finished[GEO] = num_finished[GEO] >= n_fullerenes;    // TODO: Debug over-counting
   };
   
   auto opt_routine = [&](bool final=false){
-    std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
+    std::vector<int> qsize_opt; std::for_each(Q2s.begin(),Q2s.end(),[&](auto &Q){qsize_opt.push_back(Q.size());});
+    //std::vector<int> qsize_opt = {Q2s[0].get_size(), Q2s[1].get_size()};
     for (int d = 0; d < Nd; d++){
       auto &B   = Bs[OPT][d];
       auto &ctx = opt_ctxs[d];
-      Q1s[d].refill_batch(B, opt_ctxs[d], policy);
-      isomerspace_forcefield::optimize<PEDERSEN>(B, 3*N, 20*N, ctx, policy);      
-      Q2s[d].push_done(B, ctx, policy);
-      if(final) device_io::copy(host_batch[d],B,ctx,policy); 
+      //Q1s[d].refill_batch(B, opt_ctxs[d], policy);
+      
+      QueueUtil::push(ctx, B, Q1s[d], ConditionFunctor(0,0,StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D | StatusEnum::EMPTY) );
+      forcefield_optimize(ctx, B, policy, 3*N, 20*N);      
+      QueueUtil::push(ctx, Q2s[d], B, ConditionFunctor(0,0,StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D), StatusEnum::EMPTY ); //Consume from batch (by setting consumed isomers to EMPTY)
+      std::cout << "Q2s[" << d << "].size() = " << Q2s[d].size() << std::endl;
+      //Q2s[d].push_done(B, ctx, policy);
+      //if(final) device_io::copy(Bs[PROP][d],B,ctx,policy); 
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
 			
-      num_finished_this_round[OPT][d] = Q2s[d].get_size() - qsize[d];
+      num_finished_this_round[OPT][d] = Q2s[d].size() - qsize_opt[d];
       num_finished[OPT]              += num_finished_this_round[OPT][d];
     }
     stage_finished[OPT] = num_finished[OPT] >= n_fullerenes; // TODO: Debug over-counting
@@ -304,7 +329,7 @@ int main(int ac, char **argv)
 	size_t NSTAT = int(IsomerStatus::NOT_CONVERGED)+1;
 	vector<size_t> n_states(NSTAT);
 	
-	for(size_t di=0;di<host_batch[d].isomer_capacity;di++) n_states[size_t(host_batch[d].statuses[di])]++;
+	for(size_t di=0;di<Bs[PROP][d].capacity();di++) n_states[size_t(Bs[PROP][d].m_.flags_[di])]++;
 
 	cout << "Batch " << d << " has statuses: " << n_states << "; num_finished = "<<num_finished[OPT]<<"\n";
       }
@@ -313,27 +338,28 @@ int main(int ac, char **argv)
   };
 
   auto prop_routine = [&](){
-    std::vector<int> qsize = {Q2s[0].get_size(), Q2s[1].get_size()};
+    std::vector<int> qsize(Nd); std::for_each(Q2s.begin(),Q2s.end(),[&](auto &Q){qsize.push_back(Q.size());});
     for (int d = 0; d < Nd; d++){
       auto &B   = Bs[PROP][d];
-      const auto &ctx = opt_ctxs[d];
+      auto &ctx = opt_ctxs[d];
 
-      Q2s[d].refill_batch(B, ctx, policy);
-     isomerspace_properties::transform_coordinates(B, ctx, policy);
+      //Q2s[d].refill_batch(B, ctx, policy);
+      QueueUtil::push(ctx, B, Q2s[d], ConditionFunctor()); //Empty condition means all indices in the destination batch are valid
+      transform_coordinates(ctx, B, policy);
       // Hessian units: kg/s^2, divide eigenvalues by carbon_mass to get 1/s^2, frequency = sqrt(lambda/carbon_mass)
-      isomerspace_hessian   ::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d],    ctx, policy);
-      isomerspace_eigen     ::spectrum_ends(B, hessians[d], hessian_cols[d], results[MIN_FREQ][d], results[MAX_FREQ][d], 40, ctx, policy);
+      compute_hessian(ctx, B, policy, hessians[d], hessian_cols[d]);
+      SyclVector<real_t> eigenvectorsss;
+      spectrum_ends(ctx, B, policy, hessians[d], hessian_cols[d], size_t(40), intermediate_spectrum_ends[d], eigenvectorsss);
+
       //      isomerspace_eigen     ::lambda_max(B, hessians[d], hessian_cols[d], results[MAX_FREQ][d], 40, ctx, policy);
       // Inertia is in Ångstrøm^2, multiply by carbon_mass and aangstrom_length*aangstrom_length to get SI units kg*m^2
-      isomerspace_properties::moments_of_inertia   (B, results[INERTIA][d],      ctx, policy);      
-      isomerspace_properties::eccentricities       (B, results[ECCENTRICITY][d], ctx, policy);
-      isomerspace_properties::volume_divergences   (B, results[VOLUME][d],       ctx, policy);
-      device_io::copy(host_batch[d],B,ctx,policy);      
-      B.clear(ctx,policy);      
+      inertia   (ctx, B, policy, ((Span<real_t>)results[INERTIA][d]).template as_span<std::array<real_t,3>>());      
+      eccentricity       (ctx, B, policy, results[ECCENTRICITY][d]);
+      volume   (ctx, B, policy, results[VOLUME][d]);
     }
     for (int d = 0; d < Nd; d++){
       opt_ctxs[d].wait();
-      num_finished_this_round[PROP][d] = qsize[d] - Q2s[d].get_size();
+      num_finished_this_round[PROP][d] = qsize[d] - Q2s[d].size();
       num_finished[PROP]              += num_finished_this_round[PROP][d];
     }
     stage_finished[PROP] = num_finished[PROP] >= n_fullerenes; // TODO: Debug over-counting
@@ -360,8 +386,8 @@ int main(int ac, char **argv)
 
       // First pass of batch: Update mean and variance for all results.
       for(int di=0;di<n;di++){
-	IsomerStatus &status = host_batch[d].statuses[di];	
-	if(status == IsomerStatus::CONVERGED){
+	auto &status = Bs[PROP][d].m_.flags_[di];	
+	if(status == StatusEnum::CONVERGED_3D){
 	  n_converged++;
 		  
 	  for(int r=0;r<NUM_RESULTS;r++){
@@ -381,16 +407,16 @@ int main(int ac, char **argv)
 
       // Now process the results 
       for(int di=0;di<num_finished_this_round[PROP][d];di++,i++){
-	int id = host_batch[d].IDs[di];
-	IsomerStatus &status = host_batch[d].statuses[di];
+	int id = Bs[PROP][d].m_.ID_[di];
+	auto &status = Bs[PROP][d].m_.flags_[di];
 	
-	if(status != IsomerStatus::EMPTY){
+	if(status != StatusEnum::EMPTY){
 	  num_finished_this_round[STAT][d]++;
 	  num_finished[STAT]++;
 	}
 	  
-	if(status == IsomerStatus::CONVERGED){
-	  array<device_real_t,NUM_RESULTS> R;
+	if(status == StatusEnum::CONVERGED_3D){
+	  array<real_t,NUM_RESULTS> R;
 
 	  // Convert from Hessian eigenvalues to normal mode frequencies in teraherz	    
 	  real_t min_freq = sqrt(results[MIN_FREQ][d][di]/carbon_mass)/(2*M_PI)*1e-12, 
@@ -408,7 +434,7 @@ int main(int ac, char **argv)
 	  for(int r=0;r<NUM_RESULTS;r++)
 	    if(result_sizes[r]==1) R[r] = results[r][d][di];
 	  
-	  isomer_candidate C(0, id, R, N, di, host_batch[d]);
+	  isomer_candidate C(0, id, R, Bs[PROP][d][di]);
 	  
 	  for(int r=0;r<NUM_RESULTS;r++) if(result_sizes[r]==1){
 	      auto v = results[r][d][di];
@@ -425,14 +451,14 @@ int main(int ac, char **argv)
 
 	      auto vmin = result_bounds[r][0], vmax = result_bounds[r][1];
 
-	      size_t v_bin = min(num_bins-1,max(0LU,(size_t)floor(num_bins*((v-vmin)/(vmax-vmin)))));
+	      size_t v_bin = std::min(num_bins-1,std::max(0LU,(size_t)floor(num_bins*((v-vmin)/(vmax-vmin)))));
 	      result_histograms[r][v_bin]++;
 
 	      for(int s=0;s<r;s++) if(result_sizes[s]==1){
 		  auto w = results[s][d][di];		  
 		  if(isfinite(w) && !terrible_outlier(w,s)){
 		    auto wmin = result_bounds[s][0], wmax = result_bounds[s][1];
-		    size_t w_bin = min(num_bins-1,max((size_t)0,(size_t)floor(num_bins*((w-wmin)/(wmax-wmin)))));
+		    size_t w_bin = std::min(num_bins-1,std::max((size_t)0,(size_t)floor(num_bins*((w-wmin)/(wmax-wmin)))));
 
 		    result_histograms2D[(r*(r-1))/2+s][v_bin*num_bins+w_bin]++;
 		  }
@@ -442,8 +468,8 @@ int main(int ac, char **argv)
 	  
 	  //		result_reference[r].insert({v,id+1}); // To check that result_min and result_max actually gets k smallest & largest.
 	} else {
-	  if(status == IsomerStatus::FAILED) opt_failed.push_back(id);
-	  if(status == IsomerStatus::NOT_CONVERGED) opt_not_converged.push_back(id);	  
+	  if(status == StatusEnum::FAILED_3D) opt_failed.push_back(id);
+	  if(status == StatusEnum::NOT_CONVERGED) opt_not_converged.push_back(id);	  
 	}
       }
     }
@@ -468,7 +494,7 @@ int main(int ac, char **argv)
   
   while(!stage_finished[PROP]){
       cout << loop_iters << " start: Gen: " << num_finished[GEN] << "  Geometry: " << num_finished[GEO] << "  Opt: " << num_finished[OPT] << "  Prop: " << num_finished[PROP] << std::endl;
-      cout << loop_iters << " start: Stage statuses: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
+      cout << loop_iters << " start: Stage sm_.flags_: " << stage_finished[GEN] << ", " << stage_finished[GEO] << ", " << stage_finished[OPT] << ", " << stage_finished[PROP] << std::endl;
       auto T0 = steady_clock::now();
 
       geo_routine();
@@ -478,10 +504,10 @@ int main(int ac, char **argv)
       auto handle = std::async(std::launch::async, generate_isomers, 2*batch_size);
       auto T2 = steady_clock::now();
       
-      while(Q1s[0].get_size() > Bs[GEO][0].capacity() && Q1s[1].get_size() > Bs[GEO][1].capacity()){
+      while(Q1s[0].size() > Bs[OPT][0].capacity() && Q1s[1].size() > Bs[OPT][1].capacity()){
           opt_routine();
       }
-      if(Q2s[0].get_size() > Bs[OPT][0].capacity() && Q2s[1].get_size() > Bs[OPT][1].capacity()){
+      if(Q2s[0].size() > Bs[PROP][0].capacity() && Q2s[1].size() > Bs[PROP][1].capacity()){
           prop_routine();
       }
       auto T3 = steady_clock::now(); Topt += T3-T2;
@@ -511,12 +537,12 @@ int main(int ac, char **argv)
       if(loop_iters % 3 == 0 || stage_finished[STAT]){
         auto Titer = steady_clock::now() - Tstart;
         Tstart = steady_clock::now();
-        auto Tff   = isomerspace_forcefield::time_spent()/Nd;
-        Tqueue = Topt - Tff;
-        Ttutte = isomerspace_tutte::time_spent()/Nd;
-        TX0    = isomerspace_X0::time_spent()/Nd;
-        Tdual  = isomerspace_dual::time_spent()/Nd;
-        auto TOverhead = Tinit_geom - Tdual - Ttutte - TX0;
+        //auto Tff   = isomerspace_forcefield::time_spent()/Nd;
+        //Tqueue = Topt - Tff;
+        //Ttutte = isomerspace_tutte::time_spent()/Nd;
+        //TX0    = isomerspace_X0::time_spent()/Nd;
+        //Tdual  = isomerspace_dual::time_spent()/Nd;
+        //auto TOverhead = Tinit_geom - Tdual - Ttutte - TX0;
         //progress_bar.update_progress((float)num_finished[PROP]/(float)num_fullerenes.find(N)->second, "Pace: " + to_string((Titer/1us) / max((num_finished[PROP] - n0),1)) + " us/isomer       ", {{"Gen          ", Tgen},{"Init Overhead", TOverhead},{"Opt          ", Topt},{"Dual         ", Tdual},{"Tutte        ", Ttutte},{"X0           ", TX0},{"FF Overhead  ", Tqueue}});
         n0 = num_finished[STAT];
       }
@@ -586,33 +612,34 @@ int main(int ac, char **argv)
       for(int i=0;i<n_best_candidates;i++){
 	isomer_candidate C = smallest[i];
 	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
-	Q3s[0].insert(P,C.id,IsomerStatus::CONVERGED); 
+	Q3s[0].push_back(P,C.id, StatusEnum::CONVERGED_3D); 
       }
 
       for(int i=0;i<n_best_candidates;i++){
 	isomer_candidate C = biggest[i];
 	Polyhedron P(host_graph(C.cubic_neighbours), host_points(C.X)); // TODO: Hurtigere!
-	Q3s[1].insert(P,C.id,IsomerStatus::CONVERGED);
+	Q3s[1].push_back(P,C.id, StatusEnum::CONVERGED_3D);
       }
     }
 
   if(STORE_HESSIAN){
     for(int d=0;d<Nd;d++){    
     auto &B   = final_batch[d];
-    const auto &ctx = opt_ctxs[d];
+    auto &ctx = opt_ctxs[d];
     ctx.wait();
-    
-    Q3s[d].refill_batch(B, ctx, policy);
-    final_host_batch[d].clear(ctx,policy);	
+    QueueUtil::push(ctx, B, Q3s[d], ConditionFunctor(0,StatusEnum::CONVERGED_3D) );
+    //Q3s[d].refill_batch(B, ctx, policy);
+    final_host_batch[d].clear();	
 
-    isomerspace_hessian::compute_hessians<PEDERSEN>(B, hessians[d], hessian_cols[d], ctx, policy);
+    compute_hessian(ctx, B, policy, hessians[d], hessian_cols[d]);
 
     if(STORE_EIGENSYSTEM){
-      Q[d]    = CuArray<real_t>(3*N*3*N*final_batch_size,0);
-      lams[d] = CuArray<real_t>(3*N*final_batch_size,0);    
-      isomerspace_eigen  ::eigensolve_special(B,Q[d],hessians[d],hessian_cols[d],lams[d],ctx,policy);
+      EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, real_t, device_node_t> eigen;
+      Q[d]    = SyclVector<real_t>(3*N*3*N*final_batch_size,0);
+      lams[d] = SyclVector<real_t>(3*N*final_batch_size,0);    
+      eigen(ctx, B, policy,hessians[d],hessian_cols[d],0,lams[d], Q[d]);
     }
-    device_io::copy(final_host_batch[d],B,ctx,policy);
+    final_host_batch[d] = B; //device_io::copy(final_host_batch[d],B,ctx,policy);
     ctx.wait();
     }}
   
@@ -649,13 +676,13 @@ int main(int ac, char **argv)
     };
     
     //TODO: Redundant due to writing out all results for k_smallest
-    vector<device_real_t> smallest_values(n_best_candidates), biggest_values(n_best_candidates);
+    vector<real_t> smallest_values(n_best_candidates), biggest_values(n_best_candidates);
     for(size_t i=0;i<n_best_candidates;i++){
       smallest_values[i] = smallest[i].value;
       biggest_values [i] = biggest[i].value;
     }
-    fwrite(&smallest_values[0],sizeof(device_real_t),n_best_candidates,f_min);
-    fwrite(&biggest_values[0], sizeof(device_real_t),n_best_candidates,f_max);    
+    fwrite(&smallest_values[0],sizeof(real_t),n_best_candidates,f_min);
+    fwrite(&biggest_values[0], sizeof(real_t),n_best_candidates,f_max);    
     
     mkdir(result_dir.c_str(), 0777);
     mkdir(min_dir.c_str(), 0777);
@@ -674,8 +701,8 @@ int main(int ac, char **argv)
       auto [d_min,di_min] = result_index(0,r,i);
       auto [d_max,di_max] = result_index(1,r,i);      
 
-      Polyhedron Pmin = final_host_batch[d_min].get_isomer(di_min).value();
-      Polyhedron Pmax = final_host_batch[d_max].get_isomer(di_max).value();
+      auto Pmin = (Polyhedron)final_host_batch[d_min][di_min];//.get_isomer(di_min).value();
+      auto Pmax = (Polyhedron)final_host_batch[d_max][di_max];//.get_isomer(di_max).value();
 
       Polyhedron::to_file(Pmin,min_basename+".mol2");
       Polyhedron::to_file(Pmin,min_basename+".spiral");      
@@ -693,65 +720,65 @@ int main(int ac, char **argv)
 	fclose(f);
 
 	f = fopen((min_basename+"-PX.float32").c_str(),"wb");
-	fwrite(&Cmin.X[0], sizeof(device_real_t), 3*N,f);
+	fwrite(&Cmin.X[0], sizeof(real_t), 3*N,f);
 	fclose(f);
 
 	f = fopen((max_basename+"-PX.float32").c_str(),"wb");
-	fwrite(&Cmax.X[0], sizeof(device_real_t), 3*N,f);
+	fwrite(&Cmax.X[0], sizeof(real_t), 3*N,f);
 	fclose(f);	
 
 	f = fopen((min_basename+"-X.float32").c_str(),"wb");
-	fwrite(final_host_batch[d_min].X+di_min*3*N, sizeof(device_real_t), 3*N,f);
+	fwrite(final_host_batch[d_min].d_.X_cubic_.data()+di_min*3*N, sizeof(real_t), 3*N,f);
 	fclose(f);
 
 	
 	f = fopen((max_basename+"-X.float32").c_str(),"wb");
-	fwrite(final_host_batch[d_max].X+di_max*3*N, sizeof(device_real_t), 3*N,f);
+	fwrite(final_host_batch[d_max].d_.X_cubic_.data()+di_max*3*N, sizeof(real_t), 3*N,f);
 	fclose(f);
 
 	
 	if(STORE_HESSIAN){
 	f = fopen((min_basename+"-hessians.float32").c_str(),"wb");
-	fwrite(&hessians[d_min].data[di_max*3*3*10*N], sizeof(device_real_t), 3*3*10*N,f); 
+	fwrite(&hessians[d_min].data()[di_max*3*3*10*N], sizeof(real_t), 3*3*10*N,f); 
 	fclose(f);
 
 	f = fopen((max_basename+"-hessians.float32").c_str(),"wb");
-	fwrite(&hessians[d_max].data[di_max*3*3*10*N], sizeof(device_real_t), 3*3*10*N,f); 
+	fwrite(&hessians[d_max].data()[di_max*3*3*10*N], sizeof(real_t), 3*3*10*N,f); 
 	fclose(f);	
 
 	f = fopen((min_basename+"-hessian_cols.uint16").c_str(),"wb");
-	fwrite(&hessian_cols[d_min].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
+	fwrite(&hessian_cols[d_min].data()[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
 	fclose(f);
 
 	f = fopen((max_basename+"-hessian_cols.uint16").c_str(),"wb");
-	fwrite(&hessian_cols[d_max].data[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
+	fwrite(&hessian_cols[d_max].data()[di_max*3*3*10*N], sizeof(uint16_t), 3*3*10*N,f); 
 	fclose(f);	
 
 	if(STORE_EIGENSYSTEM){
 	  f = fopen((min_basename+"-hessian_Q.float32").c_str(),"wb");
-	  fwrite(&Q[d_min].data[di_max*3*N*3*N], sizeof(device_real_t), 3*N*3*N,f); 
+	  fwrite(&Q[d_min].data()[di_max*3*N*3*N], sizeof(real_t), 3*N*3*N,f); 
 	  fclose(f);
 
 	  f = fopen((min_basename+"-hessian_lams.float32").c_str(),"wb");
-	  fwrite(&lams[d_min].data[di_max*3*N], sizeof(device_real_t), 3*N,f); 
+	  fwrite(&lams[d_min].data()[di_max*3*N], sizeof(real_t), 3*N,f); 
 	  fclose(f);			
 
 	  f = fopen((max_basename+"-hessian_Q.float32").c_str(),"wb");
-	  fwrite(&Q[d_max].data[di_max*3*N*3*N], sizeof(device_real_t), 3*N*3*N,f); 
+	  fwrite(&Q[d_max].data()[di_max*3*N*3*N], sizeof(real_t), 3*N*3*N,f); 
 	  fclose(f);
 
 	  f = fopen((max_basename+"-hessian_lams.float32").c_str(),"wb");
-	  fwrite(&lams[d_max].data[di_max*3*N], sizeof(device_real_t), 3*N,f); 
+	  fwrite(&lams[d_max].data()[di_max*3*N], sizeof(real_t), 3*N,f); 
 	  fclose(f);			
 	}
 	}
 	
 	f = fopen((min_basename+"-results.float32").c_str(),"wb");
-	fwrite(&Cmin.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+	fwrite(&Cmin.results[0],sizeof(real_t),NUM_RESULTS-1,f); 
 	fclose(f);
 
 	f = fopen((max_basename+"-results.float32").c_str(),"wb");
-	fwrite(&Cmax.results[0],sizeof(device_real_t),NUM_RESULTS-1,f); 
+	fwrite(&Cmax.results[0],sizeof(real_t),NUM_RESULTS-1,f); 
 	fclose(f);
       }
     }
