@@ -10,6 +10,7 @@ set(SYCL_EXECUTABLES
   condition-functor-test
   tutte-functor-test
   to-polyhedron
+  forcefield-functor-test
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
