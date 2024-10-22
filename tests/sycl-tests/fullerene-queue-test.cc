@@ -222,6 +222,59 @@ TEST_P(FullereneQueueTest, PushQueueToBatch) {
     }
 }
 
+TEST_P(FullereneQueueTest, PushBatchToQueue) {
+    FullereneQueue queue(N, 1);
+    FullereneBatch batch(N, 3);
+    for (int i = 0; i < 5; i++) {
+        batch.push_back(G);
+    }
+    EXPECT_EQ(queue.size(), 0);
+    EXPECT_EQ(queue.front_index(), -1);
+    EXPECT_EQ(queue.back_index(), -1);
+     QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::DUAL_INITIALIZED));
+    EXPECT_EQ(queue.size(), 5);
+    EXPECT_EQ(queue.front_index(), 0);
+    EXPECT_EQ(queue.back_index(), 4);
+
+    for (int i = 0; i < batch.size(); i++) {
+        EXPECT_EQ(batch[i], queue[i]);
+    }
+}
+
+TEST_P(FullereneQueueTest, ConsumeFromQueue) {
+    FullereneQueue queue(N, 1);
+    FullereneBatch batch(N, 5);
+    for (int i = 0; i < 5; i++) {
+        queue.push_back(G);
+        if(i%2 == 0) batch.m_.flags_[i] = (StatusEnum::DUAL_INITIALIZED);
+    }
+    EXPECT_EQ(queue.size(), 5);
+    QueueUtil::push(Q, batch, queue, ConditionFunctor(0, StatusEnum::DUAL_INITIALIZED), StatusEnum::EMPTY);
+    EXPECT_EQ(queue.size(), 3);
+    int num_consumed = 2;
+    for (int i = 0; i < 5; i++) {
+        EXPECT_EQ(batch.m_.flags_[i], (int)StatusEnum::DUAL_INITIALIZED); //Expect all flags in batch to be DUAL_INITIALIZED
+        if (i < num_consumed) EXPECT_EQ(queue.m_.flags_[i], (int)StatusEnum::EMPTY); //Queue should have been consumed
+    }
+}
+
+TEST_P(FullereneQueueTest, ConsumeFromBatch){
+    FullereneQueue queue(N, 1);
+    FullereneBatch batch(N, 5);
+    DualizeFunctor<float, uint16_t> functor;
+    for (int i = 0; i < 5; i++) {
+        batch.push_back(G);
+        if( i%2 == 0) functor(Q, batch[i], LaunchPolicy::SYNC);
+    }
+    EXPECT_EQ(queue.size(), 0);
+    QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::FULLERENEGRAPH_PREPARED), StatusEnum::EMPTY);
+    EXPECT_EQ(queue.size(), 3);
+    for (int i = 0; i < 5; i++) {
+        if(i%2 == 0) EXPECT_EQ(batch.m_.flags_[i], (int)StatusEnum::EMPTY); //Expect the consumed isomers to be empty
+        if(i < queue.size()) EXPECT_EQ(queue.m_.flags_[i], (int)(StatusEnum::FULLERENEGRAPH_PREPARED | StatusEnum::DUAL_INITIALIZED)); //Expect the queue to be full
+
+    }
+}
 
 TEST_P(FullereneQueueTest, QueueManipulation) {
     FullereneQueue queue;
