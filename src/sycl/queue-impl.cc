@@ -61,6 +61,8 @@ SyclQueue::SyclQueue(Device dev, bool in_order) : device_(dev), in_order_(in_ord
 }
 
 SyclQueue::~SyclQueue() = default;
+SyclQueue::SyclQueue(SyclQueue&& other) = default;
+SyclQueue& SyclQueue::operator=(SyclQueue&& other) = default;
 
 void SyclQueue::wait() const {impl_->wait();}
 void SyclQueue::wait_and_throw() const {impl_->wait_and_throw();}

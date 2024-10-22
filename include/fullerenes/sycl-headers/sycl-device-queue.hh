@@ -77,7 +77,7 @@ struct SyclEvent {
     SyclEvent();
     ~SyclEvent();
     SyclEvent& operator=(SyclEventImpl&& impl);
-    SyclEvent::SyclEvent(SyclEventImpl&& impl);
+    SyclEvent(SyclEventImpl&& impl);
     SyclEvent(SyclEvent&& other);
     SyclEvent& operator=(SyclEvent&& other);
     void wait() const;
@@ -97,8 +97,8 @@ struct SyclQueue{
     ~SyclQueue();
 
     SyclQueue(Device device, bool in_order = true);
-    SyclQueue(SyclQueue&& other) = default;
-    SyclQueue& operator=(SyclQueue&& other) = default;
+    SyclQueue(SyclQueue&& other); //= default;
+    SyclQueue& operator=(SyclQueue&& other);// = default;
     SyclQueue(const SyclQueue& other) = delete;
     SyclQueue& operator=(const SyclQueue& other) = delete;
     // Copy constructor and assignment operator are deleted because the unique_ptr is non-copyable
@@ -121,8 +121,12 @@ struct SyclQueue{
     void wait_and_throw() const;
     
     std::unique_ptr<SyclQueueImpl> impl_;
+
+    Device device() const { return device_; }
+    bool in_order() const { return in_order_; }
     
-    const Device device_;
-    const bool in_order_;
+    private:
+        Device device_;
+        bool in_order_;
 };
 
