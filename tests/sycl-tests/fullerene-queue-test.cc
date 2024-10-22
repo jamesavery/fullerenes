@@ -103,7 +103,7 @@ TEST_P(FullereneTest, CopyAssignment) {
 TEST_P(FullereneTest, EqualityOperator) {
     auto fullerene1 = batch[0];
     auto fullerene2 = queue[0];
-    EXPECT_TRUE(fullerene1 == fullerene2);
+    EXPECT_EQ(fullerene1 , fullerene2);
 }
 
 TEST_P(FullereneTest, CopyMethod) {
