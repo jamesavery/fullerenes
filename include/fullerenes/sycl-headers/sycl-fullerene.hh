@@ -34,8 +34,9 @@ struct Fullerene
     explicit operator Polyhedron() const {
         using namespace condition_detail;
         if (N_ == 0 || Nf_ == 0) {throw std::invalid_argument("Fullerenes are non-owning, cannot convert to Polyhedron without initializing the fullerene");}
-        ConditionFunctor cubic_and_3d(StatusEnum::FULLERENEGRAPH_PREPARED | StatusEnum::CONVERGED_3D);
-        bool is_polyhedron = (int)(m_.flags_.get()) & (int)(StatusEnum::FULLERENEGRAPH_PREPARED);
+        const ConditionFunctor graph_condition(0, 0, StatusEnum::FULLERENEGRAPH_PREPARED | StatusEnum::DUAL_INITIALIZED | StatusEnum::CUBIC_INITIALIZED);
+        const ConditionFunctor geometry_condition(0, 0, StatusEnum::NOT_CONVERGED | StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D);
+        bool is_polyhedron = graph_condition(m_.flags_.get()) && geometry_condition(m_.flags_.get());
         if (!is_polyhedron) {throw std::invalid_argument("Fullerene is not a valid polyhedron, Flag: " + std::to_string(m_.flags_.get()));}
         Polyhedron P;
         using points_t = decltype(P.points);
