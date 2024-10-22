@@ -52,6 +52,14 @@ struct SyclVector
         data_[size_++] = value;
     }
 
+    inline constexpr void push_back(T &&value) { 
+        if(size_ == capacity_){
+            size_t new_capacity = capacity_ == 0 ? 1 : 2*capacity_;
+            reserve(new_capacity);
+        }
+        data_[size_++] = std::move(value);
+    }
+
 
     inline constexpr T pop_back() { assert(size_ > 0); return data_[--size_]; }
 
