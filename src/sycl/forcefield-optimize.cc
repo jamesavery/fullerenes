@@ -1854,7 +1854,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
                     size_t iterations_done = B.m_.iterations_[bid];
                     bool converged = ((max_rel_angle_err < 0.26) && (max_rel_dihedral_err < 0.1) && (max_rel_bond_err < 0.1));
                     bool failed = (!std::isfinite(max_rel_bond_err)) || (iterations_done >= max_iterations);
-                    B.m_.flags_[bid] = failed ? StatusEnum::FAILED_3D : (converged ? StatusEnum::CONVERGED_3D : StatusEnum::NOT_CONVERGED);
+                    B.m_.flags_[bid].set(failed ? StatusEnum::FAILED_3D : (converged ? StatusEnum::CONVERGED_3D : StatusEnum::NOT_CONVERGED));
                 }
             };
             FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), std::max(iterations - 1,size_t(0)));
@@ -2042,7 +2042,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
         size_t iterations_done = fullerene.m_.iterations_;
         bool converged = ((max_rel_angle_err < 0.26) && (max_rel_dihedral_err < 0.1) && (max_rel_bond_err < 0.1));
         bool failed = (!std::isfinite(max_rel_bond_err)) || (iterations_done >= max_iterations);
-        fullerene.m_.flags_.get() = failed ? StatusEnum::FAILED_3D : (converged ? StatusEnum::CONVERGED_3D : StatusEnum::NOT_CONVERGED);
+        fullerene.m_.flags_.get().set(failed ? StatusEnum::FAILED_3D : (converged ? StatusEnum::CONVERGED_3D : StatusEnum::NOT_CONVERGED));
     };
     CG(X, X1, X2, std::max(iterations - 1,size_t(0)));
     auto E1 = energy(X);
