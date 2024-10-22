@@ -12,7 +12,7 @@ struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
 
     template<EigensolveMode M = mode, typename std::enable_if<M == EigensolveMode::ENDS, int>::type = 0>
     SyclEvent compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> hessian, Span<K> cols, size_t n_lanczos, Span<T> eigenvalues, 
-                        Span<K> indices, Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx) {
+                        Span<T> off_diagonal, Span<T> qmat, Span<T> lanczos, Span<T> diag, Span<K> ends_idx) {
                             return compute(Q, batch, hessian, cols, n_lanczos, eigenvalues, Span<T>(), off_diagonal, qmat, lanczos, diag, ends_idx);
                         }
 
@@ -27,7 +27,8 @@ struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
     mutable FunctorArrays<T> diag_;
     mutable FunctorArrays<K> ends_idx_;
 
-    inline constexpr auto to_tuple(size_t N, Span<T> hessian, Span<K> cols, size_t n_lanczos, Span<T> eigenvalues, Span<T> eigenvectors) const {
+    template <typename... Args>
+    inline constexpr auto to_tuple(size_t N, Span<T> hessian, Span<K> cols, size_t n_lanczos, Args&&... args) const {
         return  std::make_tuple(
                 std::make_pair(std::ref(indices_), N),
                 std::make_pair(std::ref(off_diagonal_), n_lanczos),
@@ -38,7 +39,8 @@ struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
                 );
     }
 
-    inline constexpr auto to_tuple_batch(size_t N, Span<T> hessian, Span<K> cols, size_t n_lanczos, Span<T> eigenvalues, Span<T> eigenvectors) const {
+    template <typename... Args>
+    inline constexpr auto to_tuple_batch(size_t N, Span<T> hessian, Span<K> cols, size_t n_lanczos, Args&&... args) const {
         return std::make_tuple(
                 std::make_pair(std::ref(off_diagonal_), n_lanczos),
                 std::make_pair(std::ref(qmat_), n_lanczos*n_lanczos),
