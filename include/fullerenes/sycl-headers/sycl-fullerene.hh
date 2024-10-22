@@ -6,7 +6,43 @@
 #include <fullerenes/sycl-headers/sycl-fullerene-data.hh>
 #include <fullerenes/sycl-headers/reference-wrapper.hh>
 
+namespace extra_type_traits {
+    template <typename T>
+    struct is_array_t : std::false_type {};
 
+    template <typename T>
+    struct is_array_t<std::vector<T>> : std::true_type {};
+
+    template <typename T>
+    struct is_array_t<Span<T>> : std::true_type {};
+
+    template <typename T, size_t N>
+    struct is_array_t<std::array<T, N>> : std::true_type {};
+
+    template <typename T>
+    struct is_tuple_t : std::false_type {};
+
+    template <typename... Ts>
+    struct is_tuple_t<std::tuple<Ts...>> : std::true_type {};
+
+    template <typename T>
+    struct is_pair_t : std::false_type {};
+
+    template <typename T, typename U>
+    struct is_pair_t<std::pair<T, U>> : std::true_type {};
+
+    // Generalization to handle references and const qualifiers
+    template <typename T>
+    struct is_array_t<T&> : is_array_t<T> {};
+
+    template <typename T>
+    struct is_array_t<T&&> : is_array_t<T> {};
+
+    template <typename T>
+    struct is_array_t<const T> : is_array_t<T> {};
+}
+
+using namespace condition_detail;
 template <typename T = float, typename K = uint16_t>
 struct Fullerene
 {
