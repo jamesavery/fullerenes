@@ -1824,6 +1824,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
             auto cta = nditem.get_group();
             auto tid = nditem.get_local_linear_id();
             auto bid = nditem.get_group_linear_id();
+            if (B.m_.flags_[bid].is_not_set(StatusEnum::NOT_CONVERGED)) return;
             Fullerene<T,K> fullerene = B[bid];
             auto X_acc = fullerene.d_.X_cubic_.template as_span<coord3d>();
             auto cubic_neighbours_acc = fullerene.d_.A_cubic_;
@@ -1832,13 +1833,38 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
 //
             Constants<T,K>      constants(cubic_neighbours_acc, tid);
             NodeNeighbours<K>   nodeG(cubic_neighbours_acc, tid);
+            bool check_convergence = false;
+
             
             X[tid] = X_acc[tid];
             sycl::group_barrier(cta);
             ForceField FF = ForceField<FFT,T,K>(nodeG, constants, cta, sdata.get_pointer());
-            FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), iterations);
-            sycl::group_barrier(cta);
+            auto convergence_check = [&]() {
+                coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
+                for(int j = 0; j < 3; j++){
+                    auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, Span<coord3d>(X.get_pointer(), N), nodeG);
+                    rel_bond_err[j] = sycl::abs(arc.bond() - constants.r0[j]) / constants.r0[j];
+                    rel_angle_err[j] = sycl::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j];
+                    rel_dihedral_err[j] = sycl::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j];
+                }
+                real_t max_rel_bond_err     = sycl::reduce_over_group(cta, max(rel_bond_err), sycl::maximum<real_t>{});
+                real_t max_rel_angle_err    = sycl::reduce_over_group(cta, max(rel_angle_err), sycl::maximum<real_t>{});
+                real_t max_rel_dihedral_err = sycl::reduce_over_group(cta, max(rel_dihedral_err), sycl::maximum<real_t>{});
+                if(tid == 0){
+                    size_t iterations_done = B.m_.iterations_[bid];
+                    bool converged = ((max_rel_angle_err < 0.26) && (max_rel_dihedral_err < 0.1) && (max_rel_bond_err < 0.1));
+                    bool failed = (!std::isfinite(max_rel_bond_err)) || (iterations_done >= max_iterations);
+                    B.m_.flags_[bid] = failed ? StatusEnum::FAILED_3D : (converged ? StatusEnum::CONVERGED_3D : StatusEnum::NOT_CONVERGED);
+                }
+            };
+            FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), std::min(iterations - 1,size_t(0)));
+            auto E1 = FF.energy(Span<coord3d>(X.get_pointer(), N));
+            FF.CG(Span<coord3d>(X.get_pointer(), N), Span<coord3d>(X1.get_pointer(),N), Span<coord3d>(X2.get_pointer(),N), std::min(size_t(1),iterations));
+            auto E2 = FF.energy(Span<coord3d>(X.get_pointer(), N));
+            if (std::abs(E1 - E2) < std::numeric_limits<T>::epsilon()*1e1) check_convergence = true;
             //
+            if (check_convergence) convergence_check();
+            B.m_.iterations_[bid] += iterations;
             X_acc[tid] = X[tid];
         }); });
     return SyclEvent(std::move(ffopt_done));
@@ -1851,9 +1877,7 @@ template <ForcefieldType FFT, typename T, typename K>
 struct ForceFieldEnergyKernel {};
 
 template <ForcefieldType FFT, typename T, typename K>
-SyclEvent forcefield_optimize_impl(SyclQueue& Q, 
-                                            const Span<std::array<T, 3>> X,
-                                            const Span<std::array<K, 3>> A,
+SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
                                             const Span<K> indices, 
                                             const Span<std::array<T, 3>> X1,
                                             const Span<std::array<T, 3>> X2,
@@ -1862,7 +1886,9 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q,
                                             const Span<std::array<T, 3>> s,
                                             size_t iterations, size_t max_iterations){
     TEMPLATE_TYPEDEFS(T, K);
-    auto N = indices.size();
+    auto N = fullerene.N_;
+    auto X = fullerene.d_.X_cubic_;
+    auto A = fullerene.d_.A_cubic_;
 
 
     //TODO: Make NodeNeighbours and Constants structures accessible to the client-code so we can compute them once and store in SyclVectors.
@@ -1906,17 +1932,6 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q,
                 grad[i] = result;
             });
         });
-        /* primitives::transform(Q, indices, grad, [=](K i) {
-            NodeNeighbours<K> node_graphs(A.data(), i);
-            Constants<T,K> constants(A.data(), i);
-            coord3d result = {0,0,0};
-            for (int j = 0; j < 3; j++)
-            {
-                typename ForceField<FFT,T,K>::ArcData arc(i, j, X, node_graphs);
-                result += arc.gradient(constants);
-            }
-            return result;
-        }); */
     };
 
     auto GSS = [&] (const Span<coord3d> X, const Span<coord3d> r0, const Span<coord3d> X1, const Span<coord3d> X2){
@@ -1991,8 +2006,52 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q,
             primitives::transform(Q, indices, s, [=](K i){return s[i] / s_norm;}); 
         }
     };
+    bool check_convergence = false;
 
-    CG(X, X1, X2, max_iterations);
+    auto convergence_check = [&] () {
+        T max_rel_bond_err = primitives::transform_reduce(Q, indices, T{0}, Max{}, [=](K i){
+            Constants<T,K> constants(A, i);
+            NodeNeighbours<K> nodeG(A, i);
+            T rel_bond_err = 0;
+            for(int j = 0; j < 3; j++){
+                typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
+                rel_bond_err = sycl::max(rel_bond_err, sycl::abs(arc.bond() - constants.r0[j]) / constants.r0[j]);
+            }
+            return rel_bond_err;
+        });
+        T max_rel_angle_err = primitives::transform_reduce(Q, indices, T{0}, Max{}, [=](K i){
+            Constants<T,K> constants(A, i);
+            NodeNeighbours<K> nodeG(A, i);
+            T rel_angle_err = 0;
+            for(int j = 0; j < 3; j++){
+                typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
+                rel_angle_err = sycl::max(rel_angle_err, sycl::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j]);
+            }
+            return rel_angle_err;
+        });
+        T max_rel_dihedral_err = primitives::transform_reduce(Q, indices, T{0}, Max{}, [=](K i){
+            Constants<T,K> constants(A, i);
+            NodeNeighbours<K> nodeG(A, i);
+            T rel_dihedral_err = 0;
+            for(int j = 0; j < 3; j++){
+                typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
+                rel_dihedral_err = sycl::max(rel_dihedral_err, sycl::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j]);
+            }
+            return rel_dihedral_err;
+        });
+        size_t iterations_done = fullerene.m_.iterations_;
+        bool converged = ((max_rel_angle_err < 0.26) && (max_rel_dihedral_err < 0.1) && (max_rel_bond_err < 0.1));
+        bool failed = (!std::isfinite(max_rel_bond_err)) || (iterations_done >= max_iterations);
+        fullerene.m_.flags_.get() = failed ? StatusEnum::FAILED_3D : (converged ? StatusEnum::CONVERGED_3D : StatusEnum::NOT_CONVERGED);
+    };
+    CG(X, X1, X2, std::min(iterations - 1,size_t(0)));
+    auto E1 = energy(X);
+    CG(X, X1, X2, std::min(size_t(1),iterations));
+    auto E2 = energy(X);
+    if (std::abs(E1 - E2) < std::numeric_limits<T>::epsilon()*1e1) check_convergence = true;
+    if (check_convergence) convergence_check();
+    fullerene.m_.iterations_ += iterations;
+
     return Q.get_event();
 }
 
@@ -2029,8 +2088,7 @@ template <ForcefieldType FFT, typename T, typename K>
 SyclEvent ForcefieldOptimizeFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, size_t iterations, size_t max_iterations,
                                                     Span<K> indices, Span<std::array<T,3>> X1, Span<std::array<T,3>> X2, Span<std::array<T,3>> g0, Span<std::array<T,3>> g1, Span<std::array<T,3>> s){
     return forcefield_optimize_impl<FFT,T,K>(Q, 
-                                        fullerene.d_.X_cubic_.template as_span<std::array<T,3>>(),
-                                        fullerene.d_.A_cubic_,
+                                        fullerene,
                                         indices,
                                         X1,
                                         X2,
