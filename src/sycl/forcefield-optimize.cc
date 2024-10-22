@@ -1864,7 +1864,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
             if (std::abs(E1 - E2) < std::numeric_limits<T>::epsilon()*1e1) check_convergence = true;
             //
             if (check_convergence) convergence_check();
-            B.m_.iterations_[bid] += iterations;
+            if (tid == 0) B.m_.iterations_[bid] += iterations;
             X_acc[tid] = X[tid];
         }); });
     return SyclEvent(std::move(ffopt_done));
