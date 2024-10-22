@@ -178,6 +178,8 @@ add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(src/c++)
 
+set(SYCL_FULLERENE_LIBS "" CACHE STRING "SYCL libraries to link against")
+
 if(ENABLE_SYCL)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})
   set(CMAKE_CXX_COMPILER ${DPCPP_COMPILER})
@@ -186,6 +188,16 @@ if(ENABLE_SYCL)
   add_subdirectory(benchmarks/sycl)
   set(CMAKE_CXX_COMPILER ${PREVIOUS_CXX_COMPILER})
 endif()
+
+message("C++ FLAGS: " ${CMAKE_CXX_FLAGS})
+message("DPCPP_FLAGS: " ${DPCPP_FLAGS})
+message("FLAGS: " ${FLAGS})
+
+
+#set(DPCPP_FLAGS "${DPCPP_FLAGS} -tis")
+
+get_target_property(TESTVAR sycl_fullerene_lib LINK_FLAGS)
+message("sycl_fullerene_lib LINK_FLAGS: " ${TESTVAR})
 
 add_subdirectory(programs)
 add_subdirectory(benchmarks)
