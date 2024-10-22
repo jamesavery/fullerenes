@@ -96,26 +96,127 @@ struct Fullerene
     Fullerene(const Fullerene<T, K> &other) = default;
     Fullerene<T, K> &operator=(const Fullerene<T, K> &other) = default;
 
-    Fullerene<T, K> &operator=(const Graph &G) {
+    Fullerene<T, K> &operator=(const neighbours_t &neighbours) {
         if (this->N_ == 0 || this->Nf_ == 0) {throw std::invalid_argument("Fullerenes are non-owning, cannot assign to an uninitialized fullerene");}
-        if (G.neighbours.size() != N_ && G.neighbours.size() != Nf_) {throw std::invalid_argument("Graph has incompatible number of vertices: " + std::to_string(G.neighbours.size()) + " vs N: " + std::to_string(N_) + " or Nf: " + std::to_string(Nf_));}
-        bool is_cubic = G.neighbours.size() == N_ && G.neighbours[0].size() == 3;
+        if (neighbours.size() != N_ && neighbours.size() != Nf_) {throw std::invalid_argument("Graph has incompatible number of vertices: " + std::to_string(neighbours.size()) + " vs N: " + std::to_string(N_) + " or Nf: " + std::to_string(Nf_));}
+        bool is_cubic = neighbours.size() == N_ && neighbours[0].size() == 3;
         auto A = is_cubic ? d_.A_cubic_.template as_span<K>() : d_.A_dual_.template as_span<K>();
         auto count = is_cubic ? N_ : Nf_;
         for (size_t i = 0; i < count; i++) {
-            auto degree = is_cubic ? 3 : G.neighbours[i].size();
+            auto degree = is_cubic ? 3 : neighbours[i].size();
             if(!is_cubic) {d_.deg_[i] = degree;}
             for (size_t j = 0; j < degree; j++) {
-                A[i * (is_cubic ? 3 : 6) + j] = G.neighbours[i][j];
+                A[i * (is_cubic ? 3 : 6) + j] = neighbours[i][j];
             }
         }
-        m_.flags_.get() |= (is_cubic ? StatusEnum::FULLERENEGRAPH_PREPARED : StatusEnum::DUAL_INITIALIZED);
+        m_.flags_.get() = (is_cubic ? StatusEnum::CUBIC_INITIALIZED : StatusEnum::DUAL_INITIALIZED);
+        m_.iterations_.get() = 0;
+        return *this;
+    }
+
+    Fullerene<T, K> &operator=(std::tuple<std::reference_wrapper<const neighbours_t>, std::reference_wrapper<const vector<coord2d>>> neighbours_and_layout) {
+        auto &[neighbours, layout] = neighbours_and_layout;
+        *this = neighbours.get();
+        auto is_cubic = N_ == neighbours.get().size();
+        auto dst_ptr = is_cubic ? d_.X_cubic_.template as_span<std::array<T, 2>>() : d_.X_dual_.template as_span<std::array<T, 2>>();
+        //using LayoutType = std::decay_t<decltype(layout.get()[0])>;
+        
+        auto copy_layout = [](auto& dst, auto& src) {
+            static_assert(extra_type_traits::is_array_t<decltype(src)>::value, "Source layout: expected an array type");
+            static_assert(extra_type_traits::is_array_t<decltype(dst)>::value, "Destination layout: expected an array type");
+            std::size(src) == std::size(dst) ? std::size(src) : throw std::invalid_argument("Layouts have different sizes");
+
+            if constexpr (extra_type_traits::is_array_t<decltype(dst[0])>::value && extra_type_traits::is_array_t<decltype(src[0])>::value) {
+                if constexpr (std::is_same_v<decltype(dst[0][0]), decltype(src[0][0])>) {
+                    memcpy(dst.data(), src.data(), src.size() * sizeof(src[0])); // Fast path for same types.
+                } else {
+                    for (size_t i = 0; i < src.size(); i++) {
+                        for (size_t j = 0; j < 2; j++) {
+                            dst[i][j] = src[i][j];
+                        }
+                    }
+                }
+            } else if constexpr (extra_type_traits::is_pair_t<decltype(src[0])>::value && extra_type_traits::is_array_t<decltype(dst[0])>::value) {
+                for (size_t i = 0; i < src.size(); i++) {
+                    dst[i][0] = static_cast<T>(src[i].first);
+                    dst[i][1] = static_cast<T>(src[i].second);
+                }
+            } else if constexpr (extra_type_traits::is_pair_t<decltype(src[0])>::value && extra_type_traits::is_pair_t<decltype(dst[0])>::value) {
+                for (size_t i = 0; i < src.size(); i++) {
+                    dst[i].first = static_cast<T>(src[i].first);
+                    dst[i].second = static_cast<T>(src[i].second);
+                }
+            } else {
+                throw std::invalid_argument("Unsupported layout types");
+                
+            }
+        };
+        copy_layout(dst_ptr, layout.get());
+        m_.flags_.get() |= StatusEnum::CONVERGED_2D;
+        return *this;
+    }
+
+    Fullerene<T, K> &operator=(const Graph &G) {
+        *this = G.neighbours;
+        return *this;
+    }
+
+    Fullerene<T, K> &operator=(const PlanarGraph &PG) {
+        *this = std::make_tuple(std::cref(PG.neighbours), std::cref(PG.layout2d));
+        return *this;
+    }
+
+    Fullerene<T, K> &operator=(const FullereneGraph &FG) {
+        *this = std::make_tuple(std::cref(FG.neighbours), std::cref(FG.layout2d));
+        return *this;
+    }
+
+    Fullerene<T, K> &operator=(const FullereneDual &FD) {
+        *this = std::make_tuple(std::cref(FD.neighbours), std::cref(FD.layout2d));
+        return *this;
+    }
+
+    Fullerene<T, K> &operator=(const Polyhedron &P) {
+        *this = P.neighbours;
+        auto is_cubic = P.points.size() == N_;
+        auto dst_ptr = is_cubic ? d_.X_cubic_.data() : d_.X_dual_.data();
+        if constexpr (std::is_same_v<decltype(d_.X_cubic_[0]), decltype(P.points[0])>) {
+            memcpy(dst_ptr, P.points.data(), P.points.size() * sizeof(P.points[0])); //Fast path for same types.
+        } else {
+            for (size_t i = 0; i < P.points.size(); i++) {
+                for (size_t j = 0; j < 3; j++) {
+                    dst_ptr[i][j] = P.points[i][j];
+                }
+            }
+        }
+        m_.flags_.get() |= StatusEnum::CONVERGED_3D; //TODO: Ought we to check this first?
+        return *this;
+    }
+
+    Fullerene<T, K> &operator=(const std::tuple<std::reference_wrapper<const neighbours_t>, size_t> &neighbours_and_ID) {
+        auto &[neighbours, ID] = neighbours_and_ID;
+        *this = neighbours.get();
+        m_.ID_.get() = ID;
         return *this;
     }
 
     Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const Graph>, size_t>& Graph_and_ID){
         auto& [G, ID] = Graph_and_ID;
-        *this = G.get();
+        *this = G.get().neighbours;
+        m_.ID_.get() = ID;
+        return *this;
+    }
+
+    Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const PlanarGraph>, size_t>& PlanarGraph_and_ID){
+        auto& [PG, ID] = PlanarGraph_and_ID;
+        *this = PG.get().neighbours;
+        m_.ID_.get() = ID;
+        return *this;
+    }
+
+    Fullerene<T, K>& operator=(const std::tuple<std::reference_wrapper<const FullereneGraph>, size_t>& FullereneGraph_and_ID){
+        auto& [FG, ID] = FullereneGraph_and_ID;
+        *this = FG.get().neighbours;
         m_.ID_.get() = ID;
         return *this;
     }
