@@ -14,12 +14,13 @@ enum class StatusEnum
     DUAL_INITIALIZED = 1 << 6,          // 0000 0100 0000
     FULLERENEGRAPH_PREPARED = 1 << 7,   // 0000 1000 0000
     NOT_CONVERGED = 1 << 8,             // 0001 0000 0000
+    CUBIC_INITIALIZED = 1 << 9,         // 0010 0000 0000
 };
 
 struct StatusFlag
 {
 
-    StatusFlag() : flag_(0) {}
+    StatusFlag() : flag_((int)StatusEnum::EMPTY) {}
     StatusFlag(const StatusFlag& flag) = default;
     StatusFlag& operator=(const StatusFlag& flag) = default;
     StatusFlag(StatusFlag&& flag) = default;
@@ -33,7 +34,7 @@ struct StatusFlag
     template <typename T>
     StatusFlag(T flag) : flag_(static_cast<int>(flag)) {}
 
-    template <typename T>
+    /* template <typename T>
     StatusFlag operator|=(T flag) { return flag_ |= static_cast<int>(flag); }
     template <typename T>
     StatusFlag operator&=(T flag) { return flag_ &= static_cast<int>(flag); }
@@ -45,7 +46,7 @@ struct StatusFlag
     template <typename T>
     StatusFlag operator&(T flag) const { return flag_ & static_cast<int>(flag); }
     template <typename T>
-    StatusFlag operator^(T flag) const { return flag_ ^ static_cast<int>(flag); }
+    StatusFlag operator^(T flag) const { return flag_ ^ static_cast<int>(flag); } */
 
 
 
@@ -120,11 +121,11 @@ namespace condition_detail{
     constexpr inline T &operator^=(T &a, K b) { return (T &)((int &)a ^= (int)b); }
 
     template <class T, class K>
-    bool not_set(const T flag, const K condition) { return int(flag & condition) == 0; }
+    constexpr inline bool not_set(const T flag, const K condition) { return int(flag & condition) == 0; }
     template <class T, class K>
-    bool all_set(const T flag, const K condition) { return int(flag | ~condition) == ~0; }
+    constexpr inline bool all_set(const T flag, const K condition) { return int(flag | ~condition) == ~0; }
     template <class T, class K>
-    bool any_set(const T flag, const K condition) { return !condition || (int(flag) & int(condition)); }
+    constexpr inline bool any_set(const T flag, const K condition) { return !condition || (int(flag) & int(condition)); }
  
 }
 
