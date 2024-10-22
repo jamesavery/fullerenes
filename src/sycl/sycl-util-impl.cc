@@ -273,17 +273,17 @@ template <typename T> struct is_fullerene_queue : std::false_type{};
 template <typename T, typename K> struct is_fullerene_queue<FullereneQueue<T,K>> : std::true_type{};
 
 template <typename T, typename K>
-void QueueUtil::push(SyclQueue& Q, FullereneQueue<T, K> &dst_queue, FullereneBatch <T, K>&src_batch, ConditionFunctor transfer_cond){
-    push_impl(Q, dst_queue, src_batch, transfer_cond);
+void QueueUtil::push(SyclQueue& Q, FullereneQueue<T, K> &dst_queue, FullereneBatch <T, K>&src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status){
+    push_impl(Q, dst_queue, src_batch, transfer_cond, consumed_status);
 }
 
 template <typename T, typename K>
-void QueueUtil::push(SyclQueue& Q, FullereneBatch<T, K>& dst_batch, FullereneQueue<T, K>& src_queue, ConditionFunctor transfer_cond){
-    push_impl(Q, dst_batch, src_queue, transfer_cond);
+void QueueUtil::push(SyclQueue& Q, FullereneBatch<T, K>& dst_batch, FullereneQueue<T, K>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status){
+    push_impl(Q, dst_batch, src_queue, transfer_cond, consumed_status);
 }
 
 template <typename DstBatch, typename SrcBatch>
-void QueueUtil::push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition){
+void QueueUtil::push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition, StatusEnum consumed_status){
 if(dst_batch.N_ != src_batch.N_ || src_batch.Nf_ != dst_batch.Nf_) throw std::runtime_error("Fullerenes have different sizes");
     constexpr bool dst_is_queue = is_fullerene_queue<DstBatch>::value;
     //If we are pushing from a FullereneQueue, we need to compute the valid indices of the destination batch
@@ -293,18 +293,17 @@ if(dst_batch.N_ != src_batch.N_ || src_batch.Nf_ != dst_batch.Nf_) throw std::ru
     auto& flags = dst_is_queue ? src_batch.m_.flags_ : dst_batch.m_.flags_;
     using int_t = std::decay_t<decltype(*indices.begin())>;
     using float_t = std::decay_t<decltype(src_batch.d_.X_cubic_[0][0])>;
+    bool replace_status = consumed_status != StatusEnum(0); //If consumed_status is not 0, we take that as instruction to replace the status of the copied fullerenes
     int_t init = 0;
-    std::transform_exclusive_scan(std::execution::par_unseq,
-        flags.begin(), flags.end(),
-        indices.begin(),
+    primitives::transform_exclusive_scan(Q,
+        flags,
+        indices,
         init,
         Plus{},
         [condition](auto f){return static_cast<int_t>(condition(f));}
     );
     Q.wait();
     
-    auto src = FullereneBatchView(src_batch, 0, src_batch.capacity());
-    auto dst = FullereneBatchView(dst_batch, 0, dst_batch.capacity());
 
     auto num_valid = condition(flags.back()) + indices.back(); // Number of valid fullerenes in the source batch
     if constexpr (dst_is_queue) dst_batch.resize( num_valid + dst_batch.size()  );
@@ -319,14 +318,26 @@ if(dst_batch.N_ != src_batch.N_ || src_batch.Nf_ != dst_batch.Nf_) throw std::ru
     auto& queue_size = queue->size_;
     auto queue_capacity = queue->capacity();
 
-    if (dst_is_queue && queue_front < 0) {queue_front = 0; queue_back = 0;}
+    if (dst_is_queue && queue_front < 0) { 
+        queue_front = 0; 
+    }
+
+    auto src = FullereneBatchView(src_batch, 0, src_batch.capacity());
+    auto dst = FullereneBatchView(dst_batch, 0, dst_batch.capacity());
 
     std::for_each(indices.begin(), indices.end(), [&](auto& it){
         auto index_in_indices = &it - &(*indices.begin());
-        if (condition(flags[index_in_indices]) && (dst_is_queue || index_in_indices < num_transfer)){ 
+        //std::cout << "Index in indices: " << index_in_indices << " Condition: " << boolalpha << condition(flags[index_in_indices]) << " Transfer: " << (dst_is_queue || it < num_transfer) << std::endl;
+        if (condition(flags[index_in_indices]) && (dst_is_queue || it < num_transfer)){ 
             auto index_in_dst = (dst_is_queue ? (queue_back + it + 1) : index_in_indices) % dst_batch.capacity();
             auto index_in_src = (dst_is_queue ? index_in_indices : queue_front + it) % src_batch.capacity();
             decltype(dst[0])::copy(dst[index_in_dst], src[index_in_src]);
+            /* if constexpr(dst_is_queue) {
+                std::cout << "Copying from batch[" << index_in_src << "] to queue[" << index_in_dst << "]\n";
+            } else {
+                std::cout << "Copying from queue[" << index_in_src << "] to batch[" << index_in_dst << "]\n";
+            } */
+            if(replace_status) src.m_.flags_[index_in_src] = consumed_status;
         }
     });
 
@@ -480,8 +491,8 @@ template std::ostream& operator<<(std::ostream& os, const ReferenceWrapper<Statu
 
 
 
-template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint16_t>& dst_queue, FullereneBatch<float,uint16_t>& src_batch, ConditionFunctor transfer_cond);
-template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint16_t>& dst_batch, FullereneQueue<float,uint16_t>& src_queue, ConditionFunctor transfer_cond);
-template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint32_t>& dst_queue, FullereneBatch<float,uint32_t>& src_batch, ConditionFunctor transfer_cond);
-template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint32_t>& dst_batch, FullereneQueue<float,uint32_t>& src_queue, ConditionFunctor transfer_cond);
+template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint16_t>& dst_queue, FullereneBatch<float,uint16_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
+template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint16_t>& dst_batch, FullereneQueue<float,uint16_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
+template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint32_t>& dst_queue, FullereneBatch<float,uint32_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
+template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint32_t>& dst_batch, FullereneQueue<float,uint32_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
 //template void push_impl (SyclQueue& Q, FullereneQueue<float,uint16_t>& dst_queue, FullereneBatch<float,uint16_t>& src_batch, ConditionFunctor condition);

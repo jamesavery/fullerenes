@@ -31,13 +31,13 @@ struct Fullerene;
 //Encapsulation of functions that must be friends of FullereneBatch and FullereneQueue so as to modify, size_, capacity_, front_, back_.
 struct QueueUtil{
     template<typename T1, typename K1>
-    static void push(SyclQueue& Q, FullereneQueue<T1, K1> &dst_queue, FullereneBatch <T1, K1>&src_batch, ConditionFunctor transfer_cond);
+    static void push(SyclQueue& Q, FullereneQueue<T1, K1> &dst_queue, FullereneBatch <T1, K1>&src_batch, ConditionFunctor transfer_cond = ConditionFunctor(), StatusEnum consumed_status = StatusEnum(0));
     
     template<typename T1, typename K1>
-    static void push(SyclQueue& Q, FullereneBatch<T1, K1> &dst_batch, FullereneQueue<T1, K1> &src_queue, ConditionFunctor transfer_cond);
+    static void push(SyclQueue& Q, FullereneBatch<T1, K1> &dst_batch, FullereneQueue<T1, K1> &src_queue, ConditionFunctor transfer_cond = ConditionFunctor(), StatusEnum consumed_status = StatusEnum(0));
 
     template <typename DstBatch, typename SrcBatch>
-    static void push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition);
+    static void push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition = ConditionFunctor(), StatusEnum consumed_status = StatusEnum(0));
 };
 
 
@@ -70,13 +70,13 @@ struct FullereneBatch
     constexpr inline operator FullereneBatchView<T, K>() const { return FullereneBatchView<T, K>(*this); }
 
     template<typename T1, typename K1>
-    friend void QueueUtil::push(SyclQueue& Q, FullereneQueue<T1, K1> &dst_queue, FullereneBatch <T1, K1>&src_batch, ConditionFunctor transfer_cond);
+    friend void QueueUtil::push(SyclQueue& Q, FullereneQueue<T1, K1> &dst_queue, FullereneBatch <T1, K1>&src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
     
     template<typename T1, typename K1>
-    friend void QueueUtil::push(SyclQueue& Q, FullereneBatch<T1, K1> &dst_batch, FullereneQueue<T1, K1> &src_queue, ConditionFunctor transfer_cond);
+    friend void QueueUtil::push(SyclQueue& Q, FullereneBatch<T1, K1> &dst_batch, FullereneQueue<T1, K1> &src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
 
     template <typename DstBatch, typename SrcBatch>
-    friend void QueueUtil::push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition);
+    friend void QueueUtil::push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition, StatusEnum consumed_status);
 
     // Getters for private members that are not supposed to be modified outside the class
     constexpr inline int size()     const {return size_;}
@@ -177,13 +177,13 @@ struct FullereneQueue : public FullereneBatch<T,K>
     FullereneQueue<T, K>& operator=(FullereneQueue<T, K> &&other) = default;
 
     template<typename T1, typename K1>
-    friend void QueueUtil::push(SyclQueue& Q, FullereneQueue<T1, K1> &dst_queue, FullereneBatch <T1, K1>&src_batch, ConditionFunctor transfer_cond);
+    friend void QueueUtil::push(SyclQueue& Q, FullereneQueue<T1, K1> &dst_queue, FullereneBatch <T1, K1>&src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
     
     template<typename T1, typename K1>
-    friend void QueueUtil::push(SyclQueue& Q, FullereneBatch<T1, K1> &dst_batch, FullereneQueue<T1, K1> &src_queue, ConditionFunctor transfer_cond);
+    friend void QueueUtil::push(SyclQueue& Q, FullereneBatch<T1, K1> &dst_batch, FullereneQueue<T1, K1> &src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
 
     template <typename DstBatch, typename SrcBatch>
-    friend void QueueUtil::push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition);
+    friend void QueueUtil::push_impl(SyclQueue& Q, DstBatch& dst_batch, SrcBatch& src_batch, ConditionFunctor condition, StatusEnum consumed_status);
 
     Fullerene<T, K> operator[](size_t index) const {
         if (index >= this->size()) {throw OOR_ERROR(index, this->size());}
@@ -227,6 +227,14 @@ private:
             Nf_ = is_cubic ? N/2 + 2 : N;
         }
         size_++;
+        if ((size_-1) == capacity_) {
+            resize(capacity_ == 0 ? 1 : capacity_ * 2);
+        } else if (size_ == 1) {
+            front_ = 0;
+            back_ = 0;
+        } else {
+            back_ = (back_ + 1) % capacity_;
+        }
     }
 };
 
