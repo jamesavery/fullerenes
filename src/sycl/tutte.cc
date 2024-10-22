@@ -19,7 +19,7 @@ template <typename T, typename K> struct TutteKernel_1 {};
 
 template <typename T, typename K>
 SyclEvent tutte_isomer_impl( SyclQueue& Q, 
-                        Span<std::array<K,3>> cubic_neighbours,
+                        Fullerene<T,K> fullerene,
                         Span<std::array<T,2>> xys,
                         Span<std::array<T,2>> newxys,
                         Span<bool> fixed,
@@ -27,6 +27,7 @@ SyclEvent tutte_isomer_impl( SyclQueue& Q,
                         int N)
 {   
     LaunchConfig<TutteKernel_1<T,K>> config1(Q);
+    auto cubic_neighbours = fullerene.d_.A_cubic_;
 
     primitives::fill(Q, fixed, false);
     primitives::fill(Q, xys, std::array<T,2>{0,0});
@@ -67,7 +68,10 @@ SyclEvent tutte_isomer_impl( SyclQueue& Q,
         if (i%N == 0){
             Q.wait();
             T max_diff = primitives::transform_reduce(Q, xys, newxys, T(0), Max{}, [&](auto& old_xys, auto& new_xys){return norm(old_xys - new_xys);});
-            if (max_diff <= 10*std::numeric_limits<T>::epsilon()) break;
+            if (max_diff <= 10*std::numeric_limits<T>::epsilon()) {
+                fullerene.m_.flags_.get().set(StatusEnum::CONVERGED_2D);
+                break;
+            }
         }
         primitives::copy(Q, newxys.subspan(0,N), xys);
     }
@@ -97,7 +101,7 @@ SyclEvent tutte_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             const auto& isomer_neighbours  = fullerene.d_.A_cubic_;
             auto xys_acc                  = fullerene.d_.X_cubic_.template as_span<coord2d>();
 	    
-            if (statuses[isomer_idx] & StatusEnum::FULLERENEGRAPH_PREPARED){
+            if (statuses[isomer_idx].is_set(StatusEnum::FULLERENEGRAPH_PREPARED)){
 
             DeviceCubicGraph FG(isomer_neighbours); 
 
@@ -160,6 +164,7 @@ SyclEvent tutte_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             }
             sycl::group_barrier(cta);
             xys_acc[a]  =  xys_smem[a];
+            if (a == 0 && converged) fullerene.m_.flags_ |= StatusEnum::CONVERGED_2D;
             }
         });
     });
@@ -196,13 +201,13 @@ SyclEvent TutteFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene,
                                     Span<T> max_change){
     if (! (fullerene.m_.flags_.get() & (int)StatusEnum::FULLERENEGRAPH_PREPARED)) return SyclEvent();
     auto ret_val = tutte_isomer_impl(  Q, 
-                        fullerene.d_.A_cubic_, 
+                        fullerene,
                         fullerene.d_.X_cubic_.template as_span<std::array<T,2>>(), 
                         newxys,
                         fixed,
                         max_change,
                         fullerene.N_);
-    fullerene.m_.flags_ |= StatusEnum::CONVERGED_2D;
+    fullerene.m_.flags_.get().set(StatusEnum::CONVERGED_2D);
     return ret_val;
 }
 
