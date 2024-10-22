@@ -84,7 +84,7 @@ template <typename T>
 void SyclVector<T>::resize(size_t new_size, size_t front, size_t back, size_t seg_size){
     if(new_size > capacity_){
         T* new_data = sycl::malloc_shared<T>(new_size, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
-        memset(new_data, 0, new_size*sizeof(T));
+        std::fill_n(new_data, new_size, T{});
         if (capacity_ > 0){
             auto n_first_segment = back < front ? capacity_ - front : (back - front + seg_size);
             assert(n_first_segment <= new_size);
