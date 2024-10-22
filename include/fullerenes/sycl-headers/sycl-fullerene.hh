@@ -45,7 +45,7 @@ namespace extra_type_traits {
 using namespace condition_detail;
 template <typename T = float, typename K = uint16_t>
 struct Fullerene
-{
+{   
     static_assert(std::is_floating_point<T>::value, "T must be a floating point type");
     static_assert(std::is_integral<K>::value, "K must be an integral type");
 
