@@ -295,7 +295,6 @@ TEST_P(FullereneQueueTest, QueueManipulation) {
     EXPECT_EQ(queue.front_index(), 0);
     EXPECT_EQ(queue.back_index(), 4);
 
-    SyclQueue Q;
     QueueUtil::push(Q, queue, batch, ConditionFunctor(StatusEnum::DUAL_INITIALIZED));
     EXPECT_EQ(queue.size(), 5);
     EXPECT_EQ(queue.front_index(), 0);
