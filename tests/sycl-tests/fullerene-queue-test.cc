@@ -19,6 +19,7 @@ protected:
     FullereneQueue queue = FullereneQueue(N, std::min(1,n_max_isomers));
 
     BuckyGen::buckygen_queue BQ = BuckyGen::start(N, false, false);
+    SyclQueue Q = SyclQueue(Device::get_devices(DeviceType::GPU)[0]);
     void SetUp() override {
         BuckyGen::next_fullerene(BQ, G);
     }
