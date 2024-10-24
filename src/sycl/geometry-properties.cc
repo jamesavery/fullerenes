@@ -65,7 +65,7 @@ SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, 
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
-            auto X = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>();
+            auto X = batch[bid].d_.X_cubic_;
             auto I = inertia_matrix(cta, X);
             auto [V,lambdas] = I.eigensystem();
             auto elipsoid = rsqrt3(d_sort(d_abs(lambdas)));
@@ -80,7 +80,7 @@ template <typename T, typename K>
 SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<T> out_ellipticity){
     if (fullerene.m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return SyclEvent();
     auto N = fullerene.N_;
-    auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
+    auto X = fullerene.d_.X_cubic_;
     auto I = inertia_matrix(Q, X);
     SyclEventImpl ret_val = Q -> single_task ([=](){
         auto [V,lambdas] = I.eigensystem();
@@ -99,7 +99,7 @@ SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> ba
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
-            auto X = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>();
+            auto X = batch[bid].d_.X_cubic_;
             auto I = inertia_matrix(cta, X);
             if (tid == 0) out_inertia[bid] = I.eigenvalues();
         });
@@ -112,7 +112,7 @@ template <typename T, typename K>
 SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene, Span<std::array<T,3>> out_inertia){
     if (fullerene.m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return SyclEvent();
     auto N = fullerene.N_;
-    auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
+    auto X = fullerene.d_.X_cubic_;
     auto I = inertia_matrix(Q, X);
     SyclEventImpl ret_val = Q -> single_task ([=](){
         out_inertia[0] = I.eigenvalues();
@@ -128,7 +128,7 @@ SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, FullereneBatch
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
-            auto X = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>();
+            auto X = batch[bid].d_.X_cubic_;
             auto P = principal_axes(cta, X);
             if (isnan(P[0][0]) || isnan(P[0][1]) || isnan(P[0][2]) || isnan(P[1][0]) || isnan(P[1][1]) || isnan(P[1][2]) || isnan(P[2][0]) || isnan(P[2][1]) || isnan(P[2][2])) {
                 return;
@@ -143,7 +143,7 @@ SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, FullereneBatch
 template <typename T, typename K>
 SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T, K> fullerene){
     auto N = fullerene.N_;
-    auto X = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>();
+    auto X = fullerene.d_.X_cubic_;
     auto P = principal_axes(Q, X);
     primitives::transform(Q, X, X, [P](auto x){return dot(P,x);});
     return Q.get_event();
@@ -161,7 +161,7 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
-            for (int i = tid; i < N; i += cta.get_local_range(0)) X_smem[i] = batch[bid].d_.X_cubic_.template as_span<std::array<T,3>>()[i];
+            for (int i = tid; i < N; i += cta.get_local_range(0)) X_smem[i] = batch[bid].d_.X_cubic_[i];
             sycl::group_barrier(cta);
             T A = 0;
             coord3d face_center = {0,0,0};
@@ -233,7 +233,7 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> bat
             auto bid = cta.get_group_linear_id();
             auto fullerene = batch[bid];
             if (fullerene.m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
-            for (int i = tid; i < N; i += cta.get_local_range(0)) X_smem[i] = fullerene.d_.X_cubic_.template as_span<std::array<T,3>>()[i];
+            for (int i = tid; i < N; i += cta.get_local_range(0)) X_smem[i] = fullerene.d_.X_cubic_[i];
             //auto node_graph = NodeNeighbours<K>(cta, fullerene.d_.A_cubic_.data(), smem.get_pointer());
             sycl::group_barrier(cta);
             T V = 0;
