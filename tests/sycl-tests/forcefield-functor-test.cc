@@ -2,7 +2,9 @@
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/isomerdb.hh>
 #include <numeric>
+#include <execution>
 #include <gtest/gtest.h>
+#include <iomanip>
 
 
 class ForceFieldTest : public ::testing::TestWithParam<int> {
@@ -47,15 +49,53 @@ TEST_P(ForceFieldTest, TestForceFieldOptimizeFunctor) {
     FullereneBatch opt_batch(N, device.get_property(DeviceProperty::MAX_COMPUTE_UNITS));
     FullereneQueue out_queue(N, 1);
 
+    std::vector<FullereneQueue> input_queues(10, FullereneQueue(N, device.get_property(DeviceProperty::MAX_COMPUTE_UNITS)*5));
+    for (int i = 0; i < input_queues[0].capacity(); i++) {
+        BuckyGen::next_fullerene(BQ, G);
+        input_queues[0].push_back(G);
+    }
+    dualize(Q, input_queues[0], LaunchPolicy::SYNC);
+    tutte(Q, input_queues[0], LaunchPolicy::SYNC);
+    spherical_projection(Q, input_queues[0], LaunchPolicy::SYNC);
+    
+    for (int i = 1 ; i < 10; i++) {
+        input_queues[i] = input_queues[0];
+    }
+    
+
+    std::vector<FullereneBatch> opt_batches(10, FullereneBatch(N, device.get_property(DeviceProperty::MAX_COMPUTE_UNITS)));
+    std::vector<FullereneQueue> out_queues(10, FullereneQueue(N, 1));
+    
+    for (int j = 0; j < 10; j++)    ASSERT_EQ(input_queues[j],input_queues[0]); //Sanity check
+    
+    for (int i = 0; i < 50; i++) {
+        for (int j = 0; j < 10; j++) {
+            QueueUtil::push(Q, opt_batches[j], input_queues[j], ConditionFunctor(0, 0, StatusEnum::EMPTY | StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D));
+            FF(Q, opt_batches[j], LaunchPolicy::SYNC, N, 10*N);
+            QueueUtil::push(Q, out_queues[j], opt_batches[j], ConditionFunctor(0, 0, StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D), StatusEnum::EMPTY);
+        }
+        bool all_equal = true;
+        for (int j = 0; j < 10; j++) {
+            all_equal &= out_queues[j] == out_queues[0];
+        }
+        ASSERT_TRUE(all_equal);
+    } 
+
+    std::cout << out_queues[0].m_.flags_ << std::endl;
+    std::cout << out_queues[0].m_.iterations_ << std::endl;
+    std::cout << out_queues[0].size() << std::endl;
+    std::cout << input_queues[0].size() << std::endl;
+    std::cout << std::transform_reduce(opt_batches[0].m_.flags_.begin(), opt_batches[0].m_.flags_.end(), 0, std::plus<int>(), [](auto x) {return x.is_set(StatusEnum::NOT_CONVERGED) ? 1 : 0;}) << std::endl;
+
     for (int i = 0; i < 21; i++) {
-        QueueUtil::push(Q, opt_batch, queue, ConditionFunctor(0, 0, StatusEnum::EMPTY | StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D));
+        /* QueueUtil::push(Q, opt_batch, queue, ConditionFunctor(0, 0, StatusEnum::EMPTY | StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D));
         FF(Q, opt_batch, LaunchPolicy::SYNC, N, N*20);
         std::cout << "Flags: " << opt_batch.m_.flags_ << std::endl;
         std::cout << "Iterations: " << opt_batch.m_.iterations_ << std::endl;
 
-        auto Qsize_before = out_queue.size();
+        auto qsize_before = out_queue.size();
         QueueUtil::push(Q, out_queue, opt_batch, ConditionFunctor(0, 0, StatusEnum::CONVERGED_3D | StatusEnum::FAILED_3D), StatusEnum::EMPTY);
-        std::cout << "Pushed " << out_queue.size() - Qsize_before << " to out_queue" << std::endl;
+        std::cout << "Pushed " << out_queue.size() - qsize_before << " to out_queue" << std::endl; */
     }
 
 
