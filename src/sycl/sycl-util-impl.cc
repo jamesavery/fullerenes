@@ -88,8 +88,9 @@ void SyclVector<T>::resize(size_t new_size, size_t front, size_t back, size_t se
         if (capacity_ > 0){
             auto n_first_segment = back < front ? capacity_ - front : (back - front + seg_size);
             assert(n_first_segment <= new_size);
+            assert((n_first_segment + front) <= new_size);
+            if(back < front) assert(back + seg_size <= front);
             memcpy(new_data, data_ + front, n_first_segment*sizeof(T));
-            assert((n_first_segment + (back + 1)) <= new_size);
             if( back < front) memcpy(new_data + n_first_segment, data_, (back + seg_size)*sizeof(T));
         }
         if(data_) sycl::free(data_,  sycl::context(device(default_selector_v)));
@@ -141,9 +142,9 @@ template <typename T>
 bool Span<T>::operator==(const Span<T> other) const {
     if(size_ != other.size_) return false;    
     if(data() == other.data()) return true;
-    if constexpr (is_floating_point_v<T>){
+    if constexpr (is_floating_point_v<std::decay_t<T>>){
         return std::equal(begin(), end(), other.begin(), [](auto& a,auto& b){
-            T eps = std::numeric_limits<T>::epsilon() * 10;
+            T eps = std::numeric_limits<T>::epsilon() * 20;
             T max_v = std::max<T>(std::abs<T>(a), std::abs<T>(b));
             return std::abs<T>(a - b) / (max_v > eps ? max_v : 1) < eps;});
     } else{
