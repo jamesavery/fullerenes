@@ -178,6 +178,7 @@ TEST_P(FunctorTests, AllTestsInOne) {
         SphericalProjectionFunctor<T, uint16_t> spherical_projection;
         ForcefieldOptimizeFunctor<PEDERSEN, T, uint16_t> forcefield_optimize;
         HessianFunctor<PEDERSEN, T, uint16_t> hessian;
+        TransformCoordinatesFunctor<T, uint16_t> transform;
         EigenFunctor<EigensolveMode::ENDS, T, uint16_t> eigen;
         EccentricityFunctor<T, uint16_t> eccentricity;
         VolumeFunctor<T, uint16_t> volume;
@@ -204,6 +205,7 @@ TEST_P(FunctorTests, AllTestsInOne) {
         tutte(Q, batch1, LaunchPolicy::SYNC);
         spherical_projection(Q, batch1, LaunchPolicy::SYNC);
         forcefield_optimize(Q, batch1, LaunchPolicy::SYNC, 5*N, 5*N);
+        transform(Q, batch1, LaunchPolicy::SYNC);
         hessian(Q, batch1, LaunchPolicy::SYNC, batch1_hessians, batch1_cols);
         eigen(Q, batch1, LaunchPolicy::SYNC, batch1_hessians, batch1_cols, 50, batch1_eigenvalues, batch1_eigenvectors);
         eccentricity(Q, batch1, LaunchPolicy::SYNC, batch1_eccentricities);
@@ -214,6 +216,7 @@ TEST_P(FunctorTests, AllTestsInOne) {
             tutte(Q, fullerene, LaunchPolicy::SYNC);
             spherical_projection(Q, fullerene, LaunchPolicy::SYNC);
             forcefield_optimize(Q, fullerene, LaunchPolicy::SYNC, 5*N, 5*N);
+            transform(Q, fullerene, LaunchPolicy::SYNC);
             //hessian(Q, fullerene, LaunchPolicy::SYNC, batch2_hessians, batch2_cols);
             //eigen(Q, fullerene, LaunchPolicy::SYNC, batch2_hessians, batch2_cols, 50, batch2_eigenvalues, batch2_eigenvectors);
             eccentricity(Q, fullerene, LaunchPolicy::SYNC, batch2_eccentricities);
