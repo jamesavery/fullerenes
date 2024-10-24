@@ -338,7 +338,7 @@ int main(int ac, char **argv)
   };
 
   auto prop_routine = [&](){
-    std::vector<int> qsize(Nd); std::for_each(Q2s.begin(),Q2s.end(),[&](auto &Q){qsize.push_back(Q.size());});
+    std::vector<int> qsize; std::for_each(Q2s.begin(),Q2s.end(),[&](auto &Q){qsize.push_back(Q.size());});
     for (int d = 0; d < Nd; d++){
       auto &B   = Bs[PROP][d];
       auto &ctx = opt_ctxs[d];
