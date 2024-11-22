@@ -193,6 +193,7 @@ SyclEvent dualize_batch_impl(SyclQueue& Q, FullereneBatchView<T,K> batch){
             node_t f = nditem.get_local_linear_id();    // Face-node index
             auto isomer = nditem.get_group_linear_id(); // Isomer    index
             if(all_set(statuses[isomer], (int)StatusEnum::FULLERENEGRAPH_PREPARED)) return;
+            if(statuses[isomer].is_not_set(StatusEnum::DUAL_INITIALIZED)) return;
             //cta.async_work_group_copy(local_ptr<K>(cached_neighbours),    global_ptr<K>(A_dual.begin() + isomer*Nf*MaxDegree), Nf*MaxDegree);
             //cta.async_work_group_copy(local_ptr<K>(cached_degrees),       global_ptr<K>(deg.begin()    + isomer*Nf), Nf);
             if ( f < Nf){
@@ -353,8 +354,8 @@ void DualizeFunctor<T,K>::operator()(SyclQueue& Q, FullereneBatchView<T,K> batch
 
 template <typename T, typename K>
 SyclEvent DualizeFunctor<T,K>::compute(SyclQueue& Q, Fullerene<T,K> fullerene, Span<K> cannon_ixs, Span<K> rep_count, Span<K> scan_array, Span<K> triangle_numbers, Span<K> arc_list){
-    if (fullerene.m_.flags_.get() & (int)StatusEnum::FULLERENEGRAPH_PREPARED) return SyclEvent(); //Job already done
-    if (! (fullerene.m_.flags_.get() & (int)StatusEnum::DUAL_INITIALIZED)) return SyclEvent(); //If the dual graph is not initialized, we cannot proceed.
+    if (fullerene.m_.flags_.get().is_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return SyclEvent(); //Job already done
+    if (fullerene.m_.flags_.get().is_not_set(StatusEnum::DUAL_INITIALIZED)) return SyclEvent(); //If the dual graph is not initialized, we cannot proceed.
     auto done_event = prepare_fullerene_graph(  Q,
                                                 fullerene,
                                                 cannon_ixs,
