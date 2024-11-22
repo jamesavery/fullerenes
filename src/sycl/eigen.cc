@@ -308,7 +308,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             real_t A[M]; //Hessian matrix, threadIdx.x'th row
             node_t C[M]; //Column indices of the threadIdx.x'th row 3-fold degenerate
             real_t* V = V_acc.data() + bid * nLanczos * N + tid;
-            coord3d* X_ptr = X_acc.template as_span<coord3d>().data() + Natoms*bid; 
+            coord3d* X_ptr = X_acc.data()  + Natoms*bid; 
 
             auto LCG = [&](const unsigned long seed){
                 //Parameters from Numerical Recipes, Knuth and H. W. Lewis
@@ -436,12 +436,13 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             auto cta = nditem.get_group();
             auto bdim = cta.get_local_linear_range();
             auto n = nLanczos;
+            auto Q = Q_acc.subspan(bid*n*n, n*n);
 
             for (int i = tid; i < n; i += bdim){
                 D[i]        = D_acc[bid*n + i];
                 L[i]        = L_acc[bid*n + i];
                 U[i]        = L_acc[bid*n + i];
-                Q_acc[bid*n*n + i*(n+1)] = 1; //Identity matrix
+                Q[i*(n+1)] = 1; //Identity matrix
             }
             sycl::group_barrier(cta);
             for(int k=n-1;k>=0;k--){
@@ -455,7 +456,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                     i++;
                     T_QTQ(cta, k+1, D, L, U, V, shift);
                     if(mode == EigensolveMode::FULL_SPECTRUM_VECTORS || mode == EigensolveMode::ENDS_VECTORS){
-                        apply_all_reflections(cta, V,k,n,Q_acc.data() + n*n*bid);
+                        apply_all_reflections(cta, V,k,n, Q.data());
                     }
                     GR = (k>0?sycl::abs(L[k-1]):0)+(k+1<n?sycl::abs(L[k]):0);
 
@@ -484,16 +485,17 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             } 
 
             if (mode == EigensolveMode::ENDS || mode == EigensolveMode::ENDS_VECTORS){
-                real_t local_max = real_t(0.);
+                real_t local_max =0;
                 real_t local_min = std::numeric_limits<real_t>::max();
                 int local_min_idx = 0;
                 int local_max_idx = 0;
                 for (int i = tid; i < n; i += bdim){
-                    local_max = isnan(D[i]) ? NAN : std::max(local_max, sycl::abs(D[i]));
-                    local_min = isnan(D[i]) ? NAN : std::min(local_min, sycl::abs(D[i]));
+                    D_acc[bid*n + i] = D[i];
+                    local_max = isfinite(D[i]) ? std::max(local_max, sycl::abs(D[i])) : local_max;
+                    local_min = isfinite(D[i]) ? std::min(local_min, sycl::abs(D[i])) : local_min;
                     if (mode == EigensolveMode::ENDS_VECTORS){
-                    local_min_idx = isnan(D[i]) ? NAN : (local_min == sycl::abs(D[i]) ? i : local_min_idx);
-                    local_max_idx = isnan(D[i]) ? NAN : (local_max == sycl::abs(D[i]) ? i : local_max_idx);
+                    local_min_idx = isfinite(D[i]) ? (local_min == sycl::abs(D[i]) ? i : local_min_idx) :  local_min_idx;
+                    local_max_idx = isfinite(D[i]) ? (local_max == sycl::abs(D[i]) ? i : local_max_idx) :  local_max_idx;
                     }
                 }
                 real_t max_eig = reduce_over_group(cta, local_max, sycl::maximum<real_t>{});
