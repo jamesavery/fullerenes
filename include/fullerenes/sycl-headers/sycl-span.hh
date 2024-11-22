@@ -31,8 +31,8 @@ struct Span
     inline constexpr Span<T>& operator= (const Span<T> &other) { data_ = other.data_; size_ = other.size_; return *this; }
     inline constexpr Span<T>& operator= (Span<T> &&other) { return *this = other; }
     inline bool operator==(const Span<T> other) const;
-    inline constexpr T &operator[](size_t index) const {assert(index < size_); return data_[index];}
-    inline constexpr T &at(size_t index) const{assert(index < size_); return data_[index];}
+    inline constexpr T &operator[](size_t index) const {assert(index < size_); assert(data_); return data_[index];}
+    inline constexpr T &at(size_t index) const{assert(index < size_); assert(data_); return data_[index];}
     inline constexpr T *data() const { return data_; }
     inline constexpr size_t size() const { return size_; }
     inline constexpr bool empty() const { return size_ == 0; }
