@@ -1807,7 +1807,6 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
     if (hess.size() < 90*B.N_*B.size() || cols.size() < 90*B.N_*B.size()) throw std::runtime_error("compute_hessians: hess and cols buffers must be of size >= 90*N*size");
     SyclEventImpl hessians_finished = Q->submit([&](sycl::handler& h){
         auto X_acc = B.d_.X_cubic_;
-        auto cubic_neighbours_acc = B.d_.A_cubic_;
 
         sycl::local_accessor<coord3d, 1> X(B.N_,h);
         sycl::local_accessor<real_t, 1> sdata(3*B.N_,h);
@@ -1820,6 +1819,7 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
             auto bid = nditem.get_group_linear_id();
             auto& flag = B.m_.flags_[bid];
             if (flag.is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return; //Skip if cubic graph is not initialized
+            auto cubic_neighbours_acc = B[bid].d_.A_cubic_;
 
             Constants<T,K> constants (cubic_neighbours_acc, K(tid));
             NodeNeighbours nodeG(cubic_neighbours_acc, K(tid));
@@ -1830,31 +1830,36 @@ SyclEvent compute_hessians(SyclQueue& Q, FullereneBatchView<T,K> B, Span<T> hess
             int n_rows = N*3;
             int hess_stride = n_cols*n_rows;
             int toff = bid*hess_stride + tid*n_cols*3;
+            Span<T> hess_span = hess.subspan(toff, n_cols*3);
+            Span<K> cols_span = cols.subspan(toff, n_cols*3);
             for (size_t i = 0; i < 3; i++) //rows
             for (size_t j = 0; j < 10; j++) //cols / 3
             {   
                 for (size_t k = 0; k < 3; k++)
                 {   
-                    cols[toff + i*n_cols + j*3 + k] = hessian.indices[j]*3 + k;
-                    hess[toff + i*n_cols + j*3 + k] = hessian.A[j][i][k];
+                    cols_span[i*n_cols + j*3 + k] = hessian.indices[j]*3 + k;
+                    hess_span[i*n_cols + j*3 + k] = hessian.A[j][i][k];
                 }    
             }
             sycl::group_barrier(cta);
             //Enforce symmetry
 
+            hess_span = hess.subspan(bid*hess_stride, n_cols*n_rows);
+            cols_span = cols.subspan(bid*hess_stride, n_cols*n_rows);
+
             for(int ii = tid; ii < n_cols*n_rows; ii += N){
                 int i = ii / n_cols;
                 int jj = ii % n_cols;
-                int j = cols[bid*hess_stride + i*n_cols + jj];
+                int j = cols_span[i*n_cols + jj];
                 int ix = 0;
                 
                 if(i < j){
-                    while (ix < n_cols && cols[bid*hess_stride + j*n_cols + ix] != i) {ix++;}
-                    int jx = cols[bid*hess_stride + j*n_cols + ix];
+                    while (ix < n_cols && cols_span[j*n_cols + ix] != i) {ix++;}
+                    int jx = cols_span[j*n_cols + ix];
 
-                    T val = 0.5*(hess[bid*hess_stride + i*n_cols + jj] + hess[bid*hess_stride + j*n_cols + ix]);
-                    hess[bid*hess_stride + i*n_cols + jj] = val;
-                    hess[bid*hess_stride + j*n_cols + ix] = val;
+                    T val = 0.5*(hess_span[i*n_cols + jj] + hess_span[j*n_cols + ix]);
+                    hess_span[i*n_cols + jj] = val;
+                    hess_span[j*n_cols + ix] = val;
                 }
             }
 
@@ -1875,9 +1880,9 @@ SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> B, Span<
 }
 
 template struct HessianFunctor<PEDERSEN, float, uint16_t>;
-template struct HessianFunctor<PEDERSEN, double, uint16_t>;
-template struct HessianFunctor<PEDERSEN, float, uint32_t>;
-template struct HessianFunctor<PEDERSEN, double, uint32_t>;
+//template struct HessianFunctor<PEDERSEN, double, uint16_t>;
+//template struct HessianFunctor<PEDERSEN, float, uint32_t>;
+//template struct HessianFunctor<PEDERSEN, double, uint32_t>;
 
 /* template void compute_hessians<PEDERSEN, float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& B, sycl::buffer<float,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
 template void compute_hessians<PEDERSEN, double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& B, sycl::buffer<double,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy); */
