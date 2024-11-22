@@ -22,10 +22,25 @@ struct SyclVector
 
     //Movement semantics can be defined here
     SyclVector() : size_(0), capacity_(0), data_(nullptr) {}
-    SyclVector(SyclVector<T> &&other) = default;
-    SyclVector<T> &operator=(SyclVector<T> &&other) = default;
+    SyclVector(SyclVector<T> &&other) : size_(other.size_), capacity_(other.capacity_), data_(other.data_) {
+        other.size_ = 0;
+        other.capacity_ = 0;
+        other.data_ = nullptr;
+    }
+    SyclVector<T> &operator=(SyclVector<T> &&other) {
+        if (this == &other) return *this;
+        this->data_ = other.data_;
+        this->size_ = other.size_;
+        this->capacity_ = other.capacity_;
+        other.data_ = nullptr;
+        other.size_ = 0;
+        other.capacity_ = 0;
+        return *this;
+    }
 
     inline constexpr operator Span<T>() const { return Span<T>(data_, size_); }
+    inline constexpr Span<T> to_span() const { return Span<T>(data_, size_); }
+    inline constexpr Span<T> subspan(size_t offset, size_t count) const { return Span<T>(data_ + offset, count); }
     inline constexpr void fill(T data) { std::fill(begin(), end(), data); }
     inline constexpr T *data() const { return data_; }
     inline constexpr size_t size() const { return size_; }
