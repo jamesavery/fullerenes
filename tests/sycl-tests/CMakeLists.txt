@@ -9,8 +9,10 @@ set(SYCL_EXECUTABLES
   fullerene-queue-test
   condition-functor-test
   tutte-functor-test
+  eigen-functor-test
   to-polyhedron
   forcefield-functor-test
+  sycl-vector-test
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
@@ -28,3 +30,4 @@ endforeach()
 add_test(NAME fullerene-queue-test COMMAND fullerene-queue-test)
 add_test(NAME condition-functor-test COMMAND condition-functor-test)
 add_test(NAME tutte-functor-test COMMAND tutte-functor-test)
+add_test(NAME eigen-functor-test COMMAND eigen-functor-test)
