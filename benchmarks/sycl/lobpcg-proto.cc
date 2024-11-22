@@ -5,12 +5,12 @@
 #include <oneapi/dpl/random>
 #include <oneapi/dpl/iterator>
 #include <fullerenes/graph.hh>
-#include <fullerenes/sycl-headers/all-kernels.hh>
+#include <fullerenes/kernel-headers/all-kernels.hh>
 #include <../src/sycl/queue-impl.cc>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/argparser.hh>
-#include <fullerenes/sycl-headers/fill.hh>
+#include <fullerenes/kernel-headers/fill.hh>
 #define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
 template <typename T, typename K, int BlockVectors, int NZ> class LOBPCGg {};
 

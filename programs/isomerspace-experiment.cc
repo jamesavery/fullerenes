@@ -15,7 +15,7 @@
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/progress_bar.hh"
 #include "fullerenes/gpu/benchmark_functions.hh"
-#include <fullerenes/sycl-headers/all-kernels.hh>
+#include <fullerenes/kernel-headers/all-kernels.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 #include "fullerenes/isomerdb.hh"
 

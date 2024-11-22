@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
-#include <fullerenes/sycl-headers/all-kernels.hh>
+#include <fullerenes/kernel-headers/all-kernels.hh>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/polyhedron.hh>
 #include <fullerenes/planargraph.hh>
 #include <fullerenes/spiral.hh>
-#include <fullerenes/sycl-headers/sycl-parallel-primitives.hh>
+#include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
 #include <iostream>
 #include <algorithm>
 #include <thread>
@@ -97,26 +97,26 @@ TEST_P(MinimumProblem, AllTestsInOne) {
         ASSERT_EQ(batch1_eigenvalues.subspan(0, 2), fullerene1_eigs.to_span());
         ASSERT_EQ(batch1_eigenvalues.subspan(2, 2), fullerene2_eigs.to_span());
 
-        
-
-        //compute_hessian(Q, batch1, LaunchPolicy::SYNC , batch1_hessians, batch1_cols);
-        //compute_hessian(Q, FullereneBatchView(batch1_copy, 0, 1), LaunchPolicy::SYNC , batch2_hessians, batch2_cols);
-//
-        //ASSERT_TRUE(float_spans_equal(batch1_hessians, batch2_hessians));
-        //ASSERT_TRUE(float_spans_equal(batch1_cols, batch2_cols));
-//
-        //spectrum_ends(Q, batch1, LaunchPolicy::SYNC, batch1_hessians, batch1_cols, 50, batch1_eigenvalues, batch1_eigenvectors);
-        //spectrum_ends(Q, batch2, LaunchPolicy::SYNC, batch2_hessians, batch2_cols, 50, batch2_eigenvalues, batch2_eigenvectors);
+        EigenFunctor<EigensolveMode::FULL_SPECTRUM, T, uint16_t> spectrum_full;
+        SyclVector<T> fullerene1_eigs_full(N*3);
+        SyclVector<T> fullerene1_eigvecs_full(N*3*N*3);
+        SyclVector<T> fullerene2_eigs_full(N*3);
+        SyclVector<T> fullerene2_eigvecs_full(N*3*N*3);
 
 
+        SyclVector<T> batch1_eigenvalues_full(3 * N * batch1.size());
+        SyclVector<T> batch1_eigenvectors_full(3*N * 3 * N * batch1.size());
+        spectrum_full(Q, batch1, LaunchPolicy::SYNC, batch1_hessians, batch1_cols, N*3-6, batch1_eigenvalues_full, batch1_eigenvectors_full);
+        spectrum_full(Q, FullereneBatchView(batch1_copy, 0, 1), LaunchPolicy::SYNC, fullerene1_hessian, fullerene1_cols, N*3-6, fullerene1_eigs_full, fullerene1_eigvecs_full);
+        spectrum_full(Q, FullereneBatchView(batch1_copy, 1, 1), LaunchPolicy::SYNC, fullerene2_hessian, fullerene2_cols, N*3-6, fullerene2_eigs_full, fullerene2_eigvecs_full);
 
+        ASSERT_EQ(batch1_eigenvalues_full.subspan(0, 3*N), fullerene1_eigs_full.to_span());
+        ASSERT_EQ(batch1_eigenvalues_full.subspan(3*N, 3*N), fullerene2_eigs_full.to_span());
 
-
-        
-        //std::cout << sorted(std::vector<T>(spectrum_ends.diag_[Q][0].data() + 0, spectrum_ends.diag_[Q][0].data() + 50)) << std::endl;
-        //std::cout << sorted(std::vector<T>(spectrum_ends.diag_[Q][0].data() + 50, spectrum_ends.diag_[Q][0].data() + 100)) << std::endl;
-        //std::cout << sorted(std::vector<T>(spectrum_ends.diag_[Q][0].data() + 0, spectrum_ends.diag_[Q][0].data() + 50)) << std::endl;
-        //std::cout << sorted(std::vector<T>(spectrum_ends.diag_[Q][0].data() + 50, spectrum_ends.diag_[Q][0].data() + 100)) << std::endl;
+        std::sort(fullerene1_eigs_full.begin(), fullerene1_eigs_full.end());
+        std::sort(fullerene2_eigs_full.begin(), fullerene2_eigs_full.end());
+        std::cout << "Eigenvalues: " << fullerene1_eigs_full << std::endl;
+        std::cout << "Eigenvalues: " << fullerene2_eigs_full << std::endl;
     }
 }
 

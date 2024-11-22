@@ -7,7 +7,7 @@
 #include "fstream"
 #define USE_MAX_NORM 0
 #define SQRT cl::sycl::sqrt
-#include <fullerenes/sycl-headers/forcefield-optimize-kernel.hh>
+#include <fullerenes/kernel-headers/forcefield-optimize-functor.hh>
 #include "primitives.cc"
 #include "forcefield-includes.cc"
 #include "kernel.cc"

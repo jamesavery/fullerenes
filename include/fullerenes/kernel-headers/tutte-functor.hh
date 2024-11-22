@@ -1,5 +1,5 @@
 #pragma once
-#include <fullerenes/sycl-headers/base-kernel.hh>
+#include <fullerenes/kernel-headers/base-functor.hh>
 
 template <typename T, typename K>
 struct TutteFunctor : public KernelFunctor<TutteFunctor<T,K>> {

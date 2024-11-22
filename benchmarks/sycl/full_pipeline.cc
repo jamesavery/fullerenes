@@ -1,5 +1,5 @@
 #include <fullerenes/graph.hh>
-#include <fullerenes/sycl-headers/all-kernels.hh>
+#include <fullerenes/kernel-headers/all-kernels.hh>
 #include <iostream>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/isomerdb.hh>

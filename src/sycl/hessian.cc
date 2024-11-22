@@ -7,7 +7,7 @@
 #include "fstream"
 #define USE_MAX_NORM 0
 #define SQRT cl::sycl::sqrt
-#include <fullerenes/sycl-headers/hessian-kernel.hh>
+#include <fullerenes/kernel-headers/hessian-functor.hh>
 #include "queue-impl.cc"
 #include "forcefield-includes.cc"
 

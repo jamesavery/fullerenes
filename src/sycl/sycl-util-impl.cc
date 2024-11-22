@@ -1,7 +1,7 @@
-#include <fullerenes/sycl-headers/sycl-parallel-primitives.hh>
-#include <fullerenes/sycl-headers/reference-wrapper.hh>
-#include <fullerenes/sycl-headers/sycl-fullerene.hh>
-#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
+#include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
+#include <fullerenes/kernel-headers/reference-wrapper.hh>
+#include <fullerenes/kernel-headers/sycl-fullerene.hh>
+#include <fullerenes/kernel-headers/sycl-fullerene-structs.hh>
 #include "primitives.cc"
 #include <CL/sycl.hpp>
 #include <unordered_map>

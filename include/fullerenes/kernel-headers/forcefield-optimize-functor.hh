@@ -1,5 +1,5 @@
 #pragma once
-#include <fullerenes/sycl-headers/base-kernel.hh>
+#include <fullerenes/kernel-headers/base-functor.hh>
 
 template <ForcefieldType FFT, typename T, typename K>
 struct ForcefieldOptimizeFunctor: public KernelFunctor<ForcefieldOptimizeFunctor<FFT,T,K>> {

@@ -10,7 +10,7 @@
 #include <fullerenes/sycl-headers/sycl-span.hh>
 #include <fullerenes/sycl-headers/sycl-vector.hh>
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
-#include <fullerenes/sycl-headers/sycl-parallel-primitives.hh>
+#include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
 #include <fullerenes/sycl-headers/sycl-status-enum.hh>
 #include <execution>
 #include "queue-impl.cc"    

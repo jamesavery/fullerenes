@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
-#include <fullerenes/sycl-headers/all-kernels.hh>
+#include <fullerenes/kernel-headers/all-kernels.hh>
 #include <fullerenes/buckygen-wrapper.hh>
 #include <fullerenes/polyhedron.hh>
 #include <fullerenes/planargraph.hh>
 #include <fullerenes/spiral.hh>
-#include <fullerenes/sycl-headers/sycl-parallel-primitives.hh>
+#include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
 #include <thread>
 #include <chrono>
 #include <future>

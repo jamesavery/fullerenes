@@ -1,0 +1,9 @@
+#pragma once
+#include <fullerenes/kernel-headers/tutte-functor.hh>
+#include <fullerenes/kernel-headers/spherical-projection-functor.hh>
+#include <fullerenes/kernel-headers/dualize-functor.hh>
+#include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
+#include <fullerenes/kernel-headers/forcefield-optimize-functor.hh>
+#include <fullerenes/kernel-headers/hessian-functor.hh>
+#include <fullerenes/kernel-headers/eigen-functor.hh>
+#include <fullerenes/kernel-headers/geometry-functors.hh>

@@ -6,7 +6,7 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
-#include <fullerenes/sycl-headers/dualize-kernel.hh>
+#include <fullerenes/kernel-headers/dualize-functor.hh>
 #include "primitives.cc"
 #include "queue-impl.cc"
 #include "forcefield-includes.cc"

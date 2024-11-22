@@ -4,7 +4,7 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
-#include <fullerenes/sycl-headers/tutte-kernel.hh>
+#include <fullerenes/kernel-headers/tutte-functor.hh>
 #include "kernel.cc"
 #include "primitives.cc"
 #include "queue-impl.cc"

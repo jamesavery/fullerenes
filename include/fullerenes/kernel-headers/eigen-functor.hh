@@ -1,5 +1,5 @@
 #pragma once
-#include <fullerenes/sycl-headers/base-kernel.hh>
+#include <fullerenes/kernel-headers/base-functor.hh>
 
 template<EigensolveMode mode, typename T, typename K>
 struct EigenFunctor : public KernelFunctor<EigenFunctor<mode, T, K>> {
