@@ -186,14 +186,14 @@ SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
             node_t d_max = reduce_over_group(cta, distance, maximum<node_t>{});
             smem[tid] = 0;
             sycl::group_barrier(cta);
-            sycl::atomic_ref<int, sycl::memory_order::relaxed, sycl::memory_scope::work_group> atomic_same_dist(smem[distance]);
+            sycl::atomic_ref<int, sycl::memory_order::seq_cst, sycl::memory_scope::work_group> atomic_same_dist(smem[distance]);
             atomic_same_dist.fetch_add(1);
             sycl::group_barrier(cta);
             node_t num_same_dist = smem[distance];
             sycl::group_barrier(cta);
             coord2d xys = xys_acc[tid];
-            sycl::atomic_ref<real_t, sycl::memory_order::relaxed, sycl::memory_scope::work_group> atomic_coord_x(atomic_coordinate_memory[distance][0]);
-            sycl::atomic_ref<real_t, sycl::memory_order::relaxed, sycl::memory_scope::work_group> atomic_coord_y(atomic_coordinate_memory[distance][1]);
+            sycl::atomic_ref<real_t, sycl::memory_order::seq_cst, sycl::memory_scope::work_group> atomic_coord_x(atomic_coordinate_memory[distance][0]);
+            sycl::atomic_ref<real_t, sycl::memory_order::seq_cst, sycl::memory_scope::work_group> atomic_coord_y(atomic_coordinate_memory[distance][1]);
             atomic_coord_x.fetch_add(xys[0]);
             atomic_coord_y.fetch_add(xys[1]);
             sycl::group_barrier(cta);
