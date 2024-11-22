@@ -4,7 +4,7 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
-#include <fullerenes/kernel-headers/spherical-projection-kernel.hh>
+#include <fullerenes/kernel-headers/spherical-projection-functor.hh>
 #include "kernel.cc"
 #include "primitives.cc"
 #include "forcefield-includes.cc"

@@ -1,4 +1,4 @@
-#include <fullerenes/kernel-headers/eigen-kernels.hh>
+#include <fullerenes/kernel-headers/eigen-functor.hh>
 #include "forcefield-includes.cc"
 #include <array>
 #include "sycl/sycl.hpp"

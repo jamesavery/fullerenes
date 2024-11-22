@@ -1,4 +1,4 @@
-#include <fullerenes/kernel-headers/geometry-kernels.hh>
+#include <fullerenes/kernel-headers/geometry-functors.hh>
 #include "forcefield-includes.cc"
 #include "queue-impl.cc"
 #include "primitives.cc"
