@@ -1880,6 +1880,7 @@ SyclEvent HessianFunctor<FFT,T,K>::compute(SyclQueue& Q, Fullerene<T,K> B, Span<
 }
 
 template struct HessianFunctor<PEDERSEN, float, uint16_t>;
+template struct HessianFunctor<PEDERSEN, double, uint16_t>;
 //template struct HessianFunctor<PEDERSEN, double, uint16_t>;
 //template struct HessianFunctor<PEDERSEN, float, uint32_t>;
 //template struct HessianFunctor<PEDERSEN, double, uint32_t>;
