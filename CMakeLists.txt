@@ -178,7 +178,21 @@ add_subdirectory(src/contrib)
 add_subdirectory(playground)
 add_subdirectory(src/c++)
 
-set(SYCL_FULLERENE_LIBS "" CACHE STRING "SYCL libraries to link against")
+set(SYCL_FULLERENE_LIBS 
+  sycl_fullerene_lib 
+  forcefield-optimize_lib 
+  dualize_lib 
+  tutte_lib 
+  spherical-projection_lib 
+  hessian_lib 
+  eigen_lib 
+  sycl-util-impl_lib 
+  primitives-instantiations_lib 
+  geometry-properties_lib
+  lobpcg_lib
+  )
+
+set(SYCL_FULLERENE_LIBS ${SYCL_FULLERENE_LIBS} CACHE STRING "SYCL_FULLERENE_LIBS")
 
 if(ENABLE_SYCL)
   set(PREVIOUS_CXX_COMPILER ${CMAKE_CXX_COMPILER})

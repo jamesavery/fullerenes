@@ -25,6 +25,8 @@ foreach(EXECUTABLE ${SYCL_EXECUTABLES})
   target_link_libraries(${EXECUTABLE} PRIVATE ${SYCL_FULLERENE_LIBS} dualize_lib sycl fullerenes ${GTEST_LIBRARIES})
 endforeach()
 
+message(STATUS "SYCL_EXECUTABLES: ${SYCL_EXECUTABLES}")
+message(STATUS "SYCL_FULLERENE_LIBS: ${SYCL_FULLERENE_LIBS}")
 
 
 add_test(NAME fullerene-queue-test COMMAND fullerene-queue-test)

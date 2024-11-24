@@ -8,6 +8,7 @@ list(APPEND SYCL_LIBRARY_SOURCES
   sycl-util-impl
   primitives-instantiations
   geometry-properties
+  lobpcg
 )
 
 list(APPEND SYCL_SOURCE_CUSTOM_FLAGS 
@@ -20,6 +21,7 @@ list(APPEND SYCL_SOURCE_CUSTOM_FLAGS
 "-Xcuda-ptxas --maxrregcount=40 -ltbb"   # sycl-util-impl.cc
 "-Xcuda-ptxas --maxrregcount=40 -ltbb"    # primitives.cc
 "-Xcuda-ptxas --maxrregcount=40"    # geometry-properties.cc
+"-Xcuda-ptxas --maxrregcount=40"    # lobpcg.cc
 )
 
 
@@ -41,17 +43,6 @@ target_link_libraries(
   PRIVATE hessian_lib eigen_lib 
   PRIVATE sycl-util-impl_lib 
   PRIVATE primitives-instantiations_lib 
-  PRIVATE geometry-properties_lib)
-
-set(SYCL_FULLERENE_LIBS ${SYCL_FULLERENE_LIBS} 
-  sycl_fullerene_lib 
-  forcefield-optimize_lib 
-  dualize_lib 
-  tutte_lib 
-  spherical-projection_lib 
-  hessian_lib 
-  eigen_lib 
-  sycl-util-impl_lib 
-  primitives-instantiations_lib 
-  geometry-properties_lib
-  CACHE STRING "SYCL_FULLERENE_LIBS")
+  PRIVATE geometry-properties_lib 
+  PRIVATE lobpcg_lib 
+)
