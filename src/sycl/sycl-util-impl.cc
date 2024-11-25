@@ -257,11 +257,17 @@ void FullereneBatch<T,K>::push_back(const Polyhedron& P, const int ID) {
 }
 
 template <typename T, typename K>
-void FullereneBatch<T,K>::push_back(const Fullerene<T,K>& fullerene, const int ID) {
+template <typename U, typename V>
+void FullereneBatch<T,K>::push_back(const Fullerene<U,V>& fullerene, const int ID) {
     if (fullerene.N_ != N_ || fullerene.Nf_ != Nf_) throw std::runtime_error("Fullerenes have different sizes");
     if (size_ == capacity_) resize(capacity_ > 0 ? 2*capacity_ : 1);
-    Fullerene<T,K>::copy((*this)[size_++], fullerene);
+    Fullerene<U,V>::copy((*this)[size_++], fullerene);
 }
+
+template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint16_t>&, const int);
+template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<double, uint16_t>&, const int);
+template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint32_t>&, const int);
+template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<double, uint32_t>&, const int);
 
 //Parameter pack expanded copy function
 template <typename... Args>

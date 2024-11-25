@@ -58,7 +58,8 @@ struct FullereneBatch
     void push_back(const neighbours_t &neighbours, const int ID = -1);
     void push_back(const PlanarGraph &G, const int ID = -1);
     void push_back(const Polyhedron &P, const int ID = -1);
-    void push_back(const Fullerene<T, K> &fullerene, const int ID = -1);
+    template <typename U, typename V>
+    void push_back(const Fullerene<U, V> &fullerene, const int ID = -1);
     void resize(size_t new_capacity);
 
     FullereneBatch(const FullereneBatch<T, K> &other) = default;

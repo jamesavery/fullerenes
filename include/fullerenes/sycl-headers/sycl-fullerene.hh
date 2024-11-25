@@ -237,7 +237,19 @@ struct Fullerene
         auto tuple_pair = forward_merge_tuples(dst.d_.to_tuple(), src.d_.to_tuple());
         
         auto copy_pair = [](auto& dst_range, auto& src_range) {
-            std::copy(std::begin(src_range), std::end(src_range), std::begin(dst_range));
+            if constexpr (std::is_same_v<std::decay_t<decltype(dst_range[0])>, std::decay_t<decltype(src_range[0])>>) {
+                std::copy(std::begin(src_range), std::end(src_range), std::begin(dst_range));
+            } else if constexpr (extra_type_traits::is_array_t<std::decay_t<decltype(dst_range)>>::value && extra_type_traits::is_array_t<std::decay_t<decltype(src_range)>>::value && extra_type_traits::is_array_t<std::decay_t<decltype(dst_range[0])>>::value && extra_type_traits::is_array_t<std::decay_t<decltype(src_range[0])>>::value) {
+                for (size_t i = 0; i < src_range.size(); ++i) {
+                    for (size_t j = 0; j < src_range[i].size(); ++j) {
+                        dst_range[i][j] = static_cast<std::decay_t<decltype(dst_range[0][0])>>(src_range[i][j]);
+                    }
+                }
+            } else {
+                for (size_t i = 0; i < src_range.size(); ++i) {
+                    dst_range[i] = static_cast<std::decay_t<decltype(dst_range[0])>>(src_range[i]);
+                }
+            }
         };
 
         std::apply([&](auto&... args) { 
