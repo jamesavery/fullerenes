@@ -256,6 +256,13 @@ void FullereneBatch<T,K>::push_back(const Polyhedron& P, const int ID) {
     (*this)[size_++] = std::tuple<std::reference_wrapper<const Polyhedron>, size_t>(std::cref(P), static_cast<size_t>(ID));
 }
 
+template <typename T, typename K>
+void FullereneBatch<T,K>::push_back(const Fullerene<T,K>& fullerene, const int ID) {
+    if (fullerene.N_ != N_ || fullerene.Nf_ != Nf_) throw std::runtime_error("Fullerenes have different sizes");
+    if (size_ == capacity_) resize(capacity_ > 0 ? 2*capacity_ : 1);
+    Fullerene<T,K>::copy((*this)[size_++], fullerene);
+}
+
 //Parameter pack expanded copy function
 template <typename... Args>
 void copy_spans(sycl::group<1>& grp, Args&&... args) {
