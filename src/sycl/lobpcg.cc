@@ -204,11 +204,9 @@ void lanczos(sycl::group<1>& cta, const local_accessor<T,1>& A, T* X, T* alphas,
     v0 = MGS(0);
     if (tid < N) V[0*N] = v0;
     for (int i = 0; i < N; i++){
-        if (i % 2 == 0 && i > 1){
-            T v_i = MGS(i-1);
-            T v_ip = MGS(i);
-            if(tid < N) V[(i-1)*N] = v_i;
-            if(tid < N) V[i*N] = v_ip;
+        if (i > 0){
+            T v_i = MGS(i);
+            if(tid < N) V[i*N] = v_i;
         }
         T vect_input = (tid < N) ? V[i*N] : T(0);
         T v = mat_vect(vect_input);
