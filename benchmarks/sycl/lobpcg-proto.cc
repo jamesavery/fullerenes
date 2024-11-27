@@ -3,7 +3,7 @@
 #include <fullerenes/kernel-headers/all-kernels.hh>
 
 template <typename T, typename K, int BlockVectors, int NZ>
-void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters);
+void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters);
 
 
 int main(int argc, char** argv){
@@ -26,12 +26,16 @@ int main(int argc, char** argv){
 
     HessianFunctor<PEDERSEN, float, uint16_t> compute_hessians;
     HessianFunctor<PEDERSEN, double, uint16_t> compute_hessians_double;
+
+    EigenFunctor<EigensolveMode::FULL_SPECTRUM, float, uint16_t> eigensolve;
+    EigenFunctor<EigensolveMode::FULL_SPECTRUM, double, uint16_t> eigensolve_double;
+
     fill(batch);
     dualize(queue, batch, LaunchPolicy::SYNC);
     tutte_layout(queue, batch, LaunchPolicy::SYNC);
     spherical_projection(queue, batch, LaunchPolicy::SYNC);
     FullereneBatch<double, uint16_t> batch_double(N, BatchSize);
-    {
+    /* {
         auto batch_acc_X = batch.d_.X_cubic_;
         auto batch_double_acc_X = batch_double.d_.X_cubic_;
         auto batch_acc_cubic_neighbours = batch.d_.A_cubic_;
@@ -43,17 +47,28 @@ int main(int argc, char** argv){
                 batch_double_acc_cubic_neighbours[i][j] = batch_acc_cubic_neighbours[i][j];
             }
         }
+    } */
+    for (int i = 0; i < batch.size(); i++){
+        batch_double.push_back(batch[i]);
     }
     forcefield_optimize_double(queue, batch_double, LaunchPolicy::SYNC, 5*N, 5*N);
     forcefield_optimize(queue, batch, LaunchPolicy::SYNC, 5*N, 5*N);
+    std::cout << batch.m_.flags_ << std::endl;
     
 
     SyclVector<float> hessians((N*90*BatchSize));
     SyclVector<double> hessians_double((N*90*BatchSize));
     SyclVector<uint16_t> cols((N*90*BatchSize));
+    SyclVector<float> eigenvalues((N*3*BatchSize));
+    SyclVector<double> eigenvalues_double((N*3*BatchSize));
+    SyclVector<float> eigenvects;
+    SyclVector<double> eigenvects_double;
 
     compute_hessians_double(queue, batch_double, LaunchPolicy::SYNC, hessians_double, cols);
     compute_hessians(queue, batch, LaunchPolicy::SYNC, hessians, cols);
+
+    eigensolve(queue, batch, LaunchPolicy::SYNC, hessians, cols, N*3 - 6, eigenvalues, eigenvects);
+    eigensolve_double(queue, batch_double, LaunchPolicy::SYNC, hessians_double, cols, N*3 - 6, eigenvalues_double, eigenvects_double);
 
 
 
@@ -62,9 +77,59 @@ int main(int argc, char** argv){
     //std::vector<float> A = {1, 2, 3, 4, 5, 6, 7, 8, 9};
     //std::vector<int> cols = {0, 1, 2, 1, 2, 0, 2, 0, 1};
 
-    
-    LOBPCG<float, uint16_t, 3, 30>(queue, hessians, cols, (int)N*3, maxiter);
-    //LOBPCG<double, uint16_t, 3, 30>(queue, hessians_double, cols, N*3, maxiter);
+
+    LOBPCG<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter);
+    LOBPCG<double, uint16_t, 21, 30>(queue, hessians_double, cols, BatchSize, N*3, maxiter);
+
+    std::vector <float> matrices(N*3*N*3*BatchSize);
+    std::vector <double> matrices_double(N*3*N*3*BatchSize);
+        std::vector <float> vect_eigenvalues(N*3*BatchSize);
+        std::vector <double> vect_eigenvalues_double(N*3*BatchSize);
+        std::vector <std::array<float,3>> vect_X(N*BatchSize);
+        std::vector <std::array<double,3>> vect_X_double(N*BatchSize);
+        auto acc_eigenvalues    = eigenvalues;
+        auto acc_hessians       = hessians;
+        auto acc_cols           = cols;
+        auto acc_X              = batch.d_.X_cubic_;
+
+        auto acc_eigenvalues_double    = eigenvalues_double;
+        auto acc_hessians_double       = hessians_double;
+        auto acc_X_double              = batch_double.d_.X_cubic_;
+
+        for (size_t ii = 0; ii < BatchSize; ii++)
+        {
+            //Create the matrices (Densely stored) from the hessians and cols
+            for (int i = 0; i < N*3; i++){
+                for (int j = 0; j < 30; j++){
+                    matrices[ii*N*3*N*3 + i*N*3 + acc_cols[ii*90*N + i*30 + j]] = acc_hessians[ii*90*N + i*30 + j];
+                    matrices_double[ii*N*3*N*3 + i*N*3 + acc_cols[ii*90*N + i*30 + j]] = acc_hessians_double[ii*90*N + i*30 + j];
+                }
+            }
+
+            //Store the eigenvalues
+            for (int i = 0; i < N*3; i++){
+                vect_eigenvalues[ii*N*3 + i] = acc_eigenvalues[ii*N*3 + i];
+                vect_eigenvalues_double[ii*N*3 + i] = acc_eigenvalues_double[ii*N*3 + i];
+            }
+            for (int i = 0; i < N; i++){
+                vect_X[ii*N + i] = acc_X[ii*N + i];
+                vect_X_double[ii*N + i] = acc_X_double[ii*N + i];
+            }
+        }
+
+        std::ofstream out_matrix("matrices.float32", ios::out | ios::binary);
+        std::ofstream out_eigenvalues("eigenvalues.float32", ios::out | ios::binary);
+        std::ofstream out_X("X.float32", ios::out | ios::binary);
+        out_matrix.write((char*)&matrices[0], matrices.size()*sizeof(float));
+        out_eigenvalues.write((char*)&vect_eigenvalues[0], vect_eigenvalues.size()*sizeof(float));
+        out_X.write((char*)&vect_X[0], vect_X.size()*sizeof(std::array<float,3>));
+
+        std::ofstream out_matrix_double("matrices.float64", ios::out | ios::binary);
+        std::ofstream out_eigenvalues_double("eigenvalues.float64", ios::out | ios::binary);
+        std::ofstream out_X_double("X.float64", ios::out | ios::binary);
+        out_matrix_double.write((char*)&matrices_double[0], matrices_double.size()*sizeof(double));
+        out_eigenvalues_double.write((char*)&vect_eigenvalues_double[0], vect_eigenvalues_double.size()*sizeof(double));
+        out_X_double.write((char*)&vect_X_double[0], vect_X_double.size()*sizeof(std::array<double,3>));
     return 0;
 }
 
