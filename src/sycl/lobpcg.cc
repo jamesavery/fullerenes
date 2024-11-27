@@ -347,7 +347,7 @@ void diagonalize(sycl::group<1>& cta, T* U, T* L, T* D, T* V, T* Q){
     
     //Eigenvalues now reside in D
 }
-//Finds the BlockVectors' smallest or largest eigenvalues of the matrix A
+//Finds the BlockVectors- smallest or largest eigenvalues of the matrix A
 template <typename T, int N, int BlockVectors>
 void compute_k_eigenpairs(sycl::group<1>& cta, const local_accessor<T,1>& A, const local_accessor<T,1>& eigvects, const local_accessor<T,1>& lambdas, T* working_space, const local_accessor<std::byte,1>& sort_scratch, const bool largest){
     auto tid = cta.get_local_linear_id();
@@ -384,7 +384,7 @@ void compute_k_eigenpairs(sycl::group<1>& cta, const local_accessor<T,1>& A, con
     if(tid < BlockVectors){
         lambdas[tid] = largest ? D[k_indices[N - 1 - tid]] : D[k_indices[tid]];
     }
-    if(tid < BlockVectors) sycl::ext::oneapi::experimental::printf("Lambdas[%d] = %f\n", tid, lambdas[tid]);
+    //if(tid < BlockVectors) sycl::ext::oneapi::experimental::printf("Lambdas[%d] = %f\n", tid, lambdas[tid]);
 
     if(tid < N){
         for(int i = 0; i < BlockVectors; i++){
@@ -591,21 +591,20 @@ void update_vectors(sycl::group<1>& cta, global_ptr<T> X, global_ptr<T> R, globa
 }
 
 template <typename T, typename K, int BlockVectors, int NZ>
-void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
-    sycl::buffer<T, 1> S(BlockVectors*9 * m);
-    sycl::buffer<T, 1> X0(BlockVectors * m);
-    sycl::buffer<T, 1> LastEigVects(BlockVectors * BlockVectors*3);
-    sycl::buffer<T, 1> LastGram(3 * BlockVectors * 3 * BlockVectors);
-    sycl::buffer<T, 1> vals(BlockVectors);
-    sycl::buffer<int, 1> indices(BlockVectors);
-    constexpr T tol = 1e-6;
+void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters){
+    sycl::buffer<T, 1> S(batch_size * BlockVectors*9 * m);
+    sycl::buffer<T, 1> X0(batch_size * BlockVectors * m);
+    sycl::buffer<T, 1> LastEigVects(batch_size * BlockVectors * BlockVectors*3);
+    sycl::buffer<T, 1> LastGram(batch_size * 3 * BlockVectors * 3 * BlockVectors);
+    sycl::buffer<T, 1> vals(batch_size * BlockVectors);
+    sycl::buffer<int, 1> indices(batch_size * BlockVectors);
+    const T tol = std::numeric_limits<T>::epsilon() * sycl::sqrt(float(m));
     //
     ctx -> submit([&](sycl::handler& h){
         using TupleType = typename std::iterator_traits<oneapi::dpl::zip_iterator<T*, int*>>::value_type;
         constexpr auto bytes = sycl::ext::oneapi::experimental::default_sorter<>::memory_required<TupleType>(sycl::memory_scope::work_group, BlockVectors*3);
 
-        auto A_acc = A;
-        auto cols_acc = cols;
+        
         auto S_acc = sycl::accessor<T, 1, sycl::access::mode::write>(S, h);
         auto X0_acc = sycl::accessor<T, 1, sycl::access::mode::write>(X0, h);
         auto LastEigVects_acc = sycl::accessor<T, 1, sycl::access::mode::write>(LastEigVects, h);
@@ -621,13 +620,16 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
         auto keys_acc = sycl::accessor<int, 1, sycl::access::mode::read_write>(indices, h);
         auto vals_acc = sycl::accessor<T, 1, sycl::access::mode::read_write>(vals, h);
 
-        h.parallel_for<LOBPCGg<T,K,BlockVectors,NZ>>(nd_range<1>(sycl::range{size_t(m)}, sycl::range{size_t(m)}), [=](sycl::nd_item<1> item){
+        h.parallel_for<LOBPCGg<T,K,BlockVectors,NZ>>(nd_range<1>(sycl::range{size_t(batch_size*m)}, sycl::range{size_t(m)}), [=](sycl::nd_item<1> item){
             auto tid = item.get_local_linear_id();
             sycl::group<1> cta = item.get_group();
+            auto bid = item.get_group_linear_id();
             constexpr auto SN = BlockVectors*3;
             std::bitset<BlockVectors> converged;
             oneapi::dpl::uniform_real_distribution<T> distr(0.0, 1.0);            
             oneapi::dpl::minstd_rand engine(42, tid);
+            auto A_acc = A.subspan(bid * m * NZ, m * NZ);
+            auto cols_acc = cols.subspan(bid * m * NZ, m * NZ);
 
             //Load the i-th row of A into registers
             T A_tid[NZ];
@@ -645,7 +647,7 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
             //iff A^T = A then 
             //X^T @ A @ X = (X^T @ A @ X)^T
 
-            global_ptr<T> blockX = S_acc.get_pointer();
+            global_ptr<T> blockX = S_acc.get_pointer() + bid * BlockVectors*9 * m;
             global_ptr<T> blockR = blockX + BlockVectors*m;
             global_ptr<T> blockP = blockR + BlockVectors*m;
 
@@ -661,7 +663,8 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
             }
             for (int i = tid; i < m*BlockVectors; i+=cta.get_local_range(0)){
                 blockX[i] = distr(engine);
-                X0_acc[i] = blockX[i];
+                //X0_acc[i] = blockX[i];
+                X0_acc[bid*m*BlockVectors + i] = blockX[i];
             }
             group_barrier(cta);
             //Normalize S vectors
@@ -673,48 +676,23 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
             //X^T * A * X
             STAS<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockX, m, NZ, StAS.get_pointer(), Scache.get_pointer());
             //Fill in with simple 3x3 matrix
-
             compute_k_eigenpairs<T, BlockVectors, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
-            //Print Eigenvectors
-            for(int i = 0; i < BlockVectors; i++){
-                for(int j = 0; j < BlockVectors; j++){
-                    if(tid == 0) sycl::ext::oneapi::experimental::printf("Eigenvector[%d][%d] = %f\n", i, j, eigvects[i*BlockVectors + j]);
-                }
-            }
-
             matBlockVector<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockX, blockAX, NZ, m);
-
             inPlaceMatMatMul<T, BlockVectors>(cta, blockX, eigvects, m);
             inPlaceMatMatMul<T, BlockVectors>(cta, blockAX, eigvects, m);
-
-            
             //Compute the residual R = A*X - X*Lambda
             int iter = 0;
             bool restart = true;
             while(!converged.all() && iter < maxiters){
                 //R = A*X - X*Lambda
-                
                 for(int i = 0; i < BlockVectors; i++) blockR[i*m + tid] = blockAX[i*m + tid] - lambdas[i] * blockX[i*m + tid];
                 //Convergence Check
                 for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(sycl::abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
-                if(tid == 0) sycl::ext::oneapi::experimental::printf("Iteration %d\n", iter);
-                for(int i = 0; i < BlockVectors; i++){if(tid == 0) sycl::ext::oneapi::experimental::printf("Unorthogonalized BlockR[%d][%d] = %f\n", i, 0, blockR[i*m + 0]);}
-                //Print ResidualNorms
-                /* for(int i = 0; i < BlockVectors; i++){
-                    T residual = sqrt(abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{})));
-                    if(tid == 0) sycl::ext::oneapi::experimental::printf("Residual Norm %d = %f\n", i, residual);
-                } */
-                
-                
-                //Print blockR
                 sycl::group_barrier(cta);
                 //R = R - X * (X^T * R)
                 applyConstraints<T, BlockVectors>(cta, blockR, blockX, m);
                 sycl::group_barrier(cta);
                 orthonormalize<T, BlockVectors>(cta, blockR, m);
-                if (tid == 0) sycl::ext::oneapi::experimental::printf("Orthogonalized BlockR After Iteration %d\n", iter);
-                for(int i = 0; i < BlockVectors; i++){if(tid == 0) sycl::ext::oneapi::experimental::printf("BlockR[%d][%d] = %f\n", i, 0, blockR[i*m + 0]);}
-                
                 matBlockVector<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockR, blockAR, NZ, m);
                 
 
@@ -725,14 +703,9 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
                         blockRtemp[i*m + tid] = blockR[i*m + tid];
                         blockPtemp[i*m + tid] = blockP[i*m + tid];
                     }
-
                     matBlockVector<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockP, blockAP, NZ, m);
-
                     orthonormalize<T, BlockVectors*3>(cta, blockX, m);
                     STAS<T, K, 1, BlockVectors*3>(cta, A_tid, cols_tid, blockX, m, NZ, StAS.get_pointer(), Scache.get_pointer());
-                    /* if (tid == 0) sycl::ext::oneapi::experimental::printf("Subspace Used In Iteration %d\n", iter);
-                    for(int i = 0; i < BlockVectors*3; i++){if(tid == 0) sycl::ext::oneapi::experimental::printf("Subspace[%d][%d] = %f\n", i, 0, blockX[i*m + 0]);}
-                     */
                     compute_k_eigenpairs<T, BlockVectors*3, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
                     
                     for (int i = 0; i < BlockVectors; i++){ 
@@ -742,10 +715,6 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
                     } 
                     group_barrier(cta);
                     update_vectors<T, BlockVectors*3, BlockVectors>(cta, blockX, blockR, blockP, blockAX, blockAR, blockAP, eigvects, m, false);
-                    /* if (tid == 0) sycl::ext::oneapi::experimental::printf("BlockAX After Iteration %d\n", iter);
-                    for(int i = 0; i < BlockVectors; i++){if(tid == 0) sycl::ext::oneapi::experimental::printf("blockAX[%d][%d] = %f\n", i, 0, blockAX[i*m + 0]);}
-                    if (tid == 0) sycl::ext::oneapi::experimental::printf("BlockAP After Iteration %d\n", iter);
-                    for(int i = 0; i < BlockVectors; i++){if(tid == 0) sycl::ext::oneapi::experimental::printf("blockAP[%d][%d] = %f\n", i, 0, blockAP[i*m + 0]);} */
                     group_barrier(cta);
 
                 } else {
@@ -754,17 +723,8 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
                         blockRtemp[i*m + tid] = blockR[i*m + tid];
                     }
                     orthonormalize<T, BlockVectors*2>(cta, blockX, m);
-                    if (tid == 0) sycl::ext::oneapi::experimental::printf("Subspace Used In Iteration %d\n", iter);
-                    for(int i = 0; i < 2*BlockVectors; i++){if(tid == 0) sycl::ext::oneapi::experimental::printf("Subspace[%d][%d] = %f\n", i, 0, blockX[i*m + 0]);}
-
                     STAS<T, K, 1, BlockVectors*2>(cta, A_tid, cols_tid, blockX, m, NZ, StAS.get_pointer(), Scache.get_pointer());
-                    compute_k_eigenpairs<T, BlockVectors*2, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
-                    /* if (tid == 0) sycl::ext::oneapi::experimental::printf("Eigenvectors Iteration %d\n", iter);
-                    for(int i = 0; i < BlockVectors; i++){
-                        for(int j = 0; j < BlockVectors*2; j++){
-                            if(tid == 0) sycl::ext::oneapi::experimental::printf("eigvects[%d][%d] = %f\n", i, j, eigvects[i*BlockVectors*2 + j]);
-                        }
-                    } */
+                    //compute_k_eigenpairs<T, BlockVectors*2, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
                     for (int i = 0; i < BlockVectors; i++){
                         blockX[i*m + tid] = blockXtemp[i*m + tid];
                         blockR[i*m + tid] = blockRtemp[i*m + tid];
@@ -773,9 +733,7 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
                     update_vectors<T, BlockVectors*2, BlockVectors>(cta, blockX, blockR, blockP, blockAX, blockAR, blockAP, eigvects, m, true);
                     restart = false;
                 }
-                //Print eigenvectors
                 sycl::group_barrier(cta);
-
                 iter++;
             }
             for (int i = tid; i < BlockVectors*BlockVectors*3; i+=cta.get_local_range(0)){
@@ -784,6 +742,7 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
             for (int i = tid; i < 3*BlockVectors*3*BlockVectors; i+=cta.get_local_range(0)){
                 LastGram_acc[i] = StAS[i];
             }
+            if(tid < BlockVectors)   vals_acc[tid] = lambdas[tid];
 
         });
     });
@@ -819,7 +778,17 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int m, size_t maxiters){
         auto LastGram_acc = host_accessor(LastGram, read_only);
         file5.write(reinterpret_cast<const char*>(LastGram_acc.get_pointer()), SD * BlockVectors * SD * BlockVectors * sizeof(T));
     }
+
+    std::ofstream file6("Lambdas_BV=" + to_string(BlockVectors) + "_N=" + to_string(m) + "_iters=" + to_string(maxiters) + dtype, ios::binary);
+    {
+        auto vals_acc = host_accessor(vals, read_only);
+        file6.write(reinterpret_cast<const char*>(vals_acc.get_pointer()), BlockVectors * sizeof(T));
+    }
 }
 
-template void LOBPCG<float, uint16_t, 3, 30>(SyclQueue &ctx, Span<float> A, Span<uint16_t> cols, int m, size_t maxiters);
-template void LOBPCG<double, uint16_t, 3, 30>(SyclQueue &ctx, Span<double> A, Span<uint16_t> cols, int m, size_t maxiters);
+//template void LOBPCG<float, uint16_t, 3, 30>(SyclQueue &ctx, Span<float> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
+//template void LOBPCG<float, uint16_t, 9, 30>(SyclQueue &ctx, Span<float> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
+template void LOBPCG<float, uint16_t, 21, 30>(SyclQueue &ctx, Span<float> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
+template void LOBPCG<double, uint16_t, 21, 30>(SyclQueue &ctx, Span<double> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
+//template void LOBPCG<double, uint16_t, 3, 30>(SyclQueue &ctx, Span<double> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
+//template void LOBPCG<double, uint16_t, 9, 30>(SyclQueue &ctx, Span<double> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
