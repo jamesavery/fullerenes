@@ -264,11 +264,6 @@ void FullereneBatch<T,K>::push_back(const Fullerene<U,V>& fullerene, const int I
     Fullerene<U,V>::copy((*this)[size_++], fullerene);
 }
 
-template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint16_t>&, const int);
-template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<double, uint16_t>&, const int);
-template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint32_t>&, const int);
-template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<double, uint32_t>&, const int);
-
 //Parameter pack expanded copy function
 template <typename... Args>
 void copy_spans(sycl::group<1>& grp, Args&&... args) {
@@ -510,3 +505,23 @@ template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint16_t>& dst_
 template void QueueUtil::push(SyclQueue& Q, FullereneQueue<float,uint32_t>& dst_queue, FullereneBatch<float,uint32_t>& src_batch, ConditionFunctor transfer_cond, StatusEnum consumed_status);
 template void QueueUtil::push(SyclQueue& Q, FullereneBatch<float,uint32_t>& dst_batch, FullereneQueue<float,uint32_t>& src_queue, ConditionFunctor transfer_cond, StatusEnum consumed_status);
 //template void push_impl (SyclQueue& Q, FullereneQueue<float,uint16_t>& dst_queue, FullereneBatch<float,uint16_t>& src_batch, ConditionFunctor condition);
+
+template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint16_t>&, const int);
+template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<double, uint16_t>&, const int);
+template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<float, uint32_t>&, const int);
+template void FullereneBatch<float, uint16_t>::push_back(const Fullerene<double, uint32_t>&, const int);
+
+template void FullereneBatch<float, uint32_t>::push_back(const Fullerene<float, uint16_t>&, const int);
+template void FullereneBatch<float, uint32_t>::push_back(const Fullerene<double, uint16_t>&, const int);
+template void FullereneBatch<float, uint32_t>::push_back(const Fullerene<float, uint32_t>&, const int);
+template void FullereneBatch<float, uint32_t>::push_back(const Fullerene<double, uint32_t>&, const int);
+
+template void FullereneBatch<double, uint16_t>::push_back(const Fullerene<float, uint16_t>&, const int);
+template void FullereneBatch<double, uint16_t>::push_back(const Fullerene<double, uint16_t>&, const int);
+template void FullereneBatch<double, uint16_t>::push_back(const Fullerene<float, uint32_t>&, const int);
+template void FullereneBatch<double, uint16_t>::push_back(const Fullerene<double, uint32_t>&, const int);
+
+template void FullereneBatch<double, uint32_t>::push_back(const Fullerene<float, uint16_t>&, const int);
+template void FullereneBatch<double, uint32_t>::push_back(const Fullerene<double, uint16_t>&, const int);
+template void FullereneBatch<double, uint32_t>::push_back(const Fullerene<float, uint32_t>&, const int);
+template void FullereneBatch<double, uint32_t>::push_back(const Fullerene<double, uint32_t>&, const int);
