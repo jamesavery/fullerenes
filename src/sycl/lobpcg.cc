@@ -613,7 +613,9 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size
         auto StAS = sycl::local_accessor<T, 1>(BlockVectors*3 * BlockVectors*3, h);
         auto eigvects = sycl::local_accessor<T, 1>(BlockVectors * BlockVectors*3,h);
         auto lambdas = sycl::local_accessor<T, 1>(BlockVectors, h);
-        auto working_space = sycl::local_accessor<T, 1>(BlockVectors*3 * BlockVectors*3 * 3, h);
+        auto working_space = sycl::local_accessor<T, 1>(
+                        BlockVectors*3 * BlockVectors*3 * 2 + //Lanczos Vectors and transformation matrix Q
+                        BlockVectors*3*8                      /*Everything else */, h);
         auto Scache = sycl::local_accessor<T, 1>(m, h);
         auto sort_scratchpad = local_accessor<std::byte, 1>(bytes, h);
 
@@ -724,7 +726,7 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size
                     }
                     orthonormalize<T, BlockVectors*2>(cta, blockX, m);
                     STAS<T, K, 1, BlockVectors*2>(cta, A_tid, cols_tid, blockX, m, NZ, StAS.get_pointer(), Scache.get_pointer());
-                    //compute_k_eigenpairs<T, BlockVectors*2, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
+                    compute_k_eigenpairs<T, BlockVectors*2, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
                     for (int i = 0; i < BlockVectors; i++){
                         blockX[i*m + tid] = blockXtemp[i*m + tid];
                         blockR[i*m + tid] = blockRtemp[i*m + tid];
@@ -784,6 +786,8 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size
         auto vals_acc = host_accessor(vals, read_only);
         file6.write(reinterpret_cast<const char*>(vals_acc.get_pointer()), BlockVectors * sizeof(T));
     }
+    auto eig_acc = host_accessor(vals, read_only);
+    std::cout << Span<T>(const_cast<T*>(eig_acc.get_pointer()), batch_size * BlockVectors) << std::endl;
 }
 
 //template void LOBPCG<float, uint16_t, 3, 30>(SyclQueue &ctx, Span<float> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
