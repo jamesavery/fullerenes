@@ -13,11 +13,17 @@ struct MDSpan
     using array_t = std::array<size_t,N>;
 
     inline constexpr MDSpan() : data_(nullptr) {}
-    inline constexpr MDSpan(T *data, array_t shape) : data_(data), shape_(shape) {
+    inline constexpr MDSpan(T *data, const array_t &shape) : data_(data), shape_(shape) {
             stride_[N-1] = 1;
             for(int axis=N-2;axis>=0;axis--) 
                 stride_[axis] = stride_[axis+1]*shape_[axis+1];
     }
+    inline constexpr MDSpan(T *data, const array_t &shape, const array_t &stride) : data_(data), shape_(shape), stride_(stride) {
+            stride_[N-1] = 1;
+            for(int axis=N-2;axis>=0;axis--) 
+                stride_[axis] = stride_[axis+1]*shape_[axis+1];
+    }
+    
     inline constexpr MDSpan(T *begin, T *end):  MDSpan(begin, {end-begin}) {} 
     inline constexpr MDSpan(const MDSpan<T,N> &other) = default;
     inline constexpr MDSpan(MDSpan<T,N> &&other) = default;
@@ -29,10 +35,13 @@ struct MDSpan
         for(int axis=0;axis<N;axis++){ shape[axis] *= sizeof(T); shape[axis] /= sizeof(U); }
         return MDSpan<U,N>(reinterpret_cast<U*>(data_), shape);
     }
-    inline constexpr size_t offset_of(array_t index) {
+    template <size_t M>
+    inline constexpr size_t offset_of(std::array<size_t,M> index) {
+        assert(M<=N);
+        
         size_t offset = 0;
 #pragma unroll(3)
-        for(int axis=0;axis<N;axis++) offset += index[axis]*stride_[axis];
+        for(int axis=0;axis<M;axis++) offset += index[axis]*stride_[axis];
         return offset;
     }
     inline constexpr array_t index_of(size_t offset) {
@@ -71,24 +80,39 @@ struct MDSpan
         return is_equal;
     }
 
-    inline constexpr T  operator[](const size_t index) const { return operator[]( array_t{{index}} ); } 
-    inline constexpr T& operator[](const size_t index)       { return operator[]( array_t{{index}} ); }     
+    // Lookup with [] gives element, lookup with () gives subspan
+    template <size_t M>
+    inline constexpr MDSpan<T,N-M> operator()(const std::array<size_t,M> &index) {
+        assert(M<N);
+        
+        for(int axis=0;axis<M;axis++) assert(index[axis] < shape_[axis]); // TODO: Langsomt, til debug naar virker
+        assert(data_ != 0); 
 
-    inline constexpr T& operator[](const array_t &index) {
-//#ifndef NDEBUG        
+        std::array<size_t,N-M> new_shape;
+        std::array<size_t,N-M> new_stride;
+        size_t offset = offset_of(index);
+        for(int axis=M;axis<N;axis++){
+            new_shape[axis-M]  = shape_[axis];
+            new_stride[axis-M] = stride_[axis];
+            return MDSpan<T,N-M>(data_ + offset, new_shape, new_stride);
+        }
+    }
+    inline constexpr MDSpan<T,N-1> operator()(size_t index) { return operator()({{index}}); }
+
+    inline constexpr T& operator[](const array_t &index)  {
         for(int axis=0;axis<N;axis++) assert(index[axis] < shape_[axis]); // TODO: Langsomt, til debug naar virker
-        assert(data_); 
-//#endif
+        assert(data_ != 0); 
         return data_[offset_of(index)];
     }
     inline constexpr T operator[](const array_t &index) const {
-//#ifndef NDEBUG        
         for(int axis=0;axis<N;axis++) assert(index[axis] < shape_[axis]); // TODO: Langsomt, til debug naar virker
-        assert(data_); 
-//#endif
+        assert(data_ != 0); 
         return data_[offset_of(index)];
-    }
+    }    
+    inline constexpr T  operator[](const size_t index) const { return operator[]( array_t{{index}} ); } 
+    inline constexpr T& operator[](const size_t index)       { return operator[]( array_t{{index}} ); }     
 
+    
     inline constexpr T &at(const array_t &index) const {
         for(int axis=0;axis<N;axis++) assert(index[axis] < shape_[axis]); // Behold for evigt.
         assert(data_ != 0);         
@@ -111,6 +135,8 @@ struct MDSpan
         return data_[offset_of(last_index)]; 
     }
     
+    
+
     template <typename U, size_t M>
     friend std::ostream &operator<<(std::ostream &os, const MDSpan<U,M> &vec);
 
