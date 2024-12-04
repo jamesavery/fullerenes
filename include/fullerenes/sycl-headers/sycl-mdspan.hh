@@ -36,7 +36,7 @@ struct MDSpan
         return MDSpan<U,N>(reinterpret_cast<U*>(data_), shape);
     }
     template <size_t M>
-    inline constexpr size_t offset_of(std::array<size_t,M> index) {
+    inline constexpr size_t offset_of(std::array<size_t,M> index) const {
         assert(M<=N);
         
         size_t offset = 0;
@@ -44,7 +44,7 @@ struct MDSpan
         for(int axis=0;axis<M;axis++) offset += index[axis]*stride_[axis];
         return offset;
     }
-    inline constexpr array_t index_of(size_t offset) {
+    inline constexpr array_t index_of(size_t offset) const {
         array_t index;
         // Requirement: Either stride[i] = shape[0]   * ... * shape[i-1]
         //              or     stride[i] = shape[i+1] * ... * shape[N-1]
@@ -80,7 +80,19 @@ struct MDSpan
         return is_equal;
     }
 
-    // Lookup with [] gives element, lookup with () gives subspan
+    // We only allow big-to-small or small-to-big strides, so no mixed transpose.
+    // TODO: Do we want to allow reversal? (negative strides)
+    inline constexpr MDSpan<T,N> transpose() const {
+        array_t new_shape;
+        array_t new_stride;
+        for(int axis=0;axis<N;axis++){
+            new_shape[axis]  = shape_[N-1-axis];
+            new_stride[axis] = stride_[N-1-axis];
+        }
+        return MDSpan<T,N>(data_, new_shape, new_stride);
+    }
+
+    // Sub-tensor spans
     template <size_t M>
     inline constexpr MDSpan<T,N-M> operator()(const std::array<size_t,M> &index) {
         assert(M<N);
@@ -99,6 +111,7 @@ struct MDSpan
     }
     inline constexpr MDSpan<T,N-1> operator()(size_t index) { return operator()({{index}}); }
 
+    // Look up element
     inline constexpr T& operator[](const array_t &index)  {
         for(int axis=0;axis<N;axis++) assert(index[axis] < shape_[axis]); // TODO: Langsomt, til debug naar virker
         assert(data_ != 0); 
@@ -140,7 +153,7 @@ struct MDSpan
     template <typename U, size_t M>
     friend std::ostream &operator<<(std::ostream &os, const MDSpan<U,M> &vec);
 
-private:
+protected:
     T *data_;
     array_t shape_, stride_;
 };
