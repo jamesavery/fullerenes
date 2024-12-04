@@ -68,17 +68,29 @@ struct MDSpan
             other_.data_[index] == data_[index];
         }
     }
-    inline constexpr T &operator[](array_t index) const {
+
+    inline constexpr T  operator[](const size_t index) const { return operator[]({ array_t{{index}} ); } 
+    inline constexpr T& operator[](const size_t index)       { return operator[]({ array_t{{index}} ); }     
+
+    inline constexpr T& operator[](const array_t &index) {
 //#ifndef NDEBUG        
         for(int axis=0;axis<N;axis++) assert(index[i] < shape_[i]); // TODO: Langsomt, til debug naar virker
         assert(data_); 
 //#endif
-        return data_[index];
+        return data_[offset_of(index)];
     }
-    inline constexpr T &at(array_t index) const {
+    inline constexpr T operator[](const array_t &index) const {
+//#ifndef NDEBUG        
+        for(int axis=0;axis<N;axis++) assert(index[i] < shape_[i]); // TODO: Langsomt, til debug naar virker
+        assert(data_); 
+//#endif
+        return data_[offset_of(index)];
+    }
+
+    inline constexpr T &at(const array_t &index) const {
         for(int axis=0;axis<N;axis++) assert(index[i] < shape_[i]); // Behold for evigt.
         assert(data_ != 0);         
-        return data_[index];
+        return data_[offset_of(index)];
     }
     inline constexpr T *data() const { return data_; }
     inline constexpr size_t size() const { 
