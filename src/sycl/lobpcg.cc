@@ -12,6 +12,41 @@
 #include <fullerenes/argparser.hh>
 #include <fullerenes/sycl-headers/fill.hh>
 #define CEIL_DIV(x, y) (((x) + (y) - 1) / (y))
+
+#ifdef CUSOLVER_BACKEND
+    #include <cusolverDn.h>
+    #include <cuda_runtime.h>
+    #include <cuda_runtime_api.h>
+    #define handle_t cusolverDnHandle_t
+    #define status_t cusolverStatus_t
+    #define stream_t cudaStream_t
+    #define params_t cusolverDnParams_t
+    #define props_t cudaDeviceProp
+    #define synchronize cudaDeviceSynchronize
+    #define create_handle cusolverDnCreate
+    #define destroy_handle cusolverDnDestroy
+    #define set_stream cusolverDnSetStream
+    #define create_stream cudaStreamCreate
+    #define destroy_stream cudaStreamDestroy
+    #define get_device_properties cudaGetDeviceProperties
+    #define EIG_SOLVE_MODE CUSOLVER_EIG_MODE_VECTOR
+    #define FILL_MODE_LOWER CUBLAS_FILL_MODE_LOWER
+    #define SsyevBatched cusolverDnXsyevBatched
+    #define SsyevBatched_bufferSize cusolverDnXsyevBatched_bufferSize
+    #define SOLVER_COMPUTE_TYPE CUDA_R_32F
+#elif defined(ROCSOLVER_BACKEND)
+    #include <rocsolver.h>
+    #define handle_t rocsolver_handle
+    #define status_t rocsolver_status
+    #define stream_t hipStream_t
+    #define synchronize hipDeviceSynchronize
+    #define create_handle rocsolver_create_handle
+    #define destroy_handle rocsolver_destroy_handle
+    #define set_stream rocsolver_set_stream
+    #define create_stream hipStreamCreate
+    #define destroy_stream hipStreamDestroy
+#endif
+
 template <typename T, typename K, int BlockVectors, int NZ> class LOBPCGg {};
 
 using namespace sycl;
@@ -603,7 +638,7 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size
     ctx -> submit([&](sycl::handler& h){
         using TupleType = typename std::iterator_traits<oneapi::dpl::zip_iterator<T*, int*>>::value_type;
         constexpr auto bytes = sycl::ext::oneapi::experimental::default_sorter<>::memory_required<TupleType>(sycl::memory_scope::work_group, BlockVectors*3);
-
+        
         
         auto S_acc = sycl::accessor<T, 1, sycl::access::mode::write>(S, h);
         auto X0_acc = sycl::accessor<T, 1, sycl::access::mode::write>(X0, h);
@@ -789,6 +824,231 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size
     auto eig_acc = host_accessor(vals, read_only);
     std::cout << Span<T>(const_cast<T*>(eig_acc.get_pointer()), batch_size * BlockVectors) << std::endl;
 }
+
+
+/* template <typename T, typename K, int BlockVectors, int NZ>
+void LOBPCG_V1(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters){
+    sycl::buffer<T, 1> S(batch_size * BlockVectors*9 * m);
+    sycl::buffer<T, 1> X0(batch_size * BlockVectors * m);
+    sycl::buffer<T, 1> LastEigVects(batch_size * BlockVectors * BlockVectors*3);
+    sycl::buffer<T, 1> LastGram(batch_size * 3 * BlockVectors * 3 * BlockVectors);
+    sycl::buffer<T, 1> vals(batch_size * BlockVectors);
+    sycl::buffer<T, 1> StAS(batch_size * BlockVectors*3 * BlockVectors*3);
+    //sycl::buffer<T, 1> lambdas(batch_size * BlockVectors*3);
+    sycl::buffer<int, 1> indices(batch_size * BlockVectors);
+    
+    T* syevd_scratchpad = nullptr;
+    int syevd_scratchpad_size = 0;
+    int syevd_scratchpad_host_size = 0;
+    auto syevd_info = SyclVector<int>(batch_size);
+    auto lambdas = SyclVector<T>(batch_size * BlockVectors);
+    handle_t handle = nullptr;
+    stream_t stream = nullptr;
+    props_t props = nullptr;
+    params_t params = nullptr;
+    create_handle(&handle);
+    create_stream(&stream);
+    set_stream(handle, stream);
+    create_params(&params);
+
+    #ifdef CUSOLVER_BACKEND
+        status_t status = cusolverDnXsyevBatched_bufferSize(handle, 
+                                params, 
+                                EIG_SOLVE_MODE, 
+                                FILL_MODE_LOWER,
+                                m,
+                                SOLVER_COMPUTE_TYPE,
+                                A.data(),
+                                m,
+                                SOLVER_COMPUTE_TYPE,
+                                lambdas.data(),
+                                SOLVER_COMPUTE_TYPE,
+                                &syevd_scratchpad_size,
+                                &syevd_scratchpad_host_size,
+                                batch_size);
+    #elif defined(ROCSOLVER_BACKEND)
+        status_t status = rocsolver_ssyevd_bufferSize(handle, params, EIG_SOLVE_MODE, FILL_MODE_LOWER, m, A.data(), m, lambdas.data(), &syevd_scratchpad_size, &syevd_scratchpad_host_size, batch_size);
+    #endif
+
+    const T tol = std::numeric_limits<T>::epsilon() * sycl::sqrt(float(m));
+
+    ctx -> submit([&](sycl::handler& h ){
+
+    });
+
+    //
+    ctx -> submit([&](sycl::handler& h){
+        auto S_acc = sycl::accessor<T, 1, sycl::access::mode::write>(S, h);
+        auto X0_acc = sycl::accessor<T, 1, sycl::access::mode::write>(X0, h);
+        auto Scache = sycl::local_accessor<T, 1>(m, h);
+
+        h.parallel_for<LOBPCGg<T,K,BlockVectors,NZ>>(nd_range<1>(sycl::range{size_t(batch_size*m)}, sycl::range{size_t(m)}), [=](sycl::nd_item<1> item){
+            auto tid = item.get_local_linear_id();
+            sycl::group<1> cta = item.get_group();
+            auto bid = item.get_group_linear_id();
+            constexpr auto SN = BlockVectors*3;
+            std::bitset<BlockVectors> converged;
+            oneapi::dpl::uniform_real_distribution<T> distr(0.0, 1.0);            
+            oneapi::dpl::minstd_rand engine(42, tid);
+            auto A_acc = A.subspan(bid * m * NZ, m * NZ);
+            auto cols_acc = cols.subspan(bid * m * NZ, m * NZ);
+
+            //Load the i-th row of A into registers
+            T A_tid[NZ];
+            for(int i = 0; i < NZ; i++){
+                A_tid[i] = A_acc[tid*NZ + i];
+            }
+            //Load the i-th row of cols into registers
+            K cols_tid[NZ]; 
+            for(int i = 0; i < NZ; i++){
+                cols_tid[i] = cols_acc[tid*NZ + i];
+            }
+
+
+            //X^T @ X  = (X^T @ X)^T = X @ X^T
+            //iff A^T = A then 
+            //X^T @ A @ X = (X^T @ A @ X)^T
+
+            global_ptr<T> blockX = S_acc.get_pointer() + bid * BlockVectors*9 * m;
+            global_ptr<T> blockR = blockX + BlockVectors*m;
+            global_ptr<T> blockP = blockR + BlockVectors*m;
+
+            global_ptr<T> blockXtemp = blockP + BlockVectors*m;
+            global_ptr<T> blockRtemp = blockXtemp + BlockVectors*m;
+            global_ptr<T> blockPtemp = blockRtemp + BlockVectors*m;
+
+            global_ptr<T> blockAX = blockPtemp + BlockVectors*m;
+            global_ptr<T> blockAR = blockAX + BlockVectors*m;
+            global_ptr<T> blockAP = blockAR + BlockVectors*m;
+            for (int i = tid + m*BlockVectors; i < 9*m*BlockVectors; i+=cta.get_local_range(0)){
+                blockX[i] = T(0);
+            }
+            for (int i = tid; i < m*BlockVectors; i+=cta.get_local_range(0)){
+                blockX[i] = distr(engine);
+                //X0_acc[i] = blockX[i];
+                X0_acc[bid*m*BlockVectors + i] = blockX[i];
+            }
+            group_barrier(cta);
+            //Normalize S vectors
+            orthonormalize<T, BlockVectors>(cta, blockX, m); //Modified Gram-Schmidt
+            
+
+            //A * X
+            //matBlockVector<T, K, 1, N>(cta, A_tid, cols_tid, blockX, blockAX, NZ, m); 
+            //X^T * A * X
+            STAS<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockX, m, NZ, StAS.get_pointer(), Scache.get_pointer());
+            //Fill in with simple 3x3 matrix
+            compute_k_eigenpairs<T, BlockVectors, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
+            matBlockVector<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockX, blockAX, NZ, m);
+            inPlaceMatMatMul<T, BlockVectors>(cta, blockX, eigvects, m);
+            inPlaceMatMatMul<T, BlockVectors>(cta, blockAX, eigvects, m);
+            //Compute the residual R = A*X - X*Lambda
+            int iter = 0;
+            bool restart = true;
+            while(!converged.all() && iter < maxiters){
+                //R = A*X - X*Lambda
+                for(int i = 0; i < BlockVectors; i++) blockR[i*m + tid] = blockAX[i*m + tid] - lambdas[i] * blockX[i*m + tid];
+                //Convergence Check
+                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(sycl::abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
+                sycl::group_barrier(cta);
+                //R = R - X * (X^T * R)
+                applyConstraints<T, BlockVectors>(cta, blockR, blockX, m);
+                sycl::group_barrier(cta);
+                orthonormalize<T, BlockVectors>(cta, blockR, m);
+                matBlockVector<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockR, blockAR, NZ, m);
+                
+
+                if (!restart) {
+                    orthonormalize<T, BlockVectors>(cta, blockP, m);
+                    for(int i = 0; i < BlockVectors; i++){ 
+                        blockXtemp[i*m + tid] = blockX[i*m + tid];
+                        blockRtemp[i*m + tid] = blockR[i*m + tid];
+                        blockPtemp[i*m + tid] = blockP[i*m + tid];
+                    }
+                    matBlockVector<T, K, 1, BlockVectors>(cta, A_tid, cols_tid, blockP, blockAP, NZ, m);
+                    orthonormalize<T, BlockVectors*3>(cta, blockX, m);
+                    STAS<T, K, 1, BlockVectors*3>(cta, A_tid, cols_tid, blockX, m, NZ, StAS.get_pointer(), Scache.get_pointer());
+                    compute_k_eigenpairs<T, BlockVectors*3, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
+                    
+                    for (int i = 0; i < BlockVectors; i++){ 
+                        blockX[i*m + tid] = blockXtemp[i*m + tid];
+                        blockR[i*m + tid] = blockRtemp[i*m + tid];
+                        blockP[i*m + tid] = blockPtemp[i*m + tid];
+                    } 
+                    group_barrier(cta);
+                    update_vectors<T, BlockVectors*3, BlockVectors>(cta, blockX, blockR, blockP, blockAX, blockAR, blockAP, eigvects, m, false);
+                    group_barrier(cta);
+
+                } else {
+                    for (int i = 0; i < BlockVectors; i++){
+                        blockXtemp[i*m + tid] = blockX[i*m + tid];
+                        blockRtemp[i*m + tid] = blockR[i*m + tid];
+                    }
+                    orthonormalize<T, BlockVectors*2>(cta, blockX, m);
+                    STAS<T, K, 1, BlockVectors*2>(cta, A_tid, cols_tid, blockX, m, NZ, StAS.get_pointer(), Scache.get_pointer());
+                    compute_k_eigenpairs<T, BlockVectors*2, BlockVectors>(cta, StAS, eigvects, lambdas, working_space.get_pointer(), sort_scratchpad, true);
+                    for (int i = 0; i < BlockVectors; i++){
+                        blockX[i*m + tid] = blockXtemp[i*m + tid];
+                        blockR[i*m + tid] = blockRtemp[i*m + tid];
+                    }
+                    group_barrier(cta);
+                    update_vectors<T, BlockVectors*2, BlockVectors>(cta, blockX, blockR, blockP, blockAX, blockAR, blockAP, eigvects, m, true);
+                    restart = false;
+                }
+                sycl::group_barrier(cta);
+                iter++;
+            }
+            for (int i = tid; i < BlockVectors*BlockVectors*3; i+=cta.get_local_range(0)){
+                LastEigVects_acc[i] = eigvects[i];
+            }
+            for (int i = tid; i < 3*BlockVectors*3*BlockVectors; i+=cta.get_local_range(0)){
+                LastGram_acc[i] = StAS[i];
+            }
+            if(tid < BlockVectors)   vals_acc[tid] = lambdas[tid];
+
+        });
+    });
+    std::string dtype = std::is_same<T, float>::value ? ".float32" : ".float64";
+    ctx.wait();
+    int SD = std::min(int(maxiters+1), 3);
+    std::ofstream file("Subspace_BV=" + to_string(BlockVectors) + "_N=" + to_string(m) + "_iters=" + to_string(maxiters) + dtype, ios::binary);
+    {
+        auto S_acc = host_accessor(S, read_only);
+        file.write(reinterpret_cast<const char*>(S_acc.get_pointer()), SD * BlockVectors * m * sizeof(T));
+    }
+
+    std::ofstream file2("AXARAP_BV=" + to_string(BlockVectors) + "_N=" + to_string(m) + "_iters=" + to_string(maxiters) + dtype, ios::binary);
+    {
+        auto S_acc = host_accessor(S, read_only);
+        file2.write(reinterpret_cast<const char*>(S_acc.get_pointer() + 6 * BlockVectors * m), 3 * BlockVectors * m * sizeof(T));
+    }
+
+    std::ofstream file3("Initial_X_BV=" + to_string(BlockVectors) + "_N=" + to_string(m) + dtype, ios::binary);
+    {
+        auto X0_acc = host_accessor(X0, read_only);
+        file3.write(reinterpret_cast<const char*>(X0_acc.get_pointer()), BlockVectors * m * sizeof(T));
+    }
+
+    std::ofstream file4("LastEigVects_BV=" + to_string(BlockVectors) + "_N=" + to_string(m) + "_iters=" + to_string(maxiters) + dtype, ios::binary);
+    {
+        auto LastEigVects_acc = host_accessor(LastEigVects, read_only);
+        file4.write(reinterpret_cast<const char*>(LastEigVects_acc.get_pointer()), BlockVectors * BlockVectors * SD * sizeof(T));
+    }
+
+    std::ofstream file5("LastGram_BV=" + to_string(BlockVectors) + "_N=" + to_string(m) + "_iters=" + to_string(maxiters) + dtype, ios::binary);
+    {
+        auto LastGram_acc = host_accessor(LastGram, read_only);
+        file5.write(reinterpret_cast<const char*>(LastGram_acc.get_pointer()), SD * BlockVectors * SD * BlockVectors * sizeof(T));
+    }
+
+    std::ofstream file6("Lambdas_BV=" + to_string(BlockVectors) + "_N=" + to_string(m) + "_iters=" + to_string(maxiters) + dtype, ios::binary);
+    {
+        auto vals_acc = host_accessor(vals, read_only);
+        file6.write(reinterpret_cast<const char*>(vals_acc.get_pointer()), BlockVectors * sizeof(T));
+    }
+    auto eig_acc = host_accessor(vals, read_only);
+    std::cout << Span<T>(const_cast<T*>(eig_acc.get_pointer()), batch_size * BlockVectors) << std::endl;
+} */
 
 //template void LOBPCG<float, uint16_t, 3, 30>(SyclQueue &ctx, Span<float> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
 //template void LOBPCG<float, uint16_t, 9, 30>(SyclQueue &ctx, Span<float> A, Span<uint16_t> cols, int batch_size, int m, size_t maxiters);
