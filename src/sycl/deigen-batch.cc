@@ -1,18 +1,20 @@
 #include <fullerenes/sycl-headers/sycl-span.hh>
-#include <fullerenes/sycl-headers/strided-span.hh>
+#include <fullerenes/sycl-headers/sycl-mdspan.hh>
 
 typedef float scalar;
+using SpanMatrix = MDSpan<scalar,2>;
+using SpanVector = MDSpan<scalar,1>;
 #define conj(x) x
 
-void apply_reflection(/*in/out*/MDSpan<scalar,2> A, const MDSpan<scalar,1> &v, const scalar sigma=0.5L)
+void apply_reflection(/*in/out*/SpanMatrix &A,/*in*/ const SpanVector &v, 
+                      /* tmp*/ SpanVector vHA, const scalar sigma=0.5L)
 {
   auto [m,n] = A.shape();
 
-  scalar vHA[n];    
   for(int j=0;j<n;j++){		
     scalar sum = 0;
-    for(int k=0;k<m;k++) sum += conj(v[k])*A[{k,j}]
-    vHA[j] = sum;
+    for(int k=0;k<m;k++) sum += conj(v[{k}])*A[{k,j}];
+    vHA[{j}] = sum;
   }
 
   for(size_t i=0;i<m;i++)       /* A += -2*outer(v,vTA) */
@@ -21,7 +23,7 @@ void apply_reflection(/*in/out*/MDSpan<scalar,2> A, const MDSpan<scalar,1> &v, c
     }
 }
 
-INLINE double COPYSIGN(double to, double from)
+double COPYSIGN(double to, double from)
 {
   if(fabs(from/to)<1e-14) return to;
   else return copysign(to,from);
@@ -30,8 +32,8 @@ INLINE double COPYSIGN(double to, double from)
 // TODO: Re-niceify C++
 // TODO: Pure C-version for complex
 // TODO: Where did real_reflection_vector go?
-void reflection_vector(/*in*/const scalar *a, const real_t anorm,
-		       /*out*/scalar *v, scalar *sigma, int n)
+void reflection_vector(/*in*/const SpanVector &a, const real_t anorm,
+		               /*out*/     SpanVector &v, scalar *sigma, int n)
 { // Reflection vector that eliminates *row* a (as opposed to *column* in eigen.c)
   for(int i=0;i<n;i++) v[i] = a[i];
 
@@ -55,26 +57,26 @@ void reflection_vector(/*in*/const scalar *a, const real_t anorm,
 // Decompose a matrix (complex or real) into A = Q H Q.H(), where H is upper Hessenberg.
 // If A is Hermitian (symmetric in real case), then H is tridiagonal.
 // TODO: Row pivot
-void QHQ(/*in/out*/matrix<scalar> A, matrix<scalar> Q={0})
+void QHQ(/*in/out*/SpanMatrix A, SpanMatrix Q={0})
 {
   auto [m,n] = A.shape;
   assert(m==n);
 
   scalar  sigma;		    // Elementary operation scale (2 for reflection)
   scalar  v_data[n], vc_data[n], a_data[n];    // Reflection vector
-  matrix<scalar> v(v_data,{n,1}), vc(vc_data,{n,1}), AT(A.transpose());
+  SpanMatrix v(v_data,{n,1}), vc(vc_data,{n,1}), AT(A.transpose());
   
   real_t numerical_zero = A.max_norm()*10*machine_precision;
 
   for(int k=0;k<n-1;k++){
     //  re-niceify ... A({k+1,n},k);	
-    matrix<scalar> a = A({k+1,n},k).copy(a_data);
+    SpanMatrix a = A({k+1,n},k).copy(a_data);
     real_t anorm = sqrt(std::abs(dot(a,a)));
 
     if(anorm < numerical_zero) continue; /* Already eliminated, don't divide by 0 */
     
     reflection_vector(a.data,anorm,v_data,&sigma,n);
-    matrix<scalar> vc = v.conj(vc_data);
+    SpanMatrix vc = v.conj(vc_data);
     
     apply_reflection( A({k+1,n},{k,n}),v,      sigma );
     apply_reflection(AT({k+1,n},{k,n}),vc,conj(sigma));
@@ -183,7 +185,7 @@ void T_QTQ(const int n, const real_t *Din, const real_t *Lin, real_t *Dout, real
 }
 
 template <typename scalar> 
-void apply_all_reflections(const real_t *V, const int n, matrix<scalar>& Q)
+void apply_all_reflections(const real_t *V, const int n, SpanMatrix& Q)
 {
   if(Q.data != 0){       // Do we want eigenvectors?
     int m = Q.shape[0];
@@ -227,8 +229,8 @@ int nth_time = 0;
 // TODO: Stop after max_steps for fixed k. Return max Gershgorin radius as convergence -- or max Rayleigh quotient residual?
 // TODO: Implement implicit QR iteration using Francis' Q theorem/bulge chasing
 template <typename scalar>
-std::pair<real_t,size_t> eigensystem_hermitian(const matrix<scalar>& A,
-					       matrix<real_t>& lambdas, matrix<scalar> Qt={0},
+std::pair<real_t,size_t> eigensystem_hermitian(const SpanMatrix& A,
+					       matrix<real_t>& lambdas, SpanMatrix Qt={0},
 					       const real_t tolerance=1e4*machine_precision,
 					       const int max_iterations=40)
 {
@@ -238,8 +240,8 @@ std::pair<real_t,size_t> eigensystem_hermitian(const matrix<scalar>& A,
   
   scalar T_data[n*n];
   real_t Qhat_data[n*n], tmp_data[n*n];
-  matrix<scalar> T = A.copy(T_data);
-  matrix<scalar> Q = Qt.T();
+  SpanMatrix T = A.copy(T_data);
+  SpanMatrix Q = Qt.T();
   matrix<real_t> Qhat, tmp(tmp_data,{n,n});
 
   real_t max_error    = tolerance;
