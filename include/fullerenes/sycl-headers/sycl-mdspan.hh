@@ -52,9 +52,9 @@ struct MDSpan
         }
     }
     
-    inline constexpr MDSpan<T> subSpan(array_t index, array_t shape) const {
+    inline constexpr MDSpan<T,N> subSpan(array_t index, array_t shape) const {
          size_t offset = offset_of(index);
-         return MDSpan<T>(data_ + offset, shape); 
+         return MDSpan<T,N>(data_ + offset, shape); 
     }
     inline constexpr MDSpan<T,N>& operator= (const MDSpan<T,N> &other)  = default;
     // inline constexpr MDSpan<T,N>& operator= (const MDSpan<T,N> &other) { 
@@ -63,10 +63,12 @@ struct MDSpan
     inline constexpr MDSpan<T,N>& operator= (MDSpan<T,N> &&other) = default; // { return *this = other; }
     inline bool operator==(const MDSpan<T,N> &other) {
         size_t size_ = size();
+        bool is_equal = shape_ == other.shape_;
         for(size_t i=0;i<size_;i++){
             array_t index = index_of(i);
-            other.data_[index] == data_[index];
+            is_equal &= (other.data_[index] == data_[index]);
         }
+        return is_equal;
     }
 
     inline constexpr T  operator[](const size_t index) const { return operator[]( array_t{{index}} ); } 
@@ -109,7 +111,8 @@ struct MDSpan
         return data_[offset_of(last_index)]; 
     }
     
-    friend std::ostream &operator<<(std::ostream &os, const MDSpan<T,N> &vec);
+    template <typename U, size_t M>
+    friend std::ostream &operator<<(std::ostream &os, const MDSpan<U,M> &vec);
 
 private:
     T *data_;
