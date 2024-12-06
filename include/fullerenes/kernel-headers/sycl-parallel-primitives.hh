@@ -5,7 +5,7 @@ struct SyclQueue; //Forward declaration
 //Unary Operators
 struct Identity{
     template <typename T>
-    constexpr inline T&& operator()(const T&& x) const { return std::forward<T>(x);}
+    constexpr inline T&& operator()(T&& x) const { return std::forward<T>(x);}
 
     template <typename T>
     constexpr inline T operator()(const T& x) const { return x;}
