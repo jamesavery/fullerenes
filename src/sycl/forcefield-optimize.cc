@@ -1844,9 +1844,9 @@ SyclEvent forcefield_optimize_impl(SyclQueue &Q, FullereneBatchView<T, K> B, siz
                 coord3d rel_bond_err, rel_angle_err, rel_dihedral_err;
                 for(int j = 0; j < 3; j++){
                     auto arc = typename ForceField<FFT,T,K>::ArcData(tid, j, Span<coord3d>(X.get_pointer(), N), nodeG);
-                    rel_bond_err[j] = sycl::abs(arc.bond() - constants.r0[j]) / constants.r0[j];
-                    rel_angle_err[j] = sycl::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j];
-                    rel_dihedral_err[j] = sycl::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j];
+                    rel_bond_err[j] = std::abs(arc.bond() - constants.r0[j]) / constants.r0[j];
+                    rel_angle_err[j] = std::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j];
+                    rel_dihedral_err[j] = std::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j];
                 }
                 real_t max_rel_bond_err     = sycl::reduce_over_group(cta, max(rel_bond_err), sycl::maximum<real_t>{});
                 real_t max_rel_angle_err    = sycl::reduce_over_group(cta, max(rel_angle_err), sycl::maximum<real_t>{});
@@ -2019,7 +2019,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
             T rel_bond_err = 0;
             for(int j = 0; j < 3; j++){
                 typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
-                rel_bond_err = sycl::max(rel_bond_err, sycl::abs(arc.bond() - constants.r0[j]) / constants.r0[j]);
+                rel_bond_err = sycl::max(rel_bond_err, std::abs(arc.bond() - constants.r0[j]) / constants.r0[j]);
             }
             return rel_bond_err;
         });
@@ -2029,7 +2029,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
             T rel_angle_err = 0;
             for(int j = 0; j < 3; j++){
                 typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
-                rel_angle_err = sycl::max(rel_angle_err, sycl::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j]);
+                rel_angle_err = sycl::max(rel_angle_err, std::abs(arc.angle() - constants.angle0[j]) / constants.angle0[j]);
             }
             return rel_angle_err;
         });
@@ -2039,7 +2039,7 @@ SyclEvent forcefield_optimize_impl(SyclQueue& Q, Fullerene<T,K> fullerene,
             T rel_dihedral_err = 0;
             for(int j = 0; j < 3; j++){
                 typename ForceField<FFT,T,K>::ArcData arc(i, j, X, nodeG);
-                rel_dihedral_err = sycl::max(rel_dihedral_err, sycl::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j]);
+                rel_dihedral_err = sycl::max(rel_dihedral_err, std::abs(arc.dihedral() - constants.inner_dih0[j]) / constants.inner_dih0[j]);
             }
             return rel_dihedral_err;
         });

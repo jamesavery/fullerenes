@@ -4,9 +4,8 @@
 #include <tuple>
 #include <iterator>
 #include <type_traits>
+#include <fullerenes/kernel-headers/base-functor.hh>
 #include "forcefield-includes.cc"
-#include <fullerenes/sycl-headers/misc-enums.hh>
-#include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 
 template <typename T, typename K>
 void nop_kernel(sycl::queue&Q, FullereneBatch<T,K>& batch, const LaunchPolicy policy){

@@ -1,7 +1,7 @@
+#include "sycl/sycl.hpp"
 #include <fullerenes/kernel-headers/eigen-functor.hh>
 #include "forcefield-includes.cc"
 #include <array>
-#include "sycl/sycl.hpp"
 #include "queue-impl.cc"
 #include <oneapi/dpl/random>
 using namespace sycl;
@@ -36,7 +36,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, const sycl::local_accessor<T,1>& D,
     // specialized max_norm = max(sum(abs(A),axis=1)) for tridiagonal matrix. 
     real_t local_max = real_t(0.);
     for (int i = tix; i < n; i += bdim){
-        local_max = std::max(local_max, sycl::abs(D[i]) + 2*sycl::abs(L[i]));
+        local_max = std::max(local_max, std::abs(D[i]) + 2*std::abs(L[i]));
     }
     real_t max_norm = reduce_over_group(cta, local_max, sycl::maximum<real_t>());
     real_t numerical_zero = 10*std::numeric_limits<real_t>::epsilon();
@@ -60,10 +60,10 @@ void T_QTQ(sycl::group<1>& cta, const int n, const sycl::local_accessor<T,1>& D,
     sycl::group_barrier(cta);
     if(tix == 0)
         for(int k=0;k<n-1;k++){
-            if (sycl::abs(L[k]) > numerical_zero){
+            if (std::abs(L[k]) > numerical_zero){
             a[0] = D[k]; a[1] = L[k];       // a = T[k:k+2,k] is the vector of nonzeros in kth subdiagonal column.
             
-            real_t anorm = sqrt(a[0]*a[0] + a[1]*a[1]); 
+            real_t anorm = sycl::sqrt(a[0]*a[0] + a[1]*a[1]); 
 
             // // Udrullet
             // //    reflection_vector(a,anorm,v);
@@ -71,7 +71,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, const sycl::local_accessor<T,1>& D,
             real_t alpha = -sycl::copysign(anorm,a[0]); // Koster ingenting
             v[0] -= alpha;
 
-            real_t vnorm = sqrt(v[0]*v[0]+v[1]*v[1]);
+            real_t vnorm = sycl::sqrt(v[0]*v[0]+v[1]*v[1]);
             real_t norm_inv = real_t(1.)/vnorm;               //Normalize
             v[0] *= norm_inv;  v[1] *= norm_inv;
 
@@ -146,7 +146,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, const sycl::local_accessor<T,1>& D,
 template <typename T>
 std::array<T,2> eigvalsh2x2(const std::array<T,4> &A){
     auto [a,b,c,d] = A;
-    T D = sqrt(4*b*c+(a-d)*(a-d));
+    T D = sycl::sqrt(4*b*c+(a-d)*(a-d));
     return {(a+d-D)/2, (a+d+D)/2};
 }
 
@@ -333,7 +333,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             };
 
             real_t Z[6]; //Eigenvectors spanning the kernel of the hessian (Rotations, Translations)
-            Z[0] = real_t(tid%3 == 0)/sqrt(T(Natoms)); Z[1] = real_t(tid%3 == 1)/sqrt(T(Natoms)); Z[2] = real_t(tid%3 == 2)/sqrt(T(Natoms)); // Translation eigenvectors
+            Z[0] = real_t(tid%3 == 0)/sycl::sqrt(T(Natoms)); Z[1] = real_t(tid%3 == 1)/sycl::sqrt(T(Natoms)); Z[2] = real_t(tid%3 == 2)/sycl::sqrt(T(Natoms)); // Translation eigenvectors
             if(tid%3 == 0){
                 Z[3] = real_t(0.);
                 Z[4] = -X_ptr[atom_idx][2];
@@ -369,7 +369,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                     auto proj = reduce_over_group(cta, result * V[j*N], sycl::plus<real_t>{}) * V[j*N];
                     result -= proj; //Remove the component along V[j*N] from result
                 }
-                result /= sqrt(reduce_over_group(cta, result * result, sycl::plus<real_t>{}));
+                result /= sycl::sqrt(reduce_over_group(cta, result * result, sycl::plus<real_t>{}));
                 return result;
             };
 
@@ -386,7 +386,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
             oneapi::dpl::minstd_rand engine(42, tid);
 
             V[0*N] =  distr(engine); //Seed the random number generator with the thread id
-            V[0*N] /= sqrt(reduce_over_group(cta, V[0*N] * V[0*N], sycl::plus<real_t>{}));
+            V[0*N] /= sycl::sqrt(reduce_over_group(cta, V[0*N] * V[0*N], sycl::plus<real_t>{}));
             V[0*N] = MGS(0);
             for (int i = 0; i < nLanczos; i++){
                 if (i > 1){
@@ -400,7 +400,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                 } else {
                     v -= betas[i- 1] * V[(i-1)*N] + alpha * V[i*N];
                 }
-                real_t beta = sqrt(reduce_over_group(cta, v * v, sycl::plus<real_t>{}));
+                real_t beta = sycl::sqrt(reduce_over_group(cta, v * v, sycl::plus<real_t>{}));
                 if (tid == i) betas[i] = beta;
                 if (i < nLanczos-1) V[(i+1)*N] = v / beta;
             }
@@ -450,7 +450,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                 real_t shift = d;
 
                 int i = 0;
-                real_t GR = (k>0?sycl::abs(L[k-1]):0)+sycl::abs(L[k]);
+                real_t GR = (k>0?std::abs(L[k-1]):0)+std::abs(L[k]);
                 int not_done = 1;
                 while (not_done > 0){
                     i++;
@@ -458,12 +458,12 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                     if(mode == EigensolveMode::FULL_SPECTRUM_VECTORS || mode == EigensolveMode::ENDS_VECTORS){
                         apply_all_reflections(cta, V,k,n, Q.data());
                     }
-                    GR = (k>0?sycl::abs(L[k-1]):0)+(k+1<n?sycl::abs(L[k]):0);
+                    GR = (k>0?std::abs(L[k-1]):0)+(k+1<n?std::abs(L[k]):0);
 
                     if(k>0){
                         std::array<T,4> args = {D[k-1], L[k-1], L[k-1], D[k]};
                         auto [l0, l1] = eigvalsh2x2(args);
-                        shift = sycl::abs(l0-d) < sycl::abs(l1-d)? l0:l1;
+                        shift = std::abs(l0-d) < std::abs(l1-d)? l0:l1;
                     } else {shift = D[k];}
                 
                     if(GR <= std::numeric_limits<real_t>::epsilon()*real_t(10.)) not_done--; // Do one (or optionally more) steps after reaching tolerance, to get all off-diagonals below.
@@ -491,11 +491,11 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                 int local_max_idx = 0;
                 for (int i = tid; i < n; i += bdim){
                     D_acc[bid*n + i] = D[i];
-                    local_max = isfinite(D[i]) ? std::max(local_max, sycl::abs(D[i])) : local_max;
-                    local_min = isfinite(D[i]) ? std::min(local_min, sycl::abs(D[i])) : local_min;
+                    local_max = std::isfinite(D[i]) ? std::max(local_max, std::abs(D[i])) : local_max;
+                    local_min = std::isfinite(D[i]) ? std::min(local_min, std::abs(D[i])) : local_min;
                     if (mode == EigensolveMode::ENDS_VECTORS){
-                    local_min_idx = isfinite(D[i]) ? (local_min == sycl::abs(D[i]) ? i : local_min_idx) :  local_min_idx;
-                    local_max_idx = isfinite(D[i]) ? (local_max == sycl::abs(D[i]) ? i : local_max_idx) :  local_max_idx;
+                    local_min_idx = std::isfinite(D[i]) ? (local_min == std::abs(D[i]) ? i : local_min_idx) :  local_min_idx;
+                    local_max_idx = std::isfinite(D[i]) ? (local_max == std::abs(D[i]) ? i : local_max_idx) :  local_max_idx;
                     }
                 }
                 real_t max_eig = reduce_over_group(cta, local_max, sycl::maximum<real_t>{});
@@ -545,9 +545,9 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
                 e[4*n + tid] = X_ptr[atom_idx][0];
                 e[5*n + tid] = real_t(0.);
             }
-                e[3*n + tid] /= sqrt(reduce_over_group(cta, e[3*n + tid]*e[3*n + tid], sycl::plus<real_t>{}));
-                e[4*n + tid] /= sqrt(reduce_over_group(cta, e[4*n + tid]*e[4*n + tid], sycl::plus<real_t>{}));
-                e[5*n + tid] /= sqrt(reduce_over_group(cta, e[5*n + tid]*e[5*n + tid], sycl::plus<real_t>{}));
+                e[3*n + tid] /= sycl::sqrt(reduce_over_group(cta, e[3*n + tid]*e[3*n + tid], sycl::plus<real_t>{}));
+                e[4*n + tid] /= sycl::sqrt(reduce_over_group(cta, e[4*n + tid]*e[4*n + tid], sycl::plus<real_t>{}));
+                e[5*n + tid] /= sycl::sqrt(reduce_over_group(cta, e[5*n + tid]*e[5*n + tid], sycl::plus<real_t>{}));
             
             if(mode == EigensolveMode::FULL_SPECTRUM_VECTORS)
             for (int k = offset; k < n; k++){

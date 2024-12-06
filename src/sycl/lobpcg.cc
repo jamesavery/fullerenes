@@ -83,7 +83,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, T* D, T* L, T* U, T* Vout, T shift=
     // specialized max_norm = max(sum(abs(A),axis=1)) for tridiagonal matrix. 
     real_t local_max = real_t(0.);
     for (int i = tix; i < n; i += bdim){
-        local_max = std::max(local_max, sycl::abs(D[i]) + 2*sycl::abs(L[i]));
+        local_max = std::max(local_max, std::abs(D[i]) + 2*std::abs(L[i]));
     }
     real_t max_norm = reduce_over_group(cta, local_max, sycl::maximum<real_t>());
     real_t numerical_zero = 10*std::numeric_limits<real_t>::epsilon();
@@ -107,10 +107,10 @@ void T_QTQ(sycl::group<1>& cta, const int n, T* D, T* L, T* U, T* Vout, T shift=
     sycl::group_barrier(cta);
     if(tix == 0)
         for(int k=0;k<n-1;k++){
-            if (sycl::abs(L[k]) > numerical_zero){
+            if (std::abs(L[k]) > numerical_zero){
             a[0] = D[k]; a[1] = L[k];       // a = T[k:k+2,k] is the vector of nonzeros in kth subdiagonal column.
             
-            real_t anorm = sqrt(a[0]*a[0] + a[1]*a[1]); 
+            real_t anorm = sycl::sqrt(a[0]*a[0] + a[1]*a[1]); 
 
             // // Udrullet
             // //    reflection_vector(a,anorm,v);
@@ -118,7 +118,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, T* D, T* L, T* U, T* Vout, T shift=
             real_t alpha = -sycl::copysign(anorm,a[0]); // Koster ingenting
             v[0] -= alpha;
 
-            real_t vnorm = sqrt(v[0]*v[0]+v[1]*v[1]);
+            real_t vnorm = sycl::sqrt(v[0]*v[0]+v[1]*v[1]);
             real_t norm_inv = real_t(1.)/vnorm;               //Normalize
             v[0] *= norm_inv;  v[1] *= norm_inv;
 
@@ -192,7 +192,7 @@ void T_QTQ(sycl::group<1>& cta, const int n, T* D, T* L, T* U, T* Vout, T shift=
 template <typename T>
 std::array<T,2> eigvalsh2x2(const std::array<T,4> &A){
     auto [a,b,c,d] = A;
-    T D = sqrt(4*b*c+(a-d)*(a-d));
+    T D = sycl::sqrt(4*b*c+(a-d)*(a-d));
     return {(a+d-D)/2, (a+d+D)/2};
 }
 //Assumes A is symmetric
@@ -229,12 +229,12 @@ void lanczos(sycl::group<1>& cta, const local_accessor<T,1>& A, T* X, T* alphas,
             auto proj = reduce_over_group(cta, result * other, sycl::plus<T>{}) * other;
             result -= (tid < N) ? proj : T(0);
         }
-        result /= sqrt(reduce_over_group(cta, result * result, sycl::plus<T>{}));
+        result /= sycl::sqrt(reduce_over_group(cta, result * result, sycl::plus<T>{}));
         return result;
     };
 
     auto v0 = (tid < N) ? distr(engine) : T(0);
-    auto norm = sqrt(reduce_over_group(cta, v0 * v0, sycl::plus<T>{}));
+    auto norm = sycl::sqrt(reduce_over_group(cta, v0 * v0, sycl::plus<T>{}));
     if (tid < N)  V[0*N] = v0 / norm;
     v0 = MGS(0);
     if (tid < N) V[0*N] = v0;
@@ -254,7 +254,7 @@ void lanczos(sycl::group<1>& cta, const local_accessor<T,1>& A, T* X, T* alphas,
             v -= betas[i- 1] * v_minus_one + alpha * vect_input;
         }
         v = (tid < N) ? v : T(0);
-        T beta = sqrt(reduce_over_group(cta, v * v, sycl::plus<T>{}));
+        T beta = sycl::sqrt(reduce_over_group(cta, v * v, sycl::plus<T>{}));
         if (tid == i) betas[i] = beta;
         if ((i < N-1) && (tid  < N)) V[(i+1)*N] = v / beta;
     } 
@@ -355,25 +355,25 @@ void diagonalize(sycl::group<1>& cta, T* U, T* L, T* D, T* V, T* Q){
         T shift = d;
 
         int i = 0;
-        T GR = (k>0?sycl::abs(L[k-1]):0)+sycl::abs(L[k]);
+        T GR = (k>0?std::abs(L[k-1]):0)+std::abs(L[k]);
         int not_done = 1;
         while (not_done > 0){
             i++;
             T_QTQ(cta, k+1, D, L, U, V, shift);
             apply_all_reflections(cta, V,k,N,Q);
-            GR = (k>0?sycl::abs(L[k-1]):0)+(k+1<N?sycl::abs(L[k]):0);
+            GR = (k>0?std::abs(L[k-1]):0)+(k+1<N?std::abs(L[k]):0);
 
             if(k>0){
                 std::array<T,4> args = {D[k-1], L[k-1], L[k-1], D[k]};
                 auto [l0, l1] = eigvalsh2x2(args);
-                shift = sycl::abs(l0-d) < sycl::abs(l1-d)? l0:l1;
+                shift = std::abs(l0-d) < std::abs(l1-d)? l0:l1;
             } else {shift = D[k];}
         
             if(GR <= std::numeric_limits<T>::epsilon()*T(10.)) not_done--; // Do one (or optionally more) steps after reaching tolerance, to get all off-diagonals below.
                                             // GPU NB: Se GPU NB ovenfor.
             if(i>10){
                 //printf("%dth run: Cannot converge eigenvalue %d to tolerance " G " using machine precision %g (d=%g, shift=%g, G=%g)\n" "D[k] = %g, L[k-1] = %g, L[k] = %g\n", nth_time,k,tolerance, std::numeric_limits<T>::epsilon(),d,shift,GR, D[k], (k>0)?L[k-1]:0, (k+1<n)?L[k]:0);
-                auto max_error = std::max(std::numeric_limits<T>::epsilon()*T(10.),GR);
+                auto max_error = sycl::max(std::numeric_limits<T>::epsilon()*T(10.),GR);
                 break;
             }
         }
@@ -405,9 +405,9 @@ void compute_k_eigenpairs(sycl::group<1>& cta, const local_accessor<T,1>& A, con
     if(tid < N) k_indices[tid] = tid;
     sycl::group_barrier(cta);
 
-    constexpr auto bytes = sycl::ext::oneapi::experimental::default_sorter<>::memory_required<T>(sycl::memory_scope::work_group, N);
+    const auto bytes = sycl::ext::oneapi::experimental::default_sorters::joint_sorter<>::memory_required<T>(sycl::memory_scope::work_group, N);
 
-    sycl::ext::oneapi::experimental::joint_sort(ext::oneapi::experimental::group_with_scratchpad(cta, sycl::span<std::byte,bytes>(sort_scratch.get_pointer(), N)), 
+    sycl::ext::oneapi::experimental::joint_sort(ext::oneapi::experimental::group_with_scratchpad(cta, sycl::span{(std::byte*)sort_scratch.get_pointer(), bytes}), 
                                                 k_indices, 
                                                 k_indices + N,
                                                 [&](auto x, auto y){ return D[x] < D[y]; });
@@ -544,7 +544,7 @@ void orthonormalize(sycl::group<1>& cta, T* S, int m){
     auto bdim = cta.get_local_range(0);
     for(int i = 0; i < SN; i++){
         T* S_i = S + i*m;
-        T norm = sqrt(reduce_over_group(cta, S_i[tid]*S_i[tid], sycl::plus<T>{}));
+        T norm = sycl::sqrt(reduce_over_group(cta, S_i[tid]*S_i[tid], sycl::plus<T>{}));
         S_i[tid] /= norm;
         sycl::group_barrier(cta);
         for(int j = i+1; j < SN; j++){
@@ -637,7 +637,7 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size
     //
     ctx -> submit([&](sycl::handler& h){
         using TupleType = typename std::iterator_traits<oneapi::dpl::zip_iterator<T*, int*>>::value_type;
-        constexpr auto bytes = sycl::ext::oneapi::experimental::default_sorter<>::memory_required<TupleType>(sycl::memory_scope::work_group, BlockVectors*3);
+        const auto bytes = sycl::ext::oneapi::experimental::default_sorters::joint_sorter<>::memory_required<TupleType>(sycl::memory_scope::work_group, BlockVectors*3);
         
         
         auto S_acc = sycl::accessor<T, 1, sycl::access::mode::write>(S, h);
@@ -724,7 +724,7 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size
                 //R = A*X - X*Lambda
                 for(int i = 0; i < BlockVectors; i++) blockR[i*m + tid] = blockAX[i*m + tid] - lambdas[i] * blockX[i*m + tid];
                 //Convergence Check
-                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(sycl::abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
+                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sycl::sqrt(std::abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
                 sycl::group_barrier(cta);
                 //R = R - X * (X^T * R)
                 applyConstraints<T, BlockVectors>(cta, blockR, blockX, m);
@@ -949,7 +949,7 @@ void LOBPCG_V1(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
                 //R = A*X - X*Lambda
                 for(int i = 0; i < BlockVectors; i++) blockR[i*m + tid] = blockAX[i*m + tid] - lambdas[i] * blockX[i*m + tid];
                 //Convergence Check
-                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(sycl::abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
+                for(int i = 0; i < BlockVectors; i++) {if(converged[i]) continue; converged[i] = sqrt(std::abs(reduce_over_group(cta, blockR[i*m + tid]*blockR[i*m + tid], sycl::plus<T>{}))) < tol;}
                 sycl::group_barrier(cta);
                 //R = R - X * (X^T * R)
                 applyConstraints<T, BlockVectors>(cta, blockR, blockX, m);

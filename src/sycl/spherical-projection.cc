@@ -204,7 +204,7 @@ SyclEvent spherical_projection(SyclQueue& Q, FullereneBatchView<T,K>& batch){
             real_t phi = dtheta*(distance+0.5);
             real_t theta = sycl::atan2(xy[0],xy[1]);
             coord2d spherical_coords = {theta, phi};
-            coord3d xyz = {cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi)};
+            coord3d xyz = {sycl::cos(theta)*sycl::sin(phi), sycl::sin(theta)*sycl::sin(phi), sycl::cos(phi)};
             real_t xsum = sycl::reduce_over_group(cta, xyz[0], sycl::plus<real_t>{});
             real_t ysum = sycl::reduce_over_group(cta, xyz[1], sycl::plus<real_t>{});
             real_t zsum = sycl::reduce_over_group(cta, xyz[2], sycl::plus<real_t>{});
@@ -292,7 +292,7 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
         T dtheta = T(M_PI)/T(d_max+1);
         T phi = dtheta*(dist+0.5);
         T theta = sycl::atan2(xy[0],xy[1]);
-        return std::array<T,3>{cos(theta)*sin(phi), sin(theta)*sin(phi), cos(phi)};
+        return std::array<T,3>{sycl::cos(theta)*sycl::sin(phi), sycl::sin(theta)*sycl::sin(phi), sycl::cos(phi)};
     });
     //Compute center of mass
     std::array<T,3> cm = primitives::reduce(Q, X, std::array<T,3>{0.0, 0.0, 0.0}, [](std::array<T,3> a, std::array<T,3> b){return a + b;});

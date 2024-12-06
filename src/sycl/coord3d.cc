@@ -57,7 +57,7 @@ template <typename T> void operator+=(std::array<T,3>& a, const std::array<T,3>&
 template <typename T> void operator-=(std::array<T,3>& a, const std::array<T,3>& b) {a = a - b;}
 template <typename T> void operator/=(std::array<T,3>& a, const T b) {a = a / b;}
 template <typename T> void operator*=(std::array<T,3>& a, const T b) {a = a * b;}
-template <typename T> std::array<T,3> d_abs(const std::array<T,3>& a){ return {sycl::abs(a[0]), sycl::abs(a[1]), sycl::abs(a[2])};}
+template <typename T> std::array<T,3> d_abs(const std::array<T,3>& a){ return {std::abs(a[0]), std::abs(a[1]), std::abs(a[2])};}
 template <typename T> void d_swap(T& a, T& b){
   T c = a;
   a = b;
@@ -65,9 +65,9 @@ template <typename T> void d_swap(T& a, T& b){
 }
 template <typename T> std::array<T,3> d_sort(const std::array<T,3>& a){
   std::array<T,3> b = a;
-  if(sycl::abs(b[0]) > sycl::abs(b[1])) d_swap(b[0], b[1]);
-  if(sycl::abs(b[1]) > sycl::abs(b[2])) d_swap(b[1], b[2]);
-  if(sycl::abs(b[0]) > sycl::abs(b[1])) d_swap(b[0], b[1]);
+  if(std::abs(b[0]) > std::abs(b[1])) d_swap(b[0], b[1]);
+  if(std::abs(b[1]) > std::abs(b[2])) d_swap(b[1], b[2]);
+  if(std::abs(b[0]) > std::abs(b[1])) d_swap(b[0], b[1]);
   return b;
 }
 template <typename T> std::array<T,3> rsqrt3(const std::array<T,3>& a){

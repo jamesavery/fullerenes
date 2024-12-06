@@ -597,8 +597,8 @@ struct ForceField
             coord3d mah = -amh;
             real_t cosa = dot(abh, amh);
             real_t cosm = dot(mah, mph);
-            real_t sina = sqrt(1 - cosa * cosa);
-            real_t sinm = sqrt(1 - cosm * cosm);
+            real_t sina = sycl::sqrt(1 - cosa * cosa);
+            real_t sinm = sycl::sqrt(1 - cosm * cosm);
             real_t cota = cosa / sina;
             real_t cotm = cosm / sinm;
             real_t csca = real_t(1.) / sina;
@@ -796,8 +796,8 @@ struct ForceField
             coord3d pmh = -mph;
             real_t cosm = dot(mbh, mph);
             real_t cosp = dot(pmh, pah);
-            real_t sinm = sqrt(1 - cosm * cosm);
-            real_t sinp = sqrt(1 - cosp * cosp);
+            real_t sinm = sycl::sqrt(1 - cosm * cosm);
+            real_t sinp = sycl::sqrt(1 - cosp * cosp);
             real_t cscm = 1 / sinm;
             real_t cscp = 1 / sinp;
             real_t cotp = cosp / sinp;
@@ -932,8 +932,8 @@ struct ForceField
             coord3d pah = -aph;
             real_t cosa = dot(aph, amh);
             real_t cosp = dot(pbh, pah);
-            real_t sina = sqrt(1 - cosa * cosa);
-            real_t sinp = sqrt(1 - cosp * cosp);
+            real_t sina = sycl::sqrt(1 - cosa * cosa);
+            real_t sinp = sycl::sqrt(1 - cosp * cosp);
             real_t csca = 1 / sina;
             real_t cscp = 1 / sinp;
             real_t cotp = cosp / sinp;

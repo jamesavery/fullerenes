@@ -1,9 +1,9 @@
+#include <CL/sycl.hpp>
 #include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
 #include <fullerenes/sycl-headers/reference-wrapper.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 #include "primitives.cc"
-#include <CL/sycl.hpp>
 #include <unordered_map>
 #include <exception>
 #include <limits>
@@ -145,8 +145,8 @@ bool Span<T>::operator==(const Span<T> other) const {
     if constexpr (is_floating_point_v<std::decay_t<T>>){
         return std::equal(begin(), end(), other.begin(), [](auto& a,auto& b){
             T eps = std::numeric_limits<T>::epsilon() * 20;
-            T max_v = std::max<T>(std::abs<T>(a), std::abs<T>(b));
-            return std::abs<T>(a - b) / (max_v > eps ? max_v : 1) < eps;});
+            T max_v = std::max(std::abs(a), std::abs(b));
+            return std::abs(a - b) / (max_v > eps ? max_v : 1) < eps;});
     } else{
         return std::equal(begin(), end(), other.begin());
     }

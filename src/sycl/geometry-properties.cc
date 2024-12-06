@@ -1,7 +1,7 @@
-#include <fullerenes/kernel-headers/geometry-functors.hh>
-#include "forcefield-includes.cc"
 #include "queue-impl.cc"
 #include "primitives.cc"
+#include <fullerenes/kernel-headers/geometry-functors.hh>
+#include "forcefield-includes.cc"
 
 template <typename T>
 symMat3<T> inertia_matrix(sycl::group<1>& cta, const Span<std::array<T,3>> X){
@@ -61,7 +61,8 @@ template <typename T, typename K>
 SyclEvent EccentricityFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<T> out_ellipticity){
     SyclEventImpl ret_val = Q -> submit([=](sycl::handler& cgh){
         auto N = batch.N_;
-        cgh.parallel_for<struct EccentricityFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::group<1> cta){
+        cgh.parallel_for<struct EccentricityFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::nd_item<1> nditem){
+            auto cta = nditem.get_group();
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
@@ -95,7 +96,8 @@ template <typename T, typename K>
 SyclEvent InertiaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> batch, Span<std::array<T,3>> out_inertia){
     SyclEventImpl ret_val = Q -> submit([=](sycl::handler& cgh){
         auto N = batch.N_;
-        cgh.parallel_for<struct InertiaFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::group<1> cta){
+        cgh.parallel_for<struct InertiaFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::nd_item<1> nditem){
+            auto cta = nditem.get_group();
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
@@ -124,13 +126,14 @@ template <typename T, typename K>
 SyclEvent TransformCoordinatesFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> batch){
     SyclEventImpl ret_val = Q -> submit([=](sycl::handler& cgh){
         auto N = batch.N_;
-        cgh.parallel_for<struct TransformCoordinatesFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::group<1> cta){
+        cgh.parallel_for<struct TransformCoordinatesFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*N), sycl::range<1>(N)), [=](sycl::nd_item<1> nditem){
+            auto cta = nditem.get_group();
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
             auto X = batch[bid].d_.X_cubic_;
             auto P = principal_axes(cta, X);
-            if (isnan(P[0][0]) || isnan(P[0][1]) || isnan(P[0][2]) || isnan(P[1][0]) || isnan(P[1][1]) || isnan(P[1][2]) || isnan(P[2][0]) || isnan(P[2][1]) || isnan(P[2][2])) {
+            if (sycl::isnan(P[0][0]) || sycl::isnan(P[0][1]) || sycl::isnan(P[0][2]) || sycl::isnan(P[1][0]) || sycl::isnan(P[1][1]) || sycl::isnan(P[1][2]) || sycl::isnan(P[2][0]) || sycl::isnan(P[2][1]) || sycl::isnan(P[2][2])) {
                 return;
             }
             X[tid] = dot(P,X[tid]);
@@ -157,7 +160,8 @@ SyclEvent SurfaceAreaFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K
         auto Nf = batch.Nf_;
         auto X_smem = sycl::local_accessor<std::array<T,3>, 1>(N, cgh);
         auto smem = sycl::local_accessor<K, 1>(N*3 + Nf * 6, cgh);
-        cgh.parallel_for<struct SurfaceAreaFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*Nf), sycl::range<1>(Nf)), [=](sycl::group<1> cta){
+        cgh.parallel_for<struct SurfaceAreaFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*Nf), sycl::range<1>(Nf)), [=](sycl::nd_item<1> nditem){
+            auto cta = nditem.get_group();
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             if (batch[bid].m_.flags_.get().is_not_set(StatusEnum::FULLERENEGRAPH_PREPARED)) return;
@@ -228,7 +232,8 @@ SyclEvent VolumeFunctor<T,K>::compute(SyclQueue& Q, FullereneBatchView<T, K> bat
         auto Nf = batch.Nf_;
         auto X_smem = sycl::local_accessor<std::array<T,3>, 1>(N, cgh);
         auto smem = sycl::local_accessor<K, 1>(N*3 + Nf * 6, cgh);
-        cgh.parallel_for<struct VolumeFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*Nf), sycl::range<1>(Nf)), [=](sycl::group<1> cta){
+        cgh.parallel_for<struct VolumeFunctor<T,K>>(sycl::nd_range<1>(sycl::range<1>(batch.capacity()*Nf), sycl::range<1>(Nf)), [=](sycl::nd_item<1> nditem){
+            auto cta = nditem.get_group();
             auto tid = cta.get_local_linear_id();
             auto bid = cta.get_group_linear_id();
             auto fullerene = batch[bid];
