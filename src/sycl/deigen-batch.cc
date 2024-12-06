@@ -62,7 +62,7 @@ public:
   }
 };
 
-void apply_reflection(/*in/out*/SpanMatrix &A,/*in*/ const SpanVector &v, 
+void apply_reflection(/*in/out*/SpanMatrix A,/*in*/ const SpanVector v, 
                       /* tmp*/ SpanVector vHA, const scalar sigma=0.5L)
 {
   const auto [m,n] = A.shape();
@@ -88,8 +88,8 @@ double COPYSIGN(double to, double from)
 // TODO: Re-niceify C++
 // TODO: Pure C-version for complex
 // TODO: Where did real_reflection_vector go?
-void reflection_vector(/*in*/const SpanVector &a, const real_t anorm,
-		                  /*out*/      SpanVector &v, scalar &sigma)
+void reflection_vector(/*in*/const SpanVector a, const real_t anorm,
+		                  /*out*/      SpanVector v, scalar &sigma)
 { // Reflection vector that eliminates *row* a (as opposed to *column* in eigen.c)
   const int n = a.size();
   for(int i=0;i<n;i++) v[i] = a[i];
@@ -149,7 +149,7 @@ void QHQ(/*in/out*/SpanMatrix A, QHQ_workspace w, SpanMatrix Q={})
     v.conj(vc);
     
     apply_reflection( A({k+1,k},l,l+1),v, w.vHA,       sigma );
-    apply_reflection(AT({k+1,k},l,l+1}),vc, w.vHA, Conj(sigma));
+    apply_reflection(AT({k+1,k},l,l+1),vc, w.vHA, Conj(sigma));
 
     //if(Q.data != 0) apply_reflection(Q({k+1,n},{0,n}),v,sigma);
   }
