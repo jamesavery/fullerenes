@@ -12,6 +12,13 @@ add_library(fullerenes SHARED
   polyhedron-optimize.cc symmetry.cc eisenstein.cc ../contrib/mgmres.cc ${MORE_SOURCES}
 )
 
-target_link_libraries(fullerenes fortran_opt buckygen gfortran)
+#Set up gfortran library (don't rely on the default)
+find_library(GFORTRAN_LIB gfortran  PATHS /usr/lib/gcc/x86_64-linux-gnu/11)
+
+if (NOT GFORTRAN_LIB)
+  message(FATAL_ERROR "libgfortran not found")
+endif()
+
+target_link_libraries(fullerenes fortran_opt buckygen ${GFORTRAN_LIB})
 
 
