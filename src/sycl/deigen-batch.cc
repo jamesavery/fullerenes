@@ -1,25 +1,81 @@
 #include <fullerenes/sycl-headers/sycl-span.hh>
 #include <fullerenes/sycl-headers/sycl-mdspan.hh>
+#include <numeric>
+#include <cmath>
+#include <complex>
 
 typedef float scalar;
-using SpanMatrix = MDSpan<scalar,2>;
-using SpanVector = MDSpan<scalar,1>;
-#define conj(x) x
+typedef float real_t;
+typedef std::complex<real_t> complex_t;
+constexpr real_t machine_precision = std::numeric_limits<real_t>::epsilon();//std::pow(std::numeric_limits<real_t>::radix,-std::numeric_limits<real_t>::digits);
+
+class SpanMatrix : public MDSpan<scalar,2>
+{
+public:  
+  using MDSpan<scalar,2>::MDSpan;
+  SpanMatrix(MDSpan<scalar,2> S): MDSpan<scalar,2>(S) {}
+
+  SpanMatrix transpose() const { return SpanMatrix(data_,{shape_[1],shape_[0]}); }
+
+  real_t max_norm() const { 
+    const auto &A = *this;
+    auto  [m,n]   = A.shape();
+    
+    real_t mx = 0;
+    for(int i=0;i<m;i++){ 	
+      real_t row_norm = 0;
+      for(int j=0;j<n;j++) row_norm += std::abs(A[{i,j}]);
+      mx = std::max(mx,row_norm);
+    }
+    return mx;
+  }  
+};
+
+complex_t Conj(const complex_t x) { return std::conj(x); }
+real_t    Conj(const real_t x)    { return x; }
+
+real_t Re(complex_t x) { return std::real(x); }
+real_t Re(real_t x)    { return x; } 
+real_t Im(complex_t x) { return std::imag(x); }
+real_t Im(real_t x)    { return 0; }
+
+class SpanVector: public MDSpan<scalar,1>
+{
+public:
+    using MDSpan<scalar,1>::MDSpan;
+    SpanVector(MDSpan<scalar,1> S): MDSpan<scalar,1>(S) {}
+
+    real_t norm_sqr() const {
+    const auto &v = *this;
+    auto  [n]     = v.shape();
+    real_t sum = 0;
+    for(int i=0;i<n;i++) sum += Conj(v[i])*v[i];
+    return sum;
+  }
+
+  void conj(SpanVector &vc) const {
+    const auto &v = *this;
+    auto  [n]     = v.shape();
+    for(int i=0;i<n;i++){
+       vc[i]   = Conj(v[i]);
+    }
+  }
+};
 
 void apply_reflection(/*in/out*/SpanMatrix &A,/*in*/ const SpanVector &v, 
                       /* tmp*/ SpanVector vHA, const scalar sigma=0.5L)
 {
-  auto [m,n] = A.shape();
+  const auto [m,n] = A.shape();
 
   for(int j=0;j<n;j++){		
     scalar sum = 0;
-    for(int k=0;k<m;k++) sum += conj(v[{k}])*A[{k,j}];
-    vHA[{j}] = sum;
+    for(int k=0;k<m;k++) sum += Conj(v[k])*A[{k,j}];
+    vHA[j] = sum;
   }
 
-  for(size_t i=0;i<m;i++)       /* A += -2*outer(v,vTA) */
-    for(size_t j=0;j<n;j++){
-      A[{n,j}] -= conj(sigma)*v[{i}]*vHA[j]; 
+  for(int i=0;i<m;i++)       /* A += -2*outer(v,vTA) */
+    for(int j=0;j<n;j++){
+      A[{n,j}] -= Conj(sigma)*v[i]*vHA[j]; 
     }
 }
 
@@ -33,8 +89,9 @@ double COPYSIGN(double to, double from)
 // TODO: Pure C-version for complex
 // TODO: Where did real_reflection_vector go?
 void reflection_vector(/*in*/const SpanVector &a, const real_t anorm,
-		               /*out*/     SpanVector &v, scalar *sigma, int n)
+		                  /*out*/      SpanVector &v, scalar &sigma)
 { // Reflection vector that eliminates *row* a (as opposed to *column* in eigen.c)
+  const int n = a.size();
   for(int i=0;i<n;i++) v[i] = a[i];
 
   // In the complex case, straightforward Householder reflection can only transform a Hermitian matrix
@@ -46,48 +103,61 @@ void reflection_vector(/*in*/const SpanVector &a, const real_t anorm,
   scalar x1 = a[0];
   double nu = copysign(anorm,Re(x1));
   scalar norm_inv = 1.0/(x1+nu);
-  *sigma = (x1+nu)/nu;
+  sigma = (x1+nu)/nu;
   v[0] += nu;
   
-  for(size_t i=0;i<n;i++) v[i] *= norm_inv;
+  for(int i=0;i<n;i++) v[i] *= norm_inv;
 }
 
+struct QHQ_workspace {
+  SpanVector v, vc, vHA;
+};   
 
+scalar dot(MDSpan<scalar,1> a, MDSpan<scalar,1> b)
+{
+  scalar sum = 0;
+  int N = a.size();
+  for(int i=0;i<N;i++) sum += Conj(a[i])*b[i];
+  return sum;
+}
 
 // Decompose a matrix (complex or real) into A = Q H Q.H(), where H is upper Hessenberg.
 // If A is Hermitian (symmetric in real case), then H is tridiagonal.
 // TODO: Row pivot
-void QHQ(/*in/out*/SpanMatrix A, SpanMatrix Q={0})
+void QHQ(/*in/out*/SpanMatrix A, QHQ_workspace w, SpanMatrix Q={})
 {
-  auto [m,n] = A.shape;
+  const auto [m,n] = A.shape();
   assert(m==n);
 
   scalar  sigma;		    // Elementary operation scale (2 for reflection)
-  scalar  v_data[n], vc_data[n], a_data[n];    // Reflection vector
-  SpanMatrix v(v_data,{n,1}), vc(vc_data,{n,1}), AT(A.transpose());
+  //  scalar  v_data[n], vc_data[n], a_data[n];    // Reflection vector
+  SpanMatrix AT(A.transpose());
+  SpanVector &v( w.v ), &vc( w.vc );
   
   real_t numerical_zero = A.max_norm()*10*machine_precision;
 
   for(int k=0;k<n-1;k++){
     //  re-niceify ... A({k+1,n},k);	
-    SpanMatrix a = A({k+1,n},k).copy(a_data);
-    real_t anorm = sqrt(std::abs(dot(a,a)));
+    //SpanMatrix a = A({k+1,n},k).copy(a_data); // TODO: Copy this into w.a
+    int l = n-k-1;
+    const SpanVector a( A({k+1,k},l) ); // 
+    real_t anorm = sqrt(a.norm_sqr());
 
     if(anorm < numerical_zero) continue; /* Already eliminated, don't divide by 0 */
     
-    reflection_vector(a.data,anorm,v_data,&sigma,n);
-    SpanMatrix vc = v.conj(vc_data);
+    reflection_vector(a,anorm,v,sigma);
+    v.conj(vc);
     
-    apply_reflection( A({k+1,n},{k,n}),v,      sigma );
-    apply_reflection(AT({k+1,n},{k,n}),vc,conj(sigma));
+    apply_reflection( A({k+1,k},l,l+1),v, w.vHA,       sigma );
+    apply_reflection(AT({k+1,k},l,l+1}),vc, w.vHA, Conj(sigma));
 
-    if(Q.data != 0) apply_reflection(Q({k+1,n},{0,n}),v,sigma);
+    //if(Q.data != 0) apply_reflection(Q({k+1,n},{0,n}),v,sigma);
   }
 }
 
-
+#if 0
 // TODO: T_QTQ based on Givens rotations (should be possible to do with fewer operations)
-//size_t QTQ_calls = 0;
+//int QTQ_calls = 0;
 void T_QTQ(const int n, const real_t *Din, const real_t *Lin, real_t *Dout, real_t *Lout, real_t *Vout, real_t shift=0)
 {
   //  QTQ_calls ++;
@@ -229,7 +299,7 @@ int nth_time = 0;
 // TODO: Stop after max_steps for fixed k. Return max Gershgorin radius as convergence -- or max Rayleigh quotient residual?
 // TODO: Implement implicit QR iteration using Francis' Q theorem/bulge chasing
 template <typename scalar>
-std::pair<real_t,size_t> eigensystem_hermitian(const SpanMatrix& A,
+std::pair<real_t,int> eigensystem_hermitian(const SpanMatrix& A,
 					       matrix<real_t>& lambdas, SpanMatrix Qt={0},
 					       const real_t tolerance=1e4*machine_precision,
 					       const int max_iterations=40)
@@ -245,7 +315,7 @@ std::pair<real_t,size_t> eigensystem_hermitian(const SpanMatrix& A,
   matrix<real_t> Qhat, tmp(tmp_data,{n,n});
 
   real_t max_error    = tolerance;
-  size_t n_iterations = 0;
+  int n_iterations = 0;
 
   if(Q.data !=0){ // Do we want to compute eigenvectors?
     Q    = identity(Q.data,{n,n}); // Yes, so initialize Q and Qhat to identity    
@@ -324,3 +394,4 @@ std::pair<real_t,size_t> eigensystem_hermitian(const SpanMatrix& A,
 
 
 
+#endif
