@@ -60,9 +60,12 @@ int main(int argc, char** argv){
             h.parallel_for<class segmented_reduce>(nd_range<1>(gdim * bdim, bdim), [=](nd_item<1> nditem){
                 auto cta = nditem.get_group();
                 auto bid = nditem.get_group_linear_id();
-                auto event = cta.async_work_group_copy(local_in.get_pointer(), in.get_pointer() + bid * bdim, bdim);
-                event.wait();
-
+                //auto event = cta.async_work_group_copy(local_in.get_pointer(), in.get_pointer() + bid * bdim, bdim);
+                //event.wait();
+                for (int i = nditem.get_local_id(0); i < bdim; i += nditem.get_local_range(0)){
+                    local_in[i] = in[bid * bdim + i];
+                }
+                sycl::group_barrier(cta);
 
                 segmented_reduce_V0<float, N>(nditem, local_in, local_out, nseg);
             });
