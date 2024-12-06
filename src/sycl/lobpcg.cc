@@ -828,20 +828,20 @@ void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size
 
 /* template <typename T, typename K, int BlockVectors, int NZ>
 void LOBPCG_V1(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters){
-    sycl::buffer<T, 1> S(batch_size * BlockVectors*9 * m);
-    sycl::buffer<T, 1> X0(batch_size * BlockVectors * m);
-    sycl::buffer<T, 1> LastEigVects(batch_size * BlockVectors * BlockVectors*3);
-    sycl::buffer<T, 1> LastGram(batch_size * 3 * BlockVectors * 3 * BlockVectors);
-    sycl::buffer<T, 1> vals(batch_size * BlockVectors);
-    sycl::buffer<T, 1> StAS(batch_size * BlockVectors*3 * BlockVectors*3);
+    SyclVector<T> S(batch_size * BlockVectors*9 * m);
+    SyclVector<T> X0(batch_size * BlockVectors * m);
+    SyclVector<T> LastEigVects(batch_size * BlockVectors * BlockVectors*3);
+    SyclVector<T> LastGram(batch_size * 3 * BlockVectors * 3 * BlockVectors);
+    SyclVector<T> vals(batch_size * BlockVectors);
+    SyclVector<T> StAS(batch_size * BlockVectors*3 * BlockVectors*3);
     //sycl::buffer<T, 1> lambdas(batch_size * BlockVectors*3);
-    sycl::buffer<int, 1> indices(batch_size * BlockVectors);
+    //sycl::buffer<int, 1> indices(batch_size * BlockVectors);
     
     T* syevd_scratchpad = nullptr;
     int syevd_scratchpad_size = 0;
     int syevd_scratchpad_host_size = 0;
-    auto syevd_info = SyclVector<int>(batch_size);
-    auto lambdas = SyclVector<T>(batch_size * BlockVectors);
+    SyclVector<int> syevd_info(batch_size);
+    SyclVector<T> lambdas(batch_size * BlockVectors);
     handle_t handle = nullptr;
     stream_t stream = nullptr;
     props_t props = nullptr;
@@ -872,8 +872,34 @@ void LOBPCG_V1(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
 
     const T tol = std::numeric_limits<T>::epsilon() * sycl::sqrt(float(m));
 
+    //Setup
     ctx -> submit([&](sycl::handler& h ){
+        auto S_acc = sycl::accessor<T, 1, sycl::access::mode::write>(S, h);
+        h.parallel_for<LOBPCGg<T,K,BlockVectors,NZ>>(nd_range<1>(sycl::range{size_t(batch_size*m)}, sycl::range{size_t(m)}), [=](sycl::nd_item<1> item){
+            auto tid = item.get_local_linear_id();
+            sycl::group<1> cta = item.get_group();
+            auto bid = item.get_group_linear_id();
+            constexpr auto SN = BlockVectors*3;
+            std::bitset<BlockVectors> converged;
+            oneapi::dpl::uniform_real_distribution<T> distr(0.0, 1.0);            
+            oneapi::dpl::minstd_rand engine(42, tid);
+            auto A_acc = A.subspan(bid * m * NZ, m * NZ);
+            auto cols_acc = cols.subspan(bid * m * NZ, m * NZ);
 
+            //Load the i-th row of A into registers
+            T A_tid[NZ];
+            for(int i = 0; i < NZ; i++){
+                A_tid[i] = A_acc[tid*NZ + i];
+            }
+            //Load the i-th row of cols into registers
+            K cols_tid[NZ]; 
+            for(int i = 0; i < NZ; i++){
+                cols_tid[i] = cols_acc[tid*NZ + i];
+            }
+        
+            global_ptr<T> blockX = S_acc.get_pointer() + bid * BlockVectors*9 * m;
+
+        });
     });
 
     //
