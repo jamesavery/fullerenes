@@ -111,10 +111,27 @@ struct MDSpan
         return MDSpan<T,N-M>(data_ + offset, new_shape, new_stride);
     }
 
-    // Sub-tensor with offset + new shape
+    /* // Sub-tensor with offset + new shape
     template <size_t M>
     inline constexpr MDSpan<T,M> operator()(const array_t &index,
                                             const std::array<int,M> &new_shape) {
+        assert(M<N);
+        assert(data_ != 0); 
+
+        std::array<int,M> new_stride;
+        int offset = offset_of<N>(index);
+        for(int axis=N-M;axis<N;axis++){
+            assert(new_shape[axis] <= shape_[axis]-index[axis]);
+            new_stride[axis-N-M] = stride_[axis];            
+        }
+        return MDSpan<T,M>(data_ + offset, new_shape, new_stride);
+    } */
+
+    // Sub-tensor with offset + new shape
+    template <typename... Args>
+    inline constexpr auto operator()(const array_t &index,
+                                            Args... args) {
+        constexpr int M = sizeof...(args);
         assert(M<N);
         assert(data_ != 0); 
 
