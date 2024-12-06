@@ -132,6 +132,7 @@ struct MDSpan
     inline constexpr auto operator()(const array_t &index,
                                             Args... args) {
         constexpr int M = sizeof...(args);
+        std::array<int,M> new_shape = {args...};
         assert(M<N);
         assert(data_ != 0); 
 
