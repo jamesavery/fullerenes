@@ -151,7 +151,7 @@ void QHQ(/*in/out*/SpanMatrix A, QHQ_workspace w, SpanMatrix Q={})
     apply_reflection( A({k+1,k},l,l+1),v, w.vHA,       sigma );
     apply_reflection(AT({k+1,k},l,l+1),vc, w.vHA, Conj(sigma));
 
-    //if(Q.data != 0) apply_reflection(Q({k+1,n},{0,n}),v,sigma);
+    if(!Q.empty()) apply_reflection(Q({k+1,0},l,n),v,w.vHA,sigma);
   }
 }
 
