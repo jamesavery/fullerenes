@@ -61,6 +61,7 @@ if(ENABLE_SYCL)
   if(SYCL_TARGETS STREQUAL "AMD") 
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa,x86_64 -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a -march=native")
   elseif(SYCL_TARGETS STREQUAL "NVIDIA")
+    find_package(CUDA)
     #set(PTXAS_COMPILE_FLAGS    " --verbose -g --maxrregcount=${GPU_MAXREGCOUNT} --opt-level=3 --generate-line-info --warn-on-double-precision-use --warn-on-spills")
     set(PTXAS_LINK_FLAGS
     "SHELL:-Xcuda-ptxas --verbose"
@@ -70,8 +71,8 @@ if(ENABLE_SYCL)
     "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
     "SHELL:-Xcuda-ptxas --warn-on-spills"
     )
-    
-    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -Xcuda-ptxas --verbose -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --offload-arch=sm_${CMAKE_CUDA_ARCHITECTURES}")
+    message("CUDA_TOOLKIT_ROOT_DIR: ${CUDA_TOOLKIT_ROOT_DIR}")
+    set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -Xcuda-ptxas --verbose -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_${CMAKE_CUDA_ARCHITECTURES} --cuda-path=${CUDA_TOOLKIT_ROOT_DIR}")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=x86_64 -march=native -mcpu=native")
@@ -210,8 +211,8 @@ message("FLAGS: " ${FLAGS})
 
 #set(DPCPP_FLAGS "${DPCPP_FLAGS} -tis")
 
-get_target_property(TESTVAR sycl_fullerene_lib LINK_FLAGS)
-message("sycl_fullerene_lib LINK_FLAGS: " ${TESTVAR})
+#get_target_property(TESTVAR sycl_fullerene_lib LINK_FLAGS)
+#message("sycl_fullerene_lib LINK_FLAGS: " ${TESTVAR})
 
 add_subdirectory(programs)
 add_subdirectory(benchmarks)
