@@ -3,8 +3,10 @@
 #include <fullerenes/kernel-headers/all-kernels.hh>
 
 template <typename T, typename K, int BlockVectors, int NZ>
-void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters);
+void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters, bool largest);
 
+template <typename T, typename K, int BlockVectors, int NZ>
+void LOBPCG_V1(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters, bool largest);
 
 int main(int argc, char** argv){
 
@@ -53,7 +55,6 @@ int main(int argc, char** argv){
     }
     forcefield_optimize_double(queue, batch_double, LaunchPolicy::SYNC, 5*N, 5*N);
     forcefield_optimize(queue, batch, LaunchPolicy::SYNC, 5*N, 5*N);
-    std::cout << batch.m_.flags_ << std::endl;
     
 
     SyclVector<float> hessians((N*90*BatchSize));
@@ -78,8 +79,27 @@ int main(int argc, char** argv){
     //std::vector<int> cols = {0, 1, 2, 1, 2, 0, 2, 0, 1};
 
 
-    LOBPCG<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter);
-    LOBPCG<double, uint16_t, 21, 30>(queue, hessians_double, cols, BatchSize, N*3, maxiter);
+    std::cout << "Starting LOBPCG" << std::endl;
+    auto T0 = std::chrono::high_resolution_clock::now();
+    LOBPCG<float, uint16_t, 3, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter,true);
+    for (size_t i = 0; i < 10; i++)
+    {
+        //LOBPCG<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
+    }
+    auto T1 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Starting LOBPCG V1" << std::endl;
+    //LOBPCG_V1<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
+    auto T2 = std::chrono::high_resolution_clock::now();
+    LOBPCG_V1<float, uint16_t, 3, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
+    /* for (int i = 0; i < 10; i++){
+        LOBPCG_V1<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
+    } */
+    auto T3 = std::chrono::high_resolution_clock::now();
+
+    //std::cout << "LOBPCG: " << std::chrono::duration_cast<std::chrono::milliseconds>(T1 - T0).count()/10 << " ms" << std::endl;
+    std::cout << "LOBPCG V1: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T3 - T2).count())/float(10*BatchSize) << " ms/isomer" << std::endl;
+    //LOBPCG<double, uint16_t, 21, 30>(queue, hessians_double, cols, BatchSize, N*3, maxiter);
 
     std::vector <float> matrices(N*3*N*3*BatchSize);
     std::vector <double> matrices_double(N*3*N*3*BatchSize);
