@@ -61,8 +61,10 @@ if(ENABLE_SYCL)
   set(DPCPP_FLAGS "-Wno-pass-failed -Wno-unused-local-typedef -Wno-unused-command-line-argument -Wno-deprecated-declarations -Wall -O3 -fsycl -fsycl-unnamed-lambda") # Use regardless of target.
   
   if(SYCL_TARGETS STREQUAL "AMD") 
+    add_definitions(-DSOLVER_BACKEND=ROCSOLVER_BACKEND)
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa,x86_64 -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a -march=native")
   elseif(SYCL_TARGETS STREQUAL "NVIDIA")
+    add_definitions(-DSOLVER_BACKEND=CUSOLVER_BACKEND)
     find_package(CUDA)
     #set(PTXAS_COMPILE_FLAGS    " --verbose -g --maxrregcount=${GPU_MAXREGCOUNT} --opt-level=3 --generate-line-info --warn-on-double-precision-use --warn-on-spills")
     set(PTXAS_LINK_FLAGS
@@ -127,7 +129,7 @@ if(ENABLE_CUDA)
   set(CUDA_INCLUDE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
   
   #find_library(CURAND_LIB curand.so HINTS /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/math_libs/12.3/targets/x86_64-linux/)
-  find_path(CURAND_INCLUDE_DIR NAMES curand.h PATHS /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/math_libs/12.3/targets/x86_64-linux/include)
+  find_path(CURAND_INCLUDE_DIR NAMES curand.h PATHS /opt/nvidia/hpc_sdk/Linux_x86_64/24.11/math_libs/12.6/targets/x86_64-linux/include)
 
   if(NOT CURAND_INCLUDE_DIR)
     message(FATAL_ERROR "Could not find curand.h")
