@@ -13,6 +13,7 @@ set(SYCL_EXECUTABLES
   to-polyhedron
   forcefield-functor-test
   sycl-vector-test
+  mdspan-test
 )
 
 foreach(EXECUTABLE ${SYCL_EXECUTABLES})
@@ -28,8 +29,8 @@ endforeach()
 message(STATUS "SYCL_EXECUTABLES: ${SYCL_EXECUTABLES}")
 message(STATUS "SYCL_FULLERENE_LIBS: ${SYCL_FULLERENE_LIBS}")
 
-
 add_test(NAME fullerene-queue-test COMMAND fullerene-queue-test)
 add_test(NAME condition-functor-test COMMAND condition-functor-test)
 add_test(NAME tutte-functor-test COMMAND tutte-functor-test)
 add_test(NAME eigen-functor-test COMMAND eigen-functor-test)
+add_test(NAME mdspan-test COMMAND mdspan-test)

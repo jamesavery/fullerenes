@@ -18,17 +18,12 @@ struct MDSpan
             else for(int axis=N-2;axis>=0;axis--) 
                     stride_[axis] = stride_[axis+1]*shape_[axis+1];
     }
-    inline constexpr MDSpan(T *data, const array_t &shape, const array_t &stride) : data_(data), shape_(shape), stride_(stride) {
-            stride_[N-1] = 1;
-            if(N==1) return;     
-            else for(int axis=N-2;axis>=0;axis--) 
-                stride_[axis] = stride_[axis+1]*shape_[axis+1];
-    }
+    inline constexpr MDSpan(T *data, const array_t &shape, const array_t &stride) : data_(data), shape_(shape), stride_(stride) {       }
     
     inline constexpr MDSpan(T *begin, T *end):  MDSpan(begin, {end-begin}) {} 
     inline constexpr MDSpan(const MDSpan<T,N> &other) = default;
     inline constexpr MDSpan(MDSpan<T,N> &&other) = default;
-    inline constexpr MDSpan(T& value) : MDSpan(&value,{1}) {}
+    //inline constexpr MDSpan(T& value) : MDSpan(&value,{1}) {}
     
     template <typename U>
     inline constexpr MDSpan<U,N> as_MDSpan() const {
@@ -45,10 +40,12 @@ struct MDSpan
         for(int axis=0;axis<M;axis++) offset += index[axis]*stride_[axis];
         return offset;
     }
+    #if 0
     inline constexpr array_t index_of(int offset) const {
         array_t index;
         // Requirement: Either stride[i] = shape[0]   * ... * shape[i-1]
         //              or     stride[i] = shape[i+1] * ... * shape[N-1]
+        // NOT GOING TO HAPPEN, SIR
         if(stride_[0] < stride_[N-1]){
             for(int axis=N-1;axis>=0;axis--){
                 index[axis] = offset / stride_[axis];
@@ -61,16 +58,18 @@ struct MDSpan
             }
         }
     }
-    
+    #endif 
     inline constexpr MDSpan<T,N> subSpan(array_t index, array_t shape) const {
          int offset = offset_of(index);
          return MDSpan<T,N>(data_ + offset, shape); 
     }
+
     inline constexpr MDSpan<T,N>& operator= (const MDSpan<T,N> &other)  = default;
     // inline constexpr MDSpan<T,N>& operator= (const MDSpan<T,N> &other) { 
     //     data_ = other.data_; shape_ = other.shape_; stride_ = other.stride_; return *this; 
     // }
     inline constexpr MDSpan<T,N>& operator= (MDSpan<T,N> &&other) = default; // { return *this = other; }
+    #if 0
     inline bool operator==(const MDSpan<T,N> &other) {
         int size_ = size();
         bool is_equal = shape_ == other.shape_;
@@ -80,6 +79,8 @@ struct MDSpan
         }
         return is_equal;
     }
+    #endif
+
 
     // We only allow big-to-small or small-to-big strides, so no mixed transpose.
     // TODO: Do we want to allow reversal? (negative strides)
@@ -133,15 +134,16 @@ struct MDSpan
                                             Args... args) {
         constexpr int M = sizeof...(args);
         std::array<int,M> new_shape = {args...};
-        assert(M<N);
+        assert(M<=N);
         assert(data_ != 0); 
 
         std::array<int,M> new_stride;
         int offset = offset_of<N>(index);
+
         for(int axis=N-M;axis<N;axis++){
-            assert(new_shape[axis] <= shape_[axis]-index[axis]);
-            new_stride[axis-N-M] = stride_[axis];            
-        }
+            assert(new_shape[axis-(N-M)] <= shape_[axis]-index[axis]);
+            new_stride[axis-(N-M)] = stride_[axis];            
+        }    
         return MDSpan<T,M>(data_ + offset, new_shape, new_stride);
     }
 
@@ -150,14 +152,27 @@ struct MDSpan
 
     // Look up element
     inline constexpr T& operator[](const array_t &index)  {
-        for(int axis=0;axis<N;axis++) assert(index[axis] < shape_[axis]); // TODO: Langsomt, til debug naar virker
+        for(int axis=0;axis<N;axis++){
+            if(index[axis] >= shape_[axis]){
+                std::cout << "index = " << Span(const_cast<int*>(index.data()), N) << "\n";
+                printf("axis = %d, index[axis] = %d, shape_[axis] = %d\n", axis, index[axis], shape_[axis]);
+            }
+             assert(index[axis] < shape_[axis]); // TODO: Langsomt, til debug naar virker
+        }
         assert(data_ != 0); 
-        return data_[offset_of<N>(index)];
+        size_t offset = offset_of<N>(index);
+        return data_[offset];
     }
     inline constexpr T operator[](const array_t &index) const {
         for(int axis=0;axis<N;axis++) assert(index[axis] < shape_[axis]); // TODO: Langsomt, til debug naar virker
         assert(data_ != 0); 
-        return data_[offset_of<N>(index)];
+        size_t offset = offset_of<N>(index);
+        if(0) if(offset >= size()){
+            std::cout << "index = " << Span(const_cast<int*>(index.data()),N) << " -> " << offset << " >= " << size() << "\n";
+            std::cout << "stride = " << Span(const_cast<int*>(stride_.data()),N) << "\n";
+            std::cout << "shape = " << Span(const_cast<int*>(shape_.data()),N) << "\n";
+        }
+        return data_[offset];
     }    
     inline constexpr T  operator[](const int index) const { return operator[]( array_t{{index}} ); } 
     inline constexpr T& operator[](const int index)       { return operator[]( array_t{{index}} ); }     
@@ -174,7 +189,8 @@ struct MDSpan
         for(int axis=0;axis<N;axis++) size_ *= shape_[axis];
         return size_;
     }
-    inline constexpr array_t shape() const { return shape_; }
+    inline constexpr array_t shape()  const { return shape_; }
+    inline constexpr array_t stride() const { return stride_; }    
     inline constexpr bool empty() const { return size() == 0; }
     inline constexpr T *begin() const { return data_; }
     inline constexpr T *end() const { return data_ + size(); }
