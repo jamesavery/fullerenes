@@ -397,6 +397,9 @@ template struct SyclVector<std::array<uint16_t,6>>;
 template struct SyclVector<std::array<uint32_t,6>>;
 template struct SyclVector<std::bitset<21>>;
 template struct SyclVector<std::bitset<3>>;
+
+template struct SyclVector<float*>;
+template struct SyclVector<double*>;
 //template struct SyclVector<NodeNeighbours<uint16_t>>;
 //template struct SyclVector<NodeNeighbours<uint32_t>>;
 //template struct SyclVector<Constants<float,uint16_t>>;
@@ -424,6 +427,9 @@ template struct Span<std::array<uint16_t,6>>;
 template struct Span<std::array<uint32_t,6>>;
 template struct Span<std::bitset<21>>;
 template struct Span<std::bitset<3>>;
+
+template struct Span<float*>;
+template struct Span<double*>;
 //template struct Span<NodeNeighbours<uint16_t>>;
 //template struct Span<NodeNeighbours<uint32_t>>;
 //template struct Span<Constants<float,uint16_t>>;
