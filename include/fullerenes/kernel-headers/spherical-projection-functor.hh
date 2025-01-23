@@ -19,7 +19,7 @@ struct SphericalProjectionFunctor : public KernelFunctor<SphericalProjectionFunc
                 std::make_pair(std::ref(reduce_in_), N * 4),
                 std::make_pair(std::ref(reduce_out_),N * 4),
                 std::make_pair(std::ref(output_keys_), N),
-                std::make_pair(std::ref(sorted_xys_), N));
+                std::make_pair(std::ref(sorted_xys_), N * 2));
     }
 
     inline constexpr auto to_tuple_batch(size_t N) const {
