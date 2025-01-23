@@ -3,11 +3,16 @@
 #include <fullerenes/kernel-headers/all-kernels.hh>
 
 template <typename T, typename K, int BlockVectors, int NZ>
-void LOBPCG(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters, bool largest);
-
-template <typename T, typename K, int BlockVectors, int NZ>
 void LOBPCG_V1(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters, bool largest);
 
+template <typename T, typename K, int BlockVectors, int NZ>
+void LOBPCG_V2(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters, bool largest);
+
+template <typename T, typename K, int BlockVectors, int NZ>
+void LOBPCG_V3(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters, bool largest, Span<T> eigvects, Span<T> eigvals);
+
+template <typename T, typename K, int BlockVectors, int NZ>
+void LOBPCG_V4(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, size_t maxiters, bool largest, Span<T> eigvects, Span<T> eigvals);
 int main(int argc, char** argv){
 
     CmdArgs args;
@@ -35,7 +40,11 @@ int main(int argc, char** argv){
     fill(batch);
     dualize(queue, batch, LaunchPolicy::SYNC);
     tutte_layout(queue, batch, LaunchPolicy::SYNC);
-    spherical_projection(queue, batch, LaunchPolicy::SYNC);
+    //spherical_projection(queue, batch, LaunchPolicy::SYNC);
+    for(int i = 0; i < batch.size(); i++){
+        spherical_projection(queue, batch[i], LaunchPolicy::SYNC);
+    }
+    //The batched version of spherical projection is not deterministic (Floating point associativity of atomic operations)
     FullereneBatch<double, uint16_t> batch_double(N, BatchSize);
     /* {
         auto batch_acc_X = batch.d_.X_cubic_;
@@ -60,16 +69,16 @@ int main(int argc, char** argv){
     SyclVector<float> hessians((N*90*BatchSize));
     SyclVector<double> hessians_double((N*90*BatchSize));
     SyclVector<uint16_t> cols((N*90*BatchSize));
-    SyclVector<float> eigenvalues((N*3*BatchSize));
-    SyclVector<double> eigenvalues_double((N*3*BatchSize));
-    SyclVector<float> eigenvects;
+    SyclVector<float> eigenvalues((21*BatchSize));
+    SyclVector<double> eigenvalues_double((21*BatchSize));
+    SyclVector<float> eigenvects((N*3*21*BatchSize));
     SyclVector<double> eigenvects_double;
 
     compute_hessians_double(queue, batch_double, LaunchPolicy::SYNC, hessians_double, cols);
     compute_hessians(queue, batch, LaunchPolicy::SYNC, hessians, cols);
 
-    eigensolve(queue, batch, LaunchPolicy::SYNC, hessians, cols, N*3 - 6, eigenvalues, eigenvects);
-    eigensolve_double(queue, batch_double, LaunchPolicy::SYNC, hessians_double, cols, N*3 - 6, eigenvalues_double, eigenvects_double);
+    //eigensolve(queue, batch, LaunchPolicy::SYNC, hessians, cols, N*3 - 6, eigenvalues, eigenvects);
+    //eigensolve_double(queue, batch_double, LaunchPolicy::SYNC, hessians_double, cols, N*3 - 6, eigenvalues_double, eigenvects_double);
 
 
 
@@ -79,32 +88,47 @@ int main(int argc, char** argv){
     //std::vector<int> cols = {0, 1, 2, 1, 2, 0, 2, 0, 1};
 
 
-    std::cout << "Starting LOBPCG" << std::endl;
+    /* 
+    std::cout << "Starting LOBPCG-V1" << std::endl;
     auto T0 = std::chrono::high_resolution_clock::now();
-    LOBPCG<float, uint16_t, 3, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter,true);
-    for (size_t i = 0; i < 10; i++)
-    {
-        //LOBPCG<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
-    }
+    LOBPCG_V1<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter,true);
     auto T1 = std::chrono::high_resolution_clock::now();
 
-    std::cout << "Starting LOBPCG V1" << std::endl;
-    //LOBPCG_V1<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
-    auto T2 = std::chrono::high_resolution_clock::now();
-    LOBPCG_V1<float, uint16_t, 3, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
-    /* for (int i = 0; i < 10; i++){
-        LOBPCG_V1<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
-    } */
-    auto T3 = std::chrono::high_resolution_clock::now();
+ */
+    //std::cout << "Starting LOBPCG-V2" << std::endl;
+    //auto T2 = std::chrono::high_resolution_clock::now();
+    //LOBPCG_V2<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true);
+    //auto T3 = std::chrono::high_resolution_clock::now();
+    std::cout << "Starting LOBPCG-V3" << std::endl;
+     auto T4 = std::chrono::high_resolution_clock::now();
+    //LOBPCG_V3<float, uint16_t, 21, 30>(queue, hessians, cols, BatchSize, (int)N*3, maxiter, true, eigenvects, eigenvalues);
+    auto T5 = std::chrono::high_resolution_clock::now();
 
+    std::cout << "Starting LOBPCG-V4" << std::endl;
+    //auto T6 = std::chrono::high_resolution_clock::now();
+    LOBPCG_V4<float, uint16_t, 3, 30>( queue, 
+                                        hessians, 
+                                        cols, 
+                                        BatchSize, 
+                                        (int)N*3, 
+                                        maxiter, 
+                                        true, 
+                                        eigenvects, 
+                                        eigenvalues);
+    //auto T7 = std::chrono::high_resolution_clock::now();
+
+    std::cout << "Eigenvalues: " << eigenvalues << std::endl;
+
+    //std::cout << "LOBPCG-V1: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T1 - T0).count())/float(BatchSize) << " ms/isomer" << std::endl;
+    //std::cout << "LOBPCG-V2: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T3 - T2).count())/float(BatchSize) << " ms/isomer" << std::endl;
+    //std::cout << "LOBPCG-V3: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T5 - T4).count())/float(BatchSize) << " ms/isomer" << std::endl;
     //std::cout << "LOBPCG: " << std::chrono::duration_cast<std::chrono::milliseconds>(T1 - T0).count()/10 << " ms" << std::endl;
-    std::cout << "LOBPCG V1: " << float(std::chrono::duration_cast<std::chrono::milliseconds>(T3 - T2).count())/float(10*BatchSize) << " ms/isomer" << std::endl;
     //LOBPCG<double, uint16_t, 21, 30>(queue, hessians_double, cols, BatchSize, N*3, maxiter);
 
     std::vector <float> matrices(N*3*N*3*BatchSize);
     std::vector <double> matrices_double(N*3*N*3*BatchSize);
-        std::vector <float> vect_eigenvalues(N*3*BatchSize);
-        std::vector <double> vect_eigenvalues_double(N*3*BatchSize);
+        std::vector <float> vect_eigenvalues(21*BatchSize);
+        std::vector <double> vect_eigenvalues_double(21*BatchSize);
         std::vector <std::array<float,3>> vect_X(N*BatchSize);
         std::vector <std::array<double,3>> vect_X_double(N*BatchSize);
         auto acc_eigenvalues    = eigenvalues;
@@ -127,9 +151,9 @@ int main(int argc, char** argv){
             }
 
             //Store the eigenvalues
-            for (int i = 0; i < N*3; i++){
-                vect_eigenvalues[ii*N*3 + i] = acc_eigenvalues[ii*N*3 + i];
-                vect_eigenvalues_double[ii*N*3 + i] = acc_eigenvalues_double[ii*N*3 + i];
+            for (int i = 0; i < 21; i++){
+                vect_eigenvalues[ii*21 + i] = acc_eigenvalues[ii*21 + i];
+                vect_eigenvalues_double[ii*21 + i] = acc_eigenvalues_double[ii*21 + i];
             }
             for (int i = 0; i < N; i++){
                 vect_X[ii*N + i] = acc_X[ii*N + i];
