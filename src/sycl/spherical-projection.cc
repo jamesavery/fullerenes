@@ -273,7 +273,8 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
     //Count number of nodes at each distance
     primitives::copy(Q, xys.subspan(0,N), sorted_xys);
     primitives::iota(Q, reduce_in.subspan(0, N), K{0});
-    primitives::sort(Q, reduce_in.subspan(0, N), [distances](K a, K b){return distances[a] < distances[b];}); 
+    //primitives::sort(Q, reduce_in.subspan(0, N), [distances](K a, K b){return distances[a] < distances[b];}); 
+    std::sort(std::execution::par_unseq, reduce_in.subspan(0, N).begin(), reduce_in.subspan(0, N).end(), [distances](K a, K b){return distances[a] < distances[b];});
     primitives::transform(Q, reduce_in.subspan(0, N), sorted_xys, [xys](K idx){return xys[idx];});
     primitives::transform(Q, reduce_in.subspan(0, N), reduce_out, [distances](K idx){return distances[idx];});
     auto summed_coordinates = reduce_in.template as_span<std::array<T,2>>().subspan(0, d_max + 1);
@@ -281,6 +282,7 @@ SyclEvent spherical_projection_impl( SyclQueue& Q,
     primitives::fill(Q, sorted_xys.template as_span<K>().subspan(0, N), K{1});
     //Compute number of nodes at each distance and store in sorted_xys at indices N to  N + d_max + 1
     auto num_nodes_at_distance = sorted_xys.subspan(N, d_max + 1).template as_span<K>().subspan(0, d_max + 1);
+    
     primitives::reduce_by_segment(Q, reduce_out.subspan(0,N), sorted_xys.template as_span<K>(), output_keys, num_nodes_at_distance);
     //Compute the centroid of the nodes at each distance
     auto centroids = reduce_out.template as_span<std::array<T,2>>().subspan(0, d_max + 1);
