@@ -41,6 +41,7 @@ struct SyclVector
     inline constexpr operator Span<T>() const { return Span<T>(data_, size_); }
     inline constexpr Span<T> to_span() const { return Span<T>(data_, size_); }
     inline constexpr Span<T> subspan(size_t offset, size_t count) const { return Span<T>(data_ + offset, count); }
+    inline constexpr Span<T> subspan(size_t offset) const { return Span<T>(data_ + offset, size_ - offset); }
     inline constexpr void fill(T data) { std::fill(begin(), end(), data); }
     inline constexpr T *data() const { return data_; }
     inline constexpr size_t size() const { return size_; }

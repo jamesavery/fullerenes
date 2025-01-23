@@ -20,6 +20,8 @@ struct Span
     inline constexpr Span(T *begin, T *end) : data_(begin), size_(std::distance(begin, end)) {}
     inline constexpr Span(const Span<T> &other) = default;
     inline constexpr Span(Span<T> &&other) = default;
+    inline constexpr Span(const Span<T>& other, size_t offset) : data_(other.data_ + offset), size_(other.size_ - offset) {}
+    inline constexpr Span(Span<T>&& other, size_t offset) : data_(other.data_ + offset), size_(other.size_ - offset) {}
     inline constexpr Span(T& value) : data_(&value), size_(1) {}
     
     template <typename U>
@@ -27,7 +29,8 @@ struct Span
         return Span<U>(reinterpret_cast<U*>(data_), (sizeof(T) * size_ / sizeof(U)) );
     }
 
-    inline constexpr Span<T> subspan(size_t offset, size_t count) const { return Span<T>(data_ + offset, count); }
+    inline constexpr Span<T> subspan(size_t offset) const { assert(size_ - offset >= 0); return Span<T>(data_ + offset, size_ - offset); }
+    inline constexpr Span<T> subspan(size_t offset, size_t count) const { assert(offset + count <= size_);  return Span<T>(data_ + offset, count); }
     inline constexpr Span<T>& operator= (const Span<T> &other) { data_ = other.data_; size_ = other.size_; return *this; }
     inline constexpr Span<T>& operator= (Span<T> &&other) { return *this = other; }
     inline bool operator==(const Span<T> other) const;
@@ -48,3 +51,16 @@ private:
     T *data_;
     size_t size_;
 };
+
+template <typename T>
+Span(T*, typename Span<T>::size_t) -> Span<T>;
+
+template <typename T>
+Span(T*, std::size_t) -> Span<T>;
+
+template <typename T>
+Span(T*, T*) -> Span<T>;
+
+template <typename T>
+Span(T&) -> Span<T>;
+
