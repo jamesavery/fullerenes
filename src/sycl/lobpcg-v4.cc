@@ -854,21 +854,6 @@ void LOBPCG_V4(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
                     residuals[i] /= sycl::sqrt(reduce_over_group(cta, blockX[i*m + tid]*blockX[i*m + tid], sycl::plus<T>{})) * lambdas[largest ? (num_eigvals - 1 - i) : i];
                     converged[i] = residuals[i] < tol;
                 }
-                sycl::group_barrier(cta);
-                sycl::group_barrier(cta);
-                auto StAS_offset = restart ? bid * BlockVectors*2 * BlockVectors*2 : bid * BlockVectors*3 * BlockVectors*3;
-                auto StAS_size = restart ? BlockVectors*2 * BlockVectors*2 : BlockVectors*3 * BlockVectors*3;
-                auto StAS = StAS_acc.subspan(StAS_offset, StAS_size);
-
-                auto AS_block = AS_acc.subspan(bid * m * BlockVectors*3, m * BlockVectors*3);
-                auto S_block = S_acc.subspan(bid * m * BlockVectors*3, m * BlockVectors*3);
-
-                /* if (!restart) {
-                    orthonormalize<T, BlockVectors*3>(cta, blockX, m);
-                } else {
-                    orthonormalize<T, BlockVectors*2>(cta, blockX, m);
-                } */
-               
             });
         });
         ctx -> wait();
