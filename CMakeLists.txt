@@ -194,7 +194,10 @@ set(SYCL_FULLERENE_LIBS
   sycl-util-impl_lib 
   primitives-instantiations_lib 
   geometry-properties_lib
-  lobpcg_lib
+  lobpcg-v1_lib
+  lobpcg-v2_lib
+  lobpcg-v3_lib
+  lobpcg-v4_lib
   )
 
 set(SYCL_FULLERENE_LIBS ${SYCL_FULLERENE_LIBS} CACHE STRING "SYCL_FULLERENE_LIBS")

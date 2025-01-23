@@ -8,7 +8,10 @@ list(APPEND SYCL_LIBRARY_SOURCES
   sycl-util-impl
   primitives-instantiations
   geometry-properties
-  lobpcg
+  lobpcg-v1
+  lobpcg-v2
+  lobpcg-v3
+  lobpcg-v4
 )
 
 list(APPEND SYCL_SOURCE_CUSTOM_FLAGS 
@@ -21,7 +24,10 @@ list(APPEND SYCL_SOURCE_CUSTOM_FLAGS
 "-Xcuda-ptxas --maxrregcount=40 -ltbb"   # sycl-util-impl.cc
 "-Xcuda-ptxas --maxrregcount=40 -ltbb"    # primitives.cc
 "-Xcuda-ptxas --maxrregcount=40"    # geometry-properties.cc
-"-Xcuda-ptxas --maxrregcount=80"    # lobpcg.cc
+"-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v1.cc
+"-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v2.cc
+"-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v3.cc
+"-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v4.cc
 )
 
 
@@ -32,7 +38,7 @@ target_link_libraries(sycl_fullerene_lib PRIVATE ${CMAKE_CXX_FLAGS} ${DPCPP_FLAG
 foreach(SYCL_SOURCE FLAGS IN ZIP_LISTS SYCL_LIBRARY_SOURCES SYCL_SOURCE_CUSTOM_FLAGS)
     add_library(${SYCL_SOURCE}_lib SHARED ${SYCL_SOURCE}.cc)
     set_target_properties(${SYCL_SOURCE}_lib PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS} ${FLAGS}")
-    target_link_libraries(${SYCL_SOURCE}_lib PRIVATE ${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS} ${FLAGS} cudart cuda cusolver)
+    target_link_libraries(${SYCL_SOURCE}_lib PRIVATE ${CMAKE_CXX_FLAGS} ${DPCPP_FLAGS} ${FLAGS} cudart cuda cusolver cublas cusparse)
 endforeach()
 
 target_link_libraries(
@@ -44,5 +50,8 @@ target_link_libraries(
   PRIVATE sycl-util-impl_lib 
   PRIVATE primitives-instantiations_lib 
   PRIVATE geometry-properties_lib 
-  PRIVATE lobpcg_lib 
+  PRIVATE lobpcg-v1_lib 
+  PRIVATE lobpcg-v2_lib
+  PRIVATE lobpcg-v3_lib
+  PRIVATE lobpcg-v4_lib
 )
