@@ -377,6 +377,7 @@ void ExternalOrthogonalization(SyclQueue& ctx,  Span<T> S  /* Candidate Basis [k
     static bool initialized = false;
     if (!initialized){
         cublasCreate(&handle);
+        initialized = true;
     }
 
     constexpr T alpha0 = 1.0;
@@ -469,15 +470,16 @@ void CholQR(SyclQueue &ctx, Span<T> S /* Subspace */,
     static SyclVector<T*> Sts_ptrs(batch_size);
     static SyclVector<T*> R_inv_ptrs(batch_size);
     static SyclVector<int> d_info(batch_size);    
-    static int stored_SN = 0;
-    if (stored_SN != SN){
-        stored_SN = SN;
+    static bool initialized = false;
+    if (!initialized){
         cublasCreate(&blas_handle);
         cusolverDnCreate(&solver_handle);
-        for(int i = 0; i < batch_size; i++){
-           Sts_ptrs[i] = StS.data() + i * SN * SN;
-            R_inv_ptrs[i] = R_inv.data() + i * SN * SN;
-        }
+        initialized = true;
+    }
+    
+    for(int i = 0; i < batch_size; i++){
+        Sts_ptrs[i] = StS.data() + i * SN * SN;
+        R_inv_ptrs[i] = R_inv.data() + i * SN * SN;
     }
     
     constexpr T alpha = 1.0;
@@ -816,8 +818,8 @@ void LOBPCG_V4(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
     auto converged_acc = converged.to_span();
     auto residuals_acc = residuals.to_span();
 
-    SVQB<T, BlockVectors*3>(ctx, S, StAS, Diag, U, m, BlockVectors*3*m, batch_size);
-    CholQR<T, BlockVectors*2>(ctx, S, StAS, R_inv, U, m, BlockVectors*3*m, batch_size);
+    //SVQB<T, BlockVectors*3>(ctx, S, StAS, Diag, U, m, BlockVectors*3*m, batch_size);
+    //CholQR<T, BlockVectors*2>(ctx, S, StAS, R_inv, U, m, BlockVectors*3*m, batch_size);
 
 
     auto Tresiduals = std::chrono::duration<double>(0);
@@ -861,7 +863,6 @@ void LOBPCG_V4(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         auto end = std::chrono::high_resolution_clock::now();
         Tresiduals += end - start;
 
-        
         start = std::chrono::high_resolution_clock::now();
         if (restart){
             ExternalOrthogonalization<T, BlockVectors, BlockVectors>(ctx, S.subspan(BlockVectors*m), S, StAS, m, m*3*BlockVectors, m*3*BlockVectors, batch_size);
@@ -895,10 +896,8 @@ void LOBPCG_V4(SyclQueue &ctx, Span<T> A, Span<K> cols, int batch_size, int m, s
         ctx.wait();
         end = std::chrono::high_resolution_clock::now();
         Tmemcpy += end - start;
-
         //ComputeGramMatrix<T,BlockVectors*3>(ctx, S, R_inv, m, BlockVectors*m*3, batch_size);
         //print_matrix(R_inv.to_span(), BlockVectors*3 , BlockVectors*3 , false);
-
         start = std::chrono::high_resolution_clock::now();
         //Compute AR
         auto SpMM_status = cusparseSpMM(SpMM_AS_handle, 
