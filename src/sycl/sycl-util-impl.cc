@@ -38,17 +38,19 @@ constexpr std::ostream& operator<<(std::ostream& os, const std::array<U,N>& arr)
 template <typename T>
 SyclVector<T>::SyclVector(size_t size) : size_(size), capacity_(size) {
     data_ = sycl::malloc_shared<T>(size, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
+    if (!data_ && size > 0) {
+        std::cout << "Could not allocate " + std::to_string(size) + " elements of type " + typeid(T).name() << std::endl;
+        throw std::bad_alloc();
+    } 
 }
 
 template <typename T>
-SyclVector<T>::SyclVector(size_t size, T value) : size_(size), capacity_(size) {
-    data_ = sycl::malloc_shared<T>(size, sycl::device(default_selector_v), sycl::context(device(default_selector_v)));
+SyclVector<T>::SyclVector(size_t size, T value) : SyclVector<T>(size) {
     for(size_t i = 0; i < size; i++) data_[i] = value;
 }
 
 template <typename T>
-SyclVector<T>::SyclVector(const SyclVector<T>& other) : size_(other.size_), capacity_(other.capacity_) {
-    data_ = sycl::malloc_shared<T>(capacity_, sycl::device(default_selector_v), sycl::context(device(default_selector_v))); 
+SyclVector<T>::SyclVector(const SyclVector<T>& other) : SyclVector<T>(other.size_) {
     for(size_t i = 0; i < size_; i++) data_[i] = other.data_[i];
 }
 
