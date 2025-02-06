@@ -3,9 +3,10 @@
 #include <numeric>
 #include <cmath>
 #include <complex>
+#include <iostream>
 
-typedef float scalar;
-typedef float real_t;
+typedef double scalar;
+typedef double real_t;
 typedef std::complex<real_t> complex_t;
 constexpr real_t machine_precision = std::numeric_limits<real_t>::epsilon();//std::pow(std::numeric_limits<real_t>::radix,-std::numeric_limits<real_t>::digits);
 
@@ -15,7 +16,7 @@ public:
   using MDSpan<scalar,2>::MDSpan;
   SpanMatrix(MDSpan<scalar,2> S): MDSpan<scalar,2>(S) {}
 
-  SpanMatrix transpose() const { return SpanMatrix(data_,{shape_[1],shape_[0]}); }
+  SpanMatrix transpose() const { return SpanMatrix(data_,{shape_[1],shape_[0]},{stride_[1],stride_[0]}); }
 
   real_t max_norm() const { 
     const auto &A = *this;
@@ -29,6 +30,14 @@ public:
     }
     return mx;
   }  
+  friend std::ostream& operator<<(std::ostream &os, const SpanMatrix &A) {
+    auto  [m,n] = A.shape();
+    for(int i=0;i<m;i++){
+      for(int j=0;j<n;j++) os << A[{i,j}] << " ";
+      os << "\n";
+    }
+    return os;
+  }
 };
 
 complex_t Conj(const complex_t x) { return std::conj(x); }
@@ -53,29 +62,41 @@ public:
     return sum;
   }
 
-  void conj(SpanVector &vc) const {
+  SpanVector conj(MDSpan<scalar,1> &w_vc) const {
     const auto &v = *this;
     auto  [n]     = v.shape();
-    for(int i=0;i<n;i++){
-       vc[i]   = Conj(v[i]);
-    }
+    SpanVector vc(w_vc.data(),{n},w_vc.stride());
+
+    for(int i=0;i<n;i++)
+      vc[i]   = Conj(v[i]);
+    
+    return vc;
+  }
+
+  friend std::ostream& operator<<(std::ostream &os, const SpanVector &v) {
+    auto  [n] = v.shape();
+    for(int i=0;i<n;i++) os << v[i] << " ";
+    return os;
   }
 };
 
-void apply_reflection(/*in/out*/SpanMatrix A,/*in*/ const SpanVector v, 
-                      /* tmp*/ SpanVector vHA, const scalar sigma=0.5L)
+void apply_reflection(/*in/out*/SpanMatrix A,  /*in*/ const SpanVector v, 
+                      /* tmp*/ MDSpan<scalar,1> w_vHA, const scalar sigma=0.5L)
 {
   const auto [m,n] = A.shape();
+  SpanVector vHA(w_vHA.data(),{n},w_vHA.stride());
 
   for(int j=0;j<n;j++){		
     scalar sum = 0;
-    for(int k=0;k<m;k++) sum += Conj(v[k])*A[{k,j}];
+    for(int k=0;k<m;k++){
+       sum += Conj(v[k])*A[{k,j}];
+    }
     vHA[j] = sum;
   }
 
   for(int i=0;i<m;i++)       /* A += -2*outer(v,vTA) */
     for(int j=0;j<n;j++){
-      A[{n,j}] -= Conj(sigma)*v[i]*vHA[j]; 
+      A[{i,j}] -= Conj(sigma)*v[i]*vHA[j]; 
     }
 }
 
@@ -88,10 +109,11 @@ double COPYSIGN(double to, double from)
 // TODO: Re-niceify C++
 // TODO: Pure C-version for complex
 // TODO: Where did real_reflection_vector go?
-void reflection_vector(/*in*/const SpanVector a, const real_t anorm,
-		                  /*out*/      SpanVector v, scalar &sigma)
+auto reflection_vector(/*in*/const SpanVector a, const real_t anorm,
+		                  /*out*/      MDSpan<scalar,1> w_v)
 { // Reflection vector that eliminates *row* a (as opposed to *column* in eigen.c)
   const int n = a.size();
+  SpanVector v(w_v.data(), {n}, w_v.stride());
   for(int i=0;i<n;i++) v[i] = a[i];
 
   // In the complex case, straightforward Householder reflection can only transform a Hermitian matrix
@@ -102,15 +124,18 @@ void reflection_vector(/*in*/const SpanVector a, const real_t anorm,
   // Using the nomenclature from [LAWN72], Pages 4-5 and setting xi_i = a[i-1]:
   scalar x1 = a[0];
   double nu = copysign(anorm,Re(x1));
-  scalar norm_inv = 1.0/(x1+nu);
-  sigma = (x1+nu)/nu;
+  const scalar norm_inv = 1.0/(x1+nu);
+  const scalar sigma = (x1+nu)/nu;
   v[0] += nu;
   
   for(int i=0;i<n;i++) v[i] *= norm_inv;
+  return std::tuple{v, sigma};
 }
 
 struct QHQ_workspace {
-  SpanVector v, vc, vHA;
+  MDSpan<scalar,1> v, vc, vHA;
+
+  QHQ_workspace(int n, scalar *v_data, scalar *vc_data, scalar *vHA_data): v(v_data,{n}), vc(vc_data,{n}), vHA(vHA_data,{n}) {}
 };   
 
 scalar dot(MDSpan<scalar,1> a, MDSpan<scalar,1> b)
@@ -129,11 +154,8 @@ void QHQ(/*in/out*/SpanMatrix A, QHQ_workspace w, SpanMatrix Q={})
   const auto [m,n] = A.shape();
   assert(m==n);
 
-  scalar  sigma;		    // Elementary operation scale (2 for reflection)
-  //  scalar  v_data[n], vc_data[n], a_data[n];    // Reflection vector
   SpanMatrix AT(A.transpose());
-  SpanVector &v( w.v ), &vc( w.vc );
-  
+
   real_t numerical_zero = A.max_norm()*10*machine_precision;
 
   for(int k=0;k<n-1;k++){
@@ -145,11 +167,11 @@ void QHQ(/*in/out*/SpanMatrix A, QHQ_workspace w, SpanMatrix Q={})
 
     if(anorm < numerical_zero) continue; /* Already eliminated, don't divide by 0 */
     
-    reflection_vector(a,anorm,v,sigma);
-    v.conj(vc);
+    auto [v, sigma] = reflection_vector(a, anorm, w.v);
+    auto vc = v.conj(w.vc);
     
-    apply_reflection( A({k+1,k},l,l+1),v, w.vHA,       sigma );
-    apply_reflection(AT({k+1,k},l,l+1),vc, w.vHA, Conj(sigma));
+    apply_reflection( A({k+1,k},l,l+1), v,  w.vHA,      sigma );
+    apply_reflection( AT({k+1,k},l,l+1),vc, w.vHA, Conj(sigma));
 
     if(!Q.empty()) apply_reflection(Q({k+1,0},l,n),v,w.vHA,sigma);
   }
