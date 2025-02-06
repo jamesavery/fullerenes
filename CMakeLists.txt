@@ -126,13 +126,6 @@ if(ENABLE_CUDA)
   enable_language(CUDA)
   set(CUDA_INCLUDE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
   
-  #find_library(CURAND_LIB curand.so HINTS /opt/nvidia/hpc_sdk/Linux_x86_64/24.1/math_libs/12.3/targets/x86_64-linux/)
-  find_path(CURAND_INCLUDE_DIR NAMES curand.h PATHS /opt/nvidia/hpc_sdk/Linux_x86_64/24.11/math_libs/12.6/targets/x86_64-linux/include)
-
-  if(NOT CURAND_INCLUDE_DIR)
-    message(FATAL_ERROR "Could not find curand.h")
-  endif()
-
   # Include the directory containing curand.h
   include_directories(${CURAND_INCLUDE_DIR})
   message("CUDA include path at:" ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
