@@ -10,6 +10,8 @@ typedef double real_t;
 typedef std::complex<real_t> complex_t;
 constexpr real_t machine_precision = std::numeric_limits<real_t>::epsilon();//std::pow(std::numeric_limits<real_t>::radix,-std::numeric_limits<real_t>::digits);
 
+
+
 class SpanMatrix : public MDSpan<scalar,2>
 {
 public:  
@@ -32,10 +34,13 @@ public:
   }  
   friend std::ostream& operator<<(std::ostream &os, const SpanMatrix &A) {
     auto  [m,n] = A.shape();
+    os << "array([\n";
     for(int i=0;i<m;i++){
-      for(int j=0;j<n;j++) os << A[{i,j}] << " ";
-      os << "\n";
+      os << "\t[";
+      for(int j=0;j<n;j++) os << A[{i,j}] << (j+1<n?",":"");
+      os << (i+1<m?"],\n":"]\n");
     }
+    os << "])";
     return os;
   }
 };
@@ -75,7 +80,9 @@ public:
 
   friend std::ostream& operator<<(std::ostream &os, const SpanVector &v) {
     auto  [n] = v.shape();
-    for(int i=0;i<n;i++) os << v[i] << " ";
+    os << "[";
+    for(int i=0;i<n;i++) os << v[i] << (i+1<n?",":"");
+    os << "]";
     return os;
   }
 };
@@ -158,21 +165,19 @@ void QHQ(/*in/out*/SpanMatrix A, QHQ_workspace w, SpanMatrix Q={})
 
   real_t numerical_zero = A.max_norm()*10*machine_precision;
 
-  for(int k=0;k<n-1;k++){
-    //  re-niceify ... A({k+1,n},k);	
-    //SpanMatrix a = A({k+1,n},k).copy(a_data); // TODO: Copy this into w.a
-    int l = n-k-1;
-    const SpanVector a( A({k+1,k},l) ); // 
+  for(int k=0;k<n-2;k++){
+    int l = n-k-1; // Length of super-diagonal
+    const SpanVector a( A({k,k+1},l) ); 
     real_t anorm = sqrt(a.norm_sqr());
 
     if(anorm < numerical_zero) continue; /* Already eliminated, don't divide by 0 */
-    
+
     auto [v, sigma] = reflection_vector(a, anorm, w.v);
     auto vc = v.conj(w.vc);
     
     apply_reflection( A({k+1,k},l,l+1), v,  w.vHA,      sigma );
     apply_reflection( AT({k+1,k},l,l+1),vc, w.vHA, Conj(sigma));
-
+  
     if(!Q.empty()) apply_reflection(Q({k+1,0},l,n),v,w.vHA,sigma);
   }
 }
