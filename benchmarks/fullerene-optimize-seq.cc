@@ -1,9 +1,7 @@
-#include "fullerenes/buckygen-wrapper.hh"
-#include "fullerenes/triangulation.hh"
-#include "fullerenes/polyhedron.hh"
-#include "fullerenes/config.h"
-#include "fullerenes/device_io.hh"
-#include "fullerenes/gpu/kernels.hh"
+#include <fullerenes/buckygen-wrapper.hh>
+#include <fullerenes/triangulation.hh>
+#include <fullerenes/polyhedron.hh>
+#include <fullerenes/config.h>
 
 #include <chrono>
 #include <fstream>
@@ -80,9 +78,11 @@ int main(int argc, char** argv){
                     auto T6 = high_resolution_clock::now(); T_opts[l] += T6 - T5;
             }
         }
-        using namespace device_io;
-        out_file << N << ", "<< N_samples << ", " << mean(T_gens)/1ns << ", "  << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns << ", "<< mean(T_polys)/1ns << "\n";
-        out_std << N << ", "<< N_samples << ", " << sdev(T_gens)/1ns << ", "  << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns <<  ", " << sdev(T_polys)/1ns<<"\n";
+
+        //out_file << N << ", "<< N_samples << ", " << mean(T_gens)/1ns << ", "  << mean(T_duals)/1ns <<", " <<  mean(T_X0s)/1ns <<", " << mean(T_tuttes)/1ns<< ", " << mean(T_opts)/1ns << ", "<< mean(T_polys)/1ns << "\n";
+        //out_std << N << ", "<< N_samples << ", " << sdev(T_gens)/1ns << ", "  << sdev(T_duals)/1ns <<", " <<  sdev(T_X0s)/1ns <<", " << sdev(T_tuttes)/1ns<< ", " << sdev(T_opts)/1ns <<  ", " << sdev(T_polys)/1ns<<"\n";
+
+        //TODO: OUTPUT
      }
 
 }

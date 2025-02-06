@@ -345,6 +345,3 @@ template struct SphericalProjectionFunctor<float,uint16_t>;
 template struct SphericalProjectionFunctor<float,uint32_t>;
 //template struct SphericalProjectionFunctor<double,uint16_t>;
 //template struct SphericalProjectionFunctor<double,uint32_t>;
-
-//template void spherical_projection<float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& batch, const LaunchPolicy policy);
-//template void spherical_projection<double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& batch, const LaunchPolicy policy);

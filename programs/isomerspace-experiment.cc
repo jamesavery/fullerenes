@@ -14,7 +14,6 @@
 #include "fullerenes/triangulation.hh"
 #include "fullerenes/polyhedron.hh"
 #include "fullerenes/progress_bar.hh"
-#include "fullerenes/gpu/benchmark_functions.hh"
 #include <fullerenes/kernel-headers/all-kernels.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene-structs.hh>
 #include "fullerenes/isomerdb.hh"
@@ -194,7 +193,7 @@ int main(int ac, char **argv)
 
   array<set<pair<real_t, int>>, NUM_RESULTS> result_reference;
 
-  // Each stage has one on-device batch per device. TODO: NUM_STAGES vector<vector<IsomerBatch>>, Nd. Dynamic number of devices != 2.
+  // Each stage has one on-device batch per device. TODO: NUM_STAGES vector<vector<FullereneBatch>>, Nd. Dynamic number of devices != 2.
   // std::array<std::vector<FullereneBatch<real_t, uint16_t,2>,NUM_STAGES> Bs;
   std::array<std::vector<FullereneBatch<real_t, device_node_t>>, 4> Bs;
   for (int i = 0; i < 4; i++)
@@ -205,7 +204,7 @@ int main(int ac, char **argv)
       Bs[i][j] = FullereneBatch<real_t, device_node_t>(N, batch_size);
     }
   }
-  // Final IsomerBatch on host
+  // Final FullereneBatch on host
 
   vector<FullereneBatch<real_t, device_node_t>> final_batch(Nd, FullereneBatch<real_t, device_node_t>(N, final_batch_size));
 

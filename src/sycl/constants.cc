@@ -33,14 +33,6 @@ struct Constants{
     coord3d outer_dih0_m;
     coord3d outer_dih0_p;
 
-    /**
-     * @brief Constructor for the Constants struct
-     *
-     * @param G The IsomerBatch in which the graph information is read from
-     * @param isomer_idx The index of the isomer that the current thread is a part of
-     * @return Forcefield constants for the current node in the isomer_idx^th isomer in G
-     */
-
     inline Constants(const Span<std::array<K,3>> cubic_neighbours, K idx){
 
         constexpr real_t optimal_corner_cos_angles[2] = {-0.30901699437494734, -0.5}; 

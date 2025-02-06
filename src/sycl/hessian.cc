@@ -1884,6 +1884,3 @@ template struct HessianFunctor<PEDERSEN, double, uint16_t>;
 //template struct HessianFunctor<PEDERSEN, double, uint16_t>;
 //template struct HessianFunctor<PEDERSEN, float, uint32_t>;
 //template struct HessianFunctor<PEDERSEN, double, uint32_t>;
-
-/* template void compute_hessians<PEDERSEN, float, uint16_t>(sycl::queue& Q, IsomerBatch<float,uint16_t>& B, sycl::buffer<float,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy);
-template void compute_hessians<PEDERSEN, double, uint16_t>(sycl::queue& Q, IsomerBatch<double,uint16_t>& B, sycl::buffer<double,1>& hess, sycl::buffer<uint16_t,1>& cols, const LaunchPolicy policy); */

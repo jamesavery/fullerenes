@@ -58,7 +58,6 @@ struct NodeNeighbours{
 
     /**
      * @brief  This constructor computes the neighbours, outer neighbours, face neighbours for the first Nf threads it stores the nodes that are part of the threadIdx.x^th face.
-     * @param  G: The IsomerBatch object that contains the graph data
      * @param  isomer_idx: The index of the isomer that the thread is a part of.
      * @param  sdata: Pointer to shared memory.
      * @return NodeNeighbours object.

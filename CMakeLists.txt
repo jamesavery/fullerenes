@@ -65,7 +65,6 @@ if(ENABLE_SYCL)
     set(DPCPP_TARGET_FLAGS "-fsycl-targets=amdgcn-amd-amdhsa,x86_64 -Xsycl-target-backend=amdgcn-amd-amdhsa --offload-arch=gfx90a -march=native")
   elseif(SYCL_TARGETS STREQUAL "NVIDIA")
     add_definitions(-DSOLVER_BACKEND=CUSOLVER_BACKEND)
-    find_package(CUDA)
     #set(PTXAS_COMPILE_FLAGS    " --verbose -g --maxrregcount=${GPU_MAXREGCOUNT} --opt-level=3 --generate-line-info --warn-on-double-precision-use --warn-on-spills")
     set(PTXAS_LINK_FLAGS
     "SHELL:-Xcuda-ptxas --verbose"
@@ -75,7 +74,6 @@ if(ENABLE_SYCL)
     "SHELL:-Xcuda-ptxas --warn-on-double-precision-use"
     "SHELL:-Xcuda-ptxas --warn-on-spills"
     )
-    message("CUDA_TOOLKIT_ROOT_DIR: ${CUDA_TOOLKIT_ROOT_DIR}")
     set(DPCPP_TARGET_FLAGS "-Xcuda-ptxas --generate-line-info -Xcuda-ptxas --verbose -fsycl-targets=nvptx64-nvidia-cuda -Xsycl-target-backend=nvptx64-nvidia-cuda --cuda-gpu-arch=sm_${CMAKE_CUDA_ARCHITECTURES} --cuda-path=${CUDA_TOOLKIT_ROOT_DIR}")
     set(DPCPP_LINK_FLAGS   "-O3 -fsycl -fsycl-unnamed-lambda ${DPCPP_TARGET_FLAGS}")    
   elseif(SYCL_TARGETS STREQUAL "X86")
@@ -162,8 +160,6 @@ set(CUDA_MAXREGCOUNT "--maxrregcount=80")
     set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-DCUSPARSE=1")
     message("CUSPARSE library found: " ${CUSPARSE_LIBRARY} ".")
   endif()
-
-  add_subdirectory(src/cuda)
 endif()
 
 configure_file(

@@ -151,9 +151,6 @@ std::array<T,2> eigvalsh2x2(const std::array<T,4> &A){
 }
 
 
-
-//template <typename T, typename K>
-//void eigensolve(const IsomerBatch<T,K>& B, const CuArray<T>& hessians, const CuArray<K>& cols, CuArray<T>& eigenvalues, const LaunchCtx& ctx, const LaunchPolicy policy){
 std::vector<sycl::device> get_devices(){
     auto platforms = sycl::platform::get_platforms();
     std::vector<sycl::device> devices;
@@ -238,7 +235,8 @@ struct EigenBuffers{
 /* 
     * @brief: Multi-purpose eigensolver for the batch of Hessian matrices derived from the batch of isomers.
     * @param mode: EigensolveMode, the mode of the eigensolver.
-    * @param B: IsomerBatch<T,K>, the batch of isomers.
+    * @param Q: sycl::queue&, the sycl queue to submit the kernels to.
+    * @param B: FullereneBatchView<T,K>, the batch of isomers.
     * @param hessians: sycl::buffer<T,1>, the buffer containing the hessians.
     * @param cols: sycl::buffer<K,1>, the buffer containing the column indices of the hessians.
     * @param eigenvalues: sycl::buffer<T,1>, the buffer to store the eigenvalues.
@@ -273,12 +271,12 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
 
     //Lanczos
     //CUDA Lanczos Call:        void* kargs[]{(void*)&B,    (void*)&Vs[dev],                (void*)&Ls[dev],        (void*)&eigenvalues,    (void*)&hessians,   (void*)&cols,           (void*)&Nlanczos};
-    //CUDA Lanczos Signature:   (const IsomerBatch<DEV> B,  CuArray<T> V_,                  CuArray<T> U,           CuArray<T> D,           const CuArray<T> H, const CuArray<K> cols,  int m)
+    //CUDA Lanczos Signature:   (const FullereneBatch B,  CuArray<T> V_,                  CuArray<T> U,           CuArray<T> D,           const CuArray<T> H, const CuArray<K> cols,  int m)
     //Should be:                B,                          lanczosBuffers[index],    offDiagBuffers[index],  eigenvalues, hessians, cols, n
 
     //Us is never so we can just delete it
     //Diagonalization (QR) Call:        void* kargs_qr[]{(void*)&B, (void*)&eigenvalues,    (void*)&Ls[dev],    (void*)&Us[dev],    (void*)&Qs[dev],    (void*)&Nlanczos};
-    //Diagonalization (QR) Signature:   (const IsomerBatch<DEV> B,  CuArray<T> D_,          CuArray<T> L_,      CuArray<T> U_,      CuArray<T> Q_,      int n)
+    //Diagonalization (QR) Signature:   (const FullereneBatch B,  CuArray<T> D_,          CuArray<T> L_,      CuArray<T> U_,      CuArray<T> Q_,      int n)
     //Should be:                        B,                          eigenvalues,            L_,                 NOTHING,                Q_,                n
 
     auto V_acc = lanczos;
@@ -412,7 +410,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
     });
     
     //Diagonalization (QR) Call:        void* kargs_qr[]{(void*)&B, (void*)&eigenvalues,    (void*)&Ls[dev],    (void*)&Us[dev],    (void*)&Qs[dev],    (void*)&Nlanczos};
-    //Diagonalization (QR) Signature:   (const IsomerBatch<DEV> B,  CuArray<T> D_,          CuArray<T> L_,      CuArray<T> U_,      CuArray<T> Q_,      int n)
+    //Diagonalization (QR) Signature:   (const FullereneBatch B,  CuArray<T> D_,          CuArray<T> L_,      CuArray<T> U_,      CuArray<T> Q_,      int n)
     //Should be:                        B,                          eigenvalues,            offDiagBuffers[index],  NOTHING,                QmatBuffers[index],                n
     auto L_acc = off_diagonal;
     auto Q_acc = qmat;
@@ -506,7 +504,7 @@ SyclEvent eigensolve(SyclQueue& Q, FullereneBatchView<T,K> B,
         });
     });
     //Eigenvector calculation call: void* kargs_vector[]{(void*)&B, (void*)&Qs[dev], (void*)&Vs[dev], (void*)&Q, (void*)&Nlanczos};
-    //Eigenvector calculation signature: (const IsomerBatch<DEV> B, CuArray<T> Q, CuArray<T> V, CuArray<T> E, int m)
+    //Eigenvector calculation signature: (const FullereneBatch B, CuArray<T> Q, CuArray<T> V, CuArray<T> E, int m)
     auto E_acc = eigenvectors;
     if (mode == EigensolveMode::FULL_SPECTRUM_VECTORS || mode == EigensolveMode::ENDS_VECTORS){
     final_compute = Q -> submit([&](sycl::handler& h){
@@ -611,16 +609,3 @@ template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM, double, uint16_t>;
 template struct EigenFunctor<EigensolveMode::ENDS, double, uint16_t>;
 template struct EigenFunctor<EigensolveMode::ENDS_VECTORS, double, uint16_t>;
 template struct EigenFunctor<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>;
-
-/* 
-template void eigensolve<EigensolveMode::FULL_SPECTRUM, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);
-template void eigensolve<EigensolveMode::ENDS, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);
-template void eigensolve<EigensolveMode::ENDS_VECTORS, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);
-template void eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, float, uint16_t>(sycl::queue& ctx, const IsomerBatch<float,uint16_t> B, sycl::buffer<float,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<float,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<float,1>& eigenvectors);
-
-template void eigensolve<EigensolveMode::FULL_SPECTRUM, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);
-template void eigensolve<EigensolveMode::ENDS, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);
-template void eigensolve<EigensolveMode::ENDS_VECTORS, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);
-template void eigensolve<EigensolveMode::FULL_SPECTRUM_VECTORS, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors); 
-*/
-//template void eigensolve<EigensolveMode::FULL_SPECTRUM, double, uint16_t>(sycl::queue& ctx, const IsomerBatch<double,uint16_t> B, sycl::buffer<double,1>& hessians, sycl::buffer<uint16_t,1>& cols, sycl::buffer<double,1>& eigenvalues, const LaunchPolicy policy, size_t _nLanczos, sycl::buffer<double,1>& eigenvectors);

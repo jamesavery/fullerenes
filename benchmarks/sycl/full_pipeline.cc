@@ -92,36 +92,6 @@ int main(int argc, char** argv) {
     SyclVector<float> spectral_buffer(BatchSize*N*3);
     SyclVector<float> spectral_vectors_buffer(BatchSize*N*3*N*3);
 
-
-  /*   auto generate_and_fill = [&](IsomerBatch<real_t, node_t>& batch){
-        auto isomer_idx = 0;
-        sycl::host_accessor acc_dual(batch.dual_neighbours, sycl::write_only);
-        sycl::host_accessor acc_degs(batch.face_degrees, sycl::write_only);
-        sycl::host_accessor acc_status (batch.statuses, sycl::write_only);
-        while (more && isomer_idx < BatchSize)
-        {
-            more &= BuckyQ.next_fullerene(G);
-            if(!more) break;
-            for (size_t j = 0; j < Nf; j++)
-            {
-                for(size_t k = 0; k < G.neighbours[j].size(); k++)
-                {
-                    acc_dual[isomer_idx*Nf*6 + j*6 + k] = G.neighbours[j][k];
-                } 
-                if(G.neighbours[j].size() == 5){
-                    acc_dual[isomer_idx*Nf*6 + j*6 + 5] = std::numeric_limits<node_t>::max();
-                    acc_degs[isomer_idx*Nf + j] = 5;
-                } else {
-                    acc_degs[isomer_idx*Nf + j] = 6;
-                }   
-
-            }
-            acc_status[isomer_idx] = IsomerStatus::NOT_CONVERGED;
-            isomer_idx++;
-            isomers_in_queue++;
-        }
-    }; */
-
     DualizeFunctor<real_t,node_t> dualize_V1;
     TutteFunctor<real_t,node_t> tutte_layout;
     SphericalProjectionFunctor<real_t,node_t> spherical_projection;
