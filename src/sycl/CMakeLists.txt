@@ -12,6 +12,10 @@ list(APPEND SYCL_LIBRARY_SOURCES
   lobpcg-v2
   lobpcg-v3
   lobpcg-v4
+  lobpcg-v5
+  lobpcg-v6
+  lobpcg-v7
+  lobpcg-v8
 )
 
 list(APPEND SYCL_SOURCE_CUSTOM_FLAGS 
@@ -28,6 +32,10 @@ list(APPEND SYCL_SOURCE_CUSTOM_FLAGS
 "-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v2.cc
 "-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v3.cc
 "-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v4.cc
+"-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v5.cc
+"-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v6.cc
+"-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v7.cc
+"-Xcuda-ptxas --maxrregcount=80"    # lobpcg-v8.cc
 )
 
 
@@ -54,4 +62,10 @@ target_link_libraries(
   PRIVATE lobpcg-v2_lib
   PRIVATE lobpcg-v3_lib
   PRIVATE lobpcg-v4_lib
+  PRIVATE lobpcg-v5_lib
+  PRIVATE lobpcg-v6_lib
+  PRIVATE lobpcg-v7_lib
+  PRIVATE lobpcg-v8_lib
 )
+
+add_subdirectory(linalg/batched/QR)
