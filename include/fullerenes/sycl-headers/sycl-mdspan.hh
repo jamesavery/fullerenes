@@ -1,7 +1,10 @@
 #pragma once
 #include <cassert>
 #include <iterator>
+#include <iostream>
 #include <array>
+#include <fullerenes/sycl-headers/sycl-span.hh>
+
 
 template <typename T, size_t N>
 struct MDSpan
