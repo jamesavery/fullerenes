@@ -75,7 +75,7 @@ namespace linalg{
             }
             // Add similar cases for other backends
             else {
-                static_assert(always_false<T>, "Unsupported backend");
+                static_assert(std::false_type{}, "Unsupported backend");
             }
         }
 
