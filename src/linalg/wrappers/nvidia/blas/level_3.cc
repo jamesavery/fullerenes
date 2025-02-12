@@ -125,12 +125,38 @@ namespace linalg {
         MatHandle<fp, BT>&, \
         MatHandle<fp, BT>&, \
         MatHandle<fp, BT>&, \
-        fp, fp, Transpose, Transpose);
+        fp, fp, Transpose, Transpose, ComputePrecision);
 
+    #define TRSM_INSTANTIATE(fp, BT) \
+    template SyclEvent trsm<Backend::CUDA, fp, BT>( \
+        SyclQueue&, \
+        MatHandle<fp, BT>&, \
+        MatHandle<fp, BT>&, \
+        Side, Uplo, Transpose, Diag, fp);
+
+    #define POTRF_INSTANTIATE(fp, BT) \
+    template SyclEvent potrf<Backend::CUDA, fp, BT>( \
+        SyclQueue&, \
+        MatHandle<fp, BT>&, \
+        Uplo, \
+        Span<std::byte>);
+    
+    #define POTRF_BUFFER_SIZE_INSTANTIATE(fp, BT) \
+    template size_t potrf_buffer_size<Backend::CUDA, fp, BT>( \
+        SyclQueue&, \
+        MatHandle<fp, BT>&, \
+        Uplo);
+    
+    #define BLAS_INSTANTIATE(fp, BT) \
+        GEMM_INSTANTIATE(fp, BT) \
+        TRSM_INSTANTIATE(fp, BT) \
+        POTRF_INSTANTIATE(fp, BT) \
+        POTRF_BUFFER_SIZE_INSTANTIATE(fp, BT)
+    
     // Macro that covers all layout and batch type combinations for a given floating-point type.
     #define GEMM_INSTANTIATE_FOR_FP(fp)                \
-        GEMM_INSTANTIATE(fp, BatchType::Single)  \
-        GEMM_INSTANTIATE(fp, BatchType::Batched)
+        BLAS_INSTANTIATE(fp, BatchType::Batched)        \
+        BLAS_INSTANTIATE(fp, BatchType::Single)        
 
     // Instantiate for the floating-point types of interest.
     GEMM_INSTANTIATE_FOR_FP(float)
