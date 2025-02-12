@@ -61,7 +61,61 @@ namespace linalg {
                    Uplo uplo,
                    Transpose transA,
                    Diag diag,
-                   T alpha) {}
+                   T alpha) {
+
+        static LinalgHandle<B> handle{};
+        handle.setStream(ctx);
+        auto [kB, n] = get_effective_dims(descrB, Transpose::NoTrans);
+
+        if constexpr (BT == BatchType::Single) {
+            call_backend<T>(cublasStrsm, cublasDtrsm, cublasCtrsm, cublasZtrsm, 
+                handle, side, uplo, transA, diag, kB, n, &alpha, get_data(descrA), descrA.ld_, get_data(descrB), descrB.ld_); 
+        }else {
+            call_backend<T>(cublasStrsmBatched, cublasDtrsmBatched, cublasCtrsmBatched, cublasZtrsmBatched, 
+                handle, side, uplo, transA, diag, kB, n, &alpha, get_data(descrA), descrA.ld_, get_data(descrB), descrB.ld_, descrA.batch_size_);
+        }
+        return ctx.get_event();
+    }
+
+    template <Backend B, typename T, BatchType BT>
+    size_t potrf_buffer_size(SyclQueue& ctx,
+                                MatHandle<T,BT>& A,
+                                Uplo uplo) {
+        static LinalgHandle<B> handle;
+        handle.setStream(ctx);
+        int size = 0;
+        if constexpr (BT == BatchType::Single) {
+            call_backend<T>(cusolverDnSpotrf_bufferSize, cusolverDnDpotrf_bufferSize, cusolverDnCpotrf_bufferSize, cusolverDnZpotrf_bufferSize,
+                handle, uplo, A.rows_, get_data(A), A.ld_, &size);
+        } else {
+            return A.batch_size_ * sizeof(int);
+        }
+        return size;
+    }
+
+    template <Backend B, typename T, BatchType BT>
+    SyclEvent potrf(SyclQueue& ctx,
+                    MatHandle<T,BT>& descrA,
+                    Uplo uplo,
+                    Span<std::byte> workspace) {        
+        static LinalgHandle<B> handle;
+        handle.setStream(ctx);
+        BumpAllocator pool(workspace);
+        auto Lwork = potrf_buffer_size<B>(ctx, descrA, uplo);
+        auto potrf_span = pool.allocate<std::byte>(ctx, Lwork);
+
+        if constexpr (BT == BatchType::Single) {
+            int info;
+            call_backend<T>(cusolverDnSpotrf, cusolverDnDpotrf, cusolverDnCpotrf, cusolverDnZpotrf,
+                handle, uplo, descrA.rows_, get_data(descrA), descrA.ld_, reinterpret_cast<T*>(potrf_span.data()), Lwork, &info);
+        } else {
+            call_backend<T>(cusolverDnSpotrfBatched, cusolverDnDpotrfBatched, cusolverDnCpotrfBatched, cusolverDnZpotrfBatched,
+                handle, uplo, descrA.rows_, get_data(descrA), descrA.ld_, reinterpret_cast<int*>(potrf_span.data()), descrA.batch_size_);
+        }
+        return ctx.get_event();
+    }
+
+    
 
 
                    
