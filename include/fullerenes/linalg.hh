@@ -80,9 +80,14 @@ namespace linalg{
     template <typename T>
     struct MatHandle<T, BatchType::Batched> {
         MatHandle(T* data, int rows, int cols, int ld, int stride, int batch_size)
-            : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size) {}
+            : data_(data), rows_(rows), cols_(cols), ld_(ld), stride_(stride), batch_size_(batch_size), data_ptrs_(batch_size) {
+                for (int i = 0; i < batch_size; i++) {
+                    data_ptrs_[i] = data + i * stride;
+                }
+            }
         // Accessors...
         T* data_;
+        SyclVector<T*> data_ptrs_;
         int rows_, cols_, ld_, stride_, batch_size_;
     };
 
@@ -180,6 +185,7 @@ namespace linalg{
         VecHandle(T* data, int size, int ldc) : data_(data), size_(size), ldc_(ldc) {}
         // Accessors...
         T* data_;
+        SyclVector<T*> data_ptrs_;
         int size_, ldc_;
     };
 
