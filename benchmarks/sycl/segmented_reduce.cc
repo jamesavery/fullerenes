@@ -1,4 +1,4 @@
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 using namespace cl::sycl;
 //Typename T, is a floating point type, e.g. float, double
 //N is the number of elements in each segment (Regular segment size)

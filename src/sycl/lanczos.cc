@@ -1,4 +1,4 @@
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <fullerenes/sycl-headers/sycl-span.hh>
 
 template <typename T>

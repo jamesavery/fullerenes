@@ -1,4 +1,4 @@
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "numeric"
 #include <vector>
 #include <tuple>
@@ -6,7 +6,7 @@
 #include <type_traits>
 #include "fstream"
 #define USE_MAX_NORM 0
-#define SQRT cl::sycl::sqrt
+#define SQRT sycl::sqrt
 #include <fullerenes/kernel-headers/hessian-functor.hh>
 #include "queue-impl.cc"
 #include "forcefield-includes.cc"

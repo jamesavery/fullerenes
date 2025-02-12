@@ -1,4 +1,4 @@
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include "numeric"
 #include <vector>
 #include <iostream>

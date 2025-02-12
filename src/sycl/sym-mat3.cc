@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <array>
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 // TODO: Hvor skal disse bo?
 template <typename scalar>  scalar 

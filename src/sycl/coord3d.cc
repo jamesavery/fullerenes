@@ -5,7 +5,7 @@
 #include <cmath>
 #include <inttypes.h>
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 
 template <typename T> std::array<T,2> operator-(const std::array<T,2>& a)                 { return {-a[0], -a[1]};  }
 template <typename T> std::array<T,2> operator-(const std::array<T,2>& a, const std::array<T,2>& b){ return {a[0]-b[0], a[1]-b[1]};  }

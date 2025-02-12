@@ -164,7 +164,7 @@ template <typename T> T norm(const mat3<T>& a){
     #pragma unroll
     for (int i = 0; i < 9; i++)
         result += a.A[i] * a.A[i];
-    return SQRT(result);
+    return sycl::sqrt(result);
 } 
 
 template <typename T> mat3<T> transpose(const mat3<T>& a)

@@ -1,4 +1,4 @@
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <fullerenes/kernel-headers/sycl-parallel-primitives.hh>
 #include <fullerenes/sycl-headers/reference-wrapper.hh>
 #include <fullerenes/sycl-headers/sycl-fullerene.hh>
