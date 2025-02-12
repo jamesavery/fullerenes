@@ -1,6 +1,6 @@
 #pragma once
 
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
 
 #ifndef DEVICE_CAST
@@ -113,6 +113,7 @@ size_t Device::get_property(DeviceProperty property) const {
         case 7: return d.get_info<sycl::info::device::max_constant_args>();
         case 8: return d.get_info<sycl::info::device::max_num_sub_groups>();
         case 9: return d.get_info<sycl::info::device::sub_group_sizes>()[0];
+        case 10: return d.get_info<sycl::info::device::mem_base_addr_align>();
         default: std::cerr << "Unknown property" << std::endl; return 0;
     }
 }

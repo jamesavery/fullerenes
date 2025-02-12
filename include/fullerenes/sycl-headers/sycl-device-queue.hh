@@ -32,6 +32,7 @@ enum class DeviceProperty
     MAX_CONSTANT_ARGS,
     MAX_NUM_SUB_GROUPS,
     MAX_SUB_GROUP_SIZE,
+    MEM_BASE_ADDR_ALIGN,
     NUMBER_OF_PROPERTIES
 };
 
