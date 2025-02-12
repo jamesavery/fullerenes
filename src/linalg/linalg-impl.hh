@@ -1,6 +1,7 @@
 #include <fullerenes/linalg.hh>
 #include "../sycl/queue-impl.cc"
-#include <CL/sycl.hpp>
+#include <sycl/sycl.hpp>
+#include <fullerenes/mempool.hh>
 
 #define USE_CUDA
 #ifdef USE_CUDA
