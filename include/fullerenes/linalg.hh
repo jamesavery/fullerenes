@@ -1,6 +1,8 @@
 #pragma once
 #include <complex>
 #include <fullerenes/sycl-headers/sycl-device-queue.hh>
+#include <fullerenes/sycl-headers/sycl-span.hh>
+#include <fullerenes/sycl-headers/sycl-vector.hh>
 
 namespace linalg{
     enum class Backend {
